@@ -1,0 +1,17 @@
+namespace http {
+  /** サーバー側の失敗（5xx 全般） */
+  exception ServerError;
+  /** 運搬の失敗（ステータスなし） */
+  exception NetworkError;
+
+  @external
+  decorator get(path: string) throws ServerError | NetworkError;
+  @external
+  decorator post(path: string) throws ServerError | NetworkError;
+
+  decorator status(code: int) for exception;
+  decorator header(name: string) for field;
+  decorator body for field;
+  decorator query for field;
+  decorator retry(times: int);
+}

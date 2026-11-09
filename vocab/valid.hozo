@@ -1,0 +1,7 @@
+namespace valid {
+  decorator min(value: int | float) for scalar | field;
+  decorator max(value: int | float) for scalar | field;
+  decorator length(min: int?, max: int?) for scalar | field;
+  decorator pattern(regex: string) for scalar | field;
+  decorator format(name: string) for scalar | field;   // "email" / "uri" / "uuid" など
+}

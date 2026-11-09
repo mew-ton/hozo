@@ -1,0 +1,261 @@
+// 設計書（mew-ton/drafts の hozo/README.md）§5〜§11 の `browser` の例を一つにまとめたもの。
+// 設計書の言葉をそのまま写す。写せなかった箇所と足した宣言は、同じディレクトリの README.md に一覧する。
+// 各ブロックの上の `// §n.m` は、設計書のどの節の例かを示す。`// 追加:` は設計書にない宣言。
+// スコープ外（docs/decisions.md「スコープ外にした設計書の例」）: §8.1 の redirectOn / redirectToLogin、§11.1 の @cache と @redirectToLogin。
+
+namespace browser {
+  // ---- §5.2 model と状態 ----
+
+  @localStorage
+  state token: single<server.Token?>;
+
+  @page.query
+  state query: single<Record<string, string[]>>;
+
+  @page.path
+  state location: single<page.Route>;
+
+  // ---- §5.3 bind ----
+
+  // token は §5.2 の browser.token（single<Token?>）
+  // server への呼び出しでは、入力のうち Token 型の位置を token で埋める
+  bind token to server.*;
+
+  // ---- §6.2 effect ----
+
+  /** ログイン画面へ遷移する */
+  effect transitionToLogin on location.put;
+
+  /** 権限がないことを示す画面へ遷移する */
+  effect transitionToForbidden on location.put;
+
+  // ---- §6.4 union ----
+
+  union ApiError {
+    server.Unauthorized;
+    server.Forbidden;
+  }
+
+  union RedirectByError {
+    transitionToLogin;
+    transitionToForbidden;
+  }
+
+  // ---- §6.5 scalar ----
+
+  /** 1 以上の整数 */
+  @valid.min(1)
+  scalar PosInt extends int;
+
+  // ---- §8.1 デコレータの宣言 ----
+
+  /** ネットワークに失敗し、キャッシュにも前回の結果がない */
+  exception OfflineCacheMiss;
+
+  // 条件付きの回復: 回復できなかった場合は別の名前の例外にする
+  decorator fallbackToCache
+    catches http.NetworkError recovers
+    throws OfflineCacheMiss;
+
+  // 結果を見ない呼び出し（ログアウトの依頼など）
+  decorator ignoreFailure
+    catches http.NetworkError | http.ServerError ignores;
+
+  // ---- §9 配線（browser 側） ----
+
+  /** 手元のトークンを消す */
+  effect removeToken on token.put;   // none を入れる
+
+  op clearToken()
+    effects removeToken;
+
+  /** サーバーのセッションの削除を依頼する。結果は見ない */
+  @ignoreFailure
+  op requestLogout()
+  {
+    server.logout({});   // token は bind で埋まる（§5.3）
+  }
+
+  // 効果 server.deleteSession / removeToken は呼び出し先から伝播する（§7.2）
+  op logout()
+  {
+    requestLogout();
+    clearToken();   // requestLogout の成功が前提。requestLogout は例外を投げない
+  }
+
+  // ---- §10.1 classify の宣言 ----
+
+  /**
+   * 商品に適用される保証の種類。
+   * ヤマダ電機の専用保証の対象となる商品は、メーカー保証があっても Yamada に分類する。
+   */
+  classify WarrantyKind of server.Item {
+    /** メーカーの保証書が付く */
+    Standard;
+    /** ヤマダ電機の専用保証プランを選べる */
+    Yamada;
+    /** 保証が付かない */
+    NoWarranty;
+  }
+
+  /** 商品が対象のキャンペーン */
+  classify CampaignKind of server.Item {
+    Spring;
+    Summer;
+    /** キャンペーンの対象外 */
+    default;
+  }
+
+  /** 二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; default; } と同じ */
+  condition WarrantyAvailable of server.Item;
+
+  // ---- §10.2 match ----
+
+  /** 支払い画面へ遷移する */
+  effect transitionToPayment on location.put;
+
+  op goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
+    effects transitionToPayment;
+
+  @page.interaction(page: openProduct, when: ProductPage.Ready)
+  op onAddToCart(item: server.Item)
+    throws page.Aborted | http.NetworkError | http.ServerError
+  {
+    const line = server.addToCart({ item });
+    const warranty = match item by WarrantyKind {
+      Standard   => chooseStandardWarranty(item, line);
+      Yamada     => chooseYamadaWarranty(item, line);
+      NoWarranty => none;
+    };
+    goPayment(line, warranty);
+  }
+
+  op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
+    : server.WarrantyLine
+    throws page.Aborted | http.NetworkError | http.ServerError
+  {
+    const plan = askYamadaWarranty(item);
+    return server.attachWarranty({ line, plan });
+  }
+
+  @page.dialog("YamadaWarrantyModal")
+  op askYamadaWarranty(item: WarrantyKind.Yamada<server.Item>): server.PlanId;
+
+  // 追加: §10.2 の match のアームが呼ぶ op。メーカー保証は選ばないので入力を待たない
+  /** メーカー保証の明細を作る */
+  op chooseStandardWarranty(item: WarrantyKind.Standard<server.Item>, line: server.CartLine): server.WarrantyLine;
+
+  // 追加: §10.2 の「二値は condition と default で書ける」の例（const plan = match item by WarrantyAvailable { ... };）を包む op
+  /** 保証プランを選ぶ。保証が付かない商品なら none */
+  op chooseWarrantyPlan(item: server.Item): server.PlanId?
+    throws page.Aborted
+  {
+    const plan = match item by WarrantyAvailable {
+      WarrantyAvailable => askWarrantyPlan(item);
+      default           => none;
+    };
+    return plan;
+  }
+
+  // 追加: chooseWarrantyPlan が呼ぶダイアログ
+  @page.dialog("WarrantyPlanModal")
+  op askWarrantyPlan(item: WarrantyAvailable.WarrantyAvailable<server.Item>): server.PlanId;
+
+  // ---- §11.1 fetch の層 ----
+  // @redirectToLogin と @cache はスコープ外（docs/decisions.md）なので外し、配線だけを残す
+
+  op fetchMe(): server.PublicUser
+    throws http.NetworkError | http.ServerError
+  {
+    return server.getMe({});
+  }
+
+  op fetchOrders(query: OrdersQuery): server.OrderSummary[]
+    throws http.NetworkError | http.ServerError
+  {
+    return server.getOrders({ page: query.page, status: query.status });
+  }
+
+  // ---- §11.2 ページとルーティング ----
+
+  model OrdersQuery { page: PosInt = 1; status: server.OrderStatus?; }
+
+  /** 一時的に表示できない */
+  model Unavailable {}
+  /** 注文一覧を一時的に表示できない */
+  model OrdersUnavailable {}
+
+  // 追加: OrderPage.Ready の orders の要素
+  /** 注文一覧の一行の表示 */
+  model OrderRow {
+    id: server.OrderId;
+    status: server.OrderStatus;
+    placedAt: Time;
+  }
+
+  union OrderPage {
+    Ready: { userName: string; orders: OrderRow[]; };
+    Empty: { userName: string; };
+    Unavailable: OrdersUnavailable;
+  }
+
+  // 共通のエラー表示: 汎用の page.fallback に引数を固定した別名
+  decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);
+
+  op orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
+
+  /** 注文一覧の既定の URL に置き換える */
+  effect transitionToOrders on location.put;
+
+  // このページだけ別の表示にする。fallback が吸収するので throws は書かない
+  // OrdersUnavailable は OrderPage のアームの型
+  @page.fallback(http.NetworkError | http.ServerError, OrdersUnavailable)
+  @page.route("/orders", from: query, onInvalid: transitionToOrders)
+  op openOrders(query: OrdersQuery): OrderPage
+  {
+    const me     = fetchMe();
+    const orders = fetchOrders(query);
+    return orderPageVm(me, orders);
+  }
+
+  union ProfilePage {
+    Ready: { userName: string; };
+    Unavailable: Unavailable;
+  }
+  op profilePageVm(me: server.PublicUser): ProfilePage;
+
+  // 共通のエラー表示を使う。Unavailable は ProfilePage のアームの型
+  @unavailableOnFailure
+  @page.route("/profile")
+  op openProfile(): ProfilePage
+  {
+    const me = fetchMe();
+    return profilePageVm(me);
+  }
+
+  // ---- 追加: §10.2 の @page.interaction(page: openProduct, when: ProductPage.Ready) が指す商品ページ ----
+
+  /** 商品ページの query（/product?id=...） */
+  model ProductQuery { id: server.ItemId; }
+
+  union ProductPage {
+    Ready: { item: server.Item; };
+    Unavailable: Unavailable;
+  }
+
+  op productPageVm(item: server.Item): ProductPage;
+
+  op fetchItem(query: ProductQuery): server.Item
+    throws http.NetworkError | http.ServerError
+  {
+    return server.getItem({ id: query.id });
+  }
+
+  @unavailableOnFailure
+  @page.route("/product", from: query)
+  op openProduct(query: ProductQuery): ProductPage
+  {
+    const item = fetchItem(query);
+    return productPageVm(item);
+  }
+}

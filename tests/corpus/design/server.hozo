@@ -1,0 +1,335 @@
+// 設計書（mew-ton/drafts の hozo/README.md）§3.4、§5〜§11 の `server` の例を一つにまとめたもの。
+// 設計書の言葉をそのまま写す。写せなかった箇所と足した宣言は、同じディレクトリの README.md に一覧する。
+// 各ブロックの上の `// §n.m` は、設計書のどの節の例かを示す。`// 追加:` は設計書にない宣言。
+
+// §6.5: valid が持たない制約は、ユーザーが valid の名前空間にデコレータとして足す（§3.2）
+namespace valid {
+  /** 末尾の 1 桁が、前の 4 桁から計算したチェックディジットと一致する */
+  decorator checkDigit for scalar | field;
+}
+
+namespace server {
+  // ---- §6.5 scalar（値の型） ----
+
+  /** メールアドレス */
+  @valid.format("email")
+  scalar Email extends string;
+
+  /** ユーザーの識別子 */
+  scalar UserId extends string;
+
+  /** ログインセッションのトークン */
+  scalar Token extends string;
+
+  /** パスワード（平文。入力でだけ使う） */
+  @valid.length(min: 8, max: 128)
+  scalar Password extends string;
+
+  /** 社員番号（英大文字 3 字 + 数字 5 桁。末尾はチェックディジット） */
+  @valid.pattern("^[A-Z]{3}[0-9]{5}$")
+  @valid.checkDigit
+  scalar EmployeeCode extends string;
+
+  // 追加: §5.2 の User.status が参照する型
+  /** ユーザーの状態（"active" / "unverified" / "suspended"。値の集合は実装が決める） */
+  scalar UserStatus extends string;
+
+  // 追加: §7.3 / §11 が参照する注文まわりの識別子と状態
+  /** 注文の識別子 */
+  scalar OrderId extends string;
+
+  /** 注文の状態（"pending" / "paid" / "shipped" / "cancelled"。値の集合は実装が決める） */
+  scalar OrderStatus extends string;
+
+  /** 商品の識別子 */
+  scalar ItemId extends string;
+
+  /** 保証プランの識別子 */
+  scalar PlanId extends string;
+
+  // ---- §5.2 model と状態 ----
+
+  model User {
+    @db.key    id: UserId;
+    @db.unique email: Email;
+    // §6.5 の `model User { @valid.length(min: 1, max: 100) name: string; }` をここに併合（README.md）
+    @valid.length(min: 1, max: 100) name: string;
+    hash: string;
+    status: UserStatus;
+  }
+
+  model Session {
+    @db.key token: Token;
+    userId: UserId;
+    expiresAt: Time;
+  }
+
+  model PublicUser is User omit hash;
+
+  @db
+  state users: list<User>;
+
+  @db
+  state sessions: list<Session>;
+
+  // 追加: §7.3 / §10.2 / §11 が参照する model と状態
+  /** 商品 */
+  model Item {
+    @db.key id: ItemId;
+    name: string;
+    price: int;
+    /** メーカー保証が付く */
+    hasMakerWarranty: boolean;
+    /** ヤマダ電機の専用保証の対象 */
+    yamadaEligible: boolean;
+  }
+
+  /** カートの一行 */
+  model CartLine {
+    item: Item;
+    quantity: int;
+  }
+
+  /** カートの一行に付けた保証 */
+  model WarrantyLine {
+    line: CartLine;
+    plan: PlanId;
+  }
+
+  /** 注文 */
+  model Order {
+    @db.key id: OrderId;
+    @db.ref(User) userId: UserId;
+    status: OrderStatus;
+    lines: CartLine[];
+    placedAt: Time;
+  }
+
+  /** 注文一覧の一行 */
+  model OrderSummary {
+    id: OrderId;
+    status: OrderStatus;
+    placedAt: Time;
+  }
+
+  /** ユーザーへの通知 */
+  model Notification {
+    userId: UserId;
+    message: string;
+  }
+
+  /** パスワードの再設定の依頼 */
+  model PasswordReset {
+    email: Email;
+    expiresAt: Time;
+  }
+
+  @db
+  state items: list<Item>;
+
+  @db
+  state carts: list<CartLine>;
+
+  @db
+  state orders: list<Order>;
+
+  @db
+  state notifications: list<Notification>;
+
+  @db
+  state passwordResets: list<PasswordReset>;
+
+  // ---- §6.1 exception ----
+
+  /** メールアドレスかパスワードが一致しない */
+  @http.status(401)
+  exception InvalidCredentials;
+
+  model Violation { field: string; constraint: string; }
+  model Violations { items: Violation[]; }
+
+  /** 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ） */
+  @http.status(400)
+  exception ClientError: Violations;
+
+  /** 認証されていない */
+  @http.status(401)
+  exception Unauthorized;
+
+  /** 権限がない */
+  @http.status(403)
+  exception Forbidden;
+
+  // ---- §6.2 effect ----
+
+  /** ログインセッションを作成する */
+  effect createSession on sessions.post;
+
+  // ---- §8.1 デコレータの宣言 ----
+
+  // 4xx は設計判断なので op ごとのデコレータで宣言する
+  // op の本体より前に投げるので、すべての効果を打ち消す（§7.3）
+  decorator requiresAuth throws Unauthorized prevents effects;
+  decorator validated throws ClientError prevents effects;
+
+  // ---- §7.1 op の宣言 ----
+
+  model LoginInput {
+    @http.header(name: "Authorization") token: Token?;
+    @http.body body: LoginInputBody;
+  }
+  model LoginInputBody { email: Email; password: Password; }
+  model LoginOk { user: PublicUser; token: Token; }
+
+  @http.status(403)
+  exception NotVerified;
+  @http.status(403)
+  exception Suspended;
+  @http.status(409)
+  exception AlreadyLoggedIn;
+
+  @http.post("/login")
+  @validated
+  op login(in: LoginInput): LoginOk
+    effects createSession
+    throws InvalidCredentials | NotVerified | Suspended | AlreadyLoggedIn prevents effects;
+
+  // ---- §7.3 例外と効果の関係 ----
+
+  // 追加: §7.3 の例が参照する入力・効果・例外
+  /** 注文の取り消しの入力 */
+  model CancelInput {
+    orderId: OrderId;
+  }
+
+  /** 注文の入力 */
+  model OrderInput {
+    userId: UserId;
+    lines: CartLine[];
+  }
+
+  /** 返金する（注文の状態を返金済みにする） */
+  effect refund on orders.put;
+
+  /** 注文を作成する */
+  effect createOrder on orders.post;
+
+  /** ユーザーに通知する */
+  effect notifyUser on notifications.post;
+
+  /** 返金の処理は受け付けたが、完了の確認が取れない */
+  exception RefundPending;
+
+  /** 通知を送れなかった */
+  exception NotificationFailed;
+
+  op cancelOrder(in: CancelInput): Order
+    effects refund
+    throws RefundPending keeps effects;   // 返金の処理は受け付けたが、完了の確認が取れない
+
+  op placeOrder(in: OrderInput): Order
+    effects createOrder | notifyUser
+    throws NotificationFailed keeps createOrder prevents notifyUser;
+
+  // ---- §3.4 コメント ----
+
+  // 追加: §3.4 の例が参照する効果と例外
+  /** 再設定メールを送る */
+  effect sendResetMail on passwordResets.post;
+
+  /** 同じアドレスに短時間で送りすぎた */
+  @http.status(429)
+  exception RateLimited;
+
+  /**
+   * パスワードの再設定メールを送る。
+   *
+   * @param email 再設定するアカウントのメールアドレス
+   * @throws RateLimited 同じアドレスに短時間で送りすぎた
+   * @see login
+   */
+  @http.post("/password-reset")
+  op requestPasswordReset(email: Email)
+    effects sendResetMail
+    throws RateLimited prevents effects;
+
+  // 仕様に入らない、書き手向けのメモ
+
+  // ---- §9 配線（server 側） ----
+
+  /** ログインセッションを削除する */
+  effect deleteSession on sessions.delete;
+
+  model LogoutInput {
+    @http.header(name: "Authorization") token: Token?;
+  }
+
+  // トークンがない・無効な場合のログアウトは何もしない（401 にしない）
+  @http.post("/logout")
+  op logout(in: LogoutInput)
+    effects deleteSession;
+
+  // ---- 追加: browser（§10.2、§11）が呼ぶ server の op ----
+  // §11.1 の fetchMe に付く @redirectToLogin がスコープ外（docs/decisions.md）なので、
+  // getMe / getOrders には @requiresAuth を付けない（付ければ browser.fetchMe が THROWS-1 に落ちる。README.md）。
+
+  /** 自分の情報を取る入力 */
+  model MeInput {
+    @http.header(name: "Authorization") token: Token?;
+  }
+
+  /** ログインしているユーザー自身を返す */
+  @http.get("/me")
+  op getMe(in: MeInput): PublicUser;
+
+  /** 注文一覧の入力 */
+  model GetOrdersInput {
+    @http.header(name: "Authorization") token: Token?;
+    /** 1 から数えるページ番号 */
+    @http.query page: int = 1;
+    /** 絞り込む状態。省略すればすべて */
+    @http.query status: OrderStatus?;
+  }
+
+  /** ログインしているユーザーの注文一覧を返す */
+  @http.get("/orders")
+  op getOrders(in: GetOrdersInput): OrderSummary[];
+
+  /** 商品を取る入力 */
+  model GetItemInput {
+    @http.query id: ItemId;
+  }
+
+  /** 商品を一つ返す（認証は要らない） */
+  @http.get("/item")
+  op getItem(in: GetItemInput): Item;
+
+  /** カートに入れる入力 */
+  model AddToCartInput {
+    @http.header(name: "Authorization") token: Token?;
+    @http.body item: Item;
+  }
+
+  /** カートに一行足す */
+  effect addCartLine on carts.post;
+
+  /** 商品をカートに入れる */
+  @http.post("/cart")
+  op addToCart(in: AddToCartInput): CartLine
+    effects addCartLine;
+
+  /** 保証を付ける入力 */
+  model AttachWarrantyInput {
+    @http.header(name: "Authorization") token: Token?;
+    @http.body line: CartLine;
+    @http.body plan: PlanId;
+  }
+
+  /** カートの一行に保証を付ける */
+  effect attachWarrantyToLine on carts.put;
+
+  /** カートの一行に保証プランを付ける */
+  @http.post("/cart/warranty")
+  op attachWarranty(in: AttachWarrantyInput): WarrantyLine
+    effects attachWarrantyToLine;
+}

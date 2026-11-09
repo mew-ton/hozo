@@ -1,0 +1,33 @@
+/** コマンドラインの語彙（http と同じ位置づけの語彙プラグイン） */
+namespace cli {
+  /**
+   * op をサブコマンドとして公開する。
+   *
+   * @param name サブコマンドの名前
+   */
+  decorator command(name: string);
+
+  /** 位置引数として受け取る */
+  decorator arg for field;
+
+  /**
+   * フラグとして受け取る。
+   *
+   * @param name フラグの名前（`--` を除く）
+   */
+  decorator flag(name: string) for field;
+
+  /**
+   * 環境変数から受け取る。フラグと両方付けたときの優先順位は cli のプラグインが決める。
+   *
+   * @param name 環境変数の名前
+   */
+  decorator env(name: string) for field;
+
+  /**
+   * この例外で終了するときの終了コード。
+   *
+   * @param code 終了コード
+   */
+  decorator exitCode(code: int) for exception;
+}

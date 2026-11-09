@@ -1,0 +1,9 @@
+/** ファイルの語彙 */
+namespace fs {
+  /**
+   * glob に当たるファイルの集まりを状態として持つ。
+   *
+   * @param glob 対象のファイルの glob
+   */
+  decorator files(glob: string) for state;
+}

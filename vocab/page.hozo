@@ -1,0 +1,19 @@
+namespace page {
+  /** ダイアログが閉じられた */
+  exception Aborted;
+
+  /** ルートの位置（path と params） */
+  scalar Route extends string;
+
+  decorator path for state;
+  decorator query for state;
+  decorator route(path: string, from: any state?, onInvalid: any effect?);
+  /**
+   * ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: "YamadaWarrantyModal"）。
+   * どの実装を指すかは展開器が解決する（表層は責務外）。
+   */
+  decorator dialog(component: string) throws Aborted;
+  /** error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2） */
+  decorator fallback(error: any exception, view: any model) catches error recovers;
+  decorator interaction(page: any op, when: any variant);
+}

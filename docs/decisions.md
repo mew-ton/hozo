@@ -48,7 +48,8 @@
 | 38 | LSP は JSON-RPC を自前で実装し、`hozo.toml` がなければ設定なしで動いて `LSP-1` を出す | `docs/lsp.md`「通信」「プロジェクト」 |
 | 39 | WIRE-6 の閾値は既定 5。NAME-1 は warning | `docs/check.md`「配線」「名前空間」 |
 | 40 | 規則のテストは `// ERROR: ID` のコメントで期待を書く | `docs/testing.md`「規則ごとのテスト」 |
-| 41 | 設計書の例のコーパスで写せなかった箇所は `tests/corpus/README.md` に一覧する | `docs/testing.md`「コーパス」 |
+| 41 | 設計書の例のコーパスで写せなかった箇所は、そのコーパスの `README.md` に一覧する | `docs/testing.md`「コーパス」 |
+| 42 | 既定値のリテラルは `scalar` の元の型に対して検査する | `docs/types.md`「既定値」 |
 
 ## スコープ外にした設計書の例
 
@@ -66,6 +67,10 @@
 | 項目 | 内容 | 決定 |
 |---|---|---|
 | 省略可能の書き方 | `x?: T` の例（§7.1 `token?: Token`、§11.2 `status?: server.OrderStatus`、§4.2 `min?: int` / `from?: any state`、`examples/hozoc.hozo` の `config?: Path`）を `x: T?` に直す | 8 |
+| `Token` の修飾 | §5.2 の `browser` の `state token: single<Token?>;` は `server.Token` でなければ §3.2 に反する | 18 |
+| ユニオンのアームの中の `;` | §11.2 の `Ready: { userName: string; orders: OrderRow[] }` は、フィールドの末尾に `;` が要る（`docs/grammar.md`「model」） | 7 |
+| §6.5 の `model User` | §5.2 の `model User` と二重の宣言になる。`@valid.length` のフィールドは §5.2 の宣言に足す | 18 |
+| scalar のフィールドの既定値 | §11.2 の `page: PosInt = 1` のような既定値の型の規則がない。`docs/types.md`「既定値」の規則を提案する | — |
 | `location` の型 | §5.2 の `state location: single<Route>;` の `Route` は標準の語彙の型なので修飾して書く（`page.Route`。`http` の語彙に置くかは設計書で決める）。ルーターのプラグインに固有の型は使わない | 18、19 |
 | `examples/hozoc.hozo` の「書けなかったもの」 | 三つの解き方。§15 が「なし」のままになっている | 20、36 |
 | 語彙の宣言の読み込み元 | §4.2 の語彙を hozoc が同梱すること、プラグインの `vocabulary` | 19、22 |

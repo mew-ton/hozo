@@ -1,0 +1,9 @@
+/** この状態を DB が持つ */
+decorator db for state;
+
+namespace db {
+  decorator key for field;
+  decorator unique for field;
+  /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
+  decorator ref(target: any model) for field;
+}

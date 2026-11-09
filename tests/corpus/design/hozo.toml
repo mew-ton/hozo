@@ -1,0 +1,15 @@
+# 設計書 §5〜§11 の例のコーパス（docs/testing.md「コーパス」）。
+# 設計書 §4.5 では browser は language = "ts" だが、TS の既定の出力は段階 5 まで存在せず
+# docs/config.md CFG-11 がエラーにするので、今は両方とも "go" にする（README.md）。
+# plugins は書かない（書けば CFG-9。プラグインはまだない）。
+
+[hozo]
+sources = ["**/*.hozo"]
+
+[server]
+language = "go"
+out      = "gen/server"
+
+[browser]
+language = "go"
+out      = "gen/browser"

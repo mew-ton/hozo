@@ -64,7 +64,7 @@ type User struct {
 ```
 
 - フィールドの説明はフィールドのコメントに。
-- 既定値（`page: PosInt = 1`）を持つフィールドが一つでもある model には `func New<Model>() <Model>` を生成し、既定値を入れて返す。
+- 既定値（`page: PosInt = 1`）を持つフィールドが一つでもある model には `func New<Model>() <Model>` を生成し、既定値を入れて返す。既定値が `scalar` の標準の制約（`valid.*`）に合わなければ GOEMIT-4。
 - `derivedFrom` を持つ model も普通の構造体。元の model からの変換関数 `func <Base>To<Derived>(v <Base>) <Derived>` を生成する（フィールドを写す）。
 - union のアームの合成 model には、union のマーカーメソッドを足す（下）。
 
@@ -299,5 +299,6 @@ API を変えるときは、生成したコードのヘッダに書く hozoc の
 | GOEMIT-1 | error | `out` の上に `go.mod` がない |
 | GOEMIT-2 | error | 大文字化でフィールド名か op 名が衝突する |
 | GOEMIT-3 | error | `valid` の制約が元の型に合わない、または `pattern` が RE2 でない、または `format` の名前を知らない |
+| GOEMIT-4 | error | フィールドの既定値が `scalar` の標準の制約に合わない |
 
 GOEMIT-* は `CheckFailed`（終了コード 1）。
