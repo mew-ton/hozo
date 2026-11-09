@@ -1,0 +1,8 @@
+name     = "go-cli"
+command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
+language = "go"
+protocol = "0.1"
+
+[emit]
+entry = ["cli.command"]
+stop  = ["proc.stdio"]
