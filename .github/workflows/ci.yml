@@ -15,7 +15,8 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
       # 生成物の一致（docs/testing.md「生成物の一致」）: docs/packages.md「生成するもの」の表を生成し直して差分がないこと
-      # go generate: TextMate の文法（editors/vscode/syntaxes、internal/tools/tmgrammar）など
+      # go generate: IR の JSON スキーマ（schema/ir.schema.json、internal/tools/irschema）と
+      # TextMate の文法（editors/vscode/syntaxes、internal/tools/tmgrammar）など
       - run: go generate ./...
       # make generate: cli.hozo から internal/gen/hozoc/**
       - run: make generate
@@ -35,4 +36,23 @@ jobs:
       - run: npm ci
       - run: npm run build
       # TextMate の文法で実物の .hozo を字句に分け、scope を確かめる（docs/editors.md「TextMate の文法」）
+      - run: npm test
+  sdk-ts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/ts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sdk/ts/package-lock.json
+      - run: npm ci
+      # 生成物の一致（docs/testing.md「生成物の一致」）: schema/ir.schema.json から src/ir.ts を生成し直して差分がないこと
+      - run: npm run generate
+      - run: git diff --exit-code -- src/ir.ts
+      - run: npm run build
+      # 生成した型でゴールデン（ir/testdata）を往復し、run() の終了コードを確かめる（docs/plugin-protocol.md「起動」）
       - run: npm test

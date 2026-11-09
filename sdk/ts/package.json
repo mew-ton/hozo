@@ -1,0 +1,34 @@
+{
+  "name": "@hozo/plugin-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hozo のプラグインを TypeScript（Node）で書くための SDK: IR の型と、標準入出力の JSON の読み書き（docs/requirements.md「プラグインの書き方」）。npm のパッケージ名は未確認なので private。",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.test.json && node --test \"build/test/**/*.test.js\"",
+    "check-generated": "npm run generate && git diff --exit-code -- src/ir.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "json-schema-to-typescript": "^16.0.0",
+    "typescript": "^5.9.3"
+  }
+}

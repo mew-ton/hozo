@@ -72,7 +72,7 @@ type ImportResponse struct {
 	Warnings []Warning   `json:"warnings"`
 }
 
-// File は書き出す（または取り込む）ファイル。Path は view.config.out からの相対パスで、
+// File は書き出す（または取り込む）ファイル。Path はプロジェクトのルートからの相対パス（docs/plugin-protocol.md「emit」）で、
 // `..` や絶対パスは PLG-1。Content は UTF-8 の文字列（バイナリは出せない）。
 type File struct {
 	Path    string `json:"path"`

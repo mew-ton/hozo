@@ -1,0 +1,2382 @@
+{
+  "$defs": {
+    "AnyOf": {
+      "enum": [
+        "exception",
+        "effect",
+        "state",
+        "op",
+        "model",
+        "variant"
+      ],
+      "type": "string"
+    },
+    "AnyParam": {
+      "additionalProperties": false,
+      "description": "`any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind \"any\"）。",
+      "properties": {
+        "kind": {
+          "const": "any"
+        },
+        "of": {
+          "$ref": "#/$defs/AnyOf"
+        },
+        "on": {
+          "$ref": "#/$defs/EffectOn"
+        }
+      },
+      "required": [
+        "kind",
+        "of"
+      ],
+      "type": "object"
+    },
+    "Application": {
+      "additionalProperties": false,
+      "description": "デコレータの適用（docs/ir.md「デコレータの適用」）。",
+      "properties": {
+        "args": {
+          "items": {
+            "$ref": "#/$defs/Arg"
+          },
+          "type": "array"
+        },
+        "decorator": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "via": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "decorator",
+        "args",
+        "span"
+      ],
+      "type": "object"
+    },
+    "Arg": {
+      "additionalProperties": false,
+      "description": "デコレータの引数の値（docs/ir.md「デコレータの適用」）。",
+      "properties": {
+        "param": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ArgValue"
+        }
+      },
+      "required": [
+        "param",
+        "value"
+      ],
+      "type": "object"
+    },
+    "ArgValue": {
+      "description": "デコレータの引数の値の種類（docs/ir.md「デコレータの適用」）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LiteralValue"
+        },
+        {
+          "$ref": "#/$defs/RefValue"
+        },
+        {
+          "$ref": "#/$defs/RefsValue"
+        },
+        {
+          "$ref": "#/$defs/VariantValue"
+        },
+        {
+          "$ref": "#/$defs/ListValue"
+        }
+      ]
+    },
+    "ArmBody": {
+      "description": "match のアームの本体（docs/ir.md「配線」）。call か none。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CallExpr"
+        },
+        {
+          "$ref": "#/$defs/NoneBody"
+        }
+      ]
+    },
+    "ArmCases": {
+      "description": "match のアームが受けるケース。\"default\" か、ケース名の列（docs/ir.md「配線」の Match）。",
+      "oneOf": [
+        {
+          "const": "default"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "ArrayType": {
+      "additionalProperties": false,
+      "description": "T[]（docs/ir.md「型」の array）。",
+      "properties": {
+        "kind": {
+          "const": "array"
+        },
+        "of": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "of"
+      ],
+      "type": "object"
+    },
+    "Atom": {
+      "description": "式の葉（docs/ir.md「配線」）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/NameAtom"
+        },
+        {
+          "$ref": "#/$defs/LiteralAtom"
+        },
+        {
+          "$ref": "#/$defs/NoneAtom"
+        },
+        {
+          "$ref": "#/$defs/RecordAtom"
+        }
+      ]
+    },
+    "AtomExpr": {
+      "additionalProperties": false,
+      "properties": {
+        "atom": {
+          "$ref": "#/$defs/Atom"
+        },
+        "kind": {
+          "const": "atom"
+        }
+      },
+      "required": [
+        "kind",
+        "atom"
+      ],
+      "type": "object"
+    },
+    "Bind": {
+      "additionalProperties": false,
+      "description": "bind 宣言（docs/ir.md「bind」）。",
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "state": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/BindTarget"
+        }
+      },
+      "required": [
+        "namespace",
+        "state",
+        "target",
+        "span"
+      ],
+      "type": "object"
+    },
+    "BindTarget": {
+      "additionalProperties": false,
+      "description": "bind の対象（docs/ir.md「bind」）。deep は `**`。",
+      "properties": {
+        "deep": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "deep"
+      ],
+      "type": "object"
+    },
+    "BooleanLiteral": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "boolean"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "type": "object"
+    },
+    "BoundPosition": {
+      "additionalProperties": false,
+      "description": "bind で埋まる位置（docs/ir.md「配線」、docs/check.md「bind」）。",
+      "properties": {
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "state"
+      ],
+      "type": "object"
+    },
+    "Call": {
+      "additionalProperties": false,
+      "description": "op の呼び出し（docs/ir.md「配線」）。args は引数名に対応付け済み。bound は計算結果。",
+      "properties": {
+        "args": {
+          "items": {
+            "$ref": "#/$defs/CallArg"
+          },
+          "type": "array"
+        },
+        "bound": {
+          "items": {
+            "$ref": "#/$defs/BoundPosition"
+          },
+          "type": "array"
+        },
+        "op": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "bound",
+        "span"
+      ],
+      "type": "object"
+    },
+    "CallArg": {
+      "additionalProperties": false,
+      "description": "呼び出しの引数（docs/ir.md「配線」の Call.args）。",
+      "properties": {
+        "param": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Atom"
+        }
+      },
+      "required": [
+        "param",
+        "value"
+      ],
+      "type": "object"
+    },
+    "CallExpr": {
+      "additionalProperties": false,
+      "properties": {
+        "call": {
+          "$ref": "#/$defs/Call"
+        },
+        "kind": {
+          "const": "call"
+        }
+      },
+      "required": [
+        "kind",
+        "call"
+      ],
+      "type": "object"
+    },
+    "CallStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "call": {
+          "$ref": "#/$defs/Call"
+        },
+        "kind": {
+          "const": "call"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "call",
+        "span"
+      ],
+      "type": "object"
+    },
+    "CaseType": {
+      "additionalProperties": false,
+      "description": "分類のケースで絞り込まれた型（docs/ir.md「型」の case）。cases は match のアームに書かれた順。",
+      "properties": {
+        "cases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "classify": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "case"
+        },
+        "of": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "classify",
+        "cases",
+        "of"
+      ],
+      "type": "object"
+    },
+    "CatchMode": {
+      "enum": [
+        "recovers",
+        "halts",
+        "ignores"
+      ],
+      "type": "string"
+    },
+    "CatchesClause": {
+      "additionalProperties": false,
+      "description": "catches の一節（docs/ir.md「decorator」）。",
+      "properties": {
+        "exceptions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "halts": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/CatchMode"
+        }
+      },
+      "required": [
+        "exceptions",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "CheckDiagnostic": {
+      "additionalProperties": false,
+      "description": "check の diagnostics の要素（docs/plugin-protocol.md「check」）。severity を必ず持つ。",
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "at",
+        "message"
+      ],
+      "type": "object"
+    },
+    "CheckRequest": {
+      "additionalProperties": false,
+      "description": "direction \"check\" の要求（docs/plugin-protocol.md「check」）。",
+      "properties": {
+        "direction": {
+          "const": "check"
+        },
+        "protocol": {
+          "const": "0.1"
+        },
+        "view": {
+          "$ref": "#/$defs/View"
+        }
+      },
+      "required": [
+        "protocol",
+        "direction",
+        "view"
+      ],
+      "type": "object"
+    },
+    "CheckResponse": {
+      "additionalProperties": false,
+      "description": "\"check\" の応答（docs/plugin-protocol.md「check」）。",
+      "properties": {
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/CheckDiagnostic"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "diagnostics"
+      ],
+      "type": "object"
+    },
+    "Classify": {
+      "additionalProperties": false,
+      "description": "classify 宣言（docs/ir.md「classify」）。cases に default は含まない。",
+      "properties": {
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/ClassifyCase"
+          },
+          "type": "array"
+        },
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "defaultDescription": {
+          "$ref": "#/$defs/Doc"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "fromCondition": {
+          "type": "boolean"
+        },
+        "hasDefault": {
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "classify"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "subject": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "subject",
+        "cases",
+        "hasDefault",
+        "fromCondition"
+      ],
+      "type": "object"
+    },
+    "ClassifyCase": {
+      "additionalProperties": false,
+      "description": "classify のケース（docs/ir.md「classify」）。",
+      "properties": {
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "name",
+        "span"
+      ],
+      "type": "object"
+    },
+    "ConstStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "expr": {
+          "$ref": "#/$defs/Expr"
+        },
+        "kind": {
+          "const": "const"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "expr",
+        "span"
+      ],
+      "type": "object"
+    },
+    "CoreName": {
+      "enum": [
+        "string",
+        "boolean",
+        "int",
+        "float",
+        "Time",
+        "Duration"
+      ],
+      "type": "string"
+    },
+    "CoreType": {
+      "additionalProperties": false,
+      "description": "核の型（docs/ir.md「型」の core）。",
+      "properties": {
+        "kind": {
+          "const": "core"
+        },
+        "name": {
+          "$ref": "#/$defs/CoreName"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "type": "object"
+    },
+    "Decl": {
+      "description": "宣言（docs/ir.md「Program」の Decl）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Model"
+        },
+        {
+          "$ref": "#/$defs/Scalar"
+        },
+        {
+          "$ref": "#/$defs/Union"
+        },
+        {
+          "$ref": "#/$defs/State"
+        },
+        {
+          "$ref": "#/$defs/Exception"
+        },
+        {
+          "$ref": "#/$defs/Effect"
+        },
+        {
+          "$ref": "#/$defs/Classify"
+        },
+        {
+          "$ref": "#/$defs/Decorator"
+        },
+        {
+          "$ref": "#/$defs/Op"
+        }
+      ]
+    },
+    "Decorator": {
+      "additionalProperties": false,
+      "description": "decorator 宣言（docs/ir.md「decorator」）。alias を持つ宣言は params / targets / throws / catches が []。",
+      "properties": {
+        "alias": {
+          "$ref": "#/$defs/DecoratorAlias"
+        },
+        "catches": {
+          "items": {
+            "$ref": "#/$defs/CatchesClause"
+          },
+          "type": "array"
+        },
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "external": {
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "decorator"
+        },
+        "name": {
+          "type": "string"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/Param"
+          },
+          "type": "array"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/DecoratorTarget"
+          },
+          "type": "array"
+        },
+        "throws": {
+          "items": {
+            "$ref": "#/$defs/ThrowsClause"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "params",
+        "targets",
+        "external",
+        "throws",
+        "catches"
+      ],
+      "type": "object"
+    },
+    "DecoratorAlias": {
+      "additionalProperties": false,
+      "description": "名前付きデコレータの中身（docs/ir.md「decorator」の alias）。",
+      "properties": {
+        "args": {
+          "items": {
+            "$ref": "#/$defs/Arg"
+          },
+          "type": "array"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "args"
+      ],
+      "type": "object"
+    },
+    "DecoratorTarget": {
+      "enum": [
+        "op",
+        "field",
+        "state",
+        "exception",
+        "scalar",
+        "model"
+      ],
+      "type": "string"
+    },
+    "DerivedFrom": {
+      "additionalProperties": false,
+      "description": "`is X omit ...` の記録（docs/ir.md「model / scalar / union」の derivedFrom）。",
+      "properties": {
+        "base": {
+          "type": "string"
+        },
+        "omit": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "base",
+        "omit"
+      ],
+      "type": "object"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "description": "emit の errors の要素（docs/plugin-protocol.md「emit」）。severity は省ける（常に error）。",
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "at",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Doc": {
+      "additionalProperties": false,
+      "description": "DocComment の内容（docs/ir.md「Doc」）。",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/DocParam"
+          },
+          "type": "array"
+        },
+        "see": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "throws": {
+          "items": {
+            "$ref": "#/$defs/DocThrows"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "summary",
+        "body",
+        "params",
+        "throws",
+        "see"
+      ],
+      "type": "object"
+    },
+    "DocParam": {
+      "additionalProperties": false,
+      "description": "Doc の @param（docs/ir.md「Doc」）。",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "text"
+      ],
+      "type": "object"
+    },
+    "DocThrows": {
+      "additionalProperties": false,
+      "description": "Doc の @throws（docs/ir.md「Doc」）。",
+      "properties": {
+        "exception": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "exception",
+        "text"
+      ],
+      "type": "object"
+    },
+    "DurationLiteral": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "duration"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Effect": {
+      "additionalProperties": false,
+      "description": "effect 宣言（docs/ir.md「state / exception / effect」）。",
+      "properties": {
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "kind": {
+          "const": "effect"
+        },
+        "name": {
+          "type": "string"
+        },
+        "operation": {
+          "$ref": "#/$defs/Operation"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "state",
+        "operation"
+      ],
+      "type": "object"
+    },
+    "EffectOn": {
+      "additionalProperties": false,
+      "description": "`any effect on \u003cstate\u003e.\u003coperation\u003e` の制約（docs/ir.md「decorator」）。",
+      "properties": {
+        "operation": {
+          "$ref": "#/$defs/Operation"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "operation"
+      ],
+      "type": "object"
+    },
+    "EffectState": {
+      "enum": [
+        "prevented",
+        "kept",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "EmitRequest": {
+      "additionalProperties": false,
+      "description": "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。",
+      "properties": {
+        "direction": {
+          "const": "emit"
+        },
+        "protocol": {
+          "const": "0.1"
+        },
+        "view": {
+          "$ref": "#/$defs/View"
+        }
+      },
+      "required": [
+        "protocol",
+        "direction",
+        "view"
+      ],
+      "type": "object"
+    },
+    "EmitResponse": {
+      "additionalProperties": false,
+      "description": "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。",
+      "properties": {
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/File"
+          },
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "files",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "Exception": {
+      "additionalProperties": false,
+      "description": "exception 宣言（docs/ir.md「state / exception / effect」）。",
+      "properties": {
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "kind": {
+          "const": "exception"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "value": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span"
+      ],
+      "type": "object"
+    },
+    "Expr": {
+      "description": "式（docs/ir.md「配線」）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CallExpr"
+        },
+        {
+          "$ref": "#/$defs/MatchExpr"
+        },
+        {
+          "$ref": "#/$defs/AtomExpr"
+        }
+      ]
+    },
+    "Field": {
+      "additionalProperties": false,
+      "description": "model のフィールド（docs/ir.md「model / scalar / union」の Field）。",
+      "properties": {
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "default": {
+          "$ref": "#/$defs/Literal"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "type": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "decorators",
+        "span"
+      ],
+      "type": "object"
+    },
+    "File": {
+      "additionalProperties": false,
+      "description": "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス、content は UTF-8 の文字列。",
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ],
+      "type": "object"
+    },
+    "FloatLiteral": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "float"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "type": "object"
+    },
+    "ImportRequest": {
+      "additionalProperties": false,
+      "description": "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",
+      "properties": {
+        "direction": {
+          "const": "import"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/File"
+          },
+          "type": "array"
+        },
+        "format": {
+          "type": "string"
+        },
+        "protocol": {
+          "const": "0.1"
+        }
+      },
+      "required": [
+        "protocol",
+        "direction",
+        "format",
+        "files"
+      ],
+      "type": "object"
+    },
+    "ImportResponse": {
+      "additionalProperties": false,
+      "description": "\"import\" の応答（docs/plugin-protocol.md「import」）。",
+      "properties": {
+        "ir": {
+          "$ref": "#/$defs/Program"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ir",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "IntLiteral": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "int"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "type": "object"
+    },
+    "ListValue": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ArgValue"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "list"
+        }
+      },
+      "required": [
+        "kind",
+        "items"
+      ],
+      "type": "object"
+    },
+    "Literal": {
+      "description": "リテラル（docs/ir.md「配線」）。duration は整数のナノ秒。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/StringLiteral"
+        },
+        {
+          "$ref": "#/$defs/IntLiteral"
+        },
+        {
+          "$ref": "#/$defs/FloatLiteral"
+        },
+        {
+          "$ref": "#/$defs/BooleanLiteral"
+        },
+        {
+          "$ref": "#/$defs/DurationLiteral"
+        }
+      ]
+    },
+    "LiteralAtom": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "literal"
+        },
+        "literal": {
+          "$ref": "#/$defs/Literal"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "literal",
+        "span"
+      ],
+      "type": "object"
+    },
+    "LiteralValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "literal"
+        },
+        "literal": {
+          "$ref": "#/$defs/Literal"
+        }
+      },
+      "required": [
+        "kind",
+        "literal"
+      ],
+      "type": "object"
+    },
+    "Match": {
+      "additionalProperties": false,
+      "description": "分類による分岐（docs/ir.md「配線」）。",
+      "properties": {
+        "arms": {
+          "items": {
+            "$ref": "#/$defs/MatchArm"
+          },
+          "type": "array"
+        },
+        "classify": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "subject": {
+          "$ref": "#/$defs/Atom"
+        }
+      },
+      "required": [
+        "subject",
+        "classify",
+        "arms",
+        "span"
+      ],
+      "type": "object"
+    },
+    "MatchArm": {
+      "additionalProperties": false,
+      "description": "match のアーム（docs/ir.md「配線」）。",
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/ArmBody"
+        },
+        "cases": {
+          "$ref": "#/$defs/ArmCases"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "cases",
+        "body",
+        "span"
+      ],
+      "type": "object"
+    },
+    "MatchExpr": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "match"
+        },
+        "match": {
+          "$ref": "#/$defs/Match"
+        }
+      },
+      "required": [
+        "kind",
+        "match"
+      ],
+      "type": "object"
+    },
+    "MatchStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "match"
+        },
+        "match": {
+          "$ref": "#/$defs/Match"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "match",
+        "span"
+      ],
+      "type": "object"
+    },
+    "Model": {
+      "additionalProperties": false,
+      "description": "model 宣言（docs/ir.md「model / scalar / union」）。",
+      "properties": {
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "derivedFrom": {
+          "$ref": "#/$defs/DerivedFrom"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/Field"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "model"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "synthesizedFrom": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "fields"
+      ],
+      "type": "object"
+    },
+    "NameAtom": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "name"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "span"
+      ],
+      "type": "object"
+    },
+    "Namespace": {
+      "additionalProperties": false,
+      "description": "一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。",
+      "properties": {
+        "decls": {
+          "items": {
+            "$ref": "#/$defs/Decl"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "decls"
+      ],
+      "type": "object"
+    },
+    "NamespaceConfig": {
+      "additionalProperties": false,
+      "description": "一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。",
+      "properties": {
+        "dir": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "out": {
+          "type": "string"
+        },
+        "plugins": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "language",
+        "out",
+        "dir",
+        "plugins"
+      ],
+      "type": "object"
+    },
+    "NoneAtom": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "none"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "span"
+      ],
+      "type": "object"
+    },
+    "NoneBody": {
+      "additionalProperties": false,
+      "description": "アームの本体の none（docs/ir.md「配線」）。",
+      "properties": {
+        "kind": {
+          "const": "none"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "Op": {
+      "additionalProperties": false,
+      "description": "op 宣言（docs/ir.md「op」）。returns の null は void、body の null は葉。",
+      "properties": {
+        "body": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Wiring"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "op"
+        },
+        "name": {
+          "type": "string"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/OpParam"
+          },
+          "type": "array"
+        },
+        "returns": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Type"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "signature": {
+          "$ref": "#/$defs/Signature"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "throws": {
+          "items": {
+            "$ref": "#/$defs/ThrowsClause"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "params",
+        "returns",
+        "effects",
+        "throws",
+        "body",
+        "signature"
+      ],
+      "type": "object"
+    },
+    "OpParam": {
+      "additionalProperties": false,
+      "description": "op の引数（docs/ir.md「op」）。",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "type": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "span"
+      ],
+      "type": "object"
+    },
+    "Operation": {
+      "enum": [
+        "post",
+        "put",
+        "delete"
+      ],
+      "type": "string"
+    },
+    "OptionalType": {
+      "additionalProperties": false,
+      "description": "T?（docs/ir.md「型」の optional）。入れ子にはしない。",
+      "properties": {
+        "kind": {
+          "const": "optional"
+        },
+        "of": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "of"
+      ],
+      "type": "object"
+    },
+    "Param": {
+      "additionalProperties": false,
+      "description": "デコレータの引数（docs/ir.md「decorator」の Param）。",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "type": {
+          "$ref": "#/$defs/ParamType"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "optional"
+      ],
+      "type": "object"
+    },
+    "ParamType": {
+      "description": "デコレータの引数の型（docs/ir.md「decorator」の ParamType）。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TypeParam"
+        },
+        {
+          "$ref": "#/$defs/AnyParam"
+        }
+      ]
+    },
+    "PluginError": {
+      "additionalProperties": false,
+      "description": "終了コード 2 のときの標準出力（docs/plugin-protocol.md「起動」）。",
+      "properties": {
+        "error": {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "protocol",
+                "unsupported"
+              ],
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "type": "object"
+    },
+    "Pos": {
+      "additionalProperties": false,
+      "description": "ファイルの中の位置（docs/ir.md「Program」）。1 始まり。col はコードポイント数。",
+      "properties": {
+        "col": {
+          "type": "integer"
+        },
+        "line": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line",
+        "col"
+      ],
+      "type": "object"
+    },
+    "Program": {
+      "additionalProperties": false,
+      "description": "IR 全体（docs/ir.md「Program」）。namespaces の先頭はグローバル（name \"\"）。",
+      "properties": {
+        "binds": {
+          "items": {
+            "$ref": "#/$defs/Bind"
+          },
+          "type": "array"
+        },
+        "namespaces": {
+          "items": {
+            "$ref": "#/$defs/Namespace"
+          },
+          "type": "array"
+        },
+        "version": {
+          "const": "0.1"
+        }
+      },
+      "required": [
+        "version",
+        "namespaces",
+        "binds"
+      ],
+      "type": "object"
+    },
+    "RecordAtom": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/RecordField"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "record"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "fields",
+        "span"
+      ],
+      "type": "object"
+    },
+    "RecordField": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Atom"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "RecordType": {
+      "additionalProperties": false,
+      "description": "Record\u003cK, V\u003e（docs/ir.md「型」の record）。",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/Type"
+        },
+        "kind": {
+          "const": "record"
+        },
+        "value": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "value"
+      ],
+      "type": "object"
+    },
+    "RefType": {
+      "additionalProperties": false,
+      "description": "model / scalar / union への参照（docs/ir.md「型」の ref）。",
+      "properties": {
+        "kind": {
+          "const": "ref"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "target"
+      ],
+      "type": "object"
+    },
+    "RefValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "ref"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "target"
+      ],
+      "type": "object"
+    },
+    "RefsValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "refs"
+        },
+        "targets": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "targets"
+      ],
+      "type": "object"
+    },
+    "Relation": {
+      "additionalProperties": false,
+      "description": "例外が効果に及ぼす関係（docs/ir.md「decorator」）。",
+      "properties": {
+        "effects": {
+          "$ref": "#/$defs/RelationEffects"
+        },
+        "kind": {
+          "$ref": "#/$defs/RelationKind"
+        }
+      },
+      "required": [
+        "kind",
+        "effects"
+      ],
+      "type": "object"
+    },
+    "RelationEffects": {
+      "description": "Relation の effects。\"all\" は `effects`（すべての効果）、列は効果の FQN（docs/ir.md「decorator」）。",
+      "oneOf": [
+        {
+          "const": "all"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "RelationKind": {
+      "enum": [
+        "prevents",
+        "keeps"
+      ],
+      "type": "string"
+    },
+    "ReturnStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "expr": {
+          "$ref": "#/$defs/Expr"
+        },
+        "kind": {
+          "const": "return"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "expr",
+        "span"
+      ],
+      "type": "object"
+    },
+    "Scalar": {
+      "additionalProperties": false,
+      "description": "scalar 宣言（docs/ir.md「model / scalar / union」）。",
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/Type"
+        },
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "kind": {
+          "const": "scalar"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "base"
+      ],
+      "type": "object"
+    },
+    "Signature": {
+      "additionalProperties": false,
+      "description": "計算結果の関数の型 Sig(O, v)（docs/ir.md「op」、docs/check.md「計算」）。",
+      "properties": {
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exceptions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/SignatureRelation"
+          },
+          "type": "array"
+        },
+        "successEffects": {
+          "items": {
+            "$ref": "#/$defs/SuccessEffect"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "exceptions",
+        "effects",
+        "relations",
+        "successEffects"
+      ],
+      "type": "object"
+    },
+    "SignatureRelation": {
+      "additionalProperties": false,
+      "description": "例外が起きたときの効果の状態（docs/ir.md「op」の Signature.relations）。",
+      "properties": {
+        "effect": {
+          "type": "string"
+        },
+        "exception": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/EffectState"
+        }
+      },
+      "required": [
+        "exception",
+        "effect",
+        "state"
+      ],
+      "type": "object"
+    },
+    "Span": {
+      "additionalProperties": false,
+      "description": "宣言や文の位置（docs/ir.md「Program」）。file はユーザーのファイルの相対パスか hozo:vocab/... か hozo:plugin/...。",
+      "properties": {
+        "end": {
+          "$ref": "#/$defs/Pos"
+        },
+        "file": {
+          "type": "string"
+        },
+        "start": {
+          "$ref": "#/$defs/Pos"
+        }
+      },
+      "required": [
+        "file",
+        "start",
+        "end"
+      ],
+      "type": "object"
+    },
+    "State": {
+      "additionalProperties": false,
+      "description": "state 宣言（docs/ir.md「state / exception / effect」）。",
+      "properties": {
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "element": {
+          "$ref": "#/$defs/Type"
+        },
+        "kind": {
+          "const": "state"
+        },
+        "name": {
+          "type": "string"
+        },
+        "shape": {
+          "$ref": "#/$defs/StateShape"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "shape",
+        "element"
+      ],
+      "type": "object"
+    },
+    "StateShape": {
+      "enum": [
+        "list",
+        "single"
+      ],
+      "type": "string"
+    },
+    "Statement": {
+      "description": "配線の文（docs/ir.md「配線」）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ConstStmt"
+        },
+        {
+          "$ref": "#/$defs/ReturnStmt"
+        },
+        {
+          "$ref": "#/$defs/CallStmt"
+        },
+        {
+          "$ref": "#/$defs/MatchStmt"
+        }
+      ]
+    },
+    "StringLiteral": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SuccessEffect": {
+      "additionalProperties": false,
+      "description": "成功のアームでの効果の状態（docs/ir.md「op」の Signature.successEffects）。",
+      "properties": {
+        "effect": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/EffectState"
+        }
+      },
+      "required": [
+        "effect",
+        "state"
+      ],
+      "type": "object"
+    },
+    "ThrowsClause": {
+      "additionalProperties": false,
+      "description": "throws の一節（docs/ir.md「decorator」）。exceptions はデコレータの引数名なら \"$param:名前\"。",
+      "properties": {
+        "exceptions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/Relation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "exceptions",
+        "relations"
+      ],
+      "type": "object"
+    },
+    "Type": {
+      "description": "型（docs/ir.md「型」）。void は型ではなく Op.returns が null であること。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CoreType"
+        },
+        {
+          "$ref": "#/$defs/RefType"
+        },
+        {
+          "$ref": "#/$defs/OptionalType"
+        },
+        {
+          "$ref": "#/$defs/ArrayType"
+        },
+        {
+          "$ref": "#/$defs/RecordType"
+        },
+        {
+          "$ref": "#/$defs/CaseType"
+        }
+      ]
+    },
+    "TypeParam": {
+      "additionalProperties": false,
+      "description": "型で受ける引数（docs/ir.md「decorator」の ParamType kind \"type\"）。",
+      "properties": {
+        "kind": {
+          "const": "type"
+        },
+        "types": {
+          "items": {
+            "$ref": "#/$defs/Type"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "types"
+      ],
+      "type": "object"
+    },
+    "Union": {
+      "additionalProperties": false,
+      "description": "union 宣言（docs/ir.md「model / scalar / union」）。arms と members は常に出し、使わない方は []。",
+      "properties": {
+        "arms": {
+          "items": {
+            "$ref": "#/$defs/UnionArm"
+          },
+          "type": "array"
+        },
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "kind": {
+          "const": "union"
+        },
+        "members": {
+          "items": {
+            "$ref": "#/$defs/UnionMember"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "variant": {
+          "$ref": "#/$defs/UnionVariant"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "variant",
+        "arms",
+        "members"
+      ],
+      "type": "object"
+    },
+    "UnionArm": {
+      "additionalProperties": false,
+      "description": "arms のユニオンのアーム（docs/ir.md「model / scalar / union」）。",
+      "properties": {
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "type": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "span"
+      ],
+      "type": "object"
+    },
+    "UnionMember": {
+      "additionalProperties": false,
+      "description": "set のユニオンのメンバー（docs/ir.md「model / scalar / union」）。",
+      "properties": {
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "span"
+      ],
+      "type": "object"
+    },
+    "UnionVariant": {
+      "enum": [
+        "arms",
+        "set"
+      ],
+      "type": "string"
+    },
+    "VariantValue": {
+      "additionalProperties": false,
+      "properties": {
+        "arm": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "variant"
+        },
+        "union": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "union",
+        "arm"
+      ],
+      "type": "object"
+    },
+    "View": {
+      "additionalProperties": false,
+      "description": "その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。プラグインに渡すもの。",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/NamespaceConfig"
+        },
+        "namespaces": {
+          "additionalProperties": {
+            "$ref": "#/$defs/NamespaceConfig"
+          },
+          "type": "object"
+        },
+        "ops": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ViewedSignature"
+          },
+          "type": "object"
+        },
+        "program": {
+          "$ref": "#/$defs/Program"
+        },
+        "version": {
+          "const": "0.1"
+        },
+        "viewer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "viewer",
+        "config",
+        "namespaces",
+        "program",
+        "ops"
+      ],
+      "type": "object"
+    },
+    "ViewedSignature": {
+      "additionalProperties": false,
+      "description": "viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」）。",
+      "properties": {
+        "bound": {
+          "items": {
+            "$ref": "#/$defs/BoundPosition"
+          },
+          "type": "array"
+        },
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exceptions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/OpParam"
+          },
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/SignatureRelation"
+          },
+          "type": "array"
+        },
+        "successEffects": {
+          "items": {
+            "$ref": "#/$defs/SuccessEffect"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "exceptions",
+        "effects",
+        "relations",
+        "successEffects",
+        "params",
+        "bound"
+      ],
+      "type": "object"
+    },
+    "Warning": {
+      "additionalProperties": false,
+      "description": "warning の診断（docs/plugin-protocol.md「emit」）。at は FQN か \"file:line:col\"。",
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "message"
+      ],
+      "type": "object"
+    },
+    "Wiring": {
+      "additionalProperties": false,
+      "description": "op の本体（docs/ir.md「配線」）。",
+      "properties": {
+        "statements": {
+          "items": {
+            "$ref": "#/$defs/Statement"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "statements"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/mew-ton/hozo/schema/ir.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（プラグインに渡すもの）。$defs にはプラグインのプロトコル（docs/plugin-protocol.md「要求と応答」）の要求と応答も含む。Go の ir / plugin パッケージから internal/tools/irschema が生成する。手で編集しない。",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Program"
+    },
+    {
+      "$ref": "#/$defs/View"
+    }
+  ],
+  "title": "Hozo IR"
+}

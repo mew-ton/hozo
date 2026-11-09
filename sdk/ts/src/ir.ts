@@ -1,0 +1,631 @@
+/* eslint-disable */
+// Code generated from schema/ir.schema.json by `npm run generate` (json-schema-to-typescript); DO NOT EDIT.
+// IR の構造の持ち主は docs/ir.md、JSON の形は Go の ir パッケージ（docs/requirements.md「プラグインの書き方」）。
+
+/**
+ * Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（プラグインに渡すもの）。$defs にはプラグインのプロトコル（docs/plugin-protocol.md「要求と応答」）の要求と応答も含む。Go の ir / plugin パッケージから internal/tools/irschema が生成する。手で編集しない。
+ */
+export type HozoIR = Program | View;
+/**
+ * 宣言（docs/ir.md「Program」の Decl）。kind で分ける。
+ */
+export type Decl = Model | Scalar | Union | State | Exception | Effect | Classify | Decorator | Op;
+/**
+ * デコレータの引数の値の種類（docs/ir.md「デコレータの適用」）。kind で分ける。
+ */
+export type ArgValue = LiteralValue | RefValue | RefsValue | VariantValue | ListValue;
+/**
+ * リテラル（docs/ir.md「配線」）。duration は整数のナノ秒。
+ */
+export type Literal = StringLiteral | IntLiteral | FloatLiteral | BooleanLiteral | DurationLiteral;
+/**
+ * 型（docs/ir.md「型」）。void は型ではなく Op.returns が null であること。
+ */
+export type Type = CoreType | RefType | OptionalType | ArrayType | RecordType | CaseType;
+export type CoreName = "string" | "boolean" | "int" | "float" | "Time" | "Duration";
+export type UnionVariant = "arms" | "set";
+export type StateShape = "list" | "single";
+export type Operation = "post" | "put" | "delete";
+export type CatchMode = "recovers" | "halts" | "ignores";
+/**
+ * デコレータの引数の型（docs/ir.md「decorator」の ParamType）。
+ */
+export type ParamType = TypeParam | AnyParam;
+export type AnyOf = "exception" | "effect" | "state" | "op" | "model" | "variant";
+export type DecoratorTarget = "op" | "field" | "state" | "exception" | "scalar" | "model";
+/**
+ * Relation の effects。"all" は `effects`（すべての効果）、列は効果の FQN（docs/ir.md「decorator」）。
+ */
+export type RelationEffects = "all" | string[];
+export type RelationKind = "prevents" | "keeps";
+/**
+ * 配線の文（docs/ir.md「配線」）。kind で分ける。
+ */
+export type Statement = ConstStmt | ReturnStmt | CallStmt | MatchStmt;
+/**
+ * 式（docs/ir.md「配線」）。kind で分ける。
+ */
+export type Expr = CallExpr | MatchExpr | AtomExpr;
+/**
+ * 式の葉（docs/ir.md「配線」）。kind で分ける。
+ */
+export type Atom = NameAtom | LiteralAtom | NoneAtom | RecordAtom;
+/**
+ * match のアームの本体（docs/ir.md「配線」）。call か none。
+ */
+export type ArmBody = CallExpr | NoneBody;
+/**
+ * match のアームが受けるケース。"default" か、ケース名の列（docs/ir.md「配線」の Match）。
+ */
+export type ArmCases = "default" | string[];
+export type EffectState = "prevented" | "kept" | "unknown";
+
+/**
+ * IR 全体（docs/ir.md「Program」）。namespaces の先頭はグローバル（name ""）。
+ */
+export interface Program {
+  binds: Bind[];
+  namespaces: Namespace[];
+  version: "0.1";
+}
+/**
+ * bind 宣言（docs/ir.md「bind」）。
+ */
+export interface Bind {
+  namespace: string;
+  span: Span;
+  state: string;
+  target: BindTarget;
+}
+/**
+ * 宣言や文の位置（docs/ir.md「Program」）。file はユーザーのファイルの相対パスか hozo:vocab/... か hozo:plugin/...。
+ */
+export interface Span {
+  end: Pos;
+  file: string;
+  start: Pos;
+}
+/**
+ * ファイルの中の位置（docs/ir.md「Program」）。1 始まり。col はコードポイント数。
+ */
+export interface Pos {
+  col: number;
+  line: number;
+}
+/**
+ * bind の対象（docs/ir.md「bind」）。deep は `**`。
+ */
+export interface BindTarget {
+  deep: boolean;
+  namespace: string;
+}
+/**
+ * 一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。
+ */
+export interface Namespace {
+  decls: Decl[];
+  description?: Doc;
+  name: string;
+}
+/**
+ * model 宣言（docs/ir.md「model / scalar / union」）。
+ */
+export interface Model {
+  decorators: Application[];
+  derivedFrom?: DerivedFrom;
+  description?: Doc;
+  fields: Field[];
+  kind: "model";
+  name: string;
+  span: Span;
+  synthesizedFrom?: string;
+}
+/**
+ * デコレータの適用（docs/ir.md「デコレータの適用」）。
+ */
+export interface Application {
+  args: Arg[];
+  decorator: string;
+  span: Span;
+  via?: string;
+}
+/**
+ * デコレータの引数の値（docs/ir.md「デコレータの適用」）。
+ */
+export interface Arg {
+  param: string;
+  value: ArgValue;
+}
+export interface LiteralValue {
+  kind: "literal";
+  literal: Literal;
+}
+export interface StringLiteral {
+  kind: "string";
+  value: string;
+}
+export interface IntLiteral {
+  kind: "int";
+  value: number;
+}
+export interface FloatLiteral {
+  kind: "float";
+  value: number;
+}
+export interface BooleanLiteral {
+  kind: "boolean";
+  value: boolean;
+}
+export interface DurationLiteral {
+  kind: "duration";
+  value: number;
+}
+export interface RefValue {
+  kind: "ref";
+  target: string;
+}
+export interface RefsValue {
+  kind: "refs";
+  targets: string[];
+}
+export interface VariantValue {
+  arm: string;
+  kind: "variant";
+  union: string;
+}
+export interface ListValue {
+  items: ArgValue[];
+  kind: "list";
+}
+/**
+ * `is X omit ...` の記録（docs/ir.md「model / scalar / union」の derivedFrom）。
+ */
+export interface DerivedFrom {
+  base: string;
+  omit: string[];
+}
+/**
+ * DocComment の内容（docs/ir.md「Doc」）。
+ */
+export interface Doc {
+  body: string;
+  params: DocParam[];
+  see: string[];
+  summary: string;
+  throws: DocThrows[];
+}
+/**
+ * Doc の @param（docs/ir.md「Doc」）。
+ */
+export interface DocParam {
+  name: string;
+  text: string;
+}
+/**
+ * Doc の @throws（docs/ir.md「Doc」）。
+ */
+export interface DocThrows {
+  exception: string;
+  text: string;
+}
+/**
+ * model のフィールド（docs/ir.md「model / scalar / union」の Field）。
+ */
+export interface Field {
+  decorators: Application[];
+  default?: Literal;
+  description?: Doc;
+  name: string;
+  span: Span;
+  type: Type;
+}
+/**
+ * 核の型（docs/ir.md「型」の core）。
+ */
+export interface CoreType {
+  kind: "core";
+  name: CoreName;
+}
+/**
+ * model / scalar / union への参照（docs/ir.md「型」の ref）。
+ */
+export interface RefType {
+  kind: "ref";
+  target: string;
+}
+/**
+ * T?（docs/ir.md「型」の optional）。入れ子にはしない。
+ */
+export interface OptionalType {
+  kind: "optional";
+  of: Type;
+}
+/**
+ * T[]（docs/ir.md「型」の array）。
+ */
+export interface ArrayType {
+  kind: "array";
+  of: Type;
+}
+/**
+ * Record<K, V>（docs/ir.md「型」の record）。
+ */
+export interface RecordType {
+  key: Type;
+  kind: "record";
+  value: Type;
+}
+/**
+ * 分類のケースで絞り込まれた型（docs/ir.md「型」の case）。cases は match のアームに書かれた順。
+ */
+export interface CaseType {
+  cases: string[];
+  classify: string;
+  kind: "case";
+  of: Type;
+}
+/**
+ * scalar 宣言（docs/ir.md「model / scalar / union」）。
+ */
+export interface Scalar {
+  base: Type;
+  decorators: Application[];
+  description?: Doc;
+  kind: "scalar";
+  name: string;
+  span: Span;
+}
+/**
+ * union 宣言（docs/ir.md「model / scalar / union」）。arms と members は常に出し、使わない方は []。
+ */
+export interface Union {
+  arms: UnionArm[];
+  decorators: Application[];
+  description?: Doc;
+  kind: "union";
+  members: UnionMember[];
+  name: string;
+  span: Span;
+  variant: UnionVariant;
+}
+/**
+ * arms のユニオンのアーム（docs/ir.md「model / scalar / union」）。
+ */
+export interface UnionArm {
+  description?: Doc;
+  name: string;
+  span: Span;
+  type: Type;
+}
+/**
+ * set のユニオンのメンバー（docs/ir.md「model / scalar / union」）。
+ */
+export interface UnionMember {
+  description?: Doc;
+  span: Span;
+  target: string;
+}
+/**
+ * state 宣言（docs/ir.md「state / exception / effect」）。
+ */
+export interface State {
+  decorators: Application[];
+  description?: Doc;
+  element: Type;
+  kind: "state";
+  name: string;
+  shape: StateShape;
+  span: Span;
+}
+/**
+ * exception 宣言（docs/ir.md「state / exception / effect」）。
+ */
+export interface Exception {
+  decorators: Application[];
+  description?: Doc;
+  kind: "exception";
+  name: string;
+  span: Span;
+  value?: Type;
+}
+/**
+ * effect 宣言（docs/ir.md「state / exception / effect」）。
+ */
+export interface Effect {
+  decorators: Application[];
+  description?: Doc;
+  kind: "effect";
+  name: string;
+  operation: Operation;
+  span: Span;
+  state: string;
+}
+/**
+ * classify 宣言（docs/ir.md「classify」）。cases に default は含まない。
+ */
+export interface Classify {
+  cases: ClassifyCase[];
+  decorators: Application[];
+  defaultDescription?: Doc;
+  description?: Doc;
+  fromCondition: boolean;
+  hasDefault: boolean;
+  kind: "classify";
+  name: string;
+  span: Span;
+  subject: Type;
+}
+/**
+ * classify のケース（docs/ir.md「classify」）。
+ */
+export interface ClassifyCase {
+  description?: Doc;
+  name: string;
+  span: Span;
+}
+/**
+ * decorator 宣言（docs/ir.md「decorator」）。alias を持つ宣言は params / targets / throws / catches が []。
+ */
+export interface Decorator {
+  alias?: DecoratorAlias;
+  catches: CatchesClause[];
+  decorators: Application[];
+  description?: Doc;
+  external: boolean;
+  kind: "decorator";
+  name: string;
+  params: Param[];
+  span: Span;
+  targets: DecoratorTarget[];
+  throws: ThrowsClause[];
+}
+/**
+ * 名前付きデコレータの中身（docs/ir.md「decorator」の alias）。
+ */
+export interface DecoratorAlias {
+  args: Arg[];
+  target: string;
+}
+/**
+ * catches の一節（docs/ir.md「decorator」）。
+ */
+export interface CatchesClause {
+  exceptions: string[];
+  halts?: string;
+  mode: CatchMode;
+}
+/**
+ * デコレータの引数（docs/ir.md「decorator」の Param）。
+ */
+export interface Param {
+  name: string;
+  optional: boolean;
+  type: ParamType;
+}
+/**
+ * 型で受ける引数（docs/ir.md「decorator」の ParamType kind "type"）。
+ */
+export interface TypeParam {
+  kind: "type";
+  types: Type[];
+}
+/**
+ * `any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind "any"）。
+ */
+export interface AnyParam {
+  kind: "any";
+  of: AnyOf;
+  on?: EffectOn;
+}
+/**
+ * `any effect on <state>.<operation>` の制約（docs/ir.md「decorator」）。
+ */
+export interface EffectOn {
+  operation: Operation;
+  state: string;
+}
+/**
+ * throws の一節（docs/ir.md「decorator」）。exceptions はデコレータの引数名なら "$param:名前"。
+ */
+export interface ThrowsClause {
+  exceptions: string[];
+  relations: Relation[];
+}
+/**
+ * 例外が効果に及ぼす関係（docs/ir.md「decorator」）。
+ */
+export interface Relation {
+  effects: RelationEffects;
+  kind: RelationKind;
+}
+/**
+ * op 宣言（docs/ir.md「op」）。returns の null は void、body の null は葉。
+ */
+export interface Op {
+  body: Wiring | null;
+  decorators: Application[];
+  description?: Doc;
+  effects: string[];
+  kind: "op";
+  name: string;
+  params: OpParam[];
+  returns: Type | null;
+  signature: Signature;
+  span: Span;
+  throws: ThrowsClause[];
+}
+/**
+ * op の本体（docs/ir.md「配線」）。
+ */
+export interface Wiring {
+  statements: Statement[];
+}
+export interface ConstStmt {
+  expr: Expr;
+  kind: "const";
+  name: string;
+  span: Span;
+}
+export interface CallExpr {
+  call: Call;
+  kind: "call";
+}
+/**
+ * op の呼び出し（docs/ir.md「配線」）。args は引数名に対応付け済み。bound は計算結果。
+ */
+export interface Call {
+  args: CallArg[];
+  bound: BoundPosition[];
+  op: string;
+  span: Span;
+}
+/**
+ * 呼び出しの引数（docs/ir.md「配線」の Call.args）。
+ */
+export interface CallArg {
+  param: string;
+  value: Atom;
+}
+export interface NameAtom {
+  kind: "name";
+  path: string[];
+  span: Span;
+}
+export interface LiteralAtom {
+  kind: "literal";
+  literal: Literal;
+  span: Span;
+}
+export interface NoneAtom {
+  kind: "none";
+  span: Span;
+}
+export interface RecordAtom {
+  fields: RecordField[];
+  kind: "record";
+  span: Span;
+}
+export interface RecordField {
+  name: string;
+  value: Atom;
+}
+/**
+ * bind で埋まる位置（docs/ir.md「配線」、docs/check.md「bind」）。
+ */
+export interface BoundPosition {
+  path: string[];
+  state: string;
+}
+export interface MatchExpr {
+  kind: "match";
+  match: Match;
+}
+/**
+ * 分類による分岐（docs/ir.md「配線」）。
+ */
+export interface Match {
+  arms: MatchArm[];
+  classify: string;
+  span: Span;
+  subject: Atom;
+}
+/**
+ * match のアーム（docs/ir.md「配線」）。
+ */
+export interface MatchArm {
+  body: ArmBody;
+  cases: ArmCases;
+  span: Span;
+}
+/**
+ * アームの本体の none（docs/ir.md「配線」）。
+ */
+export interface NoneBody {
+  kind: "none";
+}
+export interface AtomExpr {
+  atom: Atom;
+  kind: "atom";
+}
+export interface ReturnStmt {
+  expr: Expr;
+  kind: "return";
+  span: Span;
+}
+export interface CallStmt {
+  call: Call;
+  kind: "call";
+  span: Span;
+}
+export interface MatchStmt {
+  kind: "match";
+  match: Match;
+  span: Span;
+}
+/**
+ * op の引数（docs/ir.md「op」）。
+ */
+export interface OpParam {
+  name: string;
+  span: Span;
+  type: Type;
+}
+/**
+ * 計算結果の関数の型 Sig(O, v)（docs/ir.md「op」、docs/check.md「計算」）。
+ */
+export interface Signature {
+  effects: string[];
+  exceptions: string[];
+  relations: SignatureRelation[];
+  successEffects: SuccessEffect[];
+}
+/**
+ * 例外が起きたときの効果の状態（docs/ir.md「op」の Signature.relations）。
+ */
+export interface SignatureRelation {
+  effect: string;
+  exception: string;
+  state: EffectState;
+}
+/**
+ * 成功のアームでの効果の状態（docs/ir.md「op」の Signature.successEffects）。
+ */
+export interface SuccessEffect {
+  effect: string;
+  state: EffectState;
+}
+/**
+ * その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。プラグインに渡すもの。
+ */
+export interface View {
+  config: NamespaceConfig;
+  namespaces: {
+    [k: string]: NamespaceConfig;
+  };
+  ops: {
+    [k: string]: ViewedSignature;
+  };
+  program: Program;
+  version: "0.1";
+  viewer: string;
+}
+/**
+ * 一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。
+ */
+export interface NamespaceConfig {
+  dir: string;
+  language: string;
+  out: string;
+  plugins: string[];
+}
+/**
+ * viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」）。
+ */
+export interface ViewedSignature {
+  bound: BoundPosition[];
+  effects: string[];
+  exceptions: string[];
+  params: OpParam[];
+  relations: SignatureRelation[];
+  successEffects: SuccessEffect[];
+}

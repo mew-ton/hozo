@@ -255,8 +255,8 @@ func (p *Project) Errors() int
 
 | 元 | 生成物 | 道具 |
 |---|---|---|
-| `ir` の型 | `schema/ir.schema.json` | `internal/tools/irschema`（`go generate`） |
-| `schema/ir.schema.json` | `sdk/ts/src/ir.ts` | `json-schema-to-typescript`（`sdk/ts` の `npm run generate`） |
+| `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
+| `schema/ir.schema.json` | `sdk/ts/src/ir.ts`（IR の型。プロトコルの要求と応答の型は `sdk/ts/src/protocol.ts` に手で写す） | `json-schema-to-typescript`（`sdk/ts` の `npm run generate`） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json` の予約語の部分 | `internal/tools/tmgrammar`（`go generate`） |
 | `cli.hozo` | `internal/gen/hozoc/**` | `hozoc emit`（`make generate`。段階 3 から） |
 
