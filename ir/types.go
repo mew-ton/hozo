@@ -202,12 +202,22 @@ func UnmarshalType(data []byte) (Type, error) {
 	return decodeUnion("type", data, typeTable)
 }
 
-// 核の型を作る（docs/ir.md「型」の kind "core"）。
-func String() Type   { return CoreType{Name: CoreString} }
-func Boolean() Type  { return CoreType{Name: CoreBoolean} }
-func Int() Type      { return CoreType{Name: CoreInt} }
-func Float() Type    { return CoreType{Name: CoreFloat} }
-func Time() Type     { return CoreType{Name: CoreTime} }
+// String は核の型 string を作る（docs/ir.md「型」の kind "core"）。
+func String() Type { return CoreType{Name: CoreString} }
+
+// Boolean は核の型 boolean を作る（docs/ir.md「型」の kind "core"）。
+func Boolean() Type { return CoreType{Name: CoreBoolean} }
+
+// Int は核の型 int を作る（docs/ir.md「型」の kind "core"）。
+func Int() Type { return CoreType{Name: CoreInt} }
+
+// Float は核の型 float を作る（docs/ir.md「型」の kind "core"）。
+func Float() Type { return CoreType{Name: CoreFloat} }
+
+// Time は核の型 Time を作る（docs/ir.md「型」の kind "core"）。
+func Time() Type { return CoreType{Name: CoreTime} }
+
+// Duration は核の型 Duration を作る（docs/ir.md「型」の kind "core"）。
 func Duration() Type { return CoreType{Name: CoreDuration} }
 
 // Ref は宣言の FQN への参照を作る（docs/ir.md「型」の kind "ref"）。

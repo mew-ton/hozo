@@ -307,6 +307,7 @@ func sampleProgram() *Program {
 func sampleView() *View {
 	p := sampleProgram()
 	return &View{
+		Version: Version,
 		Viewer:  "browser",
 		Config:  ViewConfig{Language: "go", Out: "gen/browser", Plugins: []string{"go-cli"}},
 		Program: p,
