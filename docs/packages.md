@@ -9,7 +9,7 @@
 ```
 go.mod                 module github.com/mew-ton/hozo
 hozo.toml, cli.hozo    hozoc 自身の仕様と設定（docs/cli.md）
-cmd/hozoc/             CLI の main。骨組みは cli.hozo から生成し、葉の op の実装をつなぐ
+cmd/hozoc/             CLI の main。hozoc.New(app.Leaves) と app.Presenter を、生成した cli.Main に渡すだけ
 ir/                    IR の型（公開）
 plugin/                Go 向けプラグイン SDK（公開）
 plugin/golang/         Go の名前と型の規則（公開）
@@ -40,8 +40,10 @@ docs/                  設計文書
 ## 依存の向き
 
 ```
-cmd/hozoc → internal/gen/hozoc → internal/app → internal/project → internal/{config, vocab, syntax, sema, check, emit/golang, plugin}
-                                                                 → ir, plugin/golang, runtime
+cmd/hozoc → internal/gen/hozoc/cli → internal/gen/hozoc → runtime
+cmd/hozoc → internal/app → internal/gen/hozoc
+                         → internal/project → internal/{config, vocab, syntax, sema, check, emit/golang, plugin}
+                                            → ir, plugin/golang, runtime
 internal/lsp → internal/project
 internal/vocab → vocab
 plugins/go-cli → plugin, plugin/golang, ir
@@ -239,7 +241,7 @@ func (p *Project) Errors() int
 
 ### `internal/app`
 
-`docs/cli.md`「手で書くもの」。`hozoc.Leaves` の実装と `Presenter`。段階 3 までは、引数の解釈も持つ。
+`docs/cli.md`「手で書くもの」。生成した `hozoc.Leaves`（`internal/gen/hozoc`）の実装 `Leaves` と、`cli.Presenter`（`internal/gen/hozoc/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。
 
 ### `internal/lsp`
 
@@ -256,6 +258,6 @@ func (p *Project) Errors() int
 | `ir` の型 | `schema/ir.schema.json` | `internal/tools/irschema`（`go generate`） |
 | `schema/ir.schema.json` | `sdk/ts/src/ir.ts` | `json-schema-to-typescript`（`sdk/ts` の `npm run generate`） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json` の予約語の部分 | `internal/tools/tmgrammar`（`go generate`） |
-| `cli.hozo` | `internal/gen/hozoc/**` | `hozoc emit`（段階 3 から） |
+| `cli.hozo` | `internal/gen/hozoc/**` | `hozoc emit`（`make generate`。段階 3 から） |
 
 生成物はコミットする。CI で生成し直して差分がないことを確かめる（`docs/testing.md`）。

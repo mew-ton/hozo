@@ -97,6 +97,15 @@ func TestEmitHozocGolden(t *testing.T) {
 	if !strings.Contains(src, "func Main(ops hozoc.Ops, p Presenter, args []string, env func(string) string, stdout, stderr io.Writer) int") {
 		t.Errorf("Main has the wrong signature")
 	}
+	// 見分けた例外の Failure も Err を運ぶ（値のない例外の表示に Presenter が元の error のメッセージを使えるように）。
+	for _, want := range []string{
+		`Failure{Name: "hozoc.CheckFailed", Value: e.Value, Err: err}, 1`,
+		`Failure{Name: "hozoc.UnknownNamespace", Err: err}, 64`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("generated cli.go lacks %q", want)
+		}
+	}
 	checkGolden(t, "hozoc_cli.go.golden", src)
 }
 

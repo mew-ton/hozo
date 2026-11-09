@@ -417,3 +417,43 @@ func TestImportUsesDir(t *testing.T) {
 		}
 	}
 }
+
+// TestCopiesForeignException は「配置」の複製が、op の（viewer から見た）Signature.exceptions にある
+// 別の名前空間（語彙）の exception と、その値が参照する model にも及ぶこと。葉の実装者が投げ、
+// go-cli の cli.go が errors.As で見分けるための Go の型が viewer のパッケージに要る
+// （cli.hozo の proc.Crashed / proc.MalformedOutput で見つかった不具合の回帰テスト）。
+func TestCopiesForeignException(t *testing.T) {
+	root := newProjectRoot(t)
+	proc := ir.Namespace{Name: "proc", Decls: []ir.Decl{
+		&ir.Model{DeclBase: base("proc.Detail", doc("異常終了の内容")), Fields: []ir.Field{field("code", ir.Int())}},
+		&ir.Exception{DeclBase: base("proc.Crashed", doc("プロセスが異常終了した")), Value: ir.Ref("proc.Detail")},
+		&ir.Exception{DeclBase: base("proc.MalformedOutput", doc("出力が約束した形でなかった"))},
+	}}
+	run := &ir.Op{DeclBase: base("app.run", doc("走らせる")), Returns: ir.String(),
+		Signature: ir.Signature{Exceptions: []string{"proc.Crashed", "proc.MalformedOutput"}}}
+	ns := ir.Namespace{Name: "app", Decls: []ir.Decl{run}}
+	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), proc, ns}}
+	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p,
+		Ops: map[string]*ir.ViewedSignature{"app.run": {Signature: run.Signature, Params: run.Params}}}
+	files, diags := Emit(v, Options{Root: root})
+	if len(diags) > 0 {
+		t.Fatalf("診断が出た: %s", formatDiags(diags))
+	}
+	var types string
+	for _, f := range files {
+		if f.Path == "gen/app/types.go" {
+			types = string(f.Content)
+		}
+	}
+	for _, want := range []string{
+		"type Crashed struct{ Value Detail }",
+		`func (Crashed) HozoException() string { return "proc.Crashed" }`,
+		"type MalformedOutput struct{}",
+		"type Detail struct {",
+	} {
+		if !strings.Contains(types, want) {
+			t.Errorf("types.go に %q がない:\n%s", want, types)
+		}
+	}
+	compileFiles(t, root, files)
+}

@@ -27,6 +27,8 @@ namespace hozoc {
     start: Position?;
     end: Position?;
     related: RelatedInfo[];
+    /** 機械が読む補足（docs/check.md「Data」）。json にだけ出す */
+    data: Record<string, string[]>?;
   }
 
   /** 指摘に関連する位置 */

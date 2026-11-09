@@ -1,219 +1,192 @@
 package app
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 
-	"github.com/mew-ton/hozo/internal/diag"
-	hostplugin "github.com/mew-ton/hozo/internal/plugin"
-	"github.com/mew-ton/hozo/internal/source"
+	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 )
-
-// 終了コード（docs/diagnostics.md「終了コード」）。
-const (
-	ExitOK               = 0
-	ExitCheckFailed      = 1  // CheckFailed
-	ExitConfigInvalid    = 2  // ConfigInvalid / LanguageMismatch
-	ExitOutputConflict   = 3  // OutputConflict
-	ExitUsage            = 64 // UnknownNamespace、使い方の誤り
-	ExitSoftwareOrCrash  = 70 // proc.Crashed / proc.MalformedOutput、宣言にない例外
-	exitNotImplementedOp = ExitUsage
-)
-
-// ExitCode は誤りを終了コードにする（docs/diagnostics.md「終了コード」、cli.hozo の @cli.exitCode）。nil なら 0。
-func ExitCode(err error) int {
-	if err == nil {
-		return ExitOK
-	}
-	var (
-		cf *CheckFailed
-		ci *ConfigInvalid
-		lm *LanguageMismatch
-		oc *OutputConflict
-		un *UnknownNamespace
-	)
-	switch {
-	case errors.As(err, &cf):
-		return ExitCheckFailed
-	case errors.As(err, &ci), errors.As(err, &lm):
-		return ExitConfigInvalid
-	case errors.As(err, &oc):
-		return ExitOutputConflict
-	case errors.As(err, &un), errors.Is(err, errNotImplemented), errors.Is(err, errUsage):
-		return ExitUsage
-	case errors.Is(err, hostplugin.ErrCrashed), errors.Is(err, hostplugin.ErrMalformedOutput):
-		return ExitSoftwareOrCrash
-	}
-	return ExitSoftwareOrCrash
-}
 
 // Presenter は結果と例外の表示（docs/cli.md「手で書くもの」の Presenter、docs/plugin-go-cli.md「実行と表示」）。
-// 結果は標準出力に、例外は標準エラーに出す（呼ぶ側が w を選ぶ）。
-type Presenter interface {
-	PresentCheck(w io.Writer, r CheckResult) error
-	PresentEmit(w io.Writer, r EmitResult) error
-	PresentError(w io.Writer, err error) error
-}
-
-// NewPresenter は format（"text" か "json"。docs/diagnostics.md「表示」）の Presenter。空なら text。
-func NewPresenter(format string) Presenter {
-	if format == "json" {
-		return JSONPresenter{}
-	}
-	return TextPresenter{}
-}
-
-// TextPresenter は text の表示（docs/diagnostics.md「表示」の text、docs/cli.md「手で書くもの」）。
+// go-cli が生成した cli.Presenter の実装で、cli.Main が結果を標準出力に、例外を標準エラーに出すときに呼ぶ。
 //
-//   - CheckResult: 診断（warning）の一覧と件数（diag.WriteText）。
-//   - EmitResult: warning があればその一覧と件数、続けて `written: <path>` と `removed: <path>` の行。
-//   - 診断を運ぶ例外: その一覧と件数。UnknownNamespace: `hozoc: 名前空間 X は hozo.toml にない`。
-//     それ以外（proc.Crashed など）: `hozoc: <メッセージ>`。
-type TextPresenter struct{}
+// 形式は input（hozoc.CheckInput / hozoc.EmitInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
+//
+//   - text: CheckResult は診断（warning）の一覧と件数。EmitResult は warning があればその一覧と件数、続けて
+//     `written: <path>` と `removed: <path>` を一行ずつ。診断を運ぶ例外はその一覧と件数。それ以外の例外は
+//     `hozoc: <メッセージ>`（Failure.Err のメッセージ。なければ例外の FQN）。
+//   - json: CheckResult は {"warnings": [...]}、EmitResult は {"warnings": [...], "written": [...], "removed": [...]}。
+//     例外は {"error": "<FQN>", "value": {...}} で、診断を運ぶ例外の value は docs/diagnostics.md「表示」の json
+//     （{"diagnostics", "errors", "warnings"}）。それ以外は cli.JSONPresenter と同じ。
+//
+// 診断一件の形は docs/diagnostics.md「表示」の json の diagnostics の要素（start / end / related / data は、なければ省く）。
+type Presenter struct{}
 
-func (TextPresenter) PresentCheck(w io.Writer, r CheckResult) error {
-	return diag.WriteText(w, r.Warnings, r.Files())
-}
+var _ cli.Presenter = Presenter{}
 
-func (TextPresenter) PresentEmit(w io.Writer, r EmitResult) error {
-	if len(r.Warnings) > 0 {
-		if err := diag.WriteText(w, r.Warnings, r.Files()); err != nil {
-			return err
+// Present は成功の結果を w に出す。知らない result（void の nil を含む）は cli.JSONPresenter に委ねる（nil なら何も出さない）。
+func (Presenter) Present(w io.Writer, command string, input any, result any) error {
+	switch r := result.(type) {
+	case hozoc.CheckResult:
+		if isJSON(input) {
+			return writeJSON(w, struct {
+				Warnings []jsonDiagnostic `json:"warnings"`
+			}{jsonDiagnostics(r.Warnings)})
 		}
-	}
-	for _, p := range r.Written {
-		if _, err := fmt.Fprintf(w, "written: %s\n", p); err != nil {
-			return err
+		return writeText(w, r.Warnings)
+	case hozoc.EmitResult:
+		if isJSON(input) {
+			return writeJSON(w, struct {
+				Warnings []jsonDiagnostic `json:"warnings"`
+				Written  []hozoc.Path     `json:"written"`
+				Removed  []hozoc.Path     `json:"removed"`
+			}{jsonDiagnostics(r.Warnings), orEmpty(r.Written), orEmpty(r.Removed)})
 		}
-	}
-	for _, p := range r.Removed {
-		if _, err := fmt.Fprintf(w, "removed: %s\n", p); err != nil {
-			return err
+		if len(r.Warnings) > 0 {
+			if err := writeText(w, r.Warnings); err != nil {
+				return err
+			}
 		}
-	}
-	return nil
-}
-
-func (TextPresenter) PresentError(w io.Writer, err error) error {
-	if d, _, ok := diagnosticsOf(err); ok {
-		return diag.WriteText(w, d.Items, d.Files)
-	}
-	var un *UnknownNamespace
-	if errors.As(err, &un) {
-		for _, n := range un.Names {
-			if _, err := fmt.Fprintf(w, "hozoc: 名前空間 %s は hozo.toml にない\n", n); err != nil {
+		for _, p := range r.Written {
+			if _, err := fmt.Fprintf(w, "written: %s\n", p); err != nil {
+				return err
+			}
+		}
+		for _, p := range r.Removed {
+			if _, err := fmt.Fprintf(w, "removed: %s\n", p); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	_, werr := fmt.Fprintf(w, "hozoc: %v\n", err)
-	return werr
+	return cli.JSONPresenter{}.Present(w, command, input, result)
 }
 
-// JSONPresenter は json の表示。
-//
-//   - CheckResult: {"warnings": [診断...]}。
-//   - EmitResult: {"warnings": [診断...], "written": [パス...], "removed": [パス...]}。
-//   - 例外: docs/plugin-go-cli.md「実行と表示」の JSONPresenter と同じ {"error": "<例外の FQN>", "value": <値>}。
-//     診断を運ぶ例外の value は docs/diagnostics.md「表示」の json（{"diagnostics", "errors", "warnings"}）。
-//     UnknownNamespace は値を持たないので {"error": "hozoc.UnknownNamespace"}。宣言にない誤りは {"error": "<メッセージ>"}。
-//
-// 診断一件の形は docs/diagnostics.md「表示」の json の diagnostics の要素（diag.WriteJSON と同じ）。
-type JSONPresenter struct{}
-
-func (JSONPresenter) PresentCheck(w io.Writer, r CheckResult) error {
-	items, err := diagnosticsJSON(r.Warnings, r.Files())
-	if err != nil {
-		return err
+// PresentError は例外を w に出す。
+func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Failure) error {
+	d, carries := f.Value.(hozoc.Diagnostics)
+	if isJSON(input) {
+		if !carries {
+			return cli.JSONPresenter{}.PresentError(w, command, input, f)
+		}
+		errs, warns := count(d.Items)
+		return writeJSON(w, struct {
+			Error string `json:"error"`
+			Value any    `json:"value"`
+		}{f.Name, struct {
+			Diagnostics []jsonDiagnostic `json:"diagnostics"`
+			Errors      int              `json:"errors"`
+			Warnings    int              `json:"warnings"`
+		}{jsonDiagnostics(d.Items), errs, warns}})
 	}
-	return writeJSON(w, struct {
-		Warnings []json.RawMessage `json:"warnings"`
-	}{items})
+	if carries {
+		return writeText(w, d.Items)
+	}
+	msg := f.Name
+	if f.Err != nil {
+		msg = f.Err.Error()
+	}
+	_, err := fmt.Fprintf(w, "hozoc: %s\n", msg)
+	return err
 }
 
-func (JSONPresenter) PresentEmit(w io.Writer, r EmitResult) error {
-	items, err := diagnosticsJSON(r.Warnings, r.Files())
-	if err != nil {
-		return err
+// isJSON は入力の format が json か（cli.hozo の CheckInput / EmitInput の format。lsp にはない）。
+func isJSON(input any) bool {
+	switch in := input.(type) {
+	case hozoc.CheckInput:
+		return in.Format != nil && *in.Format == "json"
+	case hozoc.EmitInput:
+		return in.Format != nil && *in.Format == "json"
 	}
-	written, removed := r.Written, r.Removed
-	if written == nil {
-		written = []string{}
-	}
-	if removed == nil {
-		removed = []string{}
-	}
-	return writeJSON(w, struct {
-		Warnings []json.RawMessage `json:"warnings"`
-		Written  []string          `json:"written"`
-		Removed  []string          `json:"removed"`
-	}{items, written, removed})
+	return false
 }
 
-func (JSONPresenter) PresentError(w io.Writer, err error) error {
-	type failure struct {
-		Error string          `json:"error"`
-		Value json.RawMessage `json:"value,omitempty"`
-	}
-	if d, name, ok := diagnosticsOf(err); ok {
-		var buf bytes.Buffer
-		if err := diag.WriteJSON(&buf, d.Items, d.Files); err != nil {
+// writeText は docs/diagnostics.md「表示」の text: `ファイル:行:列: 重さ[コード]: メッセージ`、関連は `  ...: note: ...`、
+// 最後に件数。位置がなければ `ファイル: `、ファイルもなければ `hozoc: `。
+func writeText(w io.Writer, diags []hozoc.Diagnostic) error {
+	for i := range diags {
+		d := &diags[i]
+		if _, err := fmt.Fprintf(w, "%s%s[%s]: %s\n", location(d), d.Severity, d.Code, d.Message); err != nil {
 			return err
 		}
-		return writeJSON(w, failure{Error: name, Value: bytes.TrimSpace(buf.Bytes())})
+		for _, r := range d.Related {
+			if _, err := fmt.Fprintf(w, "  %s:%d:%d: note: %s\n", r.File, r.Start.Line, r.Start.Col, r.Message); err != nil {
+				return err
+			}
+		}
 	}
-	var un *UnknownNamespace
-	if errors.As(err, &un) {
-		return writeJSON(w, failure{Error: "hozoc.UnknownNamespace"})
-	}
-	return writeJSON(w, failure{Error: err.Error()})
+	errs, warns := count(diags)
+	_, err := fmt.Fprintf(w, "%s, %s\n", plural(errs, "error"), plural(warns, "warning"))
+	return err
 }
 
-// diagnosticsOf は診断を運ぶ例外の診断と例外の FQN。
-func diagnosticsOf(err error) (Diagnostics, string, bool) {
-	var (
-		cf *CheckFailed
-		ci *ConfigInvalid
-		lm *LanguageMismatch
-		oc *OutputConflict
-	)
+func location(d *hozoc.Diagnostic) string {
 	switch {
-	case errors.As(err, &cf):
-		return cf.Diagnostics, "hozoc.CheckFailed", true
-	case errors.As(err, &ci):
-		return ci.Diagnostics, "hozoc.ConfigInvalid", true
-	case errors.As(err, &lm):
-		return lm.Diagnostics, "hozoc.LanguageMismatch", true
-	case errors.As(err, &oc):
-		return oc.Diagnostics, "hozoc.OutputConflict", true
+	case d.File != nil && d.Start != nil:
+		return fmt.Sprintf("%s:%d:%d: ", *d.File, d.Start.Line, d.Start.Col)
+	case d.File != nil:
+		return string(*d.File) + ": "
 	}
-	return Diagnostics{}, "", false
+	return "hozoc: "
 }
 
-// diagnosticsJSON は診断の列を docs/diagnostics.md「表示」の json の要素にする。形を一つにするため diag.WriteJSON を通す。
-func diagnosticsJSON(diags []diag.Diagnostic, fs *source.FileSet) ([]json.RawMessage, error) {
-	var buf bytes.Buffer
-	if err := diag.WriteJSON(&buf, diags, fs); err != nil {
-		return nil, err
+func plural(n int, unit string) string {
+	if n == 1 {
+		return "1 " + unit
 	}
-	var out struct {
-		Diagnostics []json.RawMessage `json:"diagnostics"`
-	}
-	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
-		return nil, err
-	}
-	if out.Diagnostics == nil {
-		out.Diagnostics = []json.RawMessage{}
-	}
-	return out.Diagnostics, nil
+	return fmt.Sprintf("%d %ss", n, unit)
 }
 
+// count は error と warning の数。
+func count(diags []hozoc.Diagnostic) (errs, warns int) {
+	for _, d := range diags {
+		switch d.Severity {
+		case "error":
+			errs++
+		case "warning":
+			warns++
+		}
+	}
+	return errs, warns
+}
+
+// jsonDiagnostic は docs/diagnostics.md「表示」の json の diagnostics の要素。hozoc.Diagnostic との違いは
+// related を空なら省くこと。
+type jsonDiagnostic struct {
+	Severity string              `json:"severity"`
+	Code     string              `json:"code"`
+	Message  string              `json:"message"`
+	File     *hozoc.Path         `json:"file,omitempty"`
+	Start    *hozoc.Position     `json:"start,omitempty"`
+	End      *hozoc.Position     `json:"end,omitempty"`
+	Related  []hozoc.RelatedInfo `json:"related,omitempty"`
+	Data     map[string][]string `json:"data,omitempty"`
+}
+
+func jsonDiagnostics(diags []hozoc.Diagnostic) []jsonDiagnostic {
+	out := make([]jsonDiagnostic, 0, len(diags))
+	for _, d := range diags {
+		out = append(out, jsonDiagnostic{Severity: d.Severity, Code: d.Code, Message: d.Message, File: d.File,
+			Start: d.Start, End: d.End, Related: d.Related, Data: d.Data})
+	}
+	return out
+}
+
+func orEmpty(paths []hozoc.Path) []hozoc.Path {
+	if paths == nil {
+		return []hozoc.Path{}
+	}
+	return paths
+}
+
+// writeJSON は json.MarshalIndent（cli.JSONPresenter と同じ形）で w に出す。
 func writeJSON(w io.Writer, v any) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(w, string(b))
+	return err
 }

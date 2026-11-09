@@ -32,7 +32,7 @@ hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコー�
 
 ## 生成物の一致
 
-CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `hozoc emit`（段階 3 から）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。
+CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generate`（`hozoc emit`。段階 3 から）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc emit` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。
 
 ## 予約語の一致
 

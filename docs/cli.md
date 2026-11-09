@@ -46,6 +46,8 @@ namespace hozoc {
     start: Position?;
     end: Position?;
     related: RelatedInfo[];
+    /** 機械が読む補足（docs/check.md「Data」）。json にだけ出す */
+    data: Record<string, string[]>?;
   }
 
   /** 指摘に関連する位置 */
@@ -260,8 +262,8 @@ plugin_dirs = ["plugins"]
 
 ## 手で書くもの
 
-- `cmd/hozoc/main.go`: `internal/app` の実装を組み立てて `cli.Main`（`docs/plugin-go-cli.md`「出力」）を呼ぶ。
-- `internal/app`: `hozoc.Leaves` の実装。`check` は `internal/project.Load`、`writeOutputs` は `internal/emit/golang` と `Ops.RunEmit`、`runEmit` は `internal/plugin.Run`、`lsp` は `internal/lsp.Serve`（`docs/packages.md`）。`Wrappers` はない（`@cli.command` は go-cli の `entry`、`@proc.stdio` は `stop`。`docs/emit-go.md`「デコレータ」）。`Presenter` は `format` に応じて text か JSON で表示する（`docs/diagnostics.md`「表示」）。`text` では `CheckResult` は診断の一覧と件数、`EmitResult` は `written` / `removed` のパスの一覧を出す。
-- 段階 3 まで（骨組みを生成する前）の引数の解釈は `internal/app` が持ち、`cmd/hozoc/main.go` はそれを呼ぶだけ。解釈の規則は `docs/plugin-go-cli.md`「引数の解釈」と同じ。
-- 表示の形（`Presenter`）: 結果は標準出力、例外は標準エラー（`docs/plugin-go-cli.md`「実行と表示」）。text の `EmitResult` は warning の一覧（あれば）に続けて `written: <path>` / `removed: <path>` を一行ずつ。json の `CheckResult` は `{"warnings": [...]}`、`EmitResult` は `{"warnings": [...], "written": [...], "removed": [...]}`、例外は `{"error": "<FQN>", "value": {...}}`。診断の要素は `docs/diagnostics.md`「json」と同じ形。
+- `cmd/hozoc/main.go`: `internal/app` の `Leaves` を `hozoc.New` で `Ops` にし、`Presenter` と一緒に `cli.Main`（`docs/plugin-go-cli.md`「出力」）に渡す。それだけ。骨組み（引数の解釈、例外の見分けと終了コード、使い方）は `cli.hozo` から生成した `internal/gen/hozoc`（`docs/emit-go.md`）と `internal/gen/hozoc/cli`（go-cli）が持ち、変えるときは `cli.hozo` を変えて `make generate`（`go run ./cmd/hozoc emit`）。生成物はコミットし、`tests/generated_test.go` と CI が遅れていないことを確かめる（`docs/testing.md`「生成物の一致」）。
+- `internal/app`: 生成した `hozoc.Leaves`（`docs/emit-go.md`「op」）の実装。`check` は `internal/project.Load`、`writeOutputs` は `internal/emit/golang` と `runEmit`、`runEmit` は `internal/plugin.Runner`、`lsp` は `internal/lsp.Serve`（`docs/packages.md`）。境界の型は生成したもの（`hozoc.CheckInput`、`hozoc.Diagnostic`。中の `internal/diag.Diagnostic` は行と列に直して写す）で、例外は生成した exception の型（`hozoc.CheckFailed{Value: hozoc.Diagnostics{...}}` など。`proc.Crashed` / `proc.MalformedOutput` は hozoc のパッケージに複製された `hozoc.Crashed` / `hozoc.MalformedOutput`。`docs/emit-go.md`「配置」）。`cli.hozo` の model は境界だけ（`docs/requirements.md`「自己展開」）なので、op をまたいで要る中身（`check` が解析した `Project`、`runEmit` に渡す IR。`View` は中身を持たない）は `Leaves` の中に持つ。`Wrappers` はない（`@cli.command` は go-cli の `entry`、`@proc.stdio` は `stop`。`docs/emit-go.md`「デコレータ」）。
+- `Presenter`（`cli.Presenter` の実装）: 入力（`CheckInput` / `EmitInput`）の `format` に応じて text か JSON（`docs/diagnostics.md`「表示」）。結果は標準出力、例外は標準エラー（`docs/plugin-go-cli.md`「実行と表示」）。text の `CheckResult` は診断の一覧と件数、`EmitResult` は warning の一覧（あれば）に続けて `written: <path>` / `removed: <path>` を一行ずつ、診断を運ぶ例外はその一覧と件数、それ以外の例外は `hozoc: <Failure.Err のメッセージ>`。json の `CheckResult` は `{"warnings": [...]}`、`EmitResult` は `{"warnings": [...], "written": [...], "removed": [...]}`、例外は `{"error": "<FQN>", "value": {...}}` で、診断を運ぶ例外の `value` は `docs/diagnostics.md`「json」の形（`{"diagnostics", "errors", "warnings"}`）、それ以外は `cli.JSONPresenter` と同じ。診断の要素は `docs/diagnostics.md`「json」と同じ形。
 - `hozo.toml` がなければ、`check` は CFG-7 を一つ作って `ConfigInvalid` にする（`internal/project` は設定なしでも動くが、CLI は設定を要求する）。
+- `lsp` は段階 4 まで未実装で、宣言にない例外として 70 で終わる（`docs/diagnostics.md`「終了コード」）。

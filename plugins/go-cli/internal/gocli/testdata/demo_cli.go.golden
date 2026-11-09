@@ -33,7 +33,8 @@ type Presenter interface {
 }
 
 // Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（なければ nil）で、
-// 生成したコードが例外の型を型スイッチで見分けて入れる。宣言にない例外なら Name は空で Err だけ。
+// 生成したコードが例外の型を型スイッチで見分けて入れる。Err は op が返した error そのもの（表示のメッセージに使える）。
+// 宣言にない例外なら Name は空で Err だけ。
 type Failure struct {
 	Name  string
 	Value any
@@ -192,9 +193,9 @@ func runAdd(ops demo.Ops, p Presenter, prog string, args []string, env func(stri
 func failAdd(p Presenter, prog string, input any, err error, stderr io.Writer) int {
 	f, code := Failure{Err: err}, 70
 	if _, ok := asException[demo.Overflow](err); ok {
-		f, code = Failure{Name: "demo.Overflow"}, 5
+		f, code = Failure{Name: "demo.Overflow", Err: err}, 5
 	} else if _, ok := asException[demo.Tired](err); ok {
-		f, code = Failure{Name: "demo.Tired"}, 70
+		f, code = Failure{Name: "demo.Tired", Err: err}, 70
 	}
 	if err := p.PresentError(stderr, "add", input, f); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", prog, err)

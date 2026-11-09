@@ -35,8 +35,8 @@ type Presenter interface {
     PresentError(w io.Writer, command string, input any, f Failure) error
 }
 
-// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値。生成した cli.go が N の例外の型を見分けて入れる。
-// 宣言にない例外なら Name は空で Err だけ
+// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値、Err は op が返した error そのもの（Presenter がメッセージに使える）。
+// 生成した cli.go が N の例外の型を見分けて入れる。宣言にない例外なら Name は空で Err だけ
 type Failure struct { Name string; Value any; Err error }
 
 type JSONPresenter struct{}

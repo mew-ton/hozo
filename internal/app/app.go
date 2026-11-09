@@ -1,127 +1,36 @@
 // Package app は hozoc の葉の op の実装と表示（docs/cli.md「手で書くもの」）。
 //
-// cli.hozo（docs/cli.md「cli.hozo」）の op を同じ名前の Go の関数で持つ: Check / WriteOutputs / RunEmit が葉で、
-// Emit は配線（check を呼んでから writeOutputs）。例外は cli.hozo と同じ名前の Go の誤りの型（CheckFailed など）で、
-// 終了コードは ExitCode が docs/diagnostics.md「終了コード」の表で決める。段階 3 で cli.hozo から生成した骨組み
-// （hozoc.Leaves）にこれらをつなぐとき、ここで変わるのは関数の形（context と生成した model の型）だけにする。
+// 骨組み（引数の解釈、例外の見分けと終了コード、使い方の表示）は cli.hozo から生成した
+// internal/gen/hozoc（既定の出力。docs/emit-go.md）と internal/gen/hozoc/cli（go-cli。docs/plugin-go-cli.md）が持ち、
+// ここは hozoc.Leaves（Check / WriteOutputs / RunEmit / Lsp）と cli.Presenter を実装する。配線の op emit は生成した
+// ops が持つ（hozoc.New(leaves).Emit）。cmd/hozoc/main.go がこれらを組み立てて cli.Main を呼ぶ。
 //
-// 段階 3 まで（骨組みを生成する前）の引数の解釈は Main が持ち（docs/cli.md「手で書くもの」の最後の項）、
-// cmd/hozoc/main.go はそれを呼ぶだけ。フラグと環境変数は cli.hozo の @cli.flag / @cli.env / @cli.arg を手で写した。
+// 境界の型は生成したもの（hozoc.CheckInput、hozoc.Diagnostic、hozoc.CheckFailed など）で、中の豊かな型
+// （internal/project.Project、internal/diag.Diagnostic）は Leaves の中にとどめる。例外は生成した exception の型で
+// 返す（hozoc.CheckFailed{Value: hozoc.Diagnostics{...}} など）。cli.go はそれを errors.As で見分けて
+// @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
 package app
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
+	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/source"
-	sdk "github.com/mew-ton/hozo/plugin"
+	"github.com/mew-ton/hozo/ir"
 )
 
-// Diagnostics は cli.hozo の model Diagnostics（指摘の一覧）。Files は表示（diag.WriteText / WriteJSON）のための
-// ファイルの集合で、Items の Span のファイルを引く。
-type Diagnostics struct {
-	Items []diag.Diagnostic
-	Files *source.FileSet
-}
-
-// CheckInput は cli.hozo の model CheckInput。
-type CheckInput struct {
-	// Config は設定ファイルの場所（--config / HOZO_CONFIG）。空なら作業ディレクトリから親へ探す。
-	Config string
-	// Format は表示の形式（--format）。"text" か "json"。空なら text。表示にだけ使い、op の中身は見ない。
-	Format string
-}
-
-// EmitInput は cli.hozo の model EmitInput。
-type EmitInput struct {
-	Config string
-	Format string
-	// Namespaces は生成する名前空間（位置引数）。一つもなければすべて。
-	Namespaces []string
-	// DryRun なら書き出さずに、書き出す予定のファイルだけを返す。
-	DryRun bool
-}
-
-// CheckResult は cli.hozo の model CheckResult（誤りではない指摘）。
-// Project は Go だけの補足で、WriteOutputs が check の結果（Program、設定、マニフェスト）を受け取るために持つ。
-type CheckResult struct {
-	Warnings []diag.Diagnostic
-	Project  *project.Project
-}
-
-// Files は Warnings の表示に使うファイルの集合。
-func (r CheckResult) Files() *source.FileSet {
-	if r.Project == nil {
-		return source.NewFileSet()
-	}
-	return r.Project.Files
-}
-
-// EmitResult は cli.hozo の model EmitResult。Written / Removed はルートからの相対パス（"/" 区切り）で辞書順。
-type EmitResult struct {
-	Warnings []diag.Diagnostic
-	Written  []string
-	Removed  []string
-	files    *source.FileSet
-}
-
-// Files は Warnings の表示に使うファイルの集合。
-func (r EmitResult) Files() *source.FileSet {
-	if r.files == nil {
-		return source.NewFileSet()
-	}
-	return r.files
-}
-
-// Plugin は cli.hozo の model Plugin（プラグインの起動のしかた）。Dir はマニフェストのディレクトリ（絶対パス）。
-type Plugin struct {
-	Name    string
-	Command []string
-	Dir     string
-}
-
-// EmitRequest は cli.hozo の model EmitRequest（docs/plugin-protocol.md「emit」の要求）。SDK の型と同じ。
-type EmitRequest = sdk.EmitRequest
-
-// EmitResponse は cli.hozo の model EmitResponse（同「emit」の応答）。SDK の型と同じ。
-type EmitResponse = sdk.EmitResponse
-
-// 例外（cli.hozo の exception）。終了コードは ExitCode。
-
-// CheckFailed は「仕様に構文か型の誤りがある」。値は error と warning のすべて。@cli.exitCode(1)。
-type CheckFailed struct{ Diagnostics }
-
-// ConfigInvalid は「hozo.toml がない、または設定が誤っている（CFG-*、MAN-*）」。@cli.exitCode(2)。
-type ConfigInvalid struct{ Diagnostics }
-
-// LanguageMismatch は「プラグインの language が名前空間の language と合わない（CFG-4）」。@cli.exitCode(2)。
-type LanguageMismatch struct{ Diagnostics }
-
-// OutputConflict は「複数の出どころが同じファイルに書こうとした（CFG-5）」。@cli.exitCode(3)。
-type OutputConflict struct{ Diagnostics }
-
-// UnknownNamespace は「emit の引数に、hozo.toml にない名前空間が指定された」。@cli.exitCode(64)。
-// Names は Go だけの補足（表示のため）。
-type UnknownNamespace struct{ Names []string }
-
-func (e *CheckFailed) Error() string      { return "hozoc.CheckFailed: " + e.summary() }
-func (e *ConfigInvalid) Error() string    { return "hozoc.ConfigInvalid: " + e.summary() }
-func (e *LanguageMismatch) Error() string { return "hozoc.LanguageMismatch: " + e.summary() }
-func (e *OutputConflict) Error() string   { return "hozoc.OutputConflict: " + e.summary() }
-func (e *UnknownNamespace) Error() string {
-	return "hozoc.UnknownNamespace: " + strings.Join(e.Names, ", ")
-}
-
-// summary は「N errors, M warnings」。
-func (d Diagnostics) summary() string {
-	errs, warns := diag.Count(d.Items)
-	return fmt.Sprintf("%d errors, %d warnings", errs, warns)
-}
-
-// Leaves は葉の op の実装（docs/cli.md「手で書くもの」の internal/app）。零値で使える。
+// Leaves は葉の op の実装（docs/cli.md「手で書くもの」の internal/app）。hozoc.Leaves を満たす。零値で使える。
+//
+// cli.hozo の model は境界だけを書く（docs/requirements.md「自己展開」）ので、op をまたいで要る中身は
+// Leaves の中に持つ: Check が解析した Project（WriteOutputs が使う）と、RunEmit に渡す IR（cli.hozo の
+// model View は中身を持たない）。hozoc は一度の実行で一つのコマンドを走らせるので、同時に使われることはない。
 type Leaves struct {
 	// Dir は作業ディレクトリ。hozo.toml を探し始める場所で、--config の相対パスの基準。空なら os の作業ディレクトリ。
 	Dir string
@@ -130,30 +39,124 @@ type Leaves struct {
 	// Env はプラグインに渡す環境変数の元。nil なら os.Environ()。
 	Env []string
 
-	// root はプロジェクトのルート。WriteOutputs が RunEmit のために置く（cli.hozo の runEmit は plugin と req しか
-	// 受け取らず、起動の作業ディレクトリ（ルート）はここから渡す）。
-	root string
+	// checked は直前の Check が解析した Project。WriteOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
+	// なので、Program・設定・マニフェストはここから取る。Check が失敗すれば nil。
+	checked *project.Project
+	// view は RunEmit に渡す IR（docs/ir.md「その名前空間から見た IR」）。WriteOutputs が RunEmit を呼ぶ直前に置く。
+	view *ir.View
 }
 
-// Emit は cli.hozo の op emit（配線）: check を呼んでから writeOutputs を呼ぶ。
-func (l *Leaves) Emit(in EmitInput) (EmitResult, error) {
-	checked, err := l.Check(CheckInput{Config: in.Config, Format: in.Format})
-	if err != nil {
-		return EmitResult{}, err
-	}
-	return l.WriteOutputs(in, checked)
-}
+var _ hozoc.Leaves = (*Leaves)(nil)
 
 // Lsp は cli.hozo の op lsp。段階 4（docs/requirements.md「段階」）まで未実装で、常にその誤りを返す。
-func (l *Leaves) Lsp(_ LspInput) error {
+// 宣言にない例外なので終了コードは 70（docs/diagnostics.md「終了コード」）。
+func (l *Leaves) Lsp(_ context.Context, _ hozoc.LspInput) error {
 	return errNotImplemented
 }
 
-// LspInput は cli.hozo の model LspInput。
-type LspInput struct {
-	Config string
-	Log    string
+// errNotImplemented は段階 4 までの lsp の答え。
+var errNotImplemented = errors.New("hozoc lsp: not implemented")
+
+// 例外の値と誤りの写し（cli.hozo の exception ↔ 中の型）。
+
+// diagnostics は診断の列を cli.hozo の model Diagnostics にする。
+func diagnostics(diags []diag.Diagnostic, fs *source.FileSet) hozoc.Diagnostics {
+	return hozoc.Diagnostics{Items: toDiagnostics(diags, fs)}
 }
 
-// errNotImplemented は段階 4 までの lsp の答え。終了コードは 64（使い方の誤り）。
-var errNotImplemented = fmt.Errorf("hozoc lsp: not implemented")
+// toDiagnostics は診断の列を cli.hozo の model Diagnostic の列にする。位置は行と列に直す（docs/diagnostics.md「構造」）。
+func toDiagnostics(diags []diag.Diagnostic, fs *source.FileSet) []hozoc.Diagnostic {
+	out := make([]hozoc.Diagnostic, 0, len(diags))
+	for i := range diags {
+		out = append(out, toDiagnostic(&diags[i], fs))
+	}
+	return out
+}
+
+func toDiagnostic(d *diag.Diagnostic, fs *source.FileSet) hozoc.Diagnostic {
+	out := hozoc.Diagnostic{Severity: d.Severity.String(), Code: d.Code, Message: d.Message}
+	if p := d.Path(fs); p != "" {
+		file := hozoc.Path(p)
+		out.File = &file
+	}
+	if d.Span != nil {
+		start, end := positions(fs, *d.Span)
+		out.Start, out.End = &start, &end
+	}
+	for _, r := range d.Related {
+		start, end := positions(fs, r.Span)
+		out.Related = append(out.Related, hozoc.RelatedInfo{File: hozoc.Path(fs.Path(r.Span.File)), Start: start, End: end, Message: r.Message})
+	}
+	if len(d.Data) > 0 {
+		out.Data = map[string][]string{}
+		for k, v := range d.Data {
+			out.Data[k] = stringList(v)
+		}
+	}
+	return out
+}
+
+// positions は Span の始まりと終わりを 1 始まりの行と列にする。
+func positions(fs *source.FileSet, s source.Span) (hozoc.Position, hozoc.Position) {
+	sp, ep := fs.Position(s.File, s.Start), fs.Position(s.File, s.End)
+	return hozoc.Position{Line: int64(sp.Line), Col: int64(sp.Col)}, hozoc.Position{Line: int64(ep.Line), Col: int64(ep.Col)}
+}
+
+// stringList は Diagnostic.Data の値（docs/check.md「Data」では FQN・ケース名・パスの列）を文字列の列にする。
+func stringList(v any) []string {
+	switch x := v.(type) {
+	case []string:
+		return x
+	case []any:
+		out := make([]string, len(x))
+		for i, e := range x {
+			out[i] = fmt.Sprint(e)
+		}
+		return out
+	case nil:
+		return nil
+	}
+	return []string{fmt.Sprint(v)}
+}
+
+// unknownNamespace は hozoc.UnknownNamespace（値を運ばない）に、表示のための名前を添えたもの。
+// errors.As は Unwrap を通して hozoc.UnknownNamespace を見つける。
+type unknownNamespace struct{ names []string }
+
+func (e *unknownNamespace) Error() string {
+	return fmt.Sprintf("名前空間 %s は hozo.toml にない", strings.Join(e.names, "、"))
+}
+
+func (e *unknownNamespace) Unwrap() error { return hozoc.UnknownNamespace{} }
+
+// procError は internal/plugin の誤り（ErrCrashed / ErrMalformedOutput）を cli.hozo の proc.Crashed /
+// proc.MalformedOutput（hozoc のパッケージに複製された型。docs/emit-go.md「配置」）としても見分けられるようにしたもの。
+// メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
+type procError struct {
+	exc   error // hozoc.Crashed{} か hozoc.MalformedOutput{}
+	cause error
+}
+
+func (e *procError) Error() string   { return e.cause.Error() }
+func (e *procError) Unwrap() []error { return []error{e.exc, e.cause} }
+
+// asProc は err が internal/plugin の proc.Crashed / proc.MalformedOutput なら procError に包む。それ以外はそのまま。
+func asProc(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, hostplugin.ErrCrashed):
+		return &procError{exc: hozoc.Crashed{}, cause: err}
+	case errors.Is(err, hostplugin.ErrMalformedOutput):
+		return &procError{exc: hozoc.MalformedOutput{}, cause: err}
+	}
+	return err
+}
+
+// str は optional の文字列の値。nil なら空。
+func str[T ~string](p *T) string {
+	if p == nil {
+		return ""
+	}
+	return string(*p)
+}

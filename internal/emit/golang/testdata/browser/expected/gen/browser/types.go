@@ -40,6 +40,24 @@ type GetMeInInput struct {
 	Verbose bool `json:"verbose"`
 }
 
+// ServerError: サーバー側の失敗（5xx 全般）
+// 名前空間 http の宣言の複製（Go のパッケージを import できないため。docs/emit-go.md「配置」）。
+type ServerError struct{}
+
+func (ServerError) Error() string         { return "http.ServerError" }
+func (ServerError) HozoException() string { return "http.ServerError" }
+
+var _ runtime.Exception = ServerError{}
+
+// NetworkError: 運搬の失敗（ステータスなし）
+// 名前空間 http の宣言の複製（Go のパッケージを import できないため。docs/emit-go.md「配置」）。
+type NetworkError struct{}
+
+func (NetworkError) Error() string         { return "http.NetworkError" }
+func (NetworkError) HozoException() string { return "http.NetworkError" }
+
+var _ runtime.Exception = NetworkError{}
+
 // Route はルートの位置（path と params）
 // 名前空間 page の宣言の複製（Go のパッケージを import できないため。docs/emit-go.md「配置」）。
 type Route string

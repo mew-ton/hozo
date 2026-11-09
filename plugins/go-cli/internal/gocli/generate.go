@@ -67,7 +67,8 @@ type Presenter interface {
 }
 
 // Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（なければ nil）で、
-// 生成したコードが例外の型を型スイッチで見分けて入れる。宣言にない例外なら Name は空で Err だけ。
+// 生成したコードが例外の型を型スイッチで見分けて入れる。Err は op が返した error そのもの（表示のメッセージに使える）。
+// 宣言にない例外なら Name は空で Err だけ。
 type Failure struct {
 	Name  string
 	Value any
@@ -271,10 +272,10 @@ func (g *generator) command(c *command) {
 		}
 		if e.HasValue {
 			g.w("%sif e, ok := asException[%s](err); ok {\n", prefix, e.GoType)
-			g.w("\t\tf, code = Failure{Name: %s, Value: e.Value}, %d\n", q(e.FQN), e.ExitCode)
+			g.w("\t\tf, code = Failure{Name: %s, Value: e.Value, Err: err}, %d\n", q(e.FQN), e.ExitCode)
 		} else {
 			g.w("%sif _, ok := asException[%s](err); ok {\n", prefix, e.GoType)
-			g.w("\t\tf, code = Failure{Name: %s}, %d\n", q(e.FQN), e.ExitCode)
+			g.w("\t\tf, code = Failure{Name: %s, Err: err}, %d\n", q(e.FQN), e.ExitCode)
 		}
 		g.b.WriteString("\t}")
 	}

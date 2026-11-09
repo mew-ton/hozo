@@ -2,7 +2,9 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"os"
 	"os/exec"
@@ -10,9 +12,21 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 )
 
 var update = flag.Bool("update", false, "ゴールデンを更新する")
+
+// 終了コード（docs/diagnostics.md「終了コード」、cli.hozo の @cli.exitCode）。
+const (
+	exitCheckFailed     = 1  // CheckFailed
+	exitConfigInvalid   = 2  // ConfigInvalid / LanguageMismatch
+	exitOutputConflict  = 3  // OutputConflict
+	exitUsage           = 64 // UnknownNamespace、使い方の誤り
+	exitSoftwareOrCrash = 70 // proc.Crashed / proc.MalformedOutput、宣言にない例外
+)
 
 const corpusDir = "../../tests/corpus/design"
 
@@ -48,7 +62,8 @@ func copyCorpus(t *testing.T) string {
 	return dir
 }
 
-// run は dir を作業ディレクトリにして Main を呼ぶ。
+// run は dir を作業ディレクトリにして、cmd/hozoc/main.go と同じ組み立て（hozoc.New(Leaves) と Presenter を
+// 生成した cli.Main に渡す）で hozoc を走らせる。
 func run(t *testing.T, dir string, env map[string]string, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
@@ -60,7 +75,8 @@ func run(t *testing.T, dir string, env map[string]string, args ...string) (code 
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chdir(wd) }()
-	code = Main(args, func(k string) string { return env[k] }, &out, &errOut)
+	ops := hozoc.New(&Leaves{Stderr: &errOut})
+	code = cli.Main(ops, Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
@@ -102,19 +118,23 @@ func TestCheckFailed(t *testing.T) {
 	dir := copyCorpus(t)
 	write(t, filepath.Join(dir, "bad.hozo"), "namespace server {\n  model Bad { x: Nope; }\n}\n")
 	code, stdout, stderr := run(t, dir, nil, "check")
-	if code != ExitCheckFailed || stdout != "" {
+	if code != exitCheckFailed || stdout != "" {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if !strings.Contains(stderr, "bad.hozo:2:") || !strings.Contains(stderr, "error[RES-1]") || !strings.Contains(stderr, "1 error, 1 warning") {
 		t.Fatalf("stderr=%q", stderr)
 	}
 	code, stdout, stderr = run(t, dir, nil, "check", "--format", "json")
-	if code != ExitCheckFailed {
+	if code != exitCheckFailed {
 		t.Fatalf("code=%d", code)
 	}
 	var f struct {
 		Error string `json:"error"`
 		Value struct {
+			Diagnostics []struct {
+				Code string              `json:"code"`
+				Data map[string][]string `json:"data"`
+			} `json:"diagnostics"`
 			Errors   int `json:"errors"`
 			Warnings int `json:"warnings"`
 		} `json:"value"`
@@ -125,19 +145,32 @@ func TestCheckFailed(t *testing.T) {
 	if f.Error != "hozoc.CheckFailed" || f.Value.Errors != 1 || f.Value.Warnings != 1 {
 		t.Fatalf("%+v", f)
 	}
+	// Diagnostic.Data（docs/check.md「Data」の RES-1 の candidates）は境界（cli.hozo の Diagnostic.data）を越えて json に出る
+	found := false
+	for _, d := range f.Value.Diagnostics {
+		if d.Code == "RES-1" {
+			found = true
+			if _, ok := d.Data["candidates"]; !ok {
+				t.Errorf("RES-1 の data に candidates がない: %s", stderr)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("RES-1 がない: %s", stderr)
+	}
 }
 
 func TestCheckMissingConfig(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a { op f(); }\n")
 	code, _, stderr := run(t, dir, nil, "check")
-	if code != ExitConfigInvalid || !strings.Contains(stderr, "hozo.toml: error[CFG-7]") {
+	if code != exitConfigInvalid || !strings.Contains(stderr, "hozo.toml: error[CFG-7]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// 設定の誤り（CFG-1）も 2
 	write(t, filepath.Join(dir, "hozo.toml"), "[a]\nlanguage = \"go\"\n")
 	code, _, stderr = run(t, dir, nil, "check")
-	if code != ExitConfigInvalid || !strings.Contains(stderr, "error[CFG-1]") {
+	if code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-1]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// HOZO_CONFIG と --config
@@ -146,7 +179,7 @@ func TestCheckMissingConfig(t *testing.T) {
 	if code, _, stderr := run(t, dir, map[string]string{"HOZO_CONFIG": "alt.toml"}, "check"); code != 0 {
 		t.Fatalf("HOZO_CONFIG: code=%d stderr=%q", code, stderr)
 	}
-	if code, _, stderr := run(t, dir, map[string]string{"HOZO_CONFIG": "alt.toml"}, "check", "--config", "hozo.toml"); code != ExitConfigInvalid {
+	if code, _, stderr := run(t, dir, map[string]string{"HOZO_CONFIG": "alt.toml"}, "check", "--config", "hozo.toml"); code != exitConfigInvalid {
 		t.Fatalf("--config が HOZO_CONFIG より優先されていない: code=%d stderr=%q", code, stderr)
 	}
 }
@@ -156,11 +189,13 @@ func TestCheckLanguageMismatch(t *testing.T) {
 	fakePlugin(t, dir, "tsp", "ts", "[emit]\nentry = [\"cli.command\"]\n", `{"files":[],"warnings":[]}`, 0)
 	write(t, filepath.Join(dir, "hozo.toml"), "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[server]\nlanguage = \"go\"\nout = \"gen/server\"\nplugins = [\"tsp\"]\n\n[browser]\nlanguage = \"go\"\nout = \"gen/browser\"\n")
 	code, _, stderr := run(t, dir, nil, "check")
-	if code != ExitConfigInvalid || !strings.Contains(stderr, "error[CFG-4]") {
+	if code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-4]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	l := &Leaves{Dir: dir}
-	if _, err := l.Check(CheckInput{}); err == nil || !strings.HasPrefix(err.Error(), "hozoc.LanguageMismatch") {
+	_, err := l.Check(context.Background(), hozoc.CheckInput{})
+	var lm hozoc.LanguageMismatch
+	if !errors.As(err, &lm) || len(lm.Value.Items) == 0 {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -298,7 +333,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[{"path":"gen/server/types.go","content":"x"}],"warnings":[]}`, 0)
 	before := mtimes(t, filepath.Join(dir, "gen"))
 	code, stdout, stderr = run(t, dir, nil, "emit")
-	if code != ExitOutputConflict || stdout != "" || !strings.Contains(stderr, "gen/server/types.go: error[CFG-5]") || !strings.Contains(stderr, "プラグイン fake") {
+	if code != exitOutputConflict || stdout != "" || !strings.Contains(stderr, "gen/server/types.go: error[CFG-5]") || !strings.Contains(stderr, "プラグイン fake") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	for f, m := range mtimes(t, filepath.Join(dir, "gen")) {
@@ -309,17 +344,17 @@ func TestEmitStaleAndConflict(t *testing.T) {
 
 	// PLG-1 → proc.MalformedOutput → 70
 	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[{"path":"../x.go","content":"x"}],"warnings":[]}`, 0)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != ExitSoftwareOrCrash || !strings.Contains(stderr, "PLG-1") {
+	if code, _, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-1") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// errors → CheckFailed（1）
 	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[],"warnings":[],"errors":[{"code":"FAKE-1","at":"server.placeOrder","message":"nope"}]}`, 0)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != ExitCheckFailed || !strings.Contains(stderr, "server.hozo:230:3: error[FAKE-1]: nope") {
+	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || !strings.Contains(stderr, "server.hozo:230:3: error[FAKE-1]: nope") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// 異常終了 → 70
 	fakePlugin(t, dir, "fake", "go", emitTable, ``, 3)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != ExitSoftwareOrCrash || !strings.Contains(stderr, "hozoc: ") {
+	if code, _, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "hozoc: ") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 }
@@ -327,14 +362,14 @@ func TestEmitStaleAndConflict(t *testing.T) {
 func TestEmitUnknownNamespace(t *testing.T) {
 	dir := copyCorpus(t)
 	code, stdout, stderr := run(t, dir, nil, "emit", "nope")
-	if code != ExitUsage || stdout != "" || !strings.Contains(stderr, "名前空間 nope は hozo.toml にない") {
+	if code != exitUsage || stdout != "" || !strings.Contains(stderr, "名前空間 nope は hozo.toml にない") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "gen")); !os.IsNotExist(err) {
 		t.Fatal("書き出している")
 	}
 	code, _, stderr = run(t, dir, nil, "emit", "--format=json", "nope")
-	if code != ExitUsage || strings.TrimSpace(stderr) != "{\n  \"error\": \"hozoc.UnknownNamespace\"\n}" {
+	if code != exitUsage || strings.TrimSpace(stderr) != "{\n  \"error\": \"hozoc.UnknownNamespace\"\n}" {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 }
@@ -345,17 +380,18 @@ func TestUsageAndLsp(t *testing.T) {
 		args []string
 		code int
 	}{
-		{nil, ExitUsage},
+		{nil, exitUsage},
 		{[]string{"help"}, 0},
 		{[]string{"check", "--help"}, 0},
-		{[]string{"bogus"}, ExitUsage},
-		{[]string{"check", "--nope"}, ExitUsage},
-		{[]string{"check", "--format"}, ExitUsage},
-		{[]string{"check", "--format=yaml"}, ExitUsage},
-		{[]string{"check", "server"}, ExitUsage},
-		{[]string{"emit", "--dry-run=maybe"}, ExitUsage},
-		{[]string{"lsp"}, ExitUsage},
+		{[]string{"bogus"}, exitUsage},
+		{[]string{"check", "--nope"}, exitUsage},
+		{[]string{"check", "--format"}, exitUsage},
+		{[]string{"check", "--format=yaml"}, exitUsage},
+		{[]string{"check", "server"}, exitUsage},
+		{[]string{"emit", "--dry-run=maybe"}, exitUsage},
+		{[]string{"lsp"}, exitSoftwareOrCrash}, // 段階 4 まで未実装。宣言にない例外は 70
 		{[]string{"emit", "--dry-run", "--", "server"}, 0},
+		{[]string{"emit", "--format", "text", "--format", "json", "--dry-run", "-x"}, exitUsage}, // -x は位置引数（知らない名前空間）
 	}
 	for _, c := range cases {
 		code, _, stderr := run(t, dir, nil, c.args...)
@@ -366,23 +402,6 @@ func TestUsageAndLsp(t *testing.T) {
 	_, _, stderr := run(t, dir, nil, "lsp")
 	if !strings.Contains(stderr, "not implemented") {
 		t.Errorf("lsp stderr=%q", stderr)
-	}
-}
-
-func TestParseArgs(t *testing.T) {
-	flags, pos, err := parseArgs([]string{"--config", "a.toml", "--format=json", "--dry-run", "-x", "ns1", "--", "--ns2"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if flags["config"] != "a.toml" || flags["format"] != "json" || flags["dry-run"] != "true" {
-		t.Fatalf("flags = %v", flags)
-	}
-	if strings.Join(pos, ",") != "-x,ns1,--ns2" {
-		t.Fatalf("positional = %v", pos)
-	}
-	flags, _, _ = parseArgs([]string{"--format", "text", "--format", "json", "--dry-run=false"})
-	if flags["format"] != "json" || flags["dry-run"] != "false" {
-		t.Fatalf("flags = %v", flags)
 	}
 }
 

@@ -6,8 +6,10 @@ import "github.com/mew-ton/hozo/ir"
 // （docs/emit-go.md「配置」の「使う型を N のパッケージに複製する」）を推移的に集める。
 //
 // 複製するのは、viewer のパッケージが型として使う参照先のうち、Go で同じプロジェクトでない
-// 名前空間（語彙の名前空間、グローバル、TS の名前空間）の model / scalar / union と、
-// それらのフィールド・元の型・アームが参照する宣言。
+// 名前空間（語彙の名前空間、グローバル、TS の名前空間）の model / scalar / union / exception と、
+// それらのフィールド・元の型・アーム・値が参照する宣言。exception は op の（viewer から見た）
+// Signature.exceptions から辿る: 葉の実装者が投げ、呼ぶ側（go-cli の cli.go など）が errors.As で
+// 見分けるための Go の型が要るため（docs/emit-go.md「配置」「exception」）。
 func (e *emitter) collectDecls() {
 	for _, d := range e.ns.Decls {
 		switch x := d.(type) {
@@ -38,6 +40,9 @@ func (e *emitter) collectDecls() {
 				e.visitType(p.Type)
 			}
 			e.visitType(x.Returns)
+			for _, fqn := range e.viewedSig(x.Name).Exceptions {
+				e.visitRef(fqn)
+			}
 			e.visitWiring(x.Body)
 		}
 	}
@@ -58,6 +63,8 @@ func (e *emitter) collectDecls() {
 				e.scalars = append(e.scalars, x)
 			case *ir.Union:
 				e.unions = append(e.unions, x)
+			case *ir.Exception:
+				e.exceptions = append(e.exceptions, x)
 			}
 		}
 	}
@@ -156,6 +163,9 @@ func (e *emitter) visitRef(fqn string) {
 		for _, a := range d.Arms {
 			e.visitType(a.Type)
 		}
+	case *ir.Exception:
+		e.copied[fqn] = true
+		e.visitType(d.Value)
 	}
 }
 

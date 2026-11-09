@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,9 +14,11 @@ import (
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/emit/golang"
+	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/ir"
+	sdk "github.com/mew-ton/hozo/plugin"
 )
 
 // OutputsFile は各名前空間の Dir(N) に置く、前回書いたパスの一覧（docs/cli.md「emit」の 6 と 8）。
@@ -30,7 +33,8 @@ type output struct {
 	ns      string // 名前空間
 }
 
-// WriteOutputs は cli.hozo の op writeOutputs（docs/cli.md「emit」の 1〜8）。
+// WriteOutputs は cli.hozo の op writeOutputs（docs/cli.md「emit」の 1〜8）。checked は Check が返したもの（warning）で、
+// その中身（Program、設定、マニフェスト）は Check が l.checked に置いた Project から取る。
 //
 //  1. namespaces が空でなければ、その名前空間（と子孫）だけを対象にする。hozo.toml にない名前（設定を解決できない）なら UnknownNamespace。
 //  2. 対象の各名前空間について、language が go なら既定の出力（internal/emit/golang）を作る。
@@ -44,24 +48,23 @@ type output struct {
 //
 // プラグインの files の path はルートからの相対パス（docs/plugin-protocol.md「emit」）。`..` や絶対パスは PLG-1、
 // 同じ応答の中の重複は PLG-2 で、どちらも proc.MalformedOutput。
-func (l *Leaves) WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, error) {
-	p := checked.Project
-	if p == nil {
-		return EmitResult{}, errors.New("hozoc: WriteOutputs に check の結果がない")
+func (l *Leaves) WriteOutputs(ctx context.Context, in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitResult, error) {
+	p := l.checked
+	if p == nil || len(checked.Warnings) != len(p.Diags) {
+		return hozoc.EmitResult{}, errors.New("hozoc: WriteOutputs の checked が直前の Check の結果でない")
 	}
-	l.root = p.Root
 	views := p.Views()
 
 	// 1. 対象の名前空間
 	targets, err := selectTargets(p, views, in.Namespaces)
 	if err != nil {
-		return EmitResult{}, err
+		return hozoc.EmitResult{}, err
 	}
 
-	// 2〜3. 既定の出力とプラグイン。warnings は check の warning（checked）から始める（EmitResult.warnings は
-	// check の warning と、GOEMIT-* の warning、プラグインの warnings のすべて）。
+	// 2〜3. 既定の出力とプラグイン。warnings は check の warning（p.Diags。checked.Warnings と同じもの）から始める
+	// （EmitResult.warnings は check の warning と、GOEMIT-* の warning、プラグインの warnings のすべて）。
 	var outputs []output
-	warnings := append([]diag.Diagnostic{}, checked.Warnings...)
+	warnings := append([]diag.Diagnostic{}, p.Diags...)
 	var failures []diag.Diagnostic
 	for _, ns := range targets {
 		view := views[ns]
@@ -86,31 +89,32 @@ func (l *Leaves) WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, er
 			if !m.HasEmit() {
 				continue
 			}
-			resp, err := l.RunEmit(Plugin{Name: m.Name, Command: m.Command, Dir: p.ManifestDirs[m.Name]},
-				EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", View: view})
+			l.view = view
+			resp, err := l.RunEmit(ctx,
+				hozoc.Plugin{Name: m.Name, Command: m.Command, Dir: hozoc.Path(p.ManifestDirs[m.Name]), Root: hozoc.Path(p.Root)},
+				hozoc.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit"})
 			if err != nil {
 				var pe *hostplugin.PluginError
 				if errors.As(err, &pe) {
 					d := pe.Diagnostic(p.ManifestPath(m.Name))
-					return EmitResult{}, &ConfigInvalid{Diagnostics{Items: append(append([]diag.Diagnostic{}, warnings...), d), Files: p.Files}}
+					return hozoc.EmitResult{}, hozoc.ConfigInvalid{Value: diagnostics(append(append([]diag.Diagnostic{}, warnings...), d), p.Files)}
 				}
-				return EmitResult{}, err
+				return hozoc.EmitResult{}, err
 			}
 			for _, w := range resp.Warnings {
-				warnings = append(warnings, p.PluginWarning(m.Name, w))
+				warnings = append(warnings, p.PluginWarning(m.Name, sdk.Warning{At: w.At, Message: w.Message}))
 			}
 			for _, e := range resp.Errors {
-				e.Severity = "error"
-				failures = append(failures, p.PluginDiagnostic(m.Name, e))
+				failures = append(failures, p.PluginDiagnostic(m.Name, sdk.Diagnostic{Severity: "error", Code: e.Code, At: e.At, Message: e.Message}))
 			}
 			seen := map[string]bool{}
 			for _, f := range resp.Files {
-				rel, ok := pluginPath(f.Path)
+				rel, ok := pluginPath(string(f.Path))
 				if !ok {
-					return EmitResult{}, &hostplugin.MalformedOutputError{Plugin: m.Name, Reason: fmt.Sprintf("PLG-1: files の path %q がルートの外に出る", f.Path)}
+					return hozoc.EmitResult{}, asProc(&hostplugin.MalformedOutputError{Plugin: m.Name, Reason: fmt.Sprintf("PLG-1: files の path %q がルートの外に出る", f.Path)})
 				}
 				if seen[rel] {
-					return EmitResult{}, &hostplugin.MalformedOutputError{Plugin: m.Name, Reason: fmt.Sprintf("PLG-2: files の path %q が二度ある", f.Path)}
+					return hozoc.EmitResult{}, asProc(&hostplugin.MalformedOutputError{Plugin: m.Name, Reason: fmt.Sprintf("PLG-2: files の path %q が二度ある", f.Path)})
 				}
 				seen[rel] = true
 				outputs = append(outputs, output{path: rel, content: []byte(f.Content), source: "プラグイン " + m.Name, ns: ns})
@@ -120,7 +124,7 @@ func (l *Leaves) WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, er
 	if len(failures) > 0 {
 		all := append(append([]diag.Diagnostic{}, failures...), warnings...)
 		diag.Sort(all, p.Files, nil)
-		return EmitResult{}, &CheckFailed{Diagnostics{Items: all, Files: p.Files}}
+		return hozoc.EmitResult{}, hozoc.CheckFailed{Value: diagnostics(all, p.Files)}
 	}
 	diag.Sort(warnings, p.Files, nil)
 	sort.SliceStable(outputs, func(i, j int) bool { return outputs[i].path < outputs[j].path })
@@ -128,16 +132,16 @@ func (l *Leaves) WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, er
 	// 4. CFG-5
 	if conflicts := findConflicts(outputs); len(conflicts) > 0 {
 		all := append(conflicts, warnings...)
-		return EmitResult{}, &OutputConflict{Diagnostics{Items: all, Files: p.Files}}
+		return hozoc.EmitResult{}, hozoc.OutputConflict{Value: diagnostics(all, p.Files)}
 	}
 
-	result := EmitResult{Warnings: warnings, Written: []string{}, Removed: []string{}, files: p.Files}
+	result := hozoc.EmitResult{Warnings: toDiagnostics(warnings, p.Files), Written: []hozoc.Path{}, Removed: []hozoc.Path{}}
 	for _, o := range outputs {
-		result.Written = append(result.Written, o.path)
+		result.Written = append(result.Written, hozoc.Path(o.path))
 	}
 
 	// 5. dry-run
-	if in.DryRun {
+	if in.DryRun != nil && *in.DryRun {
 		return result, nil
 	}
 
@@ -168,10 +172,10 @@ func (l *Leaves) WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, er
 				}
 				return result, fmt.Errorf("hozoc: %s を消せない: %w", prev, err)
 			}
-			result.Removed = append(result.Removed, prev)
+			result.Removed = append(result.Removed, hozoc.Path(prev))
 		}
 	}
-	sort.Strings(result.Removed)
+	sort.Slice(result.Removed, func(i, j int) bool { return result.Removed[i] < result.Removed[j] })
 
 	// 7. 書く（内容が同じなら書き直さない）
 	for _, o := range outputs {
@@ -203,15 +207,27 @@ func (l *Leaves) WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, er
 }
 
 // RunEmit は cli.hozo の op runEmit: プラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
-// 起動は internal/plugin.Runner で、作業ディレクトリは直前の WriteOutputs のプロジェクトのルート。
-// 誤りは internal/plugin のもの（*PluginError、ErrCrashed、ErrMalformedOutput）。
-func (l *Leaves) RunEmit(pl Plugin, req EmitRequest) (EmitResponse, error) {
+// 起動は internal/plugin.Runner で、作業ディレクトリは plugin.Root。要求の view は cli.hozo では中身を書かない
+// （model View {}）ので、WriteOutputs が l.view に置いた IR を渡す。
+// 誤りは proc.Crashed / proc.MalformedOutput（asProc）か、終了コード 2 の *hostplugin.PluginError（呼ぶ側が MAN-* にする）。
+func (l *Leaves) RunEmit(_ context.Context, pl hozoc.Plugin, req hozoc.EmitRequest) (hozoc.EmitResponse, error) {
 	m := &hostplugin.Manifest{Name: pl.Name, Command: pl.Command}
-	var resp EmitResponse
-	if err := (hostplugin.Runner{Root: l.root, Stderr: l.Stderr, Env: l.Env}).Run(m, pl.Dir, &req, &resp); err != nil {
-		return EmitResponse{}, err
+	sdkReq := sdk.EmitRequest{Protocol: req.Protocol, Direction: req.Direction, View: l.view}
+	var resp sdk.EmitResponse
+	if err := (hostplugin.Runner{Root: string(pl.Root), Stderr: l.Stderr, Env: l.Env}).Run(m, string(pl.Dir), &sdkReq, &resp); err != nil {
+		return hozoc.EmitResponse{}, asProc(err)
 	}
-	return resp, nil
+	out := hozoc.EmitResponse{Files: []hozoc.OutputFile{}, Warnings: []hozoc.PluginWarning{}, Errors: []hozoc.PluginError{}}
+	for _, f := range resp.Files {
+		out.Files = append(out.Files, hozoc.OutputFile{Path: hozoc.Path(f.Path), Content: f.Content})
+	}
+	for _, w := range resp.Warnings {
+		out.Warnings = append(out.Warnings, hozoc.PluginWarning{At: w.At, Message: w.Message})
+	}
+	for _, e := range resp.Errors {
+		out.Errors = append(out.Errors, hozoc.PluginError{Code: e.Code, At: e.At, Message: e.Message})
+	}
+	return out, nil
 }
 
 // selectTargets は対象の名前空間（View のある名前空間）を Program の順で返す（docs/cli.md「emit」の 1）。
@@ -224,7 +240,7 @@ func selectTargets(p *project.Project, views map[string]*ir.View, names []string
 		}
 	}
 	if len(unknown) > 0 {
-		return nil, &UnknownNamespace{Names: unknown}
+		return nil, &unknownNamespace{names: unknown}
 	}
 	var targets []string
 	for i := range p.Sema.Program.Namespaces {

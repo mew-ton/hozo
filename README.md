@@ -14,4 +14,4 @@ make test
 
 ## 状態
 
-段階 2 まで（`docs/requirements.md`「段階」）。仮の CLI の `hozoc check` / `hozoc emit` が動き、リポジトリ直下の `cli.hozo` が `check` を通る。`hozoc lsp` は未実装。次は段階 3（`cli.hozo` から生成した骨組みで `cmd/hozoc` を置き換える）。
+段階 3 まで（`docs/requirements.md`「段階」）。`hozoc check` / `hozoc emit` が動き、`cmd/hozoc` の骨組みは `cli.hozo` から生成したもの（`internal/gen/hozoc`。`make generate` で生成し直す）。`hozoc lsp` は未実装（段階 4）。

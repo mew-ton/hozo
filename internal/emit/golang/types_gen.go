@@ -239,6 +239,9 @@ func (e *emitter) genException(g *genFile, x *ir.Exception) {
 	name := e.typeName(x.Name)
 	rt := g.imports.Add("github.com/mew-ton/hozo/runtime", "runtime")
 	g.body.WriteString(comment(name + ": " + docText(x.Description, x.Name+" の exception。")))
+	if e.copyNote != "" {
+		g.printf("// %s\n", e.copyNote)
+	}
 	if x.Value != nil {
 		g.printf("type %s struct{ Value %s }\n\n", name, gol.GoType(x.Value, &g.imports))
 	} else {

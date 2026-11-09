@@ -2,18 +2,33 @@ package tests
 
 import (
 	"bytes"
+	"io"
 	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/app"
+	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 )
+
+// hozocMain は cmd/hozoc/main.go と同じ組み立て（docs/cli.md「手で書くもの」）: 生成した cli.Main に
+// internal/app の Leaves（hozoc.New で Ops に）と Presenter を渡す。作業ディレクトリは tests/ で、hozo.toml は親（リポジトリ直下）に見つかる。
+func hozocMain(args []string, stdout, stderr io.Writer) int {
+	return hozocMainIn("", args, stdout, stderr)
+}
+
+// hozocMainIn は dir を作業ディレクトリ（hozo.toml を探し始める場所）にして hozoc を走らせる。空なら os の作業ディレクトリ。
+func hozocMainIn(dir string, args []string, stdout, stderr io.Writer) int {
+	ops := hozoc.New(&app.Leaves{Dir: dir, Stderr: stderr})
+	return cli.Main(ops, app.Presenter{}, args, func(string) string { return "" }, stdout, stderr)
+}
 
 // TestSelfCheck は hozoc 自身（リポジトリ直下の cli.hozo と hozo.toml）が hozoc check を error なしで通ること
 // （docs/testing.md「コーパス」の最後の段落、docs/requirements.md「段階」の 2）。warning は許し、表示する。
 func TestSelfCheck(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := app.Main([]string{"check"}, func(string) string { return "" }, &stdout, &stderr)
+	code := hozocMain([]string{"check"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("hozoc check の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
@@ -28,7 +43,7 @@ func TestSelfEmitDryRun(t *testing.T) {
 		t.Skip("go がない")
 	}
 	var stdout, stderr bytes.Buffer
-	code := app.Main([]string{"emit", "--dry-run"}, func(string) string { return "" }, &stdout, &stderr)
+	code := hozocMain([]string{"emit", "--dry-run"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("hozoc emit --dry-run の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
