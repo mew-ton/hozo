@@ -1,0 +1,1180 @@
+{
+  "version": "0.1",
+  "viewer": "browser",
+  "config": {
+    "language": "go",
+    "out": "gen/browser",
+    "plugins": [
+      "react-router"
+    ]
+  },
+  "program": {
+    "version": "0.1",
+    "namespaces": [
+      {
+        "name": "http",
+        "decls": [
+          {
+            "kind": "exception",
+            "name": "http.ServerError",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 1015,
+                "col": 1
+              },
+              "end": {
+                "line": 1015,
+                "col": 10
+              }
+            }
+          },
+          {
+            "kind": "exception",
+            "name": "http.NetworkError",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 1016,
+                "col": 1
+              },
+              "end": {
+                "line": 1016,
+                "col": 10
+              }
+            }
+          },
+          {
+            "kind": "decorator",
+            "name": "http.post",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 1013,
+                "col": 1
+              },
+              "end": {
+                "line": 1013,
+                "col": 10
+              }
+            },
+            "params": [
+              {
+                "name": "path",
+                "type": {
+                  "kind": "type",
+                  "types": [
+                    {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  ]
+                },
+                "optional": false
+              }
+            ],
+            "targets": [
+              "op"
+            ],
+            "external": true,
+            "throws": [
+              {
+                "exceptions": [
+                  "http.ServerError",
+                  "http.NetworkError"
+                ],
+                "relations": []
+              }
+            ],
+            "catches": []
+          },
+          {
+            "kind": "decorator",
+            "name": "http.get",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 1014,
+                "col": 1
+              },
+              "end": {
+                "line": 1014,
+                "col": 10
+              }
+            },
+            "params": [
+              {
+                "name": "path",
+                "type": {
+                  "kind": "type",
+                  "types": [
+                    {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  ]
+                },
+                "optional": false
+              }
+            ],
+            "targets": [
+              "op"
+            ],
+            "external": true,
+            "throws": [
+              {
+                "exceptions": [
+                  "http.ServerError",
+                  "http.NetworkError"
+                ],
+                "relations": []
+              }
+            ],
+            "catches": []
+          }
+        ]
+      },
+      {
+        "name": "server",
+        "decls": [
+          {
+            "kind": "scalar",
+            "name": "server.Token",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1017,
+                "col": 1
+              },
+              "end": {
+                "line": 1017,
+                "col": 10
+              }
+            },
+            "base": {
+              "kind": "core",
+              "name": "string"
+            }
+          },
+          {
+            "kind": "model",
+            "name": "server.Session",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1018,
+                "col": 1
+              },
+              "end": {
+                "line": 1018,
+                "col": 10
+              }
+            },
+            "fields": [
+              {
+                "name": "token",
+                "type": {
+                  "kind": "ref",
+                  "target": "server.Token"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1019,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1019,
+                    "col": 10
+                  }
+                }
+              },
+              {
+                "name": "userId",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1020,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1020,
+                    "col": 10
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "state",
+            "name": "server.sessions",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1021,
+                "col": 1
+              },
+              "end": {
+                "line": 1021,
+                "col": 10
+              }
+            },
+            "shape": "list",
+            "element": {
+              "kind": "ref",
+              "target": "server.Session"
+            }
+          },
+          {
+            "kind": "effect",
+            "name": "server.deleteSession",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1022,
+                "col": 1
+              },
+              "end": {
+                "line": 1022,
+                "col": 10
+              }
+            },
+            "state": "server.sessions",
+            "operation": "delete"
+          },
+          {
+            "kind": "model",
+            "name": "server.LogoutInput",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1023,
+                "col": 1
+              },
+              "end": {
+                "line": 1023,
+                "col": 10
+              }
+            },
+            "fields": [
+              {
+                "name": "token",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "ref",
+                    "target": "server.Token"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1024,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1024,
+                    "col": 10
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "op",
+            "name": "server.logout",
+            "decorators": [
+              {
+                "decorator": "http.post",
+                "args": [
+                  {
+                    "param": "path",
+                    "value": {
+                      "kind": "literal",
+                      "literal": {
+                        "kind": "string",
+                        "value": "/logout"
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "hozo:vocab/http.hozo",
+                  "start": {
+                    "line": 1004,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1004,
+                    "col": 10
+                  }
+                }
+              }
+            ],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1003,
+                "col": 1
+              },
+              "end": {
+                "line": 1003,
+                "col": 10
+              }
+            },
+            "params": [
+              {
+                "name": "in",
+                "type": {
+                  "kind": "ref",
+                  "target": "server.LogoutInput"
+                },
+                "span": {
+                  "file": "global.hozo",
+                  "start": {
+                    "line": 1002,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1002,
+                    "col": 10
+                  }
+                }
+              }
+            ],
+            "returns": null,
+            "effects": [
+              "server.deleteSession"
+            ],
+            "throws": [],
+            "body": null,
+            "signature": {
+              "exceptions": [],
+              "effects": [
+                "server.deleteSession"
+              ],
+              "relations": [],
+              "successEffects": [
+                {
+                  "effect": "server.deleteSession",
+                  "state": "kept"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "model",
+            "name": "server.Inner",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1027,
+                "col": 1
+              },
+              "end": {
+                "line": 1027,
+                "col": 10
+              }
+            },
+            "fields": [
+              {
+                "name": "token",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "ref",
+                    "target": "server.Token"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1028,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1028,
+                    "col": 10
+                  }
+                }
+              },
+              {
+                "name": "n",
+                "type": {
+                  "kind": "core",
+                  "name": "int"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1029,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1029,
+                    "col": 10
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "model",
+            "name": "server.Outer",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1030,
+                "col": 1
+              },
+              "end": {
+                "line": 1030,
+                "col": 10
+              }
+            },
+            "fields": [
+              {
+                "name": "inner",
+                "type": {
+                  "kind": "ref",
+                  "target": "server.Inner"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1031,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1031,
+                    "col": 10
+                  }
+                }
+              },
+              {
+                "name": "note",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1032,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1032,
+                    "col": 10
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "op",
+            "name": "server.deep",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1035,
+                "col": 1
+              },
+              "end": {
+                "line": 1035,
+                "col": 10
+              }
+            },
+            "params": [
+              {
+                "name": "in",
+                "type": {
+                  "kind": "ref",
+                  "target": "server.Outer"
+                },
+                "span": {
+                  "file": "global.hozo",
+                  "start": {
+                    "line": 1033,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1033,
+                    "col": 10
+                  }
+                }
+              },
+              {
+                "name": "t",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "ref",
+                    "target": "server.Token"
+                  }
+                },
+                "span": {
+                  "file": "global.hozo",
+                  "start": {
+                    "line": 1034,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1034,
+                    "col": 10
+                  }
+                }
+              }
+            ],
+            "returns": {
+              "kind": "core",
+              "name": "string"
+            },
+            "effects": [],
+            "throws": [],
+            "body": null,
+            "signature": {
+              "exceptions": [],
+              "effects": [],
+              "relations": [],
+              "successEffects": []
+            }
+          }
+        ]
+      },
+      {
+        "name": "browser",
+        "decls": [
+          {
+            "kind": "state",
+            "name": "browser.token",
+            "decorators": [],
+            "span": {
+              "file": "browser.hozo",
+              "start": {
+                "line": 1025,
+                "col": 1
+              },
+              "end": {
+                "line": 1025,
+                "col": 10
+              }
+            },
+            "shape": "single",
+            "element": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "server.Token"
+              }
+            }
+          },
+          {
+            "kind": "effect",
+            "name": "browser.removeToken",
+            "decorators": [],
+            "span": {
+              "file": "browser.hozo",
+              "start": {
+                "line": 1026,
+                "col": 1
+              },
+              "end": {
+                "line": 1026,
+                "col": 10
+              }
+            },
+            "state": "browser.token",
+            "operation": "put"
+          },
+          {
+            "kind": "op",
+            "name": "browser.clearToken",
+            "decorators": [],
+            "span": {
+              "file": "browser.hozo",
+              "start": {
+                "line": 1005,
+                "col": 1
+              },
+              "end": {
+                "line": 1005,
+                "col": 10
+              }
+            },
+            "params": [],
+            "returns": null,
+            "effects": [
+              "browser.removeToken"
+            ],
+            "throws": [],
+            "body": null,
+            "signature": {
+              "exceptions": [],
+              "effects": [
+                "browser.removeToken"
+              ],
+              "relations": [],
+              "successEffects": [
+                {
+                  "effect": "browser.removeToken",
+                  "state": "kept"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "decorator",
+            "name": "browser.ignoreFailure",
+            "decorators": [],
+            "span": {
+              "file": "browser.hozo",
+              "start": {
+                "line": 1001,
+                "col": 1
+              },
+              "end": {
+                "line": 1001,
+                "col": 10
+              }
+            },
+            "params": [],
+            "targets": [
+              "op"
+            ],
+            "external": false,
+            "throws": [],
+            "catches": [
+              {
+                "exceptions": [
+                  "http.NetworkError",
+                  "http.ServerError"
+                ],
+                "mode": "ignores"
+              }
+            ]
+          },
+          {
+            "kind": "op",
+            "name": "browser.requestLogout",
+            "decorators": [
+              {
+                "decorator": "browser.ignoreFailure",
+                "args": [],
+                "span": {
+                  "file": "browser.hozo",
+                  "start": {
+                    "line": 1008,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1008,
+                    "col": 10
+                  }
+                }
+              }
+            ],
+            "span": {
+              "file": "browser.hozo",
+              "start": {
+                "line": 1007,
+                "col": 1
+              },
+              "end": {
+                "line": 1007,
+                "col": 10
+              }
+            },
+            "params": [],
+            "returns": null,
+            "effects": [],
+            "throws": [],
+            "body": {
+              "statements": [
+                {
+                  "kind": "call",
+                  "call": {
+                    "op": "server.logout",
+                    "args": [
+                      {
+                        "param": "in",
+                        "value": {
+                          "kind": "record",
+                          "fields": [],
+                          "span": {
+                            "file": "",
+                            "start": {
+                              "line": 0,
+                              "col": 0
+                            },
+                            "end": {
+                              "line": 0,
+                              "col": 0
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [
+                      {
+                        "path": [
+                          "in",
+                          "token"
+                        ],
+                        "state": "browser.token"
+                      }
+                    ],
+                    "span": {
+                      "file": "server.hozo",
+                      "start": {
+                        "line": 1006,
+                        "col": 1
+                      },
+                      "end": {
+                        "line": 1006,
+                        "col": 10
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 1006,
+                      "col": 1
+                    },
+                    "end": {
+                      "line": 1006,
+                      "col": 10
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [],
+              "effects": [
+                "server.deleteSession"
+              ],
+              "relations": [],
+              "successEffects": [
+                {
+                  "effect": "server.deleteSession",
+                  "state": "unknown"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "op",
+            "name": "browser.logout",
+            "decorators": [],
+            "span": {
+              "file": "browser.hozo",
+              "start": {
+                "line": 1011,
+                "col": 1
+              },
+              "end": {
+                "line": 1011,
+                "col": 10
+              }
+            },
+            "params": [],
+            "returns": null,
+            "effects": [],
+            "throws": [],
+            "body": {
+              "statements": [
+                {
+                  "kind": "call",
+                  "call": {
+                    "op": "browser.requestLogout",
+                    "args": [],
+                    "bound": [],
+                    "span": {
+                      "file": "browser.hozo",
+                      "start": {
+                        "line": 1009,
+                        "col": 1
+                      },
+                      "end": {
+                        "line": 1009,
+                        "col": 10
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "browser.hozo",
+                    "start": {
+                      "line": 1009,
+                      "col": 1
+                    },
+                    "end": {
+                      "line": 1009,
+                      "col": 10
+                    }
+                  }
+                },
+                {
+                  "kind": "call",
+                  "call": {
+                    "op": "browser.clearToken",
+                    "args": [],
+                    "bound": [],
+                    "span": {
+                      "file": "browser.hozo",
+                      "start": {
+                        "line": 1010,
+                        "col": 1
+                      },
+                      "end": {
+                        "line": 1010,
+                        "col": 10
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "browser.hozo",
+                    "start": {
+                      "line": 1010,
+                      "col": 1
+                    },
+                    "end": {
+                      "line": 1010,
+                      "col": 10
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [],
+              "effects": [
+                "server.deleteSession",
+                "browser.removeToken"
+              ],
+              "relations": [],
+              "successEffects": [
+                {
+                  "effect": "server.deleteSession",
+                  "state": "unknown"
+                },
+                {
+                  "effect": "browser.removeToken",
+                  "state": "kept"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "model",
+            "name": "browser.logout$in",
+            "decorators": [],
+            "span": {
+              "file": "global.hozo",
+              "start": {
+                "line": 1002,
+                "col": 1
+              },
+              "end": {
+                "line": 1002,
+                "col": 10
+              }
+            },
+            "fields": [],
+            "synthesizedFrom": "server.logout"
+          },
+          {
+            "kind": "model",
+            "name": "browser.deep$in",
+            "decorators": [],
+            "span": {
+              "file": "global.hozo",
+              "start": {
+                "line": 1033,
+                "col": 1
+              },
+              "end": {
+                "line": 1033,
+                "col": 10
+              }
+            },
+            "fields": [
+              {
+                "name": "inner",
+                "type": {
+                  "kind": "ref",
+                  "target": "browser.deep$in$inner"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1031,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1031,
+                    "col": 10
+                  }
+                }
+              },
+              {
+                "name": "note",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1032,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1032,
+                    "col": 10
+                  }
+                }
+              }
+            ],
+            "synthesizedFrom": "server.deep"
+          },
+          {
+            "kind": "model",
+            "name": "browser.deep$in$inner",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 1031,
+                "col": 1
+              },
+              "end": {
+                "line": 1031,
+                "col": 10
+              }
+            },
+            "fields": [
+              {
+                "name": "n",
+                "type": {
+                  "kind": "core",
+                  "name": "int"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 1029,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 1029,
+                    "col": 10
+                  }
+                }
+              }
+            ],
+            "synthesizedFrom": "server.deep"
+          }
+        ]
+      }
+    ],
+    "binds": [
+      {
+        "namespace": "browser",
+        "state": "browser.token",
+        "target": {
+          "namespace": "server",
+          "deep": false
+        },
+        "span": {
+          "file": "browser.hozo",
+          "start": {
+            "line": 1012,
+            "col": 1
+          },
+          "end": {
+            "line": 1012,
+            "col": 10
+          }
+        }
+      }
+    ]
+  },
+  "ops": {
+    "browser.clearToken": {
+      "exceptions": [],
+      "effects": [
+        "browser.removeToken"
+      ],
+      "relations": [],
+      "successEffects": [
+        {
+          "effect": "browser.removeToken",
+          "state": "kept"
+        }
+      ],
+      "params": [],
+      "bound": []
+    },
+    "browser.logout": {
+      "exceptions": [],
+      "effects": [
+        "server.deleteSession",
+        "browser.removeToken"
+      ],
+      "relations": [],
+      "successEffects": [
+        {
+          "effect": "server.deleteSession",
+          "state": "unknown"
+        },
+        {
+          "effect": "browser.removeToken",
+          "state": "kept"
+        }
+      ],
+      "params": [],
+      "bound": []
+    },
+    "browser.requestLogout": {
+      "exceptions": [],
+      "effects": [
+        "server.deleteSession"
+      ],
+      "relations": [],
+      "successEffects": [
+        {
+          "effect": "server.deleteSession",
+          "state": "unknown"
+        }
+      ],
+      "params": [],
+      "bound": []
+    },
+    "server.deep": {
+      "exceptions": [],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "params": [
+        {
+          "name": "in",
+          "type": {
+            "kind": "ref",
+            "target": "browser.deep$in"
+          },
+          "span": {
+            "file": "global.hozo",
+            "start": {
+              "line": 1033,
+              "col": 1
+            },
+            "end": {
+              "line": 1033,
+              "col": 10
+            }
+          }
+        }
+      ],
+      "bound": [
+        {
+          "path": [
+            "in",
+            "inner",
+            "token"
+          ],
+          "state": "browser.token"
+        },
+        {
+          "path": [
+            "t"
+          ],
+          "state": "browser.token"
+        }
+      ]
+    },
+    "server.logout": {
+      "exceptions": [
+        "http.ServerError",
+        "http.NetworkError"
+      ],
+      "effects": [
+        "server.deleteSession"
+      ],
+      "relations": [
+        {
+          "exception": "http.ServerError",
+          "effect": "server.deleteSession",
+          "state": "unknown"
+        },
+        {
+          "exception": "http.NetworkError",
+          "effect": "server.deleteSession",
+          "state": "unknown"
+        }
+      ],
+      "successEffects": [
+        {
+          "effect": "server.deleteSession",
+          "state": "kept"
+        }
+      ],
+      "params": [
+        {
+          "name": "in",
+          "type": {
+            "kind": "ref",
+            "target": "browser.logout$in"
+          },
+          "span": {
+            "file": "global.hozo",
+            "start": {
+              "line": 1002,
+              "col": 1
+            },
+            "end": {
+              "line": 1002,
+              "col": 10
+            }
+          }
+        }
+      ],
+      "bound": [
+        {
+          "path": [
+            "in",
+            "token"
+          ],
+          "state": "browser.token"
+        }
+      ]
+    }
+  }
+}

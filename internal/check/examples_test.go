@@ -1,0 +1,164 @@
+package check
+
+import (
+	"testing"
+
+	"github.com/mew-ton/hozo/ir"
+)
+
+// logoutProgram は設計書 §9 の `browser.logout` の例（docs/testing.md「単体テスト」）。
+// §5.2 の browser.token と §5.3 の bind、§8.1 の ignoreFailure、http の語彙の post を含む。
+func logoutProgram() *ir.Program {
+	ignoreFailure := decorator("browser.ignoreFailure")
+	ignoreFailure.Catches = []ir.CatchesClause{catches(ir.Ignores, "", "http.NetworkError", "http.ServerError")}
+
+	serverLogout := leaf("server.logout", nil, param("in", ir.Ref("server.LogoutInput")))
+	serverLogout.Effects = []string{"server.deleteSession"}
+	serverLogout.Decorators = []ir.Application{app("http.post", ir.Arg{Param: "path", Value: ir.LiteralValue{Literal: ir.StringLiteral{Value: "/logout"}}})}
+
+	clearToken := leaf("browser.clearToken", nil)
+	clearToken.Effects = []string{"browser.removeToken"}
+
+	requestLogout := wire("browser.requestLogout", nil, nil, cs(call("server.logout", carg("in", rec()))))
+	requestLogout.Decorators = []ir.Application{app("browser.ignoreFailure")}
+
+	logout := wire("browser.logout", nil, nil, cs(call("browser.requestLogout")), cs(call("browser.clearToken")))
+
+	return program(
+		[]ir.Bind{bind("browser", "browser.token", "server", false)},
+		httpVocab(),
+		namespace("server",
+			scalar("server.Token", ir.String()),
+			model("server.Session", field("token", ir.Ref("server.Token")), field("userId", ir.String())),
+			state("server.sessions", ir.StateList, ir.Ref("server.Session")),
+			eff("server.deleteSession", "server.sessions", ir.OpDelete),
+			model("server.LogoutInput", field("token", ir.Optional(ir.Ref("server.Token")))),
+			serverLogout,
+		),
+		namespace("browser",
+			state("browser.token", ir.StateSingle, ir.Optional(ir.Ref("server.Token"))),
+			eff("browser.removeToken", "browser.token", ir.OpPut),
+			clearToken,
+			ignoreFailure,
+			requestLogout,
+			logout,
+		),
+	)
+}
+
+// TestExampleLogout は §9: `browser.logout` の成功のアームでは server.deleteSession は不明（http.* の例外を無視したため）、
+// removeToken は起きている。requestLogout は例外を投げない。server.logout({}) の token は bind で埋まる。
+func TestExampleLogout(t *testing.T) {
+	p := logoutProgram()
+	diags := Check(p, cfgFor("server", "browser"))
+	wantCodes(t, diags) // 診断なし
+
+	rl := sigOf(t, p, "browser.requestLogout")
+	wantStrings(t, "requestLogout.E", rl.Exceptions, nil)
+	wantStrings(t, "requestLogout.F", rl.Effects, []string{"server.deleteSession"})
+	if got := succOf(t, rl, "server.deleteSession"); got != ir.Unknown {
+		t.Errorf("requestLogout succ(deleteSession) = %s, want unknown", got)
+	}
+
+	lo := sigOf(t, p, "browser.logout")
+	wantStrings(t, "logout.E", lo.Exceptions, nil)
+	wantStrings(t, "logout.F", lo.Effects, []string{"server.deleteSession", "browser.removeToken"})
+	if got := succOf(t, lo, "server.deleteSession"); got != ir.Unknown {
+		t.Errorf("logout succ(deleteSession) = %s, want unknown", got)
+	}
+	if got := succOf(t, lo, "browser.removeToken"); got != ir.Kept {
+		t.Errorf("logout succ(removeToken) = %s, want kept", got)
+	}
+
+	// server から見た server.logout は http の例外を投げない（DEC-10）
+	sl := sigOf(t, p, "server.logout")
+	wantStrings(t, "server.logout.E", sl.Exceptions, nil)
+	if got := succOf(t, sl, "server.deleteSession"); got != ir.Kept {
+		t.Errorf("server.logout succ = %s", got)
+	}
+
+	// browser から見れば投げる
+	views := Views(p, cfgFor("server", "browser"))
+	vs := views["browser"].Ops["server.logout"]
+	wantStrings(t, "View(browser).server.logout.E", vs.Exceptions, []string{"http.ServerError", "http.NetworkError"})
+	if got := vs.Relations[0].State; got != ir.Unknown {
+		t.Errorf("rel(ServerError, deleteSession) = %s, want unknown", got)
+	}
+
+	// bind: server.logout({}) の token
+	rows := rowsOf(p.Lookup("browser.requestLogout").(*ir.Op).Body)
+	bound := rows[0].calls[0].call.Bound
+	if len(bound) != 1 || joinPath(bound[0].Path) != "in.token" || bound[0].State != "browser.token" {
+		t.Errorf("bound = %+v", bound)
+	}
+
+	// ignoreFailure を外すと requestLogout に THROWS-1 が出て、例外は logout にも伝わる
+	p2 := logoutProgram()
+	p2.Lookup("browser.requestLogout").(*ir.Op).Decorators = nil
+	t1 := withCode(Check(p2, cfgFor("server", "browser")), "THROWS-1")
+	if len(t1) != 2 {
+		t.Fatalf("THROWS-1 count = %d, want 2 (requestLogout and logout)\n%s", len(t1), messages(t1))
+	}
+	wantStrings(t, "missing", t1[0].Data["missing"].([]string), []string{"http.ServerError", "http.NetworkError"})
+	wantStrings(t, "logout.E", sigOf(t, p2, "browser.logout").Exceptions, []string{"http.ServerError", "http.NetworkError"})
+}
+
+// TestExamplePlaceOrder は §7.3 の placeOrder: `throws NotificationFailed keeps createOrder prevents notifyUser`。
+// 葉なら宣言のまま（REL-3 の warning）、配線なら本体から計算した状態と比べる（REL-4）。
+func TestExamplePlaceOrder(t *testing.T) {
+	base := func() []ir.Decl {
+		return []ir.Decl{
+			state("server.orders", ir.StateList, ir.String()),
+			state("server.notifications", ir.StateList, ir.String()),
+			eff("server.createOrder", "server.orders", ir.OpPost),
+			eff("server.notifyUser", "server.notifications", ir.OpPost),
+			exc("server.NotificationFailed"),
+			model("server.OrderInput"),
+			model("server.Order"),
+		}
+	}
+	placeOrder := leaf("server.placeOrder", ir.Ref("server.Order"), param("in", ir.Ref("server.OrderInput")))
+	placeOrder.Effects = []string{"server.createOrder", "server.notifyUser"}
+	placeOrder.Throws = []ir.ThrowsClause{throws([]string{"server.NotificationFailed"}, keeps("server.createOrder"), prevents("server.notifyUser"))}
+	p := program(nil, namespace("server", append(base(), placeOrder)...))
+	diags := Check(p, cfgFor("server"))
+	wantCodes(t, diags, "REL-3")
+	sig := sigOf(t, p, "server.placeOrder")
+	wantStrings(t, "E", sig.Exceptions, []string{"server.NotificationFailed"})
+	wantStrings(t, "F", sig.Effects, []string{"server.createOrder", "server.notifyUser"})
+	if got := relOf(t, sig, "server.NotificationFailed", "server.createOrder"); got != ir.Kept {
+		t.Errorf("rel(NotificationFailed, createOrder) = %s, want kept", got)
+	}
+	if got := relOf(t, sig, "server.NotificationFailed", "server.notifyUser"); got != ir.Prevented {
+		t.Errorf("rel(NotificationFailed, notifyUser) = %s, want prevented", got)
+	}
+
+	// 効果ごとに葉の op を分けて配線でつなぐと、状態は §9 の規則で計算される
+	create := leaf("server.createOrderOp", ir.Ref("server.Order"), param("in", ir.Ref("server.OrderInput")))
+	create.Effects = []string{"server.createOrder"}
+	notify := leaf("server.notify", nil, param("order", ir.Ref("server.Order")))
+	notify.Effects = []string{"server.notifyUser"}
+	notify.Throws = []ir.ThrowsClause{throws([]string{"server.NotificationFailed"}, prevents())}
+	wired := func(cl ...ir.ThrowsClause) *ir.Program {
+		w := wire("server.placeOrder", ir.Ref("server.Order"), []ir.OpParam{param("in", ir.Ref("server.OrderInput"))},
+			cst("order", call("server.createOrderOp", carg("in", nameAtom("in")))),
+			cs(call("server.notify", carg("order", nameAtom("order")))),
+			retAtom(nameAtom("order")),
+		)
+		w.Throws = cl
+		return program(nil, namespace("server", append(base(), create, notify, w)...))
+	}
+	p2 := wired(throws([]string{"server.NotificationFailed"}))
+	wantCodes(t, Check(p2, cfgFor("server")))
+	sig2 := sigOf(t, p2, "server.placeOrder")
+	wantStrings(t, "F", sig2.Effects, []string{"server.createOrder", "server.notifyUser"})
+	if got := relOf(t, sig2, "server.NotificationFailed", "server.createOrder"); got != ir.Kept {
+		t.Errorf("wired rel(NotificationFailed, createOrder) = %s, want kept (上の行)", got)
+	}
+	if got := relOf(t, sig2, "server.NotificationFailed", "server.notifyUser"); got != ir.Prevented {
+		t.Errorf("wired rel(NotificationFailed, notifyUser) = %s, want prevented (notify の宣言)", got)
+	}
+	// 書いた関係が計算と一致すれば REL-4 なし（REL-3 は出る）、食い違えば REL-4
+	wantCodes(t, Check(wired(throws([]string{"server.NotificationFailed"}, keeps("server.createOrder"), prevents("server.notifyUser"))), cfgFor("server")), "REL-3")
+	wantCodes(t, Check(wired(throws([]string{"server.NotificationFailed"}, prevents())), cfgFor("server")), "REL-4")
+}

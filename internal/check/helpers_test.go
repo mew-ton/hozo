@@ -1,0 +1,296 @@
+package check
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/mew-ton/hozo/internal/config"
+	"github.com/mew-ton/hozo/internal/diag"
+	"github.com/mew-ton/hozo/internal/source"
+	"github.com/mew-ton/hozo/ir"
+)
+
+// テストの IR は手で組む（docs/testing.md「単体テスト」）。宣言ごとに違う位置を振り、Related の照合に使う。
+
+var lineCounter int
+
+// sp は宣言ごとに違う位置。file は名前空間の名前から決める（語彙は hozo: の形）。
+func sp(fqn string) ir.Span {
+	lineCounter++
+	return ir.Span{File: fileOf(fqn), Start: ir.Pos{Line: lineCounter, Col: 1}, End: ir.Pos{Line: lineCounter, Col: 10}}
+}
+
+func fileOf(fqn string) string {
+	for _, prefix := range []string{"@", "call.", "p."} {
+		fqn = strings.TrimPrefix(fqn, prefix)
+	}
+	ns := parentOf(fqn)
+	switch {
+	case ns == "":
+		return "global.hozo"
+	case strings.HasPrefix(ns, "http") || strings.HasPrefix(ns, "page") || strings.HasPrefix(ns, "valid"):
+		return "hozo:vocab/" + strings.SplitN(ns, ".", 2)[0] + ".hozo"
+	}
+	return strings.SplitN(ns, ".", 2)[0] + ".hozo"
+}
+
+func exc(fqn string) *ir.Exception {
+	return &ir.Exception{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}}
+}
+
+func eff(fqn, state string, op ir.Operation) *ir.Effect {
+	return &ir.Effect{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, State: state, Operation: op}
+}
+
+func state(fqn string, shape ir.StateShape, elem ir.Type) *ir.State {
+	return &ir.State{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Shape: shape, Element: elem}
+}
+
+func scalar(fqn string, base ir.Type) *ir.Scalar {
+	return &ir.Scalar{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Base: base}
+}
+
+func model(fqn string, fields ...ir.Field) *ir.Model {
+	m := &ir.Model{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}}
+	for _, f := range fields {
+		f.Span = sp(fqn + "." + f.Name)
+		m.Fields = append(m.Fields, f)
+	}
+	return m
+}
+
+func field(name string, t ir.Type) ir.Field { return ir.Field{Name: name, Type: t} }
+
+func fieldDef(name string, t ir.Type, def ir.Literal) ir.Field {
+	return ir.Field{Name: name, Type: t, Default: def}
+}
+
+func param(name string, t ir.Type) ir.OpParam {
+	return ir.OpParam{Name: name, Type: t, Span: sp("p." + name)}
+}
+
+// leaf は葉の op。effects / throws / decorators は返した値に足す。
+func leaf(fqn string, returns ir.Type, params ...ir.OpParam) *ir.Op {
+	return &ir.Op{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Params: params, Returns: returns}
+}
+
+// wire は配線の op。
+func wire(fqn string, returns ir.Type, params []ir.OpParam, stmts ...ir.Statement) *ir.Op {
+	o := leaf(fqn, returns, params...)
+	o.Body = &ir.Wiring{Statements: stmts}
+	return o
+}
+
+func throws(exceptions []string, rels ...ir.Relation) ir.ThrowsClause {
+	return ir.ThrowsClause{Exceptions: exceptions, Relations: rels}
+}
+
+// prevents は effects が空なら all。
+func prevents(effects ...string) ir.Relation {
+	if len(effects) == 0 {
+		return ir.Relation{Kind: ir.Prevents, Effects: ir.AllEffects()}
+	}
+	return ir.Relation{Kind: ir.Prevents, Effects: ir.RelationEffects{Effects: effects}}
+}
+
+func keeps(effects ...string) ir.Relation {
+	if len(effects) == 0 {
+		return ir.Relation{Kind: ir.Keeps, Effects: ir.AllEffects()}
+	}
+	return ir.Relation{Kind: ir.Keeps, Effects: ir.RelationEffects{Effects: effects}}
+}
+
+func decorator(fqn string, params ...ir.Param) *ir.Decorator {
+	return &ir.Decorator{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Params: params, Targets: []ir.DecoratorTarget{ir.TargetOp}}
+}
+
+func catches(mode ir.CatchMode, halts string, exceptions ...string) ir.CatchesClause {
+	return ir.CatchesClause{Exceptions: exceptions, Mode: mode, Halts: halts}
+}
+
+func app(fqn string, args ...ir.Arg) ir.Application {
+	return ir.Application{Decorator: fqn, Args: args, Span: sp("@" + fqn)}
+}
+
+func refArg(param, target string) ir.Arg {
+	return ir.Arg{Param: param, Value: ir.RefValue{Target: target}}
+}
+
+func refsArg(param string, targets ...string) ir.Arg {
+	return ir.Arg{Param: param, Value: ir.RefsValue{Targets: targets}}
+}
+
+func call(op string, args ...ir.CallArg) ir.Call {
+	return ir.Call{Op: op, Args: args, Span: sp("call." + op)}
+}
+
+func carg(param string, v ir.Atom) ir.CallArg { return ir.CallArg{Param: param, Value: v} }
+
+func nameAtom(path ...string) ir.Atom { return ir.NameAtom{Path: path} }
+
+func rec(fields ...ir.RecordField) ir.Atom { return ir.RecordAtom{Fields: fields} }
+
+func rf(name string, v ir.Atom) ir.RecordField { return ir.RecordField{Name: name, Value: v} }
+
+func cst(name string, c ir.Call) ir.Statement {
+	return ir.ConstStmt{Name: name, Expr: ir.CallExpr{Call: c}, Span: c.Span}
+}
+
+func cs(c ir.Call) ir.Statement { return ir.CallStmt{Call: c, Span: c.Span} }
+
+func ret(c ir.Call) ir.Statement { return ir.ReturnStmt{Expr: ir.CallExpr{Call: c}, Span: c.Span} }
+
+func retAtom(a ir.Atom) ir.Statement { return ir.ReturnStmt{Expr: ir.AtomExpr{Atom: a}} }
+
+// arm は match のアーム。body が nil なら none。
+func arm(body *ir.Call, cases ...string) ir.MatchArm {
+	a := ir.MatchArm{Cases: ir.ArmCases{Cases: cases}}
+	if len(cases) == 0 {
+		a.Cases = ir.DefaultArm()
+	}
+	if body == nil {
+		a.Body = ir.NoneBody{}
+	} else {
+		a.Body = ir.CallExpr{Call: *body}
+	}
+	return a
+}
+
+func matchStmt(classify string, arms ...ir.MatchArm) ir.Statement {
+	return ir.MatchStmt{Match: ir.Match{Subject: nameAtom("x"), Classify: classify, Arms: arms}}
+}
+
+func matchConst(name, classify string, arms ...ir.MatchArm) ir.Statement {
+	return ir.ConstStmt{Name: name, Expr: ir.MatchExpr{Match: ir.Match{Subject: nameAtom("x"), Classify: classify, Arms: arms}}}
+}
+
+func namespace(name string, decls ...ir.Decl) ir.Namespace {
+	return ir.Namespace{Name: name, Decls: decls}
+}
+
+func program(binds []ir.Bind, nss ...ir.Namespace) *ir.Program {
+	return &ir.Program{Version: ir.Version, Namespaces: nss, Binds: binds}
+}
+
+func bind(ns, st, target string, deep bool) ir.Bind {
+	return ir.Bind{Namespace: ns, State: st, Target: ir.BindTarget{Namespace: target, Deep: deep}, Span: sp(ns + ".bind." + st)}
+}
+
+// cfgFor は名前空間ごとに language と out を持つ設定。
+func cfgFor(nss ...string) *config.Config {
+	c := config.Default("/root")
+	for _, n := range nss {
+		lang, out := "go", "gen/"+n
+		c.Namespaces[n] = config.NamespaceTable{Language: &lang, Out: &out}
+	}
+	return c
+}
+
+// httpVocab は http の語彙の最小の写し（docs/vocab.md）。post は external で ServerError | NetworkError を投げる。
+func httpVocab() ir.Namespace {
+	post := decorator("http.post", ir.Param{Name: "path", Type: ir.TypeParam{Types: []ir.Type{ir.String()}}})
+	post.External = true
+	post.Throws = []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}
+	get := decorator("http.get", ir.Param{Name: "path", Type: ir.TypeParam{Types: []ir.Type{ir.String()}}})
+	get.External = true
+	get.Throws = []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}
+	return namespace("http", exc("http.ServerError"), exc("http.NetworkError"), post, get)
+}
+
+// locatorFor は テストの Span を直す Locator。テストで使うファイル名ごとに十分な行数の中身を持つ FileSet を作る。
+func locatorFor() Locator {
+	fs := source.NewFileSet()
+	content := []byte(strings.Repeat("xxxxxxxxxxxxxxxxxxxx\n", 20000))
+	for _, f := range []string{"global.hozo", "server.hozo", "browser.hozo", "hozo:vocab/http.hozo", "hozo:vocab/page.hozo"} {
+		fs.Add(f, content)
+	}
+	return FileSetLocator(fs)
+}
+
+func sigOf(t *testing.T, p *ir.Program, fqn string) ir.Signature {
+	t.Helper()
+	o, ok := p.Lookup(fqn).(*ir.Op)
+	if !ok {
+		t.Fatalf("%s is not an op", fqn)
+	}
+	return o.Signature
+}
+
+func relOf(t *testing.T, sig ir.Signature, x, e string) ir.EffectState {
+	t.Helper()
+	for _, r := range sig.Relations {
+		if r.Exception == x && r.Effect == e {
+			return r.State
+		}
+	}
+	t.Fatalf("no relation (%s, %s) in %v", x, e, sig.Relations)
+	return ""
+}
+
+func succOf(t *testing.T, sig ir.Signature, e string) ir.EffectState {
+	t.Helper()
+	for _, s := range sig.SuccessEffects {
+		if s.Effect == e {
+			return s.State
+		}
+	}
+	t.Fatalf("no success effect %s in %v", e, sig.SuccessEffects)
+	return ""
+}
+
+func wantStrings(t *testing.T, what string, got, want []string) {
+	t.Helper()
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("%s = %v, want %v", what, got, want)
+	}
+}
+
+func codes(diags []diag.Diagnostic) []string {
+	var out []string
+	for _, d := range diags {
+		out = append(out, d.Code)
+	}
+	return out
+}
+
+func withCode(diags []diag.Diagnostic, code string) []diag.Diagnostic {
+	var out []diag.Diagnostic
+	for _, d := range diags {
+		if d.Code == code {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+func wantCodes(t *testing.T, diags []diag.Diagnostic, want ...string) {
+	t.Helper()
+	got := codes(diags)
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("codes = %v, want %v\n%s", got, want, messages(diags))
+	}
+}
+
+func wantNoCode(t *testing.T, diags []diag.Diagnostic, code string) {
+	t.Helper()
+	if ds := withCode(diags, code); len(ds) > 0 {
+		t.Errorf("unexpected %s: %s", code, messages(ds))
+	}
+}
+
+func wantOneCode(t *testing.T, diags []diag.Diagnostic, code string) diag.Diagnostic {
+	t.Helper()
+	ds := withCode(diags, code)
+	if len(ds) != 1 {
+		t.Fatalf("want exactly one %s, got %d\n%s", code, len(ds), messages(diags))
+	}
+	return ds[0]
+}
+
+func messages(diags []diag.Diagnostic) string {
+	var b strings.Builder
+	for _, d := range diags {
+		b.WriteString("  " + d.Severity.String() + "[" + d.Code + "] " + d.Message + "\n")
+	}
+	return b.String()
+}
