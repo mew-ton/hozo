@@ -73,7 +73,7 @@ type Type =
 ```
 
 - `void` は型ではなく、`Op.returns` が `null` であること。
-- その場で書いた model（`{ ... }`）と `x?: T` の形は IR にはない（「正規化」）。
+- その場で書いた model（`{ ... }`）は IR にはない（「正規化」）。
 
 ### model / scalar / union
 
@@ -294,7 +294,7 @@ interface Bind {
 | 修飾なしの参照 | FQN |
 | `condition C of T;` | `Classify` で `cases: [C]`、`hasDefault: true`、`fromCondition: true` |
 | 戻り値の型の省略 | `returns: null` |
-| `x?: T`（フィールド、op の引数、デコレータの引数） | `type: { kind: "optional", of: T }`。`T??` は `T?` と同じで、`optional` は入れ子にしない |
+| `T??` | `T?`（`optional` は入れ子にしない） |
 | `model P is U omit a, b;` | `fields` に `U` のフィールドから `a`、`b` を除いたものを複製し、`derivedFrom` に記録 |
 | ユニオンのアームのその場の model `Ready: { ... }` | `<ユニオンの FQN>.Ready` という FQN の `Model`（`synthesizedFrom` にユニオンの FQN）を同じ名前空間に足し、アームの型を `ref` にする。宣言の位置はユニオンの直後 |
 | 例外のその場の model `exception X: { ... }` | `<例外の FQN>.Value` という `Model` を同じく足し、`value` を `ref` にする |

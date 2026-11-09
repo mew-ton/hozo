@@ -69,7 +69,7 @@ S にあって T にないフィールドは落ちる。
 
 | `ParamType` | 受け付ける `ArgValue` |
 |---|---|
-| `type` の `Type` | `literal` で、リテラルの型が渡せるもの。**デコレータの引数に限り、`scalar` の位置にも元の型のリテラルを渡せる**（`@cache(key: "me")` で `key: CacheKey`。値は設計者が書く定数で、制約の検査は語彙のプラグインの仕事）。`list` は `array` の位置に。`ref` で op の引数（`$param:`。`docs/resolve.md`「手続き」1.3）なら、その引数の型が渡せること |
+| `type` の `Type` | `literal` で、リテラルの型が渡せるもの（`scalar` の位置には渡せない。TYPE-1）。`list` は `array` の位置に。`ref` で op の引数（`$param:`。`docs/resolve.md`「手続き」1.3）なら、その引数の型が渡せること |
 | `any exception` | `ref`（例外）、`refs`（例外の集合）、`ref`（`set` のユニオンで要素が例外。展開して `refs` にする） |
 | `any effect` | `ref`（効果）、`refs`、ユニオン（同上） |
 | `any effect on s.op` | 上のうち、すべての効果の `state` が `s`、`operation` が `op` のもの。違えば DEC-7 |

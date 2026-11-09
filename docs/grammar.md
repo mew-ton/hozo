@@ -112,11 +112,11 @@ ArgTerm   = Literal | QualifiedName ;
 ```
 ModelDecl   = "model" Ident ( ModelBody | "is" QualifiedName "omit" Ident { "," Ident } ";" ) ;
 ModelBody   = "{" { Field } "}" ;
-Field       = [ DocComment ] { Decorator } Ident [ "?" ] ":" Type [ "=" Literal ] ";" ;
+Field       = [ DocComment ] { Decorator } Ident ":" Type [ "=" Literal ] ";" ;
 ```
 
 - `model PublicUser is User omit hash;`（§5.2）。`omit` なしの `is` は書けない（「決めたこと」）。
-- `token?: Token` と `token: Token?` は IR では同じ（「決めたこと」）。
+- 省略可能なフィールドは型の `?` で書く（`token: Token?`）。名前に `?` を付ける書き方はない（「決めたこと」）。
 - 既定値（`page: PosInt = 1`。§11.2）は `Literal` だけ。
 
 ### scalar
@@ -168,8 +168,8 @@ DecoratorDecl = [ "@external" ] "decorator" Ident [ Params ] [ "for" Target { "|
               | "decorator" Ident "=" QualifiedName Args ";" ;
 
 Params    = "(" [ Param { "," Param } ] ")" ;
-Param     = Ident [ "?" ] ":" ParamType ;
-ParamType = AnyType | Type { "|" Type } ;
+Param     = Ident ":" ParamType ;
+ParamType = AnyType [ "?" ] | Type { "|" Type } ;      (* 省略可能は型の ? で書く。any の種類にも付けられる（from: any state?） *)
 AnyType   = "any" AnyKind [ "on" QualifiedName "." StateOp ] ;
 AnyKind   = "exception" | "effect" | "state" | "op" | "model" | "variant" ;   (* variant は文脈キーワード *)
 Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" ;     (* field は文脈キーワード *)
@@ -193,7 +193,7 @@ ExcRef          = QualifiedName ;
 ```
 OpDecl     = "op" Ident OpParams [ ":" ReturnType ] { OpClause } ( ";" | Block ) ;
 OpParams   = "(" [ OpParam { "," OpParam } ] ")" ;
-OpParam    = Ident [ "?" ] ":" Type ;
+OpParam    = Ident ":" Type ;
 ReturnType = Type | "void" ;
 OpClause   = "effects" QualifiedName { "|" QualifiedName }
            | ThrowsClause ;
@@ -270,7 +270,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
 | `@external` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
 | その場で書く model はユニオンのアームと例外の値にだけ置ける | 合成する名前（`docs/ir.md`「正規化」）がその二つにしか決まらない |
-| `x?: T` と `x: T?` を同じ意味にする | §5.3 は `token?: Token` を「省略可能」、`Token?` を「省略可能な型」として同じ性質で扱っている。IR では省略可能な型のフィールド（引数）に正規化する |
+| 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない | 同じ意味の書き方を二つ持たない。型の `?` は `single<Token?>` のように型の位置で要るので、名前の側を落とす。設計書の例の `x?: T` は `x: T?` に直す（`docs/decisions.md`「設計書へ返すこと」） |
 | 識別子は ASCII | §3.3 の命名規則が ASCII の大文字小文字で書かれている |
 | `Duration` の単位は `ms` `s` `m` `h` `d` | 例にあるのは `m` と `s`。秒未満と日は使う場面が見えるので足す。週以上は月と年が一定でないので持たない |
 | `Time` のリテラルはない | 例にない。時刻を仕様に直接書く場面がない |

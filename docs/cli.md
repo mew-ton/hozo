@@ -42,9 +42,9 @@ namespace hozoc {
     /** 規則の ID */
     code: string;
     message: string;
-    file?: Path;
-    start?: Position;
-    end?: Position;
+    file: Path?;
+    start: Position?;
+    end: Position?;
     related: RelatedInfo[];
   }
 
@@ -100,29 +100,29 @@ namespace hozoc {
   /** check の入力 */
   model CheckInput {
     /** 設定ファイルの場所 */
-    @cli.flag("config") @cli.env("HOZO_CONFIG") config?: Path;
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** 表示の形式 */
-    @cli.flag("format") format?: OutputFormat;
+    @cli.flag("format") format: OutputFormat?;
   }
 
   /** emit の入力 */
   model EmitInput {
     /** 設定ファイルの場所 */
-    @cli.flag("config") @cli.env("HOZO_CONFIG") config?: Path;
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** 表示の形式 */
-    @cli.flag("format") format?: OutputFormat;
+    @cli.flag("format") format: OutputFormat?;
     /** 生成する名前空間（一つもなければすべて） */
     @cli.arg namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
-    @cli.flag("dry-run") dryRun?: boolean;
+    @cli.flag("dry-run") dryRun: boolean?;
   }
 
   /** lsp の入力 */
   model LspInput {
     /** 設定ファイルの場所 */
-    @cli.flag("config") @cli.env("HOZO_CONFIG") config?: Path;
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** ログの書き出し先 */
-    @cli.flag("log") @cli.env("HOZO_LSP_LOG") log?: Path;
+    @cli.flag("log") @cli.env("HOZO_LSP_LOG") log: Path?;
   }
 
   /** 新しく生成したファイルを書き出す */

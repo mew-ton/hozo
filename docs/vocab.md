@@ -24,14 +24,14 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
 | `vocab/proc.hozo` | `namespace proc { Crashed / MalformedOutput / stdio }` | `examples/hozoc.hozo` |
 
-- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。
+- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし省略可能な引数の `x?: T` は `x: T?` に直す（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`。`docs/grammar.md`「決めたこと」）。
 - `cli` / `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身（`cli.hozo`）が使うので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
 - `@http.get` / `@http.post` の `@external` はそのまま写す。
 - `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator stdio throws Crashed | MalformedOutput;`）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
 
 ## 同梱しない語彙
 
-- `cache`（§4.2 `decorator cache(key: CacheKey, staleTime: Duration)`）: `CacheKey` の宣言がなく、§11.1 の例は `key` に文字列と配列の両方を渡していて、一つの型で受けられない。「引数（キーなど）はキャッシュのプラグインの詳細設計で決める」（§4.2）に従い、段階 5 のキャッシュのプラグインの `vocabulary` にする。`docs/decisions.md`。
+- `cache`（§4.2）: 今のスコープでは考えない（`docs/decisions.md`「スコープ外にした設計書の例」）。
 
 ## 語彙の意味の実装
 
