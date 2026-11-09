@@ -1,0 +1,235 @@
+// 設計書の examples/hozoc.hozo。`x?: T` は `x: T?` に直した（docs/grammar.md「決めたこと」）。
+// `namespace: string;` のフィールドは予約語なので `namespaceName` に直した。
+// hozoc 自身の設計を Hozo で書いた叩き台。
+//
+// ../README.md §14（適用範囲）の「合わないものは境界だけを書く」に従い、書くのは境界
+// （コマンド、ファイル、プラグインとのやり取り）だけ。パースや型検査の中身は書かない。
+// 今の言語で書けなかったものは、該当する宣言の上の // コメントに書く。
+
+// コマンドの入力は model で書き、フィールドの注釈で運搬場所（位置引数・フラグ・環境変数）を示す。
+// ../README.md §7.1 の「リクエストそのものが引数」と同じ形。
+// 環境変数は呼び出し側（シェルや CI）が持つ状態で、呼ばれる側からは引数になる（../README.md §5.1）。
+
+/** コマンドラインの語彙（http と同じ位置づけの語彙プラグイン） */
+namespace cli {
+  /**
+   * op をサブコマンドとして公開する。
+   *
+   * @param name サブコマンドの名前
+   */
+  decorator command(name: string);
+
+  /** 位置引数として受け取る */
+  decorator arg for field;
+
+  /**
+   * フラグとして受け取る。
+   *
+   * @param name フラグの名前（`--` を除く）
+   */
+  decorator flag(name: string) for field;
+
+  /**
+   * 環境変数から受け取る。フラグと両方付けたときの優先順位は cli のプラグインが決める。
+   *
+   * @param name 環境変数の名前
+   */
+  decorator env(name: string) for field;
+
+  /**
+   * この例外で終了するときの終了コード。
+   *
+   * @param code 終了コード
+   */
+  decorator exitCode(code: int) for exception;
+}
+
+/** ファイルの語彙 */
+namespace fs {
+  /**
+   * glob に当たるファイルの集まりを状態として持つ。
+   *
+   * @param glob 対象のファイルの glob
+   */
+  decorator files(glob: string) for state;
+}
+
+/** 外部プロセスの語彙（プラグインの呼び出し） */
+namespace proc {
+  /** プロセスが異常終了した */
+  exception Crashed;
+
+  /** 出力が約束した形（JSON）でなかった */
+  exception MalformedOutput;
+
+  /**
+   * 外部プロセスを起動し、標準入力に入力を JSON で渡し、標準出力の JSON を出力として受け取る。
+   *
+   * @param command 起動するコマンド
+   */
+  @external
+  decorator stdio(command: string) throws Crashed | MalformedOutput;
+}
+
+/** hozo の仕様を検査し、各言語のコードに展開する CLI */
+namespace hozoc {
+  /** ファイルのパス（作業ディレクトリからの相対パス） */
+  scalar Path extends string;
+
+  /** 読み込むファイル */
+  model SourceFile {
+    path: Path;
+    content: string;
+  }
+
+  /** 書き出すファイル */
+  model OutputFile {
+    path: Path;
+    content: string;
+  }
+
+  /** 検査やプラグインが報告する一件の指摘 */
+  model Diagnostic {
+    /** 指摘の位置（宣言の名前、またはファイルと行） */
+    at: string;
+    message: string;
+  }
+
+  /** 指摘の一覧 */
+  model Diagnostics {
+    items: Diagnostic[];
+  }
+
+  /** 仕様のファイル */
+  @fs.files("**/*.hozo")
+  state sources: list<SourceFile>;
+
+  /** プロジェクトの設定（../README.md §4.5） */
+  @fs.files("hozo.toml")
+  state config: single<SourceFile?>;
+
+  // 書けなかったもの: 場所は hozo.toml の out で決まるが、状態の宣言から設定の値を参照する書き方がない（仮に {out} と書いた）
+  /** 生成したファイル */
+  @fs.files("{out}/**")
+  state outputs: list<OutputFile>;
+
+  /** 仕様に構文か型の誤りがある */
+  @cli.exitCode(1)
+  exception CheckFailed: Diagnostics;
+
+  /** hozo.toml がない、または名前空間と言語の対応が足りない */
+  @cli.exitCode(2)
+  exception ConfigInvalid;
+
+  /** プラグインの language が名前空間の language と合わない */
+  @cli.exitCode(2)
+  exception LanguageMismatch;
+
+  /** 複数のプラグインが同じファイルに書こうとした */
+  @cli.exitCode(3)
+  exception OutputConflict;
+
+  /** 検査の結果（誤りではない指摘） */
+  model CheckResult {
+    warnings: Diagnostic[];
+  }
+
+  /** check の入力 */
+  model CheckInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
+  }
+
+  /** emit の入力 */
+  model EmitInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
+    /** 生成する名前空間（省略時はすべて） */
+    @cli.arg namespaces: string[]?;
+    /** 書き出さずに、書き出す予定のファイルだけを表示する */
+    @cli.flag("dry-run") dryRun: boolean?;
+  }
+
+  /** 新しく生成したファイルを書き出す */
+  effect addOutputs on outputs.post;
+
+  /** 既にあるファイルを、生成し直した内容で書き換える */
+  effect replaceOutputs on outputs.put;
+
+  /** 生成しなくなったファイルを消す */
+  effect removeStaleOutputs on outputs.delete;
+
+  /**
+   * 仕様を検査する。ファイルは書き出さない。
+   *
+   * @param in コマンドの入力
+   * @see emit
+   */
+  @cli.command("check")
+  op check(in: CheckInput): CheckResult
+    throws CheckFailed | ConfigInvalid;
+
+  // 書けなかったもの: 名前空間ごと・プラグインごとに runEmit を呼ぶ繰り返しは、配線（ループを持たない。../README.md §9）で書けないので、葉の op にする
+  /**
+   * 仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
+   *
+   * @param in コマンドの入力
+   * @throws CheckFailed 検査に失敗した。ファイルは書き出さない
+   * @throws proc.Crashed プラグインが異常終了した。書き出しが途中かどうかは分からない
+   * @see check
+   * @see runEmit
+   */
+  @cli.command("emit")
+  op emit(in: EmitInput): CheckResult
+    effects addOutputs | replaceOutputs | removeStaleOutputs
+    throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict prevents effects
+    throws proc.Crashed | proc.MalformedOutput;
+
+  /** IR（../README.md §2）。中身はこの例では書かない */
+  model Ir {}
+
+  // プラグインに送る JSON では direction で展開と取り込みを区別する（../README.md §4.6）。ここでは op で分ける
+
+  /** 展開のときのプラグインへの入力 */
+  model EmitRequest {
+    /** 対象の名前空間 */
+    namespaceName: string;   // 設計書では namespace だが予約語なので直した（docs/grammar.md「予約語」）
+    /** その名前空間から見た IR */
+    ir: Ir;
+  }
+
+  /** 展開のときのプラグインからの出力 */
+  model EmitResponse {
+    files: OutputFile[];
+    warnings: Diagnostic[];
+  }
+
+  /** 取り込みのときのプラグインへの入力 */
+  model ImportRequest {
+    files: SourceFile[];
+  }
+
+  /** 取り込みのときのプラグインからの出力 */
+  model ImportResponse {
+    ir: Ir;
+    warnings: Diagnostic[];
+  }
+
+  // 書けなかったもの: 呼び先はプラグインのマニフェストの command で決まるが、デコレータの引数に実行時の値を入れる書き方がない（仮に {plugin.command} と書いた）
+  /**
+   * プラグインを一つ呼んで展開させる。
+   *
+   * @param req プラグインへの入力
+   */
+  @proc.stdio("{plugin.command}")
+  op runEmit(req: EmitRequest): EmitResponse;
+
+  // 書けなかったもの: runEmit と同じく、呼び先が実行時に決まる
+  /**
+   * プラグインを一つ呼んで取り込ませる。
+   *
+   * @param req プラグインへの入力
+   */
+  @proc.stdio("{plugin.command}")
+  op runImport(req: ImportRequest): ImportResponse;
+}

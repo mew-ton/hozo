@@ -1,0 +1,27 @@
+// 設計書 §3.1 アノテーションの位置、§3.4 コメント。
+// `token?: Token` は `token: Token?` に直した（docs/grammar.md「決めたこと」）。
+
+@http.status(401)
+exception InvalidCredentials;
+
+@db
+state users: list<User>;
+
+model LoginInput {
+  @http.header(name: "Authorization") token: Token?;
+  @http.body body: LoginInputBody;
+}
+
+/**
+ * パスワードの再設定メールを送る。
+ *
+ * @param email 再設定するアカウントのメールアドレス
+ * @throws RateLimited 同じアドレスに短時間で送りすぎた
+ * @see login
+ */
+@http.post("/password-reset")
+op requestPasswordReset(email: Email)
+  effects sendResetMail
+  throws RateLimited prevents effects;
+
+// 仕様に入らない、書き手向けのメモ

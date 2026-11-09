@@ -1,0 +1,62 @@
+// 設計書 §4.2 語彙プラグイン。
+// `decorator cache(...)` はスコープ外（docs/decisions.md「スコープ外にした設計書の例」）なので外した。
+// `from?: any state` などは `from: any state?` に直した（docs/grammar.md「決めたこと」）。
+
+namespace http {
+  /** サーバー側の失敗（5xx 全般） */
+  exception ServerError;
+  /** 運搬の失敗（ステータスなし） */
+  exception NetworkError;
+
+  @external
+  decorator get(path: string) throws ServerError | NetworkError;
+  @external
+  decorator post(path: string) throws ServerError | NetworkError;
+
+  decorator status(code: int) for exception;
+  decorator header(name: string) for field;
+  decorator body for field;
+  decorator query for field;
+  decorator retry(times: int);
+}
+
+/** この状態を DB が持つ */
+decorator db for state;
+
+namespace db {
+  decorator key for field;
+  decorator unique for field;
+  /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
+  decorator ref(target: any model) for field;
+}
+
+/** この状態をブラウザの localStorage が持つ */
+decorator localStorage for state;
+
+namespace page {
+  /** ダイアログが閉じられた */
+  exception Aborted;
+
+  /** ルートの位置（path と params） */
+  scalar Route extends string;
+
+  decorator path for state;
+  decorator query for state;
+  decorator route(path: string, from: any state?, onInvalid: any effect?);
+  /**
+   * ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: "YamadaWarrantyModal"）。
+   * どの実装を指すかは展開器が解決する（表層は責務外）。
+   */
+  decorator dialog(component: string) throws Aborted;
+  /** error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2） */
+  decorator fallback(error: any exception, view: any model) catches error recovers;
+  decorator interaction(page: any op, when: any variant);
+}
+
+namespace valid {
+  decorator min(value: int | float) for scalar | field;
+  decorator max(value: int | float) for scalar | field;
+  decorator length(min: int?, max: int?) for scalar | field;
+  decorator pattern(regex: string) for scalar | field;
+  decorator format(name: string) for scalar | field;   // "email" / "uri" / "uuid" など
+}

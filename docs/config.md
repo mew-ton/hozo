@@ -6,7 +6,7 @@
 
 ## 置き場と探し方
 
-- `hozoc` は `--config <path>` か環境変数 `HOZO_CONFIG` で指定されたファイルを読む。どちらもなければ、作業ディレクトリから親へ向かって最初に見つかる `hozo.toml`。見つからなければ `ConfigInvalid`（`docs/diagnostics.md`「終了コード」）。
+- `hozoc` は `--config <path>` か環境変数 `HOZO_CONFIG` で指定されたファイルを読む。どちらもなければ、作業ディレクトリから親へ向かって最初に見つかる `hozo.toml`。見つからない、または読めなければ CFG-7（`ConfigInvalid`。`docs/diagnostics.md`「終了コード」）。
 - `hozo.toml` のあるディレクトリが**プロジェクトのルート**。`.hozo` の探索、`out`、プラグインの探索の起点。
 
 ## 形

@@ -79,6 +79,7 @@ Conf(N).plugins（`docs/config.md`「名前空間の設定の解決」）の名�
 
 - `path` に `..` や絶対パスがあれば PLG-1。同じ応答の中で同じ `path` が二度あれば PLG-2。どちらも `proc.MalformedOutput` として終了する。
 - `content` は UTF-8 の文字列。バイナリは出せない。
+- `files` と `warnings`（`check` の `diagnostics` も）は空でも `[]` で出す。省けるのは `errors` だけ。
 - `warnings` は warning の診断（コード `PLUGIN`、メッセージの先頭にプラグイン名）。
 - `errors` は、プラグインがその入力を変換できない理由（語彙の使い方の誤り。`docs/plugin-go-cli.md`「診断」の CLI-* など）。error の診断として報告し、`CheckFailed` になる（`docs/diagnostics.md`「終了コード」）。
 

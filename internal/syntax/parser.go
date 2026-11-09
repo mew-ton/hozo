@@ -18,10 +18,11 @@ func Parse(fs *source.FileSet, f source.FileID) (*ast.File, []diag.Diagnostic) {
 	toks, diags := lex(f, src)
 	p := &parser{file: f, toks: toks, diags: diags}
 	file := &ast.File{Span: source.Span{File: f, Start: 0, End: source.Offset(len(src))}}
-	file.Decls = p.parseDecls(token.EOF)
-	if p.tok().Kind != token.EOF {
-		// 閉じていない "}" が残った。
-		p.errorAt(p.tok().Span, "対応する「{」のない「}」")
+	for !p.at(token.EOF) {
+		file.Decls = append(file.Decls, p.parseDecls(token.EOF)...)
+		if p.at(token.RBrace) {
+			p.errorAt(p.advance().Span, "対応する「{」のない「}」")
+		}
 	}
 	return file, p.diags
 }
@@ -148,7 +149,8 @@ func (p *parser) recover(fn func()) (ok bool) {
 
 // skip は次の ";"（読む）か、対応のない "}"（読まない）か、ファイルの終わりまで読み飛ばす
 // （docs/packages.md「internal/syntax/token、internal/syntax/ast、internal/syntax」の回復）。
-// 読み飛ばす途中で開いた "{" は、閉じるまで ";" も "}" も区切りにしない。
+// 読み飛ばす途中で開いた "{" は、閉じるまで ";" を区切りにしない。閉じたらそこで止まる
+// （本体を持つ宣言や match の終わり）。その直後の ";" は一緒に読む。
 func (p *parser) skip() {
 	depth := 0
 	for {
@@ -169,6 +171,10 @@ func (p *parser) skip() {
 			}
 			depth--
 			p.advance()
+			if depth == 0 {
+				p.got(token.Semicolon)
+				return
+			}
 		default:
 			p.advance()
 		}
@@ -201,15 +207,14 @@ func (p *parser) parseDecls(until token.Kind) []ast.Decl {
 // parseDecl は Decl を一つ読む。
 //
 //	Decl = [ DocComment ] { Decorator } Declaration | [ DocComment ] NamespaceDecl | BindDecl ;
+//
+// 節の Span は DocComment を含まず、最初のデコレータか宣言の頭から始まる。
 func (p *parser) parseDecl() ast.Decl {
-	start := p.tok().Span.Start
 	doc := p.parseLeadingDoc()
+	start := p.tok().Span.Start
 	decorators, external := p.parseDecorators()
 	if p.at(token.DocComment) {
 		p.fail(p.tok().Span, "ドキュメンテーションコメントはデコレータの前に置く（設計書 §3.4）")
-	}
-	if external != nil && !p.at(token.Decorator) {
-		p.fail(*external, "@external はデコレータの宣言にだけ付けられる（docs/grammar.md「decorator の宣言」）")
 	}
 	switch p.tok().Kind {
 	case token.Namespace:
@@ -460,8 +465,8 @@ func (p *parser) parseMembers(parseOne func()) {
 
 // parseField は Field = [ DocComment ] { Decorator } Ident ":" Type [ "=" Literal ] ";" を読む。
 func (p *parser) parseField() *ast.Field {
-	start := p.tok().Span.Start
 	f := &ast.Field{Doc: p.parseLeadingDoc()}
+	start := p.tok().Span.Start
 	f.Decorators, _ = p.parseDecorators()
 	if f.Doc != nil && p.at(token.RBrace) {
 		p.fail(f.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
@@ -503,8 +508,8 @@ func (p *parser) parseUnion(start source.Offset, doc *ast.DocComment, decorators
 
 // parseUnionMember は UnionMember = [ DocComment ] ( Ident ":" ArmType ";" | QualifiedName ";" ) を読む。
 func (p *parser) parseUnionMember() *ast.UnionMember {
-	start := p.tok().Span.Start
 	m := &ast.UnionMember{Doc: p.parseLeadingDoc()}
+	start := p.tok().Span.Start
 	if m.Doc != nil && p.at(token.RBrace) {
 		p.fail(m.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	}
@@ -626,8 +631,8 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 
 // parseClassifyCase は ClassifyCase = [ DocComment ] ( Ident | "default" ) ";" を読む。
 func (p *parser) parseClassifyCase() *ast.ClassifyCase {
-	start := p.tok().Span.Start
 	c := &ast.ClassifyCase{Doc: p.parseLeadingDoc()}
+	start := p.tok().Span.Start
 	if c.Doc != nil && p.at(token.RBrace) {
 		p.fail(c.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	}
@@ -1119,7 +1124,7 @@ func (p *parser) parseMatchArm() *ast.MatchArm {
 	switch {
 	case p.at(token.None):
 		a.Body = &ast.NoneAtom{Span: p.advance().Span}
-	case p.atName():
+	case p.atName() && p.peek(1).Kind == token.LParen:
 		a.Body = p.parseCall()
 	default:
 		p.failExpected("アームの本体（呼び出しか none）")

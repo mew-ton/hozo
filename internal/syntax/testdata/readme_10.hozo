@@ -1,0 +1,70 @@
+// 設計書 §10.1 classify の宣言、§10.2 match。
+// 二値の `const plan = match ...` の断片は、配線の op の中に置いて読めるようにした。
+
+namespace browser {
+  /**
+   * 商品に適用される保証の種類。
+   * ヤマダ電機の専用保証の対象となる商品は、メーカー保証があっても Yamada に分類する。
+   */
+  classify WarrantyKind of server.Item {
+    /** メーカーの保証書が付く */
+    Standard;
+    /** ヤマダ電機の専用保証プランを選べる */
+    Yamada;
+    /** 保証が付かない */
+    NoWarranty;
+  }
+
+  /** 商品が対象のキャンペーン */
+  classify CampaignKind of server.Item {
+    Spring;
+    Summer;
+    /** キャンペーンの対象外 */
+    default;
+  }
+
+  /** 二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; default; } と同じ */
+  condition WarrantyAvailable of server.Item;
+}
+
+namespace browser {
+  /** 支払い画面へ遷移する */
+  effect transitionToPayment on location.put;
+
+  op goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
+    effects transitionToPayment;
+
+  @page.interaction(page: openProduct, when: ProductPage.Ready)
+  op onAddToCart(item: server.Item)
+    throws page.Aborted | http.NetworkError | http.ServerError
+  {
+    const line = server.addToCart({ item });
+    const warranty = match item by WarrantyKind {
+      Standard   => chooseStandardWarranty(item, line);
+      Yamada     => chooseYamadaWarranty(item, line);
+      NoWarranty => none;
+    };
+    goPayment(line, warranty);
+  }
+
+  op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
+    : server.WarrantyLine
+    throws page.Aborted | http.NetworkError | http.ServerError
+  {
+    const plan = askYamadaWarranty(item);
+    return server.attachWarranty({ line, plan });
+  }
+
+  @page.dialog("YamadaWarrantyModal")
+  op askYamadaWarranty(item: WarrantyKind.Yamada<server.Item>): server.PlanId;
+
+  op chooseWarrantyPlan(item: server.Item): server.PlanId?
+    throws page.Aborted
+  {
+    const plan = match item by WarrantyAvailable {
+      WarrantyAvailable => askWarrantyPlan(item);
+      default           => none;
+    };
+    return plan;
+  }
+}

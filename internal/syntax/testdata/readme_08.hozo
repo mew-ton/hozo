@@ -1,0 +1,23 @@
+// 設計書 §8.1 デコレータの宣言。
+// `redirectOn` / `redirectToLogin` はスコープ外（docs/decisions.md「スコープ外にした設計書の例」）なので外した。
+
+namespace server {
+  // 4xx は設計判断なので op ごとのデコレータで宣言する
+  // op の本体より前に投げるので、すべての効果を打ち消す（§7.3）
+  decorator requiresAuth throws Unauthorized prevents effects;
+  decorator validated throws ClientError prevents effects;
+}
+
+namespace browser {
+  /** ネットワークに失敗し、キャッシュにも前回の結果がない */
+  exception OfflineCacheMiss;
+
+  // 条件付きの回復: 回復できなかった場合は別の名前の例外にする
+  decorator fallbackToCache
+    catches http.NetworkError recovers
+    throws OfflineCacheMiss;
+
+  // 結果を見ない呼び出し（ログアウトの依頼など）
+  decorator ignoreFailure
+    catches http.NetworkError | http.ServerError ignores;
+}

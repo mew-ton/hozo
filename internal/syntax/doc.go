@@ -10,7 +10,7 @@ import (
 
 // parseDocComment は DocComment の中身を本文とタグに分ける（docs/grammar.md「ドキュメンテーションコメント」）。
 //
-//   - 各行の先頭の空白と "*" と、その後ろの空白一つを落としてから読む。
+//   - 各行の先頭の空白と "*" と、その後ろの空白一つを落としてから読む。行末の空白も落とす。
 //   - タグは @param / @throws / @see だけ。ほかの "@" で始まる行は本文。
 //   - タグの行より後ろの、タグでない行は、直前のタグの説明の続きとして扱う（文法は「本文の行」の後に「タグの行」が並ぶとだけ決めている）。
 //   - 名前の形が合わないタグの行（"@param" だけ、"@see 1" など）は SYNTAX にし、本文として残す。
@@ -22,7 +22,7 @@ func (p *parser) parseDocComment(tok token.Token) *ast.DocComment {
 	for _, raw := range strings.SplitAfter(tok.Text, "\n") {
 		lineStart := offset
 		offset += len(raw)
-		line := strings.TrimRight(raw, "\r\n")
+		line := strings.TrimRight(raw, " \t\r\n")
 		text, trimmed := stripDocPrefix(line)
 		span := source.Span{File: p.file, Start: source.Offset(lineStart + trimmed), End: source.Offset(lineStart + len(line))}
 		if tag, ok := p.parseDocTag(text, span); ok {

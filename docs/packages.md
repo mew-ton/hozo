@@ -31,7 +31,7 @@ internal/tools/        go generate の道具
 plugins/<name>/        プラグイン。一つのディレクトリが一つの実行ファイルと hozo-plugin.toml。Go なら main パッケージ、TS なら npm パッケージ
 sdk/ts/                TS 向けプラグイン SDK
 schema/                IR の JSON スキーマ
-vocab/                 標準の語彙の .hozo
+vocab/                 標準の語彙の .hozo と、それを embed する公開パッケージ vocab（go:embed はパッケージのディレクトリの外を参照できないため）
 editors/vscode/        VS Code 拡張
 tests/rules/, tests/corpus/   テストの入力（docs/testing.md）
 docs/                  設計文書
@@ -43,6 +43,7 @@ docs/                  設計文書
 cmd/hozoc → internal/gen/hozoc → internal/app → internal/project → internal/{config, vocab, syntax, sema, check, emit/golang, plugin}
                                                                  → ir, plugin/golang, runtime
 internal/lsp → internal/project
+internal/vocab → vocab
 plugins/go-cli → plugin, plugin/golang, ir
 ir → (標準ライブラリだけ)
 plugin → ir
@@ -81,6 +82,7 @@ type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic
 
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。終了コードを返す。
 func Main(h Handler) int
+func Run(h Handler, in io.Reader, out, errOut io.Writer) int   // Main の中身。テスト用
 // 実装しない方向は ErrUnsupported を返す。Main は docs/plugin-protocol.md「起動」の code "unsupported" で終わる
 var ErrUnsupported error
 ```
@@ -90,15 +92,17 @@ var ErrUnsupported error
 `docs/emit-go.md`「名前」「型」の規則。既定の出力と Go のプラグインが共有する。
 
 ```go
-func TypeName(fqn, viewer string) string          // 合成 model の連結を含む
+func TypeName(fqn, namespace string) string       // namespace は宣言した名前空間。合成 model（`.` と `$`）の連結を含む
 func FieldName(name string) string
 func MethodName(opName string) string
+func LocalName(name string) string                // 引数名・束縛名。予約語なら末尾に _
 func EffectConst(name string) string
 func CaseConst(classify, caseName string) string
 func GoType(t ir.Type, imports *Imports) string   // 型の文字列。必要な import を imports に足す
-type Imports struct{ ... }                         // import パスと別名の管理。Render() で import ブロック
+type Resolver func(fqn string) (namespace, pkgPath, pkgName string, local bool)   // ref の行き先が同じパッケージか、どのパッケージか
+type Imports struct{ Viewer string; Resolve Resolver }   // import パスと別名の管理。Add / Name / Paths / Render()
 func PackageName(namespace string) string
-func ImportPath(root, out string) (string, error) // go.mod を探す。GOEMIT-1
+func ImportPath(root, out string) (string, error) // go.mod を探す。見つからなければ ErrNoGoMod（GOEMIT-1）
 ```
 
 ### `runtime`（公開）
@@ -174,15 +178,18 @@ func Views(p *ir.Program, cfg *config.Config) map[string]*ir.View   // 名前空
 `docs/config.md`。
 
 ```go
-type Config struct { Root string; Hozo HozoTable; Namespaces map[string]NamespaceTable }
-func Load(path string) (*Config, []diag.Diagnostic)
+type Config struct { Root, Path string; Hozo HozoTable; Namespaces map[string]NamespaceTable }
+func Load(path string) (*Config, []diag.Diagnostic)        // CFG-2 / CFG-7 / CFG-11 はここで出る。Config は常に返す（既定値で補う）
 func Find(startDir string) (string, bool)
+func Default(root string) *Config                           // hozo.toml がないとき（Project.NoConfig）
 func (c *Config) Resolve(namespace string) (NamespaceConf, bool)   // 継承を解決
+func (c *Config) NamespaceNames() []string                  // CFG-8 / CFG-10 のため
+func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo 側のため
 ```
 
 ### `internal/vocab`
 
-`docs/vocab.md`。`embed` した `vocab/*.hozo` を `source.FileSet` に足す `Add(fs *source.FileSet)`。パスは `hozo:vocab/<名前>.hozo`。
+`docs/vocab.md`。公開パッケージ `vocab` が `embed` した `vocab/*.hozo` を、`Files() []File` と `AddTo(func(path string, content []byte))` で渡す。パスは `hozo:vocab/<名前>.hozo`。プラグインの語彙は `PluginFiles(plugin, dir, rels)` / `AddPluginTo` で `hozo:plugin/<名前>/<相対パス>`。
 
 ### `internal/emit/golang`
 
@@ -194,8 +201,11 @@ func (c *Config) Resolve(namespace string) (NamespaceConf, bool)   // 継承を�
 
 ```go
 type Manifest struct{ ... }
-func Discover(cfg *config.Config, name string) (*Manifest, string, []diag.Diagnostic)   // マニフェストとそのディレクトリ
-func Run(m *Manifest, dir string, req any, resp any) error                              // 起動して JSON をやり取り。proc.Crashed / MalformedOutput に対応するエラー型
+func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-1 / MAN-2 / MAN-4
+func Discover(cfg *config.Config, name string) (*Manifest, string, []diag.Diagnostic)   // マニフェストとそのディレクトリ（絶対パス）。CFG-9 / MAN-3
+type Runner struct { Root string; Stderr io.Writer; Env []string }
+func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）
+var ErrCrashed, ErrMalformedOutput error                                                // errors.Is で判定。*PluginError は exit 2 の code を持ち、MAN-2 / MAN-5 の診断にする
 ```
 
 ### `internal/project`

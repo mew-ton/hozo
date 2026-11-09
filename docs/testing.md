@@ -22,6 +22,8 @@
 - `emit` のゴールデン: `expected/` に書き出したファイルの木を置き、実際に一時ディレクトリに書いて比べる。差分はファイルごとに示す。
 - ゴールデンの更新は `go test ./... -update`。
 
+段階 1 の途中（検査器ができるまで）は、`tests/parse_test.go` がコーパス・標準の語彙・`docs/cli.md` の `cli.hozo` を構文だけ確かめる。
+
 hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコーパスには入れない。`hozoc check` が error なしで通ることを `tests/selfcheck_test.go` で確かめ、`emit` の結果は「生成物の一致」で確かめる。
 
 ## 言語サーバーと check の一致

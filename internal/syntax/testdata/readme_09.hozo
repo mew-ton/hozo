@@ -1,0 +1,45 @@
+// 設計書 §9 配線。
+
+op loadOrderPage(query: OrdersQuery): OrderPage
+  throws http.NetworkError | http.ServerError
+{
+  const me     = fetchMe();
+  const orders = fetchOrders(query);
+  return orderPageVm(me, orders);
+}
+
+namespace server {
+  /** ログインセッションを削除する */
+  effect deleteSession on sessions.delete;
+
+  model LogoutInput {
+    @http.header(name: "Authorization") token: Token?;
+  }
+
+  // トークンがない・無効な場合のログアウトは何もしない（401 にしない）
+  @http.post("/logout")
+  op logout(in: LogoutInput)
+    effects deleteSession;
+}
+
+namespace browser {
+  /** 手元のトークンを消す */
+  effect removeToken on token.put;   // none を入れる
+
+  op clearToken()
+    effects removeToken;
+
+  /** サーバーのセッションの削除を依頼する。結果は見ない */
+  @ignoreFailure
+  op requestLogout()
+  {
+    server.logout({});   // token は bind で埋まる（§5.3）
+  }
+
+  // 効果 server.deleteSession / removeToken は呼び出し先から伝播する（§7.2）
+  op logout()
+  {
+    requestLogout();
+    clearToken();   // requestLogout の成功が前提。requestLogout は例外を投げない
+  }
+}

@@ -1,0 +1,85 @@
+// 設計書 §6.1 exception、§6.2 effect、§6.4 union、§6.5 scalar。
+
+namespace server {
+  /** メールアドレスかパスワードが一致しない */
+  @http.status(401)
+  exception InvalidCredentials;
+
+  model Violation { field: string; constraint: string; }
+  model Violations { items: Violation[]; }
+
+  /** 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ） */
+  @http.status(400)
+  exception ClientError: Violations;
+
+  /** 認証されていない */
+  @http.status(401)
+  exception Unauthorized;
+
+  /** 権限がない */
+  @http.status(403)
+  exception Forbidden;
+}
+
+namespace server {
+  /** ログインセッションを作成する */
+  effect createSession on sessions.post;
+}
+
+namespace browser {
+  /** ログイン画面へ遷移する */
+  effect transitionToLogin on location.put;
+
+  /** 権限がないことを示す画面へ遷移する */
+  effect transitionToForbidden on location.put;
+}
+
+namespace browser {
+  union ApiError {
+    server.Unauthorized;
+    server.Forbidden;
+  }
+
+  union RedirectByError {
+    transitionToLogin;
+    transitionToForbidden;
+  }
+}
+
+namespace server {
+  /** メールアドレス */
+  @valid.format("email")
+  scalar Email extends string;
+
+  /** ユーザーの識別子 */
+  scalar UserId extends string;
+
+  /** ログインセッションのトークン */
+  scalar Token extends string;
+
+  /** パスワード（平文。入力でだけ使う） */
+  @valid.length(min: 8, max: 128)
+  scalar Password extends string;
+}
+
+namespace browser {
+  /** 1 以上の整数 */
+  @valid.min(1)
+  scalar PosInt extends int;
+}
+
+model User {
+  @valid.length(min: 1, max: 100) name: string;
+}
+
+namespace valid {
+  /** 末尾の 1 桁が、前の 4 桁から計算したチェックディジットと一致する */
+  decorator checkDigit for scalar | field;
+}
+
+namespace server {
+  /** 社員番号（英大文字 3 字 + 数字 5 桁。末尾はチェックディジット） */
+  @valid.pattern("^[A-Z]{3}[0-9]{5}$")
+  @valid.checkDigit
+  scalar EmployeeCode extends string;
+}

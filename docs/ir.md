@@ -343,7 +343,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 ## JSON
 
 - フィールド名はこの文書の通り（lowerCamelCase）。`kind` が判別子。Go の `ir` パッケージの JSON タグはここから写す。
-- 省略可能（`?`）のフィールドは、値がなければキーごと省く。`null` は出さない。空の列は `[]` で出す（省かない）。
+- 省略可能（`?`）のフィールドは、値がなければキーごと省く。空の列は `[]` で出す（省かない）。`null` を出すのは `Op.returns`（void）と `Op.body`（葉）の二つだけ。
 - 数値は JSON の number。`duration` は整数（ナノ秒）。`int` は 64 ビットの範囲に収まることを検査 LIT-1（`docs/types.md`「診断」）で保証する。
 - 列の順序はこの文書の「原則」の通りで、同じ入力から同じバイト列になる。`ops` のキーの順序は FQN の辞書順。
 - 版の照合は `docs/plugin-protocol.md`「要求と応答」。

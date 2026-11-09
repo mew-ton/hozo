@@ -1,0 +1,42 @@
+// 設計書 §5.2 model と状態、§5.3 bind。
+
+namespace server {
+  model User {
+    @db.key    id: UserId;
+    @db.unique email: Email;
+    name: string;
+    hash: string;
+    status: UserStatus;
+  }
+
+  model Session {
+    @db.key token: Token;
+    userId: UserId;
+    expiresAt: Time;
+  }
+
+  model PublicUser is User omit hash;
+
+  @db
+  state users: list<User>;
+
+  @db
+  state sessions: list<Session>;
+}
+
+namespace browser {
+  @localStorage
+  state token: single<Token?>;
+
+  @page.query
+  state query: single<Record<string, string[]>>;
+
+  @page.path
+  state location: single<Route>;
+}
+
+namespace browser {
+  // token は §5.2 の browser.token（single<Token?>）
+  // server への呼び出しでは、入力のうち Token 型の位置を token で埋める
+  bind token to server.*;
+}

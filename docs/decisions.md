@@ -71,6 +71,7 @@
 | ユニオンのアームの中の `;` | §11.2 の `Ready: { userName: string; orders: OrderRow[] }` は、フィールドの末尾に `;` が要る（`docs/grammar.md`「model」） | 7 |
 | §6.5 の `model User` | §5.2 の `model User` と二重の宣言になる。`@valid.length` のフィールドは §5.2 の宣言に足す | 18 |
 | scalar のフィールドの既定値 | §11.2 の `page: PosInt = 1` のような既定値の型の規則がない。`docs/types.md`「既定値」の規則を提案する | — |
+| `examples/hozoc.hozo` の `namespace: string` | `EmitRequest` のフィールド名 `namespace` は予約語（`docs/grammar.md`「予約語」）なので識別子にならない。別の名前に | 7 |
 | `location` の型 | §5.2 の `state location: single<Route>;` の `Route` は標準の語彙の型なので修飾して書く（`page.Route`。`http` の語彙に置くかは設計書で決める）。ルーターのプラグインに固有の型は使わない | 18、19 |
 | `examples/hozoc.hozo` の「書けなかったもの」 | 三つの解き方。§15 が「なし」のままになっている | 20、36 |
 | 語彙の宣言の読み込み元 | §4.2 の語彙を hozoc が同梱すること、プラグインの `vocabulary` | 19、22 |

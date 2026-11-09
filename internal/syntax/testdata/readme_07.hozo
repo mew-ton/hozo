@@ -1,0 +1,32 @@
+// 設計書 §7.1 op の宣言、§7.3 例外と効果の関係。
+// `token?: Token` は `token: Token?` に直した。
+
+namespace server {
+  model LoginInput {
+    @http.header(name: "Authorization") token: Token?;
+    @http.body body: LoginInputBody;
+  }
+  model LoginInputBody { email: Email; password: Password; }
+  model LoginOk { user: PublicUser; token: Token; }
+
+  @http.status(403)
+  exception NotVerified;
+  @http.status(403)
+  exception Suspended;
+  @http.status(409)
+  exception AlreadyLoggedIn;
+
+  @http.post("/login")
+  @validated
+  op login(in: LoginInput): LoginOk
+    effects createSession
+    throws InvalidCredentials | NotVerified | Suspended | AlreadyLoggedIn prevents effects;
+}
+
+op cancelOrder(in: CancelInput): Order
+  effects refund
+  throws RefundPending keeps effects;   // 返金の処理は受け付けたが、完了の確認が取れない
+
+op placeOrder(in: OrderInput): Order
+  effects createOrder | notifyUser
+  throws NotificationFailed keeps createOrder prevents notifyUser;
