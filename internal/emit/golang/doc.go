@@ -1,7 +1,7 @@
 // Package golang は Go の既定の出力（docs/emit-go.md）。
 //
 // 入力は docs/ir.md「その名前空間から見た IR」の [ir.View]（見る側 viewer が出力する名前空間）で、
-// 出力は View.Config.Out の下に置くファイルの列。何をどの形で出すかの持ち主は docs/emit-go.md で、
+// 出力は View.Config.Dir（Dir(viewer)。docs/config.md「名前空間の設定の解決」）の下に置くファイルの列。何をどの形で出すかの持ち主は docs/emit-go.md で、
 // 名前と型の規則は plugin/golang（docs/packages.md「`plugin/golang`（公開）」）と共有する。
 //
 // # 文書との対応
@@ -20,10 +20,11 @@
 //
 // 文書が決めていないところで、この実装が選んだこと。
 //
-//   - 別の名前空間が「Go で同じプロジェクト」かは [Options.LanguageOf] で答える。nil なら、
-//     他のすべての名前空間の型を複製する。
-//   - 名前空間のサブディレクトリ P（「配置」）は、LanguageOf が同じ out を答える祖先を
-//     辿って決める（Conf からは「自分で書いた」かどうかが分からないため）。
+//   - 別の名前空間 M が「Go で同じプロジェクト」かは View.Namespaces[M] の language で決め、
+//     M のパッケージのディレクトリは View.Namespaces[M].Dir（Dir(M)）。View.Namespaces にない
+//     名前空間（語彙など）の型は複製する。
+//   - View.Config.Dir（または View.Namespaces[M].Dir）が空なら Conf.out を使う（P が空の Dir(N) と同じ）。
+//     internal/check の Views は常に Dir を埋めるので、手で組んだ View のための保険。
 //   - 複製する宣言は、参照した model / scalar / union と、それらが参照する宣言（推移的）。
 //     複製した model / scalar には Validate（と既定値があれば New）も出す。derivedFrom の
 //     変換関数は複製しない。

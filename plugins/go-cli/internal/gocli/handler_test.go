@@ -87,7 +87,7 @@ func TestEmitHozocGolden(t *testing.T) {
 	if len(resp.Errors) != 0 {
 		t.Fatalf("errors = %+v", resp.Errors)
 	}
-	if len(resp.Files) != 1 || resp.Files[0].Path != OutputPath {
+	if len(resp.Files) != 1 || resp.Files[0].Path != "internal/gen/hozoc/cli/cli.go" {
 		t.Fatalf("files = %+v", resp.Files)
 	}
 	src := resp.Files[0].Content
@@ -118,6 +118,25 @@ func TestEmitIsDeterministic(t *testing.T) {
 	b := emit(t, handlerFor(root), hozocView()).Files[0].Content
 	if a != b {
 		t.Error("two emits of the same view differ")
+	}
+}
+
+// TestEmitUsesDir は出力先と import パスが View.config.dir（Dir(N)）から求まること（docs/plugin-go-cli.md「出力」）。
+// 親の out を継いだ名前空間では dir が out のサブディレクトリになっている。
+func TestEmitUsesDir(t *testing.T) {
+	v := hozocView()
+	v.Config.Out = "internal/gen"
+	v.Config.Dir = "internal/gen/hozoc"
+	v.Namespaces[v.Viewer] = v.Config
+	resp := emit(t, handlerFor(repoRoot(t)), v)
+	if len(resp.Errors) != 0 {
+		t.Fatalf("errors = %+v", resp.Errors)
+	}
+	if len(resp.Files) != 1 || resp.Files[0].Path != "internal/gen/hozoc/cli/cli.go" {
+		t.Fatalf("files = %+v", resp.Files)
+	}
+	if !strings.Contains(resp.Files[0].Content, `"github.com/mew-ton/hozo/internal/gen/hozoc"`) {
+		t.Errorf("import path should come from dir:\n%s", resp.Files[0].Content[:600])
 	}
 }
 

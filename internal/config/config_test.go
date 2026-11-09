@@ -143,6 +143,62 @@ func TestResolve(t *testing.T) {
 	}
 }
 
+// docs/config.md「名前空間の設定の解決」の Dir(N)。
+func TestDir(t *testing.T) {
+	cfg, diags := Load(write(t, example+`
+[server.admin.audit]
+out = "internal/audit"
+
+[server.ops]
+out = "internal/gen"
+`))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %+v", diags)
+	}
+	cases := []struct {
+		ns   string
+		want string
+		ok   bool
+	}{
+		// out を自分で書いた名前空間は P が空
+		{"server", "internal/gen", true},
+		{"browser", "web/src/generated", true},
+		// 親の out を継いだ子はそのセグメントのサブディレクトリ
+		{"server.admin", "internal/gen/admin", true},
+		// テーブルのない子も同じ
+		{"server.other", "internal/gen/other", true},
+		{"server.other.deep", "internal/gen/other/deep", true},
+		// 親と同じ out を自分でも書いた子は、自分が A なので P は空
+		{"server.ops", "internal/gen", true},
+		{"server.ops.x", "internal/gen/x", true},
+		// 三段: 孫が out を書けば孫が A
+		{"server.admin.audit", "internal/audit", true},
+		{"server.admin.audit.log", "internal/audit/log", true},
+		// 孫のテーブルが out を書かなければ、out を書いた最も近い祖先（server）から
+		{"server.admin.x.y", "internal/gen/admin/x/y", true},
+		// どこにもなければ未設定
+		{"unknown", "", false},
+		{"", "", false},
+	}
+	for _, c := range cases {
+		got, ok := cfg.Dir(c.ns)
+		if ok != c.ok || got != c.want {
+			t.Errorf("Dir(%q) = %q, %v; want %q, %v", c.ns, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+func TestDirWithoutOut(t *testing.T) {
+	// 祖先のどれも out を書いていなければ P は空で、Dir は Conf.out（""）のまま。
+	cfg, diags := Load(write(t, "[a]\nlanguage = \"go\"\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %+v", diags)
+	}
+	if got, ok := cfg.Dir("a.b"); !ok || got != "" {
+		t.Errorf("Dir(a.b) = %q, %v", got, ok)
+	}
+}
+
 func TestResolvePartialParent(t *testing.T) {
 	// 親に language だけ、子に out だけ
 	cfg, diags := Load(write(t, "[a]\nlanguage = \"go\"\n[a.b]\nout = \"gen\"\n"))

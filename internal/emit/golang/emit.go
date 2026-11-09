@@ -44,11 +44,6 @@ type Options struct {
 	Root string
 	// Manifests は Conf(viewer).plugins のマニフェスト。entry / stop に含まれるデコレータは包む関数にしない。
 	Manifests []ManifestInfo
-	// LanguageOf は名前空間 ns の Conf(ns).language と Conf(ns).out を答える
-	// （docs/config.md「名前空間の設定の解決」）。ok が false なら未設定（語彙の名前空間など）。
-	// 別の名前空間 M の型を import するか複製するか（docs/emit-go.md「配置」）と、
-	// M のパッケージのディレクトリを決めるのに使う。nil なら他の名前空間の型はすべて複製する。
-	LanguageOf func(ns string) (lang, out string, ok bool)
 }
 
 // 診断のコード（docs/emit-go.md「診断」）。
@@ -94,7 +89,7 @@ type emitter struct {
 	diags  []diag.Diagnostic
 
 	pkg string // Go のパッケージ名
-	dir string // ルートからの出力ディレクトリ（`/` 区切り）: Conf(viewer).out + P
+	dir string // ルートからの出力ディレクトリ（`/` 区切り）: Dir(viewer) = View.Config.Dir
 
 	declNS   map[string]string // FQN → 宣言を持つ名前空間
 	copied   map[string]bool   // viewer のパッケージに複製する宣言の FQN
@@ -151,7 +146,7 @@ func newEmitter(view *ir.View, ns *ir.Namespace, opts Options) *emitter {
 // run は docs/emit-go.md を上から順に実行する。
 func (e *emitter) run() []File {
 	e.pkg = gol.PackageName(e.viewer)
-	e.dir = path.Join(filepath.ToSlash(e.view.Config.Out), e.subPath(e.viewer, e.view.Config.Out))
+	e.dir = dirOf(e.view.Config)
 	if _, err := gol.ImportPath(e.opts.Root, e.dir); err != nil {
 		e.errorf(CodeNoGoMod, nil, "名前空間 %s の out %q の上に go.mod がない: %v", e.viewer, e.view.Config.Out, err)
 		return nil
@@ -283,12 +278,4 @@ func localName(fqn string) string {
 		return fqn[i+1:]
 	}
 	return fqn
-}
-
-// parentNS は名前空間の親。ルート直下なら ""。
-func parentNS(ns string) string {
-	if i := strings.LastIndexByte(ns, '.'); i >= 0 {
-		return ns[:i]
-	}
-	return ""
 }

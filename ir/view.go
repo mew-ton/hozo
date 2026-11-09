@@ -13,8 +13,11 @@ type View struct {
 	Version string `json:"version"`
 	// Viewer は見る側の名前空間の FQN。
 	Viewer string `json:"viewer"`
-	// Config は Conf(viewer)（docs/config.md「名前空間の設定の解決」）。
-	Config ViewConfig `json:"config"`
+	// Config は viewer の設定（Conf(viewer) と Dir(viewer)。docs/config.md「名前空間の設定の解決」）。
+	Config NamespaceConfig `json:"config"`
+	// Namespaces は設定のあるすべての名前空間（viewer を含む）の設定。キーは FQN。JSON ではキーを辞書順に出す。
+	// プラグインが別の名前空間の言語と出力先を知るため（import するか複製するか。docs/emit-go.md「配置」）。
+	Namespaces map[string]NamespaceConfig `json:"namespaces"`
 	// Program は全体そのまま（各 op の Signature は op 自身の名前空間から見たもの）。
 	// ただし Ops の params が合成する model を、viewer の Namespace.Decls の末尾に足してある。
 	Program *Program `json:"program"`
@@ -22,11 +25,16 @@ type View struct {
 	Ops map[string]*ViewedSignature `json:"ops"`
 }
 
-// ViewConfig は見る側の名前空間の設定（docs/ir.md「その名前空間から見た IR」の config）。
-type ViewConfig struct {
-	Language string   `json:"language"`
-	Out      string   `json:"out"`
-	Plugins  []string `json:"plugins"`
+// NamespaceConfig は一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」の NamespaceConfig）。
+type NamespaceConfig struct {
+	// Language は Conf(N).language（docs/config.md「名前空間の設定の解決」）。
+	Language string `json:"language"`
+	// Out は Conf(N).out。
+	Out string `json:"out"`
+	// Dir は Dir(N)。この名前空間のファイルを置くディレクトリ（ルートからの相対パス、`/` 区切り）。
+	Dir string `json:"dir"`
+	// Plugins は Conf(N).plugins。
+	Plugins []string `json:"plugins"`
 }
 
 // ViewedSignature は viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」の ViewedSignature）。
@@ -49,18 +57,20 @@ func (v *View) Signature(op string) *ViewedSignature {
 	return v.Ops[op]
 }
 
-// MarshalJSON は docs/ir.md「JSON」の形で書く。ops のキーは FQN の辞書順。Version が空なら [Version] を書く。
+// MarshalJSON は docs/ir.md「JSON」の形で書く。namespaces と ops のキーは FQN の辞書順。
+// 空の namespaces は {} で出す。Version が空なら [Version] を書く。
 func (v View) MarshalJSON() ([]byte, error) {
 	if v.Version == "" {
 		v.Version = Version
 	}
 	type head struct {
-		Version string     `json:"version"`
-		Viewer  string     `json:"viewer"`
-		Config  ViewConfig `json:"config"`
-		Program *Program   `json:"program"`
+		Version    string                     `json:"version"`
+		Viewer     string                     `json:"viewer"`
+		Config     NamespaceConfig            `json:"config"`
+		Namespaces map[string]NamespaceConfig `json:"namespaces"` // encoding/json は写像のキーを辞書順に書く
+		Program    *Program                   `json:"program"`
 	}
-	b, err := marshalStruct(head{v.Version, v.Viewer, v.Config, v.Program})
+	b, err := marshalStruct(head{v.Version, v.Viewer, v.Config, v.Namespaces, v.Program})
 	if err != nil {
 		return nil, err
 	}
@@ -92,13 +102,13 @@ func (v View) MarshalJSON() ([]byte, error) {
 func (v *View) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, v) }
 
 // MarshalJSON は docs/ir.md「JSON」の形で書く。
-func (c ViewConfig) MarshalJSON() ([]byte, error) {
-	type alias ViewConfig
+func (c NamespaceConfig) MarshalJSON() ([]byte, error) {
+	type alias NamespaceConfig
 	return marshalStruct(alias(c))
 }
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
-func (c *ViewConfig) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, c) }
+func (c *NamespaceConfig) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, c) }
 
 // MarshalJSON は Signature のフィールドの後に params と bound を書く。
 func (s ViewedSignature) MarshalJSON() ([]byte, error) {

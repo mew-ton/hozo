@@ -3,53 +3,41 @@ package golang
 import (
 	"path"
 	"path/filepath"
-	"strings"
 
+	"github.com/mew-ton/hozo/ir"
 	gol "github.com/mew-ton/hozo/plugin/golang"
 )
 
-// subPath は名前空間 ns のファイルを Conf(ns).out の下のどこに置くかの相対パス P
-// （docs/emit-go.md「配置」）。out を自分で書いた祖先 A からの相対パスだが、Conf からは
-// 「自分で書いた」かどうかが分からないので、LanguageOf が同じ out を答える最も遠い祖先を A とみなす
-// （doc.go「文書にない決定」）。LanguageOf が nil なら ""。
-func (e *emitter) subPath(ns, out string) string {
-	if e.opts.LanguageOf == nil || ns == "" {
-		return ""
+// dirOf は名前空間の設定 c の出力ディレクトリ Dir(N)（docs/emit-go.md「配置」）をルートからの `/` 区切りで。
+// Dir が空なら Conf(N).out（P が空の Dir(N) と同じ。doc.go「文書にない決定」）。
+func dirOf(c ir.NamespaceConfig) string {
+	d := c.Dir
+	if d == "" {
+		d = c.Out
 	}
-	top := ns
-	for cur := parentNS(ns); cur != ""; cur = parentNS(cur) {
-		_, o, ok := e.opts.LanguageOf(cur)
-		if !ok || o != out {
-			break
-		}
-		top = cur
-	}
-	if top == ns {
-		return ""
-	}
-	rest := strings.TrimPrefix(ns[len(top):], ".")
-	return strings.ReplaceAll(rest, ".", "/")
+	return path.Clean(filepath.ToSlash(d))
 }
 
-// isGoNS は名前空間 ns が Go で同じプロジェクトか（import する相手か）。viewer 自身には使わない。
+// isGoNS は名前空間 ns が Go で同じプロジェクトか（import する相手か。docs/emit-go.md「配置」）。
+// View.namespaces にあって language が go なら真。viewer 自身には使わない。
 func (e *emitter) isGoNS(ns string) bool {
-	if e.opts.LanguageOf == nil || ns == "" {
+	if ns == "" {
 		return false
 	}
-	lang, _, ok := e.opts.LanguageOf(ns)
-	return ok && lang == "go"
+	c, ok := e.view.Namespaces[ns]
+	return ok && c.Language == "go"
 }
 
-// importPathOf は Go の名前空間 ns のパッケージの import パス。go.mod がなければ GOEMIT-1（一度だけ）。
+// importPathOf は Go の名前空間 ns のパッケージ（Dir(ns)）の import パス。go.mod がなければ GOEMIT-1（一度だけ）。
 func (e *emitter) importPathOf(ns string) string {
 	if p, ok := e.pkgPaths[ns]; ok {
 		return p
 	}
-	_, out, _ := e.opts.LanguageOf(ns)
-	dir := path.Join(filepath.ToSlash(out), e.subPath(ns, out))
+	c := e.view.Namespaces[ns]
+	dir := dirOf(c)
 	p, err := gol.ImportPath(e.opts.Root, dir)
 	if err != nil {
-		e.errorf(CodeNoGoMod, nil, "名前空間 %s の out %q の上に go.mod がない: %v", ns, out, err)
+		e.errorf(CodeNoGoMod, nil, "名前空間 %s の out %q の上に go.mod がない: %v", ns, c.Out, err)
 		p = "INVALID/" + dir
 	}
 	e.pkgPaths[ns] = p

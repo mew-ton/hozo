@@ -4,9 +4,32 @@
   "config": {
     "language": "go",
     "out": "gen/browser",
+    "dir": "gen/browser",
     "plugins": [
       "go-cli"
     ]
+  },
+  "namespaces": {
+    "browser": {
+      "language": "go",
+      "out": "gen/browser",
+      "dir": "gen/browser",
+      "plugins": [
+        "go-cli"
+      ]
+    },
+    "server": {
+      "language": "go",
+      "out": "gen/server",
+      "dir": "gen/server",
+      "plugins": []
+    },
+    "server.admin": {
+      "language": "go",
+      "out": "gen/server",
+      "dir": "gen/server/admin",
+      "plugins": []
+    }
   },
   "program": {
     "version": "0.1",

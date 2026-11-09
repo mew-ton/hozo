@@ -71,7 +71,7 @@ Conf(N).plugins（`docs/config.md`「名前空間の設定の解決」）の名�
 
 // 応答
 {
-  "files": [ { "path": "cli/cli.go", "content": "..." } ],   // path は view.config.out からの相対パス
+  "files": [ { "path": "internal/gen/hozoc/cli/cli.go", "content": "..." } ],   // path はプロジェクトのルートからの相対パス（普通は view.config.dir の下）
   "warnings": [ { "at": "hozoc.emit", "message": "..." } ],  // at は FQN か、"file:line:col" の文字列
   "errors":   [ { "code": "CLI-1", "at": "hozoc.check", "message": "..." } ]   // 省略可。一つでもあれば書き出さない
 }

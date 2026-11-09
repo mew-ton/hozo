@@ -309,7 +309,13 @@ func sampleView() *View {
 	return &View{
 		Version: Version,
 		Viewer:  "browser",
-		Config:  ViewConfig{Language: "go", Out: "gen/browser", Plugins: []string{"go-cli"}},
+		Config:  NamespaceConfig{Language: "go", Out: "gen/browser", Dir: "gen/browser", Plugins: []string{"go-cli"}},
+		// server.admin は server の out を継いでいるので Dir(server.admin) は gen/server/admin（docs/config.md「名前空間の設定の解決」）
+		Namespaces: map[string]NamespaceConfig{
+			"browser":      {Language: "go", Out: "gen/browser", Dir: "gen/browser", Plugins: []string{"go-cli"}},
+			"server":       {Language: "go", Out: "gen/server", Dir: "gen/server"},
+			"server.admin": {Language: "go", Out: "gen/server", Dir: "gen/server/admin"},
+		},
 		Program: p,
 		Ops: map[string]*ViewedSignature{
 			"server.page": {

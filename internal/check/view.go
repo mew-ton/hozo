@@ -20,30 +20,66 @@ func Views(p *ir.Program, cfg *config.Config) map[string]*ir.View {
 	ix := newIndex(p)
 	c := newComputer(ix, &reporter{})
 	c.computeAll()
+	namespaces := namespaceConfigs(p, cfg)
 	views := map[string]*ir.View{}
 	for i := range p.Namespaces {
 		viewer := p.Namespaces[i].Name
-		conf, ok := cfg.Resolve(viewer)
+		conf, ok := namespaces[viewer]
 		if !ok {
 			continue
 		}
-		views[viewer] = c.view(viewer, conf)
+		views[viewer] = c.view(viewer, conf, namespaces)
 	}
 	return views
 }
 
-// view は viewer から見た View を作る。
-func (c *computer) view(viewer string, conf config.NamespaceConf) *ir.View {
-	ix := c.ix
+// namespaceConfigs は設定のあるすべての名前空間の設定（docs/ir.md「その名前空間から見た IR」の View.namespaces）。
+// hozo.toml にテーブルのある名前空間と、Program の名前空間のうち祖先のテーブルから設定を継ぐもの
+// （View を持つ名前空間はすべてここに入る）。
+func namespaceConfigs(p *ir.Program, cfg *config.Config) map[string]ir.NamespaceConfig {
+	names := cfg.NamespaceNames()
+	for i := range p.Namespaces {
+		names = append(names, p.Namespaces[i].Name)
+	}
+	out := map[string]ir.NamespaceConfig{}
+	for _, n := range names {
+		if _, done := out[n]; done {
+			continue
+		}
+		if nc, ok := namespaceConfig(cfg, n); ok {
+			out[n] = nc
+		}
+	}
+	return out
+}
+
+// namespaceConfig は名前空間 ns の Conf(ns) と Dir(ns)（docs/config.md「名前空間の設定の解決」）。設定がなければ false。
+func namespaceConfig(cfg *config.Config, ns string) (ir.NamespaceConfig, bool) {
+	conf, ok := cfg.Resolve(ns)
+	if !ok {
+		return ir.NamespaceConfig{}, false
+	}
+	dir, _ := cfg.Dir(ns)
 	plugins := conf.Plugins
 	if plugins == nil {
 		plugins = []string{}
 	}
+	return ir.NamespaceConfig{Language: conf.Language, Out: conf.Out, Dir: dir, Plugins: plugins}, true
+}
+
+// view は viewer から見た View を作る。conf は viewer の設定、namespaces は設定のあるすべての名前空間の設定（複製して持つ）。
+func (c *computer) view(viewer string, conf ir.NamespaceConfig, namespaces map[string]ir.NamespaceConfig) *ir.View {
+	ix := c.ix
+	nss := make(map[string]ir.NamespaceConfig, len(namespaces))
+	for k, nc := range namespaces {
+		nss[k] = nc
+	}
 	v := &ir.View{
-		Version: ir.Version,
-		Viewer:  viewer,
-		Config:  ir.ViewConfig{Language: conf.Language, Out: conf.Out, Plugins: plugins},
-		Ops:     map[string]*ir.ViewedSignature{},
+		Version:    ir.Version,
+		Viewer:     viewer,
+		Config:     conf,
+		Namespaces: nss,
+		Ops:        map[string]*ir.ViewedSignature{},
 	}
 	var synthesized []ir.Decl
 	for _, o := range ix.ops {

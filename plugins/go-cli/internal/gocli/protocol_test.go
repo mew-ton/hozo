@@ -34,7 +34,7 @@ func TestProtocolRun(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, out.String())
 	}
-	if len(resp.Files) != 1 || resp.Files[0].Path != "cli/cli.go" {
+	if len(resp.Files) != 1 || resp.Files[0].Path != "internal/gen/hozoc/cli/cli.go" {
 		t.Fatalf("files = %+v", resp.Files)
 	}
 	if !strings.Contains(out.String(), `"warnings":[]`) || strings.Contains(out.String(), `"errors"`) {
@@ -94,7 +94,7 @@ func TestPluginBinary(t *testing.T) {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, out.String())
 	}
 	golden, _ := os.ReadFile(filepath.Join("testdata", "hozoc_cli.go.golden"))
-	if len(resp.Files) != 1 || resp.Files[0].Path != "cli/cli.go" || resp.Files[0].Content != string(golden) {
+	if len(resp.Files) != 1 || resp.Files[0].Path != "internal/gen/hozoc/cli/cli.go" || resp.Files[0].Content != string(golden) {
 		t.Errorf("response differs: %d files", len(resp.Files))
 	}
 }

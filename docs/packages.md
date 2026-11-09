@@ -187,7 +187,8 @@ type Config struct { Root, Path string; Hozo HozoTable; Namespaces map[string]Na
 func Load(path string) (*Config, []diag.Diagnostic)        // CFG-2 / CFG-7 / CFG-11 はここで出る。Config は常に返す（既定値で補う）
 func Find(startDir string) (string, bool)
 func Default(root string) *Config                           // hozo.toml がないとき（Project.NoConfig）
-func (c *Config) Resolve(namespace string) (NamespaceConf, bool)   // 継承を解決
+func (c *Config) Resolve(namespace string) (NamespaceConf, bool)   // 継承を解決した Conf(N)
+func (c *Config) Dir(namespace string) (string, bool)       // Dir(N)（docs/config.md「名前空間の設定の解決」）。ルートからの相対パス。Resolve が false なら false
 func (c *Config) NamespaceNames() []string                  // CFG-8 / CFG-10 のため
 func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo 側のため
 ```
@@ -201,9 +202,9 @@ func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo �
 `docs/emit-go.md`。
 
 ```go
-type File struct { Path string; Content []byte }            // Path はルートからの相対パス
+type File struct { Path string; Content []byte }            // Path はルートからの相対パス（View.config.dir の下）
 type ManifestInfo struct { Name string; Entry, Stop, Decorate []string }   // 設定されたプラグインのマニフェストから（Wrappers の判定）
-type Options struct { Root string; Manifests []ManifestInfo }
+type Options struct { Root string; Manifests []ManifestInfo }   // 別の名前空間の言語と出力先は View.namespaces から読む（docs/emit-go.md「配置」）
 func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic)   // error があればファイルは返さない
 ```
 

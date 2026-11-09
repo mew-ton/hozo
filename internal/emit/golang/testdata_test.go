@@ -198,7 +198,7 @@ func serverNS() ir.Namespace {
 // serverView は server から見た View。
 func serverView() *ir.View {
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), httpNS(), serverNS()}}
-	v := &ir.View{Viewer: "server", Config: ir.ViewConfig{Language: "go", Out: "gen/server"}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "server", Config: nsConfig("server"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range p.Namespace("server").Decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
@@ -321,7 +321,7 @@ func browserView() *ir.View {
 		DeclBase: base("browser.getMe$in", nil), SynthesizedFrom: "server.getMe",
 		Fields: []ir.Field{field("verbose", ir.Boolean())},
 	})
-	v := &ir.View{Viewer: "browser", Config: ir.ViewConfig{Language: "go", Out: "gen/browser", Plugins: []string{"router"}}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "browser", Config: nsConfig("browser", "router"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range ns.Decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
@@ -384,7 +384,7 @@ func constraintView() *ir.View {
 		}},
 	}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, valid, inv}}
-	return &ir.View{Viewer: "inventory", Config: ir.ViewConfig{Language: "go", Out: "gen/inventory"}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	return &ir.View{Viewer: "inventory", Config: nsConfig("inventory"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 }
 
 // derivedView は derivedFrom の model と、配線の射影（既定値で埋めるフィールドを含む）。
@@ -422,7 +422,7 @@ func derivedView() *ir.View {
 			}}},
 	}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, cat}}
-	v := &ir.View{Viewer: "catalog", Config: ir.ViewConfig{Language: "go", Out: "gen/catalog"}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "catalog", Config: nsConfig("catalog"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range cat.Decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}

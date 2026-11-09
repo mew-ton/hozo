@@ -26,13 +26,19 @@ type goldenCase struct {
 	manifests []ManifestInfo
 }
 
-// languageOf は各テストの名前空間の Conf。server / browser / inventory / catalog が Go、語彙は未設定。
-func languageOf(ns string) (lang, out string, ok bool) {
-	switch ns {
-	case "server", "browser", "inventory", "catalog":
-		return "go", "gen/" + ns, true
+// namespaces は各テストの View.Namespaces。server / browser / inventory / catalog / app が Go で
+// out = Dir = gen/<ns>（out を自分で書いたので P は空）、語彙は未設定。
+func namespaces() map[string]ir.NamespaceConfig {
+	m := map[string]ir.NamespaceConfig{}
+	for _, ns := range []string{"server", "browser", "inventory", "catalog", "app"} {
+		m[ns] = nsConfig(ns)
 	}
-	return "", "", false
+	return m
+}
+
+// nsConfig は名前空間 ns の設定（out を自分で書いた名前空間）。
+func nsConfig(ns string, plugins ...string) ir.NamespaceConfig {
+	return ir.NamespaceConfig{Language: "go", Out: "gen/" + ns, Dir: "gen/" + ns, Plugins: plugins}
 }
 
 var goldenCases = []goldenCase{
@@ -73,7 +79,7 @@ func TestGolden(t *testing.T) {
 			root := newProjectRoot(t)
 			var files []File
 			for _, v := range tc.views {
-				fs, diags := Emit(v, Options{Root: root, Manifests: tc.manifests, LanguageOf: languageOf})
+				fs, diags := Emit(v, Options{Root: root, Manifests: tc.manifests})
 				if len(diags) > 0 {
 					t.Fatalf("%s: 診断が出た: %s", v.Viewer, formatDiags(diags))
 				}
@@ -207,7 +213,7 @@ func codesOf(diags []diag.Diagnostic) []string {
 func smallView(decls ...ir.Decl) *ir.View {
 	ns := ir.Namespace{Name: "app", Decls: decls}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), ns}}
-	return &ir.View{Viewer: "app", Config: ir.ViewConfig{Language: "go", Out: "gen/app"}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	return &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 }
 
 func TestNoGoMod(t *testing.T) {
@@ -328,9 +334,9 @@ func TestFormatFailure(t *testing.T) {
 // TestDeterministic は同じ入力から同じバイト列が出ること。
 func TestDeterministic(t *testing.T) {
 	root := newProjectRoot(t)
-	first, _ := Emit(browserView(), Options{Root: root, Manifests: browserManifests(), LanguageOf: languageOf})
+	first, _ := Emit(browserView(), Options{Root: root, Manifests: browserManifests()})
 	for i := 0; i < 3; i++ {
-		again, _ := Emit(browserView(), Options{Root: root, Manifests: browserManifests(), LanguageOf: languageOf})
+		again, _ := Emit(browserView(), Options{Root: root, Manifests: browserManifests()})
 		if len(first) != len(again) {
 			t.Fatal("ファイルの数が違う")
 		}
@@ -342,19 +348,17 @@ func TestDeterministic(t *testing.T) {
 	}
 }
 
-// TestSubPath は「配置」の P: 親と同じ out を継いだ子はサブディレクトリに置く。
-func TestSubPath(t *testing.T) {
+// TestDir は「配置」: 名前空間のファイルは Dir(N)（View.Config.Dir）の下に置く。
+// 親の out を継いだ子は Dir がサブディレクトリになっている。
+func TestDir(t *testing.T) {
 	root := newProjectRoot(t)
 	v := smallView(&ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()})
 	v.Viewer = "app.admin"
 	v.Program.Namespaces[2].Name = "app.admin"
 	v.Program.Namespaces[2].Decls[0].(*ir.Scalar).Name = "app.admin.Id"
-	files, diags := Emit(v, Options{Root: root, LanguageOf: func(ns string) (string, string, bool) {
-		if ns == "app" || ns == "app.admin" {
-			return "go", "gen/app", true
-		}
-		return "", "", false
-	}})
+	v.Config = ir.NamespaceConfig{Language: "go", Out: "gen/app", Dir: "gen/app/admin"}
+	v.Namespaces = map[string]ir.NamespaceConfig{"app": nsConfig("app"), "app.admin": v.Config}
+	files, diags := Emit(v, Options{Root: root})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
 	}
@@ -363,5 +367,53 @@ func TestSubPath(t *testing.T) {
 	}
 	if !bytes.Contains(files[0].Content, []byte("package admin\n")) {
 		t.Errorf("package admin を期待した:\n%s", files[0].Content)
+	}
+}
+
+// TestDirFallsBackToOut は Dir が空の View（手で組んだもの）では Conf.out に置くこと（doc.go「文書にない決定」）。
+func TestDirFallsBackToOut(t *testing.T) {
+	root := newProjectRoot(t)
+	v := smallView(&ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()})
+	v.Config.Dir = ""
+	files, diags := Emit(v, Options{Root: root})
+	if len(diags) > 0 {
+		t.Fatal(formatDiags(diags))
+	}
+	if len(files) == 0 || files[0].Path != "gen/app/types.go" {
+		t.Errorf("gen/app/types.go を期待したが %v", files)
+	}
+}
+
+// TestImportUsesDir は別の名前空間 M の import パスが Dir(M) から求まること（docs/emit-go.md「配置」）。
+// M が View.Namespaces になければ（語彙など）複製する。
+func TestImportUsesDir(t *testing.T) {
+	root := newProjectRoot(t)
+	other := ir.Namespace{Name: "lib.core", Decls: []ir.Decl{&ir.Scalar{DeclBase: base("lib.core.Id", nil), Base: ir.String()}}}
+	v := smallView(&ir.Model{DeclBase: base("app.User", nil), Fields: []ir.Field{field("id", ir.Ref("lib.core.Id"))}})
+	v.Program.Namespaces = append(v.Program.Namespaces, other)
+	v.Namespaces["lib.core"] = ir.NamespaceConfig{Language: "go", Out: "gen/lib", Dir: "gen/lib/core"}
+	files, diags := Emit(v, Options{Root: root})
+	if len(diags) > 0 {
+		t.Fatal(formatDiags(diags))
+	}
+	var types []byte
+	for _, f := range files {
+		if f.Path == "gen/app/types.go" {
+			types = f.Content
+		}
+	}
+	if !bytes.Contains(types, []byte(`"example.com/app/gen/lib/core"`)) || !bytes.Contains(types, []byte("core.Id")) {
+		t.Errorf("Dir(lib.core) の import を期待した:\n%s", types)
+	}
+	// View.Namespaces になければ複製する
+	delete(v.Namespaces, "lib.core")
+	files, diags = Emit(v, Options{Root: root})
+	if len(diags) > 0 {
+		t.Fatal(formatDiags(diags))
+	}
+	for _, f := range files {
+		if f.Path == "gen/app/types.go" && (bytes.Contains(f.Content, []byte("gen/lib")) || !bytes.Contains(f.Content, []byte("type Id string"))) {
+			t.Errorf("複製を期待した:\n%s", f.Content)
+		}
 	}
 }

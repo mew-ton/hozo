@@ -394,7 +394,7 @@ func TestCompileAndRun(t *testing.T) {
 		t.Fatalf("errors = %+v", resp.Errors)
 	}
 	write("internal/gen/hozoc/hozoc.go", hozocStub)
-	write(filepath.Join("internal/gen/hozoc", resp.Files[0].Path), resp.Files[0].Content)
+	write(resp.Files[0].Path, resp.Files[0].Content) // Path はルートからの相対（<dir>/cli/cli.go）
 	write("cmd/app/main.go", hozocMain)
 
 	dv := demoView() // out は gen/demo
@@ -403,7 +403,7 @@ func TestCompileAndRun(t *testing.T) {
 		t.Fatalf("errors = %+v", resp.Errors)
 	}
 	write("gen/demo/demo.go", demoStub)
-	write(filepath.Join("gen/demo", resp.Files[0].Path), resp.Files[0].Content)
+	write(resp.Files[0].Path, resp.Files[0].Content)
 	write("cmd/demo/main.go", demoMain)
 
 	run := func(args ...string) (string, error) {

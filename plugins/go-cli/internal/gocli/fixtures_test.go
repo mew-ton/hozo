@@ -97,14 +97,16 @@ func vocabNamespaces() []ir.Namespace {
 	}
 }
 
-// view は名前空間 ns を見る側にした View。ops は各 op の Signature をそのまま写す。
+// view は名前空間 ns を見る側にした View。out を自分で書いた名前空間なので Dir = out。ops は各 op の Signature をそのまま写す。
 func view(ns ir.Namespace, out string) *ir.View {
+	conf := ir.NamespaceConfig{Language: "go", Out: out, Dir: out, Plugins: []string{"go-cli"}}
 	v := &ir.View{
-		Version: ir.Version,
-		Viewer:  ns.Name,
-		Config:  ir.ViewConfig{Language: "go", Out: out, Plugins: []string{"go-cli"}},
-		Program: &ir.Program{Version: ir.Version, Namespaces: append([]ir.Namespace{{Name: ""}}, append(vocabNamespaces(), ns)...)},
-		Ops:     map[string]*ir.ViewedSignature{},
+		Version:    ir.Version,
+		Viewer:     ns.Name,
+		Config:     conf,
+		Namespaces: map[string]ir.NamespaceConfig{ns.Name: conf},
+		Program:    &ir.Program{Version: ir.Version, Namespaces: append([]ir.Namespace{{Name: ""}}, append(vocabNamespaces(), ns)...)},
+		Ops:        map[string]*ir.ViewedSignature{},
 	}
 	for _, d := range ns.Decls {
 		if o, ok := d.(*ir.Op); ok {

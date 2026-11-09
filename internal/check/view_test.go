@@ -6,8 +6,10 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/ir"
 )
 
@@ -30,14 +32,29 @@ func TestViewsGolden(t *testing.T) {
 	nt := cfg.Namespaces["browser"]
 	nt.Plugins = plugins
 	cfg.Namespaces["browser"] = nt
+	// server.admin はテーブルだけあって Program にはない（CFG-10 は check の別の規則）。Dir は server の out を継いで gen/server/admin
+	cfg.Namespaces["server.admin"] = config.NamespaceTable{Plugins: []string{}}
 
 	views := Views(p, cfg)
 	if len(views) != 2 {
 		t.Fatalf("views = %d, want 2 (server, browser)", len(views))
 	}
 	v := views["browser"]
-	if v.Viewer != "browser" || v.Config.Language != "go" || v.Config.Out != "gen/browser" || len(v.Config.Plugins) != 1 {
+	if v.Viewer != "browser" || v.Config.Language != "go" || v.Config.Out != "gen/browser" || v.Config.Dir != "gen/browser" || len(v.Config.Plugins) != 1 {
 		t.Errorf("config = %+v", v.Config)
+	}
+	// namespaces は設定のあるすべての名前空間（viewer を含む）
+	if len(v.Namespaces) != 3 {
+		t.Errorf("namespaces = %+v", v.Namespaces)
+	}
+	if nc := v.Namespaces["server.admin"]; nc.Language != "go" || nc.Out != "gen/server" || nc.Dir != "gen/server/admin" || len(nc.Plugins) != 0 {
+		t.Errorf("namespaces[server.admin] = %+v", nc)
+	}
+	if !reflect.DeepEqual(v.Namespaces["browser"], v.Config) {
+		t.Errorf("namespaces[viewer] = %+v, config = %+v", v.Namespaces["browser"], v.Config)
+	}
+	if !reflect.DeepEqual(views["server"].Namespaces, v.Namespaces) {
+		t.Error("every view must carry the same namespaces")
 	}
 	// 合成した model は browser の decls の末尾にだけ足され、元の Program は変わらない
 	// logout$in（token を除いた LogoutInput）、deep$in、deep$in$inner の三つ

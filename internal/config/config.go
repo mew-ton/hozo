@@ -154,6 +154,28 @@ func (c *Config) Resolve(namespace string) (NamespaceConf, bool) {
 	return conf, true
 }
 
+// Dir は名前空間 namespace（FQN）の出力先 Dir(N)（docs/config.md「名前空間の設定の解決」）。ルートからの相対パス（`/` 区切り）。
+// Conf(N).out に P を足したもの。P は、N の祖先（N 自身を含む）のうち out を自分のテーブルに書いた最も近い名前空間 A から
+// N までのセグメントを `/` でつないだもの（A が N 自身なら空）。P が空なら Conf(N).out そのまま。
+// 二つ目の返り値は Resolve と同じで、false なら "" を返す。どの祖先も out を書いていなければ P は空（CFG-1 は check が判定する）。
+func (c *Config) Dir(namespace string) (string, bool) {
+	conf, ok := c.Resolve(namespace)
+	if !ok {
+		return "", false
+	}
+	rest := ""
+	for n := namespace; n != ""; n = parent(n) {
+		if t, ok := c.Namespaces[n]; ok && t.Out != nil {
+			rest = strings.TrimPrefix(namespace[len(n):], ".")
+			break
+		}
+	}
+	if rest == "" {
+		return conf.Out, true
+	}
+	return conf.Out + "/" + strings.ReplaceAll(rest, ".", "/"), true
+}
+
 // NamespaceNames は Namespaces のキーを辞書順に返す。診断の順序を決定的にするためのもの。
 func (c *Config) NamespaceNames() []string {
 	names := make([]string, 0, len(c.Namespaces))

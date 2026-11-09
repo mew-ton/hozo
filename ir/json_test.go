@@ -204,7 +204,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.1","viewer":"","config":{"language":"","out":"","plugins":[]},"program":{"version":"0.1","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.1","viewer":"","config":{"language":"","out":"","dir":"","plugins":[]},"namespaces":{},"program":{"version":"0.1","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -281,6 +281,39 @@ func TestOpsKeysSorted(t *testing.T) {
 		if !bytes.Equal(b, b2) {
 			t.Fatal("non-deterministic output")
 		}
+	}
+}
+
+func TestNamespacesKeysSorted(t *testing.T) {
+	v := &View{Program: &Program{}, Namespaces: map[string]NamespaceConfig{
+		"z": {Language: "go", Out: "gen", Dir: "gen/z"}, "a.b": {Language: "go", Out: "gen", Dir: "gen/a/b"}, "a": {Language: "go", Out: "gen", Dir: "gen/a"},
+	}}
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	i := strings.Index(s, `"namespaces":{`)
+	if i < 0 {
+		t.Fatalf("no namespaces: %s", b)
+	}
+	last := i
+	for _, k := range []string{`"a":{`, `"a.b":{`, `"z":{`} {
+		j := strings.Index(s, k)
+		if j < 0 || j < last {
+			t.Fatalf("namespaces keys not in lexicographic order: %s", b)
+		}
+		last = j
+	}
+	if !strings.Contains(s, `"a":{"language":"go","out":"gen","dir":"gen/a","plugins":[]}`) {
+		t.Errorf("namespace config shape: %s", b)
+	}
+	var back View
+	if err := json.Unmarshal(b, &back); err != nil {
+		t.Fatal(err)
+	}
+	if len(back.Namespaces) != 3 || back.Namespaces["a.b"].Dir != "gen/a/b" {
+		t.Errorf("namespaces not read back: %+v", back.Namespaces)
 	}
 }
 
