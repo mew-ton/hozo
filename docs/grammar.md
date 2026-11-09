@@ -18,7 +18,7 @@ BlockComment = "/*" { "*/" 以外 } "*/" ;              (* 入れ子にできな
 DocComment   = "/**" { "*/" 以外 } "*/" ;
 ```
 
-`LineComment` と `BlockComment` は捨てる（§3.4「`//` と `/* ... */` はただのコメントで、IR に入らない」）。`DocComment` は字句として残し、直後の宣言・フィールド・ユニオンのメンバー・分類のケースに付く（§3.4「直後の宣言の『説明』として IR に入る」）。付く先がない `DocComment` は構文エラー。
+`LineComment` と `BlockComment` は捨てる（§3.4「`//` と `/* ... */` はただのコメントで、IR に入らない」）。`DocComment` は字句として残し、直後の宣言・フィールド・ユニオンのメンバー・分類のケース（`default` を含む）に付く（§3.4「直後の宣言の『説明』として IR に入る」）。付く先がない `DocComment` は構文エラー（「決めたこと」）。
 
 ### 識別子
 
@@ -27,7 +27,7 @@ Ident         = ( 英字 | "_" ) { 英字 | 数字 | "_" } ;
 QualifiedName = Ident { "." Ident } ;
 ```
 
-英字と数字は ASCII に限る（§3.3 の命名規則が UpperCamelCase / lowerCamelCase で書かれているため）。予約語は `Ident` にならない。
+英字と数字は ASCII に限る（「決めたこと」）。予約語は `Ident` にならない。
 
 ### 予約語
 
@@ -45,8 +45,10 @@ QualifiedName = Ident { "." Ident } ;
 
 | 語 | 位置 |
 |---|---|
-| `field` `variant` | デコレータの `for` の対象（`field`）と `any` の種類（`variant`）。`model Violation { field: string; }`（§6.1）が通るように予約しない |
+| `field` `variant` | デコレータの `for` の対象（`field`）と `any` の種類（`variant`） |
 | `post` `put` `delete` | `effect ... on 状態.操作` と `any effect on 状態.操作` の操作 |
+
+`@external` は予約語でもデコレータの宣言でもなく、核の印。デコレータの宣言の上にだけ書ける（「decorator の宣言」）。
 
 ### リテラル
 
@@ -60,7 +62,7 @@ Duration = 数字 { 数字 } ( "ms" | "s" | "m" | "h" | "d" ) ;
 Literal  = String | Int | Float | Bool | Duration ;
 ```
 
-`Duration` は §4.1「`5m` / `30s` のようなリテラルを核の構文として書くため」のもの。`Time` のリテラルはない（時刻を仕様に直接書く場面がないため）。
+`Duration` は §4.1「`5m` / `30s` のようなリテラルを核の構文として書くため」のもの。単位の選び方と、`Time` のリテラルがないことは「決めたこと」。
 
 ### 記号
 
@@ -101,7 +103,7 @@ ArgValue  = ArgTerm { "|" ArgTerm }
 ArgTerm   = Literal | QualifiedName ;
 ```
 
-- 位置で渡す引数（`@http.status(401)`）と名前で渡す引数（`@http.header(name: "Authorization")`）を混ぜられる（`@page.route("/orders", from: query, onInvalid: transitionToOrders)`）。名前で渡す引数の後ろに位置で渡す引数は書けない。
+- 位置で渡す引数（`@http.status(401)`）と名前で渡す引数（`@http.header(name: "Authorization")`）を混ぜられる（`@page.route("/orders", from: query, onInvalid: transitionToOrders)`）。名前で渡す引数の後ろに位置で渡す引数は書けない（「決めたこと」）。
 - `ArgTerm` の `|` は宣言の集合（`http.NetworkError | http.ServerError`。§11.2）。`[ ]` はリスト（`["orders", query]`。§11.1）。
 - `QualifiedName` が何を指すか（宣言、op の引数、デコレータの引数）は名前の解決が決める。
 
@@ -113,8 +115,8 @@ ModelBody   = "{" { Field } "}" ;
 Field       = [ DocComment ] { Decorator } Ident [ "?" ] ":" Type [ "=" Literal ] ";" ;
 ```
 
-- `model PublicUser is User omit hash;`（§5.2）。`omit` なしの `is` は書けない（別名にしかならないため）。
-- `token?: Token` と `token: Token?` は IR では同じ（省略可能な型のフィールド）。「決めたこと」を見よ。
+- `model PublicUser is User omit hash;`（§5.2）。`omit` なしの `is` は書けない（「決めたこと」）。
+- `token?: Token` と `token: Token?` は IR では同じ（「決めたこと」）。
 - 既定値（`page: PosInt = 1`。§11.2）は `Literal` だけ。
 
 ### scalar
@@ -127,7 +129,8 @@ ScalarDecl = "scalar" Ident "extends" Type ";" ;
 
 ```
 UnionDecl   = "union" Ident "{" { UnionMember } "}" ;
-UnionMember = [ DocComment ] ( Ident ":" Type ";" | QualifiedName ";" ) ;
+UnionMember = [ DocComment ] ( Ident ":" ArmType ";" | QualifiedName ";" ) ;
+ArmType     = Type | ModelBody ;
 ```
 
 `Ready: { userName: string; }`（アームと型）、`Unavailable: OrdersUnavailable;`（アームと宣言済みの model）、`server.Unauthorized;`（例外や効果の集合。§6.4）の三つの書き方。
@@ -141,12 +144,12 @@ StateDecl = "state" Ident ":" ( "list" | "single" ) "<" Type ">" ";" ;
 ### exception / effect
 
 ```
-ExceptionDecl = "exception" Ident [ ":" Type ] ";" ;
+ExceptionDecl = "exception" Ident [ ":" ArmType ] ";" ;
 EffectDecl    = "effect" Ident "on" QualifiedName "." StateOp ";" ;
 StateOp       = "post" | "put" | "delete" ;                 (* 文脈キーワード *)
 ```
 
-`exception ClientError: Violations;` と `exception X: { items: Violation[] };`（§6.1）。
+`exception ClientError: Violations;` と `exception X: { items: Violation[] };`（§6.1）。その場で書く model（`ModelBody`）を置けるのは、ユニオンのアームとここの二か所だけ（「決めたこと」）。
 
 `sessions.post` は字句では一つの `QualifiedName` になる（`post` は文脈キーワードで、字句としては `Ident`）。構文解析で最後の要素を `StateOp` として切り出す。`AnyType` の `on location.put` も同じ。
 
@@ -161,7 +164,7 @@ ConditionDecl = "condition" Ident "of" Type ";" ;
 ### decorator の宣言
 
 ```
-DecoratorDecl = "decorator" Ident [ Params ] [ "for" Target { "|" Target } ] { DecoratorClause } ";"
+DecoratorDecl = [ "@external" ] "decorator" Ident [ Params ] [ "for" Target { "|" Target } ] { DecoratorClause } ";"
               | "decorator" Ident "=" QualifiedName Args ";" ;
 
 Params    = "(" [ Param { "," Param } ] ")" ;
@@ -179,6 +182,7 @@ CatchesClause   = "catches" ExcRef { "|" ExcRef } ( "recovers" | "halts" Qualifi
 ExcRef          = QualifiedName ;
 ```
 
+- `@external` は核の印で、デコレータの宣言にだけ付く（§8.2「境界の外から見たときの型の変化」）。ほかの宣言に付けたら構文エラー。
 - 二つ目の形が名前付きのデコレータ（§8.1 `decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);`）。`for` も節も持たない（汎用の側の宣言に従う）。
 - `ExcRef` は例外、例外のユニオン、またはデコレータの引数の名前（`catches error recovers`。§4.2）。
 - `int | float`（§4.2 `valid.min`）のように、デコレータの引数の型にだけ `|` を書ける。model のフィールドや op の引数の型には書けない。
@@ -211,13 +215,12 @@ BindDecl = "bind" Ident "to" QualifiedName "." ( "*" | "**" ) ";" ;
 Type        = TypePrefix { "[" "]" | "?" } ;
 TypePrefix  = CoreType
             | "Record" "<" Type "," Type ">"
-            | QualifiedName [ "<" Type ">" ]
-            | ModelBody ;
+            | QualifiedName [ "<" Type ">" ] ;
 CoreType    = "string" | "boolean" | "int" | "float" | "Time" | "Duration" ;
 ```
 
 - `QualifiedName "<" Type ">"` は分類のケースで絞り込んだ型（`WarrantyKind.Yamada<server.Item>`。§10.2）にだけ使う。ほかの名前に型引数を付けたらエラー（名前の解決で判定する）。
-- `ModelBody` はその場で書く model（§6.1、§11.2）。
+- その場で書く model（`ModelBody`）は `Type` ではなく、`ArmType`（ユニオンのアームと例外の値）にだけ置ける。
 - `void` は `ReturnType` にだけ書ける。`list` / `single` は `StateDecl` にだけ書ける。
 
 ## 配線
@@ -264,7 +267,9 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 決めたこと | 理由 |
 |---|---|
 | `to` を予約語にする | `bind x to ...` の節の頭だから。ほかの節の頭と同じ扱い |
-| `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `field: string` が通る |
+| `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
+| `@external` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
+| その場で書く model はユニオンのアームと例外の値にだけ置ける | 合成する名前（`docs/ir.md`「正規化」）がその二つにしか決まらない |
 | `x?: T` と `x: T?` を同じ意味にする | §5.3 は `token?: Token` を「省略可能」、`Token?` を「省略可能な型」として同じ性質で扱っている。IR では省略可能な型のフィールド（引数）に正規化する |
 | 識別子は ASCII | §3.3 の命名規則が ASCII の大文字小文字で書かれている |
 | `Duration` の単位は `ms` `s` `m` `h` `d` | 例にあるのは `m` と `s`。秒未満と日は使う場面が見えるので足す。週以上は月と年が一定でないので持たない |
@@ -276,4 +281,4 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 
 ## 設計書へ返すこと
 
-- §8.1 の `decorator redirectOn(error: ApiError, to: RedirectByError) catches error halts to;` は、引数名 `to` が予約語とぶつかる。引数名を変える（例: `then`、`target`）ことを提案する。
+`docs/decisions.md`「設計書へ返すこと」の「`redirectOn` の引数名 `to`」。

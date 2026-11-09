@@ -6,7 +6,7 @@
 
 ## 通信
 
-- 標準入出力。`Content-Length` ヘッダ付きの JSON-RPC 2.0。実装は自前（`internal/lsp/jsonrpc`）。外部のライブラリは使わない（依存を増やさず、使う範囲が小さいため）。
+- 標準入出力。`Content-Length` ヘッダ付きの JSON-RPC 2.0。実装は自前（`internal/lsp/jsonrpc`。`docs/packages.md`「依存の向き」）。
 - 要求の型は使うものだけを `internal/lsp/protocol` に手で定義する。
 - 位置のエンコーディングは `initialize` の `general.positionEncodings` に `utf-8` があれば `utf-8`、なければ `utf-16`。`docs/ir.md` の `Pos`（コードポイント）から変換する。
 - `$/cancelRequest` は受けるが無視する（どの要求も短い）。
@@ -18,7 +18,7 @@
 |---|---|
 | `initialize` | `rootUri`（なければ `workspaceFolders` の先頭）をワークスペースにし、下の「プロジェクト」を作る。capabilities を返す |
 | `initialized` | 開いているファイルがなくても、プロジェクト全体の診断を一度発行する |
-| `shutdown` / `exit` | 終了。`exit` の終了コードは `shutdown` を受けていれば 0、なければ 1 |
+| `shutdown` / `exit` | 終了。`lsp` の op は値を返さず例外も持たないので、終了コードは常に 0 |
 
 capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includeText: false } }`、`definitionProvider`、`hoverProvider`、`documentSymbolProvider`、`positionEncoding`。段階 4 の後に `completionProvider`、`referencesProvider`、`codeActionProvider`、`semanticTokensProvider` を足す。
 
@@ -26,10 +26,10 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 - ワークスペースのディレクトリから親へ向かって `hozo.toml` を探す（`--config` があればそれ）。見つかったディレクトリがルート。
 - 見つからなければ、ワークスペースのディレクトリをルートにし、設定なしで動く: `sources` は既定、設定に関わる検査（CFG-*）は行わない。各ファイルの先頭（1 行 1 列）に warning `LSP-1`「hozo.toml が見つからない。設定の検査は行っていない」を出す。
-- 解析の単位はプロジェクト全体。`internal/project.Load(root, overlay)` を呼び直す。`overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。
+- 解析の単位はプロジェクト全体。`internal/project.Load`（`docs/packages.md`「internal/project」）を呼び直す。`overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。
 - `didOpen` / `didChange` / `didClose` / `didSave`、および `hozo.toml` の変更（`workspace/didChangeWatchedFiles` を `**/hozo.toml` と `**/*.hozo` で登録）で解析し直す。`didChange` は最後の変更から 150 ms 待ってまとめる。
 - 解析し直すたびに、プロジェクトのすべてのファイルについて `publishDiagnostics` を送る。診断がなくなったファイルには空の配列を送る。前回と同じ内容なら送らない。
-- 標準の語彙と、プラグインの語彙は `hozo:` スキームの URI（`hozo:vocab/valid.hozo`）。クライアントが開けるよう、要求 `hozo/vocabulary`（params `{ uri }`、result `{ content }`）を提供する。`docs/editors.md`。
+- 語彙のファイルの URI は `Span.file`（`docs/ir.md`「Program」の `hozo:` の形）をそのまま使う。クライアントが開けるよう、要求 `hozo/vocabulary`（params `{ uri }`、result `{ content }`）を提供する。`docs/editors.md`。
 
 ## 診断
 
@@ -49,7 +49,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 ## 定義へジャンプ
 
-カーソル位置のトークンが名前（`Ident` か `QualifiedName` の一部）なら、`docs/resolve.md` の結果の宣言の `Span` を `Location` で返す。
+カーソル位置のトークンが名前（`Ident` か `QualifiedName` の一部）なら、`internal/sema` の `Ref`（`docs/packages.md`「internal/sema」）の `Target` の `Span` を `Location` で返す。
 
 | カーソルの位置 | 飛び先 |
 |---|---|
@@ -61,7 +61,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `match` のケース名 | `classify` のケース |
 | デコレータの引数名（`name:`） | デコレータの宣言の `Param` |
 | ドキュメンテーションコメントの `@param` / `@throws` / `@see` の名前 | 同上 |
-| 標準の語彙の宣言 | `hozo:` の URI の位置 |
+| 語彙の宣言 | `hozo:` の URI の位置 |
 
 解決できなければ `null`。
 

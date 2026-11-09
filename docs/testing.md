@@ -6,7 +6,7 @@
 
 ## 規則ごとのテスト
 
-`tests/rules/<ID>/` に、その規則が通る例 `ok_*.hozo` と落ちる例 `ng_*.hozo` を少なくとも一つずつ置く（ID は `docs/requirements.md`「検査の規則の一覧」と各設計文書の診断の表）。
+`tests/rules/<ID>/` に、その規則が通る例 `ok_*.hozo` と落ちる例 `ng_*.hozo` を少なくとも一つずつ置く。対象は `.hozo` と `hozo.toml` だけで出せる診断（`docs/check.md`、`docs/resolve.md`、`docs/types.md`、`docs/config.md` の「診断」）。出力・プラグイン・言語サーバーでしか出ないもの（GOEMIT-*、CLI-*、MAN-*、PLG-*、LSP-1）は、それぞれのパッケージの単体テスト（下）で確かめる。期待を例のそばに置くために、このコメントの形にする。
 
 - 落ちる例は、診断が出る行の末尾に `// ERROR: <ID>` か `// WARN: <ID>` のコメントを書く。同じ行に複数なら `// ERROR: A, B`。
 - テストはディレクトリごとに `hozo.toml`（なければ `tests/rules/hozo.toml` を使う）で `Project` を作り、診断の集合を「ファイル、行、重さ、ID」の組で比べる。期待にない診断、出なかった期待はどちらも失敗。
@@ -18,10 +18,11 @@
 `tests/corpus/<名前>/` に、設計書の例を集めたプロジェクト（`hozo.toml` と `.hozo`）を置く。
 
 - `design/`: 設計書 §5〜§11 の例を名前空間ごとに一つのファイルにまとめたもの。設計書の言葉をそのまま写し、写せなかった箇所は `tests/corpus/README.md` に一覧する（`docs/decisions.md`「設計書へ返すこと」の項目がその候補）。
-- `hozoc/`: リポジトリ直下の `cli.hozo` と `hozo.toml` のコピーではなく、シンボリックリンクでもなく、テストがリポジトリ直下を直接読む。
 - 各コーパスについて、`hozoc check` の text 出力をゴールデン `expected.check.txt` と比べる。warning も含む。
-- `emit` のゴールデン: `expected/` に書き出したファイルの木を置き、`hozoc emit --dry-run` ではなく実際に一時ディレクトリに書いて比べる。差分はファイルごとに示す。
+- `emit` のゴールデン: `expected/` に書き出したファイルの木を置き、実際に一時ディレクトリに書いて比べる。差分はファイルごとに示す。
 - ゴールデンの更新は `go test ./... -update`。
+
+hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコーパスには入れない。`hozoc check` が error なしで通ることを `tests/selfcheck_test.go` で確かめ、`emit` の結果は「生成物の一致」で確かめる。
 
 ## 言語サーバーと check の一致
 
@@ -43,7 +44,11 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `hozoc emit`�
 
 - `internal/syntax`: 文法の各非終端記号について、受理する例と拒否する例。回復の後に読めた宣言が残ること。
 - `internal/sema`: 解決の手続きの各段（`docs/resolve.md`「手続き」）、型の互換の各規則（`docs/types.md`「互換」）に一つずつ。
-- `internal/check`: 計算（Exc / Eff / Rel / Succ / bind）は、小さな IR を直接組み立てて期待値と比べる。設計書 §9 の `browser.logout` の例（`server.deleteSession` が不明、`removeToken` が起きている）を必ず含める。
+- `internal/check`: 計算（Sig の E / F / rel / succ、bind）は、小さな IR を直接組み立てて期待値と比べる。設計書 §9 の `browser.logout` の例（`server.deleteSession` が不明、`removeToken` が起きている）を必ず含める。
+- `internal/emit/golang`: GOEMIT-* の各条件。生成物は `go/format` を通ること。
+- `internal/plugin`: MAN-* と PLG-* の各条件（「プラグインのプロトコル」）。
+- `plugins/go-cli`: CLI-* の各条件と、引数の解釈の各規則（`docs/plugin-go-cli.md`「引数の解釈」）。
+- `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。
 
 ## CI
 

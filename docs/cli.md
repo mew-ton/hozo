@@ -12,13 +12,14 @@
 - `lsp` を足す。
 - `emit` を配線にし、`check` を呼んでから `writeOutputs` を呼ぶ。
 - `outputs` の状態の `@fs.files("{out}/**")` は、置き場が設定で決まるので `@fs.files` を付けず説明に書く。
-- `runEmit` / `runImport` の `@proc.stdio("{plugin.command}")` は、呼び先を入力の `plugin` で渡す形にし、`proc.stdio` は引数を持たない。
-- 出力の形式を選ぶ `format` のフラグを足す。
+- `runEmit` の `@proc.stdio("{plugin.command}")` は、呼び先を引数 `plugin` で渡す形にし、`proc.stdio` は引数を持たない（`docs/vocab.md`「同梱する語彙」）。`runImport` は段階 6 で足す。
+- 出力の形式を選ぶ `format` のフラグと、知らない名前空間を指したときの `UnknownNamespace` を足す。
+- プラグインとやり取りする model（`EmitRequest` / `EmitResponse`）は `docs/plugin-protocol.md`「要求と応答」の JSON をそのまま写す。
 
 ```ts
 /** hozo の仕様を検査し、各言語のコードに展開する CLI */
 namespace hozoc {
-  /** ファイルのパス（プロジェクトのルートからの相対パス） */
+  /** ファイルのパス。相対パスの基準は使う場所が決める（docs/config.md「置き場と探し方」など） */
   scalar Path extends string;
 
   /** 表示の形式。text か json */
@@ -80,6 +81,10 @@ namespace hozoc {
   @cli.exitCode(3)
   exception OutputConflict: Diagnostics;
 
+  /** emit の引数に、hozo.toml にない名前空間が指定された */
+  @cli.exitCode(64)
+  exception UnknownNamespace;
+
   /** 検査の結果（誤りではない指摘） */
   model CheckResult { warnings: Diagnostic[]; }
 
@@ -106,8 +111,8 @@ namespace hozoc {
     @cli.flag("config") @cli.env("HOZO_CONFIG") config?: Path;
     /** 表示の形式 */
     @cli.flag("format") format?: OutputFormat;
-    /** 生成する名前空間（省略時はすべて） */
-    @cli.arg namespaces?: string[];
+    /** 生成する名前空間（一つもなければすべて） */
+    @cli.arg namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun?: boolean;
   }
@@ -131,24 +136,28 @@ namespace hozoc {
    * 仕様を検査する。ファイルは書き出さない。
    *
    * @param in コマンドの入力
+   * @throws LanguageMismatch プラグインのマニフェストの language が名前空間の language と合わない（docs/config.md の CFG-4）
+   * @throws proc.Crashed check を持つプラグインが異常終了した
    * @see emit
    */
   @cli.command("check")
   op check(in: CheckInput): CheckResult
-    throws CheckFailed | ConfigInvalid;
+    throws CheckFailed | ConfigInvalid | LanguageMismatch
+    throws proc.Crashed | proc.MalformedOutput;
 
   /**
    * 検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
-   * @throws LanguageMismatch プラグインの language が合わない。ファイルは書き出さない
+   * @throws CheckFailed プラグインが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした。ファイルは書き出さない
+   * @throws UnknownNamespace 引数の名前空間が hozo.toml にない。ファイルは書き出さない
    * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
    */
   op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
     effects addOutputs | replaceOutputs | removeStaleOutputs
-    throws LanguageMismatch | OutputConflict prevents effects
+    throws CheckFailed | OutputConflict | UnknownNamespace prevents effects
     throws proc.Crashed | proc.MalformedOutput prevents effects;
 
   /**
@@ -159,7 +168,7 @@ namespace hozoc {
    */
   @cli.command("emit")
   op emit(in: EmitInput): EmitResult
-    throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict prevents effects
+    throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict | UnknownNamespace prevents effects
     throws proc.Crashed | proc.MalformedOutput prevents effects
   {
     const checked = check({ config: in.config, format: in.format });
@@ -174,25 +183,32 @@ namespace hozoc {
   @cli.command("lsp")
   op lsp(in: LspInput);
 
-  /** プラグインの起動のしかた（docs/plugin-protocol.md「マニフェスト」の command） */
+  /** プラグインの起動のしかた（docs/plugin-protocol.md「マニフェスト」の command と、マニフェストのディレクトリ） */
   model Plugin { name: string; command: string[]; dir: Path; }
 
-  /** IR（docs/ir.md）。中身はこの仕様では書かない */
+  /** IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない */
   model View {}
 
-  /** 展開のときのプラグインへの入力 */
-  model EmitRequest { plugin: Plugin; namespace: string; view: View; }
+  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求） */
+  model EmitRequest { protocol: string; direction: string; view: View; }
 
-  /** 展開のときのプラグインからの出力 */
-  model EmitResponse { files: OutputFile[]; warnings: Diagnostic[]; errors: Diagnostic[]; }
+  /** プラグインの warning（同「emit」の応答の warnings の要素） */
+  model PluginWarning { at: string; message: string; }
+
+  /** プラグインの error（同「emit」の応答の errors の要素） */
+  model PluginError { code: string; at: string; message: string; }
+
+  /** 展開のときのプラグインからの出力（同「emit」の応答） */
+  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; }
 
   /**
-   * プラグインを一つ呼んで展開させる。
+   * プラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
    *
+   * @param plugin 起動するプラグイン
    * @param req プラグインへの入力
    */
   @proc.stdio
-  op runEmit(req: EmitRequest): EmitResponse;
+  op runEmit(plugin: Plugin, req: EmitRequest): EmitResponse;
 }
 ```
 
@@ -205,17 +221,18 @@ plugins  = ["go-cli"]
 out      = "internal/gen/hozoc"
 
 [hozo]
+sources     = ["cli.hozo"]      # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 ```
 
-`proc.stdio` の `writeOutputs` が `prevents effects` なのは、プラグインをすべて呼び終えて衝突を確かめてから書き始めるため（下の「emit」）。
+`writeOutputs` の `throws proc.Crashed | proc.MalformedOutput prevents effects` は、プラグインをすべて呼び終えて衝突を確かめてから書き始めるため（下の「emit」）。
 
 ## check
 
-1. `hozo.toml` を読む（`docs/config.md`「置き場と探し方」）。なければ、または CFG-* の error があれば `ConfigInvalid`（CFG-4 は `LanguageMismatch`）。
+1. `hozo.toml` を読み、プラグインのマニフェストを探して読む（`docs/config.md`「置き場と探し方」、`docs/plugin-protocol.md`「探索」）。設定とマニフェストの error は、CFG-4 なら `LanguageMismatch`、それ以外は `ConfigInvalid`（`docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」）。
 2. 標準の語彙、設定されたプラグインの語彙、`sources` のファイルの順に読み、解析する（`docs/grammar.md`）。
 3. 解決（`docs/resolve.md`）、正規化（`docs/ir.md`）、計算と検査（`docs/check.md`）を行う。
-4. `[check] enabled` のプラグインに `direction: "check"` を送り、返った診断を足す。
+4. `[check] enabled` のプラグインに `direction: "check"` を送り、返った診断を足す。プラグインの異常終了は `proc.Crashed` / `proc.MalformedOutput`。
 5. error が一つでもあれば `CheckFailed`（値は error と warning のすべて）。なければ `CheckResult`（warning）。
 
 構文エラーのあるファイルも、読めた宣言は解決・検査に進める。診断の順序は `docs/diagnostics.md`。
@@ -224,9 +241,9 @@ plugin_dirs = ["plugins"]
 
 `check` の後、`writeOutputs`:
 
-1. `namespaces` が与えられていれば、その名前空間（と子孫）だけを対象にする。知らない名前なら使い方の誤り（64）。
-2. 対象の各名前空間 N について、Conf(N) を解決し、既定の出力（`docs/emit-go.md`）を作る。
-3. Conf(N).plugins の各プラグインを `docs/plugin-protocol.md` の順で起動し、`files` を集める。`errors` があれば `CheckFailed`。
+1. `namespaces` が空でなければ、その名前空間（と子孫）だけを対象にする。`hozo.toml` にない名前なら `UnknownNamespace`。
+2. 対象の各名前空間 N について、Conf(N) を解決し、既定の出力（`docs/emit-go.md`）を作る。GOEMIT-* があれば `CheckFailed`。
+3. Conf(N).plugins の各プラグインを `runEmit` で起動し（順序は `docs/plugin-protocol.md`「起動」）、`files` を集める。`errors` があれば `CheckFailed`。
 4. すべての名前空間のファイルを集めてから、パスの重複を確かめる（CFG-5 → `OutputConflict`）。
 5. `dryRun` なら、書く予定のパスを `written` に入れて返す（書かない）。
 6. 各名前空間の `<out>/.hozoc-outputs.json`（前回書いたパスの一覧。JSON の文字列の配列、辞書順）を読み、今回書かないパスのファイルを消す（`removeStaleOutputs`）。ファイルがなければ何もしない。
@@ -241,6 +258,6 @@ plugin_dirs = ["plugins"]
 
 ## 手で書くもの
 
-- `cmd/hozoc/main.go`: `internal/app` の実装を組み立てて `cli.Main` を呼ぶ。
-- `internal/app`: `hozoc.Leaves` の実装（`check` / `writeOutputs` / `lsp` / `runEmit`）と、`format` に応じて text か JSON で表示する `Presenter`（`docs/diagnostics.md`「表示」）。`text` では `CheckResult` は診断の一覧と件数、`EmitResult` は `written` / `removed` のパスの一覧を出す。
-- 段階 3 まで（骨組みを生成する前）は、`cmd/hozoc/main.go` が引数の解釈も手で持つ。
+- `cmd/hozoc/main.go`: `internal/app` の実装を組み立てて `cli.Main`（`docs/plugin-go-cli.md`「出力」）を呼ぶ。
+- `internal/app`: `hozoc.Leaves` の実装。`check` は `internal/project.Load`、`writeOutputs` は `internal/emit/golang` と `Ops.RunEmit`、`runEmit` は `internal/plugin.Run`、`lsp` は `internal/lsp.Serve`（`docs/packages.md`）。`Wrappers` はない（`@cli.command` は go-cli の `entry`、`@proc.stdio` は `stop`。`docs/emit-go.md`「デコレータ」）。`Presenter` は `format` に応じて text か JSON で表示する（`docs/diagnostics.md`「表示」）。`text` では `CheckResult` は診断の一覧と件数、`EmitResult` は `written` / `removed` のパスの一覧を出す。
+- 段階 3 まで（骨組みを生成する前）の引数の解釈は `internal/app` が持ち、`cmd/hozoc/main.go` はそれを呼ぶだけ。

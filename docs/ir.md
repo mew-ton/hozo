@@ -9,13 +9,13 @@ IR（中間表現）の構造と、表面の構文から IR への正規化、JS
 ## 原則
 
 - **参照はすべて完全修飾名（FQN）**。`server.User` のように、ルートからの名前空間のパスと宣言名を `.` でつないだ文字列。グローバルの宣言は宣言名だけ（`db`）。表面の構文の「同じ名前空間なら修飾しない」は IR に残さない。
-- **宣言の順序は出現順**。ファイルはパスの辞書順、ファイルの中は位置順。同じ名前空間が複数の場所にあれば、この順で並べて一つにする（§3.2）。出力の決定性（`docs/requirements.md`「品質の要件」）のため、IR のどの列も集合ではなく順序付きの列。
+- **宣言の順序は出現順**。ファイルの順は、ユーザーのファイルをパスの辞書順に並べ、その後に語彙のファイル（`Span.file` が `hozo:` のもの）を同じく辞書順に並べたもの。ファイルの中は位置順。同じ名前空間が複数の場所にあれば、この順で並べて一つにする（§3.2）。出力の決定性（`docs/requirements.md`「品質の要件」）のため、IR のどの列も集合ではなく順序付きの列。診断の並び（`docs/diagnostics.md`「順序」）もこのファイルの順に従う。
 - **すべての宣言は位置（`span`）を持つ**。言語サーバーと診断のため。JSON にも出す。
 - **計算した結果も IR に持つ**。例外の集合・効果の集合・`bind` で埋まる位置は、プラグインが自分で計算しなくて済むように、`docs/check.md` の計算結果を IR に置く。
 
 ## 構造
 
-TypeScript 風の記法で書く。`?` は省略可（JSON では省くか `null`）。
+TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSON」）。
 
 ### Program
 
@@ -38,11 +38,13 @@ interface DeclBase {
   kind: "model" | "scalar" | "union" | "state" | "exception" | "effect" | "classify" | "decorator" | "op";
   name: string;                   // FQN
   description?: Doc;
-  decorators: Application[];      // 付いたデコレータ。書かれた順（上から下）
+  decorators: Application[];      // 付いたデコレータ。順序の意味は「デコレータの適用」
   span: Span;
 }
 
-interface Span { file: string; start: Pos; end: Pos; }   // file は hozo.toml からの相対パス。標準の語彙は "hozo:vocab/valid.hozo"
+interface Span { file: string; start: Pos; end: Pos; }
+// file は三つの形のどれか: ユーザーのファイルは hozo.toml からの相対パス、
+// 標準の語彙は "hozo:vocab/<名前>.hozo"、プラグインの語彙は "hozo:plugin/<プラグイン名>/<マニフェストからの相対パス>"
 interface Pos { line: number; col: number; }              // 1 始まり。col は UTF-8 のバイトではなく Unicode のコードポイント数
 ```
 
@@ -71,8 +73,7 @@ type Type =
 ```
 
 - `void` は型ではなく、`Op.returns` が `null` であること。
-- その場で書いた model（`{ ... }`）は IR にはない。「正規化」で名前付きの model にする。
-- `x?: T` は `{ kind: "optional", of: T }` のフィールド（`docs/grammar.md`「決めたこと」）。`T??` は `T?` と同じ（`optional` は入れ子にしない）。
+- その場で書いた model（`{ ... }`）と `x?: T` の形は IR にはない（「正規化」）。
 
 ### model / scalar / union
 
@@ -102,7 +103,7 @@ interface Union extends DeclBase {
   kind: "union";
   variant: "arms" | "set";        // arms: model のバリアント。set: 例外か効果の集合。混在は検査 UNION-1 のエラー
   arms: { name: string; type: Type; description?: Doc; span: Span }[];   // variant が arms のとき
-  members: string[];              // variant が set のとき。例外か効果の FQN。ユニオンのメンバーがユニオンなら展開済み
+  members: { target: string; description?: Doc; span: Span }[];   // variant が set のとき。target は例外か効果の FQN。メンバーがユニオンなら展開済み
 }
 ```
 
@@ -135,6 +136,7 @@ interface Classify extends DeclBase {
   subject: Type;
   cases: { name: string; description?: Doc; span: Span }[];   // default は含まない
   hasDefault: boolean;
+  defaultDescription?: Doc;       // default に付いた DocComment
   fromCondition: boolean;         // condition の糖衣から来たか（cases は一つ、hasDefault は true）
 }
 ```
@@ -156,8 +158,7 @@ interface Decorator extends DeclBase {
 interface Param {
   name: string;
   type: ParamType;
-  optional: boolean;
-  description?: string;           // @param から
+  optional: boolean;              // 説明は DeclBase.description.params から引く
 }
 
 type ParamType =
@@ -190,14 +191,14 @@ interface Op extends DeclBase {
   signature: Signature;           // 計算結果。自分の名前空間から見た関数の型（docs/check.md「計算」）
 }
 
-interface OpParam { name: string; type: Type; description?: string; span: Span; }
+interface OpParam { name: string; type: Type; span: Span; }   // 説明は Op.description.params から引く
 
-interface Signature {
-  exceptions: string[];           // 呼び出し元（同じ名前空間）から見て投げうる例外。宣言 + デコレータの追加 − 吸収
-  effects: string[];              // 伝播を含むすべての効果 + デコレータの halts
+interface Signature {                   // docs/check.md「計算」の Sig(O, v) の結果。Op.signature は v = op の名前空間
+  exceptions: string[];           // v から見て投げうる例外
+  effects: string[];              // 伝播を含むすべての効果と、デコレータの halts の効果
   relations: { exception: string; effect: string; state: "prevented" | "kept" | "unknown" }[];
-                                  // 例外ごと・効果ごとの状態。exceptions × effects のすべての組
-  successEffects: { effect: string; state: "kept" | "unknown" }[];   // 成功のアームでの効果の状態（ignores / recovers で不明になりうる）
+                                  // exceptions × effects のすべての組
+  successEffects: { effect: string; state: "kept" | "prevented" | "unknown" }[];   // 成功のアームでの効果の状態
 }
 ```
 
@@ -216,7 +217,7 @@ type Expr = { kind: "call"; call: Call } | { kind: "match"; match: Match } | { k
 
 interface Call {
   op: string;                     // FQN
-  args: { param: string; value: Atom }[];   // 位置で書いた引数も引数名に対応付け済み
+  args: { param: string; value: Atom }[];   // 位置で書いた引数を引数名に対応付けたもの
   bound: BoundPosition[];         // bind で埋まる位置（docs/check.md「bind」）
   span: Span;
 }
@@ -270,7 +271,7 @@ type ArgValue =
   | { kind: "list"; items: ArgValue[] };
 ```
 
-`decorators` の並びは書かれた順（上から下）。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側**。`docs/check.md`「計算」はこの順で畳む。
+`DeclBase.decorators` の並びは書かれた順（上から下）。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側で、最初に適用される**。入れ子の構造にはせず、この順序付きの列で表す（`docs/decisions.md`）。
 
 ### bind
 
@@ -293,8 +294,7 @@ interface Bind {
 | 修飾なしの参照 | FQN |
 | `condition C of T;` | `Classify` で `cases: [C]`、`hasDefault: true`、`fromCondition: true` |
 | 戻り値の型の省略 | `returns: null` |
-| `x?: T` | `type: { kind: "optional", of: T }` |
-| `T??` | `T?` |
+| `x?: T`（フィールド、op の引数、デコレータの引数） | `type: { kind: "optional", of: T }`。`T??` は `T?` と同じで、`optional` は入れ子にしない |
 | `model P is U omit a, b;` | `fields` に `U` のフィールドから `a`、`b` を除いたものを複製し、`derivedFrom` に記録 |
 | ユニオンのアームのその場の model `Ready: { ... }` | `<ユニオンの FQN>.Ready` という FQN の `Model`（`synthesizedFrom` にユニオンの FQN）を同じ名前空間に足し、アームの型を `ref` にする。宣言の位置はユニオンの直後 |
 | 例外のその場の model `exception X: { ... }` | `<例外の FQN>.Value` という `Model` を同じく足し、`value` を `ref` にする |
@@ -305,7 +305,7 @@ interface Bind {
 | `@redirectToLogin`（名前付き） | `decorator: "browser.redirectOn"`、`via: "browser.redirectToLogin"`、`args` は固定した引数 |
 | デコレータの位置で書いた引数 | `param` に対応付け |
 | `{ item }` | `{ item: item }` |
-| 呼び出しの位置で書いた引数 | `param` に対応付け |
+| 呼び出しの引数（位置だけ。`docs/grammar.md`「配線」） | 順に `param` に対応付け |
 | 複数行の `throws` | `ThrowsClause` の列（まとめない。`Relation` が節ごとに違うため） |
 | `5m` | `duration` のナノ秒 |
 
@@ -322,27 +322,28 @@ interface Bind {
 interface View {
   version: "0.1";
   viewer: string;                 // 見る側の名前空間の FQN
-  config: { language: string; out: string; plugins: string[] };   // hozo.toml のその名前空間の設定（継承を解決済み）
-  program: Program;               // 全体。ただし signature は viewer から見たものに差し替える
+  config: { language: string; out: string; plugins: string[] };   // Conf(viewer)（docs/config.md「名前空間の設定の解決」）
+  program: Program;               // 全体そのまま（各 op の signature は op 自身の名前空間から見たもの）。
+                                  // ただし下の params が合成する model を、viewer の Namespace.decls の末尾に足してある
   ops: Record<string, ViewedSignature>;   // FQN → viewer から見た関数の型。すべての op について
 }
 
-interface ViewedSignature extends Signature {
-  params: OpParam[];              // bind で埋まる位置を取り除いた引数。位置が model のフィールドなら、
-                                  // そのフィールドを除いた model を `<op の FQN>.<引数名>$<viewer>` の名前で合成し、ref にする
+interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
+  params: OpParam[];              // bind で埋まる位置（docs/check.md「bind」の Pos(b, O)）を取り除いた引数。
+                                  // 位置が model のフィールドなら、そのフィールドを除いた model を
+                                  // `<viewer>.<op 名>$<引数名>` の FQN（synthesizedFrom は op の FQN）で合成し、ref にする
   bound: BoundPosition[];         // 取り除いた位置
 }
 ```
 
 - `Program` 全体を渡すのは、プラグインが参照先（別の名前空間の型、語彙の宣言）を自分で探さなくて済むようにするため。何を出力の対象にするかはプラグインが `entry` / `stop` で決める（§4.3）。
-- `viewer` から見た `Signature` は、`external: true` のデコレータの `throws` を、`viewer` と op の名前空間が違うときだけ足す（DEC-10）。同じときは `Program` の `signature` と一致する。
-- `bind` は `viewer` の名前空間の `Bind` だけを反映する（`bind` は呼び出す側の宣言。§5.3）。
-- 呼び出し側の IR（`Call.bound`）は常に呼び出し元の名前空間の `bind` を反映しているので、`View` を作るときに変えない。
+- `ops` の `Signature` は `docs/check.md`「計算」の Sig(O, viewer)。viewer が op の名前空間と同じなら `Program` の `signature` と一致する。
+- `params` に反映する `bind` は `viewer` の名前空間の `Bind` だけ（`bind` は呼び出す側の宣言。§5.3）。
 
 ## JSON
 
-- フィールド名はこの文書の通り（lowerCamelCase）。`kind` が判別子。
-- 省略可能なフィールドは、値がなければキーごと省く。空の列は `[]` で出す（省かない）。
-- 数値は JSON の number。`duration` は整数（ナノ秒）。`int` は 64 ビットの範囲に収まることを検査 LIT-1 で保証する。
+- フィールド名はこの文書の通り（lowerCamelCase）。`kind` が判別子。Go の `ir` パッケージの JSON タグはここから写す。
+- 省略可能（`?`）のフィールドは、値がなければキーごと省く。`null` は出さない。空の列は `[]` で出す（省かない）。
+- 数値は JSON の number。`duration` は整数（ナノ秒）。`int` は 64 ビットの範囲に収まることを検査 LIT-1（`docs/types.md`「診断」）で保証する。
 - 列の順序はこの文書の「原則」の通りで、同じ入力から同じバイト列になる。`ops` のキーの順序は FQN の辞書順。
-- `version` が合わない `View` を受け取ったプラグインは、エラーを返してよい（`docs/plugin-protocol.md`）。
+- 版の照合は `docs/plugin-protocol.md`「要求と応答」。

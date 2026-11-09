@@ -1,6 +1,6 @@
 # 設計文書
 
-Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主は設計書（`mew-ton/drafts` の `hozo/README.md`。各文書の「§n」はその節）で、ここにあるのは実装のための決定。設計書にない決定とその理由は `decisions.md` にまとめてある。
+Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主は設計書（`mew-ton/drafts` の `hozo/README.md`。各文書の「§n」はその節）で、ここにあるのは実装のための決定。設計書にない決定の一覧は `decisions.md`。
 
 ## 読む順
 
@@ -20,11 +20,11 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | [`diagnostics.md`](diagnostics.md) | 診断の形、表示、終了コード | `internal/diag` |
 | [`cli.md`](cli.md) | `hozoc` の振る舞いと `cli.hozo` | `cli.hozo`、`internal/app`、`cmd/hozoc` |
 | [`lsp.md`](lsp.md) | 言語サーバー | `internal/lsp` |
-| [`packages.md`](packages.md) | Go のパッケージと API、依存の向き、生成するもの | 全体 |
+| [`packages.md`](packages.md) | ディレクトリ、Go のパッケージと API、依存の向き、生成するもの | 全体 |
 | [`testing.md`](testing.md) | テストの置き場と書き方、CI | `tests/`、`.github/workflows` |
 | [`editors.md`](editors.md) | VS Code 拡張と TextMate の文法 | `editors/vscode` |
 | [`decisions.md`](decisions.md) | 設計書にない決定と、設計書へ返すこと | — |
 
 ## 書き方
 
-一段落に一つの主張を、見出しの下に置く。別の文書が決めたことは、その文書と見出しを名指しして引き、書き写さない。決めた理由は決めた文書に置き、`decisions.md` はそれを一覧する。
+一段落に一つの主張を、見出しの下に置く。別の文書が決めたことは、その文書と見出しを名指しして引き、書き写さない。決めた理由は決めた文書に置く。`decisions.md` は決定と持ち主の一覧で、理由は持たない。

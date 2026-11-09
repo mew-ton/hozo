@@ -16,7 +16,7 @@ editors/vscode/
 
 - 言語 ID は `hozo`、拡張子 `.hozo`。
 - クライアントは `vscode-languageclient` で `hozoc lsp` を起動する。`hozoc` の場所は設定 `hozo.hozocPath`（既定は `PATH` の `hozoc`）。見つからなければ、エラーの通知と、設定を開くボタン。バイナリの同梱と取得は段階 4 の後。
-- `hozo:` スキームの `TextDocumentContentProvider` を登録し、要求 `hozo/vocabulary` で内容を取る（`docs/lsp.md`「プロジェクト」）。
+- `hozo:` スキーム（`docs/ir.md`「Program」の `Span.file`）の `TextDocumentContentProvider` を登録し、要求 `hozo/vocabulary` で内容を取る（`docs/lsp.md`「プロジェクト」）。
 - 設定 `hozo.trace.server`（LSP の通信のログ）。
 - 言語の知識（キーワード、検査）は持たない。
 
@@ -45,4 +45,4 @@ editors/vscode/
 
 ## ほかのエディタ
 
-`hozoc lsp` は標準の LSP なので、Neovim / Zed などは各エディタの設定で起動できる。TextMate の文法は GitHub の linguist にも使える（登録は段階 4 の後に検討）。
+Neovim / Zed などは各エディタの設定で `hozoc lsp` を起動する（`docs/requirements.md`「言語サーバー」）。linguist への登録は段階 4 の後に検討する。

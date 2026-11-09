@@ -2,13 +2,46 @@
 
 ## この文書が決めること
 
-モジュール `github.com/mew-ton/hozo` のパッケージの切り方、各パッケージの責務と主な API、依存の向き。ディレクトリの一覧の持ち主は `docs/requirements.md`「リポジトリの構成」で、ここはその中身。
+モジュール `github.com/mew-ton/hozo` のディレクトリとパッケージの切り方、各パッケージの責務と主な API、依存の向き。リポジトリの構成の持ち主はこの文書。
+
+## ディレクトリ
+
+```
+go.mod                 module github.com/mew-ton/hozo
+hozo.toml, cli.hozo    hozoc 自身の仕様と設定（docs/cli.md）
+cmd/hozoc/             CLI の main。骨組みは cli.hozo から生成し、葉の op の実装をつなぐ
+ir/                    IR の型（公開）
+plugin/                Go 向けプラグイン SDK（公開）
+plugin/golang/         Go の名前と型の規則（公開）
+runtime/               生成した Go のコードが import する型（公開）
+internal/source/       ファイルと位置
+internal/diag/         診断
+internal/syntax/       字句・構文解析と構文木（token、ast）
+internal/sema/         解決、型、正規化
+internal/check/        検査
+internal/config/       hozo.toml
+internal/vocab/        埋め込んだ標準の語彙
+internal/emit/golang/  Go の既定の出力
+internal/plugin/       プラグインの探索と起動
+internal/project/      一度の解析のすべて
+internal/app/          hozoc の葉の op の実装と表示
+internal/lsp/          言語サーバー
+internal/gen/hozoc/    cli.hozo からの生成物（段階 3 から）
+internal/tools/        go generate の道具
+plugins/<name>/        プラグイン。一つのディレクトリが一つの実行ファイルと hozo-plugin.toml。Go なら main パッケージ、TS なら npm パッケージ
+sdk/ts/                TS 向けプラグイン SDK
+schema/                IR の JSON スキーマ
+vocab/                 標準の語彙の .hozo
+editors/vscode/        VS Code 拡張
+tests/rules/, tests/corpus/   テストの入力（docs/testing.md）
+docs/                  設計文書
+```
 
 ## 依存の向き
 
 ```
-cmd/hozoc → internal/app → internal/project → internal/{config, vocab, syntax, sema, check, emit/golang, plugin}
-                                              → ir, plugin/golang, runtime
+cmd/hozoc → internal/gen/hozoc → internal/app → internal/project → internal/{config, vocab, syntax, sema, check, emit/golang, plugin}
+                                                                 → ir, plugin/golang, runtime
 internal/lsp → internal/project
 plugins/go-cli → plugin, plugin/golang, ir
 ir → (標準ライブラリだけ)
@@ -17,8 +50,8 @@ runtime → (標準ライブラリだけ)
 ```
 
 - `internal/` は `cmd/hozoc` と `internal/` の中からだけ使う。
-- プラグインが使えるのは `ir`、`plugin`、`plugin/golang`、`runtime`（`docs/requirements.md`「リポジトリの構成」）。
-- `ir` と `runtime` は外部のモジュールに依存しない。`internal/config` だけが `github.com/BurntSushi/toml` に依存する。ほかに外部のモジュールは使わない（`docs/lsp.md`「通信」）。
+- プラグインが使えるのは `ir`、`plugin`、`plugin/golang`、`runtime`。依存先を約束した形だけにするため（§4.3「どのプラグインも既定のインターフェースに依存する」と同じ考え方）。
+- 外部のモジュールは `github.com/BurntSushi/toml` だけ（`internal/config` と `internal/plugin` が使う）。依存を最小にするため、言語サーバーの JSON-RPC も自前で書く。
 
 ## パッケージ
 
@@ -34,7 +67,7 @@ func (v *View) Signature(op string) *ViewedSignature
 
 ### `plugin`（公開）
 
-プラグインの SDK。`docs/plugin-protocol.md`。
+プラグインの SDK。JSON の形は `docs/plugin-protocol.md`「要求と応答」で、型はそれを写す。
 
 ```go
 type Handler interface {
@@ -42,13 +75,13 @@ type Handler interface {
     Check(req *CheckRequest) (*CheckResponse, error)
     Import(req *ImportRequest) (*ImportResponse, error)
 }
-type EmitRequest struct { Namespace string; View *ir.View }
+type EmitRequest struct { Protocol string; Direction string; View *ir.View }
 type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic }
 // CheckRequest / CheckResponse / ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
 
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。終了コードを返す。
 func Main(h Handler) int
-// 実装しない方向は、ErrUnsupported を返す。Main は終了コード 2 で { "error": ... } を返す
+// 実装しない方向は ErrUnsupported を返す。Main は docs/plugin-protocol.md「起動」の code "unsupported" で終わる
 var ErrUnsupported error
 ```
 
@@ -117,7 +150,8 @@ type Result struct {
     Refs    []Ref            // トークンの Span → 解決先。定義へジャンプとホバーが使う
     Diags   []diag.Diagnostic
 }
-type Ref struct { Span source.Span; Target Target }   // Target は宣言の FQN、フィールド、束縛、引数のどれか
+type Ref struct { Span source.Span; Target Target }
+// Target は、宣言（FQN）、フィールド、ユニオンのアーム、classify のケース、デコレータの Param、束縛、op の引数のどれか。それぞれ Span を持つ
 func Analyze(fs *source.FileSet, files []*ast.File, cfg *config.Config) *Result
 ```
 

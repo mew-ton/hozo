@@ -14,13 +14,16 @@ protocol = "0.1"
 
 [emit]
 entry = ["cli.command"]
+stop  = ["proc.stdio"]
 ```
 
-`vocabulary` は書かない（`cli` は標準の語彙）。
+- `vocabulary` は書かない（`cli` は標準の語彙。`docs/vocab.md`）。
+- `stop` に `proc.stdio` を置くのは、プロセスの境界を越える op を辿らず既定のインターフェースで呼ぶため。これにより `docs/emit-go.md`「デコレータ」の規則で `@proc.stdio` の包む関数は生成されない。
+- `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため（作業ディレクトリがリポジトリのルートで、`go.mod` がある）。配布するときはビルドした実行ファイル `hozoc-plugin-go-cli` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go-cli/` に置く（`docs/plugin-protocol.md`「探索」）。
 
 ## 出力
 
-名前空間 N の `View.config.out` の下に `cli/cli.go`（パッケージ `cli`）を一つ。N のパッケージを import する。
+`View.viewer` の名前空間 N について、`View.config.out` の下に `cli/cli.go`（パッケージ `cli`）を一つ。N のパッケージを import する。import パスは `plugin/golang.ImportPath`（`docs/packages.md`「`plugin/golang`（公開）」）で、ルートは環境変数 `HOZO_PROJECT_ROOT`（`docs/plugin-protocol.md`「起動」）。
 
 ```go
 // Main は引数を解釈して ops の op を呼び、結果を p で表示し、終了コードを返す。
@@ -29,8 +32,12 @@ func Main(ops hozoc.Ops, p Presenter, args []string, env func(string) string, st
 // Presenter は結果と例外の表示。既定は JSON（JSONPresenter）。
 type Presenter interface {
     Present(w io.Writer, command string, input any, result any) error
-    PresentError(w io.Writer, command string, input any, err error) error
+    PresentError(w io.Writer, command string, input any, f Failure) error
 }
+
+// Failure は例外の内容。Name と Value は、生成した cli.go が N の例外の型を型スイッチで見分けて入れる。
+// 宣言にない例外なら Name は空で Err だけ
+type Failure struct { Name string; Value any; Err error }
 
 type JSONPresenter struct{}
 ```
@@ -40,11 +47,11 @@ type JSONPresenter struct{}
 
 ## 対象
 
-`@cli.command(name)` の付いた op がサブコマンド。
+`View.viewer` の名前空間の op のうち、`@cli.command(name)` の付いたものがサブコマンド。
 
 - 引数は 0 個か、model 一つ。それ以外は CLI-1。
 - 引数の model の各フィールドは、`@cli.arg`、`@cli.flag(name)`、`@cli.env(name)` のどれかを持つ。`@cli.flag` と `@cli.env` は両方付けられる。どれもなければ CLI-2。
-- フィールドの型は `string`、`boolean`、`int`、`float`、元がこれらの `scalar`、またはそれらの `optional`、`@cli.arg` に限り `string`（と `string` の scalar）の `array`。それ以外（model、`Record`、`Time`）は CLI-3。
+- フィールドの型は `string`、`boolean`、`int`、`float`、元がこれらの `scalar`、またはそれらの `optional`、`@cli.arg` に限り `string`（と `string` の scalar）の `array`（`optional` は付けない。0 個を表せるため）。それ以外（model、`Record`、`Time`、`optional` の `array`）は CLI-3。
 - `@cli.arg` の `array` のフィールドは、`@cli.arg` のフィールドの中で最後の一つだけ。違えば CLI-4。
 - `@cli.arg` に `boolean` は付けられない（CLI-3）。
 - 同じ `@cli.flag` の名前、同じ `@cli.command` の名前が二つあれば CLI-5。
@@ -63,20 +70,20 @@ hozoc <command> [flags] [args]
 - 必須: 型が `optional` でなく、`default` もないフィールド。
 - `@cli.env` は、フラグが与えられなかったときに環境変数の値を使う（フラグが優先）。環境変数が空文字列なら「ない」とみなす。
 - `@cli.arg` は `@cli.arg` のフィールドの宣言順に位置引数を当てる。`array` は残りすべて（0 個でもよい）。
-- 値の変換: `int` は `strconv.ParseInt(v, 10, 64)`、`float` は `ParseFloat`、`boolean` は `ParseBool`。scalar は元の型で変換してから scalar の型にし、`Validate()` を呼ぶ。違反は 64（メッセージに `Violation`）。
-- 解釈した入力の model で `Validate()` を呼び、違反は 64。
+- 値の変換: `int` は `strconv.ParseInt(v, 10, 64)`、`float` は `ParseFloat`、`boolean` は `ParseBool`。scalar は元の型で変換してから scalar の型にする。
+- 解釈した入力の model で `Validate()`（`docs/emit-go.md`「model の Validate」。scalar のフィールドの制約も確かめる）を呼び、違反は 64（メッセージに `Violation` の `Path` と `Constraint`）。
 
 ## 実行と表示
 
 1. `ops.<Op>(context.Background(), input)` を呼ぶ。
 2. 成功なら `p.Present(stdout, command, input, result)` を呼び（void なら `result` は `nil`）、0。
-3. 例外なら、終了コードを決めてから `p.PresentError(stderr, command, input, err)` を呼ぶ。終了コードは、`err` が `@cli.exitCode(code)` の付いた例外の型（`errors.As`）ならその `code`。`Signature.exceptions` の順に試す。どれでもなければ 70。
+3. 例外なら、`Signature.exceptions` の順に `errors.As` で例外の型を見分けて `Failure` を作り、終了コードを決めてから `p.PresentError(stderr, command, input, failure)` を呼ぶ。終了コードは、見分けた例外に `@cli.exitCode(code)` があればその `code`、なければ 70。見分けられなければ `Failure{Err: err}` で 70。
 4. `Present` / `PresentError` 自体が失敗したら、そのエラーを標準エラーに出して 70。
 
 `JSONPresenter`:
 
 - `Present`: `result` を `json.MarshalIndent(result, "", "  ")` で標準出力に。`nil` なら何も出さない。
-- `PresentError`: `{"error": "<HozoException()>", "value": <Value があれば>}` を標準エラーに。`runtime.Exception` でなければ `{"error": "<err.Error()>"}`。
+- `PresentError`: `Name` があれば `{"error": "<Name>", "value": <Value>}`（`Value` が `nil` なら `value` を省く）を、なければ `{"error": "<Err.Error()>"}` を標準エラーに。
 
 ## 使い方の表示
 
@@ -93,7 +100,7 @@ commands:
 
 ## Go の名前
 
-N のパッケージの型・メソッド名は `docs/emit-go.md`「名前」の規則で決める。プラグインが同じ規則を使えるよう、規則の実装は公開パッケージ `plugin/golang`（`docs/packages.md`）に置き、`internal/emit/golang` もそれを使う。
+N のパッケージの型・メソッド名は `plugin/golang`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。
 
 ## 診断
 

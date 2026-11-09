@@ -6,8 +6,8 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 ## 読み込み
 
-- `vocab/*.hozo` は hozoc のバイナリに埋め込む（Go の `embed`）。`hozoc check` / `emit` / `lsp` は、ユーザーの `.hozo` より前にこれらを同じプロジェクトのファイルとして読む（`docs/resolve.md`「標準の語彙」）。`Span.file` は `hozo:vocab/<名前>.hozo`。
-- プラグインのマニフェストの `vocabulary`（`docs/plugin-protocol.md`）の `.hozo` も同じ扱いで、`Span.file` は `plugin:<プラグイン名>/<パス>`。そのプラグインがどこかの名前空間の `plugins` に書かれているときだけ読む。
+- `vocab/*.hozo` は hozoc のバイナリに埋め込む（Go の `embed`）。`hozoc check` / `emit` / `lsp` は、これらをプロジェクトのファイルの一部として読む（順序は `docs/ir.md`「原則」）。同梱して常に読むのは、仕様の検査に展開のプラグインを要求しないため（宣言は実行環境を持たない。§4.5）。`Span.file` の形は `docs/ir.md`「Program」。
+- プラグインのマニフェストの `vocabulary`（`docs/plugin-protocol.md`「マニフェスト」）の `.hozo` も同じ扱い。そのプラグインがどこかの名前空間の `plugins` に書かれているときだけ読む。
 - ユーザーは同じ名前空間に宣言を足せる（§3.2、§6.5）。標準の語彙の宣言と同じ名前を足せば RES-6。
 - 標準の語彙は `hozoc lsp` の定義へジャンプの飛び先になる。埋め込んだ内容を読み取り専用の仮想文書として返す（`docs/lsp.md`）。
 
@@ -25,7 +25,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/proc.hozo` | `namespace proc { Crashed / MalformedOutput / stdio }` | `examples/hozoc.hozo` |
 
 - 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。
-- `cli` / `fs` / `proc` は `examples/hozoc.hozo` ではユーザーの宣言として書かれているが、hozoc 自身（`cli.hozo`）が使うので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
+- `cli` / `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身（`cli.hozo`）が使うので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
 - `@http.get` / `@http.post` の `@external` はそのまま写す。
 - `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator stdio throws Crashed | MalformedOutput;`）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
 

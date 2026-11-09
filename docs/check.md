@@ -2,93 +2,69 @@
 
 ## この文書が決めること
 
-`hozoc check` と `hozoc lsp` が IR（`docs/ir.md`）の上で行う計算と、規則ごとの検査の手続き・診断を決める。規則の ID は `docs/requirements.md`「検査の規則の一覧」のもので、規則の意味の持ち主は設計書の節。ここでは手続きだけを書く。名前の解決（`RES-*`）と型（`TYPE-*`）は `docs/resolve.md`、`docs/types.md` が持ち主。
+`hozoc check` と `hozoc lsp` が IR（`docs/ir.md`）の上で行う計算と、規則ごとの検査の手続き・診断を決める。規則の ID は `docs/requirements.md`「検査の規則の一覧」のもので、規則の意味の持ち主は設計書の節。ここでは手続きだけを書く。設計書にない規則はこの文書の「診断」の各表が持ち主。名前の解決（`RES-*`）と型（`TYPE-*`、`LIT-1`）はそれぞれ `docs/resolve.md`「診断」、`docs/types.md`「診断」。
 
-検査は IR が作れた後に行う。IR を作る途中（解析、解決、正規化）の誤りがあるファイルでも、作れた部分には検査を行う（言語サーバーのため。`docs/requirements.md`「言語サーバー」）。一つの検査で見つかる誤りはすべて報告する。
+検査は IR が作れた後に行う。IR を作る途中（解析、解決、正規化）の誤りがあるファイルでも、作れた部分には検査を行う（`docs/requirements.md`「言語サーバー」）。一つの検査で見つかる誤りはすべて報告する。
 
 ## 計算
 
-規則の検査に先立って、op ごとに次を計算し、`Op.signature` に置く。計算は op の呼び出しの依存の順に行う。配線の呼び出しが循環していれば WIRE-7 で、循環に含まれる op の `signature` は宣言から計算する（本体を無視する）。
+規則の検査に先立って、op ごとに次を計算し、`Op.signature`（`docs/ir.md`「op」）と `Call.bound` に置く。計算は op の呼び出しの依存の順に行う。配線の呼び出しが循環していれば WIRE-7 で、循環に含まれる op は本体を無視して葉として計算する。
 
-記法: op を O、O の名前空間を ns(O)、O に付いたデコレータの適用を内側から順に d₁ … dₙ（`Op.decorators` の逆順。`docs/ir.md`「デコレータの適用」）。各 dᵢ の宣言を D(dᵢ) とし、`$param:` の参照はその適用の引数で置き換えてから使う。
+記法: op を O、O の名前空間を ns(O)、O に付いたデコレータの適用を内側から順に d₁ … dₙ（`Op.decorators` の末尾から先頭へ）。各 dᵢ の宣言を D(dᵢ) とし、`$param:` の参照はその適用の引数で置き換えてから使う。見る側の名前空間を v とする。
 
-### 例外の集合 Exc(O, v)
+### Sig(O, v)
 
-名前空間 v から O を呼んだときに受け取りうる例外。
+名前空間 v から O を呼んだときの関数の型。四つの値を持つ。
 
-```
-E₀ = 葉なら Declared(O)、配線なら Raised(O)
-Eᵢ = (Eᵢ₋₁ − Catches(dᵢ)) ∪ Throws(dᵢ, v)
-Exc(O, v) = Eₙ
-```
+- E: 投げうる例外の列
+- F: 効果の列
+- rel(X, e): X ∈ E、e ∈ F ごとの `kept` / `prevented` / `unknown`
+- succ(e): 成功のアームでの e の `kept` / `prevented` / `unknown`
 
-- `Declared(O)`: `Op.throws` の例外をすべて集めたもの。
-- `Raised(O)`: 本体の各呼び出し c について `Exc(callee(c), ns(O))` を集めたもの（`match` のアームの呼び出しも含む）。配線に `Declared(O)` も足す（多めに書いた分。THROWS-2）。
-- `Catches(d)`: D(d) の `catches` の例外。
-- `Throws(d, v)`: D(d) の `throws` の例外。ただし D(d) が `external` なら、v ≠ ns(O) のときだけ（それ以外は ∅）。DEC-10。
+**手順 0（本体の分）**
 
-`Op.signature.exceptions = Exc(O, ns(O))`。`View.ops` では `Exc(O, viewer)`。
+葉の op:
 
-### 効果の集合 Eff(O)
+- E = `Op.throws` の例外（`Declared(O)` と呼ぶ）。
+- F = `Op.effects`。
+- rel(X, e) = X を含む `ThrowsClause` の `relations` に、e を含む（`all` か名前で）`prevents` があれば `prevented`、`keeps` があれば `kept`。どちらもなければ `unknown`。両方あれば REL-5。
+- succ(e) = `kept`。
 
-```
-Eff(葉) = Op.effects ∪ Halts(d₁..dₙ)
-Eff(配線) = ∪ Eff(callee(c)) over c ∪ Halts(d₁..dₙ)
-```
+配線の op: 本体の行 i = 1..m を順に見る。行 i の呼び出し（`const` / `call` / `return` なら一つ、`match` ならアームごとの呼び出し）c について Sc = Sig(callee(c), ns(O)) とする。
 
-`Halts(d)`: D(d) の `catches` で `mode: halts` の効果。`Op.signature.effects = Eff(O)`。順序は出現順（本体の行の順、アームの順、デコレータの順）。
+- F = 各 Sc.effects を行の順、アームの順に連結し、重複を最初の出現に寄せたもの。
+- E = 各 Sc.exceptions の和に `Declared(O)` を足したもの（宣言だけで本体から出ない例外も含む。THROWS-2）。
+- X の**出どころ**は、X ∈ Sc.exceptions となる (行 i, 呼び出し c) の組。出どころ一つにおける e の状態は、上から順に最初に当たるもの:
+  1. e が行 j < i のどれかの呼び出しの effects にある → `kept`
+  2. e ∈ Sc.effects → Sc.rel(X, e)
+  3. それ以外（行 i の別のアーム、行 j > i、どこにもない） → `prevented`
+- rel(X, e) = すべての出どころで同じ状態ならその状態、違えば `unknown`。出どころのない X（`Declared(O)` だけにあるもの）は葉と同じく `Op.throws` の `relations` から決める。
+- succ(e) = e を effects に持つ呼び出し c ごとの Sc.succ(e) を集め、すべて `kept` なら `kept`、すべて `prevented` なら `prevented`、それ以外は `unknown`。`match` の行で、一部のアームにしかない e は `unknown`。
+- 配線の `Op.throws` に `relations` が書かれていれば、ここで計算した rel と比べる（REL-4）。
 
-### 例外ごとの効果の状態 Rel(O)
+**手順 i = 1..n（デコレータ dᵢ を内側から）**
 
-例外 X ∈ Exc(O, ns(O)) と効果 e ∈ Eff(O) の組ごとに `prevented` / `kept` / `unknown`。
+D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節をすべて適用する。
 
-**葉の op**: 本体がないので宣言から。
+- `catches Xs mode`: 各 X ∈ Xs について、X ∉ E なら DEC-16（吸収する相手がない）。X ∈ E なら:
+  - `recovers` / `ignores`: 各 e ∈ F について rel(X, e) ≠ `kept` なら succ(e) = `unknown`（§8.2「効果が不明な例外を `recovers` で吸収すると、成功のアームでもその効果は不明になる」）。X を E から除く。
+  - `halts h`: X を E から除く。h ∉ F なら h を F の末尾に足し、残りのすべての Y ∈ E について rel(Y, h) = `prevented`、succ(h) = `prevented`。h ∈ F ならそのまま。
+- `throws Ys relations`: D が `external` で v = ns(O) なら飛ばす（DEC-10）。そうでなければ各 Y ∈ Ys について、Y を E の末尾に足し（既にあれば位置はそのまま）、各 e ∈ F について `relations` から状態を決める（葉の rel と同じ規則。`all` は F のすべて）。Y が既に E にあって状態が違えば `unknown`。
 
-- X が `Op.throws` にあり、その `ThrowsClause` の `relations` に e を含む（`all` か名前で）`prevents` があれば `prevented`、`keeps` があれば `kept`。どちらもなければ `unknown`。両方あれば REL-5。
-- X がデコレータ dᵢ の `Throws` から来たなら、D(dᵢ) のその `ThrowsClause` の `relations` から同じように決める。`all` はこのとき Eff(O) のすべて。
-- X が `Op.throws` にもデコレータにもない（配線でだけありうる）なら「出どころ」から。
-
-**配線の op**: 本体の行から計算する（§9）。行 i の呼び出し c の callee を C とする。X が行 i から出る（X ∈ Exc(C, ns(O))）とき、効果 e の状態は
-
-| e の出どころ | 状態 |
-|---|---|
-| 行 j < i の呼び出しの Eff | `kept` |
-| 行 i の呼び出し C 自身 | Rel(C) における (X, e) の状態。X が C のデコレータ由来なら、そのデコレータの宣言から（葉と同じ） |
-| 行 i の `match` の別のアーム | `prevented`（アームは排他） |
-| 行 j > i | `prevented` |
-| O 自身のデコレータの `halts` | `prevented`（例外が出た時点では起きていない。`halts` で吸収されれば X は Exc から消えるので、ここに来るのは吸収されなかった X） |
-
-X が複数の行から出るなら、状態が行ごとに違いうる。すべての行で同じならその状態、違えば `unknown`。
-
-デコレータが X を `catches ... recovers` / `ignores` で吸収した場合、X は Exc(O) から消えるので Rel には現れない。代わりに「成功のアームでの状態」に影響する（下）。
-
-**O の宣言との照合**（REL-4）: 配線の O に `Op.throws` の `relations` が書かれていれば、計算した状態と比べ、`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組があれば REL-4。
-
-`Op.signature.relations` には X × e のすべての組を置く。
-
-### 成功のアームでの効果の状態 Succ(O)
-
-効果 e ∈ Eff(O) ごとに `kept` / `unknown`。
-
-```
-Succ(葉)(e) = kept（宣言した効果は成功なら起きている）
-Succ(配線)(e) = e の出どころの呼び出し C について Succ(C)(e)。複数あれば、すべて kept なら kept、それ以外は unknown
-```
-
-その上で、O のデコレータ dᵢ（内側から）が X を `recovers` か `ignores` で吸収するなら、X が吸収される直前の集合に含まれていれば、各 e について Rel の (X, e) が `kept` でなければ Succ(e) = `unknown`。§8.2「効果が不明な例外を recovers で吸収すると、成功のアームでもその効果は不明になる」。`halts` は成功のアームに戻らないので変えない。
+**結果**: `Signature.exceptions` = E、`effects` = F、`relations` = rel、`successEffects` = succ。`Op.signature` = Sig(O, ns(O))。`View.ops` は Sig(O, viewer)（`docs/ir.md`「その名前空間から見た IR」）。
 
 ### bind
 
-`Bind` b（名前空間 A、状態 s、対象 T）と、A の配線の中の各呼び出し c（callee C、ns(C) が T.namespace と等しい、`deep` なら T.namespace を接頭辞に持つ）について:
+`Bind` b（名前空間 A、状態 s、対象 T）と op O について、埋める位置 Pos(b, O):
 
-1. 埋める型 τ = s の `element`（`optional` なら中身）。
-2. C の引数の中で型が τ と等しい位置をすべて集める。探す範囲は、各引数の型と、型が model（または model の `optional`）ならそのフィールドを再帰的に辿ったもの。`array` と `record` の中は辿らない。位置はパス（`["in", "token"]`）で表す。
-3. 位置が 0 → 何もしない。2 以上 → BIND-1（b の位置で、C と位置の一覧を示す）。
-4. 位置が 1 で、s の `element` が `optional` で、位置の型が `optional` でなく既定値もない → BIND-2。
-5. 呼び出し c の引数でその位置が明示されていれば何もしない（BIND-3）。パス上の途中のレコードリテラルが位置のフィールドを含むかで判定する。引数そのものを名前（束縛・引数）で渡しているなら、その中は分からないので「明示されている」とみなす。
-6. それ以外なら `Call.bound` に `{ path, state: s }` を足す。
+1. ns(O) が T.namespace と等しくない（`deep` なら T.namespace を接頭辞に持たない）→ Pos は空。
+2. s の `shape` が `list` → BIND-6。
+3. τ = s の `element`（`optional` なら中身）。
+4. O の各引数から、型が τ または `optional(τ)` の位置を集める。型が model（または model の `optional`）ならフィールドを再帰的に辿る。`array` と `record` の中は辿らない。辿っている途中で同じ model に戻ったら、そこで止める。位置はパス（`["in", "token"]`）。
+5. 位置が 2 以上 → BIND-1。1 で、s の `element` が `optional` で、位置の型が `optional` でなく `default` もない → BIND-2。
+6. 二つの `Bind` が同じ op の同じ位置に当たる → BIND-5。
 
-同じ呼び出しの同じ位置に二つの `Bind` が当たれば BIND-5。
+A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべての `Bind` の Pos(b, O) から、c が明示している位置を除いたもの（BIND-3）。位置が明示されているのは、パスの引数が `name` の `Atom` で渡されている（中身は分からないので明示とみなす）か、レコードリテラルの連なりがパスのフィールドを持つとき。
 
 ### 必須の入力（BIND-4）
 
@@ -97,82 +73,81 @@ Succ(配線)(e) = e の出どころの呼び出し C について Succ(C)(e)。�
 - p の型が `optional` でなく、c の `args` に p がなく、`Call.bound` に `[p]` もなければ BIND-4。
 - c の `args` に p がレコードリテラルで渡されていれば、`docs/types.md`「当てはまる」の手続きで、必須のフィールドが `Call.bound` のパスも含めて埋まっているかを再帰的に確かめる。足りなければ BIND-4（パスを示す）。
 
-## 規則
+## 診断
 
-各規則について、見る場所、条件、診断の位置と内容を書く。「重さ」は error か warning。ID の規則の意味は `docs/requirements.md`「検査の規則の一覧」の節を見よ。
+各表の「手続き」が条件。「重さ」は error か warning。位置は、表に書いてなければ規則の対象（宣言、フィールド、呼び出し、アーム）の名前のトークン。設計書にある規則の意味は `docs/requirements.md`「検査の規則の一覧」の節を、ない規則の意味はこの表を持ち主とする。
 
 ### 名前空間
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| NS-1 | error | 解決の手続きそのもの（`docs/resolve.md`）。修飾なしで別の名前空間の宣言を指したときは RES-1 の候補にその FQN を出す |
+| NS-1 | error | 解決の手続きそのもの（`docs/resolve.md`「手続き」）。診断は RES-1 として出る |
 | NS-2 | — | 正規化で行う。診断なし |
-| NS-3 | error | RES-6 のうち、両方の出どころが標準の語彙かプラグインの語彙（`Span.file` が `hozo:` で始まる）のもの。メッセージにプラグイン名を出す |
-| NS-4 | error | `match x by C` の C が現在の名前空間の `classify` でない。型の位置の `C.Case<T>` も同じ |
-| NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。標準の語彙は対象外 |
-| DOC-1 | error | `@param` が引数名にない、`@throws` が `Signature.exceptions` にない、`@see` が解決できない（RES-1 と同じ探し方）。デコレータの宣言の `@param` は `Param` の名前 |
+| NS-3 | error | RES-6 のうち、両方の出どころが語彙（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）のもの。メッセージに語彙の出どころ（標準か、どのプラグインか）を出す |
+| NS-4 | error | 型の位置の `C.Case<T>` の C が現在の名前空間の `classify` でない（`match` の C は文法上修飾できない） |
+| NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。warning にするのは、設計書が強さを決めていないため |
+| DOC-1 | error | `@param` が引数名にない、`@throws` が `Signature.exceptions` にない、`@see` が解決できない。デコレータの宣言の `@param` は `Param` の名前 |
 | DOC-2 | error | 同じ `@param` 名、同じ `@throws` 例外が二度ある |
 | UNION-1 | error | `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複 |
-| LIT-1 | error | `docs/types.md` |
 
 ### 設定
 
-`docs/config.md` が持ち主。CFG-1 〜 CFG-6 の手続きはそこにある。
+`docs/config.md`「診断」。
 
 ### 状態と効果
 
 | ID | 重さ | 手続き |
 |---|---|---|
 | STATE-1 | error | `Effect.operation` が、`State.shape` が `single` なのに `post` か `delete` |
-| STATE-2 | error | 葉の op O の `Op.effects` の効果 e について、e の `state` の名前空間が ns(O) と違う（効果の宣言自体は RES-5 で同じ名前空間に限っているので、効果の名前空間 ≠ ns(O) で判定できる） |
-| STATE-3 | warning | どの `effect` からも参照されず、どの `bind` にも使われない `state` |
-| EFF-1 | — | 計算（Eff）で行う。診断なし |
-| EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Eff(O) と等しくない。足りないもの・余分なものを示す |
-| EFF-3 | warning | `effect` の宣言が、どの op の `Op.effects` にも、どのデコレータの `halts` にも、どのデコレータの引数（`any effect`）にも使われていない |
+| STATE-2 | error | 葉の op O の `Op.effects` の効果 e について、e の名前空間が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」） |
+| EFF-1 | — | 計算（Sig の F）で行う。診断なし |
+| EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Sig(O, ns(O)).effects と等しくない。足りないもの・余分なものを `Data.missing` / `Data.extra` に |
 
 ### throws
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| THROWS-1 | error | 配線の O について `Missing = Raised(O) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ, ns(O))`。空でなければ、位置は O の名前、メッセージに Missing の FQN と、それぞれがどの行のどの呼び出しから来たかを並べる。`Raised` に足した `Declared(O)` はここでは除いて計算する |
+| THROWS-1 | error | 配線の O について `Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ)`（Sc は本体の各呼び出しの Sig(callee, ns(O))。Throws は `external` でも含める）。空でなければ、位置は O の名前、メッセージに Missing の FQN、`Related` に各例外の出どころの呼び出し、`Data.missing` に FQN の列 |
 | THROWS-2 | — | 診断なし。多めの宣言は許す |
 | REL-1 | error | `Op.throws`（またはデコレータの `throws`）の全節を通して同じ例外が二度ある |
-| REL-2 | warning | Eff(O) が空の op の `throws` に `relations` がある。デコレータの `throws` の `relations` は対象外（§7.3「デコレータの宣言は、効果を持たない op に付けた場合は単に使われない」） |
+| REL-2 | warning | Sig(O, ns(O)).effects が空の op の `Op.throws` に `relations` がある。デコレータの `throws` の `relations` は対象外（§7.3） |
 | REL-3 | warning | `relations.effects` が `all` でなく名前の列 |
-| REL-4 | error | 計算の「O の宣言との照合」 |
+| REL-4 | error | 計算の手順 0 の「配線の `Op.throws` に `relations` が書かれていれば」の比較。`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組を示す |
 | REL-5 | error | 同じ例外・同じ効果に `prevents` と `keeps` の両方がある |
-| REL-6 | error | `relations` の効果名が Eff(O) にない |
+| REL-6 | error | `relations` の効果名が Sig(O, ns(O)).effects にない |
 
 ### デコレータ
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| DEC-1 | error | `Application` が付いた先の種類（op / field / state / exception / scalar / model）が、D の `targets` にない。`union` / `effect` / `classify` / `decorator` に付けたら常に DEC-1（対象にできない） |
+| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。`union` / `effect` / `classify` / `decorator` / `namespace` / `bind` に付けたら常に DEC-1 |
 | DEC-2 | error | `targets` に `op` を含まない宣言が `throws` か `catches` を持つ |
 | DEC-3 | — | 文法で閉じる |
 | DEC-4 | error | `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている |
-| DEC-5 | warning | O のデコレータ dᵢ が X を `recovers` で吸収し、Eff(O) が空でなく、ある e で Rel の (X, e) が `kept` でない |
+| DEC-5 | warning | 計算の手順 i で `recovers` が succ(e) を `unknown` にした（F が空なら起きない） |
 | DEC-6 | warning | 一つのデコレータの宣言で、`catches` の例外と `throws` の例外に同じものがある |
-| DEC-7 | error | `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーの照合。加えて、`any effect` の引数に渡した効果の `state` の名前空間が、デコレータを付けた op の名前空間と違う（§8.2「`onInvalid` に渡した効果が、今の名前空間が持ち主ではない状態に書き込むならエラー」） |
-| DEC-8 | — | 文法で閉じる（別名の形は `= generic(args)` だけ） |
-| DEC-9 | — | 正規化 |
-| DEC-10 | — | 計算（Throws(d, v)） |
+| DEC-7 | error | `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーの照合 |
+| DEC-8 | — | 文法で閉じる |
+| DEC-9 | — | 正規化（`docs/ir.md`「デコレータの適用」） |
+| DEC-10 | — | 計算（手順 i の `throws`） |
 | DEC-11 | error | `docs/types.md`「デコレータの引数」の数と名前 |
-| DEC-12 | error | 別名の `target` が別名（別名の別名は作れない。IR を一段で展開するため）。または別名の `args` が `target` の `Param` に合わない（DEC-11 と同じ手続き） |
+| DEC-12 | error | 別名の `target` が別名。または別名の `args` が `target` の `Param` に合わない（DEC-11 と同じ手続き） |
 | DEC-13 | error | 同じデコレータが同じ宣言に二度付いている（引数が違っても） |
-| DEC-14 | warning | `external` なデコレータが `throws` を持たない（印として意味がない） |
+| DEC-14 | warning | `external` なデコレータが `throws` を持たない |
+| DEC-15 | error | `@external` がデコレータの宣言以外に付いている（文法で閉じる。索引として残す） |
+| DEC-16 | warning | 計算の手順 i で、`catches` の例外がそこまでの E にない |
 
 ### 配線
 
 | ID | 重さ | 手続き |
 |---|---|---|
 | WIRE-1 | — | 文法で閉じる |
-| WIRE-2 | error | `const x = call` で callee の `returns` が `null`。`call;` の行で callee の `returns` が `null` でない。`match` も同じ（式の型が「値がない」かどうか）。`return call` で `returns` が `null` |
-| WIRE-3 | error | O の `returns` が `null` なのに `return` がある。`returns` が `null` でないのに、本体の最後の文が `return` でない（`return` は最後の文にだけ書ける。途中に書いても下の行が評価されないため） |
+| WIRE-2 | error | `const x = 式` で式が「値がない」。`式;` の行で式に値がある。`return 式` で式が「値がない」。式の型は `docs/types.md`「式の型」 |
+| WIRE-3 | error | O の `returns` が `null` なのに `return` がある。`returns` が `null` でないのに、本体の最後の文が `return` でない。`return` が最後以外の文にある（下の行が評価されないため） |
 | WIRE-4 | error | 同じ名前を二度束縛。引数と同じ名前を束縛。束縛より上の行で使っている（RES-1 として出る） |
 | WIRE-5 | — | 文法で閉じる |
-| WIRE-6 | warning | 本体の `const` の数が `hozo.toml` の `[hozo].max_bindings`（既定 5）を超える |
-| WIRE-7 | error | 配線の呼び出しが循環している。循環上の op をすべて示す |
+| WIRE-6 | warning | 本体の `const` の数が `hozo.toml` の `[hozo].max_bindings`（`docs/config.md`「形」）を超える。既定は 5。設計書が値を決めていないため、ここで決める |
+| WIRE-7 | error | 配線の呼び出しが循環している。循環上の op をすべて `Related` に示す |
 | WIRE-8 | warning | 束縛した名前が下の行で使われていない |
 
 ### classify / match
@@ -180,18 +155,37 @@ Succ(配線)(e) = e の出どころの呼び出し C について Succ(C)(e)。�
 | ID | 重さ | 手続き |
 |---|---|---|
 | CLS-1 | error | `classify` に `default` が二つ以上、またはケース名が重複 |
-| CLS-2 | error | ケースが一つもない（`default` だけも含む） |
+| CLS-2 | error | 名前の付いたケースが一つもない |
 | MATCH-1 | — | 文法で閉じる |
-| MATCH-2 | error | アームに並べたケースの集合が `Classify.cases` と等しくない（足りない・知らない名前・重複）。`hasDefault` が false なのに `default` のアームがある。`hasDefault` が true なのに `default` のアームがない |
+| MATCH-2 | error | アームに並べたケースの集合が `Classify.cases` と等しくない（足りない・知らない名前・重複）。`hasDefault` が false なのに `default` のアームがある。`hasDefault` が true なのに `default` のアームがない。`Data.missing` / `Data.extra` |
 | MATCH-3 | — | 文法で閉じる |
-| MATCH-4 | error | アームの本体の呼び出しで、`subject` をそのまま渡している引数の型が `case(C, アームのケース, T)` に対して `docs/types.md` の規則 4・5 で渡せない。`subject` を渡していない引数は普通の TYPE-4 |
-| MATCH-5 | error | アームの本体がすべて「値がない」か `none` の `match` を `const` で束縛している。逆に、値のある `match` を文として書いている（WIRE-2 で出る） |
+| MATCH-4 | error | アームの本体の呼び出しで、`subject` をそのまま渡している引数の型が `case(C, アームのケース, T)` に対して `docs/types.md`「互換」の規則 4・5 で渡せない。`subject` を渡していない引数は TYPE-4 |
+| MATCH-5 | error | 「値がない」型の `match` を `const` で束縛している（WIRE-2 と同じ条件。索引として残す） |
 | MATCH-6 | error | `subject` の型が `Classify.subject` に渡せない |
+
+### bind
+
+| ID | 重さ | 手続き |
+|---|---|---|
+| BIND-1 | error | 計算「bind」5。位置は `Bind`。`Related` に各位置 |
+| BIND-2 | error | 計算「bind」5。位置は `Bind` |
+| BIND-3 | — | 計算「bind」の `Call.bound`。診断なし |
+| BIND-4 | error | 計算「必須の入力」。位置は呼び出し。`Data.missing` にパス |
+| BIND-5 | error | 計算「bind」6。位置は後の `Bind` |
+| BIND-6 | error | `list` の状態を `bind` に書いた |
 
 ### 語彙に固有の規則
 
-PAGE-1 / PAGE-2 は hozoc では検査しない。プラグインの `check`（`docs/plugin-protocol.md`）が返す。
+PAGE-1 / PAGE-2 は hozoc では検査しない。プラグインの `check`（`docs/plugin-protocol.md`「check」）が返す。
 
-## 診断の順序
+## Data
 
-ファイルのパスの辞書順、位置の順。同じ位置なら ID の辞書順。`docs/diagnostics.md`。
+`Diagnostic.Data`（`docs/diagnostics.md`「構造」）を持つ規則。
+
+| ID | Data |
+|---|---|
+| THROWS-1 | `{ "missing": [FQN] }` |
+| EFF-2 | `{ "missing": [FQN], "extra": [FQN] }` |
+| MATCH-2 | `{ "missing": [ケース名], "extra": [ケース名] }` |
+| BIND-4 | `{ "missing": [パス] }` |
+| RES-1 | `{ "candidates": [FQN] }`（`docs/resolve.md`「診断」） |
