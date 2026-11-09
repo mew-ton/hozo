@@ -14,4 +14,4 @@ make test
 
 ## 状態
 
-雛形のみ。`hozoc` のサブコマンドは未実装。進め方は `docs/requirements.md` の「自己展開」と「段階」。
+雛形と文法（[`docs/grammar.md`](docs/grammar.md)）のみ。`hozoc` のサブコマンドは未実装。進め方は `docs/requirements.md` の「自己展開」と「段階」。
