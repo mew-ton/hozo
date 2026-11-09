@@ -1,0 +1,432 @@
+package golang
+
+import (
+	"github.com/mew-ton/hozo/ir"
+)
+
+// このファイルは golden テストの入力。internal/sema と internal/check が作る形の ir.View を
+// 手で組み立てる（docs/ir.md「構造」「その名前空間から見た IR」）。Signature と Call.Bound は
+// docs/check.md「計算」の結果を手で書いてある。
+
+func sp(file string, line int) ir.Span {
+	return ir.Span{File: file, Start: ir.Pos{Line: line, Col: 1}, End: ir.Pos{Line: line, Col: 2}}
+}
+
+func doc(s string) *ir.Doc { return &ir.Doc{Summary: s, Body: s} }
+
+func lit(l ir.Literal) ir.ArgValue { return ir.LiteralValue{Literal: l} }
+
+func app(decorator string, args ...ir.Arg) ir.Application {
+	return ir.Application{Decorator: decorator, Args: args, Span: sp("x.hozo", 1)}
+}
+
+func arg(param string, v ir.ArgValue) ir.Arg { return ir.Arg{Param: param, Value: v} }
+
+func name(path ...string) ir.Atom { return ir.NameAtom{Path: path, Span: sp("x.hozo", 1)} }
+
+func call(op string, args ...ir.CallArg) ir.Call {
+	return ir.Call{Op: op, Args: args, Span: sp("x.hozo", 1)}
+}
+
+func carg(param string, v ir.Atom) ir.CallArg { return ir.CallArg{Param: param, Value: v} }
+
+func record(fields ...ir.RecordField) ir.Atom {
+	return ir.RecordAtom{Fields: fields, Span: sp("x.hozo", 1)}
+}
+
+func field(name string, t ir.Type) ir.Field {
+	return ir.Field{Name: name, Type: t, Span: sp("x.hozo", 1)}
+}
+
+func param(name string, t ir.Type) ir.OpParam {
+	return ir.OpParam{Name: name, Type: t, Span: sp("x.hozo", 1)}
+}
+
+func base(name string, d *ir.Doc, decos ...ir.Application) ir.DeclBase {
+	return ir.DeclBase{Name: name, Description: d, Decorators: decos, Span: sp("x.hozo", 1)}
+}
+
+// validVocab は標準の語彙 valid（vocab/valid.hozo）。extra はユーザーが足した制約。
+func validVocab(extra ...ir.Decl) ir.Namespace {
+	numeric := ir.TypeParam{Types: []ir.Type{ir.Int(), ir.Float()}}
+	str := ir.TypeParam{Types: []ir.Type{ir.String()}}
+	optInt := ir.TypeParam{Types: []ir.Type{ir.Optional(ir.Int())}}
+	targets := []ir.DecoratorTarget{ir.TargetScalar, ir.TargetField}
+	decls := []ir.Decl{
+		&ir.Decorator{DeclBase: base("valid.min", nil), Params: []ir.Param{{Name: "value", Type: numeric}}, Targets: targets},
+		&ir.Decorator{DeclBase: base("valid.max", nil), Params: []ir.Param{{Name: "value", Type: numeric}}, Targets: targets},
+		&ir.Decorator{DeclBase: base("valid.length", nil), Params: []ir.Param{{Name: "min", Type: optInt, Optional: true}, {Name: "max", Type: optInt, Optional: true}}, Targets: targets},
+		&ir.Decorator{DeclBase: base("valid.pattern", nil), Params: []ir.Param{{Name: "regex", Type: str}}, Targets: targets},
+		&ir.Decorator{DeclBase: base("valid.format", nil), Params: []ir.Param{{Name: "name", Type: str}}, Targets: targets},
+	}
+	return ir.Namespace{Name: "valid", Decls: append(decls, extra...)}
+}
+
+// httpNS は標準の語彙 http のうち使う分。
+func httpNS() ir.Namespace {
+	str := ir.TypeParam{Types: []ir.Type{ir.String()}}
+	return ir.Namespace{Name: "http", Decls: []ir.Decl{
+		&ir.Exception{DeclBase: base("http.ServerError", doc("サーバー側の失敗（5xx 全般）"))},
+		&ir.Exception{DeclBase: base("http.NetworkError", doc("運搬の失敗（ステータスなし）"))},
+		&ir.Decorator{DeclBase: base("http.post", nil), Params: []ir.Param{{Name: "path", Type: str}}, Targets: []ir.DecoratorTarget{ir.TargetOp}, External: true,
+			Throws: []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}},
+	}}
+}
+
+// pageNS は標準の語彙 page のうち使う分。
+func pageNS() ir.Namespace {
+	str := ir.TypeParam{Types: []ir.Type{ir.String()}}
+	return ir.Namespace{Name: "page", Decls: []ir.Decl{
+		&ir.Scalar{DeclBase: base("page.Route", doc("ルートの位置（path と params）")), Base: ir.String()},
+		&ir.Decorator{DeclBase: base("page.route", nil), Params: []ir.Param{{Name: "path", Type: str}}, Targets: []ir.DecoratorTarget{ir.TargetOp}},
+	}}
+}
+
+// serverNS は注文サービスの名前空間: model / scalar / union / exception / effect / 葉の op。
+func serverNS() ir.Namespace {
+	const f = "server.hozo"
+	loginSig := ir.Signature{
+		Exceptions:     []string{"server.InvalidCredentials"},
+		Effects:        []string{"server.createSession"},
+		Relations:      []ir.SignatureRelation{{Exception: "server.InvalidCredentials", Effect: "server.createSession", State: ir.Prevented}},
+		SuccessEffects: []ir.SuccessEffect{{Effect: "server.createSession", State: ir.Kept}},
+	}
+	return ir.Namespace{
+		Name:        "server",
+		Description: doc("注文サービス。\n\n葉の op は人が実装する。"),
+		Decls: []ir.Decl{
+			&ir.Scalar{DeclBase: base("server.Email", doc("メールアドレス"),
+				app("valid.format", arg("name", lit(ir.StringLiteral{Value: "email"}))),
+				app("valid.length", arg("max", lit(ir.IntLiteral{Value: 254}))),
+			), Base: ir.String()},
+			&ir.Scalar{DeclBase: base("server.UserId", nil,
+				app("valid.pattern", arg("regex", lit(ir.StringLiteral{Value: "^u_[0-9]+$"}))),
+			), Base: ir.String()},
+			&ir.Scalar{DeclBase: base("server.PosInt", doc("1 以上の整数"),
+				app("valid.min", arg("value", lit(ir.IntLiteral{Value: 1}))),
+			), Base: ir.Int()},
+			&ir.Scalar{DeclBase: base("server.Token", nil), Base: ir.String()},
+			&ir.Scalar{DeclBase: base("server.Ratio", nil,
+				app("valid.min", arg("value", lit(ir.FloatLiteral{Value: 0}))),
+				app("valid.max", arg("value", lit(ir.FloatLiteral{Value: 1}))),
+			), Base: ir.Float()},
+			&ir.Model{DeclBase: base("server.User", doc("利用者。")), Fields: []ir.Field{
+				field("id", ir.Ref("server.UserId")),
+				field("email", ir.Ref("server.Email")),
+				{Name: "name", Description: doc("表示名"), Type: ir.String(), Span: sp(f, 1),
+					Decorators: []ir.Application{app("valid.length", arg("min", lit(ir.IntLiteral{Value: 1})), arg("max", lit(ir.IntLiteral{Value: 80})))}},
+				field("token", ir.Optional(ir.Ref("server.Token"))),
+				field("tags", ir.Array(ir.String())),
+				field("alts", ir.Array(ir.Ref("server.Email"))),
+				field("attrs", ir.Record(ir.String(), ir.Ref("server.Email"))),
+				field("joined", ir.Optional(ir.Time())),
+			}},
+			&ir.Model{DeclBase: base("server.PublicUser", doc("公開する利用者の情報。")), Fields: []ir.Field{
+				field("id", ir.Ref("server.UserId")),
+				{Name: "name", Description: doc("表示名"), Type: ir.String(), Span: sp(f, 1),
+					Decorators: []ir.Application{app("valid.length", arg("min", lit(ir.IntLiteral{Value: 1})), arg("max", lit(ir.IntLiteral{Value: 80})))}},
+				field("tags", ir.Array(ir.String())),
+			}, DerivedFrom: &ir.DerivedFrom{Base: "server.User", Omit: []string{"email", "token", "alts", "attrs", "joined"}}},
+			&ir.Model{DeclBase: base("server.LoginInput", nil), Fields: []ir.Field{
+				field("email", ir.Ref("server.Email")),
+				field("password", ir.String()),
+			}},
+			&ir.Model{DeclBase: base("server.LoginOk", nil), Fields: []ir.Field{
+				field("token", ir.Ref("server.Token")),
+				field("user", ir.Ref("server.User")),
+			}},
+			&ir.Model{DeclBase: base("server.GetMeInput", nil), Fields: []ir.Field{
+				field("token", ir.Ref("server.Token")),
+				field("verbose", ir.Boolean()),
+			}},
+			&ir.Model{DeclBase: base("server.OrdersQuery", doc("注文の一覧の条件。")), Fields: []ir.Field{
+				{Name: "page", Description: doc("ページ番号（1 始まり）"), Type: ir.Ref("server.PosInt"), Default: ir.IntLiteral{Value: 1}, Span: sp(f, 1)},
+				field("status", ir.Optional(ir.String())),
+				{Name: "timeout", Type: ir.Duration(), Default: ir.DurationLiteral{Value: 30_000_000_000}, Span: sp(f, 1)},
+				{Name: "ratio", Type: ir.Optional(ir.Ref("server.Ratio")), Default: ir.FloatLiteral{Value: 0.5}, Span: sp(f, 1)},
+			}},
+			&ir.Model{DeclBase: base("server.OrderRow", nil), Fields: []ir.Field{
+				field("id", ir.String()),
+				field("total", ir.Float()),
+			}},
+			&ir.Union{DeclBase: base("server.OrderPage", doc("注文ページの表示。")), Variant: ir.UnionArms, Arms: []ir.UnionArm{
+				{Name: "Ready", Type: ir.Ref("server.OrderPage.Ready"), Span: sp(f, 1)},
+				{Name: "Empty", Type: ir.Ref("server.OrderPage.Empty"), Description: doc("注文がない"), Span: sp(f, 1)},
+				{Name: "Unavailable", Type: ir.Ref("server.OrdersUnavailable"), Span: sp(f, 1)},
+			}},
+			&ir.Model{DeclBase: base("server.OrderPage.Ready", nil), SynthesizedFrom: "server.OrderPage", Fields: []ir.Field{
+				field("userName", ir.String()),
+				field("orders", ir.Array(ir.Ref("server.OrderRow"))),
+			}},
+			&ir.Model{DeclBase: base("server.OrderPage.Empty", nil), SynthesizedFrom: "server.OrderPage"},
+			&ir.Model{DeclBase: base("server.OrdersUnavailable", nil), Fields: []ir.Field{field("reason", ir.String())}},
+			&ir.Exception{DeclBase: base("server.InvalidCredentials", doc("メールアドレスかパスワードが一致しない"))},
+			&ir.Exception{DeclBase: base("server.Unauthorized", nil)},
+			&ir.Exception{DeclBase: base("server.ClientError", doc("入力の検証に失敗した")), Value: ir.Ref("server.ClientError.Value")},
+			&ir.Model{DeclBase: base("server.ClientError.Value", nil), SynthesizedFrom: "server.ClientError", Fields: []ir.Field{
+				field("violations", ir.Array(ir.String())),
+			}},
+			&ir.Union{DeclBase: base("server.ApiError", nil), Variant: ir.UnionSet, Members: []ir.UnionMember{
+				{Target: "server.Unauthorized", Span: sp(f, 1)}, {Target: "server.ClientError", Span: sp(f, 1)},
+			}},
+			&ir.State{DeclBase: base("server.sessions", nil), Shape: ir.StateList, Element: ir.Ref("server.Token")},
+			&ir.Effect{DeclBase: base("server.createSession", doc("セッションを作る")), State: "server.sessions", Operation: ir.OpPost},
+			&ir.Effect{DeclBase: base("server.deleteSession", nil), State: "server.sessions", Operation: ir.OpDelete},
+			&ir.Op{DeclBase: base("server.login", &ir.Doc{Summary: "ログインする。", Body: "ログインする。",
+				Params: []ir.DocParam{{Name: "in", Text: "メールアドレスとパスワード"}}},
+				app("http.post", arg("path", lit(ir.StringLiteral{Value: "/login"}))),
+			), Params: []ir.OpParam{param("in", ir.Ref("server.LoginInput"))}, Returns: ir.Ref("server.LoginOk"),
+				Effects:   []string{"server.createSession"},
+				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.InvalidCredentials"}, Relations: []ir.Relation{{Kind: ir.Prevents, Effects: ir.AllEffects()}}}},
+				Signature: loginSig},
+			&ir.Op{DeclBase: base("server.getMe", doc("自分の情報。")), Params: []ir.OpParam{param("in", ir.Ref("server.GetMeInput"))}, Returns: ir.Ref("server.User"),
+				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
+				Signature: ir.Signature{Exceptions: []string{"server.Unauthorized"}}},
+			&ir.Op{DeclBase: base("server.listOrders", nil), Params: []ir.OpParam{param("token", ir.Ref("server.Token")), param("query", ir.Ref("server.OrdersQuery"))},
+				Returns:   ir.Array(ir.Ref("server.OrderRow")),
+				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
+				Signature: ir.Signature{Exceptions: []string{"server.Unauthorized"}}},
+			&ir.Op{DeclBase: base("server.logout", nil), Params: []ir.OpParam{param("token", ir.Ref("server.Token"))}, Returns: nil,
+				Effects:   []string{"server.deleteSession"},
+				Signature: ir.Signature{Effects: []string{"server.deleteSession"}, SuccessEffects: []ir.SuccessEffect{{Effect: "server.deleteSession", State: ir.Kept}}}},
+			&ir.Op{DeclBase: base("server.orderPage", doc("注文ページの VM。")), Params: []ir.OpParam{param("me", ir.Ref("server.User")), param("orders", ir.Array(ir.Ref("server.OrderRow")))},
+				Returns: ir.Ref("server.OrderPage")},
+		},
+	}
+}
+
+// serverView は server から見た View。
+func serverView() *ir.View {
+	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), httpNS(), serverNS()}}
+	v := &ir.View{Viewer: "server", Config: ir.ViewConfig{Language: "go", Out: "gen/server"}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	for _, d := range p.Namespace("server").Decls {
+		if op, ok := d.(*ir.Op); ok {
+			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
+		}
+	}
+	return v
+}
+
+// browserNS はブラウザの名前空間: 配線、match、server への bind、デコレータ、classify。
+func browserNS() ir.Namespace {
+	const f = "browser.hozo"
+	intT := ir.TypeParam{Types: []ir.Type{ir.Int()}}
+	return ir.Namespace{
+		Name:        "browser",
+		Description: doc("ブラウザの画面。"),
+		Decls: []ir.Decl{
+			&ir.State{DeclBase: base("browser.token", nil), Shape: ir.StateSingle, Element: ir.Optional(ir.Ref("server.Token"))},
+			&ir.Model{DeclBase: base("browser.Location", nil), Fields: []ir.Field{field("route", ir.Ref("page.Route"))}},
+			&ir.Model{DeclBase: base("browser.RenderInput", nil), Fields: []ir.Field{
+				field("token", ir.Optional(ir.Ref("server.Token"))),
+				field("user", ir.Ref("server.PublicUser")),
+				field("where", ir.Optional(ir.Ref("browser.Location"))),
+			}},
+			&ir.Union{DeclBase: base("browser.MeView", nil), Variant: ir.UnionArms, Arms: []ir.UnionArm{
+				{Name: "Me", Type: ir.Ref("server.PublicUser"), Span: sp(f, 1)},
+				{Name: "Anonymous", Type: ir.Ref("browser.MeView.Anonymous"), Span: sp(f, 1)},
+			}},
+			&ir.Model{DeclBase: base("browser.MeView.Anonymous", nil), SynthesizedFrom: "browser.MeView"},
+			&ir.Classify{DeclBase: base("browser.WarrantyKind", doc("保証の種類。")), Subject: ir.Ref("server.OrderRow"),
+				Cases: []ir.ClassifyCase{
+					{Name: "Standard", Description: doc("標準の保証"), Span: sp(f, 1)},
+					{Name: "Yamada", Span: sp(f, 1)},
+				}, HasDefault: true, DefaultDescription: doc("保証なし")},
+			&ir.Classify{DeclBase: base("browser.IsBig", nil), Subject: ir.Ref("server.OrderRow"),
+				Cases: []ir.ClassifyCase{{Name: "IsBig", Span: sp(f, 1)}}, HasDefault: true, FromCondition: true},
+			&ir.Decorator{DeclBase: base("browser.retry", doc("失敗したら times 回までやり直す。")), Params: []ir.Param{{Name: "times", Type: intT}}, Targets: []ir.DecoratorTarget{ir.TargetOp}},
+			&ir.Decorator{DeclBase: base("browser.tracked", nil), Targets: []ir.DecoratorTarget{ir.TargetOp}},
+			&ir.Decorator{DeclBase: base("browser.guarded", nil), Targets: []ir.DecoratorTarget{ir.TargetOp},
+				Catches: []ir.CatchesClause{{Exceptions: []string{"server.Unauthorized"}, Mode: ir.Halts, Halts: "browser.redirected"}},
+				Throws:  []ir.ThrowsClause{{Exceptions: []string{"$param:on"}, Relations: []ir.Relation{{Kind: ir.Prevents, Effects: ir.AllEffects()}}}}},
+			&ir.Decorator{DeclBase: base("browser.guardMe", nil), Alias: &ir.DecoratorAlias{Target: "browser.guarded", Args: []ir.Arg{arg("on", ir.RefValue{Target: "http.NetworkError"})}}},
+			&ir.Effect{DeclBase: base("browser.redirected", nil), State: "browser.token", Operation: ir.OpPut},
+			// 配線: 自分の情報を取って描画し、公開情報を返す。
+			&ir.Op{DeclBase: base("browser.openMe", doc("自分のページを開く。"),
+				app("page.route", arg("path", lit(ir.StringLiteral{Value: "/me"}))),
+				app("browser.retry", arg("times", lit(ir.IntLiteral{Value: 3}))),
+				ir.Application{Decorator: "browser.guarded", Via: "browser.guardMe", Args: []ir.Arg{arg("on", ir.RefValue{Target: "http.NetworkError"})}, Span: sp(f, 1)},
+				app("browser.tracked"),
+			), Params: nil, Returns: ir.Ref("server.PublicUser"),
+				Body: &ir.Wiring{Statements: []ir.Statement{
+					ir.ConstStmt{Name: "me", Expr: ir.CallExpr{Call: ir.Call{Op: "server.getMe",
+						Args:  []ir.CallArg{carg("in", record(ir.RecordField{Name: "verbose", Value: ir.LiteralAtom{Literal: ir.BooleanLiteral{Value: true}, Span: sp(f, 1)}}))},
+						Bound: []ir.BoundPosition{{Path: []string{"in", "token"}, State: "browser.token"}}, Span: sp(f, 1)}}, Span: sp(f, 1)},
+					ir.CallStmt{Call: ir.Call{Op: "browser.render",
+						Args:  []ir.CallArg{carg("in", record(ir.RecordField{Name: "user", Value: name("me")}, ir.RecordField{Name: "where", Value: ir.NoneAtom{Span: sp(f, 1)}}))},
+						Bound: []ir.BoundPosition{{Path: []string{"in", "token"}, State: "browser.token"}}, Span: sp(f, 1)}, Span: sp(f, 1)},
+					ir.ReturnStmt{Expr: ir.AtomExpr{Atom: name("me")}, Span: sp(f, 1)},
+				}},
+				Signature: ir.Signature{Exceptions: []string{"http.ServerError", "http.NetworkError"}, Effects: []string{"browser.redirected"}}},
+			&ir.Op{DeclBase: base("browser.render", doc("画面を描く。")), Params: []ir.OpParam{param("in", ir.Ref("browser.RenderInput"))}, Returns: nil},
+			// 配線: 注文の一覧から一行を選ぶ（match）。
+			&ir.Op{DeclBase: base("browser.chooseLine", nil), Params: []ir.OpParam{param("query", ir.Ref("server.OrdersQuery"))}, Returns: ir.Optional(ir.Ref("server.OrderRow")),
+				Body: &ir.Wiring{Statements: []ir.Statement{
+					ir.ConstStmt{Name: "rows", Expr: ir.CallExpr{Call: ir.Call{Op: "server.listOrders",
+						Args:  []ir.CallArg{carg("query", name("query"))},
+						Bound: []ir.BoundPosition{{Path: []string{"token"}, State: "browser.token"}}, Span: sp(f, 1)}}, Span: sp(f, 1)},
+					ir.ConstStmt{Name: "first", Expr: ir.CallExpr{Call: call("browser.pickFirst", carg("rows", name("rows")))}, Span: sp(f, 1)},
+					ir.ConstStmt{Name: "line", Expr: ir.MatchExpr{Match: ir.Match{Subject: name("first"), Classify: "browser.WarrantyKind", Arms: []ir.MatchArm{
+						{Cases: ir.ArmCases{Cases: []string{"Standard"}}, Body: ir.CallExpr{Call: call("browser.standardLine", carg("row", name("first")))}, Span: sp(f, 1)},
+						{Cases: ir.ArmCases{Cases: []string{"Yamada"}}, Body: ir.CallExpr{Call: call("browser.yamadaLine", carg("row", name("first")), carg("page", name("query", "page")))}, Span: sp(f, 1)},
+						{Cases: ir.DefaultArm(), Body: ir.NoneBody{}, Span: sp(f, 1)},
+					}, Span: sp(f, 1)}}, Span: sp(f, 1)},
+					ir.MatchStmt{Match: ir.Match{Subject: name("first"), Classify: "browser.IsBig", Arms: []ir.MatchArm{
+						{Cases: ir.ArmCases{Cases: []string{"IsBig"}}, Body: ir.CallExpr{Call: call("browser.celebrate")}, Span: sp(f, 1)},
+						{Cases: ir.DefaultArm(), Body: ir.NoneBody{}, Span: sp(f, 1)},
+					}, Span: sp(f, 1)}, Span: sp(f, 1)},
+					ir.ReturnStmt{Expr: ir.AtomExpr{Atom: name("line")}, Span: sp(f, 1)},
+				}},
+				Signature: ir.Signature{Exceptions: []string{"server.Unauthorized"}}},
+			&ir.Op{DeclBase: base("browser.pickFirst", nil), Params: []ir.OpParam{param("rows", ir.Array(ir.Ref("server.OrderRow")))}, Returns: ir.Ref("server.OrderRow")},
+			&ir.Op{DeclBase: base("browser.standardLine", nil), Params: []ir.OpParam{param("row", ir.Case("browser.WarrantyKind", []string{"Standard"}, ir.Ref("server.OrderRow")))}, Returns: ir.Ref("server.OrderRow")},
+			&ir.Op{DeclBase: base("browser.yamadaLine", nil), Params: []ir.OpParam{param("row", ir.Ref("server.OrderRow")), param("page", ir.Optional(ir.Ref("server.PosInt")))}, Returns: ir.Ref("server.OrderRow")},
+			&ir.Op{DeclBase: base("browser.celebrate", nil)},
+			// 配線: void。最後の呼び出しをそのまま返す。
+			&ir.Op{DeclBase: base("browser.logout", nil), Returns: nil,
+				Body: &ir.Wiring{Statements: []ir.Statement{
+					ir.CallStmt{Call: ir.Call{Op: "server.logout", Bound: []ir.BoundPosition{{Path: []string{"token"}, State: "browser.token"}}, Span: sp(f, 1)}, Span: sp(f, 1)},
+					ir.CallStmt{Call: call("browser.clearToken"), Span: sp(f, 1)},
+				}},
+				Signature: ir.Signature{Effects: []string{"server.deleteSession"}}},
+			&ir.Op{DeclBase: base("browser.clearToken", nil)},
+			// 配線: return call で射影が要る（User → PublicUser）。
+			&ir.Op{DeclBase: base("browser.fetchMe", nil), Params: []ir.OpParam{param("in", ir.Ref("server.GetMeInput"))}, Returns: ir.Ref("server.PublicUser"),
+				Body: &ir.Wiring{Statements: []ir.Statement{
+					ir.ReturnStmt{Expr: ir.CallExpr{Call: ir.Call{Op: "server.getMe", Args: []ir.CallArg{carg("in", name("in"))},
+						Bound: []ir.BoundPosition{{Path: []string{"in", "token"}, State: "browser.token"}}, Span: sp(f, 1)}}, Span: sp(f, 1)},
+				}},
+				Signature: ir.Signature{Exceptions: []string{"server.Unauthorized"}}},
+		},
+	}
+}
+
+// browserProgram は server と browser を含む Program。binds は browser.token を server.** と browser に。
+func browserProgram() *ir.Program {
+	return &ir.Program{Version: ir.Version,
+		Namespaces: []ir.Namespace{{Name: ""}, validVocab(), httpNS(), pageNS(), serverNS(), browserNS()},
+		Binds: []ir.Bind{
+			{Namespace: "browser", State: "browser.token", Target: ir.BindTarget{Namespace: "server", Deep: true}, Span: sp("browser.hozo", 1)},
+			{Namespace: "browser", State: "browser.token", Target: ir.BindTarget{Namespace: "browser"}, Span: sp("browser.hozo", 1)},
+		},
+	}
+}
+
+// browserView は browser から見た View。server の op は bind で token の位置が消えている。
+func browserView() *ir.View {
+	p := browserProgram()
+	ns := p.Namespace("browser")
+	// bind で合成した model（docs/ir.md「その名前空間から見た IR」）を browser の末尾に足す。
+	ns.Decls = append(ns.Decls, &ir.Model{
+		DeclBase: base("browser.getMe$in", nil), SynthesizedFrom: "server.getMe",
+		Fields: []ir.Field{field("verbose", ir.Boolean())},
+	})
+	v := &ir.View{Viewer: "browser", Config: ir.ViewConfig{Language: "go", Out: "gen/browser", Plugins: []string{"router"}}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	for _, d := range ns.Decls {
+		if op, ok := d.(*ir.Op); ok {
+			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
+		}
+	}
+	for _, d := range p.Namespace("server").Decls {
+		if op, ok := d.(*ir.Op); ok {
+			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
+		}
+	}
+	v.Ops["server.login"].Exceptions = []string{"server.InvalidCredentials", "http.ServerError", "http.NetworkError"}
+	v.Ops["server.getMe"].Params = []ir.OpParam{param("in", ir.Ref("browser.getMe$in"))}
+	v.Ops["server.getMe"].Bound = []ir.BoundPosition{{Path: []string{"in", "token"}, State: "browser.token"}}
+	v.Ops["server.listOrders"].Params = []ir.OpParam{param("query", ir.Ref("server.OrdersQuery"))}
+	v.Ops["server.listOrders"].Bound = []ir.BoundPosition{{Path: []string{"token"}, State: "browser.token"}}
+	v.Ops["server.logout"].Params = nil
+	v.Ops["server.logout"].Bound = []ir.BoundPosition{{Path: []string{"token"}, State: "browser.token"}}
+	return v
+}
+
+// browserServerView は browser のテストで一緒に出す server の View（同じ Program）。
+func browserServerView() *ir.View {
+	v := serverView()
+	v.Program = browserProgram()
+	return v
+}
+
+// browserManifests はプラグイン router のマニフェスト: page.route が entry、browser.tracked が decorate。
+func browserManifests() []ManifestInfo {
+	return []ManifestInfo{{Name: "router", Entry: []string{"page.route"}, Decorate: []string{"browser.tracked"}}}
+}
+
+// constraintView はユーザーが valid に足した制約と scalar の継承。
+func constraintView() *ir.View {
+	intT := ir.TypeParam{Types: []ir.Type{ir.Int()}}
+	valid := validVocab(
+		&ir.Decorator{DeclBase: base("valid.checkDigit", doc("検査数字が合う")), Targets: []ir.DecoratorTarget{ir.TargetScalar, ir.TargetField}},
+		&ir.Decorator{DeclBase: base("valid.multipleOf", nil), Params: []ir.Param{{Name: "base", Type: intT}}, Targets: []ir.DecoratorTarget{ir.TargetScalar, ir.TargetField}},
+	)
+	inv := ir.Namespace{Name: "inventory", Decls: []ir.Decl{
+		&ir.Scalar{DeclBase: base("inventory.Isbn", doc("ISBN。"),
+			app("valid.length", arg("min", lit(ir.IntLiteral{Value: 10})), arg("max", lit(ir.IntLiteral{Value: 13}))),
+			app("valid.checkDigit"),
+		), Base: ir.String()},
+		&ir.Scalar{DeclBase: base("inventory.Sku", doc("ISBN に接頭辞を足した SKU。"),
+			app("valid.pattern", arg("regex", lit(ir.StringLiteral{Value: `^[A-Z]`}))),
+		), Base: ir.Ref("inventory.Isbn")},
+		&ir.Scalar{DeclBase: base("inventory.Qty", nil,
+			app("valid.multipleOf", arg("base", lit(ir.IntLiteral{Value: 6}))),
+			app("valid.max", arg("value", lit(ir.IntLiteral{Value: 120}))),
+		), Base: ir.Int()},
+		&ir.Model{DeclBase: base("inventory.Item", nil), Fields: []ir.Field{
+			field("isbn", ir.Ref("inventory.Isbn")),
+			field("qty", ir.Ref("inventory.Qty")),
+			{Name: "note", Type: ir.Optional(ir.String()), Span: sp("x.hozo", 1),
+				Decorators: []ir.Application{app("valid.length", arg("max", lit(ir.IntLiteral{Value: 10})))}},
+			{Name: "code", Type: ir.String(), Span: sp("x.hozo", 1),
+				Decorators: []ir.Application{app("valid.checkDigit")}},
+			field("alts", ir.Array(ir.Ref("inventory.Sku"))),
+		}},
+	}}
+	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, valid, inv}}
+	return &ir.View{Viewer: "inventory", Config: ir.ViewConfig{Language: "go", Out: "gen/inventory"}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+}
+
+// derivedView は derivedFrom の model と、配線の射影（既定値で埋めるフィールドを含む）。
+func derivedView() *ir.View {
+	cat := ir.Namespace{Name: "catalog", Decls: []ir.Decl{
+		&ir.Model{DeclBase: base("catalog.Product", nil), Fields: []ir.Field{
+			field("id", ir.String()),
+			field("name", ir.String()),
+			field("price", ir.Float()),
+			field("secret", ir.String()),
+			{Name: "stock", Type: ir.Int(), Default: ir.IntLiteral{Value: 0}, Span: sp("x.hozo", 1)},
+			field("note", ir.Optional(ir.String())),
+		}},
+		&ir.Model{DeclBase: base("catalog.PublicProduct", nil), Fields: []ir.Field{
+			field("id", ir.String()),
+			field("name", ir.String()),
+			field("price", ir.Float()),
+			{Name: "stock", Type: ir.Int(), Default: ir.IntLiteral{Value: 0}, Span: sp("x.hozo", 1)},
+			field("note", ir.Optional(ir.String())),
+		}, DerivedFrom: &ir.DerivedFrom{Base: "catalog.Product", Omit: []string{"secret"}}},
+		&ir.Model{DeclBase: base("catalog.Summary", nil), Fields: []ir.Field{
+			field("id", ir.String()),
+			field("note", ir.Optional(ir.String())),
+			field("name", ir.Optional(ir.String())),
+			{Name: "featured", Type: ir.Boolean(), Default: ir.BooleanLiteral{Value: false}, Span: sp("x.hozo", 1)},
+		}},
+		&ir.Op{DeclBase: base("catalog.load", nil), Params: []ir.OpParam{param("id", ir.String())}, Returns: ir.Ref("catalog.Product")},
+		&ir.Op{DeclBase: base("catalog.publish", nil), Params: []ir.OpParam{param("id", ir.String())}, Returns: ir.Ref("catalog.PublicProduct"),
+			Body: &ir.Wiring{Statements: []ir.Statement{
+				ir.ReturnStmt{Expr: ir.CallExpr{Call: call("catalog.load", carg("id", name("id")))}, Span: sp("x.hozo", 1)},
+			}}},
+		&ir.Op{DeclBase: base("catalog.summarize", nil), Params: []ir.OpParam{param("p", ir.Ref("catalog.Product"))}, Returns: ir.Ref("catalog.Summary"),
+			Body: &ir.Wiring{Statements: []ir.Statement{
+				ir.ReturnStmt{Expr: ir.AtomExpr{Atom: name("p")}, Span: sp("x.hozo", 1)},
+			}}},
+	}}
+	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, cat}}
+	v := &ir.View{Viewer: "catalog", Config: ir.ViewConfig{Language: "go", Out: "gen/catalog"}, Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	for _, d := range cat.Decls {
+		if op, ok := d.(*ir.Op); ok {
+			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
+		}
+	}
+	return v
+}
