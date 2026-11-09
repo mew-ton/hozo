@@ -1,0 +1,323 @@
+{
+  "information_for_contributors": [
+    "このファイルは internal/tools/tmgrammar が生成する。手で編集せず、`go generate ./editors/...` で生成し直す。",
+    "予約語のパターン（repository の keywords.*）は internal/syntax/token の Keywords から、それ以外は internal/tools/tmgrammar/grammar.go から作る。",
+    "scope の決め方は docs/editors.md「TextMate の文法」。"
+  ],
+  "name": "Hozo",
+  "scopeName": "source.hozo",
+  "fileTypes": [
+    "hozo"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#external"
+    },
+    {
+      "include": "#decorator"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#contextual"
+    },
+    {
+      "include": "#type-positions"
+    },
+    {
+      "include": "#generic"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#number"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "include": "#doc-comment"
+        },
+        {
+          "include": "#block-comment"
+        },
+        {
+          "include": "#line-comment"
+        }
+      ]
+    },
+    "doc-comment": {
+      "comment": "docs/grammar.md「ドキュメンテーションコメント」。タグは行の頭（* の後ろ）にだけ置ける",
+      "name": "comment.block.documentation.hozo",
+      "begin": "/\\*\\*(?!/)",
+      "end": "\\*/",
+      "patterns": [
+        {
+          "match": "(?:^|(?\u003c=\\*))\\s*(@param)(?:\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+          "captures": {
+            "1": {
+              "name": "storage.type.class.jsdoc"
+            },
+            "2": {
+              "name": "variable.other.jsdoc"
+            }
+          }
+        },
+        {
+          "match": "(?:^|(?\u003c=\\*))\\s*(@(?:throws|see))(?:\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*))?",
+          "captures": {
+            "1": {
+              "name": "storage.type.class.jsdoc"
+            },
+            "2": {
+              "name": "variable.other.jsdoc"
+            }
+          }
+        }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.hozo",
+      "begin": "/\\*",
+      "end": "\\*/"
+    },
+    "line-comment": {
+      "name": "comment.line.double-slash.hozo",
+      "match": "//.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.hozo",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.hozo",
+          "match": "\\\\(?:[\"\\\\ntr]|u\\{[0-9A-Fa-f]+\\})"
+        }
+      ]
+    },
+    "number": {
+      "comment": "Int / Float / Duration（docs/grammar.md「リテラル」）。Duration は単位を含む",
+      "name": "constant.numeric.hozo",
+      "match": "(?\u003c![A-Za-z0-9_.])(?:-?[0-9]+\\.[0-9]+|[0-9]+(?:ms|s|m|h|d)|-?[0-9]+)\\b"
+    },
+    "external": {
+      "comment": "@external は核の印でデコレータではない（docs/grammar.md「予約語」）",
+      "name": "storage.modifier.hozo",
+      "match": "@external\\b"
+    },
+    "decorator": {
+      "name": "entity.name.function.decorator.hozo",
+      "match": "@[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "match": "\\b(model|scalar|union|exception|classify|condition)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.hozo"
+            },
+            "2": {
+              "name": "entity.name.type.hozo"
+            }
+          }
+        },
+        {
+          "match": "\\b(op|effect|decorator)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.hozo"
+            },
+            "2": {
+              "name": "entity.name.function.hozo"
+            }
+          }
+        },
+        {
+          "match": "\\b(state)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.hozo"
+            },
+            "2": {
+              "name": "variable.other.hozo"
+            }
+          }
+        }
+      ]
+    },
+    "contextual": {
+      "patterns": [
+        {
+          "comment": "for の対象: field は for の後ろ（| で続く位置を含む）でだけ文脈キーワード",
+          "begin": "\\b(for)\\b",
+          "end": "(?=[^\\s|A-Za-z0-9_])|(?=\\b(?:throws|catches)\\b)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            }
+          },
+          "patterns": [
+            {
+              "name": "keyword.other.hozo",
+              "match": "\\bfield\\b"
+            },
+            {
+              "include": "#keywords"
+            }
+          ]
+        },
+        {
+          "comment": "any の種類: variant は any の後ろでだけ文脈キーワード",
+          "match": "\\b(any)\\s+(variant)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            },
+            "2": {
+              "name": "keyword.other.hozo"
+            }
+          }
+        },
+        {
+          "comment": "状態の操作: post / put / delete は on 状態. の後ろでだけ文脈キーワード",
+          "match": "\\b(on)\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)\\.(post|put|delete)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            },
+            "3": {
+              "name": "keyword.other.hozo"
+            }
+          }
+        }
+      ]
+    },
+    "type": {
+      "comment": "型の位置に現れるもの。核の型、\u003c \u003e の中、大文字で始まる名前",
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#keywords.type"
+        },
+        {
+          "include": "#generic"
+        },
+        {
+          "name": "entity.name.type.hozo",
+          "match": "\\b(?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "generic": {
+      "begin": "\u003c",
+      "end": "\u003e",
+      "patterns": [
+        {
+          "include": "#type"
+        }
+      ]
+    },
+    "type-positions": {
+      "patterns": [
+        {
+          "comment": ": の後ろ（フィールド、引数、返り値、状態、例外の値）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
+          "begin": ":",
+          "end": "(?=[=;,(){}\\[\\]])|(?=\\b(?:throws|effects|catches|prevents|keeps)\\b)",
+          "patterns": [
+            {
+              "include": "#contextual"
+            },
+            {
+              "include": "#type"
+            },
+            {
+              "include": "#string"
+            },
+            {
+              "include": "#number"
+            },
+            {
+              "include": "#keywords"
+            }
+          ]
+        },
+        {
+          "comment": "is / extends / of の後ろ",
+          "begin": "\\b(is|extends|of)\\b",
+          "end": "(?=[;{])",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type"
+            }
+          ]
+        },
+        {
+          "comment": "throws / catches の後ろの例外の名前",
+          "begin": "\\b(throws|catches)\\b",
+          "end": "(?=[;{])|(?=\\b(?:throws|catches|effects|prevents|keeps|recovers|halts|ignores)\\b)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type"
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "comment": "予約語。docs/grammar.md「予約語」の表の順。token.Keywords から生成",
+      "patterns": [
+        {
+          "include": "#keywords.declaration"
+        },
+        {
+          "include": "#keywords.control"
+        },
+        {
+          "include": "#keywords.type"
+        },
+        {
+          "include": "#keywords.constant"
+        }
+      ]
+    },
+    "keywords.declaration": {
+      "name": "keyword.declaration.hozo",
+      "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind)\\b"
+    },
+    "keywords.control": {
+      "name": "keyword.control.hozo",
+      "match": "\\b(?:is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default)\\b"
+    },
+    "keywords.type": {
+      "name": "support.type.primitive.hozo",
+      "match": "\\b(?:string|boolean|int|float|Time|Duration|void|Record|list|single)\\b"
+    },
+    "keywords.constant": {
+      "name": "constant.language.hozo",
+      "match": "\\b(?:none|true|false)\\b"
+    }
+  }
+}

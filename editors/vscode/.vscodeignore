@@ -1,0 +1,7 @@
+.vscode/**
+src/**
+test/**
+out/**/*.map
+tsconfig.json
+syntaxes/generate.go
+.gitignore

@@ -1,0 +1,81 @@
+{
+  "name": "hozo",
+  "displayName": "Hozo",
+  "description": "Hozo の仕様（.hozo）のシンタックスハイライトと、hozoc lsp への接続",
+  "version": "0.0.1",
+  "publisher": "mew-ton",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mew-ton/hozo",
+    "directory": "editors/vscode"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:hozo"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "hozo",
+        "aliases": [
+          "Hozo",
+          "hozo"
+        ],
+        "extensions": [
+          ".hozo"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "hozo",
+        "scopeName": "source.hozo",
+        "path": "./syntaxes/hozo.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Hozo",
+      "properties": {
+        "hozo.hozocPath": {
+          "type": "string",
+          "default": "hozoc",
+          "description": "言語サーバーとして起動する hozoc の場所。既定は PATH の hozoc。"
+        },
+        "hozo.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "VS Code と hozoc lsp の通信のログ。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "~1.90.0",
+    "typescript": "^5.6.0",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.1.0"
+  }
+}

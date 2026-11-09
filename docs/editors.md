@@ -11,7 +11,9 @@ editors/vscode/
   package.json                 contributes: languages / grammars / configuration
   language-configuration.json  コメント（// と /* */）、括弧、自動閉じ
   syntaxes/hozo.tmLanguage.json
+  syntaxes/generate.go         go generate の置き場（internal/tools/tmgrammar を呼ぶ）
   src/extension.ts             クライアント
+  test/                        TextMate の文法のテスト（vscode-textmate で実物の .hozo を字句に分ける）
 ```
 
 - 言語 ID は `hozo`、拡張子 `.hozo`。
@@ -33,14 +35,16 @@ editors/vscode/
 | 文脈キーワード `field` / `variant` | `keyword.other.hozo` | `\bfor\s+` の後と `\bany\s+` の後に限る（`docs/grammar.md`「予約語」） |
 | 文脈キーワード `post` / `put` / `delete` | `keyword.other.hozo` | `\bon\s+[\w.]+\.` の後に限る |
 | デコレータ | `entity.name.function.decorator.hozo` | `@` から `QualifiedName` まで |
-| 宣言の名前 | `entity.name.type.hozo`（model / scalar / union / exception / classify）、`entity.name.function.hozo`（op / effect / decorator）、`variable.other.hozo`（state） | 宣言の頭の予約語の直後の `Ident` |
-| 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`extends` / `of` の後、`<` の中、`throws` / `catches` の後の `QualifiedName` |
+| `@external` | `storage.modifier.hozo` | 核の印でデコレータではない（`docs/grammar.md`「予約語」）ので、デコレータより先に拾う |
+| 宣言の名前 | `entity.name.type.hozo`（model / scalar / union / exception / classify / condition）、`entity.name.function.hozo`（op / effect / decorator）、`variable.other.hozo`（state） | 宣言の頭の予約語の直後の `Ident` |
+| 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`is` / `extends` / `of` の後、`<` の中、`throws` / `catches` の後の `QualifiedName` のうち、最後の要素が大文字で始まるもの（§3.3 の命名規則。`:` は値の位置（名前で渡す引数、レコードリテラル）にも現れるので、小文字で始まる名前は型にしない） |
 | 文字列 | `string.quoted.double.hozo` | エスケープは `constant.character.escape.hozo` |
 | 数値 | `constant.numeric.hozo` | `Int` / `Float` / `Duration`（単位も含む） |
 | コメント | `comment.line.double-slash.hozo`、`comment.block.hozo` | |
 | ドキュメンテーションコメント | `comment.block.documentation.hozo` | 中の `@param` / `@throws` / `@see` は `storage.type.class.jsdoc`、続く名前は `variable.other.jsdoc` |
 
-- 予約語の部分は `internal/tools/tmgrammar` が `token.Keywords` から生成する（`docs/packages.md`「生成するもの」）。手で書くのはそれ以外のパターン。
+- 予約語の部分は `internal/tools/tmgrammar` が `token.Keywords` から生成する（`docs/packages.md`「生成するもの」）。それ以外のパターンも同じ道具の中（`grammar.go`）に手で書き、ファイル全体を `go generate ./editors/...`（`syntaxes/generate.go`）で決定的に生成する。生成物とのずれは `internal/tools/tmgrammar` のテストと CI が見る（`docs/testing.md`「生成物の一致」）。
+- 文法のテストは `editors/vscode/test/`。`vscode-textmate` + `vscode-oniguruma` で、コーパス・標準の語彙・`cli.hozo` を字句に分け、選んだ字句の scope がこの表の通りであることを `npm test` で確かめる。
 - 型の位置と値の位置の区別は TextMate では位置の規則でしか付けられない。残りは命名規則（§3.3）に頼り、正確な区別は段階 4 の後の semantic tokens に任せる（`docs/lsp.md`）。
 
 ## ほかのエディタ
