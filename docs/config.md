@@ -13,7 +13,7 @@
 
 ```toml
 [hozo]                          # 全体の設定。省略できる
-sources      = ["**/*.hozo"]    # ルートからの glob。既定はこの一つ。各名前空間の out の下と、plugin_dirs の下は常に除く
+sources      = ["**/*.hozo"]    # ルートからの glob。既定はこの一つ。各名前空間の out の下と、plugin_dirs の下は常に除く（隠しディレクトリは除かない）
 plugin_dirs  = ["plugins"]      # プラグインを探すディレクトリ（docs/plugin-protocol.md「探索」）。ルートからの相対パス。既定は []
 max_bindings = 5                # WIRE-6 の閾値（docs/check.md「配線」）。既定はそこに書いた値
 

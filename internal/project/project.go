@@ -250,8 +250,8 @@ func (p *Project) readSources(overlay map[string][]byte) ([]sourceFile, []diag.D
 	}
 	for key, content := range overlay {
 		rel := p.relPath(key)
-		if rel == "" || !matchesAny(patterns, ex, rel) {
-			continue
+		if rel == "" || strings.HasPrefix(rel, "/") || filepath.IsAbs(rel) || !matchesAny(patterns, ex, rel) {
+			continue // ルートの外か、sources に合わない
 		}
 		byPath[rel] = content
 	}
@@ -401,7 +401,7 @@ func (p *Project) PluginWarning(plugin string, w sdk.Warning) diag.Diagnostic {
 
 // Locate はプラグインの at（docs/plugin-protocol.md「要求と応答」: FQN か "file:line:col"）を診断の位置にする。
 // FQN ならその宣言の span。"file:line:col" ならそのファイルのその位置（終わりも同じ位置）。どちらでもなければ
-// Span は nil で、at がファイルのパスの形（":" を含まない）ならそれを File に、そうでなければ File は空。
+// Span は nil で、at が読んだファイルのパスならそれを File に、そうでなければ File は空（表示は "hozoc: "）。
 func (p *Project) Locate(at string) (*source.Span, string) {
 	if at == "" {
 		return nil, ""
@@ -427,7 +427,12 @@ func (p *Project) Locate(at string) (*source.Span, string) {
 		return nil, rel
 	}
 	if !strings.Contains(at, ":") {
-		return nil, p.relPath(at)
+		rel := p.relPath(at)
+		for i := 0; i < p.Files.Len(); i++ {
+			if p.Files.Path(source.FileID(i)) == rel {
+				return nil, rel
+			}
+		}
 	}
 	return nil, ""
 }

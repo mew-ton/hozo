@@ -92,7 +92,8 @@ Conf(N).plugins（`docs/config.md`「名前空間の設定の解決」）の名�
 ```
 
 - `severity` は `"error"` か `"warning"`。`code` はプラグインが決める（語彙に固有の規則の ID。`docs/requirements.md`「検査の規則の一覧」の PAGE-1 / PAGE-2 など）。
-- `at` は FQN（その宣言の位置に付ける）か `"file:line:col"`。
+- `at` は FQN（その宣言の位置に付ける）か `"file:line:col"`。どちらでもなければ位置なしで報告する。
+- `check` の診断のメッセージにはプラグイン名を付けない（`code` がプラグインの規則を示す）。`warnings` には付ける。
 
 ### import
 

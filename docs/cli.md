@@ -183,8 +183,8 @@ namespace hozoc {
   @cli.command("lsp")
   op lsp(in: LspInput);
 
-  /** プラグインの起動のしかた（docs/plugin-protocol.md「マニフェスト」の command と、マニフェストのディレクトリ） */
-  model Plugin { name: string; command: string[]; dir: Path; }
+  /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ */
+  model Plugin { name: string; command: string[]; dir: Path; root: Path; }
 
   /** IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない */
   model View {}
@@ -233,7 +233,7 @@ plugin_dirs = ["plugins"]
 2. 標準の語彙、設定されたプラグインの語彙、`sources` のファイルの順に読み、解析する（`docs/grammar.md`）。
 3. 解決（`docs/resolve.md`）、正規化（`docs/ir.md`）、計算と検査（`docs/check.md`）を行う。
 4. `[check] enabled` のプラグインに `direction: "check"` を送り、返った診断を足す。プラグインの異常終了は `proc.Crashed` / `proc.MalformedOutput`。
-5. error が一つでもあれば `CheckFailed`（値は error と warning のすべて）。なければ `CheckResult`（warning）。
+5. error が一つでもあれば例外（値は error と warning のすべて）。設定かマニフェストの error（CFG-*、MAN-*）が一つでもあれば `ConfigInvalid`、ただしそれがすべて CFG-4 なら `LanguageMismatch`。それ以外は `CheckFailed`。error がなければ `CheckResult`（warning）。
 
 構文エラーのあるファイルも、読めた宣言は解決・検査に進める。診断の順序は `docs/diagnostics.md`。
 
@@ -246,9 +246,11 @@ plugin_dirs = ["plugins"]
 3. Conf(N).plugins の各プラグインを `runEmit` で起動し（順序は `docs/plugin-protocol.md`「起動」）、`files` を集める。`errors` があれば `CheckFailed`。
 4. すべての名前空間のファイルを集めてから、パスの重複を確かめる（CFG-5 → `OutputConflict`）。
 5. `dryRun` なら、書く予定のパスを `written` に入れて返す（書かない）。
-6. 各名前空間の `<out>/.hozoc-outputs.json`（前回書いたパスの一覧。JSON の文字列の配列、辞書順）を読み、今回書かないパスのファイルを消す（`removeStaleOutputs`）。ファイルがなければ何もしない。
+6. 対象の各名前空間の `<Dir(N)>/.hozoc-outputs.json`（前回書いたパスの一覧。ルートからの相対パスの JSON の配列、辞書順）を読み、今回書かないパスのファイルを消す（`removeStaleOutputs`）。ファイルがなければ何もしない。`hozo.toml` から名前空間のテーブルを消した場合、その出力先はもう分からないので消さない（手で消す）。
 7. ファイルを書く。内容が同じなら書き直さない（`written` には入れる）。ディレクトリは作る。
 8. `.hozoc-outputs.json` を書く。
+
+`EmitResult.warnings` は `check` の warning に、既定の出力とプラグインの warning を足したもの。
 
 書く順序はパスの辞書順。途中で失敗したら、そこまでに書いたものは残る（原子性は持たない。`proc.Crashed` は 3 で起きるので、書き出しには入っていない）。
 
@@ -260,4 +262,6 @@ plugin_dirs = ["plugins"]
 
 - `cmd/hozoc/main.go`: `internal/app` の実装を組み立てて `cli.Main`（`docs/plugin-go-cli.md`「出力」）を呼ぶ。
 - `internal/app`: `hozoc.Leaves` の実装。`check` は `internal/project.Load`、`writeOutputs` は `internal/emit/golang` と `Ops.RunEmit`、`runEmit` は `internal/plugin.Run`、`lsp` は `internal/lsp.Serve`（`docs/packages.md`）。`Wrappers` はない（`@cli.command` は go-cli の `entry`、`@proc.stdio` は `stop`。`docs/emit-go.md`「デコレータ」）。`Presenter` は `format` に応じて text か JSON で表示する（`docs/diagnostics.md`「表示」）。`text` では `CheckResult` は診断の一覧と件数、`EmitResult` は `written` / `removed` のパスの一覧を出す。
-- 段階 3 まで（骨組みを生成する前）の引数の解釈は `internal/app` が持ち、`cmd/hozoc/main.go` はそれを呼ぶだけ。
+- 段階 3 まで（骨組みを生成する前）の引数の解釈は `internal/app` が持ち、`cmd/hozoc/main.go` はそれを呼ぶだけ。解釈の規則は `docs/plugin-go-cli.md`「引数の解釈」と同じ。
+- 表示の形（`Presenter`）: 結果は標準出力、例外は標準エラー（`docs/plugin-go-cli.md`「実行と表示」）。text の `EmitResult` は warning の一覧（あれば）に続けて `written: <path>` / `removed: <path>` を一行ずつ。json の `CheckResult` は `{"warnings": [...]}`、`EmitResult` は `{"warnings": [...], "written": [...], "removed": [...]}`、例外は `{"error": "<FQN>", "value": {...}}`。診断の要素は `docs/diagnostics.md`「json」と同じ形。
+- `hozo.toml` がなければ、`check` は CFG-7 を一つ作って `ConfigInvalid` にする（`internal/project` は設定なしでも動くが、CLI は設定を要求する）。

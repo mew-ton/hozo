@@ -1,0 +1,193 @@
+/** hozo の仕様を検査し、各言語のコードに展開する CLI */
+namespace hozoc {
+  /** ファイルのパス。相対パスの基準は使う場所が決める（docs/config.md「置き場と探し方」など） */
+  scalar Path extends string;
+
+  /** 表示の形式。text か json */
+  @valid.pattern("^(text|json)$")
+  scalar OutputFormat extends string;
+
+  /** 読み込むファイル */
+  model SourceFile { path: Path; content: string; }
+
+  /** 書き出すファイル */
+  model OutputFile { path: Path; content: string; }
+
+  /** 位置（1 始まりの行と列） */
+  model Position { line: int; col: int; }
+
+  /** 検査やプラグインが報告する一件の指摘（docs/diagnostics.md） */
+  model Diagnostic {
+    /** error か warning */
+    severity: string;
+    /** 規則の ID */
+    code: string;
+    message: string;
+    file: Path?;
+    start: Position?;
+    end: Position?;
+    related: RelatedInfo[];
+  }
+
+  /** 指摘に関連する位置 */
+  model RelatedInfo { file: Path; start: Position; end: Position; message: string; }
+
+  /** 指摘の一覧 */
+  model Diagnostics { items: Diagnostic[]; }
+
+  /** 仕様のファイル */
+  @fs.files("**/*.hozo")
+  state sources: list<SourceFile>;
+
+  /** プロジェクトの設定（docs/config.md） */
+  @fs.files("hozo.toml")
+  state config: single<SourceFile?>;
+
+  /** 生成したファイル。置き場は hozo.toml の各名前空間の out */
+  state outputs: list<OutputFile>;
+
+  /** 仕様に構文か型の誤りがある */
+  @cli.exitCode(1)
+  exception CheckFailed: Diagnostics;
+
+  /** hozo.toml がない、または設定が誤っている（docs/config.md の CFG-*） */
+  @cli.exitCode(2)
+  exception ConfigInvalid: Diagnostics;
+
+  /** プラグインの language が名前空間の language と合わない */
+  @cli.exitCode(2)
+  exception LanguageMismatch: Diagnostics;
+
+  /** 複数の出どころが同じファイルに書こうとした */
+  @cli.exitCode(3)
+  exception OutputConflict: Diagnostics;
+
+  /** emit の引数に、hozo.toml にない名前空間が指定された */
+  @cli.exitCode(64)
+  exception UnknownNamespace;
+
+  /** 検査の結果（誤りではない指摘） */
+  model CheckResult { warnings: Diagnostic[]; }
+
+  /** 書き出しの結果 */
+  model EmitResult {
+    warnings: Diagnostic[];
+    /** 書いたファイル（新規と更新） */
+    written: Path[];
+    /** 消したファイル */
+    removed: Path[];
+  }
+
+  /** check の入力 */
+  model CheckInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
+    /** 表示の形式 */
+    @cli.flag("format") format: OutputFormat?;
+  }
+
+  /** emit の入力 */
+  model EmitInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
+    /** 表示の形式 */
+    @cli.flag("format") format: OutputFormat?;
+    /** 生成する名前空間（一つもなければすべて） */
+    @cli.arg namespaces: string[];
+    /** 書き出さずに、書き出す予定のファイルだけを表示する */
+    @cli.flag("dry-run") dryRun: boolean?;
+  }
+
+  /** lsp の入力 */
+  model LspInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
+    /** ログの書き出し先 */
+    @cli.flag("log") @cli.env("HOZO_LSP_LOG") log: Path?;
+  }
+
+  /** 新しく生成したファイルを書き出す */
+  effect addOutputs on outputs.post;
+  /** 既にあるファイルを、生成し直した内容で書き換える */
+  effect replaceOutputs on outputs.put;
+  /** 生成しなくなったファイルを消す */
+  effect removeStaleOutputs on outputs.delete;
+
+  /**
+   * 仕様を検査する。ファイルは書き出さない。
+   *
+   * @param in コマンドの入力
+   * @throws LanguageMismatch プラグインのマニフェストの language が名前空間の language と合わない（docs/config.md の CFG-4）
+   * @throws proc.Crashed check を持つプラグインが異常終了した
+   * @see emit
+   */
+  @cli.command("check")
+  op check(in: CheckInput): CheckResult
+    throws CheckFailed | ConfigInvalid | LanguageMismatch
+    throws proc.Crashed | proc.MalformedOutput;
+
+  /**
+   * 検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
+   *
+   * @param in コマンドの入力
+   * @param checked 検査の結果
+   * @throws CheckFailed プラグインが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
+   * @throws OutputConflict 同じファイルに二つの出どころが書こうとした。ファイルは書き出さない
+   * @throws UnknownNamespace 引数の名前空間が hozo.toml にない。ファイルは書き出さない
+   * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
+   */
+  op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
+    effects addOutputs | replaceOutputs | removeStaleOutputs
+    throws CheckFailed | OutputConflict | UnknownNamespace prevents effects
+    throws proc.Crashed | proc.MalformedOutput prevents effects;
+
+  /**
+   * 仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
+   *
+   * @param in コマンドの入力
+   * @see check
+   */
+  @cli.command("emit")
+  op emit(in: EmitInput): EmitResult
+    throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict | UnknownNamespace prevents effects
+    throws proc.Crashed | proc.MalformedOutput prevents effects
+  {
+    const checked = check({ config: in.config, format: in.format });
+    return writeOutputs(in, checked);
+  }
+
+  /**
+   * 言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
+   *
+   * @param in コマンドの入力
+   */
+  @cli.command("lsp")
+  op lsp(in: LspInput);
+
+  /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ */
+  model Plugin { name: string; command: string[]; dir: Path; root: Path; }
+
+  /** IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない */
+  model View {}
+
+  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求） */
+  model EmitRequest { protocol: string; direction: string; view: View; }
+
+  /** プラグインの warning（同「emit」の応答の warnings の要素） */
+  model PluginWarning { at: string; message: string; }
+
+  /** プラグインの error（同「emit」の応答の errors の要素） */
+  model PluginError { code: string; at: string; message: string; }
+
+  /** 展開のときのプラグインからの出力（同「emit」の応答） */
+  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; }
+
+  /**
+   * プラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
+   *
+   * @param plugin 起動するプラグイン
+   * @param req プラグインへの入力
+   */
+  @proc.stdio
+  op runEmit(plugin: Plugin, req: EmitRequest): EmitResponse;
+}

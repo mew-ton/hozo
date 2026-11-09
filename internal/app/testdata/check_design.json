@@ -1,0 +1,18 @@
+{
+  "warnings": [
+    {
+      "severity": "warning",
+      "code": "REL-3",
+      "message": "server.placeOrder の throws は効果の名前 server.createOrder、server.notifyUser を個別に書いている。効果ごとに葉の op を分ければ宣言が要らなくなる",
+      "file": "server.hozo",
+      "start": {
+        "line": 230,
+        "col": 3
+      },
+      "end": {
+        "line": 232,
+        "col": 69
+      }
+    }
+  ]
+}
