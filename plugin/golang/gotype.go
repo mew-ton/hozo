@@ -103,7 +103,7 @@ func refType(fqn string, imports *Imports) string {
 
 // guessNamespace は FQN の名前空間を、先頭が大文字でないセグメントの先頭からの並びとみなす
 // （Resolve がないときの補い。宣言名は大文字で始まる慣習 NAME-1 に頼る）。
-// `server.OrderPage.Ready` → `server`、`server.admin.Report` → `server.admin`、`Db` → ``。
+// `server.OrderPage.Ready` → `server`、`server.admin.Report` → `server.admin`、`Db` → ""（空）。
 func guessNamespace(fqn string) string {
 	segs := strings.Split(fqn, ".")
 	n := 0
