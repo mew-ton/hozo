@@ -60,7 +60,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | 引数名 | 引数 |
 | `match` のケース名 | `classify` のケース |
 | デコレータの引数名（`name:`） | デコレータの宣言の `Param` |
-| ドキュメンテーションコメントの `@param` / `@throws` / `@see` の名前 | 同上 |
+| ドキュメンテーションコメントの `@param` / `@throws` / `@see` の名前 | 同上（`internal/sema` の `Refs` にはないので、言語サーバーが構文木から解決する） |
 | 語彙の宣言 | `hozo:` の URI の位置 |
 
 解決できなければ `null`。
@@ -69,7 +69,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 Markdown の `MarkupContent`。順に:
 
-1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `op login(in: LoginInput): LoginOk`、`model User`、`scalar Email extends string`、`exception InvalidCredentials: Violations`、`effect createSession on sessions.post`、`decorator validated throws ClientError prevents effects`、`state users: list<User>`、`classify WarrantyKind of server.Item`、フィールドなら `token?: Token`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
+1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `op login(in: LoginInput): LoginOk`、`model User`、`scalar Email extends string`、`exception InvalidCredentials: Violations`、`effect createSession on sessions.post`、`decorator validated throws ClientError prevents effects`、`state users: list<User>`、`classify WarrantyKind of server.Item`、フィールドなら `token: Token?`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
 2. `description.body`。
 3. op なら `throws:` と `effects:` の一覧（`Signature`）。例外ごとの効果の状態（`relations`）が `unknown` でないものを添える。
 4. デコレータの適用なら、適用先ではなくデコレータの宣言の 1〜2 と、固定した引数。

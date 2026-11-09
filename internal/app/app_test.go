@@ -75,7 +75,7 @@ func run(t *testing.T, dir string, env map[string]string, args ...string) (code 
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chdir(wd) }()
-	ops := hozoc.New(&Leaves{Stderr: &errOut})
+	ops := hozoc.New(&Leaves{Stderr: &errOut, Stdin: strings.NewReader("")}) // lsp は入力の終わりで戻る
 	code = cli.Main(ops, Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
 	return code, out.String(), errOut.String()
 }
@@ -389,7 +389,7 @@ func TestUsageAndLsp(t *testing.T) {
 		{[]string{"check", "--format=yaml"}, exitUsage},
 		{[]string{"check", "server"}, exitUsage},
 		{[]string{"emit", "--dry-run=maybe"}, exitUsage},
-		{[]string{"lsp"}, exitSoftwareOrCrash}, // 段階 4 まで未実装。宣言にない例外は 70
+		{[]string{"lsp"}, 0}, // 入力が閉じれば終わる。終了コードは常に 0（docs/lsp.md「ライフサイクル」）
 		{[]string{"emit", "--dry-run", "--", "server"}, 0},
 		{[]string{"emit", "--format", "text", "--format", "json", "--dry-run", "-x"}, exitUsage}, // -x は位置引数（知らない名前空間）
 	}
@@ -399,9 +399,13 @@ func TestUsageAndLsp(t *testing.T) {
 			t.Errorf("%v: code=%d, want %d (stderr=%q)", c.args, code, c.code, stderr)
 		}
 	}
-	_, _, stderr := run(t, dir, nil, "lsp")
-	if !strings.Contains(stderr, "not implemented") {
-		t.Errorf("lsp stderr=%q", stderr)
+	logPath := filepath.Join(dir, "lsp.log")
+	code, _, stderr := run(t, dir, nil, "lsp", "--log", logPath)
+	if code != 0 || stderr != "" {
+		t.Errorf("lsp: code=%d stderr=%q", code, stderr) // 標準エラーには書かない（docs/lsp.md「通信」）
+	}
+	if _, err := os.Stat(logPath); err != nil {
+		t.Errorf("--log のファイルがない: %v", err)
 	}
 }
 

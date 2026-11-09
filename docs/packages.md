@@ -44,7 +44,7 @@ cmd/hozoc → internal/gen/hozoc/cli → internal/gen/hozoc → runtime
 cmd/hozoc → internal/app → internal/gen/hozoc
                          → internal/project → internal/{config, vocab, syntax, sema, check, emit/golang, plugin}
                                             → ir, plugin/golang, runtime
-internal/lsp → internal/project
+internal/lsp → internal/project, internal/syntax（シンボルと定義へのジャンプのために構文木を読み直す）
 internal/vocab → vocab
 plugins/go-cli → plugin, plugin/golang, ir
 ir → (標準ライブラリだけ)

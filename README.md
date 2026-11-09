@@ -14,4 +14,4 @@ make test
 
 ## 状態
 
-段階 3 まで（`docs/requirements.md`「段階」）。`hozoc check` / `hozoc emit` が動き、`cmd/hozoc` の骨組みは `cli.hozo` から生成したもの（`internal/gen/hozoc`。`make generate` で生成し直す）。`hozoc lsp` は未実装（段階 4）。
+段階 4 まで（`docs/requirements.md`「段階」）。`hozoc check` / `hozoc emit` / `hozoc lsp` が動き、`cmd/hozoc` の骨組みは `cli.hozo` から生成したもの（`internal/gen/hozoc`。`make generate` で生成し直す）。VS Code 拡張は `editors/vscode`。次は段階 5（TS の既定の出力と TS 向けの一次プラグイン）。

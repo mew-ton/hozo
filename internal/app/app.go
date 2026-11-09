@@ -16,10 +16,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/lsp"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/source"
@@ -38,6 +41,9 @@ type Leaves struct {
 	Stderr io.Writer
 	// Env はプラグインに渡す環境変数の元。nil なら os.Environ()。
 	Env []string
+	// Stdin と Stdout は lsp が話す相手（docs/lsp.md「通信」）。nil なら os.Stdin / os.Stdout。
+	Stdin  io.Reader
+	Stdout io.Writer
 
 	// checked は直前の Check が解析した Project。WriteOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
 	// なので、Program・設定・マニフェストはここから取る。Check が失敗すれば nil。
@@ -48,14 +54,37 @@ type Leaves struct {
 
 var _ hozoc.Leaves = (*Leaves)(nil)
 
-// Lsp は cli.hozo の op lsp。段階 4（docs/requirements.md「段階」）まで未実装で、常にその誤りを返す。
-// 宣言にない例外なので終了コードは 70（docs/diagnostics.md「終了コード」）。
-func (l *Leaves) Lsp(_ context.Context, _ hozoc.LspInput) error {
-	return errNotImplemented
+// Lsp は cli.hozo の op lsp: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
+// internal/lsp.Serve を呼び、クライアントが exit を送るまで戻らない。config（--config / HOZO_CONFIG）は
+// hozo.toml の場所で、なければクライアントの rootUri から探す。log（--log / HOZO_LSP_LOG）はログの書き出し先で、
+// 開けなければその誤りを返す（宣言にない例外なので 70。docs/diagnostics.md「終了コード」）。
+// 標準エラーには書かない（docs/lsp.md「通信」）。
+func (l *Leaves) Lsp(_ context.Context, in hozoc.LspInput) error {
+	opts := lsp.Options{Root: l.Dir}
+	if in.Config != nil && *in.Config != "" {
+		opts.ConfigPath = string(*in.Config)
+		if !filepath.IsAbs(opts.ConfigPath) && l.Dir != "" {
+			opts.ConfigPath = filepath.Join(l.Dir, opts.ConfigPath)
+		}
+	}
+	if in.Log != nil && *in.Log != "" {
+		f, err := os.OpenFile(string(*in.Log), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			return fmt.Errorf("hozoc lsp: ログを開けない: %w", err)
+		}
+		defer f.Close()
+		opts.Log = f
+	}
+	var stdin io.Reader = l.Stdin
+	if stdin == nil {
+		stdin = os.Stdin
+	}
+	var stdout io.Writer = l.Stdout
+	if stdout == nil {
+		stdout = os.Stdout
+	}
+	return lsp.Serve(stdin, stdout, opts)
 }
-
-// errNotImplemented は段階 4 までの lsp の答え。
-var errNotImplemented = errors.New("hozoc lsp: not implemented")
 
 // 例外の値と誤りの写し（cli.hozo の exception ↔ 中の型）。
 
