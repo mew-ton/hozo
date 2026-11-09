@@ -8,7 +8,7 @@
 
 ## 計算
 
-規則の検査に先立って、op ごとに次を計算し、`Op.signature`（`docs/ir.md`「op」）と `Call.bound` に置く。計算は op の呼び出しの依存の順に行う。配線の呼び出しが循環していれば WIRE-7 で、循環に含まれる op は本体を無視して葉として計算する。
+規則の検査に先立って、op ごとに次を計算し、`Op.signature`（`docs/ir.md`「op」）と `Call.bound` に置く。計算は op の呼び出しの依存の順に行う。配線の呼び出しが循環していれば WIRE-7 で、循環に含まれる op は本体を無視して葉として計算する。計算の途中で出す診断（THROWS-1、REL-4、DEC-5、DEC-16、WIRE-7）は Sig(O, ns(O)) を計算するときだけ出し、ほかの見る側の計算では出さない。
 
 記法: op を O、O の名前空間を ns(O)、O に付いたデコレータの適用を内側から順に d₁ … dₙ（`Op.decorators` の末尾から先頭へ）。各 dᵢ の宣言を D(dᵢ) とし、`$param:` の参照はその適用の引数で置き換えてから使う。見る側の名前空間を v とする。
 
@@ -75,7 +75,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 
 ## 診断
 
-各表の「手続き」が条件。「重さ」は error か warning。位置は、表に書いてなければ規則の対象（宣言、フィールド、呼び出し、アーム）の名前のトークン。設計書にある規則の意味は `docs/requirements.md`「検査の規則の一覧」の節を、ない規則の意味はこの表を持ち主とする。
+各表の「手続き」が条件。「重さ」は error か warning。位置は、表に書いてなければ規則の対象（宣言、フィールド、呼び出し、アーム）の `Span`。設計書にある規則の意味は `docs/requirements.md`「検査の規則の一覧」の節を、ない規則の意味はこの表を持ち主とする。`hozo.toml` がないとき（`docs/lsp.md`「プロジェクト」）は、呼び出す側（`internal/project`）が CFG-* を除く。
 
 ### 名前空間
 
@@ -86,7 +86,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | NS-3 | error | RES-6 のうち、両方の出どころが語彙（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）のもの。メッセージに語彙の出どころ（標準か、どのプラグインか）を出す |
 | NS-4 | error | 型の位置の `C.Case<T>` の C が現在の名前空間の `classify` でない（`match` の C は文法上修飾できない） |
 | NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。warning にするのは、設計書が強さを決めていないため |
-| DOC-1 | error | `@param` が引数名にない、`@throws` が `Signature.exceptions` にない、`@see` が解決できない。デコレータの宣言の `@param` は `Param` の名前 |
+| DOC-1 | error | `@param` が引数名にない、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いた `external` なデコレータの `throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。デコレータの宣言の `@param` は `Param` の名前 |
 | DOC-2 | error | 同じ `@param` 名、同じ `@throws` 例外が二度ある |
 | UNION-1 | error | `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複 |
 
@@ -107,9 +107,9 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| THROWS-1 | error | 配線の O について `Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ)`（Sc は本体の各呼び出しの Sig(callee, ns(O))。Throws は `external` でも含める）。空でなければ、位置は O の名前、メッセージに Missing の FQN、`Related` に各例外の出どころの呼び出し、`Data.missing` に FQN の列 |
+| THROWS-1 | error | 配線の O について `Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ, ns(O))`（Sc は本体の各呼び出しの Sig(callee, ns(O))。`external` なデコレータの `throws` は Sig と同じく数えない）。空でなければ、位置は O の名前、メッセージに Missing の FQN、`Related` に各例外の出どころの呼び出し、`Data.missing` に FQN の列 |
 | THROWS-2 | — | 診断なし。多めの宣言は許す |
-| REL-1 | error | `Op.throws`（またはデコレータの `throws`）の全節を通して同じ例外が二度ある |
+| REL-1 | error | `Op.throws`（またはデコレータの `throws`）の全節を通して同じ例外が二度ある（`Signature` を要しないので `internal/sema` が出す。REL-5 も同じ） |
 | REL-2 | warning | Sig(O, ns(O)).effects が空の op の `Op.throws` に `relations` がある。デコレータの `throws` の `relations` は対象外（§7.3） |
 | REL-3 | warning | `relations.effects` が `all` でなく名前の列 |
 | REL-4 | error | 計算の手順 0 の「配線の `Op.throws` に `relations` が書かれていれば」の比較。`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組を示す |
@@ -132,7 +132,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | DEC-10 | — | 計算（手順 i の `throws`） |
 | DEC-11 | error | `docs/types.md`「デコレータの引数」の数と名前 |
 | DEC-12 | error | 別名の `target` が別名。または別名の `args` が `target` の `Param` に合わない（DEC-11 と同じ手続き） |
-| DEC-13 | error | 同じデコレータが同じ宣言に二度付いている（引数が違っても） |
+| DEC-13 | error | 同じデコレータが同じ宣言に二度付いている（引数が違っても。名前付きデコレータは展開した汎用デコレータで比べる） |
 | DEC-14 | warning | `external` なデコレータが `throws` を持たない |
 | DEC-15 | error | `@external` がデコレータの宣言以外に付いている（文法で閉じる。索引として残す） |
 | DEC-16 | warning | 計算の手順 i で、`catches` の例外がそこまでの E にない |

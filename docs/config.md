@@ -42,7 +42,9 @@ plugins = []
 1. N のテーブルがあれば、そのキー。
 2. ないキーは親 parent(N) の Conf から引き継ぐ（§4.5「子の名前空間は親の設定を引き継ぎ、子に書いたキーで上書きする」）。値はそのまま（`out` も同じディレクトリ。子のファイルをその下のどこに置くかは出力の側が決める。`docs/emit-go.md`「配置」）。ルートまで辿ってもなければ「未設定」。
 
-Conf(N) は `View.config` としてプラグインに渡す（`docs/ir.md`「その名前空間から見た IR」）。
+名前空間 N の出力先 Dir(N) は `Conf(N).out` に P を足したもの。P は、N の祖先（N 自身を含む）のうち `out` を自分のテーブルに書いた最も近い名前空間 A から N までのセグメントをパスにしたもの（A が N 自身なら空、`server.admin` で `server` だけが書いていれば `admin`）。既定の出力もプラグインも、N のファイルは Dir(N) の下に置く。
+
+Conf(N) と Dir(N) は `View.config` と `View.namespaces` としてプラグインに渡す（`docs/ir.md`「その名前空間から見た IR」）。
 
 ## 診断
 
@@ -55,9 +57,9 @@ Conf(N) は `View.config` としてプラグインに渡す（`docs/ir.md`「そ
 | CFG-5 | error | 書き出すファイルのパス（ルートからの相対パスに正規化したもの）が、二つ以上の出どころ（既定の出力、各プラグイン）から出た。出どころを `Related` 相当としてメッセージに示す。何も書き出さない。例外は `OutputConflict` |
 | CFG-6 | warning | Conf(N).plugins のプラグインのマニフェストの `unsupported` にあるデコレータの FQN が、N の宣言に付いている。付いた位置に出す |
 | CFG-7 | error | 知らないキー、値の型違い、TOML の構文エラー、`language` が `"go"` でも `"ts"` でもない |
-| CFG-8 | error | 語彙の名前空間（`docs/vocab.md` の名前空間と、`state` も `op` も持たない名前空間）にテーブルがある |
+| CFG-8 | error | テーブルの名前空間が語彙の名前空間（`docs/vocab.md`）である。または、その名前空間とその子孫のどれも `state` と `op` を持たない（親のテーブルは、子孫が持っていれば継承のためにあってよい） |
 | CFG-9 | error | `plugins` の名前のプラグインが見つからない（`docs/plugin-protocol.md`「探索」） |
-| CFG-10 | error | `hozo.toml` に名前空間のテーブルがあるが、その名前空間が `.hozo` にない |
+| CFG-10 | error | `hozo.toml` に名前空間のテーブルがあるが、その名前空間もその子孫も `.hozo` にない |
 | CFG-11 | error | `language` が `"ts"` だが、TS の既定の出力はまだない（段階 5 まで） |
 
 CFG-4 と CFG-5 以外の error は `ConfigInvalid`。終了コードは `docs/diagnostics.md`「終了コード」。

@@ -50,6 +50,8 @@
 | 40 | 規則のテストは `// ERROR: ID` のコメントで期待を書く | `docs/testing.md`「規則ごとのテスト」 |
 | 41 | 設計書の例のコーパスで写せなかった箇所は、そのコーパスの `README.md` に一覧する | `docs/testing.md`「コーパス」 |
 | 42 | 既定値のリテラルは `scalar` の元の型に対して検査する | `docs/types.md`「既定値」 |
+| 43 | 名前空間の出力先 Dir(N) は、`out` を書いた最も近い祖先からのセグメントをパスにして足す。`View` に全名前空間の設定と Dir を持たせる | `docs/config.md`「名前空間の設定の解決」、`docs/ir.md`「その名前空間から見た IR」 |
+| 44 | THROWS-1 と Sig は `external` の例外を同じく数えず、`@throws` は `external` の例外も書ける | `docs/check.md`「throws」「名前空間」 |
 
 ## スコープ外にした設計書の例
 

@@ -155,8 +155,9 @@ type Result struct {
     Diags   []diag.Diagnostic
 }
 type Ref struct { Span source.Span; Target Target }
-// Target は、宣言（FQN）、フィールド、ユニオンのアーム、classify のケース、デコレータの Param、束縛、op の引数のどれか。それぞれ Span を持つ
-func Analyze(fs *source.FileSet, files []*ast.File, cfg *config.Config) *Result
+type Target struct { Kind TargetKind; Decl string; Name string; Span source.Span }
+// TargetKind: 宣言、フィールド、ユニオンのアーム、classify のケース、デコレータの Param、束縛、op の引数、名前空間
+func Analyze(fs *source.FileSet, files []*ast.File, cfg *config.Config) *Result   // Op.Signature と Call.Bound は空のまま（internal/check が埋める）
 ```
 
 解決と型の誤りがあっても `Program` は作る。作れなかった宣言は落とし、参照は未解決のまま残す。
@@ -167,8 +168,12 @@ func Analyze(fs *source.FileSet, files []*ast.File, cfg *config.Config) *Result
 
 ```go
 func Compute(p *ir.Program)                                  // Signature と Call.bound を埋める
-func Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic
-func Views(p *ir.Program, cfg *config.Config) map[string]*ir.View   // 名前空間ごとの View
+type Locator func(ir.Span) (source.Span, bool)               // IR の行・列を FileSet のバイトの位置に戻す
+func FileSetLocator(fs *source.FileSet) Locator
+type Checker struct { Locate Locator }
+func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic   // Compute を呼んでから規則を検査する。Locate が nil なら Span は nil で File だけ
+func (c Checker) CheckUnsupported(p *ir.Program, ns string, unsupported []string) []diag.Diagnostic   // CFG-6。unsupported はマニフェストから
+func Views(p *ir.Program, cfg *config.Config) map[string]*ir.View   // 設定のある名前空間ごとの View
 ```
 
 規則ごとに一つのファイル（`throws.go`、`bind.go`、…）。各関数のコメントに規則の ID。
@@ -193,7 +198,14 @@ func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo �
 
 ### `internal/emit/golang`
 
-`docs/emit-go.md`。`func Emit(view *ir.View) ([]File, []diag.Diagnostic)`。
+`docs/emit-go.md`。
+
+```go
+type File struct { Path string; Content []byte }            // Path はルートからの相対パス
+type ManifestInfo struct { Name string; Entry, Stop, Decorate []string }   // 設定されたプラグインのマニフェストから（Wrappers の判定）
+type Options struct { Root string; Manifests []ManifestInfo }
+func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic)   // error があればファイルは返さない
+```
 
 ### `internal/plugin`
 
@@ -220,7 +232,7 @@ type Project struct {
     Sema    *sema.Result
     Diags   []diag.Diagnostic        // 解析・解決・検査・設定・プラグインの check のすべて。並べ替え済み
 }
-func Load(root string, configPath string, overlay map[string][]byte) *Project
+func Load(root string, configPath string, overlay map[string][]byte) *Project   // NoConfig なら CFG-* の診断を除く
 func (p *Project) Errors() int
 ```
 

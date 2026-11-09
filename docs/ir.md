@@ -322,16 +322,26 @@ interface Bind {
 interface View {
   version: "0.1";
   viewer: string;                 // 見る側の名前空間の FQN
-  config: { language: string; out: string; plugins: string[] };   // Conf(viewer)（docs/config.md「名前空間の設定の解決」）
+  config: NamespaceConfig;        // viewer の設定
+  namespaces: Record<string, NamespaceConfig>;   // 設定のあるすべての名前空間（viewer を含む）。キーは FQN、順序は辞書順。
+                                                 // プラグインが別の名前空間の言語と出力先を知るため（import するか複製するか。docs/emit-go.md「配置」）
   program: Program;               // 全体そのまま（各 op の signature は op 自身の名前空間から見たもの）。
                                   // ただし下の params が合成する model を、viewer の Namespace.decls の末尾に足してある
   ops: Record<string, ViewedSignature>;   // FQN → viewer から見た関数の型。すべての op について
 }
 
+interface NamespaceConfig {
+  language: string;               // Conf(N).language（docs/config.md「名前空間の設定の解決」）
+  out: string;                    // Conf(N).out
+  dir: string;                    // Dir(N)。この名前空間のファイルを置くディレクトリ（ルートからの相対パス）
+  plugins: string[];              // Conf(N).plugins
+}
+
 interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
   params: OpParam[];              // bind で埋まる位置（docs/check.md「bind」の Pos(b, O)）を取り除いた引数。
                                   // 位置が model のフィールドなら、そのフィールドを除いた model を
-                                  // `<viewer>.<op 名>$<引数名>` の FQN（synthesizedFrom は op の FQN）で合成し、ref にする
+                                  // `<viewer>.<op 名>$<引数名>` の FQN（synthesizedFrom は op の FQN）で合成し、ref にする。
+                                  // 位置が入れ子の model の中なら、パスのセグメントを `$` でつないだ名前（`browser.deep$in$inner`）で、親を先に合成する
   bound: BoundPosition[];         // 取り除いた位置
 }
 ```

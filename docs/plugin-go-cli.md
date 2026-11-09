@@ -23,7 +23,7 @@ stop  = ["proc.stdio"]
 
 ## 出力
 
-`View.viewer` の名前空間 N について、`View.config.out` の下に `cli/cli.go`（パッケージ `cli`）を一つ。N のパッケージを import する。import パスは `plugin/golang.ImportPath`（`docs/packages.md`「`plugin/golang`（公開）」）で、ルートは環境変数 `HOZO_PROJECT_ROOT`（`docs/plugin-protocol.md`「起動」）。
+`View.viewer` の名前空間 N について、`View.config.dir` の下に `cli/cli.go`（パッケージ `cli`）を一つ。`@cli.command` の op が一つもなければファイルを出さず warning を一つ返す。N のパッケージを import する。import パスは `plugin/golang.ImportPath`（`docs/packages.md`「`plugin/golang`（公開）」）で、ルートは環境変数 `HOZO_PROJECT_ROOT`（`docs/plugin-protocol.md`「起動」）、ディレクトリは `View.config.dir`。
 
 ```go
 // Main は引数を解釈して ops の op を呼び、結果を p で表示し、終了コードを返す。
@@ -35,7 +35,7 @@ type Presenter interface {
     PresentError(w io.Writer, command string, input any, f Failure) error
 }
 
-// Failure は例外の内容。Name と Value は、生成した cli.go が N の例外の型を型スイッチで見分けて入れる。
+// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値。生成した cli.go が N の例外の型を見分けて入れる。
 // 宣言にない例外なら Name は空で Err だけ
 type Failure struct { Name string; Value any; Err error }
 
@@ -50,7 +50,7 @@ type JSONPresenter struct{}
 `View.viewer` の名前空間の op のうち、`@cli.command(name)` の付いたものがサブコマンド。
 
 - 引数は 0 個か、model 一つ。それ以外は CLI-1。
-- 引数の model の各フィールドは、`@cli.arg`、`@cli.flag(name)`、`@cli.env(name)` のどれかを持つ。`@cli.flag` と `@cli.env` は両方付けられる。どれもなければ CLI-2。
+- 引数の model の各フィールドは、`@cli.arg`、`@cli.flag(name)`、`@cli.env(name)` のどれかを持つ。`@cli.env` は `@cli.arg` か `@cli.flag` と一緒に付けられる（与えられなかったときの代わり）。`@cli.arg` と `@cli.flag` の両方、またはどれもなければ CLI-2。
 - フィールドの型は `string`、`boolean`、`int`、`float`、元がこれらの `scalar`、またはそれらの `optional`、`@cli.arg` に限り `string`（と `string` の scalar）の `array`（`optional` は付けない。0 個を表せるため）。それ以外（model、`Record`、`Time`、`optional` の `array`）は CLI-3。
 - `@cli.arg` の `array` のフィールドは、`@cli.arg` のフィールドの中で最後の一つだけ。違えば CLI-4。
 - `@cli.arg` に `boolean` は付けられない（CLI-3）。
@@ -65,7 +65,7 @@ hozoc <command> [flags] [args]
 ```
 
 - `<command>` がなければ使い方を標準エラーに出して 64。`help` か `--help` / `-h` なら使い方を標準出力に出して 0。`<command> --help` はそのコマンドの使い方。
-- フラグは `--name value`、`--name=value`。`boolean` は `--name` で true（値は取らない。`--name=false` は取れる）。`--` 以降は位置引数。
+- フラグは `--name value`、`--name=value`。`boolean` は `--name` で true（値は取らない。`--name=false` は取れる）。同じフラグが二度あれば後のものが勝つ。`-x` の形はフラグではなく位置引数（`-h` を除く。負の数を渡せるようにするため）。`--` 以降は位置引数。
 - 知らないフラグ、フラグの値がない、値を型に変換できない（`int` に `"x"`）、必須のフラグがない、位置引数が足りない・多い → 使い方を標準エラーに出して 64。
 - 必須: 型が `optional` でなく、`default` もないフィールド。
 - `@cli.env` は、フラグが与えられなかったときに環境変数の値を使う（フラグが優先）。環境変数が空文字列なら「ない」とみなす。
