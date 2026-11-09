@@ -1,0 +1,22 @@
+// WIRE-3: return の有無と位置（docs/check.md「配線」）
+namespace a {
+  model M { id: string; }
+  op value(): M;
+  op noValue(): void;
+  op voidReturns(): void {
+    return value();                    // ERROR: WIRE-3
+  }
+  op noReturn(): M {                   // ERROR: WIRE-3
+    noValue();
+  }
+  op empty(): M {                      // ERROR: WIRE-3
+  }
+  op notLast(): M {
+    return value();                    // ERROR: WIRE-3
+    noValue();
+  }
+  op ok(): M {
+    noValue();
+    return value();
+  }
+}

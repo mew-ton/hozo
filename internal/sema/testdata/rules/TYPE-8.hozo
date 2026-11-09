@@ -1,0 +1,31 @@
+// TYPE-8: match のアームの型がそろわない（docs/types.md「診断」）
+namespace a {
+  model M { id: string; }
+  model N { name: string; }
+  classify C of M { A; B; }
+  op m(x: M): M;
+  op n(x: M): N;
+  op v(x: M): void;
+  op use(x: M?): void;
+  op differ(x: M): void {
+    const r = match x by C {           // ERROR: TYPE-8
+      A => m(x);
+      B => n(x);
+    };
+    use(r);
+  }
+  op mixed(x: M): void {
+    const r = match x by C {           // ERROR: TYPE-8
+      A => m(x);
+      B => v(x);
+    };
+    use(r);
+  }
+  op ok(x: M): void {
+    const r = match x by C {
+      A => m(x);
+      B => none;
+    };
+    use(r);
+  }
+}

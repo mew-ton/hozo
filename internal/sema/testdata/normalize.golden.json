@@ -1,0 +1,1903 @@
+{
+  "version": "0.1",
+  "namespaces": [
+    {
+      "name": "",
+      "decls": []
+    },
+    {
+      "name": "a",
+      "description": {
+        "summary": "使われない説明（b.hozo の方が後）",
+        "body": "使われない説明（b.hozo の方が後）",
+        "params": [],
+        "throws": [],
+        "see": []
+      },
+      "decls": [
+        {
+          "kind": "scalar",
+          "name": "a.Email",
+          "description": {
+            "summary": "メールアドレス",
+            "body": "メールアドレス",
+            "params": [],
+            "throws": [],
+            "see": []
+          },
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 7,
+              "col": 3
+            },
+            "end": {
+              "line": 7,
+              "col": 31
+            }
+          },
+          "base": {
+            "kind": "core",
+            "name": "string"
+          }
+        },
+        {
+          "kind": "model",
+          "name": "a.User",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 8,
+              "col": 3
+            },
+            "end": {
+              "line": 8,
+              "col": 73
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 8,
+                  "col": 16
+                },
+                "end": {
+                  "line": 8,
+                  "col": 27
+                }
+              }
+            },
+            {
+              "name": "email",
+              "type": {
+                "kind": "ref",
+                "target": "a.Email"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 8,
+                  "col": 28
+                },
+                "end": {
+                  "line": 8,
+                  "col": 41
+                }
+              }
+            },
+            {
+              "name": "hash",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 8,
+                  "col": 42
+                },
+                "end": {
+                  "line": 8,
+                  "col": 55
+                }
+              }
+            },
+            {
+              "name": "nick",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "core",
+                  "name": "string"
+                }
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 8,
+                  "col": 56
+                },
+                "end": {
+                  "line": 8,
+                  "col": 71
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "model",
+          "name": "a.PublicUser",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 9,
+              "col": 3
+            },
+            "end": {
+              "line": 9,
+              "col": 38
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 8,
+                  "col": 16
+                },
+                "end": {
+                  "line": 8,
+                  "col": 27
+                }
+              }
+            },
+            {
+              "name": "email",
+              "type": {
+                "kind": "ref",
+                "target": "a.Email"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 8,
+                  "col": 28
+                },
+                "end": {
+                  "line": 8,
+                  "col": 41
+                }
+              }
+            },
+            {
+              "name": "nick",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "core",
+                  "name": "string"
+                }
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 8,
+                  "col": 56
+                },
+                "end": {
+                  "line": 8,
+                  "col": 71
+                }
+              }
+            }
+          ],
+          "derivedFrom": {
+            "base": "a.User",
+            "omit": [
+              "hash"
+            ]
+          }
+        },
+        {
+          "kind": "state",
+          "name": "a.users",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 11,
+              "col": 3
+            },
+            "end": {
+              "line": 11,
+              "col": 27
+            }
+          },
+          "shape": "list",
+          "element": {
+            "kind": "ref",
+            "target": "a.User"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "a.token",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 12,
+              "col": 3
+            },
+            "end": {
+              "line": 12,
+              "col": 32
+            }
+          },
+          "shape": "single",
+          "element": {
+            "kind": "optional",
+            "of": {
+              "kind": "core",
+              "name": "string"
+            }
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "a.add",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 13,
+              "col": 3
+            },
+            "end": {
+              "line": 13,
+              "col": 28
+            }
+          },
+          "state": "a.users",
+          "operation": "post"
+        },
+        {
+          "kind": "effect",
+          "name": "a.set",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 14,
+              "col": 3
+            },
+            "end": {
+              "line": 14,
+              "col": 27
+            }
+          },
+          "state": "a.token",
+          "operation": "put"
+        },
+        {
+          "kind": "exception",
+          "name": "a.Unauthorized",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 16,
+              "col": 3
+            },
+            "end": {
+              "line": 16,
+              "col": 26
+            }
+          }
+        },
+        {
+          "kind": "exception",
+          "name": "a.Invalid",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 17,
+              "col": 3
+            },
+            "end": {
+              "line": 17,
+              "col": 41
+            }
+          },
+          "value": {
+            "kind": "ref",
+            "target": "a.Invalid.Value"
+          }
+        },
+        {
+          "kind": "model",
+          "name": "a.Invalid.Value",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 17,
+              "col": 22
+            },
+            "end": {
+              "line": 17,
+              "col": 40
+            }
+          },
+          "fields": [
+            {
+              "name": "field",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 17,
+                  "col": 24
+                },
+                "end": {
+                  "line": 17,
+                  "col": 38
+                }
+              }
+            }
+          ],
+          "synthesizedFrom": "a.Invalid"
+        },
+        {
+          "kind": "exception",
+          "name": "a.Wrapped",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 18,
+              "col": 3
+            },
+            "end": {
+              "line": 18,
+              "col": 27
+            }
+          },
+          "value": {
+            "kind": "ref",
+            "target": "a.User"
+          }
+        },
+        {
+          "kind": "union",
+          "name": "a.Errors",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 19,
+              "col": 3
+            },
+            "end": {
+              "line": 19,
+              "col": 42
+            }
+          },
+          "variant": "set",
+          "arms": [],
+          "members": [
+            {
+              "target": "a.Unauthorized",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 19,
+                  "col": 18
+                },
+                "end": {
+                  "line": 19,
+                  "col": 31
+                }
+              }
+            },
+            {
+              "target": "a.Invalid",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 19,
+                  "col": 32
+                },
+                "end": {
+                  "line": 19,
+                  "col": 40
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "union",
+          "name": "a.AllErrors",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 20,
+              "col": 3
+            },
+            "end": {
+              "line": 20,
+              "col": 39
+            }
+          },
+          "variant": "set",
+          "arms": [],
+          "members": [
+            {
+              "target": "a.Unauthorized",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 21
+                },
+                "end": {
+                  "line": 20,
+                  "col": 28
+                }
+              }
+            },
+            {
+              "target": "a.Invalid",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 21
+                },
+                "end": {
+                  "line": 20,
+                  "col": 28
+                }
+              }
+            },
+            {
+              "target": "a.Wrapped",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 29
+                },
+                "end": {
+                  "line": 20,
+                  "col": 37
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "union",
+          "name": "a.Effects",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 21,
+              "col": 3
+            },
+            "end": {
+              "line": 21,
+              "col": 30
+            }
+          },
+          "variant": "set",
+          "arms": [],
+          "members": [
+            {
+              "target": "a.add",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 21,
+                  "col": 19
+                },
+                "end": {
+                  "line": 21,
+                  "col": 23
+                }
+              }
+            },
+            {
+              "target": "a.set",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 21,
+                  "col": 24
+                },
+                "end": {
+                  "line": 21,
+                  "col": 28
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "union",
+          "name": "a.Page",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 23,
+              "col": 3
+            },
+            "end": {
+              "line": 27,
+              "col": 4
+            }
+          },
+          "variant": "arms",
+          "arms": [
+            {
+              "name": "Ready",
+              "type": {
+                "kind": "ref",
+                "target": "a.Page.Ready"
+              },
+              "description": {
+                "summary": "準備できた",
+                "body": "準備できた",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 5
+                },
+                "end": {
+                  "line": 25,
+                  "col": 30
+                }
+              }
+            },
+            {
+              "name": "Missing",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 26,
+                  "col": 5
+                },
+                "end": {
+                  "line": 26,
+                  "col": 19
+                }
+              }
+            }
+          ],
+          "members": []
+        },
+        {
+          "kind": "model",
+          "name": "a.Page.Ready",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 25,
+              "col": 12
+            },
+            "end": {
+              "line": 25,
+              "col": 29
+            }
+          },
+          "fields": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 14
+                },
+                "end": {
+                  "line": 25,
+                  "col": 27
+                }
+              }
+            }
+          ],
+          "synthesizedFrom": "a.Page"
+        },
+        {
+          "kind": "classify",
+          "name": "a.IsActive",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 29,
+              "col": 3
+            },
+            "end": {
+              "line": 29,
+              "col": 30
+            }
+          },
+          "subject": {
+            "kind": "ref",
+            "target": "a.User"
+          },
+          "cases": [
+            {
+              "name": "IsActive",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 29,
+                  "col": 13
+                },
+                "end": {
+                  "line": 29,
+                  "col": 21
+                }
+              }
+            }
+          ],
+          "hasDefault": true,
+          "fromCondition": true
+        },
+        {
+          "kind": "classify",
+          "name": "a.Kind",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 30,
+              "col": 3
+            },
+            "end": {
+              "line": 30,
+              "col": 68
+            }
+          },
+          "subject": {
+            "kind": "ref",
+            "target": "a.User"
+          },
+          "cases": [
+            {
+              "name": "A",
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 30,
+                  "col": 27
+                },
+                "end": {
+                  "line": 30,
+                  "col": 29
+                }
+              }
+            },
+            {
+              "name": "B",
+              "description": {
+                "summary": "B の説明",
+                "body": "B の説明",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 30,
+                  "col": 43
+                },
+                "end": {
+                  "line": 30,
+                  "col": 45
+                }
+              }
+            }
+          ],
+          "hasDefault": true,
+          "defaultDescription": {
+            "summary": "それ以外",
+            "body": "それ以外",
+            "params": [],
+            "throws": [],
+            "see": []
+          },
+          "fromCondition": false
+        },
+        {
+          "kind": "decorator",
+          "name": "a.get",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 32,
+              "col": 3
+            },
+            "end": {
+              "line": 33,
+              "col": 51
+            }
+          },
+          "params": [
+            {
+              "name": "path",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                ]
+              },
+              "optional": false
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": true,
+          "throws": [
+            {
+              "exceptions": [
+                "a.Unauthorized"
+              ],
+              "relations": []
+            }
+          ],
+          "catches": []
+        },
+        {
+          "kind": "decorator",
+          "name": "a.fallback",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 34,
+              "col": 3
+            },
+            "end": {
+              "line": 34,
+              "col": 99
+            }
+          },
+          "params": [
+            {
+              "name": "error",
+              "type": {
+                "kind": "any",
+                "of": "exception"
+              },
+              "optional": false
+            },
+            {
+              "name": "view",
+              "type": {
+                "kind": "any",
+                "of": "model"
+              },
+              "optional": false
+            }
+          ],
+          "targets": [
+            "op",
+            "field"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [
+            {
+              "exceptions": [
+                "$param:error"
+              ],
+              "mode": "recovers"
+            }
+          ]
+        },
+        {
+          "kind": "decorator",
+          "name": "a.unavailable",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 35,
+              "col": 3
+            },
+            "end": {
+              "line": 35,
+              "col": 53
+            }
+          },
+          "params": [],
+          "targets": [],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "alias": {
+            "target": "a.fallback",
+            "args": [
+              {
+                "param": "error",
+                "value": {
+                  "kind": "refs",
+                  "targets": [
+                    "a.Unauthorized",
+                    "a.Invalid",
+                    "a.Wrapped"
+                  ]
+                }
+              },
+              {
+                "param": "view",
+                "value": {
+                  "kind": "ref",
+                  "target": "a.User"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "decorator",
+          "name": "a.cache",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 36,
+              "col": 3
+            },
+            "end": {
+              "line": 36,
+              "col": 52
+            }
+          },
+          "params": [
+            {
+              "name": "key",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "array",
+                    "of": {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  }
+                ]
+              },
+              "optional": false
+            },
+            {
+              "name": "stale",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "Duration"
+                  }
+                ]
+              },
+              "optional": true
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": []
+        },
+        {
+          "kind": "decorator",
+          "name": "a.tagged",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 37,
+              "col": 3
+            },
+            "end": {
+              "line": 37,
+              "col": 50
+            }
+          },
+          "params": [
+            {
+              "name": "tags",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  },
+                  {
+                    "kind": "core",
+                    "name": "int"
+                  }
+                ]
+              },
+              "optional": false
+            }
+          ],
+          "targets": [
+            "model"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": []
+        },
+        {
+          "kind": "op",
+          "name": "a.find",
+          "description": {
+            "summary": "ユーザーを探す。",
+            "body": "ユーザーを探す。\n\n詳しい説明。",
+            "params": [
+              {
+                "name": "id",
+                "text": "識別子"
+              }
+            ],
+            "throws": [
+              {
+                "exception": "a.Unauthorized",
+                "text": "認証がない"
+              }
+            ],
+            "see": [
+              "a.User"
+            ]
+          },
+          "decorators": [
+            {
+              "decorator": "a.get",
+              "args": [
+                {
+                  "param": "path",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "/users"
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 48,
+                  "col": 3
+                },
+                "end": {
+                  "line": 48,
+                  "col": 17
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 48,
+              "col": 3
+            },
+            "end": {
+              "line": 49,
+              "col": 81
+            }
+          },
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 49,
+                  "col": 11
+                },
+                "end": {
+                  "line": 49,
+                  "col": 21
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "ref",
+            "target": "a.User"
+          },
+          "effects": [],
+          "throws": [
+            {
+              "exceptions": [
+                "a.Unauthorized"
+              ],
+              "relations": [
+                {
+                  "kind": "prevents",
+                  "effects": "all"
+                }
+              ]
+            },
+            {
+              "exceptions": [
+                "a.Invalid"
+              ],
+              "relations": []
+            }
+          ],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": []
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.noop",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 50,
+              "col": 3
+            },
+            "end": {
+              "line": 50,
+              "col": 13
+            }
+          },
+          "params": [],
+          "returns": null,
+          "effects": [],
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": []
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.void2",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 51,
+              "col": 3
+            },
+            "end": {
+              "line": 51,
+              "col": 20
+            }
+          },
+          "params": [],
+          "returns": null,
+          "effects": [],
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": []
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.leaf",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 52,
+              "col": 3
+            },
+            "end": {
+              "line": 52,
+              "col": 75
+            }
+          },
+          "params": [
+            {
+              "name": "u",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 52,
+                  "col": 11
+                },
+                "end": {
+                  "line": 52,
+                  "col": 18
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "ref",
+            "target": "a.PublicUser"
+          },
+          "effects": [
+            "a.add",
+            "a.set"
+          ],
+          "throws": [
+            {
+              "exceptions": [
+                "a.Unauthorized",
+                "a.Invalid",
+                "a.Wrapped"
+              ],
+              "relations": [
+                {
+                  "kind": "keeps",
+                  "effects": [
+                    "a.add"
+                  ]
+                }
+              ]
+            }
+          ],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": []
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.take",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 53,
+              "col": 3
+            },
+            "end": {
+              "line": 53,
+              "col": 27
+            }
+          },
+          "params": [
+            {
+              "name": "in",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 53,
+                  "col": 11
+                },
+                "end": {
+                  "line": 53,
+                  "col": 19
+                }
+              }
+            }
+          ],
+          "returns": null,
+          "effects": [],
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": []
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.fromIn",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 54,
+              "col": 3
+            },
+            "end": {
+              "line": 54,
+              "col": 29
+            }
+          },
+          "params": [
+            {
+              "name": "in",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 54,
+                  "col": 13
+                },
+                "end": {
+                  "line": 54,
+                  "col": 21
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "ref",
+            "target": "a.User"
+          },
+          "effects": [],
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": []
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.wire",
+          "decorators": [
+            {
+              "decorator": "a.fallback",
+              "via": "a.unavailable",
+              "args": [
+                {
+                  "param": "error",
+                  "value": {
+                    "kind": "refs",
+                    "targets": [
+                      "a.Unauthorized",
+                      "a.Invalid",
+                      "a.Wrapped"
+                    ]
+                  }
+                },
+                {
+                  "param": "view",
+                  "value": {
+                    "kind": "ref",
+                    "target": "a.User"
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 56,
+                  "col": 3
+                },
+                "end": {
+                  "line": 56,
+                  "col": 15
+                }
+              }
+            },
+            {
+              "decorator": "a.cache",
+              "args": [
+                {
+                  "param": "key",
+                  "value": {
+                    "kind": "list",
+                    "items": [
+                      {
+                        "kind": "literal",
+                        "literal": {
+                          "kind": "string",
+                          "value": "users"
+                        }
+                      },
+                      {
+                        "kind": "ref",
+                        "target": "$param:id"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "param": "stale",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "duration",
+                      "value": 300000000000
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 57,
+                  "col": 3
+                },
+                "end": {
+                  "line": 57,
+                  "col": 28
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 56,
+              "col": 3
+            },
+            "end": {
+              "line": 66,
+              "col": 4
+            }
+          },
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 58,
+                  "col": 11
+                },
+                "end": {
+                  "line": 58,
+                  "col": 21
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "ref",
+            "target": "a.PublicUser"
+          },
+          "effects": [],
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "const",
+                "name": "u",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "op": "a.find",
+                    "args": [
+                      {
+                        "param": "id",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "id"
+                          ],
+                          "span": {
+                            "file": "a.hozo",
+                            "start": {
+                              "line": 59,
+                              "col": 20
+                            },
+                            "end": {
+                              "line": 59,
+                              "col": 22
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 59,
+                        "col": 15
+                      },
+                      "end": {
+                        "line": 59,
+                        "col": 23
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 59,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 59,
+                    "col": 24
+                  }
+                }
+              },
+              {
+                "kind": "call",
+                "call": {
+                  "op": "a.take",
+                  "args": [
+                    {
+                      "param": "in",
+                      "value": {
+                        "kind": "record",
+                        "fields": [
+                          {
+                            "name": "id",
+                            "value": {
+                              "kind": "name",
+                              "path": [
+                                "id"
+                              ],
+                              "span": {
+                                "file": "a.hozo",
+                                "start": {
+                                  "line": 60,
+                                  "col": 12
+                                },
+                                "end": {
+                                  "line": 60,
+                                  "col": 14
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "name": "email",
+                            "value": {
+                              "kind": "name",
+                              "path": [
+                                "u",
+                                "email"
+                              ],
+                              "span": {
+                                "file": "a.hozo",
+                                "start": {
+                                  "line": 60,
+                                  "col": 23
+                                },
+                                "end": {
+                                  "line": 60,
+                                  "col": 30
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "name": "hash",
+                            "value": {
+                              "kind": "literal",
+                              "literal": {
+                                "kind": "string",
+                                "value": "x"
+                              },
+                              "span": {
+                                "file": "a.hozo",
+                                "start": {
+                                  "line": 60,
+                                  "col": 38
+                                },
+                                "end": {
+                                  "line": 60,
+                                  "col": 41
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 60,
+                            "col": 10
+                          },
+                          "end": {
+                            "line": 60,
+                            "col": 43
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 60,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 60,
+                      "col": 44
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 60,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 60,
+                    "col": 45
+                  }
+                }
+              },
+              {
+                "kind": "const",
+                "name": "w",
+                "expr": {
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "name",
+                      "path": [
+                        "u"
+                      ],
+                      "span": {
+                        "file": "a.hozo",
+                        "start": {
+                          "line": 61,
+                          "col": 21
+                        },
+                        "end": {
+                          "line": 61,
+                          "col": 22
+                        }
+                      }
+                    },
+                    "classify": "a.Kind",
+                    "arms": [
+                      {
+                        "cases": [
+                          "A",
+                          "B"
+                        ],
+                        "body": {
+                          "kind": "call",
+                          "call": {
+                            "op": "a.fromIn",
+                            "args": [
+                              {
+                                "param": "in",
+                                "value": {
+                                  "kind": "name",
+                                  "path": [
+                                    "u"
+                                  ],
+                                  "span": {
+                                    "file": "a.hozo",
+                                    "start": {
+                                      "line": 62,
+                                      "col": 23
+                                    },
+                                    "end": {
+                                      "line": 62,
+                                      "col": 24
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "bound": [],
+                            "span": {
+                              "file": "a.hozo",
+                              "start": {
+                                "line": 62,
+                                "col": 16
+                              },
+                              "end": {
+                                "line": 62,
+                                "col": 25
+                              }
+                            }
+                          }
+                        },
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 62,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 62,
+                            "col": 26
+                          }
+                        }
+                      },
+                      {
+                        "cases": "default",
+                        "body": {
+                          "kind": "none"
+                        },
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 63,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 63,
+                            "col": 23
+                          }
+                        }
+                      }
+                    ],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 61,
+                        "col": 15
+                      },
+                      "end": {
+                        "line": 64,
+                        "col": 6
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 61,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 64,
+                    "col": 7
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "atom",
+                  "atom": {
+                    "kind": "name",
+                    "path": [
+                      "u"
+                    ],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 65,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 65,
+                        "col": 13
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 65,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 65,
+                    "col": 14
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": []
+          }
+        },
+        {
+          "kind": "model",
+          "name": "a.Later",
+          "decorators": [],
+          "span": {
+            "file": "b.hozo",
+            "start": {
+              "line": 4,
+              "col": 3
+            },
+            "end": {
+              "line": 4,
+              "col": 30
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "b.hozo",
+                "start": {
+                  "line": 4,
+                  "col": 17
+                },
+                "end": {
+                  "line": 4,
+                  "col": 28
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a.child",
+      "decls": [
+        {
+          "kind": "model",
+          "name": "a.child.Deeper",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 4,
+              "col": 21
+            },
+            "end": {
+              "line": 4,
+              "col": 49
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 4,
+                  "col": 36
+                },
+                "end": {
+                  "line": 4,
+                  "col": 47
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "model",
+          "name": "a.child.Deep",
+          "decorators": [],
+          "span": {
+            "file": "b.hozo",
+            "start": {
+              "line": 6,
+              "col": 21
+            },
+            "end": {
+              "line": 6,
+              "col": 47
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "b.hozo",
+                "start": {
+                  "line": 6,
+                  "col": 34
+                },
+                "end": {
+                  "line": 6,
+                  "col": 45
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "binds": []
+}

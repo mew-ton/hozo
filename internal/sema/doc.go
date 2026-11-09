@@ -1,0 +1,18 @@
+// Package sema は名前の解決（docs/resolve.md）、型（docs/types.md）、IR への正規化（docs/ir.md「正規化」）を行う
+// （docs/packages.md「internal/sema」）。
+//
+// 入口は [Analyze]。構文木（internal/syntax の ast.File）の列から ir.Program を作り、解決した参照の列（[Ref]）と
+// 診断を返す。解決と型の誤りがあっても Program は作る: 作れなかった宣言は落とし、解決できなかった参照は IR から省く
+// （docs/packages.md「internal/sema」）。
+//
+// # 手順
+//
+//  1. 名前空間の表を作る（table.go）。同じ FQN の名前空間を一つにし（NS-2）、重複を RES-6 / NS-3 にする。
+//  2. 宣言を IR に下ろす（decls.go、types.go）。scalar の継承、ユニオンの展開、`is X omit` は別の宣言の中身を要するので、
+//     必要になったときに下ろす（lower）。循環はそこで検出する。
+//  3. デコレータの適用を下ろす（decorators.go）。DEC-1 / DEC-7 / DEC-11 / DEC-12 / DEC-13。
+//  4. 配線の本体を下ろし、式の型を決める（wiring.go、compat.go）。WIRE-* / MATCH-* / TYPE-*。
+//
+// docs/check.md「計算」が埋める Op.Signature と Call.Bound は零値のまま残す。Signature を要する規則
+// （THROWS-1、EFF-2、REL-2/3/4/6、DEC-4/5/6/14/16、STATE-2、WIRE-6/7、BIND-*、DOC-1 の @throws の所属、CFG-*）は internal/check が行う。
+package sema

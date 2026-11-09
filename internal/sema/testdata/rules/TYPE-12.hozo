@@ -1,0 +1,8 @@
+// TYPE-12: C.Case<T> の T が C の subject に渡せない（docs/types.md「診断」）
+namespace a {
+  model M { id: string; }
+  model N { name: string; }
+  classify C of M { A; }
+  op ok(m: C.A<M>): void;
+  op ng(n: C.A<N>): void;              // ERROR: TYPE-12
+}

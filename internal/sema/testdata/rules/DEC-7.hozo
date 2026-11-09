@@ -1,0 +1,25 @@
+// DEC-7: any effect on の性質と、ユニオンのメンバーの照合（docs/types.md「デコレータの引数」）
+namespace a {
+  state s: single<string>;
+  state t: list<string>;
+  effect put on s.put;
+  effect post on t.post;
+  exception E;
+  exception F;
+  exception G;
+  union Errors { E; F; }
+  decorator onPut(e: any effect on s.put);
+  decorator onError(error: Errors);
+  @onPut(put)
+  op ok1(): void;
+  @onPut(post)                         // ERROR: DEC-7
+  op ng1(): void;
+  @onError(E)
+  op ok2(): void;
+  @onError(E | F)
+  op ok3(): void;
+  @onError(G)                          // ERROR: DEC-7
+  op ng2(): void;
+  @onError(E | G)                      // ERROR: DEC-7
+  op ng3(): void;
+}

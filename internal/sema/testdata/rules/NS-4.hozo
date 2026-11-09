@@ -1,0 +1,18 @@
+// NS-4: classify は宣言した名前空間の中でだけ使える（docs/check.md「名前空間」）
+namespace a {
+  model M { x: int; }
+  classify C of M { A; B; }
+  op ok(m: C.A<M>): M;
+}
+namespace b {
+  op f(m: a.C.A<a.M>): a.M;            // ERROR: NS-4
+}
+classify G of a.M { A; }
+namespace c {
+  op id(m: a.M): a.M;
+  op h(m: a.M): a.M {
+    return match m by G {              // ERROR: NS-4
+      A => id(m);
+    };
+  }
+}

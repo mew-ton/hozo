@@ -1,0 +1,11 @@
+// DEC-12: 別名の別名、別名の引数が合わない（docs/check.md「デコレータ」）
+namespace a {
+  decorator d(code: int);
+  decorator a1 = d(1);
+  decorator a2 = a1();                 // ERROR: DEC-12
+  decorator a3 = d();                  // ERROR: DEC-12
+  decorator a4 = d("x");               // ERROR: TYPE-4
+  decorator a5 = d(1, 2);              // ERROR: DEC-12
+  @a1
+  op ok(): void;
+}

@@ -1,0 +1,21 @@
+// UNION-1: アームと参照の混在、例外と効果の混在、アーム名の重複（docs/check.md「名前空間」）
+namespace a {
+  model M { id: string; }
+  exception E;
+  state s: list<M>;
+  effect e on s.post;
+  union Mixed {                        // ERROR: UNION-1
+    Ready: M;
+    E;
+  }
+  union ExcEff {                       // ERROR: UNION-1
+    E;
+    e;
+  }
+  union Dup {
+    Ready: M;
+    Ready: { x: int; };                // ERROR: UNION-1
+  }
+  union Ok { E; }
+  union Nested { Ok; }
+}

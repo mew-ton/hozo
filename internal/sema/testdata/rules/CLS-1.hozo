@@ -1,0 +1,14 @@
+// CLS-1: default は高々一つ、ケース名の重複（docs/check.md「classify / match」）
+namespace a {
+  model M { id: string; }
+  classify C of M {
+    A;
+    default;
+    default;                           // ERROR: CLS-1
+  }
+  classify D of M {
+    A;
+    A;                                 // ERROR: CLS-1
+  }
+  classify Ok of M { A; B; default; }
+}

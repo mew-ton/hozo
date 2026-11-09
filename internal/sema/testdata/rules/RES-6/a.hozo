@@ -1,0 +1,11 @@
+// RES-6: 同じスコープに同じ名前の宣言が二つ（docs/resolve.md「名前空間の併合と重複」）。位置は後の方（b.hozo）
+namespace a {
+  model X { id: string; }
+  model Y { id: string; }
+  op Y(): void;                        // ERROR: RES-6
+}
+namespace http {
+  exception ServerError;               // ERROR: RES-6
+}
+model g { id: string; }                // WARN: NAME-1
+op g(): void;                          // ERROR: RES-6

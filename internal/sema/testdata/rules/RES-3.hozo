@@ -1,0 +1,18 @@
+// RES-3: 直前のものから次のセグメントを辿れない（docs/resolve.md「診断」）
+namespace a {
+  model Q { page: int; }
+  op g(q: Q, n: int): int;
+  op f(q: Q): int {
+    return g(q, q.size);               // ERROR: RES-3
+  }
+  op h(q: Q): int {
+    return g(q, q.page.x);             // ERROR: RES-3
+  }
+  scalar S extends string;
+  op i(): S.foo;                       // ERROR: RES-3
+  classify C of Q { A; }
+  op j(q: C.B<Q>): int;                // ERROR: RES-3
+  op ok(q: Q): int {
+    return g(q, q.page);
+  }
+}

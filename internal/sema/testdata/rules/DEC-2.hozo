@@ -1,0 +1,8 @@
+// DEC-2: throws / catches を宣言できるのは op に付けるデコレータだけ（docs/check.md「デコレータ」）
+namespace a {
+  exception E;
+  decorator d for field throws E;                  // ERROR: DEC-2
+  decorator c for state | scalar catches E ignores; // ERROR: DEC-2
+  decorator ok for op | field throws E;
+  decorator ok2 throws E;
+}

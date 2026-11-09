@@ -1,0 +1,17 @@
+// MATCH-6: subject の型が Classify.subject に渡せない（docs/check.md「classify / match」）
+namespace a {
+  model M { id: string; }
+  model N { name: string; }
+  classify C of M { A; }
+  op use(n: N): void;
+  op f(n: N): void {
+    match n by C {                     // ERROR: MATCH-6
+      A => use(n);
+    };
+  }
+  op g(s: string): void {
+    match s by C {                     // ERROR: MATCH-6
+      A => none;
+    };
+  }
+}

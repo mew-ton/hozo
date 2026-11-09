@@ -1,0 +1,15 @@
+// TYPE-13: 既定値のリテラルがフィールドの型（scalar なら元の型）に渡せない（docs/types.md「既定値」）
+namespace a {
+  scalar PosInt extends int;
+  scalar Name extends string;
+  model M {
+    page: PosInt = 1;
+    name: Name = "x";
+    count: int = 0;
+    ratio: float = 1;
+    opt: int? = 3;
+    bad1: PosInt = "x";                // ERROR: TYPE-13
+    bad2: string = 1;                  // ERROR: TYPE-13
+    bad3: int = 1.5;                   // ERROR: TYPE-13
+  }
+}

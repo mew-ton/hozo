@@ -1,0 +1,26 @@
+// TYPE-3: return の値の型が op の returns に渡せない（docs/types.md「診断」）
+namespace a {
+  model User { id: string; hash: string; }
+  model PublicUser is User omit hash;
+  model Other { name: string; }
+  op user(): User;
+  op other(): Other;
+  op projected(): PublicUser {
+    return user();
+  }
+  op wrong(): PublicUser {
+    return other();                    // ERROR: TYPE-3
+  }
+  op core(): int {
+    return other();                    // ERROR: TYPE-3
+  }
+  op fromRecord(): Other {
+    return { name: "x" };
+  }
+  op noneToRequired(): Other {
+    return none;                       // ERROR: TYPE-3
+  }
+  op noneToOptional(): Other? {
+    return none;
+  }
+}

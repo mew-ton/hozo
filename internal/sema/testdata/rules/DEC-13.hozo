@@ -1,0 +1,16 @@
+// DEC-13: 同じデコレータが同じ宣言に二度（docs/check.md「デコレータ」）
+namespace a {
+  decorator d(code: int);
+  decorator alias = d(1);
+  @d(1)
+  @d(2)                                // ERROR: DEC-13
+  op twice(): void;
+  @d(1)
+  @alias                               // ERROR: DEC-13
+  op viaAlias(): void;
+  model M {
+    @db.key
+    @db.key                            // ERROR: DEC-13
+    id: string;
+  }
+}

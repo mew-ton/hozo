@@ -1,0 +1,12 @@
+// DOC-2: 同じ @param 名、同じ @throws 例外が二度ある（docs/check.md「名前空間」）。位置はタグの行
+namespace a {
+  model M { id: string; }
+  exception E;
+  /**
+   * @param m 一度目
+   * @param m 二度目                     // ERROR: DOC-2
+   * @throws E 一度目
+   * @throws a.E 二度目                  // ERROR: DOC-2
+   */
+  op f(m: M): M throws E;
+}

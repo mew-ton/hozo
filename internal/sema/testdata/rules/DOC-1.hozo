@@ -1,0 +1,25 @@
+// DOC-1: @param / @see が存在しない名前を指す（docs/check.md「名前空間」）。位置はタグの行。
+// @throws が Signature.exceptions に含まれるかは internal/check が確かめる（ここでは例外として解決できることだけ）
+namespace a {
+  model M { id: string; }
+  exception E;
+  /**
+   * 説明。
+   *
+   * @param nope ない引数                // ERROR: DOC-1
+   * @throws M                           // ERROR: DOC-1
+   * @see Nothing
+   */                                    // ERROR(-1): DOC-1
+  op f(m: M): M
+    throws E;
+  /**
+   * @param m ある引数
+   * @see f
+   * @throws E
+   */
+  op g(m: M): M throws E;
+  /** @param x フィールドには引数がない */ // ERROR: DOC-1
+  model N { x: string; }
+  /** @param code ある */
+  decorator d(code: int);
+}

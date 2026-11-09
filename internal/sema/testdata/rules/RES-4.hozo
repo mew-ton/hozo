@@ -1,0 +1,23 @@
+// RES-4: その位置で受け付けない種類（docs/resolve.md「位置ごとに受け付ける種類」）
+namespace a {
+  exception E;
+  state s: list<string>;
+  model M { x: E; }                    // ERROR: RES-4
+  op f(): s;                           // ERROR: RES-4
+  union U { E; }
+  op g(): U;                           // ERROR: RES-4
+  op h() throws M;                     // ERROR: RES-4
+  classify C of M { A; }
+  op i(): C;                           // ERROR: RES-4
+  @M                                   // ERROR: RES-4
+  op j(): void;
+  op k(): M.x;                         // ERROR: RES-3
+  op l(m: M): void {
+    M(m);                              // ERROR: RES-4
+  }
+  op m(): a.b;                         // ERROR: RES-1
+  union V { Ready: M; }
+  op n(): V;
+  op o(): V.Ready;                     // ERROR: RES-4
+  op p(): M<M>;                        // ERROR: RES-4
+}

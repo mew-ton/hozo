@@ -1,0 +1,9 @@
+// TYPE-10: model P is U omit f の f が U にない（docs/types.md「診断」）
+namespace a {
+  model User { id: string; hash: string; }
+  model P is User omit nope;           // ERROR: TYPE-10
+  model Q is User omit hash;
+  model R is Q omit id;
+  model S is T omit id;
+  model T is S omit id;                // ERROR: TYPE-10
+}

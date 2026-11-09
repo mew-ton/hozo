@@ -1,0 +1,21 @@
+// DEC-11: 引数の数と名前（docs/types.md「デコレータの引数」）
+namespace a {
+  decorator d(code: int, name: string?);
+  @d                                   // ERROR: DEC-11
+  op missing(): void;
+  @d(1, "x", true)                     // ERROR: DEC-11
+  op tooMany(): void;
+  @d(code: 1, nope: "x")               // ERROR: DEC-11
+  op unknown(): void;
+  @d(1, code: 2)                       // ERROR: DEC-11
+  op twice(): void;
+  @d(1)
+  op ok1(): void;
+  @d(name: "x", code: 1)
+  op ok2(): void;
+  decorator alias = d(1);
+  @alias(2)                            // ERROR: DEC-11
+  op aliasArgs(): void;
+  @alias
+  op ok3(): void;
+}

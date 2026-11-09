@@ -1,0 +1,10 @@
+// REL-1: throws の全節を通して同じ例外が二度ある（docs/check.md「throws」）
+namespace a {
+  exception E;
+  exception F;
+  union Errors { E; F; }
+  op f() throws E | F throws E;        // ERROR: REL-1
+  op g() throws E | Errors;            // ERROR: REL-1
+  op ok() throws E throws F;
+  decorator d throws E throws E;       // ERROR: REL-1
+}

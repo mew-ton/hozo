@@ -1,0 +1,10 @@
+// STATE-1: single の状態に post / delete（docs/check.md「状態と効果」）
+namespace a {
+  state s: single<string>;
+  state l: list<string>;
+  effect put on s.put;
+  effect post on s.post;               // ERROR: STATE-1
+  effect del on s.delete;              // ERROR: STATE-1
+  effect lpost on l.post;
+  effect ldel on l.delete;
+}

@@ -1,0 +1,25 @@
+// TYPE-1: 核の型（リテラルを含む）の値を scalar の位置に渡した（docs/types.md「診断」）
+namespace a {
+  scalar Email extends string;
+  model In { email: Email; }
+  op send(email: Email): void;
+  op f(): void {
+    send("a@b");                       // ERROR: TYPE-1
+  }
+  op g(s: string): void {
+    send(s);                           // ERROR: TYPE-1
+  }
+  op h(): void {
+    send({ email: "a@b" });            // ERROR: TYPE-4
+  }
+  op i(e: Email): void {
+    send(e);
+  }
+  decorator d(e: Email);
+  @d("x")                              // ERROR: TYPE-1
+  op j(): void;
+  op k(s: string): void {
+    take({ email: s });                // ERROR: TYPE-1
+  }
+  op take(in: In): void;
+}

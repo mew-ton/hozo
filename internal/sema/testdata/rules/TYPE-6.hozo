@@ -1,0 +1,8 @@
+// TYPE-6: レコードリテラルに同じフィールドが二度（docs/types.md「診断」）
+namespace a {
+  model In { id: string; }
+  op take(in: In): void;
+  op f(): void {
+    take({ id: "x", id: "y" });        // ERROR: TYPE-6
+  }
+}

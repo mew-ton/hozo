@@ -1,0 +1,10 @@
+// TYPE-9: scalar の extends の先が核の型でも scalar でもない、継承の循環（docs/types.md「診断」）
+namespace a {
+  model M { id: string; }
+  scalar Bad extends M;                // ERROR: RES-4
+  scalar A extends B;
+  scalar B extends A;                  // ERROR: TYPE-9
+  scalar Arr extends string[];         // ERROR: TYPE-9
+  scalar Ok extends string;
+  scalar Ok2 extends Ok;
+}

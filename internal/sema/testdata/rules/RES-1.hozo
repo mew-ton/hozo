@@ -1,0 +1,19 @@
+// RES-1: 名前が見つからない（docs/resolve.md「診断」）
+namespace a {
+  model User { id: string; }
+  model Usr { id: string; }
+  op f(u: Usre): User;                 // ERROR: RES-1
+  op g(): Nope;                        // ERROR: RES-1
+  op h(u: User): User {
+    return k(u);                       // ERROR: RES-1
+  }
+  op ok(u: User): User;
+  op use(u: User): User {
+    return ok(u);
+  }
+}
+namespace b {
+  op j(u: User): a.User;               // ERROR: RES-1
+  op m(): a.Nothing;                   // ERROR: RES-1
+  op n(): c.User;                      // ERROR: RES-1
+}
