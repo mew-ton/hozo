@@ -16,7 +16,7 @@ import (
 // すべての .hozo が構文エラーなしに解析できることを確かめる。
 func TestParseAllHozo(t *testing.T) {
 	var files []string
-	for _, pattern := range []string{"corpus/*/*.hozo", "../vocab/*.hozo"} {
+	for _, pattern := range []string{"corpus/*/*.hozo", "../vocab/*.hozo", "../plugins/*/*.hozo"} {
 		m, err := filepath.Glob(pattern)
 		if err != nil {
 			t.Fatal(err)

@@ -15,7 +15,6 @@ var expected = map[string][]string{
 	"hozo:vocab/db.hozo":           {"decorator db for state;", "namespace db {", "decorator key for field;", "decorator unique for field;", "decorator ref(target: any model) for field;"},
 	"hozo:vocab/localstorage.hozo": {"decorator localStorage for state;"},
 	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator route(path: string, from: any state?, onInvalid: any effect?);", "decorator dialog(", "decorator fallback(", "decorator interaction("},
-	"hozo:vocab/cli.hozo":          {"namespace cli {", "decorator command(", "decorator arg for field;", "decorator flag(", "decorator env(", "decorator exitCode("},
 	"hozo:vocab/fs.hozo":           {"namespace fs {", "decorator files(glob: string) for state;"},
 	"hozo:vocab/proc.hozo":         {"namespace proc {", "exception Crashed;", "exception MalformedOutput;", "decorator stdio throws Crashed | MalformedOutput;"},
 }

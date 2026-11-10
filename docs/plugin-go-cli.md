@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-`cli` の語彙（`docs/vocab.md` の `vocab/cli.hozo`）を Go の CLI の骨組みにするプラグイン `plugins/go-cli/`。hozoc 自身の骨組みもこれで生成する（`docs/requirements.md`「自己展開」）。
+`cli` の語彙（このプラグインの `cli.hozo`。出典は設計書の `examples/hozoc.hozo`）を Go の CLI の骨組みにするプラグイン `plugins/go-cli/`。hozoc 自身の骨組みもこれで生成する（`docs/requirements.md`「自己展開」）。
 
 ## マニフェスト
 
@@ -12,12 +12,14 @@ command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
 language = "go"
 protocol = "0.1"
 
+vocabulary = ["cli.hozo"]
+
 [emit]
 entry = ["cli.command"]
 stop  = ["proc.stdio"]
 ```
 
-- `vocabulary` は書かない（`cli` は標準の語彙。`docs/vocab.md`）。
+- `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`cli.hozo` の中身は `examples/hozoc.hozo` の `namespace cli` を写し、`x?: T` は `x: T?` に直す。
 - `stop` に `proc.stdio` を置くのは、プロセスの境界を越える op を辿らず既定のインターフェースで呼ぶため。これにより `docs/emit-go.md`「デコレータ」の規則で `@proc.stdio` の包む関数は生成されない。
 - `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため（作業ディレクトリがリポジトリのルートで、`go.mod` がある）。配布するときはビルドした実行ファイル `hozoc-plugin-go-cli` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go-cli/` に置く（`docs/plugin-protocol.md`「探索」）。
 

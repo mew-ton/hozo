@@ -120,7 +120,10 @@ func TestManifest(t *testing.T) {
 			t.Errorf("manifest lacks %s:\n%s", name, s)
 		}
 	}
-	if strings.Contains(s, "vocabulary") {
-		t.Error("manifest must not have vocabulary (cli is a standard vocabulary)")
+	if !strings.Contains(s, `vocabulary = ["cli.hozo"]`) {
+		t.Error("manifest must provide the cli vocabulary (docs/plugin-go-cli.md「マニフェスト」)")
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "cli.hozo")); err != nil {
+		t.Errorf("plugins/go-cli/cli.hozo is missing: %v", err)
 	}
 }

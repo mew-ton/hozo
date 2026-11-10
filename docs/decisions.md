@@ -26,7 +26,7 @@
 | 16 | デコレータの適用は入れ子にせず順序付きの列 | `docs/ir.md`「デコレータの適用」 |
 | 17 | 「その名前空間から見た IR」は `Program` 全体に見る側の `Signature` を足したもの | `docs/ir.md`「その名前空間から見た IR」 |
 | 18 | 名前の先頭のセグメントの探し方の順序 | `docs/resolve.md`「手続き」 |
-| 19 | 標準の語彙は hozoc に同梱し、常に読む。プラグインは `vocabulary` で足せる | `docs/vocab.md`「読み込み」 |
+| 19 | 標準の語彙（`valid` `http` `db` `localStorage` `page` `fs` `proc`）は hozoc に同梱し、常に読む。`cli` は go-cli が `vocabulary` で提供する | `docs/vocab.md`「読み込み」「同梱しない語彙」 |
 | 20 | `proc.stdio` は引数を持たず `@external` でもない | `docs/vocab.md`「同梱する語彙」 |
 | 21 | プラグインは `[hozo].plugin_dirs` → `HOZO_PLUGIN_PATH` → `~/.hozo/plugins` の順で探す | `docs/plugin-protocol.md`「探索」 |
 | 22 | マニフェストに `protocol` `vocabulary` `[check]` を足す。`command` は配列も可。要求は `ir` でなく `view` を持ち `protocol` を足す。応答に `errors` を持つ | `docs/plugin-protocol.md`「マニフェスト」「要求と応答」 |
