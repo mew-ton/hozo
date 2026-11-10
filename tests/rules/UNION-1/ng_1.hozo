@@ -1,0 +1,10 @@
+// UNION-1（docs/check.md「名前空間」）: アーム（A: T）と参照（X;）が混ざる。internal/sema/testdata/rules/UNION-1.hozo から
+namespace a {
+  model M { id: string; }
+  exception E;
+  union Mixed {                        // ERROR: UNION-1
+    Ready: M;
+    E;
+  }
+  op f(): M;
+}

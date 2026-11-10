@@ -1,0 +1,12 @@
+// DEC-7（docs/types.md「デコレータの引数」）: ユニオンへの ref の引数に、メンバーでない例外を渡した
+namespace a {
+  exception E;
+  exception F;
+  exception G;
+  union Errors { E; F; }
+  decorator onError(error: Errors);
+  @onError(G)                          // ERROR: DEC-7
+  op ng2(): void;
+  @onError(E | G)                      // ERROR: DEC-7
+  op ng3(): void;
+}

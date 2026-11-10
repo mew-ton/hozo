@@ -1,0 +1,5 @@
+# language が "go" でも "ts" でもない → CFG-7。language は未設定のままなので a に CFG-1 も出る
+# ERROR: CFG-7, CFG-1
+[a]
+language = "rust"
+out      = "gen/a"

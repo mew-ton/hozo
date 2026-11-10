@@ -1,0 +1,9 @@
+// TYPE-11（docs/types.md「診断」）: Record<K, V> の K が string でも、元が string の scalar でもない。internal/sema/testdata/rules/TYPE-11.hozo から
+namespace a {
+  scalar Num extends int;
+  model M {
+    ng1: Record<int, int>;             // ERROR: TYPE-11
+    ng2: Record<Num, int>;             // ERROR: TYPE-11
+  }
+  op f(): M;
+}

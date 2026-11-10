@@ -1,0 +1,4 @@
+// CFG-4（docs/config.md「診断」）: プラグインの language が名前空間の language と同じ（ok_1.toml）
+namespace a {
+  op f();
+}

@@ -1,0 +1,5 @@
+# テストの fixture: language = "ts" のプラグイン。起動しない
+name     = "tsplug"
+command  = ["true"]
+language = "ts"
+protocol = "0.1"

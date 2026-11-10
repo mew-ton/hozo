@@ -1,0 +1,7 @@
+// CFG-2（docs/config.md「診断」）: 予約された名前でない名前空間
+namespace a {
+  op f();
+}
+namespace a.output {
+  op g();
+}

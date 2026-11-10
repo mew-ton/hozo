@@ -1,0 +1,16 @@
+// DEC-7（docs/types.md「デコレータの引数」）: 性質に合う効果、ユニオンのメンバーの例外
+namespace a {
+  state s: single<string>;
+  effect put on s.put;
+  exception E;
+  exception F;
+  union Errors { E; F; }
+  decorator onPut(e: any effect on s.put);
+  decorator onError(error: Errors);
+  @onPut(put)
+  op ok1(): void;
+  @onError(E)
+  op ok2(): void;
+  @onError(E | F)
+  op ok3(): void;
+}

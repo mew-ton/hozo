@@ -1,0 +1,7 @@
+// REL-3（docs/check.md「throws」）: relations.effects が all でなく名前の列（warning）
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  exception E;
+  op f() effects e throws E prevents e;    // WARN: REL-3
+}

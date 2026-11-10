@@ -1,0 +1,18 @@
+// TYPE-4（docs/types.md「互換」）: 射影できる model、リテラルの型、リストの位置にリスト
+namespace a {
+  model M { id: string; }
+  model N { id: string; extra: int; }
+  op takeM(m: M): void;
+  op takeInt(n: int): void;
+  op takeOpt(n: int?): void;
+  op n(): N;
+  op i(): void {
+    const x = n();
+    takeM(x);
+    takeInt(1);
+    takeOpt(none);
+  }
+  decorator l(xs: string[]);
+  @l(["a", "b"])
+  op m(): void;
+}

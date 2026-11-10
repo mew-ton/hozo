@@ -110,6 +110,12 @@ func (p *parser) fail(span source.Span, message string) {
 	panic(bailout{})
 }
 
+// failLiteral はリテラルが 64 ビットに収まらない誤り（LIT-1。docs/types.md「診断」）を記録して回復へ抜ける。
+func (p *parser) failLiteral(span source.Span, message string) {
+	p.diags = append(p.diags, codedError("LIT-1", span, message))
+	panic(bailout{})
+}
+
 // failExpected は「X が必要だが Y がある」の誤り。Illegal の字句なら字句解析器が出しているので重ねて出さない。
 func (p *parser) failExpected(what string) {
 	t := p.tok()
@@ -1177,7 +1183,7 @@ func (p *parser) parseLiteral() *ast.Literal {
 		lit.Kind = ast.IntLit
 		n, err := strconv.ParseInt(t.Text, 10, 64)
 		if err != nil {
-			p.fail(t.Span, "整数が 64 ビットに収まらない: "+t.Text)
+			p.failLiteral(t.Span, "整数が 64 ビットに収まらない: "+t.Text)
 		}
 		lit.Int = n
 	case token.Float:
@@ -1194,7 +1200,7 @@ func (p *parser) parseLiteral() *ast.Literal {
 		lit.Kind = ast.DurationLit
 		d, err := parseDuration(t.Text)
 		if err != nil {
-			p.fail(t.Span, err.Error())
+			p.failLiteral(t.Span, err.Error())
 		}
 		lit.Duration = d
 	default:

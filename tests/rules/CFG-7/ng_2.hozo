@@ -1,0 +1,4 @@
+// CFG-7（docs/config.md「診断」）: hozo.toml が TOML として読めない（ng_2.toml）
+namespace a {
+  model M { id: string; }
+}

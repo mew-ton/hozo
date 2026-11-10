@@ -1,0 +1,15 @@
+// DEC-1（docs/check.md「デコレータ」）: for に書いた対象（省略は op）にだけ付ける
+namespace a {
+  model M { @db.key id: string; }
+  @db
+  state s: list<M>;
+  @http.status(404)
+  exception NotFound;
+  @valid.min(1)
+  scalar PosInt extends int;
+  decorator onlyOp;
+  decorator forField for field;
+  @onlyOp
+  op f(): void;
+  model N { @forField id: string; }
+}

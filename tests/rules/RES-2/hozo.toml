@@ -1,0 +1,7 @@
+[a]
+language = "go"
+out      = "gen/a"
+
+[b]
+language = "go"
+out      = "gen/b"

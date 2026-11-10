@@ -1,0 +1,15 @@
+// DEC-5（docs/check.md「デコレータ」）: 効果の前に投げる例外（e は prevented）を recovers で吸収すると、
+// 成功のアームでも e は不明になる（warning）
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  exception E;
+  decorator recoverE catches E recovers;
+  op write() effects e;
+  op fail() throws E;
+  @recoverE                            // WARN: DEC-5
+  op wiring() {
+    fail();
+    write();
+  }
+}

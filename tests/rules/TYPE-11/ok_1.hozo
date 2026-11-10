@@ -1,0 +1,9 @@
+// TYPE-11（docs/types.md「診断」）: K は string か、元が string の scalar
+namespace a {
+  scalar Key extends string;
+  model M {
+    ok1: Record<string, int>;
+    ok2: Record<Key, int>;
+  }
+  op f(): M;
+}

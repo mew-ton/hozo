@@ -1,0 +1,12 @@
+# NS-4 の例は classify の持ち主 a と、使おうとする b / c を使う
+[a]
+language = "go"
+out      = "gen/a"
+
+[b]
+language = "go"
+out      = "gen/b"
+
+[c]
+language = "go"
+out      = "gen/c"

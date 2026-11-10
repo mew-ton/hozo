@@ -1,0 +1,16 @@
+// TYPE-3（docs/types.md「診断」）: 射影（規則 8）、レコードリテラル（規則 9）、none を optional に（規則 3）
+namespace a {
+  model User { id: string; hash: string; }
+  model PublicUser is User omit hash;
+  model Other { name: string; }
+  op user(): User;
+  op projected(): PublicUser {
+    return user();
+  }
+  op fromRecord(): Other {
+    return { name: "x" };
+  }
+  op noneToOptional(): Other? {
+    return none;
+  }
+}

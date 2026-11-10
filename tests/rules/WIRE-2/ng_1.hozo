@@ -1,0 +1,12 @@
+// WIRE-2（docs/check.md「配線」）: 値のある式を `式;` の行に書いた（match のアームも同じ）。internal/sema/testdata/rules/WIRE-2.hozo から
+namespace a {
+  model M { id: string; }
+  op value(): M;
+  op f(): void {
+    value();                           // ERROR: WIRE-2
+  }
+  classify C of M { A; }
+  op i(m: M): void {
+    match m by C { A => value(); };    // ERROR: WIRE-2
+  }
+}

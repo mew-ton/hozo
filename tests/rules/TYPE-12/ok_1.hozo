@@ -1,0 +1,6 @@
+// TYPE-12（docs/types.md「診断」）: T が subject に渡せる
+namespace a {
+  model M { id: string; }
+  classify C of M { A; }
+  op ok(m: C.A<M>): void;
+}

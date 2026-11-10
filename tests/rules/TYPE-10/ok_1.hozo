@@ -1,0 +1,7 @@
+// TYPE-10（docs/types.md「診断」）: omit するフィールドが元の model にある
+namespace a {
+  model User { id: string; hash: string; }
+  model Q is User omit hash;
+  model R is Q omit id;
+  op f(): Q;
+}

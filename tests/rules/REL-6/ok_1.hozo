@@ -1,0 +1,7 @@
+// REL-6（docs/check.md「throws」）: effects（all）なら効果名を書かない
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  exception E;
+  op g() effects e throws E prevents effects;
+}

@@ -1,0 +1,29 @@
+// TYPE-4（docs/types.md「診断」）: 引数の値の型が引数の型に渡せない。internal/sema/testdata/rules/TYPE-4.hozo から
+namespace a {
+  model M { id: string; }
+  model N { id: string; extra: int; }
+  model O { name: string; }
+  op takeM(m: M): void;
+  op takeInt(n: int): void;
+  op takeList(l: M[]): void;
+  op n(): N;
+  op o(): O;
+  op f(): void {
+    const x = o();
+    takeM(x);                          // ERROR: TYPE-4
+  }
+  op g(): void {
+    takeInt("x");                      // ERROR: TYPE-4
+  }
+  op h(): void {
+    takeInt(1, 2);                     // ERROR: TYPE-4
+  }
+  op i(): void {
+    const x = n();
+    takeM(x);
+    takeList(x);                       // ERROR: TYPE-4
+  }
+  op j(): void {
+    takeInt(none);                     // ERROR: TYPE-4
+  }
+}

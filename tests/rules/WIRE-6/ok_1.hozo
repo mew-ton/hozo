@@ -1,0 +1,10 @@
+// WIRE-6（docs/check.md「配線」）: const が閾値（2）以内
+namespace a {
+  op v(): string;
+  op use(x: string, y: string);
+  op f() {
+    const x = v();
+    const y = v();
+    use(x, y);
+  }
+}

@@ -1,0 +1,4 @@
+namespace a {
+  model Y { id: string; }
+  op g(): Y;
+}

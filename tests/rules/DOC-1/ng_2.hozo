@@ -1,0 +1,25 @@
+// DOC-1（docs/check.md「名前空間」）: @param が引数名にない、@see が解決できない（internal/sema が出す）。位置はタグの行。
+// internal/sema/testdata/rules/DOC-1.hozo の写し（@throws M は例外として解決できない）
+namespace a {
+  model M { id: string; }
+  exception E;
+  /**
+   * 説明。
+   *
+   * @param nope ない引数                // ERROR: DOC-1
+   * @throws M                           // ERROR: DOC-1
+   * @see Nothing
+   */                                    // ERROR(-1): DOC-1
+  op f(m: M): M
+    throws E;
+  /**
+   * @param m ある引数
+   * @see f
+   * @throws E
+   */
+  op g(m: M): M throws E;
+  /** @param x フィールドには引数がない */ // ERROR: DOC-1
+  model N { x: string; }
+  /** @param code ある */
+  decorator d(code: int);
+}

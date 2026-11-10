@@ -1,0 +1,11 @@
+// NS-1（docs/check.md「名前空間」）: 別の名前空間の宣言は常に修飾して参照。外側を自動で探さない。診断は RES-1 として出る
+namespace a {
+  model M { id: string; }
+  op f(): M;
+}
+namespace b {
+  op g(): M;                           // ERROR: RES-1
+}
+namespace a.child {
+  op h(): M;                           // ERROR: RES-1
+}

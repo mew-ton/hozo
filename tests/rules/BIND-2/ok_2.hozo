@@ -1,0 +1,7 @@
+// BIND-2（docs/check.md「bind」）: 状態が省略可能でなければ、必須の位置にも埋められる
+namespace a {
+  scalar Token extends string;
+  state token: single<Token>;
+  bind token to a.*;
+  op g(t: Token);
+}

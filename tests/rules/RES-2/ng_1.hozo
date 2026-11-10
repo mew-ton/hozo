@@ -1,0 +1,8 @@
+// RES-2（docs/resolve.md「診断」）: 名前空間の子と宣言の両方に当たって曖昧。internal/sema/testdata/rules/RES-2.hozo から
+namespace a {
+  op x(): void;
+  namespace x { model Y { id: string; } }
+}
+namespace b {
+  op f(): a.x.Y;                       // ERROR: RES-2
+}

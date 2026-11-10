@@ -1,0 +1,7 @@
+// DEC-12（docs/check.md「デコレータ」）: 汎用のデコレータに引数を固定した別名
+namespace a {
+  decorator d(code: int);
+  decorator a1 = d(1);
+  @a1
+  op ok(): void;
+}

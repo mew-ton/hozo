@@ -1,0 +1,11 @@
+// MATCH-2（docs/check.md「classify / match」）: 名前の付いたケースをすべて並べ、default は classify にあるときだけ書く
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  classify D of M { A; default; }
+  op use(m: M): void;
+  op ok(m: M): void {
+    match m by C { A => use(m); B => none; };
+    match m by D { A => use(m); default => none; };
+  }
+}

@@ -1,0 +1,13 @@
+// RES-6（docs/resolve.md「名前空間の併合と重複」）: 同じスコープに同じ名前の宣言が二つ。位置は後の方（b.hozo）。
+// internal/sema/testdata/rules/RES-6/ から（グローバルの op は CFG-1 になるので exception に変えた）
+namespace a {
+  model X { id: string; }
+  model Y { id: string; }
+  op Y(): void;                        // ERROR: RES-6
+  op f(): X;
+}
+namespace http {
+  exception ServerError;               // ERROR: RES-6
+}
+model G { id: string; }
+exception G;                           // ERROR: RES-6

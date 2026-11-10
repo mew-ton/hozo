@@ -1,0 +1,6 @@
+// REL-1（docs/check.md「throws」）: op の throws の全節を通して同じ例外が二度。internal/sema/testdata/rules/REL-1.hozo から
+namespace a {
+  exception E;
+  exception F;
+  op f() throws E | F throws E;        // ERROR: REL-1
+}

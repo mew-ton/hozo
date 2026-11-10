@@ -1,0 +1,7 @@
+// CFG-1（docs/config.md「診断」）: テーブルはあるが out が未設定（ng_3.toml）
+namespace a {
+  op f();
+}
+namespace b {
+  state s: list<string>;
+}

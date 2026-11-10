@@ -1,0 +1,5 @@
+# language = "ts" → CFG-11（TS の既定の出力は段階 5 まで）
+# ERROR: CFG-11
+[a]
+language = "ts"
+out      = "gen/a"

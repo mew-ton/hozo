@@ -1,0 +1,7 @@
+# a 自身は state も op も持たないが、子孫 a.sub が持つので継承のためのテーブルとしてあってよい
+[a]
+language = "go"
+out      = "gen/a"
+
+[a.sub]
+plugins = []

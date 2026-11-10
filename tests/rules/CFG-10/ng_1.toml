@@ -1,0 +1,9 @@
+# b のテーブルがあるが .hozo に b はない → CFG-10
+# ERROR: CFG-10
+[a]
+language = "go"
+out      = "gen/a"
+
+[b]
+language = "go"
+out      = "gen/b"

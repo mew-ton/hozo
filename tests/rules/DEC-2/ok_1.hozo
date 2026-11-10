@@ -1,0 +1,7 @@
+// DEC-2（docs/check.md「デコレータ」）: op を含む targets なら throws / catches を持てる
+namespace a {
+  exception E;
+  decorator ok for op | field throws E;
+  decorator ok2 throws E;
+  op f();
+}

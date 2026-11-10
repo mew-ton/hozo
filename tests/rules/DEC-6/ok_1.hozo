@@ -1,0 +1,7 @@
+// DEC-6（docs/check.md「デコレータ」）: 吸収する例外と投げ直す例外が違えば差し引きは残る（§8.1 の fallbackToCache）
+namespace a {
+  exception E;
+  exception F;
+  decorator d catches E recovers throws F;
+  op f();
+}

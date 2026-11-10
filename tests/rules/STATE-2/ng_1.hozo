@@ -1,0 +1,9 @@
+// STATE-2（docs/check.md「状態と効果」）: 持ち主でない名前空間の葉の op が、その状態への効果を effects に宣言した
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  op f();
+}
+namespace b {
+  op g() effects a.e;                  // ERROR: STATE-2
+}

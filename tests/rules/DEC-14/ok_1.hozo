@@ -1,0 +1,7 @@
+// DEC-14（docs/check.md「デコレータ」）: external なデコレータは境界の外から見たときの例外を throws に持つ
+namespace a {
+  exception E;
+  @external
+  decorator boundary throws E;
+  op f();
+}

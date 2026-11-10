@@ -1,0 +1,6 @@
+// DEC-14（docs/check.md「デコレータ」）: external なデコレータが throws を持たない（warning）
+namespace a {
+  @external                            // WARN: DEC-14
+  decorator boundary;
+  op f();
+}

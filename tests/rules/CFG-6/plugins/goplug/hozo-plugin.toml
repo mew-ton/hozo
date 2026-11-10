@@ -1,0 +1,9 @@
+# テストの fixture: a.legacy に対応しないプラグイン。起動しない
+name     = "goplug"
+command  = ["true"]
+language = "go"
+protocol = "0.1"
+
+[emit]
+decorate    = ["a.wrap"]
+unsupported = ["a.legacy"]

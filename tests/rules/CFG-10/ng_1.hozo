@@ -1,0 +1,4 @@
+// CFG-10（docs/config.md「診断」）: hozo.toml にある名前空間 b が、その子孫も含めて .hozo にない（ng_1.toml）
+namespace a {
+  op f();
+}

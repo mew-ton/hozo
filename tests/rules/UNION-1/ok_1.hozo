@@ -1,0 +1,9 @@
+// UNION-1（docs/check.md「名前空間」）: アームだけのユニオン、例外だけの集合、集合の入れ子
+namespace a {
+  model M { id: string; }
+  exception E;
+  union Page { Ready: M; Empty: { x: int; }; }
+  union Ok { E; }
+  union Nested { Ok; }
+  op f(): Page throws Nested;
+}

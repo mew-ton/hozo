@@ -1,0 +1,8 @@
+# 値の型違い → CFG-7
+# ERROR: CFG-7
+[hozo]
+max_bindings = "many"
+
+[a]
+language = "go"
+out      = "gen/a"

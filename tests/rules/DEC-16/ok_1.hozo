@@ -1,0 +1,10 @@
+// DEC-16（docs/check.md「デコレータ」）: 本体が投げる例外を吸収する
+namespace a {
+  exception E;
+  decorator recoverE catches E recovers;
+  op leaf() throws E;
+  @recoverE
+  op wiring() {
+    leaf();
+  }
+}

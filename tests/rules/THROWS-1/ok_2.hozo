@@ -1,0 +1,10 @@
+// THROWS-1（docs/check.md「throws」）: デコレータの catches が吸収する
+namespace a {
+  exception E;
+  decorator recoverE catches E recovers;
+  op leaf() throws E;
+  @recoverE
+  op wiring() {
+    leaf();
+  }
+}

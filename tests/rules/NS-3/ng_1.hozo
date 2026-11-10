@@ -1,0 +1,7 @@
+// NS-3（docs/check.md「名前空間」）: 標準の語彙とプラグインの語彙が同じ名前（db）をグローバルに宣言した
+// （plugins/vocplug/v.hozo の decorator db）。位置は標準の語彙 vocab/db.hozo の側で、プラグインの側は Related に出る
+// ERROR(hozo:vocab/db.hozo:2): NS-3
+namespace a {
+  @vocplugMark
+  state s: list<string>;
+}

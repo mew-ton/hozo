@@ -1,0 +1,9 @@
+// MATCH-1: 対象は一つ
+namespace a {
+  model M { id: string; }
+  classify C of M { A; }
+  op use(m: M);
+  op f(m: M) {
+    match m by C { A => use(m); };
+  }
+}

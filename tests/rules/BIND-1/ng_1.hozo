@@ -1,0 +1,7 @@
+// BIND-1（docs/check.md「bind」5）: 埋める位置が op の二つ以上の引数に当たる。位置は bind
+namespace a {
+  scalar Token extends string;
+  state token: single<Token>;
+  bind token to a.*;                   // ERROR: BIND-1
+  op g(x: Token, y: Token);
+}

@@ -1,0 +1,14 @@
+// BIND-4（docs/check.md「必須の入力」）: bind は対象の名前空間（b.*）の op だけを埋めるので、a の op の位置は埋まらない
+namespace a {
+  scalar Token extends string;
+  state token: single<Token>;
+  bind token to b.*;
+  model In { id: string; token: Token; }
+  op take(in: In);
+  op f() {
+    take({ id: "x" });                 // ERROR: BIND-4
+  }
+}
+namespace b {
+  op h();
+}

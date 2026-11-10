@@ -1,0 +1,3 @@
+// プラグインの語彙（docs/vocab.md「読み込み」）。標準の語彙 vocab/db.hozo と同じ名前をグローバルに宣言する
+decorator db for state;
+decorator vocplugMark for state;

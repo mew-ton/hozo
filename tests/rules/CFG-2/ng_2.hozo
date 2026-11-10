@@ -1,0 +1,4 @@
+// CFG-2（docs/config.md「診断」）: hozo.toml の側（ng_2.toml に [plugins] がある）
+namespace a {
+  op f();
+}

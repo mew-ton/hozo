@@ -1,0 +1,12 @@
+// NAME-1（docs/check.md「名前空間」）: 型の位置は UpperCamelCase、実行・適用されるものは lowerCamelCase
+namespace a {
+  model User { id: string; }
+  scalar Token extends string;
+  exception NotFound;
+  union Page { Ready: User; }
+  classify Kind of User { Big; }
+  state users: list<User>;
+  op find(): User;
+  effect added on users.post;
+  decorator tag;
+}

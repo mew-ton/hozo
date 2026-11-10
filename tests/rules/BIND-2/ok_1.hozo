@@ -1,0 +1,8 @@
+// BIND-2（docs/check.md「bind」）: 省略可能な状態は省略できる位置（Token?）に埋める
+namespace a {
+  scalar Token extends string;
+  state token: single<Token?>;
+  bind token to a.*;
+  model In { token: Token?; }
+  op g(in: In);
+}

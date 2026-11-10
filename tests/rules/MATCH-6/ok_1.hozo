@@ -1,0 +1,11 @@
+// MATCH-6（docs/check.md「classify / match」）: subject の型が classify の of に渡せる
+namespace a {
+  model M { id: string; }
+  classify C of M { A; }
+  op use(m: M): void;
+  op f(m: M): void {
+    match m by C {
+      A => use(m);
+    };
+  }
+}

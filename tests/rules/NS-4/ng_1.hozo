@@ -1,0 +1,12 @@
+// NS-4（docs/check.md「名前空間」）: 型の位置の C.Case<T> の C が現在の名前空間の classify でない。internal/sema/testdata/rules/NS-4.hozo から
+namespace a {
+  model M { x: int; }
+  classify C of M { A; B; }
+  op ok(m: C.A<M>): M;
+}
+namespace b {
+  op f(m: a.C.A<a.M>): a.M;            // ERROR: NS-4
+}
+namespace c {
+  op g(): a.M;
+}

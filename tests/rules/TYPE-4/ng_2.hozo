@@ -1,0 +1,12 @@
+// TYPE-4（docs/types.md「デコレータの引数」）: デコレータの引数のリテラルが Param.type に渡せない
+namespace a {
+  decorator d(n: int | float);
+  @d(1.5)
+  @http.retry("x")                     // ERROR: TYPE-4
+  op k(): void;
+  decorator l(xs: string[]);
+  @l(["a", 1])                         // ERROR: TYPE-4
+  op m(): void;
+  @l("a")                              // ERROR: TYPE-4
+  op p(): void;
+}

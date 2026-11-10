@@ -1,0 +1,6 @@
+// WIRE-7（docs/check.md「配線」）: 自分を呼ぶ配線も循環
+namespace a {
+  op f() {                             // ERROR: WIRE-7
+    f();
+  }
+}

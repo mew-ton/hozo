@@ -1,0 +1,6 @@
+// DEC-3（docs/check.md「デコレータ」。文法で閉じる）: catches X の後に recovers / halts e / ignores を必ず書く
+namespace a {
+  exception E;
+  decorator d catches E;               // ERROR: SYNTAX
+  op f();
+}

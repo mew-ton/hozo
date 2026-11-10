@@ -1,0 +1,10 @@
+// BIND-1（docs/check.md「bind」）: 位置が一つ、または位置がない op は何もしない
+namespace a {
+  scalar Token extends string;
+  scalar UserId extends string;
+  state token: single<Token>;
+  bind token to a.*;
+  model In { token: Token; id: UserId; }
+  op g(in: In);
+  op h(id: UserId);
+}

@@ -1,0 +1,13 @@
+// WIRE-3（docs/check.md「配線」）: 値を返す配線は最後の文が return、返さない配線は return を書かない
+namespace a {
+  model M { id: string; }
+  op value(): M;
+  op noValue(): void;
+  op ok(): M {
+    noValue();
+    return value();
+  }
+  op okVoid(): void {
+    noValue();
+  }
+}

@@ -1,0 +1,11 @@
+// TYPE-5（docs/types.md「診断」）: レコードリテラルに、当てはめる model にないフィールド。internal/sema/testdata/rules/TYPE-5.hozo から
+namespace a {
+  model In { id: string; }
+  op take(in: In): void;
+  op f(): void {
+    take({ id: "x", nope: 1 });        // ERROR: TYPE-5
+  }
+  op g(): In {
+    return { id: "x", other: "y" };    // ERROR: TYPE-5
+  }
+}

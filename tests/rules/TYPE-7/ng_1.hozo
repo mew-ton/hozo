@@ -1,0 +1,9 @@
+// TYPE-7（docs/types.md「診断」）: レコードリテラルの当てはめる先が決まらない。internal/sema/testdata/rules/TYPE-7.hozo から
+namespace a {
+  model In { id: string; }
+  op take(in: In): void;
+  op f(): void {
+    const x = { id: "x" };             // ERROR: TYPE-7
+    take(x);
+  }
+}

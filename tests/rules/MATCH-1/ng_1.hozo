@@ -1,0 +1,9 @@
+// MATCH-1（docs/check.md「classify / match」。文法で閉じる）: match の対象は一つ
+namespace a {
+  model M { id: string; }
+  classify C of M { A; }
+  op use(m: M);
+  op f(m: M, n: M) {
+    match m, n by C { A => use(m); };  // ERROR: SYNTAX
+  }
+}

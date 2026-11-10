@@ -1,0 +1,4 @@
+// CFG-7（docs/config.md「診断」）: language が "go" でも "ts" でもない（ng_4.toml）
+namespace a {
+  op f();
+}

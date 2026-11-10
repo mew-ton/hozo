@@ -1,0 +1,8 @@
+// WIRE-2（docs/check.md「配線」）: return 式 で式が「値がない」
+namespace a {
+  model M { id: string; }
+  op noValue(): void;
+  op h(): M {
+    return noValue();                  // ERROR: WIRE-2
+  }
+}

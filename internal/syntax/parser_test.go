@@ -15,7 +15,7 @@ func parseSrc(t *testing.T, src string) (*ast.File, []diag.Diagnostic) {
 	id := fs.Add("t.hozo", []byte(src))
 	file, diags := Parse(fs, id)
 	for _, d := range diags {
-		if d.Code != "SYNTAX" || d.Severity != diag.Error || d.Span == nil {
+		if (d.Code != "SYNTAX" && d.Code != "LIT-1") || d.Severity != diag.Error || d.Span == nil {
 			t.Errorf("診断の形が違う: %+v", d)
 		}
 	}

@@ -1,0 +1,8 @@
+// RES-2（docs/resolve.md「診断」）: 子の名前空間と宣言の名前が違えば曖昧でない
+namespace a {
+  op y(): void;
+  namespace x { model Y { id: string; } }
+}
+namespace b {
+  op f(): a.x.Y;
+}

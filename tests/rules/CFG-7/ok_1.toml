@@ -1,0 +1,13 @@
+# 知っているキーだけ、型も正しい
+[hozo]
+sources      = ["**/*.hozo"]
+plugin_dirs  = []
+max_bindings = 5
+
+[a]
+language = "go"
+plugins  = []
+out      = "gen/a"
+
+[a.sub]
+plugins = []

@@ -1,0 +1,10 @@
+// THROWS-1（docs/check.md「throws」）: デコレータの throws が肩代わりする（external でないデコレータ）
+namespace a {
+  exception E;
+  decorator declaresE throws E;
+  op leaf() throws E;
+  @declaresE
+  op wiring() {
+    leaf();
+  }
+}

@@ -1,0 +1,13 @@
+// NAME-1（docs/check.md「名前空間」。warning）: 命名規則。internal/sema/testdata/rules/NAME-1.hozo から
+namespace a {
+  model user { id: string; }           // WARN: NAME-1
+  scalar token extends string;         // WARN: NAME-1
+  exception notFound;                  // WARN: NAME-1
+  union page { Ready: user; }          // WARN: NAME-1
+  classify kind of user { big; }       // WARN: NAME-1, NAME-1
+  state Users: list<user>;             // WARN: NAME-1
+  op Find(): user;                     // WARN: NAME-1
+  effect Added on Users.post;          // WARN: NAME-1
+  decorator Tag;                       // WARN: NAME-1
+  model _Hidden { id: string; }        // WARN: NAME-1
+}

@@ -1,0 +1,6 @@
+// CLS-2（docs/check.md「classify / match」）: 名前の付いたケースがある
+namespace a {
+  model M { id: string; }
+  classify Ok of M { A; }
+  op use(m: M);
+}

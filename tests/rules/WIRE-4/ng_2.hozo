@@ -1,0 +1,10 @@
+// WIRE-4（docs/check.md「配線」）: 引数と同じ名前を束縛
+namespace a {
+  model M { id: string; }
+  op value(): M;
+  op use(m: M): void;
+  op param(m: M): void {
+    const m = value();                 // ERROR: WIRE-4
+    use(m);
+  }
+}

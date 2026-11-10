@@ -1,0 +1,11 @@
+// MATCH-2（docs/check.md「classify / match」）: hasDefault が true なのに default のアームがない
+namespace a {
+  model M { id: string; }
+  classify D of M { A; default; }
+  op use(m: M): void;
+  op needsDefault(m: M): void {
+    match m by D {                     // ERROR: MATCH-2
+      A => use(m);
+    };
+  }
+}

@@ -1,0 +1,6 @@
+// CLS-1（docs/check.md「classify / match」）: default は高々一つ、ケース名は一度ずつ
+namespace a {
+  model M { id: string; }
+  classify Ok of M { A; B; default; }
+  op use(m: M);
+}

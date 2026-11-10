@@ -1,0 +1,10 @@
+// LIT-1（docs/types.md「診断」）: 64 ビット符号付きの範囲の端と、ナノ秒で収まる Duration
+namespace a {
+  model M {
+    max: int = 9223372036854775807;
+    min: int = -9223372036854775808;
+  }
+  decorator wait(d: Duration);
+  @wait(9223372036s)
+  op f(): M;
+}

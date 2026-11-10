@@ -1,0 +1,8 @@
+// TYPE-6（docs/types.md「当てはまる」）: フィールドは一度ずつ
+namespace a {
+  model In { id: string; }
+  op take(in: In): void;
+  op f(): void {
+    take({ id: "x" });
+  }
+}

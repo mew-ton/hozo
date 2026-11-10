@@ -1,0 +1,7 @@
+// REL-2（docs/check.md「throws」）: デコレータの throws の relations は対象外（§7.3）
+namespace a {
+  exception E;
+  decorator requiresAuth throws E prevents effects;
+  @requiresAuth
+  op f();
+}

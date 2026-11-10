@@ -1,0 +1,14 @@
+// TYPE-8（docs/types.md「式の型」）: 値のある呼び出しの型が等しく、none のアームがあれば optional(T)
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  op m(x: M): M;
+  op use(x: M?): void;
+  op ok(x: M): void {
+    const r = match x by C {
+      A => m(x);
+      B => none;
+    };
+    use(r);
+  }
+}

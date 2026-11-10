@@ -1,0 +1,9 @@
+# b は state も op も持たない → CFG-8
+# ERROR: CFG-8
+[a]
+language = "go"
+out      = "gen/a"
+
+[b]
+language = "go"
+out      = "gen/b"

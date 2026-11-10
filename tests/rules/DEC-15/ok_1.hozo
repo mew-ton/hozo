@@ -1,0 +1,7 @@
+// DEC-15: @external はデコレータの宣言の直前
+namespace a {
+  exception E;
+  @external
+  decorator boundary throws E;
+  op f();
+}

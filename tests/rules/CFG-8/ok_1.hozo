@@ -1,0 +1,7 @@
+// CFG-8（docs/config.md「診断」）: 親のテーブルは、子孫が state か op を持っていればあってよい（ok_1.toml）
+namespace a {
+  model M { id: string; }
+}
+namespace a.sub {
+  op f(): a.M;
+}

@@ -1,0 +1,8 @@
+// DEC-13（docs/check.md「デコレータ」）: 名前付きデコレータは展開した汎用デコレータで比べる
+namespace a {
+  decorator d(code: int);
+  decorator alias = d(1);
+  @d(1)
+  @alias                               // ERROR: DEC-13
+  op viaAlias(): void;
+}

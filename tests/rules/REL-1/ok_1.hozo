@@ -1,0 +1,6 @@
+// REL-1（docs/check.md「throws」）: 節を分けても各例外は一度だけ
+namespace a {
+  exception E;
+  exception F;
+  op ok() throws E throws F;
+}

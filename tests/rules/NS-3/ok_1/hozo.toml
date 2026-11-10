@@ -1,0 +1,7 @@
+# プラグインを読まない。plugins/ は sources から除くために plugin_dirs に書く
+[hozo]
+plugin_dirs = ["plugins"]
+
+[a]
+language = "go"
+out      = "gen/a"

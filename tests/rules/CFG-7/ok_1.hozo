@@ -1,0 +1,7 @@
+// CFG-7（docs/config.md「形」）: すべてのキーを書いた hozo.toml（ok_1.toml）
+namespace a {
+  op f();
+}
+namespace a.sub {
+  op g();
+}

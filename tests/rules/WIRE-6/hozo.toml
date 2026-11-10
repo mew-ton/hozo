@@ -1,0 +1,7 @@
+# WIRE-6 の閾値を 2 にする（docs/config.md「形」の max_bindings）
+[hozo]
+max_bindings = 2
+
+[a]
+language = "go"
+out      = "gen/a"

@@ -1,0 +1,16 @@
+// BIND-4（docs/check.md「必須の入力」）: 必須の入力 in.token は bind で埋まる（BIND-3: 明示した値は bind より優先）
+namespace a {
+  scalar Token extends string;
+  state token: single<Token>;
+  bind token to b.*;
+  op f() {
+    b.take({ id: "x" });
+  }
+  op g(t: Token) {
+    b.take({ id: "x", token: t });
+  }
+}
+namespace b {
+  model In { id: string; token: a.Token; }
+  op take(in: In);
+}

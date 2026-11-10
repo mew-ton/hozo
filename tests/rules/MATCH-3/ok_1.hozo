@@ -1,0 +1,12 @@
+// MATCH-3: 呼び出し一つか none
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  op use(m: M);
+  op f(m: M) {
+    match m by C {
+      A => use(m);
+      B => none;
+    };
+  }
+}

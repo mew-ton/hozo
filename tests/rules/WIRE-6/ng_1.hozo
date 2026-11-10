@@ -1,0 +1,11 @@
+// WIRE-6（docs/check.md「配線」）: 本体の const の数が [hozo].max_bindings（この例では 2）を超える（warning）
+namespace a {
+  op v(): string;
+  op use(x: string, y: string, z: string);
+  op f() {                             // WARN: WIRE-6
+    const x = v();
+    const y = v();
+    const z = v();
+    use(x, y, z);
+  }
+}

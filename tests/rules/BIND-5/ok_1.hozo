@@ -1,0 +1,10 @@
+// BIND-5（docs/check.md「bind」）: 型が違えば別の位置に当たる
+namespace a {
+  scalar Token extends string;
+  scalar Locale extends string;
+  state token: single<Token>;
+  state locale: single<Locale>;
+  bind token to a.*;
+  bind locale to a.*;
+  op g(t: Token, l: Locale);
+}

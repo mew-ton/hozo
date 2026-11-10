@@ -1,0 +1,11 @@
+// MATCH-2（docs/check.md「classify / match」）: 知らないケース名
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  op use(m: M): void;
+  op unknown(m: M): void {
+    match m by C {                     // ERROR: MATCH-2
+      A | B | Z => use(m);
+    };
+  }
+}

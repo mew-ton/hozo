@@ -1,0 +1,8 @@
+// WIRE-3（docs/check.md「配線」）: returns が null なのに return がある。internal/sema/testdata/rules/WIRE-3.hozo から
+namespace a {
+  model M { id: string; }
+  op value(): M;
+  op voidReturns(): void {
+    return value();                    // ERROR: WIRE-3
+  }
+}

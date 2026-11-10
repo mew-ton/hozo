@@ -1,0 +1,6 @@
+// CFG-6（docs/config.md「診断」）: unsupported にないデコレータだけを使う
+namespace a {
+  decorator wrap;
+  @wrap
+  op g();
+}

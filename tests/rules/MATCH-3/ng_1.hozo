@@ -1,0 +1,12 @@
+// MATCH-3（docs/check.md「classify / match」。文法で閉じる）: アームの本体は呼び出し一つか none。
+// パーサーは壊れたアームを捨てて match を残すので、「アームが一つ以上要る」の SYNTAX と、ケース A が足りない MATCH-2 も続いて出る
+namespace a {
+  model M { id: string; }
+  classify C of M { A; }
+  op use(m: M);
+  op f(m: M) {
+    match m by C {                     // ERROR: MATCH-2
+      A => { use(m); use(m); };        // ERROR: SYNTAX
+    };                                 // ERROR: SYNTAX
+  }
+}

@@ -1,0 +1,7 @@
+// BIND-6（docs/check.md「bind」）: single の状態は bind に書ける
+namespace a {
+  scalar Token extends string;
+  state token: single<Token>;
+  bind token to a.*;
+  op g();
+}

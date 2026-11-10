@@ -1,0 +1,10 @@
+// RES-3（docs/resolve.md「診断」）: 値の参照から model のフィールドを辿る、classify からケースを辿る
+namespace a {
+  model Q { page: int; }
+  op g(q: Q, n: int): int;
+  op ok(q: Q): int {
+    return g(q, q.page);
+  }
+  classify C of Q { A; }
+  op j(q: C.A<Q>): int;
+}

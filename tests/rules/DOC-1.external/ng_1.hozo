@@ -1,0 +1,12 @@
+// DOC-1（docs/check.md「名前空間」）: @throws の例外が Signature.exceptions にも、external なデコレータの throws にもない
+namespace a {
+  model M { id: string; }
+  exception Other;
+  /**
+   * 取ってくる。
+   *
+   * @throws Other どこからも出ない
+   */
+  @http.get("/m")                      // ERROR: DOC-1
+  op fetch(): M;
+}

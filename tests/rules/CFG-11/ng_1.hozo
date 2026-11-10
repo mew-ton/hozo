@@ -1,0 +1,4 @@
+// CFG-11（docs/config.md「診断」）: language が "ts"（ng_1.toml）
+namespace a {
+  op f();
+}

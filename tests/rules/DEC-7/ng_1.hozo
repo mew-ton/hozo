@@ -1,0 +1,12 @@
+// DEC-7（docs/types.md「デコレータの引数」）: any effect on s.put に別の操作の効果を渡した。internal/sema/testdata/rules/DEC-7.hozo から
+namespace a {
+  state s: single<string>;
+  state t: list<string>;
+  effect put on s.put;
+  effect post on t.post;
+  decorator onPut(e: any effect on s.put);
+  @onPut(put)
+  op ok1(): void;
+  @onPut(post)                         // ERROR: DEC-7
+  op ng1(): void;
+}

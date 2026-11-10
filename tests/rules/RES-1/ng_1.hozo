@@ -1,0 +1,13 @@
+// RES-1（docs/resolve.md「診断」）: 名前が見つからない（候補を示す）。internal/sema/testdata/rules/RES-1.hozo から
+namespace a {
+  model User { id: string; }
+  model Usr { id: string; }
+  op f(u: Usre): User;                 // ERROR: RES-1
+  op g(): Nope;                        // ERROR: RES-1
+  op h(u: User): User {
+    return k(u);                       // ERROR: RES-1
+  }
+}
+namespace b {
+  op j(): a.User;
+}

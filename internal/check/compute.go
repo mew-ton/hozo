@@ -629,8 +629,9 @@ func refTargets(v ir.ArgValue) []string {
 	return nil
 }
 
-// decoratorSets は THROWS-1 のための ∪Catches(dᵢ) と ∪Throws(dᵢ)（external も含める）。`$param:` は置き換え済み。
-func (c *computer) decoratorSets(o *ir.Op) (catches, throws []string) {
+// decoratorSets は O に付いたデコレータの ∪Catches(dᵢ)、∪Throws(dᵢ, ns(O))（external の throws を除く）、
+// external の throws（docs/check.md「throws」の THROWS-1 と「名前空間」の DOC-1 が使う）。`$param:` は置き換え済み。
+func (c *computer) decoratorSets(o *ir.Op) (catches, throws, externalThrows []string) {
 	for _, app := range o.Decorators {
 		d, args := c.ix.decorator(app.Decorator)
 		if d == nil {
@@ -650,12 +651,16 @@ func (c *computer) decoratorSets(o *ir.Op) (catches, throws []string) {
 		for _, cl := range d.Throws {
 			for _, raw := range cl.Exceptions {
 				for _, x := range subst(raw) {
-					throws = appendUnique(throws, x)
+					if d.External {
+						externalThrows = appendUnique(externalThrows, x)
+					} else {
+						throws = appendUnique(throws, x)
+					}
 				}
 			}
 		}
 	}
-	return catches, throws
+	return catches, throws, externalThrows
 }
 
 // fillBound はすべての配線の呼び出しの Call.Bound を埋める（docs/check.md「bind」の Call.bound）。

@@ -1,0 +1,9 @@
+// BIND-5（docs/check.md「bind」6）: 二つの bind が同じ op の同じ位置に当たる。位置は後の bind
+namespace a {
+  scalar Token extends string;
+  state t1: single<Token>;
+  state t2: single<Token>;
+  bind t1 to a.*;
+  bind t2 to a.*;                      // ERROR: BIND-5
+  op g(t: Token);
+}

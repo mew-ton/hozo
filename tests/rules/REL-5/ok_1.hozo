@@ -1,0 +1,7 @@
+// REL-5（docs/check.md「throws」）: 効果ごとに prevents か keeps のどちらか一つ（名前で書くので REL-3 は出る。ここでは effects で書く）
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  exception E;
+  op ok() effects e throws E keeps effects;
+}

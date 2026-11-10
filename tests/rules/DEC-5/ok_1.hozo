@@ -1,0 +1,14 @@
+// DEC-5（docs/check.md「デコレータ」）: 効果の後に投げる例外（e は kept）なら、吸収しても成功のアームの効果は変わらない
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  exception E;
+  decorator recoverE catches E recovers;
+  op write() effects e;
+  op fail() throws E;
+  @recoverE
+  op wiring() {
+    write();
+    fail();
+  }
+}

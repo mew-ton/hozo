@@ -1,0 +1,16 @@
+// TYPE-3（docs/types.md「診断」）: return の値の型が op の returns に渡せない（射影もできない）。internal/sema/testdata/rules/TYPE-3.hozo から
+namespace a {
+  model User { id: string; hash: string; }
+  model PublicUser is User omit hash;
+  model Other { name: string; }
+  op other(): Other;
+  op wrong(): PublicUser {
+    return other();                    // ERROR: TYPE-3
+  }
+  op core(): int {
+    return other();                    // ERROR: TYPE-3
+  }
+  op noneToRequired(): Other {
+    return none;                       // ERROR: TYPE-3
+  }
+}

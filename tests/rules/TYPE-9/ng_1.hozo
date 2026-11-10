@@ -1,0 +1,7 @@
+// TYPE-9（docs/types.md「診断」）: scalar の extends の先が核の型でも scalar でもない。internal/sema/testdata/rules/TYPE-9.hozo から
+namespace a {
+  model M { id: string; }
+  scalar Bad extends M;                // ERROR: RES-4
+  scalar Arr extends string[];         // ERROR: TYPE-9
+  op f(): M;
+}

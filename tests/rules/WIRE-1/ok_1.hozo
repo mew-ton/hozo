@@ -1,0 +1,13 @@
+// WIRE-1: const、呼び出し、match、return の行
+namespace a {
+  model M { id: string; }
+  classify C of M { A; }
+  op v(): M;
+  op use(m: M);
+  op f(): M {
+    const x = v();
+    use(x);
+    match x by C { A => use(x); };
+    return x;
+  }
+}

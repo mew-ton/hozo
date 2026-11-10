@@ -1,0 +1,4 @@
+// CFG-10（docs/config.md「診断」）: テーブル [a] の名前空間そのものはなくても、子孫 a.sub があればよい（既定の hozo.toml）
+namespace a.sub {
+  op f();
+}

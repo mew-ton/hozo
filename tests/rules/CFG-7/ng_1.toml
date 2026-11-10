@@ -1,0 +1,6 @@
+# 知らないキー → CFG-7
+# ERROR: CFG-7
+[a]
+language = "go"
+out      = "gen/a"
+color    = "blue"

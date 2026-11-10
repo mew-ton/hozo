@@ -1,0 +1,12 @@
+// DOC-1（docs/check.md「名前空間」）: 「O に付いた external なデコレータの throws」の例外も @throws に書ける
+// （外から見たときだけ起きる例外も書けるようにするため）。@http.get は語彙の external なデコレータ（docs/vocab.md）
+namespace a {
+  model M { id: string; }
+  /**
+   * 取ってくる。
+   *
+   * @throws http.NetworkError 境界の外から見たときだけ起きる
+   */
+  @http.get("/m")
+  op fetch(): M;
+}

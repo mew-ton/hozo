@@ -1,0 +1,6 @@
+// TYPE-9（docs/types.md「診断」）: scalar の継承が循環している
+namespace a {
+  scalar A extends B;
+  scalar B extends A;                  // ERROR: TYPE-9
+  op f(): A;
+}

@@ -1,0 +1,8 @@
+# BIND-4 の例は、bind を持つ a と、呼ばれる側の b の二つの名前空間を使う（§5.3）
+[a]
+language = "go"
+out      = "gen/a"
+
+[b]
+language = "go"
+out      = "gen/b"

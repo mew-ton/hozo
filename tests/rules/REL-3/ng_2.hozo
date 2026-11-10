@@ -1,0 +1,8 @@
+// REL-3（docs/check.md「throws」）: デコレータの throws でも同じ
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  exception E;
+  decorator d throws E keeps e;            // WARN: REL-3
+  op f() effects e;
+}

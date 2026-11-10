@@ -1,0 +1,11 @@
+// STATE-2（docs/check.md「状態と効果」）: 持ち主の名前空間の葉の op は効果を宣言でき、別の名前空間の配線には伝播する（EFF-1）
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  op write() effects e;
+}
+namespace b {
+  op wiring() {
+    a.write();
+  }
+}

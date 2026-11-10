@@ -1,0 +1,6 @@
+// TYPE-9（docs/types.md「診断」）: 核の型か scalar を継ぐ
+namespace a {
+  scalar Ok extends string;
+  scalar Ok2 extends Ok;
+  op f(): Ok2;
+}

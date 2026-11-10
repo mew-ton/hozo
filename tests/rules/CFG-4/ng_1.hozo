@@ -1,0 +1,4 @@
+// CFG-4（docs/config.md「診断」）: プラグインのマニフェストの language が名前空間の language と違う（ng_1.toml）
+namespace a {
+  op f();
+}

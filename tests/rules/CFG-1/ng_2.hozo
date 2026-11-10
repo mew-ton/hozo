@@ -1,0 +1,5 @@
+// CFG-1（docs/config.md「診断」）: グローバル（""）に op がある
+namespace a {
+  op f();
+}
+op g();

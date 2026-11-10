@@ -1,0 +1,11 @@
+// WIRE-4（docs/check.md「配線」）: 束縛は一度だけ、名前は使う前に上で定義する
+namespace a {
+  model M { id: string; }
+  op value(): M;
+  op use(m: M): void;
+  op ok(m: M): void {
+    const x = value();
+    use(x);
+    use(m);
+  }
+}

@@ -1,0 +1,9 @@
+// UNION-1（docs/check.md「名前空間」）: arms でアーム名が重複
+namespace a {
+  model M { id: string; }
+  union Dup {
+    Ready: M;
+    Ready: { x: int; };                // ERROR: UNION-1
+  }
+  op f(): Dup;
+}

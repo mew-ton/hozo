@@ -1,0 +1,10 @@
+// TYPE-13（docs/types.md「既定値」）: 既定値のリテラルがフィールドの型（scalar なら元の型）に渡せない。internal/sema/testdata/rules/TYPE-13.hozo から
+namespace a {
+  scalar PosInt extends int;
+  model M {
+    bad1: PosInt = "x";                // ERROR: TYPE-13
+    bad2: string = 1;                  // ERROR: TYPE-13
+    bad3: int = 1.5;                   // ERROR: TYPE-13
+  }
+  op f(): M;
+}

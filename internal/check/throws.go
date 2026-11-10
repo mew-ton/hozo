@@ -6,11 +6,11 @@ import (
 )
 
 // checkThrows1 は THROWS-1（docs/check.md「throws」）。配線の O について
-// Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ)（Throws は external も含める）。
+// Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ, ns(O))（external の throws は Sig と同じく数えない）。
 // 空でなければ、位置は O、メッセージに Missing の FQN、Related に各例外の出どころの呼び出し、Data.missing に FQN の列。
 func checkThrows1(c *computer, o *ir.Op, info *bodyInfo) {
 	decl := declared(o)
-	catches, throws := c.decoratorSets(o)
+	catches, throws, _ := c.decoratorSets(o)
 	var missing []string
 	for _, x := range info.thrown {
 		if contains(decl, x) || contains(catches, x) || contains(throws, x) {

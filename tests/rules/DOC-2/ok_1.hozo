@@ -1,0 +1,13 @@
+// DOC-2（docs/check.md「名前空間」）: 各 @param、各 @throws は一度ずつ
+namespace a {
+  model M { id: string; }
+  exception E;
+  exception F;
+  /**
+   * @param m 入力
+   * @param n もう一つ
+   * @throws E 一つ目
+   * @throws F 二つ目
+   */
+  op f(m: M, n: M): M throws E | F;
+}

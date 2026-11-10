@@ -1,0 +1,10 @@
+// WIRE-3（docs/check.md「配線」）: returns が null でないのに、本体の最後の文が return でない
+namespace a {
+  model M { id: string; }
+  op noValue(): void;
+  op noReturn(): M {                   // ERROR: WIRE-3
+    noValue();
+  }
+  op empty(): M {                      // ERROR: WIRE-3
+  }
+}

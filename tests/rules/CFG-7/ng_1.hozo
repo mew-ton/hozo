@@ -1,0 +1,4 @@
+// CFG-7（docs/config.md「診断」）: hozo.toml に知らないキーがある（ng_1.toml）
+namespace a {
+  op f();
+}

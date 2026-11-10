@@ -1,0 +1,9 @@
+// RES-5（docs/resolve.md「診断」）: effect ... on が別の名前空間の状態を指している。internal/sema/testdata/rules/RES-5.hozo から
+namespace a {
+  state s: list<string>;
+  effect ok on s.post;
+}
+namespace b {
+  effect e on a.s.post;                // ERROR: RES-5
+  op f();
+}

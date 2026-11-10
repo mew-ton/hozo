@@ -1,0 +1,7 @@
+// REL-1（docs/check.md「throws」）: ユニオン（set）の展開で同じ例外が二度
+namespace a {
+  exception E;
+  exception F;
+  union Errors { E; F; }
+  op g() throws E | Errors;            // ERROR: REL-1
+}

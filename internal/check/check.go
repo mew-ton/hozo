@@ -95,7 +95,7 @@ func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic {
 	r := &reporter{loc: c.Locate}
 	comp := newComputer(ix, r)
 	comp.computeAll()
-	checkNamespaces(ix, r)
+	checkNamespaces(comp, r)
 	checkConfig(ix, cfg, r)
 	checkStates(ix, comp, r)
 	checkThrows(ix, comp, r)

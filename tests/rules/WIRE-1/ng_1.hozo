@@ -1,0 +1,7 @@
+// WIRE-1（docs/check.md「配線」。文法で閉じる）: 書けるのは const、return、match、呼び出しの行だけ
+namespace a {
+  op v(): string;
+  op f() {
+    x = v();                           // ERROR: SYNTAX
+  }
+}

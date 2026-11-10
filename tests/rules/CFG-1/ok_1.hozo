@@ -1,0 +1,7 @@
+// CFG-1（docs/config.md「診断」）: 子の名前空間は親の設定を引き継ぐ（CFG-3）。既定の hozo.toml は [a] だけ
+namespace a {
+  op f();
+}
+namespace a.sub {
+  op g();
+}

@@ -36,14 +36,20 @@ func TestThrows1(t *testing.T) {
 	})
 	t.Run("ok", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
-		w.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+		w.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Z"})}
 		w.Decorators = []ir.Application{app("server.throwZ"), app("server.catchY")}
 		p := serverWith(a, b, catchY, throwZ, w)
 		diags := Check(p, cfgFor("server"))
 		wantNoCode(t, diags, "THROWS-1")
-		// external の throws は THROWS-1 の差し引きには含めるが、自分の名前空間から見た Sig には加えない（DEC-10）。
-		// 本体から出る Z は Sig に残る（docs/check.md「THROWS-1」の差し引きと Sig は別）
 		wantStrings(t, "E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Z"})
+	})
+	t.Run("external throws do not cover the body (docs/check.md「throws」)", func(t *testing.T) {
+		// external なデコレータの throws は Sig(O, ns(O)) に入らない（DEC-10）ので、THROWS-1 の差し引きにも数えない。
+		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
+		w.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+		w.Decorators = []ir.Application{app("server.throwZ"), app("server.catchY")}
+		p := serverWith(a, b, catchY, throwZ, w)
+		wantOneCode(t, Check(p, cfgFor("server")), "THROWS-1")
 	})
 	t.Run("over-declared is allowed (THROWS-2)", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")))

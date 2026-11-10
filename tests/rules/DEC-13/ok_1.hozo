@@ -1,0 +1,8 @@
+// DEC-13（docs/check.md「デコレータ」）: 違うデコレータなら何個でも付けられる
+namespace a {
+  decorator d(code: int);
+  decorator e;
+  @d(1)
+  @e
+  op f(): void;
+}

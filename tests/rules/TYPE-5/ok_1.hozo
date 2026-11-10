@@ -1,0 +1,8 @@
+// TYPE-5（docs/types.md「当てはまる」）: リテラルの各フィールドが model にある
+namespace a {
+  model In { id: string; name: string?; }
+  op take(in: In): void;
+  op f(): void {
+    take({ id: "x", name: "y" });
+  }
+}

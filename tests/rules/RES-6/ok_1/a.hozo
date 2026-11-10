@@ -1,0 +1,7 @@
+// RES-6（docs/resolve.md「名前空間の併合と重複」）: 同じ名前空間を二つのファイルに分けて書いても、名前が違えば一つに併合される（NS-2）
+namespace a {
+  model X { id: string; }
+  op f(): X;
+}
+// 名前空間の名前とグローバルの宣言の名前は別の空間: 衝突にしない
+decorator a for state;

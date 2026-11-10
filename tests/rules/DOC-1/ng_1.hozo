@@ -1,0 +1,11 @@
+// DOC-1（docs/check.md「名前空間」）: @throws の例外が Signature.exceptions にない（internal/check が出す）
+namespace a {
+  exception E;
+  exception F;
+  /**
+   * 何かする。
+   *
+   * @throws F 投げない例外
+   */
+  op f() throws E;                     // ERROR: DOC-1
+}

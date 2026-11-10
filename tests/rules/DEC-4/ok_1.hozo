@@ -1,0 +1,10 @@
+// DEC-4（docs/check.md「デコレータ」）: ignores は値を返さない op にだけ付けられる
+namespace a {
+  exception E;
+  decorator ignoreE catches E ignores;
+  op leaf() throws E;
+  @ignoreE
+  op f() {
+    leaf();
+  }
+}

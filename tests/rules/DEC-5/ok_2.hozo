@@ -1,0 +1,10 @@
+// DEC-5（docs/check.md「デコレータ」）: F が空なら起きない
+namespace a {
+  exception E;
+  decorator recoverE catches E recovers;
+  op fail() throws E;
+  @recoverE
+  op wiring() {
+    fail();
+  }
+}

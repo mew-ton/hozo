@@ -1,0 +1,14 @@
+// WIRE-6（docs/check.md「配線」）: 既定の閾値 5 を超える（ng_2.toml は max_bindings を書かない）
+namespace a {
+  op v(): string;
+  op use(a: string, b: string, c: string, d: string, e: string, f: string);
+  op g() {                             // WARN: WIRE-6
+    const a = v();
+    const b = v();
+    const c = v();
+    const d = v();
+    const e = v();
+    const f = v();
+    use(a, b, c, d, e, f);
+  }
+}

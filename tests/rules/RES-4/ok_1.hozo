@@ -1,0 +1,12 @@
+// RES-4（docs/resolve.md「位置ごとに受け付ける種類」）: 型の位置に model / scalar / union（arms）、throws に例外、@ にデコレータ
+namespace a {
+  exception E;
+  model M { x: string; }
+  scalar S extends string;
+  union V { Ready: M; }
+  op n(): V throws E;
+  op f(s: S): M;
+  decorator d;
+  @d
+  op j(): void;
+}

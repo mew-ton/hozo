@@ -1,0 +1,9 @@
+// CLS-1（docs/check.md「classify / match」）: ケース名が重複
+namespace a {
+  model M { id: string; }
+  classify D of M {
+    A;
+    A;                                 // ERROR: CLS-1
+  }
+  op use(m: M);
+}

@@ -1,0 +1,7 @@
+// CFG-8（docs/config.md「診断」）: テーブルの名前空間もその子孫も state と op を持たない（ng_1.toml の [b]）
+namespace a {
+  op f();
+}
+namespace b {
+  model M { id: string; }
+}

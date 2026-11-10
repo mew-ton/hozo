@@ -1,0 +1,9 @@
+# http は語彙の名前空間 → CFG-8
+# ERROR: CFG-8
+[a]
+language = "go"
+out      = "gen/a"
+
+[http]
+language = "go"
+out      = "gen/http"

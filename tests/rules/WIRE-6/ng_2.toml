@@ -1,0 +1,4 @@
+# max_bindings を書かなければ既定の 5（docs/check.md「配線」）
+[a]
+language = "go"
+out      = "gen/a"

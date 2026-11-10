@@ -1,0 +1,7 @@
+[hozo]
+plugin_dirs = ["plugins"]
+
+[a]
+language = "go"
+plugins  = ["vocplug"]
+out      = "gen/a"

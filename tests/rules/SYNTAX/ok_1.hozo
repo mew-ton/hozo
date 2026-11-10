@@ -1,0 +1,8 @@
+// 構文エラーのないファイル
+namespace a {
+  exception E;
+  op leaf() throws E;
+  op wiring() throws E {
+    leaf();
+  }
+}

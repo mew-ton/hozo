@@ -1,0 +1,9 @@
+// REL-5（docs/check.md「throws」）: 同じ例外・同じ効果に prevents と keeps の両方。internal/sema/testdata/rules/REL-5.hozo から
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  effect f on s.post;
+  exception E;
+  op a1() effects e throws E prevents effects keeps e;     // ERROR: REL-5 // WARN: REL-3
+  op a2() effects e | f throws E prevents e keeps e;       // ERROR: REL-5 // WARN: REL-3
+}

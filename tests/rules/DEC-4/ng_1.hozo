@@ -1,0 +1,10 @@
+// DEC-4（docs/check.md「デコレータ」）: catches ... ignores を持つデコレータが、値を返す op に付いている
+namespace a {
+  exception E;
+  decorator ignoreE catches E ignores;
+  op leaf(): string throws E;
+  @ignoreE                             // ERROR: DEC-4
+  op f(): string {
+    return leaf();
+  }
+}

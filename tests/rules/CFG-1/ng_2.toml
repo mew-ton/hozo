@@ -1,0 +1,5 @@
+# グローバルに op がある → CFG-1（グローバルには設定を書けない）
+# ERROR: CFG-1
+[a]
+language = "go"
+out      = "gen/a"

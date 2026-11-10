@@ -1,0 +1,9 @@
+# hozo.toml に plugins という名前のテーブルがある → CFG-2
+# ERROR: CFG-2
+[a]
+language = "go"
+out      = "gen/a"
+
+[plugins]
+language = "go"
+out      = "gen/plugins"

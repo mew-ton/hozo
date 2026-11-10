@@ -1,0 +1,13 @@
+// TYPE-13（docs/types.md「既定値」）: scalar の位置にリテラルを渡せる唯一の場所。int は float に渡せる
+namespace a {
+  scalar PosInt extends int;
+  scalar Name extends string;
+  model M {
+    page: PosInt = 1;
+    name: Name = "x";
+    count: int = 0;
+    ratio: float = 1;
+    opt: int? = 3;
+  }
+  op f(): M;
+}

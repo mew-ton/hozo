@@ -1,0 +1,11 @@
+// UNION-1（docs/check.md「名前空間」）: 参照の要素に例外と効果が混ざる
+namespace a {
+  model M { id: string; }
+  exception E;
+  state s: list<M>;
+  effect e on s.post;
+  union ExcEff {                       // ERROR: UNION-1
+    E;
+    e;
+  }
+}

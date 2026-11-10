@@ -1,0 +1,9 @@
+# nope というプラグインはない → CFG-9
+# ERROR: CFG-9
+[hozo]
+plugin_dirs = ["plugins"]
+
+[a]
+language = "go"
+plugins  = ["nope"]
+out      = "gen/a"
