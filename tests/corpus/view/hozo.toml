@@ -1,0 +1,15 @@
+# View のコーパス（docs/testing.md「コーパス」、tests/view_test.go）。
+# api と web は本来 server / browser の関係だが、TS の既定の出力は段階 5 までないので（CFG-11）どちらも "go"。
+# web には view-dump プラグイン（plugins/view-dump）を設定し、プラグインが受け取る View を書き出させる。
+
+[hozo]
+plugin_dirs = ["plugins"]
+
+[api]
+language = "go"
+out      = "gen/api"
+
+[web]
+language = "go"
+out      = "gen/web"
+plugins  = ["view-dump"]

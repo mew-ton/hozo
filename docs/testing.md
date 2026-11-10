@@ -18,8 +18,9 @@
 `tests/corpus/<名前>/` に、設計書の例を集めたプロジェクト（`hozo.toml` と `.hozo`）を置く。
 
 - `design/`: 設計書 §5〜§11 の例を名前空間ごとに一つのファイルにまとめたもの。設計書の言葉をそのまま写し、写せなかった箇所と足した宣言は、そのディレクトリの `README.md` に一覧する（`docs/decisions.md`「設計書へ返すこと」の項目がその候補）。
-- 各コーパスについて、`hozoc check` の text 出力をゴールデン `expected.check.txt` と比べる。warning も含む。
-- `emit` のゴールデン: `expected/` に書き出したファイルの木を置き、実際に一時ディレクトリに書いて比べる。差分はファイルごとに示す。
+- `view/`: プラグインが受け取る `View`（`docs/ir.md`「その名前空間から見た IR」）を端から端まで確かめるためのサンプル。`docs/ir.md`「正規化」の各行と `docs/check.md`「計算」の各手順を一か所ずつ使い、テストの語彙 `t.entry` を起点にするプラグイン `plugins/view-dump` が受け取った `View` を書き出す。`tests/view_test.go` が、`internal/project` の `Views()["web"]` をゴールデン `testdata/expected/view.web.json` と比べ、要求ごとの期待値を文書の見出しの名前のサブテストで明示し、実物の `hozoc emit` がプラグインに渡した `View` が同じであることを確かめる。見出し → 構文の対応と想定する warning は `README.md`。
+- 各コーパスについて、`hozoc check` の text 出力をゴールデン `tests/corpus/<名前>/testdata/expected/check.txt` と比べる。warning も含む（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。
+- `emit` のゴールデン: `tests/corpus/<名前>/testdata/expected/emit/` に書き出したファイルの木（`.hozoc-outputs.json` を含む）を置き、実際に一時ディレクトリに書いて比べる。差分はファイルごとに示す（同 `TestCorpusEmitGolden`）。ゴールデンをすべて `testdata/` の下に置くのは、ゴールデンの `.go` を `go build ./...` / `go vet ./...` がパッケージとして拾わないため（Go は `testdata` を無視する）。一時ディレクトリにはリポジトリの `go.mod` を写し、`ir/` `plugin/` `tests/` をシンボリックリンクで足す（`tests/generated_test.go` と同じ）。コーパスのプラグインのマニフェストの `go run github.com/mew-ton/hozo/tests/corpus/<名前>/plugins/<p>` がそこから解決でき、既定の出力の import パスも `github.com/mew-ton/hozo/<out>` に決まる。
 - ゴールデンの更新は `go test ./... -update`。
 
 段階 1 の途中（検査器ができるまで）は、`tests/parse_test.go` がコーパス・標準の語彙・`docs/cli.md` の `cli.hozo` を構文だけ確かめる。

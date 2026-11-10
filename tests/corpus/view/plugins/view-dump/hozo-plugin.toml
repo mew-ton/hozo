@@ -1,0 +1,8 @@
+# テスト用のプラグイン（tests/view_test.go）。受け取った View をそのまま <view.config.dir>/view.json に書き出す。
+name     = "view-dump"
+command  = ["go", "run", "github.com/mew-ton/hozo/tests/corpus/view/plugins/view-dump"]
+language = "go"
+protocol = "0.1"
+
+[emit]
+entry = ["t.entry"]

@@ -12,6 +12,8 @@
 
 `docs/testing.md`「コーパス」は一覧の置き場を `tests/corpus/README.md` としているが、コーパスごとに分けるためこのディレクトリに置いた。
 
+ゴールデン（`docs/testing.md`「コーパス」、`tests/corpus_emit_test.go`）は `testdata/expected/` の下（Go のツールが `.go` を拾わないように `testdata`）: `check.txt` は `hozoc check` の text 出力、`emit/` は `hozoc emit` が書き出すファイルの木。更新は `go test ./tests -update`。
+
 ## 設計書から変えた箇所
 
 | # | 設計書の箇所と原文 | このコーパスでの書き方 | 理由 |

@@ -1,0 +1,145 @@
+// ブラウザ側の名前空間。view-dump プラグインの viewer。各ブロックの `// docs/...「見出し」` は、その構文が確かめる文書の見出し。
+
+/** ユーザーページを持つフロントエンド */
+namespace web {
+  // docs/ir.md「原則」: 別の名前空間の宣言は FQN で参照する（api.Token、page.Route）
+  @localStorage
+  state token: single<api.Token?>;
+  @page.path
+  state location: single<page.Route>;
+
+  // docs/check.md「bind」: web の bind は api.* への呼び出しの Token? の位置を埋める
+  bind token to api.*;
+
+  /** ログイン画面へ */
+  effect goLogin on location.put;
+  /** ホームへ */
+  effect goHome on location.put;
+  /** 手元のトークンを消す */
+  effect removeToken on token.put;
+
+  /** 一時的に表示できない */
+  model Unavailable {}
+  // docs/ir.md「正規化」: アームのその場の model は `web.UserPage.Ready` に合成。`Missing: Unavailable` はそのまま ref
+  /** ユーザーページ */
+  union UserPage {
+    /** 表示できる */
+    Ready: { user: api.PublicUser; };
+    Missing: Unavailable;
+  }
+
+  /** オフラインで取れなかった */
+  exception Offline;
+
+  // docs/ir.md「decorator」: any の引数を節で使う。exceptions / halts は "$param:名前"
+  decorator redirectOn(error: any exception, target: any effect) catches error halts target;
+  // docs/ir.md「正規化」: 名前付きデコレータ。適用は decorator "web.redirectOn"、via "web.redirectToLogin"
+  decorator redirectToLogin = redirectOn(api.Unauthorized, goLogin);
+  // docs/check.md「計算」手順 i の catches: recovers（§8.2。効果が不明なら成功のアームでも不明）と ignores
+  decorator offlineFallback catches api.Timeout recovers throws Offline;
+  decorator ignoreTimeout catches api.Timeout ignores;
+  // docs/ir.md「デコレータの適用」: op の引数を値に取る引数は "$param:名前"（docs/resolve.md「手続き」1.3）
+  decorator traced(key: string, within: Duration);
+
+  // docs/ir.md「classify」: classify と condition の糖衣
+  /** ユーザーの種類 */
+  classify UserKind of api.PublicUser {
+    /** 管理者 */
+    Admin;
+    Member;
+  }
+  /** メールアドレスを確認済み */
+  condition Verified of api.PublicUser;
+
+  // docs/ir.md「正規化」: 既定値のリテラル（int、Duration のナノ秒、boolean）
+  /** 問い合わせ */
+  model Query { id: api.UserId; page: int = 1; timeout: Duration = 30s; strict: boolean = false; }
+
+  // 葉の op
+  op userPageVm(user: api.PublicUser): UserPage;
+  // docs/ir.md「型」: 絞り込まれた型 case
+  op adminPageVm(user: UserKind.Admin<api.PublicUser>): UserPage;
+  op greet(user: api.PublicUser) effects goHome;
+  op clearToken() effects removeToken;
+
+  /**
+   * ユーザーを取る。
+   *
+   * @param q 問い合わせ
+   * @throws api.NotFound いない
+   * @throws Offline オフラインで取れなかった
+   * @see api.getUser
+   */
+  // docs/check.md「bind」: 明示していない位置 in.token が Call.bound に入る（BIND-3）
+  @offlineFallback
+  op fetchUser(q: Query): api.PublicUser
+    throws api.NotFound | api.Unauthorized
+  {
+    return api.getUser({ id: q.id });
+  }
+
+  // docs/check.md「計算」手順 0（配線）: match の一部のアームにしかない効果は succ が unknown
+  op welcome(user: api.PublicUser)
+  {
+    match user by Verified {
+      Verified => greet(user);
+      default  => none;
+    };
+  }
+
+  // docs/check.md「計算」手順 0（配線）: 出どころが二つ（行 1 では prevented、行 2 では kept）で rel が unknown
+  // docs/ir.md「正規化」: 複数行の throws は ThrowsClause の列のまま（まとめない）
+  op reload(id: api.UserId): api.PublicUser
+    throws api.NotFound | api.Unauthorized
+    throws Offline
+  {
+    const user = fetchUser({ id });
+    api.touch(id);
+    return user;
+  }
+
+  /**
+   * ユーザーページを開く。
+   *
+   * @param id 表示するユーザー
+   * @throws Offline オフラインで取れなかった
+   * @see fetchUser
+   */
+  // docs/ir.md「デコレータの適用」: 書かれた順。最後の要素（traced）が最も内側で、最初に適用される
+  // docs/check.md「計算」手順 i の halts: Unauthorized を吸収して goLogin を F に足し、残りの例外は goLogin を prevented
+  // docs/ir.md「正規化」: `{ id }` は `{ id: id }`。docs/ir.md「配線」: match のアームの cases は書かれた順
+  @t.entry
+  @redirectToLogin
+  @traced(id, 5m)
+  op openUser(id: api.UserId): UserPage
+    throws Offline | api.NotFound
+  {
+    const user = fetchUser({ id });
+    const page = match user by UserKind {
+      Admin  => adminPageVm(user);
+      Member => userPageVm(user);
+    };
+    return page;
+  }
+
+  // docs/check.md「計算」手順 i の ignores: Timeout を吸収し、deleteSession の succ は unknown。docs/check.md「bind」: api.logout() の bound は ["token"]
+  @t.entry
+  @ignoreTimeout
+  op signOut()
+  {
+    api.logout();
+    clearToken();
+  }
+}
+
+// docs/ir.md「正規化」: 複数回の `namespace web { }` は一つの Namespace になり、decls は出現順に連結する
+namespace web {
+  // docs/check.md「計算」手順 i の recovers: Timeout のとき createSession が不明なので succ(createSession) = unknown（DEC-5 の warning。README.md）
+  model LoginForm { name: string; password: string; }
+  @offlineFallback
+  op login(form: LoginForm): api.Session
+    throws api.Invalid
+  {
+    return api.login({ creds: { name: form.name, password: form.password } });
+  }
+}

@@ -1,0 +1,38 @@
+// Command view-dump は tests/view_test.go のためのプラグイン。emit の要求の view（docs/ir.md「その名前空間から見た IR」）を
+// 2 スペースの字下げで JSON にし直し、<view.config.dir>/view.json の一つのファイルとして返す。テストはそのファイルを読んで、
+// プラグインが受け取った View が hozoc の計算した View と同じであることを確かめる。check と import は持たない。
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path"
+
+	"github.com/mew-ton/hozo/plugin"
+)
+
+type handler struct{}
+
+func (handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
+	if req.View == nil {
+		return nil, fmt.Errorf("view がない")
+	}
+	content, err := json.MarshalIndent(req.View, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return &plugin.EmitResponse{
+		Files: []plugin.File{{Path: path.Join(req.View.Config.Dir, "view.json"), Content: string(content) + "\n"}},
+	}, nil
+}
+
+func (handler) Check(*plugin.CheckRequest) (*plugin.CheckResponse, error) {
+	return nil, plugin.ErrUnsupported
+}
+
+func (handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
+	return nil, plugin.ErrUnsupported
+}
+
+func main() { os.Exit(plugin.Main(handler{})) }

@@ -1,0 +1,5 @@
+[
+  "gen/server/ops.go",
+  "gen/server/types.go",
+  "gen/server/validate.go"
+]

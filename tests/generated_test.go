@@ -75,13 +75,16 @@ func TestGeneratedUpToDate(t *testing.T) {
 	}
 }
 
-// readTree は dir の下のファイルを、dir からの相対パス（"/" 区切り）→ 内容で返す。dir がなければ空。
+// readTree は dir の下の普通のファイルを、dir からの相対パス（"/" 区切り）→ 内容で返す。dir がなければ空。
 func readTree(t *testing.T, dir string) map[string][]byte {
 	t.Helper()
 	out := map[string][]byte{}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
+		}
+		if !d.Type().IsRegular() { // シンボリックリンク（tests/corpus_emit_test.go の copyCorpusAsModule）は読まない
+			return nil
 		}
 		rel, err := filepath.Rel(dir, p)
 		if err != nil {

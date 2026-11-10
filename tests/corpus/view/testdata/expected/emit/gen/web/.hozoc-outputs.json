@@ -1,0 +1,9 @@
+[
+  "gen/web/classify.go",
+  "gen/web/doc.go",
+  "gen/web/ops.go",
+  "gen/web/types.go",
+  "gen/web/validate.go",
+  "gen/web/view.json",
+  "gen/web/wiring.go"
+]

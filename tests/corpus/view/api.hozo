@@ -1,0 +1,96 @@
+// サーバー側の名前空間。web（web.hozo）から呼ばれる。各ブロックの `// docs/...「見出し」` は、その構文が確かめる文書の見出し。
+
+/** ユーザーとセッションを持つ API */
+namespace api {
+  /** ユーザーの識別子 */
+  scalar UserId extends string;
+  /** ログインセッションのトークン */
+  scalar Token extends string;
+  // docs/ir.md「型」: scalar の base が別の scalar への ref
+  scalar AdminToken extends Token;
+
+  model User {
+    @db.key id: UserId;
+    name: string;
+    /** 表に出さない */
+    secret: string;
+    hash: string;
+    // docs/ir.md「正規化」: `T??` は `T?`（optional は入れ子にしない）
+    nick: string??;
+    // docs/ir.md「型」: array / record
+    tags: string[];
+    attrs: Record<string, string[]>;
+  }
+  // docs/ir.md「正規化」: `model P is U omit a, b;` は fields を展開し derivedFrom に記録
+  model PublicUser is User omit secret, hash;
+
+  model Session { token: Token; userId: UserId; }
+
+  @db state users: list<User>;
+  @db state sessions: list<Session>;
+
+  // docs/ir.md「正規化」: 例外のその場の model は `api.Invalid.Value` に合成し、value を ref にする
+  /** 入力が不正 */
+  @http.status(400)
+  exception Invalid: { reason: string; };
+  /** 認証されていない */
+  @http.status(401)
+  exception Unauthorized;
+  /** 見つからない */
+  @http.status(404)
+  exception NotFound;
+  /** 応答が返らない */
+  exception Timeout;
+
+  // docs/ir.md「正規化」: ユニオンのメンバー（set）。throws に書けば例外の FQN に展開。メンバーにユニオンがあれば平らに展開
+  union ClientError { Unauthorized; NotFound; }
+  union AnyError { ClientError; Timeout; }
+
+  /** セッションを作る */
+  effect createSession on sessions.post;
+  /** セッションを消す */
+  effect deleteSession on sessions.delete;
+  /** 最終アクセスを更新する */
+  effect touchUser on users.put;
+
+  // docs/check.md「計算」手順 i の throws（DEC-10）: external の例外は、境界の外（web）から見たときだけ Sig に入る
+  /** ネットワーク越しに呼ぶ */
+  @external
+  decorator remote throws Timeout;
+  decorator requiresAuth throws Unauthorized prevents effects;
+
+  // docs/check.md「bind」4: web.token の位置は model の中の Token?（path ["in", "token"]）。id は呼び出し側が渡す
+  model GetUserInput { token: Token?; id: UserId; }
+
+  /**
+   * ユーザーを一人返す。
+   *
+   * @param in 認証と識別子
+   * @throws NotFound 識別子のユーザーがいない
+   * @throws Timeout 応答が返らない（external の例外も @throws に書ける。docs/check.md DOC-1）
+   * @see PublicUser
+   */
+  @remote
+  @requiresAuth
+  op getUser(in: GetUserInput): PublicUser
+    throws NotFound;
+
+  model Credentials { name: string; password: string; }
+  model LoginInput { creds: Credentials; remember: boolean = false; }
+
+  // docs/check.md「計算」手順 0（葉）: rel(Invalid, createSession) = prevented
+  @remote
+  op login(in: LoginInput): Session
+    effects createSession
+    throws Invalid prevents effects;
+
+  // docs/check.md「bind」4: 引数そのものが位置（path ["token"]）。web から見た params は空になる
+  @remote
+  op logout(token: Token?)
+    effects deleteSession;
+
+  // docs/check.md「計算」手順 0（葉）: ユニオンを展開した E と keeps。docs/ir.md「正規化」の `throws A | B にユニオン`
+  op touch(id: UserId)
+    effects touchUser
+    throws ClientError keeps effects;
+}
