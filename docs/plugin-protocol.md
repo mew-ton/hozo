@@ -59,6 +59,10 @@ Conf(N).plugins（`docs/config.md`「名前空間の設定の解決」）の名�
 | 2 | それ以外 | `proc.MalformedOutput` |
 | それ以外 | — | `proc.Crashed` |
 
+## 信頼の前提
+
+プラグインは利用者が `hozo.toml` に名前を書いて選んだコードで、hozoc と同じユーザーの権限で動く子プロセス。protoc のプラグインと同じ信頼モデルで、サンドボックスも、応答の `files` 以外のファイルの変化の検出も行わない。hozoc が確かめるのは応答の形だけ（PLG-1 / PLG-2、CFG-5）。IR の取得と出力の書き込みを標準入出力に限るのは、プラグインを単純に書けるようにするための約束で、強制ではない。
+
 ## 要求と応答
 
 すべての要求は `protocol`（`docs/ir.md` の `version` と同じ値。`view.version` とも等しい）と `direction` を持つ。プラグインは `protocol` が合わなければ `code: "protocol"`、`direction` を実装していなければ `code: "unsupported"` の `error` を返して終了コード 2 で終わる。

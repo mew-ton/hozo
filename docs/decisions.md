@@ -52,6 +52,8 @@
 | 42 | 既定値のリテラルは `scalar` の元の型に対して検査する | `docs/types.md`「既定値」 |
 | 43 | 名前空間の出力先 Dir(N) は、`out` を書いた最も近い祖先からのセグメントをパスにして足す。`View` に全名前空間の設定と Dir を持たせる | `docs/config.md`「名前空間の設定の解決」、`docs/ir.md`「その名前空間から見た IR」 |
 | 44 | THROWS-1 と Sig は `external` の例外を同じく数えず、`@throws` は `external` の例外も書ける | `docs/check.md`「throws」「名前空間」 |
+| 45 | プラグインは protoc と同じ信頼モデル。隔離も、応答以外のファイルの変化の検出も行わない | `docs/plugin-protocol.md`「信頼の前提」 |
+| 46 | `cli` の語彙は go-cli が提供し、hozoc には同梱しない | `docs/vocab.md`「同梱しない語彙」 |
 
 ## スコープ外にした設計書の例
 
