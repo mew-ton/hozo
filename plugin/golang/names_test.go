@@ -11,6 +11,7 @@ func TestTypeName(t *testing.T) {
 		{"server.admin.Report", "server.admin", "Report"},
 		{"db", "", "Db"},
 		{"browser.getMe$in", "browser", "GetMeInInput"},
+		{"web.getUser$in$auth", "web", "GetUserInAuthInput"},
 		{"server.User", "browser", "ServerUser"},
 		{"server.OrderPage.Ready", "server", "OrderPageReady"},
 		{"server.type", "server", "Type"},

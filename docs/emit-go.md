@@ -29,7 +29,7 @@
 |---|---|
 | 宣言名（型の位置） | 先頭を大文字に（NAME-1 は warning なので小文字で始まる名前も来る） |
 | 合成した model `OrderPage.Ready`（`docs/ir.md`「正規化」） | 宣言した名前空間より後ろのセグメントをそれぞれ先頭大文字にして連結: `OrderPageReady` |
-| `bind` で合成した model `browser.getMe$in`（`docs/ir.md`「その名前空間から見た IR」） | `<Op><Param>Input`: `GetMeInInput` |
+| `bind` で合成した model `browser.getMe$in`、入れ子なら `web.getUser$in$auth`（`docs/ir.md`「その名前空間から見た IR」） | `$` のセグメントをそれぞれ先頭大文字にして連結し `Input` を付ける: `GetMeInInput`、`GetUserInAuthInput` |
 | op の引数名、配線の束縛名 | そのまま。Go の予約語、事前宣言の識別子（`error`、`string`、`nil`、`len` など）、生成したコードが使う名前（`ctx`、`o`、`err`、`ptr`）と同じなら末尾に `_` |
 | フィールド名 | 先頭を大文字に（`id` → `Id`、`userId` → `UserId`）。`json:"<元の名前>"` タグ。省略可能なら `,omitempty` |
 | op 名 | 先頭を大文字に（メソッド名） |

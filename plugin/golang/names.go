@@ -66,8 +66,10 @@ func TypeName(fqn, namespace string) string {
 		rest = fqn[len(namespace)+1:]
 	}
 	suffix := ""
-	if i := strings.IndexByte(rest, '$'); i >= 0 {
-		rest = rest[:i] + "." + rest[i+1:]
+	if strings.IndexByte(rest, '$') >= 0 {
+		// bind で合成した model `<op>$<param>[$<field>...]`（docs/ir.md「その名前空間から見た IR」）は、
+		// `$` のセグメントもそれぞれ先頭大文字にして連結し、末尾に Input（docs/emit-go.md「名前」）。
+		rest = strings.ReplaceAll(rest, "$", ".")
 		suffix = "Input"
 	}
 	var b strings.Builder
