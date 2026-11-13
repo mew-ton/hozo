@@ -69,7 +69,7 @@ func copyHozo(t *testing.T, src, dst string) {
 }
 
 // TestModelCorpus は「モデルが先」の決定（docs/decisions.md「設計書を変える決定」S10〜S12）が IR と検査に現れることを、
-// tests/corpus/model で確かめる: 宣言に付けた印のデコレータ（名前空間には付けられない）、hozo.toml にテーブルのない名前空間（出力しない。検査は同じ）、
+// tests/corpus/model で確かめる: 宣言に付けた印のデコレータ（名前空間には付けられない）、どの単位の対象でもない名前空間（出力しない。検査は同じ）、
 // どのプラグインも読まない印のデコレータ（throws を宣言していれば Signature に効く）。
 // サブテストの名前は tests/corpus/model/README.md の「見出し → 構文」の表の見出し。
 func TestModelCorpus(t *testing.T) {
@@ -124,21 +124,22 @@ func TestModelCorpus(t *testing.T) {
 		expect(t, "leave のデコレータ", renderApplications(opOf(t, prog, "customer.leave").Decorators), []string{"@marks.manual"})
 	})
 
-	t.Run("config.md 出力する名前空間", func(t *testing.T) {
-		// View を持つ（出力する）のはテーブルのある shop だけ。View.namespaces にも設定のない名前空間は入らない
-		views := p.Views()
+	t.Run("config.md 単位の対象", func(t *testing.T) {
+		// View を持つ（出力する）のは、単位の対象の shop だけ。View.namespaces にも、どの単位の対象でもない名前空間は入らない
+		views := viewsOf(p)
+		expect(t, "単位の数", len(p.Views()), 1)
 		expect(t, "View を持つ名前空間", keysOf(views), []string{"shop"})
 		expect(t, "View.namespaces", keysOf(views["shop"].Namespaces), []string{"shop"})
 		for _, ns := range []string{"marks", "carrier", "customer"} {
-			if _, ok := p.Dir(ns); ok {
-				t.Errorf("Dir(%s) がある（テーブルのない名前空間は出力先を持たない）", ns)
+			if n := len(p.Config.Covering(ns)); n != 0 {
+				t.Errorf("%s を対象にする単位が %d ある（単位の対象でない名前空間は出力先を持たない）", ns, n)
 			}
-			// 設定のない名前空間も Program にはそのまま入る（プラグインは全体を読める）
+			// 単位の対象でない名前空間も Program にはそのまま入る（トランスパイラは全体を読める）
 			if views["shop"].Program.Namespace(ns) == nil {
 				t.Errorf("View(shop).program に名前空間 %s がない", ns)
 			}
 		}
-		// View.ops はすべての op（設定のない名前空間のものも）を shop から見た Sig で持つ
+		// View.ops はすべての op（単位の対象でない名前空間のものも）を shop から見た Sig で持つ
 		for _, op := range []string{"shop.addToCart", "shop.placeOrder", "shop.fulfill", "carrier.pickup", "customer.pick", "customer.buy", "customer.leave"} {
 			if views["shop"].Ops[op] == nil {
 				t.Errorf("View(shop).ops に %s がない", op)
@@ -167,7 +168,7 @@ func TestModelCorpus(t *testing.T) {
 	})
 
 	t.Run("check.md 計算/手順 0（配線）: 名前空間をまたぐ伝播", func(t *testing.T) {
-		// 設定のある shop の配線が、設定のない carrier の op を呼ぶ
+		// 単位の対象の shop の配線が、対象でない carrier の op を呼ぶ
 		expect(t, "fulfill の Signature", sigOf(opOf(t, prog, "shop.fulfill").Signature), sig{
 			E: []string{"marks.NotApproved", "carrier.Closed"}, F: []string{"shop.createOrder", "carrier.accept"},
 			Rel: []string{
@@ -176,7 +177,7 @@ func TestModelCorpus(t *testing.T) {
 			},
 			Succ: []string{"shop.createOrder = kept", "carrier.accept = kept"},
 		})
-		// 設定のない customer の配線が、設定のある shop の op を呼ぶ。検査（THROWS-1 など）は同じに掛かり、Signature も計算される
+		// 単位の対象でない customer の配線が、対象の shop の op を呼ぶ。検査（THROWS-1 など）は同じに掛かり、Signature も計算される
 		expect(t, "buy の Signature", sigOf(opOf(t, prog, "customer.buy").Signature), sig{
 			E: []string{"shop.OutOfStock", "marks.NotApproved", "carrier.Closed"},
 			F: []string{"customer.forget", "shop.addLine", "shop.createOrder", "carrier.accept"},
@@ -192,21 +193,27 @@ func TestModelCorpus(t *testing.T) {
 		})
 	})
 
-	t.Run("emit-go.md 出力の対象/プラグインのない名前空間は何も出力しない", func(t *testing.T) {
-		// shop はテーブルを持つ（出力する名前空間）が、プラグインが一つも設定されていない。出力するのはプラグインが選んだ宣言だけ
-		// なので、emit は何も書かない。印のデコレータ（@marks.*）も何も生成しない（docs/emit-go.md「デコレータ」）。
+	t.Run("emit-go.md 出力の対象/何も選ばれなかった名前空間は何も出力しない", func(t *testing.T) {
+		// shop は単位の対象（出力する名前空間）だが、その単位のトランスパイラ none は何も選ばない。出力するのはトランスパイラが
+		// 選んだ宣言だけなので、emit は何も書かない。印のデコレータ（@marks.*）も何も生成しない（docs/emit-go.md「デコレータ」）。
 		// 前回の出力（.hozoc-outputs.json にあるもの）は古いファイルとして消え、記録も残らない（docs/cli.md「emit」の 6 と 8）。
+		requireSh(t)
 		dir := t.TempDir()
 		copyHozo(t, modelCorpus, dir)
+		manifest, err := os.ReadFile(filepath.Join(modelCorpus, "plugins", "none", "hozo-plugin.toml"))
+		if err != nil {
+			t.Fatal(err)
+		}
 		toml, err := os.ReadFile(filepath.Join(modelCorpus, "hozo.toml"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		files := map[string]string{
-			"hozo.toml":                    string(toml),
-			"gen/shop/ops.go":              "package shop // 前回の emit が書いたもの\n",
-			"gen/shop/.hozoc-outputs.json": "[\n  \"gen/shop/ops.go\"\n]\n",
-			"gen/shop/hand.go":             "package shop // 人が書いたもの。記録にないので触らない\n",
+			"hozo.toml":                     string(toml),
+			"plugins/none/hozo-plugin.toml": string(manifest),
+			"gen/shop/ops.go":               "package shop // 前回の emit が書いたもの\n",
+			"gen/shop/.hozoc-outputs.json":  "[\n  \"gen/shop/ops.go\"\n]\n",
+			"gen/shop/hand.go":              "package shop // 人が書いたもの。記録にないので触らない\n",
 		}
 		for name, content := range files {
 			path := filepath.Join(dir, filepath.FromSlash(name))
@@ -241,7 +248,7 @@ func TestModelCorpus(t *testing.T) {
 		if !q.NoConfig || len(q.Diags) != 0 {
 			t.Fatalf("NoConfig=%v diags=%v", q.NoConfig, q.Diags)
 		}
-		expect(t, "View を持つ名前空間", keysOf(q.Views()), []string{})
+		expect(t, "View を持つ名前空間", keysOf(viewsOf(q)), []string{})
 		expect(t, "buy の Signature.effects", q.Sema.Program.Lookup("customer.buy").(*ir.Op).Signature.Effects,
 			[]string{"customer.forget", "shop.addLine", "shop.createOrder", "carrier.accept"})
 		var stdout, stderr bytes.Buffer
@@ -293,5 +300,5 @@ func TestDesignPlaceOrderRelations(t *testing.T) {
 		Rel: []string{"server.NotificationFailed / server.notifyUser = prevented"}, Succ: []string{"server.notifyUser = kept"},
 	})
 	// browser から見ても同じ（external なデコレータは付いていない）
-	expect(t, "View(browser) の placeOrder", sigOf(p.Views()["browser"].Ops["server.placeOrder"].Signature), want)
+	expect(t, "View(browser) の placeOrder", sigOf(viewsOf(p)["browser"].Ops["server.placeOrder"].Signature), want)
 }

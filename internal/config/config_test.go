@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/diag"
@@ -17,18 +18,16 @@ sources      = ["**/*.hozo"]
 plugin_dirs  = ["plugins"]
 max_bindings = 5
 
-[browser]
-language = "go"
-plugins  = ["react-router"]
-out      = "web/src/generated"
+[[emit]]
+in          = ["api/**/*.hozo"]
+namespace   = "server"
+transpilers = ["go-http", "sqlc"]
+out         = "api/internal/generated"
 
-[server]
-language = "go"
-plugins  = ["go-cli"]
-out      = "internal/gen"
-
-[server.admin]
-plugins = []
+[[emit]]
+namespace   = "server"
+transpilers = ["go-cli"]
+out         = "cmd/gen"
 `
 
 func write(t *testing.T, content string) string {
@@ -50,8 +49,6 @@ func codes(diags []diag.Diagnostic) []string {
 	return out
 }
 
-func str(s string) *string { return &s }
-
 func TestLoadExample(t *testing.T) {
 	p := write(t, example)
 	cfg, diags := Load(p)
@@ -65,185 +62,160 @@ func TestLoadExample(t *testing.T) {
 	if !reflect.DeepEqual(cfg.Hozo, wantHozo) {
 		t.Errorf("Hozo = %+v, want %+v", cfg.Hozo, wantHozo)
 	}
-	want := map[string]NamespaceTable{
-		"browser":      {Language: str("go"), Plugins: []string{"react-router"}, Out: str("web/src/generated")},
-		"server":       {Language: str("go"), Plugins: []string{"go-cli"}, Out: str("internal/gen")},
-		"server.admin": {Plugins: []string{}},
+	want := []Unit{
+		{Index: 1, In: []string{"api/**/*.hozo"}, Namespace: "server", Transpilers: []string{"go-http", "sqlc"}, Out: "api/internal/generated"},
+		{Index: 2, Namespace: "server", Transpilers: []string{"go-cli"}, Out: "cmd/gen"}, // in を省けば nil
 	}
-	if !reflect.DeepEqual(cfg.Namespaces, want) {
-		t.Errorf("Namespaces = %+v, want %+v", cfg.Namespaces, want)
+	if !reflect.DeepEqual(cfg.Units, want) {
+		t.Errorf("Units = %+v, want %+v", cfg.Units, want)
 	}
-	if got := cfg.NamespaceNames(); !reflect.DeepEqual(got, []string{"browser", "server", "server.admin"}) {
-		t.Errorf("NamespaceNames = %v", got)
+	if got := cfg.UnitNamespaces(); !reflect.DeepEqual(got, []string{"server"}) {
+		t.Errorf("UnitNamespaces = %v", got)
+	}
+	if got := cfg.Units[1].Label(); got != `2 番目の [[emit]]（namespace = "server"、out = "cmd/gen"）` {
+		t.Errorf("Label = %s", got)
 	}
 }
 
 func TestLoadDefaults(t *testing.T) {
-	cfg, diags := Load(write(t, "[server]\nlanguage = \"go\"\nout = \"gen\"\n"))
+	cfg, diags := Load(write(t, "[[emit]]\nnamespace = \"server\"\ntranspilers = [\"t\"]\nout = \"gen\"\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %+v", diags)
 	}
 	if !reflect.DeepEqual(cfg.Hozo.Sources, DefaultSources) || len(cfg.Hozo.PluginDirs) != 0 || cfg.Hozo.MaxBindings != DefaultMaxBindings {
 		t.Errorf("defaults: %+v", cfg.Hozo)
 	}
-	if cfg.Namespaces["server"].Plugins != nil {
-		t.Errorf("plugins should be nil when unset")
+	if len(cfg.Units) != 1 || cfg.Units[0].In != nil {
+		t.Errorf("Units = %+v", cfg.Units)
 	}
-	conf, ok := cfg.Resolve("server")
-	if !ok || len(conf.Plugins) != 0 || conf.Plugins == nil {
-		t.Errorf("Resolve: %+v %v", conf, ok)
-	}
-}
-
-// docs/config.md「形」: インラインテーブルも子の名前空間。
-func TestLoadInlineChild(t *testing.T) {
-	cfg, diags := Load(write(t, "[server]\nlanguage = \"go\"\nout = \"gen\"\nadmin = { plugins = [\"go-cli\"] }\n"))
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %+v", diags)
-	}
-	if !reflect.DeepEqual(cfg.Namespaces["server.admin"], NamespaceTable{Plugins: []string{"go-cli"}}) {
-		t.Errorf("server.admin = %+v", cfg.Namespaces["server.admin"])
+	// [[emit]] が一つもなくてもよい（何も出力しない）
+	cfg, diags = Load(write(t, "# 単位なし\n"))
+	if len(diags) != 0 || len(cfg.Units) != 0 {
+		t.Errorf("no units: %+v %+v", cfg.Units, diags)
 	}
 }
 
-// docs/config.md「名前空間の設定の解決」。
-func TestResolve(t *testing.T) {
-	cfg, diags := Load(write(t, example+"\n[server.admin.audit]\nout = \"internal/audit\"\n"))
+// units は namespace と out の組から単位の列を作る hozo.toml。
+func units(pairs ...string) string {
+	var b strings.Builder
+	for i := 0; i+1 < len(pairs); i += 2 {
+		b.WriteString("[[emit]]\nnamespace = \"" + pairs[i] + "\"\ntranspilers = [\"t\"]\nout = \"" + pairs[i+1] + "\"\n")
+	}
+	return b.String()
+}
+
+// docs/config.md「単位の対象」の手続き（CFG-13）。
+func TestCovering(t *testing.T) {
+	// 0: server、1: browser、2: server（同じ名前空間の二つ目の単位）、3: server.admin（子孫を名指しする単位）
+	cfg, diags := Load(write(t, units("server", "gen/api", "browser", "gen/web", "server", "gen/cli", "server.admin", "gen/admin")))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %+v", diags)
 	}
 	cases := []struct {
 		ns   string
-		want NamespaceConf
-		ok   bool
+		want []int
 	}{
-		{"server", NamespaceConf{Language: "go", Plugins: []string{"go-cli"}, Out: "internal/gen"}, true},
-		// 子は書いたキーだけ上書き。out は同じ値
-		{"server.admin", NamespaceConf{Language: "go", Plugins: []string{}, Out: "internal/gen"}, true},
-		// 孫: out は自分、plugins は親（空）、language は祖父
-		{"server.admin.audit", NamespaceConf{Language: "go", Plugins: []string{}, Out: "internal/audit"}, true},
-		// テーブルのない子は親を引き継ぐ
-		{"server.other", NamespaceConf{Language: "go", Plugins: []string{"go-cli"}, Out: "internal/gen"}, true},
-		{"server.admin.x.y", NamespaceConf{Language: "go", Plugins: []string{}, Out: "internal/gen"}, true},
-		// どこにもなければ未設定
-		{"unknown", NamespaceConf{}, false},
-		{"", NamespaceConf{}, false},
+		// 同じ名前空間を複数の単位に書ける（設定の順）
+		{"server", []int{0, 2}},
+		{"browser", []int{1}},
+		// 単位は namespace とすべての子孫を対象にする
+		{"server.other", []int{0, 2}},
+		{"server.other.deep", []int{0, 2}},
+		{"browser.pages", []int{1}},
+		// 別の単位が子孫を namespace に書いていれば、その子孫とその下は祖先の単位の対象から外れる
+		{"server.admin", []int{3}},
+		{"server.admin.audit", []int{3}},
+		// どの単位の対象でもない
+		{"unknown", nil},
+		{"serverx", nil},
+		{"", nil},
 	}
 	for _, c := range cases {
-		got, ok := cfg.Resolve(c.ns)
-		if ok != c.ok || !reflect.DeepEqual(got, c.want) {
-			t.Errorf("Resolve(%q) = %+v, %v; want %+v, %v", c.ns, got, ok, c.want, c.ok)
+		if got := cfg.Covering(c.ns); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("Covering(%q) = %v, want %v", c.ns, got, c.want)
 		}
-	}
-	// 返した Plugins を書き換えても設定は変わらない
-	got, _ := cfg.Resolve("server")
-	got.Plugins[0] = "x"
-	if cfg.Namespaces["server"].Plugins[0] != "go-cli" {
-		t.Error("Resolve must copy plugins")
 	}
 }
 
-// docs/config.md「名前空間の設定の解決」の Dir(N)。
+// docs/config.md「単位の対象」の Dir(U, N)。
 func TestDir(t *testing.T) {
-	cfg, diags := Load(write(t, example+`
-[server.admin.audit]
-out = "internal/audit"
-
-[server.ops]
-out = "internal/gen"
-`))
+	cfg, diags := Load(write(t, units("server", "internal/gen", "server.admin", "./internal/admin/", "server", "cmd/gen")))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %+v", diags)
 	}
 	cases := []struct {
+		unit int
 		ns   string
 		want string
-		ok   bool
 	}{
-		// out を自分で書いた名前空間は P が空
-		{"server", "internal/gen", true},
-		{"browser", "web/src/generated", true},
-		// 親の out を継いだ子はそのセグメントのサブディレクトリ
-		{"server.admin", "internal/gen/admin", true},
-		// テーブルのない子も同じ
-		{"server.other", "internal/gen/other", true},
-		{"server.other.deep", "internal/gen/other/deep", true},
-		// 親と同じ out を自分でも書いた子は、自分が A なので P は空
-		{"server.ops", "internal/gen", true},
-		{"server.ops.x", "internal/gen/x", true},
-		// 三段: 孫が out を書けば孫が A
-		{"server.admin.audit", "internal/audit", true},
-		{"server.admin.audit.log", "internal/audit/log", true},
-		// 孫のテーブルが out を書かなければ、out を書いた最も近い祖先（server）から
-		{"server.admin.x.y", "internal/gen/admin/x/y", true},
-		// どこにもなければ未設定
-		{"unknown", "", false},
-		{"", "", false},
+		// 単位の namespace 自身は out
+		{0, "server", "internal/gen"},
+		// 子孫は、namespace からのセグメントをパスにして足す
+		{0, "server.other", "internal/gen/other"},
+		{0, "server.other.deep", "internal/gen/other/deep"},
+		// 同じ名前空間の別の単位は、自分の out の下
+		{2, "server", "cmd/gen"},
+		{2, "server.other", "cmd/gen/other"},
+		// out は ./ や余分な / を取り除いた形
+		{1, "server.admin", "internal/admin"},
+		{1, "server.admin.audit", "internal/admin/audit"},
 	}
 	for _, c := range cases {
-		got, ok := cfg.Dir(c.ns)
-		if ok != c.ok || got != c.want {
-			t.Errorf("Dir(%q) = %q, %v; want %q, %v", c.ns, got, ok, c.want, c.ok)
+		if got := cfg.Dir(c.unit, c.ns); got != c.want {
+			t.Errorf("Dir(%d, %q) = %q, want %q", c.unit, c.ns, got, c.want)
 		}
-	}
-}
-
-func TestDirWithoutOut(t *testing.T) {
-	// 祖先のどれも out を書いていなければ P は空で、Dir は Conf.out（""）のまま。
-	cfg, diags := Load(write(t, "[a]\nlanguage = \"go\"\n"))
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %+v", diags)
-	}
-	if got, ok := cfg.Dir("a.b"); !ok || got != "" {
-		t.Errorf("Dir(a.b) = %q, %v", got, ok)
-	}
-}
-
-func TestResolvePartialParent(t *testing.T) {
-	// 親に language だけ、子に out だけ
-	cfg, diags := Load(write(t, "[a]\nlanguage = \"go\"\n[a.b]\nout = \"gen\"\n"))
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %+v", diags)
-	}
-	if got, ok := cfg.Resolve("a.b"); !ok || got.Language != "go" || got.Out != "gen" {
-		t.Errorf("a.b = %+v", got)
-	}
-	// 親だけでは out が未設定（CFG-1 は check が判定する）
-	if got, ok := cfg.Resolve("a"); !ok || got.Out != "" || got.Language != "go" {
-		t.Errorf("a = %+v", got)
 	}
 }
 
 func TestDiagnostics(t *testing.T) {
+	unit := "[[emit]]\nnamespace = \"server\"\ntranspilers = [\"t\"]\nout = \"x\"\n"
 	cases := []struct {
-		name string
-		toml string
-		want []string
+		name  string
+		toml  string
+		want  []string
+		units int // 残る単位の数
 	}{
-		{"bad toml", "[server\nlanguage = \"go\"\n", []string{"CFG-7"}},
-		{"unknown top-level key", "foo = 1\n", []string{"CFG-7"}},
-		{"unknown hozo key", "[hozo]\nfoo = 1\n", []string{"CFG-7"}},
-		{"unknown namespace key", "[server]\nlanguage = \"go\"\nout = \"x\"\nfoo = \"bar\"\n", []string{"CFG-7"}},
-		{"language wrong type", "[server]\nlanguage = 1\n", []string{"CFG-7"}},
-		{"language unknown", "[server]\nlanguage = \"rust\"\n", []string{"CFG-7"}},
-		{"language ts", "[server]\nlanguage = \"ts\"\nout = \"x\"\n", []string{"CFG-11"}},
-		{"out wrong type", "[server]\nout = [\"x\"]\n", []string{"CFG-7"}},
-		{"plugins wrong type", "[server]\nplugins = \"go-cli\"\n", []string{"CFG-7"}},
-		{"plugins element wrong type", "[server]\nplugins = [1]\n", []string{"CFG-7"}},
-		{"sources wrong type", "[hozo]\nsources = \"**/*.hozo\"\n", []string{"CFG-7"}},
-		{"plugin_dirs wrong type", "[hozo]\nplugin_dirs = [1]\n", []string{"CFG-7"}},
-		{"max_bindings wrong type", "[hozo]\nmax_bindings = \"5\"\n", []string{"CFG-7"}},
-		{"max_bindings negative", "[hozo]\nmax_bindings = -1\n", []string{"CFG-7"}},
-		{"hozo not a table", "hozo = 1\n", []string{"CFG-7"}},
-		{"array of tables", "[[server]]\nlanguage = \"go\"\n", []string{"CFG-7"}},
-		{"reserved table language", "[language]\nout = \"x\"\n", []string{"CFG-2"}},
-		{"reserved table plugins", "[plugins]\n", []string{"CFG-2"}},
-		{"reserved table out", "[out]\n", []string{"CFG-2"}},
-		{"reserved child hozo", "[server.hozo]\n", []string{"CFG-2"}},
-		{"reserved child language", "[server.language]\nx = 1\n", []string{"CFG-2"}},
-		{"reserved child plugins table", "[server.plugins]\n", []string{"CFG-2"}},
-		{"reserved child out", "[server.out]\n", []string{"CFG-2"}},
-		{"several", "[server]\nlanguage = \"rust\"\nfoo = 1\n[out]\n", []string{"CFG-2", "CFG-7", "CFG-7"}},
+		{"bad toml", "[[emit\nnamespace = \"go\"\n", []string{"CFG-7"}, 0},
+		{"unknown top-level key", "foo = 1\n", []string{"CFG-7"}, 0},
+		// 名前空間ごとのテーブルはない: [hozo] と [[emit]] 以外のトップレベルのキーは知らないキー
+		{"namespace table", "[server]\nlanguage = \"go\"\nout = \"x\"\n", []string{"CFG-7"}, 0},
+		{"table named language", "[language]\nout = \"x\"\n", []string{"CFG-7"}, 0},
+		{"unknown hozo key", "[hozo]\nfoo = 1\n", []string{"CFG-7"}, 0},
+		{"unknown unit key", unit + "language = \"go\"\n", []string{"CFG-7"}, 0},
+		{"emit is a table", "[emit]\nnamespace = \"server\"\ntranspilers = [\"t\"]\nout = \"x\"\n", []string{"CFG-7"}, 0},
+		{"emit is a value", "emit = 1\n", []string{"CFG-7"}, 0},
+		{"namespace wrong type", "[[emit]]\nnamespace = 1\ntranspilers = [\"t\"]\nout = \"x\"\n", []string{"CFG-7"}, 0},
+		{"out wrong type", "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"t\"]\nout = [\"x\"]\n", []string{"CFG-7"}, 0},
+		{"transpilers wrong type", "[[emit]]\nnamespace = \"a\"\ntranspilers = \"t\"\nout = \"x\"\n", []string{"CFG-7"}, 0},
+		{"transpilers element wrong type", "[[emit]]\nnamespace = \"a\"\ntranspilers = [1]\nout = \"x\"\n", []string{"CFG-7"}, 0},
+		{"transpilers twice", "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"t\", \"t\"]\nout = \"x\"\n", []string{"CFG-7"}, 0},
+		{"in wrong type", unit + "in = \"*.hozo\"\n", []string{"CFG-7"}, 0},
+		{"sources wrong type", "[hozo]\nsources = \"**/*.hozo\"\n", []string{"CFG-7"}, 0},
+		{"plugin_dirs wrong type", "[hozo]\nplugin_dirs = [1]\n", []string{"CFG-7"}, 0},
+		{"max_bindings wrong type", "[hozo]\nmax_bindings = \"5\"\n", []string{"CFG-7"}, 0},
+		{"max_bindings negative", "[hozo]\nmax_bindings = -1\n", []string{"CFG-7"}, 0},
+		{"hozo not a table", "hozo = 1\n", []string{"CFG-7"}, 0},
+		// CFG-12: 必須のキーがない、または空
+		{"no namespace", "[[emit]]\ntranspilers = [\"t\"]\nout = \"x\"\n", []string{"CFG-12"}, 0},
+		{"no transpilers", "[[emit]]\nnamespace = \"a\"\nout = \"x\"\n", []string{"CFG-12"}, 0},
+		{"no out", "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"t\"]\n", []string{"CFG-12"}, 0},
+		{"empty unit", "[[emit]]\n", []string{"CFG-12"}, 0},
+		{"empty namespace", "[[emit]]\nnamespace = \"\"\ntranspilers = [\"t\"]\nout = \"x\"\n", []string{"CFG-12"}, 0},
+		{"empty transpilers", "[[emit]]\nnamespace = \"a\"\ntranspilers = []\nout = \"x\"\n", []string{"CFG-12"}, 0},
+		{"empty transpiler name", "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"\"]\nout = \"x\"\n", []string{"CFG-12"}, 0},
+		{"empty out", "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"t\"]\nout = \"\"\n", []string{"CFG-12"}, 0},
+		// CFG-12 の単位は使わないが、ほかの単位は残る
+		{"one bad unit", unit + "[[emit]]\nnamespace = \"b\"\n", []string{"CFG-12"}, 1},
+		// CFG-17: 二つの単位の out が同じか、一方が他方の下
+		{"same out", units("a", "gen", "b", "gen"), []string{"CFG-17"}, 2},
+		{"same out after cleaning", units("a", "gen/x", "b", "./gen//x/"), []string{"CFG-17"}, 2},
+		{"nested out", units("a", "gen", "b", "gen/b"), []string{"CFG-17"}, 2},
+		{"nested out the other way", units("a", "gen/a/deep", "b", "gen/a"), []string{"CFG-17"}, 2},
+		{"descendant unit under ancestor out", units("server", "gen", "server.admin", "gen/admin"), []string{"CFG-17"}, 2},
+		{"same namespace same out", units("a", "gen", "a", "gen"), []string{"CFG-17"}, 2},
+		{"root out overlaps everything", units("a", ".", "b", "gen"), []string{"CFG-17"}, 2},
+		{"sibling outs are fine", units("a", "gen/a", "b", "gen/b", "a", "gen/ab"), nil, 3},
+		{"several", "[server]\n" + unit + "foo = 1\n[[emit]]\nout = \"y\"\n", []string{"CFG-12", "CFG-7", "CFG-7"}, 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -255,6 +227,9 @@ func TestDiagnostics(t *testing.T) {
 			if got := codes(diags); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("codes = %v, want %v (%+v)", got, c.want, diags)
 			}
+			if len(cfg.Units) != c.units {
+				t.Errorf("Units = %+v, want %d", cfg.Units, c.units)
+			}
 			for _, d := range diags {
 				if d.Severity != diag.Error || d.File != p || d.Span != nil || d.Message == "" {
 					t.Errorf("bad diagnostic %+v", d)
@@ -265,15 +240,12 @@ func TestDiagnostics(t *testing.T) {
 }
 
 func TestLoadKeepsValidParts(t *testing.T) {
-	cfg, diags := Load(write(t, "[server]\nlanguage = \"go\"\nout = \"gen\"\nfoo = 1\n[out]\n"))
+	cfg, diags := Load(write(t, "[hozo]\nmax_bindings = 3\nfoo = 1\n"+units("server", "gen")+"[out]\n"))
 	if len(diags) != 2 {
 		t.Fatalf("diags = %+v", diags)
 	}
-	if conf, ok := cfg.Resolve("server"); !ok || conf.Language != "go" || conf.Out != "gen" {
-		t.Errorf("server = %+v, %v", conf, ok)
-	}
-	if _, ok := cfg.Namespaces["out"]; ok {
-		t.Error("reserved table must not be kept")
+	if cfg.Hozo.MaxBindings != 3 || len(cfg.Units) != 1 || cfg.Units[0].Namespace != "server" {
+		t.Errorf("cfg = %+v", cfg)
 	}
 }
 
@@ -314,21 +286,10 @@ func TestFind(t *testing.T) {
 
 func TestDefault(t *testing.T) {
 	cfg := Default("/x")
-	if cfg.Root != "/x" || cfg.Path != "" || cfg.Hozo.MaxBindings != DefaultMaxBindings || len(cfg.Namespaces) != 0 {
+	if cfg.Root != "/x" || cfg.Path != "" || cfg.Hozo.MaxBindings != DefaultMaxBindings || len(cfg.Units) != 0 {
 		t.Errorf("Default = %+v", cfg)
 	}
-	if _, ok := cfg.Resolve("server"); ok {
-		t.Error("Default must not resolve any namespace")
-	}
-}
-
-func TestIsReservedNamespaceName(t *testing.T) {
-	for _, n := range []string{"language", "plugins", "out", "hozo"} {
-		if !IsReservedNamespaceName(n) {
-			t.Errorf("%s should be reserved", n)
-		}
-	}
-	if IsReservedNamespaceName("server") {
-		t.Error("server should not be reserved")
+	if got := cfg.Covering("server"); got != nil {
+		t.Errorf("Default must not cover any namespace: %v", got)
 	}
 }

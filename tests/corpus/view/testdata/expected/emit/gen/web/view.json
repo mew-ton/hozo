@@ -1,32 +1,43 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "viewer": "web",
   "config": {
     "language": "go",
     "out": "gen/web",
     "dir": "gen/web",
-    "plugins": [
+    "transpilers": [
       "view-dump"
     ]
   },
+  "files": [
+    "api.hozo",
+    "t.hozo",
+    "web.hozo"
+  ],
   "namespaces": {
-    "api": {
-      "language": "go",
-      "out": "gen/api",
-      "dir": "gen/api",
-      "plugins": []
-    },
-    "web": {
-      "language": "go",
-      "out": "gen/web",
-      "dir": "gen/web",
-      "plugins": [
-        "view-dump"
-      ]
-    }
+    "api": [
+      {
+        "language": "go",
+        "out": "gen/api",
+        "dir": "gen/api",
+        "transpilers": [
+          "view-none"
+        ]
+      }
+    ],
+    "web": [
+      {
+        "language": "go",
+        "out": "gen/web",
+        "dir": "gen/web",
+        "transpilers": [
+          "view-dump"
+        ]
+      }
+    ]
   },
   "program": {
-    "version": "0.1",
+    "version": "0.2",
     "namespaces": [
       {
         "name": "",

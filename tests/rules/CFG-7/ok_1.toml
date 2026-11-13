@@ -1,13 +1,16 @@
 # 知っているキーだけ、型も正しい
 [hozo]
 sources      = ["**/*.hozo"]
-plugin_dirs  = []
+plugin_dirs  = ["plugins"]
 max_bindings = 5
 
-[a]
-language = "go"
-plugins  = []
-out      = "gen/a"
+[[emit]]
+in          = ["*.hozo"]
+namespace   = "a"
+transpilers = ["go", "go-b"]
+out         = "gen/a"
 
-[a.sub]
-plugins = []
+[[emit]]
+namespace   = "a.sub"
+transpilers = ["go"]
+out         = "gen/sub"

@@ -1,0 +1,4 @@
+// CFG-7（docs/config.md「診断」）: 一つの単位の transpilers に同じ名前が二度ある（ng_5.toml）
+namespace a {
+  op f();
+}

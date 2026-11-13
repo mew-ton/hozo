@@ -1,8 +1,8 @@
-[hozoc]
-language = "go"
-plugins  = ["go-cli"]
-out      = "internal/gen/hozoc"
-
 [hozo]
 sources     = ["cli.hozo"]      # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "hozoc"
+transpilers = ["go-cli"]
+out         = "internal/gen/hozoc"

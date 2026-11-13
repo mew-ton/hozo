@@ -1,9 +1,14 @@
 # http は語彙の名前空間 → CFG-8
 # ERROR: CFG-8
-[a]
-language = "go"
-out      = "gen/a"
+[hozo]
+plugin_dirs = ["plugins"]
 
-[http]
-language = "go"
-out      = "gen/http"
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "http"
+transpilers = ["go"]
+out         = "gen/http"

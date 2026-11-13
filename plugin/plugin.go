@@ -18,7 +18,7 @@ import (
 )
 
 // Handler はプラグインが実装する三つの方向（direction）。
-// 実装しない方向は ErrUnsupported を返す。Main はそれを
+// 実装しない方向と、Emit で知らないトランスパイラ（EmitRequest.Transpiler）は ErrUnsupported を返す。Main はそれを
 // docs/plugin-protocol.md「起動」の code "unsupported"（終了コード 2）にする。
 type Handler interface {
 	Emit(req *EmitRequest) (*EmitResponse, error)
@@ -26,16 +26,18 @@ type Handler interface {
 	Import(req *ImportRequest) (*ImportResponse, error)
 }
 
-// ErrUnsupported は、Handler がその direction を実装していないときに返す誤り。
+// ErrUnsupported は、Handler がその direction か、要求のトランスパイラを実装していないときに返す誤り。
 // errors.Is で比べるので、包んで返してもよい。
 var ErrUnsupported = errors.New("plugin: direction not supported")
 
 // EmitRequest は direction "emit" の要求（docs/plugin-protocol.md「emit」）。
-// View.Viewer が対象の名前空間。
+// Transpiler は起動されたトランスパイラの名前（マニフェストの [[transpiler]] の name）。複数のトランスパイラを
+// 提供するプラグインは、この名前で処理を分ける。View.Viewer が対象の名前空間で、View.Config がその単位の設定。
 type EmitRequest struct {
-	Protocol  string   `json:"protocol"`
-	Direction string   `json:"direction"`
-	View      *ir.View `json:"view"`
+	Protocol   string   `json:"protocol"`
+	Direction  string   `json:"direction"`
+	Transpiler string   `json:"transpiler"`
+	View       *ir.View `json:"view"`
 }
 
 // EmitResponse は "emit" の応答。Errors が一つでもあれば hozoc は Files を書き出さない。
@@ -48,7 +50,8 @@ type EmitResponse struct {
 }
 
 // Select は、既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN はどれも View.Viewer の
-// 名前空間の宣言。そこにない FQN や、Wraps がその op に付いていないデコレータを指していれば PLG-3。
+// 名前空間の宣言で、単位の対象のもの（View.InUnit）。そこにない FQN や、Wraps がその op に付いていないデコレータを
+// 指していれば PLG-3。
 // hozoc がここから出力の対象を決める手順は docs/emit-go.md「出力の対象」。
 type Select struct {
 	// Roots は起点にする op。
@@ -67,9 +70,10 @@ type Wrap struct {
 	Decorator string `json:"decorator"`
 }
 
-// OpsWith は view.Viewer の名前空間の op のうち、デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。
-// 名前付きデコレータを通して付いたもの（Application.Via）も数える。デコレータで起点を選ぶプラグインのための道具
-// （docs/plugin-protocol.md「選択」）。一つもなければ空の列（nil ではない）。
+// OpsWith は view.Viewer の名前空間の op のうち、単位の対象（Span.File が view.Files にある。docs/config.md「in」）で、
+// デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。名前付きデコレータを通して付いたもの
+// （Application.Via）も数える。デコレータで起点を選ぶトランスパイラのための道具（docs/plugin-protocol.md「選択」）で、
+// 返す op はどれも select に書ける。一つもなければ空の列（nil ではない）。
 func OpsWith(view *ir.View, decorator string) []string {
 	out := []string{}
 	if view == nil || view.Program == nil {
@@ -79,9 +83,13 @@ func OpsWith(view *ir.View, decorator string) []string {
 	if ns == nil {
 		return out
 	}
+	files := map[string]bool{}
+	for _, f := range view.Files {
+		files[f] = true
+	}
 	for _, d := range ns.Decls {
 		op, ok := d.(*ir.Op)
-		if !ok {
+		if !ok || !files[op.Span.File] {
 			continue
 		}
 		for _, app := range op.Decorators {
@@ -250,7 +258,11 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 // handlerError は Handler の誤りを終了コードにする。ErrUnsupported なら 2、それ以外は 1。
 func handlerError(out, errOut io.Writer, direction string, err error) int {
 	if errors.Is(err, ErrUnsupported) {
-		return refuse(out, errOut, "unsupported", fmt.Sprintf("direction %q is not supported", direction))
+		msg := fmt.Sprintf("direction %q is not supported", direction)
+		if err != ErrUnsupported { // 包んであれば、その文（どのトランスパイラを知らないか、など）も伝える
+			msg = err.Error()
+		}
+		return refuse(out, errOut, "unsupported", msg)
 	}
 	return fail(errOut, fmt.Errorf("%s: %w", direction, err))
 }

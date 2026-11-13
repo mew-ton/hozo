@@ -1,6 +1,7 @@
 package gocli
 
 import (
+	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -39,7 +40,7 @@ func handlerFor(root string) Handler {
 
 func emit(t *testing.T, h Handler, v *ir.View) *plugin.EmitResponse {
 	t.Helper()
-	resp, err := h.Emit(&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", View: v})
+	resp, err := h.Emit(&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: TranspilerName, View: v})
 	if err != nil {
 		t.Fatalf("Emit: %v", err)
 	}
@@ -130,13 +131,13 @@ func TestEmitIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestEmitUsesDir は出力先と import パスが View.config.dir（Dir(N)）から求まること（docs/plugin-go-cli.md「出力」）。
-// 親の out を継いだ名前空間では dir が out のサブディレクトリになっている。
+// TestEmitUsesDir は出力先と import パスが View.config.dir（Dir(U, N)）から求まること（docs/plugin-go-cli.md「出力」）。
+// 単位の namespace の子孫では dir が out のサブディレクトリになっている。
 func TestEmitUsesDir(t *testing.T) {
 	v := hozocView()
 	v.Config.Out = "internal/gen"
 	v.Config.Dir = "internal/gen/hozoc"
-	v.Namespaces[v.Viewer] = v.Config
+	v.Namespaces[v.Viewer] = []ir.NamespaceConfig{v.Config}
 	resp := emit(t, handlerFor(repoRoot(t)), v)
 	if len(resp.Errors) != 0 {
 		t.Fatalf("errors = %+v", resp.Errors)
@@ -177,6 +178,42 @@ func TestEmitDefaultRootIsCwd(t *testing.T) {
 	}
 	if !strings.Contains(resp.Files[0].Content, `"github.com/mew-ton/hozo/plugins/go-cli/internal/gocli/internal/gen/hozoc"`) {
 		t.Errorf("import path should be relative to cwd:\n%s", resp.Files[0].Content[:600])
+	}
+}
+
+// TestEmitUnknownTranspiler は docs/plugin-go-cli.md「マニフェスト」: 提供するトランスパイラは go-cli の一つ。
+// 要求の transpiler がそれ以外なら plugin.ErrUnsupported（plugin.Main が code "unsupported" にする）。
+func TestEmitUnknownTranspiler(t *testing.T) {
+	for _, name := range []string{"", "go-http"} {
+		_, err := handlerFor(repoRoot(t)).Emit(&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: name, View: hozocView()})
+		if !errors.Is(err, plugin.ErrUnsupported) {
+			t.Errorf("transpiler %q: err = %v, want ErrUnsupported", name, err)
+		}
+	}
+}
+
+// TestEmitOnlyUnitOps は docs/plugin-go-cli.md「対象」: サブコマンドにするのは単位の対象の op（View.files のファイルに
+// 書かれたもの）だけ。in の外の @cli.command の op は、起点にも選ばない（選べば PLG-3）。
+func TestEmitOnlyUnitOps(t *testing.T) {
+	ns := hozocNamespace()
+	extra := opDecl("hozoc.batch", "in の外で宣言したコマンド。", nil, nil, nil, cliCommand("batch"))
+	extra.Span.File = "batch.hozo"
+	ns.Decls = append(ns.Decls, extra)
+	v := view(ns, "internal/gen/hozoc")
+	v.Files = []string{"cli.hozo"} // batch.hozo は単位の in に合わない
+	resp := emit(t, handlerFor(repoRoot(t)), v)
+	if len(resp.Errors) != 0 || len(resp.Files) != 1 {
+		t.Fatalf("resp = %+v", resp)
+	}
+	if strings.Contains(resp.Files[0].Content, "Batch") || strings.Contains(strings.Join(resp.Select.Roots, ","), "hozoc.batch") {
+		t.Errorf("op outside in became a command: roots = %v", resp.Select.Roots)
+	}
+	checkGolden(t, "hozoc_cli.go.golden", resp.Files[0].Content) // in の外の op がなかったときと同じ
+	// in を省いた単位なら、サブコマンドになる
+	v.Files = []string{"batch.hozo", "cli.hozo"}
+	resp = emit(t, handlerFor(repoRoot(t)), v)
+	if len(resp.Files) != 1 || !strings.Contains(resp.Files[0].Content, "Batch") || !strings.Contains(strings.Join(resp.Select.Roots, ","), "hozoc.batch") {
+		t.Errorf("op in the unit is not a command: roots = %v", resp.Select.Roots)
 	}
 }
 

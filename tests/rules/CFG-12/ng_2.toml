@@ -1,0 +1,9 @@
+# transpilers が空 → CFG-12
+# ERROR: CFG-12
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = []
+out         = "gen/a"

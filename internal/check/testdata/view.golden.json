@@ -1,38 +1,51 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "viewer": "browser",
   "config": {
     "language": "go",
     "out": "gen/browser",
     "dir": "gen/browser",
-    "plugins": [
+    "transpilers": [
       "react-router"
     ]
   },
+  "files": [
+    "browser.hozo",
+    "server.hozo"
+  ],
   "namespaces": {
-    "browser": {
-      "language": "go",
-      "out": "gen/browser",
-      "dir": "gen/browser",
-      "plugins": [
-        "react-router"
-      ]
-    },
-    "server": {
-      "language": "go",
-      "out": "gen/server",
-      "dir": "gen/server",
-      "plugins": []
-    },
-    "server.admin": {
-      "language": "go",
-      "out": "gen/server",
-      "dir": "gen/server/admin",
-      "plugins": []
-    }
+    "browser": [
+      {
+        "language": "go",
+        "out": "gen/browser",
+        "dir": "gen/browser",
+        "transpilers": [
+          "react-router"
+        ]
+      },
+      {
+        "language": "go",
+        "out": "gen/browser2",
+        "dir": "gen/browser2",
+        "transpilers": [
+          "vue-router",
+          "pinia"
+        ]
+      }
+    ],
+    "server": [
+      {
+        "language": "go",
+        "out": "gen/server",
+        "dir": "gen/server",
+        "transpilers": [
+          "t"
+        ]
+      }
+    ]
   },
   "program": {
-    "version": "0.1",
+    "version": "0.2",
     "namespaces": [
       {
         "name": "http",

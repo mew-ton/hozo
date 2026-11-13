@@ -1,8 +1,9 @@
-# テストの fixture: a.legacy に対応しないプラグイン。起動しない
+# テストの fixture: トランスパイラ goplug は a.legacy に対応しない。起動しない
 name     = "goplug"
 command  = ["true"]
-language = "go"
-protocol = "0.1"
+protocol = "0.2"
 
-[emit]
+[[transpiler]]
+name        = "goplug"
+language    = "go"
 unsupported = ["a.legacy"]

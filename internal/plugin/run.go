@@ -85,7 +85,7 @@ func (e *PluginError) Error() string {
 // file はマニフェストのパス（診断の File）。
 func (e *PluginError) Diagnostic(file string) diag.Diagnostic {
 	code := "MAN-5"
-	msg := fmt.Sprintf("プラグイン %s はこの direction を実装していない: %s", e.Plugin, e.Message)
+	msg := fmt.Sprintf("プラグイン %s はこの direction かトランスパイラを実装していない: %s", e.Plugin, e.Message)
 	if e.Code == CodeProtocol {
 		code = "MAN-2"
 		msg = fmt.Sprintf("プラグイン %s の protocol が合わない: %s", e.Plugin, e.Message)

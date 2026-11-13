@@ -55,7 +55,7 @@ func cleanRel(p string) string {
 	return p
 }
 
-// excluder は除くディレクトリの集合（各名前空間の out と plugin_dirs。docs/config.md「形」）。
+// excluder は除くディレクトリの集合（各単位の out と plugin_dirs。docs/config.md「形」）。
 type excluder []string
 
 // excluded は rel（"/" 区切りの相対パス）が除くディレクトリの下にあるか。

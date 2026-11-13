@@ -79,7 +79,7 @@ func TestExampleLogout(t *testing.T) {
 	}
 
 	// browser から見れば投げる
-	views := Views(p, cfgFor("server", "browser"))
+	views := viewsOf(p, cfgFor("server", "browser"))
 	vs := views["browser"].Ops["server.logout"]
 	wantStrings(t, "View(browser).server.logout.E", vs.Exceptions, []string{"http.ServerError", "http.NetworkError"})
 	if got := vs.Relations[0].State; got != ir.Unknown {

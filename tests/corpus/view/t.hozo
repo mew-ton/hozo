@@ -1,5 +1,5 @@
 // テストの語彙。docs/vocab.md「読み込み」: 語彙の名前空間にはユーザーが宣言を足せる。t は標準の語彙にない名前空間で、
-// state も op も持たないので hozo.toml に設定は要らない（docs/config.md CFG-1 の対象外）。
+// どの単位の対象でもないので出力しない（docs/config.md「単位の対象」）。
 
 /** テストの語彙 */
 namespace t {

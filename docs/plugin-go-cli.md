@@ -9,16 +9,18 @@
 ```toml
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-language = "go"
-protocol = "0.1"
+protocol = "0.2"
 
 vocabulary = ["cli.hozo"]
 
-[emit]
+[[transpiler]]
+name     = "go-cli"
+language = "go"
 ```
 
+- 提供するトランスパイラは `go-cli` の一つ（`hozo.toml` の `transpilers = ["go-cli"]` で選ぶ）。要求の `transpiler` がそれ以外なら `code: "unsupported"`（`docs/plugin-protocol.md`「要求と応答」）。
 - `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`cli.hozo` の中身は `examples/hozoc.hozo` の `namespace cli` を写し、`x?: T` は `x: T?` に直す。
-- 選ぶもの（`docs/plugin-protocol.md`「選択」）: `roots` は `@cli.command` の付いた op、`stops` は `@proc.stdio` の付いた op（プロセスの境界を越える op は辿らず、口だけを出す）。`states` と `wraps` は空。
+- 選ぶもの（`docs/plugin-protocol.md`「選択」）: `roots` は `@cli.command` の付いた op、`stops` は `@proc.stdio` の付いた op（プロセスの境界を越える op は辿らず、口だけを出す）。どちらも単位の対象の op だけ（`plugin.OpsWith`）。`states` と `wraps` は空。
 - `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため（作業ディレクトリがリポジトリのルートで、`go.mod` がある）。配布するときはビルドした実行ファイル `hozoc-plugin-go-cli` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go-cli/` に置く（`docs/plugin-protocol.md`「探索」）。
 
 ## 出力
@@ -47,7 +49,7 @@ type JSONPresenter struct{}
 
 ## 対象
 
-`View.viewer` の名前空間の op のうち、`@cli.command(name)` の付いたものがサブコマンド。
+`View.viewer` の名前空間の op のうち、単位の対象（`docs/config.md`「in」。`View.files`）で、`@cli.command(name)` の付いたものがサブコマンド。
 
 - 引数は 0 個か、model 一つ。それ以外は CLI-1。
 - 引数の model の各フィールドは、`@cli.arg`、`@cli.flag(name)`、`@cli.env(name)` のどれかを持つ。`@cli.env` は `@cli.arg` か `@cli.flag` と一緒に付けられる（与えられなかったときの代わり）。`@cli.arg` と `@cli.flag` の両方、またはどれもなければ CLI-2。
@@ -92,7 +94,7 @@ usage: hozoc <command> [flags]
 
 commands:
   check   仕様を検査する。ファイルは書き出さない
-  emit    仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す
+  emit    仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す
 ```
 
 - コマンドの一行は `Op.description.summary`。コマンドごとの使い方は、フィールドの `description.summary` を `--flag` / `ARG` / `ENV` と並べる。

@@ -208,7 +208,7 @@ func serverSelect() plugin.Select {
 // serverView は server から見た View。
 func serverView() *ir.View {
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), httpNS(), serverNS()}}
-	v := &ir.View{Viewer: "server", Config: nsConfig("server"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "server", Config: nsConfig("server"), Namespaces: namespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range p.Namespace("server").Decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
@@ -341,7 +341,7 @@ func browserView() *ir.View {
 		DeclBase: base("browser.getMe$in", nil), SynthesizedFrom: "server.getMe",
 		Fields: []ir.Field{field("verbose", ir.Boolean())},
 	})
-	v := &ir.View{Viewer: "browser", Config: nsConfig("browser", "router"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "browser", Config: nsConfig("browser", "router"), Namespaces: namespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range ns.Decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
@@ -415,7 +415,7 @@ func constraintView() *ir.View {
 		&ir.Op{DeclBase: base("inventory.put", nil), Params: []ir.OpParam{param("item", ir.Ref("inventory.Item"))}},
 	}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, valid, inv}}
-	return &ir.View{Viewer: "inventory", Config: nsConfig("inventory"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	return &ir.View{Viewer: "inventory", Config: nsConfig("inventory"), Namespaces: namespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 }
 
 // constraintSelect は inventory の選択: put が起点。
@@ -456,7 +456,7 @@ func derivedView() *ir.View {
 			}}},
 	}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, cat}}
-	v := &ir.View{Viewer: "catalog", Config: nsConfig("catalog"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "catalog", Config: nsConfig("catalog"), Namespaces: namespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range cat.Decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
@@ -682,8 +682,8 @@ func stateSelect(viewer string) plugin.Select {
 }
 
 // stateNamespaces は state のテストの View.Namespaces。
-func stateNamespaces() map[string]ir.NamespaceConfig {
-	return map[string]ir.NamespaceConfig{"shop": nsConfig("shop"), "depot": nsConfig("depot")}
+func stateNamespaces() map[string][]ir.NamespaceConfig {
+	return map[string][]ir.NamespaceConfig{"shop": {nsConfig("shop")}, "depot": {nsConfig("depot")}}
 }
 
 // stateView は viewer（shop か depot）から見た View。bind は shop.token を shop の op に。
@@ -692,7 +692,7 @@ func stateView(viewer string) *ir.View {
 		Namespaces: []ir.Namespace{{Name: ""}, validVocab(), shopNS(), depotNS()},
 		Binds:      []ir.Bind{{Namespace: "shop", State: "shop.token", Target: ir.BindTarget{Namespace: "shop"}, Span: sp("x.hozo", 1)}},
 	}
-	v := &ir.View{Viewer: viewer, Config: nsConfig(viewer), Namespaces: stateNamespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: viewer, Config: nsConfig(viewer), Namespaces: stateNamespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range p.Namespace(viewer).Decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}

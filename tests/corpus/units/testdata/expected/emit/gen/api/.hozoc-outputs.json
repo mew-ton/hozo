@@ -1,0 +1,8 @@
+[
+  "gen/api/doc.go",
+  "gen/api/ops.go",
+  "gen/api/states.go",
+  "gen/api/types.go",
+  "gen/api/validate.go",
+  "gen/api/wiring.go"
+]

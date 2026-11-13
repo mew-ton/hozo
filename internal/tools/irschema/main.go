@@ -66,7 +66,7 @@ func Schema() (map[string]any, error) {
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"$id":     "https://github.com/mew-ton/hozo/schema/ir.schema.json",
 		"title":   "Hozo IR",
-		"description": "Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（プラグインに渡すもの）。" +
+		"description": "Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（トランスパイラに渡すもの）。" +
 			"$defs にはプラグインのプロトコル（docs/plugin-protocol.md「要求と応答」）の要求と応答も含む。" +
 			"Go の ir / plugin パッケージから internal/tools/irschema が生成する。手で編集しない。",
 		"oneOf": []any{ref("Program"), ref("View")},
@@ -233,13 +233,13 @@ var descriptions = map[string]string{
 	"ArgValue":             "デコレータの引数の値の種類（docs/ir.md「デコレータの適用」）。kind で分ける。",
 	"Bind":                 "bind 宣言（docs/ir.md「bind」）。",
 	"BindTarget":           "bind の対象（docs/ir.md「bind」）。deep は `**`。",
-	"View":                 "その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。プラグインに渡すもの。",
-	"NamespaceConfig":      "一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。",
+	"View":                 "その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。トランスパイラに渡すもの。単位と名前空間の組ごとに一つ。",
+	"NamespaceConfig":      "単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。",
 	"ViewedSignature":      "viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」）。",
-	"EmitRequest":          "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。",
+	"EmitRequest":          "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。transpiler は起動するトランスパイラの名前。",
 	"EmitResponse":         "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。select を省けば何も選ばない。",
-	"Select":               "既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN は view.viewer の名前空間の宣言。",
-	"Wrap":                 "プラグインが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。",
+	"Select":               "既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN は view.viewer の名前空間の、単位の対象の宣言。",
+	"Wrap":                 "トランスパイラが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。",
 	"CheckRequest":         "direction \"check\" の要求（docs/plugin-protocol.md「check」）。",
 	"CheckResponse":        "\"check\" の応答（docs/plugin-protocol.md「check」）。",
 	"ImportRequest":        "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",

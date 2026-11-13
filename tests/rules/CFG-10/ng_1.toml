@@ -1,9 +1,14 @@
-# b のテーブルがあるが .hozo に b はない → CFG-10
+# 二つ目の単位の namespace b が .hozo にない → CFG-10
 # ERROR: CFG-10
-[a]
-language = "go"
-out      = "gen/a"
+[hozo]
+plugin_dirs = ["plugins"]
 
-[b]
-language = "go"
-out      = "gen/b"
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go"]
+out         = "gen/b"

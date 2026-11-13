@@ -1,0 +1,35 @@
+// 名前空間 shop の前半。単位 2（in = ["shop/api.hozo"]）の対象の宣言はこのファイルのものだけ（docs/config.md「in」）。
+
+/** 店 */
+namespace shop {
+  /** 品物。id は別の名前空間 stock の型 */
+  model Item { id: stock.ItemId; name: string; }
+  /** 領収書 */
+  model Receipt { item: Item; }
+
+  /** 売れた品物 */
+  state items: list<Item>;
+  /** 品物を足す */
+  effect addItem on items.post;
+
+  // docs/emit-go.md「出力の対象」2: nightly は shop/batch.hozo で宣言した配線。単位 2 では in の外なので、
+  // 辿られたら選ぶが本体は辿らず、口だけを出す。単位 3（in なし）では本体を出す
+  /** 品物を売る */
+  @t.api
+  op open(item: Item): Receipt
+    throws stock.Short
+  {
+    stock.reserve(item.id);
+    save(item);
+    nightly(item);
+    const receipt = issue(item);
+    return receipt;
+  }
+
+  /** 品物を記録する */
+  op save(item: Item)
+    effects addItem;
+
+  /** 領収書を出す */
+  op issue(item: Item): Receipt;
+}

@@ -18,7 +18,7 @@ import (
 // TestProtocolRun は JSON の要求を plugin.Run に通し、応答の形（docs/plugin-protocol.md「emit」）を確かめる。
 func TestProtocolRun(t *testing.T) {
 	root := repoRoot(t)
-	req, err := json.Marshal(plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", View: hozocView()})
+	req, err := json.Marshal(plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: TranspilerName, View: hozocView()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestProtocolErrors(t *testing.T) {
 	root := repoRoot(t)
 	ns := hozocNamespace()
 	ns.Decls = append(ns.Decls, opDecl("hozoc.dup", "", nil, nil, nil, cliCommand("check")))
-	req, _ := json.Marshal(plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", View: view(ns, "internal/gen/hozoc")})
+	req, _ := json.Marshal(plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: TranspilerName, View: view(ns, "internal/gen/hozoc")})
 	var out, errOut bytes.Buffer
 	code := plugin.Run(handlerFor(root), bytes.NewReader(req), &out, &errOut)
 	if code != 0 {
@@ -90,7 +90,7 @@ func TestProtocolUnsupportedDirections(t *testing.T) {
 func TestPluginBinary(t *testing.T) {
 	goBin := goTool(t)
 	root := repoRoot(t)
-	req, _ := json.Marshal(plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", View: hozocView()})
+	req, _ := json.Marshal(plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: TranspilerName, View: hozocView()})
 	cmd := exec.Command(goBin, "run", "github.com/mew-ton/hozo/plugins/go-cli")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "HOZO_PROJECT_ROOT="+root, "HOZO_PLUGIN_DIR="+filepath.Join(root, "plugins", "go-cli"))
@@ -120,9 +120,9 @@ func TestManifest(t *testing.T) {
 	checks := map[string]*regexp.Regexp{
 		"name":     regexp.MustCompile(`(?m)^name\s*=\s*"go-cli"$`),
 		"command":  regexp.MustCompile(`(?m)^command\s*=\s*\["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"\]$`),
-		"language": regexp.MustCompile(`(?m)^language\s*=\s*"go"$`),
 		"protocol": regexp.MustCompile(`(?m)^protocol\s*=\s*"` + regexp.QuoteMeta(ir.Version) + `"$`),
-		"emit":     regexp.MustCompile(`(?m)^\[emit\]$`),
+		// 提供するトランスパイラは一つ: 名前は TranspilerName、言語は go
+		"transpiler": regexp.MustCompile(`(?m)^\[\[transpiler\]\]\nname\s*=\s*"` + regexp.QuoteMeta(TranspilerName) + `"\nlanguage\s*=\s*"go"$`),
 	}
 	for name, re := range checks {
 		if !re.MatchString(s) {
@@ -132,6 +132,9 @@ func TestManifest(t *testing.T) {
 	// 何を選ぶかはマニフェストには書かない（docs/plugin-protocol.md「マニフェスト」）。書けば知らないキー（MAN-4）
 	if regexp.MustCompile(`(?m)^(entry|stop|decorate)\s*=`).MatchString(s) {
 		t.Errorf("manifest must not have entry / stop / decorate:\n%s", s)
+	}
+	if strings.Count(s, "[[transpiler]]") != 1 {
+		t.Errorf("manifest must provide exactly one transpiler:\n%s", s)
 	}
 	if !strings.Contains(s, `vocabulary = ["cli.hozo"]`) {
 		t.Error("manifest must provide the cli vocabulary (docs/plugin-go-cli.md「マニフェスト」)")

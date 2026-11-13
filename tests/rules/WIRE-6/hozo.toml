@@ -1,7 +1,10 @@
 # WIRE-6 の閾値を 2 にする（docs/config.md「形」の max_bindings）
+
 [hozo]
 max_bindings = 2
+plugin_dirs = ["plugins"]
 
-[a]
-language = "go"
-out      = "gen/a"
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

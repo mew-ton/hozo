@@ -1,4 +1,9 @@
 # max_bindings を書かなければ既定の 5（docs/check.md「配線」）
-[a]
-language = "go"
-out      = "gen/a"
+
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

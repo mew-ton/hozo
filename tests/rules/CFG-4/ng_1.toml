@@ -1,9 +1,0 @@
-# a は go だが tsplug は ts → CFG-4
-# ERROR: CFG-4
-[hozo]
-plugin_dirs = ["plugins"]
-
-[a]
-language = "go"
-plugins  = ["tsplug"]
-out      = "gen/a"

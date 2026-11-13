@@ -1,0 +1,17 @@
+// CFG-7（docs/config.md「形」）: 名前空間の名前に使えない名前はない。hozo.toml のキーと同じ名前（out、language、
+// plugins、emit、hozo）の名前空間も書ける（既定の hozo.toml）
+namespace a {
+  op f();
+}
+namespace a.out {
+  op g();
+}
+namespace language {
+  op h();
+}
+namespace plugins {
+  model M { id: string; }
+}
+namespace hozo {
+  op i();
+}

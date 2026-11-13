@@ -28,7 +28,7 @@ internal/app/          hozoc の葉の op の実装と表示
 internal/lsp/          言語サーバー
 internal/gen/hozoc/    cli.hozo からの生成物（段階 3 から）
 internal/tools/        go generate の道具
-plugins/<name>/        プラグイン。一つのディレクトリが一つの実行ファイルと hozo-plugin.toml。Go なら main パッケージ、TS なら npm パッケージ
+plugins/<name>/        プラグイン。一つのディレクトリが一つの実行ファイルと hozo-plugin.toml（提供するトランスパイラの一覧を持つ）。Go なら main パッケージ、TS なら npm パッケージ
 sdk/ts/                TS 向けプラグイン SDK
 schema/                IR の JSON スキーマ
 vocab/                 標準の語彙の .hozo と、それを embed する公開パッケージ vocab（go:embed はパッケージのディレクトリの外を参照できないため）
@@ -66,6 +66,7 @@ runtime → (標準ライブラリだけ)
 func (p *Program) Lookup(fqn string) Decl          // 宣言を引く。なければ nil
 func (p *Program) Namespace(fqn string) *Namespace
 func (v *View) Signature(op string) *ViewedSignature
+func (v *View) InUnit(fqn string) bool             // viewer の名前空間の宣言で、単位の対象か（span.file が View.files にある。docs/config.md「in」）
 ```
 
 ### `plugin`（公開）
@@ -78,17 +79,17 @@ type Handler interface {
     Check(req *CheckRequest) (*CheckResponse, error)
     Import(req *ImportRequest) (*ImportResponse, error)
 }
-type EmitRequest struct { Protocol string; Direction string; View *ir.View }
+type EmitRequest struct { Protocol string; Direction string; Transpiler string; View *ir.View }   // Transpiler は起動されたトランスパイラの名前
 type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic; Select Select }
 type Select struct { Roots, Stops, States []string; Wraps []Wrap }   // docs/plugin-protocol.md「選択」
 type Wrap struct { Op, Decorator string }
-func OpsWith(view *ir.View, decorator string) []string             // view.viewer の op のうち、そのデコレータ（FQN。via も見る）が付いたものの FQN
+func OpsWith(view *ir.View, decorator string) []string             // view.viewer の op のうち、単位の対象（View.InUnit）で、そのデコレータ（FQN。via も見る）が付いたものの FQN
 // CheckRequest / CheckResponse / ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
 
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。終了コードを返す。
 func Main(h Handler) int
 func Run(h Handler, in io.Reader, out, errOut io.Writer) int   // Main の中身。テスト用
-// 実装しない方向は ErrUnsupported を返す。Main は docs/plugin-protocol.md「起動」の code "unsupported" で終わる
+// 実装しない方向と、Emit で知らない Transpiler は ErrUnsupported を返す。Main は docs/plugin-protocol.md「起動」の code "unsupported" で終わる
 var ErrUnsupported error
 ```
 
@@ -177,8 +178,9 @@ type Locator func(ir.Span) (source.Span, bool)               // IR の行・列�
 func FileSetLocator(fs *source.FileSet) Locator
 type Checker struct { Locate Locator }
 func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic   // Compute を呼んでから規則を検査する。Locate が nil なら Span は nil で File だけ
-func (c Checker) CheckUnsupported(p *ir.Program, ns string, unsupported []string) []diag.Diagnostic   // CFG-6。unsupported はマニフェストから
-func Views(p *ir.Program, cfg *config.Config) map[string]*ir.View   // 設定のある名前空間ごとの View
+func (c Checker) CheckUnsupported(p *ir.Program, ns string, files []string, unsupported []string) []diag.Diagnostic   // CFG-6。files は単位の in に合ったファイル、unsupported はマニフェストから
+type Unit struct { Language string; Files []string }         // 設定の外で決まる単位の情報: 言語（マニフェストから）と、in に合ったファイル
+func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.View   // 単位ごと（cfg.Units と同じ順）の、出力する名前空間 → View
 ```
 
 規則ごとに一つのファイル（`throws.go`、`bind.go`、…）。各関数のコメントに規則の ID。
@@ -188,15 +190,17 @@ func Views(p *ir.Program, cfg *config.Config) map[string]*ir.View   // 設定の
 `docs/config.md`。
 
 ```go
-type Config struct { Root, Path string; Hozo HozoTable; Namespaces map[string]NamespaceTable }
-func Load(path string) (*Config, []diag.Diagnostic)        // CFG-2 / CFG-7 / CFG-11 はここで出る。Config は常に返す（既定値で補う）
+type Config struct { Root, Path string; Hozo HozoTable; Units []Unit }
+type Unit struct { Index int; In []string; Namespace string; Transpilers []string; Out string }   // [[emit]] 一つ。Index は何番目か（1 始まり）。In は省略なら nil
+func Load(path string) (*Config, []diag.Diagnostic)        // CFG-7 / CFG-12 / CFG-17 はここで出る。Config は常に返す（既定値で補う。CFG-12 の単位は Units に入れない）
 func Find(startDir string) (string, bool)
 func Default(root string) *Config                           // hozo.toml がないとき（Project.NoConfig）
-func (c *Config) Resolve(namespace string) (NamespaceConf, bool)   // 継承を解決した Conf(N)
-func (c *Config) Dir(namespace string) (string, bool)       // Dir(N)（docs/config.md「名前空間の設定の解決」）。ルートからの相対パス。Resolve が false なら false
-func (c *Config) NamespaceNames() []string                  // CFG-8 / CFG-10 のため
-func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo 側のため
+func (c *Config) Covering(namespace string) []int           // 名前空間を対象にする単位（Units の添字、設定の順）。CFG-13（docs/config.md「単位の対象」）
+func (c *Config) Dir(unit int, namespace string) string     // Dir(U, N)。ルートからの相対パス
+func (c *Config) UnitNamespaces() []string                  // 単位の namespace（重複なし、辞書順）。CFG-8 / CFG-10 のため
 ```
+
+言語とトランスパイラの解決（CFG-11 / CFG-14〜CFG-16）と `in` の照合（CFG-18）は、マニフェストと読んだファイルが要るので `internal/project` が行う。
 
 ### `internal/vocab`
 
@@ -210,12 +214,13 @@ func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo �
 type File struct { Path string; Content []byte }            // Path はルートからの相対パス（View.config.dir の下）
 type Options struct {
     Root     string
-    Select   plugin.Select     // 名前空間に設定されたプラグインの select を合わせたもの（docs/emit-go.md「出力の対象」）
-    Exported map[string]bool   // 別の Go の名前空間の出力が持つ型の FQN（その名前空間の Exports）。ここにある型は import し、ない型は複製する（docs/emit-go.md「配置」）
-}                                                            // 別の名前空間の言語と出力先は View.namespaces から読む
+    Select   plugin.Select       // 単位のトランスパイラの select を合わせたもの（docs/emit-go.md「出力の対象」）
+    Exported map[string]string   // 別の名前空間の型の FQN → それを持つ Go の出力のディレクトリ（Dir(U', M)）。ここにある型は import し、ない型は複製する（docs/emit-go.md「配置」）
+}                                                            // どの単位の出力がその型を持つかは、呼ぶ側（internal/app）が Exports から決める
 func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic)   // error があればファイルは返さない。何も選ばれていなければ何も返さない
 func Exports(view *ir.View, sel plugin.Select) []string     // sel から決まる出力の対象のうち、view.viewer の名前空間の型の FQN
-func Uses(view *ir.View, sel plugin.Select) []string        // 出力の対象が型を参照している、別の Go の名前空間
+func Uses(view *ir.View, sel plugin.Select) []string        // 出力の対象が型を参照している、別の名前空間
+func Imports(view *ir.View, opts Options) []string          // Emit が作るファイルが import する、別の出力のディレクトリ（Exported の値）。GOEMIT-5 の判定は呼ぶ側
 ```
 
 ### `internal/plugin`
@@ -223,14 +228,16 @@ func Uses(view *ir.View, sel plugin.Select) []string        // 出力の対象�
 ホスト側。`docs/plugin-protocol.md`。
 
 ```go
-type Manifest struct{ ... }
+type Manifest struct{ ...; Transpilers []Transpiler }
+type Transpiler struct { Name, Language string; Unsupported []string }                   // [[transpiler]] 一つ
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-2 / MAN-4
-func Discover(cfg *config.Config, name string) (*Manifest, string, []diag.Diagnostic)   // マニフェストとそのディレクトリ（絶対パス）。CFG-9 / MAN-3
+type Plugin struct { Name, Dir string; Manifest *Manifest; Mismatch []diag.Diagnostic } // 入っているプラグイン一つ。Dir は絶対パス。Mismatch は MAN-2（使うときにだけ報告する）
+func Discover(cfg *config.Config) ([]*Plugin, []diag.Diagnostic)                        // 入っているプラグインのすべて（docs/plugin-protocol.md「探索」の順）。MAN-3 / MAN-4
 type Runner struct { Root string; Stderr io.Writer; Env []string }
 func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）
 var ErrCrashed, ErrMalformedOutput error                                                // errors.Is で判定。*PluginError は exit 2 の code を持ち、MAN-2 / MAN-5 の診断にする
 func CheckSelect(plugin string, view *ir.View, sel sdk.Select) error                    // emit の応答の select を確かめる。誤りは PLG-3（ErrMalformedOutput）。sdk は公開の plugin パッケージ
-func MergeSelect(sels ...sdk.Select) sdk.Select                                         // 名前空間に設定されたプラグインの select を合わせる
+func MergeSelect(sels ...sdk.Select) sdk.Select                                         // 単位のトランスパイラの select を合わせる
 ```
 
 ### `internal/project`
@@ -243,10 +250,15 @@ type Project struct {
     NoConfig bool
     Files   *source.FileSet
     Sema    *sema.Result
+    Plugins []*plugin.Plugin         // 入っているプラグイン（internal/plugin.Discover）
+    Units   []Unit                   // 解決した単位（Config.Units と同じ順）
     Diags   []diag.Diagnostic        // 解析・解決・検査・設定・プラグインの check のすべて。並べ替え済み
 }
+type Unit struct { *config.Unit; Language string; Transpilers []Transpiler; Files []string }   // 言語、解決できたトランスパイラ、in に合ったファイル
+type Transpiler struct { Name string; Plugin *plugin.Plugin; Decl *plugin.Transpiler }
 func Load(root string, configPath string, overlay map[string][]byte) *Project   // NoConfig なら CFG-* の診断を除く
 func (p *Project) Errors() int
+func (p *Project) Views() []map[string]*ir.View                                 // 単位ごとの、出力する名前空間 → View（internal/check.Views）
 ```
 
 ### `internal/app`

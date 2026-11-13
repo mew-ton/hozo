@@ -1,0 +1,4 @@
+// CFG-17（docs/config.md「診断」）: 二つの単位の out が同じ（ng_1.toml）
+namespace a {
+  op f();
+}

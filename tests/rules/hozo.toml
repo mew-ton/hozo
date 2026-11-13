@@ -1,7 +1,12 @@
 # tests/rules の既定の設定（tests/rules_test.go）。規則のディレクトリに hozo.toml も <名前>.toml もない例に使う。
+# 単位は一つ: 名前空間 a を、既定の fixture（tests/rules/plugins/std）のトランスパイラ go で gen/a に出力する。
 # 例は名前空間 a に少なくとも一つ state か op を持つこと（持たなければ CFG-8、名前空間 a がなければ CFG-10）。
-# ほかの名前空間や、プラグイン、max_bindings が要る例は、規則のディレクトリに hozo.toml を置く。
+# ほかの名前空間や、別のトランスパイラ、max_bindings が要る例は、規則のディレクトリに hozo.toml を置く。
 
-[a]
-language = "go"
-out      = "gen/a"
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

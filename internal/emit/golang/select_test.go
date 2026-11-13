@@ -76,7 +76,7 @@ func selectionView() *ir.View {
 		&ir.Op{DeclBase: base("other.inner", nil)},
 	}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), app, other}}
-	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, ns := range []ir.Namespace{app, other} {
 		for _, d := range ns.Decls {
 			if op, ok := d.(*ir.Op); ok {
@@ -207,6 +207,77 @@ func TestSelection(t *testing.T) {
 		}
 		wantContains(t, "ops.go", contentOf(files, "gen/app/ops.go"), []string{"func New() Ops {\n\treturn &ops{}\n}", "type ops struct{}"}, []string{"Leaves"})
 		compileFiles(t, newProjectRoot(t), files)
+	})
+}
+
+// TestSelectionIn は docs/emit-go.md「出力の対象」の in（docs/config.md「in」）: 単位の対象でない宣言（View.Files にない
+// ファイルで宣言されたもの）は起点に選べず、選ばれた配線から辿られた op は口だけを出す（stops とまったく同じ扱い）。
+// 選ばれた宣言が参照する状態・分類・型は、in の外で宣言されていても出力する。
+func TestSelectionIn(t *testing.T) {
+	root := newProjectRoot(t)
+	v := selectionView()
+	// batch.hozo に書かれた宣言: 配線 mid、効果を持つ葉 addItem、型 Out と Nested、状態 items。単位の in は残りのファイルだけ
+	outside := map[string]bool{"app.mid": true, "app.addItem": true, "app.Out": true, "app.Nested": true, "app.items": true, "app.spare": true}
+	for _, d := range v.Program.Namespace("app").Decls {
+		if outside[d.Common().Name] {
+			d.Common().Span.File = "batch.hozo"
+		}
+	}
+	var files []string
+	for _, f := range allFiles(v.Program) {
+		if f != "batch.hozo" {
+			files = append(files, f)
+		}
+	}
+	v.Files = files
+
+	out, diags := Emit(v, Options{Root: root, Select: plugin.Select{Roots: []string{"app.root"}}})
+	if len(diags) > 0 {
+		t.Fatalf("診断が出た: %s", formatDiags(diags))
+	}
+	ops, states := contentOf(out, "gen/app/ops.go"), contentOf(out, "gen/app/states.go")
+	wiringGo, types := contentOf(out, "gen/app/wiring.go"), contentOf(out, "gen/app/types.go")
+	t.Run("in の外の配線は口だけを出し、本体は辿らない", func(t *testing.T) {
+		// mid は配線だが Leaves のフィールド。本体が呼ぶ k1 / k2 と、match が使う値の分類 Kind は選ばれない
+		wantContains(t, "ops.go", ops,
+			[]string{"type MidFunc func(in In) (In, error)", "return o.leaves.Mid(in)"},
+			[]string{"K1Func", "K2Func", "Classifiers"})
+		if !regexp.MustCompile(`(?m)^\tMid +MidFunc$`).MatchString(ops) {
+			t.Errorf("Leaves に Mid がない:\n%s", ops)
+		}
+		wantContains(t, "wiring.go", wiringGo, []string{"func (o *ops) Root(in In) (Out, error) {", "a, err := o.Mid(in)"}, []string{"func (o *ops) Mid("})
+		if c := contentOf(out, "gen/app/classify.go"); strings.Contains(c, "Kind") {
+			t.Errorf("辿らない本体の分類が出た:\n%s", c)
+		}
+	})
+	t.Run("in の外の効果を持つ葉は、その宛先の状態の命令になる", func(t *testing.T) {
+		wantContains(t, "states.go", states, []string{"type ItemsState struct {", "AddItem AddItemFunc"}, []string{"SpareState"})
+		wantContains(t, "ops.go", ops, []string{"return States.Items.AddItem(in)"}, nil)
+	})
+	t.Run("選ばれた宣言が参照する型は in の外でも出力する", func(t *testing.T) {
+		wantContains(t, "types.go", types, []string{"type In struct {", "type Out struct {", "type Nested struct{}"}, []string{"type Hidden", "type Spare"})
+		if got, want := strings.Join(Exports(v, plugin.Select{Roots: []string{"app.root"}}), ","), "app.In,app.Out,app.Nested,app.Deep"; got != want {
+			t.Errorf("Exports = %s, want %s", got, want)
+		}
+	})
+	compileFiles(t, root, out)
+
+	t.Run("in の外の宣言は起点にならない", func(t *testing.T) {
+		// PLG-3 は呼ぶ側（internal/plugin.CheckSelect）が出す。ここは黙って飛ばし、何も選ばれなければ何も出さない
+		sel := plugin.Select{Roots: []string{"app.mid", "app.addItem"}, States: []string{"app.items", "app.spare"}}
+		out, diags := Emit(v, Options{Root: root, Select: sel})
+		if len(out) != 0 || len(diags) != 0 {
+			t.Errorf("files = %v, diags = %s", paths(out), formatDiags(diags))
+		}
+	})
+	t.Run("in を省いた単位なら、同じ選択で本体まで出す", func(t *testing.T) {
+		v.Files = allFiles(v.Program)
+		out, diags := Emit(v, Options{Root: root, Select: plugin.Select{Roots: []string{"app.root"}}})
+		if len(diags) > 0 {
+			t.Fatalf("診断が出た: %s", formatDiags(diags))
+		}
+		wantContains(t, "wiring.go", contentOf(out, "gen/app/wiring.go"), []string{"func (o *ops) Mid(in In) (In, error) {"}, nil)
+		wantContains(t, "ops.go", contentOf(out, "gen/app/ops.go"), []string{"type K1Func func(", "Classifiers"}, nil)
 	})
 }
 

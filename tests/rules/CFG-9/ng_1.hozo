@@ -1,4 +1,0 @@
-// CFG-9（docs/config.md「診断」）: plugins の名前のプラグインが見つからない（ng_1.toml）
-namespace a {
-  op f();
-}

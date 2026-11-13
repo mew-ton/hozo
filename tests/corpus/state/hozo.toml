@@ -1,11 +1,11 @@
 # 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）のコーパス（docs/testing.md「コーパス」、README.md）。
 # check と、Go の既定の出力（docs/emit-go.md「state」「classify」「match」）のゴールデンを確かめる。
-# plugins はテスト用の pick（plugins/pick）: すべての op を起点にし、すべての状態を選ぶ（README.md「既定の出力」）。
+# トランスパイラはテスト用の pick（plugins/pick）: すべての op を起点にし、すべての状態を選ぶ（README.md「既定の出力」）。
 
 [hozo]
 plugin_dirs = ["plugins"]
 
-[shop]
-language = "go"
-out      = "gen/shop"
-plugins  = ["pick"]
+[[emit]]
+namespace   = "shop"
+transpilers = ["pick"]
+out         = "gen/shop"

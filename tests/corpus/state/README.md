@@ -4,8 +4,8 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | `[shop]`（`language = "go"`、`plugins = ["pick"]`） |
-| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`）のマニフェストと `pick.json`（`"all": true`）。すべての op を起点にし、すべての状態（基底の状態と状態の分類）を選ぶ。既定の出力はプラグインが選んだ宣言だけを出す（`docs/emit-go.md`「出力の対象」）ので、これがなければ何も出力されない |
+| `hozo.toml` | 単位が一つ: `namespace = "shop"`、`transpilers = ["pick"]`、`out = "gen/shop"` |
+| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`。トランスパイラ `pick` を提供する）のマニフェストと `pick.json`（`"all": true`）。すべての op を起点にし、すべての状態（基底の状態と状態の分類）を選ぶ。既定の出力はプラグインが選んだ宣言だけを出す（`docs/emit-go.md`「出力の対象」）ので、これがなければ何も出力されない |
 | `shop.hozo` | `namespace shop`。三つの形の基底の状態、状態の分類、組み込みの効果と遷移の効果、状態での `match` |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。更新は `go test ./tests -update` |
 | `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン（同 `TestCorpusEmitGolden`。書き出した Go は一時のモジュールで `go vet` も通す） |

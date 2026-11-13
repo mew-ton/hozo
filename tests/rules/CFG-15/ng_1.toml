@@ -1,0 +1,9 @@
+# dup は plugins/one と plugins/two の両方が提供している → CFG-15
+# ERROR: CFG-15
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["dup"]
+out         = "gen/a"

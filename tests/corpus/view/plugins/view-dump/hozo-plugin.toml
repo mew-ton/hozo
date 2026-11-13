@@ -1,8 +1,14 @@
-# テスト用のプラグイン（tests/view_test.go）。受け取った View をそのまま <view.config.dir>/view.json に書き出す。
-# 既定の出力の対象は、@t.entry の付いた op を起点に選ぶ（emit の応答の select）。
+# テスト用のプラグイン（tests/view_test.go）。トランスパイラを二つ提供する。
+# view-dump: 受け取った View をそのまま <view.config.dir>/view.json に書き出し、@t.entry の付いた op を起点に選ぶ（emit の応答の select）。
+# view-none: 何も書かず、何も選ばない。
 name     = "view-dump"
 command  = ["go", "run", "github.com/mew-ton/hozo/tests/corpus/view/plugins/view-dump"]
-language = "go"
-protocol = "0.1"
+protocol = "0.2"
 
-[emit]
+[[transpiler]]
+name     = "view-dump"
+language = "go"
+
+[[transpiler]]
+name     = "view-none"
+language = "go"

@@ -1,7 +1,9 @@
-# プラグインを読まない。plugins/ は sources から除くために plugin_dirs に書く
+# vocplug は入っているだけで、どの単位もそのトランスパイラを書いていないので、語彙を読まない（docs/vocab.md「読み込み」）
+
 [hozo]
 plugin_dirs = ["plugins"]
 
-[a]
-language = "go"
-out      = "gen/a"
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

@@ -2,7 +2,9 @@
 # ERROR: CFG-7
 [hozo]
 max_bindings = "many"
+plugin_dirs  = ["plugins"]
 
-[a]
-language = "go"
-out      = "gen/a"
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

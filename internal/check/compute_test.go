@@ -452,7 +452,7 @@ func TestSigExternal(t *testing.T) {
 		t.Errorf("THROWS-1 without message or data: %+v", d)
 	}
 	wantStrings(t, "Data.missing", d.Data["missing"].([]string), []string{"http.ServerError", "http.NetworkError"})
-	views := Views(p, cfgFor("server", "browser"))
+	views := viewsOf(p, cfgFor("server", "browser"))
 	wantStrings(t, "View(browser).ops[server.getMe].E", views["browser"].Ops["server.getMe"].Exceptions, []string{"http.ServerError", "http.NetworkError"})
 	wantStrings(t, "View(server).ops[server.getMe].E", views["server"].Ops["server.getMe"].Exceptions, nil)
 }

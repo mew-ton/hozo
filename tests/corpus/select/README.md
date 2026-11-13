@@ -1,14 +1,14 @@
 # コーパス `select`
 
-既定の出力が、プラグインの選んだ宣言だけを出すこと（`docs/emit-go.md`「出力の対象」「デコレータ」、`docs/plugin-protocol.md`「選択」、`docs/decisions.md` 28 と S11）を、小さな一つのプロジェクトで確かめる（`docs/testing.md`「コーパス」）。起点から辿られる op と辿られない op、`stops` の op、`wraps` で引き受けたデコレータと印のままのデコレータ、`states` で選ぶ状態、別の名前空間の op、プラグインのない名前空間を一か所ずつ使う。
+既定の出力が、プラグインの選んだ宣言だけを出すこと（`docs/emit-go.md`「出力の対象」「デコレータ」、`docs/plugin-protocol.md`「選択」、`docs/decisions.md` 28 と S11）を、小さな一つのプロジェクトで確かめる（`docs/testing.md`「コーパス」）。起点から辿られる op と辿られない op、`stops` の op、`wraps` で引き受けたデコレータと印のままのデコレータ、`states` で選ぶ状態、別の名前空間の op、トランスパイラが何も選ばない名前空間を一か所ずつ使う。
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | `[shop]`（`language = "go"`、`plugins = ["pick"]`）と `[stock]`（`language = "go"`。プラグインなし） |
+| `hozo.toml` | 単位が二つ: `namespace = "shop"`（`out = "gen/shop"`）と `namespace = "stock"`（`out = "gen/stock"`）。どちらも `transpilers = ["pick"]` |
 | `t.hozo` | テストの語彙 `namespace t`。`pick` が読むデコレータ `entry` / `stop` / `cache` / `store` と、どのプラグインも読まない印 `note` |
 | `shop.hozo` | `namespace shop`。出力する名前空間 |
-| `stock.hozo` | `namespace stock`。テーブルはあるがプラグインがないので、何も出力しない。`shop` の配線から呼ばれる |
-| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`）のマニフェストと `pick.json`。`emit` の応答の `select` で、`roots` に `@t.entry` の op、`stops` に `@t.stop` の op、`states` に `@t.store` の状態、`wraps` に `@t.cache` の適用を返す。ファイルは出さない |
+| `stock.hozo` | `namespace stock`。単位はあるが、`pick` が読むデコレータが一つも付いていないので何も選ばれず、何も出力しない。`shop` の配線から呼ばれる |
+| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`。トランスパイラ `pick` を提供する）のマニフェストと `pick.json`。`emit` の応答の `select` で、`roots` に `@t.entry` の op、`stops` に `@t.stop` の op、`states` に `@t.store` の状態、`wraps` に `@t.cache` の適用を返す。ファイルは出さない |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`） |
 | `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン（同 `TestCorpusEmitGolden`。書き出した Go は一時のモジュールで `go vet` も通す）。`gen/shop` だけで、`gen/stock` はない |
 
@@ -27,7 +27,7 @@
 | 同 5（別の名前空間の op） | `stock.reserve(order);`（`stock.reserve` は `count` と `keep` を呼ぶ配線） | `Deps.Stock.Reserve`（`StockReserveFunc`）。`reserve` の本体は辿らない |
 | 同 6（型と効果の定数） | `model Line` / `Order` / `Receipt` / `Audit`、選ばれない `model Draft`。`effect createOrder`、選ばれない op だけが持つ `addLine` / `saveDraft` | `types.go` に `Line`、`Order`、`Receipt`、`Audit` と `EffectCreateOrder`。`Draft`、`EffectAddLine`、`EffectSaveDraft` はない |
 | 「配置」（import と複製） | `model Line { item: stock.ItemId; ... }`、`throws stock.Short` | `stock` は Go の名前空間だが、その出力が型を持たない（何も出力しない）ので、`ItemId` と `Short` を `shop` のパッケージに複製する |
-| 「出力の対象」（プラグインのない名前空間） | `hozo.toml` の `[stock]`（`plugins` なし） | `gen/stock` はできない。`.hozoc-outputs.json` も置かない |
+| 「出力の対象」（何も選ばれない名前空間） | `hozo.toml` の `stock` の単位（`pick` は `stock` の宣言を一つも選ばない） | `gen/stock` はできない。`.hozoc-outputs.json` も置かない |
 | 「実装の単位」 | すべて | 生成したコードは `context` を引数に取らない |
 
 選択を変えれば出力も変わる（`pick.json` から `stops` を外すと、`notify` の本体を出し、`sendMail` と `logSent` まで辿る）ことも `TestSelectCorpus` が確かめる。生成したコードを実際に動かす振る舞い（入れていないフィールドが `*runtime.MissingError` になる、`States` を通る配線）は、`internal/emit/golang` の `TestBehavior` が確かめる。

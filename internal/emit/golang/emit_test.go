@@ -27,25 +27,41 @@ type goldenCase struct {
 	views []goldenView
 }
 
-// goldenView は View 一つと、その名前空間に設定されたプラグインが返した選択（を合わせたもの）。
+// goldenView は View 一つと、その単位のトランスパイラが返した選択（を合わせたもの）。
 type goldenView struct {
 	view *ir.View
 	sel  plugin.Select
 }
 
-// namespaces は各テストの View.Namespaces。server / browser / inventory / catalog / app が Go で
-// out = Dir = gen/<ns>（out を自分で書いたので P は空）、語彙は未設定。
-func namespaces() map[string]ir.NamespaceConfig {
-	m := map[string]ir.NamespaceConfig{}
+// namespaces は各テストの View.Namespaces。server / browser / inventory / catalog / app を、それぞれ一つの Go の単位が
+// out = Dir = gen/<ns> に出力する（単位の namespace 自身）。語彙はどの単位の対象でもない。
+func namespaces() map[string][]ir.NamespaceConfig {
+	m := map[string][]ir.NamespaceConfig{}
 	for _, ns := range []string{"server", "browser", "inventory", "catalog", "app"} {
-		m[ns] = nsConfig(ns)
+		m[ns] = []ir.NamespaceConfig{nsConfig(ns)}
 	}
 	return m
 }
 
-// nsConfig は名前空間 ns の設定（out を自分で書いた名前空間）。
-func nsConfig(ns string, plugins ...string) ir.NamespaceConfig {
-	return ir.NamespaceConfig{Language: "go", Out: "gen/" + ns, Dir: "gen/" + ns, Plugins: plugins}
+// nsConfig は名前空間 ns を namespace に書いた単位での ns の設定。
+func nsConfig(ns string, transpilers ...string) ir.NamespaceConfig {
+	return ir.NamespaceConfig{Language: "go", Out: "gen/" + ns, Dir: "gen/" + ns, Transpilers: transpilers}
+}
+
+// allFiles は Program の宣言のファイル（Span.File）のすべて（in を省いた単位の View.Files）。
+func allFiles(p *ir.Program) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for i := range p.Namespaces {
+		for _, d := range p.Namespaces[i].Decls {
+			if f := d.Common().Span.File; !seen[f] {
+				seen[f] = true
+				out = append(out, f)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 var goldenCases = []goldenCase{
@@ -58,16 +74,25 @@ var goldenCases = []goldenCase{
 	{name: "state", views: []goldenView{{stateView("shop"), stateSelect("shop")}, {stateView("depot"), stateSelect("depot")}}},
 }
 
-// emitAll は views をそれぞれの選択で出す。別の Go の名前空間の出力が持つ型（Exports）は import させる
+// exportedOf は views の出力が持つ型（Exports）→ その出力のディレクトリ（internal/app が Options.Exported に入れるのと同じ。
+// 同じ型を複数の View が持てば、先のものが勝つ）。
+func exportedOf(views []goldenView) map[string]string {
+	exported := map[string]string{}
+	for _, v := range views {
+		for _, fqn := range Exports(v.view, v.sel) {
+			if _, earlier := exported[fqn]; !earlier {
+				exported[fqn] = v.view.Config.Dir
+			}
+		}
+	}
+	return exported
+}
+
+// emitAll は views をそれぞれの選択で出す。別の Go の出力が持つ型（Exports）は import させる
 // （internal/app が Options.Exported に入れるのと同じ）。診断が出れば失敗。
 func emitAll(t *testing.T, root string, views []goldenView) []File {
 	t.Helper()
-	exported := map[string]bool{}
-	for _, v := range views {
-		for _, fqn := range Exports(v.view, v.sel) {
-			exported[fqn] = true
-		}
-	}
+	exported := exportedOf(views)
 	var files []File
 	for _, v := range views {
 		fs, diags := Emit(v.view, Options{Root: root, Select: v.sel, Exported: exported})
@@ -237,7 +262,7 @@ func codesOf(diags []diag.Diagnostic) []string {
 func smallView(decls ...ir.Decl) *ir.View {
 	ns := ir.Namespace{Name: "app", Decls: decls}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), ns}}
-	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 	for _, d := range decls {
 		if op, ok := d.(*ir.Op); ok {
 			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
@@ -326,7 +351,7 @@ func fieldRE(name, typ string) string {
 	return `re:(?m)^\t` + regexp.QuoteMeta(name) + ` +` + regexp.QuoteMeta(typ) + `$`
 }
 
-// TestNothingSelected は docs/emit-go.md「出力の対象」: 何も選ばれていなければ（プラグインがない、select を返さない）、
+// TestNothingSelected は docs/emit-go.md「出力の対象」: 何も選ばれていなければ（トランスパイラが select を返さない）、
 // 宣言があっても何も出力しない。エラーでも warning でもない。go.mod がなくても GOEMIT-1 にならない。
 func TestNothingSelected(t *testing.T) {
 	carts, token, title, checkout := stateDecls()
@@ -516,7 +541,7 @@ func TestDeterministic(t *testing.T) {
 	}
 }
 
-// TestDir は「配置」: 名前空間のファイルは Dir(N)（View.Config.Dir）の下に置く。
+// TestDir は「配置」: 単位での名前空間のファイルは Dir(U, N)（View.Config.Dir）の下に置く。
 // 親の out を継いだ子は Dir がサブディレクトリになっている。
 func TestDir(t *testing.T) {
 	root := newProjectRoot(t)
@@ -525,7 +550,7 @@ func TestDir(t *testing.T) {
 	v.Viewer = "app.admin"
 	v.Program.Namespaces[2].Name = "app.admin"
 	v.Config = ir.NamespaceConfig{Language: "go", Out: "gen/app", Dir: "gen/app/admin"}
-	v.Namespaces = map[string]ir.NamespaceConfig{"app": nsConfig("app"), "app.admin": v.Config}
+	v.Namespaces = map[string][]ir.NamespaceConfig{"app": {nsConfig("app")}, "app.admin": {v.Config}}
 	files, diags := Emit(v, Options{Root: root, Select: selectAll(v)})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
@@ -550,8 +575,8 @@ func TestDirFallsBackToOut(t *testing.T) {
 	}
 }
 
-// TestImportOrCopy は「配置」: 別の名前空間 M の型は、M が Go で同じプロジェクト（View.Namespaces にある）で、M の出力が
-// その型を持つ（Options.Exported）なら Dir(M) のパッケージを import して使い、そうでなければ viewer のパッケージに複製する。
+// TestImportOrCopy は「配置」: 別の名前空間 M の型は、M を出力する Go の単位のどれかの出力がその型を持つ
+// （Options.Exported にそのディレクトリがある）なら、そのパッケージを import して使い、そうでなければ viewer のパッケージに複製する。
 func TestImportOrCopy(t *testing.T) {
 	root := newProjectRoot(t)
 	other := ir.Namespace{Name: "lib.core", Decls: []ir.Decl{
@@ -561,8 +586,9 @@ func TestImportOrCopy(t *testing.T) {
 	}}
 	v := smallView(&ir.Model{DeclBase: base("app.User", nil), Fields: []ir.Field{field("id", ir.Ref("lib.core.Id")), field("tag", ir.Ref("lib.core.Tag"))}}, use("app.User"))
 	v.Program.Namespaces = append(v.Program.Namespaces, other)
-	v.Namespaces["lib.core"] = ir.NamespaceConfig{Language: "go", Out: "gen/lib", Dir: "gen/lib/core"}
-	libView := &ir.View{Viewer: "lib.core", Config: v.Namespaces["lib.core"], Namespaces: v.Namespaces, Program: v.Program, Ops: map[string]*ir.ViewedSignature{}}
+	v.Namespaces["lib.core"] = []ir.NamespaceConfig{{Language: "go", Out: "gen/lib", Dir: "gen/lib/core"}}
+	v.Files = allFiles(v.Program)
+	libView := &ir.View{Viewer: "lib.core", Config: v.Namespaces["lib.core"][0], Namespaces: v.Namespaces, Files: v.Files, Program: v.Program, Ops: map[string]*ir.ViewedSignature{}}
 	libSelect := plugin.Select{Roots: []string{"lib.core.find"}}
 	sel := selectAll(v)
 
@@ -576,6 +602,14 @@ func TestImportOrCopy(t *testing.T) {
 	if got := Uses(libView, libSelect); len(got) != 0 {
 		t.Errorf("Uses(lib.core) = %v, want none", got)
 	}
+	// Imports は、作ったファイルが実際に import する別の出力のディレクトリ（GOEMIT-5 の判定のため）
+	exported := exportedOf([]goldenView{{libView, libSelect}, {v, sel}})
+	if got := Imports(v, Options{Root: root, Select: sel, Exported: exported}); strings.Join(got, ",") != "gen/lib/core" {
+		t.Errorf("Imports(app) = %v, want [gen/lib/core]", got)
+	}
+	if got := Imports(libView, Options{Root: root, Select: libSelect, Exported: exported}); len(got) != 0 {
+		t.Errorf("Imports(lib.core) = %v, want none", got)
+	}
 
 	files := emitAll(t, root, []goldenView{{libView, libSelect}, {v, sel}})
 	types := contentOf(files, "gen/app/types.go")
@@ -584,22 +618,35 @@ func TestImportOrCopy(t *testing.T) {
 		[]string{"type Id string"})
 	compileFiles(t, root, files)
 
-	// 相手の出力がその型を持たなければ（プラグインがない、選ばれていない）、Go の名前空間でも複製する
+	// どの出力もその型を持たなければ（何も選ばれていない）、Go の単位が出力する名前空間の型でも複製する
 	files, diags := Emit(v, Options{Root: root, Select: sel})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
 	}
-	wantContains(t, "gen/app/types.go", contentOf(files, "gen/app/types.go"), []string{"type Id string", "type Tag string"}, []string{"gen/lib"})
+	types = contentOf(files, "gen/app/types.go")
+	wantContains(t, "gen/app/types.go", types, []string{"type Id string", "type Tag string", "その名前空間の出力がこの型を持たないため"}, []string{"gen/lib"})
+	if got := Imports(v, Options{Root: root, Select: sel}); len(got) != 0 {
+		t.Errorf("Imports(app) without Exported = %v, want none", got)
+	}
 
-	// View.Namespaces になければ（語彙など）、Exported にあっても複製する
-	delete(v.Namespaces, "lib.core")
-	files, diags = Emit(v, Options{Root: root, Select: sel, Exported: map[string]bool{"lib.core.Id": true}})
+	// 同じ名前空間を出力する単位が複数あるとき、どの出力から import するかは Exported のディレクトリが決める
+	// （設定の順で最初にその型を持つ単位を、呼ぶ側が入れる。docs/emit-go.md「配置」）
+	files, diags = Emit(v, Options{Root: root, Select: sel, Exported: map[string]string{"lib.core.Id": "cmd/gen/core"}})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
 	}
-	wantContains(t, "gen/app/types.go", contentOf(files, "gen/app/types.go"), []string{"type Id string", "type Tag string"}, []string{"gen/lib"})
-	if got := Uses(v, sel); len(got) != 0 {
-		t.Errorf("Uses(app) = %v, want none", got)
+	wantContains(t, "gen/app/types.go", contentOf(files, "gen/app/types.go"), []string{`"example.com/app/cmd/gen/core"`, "Id  core.Id"}, []string{"gen/lib"})
+
+	// どの単位の対象でもない名前空間（View.Namespaces にない）の型は複製し、コメントの理由も変わる
+	delete(v.Namespaces, "lib.core")
+	files, diags = Emit(v, Options{Root: root, Select: sel})
+	if len(diags) > 0 {
+		t.Fatal(formatDiags(diags))
+	}
+	wantContains(t, "gen/app/types.go", contentOf(files, "gen/app/types.go"), []string{"type Id string", "type Tag string", "Go のパッケージを import できないため"}, []string{"gen/lib"})
+	// Uses は名前空間を問わない（どの単位が出力するかは呼ぶ側が見る）
+	if got := Uses(v, sel); strings.Join(got, ",") != "lib.core" {
+		t.Errorf("Uses(app) = %v, want [lib.core]", got)
 	}
 }
 
@@ -618,7 +665,7 @@ func TestCopiesForeignException(t *testing.T) {
 		Signature: ir.Signature{Exceptions: []string{"proc.Crashed", "proc.MalformedOutput"}}}
 	ns := ir.Namespace{Name: "app", Decls: []ir.Decl{run}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), proc, ns}}
-	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p,
+	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Files: allFiles(p), Program: p,
 		Ops: map[string]*ir.ViewedSignature{"app.run": {Signature: run.Signature, Params: run.Params}}}
 	files, diags := Emit(v, Options{Root: root, Select: selectAll(v)})
 	if len(diags) > 0 {

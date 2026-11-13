@@ -1,0 +1,16 @@
+// docs/emit-go.md「配置」: shop の出力（gen/api）が、この名前空間の出力（gen/stock）の型を import する。
+// stock の出力は shop の型を使わないので、import は一方向。
+
+/** 在庫 */
+namespace stock {
+  /** 品物の識別子 */
+  scalar ItemId extends string;
+
+  /** 在庫が足りない */
+  exception Short;
+
+  /** 在庫を引き当てる */
+  @t.stock
+  op reserve(id: ItemId)
+    throws Short;
+}

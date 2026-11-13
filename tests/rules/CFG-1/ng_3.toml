@@ -1,4 +1,0 @@
-# a も、a の設定を継ぐ a.sub も out が未設定 → CFG-1（名前空間ごとに出るが、位置はどちらも hozo.toml）
-# ERROR: CFG-1
-[a]
-language = "go"

@@ -105,7 +105,11 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
         return unsupported();
     }
   } catch (err) {
-    if (err instanceof UnsupportedDirectionError) return unsupported();
+    if (err instanceof UnsupportedDirectionError) {
+      // 既定の文でなければ、その文（どのトランスパイラを知らないか、など）を伝える
+      if (err.message !== "" && err.message !== "direction not supported") return refuse(stdout, stderr, "unsupported", err.message);
+      return unsupported();
+    }
     return fail(stderr, `${direction}: ${message(err)}`);
   }
   try {
@@ -117,18 +121,30 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
 }
 
 /**
- * view.viewer の名前空間の op のうち、デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。
- * 名前付きデコレータを通して付いたもの（Application の via）も数える。デコレータで起点を選ぶプラグインのための道具
+ * view.viewer の名前空間の op のうち、単位の対象（span.file が view.files にある。docs/config.md「in」）で、
+ * デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。名前付きデコレータを通して付いたもの
+ * （Application の via）も数える。デコレータで起点を選ぶトランスパイラのための道具で、返す op はどれも select に書ける
  * （docs/plugin-protocol.md「選択」。Go の plugin.OpsWith と同じ）。
  */
 export function opsWith(view: View, decorator: string): string[] {
   const out: string[] = [];
+  const files = new Set(view.files);
   const ns = view.program.namespaces.find((n) => n.name === view.viewer);
   for (const decl of ns?.decls ?? []) {
-    if (decl.kind !== "op") continue;
+    if (decl.kind !== "op" || !files.has(decl.span.file)) continue;
     if (decl.decorators.some((a) => a.decorator === decorator || a.via === decorator)) out.push(decl.name);
   }
   return out;
+}
+
+/**
+ * FQN fqn が view.viewer の名前空間の宣言で、この View の単位の対象か（docs/config.md「in」）: 宣言の span.file が
+ * view.files にある。viewer の宣言でなければ false（Go の ir.View.InUnit と同じ）。
+ */
+export function inUnit(view: View, fqn: string): boolean {
+  const ns = view.program.namespaces.find((n) => n.name === view.viewer);
+  const decl = ns?.decls.find((d) => d.name === fqn);
+  return decl !== undefined && view.files.includes(decl.span.file);
 }
 
 function refuse(stdout: Sink, stderr: Sink, code: PluginError["error"]["code"], msg: string): number {

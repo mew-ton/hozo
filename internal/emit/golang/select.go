@@ -7,7 +7,7 @@ import "github.com/mew-ton/hozo/ir"
 type selection struct {
 	// ops は選ばれた viewer の op。
 	ops map[string]bool
-	// slot は、選ばれたが本体を辿らない op（select の stops と wraps の op）。配線でも葉と同じ扱いで、
+	// slot は、選ばれたが本体を辿らない op（select の stops と wraps の op、単位の対象でない op）。配線でも葉と同じ扱いで、
 	// 実装を差し込む口だけを出す。
 	slot map[string]bool
 	// states は選ばれた状態: 基底の状態の FQN と、状態の分類の FQN。
@@ -27,7 +27,8 @@ func (s *selection) empty() bool {
 
 // computeSelection は opts.Select から出力の対象を決める（docs/emit-go.md「出力の対象」の 1〜5）。
 // select が指す FQN の確かめ（PLG-3）は呼ぶ側（internal/plugin.CheckSelect）が済ませている前提で、
-// viewer の op / 状態でないものは黙って飛ばす。
+// viewer の op / 状態でないものと、単位の対象でないもの（in の外で宣言されたもの）は黙って飛ばす。
+// 単位の対象でない viewer の op は、起点にはならないが、選ばれた配線から辿られたら口だけを出す（stops と同じ扱い）。
 func (e *emitter) computeSelection() *selection {
 	s := &selection{
 		ops: map[string]bool{}, slot: map[string]bool{}, states: map[string]bool{},
@@ -44,14 +45,16 @@ func (e *emitter) computeSelection() *selection {
 		stops[fqn] = true
 	}
 
-	// 1. 起点: roots の op、wraps の op、states の状態。
+	// 1. 起点: roots の op、wraps の op、states の状態。どれも単位の対象の宣言。
 	var work []string
 	for _, fqn := range e.opts.Select.Roots {
-		work = append(work, fqn)
+		if e.inUnit[fqn] {
+			work = append(work, fqn)
+		}
 	}
 	for _, w := range e.opts.Select.Wraps {
 		op, ok := own(w.Op).(*ir.Op)
-		if !ok || !hasDecorator(op, w.Decorator) {
+		if !ok || !e.inUnit[w.Op] || !hasDecorator(op, w.Decorator) {
 			continue
 		}
 		if s.wraps[w.Op] == nil {
@@ -61,10 +64,12 @@ func (e *emitter) computeSelection() *selection {
 		work = append(work, w.Op)
 	}
 	for _, fqn := range e.opts.Select.States {
-		s.selectState(e, fqn)
+		if e.inUnit[fqn] {
+			s.selectState(e, fqn)
+		}
 	}
 
-	// 2. op を辿る。stops と wraps の op は選ぶが、本体は辿らない。
+	// 2. op を辿る。stops と wraps の op、単位の対象でない op（in の外）は選ぶが、本体は辿らない。
 	for len(work) > 0 {
 		fqn := work[0]
 		work = work[1:]
@@ -73,7 +78,7 @@ func (e *emitter) computeSelection() *selection {
 			continue
 		}
 		s.ops[fqn] = true
-		if stops[fqn] || s.wraps[fqn] != nil {
+		if stops[fqn] || s.wraps[fqn] != nil || !e.inUnit[fqn] {
 			s.slot[fqn] = true
 		}
 		if op.Body == nil || s.slot[fqn] {

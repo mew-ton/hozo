@@ -1,4 +1,0 @@
-// CFG-1（docs/config.md「診断」）: テーブルはあるが out だけで、language が未設定（ng_2.toml）
-namespace a {
-  op f();
-}

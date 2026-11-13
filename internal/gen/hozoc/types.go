@@ -60,7 +60,7 @@ func (ConfigInvalid) HozoException() string { return "hozoc.ConfigInvalid" }
 
 var _ runtime.Exception = ConfigInvalid{}
 
-// LanguageMismatch: プラグインの language が名前空間の language と合わない
+// LanguageMismatch: 一つの単位のトランスパイラの language がそろっていない
 type LanguageMismatch struct{ Value Diagnostics }
 
 func (LanguageMismatch) Error() string         { return "hozoc.LanguageMismatch" }
@@ -76,7 +76,7 @@ func (OutputConflict) HozoException() string { return "hozoc.OutputConflict" }
 
 var _ runtime.Exception = OutputConflict{}
 
-// UnknownNamespace: emit の引数に、hozo.toml にない名前空間が指定された
+// UnknownNamespace: emit の引数に、どの単位の対象でもない名前空間が指定された
 type UnknownNamespace struct{}
 
 func (UnknownNamespace) Error() string         { return "hozoc.UnknownNamespace" }
@@ -112,7 +112,7 @@ type EmitInput struct {
 	Config *Path `json:"config,omitempty"`
 	// 表示の形式
 	Format *OutputFormat `json:"format,omitempty"`
-	// 生成する名前空間（一つもなければすべて）
+	// 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す
 	Namespaces []string `json:"namespaces"`
 	// 書き出さずに、書き出す予定のファイルだけを表示する
 	DryRun *bool `json:"dryRun,omitempty"`

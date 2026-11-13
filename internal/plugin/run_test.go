@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 
 // echoManifest は echoExe を絶対パスで呼ぶマニフェスト。
 func echoManifest(args ...string) *Manifest {
-	return &Manifest{Name: "echo", Command: append([]string{echoExe}, args...), Language: "go", Protocol: Protocol}
+	return &Manifest{Name: "echo", Command: append([]string{echoExe}, args...), Protocol: Protocol}
 }
 
 type echoReq struct {

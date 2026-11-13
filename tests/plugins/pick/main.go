@@ -1,5 +1,6 @@
 // Command pick は tests/corpus のためのプラグイン。emit の応答で、既定の出力の対象の選択（docs/plugin-protocol.md「選択」）
-// だけを返す。ファイルは出さない。check と import は持たない。
+// だけを返す。ファイルは出さない。check と import は持たない。トランスパイラの名前はコーパスのマニフェストが決め
+// （[[transpiler]]）、このプログラムはどの名前でも受ける。
 //
 // 何を選ぶかは、マニフェストのディレクトリ（HOZO_PLUGIN_DIR）の pick.json に、デコレータの FQN で書く:
 //
@@ -8,12 +9,14 @@
 //	  "stops":  ["page.dialog"],  // このデコレータが付いた op は、選ぶが本体は辿らない
 //	  "states": ["db"],           // このデコレータが付いた状態を選ぶ
 //	  "wraps":  ["t.cache"],      // このデコレータの適用を引き受ける（包む関数が生成される）
-//	  "all":    false             // true なら、すべての op を起点にし、すべての状態（基底の状態と状態の分類）を選ぶ
+//	  "all":    false,            // true なら、すべての op を起点にし、すべての状態（基底の状態と状態の分類）を選ぶ
+//	  "fqnRoots": ["shop.nightly"],             // FQN をそのまま roots に足す（確かめない。PLG-3 を起こすテストのため）
+//	  "transpilers": { "pick-batch": { ... } }  // トランスパイラの名前（要求の transpiler）ごとの規則。あれば、上の規則の代わりに使う
 //	}
 //
-// 見るのは view.viewer の名前空間の宣言だけ。roots / stops / wraps は名前付きデコレータを通した適用（via）も数える
-// （plugin.OpsWith）。本物のプラグインは View を見て自分で決める（デコレータを読まなくてもよい）が、テストでは
-// どのコーパスが何を選ぶかを pick.json に並べて見えるようにする。
+// 見るのは view.viewer の名前空間の宣言のうち、単位の対象のもの（docs/config.md「in」）だけ。roots / stops / wraps は
+// 名前付きデコレータを通した適用（via）も数える（plugin.OpsWith）。本物のトランスパイラは View を見て自分で決める
+// （デコレータを読まなくてもよい）が、テストではどのコーパスが何を選ぶかを pick.json に並べて見えるようにする。
 package main
 
 import (
@@ -28,11 +31,14 @@ import (
 
 // rules は pick.json の形。
 type rules struct {
-	Roots  []string `json:"roots"`
-	Stops  []string `json:"stops"`
-	States []string `json:"states"`
-	Wraps  []string `json:"wraps"`
-	All    bool     `json:"all"`
+	Roots    []string `json:"roots"`
+	Stops    []string `json:"stops"`
+	States   []string `json:"states"`
+	Wraps    []string `json:"wraps"`
+	All      bool     `json:"all"`
+	FQNRoots []string `json:"fqnRoots"`
+	// Transpilers はトランスパイラの名前ごとの規則。要求の transpiler の名前があれば、外側の規則の代わりに使う。
+	Transpilers map[string]rules `json:"transpilers"`
 }
 
 type handler struct{}
@@ -49,12 +55,16 @@ func (handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if err := json.Unmarshal(data, &r); err != nil {
 		return nil, fmt.Errorf("pick.json: %w", err)
 	}
+	if named, ok := r.Transpilers[req.Transpiler]; ok {
+		r = named
+	}
 	return &plugin.EmitResponse{Select: pick(req.View, r)}, nil
 }
 
-// pick は view の見る側の名前空間から、r に従って選ぶ。
+// pick は view の見る側の名前空間の、単位の対象の宣言から、r に従って選ぶ。
 func pick(view *ir.View, r rules) plugin.Select {
 	var sel plugin.Select
+	sel.Roots = append(sel.Roots, r.FQNRoots...)
 	add := func(dst *[]string, fqn string) {
 		for _, x := range *dst {
 			if x == fqn {
@@ -83,6 +93,9 @@ func pick(view *ir.View, r rules) plugin.Select {
 		return sel
 	}
 	for _, decl := range ns.Decls {
+		if decl == nil || !view.InUnit(decl.Common().Name) {
+			continue
+		}
 		switch x := decl.(type) {
 		case *ir.Op:
 			if r.All {

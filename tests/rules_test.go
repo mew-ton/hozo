@@ -29,13 +29,14 @@ import (
 // hozo.toml の側の期待（CFG-*）が例ごとに違うため。
 //
 // 設定は、例の隣の <名前>.toml（ng_1.hozo なら ng_1.toml）、なければ規則のディレクトリの hozo.toml、なければ
-// tests/rules/hozo.toml（既定: 名前空間 a だけに language = "go"、out = "gen/a"）。ディレクトリの例は中の
-// hozo.toml が最優先。規則のディレクトリの plugins/ はプラグインの探索のための fixture で、各例のプロジェクトに写す
-// （[hozo].plugin_dirs = ["plugins"] と組み合わせて CFG-4 / CFG-6 / CFG-9 / NS-3 を起こす）。
+// tests/rules/hozo.toml（既定: 名前空間 a を、トランスパイラ go で gen/a に出力する単位が一つ）。ディレクトリの例は中の
+// hozo.toml が最優先。プラグインの探索のための fixture は二段: tests/rules/plugins/（既定。トランスパイラ go / go-b / ts を
+// 提供する std）と、規則のディレクトリの plugins/（その規則のためのプラグイン）。どちらも各例のプロジェクトの plugins/ に写す
+// （[hozo].plugin_dirs = ["plugins"] と組み合わせて CFG-6 / CFG-11 / CFG-14〜CFG-16 / NS-3 を起こす）。
 //
 // 注釈の形は internal/sema/annot_test.go と同じ: `// ERROR: A, B`、`// WARN: A`、`// ERROR(-1): A`（相対の行）。
 // 加えて `// ERROR(hozo:vocab/db.hozo:2): NS-3` で別のファイルの行を指せる（埋め込まれた語彙に出る診断のため）。
-// hozo.toml の診断は位置（行）を持たないので、hozo.toml の中では `# ERROR: CFG-1` と書き、ファイル hozo.toml の
+// hozo.toml の診断は位置（行）を持たないので、hozo.toml の中では `# ERROR: CFG-12` と書き、ファイル hozo.toml の
 // 行 0 の期待にする。
 //
 // 規則のディレクトリに skip.txt があれば、その内容を理由にして飛ばす（実装か文書の誤りを見つけた例を、直るまで
@@ -166,12 +167,14 @@ func buildSample(t testing.TB, ruleDir string, entry os.DirEntry) *sample {
 	name := strings.TrimSuffix(entry.Name(), ".hozo")
 	src := filepath.Join(ruleDir, entry.Name())
 
-	// プラグインの fixture
-	if info, err := os.Stat(filepath.Join(ruleDir, "plugins")); err == nil && info.IsDir() {
-		if err := os.Mkdir(filepath.Join(root, "plugins"), 0o755); err != nil {
-			t.Fatal(err)
+	// プラグインの fixture: 既定のもの（tests/rules/plugins）と、規則のディレクトリのもの
+	if err := os.Mkdir(filepath.Join(root, "plugins"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{filepath.Join(rulesDir, "plugins"), filepath.Join(ruleDir, "plugins")} {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			copyTree(t, dir, filepath.Join(root, "plugins"))
 		}
-		copyTree(t, filepath.Join(ruleDir, "plugins"), filepath.Join(root, "plugins"))
 	}
 
 	// 例の本体
@@ -289,7 +292,7 @@ func TestRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if !e.IsDir() {
+		if !e.IsDir() || e.Name() == "plugins" { // plugins/ は既定の fixture
 			continue
 		}
 		e := e
@@ -357,7 +360,7 @@ var notTestable = map[string]string{
 	"DEC-9":    "正規化（docs/ir.md「デコレータの適用」）。診断なし",
 	"DEC-10":   "計算（手順 i の throws）。診断なし。DEC-10 の意味は THROWS-1 / DOC-1 の external の例で確かめる",
 	"BIND-3":   "計算（Call.bound）。診断なし。BIND-4 の ok の例で確かめる",
-	"CFG-3":    "解決の手続き。診断なし（docs/config.md「診断」）。CFG-1 の ok の例（子が親を継ぐ）で確かめる",
+	"CFG-13":   "対象の手続き。診断なし（docs/config.md「単位の対象」）。CFG-10 の ok の例（子孫は対象、対象でない名前空間は診断なし）と CFG-17 の例、internal/config の TestCovering で確かめる",
 	"TYPE-2":   "DEC-1 で検出される。ID は索引として残す（docs/types.md「診断」）",
 	"MATCH-5":  "WIRE-2 と同じ条件。ID は索引として残す（docs/check.md「classify / match」）",
 	"CFG-5":    "書き出すファイルの衝突は emit でしか起きない（.hozo と hozo.toml だけでは出ない。internal/emit のテスト）",
@@ -406,7 +409,7 @@ func TestRulesCoverDocs(t *testing.T) {
 	}
 	dirs := map[string]bool{}
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() && e.Name() != "plugins" {
 			dirs[ruleID(e.Name())] = true
 			if _, exact := os.Stat(filepath.Join(rulesDir, ruleID(e.Name()))); exact != nil {
 				t.Errorf("tests/rules/%s があるのに tests/rules/%s がない（補足付きのディレクトリは本体の補助）", e.Name(), ruleID(e.Name()))

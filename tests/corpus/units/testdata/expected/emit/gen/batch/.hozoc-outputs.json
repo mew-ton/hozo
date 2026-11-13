@@ -1,0 +1,7 @@
+[
+  "gen/batch/doc.go",
+  "gen/batch/ops.go",
+  "gen/batch/types.go",
+  "gen/batch/validate.go",
+  "gen/batch/wiring.go"
+]

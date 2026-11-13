@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.1";                 // この文書の版。構造が変わったら上げる
+  version: "0.2";                 // この文書の版。Program か View の構造が変わったら上げる
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -325,25 +325,29 @@ interface Bind {
 
 ## その名前空間から見た IR
 
-プラグインに渡す IR（§4.6「その名前空間から見た IR」）は、`Program` 全体に「見る側」の情報を足したもの。
+トランスパイラに渡す IR（§4.6「その名前空間から見た IR」）は、`Program` 全体に「見る側」の情報を足したもの。単位（`docs/config.md`「単位」）と、その単位が出力する名前空間の組ごとに一つ作る。
 
 ```ts
 interface View {
-  version: "0.1";
+  version: "0.2";
   viewer: string;                 // 見る側の名前空間の FQN
-  config: NamespaceConfig;        // viewer の設定
-  namespaces: Record<string, NamespaceConfig>;   // 設定のあるすべての名前空間（viewer を含む）。キーは FQN、順序は辞書順。
-                                                 // プラグインが別の名前空間の言語と出力先を知るため（import するか複製するか。docs/emit-go.md「配置」）
+  config: NamespaceConfig;        // この View の単位での viewer の設定
+  files: string[];                // この View の単位の in に合ったファイル（docs/config.md「in」）。Span.file と同じ形、辞書順。
+                                  // in を省いた単位なら、読み込んだユーザーのファイルのすべて。
+                                  // viewer の宣言のうち span.file がここにあるものが、単位の対象の宣言
+  namespaces: Record<string, NamespaceConfig[]>; // 出力のあるすべての名前空間（viewer を含む）。キーは FQN、順序は辞書順。
+                                                 // 値は、その名前空間を出力する単位ごとの設定（設定の順）。
+                                                 // トランスパイラが別の名前空間（と別の単位）の言語と出力先を知るため
   program: Program;               // 全体そのまま（各 op の signature は op 自身の名前空間から見たもの）。
                                   // ただし下の params が合成する model を、viewer の Namespace.decls の末尾に足してある
   ops: Record<string, ViewedSignature>;   // FQN → viewer から見た関数の型。すべての op について
 }
 
-interface NamespaceConfig {
-  language: string;               // Conf(N).language（docs/config.md「名前空間の設定の解決」）
-  out: string;                    // Conf(N).out
-  dir: string;                    // Dir(N)。この名前空間のファイルを置くディレクトリ（ルートからの相対パス）
-  plugins: string[];              // Conf(N).plugins
+interface NamespaceConfig {       // 単位 U での名前空間 N の設定
+  language: string;               // U の言語（docs/config.md「単位」）
+  out: string;                    // U の out
+  dir: string;                    // Dir(U, N)。U での N のファイルを置くディレクトリ（ルートからの相対パス。docs/config.md「単位の対象」）
+  transpilers: string[];          // U の transpilers
 }
 
 interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
@@ -355,9 +359,12 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 }
 ```
 
-- `Program` 全体を渡すのは、プラグインが参照先（別の名前空間の型、語彙の宣言）を自分で探さなくて済むようにするため。何を出力の対象にするかは、プラグインが `emit` の応答の `select` で返す（`docs/plugin-protocol.md`「選択」）。
+- `Program` 全体を渡すのは、トランスパイラが参照先（別の名前空間の型、語彙の宣言、`in` の外の宣言）を自分で探さなくて済むようにするため。何を出力の対象にするかは、トランスパイラが `emit` の応答の `select` で返す（`docs/plugin-protocol.md`「選択」）。
+- `files` は、トランスパイラが単位の対象の宣言を見分けるための最小の情報。宣言ごとの印を `Program` に足さないのは、`Program` を単位によらず同じにするため。合成した model（`<viewer>.<op 名>$<引数名>`）の `span` は元の引数のもので、op と同じファイルになる。
+- `namespaces` に入るのは、どれかの単位が出力する名前空間（`docs/config.md`「単位の対象」「in」）。同じ名前空間を複数の単位が出力していれば、値は複数の要素を持つ。`namespaces[viewer]` のうち `dir` が `config.dir` と同じ要素が、この View の単位のもの。
 - `ops` の `Signature` は `docs/check.md`「計算」の Sig(O, viewer)。viewer が op の名前空間と同じなら `Program` の `signature` と一致する。
 - `params` に反映する `bind` は `viewer` の名前空間の `Bind` だけ（`bind` は呼び出す側の宣言。§5.3）。
+- `viewer` が同じなら、`config`・`files` 以外は単位によらず同じ。
 
 ## JSON
 

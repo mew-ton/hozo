@@ -1,0 +1,18 @@
+# namespace がない単位と、out が空の単位 → CFG-12 が二つ（位置はどちらも hozo.toml）。一つ目の単位は正しいので残る
+# ERROR: CFG-12
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+transpilers = ["go"]
+out         = "gen/b"
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = ""

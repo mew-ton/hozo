@@ -11,10 +11,18 @@ import (
 )
 
 // selectView は PLG-3 のテストの View: 見る側は web。web には op（デコレータ付き）、基底の状態、状態の分類、
-// 値の分類、model があり、別の名前空間 api にも op と状態がある。
+// 値の分類、model があり、別の名前空間 api にも op と状態がある。web の宣言は web.hozo に、web.batch / web.jobs /
+// web.Busy だけは batch.hozo に書かれていて、単位の in に合うのは web.hozo と api.hozo（View.Files）。
 func selectView() *ir.View {
 	base := func(name string, decos ...ir.Application) ir.DeclBase {
-		return ir.DeclBase{Name: name, Decorators: decos}
+		file := "web.hozo"
+		switch {
+		case name == "web.batch" || name == "web.jobs" || name == "web.Busy":
+			file = "batch.hozo"
+		case strings.HasPrefix(name, "api."):
+			file = "api.hozo"
+		}
+		return ir.DeclBase{Name: name, Decorators: decos, Span: ir.Span{File: file}}
 	}
 	web := ir.Namespace{Name: "web", Decls: []ir.Decl{
 		&ir.Model{DeclBase: base("web.Page")},
@@ -25,16 +33,21 @@ func selectView() *ir.View {
 			ir.Application{Decorator: "t.cache"},
 			ir.Application{Decorator: "t.guarded", Via: "web.guardMe"})},
 		&ir.Op{DeclBase: base("web.plain")},
+		&ir.Op{DeclBase: base("web.batch", ir.Application{Decorator: "t.cache"})},
+		&ir.State{DeclBase: base("web.jobs"), Shape: ir.StateList, Element: ir.String()},
+		&ir.Classify{DeclBase: base("web.Busy"), Subject: ir.StatesSubject{States: []string{"web.jobs"}}, Cases: []ir.ClassifyCase{{Name: "Busy"}}, HasDefault: true},
 	}}
 	api := ir.Namespace{Name: "api", Decls: []ir.Decl{
 		&ir.State{DeclBase: base("api.users"), Shape: ir.StateList, Element: ir.String()},
 		&ir.Op{DeclBase: base("api.getUser")},
 	}}
-	return &ir.View{Viewer: "web", Program: &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, web, api}}}
+	return &ir.View{Viewer: "web", Files: []string{"api.hozo", "web.hozo"},
+		Program: &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, web, api}}}
 }
 
 // docs/plugin-protocol.md「選択」と「診断」の PLG-3: view.viewer の名前空間にない FQN、存在しない FQN、
-// wraps がその op に付いていないデコレータを指している。どれも proc.MalformedOutput。
+// 単位の対象でない宣言（in の外で宣言されたもの）、wraps がその op に付いていないデコレータを指している。
+// どれも proc.MalformedOutput。
 func TestCheckSelect(t *testing.T) {
 	view := selectView()
 	ok := []struct {
@@ -74,6 +87,12 @@ func TestCheckSelect(t *testing.T) {
 		{"wraps decorator not on the op", sdk.Select{Wraps: []sdk.Wrap{{Op: "web.plain", Decorator: "t.cache"}}}, `wraps の op "web.plain" にデコレータ "t.cache" は付いていない`},
 		{"wraps decorator on another op only", sdk.Select{Wraps: []sdk.Wrap{{Op: "web.open", Decorator: "t.retry"}}}, `wraps の op "web.open" にデコレータ "t.retry" は付いていない`},
 		{"wraps without decorator", sdk.Select{Wraps: []sdk.Wrap{{Op: "web.open"}}}, `wraps の op "web.open" にデコレータ "" は付いていない`},
+		// 単位の対象でない宣言（docs/config.md「in」）は、viewer の名前空間のものでも選べない
+		{"roots outside in", sdk.Select{Roots: []string{"web.batch"}}, `roots の "web.batch" は単位の対象でない（in の外の batch.hozo で宣言されている）`},
+		{"stops outside in", sdk.Select{Stops: []string{"web.batch"}}, `stops の "web.batch" は単位の対象でない`},
+		{"states outside in", sdk.Select{States: []string{"web.jobs"}}, `states の "web.jobs" は単位の対象でない`},
+		{"state classification outside in", sdk.Select{States: []string{"web.Busy"}}, `states の "web.Busy" は単位の対象でない`},
+		{"wraps outside in", sdk.Select{Wraps: []sdk.Wrap{{Op: "web.batch", Decorator: "t.cache"}}}, `wraps の "web.batch" は単位の対象でない`},
 		// 正しい項目の後ろにある誤りも見つける
 		{"second root", sdk.Select{Roots: []string{"web.open", "api.getUser"}}, `roots の "api.getUser"`},
 	}
@@ -91,7 +110,17 @@ func TestCheckSelect(t *testing.T) {
 	}
 }
 
-// docs/plugin-protocol.md「選択」: hozoc は名前空間に設定されたすべてのプラグインの select を合わせる。
+// in を省いた単位（View.Files が読み込んだすべてのファイル）なら、同じ宣言を選べる。
+func TestCheckSelectWholeNamespace(t *testing.T) {
+	view := selectView()
+	view.Files = []string{"api.hozo", "batch.hozo", "web.hozo"}
+	sel := sdk.Select{Roots: []string{"web.batch"}, States: []string{"web.jobs", "web.Busy"}, Wraps: []sdk.Wrap{{Op: "web.batch", Decorator: "t.cache"}}}
+	if err := CheckSelect("p", view, sel); err != nil {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// docs/plugin-protocol.md「選択」: hozoc は単位のすべてのトランスパイラの select を名前空間ごとに合わせる。
 func TestMergeSelect(t *testing.T) {
 	a := sdk.Select{Roots: []string{"web.open"}, Stops: []string{"web.plain"}, Wraps: []sdk.Wrap{{Op: "web.open", Decorator: "t.cache"}}}
 	b := sdk.Select{Roots: []string{"web.plain", "web.open"}, States: []string{"web.token"},

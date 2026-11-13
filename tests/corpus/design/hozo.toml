@@ -1,19 +1,19 @@
 # 設計書 §5〜§11 の例のコーパス（docs/testing.md「コーパス」）。
-# 設計書 §4.5 では browser は language = "ts" だが、TS の既定の出力は段階 5 まで存在せず
-# docs/config.md CFG-11 がエラーにするので、今は両方とも "go" にする（README.md）。
-# plugins はテスト用の pick（plugins/pick）: 設計書のプラグイン（http のサーバー、ルーター、db）の代わりに、
+# 設計書 §4.5 では browser は TS だが、TS の既定の出力は段階 5 まで存在せず
+# docs/config.md CFG-11 がエラーにするので、今は両方とも Go のトランスパイラにする（README.md）。
+# トランスパイラはテスト用の pick（plugins/pick）: 設計書のプラグイン（http のサーバー、ルーター、db）の代わりに、
 # 既定の出力の対象を語彙のデコレータで選ぶ（README.md「既定の出力」）。
 
 [hozo]
 sources     = ["**/*.hozo"]
 plugin_dirs = ["plugins"]
 
-[server]
-language = "go"
-out      = "gen/server"
-plugins  = ["pick"]
+[[emit]]
+namespace   = "server"
+transpilers = ["pick"]
+out         = "gen/server"
 
-[browser]
-language = "go"
-out      = "gen/browser"
-plugins  = ["pick"]
+[[emit]]
+namespace   = "browser"
+transpilers = ["pick"]
+out         = "gen/browser"

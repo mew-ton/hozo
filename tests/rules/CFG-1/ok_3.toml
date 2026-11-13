@@ -1,7 +1,0 @@
-# a.x は out だけを書き、language は a から継ぐ
-[a]
-language = "go"
-out      = "gen/a"
-
-[a.x]
-out = "gen/x"

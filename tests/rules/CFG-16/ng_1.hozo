@@ -1,0 +1,4 @@
+// CFG-16（docs/config.md「診断」）: 一つの単位のトランスパイラの language がそろっていない（ng_1.toml の go と ts）
+namespace a {
+  op f();
+}

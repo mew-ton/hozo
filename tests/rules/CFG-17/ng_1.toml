@@ -1,0 +1,14 @@
+# 同じ名前空間の二つの単位が同じ out（./ や余分な / を取り除いて比べる）→ CFG-17
+# ERROR: CFG-17
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go-b"]
+out         = "./gen/a/"

@@ -4,7 +4,7 @@
 import type { Program, View } from "./ir.js";
 
 /** プロトコルの版。docs/ir.md の version（view.version）と同じ値。 */
-export const PROTOCOL = "0.1" as const;
+export const PROTOCOL = "0.2" as const;
 
 export type Direction = "emit" | "check" | "import";
 
@@ -41,11 +41,16 @@ export interface EmitError {
 export interface EmitRequest {
   protocol: typeof PROTOCOL;
   direction: "emit";
-  /** 対象の名前空間は view.viewer。 */
+  /**
+   * 起動されたトランスパイラの名前（マニフェストの [[transpiler]] の name）。複数のトランスパイラを提供する
+   * プラグインは、この名前で処理を分ける。知らない名前なら UnsupportedDirectionError を投げる。
+   */
+  transpiler: string;
+  /** 対象の名前空間は view.viewer。その単位での設定は view.config、単位の対象のファイルは view.files。 */
   view: View;
 }
 
-/** プラグインが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。 */
+/** トランスパイラが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。 */
 export interface Wrap {
   op: string;
   /** デコレータの FQN。名前付きデコレータを通して付けたなら、その FQN でもよい。 */
@@ -54,7 +59,7 @@ export interface Wrap {
 
 /**
  * 既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN はどれも view.viewer の名前空間の宣言で、
- * そこにない FQN や、wraps がその op に付いていないデコレータを指していれば PLG-3。
+ * 単位の対象のもの（inUnit）。そこにない FQN や、wraps がその op に付いていないデコレータを指していれば PLG-3。
  */
 export interface Select {
   /** 起点にする op。 */
@@ -63,7 +68,7 @@ export interface Select {
   stops: string[];
   /** 起点にする状態（基底の状態か、状態の分類）。 */
   states: string[];
-  /** このプラグインが包む関数を実装するデコレータの適用。 */
+  /** このトランスパイラが包む関数を実装するデコレータの適用。 */
   wraps: Wrap[];
 }
 
@@ -117,7 +122,8 @@ type MaybePromise<T> = T | Promise<T>;
 
 /**
  * プラグインが実装する三つの方向。実装しない方向はメソッドを持たないか、
- * UnsupportedDirectionError を投げる。どちらも code "unsupported"（終了コード 2）になる。
+ * UnsupportedDirectionError を投げる。emit で知らないトランスパイラ（req.transpiler）のときも同じものを投げる。
+ * どれも code "unsupported"（終了コード 2）になる。
  */
 export interface Handler {
   emit?(req: EmitRequest): MaybePromise<EmitResponse>;
@@ -125,7 +131,7 @@ export interface Handler {
   import?(req: ImportRequest): MaybePromise<ImportResponse>;
 }
 
-/** Handler がその direction を実装していないことを表す（Go の plugin.ErrUnsupported）。 */
+/** Handler がその direction か、要求のトランスパイラを実装していないことを表す（Go の plugin.ErrUnsupported）。 */
 export class UnsupportedDirectionError extends Error {
   constructor(message = "direction not supported") {
     super(message);

@@ -1,0 +1,8 @@
+# 単位に out がない → CFG-12（その単位は使わない）
+# ERROR: CFG-12
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]

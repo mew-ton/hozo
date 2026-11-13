@@ -1,8 +1,0 @@
-# b のテーブルは language だけで out がない → CFG-1
-# ERROR: CFG-1
-[a]
-language = "go"
-out      = "gen/a"
-
-[b]
-language = "go"

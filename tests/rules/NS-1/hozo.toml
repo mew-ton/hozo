@@ -1,7 +1,12 @@
-[a]
-language = "go"
-out      = "gen/a"
+[hozo]
+plugin_dirs = ["plugins"]
 
-[b]
-language = "go"
-out      = "gen/b"
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go"]
+out         = "gen/b"

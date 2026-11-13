@@ -17,20 +17,22 @@ var update = flag.Bool("update", false, "update golden files (docs/testing.md「
 // corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は emit が `go run` のプラグインを起動するもの。
 // noOutput は、emit が何も書かないもの（emit のゴールデンは持たない）。
 //
-// 既定の出力は、プラグインが選んだ宣言だけを出す（docs/emit-go.md「出力の対象」）。emit のゴールデンを持つコーパスは、
-// どれも選ぶプラグインを設定している: design / state / select は tests/plugins/pick（コーパスの plugins/pick/pick.json の
-// デコレータで選ぶ）、view は plugins/view-dump（@t.entry の op を起点にする）。
+// 既定の出力は、トランスパイラが選んだ宣言だけを出す（docs/emit-go.md「出力の対象」）。emit のゴールデンを持つコーパスは、
+// どれも選ぶトランスパイラを単位に書いている: design / state / select / units は tests/plugins/pick（コーパスの
+// plugins/pick/pick.json のデコレータで選ぶ）、view は plugins/view-dump（@t.entry の op を起点にする）。
 var corpora = []struct {
 	name     string
 	needsGo  bool
 	noOutput bool
 }{
 	{name: "design", needsGo: true}, // 語彙のデコレータ（http / page / db）で選ぶ
-	{name: "view", needsGo: true},   // plugins/view-dump。api はプラグインがないので何も出力しない
+	{name: "view", needsGo: true},   // plugins/view-dump。api の単位のトランスパイラ view-none は何も選ばない
 	{name: "state", needsGo: true},  // 状態の分類・遷移の効果・状態での match。すべての op と状態を選ぶ
 	{name: "select", needsGo: true}, // 出力の対象: 起点、stops、wraps、states、別の名前空間の op
-	// モデルが先: 出力しない名前空間、宣言に付けた印のデコレータ。出力する名前空間 shop にプラグインがないので、
-	// emit は何も書かない（docs/emit-go.md「出力の対象」）
+	// 単位: 同じ名前空間の二つの単位、in、子孫を名指しする単位、単位をまたぐ一方向の import（docs/config.md「単位」）
+	{name: "units", needsGo: true},
+	// モデルが先: 出力しない名前空間、宣言に付けた印のデコレータ。shop の単位のトランスパイラ none（sh で動く）は
+	// 何も選ばないので、emit は何も書かない（docs/emit-go.md「出力の対象」）
 	{name: "model", noOutput: true},
 }
 
@@ -65,6 +67,8 @@ func TestCorpusEmitGolden(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if c.needsGo {
 				requireGo(t)
+			} else {
+				requireSh(t)
 			}
 			root, before := copyCorpusAsModule(t, c.name)
 			var stdout, stderr bytes.Buffer
@@ -77,7 +81,7 @@ func TestCorpusEmitGolden(t *testing.T) {
 				delete(got, p) // 入力（.hozo、hozo.toml、go.mod など）は書き出したものではない
 			}
 			if c.noOutput {
-				// 選ぶプラグインがない: 終了コード 0 で、何も書かない（.hozoc-outputs.json も置かない）
+				// 何も選ばれない: 終了コード 0 で、何も書かない（.hozoc-outputs.json も置かない）
 				if len(got) != 0 || stdout.String() != "" {
 					t.Errorf("emit が書いた: %v\n%s", sortedKeys(got), stdout.String())
 				}
@@ -129,6 +133,14 @@ func vetEmitted(t *testing.T, root string, got map[string][]byte) {
 	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("emit が書き出した Go が go vet を通らない（%s）: %v\n%s", strings.Join(pkgs, " "), err, out)
+	}
+}
+
+// requireSh は `sh` が PATH になければテストを飛ばす（sh で動くプラグインのため。tests/corpus/model/plugins/none）。
+func requireSh(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh がない")
 	}
 }
 

@@ -112,7 +112,7 @@ func Main(ops hozoc.Ops, p Presenter, args []string, env func(string) string, st
 
 // usage は全体の使い方（docs/plugin-go-cli.md「使い方の表示」）。
 func usage(prog string) string {
-	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  check   仕様を検査する。ファイルは書き出さない\n  emit    仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
+	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  check   仕様を検査する。ファイルは書き出さない\n  emit    仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
 }
 
 // runCheck はサブコマンド check（hozoc.check）。
@@ -252,7 +252,7 @@ func failEmit(p Presenter, prog string, input any, err error, stderr io.Writer) 
 
 // usageEmit は emit の使い方。
 func usageEmit(prog string) string {
-	return "usage: " + prog + " emit [flags] [NAMESPACES...]\n\n仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す\n\narguments:\n  NAMESPACES...   生成する名前空間（一つもなければすべて）\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n  --dry-run                 書き出さずに、書き出す予定のファイルだけを表示する\n"
+	return "usage: " + prog + " emit [flags] [NAMESPACES...]\n\n仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n\narguments:\n  NAMESPACES...   生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n  --dry-run                 書き出さずに、書き出す予定のファイルだけを表示する\n"
 }
 
 // runLsp はサブコマンド lsp（hozoc.lsp）。

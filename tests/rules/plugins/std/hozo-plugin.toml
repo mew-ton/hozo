@@ -1,0 +1,17 @@
+# tests/rules の既定の fixture（tests/rules_test.go が各例のプロジェクトの plugins/ に写す）。
+# トランスパイラ go / go-b（言語は go）と ts（言語は ts）を提供する。起動しない（[check] enabled は既定の false）
+name     = "std"
+command  = ["true"]
+protocol = "0.2"
+
+[[transpiler]]
+name     = "go"
+language = "go"
+
+[[transpiler]]
+name     = "go-b"
+language = "go"
+
+[[transpiler]]
+name     = "ts"
+language = "ts"

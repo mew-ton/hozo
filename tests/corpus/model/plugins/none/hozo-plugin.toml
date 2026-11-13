@@ -1,0 +1,9 @@
+# テスト用のプラグイン。トランスパイラ none は何も書かず、何も選ばない（emit の応答は空の files と warnings だけ）。
+# sh で動く（go run を待たないため）。
+name     = "none"
+command  = ["sh", "-c", "cat >/dev/null; printf '%s' '{\"files\":[],\"warnings\":[]}'"]
+protocol = "0.2"
+
+[[transpiler]]
+name     = "none"
+language = "go"

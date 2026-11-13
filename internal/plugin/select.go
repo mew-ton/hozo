@@ -7,11 +7,12 @@ import (
 	sdk "github.com/mew-ton/hozo/plugin"
 )
 
-// CheckSelect は、プラグイン plugin が名前空間 view.Viewer の emit の応答で返した select を確かめる
+// CheckSelect は、プラグイン plugin のトランスパイラが名前空間 view.Viewer の emit の応答で返した select を確かめる
 // （docs/plugin-protocol.md「選択」の最後の項目）。誤りがあれば PLG-3 の *MalformedOutputError（proc.MalformedOutput）:
 //
 //   - roots / stops / wraps の op が、view.Viewer の名前空間の op でない（別の名前空間の宣言、存在しない FQN、op でない宣言）。
 //   - states が、view.Viewer の名前空間の状態（基底の状態か、状態の分類。docs/emit-go.md「state」）でない。
+//   - どれかが、単位の対象の宣言でない（in の外で宣言された。docs/config.md「in」。View.InUnit）。
 //   - wraps の decorator が、その op に付いていない（Application の decorator にも via にもない）。
 //
 // 最初に見つけた一つを返す。誤りがなければ nil。
@@ -27,6 +28,9 @@ func CheckSelect(plugin string, view *ir.View, sel sdk.Select) error {
 		if ns := view.Program.Namespace(view.Viewer); ns != nil {
 			for _, d := range ns.Decls {
 				if d != nil && d.Common().Name == fqn {
+					if !view.InUnit(fqn) {
+						return nil, fmt.Sprintf("単位の対象でない（in の外の %s で宣言されている）", d.Common().Span.File)
+					}
 					return d, ""
 				}
 			}
@@ -91,8 +95,8 @@ func CheckSelect(plugin string, view *ir.View, sel sdk.Select) error {
 	return nil
 }
 
-// MergeSelect は、名前空間に設定されたプラグインの select を一つに合わせる（docs/plugin-protocol.md「選択」:
-// 「すべてのプラグインの select を合わせ」）。順序は渡された順で、同じ項目は一度だけ。結果の列は空でも nil にしない。
+// MergeSelect は、単位のトランスパイラが一つの名前空間について返した select を一つに合わせる（docs/plugin-protocol.md「選択」:
+// 「単位のすべてのトランスパイラの select を名前空間ごとに合わせ」）。順序は渡された順で、同じ項目は一度だけ。結果の列は空でも nil にしない。
 func MergeSelect(sels ...sdk.Select) sdk.Select {
 	out := sdk.Select{Roots: []string{}, Stops: []string{}, States: []string{}, Wraps: []sdk.Wrap{}}
 	add := func(dst *[]string, seen map[string]bool, src []string) {

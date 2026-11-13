@@ -1,7 +1,8 @@
 # テスト用のプラグイン（tests/plugins/pick）。既定の出力の対象を、隣の pick.json のデコレータ（t.hozo の語彙）で選ぶ。ファイルは出さない。
 name     = "pick"
 command  = ["go", "run", "github.com/mew-ton/hozo/tests/plugins/pick"]
-language = "go"
-protocol = "0.1"
+protocol = "0.2"
 
-[emit]
+[[transpiler]]
+name     = "pick"
+language = "go"

@@ -1,15 +1,17 @@
-# 出力の対象のコーパス（docs/testing.md「コーパス」、README.md）: 既定の出力は、プラグインが選んだ宣言だけを出す
+# 出力の対象のコーパス（docs/testing.md「コーパス」、README.md）: 既定の出力は、トランスパイラが選んだ宣言だけを出す
 # （docs/emit-go.md「出力の対象」、docs/plugin-protocol.md「選択」）。
-# shop にはテスト用の pick（plugins/pick）を設定する。stock はテーブルはあるがプラグインがないので、何も出力しない。
+# どちらの単位もテスト用の pick（plugins/pick）を使う。stock には pick が読むデコレータが付いていないので、
+# stock の単位は何も選ばず、何も出力しない。
 
 [hozo]
 plugin_dirs = ["plugins"]
 
-[shop]
-language = "go"
-out      = "gen/shop"
-plugins  = ["pick"]
+[[emit]]
+namespace   = "shop"
+transpilers = ["pick"]
+out         = "gen/shop"
 
-[stock]
-language = "go"
-out      = "gen/stock"
+[[emit]]
+namespace   = "stock"
+transpilers = ["pick"]
+out         = "gen/stock"

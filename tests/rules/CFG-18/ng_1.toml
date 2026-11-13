@@ -1,0 +1,10 @@
+# api/ の下に .hozo はない → CFG-18
+# ERROR: CFG-18
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+in          = ["api/**/*.hozo"]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

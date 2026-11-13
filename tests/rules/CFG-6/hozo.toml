@@ -1,7 +1,7 @@
 [hozo]
 plugin_dirs = ["plugins"]
 
-[a]
-language = "go"
-plugins  = ["goplug"]
-out      = "gen/a"
+[[emit]]
+namespace   = "a"
+transpilers = ["goplug"]
+out         = "gen/a"

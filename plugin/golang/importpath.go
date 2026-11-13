@@ -15,8 +15,8 @@ var ErrNoGoMod = errors.New("no go.mod found")
 
 // ImportPath は `<root>/<out>` に置くパッケージの import パス（docs/emit-go.md「配置」）。
 // `<root>/<out>` から親へ向かって最初に見つかる go.mod の `module` に、そのディレクトリから
-// `<root>/<out>` への相対パスを `/` でつないだもの。out は Conf(N).out に名前空間の相対パス P を
-// 足したものを渡してよい。go.mod が見つからなければ ErrNoGoMod を包んだ誤り（GOEMIT-1）。
+// `<root>/<out>` への相対パスを `/` でつないだもの。out には、単位での名前空間の出力先 Dir(U, N)
+// （View.config.dir。docs/config.md「単位の対象」）を渡す。go.mod が見つからなければ ErrNoGoMod を包んだ誤り（GOEMIT-1）。
 // go.mod が読めない、または `module` 行がなければその誤り。ディレクトリは存在しなくてよい。
 func ImportPath(root, out string) (string, error) {
 	dir, err := filepath.Abs(filepath.Join(root, out))

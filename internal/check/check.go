@@ -76,11 +76,12 @@ func Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic {
 	return Checker{}.Check(p, cfg)
 }
 
-// CheckUnsupported は CFG-6（docs/config.md「診断」）。名前空間 ns の宣言（フィールドを含む）に付いた
-// デコレータのうち、FQN が unsupported にあるものを warning にする。unsupported は Conf(ns).plugins の
-// マニフェストの unsupported を呼ぶ側が集めて渡す（docs/plugin-protocol.md「マニフェスト」）。
-func CheckUnsupported(p *ir.Program, ns string, unsupported []string) []diag.Diagnostic {
-	return Checker{}.CheckUnsupported(p, ns, unsupported)
+// CheckUnsupported は CFG-6（docs/config.md「診断」）。名前空間 ns の宣言（フィールドを含む）のうち単位の対象のもの
+// （Span.File が files にある。files が nil ならすべて）に付いたデコレータのうち、FQN が unsupported にあるものを
+// warning にする。files は単位の in に合ったファイル、unsupported は単位のトランスパイラのマニフェストの
+// unsupported を、呼ぶ側が集めて渡す（docs/plugin-protocol.md「マニフェスト」）。
+func CheckUnsupported(p *ir.Program, ns string, files []string, unsupported []string) []diag.Diagnostic {
+	return Checker{}.CheckUnsupported(p, ns, files, unsupported)
 }
 
 // Check は p を検査する。Check（パッケージ関数）と同じで、位置は c.Locate で直す。
@@ -106,12 +107,12 @@ func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic {
 }
 
 // CheckUnsupported は CFG-6。CheckUnsupported（パッケージ関数）と同じで、位置は c.Locate で直す。
-func (c Checker) CheckUnsupported(p *ir.Program, ns string, unsupported []string) []diag.Diagnostic {
+func (c Checker) CheckUnsupported(p *ir.Program, ns string, files []string, unsupported []string) []diag.Diagnostic {
 	if p == nil {
 		return nil
 	}
 	r := &reporter{loc: c.Locate}
-	checkUnsupported(newIndex(p), ns, unsupported, r)
+	checkUnsupported(newIndex(p), ns, files, unsupported, r)
 	return r.diags
 }
 

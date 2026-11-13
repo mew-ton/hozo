@@ -30,8 +30,8 @@ func TestSort(t *testing.T) {
 		{Code: "A", Message: "a at 5 A", Span: span(a, 5, 6)},
 		{Code: "A", Message: "a at 5 A second", Span: span(a, 5, 6)},
 		{Code: "C", Message: "a at 2", Span: span(a, 2, 3)},
-		{Code: "CFG-1", Message: "a no span", File: "a.hozo"},
-		{Code: "CFG-1", Message: "toml", File: "hozo.toml"},
+		{Code: "CFG-12", Message: "a no span", File: "a.hozo"},
+		{Code: "CFG-12", Message: "toml", File: "hozo.toml"},
 		{Code: "X", Message: "no file"},
 	}
 	Sort(diags, fs, nil)
@@ -85,7 +85,7 @@ func TestWriteText(t *testing.T) {
 	diags := []Diagnostic{
 		{Severity: Error, Code: "THROWS-1", Message: "openOrders は http.NetworkError を投げうるが throws に書かれていない", Span: span(f, 8, 9),
 			Related: []Related{{Span: *span(f, 17, 20), Message: "出どころ: fetchMe の呼び出し"}}},
-		{Severity: Error, Code: "CFG-1", Message: "名前空間 server に language がない", File: "hozo.toml"},
+		{Severity: Error, Code: "CFG-12", Message: "2 番目の [[emit]]（namespace = \"server\"）に out がない", File: "hozo.toml"},
 		{Severity: Warning, Code: "NAME-1", Message: "warn"},
 	}
 	var buf bytes.Buffer
@@ -94,7 +94,7 @@ func TestWriteText(t *testing.T) {
 	}
 	want := "examples/orders.hozo:2:3: error[THROWS-1]: openOrders は http.NetworkError を投げうるが throws に書かれていない\n" +
 		"  examples/orders.hozo:10:1: note: 出どころ: fetchMe の呼び出し\n" +
-		"hozo.toml: error[CFG-1]: 名前空間 server に language がない\n" +
+		"hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = \"server\"）に out がない\n" +
 		"hozoc: warning[NAME-1]: warn\n" +
 		"2 errors, 1 warning\n"
 	if buf.String() != want {
@@ -119,7 +119,7 @@ func TestWriteJSON(t *testing.T) {
 		{Severity: Error, Code: "THROWS-1", Message: "m", Span: span(f, 8, 11),
 			Related: []Related{{Span: *span(f, 0, 5), Message: "r"}},
 			Data:    map[string]any{"missing": []string{"http.NetworkError"}}},
-		{Severity: Error, Code: "CFG-1", Message: "c", File: "hozo.toml"},
+		{Severity: Error, Code: "CFG-12", Message: "c", File: "hozo.toml"},
 		{Severity: Warning, Code: "W", Message: "w"},
 	}
 	var buf bytes.Buffer

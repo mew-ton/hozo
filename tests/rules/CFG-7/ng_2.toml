@@ -1,4 +1,4 @@
-# TOML の構文エラー → CFG-7（設定は既定値になるので、.hozo は state も op も持たない）
+# TOML の構文エラー → CFG-7（設定は既定値になり、単位は一つもない）
 # ERROR: CFG-7
-[a
-language = "go"
+[[emit]
+namespace = "a"

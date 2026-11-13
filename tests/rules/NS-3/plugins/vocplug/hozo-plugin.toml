@@ -1,6 +1,9 @@
 # テストの fixture: 語彙を提供するプラグイン。起動しない
 name       = "vocplug"
 command    = ["true"]
-language   = "go"
-protocol   = "0.1"
+protocol   = "0.2"
 vocabulary = ["v.hozo"]
+
+[[transpiler]]
+name     = "vocplug"
+language = "go"

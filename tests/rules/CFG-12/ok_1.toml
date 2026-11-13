@@ -1,0 +1,8 @@
+# 必須のキーがそろっている。in は省略できる
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

@@ -1,4 +1,4 @@
-// CFG-8（docs/config.md「診断」）: テーブルの名前空間が語彙の名前空間（ng_2.toml の [http]）
+// CFG-8（docs/config.md「診断」）: 単位の namespace が語彙の名前空間（ng_2.toml の http）
 namespace a {
   op f();
 }

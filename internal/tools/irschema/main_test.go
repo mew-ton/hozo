@@ -190,8 +190,9 @@ func TestNegative(t *testing.T) {
 		{"arg value variant", "ArgValue", `{"kind":"variant","union":"a.U","arm":"Ready"}`, true},
 		{"arg value list nested", "ArgValue", `{"kind":"list","items":[{"kind":"ref","target":"x"},{"kind":"refs","targets":[]}]}`, true},
 		{"arg value literal null", "ArgValue", `{"kind":"literal","literal":null}`, false},
-		{"namespace config", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen","plugins":[]}`, true},
-		{"namespace config missing plugins", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen"}`, false},
+		{"namespace config", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen","transpilers":["go-cli"]}`, true},
+		{"namespace config missing transpilers", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen"}`, false},
+		{"namespace config with plugins", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen","plugins":[]}`, false},
 		{"bind", "Bind", `{"namespace":"browser","state":"db","target":{"namespace":"server","deep":true},"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
 		{"bind deep string", "Bind", `{"namespace":"browser","state":"db","target":{"namespace":"server","deep":"true"},"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		// プラグインのプロトコル（docs/plugin-protocol.md「要求と応答」「起動」）。
@@ -205,9 +206,9 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.1","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.1","direction":"emit","format":"openapi","files":[]}`, false},
-		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.2","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.2","direction":"emit","format":"openapi","files":[]}`, false},
+		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.1","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -251,7 +252,7 @@ func TestNegativeMutations(t *testing.T) {
 		inst func() any
 	}{
 		{"program without version", func() any { p := program(); delete(p, "version"); return p }},
-		{"program with other version", func() any { p := program(); p["version"] = "0.2"; return p }},
+		{"program with other version", func() any { p := program(); p["version"] = "0.1"; return p }},
 		{"program with extra key", func() any { p := program(); p["extra"] = 1; return p }},
 		{"program binds null", func() any { p := program(); p["binds"] = nil; return p }},
 		{"op without returns", func() any { p := program(); delete(firstDecl(p, "op"), "returns"); return p }},
@@ -284,6 +285,14 @@ func TestNegativeMutations(t *testing.T) {
 			return w
 		}},
 		{"view namespaces as array", func() any { w := view(); w["namespaces"] = []any{}; return w }},
+		// namespaces の値は、その名前空間を出力する単位ごとの設定の列（docs/ir.md「その名前空間から見た IR」）
+		{"view namespaces value as object", func() any {
+			w := view()
+			w["namespaces"] = map[string]any{"browser": w["config"]}
+			return w
+		}},
+		{"view without files", func() any { w := view(); delete(w, "files"); return w }},
+		{"view files as string", func() any { w := view(); w["files"] = "a.hozo"; return w }},
 		{"view config missing dir", func() any { w := view(); delete(w["config"].(map[string]any), "dir"); return w }},
 	}
 	for _, c := range cases {
@@ -344,7 +353,7 @@ func TestSchemaMatchesGo(t *testing.T) {
 			want = append(want, r.(string))
 		}
 		sort.Strings(want)
-		// Program / View は空の version を "0.1" に補うので、const と一致する。
+		// Program / View は空の version を ir.Version に補うので、const と一致する。
 		if !reflect.DeepEqual(gotKeys, want) {
 			t.Errorf("%s: zero value marshals keys %v, schema requires %v", name, gotKeys, want)
 		}

@@ -174,7 +174,7 @@ func stringList(v any) []string {
 type unknownNamespace struct{ names []string }
 
 func (e *unknownNamespace) Error() string {
-	return fmt.Sprintf("名前空間 %s は hozo.toml にない", strings.Join(e.names, "、"))
+	return fmt.Sprintf("名前空間 %s は、hozo.toml のどの単位の対象でもない", strings.Join(e.names, "、"))
 }
 
 func (e *unknownNamespace) Unwrap() error { return hozoc.UnknownNamespace{} }

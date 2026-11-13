@@ -1,0 +1,30 @@
+// 名前空間 shop の後半と、子の名前空間 shop.admin。単位 2 の in の外。
+// 検査は in によらず全体に掛かる（Item は shop/api.hozo の宣言）。
+
+namespace shop {
+  /** 集計 */
+  model Report { count: int; }
+
+  // 単位 3（pick-batch）の起点。単位 2 では in の外なので起点に選べない（選べば PLG-3）
+  /** 夜間の片付け */
+  @t.batch
+  op nightly(item: Item)
+  {
+    sweep(item);
+  }
+
+  /** 掃除する */
+  op sweep(item: Item);
+
+  /** 集計する */
+  @t.batch
+  op report(): Report;
+}
+
+// docs/config.md「単位の対象」: 単位 4 が名指しする子孫。shop の単位（2 と 3）の対象から外れる
+/** 管理 */
+namespace shop.admin {
+  /** 品物を売り場から外す */
+  @t.admin
+  op ban(item: shop.Item);
+}

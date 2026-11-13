@@ -1,0 +1,6 @@
+[
+  "gen/stock/doc.go",
+  "gen/stock/ops.go",
+  "gen/stock/types.go",
+  "gen/stock/validate.go"
+]

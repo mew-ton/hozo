@@ -15,6 +15,7 @@
 - `writeOutputs` の三つの効果（追加・書き換え・削除）は、葉の op が持てる効果が一つまで（`docs/check.md` EFF-3）なので、`outputs` を対象にした分類 `OutputsSync` の遷移 `syncOutputs` 一つにする。述語 `UpToDate` は「生成し直して差分がない」で、`docs/testing.md`「生成物の一致」の検査と同じ中身。
 - `runEmit` の `@proc.stdio("{plugin.command}")` は、呼び先を引数 `plugin` で渡す形にし、`proc.stdio` は引数を持たない（`docs/vocab.md`「同梱する語彙」）。`runImport` は段階 6 で足す。
 - 出力の形式を選ぶ `format` のフラグと、知らない名前空間を指したときの `UnknownNamespace` を足す。
+- 設定を単位の一覧にした（`docs/config.md`「単位」）のに合わせて、`EmitRequest` に `transpiler` を足し、`LanguageMismatch` と `UnknownNamespace` の意味を単位の言葉に直す。
 - プラグインとやり取りする model（`EmitRequest` / `EmitResponse`）は `docs/plugin-protocol.md`「要求と応答」の JSON をそのまま写す。
 
 ```ts
@@ -65,7 +66,7 @@ namespace hozoc {
   @fs.files("hozo.toml")
   state config: nullable<SourceFile>;
 
-  /** 生成したファイル。置き場は hozo.toml の各名前空間の out */
+  /** 生成したファイル。置き場は hozo.toml の各単位の out（docs/config.md「単位の対象」） */
   state outputs: list<OutputFile>;
 
   /** 仕様に構文か型の誤りがある */
@@ -76,7 +77,7 @@ namespace hozoc {
   @cli.exitCode(2)
   exception ConfigInvalid: Diagnostics;
 
-  /** プラグインの language が名前空間の language と合わない */
+  /** 一つの単位のトランスパイラの language がそろっていない */
   @cli.exitCode(2)
   exception LanguageMismatch: Diagnostics;
 
@@ -84,7 +85,7 @@ namespace hozoc {
   @cli.exitCode(3)
   exception OutputConflict: Diagnostics;
 
-  /** emit の引数に、hozo.toml にない名前空間が指定された */
+  /** emit の引数に、どの単位の対象でもない名前空間が指定された */
   @cli.exitCode(64)
   exception UnknownNamespace;
 
@@ -114,7 +115,7 @@ namespace hozoc {
     @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** 表示の形式 */
     @cli.flag("format") format: OutputFormat?;
-    /** 生成する名前空間（一つもなければすべて） */
+    /** 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す */
     @cli.arg namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
@@ -143,7 +144,7 @@ namespace hozoc {
    * 仕様を検査する。ファイルは書き出さない。
    *
    * @param in コマンドの入力
-   * @throws LanguageMismatch プラグインのマニフェストの language が名前空間の language と合わない（docs/config.md の CFG-4）
+   * @throws LanguageMismatch 一つの単位のトランスパイラの language がそろっていない（docs/config.md の CFG-16）
    * @throws proc.Crashed check を持つプラグインが異常終了した
    * @see emit
    */
@@ -153,13 +154,13 @@ namespace hozoc {
     throws proc.Crashed | proc.MalformedOutput;
 
   /**
-   * 検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
+   * 検査を通った仕様から、単位ごとに既定の出力とトランスパイラの出力を作り、書き出す。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
-   * @throws CheckFailed プラグインが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
+   * @throws CheckFailed トランスパイラが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした。ファイルは書き出さない
-   * @throws UnknownNamespace 引数の名前空間が hozo.toml にない。ファイルは書き出さない
+   * @throws UnknownNamespace 引数の名前空間がどの単位の対象でもない。ファイルは書き出さない
    * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
    */
   op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
@@ -168,7 +169,7 @@ namespace hozoc {
     throws proc.Crashed | proc.MalformedOutput prevents effects;
 
   /**
-   * 仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
+   * 仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
    *
    * @param in コマンドの入力
    * @see check
@@ -196,8 +197,8 @@ namespace hozoc {
   /** IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない */
   model View {}
 
-  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求） */
-  model EmitRequest { protocol: string; direction: string; view: View; }
+  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）。transpiler は起動するトランスパイラの名前 */
+  model EmitRequest { protocol: string; direction: string; transpiler: string; view: View; }
 
   /** プラグインの warning（同「emit」の応答の warnings の要素） */
   model PluginWarning { at: string; message: string; }
@@ -215,7 +216,7 @@ namespace hozoc {
   model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; select: Select; }
 
   /**
-   * プラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
+   * プラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
    *
    * @param plugin 起動するプラグイン
    * @param req プラグインへの入力
@@ -228,42 +229,42 @@ namespace hozoc {
 `hozo.toml`:
 
 ```toml
-[hozoc]
-language = "go"
-plugins  = ["go-cli"]
-out      = "internal/gen/hozoc"
-
 [hozo]
 sources     = ["cli.hozo"]      # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "hozoc"
+transpilers = ["go-cli"]
+out         = "internal/gen/hozoc"
 ```
 
 `writeOutputs` の `throws proc.Crashed | proc.MalformedOutput prevents effects` は、プラグインをすべて呼び終えて衝突を確かめてから書き始めるため（下の「emit」）。
 
 ## check
 
-1. `hozo.toml` を読み、プラグインのマニフェストを探して読む（`docs/config.md`「置き場と探し方」、`docs/plugin-protocol.md`「探索」）。`hozo.toml` がなければ設定なしで進む（作業ディレクトリをルートにし、`sources` は既定）。設定とマニフェストの error は、CFG-4 なら `LanguageMismatch`、それ以外は `ConfigInvalid`（`docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」）。
-2. 標準の語彙、設定されたプラグインの語彙、`sources` のファイルの順に読み、解析する（`docs/grammar.md`）。
+1. `hozo.toml` を読み、入っているプラグインのマニフェストを探して読み、各単位の `transpilers` の名前をトランスパイラに解決する（`docs/config.md`「置き場と探し方」「単位」、`docs/plugin-protocol.md`「探索」）。`hozo.toml` がなければ設定なしで進む（作業ディレクトリをルートにし、`sources` は既定。プラグインは探さない）。設定とマニフェストの error は、CFG-16 なら `LanguageMismatch`、それ以外は `ConfigInvalid`（`docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」）。
+2. 標準の語彙、使うプラグイン（`docs/plugin-protocol.md`「探索」）の語彙、`sources` のファイルの順に読み、解析する（`docs/grammar.md`）。`in` は読むファイルを変えない（`docs/config.md`「in」）。
 3. 解決（`docs/resolve.md`）、正規化（`docs/ir.md`）、計算と検査（`docs/check.md`）を行う。
-4. `[check] enabled` のプラグインに `direction: "check"` を送り、返った診断を足す。プラグインの異常終了は `proc.Crashed` / `proc.MalformedOutput`。
-5. error が一つでもあれば例外（値は error と warning のすべて）。設定かマニフェストの error（CFG-*、MAN-*）が一つでもあれば `ConfigInvalid`、ただしそれがすべて CFG-4 なら `LanguageMismatch`。それ以外は `CheckFailed`。error がなければ `CheckResult`（warning）。
+4. 使うプラグインのうち `[check] enabled` のものに `direction: "check"` を送り（相手と回数は `docs/plugin-protocol.md`「起動」）、返った診断を足す。プラグインの異常終了は `proc.Crashed` / `proc.MalformedOutput`。
+5. error が一つでもあれば例外（値は error と warning のすべて）。設定かマニフェストの error（CFG-*、MAN-*）が一つでもあれば `ConfigInvalid`、ただしそれがすべて CFG-16 なら `LanguageMismatch`。それ以外は `CheckFailed`。error がなければ `CheckResult`（warning）。
 
 構文エラーのあるファイルも、読めた宣言は解決・検査に進める。診断の順序は `docs/diagnostics.md`。
 
 ## emit
 
-`check` の後、`writeOutputs`:
+`check` の後、`writeOutputs`。ここで**出力**は、単位 U と、U が出力する名前空間 N の組（`docs/config.md`「単位の対象」「in」）。置き場は Dir(U, N)。
 
-1. `namespaces` が空でなければ、その名前空間（と子孫）だけを対象にする。`hozo.toml` にない名前なら `UnknownNamespace`。
-2. 対象の各名前空間 N について、Conf(N) を解決し、Conf(N).plugins の各プラグインを `runEmit` で起動して（順序は `docs/plugin-protocol.md`「起動」）、`files` と `select` を集める。`errors` があれば `CheckFailed`。`select` の誤り（PLG-3）は `proc.MalformedOutput`。
-3. 対象の各名前空間 N について、集めた `select` から既定の出力（`docs/emit-go.md`「出力の対象」）を作る。GOEMIT-* があれば `CheckFailed`。N の出力が、対象でない Go の名前空間 M の型を使うときは、M のプラグインも起動して `select` だけを使う（M の出力がその型を持つかで、import するか複製するかが決まる。`docs/emit-go.md`「配置」）。対象を絞っても、すべてを対象にしたときと同じ内容になる。
-4. すべての名前空間のファイルを集めてから、パスの重複を確かめる（CFG-5 → `OutputConflict`）。
+1. `namespaces` が空なら、すべての出力が対象。空でなければ、名前空間が引数のどれかと同じか、その子孫である出力だけを対象にする（その名前空間を出力するすべての単位の分。引数は単位ではなく名前空間を選ぶ）。引数の名前空間を対象にする単位が一つもなければ（`docs/config.md`「単位の対象」の手続き）`UnknownNamespace`。
+2. 対象の各出力 (U, N) について、U の `transpilers` の各トランスパイラを `runEmit` で起動して（順序は `docs/plugin-protocol.md`「起動」）、`files` と `select` を集める。`errors` があれば `CheckFailed`。`select` の誤り（PLG-3）は `proc.MalformedOutput`。
+3. 対象の各出力について、U のトランスパイラの `select` を合わせて既定の出力（`docs/emit-go.md`「出力の対象」）を作る。GOEMIT-* があれば `CheckFailed`。出力が別の名前空間 M の型を使うときは、M を出力する Go の単位のうち対象でないもののトランスパイラも起動して、`select` だけを使う（どの単位の出力がその型を持つかで、import するか複製するかが決まる。`docs/emit-go.md`「配置」）。import の循環（GOEMIT-5）は、対象の出力から import を辿って届くすべての出力について確かめる（対象でない出力も、`select` から既定の出力を作って import だけを見る）。対象を絞っても、書き出す出力の内容は、すべてを対象にしたときと同じになる。
+4. すべての出力のファイルを集めてから、パスの重複を確かめる（CFG-5 → `OutputConflict`）。
 5. `dryRun` なら、書く予定のパスを `written` に入れて返す（書かない）。
-6. 対象の各名前空間の `<Dir(N)>/.hozoc-outputs.json`（前回書いたパスの一覧。ルートからの相対パスの JSON の配列、辞書順）を読み、今回書かないパスのファイルを消す。ファイルがなければ何もしない。`hozo.toml` から名前空間のテーブルを消した場合、その出力先はもう分からないので消さない（手で消す）。
+6. 対象の各出力の `<Dir(U, N)>/.hozoc-outputs.json`（前回書いたパスの一覧。ルートからの相対パスの JSON の配列、辞書順）を読み、今回書かないパスのファイルを消す。ファイルがなければ何もしない。U の対象の名前空間が `in` のせいで出力でなくなったとき（`docs/config.md`「in」）も、その Dir(U, N) は同じに扱う（前回のファイルを消す）。`hozo.toml` から単位を消した、または `namespace` か `out` を変えた場合、前の出力先はもう分からないので消さない（手で消す）。
 7. ファイルを書く。内容が同じなら書き直さない（`written` には入れる）。ディレクトリは作る。
-8. `.hozoc-outputs.json` を書く。書くものが一つもない名前空間（プラグインがない、何も選ばれていない）には作らず、前回のものがあれば消す。
+8. `.hozoc-outputs.json` を書く。書くものが一つもない出力（何も選ばれていない）には作らず、前回のものがあれば消す。
 
-`EmitResult.warnings` は `check` の warning に、既定の出力とプラグインの warning を足したもの。
+`EmitResult.warnings` は `check` の warning に、既定の出力とトランスパイラの warning を足したもの。
 
 書く順序はパスの辞書順。途中で失敗したら、そこまでに書いたものは残る（原子性は持たない。`proc.Crashed` は 2 と 3 で起きるので、書き出しには入っていない）。
 

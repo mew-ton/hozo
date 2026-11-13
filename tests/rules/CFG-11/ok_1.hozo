@@ -1,4 +1,4 @@
-// CFG-11（docs/config.md「診断」）: language が "go"（既定の hozo.toml）
+// CFG-11（docs/config.md「診断」）: 単位の言語が "go"（既定の hozo.toml のトランスパイラ go）
 namespace a {
   op f();
 }

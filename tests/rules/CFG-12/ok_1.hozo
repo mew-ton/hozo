@@ -1,0 +1,4 @@
+// CFG-12（docs/config.md「診断」）: 単位の必須のキー namespace / transpilers / out（ok_1.toml）
+namespace a {
+  op f();
+}

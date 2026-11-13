@@ -7,79 +7,106 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Views は設定のある名前空間ごとの View（docs/ir.md「その名前空間から見た IR」）。キーは見る側の名前空間の FQN。
+// Unit は、設定の外で決まる単位の情報（docs/config.md「単位」「in」）。cfg.Units と同じ順に並べて Views に渡す。
+type Unit struct {
+	// Language は単位の言語（そのトランスパイラの language。マニフェストから）。
+	Language string
+	// Files は単位の in に合ったファイル（Span.File と同じ形、辞書順）。in を省いた単位なら読み込んだユーザーのファイルのすべて。
+	Files []string
+}
+
+// Views は、単位ごと（cfg.Units と同じ順）の、その単位が出力する名前空間 → View
+// （docs/ir.md「その名前空間から見た IR」）。単位が出力する名前空間は、単位の対象の名前空間（docs/config.md「単位の対象」）の
+// うち、Files のファイルに宣言を一つでも持つもの（同「in」）。
 // 計算（Compute）を行ってから作る。program は全体そのままに、params が合成する model を見る側の
 // Namespace.decls の末尾に足したもの。ops はすべての op について Sig(O, viewer) と、bind で埋まる位置を取り除いた引数。
-func Views(p *ir.Program, cfg *config.Config) map[string]*ir.View {
-	if p == nil {
-		return map[string]*ir.View{}
-	}
+// units が cfg.Units より短ければ、足りない単位は Language が空で Files は nil（どの名前空間も出力しない）。
+func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.View {
 	if cfg == nil {
 		cfg = config.Default("")
+	}
+	views := make([]map[string]*ir.View, len(cfg.Units))
+	for i := range views {
+		views[i] = map[string]*ir.View{}
+	}
+	if p == nil {
+		return views
+	}
+	unit := func(i int) Unit {
+		if i < len(units) {
+			return units[i]
+		}
+		return Unit{}
+	}
+	// 単位 i が出力する名前空間（Program の順）と、その設定
+	outputs := make([][]string, len(cfg.Units))
+	namespaces := map[string][]ir.NamespaceConfig{}
+	confs := make([]map[string]ir.NamespaceConfig, len(cfg.Units))
+	for i := range confs {
+		confs[i] = map[string]ir.NamespaceConfig{}
+	}
+	for ni := range p.Namespaces {
+		ns := &p.Namespaces[ni]
+		if ns.Name == "" {
+			continue
+		}
+		for _, i := range cfg.Covering(ns.Name) {
+			u := unit(i)
+			if !declaredIn(ns, u.Files) {
+				continue
+			}
+			conf := ir.NamespaceConfig{
+				Language:    u.Language,
+				Out:         cfg.Units[i].Out,
+				Dir:         cfg.Dir(i, ns.Name),
+				Transpilers: append([]string{}, cfg.Units[i].Transpilers...),
+			}
+			outputs[i] = append(outputs[i], ns.Name)
+			confs[i][ns.Name] = conf
+			namespaces[ns.Name] = append(namespaces[ns.Name], conf)
+		}
 	}
 	ix := newIndex(p)
 	c := newComputer(ix, &reporter{})
 	c.computeAll()
-	namespaces := namespaceConfigs(p, cfg)
-	views := map[string]*ir.View{}
-	for i := range p.Namespaces {
-		viewer := p.Namespaces[i].Name
-		conf, ok := namespaces[viewer]
-		if !ok {
-			continue
+	base := map[string]*ir.View{} // viewer → 単位によらない部分
+	for i := range cfg.Units {
+		for _, viewer := range outputs[i] {
+			b := base[viewer]
+			if b == nil {
+				b = c.view(viewer)
+				base[viewer] = b
+			}
+			v := *b
+			v.Config = confs[i][viewer]
+			v.Files = append([]string{}, unit(i).Files...)
+			v.Namespaces = make(map[string][]ir.NamespaceConfig, len(namespaces))
+			for k, list := range namespaces {
+				v.Namespaces[k] = append([]ir.NamespaceConfig(nil), list...)
+			}
+			views[i][viewer] = &v
 		}
-		views[viewer] = c.view(viewer, conf, namespaces)
 	}
 	return views
 }
 
-// namespaceConfigs は設定のあるすべての名前空間の設定（docs/ir.md「その名前空間から見た IR」の View.namespaces）。
-// hozo.toml にテーブルのある名前空間と、Program の名前空間のうち祖先のテーブルから設定を継ぐもの
-// （View を持つ名前空間はすべてここに入る）。
-func namespaceConfigs(p *ir.Program, cfg *config.Config) map[string]ir.NamespaceConfig {
-	names := cfg.NamespaceNames()
-	for i := range p.Namespaces {
-		names = append(names, p.Namespaces[i].Name)
-	}
-	out := map[string]ir.NamespaceConfig{}
-	for _, n := range names {
-		if _, done := out[n]; done {
-			continue
-		}
-		if nc, ok := namespaceConfig(cfg, n); ok {
-			out[n] = nc
+// declaredIn は、名前空間 ns が files のファイルに宣言を一つでも持つか。
+func declaredIn(ns *ir.Namespace, files []string) bool {
+	for _, d := range ns.Decls {
+		if d != nil && contains(files, d.Common().Span.File) {
+			return true
 		}
 	}
-	return out
+	return false
 }
 
-// namespaceConfig は名前空間 ns の Conf(ns) と Dir(ns)（docs/config.md「名前空間の設定の解決」）。設定がなければ false。
-func namespaceConfig(cfg *config.Config, ns string) (ir.NamespaceConfig, bool) {
-	conf, ok := cfg.Resolve(ns)
-	if !ok {
-		return ir.NamespaceConfig{}, false
-	}
-	dir, _ := cfg.Dir(ns)
-	plugins := conf.Plugins
-	if plugins == nil {
-		plugins = []string{}
-	}
-	return ir.NamespaceConfig{Language: conf.Language, Out: conf.Out, Dir: dir, Plugins: plugins}, true
-}
-
-// view は viewer から見た View を作る。conf は viewer の設定、namespaces は設定のあるすべての名前空間の設定（複製して持つ）。
-func (c *computer) view(viewer string, conf ir.NamespaceConfig, namespaces map[string]ir.NamespaceConfig) *ir.View {
+// view は viewer から見た View のうち、単位によらない部分（version、viewer、program、ops）を作る。
+func (c *computer) view(viewer string) *ir.View {
 	ix := c.ix
-	nss := make(map[string]ir.NamespaceConfig, len(namespaces))
-	for k, nc := range namespaces {
-		nss[k] = nc
-	}
 	v := &ir.View{
-		Version:    ir.Version,
-		Viewer:     viewer,
-		Config:     conf,
-		Namespaces: nss,
-		Ops:        map[string]*ir.ViewedSignature{},
+		Version: ir.Version,
+		Viewer:  viewer,
+		Ops:     map[string]*ir.ViewedSignature{},
 	}
 	var synthesized []ir.Decl
 	for _, o := range ix.ops {

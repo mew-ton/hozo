@@ -2,6 +2,7 @@ package gocli
 
 import (
 	"github.com/mew-ton/hozo/ir"
+	"sort"
 )
 
 // このファイルはテストの入力の View を手で組み立てる。hozocView は docs/cli.md「cli.hozo」を写したもの、
@@ -97,14 +98,25 @@ func vocabNamespaces() []ir.Namespace {
 	}
 }
 
-// view は名前空間 ns を見る側にした View。out を自分で書いた名前空間なので Dir = out。ops は各 op の Signature をそのまま写す。
+// view は名前空間 ns を見る側にした View。単位の namespace 自身なので Dir = out。in を省いた単位として、files は ns の宣言の
+// ファイルのすべて。ops は各 op の Signature をそのまま写す。
 func view(ns ir.Namespace, out string) *ir.View {
-	conf := ir.NamespaceConfig{Language: "go", Out: out, Dir: out, Plugins: []string{"go-cli"}}
+	conf := ir.NamespaceConfig{Language: "go", Out: out, Dir: out, Transpilers: []string{TranspilerName}}
+	files := []string{}
+	seen := map[string]bool{}
+	for _, d := range ns.Decls {
+		if f := d.Common().Span.File; !seen[f] {
+			seen[f] = true
+			files = append(files, f)
+		}
+	}
+	sort.Strings(files)
 	v := &ir.View{
 		Version:    ir.Version,
 		Viewer:     ns.Name,
 		Config:     conf,
-		Namespaces: map[string]ir.NamespaceConfig{ns.Name: conf},
+		Files:      files,
+		Namespaces: map[string][]ir.NamespaceConfig{ns.Name: {conf}},
 		Program:    &ir.Program{Version: ir.Version, Namespaces: append([]ir.Namespace{{Name: ""}}, append(vocabNamespaces(), ns)...)},
 		Ops:        map[string]*ir.ViewedSignature{},
 	}
@@ -154,7 +166,7 @@ func hozocNamespace() ir.Namespace {
 			mdl("hozoc.EmitInput", "emit の入力",
 				fld("config", "設定ファイルの場所", ir.Optional(ir.Ref(path)), cliFlag("config"), cliEnv("HOZO_CONFIG")),
 				fld("format", "表示の形式", ir.Optional(ir.Ref("hozoc.OutputFormat")), cliFlag("format")),
-				fld("namespaces", "生成する名前空間（一つもなければすべて）", ir.Array(ir.String()), cliArg()),
+				fld("namespaces", "生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す", ir.Array(ir.String()), cliArg()),
 				fld("dryRun", "書き出さずに、書き出す予定のファイルだけを表示する", ir.Optional(ir.Boolean()), cliFlag("dry-run")),
 			),
 			mdl("hozoc.LspInput", "lsp の入力",
@@ -169,13 +181,13 @@ func hozocNamespace() ir.Namespace {
 				{Name: "checked", Type: ir.Ref("hozoc.CheckResult"), Span: sp(0)},
 			}, ir.Ref("hozoc.EmitResult"),
 				[]string{"hozoc.CheckFailed", "hozoc.OutputConflict", "hozoc.UnknownNamespace", "proc.Crashed", "proc.MalformedOutput"}),
-			opDecl("hozoc.emit", "仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。", param("in", "hozoc.EmitInput"), ir.Ref("hozoc.EmitResult"),
+			opDecl("hozoc.emit", "仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。", param("in", "hozoc.EmitInput"), ir.Ref("hozoc.EmitResult"),
 				[]string{"hozoc.CheckFailed", "hozoc.ConfigInvalid", "hozoc.LanguageMismatch", "hozoc.OutputConflict", "hozoc.UnknownNamespace", "proc.Crashed", "proc.MalformedOutput"},
 				cliCommand("emit")),
 			opDecl("hozoc.lsp", "言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。", param("in", "hozoc.LspInput"), nil, nil,
 				cliCommand("lsp")),
 			// プロセスの境界を越える op。@cli.command ではないので cli.go には出ず、選択の stops になる
-			opDecl("hozoc.runEmit", "プラグインを一つ起動して展開させる。", nil, nil, []string{"proc.Crashed", "proc.MalformedOutput"}, app("proc.stdio")),
+			opDecl("hozoc.runEmit", "プラグインを一つ起動して、トランスパイラ一つに展開させる。", nil, nil, []string{"proc.Crashed", "proc.MalformedOutput"}, app("proc.stdio")),
 		},
 	}
 }

@@ -40,7 +40,7 @@ type Related struct {
 ```
 examples/orders.hozo:42:3: error[THROWS-1]: openOrders は http.NetworkError を投げうるが throws に書かれていない
   examples/orders.hozo:44:16: note: 出どころ: fetchMe の呼び出し
-hozo.toml: error[CFG-1]: 名前空間 server に language がない
+hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = "server"）に out がない
 2 errors, 1 warning
 ```
 

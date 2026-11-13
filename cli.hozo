@@ -45,7 +45,7 @@ namespace hozoc {
   @fs.files("hozo.toml")
   state config: nullable<SourceFile>;
 
-  /** 生成したファイル。置き場は hozo.toml の各名前空間の out */
+  /** 生成したファイル。置き場は hozo.toml の各単位の out（docs/config.md「単位の対象」） */
   state outputs: list<OutputFile>;
 
   /** 仕様に構文か型の誤りがある */
@@ -56,7 +56,7 @@ namespace hozoc {
   @cli.exitCode(2)
   exception ConfigInvalid: Diagnostics;
 
-  /** プラグインの language が名前空間の language と合わない */
+  /** 一つの単位のトランスパイラの language がそろっていない */
   @cli.exitCode(2)
   exception LanguageMismatch: Diagnostics;
 
@@ -64,7 +64,7 @@ namespace hozoc {
   @cli.exitCode(3)
   exception OutputConflict: Diagnostics;
 
-  /** emit の引数に、hozo.toml にない名前空間が指定された */
+  /** emit の引数に、どの単位の対象でもない名前空間が指定された */
   @cli.exitCode(64)
   exception UnknownNamespace;
 
@@ -94,7 +94,7 @@ namespace hozoc {
     @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** 表示の形式 */
     @cli.flag("format") format: OutputFormat?;
-    /** 生成する名前空間（一つもなければすべて） */
+    /** 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す */
     @cli.arg namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
@@ -123,7 +123,7 @@ namespace hozoc {
    * 仕様を検査する。ファイルは書き出さない。
    *
    * @param in コマンドの入力
-   * @throws LanguageMismatch プラグインのマニフェストの language が名前空間の language と合わない（docs/config.md の CFG-4）
+   * @throws LanguageMismatch 一つの単位のトランスパイラの language がそろっていない（docs/config.md の CFG-16）
    * @throws proc.Crashed check を持つプラグインが異常終了した
    * @see emit
    */
@@ -133,13 +133,13 @@ namespace hozoc {
     throws proc.Crashed | proc.MalformedOutput;
 
   /**
-   * 検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
+   * 検査を通った仕様から、単位ごとに既定の出力とトランスパイラの出力を作り、書き出す。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
-   * @throws CheckFailed プラグインが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
+   * @throws CheckFailed トランスパイラが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした。ファイルは書き出さない
-   * @throws UnknownNamespace 引数の名前空間が hozo.toml にない。ファイルは書き出さない
+   * @throws UnknownNamespace 引数の名前空間がどの単位の対象でもない。ファイルは書き出さない
    * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
    */
   op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
@@ -148,7 +148,7 @@ namespace hozoc {
     throws proc.Crashed | proc.MalformedOutput prevents effects;
 
   /**
-   * 仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
+   * 仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
    *
    * @param in コマンドの入力
    * @see check
@@ -176,8 +176,8 @@ namespace hozoc {
   /** IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない */
   model View {}
 
-  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求） */
-  model EmitRequest { protocol: string; direction: string; view: View; }
+  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）。transpiler は起動するトランスパイラの名前 */
+  model EmitRequest { protocol: string; direction: string; transpiler: string; view: View; }
 
   /** プラグインの warning（同「emit」の応答の warnings の要素） */
   model PluginWarning { at: string; message: string; }
@@ -195,7 +195,7 @@ namespace hozoc {
   model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; select: Select; }
 
   /**
-   * プラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
+   * プラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
    *
    * @param plugin 起動するプラグイン
    * @param req プラグインへの入力

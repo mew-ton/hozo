@@ -206,123 +206,85 @@ func TestDoc1Throws(t *testing.T) {
 	}
 }
 
-// TestCfg1 は CFG-1（docs/config.md「診断」）: テーブルのある名前空間（継承で設定が決まる子孫を含む）で language か out が
-// 未設定。テーブルのない名前空間（グローバルを含む）は出力しないだけで、state や op を持っていても診断は出ない
-// （docs/config.md「出力する名前空間」）。語彙は対象外。
-func TestCfg1(t *testing.T) {
-	p := program(nil,
-		namespace("", leaf("g", nil)),
-		httpVocab(),
-		namespace("server", leaf("server.o", nil)),
-		namespace("server.admin", leaf("server.admin.o", nil)),
-		namespace("types", model("types.M")),
-		namespace("actor", state("actor.s", ir.StateList, ir.String()), leaf("actor.o", nil)),
-	)
-	cfg := config.Default("/root")
-	lang := "go"
-	cfg.Namespaces["server"] = config.NamespaceTable{Language: &lang}
-	diags := Check(p, cfg)
-	c1 := withCode(diags, "CFG-1")
-	if len(c1) != 2 { // server (out), server.admin (out, inherited language)。グローバル、types、actor はテーブルがないので出ない
-		t.Fatalf("CFG-1 count = %d, want 2\n%s", len(c1), messages(diags))
-	}
-	if c1[0].File != config.FileName || c1[0].Span != nil {
-		t.Errorf("CFG-1 position: file=%q span=%v", c1[0].File, c1[0].Span)
-	}
-	if !strings.Contains(c1[0].Message, "server") || !strings.Contains(c1[0].Message, "out") || strings.Contains(c1[0].Message, "language") {
-		t.Errorf("CFG-1 message = %q", c1[0].Message)
-	}
-	if !strings.Contains(c1[1].Message, "server.admin") {
-		t.Errorf("CFG-1 message = %q", c1[1].Message)
-	}
-	// out だけ書いた（language がない）
-	out := "gen"
-	cfgOut := config.Default("/root")
-	cfgOut.Namespaces["server"] = config.NamespaceTable{Out: &out}
-	if d := wantOneCode(t, Check(program(nil, namespace("server", leaf("server.o", nil))), cfgOut), "CFG-1"); !strings.Contains(d.Message, "language") || strings.Contains(d.Message, "out") {
-		t.Errorf("CFG-1 message = %q", d.Message)
-	}
-	ok := program(nil, httpVocab(), namespace("server", leaf("server.o", nil)), namespace("server.admin", leaf("server.admin.o", nil)))
-	wantNoCode(t, Check(ok, cfgFor("server")), "CFG-1") // 子は親の設定を引き継ぐ
-	// テーブルのない名前空間は、state や op を持っていても診断なし（設定された名前空間と並んでいても、設定が空でも）
-	mixed := program(nil, namespace("", leaf("g", nil)), namespace("server", leaf("server.o", nil)), namespace("actor", leaf("actor.o", nil)))
+// TestCfg13 は docs/config.md「単位の対象」（CFG-13。診断なし）: どの単位の対象でもない名前空間（グローバルを含む）は
+// 出力しないだけで、state や op を持っていても診断は出ない。語彙も対象外。
+func TestCfg13(t *testing.T) {
+	// 単位の対象でない名前空間は、state や op を持っていても診断なし（対象の名前空間と並んでいても、単位が一つもなくても）
+	mixed := program(nil, namespace("", leaf("g", nil)), httpVocab(), namespace("server", leaf("server.o", nil)),
+		namespace("server.admin", leaf("server.admin.o", nil)), namespace("types", model("types.M")),
+		namespace("actor", state("actor.s", ir.StateList, ir.String()), leaf("actor.o", nil)))
 	wantCodes(t, Check(mixed, cfgFor("server")))
 	wantCodes(t, Check(mixed, config.Default("/root")))
-	// 設定ファイルのパスが File になる
-	cfg2 := cfgFor("server")
-	cfg2.Path = "/root/hozo.toml"
-	cfg2.Namespaces["server"] = config.NamespaceTable{Language: &lang}
-	if d := wantOneCode(t, Check(program(nil, namespace("server", leaf("server.o", nil))), cfg2), "CFG-1"); d.File != "/root/hozo.toml" {
-		t.Errorf("CFG-1 file = %q", d.File)
-	}
+	// 同じ名前空間の単位が二つあっても、子孫を名指しする単位があっても同じ
+	wantCodes(t, Check(mixed, cfgFor("server", "server", "server.admin")))
 }
 
-// TestCfg2 は CFG-2（.hozo 側）: 名前空間の名前のどの階層かが language / plugins / out / hozo。
-func TestCfg2(t *testing.T) {
-	p := program(nil,
-		namespace("server", leaf("server.o", nil)),
-		namespace("server.out", leaf("server.out.o", nil)),
-		namespace("hozo", model("hozo.M")),
-	)
-	diags := Check(p, cfgFor("server", "server.out"))
-	c2 := withCode(diags, "CFG-2")
-	if len(c2) != 2 {
-		t.Fatalf("CFG-2 count = %d, want 2\n%s", len(c2), messages(diags))
-	}
-	if c2[0].File != "server.hozo" {
-		t.Errorf("CFG-2 file = %q (first decl of the namespace)", c2[0].File)
-	}
-}
-
-// TestCfg8And10 は CFG-8（語彙の名前空間、state も op もない名前空間にテーブル）と CFG-10（.hozo にない名前空間のテーブル）。
+// TestCfg8And10 は CFG-8（語彙の名前空間、state も op もない名前空間を単位の namespace に書いた）と
+// CFG-10（.hozo にない名前空間を単位の namespace に書いた）。
 func TestCfg8And10(t *testing.T) {
 	p := program(nil,
 		httpVocab(),
 		namespace("server.admin", leaf("server.admin.o", nil)),
 		namespace("types", model("types.M")),
 	)
-	cfg := cfgFor("http", "server", "server.admin", "types", "nowhere")
+	cfg := cfgFor("http", "server", "server.admin", "types", "nowhere", "nowhere")
+	cfg.Path = "/root/hozo.toml"
 	diags := Check(p, cfg)
 	c8 := withCode(diags, "CFG-8")
 	if len(c8) != 2 {
 		t.Fatalf("CFG-8 count = %d, want 2 (http, types)\n%s", len(c8), messages(diags))
 	}
+	// 同じ namespace の単位が二つあっても一度だけ。設定ファイルのパスが File になる
 	d10 := wantOneCode(t, diags, "CFG-10")
-	if !strings.Contains(d10.Message, "nowhere") {
-		t.Errorf("CFG-10 message = %q", d10.Message)
+	if !strings.Contains(d10.Message, "nowhere") || d10.File != "/root/hozo.toml" || d10.Span != nil {
+		t.Errorf("CFG-10 = %+v", d10)
 	}
-	// [server] は子孫 server.admin が op を持つので、親のテーブルとして許す
+	// server の単位は、子孫 server.admin が op を持つのでよい
 	for _, d := range c8 {
 		if strings.Contains(d.Message, "名前空間 server ") {
-			t.Errorf("unexpected CFG-8 for parent table: %q", d.Message)
+			t.Errorf("unexpected CFG-8 for the ancestor unit: %q", d.Message)
 		}
 	}
 	wantNoCode(t, Check(p, cfgFor("server.admin")), "CFG-8")
 	wantNoCode(t, Check(p, cfgFor("server.admin")), "CFG-10")
 }
 
-// TestCfg6 は CFG-6: unsupported にあるデコレータが名前空間の宣言（フィールドを含む）に付いている。付いた位置に出す。
+// TestCfg6 は CFG-6: unsupported にあるデコレータが、名前空間の宣言（フィールドを含む）のうち単位の対象のものに付いている。
+// 付いた位置に出す。
 func TestCfg6(t *testing.T) {
 	m := model("server.M", field("f", ir.String()))
 	m.Fields[0].Decorators = []ir.Application{app("valid.min")}
 	o := leaf("server.o", nil)
 	o.Decorators = []ir.Application{app("http.get"), {Decorator: "browser.redirectOn", Via: "browser.redirectToLogin", Span: sp("@via")}}
+	batch := leaf("server.batch", nil)
+	batch.Decorators = []ir.Application{app("http.get")}
+	batch.Span.File = "batch.hozo"
 	other := leaf("browser.o", nil)
 	other.Decorators = []ir.Application{app("http.get")}
-	p := program(nil, namespace("server", m, o), namespace("browser", other))
-	diags := CheckUnsupported(p, "server", []string{"http.get", "valid.min", "browser.redirectToLogin"})
-	if n := len(withCode(diags, "CFG-6")); n != 3 {
-		t.Fatalf("CFG-6 count = %d, want 3\n%s", n, messages(diags))
+	p := program(nil, namespace("server", m, o, batch), namespace("browser", other))
+	unsupported := []string{"http.get", "valid.min", "browser.redirectToLogin"}
+	// files が nil なら名前空間のすべての宣言
+	diags := CheckUnsupported(p, "server", nil, unsupported)
+	if n := len(withCode(diags, "CFG-6")); n != 4 {
+		t.Fatalf("CFG-6 count = %d, want 4\n%s", n, messages(diags))
 	}
 	for _, d := range diags {
 		if d.Severity != diag.Warning {
 			t.Errorf("CFG-6 severity = %s", d.Severity)
 		}
 	}
-	if n := len(CheckUnsupported(p, "server", nil)); n != 0 {
+	// 単位の in に合うファイルの宣言だけ（batch.hozo の server.batch は単位の対象でない）
+	diags = CheckUnsupported(p, "server", []string{"server.hozo"}, unsupported)
+	if n := len(withCode(diags, "CFG-6")); n != 3 {
+		t.Fatalf("CFG-6 count with in = %d, want 3\n%s", n, messages(diags))
+	}
+	if n := len(CheckUnsupported(p, "server", []string{}, unsupported)); n != 0 {
+		t.Errorf("no file in the unit → %d diagnostics", n)
+	}
+	if n := len(CheckUnsupported(p, "server", nil, nil)); n != 0 {
 		t.Errorf("no unsupported → %d diagnostics", n)
 	}
-	if n := len(CheckUnsupported(p, "nowhere", []string{"http.get"})); n != 0 {
+	if n := len(CheckUnsupported(p, "nowhere", nil, []string{"http.get"})); n != 0 {
 		t.Errorf("unknown namespace → %d diagnostics", n)
 	}
 }
@@ -360,13 +322,13 @@ func TestFileSetLocator(t *testing.T) {
 // TestNilInputs は nil の Program や Config で落ちないこと。
 func TestNilInputs(t *testing.T) {
 	Compute(nil)
-	if n := len(Check(nil, nil)) + len(CheckUnsupported(nil, "x", []string{"y"})) + len(Views(nil, nil)); n != 0 {
+	if n := len(Check(nil, nil)) + len(CheckUnsupported(nil, "x", nil, []string{"y"})) + len(Views(nil, nil, nil)); n != 0 {
 		t.Errorf("nil program → %d results", n)
 	}
 	if n := len(Check(&ir.Program{}, nil)); n != 0 {
 		t.Errorf("empty program → %d diagnostics", n)
 	}
-	if v := Views(&ir.Program{}, nil); len(v) != 0 {
+	if v := Views(&ir.Program{}, nil, nil); len(v) != 0 {
 		t.Errorf("empty program → %d views", len(v))
 	}
 }

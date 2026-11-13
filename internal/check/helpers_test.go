@@ -1,6 +1,7 @@
 package check
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -186,14 +187,53 @@ func bind(ns, st, target string, deep bool) ir.Bind {
 	return ir.Bind{Namespace: ns, State: st, Target: ir.BindTarget{Namespace: target, Deep: deep}, Span: sp(ns + ".bind." + st)}
 }
 
-// cfgFor は名前空間ごとに language と out を持つ設定。
+// cfgFor は名前空間ごとに一つの単位（トランスパイラ t、out は gen/<名前空間>）を持つ設定。
 func cfgFor(nss ...string) *config.Config {
 	c := config.Default("/root")
 	for _, n := range nss {
-		lang, out := "go", "gen/"+n
-		c.Namespaces[n] = config.NamespaceTable{Language: &lang, Out: &out}
+		c.Units = append(c.Units, config.Unit{Index: len(c.Units) + 1, Namespace: n, Transpilers: []string{"t"}, Out: "gen/" + n})
 	}
 	return c
+}
+
+// allFiles は Program の宣言のファイル（Span.File）のうち、ユーザーのファイル（語彙でないもの）のすべてを辞書順で返す
+// （in を省いた単位の Files）。
+func allFiles(p *ir.Program) []string {
+	seen := map[string]bool{}
+	var out []string
+	for i := range p.Namespaces {
+		for _, d := range p.Namespaces[i].Decls {
+			if f := d.Common().Span.File; !seen[f] && !strings.HasPrefix(f, "hozo:") {
+				seen[f] = true
+				out = append(out, f)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// goUnits は cfg の単位のすべてを、言語が go で in を省いたもの（Files は Program のすべてのファイル）にする。
+func goUnits(p *ir.Program, cfg *config.Config) []Unit {
+	units := make([]Unit, len(cfg.Units))
+	for i := range units {
+		units[i] = Unit{Language: "go", Files: allFiles(p)}
+	}
+	return units
+}
+
+// viewsOf は、単位がどれも in を省いた Go の単位のときの View を、名前空間 → View で返す。同じ名前空間を複数の単位が
+// 出力していれば、設定の順で最初の単位のもの。
+func viewsOf(p *ir.Program, cfg *config.Config) map[string]*ir.View {
+	out := map[string]*ir.View{}
+	for _, m := range Views(p, cfg, goUnits(p, cfg)) {
+		for ns, v := range m {
+			if out[ns] == nil {
+				out[ns] = v
+			}
+		}
+	}
+	return out
 }
 
 // httpVocab は http の語彙の最小の写し（docs/vocab.md）。post は external で ServerError | NetworkError を投げる。

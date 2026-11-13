@@ -1,0 +1,14 @@
+# a.sub の単位の out が、a の単位の out の下にある → CFG-17
+# ERROR: CFG-17
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "a.sub"
+transpilers = ["go"]
+out         = "gen/a/sub"

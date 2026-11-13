@@ -7,17 +7,23 @@ import (
 )
 
 // View はその名前空間から見た IR（docs/ir.md「その名前空間から見た IR」の View）。
-// プラグインに渡すもの。Program 全体に「見る側」の情報を足したもの。
+// トランスパイラに渡すもの。Program 全体に「見る側」の情報を足したもの。単位（docs/config.md「単位」）と、
+// その単位が出力する名前空間の組ごとに一つ。
 type View struct {
 	// Version は IR の版。空なら JSON には [Version] を書く。
 	Version string `json:"version"`
 	// Viewer は見る側の名前空間の FQN。
 	Viewer string `json:"viewer"`
-	// Config は viewer の設定（Conf(viewer) と Dir(viewer)。docs/config.md「名前空間の設定の解決」）。
+	// Config は、この View の単位での viewer の設定。
 	Config NamespaceConfig `json:"config"`
-	// Namespaces は設定のあるすべての名前空間（viewer を含む）の設定。キーは FQN。JSON ではキーを辞書順に出す。
-	// プラグインが別の名前空間の言語と出力先を知るため（import するか複製するか。docs/emit-go.md「配置」）。
-	Namespaces map[string]NamespaceConfig `json:"namespaces"`
+	// Files は、この View の単位の in に合ったファイル（docs/config.md「in」）。Span.File と同じ形で、辞書順。
+	// in を省いた単位なら、読み込んだユーザーのファイルのすべて。viewer の宣言のうち Span.File がここにあるものが、
+	// 単位の対象の宣言（[View.InUnit]）。
+	Files []string `json:"files"`
+	// Namespaces は出力のあるすべての名前空間（viewer を含む）。キーは FQN。JSON ではキーを辞書順に出す。
+	// 値は、その名前空間を出力する単位ごとの設定（設定の順）。トランスパイラが別の名前空間（と別の単位）の言語と
+	// 出力先を知るため。
+	Namespaces map[string][]NamespaceConfig `json:"namespaces"`
 	// Program は全体そのまま（各 op の Signature は op 自身の名前空間から見たもの）。
 	// ただし Ops の params が合成する model を、viewer の Namespace.Decls の末尾に足してある。
 	Program *Program `json:"program"`
@@ -25,16 +31,16 @@ type View struct {
 	Ops map[string]*ViewedSignature `json:"ops"`
 }
 
-// NamespaceConfig は一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」の NamespaceConfig）。
+// NamespaceConfig は単位 U での名前空間 N の設定（docs/ir.md「その名前空間から見た IR」の NamespaceConfig）。
 type NamespaceConfig struct {
-	// Language は Conf(N).language（docs/config.md「名前空間の設定の解決」）。
+	// Language は U の言語（そのトランスパイラの language。docs/config.md「単位」）。
 	Language string `json:"language"`
-	// Out は Conf(N).out。
+	// Out は U の out。
 	Out string `json:"out"`
-	// Dir は Dir(N)。この名前空間のファイルを置くディレクトリ（ルートからの相対パス、`/` 区切り）。
+	// Dir は Dir(U, N)。U での N のファイルを置くディレクトリ（ルートからの相対パス、`/` 区切り。docs/config.md「単位の対象」）。
 	Dir string `json:"dir"`
-	// Plugins は Conf(N).plugins。
-	Plugins []string `json:"plugins"`
+	// Transpilers は U の transpilers。
+	Transpilers []string `json:"transpilers"`
 }
 
 // ViewedSignature は viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」の ViewedSignature）。
@@ -57,6 +63,31 @@ func (v *View) Signature(op string) *ViewedSignature {
 	return v.Ops[op]
 }
 
+// InUnit は、FQN fqn が viewer の名前空間の宣言で、この View の単位の対象か（docs/config.md「in」）:
+// 宣言の Span.File が Files にある。viewer の宣言でなければ false。
+func (v *View) InUnit(fqn string) bool {
+	if v == nil || v.Program == nil {
+		return false
+	}
+	ns := v.Program.Namespace(v.Viewer)
+	if ns == nil {
+		return false
+	}
+	for _, d := range ns.Decls {
+		if d == nil || d.Common().Name != fqn {
+			continue
+		}
+		file := d.Common().Span.File
+		for _, f := range v.Files {
+			if f == file {
+				return true
+			}
+		}
+		return false
+	}
+	return false
+}
+
 // MarshalJSON は docs/ir.md「JSON」の形で書く。namespaces と ops のキーは FQN の辞書順。
 // 空の namespaces は {} で出す。Version が空なら [Version] を書く。
 func (v View) MarshalJSON() ([]byte, error) {
@@ -64,13 +95,14 @@ func (v View) MarshalJSON() ([]byte, error) {
 		v.Version = Version
 	}
 	type head struct {
-		Version    string                     `json:"version"`
-		Viewer     string                     `json:"viewer"`
-		Config     NamespaceConfig            `json:"config"`
-		Namespaces map[string]NamespaceConfig `json:"namespaces"` // encoding/json は写像のキーを辞書順に書く
-		Program    *Program                   `json:"program"`
+		Version    string                       `json:"version"`
+		Viewer     string                       `json:"viewer"`
+		Config     NamespaceConfig              `json:"config"`
+		Files      []string                     `json:"files"`
+		Namespaces map[string][]NamespaceConfig `json:"namespaces"` // encoding/json は写像のキーを辞書順に書く
+		Program    *Program                     `json:"program"`
 	}
-	b, err := marshalStruct(head{v.Version, v.Viewer, v.Config, v.Namespaces, v.Program})
+	b, err := marshalStruct(head{v.Version, v.Viewer, v.Config, v.Files, v.Namespaces, v.Program})
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,8 @@
 // Package golang は Go の既定の出力（docs/emit-go.md）。
 //
-// 入力は docs/ir.md「その名前空間から見た IR」の [ir.View]（見る側 viewer が出力する名前空間）と、その名前空間に
-// 設定されたプラグインが返した選択を合わせたもの（[Options.Select]。docs/plugin-protocol.md「選択」）。
-// 出力は View.Config.Dir（Dir(viewer)。docs/config.md「名前空間の設定の解決」）の下に置くファイルの列。
+// 入力は docs/ir.md「その名前空間から見た IR」の [ir.View]（単位と名前空間の組ごとに一つ。見る側 viewer が出力する名前空間）と、
+// その単位のトランスパイラが返した選択を合わせたもの（[Options.Select]。docs/plugin-protocol.md「選択」）。
+// 出力は View.Config.Dir（この単位での Dir(viewer)。docs/config.md「単位の対象」）の下に置くファイルの列。
 // 出すのは選択から決まる出力の対象だけで、何も選ばれていなければ何も出さない。何をどの形で出すかの持ち主は
 // docs/emit-go.md で、名前と型の規則は plugin/golang（docs/packages.md「`plugin/golang`（公開）」）と共有する。
 //
@@ -23,9 +23,10 @@
 //
 // 文書が決めていないところで、この実装が選んだこと。
 //
-//   - 別の名前空間 M が「Go で同じプロジェクト」かは View.Namespaces[M] の language で決め、
-//     M のパッケージのディレクトリは View.Namespaces[M].Dir（Dir(M)）。
-//   - View.Config.Dir（または View.Namespaces[M].Dir）が空なら Conf.out を使う（P が空の Dir(N) と同じ）。
+//   - 別の名前空間の型をどの出力から import するか（docs/emit-go.md「配置」の「設定の順で最初の単位」）は、呼ぶ側
+//     （internal/app）が単位ごとの [Exports] から決めて [Options.Exported] に渡す。このパッケージは一つの View しか見ない。
+//     出力どうしの import の循環（GOEMIT-5）も、呼ぶ側が [Imports] から確かめる。
+//   - View.Config.Dir が空なら View.Config.Out を使う（単位の namespace 自身の Dir(U, N) と同じ）。
 //     internal/check の Views は常に Dir を埋めるので、手で組んだ View のための保険。
 //   - viewer の型は、出力の対象が参照する型を、名前空間を問わず参照を辿り切った範囲で出す（別の名前空間の型を通して
 //     参照されるものも含む）。別の名前空間の選択によらずに決まるので、[Exports] がそのまま「その名前空間の出力が持つ型」に

@@ -1,7 +1,12 @@
 # 「モデルが先」（docs/requirements.md「モデルが先」、docs/decisions.md「設計書を変える決定」S10〜S12）のコーパス
-# （docs/testing.md「コーパス」、README.md）。テーブルがあるのは shop だけ。印の語彙 marks、人の操作 customer、
-# 外部のシステム carrier にはテーブルがなく、出力しない（docs/config.md「出力する名前空間」）。検査は同じに掛かる。
+# （docs/testing.md「コーパス」、README.md）。単位があるのは shop だけ。印の語彙 marks、人の操作 customer、
+# 外部のシステム carrier はどの単位の対象でもなく、出力しない（docs/config.md「単位の対象」）。検査は同じに掛かる。
+# shop の単位のトランスパイラ none（plugins/none）は何も選ばないので、shop も何も出力しない。
 
-[shop]
-language = "go"
-out      = "gen/shop"
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "shop"
+transpilers = ["none"]
+out         = "gen/shop"

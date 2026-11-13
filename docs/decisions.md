@@ -28,34 +28,38 @@
 | 18 | 名前の先頭のセグメントの探し方の順序 | `docs/resolve.md`「手続き」 |
 | 19 | 標準の語彙（`valid` `http` `db` `localStorage` `page` `fs` `proc`）は hozoc に同梱し、常に読む。`cli` は go-cli が `vocabulary` で提供する | `docs/vocab.md`「読み込み」「同梱しない語彙」 |
 | 20 | `proc.stdio` は引数を持たず `@external` でもない | `docs/vocab.md`「同梱する語彙」 |
-| 21 | プラグインは `[hozo].plugin_dirs` → `HOZO_PLUGIN_PATH` → `~/.hozo/plugins` の順で探す | `docs/plugin-protocol.md`「探索」 |
-| 22 | マニフェストに `protocol` `vocabulary` `[check]` を足す。`command` は配列も可。要求は `ir` でなく `view` を持ち `protocol` を足す。応答に `errors` を持つ | `docs/plugin-protocol.md`「マニフェスト」「要求と応答」 |
+| 21 | 入っているプラグインは `[hozo].plugin_dirs` → `HOZO_PLUGIN_PATH` → `~/.hozo/plugins` の順で探す。単位の `transpilers` の名前は、入っているすべてのプラグインのトランスパイラから探す | `docs/plugin-protocol.md`「探索」 |
+| 22 | マニフェストに `protocol` `vocabulary` `[check]` を足す。`command` は配列も可。要求は `ir` でなく `view` を持ち `protocol` を足す。応答に `errors` を持つ。`[emit]` と `language` の代わりに `[[transpiler]]`（`name` / `language` / `unsupported`）を持ち、`emit` の要求は `transpiler` を持つ | `docs/plugin-protocol.md`「マニフェスト」「要求と応答」 |
 | 23 | 語彙に固有の検査（PAGE-1 / PAGE-2）はプラグインの `check` が行う | `docs/plugin-protocol.md`「check」 |
-| 24 | 設定されたプラグインは名前空間ごとに常に一回呼ぶ。並列にしない | `docs/plugin-protocol.md`「起動」 |
-| 25 | `[hozo]` に `sources` `plugin_dirs` `max_bindings`。`out` の継承は同じ値で、子のディレクトリは出力の側が切る | `docs/config.md`「形」「名前空間の設定の解決」 |
+| 24 | トランスパイラは、単位と、その単位が出力する名前空間の組ごとに常に一回呼ぶ。`check` はプラグインと名前空間の組ごとに一回。並列にしない | `docs/plugin-protocol.md`「起動」 |
+| 25 | `[hozo]` に `sources` `plugin_dirs` `max_bindings` | `docs/config.md`「形」 |
 | 26 | TOML は `github.com/BurntSushi/toml`。ほかに外部のモジュールは使わない | `docs/packages.md`「依存の向き」 |
 | 27 | Go の既定の出力で人やプラグインが実装するものは、宣言一つにつき型一つ。束ねるのは構造体で、未設定は `*runtime.MissingError`。生成するコードは `context` を引数に取らない | `docs/emit-go.md`「実装の単位」 |
 | 47 | 状態はパッケージの変数 `States` に置き、状態の単位は問い合わせ（述語、`Get`）と命令（その状態を宛先にする効果を持つ葉の op）を持つ | `docs/emit-go.md`「実装の単位」「state」 |
 | 48 | 予約語はフィールド名の位置に書ける。ほかの位置では予約語のまま | `docs/grammar.md`「識別子」「決めたこと」 |
-| 28 | 出力の対象はプラグインが `emit` の応答の `select` で返す。マニフェストの `decorate` / `entry` / `stop` は持たない。包む関数を生成するのは `wraps` で引き受けたデコレータの適用だけ | `docs/plugin-protocol.md`「選択」、`docs/emit-go.md`「出力の対象」「デコレータ」 |
+| 28 | 出力の対象はトランスパイラが `emit` の応答の `select` で返す。選べるのは単位の対象の宣言だけ。マニフェストの `decorate` / `entry` / `stop` は持たない。包む関数を生成するのは `wraps` で引き受けたデコレータの適用だけ | `docs/plugin-protocol.md`「選択」、`docs/emit-go.md`「出力の対象」「デコレータ」 |
 | 29 | 絞り込まれた型（`C.Case<T>`）は Go では `T` に消す | `docs/emit-go.md`「型」 |
 | 30 | 生成したコードは `github.com/mew-ton/hozo/runtime` を import する | `docs/emit-go.md`「runtime パッケージ」 |
-| 31 | 同じプロジェクトの Go の名前空間どうしは、相手の出力が持つ型を import する。別の言語の型と、相手の出力にない型は複製する | `docs/emit-go.md`「配置」 |
+| 31 | 同じプロジェクトの Go の出力どうしは、相手の出力が持つ型を import する。相手の名前空間を出力する Go の単位が複数あれば、自分の単位を先に、次に設定の順で最初にその型を持つもの。別の言語の型と、どの出力にもない型は複製する。出力どうしの import の循環はエラー（GOEMIT-5） | `docs/emit-go.md`「配置」 |
 | 32 | Go の識別子は先頭だけ大文字にする | `docs/emit-go.md`「名前」 |
 | 33 | 別の名前空間への呼び出しの `bind` の位置は `Deps` の実装者が埋める | `docs/emit-go.md`「op」 |
 | 34 | `go-cli` の `Main` は `package main` ではなく、`Presenter` で表示を差し替えられる。`proc.stdio` は `stop` | `docs/plugin-go-cli.md`「マニフェスト」「出力」 |
 | 35 | 終了コード 64（使い方）、70（内部・プラグインの異常） | `docs/diagnostics.md`「終了コード」 |
 | 36 | `cli.hozo` では `emit` を配線にし、`outputs` に `@fs.files` を付けず、`lsp` と `format` と `UnknownNamespace` を足す | `docs/cli.md`「cli.hozo」 |
-| 37 | `emit` は前回の出力を `<out>/.hozoc-outputs.json` に記録して古いものを消す | `docs/cli.md`「emit」 |
+| 37 | `emit` は前回の出力を、単位と名前空間の組ごとの `<Dir(U, N)>/.hozoc-outputs.json` に記録して古いものを消す | `docs/cli.md`「emit」 |
 | 38 | LSP は JSON-RPC を自前で実装し、`hozo.toml` がなければ設定なしで動いて `LSP-1` を出す | `docs/lsp.md`「通信」「プロジェクト」 |
 | 39 | WIRE-6 の閾値は既定 5。NAME-1 は warning | `docs/check.md`「配線」「名前空間」 |
 | 40 | 規則のテストは `// ERROR: ID` のコメントで期待を書く | `docs/testing.md`「規則ごとのテスト」 |
 | 41 | 設計書の例のコーパスで写せなかった箇所は、そのコーパスの `README.md` に一覧する | `docs/testing.md`「コーパス」 |
 | 42 | 既定値のリテラルは `scalar` の元の型に対して検査する | `docs/types.md`「既定値」 |
-| 43 | 名前空間の出力先 Dir(N) は、`out` を書いた最も近い祖先からのセグメントをパスにして足す。`View` に全名前空間の設定と Dir を持たせる | `docs/config.md`「名前空間の設定の解決」、`docs/ir.md`「その名前空間から見た IR」 |
+| 43 | 単位 U での名前空間 N の出力先 Dir(U, N) は、`U.out` に `U.namespace` から N までのセグメントをパスにして足す。`View` は単位と名前空間の組ごとに作り、出力のあるすべての名前空間の単位ごとの設定と Dir、単位の `in` に合ったファイル（`files`）を持たせる | `docs/config.md`「単位の対象」、`docs/ir.md`「その名前空間から見た IR」 |
 | 44 | THROWS-1 と Sig は `external` の例外を同じく数えず、`@throws` は `external` の例外も書ける | `docs/check.md`「throws」「名前空間」 |
 | 45 | プラグインは protoc と同じ信頼モデル。隔離も、応答以外のファイルの変化の検出も行わない | `docs/plugin-protocol.md`「信頼の前提」 |
 | 46 | `cli` の語彙は go-cli が提供し、hozoc には同梱しない | `docs/vocab.md`「同梱しない語彙」 |
+| 49 | 語彙を読むのと `check` を呼ぶのは、使うプラグイン（そのトランスパイラがどれかの単位に書かれたもの）だけ。マニフェストは入っているすべてのプラグインについて読み、MAN-3 / MAN-4 は使っていなくても、MAN-2 は使うプラグインにだけ報告する | `docs/plugin-protocol.md`「探索」、`docs/vocab.md`「読み込み」 |
+| 50 | `hozoc emit` の引数は名前空間のまま。その名前空間と子孫を出力するすべての単位の分を書き出す | `docs/cli.md`「emit」 |
+| 51 | 二つの単位の出力先は、`out` どうしを比べて、同じでも入れ子でもいけない（CFG-17）。単位の対象の名前空間が `in` に合うファイルに宣言を持たなければ、その単位はその名前空間を出力しない | `docs/config.md`「単位の対象」「in」 |
+| 52 | 規則の ID は使い回さない。なくなった規則の番号は欠番にする（CFG-1〜CFG-4、CFG-9） | `docs/config.md`「診断」 |
 
 ## 設計書を変える決定
 
@@ -74,8 +78,9 @@
 | S9 | `prevents` / `keeps` の目的語は `effects` だけ。効果を名前で書き分ける形はない | §7.3 | `docs/grammar.md`「decorator の宣言」「決めたこと」 |
 | S10 | デコレータは名前空間に付けられない（「名前空間にも付けられる」とした決定を取り消した）。名前空間は複数のファイルの複数のブロックに分けて宣言できる（TypeScript の `interface` と同じ）ので、付けたデコレータをファイルをまたいで一つにまとめて管理することになり、直感的でない。印は中の宣言に付ける | —（§3.1、§8.2 は変えない） | `docs/grammar.md`「ファイルと宣言」「決めたこと」 |
 | S11 | 出力するのはプラグインが選んだ宣言だけ。プラグインが参照しなかった op は出力せず、どのプラグインも読まないデコレータは印で何も生成しない。「プラグインがなくても、これだけで生成できる」「対応するプラグインがなければ人が実装する包む関数を出す」「どのプラグインの対象にもならない宣言は既定の出力のまま」をやめる | §4.3 | `docs/emit-go.md`「出力の対象」「デコレータ」 |
-| S12 | `hozo.toml` にない名前空間は出力しない。仕様はコードを生成しない部分（人の操作、外部のシステム）を含んでよく、設定なしでも検査できる | §1、§4.5 | `docs/config.md`「出力する名前空間」、`docs/requirements.md`「モデルが先」 |
+| S12 | どの単位（`hozo.toml` の `[[emit]]`。S14）の対象でもない名前空間は出力しない。仕様はコードを生成しない部分（人の操作、外部のシステム）を含んでよく、設定なしでも検査できる | §1、§4.5 | `docs/config.md`「単位の対象」、`docs/requirements.md`「モデルが先」 |
 | S13 | Hozo の価値はエンジニアでなくても設計できること。UML に当たる記述を検査できる仕様として持ち、将来は UI で編集する | §1、§14 | `docs/requirements.md`「価値と位置づけ」 |
+| S14 | `hozo.toml` は、名前空間ごとのテーブル（`language` / `plugins` / `out` と、子への継承）をやめ、出力の単位 `[[emit]]`（`in` / `namespace` / `transpilers` / `out`）の一覧にする。プラグインは入れるもので、一つ以上のトランスパイラを提供し、設定はトランスパイラを名前で選ぶ。言語はトランスパイラが持ち、一つの単位の中でそろえる。単位は `namespace` とその子孫を対象にし、別の単位が書いた子孫は外れる。同じ名前空間を複数の単位に書け、単位は互いに独立に出力する。「プラグインが処理を決める」形が分かりにくかったため、入力・視点・変換・出力先を一か所に並べる（Vite の「プラグインを入れる」と「設定で使う」の分け方） | §4.5（`hozo.toml` の例、継承、使えない名前空間の名前）、§4.6（マニフェストの `language` と `[emit]`、要求） | `docs/config.md`「形」「単位」「単位の対象」「in」、`docs/plugin-protocol.md`「マニフェスト」「探索」「選択」 |
 
 ## スコープ外にした設計書の例
 
@@ -94,6 +99,7 @@
 |---|---|---|
 | 状態を分類で表す | 「設計書を変える決定」の S1〜S9。§5.2・§6.2・§6.3・§7.3・§9・§10・§12・§16 を書き換える | S1〜S9 |
 | モデルが先 | 「設計書を変える決定」の S11〜S13。§1・§4.3・§4.5・§14 を書き換える（S10 は取り消したので、設計書へ返すものはない） | S11〜S13 |
+| 設定を単位の一覧にする | 「設計書を変える決定」の S14。§4.5 の `hozo.toml` の例と継承の規則を単位の一覧に、§4.6 のマニフェストを `[[transpiler]]` を持つ形に書き換え、プラグインとトランスパイラの言葉を分ける。§4.3 の「複数のプラグイン」は「単位の複数のトランスパイラ」と読む | S14 |
 | 省略可能の書き方 | `x?: T` の例（§7.1 `token?: Token`、§11.2 `status?: server.OrderStatus`、§4.2 `min?: int` / `from?: any state`、`examples/hozoc.hozo` の `config?: Path`）を `x: T?` に直す | 8 |
 | `Token` の修飾 | §5.2 の `browser` の `state token: single<Token?>;` は `server.Token` でなければ §3.2 に反する | 18 |
 | ユニオンのアームの中の `;` | §11.2 の `Ready: { userName: string; orders: OrderRow[] }` は、フィールドの末尾に `;` が要る（`docs/grammar.md`「model」） | 7 |
@@ -103,8 +109,8 @@
 | `location` の型 | §5.2 の `state location: single<Route>;` の `Route` は標準の語彙の型なので修飾して書く（`page.Route`。`http` の語彙に置くかは設計書で決める）。ルーターのプラグインに固有の型は使わない | 18、19 |
 | `examples/hozoc.hozo` の「書けなかったもの」 | 三つの解き方。§15 が「なし」のままになっている | 20、36 |
 | 語彙の宣言の読み込み元 | §4.2 の語彙を hozoc が同梱すること、プラグインの `vocabulary` | 19、22 |
-| プラグインの探索 | 探す順序 | 21 |
-| プラグインとの JSON の形 | §4.6 の要求の `ir` を `view` にし、`protocol` を足す。マニフェストの `decorate` / `entry` / `stop` をやめ、応答の `select` にする | 22、28 |
+| プラグインの探索 | 探す順序と、トランスパイラの名前の探し方 | 21、49 |
+| プラグインとの JSON の形 | §4.6 の要求の `ir` を `view` にし、`protocol` と `transpiler` を足す。マニフェストの `decorate` / `entry` / `stop` をやめ、応答の `select` にする | 22、28 |
 | 語彙に固有の検査 | §11.2 の検査の担い手をプラグインの `check` にする | 23 |
 | `View` が `Program` 全体を含むこと | §4.6「その名前空間から見た IR だけ」の読み方 | 17 |
 | 命名規則の強さと束縛の数の閾値 | 設計書に値と強さがない | 39 |

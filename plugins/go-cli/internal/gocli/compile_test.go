@@ -201,9 +201,9 @@ func (ops) Check(in hozoc.CheckInput) (hozoc.CheckResult, error) {
 	case "x1":
 		return hozoc.CheckResult{}, hozoc.CheckFailed{Value: diags("T-1")}
 	case "x2":
-		return hozoc.CheckResult{}, &hozoc.ConfigInvalid{Value: diags("CFG-1")} // ポインタでも見分ける
+		return hozoc.CheckResult{}, &hozoc.ConfigInvalid{Value: diags("CFG-12")} // ポインタでも見分ける
 	case "x3":
-		return hozoc.CheckResult{}, fmt.Errorf("wrapped: %w", hozoc.LanguageMismatch{Value: diags("CFG-4")}) // 包んでも見分ける
+		return hozoc.CheckResult{}, fmt.Errorf("wrapped: %w", hozoc.LanguageMismatch{Value: diags("CFG-16")}) // 包んでも見分ける
 	case "x5":
 		return hozoc.CheckResult{}, hozoc.Crashed{}
 	case "x6":
@@ -422,7 +422,7 @@ func TestCompileAndRun(t *testing.T) {
 		{name: "success json", args: []string{"check", "--format", "json"}, code: 0, stdout: []string{`"warnings"`, "config= format=json"}, stderrEmpty: true},
 		{name: "flag with equals", args: []string{"check", "--format=text"}, code: 0, stdout: []string{"format=text"}},
 		{name: "exit 1 CheckFailed with value", args: []string{"check", "--config", "x1"}, code: 1, stdoutEmpty: true, stderr: []string{`"error": "hozoc.CheckFailed"`, `"value"`, `"T-1"`}},
-		{name: "exit 2 pointer exception", args: []string{"check", "--config", "x2"}, code: 2, stderr: []string{`"hozoc.ConfigInvalid"`, `"CFG-1"`}},
+		{name: "exit 2 pointer exception", args: []string{"check", "--config", "x2"}, code: 2, stderr: []string{`"hozoc.ConfigInvalid"`, `"CFG-12"`}},
 		{name: "exit 2 wrapped exception", args: []string{"check", "--config", "x3"}, code: 2, stderr: []string{`"hozoc.LanguageMismatch"`}},
 		{name: "exit 3", args: []string{"emit", "--config", "x3"}, code: 3, stderr: []string{`"hozoc.OutputConflict"`}},
 		{name: "exit 64 exception without value", args: []string{"emit", "--config", "x4"}, code: 64, stderr: []string{`"error": "hozoc.UnknownNamespace"`}, notStderr: []string{`"value"`}},

@@ -1,4 +1,0 @@
-# a のテーブルは out だけで language がない → CFG-1
-# ERROR: CFG-1
-[a]
-out = "gen/a"

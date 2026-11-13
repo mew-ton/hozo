@@ -21,21 +21,23 @@ const ManifestFileName = "hozo-plugin.toml"
 // Protocol は hozoc が対応する docs/ir.md の version（ir.Version）。マニフェストの protocol と要求の protocol はこの値（MAN-2）。
 const Protocol = ir.Version
 
-// Manifest は hozo-plugin.toml（docs/plugin-protocol.md「マニフェスト」）。
+// Manifest は hozo-plugin.toml（docs/plugin-protocol.md「マニフェスト」）。プラグイン（入れるもの）一つ分。
 type Manifest struct {
-	Name       string
-	Command    []string // 先頭が実行ファイル。文字列で書かれていれば一要素
-	Language   string
-	Protocol   string
-	Vocabulary []string // マニフェストからの相対パス。省略時は []
-	Emit       *Emit    // [emit] がなければ nil（emit を持たない）
-	Check      Check
-	Import     Import
+	Name        string
+	Command     []string // 先頭が実行ファイル。文字列で書かれていれば一要素
+	Protocol    string
+	Vocabulary  []string     // マニフェストからの相対パス。省略時は []
+	Transpilers []Transpiler // [[transpiler]]。書いた順。一つもなければ emit を持たない
+	Check       Check
+	Import      Import
 }
 
-// Emit は [emit] テーブル（docs/plugin-protocol.md「マニフェスト」）。何を出力の対象に選ぶかはマニフェストには書かず、
-// プラグインが emit の応答の select で返す（同「選択」）。
-type Emit struct {
+// Transpiler は [[transpiler]] 一つ（docs/plugin-protocol.md「マニフェスト」）: プラグインが提供する、名前の付いた変換。
+// hozo.toml の単位が transpilers に Name を書いて選ぶ（docs/config.md「単位」）。何を出力の対象に選ぶかは
+// マニフェストには書かず、emit の応答の select で返す（同「選択」）。
+type Transpiler struct {
+	Name        string   // hozo.toml の transpilers に書く名前
+	Language    string   // 出力する言語。"go" か "ts"
 	Unsupported []string // 意味を保てない記法（デコレータの FQN）。使われていれば CFG-6
 }
 
@@ -49,8 +51,18 @@ type Import struct {
 	Formats []string
 }
 
-// HasEmit は emit を持つかどうか。
-func (m *Manifest) HasEmit() bool { return m.Emit != nil }
+// HasEmit は emit を持つかどうか（トランスパイラを一つでも提供するか）。
+func (m *Manifest) HasEmit() bool { return len(m.Transpilers) > 0 }
+
+// Transpiler は名前 name のトランスパイラ。なければ nil。
+func (m *Manifest) Transpiler(name string) *Transpiler {
+	for i := range m.Transpilers {
+		if m.Transpilers[i].Name == name {
+			return &m.Transpilers[i]
+		}
+	}
+	return nil
+}
 
 // HasImport は import を持つかどうか。
 func (m *Manifest) HasImport() bool { return len(m.Import.Formats) > 0 }
@@ -59,12 +71,13 @@ func (m *Manifest) HasImport() bool { return len(m.Import.Formats) > 0 }
 type rawManifest struct {
 	Name       string         `toml:"name"`
 	Command    toml.Primitive `toml:"command"`
-	Language   string         `toml:"language"`
 	Protocol   string         `toml:"protocol"`
 	Vocabulary []string       `toml:"vocabulary"`
-	Emit       *struct {
+	Transpiler []struct {
+		Name        string   `toml:"name"`
+		Language    string   `toml:"language"`
 		Unsupported []string `toml:"unsupported"`
-	} `toml:"emit"`
+	} `toml:"transpiler"`
 	Check struct {
 		Enabled bool `toml:"enabled"`
 	} `toml:"check"`
@@ -73,9 +86,10 @@ type rawManifest struct {
 	} `toml:"import"`
 }
 
-// LoadManifest は path のマニフェストを読む。診断は MAN-4（TOML の誤り、知らないキー、command が空、値の型違い）と
+// LoadManifest は path のマニフェストを読む。診断は MAN-4（TOML の誤り、知らないキー、command が空、値の型違い、
+// [[transpiler]] に name か language がない、language が go でも ts でもない、同じ名前の [[transpiler]] が二つ）と
 // MAN-2（protocol が Protocol と違う）。MAN-4 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
-// 設計書 §4.6 の [emit] の decorate / entry / stop は持たないので、書いてあれば知らないキー（MAN-4）。
+// 設計書 §4.6 の [emit]（decorate / entry / stop）とトップレベルの language は持たないので、書いてあれば知らないキー（MAN-4）。
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	var diags []diag.Diagnostic
 	errorf := func(code, format string, args ...any) {
@@ -119,7 +133,7 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 		errorf("MAN-4", "マニフェストに name がない")
 	}
 
-	m := &Manifest{Name: raw.Name, Language: raw.Language, Protocol: raw.Protocol, Vocabulary: raw.Vocabulary}
+	m := &Manifest{Name: raw.Name, Protocol: raw.Protocol, Vocabulary: raw.Vocabulary}
 	if m.Vocabulary == nil {
 		m.Vocabulary = []string{}
 	}
@@ -144,8 +158,27 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 			errorf("MAN-4", "マニフェストの command は文字列か文字列の配列でなければならない")
 		}
 	}
-	if raw.Emit != nil {
-		m.Emit = &Emit{Unsupported: orEmpty(raw.Emit.Unsupported)}
+	seen := map[string]bool{}
+	for i, t := range raw.Transpiler {
+		switch {
+		case t.Name == "":
+			errorf("MAN-4", "マニフェストの %d 番目の [[transpiler]] に name がない", i+1)
+			continue
+		case seen[t.Name]:
+			errorf("MAN-4", "マニフェストに同じ名前の [[transpiler]] %s が二つある", t.Name)
+			continue
+		}
+		seen[t.Name] = true
+		switch t.Language {
+		case "go", "ts":
+		case "":
+			errorf("MAN-4", "マニフェストの [[transpiler]] %s に language がない", t.Name)
+			continue
+		default:
+			errorf("MAN-4", "マニフェストの [[transpiler]] %s の language は \"go\" か \"ts\" でなければならない（%q）", t.Name, t.Language)
+			continue
+		}
+		m.Transpilers = append(m.Transpilers, Transpiler{Name: t.Name, Language: t.Language, Unsupported: orEmpty(t.Unsupported)})
 	}
 	m.Check.Enabled = raw.Check.Enabled
 	m.Import.Formats = orEmpty(raw.Import.Formats)

@@ -1,7 +1,0 @@
-[hozo]
-plugin_dirs = ["plugins"]
-
-[a]
-language = "go"
-plugins  = ["goplug"]
-out      = "gen/a"

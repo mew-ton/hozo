@@ -16,7 +16,7 @@ type CheckFunc func(in CheckInput) (CheckResult, error)
 
 // WriteOutputsFunc は op hozoc.writeOutputs の関数の型。
 //
-// 検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
+// 検査を通った仕様から、単位ごとに既定の出力とトランスパイラの出力を作り、書き出す。
 //
 // 引数:
 //   - in: コマンドの入力
@@ -28,7 +28,7 @@ type WriteOutputsFunc func(in EmitInput, checked CheckResult) (EmitResult, error
 
 // EmitFunc は op hozoc.emit の関数の型。
 //
-// 仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
+// 仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
 //
 // 引数:
 //   - in: コマンドの入力
@@ -62,7 +62,7 @@ type Ops interface {
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
 	Check(in CheckInput) (CheckResult, error)
 
-	// WriteOutputs は検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
+	// WriteOutputs は検査を通った仕様から、単位ごとに既定の出力とトランスパイラの出力を作り、書き出す。
 	//
 	// 引数:
 	//   - in: コマンドの入力
@@ -72,7 +72,7 @@ type Ops interface {
 	// Effects: hozoc.syncOutputs
 	WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, error)
 
-	// Emit は仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
+	// Emit は仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
 	//
 	// 引数:
 	//   - in: コマンドの入力

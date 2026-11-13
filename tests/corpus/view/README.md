@@ -4,14 +4,14 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]`、`[api]` と `[web]`（どちらも `language = "go"`。TS の既定の出力は段階 5 までないので CFG-11）。`web` に `plugins = ["view-dump"]`。`api` にはプラグインがない |
-| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。`view-dump` が起点に選ぶ op の印。標準の語彙にない名前空間で、`hozo.toml` にテーブルがないので出力しない（`docs/config.md`「出力する名前空間」） |
+| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]` と、単位が二つ: `namespace = "api"`（`transpilers = ["view-none"]`）と `namespace = "web"`（`transpilers = ["view-dump"]`）。どちらも Go のトランスパイラ（TS の既定の出力は段階 5 までないので CFG-11） |
+| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。`view-dump` が起点に選ぶ op の印。標準の語彙にない名前空間で、どの単位の対象でもないので出力しない（`docs/config.md`「単位の対象」） |
 | `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる |
 | `web.hozo` | ブラウザ側 `namespace web`。`view-dump` の viewer。`@t.entry` の付いた op が起点 |
-| `plugins/view-dump/` | テスト用のプラグイン。受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す。`emit` の応答の `select`（`docs/plugin-protocol.md`「選択」）で、`@t.entry` の付いた op を `roots` に選ぶ |
+| `plugins/view-dump/` | テスト用のプラグイン。トランスパイラを二つ提供する（要求の `transpiler` で処理が分かれる）。`view-none` は何も書かず、何も選ばない。`view-dump` は、受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す。`emit` の応答の `select`（`docs/plugin-protocol.md`「選択」）で、`@t.entry` の付いた op を `roots` に選ぶ |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（下の warning を含む） |
 | `testdata/expected/view.web.json` | `Views()["web"]` の JSON のゴールデン（`tests/view_test.go` の `TestViewFromEntry`） |
-| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン。既定の出力（`gen/web`。起点の `openUser` / `signOut` から辿った宣言だけ）と、プラグインの `gen/web/view.json`（`view.web.json` と同じ内容）。`api` はプラグインがないので何も出力せず（`docs/emit-go.md`「出力の対象」）、`web` は `api` の型を自分のパッケージに複製し、`api` の op を `Deps` の口にする。ゴールデンが `testdata` の下にあるのは、Go のツールが `.go` をパッケージとして拾わないため |
+| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン。既定の出力（`gen/web`。起点の `openUser` / `signOut` から辿った宣言だけ）と、プラグインの `gen/web/view.json`（`view.web.json` と同じ内容）。`api` の単位のトランスパイラ `view-none` は何も選ばないので `api` は何も出力せず（`docs/emit-go.md`「出力の対象」）、`web` は `api` の型を自分のパッケージに複製し、`api` の op を `Deps` の口にする。ゴールデンが `testdata` の下にあるのは、Go のツールが `.go` をパッケージとして拾わないため |
 
 ゴールデンの更新は `go test ./tests -update`。`.hozo` の各ブロックの上の `// docs/...「見出し」` のコメントが、その構文が確かめる文書の見出し。
 
@@ -38,7 +38,7 @@
 | `docs/ir.md`「デコレータの適用」 | `@t.entry @redirectToLogin @traced(id, 5m) op openUser(id: ...)` | 書かれた順の列（最後が最も内側）、op の引数を値に取る引数は `$param:id`、`via` |
 | `docs/ir.md`「配線」 | `openUser` / `welcome` / `login` / `reload` の本体 | `const` / `return` / 呼び出しの文 / `match` の文、`match` のアームの `cases` は書かれた順、`default` と `none`、入れ子のレコードリテラル、フィールド参照、`return` に束縛名 |
 | `docs/ir.md`「bind」 | `bind token to api.*;` | `Bind` の `namespace` `state` `target` |
-| `docs/ir.md`「その名前空間から見た IR」 | `View` 全体 | `viewer` `config` `namespaces`（`api` と `web`。`t` は設定がないので入らない）`ops`（すべての op）、viewer の op の `ops` は `Program` の `signature` と一致、合成した `web.getUser$in` は `web` の decls の末尾にだけある |
+| `docs/ir.md`「その名前空間から見た IR」 | `View` 全体 | `viewer` `config` `files`（単位の `in` に合ったファイル。`in` を省いているので `api.hozo` `t.hozo` `web.hozo`）`namespaces`（`api` と `web`。値は単位ごとの設定の列。`t` はどの単位の対象でもないので入らない）`ops`（すべての op）、viewer の op の `ops` は `Program` の `signature` と一致、合成した `web.getUser$in` は `web` の decls の末尾にだけある |
 | `docs/ir.md`「JSON」 | 同 | `returns: null`、`body: null`、省略可能のキーは省く、空の列は `[]`、`ops` のキーは辞書順、読み戻して書いても同じバイト列 |
 | `docs/check.md`「計算」手順 0（葉） | `api.login`（`prevents effects`）、`api.touch`（`keeps effects`）、`web.greet` | E / F / rel / succ |
 | 同 手順 0（配線）: 効果の伝播 | `signOut`、`reload` | F は呼び出しの effects を行の順に連結。`Op.effects` は `[]` のまま |
@@ -50,8 +50,8 @@
 | 同 手順 i: `throws`（DEC-10） | `@external decorator remote` を `api.getUser` / `login` / `logout` に | `Program` の `signature` に `Timeout` はなく、`web` から見た `ops` にはある。`api` から見た `View` は `Program` と一致 |
 | `docs/check.md`「bind」 | `bind token to api.*;`、`api.getUser(in: GetUserInput { token: Token?; id })`、`api.logout(token: Token?)`、`api.touch(id)` | Pos が model のフィールドなら `web.getUser$in` を合成して `ref`、引数そのものなら引数を除く、位置のない op はそのまま。`Call.bound` は明示していない位置だけ（BIND-3） |
 | `docs/plugin-protocol.md`「選択」 | `plugins/view-dump` と `@t.entry` | `TestViewFromEntry` と `TestViewDeliveredToPlugin`: プラグインの応答の `select.roots` は `@t.entry` の付いた op（`plugin.OpsWith`）。既定の出力はそこから辿った op だけで、`greet` / `welcome` / `reload` / `login` は出力しない。`gen/api` はできない |
-| `docs/plugin-protocol.md`「要求と応答」 | `plugins/view-dump` | `TestViewDeliveredToPlugin`: 実物の `hozoc emit` がプラグインに渡す `View` が `Views()["web"]` とバイト単位で同じ。`protocol` が違えば `code: "protocol"`（MAN-2）、`import` は `code: "unsupported"`（MAN-5） |
-| `docs/config.md`「名前空間の設定の解決」 | `hozo.toml` | `View.config.dir = "gen/web"`、`namespaces[api].dir = "gen/api"` |
+| `docs/plugin-protocol.md`「要求と応答」 | `plugins/view-dump` | `TestViewDeliveredToPlugin`: 実物の `hozoc emit` がトランスパイラ `view-dump` に渡す `View` が、`internal/project` の `web` の `View` とバイト単位で同じ。`protocol` が違えば `code: "protocol"`（MAN-2）、`import` と、知らない `transpiler` は `code: "unsupported"`（MAN-5） |
+| `docs/config.md`「単位の対象」 | `hozo.toml` | `View.config.dir = "gen/web"`、`namespaces[api][0].dir = "gen/api"` |
 
 このコーパスにない構文: 状態の分類（`docs/ir.md`「classify」の `subject` の `states`）、遷移の効果（`Effect.target` の `transition`）、状態での `match`（`Match.subject` の `state` / `classify`）は、専用のコーパス `tests/corpus/state` に置いた（その `README.md`。IR は `TestStateCorpusIR`、Go の既定の出力は `TestCorpusEmitGolden` が確かめる）。ここへ足すと `view.web.json` のゴールデンと `TestViewFromEntry` の見出しごとの期待値をまとめて書き直すことになるので、分けたままにしている。
 

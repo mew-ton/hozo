@@ -1,0 +1,9 @@
+# transpilers に同じ名前が二度 → CFG-7
+# ERROR: CFG-7
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go"]
+out         = "gen/a"

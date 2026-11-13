@@ -65,21 +65,21 @@ type refusal struct {
 }
 
 func viewJSON(viewer string) string {
-	return fmt.Sprintf(`{"version":%q,"viewer":%q,"config":{"language":"go","out":"gen","plugins":[]},"program":{"version":%q,"namespaces":[],"binds":[]},"ops":{}}`,
+	return fmt.Sprintf(`{"version":%q,"viewer":%q,"config":{"language":"go","out":"gen","dir":"gen","transpilers":["cli"]},"files":[],"namespaces":{},"program":{"version":%q,"namespaces":[],"binds":[]},"ops":{}}`,
 		ir.Version, viewer, ir.Version)
 }
 
 func TestEmit(t *testing.T) {
 	h := &fake{emit: func(r *EmitRequest) (*EmitResponse, error) {
-		if r.Protocol != ir.Version || r.Direction != "emit" {
-			t.Errorf("request header = %q %q", r.Protocol, r.Direction)
+		if r.Protocol != ir.Version || r.Direction != "emit" || r.Transpiler != "go-cli" {
+			t.Errorf("request header = %q %q %q", r.Protocol, r.Direction, r.Transpiler)
 		}
 		if r.View == nil || r.View.Viewer != "cli" {
 			t.Errorf("view not decoded: %+v", r.View)
 		}
 		return &EmitResponse{Files: []File{{Path: "cli/cli.go", Content: "package cli\n"}}}, nil
 	}}
-	code, out, errOut := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","view":%s}`, ir.Version, viewJSON("cli")))
+	code, out, errOut := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","transpiler":"go-cli","view":%s}`, ir.Version, viewJSON("cli")))
 	if code != 0 || errOut != "" {
 		t.Fatalf("code = %d, stderr = %q", code, errOut)
 	}
@@ -131,22 +131,29 @@ func TestEmitSelect(t *testing.T) {
 	}
 }
 
-// docs/packages.md「`plugin`（公開）」の OpsWith: viewer の op のうち、そのデコレータが付いたもの（via も見る）を宣言の順で。
+// docs/packages.md「`plugin`（公開）」の OpsWith: viewer の op のうち、単位の対象（span.file が View.files にある）で、
+// そのデコレータが付いたもの（via も見る）を宣言の順で。
 func TestOpsWith(t *testing.T) {
 	app := func(decorator, via string) ir.Application { return ir.Application{Decorator: decorator, Via: via} }
-	op := func(name string, apps ...ir.Application) *ir.Op {
-		return &ir.Op{DeclBase: ir.DeclBase{Name: name, Decorators: apps}}
+	opIn := func(file, name string, apps ...ir.Application) *ir.Op {
+		return &ir.Op{DeclBase: ir.DeclBase{Name: name, Decorators: apps, Span: ir.Span{File: file}}}
 	}
-	view := &ir.View{Viewer: "web", Program: &ir.Program{Namespaces: []ir.Namespace{
+	op := func(name string, apps ...ir.Application) *ir.Op { return opIn("web.hozo", name, apps...) }
+	view := &ir.View{Viewer: "web", Files: []string{"api.hozo", "web.hozo"}, Program: &ir.Program{Namespaces: []ir.Namespace{
 		{Name: "web", Decls: []ir.Decl{
 			op("web.open", app("t.entry", "")),
 			op("web.plain"),
-			&ir.Model{DeclBase: ir.DeclBase{Name: "web.M", Decorators: []ir.Application{app("t.entry", "")}}},
+			&ir.Model{DeclBase: ir.DeclBase{Name: "web.M", Decorators: []ir.Application{app("t.entry", "")}, Span: ir.Span{File: "web.hozo"}}},
 			op("web.viaNamed", app("page.route", "t.entry")),
+			// in の外（batch.hozo）で宣言された op は、デコレータが付いていても返さない（select に書けば PLG-3）
+			opIn("batch.hozo", "web.nightly", app("t.entry", "")),
 			op("web.both", app("t.entry", ""), app("t.other", "")),
 		}},
-		{Name: "api", Decls: []ir.Decl{op("api.open", app("t.entry", ""))}},
+		{Name: "api", Decls: []ir.Decl{opIn("api.hozo", "api.open", app("t.entry", ""))}},
 	}}}
+	if !view.InUnit("web.open") || view.InUnit("web.nightly") || view.InUnit("api.open") {
+		t.Errorf("InUnit: open=%v nightly=%v api.open=%v", view.InUnit("web.open"), view.InUnit("web.nightly"), view.InUnit("api.open"))
+	}
 	got := OpsWith(view, "t.entry")
 	want := []string{"web.open", "web.viaNamed", "web.both"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
@@ -262,12 +269,15 @@ func TestUnsupportedDirection(t *testing.T) {
 	}
 }
 
+// 知らないトランスパイラは、ErrUnsupported を包んで返す（docs/plugin-protocol.md「要求と応答」）。包んだ文がメッセージになる。
 func TestWrappedErrUnsupported(t *testing.T) {
-	h := &fake{emit: func(*EmitRequest) (*EmitResponse, error) { return nil, fmt.Errorf("emit: %w", ErrUnsupported) }}
-	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit"}`, ir.Version))
+	h := &fake{emit: func(r *EmitRequest) (*EmitResponse, error) {
+		return nil, fmt.Errorf("transpiler %q: %w", r.Transpiler, ErrUnsupported)
+	}}
+	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","transpiler":"nope"}`, ir.Version))
 	var r refusal
 	decode(t, out, &r)
-	if code != 2 || r.Error.Code != "unsupported" {
+	if code != 2 || r.Error.Code != "unsupported" || !strings.Contains(r.Error.Message, `"nope"`) {
 		t.Errorf("code = %d, refusal = %+v", code, r.Error)
 	}
 }

@@ -1,0 +1,8 @@
+{
+  "transpilers": {
+    "pick-stock": { "roots": ["t.stock"] },
+    "pick-api": { "roots": ["t.api", "t.batch"] },
+    "pick-batch": { "roots": ["t.batch"] },
+    "pick-admin": { "roots": ["t.admin"] }
+  }
+}

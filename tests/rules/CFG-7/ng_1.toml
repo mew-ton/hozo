@@ -1,6 +1,10 @@
-# 知らないキー → CFG-7
+# 単位に知らないキー → CFG-7（その単位は使わない）
 # ERROR: CFG-7
-[a]
-language = "go"
-out      = "gen/a"
-color    = "blue"
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+color       = "blue"

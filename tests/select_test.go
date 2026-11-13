@@ -108,7 +108,7 @@ func TestSelectCorpus(t *testing.T) {
 			[]string{"Draft", "EffectAddLine", "EffectSaveDraft"})
 	})
 	t.Run("配置: 出力がその型を持たない Go の名前空間の型は複製する", func(t *testing.T) {
-		// stock はテーブルを持つ Go の名前空間だが、プラグインがなく何も出力しないので、import できない
+		// stock は Go の単位が出力する名前空間だが、その単位のトランスパイラが何も選ばず、出力がその型を持たないので、import できない
 		want(t, "types.go", types, []string{"type ItemId string", "type Short struct{}", `return "stock.Short"`}, []string{"gen/stock"})
 	})
 	t.Run("実装の単位: 生成するコードは context を引数に取らない", func(t *testing.T) {
@@ -118,14 +118,14 @@ func TestSelectCorpus(t *testing.T) {
 			}
 		}
 	})
-	t.Run("出力の対象: プラグインのない名前空間は何も出力しない", func(t *testing.T) {
+	t.Run("出力の対象: トランスパイラが何も選ばなかった名前空間は何も出力しない", func(t *testing.T) {
 		for p := range got {
 			if !strings.HasPrefix(p, "gen/shop/") {
 				t.Errorf("gen/shop の外に書いた: %s", p)
 			}
 		}
 		if _, err := os.Stat(filepath.Join(root, "gen", "stock")); !os.IsNotExist(err) {
-			t.Errorf("gen/stock がある（stock にはプラグインがない）")
+			t.Errorf("gen/stock がある（stock の単位は何も選んでいない）")
 		}
 		if strings.Contains(stdout.String(), "warning") {
 			t.Errorf("選ばれなかった宣言に warning が出た:\n%s", stdout.String())

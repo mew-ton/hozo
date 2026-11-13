@@ -1,0 +1,22 @@
+// CFG-10 / CFG-13（docs/config.md「単位の対象」「診断」）: どの単位の対象でもない名前空間は、state や op を持っていても
+// 出力しないだけで、エラーにしない。既定の hozo.toml の単位は a だけで、user とグローバルを対象にする単位はない。
+// 単位の対象でない名前空間の op から、対象の名前空間の op を呼べる（検査は同じに掛かる）。
+// a.sub は a の単位の対象（単位は namespace とその子孫を対象にする）
+namespace a {
+  exception Busy;
+  op save(text: string) throws Busy;
+}
+namespace a.sub {
+  op g();
+}
+/** 画面を操作する利用者 */
+namespace user {
+  state memo: nullable<string>;
+  effect writeMemo on memo.post;
+  op note(text: string) effects writeMemo;
+  op submit(text: string) throws a.Busy {
+    note(text);
+    a.save(text);
+  }
+}
+op standalone();

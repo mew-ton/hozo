@@ -463,7 +463,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.1"
+          "const": "0.2"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -986,13 +986,16 @@
     },
     "EmitRequest": {
       "additionalProperties": false,
-      "description": "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。",
+      "description": "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。transpiler は起動するトランスパイラの名前。",
       "properties": {
         "direction": {
           "const": "emit"
         },
         "protocol": {
-          "const": "0.1"
+          "const": "0.2"
+        },
+        "transpiler": {
+          "type": "string"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1001,6 +1004,7 @@
       "required": [
         "protocol",
         "direction",
+        "transpiler",
         "view"
       ],
       "type": "object"
@@ -1169,7 +1173,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.1"
+          "const": "0.2"
         }
       },
       "required": [
@@ -1482,7 +1486,7 @@
     },
     "NamespaceConfig": {
       "additionalProperties": false,
-      "description": "一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。",
+      "description": "単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。",
       "properties": {
         "dir": {
           "type": "string"
@@ -1493,7 +1497,7 @@
         "out": {
           "type": "string"
         },
-        "plugins": {
+        "transpilers": {
           "items": {
             "type": "string"
           },
@@ -1504,7 +1508,7 @@
         "language",
         "out",
         "dir",
-        "plugins"
+        "transpilers"
       ],
       "type": "object"
     },
@@ -1757,7 +1761,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.1"
+          "const": "0.2"
         }
       },
       "required": [
@@ -1956,7 +1960,7 @@
     },
     "Select": {
       "additionalProperties": false,
-      "description": "既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN は view.viewer の名前空間の宣言。",
+      "description": "既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN は view.viewer の名前空間の、単位の対象の宣言。",
       "properties": {
         "roots": {
           "items": {
@@ -2452,14 +2456,23 @@
     },
     "View": {
       "additionalProperties": false,
-      "description": "その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。プラグインに渡すもの。",
+      "description": "その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。トランスパイラに渡すもの。単位と名前空間の組ごとに一つ。",
       "properties": {
         "config": {
           "$ref": "#/$defs/NamespaceConfig"
         },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "namespaces": {
           "additionalProperties": {
-            "$ref": "#/$defs/NamespaceConfig"
+            "items": {
+              "$ref": "#/$defs/NamespaceConfig"
+            },
+            "type": "array"
           },
           "type": "object"
         },
@@ -2473,7 +2486,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.1"
+          "const": "0.2"
         },
         "viewer": {
           "type": "string"
@@ -2483,6 +2496,7 @@
         "version",
         "viewer",
         "config",
+        "files",
         "namespaces",
         "program",
         "ops"
@@ -2575,7 +2589,7 @@
     },
     "Wrap": {
       "additionalProperties": false,
-      "description": "プラグインが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。",
+      "description": "トランスパイラが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。",
       "properties": {
         "decorator": {
           "type": "string"
@@ -2593,7 +2607,7 @@
   },
   "$id": "https://github.com/mew-ton/hozo/schema/ir.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（プラグインに渡すもの）。$defs にはプラグインのプロトコル（docs/plugin-protocol.md「要求と応答」）の要求と応答も含む。Go の ir / plugin パッケージから internal/tools/irschema が生成する。手で編集しない。",
+  "description": "Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（トランスパイラに渡すもの）。$defs にはプラグインのプロトコル（docs/plugin-protocol.md「要求と応答」）の要求と応答も含む。Go の ir / plugin パッケージから internal/tools/irschema が生成する。手で編集しない。",
   "oneOf": [
     {
       "$ref": "#/$defs/Program"

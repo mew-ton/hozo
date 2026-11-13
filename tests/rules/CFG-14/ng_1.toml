@@ -1,0 +1,9 @@
+# nope というトランスパイラを提供するプラグインは入っていない → CFG-14
+# ERROR: CFG-14
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "nope"]
+out         = "gen/a"

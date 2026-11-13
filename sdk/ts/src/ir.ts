@@ -3,7 +3,7 @@
 // IR の構造の持ち主は docs/ir.md、JSON の形は Go の ir パッケージ（docs/requirements.md「プラグインの書き方」）。
 
 /**
- * Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（プラグインに渡すもの）。$defs にはプラグインのプロトコル（docs/plugin-protocol.md「要求と応答」）の要求と応答も含む。Go の ir / plugin パッケージから internal/tools/irschema が生成する。手で編集しない。
+ * Hozo の IR（docs/ir.md）の JSON の形。Program（hozoc の出力）か View（トランスパイラに渡すもの）。$defs にはプラグインのプロトコル（docs/plugin-protocol.md「要求と応答」）の要求と応答も含む。Go の ir / plugin パッケージから internal/tools/irschema が生成する。手で編集しない。
  */
 export type HozoIR = Program | View;
 /**
@@ -81,7 +81,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.1";
+  version: "0.2";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -660,28 +660,29 @@ export interface SuccessEffect {
   state: EffectState;
 }
 /**
- * その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。プラグインに渡すもの。
+ * その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。トランスパイラに渡すもの。単位と名前空間の組ごとに一つ。
  */
 export interface View {
   config: NamespaceConfig;
+  files: string[];
   namespaces: {
-    [k: string]: NamespaceConfig;
+    [k: string]: NamespaceConfig[];
   };
   ops: {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.1";
+  version: "0.2";
   viewer: string;
 }
 /**
- * 一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。
+ * 単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。
  */
 export interface NamespaceConfig {
   dir: string;
   language: string;
   out: string;
-  plugins: string[];
+  transpilers: string[];
 }
 /**
  * viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」）。

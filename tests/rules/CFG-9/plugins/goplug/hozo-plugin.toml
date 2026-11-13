@@ -1,5 +1,0 @@
-# テストの fixture: language = "go" のプラグイン。起動しない（[check] enabled は既定の false）
-name     = "goplug"
-command  = ["true"]
-language = "go"
-protocol = "0.1"

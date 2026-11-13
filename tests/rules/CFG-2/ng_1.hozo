@@ -1,7 +1,0 @@
-// CFG-2（docs/config.md「診断」）: .hozo の名前空間の名前（どの階層でも）が language / plugins / out / hozo。位置は最初の宣言
-namespace a {
-  op f();
-}
-namespace a.out {
-  op g();                              // ERROR: CFG-2
-}

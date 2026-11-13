@@ -18,7 +18,7 @@ import (
 // 残りの診断だけで決まる。指定されたファイルが読めないときは設定なしではなく CFG-7（ConfigInvalid）。
 //
 // 例外の選び方（docs/cli.md「check」の 5、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
-// error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-4 なら LanguageMismatch、
+// error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-16 なら LanguageMismatch、
 // そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
 // プラグインの check が異常終了すれば proc.Crashed / proc.MalformedOutput（asProc）。
 func (a *App) Check(in hozoc.CheckInput) (hozoc.CheckResult, error) {
@@ -47,7 +47,7 @@ func classify(diags []diag.Diagnostic, fs *source.FileSet) error {
 			continue
 		}
 		cfgErrors++
-		if d.Code != "CFG-4" {
+		if d.Code != "CFG-16" {
 			mismatchOnly = false
 		}
 	}

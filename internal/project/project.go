@@ -40,13 +40,31 @@ type Project struct {
 	Sema *sema.Result
 	// Diags は解析・解決・検査・設定・プラグインの check のすべて。並べ替え済み（docs/diagnostics.md「順序」）。
 	Diags []diag.Diagnostic
-	// Manifests は、どれかの名前空間の plugins に書かれ、見つかったプラグインのマニフェスト。キーはプラグインの名前。
-	Manifests map[string]*hostplugin.Manifest
-	// ManifestDirs はマニフェストのディレクトリ（絶対パス）。Manifests と同じキー。
-	ManifestDirs map[string]string
+	// Plugins は入っているプラグイン（docs/plugin-protocol.md「探索」。探した順）。設定なしなら空。
+	Plugins []*hostplugin.Plugin
+	// Units は解決した単位（Config.Units と同じ順）: 言語、解決できたトランスパイラ、in に合ったファイル。
+	Units []Unit
 	// RunErr はプラグインの check が proc.Crashed / proc.MalformedOutput（internal/plugin の ErrCrashed /
 	// ErrMalformedOutput）で終わったときのその誤り。最初の一つで止め、以降のプラグインは呼ばない。なければ nil。
 	RunErr error
+}
+
+// Unit は解決した単位（docs/config.md「単位」）。設定の単位に、マニフェストと読んだファイルから決まるものを足したもの。
+type Unit struct {
+	*config.Unit
+	// Language は単位の言語（解決できた最初のトランスパイラの language）。一つも解決できなければ ""。
+	Language string
+	// Transpilers は transpilers の名前のうち解決できたもの（書いた順）。
+	Transpilers []Transpiler
+	// Files は in に合ったファイル（Project.Sources の形、辞書順）。in を省いた単位なら Sources のすべて。
+	Files []string
+}
+
+// Transpiler は単位が選んだトランスパイラ一つと、それを提供するプラグイン。
+type Transpiler struct {
+	Name   string
+	Plugin *hostplugin.Plugin
+	Decl   *hostplugin.Transpiler
 }
 
 // Options は Load の入力のうち、docs/packages.md の Load の引数にないもの。
@@ -73,7 +91,7 @@ func Load(root, configPath string, overlay map[string][]byte) *Project {
 
 // LoadWith は Load の本体。
 func LoadWith(opts Options) *Project {
-	p := &Project{Files: source.NewFileSet(), Manifests: map[string]*hostplugin.Manifest{}, ManifestDirs: map[string]string{}}
+	p := &Project{Files: source.NewFileSet()}
 	var diags []diag.Diagnostic
 
 	// 1. 設定（docs/cli.md「check」の 1）
@@ -103,8 +121,8 @@ func LoadWith(opts Options) *Project {
 	}
 	p.Root = p.Config.Root
 
-	// プラグインのマニフェスト（docs/plugin-protocol.md「探索」）
-	diags = append(diags, p.discoverPlugins()...)
+	// 入っているプラグインのマニフェストと、単位のトランスパイラの解決（docs/plugin-protocol.md「探索」、docs/config.md「単位」）
+	diags = append(diags, p.resolveUnits()...)
 
 	// 2. 読み込みと解析（docs/vocab.md「読み込み」、docs/grammar.md）
 	var files []*ast.File
@@ -120,16 +138,15 @@ func LoadWith(opts Options) *Project {
 		add(s.path, s.content)
 	}
 	vocab.AddTo(add)
-	for _, name := range p.pluginNames() {
-		m := p.Manifests[name]
-		if m == nil || len(m.Vocabulary) == 0 {
+	for _, pl := range p.usedPlugins() {
+		if len(pl.Manifest.Vocabulary) == 0 {
 			continue
 		}
-		if err := vocab.AddPluginTo(add, name, p.ManifestDirs[name], m.Vocabulary); err != nil {
-			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Code: "MAN-4", Message: err.Error(),
-				File: filepath.Join(p.ManifestDirs[name], hostplugin.ManifestFileName)})
+		if err := vocab.AddPluginTo(add, pl.Name, pl.Dir, pl.Manifest.Vocabulary); err != nil {
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Code: "MAN-4", Message: err.Error(), File: pl.ManifestPath()})
 		}
 	}
+	diags = append(diags, p.matchUnitFiles()...)
 
 	// 3. 解決・正規化・検査（docs/resolve.md、docs/ir.md、docs/check.md）
 	p.Sema = sema.Analyze(p.Files, files, p.Config)
@@ -153,74 +170,146 @@ func (p *Project) Errors() int {
 	return n
 }
 
-// Views は設定のある名前空間ごとの View（docs/ir.md「その名前空間から見た IR」）。
-func (p *Project) Views() map[string]*ir.View {
+// Views は、単位ごと（Units と同じ順）の、その単位が出力する名前空間 → View（docs/ir.md「その名前空間から見た IR」。
+// internal/check.Views）。
+func (p *Project) Views() []map[string]*ir.View {
 	if p.Sema == nil {
-		return map[string]*ir.View{}
+		return make([]map[string]*ir.View, len(p.Units))
 	}
-	return check.Views(p.Sema.Program, p.Config)
+	units := make([]check.Unit, len(p.Units))
+	for i := range p.Units {
+		units[i] = check.Unit{Language: p.Units[i].Language, Files: p.Units[i].Files}
+	}
+	return check.Views(p.Sema.Program, p.Config, units)
 }
 
-// Dir は名前空間 ns の出力先 Dir(N)（docs/config.md「名前空間の設定の解決」。config.Config.Dir）を
-// ルートからの相対パス（"/" 区切り、正規化済み）で返す。Conf(N).out が未設定なら false。
-func (p *Project) Dir(ns string) (string, bool) {
-	d, ok := p.Config.Dir(ns)
-	if !ok || d == "" {
-		return "", false
-	}
-	return cleanRel(d), true
+// ManifestPath はプラグイン pl のマニフェストのパス（診断の File に使う形: ルートからの相対パス）。
+func (p *Project) ManifestPath(pl *hostplugin.Plugin) string {
+	return p.relPath(pl.ManifestPath())
 }
 
-// Plugins は名前空間 ns の Conf(N).plugins のうち、マニフェストが見つかったもの（名前の順は設定の順）。
-func (p *Project) Plugins(ns string) []*hostplugin.Manifest {
-	conf, ok := p.Config.Resolve(ns)
-	if !ok {
+// usedPlugins は使うプラグイン（docs/plugin-protocol.md「探索」: どれかの単位の transpilers に書かれたトランスパイラを
+// 提供するプラグイン）を名前の辞書順で返す。
+func (p *Project) usedPlugins() []*hostplugin.Plugin {
+	seen := map[*hostplugin.Plugin]bool{}
+	var out []*hostplugin.Plugin
+	for i := range p.Units {
+		for _, t := range p.Units[i].Transpilers {
+			if !seen[t.Plugin] {
+				seen[t.Plugin] = true
+				out = append(out, t.Plugin)
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// resolveUnits は入っているプラグインのマニフェストを探して読み（docs/plugin-protocol.md「探索」）、各単位の transpilers の
+// 名前をトランスパイラに解決して p.Units を作る（docs/config.md「単位」）。設定なしなら探索しない。
+// 診断は MAN-3 / MAN-4（入っているプラグインのすべて）、MAN-2（使うプラグインだけ）、CFG-14（どのプラグインも提供して
+// いない）、CFG-15（二つ以上のプラグインが提供している。以降は探した順で最初のものを使う）、CFG-16（一つの単位の
+// トランスパイラの language がそろっていない）、CFG-11（単位の言語が ts）。
+func (p *Project) resolveUnits() []diag.Diagnostic {
+	var diags []diag.Diagnostic
+	if p.NoConfig {
 		return nil
 	}
-	var ms []*hostplugin.Manifest
-	for _, name := range conf.Plugins {
-		if m := p.Manifests[name]; m != nil {
-			ms = append(ms, m)
+	p.Plugins, diags = hostplugin.Discover(p.Config)
+	cfgFile := p.Config.Path
+	if cfgFile == "" {
+		cfgFile = config.FileName
+	}
+	errorf := func(code, format string, args ...any) {
+		diags = append(diags, diag.Diagnostic{Severity: diag.Error, Code: code, File: cfgFile, Message: fmt.Sprintf(format, args...)})
+	}
+	p.Units = make([]Unit, len(p.Config.Units))
+	for i := range p.Config.Units {
+		cu := &p.Config.Units[i]
+		u := Unit{Unit: cu}
+		for _, name := range cu.Transpilers {
+			var providers []*hostplugin.Plugin
+			for _, pl := range p.Plugins {
+				if pl.Manifest.Transpiler(name) != nil {
+					providers = append(providers, pl)
+				}
+			}
+			switch {
+			case len(providers) == 0:
+				// CFG-14
+				errorf("CFG-14", "%sの transpilers の %s を提供するプラグインが入っていない（plugin_dirs、%s、~/.hozo/plugins を探した）",
+					cu.Label(), name, hostplugin.PluginPathEnv)
+				continue
+			case len(providers) > 1:
+				// CFG-15
+				var where []string
+				for _, pl := range providers {
+					where = append(where, fmt.Sprintf("%s（%s）", pl.Name, p.ManifestPath(pl)))
+				}
+				errorf("CFG-15", "%sの transpilers の %s を、二つ以上のプラグインが提供している: %s", cu.Label(), name, strings.Join(where, "、"))
+			}
+			u.Transpilers = append(u.Transpilers, Transpiler{Name: name, Plugin: providers[0], Decl: providers[0].Manifest.Transpiler(name)})
 		}
-	}
-	return ms
-}
-
-// ManifestPath はプラグイン name のマニフェストのパス（診断の File に使う形: ルートからの相対パス）。
-func (p *Project) ManifestPath(name string) string {
-	return p.relPath(filepath.Join(p.ManifestDirs[name], hostplugin.ManifestFileName))
-}
-
-// pluginNames は設定のどこかの plugins に書かれたプラグインの名前を辞書順に返す。
-func (p *Project) pluginNames() []string {
-	set := map[string]bool{}
-	for _, ns := range p.Config.NamespaceNames() {
-		conf, _ := p.Config.Resolve(ns)
-		for _, name := range conf.Plugins {
-			set[name] = true
+		if len(u.Transpilers) > 0 {
+			u.Language = u.Transpilers[0].Decl.Language
+			mixed := false
+			var langs []string
+			for _, t := range u.Transpilers {
+				langs = append(langs, fmt.Sprintf("%s は %q", t.Name, t.Decl.Language))
+				if t.Decl.Language != u.Language {
+					mixed = true
+				}
+			}
+			switch {
+			case mixed:
+				// CFG-16
+				errorf("CFG-16", "%sのトランスパイラの language がそろっていない: %s", cu.Label(), strings.Join(langs, "、"))
+			case u.Language == "ts":
+				// CFG-11: TS の既定の出力はまだない（段階 5 まで）
+				errorf("CFG-11", "%sの言語が \"ts\" だが、TS の出力はまだない", cu.Label())
+			}
 		}
+		p.Units[i] = u
 	}
-	names := make([]string, 0, len(set))
-	for n := range set {
-		names = append(names, n)
+	// MAN-2 は使うプラグインにだけ
+	for _, pl := range p.usedPlugins() {
+		diags = append(diags, pl.Mismatch...)
 	}
-	sort.Strings(names)
-	return names
+	return diags
 }
 
-// discoverPlugins は設定に書かれたすべてのプラグインのマニフェストを探して読む（docs/plugin-protocol.md「探索」）。
-// 診断は CFG-9 と MAN-*。
-func (p *Project) discoverPlugins() []diag.Diagnostic {
+// matchUnitFiles は各単位の in を読み込んだファイル（p.Sources）に照らして Files を決める（docs/config.md「in」）。
+// in を省いた単位は Sources のすべて。in の glob がどのファイルにも合わなければ CFG-18。
+func (p *Project) matchUnitFiles() []diag.Diagnostic {
 	var diags []diag.Diagnostic
-	for _, name := range p.pluginNames() {
-		m, dir, ds := hostplugin.Discover(p.Config, name)
-		diags = append(diags, ds...)
-		if m != nil {
-			p.Manifests[name] = m
-			p.ManifestDirs[name] = dir
+	for i := range p.Units {
+		u := &p.Units[i]
+		u.Files = []string{}
+		if u.In == nil {
+			u.Files = append(u.Files, p.Sources...)
+			continue
+		}
+		for _, src := range p.Sources {
+			if matchesAny(u.In, nil, src) {
+				u.Files = append(u.Files, src)
+			}
+		}
+		if len(u.Files) == 0 {
+			// CFG-18
+			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Code: "CFG-18", File: p.Config.Path,
+				Message: fmt.Sprintf("%sの in %s が、読み込んだファイルのどれにも合わない", u.Label(), quoteList(u.In))})
 		}
 	}
 	return diags
+}
+
+// quoteList は文字列の列を ["a", "b"] の形にする。
+func quoteList(list []string) string {
+	quoted := make([]string, len(list))
+	for i, s := range list {
+		quoted[i] = fmt.Sprintf("%q", s)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 // sourceFile は読んだユーザーのファイル。
@@ -229,7 +318,7 @@ type sourceFile struct {
 	content []byte
 }
 
-// readSources は [hozo].sources の glob に合うファイルを読む（docs/config.md「形」）。各名前空間の out の下と
+// readSources は [hozo].sources の glob に合うファイルを読む（docs/config.md「形」）。各単位の out の下と
 // plugin_dirs の下は除く。overlay の内容はディスクより優先し、glob に合うなら足す。パスは辞書順。
 func (p *Project) readSources(overlay map[string][]byte) ([]sourceFile, []diag.Diagnostic) {
 	var diags []diag.Diagnostic
@@ -267,13 +356,11 @@ func (p *Project) readSources(overlay map[string][]byte) ([]sourceFile, []diag.D
 	return out, diags
 }
 
-// excluder は sources から常に除くディレクトリ: 各名前空間の Conf(N).out と [hozo].plugin_dirs（docs/config.md「形」）。
+// excluder は sources から常に除くディレクトリ: 各単位の out と [hozo].plugin_dirs（docs/config.md「形」）。
 func (p *Project) excluder() excluder {
 	var ex excluder
-	for _, ns := range p.Config.NamespaceNames() {
-		if conf, ok := p.Config.Resolve(ns); ok && conf.Out != "" {
-			ex = append(ex, cleanRel(conf.Out))
-		}
+	for i := range p.Config.Units {
+		ex = append(ex, config.CleanOut(p.Config.Units[i].Out))
 	}
 	for _, d := range p.Config.Hozo.PluginDirs {
 		ex = append(ex, cleanRel(d))
@@ -293,86 +380,111 @@ func (p *Project) relPath(path string) string {
 	return cleanRel(path)
 }
 
-// checkPlugins はマニフェストが要る設定の検査: CFG-4（language の不一致）と CFG-6（unsupported のデコレータ）。
-// 設定のあるすべての名前空間（Program のもの）について行う。
+// checkPlugins は CFG-6（unsupported のデコレータ）: 各単位について、その単位が出力する名前空間の、単位の対象の宣言に付いた
+// デコレータを、単位のトランスパイラのマニフェストの unsupported に照らす。同じ位置の同じ診断は一度だけ。
 func (p *Project) checkPlugins(checker check.Checker) []diag.Diagnostic {
 	var diags []diag.Diagnostic
-	cfgFile := p.Config.Path
-	if cfgFile == "" {
-		cfgFile = config.FileName
+	if p.Sema == nil || p.Sema.Program == nil {
+		return nil
 	}
-	for _, ns := range p.configuredNamespaces() {
-		conf, _ := p.Config.Resolve(ns)
+	type key struct {
+		span source.Span
+		file string
+		msg  string
+	}
+	seen := map[key]bool{}
+	for i := range p.Units {
+		u := &p.Units[i]
 		var unsupported []string
-		for _, name := range conf.Plugins {
-			m := p.Manifests[name]
-			if m == nil {
-				continue
-			}
-			if conf.Language != "" && m.Language != conf.Language {
-				diags = append(diags, diag.Diagnostic{Severity: diag.Error, Code: "CFG-4", File: cfgFile,
-					Message: fmt.Sprintf("名前空間 %s の language %q とプラグイン %s の language %q が合わない", ns, conf.Language, name, m.Language)})
-			}
-			if m.Emit != nil {
-				unsupported = append(unsupported, m.Emit.Unsupported...)
-			}
+		for _, t := range u.Transpilers {
+			unsupported = append(unsupported, t.Decl.Unsupported...)
 		}
-		if len(unsupported) > 0 {
-			diags = append(diags, checker.CheckUnsupported(p.Sema.Program, ns, unsupported)...)
+		if len(unsupported) == 0 {
+			continue
+		}
+		for _, ns := range p.covered(i) {
+			for _, d := range checker.CheckUnsupported(p.Sema.Program, ns, u.Files, unsupported) {
+				k := key{file: d.File, msg: d.Message}
+				if d.Span != nil {
+					k.span = *d.Span
+				}
+				if !seen[k] {
+					seen[k] = true
+					diags = append(diags, d)
+				}
+			}
 		}
 	}
 	return diags
 }
 
-// configuredNamespaces は Program の名前空間のうち設定のあるもの（Resolve が true）を Program の順で返す。
-func (p *Project) configuredNamespaces() []string {
+// covered は Program の名前空間のうち、単位 unit（Units の添字）の対象のもの（docs/config.md「単位の対象」）を Program の順で返す。
+func (p *Project) covered(unit int) []string {
 	var out []string
 	if p.Sema == nil || p.Sema.Program == nil {
 		return out
 	}
 	for i := range p.Sema.Program.Namespaces {
 		name := p.Sema.Program.Namespaces[i].Name
-		if _, ok := p.Config.Resolve(name); ok {
-			out = append(out, name)
+		if name == "" {
+			continue
+		}
+		for _, c := range p.Config.Covering(name) {
+			if c == unit {
+				out = append(out, name)
+			}
 		}
 	}
 	return out
 }
 
-// runPluginChecks は [check] enabled のプラグインに direction "check" を送り、返った診断を足す
-// （docs/cli.md「check」の 4、docs/plugin-protocol.md「check」）。一つのプラグインは名前空間ごとに一回起動する。
+// Covered は Program の名前空間のうち、単位 unit（Units の添字）の対象のもの。in で出力しなくなった名前空間も含む
+// （View を持つとは限らない）。
+func (p *Project) Covered(unit int) []string { return p.covered(unit) }
+
+// runPluginChecks は、使うプラグインのうち [check] enabled のものに direction "check" を送り、返った診断を足す
+// （docs/cli.md「check」の 4、docs/plugin-protocol.md「起動」「check」）。プラグインと名前空間の組ごとに一回で、
+// 相手の名前空間は、そのプラグインのトランスパイラを書いた単位が出力するもの。渡す view は、その単位のうち設定の順で
+// 最初のもの。protocol の合わないプラグイン（MAN-2）は起動しない。
 // code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断。proc.Crashed / proc.MalformedOutput なら
 // そこで止めて、その誤りを返す。
 func (p *Project) runPluginChecks(opts Options) ([]diag.Diagnostic, error) {
 	var diags []diag.Diagnostic
-	var views map[string]*ir.View
+	var views []map[string]*ir.View
 	runner := hostplugin.Runner{Root: p.Root, Stderr: opts.Stderr, Env: opts.Env}
-	for _, ns := range p.configuredNamespaces() {
-		conf, _ := p.Config.Resolve(ns)
-		for _, name := range conf.Plugins {
-			m := p.Manifests[name]
-			if m == nil || !m.Check.Enabled {
+	type pair struct {
+		plugin *hostplugin.Plugin
+		ns     string
+	}
+	done := map[pair]bool{}
+	for i := range p.Units {
+		for _, t := range p.Units[i].Transpilers {
+			pl := t.Plugin
+			if !pl.Manifest.Check.Enabled || len(pl.Mismatch) > 0 {
 				continue
 			}
 			if views == nil {
 				views = p.Views()
 			}
-			view := views[ns]
-			if view == nil {
-				continue
-			}
-			req := sdk.CheckRequest{Protocol: hostplugin.Protocol, Direction: "check", View: view}
-			var resp sdk.CheckResponse
-			if err := runner.Run(m, p.ManifestDirs[name], &req, &resp); err != nil {
-				var pe *hostplugin.PluginError
-				if errors.As(err, &pe) {
-					diags = append(diags, pe.Diagnostic(filepath.Join(p.ManifestDirs[name], hostplugin.ManifestFileName)))
+			for _, ns := range p.covered(i) {
+				view := views[i][ns]
+				if view == nil || done[pair{pl, ns}] {
 					continue
 				}
-				return diags, err
-			}
-			for _, d := range resp.Diagnostics {
-				diags = append(diags, p.PluginDiagnostic(name, d))
+				done[pair{pl, ns}] = true
+				req := sdk.CheckRequest{Protocol: hostplugin.Protocol, Direction: "check", View: view}
+				var resp sdk.CheckResponse
+				if err := runner.Run(pl.Manifest, pl.Dir, &req, &resp); err != nil {
+					var pe *hostplugin.PluginError
+					if errors.As(err, &pe) {
+						diags = append(diags, pe.Diagnostic(pl.ManifestPath()))
+						continue
+					}
+					return diags, err
+				}
+				for _, d := range resp.Diagnostics {
+					diags = append(diags, p.PluginDiagnostic(pl.Name, d))
+				}
 			}
 		}
 	}
@@ -391,10 +503,10 @@ func (p *Project) PluginDiagnostic(plugin string, d sdk.Diagnostic) diag.Diagnos
 	return out
 }
 
-// PluginWarning はプラグインの warning（docs/plugin-protocol.md「emit」の warnings）を診断にする。
-// コードは PLUGIN、メッセージの先頭にプラグイン名。
-func (p *Project) PluginWarning(plugin string, w sdk.Warning) diag.Diagnostic {
-	out := diag.Diagnostic{Severity: diag.Warning, Code: "PLUGIN", Message: plugin + ": " + w.Message}
+// PluginWarning はトランスパイラの warning（docs/plugin-protocol.md「emit」の warnings）を診断にする。
+// コードは PLUGIN、メッセージの先頭にトランスパイラの名前。
+func (p *Project) PluginWarning(transpiler string, w sdk.Warning) diag.Diagnostic {
+	out := diag.Diagnostic{Severity: diag.Warning, Code: "PLUGIN", Message: transpiler + ": " + w.Message}
 	out.Span, out.File = p.Locate(w.At)
 	return out
 }

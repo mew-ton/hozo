@@ -137,8 +137,8 @@ func analyze(view *ir.View, nsImportPath string) (*program, error) {
 	seenCommands := map[string]string{}
 	for _, d := range ns.Decls {
 		op, ok := d.(*ir.Op)
-		if !ok {
-			continue
+		if !ok || !view.InUnit(op.Name) {
+			continue // サブコマンドにするのは単位の対象の op だけ（docs/plugin-go-cli.md「対象」）
 		}
 		app := findDecorator(op.Decorators, decCommand)
 		if app == nil {

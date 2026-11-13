@@ -1,5 +1,5 @@
 // docs/requirements.md「モデルが先」: 人の操作を、担い手ごとの名前空間として書く（「ブラウザを操作する利用者」）
-// docs/config.md「出力する名前空間」: テーブルのない名前空間。出力しない
+// docs/config.md「単位の対象」: どの単位の対象でもない名前空間。出力しない
 /** 店で買い物をする利用者（人の操作。コードは生成しない） */
 namespace customer {
   /** 利用者が覚えている、ほしいもの */
@@ -13,7 +13,7 @@ namespace customer {
   op pick(): shop.Line
     effects forget;
 
-  // docs/config.md「出力する名前空間」: 設定のない名前空間の配線から、設定のある名前空間の op を呼ぶ。
+  // docs/config.md「単位の対象」: 単位の対象でない名前空間の配線から、対象の名前空間の op を呼ぶ。
   // docs/check.md「計算」手順 0（配線）: 効果も例外も、名前空間をまたいで伝播する
   /** ほしいものをカートに入れて、注文する */
   op buy(): shop.Order

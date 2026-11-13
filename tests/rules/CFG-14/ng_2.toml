@@ -1,0 +1,9 @@
+# std はプラグインの名前で、トランスパイラの名前ではない → CFG-14
+# ERROR: CFG-14
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["std"]
+out         = "gen/a"

@@ -38,11 +38,25 @@ func loadViewCorpus(t *testing.T) (*project.Project, *ir.View) {
 		}
 		t.Fatalf("tests/corpus/view に error がある:\n%s", b.String())
 	}
-	v := p.Views()["web"]
+	v := viewsOf(p)["web"]
 	if v == nil {
-		t.Fatalf("Views() に web がない: %v", keysOf(p.Views()))
+		t.Fatalf("Views() に web がない: %v", keysOf(viewsOf(p)))
 	}
 	return p, v
+}
+
+// viewsOf は Project の View を、名前空間 → View で返す（Views() は単位ごと）。同じ名前空間を複数の単位が出力していれば、
+// 設定の順で最初の単位のもの。単位ごとに見るテストは p.Views() を直接使う。
+func viewsOf(p *project.Project) map[string]*ir.View {
+	out := map[string]*ir.View{}
+	for _, m := range p.Views() {
+		for ns, v := range m {
+			if out[ns] == nil {
+				out[ns] = v
+			}
+		}
+	}
+	return out
 }
 
 // TestViewFromEntry は、tests/corpus/view（起点は @t.entry の付いた web の op）から hozoc が作る View
@@ -76,11 +90,15 @@ func TestViewFromEntry(t *testing.T) {
 	t.Run("ir.md その名前空間から見た IR/View", func(t *testing.T) {
 		expect(t, "version", v.Version, ir.Version)
 		expect(t, "viewer", v.Viewer, "web")
-		expect(t, "config（Conf(web) と Dir(web)）", v.Config, ir.NamespaceConfig{Language: "go", Out: "gen/web", Dir: "gen/web", Plugins: []string{"view-dump"}})
-		// namespaces は設定のあるすべての名前空間（viewer を含む）。t は state も op も持たず設定もないので入らない
+		expect(t, "config（web の単位での web の設定）", v.Config, ir.NamespaceConfig{Language: "go", Out: "gen/web", Dir: "gen/web", Transpilers: []string{"view-dump"}})
+		// files は単位の in に合ったファイル。web の単位は in を省いているので、読み込んだユーザーのファイルのすべて（語彙は入らない）
+		expect(t, "files", v.Files, []string{"api.hozo", "t.hozo", "web.hozo"})
+		expect(t, "InUnit（viewer の宣言で、span.file が files にある）", []bool{v.InUnit("web.openUser"), v.InUnit("api.getUser"), v.InUnit("web.nope")}, []bool{true, false, false})
+		// namespaces は出力のあるすべての名前空間（viewer を含む）。値は、その名前空間を出力する単位ごとの設定。
+		// t はどの単位の対象でもないので入らない
 		expect(t, "namespaces のキー", keysOf(v.Namespaces), []string{"api", "web"})
-		expect(t, "namespaces[api]", v.Namespaces["api"], ir.NamespaceConfig{Language: "go", Out: "gen/api", Dir: "gen/api", Plugins: []string{}})
-		expect(t, "namespaces[web] は config と同じ", v.Namespaces["web"], v.Config)
+		expect(t, "namespaces[api]", v.Namespaces["api"], []ir.NamespaceConfig{{Language: "go", Out: "gen/api", Dir: "gen/api", Transpilers: []string{"view-none"}}})
+		expect(t, "namespaces[web] は config だけ", v.Namespaces["web"], []ir.NamespaceConfig{v.Config})
 		// ops はすべての op について
 		expect(t, "ops のキー", keysOf(v.Ops), []string{
 			"api.getUser", "api.login", "api.logout", "api.touch",
@@ -331,7 +349,7 @@ func TestViewFromEntry(t *testing.T) {
 			Rel: []string{"api.Timeout / api.deleteSession = unknown"}, Succ: []string{"api.deleteSession = kept"},
 		})
 		// api から見た View では Program の signature と一致する
-		apiView := p.Views()["api"]
+		apiView := viewsOf(p)["api"]
 		if apiView == nil {
 			t.Fatal("Views() に api がない")
 		}
@@ -422,7 +440,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "web.getUser$in の synthesizedFrom", synth.SynthesizedFrom, "api.getUser")
 		expect(t, "web.getUser$in のフィールド（token を除く）", renderFields(synth), []string{"id: api.UserId"})
 		expect(t, "元の Program に合成した model はない", p.Sema.Program.Lookup("web.getUser$in") == nil, true)
-		expect(t, "api から見た View にもない", p.Views()["api"].Program.Lookup("web.getUser$in") == nil, true)
+		expect(t, "api から見た View にもない", viewsOf(p)["api"].Program.Lookup("web.getUser$in") == nil, true)
 		expect(t, "web の decls は元より一つ多い", len(webNames), len(p.Sema.Program.Namespace("web").Decls)+1)
 	})
 
@@ -674,7 +692,7 @@ func TestStateCorpusIR(t *testing.T) {
 }
 
 // TestViewDeliveredToPlugin は、実物の `hozoc emit`（internal/app の App と生成した cli.Main。tests/selfcheck_test.go と同じ組み立て）が
-// view-dump プラグイン（tests/corpus/view/plugins/view-dump。`go run` で動く）に渡す View が、internal/project の Views()["web"] と
+// view-dump プラグイン（tests/corpus/view/plugins/view-dump。`go run` で動く）に渡す View が、internal/project の web の View と
 // 同じであることを確かめる。プラグインは受け取った view を <view.config.dir>/view.json に書き出すので、それを読み戻して比べる。
 // コーパスは一時ディレクトリに写してモジュールのルートにする（copyCorpusAsModule）。
 func TestViewDeliveredToPlugin(t *testing.T) {
@@ -700,16 +718,17 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	}
 	wantJSON := marshalView(t, want)
 	if gotJSON := marshalView(t, &got); !bytes.Equal(gotJSON, wantJSON) {
-		t.Errorf("プラグインが受け取った View が Views()[\"web\"] と違う:\n%s", firstDiff(string(wantJSON), string(gotJSON)))
+		t.Errorf("プラグインが受け取った View が、internal/project が作った web の View と違う:\n%s", firstDiff(string(wantJSON), string(gotJSON)))
 	}
 	// プラグインが書いたバイト列そのもの（SDK の ir.View を 2 スペースで書き直したもの）も同じになる（docs/ir.md「JSON」の決定性）
 	if !bytes.Equal(data, wantJSON) {
-		t.Errorf("プラグインが書いた view.json のバイト列が Views()[\"web\"] の JSON と違う:\n%s", firstDiff(string(wantJSON), string(data)))
+		t.Errorf("プラグインが書いた view.json のバイト列が web の View の JSON と違う:\n%s", firstDiff(string(wantJSON), string(data)))
 	}
 	expect(t, "view.version", got.Version, ir.Version)
 	expect(t, "view.viewer", got.Viewer, "web")
 	expect(t, "view.config.dir", got.Config.Dir, "gen/web")
-	expect(t, "view.config.plugins", got.Config.Plugins, []string{"view-dump"})
+	expect(t, "view.config.transpilers", got.Config.Transpilers, []string{"view-dump"})
+	expect(t, "view.files", got.Files, []string{"api.hozo", "t.hozo", "web.hozo"})
 	expect(t, "view.namespaces のキー", keysOf(got.Namespaces), []string{"api", "web"})
 	expect(t, "起点の op", entryOps(&got), []string{"web.openUser", "web.signOut"})
 
@@ -717,12 +736,19 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	// 既定の出力にする（docs/emit-go.md「出力の対象」）。
 	t.Run("plugin-protocol.md 選択", func(t *testing.T) {
 		m, dir := viewDumpBuilt(t, root)
-		req := sdk.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", View: want}
+		req := sdk.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", Transpiler: "view-dump", View: want}
 		var resp sdk.EmitResponse
 		if err := (hostplugin.Runner{Root: root, Stderr: io.Discard}).Run(m, dir, &req, &resp); err != nil {
 			t.Fatal(err)
 		}
 		expect(t, "select", resp.Select, sdk.Select{Roots: []string{"web.openUser", "web.signOut"}, Stops: []string{}, States: []string{}, Wraps: []sdk.Wrap{}})
+		// 同じプラグインのもう一つのトランスパイラ view-none は、何も書かず、何も選ばない（要求の transpiler で処理が分かれる）
+		req.Transpiler = "view-none"
+		var none sdk.EmitResponse
+		if err := (hostplugin.Runner{Root: root, Stderr: io.Discard}).Run(m, dir, &req, &none); err != nil {
+			t.Fatal(err)
+		}
+		expect(t, "view-none の応答", none, sdk.EmitResponse{Files: []sdk.File{}, Warnings: []sdk.Warning{}, Select: sdk.Select{Roots: []string{}, Stops: []string{}, States: []string{}, Wraps: []sdk.Wrap{}}})
 		ops, err := os.ReadFile(filepath.Join(root, "gen", "web", "ops.go"))
 		if err != nil {
 			t.Fatal(err)
@@ -739,9 +765,9 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 				t.Errorf("gen/web/ops.go に、選ばれていない op の %s がある", name)
 			}
 		}
-		// api はテーブルを持つがプラグインがない: 何も出力しない。web は api の型を自分のパッケージに複製する
+		// api の単位のトランスパイラ view-none は何も選ばない: api は何も出力しない。web は api の型を自分のパッケージに複製する
 		if _, err := os.Stat(filepath.Join(root, "gen", "api")); !os.IsNotExist(err) {
-			t.Errorf("gen/api がある（api にはプラグインがない）")
+			t.Errorf("gen/api がある（api の単位は何も選んでいない）")
 		}
 		types, err := os.ReadFile(filepath.Join(root, "gen", "web", "types.go"))
 		if err != nil || strings.Contains(string(types), "gen/api") || !strings.Contains(string(types), "type PublicUser struct {") {
@@ -749,8 +775,8 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 		}
 	})
 
-	// docs/plugin-protocol.md「要求と応答」: protocol が合わなければ code "protocol"（MAN-2）、direction を実装していなければ
-	// code "unsupported"（MAN-5）で、どちらも終了コード 2。同じプラグインを internal/plugin.Runner で直接起動して確かめる。
+	// docs/plugin-protocol.md「要求と応答」: protocol が合わなければ code "protocol"（MAN-2）、direction か、要求の transpiler を
+	// 実装していなければ code "unsupported"（MAN-5）で、どちらも終了コード 2。同じプラグインを internal/plugin.Runner で直接起動して確かめる。
 	// マニフェストの `go run` を通すと `go run` が終了コード 2 を 1 に変えてしまう（proc.Crashed になる）ので、
 	// ここではプラグインを go build した実行ファイルで起動する（internal/plugin の echo-plugin のテストと同じ）。
 	t.Run("plugin-protocol.md 要求と応答/protocol", func(t *testing.T) {
@@ -772,6 +798,17 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 		var pe *hostplugin.PluginError
 		if !errors.As(err, &pe) || pe.Code != hostplugin.CodeUnsupported {
 			t.Fatalf("import の要求に対する誤り = %v, want *PluginError{Code: %q}", err, hostplugin.CodeUnsupported)
+		}
+		expect(t, "診断は MAN-5", pe.Diagnostic("plugins/view-dump/hozo-plugin.toml").Code, "MAN-5")
+	})
+	t.Run("plugin-protocol.md 要求と応答/知らない transpiler", func(t *testing.T) {
+		m, dir := viewDumpBuilt(t, root)
+		req := sdk.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", Transpiler: "view-nope", View: want}
+		var resp sdk.EmitResponse
+		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, &req, &resp)
+		var pe *hostplugin.PluginError
+		if !errors.As(err, &pe) || pe.Code != hostplugin.CodeUnsupported || !strings.Contains(pe.Message, "view-nope") {
+			t.Fatalf("知らない transpiler の要求に対する誤り = %v, want *PluginError{Code: %q}", err, hostplugin.CodeUnsupported)
 		}
 		expect(t, "診断は MAN-5", pe.Diagnostic("plugins/view-dump/hozo-plugin.toml").Code, "MAN-5")
 	})

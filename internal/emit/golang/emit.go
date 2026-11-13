@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
@@ -34,12 +35,13 @@ type Options struct {
 	// Root はプロジェクトのルート（hozo.toml のあるディレクトリ）。go.mod の探索（GOEMIT-1）と、
 	// 整形に失敗したときの `<out>/.hozoc-failed/` の書き出し先に使う。
 	Root string
-	// Select は、名前空間に設定されたプラグインの select を合わせたもの（docs/plugin-protocol.md「選択」）。
+	// Select は、単位のトランスパイラが view の名前空間について返した select を合わせたもの（docs/plugin-protocol.md「選択」）。
 	// ここから出力の対象が決まる（docs/emit-go.md「出力の対象」）。何も選ばれていなければ、ファイルは一つも出ない。
 	Select plugin.Select
-	// Exported は、同じプロジェクトの別の Go の名前空間の出力が持つ型の FQN（その名前空間の [Exports] の結果を合わせたもの）。
-	// ここにある型は相手のパッケージを import して使い、ない型は viewer のパッケージに複製する（docs/emit-go.md「配置」）。
-	Exported map[string]bool
+	// Exported は、別の名前空間の型の FQN → その型を持つ Go の出力のディレクトリ（Dir(U', M)。ルートからの相対パス）。
+	// その名前空間を出力する Go の単位のうち、設定の順で最初に出力がその型を持つ（[Exports]）ものを、呼ぶ側が決めて入れる。
+	// ここにある型はそのパッケージを import して使い、ない型は viewer のパッケージに複製する（docs/emit-go.md「配置」）。
+	Exported map[string]string
 }
 
 // 診断のコード（docs/emit-go.md「診断」）。
@@ -48,6 +50,8 @@ const (
 	CodeNameCollision = "GOEMIT-2"
 	CodeBadConstraint = "GOEMIT-3"
 	CodeBadDefault    = "GOEMIT-4"
+	// CodeImportCycle は出力どうしの import の循環。判定は呼ぶ側（internal/app）が [Imports] から行う。
+	CodeImportCycle = "GOEMIT-5"
 	// CodeInternal は生成器の不具合（整形に失敗した、など）。
 	CodeInternal = "GOEMIT-INTERNAL"
 )
@@ -88,8 +92,29 @@ func Exports(view *ir.View, sel plugin.Select) []string {
 	return out
 }
 
-// Uses は、sel から決まる出力の対象が型を参照している、同じプロジェクトの別の Go の名前空間（View.Namespaces に
-// あって language が go）の名前を Program の順で返す。その名前空間の [Exports] を [Options.Exported] に入れて Emit を呼ぶ。
+// Imports は、[Emit] が作るファイルが import する、別の出力のディレクトリ（[Options.Exported] の値）を辞書順で返す。
+// 出力どうしの import の循環（GOEMIT-5。docs/emit-go.md「配置」）を呼ぶ側が確かめるためのもの。見るのは実際に作った
+// ファイルの import で、型を参照するだけで import しないもの（複製した型の先など）は数えない。
+// 何も選ばれていない、またはファイルを作れなければ nil。
+func Imports(view *ir.View, opts Options) []string {
+	e, _ := prepare(view, opts)
+	if e == nil {
+		return nil
+	}
+	e.run()
+	if errs, _ := diag.Count(e.diags); errs > 0 {
+		return nil
+	}
+	out := make([]string, 0, len(e.imported))
+	for dir := range e.imported {
+		out = append(out, dir)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Uses は、sel から決まる出力の対象が型を参照している、別の名前空間の名前を Program の順で返す。呼ぶ側は、その名前空間を
+// 出力する Go の単位の [Exports] から [Options.Exported] を作って Emit を呼ぶ。
 func Uses(view *ir.View, sel plugin.Select) []string {
 	e, _ := prepare(view, Options{Select: sel})
 	if e == nil {
@@ -99,7 +124,7 @@ func Uses(view *ir.View, sel plugin.Select) []string {
 	var out []string
 	for i := range e.prog.Namespaces {
 		n := &e.prog.Namespaces[i]
-		if n.Name == e.viewer || !e.isGoNS(n.Name) {
+		if n.Name == e.viewer {
 			continue
 		}
 		for _, d := range n.Decls {
@@ -135,10 +160,13 @@ type emitter struct {
 	diags  []diag.Diagnostic
 
 	pkg string // Go のパッケージ名
-	dir string // ルートからの出力ディレクトリ（`/` 区切り）: Dir(viewer) = View.Config.Dir
+	dir string // ルートからの出力ディレクトリ（`/` 区切り）: この単位での Dir(viewer) = View.Config.Dir
 
-	declNS   map[string]string // FQN → 宣言を持つ名前空間
-	pkgPaths map[string]string // 名前空間 → import パス（Go の名前空間だけ）
+	declNS    map[string]string // FQN → 宣言を持つ名前空間
+	inUnit    map[string]bool   // viewer の宣言のうち、単位の対象のもの（Span.File が View.Files にある。docs/config.md「in」）
+	pkgPaths  map[string]string // 別の出力のディレクトリ → import パス
+	dirOfPath map[string]string // その逆
+	imported  map[string]bool   // 作ったファイルが実際に import した、別の出力のディレクトリ（[Imports]）
 
 	// 出力の対象（docs/emit-go.md「出力の対象」）。select.go が決める。
 	sel *selection
@@ -183,16 +211,26 @@ func newEmitter(view *ir.View, ns *ir.Namespace, opts Options) *emitter {
 		declNS:    map[string]string{},
 		reach:     map[string]bool{},
 		copied:    map[string]bool{},
+		inUnit:    map[string]bool{},
 		pkgPaths:  map[string]string{},
+		dirOfPath: map[string]string{},
+		imported:  map[string]bool{},
 		unitOf:    map[string]*stateUnit{},
 		commandOf: map[string]*stateUnit{},
 		wrappers:  map[string][]wrapper{},
+	}
+	files := map[string]bool{}
+	for _, f := range view.Files {
+		files[f] = true
 	}
 	for i := range e.prog.Namespaces {
 		n := &e.prog.Namespaces[i]
 		for _, d := range n.Decls {
 			if d != nil {
 				e.declNS[d.Common().Name] = n.Name
+				if n.Name == e.viewer && files[d.Common().Span.File] {
+					e.inUnit[d.Common().Name] = true
+				}
 			}
 		}
 	}
@@ -214,7 +252,7 @@ func (e *emitter) run() []File {
 		return nil // 何も選ばれていない（docs/emit-go.md「出力の対象」）
 	}
 	if _, err := gol.ImportPath(e.opts.Root, e.dir); err != nil {
-		e.errorf(CodeNoGoMod, nil, "名前空間 %s の out %q の上に go.mod がない: %v", e.viewer, e.view.Config.Out, err)
+		e.errorf(CodeNoGoMod, nil, "名前空間 %s の出力先 %q の上に go.mod がない: %v", e.viewer, e.dir, err)
 		return nil
 	}
 	e.checkNames()
@@ -235,6 +273,11 @@ func (e *emitter) run() []File {
 		}
 		if f, ok := e.finish(g); ok {
 			files = append(files, f)
+			for _, p := range g.imports.Paths() {
+				if dir, other := e.dirOfPath[p]; other {
+					e.imported[dir] = true
+				}
+			}
 		}
 	}
 	return files

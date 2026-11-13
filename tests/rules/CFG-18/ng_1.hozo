@@ -1,0 +1,4 @@
+// CFG-18（docs/config.md「診断」）: 単位の in の glob が、読み込んだファイルのどれにも合わない（ng_1.toml）
+namespace a {
+  op f();
+}

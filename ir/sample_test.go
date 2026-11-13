@@ -360,12 +360,20 @@ func sampleView() *View {
 	return &View{
 		Version: Version,
 		Viewer:  "browser",
-		Config:  NamespaceConfig{Language: "go", Out: "gen/browser", Dir: "gen/browser", Plugins: []string{"go-cli"}},
-		// server.admin は server の out を継いでいるので Dir(server.admin) は gen/server/admin（docs/config.md「名前空間の設定の解決」）
-		Namespaces: map[string]NamespaceConfig{
-			"browser":      {Language: "go", Out: "gen/browser", Dir: "gen/browser", Plugins: []string{"go-cli"}},
-			"server":       {Language: "go", Out: "gen/server", Dir: "gen/server"},
-			"server.admin": {Language: "go", Out: "gen/server", Dir: "gen/server/admin"},
+		Config:  NamespaceConfig{Language: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"go-cli"}},
+		Files:   []string{"browser.hozo", "server.hozo"},
+		// server は二つの単位が出力する（設定の順）。server.admin は server の単位の対象で、Dir(U, server.admin) は
+		// <out>/admin（docs/config.md「単位の対象」）
+		Namespaces: map[string][]NamespaceConfig{
+			"browser": {{Language: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"go-cli"}}},
+			"server": {
+				{Language: "go", Out: "gen/server", Dir: "gen/server", Transpilers: []string{"go-http", "sqlc"}},
+				{Language: "go", Out: "cmd/gen", Dir: "cmd/gen", Transpilers: []string{"go-cli"}},
+			},
+			"server.admin": {
+				{Language: "go", Out: "gen/server", Dir: "gen/server/admin", Transpilers: []string{"go-http", "sqlc"}},
+				{Language: "go", Out: "cmd/gen", Dir: "cmd/gen/admin", Transpilers: []string{"go-cli"}},
+			},
 		},
 		Program: p,
 		Ops: map[string]*ViewedSignature{

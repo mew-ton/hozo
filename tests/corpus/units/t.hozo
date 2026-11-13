@@ -1,0 +1,14 @@
+// テストの語彙。plugins/pick のトランスパイラが、このデコレータを読んで起点を選ぶ（plugins/pick/pick.json）。
+// どの単位の対象でもない名前空間（出力しない）。
+
+/** テストの語彙 */
+namespace t {
+  /** pick-stock が起点にする op */
+  decorator stock;
+  /** pick-api が起点にする op */
+  decorator api;
+  /** pick-batch が起点にする op。pick-api も読むが、api の単位の in の外の op は選べない */
+  decorator batch;
+  /** pick-admin が起点にする op */
+  decorator admin;
+}

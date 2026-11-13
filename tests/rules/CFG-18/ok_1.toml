@@ -1,0 +1,8 @@
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+in          = ["ok_*.hozo"]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

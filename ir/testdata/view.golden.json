@@ -1,38 +1,70 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "viewer": "browser",
   "config": {
     "language": "go",
     "out": "gen/browser",
     "dir": "gen/browser",
-    "plugins": [
+    "transpilers": [
       "go-cli"
     ]
   },
+  "files": [
+    "browser.hozo",
+    "server.hozo"
+  ],
   "namespaces": {
-    "browser": {
-      "language": "go",
-      "out": "gen/browser",
-      "dir": "gen/browser",
-      "plugins": [
-        "go-cli"
-      ]
-    },
-    "server": {
-      "language": "go",
-      "out": "gen/server",
-      "dir": "gen/server",
-      "plugins": []
-    },
-    "server.admin": {
-      "language": "go",
-      "out": "gen/server",
-      "dir": "gen/server/admin",
-      "plugins": []
-    }
+    "browser": [
+      {
+        "language": "go",
+        "out": "gen/browser",
+        "dir": "gen/browser",
+        "transpilers": [
+          "go-cli"
+        ]
+      }
+    ],
+    "server": [
+      {
+        "language": "go",
+        "out": "gen/server",
+        "dir": "gen/server",
+        "transpilers": [
+          "go-http",
+          "sqlc"
+        ]
+      },
+      {
+        "language": "go",
+        "out": "cmd/gen",
+        "dir": "cmd/gen",
+        "transpilers": [
+          "go-cli"
+        ]
+      }
+    ],
+    "server.admin": [
+      {
+        "language": "go",
+        "out": "gen/server",
+        "dir": "gen/server/admin",
+        "transpilers": [
+          "go-http",
+          "sqlc"
+        ]
+      },
+      {
+        "language": "go",
+        "out": "cmd/gen",
+        "dir": "cmd/gen/admin",
+        "transpilers": [
+          "go-cli"
+        ]
+      }
+    ]
   },
   "program": {
-    "version": "0.1",
+    "version": "0.2",
     "namespaces": [
       {
         "name": "",

@@ -323,7 +323,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.1","namespaces":[],"binds":[]}`
+	want := `{"version":"0.2","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -331,7 +331,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.1","viewer":"","config":{"language":"","out":"","dir":"","plugins":[]},"namespaces":{},"program":{"version":"0.1","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.2","viewer":"","config":{"language":"","out":"","dir":"","transpilers":[]},"files":[],"namespaces":{},"program":{"version":"0.2","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -413,8 +413,9 @@ func TestOpsKeysSorted(t *testing.T) {
 }
 
 func TestNamespacesKeysSorted(t *testing.T) {
-	v := &View{Program: &Program{}, Namespaces: map[string]NamespaceConfig{
-		"z": {Language: "go", Out: "gen", Dir: "gen/z"}, "a.b": {Language: "go", Out: "gen", Dir: "gen/a/b"}, "a": {Language: "go", Out: "gen", Dir: "gen/a"},
+	v := &View{Program: &Program{}, Namespaces: map[string][]NamespaceConfig{
+		"z": {{Language: "go", Out: "gen", Dir: "gen/z"}}, "a.b": {{Language: "go", Out: "gen", Dir: "gen/a/b"}},
+		"a": {{Language: "go", Out: "gen", Dir: "gen/a"}, {Language: "go", Out: "cmd", Dir: "cmd", Transpilers: []string{"t"}}},
 	}}
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -426,21 +427,21 @@ func TestNamespacesKeysSorted(t *testing.T) {
 		t.Fatalf("no namespaces: %s", b)
 	}
 	last := i
-	for _, k := range []string{`"a":{`, `"a.b":{`, `"z":{`} {
+	for _, k := range []string{`"a":[`, `"a.b":[`, `"z":[`} {
 		j := strings.Index(s, k)
 		if j < 0 || j < last {
 			t.Fatalf("namespaces keys not in lexicographic order: %s", b)
 		}
 		last = j
 	}
-	if !strings.Contains(s, `"a":{"language":"go","out":"gen","dir":"gen/a","plugins":[]}`) {
+	if !strings.Contains(s, `"a":[{"language":"go","out":"gen","dir":"gen/a","transpilers":[]},{"language":"go","out":"cmd","dir":"cmd","transpilers":["t"]}]`) {
 		t.Errorf("namespace config shape: %s", b)
 	}
 	var back View
 	if err := json.Unmarshal(b, &back); err != nil {
 		t.Fatal(err)
 	}
-	if len(back.Namespaces) != 3 || back.Namespaces["a.b"].Dir != "gen/a/b" {
+	if len(back.Namespaces) != 3 || len(back.Namespaces["a"]) != 2 || back.Namespaces["a.b"][0].Dir != "gen/a/b" || back.Namespaces["a"][1].Transpilers[0] != "t" {
 		t.Errorf("namespaces not read back: %+v", back.Namespaces)
 	}
 }

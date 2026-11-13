@@ -6,8 +6,8 @@
 //   - Compute は docs/check.md「計算」を行い、Op.Signature（Sig(O, ns(O))）と Call.Bound を埋める。
 //   - Check は計算の上で docs/check.md「診断」の規則（と docs/config.md「診断」のうちプログラムが要るもの）を検査する。
 //     Check は計算を含むので、先に Compute を呼ばなくてよい。CFG-6 はプラグインのマニフェストが要るので、
-//     CheckUnsupported に unsupported の一覧を渡して別に呼ぶ。
-//   - Views は設定のある名前空間ごとの View（docs/ir.md「その名前空間から見た IR」）を作る。
+//     CheckUnsupported に、単位の in に合ったファイルと unsupported の一覧を渡して別に呼ぶ。
+//   - Views は、単位と、その単位が出力する名前空間の組ごとの View（docs/ir.md「その名前空間から見た IR」）を作る。
 //
 // 診断の位置は IR の Span（ファイルのパスと行・列）から作る。診断の Span はバイトのオフセットなので、
 // Checker.Locate（FileSetLocator）で直す。Locate がなければ Span は nil で、File に IR のファイルのパスを置く。

@@ -1,4 +1,0 @@
-// CFG-9（docs/config.md「診断」）: plugin_dirs の下にマニフェストがある（plugins/goplug/hozo-plugin.toml）
-namespace a {
-  op f();
-}
