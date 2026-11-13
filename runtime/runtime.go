@@ -68,3 +68,19 @@ func (e *ClassificationError) Error() string {
 	}
 	return fmt.Sprintf("classification %s: %d cases matched (%s)", e.Classify, len(e.Hits), strings.Join(e.Hits, ", "))
 }
+
+// MissingError は、生成したコードが要る実装が埋められていなかったときの誤り（docs/emit-go.md「実装の単位」）。
+// 束ねる構造体（Leaves / Deps / States / Wrappers / Classifiers / ConstraintFuncs）のフィールドは使わなければ nil の
+// ままでよく、実行時に nil のフィールドが要るところへ来たら、生成したコードは panic せずにこれを返す。
+//
+// Kind は何の実装か: "leaf"（葉の op）、"wrapper"（包む関数）、"state"（基底の状態）、"classifier"（分類の述語）、
+// "dep"（別の名前空間の op）、"constraint"（valid に足した制約）。Name はその宣言の FQN で、"wrapper" だけは
+// `<op の FQN>@<デコレータの FQN（via があれば via）>`（一つの宣言でなく、op へのデコレータの適用が単位のため）。
+type MissingError struct {
+	Kind, Name string
+}
+
+// Error は "missing <Kind> implementation: <Name>"。
+func (e *MissingError) Error() string {
+	return fmt.Sprintf("missing %s implementation: %s", e.Kind, e.Name)
+}

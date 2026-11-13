@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -112,5 +113,34 @@ func TestCheckFormat(t *testing.T) {
 	}
 	if CheckFormat("unknown", "x") {
 		t.Error("unknown format must be false")
+	}
+}
+
+func TestMissingErrorMessage(t *testing.T) {
+	tests := []struct {
+		err  *MissingError
+		want string
+	}{
+		{&MissingError{Kind: "leaf", Name: "server.login"}, "missing leaf implementation: server.login"},
+		{&MissingError{Kind: "wrapper", Name: "browser.openMe@browser.retry"}, "missing wrapper implementation: browser.openMe@browser.retry"},
+		{&MissingError{Kind: "state", Name: "shop.carts"}, "missing state implementation: shop.carts"},
+		{&MissingError{Kind: "classifier", Name: "shop.Checkout"}, "missing classifier implementation: shop.Checkout"},
+		{&MissingError{Kind: "dep", Name: "server.getMe"}, "missing dep implementation: server.getMe"},
+		{&MissingError{Kind: "constraint", Name: "valid.checkDigit"}, "missing constraint implementation: valid.checkDigit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.err.Kind, func(t *testing.T) {
+			if got := tt.err.Error(); got != tt.want {
+				t.Errorf("Error() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMissingErrorIsError(t *testing.T) {
+	var err error = fmt.Errorf("wrapped: %w", &MissingError{Kind: "leaf", Name: "server.login"})
+	var me *MissingError
+	if !errors.As(err, &me) || me.Kind != "leaf" || me.Name != "server.login" {
+		t.Fatalf("errors.As failed for *MissingError: %#v", me)
 	}
 }
