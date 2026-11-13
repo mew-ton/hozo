@@ -243,8 +243,8 @@ func corpusDir(t *testing.T) string {
 	return dir
 }
 
-// warnFile は corpusWithWarning が足すファイル。設計書のコーパスには診断がない（§7.3 の placeOrder を配線に直したので
-// REL-3 がなくなった。tests/corpus/design/README.md の表の 14）ので、診断の発行と check との一致を空でない集合で
+// warnFile は corpusWithWarning が足すファイル。設計書のコーパスには診断がない（error も warning もない。
+// tests/corpus/design/README.md の想定）ので、診断の発行と check との一致を空でない集合で
 // 確かめるために、意図した warning を一つ持たせる: 効果を持たない op の prevents effects（REL-2。docs/check.md「throws」）。
 const warnFile = `// internal/lsp のテストが足すファイル: 意図した warning（REL-2）を一つ出す
 namespace server {

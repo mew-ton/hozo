@@ -56,11 +56,12 @@ type EmitResponse struct {
 type Select struct {
 	// Roots は起点にする op。
 	Roots []string `json:"roots"`
-	// Stops は、選ぶが本体は辿らない op。実装を差し込む口だけが出る。
+	// Stops は、起点から辿られたときに、本体を辿らず実装を差し込む口だけを出す op。起点ではないので、
+	// どこからも辿られなければ選ばれない（docs/emit-go.md「出力の対象」の 2）。
 	Stops []string `json:"stops"`
 	// States は起点にする状態（基底の状態か、状態の分類）。
 	States []string `json:"states"`
-	// Wraps は、このプラグインが包む関数を実装するデコレータの適用。
+	// Wraps は、このトランスパイラが包む関数を実装するデコレータの適用。
 	Wraps []Wrap `json:"wraps"`
 }
 
@@ -129,14 +130,15 @@ type ImportResponse struct {
 	Warnings []Warning   `json:"warnings"`
 }
 
-// File は書き出す（または取り込む）ファイル。Path はプロジェクトのルートからの相対パス（docs/plugin-protocol.md「emit」）で、
-// `..` や絶対パスは PLG-1。Content は UTF-8 の文字列（バイナリは出せない）。
+// File は書き出す（または取り込む）ファイル。Path はプロジェクトのルートからの相対パス（docs/plugin-protocol.md「emit」）。
+// emit の応答では、その起動の出力先（EmitRequest.View.Config.Dir。Dir(U, N)）の下でなければならず、そうでないパス
+// （`..`、絶対パス、別のディレクトリ）は PLG-1。Content は UTF-8 の文字列（バイナリは出せない）。
 type File struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
 }
 
-// Warning は warning の診断。At は FQN か "file:line:col"。
+// Warning は warning の診断。At は FQN か "file:line:col"（どちらでもなければ位置なし）。
 type Warning struct {
 	At      string `json:"at"`
 	Message string `json:"message"`
@@ -155,7 +157,9 @@ type Diagnostic struct {
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。
 // 終了コードを返す（docs/plugin-protocol.md「起動」）: 成功なら 0、protocol が合わないか
 // direction を実装していなければ 2（標準出力に {"error":{"code":...,"message":...}}）、
-// それ以外の誤り（要求が読めない、h が誤りを返した、書き出せない）なら 1（標準エラーにメッセージ）。
+// それ以外の誤り（要求が JSON のオブジェクトとして読めない、h が誤りを返した、書き出せない）なら 1（標準エラーにメッセージ）。
+// protocol は文字列で、この SDK の版と等しくなければ「合わない」（ない、null、文字列でないものを含む）。
+// TS の SDK（sdk/ts の run）も同じ終了コードを返す。
 func Main(h Handler) int {
 	return Run(h, os.Stdin, os.Stdout, os.Stderr)
 }
@@ -167,16 +171,27 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 	if err != nil {
 		return fail(errOut, fmt.Errorf("read request: %w", err))
 	}
-	var head struct {
-		Protocol  string `json:"protocol"`
-		Direction string `json:"direction"`
-	}
-	if err := json.Unmarshal(raw, &head); err != nil {
+	// protocol と direction は、型も確かめずに先に見る: protocol が合わない要求は、ほかの項目の形が違っていても
+	// （版が違えば違って当然）code "protocol" で断る。文字列でない protocol も「合わない」（docs/plugin-protocol.md
+	// 「要求と応答」）。文字列でない direction は、実装していない direction と同じ。
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
 		return fail(errOut, fmt.Errorf("decode request: %w", err))
 	}
-	if head.Protocol != ir.Version {
+	if fields == nil {
+		return fail(errOut, errors.New("decode request: not a JSON object"))
+	}
+	var head struct{ Protocol, Direction string }
+	if json.Unmarshal(fields["protocol"], &head.Protocol) != nil || head.Protocol != ir.Version {
+		got := `""`
+		if p, ok := fields["protocol"]; ok {
+			got = compact(p)
+		}
 		return refuse(out, errOut, "protocol",
-			fmt.Sprintf("protocol %q is not supported (this plugin speaks %q)", head.Protocol, ir.Version))
+			fmt.Sprintf("protocol %s is not supported (this plugin speaks %q)", got, ir.Version))
+	}
+	if json.Unmarshal(fields["direction"], &head.Direction) != nil {
+		head.Direction = ""
 	}
 
 	var resp any
@@ -287,6 +302,15 @@ func refuse(out, errOut io.Writer, code, message string) int {
 func fail(errOut io.Writer, err error) int {
 	fmt.Fprintf(errOut, "error: %v\n", err)
 	return 1
+}
+
+// compact は JSON の値を、メッセージに出すために一行にする。
+func compact(raw json.RawMessage) string {
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, raw); err != nil {
+		return string(raw)
+	}
+	return buf.String()
 }
 
 func writeJSON(out io.Writer, v any) error {

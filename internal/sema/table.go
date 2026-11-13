@@ -255,6 +255,3 @@ func qualify(ns, name string) string {
 	}
 	return ns + "." + name
 }
-
-// lookupNamespace は FQN の名前空間を返す。
-func (a *analyzer) lookupNamespace(fqn string) *namespace { return a.nss[fqn] }

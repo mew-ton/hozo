@@ -5,6 +5,9 @@
 // ここは internal/app の葉の op の実装（hozoc.Leaves と hozoc.States のフィールド）を入れて hozoc.New で Ops にし
 // （app.App の Ops）、表示（cli.Presenter）と一緒に cli.Main に渡すだけ（docs/cli.md「手で書くもの」）。
 // 骨組みを変えるときは cli.hozo を変えて `make generate`。
+//
+// プロセスの環境を読むのはここだけ: 環境変数は os.Getenv を cli.Main に渡し（cli.hozo の @cli.env のフィールドに入る）、
+// ホームディレクトリ（プラグインの探索の <ホーム>/.hozo/plugins。docs/plugin-protocol.md「探索」）は app.App に渡す。
 package main
 
 import (
@@ -15,6 +18,7 @@ import (
 )
 
 func main() {
-	a := &app.App{Stderr: os.Stderr}
+	home, _ := os.UserHomeDir() // 分からなければ空（ホームのプラグインは探さない）
+	a := &app.App{Stderr: os.Stderr, Home: home}
 	os.Exit(cli.Main(a.Ops(), app.Presenter{}, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
 }

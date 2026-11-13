@@ -139,6 +139,9 @@ func runCheck(ops hozoc.Ops, p Presenter, prog string, args []string, env func(s
 	if v, ok := lookup(flags, "format", env, ""); ok {
 		in.Format = ptr(hozoc.OutputFormat(v))
 	}
+	if v, ok := lookup(flags, "", env, "HOZO_PLUGIN_PATH"); ok {
+		in.PluginPath = ptr(v)
+	}
 	if err := in.Validate(); err != nil {
 		return usageError(stderr, prog, "", "invalid input: "+validationMessage(err))
 	}
@@ -176,7 +179,7 @@ func failCheck(p Presenter, prog string, input any, err error, stderr io.Writer)
 
 // usageCheck は check の使い方。
 func usageCheck(prog string) string {
-	return "usage: " + prog + " check [flags]\n\n仕様を検査する。ファイルは書き出さない\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n"
+	return "usage: " + prog + " check [flags]\n\n仕様を検査する。ファイルは書き出さない\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n\nenvironment:\n  HOZO_PLUGIN_PATH   プラグインを探すディレクトリ（OS のパス区切りで複数）\n"
 }
 
 // runEmit はサブコマンド emit（hozoc.emit）。
@@ -210,6 +213,9 @@ func runEmit(ops hozoc.Ops, p Presenter, prog string, args []string, env func(st
 			return usageError(stderr, prog, usageEmit(prog), fmt.Sprintf("invalid value %q for --dry-run: want boolean", v))
 		}
 		in.DryRun = ptr(b)
+	}
+	if v, ok := lookup(flags, "", env, "HOZO_PLUGIN_PATH"); ok {
+		in.PluginPath = ptr(v)
 	}
 	if err := in.Validate(); err != nil {
 		return usageError(stderr, prog, "", "invalid input: "+validationMessage(err))
@@ -252,7 +258,7 @@ func failEmit(p Presenter, prog string, input any, err error, stderr io.Writer) 
 
 // usageEmit は emit の使い方。
 func usageEmit(prog string) string {
-	return "usage: " + prog + " emit [flags] [NAMESPACES...]\n\n仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n\narguments:\n  NAMESPACES...   生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n  --dry-run                 書き出さずに、書き出す予定のファイルだけを表示する\n"
+	return "usage: " + prog + " emit [flags] [NAMESPACES...]\n\n仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n\narguments:\n  NAMESPACES...   生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n  --dry-run                 書き出さずに、書き出す予定のファイルだけを表示する\n\nenvironment:\n  HOZO_PLUGIN_PATH   プラグインを探すディレクトリ（OS のパス区切りで複数）\n"
 }
 
 // runLsp はサブコマンド lsp（hozoc.lsp）。
@@ -278,6 +284,9 @@ func runLsp(ops hozoc.Ops, p Presenter, prog string, args []string, env func(str
 	}
 	if v, ok := lookup(flags, "log", env, "HOZO_LSP_LOG"); ok {
 		in.Log = ptr(hozoc.Path(v))
+	}
+	if v, ok := lookup(flags, "", env, "HOZO_PLUGIN_PATH"); ok {
+		in.PluginPath = ptr(v)
 	}
 	if err := in.Validate(); err != nil {
 		return usageError(stderr, prog, "", "invalid input: "+validationMessage(err))
@@ -305,7 +314,7 @@ func failLsp(p Presenter, prog string, input any, err error, stderr io.Writer) i
 
 // usageLsp は lsp の使い方。
 func usageLsp(prog string) string {
-	return "usage: " + prog + " lsp [flags]\n\n言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n\nflags:\n  --config <Path>   設定ファイルの場所 (env: HOZO_CONFIG)\n  --log <Path>      ログの書き出し先 (env: HOZO_LSP_LOG)\n"
+	return "usage: " + prog + " lsp [flags]\n\n言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n\nflags:\n  --config <Path>   設定ファイルの場所 (env: HOZO_CONFIG)\n  --log <Path>      ログの書き出し先 (env: HOZO_LSP_LOG)\n\nenvironment:\n  HOZO_PLUGIN_PATH   プラグインを探すディレクトリ（OS のパス区切りで複数）\n"
 }
 
 // programName は使い方に出すプログラム名（filepath.Base(os.Args[0])）。

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 )
@@ -21,7 +22,9 @@ import (
 //     例外は {"error": "<FQN>", "value": {...}} で、診断を運ぶ例外の value は docs/diagnostics.md「表示」の json
 //     （{"diagnostics", "errors", "warnings"}）。それ以外は cli.JSONPresenter と同じ。
 //
-// 診断一件の形は docs/diagnostics.md「表示」の json の diagnostics の要素（start / end / related / data は、なければ省く）。
+// 診断の text と json の形は internal/diag が持つ（diag.Rendered、diag.WriteRenderedText、diag.Report）。ここは、
+// cli.hozo の model Diagnostic をその形に写して呼び、結果と例外ごとの包み（warnings / written / removed、error / value）
+// だけを書く。
 type Presenter struct{}
 
 var _ cli.Presenter = Presenter{}
@@ -32,20 +35,20 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 	case hozoc.CheckResult:
 		if isJSON(input) {
 			return writeJSON(w, struct {
-				Warnings []jsonDiagnostic `json:"warnings"`
-			}{jsonDiagnostics(r.Warnings)})
+				Warnings []diag.Rendered `json:"warnings"`
+			}{rendered(r.Warnings)})
 		}
-		return writeText(w, r.Warnings)
+		return diag.WriteRenderedText(w, rendered(r.Warnings))
 	case hozoc.EmitResult:
 		if isJSON(input) {
 			return writeJSON(w, struct {
-				Warnings []jsonDiagnostic `json:"warnings"`
-				Written  []hozoc.Path     `json:"written"`
-				Removed  []hozoc.Path     `json:"removed"`
-			}{jsonDiagnostics(r.Warnings), orEmpty(r.Written), orEmpty(r.Removed)})
+				Warnings []diag.Rendered `json:"warnings"`
+				Written  []hozoc.Path    `json:"written"`
+				Removed  []hozoc.Path    `json:"removed"`
+			}{rendered(r.Warnings), orEmpty(r.Written), orEmpty(r.Removed)})
 		}
 		if len(r.Warnings) > 0 {
-			if err := writeText(w, r.Warnings); err != nil {
+			if err := diag.WriteRenderedText(w, rendered(r.Warnings)); err != nil {
 				return err
 			}
 		}
@@ -71,18 +74,13 @@ func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Fail
 		if !carries {
 			return cli.JSONPresenter{}.PresentError(w, command, input, f)
 		}
-		errs, warns := count(d.Items)
 		return writeJSON(w, struct {
-			Error string `json:"error"`
-			Value any    `json:"value"`
-		}{f.Name, struct {
-			Diagnostics []jsonDiagnostic `json:"diagnostics"`
-			Errors      int              `json:"errors"`
-			Warnings    int              `json:"warnings"`
-		}{jsonDiagnostics(d.Items), errs, warns}})
+			Error string      `json:"error"`
+			Value diag.Report `json:"value"`
+		}{f.Name, diag.NewReport(rendered(d.Items))})
 	}
 	if carries {
-		return writeText(w, d.Items)
+		return diag.WriteRenderedText(w, rendered(d.Items))
 	}
 	msg := f.Name
 	if f.Err != nil {
@@ -103,73 +101,34 @@ func isJSON(input any) bool {
 	return false
 }
 
-// writeText は docs/diagnostics.md「表示」の text: `ファイル:行:列: 重さ[コード]: メッセージ`、関連は `  ...: note: ...`、
-// 最後に件数。位置がなければ `ファイル: `、ファイルもなければ `hozoc: `。
-func writeText(w io.Writer, diags []hozoc.Diagnostic) error {
+// rendered は cli.hozo の model Diagnostic の列を、表示する形（internal/diag.Rendered）に写す。位置は既に行と列なので
+// 写すだけ。text と json の形そのものは internal/diag が持つ（docs/packages.md「internal/diag」）。
+func rendered(diags []hozoc.Diagnostic) []diag.Rendered {
+	out := make([]diag.Rendered, 0, len(diags))
 	for i := range diags {
 		d := &diags[i]
-		if _, err := fmt.Fprintf(w, "%s%s[%s]: %s\n", location(d), d.Severity, d.Code, d.Message); err != nil {
-			return err
+		r := diag.Rendered{Severity: d.Severity, Code: d.Code, Message: d.Message}
+		if d.File != nil {
+			r.File = string(*d.File)
 		}
-		for _, r := range d.Related {
-			if _, err := fmt.Fprintf(w, "  %s:%d:%d: note: %s\n", r.File, r.Start.Line, r.Start.Col, r.Message); err != nil {
-				return err
+		if d.Start != nil {
+			r.Start = &diag.RenderedPos{Line: int(d.Start.Line), Col: int(d.Start.Col)}
+		}
+		if d.End != nil {
+			r.End = &diag.RenderedPos{Line: int(d.End.Line), Col: int(d.End.Col)}
+		}
+		for _, rel := range d.Related {
+			r.Related = append(r.Related, diag.RenderedRelated{File: string(rel.File),
+				Start: diag.RenderedPos{Line: int(rel.Start.Line), Col: int(rel.Start.Col)},
+				End:   diag.RenderedPos{Line: int(rel.End.Line), Col: int(rel.End.Col)}, Message: rel.Message})
+		}
+		if len(d.Data) > 0 {
+			r.Data = make(map[string]any, len(d.Data))
+			for k, v := range d.Data {
+				r.Data[k] = v
 			}
 		}
-	}
-	errs, warns := count(diags)
-	_, err := fmt.Fprintf(w, "%s, %s\n", plural(errs, "error"), plural(warns, "warning"))
-	return err
-}
-
-func location(d *hozoc.Diagnostic) string {
-	switch {
-	case d.File != nil && d.Start != nil:
-		return fmt.Sprintf("%s:%d:%d: ", *d.File, d.Start.Line, d.Start.Col)
-	case d.File != nil:
-		return string(*d.File) + ": "
-	}
-	return "hozoc: "
-}
-
-func plural(n int, unit string) string {
-	if n == 1 {
-		return "1 " + unit
-	}
-	return fmt.Sprintf("%d %ss", n, unit)
-}
-
-// count は error と warning の数。
-func count(diags []hozoc.Diagnostic) (errs, warns int) {
-	for _, d := range diags {
-		switch d.Severity {
-		case "error":
-			errs++
-		case "warning":
-			warns++
-		}
-	}
-	return errs, warns
-}
-
-// jsonDiagnostic は docs/diagnostics.md「表示」の json の diagnostics の要素。hozoc.Diagnostic との違いは
-// related を空なら省くこと。
-type jsonDiagnostic struct {
-	Severity string              `json:"severity"`
-	Code     string              `json:"code"`
-	Message  string              `json:"message"`
-	File     *hozoc.Path         `json:"file,omitempty"`
-	Start    *hozoc.Position     `json:"start,omitempty"`
-	End      *hozoc.Position     `json:"end,omitempty"`
-	Related  []hozoc.RelatedInfo `json:"related,omitempty"`
-	Data     map[string][]string `json:"data,omitempty"`
-}
-
-func jsonDiagnostics(diags []hozoc.Diagnostic) []jsonDiagnostic {
-	out := make([]jsonDiagnostic, 0, len(diags))
-	for _, d := range diags {
-		out = append(out, jsonDiagnostic{Severity: d.Severity, Code: d.Code, Message: d.Message, File: d.File,
-			Start: d.Start, End: d.End, Related: d.Related, Data: d.Data})
+		out = append(out, r)
 	}
 	return out
 }

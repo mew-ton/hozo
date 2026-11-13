@@ -24,7 +24,7 @@ namespace a {
   classify C of User { A; B; }
   classify D of User { A; }
 }`}, false)
-	a := analyze(fs, files, nil)
+	a := analyze(fs, files)
 	if n := len(a.diags); n > 0 {
 		t.Fatalf("診断がある: %+v", a.diags)
 	}

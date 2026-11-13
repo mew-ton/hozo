@@ -75,8 +75,9 @@ type EmitResult struct {
 }
 
 type CheckInput struct {
-	Config *Path         ` + "`json:\"config,omitempty\"`" + `
-	Format *OutputFormat ` + "`json:\"format,omitempty\"`" + `
+	Config     *Path         ` + "`json:\"config,omitempty\"`" + `
+	Format     *OutputFormat ` + "`json:\"format,omitempty\"`" + `
+	PluginPath *string       ` + "`json:\"pluginPath,omitempty\"`" + `
 }
 
 func (m CheckInput) Validate() error { return validateConfigFormat(m.Config, m.Format) }
@@ -86,13 +87,15 @@ type EmitInput struct {
 	Format     *OutputFormat ` + "`json:\"format,omitempty\"`" + `
 	Namespaces []string      ` + "`json:\"namespaces\"`" + `
 	DryRun     *bool         ` + "`json:\"dryRun,omitempty\"`" + `
+	PluginPath *string       ` + "`json:\"pluginPath,omitempty\"`" + `
 }
 
 func (m EmitInput) Validate() error { return validateConfigFormat(m.Config, m.Format) }
 
 type LspInput struct {
-	Config *Path ` + "`json:\"config,omitempty\"`" + `
-	Log    *Path ` + "`json:\"log,omitempty\"`" + `
+	Config     *Path   ` + "`json:\"config,omitempty\"`" + `
+	Log        *Path   ` + "`json:\"log,omitempty\"`" + `
+	PluginPath *string ` + "`json:\"pluginPath,omitempty\"`" + `
 }
 
 func (m LspInput) Validate() error { return nil }

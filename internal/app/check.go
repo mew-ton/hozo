@@ -17,13 +17,18 @@ import (
 // 作業ディレクトリがルート、sources は既定で、CFG-* は出ない（internal/project が除く）。例外になるかどうかは
 // 残りの診断だけで決まる。指定されたファイルが読めないときは設定なしではなく CFG-7（ConfigInvalid）。
 //
+// プラグインを探す場所のうちプロジェクトの外のもの（docs/plugin-protocol.md「探索」の 2 と 3）は、入力の pluginPath
+// （HOZO_PLUGIN_PATH）と a.Home。プロセスの環境は読まない。
+//
 // 例外の選び方（docs/cli.md「check」の 5、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
 // error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-16 なら LanguageMismatch、
 // そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
 // プラグインの check が異常終了すれば proc.Crashed / proc.MalformedOutput（asProc）。
 func (a *App) Check(in hozoc.CheckInput) (hozoc.CheckResult, error) {
 	a.checked = nil
-	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, Env: a.Env})
+	a.pluginPath = str(in.PluginPath)
+	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, Env: a.Env,
+		PluginPath: a.pluginPath, Home: a.Home})
 	if p.RunErr != nil {
 		return hozoc.CheckResult{}, asProc(p.RunErr)
 	}

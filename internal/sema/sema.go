@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/source"
 	"github.com/mew-ton/hozo/internal/syntax/ast"
@@ -88,15 +87,15 @@ type Target struct {
 // Analyze は構文木の列から IR を作る（docs/packages.md「internal/sema」）。
 //
 // files の順は docs/ir.md「原則」に従って並べ直す（ユーザーのファイルをパスの辞書順、その後に "hozo:" のファイルを辞書順）。
-// 語彙のファイルもほかのファイルと同じ規則で扱う（docs/vocab.md「読み込み」）。cfg は nil でもよい
-// （sema が見る設定はない。CFG-* は internal/check）。
-func Analyze(fs *source.FileSet, files []*ast.File, cfg *config.Config) *Result {
-	return analyze(fs, files, cfg).result()
+// 語彙のファイルもほかのファイルと同じ規則で扱う（docs/vocab.md「読み込み」）。設定は見ない
+// （CFG-* は internal/config、internal/check、internal/project）。
+func Analyze(fs *source.FileSet, files []*ast.File) *Result {
+	return analyze(fs, files).result()
 }
 
 // analyze は Analyze の中身。テストが analyzer の表と互換の判定に触るために分けてある。
-func analyze(fs *source.FileSet, files []*ast.File, cfg *config.Config) *analyzer {
-	a := newAnalyzer(fs, cfg, files)
+func analyze(fs *source.FileSet, files []*ast.File) *analyzer {
+	a := newAnalyzer(fs, files)
 	a.buildTable()
 	a.lowerAll()
 	a.lowerApplications()
@@ -108,7 +107,6 @@ func analyze(fs *source.FileSet, files []*ast.File, cfg *config.Config) *analyze
 // analyzer は一度の解析の状態。
 type analyzer struct {
 	fs        *source.FileSet
-	cfg       *config.Config
 	files     []*ast.File
 	fileOrder map[source.FileID]int
 
@@ -129,10 +127,9 @@ type analyzer struct {
 	refs  []Ref
 }
 
-func newAnalyzer(fs *source.FileSet, cfg *config.Config, files []*ast.File) *analyzer {
+func newAnalyzer(fs *source.FileSet, files []*ast.File) *analyzer {
 	a := &analyzer{
 		fs:        fs,
-		cfg:       cfg,
 		fileOrder: map[source.FileID]int{},
 		nss:       map[string]*namespace{},
 		syms:      map[string]*symbol{},

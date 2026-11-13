@@ -62,7 +62,7 @@ func (e *emitter) genStates() *genFile {
 		name := e.unitType(u)
 		if u.classify != nil {
 			states, _ := u.classify.SubjectStates()
-			g.printf("// %s は分類の状態 %s（%s を対象にした classify）の単位。\n", name, u.fqn, fqnList(states))
+			g.printf("// %s は状態の分類 %s（%s を対象にした classify）の単位。\n", name, u.fqn, fqnList(states))
 			if u.classify.Description != nil {
 				g.body.WriteString(comment(strings.TrimSpace(u.classify.Description.Body)))
 			}

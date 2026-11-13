@@ -3,7 +3,6 @@ package check
 import (
 	"fmt"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
@@ -16,7 +15,7 @@ import (
 // 直せなければ false を返す。
 type Locator func(ir.Span) (source.Span, bool)
 
-// FileSetLocator は fs の中身から行・列をオフセットに戻す Locator。
+// FileSetLocator は fs の中身から行・列をオフセットに戻す Locator（戻すのは source.FileSet.Offset）。
 // Span.File と同じパスのファイルが fs になければ false。
 func FileSetLocator(fs *source.FileSet) Locator {
 	ids := map[string]source.FileID{}
@@ -33,34 +32,13 @@ func FileSetLocator(fs *source.FileSet) Locator {
 		if !ok {
 			return source.Span{}, false
 		}
-		content := fs.Content(id)
-		start := offsetOf(content, s.Start)
-		end := offsetOf(content, s.End)
+		start := fs.Offset(id, source.Pos{Line: s.Start.Line, Col: s.Start.Col})
+		end := fs.Offset(id, source.Pos{Line: s.End.Line, Col: s.End.Col})
 		if end < start {
 			end = start
 		}
 		return source.Span{File: id, Start: start, End: end}, true
 	}
-}
-
-// offsetOf は 1 始まりの行・列（コードポイント）をバイトのオフセットにする。範囲を越えればファイルの終わり。
-func offsetOf(content []byte, pos ir.Pos) source.Offset {
-	off := 0
-	for line := 1; line < pos.Line; line++ {
-		i := strings.IndexByte(string(content[off:]), '\n')
-		if i < 0 {
-			return source.Offset(len(content))
-		}
-		off += i + 1
-	}
-	for col := 1; col < pos.Col && off < len(content); col++ {
-		if content[off] == '\n' {
-			break
-		}
-		_, n := utf8.DecodeRune(content[off:])
-		off += n
-	}
-	return source.Offset(off)
 }
 
 // Checker は検査の設定。零値は位置を直さず（Span は nil で、File に IR のファイルを置く）に検査する。

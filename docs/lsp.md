@@ -25,15 +25,15 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 ## プロジェクト
 
 - ワークスペースのディレクトリから親へ向かって `hozo.toml` を探す（`--config` があればそれ）。見つかったディレクトリがルート。
-- 見つからなければ、ワークスペースのディレクトリをルートにし、設定なしで動く: `sources` は既定、設定に関わる検査（CFG-*）は行わない。各ファイルの先頭（1 行 1 列）に warning `LSP-1`「hozo.toml が見つからない。設定の検査は行っていない」を出す。
-- 解析の単位はプロジェクト全体。`internal/project.Load`（`docs/packages.md`「internal/project」）を呼び直す。`overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。
+- 見つからなければ、ワークスペースのディレクトリをルートにし、設定なしで動く: `sources` は既定、設定に関わる検査（CFG-*）は行わない。各ファイルの先頭（1 行 1 列）に warning LSP-1 を出す（「診断」）。
+- 解析の単位はプロジェクト全体。`internal/project.LoadWith`（`docs/packages.md`「internal/project」）を呼び直す。`Overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH` とホーム。`docs/plugin-protocol.md`「探索」）は、`hozoc lsp` の入力から渡されたもの（`docs/cli.md`「cli.hozo」の `LspInput`、「手で書くもの」）。
 - `didOpen` / `didChange` / `didClose` / `didSave`、および `hozo.toml` の変更（`workspace/didChangeWatchedFiles` を `**/hozo.toml` と `**/*.hozo` で登録）で解析し直す。`didChange` は最後の変更から 150 ms 待ってまとめる。
-- 解析し直すたびに、プロジェクトのすべてのファイルについて `publishDiagnostics` を送る。診断がなくなったファイルには空の配列を送る。前回と同じ内容なら送らない。
+- 解析し直すたびに、診断のあるファイル（語彙のファイルと `hozo.toml` を含む）について `publishDiagnostics` を送る。前に診断を送っていて、今回は診断がなくなったファイルには、空の配列を送る。前回と同じ内容なら送らない。一度も診断を送っていないファイルには、空の配列を送らない（診断のないファイルと語彙のファイルの数だけ、最初に空の通知が並ぶのを避ける。クライアントは、通知の来ていないファイルを診断なしとして扱う）。
 - 語彙のファイルの URI は `Span.file`（`docs/ir.md`「Program」の `hozo:` の形）をそのまま使う。クライアントが開けるよう、要求 `hozo/vocabulary`（params `{ uri }`、result `{ content }`）を提供する。`docs/editors.md`。
 
 ## 診断
 
-`docs/diagnostics.md` の `Diagnostic` を LSP の `Diagnostic` に写す。
+`docs/diagnostics.md` の `Diagnostic` を LSP の `Diagnostic` に写す。`source` は `hozoc`。
 
 | hozoc | LSP |
 |---|---|
@@ -45,11 +45,15 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `Data` | `data`（コードアクションが使う） |
 | 位置のない診断（`hozo.toml` の誤り） | `hozo.toml` の 1 行 1 列。ファイルもないものは `hozo.toml` の URI に付ける |
 
-`hozoc check` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。
+`hozoc check` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。言語サーバーだけが出す診断は一つ:
+
+| ID | 重さ | 意味 |
+|---|---|---|
+| LSP-1 | warning | `hozo.toml` が見つからない。設定の検査は行っていない（「プロジェクト」）。ユーザーの各 `.hozo` の 1 行 1 列に出す |
 
 ## 定義へジャンプ
 
-カーソル位置のトークンが名前（`Ident` か `QualifiedName` の一部）なら、`internal/sema` の `Ref`（`docs/packages.md`「internal/sema」）の `Target` の `Span` を `Location` で返す。
+カーソル位置のトークンが名前（`Ident`、または `QualifiedName` か値の位置の `Path` の一部。`docs/grammar.md`「識別子」）なら、`internal/sema` の `Ref`（`docs/packages.md`「internal/sema」）の `Target` の `Span` を `Location` で返す。
 
 | カーソルの位置 | 飛び先 |
 |---|---|

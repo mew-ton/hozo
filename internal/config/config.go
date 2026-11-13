@@ -94,7 +94,7 @@ func Find(startDir string) (string, bool) {
 }
 
 // Load は path の hozo.toml を読む（docs/config.md「形」）。診断は CFG-7（知らないキー、値の型違い、TOML の構文エラー、
-// transpilers の重複）、CFG-12（単位の必須のキーがない、または空）、CFG-17（二つの単位の out が同じか入れ子）。
+// transpilers の重複、ルートの下でない out）、CFG-12（単位の必須のキーがない、または空）、CFG-17（二つの単位の out が同じか入れ子）。
 // error の診断があっても、読めた範囲の Config を返す（nil は返さない）。読めなかった部分は既定値。
 func Load(path string) (*Config, []diag.Diagnostic) {
 	abs, err := filepath.Abs(path)
@@ -147,7 +147,7 @@ func (c *Config) Covering(namespace string) []int {
 // namespace が U.namespace でもその子孫でもなければ U.out。
 func (c *Config) Dir(unit int, namespace string) string {
 	u := &c.Units[unit]
-	out := CleanOut(u.Out)
+	out := CleanRel(u.Out)
 	if namespace == u.Namespace || !strings.HasPrefix(namespace, u.Namespace+".") {
 		return out
 	}
@@ -172,15 +172,29 @@ func (c *Config) UnitNamespaces() []string {
 	return names
 }
 
-// CleanOut は out を比べられる形にする: `/` 区切りにし、`./` や余分な `/` を取り除く（docs/config.md「単位の対象」）。
-// ルートそのもの（"." など）は ""。
-func CleanOut(out string) string {
-	p := path.Clean(filepath.ToSlash(out))
+// CleanRel はルートからの相対パスを比べられる形にする: `/` 区切りにし、`./` や余分な `/` を取り除く
+// （docs/config.md「単位の対象」）。先頭の `/` は落とし、ルートそのもの（"." など）は ""。`..` で上へ出る分は残る
+// （ルートの外かどうかは [Under] と呼ぶ側が見る）。out、plugin_dirs、glob、書き出すファイルのパス、
+// .hozoc-outputs.json のパスを比べる前に、どれもこの一つを通す。
+func CleanRel(p string) string {
+	p = path.Clean(filepath.ToSlash(p))
 	p = strings.TrimPrefix(p, "/")
 	if p == "." {
 		return ""
 	}
 	return p
+}
+
+// Under は相対パス a（CleanRel した形）が dir（同じ形）の下（真に深い）にあるか。dir が ""（ルート）なら、ルートの
+// 外へ出ない、空でないすべての a が下。CFG-17 の入れ子、Dir(U, N) の下かどうか（PLG-1、.hozoc-outputs.json）に使う。
+func Under(a, dir string) bool {
+	if a == dir || a == "" || a == ".." || strings.HasPrefix(a, "../") {
+		return false
+	}
+	if dir == "" {
+		return true
+	}
+	return strings.HasPrefix(a, dir+"/")
 }
 
 // parent は FQN の親。"server.admin" → "server"、"server" → ""。
@@ -265,7 +279,7 @@ func (l *loader) loadHozo(t map[string]any) {
 	}
 }
 
-// loadUnit は index 番目（1 始まり）の [[emit]]（docs/config.md「形」「単位」）。知らないキーと値の型違いは CFG-7、
+// loadUnit は index 番目（1 始まり）の [[emit]]（docs/config.md「形」「単位」）。知らないキー、値の型違い、ルートの下でない out は CFG-7、
 // namespace / transpilers / out のどれかがない、または空なら CFG-12。どちらかがあれば、その単位は Units に入れない。
 func (l *loader) loadUnit(index int, t map[string]any) {
 	u := Unit{Index: index}
@@ -290,8 +304,12 @@ func (l *loader) loadUnit(index int, t map[string]any) {
 			}
 			if key == "namespace" {
 				u.Namespace = s
-			} else {
-				u.Out = s
+				continue
+			}
+			u.Out = s
+			if reason := badOut(s); reason != "" {
+				l.errorf("CFG-7", "%s の out %q は%s（out は、ルートの下のディレクトリをルートからの相対パスで書く）", where, s, reason)
+				ok = false
 			}
 		case "transpilers":
 			v, good := l.stringList(where+" の transpilers", value)
@@ -356,34 +374,43 @@ func (l *loader) loadUnit(index int, t map[string]any) {
 	}
 }
 
+// badOut は単位の out が出力先にできない理由を返す（CFG-7。docs/config.md「形」）: 絶対パス、ルートの外へ出るパス、
+// ルートそのもの。出力先にできるなら ""。空の out は CFG-12 が報告するので、ここでは数えない。
+// ルートの外を許さないのは、hozoc が書いて消すファイルをプロジェクトの中に限るため（docs/cli.md「emit」）。ルートそのものを
+// 許さないのは、out の下は sources から常に除くので、何も読めなくなるため。
+func badOut(out string) string {
+	if out == "" {
+		return ""
+	}
+	if filepath.IsAbs(out) || strings.HasPrefix(out, "/") || strings.HasPrefix(out, "\\") || filepath.VolumeName(out) != "" {
+		return "絶対パス"
+	}
+	switch clean := CleanRel(out); {
+	case clean == "":
+		return "プロジェクトのルートそのもの"
+	case clean == ".." || strings.HasPrefix(clean, "../"):
+		return "プロジェクトのルートの外"
+	}
+	return ""
+}
+
 // checkOuts は CFG-17: 二つの単位の out が同じか、一方が他方の下にある（docs/config.md「単位の対象」）。
-// 比べるのは CleanOut した形。ルートそのものを out にした単位は、ほかのすべての単位と重なる。
+// 比べるのは CleanRel した形。out がルートそのものやルートの外の単位は CFG-7 で Units に入っていない。
 func (l *loader) checkOuts() {
 	units := l.cfg.Units
 	for i := range units {
 		for j := i + 1; j < len(units); j++ {
-			a, b := CleanOut(units[i].Out), CleanOut(units[j].Out)
+			a, b := CleanRel(units[i].Out), CleanRel(units[j].Out)
 			switch {
 			case a == b:
 				l.errorf("CFG-17", "%sと%sの out が同じ", units[i].Label(), units[j].Label())
-			case under(a, b):
+			case Under(a, b):
 				l.errorf("CFG-17", "%sの out が%sの out の下にある", units[i].Label(), units[j].Label())
-			case under(b, a):
+			case Under(b, a):
 				l.errorf("CFG-17", "%sの out が%sの out の下にある", units[j].Label(), units[i].Label())
 			}
 		}
 	}
-}
-
-// under は相対パス a が b の下（真に深い）にあるか。b が ""（ルート）なら、空でないすべての a が下。
-func under(a, b string) bool {
-	if a == b {
-		return false
-	}
-	if b == "" {
-		return true
-	}
-	return strings.HasPrefix(a, b+"/")
 }
 
 // stringList は文字列の配列を読む。違えば CFG-7。

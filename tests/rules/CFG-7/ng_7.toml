@@ -1,0 +1,9 @@
+# 単位の out がプロジェクトのルートそのもの → CFG-7（その単位は使わない）
+# ERROR: CFG-7
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "."

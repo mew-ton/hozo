@@ -9,7 +9,7 @@ import (
 	gol "github.com/mew-ton/hozo/plugin/golang"
 )
 
-// wrapper は op に付いたデコレータの適用のうち、プラグインが select の wraps で引き受けたもの（docs/emit-go.md「デコレータ」）。
+// wrapper は op に付いたデコレータの適用のうち、単位のトランスパイラが select の wraps で引き受けたもの（docs/emit-go.md「デコレータ」）。
 type wrapper struct {
 	typ   string // 関数の型の名前 <Op><デコレータ名>Wrapper
 	group string // <デコレータ名>。Wrappers のフィールド名で、束ねる構造体は <デコレータ名>Wrappers
@@ -35,7 +35,7 @@ func missing(imp *gol.Imports, kind, name string) string {
 }
 
 // collectWrappers は op ごとの包む関数を、内側（Op.Decorators の末尾）から順に集める。
-// 包むのは select の wraps が指した適用だけ。どのプラグインも引き受けないデコレータは印で、何も生成しない。
+// 包むのは select の wraps が指した適用だけ。どのトランスパイラも引き受けないデコレータは印で、何も生成しない。
 func (e *emitter) collectWrappers() {
 	for _, op := range e.ops {
 		claimed := e.sel.wraps[op.Name]
@@ -207,7 +207,7 @@ func (e *emitter) genOps() *genFile {
 	}
 
 	if len(e.leaves) > 0 {
-		g.println("// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。")
+		g.println("// Leaves は効果を持たない葉の op の実装。人か、その op の語彙を読むトランスパイラがフィールドを埋める。")
 		g.println("// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は \"leaf\"）。")
 		g.println("type Leaves struct {")
 		for _, op := range e.leaves {
@@ -279,14 +279,14 @@ func (e *emitter) genOps() *genFile {
 			}
 		}
 		for _, name := range groups {
-			g.printf("// %sWrappers は @%s の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。\n", name, byGroup[name][0].name)
+			g.printf("// %sWrappers は @%s の包む関数。そのデコレータを引き受けたトランスパイラがフィールドを埋める。\n", name, byGroup[name][0].name)
 			g.printf("type %sWrappers struct {\n", name)
 			for _, w := range byGroup[name] {
 				g.printf("\t%s %s\n", w.field, w.typ)
 			}
 			g.println("}\n")
 		}
-		g.println("// Wrappers は、プラグインが select の wraps で引き受けたデコレータの適用の「包む関数」。デコレータごとに一つの構造体。")
+		g.println("// Wrappers は、トランスパイラが select の wraps で引き受けたデコレータの適用の「包む関数」。デコレータごとに一つの構造体。")
 		g.println("// 埋めていない包む関数に当たったら *runtime.MissingError（Kind は \"wrapper\"）。")
 		g.println("type Wrappers struct {")
 		for _, name := range groups {

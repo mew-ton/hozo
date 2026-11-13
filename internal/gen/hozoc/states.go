@@ -4,7 +4,7 @@ package hozoc
 
 import "github.com/mew-ton/hozo/runtime"
 
-// OutputsSyncState は分類の状態 hozoc.OutputsSync（hozoc.outputs を対象にした classify）の単位。
+// OutputsSyncState は状態の分類 hozoc.OutputsSync（hozoc.outputs を対象にした classify）の単位。
 // 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか
 type OutputsSyncState struct {
 	// 問い合わせ: ケース UpToDate の述語。

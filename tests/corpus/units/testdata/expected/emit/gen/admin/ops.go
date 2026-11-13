@@ -12,7 +12,7 @@ import (
 // 品物を売り場から外す
 type BanFunc func(item shop.Item) error
 
-// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙を読むトランスパイラがフィールドを埋める。
 // 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
 type Leaves struct {
 	Ban BanFunc

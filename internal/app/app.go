@@ -47,9 +47,17 @@ type App struct {
 	Stderr io.Writer
 	// Env はプラグインに渡す環境変数の元。nil なら os.Environ()。
 	Env []string
+	// Home はホームディレクトリ。プラグインの探索が <ホーム>/.hozo/plugins を見るのに使う（docs/plugin-protocol.md「探索」の 3）。
+	// 空なら探さない。App はプロセスの環境から読まない: cmd/hozoc/main.go が os.UserHomeDir() を入れる。
+	// 探索のもう一つの外の場所 HOZO_PLUGIN_PATH は、cli.hozo の入力の pluginPath で届く（cli.Main に渡した env から）。
+	Home string
 	// Stdin と Stdout は lsp が話す相手（docs/lsp.md「通信」）。nil なら os.Stdin / os.Stdout。
 	Stdin  io.Reader
 	Stdout io.Writer
+
+	// pluginPath は直前の Check か Lsp の入力の pluginPath（HOZO_PLUGIN_PATH）。入力を取らない UpToDate が、
+	// 自分で解析するときに使う。
+	pluginPath string
 
 	// checked は直前の Check が解析した Project。WriteOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
 	// なので、Program・設定・マニフェストはここから取る。Check が失敗すれば nil。
@@ -61,7 +69,7 @@ func (a *App) Leaves() hozoc.Leaves {
 	return hozoc.Leaves{Check: a.Check, Lsp: a.Lsp}
 }
 
-// States は hozoc の状態の単位の実装: 分類の状態 OutputsSync の述語 UpToDate（問い合わせ）と、
+// States は hozoc の状態の単位の実装: 状態の分類 OutputsSync の述語 UpToDate（問い合わせ）と、
 // 効果 syncOutputs を持つ葉の op writeOutputs（命令）。
 func (a *App) States() hozoc.StateSet {
 	return hozoc.StateSet{OutputsSync: hozoc.OutputsSyncState{UpToDate: a.UpToDate, WriteOutputs: a.WriteOutputs}}
@@ -81,7 +89,8 @@ func (a *App) Ops() hozoc.Ops {
 // 開けなければその誤りを返す（宣言にない例外なので 70。docs/diagnostics.md「終了コード」）。
 // 標準エラーには書かない（docs/lsp.md「通信」）。
 func (a *App) Lsp(in hozoc.LspInput) error {
-	opts := lsp.Options{Root: a.Dir}
+	a.pluginPath = str(in.PluginPath)
+	opts := lsp.Options{Root: a.Dir, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home}
 	if in.Config != nil && *in.Config != "" {
 		opts.ConfigPath = string(*in.Config)
 		if !filepath.IsAbs(opts.ConfigPath) && a.Dir != "" {
@@ -174,7 +183,7 @@ func stringList(v any) []string {
 type unknownNamespace struct{ names []string }
 
 func (e *unknownNamespace) Error() string {
-	return fmt.Sprintf("名前空間 %s は、hozo.toml のどの単位の対象でもない", strings.Join(e.names, "、"))
+	return fmt.Sprintf("名前空間 %s も、その子孫も、hozo.toml のどの単位の対象でもない（仕様にない名前空間も同じ）", strings.Join(e.names, "、"))
 }
 
 func (e *unknownNamespace) Unwrap() error { return hozoc.UnknownNamespace{} }

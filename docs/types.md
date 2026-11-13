@@ -46,7 +46,7 @@ S にあって T にないフィールドは落ちる。
 
 ### 既定値
 
-フィールドの `default`（`page: PosInt = 1`。§11.2）のリテラルは、フィールドの型が `scalar` への `ref` ならその `base`（`scalar` の継承を辿った核の型）に、そうでなければフィールドの型に渡せること（規則 10）。`scalar` の位置にリテラルを渡せる唯一の場所で、値は設計者が書く定数だから。`valid` の制約に合うかは既定の出力が生成時に確かめる（`docs/emit-go.md`「model」）。合わなければ TYPE-13。
+フィールドの `default`（`page: PosInt = 1`。§11.2）のリテラルは、フィールドの型が `scalar` への `ref` ならその `base`（`scalar` の継承を辿った核の型）に、そうでなければフィールドの型に渡せること（規則 10）。`scalar` の位置にリテラルを渡せる唯一の場所で、値は設計者が書く定数だから。渡せなければ TYPE-13。TYPE-13 が見るのは型だけで、既定値が `scalar` の `valid` の制約に合うかは見ない。それは既定の出力が生成時に確かめる（GOEMIT-4。`docs/emit-go.md`「model」）。
 
 ### 当てはまる（レコードリテラルを model T に）
 
@@ -91,19 +91,19 @@ S にあって T にないフィールドは落ちる。
 
 ## 診断
 
-| ID | 意味 |
-|---|---|
-| TYPE-1 | 核の型（リテラルを含む）の値を `scalar` の位置に渡した |
-| TYPE-2 | `valid` の制約を `scalar` とフィールド以外に付けた（DEC-1 で検出されるので、ID は索引として残す） |
-| TYPE-3 | `return` の値の型が op の `returns` に渡せない（射影もできない） |
-| TYPE-4 | 引数の値の型が引数の型に渡せない。どの規則で失敗したかを示す |
-| TYPE-5 | レコードリテラルに、当てはめる model にないフィールドがある |
-| TYPE-6 | レコードリテラルに同じフィールドが二度ある |
-| TYPE-7 | レコードリテラルの当てはめる先が決まらない |
-| TYPE-8 | `match` のアームの型がそろわない |
-| TYPE-9 | `scalar X extends B` の `B` が核の型でも `scalar` でもない。または `scalar` の継承が循環している |
-| TYPE-10 | `model P is U omit f` の `f` が `U` にない |
-| TYPE-11 | `Record<K, V>` の `K` が `string` でも、元が `string` の `scalar` でもない |
-| TYPE-12 | `C.Case<T>` の `T` が `C` の `subject` に渡せない |
-| TYPE-13 | 既定値のリテラルがフィールドの型（`scalar` なら元の型）に渡せない |
-| LIT-1 | 整数リテラルが 64 ビット符号付きの範囲を超える。`Duration` がナノ秒で同じ範囲を超える |
+| ID | 重さ | 意味 |
+|---|---|---|
+| TYPE-1 | error | 核の型（リテラルを含む）の値を `scalar` の位置に渡した |
+| TYPE-2 | — | `valid` の制約を `scalar` とフィールド以外に付けた（DEC-1 で検出されるので、ID は索引として残す） |
+| TYPE-3 | error | `return` の値の型が op の `returns` に渡せない（射影もできない） |
+| TYPE-4 | error | 引数の値の型が引数の型に渡せない。どの規則で失敗したかを示す |
+| TYPE-5 | error | レコードリテラルに、当てはめる model にないフィールドがある |
+| TYPE-6 | error | レコードリテラルに同じフィールドが二度ある |
+| TYPE-7 | error | レコードリテラルの当てはめる先が決まらない |
+| TYPE-8 | error | `match` のアームの型がそろわない |
+| TYPE-9 | error | `scalar X extends B` の `B` が核の型でも `scalar` でもない。または `scalar` の継承が循環している |
+| TYPE-10 | error | `model P is U omit f` の `f` が `U` にない |
+| TYPE-11 | error | `Record<K, V>` の `K` が `string` でも、元が `string` の `scalar` でもない |
+| TYPE-12 | error | `C.Case<T>` の `T` が `C` の `subject` に渡せない |
+| TYPE-13 | error | 既定値のリテラルがフィールドの型（`scalar` なら元の型）に渡せない |
+| LIT-1 | error | 整数リテラルが 64 ビット符号付きの範囲を超える。`Duration` がナノ秒で同じ範囲を超える |

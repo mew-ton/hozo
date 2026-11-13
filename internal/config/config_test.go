@@ -213,7 +213,17 @@ func TestDiagnostics(t *testing.T) {
 		{"nested out the other way", units("a", "gen/a/deep", "b", "gen/a"), []string{"CFG-17"}, 2},
 		{"descendant unit under ancestor out", units("server", "gen", "server.admin", "gen/admin"), []string{"CFG-17"}, 2},
 		{"same namespace same out", units("a", "gen", "a", "gen"), []string{"CFG-17"}, 2},
-		{"root out overlaps everything", units("a", ".", "b", "gen"), []string{"CFG-17"}, 2},
+		// CFG-7: out はルートの下のディレクトリ。ルートそのもの、ルートの外、絶対パスは使えない（その単位は使わない）
+		{"root out", units("a", ".", "b", "gen"), []string{"CFG-7"}, 1},
+		{"root out after cleaning", units("a", "gen/..", "b", "gen"), []string{"CFG-7"}, 1},
+		{"root out written as ./", units("a", "./"), []string{"CFG-7"}, 0},
+		{"out above root", units("a", "../x"), []string{"CFG-7"}, 0},
+		{"out is parent", units("a", ".."), []string{"CFG-7"}, 0},
+		{"out leaves root after cleaning", units("a", "gen/../../x"), []string{"CFG-7"}, 0},
+		{"absolute out", units("a", "/tmp/x"), []string{"CFG-7"}, 0},
+		{"out with dots inside root is fine", units("a", "gen/../gen2/./a", "b", "..gen"), nil, 2},
+		// ルートの下でない out の単位は使わないので、ほかの単位との CFG-17 にもならない
+		{"bad out does not overlap", units("a", "../gen", "b", "gen"), []string{"CFG-7"}, 1},
 		{"sibling outs are fine", units("a", "gen/a", "b", "gen/b", "a", "gen/ab"), nil, 3},
 		{"several", "[server]\n" + unit + "foo = 1\n[[emit]]\nout = \"y\"\n", []string{"CFG-12", "CFG-7", "CFG-7"}, 0},
 	}

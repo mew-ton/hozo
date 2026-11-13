@@ -8,8 +8,9 @@ Hozo は、プログラムを「状態」と「入出力」だけで記述する
 ## 開発
 
 ```
-make build   # bin/ に hozoc を作る
+make build      # bin/ に hozoc を作る
 make test
+make generate   # cli.hozo から internal/gen/hozoc を生成し直す（docs/packages.md「自己生成の手順」）
 ```
 
 ## 状態

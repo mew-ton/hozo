@@ -52,7 +52,7 @@ type LogoutFunc func() error
 // Throws: server.Unauthorized
 type FetchMeFunc func(in server.GetMeInput) (server.PublicUser, error)
 
-// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙を読むトランスパイラがフィールドを埋める。
 // 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
 type Leaves struct {
 	Render       RenderFunc
@@ -153,27 +153,27 @@ type PickFirstHttpRetryWrapper func(rows []server.OrderRow, next PickFirstFunc) 
 // LogoutTrackedWrapper は browser.logout に付いた @browser.tracked。
 type LogoutTrackedWrapper func(next LogoutFunc) error
 
-// RetryWrappers は @browser.retry の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+// RetryWrappers は @browser.retry の包む関数。そのデコレータを引き受けたトランスパイラがフィールドを埋める。
 type RetryWrappers struct {
 	Render RenderRetryWrapper
 }
 
-// GuardMeWrappers は @browser.guardMe の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+// GuardMeWrappers は @browser.guardMe の包む関数。そのデコレータを引き受けたトランスパイラがフィールドを埋める。
 type GuardMeWrappers struct {
 	Render RenderGuardMeWrapper
 }
 
-// HttpRetryWrappers は @http.retry の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+// HttpRetryWrappers は @http.retry の包む関数。そのデコレータを引き受けたトランスパイラがフィールドを埋める。
 type HttpRetryWrappers struct {
 	PickFirst PickFirstHttpRetryWrapper
 }
 
-// TrackedWrappers は @browser.tracked の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+// TrackedWrappers は @browser.tracked の包む関数。そのデコレータを引き受けたトランスパイラがフィールドを埋める。
 type TrackedWrappers struct {
 	Logout LogoutTrackedWrapper
 }
 
-// Wrappers は、プラグインが select の wraps で引き受けたデコレータの適用の「包む関数」。デコレータごとに一つの構造体。
+// Wrappers は、トランスパイラが select の wraps で引き受けたデコレータの適用の「包む関数」。デコレータごとに一つの構造体。
 // 埋めていない包む関数に当たったら *runtime.MissingError（Kind は "wrapper"）。
 type Wrappers struct {
 	Retry     RetryWrappers

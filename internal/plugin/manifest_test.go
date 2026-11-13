@@ -230,13 +230,13 @@ func names(plugins []*Plugin) []string {
 }
 
 // docs/plugin-protocol.md「探索」: 入っているプラグインは plugin_dirs、HOZO_PLUGIN_PATH、~/.hozo/plugins の直下の、
-// マニフェストを持つディレクトリのすべて。同じ名前は近いものだけを使う。
+// マニフェストを持つディレクトリのすべて。同じ名前は近いものだけを使う。HOZO_PLUGIN_PATH の値とホームは呼ぶ側が
+// SearchEnv で渡す（Discover はプロセスの環境を読まない。TestDiscoverIgnoresProcessEnvironment）。
 func TestDiscoverOrder(t *testing.T) {
 	root := t.TempDir()
 	envDir := t.TempDir()
 	home := t.TempDir()
-	t.Setenv(PluginPathEnv, envDir+string(filepath.ListSeparator)+t.TempDir())
-	t.Setenv("HOME", home)
+	env := SearchEnv{PluginPath: envDir + string(filepath.ListSeparator) + t.TempDir(), Home: home}
 	cfg := config.Default(root)
 	cfg.Path = filepath.Join(root, "hozo.toml")
 	cfg.Hozo.PluginDirs = []string{"plugins", "more"}
@@ -245,7 +245,7 @@ func TestDiscoverOrder(t *testing.T) {
 	manifest := func(name, where string) string {
 		return "name = \"" + name + "\"\ncommand = \"p\"\nprotocol = \"0.2\"\n[[transpiler]]\nname = \"" + where + "\"\nlanguage = \"go\"\n"
 	}
-	plugins, diags := Discover(cfg)
+	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || len(diags) != 0 {
 		t.Fatalf("empty: %v %+v", names(plugins), diags)
 	}
@@ -253,20 +253,20 @@ func TestDiscoverOrder(t *testing.T) {
 	homeDir := filepath.Join(home, ".hozo", "plugins", "p")
 	writeManifest(t, homeDir, manifest("p", "home"))
 	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "z"), manifest("z", "home-z"))
-	plugins, diags = Discover(cfg)
+	plugins, diags = Discover(cfg, env)
 	if len(diags) != 0 || !reflect.DeepEqual(names(plugins), []string{"p=home", "z=home-z"}) || plugins[0].Dir != homeDir {
 		t.Fatalf("home: %v diags=%+v", names(plugins), diags)
 	}
 
 	writeManifest(t, filepath.Join(envDir, "p"), manifest("p", "env"))
-	plugins, _ = Discover(cfg)
+	plugins, _ = Discover(cfg, env)
 	if !reflect.DeepEqual(names(plugins), []string{"p=env", "z=home-z"}) {
 		t.Fatalf("env: %v", names(plugins))
 	}
 
 	writeManifest(t, filepath.Join(root, "more", "p"), manifest("p", "more"))
 	writeManifest(t, filepath.Join(root, "more", "a"), manifest("a", "more-a"))
-	plugins, _ = Discover(cfg)
+	plugins, _ = Discover(cfg, env)
 	if !reflect.DeepEqual(names(plugins), []string{"a=more-a", "p=more", "z=home-z"}) {
 		t.Fatalf("more: %v", names(plugins))
 	}
@@ -280,7 +280,7 @@ func TestDiscoverOrder(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "plugins", "README.md"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	plugins, diags = Discover(cfg)
+	plugins, diags = Discover(cfg, env)
 	if len(diags) != 0 || !reflect.DeepEqual(names(plugins), []string{"p=plugins", "a=more-a", "z=home-z"}) {
 		t.Fatalf("plugins: %v diags=%+v", names(plugins), diags)
 	}
@@ -289,14 +289,35 @@ func TestDiscoverOrder(t *testing.T) {
 	}
 }
 
+// Discover はプロセスの環境変数とホームディレクトリを読まない。
+func TestDiscoverIgnoresProcessEnvironment(t *testing.T) {
+	root, hostile := t.TempDir(), t.TempDir()
+	writeManifest(t, filepath.Join(hostile, "broken"), "name = \n")
+	writeManifest(t, filepath.Join(hostile, ".hozo", "plugins", "broken-home"), "name = \n")
+	t.Setenv(PluginPathEnv, hostile)
+	t.Setenv("HOME", hostile)
+	t.Setenv("USERPROFILE", hostile)
+	cfg := config.Default(root)
+	cfg.Hozo.PluginDirs = []string{"plugins"}
+	if dirs := SearchDirs(cfg, SearchEnv{}); !reflect.DeepEqual(dirs, []string{filepath.Join(root, "plugins")}) {
+		t.Errorf("SearchDirs = %v", dirs)
+	}
+	if plugins, diags := Discover(cfg, SearchEnv{}); len(plugins) != 0 || len(diags) != 0 {
+		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
+	}
+	// 渡せば読む
+	if _, diags := Discover(cfg, SearchEnv{PluginPath: hostile, Home: hostile}); !reflect.DeepEqual(codes(diags), []string{"MAN-4", "MAN-4"}) {
+		t.Errorf("diags=%+v", diags)
+	}
+}
+
 func TestDiscoverNameMismatch(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv(PluginPathEnv, "")
-	t.Setenv("HOME", t.TempDir())
+	env := SearchEnv{}
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
 	p := writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"q\"\ncommand = \"q\"\nprotocol = \"0.2\"\n")
-	plugins, diags := Discover(cfg)
+	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-3"}) || diags[0].File != p {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
 	}
@@ -307,19 +328,18 @@ func TestDiscoverBadManifest(t *testing.T) {
 	// 読めないマニフェスト（MAN-4）は、使っていなくても報告する
 	root := t.TempDir()
 	home := t.TempDir()
-	t.Setenv(PluginPathEnv, "")
-	t.Setenv("HOME", home)
+	env := SearchEnv{Home: home}
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
 	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \n")
 	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.2\"\n")
-	plugins, diags := Discover(cfg)
+	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-4"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
 	}
 	// protocol の不一致（MAN-2）はプラグインを返し、診断は Mismatch に置く（使うプラグインにだけ報告する）
 	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.9\"\n")
-	plugins, diags = Discover(cfg)
+	plugins, diags = Discover(cfg, env)
 	if len(plugins) != 1 || len(diags) != 0 || !reflect.DeepEqual(codes(plugins[0].Mismatch), []string{"MAN-2"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
 	}

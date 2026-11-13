@@ -327,23 +327,6 @@ type DocumentSymbol struct {
 	Children       []DocumentSymbol `json:"children,omitempty"`
 }
 
-// MessageType は window/logMessage の種類。
-type MessageType int
-
-// MessageType の値。
-const (
-	MessageError   MessageType = 1
-	MessageWarning MessageType = 2
-	MessageInfo    MessageType = 3
-	MessageLog     MessageType = 4
-)
-
-// LogMessageParams は window/logMessage の params。
-type LogMessageParams struct {
-	Type    MessageType `json:"type"`
-	Message string      `json:"message"`
-}
-
 // VocabularyParams は hozo/vocabulary の params（docs/lsp.md「プロジェクト」）。
 type VocabularyParams struct {
 	URI string `json:"uri"`

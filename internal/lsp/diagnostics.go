@@ -18,7 +18,7 @@ const (
 )
 
 // lspDiagnostics は直近の解析の診断を URI ごとの LSP の診断にする（docs/lsp.md「診断」の表）。
-// プロジェクトのすべてのファイル（語彙を含む）と hozo.toml は、診断がなくても空の列で入る。
+// プロジェクトのすべてのファイル（語彙を含む）と hozo.toml は、診断がなくても空の列で入る（送るかどうかは publishAll が決める）。
 func (s *server) lspDiagnostics() map[string][]protocol.Diagnostic {
 	p := s.proj
 	out := map[string][]protocol.Diagnostic{}

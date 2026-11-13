@@ -29,17 +29,32 @@
 - `model/`: 「モデルが先」（`docs/requirements.md`）のサンプル。単位の対象は `shop` だけで、そのトランスパイラ `none`（sh で動くテスト用のプラグイン）は何も選ばないので、`emit` は何も書かない（ゴールデンを持たない）。`tests/model_test.go` の `TestModelCorpus` が、IR と、前回の出力が消えることを確かめる。
 - `units/`: 出力の単位（`docs/config.md`「単位」「単位の対象」「in」）のサンプル。同じ名前空間の二つの単位（別のトランスパイラ、別の `out`）、`in` で絞った単位（`in` の外の op は口だけ、型は出力する、選べば PLG-3）、子孫を名指しする単位、単位をまたぐ一方向の import を一か所ずつ使う。`tests/units_test.go` の `TestUnitsCorpus` が実物の `hozoc emit` の出力を確かめ、`emit` のゴールデンと `go vet` が、書き出した Go がコンパイルできることを確かめる。
 
-段階 1 の途中（検査器ができるまで）は、`tests/parse_test.go` がコーパス・標準の語彙・`docs/cli.md` の `cli.hozo` を構文だけ確かめる。
+`tests/parse_test.go` は、コーパス・標準の語彙・プラグインの語彙のすべての `.hozo` が構文エラーなしに解析できることと、`docs/cli.md`「cli.hozo」に埋め込んだ `cli.hozo` と `hozo.toml` のブロックがリポジトリ直下のファイルとバイト単位で同じであること（`TestDocsEmbedRootFiles`）を確かめる。
 
 hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコーパスには入れない。`hozoc check` が error なしで通ることを `tests/selfcheck_test.go` で確かめ、`emit` の結果は「生成物の一致」で確かめる。
 
 ## 言語サーバーと check の一致
 
-各コーパスについて、`internal/project.Load` を一度呼び、`hozoc check` の診断と `internal/lsp` が `publishDiagnostics` で送る診断（LSP の形から戻したもの）が同じ集合であることを確かめる。`LSP-1` だけは言語サーバーにしか出ないので除く。
+各コーパス（`tests/corpus/` の下のすべて。足せば自動で入る）について、`internal/project.Load` を一度呼び、`hozoc check` の診断と `internal/lsp` が `publishDiagnostics` で送る診断（LSP の形から戻したもの）が同じ集合であることを確かめる（`internal/lsp` の `TestCheckAgreement`。位置のエンコーディングは utf-16 と utf-8 の両方）。`LSP-1` だけは言語サーバーにしか出ないので除く。診断のないコーパスでは「どちらも空」を確かめることになるので、設計書のコーパスに warning を一つ足したものでも確かめる。
 
 ## 生成物の一致
 
-CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generate`（`hozoc emit`。段階 3 から）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc emit` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。
+CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generate`（`cli.hozo` からの自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc emit` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。
+
+手で写すもの（生成しないもの）の一致もテストで確かめる: `sdk/ts/src/protocol.ts` がスキーマの `$defs` と合っていること（`sdk/ts/test/protocol.test.ts`）、`docs/cli.md` のブロックがリポジトリ直下のファイルと同じであること（「コーパス」の `TestDocsEmbedRootFiles`）。
+
+## 文書とコードの一致
+
+文書が持ち主の事実のうち、コードから機械的に確かめられるものはテストにする。
+
+- 規則ごとのテストがそろっていること（`tests/rules_test.go` の `TestRulesCoverDocs`。「規則ごとのテスト」）。
+- 診断のコード: Go のコードが出しうる診断のコード（規則の ID と、`SYNTAX` / `IO` / `PLUGIN` / `GOEMIT-INTERNAL`）がどれも設計文書の「診断」の表にあり、表の重さ（error / warning。診断にならない ID は「—」）がコードと合っていること（`tests/codes_test.go` の `TestDiagnosticCodesAreDocumented`。コードの側はソースを構文木で読んで集める）。
+- 依存の向き: `docs/packages.md`「依存の向き」の表が Go のパッケージの実際の import と同じで、箇条書きの規則がテストのファイルの import を含めて守られていること（`tests/deps_test.go`）。
+- 予約語（下の「予約語の一致」）。
+
+## 環境からの独立
+
+テストの結果は、実行する人の環境に入っているプラグインに左右されない。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH` とホーム。`docs/plugin-protocol.md`「探索」）は、探索が自分では読まず呼ぶ側が渡すもので、プロジェクトを読むテストはどれも、それを渡さない（`project.Load`、`Home` が空の `app.App`、環境変数を返さない関数を渡した `cli.Main`）か、テストが作った一時ディレクトリを渡す。確かめ方は、壊れたマニフェストを置いたディレクトリを `HOZO_PLUGIN_PATH` に、`.hozo/plugins` に壊れたマニフェストを置いたディレクトリを `HOME` に向けて、`go test ./...` がすべて通ること（`HOME` を変えるときは、`GOCACHE` / `GOMODCACHE` / `GOPATH` を元の値で明示する）。渡したときに探すことと、渡さなければプロセスの環境を読まないことは、`internal/plugin`、`internal/project`、`internal/app` のテストが確かめる。
 
 ## 予約語の一致
 
@@ -47,7 +62,7 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 
 ## プラグインのプロトコル
 
-`internal/plugin` のテストは、`testdata/echo-plugin/`（`go run` で動く小さなプラグイン）を使い、要求がそのまま応答に写ること、終了コードが 0 以外なら `proc.Crashed`、JSON でなければ `proc.MalformedOutput` になることを確かめる。`plugins/go-cli` は、`plugins/go-cli/internal/gocli/testdata/` のゴールデン（`cli.hozo` と小さな例から作った `cli.go`）と、生成物の遅れの検査（「生成物の一致」）で確かめる。
+`internal/plugin` のテストは、`testdata/echo-plugin/`（テストの初めにビルドする小さなプラグイン）を使い、要求がそのまま応答に写ること、終了コードが 0 以外なら `proc.Crashed`、JSON でない・形が違う（`docs/plugin-protocol.md`「応答の形」: 必須の項目がない、型が違う。知らない項目は通る）なら `proc.MalformedOutput` になることを確かめる。二つの SDK（Go の `plugin`、TS の `sdk/ts`）が同じ要求に同じ終了コードを返すことは、どちらのテストも同じ表（`plugin/testdata/request_head.json`）を読んで確かめる。`plugins/go-cli` は、`plugins/go-cli/internal/gocli/testdata/` のゴールデン（リポジトリ直下の `cli.hozo` と小さな例から作った `cli.go`）と、生成物の遅れの検査（「生成物の一致」）で確かめる。
 
 ## 単体テスト
 
@@ -55,12 +70,22 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 - `internal/sema`: 解決の手続きの各段（`docs/resolve.md`「手続き」）、型の互換の各規則（`docs/types.md`「互換」）に一つずつ。
 - `internal/check`: 計算（Sig の E / F / rel / succ、bind）は、小さな IR を直接組み立てて期待値と比べる。設計書 §9 の `browser.logout` の例（`server.deleteSession` が不明、`removeToken` が起きている）を必ず含める。
 - `internal/emit/golang`: GOEMIT-1〜GOEMIT-4 の各条件（GOEMIT-5 は、出力どうしを見る `internal/app` のテスト）。生成物は `go/format` を通ること。出力の対象（`docs/emit-go.md`「出力の対象」の各手順）。生成したコードを一時のモジュールで実際に動かす振る舞いのテスト（`testdata/<名前>/behavior_test.go`。`nil` のフィールドが `*runtime.MissingError` になること、`States` を通る配線）。
-- `internal/plugin`: MAN-* と PLG-3 の各条件（「プラグインのプロトコル」）。PLG-1 / PLG-2 は応答のファイルを集める `internal/app` のテストで確かめる。
+- `internal/plugin`: MAN-* と PLG-3 の各条件、応答の形の各条件（「プラグインのプロトコル」）。PLG-1 / PLG-2 は応答のファイルを集める `internal/app` のテストで確かめる。
 - `internal/project`: 単位のトランスパイラの解決（CFG-11、CFG-14〜CFG-16）、`in` の照合（CFG-18）、使うプラグインだけの語彙と `check`、MAN-2 を使うプラグインにだけ出すこと。
-- `internal/app`: `emit` の手順（`docs/cli.md`「emit」）。sh で動く小さなプラグインで、同じ名前空間の複数の単位、`in`、子孫を名指しする単位、引数での対象の絞り込み、import する先の単位の選び方、import の循環（GOEMIT-5）を確かめる。
+- `internal/app`: `emit` の手順（`docs/cli.md`「emit」）。sh で動く小さなプラグインで、同じ名前空間の複数の単位、`in`、子孫を名指しする単位、引数での emit の対象の絞り込み（子孫だけが単位の対象である引数、`UnknownNamespace`）、import する先の単位の選び方、import の循環（GOEMIT-5）、`.hozoc-outputs.json` に書かれた Dir(U, N) の外のパスを消さないことを確かめる。
+- `internal/tools/selfgen`: コンパイルできない生成物を置き場に置かないこと（`docs/packages.md`「自己生成の手順」）。
 - `plugins/go-cli`: CLI-* の各条件と、引数の解釈の各規則（`docs/plugin-go-cli.md`「引数の解釈」）。
 - `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。
 
 ## CI
 
-`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`sdk/ts` と `editors/vscode` は Node 22 で `npm ci && npm test`（段階 4 から）。
+`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`sdk/ts` と `editors/vscode` は Node 22 で `npm ci && npm test`。
+
+## トランスパイラのテスト
+
+これから作るトランスパイラ（go-cli の後に作るもの。TS 向けのものを含む）のテストの方針。作る段階の持ち主は `docs/requirements.md`「段階」で、その段階をほかの作業のどこに置くかはまだ割り当てていない。ここで決めるのは、その段階に入ったときの進め方だけ。
+
+- トランスパイラは、後の一つの段階でまとめて作る。進め方はテストが先。
+- トランスパイラごとに、まず**ブラックボックスのテスト**を書く: 入力は `.hozo` のプロジェクト（`hozo.toml` と `.hozo`）、期待は書き出されるファイルのそのままの内容（バイト単位で同じ）。このテストを、そのトランスパイラの実装を一行も書く前に、すべて書く。
+- 細かい条件（語彙の使い方の誤りごとの診断、型や名前の変換の場合分けなど）は、単体テストで確かめる。ブラックボックスのテストに条件の組み合わせを背負わせない。
+- ブラックボックスのテストを書いて動かすための共通の道具（入力のプロジェクトと期待のファイルの置き方、比べ方）は、その段階に入るときに作る。今は作らない。今ある近い形は、コーパスの `emit` のゴールデン（「コーパス」）。

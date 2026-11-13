@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -46,7 +45,8 @@ type output struct {
 //
 //  0. 設定なし（hozo.toml が見つからない。docs/config.md「置き場と探し方」）なら、書き出すものがないので CFG-7 を
 //     一つ作って ConfigInvalid（docs/cli.md「手で書くもの」）。check の warning も一緒に運ぶ。
-//  1. namespaces が空でなければ、名前空間がそのどれかと同じか子孫である出力だけを対象にする。どの単位の対象でもない名前なら UnknownNamespace。
+//  1. namespaces が空でなければ、名前空間がそのどれかと同じか子孫である出力だけを対象にする。引数とその子孫のどれも、
+//     どの単位の対象でもなければ UnknownNamespace。
 //  2. 対象の各出力について、単位の各トランスパイラを runEmit で起動し、files と select を集める。
 //  3. 集めた select から、言語が go の単位の既定の出力（internal/emit/golang）を作る。
 //     GOEMIT-* とトランスパイラの errors は集めておき、すべて作り終えてから CheckFailed にする。
@@ -92,7 +92,10 @@ func (a *App) WriteOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc
 			return result, err
 		}
 		for _, prev := range previous {
-			if current[prev] {
+			// 記録のパスに従うのは、その記録の持ち主の Dir(U, N) の下のものだけ（docs/cli.md「emit」の 6）。
+			// それ以外（`..`、絶対パス、別のディレクトリ）は hozoc がこの記録に書くはずのないパスなので、
+			// 消さず、報告もしない。
+			if current[prev] || !config.Under(prev, dir) {
 				continue
 			}
 			abs := filepath.Join(p.Root, filepath.FromSlash(prev))
@@ -145,7 +148,7 @@ func (a *App) WriteOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc
 func (a *App) UpToDate() (bool, error) {
 	p := a.checked
 	if p == nil {
-		p = project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env})
+		p = project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home})
 		if p.RunErr != nil {
 			return false, asProc(p.RunErr)
 		}
@@ -227,27 +230,22 @@ func (pl *plan) record(dir string) []byte {
 // （どの単位の出力がその型を持つかで、import するか複製するかが決まる。docs/emit-go.md「配置」）。
 // 出力どうしの import の循環（GOEMIT-5）は、対象の出力から import を辿って届くすべての出力について確かめる。
 //
-// トランスパイラの files の path はルートからの相対パス（docs/plugin-protocol.md「emit」）。`..` や絶対パスは PLG-1、
+// トランスパイラの files の path はルートからの相対パスで、その起動の Dir(U, N) の下でなければならない
+// （docs/plugin-protocol.md「emit」）。そうでないもの（`..`、絶対パス、別のディレクトリ、Dir(U, N) そのもの）は PLG-1、
 // 同じ応答の中の重複は PLG-2、select が単位の対象でない宣言や付いていないデコレータを指していれば PLG-3 で、
 // どれも proc.MalformedOutput。
 func (a *App) plan(p *project.Project, namespaces []string) (*plan, error) {
 	views := p.Views()
 
-	// 1. 対象の出力
-	var unknown []string
-	for _, n := range namespaces {
-		if len(p.Config.Covering(n)) == 0 {
-			unknown = append(unknown, n)
-		}
-	}
-	if len(unknown) > 0 {
-		return nil, &unknownNamespace{names: unknown}
-	}
+	// 1. 対象の出力。引数 n が選ぶのは、仕様にある名前空間のうち n 自身と n の子孫で、どれかの単位の対象のもの
+	// （その名前空間を対象にするすべての単位の分）。n 自身がどの単位の対象でなくても、子孫を対象にする単位があればよい。
+	// 一つも選ばない引数（仕様にない名前、どの単位の対象でもない名前空間）があれば UnknownNamespace。
 	pl := &plan{}
 	var targets []outputKey
+	matched := map[string]bool{}
 	for u := range p.Units {
 		for _, ns := range p.Covered(u) {
-			if len(namespaces) > 0 && !underAny(ns, namespaces) {
+			if len(namespaces) > 0 && !underAny(ns, namespaces, matched) {
 				continue
 			}
 			pl.dirs = append(pl.dirs, p.Config.Dir(u, ns))
@@ -255,6 +253,15 @@ func (a *App) plan(p *project.Project, namespaces []string) (*plan, error) {
 				targets = append(targets, outputKey{u, ns})
 			}
 		}
+	}
+	var unknown []string
+	for _, n := range namespaces {
+		if !matched[n] {
+			unknown = append(unknown, n)
+		}
+	}
+	if len(unknown) > 0 {
+		return nil, &unknownNamespace{names: unknown}
 	}
 	where := func(k outputKey) string {
 		return fmt.Sprintf("%d 番目の [[emit]] の名前空間 %s", p.Units[k.unit].Index, k.ns)
@@ -298,9 +305,10 @@ func (a *App) plan(p *project.Project, namespaces []string) (*plan, error) {
 			}
 			seen := map[string]bool{}
 			for _, f := range resp.Files {
-				rel, ok := pluginPath(f.Path)
+				rel, ok := pluginPath(f.Path, dir)
 				if !ok {
-					return asProc(&hostplugin.MalformedOutputError{Plugin: t.Plugin.Name, Reason: fmt.Sprintf("PLG-1: files の path %q がルートの外に出る", f.Path)})
+					return asProc(&hostplugin.MalformedOutputError{Plugin: t.Plugin.Name,
+						Reason: fmt.Sprintf("PLG-1: files の path %q が、%s の出力先 %s の下にない", f.Path, where(k), dir)})
 				}
 				if seen[rel] {
 					return asProc(&hostplugin.MalformedOutputError{Plugin: t.Plugin.Name, Reason: fmt.Sprintf("PLG-2: files の path %q が二度ある", f.Path)})
@@ -379,7 +387,7 @@ func (a *App) plan(p *project.Project, namespaces []string) (*plan, error) {
 		files, ds := golang.Emit(views[k.unit][k.ns], opts)
 		warnings, failures = splitDiags(ds, warnings, failures)
 		for _, f := range files {
-			outputs = append(outputs, output{path: cleanPath(f.Path), content: f.Content, source: "既定の出力", where: where(k), dir: p.Config.Dir(k.unit, k.ns)})
+			outputs = append(outputs, output{path: config.CleanRel(f.Path), content: f.Content, source: "既定の出力", where: where(k), dir: p.Config.Dir(k.unit, k.ns)})
 		}
 	}
 	if len(failures) == 0 {
@@ -434,7 +442,7 @@ func (a *App) importCycles(p *project.Project, views []map[string]*ir.View, targ
 		edges[k] = []outputKey{}
 		order = append(order, k)
 		for _, dir := range golang.Imports(views[k.unit][k.ns], opts) {
-			if to, ok := byDir[cleanPath(dir)]; ok {
+			if to, ok := byDir[config.CleanRel(dir)]; ok {
 				edges[k] = append(edges[k], to)
 				work = append(work, to)
 			}
@@ -518,14 +526,16 @@ func (a *App) runEmit(p *project.Project, t project.Transpiler, view *ir.View) (
 	return &resp, nil
 }
 
-// underAny は ns が names のどれかと等しいか、その子孫か。
-func underAny(ns string, names []string) bool {
+// underAny は ns が names のどれかと等しいか、その子孫か。当たった names の要素を matched に記す（すべて見る）。
+func underAny(ns string, names []string, matched map[string]bool) bool {
+	hit := false
 	for _, n := range names {
 		if ns == n || strings.HasPrefix(ns, n+".") {
-			return true
+			matched[n] = true
+			hit = true
 		}
 	}
-	return false
+	return hit
 }
 
 // splitDiags は診断を warning と error に分ける。
@@ -540,21 +550,17 @@ func splitDiags(ds, warnings, failures []diag.Diagnostic) ([]diag.Diagnostic, []
 	return warnings, failures
 }
 
-// pluginPath はプラグインの files の path をルートからの相対パスに正規化する。`..` を含む、絶対パス、空なら false（PLG-1）。
-func pluginPath(p string) (string, bool) {
+// pluginPath はトランスパイラの files の path をルートからの相対パスに正規化する。その起動の Dir(U, N)（dir）の下に
+// なければ false（PLG-1。docs/plugin-protocol.md「emit」）: 空、絶対パス、`..` で外へ出るもの、別のディレクトリ、dir そのもの。
+func pluginPath(p, dir string) (string, bool) {
 	if p == "" || filepath.IsAbs(p) || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "\\") || filepath.VolumeName(p) != "" {
 		return "", false
 	}
-	clean := path.Clean(filepath.ToSlash(p))
-	if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") {
+	clean := config.CleanRel(p)
+	if !config.Under(clean, dir) {
 		return "", false
 	}
 	return clean, true
-}
-
-// cleanPath はルートからの相対パスを "/" 区切りに正規化する。
-func cleanPath(p string) string {
-	return path.Clean(filepath.ToSlash(p))
 }
 
 // findConflicts は同じパスが二つ以上の出どころから出ていれば CFG-5 の診断を作る（docs/config.md「診断」）。
@@ -579,7 +585,8 @@ func findConflicts(outputs []output) []diag.Diagnostic {
 	return diags
 }
 
-// readOutputsFile は <root>/<dir>/.hozoc-outputs.json を読む。ファイルがなければ空。
+// readOutputsFile は <root>/<dir>/.hozoc-outputs.json を読む。ファイルがなければ空。パスは正規化するだけで、
+// dir の下かどうかは確かめない（従うかどうかは呼ぶ側が決める。WriteOutputs の 6）。
 func readOutputsFile(root, dir string) ([]string, error) {
 	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(dir), OutputsFile))
 	if err != nil {
@@ -593,7 +600,7 @@ func readOutputsFile(root, dir string) ([]string, error) {
 		return nil, fmt.Errorf("hozoc: %s/%s を読めない: %w", dir, OutputsFile, err)
 	}
 	for i, p := range paths {
-		paths[i] = cleanPath(p)
+		paths[i] = config.CleanRel(p)
 	}
 	return paths, nil
 }

@@ -1,4 +1,4 @@
-// Command go-cli は、cli の語彙（vocab/cli.hozo）を Go の CLI の骨組みにするプラグイン
+// Command go-cli は、cli の語彙（このプラグインの cli.hozo。plugins/go-cli/cli.hozo）を Go の CLI の骨組みにするプラグイン
 // （docs/plugin-go-cli.md）。標準入出力で JSON をやり取りする（docs/plugin-protocol.md「起動」）。
 // 中身は internal/gocli。
 package main

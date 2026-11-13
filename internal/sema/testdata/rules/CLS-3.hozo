@@ -38,7 +38,7 @@ namespace a {
   classify Ng12 of carts, other.remote { A; }    // ERROR: CLS-3
   classify Ng13 of shared { A; }                 // ERROR: CLS-3
   condition Ng14 of other.remote;                // ERROR: CLS-3
-  // 対象が分類の状態
+  // 対象が状態の分類
   classify Ng15 of Checkout { A; }               // ERROR: CLS-3
   classify Ng16 of carts, Session { A; }         // ERROR: CLS-3
   condition Ng17 of Checkout;                    // ERROR: CLS-3

@@ -42,7 +42,7 @@ type TitleState struct {
 	Get func() (string, error)
 }
 
-// CheckoutState は分類の状態 shop.Checkout（shop.carts, shop.orders を対象にした classify）の単位。
+// CheckoutState は状態の分類 shop.Checkout（shop.carts, shop.orders を対象にした classify）の単位。
 // 買い物の進み具合
 type CheckoutState struct {
 	// 問い合わせ: ケース Shopping の述語。
@@ -57,7 +57,7 @@ type CheckoutState struct {
 	Restart RestartFunc
 }
 
-// LoggedInState は分類の状態 shop.LoggedIn（shop.token を対象にした classify）の単位。
+// LoggedInState は状態の分類 shop.LoggedIn（shop.token を対象にした classify）の単位。
 // ログインしている
 type LoggedInState struct {
 	// 問い合わせ: ケース LoggedIn の述語。

@@ -172,6 +172,19 @@ func Build() Grammar {
 			},
 		}},
 
+		{Key: "omit", Rule: Rule{
+			Comment: "omit の並びもフィールド名の位置（docs/grammar.md「model」の ModelDecl の omit FieldName { , FieldName }）。並びの中の予約語（核の型を含む）は予約語として塗らない。is の後ろの範囲の中でだけ使う",
+			Begin:   `\b(omit)\b`,
+			End:     `(?=;)`,
+			BeginCaptures: Captures{
+				"1": {Name: "keyword.control.hozo"},
+			},
+			Patterns: []Rule{
+				{Include: "#comments"},
+				{Name: "variable.other.property.hozo", Match: `\b` + anyKeyword + `\b`},
+			},
+		}},
+
 		// ---- コメント ----
 		{Key: "comments", Rule: Rule{Patterns: []Rule{
 			{Include: "#doc-comment"},
@@ -332,13 +345,13 @@ func Build() Grammar {
 				},
 			},
 			{
-				Comment: "is / extends / of の後ろ",
+				Comment: "is / extends / of の後ろ。is の元の model の後ろには omit の並びが続く",
 				Begin:   `\b(is|extends|of)\b`,
 				End:     `(?=[;{])`,
 				BeginCaptures: Captures{
 					"1": {Name: "keyword.control.hozo"},
 				},
-				Patterns: []Rule{{Include: "#type"}},
+				Patterns: []Rule{{Include: "#omit"}, {Include: "#type"}},
 			},
 			{
 				Comment: "throws / catches の後ろの例外の名前",

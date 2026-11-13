@@ -76,7 +76,7 @@ func (OutputConflict) HozoException() string { return "hozoc.OutputConflict" }
 
 var _ runtime.Exception = OutputConflict{}
 
-// UnknownNamespace: emit の引数に、どの単位の対象でもない名前空間が指定された
+// UnknownNamespace: emit の引数の名前空間も、その子孫も、どの単位の対象でもない
 type UnknownNamespace struct{}
 
 func (UnknownNamespace) Error() string         { return "hozoc.UnknownNamespace" }
@@ -104,6 +104,8 @@ type CheckInput struct {
 	Config *Path `json:"config,omitempty"`
 	// 表示の形式
 	Format *OutputFormat `json:"format,omitempty"`
+	// プラグインを探すディレクトリ（OS のパス区切りで複数）
+	PluginPath *string `json:"pluginPath,omitempty"`
 }
 
 // EmitInput は emit の入力
@@ -116,6 +118,8 @@ type EmitInput struct {
 	Namespaces []string `json:"namespaces"`
 	// 書き出さずに、書き出す予定のファイルだけを表示する
 	DryRun *bool `json:"dryRun,omitempty"`
+	// プラグインを探すディレクトリ（OS のパス区切りで複数）
+	PluginPath *string `json:"pluginPath,omitempty"`
 }
 
 // LspInput は lsp の入力
@@ -124,6 +128,8 @@ type LspInput struct {
 	Config *Path `json:"config,omitempty"`
 	// ログの書き出し先
 	Log *Path `json:"log,omitempty"`
+	// プラグインを探すディレクトリ（OS のパス区切りで複数）
+	PluginPath *string `json:"pluginPath,omitempty"`
 }
 
 // EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）

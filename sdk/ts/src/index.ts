@@ -15,7 +15,7 @@ import {
   type PluginError,
   type Select,
 } from "./protocol.js";
-import type { View } from "./ir.js";
+import type { Decl, Namespace, Program, View, ViewedSignature } from "./ir.js";
 
 export * from "./ir.js";
 export * from "./protocol.js";
@@ -41,7 +41,10 @@ export async function main(handler: Handler): Promise<number> {
  * stderr に誤りのメッセージを書く。終了コード（docs/plugin-protocol.md「起動」）:
  * 成功なら 0。protocol が合わないか direction を実装していなければ 2
  * （stdout に {"error":{"code":"protocol"|"unsupported","message":...}}）。
- * それ以外の誤り（要求が読めない、handler が投げた、書けない）なら 1（stderr にメッセージ）。
+ * それ以外の誤り（要求が JSON のオブジェクトとして読めない、handler が投げた、書けない）なら 1（stderr にメッセージ）。
+ * protocol は文字列で PROTOCOL と等しくなければ「合わない」（ない、null、文字列でないものを含む）。文字列でない
+ * direction は、実装していない direction と同じ。Go の plugin.Run と同じ終了コードを返すことは、二つの SDK の
+ * テストが同じ表（plugin/testdata/request_head.json）で確かめる。
  */
 export async function run(handler: Handler, stdin: Readable, stdout: Sink, stderr: Sink): Promise<number> {
   let raw: string;
@@ -121,6 +124,31 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
 }
 
 /**
+ * FQN で宣言を引く。なければ undefined（Go の ir.Program.Lookup と同じ。docs/packages.md「`ir`（公開）」）。
+ * 戻り値は kind で分ける（`decl.kind === "op"` など）。
+ */
+export function lookup(program: Program, fqn: string): Decl | undefined {
+  for (const ns of program.namespaces) {
+    const decl = ns.decls.find((d) => d.name === fqn);
+    if (decl !== undefined) return decl;
+  }
+  return undefined;
+}
+
+/** FQN の名前空間を引く。グローバルは ""。なければ undefined（Go の ir.Program.Namespace と同じ）。 */
+export function namespace(program: Program, fqn: string): Namespace | undefined {
+  return program.namespaces.find((n) => n.name === fqn);
+}
+
+/**
+ * op の FQN から、view.viewer から見た関数の型（docs/ir.md「その名前空間から見た IR」の ViewedSignature）を引く。
+ * なければ undefined（Go の ir.View.Signature と同じ）。
+ */
+export function signature(view: View, op: string): ViewedSignature | undefined {
+  return Object.hasOwn(view.ops, op) ? view.ops[op] : undefined;
+}
+
+/**
  * view.viewer の名前空間の op のうち、単位の対象（span.file が view.files にある。docs/config.md「in」）で、
  * デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。名前付きデコレータを通して付いたもの
  * （Application の via）も数える。デコレータで起点を選ぶトランスパイラのための道具で、返す op はどれも select に書ける
@@ -129,7 +157,7 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
 export function opsWith(view: View, decorator: string): string[] {
   const out: string[] = [];
   const files = new Set(view.files);
-  const ns = view.program.namespaces.find((n) => n.name === view.viewer);
+  const ns = namespace(view.program, view.viewer);
   for (const decl of ns?.decls ?? []) {
     if (decl.kind !== "op" || !files.has(decl.span.file)) continue;
     if (decl.decorators.some((a) => a.decorator === decorator || a.via === decorator)) out.push(decl.name);
@@ -142,7 +170,7 @@ export function opsWith(view: View, decorator: string): string[] {
  * view.files にある。viewer の宣言でなければ false（Go の ir.View.InUnit と同じ）。
  */
 export function inUnit(view: View, fqn: string): boolean {
-  const ns = view.program.namespaces.find((n) => n.name === view.viewer);
+  const ns = namespace(view.program, view.viewer);
   const decl = ns?.decls.find((d) => d.name === fqn);
   return decl !== undefined && view.files.includes(decl.span.file);
 }

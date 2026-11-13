@@ -645,7 +645,7 @@ const (
 	subjectType subjectKind = iota
 	// subjectState は基底の状態。
 	subjectState
-	// subjectStateClassify は状態を対象にした classify（分類の状態）。
+	// subjectStateClassify は状態を対象にした classify（状態の分類）。
 	subjectStateClassify
 	// subjectUnresolved は解決できない名前。RES-* として報告する。
 	subjectUnresolved
@@ -674,7 +674,7 @@ func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.
 		}
 		return nil
 	}
-	// ここからは状態の分類として読む。状態でないもの、別の名前空間の状態、分類の状態、重複は CLS-3。
+	// ここからは状態の分類として読む。状態でないもの、別の名前空間の状態、状態の分類、重複は CLS-3。
 	ok := true
 	seen := map[string]bool{}
 	var fqns []string
@@ -686,7 +686,7 @@ func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.
 			a.resolve(t.(*ast.NamedType).Name, sc, acState|acTypePos)
 			ok = false
 		case subjectStateClassify:
-			a.errorf("CLS-3", span, "classify %s の対象 %s は分類の状態（対象にできるのは宣言した名前空間の基底の状態だけ。docs/check.md「状態の形」）", s.fqn, syms[i].fqn)
+			a.errorf("CLS-3", span, "classify %s の対象 %s は状態の分類（対象にできるのは宣言した名前空間の基底の状態だけ。docs/check.md「状態の形」）", s.fqn, syms[i].fqn)
 			ok = false
 		case subjectType:
 			if states > 0 {
@@ -722,7 +722,7 @@ func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.
 }
 
 // subjectKindOf は対象の一つを、診断も参照も残さずに見分ける。型引数のない名前が state を指せば状態、
-// 状態を対象にした classify を指せば分類の状態、解決できなければ subjectUnresolved、それ以外は型。
+// 状態を対象にした classify を指せば状態の分類、解決できなければ subjectUnresolved、それ以外は型。
 func (a *analyzer) subjectKindOf(t ast.Type, sc *scope) (subjectKind, *symbol) {
 	nt, ok := t.(*ast.NamedType)
 	if !ok || nt.Arg != nil {

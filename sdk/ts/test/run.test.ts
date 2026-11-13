@@ -5,7 +5,18 @@ import { dirname, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { PROTOCOL, UnsupportedDirectionError, inUnit, opsWith, run, type Handler, type View } from "../src/index.js";
+import {
+  PROTOCOL,
+  UnsupportedDirectionError,
+  inUnit,
+  lookup,
+  namespace,
+  opsWith,
+  run,
+  signature,
+  type Handler,
+  type View,
+} from "../src/index.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const view: View = JSON.parse(readFileSync(resolve(root, "ir", "testdata", "view.golden.json"), "utf8"));
@@ -253,4 +264,69 @@ test("inUnit: declarations of the viewer namespace whose file is in view.files",
   assert.equal(inUnit(view, "server.findUser"), false); // viewer（browser）の宣言ではない
   assert.equal(inUnit(server, "server.nope"), false);
   assert.equal(inUnit({ ...server, files: ["browser.hozo"] }, "server.findUser"), false);
+});
+
+// Go の SDK（plugin.Run）と同じ表を読む: 要求の protocol と direction の読み方と終了コード
+// （docs/plugin-protocol.md「要求と応答」「起動」）。文字列でない protocol は「合わない」で code "protocol"（終了コード 2）。
+// Go の側は plugin/plugin_test.go の TestRequestHead。
+const headCases: { cases: { name: string; request: string; exit: number; code: string }[] } = JSON.parse(
+  readFileSync(resolve(root, "plugin", "testdata", "request_head.json"), "utf8"),
+);
+
+for (const c of headCases.cases) {
+  test(`request head (shared with the Go SDK): ${c.name}`, async () => {
+    let called = "";
+    const handler: Handler = {
+      emit: () => ((called = "emit"), { files: [], warnings: [] }),
+      check: () => ((called = "check"), { diagnostics: [] }),
+      import: () => ((called = "import"), { ir: view.program, warnings: [] }),
+    };
+    const r = await exec(handler, c.request);
+    assert.equal(r.code, c.exit, `stdout ${r.stdout} stderr ${r.stderr}`);
+    if (r.code === 2) {
+      const out = JSON.parse(r.stdout);
+      assert.equal(out.error.code, c.code);
+      assert.notEqual(out.error.message, "");
+      assert.equal(called, "", "断った要求で handler を呼んだ");
+    }
+    if (r.code === 1) {
+      assert.equal(r.stdout, "");
+      assert.notEqual(r.stderr, "");
+    }
+  });
+}
+
+test("request head table is not empty", () => {
+  assert.ok(headCases.cases.length > 10);
+});
+
+// Go の ir.Program.Lookup / ir.Program.Namespace / ir.View.Signature と同じ引き方（docs/packages.md「`ir`（公開）」）。
+test("lookup / namespace / signature: same lookups as the Go ir package", () => {
+  for (const ns of view.program.namespaces) {
+    assert.equal(namespace(view.program, ns.name), ns);
+  }
+  assert.equal(namespace(view.program, "")?.name, ""); // グローバル
+  assert.equal(namespace(view.program, "no.such.namespace"), undefined);
+
+  // すべての宣言が FQN で引け、引いたものはその宣言そのもの
+  let decls = 0;
+  for (const n of view.program.namespaces) {
+    for (const d of n.decls) {
+      assert.equal(lookup(view.program, d.name), d);
+      decls++;
+    }
+  }
+  assert.ok(decls > 0);
+  assert.equal(lookup(view.program, "no.such.Decl"), undefined);
+  assert.equal(lookup(view.program, view.viewer), undefined); // 名前空間は宣言ではない
+
+  // すべての op に viewer から見た関数の型がある
+  const ops = Object.keys(view.ops);
+  assert.ok(ops.length > 0);
+  for (const fqn of ops) {
+    assert.equal(signature(view, fqn), view.ops[fqn]);
+    assert.equal(lookup(view.program, fqn)?.kind, "op");
+  }
+  assert.equal(signature(view, "no.such.op"), undefined);
+  assert.equal(signature(view, "toString"), undefined); // Object.prototype の名前を拾わない
 });

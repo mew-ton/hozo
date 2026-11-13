@@ -117,7 +117,8 @@ var runMu sync.Mutex
 // Run はプラグインを一度起動し、req を JSON にして標準入力に書き、標準出力の JSON を resp に読む
 // （docs/plugin-protocol.md「起動」）。dir はマニフェストのディレクトリ。
 //
-// 終了コードと返すエラー: 0 で JSON が読めれば nil。0 で JSON でない・形が違えば *MalformedOutputError。
+// 終了コードと返すエラー: 0 で JSON が読め、形が合えば nil。0 で JSON でない・形が違えば *MalformedOutputError
+// （形を確かめるのは、resp が *sdk.EmitResponse か *sdk.CheckResponse のとき。docs/plugin-protocol.md「応答の形」。shape.go）。
 // 2 で { "error": { "code": "protocol" | "unsupported" } } なら *PluginError。2 でそれ以外なら *MalformedOutputError。
 // ほかの終了コードと起動の失敗は *CrashedError。
 func (r Runner) Run(m *Manifest, dir string, req any, resp any) error {
@@ -176,7 +177,16 @@ func (r Runner) Run(m *Manifest, dir string, req any, resp any) error {
 	}
 	switch exitCode {
 	case 0:
-		if err := decodeOne(stdout.Bytes(), resp); err != nil {
+		// JSON として一つ読めること。次に、形（必須の項目と型。shape.go）。形を先に確かめてから resp に読むのは、
+		// encoding/json が、ない項目と null を黙って零値にするため。
+		var raw json.RawMessage
+		if err := decodeOne(stdout.Bytes(), &raw); err != nil {
+			return &MalformedOutputError{Plugin: m.Name, ExitCode: 0, Reason: "標準出力を応答の JSON として読めない", Err: err}
+		}
+		if err := checkShape(raw, resp); err != nil {
+			return &MalformedOutputError{Plugin: m.Name, ExitCode: 0, Reason: "応答の形が違う", Err: err}
+		}
+		if err := json.Unmarshal(raw, resp); err != nil {
 			return &MalformedOutputError{Plugin: m.Name, ExitCode: 0, Reason: "標準出力を応答の JSON として読めない", Err: err}
 		}
 		return nil

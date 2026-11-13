@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -97,24 +98,56 @@ func diffKeys(t *testing.T, want, got map[diagKey]bool) {
 	}
 }
 
-// TestCheckAgreement は docs/testing.md「言語サーバーと check の一致」: コーパスについて project.Load の診断と
+// TestCheckAgreement は docs/testing.md「言語サーバーと check の一致」: 各コーパスについて project.Load の診断と
 // publishDiagnostics の診断（LSP の形から戻したもの）が同じ集合であること。utf-16 と utf-8 の両方で。
+// コーパスは tests/corpus の下のすべて（足せばここにも入る）と、設計書のコーパスに warning を一つ足したもの
+// （corpusWithWarning。設計書のコーパスには診断がないので、空でない集合でも確かめる）。
 func TestCheckAgreement(t *testing.T) {
-	root := corpusWithWarning(t)
-	want := checkKeys(project.Load(root, "", nil))
-	if len(want) == 0 {
-		t.Fatal("コーパスに診断がない（warn.hozo の REL-2 の warning があるはず）")
+	corpora, err := filepath.Abs(filepath.Join("..", "..", "tests", "corpus"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, encs := range [][]string{nil, {"utf-8", "utf-16"}} {
-		c := startServer(t, Options{})
-		res, byURI := c.initialize(root, protocol.ClientCapabilities{General: &protocol.GeneralClientCapabilities{PositionEncodings: encs}})
-		enc := encoding(res.Capabilities.PositionEncoding)
-		if (encs == nil && enc != encUTF16) || (encs != nil && enc != encUTF8) {
-			t.Fatalf("positionEncoding = %q for %v", enc, encs)
+	entries, err := os.ReadDir(corpora)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := map[string]string{"design+warning": corpusWithWarning(t)}
+	for _, e := range entries {
+		if _, err := os.Stat(filepath.Join(corpora, e.Name(), "hozo.toml")); err == nil {
+			roots[e.Name()] = filepath.Join(corpora, e.Name())
 		}
-		p := project.Load(root, "", nil)
-		diffKeys(t, want, lspKeys(t, p, enc, byURI))
-		c.shutdown()
+	}
+	// docs/testing.md「コーパス」に並ぶものがそろっている（名前を変えたり消したりしたら、ここで分かる）
+	for _, name := range []string{"design", "view", "state", "select", "model", "units"} {
+		if roots[name] == "" {
+			t.Errorf("コーパス %s がない", name)
+		}
+	}
+	nonEmpty := 0
+	for name, root := range roots {
+		t.Run(name, func(t *testing.T) {
+			want := checkKeys(project.Load(root, "", nil))
+			if name == "design+warning" && len(want) == 0 {
+				t.Fatal("コーパスに診断がない（warn.hozo の REL-2 の warning があるはず）")
+			}
+			if len(want) > 0 {
+				nonEmpty++
+			}
+			for _, encs := range [][]string{nil, {"utf-8", "utf-16"}} {
+				c := startServer(t, Options{})
+				res, byURI := c.initialize(root, protocol.ClientCapabilities{General: &protocol.GeneralClientCapabilities{PositionEncodings: encs}})
+				enc := encoding(res.Capabilities.PositionEncoding)
+				if (encs == nil && enc != encUTF16) || (encs != nil && enc != encUTF8) {
+					t.Fatalf("positionEncoding = %q for %v", enc, encs)
+				}
+				p := project.Load(root, "", nil)
+				diffKeys(t, want, lspKeys(t, p, enc, byURI))
+				c.shutdown()
+			}
+		})
+	}
+	if nonEmpty < 2 {
+		t.Errorf("診断のあるコーパスが %d 個しかない（design+warning と view にはあるはず）", nonEmpty)
 	}
 }
 

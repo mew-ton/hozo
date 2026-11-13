@@ -61,6 +61,25 @@
         }
       ]
     },
+    "omit": {
+      "comment": "omit の並びもフィールド名の位置（docs/grammar.md「model」の ModelDecl の omit FieldName { , FieldName }）。並びの中の予約語（核の型を含む）は予約語として塗らない。is の後ろの範囲の中でだけ使う",
+      "begin": "\\b(omit)\\b",
+      "end": "(?=;)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.hozo"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "name": "variable.other.property.hozo",
+          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|string|boolean|int|float|Time|Duration|void|Record|list|nullable|single|none|true|false)\\b"
+        }
+      ]
+    },
     "comments": {
       "patterns": [
         {
@@ -285,7 +304,7 @@
           ]
         },
         {
-          "comment": "is / extends / of の後ろ",
+          "comment": "is / extends / of の後ろ。is の元の model の後ろには omit の並びが続く",
           "begin": "\\b(is|extends|of)\\b",
           "end": "(?=[;{])",
           "beginCaptures": {
@@ -294,6 +313,9 @@
             }
           },
           "patterns": [
+            {
+              "include": "#omit"
+            },
             {
               "include": "#type"
             }

@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-`cli` の語彙（このプラグインの `cli.hozo`。出典は設計書の `examples/hozoc.hozo`）を Go の CLI の骨組みにするプラグイン `plugins/go-cli/`。hozoc 自身の骨組みもこれで生成する（`docs/requirements.md`「自己展開」）。
+`cli` の語彙（このプラグインの語彙のファイル `plugins/go-cli/cli.hozo`。リポジトリ直下の `cli.hozo`（hozoc 自身の仕様。`docs/cli.md`）とは別のファイル。出典は設計書の `examples/hozoc.hozo`）を Go の CLI の骨組みにするプラグイン `plugins/go-cli/`。hozoc 自身の骨組みもこれで生成する（`docs/requirements.md`「自己展開」）。
 
 ## マニフェスト
 
@@ -19,7 +19,7 @@ language = "go"
 ```
 
 - 提供するトランスパイラは `go-cli` の一つ（`hozo.toml` の `transpilers = ["go-cli"]` で選ぶ）。要求の `transpiler` がそれ以外なら `code: "unsupported"`（`docs/plugin-protocol.md`「要求と応答」）。
-- `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`cli.hozo` の中身は `examples/hozoc.hozo` の `namespace cli` を写し、`x?: T` は `x: T?` に直す。
+- `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`plugins/go-cli/cli.hozo`（マニフェストの `vocabulary = ["cli.hozo"]` はマニフェストからの相対パス）の中身は `examples/hozoc.hozo` の `namespace cli` を写し、`x?: T` は `x: T?` に直す。
 - 選ぶもの（`docs/plugin-protocol.md`「選択」）: `roots` は `@cli.command` の付いた op、`stops` は `@proc.stdio` の付いた op（プロセスの境界を越える op は辿らず、口だけを出す）。どちらも単位の対象の op だけ（`plugin.OpsWith`）。`states` と `wraps` は空。
 - `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため（作業ディレクトリがリポジトリのルートで、`go.mod` がある）。配布するときはビルドした実行ファイル `hozoc-plugin-go-cli` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go-cli/` に置く（`docs/plugin-protocol.md`「探索」）。
 
@@ -58,7 +58,7 @@ type JSONPresenter struct{}
 - `@cli.arg` に `boolean` は付けられない（CLI-3）。
 - 同じ `@cli.flag` の名前、同じ `@cli.command` の名前が二つあれば CLI-5。
 
-CLI-* は emit の応答の `errors`（`docs/plugin-protocol.md`）。
+CLI-* は emit の応答の `errors` で返す（`docs/plugin-protocol.md`「emit」）ので、どれも error の診断になる。
 
 ## 引数の解釈
 
@@ -106,10 +106,10 @@ N のパッケージの型・メソッド名は `plugin/golang`（`docs/packages
 
 ## 診断
 
-| ID | 意味 |
-|---|---|
-| CLI-1 | `@cli.command` の op の引数が、0 個でも model 一つでもない |
-| CLI-2 | 入力の model のフィールドに `cli` のデコレータがない |
-| CLI-3 | フィールドの型が受け付けられない |
-| CLI-4 | `array` の `@cli.arg` が最後でない、または二つ以上 |
-| CLI-5 | フラグ名かコマンド名の重複 |
+| ID | 重さ | 意味 |
+|---|---|---|
+| CLI-1 | error | `@cli.command` の op の引数が、0 個でも model 一つでもない |
+| CLI-2 | error | 入力の model のフィールドに `cli` のデコレータがない |
+| CLI-3 | error | フィールドの型が受け付けられない |
+| CLI-4 | error | `array` の `@cli.arg` が最後でない、または二つ以上 |
+| CLI-5 | error | フラグ名かコマンド名の重複 |

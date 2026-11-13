@@ -10,7 +10,7 @@ package hozoc
 // Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 // Effects: hozoc.syncOutputs
 func (o *ops) Emit(in EmitInput) (EmitResult, error) {
-	checked, err := o.Check(CheckInput{Config: in.Config, Format: in.Format})
+	checked, err := o.Check(CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath})
 	if err != nil {
 		return EmitResult{}, err
 	}

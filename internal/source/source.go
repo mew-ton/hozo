@@ -100,6 +100,33 @@ func (fs *FileSet) Position(id FileID, off Offset) Pos {
 	return Pos{Line: i + 1, Col: col}
 }
 
+// Offset は Position の逆: 1 始まりの行・列（コードポイント）をバイトのオフセットに戻す（docs/diagnostics.md「位置」）。
+// IR の Span（行・列）やプラグインの "file:line:col" を診断の Span にするときに使う。行の先頭は Add が作った行の表から
+// 引くので、行数によらず一定の手間で済む。行がファイルの終わりを越えればファイルの終わり、列が行の終わりを越えれば
+// その行の終わり（改行の位置）。1 より小さい行と列は 1 として扱う。知らない FileID なら 0。
+func (fs *FileSet) Offset(id FileID, pos Pos) Offset {
+	f := fs.get(id)
+	if f == nil {
+		return 0
+	}
+	line := pos.Line
+	if line < 1 {
+		line = 1
+	}
+	if line > len(f.lines) {
+		return Offset(len(f.content))
+	}
+	off := int(f.lines[line-1])
+	for col := 1; col < pos.Col && off < len(f.content); col++ {
+		if f.content[off] == '\n' {
+			break
+		}
+		_, n := utf8.DecodeRune(f.content[off:])
+		off += n
+	}
+	return Offset(off)
+}
+
 func (fs *FileSet) get(id FileID) *file {
 	if int(id) < 0 || int(id) >= len(fs.files) {
 		return nil

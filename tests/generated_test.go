@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-// generatedDir は cli.hozo からの生成物の置き場（hozo.toml の [hozoc] out。docs/packages.md「生成するもの」）。
+// generatedDir は cli.hozo からの生成物の置き場（hozo.toml の単位 [[emit]] の out。docs/packages.md「生成するもの」）。
 const generatedDir = "internal/gen/hozoc"
 
 // TestGeneratedUpToDate は、コミットされた internal/gen/hozoc/** が cli.hozo から遅れていないこと

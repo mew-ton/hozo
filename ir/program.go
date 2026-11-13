@@ -1,7 +1,5 @@
 package ir
 
-import "encoding/json"
-
 // Version は IR の構造の版（docs/ir.md「Program」の version）。構造が変わったら上げる。
 const Version = "0.2"
 
@@ -177,6 +175,3 @@ var declTable = map[string]func([]byte) (Decl, error){
 func UnmarshalDecl(data []byte) (Decl, error) {
 	return decodeUnion("decl", data, declTable)
 }
-
-// MarshalDecl は Decl を JSON に書く。nil は null。
-func MarshalDecl(d Decl) ([]byte, error) { return json.Marshal(d) }

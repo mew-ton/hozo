@@ -122,7 +122,7 @@ func (e *emitter) computeSelection() *selection {
 }
 
 // selectState は viewer の基底の状態か状態の分類を選ぶ。それ以外の FQN は何もしない。
-// 分類の状態を選んでも、その対象の基底の状態は選ばない（読むのは分類の述語）。
+// 状態の分類を選んでも、その対象の基底の状態は選ばない（読むのは分類の述語）。
 func (s *selection) selectState(e *emitter, fqn string) {
 	if e.declNS[fqn] != e.viewer {
 		return
@@ -157,7 +157,7 @@ func (e *emitter) effectOf(op *ir.Op) *ir.Effect {
 }
 
 // effectTargetOf は葉の op が直に持つ効果の宛先の状態（docs/emit-go.md「state」の「命令」）: 組み込みの効果なら
-// その基底の状態、遷移なら of が指す分類の状態か基底の状態。効果を持たなければ ""。
+// その基底の状態、遷移なら of が指す状態の分類か基底の状態。効果を持たなければ ""。
 func (e *emitter) effectTargetOf(op *ir.Op) string {
 	eff := e.effectOf(op)
 	if eff == nil {

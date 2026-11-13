@@ -72,7 +72,7 @@ func copyCorpus(t *testing.T) string {
 }
 
 // TestDesignCorpus は設計書のコーパス（docs/testing.md「コーパス」）: error も warning もない
-// （§7.3 の placeOrder は配線に直したので、名前で書いた relations への REL-3 はもうない。tests/corpus/design/README.md の表の 14）。
+// （tests/corpus/design/README.md の想定。§7.3 の placeOrder を配線に直した経緯はその表の 14）。
 func TestDesignCorpus(t *testing.T) {
 	p := Load(corpusDir, "", nil)
 	if p.NoConfig {
@@ -383,8 +383,6 @@ func TestPluginCheck(t *testing.T) {
 // プラグインが提供している）、CFG-16（一つの単位の言語がそろっていない）、CFG-11（単位の言語が ts）。
 func TestResolveTranspilers(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("HOZO_PLUGIN_PATH", "")
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
 	// kit は二つのトランスパイラ（go-a、go-b）を提供する。ts-kit は言語の違うトランスパイラ
 	fakePlugin(t, dir, "kit", "go", "", `{}`, 0, "go-a", "go-b")
@@ -445,12 +443,65 @@ func TestResolveTranspilers(t *testing.T) {
 	}
 }
 
+// TestDiscoveryEnvironmentComesFromCaller は docs/plugin-protocol.md「探索」の 2 と 3: プロジェクトの外でプラグインを探す場所
+// （HOZO_PLUGIN_PATH とホーム）は、呼ぶ側が Options で渡したものだけ。プロセスの環境変数とホームディレクトリは読まない
+// （読めば、テストや検査の結果が実行する人の環境に入っているプラグインに左右される）。
+func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
+
+	// プロセスの環境に、壊れたマニフェストのあるディレクトリを向ける。読めば MAN-4 が出る
+	hostilePath, hostileHome := t.TempDir(), t.TempDir()
+	write(t, filepath.Join(hostilePath, "broken", "hozo-plugin.toml"), "name = \n")
+	write(t, filepath.Join(hostileHome, ".hozo", "plugins", "broken-home", "hozo-plugin.toml"), "name = \n")
+	t.Setenv("HOZO_PLUGIN_PATH", hostilePath)
+	t.Setenv("HOME", hostileHome)
+	t.Setenv("USERPROFILE", hostileHome)
+	for name, p := range map[string]*Project{
+		"Load":     Load(dir, "", nil),
+		"LoadWith": LoadWith(Options{Root: dir}),
+	} {
+		if len(p.Diags) != 0 || len(p.Plugins) != 1 || p.Plugins[0].Name != "t" {
+			t.Errorf("%s がプロセスの環境を読んだ: plugins = %d\n%s", name, len(p.Plugins), text(p))
+		}
+	}
+
+	// 渡せば探す。順は plugin_dirs、PluginPath、Home（同じ名前は近いものだけ）
+	envDir, home := t.TempDir(), t.TempDir()
+	manifest := func(name, transpiler string) string {
+		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.2\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\n"
+	}
+	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
+	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
+	write(t, filepath.Join(home, ".hozo", "plugins", "from-home", "hozo-plugin.toml"), manifest("from-home", "home-t"))
+	write(t, filepath.Join(home, ".hozo", "plugins", "from-env", "hozo-plugin.toml"), "name = \n") // PluginPath の from-env が先
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+
+		"[[emit]]\nnamespace = \"a\"\ntranspilers = [\"t\", \"env-t\", \"home-t\"]\nout = \"gen/a\"\n")
+	p := LoadWith(Options{Root: dir, PluginPath: t.TempDir() + string(filepath.ListSeparator) + envDir, Home: home})
+	var names []string
+	for _, pl := range p.Plugins {
+		names = append(names, pl.Name)
+	}
+	if len(p.Diags) != 0 || strings.Join(names, ",") != "t,from-env,from-home" || len(p.Units) != 1 || len(p.Units[0].Transpilers) != 3 {
+		t.Errorf("plugins = %v\n%s", names, text(p))
+	}
+	// 渡さなければ、env-t と home-t を提供するプラグインは入っていない（CFG-14）
+	if got := strings.Join(codes(Load(dir, "", nil).Diags), ","); got != "CFG-14,CFG-14" {
+		t.Errorf("codes = %v, want CFG-14,CFG-14", got)
+	}
+	// 渡した場所の壊れたマニフェストは、使っていなくても報告する（MAN-4）
+	p = LoadWith(Options{Root: dir, PluginPath: hostilePath, Home: hostileHome})
+	if got := strings.Join(codes(p.Diags), ","); !strings.Contains(got, "MAN-4,MAN-4") {
+		t.Errorf("codes = %v, want MAN-4 が二つ\n%s", got, text(p))
+	}
+}
+
 // TestManifestDiagnosticsOfInstalledPlugins は docs/plugin-protocol.md「探索」: 読めないマニフェスト（MAN-4）と name の違う
 // マニフェスト（MAN-3）は使っていなくても報告し、protocol の不一致（MAN-2）は使うプラグインにだけ報告する。
 func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("HOZO_PLUGIN_PATH", "")
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
 	write(t, filepath.Join(dir, "plugins", "old", "hozo-plugin.toml"), "name = \"old\"\ncommand = \"old\"\nprotocol = \"0.1\"\n\n[[transpiler]]\nname = \"old\"\nlanguage = \"go\"\n")
@@ -480,8 +531,6 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 // in に合うファイルに宣言を持たない名前空間は、その単位では出力しない。どのファイルにも合わなければ CFG-18。
 func TestUnitIn(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("HOZO_PLUGIN_PATH", "")
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
 	write(t, filepath.Join(dir, "shop", "api.hozo"), "namespace shop {\n  model Item { id: string; }\n  op open(item: Item);\n}\n")
 	// batch.hozo は同じ名前空間 shop の続きと、子の名前空間 shop.jobs。検査は in によらず全体に掛かる（Item を参照できる）
@@ -537,8 +586,6 @@ func TestUnitIn(t *testing.T) {
 // 対象の宣言に付いている。同じ宣言を二つの単位が対象にしていても一度だけ。in の外の宣言には出ない。
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("HOZO_PLUGIN_PATH", "")
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
 		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.2\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator legacy;\n  @legacy op f();\n}\n")

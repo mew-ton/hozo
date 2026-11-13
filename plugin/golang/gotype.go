@@ -50,7 +50,7 @@ func GoType(t ir.Type, imports *Imports) string {
 		return refType(x.Target, imports)
 	case ir.OptionalType:
 		inner := GoType(x.Of, imports)
-		if isNillable(x.Of) {
+		if IsNillable(x.Of) {
 			return inner
 		}
 		return "*" + inner
@@ -64,13 +64,14 @@ func GoType(t ir.Type, imports *Imports) string {
 	panic(fmt.Sprintf("golang: unknown ir.Type %T", t))
 }
 
-// isNillable は、その型の Go の零値 nil が「なし」を表せるか（array と record。case は of を見る）。
-func isNillable(t ir.Type) bool {
+// IsNillable は、その型の Go の零値 nil が「なし」を表せるか（array と record。case は of を見る。docs/emit-go.md「型」の
+// optional の行）。optional(T) が *T にならず T のままになるのは、T がこれに当たるとき。
+func IsNillable(t ir.Type) bool {
 	switch x := t.(type) {
 	case ir.ArrayType, ir.RecordType:
 		return true
 	case ir.CaseType:
-		return isNillable(x.Of)
+		return IsNillable(x.Of)
 	}
 	return false
 }

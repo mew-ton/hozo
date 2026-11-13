@@ -40,7 +40,7 @@ type ShowEmptyFunc func() error
 // ShowCartFunc は op shop.showCart の関数の型。
 type ShowCartFunc func() error
 
-// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙を読むトランスパイラがフィールドを埋める。
 // 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
 type Leaves struct {
 	Notify    NotifyFunc
@@ -102,12 +102,12 @@ type StockReserveFunc func(order Order) error
 // pick が包む関数を引き受けるデコレータ（select の wraps）
 type IssueTCacheWrapper func(order Order, next IssueFunc) (Receipt, error)
 
-// TCacheWrappers は @t.cache の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+// TCacheWrappers は @t.cache の包む関数。そのデコレータを引き受けたトランスパイラがフィールドを埋める。
 type TCacheWrappers struct {
 	Issue IssueTCacheWrapper
 }
 
-// Wrappers は、プラグインが select の wraps で引き受けたデコレータの適用の「包む関数」。デコレータごとに一つの構造体。
+// Wrappers は、トランスパイラが select の wraps で引き受けたデコレータの適用の「包む関数」。デコレータごとに一つの構造体。
 // 埋めていない包む関数に当たったら *runtime.MissingError（Kind は "wrapper"）。
 type Wrappers struct {
 	TCache TCacheWrappers

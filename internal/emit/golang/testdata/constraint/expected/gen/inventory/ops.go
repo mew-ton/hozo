@@ -7,7 +7,7 @@ import "github.com/mew-ton/hozo/runtime"
 // PutFunc は op inventory.put の関数の型。
 type PutFunc func(item Item) error
 
-// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙を読むトランスパイラがフィールドを埋める。
 // 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
 type Leaves struct {
 	Put PutFunc

@@ -1,0 +1,4 @@
+// CFG-7（docs/config.md「診断」）: 単位の out がプロジェクトのルートそのもの（ng_7.toml）
+namespace a {
+  op f();
+}

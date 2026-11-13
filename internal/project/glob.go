@@ -6,13 +6,15 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mew-ton/hozo/internal/config"
 )
 
 // matchGlob は "/" 区切りの相対パス name が glob pattern に合うかどうか。
 // セグメントごとに path.Match で比べ、"**" のセグメントは 0 個以上のセグメントに合う（docs/config.md「形」の
 // `sources = ["**/*.hozo"]`）。pattern は "./" や余分な "/" を取り除いて比べる。
 func matchGlob(pattern, name string) bool {
-	return matchSegments(strings.Split(cleanRel(pattern), "/"), strings.Split(name, "/"))
+	return matchSegments(strings.Split(config.CleanRel(pattern), "/"), strings.Split(name, "/"))
 }
 
 func matchSegments(p, n []string) bool {
@@ -45,16 +47,6 @@ func hasMeta(pattern string) bool {
 	return strings.ContainsAny(pattern, "*?[")
 }
 
-// cleanRel はパスを "/" 区切りに正規化し、先頭の "./" と "/" を落とす。
-func cleanRel(p string) string {
-	p = path.Clean(filepath.ToSlash(p))
-	p = strings.TrimPrefix(p, "/")
-	if p == "." {
-		return ""
-	}
-	return p
-}
-
 // excluder は除くディレクトリの集合（各単位の out と plugin_dirs。docs/config.md「形」）。
 type excluder []string
 
@@ -78,7 +70,7 @@ func collectSources(root string, patterns []string, ex excluder) ([]string, erro
 	seen := map[string]bool{}
 	var walk []string
 	for _, pat := range patterns {
-		clean := cleanRel(pat)
+		clean := config.CleanRel(pat)
 		if clean == "" {
 			continue
 		}

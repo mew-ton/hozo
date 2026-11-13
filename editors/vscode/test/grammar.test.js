@@ -133,6 +133,31 @@ test('フィールド名の位置の予約語は予約語として塗らない',
   const c = tokensOf('const name = label(res.state, res.op);');
   assertScope(c, 'const name', 'state', prop);
   assertScope(c, 'const name', 'op', prop);
+  // omit の並び（docs/grammar.md「model」の ModelDecl）もフィールド名の位置。核の型も、宣言の頭も、節の頭も塗らない
+  const o = tokensOf('model Slim is server.Wrap omit op, to, string, model, default, hash;');
+  for (const w of ['op', 'to', 'string', 'model', 'default']) {
+    assertScope(o, 'model Slim', w, prop, w === 'model' ? 1 : 0);
+    for (const kw of ['keyword.declaration.hozo', 'keyword.control.hozo', 'support.type.primitive.hozo']) {
+      assert.ok(!scopesAt(o, 'model Slim', w, w === 'model' ? 1 : 0).includes(kw), `omit の並びの ${w} が ${kw}`);
+    }
+  }
+  // omit そのものは節の頭の予約語。元の model は型の位置の名前。予約語でないフィールド名には scope を付けない
+  assertScope(o, 'model Slim', 'omit', 'keyword.control.hozo');
+  assertScope(o, 'model Slim', 'is', 'keyword.control.hozo');
+  assertScope(o, 'model Slim', 'model', 'keyword.declaration.hozo', 0);
+  assertScope(o, 'model Slim', 'server.Wrap', 'entity.name.type.hozo');
+  assert.ok(!o[0].tokens.some((t) => t.text.includes('hash') && t.scopes.length > 1));
+  // 並びは ; まで。行をまたいでもよく、; の後ろは元に戻る
+  const ml = tokensOf('model Slim is Wrap\n  omit state, // 状態\n    list;\nmodel Next { list: list<string>; }\nop next(): string;');
+  assertScope(ml, 'omit state', 'state', prop);
+  assertScope(ml, 'omit state', '// 状態', 'comment.line.double-slash.hozo');
+  assertScope(ml, '    list;', 'list', prop);
+  assertScope(ml, 'model Next', 'list', prop, 0);
+  assertScope(ml, 'model Next', 'list', 'support.type.primitive.hozo', 1);
+  assertScope(ml, 'op next', 'op', 'keyword.declaration.hozo');
+  assertScope(ml, 'op next', 'string', 'support.type.primitive.hozo');
+  // 実物: コーパスの omit
+  assertScope(linesOf(files.server), 'model PublicUser is User omit hash;', 'omit', 'keyword.control.hozo');
   // 宣言の頭と文の頭は予約語のまま
   const d = tokensOf('op run(): Wrap { return fetch(); }');
   assertScope(d, 'op run', 'op', 'keyword.declaration.hozo');

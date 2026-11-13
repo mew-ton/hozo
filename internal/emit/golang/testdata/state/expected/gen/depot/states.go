@@ -12,7 +12,7 @@ type ItemsState struct {
 	Order OrderFunc
 }
 
-// LevelState は分類の状態 depot.Level（depot.items, depot.lock を対象にした classify）の単位。
+// LevelState は状態の分類 depot.Level（depot.items, depot.lock を対象にした classify）の単位。
 type LevelState struct {
 	// 問い合わせ: ケース Low の述語。
 	Low func() (bool, error)

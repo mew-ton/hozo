@@ -28,17 +28,20 @@ func stripOptional(t ir.Type) (ir.Type, bool) {
 	return t, false
 }
 
-// isNillable は Go の零値 nil が「なし」を表す型か（optional、array、record、union、void）。
+// isNillable は Go の零値 nil が「なし」を表す型か（optional、array、record、union、void）。array と record の規則は
+// plugin/golang.IsNillable（optional(T) を *T にしない型）と同じもので、ここはそれに、型だけでは決まらないもの
+// （union への ref はインターフェース）と、optional そのもの・void を足す。
 func (e *emitter) isNillable(t ir.Type) bool {
 	switch x := stripCase(t).(type) {
 	case nil:
 		return true
-	case ir.OptionalType, ir.ArrayType, ir.RecordType:
+	case ir.OptionalType:
 		return true
 	case ir.RefType:
 		return e.union(x.Target) != nil
+	default:
+		return gol.IsNillable(x)
 	}
-	return false
 }
 
 // scalarChain は scalar の継承を元の方へ辿った列（自分を含む。自分が先頭）。循環は TYPE-9 で弾かれている。
@@ -75,11 +78,6 @@ func (e *emitter) coreOf(t ir.Type) (ir.CoreName, bool) {
 		}
 	}
 	return "", false
-}
-
-// coreGoType は核の型の Go の型（time は修飾だけ。import は呼ぶ側が足す）。
-func coreGoType(c ir.CoreName) string {
-	return gol.GoType(ir.CoreType{Name: c}, nil)
 }
 
 // isNumeric は min / max を付けられる核の型か（docs/emit-go.md「scalar」: 数値の比較）。

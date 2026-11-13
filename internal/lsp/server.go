@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
@@ -27,6 +26,13 @@ type Options struct {
 	ConfigPath string
 	// Log はログの書き出し先（--log）。nil なら捨てる。標準エラーには書かない（docs/lsp.md「通信」）。
 	Log io.Writer
+	// Env はプラグイン（check を持つもの）に渡す環境変数の元。nil なら os.Environ()。
+	Env []string
+	// PluginPath と Home は、プラグインの探索が見るプロジェクトの外の場所（docs/plugin-protocol.md「探索」の 2 と 3:
+	// HOZO_PLUGIN_PATH の値と、ホームディレクトリ）。空なら探さない。サーバーはプロセスの環境から読まない
+	// （internal/app が渡す）。
+	PluginPath string
+	Home       string
 }
 
 // debounceDelay は didChange から解析し直すまでの待ち時間（docs/lsp.md「プロジェクト」の 150 ms）。
@@ -490,7 +496,7 @@ func (s *server) stopTimer() {
 	s.pending = false
 }
 
-// reanalyze はプロジェクト全体を解析し直し（internal/project.Load。docs/lsp.md「プロジェクト」）、診断を発行する。
+// reanalyze はプロジェクト全体を解析し直し（internal/project.LoadWith。docs/lsp.md「プロジェクト」）、診断を発行する。
 // 待ち合わせ中の didChange もここでまとめて反映する。
 func (s *server) reanalyze() {
 	s.stopTimer()
@@ -507,7 +513,9 @@ func (s *server) reanalyze() {
 		ConfigPath: s.opts.ConfigPath,
 		Overlay:    overlay,
 		Stderr:     s.logW, // 標準エラーには書かない（docs/lsp.md「通信」）
-		Env:        os.Environ(),
+		Env:        s.opts.Env,
+		PluginPath: s.opts.PluginPath,
+		Home:       s.opts.Home,
 	})
 	s.fileIDs = make(map[string]source.FileID, s.proj.Files.Len())
 	for i := 0; i < s.proj.Files.Len(); i++ {
@@ -525,8 +533,9 @@ func (s *server) reanalyze() {
 	s.publishAll()
 }
 
-// publishAll は docs/lsp.md「プロジェクト」の発行: プロジェクトのすべてのファイルについて publishDiagnostics を送る。
-// 診断がなくなったファイルには空の配列を送り、前回と同じ内容なら送らない。
+// publishAll は docs/lsp.md「プロジェクト」の発行: 診断のあるファイルについて publishDiagnostics を送る。前回送って今回は
+// 診断がなくなったファイルには空の配列を送り、前回と同じ内容なら送らない。一度も送っていないファイルに空の配列は
+// 送らない（診断のないファイルと語彙のファイルのぶんだけ、初めに空の通知が並ぶのを避ける）。
 func (s *server) publishAll() {
 	byURI := s.lspDiagnostics()
 	uris := make([]string, 0, len(byURI)+len(s.published))

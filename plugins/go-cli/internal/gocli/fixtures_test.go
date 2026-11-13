@@ -76,7 +76,7 @@ func param(name, model string) []ir.OpParam {
 	return []ir.OpParam{{Name: name, Type: ir.Ref(model), Span: sp(0)}}
 }
 
-// vocabNamespaces は cli と proc の語彙（vocab/cli.hozo、vocab/proc.hozo）のうちテストに要る宣言。
+// vocabNamespaces は cli と proc の語彙（plugins/go-cli/cli.hozo、vocab/proc.hozo）のうちテストに要る宣言。
 func vocabNamespaces() []ir.Namespace {
 	dec := func(fqn string, targets []ir.DecoratorTarget, params ...ir.Param) ir.Decl {
 		return &ir.Decorator{DeclBase: ir.DeclBase{Name: fqn, Span: sp(0)}, Params: params, Targets: targets}
@@ -162,16 +162,19 @@ func hozocNamespace() ir.Namespace {
 			mdl("hozoc.CheckInput", "check の入力",
 				fld("config", "設定ファイルの場所", ir.Optional(ir.Ref(path)), cliFlag("config"), cliEnv("HOZO_CONFIG")),
 				fld("format", "表示の形式", ir.Optional(ir.Ref("hozoc.OutputFormat")), cliFlag("format")),
+				fld("pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）", ir.Optional(ir.String()), cliEnv("HOZO_PLUGIN_PATH")),
 			),
 			mdl("hozoc.EmitInput", "emit の入力",
 				fld("config", "設定ファイルの場所", ir.Optional(ir.Ref(path)), cliFlag("config"), cliEnv("HOZO_CONFIG")),
 				fld("format", "表示の形式", ir.Optional(ir.Ref("hozoc.OutputFormat")), cliFlag("format")),
 				fld("namespaces", "生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す", ir.Array(ir.String()), cliArg()),
 				fld("dryRun", "書き出さずに、書き出す予定のファイルだけを表示する", ir.Optional(ir.Boolean()), cliFlag("dry-run")),
+				fld("pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）", ir.Optional(ir.String()), cliEnv("HOZO_PLUGIN_PATH")),
 			),
 			mdl("hozoc.LspInput", "lsp の入力",
 				fld("config", "設定ファイルの場所", ir.Optional(ir.Ref(path)), cliFlag("config"), cliEnv("HOZO_CONFIG")),
 				fld("log", "ログの書き出し先", ir.Optional(ir.Ref(path)), cliFlag("log"), cliEnv("HOZO_LSP_LOG")),
+				fld("pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）", ir.Optional(ir.String()), cliEnv("HOZO_PLUGIN_PATH")),
 			),
 			opDecl("hozoc.check", "仕様を検査する。ファイルは書き出さない。", param("in", "hozoc.CheckInput"), ir.Ref("hozoc.CheckResult"),
 				[]string{"hozoc.CheckFailed", "hozoc.ConfigInvalid", "hozoc.LanguageMismatch", "proc.Crashed", "proc.MalformedOutput"},

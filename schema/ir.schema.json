@@ -1125,7 +1125,7 @@
     },
     "File": {
       "additionalProperties": false,
-      "description": "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス、content は UTF-8 の文字列。",
+      "description": "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス（emit の応答では、その起動の view.config.dir の下。そうでなければ PLG-1）、content は UTF-8 の文字列。",
       "properties": {
         "content": {
           "type": "string"

@@ -47,33 +47,37 @@ func TestParseAllHozo(t *testing.T) {
 	}
 }
 
-// TestParseCliHozoInDocs は、docs/cli.md「cli.hozo」のコードブロックが解析できることを確かめる。
-// 段階 2 でリポジトリ直下の cli.hozo になるまでの間、文書の方を検査の対象にする。
-func TestParseCliHozoInDocs(t *testing.T) {
+// TestDocsEmbedRootFiles は、docs/cli.md「cli.hozo」に埋め込んだ二つのコードブロックが、リポジトリ直下の cli.hozo と
+// hozo.toml の写しであること（バイト単位で同じ）を確かめる。文書は「写し」と言っているので、片方だけを直せばここで分かる。
+// 写しが同じなら、cli.hozo が解析と検査を通ること（TestSelfCheck）は文書のブロックにも言える。
+func TestDocsEmbedRootFiles(t *testing.T) {
 	content, err := os.ReadFile("../docs/cli.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(content)
-	start := strings.Index(s, "```ts\n")
-	if start < 0 {
-		t.Fatal("no ```ts block in docs/cli.md")
-	}
-	start += len("```ts\n")
-	end := strings.Index(s[start:], "\n```")
-	if end < 0 {
-		t.Fatal("unterminated code block")
-	}
-	src := s[start : start+end]
-	fs := source.NewFileSet()
-	id := fs.Add("docs/cli.md#cli.hozo", []byte(src))
-	file, diags := syntax.Parse(fs, id)
-	if len(diags) > 0 {
-		buf := new(strings.Builder)
-		_ = diag.WriteText(buf, diags, fs)
-		t.Fatalf("syntax errors:\n%s", buf.String())
-	}
-	if file == nil || len(file.Decls) != 1 {
-		t.Fatalf("expected one namespace declaration, got %d", len(file.Decls))
+	for _, c := range []struct{ fence, file string }{
+		{"```ts\n", "cli.hozo"},
+		{"```toml\n", "hozo.toml"},
+	} {
+		t.Run(c.file, func(t *testing.T) {
+			s := string(content)
+			if n := strings.Count(s, c.fence); n != 1 {
+				t.Fatalf("docs/cli.md に %q のブロックが %d 個ある（一つのはず）", strings.TrimSpace(c.fence), n)
+			}
+			start := strings.Index(s, c.fence) + len(c.fence)
+			end := strings.Index(s[start:], "\n```\n")
+			if end < 0 {
+				t.Fatal("コードブロックが閉じていない")
+			}
+			block := s[start:start+end] + "\n"
+			want, err := os.ReadFile(filepath.Join("..", c.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if block != string(want) {
+				t.Errorf("docs/cli.md の %s のブロックが、リポジトリ直下の %s と違う（どちらかを直して合わせる）:\n%s",
+					c.file, c.file, firstDiff(string(want), block))
+			}
+		})
 	}
 }

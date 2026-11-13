@@ -64,7 +64,7 @@ namespace hozoc {
   @cli.exitCode(3)
   exception OutputConflict: Diagnostics;
 
-  /** emit の引数に、どの単位の対象でもない名前空間が指定された */
+  /** emit の引数の名前空間も、その子孫も、どの単位の対象でもない */
   @cli.exitCode(64)
   exception UnknownNamespace;
 
@@ -86,6 +86,8 @@ namespace hozoc {
     @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** 表示の形式 */
     @cli.flag("format") format: OutputFormat?;
+    /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
+    @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
   }
 
   /** emit の入力 */
@@ -98,6 +100,8 @@ namespace hozoc {
     @cli.arg namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
+    /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
+    @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
   }
 
   /** lsp の入力 */
@@ -106,6 +110,8 @@ namespace hozoc {
     @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** ログの書き出し先 */
     @cli.flag("log") @cli.env("HOZO_LSP_LOG") log: Path?;
+    /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
+    @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
   }
 
   /** 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか */
@@ -139,7 +145,7 @@ namespace hozoc {
    * @param checked 検査の結果
    * @throws CheckFailed トランスパイラが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした。ファイルは書き出さない
-   * @throws UnknownNamespace 引数の名前空間がどの単位の対象でもない。ファイルは書き出さない
+   * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない。ファイルは書き出さない
    * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
    */
   op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
@@ -158,7 +164,7 @@ namespace hozoc {
     throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict | UnknownNamespace prevents effects
     throws proc.Crashed | proc.MalformedOutput prevents effects
   {
-    const checked = check({ config: in.config, format: in.format });
+    const checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
     return writeOutputs(in, checked);
   }
 
@@ -179,16 +185,16 @@ namespace hozoc {
   /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）。transpiler は起動するトランスパイラの名前 */
   model EmitRequest { protocol: string; direction: string; transpiler: string; view: View; }
 
-  /** プラグインの warning（同「emit」の応答の warnings の要素） */
+  /** トランスパイラの warning（同「emit」の応答の warnings の要素） */
   model PluginWarning { at: string; message: string; }
 
-  /** プラグインの error（同「emit」の応答の errors の要素） */
+  /** トランスパイラの error（同「emit」の応答の errors の要素） */
   model PluginError { code: string; at: string; message: string; }
 
-  /** プラグインが包む関数を実装するデコレータの適用（同「選択」の wraps の要素） */
+  /** トランスパイラが包む関数を実装するデコレータの適用（同「選択」の wraps の要素） */
   model Wrap { op: string; decorator: string; }
 
-  /** プラグインが選んだ出力の対象（同「選択」） */
+  /** トランスパイラが選んだ出力の対象（同「選択」） */
   model Select { roots: string[]; stops: string[]; states: string[]; wraps: Wrap[]; }
 
   /** 展開のときのプラグインからの出力（同「emit」の応答） */

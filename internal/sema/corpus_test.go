@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
 )
 
@@ -14,13 +13,9 @@ import (
 // warning は許し、表示する（README.md の想定は error も warning もなし）。
 func TestCorpusDesign(t *testing.T) {
 	dir := filepath.Join("..", "..", "tests", "corpus", "design")
-	cfg, cfgDiags := config.Load(filepath.Join(dir, "hozo.toml"))
-	if n, _ := diag.Count(cfgDiags); n > 0 {
-		t.Fatalf("hozo.toml にエラー: %+v", cfgDiags)
-	}
 	p := loadDir(t, dir)
 	fs, files := parseProject(t, p, true)
-	res := Analyze(fs, files, cfg)
+	res := Analyze(fs, files)
 
 	var buf bytes.Buffer
 	_ = diag.WriteText(&buf, res.Diags, fs)

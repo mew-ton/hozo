@@ -244,7 +244,7 @@ var descriptions = map[string]string{
 	"CheckResponse":        "\"check\" の応答（docs/plugin-protocol.md「check」）。",
 	"ImportRequest":        "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",
 	"ImportResponse":       "\"import\" の応答（docs/plugin-protocol.md「import」）。",
-	"File":                 "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス、content は UTF-8 の文字列。",
+	"File":                 "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス（emit の応答では、その起動の view.config.dir の下。そうでなければ PLG-1）、content は UTF-8 の文字列。",
 	"Warning":              "warning の診断（docs/plugin-protocol.md「emit」）。at は FQN か \"file:line:col\"。",
 	"Diagnostic":           "emit の errors の要素（docs/plugin-protocol.md「emit」）。severity は省ける（常に error）。",
 	"CheckDiagnostic":      "check の diagnostics の要素（docs/plugin-protocol.md「check」）。severity を必ず持つ。",

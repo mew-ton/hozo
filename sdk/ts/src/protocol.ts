@@ -1,6 +1,7 @@
 // プラグインのプロトコルの要求と応答（docs/plugin-protocol.md「要求と応答」）。
 // 形は Go の plugin パッケージ（docs/packages.md「`plugin`（公開）」）と同じで、
-// schema/ir.schema.json の $defs（EmitRequest など）がそれを記述する。
+// schema/ir.schema.json の $defs（EmitRequest など）がそれを記述する。このファイルはその $defs を手で写したもので、
+// 写しが合っていること（項目の名前、必須かどうか、型）は test/protocol.test.ts が確かめる（docs/packages.md「生成するもの」）。
 import type { Program, View } from "./ir.js";
 
 /** プロトコルの版。docs/ir.md の version（view.version）と同じ値。 */
@@ -8,7 +9,11 @@ export const PROTOCOL = "0.2" as const;
 
 export type Direction = "emit" | "check" | "import";
 
-/** 書き出す（または取り込む）ファイル。path はプロジェクトのルートからの相対パス。content は UTF-8 の文字列。 */
+/**
+ * 書き出す（または取り込む）ファイル。path はプロジェクトのルートからの相対パス。emit の応答では、その起動の出力先
+ * （req.view.config.dir。Dir(U, N)）の下でなければならず、そうでないパス（`..`、絶対パス、別のディレクトリ）は PLG-1
+ * （docs/plugin-protocol.md「emit」）。content は UTF-8 の文字列。
+ */
 export interface File {
   path: string;
   content: string;
@@ -64,7 +69,10 @@ export interface Wrap {
 export interface Select {
   /** 起点にする op。 */
   roots: string[];
-  /** 選ぶが、本体は辿らない op。実装を差し込む口だけが出る。 */
+  /**
+   * 起点から辿られたときに、本体を辿らず実装を差し込む口だけを出す op。起点ではないので、どこからも
+   * 辿られなければ選ばれない（docs/emit-go.md「出力の対象」の 2）。
+   */
   stops: string[];
   /** 起点にする状態（基底の状態か、状態の分類）。 */
   states: string[];

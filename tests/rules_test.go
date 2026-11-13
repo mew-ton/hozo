@@ -363,7 +363,7 @@ var notTestable = map[string]string{
 	"CFG-13":   "対象の手続き。診断なし（docs/config.md「単位の対象」）。CFG-10 の ok の例（子孫は対象、対象でない名前空間は診断なし）と CFG-17 の例、internal/config の TestCovering で確かめる",
 	"TYPE-2":   "DEC-1 で検出される。ID は索引として残す（docs/types.md「診断」）",
 	"MATCH-5":  "WIRE-2 と同じ条件。ID は索引として残す（docs/check.md「classify / match」）",
-	"CFG-5":    "書き出すファイルの衝突は emit でしか起きない（.hozo と hozo.toml だけでは出ない。internal/emit のテスト）",
+	"CFG-5":    "書き出すファイルの衝突は emit でしか起きない（.hozo と hozo.toml だけでは出ない。internal/app のテスト）",
 }
 
 // tableIDs は文書 path の表の先頭の列にある規則の ID を集める。

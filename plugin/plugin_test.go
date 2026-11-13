@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -246,6 +248,56 @@ func TestProtocolMismatch(t *testing.T) {
 	}
 	if h.called != "" {
 		t.Errorf("handler must not be called on protocol mismatch, called %q", h.called)
+	}
+}
+
+// TestRequestHead は testdata/request_head.json の表: 要求の protocol と direction の読み方と終了コード
+// （docs/plugin-protocol.md「要求と応答」「起動」）。文字列でない protocol は「合わない」で code "protocol"（終了コード 2）、
+// 文字列でない direction は実装していない direction と同じ。TS の SDK のテスト（sdk/ts/test/run.test.ts）も同じ表を
+// 読むので、二つの SDK は同じ要求に同じ終了コードを返す。
+func TestRequestHead(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "request_head.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var table struct {
+		Cases []struct {
+			Name    string `json:"name"`
+			Request string `json:"request"`
+			Exit    int    `json:"exit"`
+			Code    string `json:"code"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &table); err != nil || len(table.Cases) == 0 {
+		t.Fatalf("表を読めない: %v", err)
+	}
+	for _, c := range table.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			h := &fake{
+				emit:  func(*EmitRequest) (*EmitResponse, error) { return &EmitResponse{}, nil },
+				check: func(*CheckRequest) (*CheckResponse, error) { return &CheckResponse{}, nil },
+				imp:   func(*ImportRequest) (*ImportResponse, error) { return &ImportResponse{}, nil },
+			}
+			code, out, errOut := run(t, h, c.Request)
+			if code != c.Exit {
+				t.Fatalf("code = %d, want %d（stdout %q、stderr %q）", code, c.Exit, out, errOut)
+			}
+			switch code {
+			case 2:
+				var r refusal
+				decode(t, out, &r)
+				if r.Error.Code != c.Code || r.Error.Message == "" {
+					t.Errorf("refusal = %+v, want code %q", r.Error, c.Code)
+				}
+				if h.called != "" {
+					t.Errorf("断った要求で handler を呼んだ: %q", h.called)
+				}
+			case 1:
+				if out != "" || errOut == "" {
+					t.Errorf("stdout = %q, stderr = %q", out, errOut)
+				}
+			}
+		})
 	}
 }
 

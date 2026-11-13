@@ -19,7 +19,7 @@ namespace shop {
   /** 店の名前。常に一つある */
   state title: single<string>;
 
-  // docs/check.md「状態の形」分類の状態: classify は一つ以上の基底の状態を対象にして、その場合に名前を付ける
+  // docs/check.md「状態の形」状態の分類: classify は一つ以上の基底の状態を対象にして、その場合に名前を付ける
   // docs/ir.md「classify」: subject は { kind: "states", states: [FQN]（書かれた順） }
   /** 買い物の進み具合 */
   classify Checkout of carts, orders {

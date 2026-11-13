@@ -59,7 +59,7 @@ func parseProject(t testing.TB, p project, withVocab bool) (*source.FileSet, []*
 func analyzeProject(t testing.TB, p project, withVocab bool) (*Result, *source.FileSet) {
 	t.Helper()
 	fs, files := parseProject(t, p, withVocab)
-	return Analyze(fs, files, nil), fs
+	return Analyze(fs, files), fs
 }
 
 // expectation は注釈一つ分の期待: ファイル、行、重さ、ID。

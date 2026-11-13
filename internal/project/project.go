@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/mew-ton/hozo/internal/check"
 	"github.com/mew-ton/hozo/internal/config"
@@ -80,11 +79,17 @@ type Options struct {
 	Stderr io.Writer
 	// Env はプラグインに渡す環境変数の元。nil なら os.Environ()。
 	Env []string
+	// PluginPath は HOZO_PLUGIN_PATH の値（docs/plugin-protocol.md「探索」の 2）。空なら探さない。
+	PluginPath string
+	// Home はホームディレクトリ（同 3 の <ホーム>/.hozo/plugins）。空なら探さない。
+	// このパッケージは PluginPath も Home もプロセスの環境から読まない。hozoc と言語サーバーが渡す（internal/app）。
+	Home string
 }
 
 // Load は root から hozo.toml を探して（configPath があればそれを読んで）プロジェクトを解析する
 // （docs/packages.md「internal/project」）。hozo.toml がなければ既定の設定で解析し、CFG-* の診断を除く。
 // overlay の内容はディスクの内容より優先し、ディスクにないファイルも足せる。
+// プラグインを探すのは [hozo].plugin_dirs だけ（HOZO_PLUGIN_PATH とホームは LoadWith の Options で渡す）。
 func Load(root, configPath string, overlay map[string][]byte) *Project {
 	return LoadWith(Options{Root: root, ConfigPath: configPath, Overlay: overlay})
 }
@@ -122,7 +127,7 @@ func LoadWith(opts Options) *Project {
 	p.Root = p.Config.Root
 
 	// 入っているプラグインのマニフェストと、単位のトランスパイラの解決（docs/plugin-protocol.md「探索」、docs/config.md「単位」）
-	diags = append(diags, p.resolveUnits()...)
+	diags = append(diags, p.resolveUnits(hostplugin.SearchEnv{PluginPath: opts.PluginPath, Home: opts.Home})...)
 
 	// 2. 読み込みと解析（docs/vocab.md「読み込み」、docs/grammar.md）
 	var files []*ast.File
@@ -149,7 +154,7 @@ func LoadWith(opts Options) *Project {
 	diags = append(diags, p.matchUnitFiles()...)
 
 	// 3. 解決・正規化・検査（docs/resolve.md、docs/ir.md、docs/check.md）
-	p.Sema = sema.Analyze(p.Files, files, p.Config)
+	p.Sema = sema.Analyze(p.Files, files)
 	diags = append(diags, p.Sema.Diags...)
 	checker := check.Checker{Locate: check.FileSetLocator(p.Files)}
 	diags = append(diags, checker.Check(p.Sema.Program, p.Config)...)
@@ -210,12 +215,12 @@ func (p *Project) usedPlugins() []*hostplugin.Plugin {
 // 診断は MAN-3 / MAN-4（入っているプラグインのすべて）、MAN-2（使うプラグインだけ）、CFG-14（どのプラグインも提供して
 // いない）、CFG-15（二つ以上のプラグインが提供している。以降は探した順で最初のものを使う）、CFG-16（一つの単位の
 // トランスパイラの language がそろっていない）、CFG-11（単位の言語が ts）。
-func (p *Project) resolveUnits() []diag.Diagnostic {
+func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	if p.NoConfig {
 		return nil
 	}
-	p.Plugins, diags = hostplugin.Discover(p.Config)
+	p.Plugins, diags = hostplugin.Discover(p.Config, env)
 	cfgFile := p.Config.Path
 	if cfgFile == "" {
 		cfgFile = config.FileName
@@ -360,10 +365,10 @@ func (p *Project) readSources(overlay map[string][]byte) ([]sourceFile, []diag.D
 func (p *Project) excluder() excluder {
 	var ex excluder
 	for i := range p.Config.Units {
-		ex = append(ex, config.CleanOut(p.Config.Units[i].Out))
+		ex = append(ex, config.CleanRel(p.Config.Units[i].Out))
 	}
 	for _, d := range p.Config.Hozo.PluginDirs {
-		ex = append(ex, cleanRel(d))
+		ex = append(ex, config.CleanRel(d))
 	}
 	return ex
 }
@@ -375,9 +380,9 @@ func (p *Project) relPath(path string) string {
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return filepath.ToSlash(path)
 		}
-		return cleanRel(rel)
+		return config.CleanRel(rel)
 	}
-	return cleanRel(path)
+	return config.CleanRel(path)
 }
 
 // checkPlugins は CFG-6（unsupported のデコレータ）: 各単位について、その単位が出力する名前空間の、単位の対象の宣言に付いた
@@ -533,7 +538,7 @@ func (p *Project) Locate(at string) (*source.Span, string) {
 			if p.Files.Path(id) != rel {
 				continue
 			}
-			off := offsetOf(p.Files.Content(id), line, col)
+			off := p.Files.Offset(id, source.Pos{Line: line, Col: col})
 			return &source.Span{File: id, Start: off, End: off}, ""
 		}
 		return nil, rel
@@ -566,27 +571,6 @@ func splitFileLineCol(s string) (file string, line, col int, ok bool) {
 		return "", 0, 0, false
 	}
 	return s[:j], line, col, true
-}
-
-// offsetOf は 1 始まりの行・列（コードポイント）をバイトのオフセットにする（docs/diagnostics.md「位置」）。
-// 範囲を越えればファイルの終わり（または行の終わり）。
-func offsetOf(content []byte, line, col int) source.Offset {
-	off := 0
-	for l := 1; l < line; l++ {
-		i := strings.IndexByte(string(content[off:]), '\n')
-		if i < 0 {
-			return source.Offset(len(content))
-		}
-		off += i + 1
-	}
-	for c := 1; c < col && off < len(content); c++ {
-		if content[off] == '\n' {
-			break
-		}
-		_, n := utf8.DecodeRune(content[off:])
-		off += n
-	}
-	return source.Offset(off)
 }
 
 // finish は診断の File をルートからの相対パスにし、設定なしなら CFG-* を除き、並べ替える。

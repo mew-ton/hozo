@@ -17,5 +17,5 @@
 //     （値、基底の状態の組み込みの分類、状態の分類。MATCH-7）を見分け、絞り込み（MATCH-4 / MATCH-6）は値の match にだけ掛ける。
 //
 // docs/check.md「計算」が埋める Op.Signature と Call.Bound は零値のまま残す。Signature を要する規則
-// （THROWS-1、EFF-2、REL-2/3/4/6、DEC-4/5/6/14/16、STATE-2、WIRE-6/7、BIND-*、DOC-1 の @throws の所属、CFG-*）は internal/check が行う。
+// （THROWS-1、EFF-2、REL-2/4、DEC-4/5/6/14/16、STATE-2、WIRE-6/7、BIND-*、DOC-1 の @throws の所属、CFG-*）は internal/check が行う。
 package sema

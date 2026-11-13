@@ -1,0 +1,4 @@
+// CFG-7（docs/config.md「診断」）: 単位の out が絶対パス（ng_8.toml）
+namespace a {
+  op f();
+}

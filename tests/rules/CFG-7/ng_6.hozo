@@ -1,0 +1,4 @@
+// CFG-7（docs/config.md「診断」）: 単位の out がプロジェクトのルートの外に出る（ng_6.toml）
+namespace a {
+  op f();
+}
