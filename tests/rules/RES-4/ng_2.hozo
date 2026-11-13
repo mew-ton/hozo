@@ -1,0 +1,17 @@
+// RES-4（docs/resolve.md「位置ごとに受け付ける種類」）: 遷移の宛先にできるのは、状態を対象にした classify か、
+// 組み込みの分類を持つ state。classify の対象が一つで、型でも状態でもない
+namespace a {
+  model M { id: string; }
+  exception E;
+  state s: list<M>;
+  classify Kind of M { A; B; }
+  // 値の分類の遷移は書けない
+  effect onValue on Kind: A -> B;      // ERROR: RES-4
+  // model は分類でも状態でもない
+  effect onModel on M: A -> B;         // ERROR: RES-4
+  // 「状態.操作」の後ろに遷移は続けられない（宛先は一つだけ）
+  effect both on s.post: Empty -> HasItems;   // ERROR: RES-4
+  // 対象が一つの classify: 例外は型ではなく、値の分類の名前は C.Case<T> の形でだけ型になる
+  classify OfException of E { A; }     // ERROR: RES-4
+  classify OfClassify of Kind { A; }   // ERROR: RES-4
+}

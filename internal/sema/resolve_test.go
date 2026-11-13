@@ -246,7 +246,7 @@ func TestResolveBindNamespace(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace server { model Token { v: string; } }
 namespace browser {
-  state token: single<server.Token?>;
+  state token: nullable<server.Token>;
   bind token to server.*;
   bind token to server.**;
 }`}, false)

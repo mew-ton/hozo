@@ -3,6 +3,7 @@ package sema
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/source"
@@ -374,16 +375,36 @@ func (a *analyzer) expandSet(r resolved, want declKind, span source.Span) []stri
 
 // --- state / exception / effect ---
 
+// lowerState は state。形は list / nullable / single（docs/check.md「状態の形」）。STATE-3: 要素の型が optional。
 func (a *analyzer) lowerState(s *symbol, d *ast.StateDecl, sc *scope) ir.Decl {
-	st := &ir.State{DeclBase: a.base(s, d.Doc, d.Span, docContext{}), Shape: ir.StateList}
-	if d.Shape == ast.StateSingle {
-		st.Shape = ir.StateSingle
-	}
+	st := &ir.State{DeclBase: a.base(s, d.Doc, d.Span, docContext{}), Shape: shapeOf(d.Shape)}
 	a.addSite(d.Decorators, siteState, sc, &st.DeclBase.Decorators)
 	if t, ok := a.lowerType(d.Elem, sc); ok {
-		st.Element = t
+		st.Element = a.checkSTATE3(s, d, t)
 	}
 	return st
+}
+
+func shapeOf(shape ast.StateShape) ir.StateShape {
+	switch shape {
+	case ast.StateSingle:
+		return ir.StateSingle
+	case ast.StateNullable:
+		return ir.StateNullable
+	}
+	return ir.StateList
+}
+
+// checkSTATE3 は STATE-3（docs/check.md「状態と効果」）: 状態の要素の型が optional（single<T?> など）。
+// 空になりうる状態は nullable<T> と書く。IR の element は optional にならない（docs/ir.md「state / exception / effect」）
+// ので、中身の型を返す。
+func (a *analyzer) checkSTATE3(s *symbol, d *ast.StateDecl, t ir.Type) ir.Type {
+	opt, ok := t.(ir.OptionalType)
+	if !ok {
+		return t
+	}
+	a.errorf("STATE-3", d.Elem.NodeSpan(), "状態 %s の要素の型 %s に ? は付けられない。空になりうる状態は nullable<%s> と書く（docs/grammar.md「state」）", s.fqn, typeName(t), typeName(opt.Of))
+	return opt.Of
 }
 
 // lowerException は exception。値の型は model だけ（docs/resolve.md「位置ごとに受け付ける種類」）。
@@ -409,32 +430,140 @@ func (a *analyzer) lowerException(s *symbol, d *ast.ExceptionDecl, sc *scope) ir
 	return e
 }
 
-// lowerEffect は effect。`on s.op` の s は現在の名前空間の state（別の名前空間なら RES-5）。STATE-1。
+// lowerEffect は effect。宛先は一つだけで、基底の状態の組み込みの効果か、分類の遷移（docs/check.md「状態の形」の
+// 「効果の宛先」）。宛先が決まらなければ Target は nil のまま。
 func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl {
-	e := &ir.Effect{DeclBase: a.base(s, d.Doc, d.Span, docContext{}), Operation: operationOf(d.On.Op)}
+	e := &ir.Effect{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteEffect, sc, &e.DeclBase.Decorators)
-	r, ok := a.resolve(d.On.State, sc, acState)
-	if !ok {
-		return e
+	switch {
+	case d.On != nil:
+		a.lowerBuiltinTarget(s, e, d.On, sc)
+	case d.Transition != nil:
+		a.lowerTransition(s, e, d.Transition, sc)
 	}
-	if r.sym.ns != s.ns {
-		a.errorf("RES-5", d.On.State.Span, "effect %s の on は別の名前空間の状態 %s を指している（効果は状態の持ち主の名前空間に宣言する。設計書 §6.2）", s.fqn, r.sym.fqn)
-		return e
-	}
-	e.State = r.sym.fqn
-	a.checkSTATE1(s, r.sym, d)
 	return e
 }
 
-// checkSTATE1 は STATE-1（docs/check.md「状態と効果」）: single の状態に post か delete。
-func (a *analyzer) checkSTATE1(s *symbol, state *symbol, d *ast.EffectDecl) {
-	st, ok := a.lower(state).(*ir.State)
-	if !ok || st.Shape != ir.StateSingle {
+// lowerBuiltinTarget は `on s.op`。s は現在の名前空間の state（別の名前空間なら RES-5）。STATE-1。
+// 書き込むのはその状態（docs/check.md「状態の形」の「効果が書き込む状態」）。
+func (a *analyzer) lowerBuiltinTarget(s *symbol, e *ir.Effect, on *ast.StateOpRef, sc *scope) {
+	r, ok := a.resolve(on.State, sc, acState)
+	if !ok {
 		return
 	}
-	if d.On.Op == ast.Post || d.On.Op == ast.Delete {
-		a.errorf("STATE-1", d.On.OpSpan, "状態 %s は single なので %s はできない（single にできるのは put だけ。設計書 §5.2）", state.fqn, d.On.Op)
+	if r.sym.ns != s.ns {
+		a.errorf("RES-5", on.State.Span, "effect %s の on は別の名前空間の状態 %s を指している（効果は状態の持ち主の名前空間に宣言する。設計書 §6.2）", s.fqn, r.sym.fqn)
+		return
 	}
+	e.Target = ir.BuiltinTarget{State: r.sym.fqn, Operation: operationOf(on.Op)}
+	e.Writes = []string{r.sym.fqn}
+	a.checkSTATE1(r.sym, on)
+}
+
+// builtinOperations は形ごとの組み込みの効果（docs/check.md「状態の形」の表）。
+var builtinOperations = map[ir.StateShape][]ir.Operation{
+	ir.StateList:     {ir.OpPost, ir.OpPut, ir.OpDelete},
+	ir.StateNullable: {ir.OpPost, ir.OpPut, ir.OpDelete},
+	ir.StateSingle:   {ir.OpPut},
+}
+
+// checkSTATE1 は STATE-1（docs/check.md「状態と効果」）: 組み込みの効果の operation が、その状態の形にない
+// （single に post / delete）。
+func (a *analyzer) checkSTATE1(state *symbol, on *ast.StateOpRef) {
+	st, ok := a.lower(state).(*ir.State)
+	if !ok {
+		return
+	}
+	op := operationOf(on.Op)
+	allowed := builtinOperations[st.Shape]
+	for _, o := range allowed {
+		if o == op {
+			return
+		}
+	}
+	names := make([]string, len(allowed))
+	for i, o := range allowed {
+		names[i] = string(o)
+	}
+	a.errorf("STATE-1", on.OpSpan, "状態 %s は %s なので %s はできない（%s にできるのは %s だけ。docs/check.md「状態の形」）", state.fqn, st.Shape, op, st.Shape, strings.Join(names, " / "))
+}
+
+// lowerTransition は `on X: A -> B`（docs/resolve.md「位置ごとに受け付ける種類」）。X は現在の名前空間の、状態を
+// 対象にした classify か、組み込みの分類を持つ state（list / nullable）。別の名前空間のものなら RES-5。
+// ケースの所属は STATE-4。書き込むのは、X が分類ならその対象のすべての基底の状態、X が状態ならその状態。
+func (a *analyzer) lowerTransition(s *symbol, e *ir.Effect, t *ast.Transition, sc *scope) {
+	r, ok := a.resolve(t.Of, sc, acState|acClassify)
+	if !ok {
+		return
+	}
+	if r.sym.ns != s.ns {
+		what := "状態"
+		if r.sym.kind == kindClassify {
+			what = "分類"
+		}
+		a.errorf("RES-5", t.Of.Span, "effect %s の on は別の名前空間の%s %s を指している（効果は状態の持ち主の名前空間に宣言する。設計書 §6.2）", s.fqn, what, r.sym.fqn)
+		return
+	}
+	var cases []string
+	var writes []string
+	what := ""
+	switch decl := a.lower(r.sym).(type) {
+	case *ir.State:
+		if !decl.Shape.HasBuiltinClassify() {
+			a.errorf("STATE-4", t.Of.Span, "状態 %s は %s で組み込みの分類がないので、遷移の宛先にできない（常に一列。docs/check.md「状態の形」）", decl.Name, decl.Shape)
+			return
+		}
+		cases, writes = ir.BuiltinCases(), []string{decl.Name}
+		what = fmt.Sprintf("状態 %s（%s）の組み込みの分類", decl.Name, decl.Shape)
+	case *ir.Classify:
+		states, isStates := decl.SubjectStates()
+		if !isStates {
+			if decl.Subject != nil {
+				a.errorf("RES-4", t.Of.Span, "遷移の宛先にできるのは状態を対象にした classify だけで、%s は値の分類", decl.Name)
+			}
+			return // 対象が決まっていない分類（CLS-3 などで報告済み）には重ねて報告しない
+		}
+		for _, c := range decl.Cases {
+			cases = append(cases, c.Name)
+		}
+		writes = append([]string(nil), states...)
+		what = "classify " + decl.Name + " "
+	default:
+		return
+	}
+	target := ir.TransitionTarget{Of: r.sym.fqn}
+	target.From = a.lowerCaseSet(r.sym, t.From, cases, what, "前")
+	target.To = a.lowerCaseSet(r.sym, t.To, cases, what, "後")
+	e.Target = target
+	e.Writes = writes
+}
+
+// lowerCaseSet は遷移の前か後のケースの集合。STATE-4（docs/check.md「状態と効果」）: ケースが宛先の分類のケースでない
+// （宛先が基底の状態なら Empty / HasItems）、並びに重複がある。IR には書かれた順に、書かれたまま載せる。
+func (a *analyzer) lowerCaseSet(of *symbol, cs *ast.CaseSet, known []string, what, side string) ir.CaseSet {
+	if cs == nil {
+		return ir.CaseSet{}
+	}
+	if cs.Any {
+		return ir.AnyCase()
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(cs.Cases))
+	for _, c := range cs.Cases {
+		out = append(out, c.Name)
+		switch {
+		case !contains(known, c.Name):
+			a.errorf("STATE-4", c.Span, "遷移の%sのケース %s は、%sのケースではない（%s）", side, c.Name, what, strings.Join(known, " / "))
+		case seen[c.Name]:
+			a.errorf("STATE-4", c.Span, "遷移の%sのケースに %s が二度ある", side, c.Name)
+		default:
+			if span, ok := classifyCaseSpan(of, c.Name); ok {
+				a.addRef(c.Span, Target{Kind: TargetCase, Decl: of.fqn, Name: c.Name, Span: span})
+			}
+		}
+		seen[c.Name] = true
+	}
+	return ir.CaseSet{Cases: out}
 }
 
 func operationOf(op ast.StateOp) ir.Operation {
@@ -453,9 +582,7 @@ func operationOf(op ast.StateOp) ir.Operation {
 func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
-	if t, ok := a.lowerType(d.Of, sc); ok {
-		c.Subject = t
-	}
+	c.Subject = a.lowerClassifySubject(s, d.Of, sc)
 	seen := map[string]bool{}
 	for _, cs := range d.Cases {
 		if cs == nil {
@@ -506,10 +633,119 @@ func (a *analyzer) lowerCondition(s *symbol, d *ast.ConditionDecl, sc *scope) ir
 		FromCondition: true,
 	}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
-	if t, ok := a.lowerType(d.Of, sc); ok {
-		c.Subject = t
-	}
+	c.Subject = a.lowerClassifySubject(s, d.Of, sc)
 	return c
+}
+
+// subjectKind は classify の対象の一つが何を指しているか。
+type subjectKind int
+
+const (
+	// subjectType は型（として下ろすもの）。型として受け付けない名前は lowerType が RES-* で報告する。
+	subjectType subjectKind = iota
+	// subjectState は基底の状態。
+	subjectState
+	// subjectStateClassify は状態を対象にした classify（分類の状態）。
+	subjectStateClassify
+	// subjectUnresolved は解決できない名前。RES-* として報告する。
+	subjectUnresolved
+)
+
+// lowerClassifySubject は classify / condition の対象（docs/resolve.md「位置ごとに受け付ける種類」の
+// 「classify C of ... の対象」）。一つで型を指せば値の分類、すべてが現在の名前空間の state なら状態の分類。
+// それ以外は CLS-3（docs/check.md「classify / match」）で、対象は決まらない（nil）。同じ状態が二度あるだけなら、
+// 重複を除いた状態の分類にする。
+func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.ClassifySubject {
+	if len(of) == 0 {
+		return nil
+	}
+	kinds := make([]subjectKind, len(of))
+	syms := make([]*symbol, len(of))
+	states := 0
+	for i, t := range of {
+		kinds[i], syms[i] = a.subjectKindOf(t, sc)
+		if kinds[i] == subjectState {
+			states++
+		}
+	}
+	if len(of) == 1 && (kinds[0] == subjectType || kinds[0] == subjectUnresolved) {
+		if t, ok := a.lowerType(of[0], sc); ok {
+			return ir.TypeSubject{Type: t}
+		}
+		return nil
+	}
+	// ここからは状態の分類として読む。状態でないもの、別の名前空間の状態、分類の状態、重複は CLS-3。
+	ok := true
+	seen := map[string]bool{}
+	var fqns []string
+	for i, t := range of {
+		span := t.NodeSpan()
+		switch kinds[i] {
+		case subjectUnresolved:
+			// 名前が見つからないことを先に言う（状態か型かは決まらない）
+			a.resolve(t.(*ast.NamedType).Name, sc, acState|acTypePos)
+			ok = false
+		case subjectStateClassify:
+			a.errorf("CLS-3", span, "classify %s の対象 %s は分類の状態（対象にできるのは宣言した名前空間の基底の状態だけ。docs/check.md「状態の形」）", s.fqn, syms[i].fqn)
+			ok = false
+		case subjectType:
+			if states > 0 {
+				a.errorf("CLS-3", span, "classify %s の対象に型と状態が混ざっている（%s は状態ではない）", s.fqn, a.text(span))
+			} else {
+				a.errorf("CLS-3", span, "classify %s の対象が二つ以上あるのに、%s は状態ではない（値の分類の対象は型一つ）", s.fqn, a.text(span))
+			}
+			ok = false
+		case subjectState:
+			nt := t.(*ast.NamedType)
+			r, rok := a.resolve(nt.Name, sc, acState) // 参照を記録する
+			if !rok {
+				ok = false
+				continue
+			}
+			if r.sym.ns != s.ns {
+				a.errorf("CLS-3", span, "classify %s の対象 %s は別の名前空間の状態（対象にできるのは宣言した名前空間 %s の基底の状態だけ）", s.fqn, r.sym.fqn, nsName(s.ns))
+				ok = false
+				continue
+			}
+			if seen[r.sym.fqn] {
+				a.errorf("CLS-3", span, "classify %s の対象に状態 %s が二度ある", s.fqn, r.sym.fqn)
+				continue
+			}
+			seen[r.sym.fqn] = true
+			fqns = append(fqns, r.sym.fqn)
+		}
+	}
+	if !ok || len(fqns) == 0 {
+		return nil
+	}
+	return ir.StatesSubject{States: fqns}
+}
+
+// subjectKindOf は対象の一つを、診断も参照も残さずに見分ける。型引数のない名前が state を指せば状態、
+// 状態を対象にした classify を指せば分類の状態、解決できなければ subjectUnresolved、それ以外は型。
+func (a *analyzer) subjectKindOf(t ast.Type, sc *scope) (subjectKind, *symbol) {
+	nt, ok := t.(*ast.NamedType)
+	if !ok || nt.Arg != nil {
+		return subjectType, nil
+	}
+	r, ok := a.peek(nt.Name, sc)
+	if !ok {
+		return subjectUnresolved, nil
+	}
+	if r.kind != rDecl {
+		return subjectType, nil
+	}
+	switch r.sym.kind {
+	case kindState:
+		return subjectState, r.sym
+	case kindClassify:
+		if c, ok := a.lower(r.sym).(*ir.Classify); ok {
+			if _, isStates := c.SubjectStates(); isStates {
+				return subjectStateClassify, r.sym
+			}
+		}
+	}
+	return subjectType, r.sym
 }
 
 // --- op ---

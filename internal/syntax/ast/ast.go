@@ -312,20 +312,25 @@ type ArmType struct {
 // NodeSpan は Node の実装。
 func (n *ArmType) NodeSpan() source.Span { return n.Span }
 
-// StateShape は状態の形。
+// StateShape は状態の形（docs/grammar.md「state」。列数の範囲）。
 type StateShape int
 
 const (
-	// StateList は list<T>。
+	// StateList は list<T>（0 以上）。
 	StateList StateShape = iota
-	// StateSingle は single<T>。
+	// StateSingle は single<T>（ちょうど 1）。
 	StateSingle
+	// StateNullable は nullable<T>（0 か 1）。
+	StateNullable
 )
 
-// String は "list" / "single"。
+// String は "list" / "nullable" / "single"。
 func (s StateShape) String() string {
-	if s == StateSingle {
+	switch s {
+	case StateSingle:
 		return "single"
+	case StateNullable:
+		return "nullable"
 	}
 	return "list"
 }
@@ -396,18 +401,43 @@ type StateOpRef struct {
 // NodeSpan は Node の実装。
 func (n *StateOpRef) NodeSpan() source.Span { return n.Span }
 
-// EffectDecl は effect。
+// EffectDecl は effect（docs/grammar.md「exception / effect」）。宛先は一つだけで、On か Transition のどちらか一方が nil でない。
 type EffectDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	On         StateOpRef
+	// On は基底の状態の組み込みの効果（"状態.操作"）。遷移なら nil。
+	On *StateOpRef
+	// Transition は分類の遷移（"X: A -> B"）。組み込みの効果なら nil。
+	Transition *Transition
 }
 
 // NodeSpan は Node の実装。
 func (n *EffectDecl) NodeSpan() source.Span { return n.Span }
 func (n *EffectDecl) declNode()             {}
+
+// Transition は分類の遷移 "QualifiedName : CaseSet -> CaseSet"（docs/grammar.md「exception / effect」）。
+// Of は状態を対象にした classify か、組み込みの分類を持つ基底の状態。
+type Transition struct {
+	Span source.Span
+	Of   QualifiedName
+	From *CaseSet
+	To   *CaseSet
+}
+
+// NodeSpan は Node の実装。
+func (n *Transition) NodeSpan() source.Span { return n.Span }
+
+// CaseSet は遷移の前か後のケースの集合。Any なら "any" で、Cases は空。
+type CaseSet struct {
+	Span  source.Span
+	Any   bool
+	Cases []Ident
+}
+
+// NodeSpan は Node の実装。
+func (n *CaseSet) NodeSpan() source.Span { return n.Span }
 
 // ClassifyDecl は classify（docs/grammar.md「classify / condition」）。
 type ClassifyDecl struct {
@@ -415,8 +445,9 @@ type ClassifyDecl struct {
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	Of         Type
-	Cases      []*ClassifyCase
+	// Of は対象（ClassifySubject）。一つ以上。型か状態の名前かは名前の解決が決める。
+	Of    []Type
+	Cases []*ClassifyCase
 }
 
 // NodeSpan は Node の実装。
@@ -440,7 +471,8 @@ type ConditionDecl struct {
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	Of         Type
+	// Of は対象（ClassifySubject）。一つ以上。
+	Of []Type
 }
 
 // NodeSpan は Node の実装。
@@ -916,12 +948,16 @@ type RecordField struct {
 // NodeSpan は Node の実装。
 func (n *RecordField) NodeSpan() source.Span { return n.Span }
 
-// Match は "match Atom by Ident { MatchArm... }"。
+// Match は "match [Atom] by (Ident | list | nullable) { MatchArm... }"（docs/grammar.md「配線」）。
 type Match struct {
-	Span       source.Span
-	Subject    Atom
+	Span source.Span
+	// Subject は対象。書かれていなければ nil（状態の分類での match）。
+	Subject Atom
+	// Classifier は by の後ろ。Builtin なら予約語 list / nullable で、Name はその語。
 	Classifier Ident
-	Arms       []*MatchArm
+	// Builtin は by の後ろが状態の形（組み込みの分類）か。
+	Builtin bool
+	Arms    []*MatchArm
 }
 
 // NodeSpan は Node の実装。

@@ -29,7 +29,7 @@ func newBindTable(ix *index) *bindTable {
 }
 
 // positions は Pos(b, O)（docs/check.md「bind」1〜4）。bi は Program.binds の添字。
-// 対象の名前空間に合わない、状態が list（BIND-6）、状態が引けない、のどれかなら空。
+// 対象の名前空間に合わない、状態が list（BIND-6）、状態が引けない、のどれかなら空。τ は状態の element。
 func (t *bindTable) positions(bi int, o *ir.Op) []position {
 	key := bindOpKey{bi, o.Name}
 	if pos, ok := t.cache[key]; ok {
@@ -55,10 +55,7 @@ func (t *bindTable) compute(bi int, o *ir.Op) []position {
 	if st == nil || st.Shape == ir.StateList || st.Element == nil {
 		return nil
 	}
-	tau := st.Element
-	if opt, ok := tau.(ir.OptionalType); ok {
-		tau = opt.Of
-	}
+	tau := st.Element // optional にはならない（STATE-3。docs/ir.md「state / exception / effect」）
 	var out []position
 	visiting := map[string]bool{}
 	for _, p := range o.Params {
@@ -168,16 +165,16 @@ func checkBinds(ix *index, c *computer, r *reporter) {
 	}
 }
 
-// checkBind6 は BIND-6: list の状態を bind に書いた。位置は Bind。
+// checkBind6 は BIND-6: list の状態を bind に書いた（bind できるのは single と nullable）。位置は Bind。
 func checkBind6(ix *index, bi int, r *reporter) {
 	b := ix.p.Binds[bi]
 	if st := ix.state(b.State); st != nil && st.Shape == ir.StateList {
-		r.errorAt("BIND-6", b.Span, sprintf("bind に list の状態 %s は書けない（埋められるのは single の状態だけ）", b.State))
+		r.errorAt("BIND-6", b.Span, sprintf("bind に list の状態 %s は書けない（bind できるのは single と nullable の状態だけ）", b.State))
 	}
 }
 
-// checkBind1And2 は BIND-1（位置が二つ以上。Related に各位置）と BIND-2（状態が省略可能で、位置が省略できず
-// default もない）。計算「bind」5。位置は Bind。
+// checkBind1And2 は BIND-1（位置が二つ以上。Related に各位置）と BIND-2（状態の形が nullable で、位置の型が
+// optional でなく default もない）。計算「bind」5。位置は Bind。
 func checkBind1And2(ix *index, t *bindTable, bi int, o *ir.Op, r *reporter) {
 	b := ix.p.Binds[bi]
 	pos := t.positions(bi, o)
@@ -194,13 +191,13 @@ func checkBind1And2(ix *index, t *bindTable, bi int, o *ir.Op, r *reporter) {
 			rel, nil)
 	case len(pos) == 1:
 		st := ix.state(b.State)
-		if st == nil || !isOptional(st.Element) {
+		if st == nil || st.Shape != ir.StateNullable {
 			return
 		}
 		p := pos[0]
 		if !isOptional(p.typ) && !p.hasDefault {
 			r.report(diag.Error, "BIND-2", b.Span,
-				sprintf("bind %s は省略可能だが、%s の位置 %s は省略できない", b.State, o.Name, joinPath(p.path)),
+				sprintf("bind %s は nullable で空になりうるが、%s の位置 %s は省略できない", b.State, o.Name, joinPath(p.path)),
 				[]related{{span: p.span, msg: sprintf("位置: %s", joinPath(p.path))}}, nil)
 		}
 	}

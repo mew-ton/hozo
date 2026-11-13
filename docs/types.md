@@ -65,7 +65,7 @@ S にあって T にないフィールドは落ちる。
 | `none` | `none` の型 |
 | レコードリテラル | 当てはめる先が決まるまで未定。引数の位置か `return` の位置で決まる。位置が決まらない（`const x = { ... }`）なら TYPE-7 |
 | 呼び出し | 呼び出した op の `returns`。`null`（void）なら「値がない」（WIRE-2 で区別する） |
-| `match` | アームの本体の型を集めて: 値のある呼び出しがなければ（「値がない」と `none` だけなら）「値がない」。値のある呼び出しの型がすべて等しい型 T なら、`none` のアームがあれば `optional(T)`、なければ T。等しくなければ TYPE-8。「値がない」と値のある呼び出しが混ざれば TYPE-8 |
+| `match`（値でも状態でも同じ。状態の `match` にはアームでの絞り込みがない） | アームの本体の型を集めて: 値のある呼び出しがなければ（「値がない」と `none` だけなら）「値がない」。値のある呼び出しの型がすべて等しい型 T なら、`none` のアームがあれば `optional(T)`、なければ T。等しくなければ TYPE-8。「値がない」と値のある呼び出しが混ざれば TYPE-8 |
 
 ## デコレータの引数
 
@@ -76,7 +76,7 @@ S にあって T にないフィールドは落ちる。
 | `type` の `Type` | `literal` で、リテラルの型が渡せるもの（`scalar` の位置には渡せない。TYPE-1）。`list` は `array` の位置に。`ref` で op の引数（`$param:`。`docs/resolve.md`「手続き」1.3）なら、その引数の型が渡せること |
 | `any exception` | `ref`（例外）、`refs`（例外の集合）、`ref`（`set` のユニオンで要素が例外。展開して `refs` にする） |
 | `any effect` | `ref`（効果）、`refs`、ユニオン（同上） |
-| `any effect on s.op` | 上のうち、すべての効果の `state` が `s`、`operation` が `op` のもの。違えば DEC-7 |
+| `any effect on s.op` | 上のうち、すべての効果の宛先（`Effect.target`）が組み込みの効果で、その `state` が `s`、`operation` が `op` のもの。遷移の効果や、違う状態・操作なら DEC-7 |
 | `any state` | `ref`（状態） |
 | `any op` | `ref`（op） |
 | `any model` | `ref`（model） |

@@ -9,9 +9,12 @@
 //
 //  1. 名前空間の表を作る（table.go）。同じ FQN の名前空間を一つにし（NS-2）、重複を RES-6 / NS-3 にする。
 //  2. 宣言を IR に下ろす（decls.go、types.go）。scalar の継承、ユニオンの展開、`is X omit` は別の宣言の中身を要するので、
-//     必要になったときに下ろす（lower）。循環はそこで検出する。
+//     必要になったときに下ろす（lower）。循環はそこで検出する。状態の形（STATE-1 / STATE-3）、classify の対象
+//     （型か状態か。CLS-3）、効果の宛先（組み込みの効果か遷移か。STATE-4、RES-5）と Effect.writes もここ
+//     （docs/check.md「状態の形」。どれも Signature を要しない）。
 //  3. デコレータの適用を下ろす（decorators.go）。DEC-1 / DEC-7 / DEC-11 / DEC-12 / DEC-13。
-//  4. 配線の本体を下ろし、式の型を決める（wiring.go、compat.go）。WIRE-* / MATCH-* / TYPE-*。
+//  4. 配線の本体を下ろし、式の型を決める（wiring.go、compat.go）。WIRE-* / MATCH-* / TYPE-*。match の三つの形
+//     （値、基底の状態の組み込みの分類、状態の分類。MATCH-7）を見分け、絞り込み（MATCH-4 / MATCH-6）は値の match にだけ掛ける。
 //
 // docs/check.md「計算」が埋める Op.Signature と Call.Bound は零値のまま残す。Signature を要する規則
 // （THROWS-1、EFF-2、REL-2/3/4/6、DEC-4/5/6/14/16、STATE-2、WIRE-6/7、BIND-*、DOC-1 の @throws の所属、CFG-*）は internal/check が行う。

@@ -1,0 +1,8 @@
+// STATE-3（docs/check.md「状態と効果」）: 誤りのある状態も、中身の型の状態として残りの検査を受ける
+// （single<Token?> は single<Token> として扱うので、bind は Token の位置に当たり、BIND-2 にはならない）
+namespace a {
+  scalar Token extends string;
+  state token: single<Token?>;         // ERROR: STATE-3
+  bind token to a.*;
+  op g(t: Token);
+}

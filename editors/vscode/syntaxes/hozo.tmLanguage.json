@@ -313,7 +313,7 @@
     },
     "keywords.type": {
       "name": "support.type.primitive.hozo",
-      "match": "\\b(?:string|boolean|int|float|Time|Duration|void|Record|list|single)\\b"
+      "match": "\\b(?:string|boolean|int|float|Time|Duration|void|Record|list|nullable|single)\\b"
     },
     "keywords.constant": {
       "name": "constant.language.hozo",

@@ -37,7 +37,7 @@ func TestLookup(t *testing.T) {
 func TestNamespace(t *testing.T) {
 	p := sampleProgram()
 	g := p.Namespace("")
-	if g == nil || g.Name != "" || len(g.Decls) != 1 {
+	if g == nil || g.Name != "" || len(g.Decls) != 6 {
 		t.Fatalf("global namespace: %+v", g)
 	}
 	s := p.Namespace("server")

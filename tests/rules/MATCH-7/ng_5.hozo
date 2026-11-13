@@ -1,0 +1,10 @@
+// MATCH-7（docs/check.md「classify / match」）: by list / by nullable の対象が今の名前空間の状態でない
+namespace other {
+  state remote: list<string>;
+}
+namespace a {
+  op f();
+  op ng() {
+    match other.remote by list { Empty => f(); HasItems => none; };  // ERROR: MATCH-7
+  }
+}

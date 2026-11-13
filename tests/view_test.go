@@ -99,10 +99,14 @@ func TestViewFromEntry(t *testing.T) {
 		}
 		// グローバルが先頭、ユーザーのファイル（api.hozo、t.hozo、web.hozo）の順、その後に語彙（hozo:vocab/*.hozo）の辞書順
 		expect(t, "名前空間の順", names, []string{"", "api", "t", "web", "db", "fs", "http", "page", "proc", "valid"})
-		expect(t, "web.token の要素（別の名前空間の scalar は FQN）", typeStr(declOf(t, prog, "web.token").(*ir.State).Element), "api.Token?")
+		// nullable<api.Token>: 空になりうることは形が持ち、要素の型は optional にならない（docs/ir.md「state / exception / effect」）
+		expect(t, "web.token の要素（別の名前空間の scalar は FQN）", typeStr(declOf(t, prog, "web.token").(*ir.State).Element), "api.Token")
 		expect(t, "web.location の要素（語彙の型は FQN）", typeStr(declOf(t, prog, "web.location").(*ir.State).Element), "page.Route")
 		expect(t, "fetchUser が呼ぶ op（修飾なしの参照も FQN）", renderBody(opOf(t, prog, "web.openUser").Body)[0], "const user = web.fetchUser(q: {id: id})")
-		expect(t, "web.goLogin の状態", declOf(t, prog, "web.goLogin").(*ir.Effect).State, "web.location")
+		expect(t, "web.goLogin の宛先（状態は FQN）", declOf(t, prog, "web.goLogin").(*ir.Effect).Target, ir.EffectTarget(ir.BuiltinTarget{State: "web.location", Operation: ir.OpPut}))
+		expect(t, "web.goLogin が書き込む状態", declOf(t, prog, "web.goLogin").(*ir.Effect).Writes, []string{"web.location"})
+		// 空にするのは delete（docs/decisions.md「設計書を変える決定」S2）
+		expect(t, "web.removeToken の宛先", declOf(t, prog, "web.removeToken").(*ir.Effect).Target, ir.EffectTarget(ir.BuiltinTarget{State: "web.token", Operation: ir.OpDelete}))
 		// 複数回の `namespace web { }` は一つの Namespace。二つ目のブロックの宣言（LoginForm、login）は一つ目の末尾に続く
 		expect(t, "web は一つの Namespace", countNamespaces(prog, "web"), 1)
 		webNames := declNames(prog.Namespace("web"))
@@ -162,7 +166,8 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "void は returns が null", opOf(t, prog, "web.signOut").Returns == nil, true)
 		expect(t, "戻り値の型", typeStr(opOf(t, prog, "web.openUser").Returns), "web.UserPage")
 		expect(t, "state の shape", declOf(t, prog, "api.users").(*ir.State).Shape, ir.StateList)
-		expect(t, "state の shape（single）", declOf(t, prog, "web.token").(*ir.State).Shape, ir.StateSingle)
+		expect(t, "state の shape（nullable）", declOf(t, prog, "web.token").(*ir.State).Shape, ir.StateNullable)
+		expect(t, "state の shape（single）", declOf(t, prog, "web.location").(*ir.State).Shape, ir.StateSingle)
 	})
 
 	t.Run("ir.md 正規化/model is omit", func(t *testing.T) {
@@ -214,7 +219,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "condition は cases 一つ", caseNames(c), []string{"Verified"})
 		expect(t, "condition の hasDefault", c.HasDefault, true)
 		expect(t, "condition の fromCondition", c.FromCondition, true)
-		expect(t, "condition の subject", typeStr(c.Subject), "api.PublicUser")
+		expect(t, "condition の subject", c.Subject, ir.ClassifySubject(ir.TypeSubject{Type: ir.Ref("api.PublicUser")}))
 		k := declOf(t, prog, "web.UserKind").(*ir.Classify)
 		expect(t, "classify の cases", caseNames(k), []string{"Admin", "Member"})
 		expect(t, "classify の hasDefault", k.HasDefault, false)
@@ -460,6 +465,187 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "kind は判別子", jsonDecl(t, api, "api.ClientError")["kind"], "union")
 		expect(t, "default のアームは \"default\"", jsonDecl(t, web, "web.welcome")["body"].(map[string]any)["statements"].([]any)[0].(map[string]any)["match"].(map[string]any)["arms"].([]any)[1].(map[string]any)["cases"], "default")
 		expect(t, "ops のキーは FQN の辞書順", jsonKeysInOrder(t, marshalView(t, v), "ops"), keysOf(v.Ops))
+	})
+}
+
+// stateCorpus は tests/corpus/state（その README.md に見出し → 構文の対応がある）。
+const stateCorpus = "corpus/state"
+
+// TestStateCorpusIR は、状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）の構文が、文書どおりの形で
+// IR（internal/project の Load → Sema.Program）に載ることを確かめる。サブテストの名前は要求の文書の見出し。
+// このコーパスは check だけを確かめる（emit は tests/corpus/state/README.md「emit のゴールデンがない理由」）。
+func TestStateCorpusIR(t *testing.T) {
+	p := project.LoadWith(project.Options{Root: stateCorpus, Stderr: io.Discard})
+	if len(p.Diags) > 0 {
+		var b strings.Builder
+		for _, d := range p.Diags {
+			fmt.Fprintf(&b, "%s[%s]: %s\n", d.Severity, d.Code, d.Message)
+		}
+		t.Fatalf("tests/corpus/state に診断がある（error も warning も想定しない）:\n%s", b.String())
+	}
+	prog := p.Sema.Program
+	effect := func(name string) *ir.Effect { return declOf(t, prog, name).(*ir.Effect) }
+	classify := func(name string) *ir.Classify { return declOf(t, prog, name).(*ir.Classify) }
+	matches := func(op string) []ir.Match {
+		var out []ir.Match
+		for _, st := range opOf(t, prog, op).Body.Statements {
+			switch x := st.(type) {
+			case ir.MatchStmt:
+				out = append(out, x.Match)
+			case ir.ConstStmt:
+				if m, ok := x.Expr.(ir.MatchExpr); ok {
+					out = append(out, m.Match)
+				}
+			}
+		}
+		return out
+	}
+
+	t.Run("ir.md state / exception / effect/State.shape", func(t *testing.T) {
+		expect(t, "list", declOf(t, prog, "shop.carts").(*ir.State).Shape, ir.StateList)
+		expect(t, "nullable", declOf(t, prog, "shop.token").(*ir.State).Shape, ir.StateNullable)
+		expect(t, "single", declOf(t, prog, "shop.title").(*ir.State).Shape, ir.StateSingle)
+		// element は optional にならない（STATE-3）
+		expect(t, "nullable の element", typeStr(declOf(t, prog, "shop.token").(*ir.State).Element), "shop.Token")
+	})
+
+	t.Run("ir.md classify/subject", func(t *testing.T) {
+		// 状態の分類: 基底の状態の FQN（書かれた順）
+		expect(t, "Checkout の subject", classify("shop.Checkout").Subject, ir.ClassifySubject(ir.StatesSubject{States: []string{"shop.carts", "shop.orders"}}))
+		expect(t, "Checkout の cases", caseNames(classify("shop.Checkout")), []string{"Shopping", "Ordered"})
+		expect(t, "Checkout の hasDefault", classify("shop.Checkout").HasDefault, false)
+		// condition の糖衣は状態の分類でも同じ（docs/ir.md「正規化」: cases は一つ、hasDefault と fromCondition は true）
+		loggedIn := classify("shop.LoggedIn")
+		expect(t, "LoggedIn の subject", loggedIn.Subject, ir.ClassifySubject(ir.StatesSubject{States: []string{"shop.token"}}))
+		expect(t, "LoggedIn の cases / hasDefault / fromCondition", []any{caseNames(loggedIn), loggedIn.HasDefault, loggedIn.FromCondition}, []any{[]string{"LoggedIn"}, true, true})
+		// 値の分類
+		expect(t, "LineKind の subject", classify("shop.LineKind").Subject, ir.ClassifySubject(ir.TypeSubject{Type: ir.Ref("shop.Line")}))
+	})
+
+	t.Run("ir.md state / exception / effect/Effect.target builtin", func(t *testing.T) {
+		// 組み込みの効果: 書き込むのはその基底の状態（docs/check.md「状態の形」の「効果が書き込む状態」）
+		for _, tt := range []struct {
+			name, state string
+			op          ir.Operation
+		}{
+			{"shop.addLine", "shop.carts", ir.OpPost},
+			{"shop.rename", "shop.title", ir.OpPut},
+			{"shop.removeToken", "shop.token", ir.OpDelete},
+		} {
+			expect(t, tt.name+" の target", effect(tt.name).Target, ir.EffectTarget(ir.BuiltinTarget{State: tt.state, Operation: tt.op}))
+			expect(t, tt.name+" の writes", effect(tt.name).Writes, []string{tt.state})
+		}
+	})
+
+	t.Run("ir.md state / exception / effect/Effect.target transition", func(t *testing.T) {
+		both := []string{"shop.carts", "shop.orders"}
+		for _, tt := range []struct {
+			name   string
+			target ir.TransitionTarget
+			writes []string
+		}{
+			// 宛先が状態の分類: 書き込むのはその対象のすべての基底の状態
+			{"shop.placeOrder", ir.TransitionTarget{Of: "shop.Checkout", From: ir.Cases("Shopping"), To: ir.Cases("Ordered")}, both},
+			// CaseSet: "any" か、ケース名の列（書かれた順）
+			{"shop.startOver", ir.TransitionTarget{Of: "shop.Checkout", From: ir.AnyCase(), To: ir.Cases("Shopping")}, both},
+			{"shop.touchCheckout", ir.TransitionTarget{Of: "shop.Checkout", From: ir.Cases("Shopping", "Ordered"), To: ir.AnyCase()}, both},
+			{"shop.signIn", ir.TransitionTarget{Of: "shop.LoggedIn", From: ir.AnyCase(), To: ir.Cases("LoggedIn")}, []string{"shop.token"}},
+			// 宛先が基底の状態（組み込みの分類。ケースは Empty / HasItems）: 書き込むのはその状態
+			{"shop.clearCart", ir.TransitionTarget{Of: "shop.carts", From: ir.Cases("HasItems"), To: ir.Cases("Empty")}, []string{"shop.carts"}},
+			{"shop.saveToken", ir.TransitionTarget{Of: "shop.token", From: ir.Cases("Empty"), To: ir.Cases("HasItems")}, []string{"shop.token"}},
+		} {
+			expect(t, tt.name+" の target", effect(tt.name).Target, ir.EffectTarget(tt.target))
+			expect(t, tt.name+" の writes", effect(tt.name).Writes, tt.writes)
+		}
+	})
+
+	t.Run("ir.md 配線/Match.subject", func(t *testing.T) {
+		// 基底の状態の、組み込みの分類での match: classify は状態の形
+		byNullable := matches("shop.openTop")[0]
+		expect(t, "match token by nullable の subject", byNullable.Subject, ir.MatchSubject(ir.StateSubject{State: "shop.token"}))
+		expect(t, "match token by nullable の classify", byNullable.Classify, "nullable")
+		byList := matches("shop.openCart")[0]
+		expect(t, "match carts by list の subject", byList.Subject, ir.MatchSubject(ir.StateSubject{State: "shop.carts"}))
+		expect(t, "match carts by list の classify", byList.Classify, "list")
+		expect(t, "組み込みの分類のアーム（書かれた順）", renderBody(opOf(t, prog, "shop.openCart").Body), []string{
+			"match state shop.carts by list { Empty => shop.showEmpty(); HasItems => shop.emptyCart() }",
+		})
+		// 状態の分類での match: 対象は classify が持つ
+		byClassify := matches("shop.checkout")[0]
+		expect(t, "match by Checkout の subject", byClassify.Subject, ir.MatchSubject(ir.ClassifyOwnedSubject{}))
+		expect(t, "match by Checkout の classify", byClassify.Classify, "shop.Checkout")
+		// 値の分類での match と、condition（状態の分類）での match が同じ op に並ぶ
+		add := matches("shop.add")
+		value, ok := add[0].Subject.(ir.ValueSubject)
+		if !ok {
+			t.Fatalf("match line by LineKind の subject = %#v", add[0].Subject)
+		}
+		expect(t, "match line by LineKind の atom", renderAtom(value.Atom), "line")
+		expect(t, "match line by LineKind の classify", add[0].Classify, "shop.LineKind")
+		expect(t, "match by LoggedIn の subject", add[1].Subject, ir.MatchSubject(ir.ClassifyOwnedSubject{}))
+		expect(t, "match by LoggedIn の classify", add[1].Classify, "shop.LoggedIn")
+		expect(t, "add の本体", renderBody(opOf(t, prog, "shop.add").Body), []string{
+			"const normalized = match line by shop.LineKind { Single => shop.packSingle(line: line); Bulk => shop.packBulk(line: line) }",
+			"match by shop.LoggedIn { LoggedIn => shop.addToCart(line: normalized); default => shop.showLogin() }",
+		})
+	})
+
+	t.Run("ir.md JSON", func(t *testing.T) {
+		got, err := json.MarshalIndent(prog, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// jsonNamespace は View の JSON（program の下）を読むので、Program をその形に包む
+		shop := jsonNamespace(t, map[string]any{"program": decodeJSON(t, got)}, "shop")
+		expect(t, "State.shape", jsonDecl(t, shop, "shop.token")["shape"], "nullable")
+		expect(t, "Classify.subject（states）", jsonDecl(t, shop, "shop.Checkout")["subject"], map[string]any{"kind": "states", "states": []any{"shop.carts", "shop.orders"}})
+		expect(t, "Effect.target（builtin）", jsonDecl(t, shop, "shop.removeToken")["target"], map[string]any{"kind": "builtin", "state": "shop.token", "operation": "delete"})
+		expect(t, "Effect.target（transition）", jsonDecl(t, shop, "shop.placeOrder")["target"], map[string]any{"kind": "transition", "of": "shop.Checkout", "from": []any{"Shopping"}, "to": []any{"Ordered"}})
+		// CaseSet の "any" は文字列
+		expect(t, "CaseSet の any", jsonDecl(t, shop, "shop.startOver")["target"].(map[string]any)["from"], "any")
+		expect(t, "Effect.writes", jsonDecl(t, shop, "shop.placeOrder")["writes"], []any{"shop.carts", "shop.orders"})
+		stmt := func(op string, i int) map[string]any {
+			return jsonDecl(t, shop, op)["body"].(map[string]any)["statements"].([]any)[i].(map[string]any)
+		}
+		byNullable := stmt("shop.openTop", 0)["match"].(map[string]any)
+		expect(t, "Match.subject（state）", byNullable["subject"], map[string]any{"kind": "state", "state": "shop.token"})
+		expect(t, "Match.classify（組み込みの分類）", byNullable["classify"], "nullable")
+		byClassify := stmt("shop.checkout", 0)["expr"].(map[string]any)["match"].(map[string]any)
+		expect(t, "Match.subject（classify）", byClassify["subject"], map[string]any{"kind": "classify"})
+		// 読み戻して書いても同じバイト列
+		var back ir.Program
+		if err := json.Unmarshal(got, &back); err != nil {
+			t.Fatalf("Program の JSON を読み戻せない: %v", err)
+		}
+		again, _ := json.MarshalIndent(&back, "", "  ")
+		if !bytes.Equal(again, got) {
+			t.Errorf("Program の JSON を読み戻して書くと変わる:\n%s", firstDiff(string(got), string(again)))
+		}
+	})
+
+	t.Run("types.md 式の型/match", func(t *testing.T) {
+		// 状態の match の型も値の match と同じ決め方: none のアームがあれば optional(T)。`return placed;` が Order? に渡せる
+		expect(t, "checkout の戻り値", typeStr(opOf(t, prog, "shop.checkout").Returns), "shop.Order?")
+		expect(t, "checkout の本体", renderBody(opOf(t, prog, "shop.checkout").Body), []string{
+			"const placed = match by shop.Checkout { Shopping => shop.submitOrder(); Ordered => none }",
+			"return placed",
+		})
+	})
+
+	t.Run("check.md 計算/手順 0（配線）の match", func(t *testing.T) {
+		// 状態の match もアームごとの呼び出しとして計算する。一部のアームにしかない効果は succ が unknown
+		expect(t, "openCart の Signature", sigOf(opOf(t, prog, "shop.openCart").Signature), sig{
+			E: []string{}, F: []string{"shop.clearCart"}, Rel: []string{}, Succ: []string{"shop.clearCart = unknown"},
+		})
+		// 遷移の効果も、組み込みの効果と同じく伝播する（検査器は遷移を行をまたいで追わない。docs/check.md「状態の形」）
+		expect(t, "checkout の Signature", sigOf(opOf(t, prog, "shop.checkout").Signature), sig{
+			E: []string{"shop.EmptyCart"}, F: []string{"shop.placeOrder"},
+			Rel:  []string{"shop.EmptyCart / shop.placeOrder = prevented"},
+			Succ: []string{"shop.placeOrder = unknown"},
+		})
+		expect(t, "add の Signature", sigOf(opOf(t, prog, "shop.add").Signature), sig{
+			E: []string{}, F: []string{"shop.addLine"}, Rel: []string{}, Succ: []string{"shop.addLine = unknown"},
+		})
 	})
 }
 
@@ -928,7 +1114,20 @@ func renderMatch(m ir.Match) string {
 		}
 		arms = append(arms, cases+" => "+body)
 	}
-	return "match " + renderAtom(m.Subject) + " by " + m.Classify + " { " + strings.Join(arms, "; ") + " }"
+	return renderMatchHead(m) + " { " + strings.Join(arms, "; ") + " }"
+}
+
+// renderMatchHead は match の頭を、対象の形（docs/ir.md「配線」の Match.subject）ごとに書く。
+func renderMatchHead(m ir.Match) string {
+	switch s := m.Subject.(type) {
+	case ir.ValueSubject:
+		return "match " + renderAtom(s.Atom) + " by " + m.Classify
+	case ir.StateSubject:
+		return "match state " + s.State + " by " + m.Classify
+	case ir.ClassifyOwnedSubject:
+		return "match by " + m.Classify
+	}
+	return "match <nil> by " + m.Classify
 }
 
 func renderExpr(e ir.Expr) string {

@@ -1,0 +1,13 @@
+// MATCH-6（docs/check.md「classify / match」）: 値の match だけの規則。状態の match には型を照合する対象がない
+namespace a {
+  model M { id: string; }
+  state items: list<M>;
+  state token: nullable<string>;
+  classify Stock of items { None; Some; }
+  op f(): void;
+  op ok(): void {
+    match items by list { Empty => f(); HasItems => none; };
+    match token by nullable { Empty => f(); HasItems => none; };
+    match by Stock { None => f(); Some => none; };
+  }
+}

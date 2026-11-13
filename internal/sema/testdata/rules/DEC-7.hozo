@@ -22,4 +22,20 @@ namespace a {
   op ng2(): void;
   @onError(E | G)                      // ERROR: DEC-7
   op ng3(): void;
+
+  // any effect on s.op を満たすのは、宛先が組み込みの効果 { state: s, operation: op } の効果だけ。
+  // 同じ状態に書き込む遷移の効果は満たさない
+  effect tput on t.put;
+  effect drain on t: HasItems -> Empty;
+  classify Phase of t { Idle; Busy; }
+  effect start on Phase: Idle -> Busy;
+  decorator onListPut(e: any effect on t.put);
+  @onListPut(tput)
+  op ok4(): void;
+  @onListPut(drain)                    // ERROR: DEC-7
+  op ng4(): void;
+  @onListPut(start)                    // ERROR: DEC-7
+  op ng5(): void;
+  @onListPut(post)                     // ERROR: DEC-7
+  op ng6(): void;
 }

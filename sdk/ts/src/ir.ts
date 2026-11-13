@@ -24,8 +24,23 @@ export type Literal = StringLiteral | IntLiteral | FloatLiteral | BooleanLiteral
 export type Type = CoreType | RefType | OptionalType | ArrayType | RecordType | CaseType;
 export type CoreName = "string" | "boolean" | "int" | "float" | "Time" | "Duration";
 export type UnionVariant = "arms" | "set";
-export type StateShape = "list" | "single";
+/**
+ * 状態の形（docs/ir.md「state / exception / effect」の shape）。列数の範囲: list は 0 以上、nullable は 0 か 1、single はちょうど 1（docs/check.md「状態の形」）。
+ */
+export type StateShape = "list" | "nullable" | "single";
+/**
+ * 効果の宛先（docs/ir.md「state / exception / effect」の EffectTarget）。kind で分ける。
+ */
+export type EffectTarget = BuiltinTarget | TransitionTarget;
 export type Operation = "post" | "put" | "delete";
+/**
+ * 遷移の前か後のケースの集合。"any" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。
+ */
+export type CaseSet = "any" | string[];
+/**
+ * 分類の対象（docs/ir.md「classify」の subject）。kind で分ける。
+ */
+export type ClassifySubject = TypeSubject | StatesSubject;
 export type CatchMode = "recovers" | "halts" | "ignores";
 /**
  * デコレータの引数の型（docs/ir.md「decorator」の ParamType）。
@@ -58,6 +73,10 @@ export type ArmBody = CallExpr | NoneBody;
  * match のアームが受けるケース。"default" か、ケース名の列（docs/ir.md「配線」の Match）。
  */
 export type ArmCases = "default" | string[];
+/**
+ * match の対象（docs/ir.md「配線」の Match の subject）。kind で分ける。
+ */
+export type MatchSubject = ValueSubject | StateSubject | ClassifyOwnedSubject;
 export type EffectState = "prevented" | "kept" | "unknown";
 
 /**
@@ -306,7 +325,7 @@ export interface UnionMember {
   target: string;
 }
 /**
- * state 宣言（docs/ir.md「state / exception / effect」）。
+ * state 宣言（docs/ir.md「state / exception / effect」）。element は optional にならない。
  */
 export interface State {
   decorators: Application[];
@@ -329,16 +348,33 @@ export interface Exception {
   value?: Type;
 }
 /**
- * effect 宣言（docs/ir.md「state / exception / effect」）。
+ * effect 宣言（docs/ir.md「state / exception / effect」）。宛先（target）は一つだけ。writes は書き込む基底の状態の FQN。
  */
 export interface Effect {
   decorators: Application[];
   description?: Doc;
   kind: "effect";
   name: string;
-  operation: Operation;
   span: Span;
+  target: EffectTarget;
+  writes: string[];
+}
+/**
+ * 基底の状態の組み込みの効果（docs/ir.md「state / exception / effect」の EffectTarget kind "builtin"）。
+ */
+export interface BuiltinTarget {
+  kind: "builtin";
+  operation: Operation;
   state: string;
+}
+/**
+ * 分類の遷移（docs/ir.md「state / exception / effect」の EffectTarget kind "transition"）。of は状態の分類の FQN か、組み込みの分類を持つ基底の状態の FQN。
+ */
+export interface TransitionTarget {
+  from: CaseSet;
+  kind: "transition";
+  of: string;
+  to: CaseSet;
 }
 /**
  * classify 宣言（docs/ir.md「classify」）。cases に default は含まない。
@@ -353,7 +389,7 @@ export interface Classify {
   kind: "classify";
   name: string;
   span: Span;
-  subject: Type;
+  subject: ClassifySubject;
 }
 /**
  * classify のケース（docs/ir.md「classify」）。
@@ -362,6 +398,20 @@ export interface ClassifyCase {
   description?: Doc;
   name: string;
   span: Span;
+}
+/**
+ * 値の分類の対象の型（docs/ir.md「classify」の subject kind "type"）。
+ */
+export interface TypeSubject {
+  kind: "type";
+  type: Type;
+}
+/**
+ * 状態の分類の対象（docs/ir.md「classify」の subject kind "states"）。基底の状態の FQN（書かれた順）。
+ */
+export interface StatesSubject {
+  kind: "states";
+  states: string[];
 }
 /**
  * decorator 宣言（docs/ir.md「decorator」）。alias を持つ宣言は params / targets / throws / catches が []。
@@ -521,13 +571,13 @@ export interface MatchExpr {
   match: Match;
 }
 /**
- * 分類による分岐（docs/ir.md「配線」）。
+ * 分類による分岐（docs/ir.md「配線」）。classify は FQN。組み込みの分類なら "list" か "nullable"。
  */
 export interface Match {
   arms: MatchArm[];
   classify: string;
   span: Span;
-  subject: Atom;
+  subject: MatchSubject;
 }
 /**
  * match のアーム（docs/ir.md「配線」）。
@@ -542,6 +592,26 @@ export interface MatchArm {
  */
 export interface NoneBody {
   kind: "none";
+}
+/**
+ * 値の分類での match の対象（docs/ir.md「配線」の subject kind "value"）。
+ */
+export interface ValueSubject {
+  atom: Atom;
+  kind: "value";
+}
+/**
+ * 基底の状態の、組み込みの分類での match の対象（docs/ir.md「配線」の subject kind "state"）。state は FQN。
+ */
+export interface StateSubject {
+  kind: "state";
+  state: string;
+}
+/**
+ * 状態の分類での match（docs/ir.md「配線」の subject kind "classify"）。対象は classify が持つ。
+ */
+export interface ClassifyOwnedSubject {
+  kind: "classify";
 }
 export interface AtomExpr {
   atom: Atom;

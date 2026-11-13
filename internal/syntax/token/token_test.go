@@ -97,6 +97,8 @@ func TestKindString(t *testing.T) {
 		{Semicolon, ";"},
 		{StarStar, "**"},
 		{Arrow, "=>"},
+		{ThinArrow, "->"},
+		{Nullable, "nullable"},
 		{Ident, "識別子"},
 		{EOF, "ファイルの終わり"},
 		{Kind(9999), "不明な字句"},

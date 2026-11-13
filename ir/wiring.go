@@ -344,11 +344,98 @@ func UnmarshalAtom(data []byte) (Atom, error) {
 
 // Match は分類による分岐（docs/ir.md「配線」の Match）。
 type Match struct {
-	Subject Atom `json:"subject"`
-	// Classify は classify の FQN。
+	// Subject は対象。値（[ValueSubject]）、基底の状態（[StateSubject]）、分類の宣言が持つ（[ClassifyOwnedSubject]）のどれか。
+	Subject MatchSubject `json:"subject"`
+	// Classify は classify の FQN。組み込みの分類なら状態の形 "list" か "nullable"。
 	Classify string     `json:"classify"`
 	Arms     []MatchArm `json:"arms"`
 	Span     Span       `json:"span"`
+}
+
+// MatchSubject は match の対象（docs/ir.md「配線」の Match の subject）。具体型は値型の [ValueSubject]
+// （kind "value"）、[StateSubject]（kind "state"）、[ClassifyOwnedSubject]（kind "classify"）。
+type MatchSubject interface {
+	// Kind は JSON の判別子（"value"、"state"、"classify"）。
+	Kind() string
+	isMatchSubject()
+}
+
+// ValueSubject は値の分類での match の対象（`match item by C`。docs/ir.md「配線」の subject kind "value"）。
+type ValueSubject struct {
+	Atom Atom `json:"atom"`
+}
+
+// StateSubject は基底の状態の、組み込みの分類での match の対象（`match carts by list`。
+// docs/ir.md「配線」の subject kind "state"）。
+type StateSubject struct {
+	// State は状態の FQN。
+	State string `json:"state"`
+}
+
+// ClassifyOwnedSubject は状態の分類での match（`match by C`）。対象は classify が持つので、ここには何もない
+// （docs/ir.md「配線」の subject kind "classify"）。
+type ClassifyOwnedSubject struct{}
+
+var (
+	_ MatchSubject = ValueSubject{}
+	_ MatchSubject = StateSubject{}
+	_ MatchSubject = ClassifyOwnedSubject{}
+)
+
+// Kind は "value"。
+func (ValueSubject) Kind() string { return "value" }
+
+// Kind は "state"。
+func (StateSubject) Kind() string { return "state" }
+
+// Kind は "classify"。
+func (ClassifyOwnedSubject) Kind() string { return "classify" }
+
+func (ValueSubject) isMatchSubject()         {}
+func (StateSubject) isMatchSubject()         {}
+func (ClassifyOwnedSubject) isMatchSubject() {}
+
+// MarshalJSON は kind を付けて書く。
+func (s ValueSubject) MarshalJSON() ([]byte, error) {
+	type alias ValueSubject
+	return marshalKind("value", alias(s))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (s StateSubject) MarshalJSON() ([]byte, error) {
+	type alias StateSubject
+	return marshalKind("state", alias(s))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (ClassifyOwnedSubject) MarshalJSON() ([]byte, error) { return []byte(`{"kind":"classify"}`), nil }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *ValueSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+var matchSubjectTable = map[string]func([]byte) (MatchSubject, error){
+	"value":    asValue[MatchSubject, ValueSubject],
+	"state":    asValue[MatchSubject, StateSubject],
+	"classify": asValue[MatchSubject, ClassifyOwnedSubject],
+}
+
+// UnmarshalMatchSubject は kind で分けて MatchSubject を読む（docs/ir.md「JSON」）。
+func UnmarshalMatchSubject(data []byte) (MatchSubject, error) {
+	return decodeUnion("match subject", data, matchSubjectTable)
+}
+
+// SubjectAtom は値の分類での match の対象の Atom。状態での match なら nil。
+func (m Match) SubjectAtom() Atom {
+	if s, ok := m.Subject.(ValueSubject); ok {
+		return s.Atom
+	}
+	return nil
+}
+
+// Builtin は組み込みの分類での match（`by list` / `by nullable`）か。
+func (m Match) Builtin() bool {
+	_, ok := m.Subject.(StateSubject)
+	return ok
 }
 
 // MatchArm は match のアーム（docs/ir.md「配線」の Match の arms）。

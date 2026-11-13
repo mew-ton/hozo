@@ -5,4 +5,8 @@ namespace a {
   classify C of M { A; }
   op ok(m: C.A<M>): void;
   op ng(n: C.A<N>): void;              // ERROR: TYPE-12
+  // 状態の分類には対象の型がないので、ケースで絞り込んだ型は書けない
+  state items: list<M>;
+  classify Stock of items { None; Some; }
+  op ng2(m: Stock.Some<M>): void;      // ERROR: TYPE-12
 }

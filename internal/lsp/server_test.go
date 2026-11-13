@@ -205,12 +205,12 @@ func TestSession(t *testing.T) {
 
 	// 定義へジャンプ: 別の名前空間の宣言（browser の server.Token → server.hozo の scalar Token）
 	var loc *protocol.Location
-	c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: positionOf(t, enc, browserText, "server.Token?", 0)}, &loc)
+	c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: positionOf(t, enc, browserText, "server.Token>", 0)}, &loc)
 	// 位置は "server." の先頭なので名前空間 server のブロック
 	if loc == nil || loc.URI != serverURI || loc.Range.Start != positionOf(t, enc, serverText, "server {", 0) {
 		t.Fatalf("definition(server) = %+v", loc)
 	}
-	tokenPos := positionOf(t, enc, browserText, "Token?", 0)
+	tokenPos := positionOf(t, enc, browserText, "Token>", 0)
 	c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: tokenPos}, &loc)
 	if loc == nil || loc.URI != serverURI || loc.Range.Start != positionOf(t, enc, serverText, "Token extends", 0) {
 		t.Fatalf("definition(Token) = %+v", loc)
@@ -559,4 +559,123 @@ func keysOf(m map[string][]protocol.Diagnostic) []string {
 func shift(p protocol.Position, n int) protocol.Position {
 	p.Character += n
 	return p
+}
+
+// TestStateClassification は、状態を分類で表す決定（docs/decisions.md「設計書を変える決定」）の構文に対する、
+// 診断の一致・ホバーの見出し（docs/lsp.md「ホバー」）・定義へジャンプ・ドキュメントのシンボル。
+// コーパスは tests/corpus/state（check だけのコーパス。README.md）。
+func TestStateClassification(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", "..", "tests", "corpus", "state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	enc := encUTF16
+	// 言語サーバーと check の一致（docs/testing.md）: このコーパスには診断がない
+	p := project.Load(root, "", nil)
+	diffKeys(t, checkKeys(p), lspKeys(t, p, enc, byURI))
+	if len(p.Diags) != 0 {
+		t.Fatalf("tests/corpus/state に診断がある: %d", len(p.Diags))
+	}
+
+	path := filepath.Join(root, "shop.hozo")
+	uri, text := fileURI(path), readFile(t, path)
+	hover := func(needle string, n, shiftBy int) string {
+		t.Helper()
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, n), shiftBy)}, &hov)
+		if hov == nil {
+			t.Fatalf("hover(%q) = nil", needle)
+		}
+		return hov.Contents.Value
+	}
+	definition := func(needle string, n, shiftBy int) *protocol.Location {
+		t.Helper()
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, n), shiftBy)}, &loc)
+		return loc
+	}
+
+	// ホバーの見出し: Hozo の構文で書いた宣言（docs/lsp.md「ホバー」の 1）
+	for _, tt := range []struct {
+		needle  string
+		shiftBy int
+		want    string
+	}{
+		// 効果の宛先: 組み込みの効果と、分類の遷移
+		{"effects addLine;", len("effects "), "```hozo\neffect addLine on carts.post\n```"},
+		{"effects placeOrder throws", len("effects "), "```hozo\neffect placeOrder on Checkout: Shopping -> Ordered\n```"},
+		{"effects startOver;", len("effects "), "```hozo\neffect startOver on Checkout: any -> Shopping\n```"},
+		{"effects clearCart;", len("effects "), "```hozo\neffect clearCart on carts: HasItems -> Empty\n```"},
+		{"touchCheckout on", 0, "```hozo\neffect touchCheckout on Checkout: Shopping | Ordered -> any\n```"},
+		// 分類の対象: 状態の分類は状態の名前の並び、値の分類は型
+		{"match by Checkout", len("match by "), "```hozo\nclassify Checkout of carts, orders\n```"},
+		{"match by LoggedIn", len("match by "), "```hozo\ncondition LoggedIn of token\n```"},
+		{"match line by LineKind", len("match line by "), "```hozo\nclassify LineKind of Line\n```"},
+		// 状態の形
+		{"match token by nullable", len("match "), "```hozo\nstate token: nullable<Token>\n```"},
+		{"match carts by list", len("match "), "```hozo\nstate carts: list<Line>\n```"},
+		// 遷移のケース名は分類のケース
+		{"Checkout: Shopping -> Ordered", len("Checkout: "), "classify Checkout of carts, orders\n  Shopping"},
+		// 束縛のホバーは式を短く書く: 状態の分類での match
+		{"return placed;", len("return "), "match by Checkout { ... }"},
+	} {
+		if got := hover(tt.needle, 0, tt.shiftBy); !strings.Contains(got, tt.want) {
+			t.Errorf("hover(%q) に %q がない:\n%s", tt.needle, tt.want, got)
+		}
+	}
+	if got := hover("Checkout: Shopping -> Ordered", 0, len("Checkout: ")); !strings.Contains(got, "カートに入れている途中") {
+		t.Errorf("hover(遷移のケース Shopping) にケースの説明がない:\n%s", got)
+	}
+
+	// 定義へジャンプ: 遷移の宛先（分類、基底の状態）、遷移のケース、match の対象の状態、match by の分類
+	for _, tt := range []struct {
+		what, needle string
+		shiftBy      int
+		target       string // 定義の位置（この文字列の先頭）
+	}{
+		{"遷移の宛先の分類", "placeOrder on Checkout", len("placeOrder on "), "Checkout of carts, orders"},
+		{"遷移の後のケース", "Shopping -> Ordered;", len("Shopping -> "), "Ordered;\n  }"},
+		{"遷移の宛先の基底の状態", "clearCart on carts", len("clearCart on "), "carts: list<Line>"},
+		{"分類の対象の状態", "Checkout of carts, orders", len("Checkout of carts, "), "orders: list<Order>"},
+		{"match の対象の状態", "match token by nullable", len("match "), "token: nullable<Token>"},
+		{"match by の分類", "match by Checkout", len("match by "), "Checkout of carts, orders"},
+		{"match by のアームのケース", "Shopping => submitOrder()", 0, "Shopping;\n"},
+	} {
+		loc := definition(tt.needle, 0, tt.shiftBy)
+		if loc == nil || loc.URI != uri || loc.Range.Start != positionOf(t, enc, text, tt.target, 0) {
+			t.Errorf("definition(%s) = %+v, want %q の位置 %+v", tt.what, loc, tt.target, positionOf(t, enc, text, tt.target, 0))
+		}
+	}
+	// 組み込みの分類のケース（Empty / HasItems）には定義がない
+	if loc := definition("HasItems -> Empty;", 0, 0); loc != nil {
+		t.Errorf("definition(組み込みのケース HasItems) = %+v, want nil", loc)
+	}
+
+	// ドキュメントのシンボル: 効果の detail は宛先、分類の detail は対象
+	var syms []protocol.DocumentSymbol
+	c.result(protocol.MethodDocumentSymbol, protocol.DocumentSymbolParams{TextDocument: textDoc(uri)}, &syms)
+	if len(syms) != 1 || syms[0].Name != "shop" {
+		t.Fatalf("documentSymbol top = %+v", summarize(syms))
+	}
+	details := map[string]string{}
+	for _, s := range syms[0].Children {
+		details[s.Name] = s.Detail
+	}
+	for name, want := range map[string]string{
+		"token":         "nullable<Token>",
+		"addLine":       "on carts.post",
+		"placeOrder":    "on Checkout: Shopping -> Ordered",
+		"touchCheckout": "on Checkout: Shopping | Ordered -> any",
+		"clearCart":     "on carts: HasItems -> Empty",
+		"Checkout":      "of carts, orders",
+		"LoggedIn":      "of token",
+		"LineKind":      "of Line",
+	} {
+		if details[name] != want {
+			t.Errorf("symbol %s の detail = %q, want %q", name, details[name], want)
+		}
+	}
+	c.shutdown()
 }

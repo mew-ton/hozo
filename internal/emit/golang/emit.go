@@ -153,6 +153,9 @@ func (e *emitter) run() []File {
 	}
 
 	e.collectDecls()
+	if e.checkUnsupported() {
+		return nil
+	}
 	e.checkNames()
 	e.collectWrappers()
 

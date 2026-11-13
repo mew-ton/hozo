@@ -16,7 +16,8 @@ func (e *emitter) genClassify() *genFile {
 	rt := g.imports.Add(runtimePath, "runtime")
 	for _, c := range e.classifies {
 		name := e.typeName(c.Name)
-		subject := gol.GoType(c.Subject, &g.imports)
+		// 値の分類だけがここに来る。状態の分類は checkUnsupported が GOEMIT-INTERNAL で止めている。
+		subject := gol.GoType(c.SubjectType(), &g.imports)
 		kind := "classify"
 		if c.FromCondition {
 			kind = "condition"

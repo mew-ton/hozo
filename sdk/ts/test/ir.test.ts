@@ -11,10 +11,14 @@ import type {
   ArgValue,
   ArmBody,
   Atom,
+  CaseSet,
+  ClassifySubject,
   Decl,
+  EffectTarget,
   Expr,
   Literal,
   Match,
+  MatchSubject,
   ParamType,
   Program,
   Statement,
@@ -137,8 +141,72 @@ function walkAtom(a: Atom): void {
   }
 }
 
+// docs/ir.md「配線」の Match.subject: 値、基底の状態、分類の宣言が持つ、の三つ。
+function walkMatchSubject(s: MatchSubject, classify: string): void {
+  seen.add(`matchSubject:${s.kind}`);
+  switch (s.kind) {
+    case "value":
+      walkAtom(s.atom);
+      return;
+    case "state":
+      assert.equal(typeof s.state, "string");
+      // 組み込みの分類なら classify は状態の形
+      assert.ok(["list", "nullable"].includes(classify), `classify of a state match: ${classify}`);
+      return;
+    case "classify":
+      assert.deepEqual(Object.keys(s), ["kind"]);
+      return;
+    default:
+      unreachable(s);
+  }
+}
+
+function walkCaseSet(c: CaseSet): void {
+  if (c === "any") {
+    seen.add("caseSet:any");
+    return;
+  }
+  seen.add("caseSet:list");
+  assert.ok(Array.isArray(c));
+  for (const name of c) assert.equal(typeof name, "string");
+}
+
+// docs/ir.md「state / exception / effect」の EffectTarget: 組み込みの効果か、分類の遷移。
+function walkEffectTarget(t: EffectTarget): void {
+  seen.add(`effectTarget:${t.kind}`);
+  switch (t.kind) {
+    case "builtin":
+      assert.equal(typeof t.state, "string");
+      assert.ok(["post", "put", "delete"].includes(t.operation));
+      return;
+    case "transition":
+      assert.equal(typeof t.of, "string");
+      walkCaseSet(t.from);
+      walkCaseSet(t.to);
+      return;
+    default:
+      unreachable(t);
+  }
+}
+
+// docs/ir.md「classify」の subject: 値の分類なら型、状態の分類なら基底の状態の FQN。
+function walkClassifySubject(s: ClassifySubject): void {
+  seen.add(`classifySubject:${s.kind}`);
+  switch (s.kind) {
+    case "type":
+      walkType(s.type);
+      return;
+    case "states":
+      assert.ok(s.states.length > 0);
+      for (const st of s.states) assert.equal(typeof st, "string");
+      return;
+    default:
+      unreachable(s);
+  }
+}
+
 function walkMatch(m: Match): void {
-  walkAtom(m.subject);
+  walkMatchSubject(m.subject, m.classify);
   for (const arm of m.arms) {
     if (arm.cases !== "default") assert.ok(Array.isArray(arm.cases));
     const body: ArmBody = arm.body;
@@ -210,16 +278,21 @@ function walkDecl(d: Decl): void {
       d.arms.forEach((a) => walkType(a.type));
       return;
     case "state":
+      seen.add(`stateShape:${d.shape}`);
+      assert.ok(["list", "nullable", "single"].includes(d.shape));
+      assert.notEqual(d.element.kind, "optional", "State.element is never optional (STATE-3)");
       walkType(d.element);
       return;
     case "exception":
       if (d.value) walkType(d.value);
       return;
     case "effect":
-      assert.ok(["post", "put", "delete"].includes(d.operation));
+      walkEffectTarget(d.target);
+      assert.ok(d.writes.length > 0);
+      for (const st of d.writes) assert.equal(typeof st, "string");
       return;
     case "classify":
-      walkType(d.subject);
+      walkClassifySubject(d.subject);
       return;
     case "decorator":
       d.params.forEach((p) => walkParamType(p.type));
@@ -277,6 +350,11 @@ test("goldens cover every kind of every union", () => {
     ...["call", "none"].map((k) => `armBody:${k}`),
     ...["call", "match", "atom"].map((k) => `expr:${k}`),
     ...["const", "return", "call", "match"].map((k) => `statement:${k}`),
+    ...["list", "nullable", "single"].map((k) => `stateShape:${k}`),
+    ...["builtin", "transition"].map((k) => `effectTarget:${k}`),
+    ...["any", "list"].map((k) => `caseSet:${k}`),
+    ...["type", "states"].map((k) => `classifySubject:${k}`),
+    ...["value", "state", "classify"].map((k) => `matchSubject:${k}`),
   ];
   for (const k of want) assert.ok(seen.has(k), `goldens contain no ${k}`);
 });

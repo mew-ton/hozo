@@ -1,0 +1,10 @@
+// STATE-3（docs/check.md「状態と効果」）: 状態の要素の型は optional にしない。空になりうる状態は nullable<T> と書く
+namespace a {
+  model M { id: string; }
+  state maybe: nullable<M>;
+  state one: single<M>;
+  state many: list<M>;
+  // 要素の中の optional（Record の値、配列の要素）は、要素の型そのものの optional ではない
+  state attrs: single<Record<string, string?>>;
+  state slots: list<M?[]>;
+}

@@ -106,7 +106,7 @@ type ServerOps interface {
 }
 
 // States は、この名前空間の配線が同じ名前空間の op を呼ぶときに bind で埋める状態の値の取得
-// （docs/emit-go.md「state」）。single<T?> なら *T、single<T> なら T。
+// （docs/emit-go.md「state」）。nullable<T> なら *T（空なら nil）、single<T> なら T。
 type States interface {
 	// Token は状態 browser.token の値。
 	Token(ctx context.Context) (*server.Token, error)

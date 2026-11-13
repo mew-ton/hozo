@@ -223,8 +223,14 @@ func (a *analyzer) checkTYPE12(classify *symbol, of ir.Type, span source.Span) {
 	if !ok || c.Subject == nil {
 		return
 	}
-	if !a.assignType(of, c.Subject) {
-		a.errorf("TYPE-12", span, "%s は classify %s の対象の型 %s に渡せない", typeName(of), classify.fqn, typeName(c.Subject))
+	subject := c.SubjectType()
+	if subject == nil {
+		// 状態の分類は値を絞り込まない（docs/types.md「式の型」の match）。対象の型がないので、どの T も渡せない。
+		a.errorf("TYPE-12", span, "classify %s は状態の分類で、対象の型がないので、ケースで絞り込んだ型は書けない", classify.fqn)
+		return
+	}
+	if !a.assignType(of, subject) {
+		a.errorf("TYPE-12", span, "%s は classify %s の対象の型 %s に渡せない", typeName(of), classify.fqn, typeName(subject))
 	}
 }
 

@@ -1,0 +1,22 @@
+// MATCH-7（docs/check.md「classify / match」、docs/grammar.md「配線」の表）: match の三つの形
+namespace a {
+  model M { id: string; }
+  state carts: list<M>;
+  state orders: list<M>;
+  state token: nullable<string>;
+  classify Kind of M { A; B; }
+  classify Checkout of carts, orders { Shopping; Ordered; }
+  condition LoggedIn of token;
+  op f();
+  op g(m: M);
+  op ok(m: M) {
+    // 値の分類: 対象は値
+    match m by Kind { A => g(m); B => none; };
+    // 組み込みの分類: 対象は今の名前空間の、その形の基底の状態
+    match carts by list { Empty => f(); HasItems => none; };
+    match token by nullable { Empty => f(); HasItems => none; };
+    // 状態の分類: 対象は書かない
+    match by Checkout { Shopping => f(); Ordered => none; };
+    match by LoggedIn { LoggedIn => f(); default => none; };
+  }
+}

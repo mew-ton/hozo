@@ -106,7 +106,7 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 	call := Call{Op: "s.f", Args: []CallArg{{Param: "x", Value: NoneAtom{Span: sp()}}}, Bound: []BoundPosition{{Path: []string{"x", "y"}, State: "db"}}, Span: sp()}
 	callJSON := `{"op":"s.f","args":[{"param":"x","value":{"kind":"none",` + spJSON + `}}],"bound":[{"path":["x","y"],"state":"db"}],` + spJSON + `}`
 	match := Match{
-		Subject:  NameAtom{Path: []string{"u"}, Span: sp()},
+		Subject:  ValueSubject{Atom: NameAtom{Path: []string{"u"}, Span: sp()}},
 		Classify: "s.C",
 		Arms: []MatchArm{
 			{Cases: ArmCases{Cases: []string{"A", "B"}}, Body: CallExpr{Call: call}, Span: sp()},
@@ -114,7 +114,7 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 		},
 		Span: sp(),
 	}
-	matchJSON := `{"subject":{"kind":"name","path":["u"],` + spJSON + `},"classify":"s.C","arms":[` +
+	matchJSON := `{"subject":{"kind":"value","atom":{"kind":"name","path":["u"],` + spJSON + `}},"classify":"s.C","arms":[` +
 		`{"cases":["A","B"],"body":{"kind":"call","call":` + callJSON + `},` + spJSON + `},` +
 		`{"cases":"default","body":{"kind":"none"},` + spJSON + `}],` + spJSON + `}`
 
@@ -136,6 +136,133 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 	roundTrip(t, Wiring{})
 	if b := roundTrip(t, Wiring{}); string(b) != `{"statements":[]}` {
 		t.Errorf("empty wiring: %s", b)
+	}
+}
+
+// docs/ir.md「配線」の Match の subject の三つの形。
+func TestRoundTripMatchSubjects(t *testing.T) {
+	unionRoundTrip(t, MatchSubject(ValueSubject{Atom: NameAtom{Path: []string{"item"}, Span: sp()}}), UnmarshalMatchSubject,
+		`{"kind":"value","atom":{"kind":"name","path":["item"],`+spJSON+`}}`)
+	unionRoundTrip(t, MatchSubject(StateSubject{State: "browser.token"}), UnmarshalMatchSubject, `{"kind":"state","state":"browser.token"}`)
+	unionRoundTrip(t, MatchSubject(ClassifyOwnedSubject{}), UnmarshalMatchSubject, `{"kind":"classify"}`)
+
+	arm := MatchArm{Cases: ArmCases{Cases: []string{CaseEmpty, CaseHasItems}}, Body: NoneBody{}, Span: sp()}
+	armJSON := `{"cases":["Empty","HasItems"],"body":{"kind":"none"},` + spJSON + `}`
+	// 組み込みの分類なら classify は状態の形。
+	b := roundTrip(t, Match{Subject: StateSubject{State: "browser.token"}, Classify: "nullable", Arms: []MatchArm{arm}, Span: sp()})
+	if want := `{"subject":{"kind":"state","state":"browser.token"},"classify":"nullable","arms":[` + armJSON + `],` + spJSON + `}`; string(b) != want {
+		t.Errorf("match by nullable\nwant %s\ngot  %s", want, b)
+	}
+	b = roundTrip(t, Match{Subject: ClassifyOwnedSubject{}, Classify: "shop.Checkout", Arms: []MatchArm{arm}, Span: sp()})
+	if want := `{"subject":{"kind":"classify"},"classify":"shop.Checkout","arms":[` + armJSON + `],` + spJSON + `}`; string(b) != want {
+		t.Errorf("match by C\nwant %s\ngot  %s", want, b)
+	}
+
+	m := Match{Subject: ValueSubject{Atom: NoneAtom{Span: sp()}}}
+	if m.SubjectAtom() == nil || m.Builtin() {
+		t.Errorf("value match: SubjectAtom = %v, Builtin = %v", m.SubjectAtom(), m.Builtin())
+	}
+	m = Match{Subject: StateSubject{State: "s"}, Classify: "list"}
+	if m.SubjectAtom() != nil || !m.Builtin() {
+		t.Errorf("state match: SubjectAtom = %v, Builtin = %v", m.SubjectAtom(), m.Builtin())
+	}
+	m = Match{Subject: ClassifyOwnedSubject{}}
+	if m.SubjectAtom() != nil || m.Builtin() {
+		t.Errorf("classify match: SubjectAtom = %v, Builtin = %v", m.SubjectAtom(), m.Builtin())
+	}
+	if _, err := UnmarshalMatchSubject([]byte(`{"kind":"name","path":["u"]}`)); err == nil {
+		t.Error("want error: a bare Atom is not a MatchSubject")
+	}
+}
+
+// docs/ir.md「state / exception / effect」の EffectTarget と CaseSet。
+func TestRoundTripEffectTargets(t *testing.T) {
+	unionRoundTrip(t, EffectTarget(BuiltinTarget{State: "shop.carts", Operation: OpPost}), UnmarshalEffectTarget,
+		`{"kind":"builtin","state":"shop.carts","operation":"post"}`)
+	unionRoundTrip(t, EffectTarget(TransitionTarget{Of: "shop.Checkout", From: Cases("Shopping"), To: Cases("Ordered")}), UnmarshalEffectTarget,
+		`{"kind":"transition","of":"shop.Checkout","from":["Shopping"],"to":["Ordered"]}`)
+	unionRoundTrip(t, EffectTarget(TransitionTarget{Of: "shop.carts", From: AnyCase(), To: Cases("B", "A")}), UnmarshalEffectTarget,
+		`{"kind":"transition","of":"shop.carts","from":"any","to":["B","A"]}`)
+	unionRoundTrip(t, EffectTarget(TransitionTarget{Of: "shop.carts", From: Cases("HasItems"), To: AnyCase()}), UnmarshalEffectTarget,
+		`{"kind":"transition","of":"shop.carts","from":["HasItems"],"to":"any"}`)
+
+	// writes は空でも [] で出す。target は kind で分かれる。
+	b := roundTrip(t, Effect{DeclBase: DeclBase{Name: "e", Span: sp()}, Target: BuiltinTarget{State: "s", Operation: OpPut}})
+	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"target":{"kind":"builtin","state":"s","operation":"put"},"writes":[]}`; string(b) != want {
+		t.Errorf("effect\nwant %s\ngot  %s", want, b)
+	}
+	b = roundTrip(t, Effect{
+		DeclBase: DeclBase{Name: "e", Span: sp()},
+		Target:   TransitionTarget{Of: "C", From: Cases("A"), To: AnyCase()},
+		Writes:   []string{"s1", "s2"},
+	})
+	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"target":{"kind":"transition","of":"C","from":["A"],"to":"any"},"writes":["s1","s2"]}`; string(b) != want {
+		t.Errorf("effect\nwant %s\ngot  %s", want, b)
+	}
+
+	var c CaseSet
+	if err := json.Unmarshal([]byte(`"any"`), &c); err != nil || !c.Any || c.Cases != nil {
+		t.Errorf("any: %v %+v", err, c)
+	}
+	if err := json.Unmarshal([]byte(`"all"`), &c); err == nil {
+		t.Error("want error for unknown case set string")
+	}
+	if err := json.Unmarshal([]byte(`["A","B"]`), &c); err != nil || c.Any || !reflect.DeepEqual(c.Cases, []string{"A", "B"}) {
+		t.Errorf("cases: %v %+v", err, c)
+	}
+	if err := json.Unmarshal([]byte(`{"any":true}`), &c); err == nil {
+		t.Error("want error for an object")
+	}
+	if b, _ := json.Marshal(CaseSet{}); string(b) != `[]` {
+		t.Errorf("empty case set: %s", b)
+	}
+	if _, err := UnmarshalEffectTarget([]byte(`{"kind":"state","state":"s"}`)); err == nil {
+		t.Error("want error for unknown effect target kind")
+	}
+}
+
+// docs/ir.md「classify」の subject の二つの形。
+func TestRoundTripClassifySubjects(t *testing.T) {
+	unionRoundTrip(t, ClassifySubject(TypeSubject{Type: Ref("server.Item")}), UnmarshalClassifySubject,
+		`{"kind":"type","type":{"kind":"ref","target":"server.Item"}}`)
+	unionRoundTrip(t, ClassifySubject(StatesSubject{States: []string{"shop.carts", "shop.orders"}}), UnmarshalClassifySubject,
+		`{"kind":"states","states":["shop.carts","shop.orders"]}`)
+	unionRoundTrip(t, ClassifySubject(StatesSubject{}), UnmarshalClassifySubject, `{"kind":"states","states":[]}`)
+
+	c := &Classify{Subject: TypeSubject{Type: Int()}}
+	if c.SubjectType() == nil {
+		t.Error("SubjectType of a value classify")
+	}
+	if _, ok := c.SubjectStates(); ok {
+		t.Error("SubjectStates of a value classify")
+	}
+	c = &Classify{Subject: StatesSubject{States: []string{"a.s"}}}
+	if c.SubjectType() != nil {
+		t.Error("SubjectType of a state classify")
+	}
+	if states, ok := c.SubjectStates(); !ok || !reflect.DeepEqual(states, []string{"a.s"}) {
+		t.Errorf("SubjectStates = %v, %v", states, ok)
+	}
+	if (&Classify{}).SubjectType() != nil {
+		t.Error("SubjectType of an unresolved classify")
+	}
+	if _, err := UnmarshalClassifySubject([]byte(`{"kind":"ref","target":"server.Item"}`)); err == nil {
+		t.Error("want error: a bare Type is not a ClassifySubject")
+	}
+}
+
+func TestStateShapes(t *testing.T) {
+	for shape, want := range map[StateShape]bool{StateList: true, StateNullable: true, StateSingle: false} {
+		if shape.HasBuiltinClassify() != want {
+			t.Errorf("%s.HasBuiltinClassify() = %v, want %v", shape, !want, want)
+		}
+	}
+	if !reflect.DeepEqual(BuiltinCases(), []string{"Empty", "HasItems"}) {
+		t.Errorf("BuiltinCases = %v", BuiltinCases())
+	}
+	b := roundTrip(t, State{DeclBase: DeclBase{Name: "token", Span: sp()}, Shape: StateNullable, Element: Ref("Token")})
+	if want := `{"kind":"state","name":"token","decorators":[],` + spJSON + `,"shape":"nullable","element":{"kind":"ref","target":"Token"}}`; string(b) != want {
+		t.Errorf("state\nwant %s\ngot  %s", want, b)
 	}
 }
 
@@ -254,7 +381,8 @@ func TestNoNullExceptReturnsAndBody(t *testing.T) {
 	for _, key := range []string{`"returns":null`, `"body":null`} {
 		count += strings.Count(string(b), key)
 	}
-	if n := strings.Count(string(b), "null"); n != count {
+	// 値としての null だけを数える（"nullable" の中の null は数えない）。
+	if n := strings.Count(string(b), ":null"); n != count {
 		t.Errorf("found %d nulls, but only %d are returns/body", n, count)
 	}
 }
@@ -386,6 +514,7 @@ func TestKinds(t *testing.T) {
 		"name": NameAtom{}, "literal": LiteralAtom{}, "none": NoneAtom{},
 		"string": StringLiteral{}, "int": IntLiteral{}, "float": FloatLiteral{}, "boolean": BooleanLiteral{}, "duration": DurationLiteral{},
 		"refs": RefsValue{}, "variant": VariantValue{}, "list": ListValue{},
+		"builtin": BuiltinTarget{}, "transition": TransitionTarget{}, "states": StatesSubject{}, "value": ValueSubject{},
 		"model": &Model{}, "scalar": &Scalar{}, "union": &Union{}, "state": &State{}, "exception": &Exception{}, "effect": &Effect{}, "classify": &Classify{}, "decorator": &Decorator{}, "op": &Op{},
 	}
 	for want, v := range cases {
@@ -393,8 +522,21 @@ func TestKinds(t *testing.T) {
 			t.Errorf("%T.Kind() = %q, want %q", v, v.Kind(), want)
 		}
 	}
-	for _, v := range []interface{ Kind() string }{CallStmt{}, CallExpr{}, RecordAtom{}, LiteralValue{}, RefValue{}, MatchStmt{}, MatchExpr{}, NoneBody{}} {
+	for _, v := range []interface{ Kind() string }{CallStmt{}, CallExpr{}, RecordAtom{}, LiteralValue{}, RefValue{}, MatchStmt{}, MatchExpr{}, NoneBody{},
+		TypeSubject{}, StateSubject{}, ClassifyOwnedSubject{}} {
 		switch v.(type) {
+		case TypeSubject:
+			if v.Kind() != "type" {
+				t.Errorf("%T: %q", v, v.Kind())
+			}
+		case StateSubject:
+			if v.Kind() != "state" {
+				t.Errorf("%T: %q", v, v.Kind())
+			}
+		case ClassifyOwnedSubject:
+			if v.Kind() != "classify" {
+				t.Errorf("%T: %q", v, v.Kind())
+			}
 		case CallStmt, CallExpr:
 			if v.Kind() != "call" {
 				t.Errorf("%T: %q", v, v.Kind())

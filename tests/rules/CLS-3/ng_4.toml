@@ -1,0 +1,8 @@
+# CLS-3 の ng_4 は、状態の持ち主 other と、それを対象にしようとする a を使う
+[a]
+language = "go"
+out      = "gen/a"
+
+[other]
+language = "go"
+out      = "gen/other"

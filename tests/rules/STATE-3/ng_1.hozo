@@ -1,0 +1,5 @@
+// STATE-3（docs/check.md「状態と効果」）: single<T?> は書けない（docs/grammar.md「決めたこと」。nullable<T> と書く）
+namespace a {
+  scalar Token extends string;
+  state token: single<Token?>;         // ERROR: STATE-3
+}

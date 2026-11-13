@@ -1,0 +1,8 @@
+# MATCH-7 の ng_5 は、状態の持ち主 other と、その状態で分岐しようとする a を使う
+[a]
+language = "go"
+out      = "gen/a"
+
+[other]
+language = "go"
+out      = "gen/other"

@@ -6,6 +6,43 @@
 
 検査は IR が作れた後に行う。IR を作る途中（解析、解決、正規化）の誤りがあるファイルでも、作れた部分には検査を行う（`docs/requirements.md`「言語サーバー」）。一つの検査で見つかる誤りはすべて報告する。
 
+## 状態の形
+
+設計書 §5.2 の状態の形を、状態を分類で表す決定（`docs/decisions.md`）に合わせて定める。
+
+### 基底の状態
+
+基底の状態は、列を持つ入れ物。形は列数の範囲で三つあり、形ごとに組み込みの分類と組み込みの効果が決まる。
+
+| 形 | 列数 | 組み込みの分類 | 組み込みの効果 |
+|---|---|---|---|
+| `list<T>` | 0 以上 | `Empty` / `HasItems` | `post` / `put` / `delete` |
+| `nullable<T>` | 0 か 1 | `Empty` / `HasItems` | `post` / `put` / `delete` |
+| `single<T>` | ちょうど 1 | なし（常に一列） | `put` |
+
+組み込みの効果は列数の相対的な変化。`post` は増える、`put` は変わらない、`delete` は減る。組み込みの分類をどう変えるかは形から決まる。
+
+| 形 | `post` | `put` | `delete` |
+|---|---|---|---|
+| `list` | どの場合でも → `HasItems` | `HasItems` → `HasItems` | `HasItems` → `Empty` か `HasItems` |
+| `nullable` | `Empty` → `HasItems` | `HasItems` → `HasItems` | `HasItems` → `Empty` |
+
+### 分類の状態
+
+`classify` は、一つ以上の基底の状態を対象にして、その場合に名前を付ける。値の分類（§10.1）と同じく、名前と説明だけを宣言し、判定は述語として人が実装する。排他・全集合・`default` も同じ。対象にできるのは宣言した名前空間の基底の状態だけで（CLS-3）、分類の状態を対象にはできない。効果が書き込む状態を宣言から直接読めるようにするため。
+
+### 効果の宛先
+
+一つの効果が変えるのは、一つの状態の一つの変化だけ。宛先は、基底の状態の組み込みの効果か、分類の遷移（`docs/grammar.md`「exception / effect」）。実装が二つの基底の状態を同時に変える効果は、その二つに依存する分類の状態を宣言し、その遷移として書く。
+
+**効果が書き込む状態**（`Effect.writes`）は、組み込みの効果ならその基底の状態、遷移なら、宛先が状態の分類ならその対象のすべての基底の状態、宛先が基底の状態ならその状態。
+
+### 検査器が遷移を使う範囲
+
+検査器は、遷移のケースの所属（STATE-4）を確かめ、IR に載せるだけ。配線の行をまたいで状態の場合を追うこと（効果の後の `match` で到達しないアームの検出など）はしない。§7.3 の「不明」と絡むので、要るようになってから別に決める。例外と状態の場合を結びつける書き方（`AlreadyLoggedIn` は前の場合が合わなかったことを表す、など）も持たない（§16 の「状態 × 入力の表で分岐を網羅させる」に近づくため）。
+
+リストの一部（「このユーザーのカート」）の場合は状態の分類では言えない。葉の op で値を取ってから値の分類で書く。
+
 ## 計算
 
 規則の検査に先立って、op ごとに次を計算し、`Op.signature`（`docs/ir.md`「op」）と `Call.bound` に置く。計算は op の呼び出しの依存の順に行う。配線の呼び出しが循環していれば WIRE-7 で、循環に含まれる op は本体を無視して葉として計算する。計算の途中で出す診断（THROWS-1、REL-4、DEC-5、DEC-16、WIRE-7）は Sig(O, ns(O)) を計算するときだけ出し、ほかの見る側の計算では出さない。
@@ -59,9 +96,9 @@ D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節
 
 1. ns(O) が T.namespace と等しくない（`deep` なら T.namespace を接頭辞に持たない）→ Pos は空。
 2. s の `shape` が `list` → BIND-6。
-3. τ = s の `element`（`optional` なら中身）。
+3. τ = s の `element`。
 4. O の各引数から、型が τ または `optional(τ)` の位置を集める。型が model（または model の `optional`）ならフィールドを再帰的に辿る。`array` と `record` の中は辿らない。辿っている途中で同じ model に戻ったら、そこで止める。位置はパス（`["in", "token"]`）。
-5. 位置が 2 以上 → BIND-1。1 で、s の `element` が `optional` で、位置の型が `optional` でなく `default` もない → BIND-2。
+5. 位置が 2 以上 → BIND-1。1 で、s の `shape` が `nullable` で、位置の型が `optional` でなく `default` もない → BIND-2。
 6. 二つの `Bind` が同じ op の同じ位置に当たる → BIND-5。
 
 A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべての `Bind` の Pos(b, O) から、c が明示している位置を除いたもの（BIND-3）。位置が明示されているのは、パスの引数が `name` の `Atom` で渡されている（中身は分からないので明示とみなす）か、レコードリテラルの連なりがパスのフィールドを持つとき。
@@ -98,7 +135,9 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| STATE-1 | error | `Effect.operation` が、`State.shape` が `single` なのに `post` か `delete` |
+| STATE-1 | error | 組み込みの効果の `operation` が、その状態の形にない（「状態の形」の表。`single` に `post` / `delete`） |
+| STATE-3 | error | 状態の要素の型が `optional`（`single<T?>` など）。空になりうる状態は `nullable<T>` と書く |
+| STATE-4 | error | 遷移の前か後のケースが、宛先の分類のケースでない（宛先が基底の状態なら `Empty` / `HasItems`）。宛先が `single` の状態（組み込みの分類がない）。前と後のどちらかのケースの並びに重複がある |
 | STATE-2 | error | 葉の op O の `Op.effects` の効果 e について、e の名前空間が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」） |
 | EFF-1 | — | 計算（Sig の F）で行う。診断なし |
 | EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Sig(O, ns(O)).effects と等しくない。足りないもの・余分なものを `Data.missing` / `Data.extra` に |
@@ -156,12 +195,14 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 |---|---|---|
 | CLS-1 | error | `classify` に `default` が二つ以上、またはケース名が重複 |
 | CLS-2 | error | 名前の付いたケースが一つもない |
+| CLS-3 | error | `classify` / `condition` の対象が二つ以上なのに状態でないものがある。型と状態が混ざっている。同じ状態が二度ある。対象が別の名前空間の状態、または分類の状態 |
 | MATCH-1 | — | 文法で閉じる |
-| MATCH-2 | error | アームに並べたケースの集合が `Classify.cases` と等しくない（足りない・知らない名前・重複）。`hasDefault` が false なのに `default` のアームがある。`hasDefault` が true なのに `default` のアームがない。`Data.missing` / `Data.extra` |
+| MATCH-2 | error | アームに並べたケースの集合が分類のケース（組み込みの分類なら `Empty` / `HasItems` で、`default` はない）と等しくない（足りない・知らない名前・重複）。`hasDefault` が false なのに `default` のアームがある。`hasDefault` が true なのに `default` のアームがない。`Data.missing` / `Data.extra` |
 | MATCH-3 | — | 文法で閉じる |
-| MATCH-4 | error | アームの本体の呼び出しで、`subject` をそのまま渡している引数の型が `case(C, アームのケース, T)` に対して `docs/types.md`「互換」の規則 4・5 で渡せない。`subject` を渡していない引数は TYPE-4 |
+| MATCH-4 | error | 値の `match` で、アームの本体の呼び出しで、`subject` をそのまま渡している引数の型が `case(C, アームのケース, T)` に対して `docs/types.md`「互換」の規則 4・5 で渡せない。`subject` を渡していない引数は TYPE-4 |
 | MATCH-5 | error | 「値がない」型の `match` を `const` で束縛している（WIRE-2 と同じ条件。索引として残す） |
-| MATCH-6 | error | `subject` の型が `Classify.subject` に渡せない |
+| MATCH-6 | error | 値の `match` で、`subject` の型が `Classify.subject` の型に渡せない |
+| MATCH-7 | error | `match` の形と分類が合わない（`docs/grammar.md`「配線」の表）: 値の分類なのに対象がない、状態の分類なのに対象がある、`by list` / `by nullable` の対象が今の名前空間のその形の状態でない |
 
 ### bind
 
@@ -172,7 +213,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | BIND-3 | — | 計算「bind」の `Call.bound`。診断なし |
 | BIND-4 | error | 計算「必須の入力」。位置は呼び出し。`Data.missing` にパス |
 | BIND-5 | error | 計算「bind」6。位置は後の `Bind` |
-| BIND-6 | error | `list` の状態を `bind` に書いた |
+| BIND-6 | error | `list` の状態を `bind` に書いた（`bind` できるのは `single` と `nullable`） |
 
 ### 語彙に固有の規則
 

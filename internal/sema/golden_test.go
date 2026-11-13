@@ -34,7 +34,7 @@ namespace a {
   model PublicUser is User omit hash;
 
   state users: list<User>;
-  state token: single<string?>;
+  state token: nullable<string>;
   effect add on users.post;
   effect set on token.put;
 

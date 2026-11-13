@@ -549,7 +549,7 @@ func (p *parser) parseArmType() *ast.ArmType {
 	return a
 }
 
-// parseState は StateDecl = "state" Ident ":" ( "list" | "single" ) "<" Type ">" ";" を読む（docs/grammar.md「state」）。
+// parseState は StateDecl = "state" Ident ":" ( "list" | "nullable" | "single" ) "<" Type ">" ";" を読む（docs/grammar.md「state」）。
 func (p *parser) parseState(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.StateDecl {
 	p.expect(token.State)
 	s := &ast.StateDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
@@ -557,10 +557,12 @@ func (p *parser) parseState(start source.Offset, doc *ast.DocComment, decorators
 	switch p.tok().Kind {
 	case token.List:
 		s.Shape = ast.StateList
+	case token.Nullable:
+		s.Shape = ast.StateNullable
 	case token.Single:
 		s.Shape = ast.StateSingle
 	default:
-		p.failExpected("「list」か「single」")
+		p.failExpected("「list」か「nullable」か「single」")
 	}
 	p.advance()
 	p.expect(token.Less)
@@ -583,15 +585,52 @@ func (p *parser) parseException(start source.Offset, doc *ast.DocComment, decora
 	return e
 }
 
-// parseEffect は EffectDecl = "effect" Ident "on" QualifiedName "." StateOp ";" を読む。
+// parseEffect は EffectDecl = "effect" Ident "on" ( BuiltinEffect | Transition ) ";" を読む（docs/grammar.md「exception / effect」）。
+// QualifiedName の直後が ":" なら Transition、そうでなければ最後の要素が StateOp の BuiltinEffect。
 func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.EffectDecl {
 	p.expect(token.Effect)
 	e := &ast.EffectDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	p.expect(token.On)
-	e.On = p.parseStateOpRef()
+	if p.atName() && p.peek(1).Kind == token.Colon {
+		e.Transition = p.parseTransition()
+	} else {
+		ref := p.parseStateOpRef()
+		e.On = &ref
+	}
 	p.expect(token.Semicolon)
 	e.Span = p.spanFrom(start)
 	return e
+}
+
+// parseTransition は Transition = QualifiedName ":" CaseSet "->" CaseSet を読む。
+func (p *parser) parseTransition() *ast.Transition {
+	start := p.tok().Span.Start
+	t := &ast.Transition{Of: p.parseQualifiedName()}
+	p.expect(token.Colon)
+	t.From = p.parseCaseSet()
+	p.expect(token.ThinArrow)
+	t.To = p.parseCaseSet()
+	t.Span = p.spanFrom(start)
+	return t
+}
+
+// parseCaseSet は CaseSet = "any" | Ident { "|" Ident } を読む。
+func (p *parser) parseCaseSet() *ast.CaseSet {
+	start := p.tok().Span.Start
+	c := &ast.CaseSet{}
+	if p.got(token.Any) {
+		c.Any = true
+	} else {
+		if !p.atIdent() {
+			p.failExpected("遷移のケース（any かケース名）")
+		}
+		c.Cases = append(c.Cases, p.parseIdent())
+		for p.got(token.Pipe) {
+			c.Cases = append(c.Cases, p.parseIdent())
+		}
+	}
+	c.Span = p.spanFrom(start)
+	return c
 }
 
 // parseStateOpRef は "状態.操作" を読む。字句では一つの QualifiedName なので、最後の要素を StateOp として切り出す
@@ -620,12 +659,12 @@ func (p *parser) parseStateOpRef() ast.StateOpRef {
 	return ref
 }
 
-// parseClassify は ClassifyDecl = "classify" Ident "of" Type "{" { ClassifyCase } "}" を読む（docs/grammar.md「classify / condition」）。
+// parseClassify は ClassifyDecl = "classify" Ident "of" ClassifySubject "{" { ClassifyCase } "}" を読む（docs/grammar.md「classify / condition」）。
 func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ClassifyDecl {
 	p.expect(token.Classify)
 	c := &ast.ClassifyDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent(), Cases: []*ast.ClassifyCase{}}
 	p.expect(token.Of)
-	c.Of = p.parseType()
+	c.Of = p.parseClassifySubject()
 	p.expect(token.LBrace)
 	p.parseMembers(func() {
 		c.Cases = append(c.Cases, p.parseClassifyCase())
@@ -653,12 +692,26 @@ func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	return c
 }
 
-// parseCondition は ConditionDecl = "condition" Ident "of" Type ";" を読む。
+// parseClassifySubject は ClassifySubject = Type { "," Type } を読む。型か状態の名前かは名前の解決が決める。
+func (p *parser) parseClassifySubject() []ast.Type {
+	var subject []ast.Type
+	for {
+		if p.at(token.LBrace) || p.at(token.Semicolon) {
+			p.failExpected("分類の対象（型か状態の名前）")
+		}
+		subject = append(subject, p.parseType())
+		if !p.got(token.Comma) {
+			return subject
+		}
+	}
+}
+
+// parseCondition は ConditionDecl = "condition" Ident "of" ClassifySubject ";" を読む。
 func (p *parser) parseCondition(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ConditionDecl {
 	p.expect(token.Condition)
 	c := &ast.ConditionDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	p.expect(token.Of)
-	c.Of = p.parseType()
+	c.Of = p.parseClassifySubject()
 	p.expect(token.Semicolon)
 	c.Span = p.spanFrom(start)
 	return c
@@ -957,8 +1010,8 @@ func (p *parser) parseType() ast.Type {
 		t = n
 	case token.Void:
 		p.fail(p.tok().Span, "void は op の戻り値の型にだけ書ける（docs/grammar.md「型」）")
-	case token.List, token.Single:
-		p.fail(p.tok().Span, "list / single は state にだけ書ける（docs/grammar.md「型」）")
+	case token.List, token.Nullable, token.Single:
+		p.fail(p.tok().Span, "list / nullable / single は state と match の by の後ろにだけ書ける（docs/grammar.md「型」）")
 	case token.LBrace:
 		p.fail(p.tok().Span, "その場で書く model はユニオンのアームと例外の値にだけ置ける（docs/grammar.md「決めたこと」）")
 	default:
@@ -1096,12 +1149,26 @@ func (p *parser) parseRecordLit() *ast.RecordLit {
 	return r
 }
 
-// parseMatch は Match = "match" Atom "by" Ident "{" MatchArm { MatchArm } "}" を読む。
+// parseMatch は Match = "match" [ Atom ] "by" ( Ident | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" を読む。
+// 対象を書かない形（match by C）は状態の分類、by list / by nullable は基底の状態の組み込みの分類。
+// どの形がどの分類に合うかは検査（MATCH-7）が決める。
 func (p *parser) parseMatch() *ast.Match {
 	start := p.expect(token.Match).Span.Start
-	m := &ast.Match{Subject: p.parseAtom()}
+	m := &ast.Match{}
+	if !p.at(token.By) {
+		m.Subject = p.parseAtom()
+	}
 	p.expect(token.By)
-	m.Classifier = p.parseIdent()
+	switch p.tok().Kind {
+	case token.List, token.Nullable:
+		t := p.advance()
+		m.Classifier = ast.Ident{Span: t.Span, Name: t.Text}
+		m.Builtin = true
+	case token.Single:
+		p.fail(p.tok().Span, "single の状態には組み込みの分類がないので、match の by には書けない（docs/check.md「状態の形」）")
+	default:
+		m.Classifier = p.parseIdent()
+	}
 	p.expect(token.LBrace)
 	p.parseMembers(func() {
 		m.Arms = append(m.Arms, p.parseMatchArm())

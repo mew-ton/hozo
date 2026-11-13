@@ -1,0 +1,16 @@
+// DEC-7（docs/types.md「デコレータの引数」）: any effect on s.put を満たすのは、宛先が組み込みの効果
+// { state: s, operation: put } の効果だけ。同じ状態に書き込む遷移の効果は満たさない
+namespace a {
+  state t: list<string>;
+  classify Phase of t { Idle; Busy; }
+  effect put on t.put;
+  effect drain on t: HasItems -> Empty;
+  effect start on Phase: Idle -> Busy;
+  decorator onPut(e: any effect on t.put);
+  @onPut(put)
+  op ok1(): void;
+  @onPut(drain)                        // ERROR: DEC-7
+  op ng1(): void;
+  @onPut(start)                        // ERROR: DEC-7
+  op ng2(): void;
+}

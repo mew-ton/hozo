@@ -151,6 +151,26 @@ func (a *analyzer) resolveName(qn ast.QualifiedName, sc *scope, acc accept) (res
 	return r, nil
 }
 
+// peek は名前を解決するが、診断も参照も残さない。位置が受け付ける種類の照合（手続き 3）もしない。
+// 名前が何を指すかで読み方が変わる位置（classify の対象）が、先に種類を見るために使う。
+func (a *analyzer) peek(qn ast.QualifiedName, sc *scope) (resolved, bool) {
+	if len(qn.Segments) == 0 {
+		return resolved{}, false
+	}
+	var refs []Ref
+	r, rest, err := a.resolveHead(qn, sc, 0, &refs)
+	if err != nil {
+		return resolved{}, false
+	}
+	for _, seg := range rest {
+		r, err = a.resolveSegment(r, seg, sc, 0, &refs)
+		if err != nil {
+			return resolved{}, false
+		}
+	}
+	return r, true
+}
+
 // resolveHead は手続き 1（先頭のセグメント）。残りのセグメントも返す。
 func (a *analyzer) resolveHead(qn ast.QualifiedName, sc *scope, acc accept, refs *[]Ref) (resolved, []ast.Ident, *resolveError) {
 	head := qn.Segments[0]

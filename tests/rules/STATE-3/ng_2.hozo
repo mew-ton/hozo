@@ -1,0 +1,8 @@
+// STATE-3（docs/check.md「状態と効果」）: nullable と list の要素の型も optional にできない
+namespace a {
+  model M { id: string; }
+  state maybe: nullable<M?>;           // ERROR: STATE-3
+  state many: list<M?>;                // ERROR: STATE-3
+  state twice: single<string??>;       // ERROR: STATE-3
+  state arr: single<string[]?>;        // ERROR: STATE-3
+}

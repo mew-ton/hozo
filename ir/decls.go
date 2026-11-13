@@ -79,20 +79,36 @@ type UnionMember struct {
 	Span        Span   `json:"span"`
 }
 
-// StateShape は状態の形（docs/ir.md「state / exception / effect」の shape）。
+// StateShape は状態の形（docs/ir.md「state / exception / effect」の shape）。列数の範囲で決まる
+// （docs/check.md「状態の形」）。
 type StateShape string
 
-// 状態の形。
+// 状態の形。list は 0 以上、nullable は 0 か 1、single はちょうど 1。
 const (
-	StateList   StateShape = "list"
-	StateSingle StateShape = "single"
+	StateList     StateShape = "list"
+	StateNullable StateShape = "nullable"
+	StateSingle   StateShape = "single"
 )
+
+// 組み込みの分類のケース名（docs/check.md「状態の形」）。list と nullable の状態が持つ。
+const (
+	CaseEmpty    = "Empty"
+	CaseHasItems = "HasItems"
+)
+
+// BuiltinCases は組み込みの分類のケース名の列（Empty、HasItems の順）。毎回新しい列を返す。
+func BuiltinCases() []string { return []string{CaseEmpty, CaseHasItems} }
+
+// HasBuiltinClassify は、この形の状態が組み込みの分類 Empty / HasItems を持つか（list と nullable）。
+// single は常に一列なので持たない（docs/check.md「状態の形」）。
+func (s StateShape) HasBuiltinClassify() bool { return s == StateList || s == StateNullable }
 
 // State は state 宣言（docs/ir.md「state / exception / effect」の State）。
 type State struct {
 	DeclBase
-	Shape   StateShape `json:"shape"`
-	Element Type       `json:"element"`
+	Shape StateShape `json:"shape"`
+	// Element は要素の型。optional にはならない（STATE-3）。
+	Element Type `json:"element"`
 }
 
 // Exception は exception 宣言（docs/ir.md「state / exception / effect」の Exception）。
@@ -115,15 +131,123 @@ const (
 // Effect は effect 宣言（docs/ir.md「state / exception / effect」の Effect）。
 type Effect struct {
 	DeclBase
+	// Target は宛先。一つだけ（docs/check.md「状態の形」の「効果の宛先」）。
+	Target EffectTarget `json:"target"`
+	// Writes はこの効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）。
+	Writes []string `json:"writes"`
+}
+
+// EffectTarget は効果の宛先（docs/ir.md「state / exception / effect」の EffectTarget）。
+// 具体型は値型の [BuiltinTarget]（kind "builtin"）と [TransitionTarget]（kind "transition"）。
+type EffectTarget interface {
+	// Kind は JSON の判別子（"builtin" か "transition"）。
+	Kind() string
+	isEffectTarget()
+}
+
+// BuiltinTarget は基底の状態の組み込みの効果（`on s.post`。docs/ir.md「state / exception / effect」の
+// EffectTarget kind "builtin"）。
+type BuiltinTarget struct {
 	// State は状態の FQN。
 	State     string    `json:"state"`
 	Operation Operation `json:"operation"`
 }
 
+// TransitionTarget は分類の遷移（`on X: A -> B`。docs/ir.md「state / exception / effect」の
+// EffectTarget kind "transition"）。
+type TransitionTarget struct {
+	// Of は状態の分類の FQN か、組み込みの分類を持つ基底の状態の FQN。
+	Of   string  `json:"of"`
+	From CaseSet `json:"from"`
+	To   CaseSet `json:"to"`
+}
+
+var (
+	_ EffectTarget = BuiltinTarget{}
+	_ EffectTarget = TransitionTarget{}
+)
+
+// Kind は "builtin"。
+func (BuiltinTarget) Kind() string { return "builtin" }
+
+// Kind は "transition"。
+func (TransitionTarget) Kind() string { return "transition" }
+
+func (BuiltinTarget) isEffectTarget()    {}
+func (TransitionTarget) isEffectTarget() {}
+
+// MarshalJSON は kind を付けて書く。
+func (t BuiltinTarget) MarshalJSON() ([]byte, error) {
+	type alias BuiltinTarget
+	return marshalKind("builtin", alias(t))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (t TransitionTarget) MarshalJSON() ([]byte, error) {
+	type alias TransitionTarget
+	return marshalKind("transition", alias(t))
+}
+
+var effectTargetTable = map[string]func([]byte) (EffectTarget, error){
+	"builtin":    asValue[EffectTarget, BuiltinTarget],
+	"transition": asValue[EffectTarget, TransitionTarget],
+}
+
+// UnmarshalEffectTarget は kind で分けて EffectTarget を読む（docs/ir.md「JSON」）。
+func UnmarshalEffectTarget(data []byte) (EffectTarget, error) {
+	return decodeUnion("effect target", data, effectTargetTable)
+}
+
+// CaseSet は遷移の前か後のケースの集合: "any" かケース名の列（書かれた順。docs/ir.md「state / exception / effect」
+// の CaseSet）。Any が true なら JSON は "any"、そうでなければ列。
+type CaseSet struct {
+	Any   bool
+	Cases []string
+}
+
+// AnyCase は `any`（どのケースでも）を表す CaseSet。
+func AnyCase() CaseSet { return CaseSet{Any: true} }
+
+// Cases はケース名の列の CaseSet。
+func Cases(names ...string) CaseSet { return CaseSet{Cases: names} }
+
+// MarshalJSON は "any" かケース名の列を書く。
+func (c CaseSet) MarshalJSON() ([]byte, error) {
+	if c.Any {
+		return []byte(`"any"`), nil
+	}
+	if c.Cases == nil {
+		return []byte(`[]`), nil
+	}
+	return json.Marshal(c.Cases)
+}
+
+// UnmarshalJSON は "any" かケース名の列を読む。
+func (c *CaseSet) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		if s != "any" {
+			return fmt.Errorf("ir: case set: unknown value %q", s)
+		}
+		*c = CaseSet{Any: true}
+		return nil
+	}
+	var list []string
+	if err := json.Unmarshal(data, &list); err != nil {
+		return fmt.Errorf("ir: case set: want \"any\" or array: %w", err)
+	}
+	if len(list) == 0 {
+		list = nil
+	}
+	*c = CaseSet{Cases: list}
+	return nil
+}
+
 // Classify は classify 宣言（docs/ir.md「classify」）。
 type Classify struct {
 	DeclBase
-	Subject Type `json:"subject"`
+	// Subject は対象。値の分類なら型（[TypeSubject]）、状態の分類なら基底の状態（[StatesSubject]）。
+	Subject ClassifySubject `json:"subject"`
 	// Cases はケース。default は含まない。
 	Cases      []ClassifyCase `json:"cases"`
 	HasDefault bool           `json:"hasDefault"`
@@ -131,6 +255,81 @@ type Classify struct {
 	DefaultDescription *Doc `json:"defaultDescription,omitempty"`
 	// FromCondition は condition の糖衣から来たか（Cases は一つ、HasDefault は true）。
 	FromCondition bool `json:"fromCondition"`
+}
+
+// ClassifySubject は分類の対象（docs/ir.md「classify」の subject）。
+// 具体型は値型の [TypeSubject]（kind "type"）と [StatesSubject]（kind "states"）。
+type ClassifySubject interface {
+	// Kind は JSON の判別子（"type" か "states"）。
+	Kind() string
+	isClassifySubject()
+}
+
+// TypeSubject は値の分類の対象の型（docs/ir.md「classify」の subject kind "type"）。
+type TypeSubject struct {
+	Type Type `json:"type"`
+}
+
+// StatesSubject は状態の分類の対象（docs/ir.md「classify」の subject kind "states"）。
+type StatesSubject struct {
+	// States は基底の状態の FQN（書かれた順）。
+	States []string `json:"states"`
+}
+
+var (
+	_ ClassifySubject = TypeSubject{}
+	_ ClassifySubject = StatesSubject{}
+)
+
+// Kind は "type"。
+func (TypeSubject) Kind() string { return "type" }
+
+// Kind は "states"。
+func (StatesSubject) Kind() string { return "states" }
+
+func (TypeSubject) isClassifySubject()   {}
+func (StatesSubject) isClassifySubject() {}
+
+// MarshalJSON は kind を付けて書く。
+func (s TypeSubject) MarshalJSON() ([]byte, error) {
+	type alias TypeSubject
+	return marshalKind("type", alias(s))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (s StatesSubject) MarshalJSON() ([]byte, error) {
+	type alias StatesSubject
+	return marshalKind("states", alias(s))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *TypeSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *StatesSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+var classifySubjectTable = map[string]func([]byte) (ClassifySubject, error){
+	"type":   asValue[ClassifySubject, TypeSubject],
+	"states": asValue[ClassifySubject, StatesSubject],
+}
+
+// UnmarshalClassifySubject は kind で分けて ClassifySubject を読む（docs/ir.md「JSON」）。
+func UnmarshalClassifySubject(data []byte) (ClassifySubject, error) {
+	return decodeUnion("classify subject", data, classifySubjectTable)
+}
+
+// SubjectType は値の分類の対象の型。状態の分類か、対象が決まっていなければ nil。
+func (c *Classify) SubjectType() Type {
+	if s, ok := c.Subject.(TypeSubject); ok {
+		return s.Type
+	}
+	return nil
+}
+
+// SubjectStates は状態の分類の対象の基底の状態の FQN。値の分類なら ok が false。
+func (c *Classify) SubjectStates() (states []string, ok bool) {
+	s, ok := c.Subject.(StatesSubject)
+	return s.States, ok
 }
 
 // ClassifyCase は classify のケース（docs/ir.md「classify」の cases）。

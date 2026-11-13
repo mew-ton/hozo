@@ -364,6 +364,15 @@ func (l *lexer) lexSymbol() {
 			return
 		}
 		kind = token.Star
+	case '-':
+		if l.peekByte(1) == '>' {
+			l.pos += 2
+			l.emit(token.ThinArrow, start, l.pos)
+			return
+		}
+		l.pos++
+		l.illegal(start, l.pos, "使えない文字: %q（「-」は負の数のリテラルと「->」にだけ使う）", '-')
+		return
 	default:
 		r, size := utf8.DecodeRune(l.src[l.pos:])
 		l.pos += size

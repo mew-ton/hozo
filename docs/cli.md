@@ -62,7 +62,7 @@ namespace hozoc {
 
   /** プロジェクトの設定（docs/config.md） */
   @fs.files("hozo.toml")
-  state config: single<SourceFile?>;
+  state config: nullable<SourceFile>;
 
   /** 生成したファイル。置き場は hozo.toml の各名前空間の out */
   state outputs: list<OutputFile>;

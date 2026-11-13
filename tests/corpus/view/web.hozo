@@ -4,7 +4,7 @@
 namespace web {
   // docs/ir.md「原則」: 別の名前空間の宣言は FQN で参照する（api.Token、page.Route）
   @localStorage
-  state token: single<api.Token?>;
+  state token: nullable<api.Token>;
   @page.path
   state location: single<page.Route>;
 
@@ -16,7 +16,7 @@ namespace web {
   /** ホームへ */
   effect goHome on location.put;
   /** 手元のトークンを消す */
-  effect removeToken on token.put;
+  effect removeToken on token.delete;
 
   /** 一時的に表示できない */
   model Unavailable {}

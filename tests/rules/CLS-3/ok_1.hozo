@@ -1,0 +1,19 @@
+// CLS-3（docs/check.md「classify / match」）: classify / condition の対象は、型一つ（値の分類）か、
+// 宣言した名前空間の基底の状態一つ以上（状態の分類）。状態の形は問わない
+namespace a {
+  model M { id: string; }
+  state carts: list<M>;
+  state orders: list<M>;
+  state token: nullable<string>;
+  state title: single<string>;
+
+  classify Kind of M { A; B; }
+  classify Batch of M[] { Small; Large; }
+  condition Fresh of M;
+
+  classify Checkout of carts, orders { Shopping; Ordered; }
+  classify Session of token { Anonymous; LoggedIn; }
+  classify Everything of carts, orders, token, title { Quiet; default; }
+  condition CartFilled of carts;
+  condition Busy of carts, orders;
+}

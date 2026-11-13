@@ -1,0 +1,19 @@
+// MATCH-2（docs/check.md「classify / match」）: 組み込みの分類のケース Empty / HasItems が足りない・知らない名前・重複
+namespace a {
+  state carts: list<string>;
+  state token: nullable<string>;
+  op f();
+  op ng() {
+    match carts by list {              // ERROR: MATCH-2
+      Empty => f();
+    };
+    match token by nullable {          // ERROR: MATCH-2
+      None => f();
+      Some => none;
+    };
+    match carts by list {              // ERROR: MATCH-2
+      Empty => f();
+      HasItems | Empty => none;
+    };
+  }
+}

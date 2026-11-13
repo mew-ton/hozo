@@ -36,6 +36,15 @@ type symbolBuilder struct {
 }
 
 // text は節の元の文字列（detail に使う）。
+// subject は classify / condition の対象（一つ以上。docs/grammar.md「classify / condition」の ClassifySubject）。
+func (b *symbolBuilder) subject(of []ast.Type) string {
+	parts := make([]string, 0, len(of))
+	for _, t := range of {
+		parts = append(parts, b.text(t))
+	}
+	return strings.Join(parts, ", ")
+}
+
 func (b *symbolBuilder) text(n ast.Node) string {
 	if n == nil {
 		return ""
@@ -123,9 +132,17 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			}
 			out = append(out, sym)
 		case *ast.EffectDecl:
-			out = append(out, b.sym(d.Name.Name, protocol.SymbolEvent, d.Span, d.Name.Span, "on "+d.On.State.String()+"."+d.On.Op.String()))
+			// 宛先は組み込みの効果（on s.post）か遷移（on X: A -> B）のどちらか（docs/grammar.md「exception / effect」）
+			detail := ""
+			switch {
+			case d.On != nil:
+				detail = "on " + d.On.State.String() + "." + d.On.Op.String()
+			case d.Transition != nil:
+				detail = "on " + b.text(d.Transition)
+			}
+			out = append(out, b.sym(d.Name.Name, protocol.SymbolEvent, d.Span, d.Name.Span, detail))
 		case *ast.ClassifyDecl:
-			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.text(d.Of))
+			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.subject(d.Of))
 			for _, c := range d.Cases {
 				if c.Name != nil {
 					sym.Children = append(sym.Children, b.sym(c.Name.Name, protocol.SymbolEnumMember, c.Span, c.Name.Span, ""))
@@ -133,7 +150,7 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			}
 			out = append(out, sym)
 		case *ast.ConditionDecl:
-			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.text(d.Of))
+			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.subject(d.Of))
 			sym.Children = []protocol.DocumentSymbol{b.sym(d.Name.Name, protocol.SymbolEnumMember, d.Name.Span, d.Name.Span, "")}
 			out = append(out, sym)
 		case *ast.DecoratorDecl:

@@ -1,0 +1,8 @@
+# CLS-3 の ok_2 は、それぞれが自分の状態を対象にした分類を持つ a と other を使う
+[a]
+language = "go"
+out      = "gen/a"
+
+[other]
+language = "go"
+out      = "gen/other"

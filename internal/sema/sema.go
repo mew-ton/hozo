@@ -227,5 +227,14 @@ func (a *analyzer) addRef(span source.Span, t Target) {
 	a.refs = append(a.refs, Ref{Span: span, Target: t})
 }
 
+// text は範囲の元の文字列（診断に、書かれたままの形を出すため）。
+func (a *analyzer) text(s source.Span) string {
+	content := a.fs.Content(s.File)
+	if int(s.Start) < 0 || int(s.End) > len(content) || s.Start > s.End {
+		return ""
+	}
+	return string(content[s.Start:s.End])
+}
+
 // join は FQN の表示用に名前の列をつなぐ。
 func join(parts []string) string { return strings.Join(parts, ", ") }

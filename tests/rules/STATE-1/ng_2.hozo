@@ -1,0 +1,11 @@
+// STATE-1（docs/check.md「状態の形」）: single は常に一列なので、増やす（post）ことも減らす（delete）こともできない。
+// 同じ操作が nullable ならできる
+namespace a {
+  scalar Token extends string;
+  state session: single<Token>;
+  state token: nullable<Token>;
+  effect dropSession on session.delete;   // ERROR: STATE-1
+  effect newSession on session.post;      // ERROR: STATE-1
+  effect dropToken on token.delete;
+  effect newToken on token.post;
+}

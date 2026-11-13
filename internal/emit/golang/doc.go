@@ -42,4 +42,11 @@
 //   - optional の位置に値を渡すとき `&x` が書けない式には、types.go に出すヘルパー `ptr` を使う。
 //   - 既定値の GOEMIT-4 は、scalar の標準の制約に加えてフィールド自身の valid.* も見る。
 //   - min / max を付けられる「数値」は int と float（Duration は含めない）。
+//
+// まだ実装していないところ（docs/decisions.md「設計書を変える決定」S1〜S6 の出力の側）。
+//
+//   - 状態の分類、遷移の効果、状態での match（match by C、match s by list / by nullable）は、
+//     unsupported.go の checkUnsupported が GOEMIT-INTERNAL の error にして、ファイルを出さない。
+//   - StateCases（docs/emit-go.md「state」）は出さない。New の引数にも ops の構造体にもない。
+//   - States の取得メソッドの型は対応済み: nullable<T> なら *T、single<T> なら T。
 package golang

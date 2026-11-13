@@ -276,8 +276,14 @@
                 "col": 10
               }
             },
-            "state": "server.sessions",
-            "operation": "delete"
+            "target": {
+              "kind": "builtin",
+              "state": "server.sessions",
+              "operation": "delete"
+            },
+            "writes": [
+              "server.sessions"
+            ]
           },
           {
             "kind": "model",
@@ -606,13 +612,10 @@
                 "col": 10
               }
             },
-            "shape": "single",
+            "shape": "nullable",
             "element": {
-              "kind": "optional",
-              "of": {
-                "kind": "ref",
-                "target": "server.Token"
-              }
+              "kind": "ref",
+              "target": "server.Token"
             }
           },
           {
@@ -630,8 +633,14 @@
                 "col": 10
               }
             },
-            "state": "browser.token",
-            "operation": "put"
+            "target": {
+              "kind": "builtin",
+              "state": "browser.token",
+              "operation": "delete"
+            },
+            "writes": [
+              "browser.token"
+            ]
           },
           {
             "kind": "op",

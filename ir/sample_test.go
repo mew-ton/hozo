@@ -21,6 +21,34 @@ func sampleProgram() *Program {
 						Shape:    StateList,
 						Element:  Ref("server.User"),
 					},
+					&State{
+						DeclBase: DeclBase{Name: "session", Span: span("global.hozo", 2, 1, 2, 40)},
+						Shape:    StateNullable,
+						Element:  Ref("server.Token"),
+					},
+					&State{
+						DeclBase: DeclBase{Name: "clock", Span: span("global.hozo", 3, 1, 3, 30)},
+						Shape:    StateSingle,
+						Element:  Time(),
+					},
+					&Classify{
+						DeclBase: DeclBase{Name: "Login", Span: span("global.hozo", 4, 1, 7, 2)},
+						Subject:  StatesSubject{States: []string{"db", "session"}},
+						Cases: []ClassifyCase{
+							{Name: "Anonymous", Span: span("global.hozo", 5, 3, 5, 13)},
+							{Name: "LoggedIn", Span: span("global.hozo", 6, 3, 6, 12)},
+						},
+					},
+					&Effect{
+						DeclBase: DeclBase{Name: "login", Span: span("global.hozo", 8, 1, 8, 50)},
+						Target:   TransitionTarget{Of: "Login", From: Cases("Anonymous"), To: Cases("LoggedIn")},
+						Writes:   []string{"db", "session"},
+					},
+					&Effect{
+						DeclBase: DeclBase{Name: "logout", Span: span("global.hozo", 9, 1, 9, 50)},
+						Target:   TransitionTarget{Of: "session", From: AnyCase(), To: Cases(CaseEmpty)},
+						Writes:   []string{"session"},
+					},
 				},
 			},
 			{
@@ -119,9 +147,9 @@ func sampleProgram() *Program {
 						SynthesizedFrom: "server.Unavailable",
 					},
 					&Effect{
-						DeclBase:  DeclBase{Name: "server.UserCreated", Span: span(f, 24, 1, 24, 40)},
-						State:     "db",
-						Operation: OpPost,
+						DeclBase: DeclBase{Name: "server.UserCreated", Span: span(f, 24, 1, 24, 40)},
+						Target:   BuiltinTarget{State: "db", Operation: OpPost},
+						Writes:   []string{"db"},
 					},
 					&Union{
 						DeclBase: DeclBase{Name: "server.ApiError", Span: span(f, 26, 1, 28, 2)},
@@ -133,7 +161,7 @@ func sampleProgram() *Program {
 					},
 					&Classify{
 						DeclBase: DeclBase{Name: "server.Status", Span: span(f, 30, 1, 33, 2)},
-						Subject:  Ref("server.User"),
+						Subject:  TypeSubject{Type: Ref("server.User")},
 						Cases: []ClassifyCase{
 							{Name: "Active", Span: span(f, 31, 3, 31, 10)},
 							{Name: "Banned", Description: &Doc{Summary: "Banned.", Body: "Banned."}, Span: span(f, 32, 3, 32, 10)},
@@ -143,7 +171,7 @@ func sampleProgram() *Program {
 					},
 					&Classify{
 						DeclBase:      DeclBase{Name: "server.IsAdmin", Span: span(f, 35, 1, 35, 30)},
-						Subject:       Ref("server.User"),
+						Subject:       TypeSubject{Type: Ref("server.User")},
 						Cases:         []ClassifyCase{{Name: "IsAdmin", Span: span(f, 35, 11, 35, 18)}},
 						HasDefault:    true,
 						FromCondition: true,
@@ -266,7 +294,7 @@ func sampleProgram() *Program {
 							},
 							MatchStmt{
 								Match: Match{
-									Subject:  NameAtom{Path: []string{"user"}, Span: span(f, 54, 9, 54, 13)},
+									Subject:  ValueSubject{Atom: NameAtom{Path: []string{"user"}, Span: span(f, 54, 9, 54, 13)}},
 									Classify: "server.IsAdmin",
 									Arms: []MatchArm{
 										{Cases: ArmCases{Cases: []string{"IsAdmin"}}, Body: CallExpr{Call: Call{Op: "server.notify", Args: []CallArg{{Param: "in", Value: NameAtom{Path: []string{"user"}, Span: span(f, 55, 30, 55, 34)}}}, Span: span(f, 55, 16, 55, 35)}}, Span: span(f, 55, 5, 55, 36)},
@@ -278,7 +306,7 @@ func sampleProgram() *Program {
 							},
 							ReturnStmt{
 								Expr: MatchExpr{Match: Match{
-									Subject:  NameAtom{Path: []string{"user"}, Span: span(f, 58, 16, 58, 20)},
+									Subject:  ValueSubject{Atom: NameAtom{Path: []string{"user"}, Span: span(f, 58, 16, 58, 20)}},
 									Classify: "server.Status",
 									Arms: []MatchArm{
 										{Cases: ArmCases{Cases: []string{"Active", "Banned"}}, Body: CallExpr{Call: Call{Op: "server.findUser", Args: []CallArg{{Param: "id", Value: LiteralAtom{Literal: StringLiteral{Value: "x"}, Span: span(f, 59, 40, 59, 43)}}}, Span: span(f, 59, 24, 59, 44)}}, Span: span(f, 59, 5, 59, 45)},
@@ -290,6 +318,29 @@ func sampleProgram() *Program {
 							ReturnStmt{
 								Expr: AtomExpr{Atom: LiteralAtom{Literal: FloatLiteral{Value: 1.5}, Span: span(f, 61, 10, 61, 13)}},
 								Span: span(f, 61, 3, 61, 14),
+							},
+							MatchStmt{
+								Match: Match{
+									Subject:  StateSubject{State: "session"},
+									Classify: string(StateNullable),
+									Arms: []MatchArm{
+										{Cases: ArmCases{Cases: []string{CaseEmpty}}, Body: NoneBody{}, Span: span(f, 63, 5, 63, 19)},
+										{Cases: ArmCases{Cases: []string{CaseHasItems}}, Body: CallExpr{Call: Call{Op: "server.notify", Span: span(f, 64, 17, 64, 32)}}, Span: span(f, 64, 5, 64, 33)},
+									},
+									Span: span(f, 62, 3, 65, 4),
+								},
+								Span: span(f, 62, 3, 65, 5),
+							},
+							MatchStmt{
+								Match: Match{
+									Subject:  ClassifyOwnedSubject{},
+									Classify: "Login",
+									Arms: []MatchArm{
+										{Cases: ArmCases{Cases: []string{"Anonymous", "LoggedIn"}}, Body: NoneBody{}, Span: span(f, 67, 5, 67, 34)},
+									},
+									Span: span(f, 66, 3, 68, 4),
+								},
+								Span: span(f, 66, 3, 68, 5),
 							},
 						}},
 						Signature: Signature{},

@@ -23,6 +23,8 @@
 - `emit` のゴールデン: `tests/corpus/<名前>/testdata/expected/emit/` に書き出したファイルの木（`.hozoc-outputs.json` を含む）を置き、実際に一時ディレクトリに書いて比べる。差分はファイルごとに示す（同 `TestCorpusEmitGolden`）。ゴールデンをすべて `testdata/` の下に置くのは、ゴールデンの `.go` を `go build ./...` / `go vet ./...` がパッケージとして拾わないため（Go は `testdata` を無視する）。一時ディレクトリにはリポジトリの `go.mod` を写し、`ir/` `plugin/` `tests/` をシンボリックリンクで足す（`tests/generated_test.go` と同じ）。コーパスのプラグインのマニフェストの `go run github.com/mew-ton/hozo/tests/corpus/<名前>/plugins/<p>` がそこから解決でき、既定の出力の import パスも `github.com/mew-ton/hozo/<out>` に決まる。
 - ゴールデンの更新は `go test ./... -update`。
 
+- `state/`: 状態の分類、遷移の効果、状態での `match`（`docs/check.md`「状態の形」）のサンプル。IR の中身は `tests/view_test.go` の `TestStateCorpusIR` が見出しごとに確かめる。
+
 段階 1 の途中（検査器ができるまで）は、`tests/parse_test.go` がコーパス・標準の語彙・`docs/cli.md` の `cli.hozo` を構文だけ確かめる。
 
 hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコーパスには入れない。`hozoc check` が error なしで通ることを `tests/selfcheck_test.go` で確かめ、`emit` の結果は「生成物の一致」で確かめる。

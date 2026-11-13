@@ -57,8 +57,8 @@ func TestLexTokens(t *testing.T) {
 	}{
 		{"empty", "", []token.Kind{token.EOF}},
 		{"keywords", "namespace model op throws", []token.Kind{token.Namespace, token.Model, token.Op, token.Throws, token.EOF}},
-		{"core types", "string boolean int float Time Duration void Record list single",
-			[]token.Kind{token.StringType, token.BooleanType, token.IntType, token.FloatType, token.TimeType, token.DurationType, token.Void, token.Record, token.List, token.Single, token.EOF}},
+		{"core types and state shapes", "string boolean int float Time Duration void Record list nullable single",
+			[]token.Kind{token.StringType, token.BooleanType, token.IntType, token.FloatType, token.TimeType, token.DurationType, token.Void, token.Record, token.List, token.Nullable, token.Single, token.EOF}},
 		{"bool literals", "true false", []token.Kind{token.True, token.False, token.EOF}},
 		{"ident", "foo _bar baz9", []token.Kind{token.Ident, token.Ident, token.Ident, token.EOF}},
 		{"contextual words are idents", "field variant post put delete", []token.Kind{token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.EOF}},
@@ -67,9 +67,9 @@ func TestLexTokens(t *testing.T) {
 		{"name then star", "server.* server.**", []token.Kind{token.Ident, token.Dot, token.Star, token.Ident, token.Dot, token.StarStar, token.EOF}},
 		{"name then keyword", "a.string", []token.Kind{token.Ident, token.Dot, token.StringType, token.EOF}},
 		{"keyword then dot", "string.a", []token.Kind{token.StringType, token.Dot, token.Ident, token.EOF}},
-		{"symbols", "{ } ( ) [ ] < > : ; , . = ? | @ * ** =>",
+		{"symbols", "{ } ( ) [ ] < > : ; , . = ? | @ * ** => ->",
 			[]token.Kind{token.LBrace, token.RBrace, token.LParen, token.RParen, token.LBracket, token.RBracket, token.Less, token.Greater,
-				token.Colon, token.Semicolon, token.Comma, token.Dot, token.Assign, token.Question, token.Pipe, token.At, token.Star, token.StarStar, token.Arrow, token.EOF}},
+				token.Colon, token.Semicolon, token.Comma, token.Dot, token.Assign, token.Question, token.Pipe, token.At, token.Star, token.StarStar, token.Arrow, token.ThinArrow, token.EOF}},
 		{"no >> token", "Record<string, string[]>>", []token.Kind{token.Record, token.Less, token.StringType, token.Comma, token.StringType, token.LBracket, token.RBracket, token.Greater, token.Greater, token.EOF}},
 		{"int", "0 42 -7", []token.Kind{token.Int, token.Int, token.Int, token.EOF}},
 		{"float", "1.5 -0.25", []token.Kind{token.Float, token.Float, token.EOF}},
@@ -82,6 +82,8 @@ func TestLexTokens(t *testing.T) {
 		{"doc comment", "/** d */ model", []token.Kind{token.DocComment, token.Model, token.EOF}},
 		{"empty doc comment", "/***/ model", []token.Kind{token.DocComment, token.Model, token.EOF}},
 		{"arrow and assign", "= => =", []token.Kind{token.Assign, token.Arrow, token.Assign, token.EOF}},
+		{"thin arrow", "A -> B A->B", []token.Kind{token.Ident, token.ThinArrow, token.Ident, token.Ident, token.ThinArrow, token.Ident, token.EOF}},
+		{"thin arrow and negative int", "-> -1 ->", []token.Kind{token.ThinArrow, token.Int, token.ThinArrow, token.EOF}},
 		{"at ident", "@db @http.status", []token.Kind{token.At, token.Ident, token.At, token.QualifiedName, token.EOF}},
 	}
 	for _, tt := range tests {

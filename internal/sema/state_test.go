@@ -1,0 +1,444 @@
+package sema
+
+import (
+	"encoding/json"
+	"reflect"
+	"testing"
+
+	"github.com/mew-ton/hozo/ir"
+)
+
+// 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）の、解決と正規化。
+// 期待値は docs/ir.md「state / exception / effect」「classify」「配線」と docs/check.md「状態の形」から。
+
+const stateSource = `
+namespace shop {
+  model Line { id: string; }
+  model Order { id: string; }
+  scalar Token extends string;
+
+  state carts: list<Line>;
+  state orders: list<Order>;
+  state token: nullable<Token>;
+  state clock: single<Time>;
+
+  classify Checkout of carts, orders {
+    Shopping;
+    Ordered;
+    default;
+  }
+  condition LoggedIn of token;
+  classify LineKind of Line { Gift; Normal; }
+
+  effect addLine on carts.post;
+  effect tick on clock.put;
+  effect logout on token.delete;
+  effect placeOrder on Checkout: Shopping -> Ordered;
+  effect reset on Checkout: any -> Shopping;
+  effect touch on Checkout: Ordered | Shopping -> any;
+  effect clearCart on carts: HasItems -> Empty;
+  effect login on token: Empty -> HasItems;
+  effect signIn on LoggedIn: any -> LoggedIn;
+
+  op showEmpty(): void;
+  op showCart(): void;
+  op me(): Token;
+  op gift(line: LineKind.Gift<Line>): Line;
+  op normal(line: Line): Line;
+  op order(): Order effects placeOrder;
+
+  op view(line: Line): Order {
+    match carts by list {
+      Empty => showEmpty();
+      HasItems => showCart();
+    };
+    const who = match token by nullable {
+      HasItems => me();
+      Empty => none;
+    };
+    const kind = match line by LineKind {
+      Gift => gift(line);
+      Normal => normal(line);
+    };
+    const placed = match by Checkout {
+      Shopping | Ordered => order();
+      default => order();
+    };
+    match by LoggedIn {
+      LoggedIn => showCart();
+      default => none;
+    };
+    return placed;
+  }
+}`
+
+func analyzeState(t *testing.T) *ir.Program {
+	t.Helper()
+	res, fs := analyzeProject(t, project{"shop.hozo": stateSource}, false)
+	noErrors(t, res, fs)
+	for _, d := range res.Diags {
+		if d.Code != "WIRE-8" { // who と kind は使っていない（意図した warning）
+			t.Errorf("想定しない診断: %s %s", d.Code, d.Message)
+		}
+	}
+	return res.Program
+}
+
+func jsonEq(t *testing.T, name string, got, want any) {
+	t.Helper()
+	g, _ := json.Marshal(got)
+	w, _ := json.Marshal(want)
+	if string(g) != string(w) {
+		t.Errorf("%s:\n got  %s\n want %s", name, g, w)
+	}
+}
+
+// TestStateShapes は docs/ir.md「state / exception / effect」の State.shape: 三つの形。
+func TestStateShapes(t *testing.T) {
+	p := analyzeState(t)
+	for name, want := range map[string]ir.StateShape{
+		"shop.carts": ir.StateList, "shop.token": ir.StateNullable, "shop.clock": ir.StateSingle,
+	} {
+		if got := p.Lookup(name).(*ir.State).Shape; got != want {
+			t.Errorf("%s の形 = %s, want %s", name, got, want)
+		}
+	}
+	jsonEq(t, "nullable の要素は中身の型", p.Lookup("shop.token").(*ir.State).Element, ir.Ref("shop.Token"))
+}
+
+// TestStateElementOptional は STATE-3 のときの IR: element は optional にならず、形は書かれたまま。
+func TestStateElementOptional(t *testing.T) {
+	res := runAnnotated(t, project{"a.hozo": `
+namespace a {
+  state token: single<string?>;        // ERROR: STATE-3
+}`}, false)
+	st := res.Program.Lookup("a.token").(*ir.State)
+	if st.Shape != ir.StateSingle {
+		t.Errorf("shape = %s", st.Shape)
+	}
+	jsonEq(t, "element", st.Element, ir.String())
+}
+
+// TestClassifySubject は docs/ir.md「classify」の subject: 型一つなら type、状態なら states（書かれた順）。
+func TestClassifySubject(t *testing.T) {
+	p := analyzeState(t)
+	jsonEq(t, "値の分類", p.Lookup("shop.LineKind").(*ir.Classify).Subject, ir.TypeSubject{Type: ir.Ref("shop.Line")})
+	checkout := p.Lookup("shop.Checkout").(*ir.Classify)
+	jsonEq(t, "状態の分類", checkout.Subject, ir.StatesSubject{States: []string{"shop.carts", "shop.orders"}})
+	if !checkout.HasDefault || len(checkout.Cases) != 2 {
+		t.Errorf("Checkout = %+v", checkout)
+	}
+	cond := p.Lookup("shop.LoggedIn").(*ir.Classify)
+	jsonEq(t, "状態の condition", cond.Subject, ir.StatesSubject{States: []string{"shop.token"}})
+	if !cond.FromCondition || !cond.HasDefault || cond.Cases[0].Name != "LoggedIn" {
+		t.Errorf("LoggedIn = %+v", cond)
+	}
+}
+
+// TestClassifySubjectOrder は states が書かれた順であること（宣言の順ではない）。
+func TestClassifySubjectOrder(t *testing.T) {
+	res, fs := analyzeProject(t, project{"a.hozo": `
+namespace a {
+  state x: list<string>;
+  state y: list<string>;
+  classify C of y, x { A; }
+}`}, false)
+	noErrors(t, res, fs)
+	jsonEq(t, "states", res.Program.Lookup("a.C").(*ir.Classify).Subject, ir.StatesSubject{States: []string{"a.y", "a.x"}})
+	hasRef(t, res, fs, "a.hozo:5:17 decl a.y")
+	hasRef(t, res, fs, "a.hozo:5:20 decl a.x")
+}
+
+// TestClassifySubjectInvalid は CLS-3 のときの IR: 対象は決まらない（null）。重複だけなら重複を除いた状態の分類。
+func TestClassifySubjectInvalid(t *testing.T) {
+	res := runAnnotated(t, project{"a.hozo": `
+namespace a {
+  model M { id: string; }
+  state x: list<M>;
+  classify Mixed of x, M { A; }        // ERROR: CLS-3
+  classify Twice of x, x { A; }        // ERROR: CLS-3
+  op f(): void;
+  // 対象が決まらなかった分類での match には、MATCH-7 を重ねない
+  op g(): void {
+    match by Mixed { A => f(); };
+    match by Twice { A => f(); };
+  }
+}`}, false)
+	if s := res.Program.Lookup("a.Mixed").(*ir.Classify).Subject; s != nil {
+		t.Errorf("Mixed の subject = %#v", s)
+	}
+	jsonEq(t, "Twice", res.Program.Lookup("a.Twice").(*ir.Classify).Subject, ir.StatesSubject{States: []string{"a.x"}})
+}
+
+// TestEffectTargets は docs/ir.md「state / exception / effect」の Effect.target と、docs/check.md「状態の形」の
+// 「効果が書き込む状態」（Effect.writes）。
+func TestEffectTargets(t *testing.T) {
+	p := analyzeState(t)
+	tests := []struct {
+		name   string
+		target ir.EffectTarget
+		writes []string
+	}{
+		// 組み込みの効果: 書き込むのはその基底の状態
+		{"shop.addLine", ir.BuiltinTarget{State: "shop.carts", Operation: ir.OpPost}, []string{"shop.carts"}},
+		{"shop.tick", ir.BuiltinTarget{State: "shop.clock", Operation: ir.OpPut}, []string{"shop.clock"}},
+		{"shop.logout", ir.BuiltinTarget{State: "shop.token", Operation: ir.OpDelete}, []string{"shop.token"}},
+		// 遷移で宛先が状態の分類: その対象のすべての基底の状態
+		{"shop.placeOrder", ir.TransitionTarget{Of: "shop.Checkout", From: ir.Cases("Shopping"), To: ir.Cases("Ordered")}, []string{"shop.carts", "shop.orders"}},
+		{"shop.reset", ir.TransitionTarget{Of: "shop.Checkout", From: ir.AnyCase(), To: ir.Cases("Shopping")}, []string{"shop.carts", "shop.orders"}},
+		// ケースの列は書かれた順
+		{"shop.touch", ir.TransitionTarget{Of: "shop.Checkout", From: ir.Cases("Ordered", "Shopping"), To: ir.AnyCase()}, []string{"shop.carts", "shop.orders"}},
+		{"shop.signIn", ir.TransitionTarget{Of: "shop.LoggedIn", From: ir.AnyCase(), To: ir.Cases("LoggedIn")}, []string{"shop.token"}},
+		// 遷移で宛先が基底の状態: その状態
+		{"shop.clearCart", ir.TransitionTarget{Of: "shop.carts", From: ir.Cases("HasItems"), To: ir.Cases("Empty")}, []string{"shop.carts"}},
+		{"shop.login", ir.TransitionTarget{Of: "shop.token", From: ir.Cases("Empty"), To: ir.Cases("HasItems")}, []string{"shop.token"}},
+	}
+	for _, tt := range tests {
+		e := p.Lookup(tt.name).(*ir.Effect)
+		if !reflect.DeepEqual(e.Target, tt.target) {
+			t.Errorf("%s の target = %#v, want %#v", tt.name, e.Target, tt.target)
+		}
+		if !reflect.DeepEqual(e.Writes, tt.writes) {
+			t.Errorf("%s の writes = %v, want %v", tt.name, e.Writes, tt.writes)
+		}
+	}
+}
+
+// TestEffectTargetRefs は遷移の名前とケース名の参照（定義へのジャンプ）。組み込みのケースには定義がない。
+func TestEffectTargetRefs(t *testing.T) {
+	res, fs := analyzeProject(t, project{"a.hozo": `
+namespace a {
+  state s: list<string>;
+  classify Phase of s { Idle; Busy; }
+  effect start on Phase: Idle -> Busy;
+  effect drain on s: HasItems -> Empty;
+}`}, false)
+	noErrors(t, res, fs)
+	hasRef(t, res, fs, "a.hozo:5:19 decl a.Phase")
+	hasRef(t, res, fs, "a.hozo:5:26 case a.Phase.Idle")
+	hasRef(t, res, fs, "a.hozo:5:34 case a.Phase.Busy")
+	hasRef(t, res, fs, "a.hozo:6:19 decl a.s")
+	for _, s := range refStrings(res, fs) {
+		if s == "a.hozo:6:22 case a.s.HasItems" || s == "a.hozo:6:34 case a.s.Empty" {
+			t.Errorf("組み込みのケースに参照がある: %s", s)
+		}
+	}
+}
+
+// TestEffectTargetInvalid は宛先が決まらないときの IR: target は null、writes は空。
+func TestEffectTargetInvalid(t *testing.T) {
+	res := runAnnotated(t, project{"a.hozo": `
+namespace a {
+  model M { id: string; }
+  state clock: single<string>;
+  state items: list<M>;
+  classify Kind of M { A; B; }
+  effect onSingle on clock: Empty -> HasItems; // ERROR: STATE-4
+  effect value on Kind: A -> B;                // ERROR: RES-4
+  effect unknown on nothing: A -> B;           // ERROR: RES-1
+  effect badCase on items: Empty -> Full;      // ERROR: STATE-4
+}`}, false)
+	for _, name := range []string{"a.onSingle", "a.value", "a.unknown"} {
+		e := res.Program.Lookup(name).(*ir.Effect)
+		if e.Target != nil || e.Writes != nil {
+			t.Errorf("%s: target = %#v, writes = %v", name, e.Target, e.Writes)
+		}
+	}
+	// ケースの誤りでは、宛先は書かれたまま残る
+	bad := res.Program.Lookup("a.badCase").(*ir.Effect)
+	jsonEq(t, "badCase", bad.Target, ir.TransitionTarget{Of: "a.items", From: ir.Cases("Empty"), To: ir.Cases("Full")})
+	jsonEq(t, "badCase の writes", bad.Writes, []string{"a.items"})
+}
+
+// TestMatchSubjects は docs/ir.md「配線」の Match.subject の三つの形と、Match.classify（組み込みの分類なら状態の形）。
+func TestMatchSubjects(t *testing.T) {
+	p := analyzeState(t)
+	stmts := p.Lookup("shop.view").(*ir.Op).Body.Statements
+
+	byList := stmts[0].(ir.MatchStmt).Match
+	jsonEq(t, "by list の subject", byList.Subject, ir.StateSubject{State: "shop.carts"})
+	if byList.Classify != "list" {
+		t.Errorf("by list の classify = %q", byList.Classify)
+	}
+	jsonEq(t, "by list のアーム", []ir.ArmCases{byList.Arms[0].Cases, byList.Arms[1].Cases},
+		[]ir.ArmCases{{Cases: []string{"Empty"}}, {Cases: []string{"HasItems"}}})
+
+	byNullable := stmts[1].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
+	jsonEq(t, "by nullable の subject", byNullable.Subject, ir.StateSubject{State: "shop.token"})
+	if byNullable.Classify != "nullable" {
+		t.Errorf("by nullable の classify = %q", byNullable.Classify)
+	}
+	// アームは書かれた順
+	jsonEq(t, "by nullable のアーム", []any{byNullable.Arms[0].Cases, byNullable.Arms[1].Cases, byNullable.Arms[1].Body},
+		[]any{ir.ArmCases{Cases: []string{"HasItems"}}, ir.ArmCases{Cases: []string{"Empty"}}, ir.NoneBody{}})
+
+	byValue := stmts[2].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
+	value, ok := byValue.Subject.(ir.ValueSubject)
+	if !ok {
+		t.Fatalf("値の match の subject = %#v", byValue.Subject)
+	}
+	if name, ok := value.Atom.(ir.NameAtom); !ok || !reflect.DeepEqual(name.Path, []string{"line"}) {
+		t.Errorf("値の match の atom = %#v", value.Atom)
+	}
+	if byValue.Classify != "shop.LineKind" {
+		t.Errorf("値の match の classify = %q", byValue.Classify)
+	}
+
+	byClassify := stmts[3].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
+	jsonEq(t, "match by C の subject", byClassify.Subject, ir.ClassifyOwnedSubject{})
+	if byClassify.Classify != "shop.Checkout" {
+		t.Errorf("match by C の classify = %q", byClassify.Classify)
+	}
+	jsonEq(t, "match by C のアーム", []ir.ArmCases{byClassify.Arms[0].Cases, byClassify.Arms[1].Cases},
+		[]ir.ArmCases{{Cases: []string{"Shopping", "Ordered"}}, ir.DefaultArm()})
+
+	byCondition := stmts[4].(ir.MatchStmt).Match
+	jsonEq(t, "match by condition の subject", byCondition.Subject, ir.ClassifyOwnedSubject{})
+	if byCondition.Classify != "shop.LoggedIn" {
+		t.Errorf("match by condition の classify = %q", byCondition.Classify)
+	}
+
+	// 読み戻しても同じ（docs/ir.md「JSON」）
+	b, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back ir.Program
+	if err := json.Unmarshal(b, &back); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := json.Marshal(&back)
+	if string(again) != string(b) {
+		t.Error("JSON の往復で変わる")
+	}
+}
+
+// TestMatchStateRefs は状態の match の対象・分類・ケース名の参照。
+func TestMatchStateRefs(t *testing.T) {
+	res, fs := analyzeProject(t, project{"a.hozo": `
+namespace a {
+  state s: list<string>;
+  classify Phase of s { Idle; Busy; }
+  op f(): void;
+  op g(): void {
+    match s by list { Empty => f(); HasItems => none; };
+    match by Phase { Idle => f(); Busy => none; };
+  }
+}`}, false)
+	noErrors(t, res, fs)
+	hasRef(t, res, fs, "a.hozo:7:11 decl a.s")
+	hasRef(t, res, fs, "a.hozo:8:14 decl a.Phase")
+	hasRef(t, res, fs, "a.hozo:8:22 case a.Phase.Idle")
+	hasRef(t, res, fs, "a.hozo:8:35 case a.Phase.Busy")
+}
+
+// TestMatchStateTyping は docs/types.md「式の型」の match: 状態の match の型は値の match と同じ決め方で、
+// アームでの絞り込みはない（引数は TYPE-4 で照合し、MATCH-4 / MATCH-6 は出ない）。
+func TestMatchStateTyping(t *testing.T) {
+	runAnnotated(t, project{"a.hozo": `
+namespace a {
+  model M { id: string; }
+  model N { name: string; }
+  state items: list<M>;
+  state token: nullable<string>;
+  classify Stock of items { None; Some; }
+  op m(): M;
+  op n(): N;
+  op nothing(): void;
+  op takeM(m: M): void;
+  op takeOptM(m: M?): void;
+  op takeN(n: N): void;
+
+  // すべてのアームが同じ型 → その型。none のアームがあれば optional
+  op same(): M {
+    return match items by list { Empty => m(); HasItems => m(); };
+  }
+  op optional(): void {
+    const x = match token by nullable { Empty => none; HasItems => m(); };
+    takeOptM(x);
+    takeM(x);                                                          // ERROR: TYPE-4
+  }
+  op byClassify(): M {
+    return match by Stock { None => m(); Some => m(); };
+  }
+  // 値のある呼び出しがなければ「値がない」
+  op noValue(): void {
+    match items by list { Empty => nothing(); HasItems => none; };
+    const y = match by Stock { None => nothing(); Some => none; };     // ERROR: WIRE-2 // WARN: WIRE-8
+  }
+  // 型がそろわない、値のある呼び出しと値のない呼び出しが混ざる
+  op mixed(): void {
+    const a = match items by list { Empty => m(); HasItems => n(); };          // ERROR: TYPE-8 // WARN: WIRE-8
+    const b = match by Stock { None => m(); Some => nothing(); };              // ERROR: TYPE-8 // WARN: WIRE-8
+    const c = match token by nullable { Empty => m(); HasItems => m(); };      // WARN: WIRE-8
+  }
+  // 絞り込みがない: アームの中の引数はそのままの型で照合する
+  op args(v: M): void {
+    match items by list { Empty => takeM(v); HasItems => takeN(v); };  // ERROR: TYPE-4
+    match by Stock { None => takeM(v); Some => takeN(v); };            // ERROR: TYPE-4
+  }
+  // 値がある match を束縛せずに書けない
+  op unbound(): void {
+    match items by list { Empty => m(); HasItems => m(); };            // ERROR: WIRE-2
+  }
+}`}, false)
+}
+
+// TestEffectOnAcceptsOnlyBuiltin は docs/types.md「デコレータの引数」の `any effect on s.op`: 宛先が組み込みの効果
+// { state: s, operation: op } の効果だけが満たす。
+func TestEffectOnAcceptsOnlyBuiltin(t *testing.T) {
+	res := runAnnotated(t, project{"a.hozo": `
+namespace a {
+  state location: list<string>;
+  effect go on location.put;
+  effect leave on location: HasItems -> Empty;
+  decorator nav(target: any effect on location.put);
+  @nav(go)
+  op ok(): void;
+  @nav(leave)                          // ERROR: DEC-7
+  op ng(): void;
+}`}, false)
+	nav := res.Program.Lookup("a.nav").(*ir.Decorator)
+	jsonEq(t, "on", nav.Params[0].Type, ir.AnyParam{Of: ir.AnyEffect, On: &ir.EffectOn{State: "a.location", Operation: ir.OpPut}})
+	jsonEq(t, "引数", res.Program.Lookup("a.ok").(*ir.Op).Decorators[0].Args[0].Value, ir.RefValue{Target: "a.go"})
+}
+
+// TestMatchStateClassifyWithSubject は「状態の分類なのに対象がある」（MATCH-7）のとき、対象に書いた束縛を使ったことにして
+// WIRE-8 を重ねないこと。
+func TestMatchStateClassifyWithSubject(t *testing.T) {
+	res := runAnnotated(t, project{"a.hozo": `
+namespace a {
+  model M { id: string; }
+  state items: list<M>;
+  classify Stock of items { None; Some; }
+  op get(): M;
+  op f(): void;
+  op g(): void {
+    const m = get();
+    match m by Stock { None => f(); Some => none; };   // ERROR: MATCH-7
+  }
+}`}, false)
+	// 対象は分類の宣言が持つ形で IR に載る
+	m := res.Program.Lookup("a.g").(*ir.Op).Body.Statements[1].(ir.MatchStmt).Match
+	jsonEq(t, "subject", m.Subject, ir.ClassifyOwnedSubject{})
+	if m.Classify != "a.Stock" {
+		t.Errorf("classify = %q", m.Classify)
+	}
+}
+
+// TestClassifySubjectUnresolved は、対象の名前が見つからないときは CLS-3 ではなく RES-1 になること
+// （状態か型かが決まらない。docs/resolve.md「手続き」1.7）。
+func TestClassifySubjectUnresolved(t *testing.T) {
+	res := runAnnotated(t, project{"a.hozo": `
+namespace a {
+  state carts: list<string>;
+  classify One of nothing { A; }                 // ERROR: RES-1
+  classify Two of carts, nothing { A; }          // ERROR: RES-1
+  classify Qualified of carts, b.nothing { A; }  // ERROR: RES-1
+}`}, false)
+	for _, name := range []string{"a.One", "a.Two", "a.Qualified"} {
+		if s := res.Program.Lookup(name).(*ir.Classify).Subject; s != nil {
+			t.Errorf("%s の subject = %#v, want nil", name, s)
+		}
+	}
+}

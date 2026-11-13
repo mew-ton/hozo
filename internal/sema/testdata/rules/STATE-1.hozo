@@ -1,10 +1,15 @@
-// STATE-1: single の状態に post / delete（docs/check.md「状態と効果」）
+// STATE-1: 組み込みの効果の operation が、その状態の形にない（docs/check.md「状態と効果」「状態の形」の表）
 namespace a {
   state s: single<string>;
   state l: list<string>;
+  state n: nullable<string>;
   effect put on s.put;
   effect post on s.post;               // ERROR: STATE-1
   effect del on s.delete;              // ERROR: STATE-1
   effect lpost on l.post;
+  effect lput on l.put;
   effect ldel on l.delete;
+  effect npost on n.post;
+  effect nput on n.put;
+  effect ndel on n.delete;
 }

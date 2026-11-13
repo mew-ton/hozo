@@ -1,0 +1,9 @@
+// CLS-3（docs/check.md「classify / match」）: 対象が分類の状態（対象にできるのは基底の状態だけ。docs/check.md「状態の形」）
+namespace a {
+  state carts: list<string>;
+  state orders: list<string>;
+  classify Checkout of carts, orders { Shopping; Ordered; }
+  classify Phase of Checkout { Early; Late; }    // ERROR: CLS-3
+  classify Wide of carts, Checkout { A; }        // ERROR: CLS-3
+  condition Done of Checkout;                    // ERROR: CLS-3
+}

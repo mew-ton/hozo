@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-設計書（`mew-ton/drafts` の `hozo/README.md`）が決めていないことについて、実装のためにこのリポジトリで決めたことの一覧と、設計書へ返すこと、今のスコープから外した設計書の例。決定の中身と理由の持ち主は「持ち主」の列の文書と見出し。設計書が決めれば、その項目は消して設計書を引く。
+設計書（`mew-ton/drafts` の `hozo/README.md`）が決めていないことについて、実装のためにこのリポジトリで決めたことの一覧と、設計書の内容を変える決定、設計書へ返すこと、今のスコープから外した設計書の例。決定の中身と理由の持ち主は「持ち主」の列の文書と見出し。設計書が決めれば、その項目は消して設計書を引く。
 
 ## 決めたこと
 
@@ -55,6 +55,20 @@
 | 45 | プラグインは protoc と同じ信頼モデル。隔離も、応答以外のファイルの変化の検出も行わない | `docs/plugin-protocol.md`「信頼の前提」 |
 | 46 | `cli` の語彙は go-cli が提供し、hozoc には同梱しない | `docs/vocab.md`「同梱しない語彙」 |
 
+## 設計書を変える決定
+
+設計書の節の内容そのものを変える決定。上の表の決定（設計書にないことを決めたもの）と違い、設計書の側を書き換える必要がある。
+
+| # | 決めたこと | 変わる節 | 持ち主 |
+|---|---|---|---|
+| S1 | 基底の状態の形は `list` / `nullable` / `single` の三つで、列数の範囲で決まる。`post` / `put` / `delete` は列数の相対的な変化を表す組み込みの効果。`list` と `nullable` は組み込みの分類 `Empty` / `HasItems` を持つ | §5.2 | `docs/check.md`「状態の形」 |
+| S2 | 空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない。空にするのは `delete` | §5.2、§6.2（`removeToken` の例）、§16（「single の `clear`」「`maybe<T>`」の廃案を覆す） | `docs/grammar.md`「決めたこと」、`docs/check.md`「状態の形」 |
+| S3 | `classify` は一つ以上の基底の状態を対象にできる（状態の分類） | §6.3、§10.1 | `docs/check.md`「状態の形」、`docs/grammar.md`「classify / condition」 |
+| S4 | 一つの効果が変えるのは一つの状態の一つの変化。宛先は組み込みの効果か、分類の遷移（`effect e on C: A -> B`） | §6.2 | `docs/check.md`「状態の形」、`docs/grammar.md`「exception / effect」 |
+| S5 | 配線は状態の場合で分岐できる（`match s by list`、`match by C`） | §9、§10.2 | `docs/grammar.md`「配線」 |
+| S6 | 状態の述語は判定関数に訳され、配線の `match` と、テストでの効果の結果の判定が呼ぶ。効果の観測のうち分類の場合で言える範囲は Hozo の中に入る | §10.3、§12.1、§12.2 | `docs/emit-go.md`「state」「classify」。テストのアサーションの形は段階 6 で決める |
+| S7 | 検査器は遷移を行をまたいで追わない。例外と状態の場合を結びつける書き方は持たない | — | `docs/check.md`「状態の形」 |
+
 ## スコープ外にした設計書の例
 
 今の段階では扱わず、コーパス（`docs/testing.md`「コーパス」）からも外す例。段階 5（TS 向けの一次プラグイン）で、react-router / vue-router / Next / Nuxt などのプラグインの設計と一緒に決める。
@@ -70,6 +84,7 @@
 
 | 項目 | 内容 | 決定 |
 |---|---|---|
+| 状態を分類で表す | 「設計書を変える決定」の S1〜S7。§5.2・§6.2・§6.3・§9・§10・§12・§16 を書き換える | S1〜S7 |
 | 省略可能の書き方 | `x?: T` の例（§7.1 `token?: Token`、§11.2 `status?: server.OrderStatus`、§4.2 `min?: int` / `from?: any state`、`examples/hozoc.hozo` の `config?: Path`）を `x: T?` に直す | 8 |
 | `Token` の修飾 | §5.2 の `browser` の `state token: single<Token?>;` は `server.Token` でなければ §3.2 に反する | 18 |
 | ユニオンのアームの中の `;` | §11.2 の `Ready: { userName: string; orders: OrderRow[] }` は、フィールドの末尾に `;` が要る（`docs/grammar.md`「model」） | 7 |

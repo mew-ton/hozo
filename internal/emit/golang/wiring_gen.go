@@ -207,7 +207,8 @@ func (b *bodyGen) match(m *ir.Match, bindName string, wantValue bool, rest []ir.
 		return ""
 	}
 	cName := e.typeName(c.Name)
-	subj, _ := b.atom(m.Subject, c.Subject)
+	// 値の分類での match だけがここに来る。状態での match は checkUnsupported が GOEMIT-INTERNAL で止めている。
+	subj, _ := b.atom(m.SubjectAtom(), c.SubjectType())
 	kind := b.fresh("kind")
 	b.assignErr(kind, nil, fmt.Sprintf("Classify%s(o.classifiers.%s, %s)", cName, cName, subj))
 
@@ -328,8 +329,8 @@ func (b *bodyGen) call(c *ir.Call) (string, ir.Type) {
 			}
 			e.usedStates = append(e.usedStates, st.Name)
 			n := b.fresh(localName(st.Name))
-			b.assignErr(n, st.Element, "o.states."+e.typeName(st.Name)+"(ctx)")
-			bounds = append(bounds, boundVal{pos, n, st.Element})
+			b.assignErr(n, stateValueType(st), "o.states."+e.typeName(st.Name)+"(ctx)")
+			bounds = append(bounds, boundVal{pos, n, stateValueType(st)})
 		}
 	}
 
@@ -532,7 +533,7 @@ func usesInCall(c *ir.Call, name string) bool {
 }
 
 func usesInMatch(m *ir.Match, name string) bool {
-	if usesInAtom(m.Subject, name) {
+	if a := m.SubjectAtom(); a != nil && usesInAtom(a, name) {
 		return true
 	}
 	for _, a := range m.Arms {

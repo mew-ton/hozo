@@ -1,4 +1,4 @@
-// BIND-6（docs/check.md「bind」2）: list の状態を bind に書いた
+// BIND-6（docs/check.md「bind」2）: list の状態を bind に書いた（bind できるのは single と nullable）
 namespace a {
   state items: list<string>;
   bind items to a.*;                   // ERROR: BIND-6

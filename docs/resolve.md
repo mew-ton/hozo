@@ -48,10 +48,13 @@
 
 | 位置 | 受け付けるもの |
 |---|---|
-| 型（フィールド、引数、戻り値、`scalar extends`、`state` の要素、`classify of`） | `model`、`scalar`、`union`（`arms`）、`classify` のケース（`C.Case<T>` の形でだけ）。核の型は予約語なので解決しない |
+| `classify C of ...` の対象 | 一つで型を指せば値の分類（下の「型」と同じ）。すべてが現在の名前空間の `state`（基底の状態）なら状態の分類。型と状態の混在、状態でないものを含む並びなどは CLS-3（`docs/check.md`「classify / match」）。対象が一つで型でも状態でもなければ RES-4 |
+| 型（フィールド、引数、戻り値、`scalar extends`、`state` の要素） | `model`、`scalar`、`union`（`arms`）、`classify` のケース（`C.Case<T>` の形でだけ）。核の型は予約語なので解決しない |
 | `exception X: T` の `T` | `model` |
 | ユニオンのメンバー `X;` | `exception`、`effect`、`union`（`set`） |
 | `effect e on s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
+| `effect e on X: A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
+| 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら `Empty` / `HasItems` |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
 | `prevents` / `keeps` の要素 | `effect`、`union`（`set` で要素が効果） |
@@ -60,8 +63,10 @@
 | `effects` の要素 | `effect`、`union`（`set` で要素が効果） |
 | `@name`（`@external` を除く。`docs/grammar.md`「予約語」） | `decorator`。付ける先の種類との照合は DEC-1 |
 | デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」） |
-| `match x by C` の `C` | 現在の名前空間の `classify`（NS-4） |
-| `match` のアームのケース名 | その `classify` のケース |
+| `match x by C` の `C` | 現在の名前空間の、値を対象にした `classify`（NS-4） |
+| `match s by list` / `by nullable` の `s` | 現在の名前空間の `state` |
+| `match by C` の `C` | 現在の名前空間の、状態を対象にした `classify` |
+| `match` のアームのケース名 | その分類のケース。組み込みの分類なら `Empty` / `HasItems` |
 | 呼び出しの op | `op` |
 | 呼び出しの引数の `Atom.name` | 束縛、引数、そのフィールドのパス |
 | `bind s to ns.*` の `s` | 現在の名前空間の `state`。`ns` は名前空間 |

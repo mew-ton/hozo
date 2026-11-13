@@ -7,7 +7,7 @@ namespace browser {
   // ---- §5.2 model と状態 ----
 
   @localStorage
-  state token: single<server.Token?>;
+  state token: nullable<server.Token>;
 
   @page.query
   state query: single<Record<string, string[]>>;
@@ -17,7 +17,7 @@ namespace browser {
 
   // ---- §5.3 bind ----
 
-  // token は §5.2 の browser.token（single<Token?>）
+  // token は §5.2 の browser.token（nullable<server.Token>。設計書では single<Token?>）
   // server への呼び出しでは、入力のうち Token 型の位置を token で埋める
   bind token to server.*;
 
@@ -64,7 +64,7 @@ namespace browser {
   // ---- §9 配線（browser 側） ----
 
   /** 手元のトークンを消す */
-  effect removeToken on token.put;   // none を入れる
+  effect removeToken on token.delete;   // 空にする（設計書では token.put で none を入れる）
 
   op clearToken()
     effects removeToken;

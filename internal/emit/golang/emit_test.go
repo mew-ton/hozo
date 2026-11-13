@@ -457,3 +457,76 @@ func TestCopiesForeignException(t *testing.T) {
 	}
 	compileFiles(t, root, files)
 }
+
+// TestUnsupportedStateClassification は、状態を分類で表す決定（docs/decisions.md「設計書を変える決定」）の構文のうち
+// この出力がまだ扱えないものが、黙って出力されず GOEMIT-INTERNAL の error になること（unsupported.go）。
+// 出力の側を実装したら、このテストはそれぞれの出力の期待に置き換える。
+func TestUnsupportedStateClassification(t *testing.T) {
+	root := newProjectRoot(t)
+	carts := &ir.State{DeclBase: base("app.carts", nil), Shape: ir.StateList, Element: ir.String()}
+	token := &ir.State{DeclBase: base("app.token", nil), Shape: ir.StateNullable, Element: ir.String()}
+	checkout := &ir.Classify{DeclBase: base("app.Checkout", nil), Subject: ir.StatesSubject{States: []string{"app.carts"}},
+		Cases: []ir.ClassifyCase{{Name: "Shopping"}, {Name: "Ordered"}}}
+	arms := func(a, b string) []ir.MatchArm {
+		return []ir.MatchArm{{Cases: ir.ArmCases{Cases: []string{a}}, Body: ir.NoneBody{}}, {Cases: ir.ArmCases{Cases: []string{b}}, Body: ir.NoneBody{}}}
+	}
+	wire := func(name string, m ir.Match) *ir.Op {
+		return &ir.Op{DeclBase: base(name, nil), Body: &ir.Wiring{Statements: []ir.Statement{ir.MatchStmt{Match: m}}}}
+	}
+	tests := []struct {
+		name  string
+		decls []ir.Decl
+		want  []string // メッセージに含む語（診断の順）
+	}{
+		{"state classify", []ir.Decl{carts, checkout}, []string{"状態の分類は未対応: classify app.Checkout"}},
+		{"transition on classify", []ir.Decl{carts, checkout,
+			&ir.Effect{DeclBase: base("app.placeOrder", nil), Target: ir.TransitionTarget{Of: "app.Checkout", From: ir.Cases("Shopping"), To: ir.Cases("Ordered")}, Writes: []string{"app.carts"}}},
+			[]string{"状態の分類は未対応: classify app.Checkout", "遷移の効果は未対応: effect app.placeOrder on app.Checkout"}},
+		{"transition on base state", []ir.Decl{carts,
+			&ir.Effect{DeclBase: base("app.clearCart", nil), Target: ir.TransitionTarget{Of: "app.carts", From: ir.Cases(ir.CaseHasItems), To: ir.Cases(ir.CaseEmpty)}, Writes: []string{"app.carts"}}},
+			[]string{"遷移の効果は未対応: effect app.clearCart on app.carts"}},
+		{"match by list", []ir.Decl{carts,
+			wire("app.show", ir.Match{Subject: ir.StateSubject{State: "app.carts"}, Classify: "list", Arms: arms(ir.CaseEmpty, ir.CaseHasItems)})},
+			[]string{"状態での match は未対応: op app.show の match app.carts by list"}},
+		{"match by nullable in const", []ir.Decl{token,
+			&ir.Op{DeclBase: base("app.who", nil), Body: &ir.Wiring{Statements: []ir.Statement{
+				ir.ConstStmt{Name: "x", Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.StateSubject{State: "app.token"}, Classify: "nullable", Arms: arms(ir.CaseEmpty, ir.CaseHasItems)}}},
+			}}}},
+			[]string{"状態での match は未対応: op app.who の match app.token by nullable"}},
+		{"match by classify", []ir.Decl{carts, checkout,
+			wire("app.next", ir.Match{Subject: ir.ClassifyOwnedSubject{}, Classify: "app.Checkout", Arms: arms("Shopping", "Ordered")})},
+			[]string{"状態の分類は未対応: classify app.Checkout", "状態の分類での match は未対応: op app.next の match by app.Checkout"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, diags := Emit(smallView(tt.decls...), Options{Root: root})
+			if files != nil {
+				t.Errorf("ファイルが出た: %d", len(files))
+			}
+			if len(diags) != len(tt.want) {
+				t.Fatalf("診断が %d 個、期待は %d 個: %s", len(diags), len(tt.want), formatDiags(diags))
+			}
+			for i, d := range diags {
+				if d.Code != CodeInternal || d.Severity != diag.Error || !strings.Contains(d.Message, tt.want[i]) {
+					t.Errorf("診断 %d = %s[%s] %q, want GOEMIT-INTERNAL に %q", i, d.Severity, d.Code, d.Message, tt.want[i])
+				}
+			}
+		})
+	}
+	// 組み込みの効果と値の分類だけなら、list / nullable の状態があっても今まで通り出力する（StateCases はまだ出さない）。
+	files, diags := Emit(smallView(carts, token,
+		&ir.Effect{DeclBase: base("app.addLine", nil), Target: ir.BuiltinTarget{State: "app.carts", Operation: ir.OpPost}, Writes: []string{"app.carts"}},
+		&ir.Effect{DeclBase: base("app.logout", nil), Target: ir.BuiltinTarget{State: "app.token", Operation: ir.OpDelete}, Writes: []string{"app.token"}},
+	), Options{Root: root})
+	if len(diags) != 0 || len(files) == 0 {
+		t.Fatalf("組み込みの効果だけの出力に失敗: %s", formatDiags(diags))
+	}
+	for _, f := range files {
+		if strings.Contains(string(f.Content), "StateCases") {
+			t.Errorf("%s に StateCases がある（まだ出さないはず。出すようにしたらこのテストを直す）", f.Path)
+		}
+		if strings.HasSuffix(f.Path, "types.go") && !strings.Contains(string(f.Content), "効果 app.logout（状態 app.token への delete）。") {
+			t.Errorf("%s に効果のコメントがない:\n%s", f.Path, f.Content)
+		}
+	}
+}

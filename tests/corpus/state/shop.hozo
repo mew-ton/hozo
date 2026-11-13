@@ -1,0 +1,133 @@
+// 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）のサンプル。
+// 各ブロックの `// docs/...「見出し」` は、その構文が確かめる文書の見出し。見出し → 構文の対応は README.md。
+
+/** カートと注文を持つ店 */
+namespace shop {
+  /** ログインセッションのトークン */
+  scalar Token extends string;
+  model Line { item: string; count: int = 1; }
+  model Order { id: string; }
+
+  // docs/check.md「状態の形」基底の状態: 形は列数の範囲。list は 0 以上、nullable は 0 か 1、single はちょうど 1
+  /** カートの行 */
+  state carts: list<Line>;
+  /** 注文 */
+  state orders: list<Order>;
+  // docs/grammar.md「state」: 空になりうる状態は nullable<T> とだけ書く（single<T?> は STATE-3）
+  /** 手元のトークン。空ならログインしていない */
+  state token: nullable<Token>;
+  /** 店の名前。常に一つある */
+  state title: single<string>;
+
+  // docs/check.md「状態の形」分類の状態: classify は一つ以上の基底の状態を対象にして、その場合に名前を付ける
+  // docs/ir.md「classify」: subject は { kind: "states", states: [FQN]（書かれた順） }
+  /** 買い物の進み具合 */
+  classify Checkout of carts, orders {
+    /** カートに入れている途中 */
+    Shopping;
+    /** 注文を出した */
+    Ordered;
+  }
+  // docs/grammar.md「classify / condition」: condition も状態を対象にできる（ClassifySubject）
+  /** ログインしている */
+  condition LoggedIn of token;
+  // 値の分類（§10.1）は今まで通り。subject は { kind: "type", type }
+  /** 行の種類 */
+  classify LineKind of Line {
+    Single;
+    Bulk;
+  }
+
+  // docs/check.md「状態の形」効果の宛先: 基底の状態の組み込みの効果。書き込むのはその状態
+  // docs/ir.md「state / exception / effect」: target は { kind: "builtin", state, operation }
+  /** カートに行を足す */
+  effect addLine on carts.post;
+  /** 店の名前を変える */
+  effect rename on title.put;
+  // 空にするのは delete（docs/decisions.md S2）
+  /** 手元のトークンを消す */
+  effect removeToken on token.delete;
+
+  // docs/grammar.md「exception / effect」Transition: 状態の分類の遷移。書き込むのは分類の対象のすべての基底の状態
+  // docs/ir.md「state / exception / effect」: target は { kind: "transition", of, from, to }
+  /** 注文を確定する */
+  effect placeOrder on Checkout: Shopping -> Ordered;
+  // CaseSet: any と、ケースの和
+  /** 買い物をやり直す */
+  effect startOver on Checkout: any -> Shopping;
+  /** 進み具合を記録し直す */
+  effect touchCheckout on Checkout: Shopping | Ordered -> any;
+  // condition の遷移（ケースは condition の名前）
+  /** ログインする */
+  effect signIn on LoggedIn: any -> LoggedIn;
+
+  // docs/grammar.md「exception / effect」Transition: 基底の状態の組み込みの分類の遷移（ケースは Empty / HasItems）。
+  // 書き込むのはその状態
+  /** カートを空にする */
+  effect clearCart on carts: HasItems -> Empty;
+  /** トークンを保存する */
+  effect saveToken on token: Empty -> HasItems;
+
+  /** カートが空 */
+  exception EmptyCart;
+
+  // 葉の op。効果の宛先が組み込みの効果でも遷移でも、effects の書き方は同じ
+  op addToCart(line: Line) effects addLine;
+  op submitOrder(): Order effects placeOrder throws EmptyCart prevents effects;
+  op emptyCart() effects clearCart;
+  op restart() effects startOver;
+  op login(token: Token) effects saveToken | signIn;
+  op logout() effects removeToken;
+  op showLogin();
+  op showCart();
+  op showEmpty();
+  op showOrders();
+  op packSingle(line: LineKind.Single<Line>): Line;
+  op packBulk(line: Line): Line;
+
+  // docs/grammar.md「配線」の表: 基底の状態の、組み込みの分類での match（by nullable）
+  // docs/ir.md「配線」: subject は { kind: "state", state }、classify は "nullable"
+  op openTop()
+  {
+    match token by nullable {
+      Empty    => showLogin();
+      HasItems => showCart();
+    };
+  }
+
+  // 同じく by list。ケースは Empty / HasItems で、default はない（MATCH-2）
+  // docs/check.md「計算」手順 0（配線）: 一部のアームにしかない効果（clearCart）は succ が unknown
+  op openCart()
+  {
+    match carts by list {
+      Empty    => showEmpty();
+      HasItems => emptyCart();
+    };
+  }
+
+  // docs/grammar.md「配線」の表: 状態の分類での match。対象は書かない（分類の宣言が持つ）
+  // docs/ir.md「配線」: subject は { kind: "classify" }、classify は分類の FQN
+  // docs/types.md「式の型」: 状態の match も値の match と同じ決め方（none のアームがあれば optional）
+  op checkout(): Order?
+    throws EmptyCart
+  {
+    const placed = match by Checkout {
+      Shopping => submitOrder();
+      Ordered  => none;
+    };
+    return placed;
+  }
+
+  // condition での match（default のアーム）と、値の分類での match（subject は { kind: "value", atom }）が並ぶ
+  op add(line: Line)
+  {
+    const normalized = match line by LineKind {
+      Single => packSingle(line);
+      Bulk   => packBulk(line);
+    };
+    match by LoggedIn {
+      LoggedIn => addToCart(normalized);
+      default  => showLogin();
+    };
+  }
+}

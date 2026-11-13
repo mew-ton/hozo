@@ -1,0 +1,18 @@
+// MATCH-4（docs/check.md「classify / match」）: 値の match だけの規則。状態の match にはアームでの絞り込みがない
+// （docs/types.md「式の型」）ので、アームの本体の引数はそのままの型で渡す
+namespace a {
+  model M { id: string; }
+  state items: list<M>;
+  classify Stock of items { None; Some; }
+  op wide(m: M): void;
+  op ok(m: M): void {
+    match items by list {
+      Empty => wide(m);
+      HasItems => wide(m);
+    };
+    match by Stock {
+      None => wide(m);
+      Some => wide(m);
+    };
+  }
+}

@@ -256,16 +256,13 @@
             },
             "end": {
               "line": 12,
-              "col": 32
+              "col": 33
             }
           },
-          "shape": "single",
+          "shape": "nullable",
           "element": {
-            "kind": "optional",
-            "of": {
-              "kind": "core",
-              "name": "string"
-            }
+            "kind": "core",
+            "name": "string"
           }
         },
         {
@@ -283,8 +280,14 @@
               "col": 28
             }
           },
-          "state": "a.users",
-          "operation": "post"
+          "target": {
+            "kind": "builtin",
+            "state": "a.users",
+            "operation": "post"
+          },
+          "writes": [
+            "a.users"
+          ]
         },
         {
           "kind": "effect",
@@ -301,8 +304,14 @@
               "col": 27
             }
           },
-          "state": "a.token",
-          "operation": "put"
+          "target": {
+            "kind": "builtin",
+            "state": "a.token",
+            "operation": "put"
+          },
+          "writes": [
+            "a.token"
+          ]
         },
         {
           "kind": "exception",
@@ -673,8 +682,11 @@
             }
           },
           "subject": {
-            "kind": "ref",
-            "target": "a.User"
+            "kind": "type",
+            "type": {
+              "kind": "ref",
+              "target": "a.User"
+            }
           },
           "cases": [
             {
@@ -711,8 +723,11 @@
             }
           },
           "subject": {
-            "kind": "ref",
-            "target": "a.User"
+            "kind": "type",
+            "type": {
+              "kind": "ref",
+              "target": "a.User"
+            }
           },
           "cases": [
             {
@@ -1619,19 +1634,22 @@
                   "kind": "match",
                   "match": {
                     "subject": {
-                      "kind": "name",
-                      "path": [
-                        "u"
-                      ],
-                      "span": {
-                        "file": "a.hozo",
-                        "start": {
-                          "line": 61,
-                          "col": 21
-                        },
-                        "end": {
-                          "line": 61,
-                          "col": 22
+                      "kind": "value",
+                      "atom": {
+                        "kind": "name",
+                        "path": [
+                          "u"
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 61,
+                            "col": 21
+                          },
+                          "end": {
+                            "line": 61,
+                            "col": 22
+                          }
                         }
                       }
                     },

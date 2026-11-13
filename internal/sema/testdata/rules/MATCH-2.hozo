@@ -1,4 +1,4 @@
-// MATCH-2: アームのケースの集合が Classify.cases と等しくない、default の有無（docs/check.md「classify / match」）
+// MATCH-2: アームのケースの集合が分類のケースと等しくない、default の有無（docs/check.md「classify / match」）
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
@@ -34,5 +34,73 @@ namespace a {
   op ok(m: M): void {
     match m by C { A => use(m); B => none; };
     match m by D { A => use(m); default => none; };
+  }
+
+  // 組み込みの分類のケースは Empty / HasItems で、default はない
+  state carts: list<M>;
+  state token: nullable<string>;
+  op f(): void;
+  op builtinOk(): void {
+    match carts by list { Empty => f(); HasItems => none; };
+    match token by nullable { HasItems => f(); Empty => none; };
+    match carts by list { Empty | HasItems => f(); };
+  }
+  op builtinMissing(): void {
+    match carts by list {              // ERROR: MATCH-2
+      Empty => f();
+    };
+    match token by nullable {          // ERROR: MATCH-2
+      HasItems => f();
+    };
+  }
+  op builtinUnknown(): void {
+    match carts by list {              // ERROR: MATCH-2
+      Empty => f();
+      HasItems => none;
+      Full => none;
+    };
+    match token by nullable {          // ERROR: MATCH-2
+      None => f();
+      Some => none;
+    };
+  }
+  op builtinDup(): void {
+    match carts by list {              // ERROR: MATCH-2
+      Empty => f();
+      HasItems | Empty => none;
+    };
+  }
+  op builtinDefault(): void {
+    match carts by list {              // ERROR: MATCH-2
+      Empty => f();
+      default => none;
+    };
+    match token by nullable {          // ERROR: MATCH-2
+      Empty => f();
+      HasItems => none;
+      default => none;
+    };
+  }
+
+  // 状態の分類も、値の分類と同じ
+  state orders: list<M>;
+  classify Checkout of carts, orders { Shopping; Ordered; }
+  classify Session of token { LoggedIn; default; }
+  op stateOk(): void {
+    match by Checkout { Shopping => f(); Ordered => none; };
+    match by Session { LoggedIn => f(); default => none; };
+  }
+  op stateNg(): void {
+    match by Checkout {                // ERROR: MATCH-2
+      Shopping => f();
+    };
+    match by Checkout {                // ERROR: MATCH-2
+      Shopping => f();
+      Ordered => none;
+      Empty => none;
+    };
+    match by Session {                 // ERROR: MATCH-2
+      LoggedIn => f();
+    };
   }
 }

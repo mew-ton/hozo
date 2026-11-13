@@ -33,7 +33,7 @@ func (e *emitter) collectDecls() {
 			e.effects = append(e.effects, x)
 		case *ir.Classify:
 			e.classifies = append(e.classifies, x)
-			e.visitType(x.Subject)
+			e.visitType(x.SubjectType())
 		case *ir.Op:
 			e.ops = append(e.ops, x)
 			for _, p := range x.Params {

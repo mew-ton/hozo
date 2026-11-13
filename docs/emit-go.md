@@ -19,7 +19,7 @@
 | `doc.go` | パッケージの説明（名前空間の `description`） |
 | `types.go` | model、scalar、union、exception、effect |
 | `validate.go` | `Validate` メソッド |
-| `ops.go` | `Leaves`、`Ops`、`Deps`、`States`、`Wrappers`、`Classifiers`、`New`、`ops` 構造体 |
+| `ops.go` | `Leaves`、`Ops`、`Deps`、`States`、`StateCases`、`Wrappers`、`Classifiers`、`New`、`ops` 構造体 |
 | `wiring.go` | 配線の op の本体 |
 | `classify.go` | 分類の型と判定関数 |
 
@@ -131,13 +131,27 @@ const EffectCreateSession runtime.Effect = "server.createSession"
 
 ## state
 
-状態そのものは出力しない（保存場所は語彙とプラグインが決める。§5.2）。N の配線から N 自身の op を呼ぶ呼び出しで `Call.bound` が空でないとき、その状態ごとに `States` インターフェースの取得メソッドを生成する（`bind` は `single` だけ。BIND-6）。
+状態そのものは出力しない（保存場所は語彙とプラグインが決める。§5.2）。出すのは、状態を読むための二つのインターフェース。どちらも人が保存先に問い合わせて実装する。
+
+N の配線から N 自身の op を呼ぶ呼び出しで `Call.bound` が空でないとき、その状態ごとに `States` の取得メソッドを生成する（`bind` できるのは `single` と `nullable`。BIND-6）。
 
 ```go
 type States interface {
-    Token(ctx context.Context) (*server.Token, error)   // single<Token?> なら *T、single<T> なら T
+    Token(ctx context.Context) (*server.Token, error)   // nullable<T> なら *T（空なら nil）、single<T> なら T
 }
 ```
+
+`list` と `nullable` の状態ごとに、組み込みの分類（`docs/check.md`「状態の形」）の述語を `StateCases` に生成する。`HasItems` は `Empty` の否定なので、述語は一つ。
+
+```go
+// StateCases は基底の状態の組み込みの分類の述語。配線の match と、効果の結果を確かめるテストが呼ぶ
+type StateCases interface {
+    CartsIsEmpty(ctx context.Context) (bool, error)
+    TokenIsEmpty(ctx context.Context) (bool, error)
+}
+```
+
+`StateCases` は該当する状態があれば常に生成する（配線で使われなくても、テストが効果の結果の判定に使うため）。`New` が引数に取るのは、N の配線に `match ... by list` / `by nullable` があるときだけ。
 
 別の名前空間の op への呼び出しの `Call.bound` は、`Deps` の実装者が埋める（下の「インターフェース」）。
 
@@ -165,10 +179,10 @@ type Ops interface { ...葉と配線のすべて... }
 type Deps struct { Server ServerOps }
 type ServerOps interface { GetMe(ctx context.Context, in GetMeInInput) (server.PublicUser, error) }
 
-func New(leaves Leaves, deps Deps, states States, wrappers Wrappers, classifiers Classifiers) Ops
+func New(leaves Leaves, deps Deps, states States, stateCases StateCases, wrappers Wrappers, classifiers Classifiers) Ops
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま
-type ops struct { leaves Leaves; deps Deps; states States; wrappers Wrappers; classifiers Classifiers }
+type ops struct { leaves Leaves; deps Deps; states States; stateCases StateCases; wrappers Wrappers; classifiers Classifiers }
 ```
 
 - `Deps` のフィールドは、配線から呼んでいる別の名前空間ごとに一つ。インターフェース名は `<名前空間の最後のセグメントを大文字に>Ops`。
@@ -252,6 +266,8 @@ if err != nil { return nil, err }
 - 束縛する変数の型は `docs/types.md`「式の型」の `match` の型。
 - `default` のアームは `case <C>Default:`。
 - 値のない `match` は `switch` だけ。
+- 状態の分類での `match by C` は、判定関数の呼び出しが `Classify<C>(ctx, o.classifiers.<C>)` になるだけで、あとは同じ。
+- 組み込みの分類での `match s by list` / `by nullable` は、`empty, err := o.stateCases.<S>IsEmpty(ctx)` を呼び、`if empty { <Empty のアーム> } else { <HasItems のアーム> }`。
 
 ## classify
 
@@ -278,6 +294,23 @@ func ClassifyWarrantyKind(c WarrantyKindCases, v server.Item) (WarrantyKind, err
 
 - 判定関数はすべての述語を評価し、真の数を数える。`hasDefault` が false なら 1 でなければ、true なら 2 以上なら `*runtime.ClassificationError{Classify, Hits}` を返す（§10.3 の表）。0 で `hasDefault` なら `<C>Default`。
 - 「本番で全部の述語を評価して検証するか、最初に真になったものを返すか」（§10.3）は、既定の出力では常に全部評価する。切り替えは段階 6（§12）で考える。
+
+状態の分類（`Classify.subject` が `states`）は、述語が値を取らず状態を読む。
+
+```go
+// CheckoutCases は人が実装するケースごとの述語。保存先に問い合わせる
+type CheckoutCases interface {
+    Shopping(ctx context.Context) (bool, error)
+    Ordered(ctx context.Context) (bool, error)
+}
+
+type Classifiers struct { WarrantyKind WarrantyKindCases; Checkout CheckoutCases }
+
+func ClassifyCheckout(ctx context.Context, c CheckoutCases) (Checkout, error)
+```
+
+- 列挙の型と定数、真の数の検証は値の分類と同じ。述語がエラーを返したら、そのエラーを返す。
+- 配線で `match by C` に使われない分類でも生成する（テストが効果の結果の判定に使うため）。
 
 ## runtime パッケージ
 

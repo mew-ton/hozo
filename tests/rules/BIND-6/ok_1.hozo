@@ -1,4 +1,4 @@
-// BIND-6（docs/check.md「bind」）: single の状態は bind に書ける
+// BIND-6（docs/check.md「bind」）: bind できるのは single と nullable。single の状態
 namespace a {
   scalar Token extends string;
   state token: single<Token>;

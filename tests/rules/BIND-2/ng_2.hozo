@@ -1,0 +1,8 @@
+// BIND-2（docs/check.md「bind」5）: 位置が model のフィールドでも同じ（optional でなく default もない）
+namespace a {
+  scalar Token extends string;
+  state token: nullable<Token>;
+  bind token to a.*;                   // ERROR: BIND-2
+  model In { token: Token; note: string?; }
+  op g(in: In);
+}

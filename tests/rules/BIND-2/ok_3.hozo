@@ -1,0 +1,7 @@
+// BIND-2（docs/check.md「bind」5）: nullable の状態でも、位置に default があれば埋められる（空なら既定値）
+namespace a {
+  state locale: nullable<string>;
+  bind locale to a.*;
+  model In { locale: string = "ja"; }
+  op g(in: In);
+}

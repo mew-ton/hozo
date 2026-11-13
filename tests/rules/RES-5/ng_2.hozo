@@ -1,0 +1,11 @@
+// RES-5（docs/resolve.md「位置ごとに受け付ける種類」）: 遷移の宛先が別の名前空間の分類か状態
+namespace a {
+  state s: list<string>;
+  classify Phase of s { Idle; Busy; }
+  effect ok on Phase: Idle -> Busy;
+}
+namespace b {
+  effect onState on a.s: Empty -> HasItems;    // ERROR: RES-5
+  effect onClassify on a.Phase: Idle -> Busy;  // ERROR: RES-5
+  op f();
+}

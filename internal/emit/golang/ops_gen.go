@@ -209,12 +209,12 @@ func (e *emitter) genOps() *genFile {
 	states := e.orderedStates()
 	if len(states) > 0 {
 		g.println("// States は、この名前空間の配線が同じ名前空間の op を呼ぶときに bind で埋める状態の値の取得")
-		g.println("// （docs/emit-go.md「state」）。single<T?> なら *T、single<T> なら T。")
+		g.println("// （docs/emit-go.md「state」）。nullable<T> なら *T（空なら nil）、single<T> なら T。")
 		g.println("type States interface {")
 		for _, fqn := range states {
 			st := e.lookup(fqn).(*ir.State)
 			g.printf("\t// %s は状態 %s の値。\n", e.typeName(fqn), fqn)
-			g.printf("\t%s(ctx %s.Context) (%s, error)\n", e.typeName(fqn), imp.Add("context", "context"), gol.GoType(st.Element, imp))
+			g.printf("\t%s(ctx %s.Context) (%s, error)\n", e.typeName(fqn), imp.Add("context", "context"), gol.GoType(stateValueType(st), imp))
 		}
 		g.println("}\n")
 	}

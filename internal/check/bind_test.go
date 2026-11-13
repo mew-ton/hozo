@@ -7,7 +7,8 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// bindFixture は §5.3 の形: browser.token（single<server.Token?>）を server.* に bind する。
+// bindFixture は §5.3 の形: browser.token（nullable<server.Token>。docs/decisions.md「設計書を変える決定」S2）を
+// server.* に bind する。
 func bindFixture(serverOps []ir.Decl, browserOps []ir.Decl, binds ...ir.Bind) *ir.Program {
 	server := []ir.Decl{
 		scalar("server.Token", ir.String()),
@@ -18,9 +19,10 @@ func bindFixture(serverOps []ir.Decl, browserOps []ir.Decl, binds ...ir.Bind) *i
 		model("server.Node", field("next", ir.Optional(ir.Ref("server.Node"))), field("token", ir.Optional(ir.Ref("server.Token")))),
 	}
 	browser := []ir.Decl{
-		state("browser.token", ir.StateSingle, ir.Optional(ir.Ref("server.Token"))),
-		state("browser.token2", ir.StateSingle, ir.Optional(ir.Ref("server.Token"))),
+		state("browser.token", ir.StateNullable, ir.Ref("server.Token")),
+		state("browser.token2", ir.StateNullable, ir.Ref("server.Token")),
 		state("browser.tokens", ir.StateList, ir.Ref("server.Token")),
+		state("browser.session", ir.StateSingle, ir.Ref("server.Token")),
 	}
 	return program(binds,
 		namespace("server", append(server, serverOps...)...),
@@ -70,6 +72,29 @@ func TestBindPositions(t *testing.T) {
 	wantPaths(t, "server.** reaches server.admin", positionsOf(t, p, 1, "server.admin.x"), "t")
 }
 
+// TestBindShapes は docs/check.md「bind」2〜3: bind できるのは single と nullable で、どちらも τ は状態の element。
+// 位置は型が τ か optional(τ) のところ。list は位置を持たない（BIND-6）。
+func TestBindShapes(t *testing.T) {
+	ops := []ir.Decl{
+		leaf("server.login", nil, param("in", ir.Ref("server.LoginInput"))),
+		leaf("server.strict", nil, param("in", ir.Ref("server.StrictInput"))),
+		leaf("server.two", nil, param("a", ir.Ref("server.Token")), param("b", ir.Optional(ir.Ref("server.Token")))),
+	}
+	p := bindFixture(ops, nil,
+		bind("browser", "browser.token", "server", false),   // nullable
+		bind("browser", "browser.session", "server", false), // single
+		bind("browser", "browser.tokens", "server", false),  // list
+	)
+	for bi, shape := range []string{"nullable", "single"} {
+		wantPaths(t, shape+": optional(τ) の位置", positionsOf(t, p, bi, "server.login"), "in.token")
+		wantPaths(t, shape+": τ の位置", positionsOf(t, p, bi, "server.strict"), "in.token")
+		wantPaths(t, shape+": τ と optional(τ)", positionsOf(t, p, bi, "server.two"), "a", "b")
+	}
+	for _, op := range []string{"server.login", "server.strict", "server.two"} {
+		wantPaths(t, "list: "+op, positionsOf(t, p, 2, op))
+	}
+}
+
 // TestBindRules は BIND-1 / BIND-2 / BIND-5 / BIND-6 と、それぞれの通る例。
 func TestBindRules(t *testing.T) {
 	ops := []ir.Decl{
@@ -96,12 +121,15 @@ func TestBindRules(t *testing.T) {
 		}
 	})
 	t.Run("BIND-2", func(t *testing.T) {
+		// 状態の形が nullable で、位置（StrictInput.token）が optional でなく default もない
 		p := bindFixture([]ir.Decl{ops[2]}, nil, bind("browser", "browser.token", "server", false))
 		wantOneCode(t, Check(p, cfgFor("server", "browser")), "BIND-2")
-		// 状態が省略可能でなければ BIND-2 にならない
-		p2 := bindFixture([]ir.Decl{ops[2]}, []ir.Decl{state("browser.req", ir.StateSingle, ir.Ref("server.Token"))},
-			bind("browser", "browser.req", "server", false))
+		// 状態の形が single なら、同じ位置でも BIND-2 にならない（常に一列）
+		p2 := bindFixture([]ir.Decl{ops[2]}, nil, bind("browser", "browser.session", "server", false))
 		wantNoCode(t, Check(p2, cfgFor("server", "browser")), "BIND-2")
+		// nullable でも、位置が optional（LoginInput.token）か default を持つ（DefaultInput.token）なら通る
+		p3 := bindFixture([]ir.Decl{ops[0], ops[3]}, nil, bind("browser", "browser.token", "server", false))
+		wantNoCode(t, Check(p3, cfgFor("server", "browser")), "BIND-2")
 	})
 	t.Run("BIND-5", func(t *testing.T) {
 		p := bindFixture([]ir.Decl{ops[0]}, nil,
@@ -119,6 +147,11 @@ func TestBindRules(t *testing.T) {
 		p := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", "browser.tokens", "server", false))
 		wantOneCode(t, Check(p, cfgFor("server", "browser")), "BIND-6")
 		wantPaths(t, "list state has no positions", positionsOf(t, p, 0, "server.login"))
+		// bind できるのは single と nullable
+		for _, s := range []string{"browser.token", "browser.session"} {
+			ok := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", s, "server", false))
+			wantNoCode(t, Check(ok, cfgFor("server", "browser")), "BIND-6")
+		}
 	})
 }
 

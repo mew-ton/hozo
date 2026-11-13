@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -13,12 +14,16 @@ import (
 var update = flag.Bool("update", false, "update golden files (docs/testing.md「コーパス」)")
 
 // corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は emit が `go run` のプラグインを起動するもの。
+// emit が false のコーパスは check のゴールデンだけを持つ（既定の出力がまだ扱えない構文を含む。そのコーパスの README.md）。
 var corpora = []struct {
 	name    string
 	needsGo bool
+	emit    bool
 }{
-	{"design", false},
-	{"view", true}, // plugins/view-dump を `go run` で起動する
+	{"design", false, true},
+	{"view", true, true}, // plugins/view-dump を `go run` で起動する
+	// 状態の分類・遷移の効果・状態での match。internal/emit/golang が GOEMIT-INTERNAL にする（TestCorpusEmitUnsupported）
+	{"state", false, false},
 }
 
 // corpusDir はコーパス name のディレクトリ（tests/ からの相対パス）。
@@ -49,6 +54,9 @@ func TestCorpusCheckGolden(t *testing.T) {
 // （copyCorpusAsModule）、新しくできたファイルをすべて比べる。差分はファイルごとに示す。更新は `go test ./tests -update`。
 func TestCorpusEmitGolden(t *testing.T) {
 	for _, c := range corpora {
+		if !c.emit {
+			continue
+		}
 		t.Run(c.name, func(t *testing.T) {
 			if c.needsGo {
 				requireGo(t)
@@ -67,6 +75,47 @@ func TestCorpusEmitGolden(t *testing.T) {
 				t.Fatalf("emit が何も書かなかった:\n%s%s", stdout.String(), stderr.String())
 			}
 			compareTree(t, filepath.Join(goldenDir(c.name), "emit"), got)
+		})
+	}
+}
+
+// TestCorpusEmitUnsupported は、既定の出力がまだ扱えない構文を含むコーパス（corpora の emit が false のもの）に
+// `hozoc emit` が黙って誤ったコードを書かず、GOEMIT-INTERNAL の error で終わり（終了コード 1。docs/diagnostics.md
+// 「終了コード」）、何も書き出さないことを確かめる。
+// TODO(emit): docs/emit-go.md「state」「classify」「配線の本体」の出力を実装したら、corpora の emit を true にして
+// ゴールデンを作り、このテストを消す。
+func TestCorpusEmitUnsupported(t *testing.T) {
+	for _, c := range corpora {
+		if c.emit {
+			continue
+		}
+		t.Run(c.name, func(t *testing.T) {
+			root, before := copyCorpusAsModule(t, c.name)
+			var stdout, stderr bytes.Buffer
+			code := hozocMainIn(root, []string{"emit"}, &stdout, &stderr)
+			out := stdout.String() + stderr.String()
+			if code != 1 {
+				t.Errorf("hozoc emit の終了コード %d, want 1\n%s", code, out)
+			}
+			for _, want := range []string{
+				"error[GOEMIT-INTERNAL]: 状態の分類は未対応: classify shop.Checkout",
+				"error[GOEMIT-INTERNAL]: 遷移の効果は未対応: effect shop.placeOrder on shop.Checkout",
+				"error[GOEMIT-INTERNAL]: 遷移の効果は未対応: effect shop.clearCart on shop.carts",
+				"error[GOEMIT-INTERNAL]: 状態での match は未対応: op shop.openTop の match shop.token by nullable",
+				"error[GOEMIT-INTERNAL]: 状態での match は未対応: op shop.openCart の match shop.carts by list",
+				"error[GOEMIT-INTERNAL]: 状態の分類での match は未対応: op shop.checkout の match by shop.Checkout",
+			} {
+				if !strings.Contains(out, want) {
+					t.Errorf("出力に %q がない:\n%s", want, out)
+				}
+			}
+			got := readTree(t, root)
+			for p := range before {
+				delete(got, p)
+			}
+			if len(got) != 0 {
+				t.Errorf("error なのにファイルを書いた: %v", sortedKeys(got, nil))
+			}
 		})
 	}
 }

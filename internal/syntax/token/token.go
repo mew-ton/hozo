@@ -68,7 +68,7 @@ const (
 	Default
 	None
 
-	// 核の型。
+	// 核の型と状態の形。
 	StringType
 	BooleanType
 	IntType
@@ -78,6 +78,7 @@ const (
 	Void
 	Record
 	List
+	Nullable
 	Single
 
 	// リテラル。
@@ -104,6 +105,7 @@ const (
 	Star      // *
 	StarStar  // **
 	Arrow     // =>
+	ThinArrow // ->
 )
 
 // Keywords は予約語から Kind への表（docs/grammar.md「予約語」）。
@@ -155,6 +157,7 @@ var Keywords = map[string]Kind{
 	"void":     Void,
 	"Record":   Record,
 	"list":     List,
+	"nullable": Nullable,
 	"single":   Single,
 
 	"true":  True,
@@ -178,7 +181,7 @@ func IsContextual(s string) bool {
 var symbols = map[Kind]string{
 	LBrace: "{", RBrace: "}", LParen: "(", RParen: ")", LBracket: "[", RBracket: "]",
 	Less: "<", Greater: ">", Colon: ":", Semicolon: ";", Comma: ",", Dot: ".",
-	Assign: "=", Question: "?", Pipe: "|", At: "@", Star: "*", StarStar: "**", Arrow: "=>",
+	Assign: "=", Question: "?", Pipe: "|", At: "@", Star: "*", StarStar: "**", Arrow: "=>", ThinArrow: "->",
 }
 
 var keywordNames = invert(Keywords)

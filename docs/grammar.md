@@ -38,7 +38,7 @@ QualifiedName = Ident { "." Ident } ;
 | 宣言の頭 | `namespace` `model` `scalar` `union` `state` `op` `exception` `effect` `classify` `condition` `decorator` `bind` |
 | 節の頭 | `is` `omit` `extends` `of` `on` `to` `by` `for` `effects` `throws` `prevents` `keeps` `catches` `recovers` `halts` `ignores` `any` |
 | 文の頭と値 | `const` `return` `match` `default` `none` |
-| 核の型 | `string` `boolean` `int` `float` `Time` `Duration` `void` `Record` `list` `single` |
+| 核の型と状態の形 | `string` `boolean` `int` `float` `Time` `Duration` `void` `Record` `list` `nullable` `single` |
 | リテラル | `true` `false` |
 
 次の語は予約しない。決まった位置でだけ意味を持ち、それ以外では `Ident` になる（文脈キーワード）。
@@ -67,7 +67,7 @@ Literal  = String | Int | Float | Bool | Duration ;
 ### 記号
 
 ```
-"{" "}" "(" ")" "[" "]" "<" ">" ":" ";" "," "." "=" "?" "|" "@" "*" "**" "=>"
+"{" "}" "(" ")" "[" "]" "<" ">" ":" ";" "," "." "=" "?" "|" "@" "*" "**" "=>" "->"
 ```
 
 `T[]` の `[]` は `"["` `"]"` の並び。`**` は `bind` の対象（§5.3 `server.**`）でだけ使う。
@@ -138,16 +138,23 @@ ArmType     = Type | ModelBody ;
 ### state
 
 ```
-StateDecl = "state" Ident ":" ( "list" | "single" ) "<" Type ">" ";" ;
+StateDecl = "state" Ident ":" ( "list" | "nullable" | "single" ) "<" Type ">" ";" ;
 ```
+
+形は列数の範囲（`list` は 0 以上、`nullable` は 0 か 1、`single` はちょうど 1）。要素の型に `?` は付けられず（検査 STATE-3）、空になりうる状態は `nullable<T>` と書く（`docs/check.md`「状態の形」）。
 
 ### exception / effect
 
 ```
 ExceptionDecl = "exception" Ident [ ":" ArmType ] ";" ;
-EffectDecl    = "effect" Ident "on" QualifiedName "." StateOp ";" ;
+EffectDecl    = "effect" Ident "on" ( BuiltinEffect | Transition ) ";" ;
+BuiltinEffect = QualifiedName "." StateOp ;
 StateOp       = "post" | "put" | "delete" ;                 (* 文脈キーワード *)
+Transition    = QualifiedName ":" CaseSet "->" CaseSet ;
+CaseSet       = "any" | Ident { "|" Ident } ;
 ```
+
+効果の宛先は一つだけ。基底の状態の組み込みの効果（`effect addCartLine on carts.post;`）か、分類の遷移（`effect placeOrder on Checkout: Shopping -> Ordered;`）。`Transition` の `QualifiedName` は、状態を対象にした `classify` か、組み込みの分類を持つ基底の状態（`effect clearCart on carts: HasItems -> Empty;`）。`QualifiedName` の直後が `:` なら `Transition`、そうでなければ最後の要素が `StateOp`。
 
 `exception ClientError: Violations;` と `exception X: { items: Violation[] };`（§6.1）。その場で書く model（`ModelBody`）を置けるのは、ユニオンのアームとここの二か所だけ（「決めたこと」）。
 
@@ -156,10 +163,13 @@ StateOp       = "post" | "put" | "delete" ;                 (* 文脈キーワ�
 ### classify / condition
 
 ```
-ClassifyDecl = "classify" Ident "of" Type "{" { ClassifyCase } "}" ;
-ClassifyCase = [ DocComment ] ( Ident | "default" ) ";" ;
-ConditionDecl = "condition" Ident "of" Type ";" ;
+ClassifyDecl    = "classify" Ident "of" ClassifySubject "{" { ClassifyCase } "}" ;
+ClassifyCase    = [ DocComment ] ( Ident | "default" ) ";" ;
+ConditionDecl   = "condition" Ident "of" ClassifySubject ";" ;
+ClassifySubject = Type { "," Type } ;
 ```
+
+対象が一つで型を指せば値の分類（§10.1）。対象のすべてが今の名前空間の状態の名前なら状態の分類（`classify Checkout of carts, orders { ... }`）。どちらかは名前の解決で決まり、混ざっていればエラー（検査 CLS-3）。
 
 ### decorator の宣言
 
@@ -221,7 +231,7 @@ CoreType    = "string" | "boolean" | "int" | "float" | "Time" | "Duration" ;
 
 - `QualifiedName "<" Type ">"` は分類のケースで絞り込んだ型（`WarrantyKind.Yamada<server.Item>`。§10.2）にだけ使う。ほかの名前に型引数を付けたらエラー（名前の解決で判定する）。
 - その場で書く model（`ModelBody`）は `Type` ではなく、`ArmType`（ユニオンのアームと例外の値）にだけ置ける。
-- `void` は `ReturnType` にだけ書ける。`list` / `single` は `StateDecl` にだけ書ける。
+- `void` は `ReturnType` にだけ書ける。`list` / `nullable` / `single` は `StateDecl` と、`match` の `by` の後ろ（`list` / `nullable`）にだけ書ける。
 
 ## 配線
 
@@ -238,9 +248,17 @@ Atom  = QualifiedName | Literal | "none" | RecordLit ;
 RecordLit   = "{" [ RecordField { "," RecordField } [ "," ] ] "}" ;
 RecordField = Ident [ ":" Atom ] ;
 
-Match = "match" Atom "by" Ident "{" MatchArm { MatchArm } "}" ;
+Match = "match" [ Atom ] "by" ( Ident | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" ;
 MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ( Call | "none" ) ";" ;
 ```
+
+`match` の形は三つ（どれに当たるかの検査は MATCH-7）。
+
+| 形 | 対象 | 分類 |
+|---|---|---|
+| `match item by WarrantyKind { ... }` | 値 | 値の分類 |
+| `match carts by list { ... }`、`match token by nullable { ... }` | 今の名前空間の基底の状態 | その形の組み込みの分類（ケースは `Empty` / `HasItems`） |
+| `match by Checkout { ... }` | 書かない（分類の宣言が対象を持つ） | 状態の分類 |
 
 - `Call` の引数は `Atom` だけ（§9「呼び出しの引数に呼び出しは書けない（A 正規形）」）。文法で閉じる。
 - `Atom` の `QualifiedName` は、束縛した名前・op の引数・そのフィールド（`query.page`）のどれか。何を指すかは名前の解決が決める。
@@ -270,6 +288,8 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 |---|---|
 | `to` を予約語にする | `bind x to ...` の節の頭だから。ほかの節の頭と同じ扱い |
 | `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
+| 空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない | 同じ意味の書き方を二つ持たない。「空」が入れ物と値の型の二か所に現れないようにする |
+| 状態の分類での `match` は対象を書かない（`match by C`） | 対象は分類の宣言が持っていて、書かせると二か所になる |
 | `@external` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
 | その場で書く model はユニオンのアームと例外の値にだけ置ける | 合成する名前（`docs/ir.md`「正規化」）がその二つにしか決まらない |
 | 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない | 同じ意味の書き方を二つ持たない。型の `?` は `single<Token?>` のように型の位置で要るので、名前の側を落とす。設計書の例の `x?: T` は `x: T?` に直す（`docs/decisions.md`「設計書へ返すこと」） |

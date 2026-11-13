@@ -3,6 +3,7 @@ package check
 import (
 	"testing"
 
+	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/ir"
 )
 
@@ -156,7 +157,7 @@ func TestSigMatchArms(t *testing.T) {
 	d := leaf("server.d", nil)
 	d.Effects = []string{"server.e3"}
 	ca, cb := call("server.a"), call("server.b")
-	cls := &ir.Classify{DeclBase: ir.DeclBase{Name: "server.C", Span: sp("server.C")}, Subject: ir.String(),
+	cls := &ir.Classify{DeclBase: ir.DeclBase{Name: "server.C", Span: sp("server.C")}, Subject: ir.TypeSubject{Type: ir.String()},
 		Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}, HasDefault: true}
 	w := wire("server.w", nil, []ir.OpParam{param("x", ir.String())},
 		matchConst("r", "server.C", arm(&ca, "A"), arm(&cb, "B"), arm(nil)),
@@ -194,6 +195,71 @@ func TestSigMatchArms(t *testing.T) {
 	Compute(p2)
 	if got := succOf(t, sigOf(t, p2, "server.w2"), "server.e1"); got != ir.Kept {
 		t.Errorf("succ(e1) = %s, want kept (every arm)", got)
+	}
+}
+
+// TestSigStateMatch は状態での match（docs/ir.md「配線」の Match.subject が state / classify）の計算が、値の match と
+// 同じ規則（手順 0 の「match ならアームごとの呼び出し」）であること。検査器は遷移を行をまたいで追わない
+// （docs/check.md「状態の形」の「検査器が遷移を使う範囲」）ので、効果の宛先が組み込みの効果でも遷移でも Sig は同じ。
+func TestSigStateMatch(t *testing.T) {
+	a := leaf("server.a", nil)
+	a.Effects = []string{"server.e1"}
+	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	b := leaf("server.b", nil)
+	b.Effects = []string{"server.e1", "server.move"}
+	d := leaf("server.d", nil)
+	d.Effects = []string{"server.drain"}
+	decls := []ir.Decl{
+		state("server.items", ir.StateList, ir.String()),
+		&ir.Classify{DeclBase: ir.DeclBase{Name: "server.Phase", Span: sp("server.Phase")},
+			Subject: ir.StatesSubject{States: []string{"server.sA", "server.items"}},
+			Cases:   []ir.ClassifyCase{{Name: "Idle"}, {Name: "Busy"}}},
+		transition("server.move", "server.Phase", ir.Cases("Idle"), ir.Cases("Busy"), "server.sA", "server.items"),
+		transition("server.drain", "server.items", ir.Cases(ir.CaseHasItems), ir.Cases(ir.CaseEmpty), "server.items"),
+		a, b, d,
+	}
+	for _, tt := range []struct {
+		name  string
+		match func(arms ...ir.MatchArm) ir.Statement
+		cases [2]string
+	}{
+		{"by list", func(arms ...ir.MatchArm) ir.Statement { return matchState("server.items", ir.StateList, arms...) }, [2]string{ir.CaseEmpty, ir.CaseHasItems}},
+		{"by classify", func(arms ...ir.MatchArm) ir.Statement { return matchByClassify("server.Phase", arms...) }, [2]string{"Idle", "Busy"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ca, cb := call("server.a"), call("server.b")
+			w := wire("server.w", nil, nil,
+				tt.match(arm(&ca, tt.cases[0]), arm(&cb, tt.cases[1])),
+				cs(call("server.d")),
+			)
+			w.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+			p := serverWith(append(append([]ir.Decl{}, decls...), w)...)
+			Compute(p)
+			sig := sigOf(t, p, "server.w")
+			wantStrings(t, "F", sig.Effects, []string{"server.e1", "server.move", "server.drain"})
+			wantStrings(t, "E", sig.Exceptions, []string{"server.X"})
+			if got := succOf(t, sig, "server.e1"); got != ir.Kept {
+				t.Errorf("succ(e1) = %s, want kept (すべてのアームにある)", got)
+			}
+			if got := succOf(t, sig, "server.move"); got != ir.Unknown {
+				t.Errorf("succ(move) = %s, want unknown (一部のアームだけ)", got)
+			}
+			if got := succOf(t, sig, "server.drain"); got != ir.Kept {
+				t.Errorf("succ(drain) = %s, want kept", got)
+			}
+			if got := relOf(t, sig, "server.X", "server.move"); got != ir.Prevented {
+				t.Errorf("rel(X, move) = %s, want prevented (別のアーム)", got)
+			}
+			if got := relOf(t, sig, "server.X", "server.drain"); got != ir.Prevented {
+				t.Errorf("rel(X, drain) = %s, want prevented (下の行)", got)
+			}
+			// 規則の検査も通る（EFF-2 / THROWS-1 / STATE-2 は宛先の形によらない）
+			for _, dg := range Check(p, cfgFor("server")) {
+				if dg.Severity == diag.Error {
+					t.Errorf("想定しない error: %s %s", dg.Code, dg.Message)
+				}
+			}
+		})
 	}
 }
 

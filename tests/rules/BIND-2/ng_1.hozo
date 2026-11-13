@@ -1,7 +1,7 @@
-// BIND-2（docs/check.md「bind」5）: 状態が省略可能（single<Token?>）で、位置が省略できず default もない
+// BIND-2（docs/check.md「bind」5）: 状態の形が nullable（空になりうる）で、位置が省略できず default もない
 namespace a {
   scalar Token extends string;
-  state token: single<Token?>;
+  state token: nullable<Token>;
   bind token to a.*;                   // ERROR: BIND-2
   op g(t: Token);
 }

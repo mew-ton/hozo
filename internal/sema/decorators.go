@@ -304,8 +304,9 @@ func kindOf(of ir.AnyOf) declKind {
 	return kindException
 }
 
-// checkEffectOn は DEC-7（docs/types.md「デコレータの引数」）: `any effect on s.op` にはすべての効果の state が s、
-// operation が op のものだけ。
+// checkEffectOn は DEC-7（docs/types.md「デコレータの引数」）: `any effect on s.op` が受け付けるのは、宛先が
+// 組み込みの効果で、その state が s、operation が op のものだけ。遷移の効果は、書き込む状態が同じでも受け付けない
+// （操作が宣言から決まらない）。
 func (a *analyzer) checkEffectOn(targets []string, pt ir.AnyParam, p ir.Param, span source.Span) {
 	for _, t := range targets {
 		s := a.syms[t]
@@ -316,8 +317,13 @@ func (a *analyzer) checkEffectOn(targets []string, pt ir.AnyParam, p ir.Param, s
 		if !ok {
 			continue
 		}
-		if e.State != pt.On.State || e.Operation != pt.On.Operation {
-			a.errorf("DEC-7", span, "引数 %s は %s.%s への効果だけを受け付けるが、%s は %s.%s への効果", p.Name, pt.On.State, pt.On.Operation, t, e.State, e.Operation)
+		switch target := e.Target.(type) {
+		case ir.BuiltinTarget:
+			if target.State != pt.On.State || target.Operation != pt.On.Operation {
+				a.errorf("DEC-7", span, "引数 %s は %s.%s への効果だけを受け付けるが、%s は %s.%s への効果", p.Name, pt.On.State, pt.On.Operation, t, target.State, target.Operation)
+			}
+		case ir.TransitionTarget:
+			a.errorf("DEC-7", span, "引数 %s は %s.%s への効果だけを受け付けるが、%s は %s の遷移", p.Name, pt.On.State, pt.On.Operation, t, target.Of)
 		}
 	}
 }

@@ -1,0 +1,10 @@
+// CLS-3（docs/check.md「classify / match」）: 対象が別の名前空間の状態（効果が書き込む状態を宣言から直接読めるようにするため）
+namespace other {
+  state remote: list<string>;
+}
+namespace a {
+  state carts: list<string>;
+  classify Remote of other.remote { A; }         // ERROR: CLS-3
+  classify Both of carts, other.remote { A; }    // ERROR: CLS-3
+  condition Cond of other.remote;                // ERROR: CLS-3
+}

@@ -16,6 +16,8 @@ const files = {
   page: path.join(root, 'vocab', 'page.hozo'),
   valid: path.join(root, 'vocab', 'valid.hozo'),
   cli: path.join(root, 'cli.hozo'),
+  // 状態の分類・遷移の効果・状態での match（docs/grammar.md「exception / effect」「classify / condition」「配線」）
+  state: path.join(root, 'tests', 'corpus', 'state', 'shop.hozo'),
 };
 
 let grammar;
@@ -145,7 +147,14 @@ test('型の位置の名前', () => {
   const b = linesOf(files.browser);
   assertScope(b, 'classify WarrantyKind of server.Item {', 'server.Item', 'entity.name.type.hozo');
   assertScope(b, 'catches http.NetworkError | http.ServerError ignores;', 'http.ServerError', 'entity.name.type.hozo');
-  assertScope(b, 'state token: single<server.Token?>;', 'server.Token', 'entity.name.type.hozo');
+  assertScope(b, 'state token: nullable<server.Token>;', 'server.Token', 'entity.name.type.hozo');
+  // 状態の形 nullable も予約語（docs/grammar.md「予約語」の「核の型と状態の形」）
+  assertScope(b, 'state token: nullable<server.Token>;', 'nullable', 'support.type.primitive.hozo');
+  // match の by の後ろの状態の形も同じ予約語
+  const st = linesOf(files.state);
+  assertScope(st, 'match token by nullable {', 'nullable', 'support.type.primitive.hozo');
+  assertScope(st, 'match carts by list {', 'list', 'support.type.primitive.hozo');
+  assertScope(st, 'match carts by list {', 'by', 'keyword.control.hozo');
   assertScope(b, 'state query: single<Record<string, string[]>>;', 'Record', 'support.type.primitive.hozo');
   assertScope(b, 'state query: single<Record<string, string[]>>;', 'string', 'support.type.primitive.hozo', 1);
   assertScope(b, 'op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>', 'WarrantyKind.Yamada', 'entity.name.type.hozo');

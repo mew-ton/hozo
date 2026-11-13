@@ -170,8 +170,8 @@ func serverNS() ir.Namespace {
 				{Target: "server.Unauthorized", Span: sp(f, 1)}, {Target: "server.ClientError", Span: sp(f, 1)},
 			}},
 			&ir.State{DeclBase: base("server.sessions", nil), Shape: ir.StateList, Element: ir.Ref("server.Token")},
-			&ir.Effect{DeclBase: base("server.createSession", doc("セッションを作る")), State: "server.sessions", Operation: ir.OpPost},
-			&ir.Effect{DeclBase: base("server.deleteSession", nil), State: "server.sessions", Operation: ir.OpDelete},
+			&ir.Effect{DeclBase: base("server.createSession", doc("セッションを作る")), Target: ir.BuiltinTarget{State: "server.sessions", Operation: ir.OpPost}, Writes: []string{"server.sessions"}},
+			&ir.Effect{DeclBase: base("server.deleteSession", nil), Target: ir.BuiltinTarget{State: "server.sessions", Operation: ir.OpDelete}, Writes: []string{"server.sessions"}},
 			&ir.Op{DeclBase: base("server.login", &ir.Doc{Summary: "ログインする。", Body: "ログインする。",
 				Params: []ir.DocParam{{Name: "in", Text: "メールアドレスとパスワード"}}},
 				app("http.post", arg("path", lit(ir.StringLiteral{Value: "/login"}))),
@@ -215,7 +215,7 @@ func browserNS() ir.Namespace {
 		Name:        "browser",
 		Description: doc("ブラウザの画面。"),
 		Decls: []ir.Decl{
-			&ir.State{DeclBase: base("browser.token", nil), Shape: ir.StateSingle, Element: ir.Optional(ir.Ref("server.Token"))},
+			&ir.State{DeclBase: base("browser.token", nil), Shape: ir.StateNullable, Element: ir.Ref("server.Token")},
 			&ir.Model{DeclBase: base("browser.Location", nil), Fields: []ir.Field{field("route", ir.Ref("page.Route"))}},
 			&ir.Model{DeclBase: base("browser.RenderInput", nil), Fields: []ir.Field{
 				field("token", ir.Optional(ir.Ref("server.Token"))),
@@ -227,12 +227,12 @@ func browserNS() ir.Namespace {
 				{Name: "Anonymous", Type: ir.Ref("browser.MeView.Anonymous"), Span: sp(f, 1)},
 			}},
 			&ir.Model{DeclBase: base("browser.MeView.Anonymous", nil), SynthesizedFrom: "browser.MeView"},
-			&ir.Classify{DeclBase: base("browser.WarrantyKind", doc("保証の種類。")), Subject: ir.Ref("server.OrderRow"),
+			&ir.Classify{DeclBase: base("browser.WarrantyKind", doc("保証の種類。")), Subject: ir.TypeSubject{Type: ir.Ref("server.OrderRow")},
 				Cases: []ir.ClassifyCase{
 					{Name: "Standard", Description: doc("標準の保証"), Span: sp(f, 1)},
 					{Name: "Yamada", Span: sp(f, 1)},
 				}, HasDefault: true, DefaultDescription: doc("保証なし")},
-			&ir.Classify{DeclBase: base("browser.IsBig", nil), Subject: ir.Ref("server.OrderRow"),
+			&ir.Classify{DeclBase: base("browser.IsBig", nil), Subject: ir.TypeSubject{Type: ir.Ref("server.OrderRow")},
 				Cases: []ir.ClassifyCase{{Name: "IsBig", Span: sp(f, 1)}}, HasDefault: true, FromCondition: true},
 			&ir.Decorator{DeclBase: base("browser.retry", doc("失敗したら times 回までやり直す。")), Params: []ir.Param{{Name: "times", Type: intT}}, Targets: []ir.DecoratorTarget{ir.TargetOp}},
 			&ir.Decorator{DeclBase: base("browser.tracked", nil), Targets: []ir.DecoratorTarget{ir.TargetOp}},
@@ -240,7 +240,7 @@ func browserNS() ir.Namespace {
 				Catches: []ir.CatchesClause{{Exceptions: []string{"server.Unauthorized"}, Mode: ir.Halts, Halts: "browser.redirected"}},
 				Throws:  []ir.ThrowsClause{{Exceptions: []string{"$param:on"}, Relations: []ir.Relation{{Kind: ir.Prevents, Effects: ir.AllEffects()}}}}},
 			&ir.Decorator{DeclBase: base("browser.guardMe", nil), Alias: &ir.DecoratorAlias{Target: "browser.guarded", Args: []ir.Arg{arg("on", ir.RefValue{Target: "http.NetworkError"})}}},
-			&ir.Effect{DeclBase: base("browser.redirected", nil), State: "browser.token", Operation: ir.OpPut},
+			&ir.Effect{DeclBase: base("browser.redirected", nil), Target: ir.BuiltinTarget{State: "browser.token", Operation: ir.OpPut}, Writes: []string{"browser.token"}},
 			// 配線: 自分の情報を取って描画し、公開情報を返す。
 			&ir.Op{DeclBase: base("browser.openMe", doc("自分のページを開く。"),
 				app("page.route", arg("path", lit(ir.StringLiteral{Value: "/me"}))),
@@ -266,12 +266,12 @@ func browserNS() ir.Namespace {
 						Args:  []ir.CallArg{carg("query", name("query"))},
 						Bound: []ir.BoundPosition{{Path: []string{"token"}, State: "browser.token"}}, Span: sp(f, 1)}}, Span: sp(f, 1)},
 					ir.ConstStmt{Name: "first", Expr: ir.CallExpr{Call: call("browser.pickFirst", carg("rows", name("rows")))}, Span: sp(f, 1)},
-					ir.ConstStmt{Name: "line", Expr: ir.MatchExpr{Match: ir.Match{Subject: name("first"), Classify: "browser.WarrantyKind", Arms: []ir.MatchArm{
+					ir.ConstStmt{Name: "line", Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.ValueSubject{Atom: name("first")}, Classify: "browser.WarrantyKind", Arms: []ir.MatchArm{
 						{Cases: ir.ArmCases{Cases: []string{"Standard"}}, Body: ir.CallExpr{Call: call("browser.standardLine", carg("row", name("first")))}, Span: sp(f, 1)},
 						{Cases: ir.ArmCases{Cases: []string{"Yamada"}}, Body: ir.CallExpr{Call: call("browser.yamadaLine", carg("row", name("first")), carg("page", name("query", "page")))}, Span: sp(f, 1)},
 						{Cases: ir.DefaultArm(), Body: ir.NoneBody{}, Span: sp(f, 1)},
 					}, Span: sp(f, 1)}}, Span: sp(f, 1)},
-					ir.MatchStmt{Match: ir.Match{Subject: name("first"), Classify: "browser.IsBig", Arms: []ir.MatchArm{
+					ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: name("first")}, Classify: "browser.IsBig", Arms: []ir.MatchArm{
 						{Cases: ir.ArmCases{Cases: []string{"IsBig"}}, Body: ir.CallExpr{Call: call("browser.celebrate")}, Span: sp(f, 1)},
 						{Cases: ir.DefaultArm(), Body: ir.NoneBody{}, Span: sp(f, 1)},
 					}, Span: sp(f, 1)}, Span: sp(f, 1)},

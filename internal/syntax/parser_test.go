@@ -337,12 +337,18 @@ func TestState(t *testing.T) {
 	if s.Shape != ast.StateSingle || typeString(s.Elem) != "Record<string, string[]>" {
 		t.Errorf("State = %+v %s", s, typeString(s.Elem))
 	}
+	s = firstDecl[*ast.StateDecl](t, "state token: nullable<server.Token>;")
+	if s.Shape != ast.StateNullable || s.Shape.String() != "nullable" || typeString(s.Elem) != "server.Token" {
+		t.Errorf("State = %+v %s", s, typeString(s.Elem))
+	}
+	// single<T?> は構文としては読める。書けないことは検査 STATE-3 が決める（docs/grammar.md「state」）。
 	s = firstDecl[*ast.StateDecl](t, "state token: single<Token?>;")
 	if typeString(s.Elem) != "Token?" {
 		t.Errorf("Elem = %s", typeString(s.Elem))
 	}
-	mustFail(t, "state users: User[];", "「list」か「single」が必要")
+	mustFail(t, "state users: User[];", "「list」か「nullable」か「single」が必要")
 	mustFail(t, "state users: list<User;", "「>」が必要")
+	mustFail(t, "state token: nullable Token;", "「<」が必要")
 }
 
 // --- exception / effect ---
@@ -375,6 +381,9 @@ func TestEffect(t *testing.T) {
 		{"effect b on server.users.delete;", ast.Delete, "server.users"},
 	} {
 		e := firstDecl[*ast.EffectDecl](t, tt.src)
+		if e.On == nil || e.Transition != nil {
+			t.Fatalf("%s: On = %+v, Transition = %+v", tt.src, e.On, e.Transition)
+		}
 		if e.On.Op != tt.op || e.On.State.String() != tt.stat {
 			t.Errorf("%s: On = %+v", tt.src, e.On)
 		}
@@ -387,11 +396,74 @@ func TestEffect(t *testing.T) {
 	mustFail(t, "effect a sessions.post;", "「on」が必要")
 }
 
+func idents(ids []ast.Ident) string {
+	var s []string
+	for _, id := range ids {
+		s = append(s, id.Name)
+	}
+	return strings.Join(s, "|")
+}
+
+// 遷移（docs/grammar.md「exception / effect」の Transition と CaseSet）。
+func TestEffectTransition(t *testing.T) {
+	for _, tt := range []struct {
+		src      string
+		of       string
+		from, to string // "any" か、"|" でつないだケース名
+	}{
+		{"effect placeOrder on Checkout: Shopping -> Ordered;", "Checkout", "Shopping", "Ordered"},
+		{"effect clearCart on carts: HasItems -> Empty;", "carts", "HasItems", "Empty"},
+		{"effect reset on Checkout: any -> Shopping;", "Checkout", "any", "Shopping"},
+		{"effect touch on Checkout: Shopping | Ordered -> any;", "Checkout", "Shopping|Ordered", "any"},
+		{"effect a on server.Checkout:A|B->C|D;", "server.Checkout", "A|B", "C|D"},
+	} {
+		e := firstDecl[*ast.EffectDecl](t, tt.src)
+		if e.On != nil || e.Transition == nil {
+			t.Fatalf("%s: On = %+v, Transition = %+v", tt.src, e.On, e.Transition)
+		}
+		tr := e.Transition
+		set := func(c *ast.CaseSet) string {
+			if c.Any {
+				if len(c.Cases) != 0 {
+					t.Errorf("%s: any なのに Cases = %+v", tt.src, c.Cases)
+				}
+				return "any"
+			}
+			return idents(c.Cases)
+		}
+		if tr.Of.String() != tt.of || set(tr.From) != tt.from || set(tr.To) != tt.to {
+			t.Errorf("%s: Transition = %s: %s -> %s", tt.src, tr.Of.String(), set(tr.From), set(tr.To))
+		}
+		// Transition の Span は名前から後のケースの終わりまで（";" は含まない）。
+		if tr.Span.Start != tr.Of.Span.Start || tr.Span.End != tr.To.Span.End || tr.Span.End+1 != e.Span.End {
+			t.Errorf("%s: Span = %+v（effect %+v）", tt.src, tr.Span, e.Span)
+		}
+	}
+	// 「QualifiedName の直後が ":" なら Transition」なので、これは carts.post という名前の遷移として読める。
+	// 名前が指すものの誤りは名前の解決（RES-4）が出す。
+	if e := firstDecl[*ast.EffectDecl](t, "effect a on carts.post: A -> B;"); e.Transition == nil || e.Transition.Of.String() != "carts.post" {
+		t.Errorf("Transition = %+v", e.Transition)
+	}
+	tests := []struct{ name, src, want string }{
+		{"missing arrow", "effect a on C: A;", "「->」が必要"},
+		{"fat arrow", "effect a on C: A => B;", "「->」が必要"},
+		{"missing to", "effect a on C: A -> ;", "遷移のケース（any かケース名）が必要"},
+		{"missing from", "effect a on C: -> B;", "遷移のケース（any かケース名）が必要"},
+		{"qualified case", "effect a on C: x.A -> B;", "遷移のケース（any かケース名）が必要"},
+		{"any in a set", "effect a on C: A | any -> B;", "any は予約語"},
+		{"two transitions", "effect a on C: A -> B, D: E -> F;", "「;」が必要"},
+		{"no target", "effect a on : A -> B;", "「状態.操作」"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
+}
+
 // --- classify / condition ---
 
 func TestClassify(t *testing.T) {
 	c := firstDecl[*ast.ClassifyDecl](t, "classify CampaignKind of server.Item {\n /** s */ Spring;\n Summer;\n /** d */ default;\n}")
-	if c.Name.Name != "CampaignKind" || typeString(c.Of) != "server.Item" || len(c.Cases) != 3 {
+	if c.Name.Name != "CampaignKind" || len(c.Of) != 1 || typeString(c.Of[0]) != "server.Item" || len(c.Cases) != 3 {
 		t.Fatalf("Classify = %+v", c)
 	}
 	if c.Cases[0].Doc == nil || c.Cases[0].Name == nil || c.Cases[0].Name.Name != "Spring" || c.Cases[0].Default {
@@ -405,9 +477,44 @@ func TestClassify(t *testing.T) {
 	mustFail(t, "classify A of T { /** x */ }", "付く先のない")
 }
 
+func typeStrings(ts []ast.Type) string {
+	var s []string
+	for _, t := range ts {
+		s = append(s, typeString(t))
+	}
+	return strings.Join(s, ",")
+}
+
+// 対象が二つ以上（docs/grammar.md「classify / condition」の ClassifySubject）。状態か型かは名前の解決が決める。
+func TestClassifySubject(t *testing.T) {
+	c := firstDecl[*ast.ClassifyDecl](t, "classify Checkout of carts, orders {\n Shopping;\n Ordered;\n}")
+	if typeStrings(c.Of) != "carts,orders" || len(c.Cases) != 2 {
+		t.Errorf("Classify = %+v（Of = %s）", c, typeStrings(c.Of))
+	}
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Session of token { LoggedIn; default; }")
+	if typeStrings(c.Of) != "token" {
+		t.Errorf("Of = %s", typeStrings(c.Of))
+	}
+	// 構文は Type の並びなので、型と状態が混ざっていても読める。弾くのは検査 CLS-3。
+	c = firstDecl[*ast.ClassifyDecl](t, "classify X of server.Item[], carts { A; }")
+	if typeStrings(c.Of) != "server.Item[],carts" {
+		t.Errorf("Of = %s", typeStrings(c.Of))
+	}
+	cond := firstDecl[*ast.ConditionDecl](t, "condition CartFilled of carts, orders;")
+	if cond.Name.Name != "CartFilled" || typeStrings(cond.Of) != "carts,orders" {
+		t.Errorf("Condition = %+v（Of = %s）", cond, typeStrings(cond.Of))
+	}
+	mustFail(t, "classify A of { X; }", "分類の対象（型か状態の名前）が必要")
+	mustFail(t, "classify A of carts, { X; }", "分類の対象（型か状態の名前）が必要")
+	mustFail(t, "classify A of carts orders { X; }", "「{」が必要")
+	mustFail(t, "classify A of list<T> { X; }", "list / nullable / single は state と match の by の後ろにだけ書ける")
+	mustFail(t, "condition A of carts,;", "分類の対象（型か状態の名前）が必要")
+	mustFail(t, "condition A of;", "分類の対象（型か状態の名前）が必要")
+}
+
 func TestCondition(t *testing.T) {
 	c := firstDecl[*ast.ConditionDecl](t, "condition WarrantyAvailable of server.Item;")
-	if c.Name.Name != "WarrantyAvailable" || typeString(c.Of) != "server.Item" {
+	if c.Name.Name != "WarrantyAvailable" || len(c.Of) != 1 || typeString(c.Of[0]) != "server.Item" {
 		t.Errorf("Condition = %+v", c)
 	}
 	mustFail(t, "condition A of T { }", "「;」が必要")
@@ -649,8 +756,9 @@ func TestType(t *testing.T) {
 	}
 	rejects := []struct{ src, want string }{
 		{"void", "void は op の戻り値の型にだけ書ける"},
-		{"list<A>", "list / single は state にだけ書ける"},
-		{"single<A>", "list / single は state にだけ書ける"},
+		{"list<A>", "list / nullable / single は state と match の by の後ろにだけ書ける"},
+		{"nullable<A>", "list / nullable / single は state と match の by の後ろにだけ書ける"},
+		{"single<A>", "list / nullable / single は state と match の by の後ろにだけ書ける"},
 		{"{ a: int; }", "その場で書く model はユニオンのアームと例外の値にだけ置ける"},
 		{"Record<string>", "「,」が必要"},
 		{"Record<string, int", "「>」が必要"},
@@ -756,7 +864,7 @@ func TestMatch(t *testing.T) {
   match item by Available { A => f(); };
 }`)
 	m := o.Body.Stmts[0].(*ast.ConstStmt).Value.(*ast.Match)
-	if m.Subject.(*ast.NameAtom).Name.String() != "item" || m.Classifier.Name != "WarrantyKind" || len(m.Arms) != 3 {
+	if m.Subject.(*ast.NameAtom).Name.String() != "item" || m.Classifier.Name != "WarrantyKind" || m.Builtin || len(m.Arms) != 3 {
 		t.Fatalf("Match = %+v", m)
 	}
 	a0 := m.Arms[0]
@@ -782,6 +890,99 @@ func TestMatch(t *testing.T) {
 	}
 }
 
+// 状態での match（docs/grammar.md「配線」の表の二つ目と三つ目の形）。
+func TestMatchOnState(t *testing.T) {
+	o := firstDecl[*ast.OpDecl](t, `op a() {
+  match carts by list {
+    Empty => showEmpty();
+    HasItems => showCart();
+  };
+  const me = match token by nullable {
+    Empty => none;
+    HasItems => server.getMe();
+  };
+  match by Checkout {
+    Shopping => f();
+    Ordered | Shipped => g();
+  };
+  return match by Session { LoggedIn => h(); default => none; };
+}`)
+	byList := o.Body.Stmts[0].(*ast.MatchStmt).Match
+	if byList.Subject.(*ast.NameAtom).Name.String() != "carts" || !byList.Builtin || byList.Classifier.Name != "list" || len(byList.Arms) != 2 {
+		t.Errorf("by list = %+v", byList)
+	}
+	if byList.Arms[0].Cases[0].Name != "Empty" || byList.Arms[1].Cases[0].Name != "HasItems" {
+		t.Errorf("by list arms = %+v", byList.Arms)
+	}
+	byNullable := o.Body.Stmts[1].(*ast.ConstStmt).Value.(*ast.Match)
+	if byNullable.Subject.(*ast.NameAtom).Name.String() != "token" || !byNullable.Builtin || byNullable.Classifier.Name != "nullable" {
+		t.Errorf("by nullable = %+v", byNullable)
+	}
+	byClassify := o.Body.Stmts[2].(*ast.MatchStmt).Match
+	if byClassify.Subject != nil || byClassify.Builtin || byClassify.Classifier.Name != "Checkout" || len(byClassify.Arms) != 2 {
+		t.Errorf("by Checkout = %+v", byClassify)
+	}
+	ret := o.Body.Stmts[3].(*ast.ReturnStmt).Value.(*ast.Match)
+	if ret.Subject != nil || ret.Classifier.Name != "Session" || !ret.Arms[1].Default {
+		t.Errorf("return match = %+v", ret)
+	}
+	// by の後ろの予約語の Span は Classifier が持つ。
+	if byList.Classifier.Span.End-byList.Classifier.Span.Start != source.Offset(len("list")) {
+		t.Errorf("Classifier Span = %+v", byList.Classifier.Span)
+	}
+	// 構文は対象の有無と by の後ろを別々に読む。組み合わせが合うかは検査 MATCH-7。
+	o = firstDecl[*ast.OpDecl](t, "op b() { match by list { Empty => f(); HasItems => g(); }; match carts by Checkout { A => f(); }; }")
+	if m := o.Body.Stmts[0].(*ast.MatchStmt).Match; m.Subject != nil || !m.Builtin {
+		t.Errorf("match by list = %+v", m)
+	}
+	if m := o.Body.Stmts[1].(*ast.MatchStmt).Match; m.Subject == nil || m.Builtin {
+		t.Errorf("match carts by Checkout = %+v", m)
+	}
+}
+
+// TestStateConstructSpans は、状態を分類で表す構文の節（Transition、CaseSet、対象の並び、対象のない match）の Span が
+// ファイルに収まり、親の中にあること（checkSpans。設計書の例の testdata にはこれらの構文がない）。
+func TestStateConstructSpans(t *testing.T) {
+	src := `namespace shop {
+  state carts: list<Line>;
+  state token: nullable<Token>;
+  classify Checkout of carts, orders {
+    Shopping;
+    Ordered;
+  }
+  condition LoggedIn of token;
+  effect placeOrder on Checkout: Shopping | Ordered -> any;
+  effect clearCart on shop.carts: any -> Empty;
+  op view(): Order? {
+    match token by nullable { Empty => f(); HasItems => none; };
+    const placed = match by Checkout { Shopping => submit(); Ordered => none; };
+    return match carts by list { Empty | HasItems => g(); };
+  }
+}`
+	fs := source.NewFileSet()
+	id := fs.Add("t.hozo", []byte(src))
+	file, diags := Parse(fs, id)
+	for _, d := range diags {
+		t.Errorf("予期しない診断: %s", d.Message)
+	}
+	checkSpans(t, fs, file)
+	// 節の種類ごとに一つ以上たどれている
+	seen := map[string]int{}
+	walk(file, func(n ast.Node, _ ast.Node) {
+		switch n.(type) {
+		case *ast.Transition:
+			seen["Transition"]++
+		case *ast.CaseSet:
+			seen["CaseSet"]++
+		case *ast.Match:
+			seen["Match"]++
+		}
+	})
+	if seen["Transition"] != 2 || seen["CaseSet"] != 4 || seen["Match"] != 3 {
+		t.Errorf("たどった節 = %v", seen)
+	}
+}
+
 func TestBlockReject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
 		{"nested call", "op a() { const x = f(g()); }", "呼び出しの引数に呼び出しは書けない"},
@@ -799,6 +1000,12 @@ func TestBlockReject(t *testing.T) {
 		{"doc in block", "op a() { /** d */ return x; }", "付く先のない"},
 		{"return missing semicolon", "op a() { return x }", "「;」が必要だが「}」がある"},
 		{"match by qualified", "op a() { match x by a.K { A => f(); }; }", "修飾しない識別子"},
+		{"match by single", "op a() { match s by single { A => f(); }; }", "single の状態には組み込みの分類がない"},
+		{"match by core type", "op a() { match s by string { A => f(); }; }", "string は予約語"},
+		{"match without by", "op a() { match x { A => f(); }; }", "「by」が必要"},
+		{"match two subjects", "op a() { match x, y by K { A => f(); }; }", "「by」が必要"},
+		{"match by nullable with type argument", "op a() { match s by nullable<T> { Empty => f(); }; }", "「{」が必要"},
+		{"match by without classifier", "op a() { match by { A => f(); }; }", "識別子"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

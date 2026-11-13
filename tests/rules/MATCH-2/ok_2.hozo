@@ -1,0 +1,17 @@
+// MATCH-2（docs/check.md「classify / match」）: 組み込みの分類のケースは Empty / HasItems で、default はない。
+// 状態の分類は値の分類と同じ（名前の付いたケースをすべて並べ、default は classify にあるときだけ）
+namespace a {
+  state carts: list<string>;
+  state orders: list<string>;
+  state token: nullable<string>;
+  classify Checkout of carts, orders { Shopping; Ordered; }
+  classify Session of token { LoggedIn; default; }
+  op f();
+  op ok() {
+    match carts by list { Empty => f(); HasItems => none; };
+    match token by nullable { HasItems => f(); Empty => none; };
+    match carts by list { Empty | HasItems => f(); };
+    match by Checkout { Shopping => f(); Ordered => none; };
+    match by Session { LoggedIn => f(); default => none; };
+  }
+}

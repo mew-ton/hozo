@@ -21,7 +21,7 @@
 | 1 | §4.5 `[browser] language = "ts"`、`plugins = [...]` | `language = "go"`、`plugins` なし | TS の既定の出力は段階 5 まで存在せず、`"ts"` は CFG-11 のエラー（`docs/config.md`「診断」、`docs/decisions.md` 6）。プラグインもまだないので書けば CFG-9 |
 | 2 | §7.1 `model LoginInput { @http.header(name: "Authorization") token?: Token; ... }`、§9 `model LogoutInput { ... token?: Token; }`、§11.2 `model OrdersQuery { page: PosInt = 1; status?: server.OrderStatus; }` | `token: Token?`、`status: server.OrderStatus?` | 省略可能は型の `?` だけで書く（`docs/grammar.md`「決めたこと」、`docs/decisions.md` 8、「設計書へ返すこと」の「省略可能の書き方」） |
 | 3 | §5.2 `@page.path state location: single<Route>;` | `single<page.Route>` | `Route` は語彙 `page` の宣言なので修飾する（`docs/resolve.md`「手続き」、`docs/decisions.md`「設計書へ返すこと」の「`location` の型」） |
-| 4 | §5.2 `namespace browser { @localStorage state token: single<Token?>; }` | `single<server.Token?>` | `Token` は `server` の scalar（§6.5）。別の名前空間の宣言は常に修飾する（§3.2、NS-1）。写したままだと RES-1（`docs/resolve.md`「診断」）。`docs/decisions.md`「設計書へ返すこと」にはまだない |
+| 4 | §5.2 `namespace browser { @localStorage state token: single<Token?>; }` | `nullable<server.Token>` | 二つの理由。(a) `Token` は `server` の scalar（§6.5）。別の名前空間の宣言は常に修飾する（§3.2、NS-1）。写したままだと RES-1（`docs/resolve.md`「診断」、`docs/decisions.md`「設計書へ返すこと」の「`Token` の修飾」）。(b) 空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない（`docs/decisions.md`「設計書を変える決定」S2、`docs/grammar.md`「決めたこと」）。写したままだと STATE-3（`docs/check.md`「状態と効果」） |
 | 5 | §6.5 `model User { @valid.length(min: 1, max: 100) name: string; }`（§5.2 の `model User` と別に書かれている） | §5.2 の `User` の `name` に `@valid.length(min: 1, max: 100)` を付けて一つにした | 同じ名前空間に同じ名前の宣言が二つあれば RES-6（`docs/resolve.md`「名前空間の併合と重複」） |
 | 6 | §11.2 `Ready: { userName: string; orders: OrderRow[] };`、`Empty: { userName: string };` | `Ready: { userName: string; orders: OrderRow[]; };`、`Empty: { userName: string; };` | その場で書く model のフィールドは `;` で終わる（`docs/grammar.md`「model」`Field = ... ";"`）。`ProfilePage.Ready` も同じ |
 | 7 | §8.1 `decorator redirectOn(error: ApiError, to: RedirectByError) catches error halts to;`、`decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);` | 書かない | スコープ外（`docs/decisions.md`「スコープ外にした設計書の例」1 行目）。引数名 `to` は予約語（`docs/grammar.md`「予約語」） |
@@ -30,6 +30,7 @@
 | 10 | §6.5 `namespace valid { decorator checkDigit for scalar \| field; }` | `server.hozo` の先頭に置いた | `server.EmployeeCode` が使う。`valid` は語彙の名前空間なので専用のファイルにせず、使う側のファイルに置いた（§3.2「語彙プラグインの名前空間にも、ユーザーが宣言を足せる」、`docs/vocab.md`「読み込み」） |
 | 11 | §3.4 `op requestPasswordReset(email: Email) effects sendResetMail throws RateLimited prevents effects;`（名前空間の記述なし） | `server` に置いた | `@see login` が `server.login` を指すため |
 | 12 | §10.2 の文の断片 `const plan = match item by WarrantyAvailable { WarrantyAvailable => askWarrantyPlan(item); default => none; };` | 追加した `op chooseWarrantyPlan` の本体に置いた | 文は op の本体にしか書けない（`docs/grammar.md`「配線」）。`condition` と `default` のアームの例を残すため |
+| 13 | §9 `effect removeToken on token.put;   // none を入れる` | `effect removeToken on token.delete;` | 空にするのは `delete`（`docs/decisions.md`「設計書を変える決定」S2、`docs/check.md`「状態の形」の表: `nullable` の `delete` は `HasItems` → `Empty`）。`put` は列数を変えない組み込みの効果なので、空にする意味にならない |
 
 ## 追加した宣言
 
@@ -56,7 +57,8 @@
 
 | 設計書 | 規則 | 扱い |
 |---|---|---|
-| §5.2 `state token: single<Token?>;`（`browser`） | §3.2「別の名前空間の宣言は、常に名前空間で修飾して参照する」。`docs/resolve.md` RES-1「名前が見つからない」 | 表の 4。`docs/decisions.md`「設計書へ返すこと」に足す候補 |
+| §5.2 `state token: single<Token?>;`（`browser`） | §3.2「別の名前空間の宣言は、常に名前空間で修飾して参照する」。`docs/resolve.md` RES-1「名前が見つからない」。`docs/check.md` STATE-3「状態の要素の型が `optional`」 | 表の 4。`docs/decisions.md`「設計書へ返すこと」の「`Token` の修飾」と「状態を分類で表す」（S2） |
+| §9 `effect removeToken on token.put;   // none を入れる` | `docs/check.md`「状態の形」: `put` は列数を変えない。空にするのは `delete`（S2） | 表の 13。`docs/decisions.md`「設計書へ返すこと」の「状態を分類で表す」 |
 | §11.2 `Ready: { userName: string; orders: OrderRow[] };` | `docs/grammar.md`「model」`Field = [ DocComment ] { Decorator } Ident ":" Type [ "=" Literal ] ";"` | 表の 6。同じく返す候補 |
 | §6.5 `model User { @valid.length(min: 1, max: 100) name: string; }` | `docs/resolve.md`「同じ名前空間に同じ名前の宣言が二つあれば RES-6」 | 表の 5。設計書では「フィールドに付けた制約」の説明のための抜粋と読める |
 | §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;` | `docs/check.md` REL-3（warning）「`relations.effects` が `all` でなく名前の列」。設計書 §7.3 自身が「言語はこの書き方をサポートするが、検査器は警告する」としている | そのまま写した。`hozoc check` のゴールデン（`expected.check.txt`）には `placeOrder` の `throws` に REL-3 の warning が出る |

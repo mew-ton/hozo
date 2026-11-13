@@ -353,35 +353,153 @@ func segmentsOf(qn ast.QualifiedName) []string {
 	return out
 }
 
-// evalMatch は match。classify は現在の名前空間のもの（NS-4）、MATCH-2 / MATCH-6 / TYPE-8、アームの型の集め方は
-// docs/types.md「式の型」。
+// matchClass は match が使う分類: classify の宣言か、基底の状態の組み込みの分類（docs/check.md「状態の形」）。
+type matchClass struct {
+	// name は IR の Match.classify: classify の FQN か、組み込みの分類なら状態の形（"list" / "nullable"）。
+	name string
+	// classify は classify の宣言。組み込みの分類なら nil。
+	classify   *ir.Classify
+	cases      []string
+	hasDefault bool
+}
+
+// label は診断に出す分類の呼び名。後ろに「のケース」と続ける形。
+func (c *matchClass) label() string {
+	if c.classify == nil {
+		return c.name + " の組み込みの分類"
+	}
+	return "classify " + c.name + " "
+}
+
+func classOf(c *ir.Classify) *matchClass {
+	mc := &matchClass{name: c.Name, classify: c, hasDefault: c.HasDefault}
+	for _, cs := range c.Cases {
+		mc.cases = append(mc.cases, cs.Name)
+	}
+	return mc
+}
+
+// builtinClass は形 shape の組み込みの分類。ケースは Empty / HasItems で、default はない。
+func builtinClass(shape string) *matchClass {
+	return &matchClass{name: shape, cases: ir.BuiltinCases()}
+}
+
+// evalMatch は match。形は三つ（docs/grammar.md「配線」の表。合わなければ MATCH-7）: 値の分類での match、
+// 基底の状態の組み込みの分類での match（by list / by nullable）、状態の分類での match（対象を書かない）。
+// MATCH-2 はどの形にも、MATCH-4 / MATCH-6 と絞り込みは値の match にだけ掛かる。アームの型の集め方は
+// docs/types.md「式の型」（値でも状態でも同じ）。
 func (a *analyzer) evalMatch(w *wiring, m *ast.Match) (exprType, ir.Match) {
 	out := ir.Match{Span: a.irSpan(m.Span)}
-	subjectType, subject := a.evalAtom(w, m.Subject)
-	out.Subject = subject
-	var subjectPath []string
-	if n, ok := m.Subject.(*ast.NameAtom); ok {
-		subjectPath = segmentsOf(n.Name)
+	var class *matchClass
+	var value *matchValue
+	if m.Builtin {
+		class = builtinClass(m.Classifier.Name)
+		out.Classify = class.name
+		if subject, ok := a.matchStateSubject(w, m); ok {
+			out.Subject = subject
+		}
+	} else {
+		c := a.resolveClassifier(w, m)
+		if c != nil {
+			class = classOf(c)
+			out.Classify = c.Name
+		}
+		out.Subject, value = a.matchSubject(w, m, c)
 	}
-	classify := a.resolveClassifier(w, m)
-	if classify != nil {
-		out.Classify = classify.Name
-		a.checkMATCH6(subjectType, classify, m)
-		a.checkMATCH2(classify, m)
+	if class != nil {
+		a.checkMATCH2(class, m)
 	}
 	var types []exprType
 	for _, arm := range m.Arms {
 		if arm == nil {
 			continue
 		}
-		t, ia := a.evalArm(w, arm, classify, subjectPath, subjectType)
+		t, ia := a.evalArm(w, arm, class, value)
 		types = append(types, t)
 		out.Arms = append(out.Arms, ia)
 	}
 	return a.matchType(types, m), out
 }
 
-// resolveClassifier は `match x by C` の C: 現在の名前空間の classify（NS-4）。
+// matchValue は値の match の対象。アームの本体で絞り込まれた型として渡すために持つ（MATCH-4）。
+type matchValue struct {
+	path []string // 対象が Atom.name ならそのパス
+	typ  exprType
+}
+
+// matchSubject は `match [x] by C` の対象（C は classify。解決できていなければ nil）。MATCH-7 の
+// 「値の分類なのに対象がない」「状態の分類なのに対象がある」と、値の match の MATCH-6。
+func (a *analyzer) matchSubject(w *wiring, m *ast.Match, c *ir.Classify) (ir.MatchSubject, *matchValue) {
+	if c != nil {
+		if _, isStates := c.SubjectStates(); isStates {
+			if m.Subject != nil {
+				if n, ok := m.Subject.(*ast.NameAtom); ok {
+					a.peek(n.Name, w.sc) // 束縛を書いていれば使ったことにする（WIRE-8 を重ねない）
+				}
+				a.errorf("MATCH-7", m.Subject.NodeSpan(), "classify %s は状態の分類なので、match に対象は書けない（対象は分類の宣言が持つ。match by %s と書く）", c.Name, m.Classifier.Name)
+			}
+			return ir.ClassifyOwnedSubject{}, nil
+		}
+	}
+	if m.Subject == nil {
+		if c != nil && c.SubjectType() != nil {
+			a.errorf("MATCH-7", m.Classifier.Span, "classify %s は値の分類なので、match に対象が要る（match 値 by %s と書く）", c.Name, m.Classifier.Name)
+		}
+		return nil, nil
+	}
+	typ, atom := a.evalAtom(w, m.Subject)
+	value := &matchValue{typ: typ}
+	if n, ok := m.Subject.(*ast.NameAtom); ok {
+		value.path = segmentsOf(n.Name)
+	}
+	if c != nil {
+		a.checkMATCH6(typ, c, m)
+	}
+	if atom == nil {
+		return nil, value
+	}
+	return ir.ValueSubject{Atom: atom}, value
+}
+
+// matchStateSubject は `match s by list` / `by nullable` の s: 現在の名前空間の、その形の state
+// （docs/resolve.md「位置ごとに受け付ける種類」）。そうでなければ MATCH-7。名前は手続きの通りに解決するので、
+// 同じ名前の束縛や引数があれば値の参照になり、状態ではないので MATCH-7。
+func (a *analyzer) matchStateSubject(w *wiring, m *ast.Match) (ir.StateSubject, bool) {
+	shape := m.Classifier.Name
+	if m.Subject == nil {
+		a.errorf("MATCH-7", m.Classifier.Span, "match by %s には対象の状態が要る（match 状態 by %s と書く）", shape, shape)
+		return ir.StateSubject{}, false
+	}
+	n, ok := m.Subject.(*ast.NameAtom)
+	if !ok {
+		a.errorf("MATCH-7", m.Subject.NodeSpan(), "match by %s の対象は、今の名前空間の %s の状態でなければならない", shape, shape)
+		return ir.StateSubject{}, false
+	}
+	r, err := a.resolveName(n.Name, w.sc, acAnyDecl|acCase|acVariant|acValue|acNamespace|acStateOp)
+	if err != nil {
+		a.reportResolve(err)
+		return ir.StateSubject{}, false
+	}
+	if r.kind != rDecl || r.sym.kind != kindState {
+		a.errorf("MATCH-7", n.Span, "match by %s の対象は、今の名前空間の %s の状態でなければならないが、%s は状態ではない（%s）", shape, shape, n.Name.String(), describe(r))
+		return ir.StateSubject{}, false
+	}
+	if r.sym.ns != w.sc.ns {
+		a.errorf("MATCH-7", n.Span, "match by %s の対象 %s は別の名前空間の状態（分岐できるのは今の名前空間 %s の状態だけ）", shape, r.sym.fqn, nsName(w.sc.ns))
+		return ir.StateSubject{}, false
+	}
+	st, ok := a.lower(r.sym).(*ir.State)
+	if !ok {
+		return ir.StateSubject{}, false
+	}
+	if string(st.Shape) != shape {
+		a.errorf("MATCH-7", n.Span, "状態 %s の形は %s で、%s ではない", st.Name, st.Shape, shape)
+		return ir.StateSubject{}, false
+	}
+	return ir.StateSubject{State: st.Name}, true
+}
+
+// resolveClassifier は `match x by C` / `match by C` の C: 現在の名前空間の classify（NS-4）。
 func (a *analyzer) resolveClassifier(w *wiring, m *ast.Match) *ir.Classify {
 	qn := ast.QualifiedName{Span: m.Classifier.Span, Segments: []ast.Ident{m.Classifier}}
 	r, ok := a.resolve(qn, &scope{ns: w.sc.ns}, acClassify)
@@ -393,23 +511,21 @@ func (a *analyzer) resolveClassifier(w *wiring, m *ast.Match) *ir.Classify {
 	return c
 }
 
-// checkMATCH6 は MATCH-6（docs/check.md「classify / match」）: subject の型が Classify.subject に渡せない。
+// checkMATCH6 は MATCH-6（docs/check.md「classify / match」）: 値の match で、subject の型が Classify.subject の型に渡せない。
 func (a *analyzer) checkMATCH6(subject exprType, c *ir.Classify, m *ast.Match) {
-	if c.Subject == nil || subject.kind == etUnknown {
+	want := c.SubjectType()
+	if want == nil || subject.kind == etUnknown {
 		return
 	}
-	if a.assign(subject, c.Subject) != assignOK {
-		a.errorf("MATCH-6", m.Subject.NodeSpan(), "match の対象の型 %s は classify %s の対象の型 %s に渡せない", exprName(subject), c.Name, typeName(c.Subject))
+	if a.assign(subject, want) != assignOK {
+		a.errorf("MATCH-6", m.Subject.NodeSpan(), "match の対象の型 %s は classify %s の対象の型 %s に渡せない", exprName(subject), c.Name, typeName(want))
 	}
 }
 
-// checkMATCH2 は MATCH-2（docs/check.md「classify / match」）: アームに並べたケースの集合が Classify.cases と等しくない
-// （足りない・知らない名前・重複）。default は hasDefault のときだけ書け、あるときは必ず書く。Data.missing / Data.extra。
-func (a *analyzer) checkMATCH2(c *ir.Classify, m *ast.Match) {
-	known := map[string]bool{}
-	for _, cs := range c.Cases {
-		known[cs.Name] = true
-	}
+// checkMATCH2 は MATCH-2（docs/check.md「classify / match」）: アームに並べたケースの集合が分類のケース（組み込みの
+// 分類なら Empty / HasItems で、default はない）と等しくない（足りない・知らない名前・重複）。default は hasDefault の
+// ときだけ書け、あるときは必ず書く。Data.missing / Data.extra。
+func (a *analyzer) checkMATCH2(c *matchClass, m *ast.Match) {
 	seen := map[string]bool{}
 	var extra []string
 	defaults := 0
@@ -423,7 +539,7 @@ func (a *analyzer) checkMATCH2(c *ir.Classify, m *ast.Match) {
 		}
 		for _, cs := range arm.Cases {
 			switch {
-			case !known[cs.Name]:
+			case !contains(c.cases, cs.Name):
 				extra = append(extra, cs.Name)
 			case seen[cs.Name]:
 				extra = append(extra, cs.Name)
@@ -433,9 +549,9 @@ func (a *analyzer) checkMATCH2(c *ir.Classify, m *ast.Match) {
 		}
 	}
 	var missing []string
-	for _, cs := range c.Cases {
-		if !seen[cs.Name] {
-			missing = append(missing, cs.Name)
+	for _, name := range c.cases {
+		if !seen[name] {
+			missing = append(missing, name)
 		}
 	}
 	var problems []string
@@ -445,11 +561,15 @@ func (a *analyzer) checkMATCH2(c *ir.Classify, m *ast.Match) {
 	if len(extra) > 0 {
 		problems = append(problems, "知らないか重複したケース: "+join(extra))
 	}
-	if c.HasDefault && defaults == 0 {
+	if c.hasDefault && defaults == 0 {
 		problems = append(problems, "default のアームがない")
 	}
-	if !c.HasDefault && defaults > 0 {
-		problems = append(problems, "classify に default がないのに default のアームがある")
+	if !c.hasDefault && defaults > 0 {
+		if c.classify == nil {
+			problems = append(problems, "組み込みの分類に default はないのに default のアームがある")
+		} else {
+			problems = append(problems, "classify に default がないのに default のアームがある")
+		}
 	}
 	if defaults > 1 {
 		problems = append(problems, "default のアームが二つ以上ある")
@@ -457,7 +577,7 @@ func (a *analyzer) checkMATCH2(c *ir.Classify, m *ast.Match) {
 	if len(problems) == 0 {
 		return
 	}
-	d := a.errorf("MATCH-2", m.Classifier.Span, "match のアームが classify %s のケースと合わない（%s）", c.Name, strings.Join(problems, "。"))
+	d := a.errorf("MATCH-2", m.Classifier.Span, "match のアームが %sのケース（%s）と合わない（%s）", c.label(), strings.Join(c.cases, " / "), strings.Join(problems, "。"))
 	d.Data = map[string]any{"missing": orEmpty(missing), "extra": orEmpty(extra)}
 }
 
@@ -468,23 +588,32 @@ func orEmpty(s []string) []string {
 	return s
 }
 
-// evalArm はアーム。本体は呼び出しか none。呼び出しでは subject を絞り込まれた型 case(C, アームのケース, T) として渡す（MATCH-4）。
-func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, c *ir.Classify, subjectPath []string, subjectType exprType) (exprType, ir.MatchArm) {
+// evalArm はアーム。本体は呼び出しか none。値の match（value が nil でない）の呼び出しでは、subject を絞り込まれた型
+// case(C, アームのケース, T) として渡す（MATCH-4）。状態の match には絞り込みがない（docs/types.md「式の型」）。
+func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, value *matchValue) (exprType, ir.MatchArm) {
 	out := ir.MatchArm{Span: a.irSpan(arm.Span)}
 	var ctx *armContext
 	if arm.Default {
 		out.Cases = ir.DefaultArm()
-		ctx = &armContext{subject: subjectPath, narrowed: subjectType, cases: "default"}
+		if value != nil {
+			ctx = &armContext{subject: value.path, narrowed: value.typ, cases: "default"}
+		}
 	} else {
 		cases := make([]string, 0, len(arm.Cases))
 		for _, cs := range arm.Cases {
 			cases = append(cases, cs.Name)
-			if c != nil && classifyHasCase(c, cs.Name) {
-				a.addRef(cs.Span, Target{Kind: TargetCase, Decl: c.Name, Name: cs.Name, Span: a.caseSpan(c, cs.Name)})
+			if class != nil && class.classify != nil && contains(class.cases, cs.Name) {
+				a.addRef(cs.Span, Target{Kind: TargetCase, Decl: class.name, Name: cs.Name, Span: a.caseSpan(class.classify, cs.Name)})
 			}
 		}
 		out.Cases = ir.ArmCases{Cases: cases}
-		ctx = &armContext{subject: subjectPath, narrowed: a.narrow(subjectType, c, cases), cases: strings.Join(cases, " | ")}
+		if value != nil {
+			var c *ir.Classify
+			if class != nil {
+				c = class.classify
+			}
+			ctx = &armContext{subject: value.path, narrowed: a.narrow(value.typ, c, cases), cases: strings.Join(cases, " | ")}
+		}
 	}
 	switch body := arm.Body.(type) {
 	case *ast.NoneAtom:
@@ -508,15 +637,6 @@ func (a *analyzer) narrow(subject exprType, c *ir.Classify, cases []string) expr
 		of = ct.Of
 	}
 	return valueType(ir.Case(c.Name, cases, of))
-}
-
-func classifyHasCase(c *ir.Classify, name string) bool {
-	for _, cs := range c.Cases {
-		if cs.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 // caseSpan は classify のケース名の定義の位置。

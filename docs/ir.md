@@ -112,8 +112,8 @@ interface Union extends DeclBase {
 ```ts
 interface State extends DeclBase {
   kind: "state";
-  shape: "list" | "single";
-  element: Type;
+  shape: "list" | "nullable" | "single";   // 列数の範囲（docs/check.md「状態の形」）
+  element: Type;                  // optional にはならない（STATE-3）
 }
 
 interface Exception extends DeclBase {
@@ -123,9 +123,15 @@ interface Exception extends DeclBase {
 
 interface Effect extends DeclBase {
   kind: "effect";
-  state: string;                  // FQN
-  operation: "post" | "put" | "delete";
+  target: EffectTarget;           // 宛先は一つだけ
+  writes: string[];               // この効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）
 }
+
+type EffectTarget =
+  | { kind: "builtin"; state: string; operation: "post" | "put" | "delete" }   // 基底の状態の組み込みの効果
+  | { kind: "transition"; of: string; from: CaseSet; to: CaseSet };            // 分類の遷移。of は状態の分類の FQN か、
+                                                                               // 組み込みの分類を持つ基底の状態の FQN
+type CaseSet = "any" | string[];  // ケース名の列（書かれた順）
 ```
 
 ### classify
@@ -133,7 +139,8 @@ interface Effect extends DeclBase {
 ```ts
 interface Classify extends DeclBase {
   kind: "classify";
-  subject: Type;
+  subject: { kind: "type"; type: Type }             // 値の分類
+         | { kind: "states"; states: string[] };    // 状態の分類。基底の状態の FQN（書かれた順）
   cases: { name: string; description?: Doc; span: Span }[];   // default は含まない
   hasDefault: boolean;
   defaultDescription?: Doc;       // default に付いた DocComment
@@ -234,8 +241,10 @@ type Atom =
   | { kind: "record"; fields: { name: string; value: Atom }[]; span: Span };   // { item } は { item: item } に展開済み
 
 interface Match {
-  subject: Atom;
-  classify: string;               // FQN
+  subject: { kind: "value"; atom: Atom }            // 値の分類での match
+         | { kind: "state"; state: string }         // 基底の状態の、組み込みの分類での match。state は FQN
+         | { kind: "classify" };                    // 状態の分類での match（対象は classify が持つ）
+  classify: string;               // FQN。組み込みの分類なら "list" か "nullable"
   arms: { cases: string[] | "default"; body: { kind: "call"; call: Call } | { kind: "none" }; span: Span }[];
   span: Span;
 }

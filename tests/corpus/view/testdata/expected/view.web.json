@@ -996,8 +996,14 @@
                 "col": 41
               }
             },
-            "state": "api.sessions",
-            "operation": "post"
+            "target": {
+              "kind": "builtin",
+              "state": "api.sessions",
+              "operation": "post"
+            },
+            "writes": [
+              "api.sessions"
+            ]
           },
           {
             "kind": "effect",
@@ -1021,8 +1027,14 @@
                 "col": 43
               }
             },
-            "state": "api.sessions",
-            "operation": "delete"
+            "target": {
+              "kind": "builtin",
+              "state": "api.sessions",
+              "operation": "delete"
+            },
+            "writes": [
+              "api.sessions"
+            ]
           },
           {
             "kind": "effect",
@@ -1046,8 +1058,14 @@
                 "col": 33
               }
             },
-            "state": "api.users",
-            "operation": "put"
+            "target": {
+              "kind": "builtin",
+              "state": "api.users",
+              "operation": "put"
+            },
+            "writes": [
+              "api.users"
+            ]
           },
           {
             "kind": "decorator",
@@ -1741,16 +1759,13 @@
               },
               "end": {
                 "line": 7,
-                "col": 35
+                "col": 36
               }
             },
-            "shape": "single",
+            "shape": "nullable",
             "element": {
-              "kind": "optional",
-              "of": {
-                "kind": "ref",
-                "target": "api.Token"
-              }
+              "kind": "ref",
+              "target": "api.Token"
             }
           },
           {
@@ -1812,8 +1827,14 @@
                 "col": 34
               }
             },
-            "state": "web.location",
-            "operation": "put"
+            "target": {
+              "kind": "builtin",
+              "state": "web.location",
+              "operation": "put"
+            },
+            "writes": [
+              "web.location"
+            ]
           },
           {
             "kind": "effect",
@@ -1837,8 +1858,14 @@
                 "col": 33
               }
             },
-            "state": "web.location",
-            "operation": "put"
+            "target": {
+              "kind": "builtin",
+              "state": "web.location",
+              "operation": "put"
+            },
+            "writes": [
+              "web.location"
+            ]
           },
           {
             "kind": "effect",
@@ -1859,11 +1886,17 @@
               },
               "end": {
                 "line": 19,
-                "col": 35
+                "col": 38
               }
             },
-            "state": "web.token",
-            "operation": "put"
+            "target": {
+              "kind": "builtin",
+              "state": "web.token",
+              "operation": "delete"
+            },
+            "writes": [
+              "web.token"
+            ]
           },
           {
             "kind": "model",
@@ -2248,8 +2281,11 @@
               }
             },
             "subject": {
-              "kind": "ref",
-              "target": "api.PublicUser"
+              "kind": "type",
+              "type": {
+                "kind": "ref",
+                "target": "api.PublicUser"
+              }
             },
             "cases": [
               {
@@ -2314,8 +2350,11 @@
               }
             },
             "subject": {
-              "kind": "ref",
-              "target": "api.PublicUser"
+              "kind": "type",
+              "type": {
+                "kind": "ref",
+                "target": "api.PublicUser"
+              }
             },
             "cases": [
               {
@@ -2874,19 +2913,22 @@
                   "kind": "match",
                   "match": {
                     "subject": {
-                      "kind": "name",
-                      "path": [
-                        "user"
-                      ],
-                      "span": {
-                        "file": "web.hozo",
-                        "start": {
-                          "line": 84,
-                          "col": 11
-                        },
-                        "end": {
-                          "line": 84,
-                          "col": 15
+                      "kind": "value",
+                      "atom": {
+                        "kind": "name",
+                        "path": [
+                          "user"
+                        ],
+                        "span": {
+                          "file": "web.hozo",
+                          "start": {
+                            "line": 84,
+                            "col": 11
+                          },
+                          "end": {
+                            "line": 84,
+                            "col": 15
+                          }
                         }
                       }
                     },
@@ -3489,19 +3531,22 @@
                     "kind": "match",
                     "match": {
                       "subject": {
-                        "kind": "name",
-                        "path": [
-                          "user"
-                        ],
-                        "span": {
-                          "file": "web.hozo",
-                          "start": {
-                            "line": 118,
-                            "col": 24
-                          },
-                          "end": {
-                            "line": 118,
-                            "col": 28
+                        "kind": "value",
+                        "atom": {
+                          "kind": "name",
+                          "path": [
+                            "user"
+                          ],
+                          "span": {
+                            "file": "web.hozo",
+                            "start": {
+                              "line": 118,
+                              "col": 24
+                            },
+                            "end": {
+                              "line": 118,
+                              "col": 28
+                            }
                           }
                         }
                       },

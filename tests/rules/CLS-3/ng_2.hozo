@@ -1,0 +1,10 @@
+// CLS-3（docs/check.md「classify / match」）: 型と状態が混ざっている
+namespace a {
+  model M { id: string; }
+  state carts: list<M>;
+  state orders: list<M>;
+  classify Mixed of carts, M { A; }              // ERROR: CLS-3
+  classify Leading of M, carts, orders { A; }    // ERROR: CLS-3
+  classify Shaped of carts, M[] { A; }           // ERROR: CLS-3
+  condition Cond of string, carts;               // ERROR: CLS-3
+}

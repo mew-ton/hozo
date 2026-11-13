@@ -38,8 +38,16 @@ func exc(fqn string) *ir.Exception {
 	return &ir.Exception{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}}
 }
 
+// eff は基底の状態の組み込みの効果（`effect e on s.op`）。書き込むのはその状態。
 func eff(fqn, state string, op ir.Operation) *ir.Effect {
-	return &ir.Effect{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, State: state, Operation: op}
+	return &ir.Effect{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)},
+		Target: ir.BuiltinTarget{State: state, Operation: op}, Writes: []string{state}}
+}
+
+// transition は分類の遷移の効果（`effect e on X: from -> to`）。writes は書き込む基底の状態。
+func transition(fqn, of string, from, to ir.CaseSet, writes ...string) *ir.Effect {
+	return &ir.Effect{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)},
+		Target: ir.TransitionTarget{Of: of, From: from, To: to}, Writes: writes}
 }
 
 func state(fqn string, shape ir.StateShape, elem ir.Type) *ir.State {
@@ -156,12 +164,23 @@ func arm(body *ir.Call, cases ...string) ir.MatchArm {
 	return a
 }
 
+// matchStmt は値の分類での match の文（`match x by C { ... };`）。
 func matchStmt(classify string, arms ...ir.MatchArm) ir.Statement {
-	return ir.MatchStmt{Match: ir.Match{Subject: nameAtom("x"), Classify: classify, Arms: arms}}
+	return ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("x")}, Classify: classify, Arms: arms}}
 }
 
 func matchConst(name, classify string, arms ...ir.MatchArm) ir.Statement {
-	return ir.ConstStmt{Name: name, Expr: ir.MatchExpr{Match: ir.Match{Subject: nameAtom("x"), Classify: classify, Arms: arms}}}
+	return ir.ConstStmt{Name: name, Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("x")}, Classify: classify, Arms: arms}}}
+}
+
+// matchState は基底の状態の組み込みの分類での match の文（`match s by list { ... };`）。
+func matchState(state string, shape ir.StateShape, arms ...ir.MatchArm) ir.Statement {
+	return ir.MatchStmt{Match: ir.Match{Subject: ir.StateSubject{State: state}, Classify: string(shape), Arms: arms}}
+}
+
+// matchByClassify は状態の分類での match の文（`match by C { ... };`）。
+func matchByClassify(classify string, arms ...ir.MatchArm) ir.Statement {
+	return ir.MatchStmt{Match: ir.Match{Subject: ir.ClassifyOwnedSubject{}, Classify: classify, Arms: arms}}
 }
 
 func namespace(name string, decls ...ir.Decl) ir.Namespace {

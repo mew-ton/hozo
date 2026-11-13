@@ -256,7 +256,12 @@ func (e *emitter) genException(g *genFile, x *ir.Exception) {
 func (e *emitter) genEffect(g *genFile, x *ir.Effect) {
 	rt := g.imports.Add("github.com/mew-ton/hozo/runtime", "runtime")
 	c := gol.EffectConst(localName(x.Name))
-	g.body.WriteString(declComment(c, x.Description, fmt.Sprintf("効果 %s（状態 %s への %s）。", x.Name, x.State, x.Operation)))
+	// 組み込みの効果だけがここに来る。遷移の効果は checkUnsupported が GOEMIT-INTERNAL で止めている。
+	note := fmt.Sprintf("効果 %s。", x.Name)
+	if t, ok := x.Target.(ir.BuiltinTarget); ok {
+		note = fmt.Sprintf("効果 %s（状態 %s への %s）。", x.Name, t.State, t.Operation)
+	}
+	g.body.WriteString(declComment(c, x.Description, note))
 	g.printf("const %s %s.Effect = %q\n\n", c, rt, x.Name)
 }
 

@@ -1,0 +1,6 @@
+# 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）のコーパス（docs/testing.md「コーパス」、README.md）。
+# check だけを確かめる。既定の出力はこれらの構文をまだ扱えない（README.md「emit のゴールデンがない理由」）。
+
+[shop]
+language = "go"
+out      = "gen/shop"

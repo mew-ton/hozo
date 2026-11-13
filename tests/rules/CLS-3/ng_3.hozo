@@ -1,0 +1,8 @@
+// CLS-3（docs/check.md「classify / match」）: 同じ状態が二度ある
+namespace a {
+  state carts: list<string>;
+  state orders: list<string>;
+  classify Twice of carts, carts { A; }          // ERROR: CLS-3
+  classify Apart of carts, orders, carts { A; }  // ERROR: CLS-3
+  condition Cond of orders, orders;              // ERROR: CLS-3
+}

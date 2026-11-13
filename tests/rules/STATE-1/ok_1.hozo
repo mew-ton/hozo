@@ -1,9 +1,13 @@
-// STATE-1（docs/check.md「状態と効果」）: list には post / put / delete、single には put
+// STATE-1（docs/check.md「状態と効果」「状態の形」の表）: list と nullable には post / put / delete、single には put
 namespace a {
   state s: single<string>;
   state l: list<string>;
+  state n: nullable<string>;
   effect put on s.put;
   effect lpost on l.post;
   effect lput on l.put;
   effect ldel on l.delete;
+  effect npost on n.post;
+  effect nput on n.put;
+  effect ndel on n.delete;
 }

@@ -248,6 +248,27 @@
       ],
       "type": "object"
     },
+    "BuiltinTarget": {
+      "additionalProperties": false,
+      "description": "基底の状態の組み込みの効果（docs/ir.md「state / exception / effect」の EffectTarget kind \"builtin\"）。",
+      "properties": {
+        "kind": {
+          "const": "builtin"
+        },
+        "operation": {
+          "$ref": "#/$defs/Operation"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "state",
+        "operation"
+      ],
+      "type": "object"
+    },
     "Call": {
       "additionalProperties": false,
       "description": "op の呼び出し（docs/ir.md「配線」）。args は引数名に対応付け済み。bound は計算結果。",
@@ -331,6 +352,20 @@
         "span"
       ],
       "type": "object"
+    },
+    "CaseSet": {
+      "description": "遷移の前か後のケースの集合。\"any\" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。",
+      "oneOf": [
+        {
+          "const": "any"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ]
     },
     "CaseType": {
       "additionalProperties": false,
@@ -495,7 +530,7 @@
           "$ref": "#/$defs/Span"
         },
         "subject": {
-          "$ref": "#/$defs/Type"
+          "$ref": "#/$defs/ClassifySubject"
         }
       },
       "required": [
@@ -529,6 +564,30 @@
         "span"
       ],
       "type": "object"
+    },
+    "ClassifyOwnedSubject": {
+      "additionalProperties": false,
+      "description": "状態の分類での match（docs/ir.md「配線」の subject kind \"classify\"）。対象は classify が持つ。",
+      "properties": {
+        "kind": {
+          "const": "classify"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ClassifySubject": {
+      "description": "分類の対象（docs/ir.md「classify」の subject）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TypeSubject"
+        },
+        {
+          "$ref": "#/$defs/StatesSubject"
+        }
+      ]
     },
     "ConstStmt": {
       "additionalProperties": false,
@@ -849,7 +908,7 @@
     },
     "Effect": {
       "additionalProperties": false,
-      "description": "effect 宣言（docs/ir.md「state / exception / effect」）。",
+      "description": "effect 宣言（docs/ir.md「state / exception / effect」）。宛先（target）は一つだけ。writes は書き込む基底の状態の FQN。",
       "properties": {
         "decorators": {
           "items": {
@@ -866,14 +925,17 @@
         "name": {
           "type": "string"
         },
-        "operation": {
-          "$ref": "#/$defs/Operation"
-        },
         "span": {
           "$ref": "#/$defs/Span"
         },
-        "state": {
-          "type": "string"
+        "target": {
+          "$ref": "#/$defs/EffectTarget"
+        },
+        "writes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -881,8 +943,8 @@
         "name",
         "decorators",
         "span",
-        "state",
-        "operation"
+        "target",
+        "writes"
       ],
       "type": "object"
     },
@@ -910,6 +972,17 @@
         "unknown"
       ],
       "type": "string"
+    },
+    "EffectTarget": {
+      "description": "効果の宛先（docs/ir.md「state / exception / effect」の EffectTarget）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/BuiltinTarget"
+        },
+        {
+          "$ref": "#/$defs/TransitionTarget"
+        }
+      ]
     },
     "EmitRequest": {
       "additionalProperties": false,
@@ -1217,7 +1290,7 @@
     },
     "Match": {
       "additionalProperties": false,
-      "description": "分類による分岐（docs/ir.md「配線」）。",
+      "description": "分類による分岐（docs/ir.md「配線」）。classify は FQN。組み込みの分類なら \"list\" か \"nullable\"。",
       "properties": {
         "arms": {
           "items": {
@@ -1232,7 +1305,7 @@
           "$ref": "#/$defs/Span"
         },
         "subject": {
-          "$ref": "#/$defs/Atom"
+          "$ref": "#/$defs/MatchSubject"
         }
       },
       "required": [
@@ -1299,6 +1372,20 @@
         "span"
       ],
       "type": "object"
+    },
+    "MatchSubject": {
+      "description": "match の対象（docs/ir.md「配線」の Match の subject）。kind で分ける。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ValueSubject"
+        },
+        {
+          "$ref": "#/$defs/StateSubject"
+        },
+        {
+          "$ref": "#/$defs/ClassifyOwnedSubject"
+        }
+      ]
     },
     "Model": {
       "additionalProperties": false,
@@ -1963,7 +2050,7 @@
     },
     "State": {
       "additionalProperties": false,
-      "description": "state 宣言（docs/ir.md「state / exception / effect」）。",
+      "description": "state 宣言（docs/ir.md「state / exception / effect」）。element は optional にならない。",
       "properties": {
         "decorators": {
           "items": {
@@ -2001,11 +2088,30 @@
       "type": "object"
     },
     "StateShape": {
+      "description": "状態の形（docs/ir.md「state / exception / effect」の shape）。列数の範囲: list は 0 以上、nullable は 0 か 1、single はちょうど 1（docs/check.md「状態の形」）。",
       "enum": [
         "list",
+        "nullable",
         "single"
       ],
       "type": "string"
+    },
+    "StateSubject": {
+      "additionalProperties": false,
+      "description": "基底の状態の、組み込みの分類での match の対象（docs/ir.md「配線」の subject kind \"state\"）。state は FQN。",
+      "properties": {
+        "kind": {
+          "const": "state"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "state"
+      ],
+      "type": "object"
     },
     "Statement": {
       "description": "配線の文（docs/ir.md「配線」）。kind で分ける。",
@@ -2023,6 +2129,26 @@
           "$ref": "#/$defs/MatchStmt"
         }
       ]
+    },
+    "StatesSubject": {
+      "additionalProperties": false,
+      "description": "状態の分類の対象（docs/ir.md「classify」の subject kind \"states\"）。基底の状態の FQN（書かれた順）。",
+      "properties": {
+        "kind": {
+          "const": "states"
+        },
+        "states": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "states"
+      ],
+      "type": "object"
     },
     "StringLiteral": {
       "additionalProperties": false,
@@ -2080,6 +2206,31 @@
       ],
       "type": "object"
     },
+    "TransitionTarget": {
+      "additionalProperties": false,
+      "description": "分類の遷移（docs/ir.md「state / exception / effect」の EffectTarget kind \"transition\"）。of は状態の分類の FQN か、組み込みの分類を持つ基底の状態の FQN。",
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/CaseSet"
+        },
+        "kind": {
+          "const": "transition"
+        },
+        "of": {
+          "type": "string"
+        },
+        "to": {
+          "$ref": "#/$defs/CaseSet"
+        }
+      },
+      "required": [
+        "kind",
+        "of",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
     "Type": {
       "description": "型（docs/ir.md「型」）。void は型ではなく Op.returns が null であること。",
       "oneOf": [
@@ -2120,6 +2271,23 @@
       "required": [
         "kind",
         "types"
+      ],
+      "type": "object"
+    },
+    "TypeSubject": {
+      "additionalProperties": false,
+      "description": "値の分類の対象の型（docs/ir.md「classify」の subject kind \"type\"）。",
+      "properties": {
+        "kind": {
+          "const": "type"
+        },
+        "type": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "type"
       ],
       "type": "object"
     },
@@ -2222,6 +2390,23 @@
         "set"
       ],
       "type": "string"
+    },
+    "ValueSubject": {
+      "additionalProperties": false,
+      "description": "値の分類での match の対象（docs/ir.md「配線」の subject kind \"value\"）。",
+      "properties": {
+        "atom": {
+          "$ref": "#/$defs/Atom"
+        },
+        "kind": {
+          "const": "value"
+        }
+      },
+      "required": [
+        "kind",
+        "atom"
+      ],
+      "type": "object"
     },
     "VariantValue": {
       "additionalProperties": false,

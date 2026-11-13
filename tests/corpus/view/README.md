@@ -21,10 +21,10 @@
 
 | 文書の見出し | 構文（ファイル） | 確かめること |
 |---|---|---|
-| `docs/ir.md`「原則」 | `single<api.Token?>`、`single<page.Route>`、`fetchUser({ id })`（`web.hozo`） | 参照はすべて FQN。名前空間の順は `""`、`api`、`t`、`web`（ファイルの辞書順）、その後に語彙 `db` `fs` `http` `page` `proc` `valid` |
+| `docs/ir.md`「原則」 | `nullable<api.Token>`、`single<page.Route>`、`fetchUser({ id })`（`web.hozo`） | 参照はすべて FQN。名前空間の順は `""`、`api`、`t`、`web`（ファイルの辞書順）、その後に語彙 `db` `fs` `http` `page` `proc` `valid` |
 | `docs/ir.md`「Program」 | `/** ... */ namespace api { }` など三つの名前空間、`page.Route` | `Namespace.description`、`Span.file` の形（ユーザーは相対パス、語彙は `hozo:vocab/<名前>.hozo`）、位置は 1 始まり、宣言の位置は最初のデコレータから |
 | `docs/ir.md`「Doc」、`docs/check.md`「名前空間」DOC-1 | `openUser` / `fetchUser` / `api.getUser` の `@param` `@throws` `@see`、フィールド・アーム・ケースの DocComment | `summary` と `body`、`@throws` と `@see` は FQN、説明のない宣言は `description` なし。`api.getUser` の `@throws Timeout` は `external` なデコレータの例外（`Signature.exceptions` にない）で、DOC-1 にならない |
-| `docs/ir.md`「型」 | `api.User`（`string??` `string[]` `Record<string, string[]>`）、`scalar AdminToken extends Token`、`UserKind.Admin<api.PublicUser>`、`op signOut()` | `T??` → `T?`、array / record / case、void は `returns: null`、`list` / `single` |
+| `docs/ir.md`「型」 | `api.User`（`string??` `string[]` `Record<string, string[]>`）、`scalar AdminToken extends Token`、`UserKind.Admin<api.PublicUser>`、`op signOut()` | `T??` → `T?`、array / record / case、void は `returns: null`、`list` / `nullable` / `single`（空になりうる状態は `nullable<T>`。`docs/decisions.md`「設計書を変える決定」S2） |
 | `docs/ir.md`「正規化」`namespace` | `web.hozo` の二つの `namespace web { }` | 一つの `Namespace`、decls は出現順に連結 |
 | 同 `model P is U omit a, b;` | `model PublicUser is User omit secret, hash;`（`api.hozo`） | fields は展開済み（デコレータも保つ）、`derivedFrom` |
 | 同 ユニオンのアームのその場の model | `union UserPage { Ready: { ... }; Missing: Unavailable; }`（`web.hozo`） | `web.UserPage.Ready`（`synthesizedFrom`）をユニオンの直後に足し、アームは `ref`。宣言済みの model はそのまま `ref` |
@@ -67,4 +67,5 @@
 | 文書 | 書きたかった構文 | 今の実装 |
 |---|---|---|
 | `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | `View` は `web.getUser$in` と `web.getUser$in$auth` を正しく合成するが、Go の既定の出力が `web.getUser$in$auth` を `GetUserIn$authInput` にして `go/format` に失敗する（GOEMIT-INTERNAL）。`docs/emit-go.md`「名前」は一段の `browser.getMe$in` → `GetMeInInput` しか決めていない |
+| `docs/ir.md`「classify」の `subject`（`states`）、「state / exception / effect」の `Effect.target`（`transition`）、「配線」の `Match.subject`（`state` / `classify`） | 状態の分類 `classify Checkout of carts, orders { ... }`、遷移の効果 `effect placeOrder on Checkout: Shopping -> Ordered;`、状態での `match token by nullable { ... }` / `match by Checkout { ... }` | Go の既定の出力がまだ扱えず、`GOEMIT-INTERNAL` の error にして何も書き出さない（`internal/emit/golang/unsupported.go`）。このコーパスは emit のゴールデンを持つので、これらの構文は check だけのコーパス `tests/corpus/state` に置いた（その `README.md`）。出力を実装したら、ここへ足す |
 | `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストの `command = ["go", "run", ...]` のまま `protocol` の不一致を MAN-2 にする | `go run` はプログラムの終了コードを伝えず 0 以外を 1 にするので、`proc.Crashed` になる。`TestViewDeliveredToPlugin` の protocol のサブテストは `go build` した実行ファイルで起動する |

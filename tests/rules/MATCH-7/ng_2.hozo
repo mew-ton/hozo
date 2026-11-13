@@ -1,0 +1,12 @@
+// MATCH-7（docs/check.md「classify / match」）: 状態の分類なのに対象がある（対象は分類の宣言が持つ）
+namespace a {
+  model M { id: string; }
+  state carts: list<M>;
+  state orders: list<M>;
+  classify Checkout of carts, orders { Shopping; Ordered; }
+  op f();
+  op ng(m: M) {
+    match m by Checkout { Shopping => f(); Ordered => none; };       // ERROR: MATCH-7
+    match carts by Checkout { Shopping => f(); Ordered => none; };   // ERROR: MATCH-7
+  }
+}

@@ -1,0 +1,17 @@
+// STATE-3: 状態の要素の型が optional。空になりうる状態は nullable<T> と書く（docs/check.md「状態と効果」）
+namespace a {
+  model M { id: string; }
+  state ok1: nullable<M>;
+  state ok2: single<M>;
+  state ok3: list<M>;
+  // 要素の中の optional（配列の要素、Record の値）は要素の型そのものではない
+  state ok4: single<Record<string, string?>>;
+  state ok5: list<M?[]>;
+  state ng1: single<M?>;               // ERROR: STATE-3
+  state ng2: nullable<M?>;             // ERROR: STATE-3
+  state ng3: list<string?>;            // ERROR: STATE-3
+  state ng4: single<M??>;              // ERROR: STATE-3
+  state ng5: single<string[]?>;        // ERROR: STATE-3
+  // STATE-3 の状態も、中身の型の状態として残る（single に post はできない）
+  effect e on ng1.post;                // ERROR: STATE-1
+}

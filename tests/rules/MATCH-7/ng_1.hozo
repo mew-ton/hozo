@@ -1,0 +1,11 @@
+// MATCH-7（docs/check.md「classify / match」）: 値の分類なのに対象がない
+namespace a {
+  model M { id: string; }
+  classify Kind of M { A; B; }
+  condition Fresh of M;
+  op f();
+  op ng() {
+    match by Kind { A => f(); B => none; };            // ERROR: MATCH-7
+    match by Fresh { Fresh => f(); default => none; }; // ERROR: MATCH-7
+  }
+}

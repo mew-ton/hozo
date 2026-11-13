@@ -277,12 +277,12 @@ func (r *renderer) head(d ir.Decl) string {
 		}
 		return s
 	case *ir.Effect:
-		return "effect " + name + " on " + r.rel(d.State) + "." + string(d.Operation)
+		return "effect " + name + r.effectTarget(d.Target)
 	case *ir.Classify:
 		if d.FromCondition {
-			return "condition " + name + " of " + r.typ(d.Subject)
+			return "condition " + name + " of " + r.classifySubject(d.Subject)
 		}
-		return "classify " + name + " of " + r.typ(d.Subject)
+		return "classify " + name + " of " + r.classifySubject(d.Subject)
 	case *ir.Decorator:
 		return r.decoratorHead(name, d)
 	case *ir.Op:
@@ -439,13 +439,61 @@ func (r *renderer) argValue(v ir.ArgValue) string {
 	return "?"
 }
 
+// effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect createSession on sessions.post`、
+// `effect placeOrder on Checkout: Shopping -> Ordered`）。宛先が決まっていなければ空。
+func (r *renderer) effectTarget(t ir.EffectTarget) string {
+	switch t := t.(type) {
+	case ir.BuiltinTarget:
+		return " on " + r.rel(t.State) + "." + string(t.Operation)
+	case ir.TransitionTarget:
+		return " on " + r.rel(t.Of) + ": " + caseSet(t.From) + " -> " + caseSet(t.To)
+	}
+	return ""
+}
+
+func caseSet(c ir.CaseSet) string {
+	if c.Any {
+		return "any"
+	}
+	return strings.Join(c.Cases, " | ")
+}
+
+// classifySubject は分類の対象を Hozo の構文で書く（`classify WarrantyKind of server.Item`、
+// `classify Checkout of carts, orders`）。対象が決まっていなければ "?"。
+func (r *renderer) classifySubject(s ir.ClassifySubject) string {
+	switch s := s.(type) {
+	case ir.TypeSubject:
+		return r.typ(s.Type)
+	case ir.StatesSubject:
+		names := make([]string, len(s.States))
+		for i, st := range s.States {
+			names[i] = r.rel(st)
+		}
+		return strings.Join(names, ", ")
+	}
+	return "?"
+}
+
+// matchHead は match の頭を Hozo の構文で書く（docs/grammar.md「配線」の三つの形）。
+func (r *renderer) matchHead(m ir.Match) string {
+	switch s := m.Subject.(type) {
+	case ir.ValueSubject:
+		return "match " + r.atom(s.Atom) + " by " + r.rel(m.Classify)
+	case ir.StateSubject:
+		return "match " + r.rel(s.State) + " by " + m.Classify // 組み込みの分類。classify は状態の形
+	case ir.ClassifyOwnedSubject:
+		return "match by " + r.rel(m.Classify)
+	}
+	return "match by " + r.rel(m.Classify)
+}
+
 // expr は配線の式を短く書く（束縛のホバー）。
 func (r *renderer) expr(e ir.Expr) string {
 	switch e := e.(type) {
 	case ir.CallExpr:
 		return r.call(e.Call)
 	case ir.MatchExpr:
-		return "match " + r.atom(e.Match.Subject) + " by " + r.rel(e.Match.Classify) + " { ... }"
+		return r.matchHead(e.Match) + " { ... }"
 	case ir.AtomExpr:
 		return r.atom(e.Atom)
 	}
