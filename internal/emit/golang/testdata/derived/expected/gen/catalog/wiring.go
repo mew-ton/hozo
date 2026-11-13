@@ -2,11 +2,9 @@
 
 package catalog
 
-import "context"
-
 // Publish は op catalog.publish。
-func (o *ops) Publish(ctx context.Context, id string) (PublicProduct, error) {
-	result, err := o.Load(ctx, id)
+func (o *ops) Publish(id string) (PublicProduct, error) {
+	result, err := o.Load(id)
 	if err != nil {
 		return PublicProduct{}, err
 	}
@@ -14,6 +12,6 @@ func (o *ops) Publish(ctx context.Context, id string) (PublicProduct, error) {
 }
 
 // Summarize は op catalog.summarize。
-func (o *ops) Summarize(ctx context.Context, p Product) (Summary, error) {
+func (o *ops) Summarize(p Product) (Summary, error) {
 	return ProductToSummary(p), nil
 }

@@ -2,12 +2,6 @@
 
 package depot
 
-import (
-	"context"
-
-	"github.com/mew-ton/hozo/runtime"
-)
-
 // Level は classify depot.Level のケース。
 type Level int
 
@@ -17,42 +11,3 @@ const (
 	// 鍵がかかっていて数えられない
 	LevelDefault
 )
-
-// LevelCases は人が実装するケースごとの述語（設計書 §10.3）。値を取らず、保存先に問い合わせて
-// 状態 depot.items, depot.lock がそのケースの場合かを答える。
-type LevelCases interface {
-	Low(ctx context.Context) (bool, error)
-	High(ctx context.Context) (bool, error)
-}
-
-// ClassifyLevel は状態 depot.items, depot.lock の場合を depot.Level で分類する。すべての述語を評価し、真になった数を数える。
-// 述語がエラーを返したら、（残りも評価したうえで）最初のエラーを返す。
-// 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
-func ClassifyLevel(ctx context.Context, c LevelCases) (Level, error) {
-	var hits []string
-	result := LevelDefault
-	var firstErr error
-	if ok, err := c.Low(ctx); err != nil {
-		if firstErr == nil {
-			firstErr = err
-		}
-	} else if ok {
-		hits = append(hits, "Low")
-		result = LevelLow
-	}
-	if ok, err := c.High(ctx); err != nil {
-		if firstErr == nil {
-			firstErr = err
-		}
-	} else if ok {
-		hits = append(hits, "High")
-		result = LevelHigh
-	}
-	if firstErr != nil {
-		return 0, firstErr
-	}
-	if len(hits) > 1 {
-		return 0, &runtime.ClassificationError{Classify: "depot.Level", Hits: hits}
-	}
-	return result, nil
-}

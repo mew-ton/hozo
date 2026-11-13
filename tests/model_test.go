@@ -189,6 +189,47 @@ func TestModelCorpus(t *testing.T) {
 		})
 	})
 
+	t.Run("emit-go.md 出力の対象/プラグインのない名前空間は何も出力しない", func(t *testing.T) {
+		// shop はテーブルを持つ（出力する名前空間）が、プラグインが一つも設定されていない。出力するのはプラグインが選んだ宣言だけ
+		// なので、emit は何も書かない。印のデコレータ（@marks.*）も何も生成しない（docs/emit-go.md「デコレータ」）。
+		// 前回の出力（.hozoc-outputs.json にあるもの）は古いファイルとして消え、記録も残らない（docs/cli.md「emit」の 6 と 8）。
+		dir := t.TempDir()
+		copyHozo(t, modelCorpus, dir)
+		toml, err := os.ReadFile(filepath.Join(modelCorpus, "hozo.toml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := map[string]string{
+			"hozo.toml":                    string(toml),
+			"gen/shop/ops.go":              "package shop // 前回の emit が書いたもの\n",
+			"gen/shop/.hozoc-outputs.json": "[\n  \"gen/shop/ops.go\"\n]\n",
+			"gen/shop/hand.go":             "package shop // 人が書いたもの。記録にないので触らない\n",
+		}
+		for name, content := range files {
+			path := filepath.Join(dir, filepath.FromSlash(name))
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var stdout, stderr bytes.Buffer
+		if code := hozocMainIn(dir, []string{"emit"}, &stdout, &stderr); code != 0 || stdout.String() != "removed: gen/shop/ops.go\n" || stderr.String() != "" {
+			t.Fatalf("hozoc emit: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		}
+		var left []string
+		for p := range readTree(t, filepath.Join(dir, "gen")) {
+			left = append(left, p)
+		}
+		expect(t, "gen に残るファイル", left, []string{"shop/hand.go"})
+		// 二度目は何も書かず、何も消さない
+		stdout.Reset()
+		if code := hozocMainIn(dir, []string{"emit"}, &stdout, &stderr); code != 0 || stdout.String() != "" {
+			t.Errorf("二度目の hozoc emit: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		}
+	})
+
 	t.Run("config.md 置き場と探し方/設定なし", func(t *testing.T) {
 		// 同じ .hozo を hozo.toml なしで検査しても診断はなく、どの名前空間も出力しない
 		dir := t.TempDir()

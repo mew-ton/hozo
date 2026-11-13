@@ -8,20 +8,20 @@ import (
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/app"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 )
 
 // hozocMain は cmd/hozoc/main.go と同じ組み立て（docs/cli.md「手で書くもの」）: 生成した cli.Main に
-// internal/app の Leaves（hozoc.New で Ops に）と Presenter を渡す。作業ディレクトリは tests/ で、hozo.toml は親（リポジトリ直下）に見つかる。
+// internal/app の App の Ops（hozoc.States に実装を入れて hozoc.New）と Presenter を渡す。作業ディレクトリは tests/ で、
+// hozo.toml は親（リポジトリ直下）に見つかる。
 func hozocMain(args []string, stdout, stderr io.Writer) int {
 	return hozocMainIn("", args, stdout, stderr)
 }
 
 // hozocMainIn は dir を作業ディレクトリ（hozo.toml を探し始める場所）にして hozoc を走らせる。空なら os の作業ディレクトリ。
 func hozocMainIn(dir string, args []string, stdout, stderr io.Writer) int {
-	ops := hozoc.New(&app.Leaves{Dir: dir, Stderr: stderr}, hozoc.Classifiers{})
-	return cli.Main(ops, app.Presenter{}, args, func(string) string { return "" }, stdout, stderr)
+	a := &app.App{Dir: dir, Stderr: stderr}
+	return cli.Main(a.Ops(), app.Presenter{}, args, func(string) string { return "" }, stdout, stderr)
 }
 
 // TestSelfCheck は hozoc 自身（リポジトリ直下の cli.hozo と hozo.toml）が hozoc check を error なしで通ること

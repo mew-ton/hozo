@@ -6,13 +6,3 @@ import "github.com/mew-ton/hozo/runtime"
 
 // EffectRestock は効果 depot.restock（状態 depot.items への post）。
 const EffectRestock runtime.Effect = "depot.restock"
-
-// EffectDrain は効果 depot.drain。
-//
-// on depot.Level: High -> Low
-const EffectDrain runtime.Effect = "depot.drain"
-
-// EffectUnlock は効果 depot.unlock。
-//
-// on depot.lock: HasItems -> Empty
-const EffectUnlock runtime.Effect = "depot.unlock"

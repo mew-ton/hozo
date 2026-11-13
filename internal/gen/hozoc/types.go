@@ -10,18 +10,6 @@ type Path string
 // OutputFormat は表示の形式。text か json
 type OutputFormat string
 
-// SourceFile は読み込むファイル
-type SourceFile struct {
-	Path    Path   `json:"path"`
-	Content string `json:"content"`
-}
-
-// OutputFile は書き出すファイル
-type OutputFile struct {
-	Path    Path   `json:"path"`
-	Content string `json:"content"`
-}
-
 // Position は位置（1 始まりの行と列）
 type Position struct {
 	Line int64 `json:"line"`
@@ -142,44 +130,6 @@ type LspInput struct {
 //
 // on hozoc.OutputsSync: any -> UpToDate
 const EffectSyncOutputs runtime.Effect = "hozoc.syncOutputs"
-
-// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ
-type Plugin struct {
-	Name    string   `json:"name"`
-	Command []string `json:"command"`
-	Dir     Path     `json:"dir"`
-	Root    Path     `json:"root"`
-}
-
-// View は IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない
-type View struct{}
-
-// EmitRequest は展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）
-type EmitRequest struct {
-	Protocol  string `json:"protocol"`
-	Direction string `json:"direction"`
-	View      View   `json:"view"`
-}
-
-// PluginWarning はプラグインの warning（同「emit」の応答の warnings の要素）
-type PluginWarning struct {
-	At      string `json:"at"`
-	Message string `json:"message"`
-}
-
-// PluginError はプラグインの error（同「emit」の応答の errors の要素）
-type PluginError struct {
-	Code    string `json:"code"`
-	At      string `json:"at"`
-	Message string `json:"message"`
-}
-
-// EmitResponse は展開のときのプラグインからの出力（同「emit」の応答）
-type EmitResponse struct {
-	Files    []OutputFile    `json:"files"`
-	Warnings []PluginWarning `json:"warnings"`
-	Errors   []PluginError   `json:"errors"`
-}
 
 // Crashed: プロセスが異常終了した
 // 名前空間 proc の宣言の複製（Go のパッケージを import できないため。docs/emit-go.md「配置」）。

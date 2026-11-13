@@ -1,11 +1,11 @@
 package shop
 
-// このファイルは生成物ではない。internal/emit/golang の TestStateBehavior が、生成した shop のパッケージ
-// （testdata/state/expected/gen/shop と同じ内容）の隣に置いて `go test` する。人が書く側（葉、States、StateCases、
-// <C>Cases）を偽物で埋め、docs/emit-go.md「classify」「match」の振る舞いを確かめる。
+// このファイルは生成物ではない。internal/emit/golang の TestBehavior が、生成した shop のパッケージ
+// （testdata/state/expected/gen/shop と同じ内容）の隣に置いて `go test` する。人やプラグインが実装する側
+// （Leaves のフィールド、States の問い合わせと命令）を偽物で埋め、docs/emit-go.md「実装の単位」「state」「classify」
+// 「match」の振る舞いを確かめる。生成したコードは context を取らないので、このテストも context を使わない。
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -13,113 +13,61 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// fakeLeaves は呼ばれた op の名前を記録する。
-type fakeLeaves struct {
-	calls []string
-	me    MeInput
-}
-
-func (f *fakeLeaves) SubmitOrder(context.Context) (Order, error) {
-	f.calls = append(f.calls, "submitOrder")
-	return Order{Id: "o1"}, nil
-}
-func (f *fakeLeaves) EmptyCart(context.Context) error {
-	f.calls = append(f.calls, "emptyCart")
-	return nil
-}
-func (f *fakeLeaves) ShowLogin(context.Context) error {
-	f.calls = append(f.calls, "showLogin")
-	return nil
-}
-func (f *fakeLeaves) ShowCart(context.Context) error {
-	f.calls = append(f.calls, "showCart")
-	return nil
-}
-func (f *fakeLeaves) ShowEmpty(context.Context) error {
-	f.calls = append(f.calls, "showEmpty")
-	return nil
-}
-func (f *fakeLeaves) ShowOrders(context.Context) error {
-	f.calls = append(f.calls, "showOrders")
-	return nil
-}
-func (f *fakeLeaves) SampleLine(context.Context) (Line, error) {
-	f.calls = append(f.calls, "sampleLine")
-	return Line{Item: "sample"}, nil
-}
-func (f *fakeLeaves) FirstLine(context.Context) (Line, error) {
-	f.calls = append(f.calls, "firstLine")
-	return Line{Item: "first"}, nil
-}
-func (f *fakeLeaves) Me(_ context.Context, in MeInput) (Profile, error) {
-	f.calls = append(f.calls, "me")
-	f.me = in
-	return Profile{Name: "me"}, nil
-}
-
-// fakeStates は States の偽物。
-type fakeStates struct {
-	token *Token
-	err   error
-}
-
-func (f fakeStates) Token(context.Context) (*Token, error) { return f.token, f.err }
-
-// fakeStateCases は StateCases の偽物。呼ばれた述語を記録する。
-type fakeStateCases struct {
-	cartsEmpty, ordersEmpty, tokenEmpty bool
-	err                                 error
-	calls                               []string
-}
-
-func (f *fakeStateCases) CartsIsEmpty(context.Context) (bool, error) {
-	f.calls = append(f.calls, "carts")
-	return f.cartsEmpty, f.err
-}
-func (f *fakeStateCases) OrdersIsEmpty(context.Context) (bool, error) {
-	f.calls = append(f.calls, "orders")
-	return f.ordersEmpty, f.err
-}
-func (f *fakeStateCases) TokenIsEmpty(context.Context) (bool, error) {
-	f.calls = append(f.calls, "token")
-	return f.tokenEmpty, f.err
-}
-
-// fakeCheckout は CheckoutCases の偽物。
-type fakeCheckout struct {
-	shopping, ordered       bool
-	shoppingErr, orderedErr error
-	calls                   []string
-}
-
-func (f *fakeCheckout) Shopping(context.Context) (bool, error) {
-	f.calls = append(f.calls, "Shopping")
-	return f.shopping, f.shoppingErr
-}
-func (f *fakeCheckout) Ordered(context.Context) (bool, error) {
-	f.calls = append(f.calls, "Ordered")
-	return f.ordered, f.orderedErr
-}
-
-// fakeLoggedIn は LoggedInCases の偽物。
-type fakeLoggedIn struct{ in bool }
-
-func (f fakeLoggedIn) LoggedIn(context.Context) (bool, error) { return f.in, nil }
-
+// world は偽物の一式。calls は呼ばれた葉の op と命令の名前、queries は呼ばれた問い合わせの名前。
 type world struct {
-	leaves     *fakeLeaves
-	states     fakeStates
-	stateCases *fakeStateCases
-	checkout   *fakeCheckout
-	loggedIn   fakeLoggedIn
+	calls   []string
+	queries []string
+	me      MeInput
+
+	cartsEmpty, ordersEmpty, tokenEmpty bool
+	queryErr                            error // 組み込みの分類の問い合わせが返すエラー
+	token                               *Token
+	tokenErr                            error
+	shopping, ordered                   bool
+	shoppingErr, orderedErr             error
+	loggedIn                            bool
 }
 
-func newWorld() *world {
-	return &world{leaves: &fakeLeaves{}, stateCases: &fakeStateCases{}, checkout: &fakeCheckout{}}
-}
-
-func (w *world) ops() Ops {
-	return New(w.leaves, w.states, w.stateCases, Classifiers{Checkout: w.checkout, LoggedIn: w.loggedIn})
+// install は w を States に入れ、w の葉の実装を持つ Ops を返す。States はパッケージの変数なので、
+// テストごとに入れ直す。
+func (w *world) install() Ops {
+	call := func(name string) func() error {
+		return func() error { w.calls = append(w.calls, name); return nil }
+	}
+	query := func(name string, v *bool) func() (bool, error) {
+		return func() (bool, error) { w.queries = append(w.queries, name); return *v, w.queryErr }
+	}
+	States = StateSet{
+		Carts:  CartsState{IsEmpty: query("carts", &w.cartsEmpty), EmptyCart: call("emptyCart")},
+		Orders: OrdersState{IsEmpty: query("orders", &w.ordersEmpty)},
+		Token: TokenState{
+			IsEmpty: query("token", &w.tokenEmpty),
+			Get:     func() (*Token, error) { return w.token, w.tokenErr },
+		},
+		Title: TitleState{Get: func() (string, error) { return "店", nil }},
+		Checkout: CheckoutState{
+			Shopping: func() (bool, error) { w.queries = append(w.queries, "Shopping"); return w.shopping, w.shoppingErr },
+			Ordered:  func() (bool, error) { w.queries = append(w.queries, "Ordered"); return w.ordered, w.orderedErr },
+			SubmitOrder: func() (Order, error) {
+				w.calls = append(w.calls, "submitOrder")
+				return Order{Id: "o1"}, nil
+			},
+		},
+		LoggedIn: LoggedInState{LoggedIn: func() (bool, error) { return w.loggedIn, nil }},
+	}
+	return New(Leaves{
+		ShowLogin:  call("showLogin"),
+		ShowCart:   call("showCart"),
+		ShowEmpty:  call("showEmpty"),
+		ShowOrders: call("showOrders"),
+		SampleLine: func() (Line, error) { w.calls = append(w.calls, "sampleLine"); return Line{Item: "sample"}, nil },
+		FirstLine:  func() (Line, error) { w.calls = append(w.calls, "firstLine"); return Line{Item: "first"}, nil },
+		Me: func(in MeInput) (Profile, error) {
+			w.calls = append(w.calls, "me")
+			w.me = in
+			return Profile{Name: "me"}, nil
+		},
+	})
 }
 
 func wantCalls(t *testing.T, what string, got []string, want ...string) {
@@ -132,30 +80,39 @@ func wantCalls(t *testing.T, what string, got []string, want ...string) {
 	}
 }
 
+// wantMissing は err が *runtime.MissingError{kind, name} であることを確かめる。
+func wantMissing(t *testing.T, what string, err error, kind, name string) {
+	t.Helper()
+	var miss *runtime.MissingError
+	if !errors.As(err, &miss) || miss.Kind != kind || miss.Name != name {
+		t.Errorf("%s: err = %#v, want *runtime.MissingError{Kind: %q, Name: %q}", what, err, kind, name)
+	}
+}
+
 func TestClassifyCheckout(t *testing.T) {
-	ctx := context.Background()
 	errA, errB := errors.New("a"), errors.New("b")
 	tests := []struct {
 		name string
-		c    fakeCheckout
+		w    world
 		want Checkout
 		hits []string // ClassificationError の Hits。nil なら ClassificationError ではない
 		err  error
 	}{
-		{name: "Shopping", c: fakeCheckout{shopping: true}, want: CheckoutShopping},
-		{name: "Ordered", c: fakeCheckout{ordered: true}, want: CheckoutOrdered},
-		{name: "none true", c: fakeCheckout{}, hits: []string{}},
-		{name: "both true", c: fakeCheckout{shopping: true, ordered: true}, hits: []string{"Shopping", "Ordered"}},
-		{name: "first predicate fails", c: fakeCheckout{shoppingErr: errA, ordered: true}, err: errA},
-		{name: "second predicate fails", c: fakeCheckout{shopping: true, orderedErr: errB}, err: errB},
-		{name: "both fail", c: fakeCheckout{shoppingErr: errA, orderedErr: errB}, err: errA},
+		{name: "Shopping", w: world{shopping: true}, want: CheckoutShopping},
+		{name: "Ordered", w: world{ordered: true}, want: CheckoutOrdered},
+		{name: "none true", w: world{}, hits: []string{}},
+		{name: "both true", w: world{shopping: true, ordered: true}, hits: []string{"Shopping", "Ordered"}},
+		{name: "first predicate fails", w: world{shoppingErr: errA, ordered: true}, err: errA},
+		{name: "second predicate fails", w: world{shopping: true, orderedErr: errB}, err: errB},
+		{name: "both fail", w: world{shoppingErr: errA, orderedErr: errB}, err: errA},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := tt.c
-			got, err := ClassifyCheckout(ctx, &c)
-			// どの場合もすべての述語を評価する。
-			wantCalls(t, "評価した述語", c.calls, "Shopping", "Ordered")
+			w := tt.w
+			w.install()
+			got, err := ClassifyCheckout()
+			// どの場合もすべての述語を呼ぶ。
+			wantCalls(t, "呼んだ述語", w.queries, "Shopping", "Ordered")
 			var ce *runtime.ClassificationError
 			switch {
 			case tt.err != nil:
@@ -181,117 +138,108 @@ func TestClassifyCheckout(t *testing.T) {
 }
 
 func TestClassifyLoggedInDefault(t *testing.T) {
-	ctx := context.Background()
-	if got, err := ClassifyLoggedIn(ctx, fakeLoggedIn{in: true}); err != nil || got != LoggedInLoggedIn {
+	w := &world{loggedIn: true}
+	w.install()
+	if got, err := ClassifyLoggedIn(); err != nil || got != LoggedInLoggedIn {
 		t.Errorf("LoggedIn = %v, %v", got, err)
 	}
-	if got, err := ClassifyLoggedIn(ctx, fakeLoggedIn{}); err != nil || got != LoggedInDefault {
+	w.loggedIn = false
+	if got, err := ClassifyLoggedIn(); err != nil || got != LoggedInDefault {
 		t.Errorf("default = %v, %v", got, err)
 	}
 }
 
-// match by C: 値の形（none のアームは nil）と、文の形（default のアーム）。
+// match by C: 値の形（none のアームは nil）と、文の形（default のアーム）。命令（submitOrder）は States を通る。
 func TestMatchByClassify(t *testing.T) {
-	ctx := context.Background()
-	w := newWorld()
-	w.checkout.shopping = true
-	placed, err := w.ops().Checkout(ctx)
+	w := &world{shopping: true}
+	placed, err := w.install().Checkout()
 	if err != nil || placed == nil || placed.Id != "o1" {
 		t.Errorf("Shopping: %v, %v", placed, err)
 	}
-	wantCalls(t, "Shopping の呼び出し", w.leaves.calls, "submitOrder")
+	wantCalls(t, "Shopping の呼び出し", w.calls, "submitOrder")
 
-	w = newWorld()
-	w.checkout.ordered = true
-	placed, err = w.ops().Checkout(ctx)
+	w = &world{ordered: true}
+	placed, err = w.install().Checkout()
 	if err != nil || placed != nil {
 		t.Errorf("Ordered: %v, %v", placed, err)
 	}
-	wantCalls(t, "Ordered の呼び出し", w.leaves.calls)
+	wantCalls(t, "Ordered の呼び出し", w.calls)
 
 	// 判定のエラー（真の数が合わない）はそのまま返り、アームは実行されない。
-	w = newWorld()
+	w = &world{}
 	var ce *runtime.ClassificationError
-	if _, err = w.ops().Checkout(ctx); !errors.As(err, &ce) {
+	if _, err = w.install().Checkout(); !errors.As(err, &ce) {
 		t.Errorf("どの述語も真でないのに err = %v", err)
 	}
-	wantCalls(t, "判定に失敗したときの呼び出し", w.leaves.calls)
+	wantCalls(t, "判定に失敗したときの呼び出し", w.calls)
 
-	w = newWorld()
-	w.checkout.ordered = true
-	if err := w.ops().Open(ctx); err != nil {
+	w = &world{ordered: true}
+	if err := w.install().Open(); err != nil {
 		t.Fatal(err)
 	}
-	wantCalls(t, "ログインしていないときの Open", w.leaves.calls, "showLogin", "showOrders")
-	w = newWorld()
-	w.checkout.ordered = true
-	w.loggedIn.in = true
-	if err := w.ops().Open(ctx); err != nil {
+	wantCalls(t, "ログインしていないときの Open", w.calls, "showLogin", "showOrders")
+	w = &world{ordered: true, loggedIn: true}
+	if err := w.install().Open(); err != nil {
 		t.Fatal(err)
 	}
-	wantCalls(t, "ログインしているときの Open", w.leaves.calls, "showCart", "showOrders")
+	wantCalls(t, "ログインしているときの Open", w.calls, "showCart", "showOrders")
 }
 
-// match s by nullable の値の形。HasItems のアームでは bind の token を States から取って埋める。
+// match s by nullable の値の形。HasItems のアームでは bind の token を States.Token.Get で取って埋める。
 func TestMatchByNullable(t *testing.T) {
-	ctx := context.Background()
-	w := newWorld()
-	w.stateCases.tokenEmpty = true
-	profile, err := w.ops().Who(ctx)
+	w := &world{tokenEmpty: true}
+	profile, err := w.install().Who()
 	if err != nil || profile != nil {
 		t.Errorf("Empty: %v, %v", profile, err)
 	}
-	wantCalls(t, "Empty の呼び出し", w.leaves.calls)
+	wantCalls(t, "Empty の呼び出し", w.calls)
 
-	w = newWorld()
 	tok := Token("t1")
-	w.states.token = &tok
-	profile, err = w.ops().Who(ctx)
+	w = &world{token: &tok}
+	profile, err = w.install().Who()
 	if err != nil || profile == nil || profile.Name != "me" {
 		t.Errorf("HasItems: %v, %v", profile, err)
 	}
-	wantCalls(t, "HasItems の呼び出し", w.leaves.calls, "me")
-	if want := (MeInput{Token: "t1", Verbose: true}); w.leaves.me != want {
-		t.Errorf("me の引数 = %+v, want %+v", w.leaves.me, want)
+	wantCalls(t, "HasItems の呼び出し", w.calls, "me")
+	if want := (MeInput{Token: "t1", Verbose: true}); w.me != want {
+		t.Errorf("me の引数 = %+v, want %+v", w.me, want)
 	}
 
 	// 述語のエラーはそのまま返る。
-	w = newWorld()
-	w.stateCases.err = errors.New("store down")
-	if _, err = w.ops().Who(ctx); err != w.stateCases.err {
+	w = &world{queryErr: errors.New("store down")}
+	if _, err = w.install().Who(); err != w.queryErr {
 		t.Errorf("述語のエラー: err = %v", err)
 	}
-	wantCalls(t, "述語が失敗したときの呼び出し", w.leaves.calls)
+	wantCalls(t, "述語が失敗したときの呼び出し", w.calls)
 
 	// アームの中で状態の値を取れなければ、呼び出しの前に返る。
-	w = newWorld()
-	w.states.err = errors.New("no token")
-	if _, err = w.ops().Who(ctx); err != w.states.err {
-		t.Errorf("States のエラー: err = %v", err)
+	w = &world{tokenErr: errors.New("no token")}
+	if _, err = w.install().Who(); err != w.tokenErr {
+		t.Errorf("Get のエラー: err = %v", err)
 	}
-	wantCalls(t, "States が失敗したときの呼び出し", w.leaves.calls)
+	wantCalls(t, "Get が失敗したときの呼び出し", w.calls)
 }
 
 // match s by list の文の形と値の形。アームの書かれた順によらず、Empty のアームは空のときに動く。
 func TestMatchByList(t *testing.T) {
-	ctx := context.Background()
-	w := newWorld()
-	w.stateCases.cartsEmpty = true
-	if err := w.ops().OpenCart(ctx); err != nil {
+	w := &world{cartsEmpty: true}
+	ops := w.install()
+	if err := ops.OpenCart(); err != nil {
 		t.Fatal(err)
 	}
-	wantCalls(t, "空のカートを開く", w.leaves.calls, "showEmpty")
-	line, err := w.ops().Pick(ctx)
+	wantCalls(t, "空のカートを開く", w.calls, "showEmpty")
+	line, err := ops.Pick()
 	if err != nil || line.Item != "sample" {
 		t.Errorf("空のときの Pick = %v, %v", line, err)
 	}
 
-	w = newWorld()
-	if err := w.ops().OpenCart(ctx); err != nil {
+	w = &world{}
+	ops = w.install()
+	if err := ops.OpenCart(); err != nil {
 		t.Fatal(err)
 	}
-	wantCalls(t, "行のあるカートを開く", w.leaves.calls, "emptyCart")
-	line, err = w.ops().Pick(ctx)
+	wantCalls(t, "行のあるカートを開く", w.calls, "emptyCart") // 命令は States.Carts.EmptyCart
+	line, err = ops.Pick()
 	if err != nil || line.Item != "first" {
 		t.Errorf("行があるときの Pick = %v, %v", line, err)
 	}
@@ -299,25 +247,94 @@ func TestMatchByList(t *testing.T) {
 
 // none のアームは何もしない。両方のケースを並べたアームは分岐しない。どの形でも述語は呼ぶ。
 func TestMatchArmsWithoutCode(t *testing.T) {
-	ctx := context.Background()
-	w := newWorld() // carts は行あり、token はあり
-	if err := w.ops().Refresh(ctx); err != nil {
+	w := &world{} // carts は行あり、token はあり
+	if err := w.install().Refresh(); err != nil {
 		t.Fatal(err)
 	}
-	wantCalls(t, "行あり・トークンありの Refresh", w.leaves.calls, "showCart", "showOrders", "firstLine")
-	wantCalls(t, "呼んだ述語", w.stateCases.calls, "carts", "token", "orders", "orders", "carts")
+	wantCalls(t, "行あり・トークンありの Refresh", w.calls, "showCart", "showOrders", "firstLine")
+	wantCalls(t, "呼んだ述語", w.queries, "carts", "token", "orders", "orders", "carts")
 
-	w = newWorld()
-	w.stateCases.cartsEmpty, w.stateCases.tokenEmpty = true, true
-	if err := w.ops().Refresh(ctx); err != nil {
+	w = &world{cartsEmpty: true, tokenEmpty: true}
+	if err := w.install().Refresh(); err != nil {
 		t.Fatal(err)
 	}
-	wantCalls(t, "空・トークンなしの Refresh", w.leaves.calls, "showLogin", "showOrders", "firstLine")
+	wantCalls(t, "空・トークンなしの Refresh", w.calls, "showLogin", "showOrders", "firstLine")
 
-	w = newWorld()
-	w.stateCases.err = errors.New("store down")
-	if err := w.ops().Refresh(ctx); err != w.stateCases.err {
+	w = &world{queryErr: errors.New("store down")}
+	if err := w.install().Refresh(); err != w.queryErr {
 		t.Errorf("述語のエラー: err = %v", err)
 	}
-	wantCalls(t, "述語が失敗したときの呼び出し", w.leaves.calls)
+	wantCalls(t, "述語が失敗したときの呼び出し", w.calls)
+}
+
+// docs/emit-go.md「実装の単位」: フィールドは使わなければ nil のままでよく、nil のフィールドが要るところへ来たら
+// panic せず *runtime.MissingError{Kind, Name} を返す。
+func TestMissing(t *testing.T) {
+	t.Run("leaf", func(t *testing.T) {
+		// 何も埋めていない Ops でも、葉を直に呼べば MissingError
+		States = StateSet{}
+		ops := New(Leaves{})
+		wantMissing(t, "ShowCart", ops.ShowCart(), "leaf", "shop.showCart")
+		_, err := ops.Me(MeInput{})
+		wantMissing(t, "Me", err, "leaf", "shop.me")
+
+		// 配線の途中で当たった葉。それまでの行は実行されている
+		w := &world{loggedIn: true, ordered: true}
+		w.install()
+		ops = New(Leaves{ShowCart: func() error { w.calls = append(w.calls, "showCart"); return nil }})
+		wantMissing(t, "Open", ops.Open(), "leaf", "shop.showOrders")
+		wantCalls(t, "当たるまでの呼び出し", w.calls, "showCart")
+	})
+	t.Run("state query", func(t *testing.T) {
+		w := &world{}
+		ops := w.install()
+		States.Carts.IsEmpty = nil
+		wantMissing(t, "OpenCart", ops.OpenCart(), "state", "shop.carts")
+		_, err := ops.Pick()
+		wantMissing(t, "Pick", err, "state", "shop.carts")
+		wantCalls(t, "問い合わせがないときの呼び出し", w.calls)
+
+		// bind の値の取得（Get）。IsEmpty は入っているので、当たるのは HasItems のアームの中
+		w = &world{}
+		ops = w.install()
+		States.Token.Get = nil
+		_, err = ops.Who()
+		wantMissing(t, "Who", err, "state", "shop.token")
+		wantCalls(t, "Get がないときの呼び出し", w.calls)
+	})
+	t.Run("state classification predicate", func(t *testing.T) {
+		w := &world{ordered: true}
+		ops := w.install()
+		States.Checkout.Shopping = nil
+		_, err := ClassifyCheckout()
+		wantMissing(t, "ClassifyCheckout", err, "state", "shop.Checkout")
+		wantCalls(t, "残りの述語は呼ぶ", w.queries, "Ordered")
+		_, err = ops.Checkout()
+		wantMissing(t, "Checkout", err, "state", "shop.Checkout")
+	})
+	t.Run("state command", func(t *testing.T) {
+		w := &world{shopping: true}
+		ops := w.install()
+		States.Checkout.SubmitOrder = nil
+		_, err := ops.SubmitOrder()
+		wantMissing(t, "SubmitOrder", err, "state", "shop.submitOrder")
+		_, err = ops.Checkout()
+		wantMissing(t, "Checkout", err, "state", "shop.submitOrder")
+
+		States.Carts.EmptyCart = nil
+		wantMissing(t, "OpenCart", ops.OpenCart(), "state", "shop.emptyCart")
+	})
+	t.Run("zero values everywhere", func(t *testing.T) {
+		// 何も入れていなくても、どの op も panic しない
+		States = StateSet{}
+		ops := New(Leaves{})
+		_, err := ops.Checkout()
+		wantMissing(t, "Checkout", err, "state", "shop.Checkout")
+		wantMissing(t, "Open", ops.Open(), "state", "shop.LoggedIn")
+		_, err = ops.Who()
+		wantMissing(t, "Who", err, "state", "shop.token")
+		wantMissing(t, "OpenCart", ops.OpenCart(), "state", "shop.carts")
+		wantMissing(t, "Refresh", ops.Refresh(), "state", "shop.carts")
+		wantMissing(t, "EmptyCart", ops.EmptyCart(), "state", "shop.emptyCart")
+	})
 }

@@ -44,14 +44,21 @@ func (e *emitter) importPathOf(ns string) string {
 	return p
 }
 
+// importable は、別の名前空間の型 fqn を、その名前空間のパッケージから import して使えるか（docs/emit-go.md「配置」）:
+// Go で同じプロジェクトの名前空間の型で、その名前空間の出力が持つもの（[Options.Exported]）。そうでなければ複製する。
+func (e *emitter) importable(fqn string) bool {
+	ns, known := e.declNS[fqn]
+	return known && ns != e.viewer && e.isGoNS(ns) && e.opts.Exported[fqn]
+}
+
 // resolve は plugin/golang の Resolver（docs/packages.md「`plugin/golang`（公開）」）。
-// viewer の宣言と複製した宣言はローカル、Go の名前空間は import、それ以外（知らない FQN）はローカル。
+// viewer の宣言と複製した宣言はローカル、import できる型（importable）は相手のパッケージ、それ以外（知らない FQN）はローカル。
 func (e *emitter) resolve(fqn string) (namespace, pkgPath, pkgName string, local bool) {
 	ns, known := e.declNS[fqn]
 	if !known {
 		return "", "", "", true
 	}
-	if ns == e.viewer || e.copied[fqn] || !e.isGoNS(ns) {
+	if ns == e.viewer || !e.importable(fqn) {
 		return ns, "", "", true
 	}
 	return ns, e.importPathOf(ns), gol.PackageName(ns), false

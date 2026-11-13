@@ -9,12 +9,12 @@ import (
 	gol "github.com/mew-ton/hozo/plugin/golang"
 )
 
-// genWiring は wiring.go（docs/emit-go.md「配線の本体」「match」）。配線の op ごとに本体を一つ。
-// 包む関数がなければ本体がそのまま公開メソッド、あれば非公開の <op>Body（ops.go の公開メソッドが包む）。
+// genWiring は wiring.go（docs/emit-go.md「配線の本体」「match」）。選ばれた配線の op ごとに本体を一つ。
+// 本体がそのまま Ops のメソッドになる（select の stops / wraps の op は本体を出さず、口だけを ops.go に出す）。
 func (e *emitter) genWiring() *genFile {
 	g := e.newFile("wiring.go")
 	for _, op := range e.ops {
-		if op.Body == nil {
+		if e.isSlot(op) {
 			continue
 		}
 		b := &bodyGen{e: e, g: g, op: op, imp: &g.imports, vars: map[string]ir.Type{}, names: map[string]string{}, declared: map[string]bool{}}
@@ -48,7 +48,6 @@ func (b *bodyGen) gen() {
 		b.vars[n] = p.Type
 		b.declared[n] = true
 	}
-	b.declared["ctx"] = true
 	b.ind = "\t"
 	stmts := op.Body.Statements
 	for i, s := range stmts {
@@ -63,13 +62,8 @@ func (b *bodyGen) gen() {
 		}
 	}
 	g := b.g
-	if _, wrapped := e.wrappers[op.Name]; wrapped {
-		g.printf("// %s は %s の配線の本体。包む関数を通さずに呼ぶ（ops.go の %s が包む）。\n", e.bodyMethod(op), op.Name, e.methodName(op))
-		g.printf("func (o *ops) %s(%s) %s {\n", e.bodyMethod(op), e.paramList(op.Params, b.imp), e.resultList(op.Returns, b.imp))
-	} else {
-		g.body.WriteString(e.opComment(e.methodName(op), op, op.Params, op.Signature, ""))
-		g.printf("func (o *ops) %s(%s) %s {\n", e.methodName(op), e.paramList(op.Params, b.imp), e.resultList(op.Returns, b.imp))
-	}
+	g.body.WriteString(e.opComment(e.methodName(op), "", op, op.Params, e.viewedSig(op.Name), ""))
+	g.printf("func (o *ops) %s(%s) %s {\n", e.methodName(op), e.paramList(op.Params, b.imp), e.resultList(op.Returns, b.imp))
 	g.body.WriteString(b.buf.String())
 	g.println("}\n")
 }
@@ -90,11 +84,14 @@ func (b *bodyGen) fresh(base string) string {
 }
 
 // failReturn は `return <零値>, err`（void なら `return err`）。
-func (b *bodyGen) failReturn() string {
-	if b.op.Returns == nil {
-		return "return err"
-	}
-	return "return " + b.e.zeroExpr(b.op.Returns, b.imp) + ", err"
+func (b *bodyGen) failReturn() string { return b.e.failWith(b.op.Returns, "err", b.imp) }
+
+// guard は、関数のフィールド field が nil なら *runtime.MissingError を返す文（docs/emit-go.md「実装の単位」）。
+// フィールドを呼ぶ直前に書く。
+func (b *bodyGen) guard(field, kind, name string) {
+	b.line("if " + field + " == nil {")
+	b.line("\t" + b.e.failWith(b.op.Returns, missing(b.imp, kind, name), b.imp))
+	b.line("}")
 }
 
 // assignErr は `<name>, err := expr` と err の確認。match のアームの中（depth > 0）では `var name T` で宣言してから `=`。
@@ -205,8 +202,8 @@ func (b *bodyGen) markUnused(goName, hozoName string, rest []ir.Statement) {
 // match は match の文か式（docs/emit-go.md「match」）。wantValue なら値を変数に束縛して
 // その Go の名前を返す（bindName が空なら result）。値のない match か文なら "" を返す。
 //
-// 形は三つ（docs/grammar.md「配線」の表）。値の分類と状態の分類は Classify<C> の結果の switch、
-// 組み込みの分類（match s by list / by nullable）は o.stateCases.<S>IsEmpty の結果の if。
+// 形は三つ（docs/grammar.md「配線」の表）。値の分類は Classify<C>(o.classifiers.<C>, v)、状態の分類は Classify<C>() の
+// 結果の switch、組み込みの分類（match s by list / by nullable）は States.<S>.IsEmpty() の結果の if。
 // 形と分類が合わない IR（MATCH-7 を通っていれば来ない）は内部エラーにする。
 func (b *bodyGen) match(m *ir.Match, bindName string, wantValue bool, rest []ir.Statement) string {
 	e := b.e
@@ -234,14 +231,22 @@ func (b *bodyGen) match(m *ir.Match, bindName string, wantValue bool, rest []ir.
 		if _, ok := c.SubjectStates(); !ok {
 			return fail("%s が状態の分類でない", m.Classify)
 		}
-		decide = fmt.Sprintf("Classify%s(ctx, o.classifiers.%s)", e.typeName(c.Name), e.typeName(c.Name))
+		if e.unitOf[c.Name] == nil {
+			return fail("%s が名前空間 %s の状態の分類でない", m.Classify, e.viewer)
+		}
+		decide = fmt.Sprintf("Classify%s()", e.typeName(c.Name))
 	case ir.StateSubject:
 		st, _ = e.lookup(s.State).(*ir.State)
 		if st == nil || e.declNS[s.State] != e.viewer || string(st.Shape) != m.Classify || !st.Shape.HasBuiltinClassify() {
 			return fail("%s が名前空間 %s の %s の状態でない", s.State, e.viewer, m.Classify)
 		}
-		e.matchesState = true
-		decide = "o.stateCases." + e.isEmptyMethod(st) + "(ctx)"
+		u := e.unitOf[st.Name]
+		if u == nil {
+			return fail("%s が名前空間 %s の %s の状態でない", s.State, e.viewer, m.Classify)
+		}
+		query := "States." + e.unitField(u) + "." + queryIsEmpty
+		b.guard(query, missingState, st.Name)
+		decide = query + "()"
 	default:
 		return fail("対象の種類が分からない（docs/ir.md「配線」の Match.subject）")
 	}
@@ -437,15 +442,13 @@ func (b *bodyGen) call(c *ir.Call) (string, ir.Type) {
 	}
 	sameNS := e.declNS[c.Op] == e.viewer
 	var params []ir.OpParam
-	var receiver string
+	var callee string
 	if sameNS {
 		params = op.Params
-		receiver = "o"
+		callee = "o." + e.methodName(op)
 	} else {
 		params = e.viewedParams(c.Op)
-		ns := e.declNS[c.Op]
-		receiver = "o.deps." + depsField(ns)
-		e.depsOps[ns] = append(e.depsOps[ns], c.Op)
+		callee = "o.deps." + depsField(e.declNS[c.Op]) + "." + e.methodName(op)
 	}
 
 	// 同じ名前空間への呼び出しの bind: 状態の値を取る（docs/emit-go.md「配線の本体」の Call.bound）。
@@ -458,17 +461,19 @@ func (b *bodyGen) call(c *ir.Call) (string, ir.Type) {
 	if sameNS {
 		for _, pos := range c.Bound {
 			st, _ := e.lookup(pos.State).(*ir.State)
-			if st == nil || len(pos.Path) == 0 {
+			u := e.unitOf[pos.State]
+			if st == nil || u == nil || len(pos.Path) == 0 {
 				continue
 			}
-			e.usedStates = append(e.usedStates, st.Name)
+			query := "States." + e.unitField(u) + "." + queryGet
+			b.guard(query, missingState, st.Name)
 			n := b.fresh(localName(st.Name))
-			b.assignErr(n, stateValueType(st), "o.states."+e.typeName(st.Name)+"(ctx)")
+			b.assignErr(n, stateValueType(st), query+"()")
 			bounds = append(bounds, boundVal{pos, n, stateValueType(st)})
 		}
 	}
 
-	args := []string{"ctx"}
+	var args []string
 	for _, p := range params {
 		var arg *ir.CallArg
 		for i := range c.Args {
@@ -513,7 +518,10 @@ func (b *bodyGen) call(c *ir.Call) (string, ir.Type) {
 			args = append(args, v)
 		}
 	}
-	return receiver + "." + e.methodName(op) + "(" + strings.Join(args, ", ") + ")", op.Returns
+	if !sameNS {
+		b.guard(callee, missingDep, c.Op)
+	}
+	return callee + "(" + strings.Join(args, ", ") + ")", op.Returns
 }
 
 // emptyValue は model の型の空の値（`T{}`、optional なら `&T{}`）。

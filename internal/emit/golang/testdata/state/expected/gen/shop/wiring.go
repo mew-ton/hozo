@@ -2,13 +2,13 @@
 
 package shop
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
 // Checkout は注文を出す。もう出していれば何もしない。
 //
 // Effects: shop.placeOrder
-func (o *ops) Checkout(ctx context.Context) (*Order, error) {
-	kind, err := ClassifyCheckout(ctx, o.classifiers.Checkout)
+func (o *ops) Checkout() (*Order, error) {
+	kind, err := ClassifyCheckout()
 	if err != nil {
 		return nil, err
 	}
@@ -16,7 +16,7 @@ func (o *ops) Checkout(ctx context.Context) (*Order, error) {
 	switch kind {
 	case CheckoutShopping:
 		var v Order
-		v, err = o.SubmitOrder(ctx)
+		v, err = o.SubmitOrder()
 		placed = &v
 	case CheckoutOrdered:
 		placed = nil
@@ -28,27 +28,27 @@ func (o *ops) Checkout(ctx context.Context) (*Order, error) {
 }
 
 // Open は op shop.open。
-func (o *ops) Open(ctx context.Context) error {
-	kind, err := ClassifyLoggedIn(ctx, o.classifiers.LoggedIn)
+func (o *ops) Open() error {
+	kind, err := ClassifyLoggedIn()
 	if err != nil {
 		return err
 	}
 	switch kind {
 	case LoggedInLoggedIn:
-		err = o.ShowCart(ctx)
+		err = o.ShowCart()
 	case LoggedInDefault:
-		err = o.ShowLogin(ctx)
+		err = o.ShowLogin()
 	}
 	if err != nil {
 		return err
 	}
-	kind2, err := ClassifyCheckout(ctx, o.classifiers.Checkout)
+	kind2, err := ClassifyCheckout()
 	if err != nil {
 		return err
 	}
 	switch kind2 {
 	case CheckoutShopping, CheckoutOrdered:
-		err = o.ShowOrders(ctx)
+		err = o.ShowOrders()
 	}
 	if err != nil {
 		return err
@@ -57,8 +57,11 @@ func (o *ops) Open(ctx context.Context) error {
 }
 
 // Who は op shop.who。
-func (o *ops) Who(ctx context.Context) (*Profile, error) {
-	empty, err := o.stateCases.TokenIsEmpty(ctx)
+func (o *ops) Who() (*Profile, error) {
+	if States.Token.IsEmpty == nil {
+		return nil, &runtime.MissingError{Kind: "state", Name: "shop.token"}
+	}
+	empty, err := States.Token.IsEmpty()
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +69,11 @@ func (o *ops) Who(ctx context.Context) (*Profile, error) {
 	if empty {
 		profile = nil
 	} else {
+		if States.Token.Get == nil {
+			return nil, &runtime.MissingError{Kind: "state", Name: "shop.token"}
+		}
 		var token *Token
-		token, err = o.states.Token(ctx)
+		token, err = States.Token.Get()
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +82,7 @@ func (o *ops) Who(ctx context.Context) (*Profile, error) {
 			in.Token = *token
 		}
 		var v Profile
-		v, err = o.Me(ctx, in)
+		v, err = o.Me(in)
 		profile = &v
 	}
 	if err != nil {
@@ -88,15 +94,18 @@ func (o *ops) Who(ctx context.Context) (*Profile, error) {
 // OpenCart は op shop.openCart。
 //
 // Effects: shop.clearCart
-func (o *ops) OpenCart(ctx context.Context) error {
-	empty, err := o.stateCases.CartsIsEmpty(ctx)
+func (o *ops) OpenCart() error {
+	if States.Carts.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.carts"}
+	}
+	empty, err := States.Carts.IsEmpty()
 	if err != nil {
 		return err
 	}
 	if empty {
-		err = o.ShowEmpty(ctx)
+		err = o.ShowEmpty()
 	} else {
-		err = o.EmptyCart(ctx)
+		err = o.EmptyCart()
 	}
 	if err != nil {
 		return err
@@ -105,16 +114,19 @@ func (o *ops) OpenCart(ctx context.Context) error {
 }
 
 // Pick は op shop.pick。
-func (o *ops) Pick(ctx context.Context) (Line, error) {
-	empty, err := o.stateCases.CartsIsEmpty(ctx)
+func (o *ops) Pick() (Line, error) {
+	if States.Carts.IsEmpty == nil {
+		return Line{}, &runtime.MissingError{Kind: "state", Name: "shop.carts"}
+	}
+	empty, err := States.Carts.IsEmpty()
 	if err != nil {
 		return Line{}, err
 	}
 	var result Line
 	if empty {
-		result, err = o.SampleLine(ctx)
+		result, err = o.SampleLine()
 	} else {
-		result, err = o.FirstLine(ctx)
+		result, err = o.FirstLine()
 	}
 	if err != nil {
 		return Line{}, err
@@ -123,40 +135,55 @@ func (o *ops) Pick(ctx context.Context) (Line, error) {
 }
 
 // Refresh は op shop.refresh。
-func (o *ops) Refresh(ctx context.Context) error {
-	empty, err := o.stateCases.CartsIsEmpty(ctx)
+func (o *ops) Refresh() error {
+	if States.Carts.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.carts"}
+	}
+	empty, err := States.Carts.IsEmpty()
 	if err != nil {
 		return err
 	}
 	if !empty {
-		err = o.ShowCart(ctx)
+		err = o.ShowCart()
 	}
 	if err != nil {
 		return err
 	}
-	empty2, err := o.stateCases.TokenIsEmpty(ctx)
+	if States.Token.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.token"}
+	}
+	empty2, err := States.Token.IsEmpty()
 	if err != nil {
 		return err
 	}
 	if empty2 {
-		err = o.ShowLogin(ctx)
+		err = o.ShowLogin()
 	}
 	if err != nil {
 		return err
 	}
-	if _, err := o.stateCases.OrdersIsEmpty(ctx); err != nil {
+	if States.Orders.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.orders"}
+	}
+	if _, err := States.Orders.IsEmpty(); err != nil {
 		return err
 	}
-	if _, err := o.stateCases.OrdersIsEmpty(ctx); err != nil {
+	if States.Orders.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.orders"}
+	}
+	if _, err := States.Orders.IsEmpty(); err != nil {
 		return err
 	}
-	if err := o.ShowOrders(ctx); err != nil {
+	if err := o.ShowOrders(); err != nil {
 		return err
 	}
-	if _, err := o.stateCases.CartsIsEmpty(ctx); err != nil {
+	if States.Carts.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.carts"}
+	}
+	if _, err := States.Carts.IsEmpty(); err != nil {
 		return err
 	}
-	line, err := o.FirstLine(ctx)
+	line, err := o.FirstLine()
 	if err != nil {
 		return err
 	}

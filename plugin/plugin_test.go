@@ -94,6 +94,70 @@ func TestEmit(t *testing.T) {
 	if _, ok := got["errors"]; ok {
 		t.Errorf("errors must be omitted when empty, got %s", got["errors"])
 	}
+	// select は選ばなくても四つの列を [] で書く（docs/plugin-protocol.md「emit」の応答の例）
+	if string(got["select"]) != `{"roots":[],"stops":[],"states":[],"wraps":[]}` {
+		t.Errorf("select = %s", got["select"])
+	}
+}
+
+// docs/plugin-protocol.md「選択」: select の四つの項目がそのまま応答に載る。
+func TestEmitSelect(t *testing.T) {
+	h := &fake{emit: func(*EmitRequest) (*EmitResponse, error) {
+		return &EmitResponse{Select: Select{
+			Roots:  []string{"browser.onAddToCart"},
+			Stops:  []string{"browser.askYamadaWarranty"},
+			States: []string{"browser.token"},
+			Wraps:  []Wrap{{Op: "browser.fetchMe", Decorator: "cache"}},
+		}}, nil
+	}}
+	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","view":%s}`, ir.Version, viewJSON("browser")))
+	if code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	want := `{"files":[],"warnings":[],"select":{"roots":["browser.onAddToCart"],"stops":["browser.askYamadaWarranty"],"states":["browser.token"],"wraps":[{"op":"browser.fetchMe","decorator":"cache"}]}}` + "\n"
+	if out != want {
+		t.Errorf("stdout = %s\nwant %s", out, want)
+	}
+	// 読み戻しても同じ。select を省いた応答は何も選ばない
+	var back EmitResponse
+	decode(t, out, &back)
+	if len(back.Select.Roots) != 1 || len(back.Select.Wraps) != 1 || back.Select.Wraps[0].Decorator != "cache" {
+		t.Errorf("select not decoded: %+v", back.Select)
+	}
+	var none EmitResponse
+	decode(t, `{"files":[],"warnings":[]}`, &none)
+	if len(none.Select.Roots)+len(none.Select.Stops)+len(none.Select.States)+len(none.Select.Wraps) != 0 {
+		t.Errorf("omitted select must select nothing: %+v", none.Select)
+	}
+}
+
+// docs/packages.md「`plugin`（公開）」の OpsWith: viewer の op のうち、そのデコレータが付いたもの（via も見る）を宣言の順で。
+func TestOpsWith(t *testing.T) {
+	app := func(decorator, via string) ir.Application { return ir.Application{Decorator: decorator, Via: via} }
+	op := func(name string, apps ...ir.Application) *ir.Op {
+		return &ir.Op{DeclBase: ir.DeclBase{Name: name, Decorators: apps}}
+	}
+	view := &ir.View{Viewer: "web", Program: &ir.Program{Namespaces: []ir.Namespace{
+		{Name: "web", Decls: []ir.Decl{
+			op("web.open", app("t.entry", "")),
+			op("web.plain"),
+			&ir.Model{DeclBase: ir.DeclBase{Name: "web.M", Decorators: []ir.Application{app("t.entry", "")}}},
+			op("web.viaNamed", app("page.route", "t.entry")),
+			op("web.both", app("t.entry", ""), app("t.other", "")),
+		}},
+		{Name: "api", Decls: []ir.Decl{op("api.open", app("t.entry", ""))}},
+	}}}
+	got := OpsWith(view, "t.entry")
+	want := []string{"web.open", "web.viaNamed", "web.both"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("OpsWith = %v, want %v", got, want)
+	}
+	if got := OpsWith(view, "t.none"); got == nil || len(got) != 0 {
+		t.Errorf("OpsWith(none) = %#v, want empty non-nil", got)
+	}
+	if got := OpsWith(&ir.View{Viewer: "x"}, "t.entry"); got == nil || len(got) != 0 {
+		t.Errorf("OpsWith(no program) = %#v", got)
+	}
 }
 
 func TestEmitErrorsAndWarnings(t *testing.T) {
@@ -107,7 +171,7 @@ func TestEmitErrorsAndWarnings(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code = %d", code)
 	}
-	want := `{"files":[],"warnings":[{"at":"hozoc.emit","message":"w"}],"errors":[{"code":"CLI-1","at":"hozoc.check","message":"e"}]}` + "\n"
+	want := `{"files":[],"warnings":[{"at":"hozoc.emit","message":"w"}],"errors":[{"code":"CLI-1","at":"hozoc.check","message":"e"}],"select":{"roots":[],"stops":[],"states":[],"wraps":[]}}` + "\n"
 	if out != want {
 		t.Errorf("stdout = %s\nwant %s", out, want)
 	}

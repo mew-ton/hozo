@@ -205,8 +205,14 @@ namespace hozoc {
   /** プラグインの error（同「emit」の応答の errors の要素） */
   model PluginError { code: string; at: string; message: string; }
 
+  /** プラグインが包む関数を実装するデコレータの適用（同「選択」の wraps の要素）。キーの op と decorator が予約語なので、中身はこの仕様では書かない */
+  model Wrap {}
+
+  /** プラグインが選んだ出力の対象（同「選択」） */
+  model Select { roots: string[]; stops: string[]; states: string[]; wraps: Wrap[]; }
+
   /** 展開のときのプラグインからの出力（同「emit」の応答） */
-  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; }
+  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; select: Select; }
 
   /**
    * プラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
@@ -249,17 +255,17 @@ plugin_dirs = ["plugins"]
 `check` の後、`writeOutputs`:
 
 1. `namespaces` が空でなければ、その名前空間（と子孫）だけを対象にする。`hozo.toml` にない名前なら `UnknownNamespace`。
-2. 対象の各名前空間 N について、Conf(N) を解決し、既定の出力（`docs/emit-go.md`）を作る。GOEMIT-* があれば `CheckFailed`。
-3. Conf(N).plugins の各プラグインを `runEmit` で起動し（順序は `docs/plugin-protocol.md`「起動」）、`files` を集める。`errors` があれば `CheckFailed`。
+2. 対象の各名前空間 N について、Conf(N) を解決し、Conf(N).plugins の各プラグインを `runEmit` で起動して（順序は `docs/plugin-protocol.md`「起動」）、`files` と `select` を集める。`errors` があれば `CheckFailed`。`select` の誤り（PLG-3）は `proc.MalformedOutput`。
+3. 対象の各名前空間 N について、集めた `select` から既定の出力（`docs/emit-go.md`「出力の対象」）を作る。GOEMIT-* があれば `CheckFailed`。N の出力が、対象でない Go の名前空間 M の型を使うときは、M のプラグインも起動して `select` だけを使う（M の出力がその型を持つかで、import するか複製するかが決まる。`docs/emit-go.md`「配置」）。対象を絞っても、すべてを対象にしたときと同じ内容になる。
 4. すべての名前空間のファイルを集めてから、パスの重複を確かめる（CFG-5 → `OutputConflict`）。
 5. `dryRun` なら、書く予定のパスを `written` に入れて返す（書かない）。
 6. 対象の各名前空間の `<Dir(N)>/.hozoc-outputs.json`（前回書いたパスの一覧。ルートからの相対パスの JSON の配列、辞書順）を読み、今回書かないパスのファイルを消す。ファイルがなければ何もしない。`hozo.toml` から名前空間のテーブルを消した場合、その出力先はもう分からないので消さない（手で消す）。
 7. ファイルを書く。内容が同じなら書き直さない（`written` には入れる）。ディレクトリは作る。
-8. `.hozoc-outputs.json` を書く。
+8. `.hozoc-outputs.json` を書く。書くものが一つもない名前空間（プラグインがない、何も選ばれていない）には作らず、前回のものがあれば消す。
 
 `EmitResult.warnings` は `check` の warning に、既定の出力とプラグインの warning を足したもの。
 
-書く順序はパスの辞書順。途中で失敗したら、そこまでに書いたものは残る（原子性は持たない。`proc.Crashed` は 3 で起きるので、書き出しには入っていない）。
+書く順序はパスの辞書順。途中で失敗したら、そこまでに書いたものは残る（原子性は持たない。`proc.Crashed` は 2 と 3 で起きるので、書き出しには入っていない）。
 
 ## lsp
 

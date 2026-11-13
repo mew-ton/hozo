@@ -9,25 +9,8 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// EffectTransitionToLogin はログイン画面へ遷移する
-const EffectTransitionToLogin runtime.Effect = "browser.transitionToLogin"
-
-// EffectTransitionToForbidden は権限がないことを示す画面へ遷移する
-const EffectTransitionToForbidden runtime.Effect = "browser.transitionToForbidden"
-
 // PosInt は 1 以上の整数
 type PosInt int64
-
-// OfflineCacheMiss: ネットワークに失敗し、キャッシュにも前回の結果がない
-type OfflineCacheMiss struct{}
-
-func (OfflineCacheMiss) Error() string         { return "browser.OfflineCacheMiss" }
-func (OfflineCacheMiss) HozoException() string { return "browser.OfflineCacheMiss" }
-
-var _ runtime.Exception = OfflineCacheMiss{}
-
-// EffectRemoveToken は手元のトークンを消す
-const EffectRemoveToken runtime.Effect = "browser.removeToken"
 
 // EffectTransitionToPayment は支払い画面へ遷移する
 const EffectTransitionToPayment runtime.Effect = "browser.transitionToPayment"
@@ -78,9 +61,6 @@ type OrderPageEmpty struct {
 	UserName string `json:"userName"`
 }
 
-// EffectTransitionToOrders は注文一覧の既定の URL に置き換える
-const EffectTransitionToOrders runtime.Effect = "browser.transitionToOrders"
-
 // ProfilePage は browser.ProfilePage の union。アームは Ready, Unavailable。
 type ProfilePage interface{ isProfilePage() }
 
@@ -109,14 +89,6 @@ func (Unavailable) isProductPage() {}
 type ProductPageReady struct {
 	Item server.Item `json:"item"`
 }
-
-// LoginInInput は op server.login の引数のうち bind で埋まる位置を除いたもの（docs/ir.md「その名前空間から見た IR」）。
-type LoginInInput struct {
-	Body server.LoginInputBody `json:"body"`
-}
-
-// LogoutInInput は op server.logout の引数のうち bind で埋まる位置を除いたもの（docs/ir.md「その名前空間から見た IR」）。
-type LogoutInInput struct{}
 
 // GetMeInInput は op server.getMe の引数のうち bind で埋まる位置を除いたもの（docs/ir.md「その名前空間から見た IR」）。
 type GetMeInInput struct{}
@@ -173,3 +145,7 @@ func (Aborted) Error() string         { return "page.Aborted" }
 func (Aborted) HozoException() string { return "page.Aborted" }
 
 var _ runtime.Exception = Aborted{}
+
+// Route はルートの位置（path と params）
+// 名前空間 page の宣言の複製（Go のパッケージを import できないため。docs/emit-go.md「配置」）。
+type Route string

@@ -28,9 +28,6 @@ type Order struct {
 // EffectAddLine はカートに行を足す
 const EffectAddLine runtime.Effect = "shop.addLine"
 
-// EffectRename は店の名前を変える
-const EffectRename runtime.Effect = "shop.rename"
-
 // EffectRemoveToken は手元のトークンを消す
 const EffectRemoveToken runtime.Effect = "shop.removeToken"
 
@@ -43,11 +40,6 @@ const EffectPlaceOrder runtime.Effect = "shop.placeOrder"
 //
 // on shop.Checkout: any -> Shopping
 const EffectStartOver runtime.Effect = "shop.startOver"
-
-// EffectTouchCheckout は進み具合を記録し直す
-//
-// on shop.Checkout: Shopping | Ordered -> any
-const EffectTouchCheckout runtime.Effect = "shop.touchCheckout"
 
 // EffectSignIn はログインする
 //

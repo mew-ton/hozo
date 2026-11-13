@@ -1693,8 +1693,8 @@
             "kind": "decorator",
             "name": "t.entry",
             "description": {
-              "summary": "view-dump プラグインの起点（plugins/view-dump/hozo-plugin.toml の [emit] entry）",
-              "body": "view-dump プラグインの起点（plugins/view-dump/hozo-plugin.toml の [emit] entry）",
+              "summary": "view-dump プラグインの起点（emit の応答の select の roots に選ぶ op の印）",
+              "body": "view-dump プラグインの起点（emit の応答の select の roots に選ぶ op の印）",
               "params": [],
               "throws": [],
               "see": []

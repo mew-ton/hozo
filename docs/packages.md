@@ -9,7 +9,7 @@
 ```
 go.mod                 module github.com/mew-ton/hozo
 hozo.toml, cli.hozo    hozoc 自身の仕様と設定（docs/cli.md）
-cmd/hozoc/             CLI の main。hozoc.New(app.Leaves) と app.Presenter を、生成した cli.Main に渡すだけ
+cmd/hozoc/             CLI の main。app.App の Ops()（hozoc.States に実装を入れて hozoc.New）と app.Presenter を、生成した cli.Main に渡すだけ
 ir/                    IR の型（公開）
 plugin/                Go 向けプラグイン SDK（公開）
 plugin/golang/         Go の名前と型の規則（公開）
@@ -43,7 +43,7 @@ docs/                  設計文書
 cmd/hozoc → internal/gen/hozoc/cli → internal/gen/hozoc → runtime
 cmd/hozoc → internal/app → internal/gen/hozoc
                          → internal/project → internal/{config, vocab, syntax, sema, check, emit/golang, plugin}
-                                            → ir, plugin/golang, runtime
+                                            → ir, plugin, plugin/golang, runtime
 internal/lsp → internal/project, internal/syntax（シンボルと定義へのジャンプのために構文木を読み直す）
 internal/vocab → vocab
 plugins/go-cli → plugin, plugin/golang, ir
@@ -208,8 +208,14 @@ func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo �
 
 ```go
 type File struct { Path string; Content []byte }            // Path はルートからの相対パス（View.config.dir の下）
-type Options struct { Root string; Select plugin.Select }   // 名前空間に設定されたプラグインの select を合わせたもの（docs/emit-go.md「出力の対象」）   // 別の名前空間の言語と出力先は View.namespaces から読む（docs/emit-go.md「配置」）
-func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic)   // error があればファイルは返さない
+type Options struct {
+    Root     string
+    Select   plugin.Select     // 名前空間に設定されたプラグインの select を合わせたもの（docs/emit-go.md「出力の対象」）
+    Exported map[string]bool   // 別の Go の名前空間の出力が持つ型の FQN（その名前空間の Exports）。ここにある型は import し、ない型は複製する（docs/emit-go.md「配置」）
+}                                                            // 別の名前空間の言語と出力先は View.namespaces から読む
+func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic)   // error があればファイルは返さない。何も選ばれていなければ何も返さない
+func Exports(view *ir.View, sel plugin.Select) []string     // sel から決まる出力の対象のうち、view.viewer の名前空間の型の FQN
+func Uses(view *ir.View, sel plugin.Select) []string        // 出力の対象が型を参照している、別の Go の名前空間
 ```
 
 ### `internal/plugin`
@@ -218,11 +224,13 @@ func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic)   // error �
 
 ```go
 type Manifest struct{ ... }
-func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-1 / MAN-2 / MAN-4
+func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-2 / MAN-4
 func Discover(cfg *config.Config, name string) (*Manifest, string, []diag.Diagnostic)   // マニフェストとそのディレクトリ（絶対パス）。CFG-9 / MAN-3
 type Runner struct { Root string; Stderr io.Writer; Env []string }
 func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）
 var ErrCrashed, ErrMalformedOutput error                                                // errors.Is で判定。*PluginError は exit 2 の code を持ち、MAN-2 / MAN-5 の診断にする
+func CheckSelect(plugin string, view *ir.View, sel sdk.Select) error                    // emit の応答の select を確かめる。誤りは PLG-3（ErrMalformedOutput）。sdk は公開の plugin パッケージ
+func MergeSelect(sels ...sdk.Select) sdk.Select                                         // 名前空間に設定されたプラグインの select を合わせる
 ```
 
 ### `internal/project`
@@ -243,7 +251,7 @@ func (p *Project) Errors() int
 
 ### `internal/app`
 
-`docs/cli.md`「手で書くもの」。生成した `hozoc.Leaves`（`internal/gen/hozoc`）の実装 `Leaves` と、`cli.Presenter`（`internal/gen/hozoc/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。
+`docs/cli.md`「手で書くもの」。葉の op の実装を持つ `App`（`Leaves()` が生成した `hozoc.Leaves` を、`States()` が `hozoc.StateSet` を返し、`Ops()` が `hozoc.States` に入れて `hozoc.New` を呼ぶ。`hozoc.States` に入れるのはここだけ）と、`cli.Presenter`（`internal/gen/hozoc/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。
 
 ### `internal/lsp`
 

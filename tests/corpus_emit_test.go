@@ -15,18 +15,23 @@ import (
 var update = flag.Bool("update", false, "update golden files (docs/testing.md「コーパス」)")
 
 // corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は emit が `go run` のプラグインを起動するもの。
-// checkOnly は check のゴールデンだけを持つもの（emit のゴールデンは持たない）。
+// noOutput は、emit が何も書かないもの（emit のゴールデンは持たない）。
+//
+// 既定の出力は、プラグインが選んだ宣言だけを出す（docs/emit-go.md「出力の対象」）。emit のゴールデンを持つコーパスは、
+// どれも選ぶプラグインを設定している: design / state / select は tests/plugins/pick（コーパスの plugins/pick/pick.json の
+// デコレータで選ぶ）、view は plugins/view-dump（@t.entry の op を起点にする）。
 var corpora = []struct {
-	name      string
-	needsGo   bool
-	checkOnly bool
+	name     string
+	needsGo  bool
+	noOutput bool
 }{
-	{name: "design"},
-	{name: "view", needsGo: true}, // plugins/view-dump を `go run` で起動する
-	{name: "state"},               // 状態の分類・遷移の効果・状態での match
-	// モデルが先: 名前空間のデコレータ、出力しない名前空間、印のデコレータ。Go の既定の出力の形（印のデコレータは
-	// 何も生成しない。docs/emit-go.md「デコレータ」）が決まるまで、emit のゴールデンは置かない
-	{name: "model", checkOnly: true},
+	{name: "design", needsGo: true}, // 語彙のデコレータ（http / page / db）で選ぶ
+	{name: "view", needsGo: true},   // plugins/view-dump。api はプラグインがないので何も出力しない
+	{name: "state", needsGo: true},  // 状態の分類・遷移の効果・状態での match。すべての op と状態を選ぶ
+	{name: "select", needsGo: true}, // 出力の対象: 起点、stops、wraps、states、別の名前空間の op
+	// モデルが先: 名前空間のデコレータ、出力しない名前空間、印のデコレータ。出力する名前空間 shop にプラグインがないので、
+	// emit は何も書かない（docs/emit-go.md「出力の対象」）
+	{name: "model", noOutput: true},
 }
 
 // corpusDir はコーパス name のディレクトリ（tests/ からの相対パス）。
@@ -57,9 +62,6 @@ func TestCorpusCheckGolden(t *testing.T) {
 // （copyCorpusAsModule）、新しくできたファイルをすべて比べる。差分はファイルごとに示す。更新は `go test ./tests -update`。
 func TestCorpusEmitGolden(t *testing.T) {
 	for _, c := range corpora {
-		if c.checkOnly {
-			continue
-		}
 		t.Run(c.name, func(t *testing.T) {
 			if c.needsGo {
 				requireGo(t)
@@ -73,6 +75,16 @@ func TestCorpusEmitGolden(t *testing.T) {
 			got := readTree(t, root)
 			for p := range before {
 				delete(got, p) // 入力（.hozo、hozo.toml、go.mod など）は書き出したものではない
+			}
+			if c.noOutput {
+				// 選ぶプラグインがない: 終了コード 0 で、何も書かない（.hozoc-outputs.json も置かない）
+				if len(got) != 0 || stdout.String() != "" {
+					t.Errorf("emit が書いた: %v\n%s", sortedKeys(got), stdout.String())
+				}
+				if _, err := os.Stat(filepath.Join(goldenDir(c.name), "emit")); !os.IsNotExist(err) {
+					t.Errorf("%s は何も出力しないのに、emit のゴールデンがある", c.name)
+				}
+				return
 			}
 			if len(got) == 0 {
 				t.Fatalf("emit が何も書かなかった:\n%s%s", stdout.String(), stderr.String())

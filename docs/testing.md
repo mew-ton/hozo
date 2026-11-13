@@ -18,12 +18,14 @@
 `tests/corpus/<名前>/` に、設計書の例を集めたプロジェクト（`hozo.toml` と `.hozo`）を置く。
 
 - `design/`: 設計書 §5〜§11 の例を名前空間ごとに一つのファイルにまとめたもの。設計書の言葉をそのまま写し、写せなかった箇所と足した宣言は、そのディレクトリの `README.md` に一覧する（`docs/decisions.md`「設計書へ返すこと」の項目がその候補）。
-- `view/`: プラグインが受け取る `View`（`docs/ir.md`「その名前空間から見た IR」）を端から端まで確かめるためのサンプル。`docs/ir.md`「正規化」の各行と `docs/check.md`「計算」の各手順を一か所ずつ使い、テストの語彙 `t.entry` を起点にするプラグイン `plugins/view-dump` が受け取った `View` を書き出す。`tests/view_test.go` が、`internal/project` の `Views()["web"]` をゴールデン `testdata/expected/view.web.json` と比べ、要求ごとの期待値を文書の見出しの名前のサブテストで明示し、実物の `hozoc emit` がプラグインに渡した `View` が同じであることを確かめる。見出し → 構文の対応と想定する warning は `README.md`。
+- `view/`: プラグインが受け取る `View`（`docs/ir.md`「その名前空間から見た IR」）を端から端まで確かめるためのサンプル。`docs/ir.md`「正規化」の各行と `docs/check.md`「計算」の各手順を一か所ずつ使い、テストの語彙 `t.entry` の付いた op を起点に選ぶ（`docs/plugin-protocol.md`「選択」）プラグイン `plugins/view-dump` が、受け取った `View` を書き出す。プラグインを設定しているのは `web` だけで、`api` は何も出力しない。`tests/view_test.go` が、`internal/project` の `Views()["web"]` をゴールデン `testdata/expected/view.web.json` と比べ、要求ごとの期待値を文書の見出しの名前のサブテストで明示し、実物の `hozoc emit` がプラグインに渡した `View` が同じであることを確かめる。見出し → 構文の対応と想定する warning は `README.md`。
 - 各コーパスについて、`hozoc check` の text 出力をゴールデン `tests/corpus/<名前>/testdata/expected/check.txt` と比べる。warning も含む（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。
-- `emit` のゴールデン: `tests/corpus/<名前>/testdata/expected/emit/` に書き出したファイルの木（`.hozoc-outputs.json` を含む）を置き、実際に一時ディレクトリに書いて比べる。差分はファイルごとに示す（同 `TestCorpusEmitGolden`）。ゴールデンをすべて `testdata/` の下に置くのは、ゴールデンの `.go` を `go build ./...` / `go vet ./...` がパッケージとして拾わないため（Go は `testdata` を無視する）。一時ディレクトリにはリポジトリの `go.mod` を写し、`ir/` `plugin/` `tests/` をシンボリックリンクで足す（`tests/generated_test.go` と同じ）。コーパスのプラグインのマニフェストの `go run github.com/mew-ton/hozo/tests/corpus/<名前>/plugins/<p>` がそこから解決でき、既定の出力の import パスも `github.com/mew-ton/hozo/<out>` に決まる。比べた後、書き出した Go のパッケージをその一時ディレクトリで `go vet` に通す（`runtime/` をシンボリックリンクで足す。ゴールデンと一致していても、コンパイルできない出力を見逃さないため）。
+- `emit` のゴールデン: `tests/corpus/<名前>/testdata/expected/emit/` に書き出したファイルの木（`.hozoc-outputs.json` を含む）を置き、実際に一時ディレクトリに書いて比べる。既定の出力はプラグインが選んだ宣言だけを出す（`docs/emit-go.md`「出力の対象」）ので、ゴールデンを持つコーパスには選ぶプラグインを設定する: `view` は `plugins/view-dump`、ほかはテスト用の `tests/plugins/pick`（コーパスの `plugins/pick/pick.json` に書いたデコレータで `roots` / `stops` / `states` / `wraps` を選ぶ。`"all": true` ならすべての op と状態）。差分はファイルごとに示す（同 `TestCorpusEmitGolden`）。ゴールデンをすべて `testdata/` の下に置くのは、ゴールデンの `.go` を `go build ./...` / `go vet ./...` がパッケージとして拾わないため（Go は `testdata` を無視する）。一時ディレクトリにはリポジトリの `go.mod` を写し、`ir/` `plugin/` `tests/` をシンボリックリンクで足す（`tests/generated_test.go` と同じ）。コーパスのプラグインのマニフェストの `go run github.com/mew-ton/hozo/tests/corpus/<名前>/plugins/<p>` がそこから解決でき、既定の出力の import パスも `github.com/mew-ton/hozo/<out>` に決まる。比べた後、書き出した Go のパッケージをその一時ディレクトリで `go vet` に通す（`runtime/` をシンボリックリンクで足す。ゴールデンと一致していても、コンパイルできない出力を見逃さないため）。
 - ゴールデンの更新は `go test ./... -update`。
 
 - `state/`: 状態の分類、遷移の効果、状態での `match`（`docs/check.md`「状態の形」）のサンプル。IR の中身は `tests/view_test.go` の `TestStateCorpusIR` が見出しごとに確かめ、Go の既定の出力（`docs/emit-go.md`「state」「classify」「match」）は `emit` のゴールデンが確かめる。
+- `select/`: 出力の対象（`docs/emit-go.md`「出力の対象」「デコレータ」、`docs/plugin-protocol.md`「選択」）のサンプル。起点から辿られる op と辿られない op、`stops` の op、`wraps` で引き受けたデコレータと印のままのデコレータ、`states` で選ぶ状態、別の名前空間の op（`Deps`）、プラグインのない名前空間を一か所ずつ使う。`tests/select_test.go` の `TestSelectCorpus` が、実物の `hozoc emit` の出力を手順ごとに確かめる。
+- `model/`: 「モデルが先」（`docs/requirements.md`）のサンプル。出力する名前空間 `shop` にプラグインがないので、`emit` は何も書かない（ゴールデンを持たない）。`tests/model_test.go` の `TestModelCorpus` が、IR と、前回の出力が消えることを確かめる。
 
 段階 1 の途中（検査器ができるまで）は、`tests/parse_test.go` がコーパス・標準の語彙・`docs/cli.md` の `cli.hozo` を構文だけ確かめる。
 
@@ -43,15 +45,15 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 
 ## プラグインのプロトコル
 
-`internal/plugin` のテストは、`testdata/echo-plugin/`（`go run` で動く小さなプラグイン）を使い、要求がそのまま応答に写ること、終了コードが 0 以外なら `proc.Crashed`、JSON でなければ `proc.MalformedOutput` になることを確かめる。`plugins/go-cli` は、コーパス `hozoc/` に対する `emit` のゴールデンで確かめる。
+`internal/plugin` のテストは、`testdata/echo-plugin/`（`go run` で動く小さなプラグイン）を使い、要求がそのまま応答に写ること、終了コードが 0 以外なら `proc.Crashed`、JSON でなければ `proc.MalformedOutput` になることを確かめる。`plugins/go-cli` は、`plugins/go-cli/internal/gocli/testdata/` のゴールデン（`cli.hozo` と小さな例から作った `cli.go`）と、生成物の遅れの検査（「生成物の一致」）で確かめる。
 
 ## 単体テスト
 
 - `internal/syntax`: 文法の各非終端記号について、受理する例と拒否する例。回復の後に読めた宣言が残ること。
 - `internal/sema`: 解決の手続きの各段（`docs/resolve.md`「手続き」）、型の互換の各規則（`docs/types.md`「互換」）に一つずつ。
 - `internal/check`: 計算（Sig の E / F / rel / succ、bind）は、小さな IR を直接組み立てて期待値と比べる。設計書 §9 の `browser.logout` の例（`server.deleteSession` が不明、`removeToken` が起きている）を必ず含める。
-- `internal/emit/golang`: GOEMIT-* の各条件。生成物は `go/format` を通ること。
-- `internal/plugin`: MAN-* と PLG-* の各条件（「プラグインのプロトコル」）。
+- `internal/emit/golang`: GOEMIT-* の各条件。生成物は `go/format` を通ること。出力の対象（`docs/emit-go.md`「出力の対象」の各手順）。生成したコードを一時のモジュールで実際に動かす振る舞いのテスト（`testdata/<名前>/behavior_test.go`。`nil` のフィールドが `*runtime.MissingError` になること、`States` を通る配線）。
+- `internal/plugin`: MAN-* と PLG-3 の各条件（「プラグインのプロトコル」）。PLG-1 / PLG-2 は応答のファイルを集める `internal/app` のテストで確かめる。
 - `plugins/go-cli`: CLI-* の各条件と、引数の解釈の各規則（`docs/plugin-go-cli.md`「引数の解釈」）。
 - `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。
 

@@ -5,15 +5,11 @@ package web
 import (
 	"time"
 
-	"github.com/mew-ton/hozo/gen/api"
 	"github.com/mew-ton/hozo/runtime"
 )
 
 // EffectGoLogin はログイン画面へ
 const EffectGoLogin runtime.Effect = "web.goLogin"
-
-// EffectGoHome はホームへ
-const EffectGoHome runtime.Effect = "web.goHome"
 
 // EffectRemoveToken は手元のトークンを消す
 const EffectRemoveToken runtime.Effect = "web.removeToken"
@@ -30,7 +26,7 @@ func (Unavailable) isUserPage() {}
 
 // UserPageReady は web.UserPage のその場で書いた model。
 type UserPageReady struct {
-	User api.PublicUser `json:"user"`
+	User PublicUser `json:"user"`
 }
 
 // Offline: オフラインで取れなかった
@@ -43,7 +39,7 @@ var _ runtime.Exception = Offline{}
 
 // Query は問い合わせ
 type Query struct {
-	Id      api.UserId    `json:"id"`
+	Id      UserId        `json:"id"`
 	Page    int64         `json:"page"`
 	Timeout time.Duration `json:"timeout"`
 	Strict  bool          `json:"strict"`
@@ -58,13 +54,44 @@ func NewQuery() Query {
 	return m
 }
 
-// LoginForm は web.LoginForm の model。
-type LoginForm struct {
-	Name     string `json:"name"`
-	Password string `json:"password"`
-}
-
 // GetUserInInput は op api.getUser の引数のうち bind で埋まる位置を除いたもの（docs/ir.md「その名前空間から見た IR」）。
 type GetUserInInput struct {
-	Id api.UserId `json:"id"`
+	Id UserId `json:"id"`
 }
+
+// UserId はユーザーの識別子
+// 名前空間 api の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。
+type UserId string
+
+// Token はログインセッションのトークン
+// 名前空間 api の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。
+type Token string
+
+// PublicUser は api.PublicUser の model。
+// 名前空間 api の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。
+// api.User から secret, hash を除いたもの（is ... omit）。
+type PublicUser struct {
+	Id    UserId              `json:"id"`
+	Name  string              `json:"name"`
+	Nick  *string             `json:"nick,omitempty"`
+	Tags  []string            `json:"tags"`
+	Attrs map[string][]string `json:"attrs"`
+}
+
+// Unauthorized: 認証されていない
+// 名前空間 api の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。
+type Unauthorized struct{}
+
+func (Unauthorized) Error() string         { return "api.Unauthorized" }
+func (Unauthorized) HozoException() string { return "api.Unauthorized" }
+
+var _ runtime.Exception = Unauthorized{}
+
+// NotFound: 見つからない
+// 名前空間 api の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。
+type NotFound struct{}
+
+func (NotFound) Error() string         { return "api.NotFound" }
+func (NotFound) HozoException() string { return "api.NotFound" }
+
+var _ runtime.Exception = NotFound{}

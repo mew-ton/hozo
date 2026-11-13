@@ -2,10 +2,7 @@
 
 package web
 
-import (
-	"github.com/mew-ton/hozo/gen/api"
-	"github.com/mew-ton/hozo/runtime"
-)
+import "github.com/mew-ton/hozo/runtime"
 
 // UserKind はユーザーの種類
 type UserKind int
@@ -19,13 +16,17 @@ const (
 // UserKindCases は人が実装するケースごとの述語（設計書 §10.3）。
 type UserKindCases interface {
 	// 管理者
-	Admin(v api.PublicUser) bool
-	Member(v api.PublicUser) bool
+	Admin(v PublicUser) bool
+	Member(v PublicUser) bool
 }
 
 // ClassifyUserKind は web.UserKind を分類する。すべての述語を評価し、真になった数を数える。
 // 真がちょうど一つでなければ *runtime.ClassificationError。
-func ClassifyUserKind(c UserKindCases, v api.PublicUser) (UserKind, error) {
+// c が nil（Classifiers に入れていない）なら *runtime.MissingError。
+func ClassifyUserKind(c UserKindCases, v PublicUser) (UserKind, error) {
+	if c == nil {
+		return 0, &runtime.MissingError{Kind: "classifier", Name: "web.UserKind"}
+	}
 	var hits []string
 	var result UserKind
 	if c.Admin(v) {
@@ -38,35 +39,6 @@ func ClassifyUserKind(c UserKindCases, v api.PublicUser) (UserKind, error) {
 	}
 	if len(hits) != 1 {
 		return 0, &runtime.ClassificationError{Classify: "web.UserKind", Hits: hits}
-	}
-	return result, nil
-}
-
-// Verified はメールアドレスを確認済み
-type Verified int
-
-const (
-	VerifiedVerified Verified = iota
-	// どのケースにも当たらないとき。
-	VerifiedDefault
-)
-
-// VerifiedCases は人が実装するケースごとの述語（設計書 §10.3）。
-type VerifiedCases interface {
-	Verified(v api.PublicUser) bool
-}
-
-// ClassifyVerified は web.Verified を分類する。すべての述語を評価し、真になった数を数える。
-// 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
-func ClassifyVerified(c VerifiedCases, v api.PublicUser) (Verified, error) {
-	var hits []string
-	result := VerifiedDefault
-	if c.Verified(v) {
-		hits = append(hits, "Verified")
-		result = VerifiedVerified
-	}
-	if len(hits) > 1 {
-		return 0, &runtime.ClassificationError{Classify: "web.Verified", Hits: hits}
 	}
 	return result, nil
 }

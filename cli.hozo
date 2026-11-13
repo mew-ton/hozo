@@ -185,8 +185,14 @@ namespace hozoc {
   /** プラグインの error（同「emit」の応答の errors の要素） */
   model PluginError { code: string; at: string; message: string; }
 
+  /** プラグインが包む関数を実装するデコレータの適用（同「選択」の wraps の要素）。キーの op と decorator が予約語なので、中身はこの仕様では書かない */
+  model Wrap {}
+
+  /** プラグインが選んだ出力の対象（同「選択」） */
+  model Select { roots: string[]; stops: string[]; states: string[]; wraps: Wrap[]; }
+
   /** 展開のときのプラグインからの出力（同「emit」の応答） */
-  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; }
+  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; select: Select; }
 
   /**
    * プラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。

@@ -39,10 +39,59 @@ type EmitRequest struct {
 }
 
 // EmitResponse は "emit" の応答。Errors が一つでもあれば hozoc は Files を書き出さない。
+// Select は出力の対象の選択（docs/plugin-protocol.md「選択」）。省けば何も選ばない。
 type EmitResponse struct {
 	Files    []File       `json:"files"`
 	Warnings []Warning    `json:"warnings"`
 	Errors   []Diagnostic `json:"errors,omitempty"`
+	Select   Select       `json:"select,omitzero"`
+}
+
+// Select は、既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN はどれも View.Viewer の
+// 名前空間の宣言。そこにない FQN や、Wraps がその op に付いていないデコレータを指していれば PLG-3。
+// hozoc がここから出力の対象を決める手順は docs/emit-go.md「出力の対象」。
+type Select struct {
+	// Roots は起点にする op。
+	Roots []string `json:"roots"`
+	// Stops は、選ぶが本体は辿らない op。実装を差し込む口だけが出る。
+	Stops []string `json:"stops"`
+	// States は起点にする状態（基底の状態か、状態の分類）。
+	States []string `json:"states"`
+	// Wraps は、このプラグインが包む関数を実装するデコレータの適用。
+	Wraps []Wrap `json:"wraps"`
+}
+
+// Wrap はデコレータの適用一つ: op Op に付いたデコレータ Decorator（FQN。名前付きデコレータを通して付けたなら、その FQN でもよい）。
+type Wrap struct {
+	Op        string `json:"op"`
+	Decorator string `json:"decorator"`
+}
+
+// OpsWith は view.Viewer の名前空間の op のうち、デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。
+// 名前付きデコレータを通して付いたもの（Application.Via）も数える。デコレータで起点を選ぶプラグインのための道具
+// （docs/plugin-protocol.md「選択」）。一つもなければ空の列（nil ではない）。
+func OpsWith(view *ir.View, decorator string) []string {
+	out := []string{}
+	if view == nil || view.Program == nil {
+		return out
+	}
+	ns := view.Program.Namespace(view.Viewer)
+	if ns == nil {
+		return out
+	}
+	for _, d := range ns.Decls {
+		op, ok := d.(*ir.Op)
+		if !ok {
+			continue
+		}
+		for _, app := range op.Decorators {
+			if app.Decorator == decorator || app.Via == decorator {
+				out = append(out, op.Name)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // CheckRequest は direction "check" の要求（docs/plugin-protocol.md「check」）。
@@ -141,6 +190,19 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 		}
 		if r.Warnings == nil {
 			r.Warnings = []Warning{}
+		}
+		// select は常に四つの列を持つ形で書く（空でも []。docs/plugin-protocol.md「emit」の例）。
+		if r.Select.Roots == nil {
+			r.Select.Roots = []string{}
+		}
+		if r.Select.Stops == nil {
+			r.Select.Stops = []string{}
+		}
+		if r.Select.States == nil {
+			r.Select.States = []string{}
+		}
+		if r.Select.Wraps == nil {
+			r.Select.Wraps = []Wrap{}
 		}
 		resp = r
 	case "check":

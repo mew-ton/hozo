@@ -175,10 +175,12 @@ func (e *emitter) zeroExpr(t ir.Type, imp *gol.Imports) string {
 			return gol.GoType(x, imp) + "{}"
 		}
 		if s := e.scalar(x.Target); s != nil {
-			if c, ok := e.coreOf(s.Base); ok && c == ir.CoreTime {
+			// 名前付きの型の零値は、元の核の型の零値をその型に変換したもの（`T("")`、`T(0)`、`T(false)`）。Time が元なら `T{}`。
+			c, ok := e.coreOf(s.Base)
+			if !ok || c == ir.CoreTime {
 				return gol.GoType(x, imp) + "{}"
 			}
-			return e.zeroExpr(ir.CoreType{Name: ir.CoreInt}, imp)
+			return gol.GoType(x, imp) + "(" + e.zeroExpr(ir.CoreType{Name: c}, imp) + ")"
 		}
 	}
 	return "nil"

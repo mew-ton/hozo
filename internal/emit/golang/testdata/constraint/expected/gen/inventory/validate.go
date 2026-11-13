@@ -13,25 +13,31 @@ import (
 
 var patternSku = regexp.MustCompile("^[A-Z]")
 
-// ConstraintImpls は valid に足した制約の実装（設計書 §6.5）。人が Constraints に設定する。
-type ConstraintImpls interface {
-	// CheckDigit は 検査数字が合う
-	CheckDigit(v string) bool
-	// MultipleOf は valid.multipleOf。
-	MultipleOf(v int64, base int64) bool
+// CheckDigitFunc は制約 valid.checkDigit の関数の型。値がその制約を満たせば true。
+// 検査数字が合う
+type CheckDigitFunc func(v string) bool
+
+// MultipleOfFunc は制約 valid.multipleOf の関数の型。値がその制約を満たせば true。
+type MultipleOfFunc func(v int64, base int64) bool
+
+// ConstraintFuncs は valid に足した制約の実装（設計書 §6.5）を束ねる。
+type ConstraintFuncs struct {
+	CheckDigit CheckDigitFunc
+	MultipleOf MultipleOfFunc
 }
 
-// Constraints は ConstraintImpls の実装。未設定のまま Validate を呼ぶと panic する。
-var Constraints ConstraintImpls
+// Constraints は valid に足した制約の実装。人がフィールドを設定する。
+// 設定していない制約に Validate が当たったら *runtime.MissingError（Kind は "constraint"）。
+var Constraints ConstraintFuncs
 
 // Validate は inventory.Isbn の制約を確かめる。違反がなければ nil。
 func (v Isbn) Validate() error {
 	var violations []runtime.Violation
-	if Constraints == nil {
-		panic("inventory: Constraints が設定されていない（valid に足した制約の実装）")
-	}
 	if l := utf8.RuneCountInString(string(v)); l < 10 || l > 13 {
 		violations = append(violations, runtime.Violation{Path: "", Constraint: "length"})
+	}
+	if Constraints.CheckDigit == nil {
+		return &runtime.MissingError{Kind: "constraint", Name: "valid.checkDigit"}
 	}
 	if !Constraints.CheckDigit(string(v)) {
 		violations = append(violations, runtime.Violation{Path: "", Constraint: "checkDigit"})
@@ -45,11 +51,11 @@ func (v Isbn) Validate() error {
 // Validate は inventory.Sku の制約を確かめる。違反がなければ nil。
 func (v Sku) Validate() error {
 	var violations []runtime.Violation
-	if Constraints == nil {
-		panic("inventory: Constraints が設定されていない（valid に足した制約の実装）")
-	}
 	if l := utf8.RuneCountInString(string(v)); l < 10 || l > 13 {
 		violations = append(violations, runtime.Violation{Path: "", Constraint: "length"})
+	}
+	if Constraints.CheckDigit == nil {
+		return &runtime.MissingError{Kind: "constraint", Name: "valid.checkDigit"}
 	}
 	if !Constraints.CheckDigit(string(v)) {
 		violations = append(violations, runtime.Violation{Path: "", Constraint: "checkDigit"})
@@ -66,8 +72,8 @@ func (v Sku) Validate() error {
 // Validate は inventory.Qty の制約を確かめる。違反がなければ nil。
 func (v Qty) Validate() error {
 	var violations []runtime.Violation
-	if Constraints == nil {
-		panic("inventory: Constraints が設定されていない（valid に足した制約の実装）")
+	if Constraints.MultipleOf == nil {
+		return &runtime.MissingError{Kind: "constraint", Name: "valid.multipleOf"}
 	}
 	if !Constraints.MultipleOf(int64(v), 6) {
 		violations = append(violations, runtime.Violation{Path: "", Constraint: "multipleOf"})
@@ -84,22 +90,40 @@ func (v Qty) Validate() error {
 // Validate は inventory.Item の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m Item) Validate() error {
 	var violations []runtime.Violation
-	if Constraints == nil {
-		panic("inventory: Constraints が設定されていない（valid に足した制約の実装）")
+	if err := m.Isbn.Validate(); err != nil {
+		var miss *runtime.MissingError
+		if errors.As(err, &miss) {
+			return err
+		}
+		violations = appendViolations(violations, "isbn", err)
 	}
-	violations = appendViolations(violations, "isbn", m.Isbn.Validate())
-	violations = appendViolations(violations, "qty", m.Qty.Validate())
+	if err := m.Qty.Validate(); err != nil {
+		var miss *runtime.MissingError
+		if errors.As(err, &miss) {
+			return err
+		}
+		violations = appendViolations(violations, "qty", err)
+	}
 	if m.Note != nil {
 		x0 := *m.Note
 		if l := utf8.RuneCountInString(string(x0)); l > 10 {
 			violations = append(violations, runtime.Violation{Path: "note", Constraint: "length"})
 		}
 	}
+	if Constraints.CheckDigit == nil {
+		return &runtime.MissingError{Kind: "constraint", Name: "valid.checkDigit"}
+	}
 	if !Constraints.CheckDigit(string(m.Code)) {
 		violations = append(violations, runtime.Violation{Path: "code", Constraint: "checkDigit"})
 	}
 	for i0, x0 := range m.Alts {
-		violations = appendViolations(violations, "alts["+strconv.Itoa(i0)+"]", x0.Validate())
+		if err := x0.Validate(); err != nil {
+			var miss *runtime.MissingError
+			if errors.As(err, &miss) {
+				return err
+			}
+			violations = appendViolations(violations, "alts["+strconv.Itoa(i0)+"]", err)
+		}
 	}
 	if len(violations) == 0 {
 		return nil

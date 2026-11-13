@@ -3,24 +3,32 @@
 package browser
 
 import (
-	"context"
-
 	"example.com/app/gen/server"
+	"github.com/mew-ton/hozo/runtime"
 )
 
-// openMeBody は browser.openMe の配線の本体。包む関数を通さずに呼ぶ（ops.go の OpenMe が包む）。
-func (o *ops) openMeBody(ctx context.Context) (server.PublicUser, error) {
-	me, err := o.deps.Server.GetMe(ctx, GetMeInInput{Verbose: true})
+// OpenMe は自分のページを開く。
+//
+// Throws: http.ServerError, http.NetworkError
+// Effects: browser.redirected
+func (o *ops) OpenMe() (server.PublicUser, error) {
+	if o.deps.Server.GetMe == nil {
+		return server.PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "server.getMe"}
+	}
+	me, err := o.deps.Server.GetMe(GetMeInInput{Verbose: true})
 	if err != nil {
 		return server.PublicUser{}, err
 	}
-	token, err := o.states.Token(ctx)
+	if States.Token.Get == nil {
+		return server.PublicUser{}, &runtime.MissingError{Kind: "state", Name: "browser.token"}
+	}
+	token, err := States.Token.Get()
 	if err != nil {
 		return server.PublicUser{}, err
 	}
 	in := RenderInput{User: UserToPublicUser(me), Where: nil}
 	in.Token = token
-	if err := o.Render(ctx, in); err != nil {
+	if err := o.Render(in); err != nil {
 		return server.PublicUser{}, err
 	}
 	return UserToPublicUser(me), nil
@@ -29,12 +37,15 @@ func (o *ops) openMeBody(ctx context.Context) (server.PublicUser, error) {
 // ChooseLine は op browser.chooseLine。
 //
 // Throws: server.Unauthorized
-func (o *ops) ChooseLine(ctx context.Context, query server.OrdersQuery) (*server.OrderRow, error) {
-	rows, err := o.deps.Server.ListOrders(ctx, query)
+func (o *ops) ChooseLine(query server.OrdersQuery) (*server.OrderRow, error) {
+	if o.deps.Server.ListOrders == nil {
+		return nil, &runtime.MissingError{Kind: "dep", Name: "server.listOrders"}
+	}
+	rows, err := o.deps.Server.ListOrders(query)
 	if err != nil {
 		return nil, err
 	}
-	first, err := o.PickFirst(ctx, rows)
+	first, err := o.PickFirst(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +57,11 @@ func (o *ops) ChooseLine(ctx context.Context, query server.OrdersQuery) (*server
 	switch kind {
 	case WarrantyKindStandard:
 		var v server.OrderRow
-		v, err = o.StandardLine(ctx, first)
+		v, err = o.StandardLine(first)
 		line = &v
 	case WarrantyKindYamada:
 		var v2 server.OrderRow
-		v2, err = o.YamadaLine(ctx, first, &query.Page)
+		v2, err = o.YamadaLine(first, &query.Page)
 		line = &v2
 	case WarrantyKindDefault:
 		line = nil
@@ -64,7 +75,7 @@ func (o *ops) ChooseLine(ctx context.Context, query server.OrdersQuery) (*server
 	}
 	switch kind2 {
 	case IsBigIsBig:
-		err = o.Celebrate(ctx)
+		err = o.Celebrate()
 	case IsBigDefault:
 	}
 	if err != nil {
@@ -73,21 +84,14 @@ func (o *ops) ChooseLine(ctx context.Context, query server.OrdersQuery) (*server
 	return line, nil
 }
 
-// Logout は op browser.logout。
-//
-// Effects: server.deleteSession
-func (o *ops) Logout(ctx context.Context) error {
-	if err := o.deps.Server.Logout(ctx); err != nil {
-		return err
-	}
-	return o.ClearToken(ctx)
-}
-
 // FetchMe は op browser.fetchMe。
 //
 // Throws: server.Unauthorized
-func (o *ops) FetchMe(ctx context.Context, in server.GetMeInput) (server.PublicUser, error) {
-	result, err := o.deps.Server.GetMe(ctx, GetMeInputToGetMeInInput(in))
+func (o *ops) FetchMe(in server.GetMeInput) (server.PublicUser, error) {
+	if o.deps.Server.GetMe == nil {
+		return server.PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "server.getMe"}
+	}
+	result, err := o.deps.Server.GetMe(GetMeInputToGetMeInInput(in))
 	if err != nil {
 		return server.PublicUser{}, err
 	}

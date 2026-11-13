@@ -2,6 +2,7 @@ package golang
 
 import (
 	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin"
 )
 
 // このファイルは golden テストの入力。internal/sema と internal/check が作る形の ir.View を
@@ -70,6 +71,7 @@ func httpNS() ir.Namespace {
 		&ir.Exception{DeclBase: base("http.NetworkError", doc("運搬の失敗（ステータスなし）"))},
 		&ir.Decorator{DeclBase: base("http.post", nil), Params: []ir.Param{{Name: "path", Type: str}}, Targets: []ir.DecoratorTarget{ir.TargetOp}, External: true,
 			Throws: []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}},
+		&ir.Decorator{DeclBase: base("http.retry", doc("運搬に失敗したらやり直す。")), Targets: []ir.DecoratorTarget{ir.TargetOp}},
 	}}
 }
 
@@ -191,8 +193,16 @@ func serverNS() ir.Namespace {
 				Signature: ir.Signature{Effects: []string{"server.deleteSession"}, SuccessEffects: []ir.SuccessEffect{{Effect: "server.deleteSession", State: ir.Kept}}}},
 			&ir.Op{DeclBase: base("server.orderPage", doc("注文ページの VM。")), Params: []ir.OpParam{param("me", ir.Ref("server.User")), param("orders", ir.Array(ir.Ref("server.OrderRow")))},
 				Returns: ir.Ref("server.OrderPage")},
+			&ir.Op{DeclBase: base("server.publicUser", doc("公開する情報だけを取る。")), Params: []ir.OpParam{param("id", ir.Ref("server.UserId"))}, Returns: ir.Ref("server.PublicUser"),
+				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.ClientError"}}},
+				Signature: ir.Signature{Exceptions: []string{"server.ClientError"}}},
 		},
 	}
+}
+
+// serverSelect は server の選択: すべての op が起点（状態 sessions は、login と logout の効果の宛先として選ばれる）。
+func serverSelect() plugin.Select {
+	return plugin.Select{Roots: []string{"server.login", "server.getMe", "server.listOrders", "server.logout", "server.orderPage", "server.publicUser"}}
 }
 
 // serverView は server から見た View。
@@ -208,6 +218,8 @@ func serverView() *ir.View {
 }
 
 // browserNS はブラウザの名前空間: 配線、match、server への bind、デコレータ、classify。
+// デコレータのうち、選択（browserSelect）の wraps が引き受けるのは render の @retry と @guardMe、logout の @tracked、
+// pickFirst の @http.retry。openMe に付いたものはどれも引き受けられない（印。何も生成しない）。
 func browserNS() ir.Namespace {
 	const f = "browser.hozo"
 	intT := ir.TypeParam{Types: []ir.Type{ir.Int()}}
@@ -258,7 +270,11 @@ func browserNS() ir.Namespace {
 					ir.ReturnStmt{Expr: ir.AtomExpr{Atom: name("me")}, Span: sp(f, 1)},
 				}},
 				Signature: ir.Signature{Exceptions: []string{"http.ServerError", "http.NetworkError"}, Effects: []string{"browser.redirected"}}},
-			&ir.Op{DeclBase: base("browser.render", doc("画面を描く。")), Params: []ir.OpParam{param("in", ir.Ref("browser.RenderInput"))}, Returns: nil},
+			// 葉。外側から @retry、@guardMe（名前付き。中身は guarded）。包む関数は内側の @guardMe から順に包む。
+			&ir.Op{DeclBase: base("browser.render", doc("画面を描く。"),
+				app("browser.retry", arg("times", lit(ir.IntLiteral{Value: 2}))),
+				ir.Application{Decorator: "browser.guarded", Via: "browser.guardMe", Args: []ir.Arg{arg("on", ir.RefValue{Target: "http.NetworkError"})}, Span: sp(f, 1)},
+			), Params: []ir.OpParam{param("in", ir.Ref("browser.RenderInput"))}, Returns: nil},
 			// 配線: 注文の一覧から一行を選ぶ（match）。
 			&ir.Op{DeclBase: base("browser.chooseLine", nil), Params: []ir.OpParam{param("query", ir.Ref("server.OrdersQuery"))}, Returns: ir.Optional(ir.Ref("server.OrderRow")),
 				Body: &ir.Wiring{Statements: []ir.Statement{
@@ -278,12 +294,16 @@ func browserNS() ir.Namespace {
 					ir.ReturnStmt{Expr: ir.AtomExpr{Atom: name("line")}, Span: sp(f, 1)},
 				}},
 				Signature: ir.Signature{Exceptions: []string{"server.Unauthorized"}}},
-			&ir.Op{DeclBase: base("browser.pickFirst", nil), Params: []ir.OpParam{param("rows", ir.Array(ir.Ref("server.OrderRow")))}, Returns: ir.Ref("server.OrderRow")},
+			// 葉。別の名前空間のデコレータ（包む関数の名前に名前空間が付く）。
+			&ir.Op{DeclBase: base("browser.pickFirst", nil, app("http.retry")), Params: []ir.OpParam{param("rows", ir.Array(ir.Ref("server.OrderRow")))}, Returns: ir.Ref("server.OrderRow")},
 			&ir.Op{DeclBase: base("browser.standardLine", nil), Params: []ir.OpParam{param("row", ir.Case("browser.WarrantyKind", []string{"Standard"}, ir.Ref("server.OrderRow")))}, Returns: ir.Ref("server.OrderRow")},
 			&ir.Op{DeclBase: base("browser.yamadaLine", nil), Params: []ir.OpParam{param("row", ir.Ref("server.OrderRow")), param("page", ir.Optional(ir.Ref("server.PosInt")))}, Returns: ir.Ref("server.OrderRow")},
 			&ir.Op{DeclBase: base("browser.celebrate", nil)},
-			// 配線: void。最後の呼び出しをそのまま返す。
-			&ir.Op{DeclBase: base("browser.logout", nil), Returns: nil,
+			// 葉。ユニオンを返す（アームの一つは別のパッケージの model なので、包む型ができる）。
+			&ir.Op{DeclBase: base("browser.meView", nil), Returns: ir.Ref("browser.MeView")},
+			// 配線: void。最後の呼び出しをそのまま返す。選択の wraps が @tracked を引き受けるので、本体は辿られず、口だけが出る
+			// （clearToken と server.logout は出力の対象にならない）。
+			&ir.Op{DeclBase: base("browser.logout", nil, app("browser.tracked")), Returns: nil,
 				Body: &ir.Wiring{Statements: []ir.Statement{
 					ir.CallStmt{Call: ir.Call{Op: "server.logout", Bound: []ir.BoundPosition{{Path: []string{"token"}, State: "browser.token"}}, Span: sp(f, 1)}, Span: sp(f, 1)},
 					ir.CallStmt{Call: call("browser.clearToken"), Span: sp(f, 1)},
@@ -349,9 +369,18 @@ func browserServerView() *ir.View {
 	return v
 }
 
-// browserManifests はプラグイン router のマニフェスト: page.route が entry、browser.tracked が decorate。
-func browserManifests() []ManifestInfo {
-	return []ManifestInfo{{Name: "router", Entry: []string{"page.route"}, Decorate: []string{"browser.tracked"}}}
+// browserSelect は browser の選択（プラグイン router が返したものとして）: 起点は配線の openMe / chooseLine / fetchMe と、葉の meView。
+// wraps は render の @retry と @guardMe（名前付きデコレータの FQN で指す）、logout の @tracked、pickFirst の @http.retry。
+func browserSelect() plugin.Select {
+	return plugin.Select{
+		Roots: []string{"browser.openMe", "browser.chooseLine", "browser.fetchMe", "browser.meView"},
+		Wraps: []plugin.Wrap{
+			{Op: "browser.render", Decorator: "browser.retry"},
+			{Op: "browser.render", Decorator: "browser.guardMe"},
+			{Op: "browser.logout", Decorator: "browser.tracked"},
+			{Op: "browser.pickFirst", Decorator: "http.retry"},
+		},
+	}
 }
 
 // constraintView はユーザーが valid に足した制約と scalar の継承。
@@ -382,10 +411,15 @@ func constraintView() *ir.View {
 				Decorators: []ir.Application{app("valid.checkDigit")}},
 			field("alts", ir.Array(ir.Ref("inventory.Sku"))),
 		}},
+		// 型は op から辿って選ばれる（docs/emit-go.md「出力の対象」の 6）。
+		&ir.Op{DeclBase: base("inventory.put", nil), Params: []ir.OpParam{param("item", ir.Ref("inventory.Item"))}},
 	}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, valid, inv}}
 	return &ir.View{Viewer: "inventory", Config: nsConfig("inventory"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
 }
+
+// constraintSelect は inventory の選択: put が起点。
+func constraintSelect() plugin.Select { return plugin.Select{Roots: []string{"inventory.put"}} }
 
 // derivedView は derivedFrom の model と、配線の射影（既定値で埋めるフィールドを含む）。
 func derivedView() *ir.View {
@@ -429,6 +463,11 @@ func derivedView() *ir.View {
 		}
 	}
 	return v
+}
+
+// derivedSelect は catalog の選択: 配線の publish と summarize が起点（load は publish から辿られる）。
+func derivedSelect() plugin.Select {
+	return plugin.Select{Roots: []string{"catalog.publish", "catalog.summarize"}}
 }
 
 // ---- 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S6）の出力 ----
@@ -480,7 +519,8 @@ func effectsSig(effects ...string) ir.Signature { return ir.Signature{Effects: e
 
 // shopNS は店の名前空間: 三つの形の基底の状態、状態の分類（default なし）と condition（default あり）、値の分類、
 // 組み込みの効果と遷移の効果、状態での match（match by C と match s by list / by nullable）の配線。
-// 配線に match s by list / by nullable があるので、New は stateCases を取る。
+// 選択（stateSelect）は配線を起点にする。状態は、配線の match と bind、葉の効果の宛先から選ばれ、title だけは states で選ぶ。
+// 値の分類 LineKind はどの配線の match にも使われないので、出力の対象にならない。
 func shopNS() ir.Namespace {
 	return ir.Namespace{
 		Name:        "shop",
@@ -495,7 +535,7 @@ func shopNS() ir.Namespace {
 			&ir.State{DeclBase: base("shop.carts", doc("カートの行")), Shape: ir.StateList, Element: ir.Ref("shop.Line")},
 			&ir.State{DeclBase: base("shop.orders", doc("注文")), Shape: ir.StateList, Element: ir.Ref("shop.Order")},
 			&ir.State{DeclBase: base("shop.token", doc("手元のトークン")), Shape: ir.StateNullable, Element: ir.Ref("shop.Token")},
-			// single は組み込みの分類を持たない（StateCases に述語は出ない）。
+			// single は組み込みの分類を持たない（問い合わせは Get だけ）。
 			&ir.State{DeclBase: base("shop.title", doc("店の名前")), Shape: ir.StateSingle, Element: ir.String()},
 
 			// 状態の分類。default なし。
@@ -507,7 +547,7 @@ func shopNS() ir.Namespace {
 			// condition の糖衣の状態の分類。default あり。
 			&ir.Classify{DeclBase: base("shop.LoggedIn", doc("ログインしている")), Subject: ir.StatesSubject{States: []string{"shop.token"}},
 				Cases: []ir.ClassifyCase{{Name: "LoggedIn", Span: sp("x.hozo", 1)}}, HasDefault: true, FromCondition: true},
-			// 値の分類は今まで通り（Classifiers に状態の分類と並ぶ）。
+			// 値の分類。どの配線の match にも使われない。
 			&ir.Classify{DeclBase: base("shop.LineKind", nil), Subject: ir.TypeSubject{Type: ir.Ref("shop.Line")},
 				Cases: []ir.ClassifyCase{{Name: "Single", Span: sp("x.hozo", 1)}, {Name: "Bulk", Span: sp("x.hozo", 1)}}},
 
@@ -600,8 +640,8 @@ func shopNS() ir.Namespace {
 	}
 }
 
-// depotNS は倉庫の名前空間: list / nullable の状態と状態の分類（default あり）はあるが、配線に
-// match s by list / by nullable がない。StateCases は出るが、New は stateCases を取らない。
+// depotNS は倉庫の名前空間: list / nullable の状態と状態の分類（default あり）。選ばれる状態は、配線が match で読む
+// 分類 Level と、葉の order の効果の宛先 items。lock はどこからも選ばれず、Level の対象でも出力されない。
 func depotNS() ir.Namespace {
 	return ir.Namespace{
 		Name: "depot",
@@ -627,6 +667,17 @@ func depotNS() ir.Namespace {
 					ir.ReturnStmt{Expr: ir.CallExpr{Call: call("depot.count")}, Span: sp("x.hozo", 1)},
 				), Signature: effectsSig("depot.restock")},
 		},
+	}
+}
+
+// stateSelect は state のテストの選択: 配線が起点。shop は single の状態 title を states で選ぶ。
+func stateSelect(viewer string) plugin.Select {
+	if viewer == "depot" {
+		return plugin.Select{Roots: []string{"depot.report"}}
+	}
+	return plugin.Select{
+		Roots:  []string{"shop.checkout", "shop.open", "shop.who", "shop.openCart", "shop.pick", "shop.refresh"},
+		States: []string{"shop.title"},
 	}
 }
 

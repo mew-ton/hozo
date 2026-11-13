@@ -27,7 +27,11 @@ type WarrantyKindCases interface {
 
 // ClassifyWarrantyKind は browser.WarrantyKind を分類する。すべての述語を評価し、真になった数を数える。
 // 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
+// c が nil（Classifiers に入れていない）なら *runtime.MissingError。
 func ClassifyWarrantyKind(c WarrantyKindCases, v server.OrderRow) (WarrantyKind, error) {
+	if c == nil {
+		return 0, &runtime.MissingError{Kind: "classifier", Name: "browser.WarrantyKind"}
+	}
 	var hits []string
 	result := WarrantyKindDefault
 	if c.Standard(v) {
@@ -60,7 +64,11 @@ type IsBigCases interface {
 
 // ClassifyIsBig は browser.IsBig を分類する。すべての述語を評価し、真になった数を数える。
 // 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
+// c が nil（Classifiers に入れていない）なら *runtime.MissingError。
 func ClassifyIsBig(c IsBigCases, v server.OrderRow) (IsBig, error) {
+	if c == nil {
+		return 0, &runtime.MissingError{Kind: "classifier", Name: "browser.IsBig"}
+	}
 	var hits []string
 	result := IsBigDefault
 	if c.IsBig(v) {

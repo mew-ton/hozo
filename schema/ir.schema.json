@@ -1008,7 +1008,7 @@
     },
     "EmitResponse": {
       "additionalProperties": false,
-      "description": "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。",
+      "description": "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。select を省けば何も選ばない。",
       "properties": {
         "errors": {
           "items": {
@@ -1021,6 +1021,9 @@
             "$ref": "#/$defs/File"
           },
           "type": "array"
+        },
+        "select": {
+          "$ref": "#/$defs/Select"
         },
         "warnings": {
           "items": {
@@ -1959,6 +1962,43 @@
       ],
       "type": "object"
     },
+    "Select": {
+      "additionalProperties": false,
+      "description": "既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN は view.viewer の名前空間の宣言。",
+      "properties": {
+        "roots": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "states": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "stops": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "wraps": {
+          "items": {
+            "$ref": "#/$defs/Wrap"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "roots",
+        "stops",
+        "states",
+        "wraps"
+      ],
+      "type": "object"
+    },
     "Signature": {
       "additionalProperties": false,
       "description": "計算結果の関数の型 Sig(O, v)（docs/ir.md「op」、docs/check.md「計算」）。",
@@ -2538,6 +2578,23 @@
       },
       "required": [
         "statements"
+      ],
+      "type": "object"
+    },
+    "Wrap": {
+      "additionalProperties": false,
+      "description": "プラグインが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。",
+      "properties": {
+        "decorator": {
+          "type": "string"
+        },
+        "op": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "decorator"
       ],
       "type": "object"
     }

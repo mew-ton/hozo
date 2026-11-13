@@ -2,169 +2,203 @@
 
 package shop
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// SubmitOrder は op shop.submitOrder。
-	//
-	// Effects: shop.placeOrder
-	SubmitOrder(ctx context.Context) (Order, error)
+// SubmitOrderFunc は op shop.submitOrder の関数の型。
+//
+// Effects: shop.placeOrder
+type SubmitOrderFunc func() (Order, error)
 
-	// EmptyCart は op shop.emptyCart。
-	//
-	// Effects: shop.clearCart
-	EmptyCart(ctx context.Context) error
+// EmptyCartFunc は op shop.emptyCart の関数の型。
+//
+// Effects: shop.clearCart
+type EmptyCartFunc func() error
 
-	// ShowLogin は op shop.showLogin。
-	ShowLogin(ctx context.Context) error
+// ShowLoginFunc は op shop.showLogin の関数の型。
+type ShowLoginFunc func() error
 
-	// ShowCart は op shop.showCart。
-	ShowCart(ctx context.Context) error
+// ShowCartFunc は op shop.showCart の関数の型。
+type ShowCartFunc func() error
 
-	// ShowEmpty は op shop.showEmpty。
-	ShowEmpty(ctx context.Context) error
+// ShowEmptyFunc は op shop.showEmpty の関数の型。
+type ShowEmptyFunc func() error
 
-	// ShowOrders は op shop.showOrders。
-	ShowOrders(ctx context.Context) error
+// ShowOrdersFunc は op shop.showOrders の関数の型。
+type ShowOrdersFunc func() error
 
-	// SampleLine は op shop.sampleLine。
-	SampleLine(ctx context.Context) (Line, error)
+// SampleLineFunc は op shop.sampleLine の関数の型。
+type SampleLineFunc func() (Line, error)
 
-	// FirstLine は op shop.firstLine。
-	FirstLine(ctx context.Context) (Line, error)
+// FirstLineFunc は op shop.firstLine の関数の型。
+type FirstLineFunc func() (Line, error)
 
-	// Me は自分の情報。token は bind で埋まる。
-	Me(ctx context.Context, in MeInput) (Profile, error)
+// MeFunc は op shop.me の関数の型。
+//
+// 自分の情報。token は bind で埋まる。
+type MeFunc func(in MeInput) (Profile, error)
+
+// CheckoutFunc は op shop.checkout の関数の型。
+//
+// 注文を出す。もう出していれば何もしない。
+//
+// Effects: shop.placeOrder
+type CheckoutFunc func() (*Order, error)
+
+// OpenFunc は op shop.open の関数の型。
+type OpenFunc func() error
+
+// WhoFunc は op shop.who の関数の型。
+type WhoFunc func() (*Profile, error)
+
+// OpenCartFunc は op shop.openCart の関数の型。
+//
+// Effects: shop.clearCart
+type OpenCartFunc func() error
+
+// PickFunc は op shop.pick の関数の型。
+type PickFunc func() (Line, error)
+
+// RefreshFunc は op shop.refresh の関数の型。
+type RefreshFunc func() error
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	ShowLogin  ShowLoginFunc
+	ShowCart   ShowCartFunc
+	ShowEmpty  ShowEmptyFunc
+	ShowOrders ShowOrdersFunc
+	SampleLine SampleLineFunc
+	FirstLine  FirstLineFunc
+	Me         MeFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// SubmitOrder は op shop.submitOrder。
 	//
 	// Effects: shop.placeOrder
-	SubmitOrder(ctx context.Context) (Order, error)
+	SubmitOrder() (Order, error)
 
 	// EmptyCart は op shop.emptyCart。
 	//
 	// Effects: shop.clearCart
-	EmptyCart(ctx context.Context) error
+	EmptyCart() error
 
 	// ShowLogin は op shop.showLogin。
-	ShowLogin(ctx context.Context) error
+	ShowLogin() error
 
 	// ShowCart は op shop.showCart。
-	ShowCart(ctx context.Context) error
+	ShowCart() error
 
 	// ShowEmpty は op shop.showEmpty。
-	ShowEmpty(ctx context.Context) error
+	ShowEmpty() error
 
 	// ShowOrders は op shop.showOrders。
-	ShowOrders(ctx context.Context) error
+	ShowOrders() error
 
 	// SampleLine は op shop.sampleLine。
-	SampleLine(ctx context.Context) (Line, error)
+	SampleLine() (Line, error)
 
 	// FirstLine は op shop.firstLine。
-	FirstLine(ctx context.Context) (Line, error)
+	FirstLine() (Line, error)
 
 	// Me は自分の情報。token は bind で埋まる。
-	Me(ctx context.Context, in MeInput) (Profile, error)
+	Me(in MeInput) (Profile, error)
 
 	// Checkout は注文を出す。もう出していれば何もしない。
 	//
 	// Effects: shop.placeOrder
-	Checkout(ctx context.Context) (*Order, error)
+	Checkout() (*Order, error)
 
 	// Open は op shop.open。
-	Open(ctx context.Context) error
+	Open() error
 
 	// Who は op shop.who。
-	Who(ctx context.Context) (*Profile, error)
+	Who() (*Profile, error)
 
 	// OpenCart は op shop.openCart。
 	//
 	// Effects: shop.clearCart
-	OpenCart(ctx context.Context) error
+	OpenCart() error
 
 	// Pick は op shop.pick。
-	Pick(ctx context.Context) (Line, error)
+	Pick() (Line, error)
 
 	// Refresh は op shop.refresh。
-	Refresh(ctx context.Context) error
+	Refresh() error
 }
 
-// States は、この名前空間の配線が同じ名前空間の op を呼ぶときに bind で埋める状態の値の取得
-// （docs/emit-go.md「state」）。nullable<T> なら *T（空なら nil）、single<T> なら T。
-type States interface {
-	// Token は状態 shop.token の値。
-	Token(ctx context.Context) (*Token, error)
-}
-
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// CartsIsEmpty は状態 shop.carts（list）が空（Empty）か。
-	CartsIsEmpty(ctx context.Context) (bool, error)
-	// OrdersIsEmpty は状態 shop.orders（list）が空（Empty）か。
-	OrdersIsEmpty(ctx context.Context) (bool, error)
-	// TokenIsEmpty は状態 shop.token（nullable）が空（Empty）か。
-	TokenIsEmpty(ctx context.Context) (bool, error)
-}
-
-// Classifiers は分類ごとの述語の実装（classify.go の <C>Cases）。
-type Classifiers struct {
-	Checkout CheckoutCases
-	LoggedIn LoggedInCases
-	LineKind LineKindCases
-}
-
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves, states States, stateCases StateCases, classifiers Classifiers) Ops {
-	return &ops{leaves: leaves, states: states, stateCases: stateCases, classifiers: classifiers}
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
+func New(leaves Leaves) Ops {
+	return &ops{leaves: leaves}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
-	leaves      Leaves
-	states      States
-	stateCases  StateCases
-	classifiers Classifiers
+	leaves Leaves
 }
 
-func (o *ops) SubmitOrder(ctx context.Context) (Order, error) {
-	return o.leaves.SubmitOrder(ctx)
+func (o *ops) SubmitOrder() (Order, error) {
+	if States.Checkout.SubmitOrder == nil {
+		return Order{}, &runtime.MissingError{Kind: "state", Name: "shop.submitOrder"}
+	}
+	return States.Checkout.SubmitOrder()
 }
 
-func (o *ops) EmptyCart(ctx context.Context) error {
-	return o.leaves.EmptyCart(ctx)
+func (o *ops) EmptyCart() error {
+	if States.Carts.EmptyCart == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.emptyCart"}
+	}
+	return States.Carts.EmptyCart()
 }
 
-func (o *ops) ShowLogin(ctx context.Context) error {
-	return o.leaves.ShowLogin(ctx)
+func (o *ops) ShowLogin() error {
+	if o.leaves.ShowLogin == nil {
+		return &runtime.MissingError{Kind: "leaf", Name: "shop.showLogin"}
+	}
+	return o.leaves.ShowLogin()
 }
 
-func (o *ops) ShowCart(ctx context.Context) error {
-	return o.leaves.ShowCart(ctx)
+func (o *ops) ShowCart() error {
+	if o.leaves.ShowCart == nil {
+		return &runtime.MissingError{Kind: "leaf", Name: "shop.showCart"}
+	}
+	return o.leaves.ShowCart()
 }
 
-func (o *ops) ShowEmpty(ctx context.Context) error {
-	return o.leaves.ShowEmpty(ctx)
+func (o *ops) ShowEmpty() error {
+	if o.leaves.ShowEmpty == nil {
+		return &runtime.MissingError{Kind: "leaf", Name: "shop.showEmpty"}
+	}
+	return o.leaves.ShowEmpty()
 }
 
-func (o *ops) ShowOrders(ctx context.Context) error {
-	return o.leaves.ShowOrders(ctx)
+func (o *ops) ShowOrders() error {
+	if o.leaves.ShowOrders == nil {
+		return &runtime.MissingError{Kind: "leaf", Name: "shop.showOrders"}
+	}
+	return o.leaves.ShowOrders()
 }
 
-func (o *ops) SampleLine(ctx context.Context) (Line, error) {
-	return o.leaves.SampleLine(ctx)
+func (o *ops) SampleLine() (Line, error) {
+	if o.leaves.SampleLine == nil {
+		return Line{}, &runtime.MissingError{Kind: "leaf", Name: "shop.sampleLine"}
+	}
+	return o.leaves.SampleLine()
 }
 
-func (o *ops) FirstLine(ctx context.Context) (Line, error) {
-	return o.leaves.FirstLine(ctx)
+func (o *ops) FirstLine() (Line, error) {
+	if o.leaves.FirstLine == nil {
+		return Line{}, &runtime.MissingError{Kind: "leaf", Name: "shop.firstLine"}
+	}
+	return o.leaves.FirstLine()
 }
 
-func (o *ops) Me(ctx context.Context, in MeInput) (Profile, error) {
-	return o.leaves.Me(ctx, in)
+func (o *ops) Me(in MeInput) (Profile, error) {
+	if o.leaves.Me == nil {
+		return Profile{}, &runtime.MissingError{Kind: "leaf", Name: "shop.me"}
+	}
+	return o.leaves.Me(in)
 }

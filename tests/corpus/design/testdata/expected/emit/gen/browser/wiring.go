@@ -3,29 +3,19 @@
 package browser
 
 import (
-	"context"
-
 	"github.com/mew-ton/hozo/gen/server"
+	"github.com/mew-ton/hozo/runtime"
 )
 
-// requestLogoutBody は browser.requestLogout の配線の本体。包む関数を通さずに呼ぶ（ops.go の RequestLogout が包む）。
-func (o *ops) requestLogoutBody(ctx context.Context) error {
-	return o.deps.Server.Logout(ctx, LogoutInInput{})
-}
-
-// Logout は op browser.logout。
+// OnAddToCart は op browser.onAddToCart。
 //
-// Effects: server.deleteSession, browser.removeToken
-func (o *ops) Logout(ctx context.Context) error {
-	if err := o.RequestLogout(ctx); err != nil {
-		return err
+// Throws: http.ServerError, http.NetworkError, page.Aborted
+// Effects: server.addCartLine, server.attachWarrantyToLine, browser.transitionToPayment
+func (o *ops) OnAddToCart(item server.Item) error {
+	if o.deps.Server.AddToCart == nil {
+		return &runtime.MissingError{Kind: "dep", Name: "server.addToCart"}
 	}
-	return o.ClearToken(ctx)
-}
-
-// onAddToCartBody は browser.onAddToCart の配線の本体。包む関数を通さずに呼ぶ（ops.go の OnAddToCart が包む）。
-func (o *ops) onAddToCartBody(ctx context.Context, item server.Item) error {
-	line, err := o.deps.Server.AddToCart(ctx, AddToCartInInput{Item: item})
+	line, err := o.deps.Server.AddToCart(AddToCartInInput{Item: item})
 	if err != nil {
 		return err
 	}
@@ -37,11 +27,11 @@ func (o *ops) onAddToCartBody(ctx context.Context, item server.Item) error {
 	switch kind {
 	case WarrantyKindStandard:
 		var v server.WarrantyLine
-		v, err = o.ChooseStandardWarranty(ctx, item, line)
+		v, err = o.ChooseStandardWarranty(item, line)
 		warranty = &v
 	case WarrantyKindYamada:
 		var v2 server.WarrantyLine
-		v2, err = o.ChooseYamadaWarranty(ctx, item, line)
+		v2, err = o.ChooseYamadaWarranty(item, line)
 		warranty = &v2
 	case WarrantyKindNoWarranty:
 		warranty = nil
@@ -49,7 +39,7 @@ func (o *ops) onAddToCartBody(ctx context.Context, item server.Item) error {
 	if err != nil {
 		return err
 	}
-	return o.GoPayment(ctx, line, warranty)
+	return o.GoPayment(line, warranty)
 }
 
 // ChooseYamadaWarranty は op browser.chooseYamadaWarranty。
@@ -57,85 +47,74 @@ func (o *ops) onAddToCartBody(ctx context.Context, item server.Item) error {
 // Throws: page.Aborted, http.ServerError, http.NetworkError
 // Effects: server.attachWarrantyToLine
 // 前提: item は browser.WarrantyKind.Yamada<server.Item>
-func (o *ops) ChooseYamadaWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error) {
-	plan, err := o.AskYamadaWarranty(ctx, item)
+func (o *ops) ChooseYamadaWarranty(item server.Item, line server.CartLine) (server.WarrantyLine, error) {
+	plan, err := o.AskYamadaWarranty(item)
 	if err != nil {
 		return server.WarrantyLine{}, err
 	}
-	return o.deps.Server.AttachWarranty(ctx, AttachWarrantyInInput{Line: line, Plan: plan})
-}
-
-// ChooseWarrantyPlan は保証プランを選ぶ。保証が付かない商品なら none
-//
-// Throws: page.Aborted
-func (o *ops) ChooseWarrantyPlan(ctx context.Context, item server.Item) (*server.PlanId, error) {
-	kind, err := ClassifyWarrantyAvailable(o.classifiers.WarrantyAvailable, item)
-	if err != nil {
-		return nil, err
+	if o.deps.Server.AttachWarranty == nil {
+		return server.WarrantyLine{}, &runtime.MissingError{Kind: "dep", Name: "server.attachWarranty"}
 	}
-	var plan *server.PlanId
-	switch kind {
-	case WarrantyAvailableWarrantyAvailable:
-		var v server.PlanId
-		v, err = o.AskWarrantyPlan(ctx, item)
-		plan = &v
-	case WarrantyAvailableDefault:
-		plan = nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return plan, nil
+	return o.deps.Server.AttachWarranty(AttachWarrantyInInput{Line: line, Plan: plan})
 }
 
 // FetchMe は op browser.fetchMe。
 //
 // Throws: http.ServerError, http.NetworkError
-func (o *ops) FetchMe(ctx context.Context) (server.PublicUser, error) {
-	return o.deps.Server.GetMe(ctx, GetMeInInput{})
+func (o *ops) FetchMe() (server.PublicUser, error) {
+	if o.deps.Server.GetMe == nil {
+		return server.PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "server.getMe"}
+	}
+	return o.deps.Server.GetMe(GetMeInInput{})
 }
 
 // FetchOrders は op browser.fetchOrders。
 //
 // Throws: http.ServerError, http.NetworkError
-func (o *ops) FetchOrders(ctx context.Context, query OrdersQuery) ([]server.OrderSummary, error) {
-	return o.deps.Server.GetOrders(ctx, GetOrdersInInput{Page: int64(query.Page), Status: query.Status})
+func (o *ops) FetchOrders(query OrdersQuery) ([]server.OrderSummary, error) {
+	if o.deps.Server.GetOrders == nil {
+		return nil, &runtime.MissingError{Kind: "dep", Name: "server.getOrders"}
+	}
+	return o.deps.Server.GetOrders(GetOrdersInInput{Page: int64(query.Page), Status: query.Status})
 }
 
-// openOrdersBody は browser.openOrders の配線の本体。包む関数を通さずに呼ぶ（ops.go の OpenOrders が包む）。
-func (o *ops) openOrdersBody(ctx context.Context, query OrdersQuery) (OrderPage, error) {
-	me, err := o.FetchMe(ctx)
+// OpenOrders は op browser.openOrders。
+func (o *ops) OpenOrders(query OrdersQuery) (OrderPage, error) {
+	me, err := o.FetchMe()
 	if err != nil {
 		return nil, err
 	}
-	orders, err := o.FetchOrders(ctx, query)
+	orders, err := o.FetchOrders(query)
 	if err != nil {
 		return nil, err
 	}
-	return o.OrderPageVm(ctx, me, orders)
+	return o.OrderPageVm(me, orders)
 }
 
-// openProfileBody は browser.openProfile の配線の本体。包む関数を通さずに呼ぶ（ops.go の OpenProfile が包む）。
-func (o *ops) openProfileBody(ctx context.Context) (ProfilePage, error) {
-	me, err := o.FetchMe(ctx)
+// OpenProfile は op browser.openProfile。
+func (o *ops) OpenProfile() (ProfilePage, error) {
+	me, err := o.FetchMe()
 	if err != nil {
 		return nil, err
 	}
-	return o.ProfilePageVm(ctx, me)
+	return o.ProfilePageVm(me)
 }
 
 // FetchItem は op browser.fetchItem。
 //
 // Throws: http.ServerError, http.NetworkError
-func (o *ops) FetchItem(ctx context.Context, query ProductQuery) (server.Item, error) {
-	return o.deps.Server.GetItem(ctx, server.GetItemInput{Id: query.Id})
+func (o *ops) FetchItem(query ProductQuery) (server.Item, error) {
+	if o.deps.Server.GetItem == nil {
+		return server.Item{}, &runtime.MissingError{Kind: "dep", Name: "server.getItem"}
+	}
+	return o.deps.Server.GetItem(server.GetItemInput{Id: query.Id})
 }
 
-// openProductBody は browser.openProduct の配線の本体。包む関数を通さずに呼ぶ（ops.go の OpenProduct が包む）。
-func (o *ops) openProductBody(ctx context.Context, query ProductQuery) (ProductPage, error) {
-	item, err := o.FetchItem(ctx, query)
+// OpenProduct は op browser.openProduct。
+func (o *ops) OpenProduct(query ProductQuery) (ProductPage, error) {
+	item, err := o.FetchItem(query)
 	if err != nil {
 		return nil, err
 	}
-	return o.ProductPageVm(ctx, item)
+	return o.ProductPageVm(item)
 }

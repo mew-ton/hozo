@@ -3,353 +3,267 @@
 package browser
 
 import (
-	"context"
-
 	"github.com/mew-ton/hozo/gen/server"
+	"github.com/mew-ton/hozo/runtime"
 )
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// ClearToken は op browser.clearToken。
-	//
-	// Effects: browser.removeToken
-	ClearToken(ctx context.Context) error
+// GoPaymentFunc は op browser.goPayment の関数の型。
+//
+// Effects: browser.transitionToPayment
+type GoPaymentFunc func(line server.CartLine, warranty *server.WarrantyLine) error
 
-	// GoPayment は op browser.goPayment。
-	//
-	// Effects: browser.transitionToPayment
-	GoPayment(ctx context.Context, line server.CartLine, warranty *server.WarrantyLine) error
+// OnAddToCartFunc は op browser.onAddToCart の関数の型。
+//
+// Throws: http.ServerError, http.NetworkError, page.Aborted
+// Effects: server.addCartLine, server.attachWarrantyToLine, browser.transitionToPayment
+type OnAddToCartFunc func(item server.Item) error
 
-	// AskYamadaWarranty は op browser.askYamadaWarranty。
-	//
-	// Throws: page.Aborted
-	// 前提: item は browser.WarrantyKind.Yamada<server.Item>
-	AskYamadaWarranty(ctx context.Context, item server.Item) (server.PlanId, error)
+// ChooseYamadaWarrantyFunc は op browser.chooseYamadaWarranty の関数の型。
+//
+// Throws: page.Aborted, http.ServerError, http.NetworkError
+// Effects: server.attachWarrantyToLine
+// 前提: item は browser.WarrantyKind.Yamada<server.Item>
+type ChooseYamadaWarrantyFunc func(item server.Item, line server.CartLine) (server.WarrantyLine, error)
 
-	// ChooseStandardWarranty はメーカー保証の明細を作る
-	//
-	// 前提: item は browser.WarrantyKind.Standard<server.Item>
-	ChooseStandardWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error)
+// AskYamadaWarrantyFunc は op browser.askYamadaWarranty の関数の型。
+//
+// Throws: page.Aborted
+// 前提: item は browser.WarrantyKind.Yamada<server.Item>
+type AskYamadaWarrantyFunc func(item server.Item) (server.PlanId, error)
 
-	// AskWarrantyPlan は op browser.askWarrantyPlan。
-	//
-	// Throws: page.Aborted
-	// 前提: item は browser.WarrantyAvailable.WarrantyAvailable<server.Item>
-	AskWarrantyPlan(ctx context.Context, item server.Item) (server.PlanId, error)
+// ChooseStandardWarrantyFunc は op browser.chooseStandardWarranty の関数の型。
+//
+// メーカー保証の明細を作る
+//
+// 前提: item は browser.WarrantyKind.Standard<server.Item>
+type ChooseStandardWarrantyFunc func(item server.Item, line server.CartLine) (server.WarrantyLine, error)
 
-	// OrderPageVm は op browser.orderPageVm。
-	OrderPageVm(ctx context.Context, me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
+// FetchMeFunc は op browser.fetchMe の関数の型。
+//
+// Throws: http.ServerError, http.NetworkError
+type FetchMeFunc func() (server.PublicUser, error)
 
-	// ProfilePageVm は op browser.profilePageVm。
-	ProfilePageVm(ctx context.Context, me server.PublicUser) (ProfilePage, error)
+// FetchOrdersFunc は op browser.fetchOrders の関数の型。
+//
+// Throws: http.ServerError, http.NetworkError
+type FetchOrdersFunc func(query OrdersQuery) ([]server.OrderSummary, error)
 
-	// ProductPageVm は op browser.productPageVm。
-	ProductPageVm(ctx context.Context, item server.Item) (ProductPage, error)
+// OrderPageVmFunc は op browser.orderPageVm の関数の型。
+type OrderPageVmFunc func(me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
+
+// OpenOrdersFunc は op browser.openOrders の関数の型。
+type OpenOrdersFunc func(query OrdersQuery) (OrderPage, error)
+
+// ProfilePageVmFunc は op browser.profilePageVm の関数の型。
+type ProfilePageVmFunc func(me server.PublicUser) (ProfilePage, error)
+
+// OpenProfileFunc は op browser.openProfile の関数の型。
+type OpenProfileFunc func() (ProfilePage, error)
+
+// ProductPageVmFunc は op browser.productPageVm の関数の型。
+type ProductPageVmFunc func(item server.Item) (ProductPage, error)
+
+// FetchItemFunc は op browser.fetchItem の関数の型。
+//
+// Throws: http.ServerError, http.NetworkError
+type FetchItemFunc func(query ProductQuery) (server.Item, error)
+
+// OpenProductFunc は op browser.openProduct の関数の型。
+type OpenProductFunc func(query ProductQuery) (ProductPage, error)
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	AskYamadaWarranty      AskYamadaWarrantyFunc
+	ChooseStandardWarranty ChooseStandardWarrantyFunc
+	OrderPageVm            OrderPageVmFunc
+	ProfilePageVm          ProfilePageVmFunc
+	ProductPageVm          ProductPageVmFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
-	// ClearToken は op browser.clearToken。
-	//
-	// Effects: browser.removeToken
-	ClearToken(ctx context.Context) error
-
-	// RequestLogout はサーバーのセッションの削除を依頼する。結果は見ない
-	//
-	// Effects: server.deleteSession
-	RequestLogout(ctx context.Context) error
-
-	// Logout は op browser.logout。
-	//
-	// Effects: server.deleteSession, browser.removeToken
-	Logout(ctx context.Context) error
-
 	// GoPayment は op browser.goPayment。
 	//
 	// Effects: browser.transitionToPayment
-	GoPayment(ctx context.Context, line server.CartLine, warranty *server.WarrantyLine) error
+	GoPayment(line server.CartLine, warranty *server.WarrantyLine) error
 
 	// OnAddToCart は op browser.onAddToCart。
 	//
 	// Throws: http.ServerError, http.NetworkError, page.Aborted
 	// Effects: server.addCartLine, server.attachWarrantyToLine, browser.transitionToPayment
-	OnAddToCart(ctx context.Context, item server.Item) error
+	OnAddToCart(item server.Item) error
 
 	// ChooseYamadaWarranty は op browser.chooseYamadaWarranty。
 	//
 	// Throws: page.Aborted, http.ServerError, http.NetworkError
 	// Effects: server.attachWarrantyToLine
 	// 前提: item は browser.WarrantyKind.Yamada<server.Item>
-	ChooseYamadaWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error)
+	ChooseYamadaWarranty(item server.Item, line server.CartLine) (server.WarrantyLine, error)
 
 	// AskYamadaWarranty は op browser.askYamadaWarranty。
 	//
 	// Throws: page.Aborted
 	// 前提: item は browser.WarrantyKind.Yamada<server.Item>
-	AskYamadaWarranty(ctx context.Context, item server.Item) (server.PlanId, error)
+	AskYamadaWarranty(item server.Item) (server.PlanId, error)
 
 	// ChooseStandardWarranty はメーカー保証の明細を作る
 	//
 	// 前提: item は browser.WarrantyKind.Standard<server.Item>
-	ChooseStandardWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error)
-
-	// ChooseWarrantyPlan は保証プランを選ぶ。保証が付かない商品なら none
-	//
-	// Throws: page.Aborted
-	ChooseWarrantyPlan(ctx context.Context, item server.Item) (*server.PlanId, error)
-
-	// AskWarrantyPlan は op browser.askWarrantyPlan。
-	//
-	// Throws: page.Aborted
-	// 前提: item は browser.WarrantyAvailable.WarrantyAvailable<server.Item>
-	AskWarrantyPlan(ctx context.Context, item server.Item) (server.PlanId, error)
+	ChooseStandardWarranty(item server.Item, line server.CartLine) (server.WarrantyLine, error)
 
 	// FetchMe は op browser.fetchMe。
 	//
 	// Throws: http.ServerError, http.NetworkError
-	FetchMe(ctx context.Context) (server.PublicUser, error)
+	FetchMe() (server.PublicUser, error)
 
 	// FetchOrders は op browser.fetchOrders。
 	//
 	// Throws: http.ServerError, http.NetworkError
-	FetchOrders(ctx context.Context, query OrdersQuery) ([]server.OrderSummary, error)
+	FetchOrders(query OrdersQuery) ([]server.OrderSummary, error)
 
 	// OrderPageVm は op browser.orderPageVm。
-	OrderPageVm(ctx context.Context, me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
+	OrderPageVm(me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
 
 	// OpenOrders は op browser.openOrders。
-	OpenOrders(ctx context.Context, query OrdersQuery) (OrderPage, error)
+	OpenOrders(query OrdersQuery) (OrderPage, error)
 
 	// ProfilePageVm は op browser.profilePageVm。
-	ProfilePageVm(ctx context.Context, me server.PublicUser) (ProfilePage, error)
+	ProfilePageVm(me server.PublicUser) (ProfilePage, error)
 
 	// OpenProfile は op browser.openProfile。
-	OpenProfile(ctx context.Context) (ProfilePage, error)
+	OpenProfile() (ProfilePage, error)
 
 	// ProductPageVm は op browser.productPageVm。
-	ProductPageVm(ctx context.Context, item server.Item) (ProductPage, error)
+	ProductPageVm(item server.Item) (ProductPage, error)
 
 	// FetchItem は op browser.fetchItem。
 	//
 	// Throws: http.ServerError, http.NetworkError
-	FetchItem(ctx context.Context, query ProductQuery) (server.Item, error)
+	FetchItem(query ProductQuery) (server.Item, error)
 
 	// OpenProduct は op browser.openProduct。
-	OpenProduct(ctx context.Context, query ProductQuery) (ProductPage, error)
+	OpenProduct(query ProductQuery) (ProductPage, error)
 }
 
-// Deps は配線から呼ぶ別の名前空間の op。実装者は bind で埋まる位置に状態の値を入れて呼び出し先に渡す
-// （docs/emit-go.md「op」の「インターフェース」）。
+// Deps は配線から呼ぶ別の名前空間の op。名前空間ごとに一つの構造体で、フィールドは viewer から見た関数の型
+// （bind で埋まる位置は引数から消えている。埋める者が状態の値を入れて呼び出し先に渡す）。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "dep"）。
 type Deps struct {
 	Server ServerOps
 }
 
-// ServerOps は名前空間 server の op のうち、この名前空間の配線が呼ぶもの。引数は bind で埋まる位置を除いた形。
-type ServerOps interface {
-	// Logout は op server.logout。
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: in.token ← browser.token
-	//
-	// Throws: http.ServerError, http.NetworkError
-	// Effects: server.deleteSession
-	Logout(ctx context.Context, in LogoutInInput) error
-
-	// GetMe はログインしているユーザー自身を返す
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: in.token ← browser.token
-	//
-	// Throws: http.ServerError, http.NetworkError
-	GetMe(ctx context.Context, in GetMeInInput) (server.PublicUser, error)
-
-	// GetOrders はログインしているユーザーの注文一覧を返す
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: in.token ← browser.token
-	//
-	// Throws: http.ServerError, http.NetworkError
-	GetOrders(ctx context.Context, in GetOrdersInInput) ([]server.OrderSummary, error)
-
-	// GetItem は商品を一つ返す（認証は要らない）
-	//
-	// Throws: http.ServerError, http.NetworkError
-	GetItem(ctx context.Context, in server.GetItemInput) (server.Item, error)
-
-	// AddToCart は商品をカートに入れる
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: in.token ← browser.token
-	//
-	// Throws: http.ServerError, http.NetworkError
-	// Effects: server.addCartLine
-	AddToCart(ctx context.Context, in AddToCartInInput) (server.CartLine, error)
-
-	// AttachWarranty はカートの一行に保証プランを付ける
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: in.token ← browser.token
-	//
-	// Throws: http.ServerError, http.NetworkError
-	// Effects: server.attachWarrantyToLine
-	AttachWarranty(ctx context.Context, in AttachWarrantyInInput) (server.WarrantyLine, error)
+// ServerOps は名前空間 server の op のうち、この名前空間の配線が呼ぶもの。
+type ServerOps struct {
+	GetMe          ServerGetMeFunc
+	GetOrders      ServerGetOrdersFunc
+	GetItem        ServerGetItemFunc
+	AddToCart      ServerAddToCartFunc
+	AttachWarranty ServerAttachWarrantyFunc
 }
 
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// TokenIsEmpty は状態 browser.token（nullable）が空（Empty）か。
-	TokenIsEmpty(ctx context.Context) (bool, error)
-}
+// ServerGetMeFunc は op server.getMe の、browser から見た関数の型。
+//
+// ログインしているユーザー自身を返す
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: in.token ← browser.token
+//
+// Throws: http.ServerError, http.NetworkError
+type ServerGetMeFunc func(in GetMeInInput) (server.PublicUser, error)
 
-// Wrappers は op に付いたデコレータのうち、プラグインが扱わないものの「包む関数」（docs/emit-go.md「デコレータ」）。
-// 引数は op の引数と next（op の関数の型）。
-type Wrappers interface {
-	// RequestLogoutIgnoreFailure は browser.requestLogout に付いた @browser.ignoreFailure。
-	// catches http.NetworkError | http.ServerError ignores
-	RequestLogoutIgnoreFailure(ctx context.Context, next func(ctx context.Context) error) error
+// ServerGetOrdersFunc は op server.getOrders の、browser から見た関数の型。
+//
+// ログインしているユーザーの注文一覧を返す
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: in.token ← browser.token
+//
+// Throws: http.ServerError, http.NetworkError
+type ServerGetOrdersFunc func(in GetOrdersInInput) ([]server.OrderSummary, error)
 
-	// OnAddToCartInteraction は browser.onAddToCart に付いた @page.interaction（= page.interaction(page: browser.openProduct, when: browser.ProductPage.Ready)）。
-	OnAddToCartInteraction(ctx context.Context, item server.Item, next func(ctx context.Context, item server.Item) error) error
+// ServerGetItemFunc は op server.getItem の、browser から見た関数の型。
+//
+// 商品を一つ返す（認証は要らない）
+//
+// Throws: http.ServerError, http.NetworkError
+type ServerGetItemFunc func(in server.GetItemInput) (server.Item, error)
 
-	// AskYamadaWarrantyDialog は browser.askYamadaWarranty に付いた @page.dialog（= page.dialog(component: "YamadaWarrantyModal")）。
-	// ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: "YamadaWarrantyModal"）。
-	// どの実装を指すかは展開器が解決する（表層は責務外）。
-	// throws page.Aborted
-	AskYamadaWarrantyDialog(ctx context.Context, item server.Item, next func(ctx context.Context, item server.Item) (server.PlanId, error)) (server.PlanId, error)
+// ServerAddToCartFunc は op server.addToCart の、browser から見た関数の型。
+//
+// 商品をカートに入れる
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: in.token ← browser.token
+//
+// Throws: http.ServerError, http.NetworkError
+// Effects: server.addCartLine
+type ServerAddToCartFunc func(in AddToCartInInput) (server.CartLine, error)
 
-	// AskWarrantyPlanDialog は browser.askWarrantyPlan に付いた @page.dialog（= page.dialog(component: "WarrantyPlanModal")）。
-	// ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: "YamadaWarrantyModal"）。
-	// どの実装を指すかは展開器が解決する（表層は責務外）。
-	// throws page.Aborted
-	AskWarrantyPlanDialog(ctx context.Context, item server.Item, next func(ctx context.Context, item server.Item) (server.PlanId, error)) (server.PlanId, error)
+// ServerAttachWarrantyFunc は op server.attachWarranty の、browser から見た関数の型。
+//
+// カートの一行に保証プランを付ける
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: in.token ← browser.token
+//
+// Throws: http.ServerError, http.NetworkError
+// Effects: server.attachWarrantyToLine
+type ServerAttachWarrantyFunc func(in AttachWarrantyInInput) (server.WarrantyLine, error)
 
-	// OpenOrdersRoute は browser.openOrders に付いた @page.route（= page.route(path: "/orders", from: browser.query, onInvalid: browser.transitionToOrders)）。
-	OpenOrdersRoute(ctx context.Context, query OrdersQuery, next func(ctx context.Context, query OrdersQuery) (OrderPage, error)) (OrderPage, error)
-
-	// OpenOrdersFallback は browser.openOrders に付いた @page.fallback（= page.fallback(error: http.NetworkError | http.ServerError, view: browser.OrdersUnavailable)）。
-	// error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2）
-	// catches http.NetworkError | http.ServerError recovers
-	OpenOrdersFallback(ctx context.Context, query OrdersQuery, next func(ctx context.Context, query OrdersQuery) (OrderPage, error)) (OrderPage, error)
-
-	// OpenProfileRoute は browser.openProfile に付いた @page.route（= page.route(path: "/profile")）。
-	OpenProfileRoute(ctx context.Context, next func(ctx context.Context) (ProfilePage, error)) (ProfilePage, error)
-
-	// OpenProfileUnavailableOnFailure は browser.openProfile に付いた @browser.unavailableOnFailure（= page.fallback(error: http.NetworkError | http.ServerError, view: browser.Unavailable)）。
-	// error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2）
-	// catches http.NetworkError | http.ServerError recovers
-	OpenProfileUnavailableOnFailure(ctx context.Context, next func(ctx context.Context) (ProfilePage, error)) (ProfilePage, error)
-
-	// OpenProductRoute は browser.openProduct に付いた @page.route（= page.route(path: "/product", from: browser.query)）。
-	OpenProductRoute(ctx context.Context, query ProductQuery, next func(ctx context.Context, query ProductQuery) (ProductPage, error)) (ProductPage, error)
-
-	// OpenProductUnavailableOnFailure は browser.openProduct に付いた @browser.unavailableOnFailure（= page.fallback(error: http.NetworkError | http.ServerError, view: browser.Unavailable)）。
-	// error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2）
-	// catches http.NetworkError | http.ServerError recovers
-	OpenProductUnavailableOnFailure(ctx context.Context, query ProductQuery, next func(ctx context.Context, query ProductQuery) (ProductPage, error)) (ProductPage, error)
-}
-
-// Classifiers は分類ごとの述語の実装（classify.go の <C>Cases）。
+// Classifiers は値の分類ごとの述語の実装（classify.go の <C>Cases）。
+// 埋めていない分類で判定しようとしたら *runtime.MissingError（Kind は "classifier"）。
 type Classifiers struct {
-	WarrantyKind      WarrantyKindCases
-	CampaignKind      CampaignKindCases
-	WarrantyAvailable WarrantyAvailableCases
+	WarrantyKind WarrantyKindCases
 }
 
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves, deps Deps, wrappers Wrappers, classifiers Classifiers) Ops {
-	return &ops{leaves: leaves, deps: deps, wrappers: wrappers, classifiers: classifiers}
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
+func New(leaves Leaves, deps Deps, classifiers Classifiers) Ops {
+	return &ops{leaves: leaves, deps: deps, classifiers: classifiers}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
 	leaves      Leaves
 	deps        Deps
-	wrappers    Wrappers
 	classifiers Classifiers
 }
 
-func (o *ops) ClearToken(ctx context.Context) error {
-	return o.leaves.ClearToken(ctx)
-}
-
-func (o *ops) RequestLogout(ctx context.Context) error {
-	f0 := o.requestLogoutBody
-	f1 := func(ctx context.Context) error {
-		return o.wrappers.RequestLogoutIgnoreFailure(ctx, f0)
+func (o *ops) GoPayment(line server.CartLine, warranty *server.WarrantyLine) error {
+	if States.Location.GoPayment == nil {
+		return &runtime.MissingError{Kind: "state", Name: "browser.goPayment"}
 	}
-	return f1(ctx)
+	return States.Location.GoPayment(line, warranty)
 }
 
-func (o *ops) GoPayment(ctx context.Context, line server.CartLine, warranty *server.WarrantyLine) error {
-	return o.leaves.GoPayment(ctx, line, warranty)
-}
-
-func (o *ops) OnAddToCart(ctx context.Context, item server.Item) error {
-	f0 := o.onAddToCartBody
-	f1 := func(ctx context.Context, item server.Item) error {
-		return o.wrappers.OnAddToCartInteraction(ctx, item, f0)
+func (o *ops) AskYamadaWarranty(item server.Item) (server.PlanId, error) {
+	if o.leaves.AskYamadaWarranty == nil {
+		return server.PlanId(""), &runtime.MissingError{Kind: "leaf", Name: "browser.askYamadaWarranty"}
 	}
-	return f1(ctx, item)
+	return o.leaves.AskYamadaWarranty(item)
 }
 
-func (o *ops) AskYamadaWarranty(ctx context.Context, item server.Item) (server.PlanId, error) {
-	f0 := o.leaves.AskYamadaWarranty
-	f1 := func(ctx context.Context, item server.Item) (server.PlanId, error) {
-		return o.wrappers.AskYamadaWarrantyDialog(ctx, item, f0)
+func (o *ops) ChooseStandardWarranty(item server.Item, line server.CartLine) (server.WarrantyLine, error) {
+	if o.leaves.ChooseStandardWarranty == nil {
+		return server.WarrantyLine{}, &runtime.MissingError{Kind: "leaf", Name: "browser.chooseStandardWarranty"}
 	}
-	return f1(ctx, item)
+	return o.leaves.ChooseStandardWarranty(item, line)
 }
 
-func (o *ops) ChooseStandardWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error) {
-	return o.leaves.ChooseStandardWarranty(ctx, item, line)
-}
-
-func (o *ops) AskWarrantyPlan(ctx context.Context, item server.Item) (server.PlanId, error) {
-	f0 := o.leaves.AskWarrantyPlan
-	f1 := func(ctx context.Context, item server.Item) (server.PlanId, error) {
-		return o.wrappers.AskWarrantyPlanDialog(ctx, item, f0)
+func (o *ops) OrderPageVm(me server.PublicUser, orders []server.OrderSummary) (OrderPage, error) {
+	if o.leaves.OrderPageVm == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "browser.orderPageVm"}
 	}
-	return f1(ctx, item)
+	return o.leaves.OrderPageVm(me, orders)
 }
 
-func (o *ops) OrderPageVm(ctx context.Context, me server.PublicUser, orders []server.OrderSummary) (OrderPage, error) {
-	return o.leaves.OrderPageVm(ctx, me, orders)
+func (o *ops) ProfilePageVm(me server.PublicUser) (ProfilePage, error) {
+	if o.leaves.ProfilePageVm == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "browser.profilePageVm"}
+	}
+	return o.leaves.ProfilePageVm(me)
 }
 
-func (o *ops) OpenOrders(ctx context.Context, query OrdersQuery) (OrderPage, error) {
-	f0 := o.openOrdersBody
-	f1 := func(ctx context.Context, query OrdersQuery) (OrderPage, error) {
-		return o.wrappers.OpenOrdersRoute(ctx, query, f0)
+func (o *ops) ProductPageVm(item server.Item) (ProductPage, error) {
+	if o.leaves.ProductPageVm == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "browser.productPageVm"}
 	}
-	f2 := func(ctx context.Context, query OrdersQuery) (OrderPage, error) {
-		return o.wrappers.OpenOrdersFallback(ctx, query, f1)
-	}
-	return f2(ctx, query)
-}
-
-func (o *ops) ProfilePageVm(ctx context.Context, me server.PublicUser) (ProfilePage, error) {
-	return o.leaves.ProfilePageVm(ctx, me)
-}
-
-func (o *ops) OpenProfile(ctx context.Context) (ProfilePage, error) {
-	f0 := o.openProfileBody
-	f1 := func(ctx context.Context) (ProfilePage, error) {
-		return o.wrappers.OpenProfileRoute(ctx, f0)
-	}
-	f2 := func(ctx context.Context) (ProfilePage, error) {
-		return o.wrappers.OpenProfileUnavailableOnFailure(ctx, f1)
-	}
-	return f2(ctx)
-}
-
-func (o *ops) ProductPageVm(ctx context.Context, item server.Item) (ProductPage, error) {
-	return o.leaves.ProductPageVm(ctx, item)
-}
-
-func (o *ops) OpenProduct(ctx context.Context, query ProductQuery) (ProductPage, error) {
-	f0 := o.openProductBody
-	f1 := func(ctx context.Context, query ProductQuery) (ProductPage, error) {
-		return o.wrappers.OpenProductRoute(ctx, query, f0)
-	}
-	f2 := func(ctx context.Context, query ProductQuery) (ProductPage, error) {
-		return o.wrappers.OpenProductUnavailableOnFailure(ctx, query, f1)
-	}
-	return f2(ctx, query)
+	return o.leaves.ProductPageVm(item)
 }

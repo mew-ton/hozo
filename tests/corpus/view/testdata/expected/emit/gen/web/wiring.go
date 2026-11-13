@@ -2,54 +2,30 @@
 
 package web
 
-import (
-	"context"
+import "github.com/mew-ton/hozo/runtime"
 
-	"github.com/mew-ton/hozo/gen/api"
-)
-
-// fetchUserBody は web.fetchUser の配線の本体。包む関数を通さずに呼ぶ（ops.go の FetchUser が包む）。
-func (o *ops) fetchUserBody(ctx context.Context, q Query) (api.PublicUser, error) {
-	return o.deps.Api.GetUser(ctx, GetUserInInput{Id: q.Id})
-}
-
-// Welcome は op web.welcome。
+// FetchUser はユーザーを取る。
 //
-// Effects: web.goHome
-func (o *ops) Welcome(ctx context.Context, user api.PublicUser) error {
-	kind, err := ClassifyVerified(o.classifiers.Verified, user)
-	if err != nil {
-		return err
-	}
-	switch kind {
-	case VerifiedVerified:
-		err = o.Greet(ctx, user)
-	case VerifiedDefault:
-	}
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Reload は op web.reload。
+// 引数:
+//   - q: 問い合わせ
 //
 // Throws: api.NotFound, api.Unauthorized, web.Offline
-// Effects: api.touchUser
-func (o *ops) Reload(ctx context.Context, id api.UserId) (api.PublicUser, error) {
-	user, err := o.FetchUser(ctx, Query{Id: id})
-	if err != nil {
-		return api.PublicUser{}, err
+func (o *ops) FetchUser(q Query) (PublicUser, error) {
+	if o.deps.Api.GetUser == nil {
+		return PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "api.getUser"}
 	}
-	if err := o.deps.Api.Touch(ctx, id); err != nil {
-		return api.PublicUser{}, err
-	}
-	return user, nil
+	return o.deps.Api.GetUser(GetUserInInput{Id: q.Id})
 }
 
-// openUserBody は web.openUser の配線の本体。包む関数を通さずに呼ぶ（ops.go の OpenUser が包む）。
-func (o *ops) openUserBody(ctx context.Context, id api.UserId) (UserPage, error) {
-	user, err := o.FetchUser(ctx, Query{Id: id})
+// OpenUser はユーザーページを開く。
+//
+// 引数:
+//   - id: 表示するユーザー
+//
+// Throws: api.NotFound, web.Offline
+// Effects: web.goLogin
+func (o *ops) OpenUser(id UserId) (UserPage, error) {
+	user, err := o.FetchUser(Query{Id: id})
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +36,9 @@ func (o *ops) openUserBody(ctx context.Context, id api.UserId) (UserPage, error)
 	var page UserPage
 	switch kind {
 	case UserKindAdmin:
-		page, err = o.AdminPageVm(ctx, user)
+		page, err = o.AdminPageVm(user)
 	case UserKindMember:
-		page, err = o.UserPageVm(ctx, user)
+		page, err = o.UserPageVm(user)
 	}
 	if err != nil {
 		return nil, err
@@ -70,15 +46,15 @@ func (o *ops) openUserBody(ctx context.Context, id api.UserId) (UserPage, error)
 	return page, nil
 }
 
-// signOutBody は web.signOut の配線の本体。包む関数を通さずに呼ぶ（ops.go の SignOut が包む）。
-func (o *ops) signOutBody(ctx context.Context) error {
-	if err := o.deps.Api.Logout(ctx); err != nil {
+// SignOut は op web.signOut。
+//
+// Effects: api.deleteSession, web.removeToken
+func (o *ops) SignOut() error {
+	if o.deps.Api.Logout == nil {
+		return &runtime.MissingError{Kind: "dep", Name: "api.logout"}
+	}
+	if err := o.deps.Api.Logout(); err != nil {
 		return err
 	}
-	return o.ClearToken(ctx)
-}
-
-// loginBody は web.login の配線の本体。包む関数を通さずに呼ぶ（ops.go の Login が包む）。
-func (o *ops) loginBody(ctx context.Context, form LoginForm) (api.Session, error) {
-	return o.deps.Api.Login(ctx, api.LoginInput{Creds: api.Credentials{Name: form.Name, Password: form.Password}})
+	return o.ClearToken()
 }

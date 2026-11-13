@@ -2,7 +2,6 @@ package app
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -52,8 +51,22 @@ namespace server {
 }
 `
 
-// copyCorpus は設計書のコーパスを一時ディレクトリに写し、warning を一つ出す warn.hozo（warnFile）を足し、
-// 既定の出力のために go.mod を置く（GOEMIT-1）。
+// 設計書のコーパスのうち、テストのプラグイン（pick-server / pick-browser）が起点に選ぶ op。既定の出力は
+// プラグインが選んだ宣言だけを出す（docs/emit-go.md「出力の対象」）ので、選ぶプラグインがなければ何も書かれない。
+const (
+	serverSelect  = `"select":{"roots":["server.placeOrder"]}`
+	browserSelect = `"select":{"roots":["browser.openOrders"]}`
+)
+
+// corpusConfig は copyCorpus が置く hozo.toml。serverPlugins は [server] の plugins の中身（`"pick-server"` など）。
+func corpusConfig(serverPlugins string) string {
+	return "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[server]\nlanguage = \"go\"\nout = \"gen/server\"\nplugins = [" + serverPlugins + "]\n\n" +
+		"[browser]\nlanguage = \"go\"\nout = \"gen/browser\"\nplugins = [\"pick-browser\"]\n"
+}
+
+// copyCorpus は設計書のコーパスの .hozo を一時ディレクトリに写し、warning を一つ出す warn.hozo（warnFile）を足し、
+// 既定の出力のために go.mod を置く（GOEMIT-1）。hozo.toml は corpusConfig で、名前空間ごとに、起点を選ぶだけの
+// プラグイン（pick-server / pick-browser。sh で動く fakePlugin）を設定する。
 func copyCorpus(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -73,10 +86,13 @@ func copyCorpus(t *testing.T) string {
 	}
 	write(t, filepath.Join(dir, "warn.hozo"), warnFile)
 	write(t, filepath.Join(dir, "go.mod"), "module example.com/design\n\ngo 1.24\n")
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"pick-server"`))
+	fakePlugin(t, dir, "pick-server", "go", "[emit]\n", `{"files":[],"warnings":[],`+serverSelect+`}`, 0)
+	fakePlugin(t, dir, "pick-browser", "go", "[emit]\n", `{"files":[],"warnings":[],`+browserSelect+`}`, 0)
 	return dir
 }
 
-// run は dir を作業ディレクトリにして、cmd/hozoc/main.go と同じ組み立て（hozoc.New(Leaves, Classifiers) と Presenter を
+// run は dir を作業ディレクトリにして、cmd/hozoc/main.go と同じ組み立て（App の Ops と Presenter を
 // 生成した cli.Main に渡す）で hozoc を走らせる。
 func run(t *testing.T, dir string, env map[string]string, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
@@ -89,8 +105,8 @@ func run(t *testing.T, dir string, env map[string]string, args ...string) (code 
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chdir(wd) }()
-	ops := hozoc.New(&Leaves{Stderr: &errOut, Stdin: strings.NewReader("")}, hozoc.Classifiers{}) // lsp は入力の終わりで戻る
-	code = cli.Main(ops, Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
+	a := &App{Stderr: &errOut, Stdin: strings.NewReader("")} // lsp は入力の終わりで戻る
+	code = cli.Main(a.Ops(), Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
@@ -225,17 +241,20 @@ func TestCheckWithoutConfig(t *testing.T) {
 	if code, _, stderr = run(t, dir, map[string]string{"HOZO_CONFIG": "nope.toml"}, "check"); code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-7]") {
 		t.Fatalf("HOZO_CONFIG: code=%d stderr=%q", code, stderr)
 	}
-	// 設定なしの Leaves.Check は例外なしで結果（warning）を返す
-	l := &Leaves{Dir: dir}
-	res, err := l.Check(context.Background(), hozoc.CheckInput{})
+	// 設定なしの App.Check は例外なしで結果（warning）を返す
+	l := &App{Dir: dir}
+	res, err := l.Check(hozoc.CheckInput{})
 	if err != nil || len(res.Warnings) != 1 || res.Warnings[0].Code != "NAME-1" {
 		t.Fatalf("Check = %+v, %v", res, err)
 	}
-	// その後の WriteOutputs は ConfigInvalid（CFG-7）
-	_, err = l.WriteOutputs(context.Background(), hozoc.EmitInput{}, res)
+	// その後の WriteOutputs は ConfigInvalid（CFG-7）。述語 UpToDate も、生成し直せないので同じ例外
+	_, err = l.WriteOutputs(hozoc.EmitInput{}, res)
 	var ci hozoc.ConfigInvalid
 	if !errors.As(err, &ci) || len(ci.Value.Items) != 2 || ci.Value.Items[0].Code != "CFG-7" {
 		t.Fatalf("WriteOutputs err = %v", err)
+	}
+	if _, err = l.UpToDate(); !errors.As(err, &ci) || ci.Value.Items[0].Code != "CFG-7" {
+		t.Fatalf("UpToDate err = %v", err)
 	}
 }
 
@@ -261,14 +280,14 @@ func TestCheckInvalidConfig(t *testing.T) {
 
 func TestCheckLanguageMismatch(t *testing.T) {
 	dir := copyCorpus(t)
-	fakePlugin(t, dir, "tsp", "ts", "[emit]\nentry = [\"cli.command\"]\n", `{"files":[],"warnings":[]}`, 0)
-	write(t, filepath.Join(dir, "hozo.toml"), "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[server]\nlanguage = \"go\"\nout = \"gen/server\"\nplugins = [\"tsp\"]\n\n[browser]\nlanguage = \"go\"\nout = \"gen/browser\"\n")
+	fakePlugin(t, dir, "tsp", "ts", "[emit]\n", `{"files":[],"warnings":[]}`, 0)
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"tsp"`))
 	code, _, stderr := run(t, dir, nil, "check")
 	if code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-4]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
-	l := &Leaves{Dir: dir}
-	_, err := l.Check(context.Background(), hozoc.CheckInput{})
+	l := &App{Dir: dir}
+	_, err := l.Check(hozoc.CheckInput{})
 	var lm hozoc.LanguageMismatch
 	if !errors.As(err, &lm) || len(lm.Value.Items) == 0 {
 		t.Fatalf("err = %v", err)
@@ -375,13 +394,12 @@ func TestEmitDesign(t *testing.T) {
 	}
 }
 
-// TestEmitStaleAndConflict はプラグインの出力の書き出し、設定から外したあとの古いファイルの削除、CFG-5、PLG-1、proc.Crashed。
+// TestEmitStaleAndConflict はプラグインの出力の書き出し、設定から外したあとの古いファイルの削除、CFG-5、PLG-*、proc.Crashed。
 func TestEmitStaleAndConflict(t *testing.T) {
 	dir := copyCorpus(t)
-	withPlugin := "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[server]\nlanguage = \"go\"\nout = \"gen/server\"\nplugins = [\"fake\"]\n\n[browser]\nlanguage = \"go\"\nout = \"gen/browser\"\n"
-	withoutPlugin := "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[server]\nlanguage = \"go\"\nout = \"gen/server\"\n\n[browser]\nlanguage = \"go\"\nout = \"gen/browser\"\n"
-	emitTable := "[emit]\nentry = [\"cli.command\"]\n"
-	write(t, filepath.Join(dir, "hozo.toml"), withPlugin)
+	emitTable := "[emit]\n"
+	// fake は server の二つ目のプラグイン。起点は選ばず、自分のファイルだけを書く
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"pick-server", "fake"`))
 
 	// プラグインが gen/server/extra.txt を書く（warning も一つ）
 	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[{"path":"gen/server/extra.txt","content":"hi"}],"warnings":[{"at":"server.placeOrder","message":"careful"}]}`, 0)
@@ -393,10 +411,10 @@ func TestEmitStaleAndConflict(t *testing.T) {
 		t.Fatalf("extra.txt: %q %v", b, err)
 	}
 
-	// プラグインを設定から外すと extra.txt は古いファイルとして消える
-	write(t, filepath.Join(dir, "hozo.toml"), withoutPlugin)
+	// プラグインを設定から外すと extra.txt は古いファイルとして消える。既定の出力は残る
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"pick-server"`))
 	code, stdout, stderr = run(t, dir, nil, "emit")
-	if code != 0 || !strings.Contains(stdout, "removed: gen/server/extra.txt\n") {
+	if code != 0 || !strings.Contains(stdout, "removed: gen/server/extra.txt\n") || strings.Contains(stdout, "removed: gen/server/types.go") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "gen", "server", "extra.txt")); !os.IsNotExist(err) {
@@ -404,7 +422,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	}
 
 	// CFG-5: 既定の出力と同じパスに書こうとする → 3、何も書かない
-	write(t, filepath.Join(dir, "hozo.toml"), withPlugin)
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"pick-server", "fake"`))
 	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[{"path":"gen/server/types.go","content":"x"}],"warnings":[]}`, 0)
 	before := mtimes(t, filepath.Join(dir, "gen"))
 	code, stdout, stderr = run(t, dir, nil, "emit")
@@ -422,6 +440,11 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	if code, _, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-1") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
+	// PLG-2: 同じ応答の中で同じ path が二度 → proc.MalformedOutput → 70
+	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[{"path":"gen/server/a.txt","content":"1"},{"path":"gen/server/./a.txt","content":"2"}],"warnings":[]}`, 0)
+	if code, _, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-2") {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
 	// errors → CheckFailed（1）
 	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[],"warnings":[],"errors":[{"code":"FAKE-1","at":"server.placeOrder","message":"nope"}]}`, 0)
 	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || !strings.Contains(stderr, "server.hozo:244:3: error[FAKE-1]: nope") {
@@ -432,6 +455,228 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	if code, _, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "hozoc: ") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
+}
+
+// TestEmitSelectInvalid は PLG-3（docs/plugin-protocol.md「選択」「診断」）: emit の応答の select が、対象の名前空間にない
+// 宣言や、付いていないデコレータを指していれば proc.MalformedOutput（70）。何も書かない。
+// 条件の一つずつは internal/plugin の TestCheckSelect が確かめる。
+func TestEmitSelectInvalid(t *testing.T) {
+	dir := copyCorpus(t)
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"pick-server", "fake"`))
+	cases := map[string]string{
+		"view.viewer の名前空間にない FQN":  `"select":{"roots":["browser.openOrders"]}`, // fake は server のプラグイン
+		"存在しない FQN":                 `"select":{"roots":["server.nope"]}`,
+		"stops が op でない":            `"select":{"stops":["server.User"]}`,
+		"states が別の名前空間の状態":         `"select":{"states":["browser.token"]}`,
+		"wraps がその op に付いていないデコレータ": `"select":{"wraps":[{"op":"server.placeOrder","decorator":"http.post"}]}`,
+	}
+	for name, sel := range cases {
+		t.Run(name, func(t *testing.T) {
+			fakePlugin(t, dir, "fake", "go", "[emit]\n", `{"files":[{"path":"gen/server/extra.txt","content":"hi"}],"warnings":[],`+sel+`}`, 0)
+			code, stdout, stderr := run(t, dir, nil, "emit")
+			if code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-3") || !strings.Contains(stderr, "プラグイン fake") {
+				t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "gen")); !os.IsNotExist(err) {
+				t.Fatalf("書き出している: %v", listFiles(t, filepath.Join(dir, "gen")))
+			}
+			code, _, stderr = run(t, dir, nil, "emit", "--format=json")
+			if code != exitSoftwareOrCrash || !strings.Contains(stderr, `"error": "proc.MalformedOutput"`) {
+				t.Fatalf("json: code=%d stderr=%q", code, stderr)
+			}
+		})
+	}
+	// 正しい select（wraps が、その op に付いたデコレータを指す）は通り、包む関数になる
+	fakePlugin(t, dir, "fake", "go", "[emit]\n", `{"files":[],"warnings":[],"select":{"wraps":[{"op":"server.login","decorator":"server.validated"}]}}`, 0)
+	code, _, stderr := run(t, dir, nil, "emit")
+	if code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+	ops, err := os.ReadFile(filepath.Join(dir, "gen", "server", "ops.go"))
+	if err != nil || !strings.Contains(string(ops), "type LoginValidatedWrapper func(in LoginInput, next LoginFunc) (LoginOk, error)") {
+		t.Fatalf("包む関数がない: %v\n%s", err, ops)
+	}
+}
+
+// TestEmitWithoutPlugin は docs/emit-go.md「出力の対象」: 名前空間にプラグインが一つも設定されていなければ（設定されていても
+// 何も選ばなければ）、既定の出力は何も書かない。前回の出力は古いファイルとして消え、.hozoc-outputs.json も残らない
+// （docs/cli.md「emit」の 6 と 8）。エラーでも warning でもない。
+func TestEmitWithoutPlugin(t *testing.T) {
+	dir := copyCorpus(t)
+	gen := filepath.Join(dir, "gen")
+	if code, _, stderr := run(t, dir, nil, "emit"); code != 0 {
+		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
+	}
+	if files := listFiles(t, gen); !containsStr(files, "server/types.go") || !containsStr(files, "server/.hozoc-outputs.json") || !containsStr(files, "browser/ops.go") {
+		t.Fatalf("files = %v", files)
+	}
+
+	// server からプラグインを外す。server は何も出力しなくなる
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(``))
+	code, stdout, stderr := run(t, dir, nil, "emit")
+	if code != 0 || strings.Contains(stdout, "written: gen/server/") || !strings.Contains(stdout, "removed: gen/server/types.go\n") || !strings.Contains(stdout, "removed: gen/server/ops.go\n") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	// warning は check のもの（warn.hozo の REL-2）だけ。選ばれなかった宣言に診断は出ない
+	if !strings.Contains(stdout, "0 errors, 1 warning") && strings.Count(stdout, "warning[") != 1 {
+		t.Fatalf("stdout=%q", stdout)
+	}
+	for _, f := range listFiles(t, gen) {
+		if strings.HasPrefix(f, "server/") {
+			t.Errorf("gen/%s が残っている", f)
+		}
+	}
+	// browser は server の型を import できなくなるので、自分のパッケージに複製する（docs/emit-go.md「配置」）
+	types, err := os.ReadFile(filepath.Join(gen, "browser", "types.go"))
+	if err != nil || strings.Contains(string(types), "example.com/design/gen/server") || !strings.Contains(string(types), "type OrderSummary struct {") {
+		t.Fatalf("browser の types.go が server の型を複製していない: %v\n%s", err, types)
+	}
+	// 二度目は何も書かず、何も消さない
+	code, stdout, _ = run(t, dir, nil, "emit")
+	if code != 0 || strings.Contains(stdout, "removed: ") || strings.Contains(stdout, "gen/server/") {
+		t.Fatalf("second: code=%d stdout=%q", code, stdout)
+	}
+
+	// 設定されていても、何も選ばないプラグイン（select を返さない）なら同じ。そのプラグインのファイルだけが出る
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"fake"`))
+	fakePlugin(t, dir, "fake", "go", "[emit]\n", `{"files":[{"path":"gen/server/only.txt","content":"x"}],"warnings":[]}`, 0)
+	if code, _, stderr := run(t, dir, nil, "emit"); code != 0 {
+		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
+	}
+	var server []string
+	for _, f := range listFiles(t, gen) {
+		if strings.HasPrefix(f, "server/") {
+			server = append(server, f)
+		}
+	}
+	if strings.Join(server, ",") != "server/.hozoc-outputs.json,server/only.txt" {
+		t.Fatalf("gen/server = %v", server)
+	}
+}
+
+// TestEmitTargetUsesOtherNamespace は docs/cli.md「emit」の 3: 対象の名前空間の出力が、対象でない Go の名前空間の型を使うとき、
+// その名前空間のプラグインも起動して select を使う。対象を絞っても、すべてを対象にしたときと同じ内容が出る。
+func TestEmitTargetUsesOtherNamespace(t *testing.T) {
+	dir := copyCorpus(t)
+	if code, _, stderr := run(t, dir, nil, "emit"); code != 0 {
+		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
+	}
+	all := readAll(t, filepath.Join(dir, "gen", "browser"))
+	if err := os.RemoveAll(filepath.Join(dir, "gen")); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := run(t, dir, nil, "emit", "browser")
+	if code != 0 || strings.Contains(stdout, "gen/server/") {
+		t.Fatalf("emit browser: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	only := readAll(t, filepath.Join(dir, "gen", "browser"))
+	if len(only) == 0 || len(only) != len(all) {
+		t.Fatalf("files = %d, want %d", len(only), len(all))
+	}
+	for f, content := range all {
+		if only[f] != content {
+			t.Errorf("gen/browser/%s が、すべてを対象にしたときと違う", f)
+		}
+	}
+	// server の型は import している（server のプラグインの select から、server の出力がその型を持つと分かる）
+	if !strings.Contains(only["types.go"], `"example.com/design/gen/server"`) {
+		t.Errorf("browser の types.go が gen/server を import していない:\n%s", only["types.go"])
+	}
+}
+
+// TestUpToDate は cli.hozo の分類 OutputsSync の述語 UpToDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した内容と
+// ディスクの内容を比べる。生成したコードの判定関数 hozoc.ClassifyOutputsSync が、App.Ops が hozoc.States に入れた
+// 述語を呼ぶ。
+func TestUpToDate(t *testing.T) {
+	dir := copyCorpus(t)
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(wd) }()
+	a := &App{Stderr: &bytes.Buffer{}}
+	ops := a.Ops()
+	sync := func() hozoc.OutputsSync {
+		t.Helper()
+		got, err := hozoc.ClassifyOutputsSync()
+		if err != nil {
+			t.Fatalf("ClassifyOutputsSync: %v", err)
+		}
+		return got
+	}
+	// まだ書き出していない: 足りない
+	if got := sync(); got != hozoc.OutputsSyncDefault {
+		t.Fatalf("emit の前: %v", got)
+	}
+	// 配線の emit（check → writeOutputs）。writeOutputs は hozoc.States.OutputsSync の命令で、効果 syncOutputs は
+	// どの場合からも UpToDate に移す
+	res, err := ops.Emit(hozoc.EmitInput{})
+	if err != nil || len(res.Written) == 0 {
+		t.Fatalf("Emit = %+v, %v", res, err)
+	}
+	if got := sync(); got != hozoc.OutputsSyncUpToDate {
+		t.Fatalf("emit の後: %v", got)
+	}
+	// 古い（内容が違う）
+	types := filepath.Join(dir, "gen", "server", "types.go")
+	orig, err := os.ReadFile(types)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, types, string(orig)+"\n// 手で足した行\n")
+	if got := sync(); got != hozoc.OutputsSyncDefault {
+		t.Errorf("書き換えた後: %v", got)
+	}
+	write(t, types, string(orig))
+	if got := sync(); got != hozoc.OutputsSyncUpToDate {
+		t.Errorf("戻した後: %v", got)
+	}
+	// 足りない
+	if err := os.Remove(types); err != nil {
+		t.Fatal(err)
+	}
+	if got := sync(); got != hozoc.OutputsSyncDefault {
+		t.Errorf("消した後: %v", got)
+	}
+	write(t, types, string(orig))
+	// 余分（前回書いて、今回は書かないファイルが残っている）: server のプラグインを外す
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(``))
+	b := &App{Stderr: &bytes.Buffer{}} // 設定を読み直すために新しい App（直前の Check の結果を持たない）
+	ops = b.Ops()
+	if got := sync(); got != hozoc.OutputsSyncDefault {
+		t.Errorf("プラグインを外した後: %v", got)
+	}
+	if _, err := ops.Emit(hozoc.EmitInput{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := sync(); got != hozoc.OutputsSyncUpToDate {
+		t.Errorf("もう一度 emit した後: %v", got)
+	}
+	// 仕様に誤りがあって生成し直せなければ、その例外
+	write(t, filepath.Join(dir, "bad.hozo"), "namespace server {\n  model Bad { x: Nope; }\n}\n")
+	c := &App{Stderr: &bytes.Buffer{}}
+	c.Ops()
+	var cf hozoc.CheckFailed
+	if _, err := hozoc.ClassifyOutputsSync(); !errors.As(err, &cf) {
+		t.Errorf("誤りのある仕様: err = %v, want CheckFailed", err)
+	}
+}
+
+// readAll は dir の直下のファイルの名前 → 内容。
+func readAll(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for _, f := range listFiles(t, dir) {
+		b, err := os.ReadFile(filepath.Join(dir, f))
+		if err != nil {
+			t.Fatal(err)
+		}
+		out[f] = string(b)
+	}
+	return out
 }
 
 func TestEmitUnknownNamespace(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin"
 	gol "github.com/mew-ton/hozo/plugin/golang"
 )
 
@@ -28,22 +29,17 @@ type File struct {
 	Content []byte
 }
 
-// ManifestInfo は Conf(viewer).plugins の各マニフェストのうち、包む関数を作るかどうかの判定
-// （docs/emit-go.md「デコレータ」）に要る部分。Entry / Stop / Decorate はデコレータの FQN。
-type ManifestInfo struct {
-	Name     string
-	Entry    []string
-	Stop     []string
-	Decorate []string
-}
-
 // Options は Emit の入力のうち View にないもの。
 type Options struct {
 	// Root はプロジェクトのルート（hozo.toml のあるディレクトリ）。go.mod の探索（GOEMIT-1）と、
 	// 整形に失敗したときの `<out>/.hozoc-failed/` の書き出し先に使う。
 	Root string
-	// Manifests は Conf(viewer).plugins のマニフェスト。entry / stop に含まれるデコレータは包む関数にしない。
-	Manifests []ManifestInfo
+	// Select は、名前空間に設定されたプラグインの select を合わせたもの（docs/plugin-protocol.md「選択」）。
+	// ここから出力の対象が決まる（docs/emit-go.md「出力の対象」）。何も選ばれていなければ、ファイルは一つも出ない。
+	Select plugin.Select
+	// Exported は、同じプロジェクトの別の Go の名前空間の出力が持つ型の FQN（その名前空間の [Exports] の結果を合わせたもの）。
+	// ここにある型は相手のパッケージを import して使い、ない型は viewer のパッケージに複製する（docs/emit-go.md「配置」）。
+	Exported map[string]bool
 }
 
 // 診断のコード（docs/emit-go.md「診断」）。
@@ -59,10 +55,65 @@ const (
 // FailedDir は整形に失敗したファイルを置く、out の下のディレクトリ（docs/emit-go.md「配置」）。
 const FailedDir = ".hozoc-failed"
 
-// Emit は view の名前空間の Go のファイルを作る（docs/emit-go.md）。
-// 返すファイルの Path はプロジェクトのルートからの相対パス。
+// Emit は view の名前空間の Go のファイルを作る（docs/emit-go.md）。出すのは opts.Select から決まる出力の対象だけで、
+// 何も選ばれていなければファイルも診断も返さない。返すファイルの Path はプロジェクトのルートからの相対パス。
 // error の診断が一つでもあればファイルは返さない。
 func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic) {
+	e, diags := prepare(view, opts)
+	if e == nil {
+		return nil, diags
+	}
+	files := e.run()
+	if errs, _ := diag.Count(e.diags); errs > 0 {
+		return nil, e.diags
+	}
+	return files, e.diags
+}
+
+// Exports は、sel から決まる出力の対象のうち、view の名前空間で宣言された型（model / scalar / union / exception）の
+// FQN を宣言の順で返す。その名前空間のパッケージが持つ型で、別の Go の名前空間の出力はこれを import して使える
+// （[Options.Exported]。docs/emit-go.md「配置」）。別の名前空間の選択にはよらない。
+func Exports(view *ir.View, sel plugin.Select) []string {
+	e, _ := prepare(view, Options{Select: sel})
+	if e == nil {
+		return nil
+	}
+	e.collect()
+	var out []string
+	for _, d := range e.ns.Decls {
+		if d != nil && e.reach[d.Common().Name] {
+			out = append(out, d.Common().Name)
+		}
+	}
+	return out
+}
+
+// Uses は、sel から決まる出力の対象が型を参照している、同じプロジェクトの別の Go の名前空間（View.Namespaces に
+// あって language が go）の名前を Program の順で返す。その名前空間の [Exports] を [Options.Exported] に入れて Emit を呼ぶ。
+func Uses(view *ir.View, sel plugin.Select) []string {
+	e, _ := prepare(view, Options{Select: sel})
+	if e == nil {
+		return nil
+	}
+	e.collect()
+	var out []string
+	for i := range e.prog.Namespaces {
+		n := &e.prog.Namespaces[i]
+		if n.Name == e.viewer || !e.isGoNS(n.Name) {
+			continue
+		}
+		for _, d := range n.Decls {
+			if d != nil && e.reach[d.Common().Name] {
+				out = append(out, n.Name)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// prepare は Emit / Exports / Uses の共通の前半: View を確かめ、emitter を作る。View が使えなければ nil と診断。
+func prepare(view *ir.View, opts Options) (*emitter, []diag.Diagnostic) {
 	if view == nil || view.Program == nil {
 		return nil, []diag.Diagnostic{{Severity: diag.Error, Code: CodeInternal, Message: "emit: View か Program が nil"}}
 	}
@@ -71,12 +122,7 @@ func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic) {
 		return nil, []diag.Diagnostic{{Severity: diag.Error, Code: CodeInternal,
 			Message: fmt.Sprintf("emit: 名前空間 %q が Program にない", view.Viewer)}}
 	}
-	e := newEmitter(view, ns, opts)
-	files := e.run()
-	if errs, _ := diag.Count(e.diags); errs > 0 {
-		return nil, e.diags
-	}
-	return files, e.diags
+	return newEmitter(view, ns, opts), nil
 }
 
 // emitter は一度の Emit の状態。
@@ -92,8 +138,15 @@ type emitter struct {
 	dir string // ルートからの出力ディレクトリ（`/` 区切り）: Dir(viewer) = View.Config.Dir
 
 	declNS   map[string]string // FQN → 宣言を持つ名前空間
-	copied   map[string]bool   // viewer のパッケージに複製する宣言の FQN
 	pkgPaths map[string]string // 名前空間 → import パス（Go の名前空間だけ）
+
+	// 出力の対象（docs/emit-go.md「出力の対象」）。select.go が決める。
+	sel *selection
+	// reach は、出力の対象が参照する型（model / scalar / union / exception）の FQN。名前空間を問わず、参照を辿り切ったもの。
+	// viewer の型はこのうちの全部を出す（[Exports]）。
+	reach map[string]bool
+	// copied は viewer のパッケージに複製する、別の名前空間の型の FQN（docs/emit-go.md「配置」）。
+	copied map[string]bool
 
 	// パッケージに出す宣言（viewer の宣言の順、その後に複製を Program の順で）
 	models     []*ir.Model
@@ -101,19 +154,16 @@ type emitter struct {
 	unions     []*ir.Union
 	exceptions []*ir.Exception
 	effects    []*ir.Effect
-	classifies []*ir.Classify
-	ops        []*ir.Op
-	// stateCases は StateCases に述語を出す状態（docs/emit-go.md「state」）: viewer の list / nullable の基底の状態を宣言の順で。
-	stateCases []*ir.State
+	classifies []*ir.Classify // 値の分類と状態の分類（宣言の順）
+	ops        []*ir.Op       // 選ばれた op（宣言の順）
+	leaves     []*ir.Op       // Leaves に置く op: 効果を持たない葉と、口だけを出す配線
+	units      []*stateUnit   // 状態の単位（宣言の順）
+	unitOf     map[string]*stateUnit
+	commandOf  map[string]*stateUnit // 効果を持つ葉の op の FQN → その命令を持つ状態の単位
 
 	// 配線を見て集めるもの
 	projections []projection // 必要になった射影の組（順序は必要になった順）
-	usedStates  []string     // States の取得メソッドを出す状態の FQN（Program の順）
-	depsNS      []string     // Deps のフィールドにする名前空間（Program の順）
-	depsOps     map[string][]string
-	needPtr     bool // wiring.go に ptr ヘルパーが要るか
-	// matchesState は viewer の配線に match s by list / by nullable があるか。あるときだけ New が stateCases を取る。
-	matchesState bool
+	needPtr     bool         // types.go に ptr ヘルパーが要るか
 
 	wrappers map[string][]wrapper // op の FQN → 包む関数（内側から順）
 
@@ -125,16 +175,18 @@ type projection struct{ from, to string }
 
 func newEmitter(view *ir.View, ns *ir.Namespace, opts Options) *emitter {
 	e := &emitter{
-		view:     view,
-		prog:     view.Program,
-		ns:       ns,
-		viewer:   view.Viewer,
-		opts:     opts,
-		declNS:   map[string]string{},
-		copied:   map[string]bool{},
-		pkgPaths: map[string]string{},
-		depsOps:  map[string][]string{},
-		wrappers: map[string][]wrapper{},
+		view:      view,
+		prog:      view.Program,
+		ns:        ns,
+		viewer:    view.Viewer,
+		opts:      opts,
+		declNS:    map[string]string{},
+		reach:     map[string]bool{},
+		copied:    map[string]bool{},
+		pkgPaths:  map[string]string{},
+		unitOf:    map[string]*stateUnit{},
+		commandOf: map[string]*stateUnit{},
+		wrappers:  map[string][]wrapper{},
 	}
 	for i := range e.prog.Namespaces {
 		n := &e.prog.Namespaces[i]
@@ -147,29 +199,37 @@ func newEmitter(view *ir.View, ns *ir.Namespace, opts Options) *emitter {
 	return e
 }
 
+// collect は出力の対象を決め（select.go）、パッケージに出す宣言を集める（decls.go）。ファイルは作らない。
+func (e *emitter) collect() {
+	e.sel = e.computeSelection()
+	e.collectDecls()
+}
+
 // run は docs/emit-go.md を上から順に実行する。
 func (e *emitter) run() []File {
 	e.pkg = gol.PackageName(e.viewer)
 	e.dir = dirOf(e.view.Config)
+	e.collect()
+	if e.sel.empty() {
+		return nil // 何も選ばれていない（docs/emit-go.md「出力の対象」）
+	}
 	if _, err := gol.ImportPath(e.opts.Root, e.dir); err != nil {
 		e.errorf(CodeNoGoMod, nil, "名前空間 %s の out %q の上に go.mod がない: %v", e.viewer, e.view.Config.Out, err)
 		return nil
 	}
-
-	e.collectDecls()
 	e.checkNames()
-	e.collectWrappers()
 
-	// 配線と op を先に作り、射影・状態・Deps を集める。
+	// 配線と op を先に作り、射影を集める。
 	wiring := e.genWiring()
 	ops := e.genOps()
+	states := e.genStates()
 	classify := e.genClassify()
 	types := e.genTypes()
 	validate := e.genValidate()
 	doc := e.genDoc()
 
 	var files []File
-	for _, g := range []*genFile{doc, types, validate, ops, wiring, classify} {
+	for _, g := range []*genFile{doc, types, validate, ops, states, wiring, classify} {
 		if g == nil || g.body.Len() == 0 && g.pkgDoc == "" {
 			continue
 		}

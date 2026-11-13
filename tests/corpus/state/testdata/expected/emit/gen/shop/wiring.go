@@ -2,28 +2,31 @@
 
 package shop
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
 // Login は op shop.login。
 //
 // Effects: shop.saveToken, shop.signIn
-func (o *ops) Login(ctx context.Context, token Token) error {
-	if err := o.StoreToken(ctx, token); err != nil {
+func (o *ops) Login(token Token) error {
+	if err := o.StoreToken(token); err != nil {
 		return err
 	}
-	return o.MarkLoggedIn(ctx)
+	return o.MarkLoggedIn()
 }
 
 // OpenTop は op shop.openTop。
-func (o *ops) OpenTop(ctx context.Context) error {
-	empty, err := o.stateCases.TokenIsEmpty(ctx)
+func (o *ops) OpenTop() error {
+	if States.Token.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.token"}
+	}
+	empty, err := States.Token.IsEmpty()
 	if err != nil {
 		return err
 	}
 	if empty {
-		err = o.ShowLogin(ctx)
+		err = o.ShowLogin()
 	} else {
-		err = o.ShowCart(ctx)
+		err = o.ShowCart()
 	}
 	if err != nil {
 		return err
@@ -34,15 +37,18 @@ func (o *ops) OpenTop(ctx context.Context) error {
 // OpenCart は op shop.openCart。
 //
 // Effects: shop.clearCart
-func (o *ops) OpenCart(ctx context.Context) error {
-	empty, err := o.stateCases.CartsIsEmpty(ctx)
+func (o *ops) OpenCart() error {
+	if States.Carts.IsEmpty == nil {
+		return &runtime.MissingError{Kind: "state", Name: "shop.carts"}
+	}
+	empty, err := States.Carts.IsEmpty()
 	if err != nil {
 		return err
 	}
 	if empty {
-		err = o.ShowEmpty(ctx)
+		err = o.ShowEmpty()
 	} else {
-		err = o.EmptyCart(ctx)
+		err = o.EmptyCart()
 	}
 	if err != nil {
 		return err
@@ -54,8 +60,8 @@ func (o *ops) OpenCart(ctx context.Context) error {
 //
 // Throws: shop.EmptyCart
 // Effects: shop.placeOrder
-func (o *ops) Checkout(ctx context.Context) (*Order, error) {
-	kind, err := ClassifyCheckout(ctx, o.classifiers.Checkout)
+func (o *ops) Checkout() (*Order, error) {
+	kind, err := ClassifyCheckout()
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +69,7 @@ func (o *ops) Checkout(ctx context.Context) (*Order, error) {
 	switch kind {
 	case CheckoutShopping:
 		var v Order
-		v, err = o.SubmitOrder(ctx)
+		v, err = o.SubmitOrder()
 		placed = &v
 	case CheckoutOrdered:
 		placed = nil
@@ -77,7 +83,7 @@ func (o *ops) Checkout(ctx context.Context) (*Order, error) {
 // Add は op shop.add。
 //
 // Effects: shop.addLine
-func (o *ops) Add(ctx context.Context, line Line) error {
+func (o *ops) Add(line Line) error {
 	kind, err := ClassifyLineKind(o.classifiers.LineKind, line)
 	if err != nil {
 		return err
@@ -85,22 +91,22 @@ func (o *ops) Add(ctx context.Context, line Line) error {
 	var normalized Line
 	switch kind {
 	case LineKindSingle:
-		normalized, err = o.PackSingle(ctx, line)
+		normalized, err = o.PackSingle(line)
 	case LineKindBulk:
-		normalized, err = o.PackBulk(ctx, line)
+		normalized, err = o.PackBulk(line)
 	}
 	if err != nil {
 		return err
 	}
-	kind2, err := ClassifyLoggedIn(ctx, o.classifiers.LoggedIn)
+	kind2, err := ClassifyLoggedIn()
 	if err != nil {
 		return err
 	}
 	switch kind2 {
 	case LoggedInLoggedIn:
-		err = o.AddToCart(ctx, normalized)
+		err = o.AddToCart(normalized)
 	case LoggedInDefault:
-		err = o.ShowLogin(ctx)
+		err = o.ShowLogin()
 	}
 	if err != nil {
 		return err

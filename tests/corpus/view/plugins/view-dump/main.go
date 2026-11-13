@@ -1,6 +1,7 @@
 // Command view-dump は tests/view_test.go のためのプラグイン。emit の要求の view（docs/ir.md「その名前空間から見た IR」）を
 // 2 スペースの字下げで JSON にし直し、<view.config.dir>/view.json の一つのファイルとして返す。テストはそのファイルを読んで、
-// プラグインが受け取った View が hozoc の計算した View と同じであることを確かめる。check と import は持たない。
+// プラグインが受け取った View が hozoc の計算した View と同じであることを確かめる。既定の出力の対象は、テストの語彙の
+// @t.entry が付いた op を起点に選ぶ（docs/plugin-protocol.md「選択」）。check と import は持たない。
 package main
 
 import (
@@ -11,6 +12,9 @@ import (
 
 	"github.com/mew-ton/hozo/plugin"
 )
+
+// entryDecorator は起点を選ぶデコレータ（tests/corpus/view/t.hozo）。
+const entryDecorator = "t.entry"
 
 type handler struct{}
 
@@ -23,7 +27,8 @@ func (handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 		return nil, err
 	}
 	return &plugin.EmitResponse{
-		Files: []plugin.File{{Path: path.Join(req.View.Config.Dir, "view.json"), Content: string(content) + "\n"}},
+		Files:  []plugin.File{{Path: path.Join(req.View.Config.Dir, "view.json"), Content: string(content) + "\n"}},
+		Select: plugin.Select{Roots: plugin.OpsWith(req.View, entryDecorator)},
 	}, nil
 }
 

@@ -3,193 +3,284 @@
 package browser
 
 import (
-	"context"
-
 	"example.com/app/gen/server"
+	"github.com/mew-ton/hozo/runtime"
 )
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// Render は画面を描く。
-	Render(ctx context.Context, in RenderInput) error
+// OpenMeFunc は op browser.openMe の関数の型。
+//
+// 自分のページを開く。
+//
+// Throws: http.ServerError, http.NetworkError
+// Effects: browser.redirected
+type OpenMeFunc func() (server.PublicUser, error)
 
-	// PickFirst は op browser.pickFirst。
-	PickFirst(ctx context.Context, rows []server.OrderRow) (server.OrderRow, error)
+// RenderFunc は op browser.render の関数の型。
+//
+// 画面を描く。
+type RenderFunc func(in RenderInput) error
 
-	// StandardLine は op browser.standardLine。
-	//
-	// 前提: row は browser.WarrantyKind.Standard<server.OrderRow>
-	StandardLine(ctx context.Context, row server.OrderRow) (server.OrderRow, error)
+// ChooseLineFunc は op browser.chooseLine の関数の型。
+//
+// Throws: server.Unauthorized
+type ChooseLineFunc func(query server.OrdersQuery) (*server.OrderRow, error)
 
-	// YamadaLine は op browser.yamadaLine。
-	YamadaLine(ctx context.Context, row server.OrderRow, page *server.PosInt) (server.OrderRow, error)
+// PickFirstFunc は op browser.pickFirst の関数の型。
+type PickFirstFunc func(rows []server.OrderRow) (server.OrderRow, error)
 
-	// Celebrate は op browser.celebrate。
-	Celebrate(ctx context.Context) error
+// StandardLineFunc は op browser.standardLine の関数の型。
+//
+// 前提: row は browser.WarrantyKind.Standard<server.OrderRow>
+type StandardLineFunc func(row server.OrderRow) (server.OrderRow, error)
 
-	// ClearToken は op browser.clearToken。
-	ClearToken(ctx context.Context) error
+// YamadaLineFunc は op browser.yamadaLine の関数の型。
+type YamadaLineFunc func(row server.OrderRow, page *server.PosInt) (server.OrderRow, error)
+
+// CelebrateFunc は op browser.celebrate の関数の型。
+type CelebrateFunc func() error
+
+// MeViewFunc は op browser.meView の関数の型。
+type MeViewFunc func() (MeView, error)
+
+// LogoutFunc は op browser.logout の関数の型。
+//
+// Effects: server.deleteSession
+type LogoutFunc func() error
+
+// FetchMeFunc は op browser.fetchMe の関数の型。
+//
+// Throws: server.Unauthorized
+type FetchMeFunc func(in server.GetMeInput) (server.PublicUser, error)
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	Render       RenderFunc
+	PickFirst    PickFirstFunc
+	StandardLine StandardLineFunc
+	YamadaLine   YamadaLineFunc
+	Celebrate    CelebrateFunc
+	MeView       MeViewFunc
+	Logout       LogoutFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// OpenMe は自分のページを開く。
 	//
 	// Throws: http.ServerError, http.NetworkError
 	// Effects: browser.redirected
-	OpenMe(ctx context.Context) (server.PublicUser, error)
+	OpenMe() (server.PublicUser, error)
 
 	// Render は画面を描く。
-	Render(ctx context.Context, in RenderInput) error
+	Render(in RenderInput) error
 
 	// ChooseLine は op browser.chooseLine。
 	//
 	// Throws: server.Unauthorized
-	ChooseLine(ctx context.Context, query server.OrdersQuery) (*server.OrderRow, error)
+	ChooseLine(query server.OrdersQuery) (*server.OrderRow, error)
 
 	// PickFirst は op browser.pickFirst。
-	PickFirst(ctx context.Context, rows []server.OrderRow) (server.OrderRow, error)
+	PickFirst(rows []server.OrderRow) (server.OrderRow, error)
 
 	// StandardLine は op browser.standardLine。
 	//
 	// 前提: row は browser.WarrantyKind.Standard<server.OrderRow>
-	StandardLine(ctx context.Context, row server.OrderRow) (server.OrderRow, error)
+	StandardLine(row server.OrderRow) (server.OrderRow, error)
 
 	// YamadaLine は op browser.yamadaLine。
-	YamadaLine(ctx context.Context, row server.OrderRow, page *server.PosInt) (server.OrderRow, error)
+	YamadaLine(row server.OrderRow, page *server.PosInt) (server.OrderRow, error)
 
 	// Celebrate は op browser.celebrate。
-	Celebrate(ctx context.Context) error
+	Celebrate() error
+
+	// MeView は op browser.meView。
+	MeView() (MeView, error)
 
 	// Logout は op browser.logout。
 	//
 	// Effects: server.deleteSession
-	Logout(ctx context.Context) error
-
-	// ClearToken は op browser.clearToken。
-	ClearToken(ctx context.Context) error
+	Logout() error
 
 	// FetchMe は op browser.fetchMe。
 	//
 	// Throws: server.Unauthorized
-	FetchMe(ctx context.Context, in server.GetMeInput) (server.PublicUser, error)
+	FetchMe(in server.GetMeInput) (server.PublicUser, error)
 }
 
-// Deps は配線から呼ぶ別の名前空間の op。実装者は bind で埋まる位置に状態の値を入れて呼び出し先に渡す
-// （docs/emit-go.md「op」の「インターフェース」）。
+// Deps は配線から呼ぶ別の名前空間の op。名前空間ごとに一つの構造体で、フィールドは viewer から見た関数の型
+// （bind で埋まる位置は引数から消えている。埋める者が状態の値を入れて呼び出し先に渡す）。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "dep"）。
 type Deps struct {
 	Server ServerOps
 }
 
-// ServerOps は名前空間 server の op のうち、この名前空間の配線が呼ぶもの。引数は bind で埋まる位置を除いた形。
-type ServerOps interface {
-	// GetMe は自分の情報。
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: in.token ← browser.token
-	//
-	// Throws: server.Unauthorized
-	GetMe(ctx context.Context, in GetMeInInput) (server.User, error)
-
-	// ListOrders は op server.listOrders。
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: token ← browser.token
-	//
-	// Throws: server.Unauthorized
-	ListOrders(ctx context.Context, query server.OrdersQuery) ([]server.OrderRow, error)
-
-	// Logout は op server.logout。
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: token ← browser.token
-	//
-	// Effects: server.deleteSession
-	Logout(ctx context.Context) error
+// ServerOps は名前空間 server の op のうち、この名前空間の配線が呼ぶもの。
+type ServerOps struct {
+	GetMe      ServerGetMeFunc
+	ListOrders ServerListOrdersFunc
 }
 
-// States は、この名前空間の配線が同じ名前空間の op を呼ぶときに bind で埋める状態の値の取得
-// （docs/emit-go.md「state」）。nullable<T> なら *T（空なら nil）、single<T> なら T。
-type States interface {
-	// Token は状態 browser.token の値。
-	Token(ctx context.Context) (*server.Token, error)
+// ServerGetMeFunc は op server.getMe の、browser から見た関数の型。
+//
+// 自分の情報。
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: in.token ← browser.token
+//
+// Throws: server.Unauthorized
+type ServerGetMeFunc func(in GetMeInInput) (server.User, error)
+
+// ServerListOrdersFunc は op server.listOrders の、browser から見た関数の型。
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: token ← browser.token
+//
+// Throws: server.Unauthorized
+type ServerListOrdersFunc func(query server.OrdersQuery) ([]server.OrderRow, error)
+
+// RenderGuardMeWrapper は browser.render に付いた @browser.guardMe（= browser.guarded(on: http.NetworkError)）。
+// throws http.NetworkError prevents effects
+// catches server.Unauthorized halts browser.redirected
+type RenderGuardMeWrapper func(in RenderInput, next RenderFunc) error
+
+// RenderRetryWrapper は browser.render に付いた @browser.retry（= browser.retry(times: 2)）。
+// 失敗したら times 回までやり直す。
+type RenderRetryWrapper func(in RenderInput, next RenderFunc) error
+
+// PickFirstHttpRetryWrapper は browser.pickFirst に付いた @http.retry。
+// 運搬に失敗したらやり直す。
+type PickFirstHttpRetryWrapper func(rows []server.OrderRow, next PickFirstFunc) (server.OrderRow, error)
+
+// LogoutTrackedWrapper は browser.logout に付いた @browser.tracked。
+type LogoutTrackedWrapper func(next LogoutFunc) error
+
+// RetryWrappers は @browser.retry の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+type RetryWrappers struct {
+	Render RenderRetryWrapper
 }
 
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// TokenIsEmpty は状態 browser.token（nullable）が空（Empty）か。
-	TokenIsEmpty(ctx context.Context) (bool, error)
+// GuardMeWrappers は @browser.guardMe の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+type GuardMeWrappers struct {
+	Render RenderGuardMeWrapper
 }
 
-// Wrappers は op に付いたデコレータのうち、プラグインが扱わないものの「包む関数」（docs/emit-go.md「デコレータ」）。
-// 引数は op の引数と next（op の関数の型）。
-type Wrappers interface {
-	// OpenMeTracked は browser.openMe に付いた @browser.tracked。
-	OpenMeTracked(ctx context.Context, next func(ctx context.Context) (server.PublicUser, error)) (server.PublicUser, error)
-
-	// OpenMeGuardMe は browser.openMe に付いた @browser.guardMe（= browser.guarded(on: http.NetworkError)）。
-	// throws http.NetworkError prevents effects
-	// catches server.Unauthorized halts browser.redirected
-	OpenMeGuardMe(ctx context.Context, next func(ctx context.Context) (server.PublicUser, error)) (server.PublicUser, error)
-
-	// OpenMeRetry は browser.openMe に付いた @browser.retry（= browser.retry(times: 3)）。
-	// 失敗したら times 回までやり直す。
-	OpenMeRetry(ctx context.Context, next func(ctx context.Context) (server.PublicUser, error)) (server.PublicUser, error)
+// HttpRetryWrappers は @http.retry の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+type HttpRetryWrappers struct {
+	PickFirst PickFirstHttpRetryWrapper
 }
 
-// Classifiers は分類ごとの述語の実装（classify.go の <C>Cases）。
+// TrackedWrappers は @browser.tracked の包む関数。そのデコレータを引き受けたプラグインがフィールドを埋める。
+type TrackedWrappers struct {
+	Logout LogoutTrackedWrapper
+}
+
+// Wrappers は、プラグインが select の wraps で引き受けたデコレータの適用の「包む関数」。デコレータごとに一つの構造体。
+// 埋めていない包む関数に当たったら *runtime.MissingError（Kind は "wrapper"）。
+type Wrappers struct {
+	Retry     RetryWrappers
+	GuardMe   GuardMeWrappers
+	HttpRetry HttpRetryWrappers
+	Tracked   TrackedWrappers
+}
+
+// Classifiers は値の分類ごとの述語の実装（classify.go の <C>Cases）。
+// 埋めていない分類で判定しようとしたら *runtime.MissingError（Kind は "classifier"）。
 type Classifiers struct {
 	WarrantyKind WarrantyKindCases
 	IsBig        IsBigCases
 }
 
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves, deps Deps, states States, wrappers Wrappers, classifiers Classifiers) Ops {
-	return &ops{leaves: leaves, deps: deps, states: states, wrappers: wrappers, classifiers: classifiers}
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
+func New(leaves Leaves, deps Deps, wrappers Wrappers, classifiers Classifiers) Ops {
+	return &ops{leaves: leaves, deps: deps, wrappers: wrappers, classifiers: classifiers}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
 	leaves      Leaves
 	deps        Deps
-	states      States
 	wrappers    Wrappers
 	classifiers Classifiers
 }
 
-func (o *ops) OpenMe(ctx context.Context) (server.PublicUser, error) {
-	f0 := o.openMeBody
-	f1 := func(ctx context.Context) (server.PublicUser, error) {
-		return o.wrappers.OpenMeTracked(ctx, f0)
+func (o *ops) Render(in RenderInput) error {
+	f0 := RenderFunc(func(in RenderInput) error {
+		if o.leaves.Render == nil {
+			return &runtime.MissingError{Kind: "leaf", Name: "browser.render"}
+		}
+		return o.leaves.Render(in)
+	})
+	f1 := RenderFunc(func(in RenderInput) error {
+		if o.wrappers.GuardMe.Render == nil {
+			return &runtime.MissingError{Kind: "wrapper", Name: "browser.render@browser.guardMe"}
+		}
+		return o.wrappers.GuardMe.Render(in, f0)
+	})
+	f2 := RenderFunc(func(in RenderInput) error {
+		if o.wrappers.Retry.Render == nil {
+			return &runtime.MissingError{Kind: "wrapper", Name: "browser.render@browser.retry"}
+		}
+		return o.wrappers.Retry.Render(in, f1)
+	})
+	return f2(in)
+}
+
+func (o *ops) PickFirst(rows []server.OrderRow) (server.OrderRow, error) {
+	f0 := PickFirstFunc(func(rows []server.OrderRow) (server.OrderRow, error) {
+		if o.leaves.PickFirst == nil {
+			return server.OrderRow{}, &runtime.MissingError{Kind: "leaf", Name: "browser.pickFirst"}
+		}
+		return o.leaves.PickFirst(rows)
+	})
+	f1 := PickFirstFunc(func(rows []server.OrderRow) (server.OrderRow, error) {
+		if o.wrappers.HttpRetry.PickFirst == nil {
+			return server.OrderRow{}, &runtime.MissingError{Kind: "wrapper", Name: "browser.pickFirst@http.retry"}
+		}
+		return o.wrappers.HttpRetry.PickFirst(rows, f0)
+	})
+	return f1(rows)
+}
+
+func (o *ops) StandardLine(row server.OrderRow) (server.OrderRow, error) {
+	if o.leaves.StandardLine == nil {
+		return server.OrderRow{}, &runtime.MissingError{Kind: "leaf", Name: "browser.standardLine"}
 	}
-	f2 := func(ctx context.Context) (server.PublicUser, error) {
-		return o.wrappers.OpenMeGuardMe(ctx, f1)
+	return o.leaves.StandardLine(row)
+}
+
+func (o *ops) YamadaLine(row server.OrderRow, page *server.PosInt) (server.OrderRow, error) {
+	if o.leaves.YamadaLine == nil {
+		return server.OrderRow{}, &runtime.MissingError{Kind: "leaf", Name: "browser.yamadaLine"}
 	}
-	f3 := func(ctx context.Context) (server.PublicUser, error) {
-		return o.wrappers.OpenMeRetry(ctx, f2)
+	return o.leaves.YamadaLine(row, page)
+}
+
+func (o *ops) Celebrate() error {
+	if o.leaves.Celebrate == nil {
+		return &runtime.MissingError{Kind: "leaf", Name: "browser.celebrate"}
 	}
-	return f3(ctx)
+	return o.leaves.Celebrate()
 }
 
-func (o *ops) Render(ctx context.Context, in RenderInput) error {
-	return o.leaves.Render(ctx, in)
+func (o *ops) MeView() (MeView, error) {
+	if o.leaves.MeView == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "browser.meView"}
+	}
+	return o.leaves.MeView()
 }
 
-func (o *ops) PickFirst(ctx context.Context, rows []server.OrderRow) (server.OrderRow, error) {
-	return o.leaves.PickFirst(ctx, rows)
-}
-
-func (o *ops) StandardLine(ctx context.Context, row server.OrderRow) (server.OrderRow, error) {
-	return o.leaves.StandardLine(ctx, row)
-}
-
-func (o *ops) YamadaLine(ctx context.Context, row server.OrderRow, page *server.PosInt) (server.OrderRow, error) {
-	return o.leaves.YamadaLine(ctx, row, page)
-}
-
-func (o *ops) Celebrate(ctx context.Context) error {
-	return o.leaves.Celebrate(ctx)
-}
-
-func (o *ops) ClearToken(ctx context.Context) error {
-	return o.leaves.ClearToken(ctx)
+func (o *ops) Logout() error {
+	f0 := LogoutFunc(func() error {
+		if o.leaves.Logout == nil {
+			return &runtime.MissingError{Kind: "leaf", Name: "browser.logout"}
+		}
+		return o.leaves.Logout()
+	})
+	f1 := LogoutFunc(func() error {
+		if o.wrappers.Tracked.Logout == nil {
+			return &runtime.MissingError{Kind: "wrapper", Name: "browser.logout@browser.tracked"}
+		}
+		return o.wrappers.Tracked.Logout(f0)
+	})
+	return f1()
 }

@@ -4,23 +4,11 @@ package server
 
 import (
 	"errors"
-	"regexp"
 	"strconv"
 	"unicode/utf8"
 
 	"github.com/mew-ton/hozo/runtime"
 )
-
-var patternEmployeeCode = regexp.MustCompile("^[A-Z]{3}[0-9]{5}$")
-
-// ConstraintImpls は valid に足した制約の実装（設計書 §6.5）。人が Constraints に設定する。
-type ConstraintImpls interface {
-	// CheckDigit は 末尾の 1 桁が、前の 4 桁から計算したチェックディジットと一致する
-	CheckDigit(v string) bool
-}
-
-// Constraints は ConstraintImpls の実装。未設定のまま Validate を呼ぶと panic する。
-var Constraints ConstraintImpls
 
 // Validate は server.Email の制約を確かめる。違反がなければ nil。
 func (v Email) Validate() error {
@@ -49,24 +37,6 @@ func (v Password) Validate() error {
 	var violations []runtime.Violation
 	if l := utf8.RuneCountInString(string(v)); l < 8 || l > 128 {
 		violations = append(violations, runtime.Violation{Path: "", Constraint: "length"})
-	}
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は server.EmployeeCode の制約を確かめる。違反がなければ nil。
-func (v EmployeeCode) Validate() error {
-	var violations []runtime.Violation
-	if Constraints == nil {
-		panic("server: Constraints が設定されていない（valid に足した制約の実装）")
-	}
-	if !patternEmployeeCode.MatchString(string(v)) {
-		violations = append(violations, runtime.Violation{Path: "", Constraint: "pattern"})
-	}
-	if !Constraints.CheckDigit(string(v)) {
-		violations = append(violations, runtime.Violation{Path: "", Constraint: "checkDigit"})
 	}
 	if len(violations) == 0 {
 		return nil
@@ -264,29 +234,6 @@ func (m LoginOk) Validate() error {
 	var violations []runtime.Violation
 	violations = appendViolations(violations, "user", m.User.Validate())
 	violations = appendViolations(violations, "token", m.Token.Validate())
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は server.CancelInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m CancelInput) Validate() error {
-	var violations []runtime.Violation
-	violations = appendViolations(violations, "orderId", m.OrderId.Validate())
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は server.OrderInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m OrderInput) Validate() error {
-	var violations []runtime.Violation
-	violations = appendViolations(violations, "userId", m.UserId.Validate())
-	for i0, x0 := range m.Lines {
-		violations = appendViolations(violations, "lines["+strconv.Itoa(i0)+"]", x0.Validate())
-	}
 	if len(violations) == 0 {
 		return nil
 	}

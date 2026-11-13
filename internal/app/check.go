@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
@@ -12,7 +11,7 @@ import (
 
 // Check は cli.hozo の op check（docs/cli.md「check」）。internal/project.Load が 1〜4 を行い、ここは 5:
 // error が一つでもあれば例外（値は error と warning のすべて）、なければ CheckResult（warning）。
-// 解析した Project は WriteOutputs のために l.checked に置く。
+// 解析した Project は WriteOutputs のために a.checked に置く。
 //
 // hozo.toml が見つからず、--config / HOZO_CONFIG の指定もなければ「設定なし」で検査する（docs/config.md「置き場と探し方」）:
 // 作業ディレクトリがルート、sources は既定で、CFG-* は出ない（internal/project が除く）。例外になるかどうかは
@@ -22,9 +21,9 @@ import (
 // error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-4 なら LanguageMismatch、
 // そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
 // プラグインの check が異常終了すれば proc.Crashed / proc.MalformedOutput（asProc）。
-func (l *Leaves) Check(_ context.Context, in hozoc.CheckInput) (hozoc.CheckResult, error) {
-	l.checked = nil
-	p := project.LoadWith(project.Options{Root: l.Dir, ConfigPath: str(in.Config), Stderr: l.Stderr, Env: l.Env})
+func (a *App) Check(in hozoc.CheckInput) (hozoc.CheckResult, error) {
+	a.checked = nil
+	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, Env: a.Env})
 	if p.RunErr != nil {
 		return hozoc.CheckResult{}, asProc(p.RunErr)
 	}
@@ -32,7 +31,7 @@ func (l *Leaves) Check(_ context.Context, in hozoc.CheckInput) (hozoc.CheckResul
 	if err := classify(diags, p.Files); err != nil {
 		return hozoc.CheckResult{}, err
 	}
-	l.checked = p
+	a.checked = p
 	return hozoc.CheckResult{Warnings: toDiagnostics(diags, p.Files)}, nil
 }
 

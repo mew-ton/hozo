@@ -75,7 +75,7 @@ hozoc <command> [flags] [args]
 
 ## 実行と表示
 
-1. `ops.<Op>(context.Background(), input)` を呼ぶ。
+1. `ops.<Op>(input)` を呼ぶ（引数が 0 個なら `ops.<Op>()`。生成した `Ops` は `context` を取らない。`docs/emit-go.md`「実装の単位」）。
 2. 成功なら `p.Present(stdout, command, input, result)` を呼び（void なら `result` は `nil`）、0。
 3. 例外なら、`Signature.exceptions` の順に `errors.As` で例外の型を見分けて `Failure` を作り、終了コードを決めてから `p.PresentError(stderr, command, input, failure)` を呼ぶ。終了コードは、見分けた例外に `@cli.exitCode(code)` があればその `code`、なければ 70。見分けられなければ `Failure{Err: err}` で 70。
 4. `Present` / `PresentError` 自体が失敗したら、そのエラーを標準エラーに出して 70。

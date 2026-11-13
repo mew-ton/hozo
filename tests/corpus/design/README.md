@@ -4,7 +4,8 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | `[server]` と `[browser]`。どちらも `language = "go"`（下の表の 1） |
+| `hozo.toml` | `[server]` と `[browser]`。どちらも `language = "go"`、`plugins = ["pick"]`（下の表の 1） |
+| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`）のマニフェストと `pick.json`。設計書のプラグインの代わりに、既定の出力の対象を語彙のデコレータで選ぶ（下の「既定の出力」） |
 | `server.hozo` | `namespace server` の例すべてと、§6.5 の `namespace valid { decorator checkDigit ... }` |
 | `browser.hozo` | `namespace browser` の例すべて |
 
@@ -18,7 +19,7 @@
 
 | # | 設計書の箇所と原文 | このコーパスでの書き方 | 理由 |
 |---|---|---|---|
-| 1 | §4.5 `[browser] language = "ts"`、`plugins = [...]` | `language = "go"`、`plugins` なし | TS の既定の出力は段階 5 まで存在せず、`"ts"` は CFG-11 のエラー（`docs/config.md`「診断」、`docs/decisions.md` 6）。プラグインもまだないので書けば CFG-9 |
+| 1 | §4.5 `[browser] language = "ts"`、`plugins = [...]` | `language = "go"`、`plugins = ["pick"]`（テスト用） | TS の既定の出力は段階 5 まで存在せず、`"ts"` は CFG-11 のエラー（`docs/config.md`「診断」、`docs/decisions.md` 6）。設計書のプラグイン（http のサーバー、ルーター、db）はまだないので書けば CFG-9。出力の対象を選ぶために、テスト用のプラグインを置く（下の「既定の出力」） |
 | 2 | §7.1 `model LoginInput { @http.header(name: "Authorization") token?: Token; ... }`、§9 `model LogoutInput { ... token?: Token; }`、§11.2 `model OrdersQuery { page: PosInt = 1; status?: server.OrderStatus; }` | `token: Token?`、`status: server.OrderStatus?` | 省略可能は型の `?` だけで書く（`docs/grammar.md`「決めたこと」、`docs/decisions.md` 8、「設計書へ返すこと」の「省略可能の書き方」） |
 | 3 | §5.2 `@page.path state location: single<Route>;` | `single<page.Route>` | `Route` は語彙 `page` の宣言なので修飾する（`docs/resolve.md`「手続き」、`docs/decisions.md`「設計書へ返すこと」の「`location` の型」） |
 | 4 | §5.2 `namespace browser { @localStorage state token: single<Token?>; }` | `nullable<server.Token>` | 二つの理由。(a) `Token` は `server` の scalar（§6.5）。別の名前空間の宣言は常に修飾する（§3.2、NS-1）。写したままだと RES-1（`docs/resolve.md`「診断」、`docs/decisions.md`「設計書へ返すこと」の「`Token` の修飾」）。(b) 空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない（`docs/decisions.md`「設計書を変える決定」S2、`docs/grammar.md`「決めたこと」）。写したままだと STATE-3（`docs/check.md`「状態と効果」） |
@@ -52,6 +53,18 @@
 - model: `OrderRow`（§11.2 `orders: OrderRow[]`）、`ProductQuery`
 - union: `ProductPage`（§10.2 `when: ProductPage.Ready`）
 - op: `chooseStandardWarranty`（§10.2 の `match` のアーム。葉）、`chooseWarrantyPlan`（表の 12）、`askWarrantyPlan`（`@page.dialog`）、`productPageVm`、`fetchItem`、`openProduct`（§10.2 `page: openProduct`。`@unavailableOnFailure` と `@page.route("/product", from: query)` を付けた配線）
+
+## 既定の出力
+
+既定の出力は、プラグインが選んだ宣言だけを出す（`docs/emit-go.md`「出力の対象」）。設計書のプラグインがまだないので、テスト用の `pick`（`tests/plugins/pick`）が、`plugins/pick/pick.json` に書いた語彙のデコレータで選ぶ。設計書の例（`docs/plugin-protocol.md`「選択」の `roots` / `stops` / `states`）に合わせた選び方:
+
+| `select` | デコレータ | 選ばれるもの |
+|---|---|---|
+| `roots` | `http.get`、`http.post`（http のサーバー）、`page.route`、`page.interaction`（ルーター） | `server` は `login` などの API の op。`browser` は `openOrders` / `openProfile` / `openProduct` と `onAddToCart`、そこから配線で辿られる op |
+| `stops` | `page.dialog` | `browser` の `askYamadaWarranty` / `askWarrantyPlan`（口だけを出す） |
+| `states` | `db` | `server` の `@db` の状態 |
+
+選ばれない宣言は出力されない: `server` の `placeOrder` / `saveOrder` / `sendOrderNotice` / `cancelOrder`（`@http.*` が付いていない）、`browser` の `logout` / `requestLogout` / `clearToken`（どの起点からも辿られない）。`@page.route` や `@page.fallback` などのデコレータは、どのプラグインも `wraps` で引き受けていないので、包む関数にならない。`browser` は、`server` の出力が持つ型（API の op から辿れるもの）を import する。
 
 ## 設計書の例が規則に触れるところ
 

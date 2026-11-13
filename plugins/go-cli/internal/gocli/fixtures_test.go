@@ -174,6 +174,8 @@ func hozocNamespace() ir.Namespace {
 				cliCommand("emit")),
 			opDecl("hozoc.lsp", "言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。", param("in", "hozoc.LspInput"), nil, nil,
 				cliCommand("lsp")),
+			// プロセスの境界を越える op。@cli.command ではないので cli.go には出ず、選択の stops になる
+			opDecl("hozoc.runEmit", "プラグインを一つ起動して展開させる。", nil, nil, []string{"proc.Crashed", "proc.MalformedOutput"}, app("proc.stdio")),
 		},
 	}
 }

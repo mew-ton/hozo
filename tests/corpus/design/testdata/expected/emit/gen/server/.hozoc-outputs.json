@@ -1,6 +1,6 @@
 [
   "gen/server/ops.go",
+  "gen/server/states.go",
   "gen/server/types.go",
-  "gen/server/validate.go",
-  "gen/server/wiring.go"
+  "gen/server/validate.go"
 ]

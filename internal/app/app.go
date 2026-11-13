@@ -2,17 +2,24 @@
 //
 // 骨組み（引数の解釈、例外の見分けと終了コード、使い方の表示）は cli.hozo から生成した
 // internal/gen/hozoc（既定の出力。docs/emit-go.md）と internal/gen/hozoc/cli（go-cli。docs/plugin-go-cli.md）が持ち、
-// ここは hozoc.Leaves（Check / WriteOutputs / RunEmit / Lsp）と cli.Presenter を実装する。配線の op emit は生成した
-// ops が持つ（hozoc.New(leaves, classifiers).Emit）。cmd/hozoc/main.go がこれらを組み立てて cli.Main を呼ぶ。
+// ここは生成した実装の単位を埋める [App] と、cli.Presenter の実装 [Presenter] を持つ。go-cli が選ぶのは @cli.command の
+// check / emit / lsp と、emit の配線から辿られる writeOutputs:
+//
+//   - 効果を持たない葉の check と lsp は hozoc.Leaves のフィールド（[App.Leaves]）。
+//   - 効果 syncOutputs を持つ葉の writeOutputs は、その宛先の状態の単位 hozoc.States.OutputsSync の命令。同じ単位の
+//     問い合わせ（分類 OutputsSync の述語 UpToDate）と一緒に [App.States] が返す。
+//   - 配線の emit は生成した ops が持つ。
+//   - どの配線からも呼ばれない runEmit は生成の対象にならないので、このパッケージの中の関数（emit.go）。
+//
+// [App.Ops] がこれらを組み立てる（hozoc.States に入れるのはそこだけ）。cmd/hozoc/main.go はその結果を cli.Main に渡す。
 //
 // 境界の型は生成したもの（hozoc.CheckInput、hozoc.Diagnostic、hozoc.CheckFailed など）で、中の豊かな型
-// （internal/project.Project、internal/diag.Diagnostic）は Leaves の中にとどめる。例外は生成した exception の型で
+// （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型で
 // 返す（hozoc.CheckFailed{Value: hozoc.Diagnostics{...}} など）。cli.go はそれを errors.As で見分けて
 // @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
 package app
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,15 +33,14 @@ import (
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/source"
-	"github.com/mew-ton/hozo/ir"
 )
 
-// Leaves は葉の op の実装（docs/cli.md「手で書くもの」の internal/app）。hozoc.Leaves を満たす。零値で使える。
+// App は葉の op の実装（docs/cli.md「手で書くもの」の internal/app）と、それらが共有するもの。零値で使える。
 //
 // cli.hozo の model は境界だけを書く（docs/requirements.md「自己展開」）ので、op をまたいで要る中身は
-// Leaves の中に持つ: Check が解析した Project（WriteOutputs が使う）と、RunEmit に渡す IR（cli.hozo の
-// model View は中身を持たない）。hozoc は一度の実行で一つのコマンドを走らせるので、同時に使われることはない。
-type Leaves struct {
+// App の中に持つ: Check が解析した Project（WriteOutputs が使う）。プラグインに渡す IR（cli.hozo の model View は
+// 中身を持たない）は、その Project から作る。hozoc は一度の実行で一つのコマンドを走らせるので、同時に使われることはない。
+type App struct {
 	// Dir は作業ディレクトリ。hozo.toml を探し始める場所で、--config の相対パスの基準。空なら os の作業ディレクトリ。
 	Dir string
 	// Stderr はプラグインの標準エラーを流す先（docs/plugin-protocol.md「起動」）。nil なら os.Stderr。
@@ -48,23 +54,38 @@ type Leaves struct {
 	// checked は直前の Check が解析した Project。WriteOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
 	// なので、Program・設定・マニフェストはここから取る。Check が失敗すれば nil。
 	checked *project.Project
-	// view は RunEmit に渡す IR（docs/ir.md「その名前空間から見た IR」）。WriteOutputs が RunEmit を呼ぶ直前に置く。
-	view *ir.View
 }
 
-var _ hozoc.Leaves = (*Leaves)(nil)
+// Leaves は効果を持たない葉の op（check、lsp）の実装を入れた hozoc.Leaves。
+func (a *App) Leaves() hozoc.Leaves {
+	return hozoc.Leaves{Check: a.Check, Lsp: a.Lsp}
+}
+
+// States は hozoc の状態の単位の実装: 分類の状態 OutputsSync の述語 UpToDate（問い合わせ）と、
+// 効果 syncOutputs を持つ葉の op writeOutputs（命令）。
+func (a *App) States() hozoc.StateSet {
+	return hozoc.StateSet{OutputsSync: hozoc.OutputsSyncState{UpToDate: a.UpToDate, WriteOutputs: a.WriteOutputs}}
+}
+
+// Ops は a の実装で hozoc の Ops を組み立てる（docs/cli.md「手で書くもの」の cmd/hozoc/main.go の中身）:
+// パッケージの変数 hozoc.States に a.States() を入れ、hozoc.New(a.Leaves()) を返す。hozoc.States に入れるのはここだけ。
+// 変数は一つなので、最後に Ops を呼んだ App が効く（hozoc は一度の実行で App を一つだけ作る）。
+func (a *App) Ops() hozoc.Ops {
+	hozoc.States = a.States()
+	return hozoc.New(a.Leaves())
+}
 
 // Lsp は cli.hozo の op lsp: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
 // internal/lsp.Serve を呼び、クライアントが exit を送るまで戻らない。config（--config / HOZO_CONFIG）は
 // hozo.toml の場所で、なければクライアントの rootUri から探す。log（--log / HOZO_LSP_LOG）はログの書き出し先で、
 // 開けなければその誤りを返す（宣言にない例外なので 70。docs/diagnostics.md「終了コード」）。
 // 標準エラーには書かない（docs/lsp.md「通信」）。
-func (l *Leaves) Lsp(_ context.Context, in hozoc.LspInput) error {
-	opts := lsp.Options{Root: l.Dir}
+func (a *App) Lsp(in hozoc.LspInput) error {
+	opts := lsp.Options{Root: a.Dir}
 	if in.Config != nil && *in.Config != "" {
 		opts.ConfigPath = string(*in.Config)
-		if !filepath.IsAbs(opts.ConfigPath) && l.Dir != "" {
-			opts.ConfigPath = filepath.Join(l.Dir, opts.ConfigPath)
+		if !filepath.IsAbs(opts.ConfigPath) && a.Dir != "" {
+			opts.ConfigPath = filepath.Join(a.Dir, opts.ConfigPath)
 		}
 	}
 	if in.Log != nil && *in.Log != "" {
@@ -75,11 +96,11 @@ func (l *Leaves) Lsp(_ context.Context, in hozoc.LspInput) error {
 		defer f.Close()
 		opts.Log = f
 	}
-	var stdin io.Reader = l.Stdin
+	var stdin io.Reader = a.Stdin
 	if stdin == nil {
 		stdin = os.Stdin
 	}
-	var stdout io.Writer = l.Stdout
+	var stdout io.Writer = a.Stdout
 	if stdout == nil {
 		stdout = os.Stdout
 	}

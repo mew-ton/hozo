@@ -237,7 +237,9 @@ var descriptions = map[string]string{
 	"NamespaceConfig":      "一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。",
 	"ViewedSignature":      "viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」）。",
 	"EmitRequest":          "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。",
-	"EmitResponse":         "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。",
+	"EmitResponse":         "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。select を省けば何も選ばない。",
+	"Select":               "既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN は view.viewer の名前空間の宣言。",
+	"Wrap":                 "プラグインが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。",
 	"CheckRequest":         "direction \"check\" の要求（docs/plugin-protocol.md「check」）。",
 	"CheckResponse":        "\"check\" の応答（docs/plugin-protocol.md「check」）。",
 	"ImportRequest":        "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",
@@ -410,7 +412,7 @@ func (g *gen) schemaOf(t reflect.Type, fieldKey string) (any, error) {
 }
 
 // structDef は構造体 t のオブジェクトのスキーマ。埋め込んだ構造体のフィールドは平らにする。
-// omitempty のないフィールドは required（Go は常に書く。空の列も []）。
+// omitempty も omitzero もないフィールドは required（Go は常に書く。空の列も []）。
 // t がユニオンの変種なら kind の定数を足す。
 func (g *gen) structDef(t reflect.Type, name string) (map[string]any, error) {
 	props := map[string]any{}
@@ -445,7 +447,7 @@ func (g *gen) structDef(t reflect.Type, name string) (map[string]any, error) {
 				return fmt.Errorf("%s.%s: %w", t.Name(), f.Name, err)
 			}
 			props[jsonName] = s
-			if !strings.Contains(","+opts+",", ",omitempty,") {
+			if !strings.Contains(","+opts+",", ",omitempty,") && !strings.Contains(","+opts+",", ",omitzero,") {
 				required = append(required, jsonName)
 			}
 		}

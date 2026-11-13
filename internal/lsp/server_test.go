@@ -566,7 +566,7 @@ func shift(p protocol.Position, n int) protocol.Position {
 
 // TestStateClassification は、状態を分類で表す決定（docs/decisions.md「設計書を変える決定」）の構文に対する、
 // 診断の一致・ホバーの見出し（docs/lsp.md「ホバー」）・定義へジャンプ・ドキュメントのシンボル。
-// コーパスは tests/corpus/state（check だけのコーパス。README.md）。
+// コーパスは tests/corpus/state（README.md）。
 func TestStateClassification(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", "tests", "corpus", "state"))
 	if err != nil {

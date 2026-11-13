@@ -21,6 +21,11 @@ func (v PosInt) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
+// Validate は page.Route の制約を確かめる。違反がなければ nil。
+func (v Route) Validate() error {
+	return nil
+}
+
 // Validate は browser.OrdersQuery の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m OrdersQuery) Validate() error {
 	var violations []runtime.Violation
@@ -96,21 +101,6 @@ func (m ProductPageReady) Validate() error {
 		return nil
 	}
 	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は browser.login$in の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m LoginInInput) Validate() error {
-	var violations []runtime.Violation
-	violations = appendViolations(violations, "body", m.Body.Validate())
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は browser.logout$in の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m LogoutInInput) Validate() error {
-	return nil
 }
 
 // Validate は browser.getMe$in の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。

@@ -13,7 +13,7 @@
 
 `.hozo` の各ブロックの上の `// docs/...「見出し」` のコメントが、その構文が確かめる文書の見出し。
 
-`emit` のゴールデンはまだ置いていない（`tests/corpus_emit_test.go` の `corpora` の `checkOnly`）。どのプラグインも読まないデコレータが何も生成しないこと（`docs/emit-go.md`「デコレータ」、`docs/decisions.md` S11）と、出力しない名前空間の op を呼ぶ配線の出力の形は、Go の既定の出力の側で確かめる。
+`emit` のゴールデンは持たない（`tests/corpus_emit_test.go` の `corpora` の `noOutput`）: 出力する名前空間 `shop` にプラグインがなく、出力するのはプラグインが選んだ宣言だけ（`docs/emit-go.md`「出力の対象」、`docs/decisions.md` S11）なので、`hozoc emit` は終了コード 0 で何も書かない。印のデコレータ（`@marks.*`）も何も生成しない（`docs/emit-go.md`「デコレータ」）。前回の出力が残っていれば消えること（`docs/cli.md`「emit」の 6 と 8）は、`TestModelCorpus` の「emit-go.md 出力の対象」のサブテストが確かめる。プラグインが選んだときの出力の形（印のデコレータ、出力しない名前空間の op を呼ぶ配線）は、コーパス `select` と `view` が確かめる。
 
 ## 見出し → 構文
 
@@ -29,6 +29,7 @@
 | `docs/check.md`「計算」手順 i の `throws`（印のデコレータ） | `@marks.requirement("PRD-12") op placeOrder(): Order effects createOrder;`（`shop.hozo`） | どのプラグインも読まない印でも、`throws` を宣言していれば付けた op の `Signature` に効く: `exceptions` に `marks.NotApproved`、`relations` は `prevented`。op 自身の `throws` は `[]` のまま。`throws` を持たない印（`@marks.manual`）は `Signature` を変えない |
 | `docs/check.md`「計算」手順 0（配線）: 名前空間をまたぐ伝播 | `shop.fulfill`（設定のある名前空間 → 設定のない `carrier.pickup`）、`customer.buy`（設定のない名前空間 → 設定のある `shop.addToCart` / `shop.fulfill`） | 効果と例外は名前空間をまたいで伝播し、`rel` と `succ` も同じ規則で計算される。呼び先の例外を `throws` に書かなければ、出力しない名前空間の配線でも THROWS-1 |
 | `docs/check.md`「状態と効果」STATE-2、EFF-3 | `carrier.pickup`（`effects accept`）、`customer.pick`（`effects forget`） | 出力しない名前空間にも状態の持ち主の規則が掛かる（効果は自分の名前空間の状態への効果）。葉の op の効果は一つ |
+| `docs/emit-go.md`「出力の対象」（プラグインのない名前空間） | `hozo.toml` の `[shop]`（`plugins` なし）と、前回の出力に見立てた `gen/shop/ops.go` と `.hozoc-outputs.json` | `hozoc emit` は終了コード 0 で何も書かない。前回の出力は古いファイルとして消え（`removed: gen/shop/ops.go`）、`.hozoc-outputs.json` も残らない。記録にないファイルには触らない |
 | `docs/config.md`「置き場と探し方」の「設定なし」 | 同じ `.hozo` を `hozo.toml` なしのディレクトリに置く（`TestModelCorpus` の最後のサブテスト） | `hozoc check` は終了コード 0 で `0 errors, 0 warnings`。`Views()` は空。`hozoc emit` は CFG-7（終了コード 2） |
 
 ## 想定する診断

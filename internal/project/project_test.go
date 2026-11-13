@@ -39,23 +39,34 @@ func write(t *testing.T, path, content string) {
 	}
 }
 
-// copyCorpus は設計書のコーパスを一時ディレクトリに写す。
+// copyCorpus は設計書のコーパスを一時ディレクトリに写す: 直下のファイルと、hozo.toml が設定しているプラグインの
+// マニフェスト（plugins/。検査では起動しない）。ゴールデン（testdata/）は写さない。
 func copyCorpus(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	entries, err := os.ReadDir(corpusDir)
+	err := filepath.WalkDir(corpusDir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(corpusDir, p)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if rel != "." && rel != "plugins" && !strings.HasPrefix(filepath.ToSlash(rel), "plugins/") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		write(t, filepath.Join(dir, rel), string(data))
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(corpusDir, e.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		write(t, filepath.Join(dir, e.Name()), string(data))
 	}
 	return dir
 }

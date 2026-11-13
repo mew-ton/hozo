@@ -2,6 +2,7 @@
 //
 // Handler が plugin.Handler を実装し、View の見る側の名前空間の @cli.command の op を
 // cli/cli.go（パッケージ cli）にする。「対象」の CLI-1〜CLI-5 は emit の応答の errors。
+// 既定の出力の対象は応答の select で選ぶ（docs/plugin-go-cli.md「マニフェスト」の「選ぶもの」）。
 package gocli
 
 import (
@@ -46,11 +47,15 @@ var _ plugin.Handler = Handler{}
 // Emit は View.viewer の名前空間の CLI の骨組みを `<View.config.dir>/cli/cli.go` にする（docs/plugin-go-cli.md「出力」）。
 // @cli.command の op が一つもなければファイルを出さず warning を一つ返す。
 // CLI-* があれば Files は空で Errors にそれを入れる。go.mod が見つからなければ GOEMIT-1（docs/emit-go.md「診断」）。
+//
+// どの応答も select を持つ: roots は @cli.command の付いた op、stops は @proc.stdio の付いた op
+// （プロセスの境界を越える op は辿らず、口だけを出す）。cli.go は、roots の op が既定の出力の Ops に載ることを前提に書く。
 func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req == nil || req.View == nil {
 		return nil, fmt.Errorf("emit: request has no view")
 	}
 	view := req.View
+	sel := Select(view)
 	getenv := h.Getenv
 	if getenv == nil {
 		getenv = os.Getenv
@@ -63,7 +68,7 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	importPath, err := golang.ImportPath(root, dir)
 	if err != nil {
 		if errors.Is(err, golang.ErrNoGoMod) {
-			return &plugin.EmitResponse{Errors: []plugin.Diagnostic{{
+			return &plugin.EmitResponse{Select: sel, Errors: []plugin.Diagnostic{{
 				Code: "GOEMIT-1", At: view.Viewer,
 				Message: fmt.Sprintf("名前空間 %s の out %q の上に go.mod がない（%v）", view.Viewer, view.Config.Out, err),
 			}}}, nil
@@ -75,12 +80,12 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if err != nil {
 		var ae *analyzeError
 		if errors.As(err, &ae) && ae.Err == nil {
-			return &plugin.EmitResponse{Errors: ae.Errors}, nil
+			return &plugin.EmitResponse{Select: sel, Errors: ae.Errors}, nil
 		}
 		return nil, fmt.Errorf("emit: %w", err)
 	}
 	if len(prog.Commands) == 0 {
-		return &plugin.EmitResponse{Warnings: []plugin.Warning{{
+		return &plugin.EmitResponse{Select: sel, Warnings: []plugin.Warning{{
 			At: view.Viewer, Message: fmt.Sprintf("名前空間 %s に @cli.command の op がないので cli.go を生成しない", view.Viewer),
 		}}}, nil
 	}
@@ -88,7 +93,18 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("emit: %w", err)
 	}
-	return &plugin.EmitResponse{Files: []plugin.File{{Path: OutputPathFor(view), Content: string(src)}}}, nil
+	return &plugin.EmitResponse{Select: sel, Files: []plugin.File{{Path: OutputPathFor(view), Content: string(src)}}}, nil
+}
+
+// Select は go-cli が選ぶ既定の出力の対象（docs/plugin-go-cli.md「マニフェスト」の「選ぶもの」）:
+// roots は @cli.command の付いた op、stops は @proc.stdio の付いた op。states と wraps は空。
+func Select(view *ir.View) plugin.Select {
+	return plugin.Select{
+		Roots:  plugin.OpsWith(view, decCommand),
+		Stops:  plugin.OpsWith(view, decStdio),
+		States: []string{},
+		Wraps:  []plugin.Wrap{},
+	}
 }
 
 // Check は実装しない（語彙に固有の検査はない）。

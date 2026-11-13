@@ -10,13 +10,19 @@ import (
 )
 
 // genTypes は types.go（docs/emit-go.md「model」「union」「exception」「effect」と scalar の型）。
-// 宣言は IR の順（種類ごとにまとめない）。複製した宣言はその後ろに Program の順で。
-// 最後に、配線が必要とした射影の変換関数と ptr ヘルパー。
+// 出すのは出力の対象の型と効果の定数だけ（collectDecls が集めたもの）。宣言は IR の順（種類ごとにまとめない）。
+// 複製した宣言はその後ろに Program の順で。最後に、配線が必要とした射影の変換関数と ptr ヘルパー。
 func (e *emitter) genTypes() *genFile {
 	g := e.newFile("types.go")
 	emitted := map[projection]bool{}
+	selected := map[string]bool{}
+	for _, x := range e.effects {
+		selected[x.Name] = true
+	}
 	for _, d := range e.ns.Decls {
-		e.genTypeDecl(g, d, emitted)
+		if d != nil && (e.reach[d.Common().Name] || selected[d.Common().Name]) {
+			e.genTypeDecl(g, d, emitted)
+		}
 	}
 	for i := range e.prog.Namespaces {
 		n := &e.prog.Namespaces[i]
@@ -26,6 +32,9 @@ func (e *emitter) genTypes() *genFile {
 		for _, d := range n.Decls {
 			if d != nil && e.copied[d.Common().Name] {
 				e.copyNote = fmt.Sprintf("名前空間 %s の宣言の複製（Go のパッケージを import できないため。docs/emit-go.md「配置」）。", n.Name)
+				if e.isGoNS(n.Name) {
+					e.copyNote = fmt.Sprintf("名前空間 %s の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。", n.Name)
+				}
 				e.genTypeDecl(g, d, emitted)
 				e.copyNote = ""
 			}
@@ -48,7 +57,8 @@ func (e *emitter) genTypeDecl(g *genFile, d ir.Decl, emitted map[projection]bool
 	switch x := d.(type) {
 	case *ir.Model:
 		e.genModel(g, x)
-		if x.DerivedFrom != nil && e.model(x.DerivedFrom.Base) != nil {
+		// 元の model からの変換関数。複製した model には出さない（元の model が viewer のパッケージにあるとは限らない）。
+		if x.DerivedFrom != nil && e.model(x.DerivedFrom.Base) != nil && !e.copied[x.Name] {
 			p := projection{x.DerivedFrom.Base, x.Name}
 			e.projectionFunc(p.from, p.to)
 			if !emitted[p] {

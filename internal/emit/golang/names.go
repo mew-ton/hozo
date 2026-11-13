@@ -7,11 +7,13 @@ import (
 	gol "github.com/mew-ton/hozo/plugin/golang"
 )
 
-// reservedLocals は配線の本体と op のメソッドで生成器が使う識別子。引数名・束縛名がこれと同じなら末尾に `_`。
-var reservedLocals = map[string]bool{"ctx": true, "o": true, "err": true, "ptr": true}
+// reservedLocals は配線の本体と op のメソッドで生成したコードが使う名前（docs/emit-go.md「名前」）。
+// 引数名・束縛名がこれと同じなら末尾に `_`。
+var reservedLocals = map[string]bool{"o": true, "err": true, "ptr": true, "States": true, "runtime": true}
 
 // local は引数名・束縛名を Go の識別子にする（docs/emit-go.md「名前」の「op の引数名、配線の束縛名」）。
-// 予約語に加えて、生成器が使う ctx / o / err / ptr とも衝突させない。
+// 予約語に加えて、生成したコードが使う o / err / ptr / States / runtime（*runtime.MissingError を返すためのパッケージ名）
+// とも衝突させない。
 func local(name string) string {
 	n := gol.LocalName(name)
 	if reservedLocals[n] {
@@ -20,8 +22,10 @@ func local(name string) string {
 	return n
 }
 
-// checkNames は GOEMIT-2（docs/emit-go.md「名前」の「大文字化で衝突する二つの名前」）。
-// model のフィールド名、viewer の op 名、そしてパッケージの型名と StateCases の述語の名前（doc.go「文書にない決定」）。
+// checkNames は GOEMIT-2（docs/emit-go.md「名前」の「大文字化で衝突する二つの名前」「型名どうしの衝突」と、
+// 「state」の「単位の中でフィールド名が衝突したら」）。見るのは出力の対象だけ:
+// model のフィールド名、op 名、状態の単位（StateSet のフィールドと、単位の中の問い合わせ・命令）、Deps と Wrappers の
+// フィールド、そしてパッケージに出す型と、生成したコードが決まった名前で出す宣言（doc.go「文書にない決定」）。
 func (e *emitter) checkNames() {
 	for _, m := range e.models {
 		seen := map[string]string{}
@@ -43,22 +47,61 @@ func (e *emitter) checkNames() {
 		}
 		seen[g] = o.Name
 	}
-	preds := map[string]string{}
-	for _, st := range e.stateCases {
-		g := e.isEmptyMethod(st)
-		if prev, ok := preds[g]; ok {
-			e.errorf(CodeNameCollision, &st.Span, "state %s と %s は Go では StateCases の同じメソッド名 %s になる", prev, st.Name, g)
+	// 状態の単位: StateSet のフィールド名と、単位の中のフィールド名。
+	fields := map[string]string{}
+	for _, u := range e.units {
+		span := e.lookup(u.fqn).Common().Span
+		g := e.unitField(u)
+		if prev, ok := fields[g]; ok {
+			e.errorf(CodeNameCollision, &span, "状態 %s と %s は Go では StateSet の同じフィールド名 %s になる", prev, u.fqn, g)
 			continue
 		}
-		preds[g] = st.Name
+		fields[g] = u.fqn
+		inUnit := map[string]string{}
+		for _, q := range e.unitQueries(u) {
+			if prev, ok := inUnit[q]; ok {
+				e.errorf(CodeNameCollision, &span, "状態 %s の単位で、%s と問い合わせ %s が同じフィールド名になる", u.fqn, prev, q)
+				continue
+			}
+			inUnit[q] = "問い合わせ " + q
+		}
+		for _, op := range u.commands {
+			g := e.methodName(op)
+			if prev, ok := inUnit[g]; ok {
+				e.errorf(CodeNameCollision, &op.Span, "状態 %s の単位で、%s と命令の op %s が同じフィールド名 %s になる", u.fqn, prev, op.Name, g)
+				continue
+			}
+			inUnit[g] = "命令の op " + op.Name
+		}
 	}
+	deps := map[string]string{}
+	for _, ns := range e.orderedDepsNS() {
+		g := depsField(ns)
+		if prev, ok := deps[g]; ok {
+			e.errorf(CodeNameCollision, nil, "名前空間 %s と %s は Go では Deps の同じフィールド名 %s になる", prev, ns, g)
+			continue
+		}
+		deps[g] = ns
+	}
+	groups, byGroup := e.wrapperGroups()
+	for _, name := range groups {
+		first := byGroup[name][0].name
+		for _, w := range byGroup[name] {
+			if w.name != first {
+				e.errorf(CodeNameCollision, &w.app.Span, "デコレータ %s と %s は Go では Wrappers の同じフィールド名 %s になる", first, w.name, name)
+				break
+			}
+		}
+	}
+
+	// パッケージの宣言の名前。
 	types := map[string]string{}
-	add := func(goName, fqn string, span *ir.Span) {
+	add := func(goName, what string, span *ir.Span) {
 		if prev, ok := types[goName]; ok {
-			e.errorf(CodeNameCollision, span, "%s と %s は Go では同じ型名 %s になる", prev, fqn, goName)
+			e.errorf(CodeNameCollision, span, "%s と %s は Go では同じ名前 %s になる", prev, what, goName)
 			return
 		}
-		types[goName] = fqn
+		types[goName] = what
 	}
 	for _, m := range e.models {
 		add(e.typeName(m.Name), m.Name, &m.Span)
@@ -82,7 +125,44 @@ func (e *emitter) checkNames() {
 	}
 	for _, c := range e.classifies {
 		add(e.typeName(c.Name), c.Name, &c.Span)
+		if c.SubjectType() != nil {
+			add(e.typeName(c.Name)+"Cases", c.Name+" の述語のインターフェース", &c.Span)
+		}
 	}
+	for _, o := range e.ops {
+		add(e.funcTypeName(o), "op "+o.Name+" の関数の型", &o.Span)
+		for _, w := range e.wrappers[o.Name] {
+			add(w.typ, "op "+o.Name+" の @"+w.name+" の包む関数の型", &w.app.Span)
+		}
+	}
+	for _, name := range groups {
+		add(name+"Wrappers", "@"+byGroup[name][0].name+" の包む関数の構造体", nil)
+	}
+	for _, ns := range e.orderedDepsNS() {
+		add(depsField(ns)+"Ops", "名前空間 "+ns+" の op の構造体", nil)
+		for _, fqn := range e.orderedDepsOps(ns) {
+			add(e.depFuncTypeName(e.op(fqn)), "op "+fqn+" の関数の型", nil)
+		}
+	}
+	for _, u := range e.units {
+		span := e.lookup(u.fqn).Common().Span
+		add(e.unitType(u), "状態 "+u.fqn+" の単位", &span)
+	}
+	// 生成したコードが決まった名前で出す宣言。
+	fixed := func(name string, present bool) {
+		if present {
+			add(name, "生成したコードの "+name, nil)
+		}
+	}
+	hasOps := len(e.ops) > 0
+	fixed("Ops", hasOps)
+	fixed("New", hasOps)
+	fixed("Leaves", len(e.leaves) > 0)
+	fixed("Deps", len(deps) > 0)
+	fixed("Wrappers", len(groups) > 0)
+	fixed("Classifiers", len(e.valueClassifies()) > 0)
+	fixed("StateSet", len(e.units) > 0)
+	fixed("States", len(e.units) > 0)
 }
 
 // comment は text の各行に "// " を付ける。text が空なら ""。末尾に改行を一つ付ける。

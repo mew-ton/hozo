@@ -254,8 +254,8 @@ namespace server {
 }
 `
 
-// corpusWithWarning は tests/corpus/design の直下のファイルを一時ディレクトリに写し、warn.hozo（warnFile）を足した
-// プロジェクトのルート。
+// corpusWithWarning は tests/corpus/design の直下のファイルと、hozo.toml が設定しているプラグインのマニフェスト
+// （plugins/。検査では起動しない）を一時ディレクトリに写し、warn.hozo（warnFile）を足したプロジェクトのルート。
 func corpusWithWarning(t *testing.T) string {
 	t.Helper()
 	src := corpusDir(t)
@@ -263,15 +263,25 @@ func corpusWithWarning(t *testing.T) string {
 	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
 		dir = resolved
 	}
-	entries, err := os.ReadDir(src)
+	err := filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if rel != "." && rel != "plugins" && !strings.HasPrefix(filepath.ToSlash(rel), "plugins/") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		writeFile(t, filepath.Join(dir, rel), readFile(t, p))
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		writeFile(t, filepath.Join(dir, e.Name()), readFile(t, filepath.Join(src, e.Name())))
 	}
 	writeFile(t, filepath.Join(dir, "warn.hozo"), warnFile)
 	return dir

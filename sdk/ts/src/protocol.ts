@@ -45,11 +45,38 @@ export interface EmitRequest {
   view: View;
 }
 
+/** プラグインが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。 */
+export interface Wrap {
+  op: string;
+  /** デコレータの FQN。名前付きデコレータを通して付けたなら、その FQN でもよい。 */
+  decorator: string;
+}
+
+/**
+ * 既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN はどれも view.viewer の名前空間の宣言で、
+ * そこにない FQN や、wraps がその op に付いていないデコレータを指していれば PLG-3。
+ */
+export interface Select {
+  /** 起点にする op。 */
+  roots: string[];
+  /** 選ぶが、本体は辿らない op。実装を差し込む口だけが出る。 */
+  stops: string[];
+  /** 起点にする状態（基底の状態か、状態の分類）。 */
+  states: string[];
+  /** このプラグインが包む関数を実装するデコレータの適用。 */
+  wraps: Wrap[];
+}
+
 export interface EmitResponse {
   files: File[];
   warnings: Warning[];
   /** 一つでもあれば hozoc は files を書き出さない。 */
   errors?: EmitError[];
+  /**
+   * 出力の対象の選択。省けば何も選ばない。Handler は使う項目だけを書けばよく、run が残りを [] にして
+   * 四つの列を持つ形で書く（Go の plugin.Run と同じ）。
+   */
+  select?: Partial<Select>;
 }
 
 export interface CheckRequest {

@@ -26,7 +26,6 @@ func goTool(t *testing.T) string {
 const hozocStub = `package hozoc
 
 import (
-	"context"
 	"regexp"
 
 	"github.com/mew-ton/hozo/runtime"
@@ -165,10 +164,10 @@ func (MalformedOutput) Error() string         { return "proc.MalformedOutput" }
 func (MalformedOutput) HozoException() string { return "proc.MalformedOutput" }
 
 type Ops interface {
-	Check(ctx context.Context, in CheckInput) (CheckResult, error)
-	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
-	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
-	Lsp(ctx context.Context, in LspInput) error
+	Check(in CheckInput) (CheckResult, error)
+	WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, error)
+	Emit(in EmitInput) (EmitResult, error)
+	Lsp(in LspInput) error
 }
 `
 
@@ -176,7 +175,6 @@ type Ops interface {
 const hozocMain = `package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -198,7 +196,7 @@ func diags(code string) hozoc.Diagnostics {
 	return hozoc.Diagnostics{Items: []hozoc.Diagnostic{{Severity: "error", Code: code, Message: "m"}}}
 }
 
-func (ops) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult, error) {
+func (ops) Check(in hozoc.CheckInput) (hozoc.CheckResult, error) {
 	switch cfg(in.Config) {
 	case "x1":
 		return hozoc.CheckResult{}, hozoc.CheckFailed{Value: diags("T-1")}
@@ -218,11 +216,11 @@ func (ops) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult, e
 	return hozoc.CheckResult{Warnings: []hozoc.Diagnostic{{Severity: "warning", Code: "W", Message: "config=" + cfg(in.Config) + " format=" + format}}}, nil
 }
 
-func (ops) WriteOutputs(ctx context.Context, in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitResult, error) {
+func (ops) WriteOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitResult, error) {
 	return hozoc.EmitResult{}, nil
 }
 
-func (ops) Emit(ctx context.Context, in hozoc.EmitInput) (hozoc.EmitResult, error) {
+func (ops) Emit(in hozoc.EmitInput) (hozoc.EmitResult, error) {
 	switch cfg(in.Config) {
 	case "x3":
 		return hozoc.EmitResult{}, hozoc.OutputConflict{Value: diags("CFG-5")}
@@ -241,7 +239,7 @@ func (ops) Emit(ctx context.Context, in hozoc.EmitInput) (hozoc.EmitResult, erro
 	return res, nil
 }
 
-func (ops) Lsp(ctx context.Context, in hozoc.LspInput) error {
+func (ops) Lsp(in hozoc.LspInput) error {
 	if cfg(in.Config) == "x6" {
 		return errors.New("boom")
 	}
@@ -256,8 +254,6 @@ func main() {
 const demoStub = `package demo
 
 import (
-	"context"
-
 	"github.com/mew-ton/hozo/runtime"
 )
 
@@ -305,15 +301,14 @@ func (m AddInput) Validate() error {
 }
 
 type Ops interface {
-	Add(ctx context.Context, in AddInput) (Sum, error)
-	Ping(ctx context.Context) error
+	Add(in AddInput) (Sum, error)
+	Ping() error
 }
 `
 
 const demoMain = `package main
 
 import (
-	"context"
 	"os"
 
 	"example.com/app/gen/demo"
@@ -323,7 +318,7 @@ import (
 type ops struct{}
 
 // Add は入力のすべてを一つの数に畳む: a + b + count*100 + (verbose ? 0.5 : 0) + len(label) + scale*1000。
-func (ops) Add(ctx context.Context, in demo.AddInput) (demo.Sum, error) {
+func (ops) Add(in demo.AddInput) (demo.Sum, error) {
 	switch in.A {
 	case 99:
 		return demo.Sum{}, demo.Overflow{}
@@ -346,7 +341,7 @@ func (ops) Add(ctx context.Context, in demo.AddInput) (demo.Sum, error) {
 	return demo.Sum{Total: t}, nil
 }
 
-func (ops) Ping(ctx context.Context) error { return nil }
+func (ops) Ping() error { return nil }
 
 func main() {
 	os.Exit(cli.Main(ops{}, cli.JSONPresenter{}, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))

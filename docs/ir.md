@@ -356,7 +356,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 }
 ```
 
-- `Program` 全体を渡すのは、プラグインが参照先（別の名前空間の型、語彙の宣言）を自分で探さなくて済むようにするため。何を出力の対象にするかはプラグインが `entry` / `stop` で決める（§4.3）。
+- `Program` 全体を渡すのは、プラグインが参照先（別の名前空間の型、語彙の宣言）を自分で探さなくて済むようにするため。何を出力の対象にするかは、プラグインが `emit` の応答の `select` で返す（`docs/plugin-protocol.md`「選択」）。
 - `ops` の `Signature` は `docs/check.md`「計算」の Sig(O, viewer)。viewer が op の名前空間と同じなら `Program` の `signature` と一致する。
 - `params` に反映する `bind` は `viewer` の名前空間の `Bind` だけ（`bind` は呼び出す側の宣言。§5.3）。
 

@@ -2,97 +2,74 @@
 
 package server
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// Login は op server.login。
-	//
-	// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn, server.ClientError
-	// Effects: server.createSession
-	Login(ctx context.Context, in LoginInput) (LoginOk, error)
+// LoginFunc は op server.login の関数の型。
+//
+// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn, server.ClientError
+// Effects: server.createSession
+type LoginFunc func(in LoginInput) (LoginOk, error)
 
-	// CancelOrder は op server.cancelOrder。
-	//
-	// Throws: server.RefundPending
-	// Effects: server.refund
-	CancelOrder(ctx context.Context, in CancelInput) (Order, error)
+// RequestPasswordResetFunc は op server.requestPasswordReset の関数の型。
+//
+// パスワードの再設定メールを送る。
+//
+// 引数:
+//   - email: 再設定するアカウントのメールアドレス
+//
+// Throws: server.RateLimited
+// Effects: server.sendResetMail
+type RequestPasswordResetFunc func(email Email) error
 
-	// SaveOrder は注文を保存する
-	//
-	// Effects: server.createOrder
-	SaveOrder(ctx context.Context, in OrderInput) (Order, error)
+// LogoutFunc は op server.logout の関数の型。
+//
+// Effects: server.deleteSession
+type LogoutFunc func(in LogoutInput) error
 
-	// SendOrderNotice は注文したユーザーに通知する
-	//
-	// Throws: server.NotificationFailed
-	// Effects: server.notifyUser
-	SendOrderNotice(ctx context.Context, order Order) error
+// GetMeFunc は op server.getMe の関数の型。
+//
+// ログインしているユーザー自身を返す
+type GetMeFunc func(in MeInput) (PublicUser, error)
 
-	// RequestPasswordReset はパスワードの再設定メールを送る。
-	//
-	// 引数:
-	//   - email: 再設定するアカウントのメールアドレス
-	//
-	// Throws: server.RateLimited
-	// Effects: server.sendResetMail
-	RequestPasswordReset(ctx context.Context, email Email) error
+// GetOrdersFunc は op server.getOrders の関数の型。
+//
+// ログインしているユーザーの注文一覧を返す
+type GetOrdersFunc func(in GetOrdersInput) ([]OrderSummary, error)
 
-	// Logout は op server.logout。
-	//
-	// Effects: server.deleteSession
-	Logout(ctx context.Context, in LogoutInput) error
+// GetItemFunc は op server.getItem の関数の型。
+//
+// 商品を一つ返す（認証は要らない）
+type GetItemFunc func(in GetItemInput) (Item, error)
 
-	// GetMe はログインしているユーザー自身を返す
-	GetMe(ctx context.Context, in MeInput) (PublicUser, error)
+// AddToCartFunc は op server.addToCart の関数の型。
+//
+// 商品をカートに入れる
+//
+// Effects: server.addCartLine
+type AddToCartFunc func(in AddToCartInput) (CartLine, error)
 
-	// GetOrders はログインしているユーザーの注文一覧を返す
-	GetOrders(ctx context.Context, in GetOrdersInput) ([]OrderSummary, error)
+// AttachWarrantyFunc は op server.attachWarranty の関数の型。
+//
+// カートの一行に保証プランを付ける
+//
+// Effects: server.attachWarrantyToLine
+type AttachWarrantyFunc func(in AttachWarrantyInput) (WarrantyLine, error)
 
-	// GetItem は商品を一つ返す（認証は要らない）
-	GetItem(ctx context.Context, in GetItemInput) (Item, error)
-
-	// AddToCart は商品をカートに入れる
-	//
-	// Effects: server.addCartLine
-	AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error)
-
-	// AttachWarranty はカートの一行に保証プランを付ける
-	//
-	// Effects: server.attachWarrantyToLine
-	AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error)
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	GetMe     GetMeFunc
+	GetOrders GetOrdersFunc
+	GetItem   GetItemFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// Login は op server.login。
 	//
 	// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn, server.ClientError
 	// Effects: server.createSession
-	Login(ctx context.Context, in LoginInput) (LoginOk, error)
-
-	// CancelOrder は op server.cancelOrder。
-	//
-	// Throws: server.RefundPending
-	// Effects: server.refund
-	CancelOrder(ctx context.Context, in CancelInput) (Order, error)
-
-	// SaveOrder は注文を保存する
-	//
-	// Effects: server.createOrder
-	SaveOrder(ctx context.Context, in OrderInput) (Order, error)
-
-	// SendOrderNotice は注文したユーザーに通知する
-	//
-	// Throws: server.NotificationFailed
-	// Effects: server.notifyUser
-	SendOrderNotice(ctx context.Context, order Order) error
-
-	// PlaceOrder は op server.placeOrder。
-	//
-	// Throws: server.NotificationFailed
-	// Effects: server.createOrder, server.notifyUser
-	PlaceOrder(ctx context.Context, in OrderInput) (Order, error)
+	Login(in LoginInput) (LoginOk, error)
 
 	// RequestPasswordReset はパスワードの再設定メールを送る。
 	//
@@ -101,116 +78,96 @@ type Ops interface {
 	//
 	// Throws: server.RateLimited
 	// Effects: server.sendResetMail
-	RequestPasswordReset(ctx context.Context, email Email) error
+	RequestPasswordReset(email Email) error
 
 	// Logout は op server.logout。
 	//
 	// Effects: server.deleteSession
-	Logout(ctx context.Context, in LogoutInput) error
+	Logout(in LogoutInput) error
 
 	// GetMe はログインしているユーザー自身を返す
-	GetMe(ctx context.Context, in MeInput) (PublicUser, error)
+	GetMe(in MeInput) (PublicUser, error)
 
 	// GetOrders はログインしているユーザーの注文一覧を返す
-	GetOrders(ctx context.Context, in GetOrdersInput) ([]OrderSummary, error)
+	GetOrders(in GetOrdersInput) ([]OrderSummary, error)
 
 	// GetItem は商品を一つ返す（認証は要らない）
-	GetItem(ctx context.Context, in GetItemInput) (Item, error)
+	GetItem(in GetItemInput) (Item, error)
 
 	// AddToCart は商品をカートに入れる
 	//
 	// Effects: server.addCartLine
-	AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error)
+	AddToCart(in AddToCartInput) (CartLine, error)
 
 	// AttachWarranty はカートの一行に保証プランを付ける
 	//
 	// Effects: server.attachWarrantyToLine
-	AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error)
+	AttachWarranty(in AttachWarrantyInput) (WarrantyLine, error)
 }
 
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// UsersIsEmpty は状態 server.users（list）が空（Empty）か。
-	UsersIsEmpty(ctx context.Context) (bool, error)
-	// SessionsIsEmpty は状態 server.sessions（list）が空（Empty）か。
-	SessionsIsEmpty(ctx context.Context) (bool, error)
-	// ItemsIsEmpty は状態 server.items（list）が空（Empty）か。
-	ItemsIsEmpty(ctx context.Context) (bool, error)
-	// CartsIsEmpty は状態 server.carts（list）が空（Empty）か。
-	CartsIsEmpty(ctx context.Context) (bool, error)
-	// OrdersIsEmpty は状態 server.orders（list）が空（Empty）か。
-	OrdersIsEmpty(ctx context.Context) (bool, error)
-	// NotificationsIsEmpty は状態 server.notifications（list）が空（Empty）か。
-	NotificationsIsEmpty(ctx context.Context) (bool, error)
-	// PasswordResetsIsEmpty は状態 server.passwordResets（list）が空（Empty）か。
-	PasswordResetsIsEmpty(ctx context.Context) (bool, error)
-}
-
-// Wrappers は op に付いたデコレータのうち、プラグインが扱わないものの「包む関数」（docs/emit-go.md「デコレータ」）。
-// 引数は op の引数と next（op の関数の型）。
-type Wrappers interface {
-	// LoginValidated は server.login に付いた @server.validated。
-	// throws server.ClientError prevents effects
-	LoginValidated(ctx context.Context, in LoginInput, next func(ctx context.Context, in LoginInput) (LoginOk, error)) (LoginOk, error)
-}
-
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves, wrappers Wrappers) Ops {
-	return &ops{leaves: leaves, wrappers: wrappers}
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
+func New(leaves Leaves) Ops {
+	return &ops{leaves: leaves}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
-	leaves   Leaves
-	wrappers Wrappers
+	leaves Leaves
 }
 
-func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
-	f0 := o.leaves.Login
-	f1 := func(ctx context.Context, in LoginInput) (LoginOk, error) {
-		return o.wrappers.LoginValidated(ctx, in, f0)
+func (o *ops) Login(in LoginInput) (LoginOk, error) {
+	if States.Sessions.Login == nil {
+		return LoginOk{}, &runtime.MissingError{Kind: "state", Name: "server.login"}
 	}
-	return f1(ctx, in)
+	return States.Sessions.Login(in)
 }
 
-func (o *ops) CancelOrder(ctx context.Context, in CancelInput) (Order, error) {
-	return o.leaves.CancelOrder(ctx, in)
+func (o *ops) RequestPasswordReset(email Email) error {
+	if States.PasswordResets.RequestPasswordReset == nil {
+		return &runtime.MissingError{Kind: "state", Name: "server.requestPasswordReset"}
+	}
+	return States.PasswordResets.RequestPasswordReset(email)
 }
 
-func (o *ops) SaveOrder(ctx context.Context, in OrderInput) (Order, error) {
-	return o.leaves.SaveOrder(ctx, in)
+func (o *ops) Logout(in LogoutInput) error {
+	if States.Sessions.Logout == nil {
+		return &runtime.MissingError{Kind: "state", Name: "server.logout"}
+	}
+	return States.Sessions.Logout(in)
 }
 
-func (o *ops) SendOrderNotice(ctx context.Context, order Order) error {
-	return o.leaves.SendOrderNotice(ctx, order)
+func (o *ops) GetMe(in MeInput) (PublicUser, error) {
+	if o.leaves.GetMe == nil {
+		return PublicUser{}, &runtime.MissingError{Kind: "leaf", Name: "server.getMe"}
+	}
+	return o.leaves.GetMe(in)
 }
 
-func (o *ops) RequestPasswordReset(ctx context.Context, email Email) error {
-	return o.leaves.RequestPasswordReset(ctx, email)
+func (o *ops) GetOrders(in GetOrdersInput) ([]OrderSummary, error) {
+	if o.leaves.GetOrders == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "server.getOrders"}
+	}
+	return o.leaves.GetOrders(in)
 }
 
-func (o *ops) Logout(ctx context.Context, in LogoutInput) error {
-	return o.leaves.Logout(ctx, in)
+func (o *ops) GetItem(in GetItemInput) (Item, error) {
+	if o.leaves.GetItem == nil {
+		return Item{}, &runtime.MissingError{Kind: "leaf", Name: "server.getItem"}
+	}
+	return o.leaves.GetItem(in)
 }
 
-func (o *ops) GetMe(ctx context.Context, in MeInput) (PublicUser, error) {
-	return o.leaves.GetMe(ctx, in)
+func (o *ops) AddToCart(in AddToCartInput) (CartLine, error) {
+	if States.Carts.AddToCart == nil {
+		return CartLine{}, &runtime.MissingError{Kind: "state", Name: "server.addToCart"}
+	}
+	return States.Carts.AddToCart(in)
 }
 
-func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]OrderSummary, error) {
-	return o.leaves.GetOrders(ctx, in)
-}
-
-func (o *ops) GetItem(ctx context.Context, in GetItemInput) (Item, error) {
-	return o.leaves.GetItem(ctx, in)
-}
-
-func (o *ops) AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error) {
-	return o.leaves.AddToCart(ctx, in)
-}
-
-func (o *ops) AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error) {
-	return o.leaves.AttachWarranty(ctx, in)
+func (o *ops) AttachWarranty(in AttachWarrantyInput) (WarrantyLine, error) {
+	if States.Carts.AttachWarranty == nil {
+		return WarrantyLine{}, &runtime.MissingError{Kind: "state", Name: "server.attachWarranty"}
+	}
+	return States.Carts.AttachWarranty(in)
 }

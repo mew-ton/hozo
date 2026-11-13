@@ -20,9 +20,6 @@ type Token string
 // Password はパスワード（平文。入力でだけ使う）
 type Password string
 
-// EmployeeCode は社員番号（英大文字 3 字 + 数字 5 桁。末尾はチェックディジット）
-type EmployeeCode string
-
 // UserStatus はユーザーの状態（"active" / "unverified" / "suspended"。値の集合は実装が決める）
 type UserStatus string
 
@@ -151,22 +148,6 @@ func (ClientError) HozoException() string { return "server.ClientError" }
 
 var _ runtime.Exception = ClientError{}
 
-// Unauthorized: 認証されていない
-type Unauthorized struct{}
-
-func (Unauthorized) Error() string         { return "server.Unauthorized" }
-func (Unauthorized) HozoException() string { return "server.Unauthorized" }
-
-var _ runtime.Exception = Unauthorized{}
-
-// Forbidden: 権限がない
-type Forbidden struct{}
-
-func (Forbidden) Error() string         { return "server.Forbidden" }
-func (Forbidden) HozoException() string { return "server.Forbidden" }
-
-var _ runtime.Exception = Forbidden{}
-
 // EffectCreateSession はログインセッションを作成する
 const EffectCreateSession runtime.Effect = "server.createSession"
 
@@ -211,42 +192,6 @@ func (AlreadyLoggedIn) Error() string         { return "server.AlreadyLoggedIn" 
 func (AlreadyLoggedIn) HozoException() string { return "server.AlreadyLoggedIn" }
 
 var _ runtime.Exception = AlreadyLoggedIn{}
-
-// CancelInput は注文の取り消しの入力
-type CancelInput struct {
-	OrderId OrderId `json:"orderId"`
-}
-
-// OrderInput は注文の入力
-type OrderInput struct {
-	UserId UserId     `json:"userId"`
-	Lines  []CartLine `json:"lines"`
-}
-
-// EffectRefund は返金する（注文の状態を返金済みにする）
-const EffectRefund runtime.Effect = "server.refund"
-
-// EffectCreateOrder は注文を作成する
-const EffectCreateOrder runtime.Effect = "server.createOrder"
-
-// EffectNotifyUser はユーザーに通知する
-const EffectNotifyUser runtime.Effect = "server.notifyUser"
-
-// RefundPending: 返金の処理は受け付けたが、完了の確認が取れない
-type RefundPending struct{}
-
-func (RefundPending) Error() string         { return "server.RefundPending" }
-func (RefundPending) HozoException() string { return "server.RefundPending" }
-
-var _ runtime.Exception = RefundPending{}
-
-// NotificationFailed: 通知を送れなかった
-type NotificationFailed struct{}
-
-func (NotificationFailed) Error() string         { return "server.NotificationFailed" }
-func (NotificationFailed) HozoException() string { return "server.NotificationFailed" }
-
-var _ runtime.Exception = NotificationFailed{}
 
 // EffectSendResetMail は再設定メールを送る
 const EffectSendResetMail runtime.Effect = "server.sendResetMail"

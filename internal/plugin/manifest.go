@@ -33,11 +33,9 @@ type Manifest struct {
 	Import     Import
 }
 
-// Emit は [emit] テーブル。項目の意味は docs/plugin-protocol.md「entry / stop / decorate の意味」。
+// Emit は [emit] テーブル（docs/plugin-protocol.md「マニフェスト」）。何を出力の対象に選ぶかはマニフェストには書かず、
+// プラグインが emit の応答の select で返す（同「選択」）。
 type Emit struct {
-	Decorate    []string // 包むデコレータの FQN
-	Entry       []string // 起点にするデコレータの FQN
-	Stop        []string // 打ち切るデコレータの FQN。末尾 * で名前空間全体
 	Unsupported []string // 意味を保てない記法（デコレータの FQN）。使われていれば CFG-6
 }
 
@@ -65,9 +63,6 @@ type rawManifest struct {
 	Protocol   string         `toml:"protocol"`
 	Vocabulary []string       `toml:"vocabulary"`
 	Emit       *struct {
-		Decorate    []string `toml:"decorate"`
-		Entry       []string `toml:"entry"`
-		Stop        []string `toml:"stop"`
 		Unsupported []string `toml:"unsupported"`
 	} `toml:"emit"`
 	Check struct {
@@ -78,9 +73,9 @@ type rawManifest struct {
 	} `toml:"import"`
 }
 
-// LoadManifest は path のマニフェストを読む。診断は MAN-4（TOML の誤り、知らないキー、command が空、値の型違い）、
-// MAN-1（[emit] があるのに entry も decorate も空）、MAN-2（protocol が Protocol と違う）。
-// MAN-4 なら Manifest は nil。MAN-1 / MAN-2 だけなら Manifest も返す。
+// LoadManifest は path のマニフェストを読む。診断は MAN-4（TOML の誤り、知らないキー、command が空、値の型違い）と
+// MAN-2（protocol が Protocol と違う）。MAN-4 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
+// 設計書 §4.6 の [emit] の decorate / entry / stop は持たないので、書いてあれば知らないキー（MAN-4）。
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	var diags []diag.Diagnostic
 	errorf := func(code, format string, args ...any) {
@@ -150,16 +145,13 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 		}
 	}
 	if raw.Emit != nil {
-		m.Emit = &Emit{Decorate: orEmpty(raw.Emit.Decorate), Entry: orEmpty(raw.Emit.Entry), Stop: orEmpty(raw.Emit.Stop), Unsupported: orEmpty(raw.Emit.Unsupported)}
+		m.Emit = &Emit{Unsupported: orEmpty(raw.Emit.Unsupported)}
 	}
 	m.Check.Enabled = raw.Check.Enabled
 	m.Import.Formats = orEmpty(raw.Import.Formats)
 
 	if len(diags) > 0 {
 		return nil, diags
-	}
-	if m.Emit != nil && len(m.Emit.Entry) == 0 && len(m.Emit.Decorate) == 0 {
-		errorf("MAN-1", "プラグイン %s の [emit] に entry も decorate もない", m.Name)
 	}
 	if m.Protocol != Protocol {
 		errorf("MAN-2", "プラグイン %s の protocol %q は hozoc の %q と違う", m.Name, m.Protocol, Protocol)

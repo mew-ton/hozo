@@ -8,22 +8,29 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin"
 )
 
 var update = flag.Bool("update", false, "ゴールデン（testdata/<case>/expected）を更新する")
 
 // goldenCase は golden テスト一つ: 一つの Program から出す View の列（別の名前空間の import を含めて
-// コンパイルできるように、使う側と使われる側の両方を出す）。
+// コンパイルできるように、使う側と使われる側の両方を出す）と、それぞれの選択。
 type goldenCase struct {
-	name      string
-	views     []*ir.View
-	manifests []ManifestInfo
+	name  string
+	views []goldenView
+}
+
+// goldenView は View 一つと、その名前空間に設定されたプラグインが返した選択（を合わせたもの）。
+type goldenView struct {
+	view *ir.View
+	sel  plugin.Select
 }
 
 // namespaces は各テストの View.Namespaces。server / browser / inventory / catalog / app が Go で
@@ -42,12 +49,34 @@ func nsConfig(ns string, plugins ...string) ir.NamespaceConfig {
 }
 
 var goldenCases = []goldenCase{
-	{name: "server", views: []*ir.View{serverView()}},
-	{name: "browser", views: []*ir.View{browserServerView(), browserView()}, manifests: browserManifests()},
-	{name: "constraint", views: []*ir.View{constraintView()}},
-	{name: "derived", views: []*ir.View{derivedView()}},
-	// 状態の分類、遷移の効果、状態での match、StateCases（docs/emit-go.md「state」「classify」「match」）
-	{name: "state", views: []*ir.View{stateView("shop"), stateView("depot")}},
+	{name: "server", views: []goldenView{{serverView(), serverSelect()}}},
+	// 配線、Deps、bind、値の分類の match、包む関数（wraps）、別の名前空間の型の import と複製
+	{name: "browser", views: []goldenView{{browserServerView(), serverSelect()}, {browserView(), browserSelect()}}},
+	{name: "constraint", views: []goldenView{{constraintView(), constraintSelect()}}},
+	{name: "derived", views: []goldenView{{derivedView(), derivedSelect()}}},
+	// 状態の単位、状態の分類、遷移の効果、状態での match（docs/emit-go.md「state」「classify」「match」）
+	{name: "state", views: []goldenView{{stateView("shop"), stateSelect("shop")}, {stateView("depot"), stateSelect("depot")}}},
+}
+
+// emitAll は views をそれぞれの選択で出す。別の Go の名前空間の出力が持つ型（Exports）は import させる
+// （internal/app が Options.Exported に入れるのと同じ）。診断が出れば失敗。
+func emitAll(t *testing.T, root string, views []goldenView) []File {
+	t.Helper()
+	exported := map[string]bool{}
+	for _, v := range views {
+		for _, fqn := range Exports(v.view, v.sel) {
+			exported[fqn] = true
+		}
+	}
+	var files []File
+	for _, v := range views {
+		fs, diags := Emit(v.view, Options{Root: root, Select: v.sel, Exported: exported})
+		if len(diags) > 0 {
+			t.Fatalf("%s: 診断が出た: %s", v.view.Viewer, formatDiags(diags))
+		}
+		files = append(files, fs...)
+	}
+	return files
 }
 
 // repoRoot はこのリポジトリのルート（go.mod のあるディレクトリ）。
@@ -79,14 +108,7 @@ func TestGolden(t *testing.T) {
 	for _, tc := range goldenCases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := newProjectRoot(t)
-			var files []File
-			for _, v := range tc.views {
-				fs, diags := Emit(v, Options{Root: root, Manifests: tc.manifests})
-				if len(diags) > 0 {
-					t.Fatalf("%s: 診断が出た: %s", v.Viewer, formatDiags(diags))
-				}
-				files = append(files, fs...)
-			}
+			files := emitAll(t, root, tc.views)
 			if len(files) == 0 {
 				t.Fatal("ファイルが出なかった")
 			}
@@ -211,16 +233,124 @@ func codesOf(diags []diag.Diagnostic) []string {
 	return out
 }
 
-// smallView は model / scalar だけの小さな View を作る（否定のテスト用）。
+// smallView は名前空間 app だけの小さな View を作る。
 func smallView(decls ...ir.Decl) *ir.View {
 	ns := ir.Namespace{Name: "app", Decls: decls}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), ns}}
-	return &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	for _, d := range decls {
+		if op, ok := d.(*ir.Op); ok {
+			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
+		}
+	}
+	return v
+}
+
+// use は、型 types（FQN）を引数に取る葉の op app.use。型は op から辿って選ばれる（docs/emit-go.md「出力の対象」の 6）ので、
+// 型だけを確かめるテストはこの op を起点にする。
+func use(types ...string) *ir.Op {
+	op := &ir.Op{DeclBase: base("app.use", nil)}
+	for i, fqn := range types {
+		op.Params = append(op.Params, param(fmt.Sprintf("p%d", i), ir.Ref(fqn)))
+	}
+	return op
+}
+
+// selectAll は、viewer のすべての op を起点にし、すべての状態（基底の状態と状態の分類）を選ぶ選択。
+func selectAll(v *ir.View) plugin.Select {
+	var sel plugin.Select
+	for _, d := range v.Program.Namespace(v.Viewer).Decls {
+		switch x := d.(type) {
+		case *ir.Op:
+			sel.Roots = append(sel.Roots, x.Name)
+		case *ir.State:
+			sel.States = append(sel.States, x.Name)
+		case *ir.Classify:
+			if _, ok := x.SubjectStates(); ok {
+				sel.States = append(sel.States, x.Name)
+			}
+		}
+	}
+	return sel
+}
+
+// emitSmall は smallView(decls...) を selectAll で出す。
+func emitSmall(root string, decls ...ir.Decl) ([]File, []diag.Diagnostic) {
+	v := smallView(decls...)
+	return Emit(v, Options{Root: root, Select: selectAll(v)})
+}
+
+// contentOf は files のうち Path が suffix で終わるものの中身。なければ ""。
+func contentOf(files []File, suffix string) string {
+	for _, f := range files {
+		if strings.HasSuffix(f.Path, suffix) {
+			return string(f.Content)
+		}
+	}
+	return ""
+}
+
+// paths は files の Path の列（出た順）。
+func paths(files []File) []string {
+	out := make([]string, len(files))
+	for i, f := range files {
+		out[i] = f.Path
+	}
+	return out
+}
+
+// wantContains は content に wants のすべてがあり、nots のどれもないことを確かめる。
+// `re:` で始まる項目は正規表現（gofmt が桁をそろえる構造体のフィールドは [fieldRE] で書く）。
+func wantContains(t *testing.T, file, content string, wants, nots []string) {
+	t.Helper()
+	has := func(s string) bool {
+		if re, ok := strings.CutPrefix(s, "re:"); ok {
+			return regexp.MustCompile(re).MatchString(content)
+		}
+		return strings.Contains(content, s)
+	}
+	for _, want := range wants {
+		if !has(want) {
+			t.Errorf("%s に %q がない:\n%s", file, want, content)
+		}
+	}
+	for _, not := range nots {
+		if has(not) {
+			t.Errorf("%s に %q がある:\n%s", file, not, content)
+		}
+	}
+}
+
+// fieldRE は構造体のフィールド `<name> <typ>` の行に当たる wantContains の項目（間の空白の数は問わない）。
+func fieldRE(name, typ string) string {
+	return `re:(?m)^\t` + regexp.QuoteMeta(name) + ` +` + regexp.QuoteMeta(typ) + `$`
+}
+
+// TestNothingSelected は docs/emit-go.md「出力の対象」: 何も選ばれていなければ（プラグインがない、select を返さない）、
+// 宣言があっても何も出力しない。エラーでも warning でもない。go.mod がなくても GOEMIT-1 にならない。
+func TestNothingSelected(t *testing.T) {
+	carts, token, title, checkout := stateDecls()
+	v := smallView(
+		&ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()},
+		&ir.Model{DeclBase: base("app.M", nil), Fields: []ir.Field{field("id", ir.Ref("app.Id"))}},
+		carts, token, title, checkout,
+		&ir.Op{DeclBase: base("app.run", nil), Params: []ir.OpParam{param("m", ir.Ref("app.M"))}},
+	)
+	v.Program.Namespaces[2].Description = doc("説明だけでは doc.go も出ない")
+	for name, root := range map[string]string{"with go.mod": newProjectRoot(t), "without go.mod": t.TempDir()} {
+		files, diags := Emit(v, Options{Root: root})
+		if len(files) != 0 || len(diags) != 0 {
+			t.Errorf("%s: 何も選んでいないのに files = %v, diags = %s", name, paths(files), formatDiags(diags))
+		}
+	}
+	if got := Exports(v, plugin.Select{}); len(got) != 0 {
+		t.Errorf("Exports = %v, want none", got)
+	}
 }
 
 func TestNoGoMod(t *testing.T) {
 	root := t.TempDir() // go.mod を置かない。/tmp の上にも go.mod はない前提
-	files, diags := Emit(smallView(&ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()}), Options{Root: root})
+	files, diags := emitSmall(root, &ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()}, use("app.Id"))
 	if files != nil {
 		t.Errorf("ファイルが出た: %v", files)
 	}
@@ -231,26 +361,54 @@ func TestNoGoMod(t *testing.T) {
 
 func TestNameCollision(t *testing.T) {
 	root := newProjectRoot(t)
-	t.Run("fields", func(t *testing.T) {
-		v := smallView(&ir.Model{DeclBase: base("app.M", nil), Fields: []ir.Field{field("id", ir.String()), field("Id", ir.String())}})
-		_, diags := Emit(v, Options{Root: root})
-		if got := codesOf(diags); len(got) != 1 || got[0] != CodeNameCollision {
-			t.Errorf("GOEMIT-2 を期待したが %s", formatDiags(diags))
+	one := func(t *testing.T, decls ...ir.Decl) {
+		t.Helper()
+		files, diags := emitSmall(root, decls...)
+		if got := codesOf(diags); files != nil || len(got) != 1 || got[0] != CodeNameCollision {
+			t.Errorf("GOEMIT-2 を一つ期待したが %s", formatDiags(diags))
 		}
+	}
+	t.Run("fields", func(t *testing.T) {
+		one(t, &ir.Model{DeclBase: base("app.M", nil), Fields: []ir.Field{field("id", ir.String()), field("Id", ir.String())}}, use("app.M"))
 	})
 	t.Run("ops", func(t *testing.T) {
-		v := smallView(&ir.Op{DeclBase: base("app.run", nil)}, &ir.Op{DeclBase: base("app.Run", nil)})
-		_, diags := Emit(v, Options{Root: root})
-		if got := codesOf(diags); len(got) != 1 || got[0] != CodeNameCollision {
+		// メソッド名と、関数の型の名前（RunFunc）の両方が衝突するが、どちらも同じ原因
+		_, diags := emitSmall(root, &ir.Op{DeclBase: base("app.run", nil)}, &ir.Op{DeclBase: base("app.Run", nil)})
+		if got := codesOf(diags); len(got) != 2 || got[0] != CodeNameCollision || got[1] != CodeNameCollision {
 			t.Errorf("GOEMIT-2 を期待したが %s", formatDiags(diags))
 		}
 	})
 	t.Run("types", func(t *testing.T) {
-		v := smallView(&ir.Model{DeclBase: base("app.user", nil)}, &ir.Scalar{DeclBase: base("app.User", nil), Base: ir.String()})
-		_, diags := Emit(v, Options{Root: root})
-		if got := codesOf(diags); len(got) != 1 || got[0] != CodeNameCollision {
+		one(t, &ir.Model{DeclBase: base("app.user", nil)}, &ir.Scalar{DeclBase: base("app.User", nil), Base: ir.String()}, use("app.user", "app.User"))
+	})
+	t.Run("type and op func type", func(t *testing.T) {
+		// model RunFunc と、op run の関数の型 RunFunc
+		one(t, &ir.Model{DeclBase: base("app.RunFunc", nil)}, &ir.Op{DeclBase: base("app.run", nil), Params: []ir.OpParam{param("m", ir.Ref("app.RunFunc"))}})
+	})
+	t.Run("type and generated name", func(t *testing.T) {
+		// model Leaves と、生成したコードの Leaves
+		one(t, &ir.Model{DeclBase: base("app.Leaves", nil)}, use("app.Leaves"))
+	})
+	carts, _, _, _ := stateDecls()
+	t.Run("states in StateSet", func(t *testing.T) {
+		// StateSet のフィールド名 Carts と、単位の型 CartsState の両方が衝突するが、原因は同じ
+		upper := &ir.State{DeclBase: base("app.Carts", nil), Shape: ir.StateNullable, Element: ir.String()}
+		_, diags := emitSmall(root, carts, upper)
+		if got := codesOf(diags); len(got) != 2 || got[0] != CodeNameCollision || got[1] != CodeNameCollision {
 			t.Errorf("GOEMIT-2 を期待したが %s", formatDiags(diags))
 		}
+	})
+	t.Run("query and command in a unit", func(t *testing.T) {
+		// docs/emit-go.md「state」: 単位の中で IsEmpty / Get / ケース名と、op 名を先頭大文字にしたものが衝突
+		add := &ir.Effect{DeclBase: base("app.add", nil), Target: ir.BuiltinTarget{State: "app.carts", Operation: ir.OpPost}, Writes: []string{"app.carts"}}
+		isEmpty := &ir.Op{DeclBase: base("app.isEmpty", nil), Effects: []string{"app.add"}, Signature: effectsSig("app.add")}
+		one(t, carts, add, isEmpty)
+	})
+	t.Run("case and command in a unit", func(t *testing.T) {
+		_, _, _, checkout := stateDecls()
+		move := &ir.Effect{DeclBase: base("app.move", nil), Target: ir.TransitionTarget{Of: "app.Checkout", From: ir.AnyCase(), To: ir.Cases("Ordered")}, Writes: []string{"app.carts"}}
+		ordered := &ir.Op{DeclBase: base("app.ordered", nil), Effects: []string{"app.move"}, Signature: effectsSig("app.move")}
+		one(t, carts, checkout, move, ordered)
 	})
 }
 
@@ -270,12 +428,13 @@ func TestBadConstraint(t *testing.T) {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	others := []ir.Decl{
+		&ir.Scalar{DeclBase: base("app.N", nil), Base: ir.Int()},
+		&ir.Model{DeclBase: base("app.N2", nil)},
+	}
 	for _, k := range keys {
 		t.Run(k, func(t *testing.T) {
-			v := smallView(cases[k],
-				&ir.Scalar{DeclBase: base("app.N", nil), Base: ir.Int()},
-				&ir.Model{DeclBase: base("app.N2", nil)})
-			files, diags := Emit(v, Options{Root: root})
+			files, diags := emitSmall(root, append([]ir.Decl{cases[k], use("app.S")}, others...)...)
 			if files != nil {
 				t.Error("ファイルが出た")
 			}
@@ -283,12 +442,19 @@ func TestBadConstraint(t *testing.T) {
 				t.Errorf("GOEMIT-3 を期待したが %s", formatDiags(diags))
 			}
 		})
+		t.Run(k+"/not selected", func(t *testing.T) {
+			// 出力の対象でない宣言は確かめない（エラーでも warning でもない）
+			files, diags := emitSmall(root, append([]ir.Decl{cases[k], use("app.N")}, others...)...)
+			if len(files) == 0 || len(diags) != 0 {
+				t.Errorf("選んでいない宣言で診断が出た: %s", formatDiags(diags))
+			}
+		})
 	}
 }
 
 func TestBadDefault(t *testing.T) {
 	root := newProjectRoot(t)
-	v := smallView(
+	files, diags := emitSmall(root,
 		&ir.Scalar{DeclBase: base("app.PosInt", nil, app("valid.min", arg("value", lit(ir.IntLiteral{Value: 1})))), Base: ir.Int()},
 		&ir.Scalar{DeclBase: base("app.Code", nil, app("valid.pattern", arg("regex", lit(ir.StringLiteral{Value: "^[A-Z]+$"})))), Base: ir.String()},
 		&ir.Model{DeclBase: base("app.Q", nil), Fields: []ir.Field{
@@ -298,8 +464,8 @@ func TestBadDefault(t *testing.T) {
 			{Name: "name", Type: ir.String(), Default: ir.StringLiteral{Value: "toolong"}, Span: sp("x", 4),
 				Decorators: []ir.Application{app("valid.length", arg("max", lit(ir.IntLiteral{Value: 3})))}},
 		}},
+		use("app.Q"),
 	)
-	files, diags := Emit(v, Options{Root: root})
 	if files != nil {
 		t.Error("ファイルが出た")
 	}
@@ -312,8 +478,7 @@ func TestBadDefault(t *testing.T) {
 func TestFormatFailure(t *testing.T) {
 	root := newProjectRoot(t)
 	// 識別子にならないフィールド名（構文解析は通さないが、生成器の不具合の再現として）。
-	v := smallView(&ir.Model{DeclBase: base("app.M", nil), Fields: []ir.Field{field("bad-name", ir.String())}})
-	files, diags := Emit(v, Options{Root: root})
+	files, diags := emitSmall(root, &ir.Model{DeclBase: base("app.M", nil), Fields: []ir.Field{field("bad-name", ir.String())}}, use("app.M"))
 	if files != nil {
 		t.Error("ファイルが出た")
 	}
@@ -336,9 +501,10 @@ func TestFormatFailure(t *testing.T) {
 // TestDeterministic は同じ入力から同じバイト列が出ること。
 func TestDeterministic(t *testing.T) {
 	root := newProjectRoot(t)
-	first, _ := Emit(browserView(), Options{Root: root, Manifests: browserManifests()})
+	views := []goldenView{{browserServerView(), serverSelect()}, {browserView(), browserSelect()}}
+	first := emitAll(t, root, views)
 	for i := 0; i < 3; i++ {
-		again, _ := Emit(browserView(), Options{Root: root, Manifests: browserManifests()})
+		again := emitAll(t, root, []goldenView{{browserServerView(), serverSelect()}, {browserView(), browserSelect()}})
 		if len(first) != len(again) {
 			t.Fatal("ファイルの数が違う")
 		}
@@ -354,69 +520,86 @@ func TestDeterministic(t *testing.T) {
 // 親の out を継いだ子は Dir がサブディレクトリになっている。
 func TestDir(t *testing.T) {
 	root := newProjectRoot(t)
-	v := smallView(&ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()})
+	v := smallView(&ir.Scalar{DeclBase: base("app.admin.Id", nil), Base: ir.String()},
+		&ir.Op{DeclBase: base("app.admin.use", nil), Params: []ir.OpParam{param("id", ir.Ref("app.admin.Id"))}})
 	v.Viewer = "app.admin"
 	v.Program.Namespaces[2].Name = "app.admin"
-	v.Program.Namespaces[2].Decls[0].(*ir.Scalar).Name = "app.admin.Id"
 	v.Config = ir.NamespaceConfig{Language: "go", Out: "gen/app", Dir: "gen/app/admin"}
 	v.Namespaces = map[string]ir.NamespaceConfig{"app": nsConfig("app"), "app.admin": v.Config}
-	files, diags := Emit(v, Options{Root: root})
+	files, diags := Emit(v, Options{Root: root, Select: selectAll(v)})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
 	}
-	if len(files) == 0 || files[0].Path != "gen/app/admin/types.go" {
-		t.Errorf("gen/app/admin/types.go を期待したが %v", files)
-	}
-	if !bytes.Contains(files[0].Content, []byte("package admin\n")) {
-		t.Errorf("package admin を期待した:\n%s", files[0].Content)
+	types := contentOf(files, "gen/app/admin/types.go")
+	if !strings.Contains(types, "package admin\n") || !strings.Contains(types, "type Id string") {
+		t.Errorf("gen/app/admin/types.go（package admin）を期待したが %v:\n%s", paths(files), types)
 	}
 }
 
 // TestDirFallsBackToOut は Dir が空の View（手で組んだもの）では Conf.out に置くこと（doc.go「文書にない決定」）。
 func TestDirFallsBackToOut(t *testing.T) {
 	root := newProjectRoot(t)
-	v := smallView(&ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()})
+	v := smallView(&ir.Scalar{DeclBase: base("app.Id", nil), Base: ir.String()}, use("app.Id"))
 	v.Config.Dir = ""
-	files, diags := Emit(v, Options{Root: root})
+	files, diags := Emit(v, Options{Root: root, Select: selectAll(v)})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
 	}
-	if len(files) == 0 || files[0].Path != "gen/app/types.go" {
-		t.Errorf("gen/app/types.go を期待したが %v", files)
+	if contentOf(files, "gen/app/types.go") == "" {
+		t.Errorf("gen/app/types.go を期待したが %v", paths(files))
 	}
 }
 
-// TestImportUsesDir は別の名前空間 M の import パスが Dir(M) から求まること（docs/emit-go.md「配置」）。
-// M が View.Namespaces になければ（語彙など）複製する。
-func TestImportUsesDir(t *testing.T) {
+// TestImportOrCopy は「配置」: 別の名前空間 M の型は、M が Go で同じプロジェクト（View.Namespaces にある）で、M の出力が
+// その型を持つ（Options.Exported）なら Dir(M) のパッケージを import して使い、そうでなければ viewer のパッケージに複製する。
+func TestImportOrCopy(t *testing.T) {
 	root := newProjectRoot(t)
-	other := ir.Namespace{Name: "lib.core", Decls: []ir.Decl{&ir.Scalar{DeclBase: base("lib.core.Id", nil), Base: ir.String()}}}
-	v := smallView(&ir.Model{DeclBase: base("app.User", nil), Fields: []ir.Field{field("id", ir.Ref("lib.core.Id"))}})
+	other := ir.Namespace{Name: "lib.core", Decls: []ir.Decl{
+		&ir.Scalar{DeclBase: base("lib.core.Id", nil), Base: ir.String()},
+		&ir.Scalar{DeclBase: base("lib.core.Tag", nil), Base: ir.String()},
+		&ir.Op{DeclBase: base("lib.core.find", nil), Params: []ir.OpParam{param("id", ir.Ref("lib.core.Id"))}},
+	}}
+	v := smallView(&ir.Model{DeclBase: base("app.User", nil), Fields: []ir.Field{field("id", ir.Ref("lib.core.Id")), field("tag", ir.Ref("lib.core.Tag"))}}, use("app.User"))
 	v.Program.Namespaces = append(v.Program.Namespaces, other)
 	v.Namespaces["lib.core"] = ir.NamespaceConfig{Language: "go", Out: "gen/lib", Dir: "gen/lib/core"}
-	files, diags := Emit(v, Options{Root: root})
+	libView := &ir.View{Viewer: "lib.core", Config: v.Namespaces["lib.core"], Namespaces: v.Namespaces, Program: v.Program, Ops: map[string]*ir.ViewedSignature{}}
+	libSelect := plugin.Select{Roots: []string{"lib.core.find"}}
+	sel := selectAll(v)
+
+	// lib.core の出力が持つ型は Id だけ（find から辿れる）。Tag はどの op も参照しない
+	if got := Exports(libView, libSelect); strings.Join(got, ",") != "lib.core.Id" {
+		t.Fatalf("Exports(lib.core) = %v", got)
+	}
+	if got := Uses(v, sel); strings.Join(got, ",") != "lib.core" {
+		t.Errorf("Uses(app) = %v, want [lib.core]", got)
+	}
+	if got := Uses(libView, libSelect); len(got) != 0 {
+		t.Errorf("Uses(lib.core) = %v, want none", got)
+	}
+
+	files := emitAll(t, root, []goldenView{{libView, libSelect}, {v, sel}})
+	types := contentOf(files, "gen/app/types.go")
+	wantContains(t, "gen/app/types.go", types,
+		[]string{`"example.com/app/gen/lib/core"`, "Id  core.Id", "Tag Tag", "type Tag string"}, // Id は import、Tag は複製
+		[]string{"type Id string"})
+	compileFiles(t, root, files)
+
+	// 相手の出力がその型を持たなければ（プラグインがない、選ばれていない）、Go の名前空間でも複製する
+	files, diags := Emit(v, Options{Root: root, Select: sel})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
 	}
-	var types []byte
-	for _, f := range files {
-		if f.Path == "gen/app/types.go" {
-			types = f.Content
-		}
-	}
-	if !bytes.Contains(types, []byte(`"example.com/app/gen/lib/core"`)) || !bytes.Contains(types, []byte("core.Id")) {
-		t.Errorf("Dir(lib.core) の import を期待した:\n%s", types)
-	}
-	// View.Namespaces になければ複製する
+	wantContains(t, "gen/app/types.go", contentOf(files, "gen/app/types.go"), []string{"type Id string", "type Tag string"}, []string{"gen/lib"})
+
+	// View.Namespaces になければ（語彙など）、Exported にあっても複製する
 	delete(v.Namespaces, "lib.core")
-	files, diags = Emit(v, Options{Root: root})
+	files, diags = Emit(v, Options{Root: root, Select: sel, Exported: map[string]bool{"lib.core.Id": true}})
 	if len(diags) > 0 {
 		t.Fatal(formatDiags(diags))
 	}
-	for _, f := range files {
-		if f.Path == "gen/app/types.go" && (bytes.Contains(f.Content, []byte("gen/lib")) || !bytes.Contains(f.Content, []byte("type Id string"))) {
-			t.Errorf("複製を期待した:\n%s", f.Content)
-		}
+	wantContains(t, "gen/app/types.go", contentOf(files, "gen/app/types.go"), []string{"type Id string", "type Tag string"}, []string{"gen/lib"})
+	if got := Uses(v, sel); len(got) != 0 {
+		t.Errorf("Uses(app) = %v, want none", got)
 	}
 }
 
@@ -437,37 +620,17 @@ func TestCopiesForeignException(t *testing.T) {
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, validVocab(), proc, ns}}
 	v := &ir.View{Viewer: "app", Config: nsConfig("app"), Namespaces: namespaces(), Program: p,
 		Ops: map[string]*ir.ViewedSignature{"app.run": {Signature: run.Signature, Params: run.Params}}}
-	files, diags := Emit(v, Options{Root: root})
+	files, diags := Emit(v, Options{Root: root, Select: selectAll(v)})
 	if len(diags) > 0 {
 		t.Fatalf("診断が出た: %s", formatDiags(diags))
 	}
-	var types string
-	for _, f := range files {
-		if f.Path == "gen/app/types.go" {
-			types = string(f.Content)
-		}
-	}
-	for _, want := range []string{
+	wantContains(t, "gen/app/types.go", contentOf(files, "gen/app/types.go"), []string{
 		"type Crashed struct{ Value Detail }",
 		`func (Crashed) HozoException() string { return "proc.Crashed" }`,
 		"type MalformedOutput struct{}",
 		"type Detail struct {",
-	} {
-		if !strings.Contains(types, want) {
-			t.Errorf("types.go に %q がない:\n%s", want, types)
-		}
-	}
+	}, nil)
 	compileFiles(t, root, files)
-}
-
-// contentOf は files のうち Path が suffix で終わるものの中身。なければ ""。
-func contentOf(files []File, suffix string) string {
-	for _, f := range files {
-		if strings.HasSuffix(f.Path, suffix) {
-			return string(f.Content)
-		}
-	}
-	return ""
 }
 
 // stateDecls は状態のテストで使う宣言: list / nullable / single の状態と、状態の分類。
@@ -480,198 +643,41 @@ func stateDecls() (carts, token, title *ir.State, checkout *ir.Classify) {
 	return
 }
 
-// TestStateCases は docs/emit-go.md「state」の StateCases: list / nullable の状態があれば（op がなくても、配線で
-// 使われなくても）常に生成し、New が stateCases を取るのは配線に match s by list / by nullable があるときだけ。
-func TestStateCases(t *testing.T) {
-	root := newProjectRoot(t)
-	carts, token, title, _ := stateDecls()
-	show := &ir.Op{DeclBase: base("app.show", nil)}
-	t.Run("states only", func(t *testing.T) {
-		files, diags := Emit(smallView(carts, token, title), Options{Root: root})
-		if len(diags) != 0 || len(files) != 1 {
-			t.Fatalf("ops.go だけを期待したが %d ファイル: %s", len(files), formatDiags(diags))
-		}
-		ops := contentOf(files, "gen/app/ops.go")
-		for _, want := range []string{
-			"type StateCases interface {",
-			"CartsIsEmpty(ctx context.Context) (bool, error)",
-			"TokenIsEmpty(ctx context.Context) (bool, error)",
-		} {
-			if !strings.Contains(ops, want) {
-				t.Errorf("ops.go に %q がない:\n%s", want, ops)
-			}
-		}
-		// single は組み込みの分類を持たない。op がないので New もない。
-		for _, not := range []string{"TitleIsEmpty", "func New(", "type ops struct"} {
-			if strings.Contains(ops, not) {
-				t.Errorf("ops.go に %q がある:\n%s", not, ops)
-			}
-		}
-		// 述語は宣言の順。
-		if strings.Index(ops, "CartsIsEmpty(ctx") > strings.Index(ops, "TokenIsEmpty(ctx") {
-			t.Errorf("StateCases の述語が宣言の順でない:\n%s", ops)
-		}
-		compileFiles(t, root, files)
-	})
-	t.Run("New without stateCases", func(t *testing.T) {
-		files, diags := Emit(smallView(carts, token, show), Options{Root: root})
-		if len(diags) != 0 {
-			t.Fatalf("診断が出た: %s", formatDiags(diags))
-		}
-		ops := contentOf(files, "gen/app/ops.go")
-		for _, want := range []string{"type StateCases interface {", "func New(leaves Leaves) Ops {"} {
-			if !strings.Contains(ops, want) {
-				t.Errorf("ops.go に %q がない:\n%s", want, ops)
-			}
-		}
-		if strings.Contains(ops, "stateCases") {
-			t.Errorf("配線に状態の match がないのに ops.go に stateCases がある:\n%s", ops)
-		}
-	})
-	t.Run("New with stateCases", func(t *testing.T) {
-		open := &ir.Op{DeclBase: base("app.open", nil), Body: wiring(matchStmt(byState("app.token", ir.StateNullable,
-			stateArm(nil, ir.CaseEmpty), stateArm(callp("app.show"), ir.CaseHasItems))))}
-		files, diags := Emit(smallView(carts, token, show, open), Options{Root: root})
-		if len(diags) != 0 {
-			t.Fatalf("診断が出た: %s", formatDiags(diags))
-		}
-		ops := contentOf(files, "gen/app/ops.go")
-		for _, want := range []string{
-			"func New(leaves Leaves, stateCases StateCases) Ops {",
-			"return &ops{leaves: leaves, stateCases: stateCases}",
-			"\tstateCases StateCases\n",
-		} {
-			if !strings.Contains(ops, want) {
-				t.Errorf("ops.go に %q がない:\n%s", want, ops)
-			}
-		}
-		if w := contentOf(files, "gen/app/wiring.go"); !strings.Contains(w, "empty, err := o.stateCases.TokenIsEmpty(ctx)") || !strings.Contains(w, "if !empty {") {
-			t.Errorf("wiring.go の match token by nullable の形が違う:\n%s", w)
-		}
-		compileFiles(t, root, files)
-	})
-	t.Run("name collision", func(t *testing.T) {
-		upper := &ir.State{DeclBase: base("app.Carts", nil), Shape: ir.StateNullable, Element: ir.String()}
-		files, diags := Emit(smallView(carts, upper), Options{Root: root})
-		if got := codesOf(diags); files != nil || len(got) != 1 || got[0] != CodeNameCollision {
-			t.Errorf("GOEMIT-2 を期待したが %s", formatDiags(diags))
-		}
-	})
-}
-
-// TestStateClassifyWithoutMatch は docs/emit-go.md「classify」の「配線で match by C に使われない分類でも生成する」と、
-// 「effect」の遷移のコメント（組み込みの効果のコメントは今まで通り）。
-func TestStateClassifyWithoutMatch(t *testing.T) {
-	root := newProjectRoot(t)
-	carts, token, _, checkout := stateDecls()
-	files, diags := Emit(smallView(carts, token, checkout,
-		&ir.Effect{DeclBase: base("app.logout", nil), Target: ir.BuiltinTarget{State: "app.token", Operation: ir.OpDelete}, Writes: []string{"app.token"}},
-		&ir.Effect{DeclBase: base("app.placeOrder", doc("注文を確定する")), Target: ir.TransitionTarget{Of: "app.Checkout", From: ir.Cases("Shopping"), To: ir.Cases("Ordered")}, Writes: []string{"app.carts"}},
-		&ir.Effect{DeclBase: base("app.clearCart", nil), Target: ir.TransitionTarget{Of: "app.carts", From: ir.Cases(ir.CaseHasItems), To: ir.Cases(ir.CaseEmpty)}, Writes: []string{"app.carts"}},
-		&ir.Effect{DeclBase: base("app.touch", nil), Target: ir.TransitionTarget{Of: "app.Checkout", From: ir.Cases("Shopping", "Ordered"), To: ir.AnyCase()}, Writes: []string{"app.carts"}},
-	), Options{Root: root})
-	if len(diags) != 0 {
-		t.Fatalf("診断が出た: %s", formatDiags(diags))
-	}
-	for file, wants := range map[string][]string{
-		"gen/app/classify.go": {
-			"type Checkout int",
-			"CheckoutShopping Checkout = iota",
-			"Shopping(ctx context.Context) (bool, error)",
-			"Ordered(ctx context.Context) (bool, error)",
-			"func ClassifyCheckout(ctx context.Context, c CheckoutCases) (Checkout, error) {",
-			`return 0, &runtime.ClassificationError{Classify: "app.Checkout", Hits: hits}`,
-		},
-		"gen/app/ops.go": {"type Classifiers struct {\n\tCheckout CheckoutCases\n}"},
-		"gen/app/types.go": {
-			"// EffectLogout は効果 app.logout（状態 app.token への delete）。\nconst EffectLogout",
-			"// EffectPlaceOrder は注文を確定する\n//\n// on app.Checkout: Shopping -> Ordered\nconst EffectPlaceOrder",
-			"// EffectClearCart は効果 app.clearCart。\n//\n// on app.carts: HasItems -> Empty\nconst EffectClearCart",
-			"// on app.Checkout: Shopping | Ordered -> any\nconst EffectTouch",
-		},
-	} {
-		content := contentOf(files, file)
-		for _, want := range wants {
-			if !strings.Contains(content, want) {
-				t.Errorf("%s に %q がない:\n%s", file, want, content)
-			}
-		}
-	}
-	compileFiles(t, root, files)
-}
-
-// TestMatchShapeMismatch は、match の形と分類が合わない IR（MATCH-7 を通っていれば来ない）や、対象の決まらない
-// classify を、黙って誤ったコードにせず GOEMIT-INTERNAL の error にして、ファイルを出さないこと。
-func TestMatchShapeMismatch(t *testing.T) {
-	root := newProjectRoot(t)
-	carts, token, title, checkout := stateDecls()
-	kind := &ir.Classify{DeclBase: base("app.Kind", nil), Subject: ir.TypeSubject{Type: ir.String()}, Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}}
-	both := []ir.MatchArm{stateArm(nil, ir.CaseEmpty), stateArm(nil, ir.CaseHasItems)}
-	wire := func(m ir.Match) *ir.Op {
-		return &ir.Op{DeclBase: base("app.run", nil), Params: []ir.OpParam{param("s", ir.String())}, Body: wiring(matchStmt(m))}
-	}
-	tests := []struct {
-		name  string
-		decls []ir.Decl
-		want  string // メッセージに含む語
-	}{
-		{"by list on single", []ir.Decl{title, wire(byState("app.title", ir.StateList, both...))}, "app.title が名前空間 app の list の状態でない"},
-		{"by list on nullable", []ir.Decl{token, wire(byState("app.token", ir.StateList, both...))}, "app.token が名前空間 app の list の状態でない"},
-		{"by nullable on unknown state", []ir.Decl{wire(byState("app.nope", ir.StateNullable, both...))}, "app.nope が名前空間 app の nullable の状態でない"},
-		{"by list on a non-state", []ir.Decl{wire(byState("valid.min", ir.StateList, both...))}, "valid.min が名前空間 app の list の状態でない"},
-		{"by list without HasItems", []ir.Decl{carts, wire(byState("app.carts", ir.StateList, stateArm(nil, ir.CaseEmpty)))}, "アームが Empty / HasItems を尽くしていない"},
-		{"match by value classify", []ir.Decl{kind, wire(byClassify("app.Kind", stateArm(nil, "A"), stateArm(nil, "B")))}, "app.Kind が状態の分類でない"},
-		{"match by unknown classify", []ir.Decl{wire(byClassify("app.Nope", stateArm(nil, "A")))}, "app.Nope が状態の分類でない"},
-		{"value match by state classify", []ir.Decl{carts, checkout,
-			wire(ir.Match{Subject: ir.ValueSubject{Atom: name("s")}, Classify: "app.Checkout", Arms: []ir.MatchArm{stateArm(nil, "Shopping"), stateArm(nil, "Ordered")}, Span: sp("x.hozo", 1)})},
-			"app.Checkout が値の分類でない"},
-		{"match without subject", []ir.Decl{carts, wire(ir.Match{Classify: "list", Arms: both, Span: sp("x.hozo", 1)})}, "対象の種類が分からない"},
-		{"classify without subject", []ir.Decl{&ir.Classify{DeclBase: base("app.Odd", nil), Cases: []ir.ClassifyCase{{Name: "A"}}}}, "classify app.Odd の対象が型でも状態でもない"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			files, diags := Emit(smallView(tt.decls...), Options{Root: root})
-			if files != nil {
-				t.Errorf("ファイルが出た: %d", len(files))
-			}
-			if len(diags) != 1 {
-				t.Fatalf("診断が %d 個、期待は 1 個: %s", len(diags), formatDiags(diags))
-			}
-			if d := diags[0]; d.Code != CodeInternal || d.Severity != diag.Error || !strings.Contains(d.Message, tt.want) {
-				t.Errorf("診断 = %s[%s] %q, want GOEMIT-INTERNAL に %q", d.Severity, d.Code, d.Message, tt.want)
-			}
-		})
-	}
-}
-
-// TestStateBehavior は、golden の state（testdata_test.go の shopNS）から生成したコードを実際に動かす:
-// 一時のモジュールに書き、人が書く側（葉、States、StateCases、<C>Cases）の偽物を置いたテスト
-// testdata/state/behavior_test.go を shop のパッケージに足して `go test` する。確かめるのは docs/emit-go.md
-// 「classify」（すべての述語を評価する、最初のエラーを返す、真の数の検証、default）と「match」（状態での分岐）。
-func TestStateBehavior(t *testing.T) {
+// TestBehavior は、golden の View から生成したコードを実際に動かす: 一時のモジュールに書き、人やプラグインが実装する側
+// （Leaves、States、Deps、Wrappers、Classifiers、Constraints）の偽物を置いたテスト testdata/<case>/behavior_test.go を
+// そのパッケージに足して `go test` する。確かめるのは docs/emit-go.md「実装の単位」（nil のフィールドは
+// *runtime.MissingError）、「state」「classify」「match」「配線の本体」「デコレータ」の振る舞い。
+func TestBehavior(t *testing.T) {
 	goBin, err := exec.LookPath("go")
 	if err != nil {
 		t.Skip("go が PATH にない")
 	}
-	root := newProjectRoot(t)
-	var files []File
-	for _, v := range []*ir.View{stateView("shop"), stateView("depot")} {
-		fs, diags := Emit(v, Options{Root: root})
-		if len(diags) > 0 {
-			t.Fatalf("%s: 診断が出た: %s", v.Viewer, formatDiags(diags))
-		}
-		files = append(files, fs...)
-	}
-	behavior, err := os.ReadFile(filepath.Join("testdata", "state", "behavior_test.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	files = append(files, File{Path: "gen/shop/behavior_test.go", Content: behavior})
-	compileFiles(t, root, files)
-	cmd := exec.Command(goBin, "test", "./gen/shop/")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("生成したコードのテストが落ちた: %v\n%s", err, out)
+	for _, tc := range []struct{ name, pkg string }{
+		{"state", "shop"},           // 状態の単位、状態の分類、状態での match
+		{"browser", "browser"},      // Deps、Wrappers、Classifiers、bind
+		{"constraint", "inventory"}, // valid に足した制約
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var views []goldenView
+			for _, g := range goldenCases {
+				if g.name == tc.name {
+					views = g.views
+				}
+			}
+			root := newProjectRoot(t)
+			files := emitAll(t, root, views)
+			behavior, err := os.ReadFile(filepath.Join("testdata", tc.name, "behavior_test.go"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files = append(files, File{Path: "gen/" + tc.pkg + "/behavior_test.go", Content: behavior})
+			compileFiles(t, root, files)
+			cmd := exec.Command(goBin, "test", "./gen/"+tc.pkg+"/")
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("生成したコードのテストが落ちた: %v\n%s", err, out)
+			}
+		})
 	}
 }

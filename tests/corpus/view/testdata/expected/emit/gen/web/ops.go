@@ -2,52 +2,68 @@
 
 package web
 
-import (
-	"context"
+import "github.com/mew-ton/hozo/runtime"
 
-	"github.com/mew-ton/hozo/gen/api"
-)
+// UserPageVmFunc は op web.userPageVm の関数の型。
+type UserPageVmFunc func(user PublicUser) (UserPage, error)
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// UserPageVm は op web.userPageVm。
-	UserPageVm(ctx context.Context, user api.PublicUser) (UserPage, error)
+// AdminPageVmFunc は op web.adminPageVm の関数の型。
+//
+// 前提: user は web.UserKind.Admin<api.PublicUser>
+type AdminPageVmFunc func(user PublicUser) (UserPage, error)
 
-	// AdminPageVm は op web.adminPageVm。
-	//
-	// 前提: user は web.UserKind.Admin<api.PublicUser>
-	AdminPageVm(ctx context.Context, user api.PublicUser) (UserPage, error)
+// ClearTokenFunc は op web.clearToken の関数の型。
+//
+// Effects: web.removeToken
+type ClearTokenFunc func() error
 
-	// Greet は op web.greet。
-	//
-	// Effects: web.goHome
-	Greet(ctx context.Context, user api.PublicUser) error
+// FetchUserFunc は op web.fetchUser の関数の型。
+//
+// ユーザーを取る。
+//
+// 引数:
+//   - q: 問い合わせ
+//
+// Throws: api.NotFound, api.Unauthorized, web.Offline
+type FetchUserFunc func(q Query) (PublicUser, error)
 
-	// ClearToken は op web.clearToken。
-	//
-	// Effects: web.removeToken
-	ClearToken(ctx context.Context) error
+// OpenUserFunc は op web.openUser の関数の型。
+//
+// ユーザーページを開く。
+//
+// 引数:
+//   - id: 表示するユーザー
+//
+// Throws: api.NotFound, web.Offline
+// Effects: web.goLogin
+type OpenUserFunc func(id UserId) (UserPage, error)
+
+// SignOutFunc は op web.signOut の関数の型。
+//
+// Effects: api.deleteSession, web.removeToken
+type SignOutFunc func() error
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	UserPageVm  UserPageVmFunc
+	AdminPageVm AdminPageVmFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// UserPageVm は op web.userPageVm。
-	UserPageVm(ctx context.Context, user api.PublicUser) (UserPage, error)
+	UserPageVm(user PublicUser) (UserPage, error)
 
 	// AdminPageVm は op web.adminPageVm。
 	//
 	// 前提: user は web.UserKind.Admin<api.PublicUser>
-	AdminPageVm(ctx context.Context, user api.PublicUser) (UserPage, error)
-
-	// Greet は op web.greet。
-	//
-	// Effects: web.goHome
-	Greet(ctx context.Context, user api.PublicUser) error
+	AdminPageVm(user PublicUser) (UserPage, error)
 
 	// ClearToken は op web.clearToken。
 	//
 	// Effects: web.removeToken
-	ClearToken(ctx context.Context) error
+	ClearToken() error
 
 	// FetchUser はユーザーを取る。
 	//
@@ -55,18 +71,7 @@ type Ops interface {
 	//   - q: 問い合わせ
 	//
 	// Throws: api.NotFound, api.Unauthorized, web.Offline
-	FetchUser(ctx context.Context, q Query) (api.PublicUser, error)
-
-	// Welcome は op web.welcome。
-	//
-	// Effects: web.goHome
-	Welcome(ctx context.Context, user api.PublicUser) error
-
-	// Reload は op web.reload。
-	//
-	// Throws: api.NotFound, api.Unauthorized, web.Offline
-	// Effects: api.touchUser
-	Reload(ctx context.Context, id api.UserId) (api.PublicUser, error)
+	FetchUser(q Query) (PublicUser, error)
 
 	// OpenUser はユーザーページを開く。
 	//
@@ -75,158 +80,83 @@ type Ops interface {
 	//
 	// Throws: api.NotFound, web.Offline
 	// Effects: web.goLogin
-	OpenUser(ctx context.Context, id api.UserId) (UserPage, error)
+	OpenUser(id UserId) (UserPage, error)
 
 	// SignOut は op web.signOut。
 	//
 	// Effects: api.deleteSession, web.removeToken
-	SignOut(ctx context.Context) error
-
-	// Login は op web.login。
-	//
-	// Throws: api.Invalid, web.Offline
-	// Effects: api.createSession
-	Login(ctx context.Context, form LoginForm) (api.Session, error)
+	SignOut() error
 }
 
-// Deps は配線から呼ぶ別の名前空間の op。実装者は bind で埋まる位置に状態の値を入れて呼び出し先に渡す
-// （docs/emit-go.md「op」の「インターフェース」）。
+// Deps は配線から呼ぶ別の名前空間の op。名前空間ごとに一つの構造体で、フィールドは viewer から見た関数の型
+// （bind で埋まる位置は引数から消えている。埋める者が状態の値を入れて呼び出し先に渡す）。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "dep"）。
 type Deps struct {
 	Api ApiOps
 }
 
-// ApiOps は名前空間 api の op のうち、この名前空間の配線が呼ぶもの。引数は bind で埋まる位置を除いた形。
-type ApiOps interface {
-	// GetUser はユーザーを一人返す。
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: in.token ← web.token
-	//
-	// 引数:
-	//   - in: 認証と識別子
-	//
-	// Throws: api.NotFound, api.Unauthorized, api.Timeout
-	GetUser(ctx context.Context, in GetUserInInput) (api.PublicUser, error)
-
-	// Login は op api.login。
-	//
-	// Throws: api.Invalid, api.Timeout
-	// Effects: api.createSession
-	Login(ctx context.Context, in api.LoginInput) (api.Session, error)
-
-	// Logout は op api.logout。
-	//
-	// bind で埋まる位置（Deps の実装者が埋める）: token ← web.token
-	//
-	// Throws: api.Timeout
-	// Effects: api.deleteSession
-	Logout(ctx context.Context) error
-
-	// Touch は op api.touch。
-	//
-	// Throws: api.Unauthorized, api.NotFound
-	// Effects: api.touchUser
-	Touch(ctx context.Context, id api.UserId) error
+// ApiOps は名前空間 api の op のうち、この名前空間の配線が呼ぶもの。
+type ApiOps struct {
+	GetUser ApiGetUserFunc
+	Logout  ApiLogoutFunc
 }
 
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// TokenIsEmpty は状態 web.token（nullable）が空（Empty）か。
-	TokenIsEmpty(ctx context.Context) (bool, error)
-}
+// ApiGetUserFunc は op api.getUser の、web から見た関数の型。
+//
+// ユーザーを一人返す。
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: in.token ← web.token
+//
+// 引数:
+//   - in: 認証と識別子
+//
+// Throws: api.NotFound, api.Unauthorized, api.Timeout
+type ApiGetUserFunc func(in GetUserInInput) (PublicUser, error)
 
-// Wrappers は op に付いたデコレータのうち、プラグインが扱わないものの「包む関数」（docs/emit-go.md「デコレータ」）。
-// 引数は op の引数と next（op の関数の型）。
-type Wrappers interface {
-	// FetchUserOfflineFallback は web.fetchUser に付いた @web.offlineFallback。
-	// throws web.Offline
-	// catches api.Timeout recovers
-	FetchUserOfflineFallback(ctx context.Context, q Query, next func(ctx context.Context, q Query) (api.PublicUser, error)) (api.PublicUser, error)
+// ApiLogoutFunc は op api.logout の、web から見た関数の型。
+//
+// bind で埋まる位置（フィールドを埋める者が埋める）: token ← web.token
+//
+// Throws: api.Timeout
+// Effects: api.deleteSession
+type ApiLogoutFunc func() error
 
-	// OpenUserTraced は web.openUser に付いた @web.traced（= web.traced(key: $param:id, within: 5m0s)）。
-	OpenUserTraced(ctx context.Context, id api.UserId, next func(ctx context.Context, id api.UserId) (UserPage, error)) (UserPage, error)
-
-	// OpenUserRedirectToLogin は web.openUser に付いた @web.redirectToLogin（= web.redirectOn(error: api.Unauthorized, target: web.goLogin)）。
-	// catches api.Unauthorized halts web.goLogin
-	OpenUserRedirectToLogin(ctx context.Context, id api.UserId, next func(ctx context.Context, id api.UserId) (UserPage, error)) (UserPage, error)
-
-	// SignOutIgnoreTimeout は web.signOut に付いた @web.ignoreTimeout。
-	// catches api.Timeout ignores
-	SignOutIgnoreTimeout(ctx context.Context, next func(ctx context.Context) error) error
-
-	// LoginOfflineFallback は web.login に付いた @web.offlineFallback。
-	// throws web.Offline
-	// catches api.Timeout recovers
-	LoginOfflineFallback(ctx context.Context, form LoginForm, next func(ctx context.Context, form LoginForm) (api.Session, error)) (api.Session, error)
-}
-
-// Classifiers は分類ごとの述語の実装（classify.go の <C>Cases）。
+// Classifiers は値の分類ごとの述語の実装（classify.go の <C>Cases）。
+// 埋めていない分類で判定しようとしたら *runtime.MissingError（Kind は "classifier"）。
 type Classifiers struct {
 	UserKind UserKindCases
-	Verified VerifiedCases
 }
 
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves, deps Deps, wrappers Wrappers, classifiers Classifiers) Ops {
-	return &ops{leaves: leaves, deps: deps, wrappers: wrappers, classifiers: classifiers}
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
+func New(leaves Leaves, deps Deps, classifiers Classifiers) Ops {
+	return &ops{leaves: leaves, deps: deps, classifiers: classifiers}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
 	leaves      Leaves
 	deps        Deps
-	wrappers    Wrappers
 	classifiers Classifiers
 }
 
-func (o *ops) UserPageVm(ctx context.Context, user api.PublicUser) (UserPage, error) {
-	return o.leaves.UserPageVm(ctx, user)
-}
-
-func (o *ops) AdminPageVm(ctx context.Context, user api.PublicUser) (UserPage, error) {
-	return o.leaves.AdminPageVm(ctx, user)
-}
-
-func (o *ops) Greet(ctx context.Context, user api.PublicUser) error {
-	return o.leaves.Greet(ctx, user)
-}
-
-func (o *ops) ClearToken(ctx context.Context) error {
-	return o.leaves.ClearToken(ctx)
-}
-
-func (o *ops) FetchUser(ctx context.Context, q Query) (api.PublicUser, error) {
-	f0 := o.fetchUserBody
-	f1 := func(ctx context.Context, q Query) (api.PublicUser, error) {
-		return o.wrappers.FetchUserOfflineFallback(ctx, q, f0)
+func (o *ops) UserPageVm(user PublicUser) (UserPage, error) {
+	if o.leaves.UserPageVm == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "web.userPageVm"}
 	}
-	return f1(ctx, q)
+	return o.leaves.UserPageVm(user)
 }
 
-func (o *ops) OpenUser(ctx context.Context, id api.UserId) (UserPage, error) {
-	f0 := o.openUserBody
-	f1 := func(ctx context.Context, id api.UserId) (UserPage, error) {
-		return o.wrappers.OpenUserTraced(ctx, id, f0)
+func (o *ops) AdminPageVm(user PublicUser) (UserPage, error) {
+	if o.leaves.AdminPageVm == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "web.adminPageVm"}
 	}
-	f2 := func(ctx context.Context, id api.UserId) (UserPage, error) {
-		return o.wrappers.OpenUserRedirectToLogin(ctx, id, f1)
-	}
-	return f2(ctx, id)
+	return o.leaves.AdminPageVm(user)
 }
 
-func (o *ops) SignOut(ctx context.Context) error {
-	f0 := o.signOutBody
-	f1 := func(ctx context.Context) error {
-		return o.wrappers.SignOutIgnoreTimeout(ctx, f0)
+func (o *ops) ClearToken() error {
+	if States.Token.ClearToken == nil {
+		return &runtime.MissingError{Kind: "state", Name: "web.clearToken"}
 	}
-	return f1(ctx)
-}
-
-func (o *ops) Login(ctx context.Context, form LoginForm) (api.Session, error) {
-	f0 := o.loginBody
-	f1 := func(ctx context.Context, form LoginForm) (api.Session, error) {
-		return o.wrappers.LoginOfflineFallback(ctx, form, f0)
-	}
-	return f1(ctx, form)
+	return States.Token.ClearToken()
 }

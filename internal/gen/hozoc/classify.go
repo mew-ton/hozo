@@ -2,12 +2,6 @@
 
 package hozoc
 
-import (
-	"context"
-
-	"github.com/mew-ton/hozo/runtime"
-)
-
 // OutputsSync は生成したファイルが、今の仕様と設定から生成し直したものと一致しているか
 type OutputsSync int
 
@@ -17,34 +11,3 @@ const (
 	// 足りない、古い、または余分なファイルがある
 	OutputsSyncDefault
 )
-
-// OutputsSyncCases は人が実装するケースごとの述語（設計書 §10.3）。値を取らず、保存先に問い合わせて
-// 状態 hozoc.outputs がそのケースの場合かを答える。
-type OutputsSyncCases interface {
-	// 一致している
-	UpToDate(ctx context.Context) (bool, error)
-}
-
-// ClassifyOutputsSync は状態 hozoc.outputs の場合を hozoc.OutputsSync で分類する。すべての述語を評価し、真になった数を数える。
-// 述語がエラーを返したら、（残りも評価したうえで）最初のエラーを返す。
-// 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
-func ClassifyOutputsSync(ctx context.Context, c OutputsSyncCases) (OutputsSync, error) {
-	var hits []string
-	result := OutputsSyncDefault
-	var firstErr error
-	if ok, err := c.UpToDate(ctx); err != nil {
-		if firstErr == nil {
-			firstErr = err
-		}
-	} else if ok {
-		hits = append(hits, "UpToDate")
-		result = OutputsSyncUpToDate
-	}
-	if firstErr != nil {
-		return 0, firstErr
-	}
-	if len(hits) > 1 {
-		return 0, &runtime.ClassificationError{Classify: "hozoc.OutputsSync", Hits: hits}
-	}
-	return result, nil
-}

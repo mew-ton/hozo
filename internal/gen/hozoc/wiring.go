@@ -2,8 +2,6 @@
 
 package hozoc
 
-import "context"
-
 // Emit は仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
 //
 // 引数:
@@ -11,10 +9,10 @@ import "context"
 //
 // Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 // Effects: hozoc.syncOutputs
-func (o *ops) Emit(ctx context.Context, in EmitInput) (EmitResult, error) {
-	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format})
+func (o *ops) Emit(in EmitInput) (EmitResult, error) {
+	checked, err := o.Check(CheckInput{Config: in.Config, Format: in.Format})
 	if err != nil {
 		return EmitResult{}, err
 	}
-	return o.WriteOutputs(ctx, in, checked)
+	return o.WriteOutputs(in, checked)
 }

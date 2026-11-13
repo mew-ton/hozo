@@ -28,23 +28,10 @@ type Profile struct {
 	Name string `json:"name"`
 }
 
-// EffectAddLine はカートに行を足す
-const EffectAddLine runtime.Effect = "shop.addLine"
-
 // EffectPlaceOrder は注文を確定する
 //
 // on shop.Checkout: Shopping -> Ordered
 const EffectPlaceOrder runtime.Effect = "shop.placeOrder"
-
-// EffectStartOver は効果 shop.startOver。
-//
-// on shop.Checkout: any -> Shopping
-const EffectStartOver runtime.Effect = "shop.startOver"
-
-// EffectTouchCheckout は進み具合を記録し直す
-//
-// on shop.Checkout: Shopping | Ordered -> any
-const EffectTouchCheckout runtime.Effect = "shop.touchCheckout"
 
 // EffectClearCart はカートを空にする
 //

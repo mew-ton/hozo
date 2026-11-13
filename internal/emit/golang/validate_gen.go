@@ -261,7 +261,7 @@ func describeConstraint(c constraint) string {
 	return c.name
 }
 
-// userConstraint は ConstraintImpls のメソッド一つ。
+// userConstraint は ConstraintFuncs のフィールド一つ（valid に足した制約。docs/emit-go.md「scalar」）。
 type userConstraint struct {
 	decorator string // FQN
 	decl      *ir.Decorator
@@ -281,8 +281,8 @@ type validateGen struct {
 // rt は runtime パッケージの修飾名。使うときに import に足す（使わなければ import しない）。
 func (v *validateGen) rt() string { return v.g.imports.Add(runtimePath, "runtime") }
 
-// genValidate は validate.go（docs/emit-go.md「scalar」の Validate、「model の Validate」、ConstraintImpls）。
-// scalar と model の Validate を IR の順に出し、その後に pattern の変数、appendViolations、ConstraintImpls。
+// genValidate は validate.go（docs/emit-go.md「scalar」の Validate、「model の Validate」、ConstraintFuncs）。
+// pattern の変数、制約ごとの関数の型と ConstraintFuncs、scalar と model の Validate（IR の順）、appendViolations の順に出す。
 func (e *emitter) genValidate() *genFile {
 	if len(e.scalars) == 0 && len(e.models) == 0 {
 		return nil
@@ -306,20 +306,24 @@ func (e *emitter) genValidate() *genFile {
 		g.println("")
 	}
 	if len(v.users) > 0 {
-		g.println("// ConstraintImpls は valid に足した制約の実装（設計書 §6.5）。人が Constraints に設定する。")
-		g.println("type ConstraintImpls interface {")
 		for _, u := range v.users {
-			name := gol.Capitalize(localName(u.decorator))
+			name := constraintFuncName(u.decorator)
+			text := "制約 " + u.decorator + " の関数の型。値がその制約を満たせば true。"
 			if u.decl != nil && u.decl.Description != nil {
-				g.body.WriteString(indent(comment(name+" は "+strings.TrimSpace(u.decl.Description.Body)), "\t"))
-			} else {
-				g.printf("\t// %s は %s。\n", name, u.decorator)
+				text += "\n" + strings.TrimSpace(u.decl.Description.Body)
 			}
-			g.printf("\t%s(%s) bool\n", name, e.userConstraintParams(u, &g.imports))
+			g.body.WriteString(comment(joinJa(name+" は", text)))
+			g.printf("type %s func(%s) bool\n\n", name, e.userConstraintParams(u, &g.imports))
+		}
+		g.println("// ConstraintFuncs は valid に足した制約の実装（設計書 §6.5）を束ねる。")
+		g.println("type ConstraintFuncs struct {")
+		for _, u := range v.users {
+			g.printf("\t%s %s\n", constraintField(u.decorator), constraintFuncName(u.decorator))
 		}
 		g.println("}\n")
-		g.println("// Constraints は ConstraintImpls の実装。未設定のまま Validate を呼ぶと panic する。")
-		g.println("var Constraints ConstraintImpls\n")
+		g.println("// Constraints は valid に足した制約の実装。人がフィールドを設定する。")
+		g.println("// 設定していない制約に Validate が当たったら *runtime.MissingError（Kind は \"constraint\"）。")
+		g.println("var Constraints ConstraintFuncs\n")
 	}
 	if v.needUTF8 {
 		g.imports.Add("unicode/utf8", "utf8")
@@ -341,7 +345,13 @@ func (e *emitter) genValidate() *genFile {
 	return g
 }
 
-// userConstraintParams は ConstraintImpls のメソッドの引数: `v <元の型>` と、デコレータの引数（あれば）。
+// constraintField は ConstraintFuncs のフィールド名: 制約の宣言名を先頭大文字にしたもの。
+func constraintField(decorator string) string { return gol.Capitalize(localName(decorator)) }
+
+// constraintFuncName は制約の関数の型の名前 <制約>Func。
+func constraintFuncName(decorator string) string { return constraintField(decorator) + "Func" }
+
+// userConstraintParams は制約の関数の型の引数: `v <元の型>` と、デコレータの引数（あれば）。
 func (e *emitter) userConstraintParams(u userConstraint, imp *gol.Imports) string {
 	parts := []string{"v " + coreGoTypeImp(u.core, imp)}
 	if u.decl != nil {
@@ -387,22 +397,11 @@ func (e *emitter) genScalarValidate(v *validateGen, s *ir.Scalar) {
 		return
 	}
 	g.printf("\tvar violations []%s.Violation\n", v.rt())
-	e.genUserGuard(v, cs)
 	for _, c := range cs {
 		e.genCheck(v, c, "v", `""`, "\t")
 	}
 	g.println("\tif len(violations) == 0 {\n\t\treturn nil\n\t}")
 	g.printf("\treturn &%s.ValidationError{Violations: violations}\n}\n\n", v.rt())
-}
-
-// genUserGuard は、ユーザーの制約を使うなら Constraints の未設定を panic にする行。
-func (e *emitter) genUserGuard(v *validateGen, cs []constraint) {
-	for _, c := range cs {
-		if c.user {
-			v.g.printf("\tif Constraints == nil {\n\t\tpanic(%q)\n\t}\n", e.pkg+": Constraints が設定されていない（valid に足した制約の実装）")
-			return
-		}
-	}
 }
 
 // genCheck は制約一つの検査。expr は元の型に変換できる値の式、pathExpr は Path の Go の式。
@@ -455,17 +454,20 @@ func (e *emitter) genCheck(v *validateGen, c constraint, expr, pathExpr, ind str
 				args = append(args, e.decoratorArgExpr(&c.app, p, &g.imports))
 			}
 		}
-		g.printf("%sif !Constraints.%s(%s) {\n", ind, gol.Capitalize(localName(c.app.Decorator)), strings.Join(args, ", "))
+		// 設定していない制約に当たったら、違反ではなく *runtime.MissingError を返す（docs/emit-go.md「実装の単位」）。
+		fn := "Constraints." + constraintField(c.app.Decorator)
+		g.printf("%sif %s == nil {\n%s\treturn %s\n%s}\n", ind, fn, ind, missing(&g.imports, missingConstraint, c.app.Decorator), ind)
+		g.printf("%sif !%s(%s) {\n", ind, fn, strings.Join(args, ", "))
 		g.body.WriteString(violate())
 	}
 }
 
-// registerUser はユーザーの制約を ConstraintImpls のメソッドとして登録する。
+// registerUser はユーザーの制約を ConstraintFuncs のフィールドとして登録する。
 func (e *emitter) registerUser(v *validateGen, c constraint) userConstraint {
 	for _, u := range v.users {
 		if u.decorator == c.app.Decorator {
 			if u.core != c.userCore {
-				e.errorf(CodeBadConstraint, &c.app.Span, "%s は元の型 %s の位置にも %s の位置にも付いているが、ConstraintImpls のメソッドは一つの型しか取れない", c.app.Decorator, u.core, c.userCore)
+				e.errorf(CodeBadConstraint, &c.app.Span, "%s は元の型 %s の位置にも %s の位置にも付いているが、制約の関数の型は一つの型しか取れない", c.app.Decorator, u.core, c.userCore)
 			}
 			return u
 		}
@@ -475,7 +477,7 @@ func (e *emitter) registerUser(v *validateGen, c constraint) userConstraint {
 	return u
 }
 
-// decoratorArgExpr は ConstraintImpls のメソッドに渡す、デコレータの引数 p の値の Go の式。
+// decoratorArgExpr は制約の関数に渡す、デコレータの引数 p の値の Go の式。
 func (e *emitter) decoratorArgExpr(app *ir.Application, p ir.Param, imp *gol.Imports) string {
 	var target ir.Type
 	if t, ok := p.Type.(ir.TypeParam); ok && len(t.Types) > 0 {
@@ -526,11 +528,6 @@ func (e *emitter) genModelValidate(v *validateGen, m *ir.Model) {
 		return
 	}
 	g.printf("\tvar violations []%s.Violation\n", v.rt())
-	var all []constraint
-	for _, c := range cs {
-		all = append(all, c...)
-	}
-	e.genUserGuard(v, all)
 	g.body.WriteString(body)
 	g.println("\tif len(violations) == 0 {\n\t\treturn nil\n\t}")
 	g.printf("\treturn &%s.ValidationError{Violations: violations}\n}\n\n", v.rt())
@@ -582,7 +579,15 @@ func (e *emitter) genValueValidate(v *validateGen, expr, pathExpr string, t ir.T
 	case ir.RefType:
 		if e.model(x.Target) != nil || e.scalar(x.Target) != nil {
 			v.needHelp = true
-			g.printf("%sviolations = appendViolations(violations, %s, %s.Validate())\n", ind, pathExpr, expr)
+			if e.mayMiss(x.Target, map[string]bool{}) {
+				// 中の Validate が設定していない制約に当たったら、その *runtime.MissingError をそのまま返す。
+				errs := g.imports.Add("errors", "errors")
+				g.printf("%sif err := %s.Validate(); err != nil {\n", ind, expr)
+				g.printf("%s\tvar miss *%s.MissingError\n%s\tif %s.As(err, &miss) {\n%s\t\treturn err\n%s\t}\n", ind, v.rt(), ind, errs, ind, ind)
+				g.printf("%s\tviolations = appendViolations(violations, %s, err)\n%s}\n", ind, pathExpr, ind)
+			} else {
+				g.printf("%sviolations = appendViolations(violations, %s, %s.Validate())\n", ind, pathExpr, expr)
+			}
 		}
 	case ir.ArrayType:
 		if e.needsValidate(x.Of) {
@@ -603,4 +608,43 @@ func (e *emitter) genValueValidate(v *validateGen, expr, pathExpr string, t ir.T
 	for _, c := range cs {
 		e.genCheck(v, c, expr, pathExpr, ind)
 	}
+}
+
+// mayMiss は、型 fqn（scalar か model）の Validate が *runtime.MissingError を返しうるか: valid に足した制約を
+// （継承やフィールドを通して）確かめるか。seen は辿っている途中の型（model が自分に戻る参照を止める）。
+func (e *emitter) mayMiss(fqn string, seen map[string]bool) bool {
+	if seen[fqn] {
+		return false
+	}
+	seen[fqn] = true
+	if s := e.scalar(fqn); s != nil {
+		for _, c := range e.scalarConstraints(s, false) {
+			if c.user {
+				return true
+			}
+		}
+		return false
+	}
+	m := e.model(fqn)
+	if m == nil {
+		return false
+	}
+	for _, f := range m.Fields {
+		core, ok := e.coreOf(f.Type)
+		for _, c := range e.constraintsOf(f.Decorators, core, ok, "", "", false) {
+			if c.user {
+				return true
+			}
+		}
+		miss := false
+		forEachRef(f.Type, func(target string) {
+			if e.mayMiss(target, seen) {
+				miss = true
+			}
+		})
+		if miss {
+			return true
+		}
+	}
+	return false
 }

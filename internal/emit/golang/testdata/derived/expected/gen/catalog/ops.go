@@ -2,27 +2,37 @@
 
 package catalog
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// Load は op catalog.load。
-	Load(ctx context.Context, id string) (Product, error)
+// LoadFunc は op catalog.load の関数の型。
+type LoadFunc func(id string) (Product, error)
+
+// PublishFunc は op catalog.publish の関数の型。
+type PublishFunc func(id string) (PublicProduct, error)
+
+// SummarizeFunc は op catalog.summarize の関数の型。
+type SummarizeFunc func(p Product) (Summary, error)
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	Load LoadFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// Load は op catalog.load。
-	Load(ctx context.Context, id string) (Product, error)
+	Load(id string) (Product, error)
 
 	// Publish は op catalog.publish。
-	Publish(ctx context.Context, id string) (PublicProduct, error)
+	Publish(id string) (PublicProduct, error)
 
 	// Summarize は op catalog.summarize。
-	Summarize(ctx context.Context, p Product) (Summary, error)
+	Summarize(p Product) (Summary, error)
 }
 
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
 func New(leaves Leaves) Ops {
 	return &ops{leaves: leaves}
 }
@@ -32,6 +42,9 @@ type ops struct {
 	leaves Leaves
 }
 
-func (o *ops) Load(ctx context.Context, id string) (Product, error) {
-	return o.leaves.Load(ctx, id)
+func (o *ops) Load(id string) (Product, error) {
+	if o.leaves.Load == nil {
+		return Product{}, &runtime.MissingError{Kind: "leaf", Name: "catalog.load"}
+	}
+	return o.leaves.Load(id)
 }

@@ -2,45 +2,57 @@
 
 package hozoc
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// Check は仕様を検査する。ファイルは書き出さない。
-	//
-	// 引数:
-	//   - in: コマンドの入力
-	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
-	Check(ctx context.Context, in CheckInput) (CheckResult, error)
+// CheckFunc は op hozoc.check の関数の型。
+//
+// 仕様を検査する。ファイルは書き出さない。
+//
+// 引数:
+//   - in: コマンドの入力
+//
+// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
+type CheckFunc func(in CheckInput) (CheckResult, error)
 
-	// WriteOutputs は検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
-	//
-	// 引数:
-	//   - in: コマンドの入力
-	//   - checked: 検査の結果
-	//
-	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
-	// Effects: hozoc.syncOutputs
-	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
+// WriteOutputsFunc は op hozoc.writeOutputs の関数の型。
+//
+// 検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
+//
+// 引数:
+//   - in: コマンドの入力
+//   - checked: 検査の結果
+//
+// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+// Effects: hozoc.syncOutputs
+type WriteOutputsFunc func(in EmitInput, checked CheckResult) (EmitResult, error)
 
-	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
-	//
-	// 引数:
-	//   - in: コマンドの入力
-	Lsp(ctx context.Context, in LspInput) error
+// EmitFunc は op hozoc.emit の関数の型。
+//
+// 仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
+//
+// 引数:
+//   - in: コマンドの入力
+//
+// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
+// Effects: hozoc.syncOutputs
+type EmitFunc func(in EmitInput) (EmitResult, error)
 
-	// RunEmit はプラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
-	//
-	// 引数:
-	//   - plugin: 起動するプラグイン
-	//   - req: プラグインへの入力
-	//
-	// Throws: proc.Crashed, proc.MalformedOutput
-	RunEmit(ctx context.Context, plugin Plugin, req EmitRequest) (EmitResponse, error)
+// LspFunc は op hozoc.lsp の関数の型。
+//
+// 言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
+//
+// 引数:
+//   - in: コマンドの入力
+type LspFunc func(in LspInput) error
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	Check CheckFunc
+	Lsp   LspFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// Check は仕様を検査する。ファイルは書き出さない。
 	//
@@ -48,7 +60,7 @@ type Ops interface {
 	//   - in: コマンドの入力
 	//
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
-	Check(ctx context.Context, in CheckInput) (CheckResult, error)
+	Check(in CheckInput) (CheckResult, error)
 
 	// WriteOutputs は検査を通った仕様から、名前空間ごとに既定の出力とプラグインの出力を作り、書き出す。
 	//
@@ -58,7 +70,7 @@ type Ops interface {
 	//
 	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
 	// Effects: hozoc.syncOutputs
-	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
+	WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, error)
 
 	// Emit は仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
 	//
@@ -67,64 +79,43 @@ type Ops interface {
 	//
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 	// Effects: hozoc.syncOutputs
-	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
+	Emit(in EmitInput) (EmitResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
-	Lsp(ctx context.Context, in LspInput) error
-
-	// RunEmit はプラグインを一つ起動して展開させる（docs/plugin-protocol.md「起動」）。
-	//
-	// 引数:
-	//   - plugin: 起動するプラグイン
-	//   - req: プラグインへの入力
-	//
-	// Throws: proc.Crashed, proc.MalformedOutput
-	RunEmit(ctx context.Context, plugin Plugin, req EmitRequest) (EmitResponse, error)
+	Lsp(in LspInput) error
 }
 
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// SourcesIsEmpty は状態 hozoc.sources（list）が空（Empty）か。
-	SourcesIsEmpty(ctx context.Context) (bool, error)
-	// ConfigIsEmpty は状態 hozoc.config（nullable）が空（Empty）か。
-	ConfigIsEmpty(ctx context.Context) (bool, error)
-	// OutputsIsEmpty は状態 hozoc.outputs（list）が空（Empty）か。
-	OutputsIsEmpty(ctx context.Context) (bool, error)
-}
-
-// Classifiers は分類ごとの述語の実装（classify.go の <C>Cases）。
-type Classifiers struct {
-	OutputsSync OutputsSyncCases
-}
-
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves, classifiers Classifiers) Ops {
-	return &ops{leaves: leaves, classifiers: classifiers}
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
+func New(leaves Leaves) Ops {
+	return &ops{leaves: leaves}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
-	leaves      Leaves
-	classifiers Classifiers
+	leaves Leaves
 }
 
-func (o *ops) Check(ctx context.Context, in CheckInput) (CheckResult, error) {
-	return o.leaves.Check(ctx, in)
+func (o *ops) Check(in CheckInput) (CheckResult, error) {
+	if o.leaves.Check == nil {
+		return CheckResult{}, &runtime.MissingError{Kind: "leaf", Name: "hozoc.check"}
+	}
+	return o.leaves.Check(in)
 }
 
-func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error) {
-	return o.leaves.WriteOutputs(ctx, in, checked)
+func (o *ops) WriteOutputs(in EmitInput, checked CheckResult) (EmitResult, error) {
+	if States.OutputsSync.WriteOutputs == nil {
+		return EmitResult{}, &runtime.MissingError{Kind: "state", Name: "hozoc.writeOutputs"}
+	}
+	return States.OutputsSync.WriteOutputs(in, checked)
 }
 
-func (o *ops) Lsp(ctx context.Context, in LspInput) error {
-	return o.leaves.Lsp(ctx, in)
-}
-
-func (o *ops) RunEmit(ctx context.Context, plugin Plugin, req EmitRequest) (EmitResponse, error) {
-	return o.leaves.RunEmit(ctx, plugin, req)
+func (o *ops) Lsp(in LspInput) error {
+	if o.leaves.Lsp == nil {
+		return &runtime.MissingError{Kind: "leaf", Name: "hozoc.lsp"}
+	}
+	return o.leaves.Lsp(in)
 }

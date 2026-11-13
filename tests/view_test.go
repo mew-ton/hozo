@@ -23,7 +23,8 @@ import (
 // viewCorpus は tests/corpus/view（その README.md に見出し → 構文の対応がある）。
 const viewCorpus = "corpus/view"
 
-// entryDecorator はテスト用の起点のデコレータ（tests/corpus/view/t.hozo、plugins/view-dump/hozo-plugin.toml の [emit] entry）。
+// entryDecorator はテスト用の起点のデコレータ（tests/corpus/view/t.hozo）。plugins/view-dump が、このデコレータの付いた op を
+// emit の応答の select の roots に選ぶ（docs/plugin-protocol.md「選択」）。
 const entryDecorator = "t.entry"
 
 // loadViewCorpus はコーパスを internal/project で解析し、web から見た View を返す。error があれば失敗。
@@ -52,9 +53,11 @@ func TestViewFromEntry(t *testing.T) {
 	p, v := loadViewCorpus(t)
 	prog := v.Program
 
-	t.Run("plugin-protocol.md entry/起点の op", func(t *testing.T) {
+	t.Run("plugin-protocol.md 選択/起点の op", func(t *testing.T) {
 		// 起点は viewer の op のうち @t.entry が付いたもの。配線（openUser）と、ignores を持つ void の配線（signOut）
 		expect(t, "@t.entry の付いた op", entryOps(v), []string{"web.openUser", "web.signOut"})
+		// SDK の OpsWith（docs/packages.md「`plugin`（公開）」）も同じものを返す。プラグインはこれで起点を選ぶ
+		expect(t, "plugin.OpsWith", sdk.OpsWith(v, entryDecorator), []string{"web.openUser", "web.signOut"})
 	})
 
 	t.Run("golden", func(t *testing.T) {
@@ -670,7 +673,7 @@ func TestStateCorpusIR(t *testing.T) {
 	})
 }
 
-// TestViewDeliveredToPlugin は、実物の `hozoc emit`（internal/app の Leaves と生成した cli.Main。tests/selfcheck_test.go と同じ組み立て）が
+// TestViewDeliveredToPlugin は、実物の `hozoc emit`（internal/app の App と生成した cli.Main。tests/selfcheck_test.go と同じ組み立て）が
 // view-dump プラグイン（tests/corpus/view/plugins/view-dump。`go run` で動く）に渡す View が、internal/project の Views()["web"] と
 // 同じであることを確かめる。プラグインは受け取った view を <view.config.dir>/view.json に書き出すので、それを読み戻して比べる。
 // コーパスは一時ディレクトリに写してモジュールのルートにする（copyCorpusAsModule）。
@@ -709,6 +712,42 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	expect(t, "view.config.plugins", got.Config.Plugins, []string{"view-dump"})
 	expect(t, "view.namespaces のキー", keysOf(got.Namespaces), []string{"api", "web"})
 	expect(t, "起点の op", entryOps(&got), []string{"web.openUser", "web.signOut"})
+
+	// docs/plugin-protocol.md「選択」: プラグインは emit の応答の select で起点を返し、hozoc はそこから辿った宣言だけを
+	// 既定の出力にする（docs/emit-go.md「出力の対象」）。
+	t.Run("plugin-protocol.md 選択", func(t *testing.T) {
+		m, dir := viewDumpBuilt(t, root)
+		req := sdk.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", View: want}
+		var resp sdk.EmitResponse
+		if err := (hostplugin.Runner{Root: root, Stderr: io.Discard}).Run(m, dir, &req, &resp); err != nil {
+			t.Fatal(err)
+		}
+		expect(t, "select", resp.Select, sdk.Select{Roots: []string{"web.openUser", "web.signOut"}, Stops: []string{}, States: []string{}, Wraps: []sdk.Wrap{}})
+		ops, err := os.ReadFile(filepath.Join(root, "gen", "web", "ops.go"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// 起点の openUser / signOut と、その配線から辿った fetchUser、adminPageVm、userPageVm、clearToken
+		for _, method := range []string{"OpenUser(", "SignOut(", "FetchUser(", "AdminPageVm(", "UserPageVm(", "ClearToken("} {
+			if !strings.Contains(string(ops), "\t"+method) {
+				t.Errorf("gen/web/ops.go の Ops に %s がない", method)
+			}
+		}
+		// 辿られない op（greet、welcome、reload、login）は出力しない。エラーでも warning でもない
+		for _, name := range []string{"GreetFunc", "WelcomeFunc", "ReloadFunc", "LoginFunc"} {
+			if strings.Contains(string(ops), name) {
+				t.Errorf("gen/web/ops.go に、選ばれていない op の %s がある", name)
+			}
+		}
+		// api はテーブルを持つがプラグインがない: 何も出力しない。web は api の型を自分のパッケージに複製する
+		if _, err := os.Stat(filepath.Join(root, "gen", "api")); !os.IsNotExist(err) {
+			t.Errorf("gen/api がある（api にはプラグインがない）")
+		}
+		types, err := os.ReadFile(filepath.Join(root, "gen", "web", "types.go"))
+		if err != nil || strings.Contains(string(types), "gen/api") || !strings.Contains(string(types), "type PublicUser struct {") {
+			t.Errorf("gen/web/types.go が api の型を複製していない: %v", err)
+		}
+	})
 
 	// docs/plugin-protocol.md「要求と応答」: protocol が合わなければ code "protocol"（MAN-2）、direction を実装していなければ
 	// code "unsupported"（MAN-5）で、どちらも終了コード 2。同じプラグインを internal/plugin.Runner で直接起動して確かめる。

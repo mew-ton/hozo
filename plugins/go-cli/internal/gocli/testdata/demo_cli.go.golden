@@ -10,7 +10,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -178,7 +177,7 @@ func runAdd(ops demo.Ops, p Presenter, prog string, args []string, env func(stri
 	if err := in.Validate(); err != nil {
 		return usageError(stderr, prog, "", "invalid input: "+validationMessage(err))
 	}
-	result, err := ops.Add(context.Background(), in)
+	result, err := ops.Add(in)
 	if err != nil {
 		return failAdd(p, prog, in, err, stderr)
 	}
@@ -224,7 +223,7 @@ func runPing(ops demo.Ops, p Presenter, prog string, args []string, env func(str
 		return usageError(stderr, prog, usagePing(prog), fmt.Sprintf("too many arguments: %d given, at most 0 expected", len(pos)))
 	}
 	_, _ = flags, env
-	err = ops.Ping(context.Background())
+	err = ops.Ping()
 	if err != nil {
 		return failPing(p, prog, nil, err, stderr)
 	}

@@ -236,9 +236,10 @@ func (g *generator) command(c *command) {
 	}
 
 	// 実行と表示。
-	call := fmt.Sprintf("ops.%s(context.Background()", c.Method)
+	// 生成した Ops は context を取らない（docs/emit-go.md「実装の単位」）。
+	call := fmt.Sprintf("ops.%s(", c.Method)
 	if m != nil {
-		call += ", in"
+		call += "in"
 	}
 	call += ")"
 	if c.Void {

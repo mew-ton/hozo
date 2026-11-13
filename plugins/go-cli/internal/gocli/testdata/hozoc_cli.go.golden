@@ -10,7 +10,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -143,7 +142,7 @@ func runCheck(ops hozoc.Ops, p Presenter, prog string, args []string, env func(s
 	if err := in.Validate(); err != nil {
 		return usageError(stderr, prog, "", "invalid input: "+validationMessage(err))
 	}
-	result, err := ops.Check(context.Background(), in)
+	result, err := ops.Check(in)
 	if err != nil {
 		return failCheck(p, prog, in, err, stderr)
 	}
@@ -215,7 +214,7 @@ func runEmit(ops hozoc.Ops, p Presenter, prog string, args []string, env func(st
 	if err := in.Validate(); err != nil {
 		return usageError(stderr, prog, "", "invalid input: "+validationMessage(err))
 	}
-	result, err := ops.Emit(context.Background(), in)
+	result, err := ops.Emit(in)
 	if err != nil {
 		return failEmit(p, prog, in, err, stderr)
 	}
@@ -283,7 +282,7 @@ func runLsp(ops hozoc.Ops, p Presenter, prog string, args []string, env func(str
 	if err := in.Validate(); err != nil {
 		return usageError(stderr, prog, "", "invalid input: "+validationMessage(err))
 	}
-	err = ops.Lsp(context.Background(), in)
+	err = ops.Lsp(in)
 	if err != nil {
 		return failLsp(p, prog, in, err, stderr)
 	}

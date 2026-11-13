@@ -4,14 +4,14 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]`、`[api]` と `[web]`（どちらも `language = "go"`。TS の既定の出力は段階 5 までないので CFG-11）。`web` に `plugins = ["view-dump"]` |
-| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。起点のデコレータ。標準の語彙にない名前空間で、`hozo.toml` にテーブルがないので出力しない（`docs/config.md`「出力する名前空間」） |
+| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]`、`[api]` と `[web]`（どちらも `language = "go"`。TS の既定の出力は段階 5 までないので CFG-11）。`web` に `plugins = ["view-dump"]`。`api` にはプラグインがない |
+| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。`view-dump` が起点に選ぶ op の印。標準の語彙にない名前空間で、`hozo.toml` にテーブルがないので出力しない（`docs/config.md`「出力する名前空間」） |
 | `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる |
 | `web.hozo` | ブラウザ側 `namespace web`。`view-dump` の viewer。`@t.entry` の付いた op が起点 |
-| `plugins/view-dump/` | テスト用のプラグイン。`[emit] entry = ["t.entry"]`。受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す |
+| `plugins/view-dump/` | テスト用のプラグイン。受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す。`emit` の応答の `select`（`docs/plugin-protocol.md`「選択」）で、`@t.entry` の付いた op を `roots` に選ぶ |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（下の warning を含む） |
 | `testdata/expected/view.web.json` | `Views()["web"]` の JSON のゴールデン（`tests/view_test.go` の `TestViewFromEntry`） |
-| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン。既定の出力（`gen/api`、`gen/web`）と、プラグインの `gen/web/view.json`（`view.web.json` と同じ内容）。ゴールデンが `testdata` の下にあるのは、Go のツールが `.go` をパッケージとして拾わないため |
+| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン。既定の出力（`gen/web`。起点の `openUser` / `signOut` から辿った宣言だけ）と、プラグインの `gen/web/view.json`（`view.web.json` と同じ内容）。`api` はプラグインがないので何も出力せず（`docs/emit-go.md`「出力の対象」）、`web` は `api` の型を自分のパッケージに複製し、`api` の op を `Deps` の口にする。ゴールデンが `testdata` の下にあるのは、Go のツールが `.go` をパッケージとして拾わないため |
 
 ゴールデンの更新は `go test ./tests -update`。`.hozo` の各ブロックの上の `// docs/...「見出し」` のコメントが、その構文が確かめる文書の見出し。
 
@@ -49,6 +49,7 @@
 | 同 手順 i: `catches ... ignores` | `@ignoreTimeout op signOut` | 例外を除き、`kept` でない効果の succ を `unknown` に |
 | 同 手順 i: `throws`（DEC-10） | `@external decorator remote` を `api.getUser` / `login` / `logout` に | `Program` の `signature` に `Timeout` はなく、`web` から見た `ops` にはある。`api` から見た `View` は `Program` と一致 |
 | `docs/check.md`「bind」 | `bind token to api.*;`、`api.getUser(in: GetUserInput { token: Token?; id })`、`api.logout(token: Token?)`、`api.touch(id)` | Pos が model のフィールドなら `web.getUser$in` を合成して `ref`、引数そのものなら引数を除く、位置のない op はそのまま。`Call.bound` は明示していない位置だけ（BIND-3） |
+| `docs/plugin-protocol.md`「選択」 | `plugins/view-dump` と `@t.entry` | `TestViewFromEntry` と `TestViewDeliveredToPlugin`: プラグインの応答の `select.roots` は `@t.entry` の付いた op（`plugin.OpsWith`）。既定の出力はそこから辿った op だけで、`greet` / `welcome` / `reload` / `login` は出力しない。`gen/api` はできない |
 | `docs/plugin-protocol.md`「要求と応答」 | `plugins/view-dump` | `TestViewDeliveredToPlugin`: 実物の `hozoc emit` がプラグインに渡す `View` が `Views()["web"]` とバイト単位で同じ。`protocol` が違えば `code: "protocol"`（MAN-2）、`import` は `code: "unsupported"`（MAN-5） |
 | `docs/config.md`「名前空間の設定の解決」 | `hozo.toml` | `View.config.dir = "gen/web"`、`namespaces[api].dir = "gen/api"` |
 

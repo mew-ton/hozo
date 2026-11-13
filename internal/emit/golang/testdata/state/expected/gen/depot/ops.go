@@ -2,65 +2,64 @@
 
 package depot
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// Count は op depot.count。
-	Count(ctx context.Context) (int64, error)
+// CountFunc は op depot.count の関数の型。
+type CountFunc func() (int64, error)
 
-	// Order は op depot.order。
-	//
-	// Effects: depot.restock
-	Order(ctx context.Context) error
+// OrderFunc は op depot.order の関数の型。
+//
+// Effects: depot.restock
+type OrderFunc func() error
+
+// ReportFunc は op depot.report の関数の型。
+//
+// Effects: depot.restock
+type ReportFunc func() (int64, error)
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	Count CountFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// Count は op depot.count。
-	Count(ctx context.Context) (int64, error)
+	Count() (int64, error)
 
 	// Order は op depot.order。
 	//
 	// Effects: depot.restock
-	Order(ctx context.Context) error
+	Order() error
 
 	// Report は op depot.report。
 	//
 	// Effects: depot.restock
-	Report(ctx context.Context) (int64, error)
+	Report() (int64, error)
 }
 
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// ItemsIsEmpty は状態 depot.items（list）が空（Empty）か。
-	ItemsIsEmpty(ctx context.Context) (bool, error)
-	// LockIsEmpty は状態 depot.lock（nullable）が空（Empty）か。
-	LockIsEmpty(ctx context.Context) (bool, error)
-}
-
-// Classifiers は分類ごとの述語の実装（classify.go の <C>Cases）。
-type Classifiers struct {
-	Level LevelCases
-}
-
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves, classifiers Classifiers) Ops {
-	return &ops{leaves: leaves, classifiers: classifiers}
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
+func New(leaves Leaves) Ops {
+	return &ops{leaves: leaves}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
-	leaves      Leaves
-	classifiers Classifiers
+	leaves Leaves
 }
 
-func (o *ops) Count(ctx context.Context) (int64, error) {
-	return o.leaves.Count(ctx)
+func (o *ops) Count() (int64, error) {
+	if o.leaves.Count == nil {
+		return 0, &runtime.MissingError{Kind: "leaf", Name: "depot.count"}
+	}
+	return o.leaves.Count()
 }
 
-func (o *ops) Order(ctx context.Context) error {
-	return o.leaves.Order(ctx)
+func (o *ops) Order() error {
+	if States.Items.Order == nil {
+		return &runtime.MissingError{Kind: "state", Name: "depot.order"}
+	}
+	return States.Items.Order()
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -30,6 +31,7 @@ func TestProtocolRun(t *testing.T) {
 		Files    []plugin.File       `json:"files"`
 		Warnings []plugin.Warning    `json:"warnings"`
 		Errors   []plugin.Diagnostic `json:"errors"`
+		Select   *plugin.Select      `json:"select"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, out.String())
@@ -46,6 +48,15 @@ func TestProtocolRun(t *testing.T) {
 	}
 	if resp.Files[0].Content != string(golden) {
 		t.Errorf("content differs from golden")
+	}
+	// docs/plugin-go-cli.md「マニフェスト」の「選ぶもの」: roots は @cli.command の op、stops は @proc.stdio の op。
+	// states と wraps は空（[] で書く）
+	want := plugin.Select{Roots: []string{"hozoc.check", "hozoc.emit", "hozoc.lsp"}, Stops: []string{"hozoc.runEmit"}, States: []string{}, Wraps: []plugin.Wrap{}}
+	if resp.Select == nil || !reflect.DeepEqual(*resp.Select, want) {
+		t.Errorf("select = %+v, want %+v", resp.Select, want)
+	}
+	if !strings.Contains(out.String(), `"select":{"roots":["hozoc.check","hozoc.emit","hozoc.lsp"],"stops":["hozoc.runEmit"],"states":[],"wraps":[]}`) {
+		t.Errorf("select の JSON が違う: %s", out.String()[len(out.String())-200:])
 	}
 }
 
@@ -112,13 +123,15 @@ func TestManifest(t *testing.T) {
 		"language": regexp.MustCompile(`(?m)^language\s*=\s*"go"$`),
 		"protocol": regexp.MustCompile(`(?m)^protocol\s*=\s*"` + regexp.QuoteMeta(ir.Version) + `"$`),
 		"emit":     regexp.MustCompile(`(?m)^\[emit\]$`),
-		"entry":    regexp.MustCompile(`(?m)^entry\s*=\s*\["cli.command"\]$`),
-		"stop":     regexp.MustCompile(`(?m)^stop\s*=\s*\["proc.stdio"\]$`),
 	}
 	for name, re := range checks {
 		if !re.MatchString(s) {
 			t.Errorf("manifest lacks %s:\n%s", name, s)
 		}
+	}
+	// 何を選ぶかはマニフェストには書かない（docs/plugin-protocol.md「マニフェスト」）。書けば知らないキー（MAN-4）
+	if regexp.MustCompile(`(?m)^(entry|stop|decorate)\s*=`).MatchString(s) {
+		t.Errorf("manifest must not have entry / stop / decorate:\n%s", s)
 	}
 	if !strings.Contains(s, `vocabulary = ["cli.hozo"]`) {
 		t.Error("manifest must provide the cli vocabulary (docs/plugin-go-cli.md「マニフェスト」)")

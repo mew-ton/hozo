@@ -1,0 +1,5 @@
+{
+  "roots": ["http.get", "http.post", "page.route", "page.interaction"],
+  "stops": ["page.dialog"],
+  "states": ["db"]
+}

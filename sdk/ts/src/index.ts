@@ -13,7 +13,9 @@ import {
   type ImportRequest,
   type ImportResponse,
   type PluginError,
+  type Select,
 } from "./protocol.js";
+import type { View } from "./ir.js";
 
 export * from "./ir.js";
 export * from "./protocol.js";
@@ -77,6 +79,13 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
         const r = (await handler.emit(head as EmitRequest)) ?? ({} as Partial<EmitResponse>);
         const out: EmitResponse = { files: r.files ?? [], warnings: r.warnings ?? [] };
         if (r.errors && r.errors.length > 0) out.errors = r.errors;
+        // select は常に四つの列を持つ形で書く（空でも []。docs/plugin-protocol.md「emit」の例）。
+        out.select = {
+          roots: r.select?.roots ?? [],
+          stops: r.select?.stops ?? [],
+          states: r.select?.states ?? [],
+          wraps: r.select?.wraps ?? [],
+        } satisfies Select;
         resp = out;
         break;
       }
@@ -105,6 +114,21 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
     return fail(stderr, `write response: ${message(err)}`);
   }
   return 0;
+}
+
+/**
+ * view.viewer の名前空間の op のうち、デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。
+ * 名前付きデコレータを通して付いたもの（Application の via）も数える。デコレータで起点を選ぶプラグインのための道具
+ * （docs/plugin-protocol.md「選択」。Go の plugin.OpsWith と同じ）。
+ */
+export function opsWith(view: View, decorator: string): string[] {
+  const out: string[] = [];
+  const ns = view.program.namespaces.find((n) => n.name === view.viewer);
+  for (const decl of ns?.decls ?? []) {
+    if (decl.kind !== "op") continue;
+    if (decl.decorators.some((a) => a.decorator === decorator || a.via === decorator)) out.push(decl.name);
+  }
+  return out;
 }
 
 function refuse(stdout: Sink, stderr: Sink, code: PluginError["error"]["code"], msg: string): number {

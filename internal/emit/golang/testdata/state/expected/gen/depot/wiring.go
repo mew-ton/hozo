@@ -2,24 +2,22 @@
 
 package depot
 
-import "context"
-
 // Report は op depot.report。
 //
 // Effects: depot.restock
-func (o *ops) Report(ctx context.Context) (int64, error) {
-	kind, err := ClassifyLevel(ctx, o.classifiers.Level)
+func (o *ops) Report() (int64, error) {
+	kind, err := ClassifyLevel()
 	if err != nil {
 		return 0, err
 	}
 	switch kind {
 	case LevelLow:
-		err = o.Order(ctx)
+		err = o.Order()
 	case LevelHigh:
 	case LevelDefault:
 	}
 	if err != nil {
 		return 0, err
 	}
-	return o.Count(ctx)
+	return o.Count()
 }

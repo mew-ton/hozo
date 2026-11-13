@@ -2,21 +2,19 @@
 //
 // 骨組みは cli.hozo から生成したもの（docs/requirements.md「自己展開」の 3）: 名前空間 hozoc の Go の既定の出力
 // internal/gen/hozoc（docs/emit-go.md）と、go-cli が出した internal/gen/hozoc/cli（docs/plugin-go-cli.md「出力」）。
-// ここは internal/app の葉の op の実装（hozoc.Leaves）と表示（cli.Presenter）を組み立てて cli.Main を呼ぶだけ
-// （docs/cli.md「手で書くもの」）。骨組みを変えるときは cli.hozo を変えて `make generate`。
+// ここは internal/app の葉の op の実装（hozoc.Leaves と hozoc.States のフィールド）を入れて hozoc.New で Ops にし
+// （app.App の Ops）、表示（cli.Presenter）と一緒に cli.Main に渡すだけ（docs/cli.md「手で書くもの」）。
+// 骨組みを変えるときは cli.hozo を変えて `make generate`。
 package main
 
 import (
 	"os"
 
 	"github.com/mew-ton/hozo/internal/app"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 )
 
 func main() {
-	// Classifiers（分類 OutputsSync の述語）は、どの配線も `match by OutputsSync` をしないので呼ばれない。零値のまま渡す。
-	// 述語 UpToDate の実装は、Go の既定の出力を docs/emit-go.md「実装の単位」の形（hozoc.States）にするときに足す。
-	ops := hozoc.New(&app.Leaves{Stderr: os.Stderr}, hozoc.Classifiers{})
-	os.Exit(cli.Main(ops, app.Presenter{}, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
+	a := &app.App{Stderr: os.Stderr}
+	os.Exit(cli.Main(a.Ops(), app.Presenter{}, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
 }

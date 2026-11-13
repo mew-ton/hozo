@@ -5,5 +5,4 @@ language = "go"
 protocol = "0.1"
 
 [emit]
-decorate    = ["a.wrap"]
 unsupported = ["a.legacy"]

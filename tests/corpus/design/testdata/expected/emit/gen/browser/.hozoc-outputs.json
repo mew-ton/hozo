@@ -1,6 +1,7 @@
 [
   "gen/browser/classify.go",
   "gen/browser/ops.go",
+  "gen/browser/states.go",
   "gen/browser/types.go",
   "gen/browser/validate.go",
   "gen/browser/wiring.go"

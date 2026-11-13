@@ -29,26 +29,6 @@ func (v OutputFormat) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は hozoc.SourceFile の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m SourceFile) Validate() error {
-	var violations []runtime.Violation
-	violations = appendViolations(violations, "path", m.Path.Validate())
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は hozoc.OutputFile の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m OutputFile) Validate() error {
-	var violations []runtime.Violation
-	violations = appendViolations(violations, "path", m.Path.Validate())
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
 // Validate は hozoc.Position の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m Position) Validate() error {
 	return nil
@@ -176,60 +156,6 @@ func (m LspInput) Validate() error {
 	if m.Log != nil {
 		x0 := *m.Log
 		violations = appendViolations(violations, "log", x0.Validate())
-	}
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は hozoc.Plugin の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m Plugin) Validate() error {
-	var violations []runtime.Violation
-	violations = appendViolations(violations, "dir", m.Dir.Validate())
-	violations = appendViolations(violations, "root", m.Root.Validate())
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は hozoc.View の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m View) Validate() error {
-	return nil
-}
-
-// Validate は hozoc.EmitRequest の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m EmitRequest) Validate() error {
-	var violations []runtime.Violation
-	violations = appendViolations(violations, "view", m.View.Validate())
-	if len(violations) == 0 {
-		return nil
-	}
-	return &runtime.ValidationError{Violations: violations}
-}
-
-// Validate は hozoc.PluginWarning の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m PluginWarning) Validate() error {
-	return nil
-}
-
-// Validate は hozoc.PluginError の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m PluginError) Validate() error {
-	return nil
-}
-
-// Validate は hozoc.EmitResponse の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m EmitResponse) Validate() error {
-	var violations []runtime.Violation
-	for i0, x0 := range m.Files {
-		violations = appendViolations(violations, "files["+strconv.Itoa(i0)+"]", x0.Validate())
-	}
-	for i0, x0 := range m.Warnings {
-		violations = appendViolations(violations, "warnings["+strconv.Itoa(i0)+"]", x0.Validate())
-	}
-	for i0, x0 := range m.Errors {
-		violations = appendViolations(violations, "errors["+strconv.Itoa(i0)+"]", x0.Validate())
 	}
 	if len(violations) == 0 {
 		return nil

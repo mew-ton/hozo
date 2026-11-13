@@ -2,6 +2,7 @@
   "gen/shop/classify.go",
   "gen/shop/doc.go",
   "gen/shop/ops.go",
+  "gen/shop/states.go",
   "gen/shop/types.go",
   "gen/shop/validate.go",
   "gen/shop/wiring.go"

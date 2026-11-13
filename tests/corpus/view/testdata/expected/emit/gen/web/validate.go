@@ -8,6 +8,16 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
+// Validate は api.UserId の制約を確かめる。違反がなければ nil。
+func (v UserId) Validate() error {
+	return nil
+}
+
+// Validate は api.Token の制約を確かめる。違反がなければ nil。
+func (v Token) Validate() error {
+	return nil
+}
+
 // Validate は web.Unavailable の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m Unavailable) Validate() error {
 	return nil
@@ -33,13 +43,18 @@ func (m Query) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は web.LoginForm の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m LoginForm) Validate() error {
-	return nil
-}
-
 // Validate は web.getUser$in の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m GetUserInInput) Validate() error {
+	var violations []runtime.Violation
+	violations = appendViolations(violations, "id", m.Id.Validate())
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+
+// Validate は api.PublicUser の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m PublicUser) Validate() error {
 	var violations []runtime.Violation
 	violations = appendViolations(violations, "id", m.Id.Validate())
 	if len(violations) == 0 {

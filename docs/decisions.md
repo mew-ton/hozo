@@ -39,7 +39,7 @@
 | 28 | 出力の対象はプラグインが `emit` の応答の `select` で返す。マニフェストの `decorate` / `entry` / `stop` は持たない。包む関数を生成するのは `wraps` で引き受けたデコレータの適用だけ | `docs/plugin-protocol.md`「選択」、`docs/emit-go.md`「出力の対象」「デコレータ」 |
 | 29 | 絞り込まれた型（`C.Case<T>`）は Go では `T` に消す | `docs/emit-go.md`「型」 |
 | 30 | 生成したコードは `github.com/mew-ton/hozo/runtime` を import する | `docs/emit-go.md`「runtime パッケージ」 |
-| 31 | 同じプロジェクトの Go の名前空間どうしは import し、別の言語の型は複製する | `docs/emit-go.md`「配置」 |
+| 31 | 同じプロジェクトの Go の名前空間どうしは、相手の出力が持つ型を import する。別の言語の型と、相手の出力にない型は複製する | `docs/emit-go.md`「配置」 |
 | 32 | Go の識別子は先頭だけ大文字にする | `docs/emit-go.md`「名前」 |
 | 33 | 別の名前空間への呼び出しの `bind` の位置は `Deps` の実装者が埋める | `docs/emit-go.md`「op」 |
 | 34 | `go-cli` の `Main` は `package main` ではなく、`Presenter` で表示を差し替えられる。`proc.stdio` は `stop` | `docs/plugin-go-cli.md`「マニフェスト」「出力」 |

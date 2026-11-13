@@ -18,6 +18,10 @@ const (
 	decExitCode = "cli.exitCode"
 )
 
+// decStdio は標準の語彙 proc のデコレータ（vocab/proc.hozo）。プロセスの境界を越える op の印で、選択の stops にする
+// （docs/plugin-go-cli.md「マニフェスト」）。
+const decStdio = "proc.stdio"
+
 // defaultExitCode は @cli.exitCode のない例外と、宣言にない例外の終了コード（docs/plugin-go-cli.md「実行と表示」）。
 const defaultExitCode = 70
 
@@ -166,7 +170,7 @@ func analyze(view *ir.View, nsImportPath string) (*program, error) {
 // stdImports は生成するファイルが常に使う標準ライブラリ。名前空間のパッケージより先に登録し、
 // 名前が衝突すれば名前空間の側に別名が付くようにする。
 var stdImports = []string{
-	"context", "encoding/json", "errors", "fmt", "io", "os", "path/filepath", "strconv", "strings",
+	"encoding/json", "errors", "fmt", "io", "os", "path/filepath", "strconv", "strings",
 	"github.com/mew-ton/hozo/runtime",
 }
 

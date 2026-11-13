@@ -32,7 +32,11 @@ type WarrantyKindCases interface {
 
 // ClassifyWarrantyKind は browser.WarrantyKind を分類する。すべての述語を評価し、真になった数を数える。
 // 真がちょうど一つでなければ *runtime.ClassificationError。
+// c が nil（Classifiers に入れていない）なら *runtime.MissingError。
 func ClassifyWarrantyKind(c WarrantyKindCases, v server.Item) (WarrantyKind, error) {
+	if c == nil {
+		return 0, &runtime.MissingError{Kind: "classifier", Name: "browser.WarrantyKind"}
+	}
 	var hits []string
 	var result WarrantyKind
 	if c.Standard(v) {
@@ -49,70 +53,6 @@ func ClassifyWarrantyKind(c WarrantyKindCases, v server.Item) (WarrantyKind, err
 	}
 	if len(hits) != 1 {
 		return 0, &runtime.ClassificationError{Classify: "browser.WarrantyKind", Hits: hits}
-	}
-	return result, nil
-}
-
-// CampaignKind は商品が対象のキャンペーン
-type CampaignKind int
-
-const (
-	CampaignKindSpring CampaignKind = iota
-	CampaignKindSummer
-	// キャンペーンの対象外
-	CampaignKindDefault
-)
-
-// CampaignKindCases は人が実装するケースごとの述語（設計書 §10.3）。
-type CampaignKindCases interface {
-	Spring(v server.Item) bool
-	Summer(v server.Item) bool
-}
-
-// ClassifyCampaignKind は browser.CampaignKind を分類する。すべての述語を評価し、真になった数を数える。
-// 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
-func ClassifyCampaignKind(c CampaignKindCases, v server.Item) (CampaignKind, error) {
-	var hits []string
-	result := CampaignKindDefault
-	if c.Spring(v) {
-		hits = append(hits, "Spring")
-		result = CampaignKindSpring
-	}
-	if c.Summer(v) {
-		hits = append(hits, "Summer")
-		result = CampaignKindSummer
-	}
-	if len(hits) > 1 {
-		return 0, &runtime.ClassificationError{Classify: "browser.CampaignKind", Hits: hits}
-	}
-	return result, nil
-}
-
-// WarrantyAvailable は二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; default; } と同じ
-type WarrantyAvailable int
-
-const (
-	WarrantyAvailableWarrantyAvailable WarrantyAvailable = iota
-	// どのケースにも当たらないとき。
-	WarrantyAvailableDefault
-)
-
-// WarrantyAvailableCases は人が実装するケースごとの述語（設計書 §10.3）。
-type WarrantyAvailableCases interface {
-	WarrantyAvailable(v server.Item) bool
-}
-
-// ClassifyWarrantyAvailable は browser.WarrantyAvailable を分類する。すべての述語を評価し、真になった数を数える。
-// 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
-func ClassifyWarrantyAvailable(c WarrantyAvailableCases, v server.Item) (WarrantyAvailable, error) {
-	var hits []string
-	result := WarrantyAvailableDefault
-	if c.WarrantyAvailable(v) {
-		hits = append(hits, "WarrantyAvailable")
-		result = WarrantyAvailableWarrantyAvailable
-	}
-	if len(hits) > 1 {
-		return 0, &runtime.ClassificationError{Classify: "browser.WarrantyAvailable", Hits: hits}
 	}
 	return result, nil
 }

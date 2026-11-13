@@ -35,7 +35,7 @@ func SearchDirs(cfg *config.Config, name string) []string {
 
 // Discover は name のプラグインのマニフェストを探して読む（docs/plugin-protocol.md「探索」）。
 // 返すのはマニフェストと、そのディレクトリ（絶対パス）。見つからなければ CFG-9。マニフェストの name が name と
-// 違えば MAN-3。読み込みの診断は LoadManifest（MAN-1 / MAN-2 / MAN-4）。error があればマニフェストは nil。
+// 違えば MAN-3。読み込みの診断は LoadManifest（MAN-2 / MAN-4）。error があればマニフェストは nil。
 func Discover(cfg *config.Config, name string) (*Manifest, string, []diag.Diagnostic) {
 	if name == "" || strings.ContainsAny(name, `/\`) || name == "." || name == ".." {
 		return nil, "", []diag.Diagnostic{{Severity: diag.Error, Code: "CFG-9", Message: fmt.Sprintf("プラグインの名前 %q が不正", name), File: cfg.Path}}

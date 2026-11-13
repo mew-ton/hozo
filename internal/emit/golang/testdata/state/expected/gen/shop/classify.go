@@ -2,12 +2,6 @@
 
 package shop
 
-import (
-	"context"
-
-	"github.com/mew-ton/hozo/runtime"
-)
-
 // Checkout は買い物の進み具合
 type Checkout int
 
@@ -18,47 +12,6 @@ const (
 	CheckoutOrdered
 )
 
-// CheckoutCases は人が実装するケースごとの述語（設計書 §10.3）。値を取らず、保存先に問い合わせて
-// 状態 shop.carts, shop.orders がそのケースの場合かを答える。
-type CheckoutCases interface {
-	// カートに入れている途中
-	Shopping(ctx context.Context) (bool, error)
-	// 注文を出した
-	Ordered(ctx context.Context) (bool, error)
-}
-
-// ClassifyCheckout は状態 shop.carts, shop.orders の場合を shop.Checkout で分類する。すべての述語を評価し、真になった数を数える。
-// 述語がエラーを返したら、（残りも評価したうえで）最初のエラーを返す。
-// 真がちょうど一つでなければ *runtime.ClassificationError。
-func ClassifyCheckout(ctx context.Context, c CheckoutCases) (Checkout, error) {
-	var hits []string
-	var result Checkout
-	var firstErr error
-	if ok, err := c.Shopping(ctx); err != nil {
-		if firstErr == nil {
-			firstErr = err
-		}
-	} else if ok {
-		hits = append(hits, "Shopping")
-		result = CheckoutShopping
-	}
-	if ok, err := c.Ordered(ctx); err != nil {
-		if firstErr == nil {
-			firstErr = err
-		}
-	} else if ok {
-		hits = append(hits, "Ordered")
-		result = CheckoutOrdered
-	}
-	if firstErr != nil {
-		return 0, firstErr
-	}
-	if len(hits) != 1 {
-		return 0, &runtime.ClassificationError{Classify: "shop.Checkout", Hits: hits}
-	}
-	return result, nil
-}
-
 // LoggedIn はログインしている
 type LoggedIn int
 
@@ -67,66 +20,3 @@ const (
 	// どのケースにも当たらないとき。
 	LoggedInDefault
 )
-
-// LoggedInCases は人が実装するケースごとの述語（設計書 §10.3）。値を取らず、保存先に問い合わせて
-// 状態 shop.token がそのケースの場合かを答える。
-type LoggedInCases interface {
-	LoggedIn(ctx context.Context) (bool, error)
-}
-
-// ClassifyLoggedIn は状態 shop.token の場合を shop.LoggedIn で分類する。すべての述語を評価し、真になった数を数える。
-// 述語がエラーを返したら、（残りも評価したうえで）最初のエラーを返す。
-// 真が二つ以上なら *runtime.ClassificationError、一つもなければ default。
-func ClassifyLoggedIn(ctx context.Context, c LoggedInCases) (LoggedIn, error) {
-	var hits []string
-	result := LoggedInDefault
-	var firstErr error
-	if ok, err := c.LoggedIn(ctx); err != nil {
-		if firstErr == nil {
-			firstErr = err
-		}
-	} else if ok {
-		hits = append(hits, "LoggedIn")
-		result = LoggedInLoggedIn
-	}
-	if firstErr != nil {
-		return 0, firstErr
-	}
-	if len(hits) > 1 {
-		return 0, &runtime.ClassificationError{Classify: "shop.LoggedIn", Hits: hits}
-	}
-	return result, nil
-}
-
-// LineKind は classify shop.LineKind のケース。
-type LineKind int
-
-const (
-	LineKindSingle LineKind = iota
-	LineKindBulk
-)
-
-// LineKindCases は人が実装するケースごとの述語（設計書 §10.3）。
-type LineKindCases interface {
-	Single(v Line) bool
-	Bulk(v Line) bool
-}
-
-// ClassifyLineKind は shop.LineKind を分類する。すべての述語を評価し、真になった数を数える。
-// 真がちょうど一つでなければ *runtime.ClassificationError。
-func ClassifyLineKind(c LineKindCases, v Line) (LineKind, error) {
-	var hits []string
-	var result LineKind
-	if c.Single(v) {
-		hits = append(hits, "Single")
-		result = LineKindSingle
-	}
-	if c.Bulk(v) {
-		hits = append(hits, "Bulk")
-		result = LineKindBulk
-	}
-	if len(hits) != 1 {
-		return 0, &runtime.ClassificationError{Classify: "shop.LineKind", Hits: hits}
-	}
-	return result, nil
-}

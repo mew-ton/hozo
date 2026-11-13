@@ -21,9 +21,6 @@ protocol = "0.1"
 vocabulary = ["vocab/page.hozo"]
 
 [emit]
-decorate    = []
-entry       = ["page.route", "page.interaction"]
-stop        = ["http.*"]
 unsupported = []
 
 [check]
@@ -41,8 +38,6 @@ language = "go"
 protocol = "0.1"
 
 [emit]
-entry = ["cli.command"]
-stop  = ["proc.stdio"]
 `
 
 func writeManifest(t *testing.T, dir, content string) string {
@@ -75,7 +70,7 @@ func TestLoadManifestExample(t *testing.T) {
 	want := &Manifest{
 		Name: "react-router", Command: []string{"node", "dist/main.js"}, Language: "ts", Protocol: "0.1",
 		Vocabulary: []string{"vocab/page.hozo"},
-		Emit:       &Emit{Decorate: []string{}, Entry: []string{"page.route", "page.interaction"}, Stop: []string{"http.*"}, Unsupported: []string{}},
+		Emit:       &Emit{Unsupported: []string{}},
 		Check:      Check{Enabled: true},
 		Import:     Import{Formats: []string{}},
 	}
@@ -95,7 +90,7 @@ func TestLoadManifestGoCLI(t *testing.T) {
 	if m.Name != "go-cli" || !reflect.DeepEqual(m.Command, []string{"go", "run", "github.com/mew-ton/hozo/plugins/go-cli"}) {
 		t.Errorf("%+v", m)
 	}
-	if !reflect.DeepEqual(m.Emit, &Emit{Decorate: []string{}, Entry: []string{"cli.command"}, Stop: []string{"proc.stdio"}, Unsupported: []string{}}) {
+	if !reflect.DeepEqual(m.Emit, &Emit{Unsupported: []string{}}) {
 		t.Errorf("emit = %+v", m.Emit)
 	}
 	if m.Check.Enabled || len(m.Vocabulary) != 0 || m.Vocabulary == nil || m.HasImport() {
@@ -110,7 +105,7 @@ func TestLoadManifestStringCommand(t *testing.T) {
 	}
 }
 
-// docs/plugin-protocol.md「診断」の MAN-1 / MAN-2 / MAN-4。
+// docs/plugin-protocol.md「診断」の MAN-2 / MAN-4。
 func TestLoadManifestDiagnostics(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -120,19 +115,23 @@ func TestLoadManifestDiagnostics(t *testing.T) {
 	}{
 		{"bad toml", "name = \n", []string{"MAN-4"}, true},
 		{"unknown key", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\nfoo = 1\n", []string{"MAN-4"}, true},
-		{"unknown emit key", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nentry = [\"a\"]\nfoo = 1\n", []string{"MAN-4"}, true},
+		{"unknown emit key", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nunsupported = [\"a\"]\nfoo = 1\n", []string{"MAN-4"}, true},
 		{"unknown table", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[extra]\na = 1\n", []string{"MAN-4"}, true},
 		{"no command", "name = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n", []string{"MAN-4"}, true},
 		{"empty string command", "name = \"x\"\ncommand = \"\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n", []string{"MAN-4"}, true},
 		{"empty array command", "name = \"x\"\ncommand = []\nlanguage = \"go\"\nprotocol = \"0.1\"\n", []string{"MAN-4"}, true},
 		{"command wrong type", "name = \"x\"\ncommand = 1\nlanguage = \"go\"\nprotocol = \"0.1\"\n", []string{"MAN-4"}, true},
 		{"no name", "command = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n", []string{"MAN-4"}, true},
-		{"entry wrong type", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nentry = \"a\"\n", []string{"MAN-4"}, true},
-		{"MAN-1 empty emit", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nstop = [\"http.*\"]\n", []string{"MAN-1"}, false},
-		{"MAN-1 explicit empty", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nentry = []\ndecorate = []\n", []string{"MAN-1"}, false},
+		{"unsupported wrong type", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nunsupported = \"a\"\n", []string{"MAN-4"}, true},
+		// 設計書 §4.6 の decorate / entry / stop は持たない（docs/plugin-protocol.md「選択」）。書いてあれば知らないキー
+		{"entry is unknown", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nentry = [\"cli.command\"]\n", []string{"MAN-4"}, true},
+		{"stop is unknown", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\nstop = [\"http.*\"]\n", []string{"MAN-4"}, true},
+		{"decorate is unknown", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\ndecorate = []\n", []string{"MAN-4"}, true},
+		// [emit] は空でもよい（何を選ぶかは応答の select）
+		{"empty emit", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.1\"\n[emit]\n", nil, false},
 		{"MAN-2", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"0.2\"\n", []string{"MAN-2"}, false},
 		{"MAN-2 missing protocol", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\n", []string{"MAN-2"}, false},
-		{"MAN-1 and MAN-2", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"9\"\n[emit]\n", []string{"MAN-1", "MAN-2"}, false},
+		{"MAN-2 with emit", "name = \"x\"\ncommand = \"x\"\nlanguage = \"go\"\nprotocol = \"9\"\n[emit]\n", []string{"MAN-2"}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

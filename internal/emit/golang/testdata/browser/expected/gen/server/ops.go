@@ -2,39 +2,58 @@
 
 package server
 
-import "context"
+import "github.com/mew-ton/hozo/runtime"
 
-// Leaves は人が実装する葉の op。
-type Leaves interface {
-	// Login はログインする。
-	//
-	// 引数:
-	//   - in: メールアドレスとパスワード
-	//
-	// Throws: server.InvalidCredentials
-	// Effects: server.createSession
-	Login(ctx context.Context, in LoginInput) (LoginOk, error)
+// LoginFunc は op server.login の関数の型。
+//
+// ログインする。
+//
+// 引数:
+//   - in: メールアドレスとパスワード
+//
+// Throws: server.InvalidCredentials
+// Effects: server.createSession
+type LoginFunc func(in LoginInput) (LoginOk, error)
 
-	// GetMe は自分の情報。
-	//
-	// Throws: server.Unauthorized
-	GetMe(ctx context.Context, in GetMeInput) (User, error)
+// GetMeFunc は op server.getMe の関数の型。
+//
+// 自分の情報。
+//
+// Throws: server.Unauthorized
+type GetMeFunc func(in GetMeInput) (User, error)
 
-	// ListOrders は op server.listOrders。
-	//
-	// Throws: server.Unauthorized
-	ListOrders(ctx context.Context, token Token, query OrdersQuery) ([]OrderRow, error)
+// ListOrdersFunc は op server.listOrders の関数の型。
+//
+// Throws: server.Unauthorized
+type ListOrdersFunc func(token Token, query OrdersQuery) ([]OrderRow, error)
 
-	// Logout は op server.logout。
-	//
-	// Effects: server.deleteSession
-	Logout(ctx context.Context, token Token) error
+// LogoutFunc は op server.logout の関数の型。
+//
+// Effects: server.deleteSession
+type LogoutFunc func(token Token) error
 
-	// OrderPage は注文ページの VM。
-	OrderPage(ctx context.Context, me User, orders []OrderRow) (OrderPage, error)
+// OrderPageFunc は op server.orderPage の関数の型。
+//
+// 注文ページの VM。
+type OrderPageFunc func(me User, orders []OrderRow) (OrderPage, error)
+
+// PublicUserFunc は op server.publicUser の関数の型。
+//
+// 公開する情報だけを取る。
+//
+// Throws: server.ClientError
+type PublicUserFunc func(id UserId) (PublicUser, error)
+
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める。
+// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
+type Leaves struct {
+	GetMe      GetMeFunc
+	ListOrders ListOrdersFunc
+	OrderPage  OrderPageFunc
+	PublicUser PublicUserFunc
 }
 
-// Ops は呼び出す側が使う、この名前空間のすべての op。New が返す。
+// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// Login はログインする。
 	//
@@ -43,36 +62,34 @@ type Ops interface {
 	//
 	// Throws: server.InvalidCredentials
 	// Effects: server.createSession
-	Login(ctx context.Context, in LoginInput) (LoginOk, error)
+	Login(in LoginInput) (LoginOk, error)
 
 	// GetMe は自分の情報。
 	//
 	// Throws: server.Unauthorized
-	GetMe(ctx context.Context, in GetMeInput) (User, error)
+	GetMe(in GetMeInput) (User, error)
 
 	// ListOrders は op server.listOrders。
 	//
 	// Throws: server.Unauthorized
-	ListOrders(ctx context.Context, token Token, query OrdersQuery) ([]OrderRow, error)
+	ListOrders(token Token, query OrdersQuery) ([]OrderRow, error)
 
 	// Logout は op server.logout。
 	//
 	// Effects: server.deleteSession
-	Logout(ctx context.Context, token Token) error
+	Logout(token Token) error
 
 	// OrderPage は注文ページの VM。
-	OrderPage(ctx context.Context, me User, orders []OrderRow) (OrderPage, error)
+	OrderPage(me User, orders []OrderRow) (OrderPage, error)
+
+	// PublicUser は公開する情報だけを取る。
+	//
+	// Throws: server.ClientError
+	PublicUser(id UserId) (PublicUser, error)
 }
 
-// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
-// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
-// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
-type StateCases interface {
-	// SessionsIsEmpty は状態 server.sessions（list）が空（Empty）か。
-	SessionsIsEmpty(ctx context.Context) (bool, error)
-}
-
-// New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
+// New はこの名前空間の Ops を組み立てる。効果を持たない葉は leaves に、効果を持つ葉は States（states.go）の命令に、
+// 配線は生成した本体に委ね、包む関数で内側から順に包む。
 func New(leaves Leaves) Ops {
 	return &ops{leaves: leaves}
 }
@@ -82,22 +99,44 @@ type ops struct {
 	leaves Leaves
 }
 
-func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
-	return o.leaves.Login(ctx, in)
+func (o *ops) Login(in LoginInput) (LoginOk, error) {
+	if States.Sessions.Login == nil {
+		return LoginOk{}, &runtime.MissingError{Kind: "state", Name: "server.login"}
+	}
+	return States.Sessions.Login(in)
 }
 
-func (o *ops) GetMe(ctx context.Context, in GetMeInput) (User, error) {
-	return o.leaves.GetMe(ctx, in)
+func (o *ops) GetMe(in GetMeInput) (User, error) {
+	if o.leaves.GetMe == nil {
+		return User{}, &runtime.MissingError{Kind: "leaf", Name: "server.getMe"}
+	}
+	return o.leaves.GetMe(in)
 }
 
-func (o *ops) ListOrders(ctx context.Context, token Token, query OrdersQuery) ([]OrderRow, error) {
-	return o.leaves.ListOrders(ctx, token, query)
+func (o *ops) ListOrders(token Token, query OrdersQuery) ([]OrderRow, error) {
+	if o.leaves.ListOrders == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "server.listOrders"}
+	}
+	return o.leaves.ListOrders(token, query)
 }
 
-func (o *ops) Logout(ctx context.Context, token Token) error {
-	return o.leaves.Logout(ctx, token)
+func (o *ops) Logout(token Token) error {
+	if States.Sessions.Logout == nil {
+		return &runtime.MissingError{Kind: "state", Name: "server.logout"}
+	}
+	return States.Sessions.Logout(token)
 }
 
-func (o *ops) OrderPage(ctx context.Context, me User, orders []OrderRow) (OrderPage, error) {
-	return o.leaves.OrderPage(ctx, me, orders)
+func (o *ops) OrderPage(me User, orders []OrderRow) (OrderPage, error) {
+	if o.leaves.OrderPage == nil {
+		return nil, &runtime.MissingError{Kind: "leaf", Name: "server.orderPage"}
+	}
+	return o.leaves.OrderPage(me, orders)
+}
+
+func (o *ops) PublicUser(id UserId) (PublicUser, error) {
+	if o.leaves.PublicUser == nil {
+		return PublicUser{}, &runtime.MissingError{Kind: "leaf", Name: "server.publicUser"}
+	}
+	return o.leaves.PublicUser(id)
 }
