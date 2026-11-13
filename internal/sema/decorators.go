@@ -21,12 +21,11 @@ const (
 	siteEffect
 	siteClassify
 	siteDecorator
-	siteNamespace
 )
 
 // String は設計書の語。
 func (k siteKind) String() string {
-	return [...]string{"op", "field", "state", "exception", "scalar", "model", "union", "effect", "classify", "decorator", "namespace"}[k]
+	return [...]string{"op", "field", "state", "exception", "scalar", "model", "union", "effect", "classify", "decorator"}[k]
 }
 
 // target は対応する Decorator.targets の値。付けられない種類なら ok が false。
@@ -44,8 +43,6 @@ func (k siteKind) target() (ir.DecoratorTarget, bool) {
 		return ir.TargetScalar, true
 	case siteModel:
 		return ir.TargetModel, true
-	case siteNamespace:
-		return ir.TargetNamespace, true
 	}
 	return "", false
 }
@@ -56,9 +53,6 @@ type appSite struct {
 	kind  siteKind
 	sc    *scope
 	out   *[]ir.Application
-	// seen は DEC-13 の照合に使う、この宣言に付いたデコレータ → 最初の適用の位置。nil なら場所ごとに作る。
-	// 名前空間は複数のブロックで一つの宣言なので（docs/ir.md「正規化」）、ブロックをまたいで同じ表を使う。
-	seen map[string]source.Span
 }
 
 func (a *analyzer) addSite(decos []*ast.Decorator, kind siteKind, sc *scope, out *[]ir.Application) {
@@ -71,10 +65,7 @@ func (a *analyzer) addSite(decos []*ast.Decorator, kind siteKind, sc *scope, out
 // lowerApplications はすべての適用を下ろす（docs/ir.md「デコレータの適用」）。並びは書かれた順。
 func (a *analyzer) lowerApplications() {
 	for _, site := range a.sites {
-		seen := site.seen
-		if seen == nil {
-			seen = map[string]source.Span{}
-		}
+		seen := map[string]source.Span{}
 		for _, d := range site.decos {
 			app, ok := a.lowerApplication(d, site)
 			if !ok {
@@ -139,8 +130,7 @@ func (a *analyzer) aliasTarget(dec *ir.Decorator) (*ir.Decorator, bool) {
 }
 
 // checkDEC1 は DEC-1（docs/check.md「デコレータ」）: 付けた先の種類が targets にない。
-// union / effect / classify / decorator に付けたら常に DEC-1。namespace に付けられるのは `for namespace` の
-// デコレータだけ（bind は文法で閉じる）。
+// union / effect / classify / decorator に付けたら常に DEC-1（namespace / bind は文法で閉じる）。
 func (a *analyzer) checkDEC1(dec *ir.Decorator, kind siteKind, d *ast.Decorator) {
 	t, ok := kind.target()
 	if ok {

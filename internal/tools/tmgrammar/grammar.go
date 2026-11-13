@@ -155,7 +155,23 @@ func Build() Grammar {
 		keywordIncludes = append(keywordIncludes, Rule{Include: "#" + key})
 	}
 
+	var allWords []string
+	for _, g := range groups {
+		allWords = append(allWords, g.Words...)
+	}
+	// 予約語の語の選択（\b なし）。フィールド名の位置の予約語（docs/grammar.md「識別子」の FieldName）に使う。
+	anyKeyword := `(?:` + strings.Join(allWords, "|") + `)`
+
 	repo := Repository{
+		// ---- フィールド名の位置の予約語 ----
+		{Key: "field-names", Rule: Rule{
+			Comment: "フィールド名の位置（: の前、. の後ろ）の予約語は予約語として塗らない（docs/grammar.md「識別子」の FieldName / Path）。予約語が : の前や . の後ろに来る構文はほかにない",
+			Patterns: []Rule{
+				{Name: "variable.other.property.hozo", Match: `\b` + anyKeyword + `\b(?=\s*:)`},
+				{Name: "variable.other.property.hozo", Match: `(?<=\.)` + anyKeyword + `\b`},
+			},
+		}},
+
 		// ---- コメント ----
 		{Key: "comments", Rule: Rule{Patterns: []Rule{
 			{Include: "#doc-comment"},
@@ -307,6 +323,7 @@ func Build() Grammar {
 				End:     `(?=[=;,(){}\[\]])|(?=\b(?:throws|effects|catches|prevents|keeps)\b)`,
 				Patterns: []Rule{
 					{Include: "#arrow"},
+					{Include: "#field-names"},
 					{Include: "#contextual"},
 					{Include: "#type"},
 					{Include: "#string"},
@@ -354,6 +371,7 @@ func Build() Grammar {
 		Patterns: []Rule{
 			{Include: "#comments"},
 			{Include: "#string"},
+			{Include: "#field-names"},
 			{Include: "#external"},
 			{Include: "#decorator"},
 			{Include: "#declarations"},

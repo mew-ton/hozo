@@ -1,9 +1,10 @@
 // docs/config.md「出力する名前空間」: テーブルのない名前空間。外部のシステムをモデルに含める。
 // state と op を持つが、出力しないだけでエラーにはならない（CFG-1 は「テーブルのある名前空間」の規則）
 /** 配送業者（外部のシステム。コードは生成しない） */
-@marks.context("配送")
 namespace carrier {
+  // 出力しない名前空間の宣言にも、印は同じに付けられる
   /** 引き受けた荷物 */
+  @marks.context("配送")
   state parcels: list<shop.Order>;
   /** 荷物を引き受ける */
   effect accept on parcels.post;
@@ -13,6 +14,7 @@ namespace carrier {
 
   // 出力しない名前空間にも、状態の持ち主の規則（STATE-2）などの検査は同じに掛かる
   /** 荷物を引き受ける */
+  @marks.context("配送")
   op pickup(order: shop.Order)
     effects accept
     throws Closed prevents effects;

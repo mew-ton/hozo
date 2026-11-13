@@ -24,6 +24,26 @@ var keywords = map[string]bool{
 // IsKeyword は name が Go の予約語か。
 func IsKeyword(name string) bool { return keywords[name] }
 
+// predeclared は Go の事前宣言の識別子（Go 言語仕様「Predeclared identifiers」）。
+// 小文字のまま出す名前（引数名、束縛名）がこれと同じだと、生成したコードの中の型や関数を隠してしまう
+// （引数 `error` があると戻り値の型 `error` が引数を指す）ので、LocalName が避ける。
+var predeclared = map[string]bool{
+	// 型
+	"any": true, "bool": true, "byte": true, "comparable": true,
+	"complex64": true, "complex128": true, "error": true, "float32": true, "float64": true,
+	"int": true, "int8": true, "int16": true, "int32": true, "int64": true, "rune": true, "string": true,
+	"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true, "uintptr": true,
+	// 定数と零値
+	"true": true, "false": true, "iota": true, "nil": true,
+	// 関数
+	"append": true, "cap": true, "clear": true, "close": true, "complex": true, "copy": true, "delete": true,
+	"imag": true, "len": true, "make": true, "max": true, "min": true, "new": true, "panic": true,
+	"print": true, "println": true, "real": true, "recover": true,
+}
+
+// IsPredeclared は name が Go の事前宣言の識別子か。
+func IsPredeclared(name string) bool { return predeclared[name] }
+
 // Capitalize は先頭の一文字だけを大文字にする（`id` → `Id`、`userId` → `UserId`、`URL` → `URL`）。
 // Go の慣習（`ID`）より決定性と予測しやすさを取る（docs/emit-go.md「名前」）。
 func Capitalize(s string) string {
@@ -90,10 +110,15 @@ func FieldName(name string) string { return escapeKeyword(Capitalize(name)) }
 func MethodName(opName string) string { return escapeKeyword(Capitalize(opName)) }
 
 // LocalName は op の引数名や配線の束縛名など、小文字のまま出す識別子を Go の識別子にする。
-// 元の名前のままで、Go の予約語なら末尾に `_`（`type` → `type_`）。
-// docs/emit-go.md「名前」の表にない行だが、「Go の予約語と衝突する名前 → 末尾に `_`」は
-// 大文字にしない位置でだけ実際に起きるので、その適用先としてここに置く。
-func LocalName(name string) string { return escapeKeyword(name) }
+// 元の名前のままで、Go の予約語か事前宣言の識別子なら末尾に `_`（`type` → `type_`、`error` → `error_`）。
+// docs/emit-go.md「名前」の「op の引数名、配線の束縛名」。生成したコードが使う名前（`o`、`err` など）は
+// 出力ごとに違うので、呼ぶ側が避ける。
+func LocalName(name string) string {
+	if keywords[name] || predeclared[name] {
+		return name + "_"
+	}
+	return name
+}
 
 // EffectConst は effect 名を定数の名前にする（docs/emit-go.md「名前」の「effect 名」）:
 // `createSession` → `EffectCreateSession`。name は FQN ではなく宣言名。

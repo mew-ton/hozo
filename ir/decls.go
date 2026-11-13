@@ -350,7 +350,6 @@ const (
 	TargetException DecoratorTarget = "exception"
 	TargetScalar    DecoratorTarget = "scalar"
 	TargetModel     DecoratorTarget = "model"
-	TargetNamespace DecoratorTarget = "namespace"
 )
 
 // Decorator は decorator 宣言（docs/ir.md「decorator」）。

@@ -170,7 +170,7 @@ func (a *analyzer) result() *Result {
 		if !ns.declared && ns != a.global {
 			continue
 		}
-		n := ir.Namespace{Name: ns.fqn, Description: ns.description, Decorators: ns.decorators}
+		n := ir.Namespace{Name: ns.fqn, Description: ns.description}
 		for _, s := range ns.order {
 			if s.decl != nil {
 				n.Decls = append(n.Decls, s.decl)

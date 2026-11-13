@@ -1,0 +1,13 @@
+// SYN-1（docs/grammar.md「ファイルと宣言」「決めたこと」。文法で閉じる）: namespace にデコレータは付けられない。
+// `for namespace` という対象もない。入れ子の namespace でも同じ
+namespace marks {
+  decorator context(name: string) for namespace;   // ERROR: SYNTAX
+  decorator mark for model;
+}
+namespace a {
+  @marks.mark                          // ERROR: SYNTAX
+  namespace sub {
+    op f();
+  }
+  op g();
+}

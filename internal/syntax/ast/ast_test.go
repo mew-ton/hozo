@@ -43,7 +43,6 @@ func TestEnumStrings(t *testing.T) {
 		{TargetException, "exception"},
 		{TargetScalar, "scalar"},
 		{TargetModel, "model"},
-		{TargetNamespace, "namespace"},
 		{Prevents, "prevents"},
 		{Keeps, "keeps"},
 		{Recovers, "recovers"},

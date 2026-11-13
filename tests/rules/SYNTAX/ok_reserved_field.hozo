@@ -1,0 +1,62 @@
+// 予約語はフィールド名を書く位置では使える（docs/grammar.md「識別子」の FieldName / Path、「予約語」、「決めたこと」）:
+// model のフィールド、その場で書く model、omit の並び、レコードリテラルのキー、値のパスの二つ目以降。
+// `{ "op": "foo" }` のようなオブジェクトを返す API を書けるようにするため
+namespace a {
+  model Target {
+    model: string;
+    namespace: string?;
+  }
+  /** デコレータの適用 */
+  model Wrap {
+    op: string;
+    decorator: string;
+    state: Target;
+    match: int = 1;
+    /** 型の位置の予約語と同じ名前でもよい */
+    string: string;
+    list: string[];
+    default: boolean = false;
+    true: boolean?;
+  }
+  // omit の並び
+  model Slim is Wrap omit decorator, match, default, true;
+
+  // その場で書く model（ユニオンのアーム、例外の値）
+  union Page {
+    Ready: { state: string; op: string; };
+    Failed: Slim;
+  }
+  exception Rejected: { by: string; none: string?; };
+
+  classify Kind of Target {
+    Core;
+    default;
+  }
+
+  op fetch(): Wrap;
+  op store(w: Wrap): Wrap throws Rejected;
+  op label(target: Target, text: string): string;
+  op describe(target: Target): string;
+  op show(w: Slim): Page;
+
+  // 値のパス（res.op、res.state.model）、レコードリテラルのキー、match の対象
+  op run(): Page throws Rejected {
+    const res = fetch();
+    const name = label(res.state, res.op);
+    const kind = match res.state by Kind {
+      Core => describe(res.state);
+      default => none;
+    };
+    const saved = store({
+      op: name,
+      decorator: res.decorator,
+      state: { model: res.state.model, namespace: kind },
+      match: res.match,
+      string: res.string,
+      list: res.list,
+      default: true,
+      true: none,
+    });
+    return show(saved);
+  }
+}

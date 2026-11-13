@@ -25,13 +25,18 @@ DocComment   = "/**" { "*/" 以外 } "*/" ;
 ```
 Ident         = ( 英字 | "_" ) { 英字 | 数字 | "_" } ;
 QualifiedName = Ident { "." Ident } ;
+FieldName     = Ident | 予約語 ;
+Path          = Ident { "." FieldName } ;
 ```
 
-英字と数字は ASCII に限る（「決めたこと」）。予約語は `Ident` にならない。
+- 英字と数字は ASCII に限る（「決めたこと」）。予約語は `Ident` にならない。
+- `FieldName` はフィールド名を書く位置の名前で、予約語も書ける（`op: string;`、`{ op: x }`、`res.op`）。使う位置は、model のフィールド（「model」の `Field`。その場で書く model も同じ）、`omit` の並び、レコードリテラルのキー、値のパスの二つ目以降の要素（「配線」）。理由は「決めたこと」。
+- `Path` は値を書く位置の名前。先頭は束縛か引数の名前（`Ident`）、残りはその値のフィールド名。構文木の形は `QualifiedName` と同じ。
+- 字句解析は、先頭が予約語でなければ `.` で続く要素を予約語も含めて一つの字句にまとめ、`QualifiedName` か `Path` かは構文解析が位置で決める。`QualifiedName` の位置で二つ目以降の要素が予約語なら構文エラー。
 
 ### 予約語
 
-構文の骨になる語を予約する。宣言の頭、節の頭、文の頭、核の型、リテラル。
+構文の骨になる語を予約する。宣言の頭、節の頭、文の頭、核の型、リテラル。予約語は `Ident` の位置（宣言の名前、引数の名前、束縛の名前、名前空間や型の名前の要素、呼び出す op の名前）には書けず、`FieldName` の位置にだけ書ける（「識別子」）。
 
 | 種類 | 語 |
 |---|---|
@@ -78,7 +83,7 @@ Literal  = String | Int | Float | Bool | Duration ;
 File = { Decl } ;
 
 Decl = [ DocComment ] { Decorator } Declaration
-     | [ DocComment ] { Decorator } NamespaceDecl
+     | [ DocComment ] NamespaceDecl
      | BindDecl ;
 
 Declaration = ModelDecl | ScalarDecl | UnionDecl | StateDecl | OpDecl
@@ -89,7 +94,7 @@ NamespaceDecl = "namespace" QualifiedName "{" { Decl } "}" ;
 
 - `namespace` の外の宣言はグローバル（§3.2）。
 - `namespace server.admin { }` と `namespace server { namespace admin { } }` はどちらも書ける（§3.2）。同じ名前の `namespace` は何度でも書ける。
-- デコレータはどの `Declaration` の前にも書けるが、付けられる対象はデコレータの宣言の `for` で決まる（検査 DEC-1）。`namespace` にも付けられる（分かれた文脈の印など）。同じ名前空間のブロックが複数あれば、付けたデコレータは一つの名前空間にまとまる。`bind` には付けられない（文法で閉じる）。
+- デコレータはどの `Declaration` の前にも書けるが、付けられる対象はデコレータの宣言の `for` で決まる（検査 DEC-1）。`namespace` と `bind` には付けられない（文法で閉じる。`namespace` の理由は「決めたこと」）。
 - `DocComment` → デコレータ → 宣言の順（§3.4）。デコレータの後ろに `DocComment` は置けない。
 
 ### デコレータの適用
@@ -110,9 +115,9 @@ ArgTerm   = Literal | QualifiedName ;
 ### model
 
 ```
-ModelDecl   = "model" Ident ( ModelBody | "is" QualifiedName "omit" Ident { "," Ident } ";" ) ;
+ModelDecl   = "model" Ident ( ModelBody | "is" QualifiedName "omit" FieldName { "," FieldName } ";" ) ;
 ModelBody   = "{" { Field } "}" ;
-Field       = [ DocComment ] { Decorator } Ident ":" Type [ "=" Literal ] ";" ;
+Field       = [ DocComment ] { Decorator } FieldName ":" Type [ "=" Literal ] ";" ;
 ```
 
 - `model PublicUser is User omit hash;`（§5.2）。`omit` なしの `is` は書けない（「決めたこと」）。
@@ -182,7 +187,7 @@ Param     = Ident ":" ParamType ;
 ParamType = AnyType [ "?" ] | Type { "|" Type } ;      (* 省略可能は型の ? で書く。any の種類にも付けられる（from: any state?） *)
 AnyType   = "any" AnyKind [ "on" QualifiedName "." StateOp ] ;
 AnyKind   = "exception" | "effect" | "state" | "op" | "model" | "variant" ;   (* variant は文脈キーワード *)
-Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" | "namespace" ;     (* field は文脈キーワード *)
+Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" ;     (* field は文脈キーワード *)
 
 DecoratorClause = ThrowsClause | CatchesClause ;
 ThrowsClause    = "throws" ExcRef { "|" ExcRef } { Relation } ;
@@ -243,9 +248,9 @@ Stmt  = "const" Ident "=" Expr ";"
 
 Expr  = Call | Match | Atom ;
 Call  = QualifiedName "(" [ Atom { "," Atom } ] ")" ;
-Atom  = QualifiedName | Literal | "none" | RecordLit ;
+Atom  = Path | Literal | "none" | RecordLit ;
 RecordLit   = "{" [ RecordField { "," RecordField } [ "," ] ] "}" ;
-RecordField = Ident [ ":" Atom ] ;
+RecordField = FieldName ":" Atom | Ident ;
 
 Match = "match" [ Atom ] "by" ( Ident | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" ;
 MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ( Call | "none" ) ";" ;
@@ -259,6 +264,7 @@ MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ( Call | "none" ) ";" ;
 | `match carts by list { ... }`、`match token by nullable { ... }` | 今の名前空間の基底の状態 | その形の組み込みの分類（ケースは `Empty` / `HasItems`） |
 | `match by Checkout { ... }` | 書かない（分類の宣言が対象を持つ） | 状態の分類 |
 
+- 値を省いた `RecordField`（`{ item }`）は、同じ名前の束縛か引数を指す。予約語の名前の束縛や引数は作れないので、予約語のキーは `{ op: 値 }` と書く。
 - `Call` の引数は `Atom` だけ（§9「呼び出しの引数に呼び出しは書けない（A 正規形）」）。文法で閉じる。
 - `Atom` の `QualifiedName` は、束縛した名前・op の引数・そのフィールド（`query.page`）のどれか。何を指すかは名前の解決が決める。
 - `RecordField` の `{ item }` は `{ item: item }` の略（§10.2 `server.addToCart({ item })`）。
@@ -286,10 +292,12 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 決めたこと | 理由 |
 |---|---|
 | `to` を予約語にする | `bind x to ...` の節の頭だから。ほかの節の頭と同じ扱い |
+| 予約語をフィールド名に書ける（`FieldName`） | `{ "op": "foo" }` のようなオブジェクトを返す API を、そのままの名前で書けるようにする。フィールド名の位置は `:` の前か `.` の後ろで、予約語が来ても構文があいまいにならない |
 | `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
 | 空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない | 同じ意味の書き方を二つ持たない。「空」が入れ物と値の型の二か所に現れないようにする |
 | 状態の分類での `match` は対象を書かない（`match by C`） | 対象は分類の宣言が持っていて、書かせると二か所になる |
 | `prevents` / `keeps` の目的語は `effects` だけ | 葉の op が直に持つ効果は高々一つ（`docs/check.md` EFF-3）なので、効果を名前で書き分ける場面がない |
+| デコレータは `namespace` に付けられない。`for namespace` という対象もない | 名前空間は、複数のファイルの複数のブロックに分けて宣言できる（TypeScript の `interface` と同じく、同じ名前のブロックは一つにまとまる）。名前空間に付けたデコレータは、ファイルをまたいで一つにまとめて管理することになり、どのブロックに何が付いているかが直感的でない。印は中の宣言（op、model など）に付ける |
 | `@external` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
 | その場で書く model はユニオンのアームと例外の値にだけ置ける | 合成する名前（`docs/ir.md`「正規化」）がその二つにしか決まらない |
 | 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない | 同じ意味の書き方を二つ持たない。型の `?` は `single<Token?>` のように型の位置で要るので、名前の側を落とす。設計書の例の `x?: T` は `x: T?` に直す（`docs/decisions.md`「設計書へ返すこと」） |

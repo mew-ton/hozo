@@ -18,7 +18,6 @@ var update = flag.Bool("update", false, "ゴールデンを更新する（docs/t
 var normalizeSource = project{
 	"b.hozo": `
 /** 名前空間 a の説明。二つ目のブロックの説明は使わない */
-@a.marker
 namespace a {
   model Later { id: string; }
 }
@@ -26,12 +25,8 @@ namespace a.child { model Deep { id: string; } }
 `,
 	"a.hozo": `
 /** 使われない説明（b.hozo の方が後） */
-@a.context("accounts")
 namespace a {
   namespace child { model Deeper { id: string; } }
-
-  decorator context(name: string) for namespace;
-  decorator marker for namespace | model;
 
   /** メールアドレス */
   scalar Email extends string;
@@ -176,23 +171,6 @@ func TestNormalizeExpectations(t *testing.T) {
 	child := p.Namespace("a.child")
 	eq("a.child の宣言", []string{child.Decls[0].Common().Name, child.Decls[1].Common().Name}, []string{"a.child.Deeper", "a.child.Deep"})
 	eq("a の説明は最初のブロックのもの", p.Namespace("a").Description.Summary, "使われない説明（b.hozo の方が後）")
-	// namespace ブロックに付いたデコレータは、複数のブロックの分を出現順に連結する（docs/ir.md「Program」の Namespace.decorators）。
-	nsA := p.Namespace("a")
-	eq("a のデコレータ", nsA.Decorators, []ir.Application{
-		{Decorator: "a.context", Args: []ir.Arg{{Param: "name", Value: ir.LiteralValue{Literal: ir.StringLiteral{Value: "accounts"}}}}, Span: nsA.Decorators[0].Span},
-		{Decorator: "a.marker", Span: nsA.Decorators[1].Span},
-	})
-	eq("a のデコレータの位置", []any{nsA.Decorators[0].Span.File, nsA.Decorators[1].Span.File}, []any{"a.hozo", "b.hozo"})
-	eq("a.child のデコレータ", child.Decorators, []ir.Application(nil))
-	eq("for namespace", p.Lookup("a.context").(*ir.Decorator).Targets, []ir.DecoratorTarget{ir.TargetNamespace})
-	// 適用の名前は参照として記録される（定義へジャンプとホバーが使う）
-	refsTo := 0
-	for _, r := range res.Refs {
-		if r.Target.Kind == TargetDecl && (r.Target.Decl == "a.context" || r.Target.Decl == "a.marker") {
-			refsTo++
-		}
-	}
-	eq("namespace のデコレータへの参照", refsTo, 2)
 
 	// T?? → T?
 	user := p.Lookup("a.User").(*ir.Model)

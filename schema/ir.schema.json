@@ -766,8 +766,7 @@
         "state",
         "exception",
         "scalar",
-        "model",
-        "namespace"
+        "model"
       ],
       "type": "string"
     },
@@ -1460,17 +1459,11 @@
     },
     "Namespace": {
       "additionalProperties": false,
-      "description": "一つの名前空間（docs/ir.md「Program」）。name は FQN。decorators は namespace ブロックに付いたデコレータ（複数のブロックの分は出現順に連結）。decls は出現順。",
+      "description": "一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。",
       "properties": {
         "decls": {
           "items": {
             "$ref": "#/$defs/Decl"
-          },
-          "type": "array"
-        },
-        "decorators": {
-          "items": {
-            "$ref": "#/$defs/Application"
           },
           "type": "array"
         },
@@ -1483,7 +1476,6 @@
       },
       "required": [
         "name",
-        "decorators",
         "decls"
       ],
       "type": "object"

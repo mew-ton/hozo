@@ -151,10 +151,9 @@ func TestNegative(t *testing.T) {
 		{"relation with effects list", "Relation", `{"kind":"keeps","effects":["a.b"]}`, false},
 		{"relation bad kind", "Relation", `{"kind":"stops"}`, false},
 		{"relation missing kind", "Relation", `{}`, false},
-		// Namespace.decorators は必須（空でも []。docs/ir.md「Program」）。
-		{"namespace with decorators", "Namespace", `{"name":"a","decorators":[{"decorator":"m.ctx","args":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}],"decls":[]}`, true},
-		{"namespace empty decorators", "Namespace", `{"name":"a","decorators":[],"decls":[]}`, true},
-		{"namespace missing decorators", "Namespace", `{"name":"a","decls":[]}`, false},
+		// Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）。
+		{"namespace", "Namespace", `{"name":"a","decls":[]}`, true},
+		{"namespace with decorators", "Namespace", `{"name":"a","decorators":[],"decls":[]}`, false},
 		{"arm cases default", "ArmCases", `"default"`, true},
 		{"arm cases list", "ArmCases", `["A","B"]`, true},
 		{"arm cases other word", "ArmCases", `"other"`, false},
@@ -406,7 +405,7 @@ func TestEnumsMatchGo(t *testing.T) {
 		typeOf[ir.UnionVariant]():    {string(ir.UnionArms), string(ir.UnionSet)},
 		typeOf[ir.StateShape]():      {string(ir.StateList), string(ir.StateNullable), string(ir.StateSingle)},
 		typeOf[ir.Operation]():       {string(ir.OpPost), string(ir.OpPut), string(ir.OpDelete)},
-		typeOf[ir.DecoratorTarget](): {string(ir.TargetOp), string(ir.TargetField), string(ir.TargetState), string(ir.TargetException), string(ir.TargetScalar), string(ir.TargetModel), string(ir.TargetNamespace)},
+		typeOf[ir.DecoratorTarget](): {string(ir.TargetOp), string(ir.TargetField), string(ir.TargetState), string(ir.TargetException), string(ir.TargetScalar), string(ir.TargetModel)},
 		typeOf[ir.AnyOf]():           {string(ir.AnyException), string(ir.AnyEffect), string(ir.AnyState), string(ir.AnyOp), string(ir.AnyModel), string(ir.AnyVariant)},
 		typeOf[ir.RelationKind]():    {string(ir.Prevents), string(ir.Keeps)},
 		typeOf[ir.CatchMode]():       {string(ir.Recovers), string(ir.Halts), string(ir.Ignores)},

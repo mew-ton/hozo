@@ -1,0 +1,23 @@
+// 予約語を書けるのはフィールド名の位置だけ（docs/grammar.md「予約語」）。宣言の名前、引数の名前、束縛の名前、
+// 名前空間や型の名前の要素、呼び出す op の名前には書けない。値を省いたレコードのキー（{ op }）は同じ名前の束縛か
+// 引数を指すので、予約語は書けない。誤りのある宣言は捨てられ、残りの宣言は検査される
+namespace a {
+  model Wrap { op: string; state: string; }
+  model match { id: string; }                          // ERROR: SYNTAX
+  op state(): Wrap;                                    // ERROR: SYNTAX
+  op byParam(op: string): Wrap;                        // ERROR: SYNTAX
+  op byType(w: a.model): Wrap;                         // ERROR: SYNTAX
+  decorator mark(to: string);                          // ERROR: SYNTAX
+  op fetch(): Wrap;
+  op store(w: Wrap): Wrap;
+  op run(): Wrap {
+    const res = fetch();
+    const model = fetch();                             // ERROR: SYNTAX
+    const called = res.op();                           // ERROR: SYNTAX
+    const short = store({ op, state: res.state });     // ERROR: SYNTAX
+    return store({ op: res.op, state: res.state });
+  }
+}
+namespace a.namespace {                                // ERROR: SYNTAX
+  op f();
+}

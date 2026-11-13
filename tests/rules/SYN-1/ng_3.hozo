@@ -1,0 +1,10 @@
+// SYN-1（docs/requirements.md「検査の規則の一覧」。文法で閉じる）: アノテーションは宣言の上だけ。bind には付けられない
+namespace a {
+  state s: nullable<string>;
+  op f();
+  @db                                  // ERROR: SYNTAX
+  bind s to b.*;
+}
+namespace b {
+  op g();
+}

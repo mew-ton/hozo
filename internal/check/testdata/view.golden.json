@@ -36,7 +36,6 @@
     "namespaces": [
       {
         "name": "http",
-        "decorators": [],
         "decls": [
           {
             "kind": "exception",
@@ -164,7 +163,6 @@
       },
       {
         "name": "server",
-        "decorators": [],
         "decls": [
           {
             "kind": "scalar",
@@ -598,7 +596,6 @@
       },
       {
         "name": "browser",
-        "decorators": [],
         "decls": [
           {
             "kind": "state",

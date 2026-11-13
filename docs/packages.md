@@ -100,7 +100,7 @@ var ErrUnsupported error
 func TypeName(fqn, namespace string) string       // namespace は宣言した名前空間。合成 model（`.` と `$`）の連結を含む
 func FieldName(name string) string
 func MethodName(opName string) string
-func LocalName(name string) string                // 引数名・束縛名。予約語なら末尾に _
+func LocalName(name string) string                // 引数名・束縛名。Go の予約語か事前宣言の識別子なら末尾に _
 func EffectConst(name string) string
 func CaseConst(classify, caseName string) string
 func GoType(t ir.Type, imports *Imports) string   // 型の文字列。必要な import を imports に足す

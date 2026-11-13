@@ -13,7 +13,8 @@ type Node interface {
 	NodeSpan() source.Span
 }
 
-// Ident は識別子（docs/grammar.md「識別子」）。
+// Ident は識別子（docs/grammar.md「識別子」）。フィールド名の位置（Field.Name、ModelDecl.Omit、
+// RecordField.Name、NameAtom.Name の二つ目以降の要素）では FieldName で、Name が予約語のこともある。
 type Ident struct {
 	Span source.Span
 	Name string
@@ -200,12 +201,10 @@ func (n *ArgTerm) NodeSpan() source.Span { return n.Span }
 
 // NamespaceDecl は namespace（docs/grammar.md「ファイルと宣言」）。
 type NamespaceDecl struct {
-	Span source.Span
-	Doc  *DocComment
-	// Decorators は namespace ブロックの前に付いたデコレータ。付けられるのは `for namespace` のものだけ（検査 DEC-1）。
-	Decorators []*Decorator
-	Name       QualifiedName
-	Decls      []Decl
+	Span  source.Span
+	Doc   *DocComment
+	Name  QualifiedName
+	Decls []Decl
 }
 
 // NodeSpan は Node の実装。
@@ -256,8 +255,9 @@ type Field struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
-	Name       Ident
-	Type       Type
+	// Name は FieldName（予約語も書ける）。
+	Name Ident
+	Type Type
 	// Default は既定値。なければ nil。
 	Default *Literal
 }
@@ -600,8 +600,6 @@ const (
 	TargetScalar
 	// TargetModel は model。
 	TargetModel
-	// TargetNamespace は namespace。
-	TargetNamespace
 )
 
 // String は対象の語。
@@ -619,8 +617,6 @@ func (k TargetKind) String() string {
 		return "scalar"
 	case TargetModel:
 		return "model"
-	case TargetNamespace:
-		return "namespace"
 	}
 	return "?"
 }
@@ -905,6 +901,7 @@ func (n *Call) exprNode()             {}
 // NameAtom は束縛した名前・op の引数・そのフィールド（query.page）。
 type NameAtom struct {
 	Span source.Span
+	// Name は Path（docs/grammar.md「識別子」）。二つ目以降の要素は FieldName で、予約語のこともある（res.op）。
 	Name QualifiedName
 }
 
@@ -936,7 +933,8 @@ func (n *RecordLit) atomNode()             {}
 
 // RecordField はレコードのフィールド。Value が nil なら "{ item }" の略記（"{ item: item }" の意味）。
 type RecordField struct {
-	Span  source.Span
+	Span source.Span
+	// Name は Value があれば FieldName（予約語も書ける）、略記なら Ident。
 	Name  Ident
 	Value Atom
 }

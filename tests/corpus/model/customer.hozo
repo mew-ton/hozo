@@ -1,7 +1,6 @@
 // docs/requirements.md「モデルが先」: 人の操作を、担い手ごとの名前空間として書く（「ブラウザを操作する利用者」）
 // docs/config.md「出力する名前空間」: テーブルのない名前空間。出力しない
 /** 店で買い物をする利用者（人の操作。コードは生成しない） */
-@marks.context("利用者")
 namespace customer {
   /** 利用者が覚えている、ほしいもの */
   state wishlist: list<shop.Line>;
@@ -27,9 +26,8 @@ namespace customer {
   }
 }
 
-// docs/grammar.md「ファイルと宣言」: 同じ名前空間のブロックが複数あれば、付けたデコレータは一つの名前空間にまとまる
-// docs/ir.md「Program」: 複数のブロックの分は出現順に連結
-@marks.manual
+// docs/grammar.md「ファイルと宣言」: 同じ名前の namespace は何度でも書ける（一つの名前空間にまとまる）。
+// 名前空間は複数のブロックに分かれるので、印は名前空間ではなく、中の宣言に一つずつ付ける
 namespace customer {
   /** 店を出る */
   @marks.manual

@@ -121,7 +121,7 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.UnionVariant]():    {"arms", "set"},
 	typeOf[ir.StateShape]():      {"list", "nullable", "single"},
 	typeOf[ir.Operation]():       {"post", "put", "delete"},
-	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model", "namespace"},
+	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model"},
 	typeOf[ir.AnyOf]():           {"exception", "effect", "state", "op", "model", "variant"},
 	typeOf[ir.RelationKind]():    {"prevents", "keeps"},
 	typeOf[ir.CatchMode]():       {"recovers", "halts", "ignores"},
@@ -164,7 +164,7 @@ var overrides = map[string]any{
 // descriptions は $defs の説明。docs の見出しを指す。
 var descriptions = map[string]string{
 	"Program":              "IR 全体（docs/ir.md「Program」）。namespaces の先頭はグローバル（name \"\"）。",
-	"Namespace":            "一つの名前空間（docs/ir.md「Program」）。name は FQN。decorators は namespace ブロックに付いたデコレータ（複数のブロックの分は出現順に連結）。decls は出現順。",
+	"Namespace":            "一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。",
 	"Span":                 "宣言や文の位置（docs/ir.md「Program」）。file はユーザーのファイルの相対パスか hozo:vocab/... か hozo:plugin/...。",
 	"Pos":                  "ファイルの中の位置（docs/ir.md「Program」）。1 始まり。col はコードポイント数。",
 	"Doc":                  "DocComment の内容（docs/ir.md「Doc」）。",

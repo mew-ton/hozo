@@ -14,17 +14,3 @@ namespace a {
     id: string;
   }
 }
-
-// 名前空間は、ブロックが分かれていても一つの宣言として数える
-namespace marks {
-  decorator context(name: string) for namespace;
-  decorator other for namespace;
-}
-@marks.context("a")
-@marks.context("b")                    // ERROR: DEC-13
-namespace twice { }
-@marks.context("a")
-namespace split { }
-@marks.other
-@marks.context("b")                    // ERROR: DEC-13
-namespace split { }

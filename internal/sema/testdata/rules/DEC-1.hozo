@@ -20,29 +20,3 @@ namespace a {
   @onlyOp
   op ok(): void;
 }
-
-// namespace に付けられるのは `for namespace` のデコレータだけ
-namespace marks {
-  decorator context(name: string) for namespace;
-  decorator both for op | namespace;
-  decorator modelOnly for model;
-}
-@marks.context("注文")
-@marks.both
-namespace okNs {
-  @marks.both
-  op f(): void;
-  @marks.context("x")                  // ERROR: DEC-1
-  op g(): void;
-}
-@a.onlyOp                              // ERROR: DEC-1
-namespace ngOp { }
-@marks.modelOnly                       // ERROR: DEC-1
-@db                                    // ERROR: DEC-1
-namespace ngModel { }
-namespace outer {
-  decorator inner for namespace;
-  // 適用の名前は、ブロックが書かれた場所（外側の名前空間）で解決する
-  @inner
-  namespace sub { }
-}

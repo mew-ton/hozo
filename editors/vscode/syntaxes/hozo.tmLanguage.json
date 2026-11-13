@@ -17,6 +17,9 @@
       "include": "#string"
     },
     {
+      "include": "#field-names"
+    },
+    {
       "include": "#external"
     },
     {
@@ -45,6 +48,19 @@
     }
   ],
   "repository": {
+    "field-names": {
+      "comment": "フィールド名の位置（: の前、. の後ろ）の予約語は予約語として塗らない（docs/grammar.md「識別子」の FieldName / Path）。予約語が : の前や . の後ろに来る構文はほかにない",
+      "patterns": [
+        {
+          "name": "variable.other.property.hozo",
+          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|string|boolean|int|float|Time|Duration|void|Record|list|nullable|single|none|true|false)\\b(?=\\s*:)"
+        },
+        {
+          "name": "variable.other.property.hozo",
+          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|string|boolean|int|float|Time|Duration|void|Record|list|nullable|single|none|true|false)\\b"
+        }
+      ]
+    },
     "comments": {
       "patterns": [
         {
@@ -247,6 +263,9 @@
           "patterns": [
             {
               "include": "#arrow"
+            },
+            {
+              "include": "#field-names"
             },
             {
               "include": "#contextual"

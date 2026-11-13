@@ -29,7 +29,7 @@ var corpora = []struct {
 	{name: "view", needsGo: true},   // plugins/view-dump。api はプラグインがないので何も出力しない
 	{name: "state", needsGo: true},  // 状態の分類・遷移の効果・状態での match。すべての op と状態を選ぶ
 	{name: "select", needsGo: true}, // 出力の対象: 起点、stops、wraps、states、別の名前空間の op
-	// モデルが先: 名前空間のデコレータ、出力しない名前空間、印のデコレータ。出力する名前空間 shop にプラグインがないので、
+	// モデルが先: 出力しない名前空間、宣言に付けた印のデコレータ。出力する名前空間 shop にプラグインがないので、
 	// emit は何も書かない（docs/emit-go.md「出力の対象」）
 	{name: "model", noOutput: true},
 }

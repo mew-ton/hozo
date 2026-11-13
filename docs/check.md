@@ -158,7 +158,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。`union` / `effect` / `classify` / `decorator` に付けたら常に DEC-1（`namespace` は `for namespace` のデコレータだけ） |
+| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。`union` / `effect` / `classify` / `decorator` に付けたら常に DEC-1（`namespace` と `bind` は文法で閉じる。`docs/grammar.md`「ファイルと宣言」） |
 | DEC-2 | error | `targets` に `op` を含まない宣言が `throws` か `catches` を持つ |
 | DEC-3 | — | 文法で閉じる |
 | DEC-4 | error | `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている |
@@ -170,7 +170,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | DEC-10 | — | 計算（手順 i の `throws`） |
 | DEC-11 | error | `docs/types.md`「デコレータの引数」の数と名前 |
 | DEC-12 | error | 別名の `target` が別名。または別名の `args` が `target` の `Param` に合わない（DEC-11 と同じ手続き） |
-| DEC-13 | error | 同じデコレータが同じ宣言に二度付いている（引数が違っても。名前付きデコレータは展開した汎用デコレータで比べる）。名前空間は、ブロックが分かれていても一つの宣言として数える |
+| DEC-13 | error | 同じデコレータが同じ宣言に二度付いている（引数が違っても。名前付きデコレータは展開した汎用デコレータで比べる） |
 | DEC-14 | warning | `external` なデコレータが `throws` を持たない |
 | DEC-15 | error | `@external` がデコレータの宣言以外に付いている（文法で閉じる。索引として残す） |
 | DEC-16 | warning | 計算の手順 i で、`catches` の例外がそこまでの E にない |

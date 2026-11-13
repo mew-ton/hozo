@@ -29,7 +29,6 @@ interface Program {
 interface Namespace {
   name: string;                   // FQN。"server.admin"。グローバルは ""
   description?: Doc;              // namespace ブロックの直前の DocComment。複数あれば最初のもの
-  decorators: Application[];      // namespace ブロックに付いたデコレータ。複数のブロックの分は出現順に連結
   decls: Decl[];                  // 出現順
 }
 
@@ -155,7 +154,7 @@ interface Classify extends DeclBase {
 interface Decorator extends DeclBase {
   kind: "decorator";
   params: Param[];
-  targets: ("op" | "field" | "state" | "exception" | "scalar" | "model" | "namespace")[];   // 省略時は ["op"]
+  targets: ("op" | "field" | "state" | "exception" | "scalar" | "model")[];   // 省略時は ["op"]
   external: boolean;              // @external が付いているか（DEC-10）
   throws: ThrowsClause[];
   catches: CatchesClause[];

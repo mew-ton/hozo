@@ -57,9 +57,6 @@ func sampleProgram() *Program {
 					Summary: "The server.",
 					Body:    "The server.\n\nMore.",
 				},
-				Decorators: []Application{
-					{Decorator: "server.context", Args: []Arg{{Param: "name", Value: LiteralValue{Literal: StringLiteral{Value: "accounts"}}}}, Span: span(f, 1, 1, 1, 28)},
-				},
 				Decls: []Decl{
 					&Scalar{
 						DeclBase: DeclBase{Name: "server.Token", Span: span(f, 3, 1, 3, 30)},
@@ -186,7 +183,7 @@ func sampleProgram() *Program {
 							{Name: "on", Type: AnyParam{Of: AnyException}, Optional: true},
 							{Name: "after", Type: AnyParam{Of: AnyEffect, On: &EffectOn{State: "db", Operation: OpPost}}, Optional: true},
 						},
-						Targets: []DecoratorTarget{TargetOp, TargetField, TargetNamespace},
+						Targets: []DecoratorTarget{TargetOp, TargetField},
 						Throws: []ThrowsClause{
 							{Exceptions: []string{"server.Unavailable"}, Relations: []Relation{{Kind: Prevents}}},
 							{Exceptions: []string{"$param:on"}, Relations: []Relation{{Kind: Keeps}}},

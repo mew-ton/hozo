@@ -110,6 +110,37 @@ test('文脈キーワードは位置でだけ色が付く', () => {
   assert.ok(!t[0].tokens.some((tk) => tk.scopes.includes('keyword.other.hozo')));
 });
 
+test('フィールド名の位置の予約語は予約語として塗らない', () => {
+  const prop = 'variable.other.property.hozo';
+  const m = tokensOf('model Wrap { op: string; decorator: string; state: Target; default: boolean = false; }');
+  for (const w of ['op', 'decorator', 'state', 'default']) {
+    assertScope(m, 'model Wrap', w, prop);
+    assertNoScope(m, 'model Wrap', w, 'keyword.declaration.hozo');
+    assertNoScope(m, 'model Wrap', w, 'keyword.control.hozo');
+  }
+  // 型の位置の核の型と、宣言の頭はそのまま
+  assertScope(m, 'model Wrap', 'model', 'keyword.declaration.hozo');
+  assertScope(m, 'model Wrap', 'string', 'support.type.primitive.hozo');
+  const f = tokensOf('  string: string;');
+  assertScope(f, 'string: string;', 'string', prop, 0);
+  assertScope(f, 'string: string;', 'string', 'support.type.primitive.hozo', 1);
+  // レコードリテラルのキーと値のパス
+  const r = tokensOf('const saved = store({ op: res.op, state: res.state, match: res.match });');
+  for (const w of ['op', 'state', 'match']) {
+    assertScope(r, 'const saved', w, prop, 0);
+    assertScope(r, 'const saved', w, prop, 1);
+  }
+  const c = tokensOf('const name = label(res.state, res.op);');
+  assertScope(c, 'const name', 'state', prop);
+  assertScope(c, 'const name', 'op', prop);
+  // 宣言の頭と文の頭は予約語のまま
+  const d = tokensOf('op run(): Wrap { return fetch(); }');
+  assertScope(d, 'op run', 'op', 'keyword.declaration.hozo');
+  assertScope(d, 'op run', 'return', 'keyword.control.hozo');
+  const st = tokensOf('state token: nullable<Token>;');
+  assertScope(st, 'state token', 'state', 'keyword.declaration.hozo');
+});
+
 test('デコレータと @external', () => {
   const s = linesOf(files.server);
   assertScope(s, '@http.post("/login")', '@http.post', 'entity.name.function.decorator.hozo');

@@ -1,12 +1,14 @@
 package syntax
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/source"
 	"github.com/mew-ton/hozo/internal/syntax/ast"
+	"github.com/mew-ton/hozo/internal/syntax/token"
 )
 
 func parseSrc(t *testing.T, src string) (*ast.File, []diag.Diagnostic) {
@@ -124,6 +126,7 @@ func TestDeclReject(t *testing.T) {
 		{"two docs", "/** a */ /** b */ model A {}", "付く先のない"},
 		{"doc after decorator", "@db /** x */ model A {}", "デコレータの前に置く"},
 		{"doc on bind", "/** x */ bind a to b.*;", "bind に説明は付けられない"},
+		{"decorator on namespace", "@db namespace a {}", "namespace にデコレータは付けられない"},
 		{"decorator on bind", "@db bind a to b.*;", "bind にデコレータは付けられない"},
 		{"not a decl", "foo;", "宣言が必要"},
 		{"stray close brace", "model A {} }", "対応する「{」のない「}」"},
@@ -153,33 +156,11 @@ func TestNamespace(t *testing.T) {
 	if !ok || inner.Name.String() != "x" || len(inner.Decls) != 1 {
 		t.Errorf("inner = %+v", ns.Decls[1])
 	}
-	if len(ns.Decorators) != 0 {
-		t.Errorf("Decorators = %+v", ns.Decorators)
-	}
 	mustFail(t, "namespace a { model A {}", "namespace a の「}」がない")
 	mustFail(t, "namespace { }", "名前が必要")
-}
-
-// TestNamespaceDecorators は namespace ブロックの前のデコレータ（docs/grammar.md「ファイルと宣言」の
-// Decl = [ DocComment ] { Decorator } NamespaceDecl）。
-func TestNamespaceDecorators(t *testing.T) {
-	src := "/** 注文の文脈 */\n@ctx.bounded(\"注文\") @core\nnamespace shop {\n @inner namespace admin { }\n}"
-	ns := firstDecl[*ast.NamespaceDecl](t, src)
-	if ns.Doc == nil || ns.Doc.Body != "注文の文脈" {
-		t.Errorf("Doc = %+v", ns.Doc)
-	}
-	if len(ns.Decorators) != 2 || ns.Decorators[0].Name.String() != "ctx.bounded" || len(ns.Decorators[0].Args) != 1 || ns.Decorators[1].Name.String() != "core" {
-		t.Fatalf("Decorators = %+v", ns.Decorators)
-	}
-	// 宣言の Span は DocComment を含まず、最初のデコレータから "}" まで。
-	if ns.Span.Start != source.Offset(len("/** 注文の文脈 */\n")) || ns.Span.End != source.Offset(len(src)) {
-		t.Errorf("Span = %+v", ns.Span)
-	}
-	inner, ok := ns.Decls[0].(*ast.NamespaceDecl)
-	if !ok || len(inner.Decorators) != 1 || inner.Decorators[0].Name.String() != "inner" {
-		t.Errorf("inner = %+v", ns.Decls[0])
-	}
-	mustFail(t, "@db /** x */ namespace a {}", "デコレータの前に置く")
+	// デコレータは名前空間に付けられない（docs/grammar.md「ファイルと宣言」「決めたこと」）。入れ子でも同じ。
+	mustFail(t, "/** d */ @ctx.bounded(\"注文\") namespace shop {}", "namespace にデコレータは付けられない")
+	mustFail(t, "namespace shop { @inner namespace admin {} }", "namespace にデコレータは付けられない")
 	mustFail(t, "@external namespace a {}", "@external はデコレータの宣言の直前にだけ書ける")
 }
 
@@ -298,7 +279,6 @@ func TestModelReject(t *testing.T) {
 		{"missing type", "model A { x: ; }", "型が必要"},
 		{"default not literal", "model A { x: int = y; }", "リテラルが必要"},
 		{"no body", "model A;", "「{」か「is」が必要"},
-		{"reserved field name", "model A { namespace: string; }", "予約語で、識別子には使えない"},
 		{"qualified field name", "model A { a.b: string; }", "修飾しない識別子"},
 		{"dangling doc in body", "model A { /** x */ }", "付く先のない"},
 		{"external on field", "model A { @external x: int; }", "@external はデコレータの宣言の直前にだけ書ける"},
@@ -556,11 +536,11 @@ func TestDecoratorDecl(t *testing.T) {
 	if len(d.Params) != 0 || len(d.For) != 1 || d.For[0].Kind != ast.TargetField {
 		t.Errorf("Decorator = %+v", d)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator min(value: int | float) for scalar | field | op | state | exception | model | namespace;")
-	if len(d.Params[0].Type.Types) != 2 || len(d.For) != 7 {
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator min(value: int | float) for scalar | field | op | state | exception | model;")
+	if len(d.Params[0].Type.Types) != 2 || len(d.For) != 6 {
 		t.Errorf("Decorator = %+v", d)
 	}
-	wantTargets := []ast.TargetKind{ast.TargetScalar, ast.TargetField, ast.TargetOp, ast.TargetState, ast.TargetException, ast.TargetModel, ast.TargetNamespace}
+	wantTargets := []ast.TargetKind{ast.TargetScalar, ast.TargetField, ast.TargetOp, ast.TargetState, ast.TargetException, ast.TargetModel}
 	for i, w := range wantTargets {
 		if d.For[i].Kind != w {
 			t.Errorf("For[%d] = %s, want %s", i, d.For[i].Kind, w)
@@ -670,6 +650,7 @@ func TestDecoratorDeclReject(t *testing.T) {
 		{"halts without effect", "decorator a catches X halts;", "名前が必要"},
 		{"bad any kind", "decorator a(x: any thing);", "any の種類"},
 		{"bad target", "decorator a for thing;", "for の対象"},
+		{"namespace target", "decorator a for namespace;", "for の対象"},
 		{"param without type", "decorator a(x);", "「:」が必要"},
 		{"alias without args", "decorator a = b;", "「(」が必要"},
 		{"optional non-any type with pipe", "decorator a(x: int |);", "型が必要"},
@@ -1113,7 +1094,145 @@ func TestIdentAndQualifiedName(t *testing.T) {
 	}
 	mustFail(t, "model string {}", "string は予約語で、識別子には使えない")
 	mustFail(t, "model to {}", "to は予約語")
-	mustFail(t, "scalar A extends a.string;", "「;」が必要だが「.」がある")
+	mustFail(t, "scalar A extends a.string;", "string は予約語で、名前には使えない")
+}
+
+// TestFieldName は FieldName = Ident | 予約語（docs/grammar.md「識別子」）: フィールド名を書く位置
+// （model のフィールド、その場で書く model、omit の並び、レコードリテラルのキー、値のパスの二つ目以降）には
+// 予約語を書ける。
+func TestFieldName(t *testing.T) {
+	// 予約語はすべてフィールド名になる（宣言の頭、節の頭、文の頭と値、核の型と状態の形、リテラル）。
+	var words []string
+	for w := range token.Keywords {
+		words = append(words, w)
+	}
+	sort.Strings(words)
+	var b strings.Builder
+	b.WriteString("model All {\n")
+	for _, w := range words {
+		b.WriteString("  " + w + ": string;\n")
+	}
+	b.WriteString("}")
+	m := firstDecl[*ast.ModelDecl](t, b.String())
+	if len(m.Body.Fields) != len(words) {
+		t.Fatalf("Fields = %d, want %d", len(m.Body.Fields), len(words))
+	}
+	for i, w := range words {
+		if f := m.Body.Fields[i]; f.Name.Name != w || f.Name.Span.End-f.Name.Span.Start != source.Offset(len(w)) {
+			t.Errorf("Fields[%d].Name = %+v, want %s", i, f.Name, w)
+		}
+	}
+
+	// デコレータ・説明・既定値・型との組み合わせ。フィールド名と同じ語が型の位置にあっても読める。
+	m = firstDecl[*ast.ModelDecl](t, `model Wrap {
+  /** 包む op */
+  @valid.length(min: 1) op: string = "x";
+  string: string;
+  list: Item[];
+  decorator: string?;
+  default: int = 1;
+  true: boolean = true;
+}`)
+	if len(m.Body.Fields) != 6 {
+		t.Fatalf("Fields = %d", len(m.Body.Fields))
+	}
+	op := m.Body.Fields[0]
+	if op.Name.Name != "op" || op.Doc == nil || len(op.Decorators) != 1 || op.Default == nil || op.Default.Str != "x" {
+		t.Errorf("Fields[0] = %+v", op)
+	}
+	if ct, ok := m.Body.Fields[1].Type.(*ast.CoreType); !ok || ct.Name != "string" || m.Body.Fields[1].Name.Name != "string" {
+		t.Errorf("Fields[1] = %+v", m.Body.Fields[1])
+	}
+
+	// その場で書く model（ユニオンのアーム、例外の値）も同じ Field。
+	u := firstDecl[*ast.UnionDecl](t, "union U { Ready: { state: string; match: int; }; }")
+	if fs := u.Members[0].Type.Body.Fields; len(fs) != 2 || fs[0].Name.Name != "state" || fs[1].Name.Name != "match" {
+		t.Errorf("arm body = %+v", fs)
+	}
+	x := firstDecl[*ast.ExceptionDecl](t, "exception X: { op: string; };")
+	if fs := x.Value.Body.Fields; len(fs) != 1 || fs[0].Name.Name != "op" {
+		t.Errorf("exception body = %+v", fs)
+	}
+
+	// omit の並び。
+	m = firstDecl[*ast.ModelDecl](t, "model P is U omit op, hash, namespace;")
+	if len(m.Omit) != 3 || m.Omit[0].Name != "op" || m.Omit[1].Name != "hash" || m.Omit[2].Name != "namespace" {
+		t.Errorf("Omit = %+v", m.Omit)
+	}
+
+	// レコードリテラルのキーと、値のパス（Path = Ident { "." FieldName }）。
+	o := firstDecl[*ast.OpDecl](t, `op f(res: Wrap): Wrap {
+  const a = g({ op: res.op, state: res.state.model, match: "m", namespace: none, item });
+  const b = match res.match by Kind { A => h(res.by); default => none; };
+  return res.decorator;
+}`)
+	call := o.Body.Stmts[0].(*ast.ConstStmt).Value.(*ast.Call)
+	rec := call.Args[0].(*ast.RecordLit)
+	var keys []string
+	for _, f := range rec.Fields {
+		keys = append(keys, f.Name.Name)
+	}
+	if strings.Join(keys, ",") != "op,state,match,namespace,item" {
+		t.Errorf("keys = %v", keys)
+	}
+	if rec.Fields[4].Value != nil {
+		t.Errorf("{ item } は値を省いた形: %+v", rec.Fields[4])
+	}
+	path := rec.Fields[1].Value.(*ast.NameAtom).Name
+	if path.String() != "res.state.model" || len(path.Segments) != 3 {
+		t.Fatalf("path = %+v", path)
+	}
+	// 各要素の Span は元の字句の中の位置。
+	src := "op f(res: Wrap): Wrap {\n  const a = g({ op: res.op, state: "
+	if s := path.Segments[1].Span; s.Start != source.Offset(len(src)+len("res.")) || s.End != source.Offset(len(src)+len("res.state")) {
+		t.Errorf("Segments[1].Span = %+v", s)
+	}
+	mt := o.Body.Stmts[1].(*ast.ConstStmt).Value.(*ast.Match)
+	if mt.Subject.(*ast.NameAtom).Name.String() != "res.match" || mt.Classifier.Name != "Kind" {
+		t.Errorf("match = %+v", mt)
+	}
+	if arg := mt.Arms[0].Body.(*ast.Call).Args[0].(*ast.NameAtom).Name.String(); arg != "res.by" {
+		t.Errorf("arm arg = %s", arg)
+	}
+	if ret := o.Body.Stmts[2].(*ast.ReturnStmt).Value.(*ast.NameAtom).Name.String(); ret != "res.decorator" {
+		t.Errorf("return = %s", ret)
+	}
+}
+
+// TestReservedWordReject は、フィールド名の位置のほかでは予約語が識別子にも名前にもならないこと
+// （docs/grammar.md「予約語」）。
+func TestReservedWordReject(t *testing.T) {
+	tests := []struct{ name, src, want string }{
+		{"declaration name", "model op {}", "op は予約語で、識別子には使えない"},
+		{"op name", "op state();", "state は予約語で、識別子には使えない"},
+		{"op parameter", "op f(op: string);", "op は予約語で、識別子には使えない"},
+		{"decorator parameter", "decorator d(to: string);", "to は予約語で、識別子には使えない"},
+		{"named argument", "@d(to: 1) op f();", "to は予約語で、識別子には使えない"},
+		{"const name", "op f() { const match = g(); }", "match は予約語で、識別子には使えない"},
+		{"union arm", "union U { model: string; }", "ユニオンのメンバー"},
+		{"classify case", "classify C of T { state; }", "state は予約語で、識別子には使えない"},
+		{"match arm case", "op f() { match x by C { op => g(); }; }", "op は予約語で、識別子には使えない"},
+		{"namespace segment", "namespace a.op {}", "op は予約語で、名前には使えない"},
+		{"namespace head", "namespace op {}", "op は予約語で、名前には使えない"},
+		{"type name", "model A { x: a.model; }", "model は予約語で、名前には使えない"},
+		{"decorator name", "@a.op model A {}", "op は予約語で、名前には使えない"},
+		{"callee", "op f() { res.op(); }", "op は予約語で、名前には使えない"},
+		{"callee in expr", "op f() { const x = res.match(1); }", "match は予約語で、名前には使えない"},
+		{"throws", "op f() throws a.none;", "none は予約語で、名前には使えない"},
+		{"effect state", "effect e on s.default;", "default は予約語で、名前には使えない"},
+		{"bind target", "bind s to a.model.*;", "model は予約語で、名前には使えない"},
+		{"decorator argument", "@d(a.op) op f();", "op は予約語で、名前には使えない"},
+		{"path head", "op f() { g(op.x); }", "値（名前・リテラル・none・レコード）が必要だが「op」がある"},
+		{"shorthand record key", "op f() { g({ op }); }", "op は予約語なので、値を省いた形（{ op }）では書けない"},
+		{"shorthand record key after field", "op f() { g({ a: 1, state, b }); }", "state は予約語なので、値を省いた形"},
+		{"qualified record key", "op f() { g({ a.op: 1 }); }", "修飾しない識別子"},
+		{"qualified omit", "model P is U omit a.op;", "修飾しない識別子"},
+		{"external on reserved field", "model A { @external decorator: string; }", "@external はデコレータの宣言の直前にだけ書ける"},
+		{"member not a field", "model A { op f(); }", "「:」が必要だが識別子 fがある"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
 }
 
 // --- ドキュメンテーションコメント ---
@@ -1336,6 +1455,39 @@ model N {}
 	m := o.Body.Stmts[1].(*ast.ConstStmt).Value.(*ast.Match)
 	if len(m.Arms) != 2 {
 		t.Errorf("Arms = %d", len(m.Arms))
+	}
+	if len(diags) != 3 {
+		t.Errorf("診断の数 = %d: %+v", len(diags), diags)
+	}
+}
+
+// TestRecoverInsideRecord は、レコードリテラルの中の誤りからの回復: 読みかけのレコードリテラルを閉じてから
+// 次の ";" まで読み飛ばす。レコードの "}" をブロックの終わりと取り違えず、SYNTAX は一つで、後ろの文も宣言も残る。
+func TestRecoverInsideRecord(t *testing.T) {
+	src := `op a(x: X): Y {
+  const a = f({ op, state: x.state });
+  const b = f({ in: { op: g() }, rest: x });
+  const c = match x by K {
+    A => f({ a: { state } });
+    B => none;
+  };
+  return f({ op: x.op });
+}
+model N {}
+`
+	file, diags := parseSrc(t, src)
+	if got := strings.Join(declNames(file), ", "); got != "op a, model N" {
+		t.Fatalf("Decls = %s", got)
+	}
+	o := file.Decls[0].(*ast.OpDecl)
+	if len(o.Body.Stmts) != 2 {
+		t.Fatalf("Stmts = %d", len(o.Body.Stmts))
+	}
+	if m := o.Body.Stmts[0].(*ast.ConstStmt).Value.(*ast.Match); len(m.Arms) != 1 {
+		t.Errorf("Arms = %d", len(m.Arms))
+	}
+	if _, ok := o.Body.Stmts[1].(*ast.ReturnStmt); !ok {
+		t.Errorf("Stmts[1] = %T", o.Body.Stmts[1])
 	}
 	if len(diags) != 3 {
 		t.Errorf("診断の数 = %d: %+v", len(diags), diags)

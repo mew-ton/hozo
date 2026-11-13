@@ -53,6 +53,9 @@ func TestLocalName(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"in", "in"}, {"query", "query"}, {"type", "type_"}, {"range", "range_"}, {"func", "func_"},
 		{"default", "default_"}, {"select", "select_"}, {"Type", "Type"}, {"types", "types"},
+		// 事前宣言の識別子（docs/emit-go.md「名前」）
+		{"error", "error_"}, {"nil", "nil_"}, {"len", "len_"}, {"new", "new_"}, {"int64", "int64_"},
+		{"errors", "errors"}, {"Error", "Error"},
 	}
 	for _, tt := range tests {
 		if got := LocalName(tt.in); got != tt.want {

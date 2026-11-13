@@ -19,14 +19,3 @@ namespace a {
   @alias
   op ok3(): void;
 }
-
-// 名前空間に付けた適用の引数も同じ手続き
-namespace marks {
-  decorator context(name: string) for namespace;
-}
-@marks.context                         // ERROR: DEC-11
-namespace missingArg { }
-@marks.context("a", "b")               // ERROR: DEC-11
-namespace tooManyArgs { }
-@marks.context(name: "ok")
-namespace okArgs { }

@@ -682,3 +682,58 @@ func TestStateClassification(t *testing.T) {
 	}
 	c.shutdown()
 }
+
+// TestReservedWordFields は、予約語をフィールド名に書いたとき（docs/grammar.md「識別子」の FieldName / Path）も、
+// ホバーと定義へジャンプ（docs/lsp.md「ホバー」「定義へジャンプ」）がほかのフィールドと同じに働くこと。
+func TestReservedWordFields(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace a {
+  model Wrap {
+    /** 包む op の名前 */
+    op: string;
+    state: string;
+  }
+  op fetch(): Wrap;
+  op store(w: Wrap): Wrap;
+  op run(): Wrap {
+    const res = fetch();
+    return store({ op: res.op, state: res.state });
+  }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Fatalf("診断が出た: %+v", d)
+		}
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	for _, tt := range []struct {
+		what    string
+		pos     protocol.TextDocumentPositionParams
+		target  string // 定義の位置（この文字列の先頭）
+		summary string // ホバーに入る説明。なければ ""
+	}{
+		{"フィールドの宣言", at("op: string;", 0), "op: string;", "包む op の名前"},
+		{"値のパスのフィールド", at("res.op", len("res.")), "op: string;", "包む op の名前"},
+		{"値のパスのフィールド（state）", at("res.state", len("res.")), "state: string;", ""},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, tt.pos, &hov)
+		if hov == nil || !strings.Contains(hov.Contents.Value, "model Wrap") || !strings.Contains(hov.Contents.Value, tt.summary) {
+			t.Errorf("hover(%s) = %+v", tt.what, hov)
+		}
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, tt.pos, &loc)
+		if want := positionOf(t, enc, text, tt.target, 0); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
+		}
+	}
+	c.shutdown()
+}

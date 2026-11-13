@@ -3,6 +3,7 @@ package syntax
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/source"
@@ -33,6 +34,9 @@ type parser struct {
 	toks  []token.Token
 	pos   int
 	diags []diag.Diagnostic
+	// openRecords は読みかけのレコードリテラルの "{" の数。誤りからの回復（skip）が、文の途中の "}" を
+	// ブロックの終わりと取り違えないために数える。
+	openRecords int
 }
 
 // bailout は誤りからの回復のために投げる印。宣言・メンバー・文の単位で受ける。
@@ -140,6 +144,8 @@ func describe(t token.Token) string {
 
 // recover は fn を実行し、bailout が起きたら skip で読み飛ばして false を返す。
 func (p *parser) recover(fn func()) (ok bool) {
+	outer := p.openRecords
+	p.openRecords = 0
 	defer func() {
 		if r := recover(); r != nil {
 			if _, is := r.(bailout); !is {
@@ -148,6 +154,7 @@ func (p *parser) recover(fn func()) (ok bool) {
 			p.skip()
 			ok = false
 		}
+		p.openRecords = outer
 	}()
 	fn()
 	return true
@@ -157,7 +164,19 @@ func (p *parser) recover(fn func()) (ok bool) {
 // （docs/packages.md「internal/syntax/token、internal/syntax/ast、internal/syntax」の回復）。
 // 読み飛ばす途中で開いた "{" は、閉じるまで ";" を区切りにしない。閉じたらそこで止まる
 // （本体を持つ宣言や match の終わり）。その直後の ";" は一緒に読む。
+// 誤りがレコードリテラルの中で起きたときは、先に読みかけのレコードリテラルを閉じるまで読む
+// （その "}" は文の途中で、ブロックの終わりではない）。
 func (p *parser) skip() {
+	for p.openRecords > 0 && !p.at(token.EOF) {
+		switch p.tok().Kind {
+		case token.LBrace:
+			p.openRecords++
+		case token.RBrace:
+			p.openRecords--
+		}
+		p.advance()
+	}
+	p.openRecords = 0
 	depth := 0
 	for {
 		switch p.tok().Kind {
@@ -212,7 +231,7 @@ func (p *parser) parseDecls(until token.Kind) []ast.Decl {
 
 // parseDecl は Decl を一つ読む。
 //
-//	Decl = [ DocComment ] { Decorator } Declaration | [ DocComment ] { Decorator } NamespaceDecl | BindDecl ;
+//	Decl = [ DocComment ] { Decorator } Declaration | [ DocComment ] NamespaceDecl | BindDecl ;
 //
 // 節の Span は DocComment を含まず、最初のデコレータか宣言の頭から始まる。
 func (p *parser) parseDecl() ast.Decl {
@@ -224,7 +243,10 @@ func (p *parser) parseDecl() ast.Decl {
 	}
 	switch p.tok().Kind {
 	case token.Namespace:
-		return p.parseNamespace(start, doc, decorators)
+		if len(decorators) > 0 {
+			p.fail(decorators[0].Span, "namespace にデコレータは付けられない（docs/grammar.md「決めたこと」）")
+		}
+		return p.parseNamespace(start, doc)
 	case token.Bind:
 		if doc != nil {
 			p.fail(doc.Span, "bind に説明は付けられない。付く先のないドキュメンテーションコメント")
@@ -327,7 +349,8 @@ func (p *parser) parseArgs() []*ast.Arg {
 func (p *parser) parseArg() *ast.Arg {
 	start := p.tok().Span.Start
 	a := &ast.Arg{}
-	if p.atIdent() && p.peek(1).Kind == token.Colon {
+	// 引数名はデコレータの Param の名前で、フィールド名ではないので予約語は書けない（parseIdent が誤りにする）。
+	if (p.atIdent() || p.tok().Kind.IsKeyword()) && p.peek(1).Kind == token.Colon {
 		id := p.parseIdent()
 		a.Name = &id
 		p.advance()
@@ -379,9 +402,9 @@ func (p *parser) parseArgTerm() *ast.ArgTerm {
 }
 
 // parseNamespace は NamespaceDecl = "namespace" QualifiedName "{" { Decl } "}" を読む。
-func (p *parser) parseNamespace(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.NamespaceDecl {
+func (p *parser) parseNamespace(start source.Offset, doc *ast.DocComment) *ast.NamespaceDecl {
 	p.expect(token.Namespace)
-	ns := &ast.NamespaceDecl{Doc: doc, Decorators: decorators, Name: p.parseQualifiedName()}
+	ns := &ast.NamespaceDecl{Doc: doc, Name: p.parseQualifiedName()}
 	p.expect(token.LBrace)
 	ns.Decls = p.parseDecls(token.RBrace)
 	if !p.at(token.RBrace) {
@@ -416,7 +439,7 @@ func (p *parser) parseBind(start source.Offset) *ast.BindDecl {
 
 // parseModel は ModelDecl を読む（docs/grammar.md「model」）。
 //
-//	ModelDecl = "model" Ident ( ModelBody | "is" QualifiedName "omit" Ident { "," Ident } ";" ) ;
+//	ModelDecl = "model" Ident ( ModelBody | "is" QualifiedName "omit" FieldName { "," FieldName } ";" ) ;
 func (p *parser) parseModel(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ModelDecl {
 	p.expect(token.Model)
 	m := &ast.ModelDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
@@ -431,9 +454,9 @@ func (p *parser) parseModel(start source.Offset, doc *ast.DocComment, decorators
 			p.fail(p.tok().Span, "omit のない is は書けない（docs/grammar.md「決めたこと」）")
 		}
 		p.advance()
-		m.Omit = append(m.Omit, p.parseIdent())
+		m.Omit = append(m.Omit, p.parseFieldName())
 		for p.got(token.Comma) {
-			m.Omit = append(m.Omit, p.parseIdent())
+			m.Omit = append(m.Omit, p.parseFieldName())
 		}
 		p.expect(token.Semicolon)
 	default:
@@ -466,15 +489,21 @@ func (p *parser) parseMembers(parseOne func()) {
 	}
 }
 
-// parseField は Field = [ DocComment ] { Decorator } Ident ":" Type [ "=" Literal ] ";" を読む。
+// parseField は Field = [ DocComment ] { Decorator } FieldName ":" Type [ "=" Literal ] ";" を読む。
+// 名前は FieldName なので予約語も書ける（`op: string;`。docs/grammar.md「識別子」）。
 func (p *parser) parseField() *ast.Field {
 	f := &ast.Field{Doc: p.parseLeadingDoc()}
 	start := p.tok().Span.Start
-	f.Decorators, _ = p.parseDecorators()
+	var external *source.Span
+	f.Decorators, external = p.parseDecorators()
+	if external != nil {
+		// parseDecorators は直後の字句が decorator なら @external を通すが、ここでの decorator はフィールド名。
+		p.fail(*external, "@external はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
+	}
 	if f.Doc != nil && p.at(token.RBrace) {
 		p.fail(f.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	}
-	f.Name = p.parseIdent()
+	f.Name = p.parseFieldName()
 	p.expect(token.Colon)
 	f.Type = p.parseType()
 	if p.got(token.Assign) {
@@ -824,7 +853,7 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	return a
 }
 
-// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "namespace" を読む。field は文脈キーワード。
+// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" を読む。field は文脈キーワード。
 func (p *parser) parseTarget() *ast.Target {
 	t := &ast.Target{Span: p.tok().Span}
 	switch {
@@ -840,10 +869,8 @@ func (p *parser) parseTarget() *ast.Target {
 		t.Kind = ast.TargetScalar
 	case p.at(token.Model):
 		t.Kind = ast.TargetModel
-	case p.at(token.Namespace):
-		t.Kind = ast.TargetNamespace
 	default:
-		p.failExpected("for の対象（op / field / state / exception / scalar / model / namespace）")
+		p.failExpected("for の対象（op / field / state / exception / scalar / model）")
 	}
 	p.advance()
 	return t
@@ -1110,11 +1137,11 @@ func (p *parser) parseCall() *ast.Call {
 	return c
 }
 
-// parseAtom は Atom = QualifiedName | Literal | "none" | RecordLit を読む。
+// parseAtom は Atom = Path | Literal | "none" | RecordLit を読む。
 func (p *parser) parseAtom() ast.Atom {
 	switch {
 	case p.atName():
-		qn := p.parseQualifiedName()
+		qn := p.parsePath()
 		return &ast.NameAtom{Span: qn.Span, Name: qn}
 	case p.tok().Kind.IsLiteral():
 		return p.parseLiteral()
@@ -1128,12 +1155,21 @@ func (p *parser) parseAtom() ast.Atom {
 }
 
 // parseRecordLit は RecordLit = "{" [ RecordField { "," RecordField } [ "," ] ] "}" を読む。
+//
+//	RecordField = FieldName ":" Atom | Ident ;
+//
+// キーは FieldName なので予約語も書ける（`{ op: x }`）。値を省いた形（`{ item }`）は同じ名前の束縛か引数を
+// 指すので Ident だけで、予約語は書けない（その名前の束縛や引数は作れない）。
 func (p *parser) parseRecordLit() *ast.RecordLit {
 	start := p.expect(token.LBrace).Span.Start
+	p.openRecords++
 	r := &ast.RecordLit{Fields: []*ast.RecordField{}}
 	for !p.at(token.RBrace) {
 		fstart := p.tok().Span.Start
-		f := &ast.RecordField{Name: p.parseIdent()}
+		if p.tok().Kind.IsKeyword() && p.peek(1).Kind != token.Colon {
+			p.fail(p.tok().Span, fmt.Sprintf("%s は予約語なので、値を省いた形（{ %s }）では書けない。その名前の束縛や引数は作れないので、{ %s: 値 } と書く（docs/grammar.md「配線」）", p.tok().Text, p.tok().Text, p.tok().Text))
+		}
+		f := &ast.RecordField{Name: p.parseFieldName()}
 		if p.got(token.Colon) {
 			f.Value = p.parseAtom()
 		}
@@ -1144,6 +1180,7 @@ func (p *parser) parseRecordLit() *ast.RecordLit {
 		}
 	}
 	p.expect(token.RBrace)
+	p.openRecords--
 	r.Span = p.spanFrom(start)
 	return r
 }
@@ -1220,7 +1257,26 @@ func (p *parser) parseIdent() ast.Ident {
 	return ast.Ident{Span: t.Span, Name: t.Text}
 }
 
+// parseFieldName は FieldName = Ident | 予約語 を読む（docs/grammar.md「識別子」）。フィールド名を書く位置
+// （model のフィールド、omit の並び、レコードリテラルのキー）で使う。QualifiedName なら誤り。
+func (p *parser) parseFieldName() ast.Ident {
+	if p.tok().Kind.IsKeyword() {
+		t := p.advance()
+		return ast.Ident{Span: t.Span, Name: t.Text}
+	}
+	if p.at(token.QualifiedName) {
+		p.fail(p.tok().Span, fmt.Sprintf("ここには修飾しない識別子を書く: %s", p.tok().Text))
+	}
+	if !p.at(token.Ident) {
+		p.failExpected("フィールド名")
+	}
+	t := p.advance()
+	return ast.Ident{Span: t.Span, Name: t.Text}
+}
+
 // parseQualifiedName は QualifiedName を読む。字句は Ident か QualifiedName で、"." で分けて各要素の Span を付ける。
+// 字句解析器は二つ目以降の要素が予約語でもつなげる（lexName）ので、ここで誤りにする。
+// 予約語を書けるのはフィールド名の位置だけ（parseFieldName、parsePath）。
 func (p *parser) parseQualifiedName() ast.QualifiedName {
 	if !p.atName() {
 		if p.tok().Kind.IsKeyword() {
@@ -1228,8 +1284,38 @@ func (p *parser) parseQualifiedName() ast.QualifiedName {
 		}
 		p.failExpected("名前")
 	}
-	t := p.advance()
-	qn, _ := qualifiedNameOf(t.Text, p.file, int(t.Span.Start))
+	qn := splitName(p.tok(), p.file)
+	for _, seg := range qn.Segments[1:] {
+		if _, isKeyword := token.Keywords[seg.Name]; isKeyword {
+			p.fail(seg.Span, fmt.Sprintf("%s は予約語で、名前には使えない（予約語を書けるのはフィールド名の位置だけ。docs/grammar.md「予約語」）", seg.Name))
+		}
+	}
+	p.advance()
+	return qn
+}
+
+// parsePath は Path = Ident { "." FieldName } を読む（docs/grammar.md「識別子」）。値を書く位置（Atom）の名前で、
+// 先頭は束縛か引数の名前（Ident）、残りはその値のフィールド名なので予約語も書ける（`res.op`）。
+// 構文木の形は QualifiedName と同じ。
+func (p *parser) parsePath() ast.QualifiedName {
+	if !p.atName() {
+		if p.tok().Kind.IsKeyword() {
+			p.fail(p.tok().Span, fmt.Sprintf("%s は予約語で、名前には使えない（docs/grammar.md「予約語」）", p.tok().Text))
+		}
+		p.failExpected("名前")
+	}
+	return splitName(p.advance(), p.file)
+}
+
+// splitName は Ident か QualifiedName の字句を "." で分け、各要素の Span を付ける。予約語の要素もそのまま通す。
+func splitName(t token.Token, file source.FileID) ast.QualifiedName {
+	qn := ast.QualifiedName{Span: t.Span}
+	off := t.Span.Start
+	for _, seg := range strings.Split(t.Text, ".") {
+		end := off + source.Offset(len(seg))
+		qn.Segments = append(qn.Segments, ast.Ident{Span: source.Span{File: file, Start: off, End: end}, Name: seg})
+		off = end + 1
+	}
 	return qn
 }
 

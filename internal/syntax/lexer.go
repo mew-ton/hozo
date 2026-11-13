@@ -124,8 +124,10 @@ func (l *lexer) lexDocComment() {
 }
 
 // lexName は識別子・予約語・QualifiedName を読む（docs/grammar.md「識別子」「予約語」）。
-// "." の直後に識別子が続く間はつなげて一つの QualifiedName にする（server.User、sessions.post）。
-// 予約語を含む名前（foo.string）はつなげず、予約語の前で止める。
+// "." の直後に識別子の形が続く間はつなげて一つの QualifiedName にする（server.User、sessions.post）。
+// 先頭が予約語なら、その予約語だけを字句にする。二つ目以降の要素は予約語でもつなげる（res.op）:
+// 値のパスのフィールド名には予約語を書けるので（docs/grammar.md「識別子」の FieldName と Path）、
+// 予約語を含む名前を受けるか（Path）誤りにするか（QualifiedName）は構文解析が位置で決める。
 func (l *lexer) lexName() {
 	start := l.pos
 	segments := 0
@@ -134,15 +136,9 @@ func (l *lexer) lexName() {
 		for l.pos < len(l.src) && isIdentChar(l.src[l.pos]) {
 			l.pos++
 		}
-		seg := string(l.src[segStart:l.pos])
-		if _, isKeyword := token.Keywords[seg]; isKeyword {
-			if segments == 0 {
-				l.emit(token.Keywords[seg], start, l.pos)
-				return
-			}
-			// "a.string" のような形。予約語の前で止めて、"." は記号として読ませる。
-			l.pos = segStart - 1
-			break
+		if kind, isKeyword := token.Keywords[string(l.src[segStart:l.pos])]; isKeyword && segments == 0 {
+			l.emit(kind, start, l.pos)
+			return
 		}
 		segments++
 		if l.peekByte(0) == '.' && isIdentStart(l.peekByte(1)) {

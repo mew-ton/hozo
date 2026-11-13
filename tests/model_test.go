@@ -69,23 +69,25 @@ func copyHozo(t *testing.T, src, dst string) {
 }
 
 // TestModelCorpus は「モデルが先」の決定（docs/decisions.md「設計書を変える決定」S10〜S12）が IR と検査に現れることを、
-// tests/corpus/model で確かめる: 名前空間に付けたデコレータ、hozo.toml にテーブルのない名前空間（出力しない。検査は同じ）、
+// tests/corpus/model で確かめる: 宣言に付けた印のデコレータ（名前空間には付けられない）、hozo.toml にテーブルのない名前空間（出力しない。検査は同じ）、
 // どのプラグインも読まない印のデコレータ（throws を宣言していれば Signature に効く）。
 // サブテストの名前は tests/corpus/model/README.md の「見出し → 構文」の表の見出し。
 func TestModelCorpus(t *testing.T) {
 	p := loadClean(t, modelCorpus)
 	prog := p.Sema.Program
 
-	t.Run("grammar.md ファイルと宣言/namespace のデコレータ、ir.md Program/Namespace.decorators", func(t *testing.T) {
-		// DocComment → デコレータ → namespace。適用は書かれた順で、複数のブロックの分は出現順（ファイルの辞書順）に連結
-		expect(t, "shop のデコレータ", renderApplications(prog.Namespace("shop").Decorators), []string{`@marks.context(name: "販売")`})
+	t.Run("grammar.md ファイルと宣言/デコレータは名前空間に付けられない、ir.md デコレータの適用", func(t *testing.T) {
+		// 印は名前空間ではなく宣言（model / state / op）に付ける。出力する名前空間でも、出力しない名前空間でも同じ
+		expect(t, "shop.Order のデコレータ", renderApplications(declOf(t, prog, "shop.Order").Common().Decorators), []string{`@marks.context(name: "販売")`})
+		expect(t, "shop.orders のデコレータ", renderApplications(declOf(t, prog, "shop.orders").Common().Decorators), []string{`@marks.context(name: "販売")`})
+		expect(t, "carrier.parcels のデコレータ", renderApplications(declOf(t, prog, "carrier.parcels").Common().Decorators), []string{`@marks.context(name: "配送")`})
+		expect(t, "carrier.pickup のデコレータ", renderApplications(opOf(t, prog, "carrier.pickup").Decorators), []string{`@marks.context(name: "配送")`})
+		// 印を付けていない宣言は []
+		expect(t, "shop.Line のデコレータ", renderApplications(declOf(t, prog, "shop.Line").Common().Decorators), []string{})
 		expect(t, "shop の説明", docOf(prog.Namespace("shop").Description), "店（コードを生成する側）")
-		expect(t, "carrier のデコレータ", renderApplications(prog.Namespace("carrier").Decorators), []string{`@marks.context(name: "配送")`})
-		expect(t, "customer のデコレータ（二つのブロックを連結）", renderApplications(prog.Namespace("customer").Decorators),
-			[]string{`@marks.context(name: "利用者")`, "@marks.manual"})
+		// 同じ名前の namespace のブロックは一つの Namespace にまとまる（customer.hozo の二つのブロック）
 		expect(t, "customer は一つの Namespace", countNamespaces(prog, "customer"), 1)
-		// 付けていない名前空間は []（省かない。docs/ir.md「JSON」）
-		expect(t, "marks のデコレータ", renderApplications(prog.Namespace("marks").Decorators), []string{})
+		// Namespace は decorators を持たない（docs/ir.md「Program」）
 		data, err := json.Marshal(prog)
 		if err != nil {
 			t.Fatal(err)
@@ -93,13 +95,13 @@ func TestModelCorpus(t *testing.T) {
 		raw := decodeJSON(t, data)
 		for _, n := range raw["namespaces"].([]any) {
 			ns := n.(map[string]any)
-			if _, ok := ns["decorators"].([]any); !ok {
-				t.Errorf("namespace %q の JSON に decorators（列）がない: %v", ns["name"], ns["decorators"])
+			if _, ok := ns["decorators"]; ok {
+				t.Errorf("namespace %q の JSON に decorators がある: %v", ns["name"], ns["decorators"])
 			}
 		}
 		// 位置は適用そのもの（@ から引数の閉じ括弧まで）
-		app := prog.Namespace("shop").Decorators[0]
-		expect(t, "適用の位置", []any{app.Span.File, app.Span.Start.Line, app.Span.Start.Col}, []any{"shop.hozo", lineIn(t, filepath.Join(modelCorpus, "shop.hozo"), `@marks.context("販売")`), 1})
+		app := declOf(t, prog, "shop.Order").Common().Decorators[0]
+		expect(t, "適用の位置", []any{app.Span.File, app.Span.Start.Line, app.Span.Start.Col}, []any{"shop.hozo", lineIn(t, filepath.Join(modelCorpus, "shop.hozo"), `@marks.context("販売")`), 3})
 		// 読み戻して書いても同じバイト列
 		var back ir.Program
 		if err := json.Unmarshal(data, &back); err != nil {
@@ -113,12 +115,13 @@ func TestModelCorpus(t *testing.T) {
 
 	t.Run("grammar.md decorator の宣言/Target、ir.md decorator/targets", func(t *testing.T) {
 		dec := func(name string) *ir.Decorator { return declOf(t, prog, name).(*ir.Decorator) }
-		expect(t, "context の targets", dec("marks.context").Targets, []ir.DecoratorTarget{ir.TargetNamespace})
-		expect(t, "manual の targets", dec("marks.manual").Targets, []ir.DecoratorTarget{ir.TargetNamespace, ir.TargetOp})
+		expect(t, "context の targets（書いた順）", dec("marks.context").Targets, []ir.DecoratorTarget{ir.TargetModel, ir.TargetState, ir.TargetOp})
+		expect(t, "manual の targets", dec("marks.manual").Targets, []ir.DecoratorTarget{ir.TargetOp})
 		expect(t, "requirement の targets（省略は op）", dec("marks.requirement").Targets, []ir.DecoratorTarget{ir.TargetOp})
 		expect(t, "requirement の throws", renderThrows(dec("marks.requirement").Throws), []string{"throws marks.NotApproved prevents effects"})
-		// 同じ印を名前空間にも op にも付けられる
+		// 人の操作は、担い手ごとの名前空間（customer）の中の op に印を付けて表す
 		expect(t, "pick のデコレータ", renderApplications(opOf(t, prog, "customer.pick").Decorators), []string{"@marks.manual"})
+		expect(t, "leave のデコレータ", renderApplications(opOf(t, prog, "customer.leave").Decorators), []string{"@marks.manual"})
 	})
 
 	t.Run("config.md 出力する名前空間", func(t *testing.T) {

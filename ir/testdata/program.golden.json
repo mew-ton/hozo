@@ -3,7 +3,6 @@
   "namespaces": [
     {
       "name": "",
-      "decorators": [],
       "decls": [
         {
           "kind": "state",
@@ -191,34 +190,6 @@
         "throws": [],
         "see": []
       },
-      "decorators": [
-        {
-          "decorator": "server.context",
-          "args": [
-            {
-              "param": "name",
-              "value": {
-                "kind": "literal",
-                "literal": {
-                  "kind": "string",
-                  "value": "accounts"
-                }
-              }
-            }
-          ],
-          "span": {
-            "file": "server.hozo",
-            "start": {
-              "line": 1,
-              "col": 1
-            },
-            "end": {
-              "line": 1,
-              "col": 28
-            }
-          }
-        }
-      ],
       "decls": [
         {
           "kind": "scalar",
@@ -939,8 +910,7 @@
           ],
           "targets": [
             "op",
-            "field",
-            "namespace"
+            "field"
           ],
           "external": false,
           "throws": [

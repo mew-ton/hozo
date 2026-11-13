@@ -1,15 +1,17 @@
 // docs/config.md「出力する名前空間」: hozo.toml にテーブルがある名前空間（出力する側）
-// docs/grammar.md「ファイルと宣言」: Decl = [ DocComment ] { Decorator } NamespaceDecl（DocComment → デコレータ → namespace）
-// docs/ir.md「Program」: Namespace.decorators
 /** 店（コードを生成する側） */
-@marks.context("販売")
 namespace shop {
   model Line { item: string; count: int = 1; }
+  // docs/requirements.md「モデルが先」決まったこと: 印は宣言に付ける（名前空間には付けられない。docs/grammar.md「ファイルと宣言」）
+  // docs/ir.md「デコレータの適用」: DeclBase.decorators
+  /** 注文 */
+  @marks.context("販売")
   model Order { id: string; }
 
   /** カートの行 */
   state carts: list<Line>;
   /** 注文 */
+  @marks.context("販売")
   state orders: list<Order>;
 
   /** カートに行を足す */

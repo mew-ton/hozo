@@ -65,8 +65,13 @@ func TestLexTokens(t *testing.T) {
 		{"qualified name", "server.User a.b.c", []token.Kind{token.QualifiedName, token.QualifiedName, token.EOF}},
 		{"qualified with contextual", "sessions.post", []token.Kind{token.QualifiedName, token.EOF}},
 		{"name then star", "server.* server.**", []token.Kind{token.Ident, token.Dot, token.Star, token.Ident, token.Dot, token.StarStar, token.EOF}},
-		{"name then keyword", "a.string", []token.Kind{token.Ident, token.Dot, token.StringType, token.EOF}},
+		// 二つ目以降の要素は予約語でもつなげる（値のパスのフィールド名。docs/grammar.md「識別子」の Path）。
+		// 名前として受けるかどうかは構文解析が位置で決める。先頭が予約語なら、その予約語だけが字句。
+		{"name then keyword", "a.string", []token.Kind{token.QualifiedName, token.EOF}},
+		{"path with keywords", "res.op.state.x res.match", []token.Kind{token.QualifiedName, token.QualifiedName, token.EOF}},
+		{"path then keyword", "x.by by", []token.Kind{token.QualifiedName, token.By, token.EOF}},
 		{"keyword then dot", "string.a", []token.Kind{token.StringType, token.Dot, token.Ident, token.EOF}},
+		{"keyword then dot keyword", "op.state", []token.Kind{token.Op, token.Dot, token.State, token.EOF}},
 		{"symbols", "{ } ( ) [ ] < > : ; , . = ? | @ * ** => ->",
 			[]token.Kind{token.LBrace, token.RBrace, token.LParen, token.RParen, token.LBracket, token.RBracket, token.Less, token.Greater,
 				token.Colon, token.Semicolon, token.Comma, token.Dot, token.Assign, token.Question, token.Pipe, token.At, token.Star, token.StarStar, token.Arrow, token.ThinArrow, token.EOF}},

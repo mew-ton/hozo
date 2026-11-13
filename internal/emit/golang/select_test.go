@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -399,6 +400,50 @@ func TestZeroValues(t *testing.T) {
 	}
 	if want := "\t\treturn &runtime.MissingError{Kind: \"leaf\", Name: \"app.void\"}"; !strings.Contains(ops, want) {
 		t.Errorf("ops.go に %q がない:\n%s", want, ops)
+	}
+	compileFiles(t, root, files)
+}
+
+// TestReservedWordFields は、Hozo の予約語や Go の予約語・事前宣言の識別子と同じ名前のフィールド
+// （docs/grammar.md「識別子」の FieldName）と引数（docs/emit-go.md「名前」）が、コンパイルできる Go になること。
+// フィールドは先頭を大文字にするので Go の名前と衝突せず、JSON のタグは元の名前のまま。
+func TestReservedWordFields(t *testing.T) {
+	root := newProjectRoot(t)
+	f := "x.hozo"
+	names := []string{"op", "type", "func", "string", "state", "error"}
+	var fields []ir.Field
+	var copied []ir.RecordField
+	for _, n := range names {
+		fields = append(fields, field(n, ir.String()))
+		copied = append(copied, ir.RecordField{Name: n, Value: name("res", n)})
+	}
+	// 引数 error は Go の事前宣言の識別子なので error_ になり、戻り値の型 error を隠さない。
+	copied[len(copied)-1].Value = name("error")
+	files, diags := emitSmall(root,
+		&ir.Model{DeclBase: base("app.Wrap", nil), Fields: fields},
+		&ir.Op{DeclBase: base("app.fetch", nil), Returns: ir.Ref("app.Wrap")},
+		&ir.Op{DeclBase: base("app.store", nil), Params: []ir.OpParam{param("w", ir.Ref("app.Wrap"))}, Returns: ir.Ref("app.Wrap")},
+		&ir.Op{DeclBase: base("app.run", nil), Params: []ir.OpParam{param("error", ir.String())}, Returns: ir.Ref("app.Wrap"),
+			Body: &ir.Wiring{Statements: []ir.Statement{
+				ir.ConstStmt{Name: "res", Expr: ir.CallExpr{Call: call("app.fetch")}, Span: sp(f, 1)},
+				ir.ReturnStmt{Expr: ir.CallExpr{Call: call("app.store", carg("w", record(copied...)))}, Span: sp(f, 1)},
+			}}},
+	)
+	if len(diags) != 0 {
+		t.Fatalf("診断が出た: %s", formatDiags(diags))
+	}
+	types := contentOf(files, "gen/app/types.go")
+	for _, n := range names {
+		want := regexp.MustCompile(`\t` + strings.ToUpper(n[:1]) + n[1:] + ` +string +` + "`" + `json:"` + n + `"` + "`")
+		if !want.MatchString(types) {
+			t.Errorf("types.go にフィールド %s がない:\n%s", n, types)
+		}
+	}
+	wiring := contentOf(files, "gen/app/wiring.go")
+	for _, want := range []string{"error_ string", "Op: res.Op", "Type: res.Type", "Func: res.Func", "Error: error_"} {
+		if !strings.Contains(strings.Join(strings.Fields(wiring), " "), want) {
+			t.Errorf("wiring.go に %q がない:\n%s", want, wiring)
+		}
 	}
 	compileFiles(t, root, files)
 }

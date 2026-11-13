@@ -304,7 +304,7 @@ function walkDecl(d: Decl): void {
         }
       }
       for (const target of d.targets) {
-        assert.ok(["op", "field", "state", "exception", "scalar", "model", "namespace"].includes(target));
+        assert.ok(["op", "field", "state", "exception", "scalar", "model"].includes(target));
       }
       if (d.alias) d.alias.args.forEach((a) => walkArgValue(a.value));
       return;
@@ -322,9 +322,8 @@ function walkProgram(p: Program): void {
   assert.equal(p.version, "0.1");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
-    // Namespace.decorators は常にある（空でも []。docs/ir.md「Program」）
-    assert.ok(Array.isArray(ns.decorators));
-    for (const a of ns.decorators) a.args.forEach((arg) => walkArgValue(arg.value));
+    // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
+    assert.ok(!("decorators" in ns));
     ns.decls.forEach(walkDecl);
   }
   for (const b of p.binds) assert.equal(typeof b.target.deep, "boolean");
