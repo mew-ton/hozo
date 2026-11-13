@@ -104,8 +104,10 @@ func TestExampleLogout(t *testing.T) {
 	wantStrings(t, "logout.E", sigOf(t, p2, "browser.logout").Exceptions, []string{"http.ServerError", "http.NetworkError"})
 }
 
-// TestExamplePlaceOrder は §7.3 の placeOrder: `throws NotificationFailed keeps createOrder prevents notifyUser`。
-// 葉なら宣言のまま（REL-3 の warning）、配線なら本体から計算した状態と比べる（REL-4）。
+// TestExamplePlaceOrder は §7.3 の placeOrder。設計書の原文は葉の op に
+// `effects createOrder | notifyUser throws NotificationFailed keeps createOrder prevents notifyUser` と書くが、
+// 葉の op が直に持つ効果は一つまで（EFF-3。docs/decisions.md S8）で、prevents / keeps の目的語は effects だけ（S9）なので、
+// 効果ごとの葉の op を配線でつなぐ。例外ごとの効果の状態は本体から計算され、原文が書いていた関係と同じになる。
 func TestExamplePlaceOrder(t *testing.T) {
 	base := func() []ir.Decl {
 		return []ir.Decl{
@@ -117,21 +119,6 @@ func TestExamplePlaceOrder(t *testing.T) {
 			model("server.OrderInput"),
 			model("server.Order"),
 		}
-	}
-	placeOrder := leaf("server.placeOrder", ir.Ref("server.Order"), param("in", ir.Ref("server.OrderInput")))
-	placeOrder.Effects = []string{"server.createOrder", "server.notifyUser"}
-	placeOrder.Throws = []ir.ThrowsClause{throws([]string{"server.NotificationFailed"}, keeps("server.createOrder"), prevents("server.notifyUser"))}
-	p := program(nil, namespace("server", append(base(), placeOrder)...))
-	diags := Check(p, cfgFor("server"))
-	wantCodes(t, diags, "REL-3")
-	sig := sigOf(t, p, "server.placeOrder")
-	wantStrings(t, "E", sig.Exceptions, []string{"server.NotificationFailed"})
-	wantStrings(t, "F", sig.Effects, []string{"server.createOrder", "server.notifyUser"})
-	if got := relOf(t, sig, "server.NotificationFailed", "server.createOrder"); got != ir.Kept {
-		t.Errorf("rel(NotificationFailed, createOrder) = %s, want kept", got)
-	}
-	if got := relOf(t, sig, "server.NotificationFailed", "server.notifyUser"); got != ir.Prevented {
-		t.Errorf("rel(NotificationFailed, notifyUser) = %s, want prevented", got)
 	}
 
 	// 効果ごとに葉の op を分けて配線でつなぐと、状態は §9 の規則で計算される
@@ -159,7 +146,11 @@ func TestExamplePlaceOrder(t *testing.T) {
 	if got := relOf(t, sig2, "server.NotificationFailed", "server.notifyUser"); got != ir.Prevented {
 		t.Errorf("wired rel(NotificationFailed, notifyUser) = %s, want prevented (notify の宣言)", got)
 	}
-	// 書いた関係が計算と一致すれば REL-4 なし（REL-3 は出る）、食い違えば REL-4
-	wantCodes(t, Check(wired(throws([]string{"server.NotificationFailed"}, keeps("server.createOrder"), prevents("server.notifyUser"))), cfgFor("server")), "REL-3")
+	wantStrings(t, "E", sig2.Exceptions, []string{"server.NotificationFailed"})
+	if got := succOf(t, sig2, "server.createOrder"); got != ir.Kept {
+		t.Errorf("wired succ(createOrder) = %s, want kept", got)
+	}
+	// 関係は計算されるので書かない。書けば目的語はすべての効果で、kept と prevented が混ざるこの op ではどちらも食い違う（REL-4）
 	wantCodes(t, Check(wired(throws([]string{"server.NotificationFailed"}, prevents())), cfgFor("server")), "REL-4")
+	wantCodes(t, Check(wired(throws([]string{"server.NotificationFailed"}, keeps())), cfgFor("server")), "REL-4")
 }

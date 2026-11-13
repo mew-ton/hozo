@@ -123,3 +123,67 @@ func firstDiff(a, b []byte) string {
 	}
 	return "lengths differ"
 }
+
+// TestViewsUnconfiguredNamespace は docs/config.md「出力する名前空間」: hozo.toml にテーブルのない名前空間は View を
+// 持たない（出力しない）が、検査と計算は同じに掛かる。設定のある名前空間が設定のない名前空間の op を呼んでも、
+// その逆でも、Signature は普通に計算され、設定のある側の View.ops には設定のない側の op も Sig(O, viewer) で載る。
+func TestViewsUnconfiguredNamespace(t *testing.T) {
+	// server（設定あり）: @http.get の葉 getMe と、外のシステム ext（設定なし）の葉を呼ぶ配線 sync
+	getMe := leaf("server.getMe", ir.String())
+	getMe.Decorators = []ir.Application{app("http.get", ir.Arg{Param: "path", Value: ir.LiteralValue{Literal: ir.StringLiteral{Value: "/me"}}})}
+	sync := wire("server.sync", nil, nil, cs(call("ext.push")))
+	sync.Throws = []ir.ThrowsClause{throws([]string{"ext.Down"})}
+	// ext（設定なし）: 状態と効果と例外を持つ葉
+	push := leaf("ext.push", nil)
+	push.Effects = []string{"ext.record"}
+	push.Throws = []ir.ThrowsClause{throws([]string{"ext.Down"}, prevents())}
+	// user（設定なし）: 人の操作。server の op を呼ぶ配線
+	open := wire("user.open", ir.String(), nil, ret(call("server.getMe")))
+	open.Throws = []ir.ThrowsClause{throws([]string{"http.ServerError", "http.NetworkError"})}
+	press := wire("user.press", nil, nil, cs(call("server.sync")))
+	press.Throws = []ir.ThrowsClause{throws([]string{"ext.Down"})}
+	p := program(nil,
+		httpVocab(),
+		namespace("server", getMe, sync),
+		namespace("ext", state("ext.log", ir.StateList, ir.String()), eff("ext.record", "ext.log", ir.OpPost), exc("ext.Down"), push),
+		namespace("user", open, press),
+	)
+	cfg := cfgFor("server")
+	wantCodes(t, Check(p, cfg)) // CFG-1 も THROWS-1 も出ない
+
+	// 設定のない名前空間の op の Signature も計算されている
+	wantStrings(t, "Sig(user.open).E", sigOf(t, p, "user.open").Exceptions, []string{"http.ServerError", "http.NetworkError"})
+	pressSig := sigOf(t, p, "user.press")
+	wantStrings(t, "Sig(user.press).F", pressSig.Effects, []string{"ext.record"})
+	if got := relOf(t, pressSig, "ext.Down", "ext.record"); got != ir.Prevented {
+		t.Errorf("rel(Down, record) = %s, want prevented", got)
+	}
+	wantStrings(t, "Sig(server.sync).F", sigOf(t, p, "server.sync").Effects, []string{"ext.record"})
+
+	// View は設定のある server だけ。namespaces にも設定のない名前空間は入らない
+	views := Views(p, cfg)
+	if len(views) != 1 || views["server"] == nil {
+		t.Fatalf("views = %v, want only server", reflect.ValueOf(views).MapKeys())
+	}
+	v := views["server"]
+	if len(v.Namespaces) != 1 {
+		t.Errorf("namespaces = %+v, want only server", v.Namespaces)
+	}
+	// ops はすべての op（設定のない名前空間のものも）を server から見た Sig で持つ
+	for _, name := range []string{"server.getMe", "server.sync", "ext.push", "user.open", "user.press"} {
+		if v.Ops[name] == nil {
+			t.Errorf("View(server).ops に %s がない", name)
+		}
+	}
+	wantStrings(t, "View(server).ext.push.E", v.Ops["ext.push"].Exceptions, []string{"ext.Down"})
+	wantStrings(t, "View(server).ext.push.F", v.Ops["ext.push"].Effects, []string{"ext.record"})
+	// Program は全体そのまま（設定のない名前空間の宣言も読める）
+	if v.Program.Lookup("user.press") == nil || v.Program.Lookup("ext.log") == nil {
+		t.Error("View.program に設定のない名前空間の宣言がない")
+	}
+	// 設定がまったくなければ View は一つもない（設定なしの検査）
+	if n := len(Views(p, config.Default("/root"))); n != 0 {
+		t.Errorf("views without config = %d, want 0", n)
+	}
+	wantCodes(t, Check(p, config.Default("/root")))
+}

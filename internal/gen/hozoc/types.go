@@ -138,14 +138,10 @@ type LspInput struct {
 	Log *Path `json:"log,omitempty"`
 }
 
-// EffectAddOutputs は新しく生成したファイルを書き出す
-const EffectAddOutputs runtime.Effect = "hozoc.addOutputs"
-
-// EffectReplaceOutputs は既にあるファイルを、生成し直した内容で書き換える
-const EffectReplaceOutputs runtime.Effect = "hozoc.replaceOutputs"
-
-// EffectRemoveStaleOutputs は生成しなくなったファイルを消す
-const EffectRemoveStaleOutputs runtime.Effect = "hozoc.removeStaleOutputs"
+// EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）
+//
+// on hozoc.OutputsSync: any -> UpToDate
+const EffectSyncOutputs runtime.Effect = "hozoc.syncOutputs"
 
 // Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ
 type Plugin struct {

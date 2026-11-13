@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/emit/golang"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
@@ -36,6 +37,8 @@ type output struct {
 // WriteOutputs は cli.hozo の op writeOutputs（docs/cli.md「emit」の 1〜8）。checked は Check が返したもの（warning）で、
 // その中身（Program、設定、マニフェスト）は Check が l.checked に置いた Project から取る。
 //
+//  0. 設定なし（hozo.toml が見つからない。docs/config.md「置き場と探し方」）なら、書き出すものがないので CFG-7 を
+//     一つ作って ConfigInvalid（docs/cli.md「手で書くもの」）。check の warning も一緒に運ぶ。
 //  1. namespaces が空でなければ、その名前空間（と子孫）だけを対象にする。hozo.toml にない名前（設定を解決できない）なら UnknownNamespace。
 //  2. 対象の各名前空間について、language が go なら既定の出力（internal/emit/golang）を作る。
 //  3. Conf(N).plugins の各プラグイン（[emit] を持つもの）を RunEmit で起動し、files を集める。
@@ -52,6 +55,12 @@ func (l *Leaves) WriteOutputs(ctx context.Context, in hozoc.EmitInput, checked h
 	p := l.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
 		return hozoc.EmitResult{}, errors.New("hozoc: WriteOutputs の checked が直前の Check の結果でない")
+	}
+	// 0. 設定なし
+	if p.NoConfig {
+		missing := diag.Diagnostic{Severity: diag.Error, Code: "CFG-7", File: config.FileName,
+			Message: "hozo.toml が見つからないので、書き出す名前空間がない（作業ディレクトリから親へ向かって探した。--config か HOZO_CONFIG で指定できる）"}
+		return hozoc.EmitResult{}, hozoc.ConfigInvalid{Value: diagnostics(append([]diag.Diagnostic{missing}, p.Diags...), p.Files)}
 	}
 	views := p.Views()
 

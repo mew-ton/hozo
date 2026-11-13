@@ -5,7 +5,7 @@
 | ファイル | 中身 |
 |---|---|
 | `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]`、`[api]` と `[web]`（どちらも `language = "go"`。TS の既定の出力は段階 5 までないので CFG-11）。`web` に `plugins = ["view-dump"]` |
-| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。起点のデコレータ。標準の語彙にない名前空間で、state も op も持たないので設定は要らない |
+| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。起点のデコレータ。標準の語彙にない名前空間で、`hozo.toml` にテーブルがないので出力しない（`docs/config.md`「出力する名前空間」） |
 | `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる |
 | `web.hozo` | ブラウザ側 `namespace web`。`view-dump` の viewer。`@t.entry` の付いた op が起点 |
 | `plugins/view-dump/` | テスト用のプラグイン。`[emit] entry = ["t.entry"]`。受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す |

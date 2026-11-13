@@ -1,8 +1,0 @@
-// REL-6（docs/check.md「throws」）: relations の効果名が Sig(O, ns(O)).effects にない（名前で書くので REL-3 も）
-namespace a {
-  state s: list<string>;
-  effect e on s.post;
-  effect f on s.post;
-  exception E;
-  op g() effects e throws E prevents f;    // ERROR: REL-6 // WARN: REL-3
-}

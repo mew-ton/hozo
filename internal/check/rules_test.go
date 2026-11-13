@@ -70,55 +70,40 @@ func TestRel2(t *testing.T) {
 	wantNoCode(t, Check(serverWith(d), cfgFor("server")), "REL-2")
 }
 
-// TestRel3 は REL-3: relations.effects が名前の列（op とデコレータ）。all なら出ない。
-func TestRel3(t *testing.T) {
-	o := leaf("server.o", nil)
-	o.Effects = []string{"server.e1"}
-	o.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps("server.e1"))}
-	d := decorator("server.d")
-	d.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents("server.e1"))}
-	diags := Check(serverWith(o, d), cfgFor("server"))
-	if n := len(withCode(diags, "REL-3")); n != 2 {
-		t.Errorf("REL-3 count = %d, want 2\n%s", n, messages(diags))
-	}
-	o.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
-	wantNoCode(t, Check(serverWith(o), cfgFor("server")), "REL-3")
-}
-
-// TestRel4 は REL-4: 配線の throws に書いた prevents / keeps が計算と食い違う。
+// TestRel4 は REL-4: 配線の throws に書いた prevents / keeps が計算と食い違う。目的語は常にすべての効果。
 func TestRel4(t *testing.T) {
 	a := leaf("server.a", nil)
 	a.Effects = []string{"server.e1"}
 	b := leaf("server.b", nil)
 	b.Effects = []string{"server.e2"}
 	b.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
-	mk := func(cl ir.ThrowsClause) *ir.Program {
-		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
+	k := leaf("server.k", nil)
+	k.Effects = []string{"server.e2"}
+	k.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
+	mk := func(cl ir.ThrowsClause, callees ...string) *ir.Program {
+		var stmts []ir.Statement
+		for _, c := range callees {
+			stmts = append(stmts, cs(call(c)))
+		}
+		w := wire("server.w", nil, nil, stmts...)
 		w.Throws = []ir.ThrowsClause{cl}
-		return serverWith(a, b, w)
+		return serverWith(a, b, k, w)
 	}
-	// 計算: rel(X, e1) = kept（上の行）、rel(X, e2) = prevented（b の宣言）
-	wantNoCode(t, Check(mk(throws([]string{"server.X"}, keeps("server.e1"), prevents("server.e2"))), cfgFor("server")), "REL-4")
-	d := wantOneCode(t, Check(mk(throws([]string{"server.X"}, prevents())), cfgFor("server")), "REL-4")
+	// a; b の計算: rel(X, e1) = kept（上の行）、rel(X, e2) = prevented（b の宣言）。どちらを書いても片方が食い違う
+	d := wantOneCode(t, Check(mk(throws([]string{"server.X"}, prevents()), "server.a", "server.b"), cfgFor("server")), "REL-4")
 	if !strings.Contains(d.Message, "server.e1") || !strings.Contains(d.Message, "kept") {
 		t.Errorf("REL-4 message = %q", d.Message)
 	}
-	wantOneCode(t, Check(mk(throws([]string{"server.X"}, keeps())), cfgFor("server")), "REL-4")
-	// 関係を書かなければ比較しない
-	wantNoCode(t, Check(mk(throws([]string{"server.X"})), cfgFor("server")), "REL-4")
-}
-
-// TestRel6 は REL-6: relations の効果名が Sig(O, ns(O)).effects にない。
-func TestRel6(t *testing.T) {
-	o := leaf("server.o", nil)
-	o.Effects = []string{"server.e1"}
-	o.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps("server.e1", "server.e2"))}
-	d := wantOneCode(t, Check(serverWith(o), cfgFor("server")), "REL-6")
-	if !strings.Contains(d.Message, "server.e2") || strings.Contains(d.Message, "server.e1") {
-		t.Errorf("REL-6 message = %q", d.Message)
+	d = wantOneCode(t, Check(mk(throws([]string{"server.X"}, keeps()), "server.a", "server.b"), cfgFor("server")), "REL-4")
+	if !strings.Contains(d.Message, "server.e2") || !strings.Contains(d.Message, "prevented") {
+		t.Errorf("REL-4 message = %q", d.Message)
 	}
-	o.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps("server.e1"))}
-	wantNoCode(t, Check(serverWith(o), cfgFor("server")), "REL-6")
+	// 計算と一致すれば出ない: b だけなら e2 は prevented、a; k なら e1 も e2 も kept
+	wantNoCode(t, Check(mk(throws([]string{"server.X"}, prevents()), "server.b"), cfgFor("server")), "REL-4")
+	wantNoCode(t, Check(mk(throws([]string{"server.X"}, keeps()), "server.a", "server.k"), cfgFor("server")), "REL-4")
+	wantOneCode(t, Check(mk(throws([]string{"server.X"}, keeps()), "server.b"), cfgFor("server")), "REL-4")
+	// 関係を書かなければ比較しない
+	wantNoCode(t, Check(mk(throws([]string{"server.X"}), "server.a", "server.b"), cfgFor("server")), "REL-4")
 }
 
 // TestEff2 は EFF-2: 配線の effects が伝播した効果と集合として等しくない。Data.missing / Data.extra。
@@ -221,7 +206,9 @@ func TestDoc1Throws(t *testing.T) {
 	}
 }
 
-// TestCfg1 は CFG-1: state か op を持つユーザーの名前空間で language か out が未設定。グローバルに state / op があれば CFG-1。語彙は対象外。
+// TestCfg1 は CFG-1（docs/config.md「診断」）: テーブルのある名前空間（継承で設定が決まる子孫を含む）で language か out が
+// 未設定。テーブルのない名前空間（グローバルを含む）は出力しないだけで、state や op を持っていても診断は出ない
+// （docs/config.md「出力する名前空間」）。語彙は対象外。
 func TestCfg1(t *testing.T) {
 	p := program(nil,
 		namespace("", leaf("g", nil)),
@@ -229,27 +216,42 @@ func TestCfg1(t *testing.T) {
 		namespace("server", leaf("server.o", nil)),
 		namespace("server.admin", leaf("server.admin.o", nil)),
 		namespace("types", model("types.M")),
+		namespace("actor", state("actor.s", ir.StateList, ir.String()), leaf("actor.o", nil)),
 	)
 	cfg := config.Default("/root")
 	lang := "go"
 	cfg.Namespaces["server"] = config.NamespaceTable{Language: &lang}
 	diags := Check(p, cfg)
 	c1 := withCode(diags, "CFG-1")
-	if len(c1) != 3 { // global, server (out), server.admin (out, inherited language)
-		t.Fatalf("CFG-1 count = %d, want 3\n%s", len(c1), messages(diags))
+	if len(c1) != 2 { // server (out), server.admin (out, inherited language)。グローバル、types、actor はテーブルがないので出ない
+		t.Fatalf("CFG-1 count = %d, want 2\n%s", len(c1), messages(diags))
 	}
 	if c1[0].File != config.FileName || c1[0].Span != nil {
 		t.Errorf("CFG-1 position: file=%q span=%v", c1[0].File, c1[0].Span)
 	}
-	if !strings.Contains(c1[1].Message, "server") || !strings.Contains(c1[1].Message, "out") || strings.Contains(c1[1].Message, "language") {
+	if !strings.Contains(c1[0].Message, "server") || !strings.Contains(c1[0].Message, "out") || strings.Contains(c1[0].Message, "language") {
+		t.Errorf("CFG-1 message = %q", c1[0].Message)
+	}
+	if !strings.Contains(c1[1].Message, "server.admin") {
 		t.Errorf("CFG-1 message = %q", c1[1].Message)
+	}
+	// out だけ書いた（language がない）
+	out := "gen"
+	cfgOut := config.Default("/root")
+	cfgOut.Namespaces["server"] = config.NamespaceTable{Out: &out}
+	if d := wantOneCode(t, Check(program(nil, namespace("server", leaf("server.o", nil))), cfgOut), "CFG-1"); !strings.Contains(d.Message, "language") || strings.Contains(d.Message, "out") {
+		t.Errorf("CFG-1 message = %q", d.Message)
 	}
 	ok := program(nil, httpVocab(), namespace("server", leaf("server.o", nil)), namespace("server.admin", leaf("server.admin.o", nil)))
 	wantNoCode(t, Check(ok, cfgFor("server")), "CFG-1") // 子は親の設定を引き継ぐ
+	// テーブルのない名前空間は、state や op を持っていても診断なし（設定された名前空間と並んでいても、設定が空でも）
+	mixed := program(nil, namespace("", leaf("g", nil)), namespace("server", leaf("server.o", nil)), namespace("actor", leaf("actor.o", nil)))
+	wantCodes(t, Check(mixed, cfgFor("server")))
+	wantCodes(t, Check(mixed, config.Default("/root")))
 	// 設定ファイルのパスが File になる
 	cfg2 := cfgFor("server")
 	cfg2.Path = "/root/hozo.toml"
-	delete(cfg2.Namespaces, "server")
+	cfg2.Namespaces["server"] = config.NamespaceTable{Language: &lang}
 	if d := wantOneCode(t, Check(program(nil, namespace("server", leaf("server.o", nil))), cfg2), "CFG-1"); d.File != "/root/hozo.toml" {
 		t.Errorf("CFG-1 file = %q", d.File)
 	}

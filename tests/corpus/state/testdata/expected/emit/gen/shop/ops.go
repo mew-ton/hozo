@@ -27,10 +27,15 @@ type Leaves interface {
 	// Effects: shop.startOver
 	Restart(ctx context.Context) error
 
-	// Login は op shop.login。
+	// StoreToken は op shop.storeToken。
 	//
-	// Effects: shop.saveToken, shop.signIn
-	Login(ctx context.Context, token Token) error
+	// Effects: shop.saveToken
+	StoreToken(ctx context.Context, token Token) error
+
+	// MarkLoggedIn は op shop.markLoggedIn。
+	//
+	// Effects: shop.signIn
+	MarkLoggedIn(ctx context.Context) error
 
 	// Logout は op shop.logout。
 	//
@@ -81,10 +86,15 @@ type Ops interface {
 	// Effects: shop.startOver
 	Restart(ctx context.Context) error
 
-	// Login は op shop.login。
+	// StoreToken は op shop.storeToken。
 	//
-	// Effects: shop.saveToken, shop.signIn
-	Login(ctx context.Context, token Token) error
+	// Effects: shop.saveToken
+	StoreToken(ctx context.Context, token Token) error
+
+	// MarkLoggedIn は op shop.markLoggedIn。
+	//
+	// Effects: shop.signIn
+	MarkLoggedIn(ctx context.Context) error
 
 	// Logout は op shop.logout。
 	//
@@ -110,6 +120,11 @@ type Ops interface {
 
 	// PackBulk は op shop.packBulk。
 	PackBulk(ctx context.Context, line Line) (Line, error)
+
+	// Login は op shop.login。
+	//
+	// Effects: shop.saveToken, shop.signIn
+	Login(ctx context.Context, token Token) error
 
 	// OpenTop は op shop.openTop。
 	OpenTop(ctx context.Context) error
@@ -178,8 +193,12 @@ func (o *ops) Restart(ctx context.Context) error {
 	return o.leaves.Restart(ctx)
 }
 
-func (o *ops) Login(ctx context.Context, token Token) error {
-	return o.leaves.Login(ctx, token)
+func (o *ops) StoreToken(ctx context.Context, token Token) error {
+	return o.leaves.StoreToken(ctx, token)
+}
+
+func (o *ops) MarkLoggedIn(ctx context.Context) error {
+	return o.leaves.MarkLoggedIn(ctx)
 }
 
 func (o *ops) Logout(ctx context.Context) error {

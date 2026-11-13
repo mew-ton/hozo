@@ -342,12 +342,7 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 func (r *renderer) throwsClause(c ir.ThrowsClause) string {
 	s := "throws " + r.rels(c.Exceptions)
 	for _, rel := range c.Relations {
-		s += " " + string(rel.Kind) + " "
-		if rel.Effects.All {
-			s += "effects"
-		} else {
-			s += r.rels(rel.Effects.Effects)
-		}
+		s += " " + string(rel.Kind) + " effects"
 	}
 	return s
 }

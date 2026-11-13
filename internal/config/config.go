@@ -62,7 +62,7 @@ type NamespaceConf struct {
 	Out      string
 }
 
-// Default は hozo.toml がないときの設定（docs/lsp.md「プロジェクト」の「設定なしで動く」）。
+// Default は hozo.toml がないときの設定（docs/config.md「置き場と探し方」の「設定なし」、docs/lsp.md「プロジェクト」）。
 // root をルートにし、[hozo] は既定値、名前空間のテーブルはなし。
 func Default(root string) *Config {
 	return &Config{

@@ -15,13 +15,18 @@ import (
 var update = flag.Bool("update", false, "update golden files (docs/testing.md「コーパス」)")
 
 // corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は emit が `go run` のプラグインを起動するもの。
+// checkOnly は check のゴールデンだけを持つもの（emit のゴールデンは持たない）。
 var corpora = []struct {
-	name    string
-	needsGo bool
+	name      string
+	needsGo   bool
+	checkOnly bool
 }{
-	{"design", false},
-	{"view", true},   // plugins/view-dump を `go run` で起動する
-	{"state", false}, // 状態の分類・遷移の効果・状態での match
+	{name: "design"},
+	{name: "view", needsGo: true}, // plugins/view-dump を `go run` で起動する
+	{name: "state"},               // 状態の分類・遷移の効果・状態での match
+	// モデルが先: 名前空間のデコレータ、出力しない名前空間、印のデコレータ。Go の既定の出力の形（印のデコレータは
+	// 何も生成しない。docs/emit-go.md「デコレータ」）が決まるまで、emit のゴールデンは置かない
+	{name: "model", checkOnly: true},
 }
 
 // corpusDir はコーパス name のディレクトリ（tests/ からの相対パス）。
@@ -52,6 +57,9 @@ func TestCorpusCheckGolden(t *testing.T) {
 // （copyCorpusAsModule）、新しくできたファイルをすべて比べる。差分はファイルごとに示す。更新は `go test ./tests -update`。
 func TestCorpusEmitGolden(t *testing.T) {
 	for _, c := range corpora {
+		if c.checkOnly {
+			continue
+		}
 		t.Run(c.name, func(t *testing.T) {
 			if c.needsGo {
 				requireGo(t)

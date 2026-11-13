@@ -1,0 +1,9 @@
+// prevents / keeps の目的語は `effects`（その op のすべての効果）。節ごとに一つ書ける
+namespace a {
+  state s: list<string>;
+  effect e1 on s.post;
+  exception X;
+  exception Y;
+  op f() effects e1 throws X keeps effects throws Y prevents effects;
+  decorator d throws X prevents effects;
+}

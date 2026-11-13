@@ -1,7 +1,0 @@
-// REL-3（docs/check.md「throws」）: effects（all）で書く
-namespace a {
-  state s: list<string>;
-  effect e on s.post;
-  exception E;
-  op f() effects e throws E prevents effects;
-}

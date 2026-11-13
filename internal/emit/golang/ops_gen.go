@@ -420,12 +420,7 @@ func (e *emitter) wrapperComment(op *ir.Op, w wrapper) string {
 			}
 			line := "// throws " + strings.Join(ex, " | ")
 			for _, r := range t.Relations {
-				line += " " + string(r.Kind) + " "
-				if r.Effects.All {
-					line += "effects"
-				} else {
-					line += strings.Join(r.Effects.Effects, " | ")
-				}
+				line += " " + string(r.Kind) + " effects"
 			}
 			b.WriteString(line + "\n")
 		}

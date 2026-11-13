@@ -15,12 +15,10 @@ protocol = "0.1"
 vocabulary = ["cli.hozo"]
 
 [emit]
-entry = ["cli.command"]
-stop  = ["proc.stdio"]
 ```
 
 - `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`cli.hozo` の中身は `examples/hozoc.hozo` の `namespace cli` を写し、`x?: T` は `x: T?` に直す。
-- `stop` に `proc.stdio` を置くのは、プロセスの境界を越える op を辿らず既定のインターフェースで呼ぶため。これにより `docs/emit-go.md`「デコレータ」の規則で `@proc.stdio` の包む関数は生成されない。
+- 選ぶもの（`docs/plugin-protocol.md`「選択」）: `roots` は `@cli.command` の付いた op、`stops` は `@proc.stdio` の付いた op（プロセスの境界を越える op は辿らず、口だけを出す）。`states` と `wraps` は空。
 - `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため（作業ディレクトリがリポジトリのルートで、`go.mod` がある）。配布するときはビルドした実行ファイル `hozoc-plugin-go-cli` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go-cli/` に置く（`docs/plugin-protocol.md`「探索」）。
 
 ## 出力

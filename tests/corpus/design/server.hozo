@@ -227,9 +227,27 @@ namespace server {
     effects refund
     throws RefundPending keeps effects;   // 返金の処理は受け付けたが、完了の確認が取れない
 
+  // 追加: §7.3 の `placeOrder` の二つの効果を、効果ごとの葉の op に分けたもの（README.md の表の 14）
+  /** 注文を保存する */
+  op saveOrder(in: OrderInput): Order
+    effects createOrder;
+
+  /** 注文したユーザーに通知する */
+  op sendOrderNotice(order: Order)
+    effects notifyUser
+    throws NotificationFailed prevents effects;
+
+  // §7.3 の原文は葉の op に `effects createOrder | notifyUser` と
+  // `throws NotificationFailed keeps createOrder prevents notifyUser` を書く。葉の op が直に持てる効果は一つまでで、
+  // prevents / keeps の目的語は effects だけなので、配線にした。NotificationFailed のとき createOrder は
+  // 起きていて（kept）、notifyUser は起きていない（prevented）ことは、検査器が本体から計算する。
   op placeOrder(in: OrderInput): Order
-    effects createOrder | notifyUser
-    throws NotificationFailed keeps createOrder prevents notifyUser;
+    throws NotificationFailed
+  {
+    const order = saveOrder(in);
+    sendOrderNotice(order);
+    return order;
+  }
 
   // ---- §3.4 コメント ----
 

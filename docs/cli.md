@@ -12,6 +12,7 @@
 - `lsp` を足す。
 - `emit` を配線にし、`check` を呼んでから `writeOutputs` を呼ぶ。
 - `outputs` の状態の `@fs.files("{out}/**")` は、置き場が設定で決まるので `@fs.files` を付けず説明に書く。
+- `writeOutputs` の三つの効果（追加・書き換え・削除）は、葉の op が持てる効果が一つまで（`docs/check.md` EFF-3）なので、`outputs` を対象にした分類 `OutputsSync` の遷移 `syncOutputs` 一つにする。述語 `UpToDate` は「生成し直して差分がない」で、`docs/testing.md`「生成物の一致」の検査と同じ中身。
 - `runEmit` の `@proc.stdio("{plugin.command}")` は、呼び先を引数 `plugin` で渡す形にし、`proc.stdio` は引数を持たない（`docs/vocab.md`「同梱する語彙」）。`runImport` は段階 6 で足す。
 - 出力の形式を選ぶ `format` のフラグと、知らない名前空間を指したときの `UnknownNamespace` を足す。
 - プラグインとやり取りする model（`EmitRequest` / `EmitResponse`）は `docs/plugin-protocol.md`「要求と応答」の JSON をそのまま写す。
@@ -127,12 +128,16 @@ namespace hozoc {
     @cli.flag("log") @cli.env("HOZO_LSP_LOG") log: Path?;
   }
 
-  /** 新しく生成したファイルを書き出す */
-  effect addOutputs on outputs.post;
-  /** 既にあるファイルを、生成し直した内容で書き換える */
-  effect replaceOutputs on outputs.put;
-  /** 生成しなくなったファイルを消す */
-  effect removeStaleOutputs on outputs.delete;
+  /** 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか */
+  classify OutputsSync of outputs {
+    /** 一致している */
+    UpToDate;
+    /** 足りない、古い、または余分なファイルがある */
+    default;
+  }
+
+  /** 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す） */
+  effect syncOutputs on OutputsSync: any -> UpToDate;
 
   /**
    * 仕様を検査する。ファイルは書き出さない。
@@ -158,7 +163,7 @@ namespace hozoc {
    * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
    */
   op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
-    effects addOutputs | replaceOutputs | removeStaleOutputs
+    effects syncOutputs
     throws CheckFailed | OutputConflict | UnknownNamespace prevents effects
     throws proc.Crashed | proc.MalformedOutput prevents effects;
 
@@ -231,7 +236,7 @@ plugin_dirs = ["plugins"]
 
 ## check
 
-1. `hozo.toml` を読み、プラグインのマニフェストを探して読む（`docs/config.md`「置き場と探し方」、`docs/plugin-protocol.md`「探索」）。設定とマニフェストの error は、CFG-4 なら `LanguageMismatch`、それ以外は `ConfigInvalid`（`docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」）。
+1. `hozo.toml` を読み、プラグインのマニフェストを探して読む（`docs/config.md`「置き場と探し方」、`docs/plugin-protocol.md`「探索」）。`hozo.toml` がなければ設定なしで進む（作業ディレクトリをルートにし、`sources` は既定）。設定とマニフェストの error は、CFG-4 なら `LanguageMismatch`、それ以外は `ConfigInvalid`（`docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」）。
 2. 標準の語彙、設定されたプラグインの語彙、`sources` のファイルの順に読み、解析する（`docs/grammar.md`）。
 3. 解決（`docs/resolve.md`）、正規化（`docs/ir.md`）、計算と検査（`docs/check.md`）を行う。
 4. `[check] enabled` のプラグインに `direction: "check"` を送り、返った診断を足す。プラグインの異常終了は `proc.Crashed` / `proc.MalformedOutput`。
@@ -248,7 +253,7 @@ plugin_dirs = ["plugins"]
 3. Conf(N).plugins の各プラグインを `runEmit` で起動し（順序は `docs/plugin-protocol.md`「起動」）、`files` を集める。`errors` があれば `CheckFailed`。
 4. すべての名前空間のファイルを集めてから、パスの重複を確かめる（CFG-5 → `OutputConflict`）。
 5. `dryRun` なら、書く予定のパスを `written` に入れて返す（書かない）。
-6. 対象の各名前空間の `<Dir(N)>/.hozoc-outputs.json`（前回書いたパスの一覧。ルートからの相対パスの JSON の配列、辞書順）を読み、今回書かないパスのファイルを消す（`removeStaleOutputs`）。ファイルがなければ何もしない。`hozo.toml` から名前空間のテーブルを消した場合、その出力先はもう分からないので消さない（手で消す）。
+6. 対象の各名前空間の `<Dir(N)>/.hozoc-outputs.json`（前回書いたパスの一覧。ルートからの相対パスの JSON の配列、辞書順）を読み、今回書かないパスのファイルを消す。ファイルがなければ何もしない。`hozo.toml` から名前空間のテーブルを消した場合、その出力先はもう分からないので消さない（手で消す）。
 7. ファイルを書く。内容が同じなら書き直さない（`written` には入れる）。ディレクトリは作る。
 8. `.hozoc-outputs.json` を書く。
 
@@ -262,8 +267,7 @@ plugin_dirs = ["plugins"]
 
 ## 手で書くもの
 
-- `cmd/hozoc/main.go`: `internal/app` の `Leaves` を `hozoc.New` で `Ops` にし、`Presenter` と一緒に `cli.Main`（`docs/plugin-go-cli.md`「出力」）に渡す。それだけ。骨組み（引数の解釈、例外の見分けと終了コード、使い方）は `cli.hozo` から生成した `internal/gen/hozoc`（`docs/emit-go.md`）と `internal/gen/hozoc/cli`（go-cli）が持ち、変えるときは `cli.hozo` を変えて `make generate`（`go run ./cmd/hozoc emit`）。生成物はコミットし、`tests/generated_test.go` と CI が遅れていないことを確かめる（`docs/testing.md`「生成物の一致」）。
-- `internal/app`: 生成した `hozoc.Leaves`（`docs/emit-go.md`「op」）の実装。`check` は `internal/project.Load`、`writeOutputs` は `internal/emit/golang` と `runEmit`、`runEmit` は `internal/plugin.Runner`、`lsp` は `internal/lsp.Serve`（`docs/packages.md`）。境界の型は生成したもの（`hozoc.CheckInput`、`hozoc.Diagnostic`。中の `internal/diag.Diagnostic` は行と列に直して写す）で、例外は生成した exception の型（`hozoc.CheckFailed{Value: hozoc.Diagnostics{...}}` など。`proc.Crashed` / `proc.MalformedOutput` は hozoc のパッケージに複製された `hozoc.Crashed` / `hozoc.MalformedOutput`。`docs/emit-go.md`「配置」）。`cli.hozo` の model は境界だけ（`docs/requirements.md`「自己展開」）なので、op をまたいで要る中身（`check` が解析した `Project`、`runEmit` に渡す IR。`View` は中身を持たない）は `Leaves` の中に持つ。`Wrappers` はない（`@cli.command` は go-cli の `entry`、`@proc.stdio` は `stop`。`docs/emit-go.md`「デコレータ」）。
+- `cmd/hozoc/main.go`: `internal/app` が用意した葉の実装（`hozoc.Leaves` と `hozoc.States` のフィールド。`docs/emit-go.md`「実装の単位」）を入れ、`hozoc.New` で `Ops` にし、`Presenter` と一緒に `cli.Main`（`docs/plugin-go-cli.md`「出力」）に渡す。それだけ。骨組み（引数の解釈、例外の見分けと終了コード、使い方）は `cli.hozo` から生成した `internal/gen/hozoc`（`docs/emit-go.md`）と `internal/gen/hozoc/cli`（go-cli）が持ち、変えるときは `cli.hozo` を変えて `make generate`（`go run ./cmd/hozoc emit`）。生成物はコミットし、`tests/generated_test.go` と CI が遅れていないことを確かめる（`docs/testing.md`「生成物の一致」）。
+- `internal/app`: 葉の op の実装。go-cli が選ぶのは `@cli.command` の `check` / `emit` / `lsp` と、`emit` の配線から辿られる `writeOutputs`（`docs/plugin-go-cli.md`「マニフェスト」、`docs/emit-go.md`「出力の対象」）。どの配線からも呼ばれない `runEmit` は生成の対象にならず、`internal/app` の中の関数になる（`cli.hozo` には境界の記述として残る）。効果を持たない `check` / `lsp` は `hozoc.Leaves` のフィールドに、効果 `syncOutputs` を持つ `writeOutputs` は、その宛先の状態の単位 `hozoc.States.OutputsSync` の命令に入る（`docs/emit-go.md`「state」）。`check` は `internal/project.Load`、`writeOutputs` は `internal/emit/golang` とプラグインの起動（`internal/plugin.Runner`）、`lsp` は `internal/lsp.Serve`（`docs/packages.md`）。`OutputsSync` の述語 `UpToDate` は、生成し直した内容とディスクの内容を比べて実装する。境界の型は生成したもの（`hozoc.CheckInput`、`hozoc.Diagnostic`。中の `internal/diag.Diagnostic` は行と列に直して写す）で、例外は生成した exception の型（`hozoc.CheckFailed{Value: hozoc.Diagnostics{...}}` など。`proc.Crashed` / `proc.MalformedOutput` は hozoc のパッケージに複製された `hozoc.Crashed` / `hozoc.MalformedOutput`。`docs/emit-go.md`「配置」）。`cli.hozo` の model は境界だけ（`docs/requirements.md`「自己展開」）なので、op をまたいで要る中身（`check` が解析した `Project`、`runEmit` に渡す IR。`View` は中身を持たない）は `internal/app` の中に持つ。包む関数はない（go-cli は `wraps` を返さない。`docs/emit-go.md`「デコレータ」）。
 - `Presenter`（`cli.Presenter` の実装）: 入力（`CheckInput` / `EmitInput`）の `format` に応じて text か JSON（`docs/diagnostics.md`「表示」）。結果は標準出力、例外は標準エラー（`docs/plugin-go-cli.md`「実行と表示」）。text の `CheckResult` は診断の一覧と件数、`EmitResult` は warning の一覧（あれば）に続けて `written: <path>` / `removed: <path>` を一行ずつ、診断を運ぶ例外はその一覧と件数、それ以外の例外は `hozoc: <Failure.Err のメッセージ>`。json の `CheckResult` は `{"warnings": [...]}`、`EmitResult` は `{"warnings": [...], "written": [...], "removed": [...]}`、例外は `{"error": "<FQN>", "value": {...}}` で、診断を運ぶ例外の `value` は `docs/diagnostics.md`「json」の形（`{"diagnostics", "errors", "warnings"}`）、それ以外は `cli.JSONPresenter` と同じ。診断の要素は `docs/diagnostics.md`「json」と同じ形。
-- `hozo.toml` がなければ、`check` は CFG-7 を一つ作って `ConfigInvalid` にする（`internal/project` は設定なしでも動くが、CLI は設定を要求する）。
-- `lsp` は段階 4 まで未実装で、宣言にない例外として 70 で終わる（`docs/diagnostics.md`「終了コード」）。
+- `hozo.toml` がないとき、`check` は設定なしで検査し、`emit` は CFG-7 を一つ作って `ConfigInvalid` にする（`docs/config.md`「置き場と探し方」）。

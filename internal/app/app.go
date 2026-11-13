@@ -3,7 +3,7 @@
 // 骨組み（引数の解釈、例外の見分けと終了コード、使い方の表示）は cli.hozo から生成した
 // internal/gen/hozoc（既定の出力。docs/emit-go.md）と internal/gen/hozoc/cli（go-cli。docs/plugin-go-cli.md）が持ち、
 // ここは hozoc.Leaves（Check / WriteOutputs / RunEmit / Lsp）と cli.Presenter を実装する。配線の op emit は生成した
-// ops が持つ（hozoc.New(leaves).Emit）。cmd/hozoc/main.go がこれらを組み立てて cli.Main を呼ぶ。
+// ops が持つ（hozoc.New(leaves, classifiers).Emit）。cmd/hozoc/main.go がこれらを組み立てて cli.Main を呼ぶ。
 //
 // 境界の型は生成したもの（hozoc.CheckInput、hozoc.Diagnostic、hozoc.CheckFailed など）で、中の豊かな型
 // （internal/project.Project、internal/diag.Diagnostic）は Leaves の中にとどめる。例外は生成した exception の型で

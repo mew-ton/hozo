@@ -1,0 +1,23 @@
+// EFF-3（docs/check.md「状態と効果」）: 複数の効果を持つ処理は、効果ごとの葉の op を配線でつなぐ。
+// 配線の op は伝播した効果を二つ以上書いてよい（照合は EFF-2）。効果の union でも書ける
+namespace a {
+  state s: list<string>;
+  state t: nullable<string>;
+  effect e on s.post;
+  effect f on t.post;
+  union Both { e; f; }
+  op doE() effects e;
+  op doF() effects f;
+  op wiring() effects e | f {
+    doE();
+    doF();
+  }
+  op viaUnion() effects Both {
+    doE();
+    doF();
+  }
+  op implicit() {
+    doE();
+    doF();
+  }
+}

@@ -124,7 +124,6 @@ func TestDeclReject(t *testing.T) {
 		{"two docs", "/** a */ /** b */ model A {}", "付く先のない"},
 		{"doc after decorator", "@db /** x */ model A {}", "デコレータの前に置く"},
 		{"doc on bind", "/** x */ bind a to b.*;", "bind に説明は付けられない"},
-		{"decorator on namespace", "@db namespace a {}", "namespace にデコレータは付けられない"},
 		{"decorator on bind", "@db bind a to b.*;", "bind にデコレータは付けられない"},
 		{"not a decl", "foo;", "宣言が必要"},
 		{"stray close brace", "model A {} }", "対応する「{」のない「}」"},
@@ -154,8 +153,34 @@ func TestNamespace(t *testing.T) {
 	if !ok || inner.Name.String() != "x" || len(inner.Decls) != 1 {
 		t.Errorf("inner = %+v", ns.Decls[1])
 	}
+	if len(ns.Decorators) != 0 {
+		t.Errorf("Decorators = %+v", ns.Decorators)
+	}
 	mustFail(t, "namespace a { model A {}", "namespace a の「}」がない")
 	mustFail(t, "namespace { }", "名前が必要")
+}
+
+// TestNamespaceDecorators は namespace ブロックの前のデコレータ（docs/grammar.md「ファイルと宣言」の
+// Decl = [ DocComment ] { Decorator } NamespaceDecl）。
+func TestNamespaceDecorators(t *testing.T) {
+	src := "/** 注文の文脈 */\n@ctx.bounded(\"注文\") @core\nnamespace shop {\n @inner namespace admin { }\n}"
+	ns := firstDecl[*ast.NamespaceDecl](t, src)
+	if ns.Doc == nil || ns.Doc.Body != "注文の文脈" {
+		t.Errorf("Doc = %+v", ns.Doc)
+	}
+	if len(ns.Decorators) != 2 || ns.Decorators[0].Name.String() != "ctx.bounded" || len(ns.Decorators[0].Args) != 1 || ns.Decorators[1].Name.String() != "core" {
+		t.Fatalf("Decorators = %+v", ns.Decorators)
+	}
+	// 宣言の Span は DocComment を含まず、最初のデコレータから "}" まで。
+	if ns.Span.Start != source.Offset(len("/** 注文の文脈 */\n")) || ns.Span.End != source.Offset(len(src)) {
+		t.Errorf("Span = %+v", ns.Span)
+	}
+	inner, ok := ns.Decls[0].(*ast.NamespaceDecl)
+	if !ok || len(inner.Decorators) != 1 || inner.Decorators[0].Name.String() != "inner" {
+		t.Errorf("inner = %+v", ns.Decls[0])
+	}
+	mustFail(t, "@db /** x */ namespace a {}", "デコレータの前に置く")
+	mustFail(t, "@external namespace a {}", "@external はデコレータの宣言の直前にだけ書ける")
 }
 
 // --- デコレータの適用 ---
@@ -531,11 +556,11 @@ func TestDecoratorDecl(t *testing.T) {
 	if len(d.Params) != 0 || len(d.For) != 1 || d.For[0].Kind != ast.TargetField {
 		t.Errorf("Decorator = %+v", d)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator min(value: int | float) for scalar | field | op | state | exception | model;")
-	if len(d.Params[0].Type.Types) != 2 || len(d.For) != 6 {
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator min(value: int | float) for scalar | field | op | state | exception | model | namespace;")
+	if len(d.Params[0].Type.Types) != 2 || len(d.For) != 7 {
 		t.Errorf("Decorator = %+v", d)
 	}
-	wantTargets := []ast.TargetKind{ast.TargetScalar, ast.TargetField, ast.TargetOp, ast.TargetState, ast.TargetException, ast.TargetModel}
+	wantTargets := []ast.TargetKind{ast.TargetScalar, ast.TargetField, ast.TargetOp, ast.TargetState, ast.TargetException, ast.TargetModel, ast.TargetNamespace}
 	for i, w := range wantTargets {
 		if d.For[i].Kind != w {
 			t.Errorf("For[%d] = %s, want %s", i, d.For[i].Kind, w)
@@ -561,7 +586,7 @@ func TestDecoratorDeclClauses(t *testing.T) {
     throws OfflineCacheMiss prevents effects
     catches A | B ignores
     catches C halts transitionToLogin
-    throws X keeps a | b prevents c;`)
+    throws X | Y keeps effects;`)
 	if len(d.Clauses) != 5 {
 		t.Fatalf("Clauses = %d", len(d.Clauses))
 	}
@@ -570,7 +595,7 @@ func TestDecoratorDeclClauses(t *testing.T) {
 		t.Errorf("Clause 0 = %+v", c0)
 	}
 	c1 := d.Clauses[1].(*ast.ThrowsClause)
-	if names(c1.Exceptions) != "OfflineCacheMiss" || len(c1.Relations) != 1 || c1.Relations[0].Kind != ast.Prevents || !c1.Relations[0].Effects.All {
+	if names(c1.Exceptions) != "OfflineCacheMiss" || len(c1.Relations) != 1 || c1.Relations[0].Kind != ast.Prevents {
 		t.Errorf("Clause 1 = %+v", c1)
 	}
 	c2 := d.Clauses[2].(*ast.CatchesClause)
@@ -582,8 +607,27 @@ func TestDecoratorDeclClauses(t *testing.T) {
 		t.Errorf("Clause 3 = %+v", c3)
 	}
 	c4 := d.Clauses[4].(*ast.ThrowsClause)
-	if len(c4.Relations) != 2 || c4.Relations[0].Kind != ast.Keeps || c4.Relations[0].Effects.All || names(c4.Relations[0].Effects.Names) != "a|b" || names(c4.Relations[1].Effects.Names) != "c" {
+	if names(c4.Exceptions) != "X|Y" || len(c4.Relations) != 1 || c4.Relations[0].Kind != ast.Keeps {
 		t.Errorf("Clause 4 = %+v", c4)
+	}
+	// Relation の Span は "keeps effects" の二語。
+	if got := c4.Relations[0].Span; got.End-got.Start != source.Offset(len("keeps effects")) {
+		t.Errorf("Relation.Span = %+v", got)
+	}
+}
+
+// TestRelationObject は Relation = ( "prevents" | "keeps" ) "effects"（docs/grammar.md「decorator の宣言」）:
+// 目的語は `effects` だけで、効果の名前は書けない（docs/grammar.md「決めたこと」、docs/decisions.md S9）。
+func TestRelationObject(t *testing.T) {
+	tests := []struct{ name, src, want string }{
+		{"named effect on op", "op f() effects a throws X keeps a;", "目的語は「effects」だけ"},
+		{"named effects on op", "op f() effects a throws X keeps a prevents b;", "keeps の目的語は「effects」だけ"},
+		{"qualified effect", "op f() throws X prevents server.a;", "prevents の目的語は「effects」だけ"},
+		{"named effect on decorator", "decorator d throws X prevents a | b;", "prevents の目的語は「effects」だけ"},
+		{"missing object", "op f() throws X prevents;", "「effects」が必要だが「;」がある"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
 }
 

@@ -10,7 +10,7 @@ import "context"
 //   - in: コマンドの入力
 //
 // Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
-// Effects: hozoc.addOutputs, hozoc.replaceOutputs, hozoc.removeStaleOutputs
+// Effects: hozoc.syncOutputs
 func (o *ops) Emit(ctx context.Context, in EmitInput) (EmitResult, error) {
 	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format})
 	if err != nil {

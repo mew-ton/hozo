@@ -1,0 +1,12 @@
+// EFF-3（docs/check.md「状態と効果」「効果の宛先」）: 複数の基底の状態を一体として変えるなら、
+// それらを対象にした分類の状態の遷移一つにする（葉の op の効果は一つ）
+namespace a {
+  state carts: list<string>;
+  state orders: list<string>;
+  classify Checkout of carts, orders {
+    Shopping;
+    Ordered;
+  }
+  effect placeOrder on Checkout: Shopping -> Ordered;
+  op submit() effects placeOrder;
+}

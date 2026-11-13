@@ -1,0 +1,8 @@
+// SYN-1: namespace も宣言で、デコレータを上に書ける（付けられるのは `for namespace` のデコレータ。DEC-1）
+namespace marks {
+  decorator context(name: string) for namespace;
+}
+@marks.context("a")
+namespace a {
+  op f();
+}

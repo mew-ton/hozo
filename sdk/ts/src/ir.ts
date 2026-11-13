@@ -47,11 +47,8 @@ export type CatchMode = "recovers" | "halts" | "ignores";
  */
 export type ParamType = TypeParam | AnyParam;
 export type AnyOf = "exception" | "effect" | "state" | "op" | "model" | "variant";
-export type DecoratorTarget = "op" | "field" | "state" | "exception" | "scalar" | "model";
-/**
- * Relation の effects。"all" は `effects`（すべての効果）、列は効果の FQN（docs/ir.md「decorator」）。
- */
-export type RelationEffects = "all" | string[];
+export type DecoratorTarget =
+  "op" | "field" | "state" | "exception" | "scalar" | "model" | "namespace";
 export type RelationKind = "prevents" | "keeps";
 /**
  * 配線の文（docs/ir.md「配線」）。kind で分ける。
@@ -119,10 +116,11 @@ export interface BindTarget {
   namespace: string;
 }
 /**
- * 一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。
+ * 一つの名前空間（docs/ir.md「Program」）。name は FQN。decorators は namespace ブロックに付いたデコレータ（複数のブロックの分は出現順に連結）。decls は出現順。
  */
 export interface Namespace {
   decls: Decl[];
+  decorators: Application[];
   description?: Doc;
   name: string;
 }
@@ -482,10 +480,9 @@ export interface ThrowsClause {
   relations: Relation[];
 }
 /**
- * 例外が効果に及ぼす関係（docs/ir.md「decorator」）。
+ * 例外が効果に及ぼす関係（docs/ir.md「decorator」）。目的語は常にその op のすべての効果（`effects`）。
  */
 export interface Relation {
-  effects: RelationEffects;
   kind: RelationKind;
 }
 /**

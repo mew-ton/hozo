@@ -20,7 +20,7 @@ func hozocMain(args []string, stdout, stderr io.Writer) int {
 
 // hozocMainIn は dir を作業ディレクトリ（hozo.toml を探し始める場所）にして hozoc を走らせる。空なら os の作業ディレクトリ。
 func hozocMainIn(dir string, args []string, stdout, stderr io.Writer) int {
-	ops := hozoc.New(&app.Leaves{Dir: dir, Stderr: stderr})
+	ops := hozoc.New(&app.Leaves{Dir: dir, Stderr: stderr}, hozoc.Classifiers{})
 	return cli.Main(ops, app.Presenter{}, args, func(string) string { return "" }, stdout, stderr)
 }
 

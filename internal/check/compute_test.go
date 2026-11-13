@@ -26,13 +26,16 @@ func serverWith(decls ...ir.Decl) *ir.Program {
 }
 
 // TestSigLeaf は手順 0（葉の op）の表の各行: E = Declared、F = effects、rel は relations から、succ は kept。
+// relations の目的語は常にすべての効果なので、rel は効果によらない。.hozo の葉の op が持てる効果は一つまで（EFF-3 は
+// internal/sema が出す）だが、手順 0 は循環に含まれる配線の op（本体を無視して葉として計算する）にも使うので、
+// 効果が複数の IR で確かめる。
 func TestSigLeaf(t *testing.T) {
 	o := leaf("server.op", nil)
 	o.Effects = []string{"server.e1", "server.e2", "server.e3"}
 	o.Throws = []ir.ThrowsClause{
 		throws([]string{"server.X"}, prevents()),
-		throws([]string{"server.Y"}, keeps("server.e1")),
-		throws([]string{"server.Z"}, prevents("server.e1"), keeps("server.e1")),
+		throws([]string{"server.Y"}, keeps()),
+		throws([]string{"server.Z"}, prevents(), keeps()),
 		throws([]string{"server.W"}),
 	}
 	p := serverWith(o)
@@ -45,7 +48,13 @@ func TestSigLeaf(t *testing.T) {
 	}
 	for _, e := range sig.Effects {
 		if got := relOf(t, sig, "server.X", e); got != ir.Prevented {
-			t.Errorf("rel(X, %s) = %s, want prevented (prevents all)", e, got)
+			t.Errorf("rel(X, %s) = %s, want prevented (prevents effects)", e, got)
+		}
+		if got := relOf(t, sig, "server.Y", e); got != ir.Kept {
+			t.Errorf("rel(Y, %s) = %s, want kept (keeps effects)", e, got)
+		}
+		if got := relOf(t, sig, "server.Z", e); got != ir.Unknown {
+			t.Errorf("rel(Z, %s) = %s, want unknown (both prevents and keeps; REL-5)", e, got)
 		}
 		if got := relOf(t, sig, "server.W", e); got != ir.Unknown {
 			t.Errorf("rel(W, %s) = %s, want unknown (no relation)", e, got)
@@ -53,15 +62,6 @@ func TestSigLeaf(t *testing.T) {
 		if got := succOf(t, sig, e); got != ir.Kept {
 			t.Errorf("succ(%s) = %s, want kept", e, got)
 		}
-	}
-	if got := relOf(t, sig, "server.Y", "server.e1"); got != ir.Kept {
-		t.Errorf("rel(Y, e1) = %s, want kept (keeps by name)", got)
-	}
-	if got := relOf(t, sig, "server.Y", "server.e2"); got != ir.Unknown {
-		t.Errorf("rel(Y, e2) = %s, want unknown (not named)", got)
-	}
-	if got := relOf(t, sig, "server.Z", "server.e1"); got != ir.Unknown {
-		t.Errorf("rel(Z, e1) = %s, want unknown (both prevents and keeps; REL-5)", got)
 	}
 	// 配線でない op の Call.Bound 埋めは何もしない。Signature の順は E の順、F の順。
 	if sig.Relations[0] != (ir.SignatureRelation{Exception: "server.X", Effect: "server.e1", State: ir.Prevented}) {
@@ -294,18 +294,22 @@ func TestSigSuccPrevented(t *testing.T) {
 func TestSigCatchesRecovers(t *testing.T) {
 	r := decorator("server.recover")
 	r.Catches = []ir.CatchesClause{catches(ir.Recovers, "", "server.X")}
+	// 効果ごとの葉の op: first は e1、l は e2 と例外。w は first; l の順に呼ぶので、X のとき e1 は kept（上の行）、
+	// e2 は l の宣言（relations なし）から unknown
+	first := leaf("server.first", nil)
+	first.Effects = []string{"server.e1"}
 	l := leaf("server.l", ir.String())
-	l.Effects = []string{"server.e1", "server.e2"}
-	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps("server.e1")), throws([]string{"server.Y"})}
-	w := wire("server.w", ir.String(), nil, ret(call("server.l")))
+	l.Effects = []string{"server.e2"}
+	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"}), throws([]string{"server.Y"})}
+	w := wire("server.w", ir.String(), nil, cs(call("server.first")), ret(call("server.l")))
 	w.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
 	w.Decorators = []ir.Application{app("server.recover")}
-	p := serverWith(r, l, w)
+	p := serverWith(r, first, l, w)
 	diags := Check(p, cfgFor("server"))
 	sig := sigOf(t, p, "server.w")
 	wantStrings(t, "E", sig.Exceptions, []string{"server.Y"})
 	if got := succOf(t, sig, "server.e1"); got != ir.Kept {
-		t.Errorf("succ(e1) = %s, want kept (X keeps e1)", got)
+		t.Errorf("succ(e1) = %s, want kept (X のとき e1 は上の行で起きている)", got)
 	}
 	if got := succOf(t, sig, "server.e2"); got != ir.Unknown {
 		t.Errorf("succ(e2) = %s, want unknown (X と e2 の関係は不明)", got)
@@ -318,11 +322,12 @@ func TestSigCatchesRecovers(t *testing.T) {
 
 	// すべて kept なら DEC-5 は出ない
 	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps()), throws([]string{"server.Y"})}
-	p2 := serverWith(r, l, w)
+	p2 := serverWith(r, first, l, w)
 	wantNoCode(t, Check(p2, cfgFor("server")), "DEC-5")
 	// F が空なら起きない
+	first.Effects = nil
 	l.Effects = nil
-	p3 := serverWith(r, l, w)
+	p3 := serverWith(r, first, l, w)
 	wantNoCode(t, Check(p3, cfgFor("server")), "DEC-5")
 }
 
@@ -400,7 +405,7 @@ func TestSigThrowsClause(t *testing.T) {
 	tp := decorator("server.tp")
 	tp.Throws = []ir.ThrowsClause{throws([]string{"server.Z"}, prevents())}
 	tk := decorator("server.tk")
-	tk.Throws = []ir.ThrowsClause{throws([]string{"server.W"}, keeps("server.e1"))}
+	tk.Throws = []ir.ThrowsClause{throws([]string{"server.W"}, keeps())}
 	ty := decorator("server.ty")
 	ty.Throws = []ir.ThrowsClause{throws([]string{"server.Y"}, prevents())}
 	tx := decorator("server.tx")
@@ -424,11 +429,10 @@ func TestSigThrowsClause(t *testing.T) {
 			t.Errorf("rel(X, %s) = %s, want kept (same state twice)", e, got)
 		}
 	}
-	if got := relOf(t, sig, "server.W", "server.e1"); got != ir.Kept {
-		t.Errorf("rel(W, e1) = %s, want kept (named)", got)
-	}
-	if got := relOf(t, sig, "server.W", "server.e2"); got != ir.Unknown {
-		t.Errorf("rel(W, e2) = %s, want unknown (not named)", got)
+	for _, e := range sig.Effects {
+		if got := relOf(t, sig, "server.W", e); got != ir.Kept {
+			t.Errorf("rel(W, %s) = %s, want kept (@tk の keeps effects は F のすべて)", e, got)
+		}
 	}
 }
 

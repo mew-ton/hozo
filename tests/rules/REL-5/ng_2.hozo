@@ -1,0 +1,6 @@
+// REL-5（docs/check.md「throws」）: デコレータの throws でも同じ
+namespace a {
+  exception E;
+  decorator d throws E keeps effects prevents effects;  // ERROR: REL-5
+  op f();
+}

@@ -25,17 +25,18 @@ func checkConfig(ix *index, cfg *config.Config, r *reporter) {
 	}
 }
 
-// checkCfg1 は CFG-1: state か op を一つでも持つユーザーの名前空間で、Conf の language か out が未設定。
-// グローバル（""）に state か op があれば、それも CFG-1（グローバルには設定を書けない）。位置は hozo.toml。
+// checkCfg1 は CFG-1（docs/config.md「診断」）: テーブルのある名前空間（継承で設定が決まる子孫を含む）で、
+// Conf の language か out が未設定（片方だけ書いた、など）。位置は hozo.toml。
+// 自分にも祖先にもテーブルのない名前空間（グローバルを含む）は出力しないだけで、診断は出さない
+// （docs/config.md「出力する名前空間」）。語彙の名前空間は対象外（テーブルを書けば CFG-8）。
 func checkCfg1(ns *ir.Namespace, cfg *config.Config, file string, r *reporter) {
-	if isVocab(ns) || !hasStateOrOp(ns) {
+	if ns.Name == "" || isVocab(ns) {
 		return
 	}
-	if ns.Name == "" {
-		r.reportFile(diag.Error, "CFG-1", file, "グローバルに state か op があるが、グローバルには language と out を設定できない")
+	conf, ok := cfg.Resolve(ns.Name)
+	if !ok {
 		return
 	}
-	conf, _ := cfg.Resolve(ns.Name)
 	var missing []string
 	if conf.Language == "" {
 		missing = append(missing, "language")

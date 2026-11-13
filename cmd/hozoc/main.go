@@ -15,6 +15,8 @@ import (
 )
 
 func main() {
-	ops := hozoc.New(&app.Leaves{Stderr: os.Stderr})
+	// Classifiers（分類 OutputsSync の述語）は、どの配線も `match by OutputsSync` をしないので呼ばれない。零値のまま渡す。
+	// 述語 UpToDate の実装は、Go の既定の出力を docs/emit-go.md「実装の単位」の形（hozoc.States）にするときに足す。
+	ops := hozoc.New(&app.Leaves{Stderr: os.Stderr}, hozoc.Classifiers{})
 	os.Exit(cli.Main(ops, app.Presenter{}, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))
 }

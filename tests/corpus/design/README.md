@@ -31,6 +31,7 @@
 | 11 | §3.4 `op requestPasswordReset(email: Email) effects sendResetMail throws RateLimited prevents effects;`（名前空間の記述なし） | `server` に置いた | `@see login` が `server.login` を指すため |
 | 12 | §10.2 の文の断片 `const plan = match item by WarrantyAvailable { WarrantyAvailable => askWarrantyPlan(item); default => none; };` | 追加した `op chooseWarrantyPlan` の本体に置いた | 文は op の本体にしか書けない（`docs/grammar.md`「配線」）。`condition` と `default` のアームの例を残すため |
 | 13 | §9 `effect removeToken on token.put;   // none を入れる` | `effect removeToken on token.delete;` | 空にするのは `delete`（`docs/decisions.md`「設計書を変える決定」S2、`docs/check.md`「状態の形」の表: `nullable` の `delete` は `HasItems` → `Empty`）。`put` は列数を変えない組み込みの効果なので、空にする意味にならない |
+| 14 | §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;`（葉の op） | 葉の op `saveOrder`（`effects createOrder`）と `sendOrderNotice`（`effects notifyUser`、`throws NotificationFailed prevents effects`）を足し、`placeOrder` はその二つを順に呼ぶ配線（`throws NotificationFailed`。`effects` も `prevents` / `keeps` も書かない） | 葉の op が直に持つ効果は高々一つ（`docs/decisions.md`「設計書を変える決定」S8、`docs/check.md` EFF-3）。`prevents` / `keeps` の目的語は `effects` だけで、効果を名前で書き分ける形はない（同 S9、`docs/grammar.md`「決めたこと」）。原文のままだと SYNTAX。配線にすると、`Signature.relations` は `NotificationFailed` × `createOrder` = `kept`、`NotificationFailed` × `notifyUser` = `prevented` と計算され（`docs/check.md`「計算」手順 0 の配線）、原文が手で書いていた関係と同じになる（`tests/view_test.go` の `TestDesignPlaceOrderRelations`） |
 
 ## 追加した宣言
 
@@ -43,6 +44,7 @@
 - state: `items`、`carts`、`orders`、`notifications`、`passwordResets`（追加した効果の `on` の先）
 - effect: `refund`、`createOrder`、`notifyUser`（§7.3）、`sendResetMail`（§3.4）、`addCartLine`、`attachWarrantyToLine`
 - exception: `RefundPending`、`NotificationFailed`（§7.3）、`RateLimited`（§3.4。`@http.status(429)` を付けた）
+- op（葉。§7.3 の `placeOrder` を分けたもの。表の 14）: `saveOrder`、`sendOrderNotice`
 - op（葉。すべて `@http.get` / `@http.post`）: `getMe`（§11.1 `server.getMe({})`）、`getOrders`（§11.1）、`getItem`、`addToCart`（§10.2 `server.addToCart({ item })`）、`attachWarranty`（§10.2 `server.attachWarranty({ line, plan })`）。`Token` 型の位置はすべて `@http.header(name: "Authorization") token: Token?` の一か所にし、§5.3 の `bind token to server.*` が BIND-1 / BIND-2 に触れないようにした。`getItem` だけは `Token` の位置を持たない（「該当する位置がない op には何もしない」の例）
 
 `browser`（`browser.hozo`）:
@@ -61,10 +63,10 @@
 | §9 `effect removeToken on token.put;   // none を入れる` | `docs/check.md`「状態の形」: `put` は列数を変えない。空にするのは `delete`（S2） | 表の 13。`docs/decisions.md`「設計書へ返すこと」の「状態を分類で表す」 |
 | §11.2 `Ready: { userName: string; orders: OrderRow[] };` | `docs/grammar.md`「model」`Field = [ DocComment ] { Decorator } Ident ":" Type [ "=" Literal ] ";"` | 表の 6。同じく返す候補 |
 | §6.5 `model User { @valid.length(min: 1, max: 100) name: string; }` | `docs/resolve.md`「同じ名前空間に同じ名前の宣言が二つあれば RES-6」 | 表の 5。設計書では「フィールドに付けた制約」の説明のための抜粋と読める |
-| §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;` | `docs/check.md` REL-3（warning）「`relations.effects` が `all` でなく名前の列」。設計書 §7.3 自身が「言語はこの書き方をサポートするが、検査器は警告する」としている | そのまま写した。`hozoc check` のゴールデン（`expected.check.txt`）には `placeOrder` の `throws` に REL-3 の warning が出る |
+| §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;` | `docs/grammar.md`「decorator の宣言」`Relation = ( "prevents" \| "keeps" ) "effects"`（効果の名前は SYNTAX）。`docs/check.md` EFF-3「葉の op の `Op.effects` が二つ以上」 | 表の 14。`docs/decisions.md`「設計書へ返すこと」の「状態を分類で表す」（S8、S9） |
 | §11.2 `model OrdersQuery { page: PosInt = 1; ... }`（`PosInt` は `@valid.min(1) scalar PosInt extends int;`） | `docs/types.md` TYPE-1「核の型（リテラルを含む）の値を `scalar` の位置に渡した」。同「互換」10 はリテラルを核の型にしか渡さない。フィールドの既定値（`docs/grammar.md`「model」`[ "=" Literal ]`）をどう照合するかは `docs/types.md` に書かれていない | そのまま写した。既定値のリテラルは `scalar` の元の型（`base`）に対して照合する、と `docs/types.md` で決める必要がある。決めなければ設計書の例が TYPE-1 に落ちる |
 | §8.1 `decorator redirectOn(error: ApiError, to: RedirectByError)` | `docs/grammar.md`「予約語」の `to` | 表の 7（`docs/decisions.md` に既にある） |
 | §10.2 `@page.interaction(page: openProduct, when: ProductPage.Ready)`、§11.2 `orders: OrderRow[]`、§7.3 の `CancelInput` / `Order` / `refund` など | 宣言がないので RES-1 | 「追加した宣言」で補った |
 | §11.1 `fetchMe` の `@redirectToLogin`（`catches server.Unauthorized halts transitionToLogin`） | `server.getMe` が `server.Unauthorized` を投げること（`@requiresAuth`）を前提にしているが、`getMe` の宣言は設計書にない | 表の 9 |
 
-このコーパスで `hozoc check` に error は出ない想定。warning は上の REL-3 だけの想定（`docs/check.md` の各規則を手で追った結果。THROWS-1 は配線の op ごとに呼び先の `Sig(callee, browser)` を集めて確かめ、EFF-2 は `effects` を書いた配線の op がないので対象なし、MATCH-2 は `WarrantyKind` の三つのケースと `WarrantyAvailable` の `default`、BIND-4 は `server.*` への呼び出し六つ（`logout` `getMe` `getOrders` `getItem` `addToCart` `attachWarranty`）の必須の入力を確かめた）。
+このコーパスで `hozoc check` に error も warning も出ない想定（`docs/check.md` の各規則を手で追った結果。THROWS-1 は配線の op ごとに呼び先の `Sig(callee, ns)` を集めて確かめ、EFF-2 は `effects` を書いた配線の op がないので対象なし、EFF-3 は葉の op の `effects` がどれも一つ以下、MATCH-2 は `WarrantyKind` の三つのケースと `WarrantyAvailable` の `default`、BIND-4 は `server.*` への呼び出し六つ（`logout` `getMe` `getOrders` `getItem` `addToCart` `attachWarranty`）の必須の入力を確かめた）。

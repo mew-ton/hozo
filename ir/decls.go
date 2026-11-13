@@ -350,6 +350,7 @@ const (
 	TargetException DecoratorTarget = "exception"
 	TargetScalar    DecoratorTarget = "scalar"
 	TargetModel     DecoratorTarget = "model"
+	TargetNamespace DecoratorTarget = "namespace"
 )
 
 // Decorator は decorator 宣言（docs/ir.md「decorator」）。
@@ -478,51 +479,9 @@ const (
 )
 
 // Relation は例外が効果に及ぼす関係（docs/ir.md「decorator」の Relation）。
+// 目的語は常にその op のすべての効果（`effects`）なので、種類だけを持つ。
 type Relation struct {
-	Kind    RelationKind    `json:"kind"`
-	Effects RelationEffects `json:"effects"`
-}
-
-// RelationEffects は Relation の effects: "all"（`effects` と書いたもの）か効果の FQN の列
-// （docs/ir.md「decorator」の Relation）。All が true なら JSON は "all"、そうでなければ列。
-type RelationEffects struct {
-	All     bool
-	Effects []string
-}
-
-// AllEffects は `effects`（すべての効果）を表す RelationEffects。
-func AllEffects() RelationEffects { return RelationEffects{All: true} }
-
-// MarshalJSON は "all" か FQN の列を書く。
-func (e RelationEffects) MarshalJSON() ([]byte, error) {
-	if e.All {
-		return []byte(`"all"`), nil
-	}
-	if e.Effects == nil {
-		return []byte(`[]`), nil
-	}
-	return json.Marshal(e.Effects)
-}
-
-// UnmarshalJSON は "all" か FQN の列を読む。
-func (e *RelationEffects) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err == nil {
-		if s != "all" {
-			return fmt.Errorf("ir: relation effects: unknown value %q", s)
-		}
-		*e = RelationEffects{All: true}
-		return nil
-	}
-	var list []string
-	if err := json.Unmarshal(data, &list); err != nil {
-		return fmt.Errorf("ir: relation effects: want \"all\" or array: %w", err)
-	}
-	if len(list) == 0 {
-		list = nil
-	}
-	*e = RelationEffects{Effects: list}
-	return nil
+	Kind RelationKind `json:"kind"`
 }
 
 // CatchMode は catches の扱い（docs/ir.md「decorator」の CatchesClause）。

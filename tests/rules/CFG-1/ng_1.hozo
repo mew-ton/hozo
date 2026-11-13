@@ -1,7 +1,7 @@
-// CFG-1（docs/config.md「診断」）: state か op を持つ名前空間 b に language / out の設定がない（ng_1.toml）
+// CFG-1（docs/config.md「診断」）: テーブルはあるが language だけで、out が未設定（ng_1.toml）
 namespace a {
   op f();
 }
 namespace b {
-  op g();
+  state s: list<string>;
 }

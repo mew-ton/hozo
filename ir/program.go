@@ -68,6 +68,8 @@ type Namespace struct {
 	Name string `json:"name"`
 	// Description は namespace ブロックの直前の DocComment。複数あれば最初のもの。
 	Description *Doc `json:"description,omitempty"`
+	// Decorators は namespace ブロックに付いたデコレータ。複数のブロックの分は出現順に連結。
+	Decorators []Application `json:"decorators"`
 	// Decls は宣言の列（出現順）。
 	Decls []Decl `json:"decls"`
 }

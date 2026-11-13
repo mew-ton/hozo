@@ -64,7 +64,7 @@
 
 - E = `Op.throws` の例外（`Declared(O)` と呼ぶ）。
 - F = `Op.effects`。
-- rel(X, e) = X を含む `ThrowsClause` の `relations` に、e を含む（`all` か名前で）`prevents` があれば `prevented`、`keeps` があれば `kept`。どちらもなければ `unknown`。両方あれば REL-5。
+- rel(X, e) = X を含む `ThrowsClause` の `relations` に `prevents` があれば `prevented`、`keeps` があれば `kept`。どちらもなければ `unknown`。両方あれば REL-5。
 - succ(e) = `kept`。
 
 配線の op: 本体の行 i = 1..m を順に見る。行 i の呼び出し（`const` / `call` / `return` なら一つ、`match` ならアームごとの呼び出し）c について Sc = Sig(callee(c), ns(O)) とする。
@@ -86,7 +86,7 @@ D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節
 - `catches Xs mode`: 各 X ∈ Xs について、X ∉ E なら DEC-16（吸収する相手がない）。X ∈ E なら:
   - `recovers` / `ignores`: 各 e ∈ F について rel(X, e) ≠ `kept` なら succ(e) = `unknown`（§8.2「効果が不明な例外を `recovers` で吸収すると、成功のアームでもその効果は不明になる」）。X を E から除く。
   - `halts h`: X を E から除く。h ∉ F なら h を F の末尾に足し、残りのすべての Y ∈ E について rel(Y, h) = `prevented`、succ(h) = `prevented`。h ∈ F ならそのまま。
-- `throws Ys relations`: D が `external` で v = ns(O) なら飛ばす（DEC-10）。そうでなければ各 Y ∈ Ys について、Y を E の末尾に足し（既にあれば位置はそのまま）、各 e ∈ F について `relations` から状態を決める（葉の rel と同じ規則。`all` は F のすべて）。Y が既に E にあって状態が違えば `unknown`。
+- `throws Ys relations`: D が `external` で v = ns(O) なら飛ばす（DEC-10）。そうでなければ各 Y ∈ Ys について、Y を E の末尾に足し（既にあれば位置はそのまま）、各 e ∈ F について `relations` から状態を決める（葉の rel と同じ規則。目的語の `effects` は F のすべて）。Y が既に E にあって状態が違えば `unknown`。
 
 **結果**: `Signature.exceptions` = E、`effects` = F、`relations` = rel、`successEffects` = succ。`Op.signature` = Sig(O, ns(O))。`View.ops` は Sig(O, viewer)（`docs/ir.md`「その名前空間から見た IR」）。
 
@@ -112,7 +112,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 
 ## 診断
 
-各表の「手続き」が条件。「重さ」は error か warning。位置は、表に書いてなければ規則の対象（宣言、フィールド、呼び出し、アーム）の `Span`。設計書にある規則の意味は `docs/requirements.md`「検査の規則の一覧」の節を、ない規則の意味はこの表を持ち主とする。`hozo.toml` がないとき（`docs/lsp.md`「プロジェクト」）は、呼び出す側（`internal/project`）が CFG-* を除く。
+各表の「手続き」が条件。「重さ」は error か warning。位置は、表に書いてなければ規則の対象（宣言、フィールド、呼び出し、アーム）の `Span`。設計書にある規則の意味は `docs/requirements.md`「検査の規則の一覧」の節を、ない規則の意味はこの表を持ち主とする。`hozo.toml` がないとき（`docs/config.md`「置き場と探し方」）は、呼び出す側（`internal/project`）が CFG-* を除く。
 
 ### 名前空間
 
@@ -141,6 +141,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | STATE-2 | error | 葉の op O の `Op.effects` の効果 e について、e の名前空間が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」） |
 | EFF-1 | — | 計算（Sig の F）で行う。診断なし |
 | EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Sig(O, ns(O)).effects と等しくない。足りないもの・余分なものを `Data.missing` / `Data.extra` に |
+| EFF-3 | error | 葉の op の `Op.effects`（ユニオンを展開した後。同じ効果の重複は一つと数える）が二つ以上（`Signature` を要しないので `internal/sema` が出す）。複数の効果を持つ処理は、効果ごとの葉の op を配線でつなぐ（効果は伝播する。§7.2）。複数の基底の状態を一体として変えるなら、それらを対象にした分類の状態の遷移一つにする（「効果の宛先」） |
 
 ### throws
 
@@ -150,16 +151,14 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | THROWS-2 | — | 診断なし。多めの宣言は許す |
 | REL-1 | error | `Op.throws`（またはデコレータの `throws`）の全節を通して同じ例外が二度ある（`Signature` を要しないので `internal/sema` が出す。REL-5 も同じ） |
 | REL-2 | warning | Sig(O, ns(O)).effects が空の op の `Op.throws` に `relations` がある。デコレータの `throws` の `relations` は対象外（§7.3） |
-| REL-3 | warning | `relations.effects` が `all` でなく名前の列 |
 | REL-4 | error | 計算の手順 0 の「配線の `Op.throws` に `relations` が書かれていれば」の比較。`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組を示す |
-| REL-5 | error | 同じ例外・同じ効果に `prevents` と `keeps` の両方がある |
-| REL-6 | error | `relations` の効果名が Sig(O, ns(O)).effects にない |
+| REL-5 | error | 一つの `ThrowsClause` に `prevents` と `keeps` の両方がある |
 
 ### デコレータ
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。`union` / `effect` / `classify` / `decorator` / `namespace` / `bind` に付けたら常に DEC-1 |
+| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。`union` / `effect` / `classify` / `decorator` に付けたら常に DEC-1（`namespace` は `for namespace` のデコレータだけ） |
 | DEC-2 | error | `targets` に `op` を含まない宣言が `throws` か `catches` を持つ |
 | DEC-3 | — | 文法で閉じる |
 | DEC-4 | error | `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている |
@@ -171,7 +170,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | DEC-10 | — | 計算（手順 i の `throws`） |
 | DEC-11 | error | `docs/types.md`「デコレータの引数」の数と名前 |
 | DEC-12 | error | 別名の `target` が別名。または別名の `args` が `target` の `Param` に合わない（DEC-11 と同じ手続き） |
-| DEC-13 | error | 同じデコレータが同じ宣言に二度付いている（引数が違っても。名前付きデコレータは展開した汎用デコレータで比べる） |
+| DEC-13 | error | 同じデコレータが同じ宣言に二度付いている（引数が違っても。名前付きデコレータは展開した汎用デコレータで比べる）。名前空間は、ブロックが分かれていても一つの宣言として数える |
 | DEC-14 | warning | `external` なデコレータが `throws` を持たない |
 | DEC-15 | error | `@external` がデコレータの宣言以外に付いている（文法で閉じる。索引として残す） |
 | DEC-16 | warning | 計算の手順 i で、`catches` の例外がそこまでの E にない |

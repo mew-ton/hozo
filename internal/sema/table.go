@@ -40,6 +40,10 @@ type namespace struct {
 	declared bool
 	// description は namespace ブロックの直前の DocComment。複数あれば最初のもの（docs/ir.md「Program」）。
 	description *ir.Doc
+	// decorators は namespace ブロックに付いたデコレータ。複数のブロックの分は出現順に連結（docs/ir.md「Program」）。
+	decorators []ir.Application
+	// decoSeen は DEC-13 の照合の表。ブロックをまたいで一つ（appSite.seen）。
+	decoSeen map[string]source.Span
 }
 
 // lowerState は lower の進み具合。
@@ -106,6 +110,13 @@ func (a *analyzer) declareNamespace(parent *namespace, d *ast.NamespaceDecl, fil
 	}
 	if ns.description == nil && d.Doc != nil {
 		ns.description = a.lowerDoc(d.Doc, docContext{ns: ns, span: d.Name.Span})
+	}
+	if len(d.Decorators) > 0 {
+		// デコレータの名前は、適用が書かれた場所（ブロックの外側の名前空間 parent）で解決する（docs/resolve.md「スコープ」）。
+		if ns.decoSeen == nil {
+			ns.decoSeen = map[string]source.Span{}
+		}
+		a.sites = append(a.sites, &appSite{decos: d.Decorators, kind: siteNamespace, sc: &scope{ns: parent}, out: &ns.decorators, seen: ns.decoSeen})
 	}
 	return ns
 }

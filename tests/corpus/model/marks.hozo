@@ -1,0 +1,23 @@
+// 「モデルが先」のサンプル（docs/requirements.md「モデルが先」）。
+// 各ブロックの `// docs/...「見出し」` は、その構文が確かめる文書の見出し。見出し → 構文の対応は README.md。
+
+// docs/requirements.md「モデルが先」決まったこと: どのプラグインも読まないデコレータは印で、何も生成しない
+/** 設計の印。どのプラグインも読まない */
+namespace marks {
+  // docs/grammar.md「decorator の宣言」Target: `for namespace`
+  // docs/ir.md「decorator」: targets は ["namespace"]
+  /** 分かれた文脈（境界づけられたコンテキスト） */
+  decorator context(name: string) for namespace;
+
+  // 名前空間にも op にも付けられる印
+  /** 人が担い手であること（人の手で行う） */
+  decorator manual for namespace | op;
+
+  /** 要求の承認がまだ下りていない */
+  exception NotApproved;
+
+  // docs/check.md「計算」手順 i の throws: 印でも、throws を宣言していれば付けた op の Signature に効く
+  // （external ではないので、op の名前空間から見ても投げる）
+  /** 要求（PRD）の項目に対応する op。承認されるまで始めない */
+  decorator requirement(id: string) throws NotApproved prevents effects;
+}

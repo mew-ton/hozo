@@ -1,0 +1,19 @@
+// DEC-1（docs/check.md「デコレータ」）: namespace に付けられるのは `for namespace` のデコレータだけ
+namespace marks {
+  decorator opOnly;
+  decorator forModel for model;
+  decorator context(name: string) for namespace;
+}
+@marks.opOnly                          // ERROR: DEC-1
+namespace a {
+  op f();
+}
+@marks.forModel                        // ERROR: DEC-1
+@db                                    // ERROR: DEC-1
+namespace b {
+  model M { id: string; }
+}
+namespace c {
+  @marks.context("op には付けられない")  // ERROR: DEC-1
+  op g();
+}

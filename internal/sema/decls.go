@@ -782,6 +782,7 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 		}
 	}
 	a.checkREL1(s.fqn, op.Throws, d.Span)
+	a.checkEFF3(s, d, op.Effects)
 	a.addSite(d.Decorators, siteOp, &scope{ns: s.ns, opParams: &opParamScope{decl: s.fqn, params: params}}, &op.DeclBase.Decorators)
 	if d.Body != nil {
 		a.wirings = append(a.wirings, &wiringJob{sym: s, decl: d, op: op})
@@ -799,7 +800,7 @@ func paramNames(params []*ast.OpParam) map[string]bool {
 	return m
 }
 
-// lowerEffectRefs は effects / prevents / keeps の要素: effect か、効果の union（展開）。
+// lowerEffectRefs は effects の要素: effect か、効果の union（展開）。
 func (a *analyzer) lowerEffectRefs(names []ast.QualifiedName, sc *scope) []string {
 	var out []string
 	for _, n := range names {
@@ -810,21 +811,36 @@ func (a *analyzer) lowerEffectRefs(names []ast.QualifiedName, sc *scope) []strin
 	return out
 }
 
+// checkEFF3 は EFF-3（docs/check.md「状態と効果」）: 葉の op の Op.effects（ユニオンを展開した後）が二つ以上。
+// 葉かどうか（本体がない）と展開後の効果の列だけで決まり、Signature を要しないので、REL-1 / REL-5 と同じく
+// internal/sema が出す。同じ効果を二度書いたものは一つと数える。配線の op（本体を持つ）は伝播した効果を
+// いくつ書いてもよい（EFF-2 が照合する）。位置は op の宣言。
+func (a *analyzer) checkEFF3(s *symbol, d *ast.OpDecl, effects []string) {
+	if d.Body != nil {
+		return
+	}
+	var distinct []string
+	for _, e := range effects {
+		if !contains(distinct, e) {
+			distinct = append(distinct, e)
+		}
+	}
+	if len(distinct) < 2 {
+		return
+	}
+	a.errorf("EFF-3", d.Span, "葉の op %s が効果を二つ以上持っている（%s）。葉の op が直に持てる効果は一つまで。効果ごとの葉の op を配線でつなぐか、まとめて変える状態を対象にした分類の遷移一つにする", s.fqn, join(distinct))
+}
+
 // lowerThrows は throws の一節（docs/ir.md「decorator」の ThrowsClause）。REL-5 もここで確かめる。
 func (a *analyzer) lowerThrows(c *ast.ThrowsClause, sc *scope) ir.ThrowsClause {
 	tc := ir.ThrowsClause{Exceptions: a.lowerExceptionRefs(c.Exceptions, sc)}
 	for _, r := range c.Relations {
-		if r == nil || r.Effects == nil {
+		if r == nil {
 			continue
 		}
 		rel := ir.Relation{Kind: ir.Prevents}
 		if r.Kind == ast.Keeps {
 			rel.Kind = ir.Keeps
-		}
-		if r.Effects.All {
-			rel.Effects = ir.AllEffects()
-		} else {
-			rel.Effects = ir.RelationEffects{Effects: a.lowerEffectRefs(r.Effects.Names, sc)}
 		}
 		tc.Relations = append(tc.Relations, rel)
 	}
@@ -876,48 +892,20 @@ func (a *analyzer) checkREL1(owner string, clauses []ir.ThrowsClause, span sourc
 	}
 }
 
-// checkREL5 は REL-5（docs/check.md「throws」）: 同じ例外・同じ効果に prevents と keeps の両方がある。
-// 一つの節の relations はその節の例外すべてに掛かるので、節の中で prevents と keeps の効果が重なれば違反。
+// checkREL5 は REL-5（docs/check.md「throws」）: 一つの ThrowsClause に prevents と keeps の両方がある。
+// 一つの節の relations はその節の例外すべてと、その op のすべての効果に掛かるので、両方あれば矛盾する。
 func (a *analyzer) checkREL5(c ir.ThrowsClause, span source.Span) {
-	var prevents, keeps []ir.RelationEffects
+	prevents, keeps := false, false
 	for _, r := range c.Relations {
 		if r.Kind == ir.Prevents {
-			prevents = append(prevents, r.Effects)
+			prevents = true
 		} else {
-			keeps = append(keeps, r.Effects)
+			keeps = true
 		}
 	}
-	for _, p := range prevents {
-		for _, k := range keeps {
-			if overlap := effectsOverlap(p, k); overlap != "" {
-				a.errorf("REL-5", span, "例外 %s について効果 %s に prevents と keeps の両方がある", join(c.Exceptions), overlap)
-				return
-			}
-		}
+	if prevents && keeps {
+		a.errorf("REL-5", span, "例外 %s の throws に prevents と keeps の両方がある", join(c.Exceptions))
 	}
-}
-
-// effectsOverlap は二つの目的語が重なる効果の名前（"all" どうしなら "effects"）。重ならなければ空。
-func effectsOverlap(p, k ir.RelationEffects) string {
-	switch {
-	case p.All && k.All:
-		return "effects"
-	case p.All:
-		if len(k.Effects) > 0 {
-			return k.Effects[0]
-		}
-	case k.All:
-		if len(p.Effects) > 0 {
-			return p.Effects[0]
-		}
-	default:
-		for _, e := range p.Effects {
-			if contains(k.Effects, e) {
-				return e
-			}
-		}
-	}
-	return ""
 }
 
 // --- bind ---

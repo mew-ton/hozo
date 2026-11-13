@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	"github.com/mew-ton/hozo/internal/project"
@@ -15,9 +14,13 @@ import (
 // error が一つでもあれば例外（値は error と warning のすべて）、なければ CheckResult（warning）。
 // 解析した Project は WriteOutputs のために l.checked に置く。
 //
-// 例外の選び方（docs/cli.md「check」の 1、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
-// hozo.toml が見つからなければ CFG-7 で ConfigInvalid。error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、
-// それらがすべて CFG-4 なら LanguageMismatch、そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
+// hozo.toml が見つからず、--config / HOZO_CONFIG の指定もなければ「設定なし」で検査する（docs/config.md「置き場と探し方」）:
+// 作業ディレクトリがルート、sources は既定で、CFG-* は出ない（internal/project が除く）。例外になるかどうかは
+// 残りの診断だけで決まる。指定されたファイルが読めないときは設定なしではなく CFG-7（ConfigInvalid）。
+//
+// 例外の選び方（docs/cli.md「check」の 5、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
+// error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-4 なら LanguageMismatch、
+// そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
 // プラグインの check が異常終了すれば proc.Crashed / proc.MalformedOutput（asProc）。
 func (l *Leaves) Check(_ context.Context, in hozoc.CheckInput) (hozoc.CheckResult, error) {
 	l.checked = nil
@@ -26,12 +29,6 @@ func (l *Leaves) Check(_ context.Context, in hozoc.CheckInput) (hozoc.CheckResul
 		return hozoc.CheckResult{}, asProc(p.RunErr)
 	}
 	diags := p.Diags
-	if p.NoConfig {
-		missing := diag.Diagnostic{Severity: diag.Error, Code: "CFG-7", File: config.FileName,
-			Message: "hozo.toml が見つからない（作業ディレクトリから親へ向かって探した。--config か HOZO_CONFIG で指定できる）"}
-		diags = append([]diag.Diagnostic{missing}, diags...)
-		return hozoc.CheckResult{}, hozoc.ConfigInvalid{Value: diagnostics(diags, p.Files)}
-	}
 	if err := classify(diags, p.Files); err != nil {
 		return hozoc.CheckResult{}, err
 	}

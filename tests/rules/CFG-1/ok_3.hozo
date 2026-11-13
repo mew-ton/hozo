@@ -1,0 +1,8 @@
+// CFG-1（docs/config.md「名前空間の設定の解決」）: 子のテーブルは書いたキーだけを上書きし、残りは親から継ぐ（ok_3.toml）。
+// a.x は out だけを書き、language は a から継ぐので、どちらも設定済み
+namespace a {
+  op f();
+}
+namespace a.x {
+  op g();
+}

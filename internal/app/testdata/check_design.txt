@@ -1,2 +1,2 @@
-server.hozo:230:3: warning[REL-3]: server.placeOrder の throws は効果の名前 server.createOrder、server.notifyUser を個別に書いている。効果ごとに葉の op を分ければ宣言が要らなくなる
+warn.hozo:5:3: warning[REL-2]: server.ping は効果を持たないので、throws の prevents / keeps に意味がない
 0 errors, 1 warning

@@ -93,20 +93,11 @@ func throws(exceptions []string, rels ...ir.Relation) ir.ThrowsClause {
 	return ir.ThrowsClause{Exceptions: exceptions, Relations: rels}
 }
 
-// prevents は effects が空なら all。
-func prevents(effects ...string) ir.Relation {
-	if len(effects) == 0 {
-		return ir.Relation{Kind: ir.Prevents, Effects: ir.AllEffects()}
-	}
-	return ir.Relation{Kind: ir.Prevents, Effects: ir.RelationEffects{Effects: effects}}
-}
+// prevents は `prevents effects`。目的語は常にその op のすべての効果（docs/ir.md「decorator」の Relation）。
+func prevents() ir.Relation { return ir.Relation{Kind: ir.Prevents} }
 
-func keeps(effects ...string) ir.Relation {
-	if len(effects) == 0 {
-		return ir.Relation{Kind: ir.Keeps, Effects: ir.AllEffects()}
-	}
-	return ir.Relation{Kind: ir.Keeps, Effects: ir.RelationEffects{Effects: effects}}
-}
+// keeps は `keeps effects`。
+func keeps() ir.Relation { return ir.Relation{Kind: ir.Keeps} }
 
 func decorator(fqn string, params ...ir.Param) *ir.Decorator {
 	return &ir.Decorator{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Params: params, Targets: []ir.DecoratorTarget{ir.TargetOp}}

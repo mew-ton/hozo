@@ -1,0 +1,37 @@
+// docs/requirements.md「モデルが先」: 人の操作を、担い手ごとの名前空間として書く（「ブラウザを操作する利用者」）
+// docs/config.md「出力する名前空間」: テーブルのない名前空間。出力しない
+/** 店で買い物をする利用者（人の操作。コードは生成しない） */
+@marks.context("利用者")
+namespace customer {
+  /** 利用者が覚えている、ほしいもの */
+  state wishlist: list<shop.Line>;
+  /** ほしいものを一つ選んで、覚えから消す */
+  effect forget on wishlist.delete;
+
+  // docs/requirements.md「モデルが先」: op に印を付けて書く形
+  /** ほしいものを一つ選ぶ */
+  @marks.manual
+  op pick(): shop.Line
+    effects forget;
+
+  // docs/config.md「出力する名前空間」: 設定のない名前空間の配線から、設定のある名前空間の op を呼ぶ。
+  // docs/check.md「計算」手順 0（配線）: 効果も例外も、名前空間をまたいで伝播する
+  /** ほしいものをカートに入れて、注文する */
+  op buy(): shop.Order
+    throws shop.OutOfStock | marks.NotApproved | carrier.Closed
+  {
+    const line = pick();
+    shop.addToCart(line);
+    const order = shop.fulfill();
+    return order;
+  }
+}
+
+// docs/grammar.md「ファイルと宣言」: 同じ名前空間のブロックが複数あれば、付けたデコレータは一つの名前空間にまとまる
+// docs/ir.md「Program」: 複数のブロックの分は出現順に連結
+@marks.manual
+namespace customer {
+  /** 店を出る */
+  @marks.manual
+  op leave();
+}

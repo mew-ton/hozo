@@ -89,10 +89,11 @@ func (s *sigState) signature() ir.Signature {
 	return sig
 }
 
-// relationState は ThrowsClause の relations から、例外 x と効果 e の状態を決める（葉の rel の規則）。
-// prevents があれば prevented、keeps があれば kept、どちらもなければ unknown、両方あれば unknown（REL-5 は別に出る）。
-// all は F のすべて（allEffects）。
-func relationState(clauses []ir.ThrowsClause, x, e string, allEffects []string, subst func(string) []string) ir.EffectState {
+// relationState は ThrowsClause の relations から、例外 x のときの効果の状態を決める（葉の rel の規則）。
+// x を含む節に prevents があれば prevented、keeps があれば kept、どちらもなければ unknown、両方あれば
+// unknown（REL-5 は internal/sema が別に出す）。目的語は常にその op のすべての効果（`effects`）なので、
+// 状態は効果によらない。
+func relationState(clauses []ir.ThrowsClause, x string, subst func(string) []string) ir.EffectState {
 	prevents, keeps := false, false
 	for _, cl := range clauses {
 		found := false
@@ -106,10 +107,6 @@ func relationState(clauses []ir.ThrowsClause, x, e string, allEffects []string, 
 			continue
 		}
 		for _, r := range cl.Relations {
-			hit := r.Effects.All && contains(allEffects, e) || contains(r.Effects.Effects, e)
-			if !hit {
-				continue
-			}
 			switch r.Kind {
 			case ir.Prevents:
 				prevents = true
@@ -382,7 +379,7 @@ func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 	}
 	for _, x := range s.E {
 		for _, e := range s.F {
-			s.setRel(x, e, relationState(o.Throws, x, e, s.F, identity))
+			s.setRel(x, e, relationState(o.Throws, x, identity))
 		}
 	}
 	for _, e := range s.F {
@@ -447,7 +444,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 		srcs := info.sources[x]
 		for _, e := range s.F {
 			if len(srcs) == 0 {
-				s.setRel(x, e, relationState(o.Throws, x, e, s.F, identity))
+				s.setRel(x, e, relationState(o.Throws, x, identity))
 				continue
 			}
 			var state ir.EffectState
@@ -571,7 +568,7 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 					existed := s.hasE(y)
 					s.addE(y)
 					for _, e := range s.F {
-						st := relationState([]ir.ThrowsClause{cl}, y, e, s.F, subst)
+						st := relationState([]ir.ThrowsClause{cl}, y, subst)
 						if existed && s.relOf(y, e) != st {
 							st = ir.Unknown
 						}

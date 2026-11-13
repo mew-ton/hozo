@@ -1,6 +1,6 @@
 # コーパス `state`
 
-状態を分類で表す決定（`docs/decisions.md`「設計書を変える決定」S1〜S6）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc check` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の既定の出力（`docs/emit-go.md`）の形を確かめる。
+状態を分類で表す決定（`docs/decisions.md`「設計書を変える決定」S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc check` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の既定の出力（`docs/emit-go.md`）の形を確かめる。
 
 | ファイル | 中身 |
 |---|---|
@@ -27,6 +27,13 @@
 | 同（`value`） | `match line by LineKind { ... }` | `{ kind: "value", atom }` |
 | `docs/types.md`「式の型」の `match` | `const placed = match by Checkout { Shopping => submitOrder(); Ordered => none; };` と `return placed;`（戻り値は `Order?`） | 状態の `match` の型も、値の `match` と同じ決め方（`none` のアームがあれば `optional`） |
 | `docs/check.md`「計算」手順 0（配線） | `openCart`（`HasItems` のアームだけが `emptyCart()` を呼ぶ）、`checkout` | 状態の `match` もアームごとの呼び出しとして計算する。一部のアームにしかない効果は succ が `unknown` |
+| `docs/check.md`「状態と効果」EFF-3、「計算」手順 0（配線） | 葉の `op storeToken(token: Token) effects saveToken;` と `op markLoggedIn() effects signIn;`、それを順に呼ぶ配線の `op login(token: Token) { storeToken(token); markLoggedIn(); }` | 葉の op が直に持つ効果は一つ。配線の `login` の `Signature.effects` は `saveToken`、`signIn`（行の順）で、`Op.effects` は `[]` のまま |
+
+## 書き直した箇所
+
+| 元の書き方 | 今の書き方 | 理由 |
+|---|---|---|
+| `op login(token: Token) effects saveToken \| signIn;`（葉の op に二つの効果） | 葉の `storeToken`（`effects saveToken`）と `markLoggedIn`（`effects signIn`）、その二つを順に呼ぶ配線の `login` | 葉の op が直に持つ効果は高々一つ（`docs/decisions.md`「設計書を変える決定」S8、`docs/check.md` EFF-3）。元のままだと EFF-3 の error |
 
 ## 想定する診断
 

@@ -1,5 +1,8 @@
 // 設計書の examples/hozoc.hozo。`x?: T` は `x: T?` に直した（docs/grammar.md「決めたこと」）。
 // `namespace: string;` のフィールドは予約語なので `namespaceName` に直した。
+// `emit` の三つの効果（`addOutputs | replaceOutputs | removeStaleOutputs`）は、葉の op が直に持てる効果が一つまで
+// （docs/decisions.md「設計書を変える決定」S8、docs/check.md EFF-3）なので、`outputs` を対象にした分類
+// `OutputsSync` の遷移 `syncOutputs` 一つに直した（docs/cli.md「cli.hozo」と同じ形）。
 // hozoc 自身の設計を Hozo で書いた叩き台。
 //
 // ../README.md §14（適用範囲）の「合わないものは境界だけを書く」に従い、書くのは境界
@@ -150,14 +153,16 @@ namespace hozoc {
     @cli.flag("dry-run") dryRun: boolean?;
   }
 
-  /** 新しく生成したファイルを書き出す */
-  effect addOutputs on outputs.post;
+  /** 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか */
+  classify OutputsSync of outputs {
+    /** 一致している */
+    UpToDate;
+    /** 足りない、古い、または余分なファイルがある */
+    default;
+  }
 
-  /** 既にあるファイルを、生成し直した内容で書き換える */
-  effect replaceOutputs on outputs.put;
-
-  /** 生成しなくなったファイルを消す */
-  effect removeStaleOutputs on outputs.delete;
+  /** 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す） */
+  effect syncOutputs on OutputsSync: any -> UpToDate;
 
   /**
    * 仕様を検査する。ファイルは書き出さない。
@@ -181,7 +186,7 @@ namespace hozoc {
    */
   @cli.command("emit")
   op emit(in: EmitInput): CheckResult
-    effects addOutputs | replaceOutputs | removeStaleOutputs
+    effects syncOutputs
     throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict prevents effects
     throws proc.Crashed | proc.MalformedOutput;
 

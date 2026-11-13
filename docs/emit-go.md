@@ -2,9 +2,24 @@
 
 ## この文書が決めること
 
-設計書 §4.3「言語ごとの既定の出力」を Go で具体化する。`internal/emit/golang` がこの文書を写す。入力は `docs/ir.md` の `View`（見る側は出力する名前空間）。出力は `View.config.dir` の下のファイル（パスはルートからの相対）。TS の既定の出力は段階 5 で別の文書にする。
+設計書 §4.3「言語ごとの既定の出力」を Go で具体化する。`internal/emit/golang` がこの文書を写す。入力は `docs/ir.md` の `View`（見る側は出力する名前空間）と、その名前空間に設定されたプラグインが返した選択（「出力の対象」）。出力は `View.config.dir` の下のファイル（パスはルートからの相対）。TS の既定の出力は段階 5 で別の文書にする。
 
-既定の出力が守ること（§4.3）: プラグインがなくても生成でき、呼び出す側から見た関数のインターフェースがこの文書の形で、プラグインの専用の出力もこの形を保つ。
+既定の出力は、プラグインが選んだ宣言を、プラグインどうしが共有する形（呼び出す側から見た関数のインターフェース。§4.3）で出すもの。何を出すかを決めるのはプラグインで、既定の出力はその形だけを決める。
+
+## 出力の対象
+
+**出力するのは、プラグインが選んだ宣言だけ。** プラグインは何をどう出力するかを選び、選ばれなかった宣言は出力の対象にならない（エラーでも warning でもない）。名前空間にプラグインが一つも設定されていなければ、何も出力しない。
+
+選ばれる宣言は、Conf(N).plugins の各プラグインが `emit` の応答で返す `select`（`docs/plugin-protocol.md`「選択」）を合わせたものから、次の手順で決まる。
+
+1. **起点**: `roots` の op と、`wraps` の op、`states` の状態。
+2. **op を辿る**: 選ばれた配線の op の本体が呼ぶ N の op も選ぶ。これを繰り返す。`stops` の op は選ぶが、その本体は辿らない（配線でも葉と同じ扱いにし、実装を差し込む口だけを出す。§4.3「そこから先は辿らず、既定のインターフェースで呼ぶ」）。`wraps` の op も、その本体は辿らない（§4.3「その先は辿らない」）。口だけを出す op は、効果を持てばその宛先の状態の単位に、持たなければ `Leaves` に置く（配線の op が持つ伝播した効果は数えない）。
+3. **状態**: 選ばれた葉の op の効果の宛先の状態（「state」）、選ばれた配線が `match` で読む状態、選ばれた呼び出しの `Call.bound` の状態。分類の状態を選んだら、その対象の基底の状態は選ばない（読むのは分類の述語）。
+4. **分類**: 選ばれた配線の `match` が使う値の分類。
+5. **別の名前空間の op**: 選ばれた配線が呼ぶもの（`Deps` に載る。「op」）。名前空間をまたぐ呼び出しは辿らない。
+6. **型**: 選ばれた op・状態・分類が引数、戻り値、例外、要素の型、対象の型として参照する model / scalar / union / exception と、それらが参照する型。選ばれた op の効果の定数。
+
+この文書の以降の節が言う「N の op」「N の状態」などは、すべて選ばれたものを指す。`Ops` に載るのも選ばれた op だけ。
 
 ## 配置
 
@@ -19,28 +34,34 @@
 | `doc.go` | パッケージの説明（名前空間の `description`） |
 | `types.go` | model、scalar、union、exception、effect |
 | `validate.go` | `Validate` メソッド |
-| `ops.go` | op の関数の型、`Leaves`、`Ops`、`Deps`、`States`、`Wrappers`、`Classifiers`、`New`、`ops` 構造体 |
+| `ops.go` | op の関数の型、`Leaves`、`Ops`、`Deps`、`Wrappers`、`Classifiers`、`New`、`ops` 構造体 |
+| `states.go` | 状態の単位、`StateSet`、変数 `States`、状態の分類の判定関数 |
 | `wiring.go` | 配線の op の本体 |
 | `classify.go` | 分類の型と判定関数 |
 
 ## 実装の単位
 
-人やプラグインが実装するものは、**宣言一つにつき Go の型一つ**（関数の型か、小さなインターフェース）にする。それらを束ねるのは、宣言ごとのフィールドを持つ構造体。一つのインターフェースに名前空間の全部を並べることはしない。
+人やプラグインが実装するものは、**宣言一つにつき Go の型一つ**（関数の型）にする。それらを束ねるのは、宣言ごとのフィールドを持つ構造体。一つのインターフェースに名前空間の全部を並べることはしない。
 
 | 宣言 | 実装するもの | 束ねる構造体 |
 |---|---|---|
-| 葉の op | 関数の型 `<Op>Func`（「op」） | `Leaves` |
-| 包む関数になるデコレータの適用 | 関数の型 `<Op><デコレータ>Wrapper`（「デコレータ」） | デコレータごとの `<デコレータ>Wrappers`、それを束ねる `Wrappers` |
-| 基底の状態 | インターフェース `<状態>State`（「state」） | `States` |
-| 分類 | インターフェース `<C>Cases`（「classify」） | `Classifiers` |
+| 効果を持たない葉の op | 関数の型 `<Op>Func`（「op」） | `Leaves` |
+| 効果を持つ葉の op | 関数の型 `<Op>Func`。その効果の宛先の状態の「命令」になる（「state」） | その状態の単位 `<状態>State` |
+| 基底の状態と分類の状態 | 問い合わせ（組み込みの分類の述語、`Get`、ケースの述語）の関数と、命令 | 状態の単位 `<状態>State`、それを束ねる型 `StateSet` のパッケージ変数 `States` |
+| 値の分類 | インターフェース `<C>Cases`（「classify」） | `Classifiers` |
+| プラグインが `wraps` で引き受けたデコレータの適用（`docs/plugin-protocol.md`「選択」） | 関数の型 `<Op><デコレータ>Wrapper`（「デコレータ」） | デコレータごとの `<デコレータ>Wrappers`、それを束ねる `Wrappers` |
 | 別の名前空間の op | 関数の型 `<Ns><Op>Func`（「op」） | 名前空間ごとの `<Ns>Ops`、それを束ねる `Deps` |
 | `valid` に足した制約 | 関数の型 `<制約>Func`（「scalar」） | `ConstraintFuncs`（変数 `Constraints`） |
 
-理由は三つ。保存先や運搬手段が違うものを別の実装者（人、語彙ごとのプラグイン）が埋められること（§4.3、§5.2「保存場所は語彙とプラグインが決める」）。使わないものの実装を強いないこと。生成物の形を一つの規則にそろえること。
+理由は三つ。保存先や運搬手段が違うものを別の実装者（人、語彙ごとのプラグイン）が埋められること（§4.3、§5.2「保存場所は語彙とプラグインが決める」）。使わないものの実装を強いないこと。生成物の形を一つの規則にそろえること。値の分類だけがインターフェースなのは、ケースの述語を一人が排他になるように実装する単位だから。
 
-構造体のフィールドは、使わなければ `nil` のままでよい。実行時に `nil` のフィールドが要るところへ来たら、生成したコードは panic せず `*runtime.MissingError{Kind, Name}` を返す（`Kind` は `"leaf"` / `"wrapper"` / `"state"` / `"classifier"` / `"dep"` / `"constraint"`、`Name` は宣言の FQN）。
+構造体のフィールドは、使わなければ `nil` のままでよい。実行時に `nil` のフィールドが要るところへ来たら、生成したコードは panic せず `*runtime.MissingError{Kind, Name}` を返す（`Kind` は `"leaf"` / `"state"` / `"classifier"` / `"wrapper"` / `"dep"` / `"constraint"`、`Name` は宣言の FQN）。
 
-呼ぶ側が使う `Ops` だけはインターフェースのまま（「op」）。実装するのが生成したコード自身で、誰にも実装を強いないため。
+**生成するコードは `context` を引数に取らない。** 実装が依存するものは、引数か、束ねる構造体のフィールドとして明示的に渡す（§5.1「状態は…持ち主が呼び出しのときに引数として渡す」、§7.1「リクエストそのものが引数」）。何でも入る暗黙の引数を持たないため。帰結として、既定の出力はキャンセルや期限を実装に伝えない。要るようになったら、暗黙の引数ではなく仕様の上の宣言（語彙）として設計する。
+
+**状態だけは、渡さずにパッケージの変数に置く。** 仕様が状態を「ちょうど一つの名前空間に属する」もの（§5.1）、つまりその名前空間のグローバルと定めているため。保存先の語彙のプラグインが、実装と、それを変数に入れる関数を出力できる。
+
+呼ぶ側が使う `Ops` はインターフェースのまま（「op」）。実装するのが生成したコード自身で、誰にも実装を強いないため。
 
 ## 名前
 
@@ -49,7 +70,7 @@
 | 宣言名（型の位置） | 先頭を大文字に（NAME-1 は warning なので小文字で始まる名前も来る） |
 | 合成した model `OrderPage.Ready`（`docs/ir.md`「正規化」） | 宣言した名前空間より後ろのセグメントをそれぞれ先頭大文字にして連結: `OrderPageReady` |
 | `bind` で合成した model `browser.getMe$in`、入れ子なら `web.getUser$in$auth`（`docs/ir.md`「その名前空間から見た IR」） | `$` のセグメントをそれぞれ先頭大文字にして連結し `Input` を付ける: `GetMeInInput`、`GetUserInAuthInput` |
-| op の引数名、配線の束縛名 | そのまま。Go の予約語、事前宣言の識別子（`error`、`string`、`nil`、`len` など）、生成したコードが使う名前（`ctx`、`o`、`err`、`ptr`）と同じなら末尾に `_` |
+| op の引数名、配線の束縛名 | そのまま。Go の予約語、事前宣言の識別子（`error`、`string`、`nil`、`len` など）、生成したコードが使う名前（`o`、`err`、`ptr`、`States`）と同じなら末尾に `_` |
 | フィールド名 | 先頭を大文字に（`id` → `Id`、`userId` → `UserId`）。`json:"<元の名前>"` タグ。省略可能なら `,omitempty` |
 | op 名 | 先頭を大文字に（メソッド名） |
 | effect 名 | 先頭を大文字にし、`Effect` を前に付ける（`EffectCreateSession`） |
@@ -152,38 +173,57 @@ const EffectCreateSession runtime.Effect = "server.createSession"
 
 ## state
 
-状態そのものは出力しない（保存場所は語彙とプラグインが決める。§5.2）。出すのは、状態を読むための、状態ごとのインターフェース。人か、その状態の語彙のプラグインが、保存先に問い合わせて実装する。
-
-メソッドは形で決まる（`docs/check.md`「状態の形」）。
-
-| 形 | メソッド |
-|---|---|
-| `list<T>` | `IsEmpty` |
-| `nullable<T>` | `IsEmpty`、`Get`（空なら `nil`） |
-| `single<T>` | `Get` |
+状態そのものは出力しない（保存場所は語彙とプラグインが決める。§5.2）。出すのは、状態ごとの単位。**問い合わせ**（状態を読む関数）と**命令**（その状態を変える葉の op）を、関数のフィールドとして持つ構造体にする。
 
 ```go
-// CartsState は状態 shop.carts（list<CartLine>）を読む
-type CartsState interface {
-    IsEmpty(ctx context.Context) (bool, error)   // 組み込みの分類。HasItems はその否定
+// CartsState は状態 shop.carts（list<CartLine>）の単位
+type CartsState struct {
+    IsEmpty   func() (bool, error)   // 問い合わせ: 組み込みの分類。HasItems はその否定
+    AddToCart AddToCartFunc          // 命令: 効果 addCartLine（on carts.post）を持つ葉の op
 }
 
-// TokenState は状態 browser.token（nullable<server.Token>）を読む
-type TokenState interface {
-    IsEmpty(ctx context.Context) (bool, error)
-    Get(ctx context.Context) (*server.Token, error)   // nullable<T> なら *T、single<T> なら T
+// TokenState は状態 browser.token（nullable<server.Token>）の単位
+type TokenState struct {
+    IsEmpty    func() (bool, error)
+    Get        func() (*server.Token, error)   // nullable<T> なら *T（空なら nil）、single<T> なら T
+    ClearToken ClearTokenFunc                   // 命令: 効果 removeToken（on token.delete）を持つ葉の op
 }
 
-type States struct {
-    Carts CartsState
-    Token TokenState
+// CheckoutState は分類の状態 shop.Checkout（carts と orders を対象にした classify）の単位
+type CheckoutState struct {
+    Shopping   func() (bool, error)   // 問い合わせ: ケースごとの述語
+    Ordered    func() (bool, error)
+    PlaceOrder PlaceOrderFunc         // 命令: 効果 placeOrder（on Checkout: Shopping -> Ordered）を持つ葉の op
 }
+
+type StateSet struct {
+    Carts    CartsState
+    Token    TokenState
+    Checkout CheckoutState
+}
+
+// States はこの名前空間の状態。保存先の実装と、命令の実装をここに入れる
+var States StateSet
 ```
 
-- インターフェース名は `<状態名を先頭大文字に>State`、`States` のフィールド名は状態名を先頭大文字にしたもの。並びは宣言順。
-- N に基底の状態が一つでもあれば、配線が使わなくても生成する（`IsEmpty` はテストが効果の結果の判定に使うため）。
-- `New` が `states States` を引数に取るのは、N の配線が状態を読むときだけ: `match ... by list` / `by nullable`（`IsEmpty`）か、N 自身の op への呼び出しで `Call.bound` が空でない（`Get`）。
-- 別の名前空間の op への呼び出しの `Call.bound` は、`Deps` の実装者が埋める（「op」）。
+問い合わせは形で決まる（`docs/check.md`「状態の形」）。
+
+| 状態 | 問い合わせ |
+|---|---|
+| `list<T>` | `IsEmpty` |
+| `nullable<T>` | `IsEmpty`、`Get` |
+| `single<T>` | `Get` |
+| 分類の状態 | ケースごとの述語（`default` は持たない） |
+
+命令は、葉の op のうち、その効果の宛先（`Effect.target`）がこの状態であるもの。宛先が組み込みの効果ならその基底の状態、遷移なら `of` が指す分類の状態か基底の状態。葉の op が直に持つ効果は高々一つ（EFF-3）なので、効果を持つ葉の op はちょうど一つの状態の単位に属する。効果ではなく op をぶら下げるのは、同じ効果でも目的の違う op があり（`login` と `refresh` はどちらもセッションを作る）、動詞で名付けられているのは op の方だから。
+
+- 単位の型の名前は `<状態名を先頭大文字に>State`、`StateSet` のフィールド名は状態名を先頭大文字にしたもの。並びは宣言順（基底の状態と分類の状態を、宣言された順に）。単位の中は、問い合わせ、命令（op の宣言順）の順。
+- N に状態が一つでもあれば、配線が使わなくても生成する（問い合わせはテストが効果の結果の判定に使うため）。
+- 問い合わせの関数は、人か、その状態の語彙のプラグインが保存先に問い合わせて実装する。保存先のプラグインは、実装と、それを `States` のフィールドに入れる関数（`Setup(db *sql.DB)` のようなもの）を出力する。変数は公開なので、別のパッケージから入れられる。
+- 命令の関数は、op の中身（入力から値を組み立てること）を含むので人が実装する。op の入力が要素の型そのもので、組み込みの効果をそのまま起こすだけのものは、保存先のプラグインが実装を出してよい。
+- 分類の状態の判定関数は `func Classify<C>() (<C>, error)`。`States.<C>` の述語をすべて呼び、真の数を「classify」と同じ規則で検証する。述語がエラーを返したら、残りも呼んだうえで最初のエラーを返す。
+- 単位の中でフィールド名が衝突したら GOEMIT-2（`IsEmpty` / `Get` / ケース名と、op 名を先頭大文字にしたもの）。
+- 別の名前空間の op への呼び出しの `Call.bound` は、`Deps` を埋める者が埋める（「op」）。
 
 ## op
 
@@ -193,7 +233,7 @@ op ごとに関数の型を一つ出す。葉でも配線でも同じ。
 
 ```go
 // LoginFunc は op server.login の関数の型
-type LoginFunc func(ctx context.Context, in LoginInput) (LoginOk, error)   // 引数は OpParam の並びのまま。void なら error だけ
+type LoginFunc func(in LoginInput) (LoginOk, error)   // 引数は OpParam の並びのまま。void なら error だけ
 ```
 
 - 型の名前は `<Op を先頭大文字に>Func`。
@@ -203,15 +243,15 @@ type LoginFunc func(ctx context.Context, in LoginInput) (LoginOk, error)   // �
 ### 束ねる構造体と New
 
 ```go
-// Leaves は葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める
+// Leaves は効果を持たない葉の op の実装。人か、その op の語彙のプラグインがフィールドを埋める
 type Leaves struct {
-    Login  LoginFunc
-    GetMe  GetMeFunc
+    GetMe       GetMeFunc
+    OrderPageVm OrderPageVmFunc
 }
 
 // Ops は呼ぶ側が使う、この名前空間のすべての op（葉と配線）
 type Ops interface {
-    Login(ctx context.Context, in LoginInput) (LoginOk, error)
+    Login(in LoginInput) (LoginOk, error)
     ...
 }
 
@@ -219,61 +259,53 @@ type Ops interface {
 // （bind で埋まる位置は引数から消えている）
 type Deps struct { Server ServerOps }
 type ServerOps struct { GetMe ServerGetMeFunc }
-type ServerGetMeFunc func(ctx context.Context, in GetMeInInput) (server.PublicUser, error)
+type ServerGetMeFunc func(in GetMeInInput) (server.PublicUser, error)
 
-func New(leaves Leaves, deps Deps, states States, wrappers Wrappers, classifiers Classifiers) Ops
+func New(leaves Leaves, deps Deps, wrappers Wrappers, classifiers Classifiers) Ops
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま
-type ops struct { leaves Leaves; deps Deps; states States; wrappers Wrappers; classifiers Classifiers }
+type ops struct { leaves Leaves; deps Deps; wrappers Wrappers; classifiers Classifiers }
 ```
 
-- `Leaves` のフィールドは葉の op ごとに一つ（宣言順）。フィールド名は op 名を先頭大文字にしたもの。
+- `Leaves` のフィールドは、効果を持たない葉の op ごとに一つ（宣言順）。フィールド名は op 名を先頭大文字にしたもの。効果を持つ葉の op は `States` の中（「state」）。
 - `Deps` のフィールドは、配線から呼んでいる別の名前空間ごとに一つ。構造体の名前は `<名前空間の最後のセグメントを大文字に>Ops`。
 - `<Ns>Ops` に載せるのは、N の配線から実際に呼んでいる op だけ。関数の型の名前は `<Ns><Op>Func`、引数の型は `View.ops[fqn].params`。`bind` でフィールドを除いた合成 model（`docs/ir.md`「その名前空間から見た IR」の `<viewer>.<op 名>$<引数名>`）は N のパッケージに `<Op><Param>Input` の名前（`GetMeInInput`）で構造体にする。
-- `<Ns>Ops` のフィールドを埋める者が、`bind` で埋まる位置（`View.ops[fqn].bound`）に状態の値を入れて呼び出し先に渡す。埋める者は hozoc の外（同じプロジェクトの Go なら `server.New(...)` の戻り値のメソッドを包み、状態の値を足す人の手のコード。別の言語なら http クライアントのプラグインの出力。§4.3）。
-- `ops` の各メソッドは、葉なら `leaves` の同名のフィールドを、配線なら生成した本体（「配線の本体」）を、その op の包む関数で内側から順に包んだもの。`nil` のフィールドに当たったら `*runtime.MissingError` を返す（「実装の単位」）。
-- 中身のない構造体（`States` にフィールドがない、など）は生成しない。`New` の引数と `ops` のフィールドは、N の配線が使うものだけ。
+- `<Ns>Ops` のフィールドを埋める者が、`bind` で埋まる位置（`View.ops[fqn].bound`）に状態の値を入れて呼び出し先に渡す。埋める者は hozoc の外（同じプロジェクトの Go なら `server.New(...)` の戻り値のメソッドを包み、状態の値を足す人の手のコード。別の言語なら http クライアントのプラグインの出力。§4.3）。別の名前空間が出力を持たない（`hozo.toml` にない。`docs/config.md`）ときも同じで、人の操作のような相手は、人がフィールドを埋めるか、テストが埋める。
+- `ops` の各メソッドは、効果を持たない葉なら `leaves` のフィールドを、効果を持つ葉なら `States.<状態>` のフィールドを、配線なら生成した本体（「配線の本体」）を、その op の包む関数（「デコレータ」）で内側から順に包んだもの。`nil` のフィールドに当たったら `*runtime.MissingError` を返す（「実装の単位」）。
+- 中身のない構造体（`Leaves` にフィールドがない、など）は生成しない。`New` の引数と `ops` のフィールドは、N に要るものだけ。
 
 ### デコレータ
 
-op に付いたデコレータのうち、次の両方を満たすものを「包む関数」にする（§4.3「対応するプラグインがなければ、既定の出力として包む関数のインターフェースを出し、人が実装する」）。
+デコレータが何をするかは、それを読むプラグインが決める。**どのプラグインも読まないデコレータは印**で、既定の出力は何も生成しない（`throws` や `catches` を宣言していても同じ。要求やドメインの印、ほかの道具のための注記に使う）。宣言した `throws` / `catches` は検査の計算（`docs/check.md`「計算」）には効くので、印のデコレータが足す例外を実際に投げるのは葉の実装の責務になる。
 
-- 宣言が `external` でない（運搬の境界は同じプロセスの中では意味がない）。
-- Conf(N).plugins のどのマニフェストの `entry` / `stop` にも含まれない（起点と打ち切りはプラグインが別の形で扱う。`docs/plugin-protocol.md`「entry / stop / decorate の意味」）。
-
-`decorate` に含まれるものも包む関数にする。その実装はプラグインが出力し、人は書かない。
+既定の出力が包む関数を出すのは、プラグインが `select` の `wraps` で引き受けたデコレータの適用だけ（`docs/plugin-protocol.md`「選択」）。その実装はプラグインが出力する。
 
 ```go
-// FetchMeRedirectToLoginWrapper は FetchMe に付いた @redirectToLogin（= redirectOn(server.Unauthorized, transitionToLogin)）。
-// catches server.Unauthorized halts browser.transitionToLogin
-type FetchMeRedirectToLoginWrapper func(ctx context.Context, next FetchMeFunc) (server.PublicUser, error)
-type LoginValidatedWrapper func(ctx context.Context, in LoginInput, next LoginFunc) (LoginOk, error)
+// FetchMeCacheWrapper は FetchMe に付いた @cache
+type FetchMeCacheWrapper func(next FetchMeFunc) (server.PublicUser, error)
+type FetchOrdersCacheWrapper func(query OrdersQuery, next FetchOrdersFunc) ([]server.OrderSummary, error)
 
 // デコレータごとに一つの構造体。フィールドは、そのデコレータを付けた op ごとに一つ
-type RedirectToLoginWrappers struct { FetchMe FetchMeRedirectToLoginWrapper }
-type ValidatedWrappers struct { Login LoginValidatedWrapper }
+type CacheWrappers struct { FetchMe FetchMeCacheWrapper; FetchOrders FetchOrdersCacheWrapper }
 
-type Wrappers struct {
-    RedirectToLogin RedirectToLoginWrappers
-    Validated       ValidatedWrappers
-}
+type Wrappers struct { Cache CacheWrappers }
 ```
 
 - 関数の型の名前は `<Op><デコレータ名>Wrapper`。デコレータ名は、`via` があれば `via` の名前、なければデコレータの名前を、N から見た型名の規則（「名前」）で大文字にしたもの（別の名前空間のデコレータは名前空間も付く: `HttpRetry`）。同じ op に同じデコレータは DEC-13 で弾かれているので重複しない。
 - 引数は op の引数 + `next`。`next` の型は op の関数の型。
-- デコレータごとに束ねるのは、プラグインが `decorate` で引き受ける単位がデコレータだから（`docs/plugin-protocol.md`「entry / stop / decorate の意味」）。プラグインは自分のデコレータの構造体を埋める。
-- `New` が返す `Ops` の葉のメソッドは、`leaves` のフィールドを内側のデコレータから順に包む。配線のメソッドも同じく本体を包む。
+- デコレータごとに束ねるのは、プラグインが引き受ける単位がデコレータだから。プラグインは自分のデコレータの構造体を埋める。
+- `New` が返す `Ops` のメソッドは、葉の実装か配線の本体を、内側のデコレータから順に包む。
 - 包む関数の宣言（`throws` / `catches`）は、型のコメントに写す。
 
 ### 配線の本体
 
 ```go
-func (o *ops) OpenOrders(ctx context.Context, query OrdersQuery) (OrderPage, error) {
-    me, err := o.FetchMe(ctx)
+func (o *ops) OpenOrders(query OrdersQuery) (OrderPage, error) {
+    me, err := o.FetchMe()
     if err != nil { return nil, err }
-    orders, err := o.FetchOrders(ctx, query)
+    orders, err := o.FetchOrders(query)
     if err != nil { return nil, err }
-    return o.OrderPageVm(ctx, me, orders)
+    return o.OrderPageVm(me, orders)
 }
 ```
 
@@ -284,14 +316,14 @@ func (o *ops) OpenOrders(ctx context.Context, query OrdersQuery) (OrderPage, err
 | `return call` | `return <呼び出し>`（戻り値の型が一致するとき）。射影が要るなら束縛してから変換関数 |
 | `return atom` | 射影が要れば変換してから `return` |
 | `const x = match` | 下 |
-| 同じ名前空間の op の呼び出し | `o.<Op>(ctx, ...)` |
-| 別の名前空間の op の呼び出し | `o.deps.<Ns>.<Op>(ctx, ...)`（フィールドが `nil` なら `*runtime.MissingError`） |
+| 同じ名前空間の op の呼び出し | `o.<Op>(...)` |
+| 別の名前空間の op の呼び出し | `o.deps.<Ns>.<Op>(...)`（フィールドが `nil` なら `*runtime.MissingError`） |
 | 引数の `name` | その Go の式（`query.Page`） |
 | 引数の `record` | 構造体リテラル |
 | 引数の `none` | `nil` |
 | 引数の `literal` | Go のリテラル（`Duration` は `time.Duration(ns)`） |
-| `Call.bound`（同じ名前空間の op への呼び出し） | 呼び出しの前に `tok, err := o.states.Token.Get(ctx)` で取り、引数の値のそのパスに入れる。引数が `name` なら一度変数に複製してからフィールドに代入 |
-| `Call.bound`（別の名前空間の op への呼び出し） | 何もしない。`Deps` の引数の型にその位置はなく、`Deps` の実装者が埋める |
+| `Call.bound`（同じ名前空間の op への呼び出し） | 呼び出しの前に `tok, err := States.Token.Get()` で取り、引数の値のそのパスに入れる。引数が `name` なら一度変数に複製してからフィールドに代入 |
+| `Call.bound`（別の名前空間の op への呼び出し） | 何もしない。`Deps` の引数の型にその位置はなく、`Deps` を埋める者が埋める |
 | 射影（model → model） | `<From>To<To>(v)` の変換関数（上の `derivedFrom` と同じ形）。必要になった組だけ生成 |
 
 - 零値: ポインタ・インターフェース・スライス・マップは `nil`、構造体は `T{}`、名前付きの型は `T("")` など Go の零値。
@@ -300,14 +332,14 @@ func (o *ops) OpenOrders(ctx context.Context, query OrdersQuery) (OrderPage, err
 ### match
 
 ```go
-kind, err := Classify<C>(o.classifiers.<C>, item)
+kind, err := ClassifyWarrantyKind(o.classifiers.WarrantyKind, item)
 if err != nil { return nil, err }
 var warranty *server.WarrantyLine
 switch kind {
 case WarrantyKindStandard:
-    warranty, err = o.ChooseStandardWarranty(ctx, item, line)
+    warranty, err = o.ChooseStandardWarranty(item, line)
 case WarrantyKindYamada:
-    warranty, err = o.ChooseYamadaWarranty(ctx, item, line)
+    warranty, err = o.ChooseYamadaWarranty(item, line)
 case WarrantyKindNoWarranty:
     warranty = nil
 }
@@ -317,14 +349,16 @@ if err != nil { return nil, err }
 - 束縛する変数の型は `docs/types.md`「式の型」の `match` の型。
 - `default` のアームは `case <C>Default:`。
 - 値のない `match` は `switch` だけ。
-- 状態の分類での `match by C` は、判定関数の呼び出しが `Classify<C>(ctx, o.classifiers.<C>)` になるだけで、あとは同じ。
-- 組み込みの分類での `match s by list` / `by nullable` は、`empty, err := o.states.<S>.IsEmpty(ctx)` を呼び、`if empty { <Empty のアーム> } else { <HasItems のアーム> }`。
+- 状態の分類での `match by C` は、判定関数の呼び出しが `Classify<C>()` になるだけで、あとは同じ（「state」）。
+- 組み込みの分類での `match s by list` / `by nullable` は、`empty, err := States.<S>.IsEmpty()` を呼び、`if empty { <Empty のアーム> } else { <HasItems のアーム> }`。
   - 値のある `match` は `switch` の形と同じ。`if` の前に `var x T` を置き、枝の中で `x, err = <呼び出し>`（`none` のアームは `x = nil`）、`if` を抜けてから `err` を見る。アームの書かれた順によらず、`Empty` のアームが `if empty` の枝。
   - 値のない `match` で `none` のアームの枝は書かない（`Empty => none` なら `if !empty { ... }`）。両方が `none` なら述語だけ呼ぶ。
   - 一つのアームに両方のケース（`Empty | HasItems => f();`）なら分岐せず、述語を呼んだ後に `match` のない文と同じ形で呼び出しを書く。述語を呼ぶのは、状態を読めないときにアームの分け方によらず失敗させるため。
-- アームの呼び出しが `Call.bound` で状態の値を取るとき（「配線の本体」）、`o.states.<S>(ctx)` はそのアームの枝の中に書き、エラーはその場で返す。
+- アームの呼び出しが `Call.bound` で状態の値を取るとき（「配線の本体」）、`States.<S>.Get()` はそのアームの枝の中に書き、エラーはその場で返す。
 
 ## classify
+
+値の分類（`Classify.subject` が `type`）。
 
 ```go
 type WarrantyKind int
@@ -349,23 +383,9 @@ func ClassifyWarrantyKind(c WarrantyKindCases, v server.Item) (WarrantyKind, err
 
 - 判定関数はすべての述語を評価し、真の数を数える。`hasDefault` が false なら 1 でなければ、true なら 2 以上なら `*runtime.ClassificationError{Classify, Hits}` を返す（§10.3 の表）。0 で `hasDefault` なら `<C>Default`。
 - 「本番で全部の述語を評価して検証するか、最初に真になったものを返すか」（§10.3）は、既定の出力では常に全部評価する。切り替えは段階 6（§12）で考える。
+- `Classifiers` に入るのは値の分類だけ。
 
-状態の分類（`Classify.subject` が `states`）は、述語が値を取らず状態を読む。
-
-```go
-// CheckoutCases は人が実装するケースごとの述語。保存先に問い合わせる
-type CheckoutCases interface {
-    Shopping(ctx context.Context) (bool, error)
-    Ordered(ctx context.Context) (bool, error)
-}
-
-type Classifiers struct { WarrantyKind WarrantyKindCases; Checkout CheckoutCases }
-
-func ClassifyCheckout(ctx context.Context, c CheckoutCases) (Checkout, error)
-```
-
-- 列挙の型と定数、真の数の検証は値の分類と同じ。述語がエラーを返したら、そのエラーを返す。そのときも残りの述語は評価し（「すべての述語を評価し」を保つ）、複数がエラーなら最初のものを返す。真の数は検証しない。
-- 配線で `match by C` に使われない分類でも生成する（テストが効果の結果の判定に使うため）。
+状態の分類（`Classify.subject` が `states`）は、列挙の型と定数は同じ形で出し、述語と判定関数は状態の単位に置く（「state」）。配線で `match by C` に使われない分類でも生成する（テストが効果の結果の判定に使うため）。
 
 ## runtime パッケージ
 

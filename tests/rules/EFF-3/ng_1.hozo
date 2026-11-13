@@ -1,0 +1,10 @@
+// EFF-3（docs/check.md「状態と効果」）: 葉の op の effects が二つ以上
+namespace a {
+  state s: list<string>;
+  state t: nullable<string>;
+  effect e on s.post;
+  effect f on t.post;
+  exception E;
+  op two() effects e | f;                                // ERROR: EFF-3
+  op three() effects e | f throws E prevents effects;    // ERROR: EFF-3
+}

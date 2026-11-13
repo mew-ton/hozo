@@ -15,9 +15,6 @@ protocol = "0.1"                # 対応する docs/ir.md の version
 vocabulary = ["vocab/page.hozo"]   # このプラグインが提供する語彙。マニフェストからの相対パス。省略時は []
 
 [emit]
-decorate    = []                # 包むデコレータの FQN
-entry       = ["page.route", "page.interaction"]   # 起点にするデコレータの FQN
-stop        = ["http.*"]        # 打ち切るデコレータの FQN。末尾 * で名前空間全体
 unsupported = []                # 意味を保てない記法（デコレータの FQN）。使われていれば CFG-6
 
 [check]
@@ -28,7 +25,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 ```
 
 - `command` が文字列なら実行ファイルの名前かパスで、引数なし。配列なら先頭が実行ファイル。実行ファイルにパスの区切りが含まれていればマニフェストのディレクトリからの相対パス、含まれていなければ `PATH` から探す。
-- `[emit]` がなければ `emit` を持たない。`[emit]` があれば `entry` か `decorate` の少なくとも一方が空でないこと（MAN-1）。
+- `[emit]` がなければ `emit` を持たない。何を出力の対象に選ぶかはマニフェストには書かず、プラグインが `emit` の応答で返す（「選択」）。
 - `protocol` が hozoc の `docs/ir.md` の `version` と違えば MAN-2。
 - `vocabulary` の `.hozo` の読み込みは `docs/vocab.md`「読み込み」。
 
@@ -79,7 +76,13 @@ Conf(N).plugins（`docs/config.md`「名前空間の設定の解決」）の名�
 {
   "files": [ { "path": "internal/gen/hozoc/cli/cli.go", "content": "..." } ],   // path はプロジェクトのルートからの相対パス（普通は view.config.dir の下）
   "warnings": [ { "at": "hozoc.emit", "message": "..." } ],  // at は FQN か、"file:line:col" の文字列
-  "errors":   [ { "code": "CLI-1", "at": "hozoc.check", "message": "..." } ]   // 省略可。一つでもあれば書き出さない
+  "errors":   [ { "code": "CLI-1", "at": "hozoc.check", "message": "..." } ],  // 省略可。一つでもあれば書き出さない
+  "select": {                                                                    // 「選択」
+    "roots":  ["hozoc.check", "hozoc.emit", "hozoc.lsp"],
+    "stops":  [],
+    "states": [],
+    "wraps":  []
+  }
 }
 ```
 
@@ -111,25 +114,38 @@ Conf(N).plugins（`docs/config.md`「名前空間の設定の解決」）の名�
 
 `hozoc import` の詳細は段階 6（`docs/requirements.md`「段階」）で決める。形だけをここに置く。
 
-## entry / stop / decorate の意味
+## 選択
 
-hozoc は `View` を渡し、何を変換するかはプラグインが決める（§4.3）。hozoc が `[emit]` の項目を使うのは、`unsupported` の warning（CFG-6）、マニフェストの整合（MAN-1）、既定の出力で包む関数を作るかどうかの判定（`docs/emit-go.md`「デコレータ」）。プラグインの側の約束:
+何を出力の対象にするかは、プラグインが `View` を見て自由に決め、`emit` の応答の `select` で返す。どのデコレータを読むか、デコレータを読まずに構造から決めるか（たとえば「利用者の操作を表す op から呼ばれている op」を起点にする）は、プラグインの判断。起点にも、途中の op にも、そのプラグインの語彙のデコレータが付いている必要はない。プラグインが選ばなかった宣言は出力されず、どのプラグインも読まないデコレータは印で、何も生成しない。
 
-- `entry` のデコレータが付いた宣言を起点に、配線の呼び出しを辿って出力する。
-- `stop` のデコレータが付いた op に着いたら、そこから先は辿らず、既定の出力のインターフェース（`docs/emit-go.md`「op」）で呼ぶ。
-- `decorate` のデコレータが付いた op について、既定の出力が生成する「包む関数」（`docs/emit-go.md`「デコレータ」の `Wrappers` のメソッド）の実装を出力する。
+```jsonc
+"select": {
+  "roots":  ["browser.onAddToCart"],      // 起点にする op（view.viewer の名前空間の op の FQN）
+  "stops":  ["browser.askYamadaWarranty"],// 選ぶが、本体は辿らない op。実装を差し込む口だけを出す
+  "states": ["server.users"],             // 状態を起点に選ぶ（保存先のプラグインなど）
+  "wraps":  [ { "op": "browser.fetchMe", "decorator": "cache" } ]   // このプラグインが包む関数を実装するデコレータの適用
+}
+```
+
+- hozoc は、名前空間に設定されたすべてのプラグインの `select` を合わせ、`roots` から配線の呼び出しを辿って出力の対象を決め、プラグインどうしが共有する形（`docs/emit-go.md`）で出力する。辿り方と、そこから決まる状態・分類・型は `docs/emit-go.md`「出力の対象」。
+- 名前空間をまたぐ呼び出しは辿らない（相手は `Deps` の口になる）。API を呼ぶ直前までがその名前空間のコード、という境界は `stops` に書かなくても成り立つ。
+- プラグイン自身のファイル（`files`）は、選んだ宣言が共有する形で出力されることを前提に書いてよい。
+- `select` を省いたら、何も選ばない（そのプラグインのファイルだけが出力される）。
+- `view.viewer` の名前空間にない FQN、存在しない FQN、`wraps` がその op に付いていないデコレータを指していたら PLG-3。
+
+設計書 §4.6 のマニフェストの `decorate` / `entry` / `stop` は持たない。同じ選び方を静的な一覧と応答の二通りに書けないようにするため。デコレータで起点を選ぶ単純なプラグインのために、SDK が「このデコレータが付いた op」を集める関数を提供する（`docs/packages.md`「`plugin`（公開）」）。
 
 ## 診断
 
 | ID | 重さ | 意味 |
 |---|---|---|
-| MAN-1 | error | `[emit]` があるのに `entry` も `decorate` も空 |
 | MAN-2 | error | `protocol` が合わない |
 | MAN-3 | error | マニフェストの `name` がディレクトリ名と違う |
 | MAN-4 | error | マニフェストの TOML の誤り、知らないキー、`command` が空 |
 | MAN-5 | error | プラグインがその `direction` を実装していない（マニフェストに書いてあるのに） |
 | PLG-1 | error | 応答の `path` がルートの外に出る |
 | PLG-2 | error | 応答の中で同じ `path` が二度 |
+| PLG-3 | error | 応答の `select` が、対象の名前空間にない宣言や、付いていないデコレータを指している |
 | PLUGIN | warning | プラグインの `warnings` |
 
 MAN-* は `ConfigInvalid`、PLG-* は `proc.MalformedOutput`（`docs/diagnostics.md`「終了コード」）。

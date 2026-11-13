@@ -40,7 +40,20 @@ func write(t *testing.T, path, content string) {
 	}
 }
 
-// copyCorpus は設計書のコーパスを一時ディレクトリに写し、既定の出力のために go.mod を置く（GOEMIT-1）。
+// warnFile は copyCorpus が足すファイル。設計書のコーパスには warning がない（§7.3 の placeOrder を配線に直したので
+// REL-3 がなくなった。tests/corpus/design/README.md の表の 14）ので、warning の表示と受け渡し（check の text / json、
+// 例外の値、EmitResult.warnings）を確かめるために、意図した warning を一つ持たせる: 効果を持たない op の
+// prevents effects（REL-2。docs/check.md「throws」）。
+const warnFile = `// internal/app のテストが足すファイル: 意図した warning（REL-2）を一つ出す
+namespace server {
+  /** 手が空いている */
+  exception Idle;
+  op ping() throws Idle prevents effects;
+}
+`
+
+// copyCorpus は設計書のコーパスを一時ディレクトリに写し、warning を一つ出す warn.hozo（warnFile）を足し、
+// 既定の出力のために go.mod を置く（GOEMIT-1）。
 func copyCorpus(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -58,11 +71,12 @@ func copyCorpus(t *testing.T) string {
 		}
 		write(t, filepath.Join(dir, e.Name()), string(data))
 	}
+	write(t, filepath.Join(dir, "warn.hozo"), warnFile)
 	write(t, filepath.Join(dir, "go.mod"), "module example.com/design\n\ngo 1.24\n")
 	return dir
 }
 
-// run は dir を作業ディレクトリにして、cmd/hozoc/main.go と同じ組み立て（hozoc.New(Leaves) と Presenter を
+// run は dir を作業ディレクトリにして、cmd/hozoc/main.go と同じ組み立て（hozoc.New(Leaves, Classifiers) と Presenter を
 // 生成した cli.Main に渡す）で hozoc を走らせる。
 func run(t *testing.T, dir string, env map[string]string, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
@@ -75,7 +89,7 @@ func run(t *testing.T, dir string, env map[string]string, args ...string) (code 
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chdir(wd) }()
-	ops := hozoc.New(&Leaves{Stderr: &errOut, Stdin: strings.NewReader("")}) // lsp は入力の終わりで戻る
+	ops := hozoc.New(&Leaves{Stderr: &errOut, Stdin: strings.NewReader("")}, hozoc.Classifiers{}) // lsp は入力の終わりで戻る
 	code = cli.Main(ops, Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
 	return code, out.String(), errOut.String()
 }
@@ -160,16 +174,77 @@ func TestCheckFailed(t *testing.T) {
 	}
 }
 
-func TestCheckMissingConfig(t *testing.T) {
+// TestCheckWithoutConfig は docs/config.md「置き場と探し方」の「設定なし」: hozo.toml が見つからず、--config も
+// HOZO_CONFIG もなければ、check は作業ディレクトリをルートに既定の sources で検査し、CFG-* を出さない。
+// 終了コードは診断だけで決まる。emit は書き出すものがないので CFG-7（ConfigInvalid、2）。
+// 指定したファイルが読めないのは設定なしではなく CFG-7。
+func TestCheckWithoutConfig(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a { op f(); }\n")
-	code, _, stderr := run(t, dir, nil, "check")
-	if code != exitConfigInvalid || !strings.Contains(stderr, "hozo.toml: error[CFG-7]") {
-		t.Fatalf("code=%d stderr=%q", code, stderr)
+	code, stdout, stderr := run(t, dir, nil, "check")
+	if code != 0 || stderr != "" || stdout != "0 errors, 0 warnings\n" {
+		t.Fatalf("check: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	// 設定の誤り（CFG-1）も 2
-	write(t, filepath.Join(dir, "hozo.toml"), "[a]\nlanguage = \"go\"\n")
+	// warning は出る（終了コードは 0 のまま）
+	write(t, filepath.Join(dir, "w.hozo"), "namespace a { model lower { id: string; } }\n")
+	code, stdout, stderr = run(t, dir, nil, "check")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "warning[NAME-1]") || !strings.Contains(stdout, "0 errors, 1 warning") {
+		t.Fatalf("check: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	// emit は CFG-7（check の warning も一緒に運ぶ）。何も書かない
+	code, stdout, stderr = run(t, dir, nil, "emit")
+	if code != exitConfigInvalid || stdout != "" || !strings.Contains(stderr, "hozo.toml: error[CFG-7]") || !strings.Contains(stderr, "1 error, 1 warning") {
+		t.Fatalf("emit: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, _, stderr = run(t, dir, nil, "emit", "--dry-run", "--format=json")
+	if code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozoc.ConfigInvalid"`) || !strings.Contains(stderr, `"code": "CFG-7"`) {
+		t.Fatalf("emit json: code=%d stderr=%q", code, stderr)
+	}
+	if files := listFiles(t, dir); len(files) != 2 {
+		t.Fatalf("emit がファイルを書いた: %v", files)
+	}
+	// error があれば CheckFailed（1）。設定の誤りではない
+	write(t, filepath.Join(dir, "bad.hozo"), "namespace a { op g(): Nope; }\n")
 	code, _, stderr = run(t, dir, nil, "check")
+	if code != exitCheckFailed || !strings.Contains(stderr, "error[RES-1]") || strings.Contains(stderr, "CFG-") {
+		t.Fatalf("check: code=%d stderr=%q", code, stderr)
+	}
+	// emit でも、検査の error が先（check の例外。CFG-7 にはならない）
+	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || strings.Contains(stderr, "CFG-7") {
+		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
+	}
+	if err := os.Remove(filepath.Join(dir, "bad.hozo")); err != nil {
+		t.Fatal(err)
+	}
+	// 指定したファイルが読めなければ、設定なしではなく CFG-7（2）
+	for _, args := range [][]string{{"check", "--config", "nope.toml"}, {"emit", "--config", "nope.toml"}} {
+		if code, _, stderr = run(t, dir, nil, args...); code != exitConfigInvalid || !strings.Contains(stderr, "nope.toml: error[CFG-7]") {
+			t.Fatalf("%v: code=%d stderr=%q", args, code, stderr)
+		}
+	}
+	if code, _, stderr = run(t, dir, map[string]string{"HOZO_CONFIG": "nope.toml"}, "check"); code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-7]") {
+		t.Fatalf("HOZO_CONFIG: code=%d stderr=%q", code, stderr)
+	}
+	// 設定なしの Leaves.Check は例外なしで結果（warning）を返す
+	l := &Leaves{Dir: dir}
+	res, err := l.Check(context.Background(), hozoc.CheckInput{})
+	if err != nil || len(res.Warnings) != 1 || res.Warnings[0].Code != "NAME-1" {
+		t.Fatalf("Check = %+v, %v", res, err)
+	}
+	// その後の WriteOutputs は ConfigInvalid（CFG-7）
+	_, err = l.WriteOutputs(context.Background(), hozoc.EmitInput{}, res)
+	var ci hozoc.ConfigInvalid
+	if !errors.As(err, &ci) || len(ci.Value.Items) != 2 || ci.Value.Items[0].Code != "CFG-7" {
+		t.Fatalf("WriteOutputs err = %v", err)
+	}
+}
+
+func TestCheckInvalidConfig(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a { op f(); }\n")
+	// 設定の誤り（CFG-1: テーブルに language だけ）は 2
+	write(t, filepath.Join(dir, "hozo.toml"), "[a]\nlanguage = \"go\"\n")
+	code, _, stderr := run(t, dir, nil, "check")
 	if code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-1]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
@@ -349,7 +424,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	}
 	// errors → CheckFailed（1）
 	fakePlugin(t, dir, "fake", "go", emitTable, `{"files":[],"warnings":[],"errors":[{"code":"FAKE-1","at":"server.placeOrder","message":"nope"}]}`, 0)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || !strings.Contains(stderr, "server.hozo:230:3: error[FAKE-1]: nope") {
+	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || !strings.Contains(stderr, "server.hozo:244:3: error[FAKE-1]: nope") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// 異常終了 → 70

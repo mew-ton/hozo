@@ -1,4 +1,5 @@
 [
+  "internal/gen/hozoc/classify.go",
   "internal/gen/hozoc/cli/cli.go",
   "internal/gen/hozoc/doc.go",
   "internal/gen/hozoc/ops.go",

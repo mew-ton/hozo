@@ -212,7 +212,7 @@ func (p *parser) parseDecls(until token.Kind) []ast.Decl {
 
 // parseDecl は Decl を一つ読む。
 //
-//	Decl = [ DocComment ] { Decorator } Declaration | [ DocComment ] NamespaceDecl | BindDecl ;
+//	Decl = [ DocComment ] { Decorator } Declaration | [ DocComment ] { Decorator } NamespaceDecl | BindDecl ;
 //
 // 節の Span は DocComment を含まず、最初のデコレータか宣言の頭から始まる。
 func (p *parser) parseDecl() ast.Decl {
@@ -224,10 +224,7 @@ func (p *parser) parseDecl() ast.Decl {
 	}
 	switch p.tok().Kind {
 	case token.Namespace:
-		if len(decorators) > 0 {
-			p.fail(decorators[0].Span, "namespace にデコレータは付けられない")
-		}
-		return p.parseNamespace(start, doc)
+		return p.parseNamespace(start, doc, decorators)
 	case token.Bind:
 		if doc != nil {
 			p.fail(doc.Span, "bind に説明は付けられない。付く先のないドキュメンテーションコメント")
@@ -382,9 +379,9 @@ func (p *parser) parseArgTerm() *ast.ArgTerm {
 }
 
 // parseNamespace は NamespaceDecl = "namespace" QualifiedName "{" { Decl } "}" を読む。
-func (p *parser) parseNamespace(start source.Offset, doc *ast.DocComment) *ast.NamespaceDecl {
+func (p *parser) parseNamespace(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.NamespaceDecl {
 	p.expect(token.Namespace)
-	ns := &ast.NamespaceDecl{Doc: doc, Name: p.parseQualifiedName()}
+	ns := &ast.NamespaceDecl{Doc: doc, Decorators: decorators, Name: p.parseQualifiedName()}
 	p.expect(token.LBrace)
 	ns.Decls = p.parseDecls(token.RBrace)
 	if !p.at(token.RBrace) {
@@ -827,7 +824,7 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	return a
 }
 
-// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" を読む。field は文脈キーワード。
+// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "namespace" を読む。field は文脈キーワード。
 func (p *parser) parseTarget() *ast.Target {
 	t := &ast.Target{Span: p.tok().Span}
 	switch {
@@ -843,8 +840,10 @@ func (p *parser) parseTarget() *ast.Target {
 		t.Kind = ast.TargetScalar
 	case p.at(token.Model):
 		t.Kind = ast.TargetModel
+	case p.at(token.Namespace):
+		t.Kind = ast.TargetNamespace
 	default:
-		p.failExpected("for の対象（op / field / state / exception / scalar / model）")
+		p.failExpected("for の対象（op / field / state / exception / scalar / model / namespace）")
 	}
 	p.advance()
 	return t
@@ -861,7 +860,8 @@ func (p *parser) parseThrowsClause() *ast.ThrowsClause {
 	return c
 }
 
-// parseRelation は Relation = ( "prevents" | "keeps" ) EffectsRef を読む。
+// parseRelation は Relation = ( "prevents" | "keeps" ) "effects" を読む。
+// 目的語は `effects` だけで、効果の名前は書けない（docs/grammar.md「決めたこと」）。
 func (p *parser) parseRelation() *ast.Relation {
 	start := p.tok().Span.Start
 	r := &ast.Relation{}
@@ -871,14 +871,13 @@ func (p *parser) parseRelation() *ast.Relation {
 		p.expect(token.Prevents)
 		r.Kind = ast.Prevents
 	}
-	refStart := p.tok().Span.Start
-	r.Effects = &ast.EffectsRef{}
-	if p.got(token.Effects) {
-		r.Effects.All = true
-	} else {
-		r.Effects.Names = p.parseNameList()
+	if !p.at(token.Effects) {
+		if p.atName() {
+			p.fail(p.tok().Span, fmt.Sprintf("%s の目的語は「effects」だけ。効果の名前は書けない（docs/grammar.md「決めたこと」）", r.Kind))
+		}
+		p.failExpected("「effects」")
 	}
-	r.Effects.Span = p.spanFrom(refStart)
+	p.advance()
 	r.Span = p.spanFrom(start)
 	return r
 }

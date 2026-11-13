@@ -18,6 +18,7 @@ var update = flag.Bool("update", false, "ゴールデンを更新する（docs/t
 var normalizeSource = project{
 	"b.hozo": `
 /** 名前空間 a の説明。二つ目のブロックの説明は使わない */
+@a.marker
 namespace a {
   model Later { id: string; }
 }
@@ -25,8 +26,12 @@ namespace a.child { model Deep { id: string; } }
 `,
 	"a.hozo": `
 /** 使われない説明（b.hozo の方が後） */
+@a.context("accounts")
 namespace a {
   namespace child { model Deeper { id: string; } }
+
+  decorator context(name: string) for namespace;
+  decorator marker for namespace | model;
 
   /** メールアドレス */
   scalar Email extends string;
@@ -74,7 +79,12 @@ namespace a {
   op find(id: string): User throws Unauthorized prevents effects throws Invalid;
   op noop();
   op void2(): void;
-  op leaf(u: User): PublicUser effects Effects throws AllErrors keeps add;
+  op leaf(u: User): PublicUser effects add throws AllErrors keeps effects;
+  op setToken() effects set;
+  op both(u: User): PublicUser effects Effects throws AllErrors {
+    setToken();
+    return leaf(u);
+  }
   op take(in: User): void;
   op fromIn(in: User): User;
 
@@ -166,6 +176,23 @@ func TestNormalizeExpectations(t *testing.T) {
 	child := p.Namespace("a.child")
 	eq("a.child の宣言", []string{child.Decls[0].Common().Name, child.Decls[1].Common().Name}, []string{"a.child.Deeper", "a.child.Deep"})
 	eq("a の説明は最初のブロックのもの", p.Namespace("a").Description.Summary, "使われない説明（b.hozo の方が後）")
+	// namespace ブロックに付いたデコレータは、複数のブロックの分を出現順に連結する（docs/ir.md「Program」の Namespace.decorators）。
+	nsA := p.Namespace("a")
+	eq("a のデコレータ", nsA.Decorators, []ir.Application{
+		{Decorator: "a.context", Args: []ir.Arg{{Param: "name", Value: ir.LiteralValue{Literal: ir.StringLiteral{Value: "accounts"}}}}, Span: nsA.Decorators[0].Span},
+		{Decorator: "a.marker", Span: nsA.Decorators[1].Span},
+	})
+	eq("a のデコレータの位置", []any{nsA.Decorators[0].Span.File, nsA.Decorators[1].Span.File}, []any{"a.hozo", "b.hozo"})
+	eq("a.child のデコレータ", child.Decorators, []ir.Application(nil))
+	eq("for namespace", p.Lookup("a.context").(*ir.Decorator).Targets, []ir.DecoratorTarget{ir.TargetNamespace})
+	// 適用の名前は参照として記録される（定義へジャンプとホバーが使う）
+	refsTo := 0
+	for _, r := range res.Refs {
+		if r.Target.Kind == TargetDecl && (r.Target.Decl == "a.context" || r.Target.Decl == "a.marker") {
+			refsTo++
+		}
+	}
+	eq("namespace のデコレータへの参照", refsTo, 2)
 
 	// T?? → T?
 	user := p.Lookup("a.User").(*ir.Model)
@@ -212,7 +239,7 @@ func TestNormalizeExpectations(t *testing.T) {
 	eq("void", p.Lookup("a.void2").(*ir.Op).Returns, nil)
 	find := p.Lookup("a.find").(*ir.Op)
 	eq("throws の節", find.Throws, []ir.ThrowsClause{
-		{Exceptions: []string{"a.Unauthorized"}, Relations: []ir.Relation{{Kind: ir.Prevents, Effects: ir.AllEffects()}}},
+		{Exceptions: []string{"a.Unauthorized"}, Relations: []ir.Relation{{Kind: ir.Prevents}}},
 		{Exceptions: []string{"a.Invalid"}},
 	})
 	eq("Doc", find.Description, &ir.Doc{
@@ -223,11 +250,13 @@ func TestNormalizeExpectations(t *testing.T) {
 		See:     []string{"a.User"},
 	})
 	leaf := p.Lookup("a.leaf").(*ir.Op)
-	eq("effects のユニオン", leaf.Effects, []string{"a.add", "a.set"})
-	eq("throws のユニオンと名前の列", leaf.Throws[0], ir.ThrowsClause{
+	eq("葉の effects", leaf.Effects, []string{"a.add"})
+	eq("throws のユニオンと keeps effects", leaf.Throws[0], ir.ThrowsClause{
 		Exceptions: []string{"a.Unauthorized", "a.Invalid", "a.Wrapped"},
-		Relations:  []ir.Relation{{Kind: ir.Keeps, Effects: ir.RelationEffects{Effects: []string{"a.add"}}}},
+		Relations:  []ir.Relation{{Kind: ir.Keeps}},
 	})
+	// 効果のユニオンを書けるのは、二つ以上の効果を持てる配線の op（葉は EFF-3。docs/decisions.md S8）
+	eq("effects のユニオン", p.Lookup("a.both").(*ir.Op).Effects, []string{"a.add", "a.set"})
 	eq("Signature は零値", find.Signature, ir.Signature{})
 
 	// 適用: 名前付きの展開、位置→名前、$param:、Duration

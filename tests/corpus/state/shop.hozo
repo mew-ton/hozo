@@ -1,4 +1,4 @@
-// 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）のサンプル。
+// 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5、S8）のサンプル。
 // 各ブロックの `// docs/...「見出し」` は、その構文が確かめる文書の見出し。見出し → 構文の対応は README.md。
 
 /** カートと注文を持つ店 */
@@ -76,7 +76,10 @@ namespace shop {
   op submitOrder(): Order effects placeOrder throws EmptyCart prevents effects;
   op emptyCart() effects clearCart;
   op restart() effects startOver;
-  op login(token: Token) effects saveToken | signIn;
+  // docs/check.md「状態と効果」EFF-3: 葉の op が直に持つ効果は一つまで。二つの効果を持つ処理は、
+  // 効果ごとの葉の op を配線でつなぐ（下の login。効果は伝播する）
+  op storeToken(token: Token) effects saveToken;
+  op markLoggedIn() effects signIn;
   op logout() effects removeToken;
   op showLogin();
   op showCart();
@@ -84,6 +87,13 @@ namespace shop {
   op showOrders();
   op packSingle(line: LineKind.Single<Line>): Line;
   op packBulk(line: Line): Line;
+
+  // docs/check.md「計算」手順 0（配線）: F は呼び出しの effects を行の順に連結したもの（saveToken、signIn）
+  op login(token: Token)
+  {
+    storeToken(token);
+    markLoggedIn();
+  }
 
   // docs/grammar.md「配線」の表: 基底の状態の、組み込みの分類での match（by nullable）
   // docs/ir.md「配線」: subject は { kind: "state", state }、classify は "nullable"

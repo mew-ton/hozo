@@ -445,20 +445,15 @@ func TestNamespacesKeysSorted(t *testing.T) {
 	}
 }
 
-func TestRelationEffectsAndArmCases(t *testing.T) {
-	var r Relation
-	if err := json.Unmarshal([]byte(`{"kind":"prevents","effects":"all"}`), &r); err != nil || !r.Effects.All {
-		t.Errorf("all: %v %+v", err, r)
-	}
-	if err := json.Unmarshal([]byte(`{"kind":"keeps","effects":["a","b"]}`), &r); err != nil || r.Effects.All || !reflect.DeepEqual(r.Effects.Effects, []string{"a", "b"}) {
-		t.Errorf("list: %v %+v", err, r)
-	}
-	if err := json.Unmarshal([]byte(`{"kind":"keeps","effects":"some"}`), &r); err == nil {
-		t.Error("want error for unknown effects string")
-	}
+func TestRelationAndArmCases(t *testing.T) {
+	// Relation は kind だけ（docs/ir.md「decorator」）。目的語は常にその op のすべての効果。
 	b, _ := json.Marshal(Relation{Kind: Keeps})
-	if string(b) != `{"kind":"keeps","effects":[]}` {
-		t.Errorf("empty relation: %s", b)
+	if string(b) != `{"kind":"keeps"}` {
+		t.Errorf("relation: %s", b)
+	}
+	var r Relation
+	if err := json.Unmarshal([]byte(`{"kind":"prevents"}`), &r); err != nil || r.Kind != Prevents {
+		t.Errorf("prevents: %v %+v", err, r)
 	}
 	var c ArmCases
 	if err := json.Unmarshal([]byte(`"default"`), &c); err != nil || !c.Default {

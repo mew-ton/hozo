@@ -100,10 +100,10 @@ func diffKeys(t *testing.T, want, got map[diagKey]bool) {
 // TestCheckAgreement は docs/testing.md「言語サーバーと check の一致」: コーパスについて project.Load の診断と
 // publishDiagnostics の診断（LSP の形から戻したもの）が同じ集合であること。utf-16 と utf-8 の両方で。
 func TestCheckAgreement(t *testing.T) {
-	root := corpusDir(t)
+	root := corpusWithWarning(t)
 	want := checkKeys(project.Load(root, "", nil))
 	if len(want) == 0 {
-		t.Fatal("コーパスに診断がない（REL-3 の warning があるはず）")
+		t.Fatal("コーパスに診断がない（warn.hozo の REL-2 の warning があるはず）")
 	}
 	for _, encs := range [][]string{nil, {"utf-8", "utf-16"}} {
 		c := startServer(t, Options{})
@@ -121,7 +121,7 @@ func TestCheckAgreement(t *testing.T) {
 // TestSession は台本どおりのセッション（docs/testing.md「単体テスト」）: initialize → initialized → didOpen →
 // didChange（誤りを入れる → 直す）→ 定義へジャンプ → ホバー → ドキュメントのシンボル → shutdown / exit。
 func TestSession(t *testing.T) {
-	root := corpusDir(t)
+	root := corpusWithWarning(t)
 	c := startServer(t, Options{})
 	res, byURI := c.initialize(root, protocol.ClientCapabilities{
 		Workspace: &protocol.WorkspaceClientCapabilities{DidChangeWatchedFiles: &protocol.DynamicRegistration{DynamicRegistration: true}},
@@ -153,12 +153,15 @@ func TestSession(t *testing.T) {
 	serverURI, browserURI := fileURI(serverPath), fileURI(browserPath)
 	serverText, browserText := readFile(t, serverPath), readFile(t, browserPath)
 
-	// 最初の発行: server.hozo の REL-3 だけ（tests/corpus/design/README.md）。診断のないファイルは最初は送らない。
-	if got := codes(byURI[serverURI]); strings.Join(got, ",") != "REL-3" {
-		t.Fatalf("server.hozo の最初の診断 = %v", got)
+	// 最初の発行: warn.hozo の REL-2 だけ（corpusWithWarning）。診断のないファイルは最初は送らない。
+	warnURI := fileURI(filepath.Join(root, "warn.hozo"))
+	if got := codes(byURI[warnURI]); strings.Join(got, ",") != "REL-2" {
+		t.Fatalf("warn.hozo の最初の診断 = %v", got)
 	}
-	if _, ok := byURI[browserURI]; ok {
-		t.Fatalf("browser.hozo に診断がないのに最初から送っている: %v", byURI[browserURI])
+	for _, uri := range []string{serverURI, browserURI} {
+		if _, ok := byURI[uri]; ok {
+			t.Fatalf("%s に診断がないのに最初から送っている: %v", uri, byURI[uri])
+		}
 	}
 	for uri := range byURI {
 		if !strings.HasPrefix(uri, "file://") && !strings.HasPrefix(uri, "hozo:") {

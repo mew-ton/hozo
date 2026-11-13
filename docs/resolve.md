@@ -57,11 +57,10 @@
 | 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら `Empty` / `HasItems` |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
-| `prevents` / `keeps` の要素 | `effect`、`union`（`set` で要素が効果） |
 | `catches` の要素 | `throws` と同じ |
 | `halts e` の `e` | `effect`、デコレータの宣言の中なら `any effect` の引数 |
 | `effects` の要素 | `effect`、`union`（`set` で要素が効果） |
-| `@name`（`@external` を除く。`docs/grammar.md`「予約語」） | `decorator`。付ける先の種類との照合は DEC-1 |
+| `@name`（`@external` を除く。`docs/grammar.md`「予約語」） | `decorator`。付ける先の種類との照合は DEC-1。`namespace` に付けた `@name` の「現在の名前空間」は、そのブロックが書かれた場所（外側の名前空間。トップレベルならグローバル）で、ブロックの中の名前空間ではない |
 | デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」） |
 | `match x by C` の `C` | 現在の名前空間の、値を対象にした `classify`（NS-4） |
 | `match s by list` / `by nullable` の `s` | 現在の名前空間の `state` |

@@ -297,7 +297,14 @@ function walkDecl(d: Decl): void {
     case "decorator":
       d.params.forEach((p) => walkParamType(p.type));
       for (const t of d.throws) {
-        for (const r of t.relations) if (r.effects !== "all") assert.ok(Array.isArray(r.effects));
+        // Relation は kind だけ（目的語は常にその op のすべての効果。docs/ir.md「decorator」）
+        for (const r of t.relations) {
+          assert.ok(r.kind === "prevents" || r.kind === "keeps");
+          assert.deepEqual(Object.keys(r), ["kind"]);
+        }
+      }
+      for (const target of d.targets) {
+        assert.ok(["op", "field", "state", "exception", "scalar", "model", "namespace"].includes(target));
       }
       if (d.alias) d.alias.args.forEach((a) => walkArgValue(a.value));
       return;
@@ -314,7 +321,12 @@ function walkDecl(d: Decl): void {
 function walkProgram(p: Program): void {
   assert.equal(p.version, "0.1");
   assert.equal(p.namespaces[0]?.name, "");
-  for (const ns of p.namespaces) ns.decls.forEach(walkDecl);
+  for (const ns of p.namespaces) {
+    // Namespace.decorators は常にある（空でも []。docs/ir.md「Program」）
+    assert.ok(Array.isArray(ns.decorators));
+    for (const a of ns.decorators) a.args.forEach((arg) => walkArgValue(arg.value));
+    ns.decls.forEach(walkDecl);
+  }
   for (const b of p.binds) assert.equal(typeof b.target.deep, "boolean");
 }
 

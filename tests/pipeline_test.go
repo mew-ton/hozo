@@ -18,8 +18,8 @@ import (
 )
 
 // TestCorpusPipeline は、設計書の例のコーパスを 構文解析 → sema → check に通し、
-// error がなく、warning が tests/corpus/design/README.md の想定（placeOrder の REL-3 だけ）と
-// 一致することを確かめる（docs/testing.md「コーパス」）。internal/project ができるまでのつなぎ。
+// error も warning もないこと（tests/corpus/design/README.md の想定）を確かめる（docs/testing.md「コーパス」）。
+// internal/project ができるまでのつなぎ。
 func TestCorpusPipeline(t *testing.T) {
 	dir := filepath.Join("corpus", "design")
 	cfg, cfgDiags := config.Load(filepath.Join(dir, "hozo.toml"))
@@ -60,8 +60,8 @@ func TestCorpusPipeline(t *testing.T) {
 	for _, d := range diags {
 		codes = append(codes, d.Code)
 	}
-	if strings.Join(codes, ",") != "REL-3" {
-		t.Fatalf("expected exactly one REL-3 warning, got %v:\n%s", codes, buf.String())
+	if len(codes) != 0 {
+		t.Fatalf("expected no diagnostics, got %v:\n%s", codes, buf.String())
 	}
 	t.Logf("\n%s", buf.String())
 }

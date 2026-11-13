@@ -30,6 +30,7 @@
     "namespaces": [
       {
         "name": "",
+        "decorators": [],
         "decls": [
           {
             "kind": "decorator",
@@ -102,6 +103,7 @@
           "throws": [],
           "see": []
         },
+        "decorators": [],
         "decls": [
           {
             "kind": "scalar",
@@ -1131,8 +1133,7 @@
                 ],
                 "relations": [
                   {
-                    "kind": "prevents",
-                    "effects": "all"
+                    "kind": "prevents"
                   }
                 ]
               }
@@ -1492,8 +1493,7 @@
                 ],
                 "relations": [
                   {
-                    "kind": "prevents",
-                    "effects": "all"
+                    "kind": "prevents"
                   }
                 ]
               }
@@ -1642,8 +1642,7 @@
                 ],
                 "relations": [
                   {
-                    "kind": "keeps",
-                    "effects": "all"
+                    "kind": "keeps"
                   }
                 ]
               }
@@ -1688,6 +1687,7 @@
           "throws": [],
           "see": []
         },
+        "decorators": [],
         "decls": [
           {
             "kind": "decorator",
@@ -1730,6 +1730,7 @@
           "throws": [],
           "see": []
         },
+        "decorators": [],
         "decls": [
           {
             "kind": "state",
@@ -4202,6 +4203,7 @@
       },
       {
         "name": "db",
+        "decorators": [],
         "decls": [
           {
             "kind": "decorator",
@@ -4299,6 +4301,7 @@
           "throws": [],
           "see": []
         },
+        "decorators": [],
         "decls": [
           {
             "kind": "decorator",
@@ -4353,6 +4356,7 @@
       },
       {
         "name": "http",
+        "decorators": [],
         "decls": [
           {
             "kind": "exception",
@@ -4651,6 +4655,7 @@
       },
       {
         "name": "page",
+        "decorators": [],
         "decls": [
           {
             "kind": "exception",
@@ -4957,6 +4962,7 @@
           "throws": [],
           "see": []
         },
+        "decorators": [],
         "decls": [
           {
             "kind": "exception",
@@ -5046,6 +5052,7 @@
       },
       {
         "name": "valid",
+        "decorators": [],
         "decls": [
           {
             "kind": "decorator",

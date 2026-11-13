@@ -1,5 +1,4 @@
-# グローバルに op がある → CFG-1（グローバルには設定を書けない）
+# a のテーブルは out だけで language がない → CFG-1
 # ERROR: CFG-1
 [a]
-language = "go"
-out      = "gen/a"
+out = "gen/a"

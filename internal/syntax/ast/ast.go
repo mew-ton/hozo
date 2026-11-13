@@ -200,10 +200,12 @@ func (n *ArgTerm) NodeSpan() source.Span { return n.Span }
 
 // NamespaceDecl は namespace（docs/grammar.md「ファイルと宣言」）。
 type NamespaceDecl struct {
-	Span  source.Span
-	Doc   *DocComment
-	Name  QualifiedName
-	Decls []Decl
+	Span source.Span
+	Doc  *DocComment
+	// Decorators は namespace ブロックの前に付いたデコレータ。付けられるのは `for namespace` のものだけ（検査 DEC-1）。
+	Decorators []*Decorator
+	Name       QualifiedName
+	Decls      []Decl
 }
 
 // NodeSpan は Node の実装。
@@ -598,6 +600,8 @@ const (
 	TargetScalar
 	// TargetModel は model。
 	TargetModel
+	// TargetNamespace は namespace。
+	TargetNamespace
 )
 
 // String は対象の語。
@@ -615,6 +619,8 @@ func (k TargetKind) String() string {
 		return "scalar"
 	case TargetModel:
 		return "model"
+	case TargetNamespace:
+		return "namespace"
 	}
 	return "?"
 }
@@ -650,9 +656,9 @@ func (n *ThrowsClause) clauseNode()           {}
 type RelationKind int
 
 const (
-	// Prevents は「X のとき、E は起きていない」。
+	// Prevents は「X のとき、効果は起きていない」。
 	Prevents RelationKind = iota
-	// Keeps は「X のとき、E は起きている」。
+	// Keeps は「X のとき、効果は起きている」。
 	Keeps
 )
 
@@ -664,25 +670,15 @@ func (k RelationKind) String() string {
 	return "prevents"
 }
 
-// Relation は "prevents E" / "keeps E"。
+// Relation は "prevents effects" / "keeps effects"。目的語は常にその op のすべての効果で、
+// 効果を名前で書き分ける形はない（docs/grammar.md「決めたこと」）。
 type Relation struct {
-	Span    source.Span
-	Kind    RelationKind
-	Effects *EffectsRef
+	Span source.Span
+	Kind RelationKind
 }
 
 // NodeSpan は Node の実装。
 func (n *Relation) NodeSpan() source.Span { return n.Span }
-
-// EffectsRef は Relation の目的語。All なら "effects"（その op の効果すべて）、そうでなければ Names。
-type EffectsRef struct {
-	Span  source.Span
-	All   bool
-	Names []QualifiedName
-}
-
-// NodeSpan は Node の実装。
-func (n *EffectsRef) NodeSpan() source.Span { return n.Span }
 
 // CatchOutcome は吸収したあとの振る舞い。
 type CatchOutcome int

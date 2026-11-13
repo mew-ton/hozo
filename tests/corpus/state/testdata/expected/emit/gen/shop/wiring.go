@@ -4,6 +4,16 @@ package shop
 
 import "context"
 
+// Login は op shop.login。
+//
+// Effects: shop.saveToken, shop.signIn
+func (o *ops) Login(ctx context.Context, token Token) error {
+	if err := o.StoreToken(ctx, token); err != nil {
+		return err
+	}
+	return o.MarkLoggedIn(ctx)
+}
+
 // OpenTop は op shop.openTop。
 func (o *ops) OpenTop(ctx context.Context) error {
 	empty, err := o.stateCases.TokenIsEmpty(ctx)

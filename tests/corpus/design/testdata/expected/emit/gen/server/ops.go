@@ -18,11 +18,16 @@ type Leaves interface {
 	// Effects: server.refund
 	CancelOrder(ctx context.Context, in CancelInput) (Order, error)
 
-	// PlaceOrder は op server.placeOrder。
+	// SaveOrder は注文を保存する
+	//
+	// Effects: server.createOrder
+	SaveOrder(ctx context.Context, in OrderInput) (Order, error)
+
+	// SendOrderNotice は注文したユーザーに通知する
 	//
 	// Throws: server.NotificationFailed
-	// Effects: server.createOrder, server.notifyUser
-	PlaceOrder(ctx context.Context, in OrderInput) (Order, error)
+	// Effects: server.notifyUser
+	SendOrderNotice(ctx context.Context, order Order) error
 
 	// RequestPasswordReset はパスワードの再設定メールを送る。
 	//
@@ -71,6 +76,17 @@ type Ops interface {
 	// Throws: server.RefundPending
 	// Effects: server.refund
 	CancelOrder(ctx context.Context, in CancelInput) (Order, error)
+
+	// SaveOrder は注文を保存する
+	//
+	// Effects: server.createOrder
+	SaveOrder(ctx context.Context, in OrderInput) (Order, error)
+
+	// SendOrderNotice は注文したユーザーに通知する
+	//
+	// Throws: server.NotificationFailed
+	// Effects: server.notifyUser
+	SendOrderNotice(ctx context.Context, order Order) error
 
 	// PlaceOrder は op server.placeOrder。
 	//
@@ -163,8 +179,12 @@ func (o *ops) CancelOrder(ctx context.Context, in CancelInput) (Order, error) {
 	return o.leaves.CancelOrder(ctx, in)
 }
 
-func (o *ops) PlaceOrder(ctx context.Context, in OrderInput) (Order, error) {
-	return o.leaves.PlaceOrder(ctx, in)
+func (o *ops) SaveOrder(ctx context.Context, in OrderInput) (Order, error) {
+	return o.leaves.SaveOrder(ctx, in)
+}
+
+func (o *ops) SendOrderNotice(ctx context.Context, order Order) error {
+	return o.leaves.SendOrderNotice(ctx, order)
 }
 
 func (o *ops) RequestPasswordReset(ctx context.Context, email Email) error {

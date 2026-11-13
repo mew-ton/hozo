@@ -243,6 +243,40 @@ func corpusDir(t *testing.T) string {
 	return dir
 }
 
+// warnFile は corpusWithWarning が足すファイル。設計書のコーパスには診断がない（§7.3 の placeOrder を配線に直したので
+// REL-3 がなくなった。tests/corpus/design/README.md の表の 14）ので、診断の発行と check との一致を空でない集合で
+// 確かめるために、意図した warning を一つ持たせる: 効果を持たない op の prevents effects（REL-2。docs/check.md「throws」）。
+const warnFile = `// internal/lsp のテストが足すファイル: 意図した warning（REL-2）を一つ出す
+namespace server {
+  /** 手が空いている */
+  exception Idle;
+  op ping() throws Idle prevents effects;
+}
+`
+
+// corpusWithWarning は tests/corpus/design の直下のファイルを一時ディレクトリに写し、warn.hozo（warnFile）を足した
+// プロジェクトのルート。
+func corpusWithWarning(t *testing.T) string {
+	t.Helper()
+	src := corpusDir(t)
+	dir := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		writeFile(t, filepath.Join(dir, e.Name()), readFile(t, filepath.Join(src, e.Name())))
+	}
+	writeFile(t, filepath.Join(dir, "warn.hozo"), warnFile)
+	return dir
+}
+
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)

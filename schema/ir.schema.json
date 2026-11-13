@@ -766,7 +766,8 @@
         "state",
         "exception",
         "scalar",
-        "model"
+        "model",
+        "namespace"
       ],
       "type": "string"
     },
@@ -1456,11 +1457,17 @@
     },
     "Namespace": {
       "additionalProperties": false,
-      "description": "一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。",
+      "description": "一つの名前空間（docs/ir.md「Program」）。name は FQN。decorators は namespace ブロックに付いたデコレータ（複数のブロックの分は出現順に連結）。decls は出現順。",
       "properties": {
         "decls": {
           "items": {
             "$ref": "#/$defs/Decl"
+          },
+          "type": "array"
+        },
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
           },
           "type": "array"
         },
@@ -1473,6 +1480,7 @@
       },
       "required": [
         "name",
+        "decorators",
         "decls"
       ],
       "type": "object"
@@ -1878,34 +1886,16 @@
     },
     "Relation": {
       "additionalProperties": false,
-      "description": "例外が効果に及ぼす関係（docs/ir.md「decorator」）。",
+      "description": "例外が効果に及ぼす関係（docs/ir.md「decorator」）。目的語は常にその op のすべての効果（`effects`）。",
       "properties": {
-        "effects": {
-          "$ref": "#/$defs/RelationEffects"
-        },
         "kind": {
           "$ref": "#/$defs/RelationKind"
         }
       },
       "required": [
-        "kind",
-        "effects"
+        "kind"
       ],
       "type": "object"
-    },
-    "RelationEffects": {
-      "description": "Relation の effects。\"all\" は `effects`（すべての効果）、列は効果の FQN（docs/ir.md「decorator」）。",
-      "oneOf": [
-        {
-          "const": "all"
-        },
-        {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      ]
     },
     "RelationKind": {
       "enum": [

@@ -79,7 +79,10 @@ type Handler interface {
     Import(req *ImportRequest) (*ImportResponse, error)
 }
 type EmitRequest struct { Protocol string; Direction string; View *ir.View }
-type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic }
+type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic; Select Select }
+type Select struct { Roots, Stops, States []string; Wraps []Wrap }   // docs/plugin-protocol.md「選択」
+type Wrap struct { Op, Decorator string }
+func OpsWith(view *ir.View, decorator string) []string             // view.viewer の op のうち、そのデコレータ（FQN。via も見る）が付いたものの FQN
 // CheckRequest / CheckResponse / ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
 
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。終了コードを返す。
@@ -205,8 +208,7 @@ func IsReservedNamespaceName(name string) bool              // CFG-2 の .hozo �
 
 ```go
 type File struct { Path string; Content []byte }            // Path はルートからの相対パス（View.config.dir の下）
-type ManifestInfo struct { Name string; Entry, Stop, Decorate []string }   // 設定されたプラグインのマニフェストから（Wrappers の判定）
-type Options struct { Root string; Manifests []ManifestInfo }   // 別の名前空間の言語と出力先は View.namespaces から読む（docs/emit-go.md「配置」）
+type Options struct { Root string; Select plugin.Select }   // 名前空間に設定されたプラグインの select を合わせたもの（docs/emit-go.md「出力の対象」）   // 別の名前空間の言語と出力先は View.namespaces から読む（docs/emit-go.md「配置」）
 func Emit(view *ir.View, opts Options) ([]File, []diag.Diagnostic)   // error があればファイルは返さない
 ```
 

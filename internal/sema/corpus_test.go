@@ -11,7 +11,7 @@ import (
 )
 
 // TestCorpusDesign はコーパス design（docs/testing.md「コーパス」）を標準の語彙と一緒に解析し、error が出ないことを確かめる。
-// warning は許し、表示する（README.md は REL-3 の warning を想定するが、REL-3 は Signature を要するので internal/check が出す）。
+// warning は許し、表示する（README.md の想定は error も warning もなし）。
 func TestCorpusDesign(t *testing.T) {
 	dir := filepath.Join("..", "..", "tests", "corpus", "design")
 	cfg, cfgDiags := config.Load(filepath.Join(dir, "hozo.toml"))

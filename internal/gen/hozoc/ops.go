@@ -21,7 +21,7 @@ type Leaves interface {
 	//   - checked: 検査の結果
 	//
 	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
-	// Effects: hozoc.addOutputs, hozoc.replaceOutputs, hozoc.removeStaleOutputs
+	// Effects: hozoc.syncOutputs
 	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
@@ -57,7 +57,7 @@ type Ops interface {
 	//   - checked: 検査の結果
 	//
 	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
-	// Effects: hozoc.addOutputs, hozoc.replaceOutputs, hozoc.removeStaleOutputs
+	// Effects: hozoc.syncOutputs
 	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
 
 	// Emit は仕様を検査し、名前空間ごとに設定されたプラグインを呼んで、生成したファイルを書き出す。
@@ -66,7 +66,7 @@ type Ops interface {
 	//   - in: コマンドの入力
 	//
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
-	// Effects: hozoc.addOutputs, hozoc.replaceOutputs, hozoc.removeStaleOutputs
+	// Effects: hozoc.syncOutputs
 	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
@@ -97,14 +97,20 @@ type StateCases interface {
 	OutputsIsEmpty(ctx context.Context) (bool, error)
 }
 
+// Classifiers は分類ごとの述語の実装（classify.go の <C>Cases）。
+type Classifiers struct {
+	OutputsSync OutputsSyncCases
+}
+
 // New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
-func New(leaves Leaves) Ops {
-	return &ops{leaves: leaves}
+func New(leaves Leaves, classifiers Classifiers) Ops {
+	return &ops{leaves: leaves, classifiers: classifiers}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
-	leaves Leaves
+	leaves      Leaves
+	classifiers Classifiers
 }
 
 func (o *ops) Check(ctx context.Context, in CheckInput) (CheckResult, error) {

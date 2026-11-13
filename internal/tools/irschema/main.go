@@ -121,7 +121,7 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.UnionVariant]():    {"arms", "set"},
 	typeOf[ir.StateShape]():      {"list", "nullable", "single"},
 	typeOf[ir.Operation]():       {"post", "put", "delete"},
-	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model"},
+	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model", "namespace"},
 	typeOf[ir.AnyOf]():           {"exception", "effect", "state", "op", "model", "variant"},
 	typeOf[ir.RelationKind]():    {"prevents", "keeps"},
 	typeOf[ir.CatchMode]():       {"recovers", "halts", "ignores"},
@@ -130,10 +130,6 @@ var enums = map[reflect.Type][]string{
 
 // specials は MarshalJSON が構造体の形を出さない型。手で書いたスキーマを $defs に置く。
 var specials = map[reflect.Type]map[string]any{
-	typeOf[ir.RelationEffects](): {
-		"description": "Relation の effects。\"all\" は `effects`（すべての効果）、列は効果の FQN（docs/ir.md「decorator」）。",
-		"oneOf":       []any{map[string]any{"const": "all"}, arrayOf(map[string]any{"type": "string"})},
-	},
 	typeOf[ir.CaseSet](): {
 		"description": "遷移の前か後のケースの集合。\"any\" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。",
 		"oneOf":       []any{map[string]any{"const": "any"}, arrayOf(map[string]any{"type": "string"})},
@@ -168,7 +164,7 @@ var overrides = map[string]any{
 // descriptions は $defs の説明。docs の見出しを指す。
 var descriptions = map[string]string{
 	"Program":              "IR 全体（docs/ir.md「Program」）。namespaces の先頭はグローバル（name \"\"）。",
-	"Namespace":            "一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。",
+	"Namespace":            "一つの名前空間（docs/ir.md「Program」）。name は FQN。decorators は namespace ブロックに付いたデコレータ（複数のブロックの分は出現順に連結）。decls は出現順。",
 	"Span":                 "宣言や文の位置（docs/ir.md「Program」）。file はユーザーのファイルの相対パスか hozo:vocab/... か hozo:plugin/...。",
 	"Pos":                  "ファイルの中の位置（docs/ir.md「Program」）。1 始まり。col はコードポイント数。",
 	"Doc":                  "DocComment の内容（docs/ir.md「Doc」）。",
@@ -209,7 +205,7 @@ var descriptions = map[string]string{
 	"AnyParam":             "`any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind \"any\"）。",
 	"EffectOn":             "`any effect on <state>.<operation>` の制約（docs/ir.md「decorator」）。",
 	"ThrowsClause":         "throws の一節（docs/ir.md「decorator」）。exceptions はデコレータの引数名なら \"$param:名前\"。",
-	"Relation":             "例外が効果に及ぼす関係（docs/ir.md「decorator」）。",
+	"Relation":             "例外が効果に及ぼす関係（docs/ir.md「decorator」）。目的語は常にその op のすべての効果（`effects`）。",
 	"CatchesClause":        "catches の一節（docs/ir.md「decorator」）。",
 	"Op":                   "op 宣言（docs/ir.md「op」）。returns の null は void、body の null は葉。",
 	"OpParam":              "op の引数（docs/ir.md「op」）。",

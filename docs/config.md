@@ -6,7 +6,7 @@
 
 ## 置き場と探し方
 
-- `hozoc` は `--config <path>` か環境変数 `HOZO_CONFIG` で指定されたファイルを読む。どちらもなければ、作業ディレクトリから親へ向かって最初に見つかる `hozo.toml`。見つからない、または読めなければ CFG-7（`ConfigInvalid`。`docs/diagnostics.md`「終了コード」）。
+- `hozoc` は `--config <path>` か環境変数 `HOZO_CONFIG` で指定されたファイルを読む。どちらもなければ、作業ディレクトリから親へ向かって最初に見つかる `hozo.toml`。指定されたファイルが読めなければ CFG-7（`ConfigInvalid`。`docs/diagnostics.md`「終了コード」）。指定がなく、どこにも見つからなければ「設定なし」で、どの名前空間も出力せず、設定の検査（CFG-*）も行わない。`hozoc check` と `hozoc lsp` は設定なしで動き、`hozoc emit` は書き出すものがないので CFG-7。設計だけの段階で検査できるようにするため（`docs/requirements.md`「モデルが先」）。
 - `hozo.toml` のあるディレクトリが**プロジェクトのルート**。`.hozo` の探索、`out`、プラグインの探索の起点。
 
 ## 形
@@ -35,6 +35,10 @@ plugins = []
 - `[hozo]` 以外のトップレベルのテーブルは名前空間。ドットを含むテーブル名（`[server.admin]`）は子の名前空間。`[server] admin = { ... }` のインラインテーブルも同じ意味（TOML 上は同じ構造）。
 - 値の型が違えば CFG-7。
 
+## 出力する名前空間
+
+出力するのは、`hozo.toml` にテーブルがある名前空間と、その設定を引き継ぐ子孫だけ。その中でも、出力されるのは設定したプラグインが選んだ宣言だけ（`docs/emit-go.md`「出力の対象」）。テーブルのない名前空間は出力せず、エラーにもしない（人の操作や外部のシステムのように、コードを生成しない部分をモデルに含められる。`docs/requirements.md`「モデルが先」）。検査は出力しない名前空間にも同じに掛かる。
+
 ## 名前空間の設定の解決
 
 名前空間 N（FQN）の設定 Conf(N):
@@ -50,7 +54,7 @@ Conf(N) と Dir(N) は `View.config` と `View.namespaces` としてプラグイ
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| CFG-1 | error | `state` か `op` を一つでも持つユーザーの名前空間で、Conf の `language` か `out` が未設定。グローバル（`""`）に `state` か `op` があれば、それも CFG-1（グローバルには設定を書けない） |
+| CFG-1 | error | テーブルのある名前空間（継承で設定が決まる子孫を含む）で、Conf の `language` か `out` が未設定（片方だけ書いた、など） |
 | CFG-2 | error | `.hozo` の名前空間の名前（どの階層でも）が `language` / `plugins` / `out` / `hozo`。または `hozo.toml` にこれらの名前のテーブルがある（`[hozo]` 以外） |
 | CFG-3 | — | 解決の手続き。診断なし |
 | CFG-4 | error | Conf(N).plugins のプラグインのマニフェストの `language` が Conf(N).language と違う。例外は `LanguageMismatch` |

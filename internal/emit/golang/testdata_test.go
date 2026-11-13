@@ -177,7 +177,7 @@ func serverNS() ir.Namespace {
 				app("http.post", arg("path", lit(ir.StringLiteral{Value: "/login"}))),
 			), Params: []ir.OpParam{param("in", ir.Ref("server.LoginInput"))}, Returns: ir.Ref("server.LoginOk"),
 				Effects:   []string{"server.createSession"},
-				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.InvalidCredentials"}, Relations: []ir.Relation{{Kind: ir.Prevents, Effects: ir.AllEffects()}}}},
+				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.InvalidCredentials"}, Relations: []ir.Relation{{Kind: ir.Prevents}}}},
 				Signature: loginSig},
 			&ir.Op{DeclBase: base("server.getMe", doc("自分の情報。")), Params: []ir.OpParam{param("in", ir.Ref("server.GetMeInput"))}, Returns: ir.Ref("server.User"),
 				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
@@ -238,7 +238,7 @@ func browserNS() ir.Namespace {
 			&ir.Decorator{DeclBase: base("browser.tracked", nil), Targets: []ir.DecoratorTarget{ir.TargetOp}},
 			&ir.Decorator{DeclBase: base("browser.guarded", nil), Targets: []ir.DecoratorTarget{ir.TargetOp},
 				Catches: []ir.CatchesClause{{Exceptions: []string{"server.Unauthorized"}, Mode: ir.Halts, Halts: "browser.redirected"}},
-				Throws:  []ir.ThrowsClause{{Exceptions: []string{"$param:on"}, Relations: []ir.Relation{{Kind: ir.Prevents, Effects: ir.AllEffects()}}}}},
+				Throws:  []ir.ThrowsClause{{Exceptions: []string{"$param:on"}, Relations: []ir.Relation{{Kind: ir.Prevents}}}}},
 			&ir.Decorator{DeclBase: base("browser.guardMe", nil), Alias: &ir.DecoratorAlias{Target: "browser.guarded", Args: []ir.Arg{arg("on", ir.RefValue{Target: "http.NetworkError"})}}},
 			&ir.Effect{DeclBase: base("browser.redirected", nil), Target: ir.BuiltinTarget{State: "browser.token", Operation: ir.OpPut}, Writes: []string{"browser.token"}},
 			// 配線: 自分の情報を取って描画し、公開情報を返す。

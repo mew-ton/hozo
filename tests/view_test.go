@@ -647,6 +647,27 @@ func TestStateCorpusIR(t *testing.T) {
 			E: []string{}, F: []string{"shop.addLine"}, Rel: []string{}, Succ: []string{"shop.addLine = unknown"},
 		})
 	})
+
+	t.Run("check.md 状態と効果/EFF-3、計算/手順 0（配線）", func(t *testing.T) {
+		// 葉の op が直に持つ効果は一つ。二つの効果を持つ login は、効果ごとの葉の op を順に呼ぶ配線（docs/decisions.md S8）
+		for _, ns := range prog.Namespaces {
+			for _, d := range ns.Decls {
+				if o, ok := d.(*ir.Op); ok && o.Body == nil && len(o.Effects) > 1 {
+					t.Errorf("葉の op %s が効果を二つ以上持っている: %v", o.Name, o.Effects)
+				}
+			}
+		}
+		expect(t, "storeToken の effects", opOf(t, prog, "shop.storeToken").Effects, []string{"shop.saveToken"})
+		expect(t, "markLoggedIn の effects", opOf(t, prog, "shop.markLoggedIn").Effects, []string{"shop.signIn"})
+		login := opOf(t, prog, "shop.login")
+		expect(t, "login の本体", renderBody(login.Body), []string{"shop.storeToken(token: token)", "shop.markLoggedIn()"})
+		expect(t, "login の effects（宣言）", orEmptyStrings(login.Effects), []string{})
+		// F は呼び出しの effects を行の順に連結したもの
+		expect(t, "login の Signature", sigOf(login.Signature), sig{
+			E: []string{}, F: []string{"shop.saveToken", "shop.signIn"}, Rel: []string{},
+			Succ: []string{"shop.saveToken = kept", "shop.signIn = kept"},
+		})
+	})
 }
 
 // TestViewDeliveredToPlugin は、実物の `hozoc emit`（internal/app の Leaves と生成した cli.Main。tests/selfcheck_test.go と同じ組み立て）が
@@ -990,12 +1011,7 @@ func renderParams(ps []ir.Param) []string {
 func renderRelations(rs []ir.Relation) string {
 	var s string
 	for _, r := range rs {
-		s += " " + string(r.Kind) + " "
-		if r.Effects.All {
-			s += "effects"
-		} else {
-			s += strings.Join(r.Effects.Effects, " | ")
-		}
+		s += " " + string(r.Kind) + " effects"
 	}
 	return s
 }

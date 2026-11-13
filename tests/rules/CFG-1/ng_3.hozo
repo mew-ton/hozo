@@ -1,7 +1,7 @@
-// CFG-1（docs/config.md「診断」）: テーブルはあるが out が未設定（ng_3.toml）
+// CFG-1（docs/config.md「診断」）: 継承で設定が決まる子孫も対象。親 a のテーブルに out がなく、子 a.sub も書いていない（ng_3.toml）
 namespace a {
   op f();
 }
-namespace b {
-  state s: list<string>;
+namespace a.sub {
+  op g();
 }

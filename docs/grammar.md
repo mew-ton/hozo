@@ -78,7 +78,7 @@ Literal  = String | Int | Float | Bool | Duration ;
 File = { Decl } ;
 
 Decl = [ DocComment ] { Decorator } Declaration
-     | [ DocComment ] NamespaceDecl
+     | [ DocComment ] { Decorator } NamespaceDecl
      | BindDecl ;
 
 Declaration = ModelDecl | ScalarDecl | UnionDecl | StateDecl | OpDecl
@@ -89,7 +89,7 @@ NamespaceDecl = "namespace" QualifiedName "{" { Decl } "}" ;
 
 - `namespace` の外の宣言はグローバル（§3.2）。
 - `namespace server.admin { }` と `namespace server { namespace admin { } }` はどちらも書ける（§3.2）。同じ名前の `namespace` は何度でも書ける。
-- デコレータはどの `Declaration` の前にも書けるが、付けられる対象はデコレータの宣言の `for` で決まる（検査 DEC-1）。`namespace` と `bind` には付けられない（文法で閉じる）。
+- デコレータはどの `Declaration` の前にも書けるが、付けられる対象はデコレータの宣言の `for` で決まる（検査 DEC-1）。`namespace` にも付けられる（分かれた文脈の印など）。同じ名前空間のブロックが複数あれば、付けたデコレータは一つの名前空間にまとまる。`bind` には付けられない（文法で閉じる）。
 - `DocComment` → デコレータ → 宣言の順（§3.4）。デコレータの後ろに `DocComment` は置けない。
 
 ### デコレータの適用
@@ -182,12 +182,11 @@ Param     = Ident ":" ParamType ;
 ParamType = AnyType [ "?" ] | Type { "|" Type } ;      (* 省略可能は型の ? で書く。any の種類にも付けられる（from: any state?） *)
 AnyType   = "any" AnyKind [ "on" QualifiedName "." StateOp ] ;
 AnyKind   = "exception" | "effect" | "state" | "op" | "model" | "variant" ;   (* variant は文脈キーワード *)
-Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" ;     (* field は文脈キーワード *)
+Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" | "namespace" ;     (* field は文脈キーワード *)
 
 DecoratorClause = ThrowsClause | CatchesClause ;
 ThrowsClause    = "throws" ExcRef { "|" ExcRef } { Relation } ;
-Relation        = ( "prevents" | "keeps" ) EffectsRef ;
-EffectsRef      = "effects" | QualifiedName { "|" QualifiedName } ;
+Relation        = ( "prevents" | "keeps" ) "effects" ;
 CatchesClause   = "catches" ExcRef { "|" ExcRef } ( "recovers" | "halts" QualifiedName | "ignores" ) ;
 ExcRef          = QualifiedName ;
 ```
@@ -290,6 +289,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
 | 空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない | 同じ意味の書き方を二つ持たない。「空」が入れ物と値の型の二か所に現れないようにする |
 | 状態の分類での `match` は対象を書かない（`match by C`） | 対象は分類の宣言が持っていて、書かせると二か所になる |
+| `prevents` / `keeps` の目的語は `effects` だけ | 葉の op が直に持つ効果は高々一つ（`docs/check.md` EFF-3）なので、効果を名前で書き分ける場面がない |
 | `@external` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
 | その場で書く model はユニオンのアームと例外の値にだけ置ける | 合成する名前（`docs/ir.md`「正規化」）がその二つにしか決まらない |
 | 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない | 同じ意味の書き方を二つ持たない。型の `?` は `single<Token?>` のように型の位置で要るので、名前の側を落とす。設計書の例の `x?: T` は `x: T?` に直す（`docs/decisions.md`「設計書へ返すこと」） |
