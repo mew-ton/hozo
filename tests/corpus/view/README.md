@@ -52,6 +52,8 @@
 | `docs/plugin-protocol.md`「要求と応答」 | `plugins/view-dump` | `TestViewDeliveredToPlugin`: 実物の `hozoc emit` がプラグインに渡す `View` が `Views()["web"]` とバイト単位で同じ。`protocol` が違えば `code: "protocol"`（MAN-2）、`import` は `code: "unsupported"`（MAN-5） |
 | `docs/config.md`「名前空間の設定の解決」 | `hozo.toml` | `View.config.dir = "gen/web"`、`namespaces[api].dir = "gen/api"` |
 
+このコーパスにない構文: 状態の分類（`docs/ir.md`「classify」の `subject` の `states`）、遷移の効果（`Effect.target` の `transition`）、状態での `match`（`Match.subject` の `state` / `classify`）は、専用のコーパス `tests/corpus/state` に置いた（その `README.md`。IR は `TestStateCorpusIR`、Go の既定の出力は `TestCorpusEmitGolden` が確かめる）。ここへ足すと `view.web.json` のゴールデンと `TestViewFromEntry` の見出しごとの期待値をまとめて書き直すことになるので、分けたままにしている。
+
 ## 想定する warning
 
 `hozoc check` の error はない。warning は一つで、意図したもの。
@@ -67,5 +69,4 @@
 | 文書 | 書きたかった構文 | 今の実装 |
 |---|---|---|
 | `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | `View` は `web.getUser$in` と `web.getUser$in$auth` を正しく合成するが、Go の既定の出力が `web.getUser$in$auth` を `GetUserIn$authInput` にして `go/format` に失敗する（GOEMIT-INTERNAL）。`docs/emit-go.md`「名前」は一段の `browser.getMe$in` → `GetMeInInput` しか決めていない |
-| `docs/ir.md`「classify」の `subject`（`states`）、「state / exception / effect」の `Effect.target`（`transition`）、「配線」の `Match.subject`（`state` / `classify`） | 状態の分類 `classify Checkout of carts, orders { ... }`、遷移の効果 `effect placeOrder on Checkout: Shopping -> Ordered;`、状態での `match token by nullable { ... }` / `match by Checkout { ... }` | Go の既定の出力がまだ扱えず、`GOEMIT-INTERNAL` の error にして何も書き出さない（`internal/emit/golang/unsupported.go`）。このコーパスは emit のゴールデンを持つので、これらの構文は check だけのコーパス `tests/corpus/state` に置いた（その `README.md`）。出力を実装したら、ここへ足す |
 | `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストの `command = ["go", "run", ...]` のまま `protocol` の不一致を MAN-2 にする | `go run` はプログラムの終了コードを伝えず 0 以外を 1 にするので、`proc.Crashed` になる。`TestViewDeliveredToPlugin` の protocol のサブテストは `go build` した実行ファイルで起動する |

@@ -430,3 +430,222 @@ func derivedView() *ir.View {
 	}
 	return v
 }
+
+// ---- 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S6）の出力 ----
+
+// stateArm は match のアーム一つ。body が nil なら none。
+func stateArm(body *ir.Call, cases ...string) ir.MatchArm {
+	a := ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.NoneBody{}, Span: sp("x.hozo", 1)}
+	if body != nil {
+		a.Body = ir.CallExpr{Call: *body}
+	}
+	return a
+}
+
+// defaultArm は default のアーム。body が nil なら none。
+func defaultArm(body *ir.Call) ir.MatchArm {
+	a := stateArm(body)
+	a.Cases = ir.DefaultArm()
+	return a
+}
+
+func callp(op string, args ...ir.CallArg) *ir.Call {
+	c := call(op, args...)
+	return &c
+}
+
+// byState は基底の状態の、組み込みの分類での match（`match s by list` / `by nullable`）。
+func byState(state string, shape ir.StateShape, arms ...ir.MatchArm) ir.Match {
+	return ir.Match{Subject: ir.StateSubject{State: state}, Classify: string(shape), Arms: arms, Span: sp("x.hozo", 1)}
+}
+
+// byClassify は状態の分類での match（`match by C`）。
+func byClassify(classify string, arms ...ir.MatchArm) ir.Match {
+	return ir.Match{Subject: ir.ClassifyOwnedSubject{}, Classify: classify, Arms: arms, Span: sp("x.hozo", 1)}
+}
+
+func wiring(stmts ...ir.Statement) *ir.Wiring { return &ir.Wiring{Statements: stmts} }
+
+func matchStmt(m ir.Match) ir.Statement { return ir.MatchStmt{Match: m, Span: sp("x.hozo", 1)} }
+
+func constMatch(name string, m ir.Match) ir.Statement {
+	return ir.ConstStmt{Name: name, Expr: ir.MatchExpr{Match: m}, Span: sp("x.hozo", 1)}
+}
+
+func returnName(path ...string) ir.Statement {
+	return ir.ReturnStmt{Expr: ir.AtomExpr{Atom: name(path...)}, Span: sp("x.hozo", 1)}
+}
+
+func effectsSig(effects ...string) ir.Signature { return ir.Signature{Effects: effects} }
+
+// shopNS は店の名前空間: 三つの形の基底の状態、状態の分類（default なし）と condition（default あり）、値の分類、
+// 組み込みの効果と遷移の効果、状態での match（match by C と match s by list / by nullable）の配線。
+// 配線に match s by list / by nullable があるので、New は stateCases を取る。
+func shopNS() ir.Namespace {
+	return ir.Namespace{
+		Name:        "shop",
+		Description: doc("カートと注文を持つ店。"),
+		Decls: []ir.Decl{
+			&ir.Scalar{DeclBase: base("shop.Token", doc("ログインセッションのトークン")), Base: ir.String()},
+			&ir.Model{DeclBase: base("shop.Line", nil), Fields: []ir.Field{field("item", ir.String())}},
+			&ir.Model{DeclBase: base("shop.Order", nil), Fields: []ir.Field{field("id", ir.String())}},
+			&ir.Model{DeclBase: base("shop.MeInput", nil), Fields: []ir.Field{field("token", ir.Ref("shop.Token")), field("verbose", ir.Boolean())}},
+			&ir.Model{DeclBase: base("shop.Profile", nil), Fields: []ir.Field{field("name", ir.String())}},
+
+			&ir.State{DeclBase: base("shop.carts", doc("カートの行")), Shape: ir.StateList, Element: ir.Ref("shop.Line")},
+			&ir.State{DeclBase: base("shop.orders", doc("注文")), Shape: ir.StateList, Element: ir.Ref("shop.Order")},
+			&ir.State{DeclBase: base("shop.token", doc("手元のトークン")), Shape: ir.StateNullable, Element: ir.Ref("shop.Token")},
+			// single は組み込みの分類を持たない（StateCases に述語は出ない）。
+			&ir.State{DeclBase: base("shop.title", doc("店の名前")), Shape: ir.StateSingle, Element: ir.String()},
+
+			// 状態の分類。default なし。
+			&ir.Classify{DeclBase: base("shop.Checkout", doc("買い物の進み具合")), Subject: ir.StatesSubject{States: []string{"shop.carts", "shop.orders"}},
+				Cases: []ir.ClassifyCase{
+					{Name: "Shopping", Description: doc("カートに入れている途中"), Span: sp("x.hozo", 1)},
+					{Name: "Ordered", Description: doc("注文を出した"), Span: sp("x.hozo", 1)},
+				}},
+			// condition の糖衣の状態の分類。default あり。
+			&ir.Classify{DeclBase: base("shop.LoggedIn", doc("ログインしている")), Subject: ir.StatesSubject{States: []string{"shop.token"}},
+				Cases: []ir.ClassifyCase{{Name: "LoggedIn", Span: sp("x.hozo", 1)}}, HasDefault: true, FromCondition: true},
+			// 値の分類は今まで通り（Classifiers に状態の分類と並ぶ）。
+			&ir.Classify{DeclBase: base("shop.LineKind", nil), Subject: ir.TypeSubject{Type: ir.Ref("shop.Line")},
+				Cases: []ir.ClassifyCase{{Name: "Single", Span: sp("x.hozo", 1)}, {Name: "Bulk", Span: sp("x.hozo", 1)}}},
+
+			// 組み込みの効果。
+			&ir.Effect{DeclBase: base("shop.addLine", doc("カートに行を足す")), Target: ir.BuiltinTarget{State: "shop.carts", Operation: ir.OpPost}, Writes: []string{"shop.carts"}},
+			// 状態の分類の遷移。説明があっても遷移はコメントに出る。
+			&ir.Effect{DeclBase: base("shop.placeOrder", doc("注文を確定する")),
+				Target: ir.TransitionTarget{Of: "shop.Checkout", From: ir.Cases("Shopping"), To: ir.Cases("Ordered")}, Writes: []string{"shop.carts", "shop.orders"}},
+			// 説明のない遷移。CaseSet の any。
+			&ir.Effect{DeclBase: base("shop.startOver", nil),
+				Target: ir.TransitionTarget{Of: "shop.Checkout", From: ir.AnyCase(), To: ir.Cases("Shopping")}, Writes: []string{"shop.carts", "shop.orders"}},
+			// ケースの和。
+			&ir.Effect{DeclBase: base("shop.touchCheckout", doc("進み具合を記録し直す")),
+				Target: ir.TransitionTarget{Of: "shop.Checkout", From: ir.Cases("Shopping", "Ordered"), To: ir.AnyCase()}, Writes: []string{"shop.carts", "shop.orders"}},
+			// 基底の状態の組み込みの分類の遷移。
+			&ir.Effect{DeclBase: base("shop.clearCart", doc("カートを空にする")),
+				Target: ir.TransitionTarget{Of: "shop.carts", From: ir.Cases(ir.CaseHasItems), To: ir.Cases(ir.CaseEmpty)}, Writes: []string{"shop.carts"}},
+
+			// 葉。
+			&ir.Op{DeclBase: base("shop.submitOrder", nil), Returns: ir.Ref("shop.Order"), Effects: []string{"shop.placeOrder"}, Signature: effectsSig("shop.placeOrder")},
+			&ir.Op{DeclBase: base("shop.emptyCart", nil), Effects: []string{"shop.clearCart"}, Signature: effectsSig("shop.clearCart")},
+			&ir.Op{DeclBase: base("shop.showLogin", nil)},
+			&ir.Op{DeclBase: base("shop.showCart", nil)},
+			&ir.Op{DeclBase: base("shop.showEmpty", nil)},
+			&ir.Op{DeclBase: base("shop.showOrders", nil)},
+			&ir.Op{DeclBase: base("shop.sampleLine", nil), Returns: ir.Ref("shop.Line")},
+			&ir.Op{DeclBase: base("shop.firstLine", nil), Returns: ir.Ref("shop.Line")},
+			&ir.Op{DeclBase: base("shop.me", doc("自分の情報。token は bind で埋まる。")), Params: []ir.OpParam{param("in", ir.Ref("shop.MeInput"))}, Returns: ir.Ref("shop.Profile")},
+
+			// match by C の値の形: none のアームがあるので optional。
+			&ir.Op{DeclBase: base("shop.checkout", doc("注文を出す。もう出していれば何もしない。")), Returns: ir.Optional(ir.Ref("shop.Order")),
+				Body: wiring(
+					constMatch("placed", byClassify("shop.Checkout",
+						stateArm(callp("shop.submitOrder"), "Shopping"),
+						stateArm(nil, "Ordered"))),
+					returnName("placed"),
+				), Signature: effectsSig("shop.placeOrder")},
+			// match by C の文の形。default のアーム（condition）と、ケースを並べたアーム。
+			&ir.Op{DeclBase: base("shop.open", nil),
+				Body: wiring(
+					matchStmt(byClassify("shop.LoggedIn",
+						stateArm(callp("shop.showCart"), "LoggedIn"),
+						defaultArm(callp("shop.showLogin")))),
+					matchStmt(byClassify("shop.Checkout",
+						stateArm(callp("shop.showOrders"), "Shopping", "Ordered"))),
+				)},
+			// match s by nullable の値の形: none のアームがあるので optional。HasItems のアームの呼び出しは bind で token が埋まる
+			// （アームの中で States から取る）。
+			&ir.Op{DeclBase: base("shop.who", nil), Returns: ir.Optional(ir.Ref("shop.Profile")),
+				Body: wiring(
+					constMatch("profile", byState("shop.token", ir.StateNullable,
+						stateArm(nil, ir.CaseEmpty),
+						stateArm(&ir.Call{Op: "shop.me",
+							Args:  []ir.CallArg{carg("in", record(ir.RecordField{Name: "verbose", Value: ir.LiteralAtom{Literal: ir.BooleanLiteral{Value: true}, Span: sp("x.hozo", 1)}}))},
+							Bound: []ir.BoundPosition{{Path: []string{"in", "token"}, State: "shop.token"}}, Span: sp("x.hozo", 1)}, ir.CaseHasItems))),
+					returnName("profile"),
+				)},
+			// match s by list の文の形。
+			&ir.Op{DeclBase: base("shop.openCart", nil),
+				Body: wiring(
+					matchStmt(byState("shop.carts", ir.StateList,
+						stateArm(callp("shop.showEmpty"), ir.CaseEmpty),
+						stateArm(callp("shop.emptyCart"), ir.CaseHasItems))),
+				), Signature: effectsSig("shop.clearCart")},
+			// match s by list の値の形（none がないので optional にならない）。アームは HasItems が先に書かれている。
+			&ir.Op{DeclBase: base("shop.pick", nil), Returns: ir.Ref("shop.Line"),
+				Body: wiring(
+					ir.ReturnStmt{Expr: ir.MatchExpr{Match: byState("shop.carts", ir.StateList,
+						stateArm(callp("shop.firstLine"), ir.CaseHasItems),
+						stateArm(callp("shop.sampleLine"), ir.CaseEmpty))}, Span: sp("x.hozo", 1)},
+				)},
+			// 文の形で片方のアームが none（その枝は書かない）、両方が none（述語だけ呼ぶ）、一つのアームに両方のケース（分岐しない）。
+			&ir.Op{DeclBase: base("shop.refresh", nil),
+				Body: wiring(
+					matchStmt(byState("shop.carts", ir.StateList,
+						stateArm(nil, ir.CaseEmpty),
+						stateArm(callp("shop.showCart"), ir.CaseHasItems))),
+					matchStmt(byState("shop.token", ir.StateNullable,
+						stateArm(callp("shop.showLogin"), ir.CaseEmpty),
+						stateArm(nil, ir.CaseHasItems))),
+					matchStmt(byState("shop.orders", ir.StateList,
+						stateArm(nil, ir.CaseEmpty),
+						stateArm(nil, ir.CaseHasItems))),
+					matchStmt(byState("shop.orders", ir.StateList,
+						stateArm(callp("shop.showOrders"), ir.CaseEmpty, ir.CaseHasItems))),
+					constMatch("line", byState("shop.carts", ir.StateList,
+						stateArm(callp("shop.firstLine"), ir.CaseEmpty, ir.CaseHasItems))),
+				)},
+		},
+	}
+}
+
+// depotNS は倉庫の名前空間: list / nullable の状態と状態の分類（default あり）はあるが、配線に
+// match s by list / by nullable がない。StateCases は出るが、New は stateCases を取らない。
+func depotNS() ir.Namespace {
+	return ir.Namespace{
+		Name: "depot",
+		Decls: []ir.Decl{
+			&ir.State{DeclBase: base("depot.items", nil), Shape: ir.StateList, Element: ir.String()},
+			&ir.State{DeclBase: base("depot.lock", nil), Shape: ir.StateNullable, Element: ir.String()},
+			&ir.Classify{DeclBase: base("depot.Level", nil), Subject: ir.StatesSubject{States: []string{"depot.items", "depot.lock"}},
+				Cases:      []ir.ClassifyCase{{Name: "Low", Span: sp("x.hozo", 1)}, {Name: "High", Span: sp("x.hozo", 1)}},
+				HasDefault: true, DefaultDescription: doc("鍵がかかっていて数えられない")},
+			&ir.Effect{DeclBase: base("depot.restock", nil), Target: ir.BuiltinTarget{State: "depot.items", Operation: ir.OpPost}, Writes: []string{"depot.items"}},
+			&ir.Effect{DeclBase: base("depot.drain", nil),
+				Target: ir.TransitionTarget{Of: "depot.Level", From: ir.Cases("High"), To: ir.Cases("Low")}, Writes: []string{"depot.items", "depot.lock"}},
+			&ir.Effect{DeclBase: base("depot.unlock", nil),
+				Target: ir.TransitionTarget{Of: "depot.lock", From: ir.Cases(ir.CaseHasItems), To: ir.Cases(ir.CaseEmpty)}, Writes: []string{"depot.lock"}},
+			&ir.Op{DeclBase: base("depot.count", nil), Returns: ir.Int()},
+			&ir.Op{DeclBase: base("depot.order", nil), Effects: []string{"depot.restock"}, Signature: effectsSig("depot.restock")},
+			&ir.Op{DeclBase: base("depot.report", nil), Returns: ir.Int(),
+				Body: wiring(
+					matchStmt(byClassify("depot.Level",
+						stateArm(callp("depot.order"), "Low"),
+						stateArm(nil, "High"),
+						defaultArm(nil))),
+					ir.ReturnStmt{Expr: ir.CallExpr{Call: call("depot.count")}, Span: sp("x.hozo", 1)},
+				), Signature: effectsSig("depot.restock")},
+		},
+	}
+}
+
+// stateNamespaces は state のテストの View.Namespaces。
+func stateNamespaces() map[string]ir.NamespaceConfig {
+	return map[string]ir.NamespaceConfig{"shop": nsConfig("shop"), "depot": nsConfig("depot")}
+}
+
+// stateView は viewer（shop か depot）から見た View。bind は shop.token を shop の op に。
+func stateView(viewer string) *ir.View {
+	p := &ir.Program{Version: ir.Version,
+		Namespaces: []ir.Namespace{{Name: ""}, validVocab(), shopNS(), depotNS()},
+		Binds:      []ir.Bind{{Namespace: "shop", State: "shop.token", Target: ir.BindTarget{Namespace: "shop"}, Span: sp("x.hozo", 1)}},
+	}
+	v := &ir.View{Viewer: viewer, Config: nsConfig(viewer), Namespaces: stateNamespaces(), Program: p, Ops: map[string]*ir.ViewedSignature{}}
+	for _, d := range p.Namespace(viewer).Decls {
+		if op, ok := d.(*ir.Op); ok {
+			v.Ops[op.Name] = &ir.ViewedSignature{Signature: op.Signature, Params: op.Params}
+		}
+	}
+	return v
+}

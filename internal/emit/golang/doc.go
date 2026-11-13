@@ -11,9 +11,9 @@
 //   - 「型」: plugin/golang の GoType。
 //   - 「model」「scalar」「union」「exception」「effect」: types_gen.go（types.go を作る）。
 //   - 「scalar」の Validate と「model の Validate」: validate_gen.go（validate.go を作る）。
-//   - 「state」「op」（インターフェース、デコレータ）: ops_gen.go（ops.go を作る）。
-//   - 「配線の本体」「match」: wiring_gen.go（wiring.go を作る）。
-//   - 「classify」: classify_gen.go（classify.go を作る）。
+//   - 「state」（States、StateCases）「op」（インターフェース、デコレータ）: ops_gen.go（ops.go を作る）。
+//   - 「配線の本体」「match」（値の分類・状態の分類の switch、組み込みの分類の if）: wiring_gen.go（wiring.go を作る）。
+//   - 「classify」（値の分類と状態の分類）: classify_gen.go（classify.go を作る）。
 //   - 別の名前空間の型の複製（「配置」の三つ目）: copy.go。
 //
 // # 文書にない決定
@@ -29,7 +29,8 @@
 //     複製した model / scalar には Validate（と既定値があれば New）も出す。derivedFrom の
 //     変換関数は複製しない。
 //   - GOEMIT-2 は、フィールド名と op 名に加えて、パッケージの型名（宣言・合成・複製・
-//     ユニオンの包む型）の衝突でも出す。衝突した出力はコンパイルできないため。
+//     ユニオンの包む型）と、StateCases の述語の名前（`carts` と `Carts`）の衝突でも出す。
+//     衝突した出力はコンパイルできないため。
 //   - GOEMIT-* か内部エラーが一つでもあればファイルは返さない（CheckFailed では書き出さない）。
 //   - ユーザーが valid に足した制約のデコレータに引数があれば、ConstraintImpls のメソッドに
 //     v の後ろにその引数を並べる。
@@ -42,11 +43,13 @@
 //   - optional の位置に値を渡すとき `&x` が書けない式には、types.go に出すヘルパー `ptr` を使う。
 //   - 既定値の GOEMIT-4 は、scalar の標準の制約に加えてフィールド自身の valid.* も見る。
 //   - min / max を付けられる「数値」は int と float（Duration は含めない）。
-//
-// まだ実装していないところ（docs/decisions.md「設計書を変える決定」S1〜S6 の出力の側）。
-//
-//   - 状態の分類、遷移の効果、状態での match（match by C、match s by list / by nullable）は、
-//     unsupported.go の checkUnsupported が GOEMIT-INTERNAL の error にして、ファイルを出さない。
-//   - StateCases（docs/emit-go.md「state」）は出さない。New の引数にも ops の構造体にもない。
-//   - States の取得メソッドの型は対応済み: nullable<T> なら *T、single<T> なら T。
+//   - StateCases の述語は viewer の list / nullable の状態の宣言の順。ops.go は op も classify もなくても、
+//     その状態があれば作る。
+//   - 状態の分類の判定関数は、述語がエラーを返しても残りの述語を評価し、最初のエラーを返す
+//     （「すべての述語を評価し」を、エラーのときにも保つ）。エラーがあれば真の数は検証しない。
+//   - 遷移の効果の定数のコメントには、説明の後ろに `on <宛先の FQN>: <前> -> <後>` の行を必ず足す。
+//   - match のアームの呼び出しが bind で状態の値を取るとき、その取得はアームの中に書き、エラーはその場で返す
+//     （アームの呼び出しのエラーだけを switch / if の後でまとめて見る）。
+//   - match の形と分類が合わない View（MATCH-7 を通っていれば来ない）と、対象のない classify は
+//     GOEMIT-INTERNAL の error にする。
 package golang

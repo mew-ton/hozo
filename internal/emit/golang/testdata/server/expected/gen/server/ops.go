@@ -64,6 +64,14 @@ type Ops interface {
 	OrderPage(ctx context.Context, me User, orders []OrderRow) (OrderPage, error)
 }
 
+// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
+// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
+// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
+type StateCases interface {
+	// SessionsIsEmpty は状態 server.sessions（list）が空（Empty）か。
+	SessionsIsEmpty(ctx context.Context) (bool, error)
+}
+
 // New はこの名前空間の Ops を組み立てる。葉は leaves に、配線は生成した本体に委ね、デコレータの包む関数で包む。
 func New(leaves Leaves) Ops {
 	return &ops{leaves: leaves}

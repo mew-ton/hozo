@@ -21,7 +21,7 @@ func local(name string) string {
 }
 
 // checkNames は GOEMIT-2（docs/emit-go.md「名前」の「大文字化で衝突する二つの名前」）。
-// model のフィールド名、viewer の op 名、そしてパッケージの型名（doc.go「文書にない決定」）。
+// model のフィールド名、viewer の op 名、そしてパッケージの型名と StateCases の述語の名前（doc.go「文書にない決定」）。
 func (e *emitter) checkNames() {
 	for _, m := range e.models {
 		seen := map[string]string{}
@@ -42,6 +42,15 @@ func (e *emitter) checkNames() {
 			continue
 		}
 		seen[g] = o.Name
+	}
+	preds := map[string]string{}
+	for _, st := range e.stateCases {
+		g := e.isEmptyMethod(st)
+		if prev, ok := preds[g]; ok {
+			e.errorf(CodeNameCollision, &st.Span, "state %s と %s は Go では StateCases の同じメソッド名 %s になる", prev, st.Name, g)
+			continue
+		}
+		preds[g] = st.Name
 	}
 	types := map[string]string{}
 	add := func(goName, fqn string, span *ir.Span) {

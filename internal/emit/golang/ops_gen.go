@@ -134,7 +134,7 @@ func (e *emitter) opComment(method string, op *ir.Op, params []ir.OpParam, sig i
 
 // genOps は ops.go（docs/emit-go.md「op」の「インターフェース」「デコレータ」と「state」）。
 func (e *emitter) genOps() *genFile {
-	if len(e.ops) == 0 && len(e.classifies) == 0 {
+	if len(e.ops) == 0 && len(e.classifies) == 0 && len(e.stateCases) == 0 {
 		return nil
 	}
 	g := e.newFile("ops.go")
@@ -219,6 +219,18 @@ func (e *emitter) genOps() *genFile {
 		g.println("}\n")
 	}
 
+	if len(e.stateCases) > 0 {
+		g.println("// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する")
+		g.println("// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。")
+		g.println("// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。")
+		g.println("type StateCases interface {")
+		for _, st := range e.stateCases {
+			g.printf("\t// %s は状態 %s（%s）が空（Empty）か。\n", e.isEmptyMethod(st), st.Name, st.Shape)
+			g.printf("\t%s(ctx %s.Context) (bool, error)\n", e.isEmptyMethod(st), imp.Add("context", "context"))
+		}
+		g.println("}\n")
+	}
+
 	if e.hasWrappers() {
 		g.println("// Wrappers は op に付いたデコレータのうち、プラグインが扱わないものの「包む関数」（docs/emit-go.md「デコレータ」）。")
 		g.println("// 引数は op の引数と next（op の関数の型）。")
@@ -261,6 +273,9 @@ func (e *emitter) genOps() *genFile {
 	}
 	if len(states) > 0 {
 		parts = append(parts, part{"states", "States"})
+	}
+	if e.matchesState {
+		parts = append(parts, part{"stateCases", "StateCases"})
 	}
 	if e.hasWrappers() {
 		parts = append(parts, part{"wrappers", "Wrappers"})
@@ -341,6 +356,19 @@ func (e *emitter) orderedDepsOps(ns string) []string {
 	}
 	return out
 }
+
+// stateValueType は bind で埋める状態の値の型（docs/emit-go.md「state」の States）: nullable<T> なら optional(T)
+// （Go では *T。空なら nil）、single<T> なら T。
+func stateValueType(st *ir.State) ir.Type {
+	if st.Shape == ir.StateNullable {
+		return ir.Optional(st.Element)
+	}
+	return st.Element
+}
+
+// isEmptyMethod は StateCases の述語のメソッド名 <State>IsEmpty（docs/emit-go.md「state」）。
+// 状態の名前は States の取得メソッドと同じ規則（typeName）。
+func (e *emitter) isEmptyMethod(st *ir.State) string { return e.typeName(st.Name) + "IsEmpty" }
 
 // orderedStates は States に出す状態を Program の順で。
 func (e *emitter) orderedStates() []string {

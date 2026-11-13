@@ -210,6 +210,13 @@ func Build() Grammar {
 			Match:   `(?<![A-Za-z0-9_.])(?:-?[0-9]+\.[0-9]+|[0-9]+(?:ms|s|m|h|d)|-?[0-9]+)\b`,
 		}},
 
+		// ---- 記号 ----
+		{Key: "arrow", Rule: Rule{
+			Comment: "-> は遷移（docs/grammar.md「exception / effect」の Transition）、=> は match のアーム（同「配線」の MatchArm）",
+			Name:    "keyword.operator.arrow.hozo",
+			Match:   `->|=>`,
+		}},
+
 		// ---- デコレータ ----
 		{Key: "external", Rule: Rule{
 			Comment: "@external は核の印でデコレータではない（docs/grammar.md「予約語」）",
@@ -295,10 +302,11 @@ func Build() Grammar {
 		}},
 		{Key: "type-positions", Rule: Rule{Patterns: []Rule{
 			{
-				Comment: ": の後ろ（フィールド、引数、返り値、状態、例外の値）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
+				Comment: ": の後ろ（フィールド、引数、返り値、状態、例外の値、遷移のケース）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
 				Begin:   `:`,
 				End:     `(?=[=;,(){}\[\]])|(?=\b(?:throws|effects|catches|prevents|keeps)\b)`,
 				Patterns: []Rule{
+					{Include: "#arrow"},
 					{Include: "#contextual"},
 					{Include: "#type"},
 					{Include: "#string"},
@@ -354,6 +362,7 @@ func Build() Grammar {
 			{Include: "#generic"},
 			{Include: "#keywords"},
 			{Include: "#number"},
+			{Include: "#arrow"},
 		},
 		Repository: repo,
 	}

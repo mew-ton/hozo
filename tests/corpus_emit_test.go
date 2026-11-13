@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,16 +15,13 @@ import (
 var update = flag.Bool("update", false, "update golden files (docs/testing.md「コーパス」)")
 
 // corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は emit が `go run` のプラグインを起動するもの。
-// emit が false のコーパスは check のゴールデンだけを持つ（既定の出力がまだ扱えない構文を含む。そのコーパスの README.md）。
 var corpora = []struct {
 	name    string
 	needsGo bool
-	emit    bool
 }{
-	{"design", false, true},
-	{"view", true, true}, // plugins/view-dump を `go run` で起動する
-	// 状態の分類・遷移の効果・状態での match。internal/emit/golang が GOEMIT-INTERNAL にする（TestCorpusEmitUnsupported）
-	{"state", false, false},
+	{"design", false},
+	{"view", true},   // plugins/view-dump を `go run` で起動する
+	{"state", false}, // 状態の分類・遷移の効果・状態での match
 }
 
 // corpusDir はコーパス name のディレクトリ（tests/ からの相対パス）。
@@ -54,9 +52,6 @@ func TestCorpusCheckGolden(t *testing.T) {
 // （copyCorpusAsModule）、新しくできたファイルをすべて比べる。差分はファイルごとに示す。更新は `go test ./tests -update`。
 func TestCorpusEmitGolden(t *testing.T) {
 	for _, c := range corpora {
-		if !c.emit {
-			continue
-		}
 		t.Run(c.name, func(t *testing.T) {
 			if c.needsGo {
 				requireGo(t)
@@ -75,48 +70,45 @@ func TestCorpusEmitGolden(t *testing.T) {
 				t.Fatalf("emit が何も書かなかった:\n%s%s", stdout.String(), stderr.String())
 			}
 			compareTree(t, filepath.Join(goldenDir(c.name), "emit"), got)
+			vetEmitted(t, root, got)
 		})
 	}
 }
 
-// TestCorpusEmitUnsupported は、既定の出力がまだ扱えない構文を含むコーパス（corpora の emit が false のもの）に
-// `hozoc emit` が黙って誤ったコードを書かず、GOEMIT-INTERNAL の error で終わり（終了コード 1。docs/diagnostics.md
-// 「終了コード」）、何も書き出さないことを確かめる。
-// TODO(emit): docs/emit-go.md「state」「classify」「配線の本体」の出力を実装したら、corpora の emit を true にして
-// ゴールデンを作り、このテストを消す。
-func TestCorpusEmitUnsupported(t *testing.T) {
-	for _, c := range corpora {
-		if c.emit {
-			continue
+// vetEmitted は、emit が root に書き出した Go のパッケージ（got のうち .go を持つディレクトリ）が `go vet` を通ることを
+// 確かめる。ゴールデンと一致していても、コンパイルできない出力では意味がないため。root は copyCorpusAsModule の
+// モジュール（module は github.com/mew-ton/hozo）で、生成したコードが import する runtime/ をここでシンボリックリンクに
+// して足す（比較の後なので、書き出したファイルの木には入らない）。モジュールの解決はオフライン。go がなければ飛ばす。
+func vetEmitted(t *testing.T, root string, got map[string][]byte) {
+	t.Helper()
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Log("go がないので、書き出した Go の go vet を飛ばす")
+		return
+	}
+	repo, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(repo, "runtime"), filepath.Join(root, "runtime")); err != nil {
+		t.Fatalf("runtime のシンボリックリンクを作れない: %v", err)
+	}
+	seen := map[string]bool{}
+	var pkgs []string
+	for _, p := range sortedKeys(got) {
+		if dir := path.Dir(p); strings.HasSuffix(p, ".go") && !seen[dir] {
+			seen[dir] = true
+			pkgs = append(pkgs, "./"+dir)
 		}
-		t.Run(c.name, func(t *testing.T) {
-			root, before := copyCorpusAsModule(t, c.name)
-			var stdout, stderr bytes.Buffer
-			code := hozocMainIn(root, []string{"emit"}, &stdout, &stderr)
-			out := stdout.String() + stderr.String()
-			if code != 1 {
-				t.Errorf("hozoc emit の終了コード %d, want 1\n%s", code, out)
-			}
-			for _, want := range []string{
-				"error[GOEMIT-INTERNAL]: 状態の分類は未対応: classify shop.Checkout",
-				"error[GOEMIT-INTERNAL]: 遷移の効果は未対応: effect shop.placeOrder on shop.Checkout",
-				"error[GOEMIT-INTERNAL]: 遷移の効果は未対応: effect shop.clearCart on shop.carts",
-				"error[GOEMIT-INTERNAL]: 状態での match は未対応: op shop.openTop の match shop.token by nullable",
-				"error[GOEMIT-INTERNAL]: 状態での match は未対応: op shop.openCart の match shop.carts by list",
-				"error[GOEMIT-INTERNAL]: 状態の分類での match は未対応: op shop.checkout の match by shop.Checkout",
-			} {
-				if !strings.Contains(out, want) {
-					t.Errorf("出力に %q がない:\n%s", want, out)
-				}
-			}
-			got := readTree(t, root)
-			for p := range before {
-				delete(got, p)
-			}
-			if len(got) != 0 {
-				t.Errorf("error なのにファイルを書いた: %v", sortedKeys(got, nil))
-			}
-		})
+	}
+	if len(pkgs) == 0 {
+		t.Fatal("emit が Go のファイルを書かなかった")
+	}
+	cmd := exec.Command(goBin, append([]string{"vet"}, pkgs...)...)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("emit が書き出した Go が go vet を通らない（%s）: %v\n%s", strings.Join(pkgs, " "), err, out)
 	}
 }
 

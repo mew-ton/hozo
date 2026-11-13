@@ -34,7 +34,7 @@
 | 24 | 設定されたプラグインは名前空間ごとに常に一回呼ぶ。並列にしない | `docs/plugin-protocol.md`「起動」 |
 | 25 | `[hozo]` に `sources` `plugin_dirs` `max_bindings`。`out` の継承は同じ値で、子のディレクトリは出力の側が切る | `docs/config.md`「形」「名前空間の設定の解決」 |
 | 26 | TOML は `github.com/BurntSushi/toml`。ほかに外部のモジュールは使わない | `docs/packages.md`「依存の向き」 |
-| 27 | Go の既定の出力は `Leaves` / `Ops` / `Deps` / `States` / `Wrappers` / `Classifiers` と `New` | `docs/emit-go.md`「op」 |
+| 27 | Go の既定の出力は `Leaves` / `Ops` / `Deps` / `States` / `StateCases` / `Wrappers` / `Classifiers` と `New` | `docs/emit-go.md`「op」 |
 | 28 | 包む関数を生成するのは、`external` でなく、設定されたプラグインの `entry` / `stop` にないデコレータ。`decorate` のものはプラグインが実装する | `docs/emit-go.md`「デコレータ」 |
 | 29 | 絞り込まれた型（`C.Case<T>`）は Go では `T` に消す | `docs/emit-go.md`「型」 |
 | 30 | 生成したコードは `github.com/mew-ton/hozo/runtime` を import する | `docs/emit-go.md`「runtime パッケージ」 |

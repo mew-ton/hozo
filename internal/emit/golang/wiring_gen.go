@@ -34,7 +34,7 @@ type bodyGen struct {
 	vars     map[string]ir.Type // Go の識別子 → その式の型（Go から見た型。optional の model のフィールドは中身の型）
 	names    map[string]string  // Hozo の名前（引数・束縛） → Go の識別子
 	declared map[string]bool    // 本体で宣言した Go の識別子
-	depth    int                // 0 なら関数の直下。1 以上は switch の case の中
+	depth    int                // 0 なら関数の直下。1 以上は match のアーム（switch の case か if の枝）の中
 	ind      string
 	returned bool // 直前の文が return だったか
 }
@@ -97,7 +97,7 @@ func (b *bodyGen) failReturn() string {
 	return "return " + b.e.zeroExpr(b.op.Returns, b.imp) + ", err"
 }
 
-// assignErr は `<name>, err := expr` と err の確認。switch の中（depth > 0）では `var name T` で宣言してから `=`。
+// assignErr は `<name>, err := expr` と err の確認。match のアームの中（depth > 0）では `var name T` で宣言してから `=`。
 // name が "" なら err だけ。
 func (b *bodyGen) assignErr(name string, t ir.Type, expr string) {
 	if name == "" {
@@ -117,9 +117,13 @@ func (b *bodyGen) assignErr(name string, t ir.Type, expr string) {
 		b.line("}")
 		return
 	}
+	// match のアームの中で、呼び出しの前に取る値（bind で埋める状態の値）。アームの呼び出しの err は switch / if を
+	// 抜けた後でまとめて見るが、この err はその呼び出しが上書きするので、ここで見る。
 	b.line("var " + name + " " + gol.GoType(t, b.imp))
 	b.line(name + ", err = " + expr)
-	// case の中では err を見ない。switch を抜けた後でまとめて見る（match）。
+	b.line("if err != nil {")
+	b.line("\t" + b.failReturn())
+	b.line("}")
 }
 
 // stmt は文一つ。rest は後ろの文（束縛が使われるかの判定）。last は本体の最後の文か。
@@ -200,17 +204,47 @@ func (b *bodyGen) markUnused(goName, hozoName string, rest []ir.Statement) {
 
 // match は match の文か式（docs/emit-go.md「match」）。wantValue なら値を変数に束縛して
 // その Go の名前を返す（bindName が空なら result）。値のない match か文なら "" を返す。
+//
+// 形は三つ（docs/grammar.md「配線」の表）。値の分類と状態の分類は Classify<C> の結果の switch、
+// 組み込みの分類（match s by list / by nullable）は o.stateCases.<S>IsEmpty の結果の if。
+// 形と分類が合わない IR（MATCH-7 を通っていれば来ない）は内部エラーにする。
 func (b *bodyGen) match(m *ir.Match, bindName string, wantValue bool, rest []ir.Statement) string {
 	e := b.e
-	c, _ := e.lookup(m.Classify).(*ir.Classify)
-	if c == nil {
+	fail := func(format string, args ...any) string {
+		e.errorf(CodeInternal, &m.Span, "op %s の match: %s", b.op.Name, fmt.Sprintf(format, args...))
 		return ""
 	}
-	cName := e.typeName(c.Name)
-	// 値の分類での match だけがここに来る。状態での match は checkUnsupported が GOEMIT-INTERNAL で止めている。
-	subj, _ := b.atom(m.SubjectAtom(), c.SubjectType())
-	kind := b.fresh("kind")
-	b.assignErr(kind, nil, fmt.Sprintf("Classify%s(o.classifiers.%s, %s)", cName, cName, subj))
+	// 判定の式を決める。classify は switch の形、state は if の形。
+	var c *ir.Classify
+	var st *ir.State
+	var decide string
+	switch s := m.Subject.(type) {
+	case ir.ValueSubject:
+		c, _ = e.lookup(m.Classify).(*ir.Classify)
+		if c == nil || c.SubjectType() == nil {
+			return fail("%s が値の分類でない", m.Classify)
+		}
+		subj, _ := b.atom(s.Atom, c.SubjectType())
+		decide = fmt.Sprintf("Classify%s(o.classifiers.%s, %s)", e.typeName(c.Name), e.typeName(c.Name), subj)
+	case ir.ClassifyOwnedSubject:
+		c, _ = e.lookup(m.Classify).(*ir.Classify)
+		if c == nil {
+			return fail("%s が状態の分類でない", m.Classify)
+		}
+		if _, ok := c.SubjectStates(); !ok {
+			return fail("%s が状態の分類でない", m.Classify)
+		}
+		decide = fmt.Sprintf("Classify%s(ctx, o.classifiers.%s)", e.typeName(c.Name), e.typeName(c.Name))
+	case ir.StateSubject:
+		st, _ = e.lookup(s.State).(*ir.State)
+		if st == nil || e.declNS[s.State] != e.viewer || string(st.Shape) != m.Classify || !st.Shape.HasBuiltinClassify() {
+			return fail("%s が名前空間 %s の %s の状態でない", s.State, e.viewer, m.Classify)
+		}
+		e.matchesState = true
+		decide = "o.stateCases." + e.isEmptyMethod(st) + "(ctx)"
+	default:
+		return fail("対象の種類が分からない（docs/ir.md「配線」の Match.subject）")
+	}
 
 	// match の型（docs/types.md「式の型」）。
 	var valueType ir.Type
@@ -230,67 +264,167 @@ func (b *bodyGen) match(m *ir.Match, bindName string, wantValue bool, rest []ir.
 	if valueType != nil && hasNone {
 		matchType = ir.Optional(valueType)
 	}
-	result := ""
-	if matchType != nil && wantValue {
-		base := bindName
-		if base == "" {
-			base = "result"
-		}
-		result = b.fresh(base)
+	bind := matchType != nil && wantValue
+	resultBase := bindName
+	if resultBase == "" {
+		resultBase = "result"
+	}
+	// declare は結果の変数を作り、Hozo の束縛名と結び付ける。
+	declare := func() string {
+		result := b.fresh(resultBase)
 		if bindName != "" {
 			b.names[bindName] = result
 		}
 		b.vars[result] = matchType
-		b.line("var " + result + " " + gol.GoType(matchType, b.imp))
+		return result
 	}
 
-	b.line("switch " + kind + " {")
-	for _, a := range m.Arms {
-		if a.Cases.Default {
-			b.line("case " + gol.CaseConst(cName, "default") + ":")
-		} else {
-			cs := make([]string, len(a.Cases.Cases))
-			for i, n := range a.Cases.Cases {
-				cs[i] = gol.CaseConst(cName, n)
-			}
-			b.line("case " + strings.Join(cs, ", ") + ":")
+	result := ""
+	if st != nil {
+		empty, has := armOf(m, ir.CaseEmpty), armOf(m, ir.CaseHasItems)
+		if empty == nil || has == nil {
+			return fail("アームが Empty / HasItems を尽くしていない")
 		}
-		b.depth++
-		b.ind += "\t"
-		switch body := a.Body.(type) {
-		case ir.CallExpr:
-			expr, ret := b.call(&body.Call)
+		if empty == has {
+			// `Empty | HasItems => ...` の一つのアーム: 分岐はないが、述語は呼ぶ（状態を読めなければ、アームの分け方に
+			// よらず失敗する）。本体は match のない文と同じ形。
+			b.line("if _, err := " + decide + "; err != nil {")
+			b.line("\t" + b.failReturn())
+			b.line("}")
+			call, ok := empty.Body.(ir.CallExpr)
+			if !ok {
+				return ""
+			}
+			expr, ret := b.call(&call.Call)
 			switch {
-			case result == "" && ret == nil:
-				b.line("err = " + expr)
-			case result == "":
-				b.line("_, err = " + expr)
-			case ir.TypeEqual(stripCase(ret), stripCase(matchType)):
-				b.line(result + ", err = " + expr)
+			case bind:
+				result = declare()
+				b.assignErr(result, ret, expr)
+			case ret != nil:
+				b.line("if _, err := " + expr + "; err != nil {")
+				b.line("\t" + b.failReturn())
+				b.line("}")
 			default:
-				v := b.fresh("v")
-				b.line("var " + v + " " + gol.GoType(ret, b.imp))
-				b.line(v + ", err = " + expr)
-				b.line(result + " = " + e.convert(v, ret, matchType, b.imp))
+				b.assignErr("", nil, expr)
 			}
-		case ir.NoneBody:
-			if result != "" {
-				b.line(result + " = nil")
+		} else {
+			// none のアームは、結果を束縛しないなら何も書かない。その枝は if から落とす。
+			emptyCode := bind || isCallArm(empty)
+			hasCode := bind || isCallArm(has)
+			if !emptyCode && !hasCode {
+				b.line("if _, err := " + decide + "; err != nil {")
+				b.line("\t" + b.failReturn())
+				b.line("}")
+				return ""
+			}
+			isEmpty := b.fresh("empty")
+			b.assignErr(isEmpty, nil, decide)
+			if bind {
+				result = declare()
+				b.line("var " + result + " " + gol.GoType(matchType, b.imp))
+			}
+			switch {
+			case emptyCode && hasCode:
+				b.line("if " + isEmpty + " {")
+				b.arm(empty, result, matchType)
+				b.line("} else {")
+				b.arm(has, result, matchType)
+			case emptyCode:
+				b.line("if " + isEmpty + " {")
+				b.arm(empty, result, matchType)
+			default:
+				b.line("if !" + isEmpty + " {")
+				b.arm(has, result, matchType)
+			}
+			b.line("}")
+			if hasCall {
+				b.line("if err != nil {")
+				b.line("\t" + b.failReturn())
+				b.line("}")
 			}
 		}
-		b.depth--
-		b.ind = b.ind[:len(b.ind)-1]
-	}
-	b.line("}")
-	if hasCall {
-		b.line("if err != nil {")
-		b.line("\t" + b.failReturn())
+	} else {
+		cName := e.typeName(c.Name)
+		kind := b.fresh("kind")
+		b.assignErr(kind, nil, decide)
+		if bind {
+			result = declare()
+			b.line("var " + result + " " + gol.GoType(matchType, b.imp))
+		}
+		b.line("switch " + kind + " {")
+		for i := range m.Arms {
+			a := &m.Arms[i]
+			if a.Cases.Default {
+				b.line("case " + gol.CaseConst(cName, "default") + ":")
+			} else {
+				cs := make([]string, len(a.Cases.Cases))
+				for i, n := range a.Cases.Cases {
+					cs[i] = gol.CaseConst(cName, n)
+				}
+				b.line("case " + strings.Join(cs, ", ") + ":")
+			}
+			b.arm(a, result, matchType)
+		}
 		b.line("}")
+		if hasCall {
+			b.line("if err != nil {")
+			b.line("\t" + b.failReturn())
+			b.line("}")
+		}
 	}
 	if bindName != "" && result != "" {
 		b.markUnused(result, bindName, rest)
 	}
 	return result
+}
+
+// arm は match のアームの本体を、switch の case か if の枝の中に書く。result が空でなければ値を result に入れる。
+// 呼び出しの err は枝の中では見ず、switch / if を抜けた後でまとめて見る（docs/emit-go.md「match」の例）。
+func (b *bodyGen) arm(a *ir.MatchArm, result string, matchType ir.Type) {
+	e := b.e
+	b.depth++
+	b.ind += "\t"
+	switch body := a.Body.(type) {
+	case ir.CallExpr:
+		expr, ret := b.call(&body.Call)
+		switch {
+		case result == "" && ret == nil:
+			b.line("err = " + expr)
+		case result == "":
+			b.line("_, err = " + expr)
+		case ir.TypeEqual(stripCase(ret), stripCase(matchType)):
+			b.line(result + ", err = " + expr)
+		default:
+			v := b.fresh("v")
+			b.line("var " + v + " " + gol.GoType(ret, b.imp))
+			b.line(v + ", err = " + expr)
+			b.line(result + " = " + e.convert(v, ret, matchType, b.imp))
+		}
+	case ir.NoneBody:
+		if result != "" {
+			b.line(result + " = nil")
+		}
+	}
+	b.depth--
+	b.ind = b.ind[:len(b.ind)-1]
+}
+
+// armOf は、ケース name を並べたアーム。なければ nil。
+func armOf(m *ir.Match, name string) *ir.MatchArm {
+	for i := range m.Arms {
+		for _, c := range m.Arms[i].Cases.Cases {
+			if c == name {
+				return &m.Arms[i]
+			}
+		}
+	}
+	return nil
+}
+
+// isCallArm は、アームの本体が呼び出しか（none でないか）。
+func isCallArm(a *ir.MatchArm) bool {
+	_, ok := a.Body.(ir.CallExpr)
+	return ok
 }
 
 // call は呼び出しの式を作る。bind で埋まる位置の取得など、前に要る文はここで書く。
@@ -417,7 +551,7 @@ func (b *bodyGen) assignBound(v string, t ir.Type, path []string, state string, 
 	_, stOpt := stripOptional(st)
 	_, fOpt := stripOptional(ft)
 	if stOpt && !fOpt && !e.isNillable(ft) {
-		// single<T?> の値を既定値のあるフィールドに。なければ既定値のまま（BIND-2）。
+		// nullable<T> の値（*T）を、optional でない（既定値のある）フィールドに。空なら既定値のまま（BIND-2）。
 		b.line("if " + state + " != nil {")
 		inner, _ := stripOptional(st)
 		b.line("\t" + expr + " = " + e.convert("*"+state, inner, ft, b.imp))

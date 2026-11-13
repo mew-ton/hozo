@@ -103,6 +103,8 @@ type emitter struct {
 	effects    []*ir.Effect
 	classifies []*ir.Classify
 	ops        []*ir.Op
+	// stateCases は StateCases に述語を出す状態（docs/emit-go.md「state」）: viewer の list / nullable の基底の状態を宣言の順で。
+	stateCases []*ir.State
 
 	// 配線を見て集めるもの
 	projections []projection // 必要になった射影の組（順序は必要になった順）
@@ -110,6 +112,8 @@ type emitter struct {
 	depsNS      []string     // Deps のフィールドにする名前空間（Program の順）
 	depsOps     map[string][]string
 	needPtr     bool // wiring.go に ptr ヘルパーが要るか
+	// matchesState は viewer の配線に match s by list / by nullable があるか。あるときだけ New が stateCases を取る。
+	matchesState bool
 
 	wrappers map[string][]wrapper // op の FQN → 包む関数（内側から順）
 
@@ -153,9 +157,6 @@ func (e *emitter) run() []File {
 	}
 
 	e.collectDecls()
-	if e.checkUnsupported() {
-		return nil
-	}
 	e.checkNames()
 	e.collectWrappers()
 

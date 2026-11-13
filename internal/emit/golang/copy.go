@@ -31,6 +31,10 @@ func (e *emitter) collectDecls() {
 			e.visitType(x.Value)
 		case *ir.Effect:
 			e.effects = append(e.effects, x)
+		case *ir.State:
+			if x.Shape.HasBuiltinClassify() {
+				e.stateCases = append(e.stateCases, x)
+			}
 		case *ir.Classify:
 			e.classifies = append(e.classifies, x)
 			e.visitType(x.SubjectType())

@@ -112,6 +112,26 @@ type Ops interface {
 	AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error)
 }
 
+// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
+// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
+// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
+type StateCases interface {
+	// UsersIsEmpty は状態 server.users（list）が空（Empty）か。
+	UsersIsEmpty(ctx context.Context) (bool, error)
+	// SessionsIsEmpty は状態 server.sessions（list）が空（Empty）か。
+	SessionsIsEmpty(ctx context.Context) (bool, error)
+	// ItemsIsEmpty は状態 server.items（list）が空（Empty）か。
+	ItemsIsEmpty(ctx context.Context) (bool, error)
+	// CartsIsEmpty は状態 server.carts（list）が空（Empty）か。
+	CartsIsEmpty(ctx context.Context) (bool, error)
+	// OrdersIsEmpty は状態 server.orders（list）が空（Empty）か。
+	OrdersIsEmpty(ctx context.Context) (bool, error)
+	// NotificationsIsEmpty は状態 server.notifications（list）が空（Empty）か。
+	NotificationsIsEmpty(ctx context.Context) (bool, error)
+	// PasswordResetsIsEmpty は状態 server.passwordResets（list）が空（Empty）か。
+	PasswordResetsIsEmpty(ctx context.Context) (bool, error)
+}
+
 // Wrappers は op に付いたデコレータのうち、プラグインが扱わないものの「包む関数」（docs/emit-go.md「デコレータ」）。
 // 引数は op の引数と next（op の関数の型）。
 type Wrappers interface {

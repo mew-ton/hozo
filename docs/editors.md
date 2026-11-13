@@ -34,6 +34,7 @@ editors/vscode/
 | `true` / `false` / `none` | `constant.language.hozo` | 同上 |
 | 文脈キーワード `field` / `variant` | `keyword.other.hozo` | `\bfor\s+` の後と `\bany\s+` の後に限る（`docs/grammar.md`「予約語」） |
 | 文脈キーワード `post` / `put` / `delete` | `keyword.other.hozo` | `\bon\s+[\w.]+\.` の後に限る |
+| `->`（遷移）と `=>`（`match` のアーム） | `keyword.operator.arrow.hozo` | 記号そのもの。`->` は `on X:` の後ろに来るので、`:` の後ろの型の位置でも拾う。遷移のケースと `match` のアームのケース（`Empty` / `HasItems` を含む）は予約語ではないので、専用の scope は付けない（`:` の後ろでは「型の位置の名前」の規則が当たる） |
 | デコレータ | `entity.name.function.decorator.hozo` | `@` から `QualifiedName` まで |
 | `@external` | `storage.modifier.hozo` | 核の印でデコレータではない（`docs/grammar.md`「予約語」）ので、デコレータより先に拾う |
 | 宣言の名前 | `entity.name.type.hozo`（model / scalar / union / exception / classify / condition）、`entity.name.function.hozo`（op / effect / decorator）、`variable.other.hozo`（state） | 宣言の頭の予約語の直後の `Ident` |

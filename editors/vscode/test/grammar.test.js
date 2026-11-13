@@ -168,6 +168,53 @@ test('型の位置の名前', () => {
   assert.ok(!route.tokens.some((t) => t.scopes.includes('entity.name.type.hozo')));
 });
 
+test('矢印（遷移の -> と match のアームの =>）', () => {
+  const st = linesOf(files.state);
+  // 遷移は `on X:` の後ろ（: の後ろの型の位置）に来る
+  assertScope(st, 'effect placeOrder on Checkout: Shopping -> Ordered;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'effect startOver on Checkout: any -> Shopping;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'effect touchCheckout on Checkout: Shopping | Ordered -> any;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'effect clearCart on carts: HasItems -> Empty;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'Empty    => showLogin();', '=>', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'Shopping => submitOrder();', '=>', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'Ordered  => none;', '=>', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'default  => showLogin();', '=>', 'keyword.operator.arrow.hozo');
+  const b = linesOf(files.browser);
+  assertScope(b, 'NoWarranty => none;', '=>', 'keyword.operator.arrow.hozo');
+  // 矢印の両側は今まで通り
+  assertScope(st, 'effect startOver on Checkout: any -> Shopping;', 'any', 'keyword.control.hozo');
+  assertScope(st, 'effect placeOrder on Checkout: Shopping -> Ordered;', 'on', 'keyword.control.hozo');
+  assertScope(st, 'effect placeOrder on Checkout: Shopping -> Ordered;', 'placeOrder', 'entity.name.function.hozo');
+  assertScope(st, 'Ordered  => none;', 'none', 'constant.language.hozo');
+  // 比較の記号ではない（> は型引数の閉じ、= は既定値）
+  const t = tokensOf('model X { a: int = 1; } state s: list<X>;');
+  assert.ok(!t[0].tokens.some((tk) => tk.scopes.includes('keyword.operator.arrow.hozo')));
+});
+
+test('状態の形と、組み込みの分類のケース', () => {
+  const st = linesOf(files.state);
+  assertScope(st, 'state token: nullable<Token>;', 'nullable', 'support.type.primitive.hozo');
+  assertScope(st, 'state title: single<string>;', 'single', 'support.type.primitive.hozo');
+  assertScope(st, 'match token by nullable {', 'match', 'keyword.control.hozo');
+  assertScope(st, 'match token by nullable {', 'by', 'keyword.control.hozo');
+  assertScope(st, 'match by Checkout {', 'by', 'keyword.control.hozo');
+  // 状態の分類の対象（of の後ろ）は小文字の名前なので型にしない
+  assertScope(st, 'classify Checkout of carts, orders {', 'of', 'keyword.control.hozo');
+  const of = st.find((l) => l.text.includes('classify Checkout of carts, orders {'));
+  assert.ok(!of.tokens.some((tk) => /carts|orders/.test(tk.text) && tk.scopes.includes('entity.name.type.hozo')));
+  // Empty / HasItems は予約語ではない（docs/grammar.md「予約語」）。match のアームでは色を付けない
+  for (const [line, word] of [['Empty    => showLogin();', 'Empty'], ['HasItems => showCart();', 'HasItems']]) {
+    const l = st.find((x) => x.text.includes(line));
+    assert.ok(l, `行が見つからない: ${line}`);
+    const tk = l.tokens.find((x) => x.text.includes(word));
+    assert.ok(tk, `字句 ${word} が行にない`);
+    assert.deepEqual(tk.scopes, ['source.hozo'], `${word} に scope が付いている: ${tk.scopes.join(' ')}`);
+  }
+  // 遷移のケースは : の後ろなので、ほかの大文字で始まる名前と同じく型の位置の名前になる（docs/editors.md の表の「型の位置の名前」）
+  assertScope(st, 'effect clearCart on carts: HasItems -> Empty;', 'HasItems', 'entity.name.type.hozo');
+  assertScope(st, 'effect clearCart on carts: HasItems -> Empty;', 'Empty', 'entity.name.type.hozo');
+});
+
 test('リテラル', () => {
   const s = linesOf(files.server);
   assertScope(s, '@http.header(name: "Authorization") token: Token?;', 'Authorization', 'string.quoted.double.hozo');

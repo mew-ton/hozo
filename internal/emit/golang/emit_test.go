@@ -46,6 +46,8 @@ var goldenCases = []goldenCase{
 	{name: "browser", views: []*ir.View{browserServerView(), browserView()}, manifests: browserManifests()},
 	{name: "constraint", views: []*ir.View{constraintView()}},
 	{name: "derived", views: []*ir.View{derivedView()}},
+	// 状態の分類、遷移の効果、状態での match、StateCases（docs/emit-go.md「state」「classify」「match」）
+	{name: "state", views: []*ir.View{stateView("shop"), stateView("depot")}},
 }
 
 // repoRoot はこのリポジトリのルート（go.mod のあるディレクトリ）。
@@ -458,44 +460,173 @@ func TestCopiesForeignException(t *testing.T) {
 	compileFiles(t, root, files)
 }
 
-// TestUnsupportedStateClassification は、状態を分類で表す決定（docs/decisions.md「設計書を変える決定」）の構文のうち
-// この出力がまだ扱えないものが、黙って出力されず GOEMIT-INTERNAL の error になること（unsupported.go）。
-// 出力の側を実装したら、このテストはそれぞれの出力の期待に置き換える。
-func TestUnsupportedStateClassification(t *testing.T) {
-	root := newProjectRoot(t)
-	carts := &ir.State{DeclBase: base("app.carts", nil), Shape: ir.StateList, Element: ir.String()}
-	token := &ir.State{DeclBase: base("app.token", nil), Shape: ir.StateNullable, Element: ir.String()}
-	checkout := &ir.Classify{DeclBase: base("app.Checkout", nil), Subject: ir.StatesSubject{States: []string{"app.carts"}},
-		Cases: []ir.ClassifyCase{{Name: "Shopping"}, {Name: "Ordered"}}}
-	arms := func(a, b string) []ir.MatchArm {
-		return []ir.MatchArm{{Cases: ir.ArmCases{Cases: []string{a}}, Body: ir.NoneBody{}}, {Cases: ir.ArmCases{Cases: []string{b}}, Body: ir.NoneBody{}}}
+// contentOf は files のうち Path が suffix で終わるものの中身。なければ ""。
+func contentOf(files []File, suffix string) string {
+	for _, f := range files {
+		if strings.HasSuffix(f.Path, suffix) {
+			return string(f.Content)
+		}
 	}
-	wire := func(name string, m ir.Match) *ir.Op {
-		return &ir.Op{DeclBase: base(name, nil), Body: &ir.Wiring{Statements: []ir.Statement{ir.MatchStmt{Match: m}}}}
+	return ""
+}
+
+// stateDecls は状態のテストで使う宣言: list / nullable / single の状態と、状態の分類。
+func stateDecls() (carts, token, title *ir.State, checkout *ir.Classify) {
+	carts = &ir.State{DeclBase: base("app.carts", nil), Shape: ir.StateList, Element: ir.String()}
+	token = &ir.State{DeclBase: base("app.token", nil), Shape: ir.StateNullable, Element: ir.String()}
+	title = &ir.State{DeclBase: base("app.title", nil), Shape: ir.StateSingle, Element: ir.String()}
+	checkout = &ir.Classify{DeclBase: base("app.Checkout", nil), Subject: ir.StatesSubject{States: []string{"app.carts"}},
+		Cases: []ir.ClassifyCase{{Name: "Shopping"}, {Name: "Ordered"}}}
+	return
+}
+
+// TestStateCases は docs/emit-go.md「state」の StateCases: list / nullable の状態があれば（op がなくても、配線で
+// 使われなくても）常に生成し、New が stateCases を取るのは配線に match s by list / by nullable があるときだけ。
+func TestStateCases(t *testing.T) {
+	root := newProjectRoot(t)
+	carts, token, title, _ := stateDecls()
+	show := &ir.Op{DeclBase: base("app.show", nil)}
+	t.Run("states only", func(t *testing.T) {
+		files, diags := Emit(smallView(carts, token, title), Options{Root: root})
+		if len(diags) != 0 || len(files) != 1 {
+			t.Fatalf("ops.go だけを期待したが %d ファイル: %s", len(files), formatDiags(diags))
+		}
+		ops := contentOf(files, "gen/app/ops.go")
+		for _, want := range []string{
+			"type StateCases interface {",
+			"CartsIsEmpty(ctx context.Context) (bool, error)",
+			"TokenIsEmpty(ctx context.Context) (bool, error)",
+		} {
+			if !strings.Contains(ops, want) {
+				t.Errorf("ops.go に %q がない:\n%s", want, ops)
+			}
+		}
+		// single は組み込みの分類を持たない。op がないので New もない。
+		for _, not := range []string{"TitleIsEmpty", "func New(", "type ops struct"} {
+			if strings.Contains(ops, not) {
+				t.Errorf("ops.go に %q がある:\n%s", not, ops)
+			}
+		}
+		// 述語は宣言の順。
+		if strings.Index(ops, "CartsIsEmpty(ctx") > strings.Index(ops, "TokenIsEmpty(ctx") {
+			t.Errorf("StateCases の述語が宣言の順でない:\n%s", ops)
+		}
+		compileFiles(t, root, files)
+	})
+	t.Run("New without stateCases", func(t *testing.T) {
+		files, diags := Emit(smallView(carts, token, show), Options{Root: root})
+		if len(diags) != 0 {
+			t.Fatalf("診断が出た: %s", formatDiags(diags))
+		}
+		ops := contentOf(files, "gen/app/ops.go")
+		for _, want := range []string{"type StateCases interface {", "func New(leaves Leaves) Ops {"} {
+			if !strings.Contains(ops, want) {
+				t.Errorf("ops.go に %q がない:\n%s", want, ops)
+			}
+		}
+		if strings.Contains(ops, "stateCases") {
+			t.Errorf("配線に状態の match がないのに ops.go に stateCases がある:\n%s", ops)
+		}
+	})
+	t.Run("New with stateCases", func(t *testing.T) {
+		open := &ir.Op{DeclBase: base("app.open", nil), Body: wiring(matchStmt(byState("app.token", ir.StateNullable,
+			stateArm(nil, ir.CaseEmpty), stateArm(callp("app.show"), ir.CaseHasItems))))}
+		files, diags := Emit(smallView(carts, token, show, open), Options{Root: root})
+		if len(diags) != 0 {
+			t.Fatalf("診断が出た: %s", formatDiags(diags))
+		}
+		ops := contentOf(files, "gen/app/ops.go")
+		for _, want := range []string{
+			"func New(leaves Leaves, stateCases StateCases) Ops {",
+			"return &ops{leaves: leaves, stateCases: stateCases}",
+			"\tstateCases StateCases\n",
+		} {
+			if !strings.Contains(ops, want) {
+				t.Errorf("ops.go に %q がない:\n%s", want, ops)
+			}
+		}
+		if w := contentOf(files, "gen/app/wiring.go"); !strings.Contains(w, "empty, err := o.stateCases.TokenIsEmpty(ctx)") || !strings.Contains(w, "if !empty {") {
+			t.Errorf("wiring.go の match token by nullable の形が違う:\n%s", w)
+		}
+		compileFiles(t, root, files)
+	})
+	t.Run("name collision", func(t *testing.T) {
+		upper := &ir.State{DeclBase: base("app.Carts", nil), Shape: ir.StateNullable, Element: ir.String()}
+		files, diags := Emit(smallView(carts, upper), Options{Root: root})
+		if got := codesOf(diags); files != nil || len(got) != 1 || got[0] != CodeNameCollision {
+			t.Errorf("GOEMIT-2 を期待したが %s", formatDiags(diags))
+		}
+	})
+}
+
+// TestStateClassifyWithoutMatch は docs/emit-go.md「classify」の「配線で match by C に使われない分類でも生成する」と、
+// 「effect」の遷移のコメント（組み込みの効果のコメントは今まで通り）。
+func TestStateClassifyWithoutMatch(t *testing.T) {
+	root := newProjectRoot(t)
+	carts, token, _, checkout := stateDecls()
+	files, diags := Emit(smallView(carts, token, checkout,
+		&ir.Effect{DeclBase: base("app.logout", nil), Target: ir.BuiltinTarget{State: "app.token", Operation: ir.OpDelete}, Writes: []string{"app.token"}},
+		&ir.Effect{DeclBase: base("app.placeOrder", doc("注文を確定する")), Target: ir.TransitionTarget{Of: "app.Checkout", From: ir.Cases("Shopping"), To: ir.Cases("Ordered")}, Writes: []string{"app.carts"}},
+		&ir.Effect{DeclBase: base("app.clearCart", nil), Target: ir.TransitionTarget{Of: "app.carts", From: ir.Cases(ir.CaseHasItems), To: ir.Cases(ir.CaseEmpty)}, Writes: []string{"app.carts"}},
+		&ir.Effect{DeclBase: base("app.touch", nil), Target: ir.TransitionTarget{Of: "app.Checkout", From: ir.Cases("Shopping", "Ordered"), To: ir.AnyCase()}, Writes: []string{"app.carts"}},
+	), Options{Root: root})
+	if len(diags) != 0 {
+		t.Fatalf("診断が出た: %s", formatDiags(diags))
+	}
+	for file, wants := range map[string][]string{
+		"gen/app/classify.go": {
+			"type Checkout int",
+			"CheckoutShopping Checkout = iota",
+			"Shopping(ctx context.Context) (bool, error)",
+			"Ordered(ctx context.Context) (bool, error)",
+			"func ClassifyCheckout(ctx context.Context, c CheckoutCases) (Checkout, error) {",
+			`return 0, &runtime.ClassificationError{Classify: "app.Checkout", Hits: hits}`,
+		},
+		"gen/app/ops.go": {"type Classifiers struct {\n\tCheckout CheckoutCases\n}"},
+		"gen/app/types.go": {
+			"// EffectLogout は効果 app.logout（状態 app.token への delete）。\nconst EffectLogout",
+			"// EffectPlaceOrder は注文を確定する\n//\n// on app.Checkout: Shopping -> Ordered\nconst EffectPlaceOrder",
+			"// EffectClearCart は効果 app.clearCart。\n//\n// on app.carts: HasItems -> Empty\nconst EffectClearCart",
+			"// on app.Checkout: Shopping | Ordered -> any\nconst EffectTouch",
+		},
+	} {
+		content := contentOf(files, file)
+		for _, want := range wants {
+			if !strings.Contains(content, want) {
+				t.Errorf("%s に %q がない:\n%s", file, want, content)
+			}
+		}
+	}
+	compileFiles(t, root, files)
+}
+
+// TestMatchShapeMismatch は、match の形と分類が合わない IR（MATCH-7 を通っていれば来ない）や、対象の決まらない
+// classify を、黙って誤ったコードにせず GOEMIT-INTERNAL の error にして、ファイルを出さないこと。
+func TestMatchShapeMismatch(t *testing.T) {
+	root := newProjectRoot(t)
+	carts, token, title, checkout := stateDecls()
+	kind := &ir.Classify{DeclBase: base("app.Kind", nil), Subject: ir.TypeSubject{Type: ir.String()}, Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}}
+	both := []ir.MatchArm{stateArm(nil, ir.CaseEmpty), stateArm(nil, ir.CaseHasItems)}
+	wire := func(m ir.Match) *ir.Op {
+		return &ir.Op{DeclBase: base("app.run", nil), Params: []ir.OpParam{param("s", ir.String())}, Body: wiring(matchStmt(m))}
 	}
 	tests := []struct {
 		name  string
 		decls []ir.Decl
-		want  []string // メッセージに含む語（診断の順）
+		want  string // メッセージに含む語
 	}{
-		{"state classify", []ir.Decl{carts, checkout}, []string{"状態の分類は未対応: classify app.Checkout"}},
-		{"transition on classify", []ir.Decl{carts, checkout,
-			&ir.Effect{DeclBase: base("app.placeOrder", nil), Target: ir.TransitionTarget{Of: "app.Checkout", From: ir.Cases("Shopping"), To: ir.Cases("Ordered")}, Writes: []string{"app.carts"}}},
-			[]string{"状態の分類は未対応: classify app.Checkout", "遷移の効果は未対応: effect app.placeOrder on app.Checkout"}},
-		{"transition on base state", []ir.Decl{carts,
-			&ir.Effect{DeclBase: base("app.clearCart", nil), Target: ir.TransitionTarget{Of: "app.carts", From: ir.Cases(ir.CaseHasItems), To: ir.Cases(ir.CaseEmpty)}, Writes: []string{"app.carts"}}},
-			[]string{"遷移の効果は未対応: effect app.clearCart on app.carts"}},
-		{"match by list", []ir.Decl{carts,
-			wire("app.show", ir.Match{Subject: ir.StateSubject{State: "app.carts"}, Classify: "list", Arms: arms(ir.CaseEmpty, ir.CaseHasItems)})},
-			[]string{"状態での match は未対応: op app.show の match app.carts by list"}},
-		{"match by nullable in const", []ir.Decl{token,
-			&ir.Op{DeclBase: base("app.who", nil), Body: &ir.Wiring{Statements: []ir.Statement{
-				ir.ConstStmt{Name: "x", Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.StateSubject{State: "app.token"}, Classify: "nullable", Arms: arms(ir.CaseEmpty, ir.CaseHasItems)}}},
-			}}}},
-			[]string{"状態での match は未対応: op app.who の match app.token by nullable"}},
-		{"match by classify", []ir.Decl{carts, checkout,
-			wire("app.next", ir.Match{Subject: ir.ClassifyOwnedSubject{}, Classify: "app.Checkout", Arms: arms("Shopping", "Ordered")})},
-			[]string{"状態の分類は未対応: classify app.Checkout", "状態の分類での match は未対応: op app.next の match by app.Checkout"}},
+		{"by list on single", []ir.Decl{title, wire(byState("app.title", ir.StateList, both...))}, "app.title が名前空間 app の list の状態でない"},
+		{"by list on nullable", []ir.Decl{token, wire(byState("app.token", ir.StateList, both...))}, "app.token が名前空間 app の list の状態でない"},
+		{"by nullable on unknown state", []ir.Decl{wire(byState("app.nope", ir.StateNullable, both...))}, "app.nope が名前空間 app の nullable の状態でない"},
+		{"by list on a non-state", []ir.Decl{wire(byState("valid.min", ir.StateList, both...))}, "valid.min が名前空間 app の list の状態でない"},
+		{"by list without HasItems", []ir.Decl{carts, wire(byState("app.carts", ir.StateList, stateArm(nil, ir.CaseEmpty)))}, "アームが Empty / HasItems を尽くしていない"},
+		{"match by value classify", []ir.Decl{kind, wire(byClassify("app.Kind", stateArm(nil, "A"), stateArm(nil, "B")))}, "app.Kind が状態の分類でない"},
+		{"match by unknown classify", []ir.Decl{wire(byClassify("app.Nope", stateArm(nil, "A")))}, "app.Nope が状態の分類でない"},
+		{"value match by state classify", []ir.Decl{carts, checkout,
+			wire(ir.Match{Subject: ir.ValueSubject{Atom: name("s")}, Classify: "app.Checkout", Arms: []ir.MatchArm{stateArm(nil, "Shopping"), stateArm(nil, "Ordered")}, Span: sp("x.hozo", 1)})},
+			"app.Checkout が値の分類でない"},
+		{"match without subject", []ir.Decl{carts, wire(ir.Match{Classify: "list", Arms: both, Span: sp("x.hozo", 1)})}, "対象の種類が分からない"},
+		{"classify without subject", []ir.Decl{&ir.Classify{DeclBase: base("app.Odd", nil), Cases: []ir.ClassifyCase{{Name: "A"}}}}, "classify app.Odd の対象が型でも状態でもない"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -503,30 +634,44 @@ func TestUnsupportedStateClassification(t *testing.T) {
 			if files != nil {
 				t.Errorf("ファイルが出た: %d", len(files))
 			}
-			if len(diags) != len(tt.want) {
-				t.Fatalf("診断が %d 個、期待は %d 個: %s", len(diags), len(tt.want), formatDiags(diags))
+			if len(diags) != 1 {
+				t.Fatalf("診断が %d 個、期待は 1 個: %s", len(diags), formatDiags(diags))
 			}
-			for i, d := range diags {
-				if d.Code != CodeInternal || d.Severity != diag.Error || !strings.Contains(d.Message, tt.want[i]) {
-					t.Errorf("診断 %d = %s[%s] %q, want GOEMIT-INTERNAL に %q", i, d.Severity, d.Code, d.Message, tt.want[i])
-				}
+			if d := diags[0]; d.Code != CodeInternal || d.Severity != diag.Error || !strings.Contains(d.Message, tt.want) {
+				t.Errorf("診断 = %s[%s] %q, want GOEMIT-INTERNAL に %q", d.Severity, d.Code, d.Message, tt.want)
 			}
 		})
 	}
-	// 組み込みの効果と値の分類だけなら、list / nullable の状態があっても今まで通り出力する（StateCases はまだ出さない）。
-	files, diags := Emit(smallView(carts, token,
-		&ir.Effect{DeclBase: base("app.addLine", nil), Target: ir.BuiltinTarget{State: "app.carts", Operation: ir.OpPost}, Writes: []string{"app.carts"}},
-		&ir.Effect{DeclBase: base("app.logout", nil), Target: ir.BuiltinTarget{State: "app.token", Operation: ir.OpDelete}, Writes: []string{"app.token"}},
-	), Options{Root: root})
-	if len(diags) != 0 || len(files) == 0 {
-		t.Fatalf("組み込みの効果だけの出力に失敗: %s", formatDiags(diags))
+}
+
+// TestStateBehavior は、golden の state（testdata_test.go の shopNS）から生成したコードを実際に動かす:
+// 一時のモジュールに書き、人が書く側（葉、States、StateCases、<C>Cases）の偽物を置いたテスト
+// testdata/state/behavior_test.go を shop のパッケージに足して `go test` する。確かめるのは docs/emit-go.md
+// 「classify」（すべての述語を評価する、最初のエラーを返す、真の数の検証、default）と「match」（状態での分岐）。
+func TestStateBehavior(t *testing.T) {
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go が PATH にない")
 	}
-	for _, f := range files {
-		if strings.Contains(string(f.Content), "StateCases") {
-			t.Errorf("%s に StateCases がある（まだ出さないはず。出すようにしたらこのテストを直す）", f.Path)
+	root := newProjectRoot(t)
+	var files []File
+	for _, v := range []*ir.View{stateView("shop"), stateView("depot")} {
+		fs, diags := Emit(v, Options{Root: root})
+		if len(diags) > 0 {
+			t.Fatalf("%s: 診断が出た: %s", v.Viewer, formatDiags(diags))
 		}
-		if strings.HasSuffix(f.Path, "types.go") && !strings.Contains(string(f.Content), "効果 app.logout（状態 app.token への delete）。") {
-			t.Errorf("%s に効果のコメントがない:\n%s", f.Path, f.Content)
-		}
+		files = append(files, fs...)
+	}
+	behavior, err := os.ReadFile(filepath.Join("testdata", "state", "behavior_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files = append(files, File{Path: "gen/shop/behavior_test.go", Content: behavior})
+	compileFiles(t, root, files)
+	cmd := exec.Command(goBin, "test", "./gen/shop/")
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("生成したコードのテストが落ちた: %v\n%s", err, out)
 	}
 }

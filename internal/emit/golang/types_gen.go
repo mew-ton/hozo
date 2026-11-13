@@ -256,13 +256,26 @@ func (e *emitter) genException(g *genFile, x *ir.Exception) {
 func (e *emitter) genEffect(g *genFile, x *ir.Effect) {
 	rt := g.imports.Add("github.com/mew-ton/hozo/runtime", "runtime")
 	c := gol.EffectConst(localName(x.Name))
-	// 組み込みの効果だけがここに来る。遷移の効果は checkUnsupported が GOEMIT-INTERNAL で止めている。
 	note := fmt.Sprintf("効果 %s。", x.Name)
-	if t, ok := x.Target.(ir.BuiltinTarget); ok {
+	transition := ""
+	switch t := x.Target.(type) {
+	case ir.BuiltinTarget:
 		note = fmt.Sprintf("効果 %s（状態 %s への %s）。", x.Name, t.State, t.Operation)
+	case ir.TransitionTarget:
+		// 遷移は説明があっても必ずコメントに写す（宛先の分類のどの場合からどの場合へか。docs/check.md「状態の形」の「効果の宛先」）。
+		transition = fmt.Sprintf("//\n// on %s: %s -> %s\n", t.Of, caseSetText(t.From), caseSetText(t.To))
 	}
 	g.body.WriteString(declComment(c, x.Description, note))
+	g.body.WriteString(transition)
 	g.printf("const %s %s.Effect = %q\n\n", c, rt, x.Name)
+}
+
+// caseSetText は遷移のケースの集合を Hozo の表面の形で（`any` か `A | B`。docs/grammar.md「exception / effect」の CaseSet）。
+func caseSetText(c ir.CaseSet) string {
+	if c.Any {
+		return "any"
+	}
+	return strings.Join(c.Cases, " | ")
 }
 
 // genDoc は doc.go（名前空間の description）。description がなければ nil。

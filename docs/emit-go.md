@@ -129,6 +129,8 @@ type ClientError struct{ Value Violations }
 const EffectCreateSession runtime.Effect = "server.createSession"
 ```
 
+宛先が分類の遷移（`Effect.target` が `transition`）の効果は、定数のコメントに遷移を `on <宛先の FQN>: <前> -> <後>` の形で写す（`// on shop.Checkout: Shopping -> Ordered`。ケースの集合は `any` か `A | B`）。定数そのものは組み込みの効果と同じ。
+
 ## state
 
 状態そのものは出力しない（保存場所は語彙とプラグインが決める。§5.2）。出すのは、状態を読むための二つのインターフェース。どちらも人が保存先に問い合わせて実装する。
@@ -268,6 +270,10 @@ if err != nil { return nil, err }
 - 値のない `match` は `switch` だけ。
 - 状態の分類での `match by C` は、判定関数の呼び出しが `Classify<C>(ctx, o.classifiers.<C>)` になるだけで、あとは同じ。
 - 組み込みの分類での `match s by list` / `by nullable` は、`empty, err := o.stateCases.<S>IsEmpty(ctx)` を呼び、`if empty { <Empty のアーム> } else { <HasItems のアーム> }`。
+  - 値のある `match` は `switch` の形と同じ。`if` の前に `var x T` を置き、枝の中で `x, err = <呼び出し>`（`none` のアームは `x = nil`）、`if` を抜けてから `err` を見る。アームの書かれた順によらず、`Empty` のアームが `if empty` の枝。
+  - 値のない `match` で `none` のアームの枝は書かない（`Empty => none` なら `if !empty { ... }`）。両方が `none` なら述語だけ呼ぶ。
+  - 一つのアームに両方のケース（`Empty | HasItems => f();`）なら分岐せず、述語を呼んだ後に `match` のない文と同じ形で呼び出しを書く。述語を呼ぶのは、状態を読めないときにアームの分け方によらず失敗させるため。
+- アームの呼び出しが `Call.bound` で状態の値を取るとき（「配線の本体」）、`o.states.<S>(ctx)` はそのアームの枝の中に書き、エラーはその場で返す。
 
 ## classify
 
@@ -309,7 +315,7 @@ type Classifiers struct { WarrantyKind WarrantyKindCases; Checkout CheckoutCases
 func ClassifyCheckout(ctx context.Context, c CheckoutCases) (Checkout, error)
 ```
 
-- 列挙の型と定数、真の数の検証は値の分類と同じ。述語がエラーを返したら、そのエラーを返す。
+- 列挙の型と定数、真の数の検証は値の分類と同じ。述語がエラーを返したら、そのエラーを返す。そのときも残りの述語は評価し（「すべての述語を評価し」を保つ）、複数がエラーなら最初のものを返す。真の数は検証しない。
 - 配線で `match by C` に使われない分類でも生成する（テストが効果の結果の判定に使うため）。
 
 ## runtime パッケージ

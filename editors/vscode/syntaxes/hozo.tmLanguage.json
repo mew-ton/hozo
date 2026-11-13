@@ -39,6 +39,9 @@
     },
     {
       "include": "#number"
+    },
+    {
+      "include": "#arrow"
     }
   ],
   "repository": {
@@ -109,6 +112,11 @@
       "comment": "Int / Float / Duration（docs/grammar.md「リテラル」）。Duration は単位を含む",
       "name": "constant.numeric.hozo",
       "match": "(?\u003c![A-Za-z0-9_.])(?:-?[0-9]+\\.[0-9]+|[0-9]+(?:ms|s|m|h|d)|-?[0-9]+)\\b"
+    },
+    "arrow": {
+      "comment": "-\u003e は遷移（docs/grammar.md「exception / effect」の Transition）、=\u003e は match のアーム（同「配線」の MatchArm）",
+      "name": "keyword.operator.arrow.hozo",
+      "match": "-\u003e|=\u003e"
     },
     "external": {
       "comment": "@external は核の印でデコレータではない（docs/grammar.md「予約語」）",
@@ -233,10 +241,13 @@
     "type-positions": {
       "patterns": [
         {
-          "comment": ": の後ろ（フィールド、引数、返り値、状態、例外の値）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
+          "comment": ": の後ろ（フィールド、引数、返り値、状態、例外の値、遷移のケース）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
           "begin": ":",
           "end": "(?=[=;,(){}\\[\\]])|(?=\\b(?:throws|effects|catches|prevents|keeps)\\b)",
           "patterns": [
+            {
+              "include": "#arrow"
+            },
             {
               "include": "#contextual"
             },

@@ -190,6 +190,14 @@ type ServerOps interface {
 	AttachWarranty(ctx context.Context, in AttachWarrantyInInput) (server.WarrantyLine, error)
 }
 
+// StateCases は基底の状態の組み込みの分類（Empty / HasItems）の述語。人が保存先に問い合わせて実装する
+// （docs/emit-go.md「state」）。HasItems は Empty の否定なので、述語は状態ごとに一つ。
+// 配線の match s by list / by nullable と、効果の結果を確かめるテストが呼ぶ。
+type StateCases interface {
+	// TokenIsEmpty は状態 browser.token（nullable）が空（Empty）か。
+	TokenIsEmpty(ctx context.Context) (bool, error)
+}
+
 // Wrappers は op に付いたデコレータのうち、プラグインが扱わないものの「包む関数」（docs/emit-go.md「デコレータ」）。
 // 引数は op の引数と next（op の関数の型）。
 type Wrappers interface {
