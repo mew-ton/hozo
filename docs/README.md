@@ -25,6 +25,12 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | [`editors.md`](editors.md) | VS Code 拡張と TextMate の文法 | `editors/vscode` |
 | [`decisions.md`](decisions.md) | 設計書にない決定と、設計書へ返すこと | — |
 
+## 提案
+
+まだ決まっていない仕様の変更。決まったら持ち主の文書に移して消す。
+
+- [`proposals/state-classify.md`](proposals/state-classify.md): 状態を分類で表し、効果をその変化として宣言する
+
 ## 書き方
 
 一段落に一つの主張を、見出しの下に置く。別の文書が決めたことは、その文書と見出しを名指しして引き、書き写さない。決めた理由は決めた文書に置く。`decisions.md` は決定と持ち主の一覧で、理由は持たない。
