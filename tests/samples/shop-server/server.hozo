@@ -1,0 +1,193 @@
+// サンプル shop-server の仕様（tests/samples/README.md）。名前空間 server を、互いを知らない二つのトランスパイラ
+// go-http（@http.get / @http.post の op）と go-sqlite（@db の状態）が Go に出力する。
+// 期待する出力は both/ httponly/ dbonly/ の server/（README.md）。
+
+/** 小さな店のサーバー: ログイン、自分の情報、注文 */
+namespace server {
+  // ---- 値の型 ----
+
+  /** ユーザーの識別子 */
+  scalar UserId extends string;
+
+  /** メールアドレス */
+  @valid.format("email")
+  scalar Email extends string;
+
+  /** パスワード（平文。入力でだけ使う） */
+  @valid.length(min: 8, max: 128)
+  scalar Password extends string;
+
+  /** ログインセッションのトークン */
+  scalar Token extends string;
+
+  /** 注文の識別子 */
+  scalar OrderId extends string;
+
+  /** 商品の識別子 */
+  scalar ItemId extends string;
+
+  // ---- model と状態 ----
+
+  /** ユーザー */
+  model User {
+    @db.key    id: UserId;
+    @db.unique email: Email;
+    @valid.length(min: 1, max: 100) name: string;
+    /** パスワードのハッシュ */
+    hash: string;
+  }
+
+  /** 外に見せるユーザー（ハッシュを除く） */
+  model PublicUser is User omit hash;
+
+  /** ログインセッション */
+  model Session {
+    @db.key       token: Token;
+    @db.ref(User) userId: UserId;
+    expiresAt: Time;
+  }
+
+  /** 注文の一行 */
+  model OrderLine {
+    item: ItemId;
+    @valid.min(1) quantity: int;
+  }
+
+  /** 注文 */
+  model Order {
+    @db.key       id: OrderId;
+    @db.ref(User) userId: UserId;
+    lines: OrderLine[];
+    placedAt: Time;
+  }
+
+  /** ユーザーへの通知 */
+  model Notification {
+    @db.ref(User) userId: UserId;
+    message: string;
+  }
+
+  @db
+  state users: list<User>;
+
+  @db
+  state sessions: list<Session>;
+
+  @db
+  state orders: list<Order>;
+
+  @db
+  state notifications: list<Notification>;
+
+  // ---- 例外 ----
+
+  /** メールアドレスかパスワードが一致しない */
+  @http.status(401)
+  exception InvalidCredentials;
+
+  /** 認証されていない */
+  @http.status(401)
+  exception Unauthorized;
+
+  /** 入力の一か所の違反 */
+  model Violation { field: string; constraint: string; }
+
+  /** 入力の違反の一覧 */
+  model Violations { items: Violation[]; }
+
+  /** 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ） */
+  @http.status(400)
+  exception InvalidInput: Violations;
+
+  /** 通知を送れなかった（ステータスを持たない） */
+  exception NotificationFailed;
+
+  // ---- 効果 ----
+
+  /** ログインセッションを作成する */
+  effect createSession on sessions.post;
+
+  /** ログインセッションを削除する */
+  effect deleteSession on sessions.delete;
+
+  /** 注文を作成する */
+  effect createOrder on orders.post;
+
+  /** ユーザーに通知する */
+  effect notifyUser on notifications.post;
+
+  // ---- op ----
+
+  /** ログインの本文 */
+  model Credentials { email: Email; password: Password; }
+
+  /** ログインの入力 */
+  model LoginInput {
+    @http.body body: Credentials;
+  }
+
+  /** ログインの結果 */
+  model LoginOk { user: PublicUser; token: Token; }
+
+  /** メールアドレスとパスワードでログインし、セッションを作る */
+  @http.post("/login")
+  op login(in: LoginInput): LoginOk
+    effects createSession
+    throws InvalidCredentials | InvalidInput prevents effects;
+
+  /** トークンだけを運ぶ入力 */
+  model AuthInput {
+    @http.header(name: "Authorization") token: Token?;
+  }
+
+  /** ログアウトする。トークンがない・無効な場合は何もしない（401 にしない） */
+  @http.post("/logout")
+  op logout(in: AuthInput)
+    effects deleteSession;
+
+  /** ログインしているユーザー自身を返す */
+  @http.get("/me")
+  op getMe(in: AuthInput): PublicUser
+    throws Unauthorized;
+
+  /** 注文一覧の入力 */
+  model GetOrdersInput {
+    @http.header(name: "Authorization") token: Token?;
+    /** 1 から数えるページ番号 */
+    @http.query page: int = 1;
+  }
+
+  /** ログインしているユーザーの注文一覧を返す */
+  @http.get("/orders")
+  op getOrders(in: GetOrdersInput): Order[]
+    throws Unauthorized;
+
+  /** 注文の入力 */
+  model PlaceOrderInput {
+    @http.header(name: "Authorization") token: Token?;
+    @http.body lines: OrderLine[];
+  }
+
+  /**
+   * 注文し、注文したユーザーに通知する。
+   * 通知に失敗（NotificationFailed）しても、注文は作られたまま残る（createOrder は起きている）。
+   */
+  @http.post("/orders")
+  op placeOrder(in: PlaceOrderInput): Order
+    throws Unauthorized | InvalidInput | NotificationFailed
+  {
+    const order = saveOrder(in);
+    sendOrderNotice(order);
+    return order;
+  }
+
+  /** 注文を保存する */
+  op saveOrder(in: PlaceOrderInput): Order
+    effects createOrder
+    throws Unauthorized | InvalidInput prevents effects;
+
+  /** 注文したユーザーに通知する */
+  op sendOrderNotice(order: Order)
+    effects notifyUser
+    throws NotificationFailed prevents effects;
+}

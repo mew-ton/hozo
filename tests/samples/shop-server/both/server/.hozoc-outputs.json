@@ -1,0 +1,10 @@
+[
+  "both/server/db.go",
+  "both/server/doc.go",
+  "both/server/http.go",
+  "both/server/ops.go",
+  "both/server/states.go",
+  "both/server/types.go",
+  "both/server/validate.go",
+  "both/server/wiring.go"
+]

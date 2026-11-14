@@ -1,0 +1,7 @@
+[
+  "dbonly/server/db.go",
+  "dbonly/server/doc.go",
+  "dbonly/server/states.go",
+  "dbonly/server/types.go",
+  "dbonly/server/validate.go"
+]

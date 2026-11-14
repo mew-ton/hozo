@@ -39,6 +39,7 @@ editors/vscode/        VS Code 拡張（syntaxes/ は TextMate の文法と、go
 tests/                 リポジトリをまたぐテスト（パッケージ tests。テストのファイルだけ）
 tests/rules/, tests/corpus/   テストの入力（docs/testing.md）
 tests/plugins/pick/, tests/corpus/view/plugins/view-dump/   テスト用のプラグイン（main パッケージ。docs/testing.md「コーパス」）
+tests/samples/<名前>/  サンプル（仕様と、手で書いた完成したコードの組。tests/samples/README.md）。自分の go.mod を持つ別のモジュールで、このモジュールのパッケージではない
 docs/                  設計文書
 ```
 
@@ -91,6 +92,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 - `internal/sema` は設定（`internal/config`）に依存しない。設定に関わる検査は `internal/config`、`internal/check`、`internal/project` が行う（「`internal/config`」）。
 - `internal/tools/selfgen` はこのモジュールのどのパッケージも import しない（生成物が壊れていても動くため。「自己生成の手順」）。
 - 外部のモジュールは `github.com/BurntSushi/toml` だけ（`internal/config` と `internal/plugin` が使う）。依存を最小にするため、言語サーバーの JSON-RPC も自前で書く。
+- `tests/samples/` のサンプルは別のモジュール（自分の `go.mod`）なので、この表にも上の規則にも入らない。サンプルだけが使う依存は、サンプルの `go.mod` に置く（`tests/samples/README.md`「置き方」）。
 
 ## パッケージ
 

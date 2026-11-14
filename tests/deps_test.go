@@ -18,7 +18,7 @@ const modulePath = "github.com/mew-ton/hozo"
 
 // imports はリポジトリの Go のパッケージ（ルートからの相対パス）→ このモジュールの中で import しているパッケージ。
 // tests が true なら _test.go の import、false ならそれ以外のファイルの import。Go が見ないディレクトリ（testdata、
-// 隠しディレクトリ、node_modules）は読まない。
+// 隠しディレクトリ、node_modules）と、自分の go.mod を持つディレクトリ（別のモジュール。tests/samples/ のサンプル）は読まない。
 func moduleImports(t *testing.T, tests bool) map[string][]string {
 	t.Helper()
 	root, err := filepath.Abs("..")
@@ -35,6 +35,11 @@ func moduleImports(t *testing.T, tests bool) map[string][]string {
 		if d.IsDir() {
 			if p != root && (name == "testdata" || name == "node_modules" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
 				return filepath.SkipDir
+			}
+			if p != root {
+				if _, err := os.Stat(filepath.Join(p, "go.mod")); err == nil {
+					return filepath.SkipDir // 別のモジュール。このモジュールのパッケージではない
+				}
 			}
 			return nil
 		}

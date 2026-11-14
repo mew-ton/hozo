@@ -1,0 +1,12 @@
+{
+  "transpilers": {
+    "go-http": {
+      "select": { "roots": ["http.get", "http.post"] },
+      "files": ["both/server/http.go", "httponly/server/http.go"]
+    },
+    "go-sqlite": {
+      "select": { "states": ["db"] },
+      "files": ["both/server/db.go", "dbonly/server/db.go"]
+    }
+  }
+}

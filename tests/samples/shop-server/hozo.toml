@@ -1,0 +1,21 @@
+# サンプル shop-server（tests/samples/README.md）: 同じ名前空間 server を、三つの単位（docs/config.md「単位」）で出力する。
+# 入力は同じ server.hozo で、違うのはトランスパイラの組だけ。go-http と go-sqlite は互いを知らない
+# （docs/plugin-protocol.md「選択」）。期待する出力は、それぞれの out のディレクトリ（README.md）。
+
+# 1: 両方。go-http のハンドラが配線を呼び、配線が、go-sqlite の表の上に人が書いた命令を呼ぶ
+[[emit]]
+namespace   = "server"
+transpilers = ["go-http", "go-sqlite"]
+out         = "both/server"
+
+# 2: go-http だけ。状態の単位は、人が手で埋める
+[[emit]]
+namespace   = "server"
+transpilers = ["go-http"]
+out         = "httponly/server"
+
+# 3: go-sqlite だけ。op は一つも選ばれない
+[[emit]]
+namespace   = "server"
+transpilers = ["go-sqlite"]
+out         = "dbonly/server"
