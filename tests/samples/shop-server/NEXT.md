@@ -303,6 +303,8 @@ validate = true                            # 要求を受けたときに制約�
    （`docs/emit-go.md`「配置」）では `pkgtype` になる。
 4. **`reads` の伝播**: 配線の op が読む状態は、呼び出し先の `reads` の和として計算できる（効果と同じ）。配線に書かせるかは未定。
 5. **共有の型に付く語彙のデコレータ**: `type.User` のフィールドに `@db.key` が付く。書いてよい、と決めた（P23）。
-   別の置き場も選べるように、デコレータだけを足す model の派生を考える案がある（未決）:
-   `model UserRow is type.User { @db.key id; @db.unique email; }` のように、フィールドは元のまま、デコレータだけを足す。
+   別の名前空間で注釈を足したいときは、型を継承する（P24。書き方は未定）。継承した型は別の型になる。
+7. **`omit` と、暗黙に渡せる規則**: `model PublicUser is User omit hash;` の書き方はなくなる（P24）。この仕様の
+   `return { user: user, … }`（`issueSession`）と `Found => user`（`getMe`）は、`type.User` を `type.PublicUser` に
+   暗黙に渡している。継承した型が別の型なら、ここは型を写す関数を通す形に直す。
 6. **包む関数（デコレータ）**: この仕様にはプロジェクトが宣言したデコレータがない。次のサンプルで扱う。
