@@ -14,8 +14,10 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// 純粋な op（仕様から割り出したもの: デコレータ、reads、effects がなく、状態にも別の名前空間にも触れない）の関数は
-// ctx を取らず、そうでない op の関数は最初の引数に取る。生成された関数の型が、この代入をコンパイルできることで確かめる。
+// 純粋な op（仕様から割り出したもの: デコレータ、reads、effects がなく、状態に依らない。配線なら、呼び出し先もすべて純粋）の
+// 関数は ctx を取らず、そうでない op の関数は最初の引数に取る。別の名前空間の op の口（MailerSendFunc、StoreFindSessionFunc）も
+// 相手の op の判定に従う: mailer.send はデコレータ @remote を、store.findSession は reads を持つので、純粋でなく、ctx を取る。
+// 生成された関数の型が、この代入をコンパイルできることで確かめる。
 var (
 	_ func(pkgtype.User, pkgtype.Password) error                                    = server.CheckPasswordFunc(nil)
 	_ func(pkgtype.User) (pkgtype.Session, error)                                   = server.NewSessionFunc(nil)

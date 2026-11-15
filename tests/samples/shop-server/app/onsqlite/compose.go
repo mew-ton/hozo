@@ -14,7 +14,7 @@ import (
 //
 // store.States はパッケージの変数なので、一つのプロセスで有効なのは、最後に New した db だけ。
 func New(db *sql.DB, leaves server.Leaves, send server.MailerSendFunc) (http.Handler, store.Ops, error) {
-	// go-sqlite の出力: 表を作り、store の op の中身を store.States に入れる
+	// go-sqlite の出力: 表を作り、store の op と、形で決まる問い合わせの中身を store.States に入れる
 	if err := store.SetupDB(db); err != nil {
 		return nil, nil, err
 	}

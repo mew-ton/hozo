@@ -1,6 +1,6 @@
-// Package memstore は、名前空間 store の op の、メモリの上の実装（../../README.md「人が書いたもの」）。
-// 単位 gen/storemem（transpilers は基底の go だけ）には、op の中身を出すトランスパイラがいないので、人が書いて
-// store.States に入れる。gen/store（go-sqlite が出す）と、op の関数の型は同じ。
+// Package memstore は、名前空間 store の op と、状態の形で決まる問い合わせの、メモリの上の実装
+// （../../README.md「人が書いたもの」）。単位 gen/storemem（transpilers は基底の go だけ）には、中身を出す
+// トランスパイラがいないので、人が書いて store.States に入れる。gen/store（go-sqlite が出す）と、関数の型は同じ。
 package memstore
 
 import (
@@ -25,29 +25,30 @@ type Store struct {
 	notifications []pkgtype.Notification
 }
 
-// Setup は空の Store を作り、その上の op の実装を store.States（gen/storemem）に入れる。
+// Setup は空の Store を作り、その上の実装を store.States（gen/storemem）に入れる。
 //
 // store.States はパッケージの変数なので、一つのプロセスで有効なのは、最後に Setup した Store だけ。
-func Setup() *Store {
+func Setup() {
 	m := &Store{}
-	// どの op がどの状態の単位に入るかは、生成された states.go の通り（読む先か、効果の宛先の状態）
+	// 口の並びは、生成された states.go の通り: 状態の単位ごとに、形で決まる問い合わせ（IsEmpty、Get）、
+	// その状態を読む op、その状態を宛先にする効果を持つ op
+	store.States.Users.IsEmpty = isEmpty(m, &m.users)
+	store.States.Users.Get = get(m, &m.users, same)
 	store.States.Users.FindUser = m.findUser
 	store.States.Users.FindUserById = m.findUserById
 	store.States.Users.AddUser = m.addUser
+	store.States.Sessions.IsEmpty = isEmpty(m, &m.sessions)
+	store.States.Sessions.Get = get(m, &m.sessions, same)
 	store.States.Sessions.FindSession = m.findSession
 	store.States.Sessions.AddSession = m.addSession
 	store.States.Sessions.RemoveSession = m.removeSession
+	store.States.Orders.IsEmpty = isEmpty(m, &m.orders)
+	store.States.Orders.Get = get(m, &m.orders, copyOrder)
 	store.States.Orders.ListOrders = m.listOrders
 	store.States.Orders.AddOrder = m.addOrder
+	store.States.Notifications.IsEmpty = isEmpty(m, &m.notifications)
+	store.States.Notifications.Get = get(m, &m.notifications, same)
 	store.States.Notifications.AddNotification = m.addNotification
-	return m
-}
-
-// Notifications は、足された通知（足した順）。通知を読む op は仕様にないので、テストが使う。
-func (m *Store) Notifications() []pkgtype.Notification {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return append([]pkgtype.Notification(nil), m.notifications...)
 }
 
 // lock は、ctx が生きていれば mu を取る。中断されているか期限が過ぎていれば、状態に触れずにそのエラーを返す。
@@ -58,6 +59,36 @@ func (m *Store) lock(ctx context.Context) error {
 	m.mu.Lock()
 	return nil
 }
+
+// isEmpty は、状態（m の rows）の、形で決まる問い合わせ IsEmpty を作る: 要素が一つもなければ true。
+func isEmpty[T any](m *Store, rows *[]T) func(context.Context) (bool, error) {
+	return func(ctx context.Context) (bool, error) {
+		if err := m.lock(ctx); err != nil {
+			return false, err
+		}
+		defer m.mu.Unlock()
+		return len(*rows) == 0, nil
+	}
+}
+
+// get は、状態（m の rows）の、形で決まる問い合わせ Get を作る: すべての要素の写しを、足した順に。
+// copyRow は、要素一つの写し方。
+func get[T any](m *Store, rows *[]T, copyRow func(T) T) func(context.Context) ([]T, error) {
+	return func(ctx context.Context) ([]T, error) {
+		if err := m.lock(ctx); err != nil {
+			return nil, err
+		}
+		defer m.mu.Unlock()
+		var out []T
+		for _, row := range *rows {
+			out = append(out, copyRow(row))
+		}
+		return out, nil
+	}
+}
+
+// same は、スライスを持たない要素の写し（値そのまま）。
+func same[T any](row T) T { return row }
 
 func (m *Store) findUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
 	if err := m.lock(ctx); err != nil {

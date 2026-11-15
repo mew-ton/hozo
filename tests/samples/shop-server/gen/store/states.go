@@ -2,8 +2,18 @@
 
 package store
 
+import (
+	"context"
+
+	pkgtype "example.com/shop-server/gen/type"
+)
+
 // UsersState は状態 store.users（list<type.User>）の単位。
 type UsersState struct {
+	// 問い合わせ（形 list で決まる）: store.users に要素が一つもなければ true。
+	IsEmpty func(ctx context.Context) (bool, error)
+	// 問い合わせ（形 list で決まる）: store.users の値。すべての要素を、足した順に。
+	Get func(ctx context.Context) ([]pkgtype.User, error)
 	// 問い合わせ: store.users を読む（reads）葉の op store.findUser。
 	FindUser FindUserFunc
 	// 問い合わせ: store.users を読む（reads）葉の op store.findUserById。
@@ -14,6 +24,10 @@ type UsersState struct {
 
 // SessionsState は状態 store.sessions（list<type.Session>）の単位。
 type SessionsState struct {
+	// 問い合わせ（形 list で決まる）: store.sessions に要素が一つもなければ true。
+	IsEmpty func(ctx context.Context) (bool, error)
+	// 問い合わせ（形 list で決まる）: store.sessions の値。すべての要素を、足した順に。
+	Get func(ctx context.Context) ([]pkgtype.Session, error)
 	// 問い合わせ: store.sessions を読む（reads）葉の op store.findSession。
 	FindSession FindSessionFunc
 	// 命令: 効果 store.createSession（on store.sessions.post）を持つ葉の op store.addSession。
@@ -24,6 +38,10 @@ type SessionsState struct {
 
 // OrdersState は状態 store.orders（list<type.Order>）の単位。
 type OrdersState struct {
+	// 問い合わせ（形 list で決まる）: store.orders に要素が一つもなければ true。
+	IsEmpty func(ctx context.Context) (bool, error)
+	// 問い合わせ（形 list で決まる）: store.orders の値。すべての要素を、足した順に。
+	Get func(ctx context.Context) ([]pkgtype.Order, error)
 	// 問い合わせ: store.orders を読む（reads）葉の op store.listOrders。
 	ListOrders ListOrdersFunc
 	// 命令: 効果 store.createOrder（on store.orders.post）を持つ葉の op store.addOrder。
@@ -32,6 +50,10 @@ type OrdersState struct {
 
 // NotificationsState は状態 store.notifications（list<type.Notification>）の単位。
 type NotificationsState struct {
+	// 問い合わせ（形 list で決まる）: store.notifications に要素が一つもなければ true。
+	IsEmpty func(ctx context.Context) (bool, error)
+	// 問い合わせ（形 list で決まる）: store.notifications の値。すべての要素を、足した順に。
+	Get func(ctx context.Context) ([]pkgtype.Notification, error)
 	// 命令: 効果 store.notifyUser（on store.notifications.post）を持つ葉の op store.addNotification。
 	AddNotification AddNotificationFunc
 }
@@ -44,6 +66,7 @@ type StateSet struct {
 	Notifications NotificationsState
 }
 
-// States はこの名前空間の状態。状態を読む葉の op（問い合わせ）と、状態を変える葉の op（命令）の実装をここに入れる。
+// States はこの名前空間の状態。形で決まる問い合わせ（IsEmpty、Get）と、状態を読む葉の op（問い合わせ）と、
+// 状態を変える葉の op（命令）の実装をここに入れる。
 // 入れていないフィールドが要るところへ来たら *runtime.MissingError（Kind は "state"）。
 var States StateSet

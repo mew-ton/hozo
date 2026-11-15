@@ -15,12 +15,24 @@ import (
 )
 
 // newStore は、メモリの上の SQLite に表を作り、その上の store を返す（server は組み立てない。gen/store だけで動く）。
-func newStore(t *testing.T) storetest.Ops {
+func newStore(t *testing.T) storetest.Store {
 	t.Helper()
 	if err := store.SetupDB(openDB(t)); err != nil {
 		t.Fatal(err)
 	}
-	return store.New()
+	return storetest.Store{Ops: store.New(), States: states()}
+}
+
+// states は、store.States の形で決まる問い合わせを、storetest に渡す形に並べる（SetupDB の後で呼ぶ）。
+// gen/store と gen/storemem の StateSet は別の型なので、共通のテストへは口を一つずつ渡す。
+func states() storetest.States {
+	u, s, o, n := store.States.Users, store.States.Sessions, store.States.Orders, store.States.Notifications
+	return storetest.States{
+		Users:         storetest.List[pkgtype.User]{IsEmpty: u.IsEmpty, Get: u.Get},
+		Sessions:      storetest.List[pkgtype.Session]{IsEmpty: s.IsEmpty, Get: s.Get},
+		Orders:        storetest.List[pkgtype.Order]{IsEmpty: o.IsEmpty, Get: o.Get},
+		Notifications: storetest.List[pkgtype.Notification]{IsEmpty: n.IsEmpty, Get: n.Get},
+	}
 }
 
 // TestStore は、go-sqlite が出した store の op の振る舞い。onmem の TestStore と同じ storetest.Run を走らせる。
@@ -28,15 +40,20 @@ func TestStore(t *testing.T) {
 	storetest.Run(t, newStore)
 }
 
-// TestSetupDBFillsEveryOp は、SetupDB が store.States のすべての口を埋めること（この仕様の store の op は九つとも、
-// go-sqlite の規則で中身が決まる）。埋まっていない口を調べる関数は生成されないので、リフレクションで数える。
-func TestSetupDBFillsEveryOp(t *testing.T) {
+// TestSetupDBFillsStates は、SetupDB が store.States のすべての口を埋めること: 四つの状態の、形で決まる問い合わせ
+// （IsEmpty、Get）が八つと、op が九つ（この仕様の store の op は九つとも、go-sqlite の規則で中身が決まる）。
+// 埋まっていない口を調べる関数は生成されないので、リフレクションで数える。
+func TestSetupDBFillsStates(t *testing.T) {
 	store.States = store.StateSet{}
 	// 埋める前は、どの op も *runtime.MissingError（Kind は "state"）
 	_, err := store.New().FindUser(context.Background(), "alice@example.com")
 	var missing *runtime.MissingError
 	if !errors.As(err, &missing) || missing.Kind != "state" || missing.Name != "store.findUser" {
 		t.Errorf("SetupDB の前の FindUser のエラーが %v", err)
+	}
+	// 形で決まる問い合わせは Ops を通らない（States のフィールドを直に呼ぶ）ので、埋める前は nil の関数のまま
+	if store.States.Notifications.Get != nil {
+		t.Error("SetupDB の前の States.Notifications.Get が nil でない")
 	}
 
 	if err := store.SetupDB(openDB(t)); err != nil {
@@ -53,8 +70,8 @@ func TestSetupDBFillsEveryOp(t *testing.T) {
 			filled++
 		}
 	}
-	if filled != 9 {
-		t.Errorf("States の口が %d（期待は 9）", filled)
+	if filled != 17 {
+		t.Errorf("States の口が %d（期待は 17）", filled)
 	}
 }
 

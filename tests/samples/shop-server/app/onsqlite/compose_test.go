@@ -7,6 +7,7 @@ import (
 	_ "modernc.org/sqlite" // database/sql のドライバ "sqlite"。生成された gen/store は import しない
 
 	"example.com/shop-server/app/handlertest"
+	"example.com/shop-server/gen/store"
 )
 
 // openDB は、メモリの上の SQLite を開く。
@@ -27,22 +28,15 @@ func openDB(t *testing.T) *sql.DB {
 // onmem の TestHandler と同じ handlertest.Run を走らせる。
 func TestHandler(t *testing.T) {
 	handlertest.Run(t, func(t *testing.T, f *handlertest.Fixture) handlertest.Server {
-		db := openDB(t)
-		handler, s, err := New(db, f.Leaves(), f.Send())
+		handler, s, err := New(openDB(t), f.Leaves(), f.Send())
 		if err != nil {
 			t.Fatal(err)
 		}
 		return handlertest.Server{
 			Handler: handler,
 			Store:   s,
-			// 通知を読む op は仕様にないので、go-sqlite の表を直に数える（表と列の名前は Schema の通り）
-			Notifications: func() int {
-				var n int
-				if err := db.QueryRow(`SELECT COUNT(*) FROM "notifications"`).Scan(&n); err != nil {
-					t.Fatal(err)
-				}
-				return n
-			},
+			// 通知を読む op は仕様にないので、状態の単位の、形で決まる問い合わせで読む（go-sqlite が埋めた口）
+			Notifications: store.States.Notifications.Get,
 		}
 	})
 }

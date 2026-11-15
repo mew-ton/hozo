@@ -31,7 +31,7 @@ func main() {
 		log.Printf("通知 → %s: %s", notice.UserId, notice.Message)
 		return nil
 	}}
-	handler, store, _ := onmem.New(leaves.Server(), mailer.Send)
+	handler, store := onmem.New(leaves.Server(), mailer.Send)
 
 	// 試すためのユーザーを一人入れる（store の op で）
 	demo := pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: app.HashPassword("password123")}

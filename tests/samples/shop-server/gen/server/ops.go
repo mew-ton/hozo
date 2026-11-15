@@ -216,7 +216,7 @@ type Ops interface {
 }
 
 // Deps は配線から呼ぶ別の名前空間の op。名前空間ごとに一つの構造体で、フィールドは server から見た関数の型。
-// 別の名前空間の op は、純粋かどうかによらず ctx を取る。
+// 口が ctx を取るかは、相手の op が純粋かどうかで決まる（どの名前空間から見ても同じ）: 純粋でなければ取り、純粋なら取らない。
 // 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "dep"）。
 type Deps struct {
 	Mailer MailerOps

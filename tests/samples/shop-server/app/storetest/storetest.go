@@ -3,12 +3,14 @@
 //
 // ここで確かめるのは、仕様（store.hozo の reads と効果）と、go-sqlite の規則（../../README.md「go-sqlite が従う規則」）から
 // 言えることだけ。仕様が言わないこと（@db.ref の先がないときなど）は確かめない。
+// 効果の結果は、状態の単位の、形で決まる問い合わせ（IsEmpty、Get）で確かめる: 読む op のない状態（notifications）でも読める。
 package storetest
 
 import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -29,6 +31,27 @@ type Ops interface {
 	AddNotification(ctx context.Context, notification pkgtype.Notification) error
 }
 
+// List は、list の状態の単位が形から持つ問い合わせ（<状態>State の IsEmpty と Get）。
+// フィールドは名前のない関数の型なので、gen/store と gen/storemem のどちらの States のフィールドも、そのまま入る。
+type List[T any] struct {
+	IsEmpty func(ctx context.Context) (bool, error)
+	Get     func(ctx context.Context) ([]T, error)
+}
+
+// States は、名前空間 store の四つの状態の、形で決まる問い合わせ。
+type States struct {
+	Users         List[pkgtype.User]
+	Sessions      List[pkgtype.Session]
+	Orders        List[pkgtype.Order]
+	Notifications List[pkgtype.Notification]
+}
+
+// Store は試す相手: store の op と、その状態の、形で決まる問い合わせ。
+type Store struct {
+	Ops
+	States States
+}
+
 var (
 	alice = pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: "h1"}
 	bob   = pkgtype.User{Id: "u2", Email: "bob@example.com", Name: "Bob", Hash: "h2"}
@@ -36,10 +59,10 @@ var (
 
 // Run は newStore が作る空の store の振る舞いを確かめる。サブテストごとに新しい store を作る。
 // 状態はパッケージの変数（store.States）にあるので、サブテストは並列にしない。
-func Run(t *testing.T, newStore func(t *testing.T) Ops) {
+func Run(t *testing.T, newStore func(t *testing.T) Store) {
 	ctx := context.Background()
 	// start は、alice と bob のいる store を作る
-	start := func(t *testing.T) Ops {
+	start := func(t *testing.T) Store {
 		t.Helper()
 		s := newStore(t)
 		for _, u := range []pkgtype.User{alice, bob} {
@@ -49,6 +72,15 @@ func Run(t *testing.T, newStore func(t *testing.T) Ops) {
 		}
 		return s
 	}
+
+	t.Run("empty", func(t *testing.T) {
+		// 作ったばかりの store は、どの状態も空（IsEmpty は true、Get は空）
+		s := newStore(t)
+		s.States.Users.want(t, ctx, "users", userKey)
+		s.States.Sessions.want(t, ctx, "sessions", sessionKey)
+		s.States.Orders.want(t, ctx, "orders", orderKey)
+		s.States.Notifications.want(t, ctx, "notifications", notificationKey)
+	})
 
 	t.Run("users", func(t *testing.T) {
 		s := start(t)
@@ -66,6 +98,8 @@ func Run(t *testing.T, newStore func(t *testing.T) Ops) {
 		if err := s.AddUser(ctx, pkgtype.User{Id: "u3", Email: "alice@example.com", Name: "X", Hash: "h"}); err == nil {
 			t.Error("addUser: email（@db.unique）が同じ行を足せた")
 		}
+		// 状態の値は、足せた二人だけ（足した順）
+		s.States.Users.want(t, ctx, "users", userKey, "u1", "u2")
 	})
 
 	t.Run("sessions", func(t *testing.T) {
@@ -84,6 +118,7 @@ func Run(t *testing.T, newStore func(t *testing.T) Ops) {
 		if got.Token != "t1" || got.UserId != "u1" || !got.ExpiresAt.Equal(expires) {
 			t.Errorf("findSession = %+v（期待は %+v）", *got, session)
 		}
+		s.States.Sessions.want(t, ctx, "sessions", sessionKey, "t1")
 		// トークンがなければ、ない。知らないトークンも、ない
 		if got, err := s.FindSession(ctx, nil); err != nil || got != nil {
 			t.Errorf("findSession(nil) = %v, %v（期待は nil, nil）", got, err)
@@ -102,6 +137,7 @@ func Run(t *testing.T, newStore func(t *testing.T) Ops) {
 		if err := s.RemoveSession(ctx, "t1"); err != nil {
 			t.Errorf("ない行の removeSession = %v（期待は nil）", err)
 		}
+		s.States.Sessions.want(t, ctx, "sessions", sessionKey)
 	})
 
 	t.Run("orders", func(t *testing.T) {
@@ -133,14 +169,20 @@ func Run(t *testing.T, newStore func(t *testing.T) Ops) {
 		if got, err := s.ListOrders(ctx, "u9"); err != nil || len(got) != 0 {
 			t.Errorf("listOrders(u9) = %v, %v（期待は空）", got, err)
 		}
+		// 状態の値は、どのユーザーの注文も、足した順
+		s.States.Orders.want(t, ctx, "orders", orderKey, "o2", "o3", "o1")
 	})
 
 	t.Run("notifications", func(t *testing.T) {
 		s := start(t)
-		// 通知を読む op は仕様にないので、足せることしか確かめられない（行の数は、組み立てる側のテストが保存先を直に数える）
-		if err := s.AddNotification(ctx, pkgtype.Notification{UserId: "u1", Message: "こんにちは"}); err != nil {
-			t.Fatal(err)
+		// 通知を読む op は仕様にないので、効果 notifyUser の結果は、状態の値（Get）で確かめる。
+		// 要素の model にキーがないので、同じ行も足せる
+		for _, userId := range []pkgtype.UserId{"u2", "u1", "u2"} {
+			if err := s.AddNotification(ctx, pkgtype.Notification{UserId: userId, Message: "こんにちは"}); err != nil {
+				t.Fatal(err)
+			}
 		}
+		s.States.Notifications.want(t, ctx, "notifications", notificationKey, "u2: こんにちは", "u1: こんにちは", "u2: こんにちは")
 	})
 
 	t.Run("cancelled", func(t *testing.T) {
@@ -159,20 +201,50 @@ func Run(t *testing.T, newStore func(t *testing.T) Ops) {
 			"removeSession":   s.RemoveSession(cancelled, "t1"),
 			"addOrder":        s.AddOrder(cancelled, pkgtype.Order{Id: "o1", UserId: "u1", PlacedAt: time.Now()}),
 			"addNotification": s.AddNotification(cancelled, pkgtype.Notification{UserId: "u1", Message: "x"}),
+			// 形で決まる問い合わせも ctx を取る（状態を読む）
+			"users.IsEmpty":     second(s.States.Users.IsEmpty(cancelled)),
+			"users.Get":         second(s.States.Users.Get(cancelled)),
+			"notifications.Get": second(s.States.Notifications.Get(cancelled)),
 		}
 		for op, err := range calls {
 			if !errors.Is(err, context.Canceled) {
 				t.Errorf("中断された ctx での %s のエラーが %v（期待は context.Canceled）", op, err)
 			}
 		}
-		wantUser(t, "中断された addUser の後の findUser", nil)(s.FindUser(ctx, "carol@example.com"))
-		if got, err := s.FindSession(ctx, &token); err != nil || got != nil {
-			t.Errorf("中断された addSession の後の findSession = %v, %v（期待は nil, nil）", got, err)
-		}
-		if got, err := s.ListOrders(ctx, "u1"); err != nil || len(got) != 0 {
-			t.Errorf("中断された addOrder の後の listOrders = %v, %v（期待は空）", got, err)
-		}
+		// 四つの状態の値は、start の後のまま
+		s.States.Users.want(t, ctx, "users", userKey, "u1", "u2")
+		s.States.Sessions.want(t, ctx, "sessions", sessionKey)
+		s.States.Orders.want(t, ctx, "orders", orderKey)
+		s.States.Notifications.want(t, ctx, "notifications", notificationKey)
 	})
+}
+
+// 状態の要素を、テストが見分ける文字列にする。
+var (
+	userKey         = func(u pkgtype.User) string { return string(u.Id) }
+	sessionKey      = func(s pkgtype.Session) string { return string(s.Token) }
+	orderKey        = func(o pkgtype.Order) string { return string(o.Id) }
+	notificationKey = func(n pkgtype.Notification) string { return string(n.UserId) + ": " + n.Message }
+)
+
+// want は、状態 state の値（Get）が、key で見分けて want の並び（足した順）であることと、IsEmpty がそれに合うことを確かめる。
+func (l List[T]) want(t *testing.T, ctx context.Context, state string, key func(T) string, want ...string) {
+	t.Helper()
+	rows, err := l.Get(ctx)
+	if err != nil {
+		t.Errorf("%s の Get: %v", state, err)
+		return
+	}
+	got := make([]string, 0, len(rows))
+	for _, row := range rows {
+		got = append(got, key(row))
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("%s の Get = %v（期待は %v）", state, got, want)
+	}
+	if empty, err := l.IsEmpty(ctx); err != nil || empty != (len(want) == 0) {
+		t.Errorf("%s の IsEmpty = %v, %v（期待は %v, nil）", state, empty, err, len(want) == 0)
+	}
 }
 
 // wantUser は、ユーザーを引く op の結果が want（nil なら「ない」）であることを確かめる関数を返す。

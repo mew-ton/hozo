@@ -13,9 +13,9 @@ import (
 // New はメモリの上の store と、その上の server のハンドラを返す。
 //
 // store.States はパッケージの変数なので、一つのプロセスで有効なのは、最後に New した分だけ。
-func New(leaves server.Leaves, send server.MailerSendFunc) (http.Handler, store.Ops, *memstore.Store) {
-	// 人が書いた実装: store の op の中身を store.States に入れる
-	mem := memstore.Setup()
+func New(leaves server.Leaves, send server.MailerSendFunc) (http.Handler, store.Ops) {
+	// 人が書いた実装: store の op と、形で決まる問い合わせの中身を store.States に入れる
+	memstore.Setup()
 	s := store.New()
 	ops := server.New(leaves, server.Deps{
 		Mailer: server.MailerOps{Send: send},
@@ -32,5 +32,5 @@ func New(leaves server.Leaves, send server.MailerSendFunc) (http.Handler, store.
 		},
 	})
 	// go-http の出力
-	return server.NewHandler(ops), s, mem
+	return server.NewHandler(ops), s
 }

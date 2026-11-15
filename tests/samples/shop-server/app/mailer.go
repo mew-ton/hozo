@@ -15,6 +15,7 @@ type Mailer struct {
 
 // Send は mailer.send の本体。届けられなければ、仕様の例外 type.NotificationFailed。
 // 型は server.MailerSendFunc に合っていて、server.Deps.Mailer.Send にそのまま入れられる。
+// ctx を取るのは、mailer.send が純粋でない（外にあることを示すデコレータ @remote が付いている）から。
 func (m *Mailer) Send(ctx context.Context, notice pkgtype.Notification) error {
 	if err := m.Deliver(ctx, notice); err != nil {
 		return pkgtype.NotificationFailed{}

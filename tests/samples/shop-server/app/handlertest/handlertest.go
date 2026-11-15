@@ -88,8 +88,9 @@ type Server struct {
 	Handler http.Handler
 	// Store は、そのサーバーの store。
 	Store Store
-	// Notifications は、状態 store.notifications の行の数。通知を読む op は仕様にないので、組み立てる側が保存先を直に数える。
-	Notifications func() int
+	// Notifications は、状態 store.notifications の値を読む、形で決まる問い合わせ（その store の States.Notifications.Get）。
+	// 通知を読む op は仕様にないが、状態の単位は、形で決まる問い合わせをいつも持つ。
+	Notifications func(ctx context.Context) ([]pkgtype.Notification, error)
 
 	fixture *Fixture
 }
@@ -284,7 +285,7 @@ func (s Server) login(t *testing.T) string {
 	return "token-1"
 }
 
-// count は、alice の注文の数（store.listOrders で数える）と、通知の行の数を確かめる。
+// count は、alice の注文の数（store.listOrders で数える）と、通知の数（状態 store.notifications の Get で数える）を確かめる。
 func (s Server) count(t *testing.T, orders, notifications int) {
 	t.Helper()
 	got, err := s.Store.ListOrders(context.Background(), AliceID)
@@ -294,7 +295,11 @@ func (s Server) count(t *testing.T, orders, notifications int) {
 	if len(got) != orders {
 		t.Errorf("注文が %d 件（期待は %d）", len(got), orders)
 	}
-	if got := s.Notifications(); got != notifications {
-		t.Errorf("通知が %d 行（期待は %d）", got, notifications)
+	notices, err := s.Notifications(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notices) != notifications {
+		t.Errorf("通知が %d 件（期待は %d）", len(notices), notifications)
 	}
 }

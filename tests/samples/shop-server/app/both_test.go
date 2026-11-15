@@ -46,7 +46,7 @@ func TestTwoStoresInOneProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, memStore, _ := onmem.New(onMem.Leaves(), onMem.Send())
+	_, memStore := onmem.New(onMem.Leaves(), onMem.Send())
 
 	// SQLite の方にだけユーザーと注文を足す
 	if err := sqliteStore.AddUser(ctx, handlertest.Alice()); err != nil {
