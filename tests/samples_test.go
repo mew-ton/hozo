@@ -32,18 +32,27 @@ const sampleManifestFile = "sample.json"
 // sampleProjectTranspiler は sample.json のトランスパイラ一つ分。
 type sampleProjectTranspiler struct {
 	// Select は、このトランスパイラが出力の対象に選ぶ宣言。tests/plugins/pick の規則の形（デコレータの FQN）で書く。
-	// トランスパイラがまだない間、pick がこの規則でそのトランスパイラの代役をする。
+	// トランスパイラがまだない間、pick がこの規則でそのトランスパイラの代役をする。代役を使うサブテスト（check、shared）が
+	// どちらも保留のサンプルでは、書かなくてよい。
 	Select json.RawMessage `json:"select"`
 	// Files は、期待する出力のうちこのトランスパイラが出すファイル（サンプルのルートからの相対パス）。
 	// 単位の out の下の、ここにないファイルは、共有する形（hozoc の既定の出力）。
 	Files []string `json:"files"`
 }
 
+// サンプルごとに保留にできるサブテスト（sample.json の pending のキー。tests/samples/README.md「保留」）。
+// 今の hozoc を動かすサブテストだけ。go（サンプルが動くこと）は保留にできない。
+const (
+	pendingCheck  = "check"
+	pendingShared = "shared"
+)
+
 // sampleProject はサンプル一つ。
 type sampleProject struct {
 	name        string
 	dir         string                             // サンプルのルート（tests/ からの相対パス）
 	transpilers map[string]sampleProjectTranspiler // sample.json
+	pending     map[string]string                  // sample.json の pending: 保留にするサブテスト → 理由
 	outs        []string                           // hozo.toml の単位の out（設定の順）
 	owner       map[string]string                  // トランスパイラのファイル → トランスパイラの名前
 }
@@ -58,6 +67,7 @@ func loadSample(t *testing.T, name string) *sampleProject {
 		t.Fatal(err)
 	}
 	var m struct {
+		Pending     map[string]string                  `json:"pending"`
 		Transpilers map[string]sampleProjectTranspiler `json:"transpilers"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -66,9 +76,26 @@ func loadSample(t *testing.T, name string) *sampleProject {
 		t.Fatalf("%s/%s を読めない: %v", s.dir, sampleManifestFile, err)
 	}
 	s.transpilers = m.Transpilers
+	s.pending = m.Pending
+	for sub, reason := range s.pending {
+		if sub != pendingCheck && sub != pendingShared {
+			t.Errorf("%s: pending に書けるのは %s と %s だけ（%s）", sampleManifestFile, pendingCheck, pendingShared, sub)
+		}
+		if strings.TrimSpace(reason) == "" {
+			t.Errorf("%s: pending の %s に理由がない", sampleManifestFile, sub)
+		}
+	}
+	if s.pending[pendingCheck] == "" || s.pending[pendingShared] == "" {
+		// 代役のトランスパイラ（standIn）を使うサブテストが走るなら、代役の規則が要る
+		for _, name := range s.names() {
+			if len(s.transpilers[name].Select) == 0 {
+				t.Errorf("%s: トランスパイラ %s に select がない（check と shared の代役が使う）", sampleManifestFile, name)
+			}
+		}
+	}
 
 	// 本物の hozo.toml。トランスパイラがあるかどうかは見ない（見るのは internal/project の CFG-14）
-	cfg, diags := config.Load(filepath.Join(s.dir, config.FileName))
+	cfg, diags := config.Load(s.configPath(t))
 	if len(diags) > 0 {
 		t.Fatalf("%s/%s: %+v", s.dir, config.FileName, diags)
 	}
@@ -100,6 +127,39 @@ func loadSample(t *testing.T, name string) *sampleProject {
 		t.FailNow()
 	}
 	return s
+}
+
+// configPath は、loadSample が単位（out と transpilers）を読む hozo.toml のパス。ふつうはサンプルの本物の hozo.toml。
+//
+// check が保留のサンプルは、今の hozoc が読めない書き方で書かれている。hozo.toml では、単位ごとのオプションのテーブル
+// `[emit.options.<トランスパイラ>]`（docs/decisions.md の P16。今の internal/config は知らないキーとして CFG-7 にし、
+// その単位を読まない）がそれに当たる。そのテーブルだけを行の単位で除いた写しを一時ディレクトリに作り、それを読む
+// （ほかの検査は、そのまま internal/config が行う）。P16 を実装したら、この分岐は要らなくなる。
+func (s *sampleProject) configPath(t *testing.T) string {
+	t.Helper()
+	real := filepath.Join(s.dir, config.FileName)
+	if s.pending[pendingCheck] == "" {
+		return real
+	}
+	data, err := os.ReadFile(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kept []string
+	inOptions := false
+	for _, line := range strings.Split(string(data), "\n") {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "[") {
+			inOptions = strings.HasPrefix(trimmed, "[emit.options.")
+		}
+		if !inOptions {
+			kept = append(kept, line)
+		}
+	}
+	stripped := filepath.Join(t.TempDir(), config.FileName)
+	if err := os.WriteFile(stripped, []byte(strings.Join(kept, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return stripped
 }
 
 // underOut は、サンプルのルートからの相対パス p が、どれかの単位の out の下にあるか。
@@ -249,6 +309,10 @@ func buildPick(t *testing.T) string {
 //   - go: 期待する出力と人の手のコードが、サンプルのモジュールで go vet と go test を通る。
 //   - transpilers: 本物のトランスパイラで emit した出力の全体が、期待する出力とバイト単位で同じ。
 //     トランスパイラがまだなければ飛ばす。
+//
+// check と shared は、サンプルが sample.json の pending に理由を書いていれば、その理由を示して飛ばす（今の hozoc が
+// まだ読めない書き方、まだ出さない形で書いたサンプル。tests/samples/README.md「保留」）。書いていないサンプルでは、
+// 今までどおり走る。shared を飛ばす前に、hozoc を動かさずに確かめられること（testFiles）は確かめる。
 func TestSamples(t *testing.T) {
 	requireGo(t)
 	manifests, err := filepath.Glob(filepath.Join(samplesDir, "*", sampleManifestFile))
@@ -263,8 +327,19 @@ func TestSamples(t *testing.T) {
 		name := filepath.Base(filepath.Dir(m))
 		t.Run(name, func(t *testing.T) {
 			s := loadSample(t, name)
-			t.Run("check", func(t *testing.T) { s.testCheck(t, pickExe) })
-			t.Run("shared", func(t *testing.T) { s.testShared(t, pickExe) })
+			t.Run("check", func(t *testing.T) {
+				if reason := s.pending[pendingCheck]; reason != "" {
+					t.Skipf("保留（%s/%s）: %s", s.dir, sampleManifestFile, reason)
+				}
+				s.testCheck(t, pickExe)
+			})
+			t.Run("shared", func(t *testing.T) {
+				if reason := s.pending[pendingShared]; reason != "" {
+					s.testFiles(t)
+					t.Skipf("保留（%s/%s）: %s", s.dir, sampleManifestFile, reason)
+				}
+				s.testShared(t, pickExe)
+			})
 			t.Run("go", s.testGo)
 			t.Run("transpilers", func(t *testing.T) { s.testTranspilers(t, filepath.Join("..", "plugins")) })
 		})
@@ -371,6 +446,59 @@ func (s *sampleProject) testShared(t *testing.T, pickExe string) {
 			t.Errorf("%s/%s は既定の出力が書くが、サンプルにない（-update で作る）", s.dir, p)
 		case !bytes.Equal(w, g):
 			t.Errorf("%s/%s が今の既定の出力と違う（-update で更新）:\n%s", s.dir, p, firstDiff(string(w), string(g)))
+		}
+	}
+}
+
+// testFiles は、shared が保留のサンプルについて、hozoc を動かさずに確かめられること: 期待する出力のファイルと、
+// sample.json と、出力先ごとの記録（.hozoc-outputs.json）が合っている。
+//
+//   - 単位の out の下のファイルは、記録を除いて、どれも sample.json のどれかのトランスパイラのファイル
+//     （共有する形のファイルを今の hozoc emit と比べられないので、出どころのないファイルを置かせない）。
+//   - sample.json のファイルは、どれもある。
+//   - 記録は、そのディレクトリの下のファイル（もっと深い記録のあるディレクトリの下のものを除く）のパスを、
+//     辞書順に並べた JSON の配列（docs/cli.md「emit」の 6）。記録の下にないファイルはない。
+func (s *sampleProject) testFiles(t *testing.T) {
+	want := s.expected(t)
+	listed := map[string][]string{} // 記録のあるディレクトリ → その記録が挙げるはずのファイル
+	for p := range want {
+		if path.Base(p) == app.OutputsFile {
+			listed[path.Dir(p)] = nil
+		}
+	}
+	for _, p := range sortedKeys(want) {
+		if path.Base(p) == app.OutputsFile {
+			continue
+		}
+		if s.owner[p] == "" {
+			t.Errorf("%s/%s は、%s のどのトランスパイラのファイルでもない", s.dir, p, sampleManifestFile)
+		}
+		dir, found := "", false
+		for d := range listed {
+			if config.Under(p, d) && (!found || len(d) > len(dir)) {
+				dir, found = d, true
+			}
+		}
+		if !found {
+			t.Errorf("%s/%s を下に持つ記録（%s）がない", s.dir, p, app.OutputsFile)
+			continue
+		}
+		listed[dir] = append(listed[dir], p)
+	}
+	for f, name := range s.owner {
+		if _, ok := want[f]; !ok {
+			t.Errorf("%s/%s: %s が出すはずのファイルがない（%s）", s.dir, f, name, sampleManifestFile)
+		}
+	}
+	for dir, paths := range listed {
+		sort.Strings(paths)
+		data, err := json.MarshalIndent(paths, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := path.Join(dir, app.OutputsFile)
+		if got := append(data, '\n'); !bytes.Equal(want[record], got) {
+			t.Errorf("%s/%s が、その下のファイルの一覧と違う:\n%s", s.dir, record, firstDiff(string(want[record]), string(got)))
 		}
 	}
 }

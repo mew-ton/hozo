@@ -1,193 +1,338 @@
 # サンプル `shop-server`
 
-名前空間 `server`（ログイン、自分の情報、注文）を、**互いを知らない二つのトランスパイラ**が Go に出力する。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
+小さな店のサーバー（ログイン、自分の情報、注文）を、`docs/decisions.md`「決めたが、まだ文書と実装に入れていないこと」の **P1〜P30 を当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-- `go-http`: `@http.get` / `@http.post` の付いた op を、`net/http` のハンドラにする（標準ライブラリだけ。Go 1.22 以降の `ServeMux` のパターン）。
-- `go-sqlite`: `@db` の状態を、`database/sql` の上の表にする（SQL の方言は SQLite）。
+P1〜P30 の言語の変更も、ここに出てくる四つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http`）も、まだない。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がいつかこう出す」内容を人が書いたもので、トランスパイラを実装したときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
 
-どちらのトランスパイラもまだない。このサンプルは、それぞれが出すべきものを手で書いたもので、二つが実装されたときのブラックボックスのテストの仕様になる。
+P1〜P30 を当てはめる前の形（一つの名前空間 `server` を三つの単位で出力する。以下「v1」）は、コミット `ac57788` のこのディレクトリにある。
 
-入力は一つ（`server.hozo`）で、`hozo.toml` の三つの単位が、トランスパイラの組だけを変えて出力する。
+## 保留
 
-| 単位の `out` | `transpilers` | 人が書く部分 |
-|---|---|---|
-| `both/server` | `go-http`、`go-sqlite` | `both/app`: 葉の op の本体を `server.Tables` の上に書き、SQLite で動くサーバーにする |
-| `httponly/server` | `go-http` | `httponly/app`: 状態もメモリの上に人が書く。`go-http` の出力が `go-sqlite` なしで動く |
-| `dbonly/server` | `go-sqlite` | `dbonly/app`: 表を直に使う小さな道具。`go-sqlite` の出力が `go-http` なしで動く |
+`sample.json` の `pending` が、`TestSamples` の `check` と `shared` を、このサンプルについて保留にしている（保留の仕組みは `../README.md`「保留」）。
+
+- `check`: 仕様と設定が、今の hozoc が読めない書き方を使う。使っている書き方と、それを決めた決定は「入力」の表。
+- `shared`: 期待する出力のどのファイルも、今の hozoc の既定の出力（`docs/emit-go.md`）が出す形ではない。基底の `go` も、まだないトランスパイラの一つ（P9）。
+
+## 入力
+
+仕様は名前空間ごとに一つのファイル。「まだない書き方」の語（`reads`、`as`、`throw`、`never`、`override`、`[emit.options.<トランスパイラ>]`）は、どれも `docs/decisions.md` が仮に置いた語のまま。
+
+| ファイル | 名前空間 | 中身 | まだない書き方 |
+|---|---|---|---|
+| `type.hozo` | `type` | 共有の型（P6）: scalar、model、例外 | `model PublicUser extends User { override hash: never; }`（P24〜P26） |
+| `store.hozo` | `store` | DB の状態四つ（P5）、それを読む op と書く op、読んだ結果の分類 | `reads`（P19）、`classify C of <op>`（P2）、`Case: <op> as T;`（P3） |
+| `server.hozo` | `server` | HTTP の入口と、業務の流れ（配線）。人が書く op は六つ | `match x by C` の絞り込み（P3）、`throw E`（P13）、値のアーム（P14） |
+| `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。op `send` 一つ | — |
+
+`hozo.toml` の単位は四つ。`mailer` には単位を置かないので、コードは出ない。
+
+| 単位の `out` | `namespace` | `transpilers` | 中身を埋める者 |
+|---|---|---|---|
+| `gen/type` | `type` | `go`、`go-valid` | —（型だけ） |
+| `gen/store` | `store` | `go`、`go-sqlite` | `go-sqlite`: 九つの op すべて |
+| `gen/storemem` | `store` | `go` | 人: `app/memstore`（メモリの上） |
+| `gen/server` | `server` | `go`、`go-valid`、`go-http` | 人: `app/leaves.go`（葉の op 六つ）、`app/mailer.go`（`mailer.send`） |
+
+`gen/server` の単位だけ、`[emit.options.go-http]` で `validate = true` を渡す（P16）。
+
+### 下書きから変えたこと
+
+仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の五つ。
+
+1. **継承**（P24〜P27）: `model PublicUser is User omit hash;` を `model PublicUser extends User { override hash: never; }` にした（`type.hozo:41-43`）。`type.User` を `type.PublicUser` に写す葉の op `toPublicUser` を `server` に足し（`server.hozo:71`）、下書きが `User` をそのまま渡していた二か所で呼ぶ（`server.hozo:59`、`:103`）。
+2. **外部の入出力**（P30）: `server` の葉 `deliver` をやめ、名前空間 `mailer` の `op send` にした（`mailer.hozo:7-8`、`server.hozo:143`）。
+3. **`store.addUser` と効果 `createUser` を足した**（`store.hozo:56`、`:71`）。下書きにない変更。ユーザーを足す op がなければ、起動のときとテストが、保存先を直に書き換えるしかない（v1 の「分かったこと」26）。
+4. **`getMe` の `Found` のアームは、呼び出しをそのまま書いた**（`server.hozo:103` の `Found => toPublicUser(user);`）。写した値を先に束縛する形にはできない: `user` が `type.User` になるのはアームの中だけ。
+5. 説明のコメントを足した。
 
 ## ファイルの出どころ
 
 | ファイル | 出どころ |
 |---|---|
-| `server.hozo`、`hozo.toml` | 人が書く（入力） |
-| `sample.json` | 人が書く（各トランスパイラが選ぶ宣言と、出すファイル。`../README.md`「sample.json」） |
-| `go.mod`、`go.sum` | 人が書く（サンプルのモジュール。下の「モジュール」） |
-| `both/server/doc.go` `types.go` `validate.go` `ops.go` `states.go` `wiring.go` | 共有する形（hozoc の既定の出力。`docs/emit-go.md`） |
-| `both/server/http.go` | `go-http` |
-| `both/server/db.go` | `go-sqlite` |
-| `httponly/server/doc.go` `types.go` `validate.go` `ops.go` `states.go` `wiring.go` | 共有する形 |
-| `httponly/server/http.go` | `go-http`（`both/server/http.go` とバイト単位で同じ） |
-| `dbonly/server/doc.go` `types.go` `validate.go` `states.go` | 共有する形 |
-| `dbonly/server/db.go` | `go-sqlite`（`both/server/db.go` とバイト単位で同じ） |
-| `*/server/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイル（共有する形とトランスパイラのファイル）のパス |
-| `both/app/app.go` | 人が書く: 葉の op の本体と `Setup(db)` |
-| `both/app/main.go`、`both/app/app_test.go` | 人が書く: サーバーの main と、テスト |
-| `httponly/app/app.go`、`main.go`、`app_test.go` | 人が書く: メモリの上の状態、葉の op の本体、`Setup()`、main、テスト |
-| `dbonly/app/main.go`、`main_test.go` | 人が書く: 状態ごとの行の数を表示する道具と、表のテスト |
-| `handlertest/handlertest.go` | 人が書く: ハンドラの振る舞いのテスト。`both/app` と `httponly/app` が同じものを走らせる |
-
-共有する形のファイルは、トランスパイラの代役（`sample.json` の `select` の通りに選ぶだけの `tests/plugins/pick`）で今の `hozoc emit` が書いたものをそのまま置いている。手で直さない（更新は `go test ./tests -run TestSamples -update`）。
-
-## 三つの組の共有する形
-
-選ぶ宣言: `go-http` は `@http.get` / `@http.post` の付いた op（`login`、`logout`、`getMe`、`getOrders`、`placeOrder`）を起点にし、`go-sqlite` は `@db` の状態（`users`、`sessions`、`orders`、`notifications`）を選ぶ。
-
-| | `both` | `httponly` | `dbonly` |
-|---|---|---|---|
-| `ops.go`、`wiring.go` | 七つの op（起点の五つと、`placeOrder` から辿られた `saveOrder`、`sendOrderNotice`）。`New(leaves Leaves)` | `both` と同じ | ない（op を選ぶ者がいない） |
-| `states.go` | 四つの状態の単位。`users` は `IsEmpty` だけ、ほかは `IsEmpty` と命令 | `sessions`、`orders`、`notifications` の三つ（葉の op の効果の宛先）。**`users` の単位がない** | 四つの状態の単位。**どれも `IsEmpty` だけで、命令の口がない** |
-| `types.go`、`validate.go` | op と状態が参照するすべての型、例外、効果の定数 | `both` と同じ | 表の要素の model（`User`、`Session`、`Order`、`OrderLine`、`Notification`）と、それが参照する scalar だけ。`Password`、`PublicUser`、例外、効果の定数、入力の model はない |
-| `doc.go` | 同じ | 同じ | 同じ |
-
-`both` と `httponly` の違いは `states.go` の `UsersState` と `StateSet.Users` だけ。
+| `type.hozo`、`store.hozo`、`server.hozo`、`mailer.hozo`、`hozo.toml` | 人が書く（入力） |
+| `sample.json` | 人が書く（保留の理由と、各トランスパイラが出すファイル。`../README.md`「sample.json」） |
+| `go.mod`、`go.sum` | 人が書く（「モジュール」） |
+| `gen/type/doc.go` `types.go` | `go` |
+| `gen/type/validate.go` | `go-valid` |
+| `gen/store/doc.go` `types.go` `ops.go` `states.go` | `go` |
+| `gen/store/db.go` | `go-sqlite` |
+| `gen/storemem/doc.go` `types.go` `ops.go` `states.go` | `go`（`gen/store` の同じ名前のファイルとバイト単位で同じ） |
+| `gen/server/doc.go` `types.go` `ops.go` `wiring.go` | `go` |
+| `gen/server/validate.go` | `go-valid` |
+| `gen/server/http.go` | `go-http` |
+| `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス |
+| `app/leaves.go`、`app/mailer.go` | 人が書く: `server` の葉の op 六つの本体と、`mailer.send` の実装。保存先を知らない |
+| `app/memstore/memstore.go` | 人が書く: `store` の op の、メモリの上の実装（`gen/storemem` に入れる） |
+| `app/onsqlite/compose.go`、`app/onmem/compose.go` | 人が書く: 二つの組み立て（`server` を `gen/store` の上に、`gen/storemem` の上に） |
+| `app/cmd/shop-sqlite/main.go`、`app/cmd/shop-mem/main.go` | 人が書く: それぞれの組み立てで待ち受ける main |
+| `app/handlertest/`、`app/storetest/` | 人が書く: 二つの組み立てが共に走らせるテスト（HTTP から見た振る舞い、`store` の op の振る舞い） |
+| `app/*_test.go`、`app/*/*_test.go` | 人が書く: テスト（「人が書いたもの」） |
 
 ## モジュール
 
 - サンプルは自分のモジュール `example.com/shop-server`（`go.mod`）。生成したコードが import する `github.com/mew-ton/hozo/runtime` は `replace github.com/mew-ton/hozo => ../../..` で解決する。
-- SQLite のドライバは cgo の要らない `modernc.org/sqlite`。依存はこのモジュールの `go.mod` にだけあり、import するのは人が書くコード（`*/app` の main とテスト）だけ。期待する出力（`*/server`）は `database/sql` しか import しない。
+- SQLite のドライバは cgo の要らない `modernc.org/sqlite`。import するのは人が書くコード（`app/cmd/shop-sqlite` と、テスト）だけ。期待する出力（`gen/`）は `database/sql` しか import しない。
 - ドライバは `v1.46.1` に固定している。それより新しい版は、リポジトリが使う Go（1.24）より新しいツールチェーンを求める。`GOTOOLCHAIN=local` で動かす。
 
 ```
 GOTOOLCHAIN=local go vet ./... && GOTOOLCHAIN=local go test ./...
-GOTOOLCHAIN=local go run ./both/app        # http://localhost:8080。ユーザー alice@example.com / password123 を入れる
+GOTOOLCHAIN=local go run ./app/cmd/shop-sqlite   # http://localhost:8080。ユーザー alice@example.com / password123 を入れる
+GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メモリの上で
 ```
 
-## `go-http` が従う規則
+## 基底 `go` が従う規則
 
-出すファイルは `http.go` 一つ（共有する形と同じパッケージ `server`）。
+出発点は今の Go の既定の出力（`docs/emit-go.md`）。ここに書くのは、P1〜P30 を当てはめて変えたところと、決定が決めていなかったのでこのサンプルで決めたところ（後者は「分かったこと」に番号で挙げる）。書いていないことは `docs/emit-go.md` のまま。
 
-- **選ぶもの**: `@http.get` / `@http.post` の付いた op を起点（`roots`）にする。
-- **ヘッダ**: 先頭は `// Code generated by hozoc go-http <版>; DO NOT EDIT.`。`gofmt` で整形した形。並びはどれも宣言順。
-- **入口**: `func NewHandler(ops Ops) http.Handler`。`http.NewServeMux` に、op ごとに経路を一つ、`"<メソッド> <パス>"` のパターンで足す。
-- **入力**: op の引数の model を、フィールドのデコレータで読む。初めの値は、既定値を持つ model なら共有する形の `New<Model>()`、そうでなければ零値。
-  - `@http.header(name)`: 省略可能な、string を元にした scalar。ヘッダがあって空でなければ、その値をそのまま入れる（なければ `nil`）。
-  - `@http.query`: クエリにその名前があれば、フィールドの型で読む（`int` は 10 進の 64 ビット）。なければ初めの値（既定値）のまま。
-  - `@http.body`: そのフィールドが一つだけなら、本文の JSON がそのフィールドの値。二つ以上なら、本文はフィールド名をキーにした JSON のオブジェクト（このサンプルでは使っていない）。
-- **読めない要求**（本文が JSON として読めない・型が違う、クエリが数として読めない）: 400 で、本文は `{"error":"http.BadRequest","message":"…"}`。op は呼ばない。`message` は `<場所>: <理由>` の決まった文言（`body: invalid JSON`、`query page: invalid int`）。
-- **成功**: 200 で、結果の JSON。結果が配列で `nil` なら `[]`。戻り値のない op は 204 で本文なし。
-- **エラー**: `@http.status(n)` を持つ例外は、ステータス n で `{"error":"<例外の FQN>"}`、値を運ぶ例外は `"value"` にその JSON を足す。ステータスを持たない例外と、それ以外のエラー（`*runtime.MissingError` を含む）は 500 で `{"error":"internal"}`（中身を出さない）。見分ける例外は、起点の op が投げうる例外（`Signature.exceptions`）のうち `@http.status` を持つもので、値の型で見分ける（葉は `server.Unauthorized{}` のように値で返す）。
-- **本文のある応答**は `Content-Type: application/json`。
-- 非公開の名前には `http` を前に付ける（`httpWriteJSON` など）。
+- **出すもの**: 単位の対象の名前空間の、型（model、scalar、union、例外）と効果の定数のすべて（P8）、op のすべて（P11）。選択はない。制約を確かめる関数は出さない（P10）。
+- **ヘッダ**: 先頭は `// Code generated by hozoc go <版>; DO NOT EDIT.`。
+- **ファイル**: `doc.go`、`types.go`、`ops.go`、`states.go`、`wiring.go`。`validate.go` は出さない。`classify.go` は、人が述語を書く分類があるときだけ（この仕様にはない）。
+- **パッケージ**: 名前は `docs/emit-go.md`「配置」の規則のまま。名前空間 `type` は Go の予約語なので `pkgtype`（ディレクトリは `gen/type`）。別の名前空間の型は、その名前空間の出力を import する（P7。複製しない）。パッケージ名が import パスの最後の要素と違うときは、import に名前を書く（`pkgtype "example.com/shop-server/gen/type"`）。
+- **継承した model**（P24〜P27）: 元の model とは別の構造体。フィールドは、元の宣言順から `never` にしたものを除いた並び。元の model から写す関数は出さない（`gen/type/types.go:38-44`）。
+- **op の関数と `ctx`**（P29、P30）: 関数は最初の引数に `ctx context.Context` を取る。**純粋な op** の関数は取らない。純粋かどうかは P30 の定義のまま。この仕様での判定は下の表。関数の型のコメントに `Reads:`（P28 の、伝わってきた `reads`）と、純粋なら `純粋（ctx を取らない）` を足す。純粋な op の関数も、今までどおり `error` を返す。
+- **`Leaves`**: 状態を読まず（`reads` がない）、効果も持たない葉の op。
+- **状態の単位**（`<状態>State`）: フィールドは、その状態を読む葉の op（**問い合わせ**: `reads` がその状態一つ）と、その状態を宛先にする効果を持つ葉の op（**命令**）。問い合わせ、命令の順で、それぞれ宣言順。効果を持つ葉は、`reads` があっても効果の宛先の単位に置く。
+  - 形で決まる問い合わせ（`IsEmpty`、状態の値を読む `Get`: `single<T>` は `T`、`nullable<T>` は `*T`、`list<T>` は `[]T`）は、**その名前空間の配線が、その状態を組み込みの分類で `match` するか、名前で値として参照する（P4）ときだけ**出す。この仕様の `store` に配線はないので、どちらも出ない。
+  - 複数の状態を読む葉は、どの状態の単位にも置かず、`StateSet` の最後のフィールド `Shared`（型 `SharedState`）に置く。この仕様にはない。
+- **`Deps`**: 配線が呼ぶ別の名前空間ごとに、関数のフィールドを持つ構造体一つ（`MailerOps`、`StoreOps`）。別の名前空間の op の口は、相手が純粋かどうかによらず `ctx` を取る。
+- **`New`**: 引数は、その名前空間に要るものだけ（`server` は `New(leaves Leaves, deps Deps)`、`store` は `New()`）。
+- **配線の `match`**（P2、P3、P20）: 分類のどの場合も型から決まる（下の「分類」）なら、判定関数を呼ばず、`nil` かどうかで分ける。絞り込む場合のアームを `if x != nil { … }` の枝にし、もう一方のアームをその後ろに続ける（アームを書いた順によらない）。枝の中で絞り込んだ名前を値として使う位置は `*x`。`return match` は、アームごとの `return`。それぞれの枝の頭に、場合の名前をコメントで書く。
+- **アーム**: `throw E`（P13）は、例外を**値で**返す（`return <零値>, pkgtype.Unauthorized{}`）。値のアーム（P14）は、その値を返す。
+- **分類**（P2、P3）: 場合が「対象の `T?` を `T` に絞り込む場合一つ」と `default` だけの分類は、どの場合に当たるかが値から決まる。基底は、そういう分類について何も出さない（列挙の型も、判定関数も、`Classifiers` のフィールドも）。分類の名前は、それを使う配線のコメントにだけ残る。この仕様の三つの分類はどれもこの形。
+
+| op（`server`） | 種類 | 純粋か | 関数の先頭 |
+|---|---|---|---|
+| `login`、`logout`、`getMe`、`getOrders`、`placeOrder` | 配線 | いいえ（デコレータ `@http.*` があり、`store` を呼ぶ） | `ctx` |
+| `issueSession`、`authenticate`、`notify` | 配線 | いいえ（別の名前空間を呼ぶ） | `ctx` |
+| `checkPassword`、`newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice` | 葉 | はい | 仕様の引数 |
+
+`store` の九つの op は、どれも `reads` か効果を持つ葉なので `ctx` を取る。
+
+## `go-valid` が従う規則
+
+出すファイルは `validate.go` 一つ（基底と同じパッケージ）。
+
+- **ヘッダ**: 先頭は `// Code generated by hozoc go-valid <版>; DO NOT EDIT.`。
+- **`Validate` を持つ型**: その単位の名前空間の scalar と model のうち、`@valid.*` が付いているか、付いたフィールドを持つか、`Validate` を持つ型を（配列、省略可能を通して）フィールドに持つもの。それ以外の型には出さない。継承した model は、受け継いだフィールドの制約も確かめる。
+  - `type`: `Email`、`Password`、`User`、`PublicUser`、`OrderLine`、`Order`。
+  - `server`: `Credentials`、`LoginInput`、`LoginOk`、`PlaceOrderInput`（`AuthInput` と `GetOrdersInput` にはない）。
+- **形**: `func (v T) Validate() error`。違反は `*runtime.ValidationError`（`Violation{Path, Constraint}`）で、`Path` と制約の実装は `docs/emit-go.md`「scalar」「model の Validate」のまま。
+- **別の名前空間の型のフィールド**: その型のメソッド `Validate` を呼ぶ（`gen/server/validate.go:15` の `m.Email.Validate()`）。メソッドは型を持つパッケージにしか書けないので、**その型の名前空間を出す Go の単位も `go-valid` を並べていなければならない**（この設定では `gen/type`）。並べていなければエラーにする。
+- 非公開の名前には `valid` を前に付ける（`validAppend`）。パッケージごとに一つずつ出す。
 
 ## `go-sqlite` が従う規則
 
-出すファイルは `db.go` 一つ（共有する形と同じパッケージ `server`）。import するのは `database/sql` と標準ライブラリ、`runtime` だけで、ドライバは import しない。`context` は引数に取らない（共有する形が取らないため）。
+出すファイルは `db.go` 一つ（基底と同じパッケージ）。import するのは `database/sql` と標準ライブラリ、型のパッケージだけで、ドライバは import しない。
 
-- **選ぶもの**: `@db` の付いた状態（`states`）。
-- **ヘッダ**: 先頭は `// Code generated by hozoc go-sqlite <版>; DO NOT EDIT.`。`gofmt` で整形した形。並びはどれも宣言順。
+- **ヘッダ**: 先頭は `// Code generated by hozoc go-sqlite <版>; DO NOT EDIT.`。並びはどれも宣言順。
 - **表**: `@db` の状態ごとに表一つ。名前は状態の名前。要素の model のフィールドごとに列一つ。名前はフィールドの名前。名前はいつも `"…"` で引用する。
-- **列の型**: string を元にした型は `TEXT`、`int` は `INTEGER`、`boolean` は `INTEGER`、`float` は `REAL`、`Time` は `TEXT`（RFC 3339、UTC、小数部はいつも 9 桁）、配列と model は JSON を入れた `TEXT`。省略可能でない列は `NOT NULL`。（このサンプルが使うのは `TEXT` の三通りだけ。）
+- **列の型**: string を元にした型は `TEXT`、`int` は `INTEGER`、`boolean` は `INTEGER`、`float` は `REAL`、`Time` は `TEXT`（RFC 3339、UTC、小数部はいつも 9 桁）、配列と model は JSON を入れた `TEXT`。省略可能でない列は `NOT NULL`。
 - **制約**: `@db.key` は `PRIMARY KEY`、`@db.unique` は `UNIQUE`。`@db.ref(M)` は、要素が `M` であるただ一つの `@db` の状態の表の、`@db.key` の列への `REFERENCES`（そういう状態がちょうど一つでなければ、または `M` が `@db.key` を持たなければ、制約なし）。
 - **`const Schema`**: 表ごとの `CREATE TABLE IF NOT EXISTS` を宣言順に並べたもの。
-- **表の型** `<状態>Table`: `Insert(row)`、`List()`（足した順）、`Count()`。model が `@db.key` を持てば `Get(key)`（なければ `nil`）、`Update(row)`（行がなければ `sql.ErrNoRows`）、`Delete(key)`（行がなければ何もしない）。`@db.unique` のフィールドごとに `GetBy<Field>(v)`（なければ `nil`）。
-- **`type TableSet` と `var Tables TableSet`**: 状態ごとの表を束ねたパッケージの変数。状態はその名前空間のグローバル（`docs/emit-go.md`「実装の単位」）なので、呼ぶ側は接続を持ち回らない。
-- **`func SetupDB(db *sql.DB) error`**: `Schema` を実行し、`Tables` を入れ、共有する形の状態の単位の問い合わせのうち表から機械的に決まるもの（`States.<状態>.IsEmpty`。`Count` から）を入れる。命令（op）は入れない。本体は人が書く。
-- `SetupDB` の前に表を使えば `*runtime.MissingError`（`Kind` は `"state"`、`Name` は状態の FQN）。
-- 非公開の名前には `db` を前に付ける（`dbList` など）。
+- **op の中身**: `@db` の状態 S（要素の model は M）を読み書きする葉の op のうち、次のどれかに当たるものの中身を出す。当たらない op の口には触れない（人が埋める）。
+  - **引数と列の対応**（下の三つが使う）: 引数の型（省略可能なら、その中の型）と同じ型のフィールドが、M に**ちょうど一つ**あれば、その列。なければ、または二つ以上あれば、対応しない。
+  - **一行を引く**: `reads S` だけを持ち、戻り値が `M?`。引数は一つ以上で、どれも列に対応し、対応した列のどれかが `@db.key` か `@db.unique` → `SELECT … WHERE <列> = ? [AND …]`。行がなければ `nil`。
+  - **並びを引く**: `reads S` だけを持ち、戻り値が `M[]`。引数（なくてもよい）はどれも列に対応する → `SELECT … [WHERE …] ORDER BY rowid`（足した順）。
+  - **足す**: 効果が一つで、その宛先が `S.post`。引数は M の一つだけで、戻り値がない → `INSERT`。
+  - **消す**: 効果が一つで、その宛先が `S.delete`。引数は一つ以上で、どれも列に対応し、戻り値がない → `DELETE … WHERE <列> = ? [AND …]`。行がなければ何もしない。
+  - **省略可能な引数**: 値がなければ、問い合わせない。引く op は「ない」（`nil`、空の並び）を返し、消す op は何もしない。
+- **`func SetupDB(db *sql.DB) error`**: `Schema` を実行し、中身を出した op を、基底の `States` の口（その op が属する状態の単位のフィールド）に入れる。
+- 中身は、非公開の型 `dbOps` のメソッド（名前は基底の op のメソッド名）。受け取った `ctx` で `QueryContext` / `QueryRowContext` / `ExecContext` を呼ぶ。
+- 非公開の名前には `db` を前に付ける（`dbOps`、`dbGet`、`dbScanUser` など）。
+
+この仕様の九つの op は、どれも規則に当たる: `findUser`、`findUserById`、`findSession` は「一行を引く」、`listOrders` は「並びを引く」、`addUser`、`addSession`、`addOrder`、`addNotification` は「足す」、`removeSession` は「消す」。
+
+## `go-http` が従う規則
+
+出すファイルは `http.go` 一つ（基底と同じパッケージ）。標準ライブラリだけを使う（Go 1.22 以降の `ServeMux` のパターン）。
+
+- **ヘッダ**: 先頭は `// Code generated by hozoc go-http <版>; DO NOT EDIT.`。並びはどれも宣言順。
+- **入口**: `func NewHandler(ops Ops) http.Handler`。`@http.get` / `@http.post` の付いた op ごとに経路を一つ、`"<メソッド> <パス>"` のパターンで `http.NewServeMux` に足す。op には `r.Context()` を渡す。
+- **入力**: op の引数の model を、フィールドのデコレータで読む。初めの値は、既定値を持つ model なら基底の `New<Model>()`、そうでなければ零値。
+  - `@http.header(name)`: 省略可能な、string を元にした scalar。ヘッダがあって空でなければ、その値をそのまま入れる（なければ `nil`）。
+  - `@http.query`: クエリにその名前があれば、フィールドの型で読む（`int` は 10 進の 64 ビット）。なければ初めの値（既定値）のまま。
+  - `@http.body`: そのフィールドが一つだけなら、本文の JSON がそのフィールドの値。二つ以上なら、本文はフィールド名をキーにした JSON のオブジェクト（このサンプルでは使っていない）。
+- **制約の検査**（単位のオプション `validate = true` のとき。P15、P16）: 入力を読んだ後、op を呼ぶ前に、入力の model の `Validate`（`go-valid` の出力）を呼ぶ。入力の model が `Validate` を持たなければ（`go-valid` の規則で決まる）、呼ばない。
+- **op を呼ぶ前の失敗**は 400 で、`http` の語彙の例外 `http.BadRequest` として返す。本文は例外の形（下の「エラー」）で、運ぶ値は `{"message": string, "violations": [{"path": string, "constraint": string}]}`。op は呼ばない。
+  - **読めない要求**（本文が JSON として読めない・型が違う、クエリが数として読めない）: `message` は `<場所>: <理由>` の決まった文言（`body: invalid JSON`、`query page: invalid int`）、`violations` は空の配列。
+  - **制約に合わない入力**: `message` は `invalid input`、`violations` は違反の一覧。`path` は**通信の上の場所**: `Validate` の `Path` の先頭（入力の model のフィールド名）を、そのフィールドを読む場所（`body`、`query.<名前>`、`header.<名前>`）に置き換えたもの（`body.email`、`body[1].quantity`）。`constraint` は `valid` の語彙のデコレータの名前。
+- **成功**: 200 で、結果の JSON。結果が配列で `nil` なら `[]`。戻り値のない op は 204 で本文なし。
+- **エラー**: `@http.status(n)` を持つ例外は、ステータス n で `{"error":"<例外の FQN>"}`、値を運ぶ例外は `"value"` にその JSON を足す。ステータスを持たない例外と、それ以外のエラー（`*runtime.MissingError`、`ctx` のエラーを含む）は 500 で `{"error":"internal"}`（中身を出さない）。見分ける例外は、`@http.get` / `@http.post` の付いた op が投げうる例外（`Signature.exceptions`）のうち `@http.status` を持つもので、値の型で見分ける（基底の `throw` も、人が書く葉も、`pkgtype.Unauthorized{}` のように値で返す）。
+- **本文のある応答**は `Content-Type: application/json`。
+- 非公開の名前には `http` を前に付ける（`httpWriteJSON` など）。
+
+v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制約の検査（P15、P16）、op を呼ぶ前の失敗の本文（v1 は `{"error":"http.BadRequest","message":"…"}`。「分かったこと」N44）。
 
 ## 人が書いたもの
 
-- `both/app/app.go`: 葉の op の本体（`login`、`logout`、`getMe`、`getOrders`、`saveOrder`、`sendOrderNotice`）を `server.Tables` の上に書き、`Setup(db)` が、効果を持つ葉を `server.States.<状態>.<Op>` に、効果を持たない葉を `server.Leaves{…}` に入れて、`server.NewHandler(server.New(leaves))` を返す。時計、トークンと注文の識別子の作り方、通知の届け方は `App` のフィールドで、テストが差し替える。
-- `httponly/app/app.go`: 同じ葉を、メモリの上の状態（`App` のフィールド）で書いたもの。
-- `handlertest`: HTTP から見た振る舞い。応答の本文を文字列のまま比べるので、そこに書いた JSON が、クライアントが合わせる形になる。確かめること: パスワード違いは 401 `server.InvalidCredentials`、制約に合わない入力は 400 `server.InvalidInput` と違反の一覧、ログインでトークン、`GET /me`（トークンあり・なし・期限切れ）、`POST /orders` で注文と通知が一行ずつ、通知を失敗させると 500 で**注文は残る**（仕様: `NotificationFailed` のとき `createOrder` は起きたまま）、`GET /orders?page=…`、読めない `page` は 400 `http.BadRequest`、ログアウトの後の `GET /me` は 401。
-- `dbonly/app/main_test.go`: 表の往復（キーあり・キーなし、`Time` と JSON の列、`REFERENCES`）と、`SetupDB` の後の `States.<状態>.IsEmpty`。
+- **`app/leaves.go`**: `server` の葉の op 六つの本体。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どの関数も `ctx` を取らない**: `server.Leaves` のフィールドの型（`gen/server/ops.go:35,42,49,89,105,120`）がそう決めていて、`ctx` を取る関数は入れられない（コンパイルのときの事実。`app/server_test.go:19-32` が、関数の型の代入で確かめる）。
+- **`app/mailer.go`**: `mailer.send` の実装。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。
+- `app` パッケージは保存先を知らない: import するのは `gen/server` と `gen/type` だけ（`app/leaves_test.go` の `TestNoStorageImport`）。
+- **`app/memstore/memstore.go`**: `store` の九つの op を、メモリの上の状態で書いたもの。`Setup()` が `gen/storemem` の `States` に入れる。どの op も、はじめに `ctx.Err()` を見る。
+- **二つの組み立て**: `app/onsqlite/compose.go`（`gen/store`。準備は `go-sqlite` の `store.SetupDB(db)`）と `app/onmem/compose.go`（`gen/storemem`。準備は `memstore.Setup()`）。どちらも、`store.New()` のメソッドを `server.Deps.Store` の口にそのまま入れ、`server.New(leaves, deps)` を `server.NewHandler` に渡す。**二つが使う `gen/server` と `app` の葉は同じ一つのもの**で、違うのは `store` の import とその準備だけ。
+- **`app/handlertest`**: HTTP から見た振る舞い。二つの組み立て（`app/onsqlite/compose_test.go`、`app/onmem/compose_test.go` の `TestHandler`）が同じものを走らせる。応答の本文を文字列のまま比べるので、そこに書いた JSON が、クライアントが合わせる形になる。確かめること: パスワード違いとユーザーなしは 401 `type.InvalidCredentials`、制約に合わない入力は 400 `http.BadRequest` と違反の一覧、ログインでトークン、`GET /me`（トークンあり・なし・知らないトークン）、`POST /orders` で注文と通知が一つずつ、`mailer.send` を失敗させると 500 で**注文は残る**、`GET /orders?page=…`、読めない `page` は 400、ログアウトの後の `GET /me` は 401、中断された要求は 500 で状態が変わらない。
+- **`app/storetest`**: `store` の op の振る舞い。二つの実装（`app/onsqlite/store_test.go`、`app/onmem/compose_test.go` の `TestStore`）が同じものを走らせる。`server` は組み立てない。中断された `ctx` で呼ばれた op が `context.Canceled` を返し、状態を変えないことも確かめる。
+- **`app/onsqlite/store_test.go`**: `go-sqlite` だけの事実。`SetupDB` が `States` の九つの口をすべて埋める、埋める前は `*runtime.MissingError`、`Time` と配列の列の形、`REFERENCES`。
+- **`app/server_test.go`**: `server` だけ（`store` のどの出力も使わず、`Deps` の口をテストが埋める）。要求の `context` が `Deps` の口にそのまま届く、`go-http` が読めない要求と制約に合わない入力では op を呼ばない、埋めていない口は `*runtime.MissingError` で 500。
+- **`app/both_test.go`**: 一つのプロセスで、同じ `server` を二つの保存先の上に組み立てられ、二つが混ざらない。`gen/store` と `gen/storemem` の基底のファイルが、バイト単位で同じ。
 
 ## 分かったこと
 
-理想のコードを書く途中で、今の設計が与えてくれなかったもの。それぞれ「何が要ったか → サンプルではどうしたか」。パスはこのディレクトリから。`types.go` などは、断らなければ `both/server/` のもの。
+### v1 の「分かったこと」の、その後
 
-### トランスパイラのファイルが参照するもの
+v1 の 63 項目（`git show ac57788:tests/samples/shop-server/README.md` の「分かったこと」。番号はそのまま）が、P1〜P30 を当てはめてどうなったか。「解決」は、その項目が言っていた不足がこの形ではなくなったもの。「残る」は、形が変わっても同じ不足があるもの。「当たらない」は、v1 の組み方にだけあった事情。N で始まる番号は「v2 を書いて分かったこと」の項目。
 
-1. **参照は共有する形だけで、互いは参照しない**。`http.go` が使うのは `Ops` とそのメソッド（`http.go:20,30`）、入力の model とそのフィールド（`:25-26`、`:41-44`、`:80`、`:101`）、`NewGetOrdersInput`（`:69`）、`Order`（`:88`）、例外の型と `Value`（`:154-164`）。`db.go` が使うのは `States.<状態>.IsEmpty`（`db.go:301-304`）、要素の model とそのフィールド、scalar の型、`runtime.MissingError`（`:328`）。どれも自分が選んだ宣言から決まる名前なので、`http.go` は `both` と `httponly` で、`db.go` は `both` と `dbonly` でバイト単位で同じになった。
-2. **Go の名前は `View` にない**。`GetOrdersInput`、`in.Page`、`UsersState` のような名前は、`docs/emit-go.md`「名前」の規則をトランスパイラが同じに当てはめて作る前提（Go なら `plugin/golang`）。衝突したときの末尾の `_` と GOEMIT-2 も同じに再現しなければ、共有する形とずれる。→ 規則の通りに手で書いた。
-3. **既定値**。`@http.query page: int = 1` の `1` を `http.go` に書かず、共有する形の `NewGetOrdersInput()` を呼んだ（`http.go:69`）。「既定値を持つ model には `New<Model>` がある」（`docs/emit-go.md`「model」）を知っている前提。
-4. **`New` の引数の並びは、選択を合わせた後に決まる**（`ops.go:113` は `New(leaves Leaves)`。`Deps` / `Wrappers` / `Classifiers` は要るときだけ現れ、`Leaves` も空なら消える）。トランスパイラは `New` を呼ぶコード（`NewServer()` のような近道）を出せない。→ `NewHandler(ops Ops)` で `Ops` を受け、`New` は人が呼ぶ（`both/app/app.go:50`）。
-5. **命令の口があるかどうかは、ほかのトランスパイラの選択で決まる**。`States.Sessions.Login` は、`go-http` が `login` を選んだから `both` にあり（`states.go:16`）、`dbonly` にはない（`dbonly/server/states.go:11-15`）。保存先のトランスパイラが「単純な命令まで出す」（`docs/emit-go.md`「state」）としても、その口が出力にあるかを、自分の `View` と自分の `select` からは知れない。→ 規則の通り、`go-sqlite` は命令を入れない。
-6. **型がこのパッケージにあるか**。別の名前空間の型を import するか複製するかは、ほかの単位の選択で決まる（`docs/emit-go.md`「配置」）。このサンプルは名前空間が一つなので当たらなかったが、トランスパイラは型の修飾（`server.Token` か `Token` か）を `View` だけからは決められない。
-7. **ヘッダの版**。共有する形は `hozoc 0.0.0-dev`（`types.go:1`）。トランスパイラのファイルは `hozoc go-http 0.0.0-dev`（`http.go:1`）としたが、hozoc の版なのかトランスパイラの版なのかは決まっていない。今ある `go-cli` は `hozoc plugin go-cli` で、版を書かない（`internal/gen/hozoc/cli/cli.go:1`）。版を上げるたびに、期待する出力のすべてのファイルが変わる。
+| # | v1 の項目 | その後 | 理由 |
+|---|---|---|---|
+| 1 | トランスパイラのファイルが参照するのは共有する形だけ | 解決 | P9、P17: 参照してよいのは、基底の形と、依存を宣言したプラグインの出力。ただし N31 |
+| 2 | Go の名前は `View` にない | 残る | 相乗りのプラグインは、基底の名前の規則を同じに当てはめる前提のまま |
+| 3 | 既定値は基底の `New<Model>()` を呼ぶ | 解決 | P9: 基底の形を前提にしてよい、と決まった |
+| 4 | `New` の引数の並びが、選択を合わせた後に決まる | 解決 | P9、P11: 仕様と設定だけで決まる |
+| 5 | 命令の口があるかが、ほかのトランスパイラの選択で決まる | 解決 | P11、P19: op はすべて出る。`go-sqlite` が口を埋められる |
+| 6 | 別の名前空間の型を import するか複製するかが、`View` から決まらない | 解決 | P7、P8 |
+| 7 | ヘッダの版が、hozoc のものかトランスパイラのものか | 残る | |
+| 8 | `httponly` に `users` の単位がない | 解決 | P11、P19: 同じ名前空間の二つの単位（`gen/store`、`gen/storemem`）の基底のファイルは、バイト単位で同じ |
+| 9 | 保存先だけの単位とハンドラだけの単位を、別の `out` に出して組めない | 解決 | P5〜P7。ただし N16 |
+| 10 | 誰も呼ばない `IsEmpty` が出る | 解決 | このサンプルで決めた規則（N22）。P の決定ではない |
+| 11 | 記録を代役の emit から作れない | 当たらない | 代役を使う `shared` が保留 |
+| 12 | キャンセルと期限が伝わらない | 解決 | P29 |
+| 13 | 認証の要る葉が、それぞれ呼んだ人を引く | 解決 | P1〜P3、P13、P14: 配線 `authenticate` が一度引き、セッションを引数で渡す |
+| 14 | トランザクションの口がない | 残る | N37 |
+| 15 | 葉をまたぐ原子性は書けない | 残る | N37 |
+| 16 | パッケージの変数（`States`）を守るものがない | 残る | `store` の `States` |
+| 17 | テストを並列にできない | 残る | `app/handlertest/handlertest.go:98` |
+| 18 | 一つのプロセスに二つ持てない | 残る | 同じ出力の上には。N18 |
+| 19 | 実体の持ち方が半分ずつ（`New` の引数と `States`） | 残る | 規則は同じ。この仕様では名前空間の境と重なった（N17） |
+| 20 | 入れ忘れが起動のときに分からない | 残る | `app/server_test.go` の `TestMissing`。`app/onsqlite/store_test.go:33` はリフレクションで数えた |
+| 21 | 500 の原因がどこにも出ない | 残る | |
+| 22 | ユーザーで絞ってページで切る問い合わせを引けない | 残る | 絞る方は解決（P19 と `go-sqlite` の規則）。ページと順序は N37 |
+| 23 | 期限切れのセッションを消せない | 残る | 条件を付けた削除がない。期限そのものも N3 |
+| 24 | 一意の違反を見分けられない | 残る | N37 |
+| 25 | 人が書く葉が、保存先のトランスパイラの API に結びつく | 解決 | P1、P5、P19 |
+| 26 | ユーザーを足す op が仕様にない | 解決 | 仕様に `store.addUser` を足した（「下書きから変えたこと」3）。P の決定ではない |
+| 27 | 成功の応答の形 | 残る | このサンプルで決めたまま |
+| 28 | 空の配列（入れ子の `nil` は `null`） | 残る | `app/leaves.go:79` で人が空の配列を作る |
+| 29 | 例外の応答の形 | 残る | このサンプルで決めたまま。N48 |
+| 30 | `http.BadRequest` が語彙にない | 残る | N44 |
+| 31 | 500 の `internal` は FQN ではない | 残る | |
+| 32 | 404 と 405 が JSON でない | 残る | |
+| 33 | `Time` のゾーンを人がそろえる | 残る | `app/leaves.go:57,80` |
+| 34 | `int` が JS の `number` に収まらない | 残る | |
+| 35 | 省略可能の JSON の上の形 | 残る | |
+| 36 | ユニオンの判別の書き方 | 残る | |
+| 37 | 本文の束ね方 | 残る | |
+| 38 | ヘッダの値をそのまま scalar にする | 残る | |
+| 39 | 違反の位置に、通信に現れない名前が入る | 解決 | P15 と、このサンプルで決めた規則（N46） |
+| 40 | 入力の model の `json` タグは通信の形ではない | 残る | |
+| 41 | 読み方の甘さ（知らないキー、ないキー、本文の大きさ） | 残る | |
+| 42 | `Validate` を呼ぶのは誰か | 解決 | P15、P16 |
+| 43 | 例外を値の型で見分ける（ポインタで返せば 500） | 残る | 基底の `throw` は値で返す（N25）。人が書く葉は、どちらでも書ける |
+| 44 | 例外をステータスに写す表が、名前空間に一つ | 残る | |
+| 45 | ステータスを持たない例外が、不具合と区別できない | 残る | `app/handlertest/handlertest.go:166-176` |
+| 46 | 公開の名前の衝突 | 残る | プラグインが増えた分、増えた（N49） |
+| 47 | 非公開の名前の前置きが、このサンプルだけの約束 | 残る | `valid` が増えた |
+| 48 | 識別子の衝突を見つける者がいない | 残る | |
+| 49 | ファイル名の約束がない | 残る | `validate.go` は基底のものから `go-valid` のものになった |
+| 50 | 利用者の名前から局所の名前を作らない | 残る | N43 |
+| 51 | SQL の表の名前が状態の名前だけ | 残る | |
+| 52 | v1 の仕様で変えたこと | 当たらない | v1 の仕様についての記録。v2 の分は「下書きから変えたこと」 |
+| 53 | 配列の要素数を書けない | 解決 | P22: 配列の値を `by list` で分けられる。この仕様では使っていない |
+| 54 | 成功のステータスを書けない | 残る | |
+| 55 | 応答のヘッダを書けない | 残る | |
+| 56 | `@db.ref` が指す列 | 残る | このサンプルで決めたまま |
+| 57 | 外部キーは既定では効かない | 残る | `app/onsqlite/compose_test.go:15-16` |
+| 58 | メモリの上の SQLite は接続ごとに別 | 残る | `app/onsqlite/compose_test.go:20-21` |
+| 59 | 表の作り直し（移行）の形がない | 残る | |
+| 60 | `db.Exec(Schema)` が複数の文を一度に実行する | 残る | `gen/store/db.go:42` |
+| 61 | 表は `valid` の制約を確かめない | 残る | N35 |
+| 62 | `@db` は、どの保存先かを言わない | 残る | |
+| 63 | `go-sqlite` の細部で決めたもの | 残る | 表の型（`Update`、`Delete`）はなくなった。残りはそのまま |
 
-### 三つの組の共有する形
+解決 15、残る 46、当たらない 2。
 
-8. **`httponly` に `users` の単位がない**（`both/server/states.go:5-9,39` にあり、`httponly/server/states.go` にない）。`users` はどの op の効果の宛先でもなく、状態を選ぶ `go-sqlite` がいないため。筋は通っている。→ `httponly` では、ユーザーを人が自分で持つ（`httponly/app/app.go:37`）。
-9. **`dbonly` には op の本体を入れる場所がない**。`ops.go` がなく、状態の単位は `IsEmpty` だけ（`dbonly/server/states.go`）。選んだのが状態だけなので筋は通っているが、「保存先だけの単位」と「ハンドラだけの単位」を別の `out` に出して後で組むことはできない: 同じ名前空間の二つの単位は型を共有しない（`dbonly/server.User` と `httponly/server.User` は別の Go の型。`docs/emit-go.md`「配置」）。二つのトランスパイラが組めるのは、同じ単位に並べたときだけ。→ `dbonly/app` は、表を直に使う道具にした。
-10. **読まれない問い合わせ**。`httponly` の状態の単位にも `IsEmpty` が出るが、この仕様に `match` はなく、生成したコードは誰も呼ばない。→ 人が埋めた（`httponly/app/app.go:49-53`）が、埋めなくても動く。
-11. **記録はトランスパイラのファイルも含む**。`.hozoc-outputs.json` は代役の emit からは作れないので、代役の記録に `sample.json` の `files` を足して比べている（`tests/samples_test.go` の `testShared`）。
+### v2 を書いて分かったこと
 
-### 要求ごとの関心
+P1〜P30 が決めていなかったので書きながら決めたこと、二つの決定が引っ張り合ったところ、理想のコードに決定が与えてくれなかったもの、v1 より悪くなったところ。それぞれ「何が起きたか → サンプルではどうしたか」。パスはこのディレクトリから。
 
-12. **キャンセルと期限**。ハンドラは `r.Context()` を op に渡せない（`http.go:30` など。op は `context` を取らない）。表も `db.Exec` / `db.Query` で、`ExecContext` を使えない（`db.go:339,349,369`）。クライアントが切れても問い合わせは止まらない。→ 何もしていない。
-13. **呼んだのは誰か**。認証の要る葉が、それぞれ トークン → セッション → ユーザー を引く（`both/app/app.go:151` の `caller` を `getMe`、`getOrders`、`saveOrder` が呼ぶ）。ハンドラで一度確かめて op に渡す口がない（op の引数は仕様の通り。包む関数は後のサンプル）。配線 `placeOrder` の二つ目の葉 `sendOrderNotice` はトークンを受けず、`order.userId` を信じる。
-14. **トランザクション**。このサンプルの葉に、複数の文を原子的に行う必要のあるものはなかった（`login` は読んで一行足す、`saveOrder` は読んで一行足す。`lines` は JSON の列なので、注文は一行）。要るようになっても口がない: 表は `*sql.DB` に結ばれ（`db.go:39,295-300`）、`*sql.Tx` に結んだ表を得る方法がなく、表のフィールドは非公開なので、葉は `*sql.DB` も取り出せない。人が `Setup` の `db` を別に持ち、表を通さずに SQL を書くことになる。
-15. **葉をまたぐ原子性は書けない**。葉から葉へ渡るのは仕様の引数だけ（`wiring.go:10-19`）。`placeOrder` は仕様が「通知に失敗しても注文は残る」なので今の形と合っているが、「後の葉が失敗したら前の葉の効果を取り消す」仕様は、生成した配線では実装できない。
-16. **パッケージの変数の並行性**。`States` と `Tables` は素の変数で、`SetupDB` と `Setup` が書き（`db.go:295-304`、`both/app/app.go:45-48`）、要求ごとに読む。待ち受ける前に入れ終える前提で、後から入れ替えればデータ競合。守るものはない。
-17. **テストを並列にできない**。サーバーを作り直すたびに変数を上書きするので、サブテストに `t.Parallel()` を付けられない（`handlertest/handlertest.go:46-47`）。
-18. **一つのプロセスに二つ持てない**。同じ名前空間のサーバーを二つ（利用者ごとの DB、テスト用と本物）は持てず、最後に `Setup` した一組だけが効く（`both/app/app.go:36-39`）。
-19. **実体の持ち方が半分ずつ**。効果を持たない葉は `New(leaves)` の値ごと、効果を持つ葉は変数 `States`。`both/app/app_test.go:84` の `server.New(server.Leaves{})` は別の `Ops` だが、`Login` と `PlaceOrder` は `Setup` が入れた実装で動く。
-20. **入れ忘れが起動のときに分からない**。`States.Orders.SaveOrder` を入れ忘れてもコンパイルは通り、最初の要求が `*runtime.MissingError` → 500 `internal` になる（`httponly/app/app_test.go` の `TestMissingImplementation`）。どの op がどこに入るか（効果があれば宛先の状態の単位、なければ `Leaves`）も、人が仕様から読み取る（`both/app/app.go:44-53`）。埋まっていない口を調べる関数が、共有する形にない。
-21. **500 の原因がどこにも出ない**。`NewHandler(ops)` はログの口を持たない（`http.go:165-166`）。→ 何もしていない。
+#### 仕様
 
-### 引けなかったもの
+- **N1 `Found => toPublicUser(user)` は、先に束縛できない**。`user` が `type.User` になるのはアームの中だけ（P3）なので、写す呼び出しはアームに書くしかない（`server.hozo:103`）。レコードのフィールドに渡す方（`issueSession`）は、先に束縛した（`server.hozo:59-60`）。アームに書けるのが呼び出し一つまでなら、「絞り込んだ値を写してから、もう一つ呼ぶ」は、そのための配線の op を別に作ることになる。
+- **N2 写す op を人が書く**（P27）と、**v1 より悪くなる**。v1 は基底が `UserToPublicUser` を出していた。v2 は三つのフィールドを人が写す（`app/leaves.go:62-64`）。`type.User` にフィールドを足すと、`type.PublicUser` は継承で同じフィールドを得るが、人が書いた `toPublicUser` は写さないままコンパイルが通り、零値が外へ出る。気づく仕組みはない。
+- **N3 セッションの期限を、誰も確かめない**。下書きの配線 `authenticate` は「セッションがあるか」だけで分ける（`server.hozo:79-83`、`store.hozo:48-51`）。`newSession` は `expiresAt` を入れる（`app/leaves.go:57`）が、読む者がいない。v1 は葉が時計と比べていた（期限切れは 401）。仕様に書くには、時計に依る述語を持つ分類か、比較を持つ読む op が要る。前者は「`as` で絞り込む場合に、人が書く述語を足せるか」が決まっていない（P3）。後者は `go-sqlite` の規則で表せない（N37）。→ 仕様は下書きのまま。**期限切れのトークンで入れる**。
+- **N4 三つの分類が同じ意味**。`Registration`、`Account`、`Login` は、どれも「`T?` が `T` である場合と、それ以外」（`store.hozo:36-51`）。P20 の `by nullable` と変わらず、違うのは場合の名前だけ（P21 の指針どおり）。`match user by store.Registration` の `user` が `findUser` の結果でなければならないのか（P2 の「その op が返した値の分類」）は決まっていない。基底の出力は、どちらでも同じ（N23）。
+- **N5 `findSession(token: type.Token?)` は下書きのまま**（`store.hozo:28`）。受ける側を `T?` にしたので、`go-sqlite` に「省略可能な引数」の規則が要った（N38）。P20 で `in.token` を先に絞り込めば、`findSession(token: type.Token)` にでき、その規則は要らない。
+- **N6 継承した model は、語彙のデコレータも受け継ぐ**。`type.PublicUser` のフィールドは `@db.key`、`@db.unique`、`@valid.length` を持ったまま（`type.hozo:41-43`）。外すことはできない（P25 は足すことだけ）。`go-valid` は `PublicUser` にも同じ検査を出す（`gen/type/validate.go:50-61`）。
+- **N7 `logout` は、トークンがなければ 401**。下書きの配線が `authenticate` を通るため（`server.hozo:88-93`）。v1 は 204 だった。決定の帰結ではなく、下書きの仕様の変更（`app/handlertest/handlertest.go:211-213`）。
 
-22. **ユーザーで絞ってページで切る**。表にあるのは `List()` だけなので、すべての注文を読んで Go で絞った（`both/app/app.go:104-118`）。要るのは、`@db.ref` の列での絞り込みと、件数・位置・順序の指定。
-23. **期限切れのセッションを消す**。条件を付けた削除がない。→ 消していない（期限は読むたびに比べる。`both/app/app.go:159`）。
-24. **一意の違反を見分ける**。`Insert` が返すのはドライバのエラーで、`db.go` はドライバを import しないので型を付けられない（`dbonly/app/main_test.go:87-93` は「エラーである」ことしか確かめていない）。
-25. **状態の単位に読む口がない**（あるのは `IsEmpty` だけ）。`both` の葉は `go-sqlite` の `Tables` を直に呼ぶので（`both/app/app.go:63` ほか）、人が書くコードは保存先のトランスパイラの API に結びつく。`httponly` では同じ葉を書き直した（`httponly/app/app.go:90-185`）。二つのトランスパイラは互いを知らないが、人のコードは両方を知っている。
-26. **ユーザーを足す op が仕様にない**。→ main とテストが表に直に足す（`both/app/main.go:46-56`）。
+#### 純粋さと `ctx`（P29、P30）
 
-### JSON の形（クライアントが合わせるもの）
+- **N8 この仕様では「純粋な op」と「`server` で人が書く op」が同じ集合になった**。六つの葉がすべて純粋で、配線はどれも `store` を呼ぶので純粋でない（「基底 `go` が従う規則」の表）。関数の形で「保存先に触れない」が分かる、という狙いどおり。
+- **N9 純粋と判定された op が、時計と乱数を使う**。`newSession` と `newOrder` は、仕様の上ではデコレータも `reads` も効果もないので純粋で、関数は `ctx` を取らない（`gen/server/ops.go:42,105`）。本体は、今の時刻と新しい識別子を外から得る（`app/leaves.go:55,57,77,80`）。P30 の「関数の形を見れば、その op が状態や外部に触れるかが分かる」は、ここでは成り立たない。仕様に書く方法は、時計と識別子を、単位を置かない名前空間の op にして配線から呼ぶ形（`mailer` と同じ）しかなく、書かなくても検査は通る。
+- **N10 純粋な op も `error` を返す**。`toPublicUser` の理想の形は `func(pkgtype.User) pkgtype.PublicUser` だが、口が埋まっていないことを `*runtime.MissingError` で返す（`gen/server/ops.go:332-337`）ために、`error` が要る。配線は、決して失敗しない写しの後でも `err` を確かめる（`gen/server/wiring.go:52-55`）。P29、P30 は `ctx` だけを決めていて、`error` には触れていない。
+- **N11 外部の入出力を「純粋でない」と書く方法が、置き場しかない**。`mailer.send` は、宣言だけを見ればデコレータも `reads` も効果もない葉で、P30 の定義では純粋（`mailer.hozo:7-8`）。`server` から見た口が `ctx` を取るのは、「別の名前空間の op の口は必ず `ctx` を取る」から（`gen/server/ops.go:236`）。`mailer` に Go の単位を置けば、基底は `mailer` のパッケージに `ctx` を取らない `Send(notice)` を出し、`server.MailerSendFunc` にそのまま入らなくなる。下書きのように `server` の葉 `deliver` と書けば、純粋と判定されて `ctx` がなくなる。
+- **N12 宣言を一つ変えると、関数の形が変わる**。純粋な葉に、デコレータ（どのトランスパイラも読まない印でも）、`reads`、効果のどれかを足すと、その op の関数の型（`<Op>Func`）、`Ops` のメソッド、`Leaves` のフィールドに `ctx` が増える。配線なら、呼び出し先の一つが純粋でなくなるだけで同じことが起きる（伝わる）。人が書いた本体と、`Ops` を呼ぶ人のコードは、コンパイルが通らなくなる（気づける）。`Deps` の口は、いつも `ctx` を取るので変わらない。
+- **N13 純粋さの判定を使うのは、基底だけだった**。`go-http` が呼ぶ op は `@http.*` を持ち、`go-sqlite` が中身を出す op は `reads` か効果を持つので、どれも必ず `ctx` を取る。相乗りのプラグインは、判定の結果を知らなくても正しい呼び出しを書ける（`gen/server/http.go:39,54,68,91,117`、`gen/store/db.go:62-133`）。
+- **N14 `ctx` を受けない入口がある**。`SetupDB(db *sql.DB)` は `ctx` を取らず、表を作る文は中断できない（`gen/store/db.go:41-42`）。P29 が決めているのは op の関数だけ。
+- **N15 基底が使う名前が増えた**。引数名 `ctx`、パッケージ名 `context` と `pkgtype`。仕様の op の引数が `ctx` という名前なら、末尾に `_` を付ける規則（`docs/emit-go.md`「名前」）に足すことになる。
 
-`handlertest/handlertest.go` が文字列で固定している。どれも、このサンプルで決めたもの。
+#### 基底の形
 
-27. **成功**: 結果の JSON（共有する形の `json` タグ）。戻り値のない op は 204 で本文なし（`http.go:49`）。
-28. **空の配列**: 結果の配列が `nil` なら `[]` にした（`http.go:87-89`）。入れ子の配列は共有する形の型のままなので、`nil` なら `null` になる。→ 人が空の配列を作って避けた（`both/app/app.go:132,178`）。
-29. **例外**: `{"error":"<FQN>"}`。値を運ぶなら `"value"`、運ばなければキーごとなし（`http.go:116-123,160-164`）。
-30. **op を呼ぶ前の失敗**: `{"error":"http.BadRequest","message":"body: invalid JSON"}`（`http.go:27,77`）。`http.BadRequest` は語彙（`vocab/http.hozo`）にない名前で、op の `throws` にも現れない。`message` は決まった文言にした（`encoding/json` のエラーの文言は Go の版で変わる）。
-31. **500**: `{"error":"internal"}`（`http.go:166`）。FQN ではない。語彙の `http.ServerError` との対応は決めていない。
-32. **404 と 405** は `ServeMux` の `text/plain` のまま。JSON にしていない。
-33. **`Time`**: `time.Time` の JSON（RFC 3339。小数部は末尾の 0 を落とし、ゾーンはそのまま）。人が UTC にそろえなければ、同じ注文が `POST` の応答では `+09:00`、DB から読んだ `GET` の応答では `Z` になる。→ 葉で `.UTC()`（`both/app/app.go:73,133`）。
-34. **`int`**: `int64` を JSON の数にする。2^53 を超えると、JS の `number` で桁が落ちる。
-35. **省略可能**: 型は `*T` と `omitempty`（`types.go:156`）。このサンプルで省略可能なのはヘッダで読むフィールドだけで、JSON の上の形（キーなしと `null`）は決めていない。
-36. **ユニオン**: このサンプルにない。判別の書き方は決めていない。
-37. **本文の束ね方**: `@http.body` が一つなら、本文はそのフィールドの値（`http.go:26,101`）。フィールド名 `body` / `lines` は通信に現れない。
-38. **ヘッダ**: 値をそのまま scalar にする（`http.go:41-44`）。`Authorization: <トークン>` で、`Bearer ` を前に付ける形は仕様で表せない。
-39. **違反の位置**: `body.email`（`handlertest/handlertest.go:59`）。op の入力の model からのパスなので、通信に現れない `body` が入る。
-40. **入力の model の `json` タグは通信の形ではない**。`LoginInput.Body` は `json:"body"`（`types.go:145`）、`AuthInput.Token` は `json:"token,omitempty"`（`:156`）。入力の model をそのまま JSON にすれば、違う形になる。→ `http.go` はフィールドごとに読む。
-41. **読み方の甘さ**: 知らないキーは無視し、キーがなければ零値（「必須」は読むときに確かめない。`valid` の制約に当たれば、後で `InvalidInput`）。型違いと、値の後ろの余分は 400。本文の大きさの上限と `Content-Type` の検査はない。
-42. **`Validate` を呼ぶのは誰か**。規則では `go-http` は呼ばない。→ 葉が呼び、`*runtime.ValidationError` を仕様の例外に手で写す（`both/app/app.go:60-62,126-128,173-183`）。`runtime.Violation{Path, Constraint}` と仕様の `Violation{field, constraint}` は名前が違う。呼び忘れても誰も気づかず、`getOrders` は `throws` に `InvalidInput` がないので、不正な入力を報告できない。
-43. **例外を値の型で見分ける**（`http.go:159-163`）。葉が `&server.Unauthorized{}` とポインタで返せば 500 になる。共有する形は、どちらで返すかを決めていない（どちらも `error` を満たす）。
-44. **写す表は名前空間に一つ**（`http.go:152-168`）。op の `throws` にない例外を葉が返しても、その例外のステータスで出る（`logout` が `Unauthorized` を返せば 401）。葉の実装が `throws` を守っているかは、誰も確かめない。
-45. **ステータスを持たない例外**。`NotificationFailed` は 500 `internal` になり、クライアントは不具合と区別できず、作られた注文の id も受け取れない（`handlertest/handlertest.go:97-107`）。仕様の上では「注文は残る」と分かっているのに、通信では伝わらない。
+- **N16 型を共有できるのは、共有の名前空間に置いた型だけ**。`gen/store` と `gen/storemem` の op が同じ `server.StoreOps` に入るのは、引数と戻り値の型がすべて `gen/type` のものだから（`app/both_test.go:25-28`）。`store` が自分の model を持てば、二つの出力は別々の Go の型を持ち、`server` が import するのは一方だけなので、もう一方の op は入らない。「同じ名前空間を二つの単位で出すなら、境を越える型は共有の名前空間に置く」は、P5、P6 では指針だが、この組み方では守らなければ組めない。
+- **N17 何がパッケージの変数になるかは、名前空間の境で決まった**。`server` は状態を持たないので、変数はなく、すべてが `New(leaves, deps)` の値（`gen/server/ops.go:308`）。`store` は九つの op がすべて状態の単位にあり、`New()` は引数を取らない（`gen/store/ops.go:124`、`gen/store/states.go:49`）。
+- **N18 一つのプロセスに二つの `store`**。二つの出力（`gen/store`、`gen/storemem`）は別のパッケージなので、それぞれの `States` を持ち、同じ `server` を両方の上に同時に組み立てられる（`app/both_test.go:35-67`）。同じ出力の上に二つ（SQLite の DB を二つ、メモリの `Store` を二つ）は持てない: `SetupDB` と `memstore.Setup` が `States` を上書きする（`gen/store/db.go:46-54`、`app/memstore/memstore.go:34-42`）。
+- **N19 二つの出力は、どちらも `package store`**。パッケージ名は名前空間から決まり、`out` によらない。両方を import するファイルは、一方に別の名前を付ける（`app/both_test.go:19`）。片方だけでも、import パスの最後（`storemem`）と名前（`store`）が違う（`app/onmem/compose.go:10`）。
+- **N20 パッケージ名 `pkgtype`**。共有の型の名前空間を、下書きのとおり `type` と名付けると、Go では `pkgtype.User`、ディレクトリは `gen/type`、import には名前を書くことになる（`gen/server/types.go:5`）。利用者がパッケージ名を選ぶ方法はない。通信の上の例外の名前も `type.Unauthorized` になる（N48）。名前空間を `types` や `model` と名付ければ起きない。
+- **N21 状態の単位に置く op**。「`reads` が一つの葉は、その状態の単位の問い合わせ」は、命令の規則（`docs/emit-go.md`「state」）と対に決まった（`gen/store/states.go:6-37`）。決定が言っていない二つは、ここで決めた: 効果と `reads` の両方を持つ葉は効果の宛先の単位、複数の状態を読む葉は `StateSet.Shared`（どの状態のものでもなく、埋めるのは状態の持ち主なので、`Leaves` ではなく `States` の中）。`Shared` という名前は、同じ名前の状態と当たる。
+- **N22 状態を読む口（`IsEmpty`、`Get`）は、配線が読むときだけ出す**、と決めた（P4、P22 の「状態を名前で読む」を、基底がいつ口にするかは決まっていない）。生成したコードが呼ぶ口だけを出す、という規則。帰結: **効果の結果を、読む op のない状態では確かめられない**。`notifications` には `addNotification` しかないので、テストは `go-sqlite` の表を SQL で直に数え（`app/onsqlite/compose_test.go:38-45`）、メモリの方は人が読む口を足した（`app/memstore/memstore.go:46-51`）。`docs/decisions.md` の S6（状態の述語を、テストでの効果の結果の判定が呼ぶ）とは逆を向く。
+- **N23 分類について、基底は何も出さない**、と決めた（規則は「基底 `go` が従う規則」の「分類」）。`store.Registration` などの名前は、`gen/server/wiring.go:25,71,115` のコメントにだけ残る。決まっていないこと: 絞り込む場合と、人が述語を書く場合が混ざった分類の形、別の名前空間の分類の述語を `Classifiers` のどこに置くか（P6 は分類の置き場を自由にした）。
+- **N24 `match` は `nil` の検査になった**。`return match` はアームごとの `return`（`gen/server/wiring.go:25-31`）、絞り込んだ値は使う位置で `*user`（`:28`、`:74`、`:118`）。値を束縛する `match`（`const x = match …`）はこの仕様になく、形を決めていない。
+- **N25 `throw` は例外を値で返す**（`gen/server/wiring.go:31,77,121`）。v1 の「分かったこと」43（値かポインタか）は、生成したコードについては決まった。値を運ぶ例外の `throw` は、この仕様に出てこない（P13 の未定のまま）。
+- **N26 `Ops` に、業務の途中の op がすべて載る**（P11）。`Authenticate`、`IssueSession`、`Notify` と、六つの葉が、`login` などの入口と同じ `Ops` のメソッド（`gen/server/ops.go:134-216`）。`go-http` の `NewHandler(ops Ops)` も十四のメソッドを受け取り、五つだけ呼ぶ。入口とそうでない op を分ける書き方は仕様にない。
+- **N27 `Deps` に入るのは、`Ops` のメソッドだけ**。`server.StoreFindUserFunc` と `store.FindUserFunc` は、中身が同じでも名前の違う関数の型なので、`States` のフィールドは型を変換しなければ入らない（`app/both_test.go:72-79`）。メソッドの値は名前のない関数の型なので、そのまま入る。
+- **N28 組み立ては、口の数だけの行を人が書く**。`server.StoreOps` の八つのフィールドを一つずつ入れる行が、二つの組み立てに同じ形で二度ある（`app/onsqlite/compose.go:25-34`、`app/onmem/compose.go:23-32`）。`Deps` のフィールドがインターフェース（`server` が呼ぶ op のメソッドの並び）なら、`store.New()` をそのまま渡せる。型を共有する（P7）前は複製した型だったのでできなかったが、今はできる。「実装の単位は関数の型」（`docs/emit-go.md`「実装の単位」）を、別の名前空間の op についてどうするかは、決定が触れていない。
+- **N29 `runtime` の持ち主**。`go-valid` の出力と `go-http` の出力が使う `runtime.ValidationError` と、どの出力も使う `runtime.MissingError` は、このリポジトリの `runtime` パッケージにある。本体が特定の言語を知らない（P9）なら、`runtime` は基底 `go` のもので、`ValidationError` は `go-valid` のものになるはずだが、置き場は決まっていない。
 
-### 名前の衝突
+#### `go-valid`
 
-46. **公開の名前**。`go-http` は `NewHandler`、`go-sqlite` は `Schema`、`Tables`、`TableSet`、`SetupDB`、`<状態>Table` を足す。利用者の宣言と当たる例: model `Schema`、model `UsersTable`、既定値を持つ model `Handler`（共有する形の `NewHandler()` と当たる）。
-47. **非公開の名前**。`http` / `db` を前に付けた（`http.go:116-152`、`db.go:309-402`）。二つのトランスパイラが同じ補助の名前を使わないための、このサンプルだけの約束。
-48. **見つける者がいない**。GOEMIT-2 は共有する形の中だけ、CFG-5 はファイルのパスだけを見る。識別子の衝突は `go build` まで分からない（hozoc はトランスパイラのファイルの中身を読まない）。
-49. **ファイル名**。`http.go` / `db.go` は共有する形のファイル名（`docs/emit-go.md`「配置」の表）と当たらないが、表に名前が増えれば当たる（CFG-5）。トランスパイラが使ってよい名前の約束がない。
-50. **利用者の名前から局所の名前を作らない**。`x`、`key`、`v`、`e0` にした（`http.go:42,154`、`db.go:63,69`）。フィールド名や例外名から変数名を作れば、Go の予約語や import の名前（`errors`）と当たる。
-51. **SQL の名前**。表と列の名前はいつも引用する（`db.go:15-36`。`order` や `group` のような名前のため）。表の名前は状態の名前だけなので、同じ DB を使う二つの名前空間に同じ名前の状態があれば当たり、`IF NOT EXISTS` なので黙って同じ表を使う。
+- **N30 単位をまたぐ依存**。`server` の `Validate` は `gen/type` のメソッドを呼ぶ（`gen/server/validate.go:15-16,36,47`）ので、`type` の単位にも `go-valid` を並べなければコンパイルできない。P18 が言うのは「一つの単位の `transpilers` に依存をすべて書く」で、別の単位に何を並べるかは範囲の外。型の名前空間を出す Go の単位がない（別の言語、単位なし）ときは、メソッドでは書けず、使う側のパッケージに関数を出す形が要る。
+- **N31 `go-http` は、`go-valid` の規則を知っている**。入力の model が `Validate` を持つか（`LoginInput` と `PlaceOrderInput` は持ち、`AuthInput` と `GetOrdersInput` は持たない）を、`go-http` が `go-valid` と同じ規則で決める（`gen/server/http.go:35,113` で呼び、`:54,68,91` では呼ばない）。「依存を宣言する」（P17）だけでは足りず、依存先の出力の形を再現している。v1 の「分かったこと」2 と同じ構図。
+- **N32 依存がオプションで変わる**。`go-http` が `go-valid` に依存するのは `validate = true` のときだけ。P17 の依存は、オプション（P16）によらず宣言するのか、決まっていない。
+- **N33 メソッド名 `Validate` が、フィールドと当たる**。model に `validate` というフィールドがあれば、Go では同じ型にフィールドとメソッド `Validate` ができ、コンパイルできない。
+- **N34 誰も呼ばない `Validate`**。結果の型 `LoginOk` にも出る（`gen/server/validate.go:34-41`）。補助の関数 `validAppend` は、パッケージごとに同じものが出る（`gen/type/validate.go:88`、`gen/server/validate.go:56`）。
+- **N35 `store` は制約を確かめない**。`gen/store` の単位は `go-valid` を並べず、`go-sqlite` は足す前に確かめない。`store.addUser` に、名前が空のユーザーを渡せば入る。確かめるのは HTTP の境だけ（P15 の「いつ確かめるかは、境界を持つプラグインが決める」のとおり）。
 
-### 仕様で書けなかったこと、変えたこと
+#### `go-sqlite`
 
-52. **変えたこと**: 内容は変えていない。フィールドの型を補い（`@db.key id: UserId`）、説明のコメントと、名前空間の説明（`doc.go` が出る）を足した。
-53. **配列の要素数**。`lines` を一つ以上にしたいが、`valid.length` は string だけ（GOEMIT-3）。→ 空の注文を受け付ける。
-54. **成功のステータス**。`@http.status` は例外にだけ付く。→ `POST /orders` も 200。
-55. **応答のヘッダ**。出す側の束ね方がない（`@http.header` は入力のフィールドだけ）。→ トークンは本文で返す。
-56. **`@db.ref(User)` が指す列**。規則は「表」までなので、相手の `@db.key` の列にした（`db.go:23`）。
-57. **外部キーは、既定では効かない**。SQLite は接続ごとに `PRAGMA foreign_keys` を入れなければ `REFERENCES` を確かめない。`SetupDB(*sql.DB)` はプールのすべての接続には入れられず、DSN の書き方はドライバごとで、`db.go` はドライバを import しない。→ 人が DSN に書く（`both/app/main.go:20`、`dbonly/app/main_test.go:21` と `TestRef`）。
-58. **メモリの上の SQLite**。`:memory:` は接続ごとに別の DB になる。→ テストは `SetMaxOpenConns(1)`（`both/app/app_test.go:24`）。これもドライバと DSN の知識で、人の側に漏れる。
-59. **表の作り直し**。`Schema` は `CREATE TABLE IF NOT EXISTS` だけ。model を変えても、既にある表は古いまま（移行の形がない）。
-60. **`db.Exec(Schema)`** は一度に複数の文を実行する（`db.go:292`）。ドライバが受け付ける前提（`modernc.org/sqlite` は受け付ける）。
-61. **表は `valid` の制約を確かめない**（`CHECK` にも、`Insert` の前の `Validate` にもしていない）。
-62. **`@db` は、どの保存先かを言わない**。別の保存先のトランスパイラを同じ単位に並べれば、どちらも `@db` の状態をすべて選び、`Tables` / `SetupDB` の名前も当たる。
-63. **`go-sqlite` の細部で、ここで決めたもの**: 省略可能でない列の `NOT NULL`、`List` の順序（`rowid`）、ない行の `Update` は `sql.ErrNoRows` で `Delete` は何もしない、`Time` の小数部はいつも 9 桁（末尾の 0 を落とす形では、文字列の順が時刻の順にならない。`db.go:313-314`、`dbonly/app/main_test.go` の `TestColumnTypes`）、`SetupDB` の前の表は `*runtime.MissingError`（`db.go:326-331`）。
+- **N36 規則は、この仕様の九つの op に足りた**（「`go-sqlite` が従う規則」の末尾）。人が `store` について書いたものはない（`app/onsqlite/compose.go:18` の `SetupDB` を呼ぶだけ）。
+- **N37 規則で表せないもの**。
+  - **順序**: `listOrders` の「足した順」は説明のコメントにしかない（`store.hozo:30`）。規則が `ORDER BY rowid` と決めているだけで（`gen/store/db.go:112`）、「新しい順」は書けない。
+  - **件数と位置**: ページで切るのは、すべて読んだ後の `pageOf`（`gen/server/wiring.go:136-140`）。
+  - **比較**: 「期限が今より後」（N3）。
+  - **一意の違反**: `addUser` で `email` が重なると、ドライバのエラーがそのまま返り、HTTP では 500 になる。仕様の例外に写す書き方がなく、`db.go` はドライバを import しないのでエラーを見分けられない（`app/storetest/storetest.go:62-68` は「エラーである」ことだけ、`app/onsqlite/store_test.go:93-96` は文言を見ている）。
+  - **書き換え**（`put`）、**複数の状態にまたがる読み取り**: この仕様にないので、規則を決めていない。
+  - **複数の op を一つのトランザクションにする**: `placeOrder` の `addOrder` と `addNotification` は別々の文（`gen/server/wiring.go:160`、`:187`）。配線が op の間に渡すのは仕様の引数と `ctx` だけで、`ctx` に値を載せない（P29）ので、トランザクションを運ぶ道がない。v1 では一つの葉の中に書けた処理が、配線になった分、原子的に書ける範囲は狭くなった。
+- **N38 省略可能な引数の規則は、下書きの書き方のために足した**（N5）。「値がなければ、問い合わせずに『ない』」（`gen/store/db.go:85-91`）。SQL の `= NULL` がどの行にも合わないのと同じ結果にした。
+- **N39 引数と列を、型で結ぶ**。`findUser(email: type.Email)` が列 `email` に、`listOrders(userId: type.UserId)` が列 `userId` に結ばれるのは、フィールドごとに別の scalar を宣言しているから。`name: string` のような核の型の引数は、`string` のフィールドが二つあれば（`type.User` の `name` と `hash`）結べない。引数の名前は見ていない（`findUserById` の引数は `id`、`listOrders` の引数は `userId` で、どちらも型は `type.UserId`）。
+- **N40 `delete` で行が減らなくても、エラーにしない**（`removeSession`。`gen/store/db.go:103-107`）。組み込みの効果 `delete` は「列数が減る」変化だが、消す行がないときを区別する書き方はない。
+- **N41 `go-sqlite` の公開の名前は `Schema` と `SetupDB` だけになった**。v1 の表の型（`Tables`、`Insert`、`Get` など）は、人が呼ぶ理由がなくなったので出していない。その分、仕様に op のない読み書き（N22 の通知の数）は、人が SQL を書く。
+- **N42 `@db.key`、`@db.unique`、`@db.ref` の意味は、`go-sqlite` の出力にしかない**。`gen/storemem` の単位では、どのトランスパイラも `@db` を読まない（印）。仕様は「`addUser` は、`email` が重なれば失敗する」と言っていないので、メモリの上の実装がそうするかは人が決める。→ キーと一意は合わせ（`app/memstore/memstore.go:17,93-96`）、参照先の検査は合わせていない（`app/onsqlite/store_test.go:84-97` の `TestRef` は SQLite だけ）。「同じ `store` の二つの実装」が同じ振る舞いをすることは、仕様からは言えない。
+- **N43 プラグインごとの局所の名前**。`dbOps` のメソッドの引数は、基底と同じ規則で仕様の引数名から作る（`email`、`token`）。`go-sqlite` が自分で使う名前（`s`、`args`、`err`）と当たれば、基底と同じく末尾に `_` を付けることになるが、当たる名前の一覧はプラグインごとに違う。
+
+#### `go-http` と JSON の形
+
+- **N44 op を呼ぶ前の失敗を、例外の形にそろえた**。P15 の「失敗は、そのプラグインの語彙の例外で伝える」に合わせ、`{"error":"http.BadRequest","value":{"message":…,"violations":[…]}}` とした（`gen/server/http.go:128-151`）。v1 は `{"error":"http.BadRequest","message":…}` で、例外の形（`error` と `value`）ではなかった。クライアントのトランスパイラは、ほかの例外と同じ規則で読める。**`http` の語彙には、`BadRequest` も、それが運ぶ値の model もまだない**（`vocab/http.hozo` にあるのは `ServerError` と `NetworkError`）。
+- **N45 `http.BadRequest` を投げるかどうかが、設定で変わる**。制約の違反で投げるのは `validate = true` のときだけ。呼ぶ側の名前空間が計算する `throws`（`@http.post` の宣言が持つ例外）は仕様だけから決まるので、単位のオプション（P16）で増える例外を表せない。
+- **N46 違反の位置を、通信の上の場所にした**。`Validate` の `Path`（`lines[1].quantity`）の先頭を、そのフィールドを読む場所に置き換える（`body[1].quantity`。`gen/server/http.go:36,114,192-201`）。v1 の「分かったこと」39 はこれで解決した。
+- **N47 400 が 401 より先になる**。制約を確かめるのは op を呼ぶ前なので、トークンのない `POST /orders` でも、本文が制約に合わなければ 400（`app/handlertest/handlertest.go:152-155`）。v1 は葉が先に認証していた。順序を選ぶ書き方はない。
+- **N48 例外の FQN が、型の置き場を通信に出す**。`{"error":"type.Unauthorized"}`（`gen/server/http.go:218,220`）。v1 は `server.Unauthorized`。例外を別の名前空間に移すと、クライアントが見る名前が変わる。
+
+#### 名前の衝突
+
+- **N49 プラグインが足す公開の名前**。基底: `New`、`Ops`、`Leaves`、`Deps`、`States`、`StateSet`、`<Op>Func`、`<Ns>Ops`、`<Ns><Op>Func`、`<状態>State`、`Effect<効果>`、`New<Model>`。`go-valid`: メソッド `Validate`（N33）。`go-sqlite`: `Schema`、`SetupDB`。`go-http`: `NewHandler`。利用者の宣言と当たる例: model `Schema`、既定値を持つ model `Handler`（基底の `NewHandler()` と `go-http` の `NewHandler` が当たる）。プラグインをまたぐ衝突を見つける者がいないのは、v1 の「分かったこと」48 のまま。
+- **N50 非公開の名前とファイル名**。前置きは `valid`、`db`、`http`、ファイルは `validate.go`、`db.go`、`http.go`。どれも、プラグインどうしの約束がないまま、当たらないように選んだだけ（v1 の「分かったこと」47、49）。
+
+#### 設定とテスト
+
+- **N51 今の hozoc は、この `hozo.toml` を読めない**。`[emit.options.go-http]` は、単位の知らないキー `options` として CFG-7 になり、その単位（`gen/server`）は読まれない。`tests/samples_test.go` は、`check` が保留のサンプルに限り、このテーブルを除いた写しから単位を読む（`../README.md`「保留」）。
+- **N52 「共有する形」と「トランスパイラのファイル」の区別がなくなった**（P9）。`gen/` のどのファイルも、どれかのトランスパイラのもの。`sample.json` の `select`（代役の規則）は書いていない。
+- **N53 テストは並列にできないまま**。`store.States` がパッケージの変数なので、サーバーを作り直すサブテストは順に走らせる（`app/handlertest/handlertest.go:98`、`app/storetest/storetest.go:38`）。`server` だけのテスト（`app/server_test.go`）には、この制約がない。

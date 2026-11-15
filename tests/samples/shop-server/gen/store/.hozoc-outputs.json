@@ -1,0 +1,7 @@
+[
+  "gen/store/db.go",
+  "gen/store/doc.go",
+  "gen/store/ops.go",
+  "gen/store/states.go",
+  "gen/store/types.go"
+]

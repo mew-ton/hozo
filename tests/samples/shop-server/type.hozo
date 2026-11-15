@@ -1,0 +1,84 @@
+// サンプル shop-server の仕様（README.md）。共有の型の名前空間 type。
+// 保存（store.hozo）、サーバー（server.hozo）、配送（mailer.hozo）が同じ型を使う。
+// 書き方は docs/decisions.md の P1〜P30 の後の形で、今の hozoc は読めない（README.md「保留」）。
+
+/** 共有の型。どの担い手にも属さない */
+namespace type {
+  // ---- 値の型 ----
+
+  /** ユーザーの識別子 */
+  scalar UserId extends string;
+
+  /** メールアドレス */
+  @valid.format("email")
+  scalar Email extends string;
+
+  /** パスワード（平文。入力でだけ使う） */
+  @valid.length(min: 8, max: 128)
+  scalar Password extends string;
+
+  /** ログインセッションのトークン */
+  scalar Token extends string;
+
+  /** 注文の識別子 */
+  scalar OrderId extends string;
+
+  /** 商品の識別子 */
+  scalar ItemId extends string;
+
+  // ---- model ----
+
+  /** ユーザー */
+  model User {
+    @db.key    id: UserId;
+    @db.unique email: Email;
+    @valid.length(min: 1, max: 100) name: string;
+    /** パスワードのハッシュ */
+    hash: string;
+  }
+
+  /** 外に見せるユーザー（ハッシュを持たない） */
+  model PublicUser extends User {
+    override hash: never;
+  }
+
+  /** ログインセッション */
+  model Session {
+    @db.key       token: Token;
+    @db.ref(User) userId: UserId;
+    expiresAt: Time;
+  }
+
+  /** 注文の一行 */
+  model OrderLine {
+    item: ItemId;
+    @valid.min(1) quantity: int;
+  }
+
+  /** 注文 */
+  model Order {
+    @db.key       id: OrderId;
+    @db.ref(User) userId: UserId;
+    lines: OrderLine[];
+    placedAt: Time;
+  }
+
+  /** ユーザーへの通知 */
+  model Notification {
+    @db.ref(User) userId: UserId;
+    message: string;
+  }
+
+  // ---- 例外 ----
+
+  /** メールアドレスかパスワードが一致しない */
+  @http.status(401)
+  exception InvalidCredentials;
+
+  /** 認証されていない */
+  @http.status(401)
+  exception Unauthorized;
+
+  /** 通知を送れなかった（ステータスを持たない） */
+  exception NotificationFailed;
+}

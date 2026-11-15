@@ -1,125 +1,13 @@
-// サンプル shop-server の仕様（tests/samples/README.md）。名前空間 server を、互いを知らない二つのトランスパイラ
-// go-http（@http.get / @http.post の op）と go-sqlite（@db の状態）が Go に出力する。
-// 期待する出力は both/ httponly/ dbonly/ の server/（README.md）。
+// サンプル shop-server の仕様（README.md）。HTTP の入口と業務の流れを持つ名前空間 server。
+// 保存先には触れない: 読み書きは store の op を、外への配送は mailer の op を呼ぶ。
+// 人が書く op（本体のない op）は六つで、どれも状態を読まず、効果を持たない。
 
-/** 小さな店のサーバー: ログイン、自分の情報、注文 */
+/** サーバー。HTTP の入口と、業務の流れ */
 namespace server {
-  // ---- 値の型 ----
-
-  /** ユーザーの識別子 */
-  scalar UserId extends string;
-
-  /** メールアドレス */
-  @valid.format("email")
-  scalar Email extends string;
-
-  /** パスワード（平文。入力でだけ使う） */
-  @valid.length(min: 8, max: 128)
-  scalar Password extends string;
-
-  /** ログインセッションのトークン */
-  scalar Token extends string;
-
-  /** 注文の識別子 */
-  scalar OrderId extends string;
-
-  /** 商品の識別子 */
-  scalar ItemId extends string;
-
-  // ---- model と状態 ----
-
-  /** ユーザー */
-  model User {
-    @db.key    id: UserId;
-    @db.unique email: Email;
-    @valid.length(min: 1, max: 100) name: string;
-    /** パスワードのハッシュ */
-    hash: string;
-  }
-
-  /** 外に見せるユーザー（ハッシュを除く） */
-  model PublicUser is User omit hash;
-
-  /** ログインセッション */
-  model Session {
-    @db.key       token: Token;
-    @db.ref(User) userId: UserId;
-    expiresAt: Time;
-  }
-
-  /** 注文の一行 */
-  model OrderLine {
-    item: ItemId;
-    @valid.min(1) quantity: int;
-  }
-
-  /** 注文 */
-  model Order {
-    @db.key       id: OrderId;
-    @db.ref(User) userId: UserId;
-    lines: OrderLine[];
-    placedAt: Time;
-  }
-
-  /** ユーザーへの通知 */
-  model Notification {
-    @db.ref(User) userId: UserId;
-    message: string;
-  }
-
-  @db
-  state users: list<User>;
-
-  @db
-  state sessions: list<Session>;
-
-  @db
-  state orders: list<Order>;
-
-  @db
-  state notifications: list<Notification>;
-
-  // ---- 例外 ----
-
-  /** メールアドレスかパスワードが一致しない */
-  @http.status(401)
-  exception InvalidCredentials;
-
-  /** 認証されていない */
-  @http.status(401)
-  exception Unauthorized;
-
-  /** 入力の一か所の違反 */
-  model Violation { field: string; constraint: string; }
-
-  /** 入力の違反の一覧 */
-  model Violations { items: Violation[]; }
-
-  /** 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ） */
-  @http.status(400)
-  exception InvalidInput: Violations;
-
-  /** 通知を送れなかった（ステータスを持たない） */
-  exception NotificationFailed;
-
-  // ---- 効果 ----
-
-  /** ログインセッションを作成する */
-  effect createSession on sessions.post;
-
-  /** ログインセッションを削除する */
-  effect deleteSession on sessions.delete;
-
-  /** 注文を作成する */
-  effect createOrder on orders.post;
-
-  /** ユーザーに通知する */
-  effect notifyUser on notifications.post;
-
-  // ---- op ----
+  // ---- 入力と結果 ----
 
   /** ログインの本文 */
-  model Credentials { email: Email; password: Password; }
+  model Credentials { email: type.Email; password: type.Password; }
 
   /** ログインの入力 */
   model LoginInput {
@@ -127,67 +15,135 @@ namespace server {
   }
 
   /** ログインの結果 */
-  model LoginOk { user: PublicUser; token: Token; }
-
-  /** メールアドレスとパスワードでログインし、セッションを作る */
-  @http.post("/login")
-  op login(in: LoginInput): LoginOk
-    effects createSession
-    throws InvalidCredentials | InvalidInput prevents effects;
+  model LoginOk { user: type.PublicUser; token: type.Token; }
 
   /** トークンだけを運ぶ入力 */
   model AuthInput {
-    @http.header(name: "Authorization") token: Token?;
+    @http.header(name: "Authorization") token: type.Token?;
   }
-
-  /** ログアウトする。トークンがない・無効な場合は何もしない（401 にしない） */
-  @http.post("/logout")
-  op logout(in: AuthInput)
-    effects deleteSession;
-
-  /** ログインしているユーザー自身を返す */
-  @http.get("/me")
-  op getMe(in: AuthInput): PublicUser
-    throws Unauthorized;
 
   /** 注文一覧の入力 */
   model GetOrdersInput {
-    @http.header(name: "Authorization") token: Token?;
+    @http.header(name: "Authorization") token: type.Token?;
     /** 1 から数えるページ番号 */
     @http.query page: int = 1;
   }
 
-  /** ログインしているユーザーの注文一覧を返す */
-  @http.get("/orders")
-  op getOrders(in: GetOrdersInput): Order[]
-    throws Unauthorized;
-
   /** 注文の入力 */
   model PlaceOrderInput {
-    @http.header(name: "Authorization") token: Token?;
-    @http.body lines: OrderLine[];
+    @http.header(name: "Authorization") token: type.Token?;
+    @http.body lines: type.OrderLine[];
   }
 
-  /**
-   * 注文し、注文したユーザーに通知する。
-   * 通知に失敗（NotificationFailed）しても、注文は作られたまま残る（createOrder は起きている）。
-   */
-  @http.post("/orders")
-  op placeOrder(in: PlaceOrderInput): Order
-    throws Unauthorized | InvalidInput | NotificationFailed
+  // ---- ログイン ----
+
+  /** ログインする */
+  @http.post("/login")
+  op login(in: LoginInput): LoginOk
+    throws type.InvalidCredentials
   {
-    const order = saveOrder(in);
-    sendOrderNotice(order);
+    const user = store.findUser(in.body.email);
+    return match user by store.Registration {
+      Registered => issueSession(user, in.body.password);
+      default    => throw type.InvalidCredentials;
+    };
+  }
+
+  /** パスワードを確かめて、セッションを作る */
+  op issueSession(user: type.User, password: type.Password): LoginOk
+    throws type.InvalidCredentials
+  {
+    checkPassword(user, password);
+    const session = newSession(user);
+    store.addSession(session);
+    const publicUser = toPublicUser(user);
+    return { user: publicUser, token: session.token };
+  }
+
+  /** パスワードが合わなければ InvalidCredentials（人が書く） */
+  op checkPassword(user: type.User, password: type.Password)
+    throws type.InvalidCredentials;
+
+  /** トークンと期限を決める（人が書く） */
+  op newSession(user: type.User): type.Session;
+
+  /** ユーザーを、外に見せる形に写す（人が書く） */
+  op toPublicUser(user: type.User): type.PublicUser;
+
+  // ---- 誰が呼んだか ----
+
+  /** 呼んだ人のセッション。ログインしていなければ Unauthorized */
+  op authenticate(token: type.Token?): type.Session
+    throws type.Unauthorized
+  {
+    const session = store.findSession(token);
+    return match session by store.Login {
+      LoggedIn => session;
+      default  => throw type.Unauthorized;
+    };
+  }
+
+  /** ログアウトする */
+  @http.post("/logout")
+  op logout(in: AuthInput)
+    throws type.Unauthorized
+  {
+    const session = authenticate(in.token);
+    store.removeSession(session.token);
+  }
+
+  /** 自分の情報を返す */
+  @http.get("/me")
+  op getMe(in: AuthInput): type.PublicUser
+    throws type.Unauthorized
+  {
+    const session = authenticate(in.token);
+    const user = store.findUserById(session.userId);
+    return match user by store.Account {
+      Found   => toPublicUser(user);
+      default => throw type.Unauthorized;
+    };
+  }
+
+  // ---- 注文 ----
+
+  /** 自分の注文の一覧を返す */
+  @http.get("/orders")
+  op getOrders(in: GetOrdersInput): type.Order[]
+    throws type.Unauthorized
+  {
+    const session = authenticate(in.token);
+    const orders = store.listOrders(session.userId);
+    return pageOf(orders, in.page);
+  }
+
+  /** 一覧から、そのページの分を取り出す（人が書く） */
+  op pageOf(orders: type.Order[], page: int): type.Order[];
+
+  /** 注文する。通知に失敗しても、注文は残る */
+  @http.post("/orders")
+  op placeOrder(in: PlaceOrderInput): type.Order
+    throws type.Unauthorized | type.NotificationFailed
+  {
+    const session = authenticate(in.token);
+    const order = newOrder(session, in.lines);
+    store.addOrder(order);
+    notify(order);
     return order;
   }
 
-  /** 注文を保存する */
-  op saveOrder(in: PlaceOrderInput): Order
-    effects createOrder
-    throws Unauthorized | InvalidInput prevents effects;
+  /** 識別子と時刻を決めて、注文を作る（人が書く） */
+  op newOrder(session: type.Session, lines: type.OrderLine[]): type.Order;
 
   /** 注文したユーザーに通知する */
-  op sendOrderNotice(order: Order)
-    effects notifyUser
-    throws NotificationFailed prevents effects;
+  op notify(order: type.Order)
+    throws type.NotificationFailed
+  {
+    const notice = composeNotice(order);
+    mailer.send(notice);
+    store.addNotification(notice);
+  }
+
+  /** 通知の文面を作る（人が書く） */
+  op composeNotice(order: type.Order): type.Notification;
 }

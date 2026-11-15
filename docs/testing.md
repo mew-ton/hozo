@@ -96,5 +96,6 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 
 - サンプルの期待する出力は、そのトランスパイラのブラックボックスのテストの期待になる。トランスパイラを実装したら、サンプルの入力に `hozoc emit` を掛けた出力が、期待する出力とバイト単位で同じでなければならない。
 - `tests/samples_test.go` の `TestSamples` が、サンプルごとに確かめる: 仕様が `hozoc check` を通る、期待する出力のうち共有する形のファイルが今の `hozoc emit` の出力と同じ（トランスパイラの代役は `tests/plugins/pick`）、サンプルのモジュールで `go vet` と `go test` が通る（期待するコードが本当に動く）。本物のトランスパイラでの比較は、そのトランスパイラを `plugins/` のプラグインが提供するまで飛ばす。
+- 今の hozoc がまだ読めない書き方や、まだ出さない形で書いたサンプルは、はじめの二つ（`hozoc check`、今の `hozoc emit` との比較）を、理由を書いて保留にできる（`tests/samples/README.md`「保留」）。`go vet` と `go test` は保留にできない。
 - サンプルは自分の `go.mod` を持つ別のモジュールで、リポジトリのモジュールの `go build ./...` などはその Go を見ない。サンプルだけが使う依存（SQLite のドライバなど）は、サンプルの `go.mod` にだけ置く。
 - 書いていて今の設計に足りなかったものは、サンプルの `README.md`「分かったこと」に残す。

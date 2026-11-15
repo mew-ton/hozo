@@ -1,0 +1,8 @@
+[
+  "gen/server/doc.go",
+  "gen/server/http.go",
+  "gen/server/ops.go",
+  "gen/server/types.go",
+  "gen/server/validate.go",
+  "gen/server/wiring.go"
+]

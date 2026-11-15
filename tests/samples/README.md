@@ -20,7 +20,7 @@ tests/samples/<名前>/
   README.md      ファイルごとの出どころ、各トランスパイラが従う規則、「分かったこと」
   hozo.toml      本物の設定。単位の transpilers には、まだないトランスパイラの名前をそのまま書く
   *.hozo         仕様
-  sample.json    トランスパイラごとの、選ぶ宣言と、出すファイル（下）
+  sample.json    トランスパイラごとの、選ぶ宣言と、出すファイル。保留にするサブテストと、その理由（下）
   go.mod, go.sum サンプル自身の Go のモジュール（Go のサンプルのとき）
   <out>/         単位の out。期待する出力（共有する形のファイルと、トランスパイラのファイルと、記録 .hozoc-outputs.json）
   それ以外       人が書くコード（葉の op の本体、準備、main、テスト）
@@ -45,12 +45,13 @@ tests/samples/<名前>/
 ```
 
 - `transpilers` のキーは、`hozo.toml` の単位に書いたトランスパイラの名前。単位に書いた名前はすべてここに要り、ここに書いた名前はどれかの単位が使っていなければならない。
-- `select` は、そのトランスパイラが出力の対象に選ぶ宣言（`docs/plugin-protocol.md`「選択」）を、テスト用のプラグイン `tests/plugins/pick` の規則の形（デコレータの FQN。`tests/plugins/pick/main.go` の先頭）で書いたもの。トランスパイラがまだない間、`pick` がこの規則でそのトランスパイラの代役をして、共有する形を作る。
+- `select` は、そのトランスパイラが出力の対象に選ぶ宣言（`docs/plugin-protocol.md`「選択」）を、テスト用のプラグイン `tests/plugins/pick` の規則の形（デコレータの FQN。`tests/plugins/pick/main.go` の先頭）で書いたもの。トランスパイラがまだない間、`pick` がこの規則でそのトランスパイラの代役をして、共有する形を作る。代役を使うサブテスト（`check`、`shared`）の両方を保留にしたサンプルでは、書かなくてよい。
 - `files` は、期待する出力のうち、そのトランスパイラが出すファイル（サンプルのルートからの相対パス）。単位の `out` の下の、ここにないファイルは共有する形（と、出力先ごとの記録）。
+- `pending` は、このサンプルで保留にするサブテスト（「保留」）。キーは `check` か `shared`、値は理由。なければ、どれも保留にしない。
 
 ## テスト
 
-`tests/samples_test.go` の `TestSamples` が、`tests/samples/*/sample.json` のあるディレクトリをサンプルとして見つけ（足せば自動で入る）、サンプルごとに四つを確かめる。
+`tests/samples_test.go` の `TestSamples` が、`tests/samples/*/sample.json` のあるディレクトリをサンプルとして見つけ（足せば自動で入る）、サンプルごとに四つを確かめる。`check` と `shared` は、サンプルが保留にしていれば飛ばす（「保留」）。
 
 | サブテスト | 確かめること |
 |---|---|
@@ -64,8 +65,27 @@ tests/samples/<名前>/
 - `go` は、サンプルの `go.sum` の通りの依存をモジュールキャッシュから使う（`GOFLAGS=-mod=readonly`、`GOTOOLCHAIN=local`、`GOWORK=off`）。キャッシュにあればネットワークは要らない。なければ `go` が `GOPROXY` から取りに行き、取れなければ（オフラインなど）失敗する。飛ばさないのは、動くと確かめていないサンプルを仕様として通さないため。先に取っておくには、サンプルのディレクトリで `GOTOOLCHAIN=local go mod download`。
 - サンプルだけを手で確かめるには、サンプルのディレクトリで `GOTOOLCHAIN=local go vet ./... && GOTOOLCHAIN=local go test ./...`。
 
+## 保留
+
+サンプルは、今の hozoc がまだ読めない書き方や、まだ出さない形を先に書いてよい（`docs/decisions.md`「決めたが、まだ文書と実装に入れていないこと」を当てはめた形を、実装の前に点検するため）。そういうサンプルは、今の hozoc を動かす二つのサブテストを、`sample.json` の `pending` で保留にする。
+
+```json
+{
+  "pending": {
+    "check": "仕様が、まだ実装していない書き方を使う（docs/decisions.md の P19 の reads、…）",
+    "shared": "期待する出力は、P9 の後の形を人が書いたもの。今の既定の出力はこの形を出さない"
+  },
+  "transpilers": { "go": { "files": ["gen/server/ops.go"] } }
+}
+```
+
+- 保留にできるのは `check` と `shared` だけ。`go`（サンプルが動くこと）は保留にできない。`transpilers` は、トランスパイラがあるかどうかで自動で決まる（「テスト」の表）。
+- 理由は、何がまだないのかを、決定の番号（`docs/decisions.md` の P の番号）で書く。テストは、その理由を示して飛ばす（失敗にしない）。その決定を実装したら、`pending` から外す。
+- `shared` を保留にしたサンプルでは、期待する出力のすべてのファイルを人が書く（今の `hozoc emit` が書いたものを置く「共有する形」のファイルはない）。テストは飛ばす前に、hozoc を動かさずに確かめられることを確かめる: 単位の `out` の下のファイルは、記録を除いてどれも `sample.json` のどれかのトランスパイラの `files` にあり、`files` のファイルはどれもあり、記録 `.hozoc-outputs.json` は、その下のファイルのパスを辞書順に並べたものと同じ。
+- `check` を保留にしたサンプルの `hozo.toml` は、単位ごとのオプションのテーブル `[emit.options.<トランスパイラ>]`（`docs/decisions.md` の P16）を書いてよい。今の `internal/config` は、これを知らないキー（CFG-7）にして、その単位を読まない。テストは、単位の `out` と `transpilers` を読むときに、このテーブルを除いた写しを読む。P16 を実装したら、この扱いをやめる。
+
 ## サンプルの一覧
 
 | サンプル | 中身 |
 |---|---|
-| [`shop-server`](shop-server/README.md) | 名前空間 `server` を、互いを知らない二つのトランスパイラ `go-http`（`net/http` のハンドラ）と `go-sqlite`（`database/sql` の上の表）が Go に出力する。両方、`go-http` だけ、`go-sqlite` だけの三つの組 |
+| [`shop-server`](shop-server/README.md) | `docs/decisions.md` の P1〜P30 を当てはめた後の形。共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go` と、それに相乗りする `go-valid`、`go-sqlite`（`database/sql` の上の表と、`store` の op の中身）、`go-http`（`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。`check` と `shared` は保留 |

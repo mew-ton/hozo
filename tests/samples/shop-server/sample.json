@@ -1,12 +1,35 @@
 {
+  "pending": {
+    "check": "仕様と設定が、docs/decisions.md の P1〜P30 のうち、まだ実装していない書き方を使う（P2 と P3 の op の分類と as、P13 の throw、P14 の値のアーム、P19 の reads、P25 と P26 の model の extends と override、P16 の [emit.options]）。今の hozoc は読めない",
+    "shared": "期待する出力はすべて、P7〜P11、P29、P30 の後の形を人が書いたもの。基底の go も、まだないトランスパイラの一つ（P9）で、今の hozoc の既定の出力はこの形を出さない"
+  },
   "transpilers": {
-    "go-http": {
-      "select": { "roots": ["http.get", "http.post"] },
-      "files": ["both/server/http.go", "httponly/server/http.go"]
+    "go": {
+      "files": [
+        "gen/type/doc.go",
+        "gen/type/types.go",
+        "gen/store/doc.go",
+        "gen/store/types.go",
+        "gen/store/ops.go",
+        "gen/store/states.go",
+        "gen/storemem/doc.go",
+        "gen/storemem/types.go",
+        "gen/storemem/ops.go",
+        "gen/storemem/states.go",
+        "gen/server/doc.go",
+        "gen/server/types.go",
+        "gen/server/ops.go",
+        "gen/server/wiring.go"
+      ]
+    },
+    "go-valid": {
+      "files": ["gen/type/validate.go", "gen/server/validate.go"]
     },
     "go-sqlite": {
-      "select": { "states": ["db"] },
-      "files": ["both/server/db.go", "dbonly/server/db.go"]
+      "files": ["gen/store/db.go"]
+    },
+    "go-http": {
+      "files": ["gen/server/http.go"]
     }
   }
 }
