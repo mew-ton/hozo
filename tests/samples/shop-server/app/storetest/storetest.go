@@ -17,7 +17,7 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Ops は名前空間 store のすべての op。gen/store と gen/storemem の Ops のどちらも満たす
+// Ops は名前空間 store のすべての op（九つとも export を付けてある）。gen/store と gen/storemem の Ops のどちらも満たす
 // （二つは別のパッケージの別のインターフェースだが、型は同じ gen/type のものなので、メソッドの型が一致する）。
 type Ops interface {
 	FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)

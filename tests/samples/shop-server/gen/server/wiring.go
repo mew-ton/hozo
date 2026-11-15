@@ -21,33 +21,33 @@ func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
 	// match user by store.Registration
 	if user != nil {
 		// Registered: user は type.User
-		return o.IssueSession(ctx, *user, in.Body.Password)
+		return o.issueSession(ctx, *user, in.Body.Password)
 	}
 	// default
 	return LoginOk{}, pkgtype.InvalidCredentials{}
 }
 
-// IssueSession はパスワードを確かめて、セッションを作る
+// issueSession はパスワードを確かめて、セッションを作る
 //
 // Throws: type.InvalidCredentials
 // Effects: store.createSession
-func (o *ops) IssueSession(ctx context.Context, user pkgtype.User, password pkgtype.Password) (LoginOk, error) {
-	if err := o.CheckPassword(user, password); err != nil {
+func (o *ops) issueSession(ctx context.Context, user pkgtype.User, password pkgtype.Password) (LoginOk, error) {
+	if err := o.checkPassword(user, password); err != nil {
 		return LoginOk{}, err
 	}
-	session := o.NewSession(user)
+	session := o.newSession(user)
 	if err := o.store.AddSession(ctx, session); err != nil {
 		return LoginOk{}, err
 	}
-	publicUser := o.ToPublicUser(user)
+	publicUser := o.toPublicUser(user)
 	return LoginOk{User: publicUser, Token: session.Token}, nil
 }
 
-// Authenticate は呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
+// authenticate は呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
 //
 // Throws: type.Unauthorized
 // Reads: store.sessions
-func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error) {
+func (o *ops) authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error) {
 	session, err := o.store.FindSession(ctx, token)
 	if err != nil {
 		return pkgtype.Session{}, err
@@ -55,7 +55,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 	// match session by store.Login
 	if session != nil {
 		// LoggedIn: session は type.Session
-		return o.RequireFresh(*session)
+		return o.requireFresh(*session)
 	}
 	// default
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
@@ -67,7 +67,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 // Reads: store.sessions
 // Effects: store.deleteSession
 func (o *ops) Logout(ctx context.Context, in AuthInput) error {
-	session, err := o.Authenticate(ctx, in.Token)
+	session, err := o.authenticate(ctx, in.Token)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (o *ops) Logout(ctx context.Context, in AuthInput) error {
 // Throws: type.Unauthorized
 // Reads: store.sessions, store.users
 func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, error) {
-	session, err := o.Authenticate(ctx, in.Token)
+	session, err := o.authenticate(ctx, in.Token)
 	if err != nil {
 		return pkgtype.PublicUser{}, err
 	}
@@ -93,7 +93,7 @@ func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, erro
 	// match user by store.Account
 	if user != nil {
 		// Found: user は type.User
-		return o.ToPublicUser(*user), nil
+		return o.toPublicUser(*user), nil
 	}
 	// default
 	return pkgtype.PublicUser{}, pkgtype.Unauthorized{}
@@ -104,7 +104,7 @@ func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, erro
 // Throws: type.Unauthorized
 // Reads: store.sessions, store.orders
 func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order, error) {
-	session, err := o.Authenticate(ctx, in.Token)
+	session, err := o.authenticate(ctx, in.Token)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order
 	if err != nil {
 		return nil, err
 	}
-	return o.PageOf(orders, in.Page), nil
+	return o.pageOf(orders, in.Page), nil
 }
 
 // PlaceOrder は注文する。通知に失敗しても、注文は残る
@@ -121,26 +121,26 @@ func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order
 // Reads: store.sessions
 // Effects: store.createOrder, store.notifyUser
 func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error) {
-	session, err := o.Authenticate(ctx, in.Token)
+	session, err := o.authenticate(ctx, in.Token)
 	if err != nil {
 		return pkgtype.Order{}, err
 	}
-	order := o.NewOrder(session, in.Lines)
+	order := o.newOrder(session, in.Lines)
 	if err := o.store.AddOrder(ctx, order); err != nil {
 		return pkgtype.Order{}, err
 	}
-	if err := o.Notify(ctx, order); err != nil {
+	if err := o.notify(ctx, order); err != nil {
 		return pkgtype.Order{}, err
 	}
 	return order, nil
 }
 
-// Notify は注文したユーザーに通知する
+// notify は注文したユーザーに通知する
 //
 // Throws: type.NotificationFailed
 // Effects: store.notifyUser
-func (o *ops) Notify(ctx context.Context, order pkgtype.Order) error {
-	notice := o.ComposeNotice(order)
+func (o *ops) notify(ctx context.Context, order pkgtype.Order) error {
+	notice := o.composeNotice(order)
 	if err := o.mailer.Send(ctx, notice); err != nil {
 		return err
 	}

@@ -8,7 +8,7 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
+// Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
 	// Login はログインする
 	//
@@ -16,40 +16,6 @@ type Ops interface {
 	// Reads: store.users
 	// Effects: store.createSession
 	Login(ctx context.Context, in LoginInput) (LoginOk, error)
-
-	// IssueSession はパスワードを確かめて、セッションを作る
-	//
-	// Throws: type.InvalidCredentials
-	// Effects: store.createSession
-	IssueSession(ctx context.Context, user pkgtype.User, password pkgtype.Password) (LoginOk, error)
-
-	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
-	//
-	// Throws: type.InvalidCredentials
-	// 純粋（ctx を取らない）
-	CheckPassword(user pkgtype.User, password pkgtype.Password) error
-
-	// NewSession はトークンと期限を決める（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewSession(user pkgtype.User) pkgtype.Session
-
-	// ToPublicUser はユーザーを、外に見せる形に写す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ToPublicUser(user pkgtype.User) pkgtype.PublicUser
-
-	// Authenticate は呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
-	//
-	// Throws: type.Unauthorized
-	// Reads: store.sessions
-	Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error)
-
-	// RequireFresh は期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く）
-	//
-	// Throws: type.Unauthorized
-	// 純粋（ctx を取らない）
-	RequireFresh(session pkgtype.Session) (pkgtype.Session, error)
 
 	// Logout はログアウトする
 	//
@@ -70,36 +36,15 @@ type Ops interface {
 	// Reads: store.sessions, store.orders
 	GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order, error)
 
-	// PageOf は一覧から、そのページの分を取り出す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
-
 	// PlaceOrder は注文する。通知に失敗しても、注文は残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
 	// Reads: store.sessions
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error)
-
-	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order
-
-	// Notify は注文したユーザーに通知する
-	//
-	// Throws: type.NotificationFailed
-	// Effects: store.notifyUser
-	Notify(ctx context.Context, order pkgtype.Order) error
-
-	// ComposeNotice は通知の文面を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ComposeNotice(order pkgtype.Order) pkgtype.Notification
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。
+// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
@@ -199,37 +144,38 @@ func New(leaves Leaves, mailer MailerOps, store StoreOps) Ops {
 	return &ops{leaves: leaves, mailer: mailer, store: store}
 }
 
-// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
+// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて:
+// export を付けた op は公開の名前（Ops のメソッド）、付けていない op は非公開の名前（op の名前そのまま）。
 type ops struct {
 	leaves Leaves
 	mailer MailerOps
 	store  StoreOps
 }
 
-func (o *ops) CheckPassword(user pkgtype.User, password pkgtype.Password) error {
+func (o *ops) checkPassword(user pkgtype.User, password pkgtype.Password) error {
 	return o.leaves.CheckPassword(user, password)
 }
 
-func (o *ops) NewSession(user pkgtype.User) pkgtype.Session {
+func (o *ops) newSession(user pkgtype.User) pkgtype.Session {
 	return o.leaves.NewSession(user)
 }
 
-func (o *ops) ToPublicUser(user pkgtype.User) pkgtype.PublicUser {
+func (o *ops) toPublicUser(user pkgtype.User) pkgtype.PublicUser {
 	return o.leaves.ToPublicUser(user)
 }
 
-func (o *ops) RequireFresh(session pkgtype.Session) (pkgtype.Session, error) {
+func (o *ops) requireFresh(session pkgtype.Session) (pkgtype.Session, error) {
 	return o.leaves.RequireFresh(session)
 }
 
-func (o *ops) PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
+func (o *ops) pageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
 	return o.leaves.PageOf(orders, page)
 }
 
-func (o *ops) NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {
+func (o *ops) newOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {
 	return o.leaves.NewOrder(session, lines)
 }
 
-func (o *ops) ComposeNotice(order pkgtype.Order) pkgtype.Notification {
+func (o *ops) composeNotice(order pkgtype.Order) pkgtype.Notification {
 	return o.leaves.ComposeNotice(order)
 }

@@ -1,5 +1,5 @@
 // サンプル shop-server の仕様（README.md）。DB の状態を持つ名前空間 store。
-// 状態を名前で読めるのはこの名前空間の中だけなので、ほかの名前空間は、ここの op を通して読み書きする。
+// 状態を名前で読めるのはこの名前空間の中だけなので、ほかの名前空間は、ここの op を通して読み書きする。九つの op はどれも export（P33）: 八つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
 // op の中身は、読む先（reads）と効果から決まる。単位 gen/store では go-sqlite が状態ごとの型として出し、単位 gen/storemem では人が書く。
 
 /** 保存。DB の状態の持ち主 */
@@ -19,16 +19,16 @@ namespace store {
   // ---- 読む（効果を持たない op） ----
 
   /** email からユーザーを引く */
-  op findUser(email: type.Email): type.User? reads users;
+  export op findUser(email: type.Email): type.User? reads users;
 
   /** 識別子からユーザーを引く */
-  op findUserById(id: type.UserId): type.User? reads users;
+  export op findUserById(id: type.UserId): type.User? reads users;
 
   /** トークンからセッションを引く。トークンがなければ、ない */
-  op findSession(token: type.Token?): type.Session? reads sessions;
+  export op findSession(token: type.Token?): type.Session? reads sessions;
 
   /** ユーザーの注文を、足した順に返す */
-  op listOrders(userId: type.UserId): type.Order[] reads orders;
+  export op listOrders(userId: type.UserId): type.Order[] reads orders;
 
   // ---- 読んだ結果の分類 ----
 
@@ -68,17 +68,17 @@ namespace store {
   effect notifyUser on notifications.post;
 
   /** ユーザーを足す */
-  op addUser(user: type.User) effects createUser;
+  export op addUser(user: type.User) effects createUser;
 
   /** セッションを足す */
-  op addSession(session: type.Session) effects createSession;
+  export op addSession(session: type.Session) effects createSession;
 
   /** そのトークンのセッションを消す */
-  op removeSession(token: type.Token) effects deleteSession;
+  export op removeSession(token: type.Token) effects deleteSession;
 
   /** 注文を足す */
-  op addOrder(order: type.Order) effects createOrder;
+  export op addOrder(order: type.Order) effects createOrder;
 
   /** 通知を足す */
-  op addNotification(notification: type.Notification) effects notifyUser;
+  export op addNotification(notification: type.Notification) effects notifyUser;
 }

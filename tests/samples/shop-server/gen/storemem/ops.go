@@ -8,7 +8,7 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
+// Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
 	// FindUser は email からユーザーを引く
 	//
@@ -63,7 +63,8 @@ func New(users UsersState, sessions SessionsState, orders OrdersState, notificat
 	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications}
 }
 
-// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
+// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて:
+// export を付けた op は公開の名前（Ops のメソッド）、付けていない op は非公開の名前（op の名前そのまま）。
 type ops struct {
 	users         UsersState
 	sessions      SessionsState

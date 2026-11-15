@@ -88,4 +88,4 @@ tests/samples/<名前>/
 
 | サンプル | 中身 |
 |---|---|
-| [`shop-server`](shop-server/README.md) | `docs/decisions.md` の P1〜P32 を当てはめた後の形。共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go` と、それに相乗りする `go-valid`、`go-sqlite`（`database/sql` の上の表と、`store` の op の中身）、`go-http`（`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。`check` と `shared` は保留 |
+| [`shop-server`](shop-server/README.md) | `docs/decisions.md` の P1〜P33 を当てはめた後の形。共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go` と、それに相乗りする `go-valid`、`go-sqlite`（`database/sql` の上の表と、`store` の op の中身）、`go-http`（`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。`check` と `shared` は保留 |

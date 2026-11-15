@@ -1,10 +1,10 @@
 # サンプル `shop-server`
 
-小さな店のサーバー（ログイン、自分の情報、注文）を、`docs/decisions.md`「決めたが、まだ文書と実装に入れていないこと」の **P1〜P32 を当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
+小さな店のサーバー（ログイン、自分の情報、注文）を、`docs/decisions.md`「決めたが、まだ文書と実装に入れていないこと」の **P1〜P33 を当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-P1〜P32 の言語の変更も、ここに出てくる四つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http`）も、まだない。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がいつかこう出す」内容を人が書いたもので、トランスパイラを実装したときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
+P1〜P33 の言語の変更も、ここに出てくる四つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http`）も、まだない。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がいつかこう出す」内容を人が書いたもので、トランスパイラを実装したときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
 
-P1〜P32 を当てはめる前の形（一つの名前空間 `server` を三つの単位で出力する。以下「v1」）は、コミット `ac57788` のこのディレクトリにある。
+P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つの単位で出力する。以下「v1」）は、コミット `ac57788` のこのディレクトリにある。
 
 ## 保留
 
@@ -15,14 +15,14 @@ P1〜P32 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 ## 入力
 
-仕様は名前空間ごとに一つのファイル。「まだない書き方」の語（`reads`、`as`、`throw`、`never`、`override`、`[emit.options.<トランスパイラ>]`）は、どれも `docs/decisions.md` が仮に置いた語のまま。
+仕様は名前空間ごとに一つのファイル。「まだない書き方」の語（`reads`、`as`、`throw`、`never`、`override`、`export`、`[emit.options.<トランスパイラ>]`）は、どれも `docs/decisions.md` が仮に置いた語のまま。
 
 | ファイル | 名前空間 | 中身 | まだない書き方 |
 |---|---|---|---|
 | `type.hozo` | `type` | 共有の型（P6）: scalar、model、例外 | `model PublicUser extends User { override hash: never; }`（P24〜P26） |
-| `store.hozo` | `store` | DB の状態四つ（P5）、それを読む op と書く op、読んだ結果の分類 | `reads`（P19）、`classify C of <op>`（P2）、`Case: <op> as T;`（P3） |
-| `server.hozo` | `server` | HTTP の入口と、業務の流れ（配線）。人が書く op は七つ | `match x by C` の絞り込み（P3）、`throw E`（P13） |
-| `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。`@smtp.sendMail` を付けた op `send` | — |
+| `store.hozo` | `store` | DB の状態四つ（P5）、それを読む op と書く op（九つとも `export`）、読んだ結果の分類 | `reads`（P19）、`classify C of <op>`（P2）、`Case: <op> as T;`（P3）、`export op`（P33） |
+| `server.hozo` | `server` | HTTP の入口（`export` を付けた五つ）と、業務の流れ（配線）。人が書く op は七つ | `match x by C` の絞り込み（P3）、`throw E`（P13）、`export op`（P33） |
+| `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。`@smtp.sendMail` を付けた op `send`（`export`） | `export op`（P33） |
 | `smtp.hozo` | `smtp` | メールを SMTP で送る仕組みの語彙。デコレータ `sendMail`（提供するプラグインがまだないので、サンプルの中で宣言する。今は印） | — |
 
 `hozo.toml` の単位は四つ。`mailer` には単位を置かないので、コードは出ない。
@@ -36,9 +36,24 @@ P1〜P32 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 `gen/server` の単位だけ、`[emit.options.go-http]` で `validate = true` を渡す（P16）。
 
+### `export` を付けた op
+
+別の名前空間から呼べる op には `export` を付ける（P33）。書く位置は、説明のコメントとデコレータの後ろ、`op` のすぐ前（`server.hozo:41-42` の `@http.post("/login")` と `export op login(…)`）。付けていない op は内部で、別の名前空間から呼べばエラー。対象は op だけで、型、例外、分類、効果、デコレータは、今までどおりどこからでも参照できる（`server` は `store.Registration` や `type.Unauthorized` を、そのまま書く）。
+
+この仕様の二十五の op のうち、`export` を付けたのは十五。付けたのは、**その名前空間の外に、呼ぶ者がいる op だけ**。
+
+| 名前空間 | `export` を付けた op | 外の呼び手 | 内部の op |
+|---|---|---|---|
+| `server` | `login`、`logout`、`getMe`、`getOrders`、`placeOrder`（五つ） | `go-http` のハンドラ（`@http.*` の入口）。仕様の中に、呼ぶ名前空間はない | 配線 `issueSession`、`authenticate`、`notify` と、人が書く葉 `checkPassword`、`newSession`、`toPublicUser`、`requireFresh`、`pageOf`、`newOrder`、`composeNotice`（十） |
+| `store` | `findUser`、`findUserById`、`findSession`、`listOrders`、`addSession`、`removeSession`、`addOrder`、`addNotification`（八つ） | `server` の配線 | なし |
+| `store` | `addUser` | 人が書くコード（二つの main と、テスト）。仕様の中に、呼ぶ名前空間はない | |
+| `mailer` | `send` | `server` の配線 `notify` | なし |
+
+迷ったのは `store.addUser` だけ。仕様のどの名前空間も呼ばないので、「別の名前空間から呼べる」という P33 の言い方だけなら、内部でも検査は通る。`export` にしたのは、人が書くコード（起動のときにユーザーを入れる main、テスト）が、`store.New` の返す `Ops` を通して呼ぶため: `Ops` に並ぶのは `export` を付けた op だけなので、付けなければ `store.Ops` から消える。内部にしても、状態の単位の実装（`store.NewUsersTable(db).AddUser`、`memstore` の `Users().AddUser`）を直に呼べば足せるが、それでは main とテストが、保存先ごとの型に結びつく（v1 の「分かったこと」26 の「保存先を直に書き換える」に近い形に戻る）。`export` の意味が「仕様の別の名前空間」だけでないことは、「分かったこと」N66。
+
 ### 下書きから変えたこと
 
-仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の六つ。
+仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の七つ。
 
 1. **継承**（P24〜P27）: `model PublicUser is User omit hash;` を `model PublicUser extends User { override hash: never; }` にした（`type.hozo:41-43`）。`type.User` を `type.PublicUser` に写す葉の op `toPublicUser` を `server` に足し（`server.hozo:71`）、下書きが `User` をそのまま渡していた二か所で呼ぶ（`server.hozo:59`、`:107`）。
 2. **外部の入出力**（P30）: `server` の葉 `deliver` をやめ、名前空間 `mailer` の `op send` にし、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`smtp.hozo:7`、`mailer.hozo:6-9`、`server.hozo:147`）。外部の入出力をする op は、その仕組みの語彙のデコレータを持つ形に書くのが望ましい（外部のサービスなら、そのサービスの語彙。規則ではなく書き方の指針で、検査はしない）。デコレータを持つ op は純粋でない。
@@ -46,6 +61,7 @@ P1〜P32 を当てはめる前の形（一つの名前空間 `server` を三つ�
 4. **`getMe` の `Found` のアームは、呼び出しをそのまま書いた**（`server.hozo:107` の `Found => toPublicUser(user);`）。写した値を先に束縛する形にはできない: `user` が `type.User` になるのはアームの中だけ。
 5. **セッションの期限を確かめる**: 下書きは `expiresAt` を書くだけで、誰も読まなかった（期限の切れたトークンで入れた。「分かったこと」N3）。人が書く葉の op `requireFresh` を `server` に足し（`server.hozo:86-88`）、配線 `authenticate` の `LoggedIn` のアームを `LoggedIn => requireFresh(session);` にした（`server.hozo:81`）。期限が過ぎていれば `type.Unauthorized`。下書きのアームは値のアーム（P14 の `LoggedIn => session;`）だったので、この仕様に値のアームはなくなった。
 6. 説明のコメントを足した。
+7. **`export`**（P33）: 外に呼び手のいる十五の op に `export` を付けた（上の「`export` を付けた op」）。下書きには、op を内部にする書き方がなかった。
 
 ## ファイルの出どころ
 
@@ -84,50 +100,56 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 
 ## 基底 `go` が従う規則
 
-出発点は今の Go の既定の出力（`docs/emit-go.md`）。ここに書くのは、P1〜P32 を当てはめて変えたところと、決定が決めていなかったのでこのサンプルで決めたところ（後者は「分かったこと」に番号で挙げる）。書いていないことは `docs/emit-go.md` のまま。
+出発点は今の Go の既定の出力（`docs/emit-go.md`）。ここに書くのは、P1〜P33 を当てはめて変えたところと、決定が決めていなかったのでこのサンプルで決めたところ（後者は「分かったこと」に番号で挙げる）。書いていないことは `docs/emit-go.md` のまま。
 
-- **出すもの**: 単位の対象の名前空間の、型（model、scalar、union、例外）と効果の定数のすべて（P8）、op のすべて（P11）。選択はない。制約を確かめる関数は出さない（P10）。
+- **出すもの**: 単位の対象の名前空間の、型（model、scalar、union、例外）と効果の定数のすべて（P8）、op のすべて（P11）。選択はない。制約を確かめる関数は出さない（P10）。`export` の有無（P33）は、op を出すかどうかを変えない。変えるのは、その op がどのインターフェースに、どの名前で現れるか（下の「`Ops`」「内部の op」）。型と効果の定数は、`export` によらず、今までどおり公開の名前で出す。
 - **ヘッダ**: 先頭は `// Code generated by hozoc go <版>; DO NOT EDIT.`。
 - **ファイル**: `doc.go`、`types.go`、`ops.go`、`states.go`、`wiring.go`。`validate.go` は出さない。`classify.go` は、人が述語を書く分類があるときだけ（この仕様にはない）。
 - **パッケージ**: 名前は `docs/emit-go.md`「配置」の規則のまま。名前空間 `type` は Go の予約語なので `pkgtype`（ディレクトリは `gen/type`）。別の名前空間の型は、その名前空間の出力を import する（P7。複製しない）。パッケージ名が import パスの最後の要素と違うときは、import に名前を書く（`pkgtype "example.com/shop-server/gen/type"`）。
 - **継承した model**（P24〜P27）: 元の model とは別の構造体。フィールドは、元の宣言順から `never` にしたものを除いた並び。元の model から写す関数は出さない（`gen/type/types.go:38-44`）。
-- **実装はインターフェースで受け取る**（P31、P32）: 人やプラグインが実装するものは、どれもインターフェースで、実装は `New` の引数で渡す。実装の漏れ（メソッドの書き忘れ、渡し忘れ）は、コンパイルエラーになる。基底が出すインターフェースは次の四種類（`ops.go` と `states.go`）。
-  - **`Ops`**: その名前空間の op のすべて（葉と配線。P11）。宣言順。呼ぶ側が使うもので、`New` が返す（`gen/server/ops.go:12`、`gen/store/ops.go:12`）。
-  - **`Leaves`**: **人が実装する葉の op**: 本体がなく、状態を読まず（`reads` がない）、効果も持たない op。宣言順（`gen/server/ops.go:104`）。そういう op がなければ出さない（`store`）。
-  - **`<状態>State`**（状態の単位）: 状態ごとに一つ。メソッドは、**形で決まる問い合わせ**、その状態を読む葉の op（**問い合わせ**: `reads` がその状態一つ）、その状態を宛先にする効果を持つ葉の op（**命令**）。この順で、op はそれぞれ宣言順。効果を持つ葉は、`reads` があっても効果の宛先の単位に置く。
+- **実装はインターフェースで受け取る**（P31、P32）: 人やプラグインが実装するものは、どれもインターフェースで、実装は `New` の引数で渡す。実装の漏れ（メソッドの書き忘れ、渡し忘れ）は、コンパイルエラーになる。基底が出すインターフェースは次の四種類（`ops.go` と `states.go`）。メソッドの名前は、どれも op の名前の先頭を大文字にしたもの（`docs/emit-go.md`「名前」）。
+  - **`Ops`**（P33）: その名前空間の op のうち、**`export` を付けたものだけ**（葉でも配線でも）。宣言順。名前空間の外（別の名前空間の配線、`go-http` などのプラグインの出力、人が書くコード）が使うもので、`New` が返す（`gen/server/ops.go:12`、`gen/store/ops.go:12`）。`server.Ops` は十五の op のうち五つ、`store.Ops` は九つすべて。`export` を付けた op が一つもなくても、空の `Ops` を出し、`New` はそれを返す（この仕様にはない）。
+  - **`Leaves`**: **人が実装する葉の op**: 本体がなく、状態を読まず（`reads` がない）、効果も持たない op。宣言順（`gen/server/ops.go:49`）。そういう op がなければ出さない（`store`）。**`export` の有無によらない**（P33: 内部の op も、人が書くものは実装を受け取るインターフェースに並ぶ）。人は別のパッケージで実装するので、メソッドは公開の名前（`CheckPassword`）。`server.Leaves` の七つは、どれも内部の op で、中身は P33 の前と同じ。
+  - **`<状態>State`**（状態の単位）: 状態ごとに一つ。メソッドは、**形で決まる問い合わせ**、その状態を読む葉の op（**問い合わせ**: `reads` がその状態一つ）、その状態を宛先にする効果を持つ葉の op（**命令**）。この順で、op はそれぞれ宣言順。効果を持つ葉は、`reads` があっても効果の宛先の単位に置く。`Leaves` と同じく、`export` の有無によらず、メソッドは公開の名前（この仕様の `store` の九つは、どれも `export`）。
     - **形で決まる問い合わせは、どの状態の単位にもいつも出す**。その名前空間の配線が状態を読むかどうかによらない（`docs/emit-go.md`「state」: 配線が読まなくても、形で決まる問い合わせをすべて持つ。テストが効果の結果の判定に使う）。状態を読むので、どれも `ctx` を取り、`error` を返す。並びは `IsEmpty`、`Get`。
       - `list<T>`: `IsEmpty(ctx context.Context) (bool, error)`（要素が一つもなければ真）と、`Get(ctx context.Context) ([]T, error)`（状態の値。すべての要素を、足した順に）。
       - `nullable<T>`: `IsEmpty`（同じ形）と、`Get(ctx context.Context) (*T, error)`（値がなければ `nil`）。
       - `single<T>`: `Get(ctx context.Context) (T, error)`。
       - `Get` は、状態を名前で読んだときの値（P4、P22）。`docs/emit-go.md`「state」の表は `list<T>` に `Get` を持たないので、そこに足した形になる。この仕様の四つの状態はどれも `list`（`gen/store/states.go:13-62`）で、`nullable` と `single` の形は書いていない。
     - 複数の状態を読む葉は、どの状態の単位にも置かず、インターフェース `SharedState` に置く（`New` の引数は `shared`）。この仕様にはない。
-  - **`<Ns>Ops`**（P31）: 配線が呼ぶ別の名前空間ごとに一つ（`MailerOps`、`StoreOps`。`gen/server/ops.go:145`、`:154`）。メソッドは、その名前空間の op のうち、**この名前空間の配線が呼ぶものだけ**（`server.StoreOps` は、`store` の九つの op のうち八つ。`addUser` がない）。並びは相手の宣言順。メソッドの形は相手の op の判定に従う（下）ので、相手の出力の `Ops` が、そのまま満たす: `store.New(…)` の戻り値を、`server.New` の引数 `store` に渡せる（型を共有しているとき。N16）。
-- **op ごとの関数の型は出さない**: P32 の前は、関数のフィールドを持つ構造体（`Leaves`、`<状態>State`、`Deps` の `<Ns>Ops`）と、そのフィールドの型（`<Op>Func`、`<Ns><Op>Func`）を出していた。構造体がインターフェースになり、関数の型を使う宣言がなくなったので、どちらも出さない。op の説明のコメントは、インターフェースのメソッドに書く。
-- **メソッドの形**（P29、P30、P32）: op のメソッドの形は、その op の宣言だけで決まり、どのインターフェースに現れても、どの名前空間から見ても同じ（P30）。この仕様での判定は下の表。
+  - **`<Ns>Ops`**（P31）: 配線が呼ぶ別の名前空間ごとに一つ（`MailerOps`、`StoreOps`。`gen/server/ops.go:90`、`:99`）。メソッドは、その名前空間の op のうち、**この名前空間の配線が呼ぶものだけ**（`server.StoreOps` は、`store` の九つの op のうち八つ。`addUser` がない）。並びは相手の宣言順。メソッドの形は相手の op の判定に従う（下）ので、相手の出力の `Ops` が、そのまま満たす: `store.New(…)` の戻り値を、`server.New` の引数 `store` に渡せる（型を共有しているとき。N16）。**並ぶのは、相手が `export` を付けた op だけ**（P33）: 付けていない op を別の名前空間から呼ぶ仕様は、検査でエラーになり、基底には届かない。相手の `Ops` は `export` を付けた op をすべて持つので、「相手の `Ops` がそのまま満たす」は、P33 の後も成り立つ（`app/both_test.go:34-35`、`TestOpsHoldExportedOpsOnly`）。
+- **内部の op**（P33）: `export` を付けていない op は、`Ops` に載せず、**`New` が返す非公開の構造体 `ops` の、非公開のメソッド**にする。パッケージの外からは呼べない: 名指しできず、`New` の戻り値を、外で宣言したインターフェースに型アサーションしても取り出せない（Go の非公開のメソッドの名前は、パッケージごとに別。`app/both_test.go` の `TestOpsHoldExportedOpsOnly`）。
+  - **名前**: op の名前の先頭を小文字にしたもの。仕様の名前が小文字で始まっていれば（NAME-1 のとおりなら）、op の名前そのまま（`authenticate`、`issueSession`、`checkPassword`）。`export` を付けた op は、今までどおり先頭を大文字にする（`Login`）。
+  - **衝突**: 小文字の名前は、(a) Go の予約語（`go`、`select`、`range`、`type`、`default`、`import` など。先頭を大文字にしていた P33 の前には起きなかった）、(b) 構造体 `ops` のフィールド（`New` の引数の名前: `leaves`、`shared`、状態の名前、呼ぶ別の名前空間の名前）と当たりうる。どちらも、`docs/emit-go.md`「名前」の規則のとおり、**メソッドの名前の末尾に `_` を付ける**（フィールドは `New` の引数の名前のまま動かさない）。メソッドなので、パッケージの名前（型 `ops`、相乗りのプラグインの非公開の関数 `httpWriteJSON`、`validAppend`、`dbGet` など）、事前宣言の識別子（`len`、`error`）、メソッドの中の局所の名前（`o`、`err`、引数）とは当たらない。この仕様では、どれも起きない。
+  - **形**: 引数と戻り値（`ctx`、`error`）は、公開のメソッドと同じ規則で決める（下の「メソッドの形」）。
+  - **内部の配線**（`issueSession`、`authenticate`、`notify`）: 本体は `wiring.go` の非公開のメソッド。op の説明と `Throws:` などのコメントは、そこにだけ書く（`gen/server/wiring.go:30-34`、`:46-50`、`:138-142`）。
+  - **内部の葉**: 実装は、`export` を付けた葉と同じく、`Leaves` か状態の単位のメソッド（公開の名前）で受け取る。`ops` には、それを呼ぶだけの非公開のメソッドを出す（`gen/server/ops.go:155-180`）。
+- **op ごとの関数の型は出さない**: P32 の前は、関数のフィールドを持つ構造体（`Leaves`、`<状態>State`、`Deps` の `<Ns>Ops`）と、そのフィールドの型（`<Op>Func`、`<Ns><Op>Func`）を出していた。構造体がインターフェースになり、関数の型を使う宣言がなくなったので、どちらも出さない。op の説明のコメントは、インターフェースのメソッドと、配線の本体に書く（下の「コメント」）。
+- **メソッドの形**（P29、P30、P32）: op のメソッドの形は、その op の宣言だけで決まり、どのインターフェースに現れても、どの名前空間から見ても同じ（P30）。`export` の有無にもよらない: 内部の op の非公開のメソッドも、同じ規則で決める。この仕様での判定は下の表。
   - **`ctx`**: 最初の引数に `ctx context.Context` を取る。**純粋な op** は取らない。純粋なのは、デコレータがなく、`reads` も `effects` もなく、状態に依らない op（配線なら、呼び出し先もすべて純粋で、状態を参照しない）。
   - **`error`**: 最後の戻り値に `error` を返す。**純粋で、かつ `throws` を宣言していない op は返さない**（失敗しえない。P32）: 戻り値があればその値だけを返し、なければ何も返さない。純粋でも、`throws` があれば返す。純粋でなければ、`throws` がなくても返す（保存先や外部の失敗と、`ctx` のエラーがある）。配線も同じに判定する（呼び出し先が投げる例外は、配線の `throws` にすべて書いてある。`docs/check.md` の THROWS-1）。
-  - **コメント**: `Ops`、`Leaves`、`<Ns>Ops` のメソッドには、op の説明と、`Throws:`、`Reads:`（P28 の、伝わってきた `reads`）、`Effects:` を書く。純粋なら `純粋（ctx を取らない）`、`error` も返さなければ、続けて `失敗しない（error を返さない）`。状態の単位のメソッドには、問い合わせか命令かの一行を書く。
+  - **コメント**: `Ops`、`Leaves`、`<Ns>Ops` のメソッドと、配線の本体（`wiring.go` のメソッド。公開でも非公開でも）には、op の説明と、`Throws:`、`Reads:`（P28 の、伝わってきた `reads`）、`Effects:` を書く。純粋なら `純粋（ctx を取らない）`、`error` も返さなければ、続けて `失敗しない（error を返さない）`。コメントの先頭は、そのメソッドの名前（内部の配線なら小文字の `authenticate は…`）。状態の単位のメソッドには、問い合わせか命令かの一行を書く。`ops` の、実装を呼ぶだけのメソッド（葉）には書かない。op が内部かどうかは、コメントには書かない（`Ops` にないこと、メソッドの名前が小文字であることが、それを言う）。
 - **`New`**（P32）: 実装を**位置引数**で受け取り、`Ops` を返す（構造体のフィールドは書かずに済ませられるが、引数は済ませられない）。並びは次の順。当たるものがなければ、その引数はない。
   1. `leaves Leaves`（人が実装する葉の op があるとき）。
   2. 自分の状態の単位。状態の宣言順で、引数の名前は状態の名前（`users UsersState`）。複数の状態を読む葉があれば、その後ろに `shared SharedState`。
   3. 別の名前空間。**名前空間の名前の辞書順**で、引数の名前は名前空間の名前（`mailer MailerOps`、`store StoreOps`）。配線が呼ぶ順にはよらない。
 
-  この仕様では `server.New(leaves Leaves, mailer MailerOps, store StoreOps) Ops`（`gen/server/ops.go:198`）と、`store.New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState) Ops`（`gen/store/ops.go:62`）。`New` は、引数が `nil` かどうかを確かめない（N56）。
+  この仕様では `server.New(leaves Leaves, mailer MailerOps, store StoreOps) Ops`（`gen/server/ops.go:143`）と、`store.New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState) Ops`（`gen/store/ops.go:62`）。`New` は、引数が `nil` かどうかを確かめない（N56）。
 - **パッケージの変数はない**（P32）: `States` と `StateSet` は出さない。実装があるのは、`New` が返す値（非公開の構造体 `ops`。フィールドは `New` の引数そのまま）の中だけ。同じ出力の `New` は何度呼んでもよく、返る `Ops` は互いに何も共有しない。
 - **「実装がない」を実行のときに返す道はない**（P32）: 生成したメソッドは、実装が `nil` かどうかを確かめず、`*runtime.MissingError` を返さない。`ops.go` と `wiring.go` は `runtime` を import しない。基底の出力に残る `runtime` は、`types.go` の `runtime.Effect`（効果の定数の型）と `runtime.Exception`（例外の型がそれを満たすことの確認）の二つ。`runtime.ValidationError` と `runtime.Violation` を使うのは、`go-valid` と `go-http` の出力。
-- **葉のメソッドと、配線の本体**: `ops` の葉のメソッドは、`New` に渡された実装の、同じ名前のメソッドを呼ぶだけ（`o.leaves.<Op>(…)`、`o.<状態>.<Op>(ctx, …)`。`gen/server/ops.go:209-234`、`gen/store/ops.go:74-107`）。配線の本体は、自分の名前空間の op を `o.<Op>(…)` で、別の名前空間の op を `o.<名前空間>.<Op>(ctx, …)` で呼ぶ。`error` を返さない op の呼び出しには、`err` を確かめる行がない（`session := o.NewSession(user)`。`gen/server/wiring.go:38`）。`error` を返す配線が、返さない op の結果をそのまま返すときは `return o.<Op>(…), nil`（`:96`、`:115`）。
+- **葉のメソッドと、配線の本体**: 構造体 `ops` は、その名前空間の op の**すべて**をメソッドに持つ。`export` を付けた op は公開の名前（`Ops` のメソッド）、内部の op は非公開の名前（上の「内部の op」）。`ops` の葉のメソッドは、`New` に渡された実装の、その op のメソッド（公開の名前）を呼ぶだけ（`o.leaves.<Op>(…)`、`o.<状態>.<Op>(ctx, …)`。`gen/server/ops.go:155-180`、`gen/store/ops.go:75-108`）。配線の本体は、自分の名前空間の op を、`ops` のその op のメソッドで呼ぶ（`export` を付けた op なら `o.<Op>(…)`、内部の op なら `o.<op>(…)`）。呼び出し先が葉か配線か、実装がどのインターフェースにあるかは、本体の書き方を変えない（内部の葉を `o.leaves.<Op>(…)` と直に呼ぶ形にはしなかった。N70）。別の名前空間の op は `o.<名前空間>.<Op>(ctx, …)` で呼ぶ。`error` を返さない op の呼び出しには、`err` を確かめる行がない（`session := o.newSession(user)`。`gen/server/wiring.go:38`）。`error` を返す配線が、返さない op の結果をそのまま返すときは `return o.<op>(…), nil`（`:96`、`:115`）。
 - **配線の `match`**（P2、P3、P20）: 分類のどの場合も型から決まる（下の「分類」）なら、判定関数を呼ばず、`nil` かどうかで分ける。絞り込む場合のアームを `if x != nil { … }` の枝にし、もう一方のアームをその後ろに続ける（アームを書いた順によらない）。枝の中で絞り込んだ名前を値として使う位置は `*x`。`return match` は、アームごとの `return`。それぞれの枝の頭に、場合の名前をコメントで書く。
-- **アーム**: `throw E`（P13）は、例外を**値で**返す（`return <零値>, pkgtype.Unauthorized{}`）。呼び出しのアームは、その呼び出しを返す（`return o.RequireFresh(*session)`。`gen/server/wiring.go:58`）。値のアーム（P14）は、その値を返す（`return *session, nil`）が、この仕様にはもうない（「下書きから変えたこと」5）。
+- **アーム**: `throw E`（P13）は、例外を**値で**返す（`return <零値>, pkgtype.Unauthorized{}`）。呼び出しのアームは、その呼び出しを返す（`return o.requireFresh(*session)`。`gen/server/wiring.go:58`）。値のアーム（P14）は、その値を返す（`return *session, nil`）が、この仕様にはもうない（「下書きから変えたこと」5）。
 - **分類**（P2、P3）: 場合が「対象の `T?` を `T` に絞り込む場合一つ」と `default` だけの分類は、どの場合に当たるかが値から決まる。基底は、そういう分類について何も出さない（列挙の型も、判定関数も、`New` の引数も）。分類の名前は、それを使う配線のコメントにだけ残る。この仕様の三つの分類はどれもこの形。
 
-| op（`server`） | 種類 | 純粋か | `throws` | メソッドの形 |
-|---|---|---|---|---|
-| `login`、`logout`、`getMe`、`getOrders`、`placeOrder` | 配線 | いいえ（デコレータ `@http.*` があり、純粋でない op も呼ぶ） | ある | `ctx` を取り、`error` を返す |
-| `issueSession`、`authenticate`、`notify` | 配線 | いいえ（純粋でない op を呼ぶ: 順に `store.addSession`、`store.findSession`、`mailer.send` と `store.addNotification`） | ある | `ctx` を取り、`error` を返す |
-| `checkPassword`、`requireFresh` | 葉 | はい（デコレータも `reads` も効果もない） | ある | `ctx` を取らず、`error` を返す |
-| `newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice` | 葉 | はい（同じ） | ない | `ctx` を取らず、`error` も返さない（戻り値だけ） |
+| op（`server`） | 種類 | `export` | 純粋か | `throws` | メソッドの形 | Go で現れるところ |
+|---|---|---|---|---|---|---|
+| `login`、`logout`、`getMe`、`getOrders`、`placeOrder` | 配線 | ある | いいえ（デコレータ `@http.*` があり、純粋でない op も呼ぶ） | ある | `ctx` を取り、`error` を返す | `Ops` のメソッド（`Login`）。本体は `wiring.go` の、`ops` の公開のメソッド。`go-http` のハンドラが呼ぶ |
+| `issueSession`、`authenticate`、`notify` | 配線 | ない | いいえ（純粋でない op を呼ぶ: 順に `store.addSession`、`store.findSession`、`mailer.send` と `store.addNotification`） | ある | `ctx` を取り、`error` を返す | `wiring.go` の、`ops` の非公開のメソッド（`authenticate`）だけ。どのインターフェースにもない |
+| `checkPassword`、`requireFresh` | 葉 | ない | はい（デコレータも `reads` も効果もない） | ある | `ctx` を取らず、`error` を返す | `Leaves` のメソッド（`CheckPassword`。人が実装する）と、それを呼ぶだけの、`ops` の非公開のメソッド（`checkPassword`。`ops.go`） |
+| `newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice` | 葉 | ない | はい（同じ） | ない | `ctx` を取らず、`error` も返さない（戻り値だけ） | 同じ（`Leaves` の `NewSession` と、`ops` の `newSession`） |
 
-`store` の九つの op は、どれも `reads` か効果を持つ葉なので純粋でなく、`ctx` を取り、`error` を返す（`throws` は、どれにもない）。`mailer.send` は、デコレータ `@smtp.sendMail` を持つ葉なので純粋でない（`mailer.hozo:6-9`）。`server.MailerOps` と `server.StoreOps` のメソッド（`mailer.send` と、`store` の八つ）は、相手がどれも純粋でないので、`ctx` を取り、`error` を返す。`mailer` に Go の単位を置けば、そこに出る `Ops` の `Send` も同じ判定で同じ形になり、その `Ops` は `server.MailerOps` をそのまま満たす。
+`store` の九つの op は、どれも `export` を付けた、`reads` か効果を持つ葉。`store.Ops` と、状態の単位（`<状態>State`）の両方に、公開のメソッドとして現れ、`ops` のメソッドも公開（`gen/store/ops.go:75-108`）。どれも純粋でなく、`ctx` を取り、`error` を返す（`throws` は、どれにもない）。`mailer.send` は、デコレータ `@smtp.sendMail` を持つ葉なので純粋でない（`mailer.hozo:6-9`）。`server.MailerOps` と `server.StoreOps` のメソッド（`mailer.send` と、`store` の八つ）は、相手がどれも純粋でないので、`ctx` を取り、`error` を返す。`mailer` に Go の単位を置けば、そこに出る `Ops` の `Send` も同じ判定で同じ形になり、その `Ops` は `server.MailerOps` をそのまま満たす。
 
 ## `go-valid` が従う規則
 
@@ -151,7 +173,7 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 - **制約**: `@db.key` は `PRIMARY KEY`、`@db.unique` は `UNIQUE`。`@db.ref(M)` は、要素が `M` であるただ一つの `@db` の状態の表の、`@db.key` の列への `REFERENCES`（そういう状態がちょうど一つでなければ、または `M` が `@db.key` を持たなければ、制約なし）。
 - **`const Schema`**: 表ごとの `CREATE TABLE IF NOT EXISTS` を宣言順に並べたもの。
 - **`func CreateTables(ctx context.Context, db *sql.DB) error`**: `Schema` を、受け取った `ctx` で実行する（`gen/store/db.go:40-42`）。するのは表を作ることだけ。
-- **状態ごとの型**（P32）: `@db` の状態ごとに、公開の型 `<状態>Table` と、それを作る `func New<状態>Table(db *sql.DB) <状態>Table` を出す（`UsersTable`、`NewUsersTable`。`gen/store/db.go:47-50`）。型は `*sql.DB` を一つ持つだけの値で、同じ `db` から作った値は、同じ表を読み書きする。メソッドは、基底のその状態の単位（`<状態>State`）のメソッドのうち、**中身を機械的に決められるもの**: 下の「形で決まる問い合わせの中身」（いつも）と、「op の中身」の規則に当たる op。名前と形は、基底のメソッドのまま。受け取った `ctx` で `QueryContext` / `QueryRowContext` / `ExecContext` を呼ぶ。
+- **状態ごとの型**（P32）: `@db` の状態ごとに、公開の型 `<状態>Table` と、それを作る `func New<状態>Table(db *sql.DB) <状態>Table` を出す（`UsersTable`、`NewUsersTable`。`gen/store/db.go:47-50`）。型は `*sql.DB` を一つ持つだけの値で、同じ `db` から作った値は、同じ表を読み書きする。メソッドは、基底のその状態の単位（`<状態>State`）のメソッドのうち、**中身を機械的に決められるもの**: 下の「形で決まる問い合わせの中身」（いつも）と、「op の中身」の規則に当たる op。名前と形は、基底のメソッドのまま。受け取った `ctx` で `QueryContext` / `QueryRowContext` / `ExecContext` を呼ぶ。op に `export` が付いているかは見ない（P33。状態の単位は、内部の op も公開のメソッドとして持つ。N69）。
 - **規則に当たらない op があるとき**: その状態の型は、その op のメソッドを持たない。型は `<状態>State` を満たさず、基底の `New` に渡す行がコンパイルできない。人は、**プラグインの型を自分の型に埋め込み、足りないメソッドを書き足して**、その型を `New` に渡す（この仕様では起きないので、見立ての型で形にした: `app/onsqlite/store_test.go` の `partialUsers` と `humanUsers`。`app/onsqlite/store_test.go:85-112`）。基底のメソッドをすべて持つ型には、それを確かめる `var _ <状態>State = <状態>Table{}` を出す（`gen/store/db.go:52`）。
 - **形で決まる問い合わせの中身**: 基底がその状態の単位にいつも出す問い合わせ（「基底 `go` が従う規則」の「状態の単位」）を、型のメソッド `IsEmpty`、`Get` として出す。`list` の状態は、`IsEmpty` が「`SELECT COUNT(*) FROM <表>` の結果が 0」、`Get` が `SELECT <すべての列> FROM <表> ORDER BY rowid`（足した順）。`nullable` と `single` の状態は、この仕様にないので決めていない。
 - **op の中身**: `@db` の状態 S（要素の model は M）を読み書きする葉の op のうち、次のどれかに当たるものの中身を、S の型のメソッドとして出す。
@@ -171,6 +193,7 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 
 - **ヘッダ**: 先頭は `// Code generated by hozoc go-http <版>; DO NOT EDIT.`。並びはどれも宣言順。
 - **入口**: `func NewHandler(ops Ops) http.Handler`（基底の `New` の戻り値を、そのまま渡す）。`@http.get` / `@http.post` の付いた op ごとに経路を一つ、`"<メソッド> <パス>"` のパターンで `http.NewServeMux` に足す。op には `r.Context()` を渡す。
+- **`@http.get` / `@http.post` の付いた op は、`export` が付いていなければならない**（P33）。ハンドラは、名前空間の外からの呼び出しを op に届ける入口で、op は基底の `Ops`（`export` を付けた op だけ）のメソッドとして呼ぶ。`export` のない op に `@http.get` / `@http.post` が付いていたら、**`go-http` が error の診断として報告する**（`docs/plugin-protocol.md` の、応答の `errors`。一つでもあれば、hozoc は何も書き出さない）。黙ってその op の経路を飛ばすことはしない（仕様に書いた経路が、気づかないうちにサーバーから消える。実装の漏れを黙って通さない、という P32 と同じ向き）。同じパッケージなので、型 `ops` の非公開のメソッドを直に呼ぶコードは書けるが、そうはしない（`NewHandler` が受け取るのは `Ops`。内部の op を外に出す道を、プラグインが作らない）。この仕様では、`@http.*` の付いた op と、`server` の `export` を付けた op が、同じ五つ: `NewHandler` が受け取る `Ops` は、ハンドラが呼ぶ op ちょうど（P33 の前は、十五のメソッドを受け取って五つを呼んでいた）。
 - **入力**: op の引数の model を、フィールドのデコレータで読む。初めの値は、既定値を持つ model なら基底の `New<Model>()`、そうでなければ零値。
   - `@http.header(name)`: 省略可能な、string を元にした scalar。ヘッダがあって空でなければ、その値をそのまま入れる（なければ `nil`）。
   - `@http.query`: クエリにその名前があれば、フィールドの型で読む（`int` は 10 進の 64 ビット）。なければ初めの値（既定値）のまま。
@@ -184,11 +207,11 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 - **本文のある応答**は `Content-Type: application/json`。
 - 非公開の名前には `http` を前に付ける（`httpWriteJSON` など）。
 
-v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制約の検査（P15、P16）、op を呼ぶ前の失敗の本文（v1 は `{"error":"http.BadRequest","message":"…"}`。「分かったこと」N44）。
+v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制約の検査（P15、P16）、op を呼ぶ前の失敗の本文（v1 は `{"error":"http.BadRequest","message":"…"}`。「分かったこと」N44）。P33 で足したのは、`export` のない op についての規則一つ。出力（`gen/server/http.go`）は、P33 の前とバイト単位で同じ。
 
 ## 人が書いたもの
 
-- **`app/leaves.go`**: `server` の葉の op 七つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:36`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも `ctx` を取らず、`throws` のない五つは `error` も返さない**: `server.Leaves` のメソッドの形（`gen/server/ops.go:104-140`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go:24-40` が、メソッド式の代入で確かめる）。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:62-66`）。
+- **`app/leaves.go`**: `server` の葉の op 七つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:36`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも `ctx` を取らず、`throws` のない五つは `error` も返さない**: `server.Leaves` のメソッドの形（`gen/server/ops.go:49-85`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go:28-44` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、`server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ（P33 の前から、この形）。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:62-66`）。
 - **`app/mailer.go`**: `mailer.send` の実装。`*app.Mailer` が `server.MailerOps` を満たし、`server.New` の引数 `mailer` に、そのまま渡す。`ctx` を取る（`mailer.send` は `@smtp.sendMail` を持ち、純粋でない）。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。
 - `app` パッケージは保存先を知らない: import するのは `gen/server` と `gen/type` だけ（`app/leaves_test.go` の `TestNoStorageImport`）。
 - **`app/memstore/memstore.go`**: `store` の四つの状態の単位の、メモリの上の実装。`memstore.New()` が空の `Store` を返し、`Users()`、`Sessions()`、`Orders()`、`Notifications()` が、その上の状態ごとの型を返す（`app/memstore/memstore.go:42-64`）。四つの型は、`gen/storemem` の `UsersState` などを満たす（`app/memstore/memstore.go:35-38`）。メソッドは合わせて十七（形で決まる問い合わせ `IsEmpty`、`Get` が八つ、op が九つ）で、どれも、はじめに `ctx.Err()` を見る。`Store` はいくつ作ってもよく、互いに混ざらない。テストのためだけの読む口は持たない。
@@ -197,14 +220,14 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
   - `handlertest.RunTwo`（二つの組み立ての `TestTwoServers`）: **同じ出力の上の二つのサーバーが、一つのプロセスで同時に動き、混ざらない**。SQLite ならデータベースが二つ、メモリなら `memstore.Store` が二つで、`store.New` と `server.New` を二度呼ぶ。二つに並行に要求を送り、注文と通知の数、ログアウトが、もう一方に及ばないことを確かめる（`app/handlertest/handlertest.go:277-302`）。
 - **`app/storetest`**: `store` の op と、状態の形で決まる問い合わせの振る舞い。二つの実装（`app/onsqlite/store_test.go`、`app/onmem/compose_test.go` の `TestStore`）が同じものを走らせる。`server` は組み立てない。サブテストは並列に走る。効果の結果は、`store.New` に渡したのと同じ、状態の単位の実装の `Get` と `IsEmpty` で確かめる（読む op のない `notifications` も読める。どちらの実装の型も、`storetest.List[T]` をそのまま満たす）。中断された `ctx` で呼ばれた op と問い合わせが `context.Canceled` を返し、四つの状態が変わらないことも確かめる。
 - **`app/onsqlite/store_test.go`**: `go-sqlite` だけの事実。`CreateTables` は中断された `ctx` では表を作らず、二度呼んでも足した行が残る。プラグインの型に足りないメソッドを、人が埋め込みで書き足せる（`TestHumanCompletesPluginType`。足りないままの型が `store.UsersState` を満たさないことは、リフレクションで確かめる）。`Time` と配列の列の形、`REFERENCES`。
-- **`app/server_test.go`**: `server` だけ（`store` のどの出力も使わず、`server.StoreOps` を満たす型をテストが書く）。メソッドの形（`ctx` と `error` の有無）、要求の `context` が `server.StoreOps` のメソッドにそのまま届く、`go-http` が読めない要求と制約に合わない入力では op を呼ばない、葉の op を一つだけ差し替える（`TestReplaceOneLeaf`）、`New` は `nil` を確かめない（`TestNilIsNotChecked`）。
-- **`app/both_test.go`**: 一つのプロセスで、同じ `server` を二つの保存先の上に組み立てられ、二つが混ざらない。`store` の二つの出力の `Ops` が、どちらも `server.StoreOps` をそのまま満たす（`app/both_test.go:31-32`）。一つの `store` の状態の単位を、状態ごとに別の実装（SQLite とメモリ）から取れる（`TestStatesFromTwoImplementations`）。`gen/store` と `gen/storemem` の基底のファイルが、バイト単位で同じ。
+- **`app/server_test.go`**: `server` だけ（`store` のどの出力も使わず、`server.StoreOps` を満たす型をテストが書く）。メソッドの形（`ctx` と `error` の有無。書けるのは公開のメソッドだけ: `server.Ops` の五つ、`server.Leaves`、`server.MailerOps`、`server.StoreOps`）、要求の `context` が `server.StoreOps` のメソッドにそのまま届く、`go-http` が読めない要求と制約に合わない入力では op を呼ばない、葉の op を一つだけ差し替える（`TestReplaceOneLeaf`）、`New` は `nil` を確かめない（`TestNilIsNotChecked`）。**内部の op は、テストからも直に呼べない**: 後ろの二つは、P33 の前は `ops.Notify(…)`、`ops.ToPublicUser(…)` と呼んでいた。今は、その op に届く入口（`ops.PlaceOrder`、`ops.Login`）を呼び、そこまでの道が通る op を、テストの型（`orderLog`、`registered`）に書く（N71）。
+- **`app/both_test.go`**: 一つのプロセスで、同じ `server` を二つの保存先の上に組み立てられ、二つが混ざらない。`store` の二つの出力の `Ops` が、どちらも `server.StoreOps` をそのまま満たす（`app/both_test.go:34-35`）。**`Ops` に並ぶのは `export` を付けた op だけ**（`TestOpsHoldExportedOpsOnly`。インターフェースの型のリフレクションで確かめる）: `server.Ops` のメソッドはちょうど五つ、`server.New` が返す値の公開のメソッドも同じ五つで、内部の op `authenticate` は型アサーションでも取り出せない。`store.Ops` は九つとも持ち、`server.StoreOps`（そのうちの八つ）を満たす（`app/both_test.go:53-90`）。一つの `store` の状態の単位を、状態ごとに別の実装（SQLite とメモリ）から取れる（`TestStatesFromTwoImplementations`）。`gen/store` と `gen/storemem` の基底のファイルが、バイト単位で同じ。
 
 ## 分かったこと
 
 ### v1 の「分かったこと」の、その後
 
-v1 の 63 項目（`git show ac57788:tests/samples/shop-server/README.md` の「分かったこと」。番号はそのまま）が、P1〜P32 を当てはめてどうなったか。「解決」は、その項目が言っていた不足がこの形ではなくなったもの。「残る」は、形が変わっても同じ不足があるもの。「当たらない」は、v1 の組み方にだけあった事情。N で始まる番号は「v2 を書いて分かったこと」の項目。
+v1 の 63 項目（`git show ac57788:tests/samples/shop-server/README.md` の「分かったこと」。番号はそのまま）が、P1〜P33 を当てはめてどうなったか。「解決」は、その項目が言っていた不足がこの形ではなくなったもの。「残る」は、形が変わっても同じ不足があるもの。「当たらない」は、v1 の組み方にだけあった事情。N で始まる番号は「v2 を書いて分かったこと」の項目。
 
 | # | v1 の項目 | その後 | 理由 |
 |---|---|---|---|
@@ -272,15 +295,15 @@ v1 の 63 項目（`git show ac57788:tests/samples/shop-server/README.md` の「
 | 62 | `@db` は、どの保存先かを言わない | 残る | |
 | 63 | `go-sqlite` の細部で決めたもの | 残る | 表の型（`Update`、`Delete`）はなくなった。残りはそのまま |
 
-解決 19、残る 42、当たらない 2（P31、P32 で解決に変わったのは、16〜20 の五つ）。
+解決 19、残る 42、当たらない 2（P31、P32 で解決に変わったのは、16〜20 の五つ。P33 で変わったものはない）。
 
 ### v2 を書いて分かったこと
 
 決定が決めていなかったので書きながら決めたこと、二つの決定が引っ張り合ったところ、理想のコードに決定が与えてくれなかったもの、v1 より悪くなったところ。それぞれ「何が起きたか → サンプルではどうしたか」。パスはこのディレクトリから。
 
-N1〜N53 は、P1〜P30 を当てはめた形を書いたときのもの。その後の決定（直した P30、P31、P32）と仕様の直しで片づいたものは、番号を残して、見出しに「解決」と、何で解決したかを書く。N54〜N65 は、P31 と P32 を当てはめた形（実装をインターフェースで受け取る）を書いて分かったこと。
+N1〜N53 は、P1〜P30 を当てはめた形を書いたときのもの。その後の決定（直した P30、P31、P32）と仕様の直しで片づいたものは、番号を残して、見出しに「解決」と、何で解決したかを書く。N54〜N65 は、P31 と P32 を当てはめた形（実装をインターフェースで受け取る）を書いて分かったこと。N66〜N75 は、P33 を当てはめた形（`export` を付けた op だけが `Ops` に並ぶ）を書いて分かったこと。
 
-N1〜N65 のうち、解決は 10: N3（仕様の直し）、N11（直した P30）、N22（先にあった決定に合わせた）、N27 と N28（P31）、N10、N14、N17、N18、N53（P32）。
+N1〜N75 のうち、解決は 11: N3（仕様の直し）、N11（直した P30）、N22（先にあった決定に合わせた）、N27 と N28（P31）、N10、N14、N17、N18、N53（P32）、N26（P33）。ほかに、N61 は前半だけが P33 で解決した（見出しに書く。数には入れていない）。
 
 #### 仕様
 
@@ -298,21 +321,21 @@ N1〜N65 のうち、解決は 10: N3（仕様の直し）、N11（直した P30
 
 #### 純粋さと `ctx`（P29、P30）
 
-- **N8 この仕様では「純粋な op」と「`server` で人が書く op」が同じ集合になった**。七つの葉がすべて純粋で、配線はどれも、純粋でない op（`store` の op か `mailer.send`）を呼ぶので純粋でない（「基底 `go` が従う規則」の表）。メソッドの形で「保存先に触れない」が分かる、という狙いどおり。
-- **N9 純粋と判定された op が、時計と乱数を使う**。`newSession`、`requireFresh`、`newOrder` は、仕様の上ではデコレータも `reads` も効果もないので純粋で、メソッドは `ctx` を取らない（`gen/server/ops.go:114,125,135`）。本体は、今の時刻と新しい識別子を外から得る（`app/leaves.go:49,51,63,80,83`）。P30 の「関数の形を見れば、その op が状態や外部に触れるかが分かる」は、ここでは成り立たない。仕様に書く方法は、その op にデコレータを付けること（どのトランスパイラも読まない印でよい。`mailer.send` の `@remote` と同じ）で、付けなくても検査は通る。
-- **N10（解決: P32）純粋な op も `error` を返していた**。`toPublicUser` の理想の形は `func(pkgtype.User) pkgtype.PublicUser` だが、P32 の前は、口が埋まっていないことを `*runtime.MissingError` で返すために `error` が要り、配線は、決して失敗しない写しの後でも `err` を確かめていた。P29、P30 は `ctx` だけを決めていて、`error` には触れていなかった。→ P32: 純粋で `throws` のない op は `error` を返さない。五つの葉（`newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice`）は値だけを返し（`gen/server/ops.go:104-140`）、配線は `publicUser := o.ToPublicUser(user)` と書く（`gen/server/wiring.go:42`）。「口が埋まっていない」は、実行のときには起きなくなった。この形で分かったことは N60。
-- **N11（解決: 直した P30）外部の入出力を「純粋でない」と書く方法が、置き場しかなかった**。直す前のサンプルは「別の名前空間の op の口は、相手が純粋かどうかによらず `ctx` を取る」と決めていた。`mailer.send` は、宣言だけを見ればデコレータも `reads` も効果もない純粋な葉で、`ctx` を取るのは `server` から見た口だけだった（`mailer` に Go の単位を置けば、`ctx` を取らない `Send(notice)` が出て、口に入らなくなる形）。直した P30 は、純粋かどうかを op そのものの性質とし（どの名前空間から見ても同じ。口も相手の op の判定に従う）、別のプロセスや外部にある op には受け渡しのデコレータが付く、とした。→ `send` に、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`mailer.hozo:7`。語彙は `smtp.hozo`）。`mailer.send` は純粋でなくなり、`server.MailerOps` の `Send` は `ctx` を取る（`gen/server/ops.go:149`）。理由が「別の名前空間だから」から「相手が純粋でないから」に変わった。`mailer` に Go の単位を置いても、同じ判定で `ctx` を取る `Send(ctx, notice)` が出る。残ること: `smtp` の語彙を提供するプラグインがまだないので、サンプルの中で宣言している（今はどのトランスパイラも読まない印。プラグインができれば、`send` の中身を出せる）。付け忘れても検査は通り、op は純粋と判定されて `ctx` が消える（N9 と同じ）。`throws` があるので `error` は残る（P32）。生成したメソッドのコメントに、純粋でない理由（どのデコレータか）は出ない（`gen/server/ops.go:146-149`）。
-- **N12 宣言を一つ変えると、メソッドの形が変わる**。純粋な葉に、デコレータ（どのトランスパイラも読まない印でも）、`reads`、効果のどれかを足すと、その op のメソッド（`Ops` と、`Leaves` か状態の単位）に `ctx` が増える（`throws` がなかった op なら、`error` も増える）。配線なら、呼び出し先の一つが純粋でなくなるだけで同じことが起きる（伝わる）。人が書いた本体と、`Ops` を呼ぶ人のコードは、コンパイルが通らなくなる（気づける）。別の名前空間のインターフェース（`<Ns>Ops`）のメソッドも、相手の op の判定に従うので同じように変わるが、相手の出力の `Ops` をそのまま渡している組み立ては、両方が同時に変わるので、そのまま通る（P31）。通らなくなるのは、人が書いた実装（`app.Mailer`、`app/memstore`）。`throws` を足したときのことは N60。
+- **N8 この仕様では「純粋な op」と「`server` で人が書く op」が同じ集合になった**。七つの葉がすべて純粋で、配線はどれも、純粋でない op（`store` の op か `mailer.send`）を呼ぶので純粋でない（「基底 `go` が従う規則」の表）。メソッドの形で「保存先に触れない」が分かる、という狙いどおり。P33 の後は、もう一つ重なる: `server` で `export` を付けた op は、`@http.*` を持つ五つの配線とちょうど同じで、残りの十（三つの配線と七つの葉）が内部。
+- **N9 純粋と判定された op が、時計と乱数を使う**。`newSession`、`requireFresh`、`newOrder` は、仕様の上ではデコレータも `reads` も効果もないので純粋で、メソッドは `ctx` を取らない（`gen/server/ops.go:59,70,80`）。本体は、今の時刻と新しい識別子を外から得る（`app/leaves.go:49,51,63,80,83`）。P30 の「関数の形を見れば、その op が状態や外部に触れるかが分かる」は、ここでは成り立たない。仕様に書く方法は、その op にデコレータを付けること（どのトランスパイラも読まない印でよい。`mailer.send` の `@remote` と同じ）で、付けなくても検査は通る。
+- **N10（解決: P32）純粋な op も `error` を返していた**。`toPublicUser` の理想の形は `func(pkgtype.User) pkgtype.PublicUser` だが、P32 の前は、口が埋まっていないことを `*runtime.MissingError` で返すために `error` が要り、配線は、決して失敗しない写しの後でも `err` を確かめていた。P29、P30 は `ctx` だけを決めていて、`error` には触れていなかった。→ P32: 純粋で `throws` のない op は `error` を返さない。五つの葉（`newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice`）は値だけを返し（`gen/server/ops.go:49-85`）、配線は `publicUser := o.toPublicUser(user)` と書く（`gen/server/wiring.go:42`）。「口が埋まっていない」は、実行のときには起きなくなった。この形で分かったことは N60。
+- **N11（解決: 直した P30）外部の入出力を「純粋でない」と書く方法が、置き場しかなかった**。直す前のサンプルは「別の名前空間の op の口は、相手が純粋かどうかによらず `ctx` を取る」と決めていた。`mailer.send` は、宣言だけを見ればデコレータも `reads` も効果もない純粋な葉で、`ctx` を取るのは `server` から見た口だけだった（`mailer` に Go の単位を置けば、`ctx` を取らない `Send(notice)` が出て、口に入らなくなる形）。直した P30 は、純粋かどうかを op そのものの性質とし（どの名前空間から見ても同じ。口も相手の op の判定に従う）、別のプロセスや外部にある op には受け渡しのデコレータが付く、とした。→ `send` に、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`mailer.hozo:7`。語彙は `smtp.hozo`）。`mailer.send` は純粋でなくなり、`server.MailerOps` の `Send` は `ctx` を取る（`gen/server/ops.go:94`）。理由が「別の名前空間だから」から「相手が純粋でないから」に変わった。`mailer` に Go の単位を置いても、同じ判定で `ctx` を取る `Send(ctx, notice)` が出る。残ること: `smtp` の語彙を提供するプラグインがまだないので、サンプルの中で宣言している（今はどのトランスパイラも読まない印。プラグインができれば、`send` の中身を出せる）。付け忘れても検査は通り、op は純粋と判定されて `ctx` が消える（N9 と同じ）。`throws` があるので `error` は残る（P32）。生成したメソッドのコメントに、純粋でない理由（どのデコレータか）は出ない（`gen/server/ops.go:91-94`）。
+- **N12 宣言を一つ変えると、メソッドの形が変わる**。純粋な葉に、デコレータ（どのトランスパイラも読まない印でも）、`reads`、効果のどれかを足すと、その op のメソッド（`Leaves` か状態の単位と、`export` を付けた op なら `Ops`）に `ctx` が増える（`throws` がなかった op なら、`error` も増える）。配線なら、呼び出し先の一つが純粋でなくなるだけで同じことが起きる（伝わる）。人が書いた本体と、`Ops` を呼ぶ人のコードは、コンパイルが通らなくなる（気づける）。内部の配線の形が変わっても、人のコードには何も起きない（呼ぶのは、生成し直される配線だけ。P33）。別の名前空間のインターフェース（`<Ns>Ops`）のメソッドも、相手の op の判定に従うので同じように変わるが、相手の出力の `Ops` をそのまま渡している組み立ては、両方が同時に変わるので、そのまま通る（P31）。通らなくなるのは、人が書いた実装（`app.Mailer`、`app/memstore`）。`throws` を足したときのことは N60。
 - **N13 純粋さの判定を使うのは、基底だけだった**。`go-http` が呼ぶ op は `@http.*` を持ち、`go-sqlite` が中身を出す op は `reads` か効果を持ち、形で決まる問い合わせは状態を読むので、どれも必ず `ctx` を取り、`error` を返す。相乗りのプラグインは、判定の結果を知らなくても正しい呼び出しとメソッドを書ける（`gen/server/http.go:39,54,68,91,117`、`gen/store/db.go:55-191`）。
 - **N14（解決: P32 の後の `go-sqlite` の規則）`ctx` を受けない入口があった**。P32 の前の `SetupDB(db *sql.DB)` は `ctx` を取らず、表を作る文は中断できなかった。P29 が決めているのは op の関数だけ。→ `SetupDB` は、表を作ることと、実装を `States` に入れることの二つをしていた。後ろの方がなくなった（実装は、人が `New` に渡す）ので、残った方を `CreateTables(ctx context.Context, db *sql.DB) error` にした（`gen/store/db.go:40`。`app/onsqlite/store_test.go` の `TestCreateTables`）。
 - **N15 基底が使う名前が増えた**。引数名 `ctx`、パッケージ名 `context` と `pkgtype`。仕様の op の引数が `ctx` という名前なら、末尾に `_` を付ける規則（`docs/emit-go.md`「名前」）に足すことになる。
 
 #### 基底の形
 
-- **N16 型を共有できるのは、共有の名前空間に置いた型だけ**。`gen/store` と `gen/storemem` の `Ops` が、どちらも同じ `server.StoreOps` を満たすのは、引数と戻り値の型がすべて `gen/type` のものだから（`app/both_test.go:27-32`）。`store` が自分の model を持てば、二つの出力は別々の Go の型を持ち、`server` が import するのは一方だけなので、もう一方の `Ops` は満たさない。「同じ名前空間を二つの単位で出すなら、境を越える型は共有の名前空間に置く」は、P5、P6 では指針だが、この組み方では守らなければ組めない。相手の `Ops` をそのまま渡せること（P31）も、同じ前提の上にある。
-- **N17（解決: P32）何がパッケージの変数になるかは、名前空間の境で決まっていた**。P32 の前、`server` は状態を持たないので、すべてが `New(leaves, deps)` の値で、`store` は九つの op がすべて状態の単位にあり、`New()` は引数を取らず、実装はパッケージの変数 `States` にあった。→ P32: パッケージの変数はない。`server` も `store` も、実装はすべて `New` の引数（`gen/server/ops.go:198`、`gen/store/ops.go:62`）。
-- **N18（解決: P32）一つのプロセスに二つの `store`**。P32 の前は、二つの出力（`gen/store`、`gen/storemem`）が別のパッケージで、それぞれの `States` を持つので、同じ `server` を両方の上に同時に組み立てられた（今も: `app/both_test.go:41-66`）が、同じ出力の上に二つ（SQLite の DB を二つ、メモリの `Store` を二つ）は持てなかった: 準備が `States` を上書きした。→ P32: 同じ出力の `New` を何度呼んでもよい。二つの組み立ての `TestTwoServers` が、SQLite のデータベース二つ、`memstore.Store` 二つの上で、二つのサーバーに並行に要求を送る（`app/onsqlite/compose_test.go:53`、`app/onmem/compose_test.go:33`）。
-- **N19 二つの出力は、どちらも `package store`**。パッケージ名は名前空間から決まり、`out` によらない。両方を import するファイルは、一方に別の名前を付ける（`app/both_test.go:20`）。片方だけでも、import パスの最後（`storemem`）と名前（`store`）が違う（`app/onmem/compose.go:11`）。
+- **N16 型を共有できるのは、共有の名前空間に置いた型だけ**。`gen/store` と `gen/storemem` の `Ops` が、どちらも同じ `server.StoreOps` を満たすのは、引数と戻り値の型がすべて `gen/type` のものだから（`app/both_test.go:29-35`）。`store` が自分の model を持てば、二つの出力は別々の Go の型を持ち、`server` が import するのは一方だけなので、もう一方の `Ops` は満たさない。「同じ名前空間を二つの単位で出すなら、境を越える型は共有の名前空間に置く」は、P5、P6 では指針だが、この組み方では守らなければ組めない。相手の `Ops` をそのまま渡せること（P31）も、同じ前提の上にある。
+- **N17（解決: P32）何がパッケージの変数になるかは、名前空間の境で決まっていた**。P32 の前、`server` は状態を持たないので、すべてが `New(leaves, deps)` の値で、`store` は九つの op がすべて状態の単位にあり、`New()` は引数を取らず、実装はパッケージの変数 `States` にあった。→ P32: パッケージの変数はない。`server` も `store` も、実装はすべて `New` の引数（`gen/server/ops.go:143`、`gen/store/ops.go:62`）。
+- **N18（解決: P32）一つのプロセスに二つの `store`**。P32 の前は、二つの出力（`gen/store`、`gen/storemem`）が別のパッケージで、それぞれの `States` を持つので、同じ `server` を両方の上に同時に組み立てられた（今も: `app/both_test.go:95-122`）が、同じ出力の上に二つ（SQLite の DB を二つ、メモリの `Store` を二つ）は持てなかった: 準備が `States` を上書きした。→ P32: 同じ出力の `New` を何度呼んでもよい。二つの組み立ての `TestTwoServers` が、SQLite のデータベース二つ、`memstore.Store` 二つの上で、二つのサーバーに並行に要求を送る（`app/onsqlite/compose_test.go:53`、`app/onmem/compose_test.go:33`）。
+- **N19 二つの出力は、どちらも `package store`**。パッケージ名は名前空間から決まり、`out` によらない。両方を import するファイルは、一方に別の名前を付ける（`app/both_test.go:22`）。片方だけでも、import パスの最後（`storemem`）と名前（`store`）が違う（`app/onmem/compose.go:11`）。
 - **N20 パッケージ名 `pkgtype`**。共有の型の名前空間を、下書きのとおり `type` と名付けると、Go では `pkgtype.User`、ディレクトリは `gen/type`、import には名前を書くことになる（`gen/server/types.go:5`）。利用者がパッケージ名を選ぶ方法はない。通信の上の例外の名前も `type.Unauthorized` になる（N48）。名前空間を `types` や `model` と名付ければ起きない。
 - **N21 状態の単位に置く op**。「`reads` が一つの葉は、その状態の単位の問い合わせ」は、命令の規則（`docs/emit-go.md`「state」）と対に決まった（`gen/store/states.go:13-62`）。単位の中の並びは、形で決まる問い合わせ（N22）、op の問い合わせ、命令。決定が言っていない二つは、ここで決めた: 効果と `reads` の両方を持つ葉は効果の宛先の単位、複数の状態を読む葉はインターフェース `SharedState`（どの状態のものでもなく、実装するのは状態の持ち主なので、`Leaves` ではない。`New` の引数は、状態の単位の後ろの `shared`）。`SharedState` と `shared` という名前は、`shared` という名前の状態と当たる。
 - **N22（解決: 形で決まる問い合わせは、いつも出す）状態を読む口（`IsEmpty`、`Get`）は、配線が読むときだけ出す、と決めていた**。生成したコードが呼ぶ口だけを出す、という規則で、帰結は「効果の結果を、読む op のない状態では確かめられない」だった: `notifications` には `addNotification` しかないので、テストは `go-sqlite` の表を SQL で直に数え、メモリの方は人がテストのための読む口を足していた。これは、先にあった決定（`docs/emit-go.md`「state」: 状態の単位は、配線が読まなくても、形で決まる問い合わせをすべて持つ。テストが効果の結果の判定に使う。`docs/decisions.md` の S6 も同じ向き）に反していたので、その決定に合わせて直した。→ 基底は、どの状態の単位にも `IsEmpty` と `Get` を出す（`gen/store/states.go:15-17`、`:58-60`）。`go-sqlite` と `memstore` がそれを実装し（`gen/store/db.go:180-187`、`app/memstore/memstore.go:90-108`）、テストは、その状態の単位の実装の `Get` で読む（`app/onsqlite/compose_test.go:40`、`app/onmem/compose_test.go:20`）。SQL を直に書くテストと、`memstore` の読む口はなくなった。直して分かったこと:
@@ -323,7 +346,7 @@ N1〜N65 のうち、解決は 10: N3（仕様の直し）、N11（直した P30
 - **N23 分類について、基底は何も出さない**、と決めた（規則は「基底 `go` が従う規則」の「分類」）。`store.Registration` などの名前は、`gen/server/wiring.go:21,55,93` のコメントにだけ残る。決まっていないこと: 絞り込む場合と、人が述語を書く場合が混ざった分類の形、人が書く述語をどのインターフェースに置き、`New` のどの引数で受け取るか（P32 は葉の op と状態の単位について決めた。P6 は分類の置き場を自由にした）。
 - **N24 `match` は `nil` の検査になった**。`return match` はアームごとの `return`（`gen/server/wiring.go:21-27`）、絞り込んだ値は使う位置で `*user`、`*session`（`:24`、`:58`、`:96`）。値を束縛する `match`（`const x = match …`）はこの仕様になく、形を決めていない。
 - **N25 `throw` は例外を値で返す**（`gen/server/wiring.go:27,61,99`）。v1 の「分かったこと」43（値かポインタか）は、生成したコードについては決まった。値を運ぶ例外の `throw` は、この仕様に出てこない（P13 の未定のまま）。
-- **N26 `Ops` に、業務の途中の op がすべて載る**（P11）。`Authenticate`、`IssueSession`、`Notify` と、七つの葉が、`login` などの入口と同じ `Ops` のメソッド（`gen/server/ops.go:12-99`）。`go-http` の `NewHandler(ops Ops)` も十五のメソッドを受け取り、五つだけ呼ぶ。入口とそうでない op を分ける書き方は仕様にない。P31、P32 の後の形での続きは N61。
+- **N26（解決: P33）`Ops` に、業務の途中の op がすべて載っていた**（P11）。P33 の前は、`Authenticate`、`IssueSession`、`Notify` と、七つの葉が、`login` などの入口と同じ `Ops` のメソッドだった。`go-http` の `NewHandler(ops Ops)` も十五のメソッドを受け取り、五つだけ呼んでいた。入口とそうでない op を分ける書き方が、仕様になかった。→ P33: 外から呼べる op に `export` を付ける。`server.Ops` は、`export` を付けた五つの入口だけ（`gen/server/ops.go:12-45`）。途中の十は、`ops` の非公開のメソッドになり、パッケージの外からは呼べない（`app/both_test.go` の `TestOpsHoldExportedOpsOnly`）。P31、P32 の後の形での続きは N61、この形で分かったことは N66〜N75。
 - **N27（解決: P31）`Deps` に入るのは、`Ops` のメソッドだけだった**。P31 の前、`server.StoreFindUserFunc` と `store.FindUserFunc` は、中身が同じでも名前の違う関数の型なので、`States` のフィールドは型を変換しなければ `Deps` に入らなかった（メソッドの値は名前のない関数の型なので、そのまま入った）。→ P31、P32: 関数の型も、フィールドに入れる行もない。相手の `Ops` の値を、そのまま渡す。
 - **N28（解決: P31）組み立ては、口の数だけの行を人が書いていた**。P31 の前、`server.StoreOps` の八つのフィールドを一つずつ入れる行が、二つの組み立てに同じ形で二度あった。→ P31: `server.StoreOps` はインターフェースで、`store.New(…)` の戻り値をそのまま渡す（`app/onsqlite/compose.go:24`、`app/onmem/compose.go:20`）。`server.StoreOps` にない op（`addUser`）を `store.Ops` が余分に持っていても渡せ、足りなければコンパイルできない。「実装の単位は関数の型」（`docs/emit-go.md`「実装の単位」）は、人が実装するもの（葉の op、状態の単位）についても、P32 でインターフェースのメソッドになった。
 - **N29 `runtime` の持ち主**。`go-valid` の出力と `go-http` の出力が使う `runtime.ValidationError` は、このリポジトリの `runtime` パッケージにある。本体が特定の言語を知らない（P9）なら、`runtime` は基底 `go` のもので、`ValidationError` は `go-valid` のものになるはずだが、置き場は決まっていない。P32 の後、**`runtime.MissingError` を使う出力は、この仕様にはない**（P32 の前は、`Kind` が `"leaf"`、`"state"`、`"dep"` のものを基底が返していた）。`runtime` には、ほかの `Kind`（人が書く分類の述語の `"classifier"`、デコレータの `"wrapper"`、制約の `"constraint"`）のためにも残っている。それらを P32 と同じにインターフェースで受け取るかは、この仕様に出てこないので書いていない（N23）。
@@ -375,30 +398,64 @@ N1〜N65 のうち、解決は 10: N3（仕様の直し）、N11（直した P30
 
 #### 実装をインターフェースで受け取る形（P31、P32）
 
-- **N54 `New` の位置引数は、状態と名前空間の数だけ並ぶ**。`store.New` は四つ（`gen/store/ops.go:62`）、`server.New` は三つ（`gen/server/ops.go:198`）。状態が二十あれば、引数は二十。Go では、呼ぶ側に引数の名前を書けないので、何番目がどの状態かは、型だけが頼りになる。
+- **N54 `New` の位置引数は、状態と名前空間の数だけ並ぶ**。`store.New` は四つ（`gen/store/ops.go:62`）、`server.New` は三つ（`gen/server/ops.go:143`）。状態が二十あれば、引数は二十。Go では、呼ぶ側に引数の名前を書けないので、何番目がどの状態かは、型だけが頼りになる。
   - **取り違えは、型が違えばコンパイルエラー**。ただし、**メソッドの並びが同じ二つの状態**（同じ形、同じ要素の型で、どちらにも、それを読み書きする葉の op がない。例: `state drafts: list<type.Order>` と `state archive: list<type.Order>`）は、インターフェースの中身が同じになり、入れ替えて渡してもコンパイルが通る。フィールドに名前で入れる形（P32 の前）では、起きなかった取り違え。
   - **並びは宣言順**なので、仕様で状態の宣言を入れ替えると、`New` を呼ぶすべての行が変わる。状態か、呼ぶ名前空間を一つ足しても同じ（こちらは、渡し忘れをコンパイルエラーにする、という狙いどおり）。別の名前空間を辞書順にしたのは、配線の本体を書き換えただけで並びが変わらないようにするため。
   - → サンプルでは、四つを一行に並べた（`app/onsqlite/compose.go:22`、`app/onmem/compose.go:18`）。P32 の「フィールドは省けるが、引数は省けない」と引き換えに、名前を失った。
-- **N55 `New` の引数の名前**。`leaves`、状態の名前、別の名前空間の名前を、そのまま引数の名前にした。当たる例: `leaves` や `shared` という名前の状態、自分の状態と同じ名前の別の名前空間（`mailer` という状態を持つ名前空間が、名前空間 `mailer` を呼ぶ）、Go の予約語の名前空間（`type` の op を呼ぶ名前空間の `New` は、引数 `type` を持てない）。基底の、末尾に `_` を付ける規則（`docs/emit-go.md`「名前」）に足すことになる。非公開の構造体 `ops` のフィールドも同じ名前を使う。この仕様では、どれも起きない。
-- **N56 `nil` は、書けば渡せる**。`server.New(nil, nil, nil)` はコンパイルが通る。型のある `nil`（`(*app.Leaves)(nil)`）、プラグインの型の零値（`store.UsersTable{}`: `db` が `nil`）、フィールドを入れていない人の型（`&app.Leaves{}`: `Now` が `nil`）も同じ。`New` は確かめないので、その実装を使う op が呼ばれたところで panic になる（`app/server_test.go:206-214`）。`*runtime.MissingError` のような、見分けられるエラーにはならない。`net/http` のサーバーは、ハンドラの panic を受け止めて、その接続を切る（500 の `internal` は返らない）。P32 が防ぐのは「書き忘れ」で、「`nil` と書くこと」ではない。`New` が `nil` を確かめるなら、panic するか、`New` が `(Ops, error)` を返す形になる。→ 確かめない、とした（生成したコードから、実行のときの「ない」をなくす方を取った）。人の型のフィールド（`app.Leaves` の `Now` など）の入れ忘れには、P32 は届かない。
+- **N55 `New` の引数の名前**。`leaves`、状態の名前、別の名前空間の名前を、そのまま引数の名前にした。当たる例: `leaves` や `shared` という名前の状態、自分の状態と同じ名前の別の名前空間（`mailer` という状態を持つ名前空間が、名前空間 `mailer` を呼ぶ）、Go の予約語の名前空間（`type` の op を呼ぶ名前空間の `New` は、引数 `type` を持てない）。基底の、末尾に `_` を付ける規則（`docs/emit-go.md`「名前」）に足すことになる。非公開の構造体 `ops` のフィールドも同じ名前を使う。P33 の後は、そのフィールドが、内部の op の非公開のメソッドとも当たる（N68）。この仕様では、どれも起きない。
+- **N56 `nil` は、書けば渡せる**。`server.New(nil, nil, nil)` はコンパイルが通る。型のある `nil`（`(*app.Leaves)(nil)`）、プラグインの型の零値（`store.UsersTable{}`: `db` が `nil`）、フィールドを入れていない人の型（`&app.Leaves{}`: `Now` が `nil`）も同じ。`New` は確かめないので、その実装を使う op が呼ばれたところで panic になる（`app/server_test.go:228-237`）。`*runtime.MissingError` のような、見分けられるエラーにはならない。`net/http` のサーバーは、ハンドラの panic を受け止めて、その接続を切る（500 の `internal` は返らない）。P32 が防ぐのは「書き忘れ」で、「`nil` と書くこと」ではない。`New` が `nil` を確かめるなら、panic するか、`New` が `(Ops, error)` を返す形になる。→ 確かめない、とした（生成したコードから、実行のときの「ない」をなくす方を取った）。人の型のフィールド（`app.Leaves` の `Now` など）の入れ忘れには、P32 は届かない。
 - **N57 葉の op は、すべて一つの値のメソッドになる**。`server.Leaves` は七つのメソッドを持つ一つのインターフェースで、`New` の引数は一つ。→ 一つの型 `app.Leaves` に七つを書いた（`app/leaves.go:22-88`）。分かったこと:
   - **外から何も受け取らない葉も、メソッドになる**。`checkPassword`、`toPublicUser`、`composeNotice` はレシーバを使わない（P32 の前は、ただの関数を口に入れていた）。
   - **人の型の名前と、葉のメソッド名が、同じ場所に入る**。`app.Leaves` のフィールド `NewOrderID` と、葉のメソッド `NewOrder` は一語違い（`app/leaves.go:28`、`:78`）。フィールドを `NewOrder` と名付ければ、コンパイルできない。仕様に葉を足すと、人の型にある同じ名前のフィールドや補助のメソッドと当たる。
   - **分けて書くには、埋め込む**。関心ごとの型（認証の葉、注文の葉）を一つの構造体に埋め込めば、メソッドが合わさって `server.Leaves` を満たす。二つの型が同じ名前のメソッドを持てば、渡す行が「あいまい」でコンパイルできない。葉の一部を、その語彙を読むトランスパイラが実装するとき（この仕様にはない）も、`go-sqlite` の状態の型と同じに、プラグインの型を人の型に埋め込むことになる。仕様の側に、葉をまとまりに分ける書き方（`Leaves` を二つのインターフェースにする単位）はない。
 - **N58 標準の読み取り（`IsEmpty`、`Get`）と、op の名前が、同じインターフェースに入る**。状態の単位のメソッドは、形で決まる問い合わせと、その状態の葉の op。その状態を読む op が `get` か `isEmpty` という名前なら、同じ名前のメソッドが二つになり、生成したコードがコンパイルできない（P32 の前の、構造体のフィールドでも同じだった。避ける規則は、ないまま）。`Ops` には形で決まる問い合わせを載せないので、そちらは当たらない。もう一つ: どの状態の単位も `Get` を持ち、戻り値の型が状態ごとに違うので、**一つの型は、要素の型が違う二つの状態の単位を兼ねられない**。→ `go-sqlite` の型は状態ごとに一つ（四つ）、`memstore` も、一つの `Store` の上に、状態ごとの型を四つ書いた（`app/memstore/memstore.go:42-63`）。要素の型が同じ状態どうしなら兼ねられるが、そのときは N54 の取り違えが起きる。
 - **N59 テストが op を一つだけ差し替えるには、型を一つ書く**。P32 の前は、`server.StoreOps{FindSession: func(…) {…}}` と、差し替える関数だけをフィールドに入れればよかった（入れなかった口は、呼ばれたら `*runtime.MissingError`）。今は、インターフェースを満たす型が要る。→ 二つの書き方を使った。
-  - **インターフェースを埋め込み、書きたいメソッドだけを書く**。`seenStore` は `nil` の `server.StoreOps` を埋め込み、二つのメソッドを書く（`app/server_test.go:49-62`）。書いていない op が呼ばれれば、`nil` のインターフェースの呼び出しで panic になる。生成したコードからなくした「実行のときの、ない」が、テストの中にだけ、人の選びで戻る。`server.Ops` のスパイ（`spyOps`）は、前からこの形だった。
-  - **本物の実装を埋め込み、一つだけ置き換える**。`fixedNotice` は、`server.Leaves` を満たす値を埋め込んで `ComposeNotice` を置き換える（`app/server_test.go:106-109`）。`humanUsers` も同じ形（N63）。
+  - **インターフェースを埋め込み、書きたいメソッドだけを書く**。`seenStore` は `nil` の `server.StoreOps` を埋め込み、二つのメソッドを書く（`app/server_test.go:53-66`）。書いていない op が呼ばれれば、`nil` のインターフェースの呼び出しで panic になる。生成したコードからなくした「実行のときの、ない」が、テストの中にだけ、人の選びで戻る。`server.Ops` のスパイ（`spyOps`）は、前からこの形だった。
+  - **本物の実装を埋め込み、一つだけ置き換える**。`fixedNotice` は、`server.Leaves` を満たす値を埋め込んで `ComposeNotice` を置き換える（`app/server_test.go:110-113`）。`humanUsers` も同じ形（N63）。
   - Go では、メソッドを関数の中に書けないので、型はテストの関数の外に置き、テストごとの値はフィールドで渡す（`seenStore.seen`、`humanUsers.added`）。クロージャ一つで済んでいたものが、型とフィールドとメソッドになる。
-- **N60 `throws` を足すと、メソッドの形が変わる**。純粋で `throws` のない op に `throws` を足すと、戻り値に `error` が増える（`NewSession(user) Session` が `NewSession(user) (Session, error)` になる）。`Leaves` と `Ops` のメソッド、人が書いた本体、`Ops` を呼ぶ人のコード（`x := ops.NewSession(u)`）が、コンパイルできなくなる（気づける）。配線は生成し直される。最後の `throws` を外せば、逆のことが起きる。N12 の `ctx` と合わせると、op の形は三通り（純粋でない / 純粋で `throws` がある / 純粋で `throws` がない）で、仕様の一語で行き来する。分かったこと:
+- **N60 `throws` を足すと、メソッドの形が変わる**。純粋で `throws` のない op に `throws` を足すと、戻り値に `error` が増える（`NewSession(user) Session` が `NewSession(user) (Session, error)` になる）。`Leaves` のメソッドと、人が書いた本体が、コンパイルできなくなる（気づける）。`export` を付けた op なら、`Ops` のメソッドと、それを呼ぶ人のコード（`x := ops.<Op>(…)`）も同じ。配線と、`ops` の非公開のメソッドは、生成し直される。最後の `throws` を外せば、逆のことが起きる。N12 の `ctx` と合わせると、op の形は三通り（純粋でない / 純粋で `throws` がある / 純粋で `throws` がない）で、仕様の一語で行き来する。分かったこと:
   - **`error` のない葉には、失敗を返す道がない**。`newSession` と `newOrder` は、トークンと識別子を作る。main では乱数（`crypto/rand`）で、読めなければ panic にしている（`app/cmd/shop-sqlite/main.go:68-71`）。「純粋で `throws` がない」は仕様の上の性質で、本体が本当に失敗しないことは、誰も確かめない（N9 と同じ構図）。失敗を返したければ、仕様に `throws` を書く（業務の例外ではない失敗のための、ステータスを持たない例外を宣言することになる）。
   - **純粋な配線**は、この仕様にない（配線は八つとも、純粋でない op を呼ぶ）。`error` を返さない配線の本体（`return o.<Op>(…)` が `error` なしで続く形、`match` の `throw` のない形）は書いていない。
   - **戻り値がなく、純粋で、`throws` もない op** は、引数を受け取って何も返さないメソッドになる。意味のある本体は書けないが、検査は通る。
-- **N61 `Ops` は、今も業務の途中の op をすべて載せる**（N26 の続き）。`server.Ops` の十五のメソッドのうち七つは、`New` に渡された `leaves` の同じ名前のメソッドを呼ぶだけ（`gen/server/ops.go:209-234`）で、組み立てた人は、その値をすでに持っている。P31 で、別の名前空間が使う op は、呼ぶ側が自分のインターフェースで言うようになった（`server.StoreOps` は `store` の九つのうち八つ）ので、`Ops` が「すべて」である理由は「op はすべて出る」（P11）だけになった。重さが出るのは `go-http`: `NewHandler(ops Ops)` は十五のメソッドを求めて、五つだけ呼ぶ。スパイは `server.Ops` を埋め込んで、二つだけ書く（`app/server_test.go:150-160`。N59 の一つ目の書き方）。`go-http` が、自分が呼ぶ op だけのインターフェースを出して受け取れば（P31 と同じ考え）、`New` の戻り値はそのまま渡せて、スパイは五つを書けば済み、書き忘れはコンパイルエラーになる。→ `NewHandler(ops Ops)` のままにした。入口とそうでない op を分ける書き方が仕様にないことは、変わらない。
-- **N62 同じ名前空間を二つの単位で出す理由が、薄くなった**。P32 の前は、実装がパッケージの変数に入ったので、SQLite とメモリを一つのプロセスに持つには、出力を二つ（`gen/store`、`gen/storemem`）に分けるしかなかった。今は、実装は `New` の引数。二つの出力の状態の単位は、中身が同じインターフェースなので、`gen/store` の `New` に `memstore` の型を渡せる（`app/both_test.go:34-35`）。一つの `store` の中で、状態ごとに別の実装を混ぜることもできる（`users` は SQLite、ほかはメモリ。`app/both_test.go:73-81`）。`gen/storemem` に残る意味は、`go-sqlite` のファイル（`db.go`）と `database/sql` の import を持たないパッケージであること。→ 二つの単位は残した（基底のファイルが、単位に並べたほかのトランスパイラによらないことを、`app/both_test.go` の `TestStoreOutputsShareBaseFiles` が確かめる）。混ぜたとき、`@db.ref` の `REFERENCES` は SQLite の表の間でしか効かない（N42）。
+- **N61（前半は解決: P33）`Ops` は、業務の途中の op をすべて載せていた**（N26 の続き）。P33 の前、`server.Ops` の十五のメソッドのうち七つは、`New` に渡された `leaves` の同じ名前のメソッドを呼ぶだけで、組み立てた人は、その値をすでに持っていた。P31 で、別の名前空間が使う op は、呼ぶ側が自分のインターフェースで言うようになった（`server.StoreOps` は `store` の九つのうち八つ）ので、`Ops` が「すべて」である理由は「op はすべて出る」（P11）だけだった。重さが出たのは `go-http`: `NewHandler(ops Ops)` は十五のメソッドを求めて、五つだけ呼んでいた。→ P33: `Ops` は `export` を付けた op だけ。この仕様では、それが `@http.*` の五つと同じなので、`NewHandler(ops Ops)` は、呼ぶ op ちょうどを受け取る。入口とそうでない op を分ける書き方も、仕様にできた（`export`）。
+  - **残る後半: `go-http` は、自分が呼ぶ op だけのインターフェースを持たない**。`NewHandler` が受け取るのは、今も基底の `Ops`。`export` を付けたが `@http.*` のない op（別の名前空間や人のコードだけが呼ぶ op。`store.addUser` のようなもの）が `server` にあれば、`NewHandler` は、呼ばないメソッドも求める。`go-http` が、呼ぶ op だけのインターフェースを出して受け取る形（P31 と同じ考え）にすれば、`New` の戻り値はそのまま渡せて、スパイの書き忘れはコンパイルエラーになる。→ `NewHandler(ops Ops)` のままにした。スパイは、今も `server.Ops` を埋め込んで、数える二つだけを書く（`app/server_test.go:171-185`。N59 の一つ目の書き方。五つなら、すべて書くこともできる）。
+- **N62 同じ名前空間を二つの単位で出す理由が、薄くなった**。P32 の前は、実装がパッケージの変数に入ったので、SQLite とメモリを一つのプロセスに持つには、出力を二つ（`gen/store`、`gen/storemem`）に分けるしかなかった。今は、実装は `New` の引数。二つの出力の状態の単位は、中身が同じインターフェースなので、`gen/store` の `New` に `memstore` の型を渡せる（`app/both_test.go:37-38`）。一つの `store` の中で、状態ごとに別の実装を混ぜることもできる（`users` は SQLite、ほかはメモリ。`app/both_test.go:127-135`）。`gen/storemem` に残る意味は、`go-sqlite` のファイル（`db.go`）と `database/sql` の import を持たないパッケージであること。→ 二つの単位は残した（基底のファイルが、単位に並べたほかのトランスパイラによらないことを、`app/both_test.go` の `TestStoreOutputsShareBaseFiles` が確かめる）。混ぜたとき、`@db.ref` の `REFERENCES` は SQLite の表の間でしか効かない（N42）。
 - **N63 プラグインが出す型の形は、ここで決めた**。P32 が言うのは「プラグインは、機械的に決まる op を実装した型を出し、足りない op は人が書き足す」まで。決めたもの: 名前（`<状態>Table`、`New<状態>Table`）、値の型でありポインタではないこと、作るのが関数であること（`db` を渡し忘れられない。零値は書ける: N56）、すべて実装できた型に出す `var _ <状態>State = …`。足りない op があるときに分かったこと（見立ての型で確かめた。`app/onsqlite/store_test.go:94-117`）:
   - **足りないことを人が知るのは、`New` に渡した行のコンパイルエラーから**（`missing method AddUser`）。プラグインがどの op を実装しなかったかの一覧は、どこにも出ない。足りない型には `var _` の行がない、という違いだけがある。
   - **書き足す人の型は、同じ `*sql.DB` を自分でも持つ**。プラグインの型の `db` は非公開で、読み書きの補助（`dbScanUser`、`dbArgsUser`）も非公開なので、人の SQL は列の並びを書き直す（`app/onsqlite/store_test.go:104-108`）。
   - **置き換えもできる**。すべて実装した型でも、埋め込んで一つのメソッドを書けば、そのメソッドだけが人のものになる（一意の違反を見分ける `AddUser` など。N37）。プラグインの型は、埋め込まれることを前提にした形になっている。
 - **N64 表を作り忘れても、コンパイルは通る**。`go-sqlite` の出力を使う手順は二つ（`CreateTables` を呼ぶ、型を `New` に渡す）で、P32 がコンパイルエラーにするのは後ろだけ。`CreateTables` を呼ばなければ、はじめの問い合わせが「表がない」というドライバのエラーになる。型を作る関数が `ctx` を取って表も作る形（`NewUsersTable(ctx, db) (UsersTable, error)`）なら忘れられないが、作るたびに文を実行し、`error` が増え、`store.New(…)` の引数に直に書けなくなる。→ 分けたままにした（表を作るのは、起動のときに一度）。移行の形がないこと（v1 の 59）とも、つながる。
-- **N65 op の説明が、インターフェースごとに重なる**。P32 の前は、op の説明と `Throws:` などは、op ごとの関数の型（`<Op>Func`）のコメントに一度と、`Ops` のメソッドにあった。関数の型がなくなったので、その op のメソッドを宣言するところごとに書く: `checkPassword` は `Ops` と `Leaves` に同じコメント（`gen/server/ops.go:26`、`:105`）、`store.findUser` は `store.Ops`、`store.UsersState`、`server.StoreOps` の三か所。→ `Ops`、`Leaves`、`<Ns>Ops` には op の説明を、状態の単位には、問い合わせか命令かの一行を書いた。`Ops` が `Leaves` を埋め込めば重なりは減るが、`Ops` のメソッドの並びが宣言順でなくなる。
+- **N65 op の説明が、インターフェースごとに重なる**。P32 の前は、op の説明と `Throws:` などは、op ごとの関数の型（`<Op>Func`）のコメントに一度と、`Ops` のメソッドにあった。関数の型がなくなったので、その op のメソッドを宣言するところごとに書く: `store.findUser` は `store.Ops`、`store.UsersState`、`server.StoreOps` の三か所。P33 の前は、`checkPassword` も `Ops` と `Leaves` に同じコメントがあった。→ `Ops`、`Leaves`、`<Ns>Ops` には op の説明を、状態の単位には、問い合わせか命令かの一行を書いた。`Ops` が `Leaves` を埋め込めば重なりは減るが、`Ops` のメソッドの並びが宣言順でなくなる。**P33 の後、`server` の重なりは減った**: 七つの葉は内部になり、説明は `Leaves` の一か所だけ（`gen/server/ops.go:50`）。重なるのは、`export` を付けた op（`Ops` のメソッドと、配線の本体。`export` を付けた葉なら、`Ops` と、`Leaves` か状態の単位）。内部の配線は、逆に、説明が見えにくくなった（N72）。
+
+#### `export` と内部の op（P33）
+
+- **N66 `export` を付ける理由になる「外の呼び手」は、三種類あった**。P33 の言い方は「別の名前空間から呼べる op」だが、この仕様で `export` を付けた十五のうち、仕様の別の名前空間が呼ぶのは九つ（`store` の八つと `mailer.send`）だけ。`server` の五つを呼ぶのは `go-http` のハンドラ（プラグインの出力）、`store.addUser` を呼ぶのは人が書くコード（main とテスト）で、どちらも仕様には現れない。基底の形では、`export` は「`Ops` に載る」と同じ意味になり、`Ops` を受け取る者は、みな外の呼び手。→ `addUser` は `export` にした（「`export` を付けた op」）。帰結:
+  - **「`export` を付けたのに、どの名前空間も呼ばない」を、検査は言えない**。呼び手が仕様の外にいるかどうかは、仕様から分からない。六つ（`server` の五つと `addUser`）がそうなっている。
+  - **人のコードのためだけに `export` を付けると、仕様の別の名前空間からも呼べるようになる**。「人のコードには見せるが、仕様の配線からは呼ばせない」は書けない。`addUser` は、`server` の配線からも呼べる。
+- **N67 HTTP の入口には、`@http.*` と `export` の二つを書く**。五つの入口は、どれも `@http.post` / `@http.get` と `export` を並べて持つ（`server.hozo:41-42` など）。デコレータは「どう呼ばれるか」、`export` は「外から呼べるか」で、言っていることは別だが、`@http.*` を付けて `export` を付けない op に意味はない。→ `go-http` の規則にした: `export` のない op に `@http.get` / `@http.post` が付いていれば、プラグインが error を報告する（「`go-http` が従う規則」）。考えた別の形は二つ。(a) 黙って飛ばす: 仕様に書いた経路が、エラーなしにサーバーから消えるので取らなかった。(b) `@http.*` が付いていれば `export` と見なす: 語彙のデコレータが、本体の検査（別の名前空間から呼べるか）の結果を変えることになるので取らなかった。残ること: 付け忘れが分かるのは、`go-http` を並べた単位を emit したとき（または、そのプラグインの `check`）。`hozoc check` の本体の規則ではないので、`go-http` を使わない設定では、何も言われない。
+- **N68 内部の op の名前は、ここで決めた**。P33 が言うのは「`Ops` には `export` の付いた op だけが並ぶ」までで、内部の op を Go でどう持つかは言っていない。→ 構造体 `ops` の非公開のメソッドにし、名前は op の名前の先頭を小文字にしたもの（規則は「基底 `go` が従う規則」の「内部の op」）。分かったこと:
+  - **非公開のメソッドにしたので、パッケージの外からは、どうやっても呼べない**。考えた別の形は、「公開のメソッドのまま、`Ops` から外すだけ」（`o.Authenticate`）。配線の書き方は P33 の前と変わらないが、`New` の戻り値を、外で宣言したインターフェースに型アサーションすれば呼べる（`ops.(interface{ Authenticate(…) … })`）。非公開のメソッドなら、それも通らない（`app/both_test.go:65-69`）。
+  - **`export` を付け外しすると、メソッドの名前が変わる**（`Notify` と `notify`）。`Ops` を呼ぶ人のコードは、外した op を呼んでいればコンパイルできなくなる（気づける）。その op を呼ぶ別の名前空間は、検査でエラーになる。生成したコードの中では、その op を呼ぶすべての配線の行が変わる。
+  - **Go の予約語と当たるのは、P33 から**。op の名前は小文字で始めるので、`go`、`select`、`range`、`import`、`default` のような名前の内部の op は、そのままではメソッドにできない（先頭を大文字にする `export` の op では起きない）。→ 末尾に `_`（`docs/emit-go.md`「名前」の規則のまま）。同じ op が、`export` を付ければ `Select`、外せば `select_` になる。
+  - **`ops` のフィールドと当たる**（N55 の続き）。フィールドは `New` の引数の名前（`leaves`、`shared`、状態の名前、呼ぶ名前空間の名前）なので、名前空間 `mailer` を呼ぶ `server` に、内部の op `mailer` や `leaves` があれば当たる。→ メソッドの方に `_` を付ける、とした。パッケージの名前（プラグインの `httpWriteJSON` など。N50）とは、メソッドなので当たらない。
+  - **先頭の大文字・小文字だけが違う二つの op**（`foo` と `Foo`）は、P33 の前から GOEMIT-2（先頭を大文字にした名前で比べる）。一方が内部なら、`ops` のメソッドは `Foo` と `foo` で当たらなくなるが、`Leaves` と状態の単位では、内部の op も公開の名前になるので、この規則は `export` によらず、そのままにする。
+- **N69 「内部」が隠すのは配線だけで、人が書く葉は、Go の上では公開のまま**。P33 は「内部の op も、人が書くものは実装を受け取るインターフェースに並ぶ」と決めている。`server.Leaves` の七つは内部の op だが、人が別のパッケージで実装するので、メソッドは公開の名前（`CheckPassword`）で、`app.Leaves` の公開のメソッドになる。実装の値を持つ者は、誰でも呼べる: 葉のテストは `leaves.CheckPassword(…)` と直に呼ぶ（`app/leaves_test.go:66`）。→ 矛盾ではない、と読んだ: 仕様の「内部」は「別の名前空間の配線から呼べず、`Ops` に載らない」で、「その本体を、パッケージの外の Go のコードが実行できない」ではない。本体は人のもので、基底は、それを `Ops` から配らないだけ。ただし:
+  - **`Leaves` を見ても、どの op が内部かは分からない**。`export` を付けた葉（この仕様の `server` にはない）も、同じ `Leaves` に、同じ形で並ぶ。メソッドのコメントに「内部」とは書いていない。
+  - **状態の単位でも同じことが起きる**（この仕様では、`store` の九つがすべて `export` なので、起きていない）。`store` の内部の葉は、`store.Ops` からは消えるが、`<状態>State` のメソッドと、`go-sqlite` が出す公開の型のメソッドには残る: `store.NewUsersTable(db).FindUser(ctx, …)` は、どのパッケージからも呼べる。`store` の op を内部にしても、保存先を読み書きする口は閉じない。
+  - **テストと、人のコードには、それが抜け道になる**。`addUser` を内部にして、main が `store.NewUsersTable(db).AddUser` を呼ぶ形でも動く（そうしなかった理由は「`export` を付けた op」）。
+- **N70 葉を呼ぶだけの非公開のメソッドが、七つ残った**。P33 の前、`ops` の `CheckPassword` などは、`Ops` を満たすために要った。今は、`o.checkPassword(…)` を呼ぶのは配線だけで、中身は `o.leaves.CheckPassword(…)` の一行（`gen/server/ops.go:155-180`）。配線が `o.leaves.CheckPassword(user, password)` と直に呼べば、七つのメソッドは要らない。→ 残した。配線の本体の規則が一つで済む（自分の名前空間の op は、いつも `ops` のその op のメソッド。呼び出し先が葉か配線か、`export` があるか、実装が `Leaves` か状態の単位か `SharedState` かで、本体の書き方が変わらない）方を取った。直に呼ぶ形にするなら、`export` を付けた葉（`Ops` を満たすために、`ops` のメソッドが要る）だけが、二通りの呼び方を持つことになる。
+- **N71 内部の配線は、単独では試せない**。P33 の前、テストは `ops.Notify(ctx, order)` と呼び、`notify` が通る二つの op（`mailer.send`、`store.addNotification`）だけを書けばよかった。今は、`notify` に届く入口 `placeOrder` を呼ぶしかなく、そこまでの道が通るもの（`store.findSession`、葉 `requireFresh` と `newOrder`、`store.addOrder`）も用意する（`app/server_test.go:119-167`。テストの型のメソッドは二つから四つに増えた）。`authenticate` の振る舞い（トークンなし、知らないトークン、期限切れ）は、P33 の前から、四つの入口を通して確かめている（`app/handlertest` の `expired` など）。分かったこと:
+  - **同じパッケージにテストを置く、という Go の普通の手が使えない**。`gen/server` は単位の `out` で、そこにあるファイルは hozoc のもの（記録 `.hozoc-outputs.json`）。人の `_test.go` を置く場所ではない。
+  - **内部の配線の、メソッドの形**（`ctx` と `error` の有無）は、外から書けない。P33 の前は、`server.Ops.Authenticate` のメソッド式で確かめていた。今、確かめているのは `export` を付けた五つと、葉と、別の名前空間の op だけ（`app/server_test.go:28-44`）。内部の配線の形は、人のコードの誰にも見えないので、確かめる理由もなくなった、とも言える。
+  - **`nil` を渡したときの panic**（N56）も、入口から届かせる: `TestNilIsNotChecked` は、ユーザーがいつもいる `store` を書いて、`login` を葉 `checkPassword` まで進める（`app/server_test.go:228-244`）。
+  - 隠したのだから、入口を通して試すのは狙いどおり。重さは、入口から遠い配線ほど大きくなる。
+- **N72 内部の配線の説明は、非公開のメソッドにしかない**。P33 の前、`authenticate` の説明と `Throws:`、`Reads:` は、`Ops` のメソッドのコメント（公開。`go doc` に出る）と、配線の本体の二か所にあった。今は、`wiring.go` の非公開の構造体の、非公開のメソッドのコメントだけ（`gen/server/wiring.go:46-49`）で、`go doc` には出ない。読むには、生成したファイルを開く。内部の葉の説明は、`Leaves`（公開）にある。→ そのままにした（外から呼べないものの説明を、外に出す理由がない）。残ること: `export` を付けた op のコメントの `Throws:`、`Reads:`、`Effects:` は、内部の op から伝わってきたものを含む（`PlaceOrder` の `Effects: store.createOrder, store.notifyUser` の後ろは、内部の `notify` のもの）が、どの内部の op を通ったかは、公開のコメントからは分からない。仕様を読めば分かる。
+- **N73 内部の op の分類を、外から使えるか**。P33 は、分類を、今までどおりどこからでも参照できるものにした。分類は op について宣言する（`classify Registration of findUser`。`store.hozo:36-39`）ので、**その op が内部でも、分類の名前は外から書ける**。この仕様の三つの分類は、どれも `export` を付けた op のもので、`server` は、自分で呼んだ `store.findUser` の結果を `by store.Registration` で分けている（`server.hozo:45-46`）。`findUser` が内部だったら:
+  - `server` は `findUser` を呼べないので、その結果を持てない。`match x by store.Registration` の `x` が `findUser` の結果でなければならないなら（N4 の、決まっていない点）、内部の op の分類は、外からは**参照できるが、使えない**。
+  - `store` の `export` を付けた配線が、内部の `findUser` の結果をそのまま返すとき、その値を外で `by store.Registration` で分けられるか（値の出どころが、配線を通って伝わるか）も、N4 と同じく決まっていない。
+  - 分類の宣言 `Registered: findUser as type.User;` は、内部の op の名前と戻り値の型を、外から読めるところに書く。
+  - 基底は、この形の分類について何も出さない（N23）ので、Go のコードは、どちらに決まっても変わらない。人が述語を書く分類（基底が判定関数を出す形）なら、内部の op の分類の関数を、公開の名前で出すかどうかを決めることになる。
+- **N74 すべての op が `export` の名前空間では、`export` は九回書くだけの語**。`store` の op は、ほかの名前空間に読み書きさせるためにあるので、九つとも `export`（`store.hozo:22-83`）。`mailer` も、一つの op が `export`。内部の op があるのは、配線を持つ `server` だけ。既定を逆（付けなければ外から呼べる。隠したいものに印）にすれば、`store` と `mailer` には何も書かずに済むが、`server` の十に印が要る。P33 は「付けたものだけが外から見える」を取っていて、付け忘れは、呼ぶ側の検査のエラーか、人のコードのコンパイルエラーで分かる（外に見せすぎる方の誤りは、気づけない）。関連して:
+  - **単位のない名前空間（`mailer`）の `export`** が効くのは、検査だけ。`server.MailerOps` は、P33 の前と同じ。
+  - **`export` を付けた op が一つもない名前空間**は、`New` が空の `Ops` を返す、と決めた（「基底 `go` が従う規則」）。外から何も呼べないパッケージに意味があるのかは、この仕様に出てこないので考えていない（相乗りのプラグインが、`Ops` を通さずに入口を作る形があれば、意味がある）。
+- **N75 呼ばれない内部の op を、検査が言えるようになった**。P33 の前は、どの op も `Ops` にあり、仕様のどこからも呼ばれていない op も、人のコードが呼んでいるかもしれなかった。今は、内部の op を呼べるのは、同じ名前空間の配線だけなので、**どの配線からも呼ばれない内部の op は、誰にも呼べない**。配線なら、使われない非公開のメソッドが出る。葉なら、人は、誰も呼ばない op の本体を `Leaves` に書かされる（書かなければコンパイルできない）。この仕様の十の内部の op は、どれも呼ばれている。検査の規則（warning）にできるが、P33 は決めていない。

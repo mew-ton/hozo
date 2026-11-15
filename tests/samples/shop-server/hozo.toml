@@ -1,4 +1,4 @@
-# サンプル shop-server（tests/samples/README.md）: docs/decisions.md の P1〜P32 の後の形。
+# サンプル shop-server（tests/samples/README.md）: docs/decisions.md の P1〜P33 の後の形。
 # 名前空間は四つ（type、store、server、mailer）で、単位は四つ。mailer には単位を置かない（コードを出さない）。
 # 単位の transpilers には、依存しているものもすべて書く（P18）。期待する出力は、それぞれの out のディレクトリ（README.md）。
 

@@ -1,10 +1,10 @@
 // サンプル shop-server の仕様（README.md）。通知を外へ届ける仕組みの名前空間 mailer。
-// hozo.toml に単位を置かないので、コードは出ない。呼ぶ側（server）の出力に、実装を受け取るインターフェース（server.MailerOps）だけができる。
+// send は server が呼ぶので export（P33）。hozo.toml に単位を置かないので、コードは出ない。呼ぶ側（server）の出力に、実装を受け取るインターフェース（server.MailerOps）だけができる。
 
 /** 配送。通知を外へ届ける外部の仕組み */
 namespace mailer {
   /** 通知を外へ送る。送れなければ NotificationFailed */
   @smtp.sendMail
-  op send(notice: type.Notification)
+  export op send(notice: type.Notification)
     throws type.NotificationFailed;
 }

@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -27,13 +29,65 @@ var (
 	_ storetest.Ops = store.Ops(nil)
 	_ storetest.Ops = storemem.Ops(nil)
 	// server が呼ぶ store の op のインターフェース（server.StoreOps）も、どちらの Ops もそのまま満たす。
-	// server.StoreOps は store の九つの op のうち、配線が呼ぶ八つ（addUser がない）
+	// server.StoreOps は store の九つの op のうち、配線が呼ぶ八つ（addUser がない）。別の名前空間から呼べるのは export を
+	// 付けた op だけで、Ops にはそれがすべて並ぶので、<Ns>Ops のメソッドは、いつも相手の Ops にある
 	_ server.StoreOps = store.Ops(nil)
 	_ server.StoreOps = storemem.Ops(nil)
 	// 状態の単位のインターフェースも、二つの出力で中身が同じ。一方のための実装は、もう一方の New にも渡せる
 	_ storemem.UsersState = store.UsersTable{}
 	_ store.UsersState    = memstore.Users{}
 )
+
+// methodNames は、型 T の公開のメソッドの名前（名前順）。T がインターフェースなら、そのメソッドのすべて。
+func methodNames(typ reflect.Type) []string {
+	var names []string
+	for i := range typ.NumMethod() {
+		names = append(names, typ.Method(i).Name)
+	}
+	return names
+}
+
+// TestOpsHoldExportedOpsOnly は、Ops に並ぶのが、仕様で export を付けた op だけであること。
+//   - server: 十五の op のうち、HTTP の入口の五つ。内部の op（配線 issueSession、authenticate、notify と、七つの葉）はない。
+//   - store: 九つとも export。server が呼ぶ八つ（server.StoreOps）は、その中にある。
+func TestOpsHoldExportedOpsOnly(t *testing.T) {
+	t.Parallel()
+	entries := []string{"GetMe", "GetOrders", "Login", "Logout", "PlaceOrder"}
+	if got := methodNames(reflect.TypeFor[server.Ops]()); !slices.Equal(got, entries) {
+		t.Errorf("server.Ops のメソッド = %v（期待は %v）", got, entries)
+	}
+	// New が返す値も、公開のメソッドは同じ五つ。内部の op は非公開のメソッドなので、別のパッケージが宣言した
+	// インターフェースへの型アサーションでも取り出せない
+	ops := server.New(nil, nil, nil)
+	if got := methodNames(reflect.TypeOf(ops)); !slices.Equal(got, entries) {
+		t.Errorf("server.New が返す値の公開のメソッド = %v（期待は %v）", got, entries)
+	}
+	if _, ok := ops.(interface {
+		Authenticate(context.Context, *pkgtype.Token) (pkgtype.Session, error)
+	}); ok {
+		t.Error("内部の op authenticate を、server.New が返す値から呼べる")
+	}
+
+	all := []string{
+		"AddNotification", "AddOrder", "AddSession", "AddUser", "FindSession", "FindUser", "FindUserById", "ListOrders", "RemoveSession",
+	}
+	storeOps := reflect.TypeFor[server.StoreOps]()
+	for name, typ := range map[string]reflect.Type{
+		"gen/store": reflect.TypeFor[store.Ops](), "gen/storemem": reflect.TypeFor[storemem.Ops](),
+	} {
+		if got := methodNames(typ); !slices.Equal(got, all) {
+			t.Errorf("%s の Ops のメソッド = %v（期待は %v）", name, got, all)
+		}
+		if !typ.Implements(storeOps) {
+			t.Errorf("%s の Ops が server.StoreOps を満たさない", name)
+		}
+	}
+	// server.StoreOps は、store.Ops から addUser を除いたもの
+	called := slices.DeleteFunc(slices.Clone(all), func(name string) bool { return name == "AddUser" })
+	if got := methodNames(storeOps); !slices.Equal(got, called) {
+		t.Errorf("server.StoreOps のメソッド = %v（期待は %v）", got, called)
+	}
+}
 
 // TestTwoStoresInOneProcess は、同じ server（gen/server と人が書いた葉。どちらも一つしかない）を、一つのプロセスで
 // 二つの保存先の上に組み立てられること。違うのは組み立て（onsqlite.New と onmem.New）だけ。
