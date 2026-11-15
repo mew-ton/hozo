@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"example.com/shop-server/app"
+	"example.com/shop-server/app/memstore"
 	"example.com/shop-server/app/onmem"
 	pkgtype "example.com/shop-server/gen/type"
 )
@@ -31,7 +32,7 @@ func main() {
 		log.Printf("通知 → %s: %s", notice.UserId, notice.Message)
 		return nil
 	}}
-	handler, store := onmem.New(leaves.Server(), mailer.Send)
+	handler, store := onmem.New(memstore.New(), leaves, mailer)
 
 	// 試すためのユーザーを一人入れる（store の op で）
 	demo := pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: app.HashPassword("password123")}

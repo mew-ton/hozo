@@ -1,6 +1,6 @@
 // サンプル shop-server の仕様（README.md）。HTTP の入口と業務の流れを持つ名前空間 server。
 // 保存先には触れない: 読み書きは store の op を、外への配送は mailer の op を呼ぶ。
-// 人が書く op（本体のない op）は六つで、どれも状態を読まず、効果を持たない。
+// 人が書く op（本体のない op）は七つで、どれも状態を読まず、効果を持たない。
 
 /** サーバー。HTTP の入口と、業務の流れ */
 namespace server {
@@ -72,16 +72,20 @@ namespace server {
 
   // ---- 誰が呼んだか ----
 
-  /** 呼んだ人のセッション。ログインしていなければ Unauthorized */
+  /** 呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
   op authenticate(token: type.Token?): type.Session
     throws type.Unauthorized
   {
     const session = store.findSession(token);
     return match session by store.Login {
-      LoggedIn => session;
+      LoggedIn => requireFresh(session);
       default  => throw type.Unauthorized;
     };
   }
+
+  /** 期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く） */
+  op requireFresh(session: type.Session): type.Session
+    throws type.Unauthorized;
 
   /** ログアウトする */
   @http.post("/logout")

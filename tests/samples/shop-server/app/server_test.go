@@ -7,54 +7,70 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"example.com/shop-server/app/handlertest"
 	"example.com/shop-server/gen/server"
 	pkgtype "example.com/shop-server/gen/type"
-	"github.com/mew-ton/hozo/runtime"
 )
 
-// 純粋な op（仕様から割り出したもの: デコレータ、reads、effects がなく、状態に依らない。配線なら、呼び出し先もすべて純粋）の
-// 関数は ctx を取らず、そうでない op の関数は最初の引数に取る。別の名前空間の op の口（MailerSendFunc、StoreFindSessionFunc）も
-// 相手の op の判定に従う: mailer.send はデコレータ @remote を、store.findSession は reads を持つので、純粋でなく、ctx を取る。
-// 生成された関数の型が、この代入をコンパイルできることで確かめる。
+// 生成されたメソッドの形。インターフェースのメソッド式（最初の引数がそのインターフェース）を、関数の型に代入できることで確かめる。
+//
+//   - ctx: 純粋な op（仕様から割り出したもの: デコレータ、reads、effects がなく、状態に依らない。配線なら、呼び出し先も
+//     すべて純粋）は取らず、そうでない op は最初の引数に取る。別の名前空間の op（MailerOps、StoreOps）も相手の op の判定に従う:
+//     mailer.send はデコレータ @remote を、store.findSession は reads を持つので、純粋でなく、ctx を取る。
+//   - error: 純粋で、throws のない op は返さない。それ以外は返す（純粋でも、throws があれば返す）。
 var (
-	_ func(pkgtype.User, pkgtype.Password) error                                    = server.CheckPasswordFunc(nil)
-	_ func(pkgtype.User) (pkgtype.Session, error)                                   = server.NewSessionFunc(nil)
-	_ func(pkgtype.User) (pkgtype.PublicUser, error)                                = server.ToPublicUserFunc(nil)
-	_ func([]pkgtype.Order, int64) ([]pkgtype.Order, error)                         = server.PageOfFunc(nil)
-	_ func(pkgtype.Session, []pkgtype.OrderLine) (pkgtype.Order, error)             = server.NewOrderFunc(nil)
-	_ func(pkgtype.Order) (pkgtype.Notification, error)                             = server.ComposeNoticeFunc(nil)
-	_ func(context.Context, server.LoginInput) (server.LoginOk, error)              = server.LoginFunc(nil)
-	_ func(context.Context, *pkgtype.Token) (pkgtype.Session, error)                = server.AuthenticateFunc(nil)
-	_ func(context.Context, pkgtype.Order) error                                    = server.NotifyFunc(nil)
-	_ func(context.Context, pkgtype.Notification) error                             = server.MailerSendFunc(nil)
-	_ func(context.Context, *pkgtype.Token) (*pkgtype.Session, error)               = server.StoreFindSessionFunc(nil)
-	_ func(context.Context, pkgtype.User, pkgtype.Password) (server.LoginOk, error) = server.IssueSessionFunc(nil)
+	// 純粋で、throws がない: ctx も error もない
+	_ func(server.Leaves, pkgtype.User) pkgtype.Session                       = server.Leaves.NewSession
+	_ func(server.Leaves, pkgtype.User) pkgtype.PublicUser                    = server.Leaves.ToPublicUser
+	_ func(server.Leaves, []pkgtype.Order, int64) []pkgtype.Order             = server.Leaves.PageOf
+	_ func(server.Leaves, pkgtype.Session, []pkgtype.OrderLine) pkgtype.Order = server.Leaves.NewOrder
+	_ func(server.Leaves, pkgtype.Order) pkgtype.Notification                 = server.Leaves.ComposeNotice
+	_ func(server.Ops, pkgtype.User) pkgtype.PublicUser                       = server.Ops.ToPublicUser
+	// 純粋で、throws がある: ctx はなく、error はある
+	_ func(server.Leaves, pkgtype.User, pkgtype.Password) error     = server.Leaves.CheckPassword
+	_ func(server.Leaves, pkgtype.Session) (pkgtype.Session, error) = server.Leaves.RequireFresh
+	// 純粋でない: ctx も error もある
+	_ func(server.Ops, context.Context, server.LoginInput) (server.LoginOk, error)              = server.Ops.Login
+	_ func(server.Ops, context.Context, *pkgtype.Token) (pkgtype.Session, error)                = server.Ops.Authenticate
+	_ func(server.Ops, context.Context, pkgtype.Order) error                                    = server.Ops.Notify
+	_ func(server.MailerOps, context.Context, pkgtype.Notification) error                       = server.MailerOps.Send
+	_ func(server.StoreOps, context.Context, *pkgtype.Token) (*pkgtype.Session, error)          = server.StoreOps.FindSession
+	_ func(server.Ops, context.Context, pkgtype.User, pkgtype.Password) (server.LoginOk, error) = server.Ops.IssueSession
 )
 
 // ctxKey は、要求の context を見分けるために、テストが値を載せる鍵（生成されたコードは context に値を載せない）。
 type ctxKey struct{}
 
-// TestRequestContextReachesDeps は、ハンドラが受けた要求の context が、配線を通って、別の名前空間の op の口
-// （server.Deps）にそのまま届くこと。server は store のどの出力もなしに、口を埋めるだけで動く。
-func TestRequestContextReachesDeps(t *testing.T) {
+// seenStore は、server が呼ぶ store の op（server.StoreOps）のうち、二つだけを書いたもの。届いた context を覚える。
+// 書いていない op は、埋め込んだ nil のインターフェースのまま（呼べば panic）。構造体のフィールドに関数を一つずつ入れる形は
+// もうないので、op を一つだけ差し替えるにも、型を一つ書く。
+type seenStore struct {
+	server.StoreOps
+	seen []context.Context
+}
+
+func (s *seenStore) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
+	s.seen = append(s.seen, ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return &pkgtype.Session{Token: *token, UserId: "u1", ExpiresAt: handlertest.Now.Add(time.Hour)}, nil
+}
+
+func (s *seenStore) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
+	s.seen = append(s.seen, ctx)
+	return &pkgtype.User{Id: id, Email: "alice@example.com", Name: "Alice", Hash: "h"}, nil
+}
+
+// TestRequestContextReachesStore は、ハンドラが受けた要求の context が、配線を通って、別の名前空間の op
+// （server.StoreOps）にそのまま届くこと。server は store のどの出力もなしに、インターフェースを満たす値を渡すだけで動く。
+func TestRequestContextReachesStore(t *testing.T) {
+	t.Parallel()
 	f := &handlertest.Fixture{}
-	var seen []context.Context
-	ops := server.New(f.Leaves(), server.Deps{Store: server.StoreOps{
-		FindSession: func(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
-			seen = append(seen, ctx)
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-			return &pkgtype.Session{Token: *token, UserId: "u1"}, nil
-		},
-		FindUserById: func(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
-			seen = append(seen, ctx)
-			return &pkgtype.User{Id: id, Email: "alice@example.com", Name: "Alice", Hash: "h"}, nil
-		},
-	}})
-	handler := server.NewHandler(ops)
+	st := &seenStore{}
+	handler := server.NewHandler(server.New(f.Leaves(), f.Mailer(), st))
 
 	get := func(ctx context.Context) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/me", nil).WithContext(ctx)
@@ -64,25 +80,69 @@ func TestRequestContextReachesDeps(t *testing.T) {
 		return rec
 	}
 
-	// 生きている要求: 二つの口（findSession、findUserById）に、要求の context が届く
+	// 生きている要求: 二つの op（findSession、findUserById）に、要求の context が届く
 	rec := get(context.WithValue(context.Background(), ctxKey{}, "request-1"))
 	if rec.Code != 200 || rec.Body.String() != `{"id":"u1","email":"alice@example.com","name":"Alice"}` {
 		t.Fatalf("GET /me: %d %s", rec.Code, rec.Body)
 	}
-	if len(seen) != 2 || seen[0].Value(ctxKey{}) != "request-1" || seen[1].Value(ctxKey{}) != "request-1" {
-		t.Errorf("口に届いた context が、要求のものではない: %v", seen)
+	if len(st.seen) != 2 || st.seen[0].Value(ctxKey{}) != "request-1" || st.seen[1].Value(ctxKey{}) != "request-1" {
+		t.Errorf("store の op に届いた context が、要求のものではない: %v", st.seen)
 	}
 
-	// 中断された要求: 口は中断を見て、そのエラーを返す。後ろの口は呼ばれない
-	seen = nil
+	// 中断された要求: op は中断を見て、そのエラーを返す。後ろの op は呼ばれない
+	st.seen = nil
 	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), ctxKey{}, "request-2"))
 	cancel()
 	rec = get(ctx)
 	if rec.Code != 500 || rec.Body.String() != `{"error":"internal"}` {
 		t.Errorf("中断された GET /me: %d %s", rec.Code, rec.Body)
 	}
-	if len(seen) != 1 || seen[0].Value(ctxKey{}) != "request-2" || !errors.Is(seen[0].Err(), context.Canceled) {
-		t.Errorf("中断された要求で口に届いた context: %v", seen)
+	if len(st.seen) != 1 || st.seen[0].Value(ctxKey{}) != "request-2" || !errors.Is(st.seen[0].Err(), context.Canceled) {
+		t.Errorf("中断された要求で store の op に届いた context: %v", st.seen)
+	}
+}
+
+// fixedNotice は、葉の op を一つだけ差し替えた server.Leaves: 埋め込んだ実装のうち、ComposeNotice を置き換える。
+type fixedNotice struct{ server.Leaves }
+
+func (fixedNotice) ComposeNotice(order pkgtype.Order) pkgtype.Notification {
+	return pkgtype.Notification{UserId: order.UserId, Message: "差し替えた文面"}
+}
+
+// noticeLog は、通知を受け取る二つの op（mailer.send と store.addNotification）を書いたもの。
+// server.MailerOps と、server.StoreOps（ほかの op は、埋め込んだ nil のインターフェースのまま）の両方として渡す。
+type noticeLog struct {
+	server.StoreOps
+	sent, added []pkgtype.Notification
+}
+
+func (l *noticeLog) Send(_ context.Context, notice pkgtype.Notification) error {
+	l.sent = append(l.sent, notice)
+	return nil
+}
+
+func (l *noticeLog) AddNotification(_ context.Context, notification pkgtype.Notification) error {
+	l.added = append(l.added, notification)
+	return nil
+}
+
+// TestReplaceOneLeaf は、テストが葉の op を一つだけ差し替える形: 実装を埋め込んだ型に、そのメソッドだけを書く。
+// 配線 notify は、差し替えた composeNotice の結果を、mailer.send と store.addNotification に渡す。
+func TestReplaceOneLeaf(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	log := &noticeLog{}
+	ops := server.New(fixedNotice{f.Leaves()}, log, log)
+	if err := ops.Notify(context.Background(), pkgtype.Order{Id: "o1", UserId: "u1"}); err != nil {
+		t.Fatal(err)
+	}
+	want := pkgtype.Notification{UserId: "u1", Message: "差し替えた文面"}
+	if len(log.sent) != 1 || log.sent[0] != want || len(log.added) != 1 || log.added[0] != want {
+		t.Errorf("mailer.send に %v、store.addNotification に %v（期待は、どちらも %v が一つ）", log.sent, log.added, want)
+	}
+	// 差し替えていない葉は、埋め込んだ実装のまま
+	if got := ops.ToPublicUser(pkgtype.User{Id: "u1", Name: "Alice", Hash: "h"}); got != (pkgtype.PublicUser{Id: "u1", Name: "Alice"}) {
+		t.Errorf("ToPublicUser = %+v", got)
 	}
 }
 
@@ -104,6 +164,7 @@ func (s *spyOps) PlaceOrder(context.Context, server.PlaceOrderInput) (pkgtype.Or
 
 // TestValidationPrecedesOp は、go-http（validate = true）が、読めない要求と制約に合わない入力では op を呼ばないこと。
 func TestValidationPrecedesOp(t *testing.T) {
+	t.Parallel()
 	spy := &spyOps{}
 	handler := server.NewHandler(spy)
 	post := func(path, body string) int {
@@ -140,31 +201,15 @@ func TestValidationPrecedesOp(t *testing.T) {
 	}
 }
 
-// TestMissing は、埋めていない口: 入れ忘れはコンパイルでは分からず、その op が呼ばれたときに *runtime.MissingError になり、
-// ハンドラは 500 を返す。
-func TestMissing(t *testing.T) {
-	f := &handlertest.Fixture{}
-	ctx := context.Background()
-	var missing *runtime.MissingError
-
-	// 別の名前空間の op の口（Deps）
-	ops := server.New(f.Leaves(), server.Deps{})
-	_, err := ops.Login(ctx, server.LoginInput{Body: server.Credentials{Email: "alice@example.com", Password: "password123"}})
-	if !errors.As(err, &missing) || missing.Kind != "dep" || missing.Name != "store.findUser" {
-		t.Errorf("Login のエラーが %v", err)
-	}
-	if err := ops.Notify(ctx, pkgtype.Order{Id: "o1", UserId: "u1"}); !errors.As(err, &missing) || missing.Name != "mailer.send" {
-		t.Errorf("Notify のエラーが %v", err)
-	}
-	rec := httptest.NewRecorder()
-	server.NewHandler(ops).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/me", nil))
-	if rec.Code != 500 || rec.Body.String() != `{"error":"internal"}` {
-		t.Errorf("GET /me: %d %s", rec.Code, rec.Body)
-	}
-
-	// 葉の op の口（Leaves）
-	ops = server.New(server.Leaves{}, server.Deps{})
-	if _, err := ops.ToPublicUser(pkgtype.User{}); !errors.As(err, &missing) || missing.Kind != "leaf" || missing.Name != "server.toPublicUser" {
-		t.Errorf("ToPublicUser のエラーが %v", err)
-	}
+// TestNilIsNotChecked は、New が引数を確かめないこと。渡し忘れ（引数が足りない、メソッドが足りない）はコンパイルできないが、
+// nil を書いて渡すことはできる。そのときは *runtime.MissingError ではなく、その実装を使う op を呼んだところで panic になる。
+func TestNilIsNotChecked(t *testing.T) {
+	t.Parallel()
+	ops := server.New(nil, nil, nil)
+	defer func() {
+		if recover() == nil {
+			t.Error("nil の leaves の op を呼んでも panic にならない")
+		}
+	}()
+	ops.ToPublicUser(pkgtype.User{})
 }

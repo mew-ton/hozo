@@ -7,40 +7,45 @@ import (
 	"example.com/shop-server/app/memstore"
 	"example.com/shop-server/app/storetest"
 	store "example.com/shop-server/gen/storemem"
-	pkgtype "example.com/shop-server/gen/type"
 )
+
+// newServer は、新しい memstore.Store の上に組み立てたサーバー。
+func newServer(t *testing.T, f *handlertest.Fixture) handlertest.Server {
+	m := memstore.New()
+	handler, s := New(m, f.Leaves(), f.Mailer())
+	return handlertest.Server{
+		Handler: handler,
+		Store:   s,
+		// 通知を読む op は仕様にないので、状態の単位の、形で決まる問い合わせで読む（memstore の型のメソッド）
+		Notifications: m.Notifications().Get,
+	}
+}
 
 // TestHandler は、go-http のハンドラ → 配線 → 人がメモリの上に書いた store の op、の全体の振る舞い。
 // onsqlite の TestHandler と同じ handlertest.Run を走らせる。
 func TestHandler(t *testing.T) {
-	handlertest.Run(t, func(t *testing.T, f *handlertest.Fixture) handlertest.Server {
-		handler, s := New(f.Leaves(), f.Send())
-		return handlertest.Server{
-			Handler: handler,
-			Store:   s,
-			// 通知を読む op は仕様にないので、状態の単位の、形で決まる問い合わせで読む（memstore が埋めた口）
-			Notifications: store.States.Notifications.Get,
-		}
-	})
+	t.Parallel()
+	handlertest.Run(t, newServer)
+}
+
+// TestTwoServers は、同じ出力（gen/storemem と gen/server）の上の二つのサーバーが、一つのプロセスで同時に動き、
+// 互いに混ざらないこと: memstore.Store が二つ、store.New と server.New が二度。
+func TestTwoServers(t *testing.T) {
+	t.Parallel()
+	handlertest.RunTwo(t, newServer)
 }
 
 // TestStore は、人がメモリの上に書いた store の op の振る舞い。onsqlite の TestStore と同じ storetest.Run を走らせる
 // （server は組み立てない。gen/storemem と memstore だけで動く）。
 func TestStore(t *testing.T) {
+	t.Parallel()
 	storetest.Run(t, func(t *testing.T) storetest.Store {
-		memstore.Setup()
-		return storetest.Store{Ops: store.New(), States: states()}
+		m := memstore.New()
+		users, sessions, orders, notifications := m.Users(), m.Sessions(), m.Orders(), m.Notifications()
+		return storetest.Store{
+			Ops: store.New(users, sessions, orders, notifications),
+			// 形で決まる問い合わせは、store.New に渡したのと同じ値で読む
+			States: storetest.States{Users: users, Sessions: sessions, Orders: orders, Notifications: notifications},
+		}
 	})
-}
-
-// states は、store.States の形で決まる問い合わせを、storetest に渡す形に並べる（memstore.Setup の後で呼ぶ）。
-// gen/store と gen/storemem の StateSet は別の型なので、共通のテストへは口を一つずつ渡す。
-func states() storetest.States {
-	u, s, o, n := store.States.Users, store.States.Sessions, store.States.Orders, store.States.Notifications
-	return storetest.States{
-		Users:         storetest.List[pkgtype.User]{IsEmpty: u.IsEmpty, Get: u.Get},
-		Sessions:      storetest.List[pkgtype.Session]{IsEmpty: s.IsEmpty, Get: s.Get},
-		Orders:        storetest.List[pkgtype.Order]{IsEmpty: o.IsEmpty, Get: o.Get},
-		Notifications: storetest.List[pkgtype.Notification]{IsEmpty: n.IsEmpty, Get: n.Get},
-	}
 }

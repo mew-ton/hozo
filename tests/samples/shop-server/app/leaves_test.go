@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"example.com/shop-server/gen/server"
 	pkgtype "example.com/shop-server/gen/type"
 )
 
@@ -47,16 +48,18 @@ func TestNoStorageImport(t *testing.T) {
 }
 
 // TestLeaves は、葉の op の本体。どれも引数だけで決まる（ctx を取らず、保存先に触れない）。
+// throws のない五つは、値だけを返す（error を確かめる行がない）。
 func TestLeaves(t *testing.T) {
 	now := time.Date(2026, 1, 2, 12, 4, 5, 0, time.FixedZone("JST", 9*60*60))
-	l := &Leaves{
-		Now:        func() time.Time { return now },
+	clock := now
+	// 生成されたインターフェースを通して呼ぶ（*Leaves がそれを満たすことは、leaves.go がコンパイルのときに確かめている）
+	var leaves server.Leaves = &Leaves{
+		Now:        func() time.Time { return clock },
 		NewToken:   func() pkgtype.Token { return "token-1" },
 		NewOrderID: func() pkgtype.OrderId { return "order-1" },
 		SessionTTL: time.Hour,
 		PageSize:   2,
 	}
-	leaves := l.Server()
 	alice := pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: HashPassword("password123")}
 
 	// checkPassword: 合わなければ、仕様の例外を値で返す（go-http は値の型で見分ける）
@@ -69,32 +72,44 @@ func TestLeaves(t *testing.T) {
 	}
 
 	// newSession と newOrder: 時刻は UTC にそろえる
-	session, err := leaves.NewSession(alice)
-	if err != nil || session.Token != "token-1" || session.UserId != "u1" ||
+	session := leaves.NewSession(alice)
+	if session.Token != "token-1" || session.UserId != "u1" ||
 		!session.ExpiresAt.Equal(now.Add(time.Hour)) || session.ExpiresAt.Location() != time.UTC {
-		t.Errorf("newSession = %+v, %v", session, err)
+		t.Errorf("newSession = %+v", session)
 	}
-	order, err := leaves.NewOrder(session, nil)
-	if err != nil || order.Id != "order-1" || order.UserId != "u1" || order.Lines == nil || len(order.Lines) != 0 ||
+	order := leaves.NewOrder(session, nil)
+	if order.Id != "order-1" || order.UserId != "u1" || order.Lines == nil || len(order.Lines) != 0 ||
 		!order.PlacedAt.Equal(now) || order.PlacedAt.Location() != time.UTC {
-		t.Errorf("newOrder = %+v, %v", order, err)
+		t.Errorf("newOrder = %+v", order)
 	}
 
+	// requireFresh: 今が期限より前なら、同じセッション。期限ちょうどと、その後は type.Unauthorized
+	var unauthorized pkgtype.Unauthorized
+	for _, c := range []struct {
+		elapsed time.Duration
+		fresh   bool
+	}{{0, true}, {time.Hour - time.Nanosecond, true}, {time.Hour, false}, {48 * time.Hour, false}} {
+		clock = now.Add(c.elapsed)
+		got, err := leaves.RequireFresh(session)
+		if c.fresh && (err != nil || got != session) {
+			t.Errorf("%v 後の requireFresh = %+v, %v（期待は、同じセッション）", c.elapsed, got, err)
+		}
+		if !c.fresh && !errors.As(err, &unauthorized) {
+			t.Errorf("%v 後の requireFresh = %+v, %v（期待は type.Unauthorized）", c.elapsed, got, err)
+		}
+	}
+	clock = now
+
 	// toPublicUser: hash を落とす
-	public, err := leaves.ToPublicUser(alice)
-	if err != nil || public != (pkgtype.PublicUser{Id: "u1", Email: "alice@example.com", Name: "Alice"}) {
-		t.Errorf("toPublicUser = %+v, %v", public, err)
+	if public := leaves.ToPublicUser(alice); public != (pkgtype.PublicUser{Id: "u1", Email: "alice@example.com", Name: "Alice"}) {
+		t.Errorf("toPublicUser = %+v", public)
 	}
 
 	// pageOf: 1 から数える。範囲の外は空で、1 より小さい page は 1
 	orders := []pkgtype.Order{{Id: "o1"}, {Id: "o2"}, {Id: "o3"}}
 	for page, want := range map[int64]string{1: "o1,o2", 2: "o3", 3: "", 0: "o1,o2", -5: "o1,o2"} {
-		got, err := leaves.PageOf(orders, page)
-		if err != nil {
-			t.Fatal(err)
-		}
 		var ids []string
-		for _, o := range got {
+		for _, o := range leaves.PageOf(orders, page) {
 			ids = append(ids, string(o.Id))
 		}
 		if strings.Join(ids, ",") != want {
@@ -103,8 +118,7 @@ func TestLeaves(t *testing.T) {
 	}
 
 	// composeNotice
-	notice, err := leaves.ComposeNotice(order)
-	if err != nil || notice != (pkgtype.Notification{UserId: "u1", Message: "注文 order-1 を受け付けました"}) {
-		t.Errorf("composeNotice = %+v, %v", notice, err)
+	if notice := leaves.ComposeNotice(order); notice != (pkgtype.Notification{UserId: "u1", Message: "注文 order-1 を受け付けました"}) {
+		t.Errorf("composeNotice = %+v", notice)
 	}
 }

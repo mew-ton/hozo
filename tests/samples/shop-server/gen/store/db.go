@@ -36,152 +36,164 @@ CREATE TABLE IF NOT EXISTS "notifications" (
 );
 `
 
-// SetupDB は db に表を作り（Schema）、States に、@db の状態の形で決まる問い合わせ（IsEmpty、Get）と、
-// @db の状態を読み書きする葉の op のうち、中身が仕様から決まるものを入れる。
-// この名前空間では、四つの状態の問い合わせ八つと、九つの op すべて（どの規則で決まったかは、dbOps のそれぞれのメソッド）。
-func SetupDB(db *sql.DB) error {
-	if _, err := db.Exec(Schema); err != nil {
-		return err
-	}
-	s := dbOps{db: db}
-	States.Users.IsEmpty = s.UsersIsEmpty
-	States.Users.Get = s.UsersGet
-	States.Users.FindUser = s.FindUser
-	States.Users.FindUserById = s.FindUserById
-	States.Users.AddUser = s.AddUser
-	States.Sessions.IsEmpty = s.SessionsIsEmpty
-	States.Sessions.Get = s.SessionsGet
-	States.Sessions.FindSession = s.FindSession
-	States.Sessions.AddSession = s.AddSession
-	States.Sessions.RemoveSession = s.RemoveSession
-	States.Orders.IsEmpty = s.OrdersIsEmpty
-	States.Orders.Get = s.OrdersGet
-	States.Orders.ListOrders = s.ListOrders
-	States.Orders.AddOrder = s.AddOrder
-	States.Notifications.IsEmpty = s.NotificationsIsEmpty
-	States.Notifications.Get = s.NotificationsGet
-	States.Notifications.AddNotification = s.AddNotification
-	return nil
+// CreateTables は db に、@db の状態の表を作る（Schema を実行する）。すでにある表には触れない。
+func CreateTables(ctx context.Context, db *sql.DB) error {
+	_, err := db.ExecContext(ctx, Schema)
+	return err
 }
 
-// dbOps は、形で決まる問い合わせと、葉の op の中身。SetupDB が States に入れる。
-type dbOps struct{ db *sql.DB }
+// UsersTable は状態 store.users の単位（UsersState）の、表 "users" の上の実装。メソッドは、形で決まる問い合わせ
+// （IsEmpty、Get）と、store.users を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+type UsersTable struct{ db *sql.DB }
 
-// UsersIsEmpty は状態 store.users の、形で決まる問い合わせ IsEmpty: 表 "users" に行が一つもなければ true。
-func (s dbOps) UsersIsEmpty(ctx context.Context) (bool, error) {
-	return dbIsEmpty(ctx, s.db, `SELECT COUNT(*) FROM "users"`)
+// NewUsersTable は db の表 "users" の上の UsersTable を返す。表は CreateTables が作る。
+func NewUsersTable(db *sql.DB) UsersTable { return UsersTable{db: db} }
+
+var _ UsersState = UsersTable{}
+
+// IsEmpty は形で決まる問い合わせ: 表 "users" に行が一つもなければ true。
+func (t UsersTable) IsEmpty(ctx context.Context) (bool, error) {
+	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "users"`)
 }
 
-// UsersGet は状態 store.users の、形で決まる問い合わせ Get: 表 "users" の行を、足した順にすべて引く。
-func (s dbOps) UsersGet(ctx context.Context) ([]pkgtype.User, error) {
-	return dbList(ctx, s.db, dbScanUser,
+// Get は形で決まる問い合わせ: 表 "users" の行を、足した順にすべて引く。
+func (t UsersTable) Get(ctx context.Context) ([]pkgtype.User, error) {
+	return dbList(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" ORDER BY rowid`)
 }
 
 // FindUser は op store.findUser: 表 "users" から、"email"（引数 email と型が合う列。@db.unique）が同じ行を引く。なければ nil。
-func (s dbOps) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
-	return dbGet(ctx, s.db, dbScanUser,
+func (t UsersTable) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
+	return dbGet(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "email" = ?1`, string(email))
 }
 
 // FindUserById は op store.findUserById: 表 "users" から、"id"（引数 id と型が合う列。@db.key）が同じ行を引く。なければ nil。
-func (s dbOps) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
-	return dbGet(ctx, s.db, dbScanUser,
+func (t UsersTable) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
+	return dbGet(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "id" = ?1`, string(id))
 }
 
 // AddUser は op store.addUser（効果 store.createUser は users.post）: 表 "users" に行を一つ足す。
-func (s dbOps) AddUser(ctx context.Context, user pkgtype.User) error {
+func (t UsersTable) AddUser(ctx context.Context, user pkgtype.User) error {
 	args, err := dbArgsUser(user)
 	if err != nil {
 		return err
 	}
-	return dbExec(ctx, s.db,
+	return dbExec(ctx, t.db,
 		`INSERT INTO "users" ("id", "email", "name", "hash") VALUES (?1, ?2, ?3, ?4)`, args...)
 }
 
-// SessionsIsEmpty は状態 store.sessions の、形で決まる問い合わせ IsEmpty: 表 "sessions" に行が一つもなければ true。
-func (s dbOps) SessionsIsEmpty(ctx context.Context) (bool, error) {
-	return dbIsEmpty(ctx, s.db, `SELECT COUNT(*) FROM "sessions"`)
+// SessionsTable は状態 store.sessions の単位（SessionsState）の、表 "sessions" の上の実装。メソッドは、形で決まる問い合わせ
+// （IsEmpty、Get）と、store.sessions を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+type SessionsTable struct{ db *sql.DB }
+
+// NewSessionsTable は db の表 "sessions" の上の SessionsTable を返す。表は CreateTables が作る。
+func NewSessionsTable(db *sql.DB) SessionsTable { return SessionsTable{db: db} }
+
+var _ SessionsState = SessionsTable{}
+
+// IsEmpty は形で決まる問い合わせ: 表 "sessions" に行が一つもなければ true。
+func (t SessionsTable) IsEmpty(ctx context.Context) (bool, error) {
+	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "sessions"`)
 }
 
-// SessionsGet は状態 store.sessions の、形で決まる問い合わせ Get: 表 "sessions" の行を、足した順にすべて引く。
-func (s dbOps) SessionsGet(ctx context.Context) ([]pkgtype.Session, error) {
-	return dbList(ctx, s.db, dbScanSession,
+// Get は形で決まる問い合わせ: 表 "sessions" の行を、足した順にすべて引く。
+func (t SessionsTable) Get(ctx context.Context) ([]pkgtype.Session, error) {
+	return dbList(ctx, t.db, dbScanSession,
 		`SELECT "token", "userId", "expiresAt" FROM "sessions" ORDER BY rowid`)
 }
 
 // FindSession は op store.findSession: 表 "sessions" から、"token"（引数 token と型が合う列。@db.key）が同じ行を引く。
 // なければ nil。token は省略可能で、なければ問い合わせずに nil。
-func (s dbOps) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
+func (t SessionsTable) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
 	if token == nil {
 		return nil, nil
 	}
-	return dbGet(ctx, s.db, dbScanSession,
+	return dbGet(ctx, t.db, dbScanSession,
 		`SELECT "token", "userId", "expiresAt" FROM "sessions" WHERE "token" = ?1`, string(*token))
 }
 
 // AddSession は op store.addSession（効果 store.createSession は sessions.post）: 表 "sessions" に行を一つ足す。
-func (s dbOps) AddSession(ctx context.Context, session pkgtype.Session) error {
+func (t SessionsTable) AddSession(ctx context.Context, session pkgtype.Session) error {
 	args, err := dbArgsSession(session)
 	if err != nil {
 		return err
 	}
-	return dbExec(ctx, s.db,
+	return dbExec(ctx, t.db,
 		`INSERT INTO "sessions" ("token", "userId", "expiresAt") VALUES (?1, ?2, ?3)`, args...)
 }
 
 // RemoveSession は op store.removeSession（効果 store.deleteSession は sessions.delete）: 表 "sessions" から、
 // "token"（引数 token と型が合う列）が同じ行を消す。行がなければ何もしない。
-func (s dbOps) RemoveSession(ctx context.Context, token pkgtype.Token) error {
-	return dbExec(ctx, s.db, `DELETE FROM "sessions" WHERE "token" = ?1`, string(token))
+func (t SessionsTable) RemoveSession(ctx context.Context, token pkgtype.Token) error {
+	return dbExec(ctx, t.db, `DELETE FROM "sessions" WHERE "token" = ?1`, string(token))
 }
 
-// OrdersIsEmpty は状態 store.orders の、形で決まる問い合わせ IsEmpty: 表 "orders" に行が一つもなければ true。
-func (s dbOps) OrdersIsEmpty(ctx context.Context) (bool, error) {
-	return dbIsEmpty(ctx, s.db, `SELECT COUNT(*) FROM "orders"`)
+// OrdersTable は状態 store.orders の単位（OrdersState）の、表 "orders" の上の実装。メソッドは、形で決まる問い合わせ
+// （IsEmpty、Get）と、store.orders を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+type OrdersTable struct{ db *sql.DB }
+
+// NewOrdersTable は db の表 "orders" の上の OrdersTable を返す。表は CreateTables が作る。
+func NewOrdersTable(db *sql.DB) OrdersTable { return OrdersTable{db: db} }
+
+var _ OrdersState = OrdersTable{}
+
+// IsEmpty は形で決まる問い合わせ: 表 "orders" に行が一つもなければ true。
+func (t OrdersTable) IsEmpty(ctx context.Context) (bool, error) {
+	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "orders"`)
 }
 
-// OrdersGet は状態 store.orders の、形で決まる問い合わせ Get: 表 "orders" の行を、足した順にすべて引く。
-func (s dbOps) OrdersGet(ctx context.Context) ([]pkgtype.Order, error) {
-	return dbList(ctx, s.db, dbScanOrder,
+// Get は形で決まる問い合わせ: 表 "orders" の行を、足した順にすべて引く。
+func (t OrdersTable) Get(ctx context.Context) ([]pkgtype.Order, error) {
+	return dbList(ctx, t.db, dbScanOrder,
 		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" ORDER BY rowid`)
 }
 
 // ListOrders は op store.listOrders: 表 "orders" から、"userId"（引数 userId と型が合う列）が同じ行を、足した順にすべて引く。
-func (s dbOps) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
-	return dbList(ctx, s.db, dbScanOrder,
+func (t OrdersTable) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
+	return dbList(ctx, t.db, dbScanOrder,
 		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" WHERE "userId" = ?1 ORDER BY rowid`, string(userId))
 }
 
 // AddOrder は op store.addOrder（効果 store.createOrder は orders.post）: 表 "orders" に行を一つ足す。
-func (s dbOps) AddOrder(ctx context.Context, order pkgtype.Order) error {
+func (t OrdersTable) AddOrder(ctx context.Context, order pkgtype.Order) error {
 	args, err := dbArgsOrder(order)
 	if err != nil {
 		return err
 	}
-	return dbExec(ctx, s.db,
+	return dbExec(ctx, t.db,
 		`INSERT INTO "orders" ("id", "userId", "lines", "placedAt") VALUES (?1, ?2, ?3, ?4)`, args...)
 }
 
-// NotificationsIsEmpty は状態 store.notifications の、形で決まる問い合わせ IsEmpty: 表 "notifications" に行が一つもなければ true。
-func (s dbOps) NotificationsIsEmpty(ctx context.Context) (bool, error) {
-	return dbIsEmpty(ctx, s.db, `SELECT COUNT(*) FROM "notifications"`)
+// NotificationsTable は状態 store.notifications の単位（NotificationsState）の、表 "notifications" の上の実装。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.notifications を読み書きする葉の op のうち、
+// 中身が仕様から決まるもの（この状態では、すべて）。
+type NotificationsTable struct{ db *sql.DB }
+
+// NewNotificationsTable は db の表 "notifications" の上の NotificationsTable を返す。表は CreateTables が作る。
+func NewNotificationsTable(db *sql.DB) NotificationsTable { return NotificationsTable{db: db} }
+
+var _ NotificationsState = NotificationsTable{}
+
+// IsEmpty は形で決まる問い合わせ: 表 "notifications" に行が一つもなければ true。
+func (t NotificationsTable) IsEmpty(ctx context.Context) (bool, error) {
+	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "notifications"`)
 }
 
-// NotificationsGet は状態 store.notifications の、形で決まる問い合わせ Get: 表 "notifications" の行を、足した順にすべて引く。
-func (s dbOps) NotificationsGet(ctx context.Context) ([]pkgtype.Notification, error) {
-	return dbList(ctx, s.db, dbScanNotification,
+// Get は形で決まる問い合わせ: 表 "notifications" の行を、足した順にすべて引く。
+func (t NotificationsTable) Get(ctx context.Context) ([]pkgtype.Notification, error) {
+	return dbList(ctx, t.db, dbScanNotification,
 		`SELECT "userId", "message" FROM "notifications" ORDER BY rowid`)
 }
 
 // AddNotification は op store.addNotification（効果 store.notifyUser は notifications.post）: 表 "notifications" に行を一つ足す。
-func (s dbOps) AddNotification(ctx context.Context, notification pkgtype.Notification) error {
+func (t NotificationsTable) AddNotification(ctx context.Context, notification pkgtype.Notification) error {
 	args, err := dbArgsNotification(notification)
 	if err != nil {
 		return err
 	}
-	return dbExec(ctx, s.db,
+	return dbExec(ctx, t.db,
 		`INSERT INTO "notifications" ("userId", "message") VALUES (?1, ?2)`, args...)
 }
 

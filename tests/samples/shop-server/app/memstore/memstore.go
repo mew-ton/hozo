@@ -1,6 +1,7 @@
-// Package memstore は、名前空間 store の op と、状態の形で決まる問い合わせの、メモリの上の実装
-// （../../README.md「人が書いたもの」）。単位 gen/storemem（transpilers は基底の go だけ）には、中身を出す
-// トランスパイラがいないので、人が書いて store.States に入れる。gen/store（go-sqlite が出す）と、関数の型は同じ。
+// Package memstore は、名前空間 store の状態の単位の、メモリの上の実装（../../README.md「人が書いたもの」）。
+// 単位 gen/storemem（transpilers は基底の go だけ）には、中身を出すトランスパイラがいないので、人が書いて
+// store.New の引数に渡す。状態ごとに型が一つで、gen/store で go-sqlite が出す型（store.UsersTable など）と、
+// 満たすインターフェース（store.UsersState など）の中身は同じ。
 package memstore
 
 import (
@@ -16,7 +17,8 @@ import (
 // 仕様はこの失敗を言わない（addUser などに throws はない）。SQLite の制約に合わせて、人が決めたもの。
 var ErrDuplicate = errors.New("memstore: duplicate key")
 
-// Store は、メモリの上の状態。op は並行に呼ばれるので、mu で守る。
+// Store は、メモリの上の四つの状態。op は並行に呼ばれるので、mu で守る。
+// 状態の単位の実装は、Users、Sessions、Orders、Notifications が返す。同じ Store のものは、同じ状態を読み書きする。
 type Store struct {
 	mu            sync.Mutex
 	users         []pkgtype.User
@@ -25,30 +27,41 @@ type Store struct {
 	notifications []pkgtype.Notification
 }
 
-// Setup は空の Store を作り、その上の実装を store.States（gen/storemem）に入れる。
-//
-// store.States はパッケージの変数なので、一つのプロセスで有効なのは、最後に Setup した Store だけ。
-func Setup() {
-	m := &Store{}
-	// 口の並びは、生成された states.go の通り: 状態の単位ごとに、形で決まる問い合わせ（IsEmpty、Get）、
-	// その状態を読む op、その状態を宛先にする効果を持つ op
-	store.States.Users.IsEmpty = isEmpty(m, &m.users)
-	store.States.Users.Get = get(m, &m.users, same)
-	store.States.Users.FindUser = m.findUser
-	store.States.Users.FindUserById = m.findUserById
-	store.States.Users.AddUser = m.addUser
-	store.States.Sessions.IsEmpty = isEmpty(m, &m.sessions)
-	store.States.Sessions.Get = get(m, &m.sessions, same)
-	store.States.Sessions.FindSession = m.findSession
-	store.States.Sessions.AddSession = m.addSession
-	store.States.Sessions.RemoveSession = m.removeSession
-	store.States.Orders.IsEmpty = isEmpty(m, &m.orders)
-	store.States.Orders.Get = get(m, &m.orders, copyOrder)
-	store.States.Orders.ListOrders = m.listOrders
-	store.States.Orders.AddOrder = m.addOrder
-	store.States.Notifications.IsEmpty = isEmpty(m, &m.notifications)
-	store.States.Notifications.Get = get(m, &m.notifications, same)
-	store.States.Notifications.AddNotification = m.addNotification
+// New は空の Store を返す。Store はいくつ作ってもよく、互いに混ざらない。
+func New() *Store { return &Store{} }
+
+// 四つの型は、生成された状態の単位をすべて満たす。メソッドが一つでも足りなければ、ここでコンパイルできない。
+var (
+	_ store.UsersState         = Users{}
+	_ store.SessionsState      = Sessions{}
+	_ store.OrdersState        = Orders{}
+	_ store.NotificationsState = Notifications{}
+)
+
+// Users は状態 store.users の単位（store.UsersState）の実装。
+type Users struct{ list[pkgtype.User] }
+
+// Users は m の上の、状態 store.users の単位の実装を返す。
+func (m *Store) Users() Users { return Users{listOf(m, &m.users, same)} }
+
+// Sessions は状態 store.sessions の単位（store.SessionsState）の実装。
+type Sessions struct{ list[pkgtype.Session] }
+
+// Sessions は m の上の、状態 store.sessions の単位の実装を返す。
+func (m *Store) Sessions() Sessions { return Sessions{listOf(m, &m.sessions, same)} }
+
+// Orders は状態 store.orders の単位（store.OrdersState）の実装。
+type Orders struct{ list[pkgtype.Order] }
+
+// Orders は m の上の、状態 store.orders の単位の実装を返す。
+func (m *Store) Orders() Orders { return Orders{listOf(m, &m.orders, copyOrder)} }
+
+// Notifications は状態 store.notifications の単位（store.NotificationsState）の実装。
+type Notifications struct{ list[pkgtype.Notification] }
+
+// Notifications は m の上の、状態 store.notifications の単位の実装を返す。
+func (m *Store) Notifications() Notifications {
+	return Notifications{listOf(m, &m.notifications, same)}
 }
 
 // lock は、ctx が生きていれば mu を取る。中断されているか期限が過ぎていれば、状態に触れずにそのエラーを返す。
@@ -60,42 +73,51 @@ func (m *Store) lock(ctx context.Context) error {
 	return nil
 }
 
-// isEmpty は、状態（m の rows）の、形で決まる問い合わせ IsEmpty を作る: 要素が一つもなければ true。
-func isEmpty[T any](m *Store, rows *[]T) func(context.Context) (bool, error) {
-	return func(ctx context.Context) (bool, error) {
-		if err := m.lock(ctx); err != nil {
-			return false, err
-		}
-		defer m.mu.Unlock()
-		return len(*rows) == 0, nil
-	}
+// list は、list の状態（m の rows）の、形で決まる問い合わせ（IsEmpty、Get）。四つの型が埋め込んで、メソッドを受け継ぐ。
+// copyRow は、要素一つの写し方。
+type list[T any] struct {
+	m       *Store
+	rows    *[]T
+	copyRow func(T) T
 }
 
-// get は、状態（m の rows）の、形で決まる問い合わせ Get を作る: すべての要素の写しを、足した順に。
-// copyRow は、要素一つの写し方。
-func get[T any](m *Store, rows *[]T, copyRow func(T) T) func(context.Context) ([]T, error) {
-	return func(ctx context.Context) ([]T, error) {
-		if err := m.lock(ctx); err != nil {
-			return nil, err
-		}
-		defer m.mu.Unlock()
-		var out []T
-		for _, row := range *rows {
-			out = append(out, copyRow(row))
-		}
-		return out, nil
+// listOf は、m の rows の上の list を作る。
+func listOf[T any](m *Store, rows *[]T, copyRow func(T) T) list[T] {
+	return list[T]{m: m, rows: rows, copyRow: copyRow}
+}
+
+// IsEmpty は、形で決まる問い合わせ: 要素が一つもなければ true。
+func (l list[T]) IsEmpty(ctx context.Context) (bool, error) {
+	if err := l.m.lock(ctx); err != nil {
+		return false, err
 	}
+	defer l.m.mu.Unlock()
+	return len(*l.rows) == 0, nil
+}
+
+// Get は、形で決まる問い合わせ: すべての要素の写しを、足した順に。
+func (l list[T]) Get(ctx context.Context) ([]T, error) {
+	if err := l.m.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer l.m.mu.Unlock()
+	var out []T
+	for _, row := range *l.rows {
+		out = append(out, l.copyRow(row))
+	}
+	return out, nil
 }
 
 // same は、スライスを持たない要素の写し（値そのまま）。
 func same[T any](row T) T { return row }
 
-func (m *Store) findUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
-	if err := m.lock(ctx); err != nil {
+// FindUser は store.findUser の本体。
+func (s Users) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
+	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
-	defer m.mu.Unlock()
-	for _, u := range m.users {
+	defer s.m.mu.Unlock()
+	for _, u := range s.m.users {
 		if u.Email == email {
 			return &u, nil
 		}
@@ -103,12 +125,13 @@ func (m *Store) findUser(ctx context.Context, email pkgtype.Email) (*pkgtype.Use
 	return nil, nil
 }
 
-func (m *Store) findUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
-	if err := m.lock(ctx); err != nil {
+// FindUserById は store.findUserById の本体。
+func (s Users) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
+	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
-	defer m.mu.Unlock()
-	for _, u := range m.users {
+	defer s.m.mu.Unlock()
+	for _, u := range s.m.users {
 		if u.Id == id {
 			return &u, nil
 		}
@@ -116,71 +139,76 @@ func (m *Store) findUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.U
 	return nil, nil
 }
 
-func (m *Store) addUser(ctx context.Context, user pkgtype.User) error {
-	if err := m.lock(ctx); err != nil {
+// AddUser は store.addUser の本体。id（@db.key）か email（@db.unique）が同じユーザーがいれば ErrDuplicate。
+func (s Users) AddUser(ctx context.Context, user pkgtype.User) error {
+	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
-	for _, u := range m.users {
+	defer s.m.mu.Unlock()
+	for _, u := range s.m.users {
 		if u.Id == user.Id || u.Email == user.Email {
 			return ErrDuplicate
 		}
 	}
-	m.users = append(m.users, user)
+	s.m.users = append(s.m.users, user)
 	return nil
 }
 
-func (m *Store) findSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
-	if err := m.lock(ctx); err != nil {
+// FindSession は store.findSession の本体。トークンがなければ、ない。
+func (s Sessions) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
+	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
-	defer m.mu.Unlock()
+	defer s.m.mu.Unlock()
 	if token == nil {
 		return nil, nil
 	}
-	for _, s := range m.sessions {
-		if s.Token == *token {
-			return &s, nil
+	for _, x := range s.m.sessions {
+		if x.Token == *token {
+			return &x, nil
 		}
 	}
 	return nil, nil
 }
 
-func (m *Store) addSession(ctx context.Context, session pkgtype.Session) error {
-	if err := m.lock(ctx); err != nil {
+// AddSession は store.addSession の本体。token（@db.key）が同じセッションがあれば ErrDuplicate。
+func (s Sessions) AddSession(ctx context.Context, session pkgtype.Session) error {
+	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
-	for _, s := range m.sessions {
-		if s.Token == session.Token {
+	defer s.m.mu.Unlock()
+	for _, x := range s.m.sessions {
+		if x.Token == session.Token {
 			return ErrDuplicate
 		}
 	}
-	m.sessions = append(m.sessions, session)
+	s.m.sessions = append(s.m.sessions, session)
 	return nil
 }
 
-func (m *Store) removeSession(ctx context.Context, token pkgtype.Token) error {
-	if err := m.lock(ctx); err != nil {
+// RemoveSession は store.removeSession の本体。そのトークンのセッションがなければ、何もしない。
+func (s Sessions) RemoveSession(ctx context.Context, token pkgtype.Token) error {
+	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
-	for i, s := range m.sessions {
-		if s.Token == token {
-			m.sessions = append(m.sessions[:i], m.sessions[i+1:]...)
+	defer s.m.mu.Unlock()
+	for i, x := range s.m.sessions {
+		if x.Token == token {
+			s.m.sessions = append(s.m.sessions[:i], s.m.sessions[i+1:]...)
 			break
 		}
 	}
 	return nil
 }
 
-func (m *Store) listOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
-	if err := m.lock(ctx); err != nil {
+// ListOrders は store.listOrders の本体。そのユーザーの注文の写しを、足した順に。
+func (s Orders) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
+	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
-	defer m.mu.Unlock()
+	defer s.m.mu.Unlock()
 	var out []pkgtype.Order
-	for _, o := range m.orders {
+	for _, o := range s.m.orders {
 		if o.UserId == userId {
 			out = append(out, copyOrder(o))
 		}
@@ -188,26 +216,28 @@ func (m *Store) listOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtyp
 	return out, nil
 }
 
-func (m *Store) addOrder(ctx context.Context, order pkgtype.Order) error {
-	if err := m.lock(ctx); err != nil {
+// AddOrder は store.addOrder の本体。id（@db.key）が同じ注文があれば ErrDuplicate。
+func (s Orders) AddOrder(ctx context.Context, order pkgtype.Order) error {
+	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
-	for _, o := range m.orders {
+	defer s.m.mu.Unlock()
+	for _, o := range s.m.orders {
 		if o.Id == order.Id {
 			return ErrDuplicate
 		}
 	}
-	m.orders = append(m.orders, copyOrder(order))
+	s.m.orders = append(s.m.orders, copyOrder(order))
 	return nil
 }
 
-func (m *Store) addNotification(ctx context.Context, notification pkgtype.Notification) error {
-	if err := m.lock(ctx); err != nil {
+// AddNotification は store.addNotification の本体。
+func (s Notifications) AddNotification(ctx context.Context, notification pkgtype.Notification) error {
+	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
-	defer m.mu.Unlock()
-	m.notifications = append(m.notifications, notification)
+	defer s.m.mu.Unlock()
+	s.m.notifications = append(s.m.notifications, notification)
 	return nil
 }
 

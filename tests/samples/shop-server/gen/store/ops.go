@@ -6,71 +6,7 @@ import (
 	"context"
 
 	pkgtype "example.com/shop-server/gen/type"
-	"github.com/mew-ton/hozo/runtime"
 )
-
-// FindUserFunc は op store.findUser の関数の型。
-//
-// email からユーザーを引く
-//
-// Reads: store.users
-type FindUserFunc func(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
-
-// FindUserByIdFunc は op store.findUserById の関数の型。
-//
-// 識別子からユーザーを引く
-//
-// Reads: store.users
-type FindUserByIdFunc func(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
-
-// FindSessionFunc は op store.findSession の関数の型。
-//
-// トークンからセッションを引く。トークンがなければ、ない
-//
-// Reads: store.sessions
-type FindSessionFunc func(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
-
-// ListOrdersFunc は op store.listOrders の関数の型。
-//
-// ユーザーの注文を、足した順に返す
-//
-// Reads: store.orders
-type ListOrdersFunc func(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
-
-// AddUserFunc は op store.addUser の関数の型。
-//
-// ユーザーを足す
-//
-// Effects: store.createUser
-type AddUserFunc func(ctx context.Context, user pkgtype.User) error
-
-// AddSessionFunc は op store.addSession の関数の型。
-//
-// セッションを足す
-//
-// Effects: store.createSession
-type AddSessionFunc func(ctx context.Context, session pkgtype.Session) error
-
-// RemoveSessionFunc は op store.removeSession の関数の型。
-//
-// そのトークンのセッションを消す
-//
-// Effects: store.deleteSession
-type RemoveSessionFunc func(ctx context.Context, token pkgtype.Token) error
-
-// AddOrderFunc は op store.addOrder の関数の型。
-//
-// 注文を足す
-//
-// Effects: store.createOrder
-type AddOrderFunc func(ctx context.Context, order pkgtype.Order) error
-
-// AddNotificationFunc は op store.addNotification の関数の型。
-//
-// 通知を足す
-//
-// Effects: store.notifyUser
-type AddNotificationFunc func(ctx context.Context, notification pkgtype.Notification) error
 
 // Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
@@ -120,73 +56,53 @@ type Ops interface {
 	AddNotification(ctx context.Context, notification pkgtype.Notification) error
 }
 
-// New はこの名前空間の Ops を組み立てる。状態を読む葉と、効果を持つ葉は States（states.go）の問い合わせと命令に委ねる。
-func New() Ops {
-	return &ops{}
+// New はこの名前空間の Ops を組み立てる。状態を読む葉と、効果を持つ葉は、状態の単位（states.go）の実装
+// users、sessions、orders、notifications の問い合わせと命令に委ねる。引数の並びは、状態の宣言順。
+// 引数が nil かどうかは確かめない。
+func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState) Ops {
+	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
-type ops struct{}
+type ops struct {
+	users         UsersState
+	sessions      SessionsState
+	orders        OrdersState
+	notifications NotificationsState
+}
 
 func (o *ops) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
-	if States.Users.FindUser == nil {
-		return nil, &runtime.MissingError{Kind: "state", Name: "store.findUser"}
-	}
-	return States.Users.FindUser(ctx, email)
+	return o.users.FindUser(ctx, email)
 }
 
 func (o *ops) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
-	if States.Users.FindUserById == nil {
-		return nil, &runtime.MissingError{Kind: "state", Name: "store.findUserById"}
-	}
-	return States.Users.FindUserById(ctx, id)
+	return o.users.FindUserById(ctx, id)
 }
 
 func (o *ops) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
-	if States.Sessions.FindSession == nil {
-		return nil, &runtime.MissingError{Kind: "state", Name: "store.findSession"}
-	}
-	return States.Sessions.FindSession(ctx, token)
+	return o.sessions.FindSession(ctx, token)
 }
 
 func (o *ops) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
-	if States.Orders.ListOrders == nil {
-		return nil, &runtime.MissingError{Kind: "state", Name: "store.listOrders"}
-	}
-	return States.Orders.ListOrders(ctx, userId)
+	return o.orders.ListOrders(ctx, userId)
 }
 
 func (o *ops) AddUser(ctx context.Context, user pkgtype.User) error {
-	if States.Users.AddUser == nil {
-		return &runtime.MissingError{Kind: "state", Name: "store.addUser"}
-	}
-	return States.Users.AddUser(ctx, user)
+	return o.users.AddUser(ctx, user)
 }
 
 func (o *ops) AddSession(ctx context.Context, session pkgtype.Session) error {
-	if States.Sessions.AddSession == nil {
-		return &runtime.MissingError{Kind: "state", Name: "store.addSession"}
-	}
-	return States.Sessions.AddSession(ctx, session)
+	return o.sessions.AddSession(ctx, session)
 }
 
 func (o *ops) RemoveSession(ctx context.Context, token pkgtype.Token) error {
-	if States.Sessions.RemoveSession == nil {
-		return &runtime.MissingError{Kind: "state", Name: "store.removeSession"}
-	}
-	return States.Sessions.RemoveSession(ctx, token)
+	return o.sessions.RemoveSession(ctx, token)
 }
 
 func (o *ops) AddOrder(ctx context.Context, order pkgtype.Order) error {
-	if States.Orders.AddOrder == nil {
-		return &runtime.MissingError{Kind: "state", Name: "store.addOrder"}
-	}
-	return States.Orders.AddOrder(ctx, order)
+	return o.orders.AddOrder(ctx, order)
 }
 
 func (o *ops) AddNotification(ctx context.Context, notification pkgtype.Notification) error {
-	if States.Notifications.AddNotification == nil {
-		return &runtime.MissingError{Kind: "state", Name: "store.addNotification"}
-	}
-	return States.Notifications.AddNotification(ctx, notification)
+	return o.notifications.AddNotification(ctx, notification)
 }

@@ -8,65 +8,56 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// UsersState は状態 store.users（list<type.User>）の単位。
-type UsersState struct {
-	// 問い合わせ（形 list で決まる）: store.users に要素が一つもなければ true。
-	IsEmpty func(ctx context.Context) (bool, error)
-	// 問い合わせ（形 list で決まる）: store.users の値。すべての要素を、足した順に。
-	Get func(ctx context.Context) ([]pkgtype.User, error)
-	// 問い合わせ: store.users を読む（reads）葉の op store.findUser。
-	FindUser FindUserFunc
-	// 問い合わせ: store.users を読む（reads）葉の op store.findUserById。
-	FindUserById FindUserByIdFunc
-	// 命令: 効果 store.createUser（on store.users.post）を持つ葉の op store.addUser。
-	AddUser AddUserFunc
+// UsersState は状態 store.users（list<type.User>）の単位。実装は New の引数 users に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type UsersState interface {
+	// IsEmpty は問い合わせ（形 list で決まる）: store.users に要素が一つもなければ true。
+	IsEmpty(ctx context.Context) (bool, error)
+	// Get は問い合わせ（形 list で決まる）: store.users の値。すべての要素を、足した順に。
+	Get(ctx context.Context) ([]pkgtype.User, error)
+	// FindUser は問い合わせ: store.users を読む（reads）葉の op store.findUser。
+	FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
+	// FindUserById は問い合わせ: store.users を読む（reads）葉の op store.findUserById。
+	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
+	// AddUser は命令: 効果 store.createUser（on store.users.post）を持つ葉の op store.addUser。
+	AddUser(ctx context.Context, user pkgtype.User) error
 }
 
-// SessionsState は状態 store.sessions（list<type.Session>）の単位。
-type SessionsState struct {
-	// 問い合わせ（形 list で決まる）: store.sessions に要素が一つもなければ true。
-	IsEmpty func(ctx context.Context) (bool, error)
-	// 問い合わせ（形 list で決まる）: store.sessions の値。すべての要素を、足した順に。
-	Get func(ctx context.Context) ([]pkgtype.Session, error)
-	// 問い合わせ: store.sessions を読む（reads）葉の op store.findSession。
-	FindSession FindSessionFunc
-	// 命令: 効果 store.createSession（on store.sessions.post）を持つ葉の op store.addSession。
-	AddSession AddSessionFunc
-	// 命令: 効果 store.deleteSession（on store.sessions.delete）を持つ葉の op store.removeSession。
-	RemoveSession RemoveSessionFunc
+// SessionsState は状態 store.sessions（list<type.Session>）の単位。実装は New の引数 sessions に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type SessionsState interface {
+	// IsEmpty は問い合わせ（形 list で決まる）: store.sessions に要素が一つもなければ true。
+	IsEmpty(ctx context.Context) (bool, error)
+	// Get は問い合わせ（形 list で決まる）: store.sessions の値。すべての要素を、足した順に。
+	Get(ctx context.Context) ([]pkgtype.Session, error)
+	// FindSession は問い合わせ: store.sessions を読む（reads）葉の op store.findSession。
+	FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
+	// AddSession は命令: 効果 store.createSession（on store.sessions.post）を持つ葉の op store.addSession。
+	AddSession(ctx context.Context, session pkgtype.Session) error
+	// RemoveSession は命令: 効果 store.deleteSession（on store.sessions.delete）を持つ葉の op store.removeSession。
+	RemoveSession(ctx context.Context, token pkgtype.Token) error
 }
 
-// OrdersState は状態 store.orders（list<type.Order>）の単位。
-type OrdersState struct {
-	// 問い合わせ（形 list で決まる）: store.orders に要素が一つもなければ true。
-	IsEmpty func(ctx context.Context) (bool, error)
-	// 問い合わせ（形 list で決まる）: store.orders の値。すべての要素を、足した順に。
-	Get func(ctx context.Context) ([]pkgtype.Order, error)
-	// 問い合わせ: store.orders を読む（reads）葉の op store.listOrders。
-	ListOrders ListOrdersFunc
-	// 命令: 効果 store.createOrder（on store.orders.post）を持つ葉の op store.addOrder。
-	AddOrder AddOrderFunc
+// OrdersState は状態 store.orders（list<type.Order>）の単位。実装は New の引数 orders に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type OrdersState interface {
+	// IsEmpty は問い合わせ（形 list で決まる）: store.orders に要素が一つもなければ true。
+	IsEmpty(ctx context.Context) (bool, error)
+	// Get は問い合わせ（形 list で決まる）: store.orders の値。すべての要素を、足した順に。
+	Get(ctx context.Context) ([]pkgtype.Order, error)
+	// ListOrders は問い合わせ: store.orders を読む（reads）葉の op store.listOrders。
+	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
+	// AddOrder は命令: 効果 store.createOrder（on store.orders.post）を持つ葉の op store.addOrder。
+	AddOrder(ctx context.Context, order pkgtype.Order) error
 }
 
-// NotificationsState は状態 store.notifications（list<type.Notification>）の単位。
-type NotificationsState struct {
-	// 問い合わせ（形 list で決まる）: store.notifications に要素が一つもなければ true。
-	IsEmpty func(ctx context.Context) (bool, error)
-	// 問い合わせ（形 list で決まる）: store.notifications の値。すべての要素を、足した順に。
-	Get func(ctx context.Context) ([]pkgtype.Notification, error)
-	// 命令: 効果 store.notifyUser（on store.notifications.post）を持つ葉の op store.addNotification。
-	AddNotification AddNotificationFunc
+// NotificationsState は状態 store.notifications（list<type.Notification>）の単位。実装は New の引数 notifications に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type NotificationsState interface {
+	// IsEmpty は問い合わせ（形 list で決まる）: store.notifications に要素が一つもなければ true。
+	IsEmpty(ctx context.Context) (bool, error)
+	// Get は問い合わせ（形 list で決まる）: store.notifications の値。すべての要素を、足した順に。
+	Get(ctx context.Context) ([]pkgtype.Notification, error)
+	// AddNotification は命令: 効果 store.notifyUser（on store.notifications.post）を持つ葉の op store.addNotification。
+	AddNotification(ctx context.Context, notification pkgtype.Notification) error
 }
-
-// StateSet はこの名前空間の状態の単位を束ねる。
-type StateSet struct {
-	Users         UsersState
-	Sessions      SessionsState
-	Orders        OrdersState
-	Notifications NotificationsState
-}
-
-// States はこの名前空間の状態。形で決まる問い合わせ（IsEmpty、Get）と、状態を読む葉の op（問い合わせ）と、
-// 状態を変える葉の op（命令）の実装をここに入れる。
-// 入れていないフィールドが要るところへ来たら *runtime.MissingError（Kind は "state"）。
-var States StateSet

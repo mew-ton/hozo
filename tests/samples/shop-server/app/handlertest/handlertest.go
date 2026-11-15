@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,38 +44,42 @@ func Alice() pkgtype.User {
 	return pkgtype.User{Id: AliceID, Email: AliceEmail, Name: AliceName, Hash: app.HashPassword(AlicePassword)}
 }
 
-// Fixture は、試すサーバーの材料のうち保存先によらないもの: 止まった時計と連番の識別子で動く server の葉と、
+// Fixture は、試すサーバーの材料のうち保存先によらないもの: テストが進める時計と連番の識別子で動く server の葉と、
 // 失敗させられる配送。トークンは "token-1"、"token-2"…、注文の識別子は "order-1"、"order-2"… の順に作る。
+// サーバーごとに一つ作る。並行には使えない（一つのサーバーへの要求は、一つの goroutine から順に送る）。
 type Fixture struct {
 	tokens, orders int
 	failDelivery   bool
+	elapsed        time.Duration
 }
 
-// Leaves は、人が書いた葉の op（app.Leaves）を、決まった時計と識別子で動かしたもの。
+// Leaves は、人が書いた葉の op（app.Leaves）を、決まった時計と識別子で動かしたもの。server.New の引数 leaves に渡す。
+// 時計は Now で止まっていて、Advance で進む。
 func (f *Fixture) Leaves() server.Leaves {
-	l := &app.Leaves{
-		Now:        func() time.Time { return Now },
+	return &app.Leaves{
+		Now:        func() time.Time { return Now.Add(f.elapsed) },
 		NewToken:   func() pkgtype.Token { f.tokens++; return pkgtype.Token(fmt.Sprintf("token-%d", f.tokens)) },
 		NewOrderID: func() pkgtype.OrderId { f.orders++; return pkgtype.OrderId(fmt.Sprintf("order-%d", f.orders)) },
 		SessionTTL: SessionTTL,
 		PageSize:   PageSize,
 	}
-	return l.Server()
 }
 
-// Send は mailer.send の実装（app.Mailer）。FailDelivery(true) の後は、届けられない。
-func (f *Fixture) Send() server.MailerSendFunc {
-	m := &app.Mailer{Deliver: func(context.Context, pkgtype.Notification) error {
+// Mailer は mailer の op の実装（app.Mailer）。server.New の引数 mailer に渡す。FailDelivery(true) の後は、届けられない。
+func (f *Fixture) Mailer() server.MailerOps {
+	return &app.Mailer{Deliver: func(context.Context, pkgtype.Notification) error {
 		if f.failDelivery {
 			return errors.New("届けられない")
 		}
 		return nil
 	}}
-	return m.Send
 }
 
 // FailDelivery は、以降の通知を届けられなくする（true）か、元に戻す（false）。
 func (f *Fixture) FailDelivery(fail bool) { f.failDelivery = fail }
+
+// Advance は、葉の op が見る時計を d だけ進める。
+func (f *Fixture) Advance(d time.Duration) { f.elapsed += d }
 
 // Store は、Run が状態を用意し、確かめるのに使う store の op。gen/store と gen/storemem の Ops のどちらも満たす。
 type Store interface {
@@ -84,32 +89,39 @@ type Store interface {
 
 // Server は試す相手。
 type Server struct {
-	// Handler は、Fixture の Leaves と Send で組み立てたサーバー。
+	// Handler は、Fixture の Leaves と Mailer で組み立てたサーバー。
 	Handler http.Handler
 	// Store は、そのサーバーの store。
 	Store Store
-	// Notifications は、状態 store.notifications の値を読む、形で決まる問い合わせ（その store の States.Notifications.Get）。
+	// Notifications は、状態 store.notifications の値を読む、形で決まる問い合わせ（その store に渡した、状態の単位の実装の Get）。
 	// 通知を読む op は仕様にないが、状態の単位は、形で決まる問い合わせをいつも持つ。
 	Notifications func(ctx context.Context) ([]pkgtype.Notification, error)
 
 	fixture *Fixture
 }
 
+// startServer は newServer で新しいサーバーを作り、alice を足す。
+func startServer(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) Server {
+	t.Helper()
+	f := &Fixture{}
+	s := newServer(t, f)
+	s.fixture = f
+	if err := s.Store.AddUser(context.Background(), Alice()); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
 // Run は newServer が作るサーバーの振る舞いを確かめる。サブテストごとに新しいサーバーを作る。
-// 状態はパッケージの変数（store.States）にあるので、サブテストは並列にしない。
+// サーバーは互いに何も共有しない（状態も、その実装も、server.New と store.New の引数）ので、サブテストは並列に走らせる。
 func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	start := func(t *testing.T) Server {
 		t.Helper()
-		f := &Fixture{}
-		s := newServer(t, f)
-		s.fixture = f
-		if err := s.Store.AddUser(context.Background(), Alice()); err != nil {
-			t.Fatal(err)
-		}
-		return s
+		return startServer(t, newServer)
 	}
 
 	t.Run("login", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		// パスワードが違う、ユーザーがいない: どちらも 401 type.InvalidCredentials
 		s.post(t, "/login", "", `{"email":"alice@example.com","password":"wrong-password"}`).
@@ -135,6 +147,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	})
 
 	t.Run("me", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		token := s.login(t)
 		s.get(t, "/me", token).want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
@@ -144,6 +157,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	})
 
 	t.Run("placeOrder", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		token := s.login(t)
 		s.post(t, "/orders", "", `[{"item":"apple","quantity":2}]`).want(t, 401, `{"error":"type.Unauthorized"}`)
@@ -165,6 +179,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	})
 
 	t.Run("placeOrder/NotificationFailed", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		token := s.login(t)
 		s.fixture.FailDelivery(true)
@@ -177,6 +192,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	})
 
 	t.Run("getOrders", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		token := s.login(t)
 		s.get(t, "/orders", "").want(t, 401, `{"error":"type.Unauthorized"}`)
@@ -203,6 +219,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	})
 
 	t.Run("logout", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		token := s.login(t)
 		s.get(t, "/me", token).want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
@@ -215,6 +232,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	})
 
 	t.Run("cancelled", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		token := s.login(t)
 		// 中断された要求の ctx は、ハンドラ → 配線 → store の op まで届く: store の op は ctx のエラーを返し
@@ -229,6 +247,59 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 			want(t, 200, `{"id":"order-1","userId":"u1","lines":[{"item":"apple","quantity":2}],"placedAt":"2026-01-02T03:04:05Z"}`)
 		s.count(t, 1, 1)
 	})
+
+	t.Run("expired", func(t *testing.T) {
+		t.Parallel()
+		s := start(t)
+		// ログインしたセッションの期限は、今（Now）から SessionTTL の後
+		token := s.login(t)
+		// 期限の直前までは通る
+		s.fixture.Advance(SessionTTL - time.Nanosecond)
+		s.get(t, "/me", token).want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
+		// 期限ちょうどから先は、どの入口も 401 type.Unauthorized（配線 authenticate が、葉 requireFresh を通す）
+		s.fixture.Advance(time.Nanosecond)
+		s.get(t, "/me", token).want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.get(t, "/orders", token).want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.post(t, "/orders", token, `[{"item":"apple","quantity":2}]`).want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.post(t, "/logout", token, "").want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.count(t, 0, 0)
+		// 入り直せば、新しいセッションで通る
+		s.post(t, "/login", "", `{"email":"alice@example.com","password":"password123"}`).
+			want(t, 200, `{"user":{"id":"u1","email":"alice@example.com","name":"Alice"},"token":"token-2"}`)
+		s.get(t, "/me", "token-2").want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
+		s.get(t, "/me", token).want(t, 401, `{"error":"type.Unauthorized"}`)
+	})
+}
+
+// RunTwo は、newServer が作る二つのサーバーが、一つのプロセスで同時に動き、互いに混ざらないことを確かめる。
+// 同じ出力（同じ gen/store、同じ gen/server）の上の二つでよい: 状態の実装はパッケージの変数ではなく、
+// store.New と server.New の引数なので、組み立てた数だけ別々にある。
+func RunTwo(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
+	a, b := startServer(t, newServer), startServer(t, newServer)
+	// 二つに同時に要求を送る: a には注文を三つ、b には一つ。どちらのトークンも "token-1"、注文は "order-1" から
+	var wg sync.WaitGroup
+	for _, c := range []struct {
+		s      Server
+		orders int
+	}{{a, 3}, {b, 1}} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			token := c.s.login(t)
+			for range c.orders {
+				if r := c.s.post(t, "/orders", token, `[{"item":"apple","quantity":1}]`); r.status != 200 {
+					t.Errorf("POST /orders: %d %s", r.status, r.body)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	a.count(t, 3, 3)
+	b.count(t, 1, 1)
+	// a でログアウトしても、b の同じ値のトークンは生きている
+	a.post(t, "/logout", "token-1", "").want(t, 204, "")
+	a.get(t, "/me", "token-1").want(t, 401, `{"error":"type.Unauthorized"}`)
+	b.get(t, "/me", "token-1").want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
 }
 
 // response は応答のうち、確かめるところ。
@@ -272,7 +343,7 @@ func (s Server) do(t *testing.T, ctx context.Context, method, path, token, body 
 	res := rec.Result()
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("%s %s: 応答の本文を読めない: %v", method, path, err)
 	}
 	return response{method: method, path: path, status: res.StatusCode, contentType: res.Header.Get("Content-Type"), body: string(data)}
 }
@@ -290,14 +361,14 @@ func (s Server) count(t *testing.T, orders, notifications int) {
 	t.Helper()
 	got, err := s.Store.ListOrders(context.Background(), AliceID)
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("listOrders: %v", err)
 	}
 	if len(got) != orders {
 		t.Errorf("注文が %d 件（期待は %d）", len(got), orders)
 	}
 	notices, err := s.Notifications(context.Background())
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("notifications の Get: %v", err)
 	}
 	if len(notices) != notifications {
 		t.Errorf("通知が %d 件（期待は %d）", len(notices), notifications)

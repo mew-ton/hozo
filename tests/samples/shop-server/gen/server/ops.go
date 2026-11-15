@@ -6,129 +6,7 @@ import (
 	"context"
 
 	pkgtype "example.com/shop-server/gen/type"
-	"github.com/mew-ton/hozo/runtime"
 )
-
-// LoginFunc は op server.login の関数の型。
-//
-// ログインする
-//
-// Throws: type.InvalidCredentials
-// Reads: store.users
-// Effects: store.createSession
-type LoginFunc func(ctx context.Context, in LoginInput) (LoginOk, error)
-
-// IssueSessionFunc は op server.issueSession の関数の型。
-//
-// パスワードを確かめて、セッションを作る
-//
-// Throws: type.InvalidCredentials
-// Effects: store.createSession
-type IssueSessionFunc func(ctx context.Context, user pkgtype.User, password pkgtype.Password) (LoginOk, error)
-
-// CheckPasswordFunc は op server.checkPassword の関数の型。
-//
-// パスワードが合わなければ InvalidCredentials（人が書く）
-//
-// Throws: type.InvalidCredentials
-// 純粋（ctx を取らない）
-type CheckPasswordFunc func(user pkgtype.User, password pkgtype.Password) error
-
-// NewSessionFunc は op server.newSession の関数の型。
-//
-// トークンと期限を決める（人が書く）
-//
-// 純粋（ctx を取らない）
-type NewSessionFunc func(user pkgtype.User) (pkgtype.Session, error)
-
-// ToPublicUserFunc は op server.toPublicUser の関数の型。
-//
-// ユーザーを、外に見せる形に写す（人が書く）
-//
-// 純粋（ctx を取らない）
-type ToPublicUserFunc func(user pkgtype.User) (pkgtype.PublicUser, error)
-
-// AuthenticateFunc は op server.authenticate の関数の型。
-//
-// 呼んだ人のセッション。ログインしていなければ Unauthorized
-//
-// Throws: type.Unauthorized
-// Reads: store.sessions
-type AuthenticateFunc func(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error)
-
-// LogoutFunc は op server.logout の関数の型。
-//
-// ログアウトする
-//
-// Throws: type.Unauthorized
-// Reads: store.sessions
-// Effects: store.deleteSession
-type LogoutFunc func(ctx context.Context, in AuthInput) error
-
-// GetMeFunc は op server.getMe の関数の型。
-//
-// 自分の情報を返す
-//
-// Throws: type.Unauthorized
-// Reads: store.sessions, store.users
-type GetMeFunc func(ctx context.Context, in AuthInput) (pkgtype.PublicUser, error)
-
-// GetOrdersFunc は op server.getOrders の関数の型。
-//
-// 自分の注文の一覧を返す
-//
-// Throws: type.Unauthorized
-// Reads: store.sessions, store.orders
-type GetOrdersFunc func(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order, error)
-
-// PageOfFunc は op server.pageOf の関数の型。
-//
-// 一覧から、そのページの分を取り出す（人が書く）
-//
-// 純粋（ctx を取らない）
-type PageOfFunc func(orders []pkgtype.Order, page int64) ([]pkgtype.Order, error)
-
-// PlaceOrderFunc は op server.placeOrder の関数の型。
-//
-// 注文する。通知に失敗しても、注文は残る
-//
-// Throws: type.Unauthorized, type.NotificationFailed
-// Reads: store.sessions
-// Effects: store.createOrder, store.notifyUser
-type PlaceOrderFunc func(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error)
-
-// NewOrderFunc は op server.newOrder の関数の型。
-//
-// 識別子と時刻を決めて、注文を作る（人が書く）
-//
-// 純粋（ctx を取らない）
-type NewOrderFunc func(session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error)
-
-// NotifyFunc は op server.notify の関数の型。
-//
-// 注文したユーザーに通知する
-//
-// Throws: type.NotificationFailed
-// Effects: store.notifyUser
-type NotifyFunc func(ctx context.Context, order pkgtype.Order) error
-
-// ComposeNoticeFunc は op server.composeNotice の関数の型。
-//
-// 通知の文面を作る（人が書く）
-//
-// 純粋（ctx を取らない）
-type ComposeNoticeFunc func(order pkgtype.Order) (pkgtype.Notification, error)
-
-// Leaves は、状態を読まず、効果も持たない葉の op の実装。人か、その op の語彙を読むトランスパイラがフィールドを埋める。
-// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
-type Leaves struct {
-	CheckPassword CheckPasswordFunc
-	NewSession    NewSessionFunc
-	ToPublicUser  ToPublicUserFunc
-	PageOf        PageOfFunc
-	NewOrder      NewOrderFunc
-	ComposeNotice ComposeNoticeFunc
-}
 
 // Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
@@ -153,19 +31,25 @@ type Ops interface {
 
 	// NewSession はトークンと期限を決める（人が書く）
 	//
-	// 純粋（ctx を取らない）
-	NewSession(user pkgtype.User) (pkgtype.Session, error)
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewSession(user pkgtype.User) pkgtype.Session
 
 	// ToPublicUser はユーザーを、外に見せる形に写す（人が書く）
 	//
-	// 純粋（ctx を取らない）
-	ToPublicUser(user pkgtype.User) (pkgtype.PublicUser, error)
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	ToPublicUser(user pkgtype.User) pkgtype.PublicUser
 
-	// Authenticate は呼んだ人のセッション。ログインしていなければ Unauthorized
+	// Authenticate は呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
 	//
 	// Throws: type.Unauthorized
 	// Reads: store.sessions
 	Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error)
+
+	// RequireFresh は期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く）
+	//
+	// Throws: type.Unauthorized
+	// 純粋（ctx を取らない）
+	RequireFresh(session pkgtype.Session) (pkgtype.Session, error)
 
 	// Logout はログアウトする
 	//
@@ -188,8 +72,8 @@ type Ops interface {
 
 	// PageOf は一覧から、そのページの分を取り出す（人が書く）
 	//
-	// 純粋（ctx を取らない）
-	PageOf(orders []pkgtype.Order, page int64) ([]pkgtype.Order, error)
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
 
 	// PlaceOrder は注文する。通知に失敗しても、注文は残る
 	//
@@ -200,8 +84,8 @@ type Ops interface {
 
 	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
 	//
-	// 純粋（ctx を取らない）
-	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error)
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order
 
 	// Notify は注文したユーザーに通知する
 	//
@@ -211,148 +95,141 @@ type Ops interface {
 
 	// ComposeNotice は通知の文面を作る（人が書く）
 	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	ComposeNotice(order pkgtype.Order) pkgtype.Notification
+}
+
+// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。
+// 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type Leaves interface {
+	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
+	//
+	// Throws: type.InvalidCredentials
 	// 純粋（ctx を取らない）
-	ComposeNotice(order pkgtype.Order) (pkgtype.Notification, error)
+	CheckPassword(user pkgtype.User, password pkgtype.Password) error
+
+	// NewSession はトークンと期限を決める（人が書く）
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewSession(user pkgtype.User) pkgtype.Session
+
+	// ToPublicUser はユーザーを、外に見せる形に写す（人が書く）
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	ToPublicUser(user pkgtype.User) pkgtype.PublicUser
+
+	// RequireFresh は期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く）
+	//
+	// Throws: type.Unauthorized
+	// 純粋（ctx を取らない）
+	RequireFresh(session pkgtype.Session) (pkgtype.Session, error)
+
+	// PageOf は一覧から、そのページの分を取り出す（人が書く）
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
+
+	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order
+
+	// ComposeNotice は通知の文面を作る（人が書く）
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	ComposeNotice(order pkgtype.Order) pkgtype.Notification
 }
 
-// Deps は配線から呼ぶ別の名前空間の op。名前空間ごとに一つの構造体で、フィールドは server から見た関数の型。
-// 口が ctx を取るかは、相手の op が純粋かどうかで決まる（どの名前空間から見ても同じ）: 純粋でなければ取り、純粋なら取らない。
-// 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "dep"）。
-type Deps struct {
-	Mailer MailerOps
-	Store  StoreOps
+// MailerOps は名前空間 mailer の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 mailer に渡す。
+// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、mailer の出力の Ops は、そのまま渡せる。
+type MailerOps interface {
+	// Send は op mailer.send: 通知を外へ送る。送れなければ NotificationFailed
+	//
+	// Throws: type.NotificationFailed
+	Send(ctx context.Context, notice pkgtype.Notification) error
 }
 
-// MailerOps は名前空間 mailer の op のうち、この名前空間の配線が呼ぶもの。
-type MailerOps struct {
-	Send MailerSendFunc
+// StoreOps は名前空間 store の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 store に渡す。
+// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
+type StoreOps interface {
+	// FindUser は op store.findUser: email からユーザーを引く
+	//
+	// Reads: store.users
+	FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
+
+	// FindUserById は op store.findUserById: 識別子からユーザーを引く
+	//
+	// Reads: store.users
+	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
+
+	// FindSession は op store.findSession: トークンからセッションを引く。トークンがなければ、ない
+	//
+	// Reads: store.sessions
+	FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
+
+	// ListOrders は op store.listOrders: ユーザーの注文を、足した順に返す
+	//
+	// Reads: store.orders
+	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
+
+	// AddSession は op store.addSession: セッションを足す
+	//
+	// Effects: store.createSession
+	AddSession(ctx context.Context, session pkgtype.Session) error
+
+	// RemoveSession は op store.removeSession: そのトークンのセッションを消す
+	//
+	// Effects: store.deleteSession
+	RemoveSession(ctx context.Context, token pkgtype.Token) error
+
+	// AddOrder は op store.addOrder: 注文を足す
+	//
+	// Effects: store.createOrder
+	AddOrder(ctx context.Context, order pkgtype.Order) error
+
+	// AddNotification は op store.addNotification: 通知を足す
+	//
+	// Effects: store.notifyUser
+	AddNotification(ctx context.Context, notification pkgtype.Notification) error
 }
 
-// MailerSendFunc は op mailer.send の、server から見た関数の型。
-//
-// 通知を外へ送る。送れなければ NotificationFailed
-//
-// Throws: type.NotificationFailed
-type MailerSendFunc func(ctx context.Context, notice pkgtype.Notification) error
-
-// StoreOps は名前空間 store の op のうち、この名前空間の配線が呼ぶもの。
-type StoreOps struct {
-	FindUser        StoreFindUserFunc
-	FindUserById    StoreFindUserByIdFunc
-	FindSession     StoreFindSessionFunc
-	ListOrders      StoreListOrdersFunc
-	AddSession      StoreAddSessionFunc
-	RemoveSession   StoreRemoveSessionFunc
-	AddOrder        StoreAddOrderFunc
-	AddNotification StoreAddNotificationFunc
-}
-
-// StoreFindUserFunc は op store.findUser の、server から見た関数の型。
-//
-// email からユーザーを引く
-//
-// Reads: store.users
-type StoreFindUserFunc func(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
-
-// StoreFindUserByIdFunc は op store.findUserById の、server から見た関数の型。
-//
-// 識別子からユーザーを引く
-//
-// Reads: store.users
-type StoreFindUserByIdFunc func(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
-
-// StoreFindSessionFunc は op store.findSession の、server から見た関数の型。
-//
-// トークンからセッションを引く。トークンがなければ、ない
-//
-// Reads: store.sessions
-type StoreFindSessionFunc func(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
-
-// StoreListOrdersFunc は op store.listOrders の、server から見た関数の型。
-//
-// ユーザーの注文を、足した順に返す
-//
-// Reads: store.orders
-type StoreListOrdersFunc func(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
-
-// StoreAddSessionFunc は op store.addSession の、server から見た関数の型。
-//
-// セッションを足す
-//
-// Effects: store.createSession
-type StoreAddSessionFunc func(ctx context.Context, session pkgtype.Session) error
-
-// StoreRemoveSessionFunc は op store.removeSession の、server から見た関数の型。
-//
-// そのトークンのセッションを消す
-//
-// Effects: store.deleteSession
-type StoreRemoveSessionFunc func(ctx context.Context, token pkgtype.Token) error
-
-// StoreAddOrderFunc は op store.addOrder の、server から見た関数の型。
-//
-// 注文を足す
-//
-// Effects: store.createOrder
-type StoreAddOrderFunc func(ctx context.Context, order pkgtype.Order) error
-
-// StoreAddNotificationFunc は op store.addNotification の、server から見た関数の型。
-//
-// 通知を足す
-//
-// Effects: store.notifyUser
-type StoreAddNotificationFunc func(ctx context.Context, notification pkgtype.Notification) error
-
-// New はこの名前空間の Ops を組み立てる。状態を読まず効果も持たない葉は leaves に、別の名前空間の op は deps に、
-// 配線は生成した本体に委ねる。
-func New(leaves Leaves, deps Deps) Ops {
-	return &ops{leaves: leaves, deps: deps}
+// New はこの名前空間の Ops を組み立てる。人が実装する葉は leaves に、別の名前空間の op は mailer と store に、
+// 配線は生成した本体に委ねる。引数の並びは、leaves、別の名前空間（名前の辞書順）。引数が nil かどうかは確かめない。
+func New(leaves Leaves, mailer MailerOps, store StoreOps) Ops {
+	return &ops{leaves: leaves, mailer: mailer, store: store}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。
 type ops struct {
 	leaves Leaves
-	deps   Deps
+	mailer MailerOps
+	store  StoreOps
 }
 
 func (o *ops) CheckPassword(user pkgtype.User, password pkgtype.Password) error {
-	if o.leaves.CheckPassword == nil {
-		return &runtime.MissingError{Kind: "leaf", Name: "server.checkPassword"}
-	}
 	return o.leaves.CheckPassword(user, password)
 }
 
-func (o *ops) NewSession(user pkgtype.User) (pkgtype.Session, error) {
-	if o.leaves.NewSession == nil {
-		return pkgtype.Session{}, &runtime.MissingError{Kind: "leaf", Name: "server.newSession"}
-	}
+func (o *ops) NewSession(user pkgtype.User) pkgtype.Session {
 	return o.leaves.NewSession(user)
 }
 
-func (o *ops) ToPublicUser(user pkgtype.User) (pkgtype.PublicUser, error) {
-	if o.leaves.ToPublicUser == nil {
-		return pkgtype.PublicUser{}, &runtime.MissingError{Kind: "leaf", Name: "server.toPublicUser"}
-	}
+func (o *ops) ToPublicUser(user pkgtype.User) pkgtype.PublicUser {
 	return o.leaves.ToPublicUser(user)
 }
 
-func (o *ops) PageOf(orders []pkgtype.Order, page int64) ([]pkgtype.Order, error) {
-	if o.leaves.PageOf == nil {
-		return nil, &runtime.MissingError{Kind: "leaf", Name: "server.pageOf"}
-	}
+func (o *ops) RequireFresh(session pkgtype.Session) (pkgtype.Session, error) {
+	return o.leaves.RequireFresh(session)
+}
+
+func (o *ops) PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
 	return o.leaves.PageOf(orders, page)
 }
 
-func (o *ops) NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error) {
-	if o.leaves.NewOrder == nil {
-		return pkgtype.Order{}, &runtime.MissingError{Kind: "leaf", Name: "server.newOrder"}
-	}
+func (o *ops) NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {
 	return o.leaves.NewOrder(session, lines)
 }
 
-func (o *ops) ComposeNotice(order pkgtype.Order) (pkgtype.Notification, error) {
-	if o.leaves.ComposeNotice == nil {
-		return pkgtype.Notification{}, &runtime.MissingError{Kind: "leaf", Name: "server.composeNotice"}
-	}
+func (o *ops) ComposeNotice(order pkgtype.Order) pkgtype.Notification {
 	return o.leaves.ComposeNotice(order)
 }

@@ -41,13 +41,13 @@ func main() {
 		log.Printf("通知 → %s: %s", notice.UserId, notice.Message)
 		return nil
 	}}
-	handler, store, err := onsqlite.New(db, leaves.Server(), mailer.Send)
+	ctx := context.Background()
+	handler, store, err := onsqlite.New(ctx, db, leaves, mailer)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// 試すためのユーザーを、いなければ一人入れる（store の op で。保存先の表には直に触れない）
-	ctx := context.Background()
 	demo := pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: app.HashPassword("password123")}
 	found, err := store.FindUser(ctx, demo.Email)
 	if err != nil {

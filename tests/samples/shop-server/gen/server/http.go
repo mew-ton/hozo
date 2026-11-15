@@ -207,7 +207,7 @@ func httpWriteInvalid(w http.ResponseWriter, err error, places ...httpPlace) {
 }
 
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
-// それ以外（ステータスを持たない例外、*runtime.MissingError、ほかのエラー）は 500 で、中身を出さない。
+// それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
 func httpWriteError(w http.ResponseWriter, err error) {
 	var (
 		e0 pkgtype.InvalidCredentials

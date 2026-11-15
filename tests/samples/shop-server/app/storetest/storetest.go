@@ -32,13 +32,13 @@ type Ops interface {
 }
 
 // List は、list の状態の単位が形から持つ問い合わせ（<状態>State の IsEmpty と Get）。
-// フィールドは名前のない関数の型なので、gen/store と gen/storemem のどちらの States のフィールドも、そのまま入る。
-type List[T any] struct {
-	IsEmpty func(ctx context.Context) (bool, error)
-	Get     func(ctx context.Context) ([]T, error)
+// 状態の単位の実装（go-sqlite の store.UsersTable、人が書いた memstore.Users など）は、どれもそのまま満たす。
+type List[T any] interface {
+	IsEmpty(ctx context.Context) (bool, error)
+	Get(ctx context.Context) ([]T, error)
 }
 
-// States は、名前空間 store の四つの状態の、形で決まる問い合わせ。
+// States は、名前空間 store の四つの状態の、形で決まる問い合わせ。store.New に渡したのと同じ、状態の単位の実装を入れる。
 type States struct {
 	Users         List[pkgtype.User]
 	Sessions      List[pkgtype.Session]
@@ -58,7 +58,7 @@ var (
 )
 
 // Run は newStore が作る空の store の振る舞いを確かめる。サブテストごとに新しい store を作る。
-// 状態はパッケージの変数（store.States）にあるので、サブテストは並列にしない。
+// store は互いに何も共有しない（状態の実装は store.New の引数）ので、サブテストは並列に走らせる。
 func Run(t *testing.T, newStore func(t *testing.T) Store) {
 	ctx := context.Background()
 	// start は、alice と bob のいる store を作る
@@ -74,15 +74,17 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 	}
 
 	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 		// 作ったばかりの store は、どの状態も空（IsEmpty は true、Get は空）
 		s := newStore(t)
-		s.States.Users.want(t, ctx, "users", userKey)
-		s.States.Sessions.want(t, ctx, "sessions", sessionKey)
-		s.States.Orders.want(t, ctx, "orders", orderKey)
-		s.States.Notifications.want(t, ctx, "notifications", notificationKey)
+		wantState(t, ctx, s.States.Users, "users", userKey)
+		wantState(t, ctx, s.States.Sessions, "sessions", sessionKey)
+		wantState(t, ctx, s.States.Orders, "orders", orderKey)
+		wantState(t, ctx, s.States.Notifications, "notifications", notificationKey)
 	})
 
 	t.Run("users", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		// findUser は email で、findUserById は id で引く。なければ nil
 		wantUser(t, "findUser", &alice)(s.FindUser(ctx, "alice@example.com"))
@@ -99,10 +101,11 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 			t.Error("addUser: email（@db.unique）が同じ行を足せた")
 		}
 		// 状態の値は、足せた二人だけ（足した順）
-		s.States.Users.want(t, ctx, "users", userKey, "u1", "u2")
+		wantState(t, ctx, s.States.Users, "users", userKey, "u1", "u2")
 	})
 
 	t.Run("sessions", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		// Time は、時刻として同じものが返る（ゾーンと、ナノ秒までの小数部を持つ値で確かめる）
 		expires := time.Date(2026, 1, 2, 12, 4, 5, 123456789, time.FixedZone("JST", 9*60*60))
@@ -118,7 +121,7 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		if got.Token != "t1" || got.UserId != "u1" || !got.ExpiresAt.Equal(expires) {
 			t.Errorf("findSession = %+v（期待は %+v）", *got, session)
 		}
-		s.States.Sessions.want(t, ctx, "sessions", sessionKey, "t1")
+		wantState(t, ctx, s.States.Sessions, "sessions", sessionKey, "t1")
 		// トークンがなければ、ない。知らないトークンも、ない
 		if got, err := s.FindSession(ctx, nil); err != nil || got != nil {
 			t.Errorf("findSession(nil) = %v, %v（期待は nil, nil）", got, err)
@@ -137,10 +140,11 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		if err := s.RemoveSession(ctx, "t1"); err != nil {
 			t.Errorf("ない行の removeSession = %v（期待は nil）", err)
 		}
-		s.States.Sessions.want(t, ctx, "sessions", sessionKey)
+		wantState(t, ctx, s.States.Sessions, "sessions", sessionKey)
 	})
 
 	t.Run("orders", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 		orders := []pkgtype.Order{
@@ -170,10 +174,11 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 			t.Errorf("listOrders(u9) = %v, %v（期待は空）", got, err)
 		}
 		// 状態の値は、どのユーザーの注文も、足した順
-		s.States.Orders.want(t, ctx, "orders", orderKey, "o2", "o3", "o1")
+		wantState(t, ctx, s.States.Orders, "orders", orderKey, "o2", "o3", "o1")
 	})
 
 	t.Run("notifications", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		// 通知を読む op は仕様にないので、効果 notifyUser の結果は、状態の値（Get）で確かめる。
 		// 要素の model にキーがないので、同じ行も足せる
@@ -182,10 +187,11 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 				t.Fatal(err)
 			}
 		}
-		s.States.Notifications.want(t, ctx, "notifications", notificationKey, "u2: こんにちは", "u1: こんにちは", "u2: こんにちは")
+		wantState(t, ctx, s.States.Notifications, "notifications", notificationKey, "u2: こんにちは", "u1: こんにちは", "u2: こんにちは")
 	})
 
 	t.Run("cancelled", func(t *testing.T) {
+		t.Parallel()
 		s := start(t)
 		// 中断された ctx で呼ばれた op は、ctx のエラーを返し、状態を変えない
 		cancelled, cancel := context.WithCancel(ctx)
@@ -212,10 +218,10 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 			}
 		}
 		// 四つの状態の値は、start の後のまま
-		s.States.Users.want(t, ctx, "users", userKey, "u1", "u2")
-		s.States.Sessions.want(t, ctx, "sessions", sessionKey)
-		s.States.Orders.want(t, ctx, "orders", orderKey)
-		s.States.Notifications.want(t, ctx, "notifications", notificationKey)
+		wantState(t, ctx, s.States.Users, "users", userKey, "u1", "u2")
+		wantState(t, ctx, s.States.Sessions, "sessions", sessionKey)
+		wantState(t, ctx, s.States.Orders, "orders", orderKey)
+		wantState(t, ctx, s.States.Notifications, "notifications", notificationKey)
 	})
 }
 
@@ -227,8 +233,8 @@ var (
 	notificationKey = func(n pkgtype.Notification) string { return string(n.UserId) + ": " + n.Message }
 )
 
-// want は、状態 state の値（Get）が、key で見分けて want の並び（足した順）であることと、IsEmpty がそれに合うことを確かめる。
-func (l List[T]) want(t *testing.T, ctx context.Context, state string, key func(T) string, want ...string) {
+// wantState は、状態 state の値（l の Get）が、key で見分けて want の並び（足した順）であることと、IsEmpty がそれに合うことを確かめる。
+func wantState[T any](t *testing.T, ctx context.Context, l List[T], state string, key func(T) string, want ...string) {
 	t.Helper()
 	rows, err := l.Get(ctx)
 	if err != nil {

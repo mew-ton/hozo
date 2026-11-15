@@ -6,7 +6,6 @@ import (
 	"context"
 
 	pkgtype "example.com/shop-server/gen/type"
-	"github.com/mew-ton/hozo/runtime"
 )
 
 // Login はログインする
@@ -15,10 +14,7 @@ import (
 // Reads: store.users
 // Effects: store.createSession
 func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
-	if o.deps.Store.FindUser == nil {
-		return LoginOk{}, &runtime.MissingError{Kind: "dep", Name: "store.findUser"}
-	}
-	user, err := o.deps.Store.FindUser(ctx, in.Body.Email)
+	user, err := o.store.FindUser(ctx, in.Body.Email)
 	if err != nil {
 		return LoginOk{}, err
 	}
@@ -39,39 +35,27 @@ func (o *ops) IssueSession(ctx context.Context, user pkgtype.User, password pkgt
 	if err := o.CheckPassword(user, password); err != nil {
 		return LoginOk{}, err
 	}
-	session, err := o.NewSession(user)
-	if err != nil {
+	session := o.NewSession(user)
+	if err := o.store.AddSession(ctx, session); err != nil {
 		return LoginOk{}, err
 	}
-	if o.deps.Store.AddSession == nil {
-		return LoginOk{}, &runtime.MissingError{Kind: "dep", Name: "store.addSession"}
-	}
-	if err := o.deps.Store.AddSession(ctx, session); err != nil {
-		return LoginOk{}, err
-	}
-	publicUser, err := o.ToPublicUser(user)
-	if err != nil {
-		return LoginOk{}, err
-	}
+	publicUser := o.ToPublicUser(user)
 	return LoginOk{User: publicUser, Token: session.Token}, nil
 }
 
-// Authenticate は呼んだ人のセッション。ログインしていなければ Unauthorized
+// Authenticate は呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
 //
 // Throws: type.Unauthorized
 // Reads: store.sessions
 func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error) {
-	if o.deps.Store.FindSession == nil {
-		return pkgtype.Session{}, &runtime.MissingError{Kind: "dep", Name: "store.findSession"}
-	}
-	session, err := o.deps.Store.FindSession(ctx, token)
+	session, err := o.store.FindSession(ctx, token)
 	if err != nil {
 		return pkgtype.Session{}, err
 	}
 	// match session by store.Login
 	if session != nil {
 		// LoggedIn: session は type.Session
-		return *session, nil
+		return o.RequireFresh(*session)
 	}
 	// default
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
@@ -87,10 +71,7 @@ func (o *ops) Logout(ctx context.Context, in AuthInput) error {
 	if err != nil {
 		return err
 	}
-	if o.deps.Store.RemoveSession == nil {
-		return &runtime.MissingError{Kind: "dep", Name: "store.removeSession"}
-	}
-	if err := o.deps.Store.RemoveSession(ctx, session.Token); err != nil {
+	if err := o.store.RemoveSession(ctx, session.Token); err != nil {
 		return err
 	}
 	return nil
@@ -105,17 +86,14 @@ func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, erro
 	if err != nil {
 		return pkgtype.PublicUser{}, err
 	}
-	if o.deps.Store.FindUserById == nil {
-		return pkgtype.PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "store.findUserById"}
-	}
-	user, err := o.deps.Store.FindUserById(ctx, session.UserId)
+	user, err := o.store.FindUserById(ctx, session.UserId)
 	if err != nil {
 		return pkgtype.PublicUser{}, err
 	}
 	// match user by store.Account
 	if user != nil {
 		// Found: user は type.User
-		return o.ToPublicUser(*user)
+		return o.ToPublicUser(*user), nil
 	}
 	// default
 	return pkgtype.PublicUser{}, pkgtype.Unauthorized{}
@@ -130,14 +108,11 @@ func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order
 	if err != nil {
 		return nil, err
 	}
-	if o.deps.Store.ListOrders == nil {
-		return nil, &runtime.MissingError{Kind: "dep", Name: "store.listOrders"}
-	}
-	orders, err := o.deps.Store.ListOrders(ctx, session.UserId)
+	orders, err := o.store.ListOrders(ctx, session.UserId)
 	if err != nil {
 		return nil, err
 	}
-	return o.PageOf(orders, in.Page)
+	return o.PageOf(orders, in.Page), nil
 }
 
 // PlaceOrder は注文する。通知に失敗しても、注文は残る
@@ -150,14 +125,8 @@ func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order
 	if err != nil {
 		return pkgtype.Order{}, err
 	}
-	order, err := o.NewOrder(session, in.Lines)
-	if err != nil {
-		return pkgtype.Order{}, err
-	}
-	if o.deps.Store.AddOrder == nil {
-		return pkgtype.Order{}, &runtime.MissingError{Kind: "dep", Name: "store.addOrder"}
-	}
-	if err := o.deps.Store.AddOrder(ctx, order); err != nil {
+	order := o.NewOrder(session, in.Lines)
+	if err := o.store.AddOrder(ctx, order); err != nil {
 		return pkgtype.Order{}, err
 	}
 	if err := o.Notify(ctx, order); err != nil {
@@ -171,20 +140,11 @@ func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order
 // Throws: type.NotificationFailed
 // Effects: store.notifyUser
 func (o *ops) Notify(ctx context.Context, order pkgtype.Order) error {
-	notice, err := o.ComposeNotice(order)
-	if err != nil {
+	notice := o.ComposeNotice(order)
+	if err := o.mailer.Send(ctx, notice); err != nil {
 		return err
 	}
-	if o.deps.Mailer.Send == nil {
-		return &runtime.MissingError{Kind: "dep", Name: "mailer.send"}
-	}
-	if err := o.deps.Mailer.Send(ctx, notice); err != nil {
-		return err
-	}
-	if o.deps.Store.AddNotification == nil {
-		return &runtime.MissingError{Kind: "dep", Name: "store.addNotification"}
-	}
-	if err := o.deps.Store.AddNotification(ctx, notice); err != nil {
+	if err := o.store.AddNotification(ctx, notice); err != nil {
 		return err
 	}
 	return nil
