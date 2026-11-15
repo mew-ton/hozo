@@ -22,7 +22,8 @@ P1〜P32 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | `type.hozo` | `type` | 共有の型（P6）: scalar、model、例外 | `model PublicUser extends User { override hash: never; }`（P24〜P26） |
 | `store.hozo` | `store` | DB の状態四つ（P5）、それを読む op と書く op、読んだ結果の分類 | `reads`（P19）、`classify C of <op>`（P2）、`Case: <op> as T;`（P3） |
 | `server.hozo` | `server` | HTTP の入口と、業務の流れ（配線）。人が書く op は七つ | `match x by C` の絞り込み（P3）、`throw E`（P13） |
-| `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。印のデコレータ `remote` と、それを付けた op `send` | — |
+| `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。`@smtp.sendMail` を付けた op `send` | — |
+| `smtp.hozo` | `smtp` | メールを SMTP で送る仕組みの語彙。デコレータ `sendMail`（提供するプラグインがまだないので、サンプルの中で宣言する。今は印） | — |
 
 `hozo.toml` の単位は四つ。`mailer` には単位を置かないので、コードは出ない。
 
@@ -40,7 +41,7 @@ P1〜P32 を当てはめる前の形（一つの名前空間 `server` を三つ�
 仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の六つ。
 
 1. **継承**（P24〜P27）: `model PublicUser is User omit hash;` を `model PublicUser extends User { override hash: never; }` にした（`type.hozo:41-43`）。`type.User` を `type.PublicUser` に写す葉の op `toPublicUser` を `server` に足し（`server.hozo:71`）、下書きが `User` をそのまま渡していた二か所で呼ぶ（`server.hozo:59`、`:107`）。
-2. **外部の入出力**（P30）: `server` の葉 `deliver` をやめ、名前空間 `mailer` の `op send` にし、プロセスの外にあることを示す印のデコレータ `@remote` を付けた（`mailer.hozo:7`、`:10-12`、`server.hozo:147`）。デコレータを持つ op は純粋でない。
+2. **外部の入出力**（P30）: `server` の葉 `deliver` をやめ、名前空間 `mailer` の `op send` にし、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`smtp.hozo:7`、`mailer.hozo:6-9`、`server.hozo:147`）。外部の入出力をする op には、その仕組みの語彙のデコレータを付ける（外部のサービスなら、そのサービスの語彙）。デコレータを持つ op は純粋でない。
 3. **`store.addUser` と効果 `createUser` を足した**（`store.hozo:56`、`:71`）。下書きにない変更。ユーザーを足す op がなければ、起動のときとテストが、保存先を直に書き換えるしかない（v1 の「分かったこと」26）。
 4. **`getMe` の `Found` のアームは、呼び出しをそのまま書いた**（`server.hozo:107` の `Found => toPublicUser(user);`）。写した値を先に束縛する形にはできない: `user` が `type.User` になるのはアームの中だけ。
 5. **セッションの期限を確かめる**: 下書きは `expiresAt` を書くだけで、誰も読まなかった（期限の切れたトークンで入れた。「分かったこと」N3）。人が書く葉の op `requireFresh` を `server` に足し（`server.hozo:86-88`）、配線 `authenticate` の `LoggedIn` のアームを `LoggedIn => requireFresh(session);` にした（`server.hozo:81`）。期限が過ぎていれば `type.Unauthorized`。下書きのアームは値のアーム（P14 の `LoggedIn => session;`）だったので、この仕様に値のアームはなくなった。
@@ -126,7 +127,7 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 | `checkPassword`、`requireFresh` | 葉 | はい（デコレータも `reads` も効果もない） | ある | `ctx` を取らず、`error` を返す |
 | `newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice` | 葉 | はい（同じ） | ない | `ctx` を取らず、`error` も返さない（戻り値だけ） |
 
-`store` の九つの op は、どれも `reads` か効果を持つ葉なので純粋でなく、`ctx` を取り、`error` を返す（`throws` は、どれにもない）。`mailer.send` は、デコレータ `@remote` を持つ葉なので純粋でない（`mailer.hozo:10-12`）。`server.MailerOps` と `server.StoreOps` のメソッド（`mailer.send` と、`store` の八つ）は、相手がどれも純粋でないので、`ctx` を取り、`error` を返す。`mailer` に Go の単位を置けば、そこに出る `Ops` の `Send` も同じ判定で同じ形になり、その `Ops` は `server.MailerOps` をそのまま満たす。
+`store` の九つの op は、どれも `reads` か効果を持つ葉なので純粋でなく、`ctx` を取り、`error` を返す（`throws` は、どれにもない）。`mailer.send` は、デコレータ `@smtp.sendMail` を持つ葉なので純粋でない（`mailer.hozo:6-9`）。`server.MailerOps` と `server.StoreOps` のメソッド（`mailer.send` と、`store` の八つ）は、相手がどれも純粋でないので、`ctx` を取り、`error` を返す。`mailer` に Go の単位を置けば、そこに出る `Ops` の `Send` も同じ判定で同じ形になり、その `Ops` は `server.MailerOps` をそのまま満たす。
 
 ## `go-valid` が従う規則
 
@@ -188,7 +189,7 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 ## 人が書いたもの
 
 - **`app/leaves.go`**: `server` の葉の op 七つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:36`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも `ctx` を取らず、`throws` のない五つは `error` も返さない**: `server.Leaves` のメソッドの形（`gen/server/ops.go:104-140`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go:24-40` が、メソッド式の代入で確かめる）。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:62-66`）。
-- **`app/mailer.go`**: `mailer.send` の実装。`*app.Mailer` が `server.MailerOps` を満たし、`server.New` の引数 `mailer` に、そのまま渡す。`ctx` を取る（`mailer.send` は `@remote` を持ち、純粋でない）。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。
+- **`app/mailer.go`**: `mailer.send` の実装。`*app.Mailer` が `server.MailerOps` を満たし、`server.New` の引数 `mailer` に、そのまま渡す。`ctx` を取る（`mailer.send` は `@smtp.sendMail` を持ち、純粋でない）。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。
 - `app` パッケージは保存先を知らない: import するのは `gen/server` と `gen/type` だけ（`app/leaves_test.go` の `TestNoStorageImport`）。
 - **`app/memstore/memstore.go`**: `store` の四つの状態の単位の、メモリの上の実装。`memstore.New()` が空の `Store` を返し、`Users()`、`Sessions()`、`Orders()`、`Notifications()` が、その上の状態ごとの型を返す（`app/memstore/memstore.go:42-64`）。四つの型は、`gen/storemem` の `UsersState` などを満たす（`app/memstore/memstore.go:35-38`）。メソッドは合わせて十七（形で決まる問い合わせ `IsEmpty`、`Get` が八つ、op が九つ）で、どれも、はじめに `ctx.Err()` を見る。`Store` はいくつ作ってもよく、互いに混ざらない。テストのためだけの読む口は持たない。
 - **二つの組み立て**: `app/onsqlite/compose.go`（表を作る `store.CreateTables(ctx, db)` と、`go-sqlite` の四つの型を渡す `store.New`。`app/onsqlite/compose.go:17-24`）と `app/onmem/compose.go`（`memstore` の四つの型を渡す `store.New`。`app/onmem/compose.go:16-20`）。どちらも、`store.New(…)` の戻り値を、そのまま `server.New(leaves, mailer, s)` の三つ目に渡し、その戻り値を `server.NewHandler` に渡す。**二つが使う `gen/server` と `app` の葉は同じ一つのもの**で、違うのは `store` の import と、状態の単位の実装だけ。組み立ては何度呼んでもよい（パッケージの変数がない）。
@@ -300,7 +301,7 @@ N1〜N65 のうち、解決は 10: N3（仕様の直し）、N11（直した P30
 - **N8 この仕様では「純粋な op」と「`server` で人が書く op」が同じ集合になった**。七つの葉がすべて純粋で、配線はどれも、純粋でない op（`store` の op か `mailer.send`）を呼ぶので純粋でない（「基底 `go` が従う規則」の表）。メソッドの形で「保存先に触れない」が分かる、という狙いどおり。
 - **N9 純粋と判定された op が、時計と乱数を使う**。`newSession`、`requireFresh`、`newOrder` は、仕様の上ではデコレータも `reads` も効果もないので純粋で、メソッドは `ctx` を取らない（`gen/server/ops.go:114,125,135`）。本体は、今の時刻と新しい識別子を外から得る（`app/leaves.go:49,51,63,80,83`）。P30 の「関数の形を見れば、その op が状態や外部に触れるかが分かる」は、ここでは成り立たない。仕様に書く方法は、その op にデコレータを付けること（どのトランスパイラも読まない印でよい。`mailer.send` の `@remote` と同じ）で、付けなくても検査は通る。
 - **N10（解決: P32）純粋な op も `error` を返していた**。`toPublicUser` の理想の形は `func(pkgtype.User) pkgtype.PublicUser` だが、P32 の前は、口が埋まっていないことを `*runtime.MissingError` で返すために `error` が要り、配線は、決して失敗しない写しの後でも `err` を確かめていた。P29、P30 は `ctx` だけを決めていて、`error` には触れていなかった。→ P32: 純粋で `throws` のない op は `error` を返さない。五つの葉（`newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice`）は値だけを返し（`gen/server/ops.go:104-140`）、配線は `publicUser := o.ToPublicUser(user)` と書く（`gen/server/wiring.go:42`）。「口が埋まっていない」は、実行のときには起きなくなった。この形で分かったことは N60。
-- **N11（解決: 直した P30）外部の入出力を「純粋でない」と書く方法が、置き場しかなかった**。直す前のサンプルは「別の名前空間の op の口は、相手が純粋かどうかによらず `ctx` を取る」と決めていた。`mailer.send` は、宣言だけを見ればデコレータも `reads` も効果もない純粋な葉で、`ctx` を取るのは `server` から見た口だけだった（`mailer` に Go の単位を置けば、`ctx` を取らない `Send(notice)` が出て、口に入らなくなる形）。直した P30 は、純粋かどうかを op そのものの性質とし（どの名前空間から見ても同じ。口も相手の op の判定に従う）、別のプロセスや外部にある op には受け渡しのデコレータが付く、とした。→ `mailer` に印のデコレータ `remote` を宣言し、`send` に付けた（`mailer.hozo:7`、`:10`）。`mailer.send` は純粋でなくなり、`server.MailerOps` の `Send` は `ctx` を取る（`gen/server/ops.go:149`）。理由が「別の名前空間だから」から「相手が純粋でないから」に変わった。`mailer` に Go の単位を置いても、同じ判定で `ctx` を取る `Send(ctx, notice)` が出る。残ること: この仕様にはメールを届ける語彙がないので、`remote` は、どのトランスパイラも読まない印を自分で宣言したもの。付け忘れても検査は通り、op は純粋と判定されて `ctx` が消える（N9 と同じ）。`throws` があるので `error` は残る（P32）。生成したメソッドのコメントに、純粋でない理由（どのデコレータか）は出ない（`gen/server/ops.go:146-149`）。
+- **N11（解決: 直した P30）外部の入出力を「純粋でない」と書く方法が、置き場しかなかった**。直す前のサンプルは「別の名前空間の op の口は、相手が純粋かどうかによらず `ctx` を取る」と決めていた。`mailer.send` は、宣言だけを見ればデコレータも `reads` も効果もない純粋な葉で、`ctx` を取るのは `server` から見た口だけだった（`mailer` に Go の単位を置けば、`ctx` を取らない `Send(notice)` が出て、口に入らなくなる形）。直した P30 は、純粋かどうかを op そのものの性質とし（どの名前空間から見ても同じ。口も相手の op の判定に従う）、別のプロセスや外部にある op には受け渡しのデコレータが付く、とした。→ `send` に、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`mailer.hozo:7`。語彙は `smtp.hozo`）。`mailer.send` は純粋でなくなり、`server.MailerOps` の `Send` は `ctx` を取る（`gen/server/ops.go:149`）。理由が「別の名前空間だから」から「相手が純粋でないから」に変わった。`mailer` に Go の単位を置いても、同じ判定で `ctx` を取る `Send(ctx, notice)` が出る。残ること: `smtp` の語彙を提供するプラグインがまだないので、サンプルの中で宣言している（今はどのトランスパイラも読まない印。プラグインができれば、`send` の中身を出せる）。付け忘れても検査は通り、op は純粋と判定されて `ctx` が消える（N9 と同じ）。`throws` があるので `error` は残る（P32）。生成したメソッドのコメントに、純粋でない理由（どのデコレータか）は出ない（`gen/server/ops.go:146-149`）。
 - **N12 宣言を一つ変えると、メソッドの形が変わる**。純粋な葉に、デコレータ（どのトランスパイラも読まない印でも）、`reads`、効果のどれかを足すと、その op のメソッド（`Ops` と、`Leaves` か状態の単位）に `ctx` が増える（`throws` がなかった op なら、`error` も増える）。配線なら、呼び出し先の一つが純粋でなくなるだけで同じことが起きる（伝わる）。人が書いた本体と、`Ops` を呼ぶ人のコードは、コンパイルが通らなくなる（気づける）。別の名前空間のインターフェース（`<Ns>Ops`）のメソッドも、相手の op の判定に従うので同じように変わるが、相手の出力の `Ops` をそのまま渡している組み立ては、両方が同時に変わるので、そのまま通る（P31）。通らなくなるのは、人が書いた実装（`app.Mailer`、`app/memstore`）。`throws` を足したときのことは N60。
 - **N13 純粋さの判定を使うのは、基底だけだった**。`go-http` が呼ぶ op は `@http.*` を持ち、`go-sqlite` が中身を出す op は `reads` か効果を持ち、形で決まる問い合わせは状態を読むので、どれも必ず `ctx` を取り、`error` を返す。相乗りのプラグインは、判定の結果を知らなくても正しい呼び出しとメソッドを書ける（`gen/server/http.go:39,54,68,91,117`、`gen/store/db.go:55-191`）。
 - **N14（解決: P32 の後の `go-sqlite` の規則）`ctx` を受けない入口があった**。P32 の前の `SetupDB(db *sql.DB)` は `ctx` を取らず、表を作る文は中断できなかった。P29 が決めているのは op の関数だけ。→ `SetupDB` は、表を作ることと、実装を `States` に入れることの二つをしていた。後ろの方がなくなった（実装は、人が `New` に渡す）ので、残った方を `CreateTables(ctx context.Context, db *sql.DB) error` にした（`gen/store/db.go:40`。`app/onsqlite/store_test.go` の `TestCreateTables`）。

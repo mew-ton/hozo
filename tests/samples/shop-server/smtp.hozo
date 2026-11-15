@@ -1,0 +1,8 @@
+// サンプル shop-server の仕様（README.md）。メールを SMTP で送る仕組みの語彙 smtp。
+// この語彙を提供するプラグインはまだないので、サンプルの中で宣言する。どのトランスパイラも読まないので、今は印。
+
+/** SMTP でメールを送る仕組みの語彙 */
+namespace smtp {
+  /** この op は、SMTP のサーバーにメールを送る。付いた op は純粋でなくなる */
+  decorator sendMail for op;
+}

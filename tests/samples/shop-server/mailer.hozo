@@ -3,11 +3,8 @@
 
 /** 配送。通知を外へ届ける外部の仕組み */
 namespace mailer {
-  /** この op は、このプロセスの外にある。どのトランスパイラも読まない印で、付いた op は純粋でなくなる */
-  decorator remote for op;
-
   /** 通知を外へ送る。送れなければ NotificationFailed */
-  @remote
+  @smtp.sendMail
   op send(notice: type.Notification)
     throws type.NotificationFailed;
 }
