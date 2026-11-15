@@ -85,8 +85,9 @@ func loadSample(t *testing.T, name string) *sampleProject {
 			t.Errorf("%s: pending の %s に理由がない", sampleManifestFile, sub)
 		}
 	}
-	if s.pending[pendingCheck] == "" || s.pending[pendingShared] == "" {
-		// 代役のトランスパイラ（standIn）を使うサブテストが走るなら、代役の規則が要る
+	if s.pending[pendingShared] == "" {
+		// 代役のトランスパイラ（standIn）を使うサブテストが走るなら、代役の規則が要る。shared が保留のサンプルの
+		// check は、仕様の検査だけで、代役を使わない（testCheck）
 		for _, name := range s.names() {
 			if len(s.transpilers[name].Select) == 0 {
 				t.Errorf("%s: トランスパイラ %s に select がない（check と shared の代役が使う）", sampleManifestFile, name)
@@ -131,14 +132,14 @@ func loadSample(t *testing.T, name string) *sampleProject {
 
 // configPath は、loadSample が単位（out と transpilers）を読む hozo.toml のパス。ふつうはサンプルの本物の hozo.toml。
 //
-// check が保留のサンプルは、今の hozoc が読めない書き方で書かれている。hozo.toml では、単位ごとのオプションのテーブル
-// `[emit.options.<トランスパイラ>]`（docs/decisions.md の P16。今の internal/config は知らないキーとして CFG-7 にし、
+// check か shared が保留のサンプルの hozo.toml は、今の hozoc が読めない書き方で書かれていてよい: 単位ごとのオプションの
+// テーブル `[emit.options.<トランスパイラ>]`（docs/decisions.md の P16。今の internal/config は知らないキーとして CFG-7 にし、
 // その単位を読まない）がそれに当たる。そのテーブルだけを行の単位で除いた写しを一時ディレクトリに作り、それを読む
 // （ほかの検査は、そのまま internal/config が行う）。P16 を実装したら、この分岐は要らなくなる。
 func (s *sampleProject) configPath(t *testing.T) string {
 	t.Helper()
 	real := filepath.Join(s.dir, config.FileName)
-	if s.pending[pendingCheck] == "" {
+	if len(s.pending) == 0 {
 		return real
 	}
 	data, err := os.ReadFile(real)
@@ -236,6 +237,30 @@ func (s *sampleProject) copyInputs(t *testing.T, root string) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// copySpecs は、サンプルの仕様（.hozo）だけを root に写す。hozo.toml は写さない（testCheck の、言語の検査だけの形）。
+func (s *sampleProject) copySpecs(t *testing.T, root string) {
+	t.Helper()
+	specs, err := filepath.Glob(filepath.Join(s.dir, "*.hozo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) == 0 {
+		t.Fatalf("%s に .hozo がない", s.dir)
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range specs {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.Base(p)), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -348,8 +373,19 @@ func TestSamples(t *testing.T) {
 
 // testCheck は、サンプルの仕様が hozoc check を error なしで通ること。本物の hozo.toml のまま、代役のトランスパイラで
 // 確かめる（代役がなければ、単位のトランスパイラが見つからない CFG-14 になる）。warning は許し、表示する。
+//
+// shared が保留のサンプルは、設定（hozo.toml）も、まだない形で書かれている: まだないトランスパイラと、単位ごとの
+// オプション（P16）のほかに、型だけの名前空間の単位（docs/decisions.md の P7。今の検査では CFG-8）を持ちうる。
+// そういうサンプルでは、仕様（.hozo）だけを写して、言語の検査だけを行う: hozo.toml がなければ、hozoc は設定の検査
+// （CFG-*）をしない（docs/config.md「置き場と探し方」）。設定は、shared の保留を外したときに、代役の emit が確かめる。
 func (s *sampleProject) testCheck(t *testing.T, pickExe string) {
-	root, env := s.standIn(t, pickExe)
+	root, env := "", func(string) string { return "" }
+	if s.pending[pendingShared] != "" {
+		root = filepath.Join(t.TempDir(), "project")
+		s.copySpecs(t, root)
+	} else {
+		root, env = s.standIn(t, pickExe)
+	}
 	var stdout, stderr bytes.Buffer
 	if code := hozocMainEnv(root, env, []string{"check"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("hozoc check の終了コード %d\n%s%s", code, stdout.String(), stderr.String())

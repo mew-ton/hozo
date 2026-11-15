@@ -2,7 +2,7 @@
 # どのトランスパイラが何を選ぶかは、隣の pick.json の transpilers に書く。ファイルは出さない。
 name     = "pick"
 command  = ["go", "run", "github.com/mew-ton/hozo/tests/plugins/pick"]
-protocol = "0.2"
+protocol = "0.3"
 
 [[transpiler]]
 name     = "pick-stock"

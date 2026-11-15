@@ -24,6 +24,9 @@ func (a *analyzer) assign(s exprType, t ir.Type) assignFailure {
 	switch s.kind {
 	case etUnknown:
 		return assignOK
+	case etNever:
+		// 「返らない」式は、どの型の位置にも書ける（docs/types.md「式の型」）
+		return assignOK
 	case etNoValue:
 		return failType
 	case etNone:
@@ -87,12 +90,8 @@ func (a *analyzer) assignRecord(r *recordVal, t ir.Type) assignFailure {
 	return assignOK
 }
 
-// assignType は型 S の値を型 T の位置に渡せるか（docs/types.md「互換」の規則 1、2、4〜8、11）。
+// assignType は型 S の値を型 T の位置に渡せるか（docs/types.md「互換」の規則 1、2、4〜7、11。規則 8 は欠番）。
 func (a *analyzer) assignType(s, t ir.Type) bool {
-	return a.assignTypeSeen(s, t, map[[2]string]bool{})
-}
-
-func (a *analyzer) assignTypeSeen(s, t ir.Type, seen map[[2]string]bool) bool {
 	if s == nil || t == nil {
 		return false
 	}
@@ -100,9 +99,9 @@ func (a *analyzer) assignTypeSeen(s, t ir.Type, seen map[[2]string]bool) bool {
 	if ir.TypeEqual(s, t) {
 		return true
 	}
-	// 2. T が optional(T') で、S が T' に渡せる
-	if o, ok := t.(ir.OptionalType); ok {
-		return a.assignTypeSeen(s, o.Of, seen)
+	// 2. T が optional(T') で、S が T' に渡せる。渡せなければ、残りの規則（絞り込みを捨てた S が T と等しい、など）を見る
+	if o, ok := t.(ir.OptionalType); ok && a.assignType(s, o.Of) {
+		return true
 	}
 	switch sv := s.(type) {
 	case ir.CaseType:
@@ -111,69 +110,25 @@ func (a *analyzer) assignTypeSeen(s, t ir.Type, seen map[[2]string]bool) bool {
 			return true
 		}
 		// 4. 絞り込みを捨てる
-		return a.assignTypeSeen(sv.Of, t, seen)
+		return a.assignType(sv.Of, t)
 	case ir.ArrayType:
 		// 6. 要素が渡せる
 		tv, ok := t.(ir.ArrayType)
-		return ok && a.assignTypeSeen(sv.Of, tv.Of, seen)
+		return ok && a.assignType(sv.Of, tv.Of)
 	case ir.RecordType:
 		// 7. キーが等しく、値が渡せる
 		tv, ok := t.(ir.RecordType)
-		return ok && ir.TypeEqual(sv.Key, tv.Key) && a.assignTypeSeen(sv.Value, tv.Value, seen)
+		return ok && ir.TypeEqual(sv.Key, tv.Key) && a.assignType(sv.Value, tv.Value)
 	case ir.RefType:
-		return a.assignRef(sv, t, seen)
-	}
-	return false
-}
-
-// assignRef は S が ref のとき: 8（model の射影）と 11（scalar の元の型）。
-func (a *analyzer) assignRef(s ir.RefType, t ir.Type, seen map[[2]string]bool) bool {
-	if sm := a.models[s.Target]; sm != nil {
-		tr, ok := t.(ir.RefType)
-		if !ok {
-			return false
-		}
-		tm := a.models[tr.Target]
-		return tm != nil && a.projects(sm, tm, seen)
-	}
-	if sc := a.scalarSym(s.Target); sc != nil {
-		if base := a.scalarBaseOf(sc); base != nil {
-			return a.assignTypeSeen(base, t, seen)
-		}
-	}
-	return false
-}
-
-// projects は docs/types.md「射影（model S を model T に）」。
-func (a *analyzer) projects(s, t *ir.Model, seen map[[2]string]bool) bool {
-	key := [2]string{s.Name, t.Name}
-	if seen[key] {
-		return true // 循環する参照は、ここまでの比較が成り立っているとみなす
-	}
-	seen[key] = true
-	for i := range t.Fields {
-		tf := &t.Fields[i]
-		sf := findField(s, tf.Name)
-		if sf == nil {
-			if tf.Default == nil {
-				return false
+		// 11. scalar の値は元の型の位置に渡せる。model の値は、別の model の位置には渡せない
+		// （フィールドが同じでも、一方がもう一方を継承していても。docs/types.md「互換」の「渡せないもの」）
+		if sc := a.scalarSym(sv.Target); sc != nil {
+			if base := a.scalarBaseOf(sc); base != nil {
+				return a.assignType(base, t)
 			}
-			continue
-		}
-		if !a.assignTypeSeen(sf.Type, tf.Type, seen) {
-			return false
-		}
-		if required(tf) && !required(sf) {
-			return false
 		}
 	}
-	return true
-}
-
-// required は必須のフィールド（optional でなく default もない）。
-func required(f *ir.Field) bool {
-	_, optional := f.Type.(ir.OptionalType)
-	return !optional && f.Default == nil
+	return false
 }
 
 // fitRecord は docs/types.md「当てはまる（レコードリテラルを model T に）」。TYPE-5 / TYPE-6 と、各値の互換を確かめる。

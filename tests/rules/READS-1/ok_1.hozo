@@ -1,0 +1,17 @@
+// READS-1（docs/check.md「reads」）: 葉の op は、自分の名前空間の状態を reads に書く。効果と両方持ってよい（読んでから書く op）。
+// 配線の op の reads には、別の名前空間の状態も書ける（呼び出し先から伝わったもの。READS-2）
+namespace a {
+  state users: list<string>;
+  state token: nullable<string>;
+  effect addUser on users.post;
+  op find(name: string): string? reads users;
+  op both(): string? reads users, token reads a.users;
+  op upsert(name: string) reads users effects addUser;
+  op viaStore(): string[] reads b.rows {
+    return b.all();
+  }
+}
+namespace b {
+  state rows: list<string>;
+  export op all(): string[] reads rows;
+}

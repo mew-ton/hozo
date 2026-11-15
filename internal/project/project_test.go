@@ -186,7 +186,7 @@ func TestUncoveredNamespace(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("app", "gen/app"))
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
-	write(t, filepath.Join(dir, "app.hozo"), "namespace app {\n  exception Busy;\n  op save(text: string) throws Busy;\n}\n")
+	write(t, filepath.Join(dir, "app.hozo"), "namespace app {\n  exception Busy;\n  export op save(text: string) throws Busy;\n}\n")
 	write(t, filepath.Join(dir, "user.hozo"), "/** 利用者 */\nnamespace user {\n  state memo: nullable<string>;\n  op write(text: string) throws app.Busy {\n    app.save(text);\n  }\n}\nop globalOp();\n")
 	p := Load(dir, "", nil)
 	if p.NoConfig || len(p.Diags) != 0 {
@@ -301,7 +301,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int, t
 		transpilers = []string{name}
 	}
 	script := "cat >/dev/null; printf '%s' '" + stdout + "'; exit " + string(rune('0'+exit))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.2\"\n" + extra
+	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.3\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
@@ -339,7 +339,7 @@ func TestPluginCheck(t *testing.T) {
 	}
 	got := text(p)
 	for _, want := range []string{
-		"server.hozo:244:3: warning[CHK-1]: by fqn", // FQN → 宣言の位置
+		"server.hozo:246:3: warning[CHK-1]: by fqn", // FQN → 宣言の位置
 		"server.hozo:3:5: error[CHK-2]: by pos",     // file:line:col
 		"hozoc: error[CHK-3]: unknown",              // 位置なし
 		"extra.hozo:2:9: warning[NAME-1]",           // hozoc の診断と一緒に並ぶ
@@ -471,7 +471,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	// 渡せば探す。順は plugin_dirs、PluginPath、Home（同じ名前は近いものだけ）
 	envDir, home := t.TempDir(), t.TempDir()
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.2\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\n"
+		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.3\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -520,7 +520,7 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.2\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.3\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
@@ -587,7 +587,7 @@ func TestUnitIn(t *testing.T) {
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.2\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.3\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator legacy;\n  @legacy op f();\n}\n")
 	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy op g();\n}\n")
 	count := func(units string) int {

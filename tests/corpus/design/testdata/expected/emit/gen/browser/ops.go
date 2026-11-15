@@ -15,12 +15,14 @@ type GoPaymentFunc func(line server.CartLine, warranty *server.WarrantyLine) err
 // OnAddToCartFunc は op browser.onAddToCart の関数の型。
 //
 // Throws: http.ServerError, http.NetworkError, page.Aborted
+// Reads: browser.token
 // Effects: server.addCartLine, server.attachWarrantyToLine, browser.transitionToPayment
 type OnAddToCartFunc func(item server.Item) error
 
 // ChooseYamadaWarrantyFunc は op browser.chooseYamadaWarranty の関数の型。
 //
 // Throws: page.Aborted, http.ServerError, http.NetworkError
+// Reads: browser.token
 // Effects: server.attachWarrantyToLine
 // 前提: item は browser.WarrantyKind.Yamada<server.Item>
 type ChooseYamadaWarrantyFunc func(item server.Item, line server.CartLine) (server.WarrantyLine, error)
@@ -41,23 +43,29 @@ type ChooseStandardWarrantyFunc func(item server.Item, line server.CartLine) (se
 // FetchMeFunc は op browser.fetchMe の関数の型。
 //
 // Throws: http.ServerError, http.NetworkError
+// Reads: browser.token
 type FetchMeFunc func() (server.PublicUser, error)
 
 // FetchOrdersFunc は op browser.fetchOrders の関数の型。
 //
 // Throws: http.ServerError, http.NetworkError
+// Reads: browser.token
 type FetchOrdersFunc func(query OrdersQuery) ([]server.OrderSummary, error)
 
 // OrderPageVmFunc は op browser.orderPageVm の関数の型。
 type OrderPageVmFunc func(me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
 
 // OpenOrdersFunc は op browser.openOrders の関数の型。
+//
+// Reads: browser.token
 type OpenOrdersFunc func(query OrdersQuery) (OrderPage, error)
 
 // ProfilePageVmFunc は op browser.profilePageVm の関数の型。
 type ProfilePageVmFunc func(me server.PublicUser) (ProfilePage, error)
 
 // OpenProfileFunc は op browser.openProfile の関数の型。
+//
+// Reads: browser.token
 type OpenProfileFunc func() (ProfilePage, error)
 
 // ProductPageVmFunc は op browser.productPageVm の関数の型。
@@ -91,12 +99,14 @@ type Ops interface {
 	// OnAddToCart は op browser.onAddToCart。
 	//
 	// Throws: http.ServerError, http.NetworkError, page.Aborted
+	// Reads: browser.token
 	// Effects: server.addCartLine, server.attachWarrantyToLine, browser.transitionToPayment
 	OnAddToCart(item server.Item) error
 
 	// ChooseYamadaWarranty は op browser.chooseYamadaWarranty。
 	//
 	// Throws: page.Aborted, http.ServerError, http.NetworkError
+	// Reads: browser.token
 	// Effects: server.attachWarrantyToLine
 	// 前提: item は browser.WarrantyKind.Yamada<server.Item>
 	ChooseYamadaWarranty(item server.Item, line server.CartLine) (server.WarrantyLine, error)
@@ -115,23 +125,29 @@ type Ops interface {
 	// FetchMe は op browser.fetchMe。
 	//
 	// Throws: http.ServerError, http.NetworkError
+	// Reads: browser.token
 	FetchMe() (server.PublicUser, error)
 
 	// FetchOrders は op browser.fetchOrders。
 	//
 	// Throws: http.ServerError, http.NetworkError
+	// Reads: browser.token
 	FetchOrders(query OrdersQuery) ([]server.OrderSummary, error)
 
 	// OrderPageVm は op browser.orderPageVm。
 	OrderPageVm(me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
 
 	// OpenOrders は op browser.openOrders。
+	//
+	// Reads: browser.token
 	OpenOrders(query OrdersQuery) (OrderPage, error)
 
 	// ProfilePageVm は op browser.profilePageVm。
 	ProfilePageVm(me server.PublicUser) (ProfilePage, error)
 
 	// OpenProfile は op browser.openProfile。
+	//
+	// Reads: browser.token
 	OpenProfile() (ProfilePage, error)
 
 	// ProductPageVm は op browser.productPageVm。

@@ -1,5 +1,5 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "namespaces": [
     {
       "name": "",
@@ -151,7 +151,7 @@
             },
             "end": {
               "line": 9,
-              "col": 38
+              "col": 58
             }
           },
           "fields": [
@@ -216,16 +216,17 @@
               }
             }
           ],
-          "derivedFrom": {
+          "extends": {
             "base": "a.User",
-            "omit": [
+            "removed": [
               "hash"
-            ]
+            ],
+            "overridden": []
           }
         },
         {
-          "kind": "state",
-          "name": "a.users",
+          "kind": "decorator",
+          "name": "a.mark",
           "decorators": [],
           "span": {
             "file": "a.hozo",
@@ -235,7 +236,443 @@
             },
             "end": {
               "line": 11,
+              "col": 28
+            }
+          },
+          "params": [],
+          "targets": [
+            "field"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": []
+        },
+        {
+          "kind": "model",
+          "name": "a.Member",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 12,
+              "col": 3
+            },
+            "end": {
+              "line": 20,
+              "col": 4
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "description": {
+                "summary": "識別子",
+                "body": "識別子",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [
+                {
+                  "decorator": "a.mark",
+                  "args": [],
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 14,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 14,
+                      "col": 10
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 14,
+                  "col": 5
+                },
+                "end": {
+                  "line": 14,
+                  "col": 22
+                }
+              }
+            },
+            {
+              "name": "name",
+              "description": {
+                "summary": "名前",
+                "body": "名前",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 16,
+                  "col": 5
+                },
+                "end": {
+                  "line": 16,
+                  "col": 18
+                }
+              }
+            },
+            {
+              "name": "level",
+              "description": {
+                "summary": "段階",
+                "body": "段階",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "type": {
+                "kind": "core",
+                "name": "int"
+              },
+              "default": {
+                "kind": "int",
+                "value": 1
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 18,
+                  "col": 5
+                },
+                "end": {
+                  "line": 18,
+                  "col": 20
+                }
+              }
+            },
+            {
+              "name": "since",
+              "type": {
+                "kind": "core",
+                "name": "Time"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 19,
+                  "col": 5
+                },
+                "end": {
+                  "line": 19,
+                  "col": 17
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "model",
+          "name": "a.Admin",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 21,
+              "col": 3
+            },
+            "end": {
+              "line": 27,
+              "col": 4
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "ref",
+                "target": "a.Email"
+              },
+              "decorators": [
+                {
+                  "decorator": "a.mark",
+                  "args": [],
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 14,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 14,
+                      "col": 10
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 22,
+                  "col": 5
+                },
+                "end": {
+                  "line": 22,
+                  "col": 24
+                }
+              }
+            },
+            {
+              "name": "name",
+              "description": {
+                "summary": "新しい名前",
+                "body": "新しい名前",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [
+                {
+                  "decorator": "a.mark",
+                  "args": [],
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 24,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 24,
+                      "col": 10
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 24,
+                  "col": 5
+                },
+                "end": {
+                  "line": 24,
+                  "col": 25
+                }
+              }
+            },
+            {
+              "name": "since",
+              "type": {
+                "kind": "core",
+                "name": "Time"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 19,
+                  "col": 5
+                },
+                "end": {
+                  "line": 19,
+                  "col": 17
+                }
+              }
+            },
+            {
+              "name": "role",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 26,
+                  "col": 5
+                },
+                "end": {
+                  "line": 26,
+                  "col": 18
+                }
+              }
+            }
+          ],
+          "extends": {
+            "base": "a.Member",
+            "removed": [
+              "level"
+            ],
+            "overridden": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        {
+          "kind": "model",
+          "name": "a.Shapes",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 28,
+              "col": 3
+            },
+            "end": {
+              "line": 28,
+              "col": 117
+            }
+          },
+          "fields": [
+            {
+              "name": "a",
+              "type": {
+                "kind": "array",
+                "of": {
+                  "kind": "core",
+                  "name": "string"
+                }
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 18
+                },
+                "end": {
+                  "line": 28,
+                  "col": 34
+                }
+              }
+            },
+            {
+              "name": "b",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "core",
+                  "name": "int"
+                }
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 35
+                },
+                "end": {
+                  "line": 28,
+                  "col": 52
+                }
+              }
+            },
+            {
+              "name": "c",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 53
+                },
+                "end": {
+                  "line": 28,
+                  "col": 69
+                }
+              }
+            },
+            {
+              "name": "d",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "core",
+                  "name": "string"
+                }
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 70
+                },
+                "end": {
+                  "line": 28,
+                  "col": 91
+                }
+              }
+            },
+            {
+              "name": "e",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "array",
+                  "of": {
+                    "kind": "ref",
+                    "target": "a.User"
+                  }
+                }
+              },
+              "decorators": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 92
+                },
+                "end": {
+                  "line": 28,
+                  "col": 115
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "state",
+          "name": "a.users",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 30,
+              "col": 3
+            },
+            "end": {
+              "line": 30,
               "col": 27
+            }
+          },
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "a.User"
             }
           },
           "shape": "list",
@@ -251,12 +688,19 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 12,
+              "line": 31,
               "col": 3
             },
             "end": {
-              "line": 12,
+              "line": 31,
               "col": 33
+            }
+          },
+          "type": {
+            "kind": "optional",
+            "of": {
+              "kind": "core",
+              "name": "string"
             }
           },
           "shape": "nullable",
@@ -266,17 +710,123 @@
           }
         },
         {
+          "kind": "state",
+          "name": "a.title",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 32,
+              "col": 3
+            },
+            "end": {
+              "line": 32,
+              "col": 31
+            }
+          },
+          "type": {
+            "kind": "core",
+            "name": "string"
+          },
+          "shape": "single",
+          "element": {
+            "kind": "core",
+            "name": "string"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "a.plain",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 33,
+              "col": 3
+            },
+            "end": {
+              "line": 33,
+              "col": 23
+            }
+          },
+          "type": {
+            "kind": "core",
+            "name": "string"
+          },
+          "shape": "single",
+          "element": {
+            "kind": "core",
+            "name": "string"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "a.maybe",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 34,
+              "col": 3
+            },
+            "end": {
+              "line": 34,
+              "col": 32
+            }
+          },
+          "type": {
+            "kind": "optional",
+            "of": {
+              "kind": "core",
+              "name": "string"
+            }
+          },
+          "shape": "nullable",
+          "element": {
+            "kind": "core",
+            "name": "string"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "a.rows",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 35,
+              "col": 3
+            },
+            "end": {
+              "line": 35,
+              "col": 22
+            }
+          },
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "a.User"
+            }
+          },
+          "shape": "list",
+          "element": {
+            "kind": "ref",
+            "target": "a.User"
+          }
+        },
+        {
           "kind": "effect",
           "name": "a.add",
           "decorators": [],
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 13,
+              "line": 36,
               "col": 3
             },
             "end": {
-              "line": 13,
+              "line": 36,
               "col": 28
             }
           },
@@ -296,11 +846,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 14,
+              "line": 37,
               "col": 3
             },
             "end": {
-              "line": 14,
+              "line": 37,
               "col": 27
             }
           },
@@ -320,11 +870,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 16,
+              "line": 39,
               "col": 3
             },
             "end": {
-              "line": 16,
+              "line": 39,
               "col": 26
             }
           }
@@ -336,11 +886,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 17,
+              "line": 40,
               "col": 3
             },
             "end": {
-              "line": 17,
+              "line": 40,
               "col": 41
             }
           },
@@ -356,11 +906,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 17,
+              "line": 40,
               "col": 22
             },
             "end": {
-              "line": 17,
+              "line": 40,
               "col": 40
             }
           },
@@ -375,11 +925,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 17,
+                  "line": 40,
                   "col": 24
                 },
                 "end": {
-                  "line": 17,
+                  "line": 40,
                   "col": 38
                 }
               }
@@ -394,11 +944,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 18,
+              "line": 41,
               "col": 3
             },
             "end": {
-              "line": 18,
+              "line": 41,
               "col": 27
             }
           },
@@ -414,11 +964,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 19,
+              "line": 42,
               "col": 3
             },
             "end": {
-              "line": 19,
+              "line": 42,
               "col": 42
             }
           },
@@ -430,11 +980,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 19,
+                  "line": 42,
                   "col": 18
                 },
                 "end": {
-                  "line": 19,
+                  "line": 42,
                   "col": 31
                 }
               }
@@ -444,11 +994,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 19,
+                  "line": 42,
                   "col": 32
                 },
                 "end": {
-                  "line": 19,
+                  "line": 42,
                   "col": 40
                 }
               }
@@ -462,11 +1012,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 20,
+              "line": 43,
               "col": 3
             },
             "end": {
-              "line": 20,
+              "line": 43,
               "col": 39
             }
           },
@@ -478,11 +1028,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 20,
+                  "line": 43,
                   "col": 21
                 },
                 "end": {
-                  "line": 20,
+                  "line": 43,
                   "col": 28
                 }
               }
@@ -492,11 +1042,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 20,
+                  "line": 43,
                   "col": 21
                 },
                 "end": {
-                  "line": 20,
+                  "line": 43,
                   "col": 28
                 }
               }
@@ -506,11 +1056,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 20,
+                  "line": 43,
                   "col": 29
                 },
                 "end": {
-                  "line": 20,
+                  "line": 43,
                   "col": 37
                 }
               }
@@ -524,11 +1074,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 21,
+              "line": 44,
               "col": 3
             },
             "end": {
-              "line": 21,
+              "line": 44,
               "col": 30
             }
           },
@@ -540,11 +1090,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 21,
+                  "line": 44,
                   "col": 19
                 },
                 "end": {
-                  "line": 21,
+                  "line": 44,
                   "col": 23
                 }
               }
@@ -554,11 +1104,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 21,
+                  "line": 44,
                   "col": 24
                 },
                 "end": {
-                  "line": 21,
+                  "line": 44,
                   "col": 28
                 }
               }
@@ -572,11 +1122,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 23,
+              "line": 46,
               "col": 3
             },
             "end": {
-              "line": 27,
+              "line": 50,
               "col": 4
             }
           },
@@ -598,11 +1148,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 25,
+                  "line": 48,
                   "col": 5
                 },
                 "end": {
-                  "line": 25,
+                  "line": 48,
                   "col": 30
                 }
               }
@@ -616,11 +1166,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 26,
+                  "line": 49,
                   "col": 5
                 },
                 "end": {
-                  "line": 26,
+                  "line": 49,
                   "col": 19
                 }
               }
@@ -635,11 +1185,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 25,
+              "line": 48,
               "col": 12
             },
             "end": {
-              "line": 25,
+              "line": 48,
               "col": 29
             }
           },
@@ -654,11 +1204,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 25,
+                  "line": 48,
                   "col": 14
                 },
                 "end": {
-                  "line": 25,
+                  "line": 48,
                   "col": 27
                 }
               }
@@ -673,11 +1223,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 29,
+              "line": 52,
               "col": 3
             },
             "end": {
-              "line": 29,
+              "line": 52,
               "col": 30
             }
           },
@@ -691,21 +1241,23 @@
           "cases": [
             {
               "name": "IsActive",
+              "as": [],
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 29,
+                  "line": 52,
                   "col": 13
                 },
                 "end": {
-                  "line": 29,
+                  "line": 52,
                   "col": 21
                 }
               }
             }
           ],
           "hasDefault": true,
-          "fromCondition": true
+          "fromCondition": true,
+          "decidedBy": "predicate"
         },
         {
           "kind": "classify",
@@ -714,11 +1266,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 30,
+              "line": 53,
               "col": 3
             },
             "end": {
-              "line": 30,
+              "line": 53,
               "col": 68
             }
           },
@@ -732,14 +1284,15 @@
           "cases": [
             {
               "name": "A",
+              "as": [],
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 30,
+                  "line": 53,
                   "col": 27
                 },
                 "end": {
-                  "line": 30,
+                  "line": 53,
                   "col": 29
                 }
               }
@@ -753,14 +1306,15 @@
                 "throws": [],
                 "see": []
               },
+              "as": [],
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 30,
+                  "line": 53,
                   "col": 43
                 },
                 "end": {
-                  "line": 30,
+                  "line": 53,
                   "col": 45
                 }
               }
@@ -774,7 +1328,8 @@
             "throws": [],
             "see": []
           },
-          "fromCondition": false
+          "fromCondition": false,
+          "decidedBy": "predicate"
         },
         {
           "kind": "decorator",
@@ -783,11 +1338,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 32,
+              "line": 55,
               "col": 3
             },
             "end": {
-              "line": 33,
+              "line": 56,
               "col": 51
             }
           },
@@ -827,11 +1382,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 34,
+              "line": 57,
               "col": 3
             },
             "end": {
-              "line": 34,
+              "line": 57,
               "col": 99
             }
           },
@@ -875,11 +1430,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 35,
+              "line": 58,
               "col": 3
             },
             "end": {
-              "line": 35,
+              "line": 58,
               "col": 53
             }
           },
@@ -919,11 +1474,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 36,
+              "line": 59,
               "col": 3
             },
             "end": {
-              "line": 36,
+              "line": 59,
               "col": 52
             }
           },
@@ -972,11 +1527,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 37,
+              "line": 60,
               "col": 3
             },
             "end": {
-              "line": 37,
+              "line": 60,
               "col": 50
             }
           },
@@ -1046,11 +1601,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 48,
+                  "line": 71,
                   "col": 3
                 },
                 "end": {
-                  "line": 48,
+                  "line": 71,
                   "col": 17
                 }
               }
@@ -1059,14 +1614,15 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 48,
+              "line": 71,
               "col": 3
             },
             "end": {
-              "line": 49,
+              "line": 72,
               "col": 81
             }
           },
+          "exported": false,
           "params": [
             {
               "name": "id",
@@ -1077,11 +1633,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 49,
+                  "line": 72,
                   "col": 11
                 },
                 "end": {
-                  "line": 49,
+                  "line": 72,
                   "col": 21
                 }
               }
@@ -1092,6 +1648,7 @@
             "target": "a.User"
           },
           "effects": [],
+          "reads": [],
           "throws": [
             {
               "exceptions": [
@@ -1115,7 +1672,9 @@
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1125,24 +1684,28 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 50,
+              "line": 73,
               "col": 3
             },
             "end": {
-              "line": 50,
+              "line": 73,
               "col": 13
             }
           },
+          "exported": false,
           "params": [],
           "returns": null,
           "effects": [],
+          "reads": [],
           "throws": [],
           "body": null,
           "signature": {
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1152,24 +1715,28 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 51,
+              "line": 74,
               "col": 3
             },
             "end": {
-              "line": 51,
+              "line": 74,
               "col": 20
             }
           },
+          "exported": false,
           "params": [],
           "returns": null,
           "effects": [],
+          "reads": [],
           "throws": [],
           "body": null,
           "signature": {
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1179,14 +1746,15 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 52,
+              "line": 75,
               "col": 3
             },
             "end": {
-              "line": 52,
+              "line": 75,
               "col": 75
             }
           },
+          "exported": false,
           "params": [
             {
               "name": "u",
@@ -1197,11 +1765,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 52,
+                  "line": 75,
                   "col": 11
                 },
                 "end": {
-                  "line": 52,
+                  "line": 75,
                   "col": 18
                 }
               }
@@ -1214,6 +1782,7 @@
           "effects": [
             "a.add"
           ],
+          "reads": [],
           "throws": [
             {
               "exceptions": [
@@ -1233,7 +1802,9 @@
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1243,26 +1814,30 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 53,
+              "line": 76,
               "col": 3
             },
             "end": {
-              "line": 53,
+              "line": 76,
               "col": 29
             }
           },
+          "exported": false,
           "params": [],
           "returns": null,
           "effects": [
             "a.set"
           ],
+          "reads": [],
           "throws": [],
           "body": null,
           "signature": {
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1272,14 +1847,15 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 54,
+              "line": 77,
               "col": 3
             },
             "end": {
-              "line": 57,
+              "line": 80,
               "col": 4
             }
           },
+          "exported": false,
           "params": [
             {
               "name": "u",
@@ -1290,11 +1866,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 54,
+                  "line": 77,
                   "col": 11
                 },
                 "end": {
-                  "line": 54,
+                  "line": 77,
                   "col": 18
                 }
               }
@@ -1308,6 +1884,7 @@
             "a.add",
             "a.set"
           ],
+          "reads": [],
           "throws": [
             {
               "exceptions": [
@@ -1329,11 +1906,11 @@
                   "span": {
                     "file": "a.hozo",
                     "start": {
-                      "line": 55,
+                      "line": 78,
                       "col": 5
                     },
                     "end": {
-                      "line": 55,
+                      "line": 78,
                       "col": 15
                     }
                   }
@@ -1341,11 +1918,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 55,
+                    "line": 78,
                     "col": 5
                   },
                   "end": {
-                    "line": 55,
+                    "line": 78,
                     "col": 16
                   }
                 }
@@ -1367,11 +1944,11 @@
                           "span": {
                             "file": "a.hozo",
                             "start": {
-                              "line": 56,
+                              "line": 79,
                               "col": 17
                             },
                             "end": {
-                              "line": 56,
+                              "line": 79,
                               "col": 18
                             }
                           }
@@ -1382,11 +1959,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 56,
+                        "line": 79,
                         "col": 12
                       },
                       "end": {
-                        "line": 56,
+                        "line": 79,
                         "col": 19
                       }
                     }
@@ -1395,11 +1972,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 56,
+                    "line": 79,
                     "col": 5
                   },
                   "end": {
-                    "line": 56,
+                    "line": 79,
                     "col": 20
                   }
                 }
@@ -1410,7 +1987,9 @@
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1420,14 +1999,15 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 58,
+              "line": 81,
               "col": 3
             },
             "end": {
-              "line": 58,
+              "line": 81,
               "col": 27
             }
           },
+          "exported": false,
           "params": [
             {
               "name": "in",
@@ -1438,11 +2018,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 58,
+                  "line": 81,
                   "col": 11
                 },
                 "end": {
-                  "line": 58,
+                  "line": 81,
                   "col": 19
                 }
               }
@@ -1450,13 +2030,16 @@
           ],
           "returns": null,
           "effects": [],
+          "reads": [],
           "throws": [],
           "body": null,
           "signature": {
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1466,14 +2049,15 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 59,
+              "line": 82,
               "col": 3
             },
             "end": {
-              "line": 59,
+              "line": 82,
               "col": 29
             }
           },
+          "exported": false,
           "params": [
             {
               "name": "in",
@@ -1484,11 +2068,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 59,
+                  "line": 82,
                   "col": 13
                 },
                 "end": {
-                  "line": 59,
+                  "line": 82,
                   "col": 21
                 }
               }
@@ -1499,13 +2083,937 @@
             "target": "a.User"
           },
           "effects": [],
+          "reads": [],
           "throws": [],
           "body": null,
           "signature": {
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.find2",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 84,
+              "col": 3
+            },
+            "end": {
+              "line": 84,
+              "col": 69
+            }
+          },
+          "exported": true,
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 84,
+                  "col": 19
+                },
+                "end": {
+                  "line": 84,
+                  "col": 29
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "a.User"
+            }
+          },
+          "effects": [],
+          "reads": [
+            "a.users",
+            "a.token"
+          ],
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.nameOf",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 85,
+              "col": 3
+            },
+            "end": {
+              "line": 85,
+              "col": 30
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "u",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 85,
+                  "col": 13
+                },
+                "end": {
+                  "line": 85,
+                  "col": 20
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "core",
+            "name": "string"
+          },
+          "effects": [],
+          "reads": [],
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.gone",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 86,
+              "col": 3
+            },
+            "end": {
+              "line": 86,
+              "col": 40
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "never"
+          },
+          "effects": [],
+          "reads": [],
+          "throws": [
+            {
+              "exceptions": [
+                "a.Unauthorized"
+              ],
+              "relations": []
+            }
+          ],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "classify",
+          "name": "a.Found",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 87,
+              "col": 3
+            },
+            "end": {
+              "line": 87,
+              "col": 59
+            }
+          },
+          "subject": {
+            "kind": "op",
+            "op": "a.find2",
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "a.User"
+              }
+            }
+          },
+          "cases": [
+            {
+              "name": "Hit",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "a.User"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 87,
+                      "col": 34
+                    },
+                    "end": {
+                      "line": 87,
+                      "col": 47
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 87,
+                  "col": 29
+                },
+                "end": {
+                  "line": 87,
+                  "col": 48
+                }
+              }
+            }
+          ],
+          "hasDefault": true,
+          "fromCondition": false,
+          "decidedBy": "type"
+        },
+        {
+          "kind": "classify",
+          "name": "a.Session",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 88,
+              "col": 3
+            },
+            "end": {
+              "line": 88,
+              "col": 62
+            }
+          },
+          "subject": {
+            "kind": "states",
+            "states": [
+              "a.token"
+            ]
+          },
+          "cases": [
+            {
+              "name": "In",
+              "as": [
+                {
+                  "state": "a.token",
+                  "type": {
+                    "kind": "core",
+                    "name": "string"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 88,
+                      "col": 35
+                    },
+                    "end": {
+                      "line": 88,
+                      "col": 50
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 88,
+                  "col": 31
+                },
+                "end": {
+                  "line": 88,
+                  "col": 51
+                }
+              }
+            }
+          ],
+          "hasDefault": true,
+          "fromCondition": false,
+          "decidedBy": "type"
+        },
+        {
+          "kind": "op",
+          "name": "a.wire2",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 89,
+              "col": 3
+            },
+            "end": {
+              "line": 95,
+              "col": 4
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 89,
+                  "col": 12
+                },
+                "end": {
+                  "line": 89,
+                  "col": 22
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "core",
+            "name": "string"
+          },
+          "effects": [],
+          "reads": [],
+          "throws": [
+            {
+              "exceptions": [
+                "a.Unauthorized"
+              ],
+              "relations": []
+            }
+          ],
+          "body": {
+            "statements": [
+              {
+                "kind": "const",
+                "name": "u",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "op": "a.find2",
+                    "args": [
+                      {
+                        "param": "id",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "id"
+                          ],
+                          "span": {
+                            "file": "a.hozo",
+                            "start": {
+                              "line": 90,
+                              "col": 21
+                            },
+                            "end": {
+                              "line": 90,
+                              "col": 23
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 90,
+                        "col": 15
+                      },
+                      "end": {
+                        "line": 90,
+                        "col": 24
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 90,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 90,
+                    "col": 25
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "value",
+                      "atom": {
+                        "kind": "name",
+                        "path": [
+                          "u"
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 91,
+                            "col": 18
+                          },
+                          "end": {
+                            "line": 91,
+                            "col": 19
+                          }
+                        }
+                      }
+                    },
+                    "classify": "a.Found",
+                    "arms": [
+                      {
+                        "cases": [
+                          "Hit"
+                        ],
+                        "body": {
+                          "kind": "call",
+                          "call": {
+                            "op": "a.nameOf",
+                            "args": [
+                              {
+                                "param": "u",
+                                "value": {
+                                  "kind": "name",
+                                  "path": [
+                                    "u"
+                                  ],
+                                  "span": {
+                                    "file": "a.hozo",
+                                    "start": {
+                                      "line": 92,
+                                      "col": 21
+                                    },
+                                    "end": {
+                                      "line": 92,
+                                      "col": 22
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "bound": [],
+                            "span": {
+                              "file": "a.hozo",
+                              "start": {
+                                "line": 92,
+                                "col": 14
+                              },
+                              "end": {
+                                "line": 92,
+                                "col": 23
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "ref",
+                              "target": "a.User"
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 92,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 92,
+                            "col": 24
+                          }
+                        }
+                      },
+                      {
+                        "cases": "default",
+                        "body": {
+                          "kind": "throw",
+                          "exception": "a.Unauthorized",
+                          "span": {
+                            "file": "a.hozo",
+                            "start": {
+                              "line": 93,
+                              "col": 18
+                            },
+                            "end": {
+                              "line": 93,
+                              "col": 36
+                            }
+                          }
+                        },
+                        "narrowed": [],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 93,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 93,
+                            "col": 37
+                          }
+                        }
+                      }
+                    ],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 91,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 94,
+                        "col": 6
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 91,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 94,
+                    "col": 7
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.wire3",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 96,
+              "col": 3
+            },
+            "end": {
+              "line": 98,
+              "col": 4
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "core",
+              "name": "string"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "value",
+                      "atom": {
+                        "kind": "state",
+                        "state": "a.token",
+                        "path": [],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 97,
+                            "col": 18
+                          },
+                          "end": {
+                            "line": 97,
+                            "col": 23
+                          }
+                        }
+                      }
+                    },
+                    "classify": "nullable",
+                    "arms": [
+                      {
+                        "cases": [
+                          "HasItems"
+                        ],
+                        "body": {
+                          "kind": "atom",
+                          "atom": {
+                            "kind": "state",
+                            "state": "a.token",
+                            "path": [],
+                            "span": {
+                              "file": "a.hozo",
+                              "start": {
+                                "line": 97,
+                                "col": 50
+                              },
+                              "end": {
+                                "line": 97,
+                                "col": 55
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "core",
+                              "name": "string"
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 97,
+                            "col": 38
+                          },
+                          "end": {
+                            "line": 97,
+                            "col": 56
+                          }
+                        }
+                      },
+                      {
+                        "cases": [
+                          "Empty"
+                        ],
+                        "body": {
+                          "kind": "none"
+                        },
+                        "narrowed": [],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 97,
+                            "col": 57
+                          },
+                          "end": {
+                            "line": 97,
+                            "col": 71
+                          }
+                        }
+                      }
+                    ],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 97,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 97,
+                        "col": 73
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 97,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 97,
+                    "col": 74
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.wire4",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 99,
+              "col": 3
+            },
+            "end": {
+              "line": 99,
+              "col": 41
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "core",
+            "name": "string"
+          },
+          "effects": [],
+          "reads": [],
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "atom",
+                  "atom": {
+                    "kind": "state",
+                    "state": "a.title",
+                    "path": [],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 99,
+                        "col": 31
+                      },
+                      "end": {
+                        "line": 99,
+                        "col": 38
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 99,
+                    "col": 24
+                  },
+                  "end": {
+                    "line": 99,
+                    "col": 39
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "a.wire5",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 100,
+              "col": 3
+            },
+            "end": {
+              "line": 102,
+              "col": 4
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "core",
+            "name": "string"
+          },
+          "effects": [],
+          "reads": [],
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "classify"
+                    },
+                    "classify": "a.Session",
+                    "arms": [
+                      {
+                        "cases": [
+                          "In"
+                        ],
+                        "body": {
+                          "kind": "atom",
+                          "atom": {
+                            "kind": "state",
+                            "state": "a.token",
+                            "path": [],
+                            "span": {
+                              "file": "a.hozo",
+                              "start": {
+                                "line": 101,
+                                "col": 37
+                              },
+                              "end": {
+                                "line": 101,
+                                "col": 42
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "state": "a.token",
+                            "type": {
+                              "kind": "core",
+                              "name": "string"
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 101,
+                            "col": 31
+                          },
+                          "end": {
+                            "line": 101,
+                            "col": 43
+                          }
+                        }
+                      },
+                      {
+                        "cases": "default",
+                        "body": {
+                          "kind": "call",
+                          "call": {
+                            "op": "a.gone",
+                            "args": [],
+                            "bound": [],
+                            "span": {
+                              "file": "a.hozo",
+                              "start": {
+                                "line": 101,
+                                "col": 55
+                              },
+                              "end": {
+                                "line": 101,
+                                "col": 61
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 101,
+                            "col": 44
+                          },
+                          "end": {
+                            "line": 101,
+                            "col": 62
+                          }
+                        }
+                      }
+                    ],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 101,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 101,
+                        "col": 64
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 101,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 101,
+                    "col": 65
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {
@@ -1538,11 +3046,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 61,
+                  "line": 104,
                   "col": 3
                 },
                 "end": {
-                  "line": 61,
+                  "line": 104,
                   "col": 15
                 }
               }
@@ -1583,11 +3091,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 62,
+                  "line": 105,
                   "col": 3
                 },
                 "end": {
-                  "line": 62,
+                  "line": 105,
                   "col": 28
                 }
               }
@@ -1596,14 +3104,15 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 61,
+              "line": 104,
               "col": 3
             },
             "end": {
-              "line": 71,
+              "line": 114,
               "col": 4
             }
           },
+          "exported": false,
           "params": [
             {
               "name": "id",
@@ -1614,11 +3123,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 63,
+                  "line": 106,
                   "col": 11
                 },
                 "end": {
-                  "line": 63,
+                  "line": 106,
                   "col": 21
                 }
               }
@@ -1626,9 +3135,10 @@
           ],
           "returns": {
             "kind": "ref",
-            "target": "a.PublicUser"
+            "target": "a.User"
           },
           "effects": [],
+          "reads": [],
           "throws": [],
           "body": {
             "statements": [
@@ -1650,11 +3160,11 @@
                           "span": {
                             "file": "a.hozo",
                             "start": {
-                              "line": 64,
+                              "line": 107,
                               "col": 20
                             },
                             "end": {
-                              "line": 64,
+                              "line": 107,
                               "col": 22
                             }
                           }
@@ -1665,11 +3175,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 64,
+                        "line": 107,
                         "col": 15
                       },
                       "end": {
-                        "line": 64,
+                        "line": 107,
                         "col": 23
                       }
                     }
@@ -1678,11 +3188,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 64,
+                    "line": 107,
                     "col": 5
                   },
                   "end": {
-                    "line": 64,
+                    "line": 107,
                     "col": 24
                   }
                 }
@@ -1707,11 +3217,11 @@
                               "span": {
                                 "file": "a.hozo",
                                 "start": {
-                                  "line": 65,
+                                  "line": 108,
                                   "col": 12
                                 },
                                 "end": {
-                                  "line": 65,
+                                  "line": 108,
                                   "col": 14
                                 }
                               }
@@ -1728,11 +3238,11 @@
                               "span": {
                                 "file": "a.hozo",
                                 "start": {
-                                  "line": 65,
+                                  "line": 108,
                                   "col": 23
                                 },
                                 "end": {
-                                  "line": 65,
+                                  "line": 108,
                                   "col": 30
                                 }
                               }
@@ -1749,11 +3259,11 @@
                               "span": {
                                 "file": "a.hozo",
                                 "start": {
-                                  "line": 65,
+                                  "line": 108,
                                   "col": 38
                                 },
                                 "end": {
-                                  "line": 65,
+                                  "line": 108,
                                   "col": 41
                                 }
                               }
@@ -1763,11 +3273,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 65,
+                            "line": 108,
                             "col": 10
                           },
                           "end": {
-                            "line": 65,
+                            "line": 108,
                             "col": 43
                           }
                         }
@@ -1778,11 +3288,11 @@
                   "span": {
                     "file": "a.hozo",
                     "start": {
-                      "line": 65,
+                      "line": 108,
                       "col": 5
                     },
                     "end": {
-                      "line": 65,
+                      "line": 108,
                       "col": 44
                     }
                   }
@@ -1790,11 +3300,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 65,
+                    "line": 108,
                     "col": 5
                   },
                   "end": {
-                    "line": 65,
+                    "line": 108,
                     "col": 45
                   }
                 }
@@ -1815,11 +3325,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 66,
+                            "line": 109,
                             "col": 21
                           },
                           "end": {
-                            "line": 66,
+                            "line": 109,
                             "col": 22
                           }
                         }
@@ -1847,11 +3357,11 @@
                                   "span": {
                                     "file": "a.hozo",
                                     "start": {
-                                      "line": 67,
+                                      "line": 110,
                                       "col": 23
                                     },
                                     "end": {
-                                      "line": 67,
+                                      "line": 110,
                                       "col": 24
                                     }
                                   }
@@ -1862,24 +3372,40 @@
                             "span": {
                               "file": "a.hozo",
                               "start": {
-                                "line": 67,
+                                "line": 110,
                                 "col": 16
                               },
                               "end": {
-                                "line": 67,
+                                "line": 110,
                                 "col": 25
                               }
                             }
                           }
                         },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "a.Kind",
+                              "cases": [
+                                "A",
+                                "B"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "a.User"
+                              }
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 67,
+                            "line": 110,
                             "col": 7
                           },
                           "end": {
-                            "line": 67,
+                            "line": 110,
                             "col": 26
                           }
                         }
@@ -1889,14 +3415,15 @@
                         "body": {
                           "kind": "none"
                         },
+                        "narrowed": [],
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 68,
+                            "line": 111,
                             "col": 7
                           },
                           "end": {
-                            "line": 68,
+                            "line": 111,
                             "col": 23
                           }
                         }
@@ -1905,11 +3432,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 66,
+                        "line": 109,
                         "col": 15
                       },
                       "end": {
-                        "line": 69,
+                        "line": 112,
                         "col": 6
                       }
                     }
@@ -1918,11 +3445,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 66,
+                    "line": 109,
                     "col": 5
                   },
                   "end": {
-                    "line": 69,
+                    "line": 112,
                     "col": 7
                   }
                 }
@@ -1939,11 +3466,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 70,
+                        "line": 113,
                         "col": 12
                       },
                       "end": {
-                        "line": 70,
+                        "line": 113,
                         "col": 13
                       }
                     }
@@ -1952,11 +3479,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 70,
+                    "line": 113,
                     "col": 5
                   },
                   "end": {
-                    "line": 70,
+                    "line": 113,
                     "col": 14
                   }
                 }
@@ -1967,7 +3494,9 @@
             "exceptions": [],
             "effects": [],
             "relations": [],
-            "successEffects": []
+            "successEffects": [],
+            "reads": [],
+            "pure": false
           }
         },
         {

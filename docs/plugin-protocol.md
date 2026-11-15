@@ -11,7 +11,7 @@
 ```toml
 name     = "react-router"       # 例。プラグインの名前。go-cli のマニフェストは docs/plugin-go-cli.md「マニフェスト」
 command  = ["node", "dist/main.js"]   # 文字列か文字列の配列
-protocol = "0.2"                # 対応する docs/ir.md の version
+protocol = "0.3"                # 対応する docs/ir.md の version
 
 vocabulary = ["vocab/page.hozo"]   # このプラグインが提供する語彙。マニフェストからの相対パス。省略時は []
 
@@ -94,7 +94,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 
 ```jsonc
 // 要求
-{ "protocol": "0.2", "direction": "emit",
+{ "protocol": "0.3", "direction": "emit",
   "transpiler": "go-cli",                 // 起動するトランスパイラの名前（マニフェストの [[transpiler]] の name）
   "view": { /* docs/ir.md の View。対象の名前空間は view.viewer、単位の設定は view.config */ } }
 
@@ -122,7 +122,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 ### check
 
 ```jsonc
-{ "protocol": "0.2", "direction": "check", "view": { /* View */ } }
+{ "protocol": "0.3", "direction": "check", "view": { /* View */ } }
 
 { "diagnostics": [ { "severity": "error", "code": "PAGE-1", "message": "...", "at": "browser.openOrders" } ] }
 ```
@@ -135,7 +135,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 ### import
 
 ```jsonc
-{ "protocol": "0.2", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
+{ "protocol": "0.3", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
 
 { "ir": { /* docs/ir.md の Program */ }, "warnings": [ /* 同上 */ ] }
 ```

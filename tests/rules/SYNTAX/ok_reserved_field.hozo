@@ -1,5 +1,5 @@
 // 予約語はフィールド名を書く位置では使える（docs/grammar.md「識別子」の FieldName / Path、「予約語」、「決めたこと」）:
-// model のフィールド、その場で書く model、omit の並び、レコードリテラルのキー、値のパスの二つ目以降。
+// model のフィールド、その場で書く model、override の後ろの名前、レコードリテラルのキー、値のパスの二つ目以降。
 // `{ "op": "foo" }` のようなオブジェクトを返す API を書けるようにするため
 namespace a {
   model Target {
@@ -18,8 +18,13 @@ namespace a {
     default: boolean = false;
     true: boolean?;
   }
-  // omit の並び
-  model Slim is Wrap omit decorator, match, default, true;
+  // override の後ろの名前
+  model Slim extends Wrap {
+    override decorator: never;
+    override match: never;
+    override default: never;
+    override true: never;
+  }
 
   // その場で書く model（ユニオンのアーム、例外の値）
   union Page {
@@ -38,6 +43,8 @@ namespace a {
   op label(target: Target, text: string): string;
   op describe(target: Target): string;
   op show(w: Slim): Page;
+  // 継承した model は別の型なので、写す op を通す
+  op slim(w: Wrap): Slim;
 
   // 値のパス（res.op、res.state.model）、レコードリテラルのキー、match の対象
   op run(): Page throws Rejected {
@@ -57,6 +64,7 @@ namespace a {
       default: true,
       true: none,
     });
-    return show(saved);
+    const slimmed = slim(saved);
+    return show(slimmed);
   }
 }

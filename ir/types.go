@@ -7,10 +7,11 @@ import (
 )
 
 // Type は型（docs/ir.md「型」）。具体型は値型の [CoreType]、[RefType]、[OptionalType]、
-// [ArrayType]、[RecordType]、[CaseType]。void は型ではなく Op.Returns が nil であること。
+// [ArrayType]、[RecordType]、[CaseType]、[NeverType]。void は型ではなく Op.Returns が nil であること。
+// never は値の型ではなく、Op.Returns にだけ現れる。
 // 等しさは [TypeEqual]（docs/types.md「等しい」）、表示は String（Hozo の構文）。
 type Type interface {
-	// Kind は JSON の判別子（"core"、"ref"、"optional"、"array"、"record"、"case"）。
+	// Kind は JSON の判別子（"core"、"ref"、"optional"、"array"、"record"、"case"、"never"）。
 	Kind() string
 	// String は Hozo の構文で型を書く（docs/grammar.md「型」）。
 	String() string
@@ -68,7 +69,11 @@ type CaseType struct {
 	Of Type `json:"of"`
 }
 
+// NeverType は決して値を返さないことを表す型（docs/ir.md「型」の kind "never"）。Op.Returns にだけ現れる。
+type NeverType struct{}
+
 var (
+	_ Type = NeverType{}
 	_ Type = CoreType{}
 	_ Type = RefType{}
 	_ Type = OptionalType{}
@@ -95,12 +100,22 @@ func (RecordType) Kind() string { return "record" }
 // Kind は "case"。
 func (CaseType) Kind() string { return "case" }
 
+// Kind は "never"。
+func (NeverType) Kind() string { return "never" }
+
+func (NeverType) isType()    {}
 func (CoreType) isType()     {}
 func (RefType) isType()      {}
 func (OptionalType) isType() {}
 func (ArrayType) isType()    {}
 func (RecordType) isType()   {}
 func (CaseType) isType()     {}
+
+// String は "never"。
+func (NeverType) String() string { return "never" }
+
+// MarshalJSON は kind だけを書く。
+func (NeverType) MarshalJSON() ([]byte, error) { return []byte(`{"kind":"never"}`), nil }
 
 // String は核の型の名前。
 func (t CoreType) String() string { return string(t.Name) }
@@ -195,6 +210,7 @@ var typeTable = map[string]func([]byte) (Type, error){
 	"array":    asValue[Type, ArrayType],
 	"record":   asValue[Type, RecordType],
 	"case":     asValue[Type, CaseType],
+	"never":    asValue[Type, NeverType],
 }
 
 // UnmarshalType は kind で分けて Type を読む（docs/ir.md「JSON」）。
@@ -237,6 +253,15 @@ func Array(of Type) Type { return ArrayType{Of: of} }
 // Record は Record<K, V> を作る（docs/ir.md「型」の kind "record"）。
 func Record(key, value Type) Type { return RecordType{Key: key, Value: value} }
 
+// Never は never を作る（docs/ir.md「型」の kind "never"）。Op.Returns にだけ置く。
+func Never() Type { return NeverType{} }
+
+// IsNever は t が never か。
+func IsNever(t Type) bool {
+	_, ok := t.(NeverType)
+	return ok
+}
+
 // Case は C.Case<T> を作る（docs/ir.md「型」の kind "case"）。cases は書かれた順のまま。
 func Case(classify string, cases []string, of Type) Type {
 	return CaseType{Classify: classify, Cases: cases, Of: of}
@@ -267,6 +292,9 @@ func TypeEqual(a, b Type) bool {
 	case CaseType:
 		y, ok := b.(CaseType)
 		return ok && x.Classify == y.Classify && sameSet(x.Cases, y.Cases) && TypeEqual(x.Of, y.Of)
+	case NeverType:
+		_, ok := b.(NeverType)
+		return ok
 	}
 	panic(fmt.Sprintf("ir: unknown Type %T", a))
 }

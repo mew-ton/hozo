@@ -12,5 +12,5 @@ namespace a {
 }
 namespace b {
   model In { id: string; token: a.Token; }
-  op take(in: In);
+  export op take(in: In);
 }

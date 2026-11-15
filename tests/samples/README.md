@@ -45,7 +45,7 @@ tests/samples/<名前>/
 ```
 
 - `transpilers` のキーは、`hozo.toml` の単位に書いたトランスパイラの名前。単位に書いた名前はすべてここに要り、ここに書いた名前はどれかの単位が使っていなければならない。
-- `select` は、そのトランスパイラが出力の対象に選ぶ宣言（`docs/plugin-protocol.md`「選択」）を、テスト用のプラグイン `tests/plugins/pick` の規則の形（デコレータの FQN。`tests/plugins/pick/main.go` の先頭）で書いたもの。トランスパイラがまだない間、`pick` がこの規則でそのトランスパイラの代役をして、共有する形を作る。代役を使うサブテスト（`check`、`shared`）の両方を保留にしたサンプルでは、書かなくてよい。
+- `select` は、そのトランスパイラが出力の対象に選ぶ宣言（`docs/plugin-protocol.md`「選択」）を、テスト用のプラグイン `tests/plugins/pick` の規則の形（デコレータの FQN。`tests/plugins/pick/main.go` の先頭）で書いたもの。トランスパイラがまだない間、`pick` がこの規則でそのトランスパイラの代役をして、共有する形を作る。`shared` を保留にしたサンプルでは、書かなくてよい（代役を使うサブテストが走らない。「保留」）。
 - `files` は、期待する出力のうち、そのトランスパイラが出すファイル（サンプルのルートからの相対パス）。単位の `out` の下の、ここにないファイルは共有する形（と、出力先ごとの記録）。
 - `pending` は、このサンプルで保留にするサブテスト（「保留」）。キーは `check` か `shared`、値は理由。なければ、どれも保留にしない。
 
@@ -60,6 +60,7 @@ tests/samples/<名前>/
 | `go` | **サンプルが動く**: サンプルのモジュールで `go vet ./...` と `go test ./...` が通る（期待する出力がコンパイルでき、人が書いたコードと合わせて仕様の通りに動く） |
 | `transpilers` | **トランスパイラのブラックボックスのテスト**: 本物の `hozo.toml` と、リポジトリの `plugins/` のプラグインで `hozoc emit` した出力の全体（共有する形、トランスパイラのファイル、記録）が、期待する出力とバイト単位で同じ。サンプルのトランスパイラを `plugins/` のどのプラグインも提供していなければ、理由を書いて飛ばす（保留）。提供するプラグインを足せば、何も変えずに走る |
 
+- `shared` を保留にしたサンプルの `check` は、仕様（`.hozo`）だけを一時ディレクトリに写して、言語の検査だけを行う（「保留」）。それ以外では、次のとおり。
 - `check` と `shared` は、サンプルの入力（`hozo.toml`、`.hozo`、`go.mod`）を一時ディレクトリに写して走らせる。本物の `hozo.toml` は書き換えない: まだないトランスパイラと同じ名前のトランスパイラを提供する代役のプラグイン（`pick` を `go build` したものと、`sample.json` の `select` から作ったマニフェストと `pick.json`）を、プロジェクトの外のディレクトリに置き、`HOZO_PLUGIN_PATH` として hozoc に渡す（`docs/plugin-protocol.md`「探索」の 2）。代役がなければ、単位のトランスパイラが見つからず CFG-14 になる。
 - 共有する形の更新は `go test ./tests -run TestSamples -update`。共有する形のファイルと記録を書き直し、既定の出力が書かなくなったファイルを消す。トランスパイラのファイルと人が書くコードには触らない（生成器を変えて共有する形が変わったら、それに合わせて手で直す。`go` が、合っていないことを教える）。
 - `go` は、サンプルの `go.sum` の通りの依存をモジュールキャッシュから使う（`GOFLAGS=-mod=readonly`、`GOTOOLCHAIN=local`、`GOWORK=off`）。キャッシュにあればネットワークは要らない。なければ `go` が `GOPROXY` から取りに行き、取れなければ（オフラインなど）失敗する。飛ばさないのは、動くと確かめていないサンプルを仕様として通さないため。先に取っておくには、サンプルのディレクトリで `GOTOOLCHAIN=local go mod download`。
@@ -82,10 +83,11 @@ tests/samples/<名前>/
 - 保留にできるのは `check` と `shared` だけ。`go`（サンプルが動くこと）は保留にできない。`transpilers` は、トランスパイラがあるかどうかで自動で決まる（「テスト」の表）。
 - 理由は、何がまだないのかを、決定の番号（`docs/decisions.md` の P の番号）で書く。テストは、その理由を示して飛ばす（失敗にしない）。その決定を実装したら、`pending` から外す。
 - `shared` を保留にしたサンプルでは、期待する出力のすべてのファイルを人が書く（今の `hozoc emit` が書いたものを置く「共有する形」のファイルはない）。テストは飛ばす前に、hozoc を動かさずに確かめられることを確かめる: 単位の `out` の下のファイルは、記録を除いてどれも `sample.json` のどれかのトランスパイラの `files` にあり、`files` のファイルはどれもあり、記録 `.hozoc-outputs.json` は、その下のファイルのパスを辞書順に並べたものと同じ。
-- `check` を保留にしたサンプルの `hozo.toml` は、単位ごとのオプションのテーブル `[emit.options.<トランスパイラ>]`（`docs/decisions.md` の P16）を書いてよい。今の `internal/config` は、これを知らないキー（CFG-7）にして、その単位を読まない。テストは、単位の `out` と `transpilers` を読むときに、このテーブルを除いた写しを読む。P16 を実装したら、この扱いをやめる。
+- `check` か `shared` を保留にしたサンプルの `hozo.toml` は、単位ごとのオプションのテーブル `[emit.options.<トランスパイラ>]`（`docs/decisions.md` の P16）を書いてよい。今の `internal/config` は、これを知らないキー（CFG-7）にして、その単位を読まない。テストは、単位の `out` と `transpilers` を読むときに、このテーブルを除いた写しを読む。P16 を実装したら、この扱いをやめる。
+- `shared` を保留にしたサンプルは、設定（`hozo.toml`）も、まだない形で書いてよい: まだないトランスパイラ、上のオプションのテーブル、型だけの名前空間の単位（`docs/decisions.md` の P7。今の検査では CFG-8）。そういうサンプルの `check` は、**仕様（`.hozo`）の言語の検査だけ**を行う: `.hozo` だけを写し、`hozo.toml` を写さずに `hozoc check` を走らせる（`hozo.toml` がなければ、hozoc は設定の検査 CFG-* をしない。`docs/config.md`「置き場と探し方」）。設定は、`shared` の保留を外したときに、代役の emit が確かめる。
 
 ## サンプルの一覧
 
 | サンプル | 中身 |
 |---|---|
-| [`shop-server`](shop-server/README.md) | `docs/decisions.md` の P1〜P33 を当てはめた後の形。共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go` と、それに相乗りする `go-valid`、`go-sqlite`（`database/sql` の上の表と、`store` の op の中身）、`go-http`（`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。`check` と `shared` は保留 |
+| [`shop-server`](shop-server/README.md) | `docs/decisions.md` の P1〜P33 を当てはめた後の形。共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go` と、それに相乗りする `go-valid`、`go-sqlite`（`database/sql` の上の表と、`store` の op の中身）、`go-http`（`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。`shared` は保留（`check` は仕様の言語の検査だけ） |

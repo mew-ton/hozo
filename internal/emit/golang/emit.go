@@ -190,16 +190,13 @@ type emitter struct {
 	commandOf  map[string]*stateUnit // 効果を持つ葉の op の FQN → その命令を持つ状態の単位
 
 	// 配線を見て集めるもの
-	projections []projection // 必要になった射影の組（順序は必要になった順）
+	projections []projection // 必要になった変換関数の組（順序は必要になった順）
 	needPtr     bool         // types.go に ptr ヘルパーが要るか
 
 	wrappers map[string][]wrapper // op の FQN → 包む関数（内側から順）
 
 	copyNote string // 複製した宣言を出している間、そのコメントに足す文
 }
-
-// projection は model から model への変換関数 <From>To<To>（docs/emit-go.md「配線の本体」の「射影」）。
-type projection struct{ from, to string }
 
 func newEmitter(view *ir.View, ns *ir.Namespace, opts Options) *emitter {
 	e := &emitter{
@@ -237,6 +234,11 @@ func newEmitter(view *ir.View, ns *ir.Namespace, opts Options) *emitter {
 	return e
 }
 
+// projection は model から model への変換関数 <From>To<To>。model から model への暗黙の射影はなくなった
+// （docs/types.md「互換」）ので、要るのは、名前で渡した引数を、bind で埋まる位置を除いた合成 model
+// （`<viewer>.<op 名>$<引数名>`。docs/ir.md「その名前空間から見た IR」）に写すときだけ。
+type projection struct{ from, to string }
+
 // collect は出力の対象を決め（select.go）、パッケージに出す宣言を集める（decls.go）。ファイルは作らない。
 func (e *emitter) collect() {
 	e.sel = e.computeSelection()
@@ -256,8 +258,17 @@ func (e *emitter) run() []File {
 		return nil
 	}
 	e.checkNames()
+	// 既定の出力が支えない書き方（docs/emit-go.md「移行の間の扱い」）があれば、何も作らない
+	e.checkUnsupported()
+	if errs, _ := diag.Count(e.diags); errs > 0 {
+		for _, d := range e.diags {
+			if d.Code == CodeUnsupported {
+				return nil
+			}
+		}
+	}
 
-	// 配線と op を先に作り、射影を集める。
+	// 配線と op を先に作り、要る変換関数を集める。
 	wiring := e.genWiring()
 	ops := e.genOps()
 	states := e.genStates()

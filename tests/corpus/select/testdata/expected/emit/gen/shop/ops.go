@@ -32,6 +32,8 @@ type IssueFunc func(order Order) (Receipt, error)
 // OpenCartFunc は op shop.openCart の関数の型。
 //
 // カートを開く
+//
+// Reads: shop.carts
 type OpenCartFunc func() error
 
 // ShowEmptyFunc は op shop.showEmpty の関数の型。
@@ -69,6 +71,8 @@ type Ops interface {
 	Issue(order Order) (Receipt, error)
 
 	// OpenCart はカートを開く
+	//
+	// Reads: shop.carts
 	OpenCart() error
 
 	// ShowEmpty は op shop.showEmpty。

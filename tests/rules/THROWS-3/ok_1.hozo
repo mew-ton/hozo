@@ -1,0 +1,24 @@
+// THROWS-3（docs/check.md「never を返す op」）: 値を運ばない例外を一つ投げる、引数のない葉。catches を持たないデコレータは付けられる。
+// 呼び出しの式の型は「返らない」で、どの型のアームにも、どの型の return にも書ける
+namespace a {
+  model M { id: string; }
+  exception Unauthorized;
+  decorator mark;
+  classify Kind of M { A; B; }
+  op unauthorized(): never throws Unauthorized;
+  @mark
+  export op denied(): never throws Unauthorized;
+  op keep(m: M): M;
+  op f(m: M): M throws Unauthorized {
+    return match m by Kind {
+      A => keep(m);
+      B => unauthorized();
+    };
+  }
+  op g(): int throws Unauthorized {
+    return denied();
+  }
+  op h() throws Unauthorized {
+    unauthorized();
+  }
+}

@@ -26,8 +26,6 @@ func TestEnumStrings(t *testing.T) {
 		v    fmt.Stringer
 		want string
 	}{
-		{StateList, "list"},
-		{StateSingle, "single"},
 		{Post, "post"},
 		{Put, "put"},
 		{Delete, "delete"},

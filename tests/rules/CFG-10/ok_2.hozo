@@ -4,7 +4,7 @@
 // a.sub は a の単位の対象（単位は namespace とその子孫を対象にする）
 namespace a {
   exception Busy;
-  op save(text: string) throws Busy;
+  export op save(text: string) throws Busy;
 }
 namespace a.sub {
   op g();

@@ -1,0 +1,21 @@
+// WIRE-9（docs/check.md「配線」）: 「返らない」式の文（never を返す op の呼び出し、すべてのアームが返らない match）が、
+// 本体の最後以外にある（下の行が評価されない）。位置はその文
+namespace a {
+  model M { id: string; }
+  exception E;
+  classify Kind of M { A; B; }
+  op fail(): never throws E;
+  op g();
+  op f() throws E {
+    fail();                            // ERROR: WIRE-9
+    g();
+  }
+  op h(m: M) throws E {
+    match m by Kind { A => throw E; B => fail(); };    // ERROR: WIRE-9
+    g();
+  }
+  op twice() throws E {
+    fail();                            // ERROR: WIRE-9
+    fail();
+  }
+}

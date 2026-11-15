@@ -110,7 +110,7 @@ func (c *computer) view(viewer string) *ir.View {
 	}
 	var synthesized []ir.Decl
 	for _, o := range ix.ops {
-		vs := &ir.ViewedSignature{Signature: c.sig(o, viewer).signature()}
+		vs := &ir.ViewedSignature{Signature: c.signature(o, viewer)}
 		for bi, b := range ix.p.Binds {
 			if b.Namespace != viewer {
 				continue

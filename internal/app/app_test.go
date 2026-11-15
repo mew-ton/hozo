@@ -520,7 +520,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	}
 	// errors → CheckFailed（1）
 	fakePlugin(t, dir, "fake", "go", "", `{"files":[],"warnings":[],"errors":[{"code":"FAKE-1","at":"server.placeOrder","message":"nope"}]}`, 0)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || !strings.Contains(stderr, "server.hozo:244:3: error[FAKE-1]: nope") {
+	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || !strings.Contains(stderr, "server.hozo:246:3: error[FAKE-1]: nope") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// 異常終了 → 70
@@ -972,7 +972,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int) {
 		t.Skip("sh がない")
 	}
 	script := "cat >>\"$HOZO_PLUGIN_DIR/" + requestsFile + "\"; echo >>\"$HOZO_PLUGIN_DIR/" + requestsFile + "\"; printf '%s' '" + stdout + "'; exit " + string(rune('0'+exit))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(strings.ReplaceAll(script, `\`, `\\`), `"`, `\"`) + "\"]\nprotocol = \"0.2\"\n" + extra +
+	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(strings.ReplaceAll(script, `\`, `\\`), `"`, `\"`) + "\"]\nprotocol = \"0.3\"\n" + extra +
 		"\n[[transpiler]]\nname = \"" + name + "\"\nlanguage = \"" + lang + "\"\n"
 	write(t, filepath.Join(dir, "plugins", name, "hozo-plugin.toml"), manifest)
 }
@@ -1425,7 +1425,7 @@ func TestEmitImportPrefersOwnUnit(t *testing.T) {
 	script := `if grep -q '"viewer": *"shop.admin"'; then printf '%s' '{"files":[],"warnings":[],"select":{"roots":["shop.admin.ban"]}}'; ` +
 		`else printf '%s' '{"files":[],"warnings":[],"select":{"roots":["shop.nightly"]}}'; fi`
 	write(t, filepath.Join(dir, "plugins", "both", "hozo-plugin.toml"),
-		"name = \"both\"\ncommand = [\"sh\", \"-c\", \""+strings.ReplaceAll(strings.ReplaceAll(script, `\`, `\\`), `"`, `\"`)+"\"]\nprotocol = \"0.2\"\n"+
+		"name = \"both\"\ncommand = [\"sh\", \"-c\", \""+strings.ReplaceAll(strings.ReplaceAll(script, `\`, `\\`), `"`, `\"`)+"\"]\nprotocol = \"0.3\"\n"+
 			"\n[[transpiler]]\nname = \"first\"\nlanguage = \"go\"\n\n[[transpiler]]\nname = \"second\"\nlanguage = \"go\"\n")
 	got := emitAll(t, dir)
 	wantIn(t, "gen/first/admin/ops.go", got["first/admin/ops.go"], []string{`"example.com/units/gen/first"`, "item shop.Item"}, []string{"gen/second"})

@@ -1,0 +1,25 @@
+// MATCH-8（docs/check.md「classify / match」「throw」）: アームの本体の throw E の E が、値を運ぶ例外。位置は E
+namespace a {
+  model M { id: string; }
+  model Detail { reason: string; }
+  exception Plain;
+  exception WithModel: Detail;
+  exception Inline: { reason: string; };
+  classify Kind of M { A; B; C; }
+  op f(m: M): M throws Plain | WithModel | Inline {
+    return match m by Kind {
+      A => throw WithModel;            // ERROR: MATCH-8
+      B => throw Inline;               // ERROR: MATCH-8
+      C => throw Plain;
+    };
+  }
+  op g(m: M): M throws b.Remote {
+    return match m by Kind {
+      A | B => throw b.Remote;         // ERROR: MATCH-8
+      C => throw b.Remote;             // ERROR: MATCH-8
+    };
+  }
+}
+namespace b {
+  exception Remote: a.Detail;
+}

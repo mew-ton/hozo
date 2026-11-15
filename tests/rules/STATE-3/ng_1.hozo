@@ -1,5 +1,5 @@
-// STATE-3（docs/check.md「状態と効果」）: single<T?> は書けない（docs/grammar.md「決めたこと」。nullable<T> と書く）
+// STATE-3（docs/check.md「状態と効果」）: list の状態の要素は optional にできない（列は値を持つ）
 namespace a {
   scalar Token extends string;
-  state token: single<Token?>;         // ERROR: STATE-3
+  state tokens: list<Token?>;          // ERROR: STATE-3
 }

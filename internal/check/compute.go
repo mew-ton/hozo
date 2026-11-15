@@ -6,8 +6,8 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Compute は docs/check.md「計算」を行い、すべての op の Op.Signature（= Sig(O, ns(O))）と
-// すべての呼び出しの Call.Bound を埋める。計算は呼び出しの依存の順に行い、循環に含まれる op は
+// Compute は docs/check.md「計算」を行い、すべての op の Op.Signature（= Sig(O, ns(O))。例外・効果・読む状態・
+// 純粋さ）とすべての呼び出しの Call.Bound を埋める。計算は呼び出しの依存の順に行い、循環に含まれる op は
 // 本体を無視して葉として計算する（WIRE-7）。
 func Compute(p *ir.Program) {
 	ix := newIndex(p)
@@ -18,7 +18,8 @@ func Compute(p *ir.Program) {
 // sigKey は Sig(O, v) のメモのキー。
 type sigKey struct{ op, viewer string }
 
-// sigState は Sig(O, v) の四つの値（docs/check.md「Sig(O, v)」）。
+// sigState は Sig(O, v) の値（docs/check.md「Sig(O, v)」）のうち、見る側によるもの。
+// R と pure は見る側によらないので、computer が op ごとに持つ（computer.reads、computer.pure）。
 type sigState struct {
 	E    []string                             // 例外の列
 	F    []string                             // 効果の列
@@ -139,19 +140,22 @@ func declared(o *ir.Op) []string {
 	return out
 }
 
-// callRef は配線の本体の一つの呼び出し。
+// callRef は配線の本体の一つの呼び出し。アームの本体の `throw X` も、例外が X だけで効果を持たない呼び出しとして
+// 数える（docs/check.md「手順 0」）。そのときは throw に X が入り、call は Op が空で、Span がその throw の位置。
 type callRef struct {
-	row  int     // 行（0 始まり）
-	arm  int     // match のアーム（アームでなければ -1）
-	call ir.Call // 呼び出し（写し）
-	stmt ir.Span // 行の位置
+	row   int     // 行（0 始まり）
+	arm   int     // match のアーム（アームでなければ -1）
+	call  ir.Call // 呼び出し（写し）
+	throw string  // アームの本体の throw の例外。呼び出しなら空
+	stmt  ir.Span // 行の位置
 }
 
 // row は配線の本体の一行。
 type row struct {
 	calls   []callRef
 	isMatch bool
-	arms    int // match のアームの数（none のアームを含む）
+	// armBodies は match のアームごとの本体（アームの順）。呼び出しを持たないアーム（値、none）も含む。
+	armBodies []ir.ArmBody
 }
 
 // rowsOf は配線の本体を行ごとの呼び出しに分ける（docs/check.md「手順 0」の「行 i の呼び出し」）。
@@ -179,10 +183,15 @@ func rowsOf(w *ir.Wiring) []row {
 			r.calls = append(r.calls, callRef{row: i, arm: -1, call: e.Call, stmt: span})
 		case ir.MatchExpr:
 			r.isMatch = true
-			r.arms = len(e.Match.Arms)
 			for j, arm := range e.Match.Arms {
-				if ce, ok := arm.Body.(ir.CallExpr); ok {
-					r.calls = append(r.calls, callRef{row: i, arm: j, call: ce.Call, stmt: span})
+				r.armBodies = append(r.armBodies, arm.Body)
+				switch body := arm.Body.(type) {
+				case ir.CallExpr:
+					r.calls = append(r.calls, callRef{row: i, arm: j, call: body.Call, stmt: span})
+				case ir.ThrowBody:
+					if body.Exception != "" {
+						r.calls = append(r.calls, callRef{row: i, arm: j, call: ir.Call{Span: body.Span}, throw: body.Exception, stmt: span})
+					}
 				}
 			}
 		}
@@ -255,21 +264,36 @@ type computer struct {
 	cyclic map[string]bool // 循環に含まれる op（本体を無視する）
 	bodies map[string]*bodyInfo
 	binds  *bindTable
+	// reads と pure は op ごとの R と pure（docs/check.md「reads」「純粋」）。見る側によらない。
+	reads map[string][]string
+	pure  map[string]bool
 }
 
 func newComputer(ix *index, r *reporter) *computer {
-	c := &computer{ix: ix, r: r, memo: map[sigKey]*sigState{}, cyclic: map[string]bool{}, bodies: map[string]*bodyInfo{}}
+	c := &computer{
+		ix: ix, r: r, memo: map[sigKey]*sigState{}, cyclic: map[string]bool{}, bodies: map[string]*bodyInfo{},
+		reads: map[string][]string{}, pure: map[string]bool{},
+	}
 	c.binds = newBindTable(ix)
 	return c
 }
 
-// computeAll は WIRE-7 の検出、全 op の Signature、全呼び出しの Call.Bound を順に行う。
+// computeAll は WIRE-7 の検出、全呼び出しの Call.Bound、全 op の Signature を順に行う。
+// Call.Bound を先に埋めるのは、読む状態（R）が bind で埋まる位置の状態を含むため（docs/check.md「reads」の 2.2）。
 func (c *computer) computeAll() {
 	c.detectCycles()
-	for i, o := range c.ix.ops {
-		o.Signature = c.sig(o, c.ix.opsNS[i]).signature()
-	}
 	c.fillBound()
+	for i, o := range c.ix.ops {
+		o.Signature = c.signature(o, c.ix.opsNS[i])
+	}
+}
+
+// signature は Sig(O, viewer) を ir.Signature にする。reads と pure は見る側によらない。
+func (c *computer) signature(o *ir.Op, viewer string) ir.Signature {
+	sig := c.sig(o, viewer).signature()
+	sig.Reads = append([]string{}, c.readsOf(o)...)
+	sig.Pure = c.pureOf(o)
+	return sig
 }
 
 // detectCycles は配線の呼び出しのグラフの強連結成分を出現順に求め、循環（二つ以上の op、または自分を呼ぶ op）を
@@ -393,9 +417,12 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 	info.sigs = make([][]*sigState, len(info.rows))
 	for i, r := range info.rows {
 		for _, cr := range r.calls {
-			callee := c.ix.op(cr.call.Op)
 			var sc *sigState
-			if callee != nil {
+			if cr.throw != "" {
+				// アームの本体の throw X: 例外が X だけで、効果を持たない呼び出し
+				sc = newSigState()
+				sc.addE(cr.throw)
+			} else if callee := c.ix.op(cr.call.Op); callee != nil {
 				sc = c.sig(callee, ns)
 			}
 			info.sigs[i] = append(info.sigs[i], sc)
@@ -467,14 +494,14 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 			s.setRel(x, e, state)
 		}
 	}
-	// succ
+	// succ。本体が「返らない」アーム（throw、never を返す op の呼び出し）は、成功しないので数えない
 	for _, e := range s.F {
 		kept, prevented, other := 0, 0, 0
 		partial := false
 		for i, r := range info.rows {
 			inArms := 0
-			for _, sc := range info.sigs[i] {
-				if sc == nil || !sc.hasF(e) {
+			for j, sc := range info.sigs[i] {
+				if sc == nil || !sc.hasF(e) || c.neverReturns(r.calls[j]) {
 					continue
 				}
 				inArms++
@@ -487,7 +514,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 					other++
 				}
 			}
-			if r.isMatch && inArms > 0 && inArms < r.arms {
+			if r.isMatch && inArms > 0 && inArms < c.returningArms(r) {
 				partial = true
 			}
 		}
@@ -671,4 +698,141 @@ func (c *computer) fillBound() {
 			call.Bound = c.binds.boundOf(ns, call)
 		})
 	}
+}
+
+// neverReturns は呼び出し（か throw）が「返らない」か: アームの本体の throw と、never を返す op の呼び出し
+// （docs/types.md「式の型」）。
+func (c *computer) neverReturns(cr callRef) bool {
+	if cr.throw != "" {
+		return true
+	}
+	callee := c.ix.op(cr.call.Op)
+	return callee != nil && ir.IsNever(callee.Returns)
+}
+
+// returningArms は match の行の、本体が「返らない」でないアームの数（値と none のアームを含む）。
+func (c *computer) returningArms(r row) int {
+	n := 0
+	for _, body := range r.armBodies {
+		switch b := body.(type) {
+		case ir.ThrowBody:
+			continue
+		case ir.CallExpr:
+			if callee := c.ix.op(b.Call.Op); callee != nil && ir.IsNever(callee.Returns) {
+				continue
+			}
+		}
+		n++
+	}
+	return n
+}
+
+// readsOf は op が読む状態 R（docs/check.md「reads」）。基底の状態の FQN の列で、デコレータは R を変えない。
+// 葉の op（と、呼び出しが循環している op）は Op.reads。配線の op は、本体を行の順に見て集める。
+func (c *computer) readsOf(o *ir.Op) []string {
+	if r, ok := c.reads[o.Name]; ok {
+		return r
+	}
+	c.reads[o.Name] = nil // 循環の保険。detectCycles が循環を葉にしているので、ここには戻らない
+	var out []string
+	add := func(states ...string) {
+		for _, s := range states {
+			if s != "" {
+				out = appendUnique(out, s)
+			}
+		}
+	}
+	if o.Body == nil || c.cyclic[o.Name] {
+		add(o.Reads...)
+		c.reads[o.Name] = out
+		return out
+	}
+	call := func(call ir.Call) {
+		// 2.1 引数の Atom が参照する状態、2.2 Call.bound の状態、2.3 呼び出し先の R
+		for _, a := range call.Args {
+			add(atomStates(a.Value)...)
+		}
+		for _, b := range call.Bound {
+			add(b.State)
+		}
+		if callee := c.ix.op(call.Op); callee != nil {
+			add(c.readsOf(callee)...)
+		}
+	}
+	expr := func(e ir.Expr) {
+		switch x := e.(type) {
+		case ir.CallExpr:
+			call(x.Call)
+		case ir.AtomExpr:
+			add(atomStates(x.Atom)...)
+		case ir.MatchExpr:
+			// 1. match の対象が読む状態
+			m := x.Match
+			if atom := m.SubjectAtom(); atom != nil {
+				add(atomStates(atom)...)
+			} else if cl, ok := c.ix.decls[m.Classify].(*ir.Classify); ok {
+				states, _ := cl.SubjectStates()
+				add(states...)
+			}
+			// 2. アームの順に、各アームの本体
+			for _, arm := range m.Arms {
+				switch body := arm.Body.(type) {
+				case ir.CallExpr:
+					call(body.Call)
+				case ir.AtomExpr:
+					add(atomStates(body.Atom)...)
+				}
+			}
+		}
+	}
+	for _, st := range o.Body.Statements {
+		switch s := st.(type) {
+		case ir.ConstStmt:
+			expr(s.Expr)
+		case ir.ReturnStmt:
+			expr(s.Expr)
+		case ir.CallStmt:
+			call(s.Call)
+		case ir.MatchStmt:
+			expr(ir.MatchExpr{Match: s.Match})
+		}
+	}
+	c.reads[o.Name] = out
+	return out
+}
+
+// atomStates は Atom が参照する状態（書かれた順）。レコードリテラルの中の値も見る。
+func atomStates(a ir.Atom) []string {
+	switch x := a.(type) {
+	case ir.StateAtom:
+		return []string{x.State}
+	case ir.RecordAtom:
+		var out []string
+		for _, f := range x.Fields {
+			out = append(out, atomStates(f.Value)...)
+		}
+		return out
+	}
+	return nil
+}
+
+// pureOf は op が純粋か（docs/check.md「純粋」）: デコレータが付いていない、R が空、F が空、配線なら本体の呼び出し先が
+// すべて純粋。呼び出しが循環している op は、葉としてはじめの三つだけで決める。
+func (c *computer) pureOf(o *ir.Op) bool {
+	if p, ok := c.pure[o.Name]; ok {
+		return p
+	}
+	c.pure[o.Name] = false // 循環の保険
+	pure := len(o.Decorators) == 0 && len(c.readsOf(o)) == 0 && len(c.sig(o, c.ix.namespaceOf(o.Name)).F) == 0
+	if pure && o.Body != nil && !c.cyclic[o.Name] {
+		for _, r := range rowsOf(o.Body) {
+			for _, cr := range r.calls {
+				if callee := c.ix.op(cr.call.Op); callee != nil && !c.pureOf(callee) {
+					pure = false
+				}
+			}
+		}
+	}
+	c.pure[o.Name] = pure
+	return pure
 }

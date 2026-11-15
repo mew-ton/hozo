@@ -1,0 +1,13 @@
+// TYPE-12（docs/types.md「診断」）: op の分類と、別の名前空間の分類のケースで絞り込んだ型（分類はどの名前空間からも使える）
+namespace a {
+  model M { id: string; }
+  op find(): M?;
+  classify Found of find { Hit; default; }
+  classify Kind of M { A; B; }
+  op ok1(m: Found.Hit<M?>): void;
+  op ok2(m: Found.Hit<M>): void;
+}
+namespace b {
+  op ok3(m: a.Kind.A<a.M>): void;
+  op ok4(m: a.Found.Hit<a.M>): void;
+}

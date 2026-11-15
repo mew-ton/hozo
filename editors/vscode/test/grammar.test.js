@@ -18,6 +18,10 @@ const files = {
   cli: path.join(root, 'cli.hozo'),
   // 状態の分類・遷移の効果・状態での match（docs/grammar.md「exception / effect」「classify / condition」「配線」）
   state: path.join(root, 'tests', 'corpus', 'state', 'shop.hozo'),
+  // export、reads、extends / override、op の分類とケースの as、throw（docs/grammar.md「model」「classify / condition」「op」「配線」）
+  sampleType: path.join(root, 'tests', 'samples', 'shop-server', 'type.hozo'),
+  sampleStore: path.join(root, 'tests', 'samples', 'shop-server', 'store.hozo'),
+  sampleServer: path.join(root, 'tests', 'samples', 'shop-server', 'server.hozo'),
 };
 
 let grammar;
@@ -133,31 +137,33 @@ test('フィールド名の位置の予約語は予約語として塗らない',
   const c = tokensOf('const name = label(res.state, res.op);');
   assertScope(c, 'const name', 'state', prop);
   assertScope(c, 'const name', 'op', prop);
-  // omit の並び（docs/grammar.md「model」の ModelDecl）もフィールド名の位置。核の型も、宣言の頭も、節の頭も塗らない
-  const o = tokensOf('model Slim is server.Wrap omit op, to, string, model, default, hash;');
+  // override の後ろの名前（docs/grammar.md「model」の Override）もフィールド名の位置。核の型も、宣言の頭も、節の頭も塗らない
+  const o = tokensOf('model Slim extends server.Wrap { override op; override to: never; @db.key override string; override model: Wide; override default: never; override hash: never; }');
   for (const w of ['op', 'to', 'string', 'model', 'default']) {
     assertScope(o, 'model Slim', w, prop, w === 'model' ? 1 : 0);
     for (const kw of ['keyword.declaration.hozo', 'keyword.control.hozo', 'support.type.primitive.hozo']) {
-      assert.ok(!scopesAt(o, 'model Slim', w, w === 'model' ? 1 : 0).includes(kw), `omit の並びの ${w} が ${kw}`);
+      assert.ok(!scopesAt(o, 'model Slim', w, w === 'model' ? 1 : 0).includes(kw), `override の後ろの ${w} が ${kw}`);
     }
   }
-  // omit そのものは節の頭の予約語。元の model は型の位置の名前。予約語でないフィールド名には scope を付けない
-  assertScope(o, 'model Slim', 'omit', 'keyword.control.hozo');
-  assertScope(o, 'model Slim', 'is', 'keyword.control.hozo');
+  // override そのものは修飾の予約語。元の model は型の位置の名前。予約語でないフィールド名には scope を付けない
+  for (let n = 0; n < 6; n++) assertScope(o, 'model Slim', 'override', 'storage.modifier.hozo', n);
+  assertScope(o, 'model Slim', 'extends', 'keyword.control.hozo');
   assertScope(o, 'model Slim', 'model', 'keyword.declaration.hozo', 0);
   assertScope(o, 'model Slim', 'server.Wrap', 'entity.name.type.hozo');
+  assertScope(o, 'model Slim', 'Wide', 'entity.name.type.hozo');
+  assertScope(o, 'model Slim', 'never', 'support.type.primitive.hozo', 0);
   assert.ok(!o[0].tokens.some((t) => t.text.includes('hash') && t.scopes.length > 1));
-  // 並びは ; まで。行をまたいでもよく、; の後ろは元に戻る
-  const ml = tokensOf('model Slim is Wrap\n  omit state, // 状態\n    list;\nmodel Next { list: list<string>; }\nop next(): string;');
-  assertScope(ml, 'omit state', 'state', prop);
-  assertScope(ml, 'omit state', '// 状態', 'comment.line.double-slash.hozo');
-  assertScope(ml, '    list;', 'list', prop);
-  assertScope(ml, 'model Next', 'list', prop, 0);
-  assertScope(ml, 'model Next', 'list', 'support.type.primitive.hozo', 1);
-  assertScope(ml, 'op next', 'op', 'keyword.declaration.hozo');
-  assertScope(ml, 'op next', 'string', 'support.type.primitive.hozo');
-  // 実物: コーパスの omit
-  assertScope(linesOf(files.server), 'model PublicUser is User omit hash;', 'omit', 'keyword.control.hozo');
+  // `override: string;` の override はフィールドの名前（: の前）。`override override: never;` は、その名前のフィールドへの Override
+  const of = tokensOf('model M extends B { override: string; override override: never; }');
+  assertScope(of, 'model M', 'override', prop, 0);
+  assertScope(of, 'model M', 'override', 'storage.modifier.hozo', 1);
+  assertScope(of, 'model M', 'override', prop, 2);
+  // is と omit は予約語ではない（docs/grammar.md「予約語」）
+  const io = tokensOf('op is(omit: string): string;');
+  assert.ok(!io[0].tokens.some((t) => (t.text === 'is' || t.text === 'omit') && t.scopes.some((x) => x.startsWith('keyword.'))));
+  // 実物: サンプルの override
+  assertScope(linesOf(files.sampleType), 'override hash: never;', 'override', 'storage.modifier.hozo');
+  assertScope(linesOf(files.sampleType), 'override hash: never;', 'never', 'support.type.primitive.hozo');
   // 宣言の頭と文の頭は予約語のまま
   const d = tokensOf('op run(): Wrap { return fetch(); }');
   assertScope(d, 'op run', 'op', 'keyword.declaration.hozo');
@@ -198,15 +204,15 @@ test('型の位置の名前', () => {
   assertScope(s, 'op login(in: LoginInput): LoginOk', 'LoginInput', 'entity.name.type.hozo');
   assertScope(s, 'op login(in: LoginInput): LoginOk', 'LoginOk', 'entity.name.type.hozo');
   assertScope(s, 'exception ClientError: Violations;', 'Violations', 'entity.name.type.hozo');
-  assertScope(s, 'model PublicUser is User omit hash;', 'User', 'entity.name.type.hozo');
+  assertScope(linesOf(files.sampleType), 'model PublicUser extends User {', 'User', 'entity.name.type.hozo');
   assertScope(s, 'throws InvalidCredentials | NotVerified', 'NotVerified', 'entity.name.type.hozo');
   const b = linesOf(files.browser);
   assertScope(b, 'classify WarrantyKind of server.Item {', 'server.Item', 'entity.name.type.hozo');
   assertScope(b, 'catches http.NetworkError | http.ServerError ignores;', 'http.ServerError', 'entity.name.type.hozo');
   assertScope(b, 'state token: nullable<server.Token>;', 'server.Token', 'entity.name.type.hozo');
-  // 状態の形 nullable も予約語（docs/grammar.md「予約語」の「核の型と状態の形」）
+  // 形の語 nullable も予約語（docs/grammar.md「予約語」の「核の型と形」）
   assertScope(b, 'state token: nullable<server.Token>;', 'nullable', 'support.type.primitive.hozo');
-  // match の by の後ろの状態の形も同じ予約語
+  // match の by の後ろの標準の分類の名前も同じ予約語
   const st = linesOf(files.state);
   assertScope(st, 'match token by nullable {', 'nullable', 'support.type.primitive.hozo');
   assertScope(st, 'match carts by list {', 'list', 'support.type.primitive.hozo');
@@ -222,6 +228,53 @@ test('型の位置の名前', () => {
   assert.ok(!orders.tokens.some((t) => t.scopes.includes('entity.name.type.hozo')));
   const route = b.find((l) => l.text.includes('@page.route("/orders", from: query, onInvalid: transitionToOrders)'));
   assert.ok(!route.tokens.some((t) => t.scopes.includes('entity.name.type.hozo')));
+});
+
+test('修飾（export、override）と、reads / as / throw / never', () => {
+  const store = linesOf(files.sampleStore);
+  const server = linesOf(files.sampleServer);
+  // export は修飾の予約語。op の名前は今まで通り
+  assertScope(store, 'export op findUser(email: type.Email): type.User? reads users;', 'export', 'storage.modifier.hozo');
+  assertScope(store, 'export op findUser(email: type.Email): type.User? reads users;', 'op', 'keyword.declaration.hozo');
+  assertScope(store, 'export op findUser(email: type.Email): type.User? reads users;', 'findUser', 'entity.name.function.hozo');
+  // reads は節の頭。後ろの状態の名前は小文字で始まるので scope を付けない
+  assertScope(store, 'export op findUser(email: type.Email): type.User? reads users;', 'reads', 'keyword.control.hozo');
+  assertScope(store, 'export op findUser(email: type.Email): type.User? reads users;', 'type.User', 'entity.name.type.hozo');
+  const reads = store.find((l) => l.text.includes('export op findUser(email: type.Email): type.User? reads users;'));
+  assert.ok(!reads.tokens.some((tk) => tk.text.includes('users') && tk.scopes.length > 1));
+  // op の分類: of の後ろの op の名前と、as の前の op の名前は scope を付けない。as の後ろは型の位置
+  assertScope(store, 'classify Registration of findUser {', 'of', 'keyword.control.hozo');
+  assertScope(store, 'Registered: findUser as type.User;', 'as', 'keyword.control.hozo');
+  assertScope(store, 'Registered: findUser as type.User;', 'type.User', 'entity.name.type.hozo');
+  for (const line of ['classify Registration of findUser {', 'Registered: findUser as type.User;']) {
+    const l = store.find((x) => x.text.includes(line));
+    assert.ok(!l.tokens.some((tk) => tk.text.includes('findUser') && tk.scopes.length > 1), `${line} の findUser に scope が付いている`);
+  }
+  // 状態の分類の、対象ごとの as（, で続く）
+  const as = tokensOf('classify Ready of token, profile { Ready: token as Token, profile as Profile; default; }');
+  assertScope(as, 'classify Ready', 'as', 'keyword.control.hozo', 0);
+  assertScope(as, 'classify Ready', 'as', 'keyword.control.hozo', 1);
+  assertScope(as, 'classify Ready', 'Token', 'entity.name.type.hozo');
+  assertScope(as, 'classify Ready', 'Profile', 'entity.name.type.hozo');
+  assertScope(as, 'classify Ready', 'default', 'keyword.control.hozo');
+  // match の by の後ろの、修飾した分類の名前
+  assertScope(server, 'return match user by store.Registration {', 'by', 'keyword.control.hozo');
+  assertScope(server, 'return match user by store.Registration {', 'store.Registration', 'entity.name.type.hozo');
+  // アームの throw と、その例外
+  assertScope(server, 'default    => throw type.InvalidCredentials;', 'throw', 'keyword.control.hozo');
+  assertScope(server, 'default    => throw type.InvalidCredentials;', 'type.InvalidCredentials', 'entity.name.type.hozo');
+  assertScope(server, 'default    => throw type.InvalidCredentials;', '=>', 'keyword.operator.arrow.hozo');
+  // never は核の型と同じ scope
+  const nv = tokensOf('op unauthorized(): never throws Unauthorized;');
+  assertScope(nv, 'op unauthorized', 'never', 'support.type.primitive.hozo');
+  assertScope(nv, 'op unauthorized', 'throws', 'keyword.control.hozo');
+  assertScope(nv, 'op unauthorized', 'Unauthorized', 'entity.name.type.hozo');
+  // 形の語は型の位置のどこでも同じ scope
+  const sh = tokensOf('op f(xs: list<Item>, t: nullable<Token>): single<Item>;');
+  assertScope(sh, 'op f', 'list', 'support.type.primitive.hozo');
+  assertScope(sh, 'op f', 'nullable', 'support.type.primitive.hozo');
+  assertScope(sh, 'op f', 'single', 'support.type.primitive.hozo');
+  assertScope(sh, 'op f', 'Item', 'entity.name.type.hozo', 0);
 });
 
 test('矢印（遷移の -> と match のアームの =>）', () => {
@@ -247,7 +300,7 @@ test('矢印（遷移の -> と match のアームの =>）', () => {
   assert.ok(!t[0].tokens.some((tk) => tk.scopes.includes('keyword.operator.arrow.hozo')));
 });
 
-test('状態の形と、組み込みの分類のケース', () => {
+test('形の語と、標準の分類のケース', () => {
   const st = linesOf(files.state);
   assertScope(st, 'state token: nullable<Token>;', 'nullable', 'support.type.primitive.hozo');
   assertScope(st, 'state title: single<string>;', 'single', 'support.type.primitive.hozo');

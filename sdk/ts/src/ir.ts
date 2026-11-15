@@ -19,13 +19,14 @@ export type ArgValue = LiteralValue | RefValue | RefsValue | VariantValue | List
  */
 export type Literal = StringLiteral | IntLiteral | FloatLiteral | BooleanLiteral | DurationLiteral;
 /**
- * 型（docs/ir.md「型」）。void は型ではなく Op.returns が null であること。
+ * 型（docs/ir.md「型」）。void は型ではなく Op.returns が null であること。never は Op.returns にだけ現れる。
  */
-export type Type = CoreType | RefType | OptionalType | ArrayType | RecordType | CaseType;
+export type Type =
+  CoreType | RefType | OptionalType | ArrayType | RecordType | CaseType | NeverType;
 export type CoreName = "string" | "boolean" | "int" | "float" | "Time" | "Duration";
 export type UnionVariant = "arms" | "set";
 /**
- * 状態の形（docs/ir.md「state / exception / effect」の shape）。列数の範囲: list は 0 以上、nullable は 0 か 1、single はちょうど 1（docs/check.md「状態の形」）。
+ * 状態の形（docs/ir.md「state / exception / effect」の shape）。列数の範囲: list は 0 以上、nullable は 0 か 1、single はちょうど 1。状態の型の最も外側から決まる（docs/check.md「状態の形」）。
  */
 export type StateShape = "list" | "nullable" | "single";
 /**
@@ -38,9 +39,17 @@ export type Operation = "post" | "put" | "delete";
  */
 export type CaseSet = "any" | string[];
 /**
+ * 絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。
+ */
+export type NarrowBy = "presence" | "variant" | "predicate";
+/**
+ * 分類のケースが何で決まるか（docs/ir.md「classify」の decidedBy、docs/check.md「ケースの判定」）。type なら述語を持たない。
+ */
+export type DecidedBy = "type" | "predicate";
+/**
  * 分類の対象（docs/ir.md「classify」の subject）。kind で分ける。
  */
-export type ClassifySubject = TypeSubject | StatesSubject;
+export type ClassifySubject = TypeSubject | OpSubject | StatesSubject;
 export type CatchMode = "recovers" | "halts" | "ignores";
 /**
  * デコレータの引数の型（docs/ir.md「decorator」の ParamType）。
@@ -60,11 +69,11 @@ export type Expr = CallExpr | MatchExpr | AtomExpr;
 /**
  * 式の葉（docs/ir.md「配線」）。kind で分ける。
  */
-export type Atom = NameAtom | LiteralAtom | NoneAtom | RecordAtom;
+export type Atom = NameAtom | StateAtom | LiteralAtom | NoneAtom | RecordAtom;
 /**
- * match のアームの本体（docs/ir.md「配線」）。call か none。
+ * match のアームの本体（docs/ir.md「配線」）。call、atom、none、throw のどれか。
  */
-export type ArmBody = CallExpr | NoneBody;
+export type ArmBody = CallExpr | AtomExpr | NoneBody | ThrowBody;
 /**
  * match のアームが受けるケース。"default" か、ケース名の列（docs/ir.md「配線」の Match）。
  */
@@ -72,7 +81,7 @@ export type ArmCases = "default" | string[];
 /**
  * match の対象（docs/ir.md「配線」の Match の subject）。kind で分ける。
  */
-export type MatchSubject = ValueSubject | StateSubject | ClassifyOwnedSubject;
+export type MatchSubject = ValueSubject | ClassifyOwnedSubject;
 export type EffectState = "prevented" | "kept" | "unknown";
 
 /**
@@ -81,7 +90,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.2";
+  version: "0.3";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -127,8 +136,8 @@ export interface Namespace {
  */
 export interface Model {
   decorators: Application[];
-  derivedFrom?: DerivedFrom;
   description?: Doc;
+  extends?: ModelExtends;
   fields: Field[];
   kind: "model";
   name: string;
@@ -193,13 +202,6 @@ export interface ListValue {
   kind: "list";
 }
 /**
- * `is X omit ...` の記録（docs/ir.md「model / scalar / union」の derivedFrom）。
- */
-export interface DerivedFrom {
-  base: string;
-  omit: string[];
-}
-/**
  * DocComment の内容（docs/ir.md「Doc」）。
  */
 export interface Doc {
@@ -222,6 +224,14 @@ export interface DocParam {
 export interface DocThrows {
   exception: string;
   text: string;
+}
+/**
+ * 継承した model（`model D extends B { ... }`）の記録（docs/ir.md「model / scalar / union」の extends）。fields は展開済み。
+ */
+export interface ModelExtends {
+  base: string;
+  overridden: string[];
+  removed: string[];
 }
 /**
  * model のフィールド（docs/ir.md「model / scalar / union」の Field）。
@@ -280,6 +290,12 @@ export interface CaseType {
   of: Type;
 }
 /**
+ * 決して値を返さない（docs/ir.md「型」の never）。Op.returns にだけ現れる。
+ */
+export interface NeverType {
+  kind: "never";
+}
+/**
  * scalar 宣言（docs/ir.md「model / scalar / union」）。
  */
 export interface Scalar {
@@ -321,7 +337,7 @@ export interface UnionMember {
   target: string;
 }
 /**
- * state 宣言（docs/ir.md「state / exception / effect」）。element は optional にならない。
+ * state 宣言（docs/ir.md「state / exception / effect」）。type は状態の型。shape と element は type から決まり、element は optional にならない。
  */
 export interface State {
   decorators: Application[];
@@ -331,6 +347,7 @@ export interface State {
   name: string;
   shape: StateShape;
   span: Span;
+  type: Type;
 }
 /**
  * exception 宣言（docs/ir.md「state / exception / effect」）。
@@ -377,6 +394,7 @@ export interface TransitionTarget {
  */
 export interface Classify {
   cases: ClassifyCase[];
+  decidedBy: DecidedBy;
   decorators: Application[];
   defaultDescription?: Doc;
   description?: Doc;
@@ -388,18 +406,36 @@ export interface Classify {
   subject: ClassifySubject;
 }
 /**
- * classify のケース（docs/ir.md「classify」）。
+ * classify のケース（docs/ir.md「classify」）。as は `対象 as T` の並び（なければ []）。
  */
 export interface ClassifyCase {
+  as: CaseTyping[];
   description?: Doc;
   name: string;
   span: Span;
+}
+/**
+ * ケースの `対象 as T`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。
+ */
+export interface CaseTyping {
+  by: NarrowBy;
+  span: Span;
+  state?: string;
+  type: Type;
 }
 /**
  * 値の分類の対象の型（docs/ir.md「classify」の subject kind "type"）。
  */
 export interface TypeSubject {
   kind: "type";
+  type: Type;
+}
+/**
+ * op の分類の対象（docs/ir.md「classify」の subject kind "op"）。op は FQN、type はその op の returns。
+ */
+export interface OpSubject {
+  kind: "op";
+  op: string;
   type: Type;
 }
 /**
@@ -484,16 +520,18 @@ export interface Relation {
   kind: RelationKind;
 }
 /**
- * op 宣言（docs/ir.md「op」）。returns の null は void、body の null は葉。
+ * op 宣言（docs/ir.md「op」）。returns の null は void、never は決して返さない op。body の null は葉。
  */
 export interface Op {
   body: Wiring | null;
   decorators: Application[];
   description?: Doc;
   effects: string[];
+  exported: boolean;
   kind: "op";
   name: string;
   params: OpParam[];
+  reads: string[];
   returns: Type | null;
   signature: Signature;
   span: Span;
@@ -536,6 +574,15 @@ export interface NameAtom {
   path: string[];
   span: Span;
 }
+/**
+ * 状態の参照（docs/ir.md「配線」の Atom kind "state"）。state は FQN、path はその値のフィールドのパス（状態そのものなら []）。
+ */
+export interface StateAtom {
+  kind: "state";
+  path: string[];
+  span: Span;
+  state: string;
+}
 export interface LiteralAtom {
   kind: "literal";
   literal: Literal;
@@ -566,7 +613,7 @@ export interface MatchExpr {
   match: Match;
 }
 /**
- * 分類による分岐（docs/ir.md「配線」）。classify は FQN。組み込みの分類なら "list" か "nullable"。
+ * 分類による分岐（docs/ir.md「配線」）。classify は FQN。標準の分類なら "list" か "nullable"。
  */
 export interface Match {
   arms: MatchArm[];
@@ -575,12 +622,17 @@ export interface Match {
   subject: MatchSubject;
 }
 /**
- * match のアーム（docs/ir.md「配線」）。
+ * match のアーム（docs/ir.md「配線」）。narrowed は、アームの中で外と型が違う対象（なければ []）。
  */
 export interface MatchArm {
   body: ArmBody;
   cases: ArmCases;
+  narrowed: Narrowing[];
   span: Span;
+}
+export interface AtomExpr {
+  atom: Atom;
+  kind: "atom";
 }
 /**
  * アームの本体の none（docs/ir.md「配線」）。
@@ -589,28 +641,32 @@ export interface NoneBody {
   kind: "none";
 }
 /**
- * 値の分類での match の対象（docs/ir.md「配線」の subject kind "value"）。
+ * アームの本体の throw（docs/ir.md「配線」）。exception は FQN。
+ */
+export interface ThrowBody {
+  exception: string;
+  kind: "throw";
+  span: Span;
+}
+/**
+ * アームの中で絞り込まれた対象の型（docs/ir.md「配線」の Narrowing）。state は状態の分類での match のときだけ持つ。
+ */
+export interface Narrowing {
+  state?: string;
+  type: Type;
+}
+/**
+ * 値を対象にした match の対象（docs/ir.md「配線」の subject kind "value"）。状態を名前で書いた対象は atom が state。
  */
 export interface ValueSubject {
   atom: Atom;
   kind: "value";
 }
 /**
- * 基底の状態の、組み込みの分類での match の対象（docs/ir.md「配線」の subject kind "state"）。state は FQN。
- */
-export interface StateSubject {
-  kind: "state";
-  state: string;
-}
-/**
  * 状態の分類での match（docs/ir.md「配線」の subject kind "classify"）。対象は classify が持つ。
  */
 export interface ClassifyOwnedSubject {
   kind: "classify";
-}
-export interface AtomExpr {
-  atom: Atom;
-  kind: "atom";
 }
 export interface ReturnStmt {
   expr: Expr;
@@ -641,6 +697,8 @@ export interface OpParam {
 export interface Signature {
   effects: string[];
   exceptions: string[];
+  pure: boolean;
+  reads: string[];
   relations: SignatureRelation[];
   successEffects: SuccessEffect[];
 }
@@ -672,7 +730,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.2";
+  version: "0.3";
   viewer: string;
 }
 /**
@@ -692,6 +750,8 @@ export interface ViewedSignature {
   effects: string[];
   exceptions: string[];
   params: OpParam[];
+  pure: boolean;
+  reads: string[];
   relations: SignatureRelation[];
   successEffects: SuccessEffect[];
 }

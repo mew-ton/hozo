@@ -14,7 +14,7 @@ namespace stock {
 
   // docs/emit-go.md「出力の対象」5: shop の配線から呼ばれる、別の名前空間の op。shop の Deps に載り、本体は辿られない
   /** 在庫を確かめて引き当てる */
-  op reserve(order: shop.Order)
+  export op reserve(order: shop.Order)
     throws Short
   {
     count(order);

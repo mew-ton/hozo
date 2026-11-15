@@ -30,6 +30,8 @@ func (o *ops) Checkout() (Receipt, error) {
 }
 
 // OpenCart はカートを開く
+//
+// Reads: shop.carts
 func (o *ops) OpenCart() error {
 	if States.Carts.IsEmpty == nil {
 		return &runtime.MissingError{Kind: "state", Name: "shop.carts"}

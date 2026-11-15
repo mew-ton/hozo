@@ -770,3 +770,200 @@ func TestReservedWordFields(t *testing.T) {
 	}
 	c.shutdown()
 }
+
+// TestExtendsReadsAsThrow は、op の export / reads / never、継承した model、op の分類とケースの as、状態の参照、
+// アームの throw について、ホバーの見出し（docs/lsp.md「ホバー」）と定義へジャンプ（同「定義へジャンプ」の表）を確かめる。
+func TestExtendsReadsAsThrow(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace type {
+  model User {
+    /** 識別子 */
+    @db.key id: string;
+    /** 表示名 */
+    name: string;
+    /** パスワードのハッシュ */
+    hash: string;
+  }
+  model PublicUser extends User {
+    override hash: never;
+    /** 公開する識別子 */
+    @db.unique override id;
+    @db.unique override name;
+  }
+  exception Unauthorized;
+}
+namespace store {
+  state users: list<type.User>;
+  state current: type.User?;
+  state title: string;
+  export op findUser(id: string): type.User? reads users;
+  op unauthorized(): never throws type.Unauthorized;
+  op nameOf(user: type.User): string;
+  classify Registration of findUser {
+    Registered: findUser as type.User;
+    default;
+  }
+  classify Session of current {
+    LoggedIn: current as type.User;
+    default;
+  }
+  op whoAmI(): type.User? {
+    return match current by nullable {
+      HasItems => current;
+      Empty    => none;
+    };
+  }
+  op heading(): string {
+    return title;
+  }
+}
+namespace server {
+  export op login(id: string): string
+    throws type.Unauthorized
+  {
+    const user = store.findUser(id);
+    return match user by store.Registration {
+      Registered => store.nameOf2(user);
+      default    => throw type.Unauthorized;
+    };
+  }
+}
+namespace store {
+  export op nameOf2(user: type.User): string;
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Fatalf("診断が出た: %+v", d)
+		}
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	hover := func(needle string, shiftBy int) string {
+		t.Helper()
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, at(needle, shiftBy), &hov)
+		if hov == nil {
+			t.Fatalf("hover(%q) = nil", needle)
+		}
+		return hov.Contents.Value
+	}
+
+	// ホバーの見出しと、op の reads / 純粋
+	for _, tt := range []struct {
+		needle  string
+		shiftBy int
+		wants   []string
+		nots    []string
+	}{
+		// export、never、reads、純粋
+		{"store.findUser(id)", len("store."), []string{"```hozo\nexport op store.findUser(id: string): type.User?\n```", "\nreads:\n- `store.users`\n"}, []string{"純粋"}},
+		{"unauthorized(): never", 0, []string{"```hozo\nop unauthorized(): never\n```", "throws:\n- `type.Unauthorized`", "\n純粋\n"}, []string{"reads:"}},
+		{"nameOf(user: type.User)", 0, []string{"```hozo\nop nameOf(user: type.User): string\n```", "\n純粋\n"}, []string{"export"}},
+		// 配線の op の reads は、呼び出し先から伝わったもの
+		{"login(id: string)", 0, []string{"```hozo\nexport op login(id: string): string\n```", "\nreads:\n- `store.users`\n"}, []string{"純粋"}},
+		// 継承した model
+		{"PublicUser extends User", 0, []string{"```hozo\nmodel PublicUser extends User\n```"}, nil},
+		{"PublicUser extends User", len("PublicUser extends "), []string{"```hozo\nmodel User\n```"}, []string{"extends"}},
+		// op の分類と、as を持つケース
+		{"by store.Registration", len("by store."), []string{"```hozo\nclassify store.Registration of store.findUser\n```"}, nil},
+		{"Registered => store.nameOf2", 0, []string{"classify store.Registration of store.findUser\n  Registered: store.findUser as type.User"}, nil},
+		{"Registration of findUser", len("Registration of "), []string{"```hozo\nexport op findUser(id: string): type.User?\n```"}, nil},
+		{"Registered: findUser as", len("Registered: "), []string{"```hozo\nexport op findUser(id: string): type.User?\n```"}, nil},
+		{"LoggedIn: current as", len("LoggedIn: "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
+		// 状態の見出しだけは形の語で書く（T? と書いた状態も nullable<T>、T と書いた状態は single<T>）。アームの中で
+		// 絞り込まれていても、見出しは宣言のまま
+		{"match current by nullable", len("match "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
+		{"HasItems => current;", len("HasItems => "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
+		{"return title;", len("return "), []string{"```hozo\nstate title: single<string>\n```"}, nil},
+		{"reads users;", len("reads "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
+		// throw の例外
+		{"throw type.Unauthorized", len("throw type."), []string{"```hozo\nexception type.Unauthorized\n```"}, nil},
+	} {
+		got := hover(tt.needle, tt.shiftBy)
+		for _, want := range tt.wants {
+			if !strings.Contains(got, want) {
+				t.Errorf("hover(%q) に %q がない:\n%s", tt.needle, want, got)
+			}
+		}
+		for _, not := range tt.nots {
+			if strings.Contains(got, not) {
+				t.Errorf("hover(%q) に %q がある:\n%s", tt.needle, not, got)
+			}
+		}
+	}
+	// 継承した model のフィールドの説明: override したフィールドは override に書いたもの（なければなし）。
+	// override の名前の上では、元の model のフィールド（飛び先と同じ）
+	if got := hover("override id;", len("override ")); !strings.Contains(got, "model User") || !strings.Contains(got, "識別子") {
+		t.Errorf("hover(override id) は元の model のフィールド:\n%s", got)
+	}
+
+	// 定義へジャンプ
+	for _, tt := range []struct {
+		what, needle string
+		shiftBy      int
+		target       string
+	}{
+		{"extends の元の model", "PublicUser extends User", len("PublicUser extends "), "User {\n    /** 識別子 */"},
+		{"override のフィールド", "override hash: never", len("override "), "hash: string;"},
+		{"override のフィールド（デコレータを足す）", "@db.unique override id;", len("@db.unique override "), "id: string;"},
+		{"分類の対象の op", "Registration of findUser", len("Registration of "), "findUser(id: string)"},
+		{"ケースの op as T の op", "Registered: findUser as", len("Registered: "), "findUser(id: string)"},
+		{"ケースの X as T の T", "findUser as type.User;", len("findUser as type."), "User {\n    /** 識別子 */"},
+		{"ケースの X as T の X（状態）", "LoggedIn: current as", len("LoggedIn: "), "current: type.User?;"},
+		{"reads の状態", "reads users;", len("reads "), "users: list<type.User>;"},
+		{"配線の値の位置の状態（match の対象）", "match current by nullable", len("match "), "current: type.User?;"},
+		{"配線の値の位置の状態（アームの値）", "HasItems => current;", len("HasItems => "), "current: type.User?;"},
+		{"配線の値の位置の状態（return）", "return title;", len("return "), "title: string;"},
+		{"match x by ns.C の C", "by store.Registration", len("by store."), "Registration of findUser"},
+		{"アームのケース名", "Registered => store.nameOf2", 0, "Registered: findUser as"},
+		{"throw E の E", "throw type.Unauthorized", len("throw type."), "Unauthorized;\n}"},
+	} {
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, at(tt.needle, tt.shiftBy), &loc)
+		if want := positionOf(t, enc, text, tt.target, 0); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %q の位置 %+v", tt.what, loc, tt.target, want)
+		}
+	}
+	// 標準の分類の名前（by の後ろの nullable）とケース（Empty / HasItems）は宣言を持たないので null
+	for _, tt := range []struct {
+		needle  string
+		shiftBy int
+	}{{"by nullable {", len("by ")}, {"HasItems => current;", 0}, {"Empty    => none;", 0}} {
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, at(tt.needle, tt.shiftBy), &loc)
+		if loc != nil {
+			t.Errorf("definition(%q) = %+v, want nil", tt.needle, loc)
+		}
+	}
+
+	// ドキュメントのシンボル: 継承した model は、本体に書いたメンバー（Field と Override）だけが子になる
+	var syms []protocol.DocumentSymbol
+	c.result(protocol.MethodDocumentSymbol, protocol.DocumentSymbolParams{TextDocument: textDoc(uri)}, &syms)
+	var public *protocol.DocumentSymbol
+	details := map[string]string{}
+	for i := range syms {
+		for j := range syms[i].Children {
+			s := &syms[i].Children[j]
+			details[s.Name] = s.Detail
+			if s.Name == "PublicUser" {
+				public = s
+			}
+		}
+	}
+	if public == nil || public.Detail != "extends User" || strings.Join(names(public.Children), ",") != "hash,id,name" {
+		t.Errorf("PublicUser のシンボル = %+v", public)
+	}
+	for name, want := range map[string]string{"users": "list<type.User>", "current": "type.User?", "title": "string", "Registration": "of findUser"} {
+		if details[name] != want {
+			t.Errorf("symbol %s の detail = %q, want %q", name, details[name], want)
+		}
+	}
+	c.shutdown()
+}

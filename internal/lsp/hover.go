@@ -125,7 +125,7 @@ func (r *renderer) hover(t sema.Target) (string, bool) {
 		}
 		for _, cs := range c.Cases {
 			if cs.Name == t.Name {
-				code(r.head(c), "  "+cs.Name)
+				code(r.head(c), "  "+r.caseLine(c, cs))
 				body(cs.Description)
 				return b.String(), true
 			}
@@ -184,7 +184,7 @@ func (r *renderer) paramDoc(b *strings.Builder, d *ir.Doc, name string) {
 }
 
 // signature は docs/lsp.md「ホバー」の 3: Signature の throws と effects の一覧。例外ごとに、効果の状態
-// （relations）が unknown でないものを添える。
+// （relations）が unknown でないものを添える。続けて、reads が空でなければその一覧、純粋なら「純粋」の一行。
 func (r *renderer) signature(op *ir.Op) string {
 	var b strings.Builder
 	sig := op.Signature
@@ -229,6 +229,15 @@ func (r *renderer) signature(op *ir.Op) string {
 			fmt.Fprintf(&b, "- `%s`\n", r.rel(ef))
 		}
 	}
+	if len(sig.Reads) > 0 {
+		b.WriteString("\nreads:\n")
+		for _, st := range sig.Reads {
+			fmt.Fprintf(&b, "- `%s`\n", r.rel(st))
+		}
+	}
+	if sig.Pure {
+		b.WriteString("\n純粋\n")
+	}
 	return b.String()
 }
 
@@ -260,8 +269,8 @@ func (r *renderer) head(d ir.Decl) string {
 	switch d := d.(type) {
 	case *ir.Model:
 		s := "model " + name
-		if d.DerivedFrom != nil {
-			s += " is " + r.rel(d.DerivedFrom.Base) + " omit " + strings.Join(d.DerivedFrom.Omit, ", ")
+		if d.Extends != nil {
+			s += " extends " + r.rel(d.Extends.Base)
 		}
 		return s
 	case *ir.Scalar:
@@ -269,6 +278,7 @@ func (r *renderer) head(d ir.Decl) string {
 	case *ir.Union:
 		return "union " + name
 	case *ir.State:
+		// 状態の見出しだけは、形の語で書く（docs/lsp.md「ホバー」）
 		return "state " + name + ": " + string(d.Shape) + "<" + r.typ(d.Element) + ">"
 	case *ir.Exception:
 		s := "exception " + name
@@ -291,6 +301,9 @@ func (r *renderer) head(d ir.Decl) string {
 			params = append(params, p.Name+": "+r.typ(p.Type))
 		}
 		s := "op " + name + "(" + strings.Join(params, ", ") + ")"
+		if d.Exported {
+			s = "export " + s
+		}
 		if d.Returns != nil {
 			s += ": " + r.typ(d.Returns)
 		}
@@ -409,8 +422,32 @@ func (r *renderer) typ(t ir.Type) string {
 			cases = "(" + cases + ")"
 		}
 		return r.rel(t.Classify) + "." + cases + "<" + r.typ(t.Of) + ">"
+	case ir.NeverType:
+		return "never"
 	}
 	return t.String()
+}
+
+// caseLine は分類のケースを Hozo の構文で書く。as を持つケースなら `Registered: findUser as type.User`
+// （docs/lsp.md「ホバー」）。as の前は、値の分類なら対象の型、op の分類ならその op、状態の分類ならその状態。
+func (r *renderer) caseLine(c *ir.Classify, cs ir.ClassifyCase) string {
+	if len(cs.As) == 0 {
+		return cs.Name
+	}
+	var parts []string
+	for _, as := range cs.As {
+		subject := "?"
+		switch s := c.Subject.(type) {
+		case ir.TypeSubject:
+			subject = r.typ(s.Type)
+		case ir.OpSubject:
+			subject = r.rel(s.Op)
+		case ir.StatesSubject:
+			subject = r.rel(as.State)
+		}
+		parts = append(parts, subject+" as "+r.typ(as.Type))
+	}
+	return cs.Name + ": " + strings.Join(parts, ", ")
 }
 
 // argValue はデコレータの引数の値（docs/ir.md「デコレータの適用」の ArgValue）。
@@ -454,11 +491,13 @@ func caseSet(c ir.CaseSet) string {
 }
 
 // classifySubject は分類の対象を Hozo の構文で書く（`classify WarrantyKind of server.Item`、
-// `classify Checkout of carts, orders`）。対象が決まっていなければ "?"。
+// `classify Registration of findUser`、`classify Checkout of carts, orders`）。対象が決まっていなければ "?"。
 func (r *renderer) classifySubject(s ir.ClassifySubject) string {
 	switch s := s.(type) {
 	case ir.TypeSubject:
 		return r.typ(s.Type)
+	case ir.OpSubject:
+		return r.rel(s.Op)
 	case ir.StatesSubject:
 		names := make([]string, len(s.States))
 		for i, st := range s.States {
@@ -473,9 +512,10 @@ func (r *renderer) classifySubject(s ir.ClassifySubject) string {
 func (r *renderer) matchHead(m ir.Match) string {
 	switch s := m.Subject.(type) {
 	case ir.ValueSubject:
+		if m.Builtin() {
+			return "match " + r.atom(s.Atom) + " by " + m.Classify // 標準の分類。classify は "list" か "nullable"
+		}
 		return "match " + r.atom(s.Atom) + " by " + r.rel(m.Classify)
-	case ir.StateSubject:
-		return "match " + r.rel(s.State) + " by " + m.Classify // 組み込みの分類。classify は状態の形
 	case ir.ClassifyOwnedSubject:
 		return "match by " + r.rel(m.Classify)
 	}
@@ -507,6 +547,8 @@ func (r *renderer) atom(a ir.Atom) string {
 	switch a := a.(type) {
 	case ir.NameAtom:
 		return strings.Join(a.Path, ".")
+	case ir.StateAtom:
+		return strings.Join(append([]string{r.rel(a.State)}, a.Path...), ".")
 	case ir.LiteralAtom:
 		return literal(a.Literal)
 	case ir.NoneAtom:

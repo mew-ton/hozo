@@ -69,7 +69,7 @@ type Token string
 
 // PublicUser は api.PublicUser の model。
 // 名前空間 api の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。
-// api.User から secret, hash を除いたもの（is ... omit）。
+// api.User を継承。
 type PublicUser struct {
 	Id    UserId              `json:"id"`
 	Name  string              `json:"name"`

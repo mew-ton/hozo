@@ -26,7 +26,7 @@ const (
 	acOp
 	acCase      // classify のケース（C.Case）
 	acVariant   // ユニオンのアーム（U.Arm）
-	acValue     // 束縛・引数とそのフィールド（Atom.name）
+	acValue     // 束縛・引数・状態とそのフィールド（Atom.name、状態から辿ったフィールドの Atom.state）
 	acDecoParam // デコレータの宣言の引数（$param:）
 	acOpParam   // op の引数（デコレータの適用の引数。$param:）
 	acNamespace // 名前空間（bind の対象）
@@ -61,10 +61,22 @@ type resolved struct {
 	span  source.Span
 }
 
-// valueRef は束縛・引数とそのフィールドのパス。
+// valueRef は束縛・引数・状態とそのフィールドのパス。
 type valueRef struct {
+	// path は書かれたパス（診断用）。先頭は束縛名か引数名か、状態を指す名前（修飾していれば名前空間も含む）。
 	path []string
 	typ  exprType
+	// root は起点の同一性: 束縛・引数なら "b:名前"、状態なら "s:FQN"。絞り込み（docs/types.md「アームの中の対象の型」）の照合に使う。
+	root string
+	// fields は起点から辿ったフィールドの名前。起点そのものなら空。
+	fields []string
+	// state は起点が状態（配線の値の位置で名前で書いた状態）ならその宣言。束縛・引数なら nil。
+	state *symbol
+}
+
+// narrowKey は絞り込みの表のキー: 起点とフィールドのパス。
+func narrowKey(root string, fields []string) string {
+	return root + "\x00" + strings.Join(fields, ".")
 }
 
 // resolveError は解決の失敗。code は RES-1 〜 RES-5。
@@ -86,6 +98,20 @@ type scope struct {
 	opParams *opParamScope
 	// asNamespace は bind の対象: セグメントが一つでも名前空間として解決する。
 	asNamespace bool
+	// values は配線の値の位置（Atom の Path）: 現在の名前空間の state を値として読め、state から先のセグメントは
+	// その値のフィールド（docs/resolve.md「手続き」2 の表）。
+	values bool
+}
+
+// narrowed は、起点 root から fields を辿った値の型。アームの中で絞り込まれていればその型、そうでなければ t。
+func (sc *scope) narrowed(root string, fields []string, t exprType) exprType {
+	if sc.wiring == nil || len(sc.wiring.narrow) == 0 {
+		return t
+	}
+	if n, ok := sc.wiring.narrow[narrowKey(root, fields)]; ok {
+		return n
+	}
+	return t
 }
 
 // decoParamScope はデコレータの宣言の引数の名前。
@@ -180,7 +206,8 @@ func (a *analyzer) resolveHead(qn ast.QualifiedName, sc *scope, acc accept, refs
 		if v, ok := sc.wiring.lookup(head.Name); ok {
 			*refs = append(*refs, Ref{Span: head.Span, Target: v.target})
 			v.markUsed()
-			return resolved{kind: rValue, value: &valueRef{path: []string{head.Name}, typ: v.typ}}, rest, nil
+			root := "b:" + head.Name
+			return resolved{kind: rValue, value: &valueRef{path: []string{head.Name}, typ: sc.narrowed(root, nil, v.typ), root: root}}, rest, nil
 		}
 	}
 	// 1.2 デコレータの宣言の引数
@@ -232,8 +259,16 @@ func (a *analyzer) resolveSegment(prev resolved, seg ast.Ident, sc *scope, acc a
 	case rNamespace:
 		return a.resolveInNamespace(prev.ns, seg, sc, acc, refs)
 	case rValue:
-		return a.resolveField(prev, seg, refs)
+		return a.resolveField(prev, seg, sc, refs)
 	case rDecl:
+		if prev.sym.kind == kindState && sc.values {
+			// 配線の値の位置: 状態は値で、次のセグメントはその値のフィールド
+			v, err := a.stateValue(prev.sym, sc, seg.Span)
+			if err != nil {
+				return resolved{}, err
+			}
+			return a.resolveField(resolved{kind: rValue, value: v}, seg, sc, refs)
+		}
 		switch prev.sym.kind {
 		case kindClassify:
 			if span, ok := classifyCaseSpan(prev.sym, seg.Name); ok {
@@ -280,19 +315,38 @@ func (a *analyzer) resolveInNamespace(ns *namespace, seg ast.Ident, sc *scope, a
 	}
 }
 
+// stateValue は配線の値の位置で名前で書いた状態（docs/check.md「状態の参照」）。型はその状態の型。
+// 別の名前空間（かグローバル）の状態なら RES-5。span は診断の位置。
+func (a *analyzer) stateValue(s *symbol, sc *scope, span source.Span) (*valueRef, *resolveError) {
+	if s.ns != sc.ns {
+		return nil, &resolveError{code: "RES-5", span: span, msg: fmt.Sprintf("状態 %s は別の名前空間のもので、名前では読めない（状態を名前で読めるのは持ち主の名前空間 %s の配線だけ。その名前空間の op を通して読む）", s.fqn, nsName(s.ns))}
+	}
+	typ := unknownType()
+	if st, ok := a.lower(s).(*ir.State); ok && st.Type != nil {
+		typ = valueType(st.Type)
+	}
+	root := "s:" + s.fqn
+	return &valueRef{path: strings.Split(s.fqn, "."), typ: sc.narrowed(root, nil, typ), root: root, state: s}, nil
+}
+
 // resolveField は値の参照の次のセグメント: 型のフィールド（model か model の optional）。それ以外は RES-3。
-func (a *analyzer) resolveField(prev resolved, seg ast.Ident, refs *[]Ref) (resolved, *resolveError) {
+// 絞り込まれた型（case）は元の型に戻してから辿る（docs/types.md「アームの中の対象の型」）。
+func (a *analyzer) resolveField(prev resolved, seg ast.Ident, sc *scope, refs *[]Ref) (resolved, *resolveError) {
 	v := prev.value
+	next := func(t exprType) *valueRef {
+		fields := append(append([]string{}, v.fields...), seg.Name)
+		return &valueRef{path: append(append([]string{}, v.path...), seg.Name), typ: sc.narrowed(v.root, fields, t), root: v.root, fields: fields, state: v.state}
+	}
 	if v.typ.kind == etUnknown {
-		return resolved{kind: rValue, value: &valueRef{path: append(append([]string{}, v.path...), seg.Name), typ: unknownType()}}, nil
+		return resolved{kind: rValue, value: next(unknownType())}, nil
 	}
 	if v.typ.kind != etValue {
 		return resolved{}, &resolveError{code: "RES-3", span: seg.Span, msg: fmt.Sprintf("%s の型からフィールド %s を辿れない", strings.Join(v.path, "."), seg.Name)}
 	}
-	t := v.typ.typ
+	t := uncase(v.typ.typ)
 	optional := false
 	if o, ok := t.(ir.OptionalType); ok {
-		t, optional = o.Of, true
+		t, optional = uncase(o.Of), true
 	}
 	ref, ok := t.(ir.RefType)
 	var m *ir.Model
@@ -311,7 +365,15 @@ func (a *analyzer) resolveField(prev resolved, seg ast.Ident, refs *[]Ref) (reso
 		ft = ir.Optional(ft)
 	}
 	*refs = append(*refs, Ref{Span: seg.Span, Target: Target{Kind: TargetField, Decl: m.Name, Name: seg.Name, Span: a.fields[m.Name][seg.Name]}})
-	return resolved{kind: rValue, value: &valueRef{path: append(append([]string{}, v.path...), seg.Name), typ: valueType(ft)}}, nil
+	return resolved{kind: rValue, value: next(valueType(ft))}, nil
+}
+
+// uncase は絞り込まれた型（case）を元の型に戻す。
+func uncase(t ir.Type) ir.Type {
+	if c, ok := t.(ir.CaseType); ok {
+		return c.Of
+	}
+	return t
 }
 
 // checkAccept は手続き 3（位置が受け付ける種類か）。表にない種類なら RES-4。

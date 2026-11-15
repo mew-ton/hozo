@@ -67,6 +67,8 @@ func typeString(t ast.Type) string {
 		return x.Name
 	case *ast.RecordType:
 		return "Record<" + typeString(x.Key) + ", " + typeString(x.Value) + ">"
+	case *ast.ShapeType:
+		return x.Shape + "<" + typeString(x.Elem) + ">"
 	case *ast.NamedType:
 		if x.Arg != nil {
 			return x.Name.String() + "<" + typeString(x.Arg) + ">"
@@ -229,7 +231,7 @@ func TestDecoratorApplicationReject(t *testing.T) {
 
 func TestModel(t *testing.T) {
 	m := firstDecl[*ast.ModelDecl](t, "model User {\n  /** 鍵 */\n  @db.key id: UserId;\n  name: string = \"n\";\n  page: PosInt = 1;\n  field: string;\n  tags: string[]?;\n}")
-	if m.Name.Name != "User" || m.Body == nil || m.Base != nil {
+	if m.Name.Name != "User" || m.Body == nil || m.Extends != nil {
 		t.Fatalf("Model = %+v", m)
 	}
 	f := m.Body.Fields
@@ -261,24 +263,81 @@ func TestModel(t *testing.T) {
 	}
 }
 
-func TestModelIsOmit(t *testing.T) {
-	m := firstDecl[*ast.ModelDecl](t, "model PublicUser is server.User omit hash, salt;")
-	if m.Body != nil || m.Base == nil || m.Base.String() != "server.User" {
+// 継承した model（docs/grammar.md「model」の ModelDecl の extends と Override）。
+func TestModelExtends(t *testing.T) {
+	m := firstDecl[*ast.ModelDecl](t, `model PublicUser extends server.User {
+  override hash: never;
+  /** 鍵 */
+  @db.key override id;
+  override status: StatusOrPending;
+  @db.unique override email: Email;
+  nickname: string;
+  override: string;
+  override override: never;
+}`)
+	if m.Extends == nil || m.Extends.String() != "server.User" || m.Body == nil {
 		t.Fatalf("Model = %+v", m)
 	}
-	if len(m.Omit) != 2 || m.Omit[0].Name != "hash" || m.Omit[1].Name != "salt" {
-		t.Errorf("Omit = %+v", m.Omit)
+	o := m.Body.Overrides
+	if len(o) != 5 || len(m.Body.Fields) != 2 {
+		t.Fatalf("Overrides = %d, Fields = %d", len(o), len(m.Body.Fields))
+	}
+	if o[0].Name.Name != "hash" || !o[0].Never || o[0].Type != nil || o[0].NeverSpan.End-o[0].NeverSpan.Start != source.Offset(len("never")) {
+		t.Errorf("Override 0 = %+v", o[0])
+	}
+	if o[1].Name.Name != "id" || o[1].Never || o[1].Type != nil || len(o[1].Decorators) != 1 || o[1].Doc == nil || o[1].Doc.Body != "鍵" {
+		t.Errorf("Override 1 = %+v", o[1])
+	}
+	if o[2].Name.Name != "status" || typeString(o[2].Type) != "StatusOrPending" || o[2].Never {
+		t.Errorf("Override 2 = %+v", o[2])
+	}
+	if o[3].Name.Name != "email" || typeString(o[3].Type) != "Email" || len(o[3].Decorators) != 1 {
+		t.Errorf("Override 3 = %+v", o[3])
+	}
+	// メンバーの頭の override は、直後が ":" ならフィールドの名前。override override は、その名前のフィールドへの Override。
+	if m.Body.Fields[0].Name.Name != "nickname" || m.Body.Fields[1].Name.Name != "override" {
+		t.Errorf("Fields = %+v", m.Body.Fields)
+	}
+	if o[4].Name.Name != "override" || !o[4].Never {
+		t.Errorf("Override 4 = %+v", o[4])
+	}
+	// Override の Span は DocComment を含まず、デコレータ（なければ override）から ";" まで。
+	if o[1].Span.Start != o[1].Decorators[0].Span.Start || o[1].Span.End <= o[1].Name.Span.End {
+		t.Errorf("Override 1 Span = %+v", o[1].Span)
+	}
+	// 本体が空でもよい。extends のない model の Override も構文としては読める（検査 TYPE-10）。
+	empty := firstDecl[*ast.ModelDecl](t, "model Admin extends User { }")
+	if empty.Extends == nil || empty.Body == nil || len(empty.Body.Fields) != 0 || len(empty.Body.Overrides) != 0 {
+		t.Errorf("empty = %+v", empty)
+	}
+	plain := firstDecl[*ast.ModelDecl](t, "model A { override f; }")
+	if plain.Extends != nil || len(plain.Body.Overrides) != 1 {
+		t.Errorf("plain = %+v", plain)
+	}
+	// その場で書く model の本体も同じ Member。
+	u := firstDecl[*ast.UnionDecl](t, "union U { Ready: { override f: never; }; }")
+	if len(u.Members[0].Type.Body.Overrides) != 1 {
+		t.Errorf("arm body = %+v", u.Members[0].Type.Body)
 	}
 }
 
 func TestModelReject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
-		{"is without omit", "model A is B;", "omit のない is は書けない"},
+		{"is omit", "model A is B omit f;", "model A extends 元の model { override フィールド: never; } と書く"},
+		{"is without omit", "model A is B;", "model A is ... omit ... は書けない"},
+		{"extends without body", "model A extends B;", "「{」が必要だが「;」がある"},
+		{"extends without name", "model A extends { }", "名前が必要"},
+		{"override default", "model A extends B { override f: int = 1; }", "override に既定値は書けない"},
+		{"override default without type", "model A extends B { override f = 1; }", "override に既定値は書けない"},
+		{"override without name", "model A extends B { override; }", "フィールド名が必要"},
+		{"override qualified", "model A extends B { override a.b; }", "修飾しない識別子"},
+		{"never field type", "model A { f: never; }", "never は op の戻り値の型と、override のなくす印にだけ書ける"},
+		{"override never optional", "model A extends B { override f: never?; }", "「;」が必要だが「?」がある"},
 		{"optional on name", "model A { x?: T; }", "「:」が必要だが「?」がある"},
 		{"missing semicolon", "model A { x: T }", "「;」が必要だが「}」がある"},
 		{"missing type", "model A { x: ; }", "型が必要"},
 		{"default not literal", "model A { x: int = y; }", "リテラルが必要"},
-		{"no body", "model A;", "「{」か「is」が必要"},
+		{"no body", "model A;", "「{」か「extends」が必要"},
 		{"qualified field name", "model A { a.b: string; }", "修飾しない識別子"},
 		{"dangling doc in body", "model A { /** x */ }", "付く先のない"},
 		{"external on field", "model A { @external x: int; }", "@external はデコレータの宣言の直前にだけ書ける"},
@@ -335,25 +394,30 @@ func TestUnion(t *testing.T) {
 
 func TestState(t *testing.T) {
 	s := firstDecl[*ast.StateDecl](t, "@db state users: list<User>;")
-	if s.Name.Name != "users" || s.Shape != ast.StateList || typeString(s.Elem) != "User" {
+	if s.Name.Name != "users" || typeString(s.Type) != "list<User>" || len(s.Decorators) != 1 {
 		t.Errorf("State = %+v", s)
 	}
-	s = firstDecl[*ast.StateDecl](t, "state query: single<Record<string, string[]>>;")
-	if s.Shape != ast.StateSingle || typeString(s.Elem) != "Record<string, string[]>" {
-		t.Errorf("State = %+v %s", s, typeString(s.Elem))
+	// 形の語は型の別の書き方で、状態の型は Type（docs/grammar.md「state」）。形は検査が型から決める。
+	tests := []struct{ src, want string }{
+		{"state query: single<Record<string, string[]>>;", "single<Record<string, string[]>>"},
+		{"state token: nullable<server.Token>;", "nullable<server.Token>"},
+		{"state token: single<Token?>;", "single<Token?>"},
+		{"state token: Token?;", "Token?"},
+		{"state title: string;", "string"},
+		{"state users: User[];", "User[]"},
+		{"state nested: list<list<User>>?;", "list<list<User>>?"},
 	}
-	s = firstDecl[*ast.StateDecl](t, "state token: nullable<server.Token>;")
-	if s.Shape != ast.StateNullable || s.Shape.String() != "nullable" || typeString(s.Elem) != "server.Token" {
-		t.Errorf("State = %+v %s", s, typeString(s.Elem))
+	for _, tt := range tests {
+		s = firstDecl[*ast.StateDecl](t, tt.src)
+		if got := typeString(s.Type); got != tt.want {
+			t.Errorf("%s: Type = %s, want %s", tt.src, got, tt.want)
+		}
 	}
-	// single<T?> は構文としては読める。書けないことは検査 STATE-3 が決める（docs/grammar.md「state」）。
-	s = firstDecl[*ast.StateDecl](t, "state token: single<Token?>;")
-	if typeString(s.Elem) != "Token?" {
-		t.Errorf("Elem = %s", typeString(s.Elem))
-	}
-	mustFail(t, "state users: User[];", "「list」か「nullable」か「single」が必要")
+	mustFail(t, "state users list<User>;", "「:」が必要")
 	mustFail(t, "state users: list<User;", "「>」が必要")
-	mustFail(t, "state token: nullable Token;", "「<」が必要")
+	mustFail(t, "state users: list;", "「<」が必要")
+	mustFail(t, "state users: ;", "型が必要")
+	mustFail(t, "state users: never;", "never は op の戻り値の型と")
 }
 
 // --- exception / effect ---
@@ -477,6 +541,35 @@ func TestClassify(t *testing.T) {
 	if !c.Cases[2].Default || c.Cases[2].Name != nil || c.Cases[2].Doc == nil || c.Cases[2].Doc.Body != "d" {
 		t.Errorf("Case 2 = %+v", c.Cases[2])
 	}
+	// ケースの型（CaseTyping = Type "as" Type）。
+	c = firstDecl[*ast.ClassifyDecl](t, `classify Registration of findUser {
+  /** 登録済み */
+  Registered: findUser as type.User;
+  default;
+}`)
+	if as := c.Cases[0].As; len(as) != 1 || typeString(as[0].Subject) != "findUser" || typeString(as[0].Type) != "type.User" || c.Cases[0].Doc == nil {
+		t.Errorf("Case 0 = %+v", c.Cases[0])
+	}
+	if len(c.Cases[1].As) != 0 || !c.Cases[1].Default {
+		t.Errorf("Case 1 = %+v", c.Cases[1])
+	}
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Ready of token, profile { Ready: token as Token, profile as Profile; Half: token as nullable<Token>; default; }")
+	if as := c.Cases[0].As; len(as) != 2 || typeString(as[1].Subject) != "profile" || typeString(as[1].Type) != "Profile" {
+		t.Errorf("Case 0 = %+v", c.Cases[0])
+	}
+	if as := c.Cases[1].As; len(as) != 1 || typeString(as[0].Type) != "nullable<Token>" {
+		t.Errorf("Case 1 = %+v", c.Cases[1])
+	}
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Presence of nullable<User> { Present: nullable<User> as User; default; }")
+	if typeString(c.Of[0]) != "nullable<User>" || typeString(c.Cases[0].As[0].Subject) != "nullable<User>" {
+		t.Errorf("Classify = %+v", c)
+	}
+	mustFail(t, "classify A of T { X: T; }", "「as」が必要")
+	mustFail(t, "classify A of T { X: as U; }", "型が必要")
+	mustFail(t, "classify A of T { X: T as; }", "型が必要")
+	mustFail(t, "classify A of T { X: T as U,; }", "型が必要")
+	mustFail(t, "classify A of T { default: T as U; }", "default には as を書けない")
+	mustFail(t, "condition A of T: T as U;", "condition には as を書けない")
 	mustFail(t, "classify A of T { x }", "「;」が必要")
 	mustFail(t, "classify A T { }", "「of」が必要")
 	mustFail(t, "classify A of T { /** x */ }", "付く先のない")
@@ -490,7 +583,7 @@ func typeStrings(ts []ast.Type) string {
 	return strings.Join(s, ",")
 }
 
-// 対象が二つ以上（docs/grammar.md「classify / condition」の ClassifySubject）。状態か型かは名前の解決が決める。
+// 対象が二つ以上（docs/grammar.md「classify / condition」の ClassifySubject）。型か op か状態かは名前の解決が決める。
 func TestClassifySubject(t *testing.T) {
 	c := firstDecl[*ast.ClassifyDecl](t, "classify Checkout of carts, orders {\n Shopping;\n Ordered;\n}")
 	if typeStrings(c.Of) != "carts,orders" || len(c.Cases) != 2 {
@@ -509,12 +602,16 @@ func TestClassifySubject(t *testing.T) {
 	if cond.Name.Name != "CartFilled" || typeStrings(cond.Of) != "carts,orders" {
 		t.Errorf("Condition = %+v（Of = %s）", cond, typeStrings(cond.Of))
 	}
-	mustFail(t, "classify A of { X; }", "分類の対象（型か状態の名前）が必要")
-	mustFail(t, "classify A of carts, { X; }", "分類の対象（型か状態の名前）が必要")
+	mustFail(t, "classify A of { X; }", "分類の対象（型か op か状態の名前）が必要")
+	mustFail(t, "classify A of carts, { X; }", "分類の対象（型か op か状態の名前）が必要")
 	mustFail(t, "classify A of carts orders { X; }", "「{」が必要")
-	mustFail(t, "classify A of list<T> { X; }", "list / nullable / single は state と match の by の後ろにだけ書ける")
-	mustFail(t, "condition A of carts,;", "分類の対象（型か状態の名前）が必要")
-	mustFail(t, "condition A of;", "分類の対象（型か状態の名前）が必要")
+	// 形の語は型なので、対象にも書ける。
+	c = firstDecl[*ast.ClassifyDecl](t, "classify A of list<T> { X; }")
+	if typeStrings(c.Of) != "list<T>" {
+		t.Errorf("Of = %s", typeStrings(c.Of))
+	}
+	mustFail(t, "condition A of carts,;", "分類の対象（型か op か状態の名前）が必要")
+	mustFail(t, "condition A of;", "分類の対象（型か op か状態の名前）が必要")
 }
 
 func TestCondition(t *testing.T) {
@@ -706,6 +803,33 @@ op login(in: LoginInput, n: int): LoginOk
 	if o.Span.End != o.Body.Span.End {
 		t.Errorf("Span = %+v, Body = %+v", o.Span, o.Body.Span)
 	}
+
+	// export、reads、never（docs/grammar.md「op」）。
+	o = firstDecl[*ast.OpDecl](t, "/** d */ @http.get(\"/x\") export op findUser(email: Email): User? reads users, sessions reads store.orders throws X;")
+	if !o.Export || o.ExportSpan.End-o.ExportSpan.Start != source.Offset(len("export")) || o.Doc == nil || len(o.Decorators) != 1 {
+		t.Errorf("Op = %+v", o)
+	}
+	if len(o.Clauses) != 3 {
+		t.Fatalf("Clauses = %d", len(o.Clauses))
+	}
+	if r := o.Clauses[0].(*ast.ReadsClause); names(r.States) != "users|sessions" {
+		t.Errorf("Reads 0 = %+v", r)
+	}
+	if r := o.Clauses[1].(*ast.ReadsClause); names(r.States) != "store.orders" {
+		t.Errorf("Reads 1 = %+v", r)
+	}
+	// Span は export から。
+	if o.Span.Start != o.Decorators[0].Span.Start {
+		t.Errorf("Span = %+v", o.Span)
+	}
+	o = firstDecl[*ast.OpDecl](t, "export op a();")
+	if !o.Export || o.Span.Start != o.ExportSpan.Start {
+		t.Errorf("Op = %+v", o)
+	}
+	o = firstDecl[*ast.OpDecl](t, "op unauthorized(): never throws Unauthorized;")
+	if o.Export || o.Return == nil || !o.Return.Never || o.Return.Void || o.Return.Type != nil {
+		t.Errorf("Op = %+v（Return = %+v）", o, o.Return)
+	}
 }
 
 func TestOpReject(t *testing.T) {
@@ -718,6 +842,16 @@ func TestOpReject(t *testing.T) {
 		{"pipe type in param", "op a(x: int | float);", "「,」か「)」"},
 		{"for on op", "op a() for op;", "「;」か配線の「{」が必要"},
 		{"qualified name", "op a.b();", "修飾しない識別子"},
+		{"export on model", "export model A {}", "export を付けられるのは op だけ"},
+		{"export on state", "export state s: int;", "export を付けられるのは op だけ"},
+		{"export on namespace", "export namespace a {}", "export を付けられるのは op だけ"},
+		{"export before decorator", "export @d op a();", "export を付けられるのは op だけ"},
+		{"export twice", "export export op a();", "export を付けられるのは op だけ"},
+		{"reads with pipe", "op a() reads s | t;", "「;」か配線の「{」が必要"},
+		{"reads without name", "op a() reads;", "名前が必要"},
+		{"reads trailing comma", "op a() reads s,;", "名前が必要"},
+		{"never param", "op a(x: never);", "never は op の戻り値の型と"},
+		{"never optional", "op a(): never?;", "「;」か配線の「{」が必要"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -769,6 +903,12 @@ func TestType(t *testing.T) {
 		{"Record<string, Record<string, int>>", "Record<string, Record<string, int>>"},
 		{"WarrantyKind.Yamada<server.Item>", "WarrantyKind.Yamada<server.Item>"},
 		{"A<B<C>>?", "A<B<C>>?"},
+		{"list<A>", "list<A>"},
+		{"nullable<A>", "nullable<A>"},
+		{"single<A>", "single<A>"},
+		{"list<nullable<a.B>>?", "list<nullable<a.B>>?"},
+		{"Record<string, list<int>>", "Record<string, list<int>>"},
+		{"single<A?>[]", "single<A?>[]"},
 	}
 	for _, tt := range tests {
 		s := firstDecl[*ast.ScalarDecl](t, "scalar X extends "+tt.src+";")
@@ -781,9 +921,10 @@ func TestType(t *testing.T) {
 	}
 	rejects := []struct{ src, want string }{
 		{"void", "void は op の戻り値の型にだけ書ける"},
-		{"list<A>", "list / nullable / single は state と match の by の後ろにだけ書ける"},
-		{"nullable<A>", "list / nullable / single は state と match の by の後ろにだけ書ける"},
-		{"single<A>", "list / nullable / single は state と match の by の後ろにだけ書ける"},
+		{"never", "never は op の戻り値の型と、override のなくす印にだけ書ける"},
+		{"list<never>", "never は op の戻り値の型と"},
+		{"list", "「<」が必要"},
+		{"list<A, B>", "「>」が必要"},
 		{"{ a: int; }", "その場で書く model はユニオンのアームと例外の値にだけ置ける"},
 		{"Record<string>", "「,」が必要"},
 		{"Record<string, int", "「>」が必要"},
@@ -846,7 +987,7 @@ func TestBlockStmts(t *testing.T) {
 	if cs6.Call.Callee.String() != "server.logout" || len(cs6.Call.Args) != 1 || len(cs6.Call.Args[0].(*ast.RecordLit).Fields) != 0 {
 		t.Errorf("Stmt 6 = %+v", cs6)
 	}
-	if ms, ok := st[7].(*ast.MatchStmt); !ok || ms.Match.Classifier.Name != "K" {
+	if ms, ok := st[7].(*ast.MatchStmt); !ok || ms.Match.Classifier.String() != "K" {
 		t.Errorf("Stmt 7 = %+v", st[7])
 	}
 	ret := st[8].(*ast.ReturnStmt).Value.(*ast.Call)
@@ -889,7 +1030,7 @@ func TestMatch(t *testing.T) {
   match item by Available { A => f(); };
 }`)
 	m := o.Body.Stmts[0].(*ast.ConstStmt).Value.(*ast.Match)
-	if m.Subject.(*ast.NameAtom).Name.String() != "item" || m.Classifier.Name != "WarrantyKind" || m.Builtin || len(m.Arms) != 3 {
+	if m.Subject.(*ast.NameAtom).Name.String() != "item" || m.Classifier.String() != "WarrantyKind" || m.Builtin || len(m.Arms) != 3 {
 		t.Fatalf("Match = %+v", m)
 	}
 	a0 := m.Arms[0]
@@ -915,6 +1056,60 @@ func TestMatch(t *testing.T) {
 	}
 }
 
+// アームの本体（docs/grammar.md「配線」の ArmBody = Call | Atom | Throw）と、修飾した分類の名前。
+func TestMatchArmBody(t *testing.T) {
+	o := firstDecl[*ast.OpDecl](t, `op a(user: User?): Session {
+  return match user by store.Registration {
+    Registered => issueSession(user, in.body.password);
+    LoggedIn => session;
+    Field => session.token;
+    Empty => none;
+    Standard => 1;
+    Named => "x";
+    Rec => { a: 1, b };
+    default => throw type.Unauthorized;
+  };
+}`)
+	m := o.Body.Stmts[0].(*ast.ReturnStmt).Value.(*ast.Match)
+	if m.Classifier.String() != "store.Registration" || len(m.Classifier.Segments) != 2 || m.Builtin {
+		t.Fatalf("Classifier = %+v", m.Classifier)
+	}
+	if _, ok := m.Arms[0].Body.(*ast.Call); !ok {
+		t.Errorf("Arm 0 body = %+v", m.Arms[0].Body)
+	}
+	if n, ok := m.Arms[1].Body.(*ast.NameAtom); !ok || n.Name.String() != "session" {
+		t.Errorf("Arm 1 body = %+v", m.Arms[1].Body)
+	}
+	if n, ok := m.Arms[2].Body.(*ast.NameAtom); !ok || n.Name.String() != "session.token" {
+		t.Errorf("Arm 2 body = %+v", m.Arms[2].Body)
+	}
+	if _, ok := m.Arms[3].Body.(*ast.NoneAtom); !ok {
+		t.Errorf("Arm 3 body = %+v", m.Arms[3].Body)
+	}
+	if l, ok := m.Arms[4].Body.(*ast.Literal); !ok || l.Int != 1 {
+		t.Errorf("Arm 4 body = %+v", m.Arms[4].Body)
+	}
+	if l, ok := m.Arms[5].Body.(*ast.Literal); !ok || l.Str != "x" {
+		t.Errorf("Arm 5 body = %+v", m.Arms[5].Body)
+	}
+	if r, ok := m.Arms[6].Body.(*ast.RecordLit); !ok || len(r.Fields) != 2 {
+		t.Errorf("Arm 6 body = %+v", m.Arms[6].Body)
+	}
+	th, ok := m.Arms[7].Body.(*ast.Throw)
+	if !ok || th.Exception.String() != "type.Unauthorized" || !m.Arms[7].Default {
+		t.Fatalf("Arm 7 body = %+v", m.Arms[7].Body)
+	}
+	// Throw の Span は throw から例外の名前まで。
+	if th.Span.End != th.Exception.Span.End || th.Exception.Span.Start-th.Span.Start != source.Offset(len("throw ")) {
+		t.Errorf("Throw Span = %+v, Exception = %+v", th.Span, th.Exception.Span)
+	}
+	// 値を対象にした標準の分類（対象は Atom のどれでも）。
+	o = firstDecl[*ast.OpDecl](t, "op b(in: In) { match in.token by nullable { Empty => f(); HasItems => g(in.token); }; }")
+	if mt := o.Body.Stmts[0].(*ast.MatchStmt).Match; mt.Subject.(*ast.NameAtom).Name.String() != "in.token" || !mt.Builtin {
+		t.Errorf("match = %+v", mt)
+	}
+}
+
 // 状態での match（docs/grammar.md「配線」の表の二つ目と三つ目の形）。
 func TestMatchOnState(t *testing.T) {
 	o := firstDecl[*ast.OpDecl](t, `op a() {
@@ -933,22 +1128,22 @@ func TestMatchOnState(t *testing.T) {
   return match by Session { LoggedIn => h(); default => none; };
 }`)
 	byList := o.Body.Stmts[0].(*ast.MatchStmt).Match
-	if byList.Subject.(*ast.NameAtom).Name.String() != "carts" || !byList.Builtin || byList.Classifier.Name != "list" || len(byList.Arms) != 2 {
+	if byList.Subject.(*ast.NameAtom).Name.String() != "carts" || !byList.Builtin || byList.Classifier.String() != "list" || len(byList.Arms) != 2 {
 		t.Errorf("by list = %+v", byList)
 	}
 	if byList.Arms[0].Cases[0].Name != "Empty" || byList.Arms[1].Cases[0].Name != "HasItems" {
 		t.Errorf("by list arms = %+v", byList.Arms)
 	}
 	byNullable := o.Body.Stmts[1].(*ast.ConstStmt).Value.(*ast.Match)
-	if byNullable.Subject.(*ast.NameAtom).Name.String() != "token" || !byNullable.Builtin || byNullable.Classifier.Name != "nullable" {
+	if byNullable.Subject.(*ast.NameAtom).Name.String() != "token" || !byNullable.Builtin || byNullable.Classifier.String() != "nullable" {
 		t.Errorf("by nullable = %+v", byNullable)
 	}
 	byClassify := o.Body.Stmts[2].(*ast.MatchStmt).Match
-	if byClassify.Subject != nil || byClassify.Builtin || byClassify.Classifier.Name != "Checkout" || len(byClassify.Arms) != 2 {
+	if byClassify.Subject != nil || byClassify.Builtin || byClassify.Classifier.String() != "Checkout" || len(byClassify.Arms) != 2 {
 		t.Errorf("by Checkout = %+v", byClassify)
 	}
 	ret := o.Body.Stmts[3].(*ast.ReturnStmt).Value.(*ast.Match)
-	if ret.Subject != nil || ret.Classifier.Name != "Session" || !ret.Arms[1].Default {
+	if ret.Subject != nil || ret.Classifier.String() != "Session" || !ret.Arms[1].Default {
 		t.Errorf("return match = %+v", ret)
 	}
 	// by の後ろの予約語の Span は Classifier が持つ。
@@ -1013,8 +1208,14 @@ func TestBlockReject(t *testing.T) {
 		{"nested call", "op a() { const x = f(g()); }", "呼び出しの引数に呼び出しは書けない"},
 		{"match without arms", "op a() { match x by K { }; }", "match にはアームが一つ以上要る"},
 		{"match without semicolon", "op a() { match x by K { A => f(); } }", "「;」が必要だが「}」がある"},
-		{"arm body atom", "op a() { match x by K { A => x; }; }", "アームの本体（呼び出しか none）"},
-		{"arm body match", "op a() { match x by K { A => match y by L { B => none; }; }; }", "アームの本体（呼び出しか none）"},
+		{"arm body match", "op a() { match x by K { A => match y by L { B => none; }; }; }", "アームの本体に match は書けない"},
+		{"arm body missing", "op a() { match x by K { A => ; }; }", "アームの本体（呼び出しか値か throw）"},
+		{"arm throw without name", "op a() { match x by K { A => throw; }; }", "名前が必要"},
+		{"arm throw call", "op a() { match x by K { A => throw f(); }; }", "「;」が必要だが「(」がある"},
+		{"arm throw value", "op a() { match x by K { A => throw 5; }; }", "名前が必要"},
+		{"throw statement", "op a() { throw X; }", "throw は match のアームの本体にだけ書ける"},
+		{"return throw", "op a(): T { return throw X; }", "throw は match のアームの本体にだけ書ける"},
+		{"const throw", "op a() { const x = throw X; }", "throw は match のアームの本体にだけ書ける"},
 		{"arm without arrow", "op a() { match x by K { A f(); }; }", "「=>」が必要"},
 		{"if", "op a() { if (x) { } }", "「;」が必要だが「{」がある"},
 		{"literal statement", "op a() { 5; }", "文（const / return / 呼び出し / match）が必要"},
@@ -1024,13 +1225,13 @@ func TestBlockReject(t *testing.T) {
 		{"record field qualified", "op a() { f({ a.b }); }", "修飾しない識別子"},
 		{"doc in block", "op a() { /** d */ return x; }", "付く先のない"},
 		{"return missing semicolon", "op a() { return x }", "「;」が必要だが「}」がある"},
-		{"match by qualified", "op a() { match x by a.K { A => f(); }; }", "修飾しない識別子"},
-		{"match by single", "op a() { match s by single { A => f(); }; }", "single の状態には組み込みの分類がない"},
+		{"match by single", "op a() { match s by single { A => f(); }; }", "single は標準の分類ではない"},
+		{"match by reserved segment", "op a() { match x by a.op { A => f(); }; }", "op は予約語で、名前には使えない"},
 		{"match by core type", "op a() { match s by string { A => f(); }; }", "string は予約語"},
 		{"match without by", "op a() { match x { A => f(); }; }", "「by」が必要"},
 		{"match two subjects", "op a() { match x, y by K { A => f(); }; }", "「by」が必要"},
 		{"match by nullable with type argument", "op a() { match s by nullable<T> { Empty => f(); }; }", "「{」が必要"},
-		{"match by without classifier", "op a() { match by { A => f(); }; }", "識別子"},
+		{"match by without classifier", "op a() { match by { A => f(); }; }", "名前が必要"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1098,10 +1299,10 @@ func TestIdentAndQualifiedName(t *testing.T) {
 }
 
 // TestFieldName は FieldName = Ident | 予約語（docs/grammar.md「識別子」）: フィールド名を書く位置
-// （model のフィールド、その場で書く model、omit の並び、レコードリテラルのキー、値のパスの二つ目以降）には
+// （model のフィールド、その場で書く model、override の後ろの名前、レコードリテラルのキー、値のパスの二つ目以降）には
 // 予約語を書ける。
 func TestFieldName(t *testing.T) {
-	// 予約語はすべてフィールド名になる（宣言の頭、節の頭、文の頭と値、核の型と状態の形、リテラル）。
+	// 予約語はすべてフィールド名になる（宣言の頭、修飾、節の頭、文の頭と値、核の型と形、リテラル）。
 	var words []string
 	for w := range token.Keywords {
 		words = append(words, w)
@@ -1154,10 +1355,10 @@ func TestFieldName(t *testing.T) {
 		t.Errorf("exception body = %+v", fs)
 	}
 
-	// omit の並び。
-	m = firstDecl[*ast.ModelDecl](t, "model P is U omit op, hash, namespace;")
-	if len(m.Omit) != 3 || m.Omit[0].Name != "op" || m.Omit[1].Name != "hash" || m.Omit[2].Name != "namespace" {
-		t.Errorf("Omit = %+v", m.Omit)
+	// override の後ろの名前。
+	m = firstDecl[*ast.ModelDecl](t, "model P extends U { override op: never; @d override namespace; override never: never; override hash: string; }")
+	if ov := m.Body.Overrides; len(ov) != 4 || ov[0].Name.Name != "op" || ov[1].Name.Name != "namespace" || ov[2].Name.Name != "never" || !ov[2].Never || ov[3].Name.Name != "hash" {
+		t.Errorf("Overrides = %+v", ov)
 	}
 
 	// レコードリテラルのキーと、値のパス（Path = Ident { "." FieldName }）。
@@ -1188,7 +1389,7 @@ func TestFieldName(t *testing.T) {
 		t.Errorf("Segments[1].Span = %+v", s)
 	}
 	mt := o.Body.Stmts[1].(*ast.ConstStmt).Value.(*ast.Match)
-	if mt.Subject.(*ast.NameAtom).Name.String() != "res.match" || mt.Classifier.Name != "Kind" {
+	if mt.Subject.(*ast.NameAtom).Name.String() != "res.match" || mt.Classifier.String() != "Kind" {
 		t.Errorf("match = %+v", mt)
 	}
 	if arg := mt.Arms[0].Body.(*ast.Call).Args[0].(*ast.NameAtom).Name.String(); arg != "res.by" {
@@ -1196,6 +1397,16 @@ func TestFieldName(t *testing.T) {
 	}
 	if ret := o.Body.Stmts[2].(*ast.ReturnStmt).Value.(*ast.NameAtom).Name.String(); ret != "res.decorator" {
 		t.Errorf("return = %s", ret)
+	}
+}
+
+// is と omit は予約語ではなくなった（docs/grammar.md「予約語」）: 識別子として、どの位置にも書ける。
+func TestIsAndOmitAreIdents(t *testing.T) {
+	file := mustParse(t, `model is { omit: string; }
+op omit(is: is): is { const omit = f(is); return omit; }
+namespace is.omit { scalar Omit extends string; }`)
+	if got := strings.Join(declNames(file), ","); got != "model is,op omit,namespace is.omit" {
+		t.Errorf("decls = %s", got)
 	}
 }
 
@@ -1226,7 +1437,11 @@ func TestReservedWordReject(t *testing.T) {
 		{"shorthand record key", "op f() { g({ op }); }", "op は予約語なので、値を省いた形（{ op }）では書けない"},
 		{"shorthand record key after field", "op f() { g({ a: 1, state, b }); }", "state は予約語なので、値を省いた形"},
 		{"qualified record key", "op f() { g({ a.op: 1 }); }", "修飾しない識別子"},
-		{"qualified omit", "model P is U omit a.op;", "修飾しない識別子"},
+		{"export as name", "op export();", "export は予約語で、識別子には使えない"},
+		{"reads as param", "op f(reads: string);", "reads は予約語で、識別子には使えない"},
+		{"as as const", "op f() { const as = g(); }", "as は予約語で、識別子には使えない"},
+		{"never as type name", "model A { x: a.never; }", "never は予約語で、名前には使えない"},
+		{"throw as callee", "op f() { throw(); }", "throw は match のアームの本体にだけ書ける"},
 		{"external on reserved field", "model A { @external decorator: string; }", "@external はデコレータの宣言の直前にだけ書ける"},
 		{"member not a field", "model A { op f(); }", "「:」が必要だが識別子 fがある"},
 	}

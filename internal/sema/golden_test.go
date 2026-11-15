@@ -31,10 +31,33 @@ namespace a {
   /** メールアドレス */
   scalar Email extends string;
   model User { id: string; email: Email; hash: string; nick: string??; }
-  model PublicUser is User omit hash;
+  model PublicUser extends User { override hash: never; }
+
+  decorator mark for field;
+  model Member {
+    /** 識別子 */
+    @mark id: string;
+    /** 名前 */
+    name: string;
+    /** 段階 */
+    level: int = 1;
+    since: Time;
+  }
+  model Admin extends Member {
+    override id: Email;
+    /** 新しい名前 */
+    @mark override name;
+    override level: never;
+    role: string;
+  }
+  model Shapes { a: list<string>; b: nullable<int>; c: single<User>; d: nullable<string?>; e: single<list<User>?>; }
 
   state users: list<User>;
   state token: nullable<string>;
+  state title: single<string>;
+  state plain: string;
+  state maybe: single<string?>;
+  state rows: User[];
   effect add on users.post;
   effect set on token.put;
 
@@ -83,9 +106,29 @@ namespace a {
   op take(in: User): void;
   op fromIn(in: User): User;
 
+  export op find2(id: string): User? reads users, token reads users;
+  op nameOf(u: User): string;
+  op gone(): never throws Unauthorized;
+  classify Found of find2 { Hit: find2 as User; default; }
+  classify Session of token { In: token as string; default; }
+  op wire2(id: string): string throws Unauthorized {
+    const u = find2(id);
+    return match u by Found {
+      Hit => nameOf(u);
+      default => throw Unauthorized;
+    };
+  }
+  op wire3(): string? {
+    return match token by nullable { HasItems => token; Empty => none; };
+  }
+  op wire4(): string { return a.title; }
+  op wire5(): string {
+    return match by Session { In => token; default => gone(); };
+  }
+
   @unavailable
   @cache(["users", id], 5m)
-  op wire(id: string): PublicUser {
+  op wire(id: string): User {
     const u = find(id);
     take({ id, email: u.email, hash: "x" });
     const w = match u by Kind {
@@ -176,10 +219,42 @@ func TestNormalizeExpectations(t *testing.T) {
 	user := p.Lookup("a.User").(*ir.Model)
 	eq("nick の型", user.Fields[3].Type, ir.Optional(ir.String()))
 
-	// is X omit
+	// model D extends B { override ...; 足すフィールド }
 	pub := p.Lookup("a.PublicUser").(*ir.Model)
-	eq("derivedFrom", pub.DerivedFrom, &ir.DerivedFrom{Base: "a.User", Omit: []string{"hash"}})
+	eq("extends", pub.Extends, &ir.ModelExtends{Base: "a.User", Removed: []string{"hash"}})
 	eq("PublicUser のフィールド", fieldNames(pub), []string{"id", "email", "nick"})
+	member := p.Lookup("a.Member").(*ir.Model)
+	admin := p.Lookup("a.Admin").(*ir.Model)
+	eq("Admin の extends", admin.Extends, &ir.ModelExtends{Base: "a.Member", Removed: []string{"level"}, Overridden: []string{"id", "name"}})
+	eq("Admin のフィールド（元の並びのまま、足したものは末尾）", fieldNames(admin), []string{"id", "name", "since", "role"})
+	eq("override した型（差し替え）", admin.Fields[0].Type, ir.Ref("a.Email"))
+	eq("受け継いだデコレータ", len(admin.Fields[0].Decorators), 1)
+	eq("override に足したデコレータ", len(admin.Fields[1].Decorators), 1)
+	// 説明: override したフィールドは override に書いたもの（なければなし）。していないフィールドは受け継ぐ
+	eq("override に説明がなければ説明なし", admin.Fields[0].Description, (*ir.Doc)(nil))
+	eq("override に書いた説明", admin.Fields[1].Description.Summary, "新しい名前")
+	eq("元の説明は変わらない", []string{member.Fields[0].Description.Summary, member.Fields[1].Description.Summary}, []string{"識別子", "名前"})
+	eq("受け継いだままのフィールドの位置は元のもの", admin.Fields[2].Span, member.Fields[3].Span)
+	if admin.Fields[0].Span == member.Fields[0].Span {
+		t.Errorf("override したフィールドの位置は override のもの: %+v", admin.Fields[0].Span)
+	}
+	eq("元の model は変わらない", fieldNames(member), []string{"id", "name", "level", "since"})
+
+	// 形の語は型の別の書き方（どの型の位置でも）
+	shapes := p.Lookup("a.Shapes").(*ir.Model)
+	eq("list<T> / nullable<T> / single<T>", []ir.Type{shapes.Fields[0].Type, shapes.Fields[1].Type, shapes.Fields[2].Type, shapes.Fields[3].Type, shapes.Fields[4].Type},
+		[]ir.Type{ir.Array(ir.String()), ir.Optional(ir.Int()), ir.Ref("a.User"), ir.Optional(ir.String()), ir.Optional(ir.Array(ir.Ref("a.User")))})
+	// state s: T は type に正規化した型を置き、shape と element をそこから決める
+	state := func(name string) []any {
+		st := p.Lookup(name).(*ir.State)
+		return []any{st.Type, st.Shape, st.Element}
+	}
+	eq("state users", state("a.users"), []any{ir.Array(ir.Ref("a.User")), ir.StateList, ir.Ref("a.User")})
+	eq("state rows（T[]）", state("a.rows"), []any{ir.Array(ir.Ref("a.User")), ir.StateList, ir.Ref("a.User")})
+	eq("state token", state("a.token"), []any{ir.Optional(ir.String()), ir.StateNullable, ir.String()})
+	eq("state title（single<T>）", state("a.title"), []any{ir.String(), ir.StateSingle, ir.String()})
+	eq("state plain（T）", state("a.plain"), []any{ir.String(), ir.StateSingle, ir.String()})
+	eq("state maybe（single<T?> は nullable<T>）", state("a.maybe"), []any{ir.Optional(ir.String()), ir.StateNullable, ir.String()})
 
 	// 例外のその場の model、ユニオンのアームのその場の model（持ち主の直後）
 	eq("Invalid の値", p.Lookup("a.Invalid").(*ir.Exception).Value, ir.Ref("a.Invalid.Value"))
@@ -198,6 +273,16 @@ func TestNormalizeExpectations(t *testing.T) {
 	eq("condition", []any{cond.FromCondition, cond.HasDefault, cond.Cases[0].Name}, []any{true, true, "IsActive"})
 	kind := p.Lookup("a.Kind").(*ir.Classify)
 	eq("default の説明", kind.DefaultDescription.Summary, "それ以外")
+	eq("as のないケースは as: []、述語で決まる", []any{len(kind.Cases[0].As), kind.DecidedBy, cond.DecidedBy}, []any{0, ir.DecidedByPredicate, ir.DecidedByPredicate})
+
+	// op の分類、ケースの X as T、型で決まる分類
+	found := p.Lookup("a.Found").(*ir.Classify)
+	eq("op の分類の対象", found.Subject, ir.OpSubject{Op: "a.find2", Type: ir.Optional(ir.Ref("a.User"))})
+	eq("ケースの as（op）", found.Cases[0].As, []ir.CaseTyping{{Type: ir.Ref("a.User"), By: ir.NarrowByPresence, Span: found.Cases[0].As[0].Span}})
+	eq("型で決まる分類", found.DecidedBy, ir.DecidedByType)
+	session := p.Lookup("a.Session").(*ir.Classify)
+	eq("ケースの as（状態）", session.Cases[0].As, []ir.CaseTyping{{State: "a.token", Type: ir.String(), By: ir.NarrowByPresence, Span: session.Cases[0].As[0].Span}})
+	eq("状態一つの、型で決まる分類", session.DecidedBy, ir.DecidedByType)
 
 	// デコレータの宣言: targets の既定、external、alias
 	get := p.Lookup("a.get").(*ir.Decorator)
@@ -233,6 +318,12 @@ func TestNormalizeExpectations(t *testing.T) {
 		Exceptions: []string{"a.Unauthorized", "a.Invalid", "a.Wrapped"},
 		Relations:  []ir.Relation{{Kind: ir.Keeps}},
 	})
+	// export、reads、never
+	find2 := p.Lookup("a.find2").(*ir.Op)
+	eq("export", []bool{find2.Exported, find.Exported}, []bool{true, false})
+	eq("reads（複数の節、重複は最初の出現に寄せる）", find2.Reads, []string{"a.users", "a.token"})
+	eq("reads を書いていなければ空", find.Reads, []string(nil))
+	eq("never", p.Lookup("a.gone").(*ir.Op).Returns, ir.Never())
 	// 効果のユニオンを書けるのは、二つ以上の効果を持てる配線の op（葉は EFF-3。docs/decisions.md S8）
 	eq("effects のユニオン", p.Lookup("a.both").(*ir.Op).Effects, []string{"a.add", "a.set"})
 	eq("Signature は零値", find.Signature, ir.Signature{})
@@ -262,6 +353,30 @@ func TestNormalizeExpectations(t *testing.T) {
 	if !reflect.DeepEqual(stmts[3].(ir.ReturnStmt).Expr.(ir.AtomExpr).Atom.(ir.NameAtom).Path, []string{"u"}) {
 		t.Errorf("return u のパス")
 	}
+	// 型を書かないケースの絞り込みは case(C, Ks, X)。default のアームは外のまま
+	eq("narrowed（型を書かないケース）", m.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.Case("a.Kind", []string{"A", "B"}, ir.Ref("a.User"))}})
+	eq("narrowed（default）", m.Arms[1].Narrowed, []ir.Narrowing(nil))
+
+	// アームの本体の throw、as で絞り込んだ型
+	m2 := p.Lookup("a.wire2").(*ir.Op).Body.Statements[1].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match
+	eq("as のケースのアームでは、対象は書いた型", m2.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.Ref("a.User")}})
+	eq("throw", m2.Arms[1].Body, ir.ThrowBody{Exception: "a.Unauthorized", Span: m2.Arms[1].Body.(ir.ThrowBody).Span})
+	// 状態の名前は Atom の state。標準の分類の対象も value。アームの本体の値は atom、none は none
+	m3 := p.Lookup("a.wire3").(*ir.Op).Body.Statements[0].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match
+	subject := m3.Subject.(ir.ValueSubject).Atom.(ir.StateAtom)
+	eq("match token by nullable の対象", []any{subject.State, subject.Path, m3.Classify}, []any{"a.token", []string(nil), "nullable"})
+	eq("HasItems だけのアームで T", m3.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.String()}})
+	body := m3.Arms[0].Body.(ir.AtomExpr).Atom.(ir.StateAtom)
+	eq("アームの本体の値", []any{body.State, len(body.Path)}, []any{"a.token", 0})
+	eq("アームの本体の none", m3.Arms[1].Body, ir.NoneBody{})
+	eq("Empty のアームは外のまま", m3.Arms[1].Narrowed, []ir.Narrowing(nil))
+	// 修飾して書いた状態も同じ
+	ret := p.Lookup("a.wire4").(*ir.Op).Body.Statements[0].(ir.ReturnStmt).Expr.(ir.AtomExpr).Atom.(ir.StateAtom)
+	eq("a.title", []any{ret.State, len(ret.Path)}, []any{"a.title", 0})
+	// 状態の分類での match: 絞り込まれる状態ごとに narrowed
+	m5 := p.Lookup("a.wire5").(*ir.Op).Body.Statements[0].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match
+	eq("match by C の対象", m5.Subject, ir.ClassifyOwnedSubject{})
+	eq("状態の分類の narrowed", m5.Arms[0].Narrowed, []ir.Narrowing{{State: "a.token", Type: ir.String()}})
 }
 
 func fieldNames(m *ir.Model) []string {

@@ -1,0 +1,58 @@
+// TYPE-8（docs/types.md「match の型」の 4〜6）: 値のある本体と「値がない」が混ざる、ほかのすべてが渡せる型がない、
+// リテラルの種類が混ざる（int と float も別の種類）、リテラルやレコードリテラルがそろえた型に渡せない（そのアームの位置）
+namespace a {
+  scalar Email extends string;
+  model M { id: string; }
+  model N { name: string; }
+  classify C of M { A; B; }
+  op m(x: M): M;
+  op v(x: M): void;
+  op use(x: M?): void;
+  op useInt(n: int): void;
+  op useFloat(n: float): void;
+  op useString(s: string): void;
+  op email(): Email;
+  op valueAndNoValue(x: M): void {
+    const r = match x by C {           // ERROR: TYPE-8
+      A => x;
+      B => v(x);
+    };
+    use(r);
+  }
+  op literalKinds(x: M): void {
+    const r = match x by C {           // ERROR: TYPE-8
+      A => 1;
+      B => "one";
+    };
+    useInt(r);
+  }
+  op intAndFloat(x: M): void {
+    const r = match x by C {           // ERROR: TYPE-8
+      A => 1;
+      B => 1.5;
+    };
+    useFloat(r);
+  }
+  op literalToModel(x: M): void {
+    const r = match x by C {
+      A => m(x);
+      B => 1;                          // ERROR: TYPE-8
+    };
+    use(r);
+  }
+  // scalar にそろえた match に、リテラルは渡せない（TYPE-1）
+  op literalToScalar(x: M): void {
+    const r = match x by C {
+      A => email();
+      B => "none";                     // ERROR: TYPE-1
+    };
+    useString(r);
+  }
+  op recordToOther(x: M, n: N): void {
+    const r = match x by C {
+      A => m(x);
+      B => { name: n.name };           // ERROR: TYPE-5
+    };
+    use(r);
+  }
+}

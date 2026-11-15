@@ -1,0 +1,10 @@
+// TYPE-10（docs/types.md「循環」）: extends を辿って自分に戻る。位置は extends の後ろの名前。
+// 循環に入った model は、元の model を持たないものとして続け、その本体の override は重ねて報告しない
+namespace a {
+  model S extends T { override id: never; }              // ERROR: TYPE-10
+  model T extends S { override id: never; }              // ERROR: TYPE-10
+  model Self extends Self { }                            // ERROR: TYPE-10
+  // 循環に入っていない model は、循環に入った model を元にできる
+  model Tail extends S { extra: string; }
+  op f(): Tail;
+}

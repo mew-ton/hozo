@@ -1,0 +1,22 @@
+// READS-2（docs/check.md「状態と効果」「reads」）: 配線の op に書いた reads が、本体から計算した読む状態と集合として等しくない。
+// 位置は op
+namespace a {
+  state users: list<string>;
+  state token: nullable<string>;
+  op find(name: string): string? reads users;
+  op pure(name: string): string;
+  op show(t: string?);
+  // 足りない
+  op missing(name: string): string? reads token {    // ERROR: READS-2
+    show(token);
+    return find(name);
+  }
+  // 余分
+  op extra(name: string): string? reads users, token {   // ERROR: READS-2
+    return find(name);
+  }
+  // 読まないのに書いた
+  op none1(name: string): string reads users {       // ERROR: READS-2
+    return pure(name);
+  }
+}

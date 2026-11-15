@@ -51,8 +51,16 @@ func transition(fqn, of string, from, to ir.CaseSet, writes ...string) *ir.Effec
 		Target: ir.TransitionTarget{Of: of, From: from, To: to}, Writes: writes}
 }
 
+// state は基底の状態。型は形と要素から決める（list は elem[]、nullable は elem?、single は elem）。
 func state(fqn string, shape ir.StateShape, elem ir.Type) *ir.State {
-	return &ir.State{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Shape: shape, Element: elem}
+	t := elem
+	switch shape {
+	case ir.StateList:
+		t = ir.Array(elem)
+	case ir.StateNullable:
+		t = ir.Optional(elem)
+	}
+	return &ir.State{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Type: t, Shape: shape, Element: elem}
 }
 
 func scalar(fqn string, base ir.Type) *ir.Scalar {
@@ -78,9 +86,22 @@ func param(name string, t ir.Type) ir.OpParam {
 	return ir.OpParam{Name: name, Type: t, Span: sp("p." + name)}
 }
 
-// leaf は葉の op。effects / throws / decorators は返した値に足す。
+// leaf は葉の op。effects / throws / decorators は返した値に足す。別の名前空間から呼ぶテストが多いので、
+// export を付けた op として作る。内部の op は internal で作る。
 func leaf(fqn string, returns ir.Type, params ...ir.OpParam) *ir.Op {
-	return &ir.Op{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Params: params, Returns: returns}
+	return &ir.Op{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Exported: true, Params: params, Returns: returns}
+}
+
+// internal は o を、export のない op（内部の op。docs/check.md「export」）にする。
+func internal(o *ir.Op) *ir.Op {
+	o.Exported = false
+	return o
+}
+
+// reads は o に reads を足す。
+func reads(o *ir.Op, states ...string) *ir.Op {
+	o.Reads = append(o.Reads, states...)
+	return o
 }
 
 // wire は配線の op。
@@ -128,6 +149,9 @@ func carg(param string, v ir.Atom) ir.CallArg { return ir.CallArg{Param: param, 
 
 func nameAtom(path ...string) ir.Atom { return ir.NameAtom{Path: path} }
 
+// stateAtom は状態の参照（`token`、`session.userId`）。
+func stateAtom(state string, path ...string) ir.Atom { return ir.StateAtom{State: state, Path: path} }
+
 func rec(fields ...ir.RecordField) ir.Atom { return ir.RecordAtom{Fields: fields} }
 
 func rf(name string, v ir.Atom) ir.RecordField { return ir.RecordField{Name: name, Value: v} }
@@ -165,9 +189,27 @@ func matchConst(name, classify string, arms ...ir.MatchArm) ir.Statement {
 	return ir.ConstStmt{Name: name, Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("x")}, Classify: classify, Arms: arms}}}
 }
 
-// matchState は基底の状態の組み込みの分類での match の文（`match s by list { ... };`）。
+// matchState は状態を名前で書いた、標準の分類での match の文（`match s by list { ... };`）。
 func matchState(state string, shape ir.StateShape, arms ...ir.MatchArm) ir.Statement {
-	return ir.MatchStmt{Match: ir.Match{Subject: ir.StateSubject{State: state}, Classify: string(shape), Arms: arms}}
+	return ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: stateAtom(state)}, Classify: string(shape), Arms: arms}}
+}
+
+// throwArm はアームの本体が `throw E` のアーム。
+func throwArm(exception string, cases ...string) ir.MatchArm {
+	a := ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.ThrowBody{Exception: exception, Span: sp("call." + parentOf(exception) + ".throw")}}
+	if len(cases) == 0 {
+		a.Cases = ir.DefaultArm()
+	}
+	return a
+}
+
+// atomArm はアームの本体が値のアーム。
+func atomArm(v ir.Atom, cases ...string) ir.MatchArm {
+	a := ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.AtomExpr{Atom: v}}
+	if len(cases) == 0 {
+		a.Cases = ir.DefaultArm()
+	}
+	return a
 }
 
 // matchByClassify は状態の分類での match の文（`match by C { ... };`）。

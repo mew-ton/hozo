@@ -5,12 +5,44 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// checkStates は STATE-2 / EFF-2（docs/check.md「状態と効果」）。Signature は計算済み。
+// checkStates は STATE-2 / EFF-2 / READS-2（docs/check.md「状態と効果」）。Signature は計算済み。
 func checkStates(ix *index, c *computer, r *reporter) {
 	for i, o := range ix.ops {
 		checkState2(ix, o, ix.opsNS[i], r)
 		checkEff2(o, r)
+		checkReads2(o, r)
 	}
+}
+
+// checkReads2 は READS-2: 配線の O で Op.reads が空でなく、集合として Sig(O, ns(O)).reads と等しくない。
+// 足りないもの・余分なものを Data.missing / Data.extra に。位置は O。
+func checkReads2(o *ir.Op, r *reporter) {
+	if o.Body == nil || len(o.Reads) == 0 {
+		return
+	}
+	missing := []string{}
+	extra := []string{}
+	for _, s := range o.Signature.Reads {
+		if !contains(o.Reads, s) {
+			missing = append(missing, s)
+		}
+	}
+	for _, s := range o.Reads {
+		if !contains(o.Signature.Reads, s) {
+			extra = appendUnique(extra, s)
+		}
+	}
+	if len(missing) == 0 && len(extra) == 0 {
+		return
+	}
+	msg := sprintf("%s に書いた reads が、本体から計算した読む状態と食い違う", o.Name)
+	if len(missing) > 0 {
+		msg += sprintf("（足りない: %s）", joinNames(missing))
+	}
+	if len(extra) > 0 {
+		msg += sprintf("（余分: %s）", joinNames(extra))
+	}
+	r.report(diag.Error, "READS-2", o.Span, msg, nil, map[string]any{"missing": missing, "extra": extra})
 }
 
 // checkState2 は STATE-2: 葉の op O の Op.effects の効果 e の名前空間が ns(O) と違う。デコレータの halts の効果

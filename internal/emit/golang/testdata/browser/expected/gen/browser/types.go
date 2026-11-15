@@ -62,16 +62,7 @@ var _ runtime.Exception = NetworkError{}
 // 名前空間 page の宣言の複製（Go のパッケージを import できないため。docs/emit-go.md「配置」）。
 type Route string
 
-// UserToPublicUser は server.User を server.PublicUser に射影する（docs/types.md「射影」）。
-func UserToPublicUser(v server.User) server.PublicUser {
-	return server.PublicUser{
-		Id:   v.Id,
-		Name: v.Name,
-		Tags: v.Tags,
-	}
-}
-
-// GetMeInputToGetMeInInput は server.GetMeInput を browser.getMe$in に射影する（docs/types.md「射影」）。
+// GetMeInputToGetMeInInput は server.GetMeInput を、bind で埋まる位置を除いた browser.getMe$in に写す（docs/emit-go.md「移行の間の扱い」）。
 func GetMeInputToGetMeInInput(v server.GetMeInput) GetMeInInput {
 	return GetMeInInput{
 		Verbose: v.Verbose,

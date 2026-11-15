@@ -11,17 +11,16 @@ import (
 
 // genTypes は types.go（docs/emit-go.md「model」「union」「exception」「effect」と scalar の型）。
 // 出すのは出力の対象の型と効果の定数だけ（collectDecls が集めたもの）。宣言は IR の順（種類ごとにまとめない）。
-// 複製した宣言はその後ろに Program の順で。最後に、配線が必要とした射影の変換関数と ptr ヘルパー。
+// 複製した宣言はその後ろに Program の順で。最後に、配線が必要とした変換関数と ptr ヘルパー。
 func (e *emitter) genTypes() *genFile {
 	g := e.newFile("types.go")
-	emitted := map[projection]bool{}
 	selected := map[string]bool{}
 	for _, x := range e.effects {
 		selected[x.Name] = true
 	}
 	for _, d := range e.ns.Decls {
 		if d != nil && (e.reach[d.Common().Name] || selected[d.Common().Name]) {
-			e.genTypeDecl(g, d, emitted)
+			e.genTypeDecl(g, d)
 		}
 	}
 	for i := range e.prog.Namespaces {
@@ -35,11 +34,12 @@ func (e *emitter) genTypes() *genFile {
 				if e.isGoNS(n.Name) {
 					e.copyNote = fmt.Sprintf("名前空間 %s の宣言の複製（その名前空間の出力がこの型を持たないため。docs/emit-go.md「配置」）。", n.Name)
 				}
-				e.genTypeDecl(g, d, emitted)
+				e.genTypeDecl(g, d)
 				e.copyNote = ""
 			}
 		}
 	}
+	emitted := map[projection]bool{}
 	for _, p := range e.projections {
 		if !emitted[p] {
 			emitted[p] = true
@@ -53,19 +53,10 @@ func (e *emitter) genTypes() *genFile {
 	return g
 }
 
-func (e *emitter) genTypeDecl(g *genFile, d ir.Decl, emitted map[projection]bool) {
+func (e *emitter) genTypeDecl(g *genFile, d ir.Decl) {
 	switch x := d.(type) {
 	case *ir.Model:
 		e.genModel(g, x)
-		// 元の model からの変換関数。複製した model には出さない（元の model が viewer のパッケージにあるとは限らない）。
-		if x.DerivedFrom != nil && e.model(x.DerivedFrom.Base) != nil && !e.copied[x.Name] {
-			p := projection{x.DerivedFrom.Base, x.Name}
-			e.projectionFunc(p.from, p.to)
-			if !emitted[p] {
-				emitted[p] = true
-				e.genProjection(g, p)
-			}
-		}
 	case *ir.Scalar:
 		e.genScalar(g, x)
 	case *ir.Union:
@@ -98,8 +89,9 @@ func (e *emitter) genModel(g *genFile, m *ir.Model) {
 		}
 	}
 	g.body.WriteString(e.declDoc(name, m.Description, fallback))
-	if m.DerivedFrom != nil {
-		g.printf("// %s から %s を除いたもの（is ... omit）。\n", m.DerivedFrom.Base, strings.Join(m.DerivedFrom.Omit, ", "))
+	if m.Extends != nil {
+		// 継承した model は、ほかの model と同じ別々の構造体（docs/emit-go.md「移行の間の扱い」）
+		g.printf("// %s を継承。\n", m.Extends.Base)
 	}
 	if len(m.Fields) == 0 {
 		g.printf("type %s struct{}\n\n", name)
@@ -160,8 +152,8 @@ func (e *emitter) genNewModel(g *genFile, m *ir.Model) {
 	g.println("\treturn m\n}\n")
 }
 
-// genProjection は model から model への変換関数（docs/emit-go.md「model」の derivedFrom と
-// 「配線の本体」の射影）。docs/types.md「射影」: 同じ名前のフィールドを写し、ないものは既定値で埋める。
+// genProjection は model から、bind で埋まる位置を除いた合成 model への変換関数（[projection]）。
+// 同じ名前のフィールドを写し、ないものは既定値で埋める。
 func (e *emitter) genProjection(g *genFile, p projection) {
 	from, to := e.model(p.from), e.model(p.to)
 	if from == nil || to == nil {
@@ -169,7 +161,7 @@ func (e *emitter) genProjection(g *genFile, p projection) {
 	}
 	fromT, toT := gol.GoType(ir.Ref(p.from), &g.imports), gol.GoType(ir.Ref(p.to), &g.imports)
 	fn := e.typeName(p.from) + "To" + e.typeName(p.to)
-	g.printf("// %s は %s を %s に射影する（docs/types.md「射影」）。\n", fn, p.from, p.to)
+	g.printf("// %s は %s を、bind で埋まる位置を除いた %s に写す（docs/emit-go.md「移行の間の扱い」）。\n", fn, p.from, p.to)
 	g.printf("func %s(v %s) %s {\n", fn, fromT, toT)
 	g.printf("\treturn %s{\n", toT)
 	for _, tf := range to.Fields {

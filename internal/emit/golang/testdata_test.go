@@ -128,7 +128,7 @@ func serverNS() ir.Namespace {
 				{Name: "name", Description: doc("表示名"), Type: ir.String(), Span: sp(f, 1),
 					Decorators: []ir.Application{app("valid.length", arg("min", lit(ir.IntLiteral{Value: 1})), arg("max", lit(ir.IntLiteral{Value: 80})))}},
 				field("tags", ir.Array(ir.String())),
-			}, DerivedFrom: &ir.DerivedFrom{Base: "server.User", Omit: []string{"email", "token", "alts", "attrs", "joined"}}},
+			}, Extends: &ir.ModelExtends{Base: "server.User", Removed: []string{"email", "token", "alts", "attrs", "joined"}}},
 			&ir.Model{DeclBase: base("server.LoginInput", nil), Fields: []ir.Field{
 				field("email", ir.Ref("server.Email")),
 				field("password", ir.String()),
@@ -181,7 +181,7 @@ func serverNS() ir.Namespace {
 				Effects:   []string{"server.createSession"},
 				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.InvalidCredentials"}, Relations: []ir.Relation{{Kind: ir.Prevents}}}},
 				Signature: loginSig},
-			&ir.Op{DeclBase: base("server.getMe", doc("自分の情報。")), Params: []ir.OpParam{param("in", ir.Ref("server.GetMeInput"))}, Returns: ir.Ref("server.User"),
+			&ir.Op{DeclBase: base("server.getMe", doc("自分の情報。")), Params: []ir.OpParam{param("in", ir.Ref("server.GetMeInput"))}, Returns: ir.Ref("server.PublicUser"),
 				Throws:    []ir.ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
 				Signature: ir.Signature{Exceptions: []string{"server.Unauthorized"}}},
 			&ir.Op{DeclBase: base("server.listOrders", nil), Params: []ir.OpParam{param("token", ir.Ref("server.Token")), param("query", ir.Ref("server.OrdersQuery"))},
@@ -310,7 +310,7 @@ func browserNS() ir.Namespace {
 				}},
 				Signature: ir.Signature{Effects: []string{"server.deleteSession"}}},
 			&ir.Op{DeclBase: base("browser.clearToken", nil)},
-			// 配線: return call で射影が要る（User → PublicUser）。
+			// 配線: return call。呼び出しの型がそのまま戻り値の型（model から model への射影はない）。
 			&ir.Op{DeclBase: base("browser.fetchMe", nil), Params: []ir.OpParam{param("in", ir.Ref("server.GetMeInput"))}, Returns: ir.Ref("server.PublicUser"),
 				Body: &ir.Wiring{Statements: []ir.Statement{
 					ir.ReturnStmt{Expr: ir.CallExpr{Call: ir.Call{Op: "server.getMe", Args: []ir.CallArg{carg("in", name("in"))},
@@ -421,7 +421,8 @@ func constraintView() *ir.View {
 // constraintSelect は inventory の選択: put が起点。
 func constraintSelect() plugin.Select { return plugin.Select{Roots: []string{"inventory.put"}} }
 
-// derivedView は derivedFrom の model と、配線の射影（既定値で埋めるフィールドを含む）。
+// derivedView は継承した model（Model.extends。docs/emit-go.md「移行の間の扱い」）: ほかの model と同じ別々の構造体で、
+// 元の model からの変換関数は出さない。別の model の値は、写す op（人が中身を書く葉の op）を呼んで作る。
 func derivedView() *ir.View {
 	cat := ir.Namespace{Name: "catalog", Decls: []ir.Decl{
 		&ir.Model{DeclBase: base("catalog.Product", nil), Fields: []ir.Field{
@@ -438,22 +439,32 @@ func derivedView() *ir.View {
 			field("price", ir.Float()),
 			{Name: "stock", Type: ir.Int(), Default: ir.IntLiteral{Value: 0}, Span: sp("x.hozo", 1)},
 			field("note", ir.Optional(ir.String())),
-		}, DerivedFrom: &ir.DerivedFrom{Base: "catalog.Product", Omit: []string{"secret"}}},
+		}, Extends: &ir.ModelExtends{Base: "catalog.Product", Removed: []string{"secret"}}},
 		&ir.Model{DeclBase: base("catalog.Summary", nil), Fields: []ir.Field{
 			field("id", ir.String()),
 			field("note", ir.Optional(ir.String())),
 			field("name", ir.Optional(ir.String())),
 			{Name: "featured", Type: ir.Boolean(), Default: ir.BooleanLiteral{Value: false}, Span: sp("x.hozo", 1)},
 		}},
-		&ir.Op{DeclBase: base("catalog.load", nil), Params: []ir.OpParam{param("id", ir.String())}, Returns: ir.Ref("catalog.Product")},
-		&ir.Op{DeclBase: base("catalog.publish", nil), Params: []ir.OpParam{param("id", ir.String())}, Returns: ir.Ref("catalog.PublicProduct"),
+		&ir.Op{DeclBase: base("catalog.load", nil), Params: []ir.OpParam{param("id", ir.String())}, Returns: ir.Ref("catalog.Product"),
+			Reads: []string{"catalog.products"}, Signature: ir.Signature{Reads: []string{"catalog.products"}}},
+		// 写す op: 仕様の上では普通の葉の op で、人が中身を書く
+		&ir.Op{DeclBase: base("catalog.toPublic", nil), Params: []ir.OpParam{param("p", ir.Ref("catalog.Product"))}, Returns: ir.Ref("catalog.PublicProduct"),
+			Signature: ir.Signature{Pure: true}},
+		&ir.Op{DeclBase: base("catalog.toSummary", nil), Params: []ir.OpParam{param("p", ir.Ref("catalog.Product"))}, Returns: ir.Ref("catalog.Summary"),
+			Signature: ir.Signature{Pure: true}},
+		// export は見ない。reads は関数の型のコメントの Reads: の行になる
+		&ir.Op{DeclBase: base("catalog.publish", nil), Exported: true, Params: []ir.OpParam{param("id", ir.String())}, Returns: ir.Ref("catalog.PublicProduct"),
 			Body: &ir.Wiring{Statements: []ir.Statement{
-				ir.ReturnStmt{Expr: ir.CallExpr{Call: call("catalog.load", carg("id", name("id")))}, Span: sp("x.hozo", 1)},
-			}}},
+				ir.ConstStmt{Name: "p", Expr: ir.CallExpr{Call: call("catalog.load", carg("id", name("id")))}, Span: sp("x.hozo", 1)},
+				ir.ReturnStmt{Expr: ir.CallExpr{Call: call("catalog.toPublic", carg("p", name("p")))}, Span: sp("x.hozo", 1)},
+			}},
+			Signature: ir.Signature{Reads: []string{"catalog.products"}}},
 		&ir.Op{DeclBase: base("catalog.summarize", nil), Params: []ir.OpParam{param("p", ir.Ref("catalog.Product"))}, Returns: ir.Ref("catalog.Summary"),
 			Body: &ir.Wiring{Statements: []ir.Statement{
-				ir.ReturnStmt{Expr: ir.AtomExpr{Atom: name("p")}, Span: sp("x.hozo", 1)},
-			}}},
+				ir.ReturnStmt{Expr: ir.CallExpr{Call: call("catalog.toSummary", carg("p", name("p")))}, Span: sp("x.hozo", 1)},
+			}},
+			Signature: ir.Signature{Pure: true}},
 	}}
 	p := &ir.Program{Version: ir.Version, Namespaces: []ir.Namespace{{Name: ""}, cat}}
 	v := &ir.View{Viewer: "catalog", Config: nsConfig("catalog"), Namespaces: namespaces(), Files: allFiles(p), Program: p, Ops: map[string]*ir.ViewedSignature{}}
@@ -495,7 +506,7 @@ func callp(op string, args ...ir.CallArg) *ir.Call {
 
 // byState は基底の状態の、組み込みの分類での match（`match s by list` / `by nullable`）。
 func byState(state string, shape ir.StateShape, arms ...ir.MatchArm) ir.Match {
-	return ir.Match{Subject: ir.StateSubject{State: state}, Classify: string(shape), Arms: arms, Span: sp("x.hozo", 1)}
+	return ir.Match{Subject: ir.ValueSubject{Atom: ir.StateAtom{State: state, Span: sp("x.hozo", 1)}}, Classify: string(shape), Arms: arms, Span: sp("x.hozo", 1)}
 }
 
 // byClassify は状態の分類での match（`match by C`）。

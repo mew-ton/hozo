@@ -1,0 +1,36 @@
+// MATCH-4（docs/types.md「アームの中の対象の型」）: 型を書いたケース（as）のアームでは対象はその型になり、型を書かないケースや
+// default のアームでは絞り込まれない。対象と同じ Atom をそのまま渡して渡せなければ MATCH-4
+namespace a {
+  model M { id: string; }
+  model In { m: M?; }
+  op find(): M?;
+  classify Found of find { Hit: find as M; default; }
+  classify Loose of find { Hit; default; }
+  op takeM(m: M): void;
+  op takeOpt(m: M?): void;
+  op f(): void {
+    const m = find();
+    match m by Found {
+      Hit     => takeM(m);
+      default => takeM(m);             // ERROR: MATCH-4
+    };
+    // 型を書かないケースは case(C, Ks, X) に絞り込むだけで、M? のまま
+    match m by Loose {
+      Hit     => takeM(m);             // ERROR: MATCH-4
+      default => takeOpt(m);
+    };
+    // by nullable の Empty のアームは外のまま
+    match m by nullable {
+      HasItems => takeM(m);
+      Empty    => takeM(m);            // ERROR: MATCH-4
+    };
+  }
+  // 型を書いたケースと C.Case<T> は、どちらか一方で書く: 絞り込んだ型は T そのもので、C.K<…> の位置には渡せない
+  op onHit(m: Found.Hit<M?>): void;
+  op g(in: In): void {
+    match in.m by Found {
+      Hit     => onHit(in.m);          // ERROR: MATCH-4
+      default => none;
+    };
+  }
+}

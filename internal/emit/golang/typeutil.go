@@ -222,7 +222,8 @@ func (e *emitter) scalarOf(t ir.Type) *ir.Scalar {
 //   - to が optional(T) で from が optional でなければ、T に変換してからポインタにする
 //     （array / record はそのまま）。`&x` が書ける式（名前とフィールドの並び、複合リテラル）はそれで、
 //     それ以外は wiring.go の ptr ヘルパー。
-//   - model から別の model へは射影の変換関数 <From>To<To>（必要になった組を記録する）。
+//   - model から別の model へは渡せない（docs/types.md「互換」の「渡せないもの」）。例外は、bind で埋まる位置を
+//     除いた合成 model（`<viewer>.<op 名>$<引数名>`）の位置で、変換関数 <From>To<To>（必要になった組を記録する）。
 //   - scalar から核の型（規則 11）や核の型から scalar（既定値の規則 10）は Go の型変換。
 //   - それ以外（配列の要素の変換など）はそのまま出す。
 func (e *emitter) convert(expr string, from, to ir.Type, imp *gol.Imports) string {
@@ -246,8 +247,12 @@ func (e *emitter) convert(expr string, from, to ir.Type, imp *gol.Imports) strin
 	fromRef, fok := from.(ir.RefType)
 	toRef, tok := to.(ir.RefType)
 	if fok && tok {
-		if e.model(fromRef.Target) != nil && e.model(toRef.Target) != nil {
-			return e.projectionFunc(fromRef.Target, toRef.Target) + "(" + expr + ")"
+		if from, to := e.model(fromRef.Target), e.model(toRef.Target); from != nil && to != nil {
+			if to.SynthesizedFrom != "" && strings.Contains(to.Name, "$") {
+				// 名前で渡した引数を、bind で埋まる位置を除いた合成 model に写す
+				return e.projectionFunc(fromRef.Target, toRef.Target) + "(" + expr + ")"
+			}
+			return expr
 		}
 		return gol.GoType(to, imp) + "(" + expr + ")"
 	}
@@ -286,7 +291,7 @@ func isAddressable(expr string) bool {
 	return expr != ""
 }
 
-// projectionFunc は射影の変換関数の名前 <From>To<To> を返し、必要な組として記録する。
+// projectionFunc は合成 model への変換関数の名前 <From>To<To> を返し、必要な組として記録する。
 func (e *emitter) projectionFunc(from, to string) string {
 	p := projection{from, to}
 	found := false

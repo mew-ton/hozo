@@ -1,0 +1,38 @@
+// TYPE-16（tests/rules/TYPE-16/ng_1.hozo と同じ。docs/types.md「診断」「本体に書けるもの」）: override の形が合わない: 何も変えない（説明だけを変えるのも含む）、
+// never にデコレータか説明を付けた、同じフィールドへの override が二度ある
+namespace a {
+  scalar Email extends string;
+  decorator mark for field;
+  model User {
+    /** 識別子 */
+    id: string;
+    email: Email;
+    name: string;
+    hash: string;
+    salt: string;
+  }
+  model D extends User {
+    // 型を書かず、デコレータもない
+    override id;                       // ERROR: TYPE-16
+    // 元と等しい型で、デコレータもない
+    override email: Email;             // ERROR: TYPE-16
+    // 説明だけを変える
+    /** 新しい説明 */
+    override name;                     // ERROR: TYPE-16
+    // なくすフィールドには何も足せない
+    @mark
+    override hash: never;              // ERROR: TYPE-16
+    /** もう要らない */
+    override salt: never;              // ERROR: TYPE-16
+  }
+  model D2 extends User {
+    /** 説明だけ（型は元と等しい） */
+    override name: string;             // ERROR: TYPE-16
+    // 同じフィールドへの override が二度
+    @mark override id;
+    override id: Email;                // ERROR: TYPE-16
+    override hash: never;
+    override hash: never;              // ERROR: TYPE-16
+  }
+  op f(): User;
+}

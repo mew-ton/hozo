@@ -52,22 +52,12 @@ type Session struct {
 }
 
 // PublicUser は server.PublicUser の model。
-// server.User から hash を除いたもの（is ... omit）。
+// server.User を継承。
 type PublicUser struct {
 	Id     UserId     `json:"id"`
 	Email  Email      `json:"email"`
 	Name   string     `json:"name"`
 	Status UserStatus `json:"status"`
-}
-
-// UserToPublicUser は server.User を server.PublicUser に射影する（docs/types.md「射影」）。
-func UserToPublicUser(v User) PublicUser {
-	return PublicUser{
-		Id:     v.Id,
-		Email:  v.Email,
-		Name:   v.Name,
-		Status: v.Status,
-	}
 }
 
 // Item は商品

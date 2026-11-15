@@ -1,0 +1,23 @@
+// SYNTAX（docs/grammar.md「op」「配線」「型」「model」）: export は op の前だけ、throw はアームの本体だけ、
+// never は戻り値の型と override のなくす印だけ、override に既定値は書けない
+namespace a {
+  model M { id: string; n: int = 1; }
+  exception E;
+  classify C of M { A; B; }
+  export model X { id: string; }       // ERROR: SYNTAX
+  export state s: string;              // ERROR: SYNTAX
+  model N { f: never; }                // ERROR: SYNTAX
+  model D extends M { override n: int = 2; }   // ERROR: SYNTAX
+  op p(x: never);                      // ERROR: SYNTAX
+  op f(m: M): M throws E {
+    throw E;                           // ERROR: SYNTAX
+    return m;
+  }
+  op g(m: M): M throws E {             // ERROR: WIRE-3
+    return throw E;                    // ERROR: SYNTAX
+  }
+  op h() reads a | b;                  // ERROR: SYNTAX
+  classify K of M { A; default: M as M; }      // ERROR: SYNTAX
+  condition Q of M: M as M;            // ERROR: SYNTAX
+  op ok(m: M): M;
+}

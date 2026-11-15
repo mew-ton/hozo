@@ -1,4 +1,4 @@
-// STATE-3（docs/check.md「状態と効果」）: 状態の要素の型は optional にしない。空になりうる状態は nullable<T> と書く
+// STATE-3（docs/check.md「状態と効果」）: list の状態の要素は optional にしない
 namespace a {
   model M { id: string; }
   state maybe: nullable<M>;

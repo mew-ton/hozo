@@ -1,0 +1,23 @@
+// TYPE-16（docs/types.md「本体に書けるもの」）: 型を書かない override はデコレータを足す。型を書く override は型を変えるか、
+// 元と等しい型でデコレータを足す。説明は、デコレータを足すか型を変える override に書ける。なくす override には何も付けない
+namespace a {
+  scalar Email extends string;
+  decorator mark for field;
+  decorator tag(name: string) for field;
+  model User {
+    /** 識別子 */
+    @mark id: string;
+    email: string;
+    name: string;
+    hash: string;
+  }
+  model D extends User {
+    @tag("key") override id;
+    /** 連絡先 */
+    override email: Email;
+    /** 表示名 */
+    @mark override name: string;
+    override hash: never;
+  }
+  op f(): D;
+}

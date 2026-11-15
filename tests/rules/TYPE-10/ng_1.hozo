@@ -1,8 +1,16 @@
-// TYPE-10（docs/types.md「診断」）: model P is U omit f の f が U にない、is の循環。internal/sema/testdata/rules/TYPE-10.hozo から
+// TYPE-10（docs/types.md「診断」）: override f の f が元の model のフィールドにない
 namespace a {
+  decorator mark for field;
   model User { id: string; hash: string; }
-  model P is User omit nope;           // ERROR: TYPE-10
-  model S is T omit id;
-  model T is S omit id;                // ERROR: TYPE-10
+  model P extends User { override nope: never; }         // ERROR: TYPE-10
+  model P2 extends User { @mark override nope; }         // ERROR: TYPE-10
+  // 元の model がなくしたフィールドは、元の model にない
+  model Q extends User { override hash: never; }
+  model R extends Q { override hash: never; }            // ERROR: TYPE-10
+  // 足したフィールドには override を書かない
+  model S extends User {
+    extra: string;
+    override extra: never;                               // ERROR: TYPE-10
+  }
   op f(): User;
 }

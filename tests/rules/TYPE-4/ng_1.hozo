@@ -18,9 +18,10 @@ namespace a {
   op h(): void {
     takeInt(1, 2);                     // ERROR: TYPE-4
   }
+  // model の値は、別の model の位置には渡せない（フィールドを含んでいても。暗黙の射影はない）
   op i(): void {
     const x = n();
-    takeM(x);
+    takeM(x);                          // ERROR: TYPE-4
     takeList(x);                       // ERROR: TYPE-4
   }
   op j(): void {

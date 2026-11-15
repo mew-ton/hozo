@@ -233,13 +233,22 @@ func (p *parser) parseDecls(until token.Kind) []ast.Decl {
 //
 //	Decl = [ DocComment ] { Decorator } Declaration | [ DocComment ] NamespaceDecl | BindDecl ;
 //
-// 節の Span は DocComment を含まず、最初のデコレータか宣言の頭から始まる。
+// 節の Span は DocComment を含まず、最初のデコレータか宣言の頭（op なら export）から始まる。
 func (p *parser) parseDecl() ast.Decl {
 	doc := p.parseLeadingDoc()
 	start := p.tok().Span.Start
 	decorators, external := p.parseDecorators()
 	if p.at(token.DocComment) {
 		p.fail(p.tok().Span, "ドキュメンテーションコメントはデコレータの前に置く（設計書 §3.4）")
+	}
+	if p.at(token.Export) {
+		export := p.advance().Span
+		if !p.at(token.Op) {
+			p.fail(export, "export を付けられるのは op だけで、op の直前に書く（docs/grammar.md「op」）")
+		}
+		o := p.parseOp(start, doc, decorators)
+		o.Export, o.ExportSpan = true, export
+		return o
 	}
 	switch p.tok().Kind {
 	case token.Namespace:
@@ -439,39 +448,42 @@ func (p *parser) parseBind(start source.Offset) *ast.BindDecl {
 
 // parseModel は ModelDecl を読む（docs/grammar.md「model」）。
 //
-//	ModelDecl = "model" Ident ( ModelBody | "is" QualifiedName "omit" FieldName { "," FieldName } ";" ) ;
+//	ModelDecl = "model" Ident [ "extends" QualifiedName ] ModelBody ;
+//
+// `model A is B omit f;` はなくした書き方で、名前の直後の識別子 is は、今の書き方を示して誤りにする。
 func (p *parser) parseModel(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ModelDecl {
 	p.expect(token.Model)
 	m := &ast.ModelDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
-	switch p.tok().Kind {
-	case token.LBrace:
-		m.Body = p.parseModelBody()
-	case token.Is:
-		p.advance()
-		base := p.parseQualifiedName()
-		m.Base = &base
-		if !p.at(token.Omit) {
-			p.fail(p.tok().Span, "omit のない is は書けない（docs/grammar.md「決めたこと」）")
-		}
-		p.advance()
-		m.Omit = append(m.Omit, p.parseFieldName())
-		for p.got(token.Comma) {
-			m.Omit = append(m.Omit, p.parseFieldName())
-		}
-		p.expect(token.Semicolon)
-	default:
-		p.failExpected("「{」か「is」")
+	if p.atContextual("is") {
+		p.fail(p.tok().Span, fmt.Sprintf("model %s is ... omit ... は書けない。model %s extends 元の model { override フィールド: never; } と書く（docs/grammar.md「model」）", m.Name.Name, m.Name.Name))
 	}
+	if p.got(token.Extends) {
+		base := p.parseQualifiedName()
+		m.Extends = &base
+	}
+	if !p.at(token.LBrace) {
+		if m.Extends != nil {
+			p.failExpected("「{」")
+		}
+		p.failExpected("「{」か「extends」")
+	}
+	m.Body = p.parseModelBody()
 	m.Span = p.spanFrom(start)
 	return m
 }
 
-// parseModelBody は ModelBody = "{" { Field } "}" を読む。誤ったフィールドは読み飛ばし、読めたものを残す。
+// parseModelBody は ModelBody = "{" { Member } "}" を読む。誤ったメンバーは読み飛ばし、読めたものを残す。
 func (p *parser) parseModelBody() *ast.ModelBody {
 	start := p.expect(token.LBrace).Span.Start
 	body := &ast.ModelBody{Fields: []*ast.Field{}}
 	p.parseMembers(func() {
-		body.Fields = append(body.Fields, p.parseField())
+		f, o := p.parseMember()
+		if f != nil {
+			body.Fields = append(body.Fields, f)
+		}
+		if o != nil {
+			body.Overrides = append(body.Overrides, o)
+		}
 	})
 	p.expect(token.RBrace)
 	body.Span = p.spanFrom(start)
@@ -489,21 +501,42 @@ func (p *parser) parseMembers(parseOne func()) {
 	}
 }
 
-// parseField は Field = [ DocComment ] { Decorator } FieldName ":" Type [ "=" Literal ] ";" を読む。
-// 名前は FieldName なので予約語も書ける（`op: string;`。docs/grammar.md「識別子」）。
-func (p *parser) parseField() *ast.Field {
-	f := &ast.Field{Doc: p.parseLeadingDoc()}
+// parseMember は Member = Field | Override を読む。どちらか一方を返す。
+//
+//	Field    = [ DocComment ] { Decorator } FieldName ":" Type [ "=" Literal ] ";" ;
+//	Override = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "never" ) ] ";" ;
+//
+// フィールドの名前は FieldName なので予約語も書ける（`op: string;`。docs/grammar.md「識別子」）。
+// メンバーの頭の override は、直後が ":" ならフィールドの名前、そうでなければ Override の頭。
+func (p *parser) parseMember() (*ast.Field, *ast.Override) {
+	doc := p.parseLeadingDoc()
 	start := p.tok().Span.Start
-	var external *source.Span
-	f.Decorators, external = p.parseDecorators()
+	decorators, external := p.parseDecorators()
 	if external != nil {
 		// parseDecorators は直後の字句が decorator なら @external を通すが、ここでの decorator はフィールド名。
 		p.fail(*external, "@external はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
 	}
-	if f.Doc != nil && p.at(token.RBrace) {
-		p.fail(f.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
+	if doc != nil && p.at(token.RBrace) {
+		p.fail(doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	}
-	f.Name = p.parseFieldName()
+	if p.at(token.Override) && p.peek(1).Kind != token.Colon {
+		p.advance()
+		o := &ast.Override{Doc: doc, Decorators: decorators, Name: p.parseFieldName()}
+		if p.got(token.Colon) {
+			if p.at(token.Never) {
+				o.Never, o.NeverSpan = true, p.advance().Span
+			} else {
+				o.Type = p.parseType()
+			}
+		}
+		if p.at(token.Assign) {
+			p.fail(p.tok().Span, "override に既定値は書けない（docs/grammar.md「model」）")
+		}
+		p.expect(token.Semicolon)
+		o.Span = p.spanFrom(start)
+		return nil, o
+	}
+	f := &ast.Field{Doc: doc, Decorators: decorators, Name: p.parseFieldName()}
 	p.expect(token.Colon)
 	f.Type = p.parseType()
 	if p.got(token.Assign) {
@@ -511,7 +544,7 @@ func (p *parser) parseField() *ast.Field {
 	}
 	p.expect(token.Semicolon)
 	f.Span = p.spanFrom(start)
-	return f
+	return f, nil
 }
 
 // parseScalar は ScalarDecl = "scalar" Ident "extends" Type ";" を読む（docs/grammar.md「scalar」）。
@@ -575,25 +608,12 @@ func (p *parser) parseArmType() *ast.ArmType {
 	return a
 }
 
-// parseState は StateDecl = "state" Ident ":" ( "list" | "nullable" | "single" ) "<" Type ">" ";" を読む（docs/grammar.md「state」）。
+// parseState は StateDecl = "state" Ident ":" Type ";" を読む（docs/grammar.md「state」）。
 func (p *parser) parseState(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.StateDecl {
 	p.expect(token.State)
 	s := &ast.StateDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	p.expect(token.Colon)
-	switch p.tok().Kind {
-	case token.List:
-		s.Shape = ast.StateList
-	case token.Nullable:
-		s.Shape = ast.StateNullable
-	case token.Single:
-		s.Shape = ast.StateSingle
-	default:
-		p.failExpected("「list」か「nullable」か「single」")
-	}
-	p.advance()
-	p.expect(token.Less)
-	s.Elem = p.parseType()
-	p.expect(token.Greater)
+	s.Type = p.parseType()
 	p.expect(token.Semicolon)
 	s.Span = p.spanFrom(start)
 	return s
@@ -700,7 +720,10 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 	return c
 }
 
-// parseClassifyCase は ClassifyCase = [ DocComment ] ( Ident | "default" ) ";" を読む。
+// parseClassifyCase は ClassifyCase を読む。
+//
+//	ClassifyCase = [ DocComment ] ( Ident [ ":" CaseTyping { "," CaseTyping } ] | "default" ) ";" ;
+//	CaseTyping   = Type "as" Type ;
 func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	c := &ast.ClassifyCase{Doc: p.parseLeadingDoc()}
 	start := p.tok().Span.Start
@@ -709,21 +732,40 @@ func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	}
 	if p.got(token.Default) {
 		c.Default = true
+		if p.at(token.Colon) {
+			p.fail(p.tok().Span, "default には as を書けない（docs/grammar.md「classify / condition」）")
+		}
 	} else {
 		name := p.parseIdent()
 		c.Name = &name
+		if p.got(token.Colon) {
+			c.As = append(c.As, p.parseCaseTyping())
+			for p.got(token.Comma) {
+				c.As = append(c.As, p.parseCaseTyping())
+			}
+		}
 	}
 	p.expect(token.Semicolon)
 	c.Span = p.spanFrom(start)
 	return c
 }
 
-// parseClassifySubject は ClassifySubject = Type { "," Type } を読む。型か状態の名前かは名前の解決が決める。
+// parseCaseTyping は CaseTyping = Type "as" Type を読む。as の前は対象（宣言の of の後ろと同じに書く）。
+func (p *parser) parseCaseTyping() *ast.CaseTyping {
+	start := p.tok().Span.Start
+	t := &ast.CaseTyping{Subject: p.parseType()}
+	p.expect(token.As)
+	t.Type = p.parseType()
+	t.Span = p.spanFrom(start)
+	return t
+}
+
+// parseClassifySubject は ClassifySubject = Type { "," Type } を読む。型か op か状態の名前かは名前の解決が決める。
 func (p *parser) parseClassifySubject() []ast.Type {
 	var subject []ast.Type
 	for {
 		if p.at(token.LBrace) || p.at(token.Semicolon) {
-			p.failExpected("分類の対象（型か状態の名前）")
+			p.failExpected("分類の対象（型か op か状態の名前）")
 		}
 		subject = append(subject, p.parseType())
 		if !p.got(token.Comma) {
@@ -738,6 +780,9 @@ func (p *parser) parseCondition(start source.Offset, doc *ast.DocComment, decora
 	c := &ast.ConditionDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	p.expect(token.Of)
 	c.Of = p.parseClassifySubject()
+	if p.at(token.Colon) || p.at(token.As) {
+		p.fail(p.tok().Span, "condition には as を書けない（docs/grammar.md「classify / condition」）")
+	}
 	p.expect(token.Semicolon)
 	c.Span = p.spanFrom(start)
 	return c
@@ -943,7 +988,9 @@ func (p *parser) parseNameList() []ast.QualifiedName {
 
 // parseOp は OpDecl を読む（docs/grammar.md「op」）。
 //
-//	OpDecl = "op" Ident OpParams [ ":" ReturnType ] { OpClause } ( ";" | Block ) ;
+//	OpDecl = [ "export" ] "op" Ident OpParams [ ":" ReturnType ] { OpClause } ( ";" | Block ) ;
+//
+// export は parseDecl が読む。
 func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.OpDecl {
 	p.expect(token.Op)
 	o := &ast.OpDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
@@ -958,6 +1005,9 @@ func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []
 			c := &ast.EffectsClause{Effects: p.parseNameList()}
 			c.Span = p.spanFrom(s)
 			o.Clauses = append(o.Clauses, c)
+			continue
+		case token.Reads:
+			o.Clauses = append(o.Clauses, p.parseReadsClause())
 			continue
 		case token.Throws:
 			o.Clauses = append(o.Clauses, p.parseThrowsClause())
@@ -979,6 +1029,17 @@ func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []
 	return o
 }
 
+// parseReadsClause は "reads" QualifiedName { "," QualifiedName } を読む（docs/grammar.md「op」）。区切りは ","。
+func (p *parser) parseReadsClause() *ast.ReadsClause {
+	start := p.expect(token.Reads).Span.Start
+	c := &ast.ReadsClause{States: []ast.QualifiedName{p.parseQualifiedName()}}
+	for p.got(token.Comma) {
+		c.States = append(c.States, p.parseQualifiedName())
+	}
+	c.Span = p.spanFrom(start)
+	return c
+}
+
 // parseOpParams は OpParams = "(" [ OpParam { "," OpParam } ] ")" を読む。
 func (p *parser) parseOpParams() []*ast.OpParam {
 	p.expect(token.LParen)
@@ -998,10 +1059,13 @@ func (p *parser) parseOpParams() []*ast.OpParam {
 	return params
 }
 
-// parseReturnType は ReturnType = Type | "void" を読む。
+// parseReturnType は ReturnType = Type | "void" | "never" を読む。
 func (p *parser) parseReturnType() *ast.ReturnType {
 	if p.at(token.Void) {
 		return &ast.ReturnType{Span: p.advance().Span, Void: true}
+	}
+	if p.at(token.Never) {
+		return &ast.ReturnType{Span: p.advance().Span, Never: true}
 	}
 	t := p.parseType()
 	return &ast.ReturnType{Span: t.NodeSpan(), Type: t}
@@ -1009,7 +1073,8 @@ func (p *parser) parseReturnType() *ast.ReturnType {
 
 // --- 型（docs/grammar.md「型」） ---
 
-// parseType は Type = TypePrefix { "[" "]" | "?" } を読む。
+// parseType は Type = TypePrefix { "[" "]" | "?" } を読む。形の語（list<T> / nullable<T> / single<T>）は
+// 型の別の書き方で、どの型の位置にも書ける。
 func (p *parser) parseType() ast.Type {
 	start := p.tok().Span.Start
 	var t ast.Type
@@ -1034,10 +1099,17 @@ func (p *parser) parseType() ast.Type {
 		}
 		n.Span = p.spanFrom(start)
 		t = n
+	case token.List, token.Nullable, token.Single:
+		shape := p.advance()
+		p.expect(token.Less)
+		st := &ast.ShapeType{Shape: shape.Text, ShapeSpan: shape.Span, Elem: p.parseType()}
+		p.expect(token.Greater)
+		st.Span = p.spanFrom(start)
+		t = st
 	case token.Void:
 		p.fail(p.tok().Span, "void は op の戻り値の型にだけ書ける（docs/grammar.md「型」）")
-	case token.List, token.Nullable, token.Single:
-		p.fail(p.tok().Span, "list / nullable / single は state と match の by の後ろにだけ書ける（docs/grammar.md「型」）")
+	case token.Never:
+		p.fail(p.tok().Span, "never は op の戻り値の型と、override のなくす印にだけ書ける（docs/grammar.md「型」）")
 	case token.LBrace:
 		p.fail(p.tok().Span, "その場で書く model はユニオンのアームと例外の値にだけ置ける（docs/grammar.md「決めたこと」）")
 	default:
@@ -1102,6 +1174,8 @@ func (p *parser) parseStmt() ast.Stmt {
 		return s
 	case token.DocComment:
 		p.fail(p.tok().Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
+	case token.Throw:
+		p.fail(p.tok().Span, "throw は match のアームの本体にだけ書ける（docs/grammar.md「配線」）")
 	}
 	p.failExpected("文（const / return / 呼び出し / match）")
 	return nil
@@ -1114,6 +1188,9 @@ func (p *parser) parseExpr() ast.Expr {
 	}
 	if p.atName() && p.peek(1).Kind == token.LParen {
 		return p.parseCall()
+	}
+	if p.at(token.Throw) {
+		p.fail(p.tok().Span, "throw は match のアームの本体にだけ書ける（docs/grammar.md「配線」）")
 	}
 	return p.parseAtom()
 }
@@ -1185,8 +1262,8 @@ func (p *parser) parseRecordLit() *ast.RecordLit {
 	return r
 }
 
-// parseMatch は Match = "match" [ Atom ] "by" ( Ident | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" を読む。
-// 対象を書かない形（match by C）は状態の分類、by list / by nullable は基底の状態の組み込みの分類。
+// parseMatch は Match = "match" [ Atom ] "by" ( QualifiedName | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" を読む。
+// 対象を書かない形（match by C）は状態の分類、by list / by nullable は標準の分類。
 // どの形がどの分類に合うかは検査（MATCH-7）が決める。
 func (p *parser) parseMatch() *ast.Match {
 	start := p.expect(token.Match).Span.Start
@@ -1198,12 +1275,12 @@ func (p *parser) parseMatch() *ast.Match {
 	switch p.tok().Kind {
 	case token.List, token.Nullable:
 		t := p.advance()
-		m.Classifier = ast.Ident{Span: t.Span, Name: t.Text}
+		m.Classifier = ast.QualifiedName{Span: t.Span, Segments: []ast.Ident{{Span: t.Span, Name: t.Text}}}
 		m.Builtin = true
 	case token.Single:
-		p.fail(p.tok().Span, "single の状態には組み込みの分類がないので、match の by には書けない（docs/check.md「状態の形」）")
+		p.fail(p.tok().Span, "single は標準の分類ではないので、match の by には書けない（標準の分類は list と nullable。docs/check.md「標準の分類」）")
 	default:
-		m.Classifier = p.parseIdent()
+		m.Classifier = p.parseQualifiedName()
 	}
 	p.expect(token.LBrace)
 	p.parseMembers(func() {
@@ -1217,7 +1294,12 @@ func (p *parser) parseMatch() *ast.Match {
 	return m
 }
 
-// parseMatchArm は MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ( Call | "none" ) ";" を読む。
+// parseMatchArm は MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ArmBody ";" を読む。
+//
+//	ArmBody = Call | Atom | Throw ;
+//	Throw   = "throw" QualifiedName ;
+//
+// Path の直後が "(" なら Call、そうでなければ Atom。
 func (p *parser) parseMatchArm() *ast.MatchArm {
 	start := p.tok().Span.Start
 	a := &ast.MatchArm{}
@@ -1231,12 +1313,19 @@ func (p *parser) parseMatchArm() *ast.MatchArm {
 	}
 	p.expect(token.Arrow)
 	switch {
-	case p.at(token.None):
-		a.Body = &ast.NoneAtom{Span: p.advance().Span}
+	case p.at(token.Throw):
+		tstart := p.advance().Span.Start
+		t := &ast.Throw{Exception: p.parseQualifiedName()}
+		t.Span = p.spanFrom(tstart)
+		a.Body = t
 	case p.atName() && p.peek(1).Kind == token.LParen:
 		a.Body = p.parseCall()
+	case p.atName(), p.tok().Kind.IsLiteral(), p.at(token.None), p.at(token.LBrace):
+		a.Body = p.parseAtom()
+	case p.at(token.Match):
+		p.fail(p.tok().Span, "アームの本体に match は書けない（呼び出し一つか、値一つか、throw 一つ。docs/grammar.md「配線」）")
 	default:
-		p.failExpected("アームの本体（呼び出しか none）")
+		p.failExpected("アームの本体（呼び出しか値か throw）")
 	}
 	p.expect(token.Semicolon)
 	a.Span = p.spanFrom(start)
@@ -1258,7 +1347,7 @@ func (p *parser) parseIdent() ast.Ident {
 }
 
 // parseFieldName は FieldName = Ident | 予約語 を読む（docs/grammar.md「識別子」）。フィールド名を書く位置
-// （model のフィールド、omit の並び、レコードリテラルのキー）で使う。QualifiedName なら誤り。
+// （model のフィールド、override の後ろの名前、レコードリテラルのキー）で使う。QualifiedName なら誤り。
 func (p *parser) parseFieldName() ast.Ident {
 	if p.tok().Kind.IsKeyword() {
 		t := p.advance()
@@ -1295,7 +1384,7 @@ func (p *parser) parseQualifiedName() ast.QualifiedName {
 }
 
 // parsePath は Path = Ident { "." FieldName } を読む（docs/grammar.md「識別子」）。値を書く位置（Atom）の名前で、
-// 先頭は束縛か引数の名前（Ident）、残りはその値のフィールド名なので予約語も書ける（`res.op`）。
+// 先頭は束縛か引数か状態の名前（Ident）、残りはその値のフィールド名なので予約語も書ける（`res.op`）。
 // 構文木の形は QualifiedName と同じ。
 func (p *parser) parsePath() ast.QualifiedName {
 	if !p.atName() {

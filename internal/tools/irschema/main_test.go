@@ -175,7 +175,28 @@ func TestNegative(t *testing.T) {
 		{"classify subject bare type", "ClassifySubject", `{"kind":"ref","target":"a.M"}`, false},
 		{"classify subject states as type", "ClassifySubject", `{"kind":"states","type":{"kind":"ref","target":"a.M"}}`, false},
 		{"match subject value", "MatchSubject", `{"kind":"value","atom":{"kind":"none","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}}`, true},
-		{"match subject state", "MatchSubject", `{"kind":"state","state":"a.carts"}`, true},
+		// 0.3: subject の state はなくなり、状態を名前で書いた対象は value の atom が state（docs/ir.md「版」）。
+		{"match subject state", "MatchSubject", `{"kind":"state","state":"a.carts"}`, false},
+		{"match subject value state atom", "MatchSubject", `{"kind":"value","atom":{"kind":"state","state":"a.carts","path":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}}`, true},
+		{"atom state without path", "Atom", `{"kind":"state","state":"a.carts","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
+		{"classify subject op", "ClassifySubject", `{"kind":"op","op":"a.find","type":{"kind":"optional","of":{"kind":"ref","target":"a.M"}}}`, true},
+		{"classify subject op without type", "ClassifySubject", `{"kind":"op","op":"a.find"}`, false},
+		{"case typing", "CaseTyping", `{"type":{"kind":"ref","target":"a.M"},"by":"presence","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
+		{"case typing with state", "CaseTyping", `{"state":"a.s","type":{"kind":"ref","target":"a.M"},"by":"predicate","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
+		{"case typing bad by", "CaseTyping", `{"type":{"kind":"ref","target":"a.M"},"by":"guess","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
+		{"classify case without as", "ClassifyCase", `{"name":"A","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
+		{"decided by", "DecidedBy", `"type"`, true},
+		{"decided by unknown", "DecidedBy", `"value"`, false},
+		{"type never", "Type", `{"kind":"never"}`, true},
+		{"type never with of", "Type", `{"kind":"never","of":{"kind":"core","name":"int"}}`, false},
+		{"arm body atom", "ArmBody", `{"kind":"atom","atom":{"kind":"name","path":["x"],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}}`, true},
+		{"arm body throw", "ArmBody", `{"kind":"throw","exception":"a.E","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
+		{"arm body throw without exception", "ArmBody", `{"kind":"throw","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
+		{"narrowing", "Narrowing", `{"type":{"kind":"ref","target":"a.M"}}`, true},
+		{"narrowing with state", "Narrowing", `{"state":"a.s","type":{"kind":"ref","target":"a.M"}}`, true},
+		{"narrowing without type", "Narrowing", `{"state":"a.s"}`, false},
+		{"model extends", "ModelExtends", `{"base":"a.B","removed":["x"],"overridden":[]}`, true},
+		{"model extends old shape", "ModelExtends", `{"base":"a.B","omit":["x"]}`, false},
 		{"match subject classify", "MatchSubject", `{"kind":"classify"}`, true},
 		{"match subject classify with state", "MatchSubject", `{"kind":"classify","state":"a.carts"}`, false},
 		{"match subject bare atom", "MatchSubject", `{"kind":"name","path":["x"],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
@@ -206,9 +227,9 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.2","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.2","direction":"emit","format":"openapi","files":[]}`, false},
-		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.1","direction":"check","view":{}}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.3","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.3","direction":"emit","format":"openapi","files":[]}`, false},
+		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -419,6 +440,8 @@ func TestEnumsMatchGo(t *testing.T) {
 		typeOf[ir.RelationKind]():    {string(ir.Prevents), string(ir.Keeps)},
 		typeOf[ir.CatchMode]():       {string(ir.Recovers), string(ir.Halts), string(ir.Ignores)},
 		typeOf[ir.EffectState]():     {string(ir.Prevented), string(ir.Kept), string(ir.Unknown)},
+		typeOf[ir.DecidedBy]():       {string(ir.DecidedByType), string(ir.DecidedByPredicate)},
+		typeOf[ir.NarrowBy]():        {string(ir.NarrowByPresence), string(ir.NarrowByVariant), string(ir.NarrowByPredicate)},
 	}
 	if len(want) != len(enums) {
 		t.Errorf("enums table has %d entries, test knows %d", len(enums), len(want))

@@ -222,16 +222,13 @@ func (e *emitter) typeDecl(fqn string) ir.Decl {
 	return nil
 }
 
-// eachTypeOf は宣言 d が参照する型（フィールド、元の型、アーム、値、derivedFrom の元の model）を f に渡す。
+// eachTypeOf は宣言 d が参照する型（フィールド、元の型、アーム、値）を f に渡す。継承した model の元の model は
+// 参照に数えない（展開済みのフィールドをそのまま出し、変換関数は出さない。docs/emit-go.md「移行の間の扱い」）。
 func (e *emitter) eachTypeOf(d ir.Decl, f func(ir.Type)) {
 	switch x := d.(type) {
 	case *ir.Model:
 		for _, fl := range x.Fields {
 			f(fl.Type)
-		}
-		// 元の model からの変換関数（docs/emit-go.md「model」）が元の model を参照する。
-		if x.DerivedFrom != nil {
-			f(ir.Ref(x.DerivedFrom.Base))
 		}
 	case *ir.Scalar:
 		f(x.Base)

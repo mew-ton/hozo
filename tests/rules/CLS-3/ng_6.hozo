@@ -1,0 +1,11 @@
+// CLS-3（docs/check.md「classify / match」）: op は一つだけ対象にできる。op と状態、op と型、op 二つは並べられない
+namespace a {
+  model M { id: string; }
+  state items: list<M>;
+  op find(): M?;
+  op find2(): M?;
+  classify A1 of find, find2 { X; default; }     // ERROR: CLS-3, CLS-3
+  classify A2 of find, items { X; default; }     // ERROR: CLS-3
+  classify A3 of items, find { X; default; }     // ERROR: CLS-3
+  classify A4 of find, M { X; default; }         // ERROR: CLS-3, CLS-3
+}

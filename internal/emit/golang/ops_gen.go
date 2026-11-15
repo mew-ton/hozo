@@ -170,6 +170,10 @@ func (e *emitter) opComment(method, head string, op *ir.Op, params []ir.OpParam,
 	if len(sig.Exceptions) > 0 {
 		extra = append(extra, "Throws: "+fqnList(sig.Exceptions))
 	}
+	if len(sig.Reads) > 0 {
+		// 読む状態（docs/emit-go.md「移行の間の扱い」）。空なら書かない
+		extra = append(extra, "Reads: "+fqnList(sig.Reads))
+	}
 	if len(sig.Effects) > 0 {
 		extra = append(extra, "Effects: "+fqnList(sig.Effects))
 	}

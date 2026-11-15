@@ -2,7 +2,7 @@
 # sh で動く（go run を待たないため）。
 name     = "none"
 command  = ["sh", "-c", "cat >/dev/null; printf '%s' '{\"files\":[],\"warnings\":[]}'"]
-protocol = "0.2"
+protocol = "0.3"
 
 [[transpiler]]
 name     = "none"

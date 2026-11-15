@@ -1,18 +1,17 @@
-// MATCH-7（docs/check.md「classify / match」）: by list / by nullable の対象が状態でない
+// MATCH-7（docs/check.md「classify / match」）: by list の対象の型が array でない、by nullable の対象の型が optional でない
 namespace a {
   model M { id: string; }
   state carts: list<M>;
-  classify Stock of carts { None; Some; }
   op f();
   op g(m: M);
   op ng(m: M) {
     match m by list { Empty => f(); HasItems => none; };             // ERROR: MATCH-7
-    match Stock by list { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
     match 1 by nullable { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
+    match none by list { Empty => f(); HasItems => none; };          // ERROR: MATCH-7
     // 対象を書いていない
     match by list { Empty => f(); HasItems => none; };               // ERROR: MATCH-7
   }
-  // 引数が状態と同じ名前なら値の参照になる（docs/resolve.md「手続き」1.1）ので、状態ではない
+  // 引数が状態と同じ名前なら、そちらを指す（docs/resolve.md「手続き」1.1）。その値の型で照合する
   op shadow(carts: M) {
     match carts by list { Empty => f(); HasItems => g(carts); };     // ERROR: MATCH-7
   }

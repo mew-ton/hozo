@@ -1,9 +1,24 @@
-// TYPE-10: model P is U omit f の f が U にない（docs/types.md「診断」）
+// TYPE-10: override f の f が元の model のフィールドにない（元の model を持たない model に書いた override を含む）。
+// または model の extends が循環している（docs/types.md「診断」）
 namespace a {
+  decorator mark for field;
   model User { id: string; hash: string; }
-  model P is User omit nope;           // ERROR: TYPE-10
-  model Q is User omit hash;
-  model R is Q omit id;
-  model S is T omit id;
-  model T is S omit id;                // ERROR: TYPE-10
+  model P extends User { override nope: never; }         // ERROR: TYPE-10
+  model P2 extends User { @mark override nope; }         // ERROR: TYPE-10
+  model Q extends User { override hash: never; }
+  model R extends Q { override id: never; }
+  // 元の model がなくしたフィールドは、元の model にない
+  model R2 extends Q { override hash: never; }           // ERROR: TYPE-10
+  // 足したフィールドには override を書かない
+  model R3 extends User { extra: string; override extra: never; }   // ERROR: TYPE-10
+  // 元の model を持たない model
+  model Plain { id: string; @mark override id; }         // ERROR: TYPE-10
+  union U { Arm: { x: string; override x: never; }; }    // ERROR: TYPE-10
+  exception E: { override x: string; };                  // ERROR: TYPE-10
+  // 循環。循環に入った model の本体の override は重ねて報告しない
+  model S extends T { override id: never; }              // ERROR: TYPE-10
+  model T extends S { override id: never; }              // ERROR: TYPE-10
+  model Self extends Self { }                            // ERROR: TYPE-10
+  // 循環に入った model は、元の model を持たないものとして続ける
+  model Tail extends S { extra: string; }
 }

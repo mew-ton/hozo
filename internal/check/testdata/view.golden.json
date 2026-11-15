@@ -1,5 +1,5 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "viewer": "browser",
   "config": {
     "language": "go",
@@ -45,7 +45,7 @@
     ]
   },
   "program": {
-    "version": "0.2",
+    "version": "0.3",
     "namespaces": [
       {
         "name": "http",
@@ -268,6 +268,13 @@
                 "col": 10
               }
             },
+            "type": {
+              "kind": "array",
+              "of": {
+                "kind": "ref",
+                "target": "server.Session"
+              }
+            },
             "shape": "list",
             "element": {
               "kind": "ref",
@@ -380,6 +387,7 @@
                 "col": 10
               }
             },
+            "exported": true,
             "params": [
               {
                 "name": "in",
@@ -404,6 +412,7 @@
             "effects": [
               "server.deleteSession"
             ],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
@@ -417,7 +426,9 @@
                   "effect": "server.deleteSession",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -550,6 +561,7 @@
                 "col": 10
               }
             },
+            "exported": true,
             "params": [
               {
                 "name": "in",
@@ -596,13 +608,16 @@
               "name": "string"
             },
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
               "exceptions": [],
               "effects": [],
               "relations": [],
-              "successEffects": []
+              "successEffects": [],
+              "reads": [],
+              "pure": true
             }
           }
         ]
@@ -623,6 +638,13 @@
               "end": {
                 "line": 1025,
                 "col": 10
+              }
+            },
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "server.Token"
               }
             },
             "shape": "nullable",
@@ -670,11 +692,13 @@
                 "col": 10
               }
             },
+            "exported": true,
             "params": [],
             "returns": null,
             "effects": [
               "browser.removeToken"
             ],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
@@ -688,7 +712,9 @@
                   "effect": "browser.removeToken",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -753,9 +779,11 @@
                 "col": 10
               }
             },
+            "exported": true,
             "params": [],
             "returns": null,
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": {
               "statements": [
@@ -829,7 +857,11 @@
                   "effect": "server.deleteSession",
                   "state": "unknown"
                 }
-              ]
+              ],
+              "reads": [
+                "browser.token"
+              ],
+              "pure": false
             }
           },
           {
@@ -847,9 +879,11 @@
                 "col": 10
               }
             },
+            "exported": true,
             "params": [],
             "returns": null,
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": {
               "statements": [
@@ -931,7 +965,11 @@
                   "effect": "browser.removeToken",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [
+                "browser.token"
+              ],
+              "pure": false
             }
           },
           {
@@ -1085,6 +1123,8 @@
           "state": "kept"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [],
       "bound": []
     },
@@ -1105,6 +1145,10 @@
           "state": "kept"
         }
       ],
+      "reads": [
+        "browser.token"
+      ],
+      "pure": false,
       "params": [],
       "bound": []
     },
@@ -1120,6 +1164,10 @@
           "state": "unknown"
         }
       ],
+      "reads": [
+        "browser.token"
+      ],
+      "pure": false,
       "params": [],
       "bound": []
     },
@@ -1128,6 +1176,8 @@
       "effects": [],
       "relations": [],
       "successEffects": [],
+      "reads": [],
+      "pure": true,
       "params": [
         {
           "name": "in",
@@ -1191,6 +1241,8 @@
           "state": "kept"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "in",

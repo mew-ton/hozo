@@ -17,6 +17,9 @@
       "include": "#string"
     },
     {
+      "include": "#override-name"
+    },
+    {
       "include": "#field-names"
     },
     {
@@ -53,32 +56,25 @@
       "patterns": [
         {
           "name": "variable.other.property.hozo",
-          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|string|boolean|int|float|Time|Duration|void|Record|list|nullable|single|none|true|false)\\b(?=\\s*:)"
+          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b(?=\\s*:)"
         },
         {
           "name": "variable.other.property.hozo",
-          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|string|boolean|int|float|Time|Duration|void|Record|list|nullable|single|none|true|false)\\b"
+          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b"
         }
       ]
     },
-    "omit": {
-      "comment": "omit の並びもフィールド名の位置（docs/grammar.md「model」の ModelDecl の omit FieldName { , FieldName }）。並びの中の予約語（核の型を含む）は予約語として塗らない。is の後ろの範囲の中でだけ使う",
-      "begin": "\\b(omit)\\b",
-      "end": "(?=;)",
-      "beginCaptures": {
+    "override-name": {
+      "comment": "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
+      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false))\\b",
+      "captures": {
         "1": {
-          "name": "keyword.control.hozo"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#comments"
+          "name": "storage.modifier.hozo"
         },
-        {
-          "name": "variable.other.property.hozo",
-          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|string|boolean|int|float|Time|Duration|void|Record|list|nullable|single|none|true|false)\\b"
+        "2": {
+          "name": "variable.other.property.hozo"
         }
-      ]
+      }
     },
     "comments": {
       "patterns": [
@@ -276,9 +272,9 @@
     "type-positions": {
       "patterns": [
         {
-          "comment": ": の後ろ（フィールド、引数、返り値、状態、例外の値、遷移のケース）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
+          "comment": ": の後ろ（フィールド、引数、返り値、状態、例外の値、遷移のケース、ケースの as）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
           "begin": ":",
-          "end": "(?=[=;,(){}\\[\\]])|(?=\\b(?:throws|effects|catches|prevents|keeps)\\b)",
+          "end": "(?=[=;,(){}\\[\\]])|(?=\\b(?:throws|effects|reads|catches|prevents|keeps)\\b)",
           "patterns": [
             {
               "include": "#arrow"
@@ -304,8 +300,8 @@
           ]
         },
         {
-          "comment": "is / extends / of の後ろ。is の元の model の後ろには omit の並びが続く",
-          "begin": "\\b(is|extends|of)\\b",
+          "comment": "extends / of の後ろ（元の model、scalar の元の型、分類の対象）。of の後ろの op や状態の名前は小文字で始まるので、scope が付かない",
+          "begin": "\\b(extends|of)\\b",
           "end": "(?=[;{])",
           "beginCaptures": {
             "1": {
@@ -314,17 +310,44 @@
           },
           "patterns": [
             {
-              "include": "#omit"
-            },
+              "include": "#type"
+            }
+          ]
+        },
+        {
+          "comment": "ケースの as の後ろの型（docs/grammar.md「classify / condition」の CaseTyping）。, で次の CaseTyping が続く",
+          "begin": "\\b(as)\\b",
+          "end": "(?=[;{,])",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            }
+          },
+          "patterns": [
             {
               "include": "#type"
             }
           ]
         },
         {
-          "comment": "throws / catches の後ろの例外の名前",
-          "begin": "\\b(throws|catches)\\b",
-          "end": "(?=[;{])|(?=\\b(?:throws|catches|effects|prevents|keeps|recovers|halts|ignores)\\b)",
+          "comment": "match の by の後ろの分類の名前（修飾できる。docs/grammar.md「配線」の Match）。標準の分類 list / nullable は形の語として塗る",
+          "begin": "\\b(by)\\b",
+          "end": "(?=[;{])",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#type"
+            }
+          ]
+        },
+        {
+          "comment": "throws / catches / throw の後ろの例外の名前",
+          "begin": "\\b(throws|catches|throw)\\b",
+          "end": "(?=[;{])|(?=\\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\\b)",
           "beginCaptures": {
             "1": {
               "name": "keyword.control.hozo"
@@ -345,6 +368,9 @@
           "include": "#keywords.declaration"
         },
         {
+          "include": "#keywords.modifier"
+        },
+        {
           "include": "#keywords.control"
         },
         {
@@ -359,13 +385,17 @@
       "name": "keyword.declaration.hozo",
       "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind)\\b"
     },
+    "keywords.modifier": {
+      "name": "storage.modifier.hozo",
+      "match": "\\b(?:export|override)\\b"
+    },
     "keywords.control": {
       "name": "keyword.control.hozo",
-      "match": "\\b(?:is|omit|extends|of|on|to|by|for|effects|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default)\\b"
+      "match": "\\b(?:extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw)\\b"
     },
     "keywords.type": {
       "name": "support.type.primitive.hozo",
-      "match": "\\b(?:string|boolean|int|float|Time|Duration|void|Record|list|nullable|single)\\b"
+      "match": "\\b(?:string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single)\\b"
     },
     "keywords.constant": {
       "name": "constant.language.hozo",

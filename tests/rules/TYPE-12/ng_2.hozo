@@ -1,7 +1,8 @@
-// TYPE-12（docs/types.md「診断」）: 状態の分類には対象の型がないので、C.Case<T> のどの T も subject に渡せない
+// TYPE-12（docs/types.md「診断」）: op の分類の対象の型は、その op の returns
 namespace a {
   model M { id: string; }
-  state items: list<M>;
-  classify Stock of items { None; Some; }
-  op ng(m: Stock.Some<M>): void;       // ERROR: TYPE-12
+  model N { name: string; }
+  op find(): M?;
+  classify Found of find { Hit; default; }
+  op ng(n: Found.Hit<N>): void;        // ERROR: TYPE-12
 }

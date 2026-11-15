@@ -10,8 +10,8 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | [`grammar.md`](grammar.md) | 字句と構文（EBNF） | `internal/syntax` |
 | [`ir.md`](ir.md) | IR の構造、正規化、JSON、その名前空間から見た IR | `ir`、`internal/sema` |
 | [`resolve.md`](resolve.md) | 名前の解決 | `internal/sema` |
-| [`types.md`](types.md) | 型の互換と式の型 | `internal/sema` |
-| [`check.md`](check.md) | 例外・効果・`bind` の計算と、規則ごとの検査 | `internal/check` |
+| [`types.md`](types.md) | 型の互換、形の書き方、継承した model、絞り込み、式の型 | `internal/sema` |
+| [`check.md`](check.md) | 状態の形、分類、`export` などの op の規則、例外・効果・読む状態・純粋さ・`bind` の計算と、規則ごとの検査 | `internal/check` |
 | [`config.md`](config.md) | `hozo.toml` | `internal/config` |
 | [`vocab.md`](vocab.md) | 標準の語彙 | `vocab/`、`internal/vocab` |
 | [`plugin-protocol.md`](plugin-protocol.md) | マニフェスト、探索、JSON のやり取り | `internal/plugin`、`plugin`、`sdk/ts` |
@@ -39,6 +39,12 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | 出力の対象（一つの出力に出す宣言） | `emit-go.md`「出力の対象」 |
 | emit の対象（一度の `hozoc emit` が書き出す出力） | `cli.md`「emit」 |
 | 基底の状態、状態の分類、値の分類 | `check.md`「状態の形」 |
+| op の分類、標準の分類、型で決まる分類、述語で決まる分類 | `check.md`「分類」 |
+| 読む op、内部の op、純粋 | `check.md`「reads」「export」「純粋」 |
+| 形の語、状態の型 | `types.md`「形の書き方」 |
+| 継承した model、元の model、継承している | `types.md`「継承した model」 |
+| 絞り込み、型で決まる絞り込み、述語の要る絞り込み | `types.md`「絞り込み」 |
+| 「値がない」「返らない」（式の型） | `types.md`「型の種類」 |
 | 状態の単位、実装の単位（生成した Go の中のまとまり。設定の単位とは別） | `emit-go.md`「state」「実装の単位」 |
 | 語彙の名前空間 | `vocab.md`「語彙の名前空間」 |
 | `cli.hozo`（リポジトリ直下の、hozoc 自身の仕様）と `plugins/go-cli/cli.hozo`（go-cli の語彙） | `cli.md`「cli.hozo」 |

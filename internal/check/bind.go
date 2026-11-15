@@ -29,7 +29,8 @@ func newBindTable(ix *index) *bindTable {
 }
 
 // positions は Pos(b, O)（docs/check.md「bind」1〜4）。bi は Program.binds の添字。
-// 対象の名前空間に合わない、状態が list（BIND-6）、状態が引けない、のどれかなら空。τ は状態の element。
+// 対象の名前空間に合わない、bind を書いた名前空間から呼べない（別の名前空間の、export のない op）、
+// 状態が list（BIND-6）、状態が引けない、のどれかなら空。τ は状態の element。
 func (t *bindTable) positions(bi int, o *ir.Op) []position {
 	key := bindOpKey{bi, o.Name}
 	if pos, ok := t.cache[key]; ok {
@@ -49,6 +50,10 @@ func (t *bindTable) compute(bi int, o *ir.Op) []position {
 			return nil
 		}
 	} else if ns != b.Target.Namespace {
+		return nil
+	}
+	if ns != b.Namespace && !o.Exported {
+		// 別の名前空間の内部の op には位置を作らない（呼べない op のために BIND-1 / BIND-2 を出さない）
 		return nil
 	}
 	st := ix.state(b.State)
@@ -111,8 +116,8 @@ func (t *bindTable) boundOf(ns string, call *ir.Call) []ir.BoundPosition {
 	return out
 }
 
-// explicit は call が path の位置を明示して渡しているか。パスの引数が name の Atom（中身は分からないので明示と
-// みなす）、リテラル、none で渡されているか、レコードリテラルの連なりがパスのフィールドを持つとき。
+// explicit は call が path の位置を明示して渡しているか。パスの引数が name か state の Atom（中身は分からないので
+// 明示とみなす）、リテラル、none で渡されているか、レコードリテラルの連なりがパスのフィールドを持つとき。
 func explicit(call *ir.Call, path []string) bool {
 	for _, a := range call.Args {
 		if a.Param == path[0] {
@@ -128,7 +133,7 @@ func explicitAtom(atom ir.Atom, rest []string) bool {
 	}
 	rec, ok := atom.(ir.RecordAtom)
 	if !ok {
-		return true // name / literal / none: 中身は分からないので明示とみなす
+		return true // name / state / literal / none: 中身は分からないので明示とみなす
 	}
 	for _, f := range rec.Fields {
 		if f.Name == rest[0] {

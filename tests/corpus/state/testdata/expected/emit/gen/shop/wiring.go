@@ -15,6 +15,8 @@ func (o *ops) Login(token Token) error {
 }
 
 // OpenTop は op shop.openTop。
+//
+// Reads: shop.token
 func (o *ops) OpenTop() error {
 	if States.Token.IsEmpty == nil {
 		return &runtime.MissingError{Kind: "state", Name: "shop.token"}
@@ -36,6 +38,7 @@ func (o *ops) OpenTop() error {
 
 // OpenCart は op shop.openCart。
 //
+// Reads: shop.carts
 // Effects: shop.clearCart
 func (o *ops) OpenCart() error {
 	if States.Carts.IsEmpty == nil {
@@ -59,6 +62,7 @@ func (o *ops) OpenCart() error {
 // Checkout は op shop.checkout。
 //
 // Throws: shop.EmptyCart
+// Reads: shop.carts, shop.orders
 // Effects: shop.placeOrder
 func (o *ops) Checkout() (*Order, error) {
 	kind, err := ClassifyCheckout()
@@ -82,6 +86,7 @@ func (o *ops) Checkout() (*Order, error) {
 
 // Add は op shop.add。
 //
+// Reads: shop.token
 // Effects: shop.addLine
 func (o *ops) Add(line Line) error {
 	kind, err := ClassifyLineKind(o.classifiers.LineKind, line)

@@ -1,0 +1,18 @@
+// TYPE-7（docs/types.md「match の型」の 5.3）: アームがレコードリテラルと none だけの match は、return の式なら
+// op の returns（optional を外した型）に当てはめる
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  op f(x: M): M {
+    return match x by C {
+      A => { id: "a" };
+      B => { id: "b" };
+    };
+  }
+  op g(x: M): M? {
+    return match x by C {
+      A => { id: "a" };
+      B => none;
+    };
+  }
+}

@@ -1,0 +1,36 @@
+// TYPE-15（docs/types.md「変えられる型」）: 2 広げる（元の型をアームに持つ union）、3 差し替える（元の型を継承した型）、
+// 4〜6 optional / array / record の中で 2〜3
+namespace a {
+  scalar Email extends string;
+  scalar WorkEmail extends Email;
+  model Other { name: string; }
+  model Profile { nick: string; }
+  model Wide extends Profile { extra: string; }
+  model Wider extends Wide { }
+  union Status { Active: Profile; Pending: Other; }
+  union IdOrEmail { Id: string; Mail: Email; }
+  model User {
+    id: string;
+    email: Email;
+    profile: Profile;
+    maybe: Profile?;
+    list1: Profile[];
+    attrs: Record<string, Profile>;
+    name: string = "x";
+    count: int = 1;
+  }
+  model D extends User {
+    // 2. 広げる
+    override id: IdOrEmail;
+    override profile: Status;
+    // 3. 差し替える（scalar を継承した scalar）
+    override email: WorkEmail;
+    // 4〜6
+    override maybe: Wide?;
+    override list1: Wider[];
+    override attrs: Record<string, Status>;
+    // 3. 核の型を継承した scalar。既定値は受け継ぐ
+    override name: Email;
+  }
+  op f(): D;
+}

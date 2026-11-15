@@ -1,0 +1,24 @@
+// CLS-6（docs/types.md「絞り込める型」「型で決まる絞り込み」）: 対象の型に渡せる型（T? を T に、string を scalar に、同じ型に、
+// 絞り込まれた型に）か、対象の union のアームの型（optional を外した型が union でもよい）
+namespace a {
+  model M { id: string; }
+  model N { id: string; }
+  scalar Email extends string;
+  union Page { Ready: M; Missing: N; }
+  state token: nullable<Email>;
+  op find(): M?;
+  op page(): Page;
+  op maybePage(): Page?;
+  op raw(): string?;
+  classify Kind of M { A; B; }
+  classify V1 of M? { Has: M? as M; default; }
+  classify V2 of string { Valid: string as Email; default; }
+  classify V3 of M { Same: M as M; default; }
+  classify V4 of M { Narrow: M as Kind.A<M>; default; }
+  classify O1 of find { Hit: find as M; default; }
+  classify O2 of page { Ready: page as M; Missing: page as N; }
+  classify O3 of maybePage { Ready: maybePage as M; default; }
+  classify O4 of raw { Valid: raw as Email; default; }
+  classify S1 of token { In: token as Email; default; }
+  op f(): M;
+}

@@ -9,7 +9,7 @@
 ```toml
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.2"
+protocol = "0.3"
 
 vocabulary = ["cli.hozo"]
 

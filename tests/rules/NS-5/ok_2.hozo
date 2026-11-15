@@ -1,0 +1,27 @@
+// NS-5（docs/check.md「export」）: 「呼ぶ」に当たらないもの: 分類の対象にする（classify C of ns.op）、@see、
+// bind の対象の名前空間に含まれること（別の名前空間の内部の op には、bind は位置を作らない）。
+// デコレータの引数には、同じ名前空間の内部の op と、別の名前空間の export の付いた op を渡せる
+namespace a {
+  scalar Token extends string;
+  state token: nullable<Token>;
+  bind token to b.*;
+  decorator fallback(target: any op);
+  decorator toOpen = fallback(b.open);
+  op local();
+  // 対象にすることは呼び出しではない
+  classify Found of b.find { Hit; default; }
+  /**
+   * @see b.find
+   */
+  @fallback(local)
+  op f();
+  @toOpen
+  op g();
+  @fallback(b.open)
+  op h();
+}
+namespace b {
+  // 内部の op。二つの Token の位置を持つが、a から呼べないので、a の bind は位置を作らない（BIND-1 にならない）
+  op find(x: a.Token, y: a.Token): string?;
+  export op open();
+}

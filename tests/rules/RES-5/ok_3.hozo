@@ -1,0 +1,21 @@
+// RES-5（docs/check.md「状態の参照」）: 状態を名前で読めるのは持ち主の名前空間の配線だけ。ほかの名前空間は、その op を通して読む。
+// 修飾して書いても、今の名前空間の状態なら同じ
+namespace a {
+  state s: list<string>;
+  classify Phase of s { Idle; Busy; }
+  export op all(): string[] reads s;
+  op own(): string[] {
+    return a.s;
+  }
+  op g();
+  op phase() {
+    match by a.Phase { Idle => g(); Busy => none; };
+  }
+}
+namespace b {
+  op f(xs: string[]);
+  op ok() {
+    const xs = a.all();
+    f(xs);
+  }
+}

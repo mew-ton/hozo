@@ -64,7 +64,9 @@ namespace server {
     expiresAt: Time;
   }
 
-  model PublicUser is User omit hash;
+  model PublicUser extends User {
+    override hash: never;
+  }
 
   @db
   state users: list<User>;
@@ -284,7 +286,7 @@ namespace server {
 
   // トークンがない・無効な場合のログアウトは何もしない（401 にしない）
   @http.post("/logout")
-  op logout(in: LogoutInput)
+  export op logout(in: LogoutInput)
     effects deleteSession;
 
   // ---- 追加: browser（§10.2、§11）が呼ぶ server の op ----
@@ -298,7 +300,7 @@ namespace server {
 
   /** ログインしているユーザー自身を返す */
   @http.get("/me")
-  op getMe(in: MeInput): PublicUser;
+  export op getMe(in: MeInput): PublicUser;
 
   /** 注文一覧の入力 */
   model GetOrdersInput {
@@ -311,7 +313,7 @@ namespace server {
 
   /** ログインしているユーザーの注文一覧を返す */
   @http.get("/orders")
-  op getOrders(in: GetOrdersInput): OrderSummary[];
+  export op getOrders(in: GetOrdersInput): OrderSummary[];
 
   /** 商品を取る入力 */
   model GetItemInput {
@@ -320,7 +322,7 @@ namespace server {
 
   /** 商品を一つ返す（認証は要らない） */
   @http.get("/item")
-  op getItem(in: GetItemInput): Item;
+  export op getItem(in: GetItemInput): Item;
 
   /** カートに入れる入力 */
   model AddToCartInput {
@@ -333,7 +335,7 @@ namespace server {
 
   /** 商品をカートに入れる */
   @http.post("/cart")
-  op addToCart(in: AddToCartInput): CartLine
+  export op addToCart(in: AddToCartInput): CartLine
     effects addCartLine;
 
   /** 保証を付ける入力 */
@@ -348,6 +350,6 @@ namespace server {
 
   /** カートの一行に保証プランを付ける */
   @http.post("/cart/warranty")
-  op attachWarranty(in: AttachWarrantyInput): WarrantyLine
+  export op attachWarranty(in: AttachWarrantyInput): WarrantyLine
     effects attachWarrantyToLine;
 }

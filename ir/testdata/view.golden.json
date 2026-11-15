@@ -1,5 +1,5 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "viewer": "browser",
   "config": {
     "language": "go",
@@ -64,7 +64,7 @@
     ]
   },
   "program": {
-    "version": "0.2",
+    "version": "0.3",
     "namespaces": [
       {
         "name": "",
@@ -82,6 +82,13 @@
               "end": {
                 "line": 1,
                 "col": 20
+              }
+            },
+            "type": {
+              "kind": "array",
+              "of": {
+                "kind": "ref",
+                "target": "server.User"
               }
             },
             "shape": "list",
@@ -105,6 +112,13 @@
                 "col": 40
               }
             },
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "server.Token"
+              }
+            },
             "shape": "nullable",
             "element": {
               "kind": "ref",
@@ -125,6 +139,10 @@
                 "line": 3,
                 "col": 30
               }
+            },
+            "type": {
+              "kind": "core",
+              "name": "Time"
             },
             "shape": "single",
             "element": {
@@ -157,6 +175,7 @@
             "cases": [
               {
                 "name": "Anonymous",
+                "as": [],
                 "span": {
                   "file": "global.hozo",
                   "start": {
@@ -171,6 +190,49 @@
               },
               {
                 "name": "LoggedIn",
+                "as": [
+                  {
+                    "state": "session",
+                    "type": {
+                      "kind": "ref",
+                      "target": "server.Token"
+                    },
+                    "by": "presence",
+                    "span": {
+                      "file": "global.hozo",
+                      "start": {
+                        "line": 6,
+                        "col": 13
+                      },
+                      "end": {
+                        "line": 6,
+                        "col": 40
+                      }
+                    }
+                  },
+                  {
+                    "state": "db",
+                    "type": {
+                      "kind": "array",
+                      "of": {
+                        "kind": "ref",
+                        "target": "server.User"
+                      }
+                    },
+                    "by": "predicate",
+                    "span": {
+                      "file": "global.hozo",
+                      "start": {
+                        "line": 6,
+                        "col": 42
+                      },
+                      "end": {
+                        "line": 6,
+                        "col": 60
+                      }
+                    }
+                  }
+                ],
                 "span": {
                   "file": "global.hozo",
                   "start": {
@@ -179,13 +241,14 @@
                   },
                   "end": {
                     "line": 6,
-                    "col": 12
+                    "col": 61
                   }
                 }
               }
             ],
             "hasDefault": false,
-            "fromCondition": false
+            "fromCondition": false,
+            "decidedBy": "predicate"
           },
           {
             "kind": "effect",
@@ -541,24 +604,46 @@
                 "span": {
                   "file": "server.hozo",
                   "start": {
-                    "line": 7,
+                    "line": 14,
                     "col": 3
                   },
                   "end": {
-                    "line": 7,
-                    "col": 10
+                    "line": 14,
+                    "col": 20
+                  }
+                }
+              },
+              {
+                "name": "nick",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 14,
+                    "col": 22
+                  },
+                  "end": {
+                    "line": 14,
+                    "col": 35
                   }
                 }
               }
             ],
-            "derivedFrom": {
+            "extends": {
               "base": "server.User",
-              "omit": [
+              "removed": [
                 "email",
                 "token",
                 "tags",
                 "limit",
                 "attrs"
+              ],
+              "overridden": [
+                "id"
               ]
             }
           },
@@ -834,6 +919,7 @@
             "cases": [
               {
                 "name": "Active",
+                "as": [],
                 "span": {
                   "file": "server.hozo",
                   "start": {
@@ -855,6 +941,7 @@
                   "throws": [],
                   "see": []
                 },
+                "as": [],
                 "span": {
                   "file": "server.hozo",
                   "start": {
@@ -876,7 +963,74 @@
               "throws": [],
               "see": []
             },
-            "fromCondition": false
+            "fromCondition": false,
+            "decidedBy": "predicate"
+          },
+          {
+            "kind": "classify",
+            "name": "server.Registration",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 34,
+                "col": 1
+              },
+              "end": {
+                "line": 34,
+                "col": 80
+              }
+            },
+            "subject": {
+              "kind": "op",
+              "op": "server.findUser",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "ref",
+                  "target": "server.User"
+                }
+              }
+            },
+            "cases": [
+              {
+                "name": "Registered",
+                "as": [
+                  {
+                    "type": {
+                      "kind": "ref",
+                      "target": "server.User"
+                    },
+                    "by": "presence",
+                    "span": {
+                      "file": "server.hozo",
+                      "start": {
+                        "line": 34,
+                        "col": 50
+                      },
+                      "end": {
+                        "line": 34,
+                        "col": 70
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 34,
+                    "col": 38
+                  },
+                  "end": {
+                    "line": 34,
+                    "col": 71
+                  }
+                }
+              }
+            ],
+            "hasDefault": true,
+            "fromCondition": false,
+            "decidedBy": "type"
           },
           {
             "kind": "classify",
@@ -903,6 +1057,7 @@
             "cases": [
               {
                 "name": "IsAdmin",
+                "as": [],
                 "span": {
                   "file": "server.hozo",
                   "start": {
@@ -917,7 +1072,8 @@
               }
             ],
             "hasDefault": true,
-            "fromCondition": true
+            "fromCondition": true,
+            "decidedBy": "predicate"
           },
           {
             "kind": "decorator",
@@ -1191,6 +1347,7 @@
                 "col": 60
               }
             },
+            "exported": true,
             "params": [
               {
                 "name": "id",
@@ -1220,6 +1377,9 @@
             },
             "effects": [
               "server.UserCreated"
+            ],
+            "reads": [
+              "db"
             ],
             "throws": [
               {
@@ -1255,7 +1415,53 @@
                   "effect": "server.UserCreated",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [
+                "db"
+              ],
+              "pure": false
+            }
+          },
+          {
+            "kind": "op",
+            "name": "server.unauthorized",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 48,
+                "col": 1
+              },
+              "end": {
+                "line": 48,
+                "col": 50
+              }
+            },
+            "exported": false,
+            "params": [],
+            "returns": {
+              "kind": "never"
+            },
+            "effects": [],
+            "reads": [],
+            "throws": [
+              {
+                "exceptions": [
+                  "server.Unauthorized"
+                ],
+                "relations": []
+              }
+            ],
+            "body": null,
+            "signature": {
+              "exceptions": [
+                "server.Unauthorized"
+              ],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [],
+              "pure": true
             }
           },
           {
@@ -1273,6 +1479,7 @@
                 "col": 30
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "in",
@@ -1295,13 +1502,16 @@
             ],
             "returns": null,
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
               "exceptions": [],
               "effects": [],
               "relations": [],
-              "successEffects": []
+              "successEffects": [],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -1319,6 +1529,7 @@
                 "col": 2
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "id",
@@ -1369,6 +1580,7 @@
               "target": "server.OrderPage"
             },
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": {
               "statements": [
@@ -1613,6 +1825,7 @@
                             }
                           }
                         },
+                        "narrowed": [],
                         "span": {
                           "file": "server.hozo",
                           "start": {
@@ -1630,6 +1843,7 @@
                         "body": {
                           "kind": "none"
                         },
+                        "narrowed": [],
                         "span": {
                           "file": "server.hozo",
                           "start": {
@@ -1740,6 +1954,7 @@
                               }
                             }
                           },
+                          "narrowed": [],
                           "span": {
                             "file": "server.hozo",
                             "start": {
@@ -1817,8 +2032,23 @@
                   "kind": "match",
                   "match": {
                     "subject": {
-                      "kind": "state",
-                      "state": "session"
+                      "kind": "value",
+                      "atom": {
+                        "kind": "state",
+                        "state": "session",
+                        "path": [],
+                        "span": {
+                          "file": "server.hozo",
+                          "start": {
+                            "line": 62,
+                            "col": 9
+                          },
+                          "end": {
+                            "line": 62,
+                            "col": 16
+                          }
+                        }
+                      }
                     },
                     "classify": "nullable",
                     "arms": [
@@ -1829,6 +2059,7 @@
                         "body": {
                           "kind": "none"
                         },
+                        "narrowed": [],
                         "span": {
                           "file": "server.hozo",
                           "start": {
@@ -1864,6 +2095,14 @@
                             }
                           }
                         },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "ref",
+                              "target": "server.Token"
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "server.hozo",
                           "start": {
@@ -1911,12 +2150,24 @@
                     "arms": [
                       {
                         "cases": [
-                          "Anonymous",
-                          "LoggedIn"
+                          "Anonymous"
                         ],
                         "body": {
-                          "kind": "none"
+                          "kind": "throw",
+                          "exception": "server.Unauthorized",
+                          "span": {
+                            "file": "server.hozo",
+                            "start": {
+                              "line": 67,
+                              "col": 18
+                            },
+                            "end": {
+                              "line": 67,
+                              "col": 43
+                            }
+                          }
                         },
+                        "narrowed": [],
                         "span": {
                           "file": "server.hozo",
                           "start": {
@@ -1925,7 +2176,63 @@
                           },
                           "end": {
                             "line": 67,
-                            "col": 34
+                            "col": 44
+                          }
+                        }
+                      },
+                      {
+                        "cases": [
+                          "LoggedIn"
+                        ],
+                        "body": {
+                          "kind": "atom",
+                          "atom": {
+                            "kind": "state",
+                            "state": "session",
+                            "path": [
+                              "value"
+                            ],
+                            "span": {
+                              "file": "server.hozo",
+                              "start": {
+                                "line": 67,
+                                "col": 58
+                              },
+                              "end": {
+                                "line": 67,
+                                "col": 71
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "state": "session",
+                            "type": {
+                              "kind": "ref",
+                              "target": "server.Token"
+                            }
+                          },
+                          {
+                            "state": "db",
+                            "type": {
+                              "kind": "array",
+                              "of": {
+                                "kind": "ref",
+                                "target": "server.User"
+                              }
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "server.hozo",
+                          "start": {
+                            "line": 67,
+                            "col": 46
+                          },
+                          "end": {
+                            "line": 67,
+                            "col": 72
                           }
                         }
                       }
@@ -1960,7 +2267,9 @@
               "exceptions": [],
               "effects": [],
               "relations": [],
-              "successEffects": []
+              "successEffects": [],
+              "reads": [],
+              "pure": false
             }
           }
         ]
@@ -2034,6 +2343,10 @@
           "state": "kept"
         }
       ],
+      "reads": [
+        "db"
+      ],
+      "pure": false,
       "params": [
         {
           "name": "in",
@@ -2069,6 +2382,8 @@
       "effects": [],
       "relations": [],
       "successEffects": [],
+      "reads": [],
+      "pure": false,
       "params": [],
       "bound": []
     },
@@ -2079,6 +2394,8 @@
       "effects": [],
       "relations": [],
       "successEffects": [],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "id",

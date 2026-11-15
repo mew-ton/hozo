@@ -15,7 +15,7 @@ namespace carrier {
   // 出力しない名前空間にも、状態の持ち主の規則（STATE-2）などの検査は同じに掛かる
   /** 荷物を引き受ける */
   @marks.context("配送")
-  op pickup(order: shop.Order)
+  export op pickup(order: shop.Order)
     effects accept
     throws Closed prevents effects;
 }

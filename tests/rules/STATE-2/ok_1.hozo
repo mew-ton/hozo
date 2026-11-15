@@ -2,7 +2,7 @@
 namespace a {
   state s: list<string>;
   effect e on s.post;
-  op write() effects e;
+  export op write() effects e;
 }
 namespace b {
   op wiring() {

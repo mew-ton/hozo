@@ -11,7 +11,7 @@ IR（中間表現）の構造と、表面の構文から IR への正規化、JS
 - **参照はすべて完全修飾名（FQN）**。`server.User` のように、ルートからの名前空間のパスと宣言名を `.` でつないだ文字列。グローバルの宣言は宣言名だけ（`db`）。表面の構文の「同じ名前空間なら修飾しない」は IR に残さない。
 - **宣言の順序は出現順**。ファイルの順は、ユーザーのファイルをパスの辞書順に並べ、その後に語彙のファイル（`Span.file` が `hozo:` のもの）を同じく辞書順に並べたもの。ファイルの中は位置順。同じ名前空間が複数の場所にあれば、この順で並べて一つにする（§3.2）。出力の決定性（`docs/requirements.md`「品質の要件」）のため、IR のどの列も集合ではなく順序付きの列。診断の並び（`docs/diagnostics.md`「順序」）もこのファイルの順に従う。
 - **すべての宣言は位置（`span`）を持つ**。言語サーバーと診断のため。JSON にも出す。
-- **計算した結果も IR に持つ**。例外の集合・効果の集合・`bind` で埋まる位置は、プラグインが自分で計算しなくて済むように、`docs/check.md` の計算結果を IR に置く。
+- **計算した結果も IR に持つ**。例外の集合・効果の集合・読む状態の集合・純粋かどうか・`bind` で埋まる位置は、プラグインが自分で計算しなくて済むように、`docs/check.md` の計算結果を IR に置く。宣言から決まること（状態の形、分類が型で決まるか、アームの中で絞り込まれた型）も同じ。
 
 ## 構造
 
@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.2";                 // この文書の版。Program か View の構造が変わったら上げる
+  version: "0.3";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -69,10 +69,13 @@ type Type =
   | { kind: "optional"; of: Type }
   | { kind: "array"; of: Type }
   | { kind: "record"; key: Type; value: Type }
-  | { kind: "case"; classify: string; cases: string[]; of: Type };   // 絞り込まれた型。cases は昇順ではなく match のアームに書かれた順
+  | { kind: "case"; classify: string; cases: string[]; of: Type }    // 絞り込まれた型。cases は昇順ではなく match のアームに書かれた順
+  | { kind: "never" };                                               // 決して値を返さない。Op.returns にだけ現れる
 ```
 
 - `void` は型ではなく、`Op.returns` が `null` であること。
+- `never` は値の型ではない。`Op.returns` 以外の位置（フィールド、引数、`of`、`as` など）には現れない。`override f: never;` の `never` は型ではなく、IR では `Model.extends.removed` になる。
+- 形の語（`list<T>` / `nullable<T>` / `single<T>`）は IR にない。`array(T)` / `optional(T)` / T になる（「正規化」）。
 - その場で書いた model（`{ ... }`）は IR にはない（「正規化」）。
 
 ### model / scalar / union
@@ -80,9 +83,13 @@ type Type =
 ```ts
 interface Model extends DeclBase {
   kind: "model";
-  fields: Field[];
-  derivedFrom?: { base: string; omit: string[] };    // `is X omit ...` の記録。fields は展開済み
-  synthesizedFrom?: string;                           // その場で書いた model の出どころ。"server.OrderPage.Ready" のように持ち主の FQN
+  fields: Field[];                // 継承した model なら、受け継いだ分も入れた展開済みの並び（docs/types.md「継承した model」の「フィールド」）
+  extends?: {                     // 継承した model（`model D extends B { ... }`）の記録
+    base: string;                 // 元の model の FQN（直接の元）
+    removed: string[];            // `override f: never;` でなくしたフィールドの名前（書かれた順）
+    overridden: string[];         // `override` で型を変えたか、デコレータを足したフィールドの名前（書かれた順）。これらのフィールドの説明は、`override` に書いたもの（なければなし）
+  };                              // 足したフィールドは、fields のうち、元の model の fields に名前がないもの
+  synthesizedFrom?: string;       // その場で書いた model の出どころ。"server.OrderPage.Ready" のように持ち主の FQN
 }
 
 interface Field {
@@ -91,7 +98,7 @@ interface Field {
   type: Type;                     // 省略可能なら optional
   default?: Literal;
   decorators: Application[];
-  span: Span;
+  span: Span;                     // 受け継いだままのフィールドは元の model のフィールドの位置。`override` したフィールドは `override` の位置
 }
 
 interface Scalar extends DeclBase {
@@ -112,8 +119,11 @@ interface Union extends DeclBase {
 ```ts
 interface State extends DeclBase {
   kind: "state";
-  shape: "list" | "nullable" | "single";   // 列数の範囲（docs/check.md「状態の形」）
-  element: Type;                  // optional にはならない（STATE-3）
+  type: Type;                     // 状態の型。配線が名前で参照したときの値の型（docs/types.md「形の書き方」）
+  shape: "list" | "nullable" | "single";   // 列数の範囲。type の最も外側から決まる（docs/check.md「状態の形」）:
+                                           // array なら list、optional なら nullable、それ以外は single
+  element: Type;                  // type から決まる: list と nullable なら type の of、single なら type そのもの。
+                                  // optional にはならない（STATE-3。当たった状態は optional を外して載せる）
 }
 
 interface Exception extends DeclBase {
@@ -140,11 +150,20 @@ type CaseSet = "any" | string[];  // ケース名の列（書かれた順）
 interface Classify extends DeclBase {
   kind: "classify";
   subject: { kind: "type"; type: Type }             // 値の分類
+         | { kind: "op"; op: string; type: Type }   // op の分類。op は FQN、type はその op の returns（対象の型）
          | { kind: "states"; states: string[] };    // 状態の分類。基底の状態の FQN（書かれた順）
-  cases: { name: string; description?: Doc; span: Span }[];   // default は含まない
+  cases: { name: string; description?: Doc; as: CaseTyping[]; span: Span }[];   // default は含まない。as は書かれた順（なければ []）
   hasDefault: boolean;
   defaultDescription?: Doc;       // default に付いた DocComment
   fromCondition: boolean;         // condition の糖衣から来たか（cases は一つ、hasDefault は true）
+  decidedBy: "type" | "predicate";   // ケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない
+}
+
+interface CaseTyping {            // ケースの `対象 as T`（docs/check.md「ケースの型」）
+  state?: string;                 // 状態の分類のとき、その対象の状態の FQN。値の分類と op の分類では持たない（対象は一つ）
+  type: Type;                     // そのケースでの対象の型
+  by: "presence" | "variant" | "predicate";   // 絞り込みの種類（docs/types.md「型で決まる絞り込み」）
+  span: Span;
 }
 ```
 
@@ -190,9 +209,11 @@ interface CatchesClause {
 ```ts
 interface Op extends DeclBase {
   kind: "op";
+  exported: boolean;              // `export` が付いているか（docs/check.md「export」）
   params: OpParam[];
-  returns: Type | null;           // null は void
+  returns: Type | null;           // null は void。決して返さない op は { kind: "never" }
   effects: string[];              // 書かれた effects（FQN）。配線で省略していれば []
+  reads: string[];                // 書かれた reads（基底の状態の FQN。書かれた順、重複は最初の出現に寄せる）。書いていなければ []
   throws: ThrowsClause[];         // 書かれた throws
   body: Wiring | null;            // null は葉
   signature: Signature;           // 計算結果。自分の名前空間から見た関数の型（docs/check.md「計算」）
@@ -206,6 +227,8 @@ interface Signature {                   // docs/check.md「計算」の Sig(O, v
   relations: { exception: string; effect: string; state: "prevented" | "kept" | "unknown" }[];
                                   // exceptions × effects のすべての組
   successEffects: { effect: string; state: "kept" | "prevented" | "unknown" }[];   // 成功のアームでの効果の状態
+  reads: string[];                // 読む基底の状態の FQN。伝播を含む（docs/check.md「reads」の R）。v によらない
+  pure: boolean;                  // 純粋か（docs/check.md「純粋」）。v によらない
 }
 ```
 
@@ -236,17 +259,35 @@ interface BoundPosition {
 
 type Atom =
   | { kind: "name"; path: string[]; span: Span }      // ["query", "page"]。先頭は束縛名か引数名
+  | { kind: "state"; state: string; path: string[]; span: Span }   // 状態の参照（docs/check.md「状態の参照」）。state は FQN、
+                                                                    // path はその値のフィールドのパス（状態そのものなら []）
   | { kind: "literal"; literal: Literal; span: Span }
   | { kind: "none"; span: Span }
   | { kind: "record"; fields: { name: string; value: Atom }[]; span: Span };   // { item } は { item: item } に展開済み
 
 interface Match {
-  subject: { kind: "value"; atom: Atom }            // 値の分類での match
-         | { kind: "state"; state: string }         // 基底の状態の、組み込みの分類での match。state は FQN
+  subject: { kind: "value"; atom: Atom }            // 値を対象にした match（値の分類、op の分類、標準の分類）。
+                                                    // 状態を名前で書いた対象（match token by nullable）は、atom が state
          | { kind: "classify" };                    // 状態の分類での match（対象は classify が持つ）
-  classify: string;               // FQN。組み込みの分類なら "list" か "nullable"
-  arms: { cases: string[] | "default"; body: { kind: "call"; call: Call } | { kind: "none" }; span: Span }[];
+  classify: string;               // FQN。標準の分類なら "list" か "nullable"
+  arms: MatchArm[];
   span: Span;
+}
+
+interface MatchArm {
+  cases: string[] | "default";
+  body: { kind: "call"; call: Call }
+      | { kind: "atom"; atom: Atom }                // 値（docs/grammar.md「配線」の ArmBody の Atom）。none はここに入れず、下の none にする
+      | { kind: "none" }
+      | { kind: "throw"; exception: string; span: Span };   // `throw E`。exception は FQN
+  narrowed: Narrowing[];          // このアームの中で、外と型が違う対象（docs/types.md「アームの中の対象の型」）。なければ []
+  span: Span;
+}
+
+interface Narrowing {
+  state?: string;                 // 状態の分類での match（subject が classify）のとき、絞り込まれる状態の FQN。
+                                  // subject が value なら持たない（絞り込まれるのは subject の atom）
+  type: Type;                     // アームの中での型
 }
 
 type Literal =
@@ -304,7 +345,14 @@ interface Bind {
 | `condition C of T;` | `Classify` で `cases: [C]`、`hasDefault: true`、`fromCondition: true` |
 | 戻り値の型の省略 | `returns: null` |
 | `T??` | `T?`（`optional` は入れ子にしない） |
-| `model P is U omit a, b;` | `fields` に `U` のフィールドから `a`、`b` を除いたものを複製し、`derivedFrom` に記録 |
+| `list<T>` / `nullable<T>` / `single<T>`（どの型の位置でも） | `array(T)` / `optional(T)` / T（`docs/types.md`「形の書き方」）。`nullable<T?>` と `single<T?>` は `optional(T)` |
+| `state s: T;`（形の語でも、`?` / `[]` でも） | `type` に正規化した型を置き、`shape` と `element` をそこから決める |
+| `model D extends B { override a: never; override b: T; c: U; }` | `fields` に、`B` の `fields` を写して `Override` を当て、足したフィールドを末尾に足したもの（`docs/types.md`「継承した model」の「フィールド」）。`extends` に `base`、`removed`、`overridden` を記録。受け継いだフィールドのデコレータ・説明・既定値も写す |
+| `export op f()` | `exported: true` |
+| `reads a, b`、複数の `reads` | 基底の状態の FQN の列一つ（重複は最初の出現に寄せる） |
+| ケースの `X as T` | `as` の `CaseTyping`。`X` が状態なら `state` にその FQN、型か op なら `state` を持たない |
+| 配線の値の位置の、状態の名前（`f(token)`、`token.value`、`match token by nullable`） | `Atom` の `state`。修飾して書いても同じ |
+| アームの本体の `none` | `body` の `none`（`atom` にはしない） |
 | ユニオンのアームのその場の model `Ready: { ... }` | `<ユニオンの FQN>.Ready` という FQN の `Model`（`synthesizedFrom` にユニオンの FQN）を同じ名前空間に足し、アームの型を `ref` にする。宣言の位置はユニオンの直後 |
 | 例外のその場の model `exception X: { ... }` | `<例外の FQN>.Value` という `Model` を同じく足し、`value` を `ref` にする |
 | `Unavailable: Unavailable` | そのまま `ref`（新しい model は作らない） |
@@ -329,7 +377,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.2";
+  version: "0.3";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったファイル（docs/config.md「in」）。Span.file と同じ形、辞書順。
@@ -362,7 +410,8 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 - `Program` 全体を渡すのは、トランスパイラが参照先（別の名前空間の型、語彙の宣言、`in` の外の宣言）を自分で探さなくて済むようにするため。何を出力の対象にするかは、トランスパイラが `emit` の応答の `select` で返す（`docs/plugin-protocol.md`「選択」）。
 - `files` は、トランスパイラが単位の対象の宣言を見分けるための最小の情報。宣言ごとの印を `Program` に足さないのは、`Program` を単位によらず同じにするため。合成した model（`<viewer>.<op 名>$<引数名>`）の `span` は元の引数のもので、op と同じファイルになる。
 - `namespaces` に入るのは、どれかの単位が出力する名前空間（`docs/config.md`「単位の対象」「in」）。同じ名前空間を複数の単位が出力していれば、値は複数の要素を持つ。`namespaces[viewer]` のうち `dir` が `config.dir` と同じ要素が、この View の単位のもの。
-- `ops` の `Signature` は `docs/check.md`「計算」の Sig(O, viewer)。viewer が op の名前空間と同じなら `Program` の `signature` と一致する。
+- `ops` の `Signature` は `docs/check.md`「計算」の Sig(O, viewer)。viewer が op の名前空間と同じなら `Program` の `signature` と一致する。`reads` と `pure` は viewer によらず、`Program` の `signature` と同じ値。
+- `ops` は、`export` の有無によらずすべての op を持つ。viewer が呼べる op かどうかは `Op.exported` と名前空間から分かる（`docs/check.md`「export」）。
 - `params` に反映する `bind` は `viewer` の名前空間の `Bind` だけ（`bind` は呼び出す側の宣言。§5.3）。
 - `viewer` が同じなら、`config`・`files` 以外は単位によらず同じ。
 
@@ -373,3 +422,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 - 数値は JSON の number。`duration` は整数（ナノ秒）。`int` は 64 ビットの範囲に収まることを検査 LIT-1（`docs/types.md`「診断」）で保証する。
 - 列の順序はこの文書の「原則」の通りで、同じ入力から同じバイト列になる。`ops` のキーの順序は FQN の辞書順。
 - 版の照合は `docs/plugin-protocol.md`「要求と応答」。
+
+## 版
+
+`Program.version` と `View.version` は同じ値で、どちらかの構造が変わったら上げる。今の版は `"0.3"`。
+
+| 版 | 変わったこと |
+|---|---|
+| 0.3 | `Type` に `never`。`Model.derivedFrom` をやめて `Model.extends`。`State.type`。`Classify.subject` に `op`、`cases[].as`、`decidedBy`。`Op.exported`、`Op.reads`。`Signature.reads`、`Signature.pure`。`Atom` に `state`。`Match.subject` の `state` をやめる（`value` の `atom` が `state`）。`Match.arms[].body` に `atom` と `throw`、`Match.arms[].narrowed` |

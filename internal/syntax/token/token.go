@@ -42,16 +42,20 @@ const (
 	Decorator
 	Bind
 
+	// 修飾（宣言やフィールドの前に置く）。
+	Export
+	Override
+
 	// 節の頭。
-	Is
-	Omit
 	Extends
 	Of
 	On
 	To
 	By
 	For
+	As
 	Effects
+	Reads
 	Throws
 	Prevents
 	Keeps
@@ -67,8 +71,9 @@ const (
 	Match
 	Default
 	None
+	Throw
 
-	// 核の型と状態の形。
+	// 核の型と形。
 	StringType
 	BooleanType
 	IntType
@@ -76,6 +81,7 @@ const (
 	TimeType
 	DurationType
 	Void
+	Never
 	Record
 	List
 	Nullable
@@ -124,15 +130,18 @@ var Keywords = map[string]Kind{
 	"decorator": Decorator,
 	"bind":      Bind,
 
-	"is":       Is,
-	"omit":     Omit,
+	"export":   Export,
+	"override": Override,
+
 	"extends":  Extends,
 	"of":       Of,
 	"on":       On,
 	"to":       To,
 	"by":       By,
 	"for":      For,
+	"as":       As,
 	"effects":  Effects,
+	"reads":    Reads,
 	"throws":   Throws,
 	"prevents": Prevents,
 	"keeps":    Keeps,
@@ -147,6 +156,7 @@ var Keywords = map[string]Kind{
 	"match":   Match,
 	"default": Default,
 	"none":    None,
+	"throw":   Throw,
 
 	"string":   StringType,
 	"boolean":  BooleanType,
@@ -155,6 +165,7 @@ var Keywords = map[string]Kind{
 	"Time":     TimeType,
 	"Duration": DurationType,
 	"void":     Void,
+	"never":    Never,
 	"Record":   Record,
 	"list":     List,
 	"nullable": Nullable,

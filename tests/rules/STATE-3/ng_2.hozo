@@ -1,8 +1,8 @@
-// STATE-3（docs/check.md「状態と効果」）: nullable と list の要素の型も optional にできない
+// STATE-3（docs/check.md「状態と効果」）: 形は型の最も外側から決まる。どの書き方でも、list の要素が optional なら当たる
 namespace a {
   model M { id: string; }
-  state maybe: nullable<M?>;           // ERROR: STATE-3
-  state many: list<M?>;                // ERROR: STATE-3
-  state twice: single<string??>;       // ERROR: STATE-3
-  state arr: single<string[]?>;        // ERROR: STATE-3
+  state many: M?[];                    // ERROR: STATE-3
+  state nested: list<nullable<M>>;     // ERROR: STATE-3
+  state wrapped: single<list<M?>>;     // ERROR: STATE-3
+  state twice: list<M??>;              // ERROR: STATE-3
 }

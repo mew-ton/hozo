@@ -30,7 +30,7 @@ func (a *analyzer) lowerAll() {
 }
 
 // lower は宣言を IR に下ろす。済んでいればその結果を返す。下ろしている途中（循環）なら nil を返し、
-// 呼び手がそれぞれの規則（TYPE-9 / UNION-1 / TYPE-10）で報告する。
+// 呼び手がそれぞれの規則（TYPE-9 / UNION-1）で報告する。
 func (a *analyzer) lower(s *symbol) ir.Decl {
 	switch s.state {
 	case lowered:
@@ -79,7 +79,8 @@ func (a *analyzer) base(s *symbol, doc *ast.DocComment, span source.Span, dctx d
 
 // --- model ---
 
-// lowerModel は model（docs/ir.md「model / scalar / union」）。`is X omit` は finalizeDerived で展開する。
+// lowerModel は model（docs/ir.md「model / scalar / union」）。本体の Field を下ろす。継承した model の展開と
+// Override は finalizeModels で行う（元の model のフィールドのデコレータが下りてから写すため）。
 func (a *analyzer) lowerModel(s *symbol, d *ast.ModelDecl, sc *scope) ir.Decl {
 	m := &ir.Model{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.models[s.fqn] = m
@@ -87,9 +88,8 @@ func (a *analyzer) lowerModel(s *symbol, d *ast.ModelDecl, sc *scope) ir.Decl {
 	a.addSite(d.Decorators, siteModel, sc, &m.DeclBase.Decorators)
 	if d.Body != nil {
 		m.Fields = a.lowerFields(d.Body.Fields, s.fqn, sc)
-	} else if d.Base != nil {
-		a.derived = append(a.derived, s)
 	}
+	a.addModelJob(&modelJob{sym: s, model: m, body: d.Body, extends: d.Extends, sc: sc})
 	return m
 }
 
@@ -147,63 +147,6 @@ func (a *analyzer) checkLiteralRange(l *ast.Literal) {
 	if _, err := strconv.ParseInt(l.Raw, 10, 64); err != nil {
 		a.errorf("LIT-1", l.Span, "整数リテラル %s は 64 ビット符号付きの範囲を超える", l.Raw)
 	}
-}
-
-// finalizeDerived は `model P is U omit a, b;` を展開する（docs/ir.md「正規化」）。U のフィールドのデコレータが
-// 下りてから複製するため、lowerApplications の後に行う。TYPE-10 と循環。
-func (a *analyzer) finalizeDerived() {
-	for _, s := range a.derived {
-		a.deriveModel(s, map[string]bool{})
-	}
-}
-
-func (a *analyzer) deriveModel(s *symbol, visiting map[string]bool) {
-	if s.derivedDone {
-		return
-	}
-	d := s.node.(*ast.ModelDecl)
-	m := s.decl.(*ir.Model)
-	s.derivedDone = true
-	r, ok := a.resolve(*d.Base, &scope{ns: s.ns}, acModel)
-	if !ok {
-		return
-	}
-	if visiting[r.sym.fqn] || r.sym == s {
-		a.errorf("TYPE-10", d.Base.Span, "model %s の is の元 %s が循環している", s.fqn, r.sym.fqn)
-		return
-	}
-	visiting[s.fqn] = true
-	base := a.models[r.sym.fqn]
-	if bd, ok := r.sym.node.(*ast.ModelDecl); ok && bd.Base != nil {
-		a.deriveModel(r.sym, visiting)
-		if base != nil && base.DerivedFrom == nil {
-			return // 元の展開に失敗した（循環など）。重ねて報告しない
-		}
-	}
-	if base == nil {
-		return
-	}
-	omit := a.checkOmit(d, base)
-	m.DerivedFrom = &ir.DerivedFrom{Base: base.Name, Omit: omit}
-	for _, f := range base.Fields {
-		if !contains(omit, f.Name) {
-			m.Fields = append(m.Fields, f)
-			a.fields[s.fqn][f.Name] = a.fields[base.Name][f.Name]
-		}
-	}
-}
-
-// checkOmit は TYPE-10（docs/types.md「診断」）: omit の名前が元の model にない。
-func (a *analyzer) checkOmit(d *ast.ModelDecl, base *ir.Model) []string {
-	omit := make([]string, 0, len(d.Omit))
-	for _, o := range d.Omit {
-		if findField(base, o.Name) == nil {
-			a.errorf("TYPE-10", o.Span, "model %s にフィールド %s はないので omit できない", base.Name, o.Name)
-			continue
-		}
-		omit = append(omit, o.Name)
-	}
-	return omit
 }
 
 // --- scalar ---
@@ -298,6 +241,7 @@ func (a *analyzer) synthesize(owner *symbol, name string, body *ast.ModelBody, s
 	a.models[fqn] = m
 	a.fields[fqn] = map[string]source.Span{}
 	m.Fields = a.lowerFields(body.Fields, fqn, sc)
+	a.addModelJob(&modelJob{model: m, body: body, sc: sc})
 	owner.synthesized = append(owner.synthesized, m)
 	return fqn
 }
@@ -375,36 +319,32 @@ func (a *analyzer) expandSet(r resolved, want declKind, span source.Span) []stri
 
 // --- state / exception / effect ---
 
-// lowerState は state。形は list / nullable / single（docs/check.md「状態の形」）。STATE-3: 要素の型が optional。
+// lowerState は state。型は宣言に書いた型で、形と要素はその最も外側から決まる（docs/check.md「状態の形」）。
 func (a *analyzer) lowerState(s *symbol, d *ast.StateDecl, sc *scope) ir.Decl {
-	st := &ir.State{DeclBase: a.base(s, d.Doc, d.Span, docContext{}), Shape: shapeOf(d.Shape)}
+	st := &ir.State{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteState, sc, &st.DeclBase.Decorators)
-	if t, ok := a.lowerType(d.Elem, sc); ok {
-		st.Element = a.checkSTATE3(s, d, t)
+	st.Shape = ir.StateSingle
+	if t, ok := a.lowerType(d.Type, sc); ok {
+		st.Type = a.checkSTATE3(s, d, t)
+		st.Shape, st.Element = ir.ShapeOf(st.Type)
 	}
 	return st
 }
 
-func shapeOf(shape ast.StateShape) ir.StateShape {
-	switch shape {
-	case ast.StateSingle:
-		return ir.StateSingle
-	case ast.StateNullable:
-		return ir.StateNullable
-	}
-	return ir.StateList
-}
-
-// checkSTATE3 は STATE-3（docs/check.md「状態と効果」）: 状態の要素の型が optional（single<T?> など）。
-// 空になりうる状態は nullable<T> と書く。IR の element は optional にならない（docs/ir.md「state / exception / effect」）
-// ので、中身の型を返す。
+// checkSTATE3 は STATE-3（docs/check.md「状態と効果」）: 状態の要素の型が optional。形が型から決まるので、当たるのは
+// list の状態だけ（list<T?>、T?[]）。当たった状態は list<T> として残りの検査を続けるので、その型を返す
+// （IR の element は optional にならない。docs/ir.md「state / exception / effect」）。
 func (a *analyzer) checkSTATE3(s *symbol, d *ast.StateDecl, t ir.Type) ir.Type {
-	opt, ok := t.(ir.OptionalType)
+	arr, ok := t.(ir.ArrayType)
 	if !ok {
 		return t
 	}
-	a.errorf("STATE-3", d.Elem.NodeSpan(), "状態 %s の要素の型 %s に ? は付けられない。空になりうる状態は nullable<%s> と書く（docs/grammar.md「state」）", s.fqn, typeName(t), typeName(opt.Of))
-	return opt.Of
+	opt, ok := arr.Of.(ir.OptionalType)
+	if !ok {
+		return t
+	}
+	a.errorf("STATE-3", d.Type.NodeSpan(), "状態 %s の型 %s は、列の要素に ? が付いている。列は値を持つので、要素は省略可能にできない（%s と書く。docs/check.md「状態の形」）", s.fqn, typeName(t), typeName(ir.Array(opt.Of)))
+	return ir.Array(opt.Of)
 }
 
 // lowerException は exception。値の型は model だけ（docs/resolve.md「位置ごとに受け付ける種類」）。
@@ -519,7 +459,7 @@ func (a *analyzer) lowerTransition(s *symbol, e *ir.Effect, t *ast.Transition, s
 		states, isStates := decl.SubjectStates()
 		if !isStates {
 			if decl.Subject != nil {
-				a.errorf("RES-4", t.Of.Span, "遷移の宛先にできるのは状態を対象にした classify だけで、%s は値の分類", decl.Name)
+				a.errorf("RES-4", t.Of.Span, "遷移の宛先にできるのは状態を対象にした classify だけで、%s は%s", decl.Name, classifyKindName(decl))
 			}
 			return // 対象が決まっていない分類（CLS-3 などで報告済み）には重ねて報告しない
 		}
@@ -578,7 +518,8 @@ func operationOf(op ast.StateOp) ir.Operation {
 
 // --- classify / condition ---
 
-// lowerClassify は classify。CLS-1（default が二つ以上、ケース名の重複）、CLS-2（名前の付いたケースがない）。
+// lowerClassify は classify。CLS-1（default が二つ以上、ケース名の重複）、CLS-2（名前の付いたケースがない）、
+// ケースの `対象 as T`（CLS-5 / CLS-6）、ケースの判定（decidedBy。docs/check.md「ケースの判定」）。
 func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
@@ -605,11 +546,13 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 		if cs.Doc != nil {
 			cc.Description = a.lowerDoc(cs.Doc, docContext{ns: sc.ns, span: cs.Name.Span})
 		}
+		cc.As = a.lowerCaseTypings(s, c, cs, sc)
 		c.Cases = append(c.Cases, cc)
 	}
 	if len(c.Cases) == 0 {
 		a.errorf("CLS-2", s.nameSpan, "classify %s に名前の付いたケースが一つもない", s.fqn)
 	}
+	c.DecidedBy = a.decidedBy(c)
 	return c
 }
 
@@ -624,13 +567,257 @@ func (a *analyzer) lowerDefaultCase(s *symbol, c *ir.Classify, cs *ast.ClassifyC
 	}
 }
 
+// classifyKindName は分類の種類の呼び名（診断用）。
+func classifyKindName(c *ir.Classify) string {
+	switch c.Subject.(type) {
+	case ir.OpSubject:
+		return "op の分類"
+	case ir.StatesSubject:
+		return "状態の分類"
+	}
+	return "値の分類"
+}
+
+// lowerCaseTypings はケースの `対象 as T` の並び（docs/check.md「ケースの型」）。CLS-5: as の前がその分類の対象でない、
+// 一つのケースに同じ対象の as が二度ある。CLS-6: as の後ろの型が、対象の型から絞り込める型でない。
+// 対象が決まっていない分類（CLS-3 などで報告済み）では、型の解決だけを行う。
+func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope) []ir.CaseTyping {
+	var out []ir.CaseTyping
+	seen := map[string]bool{}
+	for _, ct := range cs.As {
+		if ct == nil {
+			continue
+		}
+		t, tok := a.lowerType(ct.Type, sc)
+		if c.Subject == nil {
+			continue
+		}
+		state, subjectType, ok := a.caseTypingSubject(s, c, ct, sc)
+		if !ok {
+			continue
+		}
+		if seen[state] {
+			a.errorf("CLS-5", ct.Subject.NodeSpan(), "classify %s のケース %s に、対象 %s の as が二度ある", s.fqn, cs.Name.Name, a.text(ct.Subject.NodeSpan()))
+			continue
+		}
+		seen[state] = true
+		if !tok || subjectType == nil {
+			continue
+		}
+		if !a.narrowable(subjectType, t) {
+			a.errorf("CLS-6", ct.Type.NodeSpan(), "classify %s のケース %s: 対象の型 %s を %s には絞り込めない（絞り込めるのは、対象の型に渡せる型か、対象の union のアームの型。docs/types.md「絞り込める型」）", s.fqn, cs.Name.Name, typeName(subjectType), typeName(t))
+			continue
+		}
+		out = append(out, ir.CaseTyping{State: state, Type: t, By: a.narrowBy(subjectType, t), Span: a.irSpan(ct.Span)})
+	}
+	return out
+}
+
+// caseTypingSubject は `X as T` の X を、その分類の対象と照らす。状態の分類ならその状態の FQN と型、値の分類と
+// op の分類なら state は空で、対象の型を返す。対象でなければ CLS-5 を出して ok は false。
+// 解決は対象と同じ規則で行う（docs/resolve.md「位置ごとに受け付ける種類」）。
+func (a *analyzer) caseTypingSubject(s *symbol, c *ir.Classify, ct *ast.CaseTyping, sc *scope) (state string, subjectType ir.Type, ok bool) {
+	span := ct.Subject.NodeSpan()
+	notSubject := func() (string, ir.Type, bool) {
+		a.errorf("CLS-5", span, "classify %s のケースの as の前の %s は、この分類の対象ではない（%s）", s.fqn, a.text(span), subjectText(c))
+		return "", nil, false
+	}
+	var named *symbol
+	nt, isName := ct.Subject.(*ast.NamedType)
+	if isName && nt.Arg == nil {
+		r, found := a.peek(nt.Name, sc)
+		if !found {
+			a.resolve(nt.Name, sc, acState|acOp|acTypePos) // 名前が見つからないことを言う
+			return "", nil, false
+		}
+		if r.kind == rDecl {
+			named = r.sym
+		}
+	}
+	switch subj := c.Subject.(type) {
+	case ir.OpSubject:
+		if named == nil || named.kind != kindOp || named.fqn != subj.Op {
+			return notSubject()
+		}
+		a.resolve(nt.Name, sc, acOp) // 参照を記録する
+		return "", subj.Type, true
+	case ir.StatesSubject:
+		if named == nil || named.kind != kindState || !contains(subj.States, named.fqn) {
+			return notSubject()
+		}
+		a.resolve(nt.Name, sc, acState)
+		st, _ := a.lower(named).(*ir.State)
+		if st == nil {
+			return named.fqn, nil, true
+		}
+		return named.fqn, st.Type, true
+	case ir.TypeSubject:
+		if named != nil && symAccept(named)&acTypePos == 0 {
+			return notSubject()
+		}
+		t, tok := a.lowerType(ct.Subject, sc)
+		if !tok {
+			return "", nil, false
+		}
+		if !ir.TypeEqual(t, subj.Type) {
+			return notSubject()
+		}
+		return "", subj.Type, true
+	}
+	return "", nil, false
+}
+
+// subjectText は分類の対象の表示（診断用）。
+func subjectText(c *ir.Classify) string {
+	switch subj := c.Subject.(type) {
+	case ir.OpSubject:
+		return "対象は op " + subj.Op
+	case ir.StatesSubject:
+		return "対象は状態 " + join(subj.States)
+	case ir.TypeSubject:
+		return "対象は型 " + typeName(subj.Type)
+	}
+	return "対象が決まっていない"
+}
+
+// narrowable は docs/types.md「絞り込める型」: 対象の型 S を T に絞り込めるか。T が S に渡せるか、S から optional を
+// 外した型が union（arms）への ref で、T がそのアームのどれかの型と等しい。
+func (a *analyzer) narrowable(s, t ir.Type) bool {
+	if a.assignType(t, s) {
+		return true
+	}
+	return a.armOf(stripOptional(s), t)
+}
+
+// unionArms は t が union（arms）への ref なら、そのユニオン。そうでなければ nil。
+func (a *analyzer) unionArms(t ir.Type) *ir.Union {
+	r, ok := t.(ir.RefType)
+	if !ok {
+		return nil
+	}
+	sym := a.syms[r.Target]
+	if sym == nil || sym.kind != kindUnion {
+		return nil
+	}
+	un, ok := a.lower(sym).(*ir.Union)
+	if !ok || un.Variant != ir.UnionArms {
+		return nil
+	}
+	return un
+}
+
+// armOf は u が union（arms）への ref で、t がそのアームのどれかの型と等しいか。
+func (a *analyzer) armOf(u, t ir.Type) bool {
+	un := a.unionArms(u)
+	if un == nil {
+		return false
+	}
+	for _, arm := range un.Arms {
+		if arm.Type != nil && ir.TypeEqual(arm.Type, t) {
+			return true
+		}
+	}
+	return false
+}
+
+// narrowBy は絞り込みの種類（docs/types.md「型で決まる絞り込み」）: S が optional(T) なら presence、S が union（arms）への
+// ref で T がそのアームの型なら variant、それ以外は predicate（述語の要る絞り込み）。
+func (a *analyzer) narrowBy(s, t ir.Type) ir.NarrowBy {
+	if o, ok := s.(ir.OptionalType); ok && ir.TypeEqual(o.Of, t) {
+		return ir.NarrowByPresence
+	}
+	if a.armOf(s, t) {
+		return ir.NarrowByVariant
+	}
+	return ir.NarrowByPredicate
+}
+
+// decidedBy は docs/check.md「ケースの判定」: 型で決まる分類の四つの条件をすべて満たせば type、そうでなければ predicate。
+func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
+	// 1. 対象が一つ
+	state := ""
+	var subjectType ir.Type
+	switch subj := c.Subject.(type) {
+	case ir.TypeSubject:
+		subjectType = subj.Type
+	case ir.OpSubject:
+		subjectType = subj.Type
+	case ir.StatesSubject:
+		if len(subj.States) != 1 {
+			return ir.DecidedByPredicate
+		}
+		state = subj.States[0]
+		if sym := a.syms[state]; sym != nil {
+			if st, ok := a.lower(sym).(*ir.State); ok {
+				subjectType = st.Type
+			}
+		}
+	default:
+		return ir.DecidedByPredicate
+	}
+	if len(c.Cases) == 0 || subjectType == nil {
+		return ir.DecidedByPredicate
+	}
+	// 2. すべてのケースがその対象の as を持ち、どれも型で決まる絞り込み。3. as の型がケースの間ですべて違う。
+	var types []ir.Type
+	by := ir.NarrowBy("")
+	for _, cs := range c.Cases {
+		var as *ir.CaseTyping
+		for i := range cs.As {
+			if cs.As[i].State == state {
+				as = &cs.As[i]
+			}
+		}
+		if as == nil || as.By == ir.NarrowByPredicate {
+			return ir.DecidedByPredicate
+		}
+		for _, t := range types {
+			if ir.TypeEqual(t, as.Type) {
+				return ir.DecidedByPredicate
+			}
+		}
+		types = append(types, as.Type)
+		by = as.By
+	}
+	// 4. presence なら default がある。variant なら、default があるか、書いた型が union のすべてのアームの型を覆う。
+	if c.HasDefault {
+		return ir.DecidedByType
+	}
+	if by == ir.NarrowByVariant && a.coversArms(subjectType, types) {
+		return ir.DecidedByType
+	}
+	return ir.DecidedByPredicate
+}
+
+// coversArms は types が union u のすべてのアームの型を覆うか。
+func (a *analyzer) coversArms(u ir.Type, types []ir.Type) bool {
+	un := a.unionArms(u)
+	if un == nil {
+		return false
+	}
+	for _, arm := range un.Arms {
+		covered := false
+		for _, t := range types {
+			if arm.Type != nil && ir.TypeEqual(arm.Type, t) {
+				covered = true
+			}
+		}
+		if !covered {
+			return false
+		}
+	}
+	return true
+}
+
 // lowerCondition は condition → Classify（cases は一つ、hasDefault は true、fromCondition は true。docs/ir.md「正規化」）。
+// as を書けないので、述語で決まる分類。
 func (a *analyzer) lowerCondition(s *symbol, d *ast.ConditionDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{
 		DeclBase:      a.base(s, d.Doc, d.Span, docContext{}),
 		Cases:         []ir.ClassifyCase{{Name: d.Name.Name, Span: a.irSpan(d.Name.Span)}},
 		HasDefault:    true,
 		FromCondition: true,
+		DecidedBy:     ir.DecidedByPredicate,
 	}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
 	c.Subject = a.lowerClassifySubject(s, d.Of, sc)
@@ -647,14 +834,16 @@ const (
 	subjectState
 	// subjectStateClassify は状態を対象にした classify（状態の分類）。
 	subjectStateClassify
+	// subjectOp は op。
+	subjectOp
 	// subjectUnresolved は解決できない名前。RES-* として報告する。
 	subjectUnresolved
 )
 
 // lowerClassifySubject は classify / condition の対象（docs/resolve.md「位置ごとに受け付ける種類」の
-// 「classify C of ... の対象」）。一つで型を指せば値の分類、すべてが現在の名前空間の state なら状態の分類。
-// それ以外は CLS-3（docs/check.md「classify / match」）で、対象は決まらない（nil）。同じ状態が二度あるだけなら、
-// 重複を除いた状態の分類にする。
+// 「classify C of ... の対象」）。一つで型を指せば値の分類、一つで op を指せば op の分類（値を返さない op は CLS-4）、
+// すべてが現在の名前空間の state なら状態の分類。それ以外は CLS-3（docs/check.md「classify / match」）で、対象は
+// 決まらない（nil）。同じ状態が二度あるだけなら、重複を除いた状態の分類にする。
 func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.ClassifySubject {
 	if len(of) == 0 {
 		return nil
@@ -668,11 +857,16 @@ func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.
 			states++
 		}
 	}
-	if len(of) == 1 && (kinds[0] == subjectType || kinds[0] == subjectUnresolved) {
-		if t, ok := a.lowerType(of[0], sc); ok {
-			return ir.TypeSubject{Type: t}
+	if len(of) == 1 {
+		switch kinds[0] {
+		case subjectType, subjectUnresolved:
+			if t, ok := a.lowerType(of[0], sc); ok {
+				return ir.TypeSubject{Type: t}
+			}
+			return nil
+		case subjectOp:
+			return a.lowerOpSubject(s, of[0].(*ast.NamedType), sc)
 		}
-		return nil
 	}
 	// ここからは状態の分類として読む。状態でないもの、別の名前空間の状態、状態の分類、重複は CLS-3。
 	ok := true
@@ -688,11 +882,15 @@ func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.
 		case subjectStateClassify:
 			a.errorf("CLS-3", span, "classify %s の対象 %s は状態の分類（対象にできるのは宣言した名前空間の基底の状態だけ。docs/check.md「状態の形」）", s.fqn, syms[i].fqn)
 			ok = false
-		case subjectType:
+		case subjectType, subjectOp:
+			what := "型"
+			if kinds[i] == subjectOp {
+				what = "op"
+			}
 			if states > 0 {
-				a.errorf("CLS-3", span, "classify %s の対象に型と状態が混ざっている（%s は状態ではない）", s.fqn, a.text(span))
+				a.errorf("CLS-3", span, "classify %s の対象に%sと状態が混ざっている（%s は状態ではない）", s.fqn, what, a.text(span))
 			} else {
-				a.errorf("CLS-3", span, "classify %s の対象が二つ以上あるのに、%s は状態ではない（値の分類の対象は型一つ）", s.fqn, a.text(span))
+				a.errorf("CLS-3", span, "classify %s の対象が二つ以上あるのに、%s は状態ではない（値の分類の対象は型一つ、op の分類の対象は op 一つ）", s.fqn, a.text(span))
 			}
 			ok = false
 		case subjectState:
@@ -721,8 +919,48 @@ func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.
 	return ir.StatesSubject{States: fqns}
 }
 
-// subjectKindOf は対象の一つを、診断も参照も残さずに見分ける。型引数のない名前が state を指せば状態、
+// lowerOpSubject は op の分類の対象（docs/check.md「分類」の「対象」）。どの名前空間の op でもよく、export は要らない
+// （対象にすることは呼び出しではない）。CLS-4: 値を返さない op（returns が null か never）。
+// 対象の型（その op の returns）は op の宣言の構文から読む: op の引数や戻り値の型が、この分類のケースで絞り込んだ型
+// （C.Case<T>）を使っていても、互いを下ろし合わないようにするため。
+func (a *analyzer) lowerOpSubject(s *symbol, nt *ast.NamedType, sc *scope) ir.ClassifySubject {
+	r, ok := a.resolve(nt.Name, sc, acOp)
+	if !ok {
+		return nil
+	}
+	od, isOp := r.sym.node.(*ast.OpDecl)
+	if !isOp {
+		return nil
+	}
+	if od.Return == nil || od.Return.Void || od.Return.Never {
+		a.errorf("CLS-4", nt.Name.Span, "classify %s の対象の op %s は値を返さない（分類できるのは、その op が返した値）", s.fqn, r.sym.fqn)
+		return nil
+	}
+	if op, lowered := a.lower(r.sym).(*ir.Op); lowered {
+		if op.Returns == nil {
+			return nil // 戻り値の型が解決できなかった（RES-* で報告済み）
+		}
+		return ir.OpSubject{Op: op.Name, Type: op.Returns}
+	}
+	// op を下ろしている途中（その op の型が、この分類を使っている）。戻り値の型だけを、診断を重ねずに読む。
+	t, ok := a.quietType(od.Return.Type, &scope{ns: r.sym.ns})
+	if !ok {
+		return nil
+	}
+	return ir.OpSubject{Op: r.sym.fqn, Type: t}
+}
+
+// quietType は型を下ろすが、診断も参照も残さない（同じ型をほかの場所が下ろして報告する）。
+func (a *analyzer) quietType(t ast.Type, sc *scope) (ir.Type, bool) {
+	diags, refs, pending := len(a.diags), len(a.refs), len(a.pendingCaseTypes)
+	out, ok := a.lowerType(t, sc)
+	a.diags, a.refs, a.pendingCaseTypes = a.diags[:diags], a.refs[:refs], a.pendingCaseTypes[:pending]
+	return out, ok
+}
+
+// subjectKindOf は対象の一つを、診断も参照も残さずに見分ける。型引数のない名前が state を指せば状態、op を指せば op、
 // 状態を対象にした classify を指せば状態の分類、解決できなければ subjectUnresolved、それ以外は型。
+// 形の語や ? / [] を持つ型は、型として読む。
 func (a *analyzer) subjectKindOf(t ast.Type, sc *scope) (subjectKind, *symbol) {
 	nt, ok := t.(*ast.NamedType)
 	if !ok || nt.Arg != nil {
@@ -738,6 +976,8 @@ func (a *analyzer) subjectKindOf(t ast.Type, sc *scope) (subjectKind, *symbol) {
 	switch r.sym.kind {
 	case kindState:
 		return subjectState, r.sym
+	case kindOp:
+		return subjectOp, r.sym
 	case kindClassify:
 		if c, ok := a.lower(r.sym).(*ir.Classify); ok {
 			if _, isStates := c.SubjectStates(); isStates {
@@ -768,7 +1008,13 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 	if d.Doc != nil {
 		op.Description = a.lowerDoc(d.Doc, docContext{ns: s.ns, span: s.nameSpan, params: paramNames(d.Params), hasParams: true})
 	}
-	if d.Return != nil && !d.Return.Void {
+	op.Exported = d.Export
+	switch {
+	case d.Return == nil || d.Return.Void:
+	case d.Return.Never:
+		op.Returns = ir.Never()
+		a.neverOps = append(a.neverOps, &neverOp{sym: s, decl: d, op: op})
+	default:
 		if t, ok := a.lowerType(d.Return.Type, sc); ok {
 			op.Returns = t
 		}
@@ -777,6 +1023,8 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 		switch c := c.(type) {
 		case *ast.EffectsClause:
 			op.Effects = append(op.Effects, a.lowerEffectRefs(c.Effects, sc)...)
+		case *ast.ReadsClause:
+			op.Reads = a.lowerReads(s, d, c, op.Reads, sc)
 		case *ast.ThrowsClause:
 			op.Throws = append(op.Throws, a.lowerThrows(c, sc))
 		}
@@ -788,6 +1036,114 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 		a.wirings = append(a.wirings, &wiringJob{sym: s, decl: d, op: op})
 	}
 	return op
+}
+
+// lowerReads は reads の一節を、ここまでの並び reads に足す（docs/ir.md「正規化」: 重複は最初の出現に寄せる）。
+// 要素は state（基底の状態。どの名前空間のものでも解決する。状態でなければ RES-4）。
+// READS-1（docs/check.md「状態と効果」）: 葉の op が別の名前空間の状態を書いた。位置はその状態の名前。
+func (a *analyzer) lowerReads(s *symbol, d *ast.OpDecl, c *ast.ReadsClause, reads []string, sc *scope) []string {
+	for _, n := range c.States {
+		r, ok := a.resolve(n, sc, acState)
+		if !ok {
+			continue
+		}
+		if d.Body == nil && r.sym.ns != s.ns {
+			a.errorf("READS-1", n.Span, "葉の op %s が、別の名前空間の状態 %s を reads に書いている（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", s.fqn, r.sym.fqn, nsName(s.ns))
+		}
+		if !contains(reads, r.sym.fqn) {
+			reads = append(reads, r.sym.fqn)
+		}
+	}
+	return reads
+}
+
+// neverOp は never を返す op。デコレータの適用が下りてから確かめる（THROWS-3 の条件 6）。
+type neverOp struct {
+	sym  *symbol
+	decl *ast.OpDecl
+	op   *ir.Op
+}
+
+// checkNeverOps は THROWS-3（docs/check.md「throws」）: never を返す op が、docs/check.md「never を返す op」の条件 1〜6 の
+// どれかを満たさない。満たさない条件ごとに一つ。位置は、1 は op の名前、2 と 3 は throws（なければ op の名前）、
+// 4 は最初の引数、5 はその節、6 はそのデコレータ。
+func (a *analyzer) checkNeverOps() {
+	for _, n := range a.neverOps {
+		a.checkTHROWS3(n)
+	}
+}
+
+func (a *analyzer) checkTHROWS3(n *neverOp) {
+	d, op, name := n.decl, n.op, n.sym.fqn
+	// 1. 葉である
+	if d.Body != nil {
+		a.errorf("THROWS-3", n.sym.nameSpan, "never を返す op %s は本体を持てない（決して返さない op は、例外を一つ投げる葉）", name)
+	}
+	// 2. throws の例外（ユニオンを展開した後）が、ちょうど一つ。3. その例外が値を運ばない
+	var throws *ast.ThrowsClause
+	for _, c := range d.Clauses {
+		if tc, ok := c.(*ast.ThrowsClause); ok && throws == nil {
+			throws = tc
+		}
+	}
+	throwsSpan := n.sym.nameSpan
+	if throws != nil {
+		throwsSpan = throws.Span
+	}
+	var exceptions []string
+	for _, tc := range op.Throws {
+		for _, e := range tc.Exceptions {
+			if !contains(exceptions, e) {
+				exceptions = append(exceptions, e)
+			}
+		}
+	}
+	if len(exceptions) != 1 {
+		if len(exceptions) == 0 {
+			a.errorf("THROWS-3", throwsSpan, "never を返す op %s は、throws に例外をちょうど一つ書く（投げる例外がない）", name)
+		} else {
+			a.errorf("THROWS-3", throwsSpan, "never を返す op %s は、throws に例外をちょうど一つ書く（%s）", name, join(exceptions))
+		}
+	}
+	for _, e := range exceptions {
+		if sym := a.syms[e]; sym != nil {
+			if ex, ok := a.lower(sym).(*ir.Exception); ok && ex.Value != nil {
+				a.errorf("THROWS-3", throwsSpan, "never を返す op %s の例外 %s は値を運ぶ（値を運ぶ例外を投げるのは、人が書く葉の op）", name, e)
+				break
+			}
+		}
+	}
+	// 4. 引数を持たない
+	if len(d.Params) > 0 && d.Params[0] != nil {
+		a.errorf("THROWS-3", d.Params[0].Span, "never を返す op %s は引数を持てない", name)
+	}
+	// 5. effects も reads も持たない
+	for _, c := range d.Clauses {
+		switch c.(type) {
+		case *ast.EffectsClause, *ast.ReadsClause:
+			a.errorf("THROWS-3", c.NodeSpan(), "never を返す op %s は effects も reads も持てない", name)
+		default:
+			continue
+		}
+		break
+	}
+	// 6. catches を持つデコレータが付いていない
+	for _, app := range op.Decorators {
+		sym := a.syms[app.Decorator]
+		if sym == nil {
+			continue
+		}
+		dec, ok := a.lower(sym).(*ir.Decorator)
+		if !ok || len(dec.Catches) == 0 {
+			continue
+		}
+		span := n.sym.nameSpan
+		if ds := a.decoratorSpan(d.Decorators, app); ds != (source.Span{}) {
+			span = ds
+		}
+		a.errorf("THROWS-3", span, "never を返す op %s に、catches を持つデコレータ %s は付けられない", name, app.Decorator)
+		break
+	}
 }
 
 func paramNames(params []*ast.OpParam) map[string]bool {

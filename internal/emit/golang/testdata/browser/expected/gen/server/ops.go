@@ -20,7 +20,7 @@ type LoginFunc func(in LoginInput) (LoginOk, error)
 // 自分の情報。
 //
 // Throws: server.Unauthorized
-type GetMeFunc func(in GetMeInput) (User, error)
+type GetMeFunc func(in GetMeInput) (PublicUser, error)
 
 // ListOrdersFunc は op server.listOrders の関数の型。
 //
@@ -67,7 +67,7 @@ type Ops interface {
 	// GetMe は自分の情報。
 	//
 	// Throws: server.Unauthorized
-	GetMe(in GetMeInput) (User, error)
+	GetMe(in GetMeInput) (PublicUser, error)
 
 	// ListOrders は op server.listOrders。
 	//
@@ -106,9 +106,9 @@ func (o *ops) Login(in LoginInput) (LoginOk, error) {
 	return States.Sessions.Login(in)
 }
 
-func (o *ops) GetMe(in GetMeInput) (User, error) {
+func (o *ops) GetMe(in GetMeInput) (PublicUser, error) {
 	if o.leaves.GetMe == nil {
-		return User{}, &runtime.MissingError{Kind: "leaf", Name: "server.getMe"}
+		return PublicUser{}, &runtime.MissingError{Kind: "leaf", Name: "server.getMe"}
 	}
 	return o.leaves.GetMe(in)
 }

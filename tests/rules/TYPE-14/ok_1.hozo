@@ -1,0 +1,12 @@
+// TYPE-14（docs/types.md「本体に書けるもの」）: 足すフィールドは、元の model のフィールドにない名前。
+// 元の model がなくしたフィールドは元の model にないので、同じ名前のフィールドを足せる
+namespace a {
+  model User { id: string; name: string; hash: string; }
+  model P extends User {
+    nick: string?;
+    level: int = 1;
+  }
+  model Q extends User { override hash: never; }
+  model R extends Q { hash: int; }
+  op f(): R;
+}

@@ -66,21 +66,26 @@ type PackBulkFunc func(line Line) (Line, error)
 type LoginFunc func(token Token) error
 
 // OpenTopFunc は op shop.openTop の関数の型。
+//
+// Reads: shop.token
 type OpenTopFunc func() error
 
 // OpenCartFunc は op shop.openCart の関数の型。
 //
+// Reads: shop.carts
 // Effects: shop.clearCart
 type OpenCartFunc func() error
 
 // CheckoutFunc は op shop.checkout の関数の型。
 //
 // Throws: shop.EmptyCart
+// Reads: shop.carts, shop.orders
 // Effects: shop.placeOrder
 type CheckoutFunc func() (*Order, error)
 
 // AddFunc は op shop.add の関数の型。
 //
+// Reads: shop.token
 // Effects: shop.addLine
 type AddFunc func(line Line) error
 
@@ -159,21 +164,26 @@ type Ops interface {
 	Login(token Token) error
 
 	// OpenTop は op shop.openTop。
+	//
+	// Reads: shop.token
 	OpenTop() error
 
 	// OpenCart は op shop.openCart。
 	//
+	// Reads: shop.carts
 	// Effects: shop.clearCart
 	OpenCart() error
 
 	// Checkout は op shop.checkout。
 	//
 	// Throws: shop.EmptyCart
+	// Reads: shop.carts, shop.orders
 	// Effects: shop.placeOrder
 	Checkout() (*Order, error)
 
 	// Add は op shop.add。
 	//
+	// Reads: shop.token
 	// Effects: shop.addLine
 	Add(line Line) error
 }

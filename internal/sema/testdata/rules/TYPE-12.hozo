@@ -1,12 +1,18 @@
-// TYPE-12: C.Case<T> の T が C の subject に渡せない（docs/types.md「診断」）
+// TYPE-12: C.Case<T> の T が C の対象の型（値の分類は subject の型、op の分類はその op の returns）に渡せない（docs/types.md「診断」）
 namespace a {
   model M { id: string; }
   model N { name: string; }
   classify C of M { A; }
   op ok(m: C.A<M>): void;
   op ng(n: C.A<N>): void;              // ERROR: TYPE-12
-  // 状態の分類には対象の型がないので、ケースで絞り込んだ型は書けない
+  // op の分類の対象の型は、その op の returns
+  op find(): M?;
+  classify Found of find { Hit; default; }
+  op ok2(m: Found.Hit<M?>): void;
+  op ok3(m: Found.Hit<M>): void;
+  op ng3(n: Found.Hit<N>): void;       // ERROR: TYPE-12
+  // 状態の分類のケースで絞り込んだ型は書けない（RES-4。docs/resolve.md「位置ごとに受け付ける種類」の「型」）
   state items: list<M>;
   classify Stock of items { None; Some; }
-  op ng2(m: Stock.Some<M>): void;      // ERROR: TYPE-12
+  op ng2(m: Stock.Some<M>): void;      // ERROR: RES-4
 }

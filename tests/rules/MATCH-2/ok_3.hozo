@@ -1,0 +1,11 @@
+// MATCH-2（docs/check.md「標準の分類」）: 標準の分類（by list / by nullable）のケースは Empty / HasItems で、default はない。
+// 値を対象にしても同じ
+namespace a {
+  model In { token: string?; lines: string[]; }
+  op f();
+  op ok(in: In) {
+    match in.token by nullable { Empty => f(); HasItems => none; };
+    match in.lines by list { HasItems => f(); Empty => none; };
+    match in.lines by list { Empty | HasItems => f(); };
+  }
+}

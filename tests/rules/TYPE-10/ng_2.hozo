@@ -1,0 +1,18 @@
+// TYPE-10（docs/types.md「診断」）: 元の model を持たない model（extends のない model、その場で書いた model）に書いた override
+namespace a {
+  decorator mark for field;
+  model Plain {
+    id: string;
+    @mark override id;                 // ERROR: TYPE-10
+  }
+  union U {
+    Arm: {
+      x: string;
+      override x: never;               // ERROR: TYPE-10
+    };
+  }
+  exception E: {
+    override x: string;                // ERROR: TYPE-10
+  };
+  op f(): Plain;
+}

@@ -85,8 +85,8 @@ func TestKeywordsCovered(t *testing.T) {
 			scopes[w] = rule.Name
 		}
 	}
-	if groups != 4 {
-		t.Errorf("予約語のパターンは docs/editors.md の表の 4 行のはずが %d", groups)
+	if groups != 5 {
+		t.Errorf("予約語のパターンは docs/editors.md の表の 5 行のはずが %d", groups)
 	}
 	for w := range token.Keywords {
 		if count[w] != 1 {
@@ -103,11 +103,19 @@ func TestKeywordsCovered(t *testing.T) {
 	wantScope := map[string]string{
 		"namespace": "keyword.declaration.hozo",
 		"bind":      "keyword.declaration.hozo",
-		"is":        "keyword.control.hozo",
+		"export":    "storage.modifier.hozo",
+		"override":  "storage.modifier.hozo",
+		"extends":   "keyword.control.hozo",
+		"as":        "keyword.control.hozo",
+		"reads":     "keyword.control.hozo",
 		"any":       "keyword.control.hozo",
 		"const":     "keyword.control.hozo",
 		"default":   "keyword.control.hozo",
+		"throw":     "keyword.control.hozo",
 		"string":    "support.type.primitive.hozo",
+		"never":     "support.type.primitive.hozo",
+		"list":      "support.type.primitive.hozo",
+		"nullable":  "support.type.primitive.hozo",
 		"single":    "support.type.primitive.hozo",
 		"true":      "constant.language.hozo",
 		"false":     "constant.language.hozo",

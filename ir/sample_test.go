@@ -18,16 +18,19 @@ func sampleProgram() *Program {
 				Decls: []Decl{
 					&State{
 						DeclBase: DeclBase{Name: "db", Span: span("global.hozo", 1, 1, 1, 20)},
+						Type:     Array(Ref("server.User")),
 						Shape:    StateList,
 						Element:  Ref("server.User"),
 					},
 					&State{
 						DeclBase: DeclBase{Name: "session", Span: span("global.hozo", 2, 1, 2, 40)},
+						Type:     Optional(Ref("server.Token")),
 						Shape:    StateNullable,
 						Element:  Ref("server.Token"),
 					},
 					&State{
 						DeclBase: DeclBase{Name: "clock", Span: span("global.hozo", 3, 1, 3, 30)},
+						Type:     Time(),
 						Shape:    StateSingle,
 						Element:  Time(),
 					},
@@ -36,8 +39,16 @@ func sampleProgram() *Program {
 						Subject:  StatesSubject{States: []string{"db", "session"}},
 						Cases: []ClassifyCase{
 							{Name: "Anonymous", Span: span("global.hozo", 5, 3, 5, 13)},
-							{Name: "LoggedIn", Span: span("global.hozo", 6, 3, 6, 12)},
+							{
+								Name: "LoggedIn",
+								As: []CaseTyping{
+									{State: "session", Type: Ref("server.Token"), By: NarrowByPresence, Span: span("global.hozo", 6, 13, 6, 40)},
+									{State: "db", Type: Array(Ref("server.User")), By: NarrowByPredicate, Span: span("global.hozo", 6, 42, 6, 60)},
+								},
+								Span: span("global.hozo", 6, 3, 6, 61),
+							},
 						},
+						DecidedBy: DecidedByPredicate,
 					},
 					&Effect{
 						DeclBase: DeclBase{Name: "login", Span: span("global.hozo", 8, 1, 8, 50)},
@@ -112,9 +123,9 @@ func sampleProgram() *Program {
 						},
 					},
 					&Model{
-						DeclBase:    DeclBase{Name: "server.PublicUser", Span: span(f, 14, 1, 14, 40)},
-						Fields:      []Field{{Name: "id", Type: Int(), Span: span(f, 7, 3, 7, 10)}},
-						DerivedFrom: &DerivedFrom{Base: "server.User", Omit: []string{"email", "token", "tags", "limit", "attrs"}},
+						DeclBase: DeclBase{Name: "server.PublicUser", Span: span(f, 14, 1, 14, 40)},
+						Fields:   []Field{{Name: "id", Type: Int(), Span: span(f, 14, 3, 14, 20)}, {Name: "nick", Type: String(), Span: span(f, 14, 22, 14, 35)}},
+						Extends:  &ModelExtends{Base: "server.User", Removed: []string{"email", "token", "tags", "limit", "attrs"}, Overridden: []string{"id"}},
 					},
 					&Union{
 						DeclBase: DeclBase{Name: "server.OrderPage", Span: span(f, 16, 1, 19, 2)},
@@ -168,6 +179,18 @@ func sampleProgram() *Program {
 						},
 						HasDefault:         true,
 						DefaultDescription: &Doc{Summary: "Others.", Body: "Others."},
+						DecidedBy:          DecidedByPredicate,
+					},
+					&Classify{
+						DeclBase: DeclBase{Name: "server.Registration", Span: span(f, 34, 1, 34, 80)},
+						Subject:  OpSubject{Op: "server.findUser", Type: Optional(Ref("server.User"))},
+						Cases: []ClassifyCase{{
+							Name: "Registered",
+							As:   []CaseTyping{{Type: Ref("server.User"), By: NarrowByPresence, Span: span(f, 34, 50, 34, 70)}},
+							Span: span(f, 34, 38, 34, 71),
+						}},
+						HasDefault: true,
+						DecidedBy:  DecidedByType,
 					},
 					&Classify{
 						DeclBase:      DeclBase{Name: "server.IsAdmin", Span: span(f, 35, 1, 35, 30)},
@@ -175,6 +198,7 @@ func sampleProgram() *Program {
 						Cases:         []ClassifyCase{{Name: "IsAdmin", Span: span(f, 35, 11, 35, 18)}},
 						HasDefault:    true,
 						FromCondition: true,
+						DecidedBy:     DecidedByPredicate,
 					},
 					&Decorator{
 						DeclBase: DeclBase{Name: "server.retry", Span: span(f, 37, 1, 41, 2)},
@@ -239,11 +263,13 @@ func sampleProgram() *Program {
 							},
 							Span: span(f, 47, 1, 47, 60),
 						},
-						Params:  []OpParam{{Name: "id", Type: Int(), Span: span(f, 47, 15, 47, 22)}},
-						Returns: Optional(Ref("server.User")),
-						Effects: []string{"server.UserCreated"},
-						Throws:  []ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
-						Body:    nil,
+						Exported: true,
+						Params:   []OpParam{{Name: "id", Type: Int(), Span: span(f, 47, 15, 47, 22)}},
+						Returns:  Optional(Ref("server.User")),
+						Effects:  []string{"server.UserCreated"},
+						Reads:    []string{"db"},
+						Throws:   []ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
+						Body:     nil,
 						Signature: Signature{
 							Exceptions: []string{"server.Unauthorized", "server.Unavailable"},
 							Effects:    []string{"server.UserCreated"},
@@ -252,7 +278,14 @@ func sampleProgram() *Program {
 								{Exception: "server.Unavailable", Effect: "server.UserCreated", State: Unknown},
 							},
 							SuccessEffects: []SuccessEffect{{Effect: "server.UserCreated", State: Kept}},
+							Reads:          []string{"db"},
 						},
+					},
+					&Op{
+						DeclBase:  DeclBase{Name: "server.unauthorized", Span: span(f, 48, 1, 48, 50)},
+						Returns:   Never(),
+						Throws:    []ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
+						Signature: Signature{Exceptions: []string{"server.Unauthorized"}, Pure: true},
 					},
 					&Op{
 						DeclBase: DeclBase{Name: "server.notify", Span: span(f, 49, 1, 49, 30)},
@@ -321,11 +354,16 @@ func sampleProgram() *Program {
 							},
 							MatchStmt{
 								Match: Match{
-									Subject:  StateSubject{State: "session"},
-									Classify: string(StateNullable),
+									Subject:  ValueSubject{Atom: StateAtom{State: "session", Span: span(f, 62, 9, 62, 16)}},
+									Classify: ClassifyNullable,
 									Arms: []MatchArm{
 										{Cases: ArmCases{Cases: []string{CaseEmpty}}, Body: NoneBody{}, Span: span(f, 63, 5, 63, 19)},
-										{Cases: ArmCases{Cases: []string{CaseHasItems}}, Body: CallExpr{Call: Call{Op: "server.notify", Span: span(f, 64, 17, 64, 32)}}, Span: span(f, 64, 5, 64, 33)},
+										{
+											Cases:    ArmCases{Cases: []string{CaseHasItems}},
+											Body:     CallExpr{Call: Call{Op: "server.notify", Span: span(f, 64, 17, 64, 32)}},
+											Narrowed: []Narrowing{{Type: Ref("server.Token")}},
+											Span:     span(f, 64, 5, 64, 33),
+										},
 									},
 									Span: span(f, 62, 3, 65, 4),
 								},
@@ -336,7 +374,13 @@ func sampleProgram() *Program {
 									Subject:  ClassifyOwnedSubject{},
 									Classify: "Login",
 									Arms: []MatchArm{
-										{Cases: ArmCases{Cases: []string{"Anonymous", "LoggedIn"}}, Body: NoneBody{}, Span: span(f, 67, 5, 67, 34)},
+										{Cases: ArmCases{Cases: []string{"Anonymous"}}, Body: ThrowBody{Exception: "server.Unauthorized", Span: span(f, 67, 18, 67, 43)}, Span: span(f, 67, 5, 67, 44)},
+										{
+											Cases:    ArmCases{Cases: []string{"LoggedIn"}},
+											Body:     AtomExpr{Atom: StateAtom{State: "session", Path: []string{"value"}, Span: span(f, 67, 58, 67, 71)}},
+											Narrowed: []Narrowing{{State: "session", Type: Ref("server.Token")}, {State: "db", Type: Array(Ref("server.User"))}},
+											Span:     span(f, 67, 46, 67, 72),
+										},
 									},
 									Span: span(f, 66, 3, 68, 4),
 								},

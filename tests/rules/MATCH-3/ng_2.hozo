@@ -1,0 +1,20 @@
+// MATCH-3（docs/grammar.md「配線」の ArmBody。文法で閉じる）: アームの本体に match、const、複数の文は書けない。
+// throw の後ろは例外の名前一つ
+namespace a {
+  model M { id: string; }
+  exception E;
+  classify C of M { A; B; }
+  op use(m: M): M;
+  op f(m: M): M {
+    return match m by C {              // ERROR: MATCH-2
+      A => match m by C { A => m; B => m; };   // ERROR: SYNTAX
+      B => m;
+    };
+  }
+  op g(m: M): M throws E {
+    return match m by C {              // ERROR: MATCH-2
+      A => throw use(m);               // ERROR: SYNTAX
+      B => m;
+    };
+  }
+}

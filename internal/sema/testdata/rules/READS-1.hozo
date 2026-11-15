@@ -1,0 +1,15 @@
+// READS-1（tests/rules/READS-1/ng_1.hozo と同じ。docs/check.md「状態と効果」「reads」）: 葉の op が読めるのは自分の名前空間の状態だけ。位置はその状態の名前
+state shared: list<string>;
+namespace a {
+  state own: list<string>;
+  op f(): string[] reads b.users;                // ERROR: READS-1
+  op g(): string[] reads own, b.users;           // ERROR: READS-1
+  op h(): string[] reads shared;                 // ERROR: READS-1
+  op i(): string[]
+    reads own
+    reads b.users, b.token;                      // ERROR: READS-1
+}
+namespace b {
+  state users: list<string>;
+  state token: nullable<string>;
+}

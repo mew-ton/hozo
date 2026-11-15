@@ -10,6 +10,7 @@ import (
 // OnAddToCart は op browser.onAddToCart。
 //
 // Throws: http.ServerError, http.NetworkError, page.Aborted
+// Reads: browser.token
 // Effects: server.addCartLine, server.attachWarrantyToLine, browser.transitionToPayment
 func (o *ops) OnAddToCart(item server.Item) error {
 	if o.deps.Server.AddToCart == nil {
@@ -45,6 +46,7 @@ func (o *ops) OnAddToCart(item server.Item) error {
 // ChooseYamadaWarranty は op browser.chooseYamadaWarranty。
 //
 // Throws: page.Aborted, http.ServerError, http.NetworkError
+// Reads: browser.token
 // Effects: server.attachWarrantyToLine
 // 前提: item は browser.WarrantyKind.Yamada<server.Item>
 func (o *ops) ChooseYamadaWarranty(item server.Item, line server.CartLine) (server.WarrantyLine, error) {
@@ -61,6 +63,7 @@ func (o *ops) ChooseYamadaWarranty(item server.Item, line server.CartLine) (serv
 // FetchMe は op browser.fetchMe。
 //
 // Throws: http.ServerError, http.NetworkError
+// Reads: browser.token
 func (o *ops) FetchMe() (server.PublicUser, error) {
 	if o.deps.Server.GetMe == nil {
 		return server.PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "server.getMe"}
@@ -71,6 +74,7 @@ func (o *ops) FetchMe() (server.PublicUser, error) {
 // FetchOrders は op browser.fetchOrders。
 //
 // Throws: http.ServerError, http.NetworkError
+// Reads: browser.token
 func (o *ops) FetchOrders(query OrdersQuery) ([]server.OrderSummary, error) {
 	if o.deps.Server.GetOrders == nil {
 		return nil, &runtime.MissingError{Kind: "dep", Name: "server.getOrders"}
@@ -79,6 +83,8 @@ func (o *ops) FetchOrders(query OrdersQuery) ([]server.OrderSummary, error) {
 }
 
 // OpenOrders は op browser.openOrders。
+//
+// Reads: browser.token
 func (o *ops) OpenOrders(query OrdersQuery) (OrderPage, error) {
 	me, err := o.FetchMe()
 	if err != nil {
@@ -92,6 +98,8 @@ func (o *ops) OpenOrders(query OrdersQuery) (OrderPage, error) {
 }
 
 // OpenProfile は op browser.openProfile。
+//
+// Reads: browser.token
 func (o *ops) OpenProfile() (ProfilePage, error) {
 	me, err := o.FetchMe()
 	if err != nil {

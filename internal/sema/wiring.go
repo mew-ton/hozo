@@ -35,6 +35,9 @@ type wiringScope struct {
 	params   map[string]*binding
 	bindings map[string]*binding
 	order    []*binding
+	// narrow は、今見ているアームの中で絞り込まれた型（docs/types.md「アームの中の対象の型」）。キーは narrowKey。
+	// アームの本体を評価する間だけ持つ。
+	narrow map[string]exprType
 }
 
 // lookup は束縛か引数。
@@ -55,12 +58,15 @@ func (a *analyzer) lowerWirings() {
 
 // wiring は一つの配線の下ろしの状態。
 type wiring struct {
-	job   *wiringJob
-	sc    *scope
+	job *wiringJob
+	// sc は宣言の名前（呼び出す op、分類、例外）を解決するスコープ。
+	sc *scope
+	// vsc は値の位置（Atom の Path）のスコープ。今の名前空間の状態を名前で読める。
+	vsc   *scope
 	scope *wiringScope
 }
 
-// lowerWiring は配線の本体（docs/ir.md「配線」）。WIRE-2 / WIRE-3 / WIRE-4 / WIRE-8 と式の型。
+// lowerWiring は配線の本体（docs/ir.md「配線」）。WIRE-2 / WIRE-3 / WIRE-4 / WIRE-8 / WIRE-9 と式の型。
 func (a *analyzer) lowerWiring(j *wiringJob) {
 	ws := &wiringScope{op: j.sym.fqn, params: map[string]*binding{}, bindings: map[string]*binding{}}
 	for _, p := range j.op.Params {
@@ -74,7 +80,7 @@ func (a *analyzer) lowerWiring(j *wiringJob) {
 		}
 		ws.params[p.Name] = &binding{name: p.Name, typ: typ, span: span, isParam: true, target: Target{Kind: TargetOpParam, Decl: j.sym.fqn, Name: p.Name, Span: span}}
 	}
-	w := &wiring{job: j, scope: ws, sc: &scope{ns: j.sym.ns, wiring: ws}}
+	w := &wiring{job: j, scope: ws, sc: &scope{ns: j.sym.ns, wiring: ws}, vsc: &scope{ns: j.sym.ns, wiring: ws, values: true}}
 	body := &ir.Wiring{}
 	stmts := j.decl.Body.Stmts
 	for i, s := range stmts {
@@ -141,9 +147,10 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 			return nil, false
 		}
 		t, call, ok := a.evalCall(w, s.Call, nil)
-		if ok && t.kind != etNoValue && t.kind != etUnknown {
+		if ok && hasValue(t) {
 			a.errorf("WIRE-2", s.Call.Span, "呼び出し %s は値を返すので、束縛せずに書けない（設計書 §9）", call.Op)
 		}
+		a.checkWIRE9(t, s.Span, last)
 		if !ok {
 			return nil, false
 		}
@@ -152,23 +159,39 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		if s.Match == nil {
 			return nil, false
 		}
-		t, m := a.evalMatch(w, s.Match)
-		if t.kind != etNoValue && t.kind != etUnknown {
+		t, m := a.evalMatch(w, s.Match, nil)
+		if hasValue(t) {
 			a.errorf("WIRE-2", s.Match.Span, "match は値を持つので、束縛せずに書けない（設計書 §9）")
 		}
+		a.checkWIRE9(t, s.Span, last)
 		return ir.MatchStmt{Match: m, Span: a.irSpan(s.Span)}, true
 	}
 	return nil, false
 }
 
-// lowerConst は `const x = 式;`。WIRE-4（同じ名前を二度束縛、引数と同じ名前）、WIRE-2（式が「値がない」）、
+// hasValue は式に値があるか（「値がない」「返らない」と、解決できなかった式を除く）。
+func hasValue(t exprType) bool {
+	return t.kind != etNoValue && t.kind != etNever && t.kind != etUnknown
+}
+
+// checkWIRE9 は WIRE-9（docs/check.md「配線」）: 「返らない」式の文が、本体の最後以外にある（下の行が評価されない）。
+func (a *analyzer) checkWIRE9(t exprType, span source.Span, last bool) {
+	if t.kind == etNever && !last {
+		a.errorf("WIRE-9", span, "この文は決して返らないので、本体の最後にだけ書ける（下の行が評価されない）")
+	}
+}
+
+// lowerConst は `const x = 式;`。WIRE-4（同じ名前を二度束縛、引数と同じ名前）、WIRE-2（式が「値がない」か「返らない」）、
 // TYPE-7（レコードリテラルの当てはめる先が決まらない）。
 func (a *analyzer) lowerConst(w *wiring, s *ast.ConstStmt) (ir.Statement, bool) {
-	t, expr, ok := a.evalExpr(w, s.Value)
+	t, expr, ok := a.evalExpr(w, s.Value, nil)
 	name := s.Name.Name
 	switch t.kind {
 	case etNoValue:
 		a.errorf("WIRE-2", s.Value.NodeSpan(), "const %s に束縛する式は値を持たない（設計書 §9）", name)
+		t = unknownType()
+	case etNever:
+		a.errorf("WIRE-2", s.Value.NodeSpan(), "const %s に束縛する式は決して返らない（束縛できない）", name)
 		t = unknownType()
 	case etRecord:
 		a.errorf("TYPE-7", s.Value.NodeSpan(), "レコードリテラルの当てはめる先が決まらない（const %s）。引数か return の位置に書く", name)
@@ -192,6 +215,7 @@ func (a *analyzer) lowerConst(w *wiring, s *ast.ConstStmt) (ir.Statement, bool) 
 }
 
 // lowerReturn は `return 式;`。WIRE-3（void の op に return、最後以外の行の return）、WIRE-2（値がない）、TYPE-3（returns に渡せない）。
+// 「返らない」式は、どの型の return にも書ける（docs/types.md「式の型」）。
 func (a *analyzer) lowerReturn(w *wiring, s *ast.ReturnStmt, last bool) (ir.Statement, bool) {
 	op := w.job.op
 	if op.Returns == nil {
@@ -199,20 +223,26 @@ func (a *analyzer) lowerReturn(w *wiring, s *ast.ReturnStmt, last bool) (ir.Stat
 	} else if !last {
 		a.errorf("WIRE-3", s.Span, "return は本体の最後の文にだけ書ける（下の行が評価されないため）")
 	}
-	t, expr, ok := a.evalExpr(w, s.Value)
+	t, expr, ok := a.evalExpr(w, s.Value, &returnContext{returns: op.Returns})
 	if !ok {
 		return nil, false
 	}
 	if t.kind == etNoValue {
 		a.errorf("WIRE-2", s.Value.NodeSpan(), "return の式は値を持たない（設計書 §9）")
 	} else if op.Returns != nil && a.assign(t, op.Returns) != assignOK {
-		a.errorf("TYPE-3", s.Value.NodeSpan(), "return の値の型 %s は op %s の戻り値の型 %s に渡せない（射影もできない）", exprName(t), op.Name, typeName(op.Returns))
+		a.errorf("TYPE-3", s.Value.NodeSpan(), "return の値の型 %s は op %s の戻り値の型 %s に渡せない", exprName(t), op.Name, typeName(op.Returns))
 	}
 	return ir.ReturnStmt{Expr: expr, Span: a.irSpan(s.Span)}, true
 }
 
-// evalExpr は式の型（docs/types.md「式の型」）と IR の式。
-func (a *analyzer) evalExpr(w *wiring, e ast.Expr) (exprType, ir.Expr, bool) {
+// returnContext は `return` の式であること。match のアームがレコードリテラルと none だけのとき、当てはめる先を
+// op の returns から決めるために渡す（docs/types.md「match の型」の 5.3）。
+type returnContext struct {
+	returns ir.Type
+}
+
+// evalExpr は式の型（docs/types.md「式の型」）と IR の式。ret は式が `return` の式なら nil でない。
+func (a *analyzer) evalExpr(w *wiring, e ast.Expr, ret *returnContext) (exprType, ir.Expr, bool) {
 	switch e := e.(type) {
 	case nil:
 		return unknownType(), nil, false
@@ -220,7 +250,7 @@ func (a *analyzer) evalExpr(w *wiring, e ast.Expr) (exprType, ir.Expr, bool) {
 		t, call, ok := a.evalCall(w, e, nil)
 		return t, ir.CallExpr{Call: call}, ok
 	case *ast.Match:
-		t, m := a.evalMatch(w, e)
+		t, m := a.evalMatch(w, e, ret)
 		return t, ir.MatchExpr{Match: m}, true
 	case ast.Atom:
 		t, atom := a.evalAtom(w, e)
@@ -229,15 +259,16 @@ func (a *analyzer) evalExpr(w *wiring, e ast.Expr) (exprType, ir.Expr, bool) {
 	return unknownType(), nil, false
 }
 
-// armContext は match のアームの本体の呼び出しで、subject を絞り込まれた型として渡すための文脈（MATCH-4）。
+// armContext は値を対象にした match のアームの本体の文脈。呼び出しに対象と同じ Atom をそのまま渡していて、
+// アームの中の対象の型では渡せなければ、TYPE-4 ではなく MATCH-4 にする。
 type armContext struct {
-	subject  []string // subject の Atom.name のパス
-	narrowed exprType
-	cases    string
+	// subject は対象の Atom の同一性（narrowKey）。対象が名前でなければ空。
+	subject string
+	cases   string
 }
 
 // evalCall は呼び出し。op を解決し、位置の引数を引数名に対応付け（docs/ir.md「正規化」）、型を照合する（TYPE-4、MATCH-4）。
-// Bound は nil のまま（docs/check.md「bind」が埋める）。
+// 別の名前空間の、export のない op なら NS-5。Bound は nil のまま（docs/check.md「bind」が埋める）。
 func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, ir.Call, bool) {
 	call := ir.Call{Span: a.irSpan(c.Span)}
 	args := a.evalArgs(w, c.Args)
@@ -249,6 +280,7 @@ func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, 
 	if !ok {
 		return unknownType(), call, false
 	}
+	a.checkNS5(r.sym, w.sc.ns, c.Callee.Span)
 	call.Op = op.Name
 	for i, arg := range args {
 		if i >= len(op.Params) {
@@ -257,12 +289,20 @@ func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, 
 		}
 		p := op.Params[i]
 		call.Args = append(call.Args, ir.CallArg{Param: p.Name, Value: arg.atom})
-		a.checkArg(w, op, p, arg, arm)
+		a.checkArg(op, p, arg, arm)
 	}
-	if op.Returns == nil {
-		return noValue(), call, true
+	return callType(op.Returns), call, true
+}
+
+// checkNS5 は NS-5（docs/check.md「名前空間」）: 別の名前空間の、export のない op を呼んだ。位置は呼び出しの op の名前
+// （デコレータの引数ならその引数の値）。Related にその op の宣言。from は呼ぶ側の名前空間。
+func (a *analyzer) checkNS5(op *symbol, from *namespace, span source.Span) {
+	d, ok := op.node.(*ast.OpDecl)
+	if !ok || d.Export || op.ns == from {
+		return
 	}
-	return valueType(op.Returns), call, true
+	a.errorf("NS-5", span, "op %s は名前空間 %s の内部の op で、別の名前空間 %s からは呼べない（呼べるようにするには export を付ける）", op.fqn, nsName(op.ns), nsName(from)).
+		Related = []diag.Related{related(op.nameSpan, "op %s の宣言", op.fqn)}
 }
 
 // evaluatedArg は評価した引数。
@@ -270,7 +310,9 @@ type evaluatedArg struct {
 	typ  exprType
 	atom ir.Atom
 	span source.Span
-	path []string // Atom.name のパス（subject の照合に使う）
+	// key は名前の Atom の同一性（narrowKey）。名前でなければ空。
+	key  string
+	text string
 }
 
 func (a *analyzer) evalArgs(w *wiring, atoms []ast.Atom) []evaluatedArg {
@@ -279,50 +321,71 @@ func (a *analyzer) evalArgs(w *wiring, atoms []ast.Atom) []evaluatedArg {
 		if at == nil {
 			continue
 		}
-		t, atom := a.evalAtom(w, at)
-		arg := evaluatedArg{typ: t, atom: atom, span: at.NodeSpan()}
-		if n, ok := at.(*ast.NameAtom); ok {
-			arg.path = segmentsOf(n.Name)
-		}
-		out = append(out, arg)
+		t, atom, key := a.evalAtomKey(w, at)
+		out = append(out, evaluatedArg{typ: t, atom: atom, span: at.NodeSpan(), key: key, text: a.text(at.NodeSpan())})
 	}
 	return out
 }
 
-// checkArg は引数の型の照合。アームの中で subject をそのまま渡していれば絞り込まれた型で照合し、違反は MATCH-4。
-func (a *analyzer) checkArg(w *wiring, op *ir.Op, p ir.OpParam, arg evaluatedArg, arm *armContext) {
+// checkArg は引数の型の照合（TYPE-4 / TYPE-1）。アームの中の対象は、絞り込まれた型で評価されている。
+// 対象と同じ Atom をそのまま渡していて渡せなければ MATCH-4。
+func (a *analyzer) checkArg(op *ir.Op, p ir.OpParam, arg evaluatedArg, arm *armContext) {
 	if p.Type == nil {
 		return
 	}
-	if arm != nil && arg.path != nil && strings.Join(arg.path, ".") == strings.Join(arm.subject, ".") {
-		if a.assign(arm.narrowed, p.Type) != assignOK {
-			a.errorf("MATCH-4", arg.span, "アーム %s の中で %s は %s に絞り込まれているが、op %s の引数 %s の型 %s に渡せない", arm.cases, strings.Join(arg.path, "."), exprName(arm.narrowed), op.Name, p.Name, typeName(p.Type))
-		}
+	fail := a.assign(arg.typ, p.Type)
+	if fail == assignOK {
 		return
 	}
-	if fail := a.assign(arg.typ, p.Type); fail != assignOK {
-		a.errorf(string(fail), arg.span, "%s", failMessage(fail, fmt.Sprintf("op %s の引数 %s", op.Name, p.Name), arg.typ, p.Type))
+	if arm != nil && arm.subject != "" && arg.key == arm.subject {
+		a.errorf("MATCH-4", arg.span, "アーム %s の中で %s の型は %s で、op %s の引数 %s の型 %s に渡せない", arm.cases, arg.text, exprName(arg.typ), op.Name, p.Name, typeName(p.Type))
+		return
 	}
+	a.errorf(string(fail), arg.span, "%s", failMessage(fail, fmt.Sprintf("op %s の引数 %s", op.Name, p.Name), arg.typ, p.Type))
 }
 
-// evalAtom は Atom の型と IR。名前は束縛・引数・そのフィールド（docs/resolve.md「手続き」1.1 と 2）。
+// evalAtom は Atom の型と IR。
 func (a *analyzer) evalAtom(w *wiring, at ast.Atom) (exprType, ir.Atom) {
+	t, atom, _ := a.evalAtomKey(w, at)
+	return t, atom
+}
+
+// evalAtomKey は Atom の型と IR と、名前の Atom の同一性（narrowKey。名前でなければ空）。
+// 名前は束縛・引数・今の名前空間の状態と、そのフィールド（docs/resolve.md「位置ごとに受け付ける種類」の
+// 「配線の値の位置の Path」）。束縛と引数は Atom.name、状態は Atom.state になる。別の名前空間の状態は RES-5。
+// アームの中では、対象は絞り込まれた型になる（スコープが持つ）。
+func (a *analyzer) evalAtomKey(w *wiring, at ast.Atom) (exprType, ir.Atom, string) {
 	switch at := at.(type) {
 	case *ast.NameAtom:
-		r, ok := a.resolve(at.Name, w.sc, acValue)
-		atom := ir.NameAtom{Path: segmentsOf(at.Name), Span: a.irSpan(at.Span)}
+		span := a.irSpan(at.Span)
+		r, ok := a.resolve(at.Name, w.vsc, acValue|acState)
 		if !ok {
-			return unknownType(), atom
+			return unknownType(), ir.NameAtom{Path: segmentsOf(at.Name), Span: span}, ""
 		}
-		return r.value.typ, atom
+		v := r.value
+		if r.kind == rDecl {
+			// 状態そのもの
+			sv, err := a.stateValue(r.sym, w.vsc, at.Name.Span)
+			if err != nil {
+				a.reportResolve(err)
+				return unknownType(), ir.NameAtom{Path: segmentsOf(at.Name), Span: span}, ""
+			}
+			v = sv
+		}
+		key := narrowKey(v.root, v.fields)
+		if v.state != nil {
+			return v.typ, ir.StateAtom{State: v.state.fqn, Path: v.fields, Span: span}, key
+		}
+		return v.typ, ir.NameAtom{Path: segmentsOf(at.Name), Span: span}, key
 	case *ast.Literal:
-		return literalType(at.Kind), ir.LiteralAtom{Literal: a.lowerLiteral(at), Span: a.irSpan(at.Span)}
+		return literalType(at.Kind), ir.LiteralAtom{Literal: a.lowerLiteral(at), Span: a.irSpan(at.Span)}, ""
 	case *ast.NoneAtom:
-		return noneType(), ir.NoneAtom{Span: a.irSpan(at.Span)}
+		return noneType(), ir.NoneAtom{Span: a.irSpan(at.Span)}, ""
 	case *ast.RecordLit:
-		return a.evalRecord(w, at)
+		t, atom := a.evalRecord(w, at)
+		return t, atom, ""
 	}
-	return unknownType(), nil
+	return unknownType(), nil, ""
 }
 
 // evalRecord はレコードリテラル。`{ item }` は `{ item: item }` に展開する（docs/ir.md「正規化」）。
@@ -353,11 +416,11 @@ func segmentsOf(qn ast.QualifiedName) []string {
 	return out
 }
 
-// matchClass は match が使う分類: classify の宣言か、基底の状態の組み込みの分類（docs/check.md「状態の形」）。
+// matchClass は match が使う分類: classify の宣言か、標準の分類（docs/check.md「標準の分類」）。
 type matchClass struct {
-	// name は IR の Match.classify: classify の FQN か、組み込みの分類なら状態の形（"list" / "nullable"）。
+	// name は IR の Match.classify: classify の FQN か、標準の分類なら "list" / "nullable"。
 	name string
-	// classify は classify の宣言。組み込みの分類なら nil。
+	// classify は classify の宣言。標準の分類なら nil。
 	classify   *ir.Classify
 	cases      []string
 	hasDefault bool
@@ -366,7 +429,7 @@ type matchClass struct {
 // label は診断に出す分類の呼び名。後ろに「のケース」と続ける形。
 func (c *matchClass) label() string {
 	if c.classify == nil {
-		return c.name + " の組み込みの分類"
+		return "標準の分類 " + c.name + " "
 	}
 	return "classify " + c.name + " "
 }
@@ -379,25 +442,24 @@ func classOf(c *ir.Classify) *matchClass {
 	return mc
 }
 
-// builtinClass は形 shape の組み込みの分類。ケースは Empty / HasItems で、default はない。
-func builtinClass(shape string) *matchClass {
-	return &matchClass{name: shape, cases: ir.BuiltinCases()}
+// standardClass は標準の分類（list / nullable）。ケースは Empty / HasItems で、default はない。
+func standardClass(name string) *matchClass {
+	return &matchClass{name: name, cases: ir.BuiltinCases()}
 }
 
-// evalMatch は match。形は三つ（docs/grammar.md「配線」の表。合わなければ MATCH-7）: 値の分類での match、
-// 基底の状態の組み込みの分類での match（by list / by nullable）、状態の分類での match（対象を書かない）。
-// MATCH-2 はどの形にも、MATCH-4 / MATCH-6 と絞り込みは値の match にだけ掛かる。アームの型の集め方は
-// docs/types.md「式の型」（値でも状態でも同じ）。
-func (a *analyzer) evalMatch(w *wiring, m *ast.Match) (exprType, ir.Match) {
+// evalMatch は match。形は三つ（docs/grammar.md「配線」の表。合わなければ MATCH-7）: 値を対象にした、値の分類か
+// op の分類での match。値を対象にした、標準の分類での match（by list / by nullable）。状態の分類での match
+// （対象を書かない）。MATCH-2 はどの形にも、MATCH-4 / MATCH-6 は値を対象にした match に掛かる。
+// アームの中の対象の型は docs/types.md「アームの中の対象の型」、アームの型の集め方は同「match の型」。
+// ret は match が `return` の式なら nil でない。
+func (a *analyzer) evalMatch(w *wiring, m *ast.Match, ret *returnContext) (exprType, ir.Match) {
 	out := ir.Match{Span: a.irSpan(m.Span)}
 	var class *matchClass
 	var value *matchValue
 	if m.Builtin {
-		class = builtinClass(m.Classifier.Name)
+		class = standardClass(m.Classifier.String())
 		out.Classify = class.name
-		if subject, ok := a.matchStateSubject(w, m); ok {
-			out.Subject = subject
-		}
+		out.Subject, value = a.standardSubject(w, m)
 	} else {
 		c := a.resolveClassifier(w, m)
 		if c != nil {
@@ -409,49 +471,48 @@ func (a *analyzer) evalMatch(w *wiring, m *ast.Match) (exprType, ir.Match) {
 	if class != nil {
 		a.checkMATCH2(class, m)
 	}
-	var types []exprType
+	var arms []armResult
 	for _, arm := range m.Arms {
 		if arm == nil {
 			continue
 		}
 		t, ia := a.evalArm(w, arm, class, value)
-		types = append(types, t)
+		arms = append(arms, armResult{typ: t, span: arm.Span})
 		out.Arms = append(out.Arms, ia)
 	}
-	return a.matchType(types, m), out
+	return a.matchType(arms, m, ret), out
 }
 
-// matchValue は値の match の対象。アームの本体で絞り込まれた型として渡すために持つ（MATCH-4）。
+// matchValue は値を対象にした match の対象。
 type matchValue struct {
-	path []string // 対象が Atom.name ならそのパス
-	typ  exprType
+	// key は対象が名前の Atom ならその同一性（narrowKey）。リテラル、レコードリテラル、none なら空で、
+	// 絞り込みは何にも掛からない。
+	key string
+	typ exprType
 }
 
 // matchSubject は `match [x] by C` の対象（C は classify。解決できていなければ nil）。MATCH-7 の
-// 「値の分類なのに対象がない」「状態の分類なのに対象がある」と、値の match の MATCH-6。
+// 「値の分類・op の分類なのに対象がない」「状態の分類なのに対象がある」と、値を対象にした match の MATCH-6。
 func (a *analyzer) matchSubject(w *wiring, m *ast.Match, c *ir.Classify) (ir.MatchSubject, *matchValue) {
 	if c != nil {
 		if _, isStates := c.SubjectStates(); isStates {
 			if m.Subject != nil {
 				if n, ok := m.Subject.(*ast.NameAtom); ok {
-					a.peek(n.Name, w.sc) // 束縛を書いていれば使ったことにする（WIRE-8 を重ねない）
+					a.peek(n.Name, w.vsc) // 束縛を書いていれば使ったことにする（WIRE-8 を重ねない）
 				}
-				a.errorf("MATCH-7", m.Subject.NodeSpan(), "classify %s は状態の分類なので、match に対象は書けない（対象は分類の宣言が持つ。match by %s と書く）", c.Name, m.Classifier.Name)
+				a.errorf("MATCH-7", m.Subject.NodeSpan(), "classify %s は状態の分類なので、match に対象は書けない（対象は分類の宣言が持つ。match by %s と書く）", c.Name, m.Classifier.String())
 			}
 			return ir.ClassifyOwnedSubject{}, nil
 		}
 	}
 	if m.Subject == nil {
 		if c != nil && c.SubjectType() != nil {
-			a.errorf("MATCH-7", m.Classifier.Span, "classify %s は値の分類なので、match に対象が要る（match 値 by %s と書く）", c.Name, m.Classifier.Name)
+			a.errorf("MATCH-7", m.Classifier.Span, "classify %s は%sなので、match に対象が要る（match 値 by %s と書く）", c.Name, classifyKindName(c), m.Classifier.String())
 		}
 		return nil, nil
 	}
-	typ, atom := a.evalAtom(w, m.Subject)
-	value := &matchValue{typ: typ}
-	if n, ok := m.Subject.(*ast.NameAtom); ok {
-		value.path = segmentsOf(n.Name)
-	}
+	typ, atom, key := a.evalAtomKey(w, m.Subject)
+	value := &matchValue{typ: typ, key: key}
 	if c != nil {
 		a.checkMATCH6(typ, c, m)
 	}
@@ -461,57 +522,61 @@ func (a *analyzer) matchSubject(w *wiring, m *ast.Match, c *ir.Classify) (ir.Mat
 	return ir.ValueSubject{Atom: atom}, value
 }
 
-// matchStateSubject は `match s by list` / `by nullable` の s: 現在の名前空間の、その形の state
-// （docs/resolve.md「位置ごとに受け付ける種類」）。そうでなければ MATCH-7。名前は手続きの通りに解決するので、
-// 同じ名前の束縛や引数があれば値の参照になり、状態ではないので MATCH-7。
-func (a *analyzer) matchStateSubject(w *wiring, m *ast.Match) (ir.StateSubject, bool) {
-	shape := m.Classifier.Name
+// standardSubject は `match x by list` / `by nullable` の対象: 型が list<T>（by list）か nullable<T>（by nullable）の値
+// （docs/check.md「標準の分類」）。状態に限らない。MATCH-7: 対象がない、対象の型が array / optional でない。
+func (a *analyzer) standardSubject(w *wiring, m *ast.Match) (ir.MatchSubject, *matchValue) {
+	name := m.Classifier.String()
 	if m.Subject == nil {
-		a.errorf("MATCH-7", m.Classifier.Span, "match by %s には対象の状態が要る（match 状態 by %s と書く）", shape, shape)
-		return ir.StateSubject{}, false
+		a.errorf("MATCH-7", m.Classifier.Span, "match by %s には対象の値が要る（match 値 by %s と書く）", name, name)
+		return nil, nil
 	}
-	n, ok := m.Subject.(*ast.NameAtom)
-	if !ok {
-		a.errorf("MATCH-7", m.Subject.NodeSpan(), "match by %s の対象は、今の名前空間の %s の状態でなければならない", shape, shape)
-		return ir.StateSubject{}, false
+	typ, atom, key := a.evalAtomKey(w, m.Subject)
+	value := &matchValue{typ: typ, key: key}
+	if typ.kind != etUnknown {
+		ok := false
+		if typ.kind == etValue {
+			switch uncase(typ.typ).(type) {
+			case ir.ArrayType:
+				ok = name == ir.ClassifyList
+			case ir.OptionalType:
+				ok = name == ir.ClassifyNullable
+			}
+		}
+		if !ok {
+			want := "list<T>（T[]）"
+			if name == ir.ClassifyNullable {
+				want = "nullable<T>（T?）"
+			}
+			a.errorf("MATCH-7", m.Subject.NodeSpan(), "match by %s の対象の型は %s でなければならないが、%s", name, want, exprName(typ))
+			value.typ = unknownType()
+		}
 	}
-	r, err := a.resolveName(n.Name, w.sc, acAnyDecl|acCase|acVariant|acValue|acNamespace|acStateOp)
-	if err != nil {
-		a.reportResolve(err)
-		return ir.StateSubject{}, false
+	if atom == nil {
+		return nil, value
 	}
-	if r.kind != rDecl || r.sym.kind != kindState {
-		a.errorf("MATCH-7", n.Span, "match by %s の対象は、今の名前空間の %s の状態でなければならないが、%s は状態ではない（%s）", shape, shape, n.Name.String(), describe(r))
-		return ir.StateSubject{}, false
-	}
-	if r.sym.ns != w.sc.ns {
-		a.errorf("MATCH-7", n.Span, "match by %s の対象 %s は別の名前空間の状態（分岐できるのは今の名前空間 %s の状態だけ）", shape, r.sym.fqn, nsName(w.sc.ns))
-		return ir.StateSubject{}, false
-	}
-	st, ok := a.lower(r.sym).(*ir.State)
-	if !ok {
-		return ir.StateSubject{}, false
-	}
-	if string(st.Shape) != shape {
-		a.errorf("MATCH-7", n.Span, "状態 %s の形は %s で、%s ではない", st.Name, st.Shape, shape)
-		return ir.StateSubject{}, false
-	}
-	return ir.StateSubject{State: st.Name}, true
+	return ir.ValueSubject{Atom: atom}, value
 }
 
-// resolveClassifier は `match x by C` / `match by C` の C: 現在の名前空間の classify（NS-4）。
+// resolveClassifier は `match x by C` / `match by C` の C: classify（値の分類、op の分類、状態の分類）。
+// どの名前空間のものでもよく、別の名前空間のものは修飾して書く。状態の分類が別の名前空間のものなら RES-5
+// （読むのは状態で、状態を読めるのは持ち主の名前空間だけ。docs/check.md「置き場」）。
 func (a *analyzer) resolveClassifier(w *wiring, m *ast.Match) *ir.Classify {
-	qn := ast.QualifiedName{Span: m.Classifier.Span, Segments: []ast.Ident{m.Classifier}}
-	r, ok := a.resolve(qn, &scope{ns: w.sc.ns}, acClassify)
+	r, ok := a.resolve(m.Classifier, &scope{ns: w.sc.ns}, acClassify)
 	if !ok {
 		return nil
 	}
-	a.checkNS4(r.sym, m.Classifier.Span, w.sc)
 	c, _ := a.lower(r.sym).(*ir.Classify)
+	if c == nil {
+		return nil
+	}
+	if _, isStates := c.SubjectStates(); isStates && r.sym.ns != w.sc.ns {
+		a.errorf("RES-5", m.Classifier.Span, "classify %s は別の名前空間の状態の分類で、match by では読めない（状態を読めるのは持ち主の名前空間 %s の配線だけ。その名前空間の op を通して読む）", c.Name, nsName(r.sym.ns))
+		return nil
+	}
 	return c
 }
 
-// checkMATCH6 は MATCH-6（docs/check.md「classify / match」）: 値の match で、subject の型が Classify.subject の型に渡せない。
+// checkMATCH6 は MATCH-6（docs/check.md「classify / match」）: 値の分類か op の分類での match で、対象の型が分類の対象の型に渡せない。
 func (a *analyzer) checkMATCH6(subject exprType, c *ir.Classify, m *ast.Match) {
 	want := c.SubjectType()
 	if want == nil || subject.kind == etUnknown {
@@ -522,8 +587,8 @@ func (a *analyzer) checkMATCH6(subject exprType, c *ir.Classify, m *ast.Match) {
 	}
 }
 
-// checkMATCH2 は MATCH-2（docs/check.md「classify / match」）: アームに並べたケースの集合が分類のケース（組み込みの
-// 分類なら Empty / HasItems で、default はない）と等しくない（足りない・知らない名前・重複）。default は hasDefault の
+// checkMATCH2 は MATCH-2（docs/check.md「classify / match」）: アームに並べたケースの集合が分類のケース（標準の分類なら
+// Empty / HasItems で、default はない）と等しくない（足りない・知らない名前・重複）。default は hasDefault の
 // ときだけ書け、あるときは必ず書く。Data.missing / Data.extra。
 func (a *analyzer) checkMATCH2(c *matchClass, m *ast.Match) {
 	seen := map[string]bool{}
@@ -566,7 +631,7 @@ func (a *analyzer) checkMATCH2(c *matchClass, m *ast.Match) {
 	}
 	if !c.hasDefault && defaults > 0 {
 		if c.classify == nil {
-			problems = append(problems, "組み込みの分類に default はないのに default のアームがある")
+			problems = append(problems, "標準の分類に default はないのに default のアームがある")
 		} else {
 			problems = append(problems, "classify に default がないのに default のアームがある")
 		}
@@ -588,18 +653,22 @@ func orEmpty(s []string) []string {
 	return s
 }
 
-// evalArm はアーム。本体は呼び出しか none。値の match（value が nil でない）の呼び出しでは、subject を絞り込まれた型
-// case(C, アームのケース, T) として渡す（MATCH-4）。状態の match には絞り込みがない（docs/types.md「式の型」）。
+// armResult は評価したアーム。
+type armResult struct {
+	typ  exprType
+	span source.Span
+}
+
+// evalArm はアーム。本体は呼び出し一つ、値一つ、throw 一つのどれか（docs/grammar.md「配線」の ArmBody）。
+// 本体は、アームの中の対象の型（narrowArm）のもとで評価する。
 func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, value *matchValue) (exprType, ir.MatchArm) {
 	out := ir.MatchArm{Span: a.irSpan(arm.Span)}
-	var ctx *armContext
+	label := "default"
+	var cases []string
 	if arm.Default {
 		out.Cases = ir.DefaultArm()
-		if value != nil {
-			ctx = &armContext{subject: value.path, narrowed: value.typ, cases: "default"}
-		}
 	} else {
-		cases := make([]string, 0, len(arm.Cases))
+		cases = make([]string, 0, len(arm.Cases))
 		for _, cs := range arm.Cases {
 			cases = append(cases, cs.Name)
 			if class != nil && class.classify != nil && contains(class.cases, cs.Name) {
@@ -607,36 +676,153 @@ func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, valu
 			}
 		}
 		out.Cases = ir.ArmCases{Cases: cases}
-		if value != nil {
-			var c *ir.Classify
-			if class != nil {
-				c = class.classify
-			}
-			ctx = &armContext{subject: value.path, narrowed: a.narrow(value.typ, c, cases), cases: strings.Join(cases, " | ")}
-		}
+		label = strings.Join(cases, " | ")
 	}
+	var ctx *armContext
+	if value != nil {
+		ctx = &armContext{subject: value.key, cases: label}
+	}
+	narrow, narrowed := a.narrowArm(arm.Default, cases, class, value)
+	out.Narrowed = narrowed
+	w.scope.narrow = narrow
+	defer func() { w.scope.narrow = nil }()
+
 	switch body := arm.Body.(type) {
-	case *ast.NoneAtom:
-		out.Body = ir.NoneBody{}
-		return noneType(), out
 	case *ast.Call:
 		t, call, _ := a.evalCall(w, body, ctx)
 		out.Body = ir.CallExpr{Call: call}
+		return t, out
+	case *ast.Throw:
+		out.Body = a.lowerThrow(w, body)
+		return neverType(), out
+	case *ast.NoneAtom:
+		// アームの本体の none は body の none（atom にはしない。docs/ir.md「正規化」）
+		out.Body = ir.NoneBody{}
+		return noneType(), out
+	case ast.Atom:
+		t, atom := a.evalAtom(w, body)
+		if atom != nil {
+			out.Body = ir.AtomExpr{Atom: atom}
+		}
 		return t, out
 	}
 	return unknownType(), out
 }
 
-// narrow は subject の型を case(C, cases, T) に絞り込む。T は subject の型（既に絞り込まれていればその元）。
-func (a *analyzer) narrow(subject exprType, c *ir.Classify, cases []string) exprType {
-	if c == nil || subject.kind != etValue {
-		return subject
+// lowerThrow はアームの本体の `throw E`（docs/check.md「throw」）。E は例外一つ（どの名前空間のものでも。例外の
+// ユニオンとデコレータの引数は RES-4）。MATCH-8: E が値を運ぶ例外。
+func (a *analyzer) lowerThrow(w *wiring, t *ast.Throw) ir.ArmBody {
+	body := ir.ThrowBody{Span: a.irSpan(t.Span)}
+	r, ok := a.resolve(t.Exception, &scope{ns: w.sc.ns}, acException)
+	if !ok {
+		return body
 	}
-	of := subject.typ
-	if ct, ok := of.(ir.CaseType); ok {
-		of = ct.Of
+	body.Exception = r.sym.fqn
+	if e, ok := a.lower(r.sym).(*ir.Exception); ok && e.Value != nil {
+		a.errorf("MATCH-8", t.Exception.Span, "例外 %s は値を運ぶので、throw では投げられない（値を運ぶ例外を投げるのは、葉の op）", e.Name)
 	}
-	return valueType(ir.Case(c.Name, cases, of))
+	return body
+}
+
+// narrowArm は docs/types.md「アームの中の対象の型」: アーム（ケースの並び cases。default なら isDefault）の中での対象の型。
+// 外と型が違う対象だけを、スコープに掛ける表（narrowKey → 型）と IR の Narrowing の列で返す。
+// 値を対象にした match（value が nil でない）なら対象はその Atom、状態の分類での match なら分類の対象の状態のそれぞれ。
+func (a *analyzer) narrowArm(isDefault bool, cases []string, class *matchClass, value *matchValue) (map[string]exprType, []ir.Narrowing) {
+	if isDefault || class == nil {
+		return nil, nil // 1. default のアームは外のまま
+	}
+	if value != nil {
+		if value.typ.kind != etValue || value.key == "" {
+			return nil, nil // 対象が名前でない Atom なら、絞り込みは何にも掛からない
+		}
+		x := value.typ.typ
+		n := a.narrowValue(x, cases, class)
+		if n == nil || ir.TypeEqual(n, x) {
+			return nil, nil
+		}
+		return map[string]exprType{value.key: valueType(n)}, []ir.Narrowing{{Type: n}}
+	}
+	if class.classify == nil {
+		return nil, nil
+	}
+	states, isStates := class.classify.SubjectStates()
+	if !isStates {
+		return nil, nil
+	}
+	var narrow map[string]exprType
+	var narrowed []ir.Narrowing
+	for _, state := range states {
+		sym := a.syms[state]
+		if sym == nil {
+			continue
+		}
+		st, ok := a.lower(sym).(*ir.State)
+		if !ok || st.Type == nil {
+			continue
+		}
+		// 3. すべてのケースがその状態の as を持ち、書いた型がすべて等しい。5. そうでなければ外のまま
+		n := a.writtenType(class.classify, cases, state)
+		if n == nil || a.assignType(st.Type, n) {
+			continue
+		}
+		if narrow == nil {
+			narrow = map[string]exprType{}
+		}
+		narrow[narrowKey("s:"+state, nil)] = valueType(n)
+		narrowed = append(narrowed, ir.Narrowing{State: state, Type: n})
+	}
+	return narrow, narrowed
+}
+
+// narrowValue は値を対象にした match の、アームの中での対象の型（外での型は x）。規則 2〜4。
+func (a *analyzer) narrowValue(x ir.Type, cases []string, class *matchClass) ir.Type {
+	if class.classify == nil {
+		// 2. 標準の分類: by nullable の HasItems だけのアームで、optional(T) は T。それ以外は外のまま
+		if class.name == ir.ClassifyNullable && len(cases) == 1 && cases[0] == ir.CaseHasItems {
+			if o, ok := uncase(x).(ir.OptionalType); ok {
+				return o.Of
+			}
+		}
+		return x
+	}
+	if _, isStates := class.classify.SubjectStates(); isStates {
+		return x
+	}
+	// 3. すべてのケースが as を持ち、書いた型がすべて等しい → その型。ただし x がその型に渡せるなら x のまま
+	if n := a.writtenType(class.classify, cases, ""); n != nil {
+		if a.assignType(x, n) {
+			return x
+		}
+		return n
+	}
+	// 4. 型を書かないケースの絞り込み: case(C, Ks, X)
+	return ir.Case(class.classify.Name, cases, uncase(x))
+}
+
+// writtenType は、cases のすべてのケースが対象（状態の分類なら state、それ以外は ""）の as を持ち、書いた型が
+// すべて等しければその型。そうでなければ nil。
+func (a *analyzer) writtenType(c *ir.Classify, cases []string, state string) ir.Type {
+	var t ir.Type
+	for _, name := range cases {
+		cs := c.Case(name)
+		if cs == nil {
+			return nil
+		}
+		var as *ir.CaseTyping
+		for i := range cs.As {
+			if cs.As[i].State == state {
+				as = &cs.As[i]
+			}
+		}
+		if as == nil || as.Type == nil {
+			return nil
+		}
+		if t != nil && !ir.TypeEqual(t, as.Type) {
+			return nil
+		}
+		t = as.Type
+	}
+	return t
 }
 
 // caseSpan は classify のケース名の定義の位置。
@@ -649,41 +835,106 @@ func (a *analyzer) caseSpan(c *ir.Classify, name string) source.Span {
 	return source.Span{}
 }
 
-// matchType は docs/types.md「式の型」の match: 値のある呼び出しがなければ「値がない」。すべて等しい型 T なら、
-// none のアームがあれば optional(T)、なければ T。等しくなければ TYPE-8。「値がない」と値が混ざれば TYPE-8。
-func (a *analyzer) matchType(types []exprType, m *ast.Match) exprType {
-	var value *exprType
-	hasNone, hasNoValue, unknown := false, false, false
-	for i := range types {
-		t := types[i]
-		switch t.kind {
+// matchType は docs/types.md「match の型」。「返らない」アームを除き、残りに値のある本体がなければ「値がない」。
+// 値のある本体と「値がない」が混ざれば TYPE-8。そろえる型 T は、型の決まった本体があれば、ほかのすべてが渡せる型
+// （なければ TYPE-8）。リテラルだけなら、その種類の核の型。レコードリテラルと none だけなら、return の式に限って
+// op の returns から決める（そうでなければ TYPE-7）。リテラルとレコードリテラルの本体は T に渡せること。
+// none の本体があれば optional(T)。
+func (a *analyzer) matchType(arms []armResult, m *ast.Match, ret *returnContext) exprType {
+	var typed, literals, records []armResult
+	hasNone, hasNoValue, unknown, returning := false, false, false, false
+	for _, arm := range arms {
+		switch arm.typ.kind {
+		case etNever:
+			continue
+		case etUnknown:
+			unknown = true
 		case etNone:
 			hasNone = true
 		case etNoValue:
 			hasNoValue = true
-		case etUnknown:
-			unknown = true
 		case etValue:
-			if value == nil {
-				value = &t
-			} else if !ir.TypeEqual(value.typ, t.typ) {
-				a.errorf("TYPE-8", m.Span, "match のアームの型がそろわない: %s と %s", typeName(value.typ), typeName(t.typ))
-				return unknownType()
-			}
+			typed = append(typed, arm)
+		case etLiteral:
+			literals = append(literals, arm)
+		case etRecord:
+			records = append(records, arm)
 		}
+		returning = true
 	}
-	if value == nil {
+	if !returning {
+		return neverType() // 2. すべてのアームが返らない
+	}
+	if len(typed)+len(literals)+len(records) == 0 {
 		if unknown {
 			return unknownType()
 		}
-		return noValue()
+		return noValue() // 3. 「値がない」と none だけ
 	}
 	if hasNoValue {
-		a.errorf("TYPE-8", m.Span, "match に値のある呼び出しと値のない呼び出しが混ざっている")
+		a.errorf("TYPE-8", m.Span, "match に値のある本体と値のない呼び出しが混ざっている")
 		return unknownType()
 	}
-	if hasNone {
-		return valueType(ir.Optional(value.typ))
+	// 5. そろえる型
+	var t ir.Type
+	switch {
+	case len(typed) > 0:
+		for _, cand := range typed {
+			all := true
+			for _, other := range typed {
+				if !a.assignType(other.typ.typ, cand.typ.typ) {
+					all = false
+					break
+				}
+			}
+			if all {
+				t = cand.typ.typ
+				break
+			}
+		}
+		if t == nil {
+			a.errorf("TYPE-8", m.Span, "match のアームの型がそろわない（ほかのすべてのアームの型が渡せる型がない）: %s", armTypeNames(typed))
+			return unknownType()
+		}
+	case len(literals) > 0:
+		t = literals[0].typ.typ
+		for _, l := range literals[1:] {
+			if !ir.TypeEqual(l.typ.typ, t) {
+				a.errorf("TYPE-8", m.Span, "match のアームのリテラルの種類がそろわない: %s", armTypeNames(literals))
+				return unknownType()
+			}
+		}
+	default:
+		if ret == nil || ret.returns == nil || ir.IsNever(ret.returns) {
+			a.errorf("TYPE-7", m.Span, "match のアームのレコードリテラルの当てはめる先が決まらない（return の式に書くか、型の決まったアームを書く）")
+			return unknownType()
+		}
+		t = stripOptional(ret.returns)
 	}
-	return *value
+	// 6. リテラルとレコードリテラルの本体は T に渡せること
+	for _, arm := range append(append([]armResult{}, literals...), records...) {
+		switch a.assign(arm.typ, t) {
+		case assignOK:
+		case failScalar:
+			a.errorf("TYPE-1", arm.span, "アームの値 %s を scalar %s の位置に渡せない（検証を通していない。設計書 §6.5）", exprName(arm.typ), typeName(t))
+		default:
+			a.errorf("TYPE-8", arm.span, "アームの値 %s は、match の型 %s に渡せない", exprName(arm.typ), typeName(t))
+		}
+	}
+	// 7. none の本体があれば optional(T)
+	if hasNone {
+		return valueType(ir.Optional(t))
+	}
+	return valueType(t)
+}
+
+// armTypeNames はアームの型の表示（重複を除く。診断用）。
+func armTypeNames(arms []armResult) string {
+	var names []string
+	for _, arm := range arms {
+		if n := exprName(arm.typ); !contains(names, n) {
+			names = append(names, n)
+		}
+	}
+	return strings.Join(names, " と ")
 }

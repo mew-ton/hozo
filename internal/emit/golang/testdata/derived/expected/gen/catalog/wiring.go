@@ -3,15 +3,17 @@
 package catalog
 
 // Publish は op catalog.publish。
+//
+// Reads: catalog.products
 func (o *ops) Publish(id string) (PublicProduct, error) {
-	result, err := o.Load(id)
+	p, err := o.Load(id)
 	if err != nil {
 		return PublicProduct{}, err
 	}
-	return ProductToPublicProduct(result), nil
+	return o.ToPublic(p)
 }
 
 // Summarize は op catalog.summarize。
 func (o *ops) Summarize(p Product) (Summary, error) {
-	return ProductToSummary(p), nil
+	return o.ToSummary(p)
 }

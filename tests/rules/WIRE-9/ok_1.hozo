@@ -1,0 +1,20 @@
+// WIRE-9（docs/check.md「配線」）: 「返らない」式の文は、本体の最後にだけ書ける。一部のアームだけが返らない match は、どこにでも書ける
+namespace a {
+  model M { id: string; }
+  exception E;
+  classify Kind of M { A; B; }
+  op fail(): never throws E;
+  op g();
+  op f() throws E {
+    g();
+    fail();
+  }
+  op h(m: M) throws E {
+    g();
+    match m by Kind { A => throw E; B => fail(); };
+  }
+  op some(m: M) throws E {
+    match m by Kind { A => throw E; B => g(); };
+    g();
+  }
+}

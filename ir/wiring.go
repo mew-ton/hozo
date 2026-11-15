@@ -135,6 +135,7 @@ type MatchExpr struct {
 }
 
 // AtomExpr は式としてのアトム（docs/ir.md「配線」の Expr kind "atom"）。
+// match のアームの本体の値（[ArmBody] の kind "atom"）にも使う。none はそこには入れず [NoneBody] にする。
 type AtomExpr struct {
 	Atom Atom `json:"atom"`
 }
@@ -233,9 +234,9 @@ func (b BoundPosition) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (b *BoundPosition) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, b) }
 
-// Atom は式の葉（docs/ir.md「配線」の Atom）。具体型は値型の [NameAtom]、[LiteralAtom]、[NoneAtom]、[RecordAtom]。
+// Atom は式の葉（docs/ir.md「配線」の Atom）。具体型は値型の [NameAtom]、[StateAtom]、[LiteralAtom]、[NoneAtom]、[RecordAtom]。
 type Atom interface {
-	// Kind は JSON の判別子（"name"、"literal"、"none"、"record"）。
+	// Kind は JSON の判別子（"name"、"state"、"literal"、"none"、"record"）。
 	Kind() string
 	isAtom()
 }
@@ -243,6 +244,15 @@ type Atom interface {
 // NameAtom は名前の参照（docs/ir.md「配線」の Atom kind "name"）。
 type NameAtom struct {
 	// Path は ["query", "page"] のようなパス。先頭は束縛名か引数名。
+	Path []string `json:"path"`
+	Span Span     `json:"span"`
+}
+
+// StateAtom は状態の参照（docs/ir.md「配線」の Atom kind "state"。docs/check.md「状態の参照」）。
+type StateAtom struct {
+	// State は状態の FQN。
+	State string `json:"state"`
+	// Path はその値のフィールドのパス。状態そのものなら空（JSON では []）。
 	Path []string `json:"path"`
 	Span Span     `json:"span"`
 }
@@ -271,6 +281,7 @@ type RecordField struct {
 }
 
 var (
+	_ Atom = StateAtom{}
 	_ Atom = NameAtom{}
 	_ Atom = LiteralAtom{}
 	_ Atom = NoneAtom{}
@@ -279,6 +290,20 @@ var (
 
 // Kind は "name"。
 func (NameAtom) Kind() string { return "name" }
+
+// Kind は "state"。
+func (StateAtom) Kind() string { return "state" }
+
+func (StateAtom) isAtom() {}
+
+// MarshalJSON は kind を付けて書く。
+func (a StateAtom) MarshalJSON() ([]byte, error) {
+	type alias StateAtom
+	return marshalKind("state", alias(a))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (a *StateAtom) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, a) }
 
 // Kind は "literal"。
 func (LiteralAtom) Kind() string { return "literal" }
@@ -332,6 +357,7 @@ func (f *RecordField) UnmarshalJSON(data []byte) error { return unmarshalStruct(
 
 var atomTable = map[string]func([]byte) (Atom, error){
 	"name":    asValue[Atom, NameAtom],
+	"state":   asValue[Atom, StateAtom],
 	"literal": asValue[Atom, LiteralAtom],
 	"none":    asValue[Atom, NoneAtom],
 	"record":  asValue[Atom, RecordAtom],
@@ -344,32 +370,26 @@ func UnmarshalAtom(data []byte) (Atom, error) {
 
 // Match は分類による分岐（docs/ir.md「配線」の Match）。
 type Match struct {
-	// Subject は対象。値（[ValueSubject]）、基底の状態（[StateSubject]）、分類の宣言が持つ（[ClassifyOwnedSubject]）のどれか。
+	// Subject は対象。値（[ValueSubject]）か、分類の宣言が持つ（[ClassifyOwnedSubject]）。
 	Subject MatchSubject `json:"subject"`
-	// Classify は classify の FQN。組み込みの分類なら状態の形 "list" か "nullable"。
+	// Classify は classify の FQN。標準の分類なら "list" か "nullable"。
 	Classify string     `json:"classify"`
 	Arms     []MatchArm `json:"arms"`
 	Span     Span       `json:"span"`
 }
 
 // MatchSubject は match の対象（docs/ir.md「配線」の Match の subject）。具体型は値型の [ValueSubject]
-// （kind "value"）、[StateSubject]（kind "state"）、[ClassifyOwnedSubject]（kind "classify"）。
+// （kind "value"）と [ClassifyOwnedSubject]（kind "classify"）。
 type MatchSubject interface {
-	// Kind は JSON の判別子（"value"、"state"、"classify"）。
+	// Kind は JSON の判別子（"value" か "classify"）。
 	Kind() string
 	isMatchSubject()
 }
 
-// ValueSubject は値の分類での match の対象（`match item by C`。docs/ir.md「配線」の subject kind "value"）。
+// ValueSubject は値を対象にした match の対象（値の分類、op の分類、標準の分類。`match item by C`。
+// docs/ir.md「配線」の subject kind "value"）。状態を名前で書いた対象（`match token by nullable`）は、Atom が [StateAtom]。
 type ValueSubject struct {
 	Atom Atom `json:"atom"`
-}
-
-// StateSubject は基底の状態の、組み込みの分類での match の対象（`match carts by list`。
-// docs/ir.md「配線」の subject kind "state"）。
-type StateSubject struct {
-	// State は状態の FQN。
-	State string `json:"state"`
 }
 
 // ClassifyOwnedSubject は状態の分類での match（`match by C`）。対象は classify が持つので、ここには何もない
@@ -378,33 +398,22 @@ type ClassifyOwnedSubject struct{}
 
 var (
 	_ MatchSubject = ValueSubject{}
-	_ MatchSubject = StateSubject{}
 	_ MatchSubject = ClassifyOwnedSubject{}
 )
 
 // Kind は "value"。
 func (ValueSubject) Kind() string { return "value" }
 
-// Kind は "state"。
-func (StateSubject) Kind() string { return "state" }
-
 // Kind は "classify"。
 func (ClassifyOwnedSubject) Kind() string { return "classify" }
 
 func (ValueSubject) isMatchSubject()         {}
-func (StateSubject) isMatchSubject()         {}
 func (ClassifyOwnedSubject) isMatchSubject() {}
 
 // MarshalJSON は kind を付けて書く。
 func (s ValueSubject) MarshalJSON() ([]byte, error) {
 	type alias ValueSubject
 	return marshalKind("value", alias(s))
-}
-
-// MarshalJSON は kind を付けて書く。
-func (s StateSubject) MarshalJSON() ([]byte, error) {
-	type alias StateSubject
-	return marshalKind("state", alias(s))
 }
 
 // MarshalJSON は kind を付けて書く。
@@ -415,7 +424,6 @@ func (s *ValueSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct
 
 var matchSubjectTable = map[string]func([]byte) (MatchSubject, error){
 	"value":    asValue[MatchSubject, ValueSubject],
-	"state":    asValue[MatchSubject, StateSubject],
 	"classify": asValue[MatchSubject, ClassifyOwnedSubject],
 }
 
@@ -424,7 +432,7 @@ func UnmarshalMatchSubject(data []byte) (MatchSubject, error) {
 	return decodeUnion("match subject", data, matchSubjectTable)
 }
 
-// SubjectAtom は値の分類での match の対象の Atom。状態での match なら nil。
+// SubjectAtom は値を対象にした match の対象の Atom。状態の分類での match なら nil。
 func (m Match) SubjectAtom() Atom {
 	if s, ok := m.Subject.(ValueSubject); ok {
 		return s.Atom
@@ -432,18 +440,41 @@ func (m Match) SubjectAtom() Atom {
 	return nil
 }
 
-// Builtin は組み込みの分類での match（`by list` / `by nullable`）か。
-func (m Match) Builtin() bool {
-	_, ok := m.Subject.(StateSubject)
-	return ok
+// Builtin は標準の分類での match（`by list` / `by nullable`）か。
+func (m Match) Builtin() bool { return IsStandardClassify(m.Classify) }
+
+// SubjectState は、対象が状態そのもの（[StateAtom] でパスが空。`match token by nullable`）なら、その状態の FQN。
+func (m Match) SubjectState() (state string, ok bool) {
+	a, ok := m.SubjectAtom().(StateAtom)
+	if !ok || len(a.Path) > 0 {
+		return "", false
+	}
+	return a.State, true
 }
 
-// MatchArm は match のアーム（docs/ir.md「配線」の Match の arms）。
+// MatchArm は match のアーム（docs/ir.md「配線」の MatchArm）。
 type MatchArm struct {
 	Cases ArmCases `json:"cases"`
 	Body  ArmBody  `json:"body"`
-	Span  Span     `json:"span"`
+	// Narrowed はこのアームの中で、外と型が違う対象（docs/types.md「アームの中の対象の型」）。なければ空（JSON では []）。
+	Narrowed []Narrowing `json:"narrowed"`
+	Span     Span        `json:"span"`
 }
+
+// Narrowing はアームの中で絞り込まれた対象の型（docs/ir.md「配線」の Narrowing）。
+type Narrowing struct {
+	// State は状態の分類での match（subject が classify）のとき、絞り込まれる状態の FQN。
+	// subject が value なら持たない（絞り込まれるのは subject の atom）。
+	State string `json:"state,omitempty"`
+	// Type はアームの中での型。
+	Type Type `json:"type"`
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (n *Narrowing) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, n) }
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く。
+func (a MatchArm) MarshalJSON() ([]byte, error) { type alias MatchArm; return marshalStruct(alias(a)) }
 
 // ArmCases はアームが受けるケース: ケース名の列か default（docs/ir.md「配線」の Match の cases）。
 // Default が true なら JSON は "default"、そうでなければ列。
@@ -487,34 +518,56 @@ func (c *ArmCases) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ArmBody は match のアームの本体（docs/ir.md「配線」の Match の body）。
-// 具体型は値型の [CallExpr]（kind "call"）と [NoneBody]（kind "none"）。
+// ArmBody は match のアームの本体（docs/ir.md「配線」の MatchArm の body）。
+// 具体型は値型の [CallExpr]（kind "call"）、[AtomExpr]（kind "atom"）、[NoneBody]（kind "none"）、[ThrowBody]（kind "throw"）。
 type ArmBody interface {
-	// Kind は JSON の判別子（"call" か "none"）。
+	// Kind は JSON の判別子（"call"、"atom"、"none"、"throw"）。
 	Kind() string
 	isArmBody()
 }
 
-// NoneBody はアームの本体の `none`（docs/ir.md「配線」の Match の body kind "none"）。
+// NoneBody はアームの本体の `none`（docs/ir.md「配線」の MatchArm の body kind "none"）。
 type NoneBody struct{}
+
+// ThrowBody はアームの本体の `throw E`（docs/ir.md「配線」の MatchArm の body kind "throw"）。
+type ThrowBody struct {
+	// Exception は例外の FQN。
+	Exception string `json:"exception"`
+	Span      Span   `json:"span"`
+}
 
 var (
 	_ ArmBody = CallExpr{}
+	_ ArmBody = AtomExpr{}
 	_ ArmBody = NoneBody{}
+	_ ArmBody = ThrowBody{}
 )
 
 // Kind は "none"。
 func (NoneBody) Kind() string { return "none" }
 
-func (CallExpr) isArmBody() {}
-func (NoneBody) isArmBody() {}
+// Kind は "throw"。
+func (ThrowBody) Kind() string { return "throw" }
+
+func (CallExpr) isArmBody()  {}
+func (AtomExpr) isArmBody()  {}
+func (NoneBody) isArmBody()  {}
+func (ThrowBody) isArmBody() {}
 
 // MarshalJSON は kind を付けて書く。
 func (NoneBody) MarshalJSON() ([]byte, error) { return []byte(`{"kind":"none"}`), nil }
 
+// MarshalJSON は kind を付けて書く。
+func (b ThrowBody) MarshalJSON() ([]byte, error) {
+	type alias ThrowBody
+	return marshalKind("throw", alias(b))
+}
+
 var armBodyTable = map[string]func([]byte) (ArmBody, error){
-	"call": asValue[ArmBody, CallExpr],
-	"none": asValue[ArmBody, NoneBody],
+	"call":  asValue[ArmBody, CallExpr],
+	"atom":  asValue[ArmBody, AtomExpr],
+	"none":  asValue[ArmBody, NoneBody],
+	"throw": asValue[ArmBody, ThrowBody],
 }
 
 // UnmarshalArmBody は kind で分けて ArmBody を読む（docs/ir.md「JSON」）。

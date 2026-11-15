@@ -2,6 +2,8 @@ package golang
 
 import (
 	"regexp"
+
+	"github.com/mew-ton/hozo/internal/diag"
 	"strings"
 	"testing"
 
@@ -517,4 +519,124 @@ func TestReservedWordFields(t *testing.T) {
 		}
 	}
 	compileFiles(t, root, files)
+}
+
+// TestUnsupported は GOEMIT-6（docs/emit-go.md「移行の間の扱い」）: 出力の対象の宣言が、既定の出力が支えない書き方を
+// 使っていれば、使っている箇所ごとに一つ出し、何も書き出さない。出力の対象でない宣言が使っていても、何もしない。
+func TestUnsupported(t *testing.T) {
+	root := newProjectRoot(t)
+	in := ir.Ref("app.In")
+	model := &ir.Model{DeclBase: base("app.In", nil), Fields: []ir.Field{field("x", ir.Optional(ir.String())), field("xs", ir.Array(ir.String()))}}
+	exc := &ir.Exception{DeclBase: base("app.E", nil)}
+	token := &ir.State{DeclBase: base("app.token", nil), Type: ir.Optional(ir.String()), Shape: ir.StateNullable, Element: ir.String()}
+	find := &ir.Op{DeclBase: base("app.find", nil), Returns: ir.Optional(in)}
+	keep := &ir.Op{DeclBase: base("app.keep", nil), Params: []ir.OpParam{param("in", in)}, Returns: in}
+	take := &ir.Op{DeclBase: base("app.take", nil), Params: []ir.OpParam{param("t", ir.Optional(ir.String()))}}
+	fail := &ir.Op{DeclBase: base("app.fail", nil), Returns: ir.Never(), Throws: []ir.ThrowsClause{{Exceptions: []string{"app.E"}}}}
+	kind := &ir.Classify{DeclBase: base("app.Kind", nil), Subject: ir.TypeSubject{Type: in}, Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}}
+	found := &ir.Classify{DeclBase: base("app.Found", nil), Subject: ir.OpSubject{Op: "app.find", Type: ir.Optional(in)},
+		Cases: []ir.ClassifyCase{{Name: "Hit", As: []ir.CaseTyping{{Type: in, By: ir.NarrowByPresence, Span: sp("x.hozo", 1)}}}}, HasDefault: true}
+	typed := &ir.Classify{DeclBase: base("app.Typed", nil), Subject: ir.TypeSubject{Type: ir.Optional(in)},
+		Cases: []ir.ClassifyCase{{Name: "Has", As: []ir.CaseTyping{{Type: in, By: ir.NarrowByPresence, Span: sp("x.hozo", 1)}}}}, HasDefault: true}
+	remote := &ir.Classify{DeclBase: base("other.Remote", nil), Subject: ir.TypeSubject{Type: in}, Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}}
+	byKind := func(arms ...ir.MatchArm) ir.Match {
+		return ir.Match{Subject: ir.ValueSubject{Atom: name("in")}, Classify: "app.Kind", Arms: arms, Span: sp("x.hozo", 1)}
+	}
+	keepArm := func(cases ...string) ir.MatchArm {
+		return stateArm(callp("app.keep", carg("in", name("in"))), cases...)
+	}
+	stateAtom := func(path ...string) ir.Atom {
+		return ir.StateAtom{State: "app.token", Path: path, Span: sp("x.hozo", 1)}
+	}
+	run := func(returns ir.Type, stmts ...ir.Statement) *ir.Op {
+		return &ir.Op{DeclBase: base("app.run", nil), Params: []ir.OpParam{param("in", in)}, Returns: returns, Body: wiring(stmts...)}
+	}
+	ret := func(e ir.Expr) ir.Statement { return ir.ReturnStmt{Expr: e, Span: sp("x.hozo", 1)} }
+
+	tests := []struct {
+		name  string
+		decls []ir.Decl
+		wants []string // 診断ごとの、メッセージに含む語（順序どおり）
+	}{
+		{"op の分類と、as を持つケース", []ir.Decl{model, find, found,
+			run(nil, matchStmt(ir.Match{Subject: ir.ValueSubject{Atom: name("in")}, Classify: "app.Found", Arms: []ir.MatchArm{stateArm(nil, "Hit"), defaultArm(nil)}, Span: sp("x.hozo", 1)}))},
+			[]string{"op の分類（classify app.Found）", "ケースの as（classify app.Found の Hit）"}},
+		{"as を持つケースのある値の分類", []ir.Decl{model, typed,
+			run(nil, matchStmt(ir.Match{Subject: ir.ValueSubject{Atom: name("in")}, Classify: "app.Typed", Arms: []ir.MatchArm{stateArm(nil, "Has"), defaultArm(nil)}, Span: sp("x.hozo", 1)}))},
+			[]string{"ケースの as（classify app.Typed の Has）"}},
+		{"別の名前空間の分類での match", []ir.Decl{model,
+			run(nil, matchStmt(ir.Match{Subject: ir.ValueSubject{Atom: name("in")}, Classify: "other.Remote", Arms: []ir.MatchArm{stateArm(nil, "A"), stateArm(nil, "B")}, Span: sp("x.hozo", 1)}))},
+			[]string{"別の名前空間の分類での match（by other.Remote）"}},
+		{"値を対象にした標準の分類での match", []ir.Decl{model,
+			run(nil, matchStmt(ir.Match{Subject: ir.ValueSubject{Atom: name("in", "x")}, Classify: "nullable", Arms: []ir.MatchArm{stateArm(nil, ir.CaseEmpty), stateArm(nil, ir.CaseHasItems)}, Span: sp("x.hozo", 1)}))},
+			[]string{"値を対象にした、標準の分類での match（by nullable）"}},
+		{"アームの本体の値", []ir.Decl{model, kind, keep,
+			run(in, ret(ir.MatchExpr{Match: byKind(keepArm("A"), ir.MatchArm{Cases: ir.ArmCases{Cases: []string{"B"}}, Body: ir.AtomExpr{Atom: name("in")}, Span: sp("x.hozo", 1)})}))},
+			[]string{"アームの本体の値"}},
+		{"アームの本体の throw", []ir.Decl{model, exc, kind, keep,
+			run(in, ret(ir.MatchExpr{Match: byKind(keepArm("A"), ir.MatchArm{Cases: ir.ArmCases{Cases: []string{"B"}}, Body: ir.ThrowBody{Exception: "app.E", Span: sp("x.hozo", 1)}, Span: sp("x.hozo", 1)})}))},
+			[]string{"アームの本体の throw"}},
+		{"never を返す op（選ばれた配線が呼ぶ op と、選ばれた op）", []ir.Decl{model, exc, fail,
+			run(in, ret(ir.CallExpr{Call: call("app.fail")}))},
+			[]string{"never を返す op（app.fail）", "never を返す op の呼び出し（app.fail）"}},
+		{"状態の参照: 呼び出しの引数", []ir.Decl{model, token, take,
+			run(nil, ir.CallStmt{Call: call("app.take", carg("t", stateAtom())), Span: sp("x.hozo", 1)})},
+			[]string{"状態の参照（app.token）"}},
+		{"状態の参照: return の値", []ir.Decl{model, token,
+			&ir.Op{DeclBase: base("app.run", nil), Returns: ir.Optional(ir.String()), Body: wiring(ret(ir.AtomExpr{Atom: stateAtom()}))}},
+			[]string{"状態の参照（app.token）"}},
+		{"状態の参照: レコードリテラルの中", []ir.Decl{model, token, keep,
+			run(nil, ir.ConstStmt{Name: "r", Expr: ir.CallExpr{Call: call("app.keep", carg("in", record(ir.RecordField{Name: "x", Value: stateAtom()})))}, Span: sp("x.hozo", 1)})},
+			[]string{"状態の参照（app.token）"}},
+		{"状態の参照: パスを持つ参照を対象にした標準の分類", []ir.Decl{model, token,
+			run(nil, matchStmt(ir.Match{Subject: ir.ValueSubject{Atom: stateAtom("x")}, Classify: "nullable", Arms: []ir.MatchArm{stateArm(nil, ir.CaseEmpty), stateArm(nil, ir.CaseHasItems)}, Span: sp("x.hozo", 1)}))},
+			[]string{"値を対象にした、標準の分類での match（by nullable）", "状態の参照（app.token）"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := smallView(tt.decls...)
+			v.Program.Namespaces = append(v.Program.Namespaces, ir.Namespace{Name: "other", Decls: []ir.Decl{remote}})
+			files, diags := Emit(v, Options{Root: root, Select: plugin.Select{Roots: []string{"app.run"}}})
+			if files != nil {
+				t.Errorf("ファイルが出た: %d", len(files))
+			}
+			if len(diags) != len(tt.wants) {
+				t.Fatalf("診断が %d 個、期待は %d 個: %s", len(diags), len(tt.wants), formatDiags(diags))
+			}
+			for i, want := range tt.wants {
+				if d := diags[i]; d.Code != CodeUnsupported || d.Severity != diag.Error || !strings.Contains(d.Message, want) || !strings.Contains(d.Message, "は、組み込みの Go の出力では使えない") {
+					t.Errorf("診断 %d = %s[%s] %q, want GOEMIT-6 に %q", i, d.Severity, d.Code, d.Message, want)
+				}
+			}
+		})
+	}
+
+	// 出力の対象でない宣言が使っていても、何もしない: 選ばれていない op、選ばれた配線から辿られない分類
+	t.Run("出力の対象でない宣言", func(t *testing.T) {
+		unselected := &ir.Op{DeclBase: base("app.unselected", nil), Returns: ir.Optional(ir.String()), Body: wiring(ret(ir.AtomExpr{Atom: stateAtom()}))}
+		v := smallView(model, exc, token, find, found, fail, unselected, keep, run(in, ret(ir.CallExpr{Call: call("app.keep", carg("in", name("in")))})))
+		files, diags := Emit(v, Options{Root: root, Select: plugin.Select{Roots: []string{"app.run"}}})
+		if len(diags) != 0 || len(files) == 0 {
+			t.Fatalf("files = %d, 診断: %s", len(files), formatDiags(diags))
+		}
+		compileFiles(t, root, files)
+	})
+
+	// 支える四つ: 継承した model、export、reads、状態を名前で書いた標準の分類での match
+	t.Run("支える書き方", func(t *testing.T) {
+		derived := &ir.Model{DeclBase: base("app.Sub", nil), Fields: []ir.Field{field("x", ir.Optional(ir.String()))},
+			Extends: &ir.ModelExtends{Base: "app.In", Removed: []string{"xs"}}}
+		op := &ir.Op{DeclBase: base("app.run", nil), Exported: true, Params: []ir.OpParam{param("in", ir.Ref("app.Sub"))},
+			Body:      wiring(matchStmt(byState("app.token", ir.StateNullable, stateArm(nil, ir.CaseEmpty), stateArm(callp("app.use", carg("in", name("in"))), ir.CaseHasItems)))),
+			Signature: ir.Signature{Reads: []string{"app.token"}}}
+		use := &ir.Op{DeclBase: base("app.use", nil), Params: []ir.OpParam{param("in", ir.Ref("app.Sub"))}}
+		v := smallView(model, derived, token, use, op)
+		files, diags := Emit(v, Options{Root: root, Select: plugin.Select{Roots: []string{"app.run"}}})
+		if len(diags) != 0 {
+			t.Fatalf("診断: %s", formatDiags(diags))
+		}
+		wantContains(t, "types.go", contentOf(files, "types.go"), []string{"// app.In を継承。\ntype Sub struct {"}, []string{"InToSub", "func "})
+		wantContains(t, "ops.go", contentOf(files, "ops.go"), []string{"// Reads: app.token\n"}, []string{"Effects:"})
+		compileFiles(t, root, files)
+	})
 }

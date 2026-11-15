@@ -1,0 +1,23 @@
+// TYPE-14（docs/types.md「診断」「本体に書けるもの」）: 継承した model の本体に、元の model のフィールドと同じ名前の
+// フィールドを override なしで書いた
+namespace a {
+  model User { id: string; name: string; hash: string; }
+  model P extends User {
+    hash: string;                      // ERROR: TYPE-14
+  }
+  model Q extends User {
+    name: int;                         // ERROR: TYPE-14
+    extra: string;
+  }
+  // 元の model が受け継いだフィールドも、元の model のフィールド
+  model R extends Q {
+    id: string;                        // ERROR: TYPE-14
+    extra: string;                     // ERROR: TYPE-14
+  }
+  // 同じ本体でなくしても、元の model にあるフィールドは足せない
+  model S extends User {
+    override hash: never;
+    hash: int;                         // ERROR: TYPE-14
+  }
+  op f(): User;
+}

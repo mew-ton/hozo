@@ -25,6 +25,7 @@ type ClearTokenFunc func() error
 //   - q: 問い合わせ
 //
 // Throws: api.NotFound, api.Unauthorized, web.Offline
+// Reads: web.token
 type FetchUserFunc func(q Query) (PublicUser, error)
 
 // OpenUserFunc は op web.openUser の関数の型。
@@ -35,11 +36,13 @@ type FetchUserFunc func(q Query) (PublicUser, error)
 //   - id: 表示するユーザー
 //
 // Throws: api.NotFound, web.Offline
+// Reads: web.token
 // Effects: web.goLogin
 type OpenUserFunc func(id UserId) (UserPage, error)
 
 // SignOutFunc は op web.signOut の関数の型。
 //
+// Reads: web.token
 // Effects: api.deleteSession, web.removeToken
 type SignOutFunc func() error
 
@@ -71,6 +74,7 @@ type Ops interface {
 	//   - q: 問い合わせ
 	//
 	// Throws: api.NotFound, api.Unauthorized, web.Offline
+	// Reads: web.token
 	FetchUser(q Query) (PublicUser, error)
 
 	// OpenUser はユーザーページを開く。
@@ -79,11 +83,13 @@ type Ops interface {
 	//   - id: 表示するユーザー
 	//
 	// Throws: api.NotFound, web.Offline
+	// Reads: web.token
 	// Effects: web.goLogin
 	OpenUser(id UserId) (UserPage, error)
 
 	// SignOut は op web.signOut。
 	//
+	// Reads: web.token
 	// Effects: api.deleteSession, web.removeToken
 	SignOut() error
 }

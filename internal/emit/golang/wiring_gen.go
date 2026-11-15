@@ -215,8 +215,27 @@ func (b *bodyGen) match(m *ir.Match, bindName string, wantValue bool, rest []ir.
 	var c *ir.Classify
 	var st *ir.State
 	var decide string
+	state, onState := m.SubjectState()
 	switch s := m.Subject.(type) {
 	case ir.ValueSubject:
+		if m.Builtin() {
+			// 状態を名前で書いた、標準の分類での match（docs/emit-go.md「移行の間の扱い」）。値を対象にしたものは GOEMIT-6
+			if !onState {
+				return fail("標準の分類 %s の対象が状態そのものでない", m.Classify)
+			}
+			st, _ = e.lookup(state).(*ir.State)
+			if st == nil || e.declNS[state] != e.viewer || string(st.Shape) != m.Classify || !st.Shape.HasBuiltinClassify() {
+				return fail("%s が名前空間 %s の %s の状態でない", state, e.viewer, m.Classify)
+			}
+			u := e.unitOf[st.Name]
+			if u == nil {
+				return fail("%s が名前空間 %s の %s の状態でない", state, e.viewer, m.Classify)
+			}
+			query := "States." + e.unitField(u) + "." + queryIsEmpty
+			b.guard(query, missingState, st.Name)
+			decide = query + "()"
+			break
+		}
 		c, _ = e.lookup(m.Classify).(*ir.Classify)
 		if c == nil || c.SubjectType() == nil {
 			return fail("%s が値の分類でない", m.Classify)
@@ -235,18 +254,6 @@ func (b *bodyGen) match(m *ir.Match, bindName string, wantValue bool, rest []ir.
 			return fail("%s が名前空間 %s の状態の分類でない", m.Classify, e.viewer)
 		}
 		decide = fmt.Sprintf("Classify%s()", e.typeName(c.Name))
-	case ir.StateSubject:
-		st, _ = e.lookup(s.State).(*ir.State)
-		if st == nil || e.declNS[s.State] != e.viewer || string(st.Shape) != m.Classify || !st.Shape.HasBuiltinClassify() {
-			return fail("%s が名前空間 %s の %s の状態でない", s.State, e.viewer, m.Classify)
-		}
-		u := e.unitOf[st.Name]
-		if u == nil {
-			return fail("%s が名前空間 %s の %s の状態でない", s.State, e.viewer, m.Classify)
-		}
-		query := "States." + e.unitField(u) + "." + queryIsEmpty
-		b.guard(query, missingState, st.Name)
-		decide = query + "()"
 	default:
 		return fail("対象の種類が分からない（docs/ir.md「配線」の Match.subject）")
 	}

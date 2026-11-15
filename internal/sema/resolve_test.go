@@ -346,3 +346,125 @@ namespace a {
 		}
 	}
 }
+
+// TestResolveStateValue は docs/resolve.md「手続き」の 1 と 2 の、配線の値の位置の状態: 束縛と引数が先（状態を隠す）、
+// なければ今の名前空間の状態（修飾して書いても同じ）。状態から先のセグメントはその値のフィールド。
+// 別の名前空間（かグローバル）の状態は RES-5、それ以外の宣言は RES-4。
+func TestResolveStateValue(t *testing.T) {
+	p := project{"a.hozo": `
+state shared: list<string>;
+namespace a {
+  model Profile { nick: string; }
+  model User { id: string; profile: Profile; }
+  state token: nullable<string>;
+  state me: single<User>;
+  state maybe: User?;
+  op takeToken(t: string?);
+  op takeString(s: string);
+  op takeOptString(s: string?);
+  op f(token: string) {
+    takeString(token);
+  }
+  op g() {
+    takeToken(token);
+    takeToken(a.token);
+    takeString(me.profile.nick);
+    takeOptString(maybe.id);
+  }
+  op ng() {
+    takeToken(b.remote);                // ERROR: RES-5
+    takeToken(shared);                  // ERROR: RES-5
+    takeToken(Profile);                 // ERROR: RES-4
+    takeString(me.nope);                // ERROR: RES-3
+    takeString(token.value);            // ERROR: RES-3
+  }
+}
+namespace b {
+  state remote: nullable<string>;
+}`}
+	res, fs := analyzeProject(t, p, false)
+	checkAnnotations(t, fs, p, res.Diags)
+	// 引数が同じ名前なら、引数を指す（状態を隠す）
+	hasRef(t, res, fs, "a.hozo:13:16 opParam a.f.token")
+	// 状態の名前は、状態の宣言への参照。修飾して書けば、名前空間と状態
+	hasRef(t, res, fs, "a.hozo:16:15 decl a.token")
+	hasRef(t, res, fs, "a.hozo:17:15 namespace a")
+	hasRef(t, res, fs, "a.hozo:17:17 decl a.token")
+	// 状態から先はフィールド
+	hasRef(t, res, fs, "a.hozo:18:16 decl a.me")
+	hasRef(t, res, fs, "a.hozo:18:19 field a.User.profile")
+	hasRef(t, res, fs, "a.hozo:18:27 field a.Profile.nick")
+	// IR: 束縛と引数は Atom.name、状態は Atom.state（修飾して書いても同じ。path は状態の値のフィールド）
+	g := res.Program.Lookup("a.g").(*ir.Op).Body.Statements
+	atom := func(i int) ir.Atom { return g[i].(ir.CallStmt).Call.Args[0].Value }
+	for i, want := range []ir.StateAtom{
+		{State: "a.token"}, {State: "a.token"}, {State: "a.me", Path: []string{"profile", "nick"}}, {State: "a.maybe", Path: []string{"id"}},
+	} {
+		got, ok := atom(i).(ir.StateAtom)
+		if !ok || got.State != want.State || strings.Join(got.Path, ".") != strings.Join(want.Path, ".") {
+			t.Errorf("g の %d 行目の引数 = %#v, want %#v", i+1, atom(i), want)
+		}
+	}
+	if _, ok := res.Program.Lookup("a.f").(*ir.Op).Body.Statements[0].(ir.CallStmt).Call.Args[0].Value.(ir.NameAtom); !ok {
+		t.Errorf("引数と同じ名前は Atom.name")
+	}
+}
+
+// TestRefsForNewPositions は、定義へジャンプとホバーが使う参照（docs/lsp.md「定義へジャンプ」の表）のうち、
+// extends の元の model、override のフィールド、分類の対象の op、ケースの X as T、reads の状態、修飾した分類、throw の例外。
+func TestRefsForNewPositions(t *testing.T) {
+	res, fs := analyzeProject(t, project{"a.hozo": `
+namespace t {
+  model User { id: string; hash: string; }
+  exception Gone;
+}
+namespace a {
+  model PublicUser extends t.User { override hash: never; }
+  model Admin extends PublicUser { override id: Id; }
+  scalar Id extends string;
+  state users: list<t.User>;
+  state current: t.User?;
+  export op find(id: string): t.User? reads users, a.current;
+  classify Found of find { Hit: find as t.User; default; }
+  classify Session of current { In: current as t.User; default; }
+}
+namespace b {
+  op keep(u: t.User): t.User;
+  op f(id: string): t.User throws t.Gone {
+    const u = a.find(id);
+    return match u by a.Found {
+      Hit     => keep(u);
+      default => throw t.Gone;
+    };
+  }
+}`}, false)
+	noErrors(t, res, fs)
+	for _, want := range []string{
+		"a.hozo:7:30 decl t.User",           // extends B
+		"a.hozo:7:46 field t.User.hash",     // override f → 元の model のフィールド
+		"a.hozo:8:23 decl a.PublicUser",     // 元の model が継承した model
+		"a.hozo:8:45 field a.PublicUser.id", // 元の model の fields の、そのフィールド
+		"a.hozo:12:45 decl a.users",         // reads
+		"a.hozo:12:54 decl a.current",       // reads（修飾）
+		"a.hozo:13:21 decl a.find",          // classify C of op
+		"a.hozo:13:33 decl a.find",          // ケースの op as T の op
+		"a.hozo:13:43 decl t.User",          // ケースの X as T の T
+		"a.hozo:14:23 decl a.current",       // 状態の分類の対象
+		"a.hozo:14:37 decl a.current",       // ケースの X as T の X（状態）
+		"a.hozo:20:25 decl a.Found",         // match x by ns.C
+		"a.hozo:21:7 case a.Found.Hit",      // アームのケース名
+		"a.hozo:22:26 decl t.Gone",          // throw E
+	} {
+		hasRef(t, res, fs, want)
+	}
+	// override f の飛び先: 元の model が受け継いだままのフィールドなら、さらに元の宣言の位置
+	for _, r := range res.Refs {
+		pos := fs.Position(r.Span.File, r.Span.Start)
+		if pos.Line == 8 && pos.Col == 45 {
+			def := fs.Position(r.Target.Span.File, r.Target.Span.Start)
+			if def.Line != 3 || def.Col != 16 {
+				t.Errorf("override id の飛び先 = %d:%d, want 3:16（t.User の id）", def.Line, def.Col)
+			}
+		}
+	}
+}

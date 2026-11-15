@@ -13,7 +13,7 @@ type Node interface {
 	NodeSpan() source.Span
 }
 
-// Ident は識別子（docs/grammar.md「識別子」）。フィールド名の位置（Field.Name、ModelDecl.Omit、
+// Ident は識別子（docs/grammar.md「識別子」）。フィールド名の位置（Field.Name、Override.Name、
 // RecordField.Name、NameAtom.Name の二つ目以降の要素）では FieldName で、Name が予約語のこともある。
 type Ident struct {
 	Span source.Span
@@ -137,8 +137,9 @@ type Literal struct {
 // NodeSpan は Node の実装。
 func (n *Literal) NodeSpan() source.Span { return n.Span }
 
-func (n *Literal) exprNode() {}
-func (n *Literal) atomNode() {}
+func (n *Literal) exprNode()    {}
+func (n *Literal) atomNode()    {}
+func (n *Literal) armBodyNode() {}
 
 // File は一つの .hozo（docs/grammar.md「ファイルと宣言」）。
 type File struct {
@@ -224,27 +225,28 @@ type BindDecl struct {
 func (n *BindDecl) NodeSpan() source.Span { return n.Span }
 func (n *BindDecl) declNode()             {}
 
-// ModelDecl は model（docs/grammar.md「model」）。Body か Base のどちらか一方が nil でない。
+// ModelDecl は model（docs/grammar.md「model」）。
 type ModelDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	// Body は "{ }" の形。
+	// Extends は "extends X" の元の model。なければ nil。
+	Extends *QualifiedName
+	// Body は "{ }"。
 	Body *ModelBody
-	// Base と Omit は "is X omit a, b" の形。
-	Base *QualifiedName
-	Omit []Ident
 }
 
 // NodeSpan は Node の実装。
 func (n *ModelDecl) NodeSpan() source.Span { return n.Span }
 func (n *ModelDecl) declNode()             {}
 
-// ModelBody は "{ Field... }"。model の本体と、その場で書く model（ArmType）。
+// ModelBody は "{ Member... }"。model の本体と、その場で書く model（ArmType）。
+// メンバーは Field と Override の二つの列に分けて持つ（それぞれ書かれた順）。
 type ModelBody struct {
-	Span   source.Span
-	Fields []*Field
+	Span      source.Span
+	Fields    []*Field
+	Overrides []*Override
 }
 
 // NodeSpan は Node の実装。
@@ -264,6 +266,25 @@ type Field struct {
 
 // NodeSpan は Node の実装。
 func (n *Field) NodeSpan() source.Span { return n.Span }
+
+// Override は元の model のフィールドに触れるメンバー（docs/grammar.md「model」の Override）。
+// 形は三つ: 型を書かない（Type が nil で Never が false）、型を変える（Type）、なくす（Never）。
+type Override struct {
+	Span       source.Span
+	Doc        *DocComment
+	Decorators []*Decorator
+	// Name は FieldName（予約語も書ける）。
+	Name Ident
+	// Type は ":" の後ろの型。書いていないか never なら nil。
+	Type Type
+	// Never は ": never"（そのフィールドをなくす）。
+	Never bool
+	// NeverSpan は never の範囲。Never でなければゼロ値。
+	NeverSpan source.Span
+}
+
+// NodeSpan は Node の実装。
+func (n *Override) NodeSpan() source.Span { return n.Span }
 
 // ScalarDecl は scalar（docs/grammar.md「scalar」）。
 type ScalarDecl struct {
@@ -314,37 +335,13 @@ type ArmType struct {
 // NodeSpan は Node の実装。
 func (n *ArmType) NodeSpan() source.Span { return n.Span }
 
-// StateShape は状態の形（docs/grammar.md「state」。列数の範囲）。
-type StateShape int
-
-const (
-	// StateList は list<T>（0 以上）。
-	StateList StateShape = iota
-	// StateSingle は single<T>（ちょうど 1）。
-	StateSingle
-	// StateNullable は nullable<T>（0 か 1）。
-	StateNullable
-)
-
-// String は "list" / "nullable" / "single"。
-func (s StateShape) String() string {
-	switch s {
-	case StateSingle:
-		return "single"
-	case StateNullable:
-		return "nullable"
-	}
-	return "list"
-}
-
-// StateDecl は state（docs/grammar.md「state」）。
+// StateDecl は state（docs/grammar.md「state」）。形は型から決まる（docs/check.md「状態の形」）。
 type StateDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	Shape      StateShape
-	Elem       Type
+	Type       Type
 }
 
 // NodeSpan は Node の実装。
@@ -447,7 +444,7 @@ type ClassifyDecl struct {
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	// Of は対象（ClassifySubject）。一つ以上。型か状態の名前かは名前の解決が決める。
+	// Of は対象（ClassifySubject）。一つ以上。型か op か状態の名前かは名前の解決が決める。
 	Of    []Type
 	Cases []*ClassifyCase
 }
@@ -462,10 +459,23 @@ type ClassifyCase struct {
 	Doc     *DocComment
 	Name    *Ident
 	Default bool
+	// As は "対象 as 型" の並び（CaseTyping）。なければ空。default には書けない。
+	As []*CaseTyping
 }
 
 // NodeSpan は Node の実装。
 func (n *ClassifyCase) NodeSpan() source.Span { return n.Span }
+
+// CaseTyping はケースの "対象 as 型"（docs/grammar.md「classify / condition」）。
+// Subject は宣言の of の後ろと同じに書いた対象（型か op か状態の名前。名前の解決が決める）。
+type CaseTyping struct {
+	Span    source.Span
+	Subject Type
+	Type    Type
+}
+
+// NodeSpan は Node の実装。
+func (n *CaseTyping) NodeSpan() source.Span { return n.Span }
 
 // ConditionDecl は condition。
 type ConditionDecl struct {
@@ -630,7 +640,7 @@ type Target struct {
 // NodeSpan は Node の実装。
 func (n *Target) NodeSpan() source.Span { return n.Span }
 
-// Clause はデコレータの宣言と op の節。*ThrowsClause、*CatchesClause、*EffectsClause が実装する。
+// Clause はデコレータの宣言と op の節。*ThrowsClause、*CatchesClause、*EffectsClause、*ReadsClause が実装する。
 // どれをどこに書けるかは構文解析器が決める（docs/grammar.md「decorator の宣言」「op」）。
 type Clause interface {
 	Node
@@ -724,11 +734,25 @@ type EffectsClause struct {
 func (n *EffectsClause) NodeSpan() source.Span { return n.Span }
 func (n *EffectsClause) clauseNode()           {}
 
+// ReadsClause は op の "reads a, b"（docs/grammar.md「op」）。
+type ReadsClause struct {
+	Span   source.Span
+	States []QualifiedName
+}
+
+// NodeSpan は Node の実装。
+func (n *ReadsClause) NodeSpan() source.Span { return n.Span }
+func (n *ReadsClause) clauseNode()           {}
+
 // OpDecl は op（docs/grammar.md「op」）。Body が nil なら葉、あれば配線。
 type OpDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
+	// Export は "export" の印（別の名前空間から呼べる op）。
+	Export bool
+	// ExportSpan は export の範囲。Export でなければゼロ値。
+	ExportSpan source.Span
 	Name       Ident
 	Params     []*OpParam
 	// Return は戻り値の型。省略なら nil（void と同じ意味。設計書 §7.1）。
@@ -751,17 +775,19 @@ type OpParam struct {
 // NodeSpan は Node の実装。
 func (n *OpParam) NodeSpan() source.Span { return n.Span }
 
-// ReturnType は戻り値の型。Void なら Type は nil。
+// ReturnType は戻り値の型。Void か Never なら Type は nil。
 type ReturnType struct {
 	Span source.Span
 	Void bool
-	Type Type
+	// Never は "never"（決して値を返さない op）。
+	Never bool
+	Type  Type
 }
 
 // NodeSpan は Node の実装。
 func (n *ReturnType) NodeSpan() source.Span { return n.Span }
 
-// Type は型（docs/grammar.md「型」）。*CoreType、*RecordType、*NamedType、*ArrayType、*OptionalType が実装する。
+// Type は型（docs/grammar.md「型」）。*CoreType、*RecordType、*ShapeType、*NamedType、*ArrayType、*OptionalType が実装する。
 type Type interface {
 	Node
 	typeNode()
@@ -787,6 +813,21 @@ type RecordType struct {
 // NodeSpan は Node の実装。
 func (n *RecordType) NodeSpan() source.Span { return n.Span }
 func (n *RecordType) typeNode()             {}
+
+// ShapeType は形の語で書いた型（list<T> / nullable<T> / single<T>。docs/grammar.md「型」）。
+// T[] / T? / T の別の書き方で、IR では同じ型になる。
+type ShapeType struct {
+	Span source.Span
+	// Shape は "list" / "nullable" / "single"。
+	Shape string
+	// ShapeSpan は形の語の範囲。
+	ShapeSpan source.Span
+	Elem      Type
+}
+
+// NodeSpan は Node の実装。
+func (n *ShapeType) NodeSpan() source.Span { return n.Span }
+func (n *ShapeType) typeNode()             {}
 
 // NamedType は宣言の名前。Arg は分類のケースで絞り込んだ型の型引数（WarrantyKind.Yamada<server.Item>）。なければ nil。
 type NamedType struct {
@@ -881,9 +922,10 @@ type Expr interface {
 	exprNode()
 }
 
-// Atom は呼び出しの引数に書けるもの。*NameAtom、*Literal、*NoneAtom、*RecordLit が実装する。
+// Atom は呼び出しの引数とアームの本体に書ける値。*NameAtom、*Literal、*NoneAtom、*RecordLit が実装する。
 type Atom interface {
 	Expr
+	ArmBody
 	atomNode()
 }
 
@@ -897,8 +939,9 @@ type Call struct {
 // NodeSpan は Node の実装。
 func (n *Call) NodeSpan() source.Span { return n.Span }
 func (n *Call) exprNode()             {}
+func (n *Call) armBodyNode()          {}
 
-// NameAtom は束縛した名前・op の引数・そのフィールド（query.page）。
+// NameAtom は束縛した名前・op の引数・今の名前空間の状態と、そのフィールド（query.page）。
 type NameAtom struct {
 	Span source.Span
 	// Name は Path（docs/grammar.md「識別子」）。二つ目以降の要素は FieldName で、予約語のこともある（res.op）。
@@ -909,6 +952,7 @@ type NameAtom struct {
 func (n *NameAtom) NodeSpan() source.Span { return n.Span }
 func (n *NameAtom) exprNode()             {}
 func (n *NameAtom) atomNode()             {}
+func (n *NameAtom) armBodyNode()          {}
 
 // NoneAtom は none。
 type NoneAtom struct {
@@ -919,6 +963,7 @@ type NoneAtom struct {
 func (n *NoneAtom) NodeSpan() source.Span { return n.Span }
 func (n *NoneAtom) exprNode()             {}
 func (n *NoneAtom) atomNode()             {}
+func (n *NoneAtom) armBodyNode()          {}
 
 // RecordLit は "{ a: x, b }"。
 type RecordLit struct {
@@ -930,6 +975,7 @@ type RecordLit struct {
 func (n *RecordLit) NodeSpan() source.Span { return n.Span }
 func (n *RecordLit) exprNode()             {}
 func (n *RecordLit) atomNode()             {}
+func (n *RecordLit) armBodyNode()          {}
 
 // RecordField はレコードのフィールド。Value が nil なら "{ item }" の略記（"{ item: item }" の意味）。
 type RecordField struct {
@@ -942,14 +988,14 @@ type RecordField struct {
 // NodeSpan は Node の実装。
 func (n *RecordField) NodeSpan() source.Span { return n.Span }
 
-// Match は "match [Atom] by (Ident | list | nullable) { MatchArm... }"（docs/grammar.md「配線」）。
+// Match は "match [Atom] by (QualifiedName | list | nullable) { MatchArm... }"（docs/grammar.md「配線」）。
 type Match struct {
 	Span source.Span
 	// Subject は対象。書かれていなければ nil（状態の分類での match）。
 	Subject Atom
-	// Classifier は by の後ろ。Builtin なら予約語 list / nullable で、Name はその語。
-	Classifier Ident
-	// Builtin は by の後ろが状態の形（組み込みの分類）か。
+	// Classifier は by の後ろ。Builtin なら予約語 list / nullable で、要素は一つ（Name はその語）。
+	Classifier QualifiedName
+	// Builtin は by の後ろが形の語（標準の分類）か。
 	Builtin bool
 	Arms    []*MatchArm
 }
@@ -958,12 +1004,28 @@ type Match struct {
 func (n *Match) NodeSpan() source.Span { return n.Span }
 func (n *Match) exprNode()             {}
 
-// MatchArm は "A | B => Call;" か "default => none;"。Body は *Call か *NoneAtom。
+// ArmBody はアームの本体（docs/grammar.md「配線」の ArmBody）。*Call、Atom の各構造体、*Throw が実装する。
+type ArmBody interface {
+	Node
+	armBodyNode()
+}
+
+// Throw は "throw E"。アームの本体にだけ書ける。
+type Throw struct {
+	Span      source.Span
+	Exception QualifiedName
+}
+
+// NodeSpan は Node の実装。
+func (n *Throw) NodeSpan() source.Span { return n.Span }
+func (n *Throw) armBodyNode()          {}
+
+// MatchArm は "A | B => ArmBody;"。Body は *Call か Atom か *Throw。
 type MatchArm struct {
 	Span    source.Span
 	Cases   []Ident
 	Default bool
-	Body    Expr
+	Body    ArmBody
 }
 
 // NodeSpan は Node の実装。

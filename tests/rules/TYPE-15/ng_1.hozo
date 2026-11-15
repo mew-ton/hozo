@@ -1,0 +1,38 @@
+// TYPE-15（docs/types.md「診断」「変えられる型」）: override f: T の T が、元の型から変えられる型でない
+namespace a {
+  scalar Email extends string;
+  scalar Token extends string;
+  model Other { name: string; }
+  model Profile { nick: string; }
+  model Wide extends Profile { }
+  union Status { Active: Profile; Pending: Other; }
+  model User {
+    id: string;
+    email: Email;
+    profile: Profile;
+    nick: string?;
+    tags: string[];
+    attrs: Record<string, Profile>;
+    status: Status;
+    wide: Wide;
+  }
+  model D extends User {
+    override id: int;                              // ERROR: TYPE-15
+    override email: Token;                         // ERROR: TYPE-15
+    // 必須を省略可能に、省略可能を必須に
+    override profile: Profile?;                    // ERROR: TYPE-15
+    override nick: string;                         // ERROR: TYPE-15
+    override tags: string;                         // ERROR: TYPE-15
+    override attrs: Record<Email, Profile>;        // ERROR: TYPE-15
+    // union から元の型には戻せない。継承した型から元の型にも戻せない
+    override status: Profile;                      // ERROR: TYPE-15
+    override wide: Profile;                        // ERROR: TYPE-15
+  }
+  model D2 extends User {
+    // アームに元の型を持たない union、scalar から核の型
+    override id: Status;                           // ERROR: TYPE-15
+    override email: string;                        // ERROR: TYPE-15
+    override profile: Other;                       // ERROR: TYPE-15
+  }
+  op f(): User;
+}

@@ -1,0 +1,22 @@
+// CLS-4（docs/check.md「対象」）: 対象にできる op は、値を返す op。どの名前空間の op でもよく、export の有無によらない。
+// op の分類は、その op が返した値の分類で、match の対象は、型が渡せる値ならよい（その op の呼び出しの結果でなくてもよい）
+namespace a {
+  model M { id: string; }
+  op find(id: string): M?;
+  op list1(): M[];
+  op g(m: M?);
+  classify Found of find { Hit; default; }
+  classify Any of list1 { Some; None; }
+  classify Remote of b.lookup { Hit; default; }
+  condition Known of find;
+  op f(id: string, given: M?) {
+    const m = find(id);
+    match m by Found { Hit => g(m); default => none; };
+    match given by Found { Hit => g(given); default => none; };
+    match given by Remote { Hit => g(given); default => none; };
+    match given by Known { Known => g(given); default => none; };
+  }
+}
+namespace b {
+  op lookup(): a.M?;
+}

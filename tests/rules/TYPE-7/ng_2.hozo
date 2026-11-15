@@ -1,0 +1,14 @@
+// TYPE-7（docs/types.md「match の型」の 5.3）: アームがレコードリテラルと none だけの match は、return の式でなければ
+// 当てはめる先が決まらない
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  op use(x: M?): void;
+  op f(x: M): void {
+    const r = match x by C {           // ERROR: TYPE-7
+      A => { id: "a" };
+      B => none;
+    };
+    use(r);
+  }
+}

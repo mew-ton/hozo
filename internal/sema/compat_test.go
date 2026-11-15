@@ -17,10 +17,13 @@ namespace a {
   scalar Token extends string;
   scalar Mail2 extends Email;
   model User { id: string; email: Email; hash: string; nick: string?; page: int = 1; }
-  model PublicUser is User omit hash;
+  model PublicUser extends User { override hash: never; }
   model Other { name: string; }
-  model NeedsNick { id: string; nick: string; }
+  model Same { name: string; }
+  model Admin extends User { }
+  model SuperAdmin extends Admin { level: int; }
   model HasDefault { id: string; limit: int = 10; }
+  union Page { Ready: User; Missing: Other; }
   classify C of User { A; B; }
   classify D of User { A; }
 }`}, false)
@@ -76,8 +79,11 @@ func TestCompatRule4CaseToOf(t *testing.T) {
 	if !a.assignType(narrowed, user) {
 		t.Error("絞り込まれた型は元の型に渡せる")
 	}
-	if !a.assignType(narrowed, publicUser) {
-		t.Error("絞り込みを捨てた後は射影もできる（再帰的に適用）")
+	if !a.assignType(narrowed, ir.Optional(user)) {
+		t.Error("絞り込みを捨てた後も再帰的に適用する（T は T? に）")
+	}
+	if a.assignType(narrowed, publicUser) {
+		t.Error("絞り込みを捨てても、別の model には渡せない")
 	}
 	if a.assignType(user, narrowed) {
 		t.Error("元の型は絞り込まれた型に渡せない")
@@ -101,8 +107,11 @@ func TestCompatRule5CaseSubset(t *testing.T) {
 
 func TestCompatRule6Array(t *testing.T) {
 	a := compatAnalyzer(t)
-	if !a.assignType(ir.Array(user), ir.Array(publicUser)) {
+	if !a.assignType(ir.Array(email), ir.Array(ir.String())) {
 		t.Error("要素が渡せれば配列も渡せる")
+	}
+	if a.assignType(ir.Array(user), ir.Array(publicUser)) {
+		t.Error("別の model の配列には渡せない")
 	}
 	if a.assignType(ir.Array(other), ir.Array(user)) {
 		t.Error("要素が渡せなければ配列も渡せない")
@@ -111,30 +120,130 @@ func TestCompatRule6Array(t *testing.T) {
 
 func TestCompatRule7Record(t *testing.T) {
 	a := compatAnalyzer(t)
-	if !a.assignType(ir.Record(ir.String(), user), ir.Record(ir.String(), publicUser)) {
+	if !a.assignType(ir.Record(ir.String(), email), ir.Record(ir.String(), ir.String())) {
 		t.Error("キーが等しく値が渡せれば Record も渡せる")
+	}
+	if a.assignType(ir.Record(ir.String(), user), ir.Record(ir.String(), publicUser)) {
+		t.Error("値が別の model なら渡せない")
 	}
 	if a.assignType(ir.Record(email, user), ir.Record(ir.String(), user)) {
 		t.Error("キーが違えば渡せない（Email と string は別）")
 	}
 }
 
-func TestCompatRule8Projection(t *testing.T) {
+// 規則 8（model から model への射影）は欠番（docs/types.md「互換」）。model の値は、別の model の位置には渡せない:
+// フィールドが同じでも、一方がもう一方を継承していても、どちらの向きにも。
+func TestCompatRule8Gone(t *testing.T) {
 	a := compatAnalyzer(t)
-	if !a.assignType(user, publicUser) {
-		t.Error("User は PublicUser に射影できる")
+	pairs := [][2]ir.Type{
+		{user, publicUser}, {publicUser, user}, // 継承（フィールドをなくした）
+		{ir.Ref("a.Admin"), user}, {user, ir.Ref("a.Admin")}, // 継承（本体が空で、フィールドは同じ）
+		{ir.Ref("a.SuperAdmin"), ir.Ref("a.Admin")},
+		{other, ir.Ref("a.Same")}, {ir.Ref("a.Same"), other}, // フィールドが同じ
+		{user, ir.Ref("a.HasDefault")},
 	}
-	if !a.assignType(user, ir.Ref("a.HasDefault")) {
-		t.Error("S にないフィールドは default で埋める")
+	for _, p := range pairs {
+		if a.assignType(p[0], p[1]) {
+			t.Errorf("%s は %s に渡せない（別の型）", p[0], p[1])
+		}
+		if a.assign(valueType(p[0]), p[1]) != failType {
+			t.Errorf("%s → %s は TYPE-4 / TYPE-3", p[0], p[1])
+		}
 	}
-	if a.assignType(user, ir.Ref("a.NeedsNick")) {
-		t.Error("T の必須のフィールドが S で省略可能なら射影できない")
+	// union（arms）に、アームの型の値を直接渡せない
+	if a.assignType(user, ir.Ref("a.Page")) {
+		t.Error("アームの型の値は union の位置に渡せない")
 	}
-	if a.assignType(publicUser, user) {
-		t.Error("hash がないので PublicUser は User に射影できない")
+}
+
+// 「返らない」式は、どの型の位置にも書ける（docs/types.md「式の型」）。
+func TestCompatNever(t *testing.T) {
+	a := compatAnalyzer(t)
+	for _, to := range []ir.Type{user, ir.String(), ir.Optional(email), ir.Array(user)} {
+		if a.assign(neverType(), to) != assignOK {
+			t.Errorf("「返らない」は %s に渡せる", to)
+		}
 	}
-	if a.assignType(other, user) {
-		t.Error("フィールドが合わなければ射影できない")
+	if callType(ir.Never()).kind != etNever || callType(nil).kind != etNoValue || callType(user).kind != etValue {
+		t.Error("呼び出しの式の型")
+	}
+}
+
+// docs/types.md「変えられる型」の規則 1〜6。
+func TestChangeable(t *testing.T) {
+	a := compatAnalyzer(t)
+	admin, super, page := ir.Ref("a.Admin"), ir.Ref("a.SuperAdmin"), ir.Ref("a.Page")
+	cases := []struct {
+		name    string
+		o, n    ir.Type
+		ok      bool
+		widened bool
+	}{
+		{"1 等しい", user, user, true, false},
+		{"2 広げる（union のアームに元の型）", user, page, true, true},
+		{"2 アームにない型", email, page, false, false},
+		{"3 差し替える（model を継承した model）", user, admin, true, false},
+		{"3 二段の継承", user, super, true, false},
+		{"3 逆向きは変えられない", admin, user, false, false},
+		{"3 scalar を継承した scalar", email, mail2, true, false},
+		{"3 核の型を継承した scalar", ir.String(), email, true, false},
+		{"3 核の型を、二段で継承した scalar", ir.String(), mail2, true, false},
+		{"3 別の scalar", email, token, false, false},
+		{"3 scalar から核の型には戻せない", email, ir.String(), false, false},
+		{"4 optional の中", ir.Optional(user), ir.Optional(admin), true, false},
+		{"4 optional の中を広げる", ir.Optional(user), ir.Optional(page), true, true},
+		{"5 array の中", ir.Array(ir.String()), ir.Array(email), true, false},
+		{"6 record の値", ir.Record(ir.String(), user), ir.Record(ir.String(), page), true, true},
+		{"6 record のキーは変えられない", ir.Record(ir.String(), user), ir.Record(email, user), false, false},
+		{"必須を省略可能にできない", user, ir.Optional(user), false, false},
+		{"省略可能を必須にできない", ir.Optional(user), user, false, false},
+		{"関係のない型", user, other, false, false},
+		{"union から元の型には戻せない", page, user, false, false},
+		{"array を外せない", ir.Array(user), user, false, false},
+	}
+	for _, c := range cases {
+		widened, ok := a.changeable(c.o, c.n)
+		if ok != c.ok || widened != c.widened {
+			t.Errorf("%s: %s → %s = (widened %v, ok %v), want (%v, %v)", c.name, c.o, c.n, widened, ok, c.widened, c.ok)
+		}
+	}
+	// 継承している: 等しいときは含まない
+	if a.inherits(user, user) || a.inherits(email, email) || !a.inherits(super, user) || a.inherits(user, super) {
+		t.Error("inherits")
+	}
+}
+
+// docs/types.md「絞り込める型」と「型で決まる絞り込み」。
+func TestNarrowable(t *testing.T) {
+	a := compatAnalyzer(t)
+	page := ir.Ref("a.Page")
+	cases := []struct {
+		name string
+		s, t ir.Type
+		ok   bool
+		by   ir.NarrowBy
+	}{
+		{"optional(T) を T に", ir.Optional(user), user, true, ir.NarrowByPresence},
+		{"union をアームの型に", page, user, true, ir.NarrowByVariant},
+		{"optional(union) をアームの型に（型では決まらない）", ir.Optional(page), other, true, ir.NarrowByPredicate},
+		{"string を scalar に", ir.String(), email, true, ir.NarrowByPredicate},
+		{"string? を scalar に", ir.Optional(ir.String()), email, true, ir.NarrowByPredicate},
+		{"対象と同じ型に", user, user, true, ir.NarrowByPredicate},
+		{"絞り込まれた型（case）に", user, ir.Case("a.C", []string{"A"}, user), true, ir.NarrowByPredicate},
+		{"関係のない型には絞り込めない", user, other, false, ""},
+		{"union のアームでない型", page, email, false, ""},
+		{"広い型には絞り込めない", user, ir.Optional(user), false, ""},
+	}
+	for _, c := range cases {
+		if got := a.narrowable(c.s, c.t); got != c.ok {
+			t.Errorf("%s: narrowable(%s, %s) = %v, want %v", c.name, c.s, c.t, got, c.ok)
+			continue
+		}
+		if c.ok {
+			if got := a.narrowBy(c.s, c.t); got != c.by {
+				t.Errorf("%s: narrowBy(%s, %s) = %s, want %s", c.name, c.s, c.t, got, c.by)
+			}
+		}
 	}
 }
 

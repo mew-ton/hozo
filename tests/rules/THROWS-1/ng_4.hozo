@@ -1,0 +1,21 @@
+// THROWS-1（docs/check.md「throws」「throw」）: アームの本体の throw の例外も、配線の throws に書くか、デコレータが吸収する。
+// never を返す op の例外も同じ
+namespace a {
+  model M { id: string; }
+  exception E;
+  exception F;
+  classify Kind of M { A; B; }
+  op fail(): never throws F;
+  op f(m: M): M {                      // ERROR: THROWS-1
+    return match m by Kind {
+      A => m;
+      B => throw E;
+    };
+  }
+  op g(m: M): M throws E {             // ERROR: THROWS-1
+    return match m by Kind {
+      A => throw E;
+      B => fail();
+    };
+  }
+}

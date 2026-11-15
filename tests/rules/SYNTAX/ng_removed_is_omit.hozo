@@ -1,0 +1,6 @@
+// SYNTAX（docs/grammar.md「model」）: `model A is B omit f;` はなくした書き方。extends と override f: never; で書く
+namespace a {
+  model User { id: string; hash: string; }
+  model PublicUser is User omit hash;  // ERROR: SYNTAX
+  op f(): User;
+}

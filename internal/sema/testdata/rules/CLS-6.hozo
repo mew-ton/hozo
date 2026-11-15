@@ -1,0 +1,21 @@
+// CLS-6（tests/rules/CLS-6/ng_1.hozo と同じ。docs/check.md「classify / match」、docs/types.md「絞り込める型」）: as の後ろの型が、対象の型から絞り込める型でない
+// （対象の型に渡せる型か、対象の union のアームの型）。位置は as の後ろの型
+namespace a {
+  model M { id: string; }
+  model N { id: string; }
+  model Sub extends M { }
+  scalar Email extends string;
+  union Page { Ready: M; Missing: N; }
+  state token: nullable<string>;
+  op find(): M?;
+  op page(): Page;
+  classify V1 of M { Other: M as N; default; }                   // ERROR: CLS-6
+  classify V2 of M { Wide: M as M?; default; }                   // ERROR: CLS-6
+  classify V3 of Email { Raw: Email as string; default; }        // ERROR: CLS-6
+  // 継承した model は別の型で、元の型には渡せない
+  classify V4 of M { Sub: M as Sub; default; }                   // ERROR: CLS-6
+  classify O1 of find { Hit: find as N; default; }               // ERROR: CLS-6
+  classify O2 of page { Other: page as Email; default; }         // ERROR: CLS-6
+  classify S1 of token { In: token as int; default; }            // ERROR: CLS-6
+  op f(): N;
+}

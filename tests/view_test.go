@@ -100,8 +100,9 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "namespaces[api]", v.Namespaces["api"], []ir.NamespaceConfig{{Language: "go", Out: "gen/api", Dir: "gen/api", Transpilers: []string{"view-none"}}})
 		expect(t, "namespaces[web] は config だけ", v.Namespaces["web"], []ir.NamespaceConfig{v.Config})
 		// ops はすべての op について
-		expect(t, "ops のキー", keysOf(v.Ops), []string{
-			"api.getUser", "api.login", "api.logout", "api.touch",
+		expect(t, "ops のキー（export の有無によらず、すべての op）", keysOf(v.Ops), []string{
+			"api.currentName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.login", "api.logout", "api.nameOf",
+			"api.tokenOrNone", "api.touch", "api.unauthorized",
 			"web.adminPageVm", "web.clearToken", "web.fetchUser", "web.greet", "web.login", "web.openUser",
 			"web.reload", "web.signOut", "web.userPageVm", "web.welcome",
 		})
@@ -191,12 +192,97 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "state の shape（single）", declOf(t, prog, "web.location").(*ir.State).Shape, ir.StateSingle)
 	})
 
-	t.Run("ir.md 正規化/model is omit", func(t *testing.T) {
+	t.Run("ir.md 正規化/model extends", func(t *testing.T) {
 		m := declOf(t, prog, "api.PublicUser").(*ir.Model)
-		expect(t, "fields は omit を除いて複製", renderFields(m), []string{"id: api.UserId", "name: string", "nick: string?", "tags: string[]", "attrs: Record<string, string[]>"})
-		expect(t, "derivedFrom", m.DerivedFrom, &ir.DerivedFrom{Base: "api.User", Omit: []string{"secret", "hash"}})
-		expect(t, "複製したフィールドはデコレータも保つ", renderApplications(m.Fields[0].Decorators), []string{"@db.key"})
-		expect(t, "元の model に derivedFrom はない", declOf(t, prog, "api.User").(*ir.Model).DerivedFrom == nil, true)
+		expect(t, "fields は、なくしたものを除いて元の並びのまま写す", renderFields(m), []string{"id: api.UserId", "name: string", "nick: string?", "tags: string[]", "attrs: Record<string, string[]>"})
+		expect(t, "extends", m.Extends, &ir.ModelExtends{Base: "api.User", Removed: []string{"secret", "hash"}})
+		expect(t, "写したフィールドはデコレータも保つ", renderApplications(m.Fields[0].Decorators), []string{"@db.key"})
+		user := declOf(t, prog, "api.User").(*ir.Model)
+		expect(t, "元の model に extends はない", user.Extends == nil, true)
+		// override で型を変える・デコレータを足す・なくす、フィールドを足す
+		a := declOf(t, prog, "api.Admin").(*ir.Model)
+		expect(t, "Admin の fields（override は元の位置のまま、足したフィールドは末尾）", renderFields(a), []string{
+			"id: api.AdminId", "name: string", "secret: string", "nick: string?", "tags: string[]", "attrs: Record<string, string[]>", "level: int = 1",
+		})
+		expect(t, "Admin の extends（書かれた順）", a.Extends, &ir.ModelExtends{Base: "api.User", Removed: []string{"hash"}, Overridden: []string{"id", "name", "secret"}})
+		expect(t, "override に付けたデコレータは、受け継いだものの後ろ", [][]string{renderApplications(a.Fields[0].Decorators), renderApplications(a.Fields[1].Decorators)}, [][]string{{"@db.key"}, {"@db.unique"}})
+		// 説明: override したフィールドは override に書いたもの（なければなし）。していないフィールドは受け継ぐ
+		expect(t, "override に書いた説明", docOf(fieldOf(t, prog, "api.Admin", "name").Description), "表に出す名前")
+		expect(t, "override に説明がなければ説明なし（元の説明は受け継がない）", fieldOf(t, prog, "api.Admin", "secret").Description == nil, true)
+		expect(t, "元のフィールドの説明は変わらない", docOf(fieldOf(t, prog, "api.User", "secret").Description), "表に出さない")
+		expect(t, "PublicUser は secret をなくしている", indexOf(renderFields(m), "secret: string"), -1)
+		// 位置: 受け継いだままのフィールドは元の位置、override したフィールドは override の位置
+		expect(t, "受け継いだままのフィールドの span", fieldOf(t, prog, "api.Admin", "tags").Span, fieldOf(t, prog, "api.User", "tags").Span)
+		expect(t, "override したフィールドの span の行", fieldOf(t, prog, "api.Admin", "id").Span.Start.Line, lineOf(t, "api.hozo", "override id: AdminId;"))
+		// model の説明とデコレータは受け継がない
+		expect(t, "Admin の説明は自分のもの", docOf(a.Description), "管理者")
+	})
+
+	t.Run("ir.md 正規化/形の語と状態の型", func(t *testing.T) {
+		expect(t, "形の語は array / optional / そのままの型", renderFields(declOf(t, prog, "api.Shapes").(*ir.Model)), []string{
+			"ids: api.UserId[]", "nick: string?", "one: api.Token", "twice: string?",
+		})
+		state := func(name string) []string {
+			st := declOf(t, prog, name).(*ir.State)
+			return []string{typeStr(st.Type), string(st.Shape), typeStr(st.Element)}
+		}
+		expect(t, "state users: list<User>", state("api.users"), []string{"api.User[]", "list", "api.User"})
+		expect(t, "state current: Token?（nullable<Token> と同じ）", state("api.current"), []string{"api.Token?", "nullable", "api.Token"})
+		expect(t, "state motd: string（single<string> と同じ）", state("api.motd"), []string{"string", "single", "string"})
+		expect(t, "state token: nullable<api.Token>", state("web.token"), []string{"api.Token?", "nullable", "api.Token"})
+		expect(t, "state location: single<page.Route>", state("web.location"), []string{"page.Route", "single", "page.Route"})
+	})
+
+	t.Run("ir.md 正規化/export と reads と never", func(t *testing.T) {
+		find := opOf(t, prog, "api.findUser")
+		expect(t, "export op は exported", []bool{find.Exported, opOf(t, prog, "api.getUser").Exported, opOf(t, prog, "api.nameOf").Exported, opOf(t, prog, "web.openUser").Exported}, []bool{true, true, false, false})
+		expect(t, "reads は FQN の列一つ（重複は最初の出現に寄せる）", find.Reads, []string{"api.users", "api.sessions"})
+		expect(t, "reads を書いていなければ []", orEmptyStrings(opOf(t, prog, "api.getUser").Reads), []string{})
+		expect(t, "never を返す op の returns", opOf(t, prog, "api.unauthorized").Returns, ir.Type(ir.Never()))
+	})
+
+	t.Run("ir.md classify/op の分類とケースの as", func(t *testing.T) {
+		l := declOf(t, prog, "api.Lookup").(*ir.Classify)
+		expect(t, "op の分類の subject（type は op の returns）", l.Subject, ir.ClassifySubject(ir.OpSubject{Op: "api.findUser", Type: ir.Optional(ir.Ref("api.User"))}))
+		expect(t, "ケースの as（op の分類は state を持たない）", []any{l.Cases[0].As[0].State, typeStr(l.Cases[0].As[0].Type), l.Cases[0].As[0].By}, []any{"", "api.User", ir.NarrowByPresence})
+		expect(t, "型で決まる分類", l.DecidedBy, ir.DecidedByType)
+		s := declOf(t, prog, "api.SignedIn").(*ir.Classify)
+		expect(t, "状態の分類の subject", s.Subject, ir.ClassifySubject(ir.StatesSubject{States: []string{"api.current"}}))
+		expect(t, "ケースの as（状態の分類は state に FQN）", []any{s.Cases[0].As[0].State, typeStr(s.Cases[0].As[0].Type), s.Cases[0].As[0].By}, []any{"api.current", "api.Token", ir.NarrowByPresence})
+		expect(t, "as を書かないケースの as は []、述語で決まる", []any{len(declOf(t, prog, "web.UserKind").(*ir.Classify).Cases[0].As), declOf(t, prog, "web.UserKind").(*ir.Classify).DecidedBy, declOf(t, prog, "web.Verified").(*ir.Classify).DecidedBy},
+			[]any{0, ir.DecidedByPredicate, ir.DecidedByPredicate})
+	})
+
+	t.Run("ir.md 配線/状態の参照とアームの本体", func(t *testing.T) {
+		expect(t, "currentName の本体（アームの throw）", renderBody(opOf(t, prog, "api.currentName").Body), []string{
+			"const user = api.findUser(id: id)",
+			"return match user by api.Lookup { Found => api.nameOf(user: user); default => throw api.NotFound }",
+		})
+		expect(t, "tokenOrNone の本体（状態の名前は Atom の state、アームの値と none）", renderBody(opOf(t, prog, "api.tokenOrNone").Body), []string{
+			"return match state api.current by nullable { HasItems => state api.current; Empty => none }",
+		})
+		expect(t, "greeting の本体（修飾して書いた状態の名前も同じ）", renderBody(opOf(t, prog, "api.greeting").Body), []string{"return state api.motd"})
+		expect(t, "guard の本体（状態の分類での match、never を返す op の呼び出し）", renderBody(opOf(t, prog, "api.guard").Body), []string{
+			"return match by api.SignedIn { Yes => state api.current; default => api.unauthorized() }",
+		})
+		arms := func(op string) []ir.MatchArm {
+			return opOf(t, prog, op).Body.Statements[len(opOf(t, prog, op).Body.Statements)-1].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match.Arms
+		}
+		narrowed := func(ns []ir.Narrowing) []string {
+			out := []string{}
+			for _, n := range ns {
+				out = append(out, strings.TrimPrefix(n.State+": ", ": ")+typeStr(n.Type))
+			}
+			return out
+		}
+		expect(t, "as のケースのアームでは、対象は書いた型", narrowed(arms("api.currentName")[0].Narrowed), []string{"api.User"})
+		expect(t, "default のアームは外のまま", narrowed(arms("api.currentName")[1].Narrowed), []string{})
+		expect(t, "by nullable の HasItems だけのアームで T", narrowed(arms("api.tokenOrNone")[0].Narrowed), []string{"api.Token"})
+		expect(t, "Empty のアームは外のまま", narrowed(arms("api.tokenOrNone")[1].Narrowed), []string{})
+		expect(t, "状態の分類での match の narrowed は state を持つ", narrowed(arms("api.guard")[0].Narrowed), []string{"api.current: api.Token"})
+		// 型を書かないケースの絞り込みは case(C, Ks, X)
+		open := opOf(t, prog, "web.openUser").Body.Statements[1].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
+		expect(t, "型を書かないケースの narrowed", narrowed(open.Arms[0].Narrowed), []string{"web.UserKind.Admin<api.PublicUser>"})
 	})
 
 	t.Run("ir.md 正規化/その場の model", func(t *testing.T) {
@@ -370,6 +456,38 @@ func TestViewFromEntry(t *testing.T) {
 		})
 	})
 
+	t.Run("check.md 計算/reads", func(t *testing.T) {
+		reads := func(name string) []string { return orEmptyStrings(opOf(t, prog, name).Signature.Reads) }
+		expect(t, "葉の op の R は Op.reads", reads("api.findUser"), []string{"api.users", "api.sessions"})
+		expect(t, "配線の R: 呼び出し先の R が伝わる", reads("api.currentName"), []string{"api.users", "api.sessions"})
+		expect(t, "配線の R: match の対象と、アームの値が参照する状態", reads("api.tokenOrNone"), []string{"api.current"})
+		expect(t, "配線の R: return の値が参照する状態", reads("api.greeting"), []string{"api.motd"})
+		expect(t, "配線の R: match by C は C の対象の状態", reads("api.guard"), []string{"api.current"})
+		// bind で埋まる位置の状態も読む（Call.bound）。別の名前空間の呼び出し先の R は、そのまま伝わる
+		expect(t, "配線の R: Call.bound の状態", reads("web.fetchUser"), []string{"web.token"})
+		expect(t, "reads を書いていない葉の R は []", reads("api.getUser"), []string{})
+		// R は見る側によらない
+		expect(t, "web から見た api.findUser の reads", v.Ops["api.findUser"].Reads, []string{"api.users", "api.sessions"})
+	})
+
+	t.Run("check.md 計算/純粋", func(t *testing.T) {
+		pure := func(name string) bool { return opOf(t, prog, name).Signature.Pure }
+		expect(t, "デコレータがなく、状態を読まず、効果を持たない葉は純粋", []bool{pure("api.nameOf"), pure("web.userPageVm")}, []bool{true, true})
+		expect(t, "throws は純粋さを変えない", pure("api.unauthorized"), true)
+		expect(t, "デコレータが付いていれば純粋でない", pure("api.getUser"), false)
+		expect(t, "状態を読めば純粋でない", []bool{pure("api.findUser"), pure("api.tokenOrNone"), pure("api.currentName")}, []bool{false, false, false})
+		expect(t, "効果を持てば純粋でない", []bool{pure("api.touch"), pure("web.greet")}, []bool{false, false})
+		// 見る側によらない
+		expect(t, "web から見た pure は Program と同じ", []bool{v.Ops["api.nameOf"].Pure, v.Ops["api.findUser"].Pure}, []bool{true, false})
+	})
+
+	t.Run("check.md 計算/配線 throw と返らないアーム", func(t *testing.T) {
+		// アームの throw は、例外がそれだけで効果を持たない呼び出しとして数える
+		expect(t, "api.currentName", sigOf(opOf(t, prog, "api.currentName").Signature), sig{E: []string{"api.NotFound"}, F: []string{}, Rel: []string{}, Succ: []string{}})
+		// never を返す op の呼び出しの例外も伝わる
+		expect(t, "api.guard", sigOf(opOf(t, prog, "api.guard").Signature), sig{E: []string{"api.Unauthorized"}, F: []string{}, Rel: []string{}, Succ: []string{}})
+	})
+
 	t.Run("check.md 計算/配線 match", func(t *testing.T) {
 		// match の行で一部のアームにしかない効果は succ が unknown
 		expect(t, "web.welcome", sigOf(opOf(t, prog, "web.welcome").Signature), sig{E: []string{}, F: []string{"web.goHome"}, Rel: []string{}, Succ: []string{"web.goHome = unknown"}})
@@ -480,8 +598,8 @@ func TestViewFromEntry(t *testing.T) {
 		if _, ok := jsonDecl(t, api, "api.Unauthorized")["value"]; ok {
 			t.Error("値のない例外に value のキーを出さない")
 		}
-		if _, ok := jsonDecl(t, api, "api.User")["derivedFrom"]; ok {
-			t.Error("is で作っていない model に derivedFrom のキーを出さない")
+		if _, ok := jsonDecl(t, api, "api.User")["extends"]; ok {
+			t.Error("継承していない model に extends のキーを出さない")
 		}
 		expect(t, "kind は判別子", jsonDecl(t, api, "api.ClientError")["kind"], "union")
 		expect(t, "default のアームは \"default\"", jsonDecl(t, web, "web.welcome")["body"].(map[string]any)["statements"].([]any)[0].(map[string]any)["match"].(map[string]any)["arms"].([]any)[1].(map[string]any)["cases"], "default")
@@ -583,10 +701,10 @@ func TestStateCorpusIR(t *testing.T) {
 	t.Run("ir.md 配線/Match.subject", func(t *testing.T) {
 		// 基底の状態の、組み込みの分類での match: classify は状態の形
 		byNullable := matches("shop.openTop")[0]
-		expect(t, "match token by nullable の subject", byNullable.Subject, ir.MatchSubject(ir.StateSubject{State: "shop.token"}))
+		expect(t, "match token by nullable の subject（value の atom が state）", renderAtom(byNullable.SubjectAtom()), "state shop.token")
 		expect(t, "match token by nullable の classify", byNullable.Classify, "nullable")
 		byList := matches("shop.openCart")[0]
-		expect(t, "match carts by list の subject", byList.Subject, ir.MatchSubject(ir.StateSubject{State: "shop.carts"}))
+		expect(t, "match carts by list の subject（value の atom が state）", renderAtom(byList.SubjectAtom()), "state shop.carts")
 		expect(t, "match carts by list の classify", byList.Classify, "list")
 		expect(t, "組み込みの分類のアーム（書かれた順）", renderBody(opOf(t, prog, "shop.openCart").Body), []string{
 			"match state shop.carts by list { Empty => shop.showEmpty(); HasItems => shop.emptyCart() }",
@@ -629,8 +747,12 @@ func TestStateCorpusIR(t *testing.T) {
 			return jsonDecl(t, shop, op)["body"].(map[string]any)["statements"].([]any)[i].(map[string]any)
 		}
 		byNullable := stmt("shop.openTop", 0)["match"].(map[string]any)
-		expect(t, "Match.subject（state）", byNullable["subject"], map[string]any{"kind": "state", "state": "shop.token"})
-		expect(t, "Match.classify（組み込みの分類）", byNullable["classify"], "nullable")
+		// 状態を名前で書いた対象は、value の atom が state（docs/ir.md「版」の 0.3）
+		subject := byNullable["subject"].(map[string]any)
+		expect(t, "Match.subject（value）の kind", subject["kind"], "value")
+		atom := subject["atom"].(map[string]any)
+		expect(t, "Match.subject の atom（state）", []any{atom["kind"], atom["state"], atom["path"]}, []any{"state", "shop.token", []any{}})
+		expect(t, "Match.classify（標準の分類）", byNullable["classify"], "nullable")
 		byClassify := stmt("shop.checkout", 0)["expr"].(map[string]any)["match"].(map[string]any)
 		expect(t, "Match.subject（classify）", byClassify["subject"], map[string]any{"kind": "classify"})
 		// 読み戻して書いても同じバイト列
@@ -1159,6 +1281,8 @@ func renderAtom(a ir.Atom) string {
 	switch x := a.(type) {
 	case ir.NameAtom:
 		return strings.Join(x.Path, ".")
+	case ir.StateAtom:
+		return "state " + strings.Join(append([]string{x.State}, x.Path...), ".")
 	case ir.LiteralAtom:
 		return renderLiteral(x.Literal)
 	case ir.NoneAtom:
@@ -1200,9 +1324,16 @@ func renderMatch(m ir.Match) string {
 		if !a.Cases.Default {
 			cases = strings.Join(a.Cases.Cases, " | ")
 		}
-		body := "none"
-		if ce, ok := a.Body.(ir.CallExpr); ok {
-			body = renderCall(ce.Call)
+		body := fmt.Sprintf("<%T>", a.Body)
+		switch b := a.Body.(type) {
+		case ir.CallExpr:
+			body = renderCall(b.Call)
+		case ir.AtomExpr:
+			body = renderAtom(b.Atom)
+		case ir.NoneBody:
+			body = "none"
+		case ir.ThrowBody:
+			body = "throw " + b.Exception
 		}
 		arms = append(arms, cases+" => "+body)
 	}
@@ -1214,8 +1345,6 @@ func renderMatchHead(m ir.Match) string {
 	switch s := m.Subject.(type) {
 	case ir.ValueSubject:
 		return "match " + renderAtom(s.Atom) + " by " + m.Classify
-	case ir.StateSubject:
-		return "match state " + s.State + " by " + m.Classify
 	case ir.ClassifyOwnedSubject:
 		return "match by " + m.Classify
 	}

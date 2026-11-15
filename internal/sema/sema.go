@@ -99,8 +99,10 @@ func analyze(fs *source.FileSet, files []*ast.File) *analyzer {
 	a.buildTable()
 	a.lowerAll()
 	a.lowerApplications()
-	a.finalizeDerived()
+	a.finalizeModels()
+	a.checkNeverOps()
 	a.lowerWirings()
+	a.checkPendingCaseTypes()
 	return a
 }
 
@@ -117,11 +119,13 @@ type analyzer struct {
 	models  map[string]*ir.Model  // すべての model（合成したものを含む）
 	fields  map[string]map[string]source.Span
 
-	pendingBinds []pendingBind
-	binds        []ir.Bind
-	sites        []*appSite
-	wirings      []*wiringJob
-	derived      []*symbol
+	pendingBinds     []pendingBind
+	binds            []ir.Bind
+	sites            []*appSite
+	wirings          []*wiringJob
+	bodies           []*modelJob
+	neverOps         []*neverOp
+	pendingCaseTypes []pendingCaseType
 
 	diags []diag.Diagnostic
 	refs  []Ref

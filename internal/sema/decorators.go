@@ -264,6 +264,11 @@ func (a *analyzer) lowerAnyArg(v *ast.ArgValue, p ir.Param, pt ir.AnyParam, sc *
 			targets = append(targets, a.expandSet(r, kindOf(pt.Of), term.Span)...)
 			continue
 		}
+		if pt.Of == ir.AnyOp {
+			// デコレータの引数に渡した op は「呼ぶ」に当たる（docs/check.md「export」）。呼ぶ側は、デコレータを付けた
+			// 宣言の名前空間（名前付きのデコレータの固定した引数なら、その別名の宣言の名前空間）
+			a.checkNS5(r.sym, sc.ns, term.Span)
+		}
 		targets = append(targets, r.sym.fqn)
 	}
 	if len(targets) == 0 {

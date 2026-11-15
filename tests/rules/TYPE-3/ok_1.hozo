@@ -1,16 +1,28 @@
-// TYPE-3（docs/types.md「診断」）: 射影（規則 8）、レコードリテラル（規則 9）、none を optional に（規則 3）
+// TYPE-3（docs/types.md「互換」）: 別の model の値が要るところでは写す op（人が中身を書く葉の op）を呼ぶ。
+// レコードリテラル（規則 9）、none を optional に（規則 3）。「返らない」式は、どの型の return にも書ける
 namespace a {
   model User { id: string; hash: string; }
-  model PublicUser is User omit hash;
+  model PublicUser extends User { override hash: never; }
   model Other { name: string; }
+  exception Gone;
+  classify Kind of User { A; B; }
   op user(): User;
-  op projected(): PublicUser {
-    return user();
+  op toPublic(u: User): PublicUser;
+  op gone(): never throws Gone;
+  op mapped(): PublicUser {
+    const u = user();
+    return toPublic(u);
   }
   op fromRecord(): Other {
     return { name: "x" };
   }
   op noneToOptional(): Other? {
     return none;
+  }
+  op never1(): Other throws Gone {
+    return gone();
+  }
+  op never2(u: User): int throws Gone {
+    return match u by Kind { A => throw Gone; B => gone(); };
   }
 }

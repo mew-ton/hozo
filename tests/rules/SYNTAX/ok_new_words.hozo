@@ -1,0 +1,31 @@
+// SYNTAX（docs/grammar.md）: export、reads、extends / override、as、throw、never、形の語を型の位置に書く。
+// is と omit は予約語ではないので、名前に使える
+namespace a {
+  scalar Email extends string;
+  model User { id: string; email: string; hash: string; override: string; }
+  model PublicUser extends User {
+    override hash: never;
+    override email: Email;
+    override override: never;
+    nick: nullable<string>;
+    tags: list<string>;
+    one: single<Email>;
+  }
+  exception Gone;
+  state users: list<User>;
+  state omit: string;
+  export op find(is: string): User? reads users;
+  op gone(): never throws Gone;
+  op nameOf(u: User): string;
+  classify Found of find { Hit: find as User; default; }
+  op name(is: string): string throws Gone {
+    const u = find(is);
+    return match u by a.Found {
+      Hit     => nameOf(u);
+      default => throw Gone;
+    };
+  }
+  op title(): string {
+    return omit;
+  }
+}

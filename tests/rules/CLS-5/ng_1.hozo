@@ -1,0 +1,26 @@
+// CLS-5（docs/check.md「classify / match」「ケースの型」）: ケースの as の前に書いたものが、その分類の対象でない。
+// または一つのケースに同じ対象の as が二度ある。位置は as の前の名前
+namespace a {
+  model M { id: string; }
+  model N { id: string; }
+  scalar Email extends string;
+  state token: nullable<string>;
+  state profile: nullable<M>;
+  state other: nullable<M>;
+  op find(): M?;
+  op find2(): M?;
+  // 値の分類: as の前は subject の型と等しい型
+  classify V1 of M? { Has: M as M; default; }                    // ERROR: CLS-5
+  classify V2 of string { Valid: Email as Email; default; }      // ERROR: CLS-5
+  classify V3 of M? { Has: find as M; default; }                 // ERROR: CLS-5
+  // op の分類: as の前はその op
+  classify O1 of find { Hit: find2 as M; default; }              // ERROR: CLS-5
+  classify O2 of find { Hit: M? as M; default; }                 // ERROR: CLS-5
+  // 状態の分類: as の前は対象の状態のどれか
+  classify S1 of token, profile { Ready: other as M; default; }  // ERROR: CLS-5
+  classify S2 of token { In: string? as string; default; }       // ERROR: CLS-5
+  // 同じ対象の as が二度
+  classify D1 of find { Hit: find as M, find as M; default; }    // ERROR: CLS-5
+  classify D2 of token, profile { Ready: token as string, token as string; default; }   // ERROR: CLS-5
+  op f(): N;
+}

@@ -1,0 +1,28 @@
+// MATCH-3（docs/grammar.md「配線」の ArmBody）: アームの本体は、呼び出し一つ、値一つ（名前、リテラル、none、レコードリテラル）、
+// throw 一つのどれか
+namespace a {
+  model M { id: string; }
+  exception E;
+  classify C of M { A; B; D; }
+  classify K of M { A; B; }
+  op use(m: M): M;
+  op call1(m: M): M? throws E {
+    return match m by C {
+      A => use(m);
+      B => none;
+      D => throw E;
+    };
+  }
+  op atom(m: M): M {
+    return match m by K {
+      A => use(m);
+      B => { id: m.id };
+    };
+  }
+  op literal(m: M): int {
+    return match m by K {
+      A => 1;
+      B => 2;
+    };
+  }
+}

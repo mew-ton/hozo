@@ -1,7 +1,11 @@
-// TYPE-10（docs/types.md「診断」）: omit するフィールドが元の model にある
+// TYPE-10（docs/types.md「継承した model」）: override するフィールドが元の model にある。元の model は継承した model でもよい
 namespace a {
   model User { id: string; hash: string; }
-  model Q is User omit hash;
-  model R is Q omit id;
+  model Q extends User { override hash: never; }
+  model R extends Q { override id: never; }
+  // 元の model がなくしたフィールドと同じ名前のフィールドを、足せる
+  model Again extends Q { hash: int; }
+  // 本体が空でもよい（別の型で、別名ではない）
+  model Admin extends User { }
   op f(): Q;
 }

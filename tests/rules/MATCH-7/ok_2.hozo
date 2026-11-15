@@ -1,0 +1,19 @@
+// MATCH-7（docs/check.md「標準の分類」）: by list / by nullable の対象は値。状態に限らない（引数のフィールド、束縛）
+namespace a {
+  model M { id: string; }
+  model In { token: string?; lines: M[]; }
+  state maybe: M?;
+  op f();
+  op find(): M?;
+  op all(): M[];
+  op ok(in: In) {
+    match in.token by nullable { Empty => f(); HasItems => none; };
+    match in.lines by list { Empty => f(); HasItems => none; };
+    const m = find();
+    match m by nullable { Empty => f(); HasItems => none; };
+    const ms = all();
+    match ms by list { Empty | HasItems => f(); };
+    // 状態は、名前で書けば値になる。T? と書いた状態も nullable
+    match maybe by nullable { Empty => f(); HasItems => none; };
+  }
+}

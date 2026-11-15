@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-`.hozo` の字句と構文を決める。パーサー（`internal/syntax`）とシンタックスハイライトの文法（`editors/vscode/syntaxes/`）はこの文書から書く。構文の意味（何が正しい宣言か）は設計書（`mew-ton/drafts` の `hozo/README.md`。「§n」はその節）が持ち主で、この文書は設計書の例がすべて通る形になるように書いた。例から決められなかったことは「決めたこと」に、設計書の例と両立しなかったことは「設計書へ返すこと」にある。
+`.hozo` の字句と構文を決める。パーサー（`internal/syntax`）とシンタックスハイライトの文法（`editors/vscode/syntaxes/`）はこの文書から書く。構文の意味（何が正しい宣言か）は設計書（`mew-ton/drafts` の `hozo/README.md`。「§n」はその節）が持ち主で、この文書は設計書の例がすべて通る形になるように書いた。例から決められなかったことは「決めたこと」に、設計書の例と両立しなかったことは「設計書へ返すこと」にある。設計書にない構文（`reads`、`export`、`extends` を持つ model、`as`、`throw`、`never`、形の語を型として書くこと）は、`docs/decisions.md`「設計書を変える決定」の S15〜S23 が足したもので、意味の持ち主はその表の「持ち主」の列の文書。
 
 記法は EBNF。`=` で定義、`|` で選択、`[ ]` は省略可、`{ }` は 0 回以上の繰り返し、`" "` は終端記号、`( )` はまとまり。
 
@@ -18,7 +18,7 @@ BlockComment = "/*" { "*/" 以外 } "*/" ;              (* 入れ子にできな
 DocComment   = "/**" { "*/" 以外 } "*/" ;
 ```
 
-`LineComment` と `BlockComment` は捨てる（§3.4「`//` と `/* ... */` はただのコメントで、IR に入らない」）。`DocComment` は字句として残し、直後の宣言・フィールド・ユニオンのメンバー・分類のケース（`default` を含む）に付く（§3.4「直後の宣言の『説明』として IR に入る」）。付く先がない `DocComment` は構文エラー（「決めたこと」）。
+`LineComment` と `BlockComment` は捨てる（§3.4「`//` と `/* ... */` はただのコメントで、IR に入らない」）。`DocComment` は字句として残し、直後の宣言・フィールド（`override` のメンバーを含む。「model」）・ユニオンのメンバー・分類のケース（`default` を含む）に付く（§3.4「直後の宣言の『説明』として IR に入る」）。付く先がない `DocComment` は構文エラー（「決めたこと」）。
 
 ### 識別子
 
@@ -30,20 +30,21 @@ Path          = Ident { "." FieldName } ;
 ```
 
 - 英字と数字は ASCII に限る（「決めたこと」）。予約語は `Ident` にならない。
-- `FieldName` はフィールド名を書く位置の名前で、予約語も書ける（`op: string;`、`{ op: x }`、`res.op`）。使う位置は、model のフィールド（「model」の `Field`。その場で書く model も同じ）、`omit` の並び、レコードリテラルのキー、値のパスの二つ目以降の要素（「配線」）。理由は「決めたこと」。
-- `Path` は値を書く位置の名前。先頭は束縛か引数の名前（`Ident`）、残りはその値のフィールド名。構文木の形は `QualifiedName` と同じ。
+- `FieldName` はフィールド名を書く位置の名前で、予約語も書ける（`op: string;`、`{ op: x }`、`res.op`）。使う位置は、model のフィールド（「model」の `Field`。その場で書く model も同じ）、`override` の後ろの名前（「model」の `Override`）、レコードリテラルのキー、値のパスの二つ目以降の要素（「配線」）。理由は「決めたこと」。
+- `Path` は値を書く位置の名前。先頭は束縛か引数か状態の名前（`Ident`）、残りはその値のフィールド名。構文木の形は `QualifiedName` と同じ。何を指すかは `docs/resolve.md`「手続き」。
 - 字句解析は、先頭が予約語でなければ `.` で続く要素を予約語も含めて一つの字句にまとめ、`QualifiedName` か `Path` かは構文解析が位置で決める。`QualifiedName` の位置で二つ目以降の要素が予約語なら構文エラー。
 
 ### 予約語
 
-構文の骨になる語を予約する。宣言の頭、節の頭、文の頭、核の型、リテラル。予約語は `Ident` の位置（宣言の名前、引数の名前、束縛の名前、名前空間や型の名前の要素、呼び出す op の名前）には書けず、`FieldName` の位置にだけ書ける（「識別子」）。
+構文の骨になる語を予約する。宣言の頭、宣言やフィールドの前に置く修飾、節の頭、文の頭、核の型、リテラル。予約語は `Ident` の位置（宣言の名前、引数の名前、束縛の名前、名前空間や型の名前の要素、呼び出す op の名前）には書けず、`FieldName` の位置にだけ書ける（「識別子」）。
 
 | 種類 | 語 |
 |---|---|
 | 宣言の頭 | `namespace` `model` `scalar` `union` `state` `op` `exception` `effect` `classify` `condition` `decorator` `bind` |
-| 節の頭 | `is` `omit` `extends` `of` `on` `to` `by` `for` `effects` `throws` `prevents` `keeps` `catches` `recovers` `halts` `ignores` `any` |
-| 文の頭と値 | `const` `return` `match` `default` `none` |
-| 核の型と状態の形 | `string` `boolean` `int` `float` `Time` `Duration` `void` `Record` `list` `nullable` `single` |
+| 修飾 | `export` `override` |
+| 節の頭 | `extends` `of` `on` `to` `by` `for` `as` `effects` `reads` `throws` `prevents` `keeps` `catches` `recovers` `halts` `ignores` `any` |
+| 文の頭と値 | `const` `return` `match` `default` `none` `throw` |
+| 核の型と形 | `string` `boolean` `int` `float` `Time` `Duration` `void` `never` `Record` `list` `nullable` `single` |
 | リテラル | `true` `false` |
 
 次の語は予約しない。決まった位置でだけ意味を持ち、それ以外では `Ident` になる（文脈キーワード）。
@@ -54,6 +55,8 @@ Path          = Ident { "." FieldName } ;
 | `post` `put` `delete` | `effect ... on 状態.操作` と `any effect on 状態.操作` の操作 |
 
 `@external` は予約語でもデコレータの宣言でもなく、核の印。デコレータの宣言の上にだけ書ける（「decorator の宣言」）。
+
+`reads` `as` `never` `throw` `override` `export` の六つは仮の綴りで、後で別の語に変えうる（「決めたこと」）。`is` と `omit` は予約語ではない（`model A is B omit …` をなくしたときに外した。「model」）。
 
 ### リテラル
 
@@ -115,14 +118,28 @@ ArgTerm   = Literal | QualifiedName ;
 ### model
 
 ```
-ModelDecl   = "model" Ident ( ModelBody | "is" QualifiedName "omit" FieldName { "," FieldName } ";" ) ;
-ModelBody   = "{" { Field } "}" ;
+ModelDecl   = "model" Ident [ "extends" QualifiedName ] ModelBody ;
+ModelBody   = "{" { Member } "}" ;
+Member      = Field | Override ;
 Field       = [ DocComment ] { Decorator } FieldName ":" Type [ "=" Literal ] ";" ;
+Override    = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "never" ) ] ";" ;
 ```
 
-- `model PublicUser is User omit hash;`（§5.2）。`omit` なしの `is` は書けない（「決めたこと」）。
 - 省略可能なフィールドは型の `?` で書く（`token: Token?`）。名前に `?` を付ける書き方はない（「決めたこと」）。
 - 既定値（`page: PosInt = 1`。§11.2）は `Literal` だけ。
+- `extends` を持つ model は、既存の model を継承した別の型（`model PublicUser extends User { override hash: never; }`）。本体が空でもよい（`model Admin extends User { }`）。何を受け継ぎ、本体に何を書けるかは `docs/types.md`「継承した model」。
+- `Override` は、元の model のフィールドに触れるメンバー。形は三つ。
+
+  | 形 | 意味 |
+  |---|---|
+  | `@db.key override id;` | 型を変えず、デコレータを足す |
+  | `override status: StatusOrPending;` | 型を変える（変えられる形は `docs/types.md`「継承した model」） |
+  | `override hash: never;` | そのフィールドをなくす。`never` はここでは型ではなく、なくす印 |
+
+- メンバーの頭（`DocComment` とデコレータの後ろ）の `override` は、直後が `:` ならフィールドの名前（`override: string;`。`FieldName` は予約語も書ける）、そうでなければ `Override` の頭。`override override: never;` は、`override` という名前のフィールドをなくす。
+- `Override` に既定値（`= Literal`）は書けない。
+- `Override` は文法ではどの `ModelBody` にも書けるが、`extends` のない model と、その場で書く model（「union」「exception / effect」）には元の model がないので、検査でエラーになる（TYPE-10。`docs/types.md`「診断」）。
+- `model A is B omit f;` は書けない（なくした書き方。「決めたこと」）。パーサーは、`model` の名前の直後に `is` という識別子が来たら、`extends` と `override f: never;` で書くことをメッセージで示して SYNTAX にする。
 
 ### scalar
 
@@ -143,10 +160,10 @@ ArmType     = Type | ModelBody ;
 ### state
 
 ```
-StateDecl = "state" Ident ":" ( "list" | "nullable" | "single" ) "<" Type ">" ";" ;
+StateDecl = "state" Ident ":" Type ";" ;
 ```
 
-形は列数の範囲（`list` は 0 以上、`nullable` は 0 か 1、`single` はちょうど 1）。要素の型に `?` は付けられず（検査 STATE-3）、空になりうる状態は `nullable<T>` と書く（`docs/check.md`「状態の形」）。
+状態は、その名前空間が持つ、型 `Type` の値。`state users: list<User>;`、`state token: nullable<Token>;`、`state title: single<string>;` のように形の語（「型」）で書け、`state token: Token?;`（`nullable<Token>` と同じ）、`state title: string;`（`single<string>` と同じ）とも書ける。形（`list` / `nullable` / `single`）は型から決まる（`docs/check.md`「状態の形」）。
 
 ### exception / effect
 
@@ -169,12 +186,23 @@ CaseSet       = "any" | Ident { "|" Ident } ;
 
 ```
 ClassifyDecl    = "classify" Ident "of" ClassifySubject "{" { ClassifyCase } "}" ;
-ClassifyCase    = [ DocComment ] ( Ident | "default" ) ";" ;
+ClassifyCase    = [ DocComment ] ( Ident [ ":" CaseTyping { "," CaseTyping } ] | "default" ) ";" ;
+CaseTyping      = Type "as" Type ;
 ConditionDecl   = "condition" Ident "of" ClassifySubject ";" ;
 ClassifySubject = Type { "," Type } ;
 ```
 
-対象が一つで型を指せば値の分類（§10.1）。対象のすべてが今の名前空間の状態の名前なら状態の分類（`classify Checkout of carts, orders { ... }`）。どちらかは名前の解決で決まり、混ざっていればエラー（検査 CLS-3）。
+対象の種類は三つで、名前の解決で決まる（`docs/resolve.md`「位置ごとに受け付ける種類」）。合わない並びはエラー（検査 CLS-3）。
+
+| 対象 | 例 | 分類の種類 |
+|---|---|---|
+| 一つで、型を指す | `classify WarrantyKind of server.Item { ... }`、`classify Presence of nullable<User> { ... }` | 値の分類（§10.1） |
+| 一つで、op を指す | `classify Registration of findUser { ... }` | op の分類（その op が返した値の分類） |
+| すべてが今の名前空間の状態の名前 | `classify Checkout of carts, orders { ... }` | 状態の分類 |
+
+- `CaseTyping` は、そのケースのときに対象が何の型になるかを書く（`Registered: findUser as type.User;`）。`as` の前は対象の一つで、宣言の `of` の後ろと同じに書く（値の分類なら同じ型、op の分類ならその op、状態の分類なら対象の状態の一つ）。`as` の後ろはそのケースでの型。意味と、書ける型は `docs/check.md`「分類」と `docs/types.md`「絞り込み」。
+- 状態の分類は、一つのケースに複数の対象の型を `,` で並べられる（`Ready: token as Token, profile as Profile;`）。
+- `default` と `condition` には `as` を書けない（文法で閉じる）。
 
 ### decorator の宣言
 
@@ -205,16 +233,20 @@ ExcRef          = QualifiedName ;
 ### op
 
 ```
-OpDecl     = "op" Ident OpParams [ ":" ReturnType ] { OpClause } ( ";" | Block ) ;
+OpDecl     = [ "export" ] "op" Ident OpParams [ ":" ReturnType ] { OpClause } ( ";" | Block ) ;
 OpParams   = "(" [ OpParam { "," OpParam } ] ")" ;
 OpParam    = Ident ":" Type ;
-ReturnType = Type | "void" ;
+ReturnType = Type | "void" | "never" ;
 OpClause   = "effects" QualifiedName { "|" QualifiedName }
+           | "reads" QualifiedName { "," QualifiedName }
            | ThrowsClause ;
 ```
 
 - `;` で終われば葉、`Block` を持てば配線（§7.1）。
 - `ReturnType` を省略するのと `void` は IR で同じ（§7.1）。
+- `never` は、決して値を返さない op（`op unauthorized(): never throws Unauthorized;`）。宣言の規則は `docs/check.md`「never を返す op」。
+- `export` は、別の名前空間から呼べる op の印（`export op login(in: LoginInput): LoginOk`）。`DocComment` とデコレータの後ろ、`op` の直前に書く。付けられるのは `op` だけで、ほかの宣言の前に書いたら構文エラー。意味は `docs/check.md`「export」。
+- `reads` は、その op が読む状態の並び（`op findUser(email: Email): User? reads users;`）。区切りは `,`。`effects` と同じく何度でも書け、同じ状態の重複は一つと数える。意味は `docs/check.md`「reads」。
 - `ThrowsClause` は何度でも書ける（§7.3「状態の違う例外は `throws` を複数行に分けて書く」）。`Relation` は、その節に並べた例外すべてに掛かる。
 
 ### bind
@@ -229,13 +261,16 @@ BindDecl = "bind" Ident "to" QualifiedName "." ( "*" | "**" ) ";" ;
 Type        = TypePrefix { "[" "]" | "?" } ;
 TypePrefix  = CoreType
             | "Record" "<" Type "," Type ">"
+            | ( "list" | "nullable" | "single" ) "<" Type ">"
             | QualifiedName [ "<" Type ">" ] ;
 CoreType    = "string" | "boolean" | "int" | "float" | "Time" | "Duration" ;
 ```
 
+- 形の語は型の別の書き方: `list<T>` は `T[]`、`nullable<T>` は `T?`、`single<T>` は `T`。`Type` を書けるどの位置にも書け、IR では同じ型になる（`docs/types.md`「形の書き方」）。
+
 - `QualifiedName "<" Type ">"` は分類のケースで絞り込んだ型（`WarrantyKind.Yamada<server.Item>`。§10.2）にだけ使う。ほかの名前に型引数を付けたらエラー（名前の解決で判定する）。
 - その場で書く model（`ModelBody`）は `Type` ではなく、`ArmType`（ユニオンのアームと例外の値）にだけ置ける。
-- `void` は `ReturnType` にだけ書ける。`list` / `nullable` / `single` は `StateDecl` と、`match` の `by` の後ろ（`list` / `nullable`）にだけ書ける。
+- `void` と `never` は `ReturnType` にだけ書ける（`never` は、ほかに `Override` のなくす印として書く。「model」）。`match` の `by` の後ろの `list` / `nullable` は型ではなく、標準の分類の名前（「配線」）。
 
 ## 配線
 
@@ -252,23 +287,34 @@ Atom  = Path | Literal | "none" | RecordLit ;
 RecordLit   = "{" [ RecordField { "," RecordField } [ "," ] ] "}" ;
 RecordField = FieldName ":" Atom | Ident ;
 
-Match = "match" [ Atom ] "by" ( Ident | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" ;
-MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ( Call | "none" ) ";" ;
+Match    = "match" [ Atom ] "by" ( QualifiedName | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" ;
+MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ArmBody ";" ;
+ArmBody  = Call | Atom | Throw ;
+Throw    = "throw" QualifiedName ;
 ```
 
 `match` の形は三つ（どれに当たるかの検査は MATCH-7）。
 
 | 形 | 対象 | 分類 |
 |---|---|---|
-| `match item by WarrantyKind { ... }` | 値 | 値の分類 |
-| `match carts by list { ... }`、`match token by nullable { ... }` | 今の名前空間の基底の状態 | その形の組み込みの分類（ケースは `Empty` / `HasItems`） |
+| `match item by WarrantyKind { ... }`、`match user by store.Registration { ... }` | 値 | 値の分類か op の分類 |
+| `match carts by list { ... }`、`match in.token by nullable { ... }` | 値。型が `list<T>`（`by list`）か `nullable<T>`（`by nullable`） | 標準の分類（ケースは `Empty` / `HasItems`。`docs/check.md`「分類」） |
 | `match by Checkout { ... }` | 書かない（分類の宣言が対象を持つ） | 状態の分類 |
 
-- 値を省いた `RecordField`（`{ item }`）は、同じ名前の束縛か引数を指す。予約語の名前の束縛や引数は作れないので、予約語のキーは `{ op: 値 }` と書く。
+- `Atom` の `Path` は、束縛した名前・op の引数・今の名前空間の状態と、そのフィールド（`query.page`）のどれか。状態は名前で値として書ける（`f(token)`、`match token by nullable { ... }`）。同じ名前の束縛か引数があれば、そちらを指す。何を指すかは名前の解決が決める（`docs/resolve.md`「手続き」）。
+- 値を省いた `RecordField`（`{ item }`）は `{ item: item }` の略（§10.2 `server.addToCart({ item })`）で、`item` は `Atom` の `Path` と同じに解決する。予約語の名前の束縛や引数は作れないので、予約語のキーは `{ op: 値 }` と書く。
 - `Call` の引数は `Atom` だけ（§9「呼び出しの引数に呼び出しは書けない（A 正規形）」）。文法で閉じる。
-- `Atom` の `Path` は、束縛した名前・op の引数・そのフィールド（`query.page`）のどれか。何を指すかは名前の解決が決める。
-- `RecordField` の `{ item }` は `{ item: item }` の略（§10.2 `server.addToCart({ item })`）。
-- `match` のアームの本体は `Call` か `none` だけ（§10.2「各アームの本体は呼び出し一つか `none`」）。文法で閉じる。
+- `match` の分類の名前は修飾できる（`by store.Registration`）。分類はどの名前空間からも使える（`docs/check.md`「分類」）。
+- アームの本体（`ArmBody`）は三つのどれか一つ。文法で閉じる。
+
+  | 本体 | 例 | 意味 |
+  |---|---|---|
+  | `Call` | `Registered => issueSession(user, in.body.password);` | 呼び出し一つ |
+  | `Atom` | `LoggedIn => session;`、`Empty => none;`、`Standard => 1;` | 値そのもの。`none` もここに入る |
+  | `Throw` | `default => throw type.Unauthorized;` | その例外を投げる。書ける例外は `docs/check.md`「throw」 |
+
+- `Path` の直後が `(` なら `Call`、そうでなければ `Atom`。
+- `throw` はアームの本体にだけ書ける。文（`Stmt`）や `return` の式には書けない。
 - `const warranty = match ... { ... };` のように、`match` の `}` の後にも `;` が要る。
 
 ## ドキュメンテーションコメント
@@ -294,7 +340,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `to` を予約語にする | `bind x to ...` の節の頭だから。ほかの節の頭と同じ扱い |
 | 予約語をフィールド名に書ける（`FieldName`） | `{ "op": "foo" }` のようなオブジェクトを返す API を、そのままの名前で書けるようにする。フィールド名の位置は `:` の前か `.` の後ろで、予約語が来ても構文があいまいにならない |
 | `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
-| 空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない | 同じ意味の書き方を二つ持たない。「空」が入れ物と値の型の二か所に現れないようにする |
+| 形の語（`list<T>` / `nullable<T>` / `single<T>`）は型の別の書き方で、型を書けるどの位置にも書ける。状態の宣言は `state 名前: Type;` | 形と型を揃えた（`docs/decisions.md`「設計書を変える決定」S21）。状態を名前で参照したときの型が、宣言に書いた型そのものになる。位置ごとに書ける綴りを分けると、同じ型なのに位置で書き方が変わる規則が要る。以前の「空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない」はなくした: `single<T>` は `T` なので、`single<T?>` は `T?`、つまり `nullable<T>` と同じ型で、「空」は型の一か所にしか現れない |
 | 状態の分類での `match` は対象を書かない（`match by C`） | 対象は分類の宣言が持っていて、書かせると二か所になる |
 | `prevents` / `keeps` の目的語は `effects` だけ | 葉の op が直に持つ効果は高々一つ（`docs/check.md` EFF-3）なので、効果を名前で書き分ける場面がない |
 | デコレータは `namespace` に付けられない。`for namespace` という対象もない | 名前空間は、複数のファイルの複数のブロックに分けて宣言できる（TypeScript の `interface` と同じく、同じ名前のブロックは一つにまとまる）。名前空間に付けたデコレータは、ファイルをまたいで一つにまとめて管理することになり、どのブロックに何が付いているかが直感的でない。印は中の宣言（op、model など）に付ける |
@@ -305,7 +351,17 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `Duration` の単位は `ms` `s` `m` `h` `d` | 例にあるのは `m` と `s`。秒未満と日は使う場面が見えるので足す。週以上は月と年が一定でないので持たない |
 | `Time` のリテラルはない | 例にない。時刻を仕様に直接書く場面がない |
 | 付く先のない `DocComment` はエラー | 説明が IR から落ちることに気づけるようにする（§2「書き忘れ・曖昧さは構文や検査器で検出し」） |
-| `model A is B;`（`omit` なし）は書けない | 別名にしかならず、§2「名前を持つ概念は…名前と説明と関係だけを宣言する」のどれでもない |
+| `model A is B omit f;` をなくし、`model A extends B { override f: never; }` と書く。`is` と `omit` は予約語から外す | 継承した型でできること（足す、なくす、型を変える）を一つの書き方にまとめた（`docs/decisions.md`「設計書を変える決定」S22）。どの生成規則も使わない語を予約したままにすると、名前に使える語を減らすだけになる |
+| 本体が空の `model A extends B { }` は書ける | 継承した model は元の model とは別の型（`docs/types.md`「継承した model」）で、別名ではない。以前の「`omit` のない `is` は書けない」の理由（別名にしかならない）が当たらない |
+| `override` の型は省略でき、省略は「型を変えない」。なくす書き方は `override f: never;`。`override` に既定値は書けない | デコレータを足すだけのときに、元の型を書き写させない（元の型を変えたときに、書き写した側が食い違う）。`never` は「そのフィールドに入る値がない」と読める。既定値を変えることは、継承した型でできることに入っていない（`docs/types.md`「継承した model」） |
+| `reads` `as` `never` `throw` `override` `export` は予約語。綴りは仮で、後で別の語に変えうる | どれも構文の骨（節の頭、文の頭、核の型、修飾）で、識別子が来る位置の名詞ではないので、文脈キーワードの基準（下の行）に当たらない。`never` は `void` と同じく型の位置に来るので、予約しないと同じ名前の型と区別できない。`override` は予約してもフィールド名には書ける（`FieldName`）。綴りを変えるときは、この表と「予約語」の表を変える |
+| `export` と `override` は、予約語の表の「修飾」の行に置く | 宣言やフィールドの頭の語の前に置いて性質を足す語で、宣言の頭でも節の頭でもない。色分けも分ける（`docs/editors.md`「TextMate の文法」） |
+| `export` を書けるのは `op` の前だけ | 別の名前空間から隠せるのは op だけ（`docs/check.md`「export」）。ほかの宣言に書ける形にしておくと、意味のない `export` が検査まで残る |
+| `reads` の並びの区切りは `,` | 状態の並びは `classify C of carts, orders` と同じ書き方にする。`effects` と `throws` の `\|` は宣言の集合（ユニオンを展開できる）で、状態には集合の宣言がない |
+| `as` の前には対象を、宣言の `of` の後ろと同じに書く。対象が一つでも省略できない | どの対象が何の型になるかを、対象が複数ある状態の分類と同じ形で読めるようにする。`default` と `condition` には書けない（`default` は「どれでもない」で、型を言えない。`condition` は名前と対象だけの糖衣） |
+| `throw` はアームの本体にだけ書ける | 「この場合は失敗」を書くためのもの。本体のどこにでも書ける文にすると、下の行が評価されない配線を書ける |
+| アームの本体の値は `Atom` のすべて（名前、リテラル、`none`、レコードリテラル） | 呼び出しの引数と同じ集合にして、位置ごとに書ける値を分けない |
+| `match` の分類の名前は修飾できる | 分類はどの名前空間からも使える（`docs/decisions.md`「設計書を変える決定」S18） |
 | 名前で渡す引数の後ろに位置で渡す引数は書けない | 対応が読めなくなる。TS や Python と同じ |
 | `return` の後ろに `Atom` も書ける | `return me;` のような、束縛した値をそのまま返す配線を禁じる理由がない |
 

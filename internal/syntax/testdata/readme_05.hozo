@@ -15,7 +15,9 @@ namespace server {
     expiresAt: Time;
   }
 
-  model PublicUser is User omit hash;
+  model PublicUser extends User {
+    override hash: never;
+  }
 
   @db
   state users: list<User>;

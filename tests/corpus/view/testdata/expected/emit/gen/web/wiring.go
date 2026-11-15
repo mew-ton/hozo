@@ -10,6 +10,7 @@ import "github.com/mew-ton/hozo/runtime"
 //   - q: 問い合わせ
 //
 // Throws: api.NotFound, api.Unauthorized, web.Offline
+// Reads: web.token
 func (o *ops) FetchUser(q Query) (PublicUser, error) {
 	if o.deps.Api.GetUser == nil {
 		return PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "api.getUser"}
@@ -23,6 +24,7 @@ func (o *ops) FetchUser(q Query) (PublicUser, error) {
 //   - id: 表示するユーザー
 //
 // Throws: api.NotFound, web.Offline
+// Reads: web.token
 // Effects: web.goLogin
 func (o *ops) OpenUser(id UserId) (UserPage, error) {
 	user, err := o.FetchUser(Query{Id: id})
@@ -48,6 +50,7 @@ func (o *ops) OpenUser(id UserId) (UserPage, error) {
 
 // SignOut は op web.signOut。
 //
+// Reads: web.token
 // Effects: api.deleteSession, web.removeToken
 func (o *ops) SignOut() error {
 	if o.deps.Api.Logout == nil {

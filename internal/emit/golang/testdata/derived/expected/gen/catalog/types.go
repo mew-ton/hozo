@@ -20,7 +20,7 @@ func NewProduct() Product {
 }
 
 // PublicProduct は catalog.PublicProduct の model。
-// catalog.Product から secret を除いたもの（is ... omit）。
+// catalog.Product を継承。
 type PublicProduct struct {
 	Id    string  `json:"id"`
 	Name  string  `json:"name"`
@@ -36,17 +36,6 @@ func NewPublicProduct() PublicProduct {
 	return m
 }
 
-// ProductToPublicProduct は catalog.Product を catalog.PublicProduct に射影する（docs/types.md「射影」）。
-func ProductToPublicProduct(v Product) PublicProduct {
-	return PublicProduct{
-		Id:    v.Id,
-		Name:  v.Name,
-		Price: v.Price,
-		Stock: v.Stock,
-		Note:  v.Note,
-	}
-}
-
 // Summary は catalog.Summary の model。
 type Summary struct {
 	Id       string  `json:"id"`
@@ -60,14 +49,4 @@ func NewSummary() Summary {
 	m := Summary{}
 	m.Featured = false
 	return m
-}
-
-// ProductToSummary は catalog.Product を catalog.Summary に射影する（docs/types.md「射影」）。
-func ProductToSummary(v Product) Summary {
-	return Summary{
-		Id:       v.Id,
-		Note:     v.Note,
-		Name:     &v.Name,
-		Featured: false,
-	}
 }

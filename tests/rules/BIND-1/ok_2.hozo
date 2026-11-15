@@ -1,0 +1,14 @@
+// BIND-1（docs/check.md「bind」の 1）: 別の名前空間の、export のない op には位置を作らない（呼べない op のために BIND-1 を出さない）
+namespace a {
+  scalar Token extends string;
+  state token: single<Token>;
+  bind token to b.*;
+  op f() {
+    b.open();
+  }
+}
+namespace b {
+  // 内部の op。Token の位置が二つあるが、a からは呼べない
+  op internal(x: a.Token, y: a.Token);
+  export op open(t: a.Token);
+}

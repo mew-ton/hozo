@@ -1,5 +1,5 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "viewer": "web",
   "config": {
     "language": "go",
@@ -37,7 +37,7 @@
     ]
   },
   "program": {
-    "version": "0.2",
+    "version": "0.3",
     "namespaces": [
       {
         "name": "",
@@ -389,8 +389,8 @@
                 "col": 3
               },
               "end": {
-                "line": 25,
-                "col": 46
+                "line": 28,
+                "col": 4
               }
             },
             "fields": [
@@ -522,12 +522,13 @@
                 }
               }
             ],
-            "derivedFrom": {
+            "extends": {
               "base": "api.User",
-              "omit": [
+              "removed": [
                 "secret",
                 "hash"
-              ]
+              ],
+              "overridden": []
             }
           },
           {
@@ -537,11 +538,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 27,
+                "line": 30,
                 "col": 3
               },
               "end": {
-                "line": 27,
+                "line": 30,
                 "col": 50
               }
             },
@@ -556,11 +557,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 27,
+                    "line": 30,
                     "col": 19
                   },
                   "end": {
-                    "line": 27,
+                    "line": 30,
                     "col": 32
                   }
                 }
@@ -575,11 +576,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 27,
+                    "line": 30,
                     "col": 33
                   },
                   "end": {
-                    "line": 27,
+                    "line": 30,
                     "col": 48
                   }
                 }
@@ -596,11 +597,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 29,
+                    "line": 32,
                     "col": 3
                   },
                   "end": {
-                    "line": 29,
+                    "line": 32,
                     "col": 6
                   }
                 }
@@ -609,12 +610,19 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 29,
+                "line": 32,
                 "col": 3
               },
               "end": {
-                "line": 29,
+                "line": 32,
                 "col": 31
+              }
+            },
+            "type": {
+              "kind": "array",
+              "of": {
+                "kind": "ref",
+                "target": "api.User"
               }
             },
             "shape": "list",
@@ -633,11 +641,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 30,
+                    "line": 33,
                     "col": 3
                   },
                   "end": {
-                    "line": 30,
+                    "line": 33,
                     "col": 6
                   }
                 }
@@ -646,12 +654,19 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 30,
+                "line": 33,
                 "col": 3
               },
               "end": {
-                "line": 30,
+                "line": 33,
                 "col": 37
+              }
+            },
+            "type": {
+              "kind": "array",
+              "of": {
+                "kind": "ref",
+                "target": "api.Session"
               }
             },
             "shape": "list",
@@ -688,11 +703,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 34,
+                    "line": 37,
                     "col": 3
                   },
                   "end": {
-                    "line": 34,
+                    "line": 37,
                     "col": 20
                   }
                 }
@@ -701,11 +716,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 34,
+                "line": 37,
                 "col": 3
               },
               "end": {
-                "line": 35,
+                "line": 38,
                 "col": 42
               }
             },
@@ -721,11 +736,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 35,
+                "line": 38,
                 "col": 22
               },
               "end": {
-                "line": 35,
+                "line": 38,
                 "col": 41
               }
             },
@@ -740,11 +755,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 35,
+                    "line": 38,
                     "col": 24
                   },
                   "end": {
-                    "line": 35,
+                    "line": 38,
                     "col": 39
                   }
                 }
@@ -780,11 +795,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 37,
+                    "line": 40,
                     "col": 3
                   },
                   "end": {
-                    "line": 37,
+                    "line": 40,
                     "col": 20
                   }
                 }
@@ -793,11 +808,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 37,
+                "line": 40,
                 "col": 3
               },
               "end": {
-                "line": 38,
+                "line": 41,
                 "col": 26
               }
             }
@@ -830,11 +845,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 40,
+                    "line": 43,
                     "col": 3
                   },
                   "end": {
-                    "line": 40,
+                    "line": 43,
                     "col": 20
                   }
                 }
@@ -843,11 +858,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 40,
+                "line": 43,
                 "col": 3
               },
               "end": {
-                "line": 41,
+                "line": 44,
                 "col": 22
               }
             }
@@ -866,11 +881,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 43,
+                "line": 46,
                 "col": 3
               },
               "end": {
-                "line": 43,
+                "line": 46,
                 "col": 21
               }
             }
@@ -882,11 +897,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 46,
+                "line": 49,
                 "col": 3
               },
               "end": {
-                "line": 46,
+                "line": 49,
                 "col": 48
               }
             },
@@ -898,11 +913,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 46,
+                    "line": 49,
                     "col": 23
                   },
                   "end": {
-                    "line": 46,
+                    "line": 49,
                     "col": 36
                   }
                 }
@@ -912,11 +927,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 46,
+                    "line": 49,
                     "col": 37
                   },
                   "end": {
-                    "line": 46,
+                    "line": 49,
                     "col": 46
                   }
                 }
@@ -930,11 +945,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 47,
+                "line": 50,
                 "col": 3
               },
               "end": {
-                "line": 47,
+                "line": 50,
                 "col": 43
               }
             },
@@ -946,11 +961,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 47,
+                    "line": 50,
                     "col": 20
                   },
                   "end": {
-                    "line": 47,
+                    "line": 50,
                     "col": 32
                   }
                 }
@@ -960,11 +975,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 47,
+                    "line": 50,
                     "col": 20
                   },
                   "end": {
-                    "line": 47,
+                    "line": 50,
                     "col": 32
                   }
                 }
@@ -974,11 +989,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 47,
+                    "line": 50,
                     "col": 33
                   },
                   "end": {
-                    "line": 47,
+                    "line": 50,
                     "col": 41
                   }
                 }
@@ -999,11 +1014,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 50,
+                "line": 53,
                 "col": 3
               },
               "end": {
-                "line": 50,
+                "line": 53,
                 "col": 41
               }
             },
@@ -1030,11 +1045,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 52,
+                "line": 55,
                 "col": 3
               },
               "end": {
-                "line": 52,
+                "line": 55,
                 "col": 43
               }
             },
@@ -1061,11 +1076,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 54,
+                "line": 57,
                 "col": 3
               },
               "end": {
-                "line": 54,
+                "line": 57,
                 "col": 33
               }
             },
@@ -1092,11 +1107,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 58,
+                "line": 61,
                 "col": 3
               },
               "end": {
-                "line": 59,
+                "line": 62,
                 "col": 35
               }
             },
@@ -1122,11 +1137,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 60,
+                "line": 63,
                 "col": 3
               },
               "end": {
-                "line": 60,
+                "line": 63,
                 "col": 63
               }
             },
@@ -1156,11 +1171,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 63,
+                "line": 66,
                 "col": 3
               },
               "end": {
-                "line": 63,
+                "line": 66,
                 "col": 52
               }
             },
@@ -1178,11 +1193,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 63,
+                    "line": 66,
                     "col": 24
                   },
                   "end": {
-                    "line": 63,
+                    "line": 66,
                     "col": 38
                   }
                 }
@@ -1197,11 +1212,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 63,
+                    "line": 66,
                     "col": 39
                   },
                   "end": {
-                    "line": 63,
+                    "line": 66,
                     "col": 50
                   }
                 }
@@ -1241,11 +1256,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 73,
+                    "line": 76,
                     "col": 3
                   },
                   "end": {
-                    "line": 73,
+                    "line": 76,
                     "col": 10
                   }
                 }
@@ -1256,11 +1271,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 74,
+                    "line": 77,
                     "col": 3
                   },
                   "end": {
-                    "line": 74,
+                    "line": 77,
                     "col": 16
                   }
                 }
@@ -1269,14 +1284,15 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 73,
+                "line": 76,
                 "col": 3
               },
               "end": {
-                "line": 76,
+                "line": 79,
                 "col": 21
               }
             },
+            "exported": true,
             "params": [
               {
                 "name": "in",
@@ -1287,12 +1303,12 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 75,
-                    "col": 14
+                    "line": 78,
+                    "col": 21
                   },
                   "end": {
-                    "line": 75,
-                    "col": 30
+                    "line": 78,
+                    "col": 37
                   }
                 }
               }
@@ -1302,6 +1318,7 @@
               "target": "api.PublicUser"
             },
             "effects": [],
+            "reads": [],
             "throws": [
               {
                 "exceptions": [
@@ -1318,7 +1335,9 @@
               ],
               "effects": [],
               "relations": [],
-              "successEffects": []
+              "successEffects": [],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -1328,11 +1347,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 78,
+                "line": 81,
                 "col": 3
               },
               "end": {
-                "line": 78,
+                "line": 81,
                 "col": 56
               }
             },
@@ -1347,11 +1366,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 78,
+                    "line": 81,
                     "col": 23
                   },
                   "end": {
-                    "line": 78,
+                    "line": 81,
                     "col": 36
                   }
                 }
@@ -1366,11 +1385,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 78,
+                    "line": 81,
                     "col": 37
                   },
                   "end": {
-                    "line": 78,
+                    "line": 81,
                     "col": 54
                   }
                 }
@@ -1384,11 +1403,11 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 79,
+                "line": 82,
                 "col": 3
               },
               "end": {
-                "line": 79,
+                "line": 82,
                 "col": 70
               }
             },
@@ -1403,11 +1422,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 79,
+                    "line": 82,
                     "col": 22
                   },
                   "end": {
-                    "line": 79,
+                    "line": 82,
                     "col": 41
                   }
                 }
@@ -1426,11 +1445,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 79,
+                    "line": 82,
                     "col": 42
                   },
                   "end": {
-                    "line": 79,
+                    "line": 82,
                     "col": 68
                   }
                 }
@@ -1447,11 +1466,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 82,
+                    "line": 85,
                     "col": 3
                   },
                   "end": {
-                    "line": 82,
+                    "line": 85,
                     "col": 10
                   }
                 }
@@ -1460,14 +1479,15 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 82,
+                "line": 85,
                 "col": 3
               },
               "end": {
-                "line": 85,
+                "line": 88,
                 "col": 37
               }
             },
+            "exported": true,
             "params": [
               {
                 "name": "in",
@@ -1478,12 +1498,12 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 83,
-                    "col": 12
+                    "line": 86,
+                    "col": 19
                   },
                   "end": {
-                    "line": 83,
-                    "col": 26
+                    "line": 86,
+                    "col": 33
                   }
                 }
               }
@@ -1495,6 +1515,7 @@
             "effects": [
               "api.createSession"
             ],
+            "reads": [],
             "throws": [
               {
                 "exceptions": [
@@ -1527,7 +1548,9 @@
                   "effect": "api.createSession",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -1540,11 +1563,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 88,
+                    "line": 91,
                     "col": 3
                   },
                   "end": {
-                    "line": 88,
+                    "line": 91,
                     "col": 10
                   }
                 }
@@ -1553,14 +1576,15 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 88,
+                "line": 91,
                 "col": 3
               },
               "end": {
-                "line": 90,
+                "line": 93,
                 "col": 27
               }
             },
+            "exported": true,
             "params": [
               {
                 "name": "token",
@@ -1574,12 +1598,12 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 89,
-                    "col": 13
+                    "line": 92,
+                    "col": 20
                   },
                   "end": {
-                    "line": 89,
-                    "col": 26
+                    "line": 92,
+                    "col": 33
                   }
                 }
               }
@@ -1588,6 +1612,7 @@
             "effects": [
               "api.deleteSession"
             ],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
@@ -1601,7 +1626,9 @@
                   "effect": "api.deleteSession",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -1611,14 +1638,15 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 93,
+                "line": 96,
                 "col": 3
               },
               "end": {
-                "line": 95,
+                "line": 98,
                 "col": 38
               }
             },
+            "exported": true,
             "params": [
               {
                 "name": "id",
@@ -1629,12 +1657,12 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 93,
-                    "col": 12
+                    "line": 96,
+                    "col": 19
                   },
                   "end": {
-                    "line": 93,
-                    "col": 22
+                    "line": 96,
+                    "col": 29
                   }
                 }
               }
@@ -1643,6 +1671,7 @@
             "effects": [
               "api.touchUser"
             ],
+            "reads": [],
             "throws": [
               {
                 "exceptions": [
@@ -1682,7 +1711,1389 @@
                   "effect": "api.touchUser",
                   "state": "kept"
                 }
+              ],
+              "reads": [],
+              "pure": false
+            }
+          },
+          {
+            "kind": "model",
+            "name": "api.Shapes",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 103,
+                "col": 3
+              },
+              "end": {
+                "line": 103,
+                "col": 108
+              }
+            },
+            "fields": [
+              {
+                "name": "ids",
+                "type": {
+                  "kind": "array",
+                  "of": {
+                    "kind": "ref",
+                    "target": "api.UserId"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 103,
+                    "col": 18
+                  },
+                  "end": {
+                    "line": 103,
+                    "col": 36
+                  }
+                }
+              },
+              {
+                "name": "nick",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 103,
+                    "col": 37
+                  },
+                  "end": {
+                    "line": 103,
+                    "col": 60
+                  }
+                }
+              },
+              {
+                "name": "one",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.Token"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 103,
+                    "col": 61
+                  },
+                  "end": {
+                    "line": 103,
+                    "col": 80
+                  }
+                }
+              },
+              {
+                "name": "twice",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 103,
+                    "col": 81
+                  },
+                  "end": {
+                    "line": 103,
+                    "col": 106
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "state",
+            "name": "api.current",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 105,
+                "col": 3
+              },
+              "end": {
+                "line": 105,
+                "col": 25
+              }
+            },
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "api.Token"
+              }
+            },
+            "shape": "nullable",
+            "element": {
+              "kind": "ref",
+              "target": "api.Token"
+            }
+          },
+          {
+            "kind": "state",
+            "name": "api.motd",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 106,
+                "col": 3
+              },
+              "end": {
+                "line": 106,
+                "col": 22
+              }
+            },
+            "type": {
+              "kind": "core",
+              "name": "string"
+            },
+            "shape": "single",
+            "element": {
+              "kind": "core",
+              "name": "string"
+            }
+          },
+          {
+            "kind": "scalar",
+            "name": "api.AdminId",
+            "description": {
+              "summary": "管理者の識別子",
+              "body": "管理者の識別子",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 109,
+                "col": 3
+              },
+              "end": {
+                "line": 109,
+                "col": 33
+              }
+            },
+            "base": {
+              "kind": "ref",
+              "target": "api.UserId"
+            }
+          },
+          {
+            "kind": "model",
+            "name": "api.Admin",
+            "description": {
+              "summary": "管理者",
+              "body": "管理者",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 113,
+                "col": 3
+              },
+              "end": {
+                "line": 120,
+                "col": 4
+              }
+            },
+            "fields": [
+              {
+                "name": "id",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.AdminId"
+                },
+                "decorators": [
+                  {
+                    "decorator": "db.key",
+                    "args": [],
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 13,
+                        "col": 5
+                      },
+                      "end": {
+                        "line": 13,
+                        "col": 12
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 114,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 114,
+                    "col": 26
+                  }
+                }
+              },
+              {
+                "name": "name",
+                "description": {
+                  "summary": "表に出す名前",
+                  "body": "表に出す名前",
+                  "params": [],
+                  "throws": [],
+                  "see": []
+                },
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [
+                  {
+                    "decorator": "db.unique",
+                    "args": [],
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 116,
+                        "col": 5
+                      },
+                      "end": {
+                        "line": 116,
+                        "col": 15
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 116,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 116,
+                    "col": 30
+                  }
+                }
+              },
+              {
+                "name": "secret",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [
+                  {
+                    "decorator": "db.unique",
+                    "args": [],
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 117,
+                        "col": 5
+                      },
+                      "end": {
+                        "line": 117,
+                        "col": 15
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 117,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 117,
+                    "col": 32
+                  }
+                }
+              },
+              {
+                "name": "nick",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 19,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 19,
+                    "col": 20
+                  }
+                }
+              },
+              {
+                "name": "tags",
+                "type": {
+                  "kind": "array",
+                  "of": {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 21,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 21,
+                    "col": 20
+                  }
+                }
+              },
+              {
+                "name": "attrs",
+                "type": {
+                  "kind": "record",
+                  "key": {
+                    "kind": "core",
+                    "name": "string"
+                  },
+                  "value": {
+                    "kind": "array",
+                    "of": {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 22,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 22,
+                    "col": 37
+                  }
+                }
+              },
+              {
+                "name": "level",
+                "type": {
+                  "kind": "core",
+                  "name": "int"
+                },
+                "default": {
+                  "kind": "int",
+                  "value": 1
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 119,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 119,
+                    "col": 20
+                  }
+                }
+              }
+            ],
+            "extends": {
+              "base": "api.User",
+              "removed": [
+                "hash"
+              ],
+              "overridden": [
+                "id",
+                "name",
+                "secret"
               ]
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.findUser",
+            "description": {
+              "summary": "識別子からユーザーを引く",
+              "body": "識別子からユーザーを引く",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 125,
+                "col": 3
+              },
+              "end": {
+                "line": 125,
+                "col": 75
+              }
+            },
+            "exported": true,
+            "params": [
+              {
+                "name": "id",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.UserId"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 125,
+                    "col": 22
+                  },
+                  "end": {
+                    "line": 125,
+                    "col": 32
+                  }
+                }
+              }
+            ],
+            "returns": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "api.User"
+              }
+            },
+            "effects": [],
+            "reads": [
+              "api.users",
+              "api.sessions"
+            ],
+            "throws": [],
+            "body": null,
+            "signature": {
+              "exceptions": [],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [
+                "api.users",
+                "api.sessions"
+              ],
+              "pure": false
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.unauthorized",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 127,
+                "col": 3
+              },
+              "end": {
+                "line": 127,
+                "col": 48
+              }
+            },
+            "exported": false,
+            "params": [],
+            "returns": {
+              "kind": "never"
+            },
+            "effects": [],
+            "reads": [],
+            "throws": [
+              {
+                "exceptions": [
+                  "api.Unauthorized"
+                ],
+                "relations": []
+              }
+            ],
+            "body": null,
+            "signature": {
+              "exceptions": [
+                "api.Unauthorized"
+              ],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [],
+              "pure": true
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.nameOf",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 129,
+                "col": 3
+              },
+              "end": {
+                "line": 129,
+                "col": 33
+              }
+            },
+            "exported": false,
+            "params": [
+              {
+                "name": "user",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.User"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 129,
+                    "col": 13
+                  },
+                  "end": {
+                    "line": 129,
+                    "col": 23
+                  }
+                }
+              }
+            ],
+            "returns": {
+              "kind": "core",
+              "name": "string"
+            },
+            "effects": [],
+            "reads": [],
+            "throws": [],
+            "body": null,
+            "signature": {
+              "exceptions": [],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [],
+              "pure": true
+            }
+          },
+          {
+            "kind": "classify",
+            "name": "api.Lookup",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 133,
+                "col": 3
+              },
+              "end": {
+                "line": 136,
+                "col": 4
+              }
+            },
+            "subject": {
+              "kind": "op",
+              "op": "api.findUser",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "ref",
+                  "target": "api.User"
+                }
+              }
+            },
+            "cases": [
+              {
+                "name": "Found",
+                "as": [
+                  {
+                    "type": {
+                      "kind": "ref",
+                      "target": "api.User"
+                    },
+                    "by": "presence",
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 134,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 134,
+                        "col": 28
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 134,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 134,
+                    "col": 29
+                  }
+                }
+              }
+            ],
+            "hasDefault": true,
+            "fromCondition": false,
+            "decidedBy": "type"
+          },
+          {
+            "kind": "classify",
+            "name": "api.SignedIn",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 138,
+                "col": 3
+              },
+              "end": {
+                "line": 141,
+                "col": 4
+              }
+            },
+            "subject": {
+              "kind": "states",
+              "states": [
+                "api.current"
+              ]
+            },
+            "cases": [
+              {
+                "name": "Yes",
+                "as": [
+                  {
+                    "state": "api.current",
+                    "type": {
+                      "kind": "ref",
+                      "target": "api.Token"
+                    },
+                    "by": "presence",
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 139,
+                        "col": 10
+                      },
+                      "end": {
+                        "line": 139,
+                        "col": 26
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 139,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 139,
+                    "col": 27
+                  }
+                }
+              }
+            ],
+            "hasDefault": true,
+            "fromCondition": false,
+            "decidedBy": "type"
+          },
+          {
+            "kind": "op",
+            "name": "api.currentName",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 145,
+                "col": 3
+              },
+              "end": {
+                "line": 153,
+                "col": 4
+              }
+            },
+            "exported": false,
+            "params": [
+              {
+                "name": "id",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.UserId"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 145,
+                    "col": 18
+                  },
+                  "end": {
+                    "line": 145,
+                    "col": 28
+                  }
+                }
+              }
+            ],
+            "returns": {
+              "kind": "core",
+              "name": "string"
+            },
+            "effects": [],
+            "reads": [],
+            "throws": [
+              {
+                "exceptions": [
+                  "api.NotFound"
+                ],
+                "relations": []
+              }
+            ],
+            "body": {
+              "statements": [
+                {
+                  "kind": "const",
+                  "name": "user",
+                  "expr": {
+                    "kind": "call",
+                    "call": {
+                      "op": "api.findUser",
+                      "args": [
+                        {
+                          "param": "id",
+                          "value": {
+                            "kind": "name",
+                            "path": [
+                              "id"
+                            ],
+                            "span": {
+                              "file": "api.hozo",
+                              "start": {
+                                "line": 148,
+                                "col": 27
+                              },
+                              "end": {
+                                "line": 148,
+                                "col": 29
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "bound": [],
+                      "span": {
+                        "file": "api.hozo",
+                        "start": {
+                          "line": 148,
+                          "col": 18
+                        },
+                        "end": {
+                          "line": 148,
+                          "col": 30
+                        }
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 148,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 148,
+                      "col": 31
+                    }
+                  }
+                },
+                {
+                  "kind": "return",
+                  "expr": {
+                    "kind": "match",
+                    "match": {
+                      "subject": {
+                        "kind": "value",
+                        "atom": {
+                          "kind": "name",
+                          "path": [
+                            "user"
+                          ],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 149,
+                              "col": 18
+                            },
+                            "end": {
+                              "line": 149,
+                              "col": 22
+                            }
+                          }
+                        }
+                      },
+                      "classify": "api.Lookup",
+                      "arms": [
+                        {
+                          "cases": [
+                            "Found"
+                          ],
+                          "body": {
+                            "kind": "call",
+                            "call": {
+                              "op": "api.nameOf",
+                              "args": [
+                                {
+                                  "param": "user",
+                                  "value": {
+                                    "kind": "name",
+                                    "path": [
+                                      "user"
+                                    ],
+                                    "span": {
+                                      "file": "api.hozo",
+                                      "start": {
+                                        "line": 150,
+                                        "col": 25
+                                      },
+                                      "end": {
+                                        "line": 150,
+                                        "col": 29
+                                      }
+                                    }
+                                  }
+                                }
+                              ],
+                              "bound": [],
+                              "span": {
+                                "file": "api.hozo",
+                                "start": {
+                                  "line": 150,
+                                  "col": 18
+                                },
+                                "end": {
+                                  "line": 150,
+                                  "col": 30
+                                }
+                              }
+                            }
+                          },
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "ref",
+                                "target": "api.User"
+                              }
+                            }
+                          ],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 150,
+                              "col": 7
+                            },
+                            "end": {
+                              "line": 150,
+                              "col": 31
+                            }
+                          }
+                        },
+                        {
+                          "cases": "default",
+                          "body": {
+                            "kind": "throw",
+                            "exception": "api.NotFound",
+                            "span": {
+                              "file": "api.hozo",
+                              "start": {
+                                "line": 151,
+                                "col": 18
+                              },
+                              "end": {
+                                "line": 151,
+                                "col": 32
+                              }
+                            }
+                          },
+                          "narrowed": [],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 151,
+                              "col": 7
+                            },
+                            "end": {
+                              "line": 151,
+                              "col": 33
+                            }
+                          }
+                        }
+                      ],
+                      "span": {
+                        "file": "api.hozo",
+                        "start": {
+                          "line": 149,
+                          "col": 12
+                        },
+                        "end": {
+                          "line": 152,
+                          "col": 6
+                        }
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 149,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 152,
+                      "col": 7
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [
+                "api.NotFound"
+              ],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [
+                "api.users",
+                "api.sessions"
+              ],
+              "pure": false
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.tokenOrNone",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 157,
+                "col": 3
+              },
+              "end": {
+                "line": 163,
+                "col": 4
+              }
+            },
+            "exported": false,
+            "params": [],
+            "returns": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "api.Token"
+              }
+            },
+            "effects": [],
+            "reads": [],
+            "throws": [],
+            "body": {
+              "statements": [
+                {
+                  "kind": "return",
+                  "expr": {
+                    "kind": "match",
+                    "match": {
+                      "subject": {
+                        "kind": "value",
+                        "atom": {
+                          "kind": "state",
+                          "state": "api.current",
+                          "path": [],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 159,
+                              "col": 18
+                            },
+                            "end": {
+                              "line": 159,
+                              "col": 25
+                            }
+                          }
+                        }
+                      },
+                      "classify": "nullable",
+                      "arms": [
+                        {
+                          "cases": [
+                            "HasItems"
+                          ],
+                          "body": {
+                            "kind": "atom",
+                            "atom": {
+                              "kind": "state",
+                              "state": "api.current",
+                              "path": [],
+                              "span": {
+                                "file": "api.hozo",
+                                "start": {
+                                  "line": 160,
+                                  "col": 19
+                                },
+                                "end": {
+                                  "line": 160,
+                                  "col": 26
+                                }
+                              }
+                            }
+                          },
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "ref",
+                                "target": "api.Token"
+                              }
+                            }
+                          ],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 160,
+                              "col": 7
+                            },
+                            "end": {
+                              "line": 160,
+                              "col": 27
+                            }
+                          }
+                        },
+                        {
+                          "cases": [
+                            "Empty"
+                          ],
+                          "body": {
+                            "kind": "none"
+                          },
+                          "narrowed": [],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 161,
+                              "col": 7
+                            },
+                            "end": {
+                              "line": 161,
+                              "col": 24
+                            }
+                          }
+                        }
+                      ],
+                      "span": {
+                        "file": "api.hozo",
+                        "start": {
+                          "line": 159,
+                          "col": 12
+                        },
+                        "end": {
+                          "line": 162,
+                          "col": 6
+                        }
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 159,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 162,
+                      "col": 7
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [
+                "api.current"
+              ],
+              "pure": false
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.greeting",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 166,
+                "col": 3
+              },
+              "end": {
+                "line": 169,
+                "col": 4
+              }
+            },
+            "exported": false,
+            "params": [],
+            "returns": {
+              "kind": "core",
+              "name": "string"
+            },
+            "effects": [],
+            "reads": [],
+            "throws": [],
+            "body": {
+              "statements": [
+                {
+                  "kind": "return",
+                  "expr": {
+                    "kind": "atom",
+                    "atom": {
+                      "kind": "state",
+                      "state": "api.motd",
+                      "path": [],
+                      "span": {
+                        "file": "api.hozo",
+                        "start": {
+                          "line": 168,
+                          "col": 12
+                        },
+                        "end": {
+                          "line": 168,
+                          "col": 20
+                        }
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 168,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 168,
+                      "col": 21
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [
+                "api.motd"
+              ],
+              "pure": false
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.guard",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 172,
+                "col": 3
+              },
+              "end": {
+                "line": 179,
+                "col": 4
+              }
+            },
+            "exported": false,
+            "params": [],
+            "returns": {
+              "kind": "ref",
+              "target": "api.Token"
+            },
+            "effects": [],
+            "reads": [],
+            "throws": [
+              {
+                "exceptions": [
+                  "api.Unauthorized"
+                ],
+                "relations": []
+              }
+            ],
+            "body": {
+              "statements": [
+                {
+                  "kind": "return",
+                  "expr": {
+                    "kind": "match",
+                    "match": {
+                      "subject": {
+                        "kind": "classify"
+                      },
+                      "classify": "api.SignedIn",
+                      "arms": [
+                        {
+                          "cases": [
+                            "Yes"
+                          ],
+                          "body": {
+                            "kind": "atom",
+                            "atom": {
+                              "kind": "state",
+                              "state": "api.current",
+                              "path": [],
+                              "span": {
+                                "file": "api.hozo",
+                                "start": {
+                                  "line": 176,
+                                  "col": 18
+                                },
+                                "end": {
+                                  "line": 176,
+                                  "col": 25
+                                }
+                              }
+                            }
+                          },
+                          "narrowed": [
+                            {
+                              "state": "api.current",
+                              "type": {
+                                "kind": "ref",
+                                "target": "api.Token"
+                              }
+                            }
+                          ],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 176,
+                              "col": 7
+                            },
+                            "end": {
+                              "line": 176,
+                              "col": 26
+                            }
+                          }
+                        },
+                        {
+                          "cases": "default",
+                          "body": {
+                            "kind": "call",
+                            "call": {
+                              "op": "api.unauthorized",
+                              "args": [],
+                              "bound": [],
+                              "span": {
+                                "file": "api.hozo",
+                                "start": {
+                                  "line": 177,
+                                  "col": 18
+                                },
+                                "end": {
+                                  "line": 177,
+                                  "col": 32
+                                }
+                              }
+                            }
+                          },
+                          "narrowed": [],
+                          "span": {
+                            "file": "api.hozo",
+                            "start": {
+                              "line": 177,
+                              "col": 7
+                            },
+                            "end": {
+                              "line": 177,
+                              "col": 33
+                            }
+                          }
+                        }
+                      ],
+                      "span": {
+                        "file": "api.hozo",
+                        "start": {
+                          "line": 175,
+                          "col": 12
+                        },
+                        "end": {
+                          "line": 178,
+                          "col": 6
+                        }
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 175,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 178,
+                      "col": 7
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [
+                "api.Unauthorized"
+              ],
+              "effects": [],
+              "relations": [],
+              "successEffects": [],
+              "reads": [
+                "api.current"
+              ],
+              "pure": false
             }
           }
         ]
@@ -1770,6 +3181,13 @@
                 "col": 36
               }
             },
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "api.Token"
+              }
+            },
             "shape": "nullable",
             "element": {
               "kind": "ref",
@@ -1806,6 +3224,10 @@
                 "line": 9,
                 "col": 38
               }
+            },
+            "type": {
+              "kind": "ref",
+              "target": "page.Route"
             },
             "shape": "single",
             "element": {
@@ -2305,6 +3727,7 @@
                   "throws": [],
                   "see": []
                 },
+                "as": [],
                 "span": {
                   "file": "web.hozo",
                   "start": {
@@ -2319,6 +3742,7 @@
               },
               {
                 "name": "Member",
+                "as": [],
                 "span": {
                   "file": "web.hozo",
                   "start": {
@@ -2333,7 +3757,8 @@
               }
             ],
             "hasDefault": false,
-            "fromCondition": false
+            "fromCondition": false,
+            "decidedBy": "predicate"
           },
           {
             "kind": "classify",
@@ -2367,6 +3792,7 @@
             "cases": [
               {
                 "name": "Verified",
+                "as": [],
                 "span": {
                   "file": "web.hozo",
                   "start": {
@@ -2381,7 +3807,8 @@
               }
             ],
             "hasDefault": true,
-            "fromCondition": true
+            "fromCondition": true,
+            "decidedBy": "predicate"
           },
           {
             "kind": "model",
@@ -2511,6 +3938,7 @@
                 "col": 49
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "user",
@@ -2536,13 +3964,16 @@
               "target": "web.UserPage"
             },
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
               "exceptions": [],
               "effects": [],
               "relations": [],
-              "successEffects": []
+              "successEffects": [],
+              "reads": [],
+              "pure": true
             }
           },
           {
@@ -2560,6 +3991,7 @@
                 "col": 66
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "user",
@@ -2592,13 +4024,16 @@
               "target": "web.UserPage"
             },
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
               "exceptions": [],
               "effects": [],
               "relations": [],
-              "successEffects": []
+              "successEffects": [],
+              "reads": [],
+              "pure": true
             }
           },
           {
@@ -2616,6 +4051,7 @@
                 "col": 49
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "user",
@@ -2640,6 +4076,7 @@
             "effects": [
               "web.goHome"
             ],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
@@ -2653,7 +4090,9 @@
                   "effect": "web.goHome",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -2671,11 +4110,13 @@
                 "col": 39
               }
             },
+            "exported": false,
             "params": [],
             "returns": null,
             "effects": [
               "web.removeToken"
             ],
+            "reads": [],
             "throws": [],
             "body": null,
             "signature": {
@@ -2689,7 +4130,9 @@
                   "effect": "web.removeToken",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -2746,6 +4189,7 @@
                 "col": 4
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "q",
@@ -2771,6 +4215,7 @@
               "target": "api.PublicUser"
             },
             "effects": [],
+            "reads": [],
             "throws": [
               {
                 "exceptions": [
@@ -2874,7 +4319,11 @@
               ],
               "effects": [],
               "relations": [],
-              "successEffects": []
+              "successEffects": [],
+              "reads": [
+                "web.token"
+              ],
+              "pure": false
             }
           },
           {
@@ -2892,6 +4341,7 @@
                 "col": 4
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "user",
@@ -2914,6 +4364,7 @@
             ],
             "returns": null,
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": {
               "statements": [
@@ -2986,6 +4437,21 @@
                             }
                           }
                         },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "web.Verified",
+                              "cases": [
+                                "Verified"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "api.PublicUser"
+                              }
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "web.hozo",
                           "start": {
@@ -3003,6 +4469,7 @@
                         "body": {
                           "kind": "none"
                         },
+                        "narrowed": [],
                         "span": {
                           "file": "web.hozo",
                           "start": {
@@ -3053,7 +4520,9 @@
                   "effect": "web.goHome",
                   "state": "unknown"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -3071,6 +4540,7 @@
                 "col": 4
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "id",
@@ -3096,6 +4566,7 @@
               "target": "api.PublicUser"
             },
             "effects": [],
+            "reads": [],
             "throws": [
               {
                 "exceptions": [
@@ -3305,7 +4776,11 @@
                   "effect": "api.touchUser",
                   "state": "kept"
                 }
-              ]
+              ],
+              "reads": [
+                "web.token"
+              ],
+              "pure": false
             }
           },
           {
@@ -3422,6 +4897,7 @@
                 "col": 4
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "id",
@@ -3447,6 +4923,7 @@
               "target": "web.UserPage"
             },
             "effects": [],
+            "reads": [],
             "throws": [
               {
                 "exceptions": [
@@ -3604,6 +5081,21 @@
                               }
                             }
                           },
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "web.UserKind",
+                                "cases": [
+                                  "Admin"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.PublicUser"
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "web.hozo",
                             "start": {
@@ -3660,6 +5152,21 @@
                               }
                             }
                           },
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "web.UserKind",
+                                "cases": [
+                                  "Member"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.PublicUser"
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "web.hozo",
                             "start": {
@@ -3759,7 +5266,11 @@
                   "effect": "web.goLogin",
                   "state": "prevented"
                 }
-              ]
+              ],
+              "reads": [
+                "web.token"
+              ],
+              "pure": false
             }
           },
           {
@@ -3808,9 +5319,11 @@
                 "col": 4
               }
             },
+            "exported": false,
             "params": [],
             "returns": null,
             "effects": [],
+            "reads": [],
             "throws": [],
             "body": {
               "statements": [
@@ -3899,7 +5412,11 @@
                   "effect": "web.removeToken",
                   "state": "unknown"
                 }
-              ]
+              ],
+              "reads": [
+                "web.token"
+              ],
+              "pure": false
             }
           },
           {
@@ -3989,6 +5506,7 @@
                 "col": 4
               }
             },
+            "exported": false,
             "params": [
               {
                 "name": "form",
@@ -4014,6 +5532,7 @@
               "target": "api.Session"
             },
             "effects": [],
+            "reads": [],
             "throws": [
               {
                 "exceptions": [
@@ -4165,7 +5684,9 @@
                   "effect": "api.createSession",
                   "state": "unknown"
                 }
-              ]
+              ],
+              "reads": [],
+              "pure": false
             }
           },
           {
@@ -4175,12 +5696,12 @@
             "span": {
               "file": "api.hozo",
               "start": {
-                "line": 75,
-                "col": 14
+                "line": 78,
+                "col": 21
               },
               "end": {
-                "line": 75,
-                "col": 30
+                "line": 78,
+                "col": 37
               }
             },
             "fields": [
@@ -4194,11 +5715,11 @@
                 "span": {
                   "file": "api.hozo",
                   "start": {
-                    "line": 63,
+                    "line": 66,
                     "col": 39
                   },
                   "end": {
-                    "line": 63,
+                    "line": 66,
                     "col": 50
                   }
                 }
@@ -5292,6 +6813,72 @@
     ]
   },
   "ops": {
+    "api.currentName": {
+      "exceptions": [
+        "api.NotFound"
+      ],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "reads": [
+        "api.users",
+        "api.sessions"
+      ],
+      "pure": false,
+      "params": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "ref",
+            "target": "api.UserId"
+          },
+          "span": {
+            "file": "api.hozo",
+            "start": {
+              "line": 145,
+              "col": 18
+            },
+            "end": {
+              "line": 145,
+              "col": 28
+            }
+          }
+        }
+      ],
+      "bound": []
+    },
+    "api.findUser": {
+      "exceptions": [],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "reads": [
+        "api.users",
+        "api.sessions"
+      ],
+      "pure": false,
+      "params": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "ref",
+            "target": "api.UserId"
+          },
+          "span": {
+            "file": "api.hozo",
+            "start": {
+              "line": 125,
+              "col": 22
+            },
+            "end": {
+              "line": 125,
+              "col": 32
+            }
+          }
+        }
+      ],
+      "bound": []
+    },
     "api.getUser": {
       "exceptions": [
         "api.NotFound",
@@ -5301,6 +6888,8 @@
       "effects": [],
       "relations": [],
       "successEffects": [],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "in",
@@ -5311,12 +6900,12 @@
           "span": {
             "file": "api.hozo",
             "start": {
-              "line": 75,
-              "col": 14
+              "line": 78,
+              "col": 21
             },
             "end": {
-              "line": 75,
-              "col": 30
+              "line": 78,
+              "col": 37
             }
           }
         }
@@ -5330,6 +6919,32 @@
           "state": "web.token"
         }
       ]
+    },
+    "api.greeting": {
+      "exceptions": [],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "reads": [
+        "api.motd"
+      ],
+      "pure": false,
+      "params": [],
+      "bound": []
+    },
+    "api.guard": {
+      "exceptions": [
+        "api.Unauthorized"
+      ],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "reads": [
+        "api.current"
+      ],
+      "pure": false,
+      "params": [],
+      "bound": []
     },
     "api.login": {
       "exceptions": [
@@ -5357,6 +6972,8 @@
           "state": "kept"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "in",
@@ -5367,12 +6984,12 @@
           "span": {
             "file": "api.hozo",
             "start": {
-              "line": 83,
-              "col": 12
+              "line": 86,
+              "col": 19
             },
             "end": {
-              "line": 83,
-              "col": 26
+              "line": 86,
+              "col": 33
             }
           }
         }
@@ -5399,6 +7016,8 @@
           "state": "kept"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [],
       "bound": [
         {
@@ -5408,6 +7027,47 @@
           "state": "web.token"
         }
       ]
+    },
+    "api.nameOf": {
+      "exceptions": [],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "reads": [],
+      "pure": true,
+      "params": [
+        {
+          "name": "user",
+          "type": {
+            "kind": "ref",
+            "target": "api.User"
+          },
+          "span": {
+            "file": "api.hozo",
+            "start": {
+              "line": 129,
+              "col": 13
+            },
+            "end": {
+              "line": 129,
+              "col": 23
+            }
+          }
+        }
+      ],
+      "bound": []
+    },
+    "api.tokenOrNone": {
+      "exceptions": [],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "reads": [
+        "api.current"
+      ],
+      "pure": false,
+      "params": [],
+      "bound": []
     },
     "api.touch": {
       "exceptions": [
@@ -5435,6 +7095,8 @@
           "state": "kept"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "id",
@@ -5445,16 +7107,28 @@
           "span": {
             "file": "api.hozo",
             "start": {
-              "line": 93,
-              "col": 12
+              "line": 96,
+              "col": 19
             },
             "end": {
-              "line": 93,
-              "col": 22
+              "line": 96,
+              "col": 29
             }
           }
         }
       ],
+      "bound": []
+    },
+    "api.unauthorized": {
+      "exceptions": [
+        "api.Unauthorized"
+      ],
+      "effects": [],
+      "relations": [],
+      "successEffects": [],
+      "reads": [],
+      "pure": true,
+      "params": [],
       "bound": []
     },
     "web.adminPageVm": {
@@ -5462,6 +7136,8 @@
       "effects": [],
       "relations": [],
       "successEffects": [],
+      "reads": [],
+      "pure": true,
       "params": [
         {
           "name": "user",
@@ -5503,6 +7179,8 @@
           "state": "kept"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [],
       "bound": []
     },
@@ -5515,6 +7193,10 @@
       "effects": [],
       "relations": [],
       "successEffects": [],
+      "reads": [
+        "web.token"
+      ],
+      "pure": false,
       "params": [
         {
           "name": "q",
@@ -5549,6 +7231,8 @@
           "state": "kept"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "user",
@@ -5597,6 +7281,8 @@
           "state": "unknown"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "form",
@@ -5645,6 +7331,10 @@
           "state": "prevented"
         }
       ],
+      "reads": [
+        "web.token"
+      ],
+      "pure": false,
       "params": [
         {
           "name": "id",
@@ -5699,6 +7389,10 @@
           "state": "kept"
         }
       ],
+      "reads": [
+        "web.token"
+      ],
+      "pure": false,
       "params": [
         {
           "name": "id",
@@ -5738,6 +7432,10 @@
           "state": "unknown"
         }
       ],
+      "reads": [
+        "web.token"
+      ],
+      "pure": false,
       "params": [],
       "bound": []
     },
@@ -5746,6 +7444,8 @@
       "effects": [],
       "relations": [],
       "successEffects": [],
+      "reads": [],
+      "pure": true,
       "params": [
         {
           "name": "user",
@@ -5780,6 +7480,8 @@
           "state": "unknown"
         }
       ],
+      "reads": [],
+      "pure": false,
       "params": [
         {
           "name": "user",

@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/lsp/protocol"
@@ -82,12 +83,12 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolProperty, d.Span, d.Name.Span, "to "+target))
 		case *ast.ModelDecl:
 			detail := ""
-			if d.Base != nil {
-				detail = "is " + d.Base.String()
+			if d.Extends != nil {
+				detail = "extends " + d.Extends.String()
 			}
 			sym := b.sym(d.Name.Name, protocol.SymbolStruct, d.Span, d.Name.Span, detail)
 			if d.Body != nil {
-				sym.Children = b.fields(d.Body.Fields)
+				sym.Children = b.members(d.Body)
 			}
 			out = append(out, sym)
 		case *ast.ScalarDecl:
@@ -107,7 +108,7 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 					}
 					child := b.sym(m.Arm.Name, protocol.SymbolEnumMember, m.Span, m.Arm.Span, detail)
 					if m.Type != nil && m.Type.Body != nil {
-						child.Children = b.fields(m.Type.Body.Fields)
+						child.Children = b.members(m.Type.Body)
 					}
 					sym.Children = append(sym.Children, child)
 				case m.Target != nil:
@@ -116,7 +117,11 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			}
 			out = append(out, sym)
 		case *ast.StateDecl:
-			out = append(out, b.sym(d.Name.Name, protocol.SymbolVariable, d.Span, d.Name.Span, d.Shape.String()+"<"+b.text(d.Elem)+">"))
+			detail := ""
+			if d.Type != nil {
+				detail = b.text(d.Type)
+			}
+			out = append(out, b.sym(d.Name.Name, protocol.SymbolVariable, d.Span, d.Name.Span, detail))
 		case *ast.ExceptionDecl:
 			detail := ""
 			if d.Value != nil {
@@ -128,7 +133,7 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			}
 			sym := b.sym(d.Name.Name, protocol.SymbolClass, d.Span, d.Name.Span, detail)
 			if d.Value != nil && d.Value.Body != nil {
-				sym.Children = b.fields(d.Value.Body.Fields)
+				sym.Children = b.members(d.Value.Body)
 			}
 			out = append(out, sym)
 		case *ast.EffectDecl:
@@ -170,10 +175,35 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 	return out
 }
 
-func (b *symbolBuilder) fields(fields []*ast.Field) []protocol.DocumentSymbol {
+// members は model の本体に書いたメンバー（Field と Override）を、書かれた順に子にする。構文木から引くので、
+// 継承した model が受け継いだフィールドは子にならない（docs/lsp.md「ドキュメントのシンボル」）。
+func (b *symbolBuilder) members(body *ast.ModelBody) []protocol.DocumentSymbol {
+	type member struct {
+		start source.Offset
+		sym   protocol.DocumentSymbol
+	}
+	var all []member
+	for _, f := range body.Fields {
+		detail := ""
+		if f.Type != nil {
+			detail = b.text(f.Type)
+		}
+		all = append(all, member{f.Span.Start, b.sym(f.Name.Name, protocol.SymbolField, f.Span, f.Name.Span, detail)})
+	}
+	for _, o := range body.Overrides {
+		detail := "override"
+		switch {
+		case o.Never:
+			detail = "override: never"
+		case o.Type != nil:
+			detail = "override: " + b.text(o.Type)
+		}
+		all = append(all, member{o.Span.Start, b.sym(o.Name.Name, protocol.SymbolField, o.Span, o.Name.Span, detail)})
+	}
+	sort.SliceStable(all, func(i, j int) bool { return all[i].start < all[j].start })
 	var out []protocol.DocumentSymbol
-	for _, f := range fields {
-		out = append(out, b.sym(f.Name.Name, protocol.SymbolField, f.Span, f.Name.Span, b.text(f.Type)))
+	for _, m := range all {
+		out = append(out, m.sym)
 	}
 	return out
 }

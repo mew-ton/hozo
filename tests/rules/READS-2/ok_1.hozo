@@ -1,0 +1,44 @@
+// READS-2（docs/check.md「reads」）: 配線の op は reads を書かなくてよい。書いた場合は、計算と集合として等しいこと
+// （順序は問わない）。等しくするために、別の名前空間の状態も書ける
+namespace a {
+  scalar Token extends string;
+  state token: nullable<Token>;
+  state rows: list<string>;
+  bind token to a.*;
+  classify Phase of rows { Idle; Busy; }
+  op take(t: Token?): string;
+  op find(name: string): string? reads rows;
+  op g();
+  op omitted(name: string): string? {
+    return find(name);
+  }
+  op written(name: string): string? reads rows {
+    return find(name);
+  }
+  op byName(): Token? reads token {
+    return token;
+  }
+  op bySubject() reads rows {
+    match rows by list { Empty => g(); HasItems => none; };
+  }
+  op byClassify() reads a.rows {
+    match by Phase { Idle => g(); Busy => none; };
+  }
+  op byBind(): string reads token {
+    return take();
+  }
+  // 状態を名前で渡した位置は明示で、bind は埋めないが、読むことに変わりはない
+  op explicit(): string reads token {
+    return take(token);
+  }
+  op across(name: string): string[] reads b.items, rows {
+    const x = find(name);
+    g2(x);
+    return b.all();
+  }
+  op g2(x: string?);
+}
+namespace b {
+  state items: list<string>;
+  export op all(): string[] reads items;
+}

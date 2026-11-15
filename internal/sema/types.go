@@ -9,7 +9,7 @@ import (
 )
 
 // exprKind は式の型の種類（docs/types.md「型の種類」: Type に加えて none の型とレコードリテラルの型、
-// それに「値がない」と、解決できなかったことを表す unknown）。
+// 「値がない」、「返らない」と、解決できなかったことを表す unknown）。
 type exprKind int
 
 const (
@@ -25,6 +25,8 @@ const (
 	etLiteral
 	// etRecord はレコードリテラル。当てはめる先が決まるまで型は未定。
 	etRecord
+	// etNever は「返らない」（never を返す op の呼び出し、アームの本体の throw、すべてのアームが返らない match）。
+	etNever
 )
 
 // exprType は式の型。
@@ -43,8 +45,20 @@ func valueType(t ir.Type) exprType {
 	}
 	return exprType{kind: etValue, typ: t}
 }
-func noValue() exprType  { return exprType{kind: etNoValue} }
-func noneType() exprType { return exprType{kind: etNone} }
+func noValue() exprType   { return exprType{kind: etNoValue} }
+func noneType() exprType  { return exprType{kind: etNone} }
+func neverType() exprType { return exprType{kind: etNever} }
+
+// callType は呼び出しの式の型（docs/types.md「式の型」）: returns が null なら「値がない」、never なら「返らない」。
+func callType(returns ir.Type) exprType {
+	switch {
+	case returns == nil:
+		return noValue()
+	case ir.IsNever(returns):
+		return neverType()
+	}
+	return valueType(returns)
+}
 
 // literalType はリテラルの型（核の型）。
 func literalType(k ast.LiteralKind) exprType {
@@ -88,6 +102,8 @@ func exprName(e exprType) string {
 		return typeName(e.typ) + " のリテラル"
 	case etRecord:
 		return "レコードリテラル"
+	case etNever:
+		return "返らない"
 	}
 	return "不明"
 }
@@ -143,6 +159,19 @@ func (a *analyzer) lowerType(t ast.Type, sc *scope) (ir.Type, bool) {
 			return nil, false
 		}
 		return ir.Optional(elem), true // T?? → T?（docs/ir.md「正規化」）
+	case *ast.ShapeType:
+		// 形の語は型の別の書き方（docs/types.md「形の書き方」）: list<T> は T[]、nullable<T> は T?、single<T> は T。
+		elem, ok := a.lowerType(t.Elem, sc)
+		if !ok {
+			return nil, false
+		}
+		switch t.Shape {
+		case "list":
+			return ir.Array(elem), true
+		case "nullable":
+			return ir.Optional(elem), true
+		}
+		return elem, true
 	case *ast.NamedType:
 		return a.lowerNamedType(t, sc)
 	}
@@ -169,7 +198,7 @@ func (a *analyzer) isStringLike(t ir.Type) bool {
 	return ok && c.Name == ir.CoreString
 }
 
-// lowerNamedType は名前の型。`C.Case<T>` は絞り込まれた型（NS-4、TYPE-12）、ほかは ref。
+// lowerNamedType は名前の型。`C.Case<T>` は絞り込まれた型（TYPE-12）、ほかは ref。
 func (a *analyzer) lowerNamedType(t *ast.NamedType, sc *scope) (ir.Type, bool) {
 	r, ok := a.resolve(t.Name, sc, acTypePos)
 	if !ok {
@@ -186,6 +215,8 @@ func (a *analyzer) lowerNamedType(t *ast.NamedType, sc *scope) (ir.Type, bool) {
 }
 
 // lowerCaseType は C.Case<T>。型引数を付けられるのは classify のケースだけ（docs/grammar.md「型」）。
+// C は値の分類か op の分類で、どの名前空間のものでもよい（docs/resolve.md「位置ごとに受け付ける種類」の「型」）。
+// 状態の分類なら RES-4。対象の型との照合（TYPE-12）は、すべての宣言が下りてから行う（checkPendingCaseTypes）。
 func (a *analyzer) lowerCaseType(t *ast.NamedType, r resolved, sc *scope) (ir.Type, bool) {
 	if r.kind != rCase {
 		a.errorf("RES-4", t.Name.Span, "型引数を付けられるのは classify のケースだけで、%s ではない", describe(r))
@@ -195,19 +226,41 @@ func (a *analyzer) lowerCaseType(t *ast.NamedType, r resolved, sc *scope) (ir.Ty
 	if !ok {
 		return nil, false
 	}
-	a.checkNS4(r.sym, t.Name.Span, sc)
-	a.checkTYPE12(r.sym, of, t.Arg.NodeSpan())
+	a.pendingCaseTypes = append(a.pendingCaseTypes, pendingCaseType{classify: r.sym, of: of, nameSpan: t.Name.Span, argSpan: t.Arg.NodeSpan()})
 	return ir.Case(r.sym.fqn, []string{r.name}, of), true
 }
 
-// checkNS4 は NS-4（docs/check.md「名前空間」）: 型の位置の C.Case<T> の C が現在の名前空間の classify でない。
-// match の C（文法上修飾できない）にも同じ関数を使う。
-func (a *analyzer) checkNS4(classify *symbol, span source.Span, sc *scope) bool {
-	if classify.ns == sc.ns {
-		return true
+// pendingCaseType は、宣言が下りてから確かめる C.Case<T>。
+type pendingCaseType struct {
+	classify *symbol
+	of       ir.Type
+	nameSpan source.Span
+	argSpan  source.Span
+}
+
+// checkPendingCaseTypes は、型の位置の C.Case<T> を確かめる。分類の対象は op でありうる（op の分類）ので、
+// 分類と op が互いを参照していても確かめられるように、すべての宣言が下りてから行う。
+func (a *analyzer) checkPendingCaseTypes() {
+	for _, p := range a.pendingCaseTypes {
+		a.checkCaseType(p)
 	}
-	a.errorf("NS-4", span, "classify %s は宣言した名前空間 %s の中でだけ使える", classify.fqn, nsName(classify.ns))
-	return false
+	a.pendingCaseTypes = nil
+}
+
+// checkCaseType は RES-4（C が状態の分類）と TYPE-12（docs/types.md「診断」: C.Case<T> の T が C の対象の型に渡せない）。
+func (a *analyzer) checkCaseType(p pendingCaseType) {
+	c, ok := a.lower(p.classify).(*ir.Classify)
+	if !ok || c.Subject == nil {
+		return
+	}
+	subject := c.SubjectType()
+	if subject == nil {
+		a.errorf("RES-4", p.nameSpan, "classify %s は状態の分類で、ケースで絞り込んだ型は書けない（書けるのは値の分類と op の分類）", p.classify.fqn)
+		return
+	}
+	if !a.assignType(p.of, subject) {
+		a.errorf("TYPE-12", p.argSpan, "%s は classify %s の対象の型 %s に渡せない", typeName(p.of), p.classify.fqn, typeName(subject))
+	}
 }
 
 func nsName(ns *namespace) string {
@@ -215,23 +268,6 @@ func nsName(ns *namespace) string {
 		return "（グローバル）"
 	}
 	return ns.fqn
-}
-
-// checkTYPE12 は TYPE-12（docs/types.md「診断」）: C.Case<T> の T が C の subject に渡せない。
-func (a *analyzer) checkTYPE12(classify *symbol, of ir.Type, span source.Span) {
-	c, ok := a.lower(classify).(*ir.Classify)
-	if !ok || c.Subject == nil {
-		return
-	}
-	subject := c.SubjectType()
-	if subject == nil {
-		// 状態の分類は値を絞り込まない（docs/types.md「式の型」の match）。対象の型がないので、どの T も渡せない。
-		a.errorf("TYPE-12", span, "classify %s は状態の分類で、対象の型がないので、ケースで絞り込んだ型は書けない", classify.fqn)
-		return
-	}
-	if !a.assignType(of, subject) {
-		a.errorf("TYPE-12", span, "%s は classify %s の対象の型 %s に渡せない", typeName(of), classify.fqn, typeName(subject))
-	}
 }
 
 // durationOf は int64 のナノ秒を time.Duration にする（docs/ir.md「正規化」: Go の time.Duration と同じ単位）。

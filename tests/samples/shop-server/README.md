@@ -8,9 +8,9 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 ## 保留
 
-`sample.json` の `pending` が、`TestSamples` の `check` と `shared` を、このサンプルについて保留にしている（保留の仕組みは `../README.md`「保留」）。
+`sample.json` の `pending` が、`TestSamples` の `shared` を、このサンプルについて保留にしている（保留の仕組みは `../README.md`「保留」）。
 
-- `check`: 仕様と設定が、今の hozoc が読めない書き方を使う。使っている書き方と、それを決めた決定は「入力」の表。
+- `check`: 保留ではない。仕様（`.hozo`）の書き方（「入力」の表の「まだない書き方」の列。`[emit.options]` を除く）は、言語に入った（`docs/decisions.md`「P の番号との対応」）ので、今の hozoc が読む。設定（`hozo.toml`）は、まだない形のまま（まだないトランスパイラ、P16 の `[emit.options]`、P7 の型だけの名前空間 `type` の単位）なので、`check` は仕様の言語の検査だけを行う（`../README.md`「保留」）。
 - `shared`: 期待する出力のどのファイルも、今の hozoc の既定の出力（`docs/emit-go.md`）が出す形ではない。基底の `go` も、まだないトランスパイラの一つ（P9）。
 
 ## 入力
@@ -392,7 +392,7 @@ N1〜N75 のうち、解決は 11: N3（仕様の直し）、N11（直した P30
 
 #### 設定とテスト
 
-- **N51 今の hozoc は、この `hozo.toml` を読めない**。`[emit.options.go-http]` は、単位の知らないキー `options` として CFG-7 になり、その単位（`gen/server`）は読まれない。`tests/samples_test.go` は、`check` が保留のサンプルに限り、このテーブルを除いた写しから単位を読む（`../README.md`「保留」）。
+- **N51 今の hozoc は、この `hozo.toml` を読めない**。`[emit.options.go-http]` は、単位の知らないキー `options` として CFG-7 になり、その単位（`gen/server`）は読まれない。`tests/samples_test.go` は、保留のあるサンプルに限り、このテーブルを除いた写しから単位を読む（`../README.md`「保留」）。`check` は、仕様（`.hozo`）だけを写して言語の検査だけを行うので、この `hozo.toml` を読まない。
 - **N52 「共有する形」と「トランスパイラのファイル」の区別がなくなった**（P9）。`gen/` のどのファイルも、どれかのトランスパイラのもの。`sample.json` の `select`（代役の規則）は書いていない。
 - **N53（解決: P32）テストは並列にできなかった**。`store.States` がパッケージの変数だったので、サーバーを作り直すサブテストは順に走らせていた。→ P32: サーバーも `store` も、作るたびに別の値で、何も共有しない。`app/handlertest` と `app/storetest` のサブテストと、その上のテストを `t.Parallel()` にした（`app/handlertest/handlertest.go:115-124`、`app/storetest/storetest.go:60-77`）。`go test -race` で通る。
 

@@ -2,7 +2,7 @@
 # トランスパイラ go / go-b（言語は go）と ts（言語は ts）を提供する。起動しない（[check] enabled は既定の false）
 name     = "std"
 command  = ["true"]
-protocol = "0.2"
+protocol = "0.3"
 
 [[transpiler]]
 name     = "go"

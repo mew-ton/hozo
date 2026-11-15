@@ -5,9 +5,19 @@ package catalog
 import "github.com/mew-ton/hozo/runtime"
 
 // LoadFunc は op catalog.load の関数の型。
+//
+// Reads: catalog.products
 type LoadFunc func(id string) (Product, error)
 
+// ToPublicFunc は op catalog.toPublic の関数の型。
+type ToPublicFunc func(p Product) (PublicProduct, error)
+
+// ToSummaryFunc は op catalog.toSummary の関数の型。
+type ToSummaryFunc func(p Product) (Summary, error)
+
 // PublishFunc は op catalog.publish の関数の型。
+//
+// Reads: catalog.products
 type PublishFunc func(id string) (PublicProduct, error)
 
 // SummarizeFunc は op catalog.summarize の関数の型。
@@ -16,15 +26,27 @@ type SummarizeFunc func(p Product) (Summary, error)
 // Leaves は効果を持たない葉の op の実装。人か、その op の語彙を読むトランスパイラがフィールドを埋める。
 // 埋めていない op が呼ばれたら *runtime.MissingError（Kind は "leaf"）。
 type Leaves struct {
-	Load LoadFunc
+	Load      LoadFunc
+	ToPublic  ToPublicFunc
+	ToSummary ToSummaryFunc
 }
 
 // Ops は呼ぶ側が使う、この名前空間の op（葉と配線）。New が返す。
 type Ops interface {
 	// Load は op catalog.load。
+	//
+	// Reads: catalog.products
 	Load(id string) (Product, error)
 
+	// ToPublic は op catalog.toPublic。
+	ToPublic(p Product) (PublicProduct, error)
+
+	// ToSummary は op catalog.toSummary。
+	ToSummary(p Product) (Summary, error)
+
 	// Publish は op catalog.publish。
+	//
+	// Reads: catalog.products
 	Publish(id string) (PublicProduct, error)
 
 	// Summarize は op catalog.summarize。
@@ -47,4 +69,18 @@ func (o *ops) Load(id string) (Product, error) {
 		return Product{}, &runtime.MissingError{Kind: "leaf", Name: "catalog.load"}
 	}
 	return o.leaves.Load(id)
+}
+
+func (o *ops) ToPublic(p Product) (PublicProduct, error) {
+	if o.leaves.ToPublic == nil {
+		return PublicProduct{}, &runtime.MissingError{Kind: "leaf", Name: "catalog.toPublic"}
+	}
+	return o.leaves.ToPublic(p)
+}
+
+func (o *ops) ToSummary(p Product) (Summary, error) {
+	if o.leaves.ToSummary == nil {
+		return Summary{}, &runtime.MissingError{Kind: "leaf", Name: "catalog.toSummary"}
+	}
+	return o.leaves.ToSummary(p)
 }

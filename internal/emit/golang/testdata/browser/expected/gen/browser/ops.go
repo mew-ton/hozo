@@ -128,7 +128,7 @@ type ServerOps struct {
 // bind で埋まる位置（フィールドを埋める者が埋める）: in.token ← browser.token
 //
 // Throws: server.Unauthorized
-type ServerGetMeFunc func(in GetMeInInput) (server.User, error)
+type ServerGetMeFunc func(in GetMeInInput) (server.PublicUser, error)
 
 // ServerListOrdersFunc は op server.listOrders の、browser から見た関数の型。
 //

@@ -1,0 +1,14 @@
+// MATCH-6（docs/check.md「classify / match」）: op の分類での match の対象の型が、その op の returns に渡せない
+namespace a {
+  model M { id: string; }
+  model N { id: string; }
+  op find(): M?;
+  op other(): N?;
+  op g();
+  classify Found of find { Hit: find as M; default; }
+  op f(s: string) {
+    const n = other();
+    match n by Found { Hit => g(); default => none; };     // ERROR: MATCH-6
+    match s by Found { Hit => g(); default => none; };     // ERROR: MATCH-6
+  }
+}

@@ -1,9 +1,22 @@
-// TYPE-3（docs/types.md「診断」）: return の値の型が op の returns に渡せない（射影もできない）。internal/sema/testdata/rules/TYPE-3.hozo から
+// TYPE-3（docs/types.md「診断」）: return の値の型が op の returns に渡せない。model の値は、別の model の位置には渡せない
+// （フィールドが同じでも、一方がもう一方を継承していても、どちらの向きにも。docs/types.md「互換」の「渡せないもの」）
 namespace a {
   model User { id: string; hash: string; }
-  model PublicUser is User omit hash;
+  model PublicUser extends User { override hash: never; }
+  model Same { id: string; hash: string; }
   model Other { name: string; }
+  op user(): User;
+  op publicUser(): PublicUser;
   op other(): Other;
+  op projected(): PublicUser {
+    return user();                     // ERROR: TYPE-3
+  }
+  op back(): User {
+    return publicUser();               // ERROR: TYPE-3
+  }
+  op same(): Same {
+    return user();                     // ERROR: TYPE-3
+  }
   op wrong(): PublicUser {
     return other();                    // ERROR: TYPE-3
   }

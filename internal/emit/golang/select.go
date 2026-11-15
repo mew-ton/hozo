@@ -105,12 +105,14 @@ func (e *emitter) computeSelection() *selection {
 			}
 		})
 		forEachMatch(op.Body, func(m *ir.Match) {
-			switch subject := m.Subject.(type) {
-			case ir.StateSubject:
-				s.selectState(e, subject.State) // 3. 配線が match で読む状態
+			switch m.Subject.(type) {
 			case ir.ClassifyOwnedSubject:
 				s.selectState(e, m.Classify)
 			case ir.ValueSubject:
+				if state, ok := m.SubjectState(); ok && m.Builtin() {
+					s.selectState(e, state) // 3. 配線が match で読む状態（状態を名前で書いた、標準の分類での match）
+					return
+				}
 				// 4. 選ばれた配線の match が使う値の分類
 				if c, ok := own(m.Classify).(*ir.Classify); ok && c.SubjectType() != nil {
 					s.classifies[m.Classify] = true

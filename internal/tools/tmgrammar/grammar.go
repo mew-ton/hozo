@@ -89,6 +89,7 @@ type KeywordGroup struct {
 func KeywordGroups() []KeywordGroup {
 	groups := []KeywordGroup{
 		{Key: "declaration", Scope: "keyword.declaration.hozo"},
+		{Key: "modifier", Scope: "storage.modifier.hozo"},
 		{Key: "control", Scope: "keyword.control.hozo"},
 		{Key: "type", Scope: "support.type.primitive.hozo"},
 		{Key: "constant", Scope: "constant.language.hozo"},
@@ -114,14 +115,16 @@ func groupOf(k token.Kind) int {
 	switch {
 	case k >= token.Namespace && k <= token.Bind: // 宣言の頭
 		return 0
-	case k >= token.Is && k <= token.Any: // 節の頭
+	case k >= token.Export && k <= token.Override: // 修飾
 		return 1
-	case k == token.None, k == token.True, k == token.False: // true / false / none
-		return 3
-	case k >= token.Const && k <= token.Default: // 文の頭
-		return 1
-	case k >= token.StringType && k <= token.Single: // 核の型
+	case k >= token.Extends && k <= token.Any: // 節の頭
 		return 2
+	case k == token.None, k == token.True, k == token.False: // true / false / none
+		return 4
+	case k >= token.Const && k <= token.Throw: // 文の頭（none は上で拾っている）
+		return 2
+	case k >= token.StringType && k <= token.Single: // 核の型と形
+		return 3
 	}
 	panic("tmgrammar: 予約語でない Kind: " + k.String())
 }
@@ -172,16 +175,12 @@ func Build() Grammar {
 			},
 		}},
 
-		{Key: "omit", Rule: Rule{
-			Comment: "omit の並びもフィールド名の位置（docs/grammar.md「model」の ModelDecl の omit FieldName { , FieldName }）。並びの中の予約語（核の型を含む）は予約語として塗らない。is の後ろの範囲の中でだけ使う",
-			Begin:   `\b(omit)\b`,
-			End:     `(?=;)`,
-			BeginCaptures: Captures{
-				"1": {Name: "keyword.control.hozo"},
-			},
-			Patterns: []Rule{
-				{Include: "#comments"},
-				{Name: "variable.other.property.hozo", Match: `\b` + anyKeyword + `\b`},
+		{Key: "override-name", Rule: Rule{
+			Comment: "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
+			Match:   `\b(override)\s+(` + anyKeyword + `)\b`,
+			Captures: Captures{
+				"1": {Name: "storage.modifier.hozo"},
+				"2": {Name: "variable.other.property.hozo"},
 			},
 		}},
 
@@ -331,9 +330,9 @@ func Build() Grammar {
 		}},
 		{Key: "type-positions", Rule: Rule{Patterns: []Rule{
 			{
-				Comment: ": の後ろ（フィールド、引数、返り値、状態、例外の値、遷移のケース）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
+				Comment: ": の後ろ（フィールド、引数、返り値、状態、例外の値、遷移のケース、ケースの as）。値の位置の : も通るが、小文字で始まる名前は型にしない。any の種類もここに来る",
 				Begin:   `:`,
-				End:     `(?=[=;,(){}\[\]])|(?=\b(?:throws|effects|catches|prevents|keeps)\b)`,
+				End:     `(?=[=;,(){}\[\]])|(?=\b(?:throws|effects|reads|catches|prevents|keeps)\b)`,
 				Patterns: []Rule{
 					{Include: "#arrow"},
 					{Include: "#field-names"},
@@ -345,18 +344,36 @@ func Build() Grammar {
 				},
 			},
 			{
-				Comment: "is / extends / of の後ろ。is の元の model の後ろには omit の並びが続く",
-				Begin:   `\b(is|extends|of)\b`,
+				Comment: "extends / of の後ろ（元の model、scalar の元の型、分類の対象）。of の後ろの op や状態の名前は小文字で始まるので、scope が付かない",
+				Begin:   `\b(extends|of)\b`,
 				End:     `(?=[;{])`,
 				BeginCaptures: Captures{
 					"1": {Name: "keyword.control.hozo"},
 				},
-				Patterns: []Rule{{Include: "#omit"}, {Include: "#type"}},
+				Patterns: []Rule{{Include: "#type"}},
 			},
 			{
-				Comment: "throws / catches の後ろの例外の名前",
-				Begin:   `\b(throws|catches)\b`,
-				End:     `(?=[;{])|(?=\b(?:throws|catches|effects|prevents|keeps|recovers|halts|ignores)\b)`,
+				Comment: "ケースの as の後ろの型（docs/grammar.md「classify / condition」の CaseTyping）。, で次の CaseTyping が続く",
+				Begin:   `\b(as)\b`,
+				End:     `(?=[;{,])`,
+				BeginCaptures: Captures{
+					"1": {Name: "keyword.control.hozo"},
+				},
+				Patterns: []Rule{{Include: "#type"}},
+			},
+			{
+				Comment: "match の by の後ろの分類の名前（修飾できる。docs/grammar.md「配線」の Match）。標準の分類 list / nullable は形の語として塗る",
+				Begin:   `\b(by)\b`,
+				End:     `(?=[;{])`,
+				BeginCaptures: Captures{
+					"1": {Name: "keyword.control.hozo"},
+				},
+				Patterns: []Rule{{Include: "#type"}},
+			},
+			{
+				Comment: "throws / catches / throw の後ろの例外の名前",
+				Begin:   `\b(throws|catches|throw)\b`,
+				End:     `(?=[;{])|(?=\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\b)`,
 				BeginCaptures: Captures{
 					"1": {Name: "keyword.control.hozo"},
 				},
@@ -384,6 +401,7 @@ func Build() Grammar {
 		Patterns: []Rule{
 			{Include: "#comments"},
 			{Include: "#string"},
+			{Include: "#override-name"},
 			{Include: "#field-names"},
 			{Include: "#external"},
 			{Include: "#decorator"},

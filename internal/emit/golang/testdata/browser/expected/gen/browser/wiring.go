@@ -26,12 +26,12 @@ func (o *ops) OpenMe() (server.PublicUser, error) {
 	if err != nil {
 		return server.PublicUser{}, err
 	}
-	in := RenderInput{User: UserToPublicUser(me), Where: nil}
+	in := RenderInput{User: me, Where: nil}
 	in.Token = token
 	if err := o.Render(in); err != nil {
 		return server.PublicUser{}, err
 	}
-	return UserToPublicUser(me), nil
+	return me, nil
 }
 
 // ChooseLine は op browser.chooseLine。
@@ -91,9 +91,5 @@ func (o *ops) FetchMe(in server.GetMeInput) (server.PublicUser, error) {
 	if o.deps.Server.GetMe == nil {
 		return server.PublicUser{}, &runtime.MissingError{Kind: "dep", Name: "server.getMe"}
 	}
-	result, err := o.deps.Server.GetMe(GetMeInputToGetMeInInput(in))
-	if err != nil {
-		return server.PublicUser{}, err
-	}
-	return UserToPublicUser(result), nil
+	return o.deps.Server.GetMe(GetMeInputToGetMeInInput(in))
 }

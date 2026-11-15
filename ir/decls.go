@@ -8,20 +8,25 @@ import (
 // Model は model 宣言（docs/ir.md「model / scalar / union」の Model）。
 type Model struct {
 	DeclBase
-	// Fields はフィールドの列。`is X omit ...` なら展開済み。
+	// Fields はフィールドの列。継承した model なら、受け継いだ分も入れた展開済みの並び
+	// （docs/types.md「継承した model」の「フィールド」）。
 	Fields []Field `json:"fields"`
-	// DerivedFrom は `is X omit ...` の記録。
-	DerivedFrom *DerivedFrom `json:"derivedFrom,omitempty"`
+	// Extends は継承した model（`model D extends B { ... }`）の記録。
+	Extends *ModelExtends `json:"extends,omitempty"`
 	// SynthesizedFrom はその場で書いた model の出どころ（持ち主の FQN。"server.OrderPage.Ready"）。
 	SynthesizedFrom string `json:"synthesizedFrom,omitempty"`
 }
 
-// DerivedFrom は `model P is U omit a, b;` の記録（docs/ir.md「model / scalar / union」の derivedFrom）。
-type DerivedFrom struct {
-	// Base は元の model の FQN。
+// ModelExtends は `model D extends B { ... }` の記録（docs/ir.md「model / scalar / union」の extends）。
+// 足したフィールドは、Fields のうち、元の model の Fields に名前がないもの。
+type ModelExtends struct {
+	// Base は元の model の FQN（直接の元）。
 	Base string `json:"base"`
-	// Omit は除いたフィールド名。
-	Omit []string `json:"omit"`
+	// Removed は `override f: never;` でなくしたフィールドの名前（書かれた順）。
+	Removed []string `json:"removed"`
+	// Overridden は `override` で型を変えたか、デコレータを足したフィールドの名前（書かれた順）。
+	// これらのフィールドの説明は、`override` に書いたもの（なければなし）。
+	Overridden []string `json:"overridden"`
 }
 
 // Field は model のフィールド（docs/ir.md「model / scalar / union」の Field）。
@@ -33,7 +38,8 @@ type Field struct {
 	// Default は既定値。
 	Default    Literal       `json:"default,omitempty"`
 	Decorators []Application `json:"decorators"`
-	Span       Span          `json:"span"`
+	// Span は位置。受け継いだままのフィールドは元の model のフィールドの位置、`override` したフィールドは `override` の位置。
+	Span Span `json:"span"`
 }
 
 // Scalar は scalar 宣言（docs/ir.md「model / scalar / union」の Scalar）。
@@ -90,14 +96,35 @@ const (
 	StateSingle   StateShape = "single"
 )
 
-// 組み込みの分類のケース名（docs/check.md「状態の形」）。list と nullable の状態が持つ。
+// 標準の分類のケース名（docs/check.md「標準の分類」）。基底の状態の組み込みの分類は、これを状態に当てたもの。
 const (
 	CaseEmpty    = "Empty"
 	CaseHasItems = "HasItems"
 )
 
-// BuiltinCases は組み込みの分類のケース名の列（Empty、HasItems の順）。毎回新しい列を返す。
+// 標準の分類の名前（docs/check.md「標準の分類」）。Match.Classify に、FQN の代わりに置く。
+const (
+	ClassifyList     = "list"
+	ClassifyNullable = "nullable"
+)
+
+// IsStandardClassify は name が標準の分類の名前（"list" か "nullable"）か。
+func IsStandardClassify(name string) bool { return name == ClassifyList || name == ClassifyNullable }
+
+// BuiltinCases は標準の分類のケース名の列（Empty、HasItems の順）。毎回新しい列を返す。
 func BuiltinCases() []string { return []string{CaseEmpty, CaseHasItems} }
+
+// ShapeOf は状態の型から形と要素を決める（docs/check.md「状態の形」の表）: 最も外側が array なら list、
+// optional なら nullable、それ以外は single。list と nullable の要素は of、single は型そのもの。
+func ShapeOf(t Type) (StateShape, Type) {
+	switch x := t.(type) {
+	case ArrayType:
+		return StateList, x.Of
+	case OptionalType:
+		return StateNullable, x.Of
+	}
+	return StateSingle, t
+}
 
 // HasBuiltinClassify は、この形の状態が組み込みの分類 Empty / HasItems を持つか（list と nullable）。
 // single は常に一列なので持たない（docs/check.md「状態の形」）。
@@ -106,8 +133,11 @@ func (s StateShape) HasBuiltinClassify() bool { return s == StateList || s == St
 // State は state 宣言（docs/ir.md「state / exception / effect」の State）。
 type State struct {
 	DeclBase
+	// Type は状態の型。配線が名前で参照したときの値の型（docs/types.md「形の書き方」）。
+	Type Type `json:"type"`
+	// Shape は列数の範囲。Type の最も外側から決まる（[ShapeOf]）。
 	Shape StateShape `json:"shape"`
-	// Element は要素の型。optional にはならない（STATE-3）。
+	// Element は要素の型。Type から決まる（[ShapeOf]）。optional にはならない（STATE-3。当たった状態は optional を外して載せる）。
 	Element Type `json:"element"`
 }
 
@@ -246,7 +276,8 @@ func (c *CaseSet) UnmarshalJSON(data []byte) error {
 // Classify は classify 宣言（docs/ir.md「classify」）。
 type Classify struct {
 	DeclBase
-	// Subject は対象。値の分類なら型（[TypeSubject]）、状態の分類なら基底の状態（[StatesSubject]）。
+	// Subject は対象。値の分類なら型（[TypeSubject]）、op の分類なら op（[OpSubject]）、
+	// 状態の分類なら基底の状態（[StatesSubject]）。
 	Subject ClassifySubject `json:"subject"`
 	// Cases はケース。default は含まない。
 	Cases      []ClassifyCase `json:"cases"`
@@ -255,14 +286,57 @@ type Classify struct {
 	DefaultDescription *Doc `json:"defaultDescription,omitempty"`
 	// FromCondition は condition の糖衣から来たか（Cases は一つ、HasDefault は true）。
 	FromCondition bool `json:"fromCondition"`
+	// DecidedBy はケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない。
+	DecidedBy DecidedBy `json:"decidedBy"`
 }
 
+// DecidedBy は分類のケースが何で決まるか（docs/ir.md「classify」の decidedBy）。
+type DecidedBy string
+
+// ケースの判定。型で決まる分類は述語を持たない（docs/check.md「ケースの判定」）。
+const (
+	DecidedByType      DecidedBy = "type"
+	DecidedByPredicate DecidedBy = "predicate"
+)
+
+// NarrowBy は絞り込みの種類（docs/ir.md「classify」の CaseTyping の by。docs/types.md「型で決まる絞り込み」）。
+type NarrowBy string
+
+// 絞り込みの種類。presence と variant は型で決まる絞り込み、predicate は述語の要る絞り込み。
+const (
+	NarrowByPresence  NarrowBy = "presence"
+	NarrowByVariant   NarrowBy = "variant"
+	NarrowByPredicate NarrowBy = "predicate"
+)
+
+// CaseTyping はケースの `対象 as T`（docs/ir.md「classify」の CaseTyping。docs/check.md「ケースの型」）。
+type CaseTyping struct {
+	// State は状態の分類のとき、その対象の状態の FQN。値の分類と op の分類では持たない（対象は一つ）。
+	State string `json:"state,omitempty"`
+	// Type はそのケースでの対象の型。
+	Type Type `json:"type"`
+	// By は絞り込みの種類。
+	By   NarrowBy `json:"by"`
+	Span Span     `json:"span"`
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (x *CaseTyping) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
+
 // ClassifySubject は分類の対象（docs/ir.md「classify」の subject）。
-// 具体型は値型の [TypeSubject]（kind "type"）と [StatesSubject]（kind "states"）。
+// 具体型は値型の [TypeSubject]（kind "type"）、[OpSubject]（kind "op"）、[StatesSubject]（kind "states"）。
 type ClassifySubject interface {
-	// Kind は JSON の判別子（"type" か "states"）。
+	// Kind は JSON の判別子（"type"、"op"、"states"）。
 	Kind() string
 	isClassifySubject()
+}
+
+// OpSubject は op の分類の対象（docs/ir.md「classify」の subject kind "op"）。
+type OpSubject struct {
+	// Op は対象の op の FQN。
+	Op string `json:"op"`
+	// Type はその op の returns（対象の型）。
+	Type Type `json:"type"`
 }
 
 // TypeSubject は値の分類の対象の型（docs/ir.md「classify」の subject kind "type"）。
@@ -278,11 +352,26 @@ type StatesSubject struct {
 
 var (
 	_ ClassifySubject = TypeSubject{}
+	_ ClassifySubject = OpSubject{}
 	_ ClassifySubject = StatesSubject{}
 )
 
 // Kind は "type"。
 func (TypeSubject) Kind() string { return "type" }
+
+// Kind は "op"。
+func (OpSubject) Kind() string { return "op" }
+
+func (OpSubject) isClassifySubject() {}
+
+// MarshalJSON は kind を付けて書く。
+func (s OpSubject) MarshalJSON() ([]byte, error) {
+	type alias OpSubject
+	return marshalKind("op", alias(s))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *OpSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
 
 // Kind は "states"。
 func (StatesSubject) Kind() string { return "states" }
@@ -310,6 +399,7 @@ func (s *StatesSubject) UnmarshalJSON(data []byte) error { return unmarshalStruc
 
 var classifySubjectTable = map[string]func([]byte) (ClassifySubject, error){
 	"type":   asValue[ClassifySubject, TypeSubject],
+	"op":     asValue[ClassifySubject, OpSubject],
 	"states": asValue[ClassifySubject, StatesSubject],
 }
 
@@ -318,15 +408,35 @@ func UnmarshalClassifySubject(data []byte) (ClassifySubject, error) {
 	return decodeUnion("classify subject", data, classifySubjectTable)
 }
 
-// SubjectType は値の分類の対象の型。状態の分類か、対象が決まっていなければ nil。
+// SubjectType は値の分類と op の分類の対象の型（op の分類ならその op の returns）。
+// 状態の分類か、対象が決まっていなければ nil。
 func (c *Classify) SubjectType() Type {
-	if s, ok := c.Subject.(TypeSubject); ok {
+	switch s := c.Subject.(type) {
+	case TypeSubject:
+		return s.Type
+	case OpSubject:
 		return s.Type
 	}
 	return nil
 }
 
-// SubjectStates は状態の分類の対象の基底の状態の FQN。値の分類なら ok が false。
+// SubjectOp は op の分類の対象の op の FQN。op の分類でなければ ok が false。
+func (c *Classify) SubjectOp() (op string, ok bool) {
+	s, ok := c.Subject.(OpSubject)
+	return s.Op, ok
+}
+
+// Case はケースを名前で引く。なければ nil。
+func (c *Classify) Case(name string) *ClassifyCase {
+	for i := range c.Cases {
+		if c.Cases[i].Name == name {
+			return &c.Cases[i]
+		}
+	}
+	return nil
+}
+
+// SubjectStates は状態の分類の対象の基底の状態の FQN。値の分類か op の分類なら ok が false。
 func (c *Classify) SubjectStates() (states []string, ok bool) {
 	s, ok := c.Subject.(StatesSubject)
 	return s.States, ok
@@ -336,8 +446,19 @@ func (c *Classify) SubjectStates() (states []string, ok bool) {
 type ClassifyCase struct {
 	Name        string `json:"name"`
 	Description *Doc   `json:"description,omitempty"`
-	Span        Span   `json:"span"`
+	// As は `対象 as T` の並び（書かれた順）。なければ空（JSON では []）。
+	As   []CaseTyping `json:"as"`
+	Span Span         `json:"span"`
 }
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く。
+func (x ClassifyCase) MarshalJSON() ([]byte, error) {
+	type alias ClassifyCase
+	return marshalStruct(alias(x))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (x *ClassifyCase) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
 
 // DecoratorTarget はデコレータを付けられる宣言の種類（docs/ir.md「decorator」の targets）。
 type DecoratorTarget string
@@ -505,11 +626,15 @@ type CatchesClause struct {
 // Op は op 宣言（docs/ir.md「op」）。
 type Op struct {
 	DeclBase
-	Params []OpParam `json:"params"`
-	// Returns は戻り値の型。nil は void（JSON では null）。
+	// Exported は `export` が付いているか（docs/check.md「export」）。
+	Exported bool      `json:"exported"`
+	Params   []OpParam `json:"params"`
+	// Returns は戻り値の型。nil は void（JSON では null）。決して返さない op は [NeverType]。
 	Returns Type `json:"returns"`
 	// Effects は書かれた effects の FQN。配線で省略していれば空。
 	Effects []string `json:"effects"`
+	// Reads は書かれた reads（基底の状態の FQN。書かれた順、重複は最初の出現に寄せる）。書いていなければ空。
+	Reads []string `json:"reads"`
 	// Throws は書かれた throws。
 	Throws []ThrowsClause `json:"throws"`
 	// Body は配線。nil は葉（JSON では null）。
@@ -545,6 +670,10 @@ type Signature struct {
 	Relations []SignatureRelation `json:"relations"`
 	// SuccessEffects は成功のアームでの効果の状態。
 	SuccessEffects []SuccessEffect `json:"successEffects"`
+	// Reads は読む基底の状態の FQN。伝播を含む（docs/check.md「reads」の R）。見る側によらない。
+	Reads []string `json:"reads"`
+	// Pure は純粋か（docs/check.md「純粋」）。見る側によらない。
+	Pure bool `json:"pure"`
 }
 
 // SignatureRelation は例外が起きたときの効果の状態（docs/ir.md「op」の Signature の relations）。
@@ -683,13 +812,13 @@ func (d *Op) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, d) 
 // 残りの構造体の JSON（nil の列を [] にし、ユニオンのフィールドを読むため）。
 
 // MarshalJSON は docs/ir.md「JSON」の形で書く。
-func (x DerivedFrom) MarshalJSON() ([]byte, error) {
-	type alias DerivedFrom
+func (x ModelExtends) MarshalJSON() ([]byte, error) {
+	type alias ModelExtends
 	return marshalStruct(alias(x))
 }
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
-func (x *DerivedFrom) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
+func (x *ModelExtends) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
 
 // MarshalJSON は docs/ir.md「JSON」の形で書く。
 func (x Field) MarshalJSON() ([]byte, error) { type alias Field; return marshalStruct(alias(x)) }

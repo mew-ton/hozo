@@ -57,6 +57,10 @@ function walkType(t: Type): void {
       assert.ok(Array.isArray(t.cases));
       walkType(t.of);
       return;
+    case "never":
+      // never は Op.returns にだけ現れる（docs/ir.md「型」）
+      assert.deepEqual(Object.keys(t), ["kind"]);
+      return;
     default:
       unreachable(t);
   }
@@ -128,6 +132,12 @@ function walkAtom(a: Atom): void {
     case "name":
       assert.ok(a.path.length > 0);
       return;
+    case "state":
+      // 状態の参照。path は状態そのものなら []（docs/ir.md「配線」）
+      assert.equal(typeof a.state, "string");
+      assert.ok(Array.isArray(a.path));
+      seen.add(a.path.length === 0 ? "stateAtom:whole" : "stateAtom:path");
+      return;
     case "literal":
       walkLiteral(a.literal);
       return;
@@ -141,17 +151,13 @@ function walkAtom(a: Atom): void {
   }
 }
 
-// docs/ir.md「配線」の Match.subject: 値、基底の状態、分類の宣言が持つ、の三つ。
+// docs/ir.md「配線」の Match.subject: 値か、分類の宣言が持つ、の二つ。状態を名前で書いた対象は、value の atom が state。
 function walkMatchSubject(s: MatchSubject, classify: string): void {
   seen.add(`matchSubject:${s.kind}`);
   switch (s.kind) {
     case "value":
       walkAtom(s.atom);
-      return;
-    case "state":
-      assert.equal(typeof s.state, "string");
-      // 組み込みの分類なら classify は状態の形
-      assert.ok(["list", "nullable"].includes(classify), `classify of a state match: ${classify}`);
+      if (["list", "nullable"].includes(classify)) seen.add(`standardClassify:${classify}`);
       return;
     case "classify":
       assert.deepEqual(Object.keys(s), ["kind"]);
@@ -189,11 +195,15 @@ function walkEffectTarget(t: EffectTarget): void {
   }
 }
 
-// docs/ir.md「classify」の subject: 値の分類なら型、状態の分類なら基底の状態の FQN。
+// docs/ir.md「classify」の subject: 値の分類なら型、op の分類なら op とその returns、状態の分類なら基底の状態の FQN。
 function walkClassifySubject(s: ClassifySubject): void {
   seen.add(`classifySubject:${s.kind}`);
   switch (s.kind) {
     case "type":
+      walkType(s.type);
+      return;
+    case "op":
+      assert.equal(typeof s.op, "string");
       walkType(s.type);
       return;
     case "states":
@@ -215,10 +225,22 @@ function walkMatch(m: Match): void {
       case "call":
         body.call.args.forEach((x) => walkAtom(x.value));
         break;
+      case "atom":
+        walkAtom(body.atom);
+        break;
       case "none":
+        break;
+      case "throw":
+        assert.equal(typeof body.exception, "string");
         break;
       default:
         unreachable(body);
+    }
+    // アームの中で絞り込まれた型（docs/ir.md「配線」の Narrowing）。なければ []
+    assert.ok(Array.isArray(arm.narrowed));
+    for (const n of arm.narrowed) {
+      seen.add(n.state === undefined ? "narrowing:value" : "narrowing:state");
+      walkType(n.type);
     }
   }
 }
@@ -270,6 +292,12 @@ function walkDecl(d: Decl): void {
         walkType(f.type);
         if (f.default) walkLiteral(f.default);
       }
+      if (d.extends) {
+        seen.add("model:extends");
+        assert.equal(typeof d.extends.base, "string");
+        assert.ok(Array.isArray(d.extends.removed) && Array.isArray(d.extends.overridden));
+      }
+      assert.ok(!("derivedFrom" in d), "Model.derivedFrom は 0.3 でなくなった");
       return;
     case "scalar":
       walkType(d.base);
@@ -282,6 +310,9 @@ function walkDecl(d: Decl): void {
       assert.ok(["list", "nullable", "single"].includes(d.shape));
       assert.notEqual(d.element.kind, "optional", "State.element is never optional (STATE-3)");
       walkType(d.element);
+      // 形は型の最も外側から決まる（docs/check.md「状態の形」）
+      walkType(d.type);
+      assert.equal(d.shape, d.type.kind === "array" ? "list" : d.type.kind === "optional" ? "nullable" : "single");
       return;
     case "exception":
       if (d.value) walkType(d.value);
@@ -293,6 +324,14 @@ function walkDecl(d: Decl): void {
       return;
     case "classify":
       walkClassifySubject(d.subject);
+      seen.add(`decidedBy:${d.decidedBy}`);
+      for (const c of d.cases) {
+        assert.ok(Array.isArray(c.as));
+        for (const as of c.as) {
+          seen.add(`narrowBy:${as.by}`);
+          walkType(as.type);
+        }
+      }
       return;
     case "decorator":
       d.params.forEach((p) => walkParamType(p.type));
@@ -312,6 +351,10 @@ function walkDecl(d: Decl): void {
       d.params.forEach((p) => walkType(p.type));
       if (d.returns !== null) walkType(d.returns);
       if (d.body !== null) d.body.statements.forEach(walkStatement);
+      assert.equal(typeof d.exported, "boolean");
+      if (d.exported) seen.add("op:exported");
+      assert.ok(Array.isArray(d.reads) && Array.isArray(d.signature.reads));
+      assert.equal(typeof d.signature.pure, "boolean");
       return;
     default:
       unreachable(d);
@@ -319,7 +362,7 @@ function walkDecl(d: Decl): void {
 }
 
 function walkProgram(p: Program): void {
-  assert.equal(p.version, "0.2");
+  assert.equal(p.version, "0.3");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
     // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
@@ -339,7 +382,7 @@ test("program.golden.json reads as Program and round-trips", () => {
 test("view.golden.json reads as View and round-trips", () => {
   const text = golden("view.golden.json");
   const view: View = JSON.parse(text);
-  assert.equal(view.version, "0.2");
+  assert.equal(view.version, "0.3");
   assert.equal(typeof view.viewer, "string");
   // files は単位の in に合ったファイル。namespaces の値は、その名前空間を出力する単位ごとの設定（設定の順）
   assert.ok(view.files.every((f) => typeof f === "string"));
@@ -356,20 +399,27 @@ test("view.golden.json reads as View and round-trips", () => {
 
 test("goldens cover every kind of every union", () => {
   const want = [
-    ...["core", "ref", "optional", "array", "record", "case"].map((k) => `type:${k}`),
+    ...["core", "ref", "optional", "array", "record", "case", "never"].map((k) => `type:${k}`),
     ...["model", "scalar", "union", "state", "exception", "effect", "classify", "decorator", "op"].map((k) => `decl:${k}`),
     ...["string", "int", "float", "boolean", "duration"].map((k) => `literal:${k}`),
     ...["literal", "ref", "refs", "variant", "list"].map((k) => `argValue:${k}`),
     ...["type", "any"].map((k) => `paramType:${k}`),
-    ...["name", "literal", "none", "record"].map((k) => `atom:${k}`),
-    ...["call", "none"].map((k) => `armBody:${k}`),
+    ...["name", "state", "literal", "none", "record"].map((k) => `atom:${k}`),
+    ...["whole", "path"].map((k) => `stateAtom:${k}`),
+    ...["call", "atom", "none", "throw"].map((k) => `armBody:${k}`),
+    ...["value", "state"].map((k) => `narrowing:${k}`),
     ...["call", "match", "atom"].map((k) => `expr:${k}`),
     ...["const", "return", "call", "match"].map((k) => `statement:${k}`),
     ...["list", "nullable", "single"].map((k) => `stateShape:${k}`),
     ...["builtin", "transition"].map((k) => `effectTarget:${k}`),
     ...["any", "list"].map((k) => `caseSet:${k}`),
-    ...["type", "states"].map((k) => `classifySubject:${k}`),
-    ...["value", "state", "classify"].map((k) => `matchSubject:${k}`),
+    ...["type", "op", "states"].map((k) => `classifySubject:${k}`),
+    ...["type", "predicate"].map((k) => `decidedBy:${k}`),
+    ...["presence", "predicate"].map((k) => `narrowBy:${k}`),
+    ...["value", "classify"].map((k) => `matchSubject:${k}`),
+    "standardClassify:nullable",
+    "model:extends",
+    "op:exported",
   ];
   for (const k of want) assert.ok(seen.has(k), `goldens contain no ${k}`);
 });

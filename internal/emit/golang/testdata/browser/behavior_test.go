@@ -57,10 +57,10 @@ func (w *world) leaves() Leaves {
 
 func (w *world) deps() Deps {
 	return Deps{Server: ServerOps{
-		GetMe: func(in GetMeInInput) (server.User, error) {
+		GetMe: func(in GetMeInInput) (server.PublicUser, error) {
 			w.note("server.getMe")
 			w.getMeIn = in
-			return server.User{Id: "u_1", Name: "山田", Tags: []string{"a"}}, nil
+			return server.PublicUser{Id: "u_1", Name: "山田", Tags: []string{"a"}}, nil
 		},
 		ListOrders: func(query server.OrdersQuery) ([]server.OrderRow, error) {
 			w.note("server.listOrders")
@@ -109,7 +109,7 @@ func TestOpenMe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 戻り値は User → PublicUser の射影
+	// 戻り値は server.getMe の結果そのまま（model から model への射影はない）
 	if want := (server.PublicUser{Id: "u_1", Name: "山田", Tags: []string{"a"}}); !reflect.DeepEqual(me, want) {
 		t.Errorf("OpenMe = %+v, want %+v", me, want)
 	}

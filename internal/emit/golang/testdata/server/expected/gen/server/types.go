@@ -37,21 +37,12 @@ type User struct {
 }
 
 // PublicUser は公開する利用者の情報。
-// server.User から email, token, alts, attrs, joined を除いたもの（is ... omit）。
+// server.User を継承。
 type PublicUser struct {
 	Id UserId `json:"id"`
 	// 表示名
 	Name string   `json:"name"`
 	Tags []string `json:"tags"`
-}
-
-// UserToPublicUser は server.User を server.PublicUser に射影する（docs/types.md「射影」）。
-func UserToPublicUser(v User) PublicUser {
-	return PublicUser{
-		Id:   v.Id,
-		Name: v.Name,
-		Tags: v.Tags,
-	}
 }
 
 // LoginInput は server.LoginInput の model。

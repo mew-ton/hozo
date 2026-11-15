@@ -24,6 +24,10 @@ func checkThrows1(c *computer, o *ir.Op, info *bodyInfo) {
 	var rel []related
 	for _, x := range missing {
 		for _, src := range info.sources[x] {
+			if src.ref.throw != "" {
+				rel = append(rel, related{span: src.ref.call.Span, msg: sprintf("出どころ: アームの throw（%s）", x)})
+				continue
+			}
 			rel = append(rel, related{span: src.ref.call.Span, msg: sprintf("出どころ: %s の呼び出し（%s）", src.ref.call.Op, x)})
 		}
 	}

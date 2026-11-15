@@ -1,0 +1,30 @@
+// READS-2（docs/check.md「reads」）: 名前で書いた状態、match の対象、match by C の対象の状態、bind で埋まる位置の状態も、
+// その配線が読む状態に入る。別の名前空間の op が読む状態も伝わる
+namespace a {
+  scalar Token extends string;
+  state token: nullable<Token>;
+  state rows: list<string>;
+  bind token to a.*;
+  classify Phase of rows { Idle; Busy; }
+  op take(t: Token?): string;
+  op g();
+  op byName(): Token? reads rows {             // ERROR: READS-2
+    return token;
+  }
+  op bySubject() reads token {                 // ERROR: READS-2
+    match rows by list { Empty => g(); HasItems => none; };
+  }
+  op byClassify() reads token {                // ERROR: READS-2
+    match by Phase { Idle => g(); Busy => none; };
+  }
+  op byBind(): string reads rows {             // ERROR: READS-2
+    return take();
+  }
+  op across(): string[] reads rows {           // ERROR: READS-2
+    return b.all();
+  }
+}
+namespace b {
+  state items: list<string>;
+  export op all(): string[] reads items;
+}

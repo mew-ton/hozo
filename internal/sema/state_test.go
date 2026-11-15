@@ -106,17 +106,36 @@ func TestStateShapes(t *testing.T) {
 	jsonEq(t, "nullable の要素は中身の型", p.Lookup("shop.token").(*ir.State).Element, ir.Ref("shop.Token"))
 }
 
-// TestStateElementOptional は STATE-3 のときの IR: element は optional にならず、形は書かれたまま。
+// TestStateElementOptional は STATE-3 のときの IR: 当たるのは list の状態だけで、list<T> として載る
+// （element は optional にならない）。single<T?> と nullable<T?> は nullable<T> と同じ型なので当たらない。
 func TestStateElementOptional(t *testing.T) {
 	res := runAnnotated(t, project{"a.hozo": `
 namespace a {
-  state token: single<string?>;        // ERROR: STATE-3
+  state tokens: list<string?>;         // ERROR: STATE-3
+  state marks: string?[];              // ERROR: STATE-3
+  state token: single<string?>;
+  state other: nullable<string?>;
+  state rows: list<string>?;
 }`}, false)
-	st := res.Program.Lookup("a.token").(*ir.State)
-	if st.Shape != ir.StateSingle {
-		t.Errorf("shape = %s", st.Shape)
+	for _, name := range []string{"a.tokens", "a.marks"} {
+		st := res.Program.Lookup(name).(*ir.State)
+		if st.Shape != ir.StateList {
+			t.Errorf("%s: shape = %s", name, st.Shape)
+		}
+		jsonEq(t, name+" の type", st.Type, ir.Array(ir.String()))
+		jsonEq(t, name+" の element", st.Element, ir.String())
 	}
-	jsonEq(t, "element", st.Element, ir.String())
+	for _, name := range []string{"a.token", "a.other"} {
+		st := res.Program.Lookup(name).(*ir.State)
+		if st.Shape != ir.StateNullable {
+			t.Errorf("%s: shape = %s", name, st.Shape)
+		}
+		jsonEq(t, name+" の type", st.Type, ir.Optional(ir.String()))
+		jsonEq(t, name+" の element", st.Element, ir.String())
+	}
+	// 形を決めるのは最も外側だけ: T[]? は nullable（要素は T[]）
+	rows := res.Program.Lookup("a.rows").(*ir.State)
+	jsonEq(t, "rows", []any{rows.Shape, rows.Element}, []any{ir.StateNullable, ir.Array(ir.String())})
 }
 
 // TestClassifySubject は docs/ir.md「classify」の subject: 型一つなら type、状態なら states（書かれた順）。
@@ -250,13 +269,17 @@ namespace a {
 	jsonEq(t, "badCase の writes", bad.Writes, []string{"a.items"})
 }
 
-// TestMatchSubjects は docs/ir.md「配線」の Match.subject の三つの形と、Match.classify（組み込みの分類なら状態の形）。
+// TestMatchSubjects は docs/ir.md「配線」の Match.subject の形と、Match.classify（標準の分類なら "list" か "nullable"）。
+// 状態を名前で書いた対象は、value の atom が state。
 func TestMatchSubjects(t *testing.T) {
 	p := analyzeState(t)
 	stmts := p.Lookup("shop.view").(*ir.Op).Body.Statements
 
 	byList := stmts[0].(ir.MatchStmt).Match
-	jsonEq(t, "by list の subject", byList.Subject, ir.StateSubject{State: "shop.carts"})
+	jsonEq(t, "by list の subject", byList.Subject, ir.ValueSubject{Atom: ir.StateAtom{State: "shop.carts", Span: byList.Subject.(ir.ValueSubject).Atom.(ir.StateAtom).Span}})
+	if state, ok := byList.SubjectState(); !ok || state != "shop.carts" {
+		t.Errorf("by list の SubjectState = %q, %v", state, ok)
+	}
 	if byList.Classify != "list" {
 		t.Errorf("by list の classify = %q", byList.Classify)
 	}
@@ -264,7 +287,7 @@ func TestMatchSubjects(t *testing.T) {
 		[]ir.ArmCases{{Cases: []string{"Empty"}}, {Cases: []string{"HasItems"}}})
 
 	byNullable := stmts[1].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
-	jsonEq(t, "by nullable の subject", byNullable.Subject, ir.StateSubject{State: "shop.token"})
+	jsonEq(t, "by nullable の subject", byNullable.Subject, ir.ValueSubject{Atom: ir.StateAtom{State: "shop.token", Span: byNullable.Subject.(ir.ValueSubject).Atom.(ir.StateAtom).Span}})
 	if byNullable.Classify != "nullable" {
 		t.Errorf("by nullable の classify = %q", byNullable.Classify)
 	}
@@ -332,8 +355,8 @@ namespace a {
 	hasRef(t, res, fs, "a.hozo:8:35 case a.Phase.Busy")
 }
 
-// TestMatchStateTyping は docs/types.md「式の型」の match: 状態の match の型は値の match と同じ決め方で、
-// アームでの絞り込みはない（引数は TYPE-4 で照合し、MATCH-4 / MATCH-6 は出ない）。
+// TestMatchStateTyping は docs/types.md「match の型」: 状態を対象にした match の型は、値の match と同じ決め方。
+// 対象と関係のない引数は、そのままの型で照合する（TYPE-4）。
 func TestMatchStateTyping(t *testing.T) {
 	runAnnotated(t, project{"a.hozo": `
 namespace a {
@@ -372,7 +395,7 @@ namespace a {
     const b = match by Stock { None => m(); Some => nothing(); };              // ERROR: TYPE-8 // WARN: WIRE-8
     const c = match token by nullable { Empty => m(); HasItems => m(); };      // WARN: WIRE-8
   }
-  // 絞り込みがない: アームの中の引数はそのままの型で照合する
+  // 対象でない引数は、アームの中でもそのままの型で照合する
   op args(v: M): void {
     match items by list { Empty => takeM(v); HasItems => takeN(v); };  // ERROR: TYPE-4
     match by Stock { None => takeM(v); Some => takeN(v); };            // ERROR: TYPE-4
