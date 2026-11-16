@@ -190,6 +190,8 @@ func init() {
 		reflect.TypeOf((*Decl)(nil)).Elem():      lift(UnmarshalDecl),
 
 		reflect.TypeOf((*EffectTarget)(nil)).Elem():    lift(UnmarshalEffectTarget),
+		reflect.TypeOf((*ReadRef)(nil)).Elem():         lift(UnmarshalReadRef),
+		reflect.TypeOf((*EffectRef)(nil)).Elem():       lift(UnmarshalEffectRef),
 		reflect.TypeOf((*ClassifySubject)(nil)).Elem(): lift(UnmarshalClassifySubject),
 		reflect.TypeOf((*MatchSubject)(nil)).Elem():    lift(UnmarshalMatchSubject),
 	}

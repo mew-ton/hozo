@@ -415,6 +415,20 @@ type EffectDecl struct {
 func (n *EffectDecl) NodeSpan() source.Span { return n.Span }
 func (n *EffectDecl) declNode()             {}
 
+// ReadDecl は read（docs/grammar.md「read」）: "read 名前 on 状態"。状態を読むことに名前を付ける。
+type ReadDecl struct {
+	Span       source.Span
+	Doc        *DocComment
+	Decorators []*Decorator
+	Name       Ident
+	// On は読む基底の状態の名前。
+	On QualifiedName
+}
+
+// NodeSpan は Node の実装。
+func (n *ReadDecl) NodeSpan() source.Span { return n.Span }
+func (n *ReadDecl) declNode()             {}
+
 // Transition は分類の遷移 "QualifiedName : CaseSet -> CaseSet"（docs/grammar.md「exception / effect」）。
 // Of は状態を対象にした classify か、組み込みの分類を持つ基底の状態。
 type Transition struct {
@@ -561,6 +575,8 @@ const (
 	AnyException AnyKind = iota
 	// AnyEffect は any effect。
 	AnyEffect
+	// AnyRead は any read。
+	AnyRead
 	// AnyState は any state。
 	AnyState
 	// AnyOp は any op。
@@ -578,6 +594,8 @@ func (k AnyKind) String() string {
 		return "exception"
 	case AnyEffect:
 		return "effect"
+	case AnyRead:
+		return "read"
 	case AnyState:
 		return "state"
 	case AnyOp:
@@ -619,6 +637,8 @@ const (
 	TargetModel
 	// TargetEffect は effect。
 	TargetEffect
+	// TargetRead は read。
+	TargetRead
 )
 
 // String は対象の語。
@@ -638,6 +658,8 @@ func (k TargetKind) String() string {
 		return "model"
 	case TargetEffect:
 		return "effect"
+	case TargetRead:
+		return "read"
 	}
 	return "?"
 }
@@ -658,7 +680,7 @@ type Clause interface {
 	clauseNode()
 }
 
-// ThrowsClause は "throws X | Y { Relation }"。
+// ThrowsClause は "throws X, Y { Relation }"。
 type ThrowsClause struct {
 	Span       source.Span
 	Exceptions []QualifiedName
@@ -722,7 +744,7 @@ func (o CatchOutcome) String() string {
 	return "?"
 }
 
-// CatchesClause は "catches X | Y (recovers | halts E | ignores)"。
+// CatchesClause は "catches X, Y (recovers | halts E | ignores)"。
 type CatchesClause struct {
 	Span       source.Span
 	Exceptions []QualifiedName
@@ -735,9 +757,10 @@ type CatchesClause struct {
 func (n *CatchesClause) NodeSpan() source.Span { return n.Span }
 func (n *CatchesClause) clauseNode()           {}
 
-// EffectsClause は "effects X | Y"。op の節と、デコレータの宣言の節（DecoEffectsClause）。
+// EffectsClause は "effects a, s.post"（docs/grammar.md「op」）。op の節と、デコレータの宣言の節（DecoEffectsClause）。
 type EffectsClause struct {
-	Span    source.Span
+	Span source.Span
+	// Effects は要素（EffectElem）: 効果の名前か、直に書いた「状態.操作」。どちらかは名前の解決が決める。
 	Effects []QualifiedName
 }
 
@@ -747,8 +770,9 @@ func (n *EffectsClause) clauseNode()           {}
 
 // ReadsClause は "reads a, b"（docs/grammar.md「op」）。op の節と、デコレータの宣言の節（DecoReadsClause）。
 type ReadsClause struct {
-	Span   source.Span
-	States []QualifiedName
+	Span source.Span
+	// Reads は要素（ReadElem）: read の名前か、直に書いた状態の名前。どちらかは名前の解決が決める。
+	Reads []QualifiedName
 }
 
 // NodeSpan は Node の実装。

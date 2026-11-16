@@ -1,7 +1,7 @@
 // サンプル shop-server の仕様（README.md）。DB の状態を持つ名前空間 store。
 // 状態を名前で読めるのはこの名前空間の中だけなので、ほかの名前空間は、ここの op を通して読み書きする。八つの op はどれも export（P33）: 七つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
 // 表は、状態に付けた @db.table(<要素の model>) が言う（docs/plugin-go-sqlite.md「表」）。
-// op の中身は、db の語彙のデコレータが言う（docs/plugin-go-sqlite.md「op の中身」）: 読む op は @db.find / @db.list で表と列を、書く op は @db.effects で効果を並べ、効果は @db.insert / @db.delete で表への操作を言う。op は reads も effects も書かない（デコレータが運ぶ）。
+// op の中身は、db の語彙のデコレータが言う（docs/plugin-go-sqlite.md「op の中身」）。読む側も書く側も二段: 名前を付けた read は @db.find / @db.list で、効果は @db.insert / @db.delete で、表に何をするかを言い、op は、行う read を @db.reads で、効果を @db.effects で並べる。op は reads も effects も書かない（デコレータが運ぶ）。
 // 単位 gen/store では go-sqlite がその通りに出し、単位 gen/storemem では人が書く。
 
 /** 保存。DB の状態の持ち主 */
@@ -18,22 +18,40 @@ namespace store {
   @db.table(type.Notification)
   state notifications: list<type.Notification>;
 
-  // ---- 読む（効果を持たない op） ----
+  // ---- 読む: read は、表から何を引くかを言う ----
+
+  /** email が同じユーザー */
+  @db.find(users, "email")
+  read userByEmail on users;
+
+  /** 識別子が同じユーザー */
+  @db.find(users, "id")
+  read userById on users;
+
+  /** トークンが同じセッション */
+  @db.find(sessions, "token")
+  read sessionByToken on sessions;
+
+  /** そのユーザーの注文 */
+  @db.list(orders, "userId")
+  read ordersOfUser on orders;
+
+  // ---- 読む: op は、行う read を名指しする。op の引数を read が受け取り、read が引いたものを op が返す ----
 
   /** email からユーザーを引く */
-  @db.find(users, "email")
+  @db.reads(userByEmail)
   export op findUser(email: type.Email): type.User?;
 
   /** 識別子からユーザーを引く */
-  @db.find(users, "id")
+  @db.reads(userById)
   export op findUserById(id: type.UserId): type.User?;
 
   /** トークンからセッションを引く */
-  @db.find(sessions, "token")
+  @db.reads(sessionByToken)
   export op findSession(token: type.Token): type.Session?;
 
   /** ユーザーの注文を、足した順に返す */
-  @db.list(orders, "userId")
+  @db.reads(ordersOfUser)
   export op listOrders(userId: type.UserId): type.Order[];
 
   // ---- 読んだ結果の分類 ----

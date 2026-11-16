@@ -1,7 +1,7 @@
 package ir
 
 // Version は IR の構造の版（docs/ir.md「Program」の version）。構造が変わったら上げる。
-const Version = "0.5"
+const Version = "0.6"
 
 // Program は IR 全体（docs/ir.md「Program」）。
 //
@@ -132,7 +132,7 @@ func (d Doc) MarshalJSON() ([]byte, error) {
 func (d *Doc) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, d) }
 
 // Decl は宣言（docs/ir.md「Program」の Decl）。
-// 具体型は *Model、*Scalar、*Union、*State、*Exception、*Effect、*Classify、*Decorator、*Op。
+// 具体型は *Model、*Scalar、*Union、*State、*Exception、*Effect、*Read、*Classify、*Decorator、*Op。
 // JSON では kind で分ける。
 type Decl interface {
 	// Kind は JSON の判別子（"model"、"scalar"、…）。
@@ -166,6 +166,7 @@ var declTable = map[string]func([]byte) (Decl, error){
 	"state":     asPointer[Decl, State],
 	"exception": asPointer[Decl, Exception],
 	"effect":    asPointer[Decl, Effect],
+	"read":      asPointer[Decl, Read],
 	"classify":  asPointer[Decl, Classify],
 	"decorator": asPointer[Decl, Decorator],
 	"op":        asPointer[Decl, Op],

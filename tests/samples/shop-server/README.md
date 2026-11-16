@@ -2,7 +2,7 @@
 
 小さな店のサーバー（ログイン、自分の情報、注文）を、サンプルを書きながら決めたこと（`docs/decisions.md`「サンプルを書きながら決めたこと（P の番号との対応）」の P1〜P39）を**当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書を変える決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
+P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書を変える決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124〜131 と S25: 節の区切りは `,` 一つ、`read` に名前を付ける、`db` の語彙の読む側は、`read` のデコレータと op の `@db.reads` の二段）も、このサンプルと設計文書を先に書いた。こちらは、実装がまだない**（同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
 
 **生成するコードの規則の持ち主は、トランスパイラごとの設計文書**（「各トランスパイラの規則」）。この文書が持つのは、ファイルの出どころ、この仕様に固有の事実、サンプルの中のプラグイン `go-ratelimit` の規則、書いて分かったこと。期待する出力（`gen/`）は、設計文書の形のとおりに書いてある（文書と違うところは、残していない）。
 
@@ -24,9 +24,25 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | `go-http`: フィールドごと・経路ごとのコードは、型に依らず、同じ補助の呼び出し。項目がないときの扱いは、デコレータが足す引数（`httpRequired`、`httpDefault(1)`）で決まる。成功の応答は、実行時に、返す値で決める | `gen/server/http.go` | `docs/plugin-go-http.md`「出力」「入力の読み方」「補助」 |
 | 版 0.5 | `plugins/go-ratelimit/hozo-plugin.toml` の `protocol` は `"0.5"`。hozoc と、リポジトリのプラグインのマニフェストと、一緒に上げた | `docs/ir.md`「版」 |
 
-**今は、この表のどれにも実装がある**（hozoc の版は 0.5。R3 を済みとするのは、全体を確かめてから。`docs/requirements.md`「作り直しの段階」）。`TestSamples` のサブテストは、最後の形で書いてあり、足りないものがあれば、名指しして飛ばす（`../README.md`「飛ばす条件」「移行の間」）。今は、`check`、`files`、`go`（このモジュールの `go vet` と `go test`）と、六つの `transpilers/*` が、飛ばしも、代役もなく、すべて通る。`sample.json` に、保留を書くところはない。
+**この表のどれにも、実装がある**（版 0.5 の hozoc。`docs/requirements.md`「作り直しの段階」の R3）。`TestSamples` のサブテストは、最後の形で書いてあり、足りないものがあれば、名指しして飛ばす（`../README.md`「飛ばす条件」「移行の間」）。R4 の書き方を入れる前のこのサンプルでは、`check`、`files`、`go`（このモジュールの `go vet` と `go test`）と、六つの `transpilers/*` が、飛ばしも、代役もなく、すべて通っていた。今の状態は、この節の「R4 で、まだないもの」。`sample.json` に、保留を書くところはない。
 
-`gen/type`、`gen/rate` と、`gen/server` の基底と `go-valid` と `go-ratelimit` のファイル（`http.go` のほかのすべて）は、今の hozoc でも確かめてある: 仕様の写しを、今の hozoc が読める書き方に直して（`store.hozo` は、同じ op を、`reads` と `effects` を op に書く形で。`placeOrder` の効果は一つだけ。しまい方のデコレータを外し、`@db.table(…)` を `@db` に、`@http.bodyObj` を `@http.body` に）`hozoc emit` を掛けると、それらのファイルは、`placeOrder` の `Effects:` のコメント（効果が一つになる）のほかは、期待する出力とバイト単位で同じ。`gen/server/http.go`、`gen/store` と `gen/storemem` の `SharedState`、デコレータで決まる `db.go` は、文書のとおりに手で書いた。**この確かめは、決定 114〜122 を入れる前のもの。** その後、`gen/server/inner/types.go` と `gen/server/types.go` から、`NewGetOrdersInput`（既定値を入れる関数）を、手で外した。外した後の二つのファイルは、道具では確かめていない（「分かったこと」N110）。
+この段落の確かめは、R3 を書いたときのもの。`gen/type`、`gen/rate` と、`gen/server` の基底と `go-valid` と `go-ratelimit` のファイル（`http.go` のほかのすべて）は、そのときの hozoc でも確かめてある: 仕様の写しを、今の hozoc が読める書き方に直して（`store.hozo` は、同じ op を、`reads` と `effects` を op に書く形で。`placeOrder` の効果は一つだけ。しまい方のデコレータを外し、`@db.table(…)` を `@db` に、`@http.bodyObj` を `@http.body` に）`hozoc emit` を掛けると、それらのファイルは、`placeOrder` の `Effects:` のコメント（効果が一つになる）のほかは、期待する出力とバイト単位で同じ。`gen/server/http.go`、`gen/store` と `gen/storemem` の `SharedState`、デコレータで決まる `db.go` は、文書のとおりに手で書いた。**この確かめは、決定 114〜122 を入れる前のもの。** その後、`gen/server/inner/types.go` と `gen/server/types.go` から、`NewGetOrdersInput`（既定値を入れる関数）を、手で外した。外した後の二つのファイルは、道具では確かめていない（「分かったこと」N110）。
+
+### R4 で、まだないもの
+
+`docs/requirements.md`「作り直しの段階」の R4（`docs/decisions.md`「決めたこと」124〜131）も、実装より先に、このサンプルに入れた。**次の表のものは、実装がまだない。**
+
+| ないもの | このサンプルで使っているところ | 文書 |
+|---|---|---|
+| 言語: `throws` / `catches` / `effects` / `reads` の節の区切りの `,` | `server.hozo:162` の `throws type.Unauthorized, type.NotificationFailed`（この仕様で、節に二つ以上を並べているのは、ここだけ） | `docs/grammar.md`「op」「decorator の宣言」 |
+| 言語: `read` の宣言、デコレータの対象 `read`、引数の種類 `any read` | `store.hozo:23-37` の四つの `read` と、`store.hozo:41-55` の四つの `@db.reads(<read>)` | `docs/grammar.md`「read」、`docs/check.md`「読むことの宛先」 |
+| 語彙 `db` の、`read` に付ける `find` / `list` と、op に付ける `reads` | 同じ | `docs/vocab.md`「`db` の読み書きのデコレータ」 |
+| `go-sqlite`: `@db.find` / `@db.list` を `read` の宣言から、`@db.reads` を op から読む | `gen/store/db.go` の、四つの読む op のコメント（`:69`、`:75`、`:111`、`:152`）。本体は、変わらない | `docs/plugin-go-sqlite.md`「op の中身」「メソッドの形とコメント」 |
+| 文書の版（`docs/ir.md`「版」） | `plugins/go-ratelimit/hozo-plugin.toml` の `protocol` は、上げていない（「分かったこと」N94 と同じ理由で、実装と一緒に上げる） | `docs/ir.md`「版」 |
+
+- その間に `TestSamples` のどのサブテストが通らないかの持ち主は、`../README.md`「移行の間」。
+- **保留: op の側の書き方。** op が、行う `read` と効果を名指しする書き方（`store.hozo:41-55` の `@db.reads(<read>)` と、`store.hozo:101-115` の `@db.effects(<効果>, …)`）は、見直しの途中: op の中身の全体を `db` のプラグインが出す、ということを、op のデコレータとして書くかどうかが、まだ決まっていない（前後に処理を足すデコレータと違い、中身そのものを置き換えるので、二つ重ねられない）。決まるまで、この仕様の op の側と、それに当たる期待する出力（`gen/store/db.go` の、op のメソッドのコメントの `（@db.reads）` / `（@db.effects）`）は、決定 128 の形のまま置いてある。`read` の宣言と、その `@db.find` / `@db.list`（`store.hozo:23-37`）、節の区切りの `,` は、この見直しに依らない。
+- **期待する出力のうち、R4 で変えたのは、`gen/store/db.go` の四つのコメントの行だけ**（「分かったこと」N114）。`files` と `go`（このモジュールの `go vet` と `go test`）は、hozoc を使わないので、今も通る。
 
 ## 入力
 
@@ -35,7 +51,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | ファイル | 名前空間 | 中身 |
 |---|---|---|
 | `type.hozo` | `type` | 共有の型（P6）: scalar、model、例外。`model PublicUser extends User { override hash: never; }`（P24〜P26）。表の model（`User`、`Session`、`Order`、`Notification`）のフィールドは、しまい方のデコレータ（`@db.text`、`@db.time`、`@db.json`）を一つずつ持つ |
-| `store.hozo` | `store` | DB の状態四つ（P5。どれも `@db.table(type.<Model>)`）、それを読む op と書く op（八つとも `export`）、読んだ結果の分類（`classify C of <op>`、`Case: <op> as T;`）。読み書きは `db` の語彙のデコレータで言う: 読む op に `@db.find` / `@db.list`、効果に `@db.insert` / `@db.delete`、書く op に `@db.effects`。op は `reads` も `effects` も書かない |
+| `store.hozo` | `store` | DB の状態四つ（P5。どれも `@db.table(type.<Model>)`）、それを読む op と書く op（八つとも `export`）、読んだ結果の分類（`classify C of <op>`、`Case: <op> as T;`）。読み書きは `db` の語彙のデコレータで、二段で言う: 名前を付けた四つの `read` に `@db.find` / `@db.list`、五つの効果に `@db.insert` / `@db.delete`、読む op に `@db.reads`、書く op に `@db.effects`。op は `reads` も `effects` も書かない |
 | `server.hozo` | `server` | HTTP の入口（`export` を付けた六つ）と、業務の流れ（配線）。人が書く op は八つ。入力の model のフィールドは、要求のどこから読むかを `@http.header("Authorization")` / `@http.query` / `@http.body` / `@http.bodyObj` で、項目がないときの扱いを `@http.required`（`lines`）/ `@http.default(1)`（`page`）で言う。`login` に `@rate.limited`（継ぎ目。P38）。トークンのない要求を断る分類 `Credential` |
 | `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。`@smtp.sendMail` を付けた op `send`（`export`） |
 | `smtp.hozo` | `smtp` | メールを SMTP で送る仕組みの語彙。デコレータ `sendMail`。読むトランスパイラがないので、印（何も出ない。P37） |
@@ -73,18 +89,18 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 ### 下書きから変えたこと
 
-仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の十七。9〜11 は、`docs/decisions.md`「決めたこと」91〜102 を、12〜15 は、同 103〜113 を、16 と 17 は、同 114〜122 を当てはめたもの。
+仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の十九。9〜11 は、`docs/decisions.md`「決めたこと」91〜102 を、12〜15 は、同 103〜113 を、16 と 17 は、同 114〜122 を、18 と 19 は、同 124〜131 を当てはめたもの。
 
 1. **継承**（P24〜P27）: `model PublicUser is User omit hash;` を `model PublicUser extends User { override hash: never; }` にした（`type.hozo:42-44`）。`type.User` を `type.PublicUser` に写す葉の op `toPublicUser` を `server` に足し（`server.hozo:74`）、下書きが `User` をそのまま渡していた二か所で呼ぶ（`server.hozo:62`、`:126`）。
 2. **外部の入出力**（P30）: `server` の葉 `deliver` をやめ、名前空間 `mailer` の `op send` にし、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`smtp.hozo:7`、`mailer.hozo:6-9`、`server.hozo:168`）。外部の入出力をする op は、その仕組みの語彙のデコレータを持つ形に書くのが望ましい（外部のサービスなら、そのサービスの語彙。規則ではなく書き方の指針で、検査はしない）。デコレータを持つ op は純粋でない。
-3. **`store.addUser` と効果 `createUser` を足した**（`store.hozo:62-63`、`:84-85`）。下書きにない変更。ユーザーを足す op がなければ、起動のときとテストが、保存先を直に書き換えるしかない（v1 の「分かったこと」26）。
+3. **`store.addUser` と効果 `createUser` を足した**（`store.hozo:80-81`、`:102-103`）。下書きにない変更。ユーザーを足す op がなければ、起動のときとテストが、保存先を直に書き換えるしかない（v1 の「分かったこと」26）。
 4. **`getMe` の `Found` のアームは、呼び出しをそのまま書いた**（`server.hozo:126` の `Found => toPublicUser(user);`）。写した値を先に束縛する形にはできない: `user` が `type.User` になるのはアームの中だけ。
 5. **セッションの期限を確かめる**: 下書きは `expiresAt` を書くだけで、誰も読まなかった（期限の切れたトークンで入れた。「分かったこと」N3）。人が書く葉の op `requireFresh` を `server` に足し（`server.hozo:106-107`）、`LoggedIn` のアームを `LoggedIn => requireFresh(session);` にした（`server.hozo:100`。今は配線 `sessionOf` の中。下の 11）。期限が過ぎていれば `type.Unauthorized`。下書きのアームは値のアーム（P14 の `LoggedIn => session;`）だったので、この仕様に値のアームはなくなった。
 6. 説明のコメントを足した。
 7. **`export`**（P33）: 外に呼び手のいる op に `export` を付けた（上の「`export` を付けた op」）。下書きには、op を内部にする書き方がなかった。
 8. **継ぎ目**（P36〜P38）: `login` に `@rate.limited` を付けた（`server.hozo:44`）。語彙 `rate` と、その継ぎ目を宣言するトランスパイラは、サンプルの中のプラグイン `go-ratelimit` が提供する（下の「サンプルの中のプラグイン」）。`login` の `throws` には `rate.LimitExceeded` を書いていない: デコレータの `throws` が足す例外は、op が書かなくても `Signature.exceptions` に入る（`docs/check.md`「計算」の手順 i）。`login` を呼ぶ仕様の名前空間があれば、そこは書くことになる（THROWS-1）。
 9. **読み書きを、`db` の語彙のデコレータで言う**（決定 92〜95）: `store` の読む op の `reads <状態>` を `@db.find(<状態>, "<列>")` / `@db.list(<状態>, "<列>")` に、書く op の `effects <効果>` を `@db.effects(<効果>)` に置き換え、五つの効果に `@db.insert(<状態>)` / `@db.delete(<状態>, "<列>")` を付けた（`store.hozo`）。op は `reads` も `effects` も書かない（デコレータが運ぶ）。引数と列を、型が合うかどうかで結ぶ規則（N39）は、なくなった: 列は、仕様が名指しする。
-10. **二つの効果を、一つのトランザクションで**（決定 94）: `store.placeOrder(order, notification)` を足した（`@db.effects(createOrder, notifyUser)`。`store.hozo:96-97`）。`server.placeOrder` は、注文と通知の文面を作ってから、`store.placeOrder` で二つを一緒に記録し、その後で `mailer.send` で配送する（`server.hozo:166-168`）。前は、`store.addOrder`、`mailer.send`、`store.addNotification` を順に呼んでいて、配送に失敗すると、注文だけが残り、通知の記録は残らなかった。今は、配送に失敗しても、注文と通知の記録の両方が残る（HTTP の応答は、前と同じ 500）。**なくした op**: `store.addOrder`、`store.addNotification`（呼ぶ者が、仕様にも、人が書くコードにも、いなくなった。テストは、注文と通知を `placeOrder` で足す。`export` を付けるのは外に呼ぶ者がいる op だけ、という上の「`export` を付けた op」の決まりのとおり）と、`server.notify`（中身が `mailer.send` の呼び出し一つになった）。効果 `createOrder` と `notifyUser` は残る。
+10. **二つの効果を、一つのトランザクションで**（決定 94）: `store.placeOrder(order, notification)` を足した（`@db.effects(createOrder, notifyUser)`。`store.hozo:114-115`）。`server.placeOrder` は、注文と通知の文面を作ってから、`store.placeOrder` で二つを一緒に記録し、その後で `mailer.send` で配送する（`server.hozo:166-168`）。前は、`store.addOrder`、`mailer.send`、`store.addNotification` を順に呼んでいて、配送に失敗すると、注文だけが残り、通知の記録は残らなかった。今は、配送に失敗しても、注文と通知の記録の両方が残る（HTTP の応答は、前と同じ 500）。**なくした op**: `store.addOrder`、`store.addNotification`（呼ぶ者が、仕様にも、人が書くコードにも、いなくなった。テストは、注文と通知を `placeOrder` で足す。`export` を付けるのは外に呼ぶ者がいる op だけ、という上の「`export` を付けた op」の決まりのとおり）と、`server.notify`（中身が `mailer.send` の呼び出し一つになった）。効果 `createOrder` と `notifyUser` は残る。
 11. **トークンのない要求は、`server` が断る**（決定 96）: `store.findSession` の引数を `type.Token?` から `type.Token` にした（列 `token` の型と等しい。列より広い引数は GOSQL-9）。「トークンがなければ、問い合わせずに『ない』」は、`go-sqlite` の規則ではなくなったので、仕様に書く: `server` に、値の分類 `classify Credential of type.Token? { Presented: type.Token? as type.Token; default; }` を足し（型で決まる分類。`server.hozo:79-82`）、配線 `authenticate(token: type.Token?)` は `match token by Credential` で分け、`Presented` のアームで、新しい内部の配線 `sessionOf(token: type.Token)` を呼び、`default` のアームで `throw type.Unauthorized`（`server.hozo:85-92`）。`sessionOf` が、前の `authenticate` の中身（`store.findSession` と、`store.Login` での分岐）を持つ（`server.hozo:95-103`）。HTTP から見た振る舞いは変わらない（トークンのない要求は 401 `type.Unauthorized`）。変わったのは、そのとき `store` が呼ばれないこと。
 
 12. **表は `@db.table` で言う**（決定 104）: 四つの状態の `@db` を `@db.table(type.<要素の model>)` にした（`store.hozo:9-19`）。状態の型に書いてある model を、デコレータの引数でもう一度書く: 表の列を決めるのは、デコレータの引数だけ。
@@ -93,6 +109,9 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 15. **省略可能な戻り値の経路を足した**（決定 108）: `@http.get("/orders/latest") export op getLatestOrder(in: AuthInput): type.Order?` と、人が書く葉 `latestOf(orders: type.Order[]): type.Order?`（`server.hozo:146-157`）。注文がなければ 204 で本文なし、あれば 200 と、その注文。成功の応答を、op の型でなく、実行時の値で決めること（`docs/plugin-go-http.md`「通信の形」の「成功の応答」）を、期待する出力とテストで確かめるためだけに足した。
 16. **なければ誤りの項目に、`@http.required` を付けた**（決定 114）: `PlaceOrderInput` の `@http.required @http.body lines: type.OrderLine[]`（`server.hozo:37`）。**振る舞いが一つ変わった**: `lines` のない `POST /orders`（本文が `{}`、または、ほかのキーだけ）は、前は、空の注文を作って 200 を返していた（本文の項目は、なくても誤りにしなかった）。今は、op を呼ばずに 400 `body lines: missing`。付けたのは、この一つ。ほかの項目の形のフィールド（三つの入力の `token` と、`page`）は、前も、なくても誤りにならなかった（`token` は省略可能で、`page` は既定値を持っていた）ので、付けていない。`LoginInput` の `body` は全体の形なので、付けられない（GOHTTP-14）。
 17. **既定値を、型の宣言から、境界のデコレータに移した**（決定 S24、115）: `GetOrdersInput` の `@http.query page: int = 1` を `@http.query @http.default(1) page: int` にした（`server.hozo:31`）。`page` のない `GET /orders` が 1 ページ目であることは、変わらない。変わったのは、1 を入れる者: 前は、基底の `NewGetOrdersInput()`（型を作る誰もが入れる）、今は、要求を読むハンドラ（`req.query("page", &in.Page, httpDefault(1))`）。`server.GetOrdersInput{}` を自分で作るコード（op を直に呼ぶテストなど）の `Page` は、0 になる。この仕様のほかのフィールドに、既定値はなかった。
+
+18. **節の区切りを `,` にした**（決定 124）: `server.placeOrder` の `throws type.Unauthorized | type.NotificationFailed` を `throws type.Unauthorized, type.NotificationFailed` にした（`server.hozo:162`）。この仕様で、一つの節に二つ以上を並べているのは、ここだけ（語彙 `rate` の `limited` の `throws` は一つ）。意味も、期待する出力も、変わらない。
+19. **読む側を、書く側と同じ二段にした**（決定 125、128）: 四つの `read`（`userByEmail`、`userById`、`sessionByToken`、`ordersOfUser`）を宣言し、9 で読む op に付けた `@db.find` / `@db.list` を、そちらに移した（`store.hozo:23-37`）。四つの読む op には、行う `read` を名指しする `@db.reads(<read>)` を付けた（`store.hozo:41-55`）。op の引数と戻り値、読む状態（`Reads: store.users` など）、op の置き場、SQL は、変わらない。変わったのは、`gen/store/db.go` の四つのコメントの行（op のデコレータが `@db.reads` になり、`read` の名前が入る）。
 
 ## サンプルの中のプラグイン `go-ratelimit`
 
@@ -234,8 +253,8 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 | `@http.header` / `@http.query` / `@http.body` / `@http.bodyObj`、`@http.required` / `@http.default`（フィールド）、`@http.status`（例外） | `go-http` | 材料にする | なし |
 | `@db.table`（状態） | `go-sqlite`（単位 3 だけ） | 実装を出す（`<状態>Table`） | なし |
 | `@db.text` / `@db.time` / `@db.json`、`@db.key` / `@db.unique` / `@db.ref`（フィールド） | `go-sqlite`（単位 3 だけ） | 材料にする（`type` の単位 1 では、どのトランスパイラも読まない: 印） | なし |
-| `@db.find` / `@db.list` / `@db.effects`（op） | `go-sqlite`（単位 3 だけ） | 実装を出す（単位の型のメソッド） | 純粋さと、op の置き場（デコレータが運ぶ読む状態と効果。hozoc が `Op.carried` に置く。単位 4 でも同じ） |
-| `@db.insert` / `@db.delete`（効果） | `go-sqlite`（単位 3 だけ） | 材料にする | なし |
+| `@db.reads` / `@db.effects`（op） | `go-sqlite`（単位 3 だけ） | 実装を出す（単位の型のメソッド） | 純粋さと、op の置き場（デコレータが運ぶ読む状態と効果。hozoc が `Op.carried` に置く。単位 4 でも同じ） |
+| `@db.find` / `@db.list`（`read`）、`@db.insert` / `@db.delete`（効果） | `go-sqlite`（単位 3 だけ） | 材料にする（それを `@db.reads` / `@db.effects` で並べた op のメソッドの中身） | なし |
 | `@valid.*`（scalar、フィールド） | `go-valid` | 材料にする（`Validate`） | なし |
 | `@rate.limited`（op） | `go-ratelimit`（単位 5） | 継ぎ目を要る | 純粋さと、二層・`Seams`・`New` の引数 `seams` |
 | `@smtp.sendMail`（op） | なし（`mailer` には単位もない） | —（印） | 純粋さだけ（`server.MailerOps` の `Send` が `ctx` を取る） |
@@ -252,13 +271,13 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 
 持ち主は `docs/plugin-go-sqlite.md`。出すファイルは `db.go` 一つ（入口のパッケージ）。
 
-- この仕様の八つの op は、どれも `db` の語彙の op のデコレータを持つ（同「op の中身」）: `findUser`、`findUserById`、`findSession` は `@db.find`、`listOrders` は `@db.list`、`addUser`、`addSession`、`removeSession`、`placeOrder` は `@db.effects`。五つの効果は、`@db.insert`（四つ）か `@db.delete`（`deleteSession`）を持つ。形で決まる問い合わせは、四つの状態に `IsEmpty` と `Get` で八つ。五つの型（`UsersTable`、`SessionsTable`、`OrdersTable`、`NotificationsTable`、`SharedTable`）は、合わせて十六のメソッドを持ち、どれも基底の口（四つの状態の単位と `SharedState`）を満たす（`gen/store/db.go:49-211`）。組み立ては、五つの型を `store.New` に渡す一行（`app/onsqlite/compose.go:23-24`）。
+- この仕様の八つの op は、どれも `db` の語彙の op のデコレータを持つ（同「op の中身」）: `findUser`、`findUserById`、`findSession`、`listOrders` は `@db.reads`、`addUser`、`addSession`、`removeSession`、`placeOrder` は `@db.effects`。四つの `read` は、`@db.find`（三つ）か `@db.list`（`ordersOfUser`）を、五つの効果は、`@db.insert`（四つ）か `@db.delete`（`deleteSession`）を持つ。四つの読む op は、どれも `read` を一つ名指しし、戻り値は、その `read` の引くもの（`type.User?`、`type.Session?`、`type.Order[]`）と等しい。形で決まる問い合わせは、四つの状態に `IsEmpty` と `Get` で八つ。五つの型（`UsersTable`、`SessionsTable`、`OrdersTable`、`NotificationsTable`、`SharedTable`）は、合わせて十六のメソッドを持ち、どれも基底の口（四つの状態の単位と `SharedState`）を満たす（`gen/store/db.go:49-211`）。組み立ては、五つの型を `store.New` に渡す一行（`app/onsqlite/compose.go:23-24`）。
 - **`placeOrder` は、二つの効果を一つのトランザクションで行う**（同「トランザクション」。`gen/store/db.go:187-211`）: `orders` と `notifications` への二つの `INSERT` を、書いた順に実行し、どちらかが失敗すれば、どちらも残らない。効果が一つの op（`addUser` など）は、文一つ。
 - 列と引数の型（同「列と引数の型」）は、どの op でも等しい（`findUser` は `email: type.Email`、`findSession` と `removeSession` は `token: type.Token`、`listOrders` は `userId: type.UserId`）。条件は、どれも `"<列>" IS ?1` で、引数は、その列のしまい方の補助で包む（五つとも `@db.text` の列なので `dbText(…)`）。
 - **しまい方**（同「しまい方」）: 四つの表の十三の列は、`@db.text` が十、`@db.time` が二、`@db.json` が一。`dbArgs<Model>` と `dbScan<Model>` は、フィールドごとに、しまい方の補助の呼び出し一つ（`gen/store/db.go:213-267`）。scalar（`type.UserId` など）と核の型（`string`）を、書き分けていない。
 - **どの列も `NOT NULL`**（同「表」）: 表の model の十三のフィールドは、どれも省略可能でなく、`@db.nullable` を持たない。`dbArgs<Model>` と `dbScan<Model>` の行に、`dbNullable` は一つも現れない。三つの `@db.ref(User)` は、どれも先が決まる（`@db.table(type.User)` の状態は `users` の一つで、`User` の `@db.key` は `id` の一つ）。
 - デコレータを付けていない op があるときの形（人が、プラグインの型を埋め込んで書き足す）は、この仕様では起きないので、見立ての型で確かめている（`app/onsqlite/store_test.go` の `partialUsers` と `humanUsers`）。
-- この仕様が使っていない規則: `@db.nullable` の列（と、`T?` の列と比べる引数）、`@db.int` / `@db.float` / `@db.bool` の列、`@db.update`、列のない `@db.list`、複数の `@db.key`、遷移を宛先にする効果のデコレータ、述語で決まる状態の分類の単位の型（`<C>Table`）、効果の宛先の単位が一つの、複数の効果。
+- この仕様が使っていない規則: `@db.nullable` の列（と、`T?` の列と比べる引数）、`@db.int` / `@db.float` / `@db.bool` の列、`@db.update`、列のない `@db.list`、複数の `@db.key`、遷移を宛先にする効果のデコレータ、述語で決まる状態の分類の単位の型（`<C>Table`）、効果の宛先の単位が一つの、複数の効果、二つ以上の op が名指しする `read`、どの op も名指ししない `read`、`@db.reads` のない op が読む `read`。`read` を二つ以上並べた `@db.reads` は、まだ決めていない形（同「未決: 複数の `read` と、戻り値の型」）。
 
 ## `go-http` が従う規則
 
@@ -595,3 +614,10 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
 - **N111 この仕様には、`@db.nullable` の列がない**。表の model のフィールドは、どれも省略可能でない。`gen/store/db.go` に現れるのは、補助が `dbNullable` を受け取れる形（`dbOption`、しまい方の補助の `opts`、`dbCol` の `Value` と `Scan`）だけで、`dbNullable` を渡す行も、`NOT NULL` のない列も、期待する出力にない（`go-sqlite` の単体テストが、小さな入力で確かめることになる。`docs/testing.md`「単体テスト」）。先の決まらない `@db.ref`（GOSQL-20）も、この仕様では起きない。
 - **N112 `default` の値を、制約で確かめる者がいない**。`@http.default(1)` の 1 が、フィールドの制約（`@valid.*`）に合うかは、生成するときには確かめられない（前は、`go-valid` が、既定値を GOVALID-2 で確かめていた）。`validate = true` のこの単位では、入れた値も、実行時に `httpValidate` を通る。`page` に制約はないので、この仕様では起きない。その後、生成するときに確かめると決めた（`docs/plugin-go-http.md`「補う値と制約」。GOHTTP-19）。
 - **N113 `@cli.required` と `@cli.default` の、期待する出力は、ここにない**。この仕様に CLI はない。`go-cli` の形（`line.required(&in.<F>)`、`line.orDefault(&in.<F>, <リテラル>)`）を固定するのは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`docs/plugin-go-cli.md`「コマンドごとの関数」）で、hozoc 自身の `cli.hozo` も、この二つを使わない。
+
+#### 例外、効果、`read` を同じ書き方に（決定 124〜131、S25）
+
+- **N114 期待する出力は、コメントの四行しか変わらなかった**。`read` に名前を付けても、基底の出力は変わらない: op が読む状態（`Signature.reads`。`Reads: store.users`）も、op の置き場も、状態の単位のメソッドのコメント（`// FindUser は問い合わせ: store.users を読む（reads）葉の op store.findUser。`）も、`read` の名前を持たない。`read` の名前が出るのは、`go-sqlite` の四つのメソッドのコメントだけ。基底のコメントに `read` の名前を書くかどうかは、決めていない（`docs/plugin-go.md`「コメント」の未決）。
+- **N115 表を、二度書く**。`@db.find(users, "email") read userByEmail on users;` は、表 `users` を、デコレータの引数と、`on` の後ろの両方に書く。効果（`@db.insert(users) effect createUser on users.post;`）と同じ形で、食い違いは GOSQL-21。出力を決めるのがデコレータの引数だけ、という原則の帰結。
+- **N116 読む op の説明と、`read` の説明が、ほとんど同じ文になる**。`read userByEmail`（「email が同じユーザー」）と `op findUser`（「email からユーザーを引く」）。`read` を一つだけ行い、引いたものをそのまま返す op では、二つの宣言が同じことを言う。書く側の `effect createUser` と `op addUser` も同じ。`read` を二つ以上並べる op が書けるようになれば、分かれる（`docs/plugin-go-sqlite.md`「未決: 複数の `read` と、戻り値の型」）。
+- **N117 この段階の期待する出力は、道具で確かめていない**。書いたときの hozoc は、この仕様を読めない（節の `,` と、`read` の宣言）。確かめたのは、このモジュールの `go vet` と `go test` が通ることまで（変えたのは、コメントだけ）。

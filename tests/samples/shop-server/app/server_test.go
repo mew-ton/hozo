@@ -21,7 +21,7 @@ import (
 //
 //   - ctx: 純粋な op（仕様から割り出したもの: デコレータ、reads、effects がなく、状態に依らない。配線なら、呼び出し先も
 //     すべて純粋）は取らず、そうでない op は最初の引数に取る。別の名前空間の op（MailerOps、StoreOps）も相手の op の判定に従う:
-//     mailer.send はデコレータ @smtp.sendMail を、store.findSession はデコレータ @db.find（状態 sessions を読む）を持つので、
+//     mailer.send はデコレータ @smtp.sendMail を、store.findSession はデコレータ @db.reads（状態 sessions を読む）を持つので、
 //     純粋でなく、ctx を取る。
 //   - error: 純粋で、throws のない op は返さない。それ以外は返す（純粋でも、throws があれば返す）。
 //

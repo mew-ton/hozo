@@ -119,11 +119,19 @@ func (p *Program) Lookup(fqn string) Decl          // 宣言を引く。なけ�
 func (p *Program) Namespace(fqn string) *Namespace
 func (v *View) Signature(op string) *ViewedSignature
 func (v *View) InUnit(fqn string) bool             // viewer の名前空間の宣言で、単位の対象か（span.file が View.files にある。docs/config.md「in」）
-func (o *Op) DirectReads() []string                // op が直に読む状態: Reads の後ろに Carried.Reads（重複は最初の出現に寄せる。docs/check.md「デコレータが運ぶ reads と effects」）
-func (o *Op) DirectEffects() []string              // op が直に持つ効果: Effects の後ろに Carried.Effects（同上）
+func (o *Op) DirectReads() []ReadRef               // op が直に読むもの: Reads の後ろに Carried.Reads（重複は最初の出現に寄せる。docs/check.md「デコレータが運ぶ reads と effects」）
+func (o *Op) DirectEffects() []EffectRef           // op が直に持つ効果: Effects の後ろに Carried.Effects（同上）
+func (p *Program) ReadState(r ReadRef) string      // 要素が読む基底の状態の FQN: named なら read の宣言の state、direct ならその state。宣言がなければ ""
+func (p *Program) ReadStates(rs []ReadRef) []string   // 要素ごとの ReadState を同じ順に並べ、重複を最初の出現に寄せたもの。op が直に読む状態は p.ReadStates(o.DirectReads())
+func (p *Program) EffectWrites(e EffectRef) []string  // 効果が書き込む基底の状態の FQN: named なら effect の宣言の writes、direct ならその state。宣言がなければ nil
+func NamedReads(fqns ...string) []ReadRef          // read の宣言の FQN の列から、named の要素の列
+func StateReads(states ...string) []ReadRef        // 基底の状態の FQN の列から、direct の要素の列
+func NamedEffects(fqns ...string) []EffectRef      // effect の宣言の FQN の列から、named の要素の列
 ```
 
-TS の SDK（`sdk/ts`）は同じ引き方を関数で持つ: `lookup(program, fqn)`、`namespace(program, fqn)`、`signature(view, op)`、`inUnit(view, fqn)`（なければ `undefined`）、`directReads(op)`、`directEffects(op)`。
+`ReadRef` と `EffectRef`（`docs/ir.md`「op」）は、具体型が値型（`NamedRead`、`DirectRead`、`NamedEffect`、`DirectEffect`）の interface で、`==` で比べられ、写像のキーにできる。`String()` は表示のための文字列: 名前で書いた要素は宣言の FQN、直に書いた要素は `<状態の FQN>`（読む方）か `<状態の FQN>.<操作>`（効果）。
+
+TS の SDK（`sdk/ts`）は同じ引き方を関数で持つ: `lookup(program, fqn)`、`namespace(program, fqn)`、`signature(view, op)`、`inUnit(view, fqn)`（なければ `undefined`）、`directReads(op)`、`directEffects(op)`、`readState(program, ref)`、`readStates(program, refs)`、`effectWrites(program, ref)`。値として比べられないので、要素が同じかどうかは `sameRef(a, b)` で見る。
 
 ### `plugin`（公開）
 

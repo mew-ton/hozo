@@ -90,7 +90,7 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		wantUser(t, "findUser", nil)(s.FindUser(ctx, "carol@example.com"))
 		wantUser(t, "findUserById", &bob)(s.FindUserById(ctx, "u2"))
 		wantUser(t, "findUserById", nil)(s.FindUserById(ctx, "u9"))
-		// findUser が比べるのは、@db.find が名指しした列（email）だけ。id の値を渡しても引けない
+		// findUser が比べるのは、read userByEmail の @db.find が名指しした列（email）だけ。id の値を渡しても引けない
 		wantUser(t, "findUser", nil)(s.FindUser(ctx, "u1"))
 		// @db.key と @db.unique が同じ行は足せない。どのエラーかは決まっていない
 		if err := s.AddUser(ctx, pkgtype.User{Id: "u1", Email: "other@example.com", Name: "X", Hash: "h"}); err == nil {

@@ -205,6 +205,7 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 | `any exception` | `ref`（例外）、`refs`（例外の集合）、`ref`（`set` のユニオンで要素が例外。展開して `refs` にする） |
 | `any effect` | `ref`（効果）、`refs`、ユニオン（同上） |
 | `any effect on s.op` | 上のうち、すべての効果の宛先（`Effect.target`）が組み込みの効果で、その `state` が `s`、`operation` が `op` のもの。遷移の効果や、違う状態・操作なら DEC-7 |
+| `any read` | `ref`（`read` の宣言。状態の名前は渡せない: 状態は `any state`） |
 | `any state` | `ref`（状態） |
 | `any op` | `ref`（op） |
 | `any model` | `ref`（model） |

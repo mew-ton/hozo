@@ -118,6 +118,8 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 - **同じことを、型でもう一度言っているように見えても、デコレータで言う。** フィールドの型が `string` でも、列にしまうなら `@db.text` を書く。型は、それが食い違っていないかを確かめる側（`string` のフィールドに `@db.int` は error）。
 - **値がないときの扱いも、型からは決めない。** フィールドが省略可能かどうかから、「なければ誤り」や `NOT NULL` を決めない。なければ誤りか（`@http.required`、`@cli.required`）、何を入れるか（`@http.default`、`@cli.default`）、列が値を持たなくてよいか（`@db.nullable`）は、デコレータが言い、型は、それと食い違っていないかを確かめる側（省略可能なフィールドに `@http.required` は error）。型の宣言に書く既定値は、言語にない: 誰が値を入れるかは、境界の振る舞い（`docs/decisions.md`「設計書を変える決定」S24）。
 - **デコレータを付けていない宣言には、何も生成しない。** warning も出さない: 付けないのは、中身を人が書くと、仕様を書いた人が選んだこと。
+- **例外、効果、`read` に付けたデコレータは、それを投げる、持つ、読む op の実装に働く。** 例外の `@http.status(401)` は、その例外を投げる op のハンドラの応答を、効果の `@db.insert(users)` は、その効果を持つ op の中身を、`read` の `@db.find(users, "email")` は、その `read` を読む op の中身を決める材料になる（`docs/decisions.md`「決めたこと」127 の（a））。
+- **デコレータのない op には、中身を生成しない。** op が持つ効果や、読む `read` にデコレータが付いていても、同じ: それらは材料で、op のデコレータの代わりにはならない。だから、効果を並べる op のデコレータ（`@db.effects`）と対に、`read` を並べる op のデコレータ（`@db.reads`）が要る（同 127 の（b）。`docs/vocab.md`「`db` の読み書きのデコレータ」）。
 - 言語が形から決めている約束（状態の形ごとの組み込みの分類と問い合わせ。`docs/check.md`「状態の形」）を出力にするのは、この原則の外: デコレータが出すコードではない。型そのものを出す基底（`docs/plugin-go.md`「型」）も同じ。
 - 相乗りが、基底の出したものを名指しする（op のメソッドを呼ぶ、型の名前を書く）のは、型で出力を決めることではない。名前と形は、基底の規則の写し（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）から求める。
 
@@ -147,13 +149,14 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 
 ### 作り直しの段階
 
-段階 4 までを作った後で、サンプル（`tests/samples/README.md`）を書きながら決めたこと（`docs/decisions.md`「P の番号との対応」）を、二つの段階（R1、R2）に分けて入れた。R3 は、その後に決めたこと（デコレータで言う読み書きと、型に依らない出力）を入れる段階。どれも、上の表の段階 5 より前に置く（TS の基底は、ここで決めた基底と相乗りの形の上に作る）。
+段階 4 までを作った後で、サンプル（`tests/samples/README.md`）を書きながら決めたこと（`docs/decisions.md`「P の番号との対応」）を、二つの段階（R1、R2）に分けて入れた。R3 は、その後に決めたこと（デコレータで言う読み書きと、型に依らない出力）を入れる段階。R4 は、さらにその後に決めたこと（節の区切りの統一、名前を付けた `read`、`db` の語彙の読む側の二段）を入れる段階。どれも、上の表の段階 5 より前に置く（TS の基底は、ここで決めた基底と相乗りの形の上に作る）。
 
 | 段階 | 入口 | 終わったと言える条件 |
 |---|---|---|
 | R1 | 言語の変更（`docs/decisions.md`「設計書を変える決定」S15〜S23） | 済み。`reads`、純粋さ、op の分類、ケースの型、`throw`、`never`、状態の参照、形の型、model の継承、`export` を、解析・検査・IR が持つ |
 | R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜88） | 済み。hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としもなく、すべて通る（サンプルの中のプラグイン `go-ratelimit` の分を含む）。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
 | R3 | デコレータで言う読み書きと、型に依らない出力（同「決めたこと」91〜123、「設計書を変える決定」S24） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 言語（デコレータの対象 `effect`、`reads` / `effects` の節、残りの引数、予約語のデコレータ名、DEC-17、`Op.carried`、版 0.5。フィールドの既定値がないこと）を、解析・検査・IR・スキーマ・SDK が持つ。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の読み書きのデコレータ」の全文）、`vocab/http.hozo`（同「`http` の語彙」）、`plugins/go-cli/cli.hozo`（`docs/plugin-go-cli.md`「語彙」）。三つとも、値がないときの扱いのデコレータ（`db.nullable`、`http.required` / `http.default`、`cli.required` / `cli.default`）を持つ。今の語彙で書いてある仕様を、それに合わせて直す: リポジトリ直下の `cli.hozo` と、その写し（`docs/cli.md`「cli.hozo」の `@cli.arg(1)`）、コーパスと規則ごとのテストとプラグインの単体テストの入力のうち、`@db state …`、引数のない `@cli.arg`、一つの `@http.body` を「本文そのもの」と読ませているもの、フィールドの既定値（`= 1`）、`@db.nullable` のない省略可能な列、`@http.required` / `@cli.required` を書かずに「なければ誤り」を当てにしているもの。基底 `go` が op の置き場を直に持つ効果と読む状態で決め（`SharedState` の命令）、`New<Model>` を出さず、`go-sqlite`、`go-http`、`go-cli` が、それぞれの文書の通りに出す（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」、`docs/plugin-go-http.md`「出力」「入力の読み方」「通信の形」、`docs/plugin-go-cli.md`「引数の解釈」「コマンドごとの関数」）。`go-valid` が GOVALID-2 を返さない。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が 0.5 になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」）。残っていた二点は決めた（`docs/decisions.md`「決めたこと」123） |
+| R4 | 例外、効果、`read` を同じ書き方にする（同「決めたこと」124〜131、「設計書を変える決定」S25） | **文書とサンプルを先に書いた。実装は、まだ。** 条件: 言語（`throws` / `catches` / `effects` / `reads` の節の区切りの `,`、`read` の宣言、`reads` / `effects` に直に書く要素、デコレータの対象 `read` と引数の種類 `any read`、版）を、解析・検査・IR・スキーマ・SDK が持つ（`docs/grammar.md`「read」「op」「decorator の宣言」、`docs/check.md`「読むことの宛先」「直に書く要素」、`docs/ir.md`「版」）。`vocab/db.hozo` が、`docs/vocab.md`「`db` の読み書きのデコレータ」の全文になり、ほかの語彙のファイル（`vocab/http.hozo`、`vocab/proc.hozo` の `throws`）と、サンプル `shop-server` の外の、すべての仕様（リポジトリ直下の `cli.hozo` と、その写し `docs/cli.md`「cli.hozo」、コーパス、規則ごとのテスト、プラグインの単体テストの入力と、その `views.json`。サンプルの中の `go-ratelimit` の `views.json` を含む）が、新しい書き方と版になる。`go-sqlite` が、`@db.find` / `@db.list` を `read` の宣言から、`@db.reads` を op から読み、`docs/plugin-go-sqlite.md`「op の中身」「メソッドの形とコメント」「診断」の通りに出す（`read` を二つ以上並べた op は、同「未決: 複数の `read` と、戻り値の型」が決まるまで GOSQL-23）。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が、`docs/ir.md`「版」の今の版になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」） |
 
 R2 の成果物:
 
@@ -242,8 +245,8 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | DOC-1 | `@param` / `@throws` / `@see` が存在しない名前を指したらエラー。説明の有無は警告しない | §3.4 |
 | CFG-5 | 二つ以上のトランスパイラが同じファイルに書こうとしたらエラー | §4.3。S14: `docs/config.md`「診断」 |
 | CFG-6 | 単位のトランスパイラの `unsupported` に当たる箇所は warning | §4.3。S14: `docs/config.md`「診断」 |
-| STATE-1 | 状態への操作は形で決まる（形と操作の表は `docs/check.md`「状態の形」） | §5.2。S1: `docs/check.md`「状態の形」 |
-| STATE-2 | 持ち主でない名前空間の葉の op が、その状態への効果を `effects` に宣言したらエラー | §5.1、§6.2 |
+| STATE-1 | 状態への操作は形で決まる（形と操作の表は `docs/check.md`「状態の形」） | §5.2。S1: `docs/check.md`「状態の形」。`effects` に直に書いた `状態.操作` にも掛かる: 同「直に書く要素」 |
+| STATE-2 | 持ち主でない名前空間の葉の op が、その状態への効果を `effects` に宣言したらエラー | §5.1、§6.2。直に書いた `状態.操作` も同じ: `docs/check.md`「直に書く要素」 |
 | BIND-1 | 埋める位置は状態と同じ型を持つ入力の位置。位置がなければ何もしない。二つ以上ならエラー | §5.3 |
 | BIND-2 | 状態が空になりうる（形が `nullable`）のに、位置が省略できなければエラー | §5.3。S2: `docs/check.md`「bind」 |
 | BIND-3 | 明示して渡した値は `bind` より優先 | §5.3 |
@@ -251,11 +254,11 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | THROWS-1 | 呼び出し先の例外と、アームの `throw` の例外は、すべて `throws` に書くか、デコレータが吸収・肩代わりする。漏れはエラーで、どれが漏れているかを示す | §7.2。S20: `docs/check.md`「throw」 |
 | THROWS-2 | 多めに書くのは許容。検査は足りない方向だけ | §7.2 |
 | EFF-1 | 効果は呼び出し元に自動で伝播する | §7.2 |
-| EFF-2 | 配線の op に書いた `effects` が伝播した効果と食い違えばエラー | §7.2 |
+| EFF-2 | 配線の op に書いた `effects` が伝播した効果と食い違えばエラー | §7.2。直に書いた効果の数え方: `docs/check.md`「直に書く要素」 |
 | REL-1 | `throws` の中で各例外は一度だけ現れる | §7.3 |
 | REL-2 | 効果を持たない op の `throws` に `prevents` / `keeps` があれば警告 | §7.3 |
 | REL-4 | 配線の op の例外ごとの効果の状態は検査器が計算する。書かれた `prevents` / `keeps`（目的語は `effects` だけ）が計算と食い違えばエラー | §7.3、§9。S9: `docs/check.md`「計算」「throws」 |
-| DEC-1 | 付けられる対象は `for` で決まる。省略は `op`。宣言にない対象に付けたらエラー | §8.2。対象に `effect` を足したのは `docs/decisions.md` の 98: `docs/grammar.md`「decorator の宣言」 |
+| DEC-1 | 付けられる対象は `for` で決まる。省略は `op`。宣言にない対象に付けたらエラー | §8.2。対象に `effect` を足したのは `docs/decisions.md` の 98: `docs/grammar.md`「decorator の宣言」。対象 `read` も同じ節（理由は同「決めたこと」） |
 | DEC-2 | `throws` / `catches`（と、`reads` / `effects`）の節を宣言できるのは `op` に付けるデコレータだけ | §8.2。`reads` / `effects` の節は `docs/decisions.md` の 98: `docs/check.md`「デコレータ」 |
 | DEC-3 | `catches X` の後に `recovers` / `halts e` / `ignores` を必ず書く | §8.2 |
 | DEC-4 | `ignores` は値を返さない op にだけ付けられる | §8.2 |
@@ -308,7 +311,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 
 TextMate の文法（`editors/vscode/syntaxes/hozo.tmLanguage.json`）で色を付ける。VS Code のほかに GitHub の表示（linguist）など、言語サーバーがない場所でも使える形だから。言語サーバーの semantic tokens による色分けは、段階 4 の後に足してよいが、TextMate の文法を置き換えるものではない。
 
-色を分けるもの: 予約語と文脈キーワード（`docs/grammar.md`「予約語」）、デコレータ（`@` から名前まで。名前空間の修飾を含む）、型の位置の名前と値・実行の位置の名前（§3.3 の命名規則に沿う）、リテラル（`docs/grammar.md`「リテラル」）、コメントとドキュメンテーションコメント（中の `@param` / `@throws` / `@see` も分ける）。文脈キーワードは、その位置（`for` の後ろ、`any` の後ろ、`on 状態.` の後ろ）でだけ色を付ける。
+色を分けるもの: 予約語と文脈キーワード（`docs/grammar.md`「予約語」）、デコレータ（`@` から名前まで。名前空間の修飾を含む）、型の位置の名前と値・実行の位置の名前（§3.3 の命名規則に沿う）、リテラル（`docs/grammar.md`「リテラル」）、コメントとドキュメンテーションコメント（中の `@param` / `@throws` / `@see` も分ける）。文脈キーワードは、その位置（`for` の後ろ、`any` の後ろ、`on 状態.` の後ろ、`effects` の節の要素の最後の `.` の後ろ）でだけ色を付ける。
 
 予約語と文脈キーワードの一覧は `docs/grammar.md`「予約語」が持ち主。字句解析器はそこから書き写し、TextMate の文法の予約語の部分は字句解析器の一覧から生成する（`docs/packages.md`「生成するもの」）。一覧の一致は `docs/testing.md`「予約語の一致」で確かめる。
 

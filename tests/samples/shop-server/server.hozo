@@ -159,7 +159,7 @@ namespace server {
   /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")
   export op placeOrder(in: PlaceOrderInput): type.Order
-    throws type.Unauthorized | type.NotificationFailed
+    throws type.Unauthorized, type.NotificationFailed
   {
     const session = authenticate(in.token);
     const order = newOrder(session, in.lines);

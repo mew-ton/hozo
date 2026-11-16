@@ -29,7 +29,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
 | `vocab/proc.hozo` | `namespace proc { Crashed / MalformedOutput / stdio }` | `examples/hozoc.hozo` |
 
-- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし省略可能な引数の `x?: T` は `x: T?` に直す（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`。`docs/grammar.md`「決めたこと」）。
+- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator get(path: string) throws ServerError, NetworkError;`。`docs/decisions.md`「設計書を変える決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
 - `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイルとプラグインの起動）なので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
 - `@http.get` / `@http.post` の `@external` はそのまま写す。
 - `http` には、出典にない例外を一つ足す: op を呼ぶ前の失敗（要求を入力に読めない、入力が制約に合わない）を伝える `BadRequest` と、それが運ぶ値。HTTP のサーバーのトランスパイラが返し（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）、通信の上の名前 `http.BadRequest` と値の形の持ち主になる。`@http.get` / `@http.post` の `throws`（外から見たときに加わる例外）には、まだ入れない: 入れると、HTTP の op を呼ぶすべての配線が `http.BadRequest` を書くことになる。呼ぶ側のトランスパイラを作るときに決める。
@@ -47,7 +47,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 ### `db` の読み書きのデコレータ
 
-状態が表であること、フィールドを列にどうしまうか、列が値を持たなくてよいか（「`db` の表と、しまい方」）、読みが表から何を引き、効果が表に何をし、op がどの読みと効果を行うか（この節）を、仕様が言うためのデコレータ（`docs/decisions.md`「決めたこと」93〜95、104、105、119、128）。`vocab/db.hozo` の全文は次のとおり。出典にあるのは `key` / `unique` / `ref` だけ。
+状態が表であること、フィールドを列にどうしまうか、列が値を持たなくてよいか（「`db` の表と、しまい方」）、`read` が表から何を引き、効果が表に何をし、op がどの `read` と効果を行うか（この節）を、仕様が言うためのデコレータ（`docs/decisions.md`「決めたこと」93〜95、104、105、119、128）。`vocab/db.hozo` の全文は次のとおり。出典にあるのは `key` / `unique` / `ref` だけ。
 
 ```ts
 namespace db {
@@ -75,9 +75,9 @@ namespace db {
   /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
   decorator ref(target: any model) for field;
 
-  /** この読みは、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
+  /** この read は、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
   decorator find(table: any state, column: string) for read;
-  /** この読みは、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
+  /** この read は、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
   decorator list(table: any state, column: string?) for read;
 
   /** この効果は、表 table に行を一つ足す */
@@ -87,14 +87,14 @@ namespace db {
   /** この効果は、表 table から、列 column が引数の値と同じ行を消す */
   decorator delete(table: any state, column: string) for effect;
 
-  /** この op は、並べた読みで、表から引く。読みが一つなら、op の引数をその読みが受け取り、op は、その読みが引いたものを返す */
+  /** この op は、並べた read で、表から引く。read が一つなら、op の引数をその read が受け取り、op は、その read が引いたものを返す */
   decorator reads(...targets: any read) for op reads targets;
   /** この op は、並べた効果を、書いた順に、一つのトランザクションで行う。n 番目の効果が、op の n 番目の引数を受け取る */
   decorator effects(...targets: any effect) for op effects targets;
 }
 ```
 
-- **読む側も、書く側も、二段**（`docs/decisions.md`「決めたこと」128）: 何をするかは、名前を付けた読み（`read userByEmail on users;`）と効果（`effect createUser on users.post;`）の宣言に付けたデコレータが言い、op は、行う読みと効果を `@db.reads` / `@db.effects` で並べる。二段にする理由（読み・効果のデコレータは、それを行う op の実装に働く。デコレータのない op には、中身を出さない）の持ち主は `docs/requirements.md`「出力を推論しない」。
+- **読む側も、書く側も、二段**（`docs/decisions.md`「決めたこと」128）: 何をするかは、名前を付けた `read`（`read userByEmail on users;`）と効果（`effect createUser on users.post;`）の宣言に付けたデコレータが言い、op は、行う `read` と効果を `@db.reads` / `@db.effects` で並べる。二段にする理由（`read`・効果のデコレータは、それを行う op の実装に働く。デコレータのない op には、中身を出さない）の持ち主は `docs/requirements.md`「出力を推論しない」。
 
   ```ts
   @db.find(users, "email")
@@ -104,13 +104,13 @@ namespace db {
   export op findUser(email: type.Email): type.User?;
   ```
 
-- `reads` は、並べた読みを `reads` で、`effects` は、並べた効果を `effects` で op に運ぶ（`docs/check.md`「デコレータが運ぶ reads と effects」）。これらを付けた op は、`reads` も `effects` も自分では書かない。`find` と `list` は、読みの宣言に付けるもので、op には付けられない（DEC-1）。
-- `reads` に読みを二つ以上並べたときと、op の戻り値の型が読みの引くものと違うときの意味は、まだ決めていない（`docs/plugin-go-sqlite.md`「未決: 複数の読みと、戻り値の型」）。
-- 表は状態の名前で、列は文字列で渡す。読みの宣言の `on <状態>` と、効果の宛先に状態が書いてあっても、表は、デコレータの引数でもう一度名指しする（出力を決めるのは、デコレータの引数だけ。`docs/requirements.md`「出力を推論しない」。食い違いは、語彙を読むトランスパイラの error）。列の名前は、フィールドの名前。列は一つだけ（複数の列の条件は、要るサンプルが出てから。そのときは `column` の型を `string | string[]` に広げる。今の書き方は、そのまま通る）。
+- `reads` は、並べた `read` を `reads` で、`effects` は、並べた効果を `effects` で op に運ぶ（`docs/check.md`「デコレータが運ぶ reads と effects」）。これらを付けた op は、`reads` も `effects` も自分では書かない。`find` と `list` は、`read` の宣言に付けるもので、op には付けられない（DEC-1）。
+- `reads` に `read` を二つ以上並べたときと、op の戻り値の型が `read` の引くものと違うときの意味は、まだ決めていない（`docs/plugin-go-sqlite.md`「未決: 複数の `read` と、戻り値の型」）。
+- 表は状態の名前で、列は文字列で渡す。`read` の宣言の `on <状態>` と、効果の宛先に状態が書いてあっても、表は、デコレータの引数でもう一度名指しする（出力を決めるのは、デコレータの引数だけ。`docs/requirements.md`「出力を推論しない」。食い違いは、語彙を読むトランスパイラの error）。列の名前は、フィールドの名前。列は一つだけ（複数の列の条件は、要るサンプルが出てから。そのときは `column` の型を `string | string[]` に広げる。今の書き方は、そのまま通る）。
 - 列を渡す引数の名前を `by` にしないのは、`by` が予約語で、引数の名前（`Ident`）に書けないため（`docs/grammar.md`「予約語」）。
 - `int`、`float`、`list`、`nullable`、`reads`、`effects` は予約語、`delete` は文脈キーワードだが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
-- 何を生成するかと、書いたものの整合の検査（表は `@db.table` の状態か、列はあるか、引数と戻り値の型は合うか、デコレータの表は、読みの `on` の状態や効果の宛先と合うか）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「op の中身」「診断」）。hozoc は、デコレータの引数の種類（`docs/types.md`「デコレータの引数」）だけを確かめる。
-- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（読みの宣言、デコレータの対象 `read` と `effect`、引数の種類 `any read`、デコレータの `reads` / `effects` の節、残りの引数、予約語のデコレータ名）は hozoc が読む。語彙を読んで出力にするのは `go-sqlite`（`docs/plugin-go-sqlite.md`）。
+- 何を生成するかと、書いたものの整合の検査（表は `@db.table` の状態か、列はあるか、引数と戻り値の型は合うか、デコレータの表は、`read` の `on` の状態や効果の宛先と合うか）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「op の中身」「診断」）。hozoc は、デコレータの引数の種類（`docs/types.md`「デコレータの引数」）だけを確かめる。
+- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（`read` の宣言、デコレータの対象 `read` と `effect`、引数の種類 `any read`、デコレータの `reads` / `effects` の節、残りの引数、予約語のデコレータ名）は hozoc が読む。語彙を読んで出力にするのは `go-sqlite`（`docs/plugin-go-sqlite.md`）。
 
 ### `db` の表と、しまい方
 

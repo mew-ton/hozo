@@ -37,6 +37,7 @@ const (
 	Op
 	Exception
 	Effect
+	Read
 	Classify
 	Condition
 	Decorator
@@ -126,6 +127,7 @@ var Keywords = map[string]Kind{
 	"op":        Op,
 	"exception": Exception,
 	"effect":    Effect,
+	"read":      Read,
 	"classify":  Classify,
 	"condition": Condition,
 	"decorator": Decorator,

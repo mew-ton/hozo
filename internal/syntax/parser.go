@@ -278,6 +278,8 @@ func (p *parser) parseDecl() ast.Decl {
 		return p.parseException(start, doc, decorators)
 	case token.Effect:
 		return p.parseEffect(start, doc, decorators)
+	case token.Read:
+		return p.parseRead(start, doc, decorators)
 	case token.Classify:
 		return p.parseClassify(start, doc, decorators)
 	case token.Condition:
@@ -655,6 +657,21 @@ func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorator
 	return e
 }
 
+// parseRead は ReadDecl = "read" Ident "on" QualifiedName ";" を読む（docs/grammar.md「read」）。
+// on の後ろは状態の名前一つで、操作は書かない。
+func (p *parser) parseRead(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ReadDecl {
+	p.expect(token.Read)
+	r := &ast.ReadDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
+	p.expect(token.On)
+	if !p.atName() {
+		p.failExpected("読む状態の名前")
+	}
+	r.On = p.parseQualifiedName()
+	p.expect(token.Semicolon)
+	r.Span = p.spanFrom(start)
+	return r
+}
+
 // parseTransition は Transition = QualifiedName ":" CaseSet "->" CaseSet を読む。
 func (p *parser) parseTransition() *ast.Transition {
 	start := p.tok().Span.Start
@@ -937,6 +954,8 @@ func (p *parser) parseAnyType() *ast.AnyType {
 		a.Kind = ast.AnyException
 	case p.at(token.Effect):
 		a.Kind = ast.AnyEffect
+	case p.at(token.Read):
+		a.Kind = ast.AnyRead
 	case p.at(token.State):
 		a.Kind = ast.AnyState
 	case p.at(token.Op):
@@ -946,7 +965,7 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	case p.atContextual("variant"):
 		a.Kind = ast.AnyVariant
 	default:
-		p.failExpected("any の種類（exception / effect / state / op / model / variant）")
+		p.failExpected("any の種類（exception / effect / read / state / op / model / variant）")
 	}
 	p.advance()
 	if p.got(token.On) {
@@ -957,7 +976,7 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	return a
 }
 
-// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" を読む。field は文脈キーワード。
+// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" を読む。field は文脈キーワード。
 func (p *parser) parseTarget() *ast.Target {
 	t := &ast.Target{Span: p.tok().Span}
 	switch {
@@ -975,17 +994,19 @@ func (p *parser) parseTarget() *ast.Target {
 		t.Kind = ast.TargetModel
 	case p.at(token.Effect):
 		t.Kind = ast.TargetEffect
+	case p.at(token.Read):
+		t.Kind = ast.TargetRead
 	default:
-		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect）")
+		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect / read）")
 	}
 	p.advance()
 	return t
 }
 
-// parseThrowsClause は ThrowsClause = "throws" ExcRef { "|" ExcRef } { Relation } を読む。
+// parseThrowsClause は ThrowsClause = "throws" ExcRef { "," ExcRef } { Relation } を読む。
 func (p *parser) parseThrowsClause() *ast.ThrowsClause {
 	start := p.expect(token.Throws).Span.Start
-	c := &ast.ThrowsClause{Exceptions: p.parseNameList()}
+	c := &ast.ThrowsClause{Exceptions: p.parseNameList("throws")}
 	for p.at(token.Prevents) || p.at(token.Keeps) {
 		c.Relations = append(c.Relations, p.parseRelation())
 	}
@@ -1015,10 +1036,10 @@ func (p *parser) parseRelation() *ast.Relation {
 	return r
 }
 
-// parseCatchesClause は CatchesClause = "catches" ExcRef { "|" ExcRef } ( "recovers" | "halts" QualifiedName | "ignores" ) を読む。
+// parseCatchesClause は CatchesClause = "catches" ExcRef { "," ExcRef } ( "recovers" | "halts" QualifiedName | "ignores" ) を読む。
 func (p *parser) parseCatchesClause() *ast.CatchesClause {
 	start := p.expect(token.Catches).Span.Start
-	c := &ast.CatchesClause{Exceptions: p.parseNameList()}
+	c := &ast.CatchesClause{Exceptions: p.parseNameList("catches")}
 	switch p.tok().Kind {
 	case token.Recovers:
 		p.advance()
@@ -1038,13 +1059,20 @@ func (p *parser) parseCatchesClause() *ast.CatchesClause {
 	return c
 }
 
-// parseNameList は QualifiedName { "|" QualifiedName } を読む。
-func (p *parser) parseNameList() []ast.QualifiedName {
+// parseNameList は節の並び QualifiedName { "," QualifiedName } を読む。clause は節の頭の語（throws / catches / effects / reads）。
+// 区切りはどの節も ","（docs/grammar.md「op」）。要素の後ろに "|" が来たら（なくした書き方）、区切りが "," であることを
+// メッセージで示して SYNTAX にし、"," として読み進める。
+func (p *parser) parseNameList(clause string) []ast.QualifiedName {
 	names := []ast.QualifiedName{p.parseQualifiedName()}
-	for p.got(token.Pipe) {
+	for {
+		if p.at(token.Pipe) {
+			p.errorAt(p.tok().Span, fmt.Sprintf("%s の並びの区切りは「,」で、「|」ではない（%s A, B と書く。docs/grammar.md「op」）", clause, clause))
+			p.advance()
+		} else if !p.got(token.Comma) {
+			return names
+		}
 		names = append(names, p.parseQualifiedName())
 	}
-	return names
 }
 
 // parseOp は OpDecl を読む（docs/grammar.md「op」）。
@@ -1087,23 +1115,20 @@ func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []
 	return o
 }
 
-// parseEffectsClause は "effects" QualifiedName { "|" QualifiedName } を読む（docs/grammar.md「op」の OpClause と、
-// 「decorator の宣言」の DecoEffectsClause）。
+// parseEffectsClause は "effects" EffectElem { "," EffectElem } を読む（docs/grammar.md「op」の OpClause と、
+// 「decorator の宣言」の DecoEffectsClause）。要素が効果の名前か、直に書いた「状態.操作」かは、名前の解決が決める。
 func (p *parser) parseEffectsClause() *ast.EffectsClause {
 	start := p.expect(token.Effects).Span.Start
-	c := &ast.EffectsClause{Effects: p.parseNameList()}
+	c := &ast.EffectsClause{Effects: p.parseNameList("effects")}
 	c.Span = p.spanFrom(start)
 	return c
 }
 
-// parseReadsClause は "reads" QualifiedName { "," QualifiedName } を読む（docs/grammar.md「op」の OpClause と、
-// 「decorator の宣言」の DecoReadsClause）。区切りは ","。
+// parseReadsClause は "reads" ReadElem { "," ReadElem } を読む（docs/grammar.md「op」の OpClause と、
+// 「decorator の宣言」の DecoReadsClause）。要素が read の名前か、直に書いた状態の名前かは、名前の解決が決める。
 func (p *parser) parseReadsClause() *ast.ReadsClause {
 	start := p.expect(token.Reads).Span.Start
-	c := &ast.ReadsClause{States: []ast.QualifiedName{p.parseQualifiedName()}}
-	for p.got(token.Comma) {
-		c.States = append(c.States, p.parseQualifiedName())
-	}
+	c := &ast.ReadsClause{Reads: p.parseNameList("reads")}
 	c.Span = p.spanFrom(start)
 	return c
 }

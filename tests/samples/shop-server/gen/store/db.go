@@ -66,13 +66,13 @@ func (t UsersTable) Get(ctx context.Context) ([]pkgtype.User, error) {
 		`SELECT "id", "email", "name", "hash" FROM "users" ORDER BY rowid`)
 }
 
-// FindUser は op store.findUser（@db.find）: 表 "users" から、"email"（@db.unique）が引数 email と同じ行を引く。なければ nil。
+// FindUser は op store.findUser（@db.reads）: read store.userByEmail（@db.find）で、表 "users" から、"email"（@db.unique）が引数 email と同じ行を引く。なければ nil。
 func (t UsersTable) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
 	return dbGet(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "email" IS ?1`, dbText(email))
 }
 
-// FindUserById は op store.findUserById（@db.find）: 表 "users" から、"id"（@db.key）が引数 id と同じ行を引く。なければ nil。
+// FindUserById は op store.findUserById（@db.reads）: read store.userById（@db.find）で、表 "users" から、"id"（@db.key）が引数 id と同じ行を引く。なければ nil。
 func (t UsersTable) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
 	return dbGet(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "id" IS ?1`, dbText(id))
@@ -108,7 +108,7 @@ func (t SessionsTable) Get(ctx context.Context) ([]pkgtype.Session, error) {
 		`SELECT "token", "userId", "expiresAt" FROM "sessions" ORDER BY rowid`)
 }
 
-// FindSession は op store.findSession（@db.find）: 表 "sessions" から、"token"（@db.key）が引数 token と同じ行を引く。なければ nil。
+// FindSession は op store.findSession（@db.reads）: read store.sessionByToken（@db.find）で、表 "sessions" から、"token"（@db.key）が引数 token と同じ行を引く。なければ nil。
 func (t SessionsTable) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
 	return dbGet(ctx, t.db, dbScanSession,
 		`SELECT "token", "userId", "expiresAt" FROM "sessions" WHERE "token" IS ?1`, dbText(token))
@@ -149,7 +149,7 @@ func (t OrdersTable) Get(ctx context.Context) ([]pkgtype.Order, error) {
 		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" ORDER BY rowid`)
 }
 
-// ListOrders は op store.listOrders（@db.list）: 表 "orders" から、"userId" が引数 userId と同じ行を、足した順にすべて引く。
+// ListOrders は op store.listOrders（@db.reads）: read store.ordersOfUser（@db.list）で、表 "orders" から、"userId" が引数 userId と同じ行を、足した順にすべて引く。
 func (t OrdersTable) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
 	return dbList(ctx, t.db, dbScanOrder,
 		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" WHERE "userId" IS ?1 ORDER BY rowid`, dbText(userId))

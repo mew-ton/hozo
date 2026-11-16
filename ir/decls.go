@@ -165,6 +165,13 @@ type Effect struct {
 	Writes []string `json:"writes"`
 }
 
+// Read は read 宣言（docs/ir.md「read」）。状態を読むことに付けた名前。
+type Read struct {
+	DeclBase
+	// State は読む基底の状態の FQN。宛先は一つだけ（docs/check.md「読むことの宛先」）。
+	State string `json:"state"`
+}
+
 // EffectTarget は効果の宛先（docs/ir.md「state / exception / effect」の EffectTarget）。
 // 具体型は値型の [BuiltinTarget]（kind "builtin"）と [TransitionTarget]（kind "transition"）。
 type EffectTarget interface {
@@ -470,6 +477,7 @@ const (
 	TargetScalar    DecoratorTarget = "scalar"
 	TargetModel     DecoratorTarget = "model"
 	TargetEffect    DecoratorTarget = "effect"
+	TargetRead      DecoratorTarget = "read"
 )
 
 // Decorator は decorator 宣言（docs/ir.md「decorator」）。
@@ -483,11 +491,12 @@ type Decorator struct {
 	External bool            `json:"external"`
 	Throws   []ThrowsClause  `json:"throws"`
 	Catches  []CatchesClause `json:"catches"`
-	// Reads は `reads` の節の要素（書かれた順。節が複数なら連結）。基底の状態の FQN か、デコレータの引数名
-	// "$param:名前"。付いた op に何が運ばれるかは Op.Carried（docs/check.md「デコレータが運ぶ reads と effects」）。
-	Reads []string `json:"reads"`
-	// Effects は `effects` の節の要素（同じ）。効果の FQN（ユニオンは展開済み）か "$param:名前"。
-	Effects []string `json:"effects"`
+	// Reads は `reads` の節の要素（書かれた順。節が複数なら連結）。FQN の位置に、デコレータの引数名 "$param:名前" も来る:
+	// any read の引数は [NamedRead] の Read に、any state の引数は [DirectRead] の State に。
+	// 付いた op に何が運ばれるかは Op.Carried（docs/check.md「デコレータが運ぶ reads と effects」）。
+	Reads []ReadRef `json:"reads"`
+	// Effects は `effects` の節の要素（同じ。ユニオンは展開済み）。any effect の引数は [NamedEffect] の Effect に "$param:名前"。
+	Effects []EffectRef `json:"effects"`
 	// Alias は名前付きデコレータの記録。
 	Alias *DecoratorAlias `json:"alias,omitempty"`
 }
@@ -530,6 +539,7 @@ type AnyOf string
 const (
 	AnyException AnyOf = "exception"
 	AnyEffect    AnyOf = "effect"
+	AnyRead      AnyOf = "read"
 	AnyState     AnyOf = "state"
 	AnyOp        AnyOf = "op"
 	AnyModel     AnyOf = "model"
@@ -638,11 +648,12 @@ type Op struct {
 	Params   []OpParam `json:"params"`
 	// Returns は戻り値の型。nil は void（JSON では null）。決して返さない op は [NeverType]。
 	Returns Type `json:"returns"`
-	// Effects は書かれた effects の FQN。配線で省略していれば空。デコレータが運ぶものは含まない。
-	Effects []string `json:"effects"`
-	// Reads は書かれた reads（基底の状態の FQN。書かれた順、重複は最初の出現に寄せる）。書いていなければ空。
+	// Effects は書かれた effects（書かれた順。ユニオンは展開済み。重複は最初の出現に寄せる）。配線で省略していれば空。
 	// デコレータが運ぶものは含まない。
-	Reads []string `json:"reads"`
+	Effects []EffectRef `json:"effects"`
+	// Reads は書かれた reads（書かれた順、重複は最初の出現に寄せる）。書いていなければ空。
+	// デコレータが運ぶものは含まない。
+	Reads []ReadRef `json:"reads"`
 	// Carried はデコレータの reads / effects の節が、この op に運ぶもの
 	// （docs/check.md「デコレータが運ぶ reads と effects」）。
 	Carried Carried `json:"carried"`
@@ -656,10 +667,10 @@ type Op struct {
 
 // Carried はデコレータが op に運ぶもの（docs/ir.md「op」の carried）。書いたもの（Op.Reads / Op.Effects）とは分けて持つ。
 type Carried struct {
-	// Reads は基底の状態の FQN。decorators の順、節の順、引数に書いた順。重複は最初の出現に寄せる。
-	Reads []string `json:"reads"`
-	// Effects は効果の FQN（ユニオンは展開済み）。同じ順。
-	Effects []string `json:"effects"`
+	// Reads は運ばれた reads の要素。decorators の順、節の順、引数に書いた順。重複は最初の出現に寄せる。
+	Reads []ReadRef `json:"reads"`
+	// Effects は運ばれた effects の要素（ユニオンは展開済み）。同じ順。
+	Effects []EffectRef `json:"effects"`
 }
 
 // MarshalJSON は docs/ir.md「JSON」の形で書く（空の列は []）。
@@ -668,19 +679,20 @@ func (x Carried) MarshalJSON() ([]byte, error) { type alias Carried; return mars
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (x *Carried) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
 
-// DirectReads は op が直に読む状態: Reads の後ろに Carried.Reads を並べ、重複を最初の出現に寄せたもの
+// DirectReads は op が直に読むもの: Reads の後ろに Carried.Reads を並べ、重複を最初の出現に寄せたもの
 // （docs/check.md「デコレータが運ぶ reads と effects」）。呼び出し先から伝わるものは含まない。
-func (o *Op) DirectReads() []string { return mergeUnique(o.Reads, o.Carried.Reads) }
+// 直に読む状態は [Program.ReadStates] で求める。
+func (o *Op) DirectReads() []ReadRef { return mergeUnique(o.Reads, o.Carried.Reads) }
 
 // DirectEffects は op が直に持つ効果: Effects の後ろに Carried.Effects を並べ、重複を最初の出現に寄せたもの
 // （同上）。呼び出し先から伝わるものと、デコレータの halts の効果は含まない。
-func (o *Op) DirectEffects() []string { return mergeUnique(o.Effects, o.Carried.Effects) }
+func (o *Op) DirectEffects() []EffectRef { return mergeUnique(o.Effects, o.Carried.Effects) }
 
 // mergeUnique は二つの列を順に並べ、重複を最初の出現に寄せる。
-func mergeUnique(a, b []string) []string {
-	var out []string
-	seen := map[string]bool{}
-	for _, list := range [][]string{a, b} {
+func mergeUnique[T comparable](a, b []T) []T {
+	var out []T
+	seen := map[T]bool{}
+	for _, list := range [][]T{a, b} {
 		for _, s := range list {
 			if !seen[s] {
 				seen[s] = true
@@ -713,12 +725,13 @@ type Signature struct {
 	// Exceptions は v から見て投げうる例外の FQN。
 	Exceptions []string `json:"exceptions"`
 	// Effects は伝播を含むすべての効果（op が書いたものと、デコレータが運ぶもの）と、デコレータの halts の効果。
-	Effects []string `json:"effects"`
+	Effects []EffectRef `json:"effects"`
 	// Relations は Exceptions × Effects のすべての組。
 	Relations []SignatureRelation `json:"relations"`
 	// SuccessEffects は成功のアームでの効果の状態。
 	SuccessEffects []SuccessEffect `json:"successEffects"`
 	// Reads は読む基底の状態の FQN。伝播と、デコレータが運ぶものを含む（docs/check.md「reads」の R）。見る側によらない。
+	// read の宣言は、その State として入る。
 	Reads []string `json:"reads"`
 	// Pure は純粋か（docs/check.md「純粋」）。見る側によらない。
 	Pure bool `json:"pure"`
@@ -727,15 +740,21 @@ type Signature struct {
 // SignatureRelation は例外が起きたときの効果の状態（docs/ir.md「op」の Signature の relations）。
 type SignatureRelation struct {
 	Exception string      `json:"exception"`
-	Effect    string      `json:"effect"`
+	Effect    EffectRef   `json:"effect"`
 	State     EffectState `json:"state"`
 }
 
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (x *SignatureRelation) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
+
 // SuccessEffect は成功のアームでの効果の状態（docs/ir.md「op」の Signature の successEffects）。
 type SuccessEffect struct {
-	Effect string      `json:"effect"`
+	Effect EffectRef   `json:"effect"`
 	State  EffectState `json:"state"`
 }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (x *SuccessEffect) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
 
 // Decl の実装。
 
@@ -757,6 +776,9 @@ func (*Exception) Kind() string { return "exception" }
 // Kind は "effect"。
 func (*Effect) Kind() string { return "effect" }
 
+// Kind は "read"。
+func (*Read) Kind() string { return "read" }
+
 // Kind は "classify"。
 func (*Classify) Kind() string { return "classify" }
 
@@ -772,6 +794,7 @@ func (*Union) isDecl()     {}
 func (*State) isDecl()     {}
 func (*Exception) isDecl() {}
 func (*Effect) isDecl()    {}
+func (*Read) isDecl()      {}
 func (*Classify) isDecl()  {}
 func (*Decorator) isDecl() {}
 func (*Op) isDecl()        {}
@@ -783,6 +806,7 @@ var (
 	_ Decl = (*State)(nil)
 	_ Decl = (*Exception)(nil)
 	_ Decl = (*Effect)(nil)
+	_ Decl = (*Read)(nil)
 	_ Decl = (*Classify)(nil)
 	_ Decl = (*Decorator)(nil)
 	_ Decl = (*Op)(nil)
@@ -816,6 +840,9 @@ func (d Effect) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON は kind を付けて書く。
+func (d Read) MarshalJSON() ([]byte, error) { type alias Read; return marshalKind("read", alias(d)) }
+
+// MarshalJSON は kind を付けて書く。
 func (d Classify) MarshalJSON() ([]byte, error) {
 	type alias Classify
 	return marshalKind("classify", alias(d))
@@ -847,6 +874,9 @@ func (d *Exception) UnmarshalJSON(data []byte) error { return unmarshalStruct(da
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (d *Effect) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, d) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (d *Read) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, d) }
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (d *Classify) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, d) }

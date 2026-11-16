@@ -41,6 +41,27 @@
 
 **効果が書き込む状態**（`Effect.writes`）は、組み込みの効果ならその基底の状態、遷移なら、宛先が状態の分類ならその対象のすべての基底の状態、宛先が基底の状態ならその状態。
 
+### 読むことの宛先
+
+`read` の宣言（`docs/grammar.md`「read」）は、基底の状態一つを読むことに名前を付ける。宛先（`Read.state`）は、宣言した名前空間の基底の状態一つ。別の名前空間の状態なら RES-5、状態でないもの（状態の分類を含む）なら RES-4（`docs/resolve.md`「位置ごとに受け付ける種類」）。状態の分類を宛先にできないのは、分類を読むのが配線の `match by C` で、葉の op が読むのは基底の状態だから。
+
+`read` の宣言そのものは、何も読まない。op の `reads` の要素（「直に書く要素」）か、デコレータの `any read` の引数（`docs/types.md`「デコレータの引数」）になって、op が読むものを指す。どの op も指していない `read` は診断しない（どの op も持たない効果を診断しないのと同じ）。
+
+### 直に書く要素
+
+op の `reads` と `effects` の要素は、宣言の名前でも、直にでも書ける（`docs/grammar.md`「op」）。デコレータの宣言の `reads` / `effects` の節の要素も同じ（「計算」の「デコレータが運ぶ reads と effects」）。
+
+| 節 | 名前で書く（`named`） | 直に書く（`direct`） | 直に書いたものが指すもの |
+|---|---|---|---|
+| `reads` | `read` の宣言の名前（`reads userByEmail`） | 基底の状態の名前（`reads users`） | その状態を読むこと |
+| `effects` | `effect` の宣言の名前か、効果のユニオンの名前（`effects addUser`） | `状態.操作`（`effects users.post`） | その状態の組み込みの効果（「基底の状態」の表） |
+
+- 直に書いた要素は、同じ宛先を持つ宣言と同じ規則に従う: 操作がその状態の形になければ STATE-1、葉の op が別の名前空間の状態に書けば STATE-2、読めば READS-1。直に書いた効果が書き込む状態は、その状態。
+- **効果は、書き方ごとに別のもの**として数える。直に書いた `users.post` は、状態 `users` の組み込みの効果 `post` そのもので、同じ宛先を持つ宣言（`effect addUser on users.post;`）とは別の効果。宣言した効果は、宛先が同じでも、宣言ごとに別。効果を数えるところ（Sig の F と rel、EFF-2、EFF-3）は、どれもこの数え方に従う。
+- **読む状態は、書き方によらない。** 読む状態（「計算」の「reads」の R）は基底の状態の集合で、`read` の宣言は、その宛先の状態として数える。`reads userByEmail`（`read userByEmail on users;`）と `reads users` は、R に同じ `users` を足す。
+- 分類の遷移は、直には書けない（`effects Checkout` は RES-4）。宣言した `effect` の宛先にだけ書ける（「効果の宛先」）。
+- 一つの節に、名前で書いた要素と直に書いた要素を混ぜてよい。IR は、要素ごとに、どちらで書いたかを持つ（`docs/ir.md`「op」の `ReadRef`、`EffectRef`）。
+
 ### 検査器が遷移を使う範囲
 
 検査器は、遷移のケースの所属（STATE-4）を確かめ、IR に載せるだけ。配線の行をまたいで状態の場合を追うこと（効果の後の `match` で到達しないアームの検出など）はしない。§7.3 の「不明」と絡むので、要るようになってから別に決める。例外と状態の場合を結びつける書き方（`AlreadyLoggedIn` は前の場合が合わなかったことを表す、など）も持たない（§16 の「状態 × 入力の表で分岐を網羅させる」に近づくため）。
@@ -140,7 +161,7 @@ classify Registration of findUser {     // findUser(email: Email): User?
 
 当たらないもの: 分類の対象にする（`classify C of ns.op`）、ドキュメンテーションコメントの `@see`、`bind` の対象の名前空間に含まれること。
 
-- 対象は op だけ。型、例外、分類、効果、デコレータは、今までどおり修飾すればどこからでも参照できる。状態の規則（持ち主の名前空間だけが読み書きする）も変わらない。
+- 対象は op だけ。型、例外、分類、効果、`read`、デコレータは、今までどおり修飾すればどこからでも参照できる。状態の規則（持ち主の名前空間だけが読み書きする）も変わらない。
 - `bind` は、別の名前空間の内部の op には位置を作らない（「計算」の「bind」の 1）。呼べない op のために BIND-1 / BIND-2 を出さないため。
 - 計算（Sig、`View.ops`）は `export` によらず、すべての op について行う。
 - `export` は IR に載る（`Op.exported`）。検査が見るのは仕様の中の呼び出しだけで、`export` を付けた op をどの名前空間も呼んでいないことは診断しない（呼び手が、プラグインの出力や人が書くコードのように、仕様の外にいることがある）。
@@ -186,12 +207,12 @@ classify Registration of findUser {     // findUser(email: Email): User?
 
 ### デコレータが運ぶ reads と effects
 
-デコレータの宣言の `reads` / `effects` の節（`docs/grammar.md`「decorator の宣言」）は、そのデコレータを付けた op の中身が読む状態と持つ効果を、op の代わりに言う（`docs/decisions.md`「決めたこと」98）。op は、同じものを自分の `reads` / `effects` に書かなくてよい。書いてもよく、重複は一つと数える。
+デコレータの宣言の `reads` / `effects` の節（`docs/grammar.md`「decorator の宣言」）は、そのデコレータを付けた op の中身が読むものと持つ効果を、op の代わりに言う（`docs/decisions.md`「決めたこと」98）。op は、同じものを自分の `reads` / `effects` に書かなくてよい。書いてもよく、重複は一つと数える。
 
-- **運ばれるもの**（`Op.carried`。`docs/ir.md`「op」）: O に付いたデコレータを書かれた順（`Op.decorators` の順）に、その宣言の節を書かれた順に見て、節の要素を並べたもの。`$param:` の要素は、その適用の引数の値で置き換える: 残りの引数なら、渡した値を書いた順にすべて。省略可能な引数を省いていれば、何も足さない。効果のユニオンは展開する。`reads` の要素は `carried.reads` に、`effects` の要素は `carried.effects` に入れ、それぞれ重複を最初の出現に寄せる。
-- O が**直に読む状態**は、`Op.reads` の後ろに `Op.carried.reads` を並べ、重複を最初の出現に寄せたもの。**直に持つ効果**は、`Op.effects` と `Op.carried.effects` で同じ。呼び出し先から伝わるもの（配線）と、`halts` の効果（手順 i）は含まない。
+- **運ばれるもの**（`Op.carried`。`docs/ir.md`「op」）: O に付いたデコレータを書かれた順（`Op.decorators` の順）に、その宣言の節を書かれた順に見て、節の要素を並べたもの。要素は op の節と同じ形（「状態の形」の「直に書く要素」）で、デコレータの引数を指す要素（`$param:`）は、その適用の引数の値で置き換える: `any read` と `any effect` の引数の値は名前で書いた要素（`named`）に、`any state` の引数の値は直に書いた状態（`direct`）になる。残りの引数なら、渡した値を書いた順にすべて。省略可能な引数を省いていれば、何も足さない。効果のユニオンは展開する。`reads` の要素は `carried.reads` に、`effects` の要素は `carried.effects` に入れ、それぞれ重複を最初の出現に寄せる。
+- O が**直に読むもの**は、`Op.reads` の後ろに `Op.carried.reads` を並べ、重複を最初の出現に寄せたもの。**直に読む状態**は、その要素ごとの状態（`read` の宣言ならその宛先、直に書いた状態ならその状態）を同じ順に並べ、重複を最初の出現に寄せたもの。**直に持つ効果**は、`Op.effects` の後ろに `Op.carried.effects` を並べ、重複を最初の出現に寄せたもの。どれも、呼び出し先から伝わるもの（配線）と、`halts` の効果（手順 i）は含まない。
 - 運ぶ節を持つデコレータを付けられるのは、葉の op だけ。配線に付ければ DEC-17: 配線が読む状態と効果は、本体の呼び出しから決まる事実で、節で足すものではない。配線の計算は、運ばれるものを使わない。
-- 運ばれたものも、op が書いたものと同じに確かめる: 別の名前空間の状態なら READS-1、別の名前空間の効果なら STATE-2。
+- 運ばれたものも、op が書いたものと同じに確かめる: 別の名前空間の状態を読むもの（その状態、その状態の `read`）なら READS-1、別の名前空間の効果なら STATE-2。
 - EFF-3（葉の op が自分で書ける効果は一つまで）が数えるのは `Op.effects` だけ。運ばれる効果はいくつでもよい: 順序はデコレータの引数に書いた順で、それらをどう行うか（一体か、どの順か）は、そのデコレータを読むトランスパイラが決める（`@db.effects` は、書いた順の、一つのトランザクション。`docs/plugin-go-sqlite.md`「op の中身」）。
 - 呼び出し元への伝わり方は、op が書いたものと同じ（EFF-1、「reads」）。デコレータの付いた op は、もともと純粋でない（「純粋」の 1）ので、純粋さは変わらない。
 
@@ -200,7 +221,7 @@ classify Registration of findUser {     // findUser(email: Email): User?
 名前空間 v から O を呼んだときの関数の型。六つの値を持つ。
 
 - E: 投げうる例外の列
-- F: 効果の列
+- F: 効果の列（効果の数え方は「状態の形」の「直に書く要素」）
 - rel(X, e): X ∈ E、e ∈ F ごとの `kept` / `prevented` / `unknown`
 - succ(e): 成功のアームでの e の `kept` / `prevented` / `unknown`
 - R: 読む状態の列（下の「reads」）
@@ -242,11 +263,11 @@ D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節
 
 ### reads
 
-op が読む状態。`effects`（書く）と対になる、事実の記録（`docs/decisions.md`「設計書を変える決定」S15）。状態を読むための別の宣言はなく、状態を読むのは op。状態を読み（R が空でない）、効果を持たない op を**読む op** と呼ぶ（`op findUser(email: Email): User? reads users;`。デコレータが運ぶ形なら `@db.find(users, "email") op findUser(email: Email): User?;`）。葉の op は、読む状態と効果を両方持ってよい（読んでから書く op）。
+op が読む状態。`effects`（書く）と対になる、事実の記録（`docs/decisions.md`「設計書を変える決定」S15）。状態を読むのは op で、`read` の宣言（「状態の形」の「読むことの宛先」）は、op が読むものに名前を付けるだけ。状態を読み（R が空でない）、効果を持たない op を**読む op** と呼ぶ（`op findUser(email: Email): User? reads users;`。デコレータが運ぶ形なら `@db.find(users, "email") op findUser(email: Email): User?;`）。葉の op は、読む状態と効果を両方持ってよい（読んでから書く op）。
 
 R は基底の状態の FQN の列で、op ごとに次のように決まる。デコレータが R に足すのは、`reads` の節が運ぶものだけ（「デコレータが運ぶ reads と effects」）。`throws` / `catches` の節は R を変えない。
 
-葉の op: R = O が直に読む状態（`Op.reads` の後ろに `Op.carried.reads`。重複は最初の出現に寄せる）。葉の op が読めるのは自分の名前空間の状態だけで、別の名前空間の状態なら READS-1。
+葉の op: R = O が直に読む状態（「デコレータが運ぶ reads と effects」。`read` の宣言は、その宛先の状態として数える）。葉の op が読めるのは自分の名前空間の状態だけで、別の名前空間の状態なら READS-1。
 
 配線の op: 本体を行の順に見て、次を出現順に集め、重複を最初の出現に寄せる。一つの行の中の順は 1、2 の順。
 
@@ -257,8 +278,8 @@ R は基底の状態の FQN の列で、op ごとに次のように決まる。�
    3. 呼び出し先の Sig の R。
 
 - R は名前空間をまたいで伝わる。`server` の配線が `store.findUser`（`reads users`）を呼べば、その配線の R に `store.users` が入る。効果（EFF-1）と同じ。
-- 配線の op は `reads` を書かなくてよい。書いた場合（`Op.reads` が空でない）、集合として R と等しくなければ READS-2。等しくするために、配線の `reads` には別の名前空間の状態も書ける（配線の `effects` に別の名前空間の効果を書けるのと同じ）。
-- 呼び出しが循環している op（WIRE-7）は、葉として R = `Op.reads`。
+- 配線の op は `reads` を書かなくてよい。書いた場合（`Op.reads` が空でない）、書いた要素の状態の集合が R と等しくなければ READS-2。等しくするために、配線の `reads` には別の名前空間の状態（と、その `read`）も書ける（配線の `effects` に別の名前空間の効果を書けるのと同じ）。
+- 呼び出しが循環している op（WIRE-7）は、葉として R = `Op.reads` の要素の状態。
 
 ### 純粋
 
@@ -307,7 +328,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | NS-2 | — | 正規化で行う。診断なし |
 | NS-3 | error | RES-6 のうち、両方の出どころが語彙（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）のもの。メッセージに語彙の出どころ（標準か、どのプラグインか）を出す |
 | NS-5 | error | 別の名前空間の、`export` のない op を呼んだ（「op の宣言と本体」の「export」の表の二つ: 配線の呼び出し、デコレータの引数に渡した op）。位置は呼び出しの op の名前（デコレータの引数ならその引数の値）。`Related` にその op の宣言 |
-| NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。warning にするのは、設計書が強さを決めていないため |
+| NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `read` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。warning にするのは、設計書が強さを決めていないため |
 | DOC-1 | error | `@param` が引数名にない、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いた `external` なデコレータの `throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。デコレータの宣言の `@param` は `Param` の名前 |
 | DOC-2 | error | 同じ `@param` 名、同じ `@throws` 例外が二度ある |
 | UNION-1 | error | `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複 |
@@ -322,15 +343,15 @@ NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使え�
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| STATE-1 | error | 組み込みの効果の `operation` が、その状態の形にない（「状態の形」の表。`single` に `post` / `delete`） |
+| STATE-1 | error | 組み込みの効果の `operation` が、その状態の形にない（「状態の形」の表。`single` に `post` / `delete`）。`effect` の宣言の宛先にも、`effects` に直に書いた `状態.操作`（「直に書く要素」）にも掛かる。位置は操作の語（直に書いた要素なら、その要素） |
 | STATE-3 | error | 状態の要素の型（`State.element`）が `optional`。形が型から決まるようになった（「状態の形」）ので、当たるのは `list` の状態だけ（`list<T?>`、`T?[]`）: 列は値を持つ。`single<T?>` と `nullable<T?>` は `T?`（`nullable<T>`）と同じ型なので当たらない（`docs/types.md`「形の書き方」）。当たった状態は、`list<T>` として残りの検査を続ける |
 | STATE-4 | error | 遷移の前か後のケースが、宛先の分類のケースでない（宛先が基底の状態なら `Empty` / `HasItems`）。宛先が `single` の状態（組み込みの分類がない）。前と後のどちらかのケースの並びに重複がある |
-| STATE-2 | error | 葉の op O が直に持つ効果 e（`Op.effects` と、デコレータが運ぶ `Op.carried.effects`）について、e の名前空間が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」）。位置は、op が書いた効果ならその名前、デコレータのものならその適用 |
+| STATE-2 | error | 葉の op O が直に持つ効果 e（`Op.effects` と、デコレータが運ぶ `Op.carried.effects`）について、e の名前空間（直に書いた効果なら、その状態の名前空間）が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」）。位置は、op が書いた効果ならその名前、デコレータのものならその適用 |
 | EFF-1 | — | 計算（Sig の F）で行う。診断なし |
-| EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Sig(O, ns(O)).effects と等しくない。足りないもの・余分なものを `Data.missing` / `Data.extra` に |
-| READS-1 | error | 葉の op O が直に読む状態（`Op.reads` と、デコレータが運ぶ `Op.carried.reads`）の名前空間が ns(O) と違う（計算「reads」。`Signature` を要しないので `internal/sema` が出す）。位置は、op が書いた状態ならその名前、デコレータが運ぶものならその適用 |
-| READS-2 | error | 配線の O で `Op.reads` が空でなく、集合として Sig(O, ns(O)).reads と等しくない（計算「reads」）。足りないもの・余分なものを `Data.missing` / `Data.extra` に。位置は O の名前 |
-| EFF-3 | error | 葉の op が自分で書いた `Op.effects`（ユニオンを展開した後。同じ効果の重複は一つと数える）が二つ以上（`Signature` を要しないので `internal/sema` が出す）。デコレータが運ぶ効果（`Op.carried.effects`）は数えない（計算「デコレータが運ぶ reads と effects」）。op が自分で書く形で複数の効果を持つ処理は、効果ごとの葉の op を配線でつなぐ（効果は伝播する。§7.2）。複数の基底の状態を一体として変えるなら、それらを対象にした状態の分類の遷移一つにするか（「効果の宛先」）、効果を並べて一体に行うと言うデコレータを付ける |
+| EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Sig(O, ns(O)).effects と等しくない（効果の数え方は「直に書く要素」: 直に書いた効果と、同じ宛先の宣言は別）。足りないもの・余分なものを `Data.missing` / `Data.extra` に（宣言は FQN、直に書いた効果は `<状態の FQN>.<操作>`） |
+| READS-1 | error | 葉の op O が直に読む状態（`Op.reads` と、デコレータが運ぶ `Op.carried.reads` の要素の状態。`read` の宣言なら、その宛先）の名前空間が ns(O) と違う（計算「reads」。`Signature` を要しないので `internal/sema` が出す）。位置は、op が書いた要素ならその名前、デコレータが運ぶものならその適用 |
+| READS-2 | error | 配線の O で `Op.reads` が空でなく、その要素の状態の集合が Sig(O, ns(O)).reads と等しくない（計算「reads」）。足りないもの・余分なものを `Data.missing` / `Data.extra` に。位置は O の名前 |
+| EFF-3 | error | 葉の op が自分で書いた `Op.effects`（ユニオンを展開した後。同じ効果の重複は一つと数える。名前で書いたものも、直に書いたものも数える）が二つ以上（`Signature` を要しないので `internal/sema` が出す）。デコレータが運ぶ効果（`Op.carried.effects`）は数えない（計算「デコレータが運ぶ reads と effects」）。op が自分で書く形で複数の効果を持つ処理は、効果ごとの葉の op を配線でつなぐ（効果は伝播する。§7.2）。複数の基底の状態を一体として変えるなら、それらを対象にした状態の分類の遷移一つにするか（「効果の宛先」）、効果を並べて一体に行うと言うデコレータを付ける |
 
 ### throws
 
@@ -423,7 +444,7 @@ PAGE-1 / PAGE-2 は hozoc では検査しない。プラグインの `check`（`
 | ID | Data |
 |---|---|
 | THROWS-1 | `{ "missing": [FQN] }` |
-| EFF-2 | `{ "missing": [FQN], "extra": [FQN] }` |
+| EFF-2 | `{ "missing": [効果], "extra": [効果] }`。効果は、宣言なら FQN、直に書いた効果なら `<状態の FQN>.<操作>` |
 | READS-2 | `{ "missing": [FQN], "extra": [FQN] }` |
 | MATCH-2 | `{ "missing": [ケース名], "extra": [ケース名] }` |
 | BIND-4 | `{ "missing": [パス] }` |
