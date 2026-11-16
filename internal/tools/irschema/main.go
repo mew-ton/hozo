@@ -88,9 +88,12 @@ var unions = []struct {
 	}},
 	{typeOf[ir.Decl](), []reflect.Type{
 		typeOf[ir.Model](), typeOf[ir.Scalar](), typeOf[ir.Union](), typeOf[ir.State](),
-		typeOf[ir.Exception](), typeOf[ir.Effect](), typeOf[ir.Classify](), typeOf[ir.Decorator](), typeOf[ir.Op](),
+		typeOf[ir.Exception](), typeOf[ir.Effect](), typeOf[ir.Read](), typeOf[ir.Classify](), typeOf[ir.Decorator](), typeOf[ir.Op](),
 	}},
 	{typeOf[ir.EffectTarget](), []reflect.Type{typeOf[ir.BuiltinTarget](), typeOf[ir.TransitionTarget]()}},
+	{typeOf[ir.ReadRef](), []reflect.Type{typeOf[ir.NamedRead](), typeOf[ir.DirectRead]()}},
+	{typeOf[ir.EffectRef](), []reflect.Type{typeOf[ir.NamedEffect](), typeOf[ir.DirectEffect]()}},
+	{typeOf[ir.Callee](), []reflect.Type{typeOf[ir.OpCallee](), typeOf[ir.ReadCallee](), typeOf[ir.EffectCallee]()}},
 	{typeOf[ir.ClassifySubject](), []reflect.Type{typeOf[ir.TypeSubject](), typeOf[ir.OpSubject](), typeOf[ir.StatesSubject]()}},
 	{typeOf[ir.ParamType](), []reflect.Type{typeOf[ir.TypeParam](), typeOf[ir.AnyParam]()}},
 	{typeOf[ir.Statement](), []reflect.Type{
@@ -123,7 +126,7 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.UnionVariant]():    {"arms", "set"},
 	typeOf[ir.StateShape]():      {"list", "nullable", "single"},
 	typeOf[ir.Operation]():       {"post", "put", "delete"},
-	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model", "effect"},
+	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model", "effect", "read"},
 	typeOf[ir.AnyOf]():           {"exception", "effect", "state", "op", "model", "variant"},
 	typeOf[ir.RelationKind]():    {"prevents", "keeps"},
 	typeOf[ir.CatchMode]():       {"recovers", "halts", "ignores"},

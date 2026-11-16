@@ -294,15 +294,15 @@
           },
           "type": "array"
         },
-        "op": {
-          "type": "string"
+        "callee": {
+          "$ref": "#/$defs/Callee"
         },
         "span": {
           "$ref": "#/$defs/Span"
         }
       },
       "required": [
-        "op",
+        "callee",
         "args",
         "bound",
         "span"
@@ -362,18 +362,31 @@
       ],
       "type": "object"
     },
+    "Callee": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/OpCallee"
+        },
+        {
+          "$ref": "#/$defs/ReadCallee"
+        },
+        {
+          "$ref": "#/$defs/EffectCallee"
+        }
+      ]
+    },
     "Carried": {
       "additionalProperties": false,
       "properties": {
         "effects": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/EffectRef"
           },
           "type": "array"
         },
         "reads": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/ReadRef"
           },
           "type": "array"
         }
@@ -518,7 +531,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.5"
+          "const": "0.6"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -740,6 +753,9 @@
           "$ref": "#/$defs/Effect"
         },
         {
+          "$ref": "#/$defs/Read"
+        },
+        {
           "$ref": "#/$defs/Classify"
         },
         {
@@ -774,7 +790,7 @@
         },
         "effects": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/EffectRef"
           },
           "type": "array"
         },
@@ -795,9 +811,12 @@
         },
         "reads": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/ReadRef"
           },
           "type": "array"
+        },
+        "repeatable": {
+          "type": "boolean"
         },
         "span": {
           "$ref": "#/$defs/Span"
@@ -823,6 +842,7 @@
         "params",
         "targets",
         "external",
+        "repeatable",
         "throws",
         "catches",
         "reads",
@@ -858,7 +878,8 @@
         "exception",
         "scalar",
         "model",
-        "effect"
+        "effect",
+        "read"
       ],
       "type": "string"
     },
@@ -887,6 +908,42 @@
         "code",
         "at",
         "message"
+      ],
+      "type": "object"
+    },
+    "DirectEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "direct"
+        },
+        "operation": {
+          "$ref": "#/$defs/Operation"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "state",
+        "operation"
+      ],
+      "type": "object"
+    },
+    "DirectRead": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "direct"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "state"
       ],
       "type": "object"
     },
@@ -997,6 +1054,12 @@
         "name": {
           "type": "string"
         },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/OpParam"
+          },
+          "type": "array"
+        },
         "span": {
           "$ref": "#/$defs/Span"
         },
@@ -1015,8 +1078,25 @@
         "name",
         "decorators",
         "span",
+        "params",
         "target",
         "writes"
+      ],
+      "type": "object"
+    },
+    "EffectCallee": {
+      "additionalProperties": false,
+      "properties": {
+        "effect": {
+          "$ref": "#/$defs/EffectRef"
+        },
+        "kind": {
+          "const": "effect"
+        }
+      },
+      "required": [
+        "kind",
+        "effect"
       ],
       "type": "object"
     },
@@ -1036,6 +1116,16 @@
         "operation"
       ],
       "type": "object"
+    },
+    "EffectRef": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/NamedEffect"
+        },
+        {
+          "$ref": "#/$defs/DirectEffect"
+        }
+      ]
     },
     "EffectState": {
       "enum": [
@@ -1064,7 +1154,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.5"
+          "const": "0.6"
         },
         "transpiler": {
           "type": "string"
@@ -1129,18 +1219,22 @@
         "name": {
           "type": "string"
         },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/OpParam"
+          },
+          "type": "array"
+        },
         "span": {
           "$ref": "#/$defs/Span"
-        },
-        "value": {
-          "$ref": "#/$defs/Type"
         }
       },
       "required": [
         "kind",
         "name",
         "decorators",
-        "span"
+        "span",
+        "params"
       ],
       "type": "object"
     },
@@ -1239,7 +1333,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.5"
+          "const": "0.6"
         }
       },
       "required": [
@@ -1558,6 +1652,38 @@
       ],
       "type": "object"
     },
+    "NamedEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "effect": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "named"
+        }
+      },
+      "required": [
+        "kind",
+        "effect"
+      ],
+      "type": "object"
+    },
+    "NamedRead": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "named"
+        },
+        "read": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "read"
+      ],
+      "type": "object"
+    },
     "Namespace": {
       "additionalProperties": false,
       "description": "一つの名前空間（docs/ir.md「Program」）。name は FQN。decls は出現順。",
@@ -1727,7 +1853,7 @@
         },
         "effects": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/EffectRef"
           },
           "type": "array"
         },
@@ -1748,7 +1874,7 @@
         },
         "reads": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/ReadRef"
           },
           "type": "array"
         },
@@ -1789,6 +1915,22 @@
         "throws",
         "body",
         "signature"
+      ],
+      "type": "object"
+    },
+    "OpCallee": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "op"
+        },
+        "op": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "op"
       ],
       "type": "object"
     },
@@ -1959,7 +2101,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.5"
+          "const": "0.6"
         }
       },
       "required": [
@@ -1968,6 +2110,77 @@
         "binds"
       ],
       "type": "object"
+    },
+    "Read": {
+      "additionalProperties": false,
+      "properties": {
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
+        "description": {
+          "$ref": "#/$defs/Doc"
+        },
+        "kind": {
+          "const": "read"
+        },
+        "name": {
+          "type": "string"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/OpParam"
+          },
+          "type": "array"
+        },
+        "returns": {
+          "$ref": "#/$defs/Type"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "decorators",
+        "span",
+        "params",
+        "returns",
+        "state"
+      ],
+      "type": "object"
+    },
+    "ReadCallee": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "read"
+        },
+        "read": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "read"
+      ],
+      "type": "object"
+    },
+    "ReadRef": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/NamedRead"
+        },
+        {
+          "$ref": "#/$defs/DirectRead"
+        }
+      ]
     },
     "RecordAtom": {
       "additionalProperties": false,
@@ -2162,7 +2375,7 @@
       "properties": {
         "effects": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/EffectRef"
           },
           "type": "array"
         },
@@ -2209,7 +2422,7 @@
       "description": "例外が起きたときの効果の状態（docs/ir.md「op」の Signature.relations）。",
       "properties": {
         "effect": {
-          "type": "string"
+          "$ref": "#/$defs/EffectRef"
         },
         "exception": {
           "type": "string"
@@ -2384,7 +2597,7 @@
       "description": "成功のアームでの効果の状態（docs/ir.md「op」の Signature.successEffects）。",
       "properties": {
         "effect": {
-          "type": "string"
+          "$ref": "#/$defs/EffectRef"
         },
         "state": {
           "$ref": "#/$defs/EffectState"
@@ -2400,6 +2613,12 @@
       "additionalProperties": false,
       "description": "アームの本体の throw（docs/ir.md「配線」）。exception は FQN。",
       "properties": {
+        "args": {
+          "items": {
+            "$ref": "#/$defs/CallArg"
+          },
+          "type": "array"
+        },
         "exception": {
           "type": "string"
         },
@@ -2413,6 +2632,7 @@
       "required": [
         "kind",
         "exception",
+        "args",
         "span"
       ],
       "type": "object"
@@ -2697,7 +2917,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.5"
+          "const": "0.6"
         },
         "viewer": {
           "type": "string"
@@ -2726,7 +2946,7 @@
         },
         "effects": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/EffectRef"
           },
           "type": "array"
         },
