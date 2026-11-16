@@ -311,7 +311,7 @@ func (p *parser) parseDecorators() ([]*ast.Decorator, *source.Span) {
 	var external *source.Span
 	for p.at(token.At) {
 		start := p.advance().Span.Start
-		name := p.parseQualifiedName()
+		name := p.parseDecoratorRef()
 		if name.String() == "external" {
 			if p.at(token.LParen) {
 				p.fail(p.tok().Span, "@external は引数を取らない")
@@ -790,11 +790,16 @@ func (p *parser) parseCondition(start source.Offset, doc *ast.DocComment, decora
 
 // parseDecoratorDecl は DecoratorDecl を読む（docs/grammar.md「decorator の宣言」）。
 //
-//	DecoratorDecl = [ "@external" ] "decorator" Ident [ Params ] [ "for" Target { "|" Target } ] { DecoratorClause } ";"
-//	              | "decorator" Ident "=" QualifiedName Args ";" ;
+//	DecoratorDecl = [ "@external" ] "decorator" DecoratorName [ Params ] [ "for" Target { "|" Target } ] { DecoratorClause } ";"
+//	              | "decorator" DecoratorName "=" DecoratorRef Args ";" ;
+//
+//	DecoratorClause = ThrowsClause | CatchesClause | DecoReadsClause | DecoEffectsClause ;
+//
+// デコレータの名前は DecoratorName なので予約語も書ける（`decorator list(…)`。docs/grammar.md「識別子」）。
+// reads / effects の節は op の節と同じ形で、同じ構文木（ReadsClause / EffectsClause）にする。
 func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator, external *source.Span) *ast.DecoratorDecl {
 	p.expect(token.Decorator)
-	d := &ast.DecoratorDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
+	d := &ast.DecoratorDecl{Doc: doc, Decorators: decorators, Name: p.parseDecoratorName()}
 	if external != nil {
 		d.External = true
 		d.ExternalSpan = *external
@@ -804,7 +809,7 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 			p.errorAt(*external, "名前付きのデコレータに @external は付けられない（docs/grammar.md「decorator の宣言」）")
 		}
 		aliasStart := p.advance().Span.Start
-		alias := &ast.DecoratorAlias{Name: p.parseQualifiedName()}
+		alias := &ast.DecoratorAlias{Name: p.parseDecoratorRef()}
 		alias.Args = p.parseArgs()
 		alias.Span = p.spanFrom(aliasStart)
 		d.Alias = alias
@@ -821,11 +826,19 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 			d.For = append(d.For, p.parseTarget())
 		}
 	}
-	for p.at(token.Throws) || p.at(token.Catches) {
-		if p.at(token.Throws) {
+clauses:
+	for {
+		switch p.tok().Kind {
+		case token.Throws:
 			d.Clauses = append(d.Clauses, p.parseThrowsClause())
-		} else {
+		case token.Catches:
 			d.Clauses = append(d.Clauses, p.parseCatchesClause())
+		case token.Reads:
+			d.Clauses = append(d.Clauses, p.parseReadsClause())
+		case token.Effects:
+			d.Clauses = append(d.Clauses, p.parseEffectsClause())
+		default:
+			break clauses
 		}
 	}
 	p.expect(token.Semicolon)
@@ -833,23 +846,62 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 	return d
 }
 
-// parseParams は Params = "(" [ Param { "," Param } ] ")" を読む。
+// parseParams は Params を読む。
+//
+//	Params    = "(" [ Param { "," Param } [ "," RestParam ] | RestParam ] ")" ;
+//	Param     = Ident ":" ParamType ;
+//	RestParam = "..." Ident ":" RestType ;
+//	RestType  = AnyType | Type { "|" Type } ;
+//
+// 残りの引数（RestParam）は最後に一つだけ書け、型は渡す値一つの型で、? も [] も付けない（文法で閉じる）。
 func (p *parser) parseParams() []*ast.Param {
 	p.expect(token.LParen)
 	params := []*ast.Param{}
 	for !p.at(token.RParen) {
 		start := p.tok().Span.Start
-		param := &ast.Param{Name: p.parseIdent()}
+		param := &ast.Param{}
+		if p.at(token.Ellipsis) {
+			param.Rest, param.RestSpan = true, p.advance().Span
+		}
+		param.Name = p.parseIdent()
 		p.expect(token.Colon)
 		param.Type = p.parseParamType()
 		param.Span = p.spanFrom(start)
+		if param.Rest {
+			p.checkRestType(param)
+		}
 		params = append(params, param)
 		if !p.got(token.Comma) {
 			break
 		}
+		if param.Rest {
+			p.fail(param.Span, fmt.Sprintf("残りの引数 ...%s は引数の並びの最後に一つだけ書ける（docs/grammar.md「decorator の宣言」）", param.Name.Name))
+		}
 	}
 	p.expect(token.RParen)
 	return params
+}
+
+// checkRestType は RestType の形を確かめる: 渡す値一つの型で、省略可能（?）にも配列（[]）にもできない。
+func (p *parser) checkRestType(param *ast.Param) {
+	t := param.Type
+	if t.Any != nil {
+		if t.Optional {
+			p.errorAt(t.Span, fmt.Sprintf("残りの引数 ...%s は省略可能にできない（0 個でも渡せる。docs/grammar.md「decorator の宣言」）", param.Name.Name))
+			t.Optional = false
+		}
+		return
+	}
+	for i, typ := range t.Types {
+		switch x := typ.(type) {
+		case *ast.OptionalType:
+			p.errorAt(x.Span, fmt.Sprintf("残りの引数 ...%s は省略可能にできない（0 個でも渡せる。docs/grammar.md「decorator の宣言」）", param.Name.Name))
+			t.Types[i] = x.Elem
+		case *ast.ArrayType:
+			p.errorAt(x.Span, fmt.Sprintf("残りの引数 ...%s の型には、渡す値一つの型を書く（[] は付けない。docs/grammar.md「decorator の宣言」）", param.Name.Name))
+			t.Types[i] = x.Elem
+		}
+	}
 }
 
 // parseParamType は ParamType = AnyType [ "?" ] | Type { "|" Type } を読む。
@@ -898,7 +950,7 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	return a
 }
 
-// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" を読む。field は文脈キーワード。
+// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" を読む。field は文脈キーワード。
 func (p *parser) parseTarget() *ast.Target {
 	t := &ast.Target{Span: p.tok().Span}
 	switch {
@@ -914,8 +966,10 @@ func (p *parser) parseTarget() *ast.Target {
 		t.Kind = ast.TargetScalar
 	case p.at(token.Model):
 		t.Kind = ast.TargetModel
+	case p.at(token.Effect):
+		t.Kind = ast.TargetEffect
 	default:
-		p.failExpected("for の対象（op / field / state / exception / scalar / model）")
+		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect）")
 	}
 	p.advance()
 	return t
@@ -1001,10 +1055,7 @@ func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []
 	for {
 		switch p.tok().Kind {
 		case token.Effects:
-			s := p.advance().Span.Start
-			c := &ast.EffectsClause{Effects: p.parseNameList()}
-			c.Span = p.spanFrom(s)
-			o.Clauses = append(o.Clauses, c)
+			o.Clauses = append(o.Clauses, p.parseEffectsClause())
 			continue
 		case token.Reads:
 			o.Clauses = append(o.Clauses, p.parseReadsClause())
@@ -1029,7 +1080,17 @@ func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []
 	return o
 }
 
-// parseReadsClause は "reads" QualifiedName { "," QualifiedName } を読む（docs/grammar.md「op」）。区切りは ","。
+// parseEffectsClause は "effects" QualifiedName { "|" QualifiedName } を読む（docs/grammar.md「op」の OpClause と、
+// 「decorator の宣言」の DecoEffectsClause）。
+func (p *parser) parseEffectsClause() *ast.EffectsClause {
+	start := p.expect(token.Effects).Span.Start
+	c := &ast.EffectsClause{Effects: p.parseNameList()}
+	c.Span = p.spanFrom(start)
+	return c
+}
+
+// parseReadsClause は "reads" QualifiedName { "," QualifiedName } を読む（docs/grammar.md「op」の OpClause と、
+// 「decorator の宣言」の DecoReadsClause）。区切りは ","。
 func (p *parser) parseReadsClause() *ast.ReadsClause {
 	start := p.expect(token.Reads).Span.Start
 	c := &ast.ReadsClause{States: []ast.QualifiedName{p.parseQualifiedName()}}
@@ -1377,6 +1438,48 @@ func (p *parser) parseQualifiedName() ast.QualifiedName {
 	for _, seg := range qn.Segments[1:] {
 		if _, isKeyword := token.Keywords[seg.Name]; isKeyword {
 			p.fail(seg.Span, fmt.Sprintf("%s は予約語で、名前には使えない（予約語を書けるのはフィールド名の位置だけ。docs/grammar.md「予約語」）", seg.Name))
+		}
+	}
+	p.advance()
+	return qn
+}
+
+// parseDecoratorName は DecoratorName = Ident | 予約語 を読む（docs/grammar.md「識別子」）。デコレータの宣言の名前の位置で使う。
+// QualifiedName なら誤り。
+func (p *parser) parseDecoratorName() ast.Ident {
+	if p.tok().Kind.IsKeyword() {
+		t := p.advance()
+		return ast.Ident{Span: t.Span, Name: t.Text}
+	}
+	if p.at(token.QualifiedName) {
+		p.fail(p.tok().Span, fmt.Sprintf("ここには修飾しない識別子を書く: %s", p.tok().Text))
+	}
+	if !p.at(token.Ident) {
+		p.failExpected("デコレータの名前")
+	}
+	t := p.advance()
+	return ast.Ident{Span: t.Span, Name: t.Text}
+}
+
+// parseDecoratorRef は DecoratorRef = [ QualifiedName "." ] DecoratorName を読む（docs/grammar.md「識別子」）。
+// デコレータを指す位置（適用の "@" の後ろ、別名の "=" の後ろ）の名前で、最後の要素にだけ予約語を書ける
+// （`@db.effects`、`@db.list`）。要素が一つで予約語のとき（`@effects`）は、その予約語の字句をそのまま名前として読む。
+// 構文木の形は QualifiedName と同じ。
+func (p *parser) parseDecoratorRef() ast.QualifiedName {
+	if p.tok().Kind.IsKeyword() {
+		t := p.advance()
+		return ast.QualifiedName{Span: t.Span, Segments: []ast.Ident{{Span: t.Span, Name: t.Text}}}
+	}
+	if !p.atName() {
+		p.failExpected("デコレータの名前")
+	}
+	qn := splitName(p.tok(), p.file)
+	for i, seg := range qn.Segments {
+		if i == 0 || i == len(qn.Segments)-1 {
+			continue
+		}
+		if _, isKeyword := token.Keywords[seg.Name]; isKeyword {
+			p.fail(seg.Span, fmt.Sprintf("%s は予約語で、名前には使えない（デコレータを指す名前で予約語を書けるのは、最後の要素だけ。docs/grammar.md「識別子」）", seg.Name))
 		}
 	}
 	p.advance()

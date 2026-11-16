@@ -471,10 +471,11 @@ const (
 	TargetException DecoratorTarget = "exception"
 	TargetScalar    DecoratorTarget = "scalar"
 	TargetModel     DecoratorTarget = "model"
+	TargetEffect    DecoratorTarget = "effect"
 )
 
 // Decorator は decorator 宣言（docs/ir.md「decorator」）。
-// Alias を持つ宣言は Params / Targets / Throws / Catches を持たず（JSON では []）、Alias.Target のものを使う。
+// Alias を持つ宣言は Params / Targets / Throws / Catches / Reads / Effects を持たず（JSON では []）、Alias.Target のものを使う。
 type Decorator struct {
 	DeclBase
 	Params []Param `json:"params"`
@@ -484,6 +485,11 @@ type Decorator struct {
 	External bool            `json:"external"`
 	Throws   []ThrowsClause  `json:"throws"`
 	Catches  []CatchesClause `json:"catches"`
+	// Reads は `reads` の節の要素（書かれた順。節が複数なら連結）。基底の状態の FQN か、デコレータの引数名
+	// "$param:名前"。付いた op に何が運ばれるかは Op.Carried（docs/check.md「デコレータが運ぶ reads と effects」）。
+	Reads []string `json:"reads"`
+	// Effects は `effects` の節の要素（同じ）。効果の FQN（ユニオンは展開済み）か "$param:名前"。
+	Effects []string `json:"effects"`
 	// Alias は名前付きデコレータの記録。
 	Alias *DecoratorAlias `json:"alias,omitempty"`
 }
@@ -500,6 +506,9 @@ type Param struct {
 	Name     string    `json:"name"`
 	Type     ParamType `json:"type"`
 	Optional bool      `json:"optional"`
+	// Rest は残りの引数（`...名前: 型`。docs/grammar.md「decorator の宣言」）。Params の最後の一つだけが true になりうる。
+	// true なら Optional は false で、Type は渡す値一つの型。
+	Rest bool `json:"rest"`
 }
 
 // ParamType はデコレータの引数の型（docs/ir.md「decorator」の ParamType）。
@@ -631,16 +640,57 @@ type Op struct {
 	Params   []OpParam `json:"params"`
 	// Returns は戻り値の型。nil は void（JSON では null）。決して返さない op は [NeverType]。
 	Returns Type `json:"returns"`
-	// Effects は書かれた effects の FQN。配線で省略していれば空。
+	// Effects は書かれた effects の FQN。配線で省略していれば空。デコレータが運ぶものは含まない。
 	Effects []string `json:"effects"`
 	// Reads は書かれた reads（基底の状態の FQN。書かれた順、重複は最初の出現に寄せる）。書いていなければ空。
+	// デコレータが運ぶものは含まない。
 	Reads []string `json:"reads"`
+	// Carried はデコレータの reads / effects の節が、この op に運ぶもの
+	// （docs/check.md「デコレータが運ぶ reads と effects」）。
+	Carried Carried `json:"carried"`
 	// Throws は書かれた throws。
 	Throws []ThrowsClause `json:"throws"`
 	// Body は配線。nil は葉（JSON では null）。
 	Body *Wiring `json:"body"`
 	// Signature は計算結果。自分の名前空間から見た関数の型（docs/check.md「計算」）。
 	Signature Signature `json:"signature"`
+}
+
+// Carried はデコレータが op に運ぶもの（docs/ir.md「op」の carried）。書いたもの（Op.Reads / Op.Effects）とは分けて持つ。
+type Carried struct {
+	// Reads は基底の状態の FQN。decorators の順、節の順、引数に書いた順。重複は最初の出現に寄せる。
+	Reads []string `json:"reads"`
+	// Effects は効果の FQN（ユニオンは展開済み）。同じ順。
+	Effects []string `json:"effects"`
+}
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く（空の列は []）。
+func (x Carried) MarshalJSON() ([]byte, error) { type alias Carried; return marshalStruct(alias(x)) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (x *Carried) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
+
+// DirectReads は op が直に読む状態: Reads の後ろに Carried.Reads を並べ、重複を最初の出現に寄せたもの
+// （docs/check.md「デコレータが運ぶ reads と effects」）。呼び出し先から伝わるものは含まない。
+func (o *Op) DirectReads() []string { return mergeUnique(o.Reads, o.Carried.Reads) }
+
+// DirectEffects は op が直に持つ効果: Effects の後ろに Carried.Effects を並べ、重複を最初の出現に寄せたもの
+// （同上）。呼び出し先から伝わるものと、デコレータの halts の効果は含まない。
+func (o *Op) DirectEffects() []string { return mergeUnique(o.Effects, o.Carried.Effects) }
+
+// mergeUnique は二つの列を順に並べ、重複を最初の出現に寄せる。
+func mergeUnique(a, b []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, list := range [][]string{a, b} {
+		for _, s := range list {
+			if !seen[s] {
+				seen[s] = true
+				out = append(out, s)
+			}
+		}
+	}
+	return out
 }
 
 // OpParam は op の引数（docs/ir.md「op」の OpParam）。説明は Op.Description.Params から引く。
@@ -664,13 +714,13 @@ const (
 type Signature struct {
 	// Exceptions は v から見て投げうる例外の FQN。
 	Exceptions []string `json:"exceptions"`
-	// Effects は伝播を含むすべての効果と、デコレータの halts の効果。
+	// Effects は伝播を含むすべての効果（op が書いたものと、デコレータが運ぶもの）と、デコレータの halts の効果。
 	Effects []string `json:"effects"`
 	// Relations は Exceptions × Effects のすべての組。
 	Relations []SignatureRelation `json:"relations"`
 	// SuccessEffects は成功のアームでの効果の状態。
 	SuccessEffects []SuccessEffect `json:"successEffects"`
-	// Reads は読む基底の状態の FQN。伝播を含む（docs/check.md「reads」の R）。見る側によらない。
+	// Reads は読む基底の状態の FQN。伝播と、デコレータが運ぶものを含む（docs/check.md「reads」の R）。見る側によらない。
 	Reads []string `json:"reads"`
 	// Pure は純粋か（docs/check.md「純粋」）。見る側によらない。
 	Pure bool `json:"pure"`

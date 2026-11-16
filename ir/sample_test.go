@@ -158,9 +158,18 @@ func sampleProgram() *Program {
 						SynthesizedFrom: "server.Unavailable",
 					},
 					&Effect{
-						DeclBase: DeclBase{Name: "server.UserCreated", Span: span(f, 24, 1, 24, 40)},
-						Target:   BuiltinTarget{State: "db", Operation: OpPost},
-						Writes:   []string{"db"},
+						DeclBase: DeclBase{
+							Name: "server.UserCreated",
+							// 効果の宣言に付けたデコレータ（Decorator.targets の effect）
+							Decorators: []Application{{
+								Decorator: "server.inserts",
+								Args:      []Arg{{Param: "table", Value: RefValue{Target: "db"}}},
+								Span:      span(f, 24, 1, 24, 20),
+							}},
+							Span: span(f, 24, 1, 24, 40),
+						},
+						Target: BuiltinTarget{State: "db", Operation: OpPost},
+						Writes: []string{"db"},
 					},
 					&Union{
 						DeclBase: DeclBase{Name: "server.ApiError", Span: span(f, 26, 1, 28, 2)},
@@ -229,6 +238,22 @@ func sampleProgram() *Program {
 							},
 						},
 					},
+					&Decorator{
+						DeclBase: DeclBase{Name: "server.inserts", Span: span(f, 44, 1, 44, 50)},
+						Params:   []Param{{Name: "table", Type: AnyParam{Of: AnyState}}},
+						Targets:  []DecoratorTarget{TargetEffect},
+					},
+					// reads / effects の節と、残りの引数を持つデコレータ
+					&Decorator{
+						DeclBase: DeclBase{Name: "server.stores", Span: span(f, 44, 52, 44, 140)},
+						Params: []Param{
+							{Name: "table", Type: AnyParam{Of: AnyState}, Optional: true},
+							{Name: "targets", Type: AnyParam{Of: AnyEffect}, Rest: true},
+						},
+						Targets: []DecoratorTarget{TargetOp},
+						Reads:   []string{"$param:table", "session"},
+						Effects: []string{"$param:targets"},
+					},
 					&Op{
 						DeclBase: DeclBase{
 							Name: "server.findUser",
@@ -286,6 +311,38 @@ func sampleProgram() *Program {
 						Returns:   Never(),
 						Throws:    []ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
 						Signature: Signature{Exceptions: []string{"server.Unauthorized"}, Pure: true},
+					},
+					// デコレータが reads と effects を運ぶ葉の op（Op.carried）。残りの引数は一つの list
+					&Op{
+						DeclBase: DeclBase{
+							Name: "server.record",
+							Decorators: []Application{{
+								Decorator: "server.stores",
+								Args: []Arg{
+									{Param: "table", Value: RefValue{Target: "db"}},
+									{Param: "targets", Value: ListValue{Items: []ArgValue{
+										RefValue{Target: "server.UserCreated"},
+										RefsValue{Targets: []string{"login", "logout"}},
+									}}},
+								},
+								Span: span(f, 48, 52, 48, 90),
+							}},
+							Span: span(f, 48, 52, 48, 130),
+						},
+						Params: []OpParam{{Name: "in", Type: Ref("server.User"), Span: span(f, 48, 100, 48, 115)}},
+						Carried: Carried{
+							Reads:   []string{"db", "session"},
+							Effects: []string{"server.UserCreated", "login", "logout"},
+						},
+						Signature: Signature{
+							Effects: []string{"server.UserCreated", "login", "logout"},
+							SuccessEffects: []SuccessEffect{
+								{Effect: "server.UserCreated", State: Kept},
+								{Effect: "login", State: Kept},
+								{Effect: "logout", State: Kept},
+							},
+							Reads: []string{"db", "session"},
+						},
 					},
 					&Op{
 						DeclBase: DeclBase{Name: "server.notify", Span: span(f, 49, 1, 49, 30)},
@@ -435,6 +492,10 @@ func sampleView() *View {
 				Bound:     []BoundPosition{{Path: []string{"in", "token"}, State: "db"}},
 			},
 			"server.notify": {},
+			"server.record": {
+				Signature: p.Lookup("server.record").(*Op).Signature,
+				Params:    []OpParam{{Name: "in", Type: Ref("server.User"), Span: span("server.hozo", 48, 100, 48, 115)}},
+			},
 		},
 	}
 }

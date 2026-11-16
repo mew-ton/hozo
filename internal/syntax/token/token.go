@@ -112,6 +112,7 @@ const (
 	StarStar  // **
 	Arrow     // =>
 	ThinArrow // ->
+	Ellipsis  // ...
 )
 
 // Keywords は予約語から Kind への表（docs/grammar.md「予約語」）。
@@ -192,7 +193,7 @@ func IsContextual(s string) bool {
 var symbols = map[Kind]string{
 	LBrace: "{", RBrace: "}", LParen: "(", RParen: ")", LBracket: "[", RBracket: "]",
 	Less: "<", Greater: ">", Colon: ":", Semicolon: ";", Comma: ",", Dot: ".",
-	Assign: "=", Question: "?", Pipe: "|", At: "@", Star: "*", StarStar: "**", Arrow: "=>", ThinArrow: "->",
+	Assign: "=", Question: "?", Pipe: "|", At: "@", Star: "*", StarStar: "**", Arrow: "=>", ThinArrow: "->", Ellipsis: "...",
 }
 
 var keywordNames = invert(Keywords)

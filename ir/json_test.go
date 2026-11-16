@@ -405,7 +405,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.4","namespaces":[],"binds":[]}`
+	want := `{"version":"0.5","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -413,7 +413,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.4","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.4","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.5","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.5","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -424,7 +424,7 @@ func TestEmptySlicesAndOptionals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"kind":"op","name":"f","decorators":[],` + spJSON + `,"exported":false,"params":[],"returns":null,"effects":[],"reads":[],"throws":[],"body":null,` +
+	want := `{"kind":"op","name":"f","decorators":[],` + spJSON + `,"exported":false,"params":[],"returns":null,"effects":[],"reads":[],"carried":{"reads":[],"effects":[]},"throws":[],"body":null,` +
 		`"signature":{"exceptions":[],"effects":[],"relations":[],"successEffects":[],"reads":[],"pure":false}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
@@ -679,5 +679,62 @@ func TestNamespaceConfigJSON(t *testing.T) {
 	empty, _ := json.Marshal(NamespaceConfig{})
 	if want := `{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}}`; string(empty) != want {
 		t.Errorf("got  %s\nwant %s", empty, want)
+	}
+}
+
+// TestVersion05Fields は版 0.5 で足した項目（docs/ir.md「版」）の JSON の形: Decorator.targets の effect、
+// Decorator.reads / effects、Param.rest、Op.carried。空の列は [] で出し、読み戻すと同じ値になる。
+func TestVersion05Fields(t *testing.T) {
+	dec := &Decorator{
+		DeclBase: DeclBase{Name: "db.effects", Span: sp()},
+		Params:   []Param{{Name: "targets", Type: AnyParam{Of: AnyEffect}, Rest: true}},
+		Targets:  []DecoratorTarget{TargetOp, TargetEffect},
+		Effects:  []string{"$param:targets"},
+	}
+	b := roundTrip(t, *dec)
+	for _, want := range []string{
+		`"params":[{"name":"targets","type":{"kind":"any","of":"effect"},"optional":false,"rest":true}]`,
+		`"targets":["op","effect"]`,
+		`"reads":[]`,
+		`"effects":["$param:targets"]`,
+	} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("decorator の JSON に %s がない: %s", want, b)
+		}
+	}
+	// 節を持たない宣言も、reads と effects を [] で出す。
+	b, _ = json.Marshal(&Decorator{DeclBase: DeclBase{Name: "d", Span: sp()}})
+	if !strings.Contains(string(b), `"catches":[],"reads":[],"effects":[]`) {
+		t.Errorf("節のない decorator: %s", b)
+	}
+	// 残りの引数でない Param は rest: false を出す（省かない）。
+	b, _ = json.Marshal(Param{Name: "p", Type: AnyParam{Of: AnyState}})
+	if string(b) != `{"name":"p","type":{"kind":"any","of":"state"},"optional":false,"rest":false}` {
+		t.Errorf("param: %s", b)
+	}
+	op := &Op{
+		DeclBase: DeclBase{Name: "store.placeOrder", Span: sp()},
+		Reads:    []string{"store.users"},
+		Effects:  []string{"store.e1"},
+		Carried:  Carried{Reads: []string{"store.orders", "store.users"}, Effects: []string{"store.e1", "store.e2"}},
+	}
+	b = roundTrip(t, *op)
+	if want := `"effects":["store.e1"],"reads":["store.users"],"carried":{"reads":["store.orders","store.users"],"effects":["store.e1","store.e2"]}`; !strings.Contains(string(b), want) {
+		t.Errorf("op の JSON に %s がない: %s", want, b)
+	}
+	// 直に読む状態と直に持つ効果は、書いたものの後ろに運ばれたものを並べ、重複を最初の出現に寄せる。
+	if got := op.DirectReads(); !reflect.DeepEqual(got, []string{"store.users", "store.orders"}) {
+		t.Errorf("DirectReads = %v", got)
+	}
+	if got := op.DirectEffects(); !reflect.DeepEqual(got, []string{"store.e1", "store.e2"}) {
+		t.Errorf("DirectEffects = %v", got)
+	}
+	if got := (&Op{}).DirectReads(); got != nil {
+		t.Errorf("何も読まない op の DirectReads = %v", got)
+	}
+	// carried は単独でも、空の列を [] で出す。
+	b, _ = json.Marshal(Carried{})
+	if string(b) != `{"reads":[],"effects":[]}` {
+		t.Errorf("carried: %s", b)
 	}
 }

@@ -160,6 +160,7 @@ type Decl interface {
 // Decorator はデコレータの適用（docs/grammar.md「デコレータの適用」）。
 type Decorator struct {
 	Span source.Span
+	// Name は DecoratorRef（docs/grammar.md「識別子」）。最後の要素は予約語のこともある（@db.list、@effects）。
 	Name QualifiedName
 	// Args は引数。"( )" がなければ nil、"()" なら空でない nil 以外（長さ 0）。
 	Args []*Arg
@@ -501,10 +502,13 @@ type DecoratorDecl struct {
 	External bool
 	// ExternalSpan は @external の範囲。External でなければゼロ値。
 	ExternalSpan source.Span
-	Name         Ident
-	Params       []*Param
+	// Name は DecoratorName（docs/grammar.md「識別子」）。予約語のこともある（decorator list(…)）。
+	Name   Ident
+	Params []*Param
 	// For は付けられる対象。省略なら空（意味は op。設計書 §8.2）。
-	For     []*Target
+	For []*Target
+	// Clauses は節。*ThrowsClause、*CatchesClause と、デコレータが op に運ぶ *ReadsClause、*EffectsClause
+	// （docs/grammar.md「decorator の宣言」の DecoReadsClause / DecoEffectsClause）。書かれた順。
 	Clauses []Clause
 	Alias   *DecoratorAlias
 }
@@ -513,9 +517,10 @@ type DecoratorDecl struct {
 func (n *DecoratorDecl) NodeSpan() source.Span { return n.Span }
 func (n *DecoratorDecl) declNode()             {}
 
-// DecoratorAlias は "= QualifiedName Args" の部分。
+// DecoratorAlias は "= DecoratorRef Args" の部分。
 type DecoratorAlias struct {
 	Span source.Span
+	// Name は DecoratorRef。最後の要素は予約語のこともある。
 	Name QualifiedName
 	Args []*Arg
 }
@@ -523,11 +528,15 @@ type DecoratorAlias struct {
 // NodeSpan は Node の実装。
 func (n *DecoratorAlias) NodeSpan() source.Span { return n.Span }
 
-// Param はデコレータの引数の宣言。
+// Param はデコレータの引数の宣言。Rest なら残りの引数（"..." Ident ":" RestType。docs/grammar.md「decorator の宣言」）。
 type Param struct {
 	Span source.Span
 	Name Ident
 	Type *ParamType
+	// Rest は残りの引数か。引数の並びの最後の一つだけが true になりうる。
+	Rest bool
+	// RestSpan は "..." の範囲。Rest でなければゼロ値。
+	RestSpan source.Span
 }
 
 // NodeSpan は Node の実装。
@@ -610,6 +619,8 @@ const (
 	TargetScalar
 	// TargetModel は model。
 	TargetModel
+	// TargetEffect は effect。
+	TargetEffect
 )
 
 // String は対象の語。
@@ -627,6 +638,8 @@ func (k TargetKind) String() string {
 		return "scalar"
 	case TargetModel:
 		return "model"
+	case TargetEffect:
+		return "effect"
 	}
 	return "?"
 }
@@ -724,7 +737,7 @@ type CatchesClause struct {
 func (n *CatchesClause) NodeSpan() source.Span { return n.Span }
 func (n *CatchesClause) clauseNode()           {}
 
-// EffectsClause は op の "effects X | Y"。
+// EffectsClause は "effects X | Y"。op の節と、デコレータの宣言の節（DecoEffectsClause）。
 type EffectsClause struct {
 	Span    source.Span
 	Effects []QualifiedName
@@ -734,7 +747,7 @@ type EffectsClause struct {
 func (n *EffectsClause) NodeSpan() source.Span { return n.Span }
 func (n *EffectsClause) clauseNode()           {}
 
-// ReadsClause は op の "reads a, b"（docs/grammar.md「op」）。
+// ReadsClause は "reads a, b"（docs/grammar.md「op」）。op の節と、デコレータの宣言の節（DecoReadsClause）。
 type ReadsClause struct {
 	Span   source.Span
 	States []QualifiedName

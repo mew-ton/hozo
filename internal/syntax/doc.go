@@ -81,7 +81,9 @@ func (p *parser) parseDocTag(text string, span source.Span) (*ast.DocTag, bool) 
 		return nil, false
 	}
 	nameStart := int(span.Start) + strings.Index(text, fields[1])
-	name, ok := qualifiedNameOf(fields[1], p.file, nameStart)
+	// @see の名前は QualifiedName か DecoratorRef で、最後の要素にだけ予約語を書ける（@see db.list。
+	// docs/grammar.md「ドキュメンテーションコメント」）。
+	name, ok := qualifiedNameOf(fields[1], p.file, nameStart, kind == ast.DocSee)
 	if !ok || (kind == ast.DocParam && len(name.Segments) != 1) {
 		p.errorAt(span, fields[0]+" の名前の形が正しくない: "+fields[1])
 		return nil, false
@@ -99,11 +101,13 @@ func (p *parser) parseDocTag(text string, span source.Span) (*ast.DocTag, bool) 
 }
 
 // qualifiedNameOf は文字列を QualifiedName にする。識別子の形でなければ ok は false。
-func qualifiedNameOf(s string, file source.FileID, start int) (ast.QualifiedName, bool) {
+// keywordLast が true なら、最後の要素は予約語でもよい（DecoratorRef）。
+func qualifiedNameOf(s string, file source.FileID, start int, keywordLast bool) (ast.QualifiedName, bool) {
 	qn := ast.QualifiedName{Span: source.Span{File: file, Start: source.Offset(start), End: source.Offset(start + len(s))}}
 	off := start
-	for _, seg := range strings.Split(s, ".") {
-		if !isIdentText(seg) {
+	segs := strings.Split(s, ".")
+	for i, seg := range segs {
+		if !isIdentText(seg) && !(keywordLast && i == len(segs)-1 && isKeywordText(seg)) {
 			return qn, false
 		}
 		qn.Segments = append(qn.Segments, ast.Ident{
@@ -126,4 +130,9 @@ func isIdentText(s string) bool {
 	}
 	_, keyword := token.Keywords[s]
 	return !keyword
+}
+
+func isKeywordText(s string) bool {
+	_, keyword := token.Keywords[s]
+	return keyword
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -30,7 +31,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.login
 	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
-		var in LoginInput
+		in := NewLoginInput()
 		req := httpRequest{r: r}
 		req.bodyObj(&in.Body)
 		if !req.ok(w) {
@@ -49,7 +50,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.logout
 	mux.HandleFunc("POST /logout", func(w http.ResponseWriter, r *http.Request) {
-		var in AuthInput
+		in := NewAuthInput()
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
 		if !req.ok(w) {
@@ -67,7 +68,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.getMe
 	mux.HandleFunc("GET /me", func(w http.ResponseWriter, r *http.Request) {
-		var in AuthInput
+		in := NewAuthInput()
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
 		if !req.ok(w) {
@@ -106,7 +107,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.getLatestOrder
 	mux.HandleFunc("GET /orders/latest", func(w http.ResponseWriter, r *http.Request) {
-		var in AuthInput
+		in := NewAuthInput()
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
 		if !req.ok(w) {
@@ -125,10 +126,10 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.placeOrder
 	mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
-		var in PlaceOrderInput
+		in := NewPlaceOrderInput()
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
-		req.body("lines", &in.Lines)
+		req.body("lines", &in.Lines, httpRequired)
 		if !req.ok(w) {
 			return
 		}
@@ -173,6 +174,12 @@ type httpViolation struct {
 // httpPlace は、入力の model のフィールドと、それを読む通信の上の場所の組。
 type httpPlace struct{ field, place string }
 
+// httpOption は、項目の読み方に、フィールドのデコレータが足すこと。
+type httpOption int
+
+// httpRequired は @http.required: その項目がなければ、読めない要求（"<場所> <名前>: missing"）。
+const httpRequired httpOption = 1
+
 // httpRequest は、要求一つを、入力のフィールドに読む。読めなかった最初の理由を fail に持ち、その後は何も読まない。
 type httpRequest struct {
 	r     *http.Request
@@ -181,20 +188,20 @@ type httpRequest struct {
 }
 
 // header は、ヘッダ name の値を dst（フィールドへのポインタ）に読む（@http.header）。空の値は、ないものと読む。
-func (q *httpRequest) header(name string, dst any) {
+func (q *httpRequest) header(name string, dst any, opts ...httpOption) {
 	text := q.r.Header.Get(name)
-	q.text("header", name, text, text != "", dst)
+	q.text("header", name, text, text != "", dst, opts)
 }
 
 // query は、クエリ name の値を dst（フィールドへのポインタ）に読む（@http.query）。同じ名前が二度あれば、最初の値。
-func (q *httpRequest) query(name string, dst any) {
+func (q *httpRequest) query(name string, dst any, opts ...httpOption) {
 	values := q.r.URL.Query()
-	q.text("query", name, values.Get(name), values.Has(name), dst)
+	q.text("query", name, values.Get(name), values.Has(name), dst, opts)
 }
 
 // body は、本文（JSON のオブジェクト）のキー name の値を dst（フィールドへのポインタ）に読む（@http.body）。
-// キーがなければ、dst は初めの値のまま。
-func (q *httpRequest) body(name string, dst any) {
+// キーがあれば、値が null でも、あるものと読む。
+func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 	if q.fail != "" {
 		return
 	}
@@ -211,6 +218,7 @@ func (q *httpRequest) body(name string, dst any) {
 	}
 	raw, present := q.items[name]
 	if !present {
+		q.missing("body", name, opts)
 		return
 	}
 	if err := json.Unmarshal(raw, dst); err != nil {
@@ -232,20 +240,26 @@ func (q *httpRequest) bodyObj(dst any) {
 	}
 }
 
+// missing は、項目がなかったときの扱い。読む先は、初めの値のまま。
+// @http.required（httpRequired）の項目なら、読めない要求。型は見ない。
+func (q *httpRequest) missing(place, name string, opts []httpOption) {
+	if slices.Contains(opts, httpRequired) {
+		q.fail = place + " " + name + ": missing"
+	}
+}
+
 // text は、通信の上の文字列（ヘッダとクエリの値）一つを dst（フィールドへのポインタ）に読む。読み方は、実行時に、dst の指す型で決める:
 // ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。
-// 値がない（present が false）ときは、dst を初めの値のままにする。省略可能でなく、初めの値が零値のままなら、足りない。
-func (q *httpRequest) text(place, name, text string, present bool, dst any) {
+// 値がない（present が false）ときの扱いは、missing。
+func (q *httpRequest) text(place, name, text string, present bool, dst any, opts []httpOption) {
 	if q.fail != "" {
 		return
 	}
-	v := reflect.ValueOf(dst).Elem()
 	if !present {
-		if v.Kind() != reflect.Pointer && v.IsZero() {
-			q.fail = place + " " + name + ": missing"
-		}
+		q.missing(place, name, opts)
 		return
 	}
+	v := reflect.ValueOf(dst).Elem()
 	if v.Kind() == reflect.Pointer {
 		v.Set(reflect.New(v.Type().Elem()))
 		v = v.Elem()

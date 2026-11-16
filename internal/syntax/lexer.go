@@ -339,6 +339,12 @@ func (l *lexer) lexSymbol() {
 	case ',':
 		kind = token.Comma
 	case '.':
+		if l.peekByte(1) == '.' && l.peekByte(2) == '.' {
+			// "..." はデコレータの宣言の残りの引数でだけ使う（docs/grammar.md「記号」）
+			l.pos += 3
+			l.emit(token.Ellipsis, start, l.pos)
+			return
+		}
 		kind = token.Dot
 	case '?':
 		kind = token.Question

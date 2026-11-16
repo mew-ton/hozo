@@ -1,5 +1,5 @@
 {
-  "version": "0.4",
+  "version": "0.5",
   "viewer": "browser",
   "config": {
     "index": 1,
@@ -115,7 +115,7 @@
     ]
   },
   "program": {
-    "version": "0.4",
+    "version": "0.5",
     "namespaces": [
       {
         "name": "",
@@ -876,7 +876,31 @@
           {
             "kind": "effect",
             "name": "server.UserCreated",
-            "decorators": [],
+            "decorators": [
+              {
+                "decorator": "server.inserts",
+                "args": [
+                  {
+                    "param": "table",
+                    "value": {
+                      "kind": "ref",
+                      "target": "db"
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 24,
+                    "col": 1
+                  },
+                  "end": {
+                    "line": 24,
+                    "col": 20
+                  }
+                }
+              }
+            ],
             "span": {
               "file": "server.hozo",
               "start": {
@@ -1157,7 +1181,8 @@
                     }
                   ]
                 },
-                "optional": false
+                "optional": false,
+                "rest": false
               },
               {
                 "name": "on",
@@ -1165,7 +1190,8 @@
                   "kind": "any",
                   "of": "exception"
                 },
-                "optional": true
+                "optional": true,
+                "rest": false
               },
               {
                 "name": "after",
@@ -1177,7 +1203,8 @@
                     "operation": "post"
                   }
                 },
-                "optional": true
+                "optional": true,
+                "rest": false
               }
             ],
             "targets": [
@@ -1227,7 +1254,9 @@
                 ],
                 "mode": "ignores"
               }
-            ]
+            ],
+            "reads": [],
+            "effects": []
           },
           {
             "kind": "decorator",
@@ -1249,6 +1278,8 @@
             "external": true,
             "throws": [],
             "catches": [],
+            "reads": [],
+            "effects": [],
             "alias": {
               "target": "server.retry",
               "args": [
@@ -1274,6 +1305,90 @@
                 }
               ]
             }
+          },
+          {
+            "kind": "decorator",
+            "name": "server.inserts",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 44,
+                "col": 1
+              },
+              "end": {
+                "line": 44,
+                "col": 50
+              }
+            },
+            "params": [
+              {
+                "name": "table",
+                "type": {
+                  "kind": "any",
+                  "of": "state"
+                },
+                "optional": false,
+                "rest": false
+              }
+            ],
+            "targets": [
+              "effect"
+            ],
+            "external": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "server.stores",
+            "decorators": [],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 44,
+                "col": 52
+              },
+              "end": {
+                "line": 44,
+                "col": 140
+              }
+            },
+            "params": [
+              {
+                "name": "table",
+                "type": {
+                  "kind": "any",
+                  "of": "state"
+                },
+                "optional": true,
+                "rest": false
+              },
+              {
+                "name": "targets",
+                "type": {
+                  "kind": "any",
+                  "of": "effect"
+                },
+                "optional": false,
+                "rest": true
+              }
+            ],
+            "targets": [
+              "op"
+            ],
+            "external": false,
+            "throws": [],
+            "catches": [],
+            "reads": [
+              "$param:table",
+              "session"
+            ],
+            "effects": [
+              "$param:targets"
+            ]
           },
           {
             "kind": "op",
@@ -1432,6 +1547,10 @@
             "reads": [
               "db"
             ],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [
               {
                 "exceptions": [
@@ -1495,6 +1614,10 @@
             },
             "effects": [],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [
               {
                 "exceptions": [
@@ -1513,6 +1636,130 @@
               "successEffects": [],
               "reads": [],
               "pure": true
+            }
+          },
+          {
+            "kind": "op",
+            "name": "server.record",
+            "decorators": [
+              {
+                "decorator": "server.stores",
+                "args": [
+                  {
+                    "param": "table",
+                    "value": {
+                      "kind": "ref",
+                      "target": "db"
+                    }
+                  },
+                  {
+                    "param": "targets",
+                    "value": {
+                      "kind": "list",
+                      "items": [
+                        {
+                          "kind": "ref",
+                          "target": "server.UserCreated"
+                        },
+                        {
+                          "kind": "refs",
+                          "targets": [
+                            "login",
+                            "logout"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 48,
+                    "col": 52
+                  },
+                  "end": {
+                    "line": 48,
+                    "col": 90
+                  }
+                }
+              }
+            ],
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 48,
+                "col": 52
+              },
+              "end": {
+                "line": 48,
+                "col": 130
+              }
+            },
+            "exported": false,
+            "params": [
+              {
+                "name": "in",
+                "type": {
+                  "kind": "ref",
+                  "target": "server.User"
+                },
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 48,
+                    "col": 100
+                  },
+                  "end": {
+                    "line": 48,
+                    "col": 115
+                  }
+                }
+              }
+            ],
+            "returns": null,
+            "effects": [],
+            "reads": [],
+            "carried": {
+              "reads": [
+                "db",
+                "session"
+              ],
+              "effects": [
+                "server.UserCreated",
+                "login",
+                "logout"
+              ]
+            },
+            "throws": [],
+            "body": null,
+            "signature": {
+              "exceptions": [],
+              "effects": [
+                "server.UserCreated",
+                "login",
+                "logout"
+              ],
+              "relations": [],
+              "successEffects": [
+                {
+                  "effect": "server.UserCreated",
+                  "state": "kept"
+                },
+                {
+                  "effect": "login",
+                  "state": "kept"
+                },
+                {
+                  "effect": "logout",
+                  "state": "kept"
+                }
+              ],
+              "reads": [
+                "db",
+                "session"
+              ],
+              "pure": false
             }
           },
           {
@@ -1554,6 +1801,10 @@
             "returns": null,
             "effects": [],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [],
             "body": null,
             "signature": {
@@ -1632,6 +1883,10 @@
             },
             "effects": [],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [],
             "body": {
               "statements": [
@@ -2463,6 +2718,55 @@
             "end": {
               "line": 51,
               "col": 16
+            }
+          }
+        }
+      ],
+      "bound": []
+    },
+    "server.record": {
+      "exceptions": [],
+      "effects": [
+        "server.UserCreated",
+        "login",
+        "logout"
+      ],
+      "relations": [],
+      "successEffects": [
+        {
+          "effect": "server.UserCreated",
+          "state": "kept"
+        },
+        {
+          "effect": "login",
+          "state": "kept"
+        },
+        {
+          "effect": "logout",
+          "state": "kept"
+        }
+      ],
+      "reads": [
+        "db",
+        "session"
+      ],
+      "pure": false,
+      "params": [
+        {
+          "name": "in",
+          "type": {
+            "kind": "ref",
+            "target": "server.User"
+          },
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 48,
+              "col": 100
+            },
+            "end": {
+              "line": 48,
+              "col": 115
             }
           }
         }

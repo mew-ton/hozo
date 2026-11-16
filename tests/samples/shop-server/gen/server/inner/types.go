@@ -10,9 +10,21 @@ type Credentials struct {
 	Password pkgtype.Password `json:"password"`
 }
 
+// NewCredentials は Credentials の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
+func NewCredentials() Credentials {
+	m := Credentials{}
+	return m
+}
+
 // LoginInput はログインの入力
 type LoginInput struct {
 	Body Credentials `json:"body"`
+}
+
+// NewLoginInput は LoginInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
+func NewLoginInput() LoginInput {
+	m := LoginInput{}
+	return m
 }
 
 // LoginOk はログインの結果
@@ -21,9 +33,21 @@ type LoginOk struct {
 	Token pkgtype.Token      `json:"token"`
 }
 
+// NewLoginOk は LoginOk の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
+func NewLoginOk() LoginOk {
+	m := LoginOk{}
+	return m
+}
+
 // AuthInput はトークンだけを運ぶ入力
 type AuthInput struct {
 	Token *pkgtype.Token `json:"token,omitempty"`
+}
+
+// NewAuthInput は AuthInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
+func NewAuthInput() AuthInput {
+	m := AuthInput{}
+	return m
 }
 
 // GetOrdersInput は注文一覧の入力
@@ -33,7 +57,7 @@ type GetOrdersInput struct {
 	Page int64 `json:"page"`
 }
 
-// NewGetOrdersInput は既定値を入れた GetOrdersInput を返す。
+// NewGetOrdersInput は GetOrdersInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
 func NewGetOrdersInput() GetOrdersInput {
 	m := GetOrdersInput{}
 	m.Page = 1
@@ -44,4 +68,10 @@ func NewGetOrdersInput() GetOrdersInput {
 type PlaceOrderInput struct {
 	Token *pkgtype.Token      `json:"token,omitempty"`
 	Lines []pkgtype.OrderLine `json:"lines"`
+}
+
+// NewPlaceOrderInput は PlaceOrderInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
+func NewPlaceOrderInput() PlaceOrderInput {
+	m := PlaceOrderInput{}
+	return m
 }

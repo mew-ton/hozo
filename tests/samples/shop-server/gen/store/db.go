@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	pkgtype "example.com/shop-server/gen/type"
@@ -270,38 +271,50 @@ type dbRow interface {
 	Scan(dest ...any) error
 }
 
-// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v。
+// dbOption は、列の読み書きに、フィールドのデコレータが足すこと。
+type dbOption int
+
+// dbNullable は @db.nullable: その列は、値がなくてよい（NULL）。
+const dbNullable dbOption = 1
+
+// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドのデコレータが足したこと opts。
 // v は、書くときはフィールドの値（か、列と比べる引数）、読むときはフィールドへのポインタ。
 // database/sql が、書くときに Value を、読むときに Scan を呼ぶ。
 type dbCol struct {
 	v     any
+	opts  []dbOption
 	write func(v reflect.Value) (driver.Value, error) // 値のある Go の値を、列の値にする
 	read  func(src any, dst reflect.Value) error      // NULL でない列の値を、Go の値に読む
 }
 
-// Value は、列に書く値。値があるかどうかは、実行時に見る: 値のないポインタ（省略可能で、ない）は NULL。
+// Value は、列に書く値。値があるかどうかは、実行時に見る: 値のないポインタは NULL。
+// @db.nullable（dbNullable）の列では、値のないスライスとマップも NULL。
 func (c dbCol) Value() (driver.Value, error) {
 	v := reflect.ValueOf(c.v)
-	if v.Kind() == reflect.Pointer {
+	switch v.Kind() {
+	case reflect.Pointer:
 		if v.IsNil() {
 			return nil, nil
 		}
 		v = v.Elem()
+	case reflect.Slice, reflect.Map:
+		if v.IsNil() && slices.Contains(c.opts, dbNullable) {
+			return nil, nil
+		}
 	}
 	return c.write(v)
 }
 
-// Scan は、列の値 src を、読む先に読む。読む先がポインタ（省略可能）かどうかは、実行時に見る: NULL は、値がない。
-// 値がないことを表せない読む先に NULL を読めば、エラー。
+// Scan は、列の値 src を、読む先に読む。NULL は、@db.nullable（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
+// ほかの列に NULL があれば、エラー。読む先がポインタ（省略可能）かどうかは、実行時に見る。
 func (c dbCol) Scan(src any) error {
 	dst := reflect.ValueOf(c.v).Elem()
 	if src == nil {
-		switch dst.Kind() {
-		case reflect.Pointer, reflect.Slice, reflect.Map:
-			dst.SetZero()
-			return nil
+		if !slices.Contains(c.opts, dbNullable) {
+			return fmt.Errorf("db: NULL in a column without @db.nullable (read into %s)", dst.Type())
 		}
-		return fmt.Errorf("db: NULL in a column read into %s", dst.Type())
+		dst.SetZero()
+		return nil
 	}
 	if dst.Kind() == reflect.Pointer {
 		dst.Set(reflect.New(dst.Type().Elem()))
@@ -331,8 +344,8 @@ func dbString(src any) (string, error) {
 }
 
 // dbText は @db.text の列: 文字列を、そのまま。
-func dbText(v any) dbCol {
-	return dbCol{v, func(v reflect.Value) (driver.Value, error) {
+func dbText(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		return v.String(), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
@@ -348,8 +361,8 @@ func dbText(v any) dbCol {
 const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
 // dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any) dbCol {
-	return dbCol{v, func(v reflect.Value) (driver.Value, error) {
+func dbTime(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
 		return t.UTC().Format(dbTimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
@@ -367,8 +380,8 @@ func dbTime(v any) dbCol {
 }
 
 // dbJSON は @db.json の列: 値を、encoding/json の JSON の文字列で。
-func dbJSON(v any) dbCol {
-	return dbCol{v, func(v reflect.Value) (driver.Value, error) {
+func dbJSON(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		data, err := json.Marshal(v.Interface())
 		return string(data), err
 	}, func(src any, dst reflect.Value) error {
