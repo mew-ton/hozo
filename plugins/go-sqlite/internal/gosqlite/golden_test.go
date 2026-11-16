@@ -107,8 +107,8 @@ func TestSeamsUniform(t *testing.T) {
 	}
 	signature := regexp.MustCompile(`^func \(s DbSeams\) (\w+)\(ctx context\.Context(.*), body func\(ctx context\.Context(.*)\) (.+)\) (.+) \{$`)
 	const (
-		returning = "\treturn dbTransaction(ctx, s.db, func(ctx context.Context) (RESULT, error) {\n\t\treturn body(ctx ARGS)\n\t})\n}"
-		void      = "\t_, err := dbTransaction(ctx, s.db, func(ctx context.Context) (struct{}, error) {\n\t\treturn struct{}{}, body(ctx ARGS)\n\t})\n\treturn err\n}"
+		returning = "\treturn dbTransaction(ctx, s.db, func(ctx context.Context) (RESULT, error) {\n\t\treturn body(ctxARGS)\n\t})\n}"
+		void      = "\t_, err := dbTransaction(ctx, s.db, func(ctx context.Context) (struct{}, error) {\n\t\treturn struct{}{}, body(ctxARGS)\n\t})\n\treturn err\n}"
 	)
 	lines := strings.Split(src, "\n")
 	forms := map[string]int{}

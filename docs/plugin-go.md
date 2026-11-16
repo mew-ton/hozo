@@ -835,7 +835,7 @@ type ClassificationError struct { Classify string; Hits []string }   // 述語�
 
 - `Effect` と `Exception` は `types.go`、`ClassificationError` は `classify.go` と `wiring.go` が使う。`ops.go` と `states.go` は `runtime` を import しない。
 - `MissingError` はなくした（「実装を受け取る口」）。
-- `runtime` には、標準の相乗りが使う型も置く: `Violation`、`ValidationError`、`CheckFormat` は `go-valid` のもの（持ち主は `docs/plugin-go-valid.md`「runtime」）。Go の出力が import するライブラリを一つにするため。
+- `runtime` には、標準の相乗りが使う型も置く: `Violation`、`ValidationError`、`CheckFormat` は `go-valid` のもの（持ち主は `docs/plugin-go-valid.md`「runtime」）。`DBTxKey`（`ctx` が運ぶ DB のトランザクションの鍵。`struct { DB *sql.DB }`）は `go-sqlite` のもの（持ち主は `docs/plugin-go-sqlite.md`「トランザクション」）。Go の出力が import するライブラリを一つにするため。`DBTxKey` は、それに加えて、同じ DB を使う二つの名前空間の出力が、同じ鍵を使うため（出力のパッケージごとの型では、共有できない）。
 - API を変えるときは、生成したコードのヘッダに書く版（「ファイル」）と合わせて互換を保つ。
 
 ## 決定性

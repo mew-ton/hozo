@@ -83,7 +83,7 @@ func (n notes) FirstNote(ctx context.Context, note lib.Note) error {
 // drafts は、表でない状態 lib.drafts の単位（go-sqlite は型を出さない）の、人がメモリの上に書いた実装。
 type drafts struct{ list *[]lib.Note }
 
-func (d drafts) IsEmpty(context.Context) (bool, error)    { return len(*d.list) == 0, nil }
+func (d drafts) IsEmpty(context.Context) (bool, error)   { return len(*d.list) == 0, nil }
 func (d drafts) Get(context.Context) ([]lib.Note, error) { return *d.list, nil }
 func (d drafts) DraftsWith(_ context.Context, stars int64) ([]lib.Note, error) {
 	var out []lib.Note

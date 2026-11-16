@@ -297,7 +297,20 @@ func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch   /
 
 ### `runtime`（公開）
 
-`docs/plugin-go.md`「runtime パッケージ」と `docs/plugin-go-valid.md`「runtime」。`MissingError` はなくした。
+`docs/plugin-go.md`「runtime パッケージ」と `docs/plugin-go-valid.md`「runtime」、`docs/plugin-go-sqlite.md`「トランザクション」。`MissingError` はなくした。公開の名前はここに並べたものがすべて。
+
+```go
+type Effect string                                // 効果の名前（FQN）
+type Exception interface { error; HozoException() string }   // 生成した例外の型が満たす
+type ClassificationError struct { Classify string; Hits []string }   // 分類の判定の誤り。Error() を持つ
+type Violation struct { Path, Constraint string } // 制約への違反一つ。String() を持つ（go-valid）
+type ValidationError struct { Violations []Violation }   // Validate が返す誤り。Error() を持つ（go-valid）
+func CheckFormat(name, v string) bool             // valid.format(name) の実装（go-valid）
+type DBTxKey struct { DB *sql.DB }                // ctx が運ぶ DB のトランザクション（*sql.Tx）の鍵。DB ごとに一つ（go-sqlite）
+```
+
+- `DBTxKey` は、`go-sqlite` の出力（`db.go`）が、`@db.transaction` のトランザクションを `ctx` に置き、引くときの鍵: `context.WithValue(ctx, runtime.DBTxKey{DB: db}, tx)` と `ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx)`。型を、出力のパッケージごとでなく、ここに一つ置くのは、同じ `*sql.DB` を使う、すべての名前空間の出力が、同じ鍵でトランザクションを見つけるため（`docs/plugin-go-sqlite.md`「トランザクション」の「鍵を `runtime` に置く理由」）。関数は持たない: 始め方と終わり方は、`go-sqlite` の出力の補助（`dbTransaction`、`Conn`）にある。
+- 依存は、標準ライブラリだけ（「依存の向き」の表の `runtime` は「—」）。`DBTxKey` のために `database/sql` を import する。ドライバは import しない。
 
 ### `internal/source`
 
