@@ -2,5 +2,6 @@
   "gen/storemem/doc.go",
   "gen/storemem/ops.go",
   "gen/storemem/states.go",
-  "gen/storemem/types.go"
+  "gen/storemem/types.go",
+  "gen/storemem/wiring.go"
 ]

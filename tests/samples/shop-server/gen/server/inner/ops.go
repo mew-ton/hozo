@@ -87,11 +87,6 @@ type Ops interface {
 	// Reads: store.sessions, store.orders
 	GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order, error)
 
-	// LatestOf は一覧の最後の一つ。一覧が空なら、ない（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	LatestOf(orders []pkgtype.Order) *pkgtype.Order
-
 	// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
@@ -110,7 +105,7 @@ type Ops interface {
 	ComposeNotice(order pkgtype.Order) pkgtype.Notification
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
@@ -139,11 +134,6 @@ type Leaves interface {
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
-
-	// LatestOf は一覧の最後の一つ。一覧が空なら、ない（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	LatestOf(orders []pkgtype.Order) *pkgtype.Order
 
 	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
 	//
@@ -188,6 +178,11 @@ type StoreOps interface {
 	// Reads: store.orders
 	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
 
+	// LatestOrder は op store.latestOrder: ユーザーの、いちばん新しい注文を返す。まだ注文がなければ、値がない
+	//
+	// Reads: store.orders
+	LatestOrder(ctx context.Context, userId pkgtype.UserId) (*pkgtype.Order, error)
+
 	// AddSession は op store.addSession: セッションを足す
 	//
 	// Effects: store.createSession
@@ -198,7 +193,7 @@ type StoreOps interface {
 	// Effects: store.deleteSession
 	RemoveSession(ctx context.Context, token pkgtype.Token) error
 
-	// PlaceOrder は op store.placeOrder: 注文と、その通知の記録を、一緒に足す。一つのトランザクションで、どちらも足すか、どちらも足さない
+	// PlaceOrder は op store.placeOrder: 注文と、その通知の記録を、一緒に足す。どちらも足すか、どちらも足さない
 	//
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
@@ -248,10 +243,6 @@ func (o *ops) RequireFresh(session pkgtype.Session) (pkgtype.Session, error) {
 
 func (o *ops) PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
 	return o.leaves.PageOf(orders, page)
-}
-
-func (o *ops) LatestOf(orders []pkgtype.Order) *pkgtype.Order {
-	return o.leaves.LatestOf(orders)
 }
 
 func (o *ops) NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {

@@ -18,10 +18,11 @@ func New(ctx context.Context, db *sql.DB, leaves server.Leaves, mailer server.Ma
 	if err := store.CreateTables(ctx, db); err != nil {
 		return nil, nil, err
 	}
-	// 状態の単位の実装は、go-sqlite が状態ごとに出した型。最後は、二つの状態にまたがる op（placeOrder。一つの
-	// トランザクション）の実装で、これも go-sqlite が出した型。一つでも渡し忘れれば、コンパイルできない
+	// 状態の単位の実装は、go-sqlite が状態ごとに出した型（その状態の read と効果の中身）。最後は、@db.transaction の
+	// 継ぎ目（store.placeOrder を、一つのトランザクションにする）の実装で、これも go-sqlite が出した型。表の型と同じ db を渡す。
+	// 一つでも渡し忘れれば、コンパイルできない
 	s := store.New(store.NewUsersTable(db), store.NewSessionsTable(db), store.NewOrdersTable(db), store.NewNotificationsTable(db),
-		store.NewSharedTable(db))
+		store.NewDbSeams(db))
 	// store.Ops は、server が呼ぶ store の op（server.StoreOps）をそのまま満たす。
 	// 継ぎ目（server.Seams）の実装は、go-ratelimit が出した型。この単位で継ぎ目を宣言したトランスパイラは一つなので、そのまま渡せる
 	return server.NewHandler(server.New(leaves, mailer, s, server.NewRateSeams(limiter))), s, nil

@@ -347,21 +347,21 @@ type StateDecl struct {
 func (n *StateDecl) NodeSpan() source.Span { return n.Span }
 func (n *StateDecl) declNode()             {}
 
-// ExceptionDecl は exception（docs/grammar.md「exception / effect」）。
+// ExceptionDecl は exception（docs/grammar.md「exception / effect / read」）: "exception 名前 [ ( 引数 ) ]"。
 type ExceptionDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	// Value は運ぶ値の型。なければ nil。
-	Value *ArmType
+	// Params は例外が運ぶ値。括弧を書かない例外（値を運ばない）なら空。
+	Params []*OpParam
 }
 
 // NodeSpan は Node の実装。
 func (n *ExceptionDecl) NodeSpan() source.Span { return n.Span }
 func (n *ExceptionDecl) declNode()             {}
 
-// StateOp は状態への操作（docs/grammar.md「exception / effect」の StateOp）。
+// StateOp は状態への操作（docs/grammar.md「exception / effect / read」の StateOp）。
 type StateOp int
 
 const (
@@ -387,7 +387,7 @@ func (s StateOp) String() string {
 }
 
 // StateOpRef は "状態.操作"（sessions.post）。字句では一つの QualifiedName で、
-// 構文解析で最後の要素を StateOp として切り出したもの（docs/grammar.md「exception / effect」）。
+// 構文解析で最後の要素を StateOp として切り出したもの（docs/grammar.md「exception / effect / read」）。
 type StateOpRef struct {
 	Span  source.Span
 	State QualifiedName
@@ -399,12 +399,14 @@ type StateOpRef struct {
 // NodeSpan は Node の実装。
 func (n *StateOpRef) NodeSpan() source.Span { return n.Span }
 
-// EffectDecl は effect（docs/grammar.md「exception / effect」）。宛先は一つだけで、On か Transition のどちらか一方が nil でない。
+// EffectDecl は effect（docs/grammar.md「exception / effect / read」）。宛先は一つだけで、On か Transition のどちらか一方が nil でない。
 type EffectDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
+	// Params は効果が受け取る値。括弧は必ず書く（引数がなければ空）。
+	Params []*OpParam
 	// On は基底の状態の組み込みの効果（"状態.操作"）。遷移なら nil。
 	On *StateOpRef
 	// Transition は分類の遷移（"X: A -> B"）。組み込みの効果なら nil。
@@ -415,12 +417,17 @@ type EffectDecl struct {
 func (n *EffectDecl) NodeSpan() source.Span { return n.Span }
 func (n *EffectDecl) declNode()             {}
 
-// ReadDecl は read（docs/grammar.md「read」）: "read 名前 on 状態"。状態を読むことに名前を付ける。
+// ReadDecl は read（docs/grammar.md「exception / effect / read」）: "read 名前 ( 引数 ) : 型 on 状態"。
+// 状態を読むことに名前を付ける。
 type ReadDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
+	// Params は読むときに受け取る値。括弧は必ず書く（引数がなければ空）。
+	Params []*OpParam
+	// Result は結果の型。省略できない（解析できなかったときだけ nil）。
+	Result Type
 	// On は読む基底の状態の名前。
 	On QualifiedName
 }
@@ -429,7 +436,7 @@ type ReadDecl struct {
 func (n *ReadDecl) NodeSpan() source.Span { return n.Span }
 func (n *ReadDecl) declNode()             {}
 
-// Transition は分類の遷移 "QualifiedName : CaseSet -> CaseSet"（docs/grammar.md「exception / effect」）。
+// Transition は分類の遷移 "QualifiedName : CaseSet -> CaseSet"（docs/grammar.md「exception / effect / read」）。
 // Of は状態を対象にした classify か、組み込みの分類を持つ基底の状態。
 type Transition struct {
 	Span source.Span
@@ -514,6 +521,10 @@ type DecoratorDecl struct {
 	External bool
 	// ExternalSpan は @external の範囲。External でなければゼロ値。
 	ExternalSpan source.Span
+	// Repeatable は @repeatable の印（docs/grammar.md「decorator の宣言」の CoreMark）。
+	Repeatable bool
+	// RepeatableSpan は @repeatable の範囲。Repeatable でなければゼロ値。
+	RepeatableSpan source.Span
 	// Name は DecoratorName（docs/grammar.md「識別子」）。予約語のこともある（decorator list(…)）。
 	Name   Ident
 	Params []*Param
@@ -575,8 +586,6 @@ const (
 	AnyException AnyKind = iota
 	// AnyEffect は any effect。
 	AnyEffect
-	// AnyRead は any read。
-	AnyRead
 	// AnyState は any state。
 	AnyState
 	// AnyOp は any op。
@@ -594,8 +603,6 @@ func (k AnyKind) String() string {
 		return "exception"
 	case AnyEffect:
 		return "effect"
-	case AnyRead:
-		return "read"
 	case AnyState:
 		return "state"
 	case AnyOp:
@@ -1049,6 +1056,8 @@ type ArmBody interface {
 type Throw struct {
 	Span      source.Span
 	Exception QualifiedName
+	// Args は例外の引数に位置で渡す値（`throw E(a, b)`）。括弧を書かなければ空。
+	Args []Atom
 }
 
 // NodeSpan は Node の実装。

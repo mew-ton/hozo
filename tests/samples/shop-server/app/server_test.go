@@ -21,7 +21,7 @@ import (
 //
 //   - ctx: 純粋な op（仕様から割り出したもの: デコレータ、reads、effects がなく、状態に依らない。配線なら、呼び出し先も
 //     すべて純粋）は取らず、そうでない op は最初の引数に取る。別の名前空間の op（MailerOps、StoreOps）も相手の op の判定に従う:
-//     mailer.send はデコレータ @smtp.sendMail を、store.findSession はデコレータ @db.reads（状態 sessions を読む）を持つので、
+//     mailer.send はデコレータ @smtp.sendMail を持ち、store.findSession は read（状態 sessions を読む）を呼ぶ配線なので、
 //     純粋でなく、ctx を取る。
 //   - error: 純粋で、throws のない op は返さない。それ以外は返す（純粋でも、throws があれば返す）。
 //
@@ -34,7 +34,6 @@ var (
 	_ func(server.Leaves, pkgtype.User) pkgtype.PublicUser                    = server.Leaves.ToPublicUser
 	_ func(server.Leaves, []pkgtype.Order, int64) []pkgtype.Order             = server.Leaves.PageOf
 	_ func(server.Leaves, pkgtype.Session, []pkgtype.OrderLine) pkgtype.Order = server.Leaves.NewOrder
-	_ func(server.Leaves, []pkgtype.Order) *pkgtype.Order                     = server.Leaves.LatestOf
 	_ func(server.Leaves, pkgtype.Order) pkgtype.Notification                 = server.Leaves.ComposeNotice
 	// 純粋で、throws がある: ctx はなく、error はある
 	_ func(server.Leaves, pkgtype.User, pkgtype.Password) error     = server.Leaves.CheckPassword
@@ -48,7 +47,7 @@ var (
 	_ func(server.Ops, context.Context, server.PlaceOrderInput) (pkgtype.Order, error)  = server.Ops.PlaceOrder
 	_ func(server.MailerOps, context.Context, pkgtype.Notification) error               = server.MailerOps.Send
 	_ func(server.StoreOps, context.Context, pkgtype.Token) (*pkgtype.Session, error)   = server.StoreOps.FindSession
-	// 二つの効果を持つ op（store.placeOrder）も、引数の並びは op の宣言のまま
+	// 二つの効果を呼ぶ配線（store.placeOrder）も、引数の並びは op の宣言のまま
 	_ func(server.StoreOps, context.Context, pkgtype.Order, pkgtype.Notification) error = server.StoreOps.PlaceOrder
 	// 内部の配線も同じ判定: 純粋でない op を呼ぶので、ctx も error もある
 	_ func(inner.Ops, context.Context, pkgtype.User, pkgtype.Password) (server.LoginOk, error) = inner.Ops.IssueSession

@@ -189,6 +189,7 @@ func init() {
 		reflect.TypeOf((*ArgValue)(nil)).Elem():  lift(UnmarshalArgValue),
 		reflect.TypeOf((*Decl)(nil)).Elem():      lift(UnmarshalDecl),
 
+		reflect.TypeOf((*Callee)(nil)).Elem():          lift(UnmarshalCallee),
 		reflect.TypeOf((*EffectTarget)(nil)).Elem():    lift(UnmarshalEffectTarget),
 		reflect.TypeOf((*ReadRef)(nil)).Elem():         lift(UnmarshalReadRef),
 		reflect.TypeOf((*EffectRef)(nil)).Elem():       lift(UnmarshalEffectRef),

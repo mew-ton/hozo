@@ -142,8 +142,8 @@ type State struct {
 // Exception は exception 宣言（docs/ir.md「state / exception / effect」の Exception）。
 type Exception struct {
 	DeclBase
-	// Value は運ぶ値の型。ref か、SynthesizedFrom を持つ model への ref。
-	Value Type `json:"value,omitempty"`
+	// Params は例外が運ぶ値（`exception X(a: T, b: U);`）。値を運ばない例外は空（JSON では []）。
+	Params []OpParam `json:"params"`
 }
 
 // Operation は状態への操作（docs/ir.md「state / exception / effect」の operation）。
@@ -159,6 +159,8 @@ const (
 // Effect は effect 宣言（docs/ir.md「state / exception / effect」の Effect）。
 type Effect struct {
 	DeclBase
+	// Params は効果が受け取る値（`effect e(order: Order) on …;`）。なければ空（JSON では []）。
+	Params []OpParam `json:"params"`
 	// Target は宛先。一つだけ（docs/check.md「状態の形」の「効果の宛先」）。
 	Target EffectTarget `json:"target"`
 	// Writes はこの効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）。
@@ -168,6 +170,10 @@ type Effect struct {
 // Read は read 宣言（docs/ir.md「read」）。状態を読むことに付けた名前。
 type Read struct {
 	DeclBase
+	// Params は読むときに受け取る値。なければ空（JSON では []）。
+	Params []OpParam `json:"params"`
+	// Returns は結果の型。nil にも [NeverType] にもならない。
+	Returns Type `json:"returns"`
 	// State は読む基底の状態の FQN。宛先は一つだけ（docs/check.md「読むことの宛先」）。
 	State string `json:"state"`
 }
@@ -488,9 +494,11 @@ type Decorator struct {
 	// Targets は対象。表面で省略されていれば ["op"]（正規化の側が埋める）。
 	Targets []DecoratorTarget `json:"targets"`
 	// External は @external が付いているか（DEC-10）。
-	External bool            `json:"external"`
-	Throws   []ThrowsClause  `json:"throws"`
-	Catches  []CatchesClause `json:"catches"`
+	External bool `json:"external"`
+	// Repeatable は @repeatable が付いているか。偽なら、一つの宣言に一度だけ付けられる（DEC-13）。
+	Repeatable bool            `json:"repeatable"`
+	Throws     []ThrowsClause  `json:"throws"`
+	Catches    []CatchesClause `json:"catches"`
 	// Reads は `reads` の節の要素（書かれた順。節が複数なら連結）。FQN の位置に、デコレータの引数名 "$param:名前" も来る:
 	// any read の引数は [NamedRead] の Read に、any state の引数は [DirectRead] の State に。
 	// 付いた op に何が運ばれるかは Op.Carried（docs/check.md「デコレータが運ぶ reads と effects」）。
@@ -539,7 +547,6 @@ type AnyOf string
 const (
 	AnyException AnyOf = "exception"
 	AnyEffect    AnyOf = "effect"
-	AnyRead      AnyOf = "read"
 	AnyState     AnyOf = "state"
 	AnyOp        AnyOf = "op"
 	AnyModel     AnyOf = "model"

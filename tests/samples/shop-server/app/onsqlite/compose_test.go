@@ -35,13 +35,13 @@ func newServer(t *testing.T, f *handlertest.Fixture) handlertest.Server {
 	return handlertest.Server{
 		Handler: handler,
 		Store:   s,
-		// 通知を読む op は仕様にないので、状態の単位の、形で決まる問い合わせで読む（go-sqlite の型のメソッド。
+		// 通知の read は仕様にないので、状態の単位の、形で決まる問い合わせで読む（go-sqlite の型のメソッド。
 		// 同じ db の上の値なら、組み立てに渡したものと同じ表を読む）
 		Notifications: store.NewNotificationsTable(db).Get,
 	}
 }
 
-// TestHandler は、go-http のハンドラ → 配線 → go-sqlite が出した store の op、の全体の振る舞い。
+// TestHandler は、go-http のハンドラ → 配線 → go-sqlite が出した read と効果、の全体の振る舞い。
 // onmem の TestHandler と同じ handlertest.Run を走らせる。
 func TestHandler(t *testing.T) {
 	t.Parallel()

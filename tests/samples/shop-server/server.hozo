@@ -1,6 +1,6 @@
 // サンプル shop-server の仕様（README.md）。HTTP の入口と業務の流れを持つ名前空間 server。
 // 保存先には触れない: 読み書きは store の op を、外への配送は mailer の op を呼ぶ。
-// 人が書く op（本体のない op）は八つで、どれも状態を読まず、効果を持たない。export を付けたのは HTTP の入口の六つだけで、ほかの十一は内部の op（P33）。
+// 人が書く op（本体のない op）は七つで、どれも状態に触れない。export を付けたのは HTTP の入口の六つだけで、ほかの十は内部の op（P33）。
 // 入力の model のフィールドは、要求のどこから読むかを http の語彙のデコレータで言う（docs/plugin-go-http.md「対象」）: 一つの項目は @http.header / @http.query / @http.body（名前を省けば、フィールドの名前）、本文の全体を一つの model で受け取るなら @http.bodyObj。項目がないときの扱いも、デコレータで言う: @http.required なら 400（PlaceOrderInput の lines）、@http.default(v) なら v（GetOrdersInput の page は 1）、どちらもなければ、零値のまま（省略可能な token は、値がない）。
 // トークンのない要求は、store を呼ぶ前に、ここで断る（分類 Credential）: store.findSession は、列と同じ型のトークンだけを受け取る。login には、サンプルの中のプラグインの語彙のデコレータ @rate.limited を付けた（継ぎ目。P38）。
 
@@ -149,12 +149,8 @@ namespace server {
     throws type.Unauthorized
   {
     const session = authenticate(in.token);
-    const orders = store.listOrders(session.userId);
-    return latestOf(orders);
+    return store.latestOrder(session.userId);
   }
-
-  /** 一覧の最後の一つ。一覧が空なら、ない（人が書く） */
-  op latestOf(orders: type.Order[]): type.Order?;
 
   /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")

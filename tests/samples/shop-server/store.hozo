@@ -1,58 +1,117 @@
 // サンプル shop-server の仕様（README.md）。DB の状態を持つ名前空間 store。
-// 状態を名前で読めるのはこの名前空間の中だけなので、ほかの名前空間は、ここの op を通して読み書きする。八つの op はどれも export（P33）: 七つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
-// 表は、状態に付けた @db.table(<要素の model>) が言う（docs/plugin-go-sqlite.md「表」）。
-// op の中身は、db の語彙のデコレータが言う（docs/plugin-go-sqlite.md「op の中身」）。読む側も書く側も二段: 名前を付けた read は @db.find / @db.list で、効果は @db.insert / @db.delete で、表に何をするかを言い、op は、行う read を @db.reads で、効果を @db.effects で並べる。op は reads も effects も書かない（デコレータが運ぶ）。
-// 単位 gen/store では go-sqlite がその通りに出し、単位 gen/storemem では人が書く。
+// 状態に触れるのは、read（読む）と効果（書く）だけ。どちらも本体を持たず、中身は、付けた db の語彙のデコレータから go-sqlite が出す
+// （docs/plugin-go-sqlite.md「read の中身」「効果の中身」）。表は、宣言の on の状態で、列は、引数の名前。
+// read と効果を呼べるのは、この名前空間の中だけ。ほかの名前空間は、ここの op（どれも、read か効果を呼ぶだけの配線）を通して読み書きする。
+// 九つの op はどれも export（P33）: 八つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
+// 単位 gen/store では go-sqlite が read と効果の中身を出し、単位 gen/storemem では人が書く。
 
 /** 保存。DB の状態の持ち主 */
 namespace store {
-  @db.table(type.User)
+  @db.table
   state users: list<type.User>;
 
-  @db.table(type.Session)
+  @db.table
   state sessions: list<type.Session>;
 
-  @db.table(type.Order)
+  @db.table
   state orders: list<type.Order>;
 
-  @db.table(type.Notification)
+  @db.table
   state notifications: list<type.Notification>;
 
-  // ---- 読む: read は、表から何を引くかを言う ----
+  // ---- 読む: read は、表から何を引くかを言う。引数の名前が、比べる列 ----
 
   /** email が同じユーザー */
-  @db.find(users, "email")
-  read userByEmail on users;
+  @db.find
+  read userByEmail(email: type.Email): type.User? on users;
 
   /** 識別子が同じユーザー */
-  @db.find(users, "id")
-  read userById on users;
+  @db.find
+  read userById(id: type.UserId): type.User? on users;
 
   /** トークンが同じセッション */
-  @db.find(sessions, "token")
-  read sessionByToken on sessions;
+  @db.find
+  read sessionByToken(token: type.Token): type.Session? on sessions;
 
-  /** そのユーザーの注文 */
-  @db.list(orders, "userId")
-  read ordersOfUser on orders;
+  /** そのユーザーの注文。足した順 */
+  @db.list
+  read ordersOfUser(userId: type.UserId): type.Order[] on orders;
 
-  // ---- 読む: op は、行う read を名指しする。op の引数を read が受け取り、read が引いたものを op が返す ----
+  /** そのユーザーの、いちばん新しい注文。まだ注文がなければ、ない */
+  @db.find
+  @db.latest("placedAt")
+  read latestOrderOf(userId: type.UserId): type.Order? on orders;
+
+  // ---- 書く: 効果は、表に何をするかを言う ----
+
+  /** ユーザーを登録する */
+  @db.insert
+  effect createUser(user: type.User) on users.post;
+
+  /** ログインセッションを作る */
+  @db.insert
+  effect createSession(session: type.Session) on sessions.post;
+
+  /** ログインセッションを消す */
+  @db.delete
+  effect deleteSession(token: type.Token) on sessions.delete;
+
+  /** 注文を作る */
+  @db.insert
+  effect createOrder(order: type.Order) on orders.post;
+
+  /** ユーザーへの通知を記録する */
+  @db.insert
+  effect notifyUser(notification: type.Notification) on notifications.post;
+
+  // ---- ほかの名前空間が呼ぶ op: read か効果を呼ぶだけの配線 ----
 
   /** email からユーザーを引く */
-  @db.reads(userByEmail)
-  export op findUser(email: type.Email): type.User?;
+  export op findUser(email: type.Email): type.User? {
+    return userByEmail(email);
+  }
 
   /** 識別子からユーザーを引く */
-  @db.reads(userById)
-  export op findUserById(id: type.UserId): type.User?;
+  export op findUserById(id: type.UserId): type.User? {
+    return userById(id);
+  }
 
   /** トークンからセッションを引く */
-  @db.reads(sessionByToken)
-  export op findSession(token: type.Token): type.Session?;
+  export op findSession(token: type.Token): type.Session? {
+    return sessionByToken(token);
+  }
 
   /** ユーザーの注文を、足した順に返す */
-  @db.reads(ordersOfUser)
-  export op listOrders(userId: type.UserId): type.Order[];
+  export op listOrders(userId: type.UserId): type.Order[] {
+    return ordersOfUser(userId);
+  }
+
+  /** ユーザーの、いちばん新しい注文を返す。まだ注文がなければ、値がない */
+  export op latestOrder(userId: type.UserId): type.Order? {
+    return latestOrderOf(userId);
+  }
+
+  /** ユーザーを足す */
+  export op addUser(user: type.User) {
+    createUser(user);
+  }
+
+  /** セッションを足す */
+  export op addSession(session: type.Session) {
+    createSession(session);
+  }
+
+  /** そのトークンのセッションを消す */
+  export op removeSession(token: type.Token) {
+    deleteSession(token);
+  }
+
+  /** 注文と、その通知の記録を、一緒に足す。どちらも足すか、どちらも足さない */
+  @db.transaction
+  export op placeOrder(order: type.Order, notification: type.Notification) {
+    createOrder(order);
+    notifyUser(notification);
+  }
 
   // ---- 読んだ結果の分類 ----
 
@@ -73,44 +132,4 @@ namespace store {
     LoggedIn: findSession as type.Session;
     default;
   }
-
-  // ---- 書く: 効果は、表に何をするかを言う ----
-
-  /** ユーザーを登録する */
-  @db.insert(users)
-  effect createUser on users.post;
-
-  /** ログインセッションを作る */
-  @db.insert(sessions)
-  effect createSession on sessions.post;
-
-  /** ログインセッションを消す */
-  @db.delete(sessions, "token")
-  effect deleteSession on sessions.delete;
-
-  /** 注文を作る */
-  @db.insert(orders)
-  effect createOrder on orders.post;
-
-  /** ユーザーへの通知を記録する */
-  @db.insert(notifications)
-  effect notifyUser on notifications.post;
-
-  // ---- 書く: op は、行う効果を並べる。n 番目の効果が、n 番目の引数を受け取る ----
-
-  /** ユーザーを足す */
-  @db.effects(createUser)
-  export op addUser(user: type.User);
-
-  /** セッションを足す */
-  @db.effects(createSession)
-  export op addSession(session: type.Session);
-
-  /** そのトークンのセッションを消す */
-  @db.effects(deleteSession)
-  export op removeSession(token: type.Token);
-
-  /** 注文と、その通知の記録を、一緒に足す。一つのトランザクションで、どちらも足すか、どちらも足さない */
-  @db.effects(createOrder, notifyUser)
-  export op placeOrder(order: type.Order, notification: type.Notification);
 }

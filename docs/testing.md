@@ -11,9 +11,10 @@
 - 落ちる例は、診断が出る行の末尾に `// ERROR: <ID>` か `// WARN: <ID>` のコメントを書く。同じ行に複数なら `// ERROR: A, B`。
 - テストはディレクトリごとに `hozo.toml`（なければ `tests/rules/hozo.toml` を使う）で `Project` を作り、診断の集合を「ファイル、行、重さ、ID」の組で比べる。期待にない診断、出なかった期待はどちらも失敗。
 - `hozo.toml` の単位はトランスパイラを要る（`docs/config.md`「単位」）ので、起動しないプラグインの fixture を置く: 既定のもの `tests/rules/plugins/std`（基底 `go` / `go-b` / `ts` と、`go` に相乗りする `go-x`、`go` と `go-x` に相乗りする `go-y`）と、規則のディレクトリの `plugins/`（その規則のためのもの）。どちらも各例のプロジェクトの `plugins/` に写す。既定の `tests/rules/hozo.toml` は、名前空間 `a` をトランスパイラ `go` で出力する単位一つ。規則のテストは `check` だけで、プラグインを起動しない。
-- 欠番にした規則（CFG-8、CFG-11、TYPE-13）のディレクトリは消す。足した規則（CFG-19〜CFG-23、DEC-17）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
+- 欠番にした規則（CFG-8、CFG-11、TYPE-13、EFF-3、MATCH-8）のディレクトリは消す。足した規則（CFG-19〜CFG-23、DEC-17、NS-6、STATE-5、STATE-6）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
 - メッセージの文言は比べない（変えやすくするため）。文言はゴールデン（下）で確かめる。
 - 文法で閉じている規則（`—` のもの）は、構文エラーになる例を `ng_*.hozo` に置き、`// ERROR: SYNTAX` で確かめる。
+- なくした書き方（`docs/grammar.md` の、新しい書き方をメッセージで示して SYNTAX にするもの: `throws A | B`、`exception X: T`、引数の括弧のない `effect e on s.post`、`exception X()`、`throw X()`、`model A is B`、フィールドの既定値）は、`tests/rules/SYNTAX/` に `ng_*.hozo` を一つずつ置く。メッセージの文言は、`internal/syntax` の単体テストが確かめる。
 
 ## コーパス
 
@@ -23,7 +24,7 @@
 - `view/`: プラグインが受け取る `View`（`docs/ir.md`「その名前空間から見た IR」）を端から端まで確かめるためのサンプル。`docs/ir.md`「正規化」の各行と `docs/check.md`「計算」の各手順を一か所ずつ使う。プラグイン `plugins/view-dump` のトランスパイラ `view-dump`（`requires` を持たない、テストのための基底）が、受け取った `View` を `view.json` として書き出す。`api`、`web`、`page` の三つの単位が、どれもそれを使う（`web` は `api` の型と、語彙 `page` の型を使うので、その二つも同じ基底の出力を持つ。`docs/config.md`「型の置き場」）。`tests/view_test.go` が、`internal/project` の `web` の `View` をゴールデン `testdata/expected/view.web.json` と比べ、要求ごとの期待値を文書の見出しの名前のサブテストで明示し、実物の `hozoc emit` がプラグインに渡した `View` が同じであることを確かめる。見出し → 構文の対応と想定する warning は `README.md`。
 - 各コーパスについて、`hozoc check` の text 出力をゴールデン `tests/corpus/<名前>/testdata/expected/check.txt` と比べる。warning も含む（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。
 - `emit` のゴールデン: `tests/corpus/<名前>/testdata/expected/emit/` に書き出したファイルの木（`.hozoc-outputs.json` を含む）を置き、実際に一時ディレクトリに書いて比べる。単位のトランスパイラは、リポジトリの `plugins/` の本物（基底 `go`）で、`HOZO_PLUGIN_PATH` として渡す（`view` だけは、コーパスの `plugins/view-dump`）。差分はファイルごとに示す（同 `TestCorpusEmitGolden`）。ゴールデンをすべて `testdata/` の下に置くのは、ゴールデンの `.go` を `go build ./...` / `go vet ./...` がパッケージとして拾わないため（Go は `testdata` を無視する）。一時ディレクトリにはリポジトリの `go.mod` を写し、`ir/` `plugin/` `plugins/` `tests/` をシンボリックリンクで足す（`tests/generated_test.go` と同じ）。プラグインのマニフェストの `go run` がそこから解決でき、生成したコードの import パスも `github.com/mew-ton/hozo/<out>` に決まる。比べた後、書き出した Go のパッケージをその一時ディレクトリで `go vet` に通す（`runtime/` をシンボリックリンクで足す。ゴールデンと一致していても、コンパイルできない出力を見逃さないため）。
-- **コーパスのゴールデンは、サンプルの期待する出力（「トランスパイラのテスト」）とは役目が違う。** サンプルは人が書いた仕様で、実装より先にあり、`-update` で書き直さない。コーパスのゴールデンは、実装が書いたものを `-update` で置き、差分をレビューで見る、後戻りの検出のためのもの（サンプルが使わない書き方 — union、述語で決まる分類、状態の分類と遷移、`bind`、値のアーム — を広く通す）。
+- **コーパスのゴールデンは、サンプルの期待する出力（「トランスパイラのテスト」）とは役目が違う。** サンプルは人が書いた仕様で、実装より先にあり、`-update` で書き直さない。コーパスのゴールデンは、実装が書いたものを `-update` で置き、差分をレビューで見る、後戻りの検出のためのもの（サンプルが使わない書き方 — union、述語で決まる分類、状態の分類と遷移、`bind`、値のアーム、直に呼ぶ組み込みの効果、引数を持つ `throw`、`@repeatable` — を広く通す）。
 - ゴールデンの更新は `go test ./... -update`。
 
 コーパスごとの、`emit` のゴールデンの扱い（出力をトランスパイラに任せ、選択をなくしたときに決めた。`docs/decisions.md`「決めたこと」81）:
@@ -77,8 +78,8 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 ## 単体テスト
 
 - `internal/syntax`: 文法の各非終端記号について、受理する例と拒否する例。回復の後に読めた宣言が残ること。
-- `internal/sema`: 解決の手続きの各段（`docs/resolve.md`「手続き」）、型の互換の各規則（`docs/types.md`「互換」）に一つずつ。
-- `internal/check`: 計算（Sig の E / F / rel / succ、bind）は、小さな IR を直接組み立てて期待値と比べる。設計書 §9 の `browser.logout` の例（`server.deleteSession` が不明、`removeToken` が起きている）を必ず含める。
+- `internal/sema`: 解決の手続きの各段（`docs/resolve.md`「手続き」）、呼び出しの読み分けの各行（同「呼び出しの読み分け」）、型の互換の各規則（`docs/types.md`「互換」）、呼び出しの引数の各行（同「呼び出しの引数」）に一つずつ。
+- `internal/check`: 計算（Sig の E / F / rel / succ、bind）は、小さな IR を直接組み立てて期待値と比べる。手順 0 の表の各行（op、効果、`read`、`throw` の呼び出し）を含める。設計書 §9 の `browser.logout` の例（`server.deleteSession` が不明、`removeToken` が起きている）を必ず含める。
 - `plugin/golang`: 名前、型、置き場、import の名前（当たる名前、基底の非公開の名前 `ops` と `ptr`、`Reserve` した名前）、op の置き場（op が書いた `reads` / `effects` と、デコレータが運ぶものの組）と形、継ぎ目（継ぎ目を持つ op、`Seams` のメソッドの名前と並び、中身の名前）、定義のパッケージの公開の名前の一覧（`PublicNames`。種類ごとに一つ）（`docs/plugin-go.md` の各表の行に一つずつ）。相乗りが使うのと同じ関数を、基底も使うことを前提に、ここで細かい場合分けを確かめる。
 - `plugin/govalid`: `Validate` を持つ型の規則の各行。別の名前空間の型の置き場の単位が `go-valid` を並べているか（`Unlisted`。置き場の選び方の各場合）。
 - プラグインの単体テストの入力は、小さなプロジェクト `testdata/<名前>/`（`hozo.toml` と `.hozo`）。プラグインのパッケージは `internal/` を import できない（`docs/packages.md`「依存の向き」）ので、`.hozo` を自分では解析しない: `tests/pluginviews_test.go` の `TestPluginViewFixtures` が、`plugins/` の下（と、サンプルの中のプラグインの下。`tests/samples/README.md`「置き方」）のそれぞれの `testdata/<名前>/` を `internal/project` に解析させ、hozoc がトランスパイラに渡すのと同じ `View` の列（単位の順、その中は名前空間の辞書順）を `testdata/<名前>/views.json` に置く。プラグインのテストは、それを読んで入力にする。仕様か hozoc を変えて `View` が変われば、このテストが落ちる（更新は `go test ./tests -run TestPluginViewFixtures -update`、その後にプラグインのゴールデンを `-update`）。入力の仕様は hozoc の検査を通るものに限る（プラグインが返す診断の条件も、検査を通る仕様で書く）。

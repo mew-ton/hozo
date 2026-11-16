@@ -115,6 +115,8 @@ interface Union extends DeclBase {
 
 ### state / exception / effect
 
+`exception`、`effect`、`read`（次の節）は、op が使う最小の単位で、どれも引数の並び `params` を持つ（`docs/grammar.md`「exception / effect / read」）。
+
 ```ts
 interface State extends DeclBase {
   kind: "state";
@@ -127,11 +129,12 @@ interface State extends DeclBase {
 
 interface Exception extends DeclBase {
   kind: "exception";
-  value?: Type;                   // 運ぶ値の型。ref か、synthesizedFrom を持つ model への ref
+  params: OpParam[];              // 運ぶ値（`exception X(a: T, b: U);`）。値を運ばない例外は []。OpParam は「op」
 }
 
 interface Effect extends DeclBase {
   kind: "effect";
+  params: OpParam[];              // 受け取る値（`effect e(order: Order) on …;`）。なければ []
   target: EffectTarget;           // 宛先は一つだけ
   writes: string[];               // この効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）
 }
@@ -148,7 +151,9 @@ type CaseSet = "any" | string[];  // ケース名の列（書かれた順）
 ```ts
 interface Read extends DeclBase {
   kind: "read";
-  state: string;                  // 読む基底の状態の FQN。宛先は一つだけ（docs/check.md「読むことの宛先」）
+  params: OpParam[];              // 読むときに受け取る値（`read r(email: Email): User? on users;`）。なければ []
+  returns: Type;                  // 結果の型。null にも never にもならない
+  state: string;                  // 読む基底の状態の FQN。宛先は一つだけ（docs/check.md「read の宛先」）
 }
 ```
 
@@ -183,15 +188,17 @@ interface Decorator extends DeclBase {
   params: Param[];
   targets: ("op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read")[];   // 省略時は ["op"]
   external: boolean;              // @external が付いているか（DEC-10）
+  repeatable: boolean;            // @repeatable が付いているか。偽なら、一つの宣言に一度だけ付けられる（DEC-13）
   throws: ThrowsClause[];
   catches: CatchesClause[];
   reads: ReadRef[];               // `reads` の節の要素（書かれた順。節が複数なら連結）。なければ []。形は「op」の ReadRef で、FQN の位置に
-                                  // デコレータの引数名 "$param:名前" も来る: any read の引数は named の read に、any state の引数は direct の state に
+                                  // デコレータの引数名 "$param:名前" も来る: any state の引数は direct の state に
   effects: EffectRef[];           // `effects` の節の要素（同じ）。形は「op」の EffectRef（ユニオンは展開済み）で、any effect の引数は
                                   // named の effect に "$param:名前"。なければ []
                                   // 付いた op に何が運ばれるかは Op.carried（docs/check.md「デコレータが運ぶ reads と effects」）
   alias?: { target: string; args: Arg[] };   // 名前付きデコレータ。target は汎用デコレータの FQN。
-                                             // alias を持つ宣言は params / targets / throws / catches / reads / effects を持たず、target のものを使う
+                                             // alias を持つ宣言は params / targets / throws / catches / reads / effects を持たず、
+                                             // external と repeatable は false で、どれも target のものを使う
 }
 
 interface Param {
@@ -204,7 +211,7 @@ interface Param {
 
 type ParamType =
   | { kind: "type"; types: Type[] }                   // `int | float` は types が二つ。普通は一つ
-  | { kind: "any"; of: "exception" | "effect" | "read" | "state" | "op" | "model" | "variant"; on?: { state: string; operation: "post" | "put" | "delete" } };
+  | { kind: "any"; of: "exception" | "effect" | "state" | "op" | "model" | "variant"; on?: { state: string; operation: "post" | "put" | "delete" } };
 
 interface ThrowsClause {
   exceptions: string[];           // FQN。ユニオンは展開済み。デコレータの引数名なら "$param:名前"
@@ -227,38 +234,38 @@ interface Op extends DeclBase {
   exported: boolean;              // `export` が付いているか（docs/check.md「export」）
   params: OpParam[];
   returns: Type | null;           // null は void。決して返さない op は { kind: "never" }
-  effects: EffectRef[];           // 書かれた effects（書かれた順。ユニオンは展開済み）。配線で省略していれば []。
+  effects: EffectRef[];           // 節に書かれた effects（書かれた順。ユニオンは展開済み）。書いていなければ []。
+                                  // 書けるのは配線の op だけ（葉は STATE-5）。本体が行う効果は、body の呼び出しと signature にある。
                                   // デコレータが運ぶものは含まない
-  reads: ReadRef[];               // 書かれた reads（書かれた順、重複は最初の出現に寄せる）。書いていなければ []。同上
+  reads: ReadRef[];               // 節に書かれた reads（書かれた順、重複は最初の出現に寄せる）。書いていなければ []。同上
   carried: {                      // デコレータの reads / effects の節が、この op に運ぶもの（docs/check.md「デコレータが運ぶ reads と effects」）。
     reads: ReadRef[];             // decorators の順、節の順、引数に書いた順。重複は最初の出現に寄せる。なければ []
     effects: EffectRef[];         // ユニオンは展開済み。同じ順。なければ []
-  };                              // op が直に読むものは reads の後ろに carried.reads、直に持つ効果は effects の後ろに carried.effects
-                                  // （どちらも、重複は最初の出現に寄せる）。書いたものと運ばれたものの区別は、この二組の項目にだけある
+  };                              // 葉の op が状態に触れるのは、この分だけ（docs/check.md「葉の op」）。配線の op では空（DEC-17）
   throws: ThrowsClause[];         // 書かれた throws
   body: Wiring | null;            // null は葉
   signature: Signature;           // 計算結果。自分の名前空間から見た関数の型（docs/check.md「計算」）
 }
 
-interface OpParam { name: string; type: Type; span: Span; }   // 説明は Op.description.params から引く
+interface OpParam { name: string; type: Type; span: Span; }   // op、exception、effect、read の引数。説明は、その宣言の description.params から引く
 
-// reads と effects の要素。名前で書いたか、直に書いたかを要素ごとに持つ（docs/check.md「直に書く要素」）
+// reads と effects の要素。名前で書いたか、直に書いたかを要素ごとに持つ（docs/check.md「節に書く要素」）
 type ReadRef =
   | { kind: "named"; read: string }                   // read の宣言の FQN。読む状態はその宣言の state
   | { kind: "direct"; state: string };                // 直に書いた基底の状態の FQN
 type EffectRef =
   | { kind: "named"; effect: string }                 // effect の宣言の FQN
-  | { kind: "direct"; state: string; operation: "post" | "put" | "delete" };   // 直に書いた、基底の状態の組み込みの効果。
-                                                                               // 同じ宛先の宣言とは別の効果（同「直に書く要素」）
+  | { kind: "direct"; state: string; operation: "post" | "put" | "delete" };   // 直に書いた（節）か、直に呼んだ（配線）、
+                                                                               // 基底の状態の組み込みの効果。同じ宛先の宣言とは別の効果（同上）
 
 interface Signature {                   // docs/check.md「計算」の Sig(O, v) の結果。Op.signature は v = op の名前空間
   exceptions: string[];           // v から見て投げうる例外
-  effects: EffectRef[];           // 伝播を含むすべての効果（op が書いたものと、デコレータが運ぶもの）と、デコレータの halts の効果
+  effects: EffectRef[];           // 伝播を含むすべての効果（配線が呼んだものと、デコレータが運ぶもの）と、デコレータの halts の効果
   relations: { exception: string; effect: EffectRef; state: "prevented" | "kept" | "unknown" }[];
                                   // exceptions × effects のすべての組
   successEffects: { effect: EffectRef; state: "kept" | "prevented" | "unknown" }[];   // 成功のアームでの効果の状態
   reads: string[];                // 読む基底の状態の FQN。伝播と、デコレータが運ぶものを含む（docs/check.md「reads」の R）。v によらない。
-                                  // read の宣言は、その state として入る（どの read を通して読むかは、葉の op の reads と carried.reads にある）
+                                  // read の宣言は、その state として入る（どの read を呼んだかは、配線の body の Call.callee にある）
   pure: boolean;                  // 純粋か（docs/check.md「純粋」）。v によらない
 }
 ```
@@ -277,11 +284,17 @@ type Statement =
 type Expr = { kind: "call"; call: Call } | { kind: "match"; match: Match } | { kind: "atom"; atom: Atom };
 
 interface Call {
-  op: string;                     // FQN
-  args: { param: string; value: Atom }[];   // 位置で書いた引数を引数名に対応付けたもの
-  bound: BoundPosition[];         // bind で埋まる位置（docs/check.md「bind」）
+  callee: Callee;                 // 呼び出し先（docs/check.md「配線からの呼び出し」）
+  args: { param: string; value: Atom }[];   // 位置で書いた引数を、呼び出し先の引数名に対応付けたもの（docs/types.md「呼び出しの引数」）。
+                                  // 直に呼ぶ組み込みの効果の、値を取る操作の引数名は "value"
+  bound: BoundPosition[];         // bind で埋まる位置（docs/check.md「bind」）。callee が op でなければ []
   span: Span;
 }
+
+type Callee =
+  | { kind: "op"; op: string }                        // op の FQN
+  | { kind: "read"; read: string }                    // read の宣言の FQN。名前を付けない read は、呼び出しではなく Atom の state
+  | { kind: "effect"; effect: EffectRef };            // named: effect の宣言の呼び出し。direct: 組み込みの効果を直に呼んだもの（`users.post(user)`）
 
 interface BoundPosition {
   path: string[];                 // ["in", "token"] のように、引数名から始まるフィールドのパス
@@ -310,7 +323,9 @@ interface MatchArm {
   body: { kind: "call"; call: Call }
       | { kind: "atom"; atom: Atom }                // 値（docs/grammar.md「配線」の ArmBody の Atom）。none はここに入れず、下の none にする
       | { kind: "none" }
-      | { kind: "throw"; exception: string; span: Span };   // `throw E`。exception は FQN
+      | { kind: "throw"; exception: string; args: { param: string; value: Atom }[]; span: Span };
+                                                    // `throw E`、`throw E(値, …)`。exception は FQN。args は、位置で書いた値を
+                                                    // 例外の params の名前に対応付けたもの（なければ []）
   narrowed: Narrowing[];          // このアームの中で、外と型が違う対象（docs/types.md「アームの中の対象の型」）。なければ []
   span: Span;
 }
@@ -353,7 +368,7 @@ type ArgValue =
   | { kind: "list"; items: ArgValue[] };
 ```
 
-`DeclBase.decorators` の並びは書かれた順（上から下）。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側で、最初に適用される**。入れ子の構造にはせず、この順序付きの列で表す（`docs/decisions.md`）。
+`DeclBase.decorators` の並びは書かれた順（上から下）。`repeatable` なデコレータは、同じ `decorator` の `Application` が、付けた数だけ、書かれた順に並ぶ。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側で、最初に適用される**。入れ子の構造にはせず、この順序付きの列で表す（`docs/decisions.md`）。
 
 ### bind
 
@@ -386,7 +401,9 @@ interface Bind {
 | 配線の値の位置の、状態の名前（`f(token)`、`token.value`、`match token by nullable`） | `Atom` の `state`。修飾して書いても同じ |
 | アームの本体の `none` | `body` の `none`（`atom` にはしない） |
 | ユニオンのアームのその場の model `Ready: { ... }` | `<ユニオンの FQN>.Ready` という FQN の `Model`（`synthesizedFrom` にユニオンの FQN）を同じ名前空間に足し、アームの型を `ref` にする。宣言の位置はユニオンの直後 |
-| 例外のその場の model `exception X: { ... }` | `<例外の FQN>.Value` という `Model` を同じく足し、`value` を `ref` にする |
+| `exception X;` | `params: []` |
+| 配線の呼び出し `f(a)`、`r(a)`、`e(a)`、`s.post(a)` | `Call`。`callee` は、行き着いた宣言の種類で決まる（`docs/resolve.md`「呼び出しの読み分け」）: `op`、`read`、`effect` の `named`、`effect` の `direct` |
+| `throw E(a, b)` | `body` の `throw`。`args` は例外の `params` に対応付け |
 | `Unavailable: Unavailable` | そのまま `ref`（新しい model は作らない） |
 | ユニオンのメンバーにユニオン | メンバーを展開して平らにする |
 | `throws A, B` にユニオン | 例外の FQN に展開 |
@@ -397,7 +414,7 @@ interface Bind {
 | デコレータの宣言の `reads a, b`、`effects a, b`、複数の節 | `Decorator.reads` / `Decorator.effects` の列一つずつ（書かれた順に連結。効果のユニオンは展開。引数名は `$param:名前`） |
 | op に付いたデコレータの `reads` / `effects` の節 | `Op.carried`（`$param:` を適用の引数で置き換えたもの）。`Op.reads` / `Op.effects` には足さない |
 | `{ item }` | `{ item: item }` |
-| 呼び出しの引数（位置だけ。`docs/grammar.md`「配線」） | 順に `param` に対応付け |
+| 呼び出しと `throw` の引数（位置だけ。`docs/grammar.md`「配線」） | 順に、呼び出し先の引数の名前（`param`）に対応付け |
 | 複数行の `throws` | `ThrowsClause` の列（まとめない。`Relation` が節ごとに違うため） |
 | `5m` | `duration` のナノ秒 |
 
@@ -474,7 +491,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 | 版 | 変わったこと |
 |---|---|
-| 0.6 | 宣言の種類 `read`（`Read`）。`Decorator.targets` と `ParamType` の `of` に `read`。`reads` と `effects` の要素が、文字列（FQN）から `ReadRef` / `EffectRef` に変わった: `Op.reads`、`Op.effects`、`Op.carried`、`Decorator.reads`、`Decorator.effects`、`Signature.effects`、`Signature.relations[].effect`、`Signature.successEffects[].effect`。`Signature.reads` は、基底の状態の FQN の列のまま。`View` とやり取りの形は 0.5 と同じ |
+| 0.6 | 宣言の種類 `read`（`Read`: `params`、`returns`、`state`）。`Exception.value` をやめて `Exception.params`（例外のその場の model `<例外の FQN>.Value` は、もう合成しない）。`Effect.params`。`Call.op` をやめて `Call.callee`（`op` / `read` / `effect`）。`Match.arms[].body` の `throw` に `args`。`Decorator.targets` に `read`。`Decorator.repeatable`（同じデコレータの `Application` が、一つの宣言に複数並びうる）。`reads` と `effects` の要素が、文字列（FQN）から `ReadRef` / `EffectRef` に変わった: `Op.reads`、`Op.effects`、`Op.carried`、`Decorator.reads`、`Decorator.effects`、`Signature.effects`、`Signature.relations[].effect`、`Signature.successEffects[].effect`。`Signature.reads` は、基底の状態の FQN の列のまま。葉の op の `Op.reads` / `Op.effects` は、いつも空になった（STATE-5）。`View` とやり取りの形は 0.5 と同じ |
 | 0.5 | `Decorator.targets` に `effect`（効果の宣言の `decorators` が空でなくなりうる）。`Decorator.reads`、`Decorator.effects`。`Param.rest` と、残りの引数の `Arg`（`list`）。`Op.carried`。`Signature.reads` / `Signature.effects` が、デコレータが運ぶものを含む。`Field.default` をなくした（フィールドの既定値を、言語からなくした。`docs/grammar.md`「決めたこと」）。`View` とやり取りの形は 0.4 と同じ |
 | 0.4 | `NamespaceConfig` に `index`、`base`、`options`、`seams`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
 | 0.3 | `Type` に `never`。`Model.derivedFrom` をやめて `Model.extends`。`State.type`。`Classify.subject` に `op`、`cases[].as`、`decidedBy`。`Op.exported`、`Op.reads`。`Signature.reads`、`Signature.pure`。`Atom` に `state`。`Match.subject` の `state` をやめる（`value` の `atom` が `state`）。`Match.arms[].body` に `atom` と `throw`、`Match.arms[].narrowed` |

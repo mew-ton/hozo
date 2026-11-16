@@ -30,16 +30,16 @@ var (
 	_ storetest.Ops = store.Ops(nil)
 	_ storetest.Ops = storemem.Ops(nil)
 	// server が呼ぶ store の op のインターフェース（server.StoreOps）も、どちらの Ops もそのまま満たす。
-	// server.StoreOps は store の八つの op のうち、配線が呼ぶ七つ（addUser がない）。別の名前空間から呼べるのは export を
+	// server.StoreOps は store の九つの op のうち、配線が呼ぶ八つ（addUser がない）。別の名前空間から呼べるのは export を
 	// 付けた op だけで、Ops にはそれがすべて並ぶので、<Ns>Ops のメソッドは、いつも相手の Ops にある
 	_ server.StoreOps = store.Ops(nil)
 	_ server.StoreOps = storemem.Ops(nil)
 	// 状態の単位のインターフェースも、二つの出力で中身が同じ。一方のための実装は、もう一方の New にも渡せる
 	_ storemem.UsersState = store.UsersTable{}
 	_ store.UsersState    = memstore.Users{}
-	// 複数の状態にまたがる op の口（SharedState）も同じ
-	_ storemem.SharedState = store.SharedTable{}
-	_ store.SharedState    = memstore.Shared{}
+	// 継ぎ目の口（Seams）は、gen/store にだけある: @db.transaction の継ぎ目を宣言した go-sqlite を並べているのは、その単位だけ。
+	// 実装は、go-sqlite が出した型
+	_ store.Seams = store.DbSeams{}
 )
 
 // methodNames は、型 T の公開のメソッドの名前（名前順）。T がインターフェースなら、そのメソッドのすべて。
@@ -52,10 +52,10 @@ func methodNames(typ reflect.Type) []string {
 }
 
 // TestOpsHoldExportedOpsOnly は、入口の Ops に並ぶのが、仕様で export を付けた op だけであること。
-//   - server: 十七の op のうち、HTTP の入口の六つ。内部の op（配線 issueSession、authenticate、sessionOf と、八つの葉）は、
-//     入口の Ops にはなく、内側のパッケージ（gen/server/inner）の Ops にある（十七のすべて）。
-//   - store: 八つとも export。内部の op がないので、出力を分けない（内側のパッケージがない）。server が呼ぶ七つ
-//     （server.StoreOps）は、その中にある。
+//   - server: 十六の op のうち、HTTP の入口の六つ。内部の op（配線 issueSession、authenticate、sessionOf と、七つの葉）は、
+//     入口の Ops にはなく、内側のパッケージ（gen/server/inner）の Ops にある（十六のすべて）。
+//   - store: 九つとも export。内部の op がないので、出力を分けない（内側のパッケージがない）。server が呼ぶ八つ
+//     （server.StoreOps）は、その中にある。read と効果は op ではないので、Ops にはない（状態の単位のメソッド）。
 //
 // 確かめるのは、インターフェースのメソッド。内部の op を、入口の New が返す値から取り出せないことは、約束していない
 // （守るのは Hozo の検査 NS-5。生成したコードは、置き方で分けるだけ）。
@@ -66,7 +66,7 @@ func TestOpsHoldExportedOpsOnly(t *testing.T) {
 		t.Errorf("server.Ops のメソッド = %v（期待は %v）", got, entries)
 	}
 	everything := []string{
-		"Authenticate", "CheckPassword", "ComposeNotice", "GetLatestOrder", "GetMe", "GetOrders", "IssueSession", "LatestOf",
+		"Authenticate", "CheckPassword", "ComposeNotice", "GetLatestOrder", "GetMe", "GetOrders", "IssueSession",
 		"Login", "Logout", "NewOrder", "NewSession", "PageOf", "PlaceOrder", "RequireFresh", "SessionOf", "ToPublicUser",
 	}
 	if got := methodNames(reflect.TypeFor[inner.Ops]()); !slices.Equal(got, everything) {
@@ -82,8 +82,13 @@ func TestOpsHoldExportedOpsOnly(t *testing.T) {
 		t.Errorf("server.Seams のメソッド = %v（期待は LoginRateLimited だけ）", got)
 	}
 
+	// store の継ぎ目も、op と、継ぎ目を宣言されたデコレータの組ごとに一つ: placeOrder の @db.transaction だけ
+	if got := methodNames(reflect.TypeFor[store.Seams]()); !slices.Equal(got, []string{"PlaceOrderDbTransaction"}) {
+		t.Errorf("store.Seams のメソッド = %v（期待は PlaceOrderDbTransaction だけ）", got)
+	}
+
 	all := []string{
-		"AddSession", "AddUser", "FindSession", "FindUser", "FindUserById", "ListOrders", "PlaceOrder", "RemoveSession",
+		"AddSession", "AddUser", "FindSession", "FindUser", "FindUserById", "LatestOrder", "ListOrders", "PlaceOrder", "RemoveSession",
 	}
 	storeOps := reflect.TypeFor[server.StoreOps]()
 	for name, typ := range map[string]reflect.Type{
@@ -144,8 +149,9 @@ func TestTwoStoresInOneProcess(t *testing.T) {
 
 // TestStatesFromTwoImplementations は、一つの store の状態の単位を、状態ごとに別の実装から取れること:
 // users は SQLite（go-sqlite の型）、ほかの三つはメモリ（memstore の型）。store.New は、状態ごとのインターフェースを
-// 満たす値を受け取るだけで、どの実装かを知らない。二つの状態（orders と notifications）にまたがる op（placeOrder）の
-// 実装は、その二つの状態と同じ保存先のもの（memstore の Shared）を渡す。
+// 満たす値を受け取るだけで、どの実装かを知らない。
+// @db.transaction の継ぎ目（store.DbSeams）が取り消せるのは、同じ db の上の go-sqlite の型がしたことだけ: placeOrder が
+// 呼ぶ二つの効果（orders と notifications）は、ここではメモリの上なので、トランザクションには入らない。
 func TestStatesFromTwoImplementations(t *testing.T) {
 	t.Parallel()
 	db, m := openDB(t), memstore.New()
@@ -154,7 +160,7 @@ func TestStatesFromTwoImplementations(t *testing.T) {
 		t.Fatal(err)
 	}
 	users := store.NewUsersTable(db)
-	s := store.New(users, m.Sessions(), m.Orders(), m.Notifications(), m.Shared())
+	s := store.New(users, m.Sessions(), m.Orders(), m.Notifications(), store.NewDbSeams(db))
 	if err := s.AddUser(ctx, handlertest.Alice()); err != nil {
 		t.Fatal(err)
 	}
@@ -189,21 +195,35 @@ func openDB(t *testing.T) *sql.DB {
 	return db
 }
 
-// TestStoreOutputsShareBaseFiles は、同じ名前空間 store の二つの出力で、基底 go のファイルがバイト単位で同じであること
-// （基底の出力は、仕様と名前空間だけで決まり、単位に並べたほかのトランスパイラによらない）。
+// TestStoreOutputsShareBaseFiles は、同じ名前空間 store の二つの出力で、基底 go のファイルのうち、継ぎ目に関わらないものが、
+// バイト単位で同じであること（基底の出力は、仕様と名前空間と、単位の継ぎ目だけで決まる。docs/plugin-go.md「決定性」）。
+// 違うのは、継ぎ目を持つ op（placeOrder）のあるファイル: gen/store は go-sqlite が @db.transaction の継ぎ目を宣言しているので、
+// ops.go に Seams と外側が、wiring.go に中身の名前（placeOrderBody）がある。gen/storemem には、どちらもない。
 func TestStoreOutputsShareBaseFiles(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"doc.go", "types.go", "ops.go", "states.go"} {
-		a, err := os.ReadFile(filepath.Join("..", "gen", "store", name))
+	read := func(dir, name string) []byte {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join("..", "gen", dir, name))
 		if err != nil {
 			t.Fatal(err)
 		}
-		b, err := os.ReadFile(filepath.Join("..", "gen", "storemem", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(a, b) {
+		return data
+	}
+	for _, name := range []string{"doc.go", "types.go", "states.go"} {
+		if !bytes.Equal(read("store", name), read("storemem", name)) {
 			t.Errorf("gen/store/%s と gen/storemem/%s が違う", name, name)
 		}
+	}
+	for _, name := range []string{"ops.go", "wiring.go"} {
+		if bytes.Equal(read("store", name), read("storemem", name)) {
+			t.Errorf("gen/store/%s と gen/storemem/%s が同じ（継ぎ目の有無で違うはず）", name, name)
+		}
+	}
+	// 継ぎ目の口は、gen/storemem にはない（New の引数は、四つの状態の単位だけ）
+	if got := reflect.TypeOf(storemem.New).NumIn(); got != 4 {
+		t.Errorf("storemem.New の引数が %d（期待は 4）", got)
+	}
+	if got := reflect.TypeOf(store.New).NumIn(); got != 5 {
+		t.Errorf("store.New の引数が %d（期待は 5: 四つの状態の単位と seams）", got)
 	}
 }

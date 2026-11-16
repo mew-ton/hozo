@@ -237,7 +237,7 @@ func (p *parser) parseDecls(until token.Kind) []ast.Decl {
 func (p *parser) parseDecl() ast.Decl {
 	doc := p.parseLeadingDoc()
 	start := p.tok().Span.Start
-	decorators, external := p.parseDecorators()
+	decorators, marks := p.parseDecorators()
 	if p.at(token.DocComment) {
 		p.fail(p.tok().Span, "ドキュメンテーションコメントはデコレータの前に置く（設計書 §3.4）")
 	}
@@ -285,7 +285,7 @@ func (p *parser) parseDecl() ast.Decl {
 	case token.Condition:
 		return p.parseCondition(start, doc, decorators)
 	case token.Decorator:
-		return p.parseDecoratorDecl(start, doc, decorators, external)
+		return p.parseDecoratorDecl(start, doc, decorators, marks)
 	}
 	if doc != nil && len(decorators) == 0 {
 		p.fail(doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
@@ -306,23 +306,37 @@ func (p *parser) parseLeadingDoc() *ast.DocComment {
 	return doc
 }
 
+// coreMarks は核の印（docs/grammar.md「decorator の宣言」の CoreMark）の範囲。書かれていなければ nil。
+type coreMarks struct {
+	external   *source.Span
+	repeatable *source.Span
+}
+
 // parseDecorators はデコレータの適用の列を読む（docs/grammar.md「デコレータの適用」）。
-// "@external" は核の印なので列には入れず、その範囲を返す。直後が "decorator" でなければ誤り。
-func (p *parser) parseDecorators() ([]*ast.Decorator, *source.Span) {
+// "@external" と "@repeatable" は核の印なので列には入れず、その範囲を返す。印の後ろは、もう一つの印か "decorator" で
+// なければ誤り。同じ印を二度書いても誤り。
+func (p *parser) parseDecorators() ([]*ast.Decorator, coreMarks) {
 	var decorators []*ast.Decorator
-	var external *source.Span
+	var marks coreMarks
 	for p.at(token.At) {
 		start := p.advance().Span.Start
 		name := p.parseDecoratorRef()
-		if name.String() == "external" {
+		if mark := name.String(); mark == "external" || mark == "repeatable" {
 			if p.at(token.LParen) {
-				p.fail(p.tok().Span, "@external は引数を取らない")
-			}
-			if !p.at(token.Decorator) {
-				p.fail(p.spanFrom(start), "@external はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
+				p.fail(p.tok().Span, "@"+mark+" は引数を取らない")
 			}
 			s := p.spanFrom(start)
-			external = &s
+			slot := &marks.external
+			if mark == "repeatable" {
+				slot = &marks.repeatable
+			}
+			if *slot != nil {
+				p.fail(s, "@"+mark+" を二度書いている（docs/grammar.md「decorator の宣言」）")
+			}
+			if !p.at(token.Decorator) && !p.atCoreMark() {
+				p.fail(s, "@"+mark+" はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
+			}
+			*slot = &s
 			continue
 		}
 		d := &ast.Decorator{Name: name}
@@ -332,7 +346,16 @@ func (p *parser) parseDecorators() ([]*ast.Decorator, *source.Span) {
 		d.Span = p.spanFrom(start)
 		decorators = append(decorators, d)
 	}
-	return decorators, external
+	return decorators, marks
+}
+
+// atCoreMark は今の位置が核の印（"@external" か "@repeatable"）の頭か。
+func (p *parser) atCoreMark() bool {
+	if !p.at(token.At) {
+		return false
+	}
+	next := p.peek(1)
+	return next.Kind == token.Ident && (next.Text == "external" || next.Text == "repeatable")
 }
 
 // parseArgs は "( Arg, ... )" を読む。名前で渡す引数の後ろに位置で渡す引数は書けない（docs/grammar.md「決めたこと」）。
@@ -515,10 +538,13 @@ func (p *parser) parseMembers(parseOne func()) {
 func (p *parser) parseMember() (*ast.Field, *ast.Override) {
 	doc := p.parseLeadingDoc()
 	start := p.tok().Span.Start
-	decorators, external := p.parseDecorators()
-	if external != nil {
-		// parseDecorators は直後の字句が decorator なら @external を通すが、ここでの decorator はフィールド名。
-		p.fail(*external, "@external はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
+	decorators, marks := p.parseDecorators()
+	// parseDecorators は直後の字句が decorator なら核の印を通すが、ここでの decorator はフィールド名。
+	if marks.external != nil {
+		p.fail(*marks.external, "@external はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
+	}
+	if marks.repeatable != nil {
+		p.fail(*marks.repeatable, "@repeatable はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
 	}
 	if doc != nil && p.at(token.RBrace) {
 		p.fail(doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
@@ -628,23 +654,38 @@ func (p *parser) parseState(start source.Offset, doc *ast.DocComment, decorators
 	return s
 }
 
-// parseException は ExceptionDecl = "exception" Ident [ ":" ArmType ] ";" を読む（docs/grammar.md「exception / effect」）。
+// parseException は ExceptionDecl = "exception" Ident [ "(" OpParam { "," OpParam } ")" ] ";" を読む
+// （docs/grammar.md「exception / effect / read」）。引数は例外が運ぶ値。引数がなければ括弧を書かない（`exception X();` は誤り）。
+// なくした書き方 `exception X: T;` は、引数で書くことをメッセージで示して SYNTAX にする。
 func (p *parser) parseException(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ExceptionDecl {
 	p.expect(token.Exception)
 	e := &ast.ExceptionDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
-	if p.got(token.Colon) {
-		e.Value = p.parseArmType()
+	if p.at(token.Colon) {
+		p.fail(p.tok().Span, fmt.Sprintf("exception %s: T という書き方はなくなった。例外が運ぶ値は引数で書く（exception %s(value: T);。docs/grammar.md「exception / effect / read」）", e.Name.Name, e.Name.Name))
+	}
+	if p.at(token.LParen) {
+		open := p.tok().Span
+		e.Params = p.parseOpParams()
+		if len(e.Params) == 0 {
+			p.errorAt(source.Span{File: open.File, Start: open.Start, End: p.prevEnd()}, fmt.Sprintf("引数のない例外は括弧を書かない（exception %s; と書く。docs/grammar.md「exception / effect / read」）", e.Name.Name))
+		}
 	}
 	p.expect(token.Semicolon)
 	e.Span = p.spanFrom(start)
 	return e
 }
 
-// parseEffect は EffectDecl = "effect" Ident "on" ( BuiltinEffect | Transition ) ";" を読む（docs/grammar.md「exception / effect」）。
+// parseEffect は EffectDecl = "effect" Ident OpParams "on" ( BuiltinEffect | Transition ) ";" を読む
+// （docs/grammar.md「exception / effect / read」）。引数がなくても括弧を書く。
 // QualifiedName の直後が ":" なら Transition、そうでなければ最後の要素が StateOp の BuiltinEffect。
+// なくした書き方 `effect e on s.post;`（括弧なし）は、括弧が要ることをメッセージで示して SYNTAX にする。
 func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.EffectDecl {
 	p.expect(token.Effect)
 	e := &ast.EffectDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
+	if p.at(token.On) {
+		p.fail(p.tok().Span, fmt.Sprintf("effect %s の名前の後ろに、引数の括弧が要る（引数がなくても effect %s() on … と書く。docs/grammar.md「exception / effect / read」）", e.Name.Name, e.Name.Name))
+	}
+	e.Params = p.parseOpParams()
 	p.expect(token.On)
 	if p.atName() && p.peek(1).Kind == token.Colon {
 		e.Transition = p.parseTransition()
@@ -657,11 +698,24 @@ func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorator
 	return e
 }
 
-// parseRead は ReadDecl = "read" Ident "on" QualifiedName ";" を読む（docs/grammar.md「read」）。
+// parseRead は ReadDecl = "read" Ident OpParams ":" Type "on" QualifiedName ";" を読む
+// （docs/grammar.md「exception / effect / read」）。引数がなくても括弧を書き、結果の型は省略できない（void / never も書けない）。
 // on の後ろは状態の名前一つで、操作は書かない。
 func (p *parser) parseRead(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ReadDecl {
 	p.expect(token.Read)
 	r := &ast.ReadDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
+	if !p.at(token.LParen) {
+		p.fail(p.tok().Span, fmt.Sprintf("read %s の名前の後ろに、引数の括弧と結果の型が要る（read %s(…): T on 状態; と書く。docs/grammar.md「exception / effect / read」）", r.Name.Name, r.Name.Name))
+	}
+	r.Params = p.parseOpParams()
+	if !p.at(token.Colon) {
+		p.fail(p.tok().Span, fmt.Sprintf("read %s は結果の型を省略できない（read %s(…): T on 状態; と書く。docs/grammar.md「exception / effect / read」）", r.Name.Name, r.Name.Name))
+	}
+	p.advance()
+	if p.at(token.Void) || p.at(token.Never) {
+		p.fail(p.tok().Span, fmt.Sprintf("read %s の結果の型に %s は書けない（read は値を得るもの）", r.Name.Name, p.tok().Text))
+	}
+	r.Result = p.parseType()
 	p.expect(token.On)
 	if !p.atName() {
 		p.failExpected("読む状態の名前")
@@ -704,7 +758,7 @@ func (p *parser) parseCaseSet() *ast.CaseSet {
 }
 
 // parseStateOpRef は "状態.操作" を読む。字句では一つの QualifiedName なので、最後の要素を StateOp として切り出す
-// （docs/grammar.md「exception / effect」）。
+// （docs/grammar.md「exception / effect / read」）。
 func (p *parser) parseStateOpRef() ast.StateOpRef {
 	if !p.at(token.QualifiedName) {
 		p.failExpected("「状態.操作」（操作は post / put / delete）")
@@ -821,16 +875,23 @@ func (p *parser) parseCondition(start source.Offset, doc *ast.DocComment, decora
 //
 // デコレータの名前は DecoratorName なので予約語も書ける（`decorator list(…)`。docs/grammar.md「識別子」）。
 // reads / effects の節は op の節と同じ形で、同じ構文木（ReadsClause / EffectsClause）にする。
-func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator, external *source.Span) *ast.DecoratorDecl {
+func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator, marks coreMarks) *ast.DecoratorDecl {
 	p.expect(token.Decorator)
 	d := &ast.DecoratorDecl{Doc: doc, Decorators: decorators, Name: p.parseDecoratorName()}
-	if external != nil {
+	if marks.external != nil {
 		d.External = true
-		d.ExternalSpan = *external
+		d.ExternalSpan = *marks.external
+	}
+	if marks.repeatable != nil {
+		d.Repeatable = true
+		d.RepeatableSpan = *marks.repeatable
 	}
 	if p.at(token.Assign) {
-		if external != nil {
-			p.errorAt(*external, "名前付きのデコレータに @external は付けられない（docs/grammar.md「decorator の宣言」）")
+		if marks.external != nil {
+			p.errorAt(*marks.external, "名前付きのデコレータに @external は付けられない（docs/grammar.md「decorator の宣言」）")
+		}
+		if marks.repeatable != nil {
+			p.errorAt(*marks.repeatable, "名前付きのデコレータに @repeatable は付けられない（docs/grammar.md「decorator の宣言」）")
 		}
 		aliasStart := p.advance().Span.Start
 		alias := &ast.DecoratorAlias{Name: p.parseDecoratorRef()}
@@ -954,8 +1015,6 @@ func (p *parser) parseAnyType() *ast.AnyType {
 		a.Kind = ast.AnyException
 	case p.at(token.Effect):
 		a.Kind = ast.AnyEffect
-	case p.at(token.Read):
-		a.Kind = ast.AnyRead
 	case p.at(token.State):
 		a.Kind = ast.AnyState
 	case p.at(token.Op):
@@ -965,7 +1024,7 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	case p.atContextual("variant"):
 		a.Kind = ast.AnyVariant
 	default:
-		p.failExpected("any の種類（exception / effect / read / state / op / model / variant）")
+		p.failExpected("any の種類（exception / effect / state / op / model / variant）")
 	}
 	p.advance()
 	if p.got(token.On) {
@@ -1291,20 +1350,27 @@ func (p *parser) parseExpr() ast.Expr {
 // parseCall は Call = QualifiedName "(" [ Atom { "," Atom } ] ")" を読む。引数は Atom だけ（設計書 §9「A 正規形」）。
 func (p *parser) parseCall() *ast.Call {
 	start := p.tok().Span.Start
-	c := &ast.Call{Callee: p.parseQualifiedName(), Args: []ast.Atom{}}
+	c := &ast.Call{Callee: p.parseQualifiedName()}
+	c.Args = p.parseCallArgs()
+	c.Span = p.spanFrom(start)
+	return c
+}
+
+// parseCallArgs は呼び出しと throw の引数 "(" [ Atom { "," Atom } ] ")" を読む。引数は Atom だけ。
+func (p *parser) parseCallArgs() []ast.Atom {
+	args := []ast.Atom{}
 	p.expect(token.LParen)
 	for !p.at(token.RParen) {
 		if p.atName() && p.peek(1).Kind == token.LParen {
 			p.fail(p.tok().Span, "呼び出しの引数に呼び出しは書けない。中間結果に const で名前を付ける（設計書 §9）")
 		}
-		c.Args = append(c.Args, p.parseAtom())
+		args = append(args, p.parseAtom())
 		if !p.got(token.Comma) {
 			break
 		}
 	}
 	p.expect(token.RParen)
-	c.Span = p.spanFrom(start)
-	return c
+	return args
 }
 
 // parseAtom は Atom = Path | Literal | "none" | RecordLit を読む。
@@ -1409,6 +1475,13 @@ func (p *parser) parseMatchArm() *ast.MatchArm {
 	case p.at(token.Throw):
 		tstart := p.advance().Span.Start
 		t := &ast.Throw{Exception: p.parseQualifiedName()}
+		if p.at(token.LParen) {
+			open := p.tok().Span
+			t.Args = p.parseCallArgs()
+			if len(t.Args) == 0 {
+				p.errorAt(source.Span{File: open.File, Start: open.Start, End: p.prevEnd()}, fmt.Sprintf("引数のない例外は括弧を書かない（throw %s と書く。docs/grammar.md「配線」）", t.Exception.String()))
+			}
+		}
 		t.Span = p.spanFrom(tstart)
 		a.Body = t
 	case p.atName() && p.peek(1).Kind == token.LParen:

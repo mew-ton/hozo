@@ -433,19 +433,26 @@ func TestState(t *testing.T) {
 
 func TestException(t *testing.T) {
 	e := firstDecl[*ast.ExceptionDecl](t, "@http.status(401) exception Unauthorized;")
-	if e.Name.Name != "Unauthorized" || e.Value != nil {
+	if e.Name.Name != "Unauthorized" || len(e.Params) != 0 || len(e.Decorators) != 1 {
 		t.Errorf("Exception = %+v", e)
 	}
-	e = firstDecl[*ast.ExceptionDecl](t, "exception ClientError: Violations;")
-	if e.Value == nil || e.Value.Type == nil || typeString(e.Value.Type) != "Violations" {
+	// 引数は例外が運ぶ値（docs/grammar.md「exception / effect / read」）
+	e = firstDecl[*ast.ExceptionDecl](t, "/** 待つ */ exception LimitExceeded(wait: Duration, items: Violation[]);")
+	if len(e.Params) != 2 || e.Params[0].Name.Name != "wait" || typeString(e.Params[0].Type) != "Duration" ||
+		e.Params[1].Name.Name != "items" || typeString(e.Params[1].Type) != "Violation[]" || e.Doc == nil {
 		t.Errorf("Exception = %+v", e)
 	}
-	e = firstDecl[*ast.ExceptionDecl](t, "exception X: { items: Violation[]; };")
-	if e.Value == nil || e.Value.Body == nil || len(e.Value.Body.Fields) != 1 {
-		t.Errorf("Exception = %+v", e)
-	}
-	mustFail(t, "exception X: ;", "型が必要")
 	mustFail(t, "exception X", "「;」が必要")
+	// なくした書き方と、括弧だけの書き方は、今の書き方をメッセージで示す
+	mustFail(t, "exception ClientError: Violations;", "例外が運ぶ値は引数で書く（exception ClientError(value: T);")
+	mustFail(t, "exception X: { items: Violation[]; };", "exception X: T という書き方はなくなった")
+	mustFail(t, "exception X();", "引数のない例外は括弧を書かない（exception X; と書く")
+	mustFail(t, "exception X(a);", "「:」が必要")
+	// 括弧だけの誤りの後ろの宣言は残る
+	file, diags := parseSrc(t, "exception X();\nexception Y;")
+	if len(diags) != 1 || len(file.Decls) != 2 {
+		t.Errorf("回復: decls = %d、diags = %v", len(file.Decls), diags)
+	}
 }
 
 func TestEffect(t *testing.T) {
@@ -454,9 +461,9 @@ func TestEffect(t *testing.T) {
 		op   ast.StateOp
 		stat string
 	}{
-		{"effect createSession on sessions.post;", ast.Post, "sessions"},
-		{"effect a on location.put;", ast.Put, "location"},
-		{"effect b on server.users.delete;", ast.Delete, "server.users"},
+		{"effect createSession() on sessions.post;", ast.Post, "sessions"},
+		{"effect a() on location.put;", ast.Put, "location"},
+		{"effect b() on server.users.delete;", ast.Delete, "server.users"},
 	} {
 		e := firstDecl[*ast.EffectDecl](t, tt.src)
 		if e.On == nil || e.Transition != nil {
@@ -469,9 +476,17 @@ func TestEffect(t *testing.T) {
 			t.Errorf("%s: Span = %+v", tt.src, e.On)
 		}
 	}
-	mustFail(t, "effect a on sessions.get;", "状態の操作は post / put / delete のどれかで、get ではない")
-	mustFail(t, "effect a on sessions;", "「状態.操作」")
-	mustFail(t, "effect a sessions.post;", "「on」が必要")
+	mustFail(t, "effect a() on sessions.get;", "状態の操作は post / put / delete のどれかで、get ではない")
+	mustFail(t, "effect a() on sessions;", "「状態.操作」")
+	mustFail(t, "effect a() sessions.post;", "「on」が必要")
+	// 引数（効果が受け取る値）。括弧は引数がなくても書く
+	e := firstDecl[*ast.EffectDecl](t, "effect createOrder(order: Order, at: Time) on orders.post;")
+	if len(e.Params) != 2 || e.Params[0].Name.Name != "order" || typeString(e.Params[1].Type) != "Time" {
+		t.Errorf("Params = %+v", e.Params)
+	}
+	// なくした書き方（括弧なし）は、今の書き方をメッセージで示す
+	mustFail(t, "effect a on sessions.post;", "effect a の名前の後ろに、引数の括弧が要る（引数がなくても effect a() on … と書く")
+	mustFail(t, "effect a: T on sessions.post;", "「(」が必要")
 }
 
 func idents(ids []ast.Ident) string {
@@ -482,18 +497,18 @@ func idents(ids []ast.Ident) string {
 	return strings.Join(s, "|")
 }
 
-// 遷移（docs/grammar.md「exception / effect」の Transition と CaseSet）。
+// 遷移（docs/grammar.md「exception / effect / read」の Transition と CaseSet）。
 func TestEffectTransition(t *testing.T) {
 	for _, tt := range []struct {
 		src      string
 		of       string
 		from, to string // "any" か、"|" でつないだケース名
 	}{
-		{"effect placeOrder on Checkout: Shopping -> Ordered;", "Checkout", "Shopping", "Ordered"},
-		{"effect clearCart on carts: HasItems -> Empty;", "carts", "HasItems", "Empty"},
-		{"effect reset on Checkout: any -> Shopping;", "Checkout", "any", "Shopping"},
-		{"effect touch on Checkout: Shopping | Ordered -> any;", "Checkout", "Shopping|Ordered", "any"},
-		{"effect a on server.Checkout:A|B->C|D;", "server.Checkout", "A|B", "C|D"},
+		{"effect placeOrder() on Checkout: Shopping -> Ordered;", "Checkout", "Shopping", "Ordered"},
+		{"effect clearCart() on carts: HasItems -> Empty;", "carts", "HasItems", "Empty"},
+		{"effect reset() on Checkout: any -> Shopping;", "Checkout", "any", "Shopping"},
+		{"effect touch() on Checkout: Shopping | Ordered -> any;", "Checkout", "Shopping|Ordered", "any"},
+		{"effect a() on server.Checkout:A|B->C|D;", "server.Checkout", "A|B", "C|D"},
 	} {
 		e := firstDecl[*ast.EffectDecl](t, tt.src)
 		if e.On != nil || e.Transition == nil {
@@ -519,18 +534,18 @@ func TestEffectTransition(t *testing.T) {
 	}
 	// 「QualifiedName の直後が ":" なら Transition」なので、これは carts.post という名前の遷移として読める。
 	// 名前が指すものの誤りは名前の解決（RES-4）が出す。
-	if e := firstDecl[*ast.EffectDecl](t, "effect a on carts.post: A -> B;"); e.Transition == nil || e.Transition.Of.String() != "carts.post" {
+	if e := firstDecl[*ast.EffectDecl](t, "effect a() on carts.post: A -> B;"); e.Transition == nil || e.Transition.Of.String() != "carts.post" {
 		t.Errorf("Transition = %+v", e.Transition)
 	}
 	tests := []struct{ name, src, want string }{
-		{"missing arrow", "effect a on C: A;", "「->」が必要"},
-		{"fat arrow", "effect a on C: A => B;", "「->」が必要"},
-		{"missing to", "effect a on C: A -> ;", "遷移のケース（any かケース名）が必要"},
-		{"missing from", "effect a on C: -> B;", "遷移のケース（any かケース名）が必要"},
-		{"qualified case", "effect a on C: x.A -> B;", "遷移のケース（any かケース名）が必要"},
-		{"any in a set", "effect a on C: A | any -> B;", "any は予約語"},
-		{"two transitions", "effect a on C: A -> B, D: E -> F;", "「;」が必要"},
-		{"no target", "effect a on : A -> B;", "「状態.操作」"},
+		{"missing arrow", "effect a() on C: A;", "「->」が必要"},
+		{"fat arrow", "effect a() on C: A => B;", "「->」が必要"},
+		{"missing to", "effect a() on C: A -> ;", "遷移のケース（any かケース名）が必要"},
+		{"missing from", "effect a() on C: -> B;", "遷移のケース（any かケース名）が必要"},
+		{"qualified case", "effect a() on C: x.A -> B;", "遷移のケース（any かケース名）が必要"},
+		{"any in a set", "effect a() on C: A | any -> B;", "any は予約語"},
+		{"two transitions", "effect a() on C: A -> B, D: E -> F;", "「;」が必要"},
+		{"no target", "effect a() on : A -> B;", "「状態.操作」"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -666,6 +681,39 @@ func TestDecoratorDecl(t *testing.T) {
 	}
 }
 
+// TestCoreMarks は核の印 CoreMark = "@external" | "@repeatable"（docs/grammar.md「decorator の宣言」）。
+func TestCoreMarks(t *testing.T) {
+	d := firstDecl[*ast.DecoratorDecl](t, "@repeatable decorator where(column: string, value: string | int | float | boolean) for read;")
+	if !d.Repeatable || d.External || d.RepeatableSpan.Start != 0 || d.RepeatableSpan.End != source.Offset(len("@repeatable")) || d.Span.Start != 0 {
+		t.Fatalf("Decorator = %+v", d)
+	}
+	// 二つを並べてよく、順は問わない
+	for _, src := range []string{"@external @repeatable decorator x throws E;", "@repeatable @external decorator x throws E;"} {
+		d = firstDecl[*ast.DecoratorDecl](t, src)
+		if !d.Repeatable || !d.External || len(d.Decorators) != 0 {
+			t.Errorf("%s: Decorator = %+v", src, d)
+		}
+	}
+	// 印のない宣言
+	if d = firstDecl[*ast.DecoratorDecl](t, "decorator x;"); d.Repeatable || d.External {
+		t.Errorf("Decorator = %+v", d)
+	}
+	tests := []struct{ name, src, want string }{
+		{"on model", "@repeatable model A {}", "@repeatable はデコレータの宣言の直前にだけ書ける"},
+		{"with args", "@repeatable() decorator x;", "@repeatable は引数を取らない"},
+		{"before other decorator", "@repeatable @db decorator x;", "@repeatable はデコレータの宣言の直前にだけ書ける"},
+		{"twice", "@repeatable @repeatable decorator x;", "@repeatable を二度書いている"},
+		{"external twice", "@external @repeatable @external decorator x;", "@external を二度書いている"},
+		{"on alias", "@repeatable decorator a = b();", "名前付きのデコレータに @repeatable は付けられない"},
+		{"on field", "model A { @repeatable x: int; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
+		{"on reserved field", "model A { @repeatable decorator: string; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
+		{"on op", "@repeatable op f();", "@repeatable はデコレータの宣言の直前にだけ書ける"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
+}
+
 func TestDecoratorDeclClauses(t *testing.T) {
 	d := firstDecl[*ast.DecoratorDecl](t, `decorator fallbackToCache
     catches http.NetworkError recovers
@@ -744,7 +792,7 @@ func TestDecoratorName(t *testing.T) {
 	if got := m.Body.Fields[1].Decorators[0].Name.String(); got != "text" {
 		t.Errorf("field decorator = %s", got)
 	}
-	e := firstDecl[*ast.EffectDecl](t, "@db.delete(sessions, \"token\") effect deleteSession on sessions.delete;")
+	e := firstDecl[*ast.EffectDecl](t, "@db.delete(sessions, \"token\") effect deleteSession() on sessions.delete;")
 	if len(e.Decorators) != 1 || e.Decorators[0].Name.String() != "db.delete" || len(e.Decorators[0].Args) != 2 {
 		t.Errorf("effect decorators = %+v", e.Decorators)
 	}
@@ -1062,17 +1110,20 @@ func TestClauseSeparators(t *testing.T) {
 	}
 }
 
-// TestReadDecl は ReadDecl = "read" Ident "on" QualifiedName ";"（docs/grammar.md「read」）。
+// TestReadDecl は ReadDecl = "read" Ident OpParams ":" Type "on" QualifiedName ";"（docs/grammar.md「exception / effect / read」）。
 func TestReadDecl(t *testing.T) {
-	r := firstDecl[*ast.ReadDecl](t, "/** メールで引く */ @db.find(users, \"email\") read userByEmail on users;")
+	r := firstDecl[*ast.ReadDecl](t, "/** メールで引く */ @db.find(users) read userByEmail(email: Email): User? on users;")
 	if r.Name.Name != "userByEmail" || r.On.String() != "users" || r.Doc == nil || len(r.Decorators) != 1 {
 		t.Fatalf("Read = %+v", r)
+	}
+	if len(r.Params) != 1 || r.Params[0].Name.Name != "email" || typeString(r.Params[0].Type) != "Email" || typeString(r.Result) != "User?" {
+		t.Errorf("Read の引数と結果 = %+v %v", r.Params, r.Result)
 	}
 	if r.Span.Start != r.Decorators[0].Span.Start {
 		t.Errorf("Span はデコレータから: %+v", r.Span)
 	}
-	r = firstDecl[*ast.ReadDecl](t, "read all on store.users;")
-	if r.On.String() != "store.users" || r.Doc != nil || len(r.Decorators) != 0 {
+	r = firstDecl[*ast.ReadDecl](t, "read all(): User[] on store.users;")
+	if r.On.String() != "store.users" || r.Doc != nil || len(r.Decorators) != 0 || len(r.Params) != 0 || typeString(r.Result) != "User[]" {
 		t.Errorf("Read = %+v", r)
 	}
 
@@ -1081,8 +1132,8 @@ func TestReadDecl(t *testing.T) {
 	if len(m.Body.Fields) != 1 || m.Body.Fields[0].Name.Name != "read" {
 		t.Errorf("Model = %+v", m)
 	}
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator read(target: any read, ...rest: any read) for read | op reads target;")
-	if d.Name.Name != "read" || d.Params[0].Type.Any.Kind != ast.AnyRead || d.Params[1].Type.Any.Kind != ast.AnyRead {
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator read(target: any state, ...rest: any state) for read | op reads target;")
+	if d.Name.Name != "read" || d.Params[0].Type.Any.Kind != ast.AnyState || !d.Params[1].Rest {
 		t.Fatalf("Decorator = %+v", d)
 	}
 	if len(d.For) != 2 || d.For[0].Kind != ast.TargetRead || d.For[1].Kind != ast.TargetOp {
@@ -1090,11 +1141,16 @@ func TestReadDecl(t *testing.T) {
 	}
 
 	tests := []struct{ name, src, want string }{
-		{"no on", "read r;", "「on」が必要"},
-		{"no state", "read r on;", "読む状態の名前が必要"},
-		{"with body", "read r on users {}", "「;」が必要"},
-		{"export", "export read r on users;", "export を付けられるのは op だけ"},
-		{"qualified name", "read a.r on users;", "修飾しない識別子"},
+		{"no on", "read r(): T;", "「on」が必要"},
+		{"no state", "read r(): T on;", "読む状態の名前が必要"},
+		{"with body", "read r(): T on users {}", "「;」が必要"},
+		{"export", "export read r(): T on users;", "export を付けられるのは op だけ"},
+		{"qualified name", "read a.r(): T on users;", "修飾しない識別子"},
+		{"no parens", "read r on users;", "read r の名前の後ろに、引数の括弧と結果の型が要る"},
+		{"no result", "read r() on users;", "read r は結果の型を省略できない"},
+		{"void result", "read r(): void on users;", "read r の結果の型に void は書けない"},
+		{"never result", "read r(): never on users;", "read r の結果の型に never は書けない"},
+		{"any read", "decorator d(x: any read);", "any の種類（exception / effect / state / op / model / variant）が必要"},
 		{"keyword as op name", "op read();", "read は予約語で、識別子には使えない"},
 	}
 	for _, tt := range tests {
@@ -1373,8 +1429,20 @@ func TestMatchArmBody(t *testing.T) {
 		t.Fatalf("Arm 7 body = %+v", m.Arms[7].Body)
 	}
 	// Throw の Span は throw から例外の名前まで。
-	if th.Span.End != th.Exception.Span.End || th.Exception.Span.Start-th.Span.Start != source.Offset(len("throw ")) {
+	if th.Span.End != th.Exception.Span.End || th.Exception.Span.Start-th.Span.Start != source.Offset(len("throw ")) || len(th.Args) != 0 {
 		t.Errorf("Throw Span = %+v, Exception = %+v", th.Span, th.Exception.Span)
+	}
+	// 引数を持つ throw（docs/grammar.md「配線」の Throw）。引数は Atom で、Span は閉じ括弧まで。
+	tsrc := "op a() { match x by K { A => throw rate.LimitExceeded(wait, 5, { a: b }); default => throw X; }; }"
+	ta := firstDecl[*ast.OpDecl](t, tsrc).Body.Stmts[0].(*ast.MatchStmt).Match.Arms[0].Body.(*ast.Throw)
+	if ta.Exception.String() != "rate.LimitExceeded" || len(ta.Args) != 3 {
+		t.Fatalf("Throw = %+v", ta)
+	}
+	if _, ok := ta.Args[0].(*ast.NameAtom); !ok {
+		t.Errorf("Args[0] = %+v", ta.Args[0])
+	}
+	if tsrc[ta.Span.End-1] != ')' {
+		t.Errorf("Throw Span.End = %d", ta.Span.End)
 	}
 	// 値を対象にした標準の分類（対象は Atom のどれでも）。
 	o = firstDecl[*ast.OpDecl](t, "op b(in: In) { match in.token by nullable { Empty => f(); HasItems => g(in.token); }; }")
@@ -1444,8 +1512,8 @@ func TestStateConstructSpans(t *testing.T) {
     Ordered;
   }
   condition LoggedIn of token;
-  effect placeOrder on Checkout: Shopping | Ordered -> any;
-  effect clearCart on shop.carts: any -> Empty;
+  effect placeOrder() on Checkout: Shopping | Ordered -> any;
+  effect clearCart() on shop.carts: any -> Empty;
   op view(): Order? {
     match token by nullable { Empty => f(); HasItems => none; };
     const placed = match by Checkout { Shopping => submit(); Ordered => none; };
@@ -1484,7 +1552,8 @@ func TestBlockReject(t *testing.T) {
 		{"arm body match", "op a() { match x by K { A => match y by L { B => none; }; }; }", "アームの本体に match は書けない"},
 		{"arm body missing", "op a() { match x by K { A => ; }; }", "アームの本体（呼び出しか値か throw）"},
 		{"arm throw without name", "op a() { match x by K { A => throw; }; }", "名前が必要"},
-		{"arm throw call", "op a() { match x by K { A => throw f(); }; }", "「;」が必要だが「(」がある"},
+		{"arm throw empty parens", "op a() { match x by K { A => throw f(); }; }", "引数のない例外は括弧を書かない（throw f と書く"},
+		{"arm throw call in args", "op a() { match x by K { A => throw f(g()); }; }", "呼び出しの引数に呼び出しは書けない"},
 		{"arm throw value", "op a() { match x by K { A => throw 5; }; }", "名前が必要"},
 		{"throw statement", "op a() { throw X; }", "throw は match のアームの本体にだけ書ける"},
 		{"return throw", "op a(): T { return throw X; }", "throw は match のアームの本体にだけ書ける"},
@@ -1553,7 +1622,7 @@ func TestLiteral(t *testing.T) {
 // --- 識別子 ---
 
 func TestIdentAndQualifiedName(t *testing.T) {
-	e := firstDecl[*ast.EffectDecl](t, "effect post on a.b.put;")
+	e := firstDecl[*ast.EffectDecl](t, "effect post() on a.b.put;")
 	if e.Name.Name != "post" {
 		t.Errorf("文脈キーワードが識別子にならない: %+v", e.Name)
 	}
@@ -1561,7 +1630,7 @@ func TestIdentAndQualifiedName(t *testing.T) {
 	if len(segs) != 2 || segs[0].Name != "a" || segs[1].Name != "b" {
 		t.Fatalf("Segments = %+v", segs)
 	}
-	start := source.Offset(len("effect post on "))
+	start := source.Offset(len("effect post() on "))
 	if segs[0].Span.Start != start || segs[0].Span.End != start+1 || segs[1].Span.Start != start+2 || segs[1].Span.End != start+3 {
 		t.Errorf("Segment Spans = %+v %+v", segs[0].Span, segs[1].Span)
 	}
@@ -1617,14 +1686,10 @@ func TestFieldName(t *testing.T) {
 		t.Errorf("Fields[1] = %+v", m.Body.Fields[1])
 	}
 
-	// その場で書く model（ユニオンのアーム、例外の値）も同じ Field。
+	// その場で書く model（ユニオンのアーム）も同じ Field。
 	u := firstDecl[*ast.UnionDecl](t, "union U { Ready: { state: string; match: int; }; }")
 	if fs := u.Members[0].Type.Body.Fields; len(fs) != 2 || fs[0].Name.Name != "state" || fs[1].Name.Name != "match" {
 		t.Errorf("arm body = %+v", fs)
-	}
-	x := firstDecl[*ast.ExceptionDecl](t, "exception X: { op: string; };")
-	if fs := x.Value.Body.Fields; len(fs) != 1 || fs[0].Name.Name != "op" {
-		t.Errorf("exception body = %+v", fs)
 	}
 
 	// override の後ろの名前。
@@ -1702,7 +1767,7 @@ func TestReservedWordReject(t *testing.T) {
 		{"callee", "op f() { res.op(); }", "op は予約語で、名前には使えない"},
 		{"callee in expr", "op f() { const x = res.match(1); }", "match は予約語で、名前には使えない"},
 		{"throws", "op f() throws a.none;", "none は予約語で、名前には使えない"},
-		{"effect state", "effect e on s.default;", "default は予約語で、名前には使えない"},
+		{"effect state", "effect e() on s.default;", "default は予約語で、名前には使えない"},
 		{"bind target", "bind s to a.model.*;", "model は予約語で、名前には使えない"},
 		{"decorator argument", "@d(a.op) op f();", "op は予約語で、名前には使えない"},
 		{"path head", "op f() { g(op.x); }", "値（名前・リテラル・none・レコード）が必要だが「op」がある"},

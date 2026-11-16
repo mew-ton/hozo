@@ -14,10 +14,10 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Leaves は、server の葉の op 八つの本体（メソッド）と、それが外から受け取るもの（フィールド）。
+// Leaves は、server の葉の op 七つの本体（メソッド）と、それが外から受け取るもの（フィールド）。
 // *Leaves を server.New の引数 leaves にそのまま渡す。テストが差し替えられるように、時計と識別子の作り方を持つ。
 //
-// 八つとも仕様の上で純粋な op で、メソッドは ctx を取らない。throws のない六つは error も返さない
+// 七つとも仕様の上で純粋な op で、メソッドは ctx を取らない。throws のない五つは error も返さない
 // （生成された server.Leaves のメソッドの形がそう決めている）。
 type Leaves struct {
 	// Now は今の時刻。
@@ -72,14 +72,6 @@ func (l *Leaves) PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
 	start := min((max(page, 1)-1)*size, n)
 	end := min(start+size, n)
 	return orders[start:end]
-}
-
-// LatestOf は server.latestOf の本体。一覧の最後の一つ（store.listOrders は、足した順に返す）。一覧が空なら nil。
-func (l *Leaves) LatestOf(orders []pkgtype.Order) *pkgtype.Order {
-	if len(orders) == 0 {
-		return nil
-	}
-	return &orders[len(orders)-1]
 }
 
 // NewOrder は server.newOrder の本体。識別子を作り、注文した時刻を今にする。

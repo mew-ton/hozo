@@ -134,11 +134,7 @@ func (o *ops) GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order,
 	if err != nil {
 		return nil, err
 	}
-	orders, err := o.store.ListOrders(ctx, session.UserId)
-	if err != nil {
-		return nil, err
-	}
-	return o.LatestOf(orders), nil
+	return o.store.LatestOrder(ctx, session.UserId)
 }
 
 // PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る

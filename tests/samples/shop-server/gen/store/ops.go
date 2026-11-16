@@ -30,6 +30,11 @@ type Ops interface {
 	// Reads: store.orders
 	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
 
+	// LatestOrder はユーザーの、いちばん新しい注文を返す。まだ注文がなければ、値がない
+	//
+	// Reads: store.orders
+	LatestOrder(ctx context.Context, userId pkgtype.UserId) (*pkgtype.Order, error)
+
 	// AddUser はユーザーを足す
 	//
 	// Effects: store.createUser
@@ -45,16 +50,23 @@ type Ops interface {
 	// Effects: store.deleteSession
 	RemoveSession(ctx context.Context, token pkgtype.Token) error
 
-	// PlaceOrder は注文と、その通知の記録を、一緒に足す。一つのトランザクションで、どちらも足すか、どちらも足さない
+	// PlaceOrder は注文と、その通知の記録を、一緒に足す。どちらも足すか、どちらも足さない
 	//
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
 }
 
-// New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）、shared。
+// Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type Seams interface {
+	// PlaceOrderDbTransaction は op store.placeOrder に付いた @db.transaction の継ぎ目（go-sqlite）。body が op の中身で、その前後に置くものを、実装が決める。
+	PlaceOrderDbTransaction(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification, body func(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error) error
+}
+
+// New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）、seams。
 // 引数が nil かどうかは確かめない。
-func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState, shared SharedState) Ops {
-	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications, shared: shared}
+func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState, seams Seams) Ops {
+	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications, seams: seams}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
@@ -63,37 +75,10 @@ type ops struct {
 	sessions      SessionsState
 	orders        OrdersState
 	notifications NotificationsState
-	shared        SharedState
+	seams         Seams
 }
 
-func (o *ops) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
-	return o.users.FindUser(ctx, email)
-}
-
-func (o *ops) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
-	return o.users.FindUserById(ctx, id)
-}
-
-func (o *ops) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
-	return o.sessions.FindSession(ctx, token)
-}
-
-func (o *ops) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
-	return o.orders.ListOrders(ctx, userId)
-}
-
-func (o *ops) AddUser(ctx context.Context, user pkgtype.User) error {
-	return o.users.AddUser(ctx, user)
-}
-
-func (o *ops) AddSession(ctx context.Context, session pkgtype.Session) error {
-	return o.sessions.AddSession(ctx, session)
-}
-
-func (o *ops) RemoveSession(ctx context.Context, token pkgtype.Token) error {
-	return o.sessions.RemoveSession(ctx, token)
-}
-
+// PlaceOrder は、継ぎ目（@db.transaction）を通して、中身（o.placeOrderBody）を呼ぶ。
 func (o *ops) PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error {
-	return o.shared.PlaceOrder(ctx, order, notification)
+	return o.seams.PlaceOrderDbTransaction(ctx, order, notification, o.placeOrderBody)
 }

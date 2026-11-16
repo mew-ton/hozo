@@ -15,12 +15,12 @@ type UsersState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: store.users の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]pkgtype.User, error)
-	// FindUser は問い合わせ: store.users を読む（reads）葉の op store.findUser。
-	FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
-	// FindUserById は問い合わせ: store.users を読む（reads）葉の op store.findUserById。
-	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
-	// AddUser は命令: 効果 store.createUser（on store.users.post）を持つ葉の op store.addUser。
-	AddUser(ctx context.Context, user pkgtype.User) error
+	// UserByEmail は問い合わせ（read store.userByEmail）: email が同じユーザー
+	UserByEmail(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
+	// UserById は問い合わせ（read store.userById）: 識別子が同じユーザー
+	UserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
+	// CreateUser は命令（効果 store.createUser、on store.users.post）: ユーザーを登録する
+	CreateUser(ctx context.Context, user pkgtype.User) error
 }
 
 // SessionsState は状態 store.sessions（list<type.Session>）の単位。実装は New の引数 sessions に渡す。
@@ -30,12 +30,12 @@ type SessionsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: store.sessions の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]pkgtype.Session, error)
-	// FindSession は問い合わせ: store.sessions を読む（reads）葉の op store.findSession。
-	FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error)
-	// AddSession は命令: 効果 store.createSession（on store.sessions.post）を持つ葉の op store.addSession。
-	AddSession(ctx context.Context, session pkgtype.Session) error
-	// RemoveSession は命令: 効果 store.deleteSession（on store.sessions.delete）を持つ葉の op store.removeSession。
-	RemoveSession(ctx context.Context, token pkgtype.Token) error
+	// SessionByToken は問い合わせ（read store.sessionByToken）: トークンが同じセッション
+	SessionByToken(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error)
+	// CreateSession は命令（効果 store.createSession、on store.sessions.post）: ログインセッションを作る
+	CreateSession(ctx context.Context, session pkgtype.Session) error
+	// DeleteSession は命令（効果 store.deleteSession、on store.sessions.delete）: ログインセッションを消す
+	DeleteSession(ctx context.Context, token pkgtype.Token) error
 }
 
 // OrdersState は状態 store.orders（list<type.Order>）の単位。実装は New の引数 orders に渡す。
@@ -45,8 +45,12 @@ type OrdersState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: store.orders の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]pkgtype.Order, error)
-	// ListOrders は問い合わせ: store.orders を読む（reads）葉の op store.listOrders。
-	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
+	// OrdersOfUser は問い合わせ（read store.ordersOfUser）: そのユーザーの注文。足した順
+	OrdersOfUser(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
+	// LatestOrderOf は問い合わせ（read store.latestOrderOf）: そのユーザーの、いちばん新しい注文。まだ注文がなければ、ない
+	LatestOrderOf(ctx context.Context, userId pkgtype.UserId) (*pkgtype.Order, error)
+	// CreateOrder は命令（効果 store.createOrder、on store.orders.post）: 注文を作る
+	CreateOrder(ctx context.Context, order pkgtype.Order) error
 }
 
 // NotificationsState は状態 store.notifications（list<type.Notification>）の単位。実装は New の引数 notifications に渡す。
@@ -56,11 +60,6 @@ type NotificationsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: store.notifications の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]pkgtype.Notification, error)
-}
-
-// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
-// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
-type SharedState interface {
-	// PlaceOrder は命令: 効果 store.createOrder（on store.orders.post）、store.notifyUser（on store.notifications.post）を持つ葉の op store.placeOrder。
-	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
+	// NotifyUser は命令（効果 store.notifyUser、on store.notifications.post）: ユーザーへの通知を記録する
+	NotifyUser(ctx context.Context, notification pkgtype.Notification) error
 }

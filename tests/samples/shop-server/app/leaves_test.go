@@ -117,14 +117,6 @@ func TestLeaves(t *testing.T) {
 		}
 	}
 
-	// latestOf: 最後の一つ。空なら、ない
-	if latest := leaves.LatestOf(orders); latest == nil || latest.Id != "o3" {
-		t.Errorf("latestOf = %+v（期待は o3）", latest)
-	}
-	if latest := leaves.LatestOf(nil); latest != nil {
-		t.Errorf("latestOf(空) = %+v（期待は、ない）", latest)
-	}
-
 	// composeNotice
 	if notice := leaves.ComposeNotice(order); notice != (pkgtype.Notification{UserId: "u1", Message: "注文 order-1 を受け付けました"}) {
 		t.Errorf("composeNotice = %+v", notice)

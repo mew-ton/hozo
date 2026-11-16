@@ -1,9 +1,10 @@
-// Package storetest は、名前空間 store の op の振る舞いのテスト。人が書いたもので、二つの実装（gen/store: go-sqlite が
-// 出した中身、gen/storemem: 人がメモリの上に書いた中身）が同じものを走らせる。
+// Package storetest は、名前空間 store の op の振る舞いのテスト。人が書いたもので、二つの実装（gen/store: read と効果の中身は
+// go-sqlite が出したもの、gen/storemem: 人がメモリの上に書いたもの）が同じものを走らせる。
 //
-// ここで確かめるのは、仕様（store.hozo の、db の語彙のデコレータ）と、go-sqlite の規則（../../README.md「go-sqlite が従う規則」）から
-// 言えることだけ。仕様が言わないこと（@db.ref の先がないときなど）は確かめない。
-// 効果の結果は、状態の単位の、形で決まる問い合わせ（IsEmpty、Get）で確かめる: 読む op のない状態（notifications）でも読める。
+// ここで確かめるのは、仕様（store.hozo の read と効果と、その説明と、db の語彙のデコレータ）と、go-sqlite の規則
+// （../../README.md「go-sqlite が従う規則」）から、二つの実装に共に言えることだけ。仕様が言わないこと（@db.ref の先がないときなど）と、
+// 一方だけに言えること（@db.transaction。onsqlite と onmem のテスト）は確かめない。
+// 効果の結果は、状態の単位の、形で決まる問い合わせ（IsEmpty、Get）で確かめる: read のない状態（notifications）でも読める。
 package storetest
 
 import (
@@ -17,13 +18,14 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Ops は名前空間 store のすべての op（八つとも export を付けてある）。gen/store と gen/storemem の Ops のどちらも満たす
+// Ops は名前空間 store のすべての op（九つとも export を付けてある）。gen/store と gen/storemem の Ops のどちらも満たす
 // （二つは別のパッケージの別のインターフェースだが、型は同じ gen/type のものなので、メソッドの型が一致する）。
 type Ops interface {
 	FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
 	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
 	FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error)
 	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
+	LatestOrder(ctx context.Context, userId pkgtype.UserId) (*pkgtype.Order, error)
 	AddUser(ctx context.Context, user pkgtype.User) error
 	AddSession(ctx context.Context, session pkgtype.Session) error
 	RemoveSession(ctx context.Context, token pkgtype.Token) error
@@ -90,7 +92,7 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		wantUser(t, "findUser", nil)(s.FindUser(ctx, "carol@example.com"))
 		wantUser(t, "findUserById", &bob)(s.FindUserById(ctx, "u2"))
 		wantUser(t, "findUserById", nil)(s.FindUserById(ctx, "u9"))
-		// findUser が比べるのは、read userByEmail の @db.find が名指しした列（email）だけ。id の値を渡しても引けない
+		// findUser（read userByEmail）が比べるのは、引数の名前の列（email）だけ。id の値を渡しても引けない
 		wantUser(t, "findUser", nil)(s.FindUser(ctx, "u1"))
 		// @db.key と @db.unique が同じ行は足せない。どのエラーかは決まっていない
 		if err := s.AddUser(ctx, pkgtype.User{Id: "u1", Email: "other@example.com", Name: "X", Hash: "h"}); err == nil {
@@ -168,16 +170,33 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		if got, err := s.ListOrders(ctx, "u9"); err != nil || len(got) != 0 {
 			t.Errorf("listOrders(u9) = %v, %v（期待は空）", got, err)
 		}
+		// latestOrder（read latestOrderOf）は、そのユーザーの注文のうち、placedAt がいちばん新しいもの。
+		// 最後に足したもの（o1）ではない: u1 の o2 は、o1 より一時間新しい
+		latest, err := s.LatestOrder(ctx, "u1")
+		if err != nil || latest == nil || latest.Id != "o2" || !reflect.DeepEqual(latest.Lines, orders[0].Lines) {
+			t.Errorf("latestOrder(u1) = %+v, %v（期待は o2）", latest, err)
+		}
+		// 注文のないユーザーは、ない
+		if latest, err := s.LatestOrder(ctx, "u9"); err != nil || latest != nil {
+			t.Errorf("latestOrder(u9) = %+v, %v（期待は nil, nil）", latest, err)
+		}
+		// placedAt が同じ注文が二つあれば、後から足した方（u2 に、o3 と同じ時刻の o4 を足す）
+		if err := s.PlaceOrder(ctx, pkgtype.Order{Id: "o4", UserId: "u2", PlacedAt: at}, pkgtype.Notification{UserId: "u2", Message: "注文 o4"}); err != nil {
+			t.Fatal(err)
+		}
+		if latest, err := s.LatestOrder(ctx, "u2"); err != nil || latest == nil || latest.Id != "o4" {
+			t.Errorf("latestOrder(u2) = %+v, %v（期待は、後から足した o4）", latest, err)
+		}
 		// 状態の値は、どのユーザーの注文も、足した順。通知も、注文と同じ順に一つずつ。
-		// 通知を読む op は仕様にないので、効果 notifyUser の結果は、状態の値（Get）で確かめる
-		wantState(t, ctx, s.States.Orders, "orders", orderKey, "o2", "o3", "o1")
-		wantState(t, ctx, s.States.Notifications, "notifications", notificationKey, "u1: 注文 o2", "u2: 注文 o3", "u1: 注文 o1")
+		// 通知の read は仕様にないので、効果 notifyUser の結果は、状態の値（Get）で確かめる
+		wantState(t, ctx, s.States.Orders, "orders", orderKey, "o2", "o3", "o1", "o4")
+		wantState(t, ctx, s.States.Notifications, "notifications", notificationKey, "u1: 注文 o2", "u2: 注文 o3", "u1: 注文 o1", "u2: 注文 o4")
 	})
 
 	t.Run("placeOrder", func(t *testing.T) {
 		t.Parallel()
 		s := start(t)
-		// placeOrder は二つの効果（createOrder、notifyUser）を持つ: 注文と通知を、一緒に足す。
+		// placeOrder は二つの効果（createOrder、notifyUser）を、この順に呼ぶ配線: 注文と通知を、一緒に足す。
 		// 通知の model にはキーがないので、同じ文面の行も足せる
 		at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 		notice := pkgtype.Notification{UserId: "u1", Message: "こんにちは"}
@@ -188,7 +207,9 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		}
 		wantState(t, ctx, s.States.Orders, "orders", orderKey, "o1", "o2")
 		wantState(t, ctx, s.States.Notifications, "notifications", notificationKey, "u1: こんにちは", "u1: こんにちは")
-		// どちらも足すか、どちらも足さない: id（@db.key）が同じ注文は足せず、そのときは通知も足されない。どのエラーかは決まっていない
+		// 一つ目の効果（createOrder）が失敗すれば、二つ目（notifyUser）は呼ばれない: id（@db.key）が同じ注文は足せず、
+		// そのときは通知も足されない。どのエラーかは決まっていない。二つ目だけが失敗するときにどうなるかは、実装ごとに違う
+		// （SQLite は、@db.transaction の継ぎ目が取り消す。メモリは、取り消さない。onsqlite と onmem のテスト）
 		if err := s.PlaceOrder(ctx, pkgtype.Order{Id: "o1", UserId: "u2", PlacedAt: at}, pkgtype.Notification{UserId: "u2", Message: "残らない"}); err == nil {
 			t.Error("placeOrder: id（@db.key）が同じ注文を足せた")
 		}
@@ -213,6 +234,7 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 			"findUserById":  second(s.FindUserById(cancelled, "u1")),
 			"findSession":   second(s.FindSession(cancelled, "t1")),
 			"listOrders":    second(s.ListOrders(cancelled, "u1")),
+			"latestOrder":   second(s.LatestOrder(cancelled, "u1")),
 			"addUser":       s.AddUser(cancelled, pkgtype.User{Id: "u3", Email: "carol@example.com", Name: "Carol", Hash: "h3"}),
 			"addSession":    s.AddSession(cancelled, pkgtype.Session{Token: "t1", UserId: "u1", ExpiresAt: time.Now()}),
 			"removeSession": s.RemoveSession(cancelled, "t1"),

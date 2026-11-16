@@ -30,6 +30,11 @@ type Ops interface {
 	// Reads: store.orders
 	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
 
+	// LatestOrder はユーザーの、いちばん新しい注文を返す。まだ注文がなければ、値がない
+	//
+	// Reads: store.orders
+	LatestOrder(ctx context.Context, userId pkgtype.UserId) (*pkgtype.Order, error)
+
 	// AddUser はユーザーを足す
 	//
 	// Effects: store.createUser
@@ -45,16 +50,16 @@ type Ops interface {
 	// Effects: store.deleteSession
 	RemoveSession(ctx context.Context, token pkgtype.Token) error
 
-	// PlaceOrder は注文と、その通知の記録を、一緒に足す。一つのトランザクションで、どちらも足すか、どちらも足さない
+	// PlaceOrder は注文と、その通知の記録を、一緒に足す。どちらも足すか、どちらも足さない
 	//
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
 }
 
-// New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）、shared。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）。
 // 引数が nil かどうかは確かめない。
-func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState, shared SharedState) Ops {
-	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications, shared: shared}
+func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState) Ops {
+	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
@@ -63,37 +68,4 @@ type ops struct {
 	sessions      SessionsState
 	orders        OrdersState
 	notifications NotificationsState
-	shared        SharedState
-}
-
-func (o *ops) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
-	return o.users.FindUser(ctx, email)
-}
-
-func (o *ops) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
-	return o.users.FindUserById(ctx, id)
-}
-
-func (o *ops) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
-	return o.sessions.FindSession(ctx, token)
-}
-
-func (o *ops) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
-	return o.orders.ListOrders(ctx, userId)
-}
-
-func (o *ops) AddUser(ctx context.Context, user pkgtype.User) error {
-	return o.users.AddUser(ctx, user)
-}
-
-func (o *ops) AddSession(ctx context.Context, session pkgtype.Session) error {
-	return o.sessions.AddSession(ctx, session)
-}
-
-func (o *ops) RemoveSession(ctx context.Context, token pkgtype.Token) error {
-	return o.sessions.RemoveSession(ctx, token)
-}
-
-func (o *ops) PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error {
-	return o.shared.PlaceOrder(ctx, order, notification)
 }

@@ -11,8 +11,8 @@
 | スコープ | 中身 | 有効な範囲 |
 |---|---|---|
 | 配線 | `const` で束縛した名前 | その行より下の行（§9「名前は使う前に上で定義する」） |
-| op の引数 | `OpParam` の名前 | その op の本体と、その op に付いたデコレータの引数のうち値を取るもの（`@cache(key: ["orders", query])`。§11.1） |
-| デコレータの引数 | `Param` の名前（残りの引数を含む） | そのデコレータの宣言の `throws` / `catches` / `reads` / `effects`（`catches error recovers`。§4.2。`reads target`、`effects targets`） |
+| op の引数 | `OpParam` の名前 | その op の本体と、その op に付いたデコレータの引数のうち値を取るもの（`@cache(key: ["orders", query])`。§11.1）。`exception`、`effect`、`read` の引数の名前は、どのスコープにも入らない（本体を持たない。呼び出しの引数を位置で対応付けるのと、`@param` に使う） |
+| デコレータの引数 | `Param` の名前（残りの引数を含む） | そのデコレータの宣言の `throws` / `catches` / `reads` / `effects`（`catches error recovers`。§4.2。`reads counter`、`effects targets`） |
 | 現在の名前空間 | その名前空間の宣言（併合後）。状態は、配線の値の位置では値として参照できる（「位置ごとに受け付ける種類」） | その名前空間のブロックの中。親子は別（§3.2） |
 | グローバル | `namespace` の外の宣言 | すべて |
 | ルート | 名前空間の名前 | 修飾の先頭としてだけ |
@@ -39,7 +39,7 @@
    | 値の参照（束縛・引数。配線の値の位置では、現在の名前空間の `state` も） | その値の型のフィールド（型が model、または model の `optional`）。それ以外の型なら `RES-3`。`match` のアームの中では、絞り込まれた型から辿る（`docs/types.md`「アームの中の対象の型」） |
    | `classify` | ケース名 → 絞り込まれた型の元（`Type.case`）。`default` は指せない |
    | `union`（`arms`） | アーム名 → `ArgValue.variant` |
-   | `state`（値の位置でないとき） | `post` / `put` / `delete` → 状態への操作（`effect ... on`、`any effect on`、`effects` の要素の位置でだけ） |
+   | `state`（値の位置でないとき） | `post` / `put` / `delete` → 状態への操作（`effect ... on`、`any effect on`、`effects` の要素、配線の呼び出しの位置でだけ） |
    | それ以外 | `RES-3` |
 
 3. **位置が受け付ける種類か確かめる。** 表にない種類なら `RES-4`。
@@ -54,31 +54,31 @@
 | ケースの `X as T` の `X` | その分類の対象と同じもの: 値の分類なら型（`subject` の型と等しいこと）、op の分類ならその `op`、状態の分類なら対象の `state` のどれか。解決は対象と同じ規則で行い、対象でなければ CLS-5（`docs/check.md`「classify / match」） |
 | ケースの `X as T` の `T` | 下の「型」と同じ。絞り込める型かどうかは CLS-6 |
 | 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）、`classify` のケース（`C.Case<T>` の形でだけ。`C` は値の分類か op の分類で、どの名前空間のものでもよい。状態の分類なら RES-4）。核の型と形の語は予約語なので解決しない |
-| `exception X: T` の `T` | `model` |
 | ユニオンのメンバー `X;` | `exception`、`effect`、`union`（`set`） |
-| `effect e on s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
-| `read r on s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「読むことの宛先」） |
-| `effect e on X: A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
+| `exception`、`effect`、`read` の引数の型、`read` の結果の型 | 上の「型」と同じ |
+| `effect e(…) on s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
+| `read r(…): T on s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
+| `effect e(…) on X: A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
 | 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら `Empty` / `HasItems` |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
 | `catches` の要素 | `throws` と同じ |
 | `halts e` の `e` | `effect`、デコレータの宣言の中なら `any effect` の引数 |
-| `effects` の要素 | 名前で書いた要素: `effect`、`union`（`set` で要素が効果）。直に書いた要素: `state`（基底の状態。どの名前空間のものでも解決する）から辿った `post` / `put` / `delete`（下の「`effects` の要素の読み分け」）。デコレータの宣言の中なら `any effect` の引数（残りの引数でもよい）も。操作を付けない `state` と `classify` は RES-4（分類の遷移は直に書けない）。操作が状態の形になければ STATE-1、葉の op が別の名前空間の効果か状態を書けば STATE-2（`docs/check.md`「状態と効果」） |
-| `reads` の要素 | 名前で書いた要素: `read`。直に書いた要素: `state`（基底の状態）。どちらも、どの名前空間のものでも解決する。デコレータの宣言の中なら `any read` か `any state` の引数（残りの引数でもよい）も。どれでもなければ RES-4（状態の分類も書けない）。同じ名前空間に同じ名前の `read` と `state` は宣言できない（RES-6）ので、名前がどちらを指すかは一つに決まる。葉の op が別の名前空間の状態を読めば READS-1（デコレータが運ぶものを含む）、配線の op に書いたものが計算と食い違えば READS-2（`docs/check.md`「状態と効果」） |
+| `effects` の要素 | 名前で書いた要素: `effect`、`union`（`set` で要素が効果）。直に書いた要素: `state`（基底の状態。どの名前空間のものでも解決する）から辿った `post` / `put` / `delete`（下の「`effects` の要素の読み分け」）。デコレータの宣言の中なら `any effect` の引数（残りの引数でもよい）も。操作を付けない `state` と `classify` は RES-4（分類の遷移は直に書けない）。操作が状態の形になければ STATE-1、葉の op が節を書けば STATE-5、配線の op に書いたものが計算と食い違えば EFF-2（`docs/check.md`「状態と効果」） |
+| `reads` の要素 | 名前で書いた要素: `read`。直に書いた要素: `state`（基底の状態）。どちらも、どの名前空間のものでも解決する。デコレータの宣言の中なら `any state` の引数（残りの引数でもよい）も。どれでもなければ RES-4（状態の分類も書けない）。同じ名前空間に同じ名前の `read` と `state` は宣言できない（RES-6）ので、名前がどちらを指すかは一つに決まる。葉の op が節を書けば STATE-5、配線の op に書いたものが計算と食い違えば READS-2（`docs/check.md`「状態と効果」） |
 | `@name`（`@external` を除く。`docs/grammar.md`「予約語」） | `decorator`。名前の最後の要素は予約語でもよい（`@db.effects`。`docs/grammar.md`「識別子」の `DecoratorRef`）。付ける先の種類との照合は DEC-1 |
 | デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」）。`any op` の引数に渡した op が、デコレータを付けた宣言とは別の名前空間の、`export` のない op なら NS-5 |
 | `match x by C` の `C` | `classify`（値の分類、op の分類、状態の分類）。どの名前空間のものでもよく、別の名前空間のものは修飾して書く。対象の有無と分類の種類の照合は MATCH-7 |
 | `match by C` の `C` | 同上。状態の分類が別の名前空間のものなら `RES-5` |
 | `match x by list` / `by nullable` の `list` / `nullable` | 解決しない（標準の分類の名前。予約語） |
 | `match` のアームのケース名 | その分類のケース。標準の分類なら `Empty` / `HasItems` |
-| 呼び出しの op | `op`。別の名前空間の、`export` のない op なら NS-5（`docs/check.md`「名前空間」） |
+| 配線の呼び出しの名前（`Call` の `QualifiedName`） | `op`、`read`、`effect`、現在の名前空間の `state`（基底の状態）から辿った `post` / `put` / `delete`（下の「呼び出しの読み分け」）。別の名前空間の、`export` のない op なら NS-5、別の名前空間の `read` か `effect` なら NS-6（`docs/check.md`「名前空間」）、別の名前空間の状態の操作なら RES-5。効果の `union`、操作を付けない `state`、`classify` は RES-4 |
 | 配線の値の位置の `Path`（呼び出しの引数、レコードリテラルの値、`return` の値、`match` の対象、アームの本体の値） | 束縛、引数、現在の名前空間の `state`（基底の状態。修飾して書いても同じ）と、そのフィールドのパス。束縛と引数は `Atom.name`、状態は `Atom.state` になる（`docs/ir.md`「配線」）。別の名前空間（かグローバル）の `state` に解決できたら `RES-5`。それ以外の宣言なら RES-4 |
-| アームの本体の `throw E` の `E` | `exception`（どの名前空間のものでも）。ユニオン（`set`）とデコレータの引数は RES-4。値を運ぶ例外は MATCH-8 |
+| アームの本体の `throw E`、`throw E(…)` の `E` | `exception`（どの名前空間のものでも）。ユニオン（`set`）とデコレータの引数は RES-4 |
 | `bind s to ns.*` の `s` | 現在の名前空間の `state`。`ns` は名前空間 |
 | `model D extends B` の `B` | `model`（その場で書いた model は名前を持たないので書けない）。循環は TYPE-10 |
 | `override f` の `f` | 元の model のフィールド（`docs/types.md`「継承した model」の「フィールド」で作った後の並び）。なければ TYPE-10 |
-| `@param x` | その op（またはデコレータ）の引数名 |
+| `@param x` | その宣言（op、デコレータ、`exception`、`effect`、`read`）の引数名 |
 | `@throws X` | その op の `Signature.exceptions` に含まれる例外か、その op に付いた `external` なデコレータの `throws` の例外（外から見たときだけ起きる例外も書ける。DOC-1 の手続きは `docs/check.md`「名前空間」） |
 | `@see X` | どの宣言でも |
 
@@ -96,6 +96,21 @@
 - セグメントが一つの名前（`effects post`）は、いつも宣言の名前（効果 `post`）。状態への操作は、状態の名前と操作の、二つ以上のセグメントを要る。
 - `users.post` の `users` が、ルートの名前空間の名前でも、現在の名前空間の状態の名前でもあるとき、名前空間が先（手続き 1.4 が 1.5 より先）: 名前空間 `users` の効果 `post` を指し、なければ RES-1。状態を指すには、修飾して書く（`store.users.post`）。
 - 名前空間 `ns` が、子の名前空間 `users` と状態 `users` の両方を持つとき、`ns.users.post` は RES-2（手続き 2 の表の「名前空間」の行）。
+
+### 呼び出しの読み分け
+
+配線の呼び出しの名前 `a.b.….z`（`docs/grammar.md`「配線」の `Call`）は、ほかの名前と同じ「手続き」で一度だけ解決し、行き着いたものの種類で、何を呼ぶかが決まる。
+
+| 行き着いたもの | 読み方 |
+|---|---|
+| `op` | op の呼び出し |
+| `read` | `read` の呼び出し |
+| `effect` | 効果（宣言）の呼び出し |
+| `state` から `post` / `put` / `delete` を辿ったところ（手続き 2 の表） | その状態の組み込みの効果を、直に呼ぶ |
+
+- 手続きの順は「`effects` の要素の読み分け」と同じ: セグメントが一つの名前（`post(x)`）は、いつも宣言の名前。`users.post(x)` の `users` がルートの名前空間の名前でもあれば、名前空間が先。
+- 呼び出しの名前の先頭が、その行より上の束縛か、op の引数の名前と同じなら、手続き 1.1 が先で、値を指す（値は呼べないので、`users.post(x)` なら RES-3、`users(x)` なら RES-4）。状態と同じ名前の引数を持つ配線から、その状態の操作を呼ぶには、修飾して書く（`store.users.post(x)`）。
+- 呼び出しの位置は、配線の値の位置ではない: 状態の名前の次のセグメントは、その値のフィールドではなく、操作。
 
 ## 名前空間の併合と重複
 
@@ -115,5 +130,5 @@
 | RES-2 | error | 名前空間の子と宣言の両方に当たって曖昧 | その名前 |
 | RES-3 | error | 直前のものから次のセグメントを辿れない | 辿れなかったセグメント |
 | RES-4 | error | その位置で受け付けない種類のものを指している | その名前 |
-| RES-5 | error | 現在の名前空間の状態（か状態の分類）しか書けない位置が、別の名前空間のものを指している: `effect ... on`、`read ... on`、配線の値の位置の状態の名前、`match by C` の状態の分類。値の位置なら、その名前空間の op を通して読むことをメッセージに示す | その名前 |
+| RES-5 | error | 現在の名前空間の状態（か状態の分類）しか書けない位置が、別の名前空間のものを指している: `effect ... on`、`read ... on`、配線の値の位置の状態の名前、配線で直に呼ぶ `状態.操作(…)` の状態、`match by C` の状態の分類。値の位置と呼び出しなら、その名前空間の op を通すことをメッセージに示す | その名前 |
 | RES-6 | error | 同じスコープに同じ名前の宣言が二つある。相手の位置を `Related` に示す | ユーザーのファイルの側。両方ユーザーのファイルなら `docs/ir.md`「原則」の順で後の方 |

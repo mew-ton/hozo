@@ -330,34 +330,44 @@ func (a *analyzer) checkSTATE3(s *symbol, d *ast.StateDecl, t ir.Type) ir.Type {
 	return ir.Array(opt.Of)
 }
 
-// lowerException は exception。値の型は model だけ（docs/resolve.md「位置ごとに受け付ける種類」）。
-// その場の model は `<例外の FQN>.Value` に合成する。
-func (a *analyzer) lowerException(s *symbol, d *ast.ExceptionDecl, sc *scope) ir.Decl {
-	e := &ir.Exception{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
-	a.addSite(d.Decorators, siteException, sc, &e.DeclBase.Decorators)
-	if d.Value == nil {
-		return e
-	}
-	switch {
-	case d.Value.Body != nil:
-		e.Value = ir.Ref(a.synthesize(s, "Value", d.Value.Body, sc))
-	case d.Value.Type != nil:
-		if nt, ok := d.Value.Type.(*ast.NamedType); ok && nt.Arg == nil {
-			if r, ok := a.resolve(nt.Name, sc, acModel); ok {
-				e.Value = ir.Ref(r.sym.fqn)
-			}
-		} else {
-			a.errorf("RES-4", d.Value.Span, "exception %s の値の型は model でなければならない", s.fqn)
+// lowerDeclParams は exception / effect / read の引数の並び（docs/ir.md の OpParam）。型は「型」の位置と同じに解決する。
+// 同じ名前の引数が二つあれば RES-6。
+func (a *analyzer) lowerDeclParams(s *symbol, params []*ast.OpParam, sc *scope) []ir.OpParam {
+	var out []ir.OpParam
+	seen := map[string]source.Span{}
+	for _, p := range params {
+		if p == nil {
+			continue
 		}
+		if first, dup := seen[p.Name.Name]; dup {
+			a.errorf("RES-6", p.Name.Span, "%s %s の引数 %s が二度ある", s.kind, s.fqn, p.Name.Name).Related = []diag.Related{related(first, "最初の定義")}
+			continue
+		}
+		seen[p.Name.Name] = p.Name.Span
+		param := ir.OpParam{Name: p.Name.Name, Span: a.irSpan(p.Span)}
+		if t, ok := a.lowerType(p.Type, sc); ok {
+			param.Type = t
+		}
+		out = append(out, param)
 	}
+	return out
+}
+
+// lowerException は exception（docs/ir.md「state / exception / effect」）。引数は例外が運ぶ値。
+func (a *analyzer) lowerException(s *symbol, d *ast.ExceptionDecl, sc *scope) ir.Decl {
+	e := &ir.Exception{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
+	a.addSite(d.Decorators, siteException, sc, &e.DeclBase.Decorators)
+	e.Params = a.lowerDeclParams(s, d.Params, sc)
 	return e
 }
 
 // lowerEffect は effect。宛先は一つだけで、基底の状態の組み込みの効果か、分類の遷移（docs/check.md「状態の形」の
-// 「効果の宛先」）。宛先が決まらなければ Target は nil のまま。
+// 「効果の宛先」）。宛先が決まらなければ Target は nil のまま。引数は効果が受け取る値で、検査器は宛先の状態の型と
+// 照らさない（docs/check.md「read と効果」）。
 func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl {
-	e := &ir.Effect{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
+	e := &ir.Effect{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
 	a.addSite(d.Decorators, siteEffect, sc, &e.DeclBase.Decorators)
+	e.Params = a.lowerDeclParams(s, d.Params, sc)
 	switch {
 	case d.On != nil:
 		a.lowerBuiltinTarget(s, e, d.On, sc)
@@ -367,11 +377,18 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 	return e
 }
 
-// lowerRead は read（docs/ir.md「read」）。宛先は現在の名前空間の基底の状態一つ（docs/check.md「読むことの宛先」）。
+// lowerRead は read（docs/ir.md「read」）。宛先は現在の名前空間の基底の状態一つ（docs/check.md「read の宛先」）。
 // 別の名前空間の状態なら RES-5、状態でなければ（状態の分類を含む）RES-4。宛先が決まらなければ State は空のまま。
+// 引数と結果の型は、書かれたままの約束で、宛先の状態の型とは照らさない（同「read と効果」）。
 func (a *analyzer) lowerRead(s *symbol, d *ast.ReadDecl, sc *scope) ir.Decl {
-	rd := &ir.Read{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
+	rd := &ir.Read{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
 	a.addSite(d.Decorators, siteRead, sc, &rd.DeclBase.Decorators)
+	rd.Params = a.lowerDeclParams(s, d.Params, sc)
+	if d.Result != nil {
+		if t, ok := a.lowerType(d.Result, sc); ok {
+			rd.Returns = t
+		}
+	}
 	r, ok := a.resolve(d.On, sc, acState)
 	if !ok {
 		return rd
@@ -1021,9 +1038,11 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 	for _, c := range d.Clauses {
 		switch c := c.(type) {
 		case *ast.EffectsClause:
-			op.Effects = append(op.Effects, a.lowerOpEffects(s, d, c, sc)...)
+			a.checkSTATE5(s, d, c.Span, "effects")
+			op.Effects = append(op.Effects, a.lowerOpEffects(c, sc)...)
 		case *ast.ReadsClause:
-			for _, r := range a.lowerReads(s, d, c, sc) {
+			a.checkSTATE5(s, d, c.Span, "reads")
+			for _, r := range a.lowerReads(c, sc) {
 				if !containsRef(op.Reads, r) {
 					op.Reads = append(op.Reads, r)
 				}
@@ -1033,7 +1052,6 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 		}
 	}
 	a.checkREL1(s.fqn, op.Throws, d.Span)
-	a.checkEFF3(s, d, op.Effects)
 	if site := a.addSite(d.Decorators, siteOp, &scope{ns: s.ns, opParams: &opParamScope{decl: s.fqn, params: params}}, &op.DeclBase.Decorators); site != nil {
 		site.op = &opSite{sym: s, decl: d, op: op}
 	}
@@ -1043,24 +1061,30 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 	return op
 }
 
+// checkSTATE5 は STATE-5（docs/check.md「状態と効果」）: 葉の op（本体を持たない op）が reads か effects の節を書いた。
+// 葉は人が中身を書く op で、状態に触れない（同「葉の op」）。節ごとに一つ。位置はその節。
+func (a *analyzer) checkSTATE5(s *symbol, d *ast.OpDecl, span source.Span, clause string) {
+	if d.Body != nil {
+		return
+	}
+	what := "read"
+	if clause == "effects" {
+		what = "効果（effect）"
+	}
+	a.errorf("STATE-5", span, "葉の op %s は %s の節を書けない（葉は状態に触れない。%s を宣言して、配線で呼ぶ。docs/check.md「葉の op」）", s.fqn, clause, what)
+}
+
 // lowerOpEffects は op の effects の一節（docs/ir.md「op」の effects）。要素は、名前で書いた効果（effect か、効果の union。
-// 展開する）か、直に書いた「状態.操作」（docs/check.md「直に書く要素」）。
-// STATE-2（docs/check.md「状態と効果」）のうち、葉の op が自分で書いた効果の分: 効果の名前空間（直に書いた効果なら、その
-// 状態の名前空間）が op の名前空間と違う。位置はその要素。デコレータが運ぶ効果の分は carry、halts の効果の分は
-// internal/check が出す。
-func (a *analyzer) lowerOpEffects(s *symbol, d *ast.OpDecl, c *ast.EffectsClause, sc *scope) []ir.EffectRef {
+// 展開する）か、直に書いた「状態.操作」（docs/check.md「節に書く要素」）。どの名前空間のものでも書ける（配線の効果は、
+// 呼び出し先から名前空間をまたいで伝わる）。本体から決まる効果との照合（EFF-2）は internal/check が行う。
+func (a *analyzer) lowerOpEffects(c *ast.EffectsClause, sc *scope) []ir.EffectRef {
 	var out []ir.EffectRef
 	for _, n := range c.Effects {
 		r, ok := a.resolve(n, sc, acEffectsPos)
 		if !ok {
 			continue
 		}
-		for _, e := range a.effectRefs(r, n) {
-			out = append(out, e)
-			if owner := a.effectOwner(e); d.Body == nil && owner != nil && owner != s.ns {
-				a.errorf("STATE-2", n.Span, "%s は名前空間 %s の持ち主ではないので、効果 %s を effects に宣言できない", s.fqn, nsName(owner), e)
-			}
-		}
+		out = append(out, a.effectRefs(r, n)...)
 	}
 	return out
 }
@@ -1092,20 +1116,16 @@ func (a *analyzer) effectOwner(e ir.EffectRef) *namespace {
 }
 
 // lowerReads は reads の一節（docs/ir.md「op」の reads）。要素は、名前で書いた read か、直に書いた state（基底の状態）。
-// どちらも、どの名前空間のものでも解決する（どちらでもなければ RES-4）。
-// READS-1（docs/check.md「状態と効果」）: 葉の op が別の名前空間の状態（か、その read）を書いた。位置はその要素。
-func (a *analyzer) lowerReads(s *symbol, d *ast.OpDecl, c *ast.ReadsClause, sc *scope) []ir.ReadRef {
+// どちらも、どの名前空間のものでも解決する（どちらでもなければ RES-4）。本体から決まる読む状態との照合（READS-2）は
+// internal/check が行う。
+func (a *analyzer) lowerReads(c *ast.ReadsClause, sc *scope) []ir.ReadRef {
 	var out []ir.ReadRef
 	for _, n := range c.Reads {
 		r, ok := a.resolve(n, sc, acReadsPos)
 		if !ok {
 			continue
 		}
-		ref := readRef(r.sym)
-		if d.Body == nil && r.sym.ns != s.ns {
-			a.errorf("READS-1", n.Span, "葉の op %s が、別の名前空間の%sを reads に書いている（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", s.fqn, readRefText(ref), nsName(s.ns))
-		}
-		out = append(out, ref)
+		out = append(out, readRef(r.sym))
 	}
 	return out
 }
@@ -1145,7 +1165,7 @@ type neverOp struct {
 
 // checkNeverOps は THROWS-3（docs/check.md「throws」）: never を返す op が、docs/check.md「never を返す op」の条件 1〜6 の
 // どれかを満たさない。満たさない条件ごとに一つ。位置は、1 は op の名前、2 と 3 は throws（なければ op の名前）、
-// 4 は最初の引数、5 はその節（デコレータが運ぶものなら、そのデコレータ）、6 はそのデコレータ。
+// 4 は最初の引数、5 と 6 はそのデコレータ。
 func (a *analyzer) checkNeverOps() {
 	for _, n := range a.neverOps {
 		a.checkTHROWS3(n)
@@ -1158,7 +1178,7 @@ func (a *analyzer) checkTHROWS3(n *neverOp) {
 	if d.Body != nil {
 		a.errorf("THROWS-3", n.sym.nameSpan, "never を返す op %s は本体を持てない（決して返さない op は、例外を一つ投げる葉）", name)
 	}
-	// 2. throws の例外（ユニオンを展開した後）が、ちょうど一つ。3. その例外が値を運ばない
+	// 2. throws の例外（ユニオンを展開した後）が、ちょうど一つ。3. その例外が引数を持たない
 	var throws *ast.ThrowsClause
 	for _, c := range d.Clauses {
 		if tc, ok := c.(*ast.ThrowsClause); ok && throws == nil {
@@ -1186,8 +1206,8 @@ func (a *analyzer) checkTHROWS3(n *neverOp) {
 	}
 	for _, e := range exceptions {
 		if sym := a.syms[e]; sym != nil {
-			if ex, ok := a.lower(sym).(*ir.Exception); ok && ex.Value != nil {
-				a.errorf("THROWS-3", throwsSpan, "never を返す op %s の例外 %s は値を運ぶ（値を運ぶ例外を投げるのは、人が書く葉の op）", name, e)
+			if ex, ok := a.lower(sym).(*ir.Exception); ok && len(ex.Params) > 0 {
+				a.errorf("THROWS-3", throwsSpan, "never を返す op %s の例外 %s は引数を持つ（引数を持つ例外は、配線のアームで値を渡して投げる: throw %s(…)）", name, e, e)
 				break
 			}
 		}
@@ -1196,20 +1216,9 @@ func (a *analyzer) checkTHROWS3(n *neverOp) {
 	if len(d.Params) > 0 && d.Params[0] != nil {
 		a.errorf("THROWS-3", d.Params[0].Span, "never を返す op %s は引数を持てない", name)
 	}
-	// 5. effects も reads も持たない（デコレータが運ぶものを含めて）
-	written := false
-	for _, c := range d.Clauses {
-		switch c.(type) {
-		case *ast.EffectsClause, *ast.ReadsClause:
-			a.errorf("THROWS-3", c.NodeSpan(), "never を返す op %s は effects も reads も持てない", name)
-			written = true
-		default:
-			continue
-		}
-		break
-	}
-	if carriers := a.carriers[op]; !written && len(carriers) > 0 {
-		a.errorf("THROWS-3", carriers[0].span, "never を返す op %s は effects も reads も持てない（デコレータが運ぶものを含めて）", name)
+	// 5. デコレータが運ぶ reads も effects も持たない（節に書いたものは、葉なので STATE-5）
+	if carriers := a.carriers[op]; len(carriers) > 0 {
+		a.errorf("THROWS-3", carriers[0].span, "never を返す op %s は、reads も effects も運ぶデコレータを持てない", name)
 	}
 	// 6. catches を持つデコレータが付いていない
 	for _, app := range op.Decorators {
@@ -1238,30 +1247,6 @@ func paramNames(params []*ast.OpParam) map[string]bool {
 		}
 	}
 	return m
-}
-
-// checkEFF3 は EFF-3（docs/check.md「状態と効果」）: 葉の op が自分で書いた Op.effects（ユニオンを展開した後。名前で書いたものも、
-// 直に書いたものも数える）が二つ以上。
-// 葉かどうか（本体がない）と展開後の効果の列だけで決まり、Signature を要しないので、REL-1 / REL-5 と同じく
-// internal/sema が出す。同じ効果を二度書いたものは一つと数える。デコレータが運ぶ効果（Op.carried.effects）は数えない
-// （順序はデコレータの引数に書いてある）。配線の op（本体を持つ）は伝播した効果をいくつ書いてもよい（EFF-2 が照合する）。
-// 位置は op の宣言。
-func (a *analyzer) checkEFF3(s *symbol, d *ast.OpDecl, effects []ir.EffectRef) {
-	if d.Body != nil {
-		return
-	}
-	var distinct []ir.EffectRef
-	var names []string
-	for _, e := range effects {
-		if !containsRef(distinct, e) {
-			distinct = append(distinct, e)
-			names = append(names, e.String())
-		}
-	}
-	if len(distinct) < 2 {
-		return
-	}
-	a.errorf("EFF-3", d.Span, "葉の op %s が効果を二つ以上書いている（%s）。葉の op が自分で書ける効果は一つまで。効果ごとの葉の op を配線でつなぐか、まとめて変える状態を対象にした分類の遷移一つにするか、効果を並べて一体に行うと言うデコレータを付ける", s.fqn, join(names))
 }
 
 // lowerThrows は throws の一節（docs/ir.md「decorator」の ThrowsClause）。REL-5 もここで確かめる。

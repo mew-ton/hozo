@@ -57,19 +57,21 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 | カーソルの位置 | 飛び先 |
 |---|---|
-| 宣言への参照（型、`throws`、デコレータ名、呼び出しの op など） | その宣言の名前のトークン |
+| 宣言への参照（型、`throws`、デコレータ名、呼び出しの op・`read`・効果など） | その宣言の名前のトークン |
+| 配線で直に呼ぶ `状態.操作(…)` | 状態の名前のセグメントは `state` の名前。操作の語（`post` / `put` / `delete`）は宣言を持たないので `null` |
+| `exception`、`effect`、`read` の引数の型、`read` の結果の型 | その型の宣言 |
 | `model D extends B` の `B` | model `B` の名前 |
 | `override f` の `f` | 元の model の `fields` の、そのフィールドの位置（`Field.span`。`docs/ir.md`「model / scalar / union」。元の model が受け継いだままのフィールドなら、さらに元の宣言の位置になる） |
 | `classify C of op` の `op`、ケースの `op as T` の `op` | その op の名前 |
 | ケースの `X as T` の `X`（状態、型）と `T` | 状態なら `state` の名前、型ならその宣言 |
 | `reads` の要素 | `read` の名前（名前で書いた要素）か、`state` の名前（直に書いた要素） |
 | `effects` の要素 | `effect` か効果の `union` の名前（名前で書いた要素）。直に書いた `状態.操作` は、状態の名前のセグメントが `state` の名前、操作の語（`post` / `put` / `delete`）は宣言を持たないので `null` |
-| `read r on s` の `s` | `state` の名前 |
+| `read r(…): T on s` の `s` | `state` の名前 |
 | デコレータの宣言の `reads` / `effects` の節の名前 | op の節と同じ。デコレータの引数の名前（残りの引数を含む）なら、その `Param` |
 | 予約語のデコレータ名（`@db.list`、`@effects`、別名の `=` の後ろ） | ほかのデコレータ名と同じく、その `decorator` の名前 |
 | 配線の値の位置の、状態の名前（`f(token)`、`match token by nullable`） | `state` の名前。同じ名前の束縛か引数があれば、そちら（`docs/resolve.md`「手続き」） |
 | `match x by ns.C` の `C` | `classify` の名前 |
-| アームの `throw E` の `E` | `exception` の名前 |
+| アームの `throw E`、`throw E(…)` の `E` | `exception` の名前。引数の値は、配線のほかの値と同じ |
 | `a.b.c` の途中のセグメント | そのセグメントまでで決まるもの（名前空間なら、その名前空間の最初のブロックの名前） |
 | フィールドの参照 `x.f` | フィールドの宣言 |
 | 束縛名 | `const` の名前 |
@@ -85,8 +87,9 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 Markdown の `MarkupContent`。順に:
 
-1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `op login(in: LoginInput): LoginOk`、`export op login(in: LoginInput): LoginOk`（`Op.exported`）、`op unauthorized(): never`、`model User`、`model PublicUser extends User`（`Model.extends.base`）、`scalar Email extends string`、`exception InvalidCredentials: Violations`、`effect createSession on sessions.post`、`effect placeOrder on Checkout: Shopping -> Ordered`、`read userByEmail on users`、`decorator validated throws ClientError prevents effects`、`decorator reads(target: any read) reads target`、`decorator effects(...targets: any effect) effects targets`（残りの引数は `...名前: 型`。節は `throws`、`catches`、`reads`、`effects` の順にまとめて書き、並びの区切りは `,`）、`decorator insert(table: any state) for effect`、`decorator find(table: any state, column: string) for read`、`state users: list<User>`、`classify WarrantyKind of server.Item`、`classify Registration of findUser`（op の分類）、`classify Checkout of carts, orders`、フィールドなら `token: Token?`、`as` を持つケースなら `Registered: findUser as type.User`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
+1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `op login(in: LoginInput): LoginOk`、`export op login(in: LoginInput): LoginOk`（`Op.exported`）、`op unauthorized(): never`、`model User`、`model PublicUser extends User`（`Model.extends.base`）、`scalar Email extends string`、`exception InvalidCredentials`、`exception LimitExceeded(wait: Duration)`、`effect createSession(session: Session) on sessions.post`、`effect placeOrder() on Checkout: Shopping -> Ordered`、`read userByEmail(email: Email): User? on users`、`decorator validated throws ClientError prevents effects`、`decorator limit(counter: any state) reads counter`、`decorator effects(...targets: any effect) effects targets`（残りの引数は `...名前: 型`。節は `throws`、`catches`、`reads`、`effects` の順にまとめて書き、並びの区切りは `,`）、`decorator insert(table: any state) for effect`、`decorator find(table: any state) for read`、`@repeatable decorator where(column: string) for read`（核の印 `@external` / `@repeatable` は、`decorator` の前に、この順で）、`state users: list<User>`、`classify WarrantyKind of server.Item`、`classify Registration of findUser`（op の分類）、`classify Checkout of carts, orders`、フィールドなら `token: Token?`、`as` を持つケースなら `Registered: findUser as type.User`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
    - 型は `T?` と `T[]` で書く。状態の見出しだけは、形の語で書く（`State.shape` と `State.element` から `list<T>` / `nullable<T>` / `single<T>`）。
+   - 配線の呼び出しの名前は、呼び出し先の宣言（op、`read`、`effect`）の見出し。直に呼ぶ `状態.操作(…)` の状態のセグメントは、その状態の見出し。
    - 配線の値の位置の状態の名前は、ほかの宣言への参照と同じく、その状態の見出し。アームの中で絞り込まれていても、見出しは宣言のまま。
    - 継承した model のフィールドは、受け継いだものも `fields` にあるので、同じ形で出る。
 2. `description.body`。

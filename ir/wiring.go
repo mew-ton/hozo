@@ -191,15 +191,120 @@ func UnmarshalExpr(data []byte) (Expr, error) {
 	return decodeUnion("expr", data, exprTable)
 }
 
-// Call は op の呼び出し（docs/ir.md「配線」の Call）。
+// Call は配線の呼び出し（docs/ir.md「配線」の Call）: op、read、効果のどれか（docs/check.md「配線からの呼び出し」）。
 type Call struct {
-	// Op は呼ぶ op の FQN。
-	Op string `json:"op"`
-	// Args は引数。位置で書いた引数を引数名に対応付けたもの。
+	// Callee は呼び出し先。解決できなかった呼び出しでは nil。
+	Callee Callee `json:"callee"`
+	// Args は引数。位置で書いた引数を、呼び出し先の引数名に対応付けたもの（docs/types.md「呼び出しの引数」）。
+	// 直に呼ぶ組み込みの効果の、値を取る操作の引数名は [DirectEffectParam]。
 	Args []CallArg `json:"args"`
-	// Bound は bind で埋まる位置（docs/check.md「bind」）。計算結果。
+	// Bound は bind で埋まる位置（docs/check.md「bind」）。計算結果。呼び出し先が op でなければ空。
 	Bound []BoundPosition `json:"bound"`
 	Span  Span            `json:"span"`
+}
+
+// DirectEffectParam は、直に呼ぶ組み込みの効果の、値を取る操作の引数名（docs/ir.md「配線」の Call の args）。
+const DirectEffectParam = "value"
+
+// CalledOp は呼び出し先が op なら、その FQN。read か効果の呼び出し（と、解決できなかった呼び出し）なら ""。
+func (c Call) CalledOp() string {
+	if o, ok := c.Callee.(OpCallee); ok {
+		return o.Op
+	}
+	return ""
+}
+
+// Callee は呼び出し先（docs/ir.md「配線」の Callee）。具体型は値型の [OpCallee]（kind "op"）、[ReadCallee]（kind "read"）、
+// [EffectCallee]（kind "effect"）で、== で比べられる。
+type Callee interface {
+	// Kind は JSON の判別子（"op"、"read"、"effect"）。
+	Kind() string
+	// String は表示のための文字列: op と read は宣言の FQN、効果は [EffectRef] の String。
+	String() string
+	isCallee()
+}
+
+// OpCallee は op の呼び出し。
+type OpCallee struct {
+	// Op は op の FQN。
+	Op string `json:"op"`
+}
+
+// ReadCallee は read の宣言の呼び出し（`userByEmail(email)`）。名前を付けない read は、呼び出しではなく [StateAtom]。
+type ReadCallee struct {
+	// Read は read の宣言の FQN。
+	Read string `json:"read"`
+}
+
+// EffectCallee は効果の呼び出し。Effect が [NamedEffect] なら effect の宣言の呼び出し（`createOrder(order)`）、
+// [DirectEffect] なら組み込みの効果を直に呼んだもの（`orders.post(order)`）。
+type EffectCallee struct {
+	Effect EffectRef `json:"effect"`
+}
+
+var (
+	_ Callee = OpCallee{}
+	_ Callee = ReadCallee{}
+	_ Callee = EffectCallee{}
+)
+
+// Kind は "op"。
+func (OpCallee) Kind() string { return "op" }
+
+// Kind は "read"。
+func (ReadCallee) Kind() string { return "read" }
+
+// Kind は "effect"。
+func (EffectCallee) Kind() string { return "effect" }
+
+// String は op の FQN。
+func (c OpCallee) String() string { return c.Op }
+
+// String は read の宣言の FQN。
+func (c ReadCallee) String() string { return c.Read }
+
+// String は効果の表示（[EffectRef] の String）。
+func (c EffectCallee) String() string {
+	if c.Effect == nil {
+		return ""
+	}
+	return c.Effect.String()
+}
+
+func (OpCallee) isCallee()     {}
+func (ReadCallee) isCallee()   {}
+func (EffectCallee) isCallee() {}
+
+// MarshalJSON は kind を付けて書く。
+func (c OpCallee) MarshalJSON() ([]byte, error) {
+	type alias OpCallee
+	return marshalKind("op", alias(c))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (c ReadCallee) MarshalJSON() ([]byte, error) {
+	type alias ReadCallee
+	return marshalKind("read", alias(c))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (c EffectCallee) MarshalJSON() ([]byte, error) {
+	type alias EffectCallee
+	return marshalKind("effect", alias(c))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (c *EffectCallee) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, c) }
+
+var calleeTable = map[string]func([]byte) (Callee, error){
+	"op":     asValue[Callee, OpCallee],
+	"read":   asValue[Callee, ReadCallee],
+	"effect": asValue[Callee, EffectCallee],
+}
+
+// UnmarshalCallee は kind で分けて Callee を読む（docs/ir.md「JSON」）。
+func UnmarshalCallee(data []byte) (Callee, error) {
+	return decodeUnion("callee", data, calleeTable)
 }
 
 // CallArg は呼び出しの引数（docs/ir.md「配線」の Call の args）。
@@ -529,12 +634,17 @@ type ArmBody interface {
 // NoneBody はアームの本体の `none`（docs/ir.md「配線」の MatchArm の body kind "none"）。
 type NoneBody struct{}
 
-// ThrowBody はアームの本体の `throw E`（docs/ir.md「配線」の MatchArm の body kind "throw"）。
+// ThrowBody はアームの本体の `throw E`、`throw E(値, …)`（docs/ir.md「配線」の MatchArm の body kind "throw"）。
 type ThrowBody struct {
 	// Exception は例外の FQN。
 	Exception string `json:"exception"`
-	Span      Span   `json:"span"`
+	// Args は位置で書いた値を、例外の Params の名前に対応付けたもの。なければ空（JSON では []）。
+	Args []CallArg `json:"args"`
+	Span Span      `json:"span"`
 }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (b *ThrowBody) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, b) }
 
 var (
 	_ ArmBody = CallExpr{}

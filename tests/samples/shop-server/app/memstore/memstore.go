@@ -1,8 +1,7 @@
 // Package memstore は、名前空間 store の状態の単位の、メモリの上の実装（../../README.md「人が書いたもの」）。
-// 単位 gen/storemem（transpilers は基底の go だけ）には、中身を出すトランスパイラがいないので、人が書いて
-// store.New の引数に渡す。状態ごとに型が一つと、二つの状態にまたがる op（placeOrder）の型が一つで、gen/store で
-// go-sqlite が出す型（store.UsersTable、store.SharedTable など）と、満たすインターフェース（store.UsersState、
-// store.SharedState など）の中身は同じ。
+// 単位 gen/storemem（transpilers は基底の go だけ）には、read と効果の中身を出すトランスパイラがいないので、人が書いて
+// store.New の引数に渡す。状態ごとに型が一つで、gen/store で go-sqlite が出す型（store.UsersTable など）と、満たす
+// インターフェース（store.UsersState など）の中身は同じ: 形で決まる問い合わせ（IsEmpty、Get）と、その状態の read と効果。
 package memstore
 
 import (
@@ -15,12 +14,12 @@ import (
 )
 
 // ErrDuplicate は、@db.key か @db.unique のフィールドが同じ行を足そうとした。
-// 仕様はこの失敗を言わない（addUser などに throws はない）。SQLite の制約に合わせて、人が決めたもの。
+// 仕様はこの失敗を言わない（効果にも、それを呼ぶ op にも、throws はない）。SQLite の制約に合わせて、人が決めたもの。
 var ErrDuplicate = errors.New("memstore: duplicate key")
 
-// Store は、メモリの上の四つの状態。op は並行に呼ばれるので、mu で守る。
-// 状態の単位の実装は、Users、Sessions、Orders、Notifications が、複数の状態にまたがる op の実装は、Shared が返す。
-// 同じ Store のものは、同じ状態を読み書きする。
+// Store は、メモリの上の四つの状態。read と効果は並行に呼ばれるので、mu で守る。
+// 状態の単位の実装は、Users、Sessions、Orders、Notifications が返す。同じ Store のものは、同じ状態を読み書きする。
+// read 一つ、効果一つは、それぞれ一度の lock の中で行う。二つの効果をまたぐ lock（トランザクションに当たるもの）は、ない。
 type Store struct {
 	mu            sync.Mutex
 	users         []pkgtype.User
@@ -32,13 +31,12 @@ type Store struct {
 // New は空の Store を返す。Store はいくつ作ってもよく、互いに混ざらない。
 func New() *Store { return &Store{} }
 
-// 五つの型は、生成された口（四つの状態の単位と、SharedState）をすべて満たす。メソッドが一つでも足りなければ、ここでコンパイルできない。
+// 四つの型は、生成された口（四つの状態の単位）をすべて満たす。メソッドが一つでも足りなければ、ここでコンパイルできない。
 var (
 	_ store.UsersState         = Users{}
 	_ store.SessionsState      = Sessions{}
 	_ store.OrdersState        = Orders{}
 	_ store.NotificationsState = Notifications{}
-	_ store.SharedState        = Shared{}
 )
 
 // Users は状態 store.users の単位（store.UsersState）の実装。
@@ -66,12 +64,6 @@ type Notifications struct{ list[pkgtype.Notification] }
 func (m *Store) Notifications() Notifications {
 	return Notifications{listOf(m, &m.notifications, same)}
 }
-
-// Shared は、複数の状態にまたがる葉の op（store.SharedState）の実装。
-type Shared struct{ m *Store }
-
-// Shared は m の上の、複数の状態にまたがる op の実装を返す。
-func (m *Store) Shared() Shared { return Shared{m: m} }
 
 // lock は、ctx が生きていれば mu を取る。中断されているか期限が過ぎていれば、状態に触れずにそのエラーを返す。
 func (m *Store) lock(ctx context.Context) error {
@@ -120,8 +112,8 @@ func (l list[T]) Get(ctx context.Context) ([]T, error) {
 // same は、スライスを持たない要素の写し（値そのまま）。
 func same[T any](row T) T { return row }
 
-// FindUser は store.findUser の本体。
-func (s Users) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
+// UserByEmail は read store.userByEmail の本体: email が同じユーザー。
+func (s Users) UserByEmail(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
 	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
@@ -134,8 +126,8 @@ func (s Users) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User
 	return nil, nil
 }
 
-// FindUserById は store.findUserById の本体。
-func (s Users) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
+// UserById は read store.userById の本体: 識別子が同じユーザー。
+func (s Users) UserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
 	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
@@ -148,8 +140,8 @@ func (s Users) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.Us
 	return nil, nil
 }
 
-// AddUser は store.addUser の本体。id（@db.key）か email（@db.unique）が同じユーザーがいれば ErrDuplicate。
-func (s Users) AddUser(ctx context.Context, user pkgtype.User) error {
+// CreateUser は効果 store.createUser の本体。id（@db.key）か email（@db.unique）が同じユーザーがいれば ErrDuplicate。
+func (s Users) CreateUser(ctx context.Context, user pkgtype.User) error {
 	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
@@ -163,8 +155,8 @@ func (s Users) AddUser(ctx context.Context, user pkgtype.User) error {
 	return nil
 }
 
-// FindSession は store.findSession の本体。
-func (s Sessions) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
+// SessionByToken は read store.sessionByToken の本体: トークンが同じセッション。
+func (s Sessions) SessionByToken(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
 	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
@@ -177,8 +169,8 @@ func (s Sessions) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtyp
 	return nil, nil
 }
 
-// AddSession は store.addSession の本体。token（@db.key）が同じセッションがあれば ErrDuplicate。
-func (s Sessions) AddSession(ctx context.Context, session pkgtype.Session) error {
+// CreateSession は効果 store.createSession の本体。token（@db.key）が同じセッションがあれば ErrDuplicate。
+func (s Sessions) CreateSession(ctx context.Context, session pkgtype.Session) error {
 	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
@@ -192,8 +184,8 @@ func (s Sessions) AddSession(ctx context.Context, session pkgtype.Session) error
 	return nil
 }
 
-// RemoveSession は store.removeSession の本体。そのトークンのセッションがなければ、何もしない。
-func (s Sessions) RemoveSession(ctx context.Context, token pkgtype.Token) error {
+// DeleteSession は効果 store.deleteSession の本体。そのトークンのセッションがなければ、何もしない。
+func (s Sessions) DeleteSession(ctx context.Context, token pkgtype.Token) error {
 	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
@@ -207,8 +199,8 @@ func (s Sessions) RemoveSession(ctx context.Context, token pkgtype.Token) error 
 	return nil
 }
 
-// ListOrders は store.listOrders の本体。そのユーザーの注文の写しを、足した順に。
-func (s Orders) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
+// OrdersOfUser は read store.ordersOfUser の本体: そのユーザーの注文の写しを、足した順に。
+func (s Orders) OrdersOfUser(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
 	if err := s.m.lock(ctx); err != nil {
 		return nil, err
 	}
@@ -222,10 +214,28 @@ func (s Orders) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtyp
 	return out, nil
 }
 
-// PlaceOrder は store.placeOrder の本体: 注文と通知を、一緒に足す（効果 createOrder、notifyUser の順）。
-// 仕様（@db.effects に二つの効果）は「どちらも足すか、どちらも足さない」と言う。一度の lock の中で、失敗しうること
-// （id（@db.key）が同じ注文があれば ErrDuplicate）を先にすべて確かめてから、二つの状態を書く。
-func (s Shared) PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error {
+// LatestOrderOf は read store.latestOrderOf の本体: そのユーザーの注文のうち、placedAt がいちばん新しいものの写し。なければ nil。
+// placedAt が同じなら、後から足した方（go-sqlite の @db.latest と同じ決め方。docs/plugin-go-sqlite.md「read の中身」）。
+func (s Orders) LatestOrderOf(ctx context.Context, userId pkgtype.UserId) (*pkgtype.Order, error) {
+	if err := s.m.lock(ctx); err != nil {
+		return nil, err
+	}
+	defer s.m.mu.Unlock()
+	var latest *pkgtype.Order
+	for _, o := range s.m.orders {
+		if o.UserId == userId && (latest == nil || !o.PlacedAt.Before(latest.PlacedAt)) {
+			latest = &o
+		}
+	}
+	if latest == nil {
+		return nil, nil
+	}
+	out := copyOrder(*latest)
+	return &out, nil
+}
+
+// CreateOrder は効果 store.createOrder の本体。id（@db.key）が同じ注文があれば ErrDuplicate。
+func (s Orders) CreateOrder(ctx context.Context, order pkgtype.Order) error {
 	if err := s.m.lock(ctx); err != nil {
 		return err
 	}
@@ -236,6 +246,15 @@ func (s Shared) PlaceOrder(ctx context.Context, order pkgtype.Order, notificatio
 		}
 	}
 	s.m.orders = append(s.m.orders, copyOrder(order))
+	return nil
+}
+
+// NotifyUser は効果 store.notifyUser の本体。通知の model にはキーがないので、同じ文面の行も足せる。
+func (s Notifications) NotifyUser(ctx context.Context, notification pkgtype.Notification) error {
+	if err := s.m.lock(ctx); err != nil {
+		return err
+	}
+	defer s.m.mu.Unlock()
 	s.m.notifications = append(s.m.notifications, notification)
 	return nil
 }

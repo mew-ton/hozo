@@ -16,7 +16,8 @@ namespace type {
 namespace shop {
   model Receipt { item: type.Item; count: int; }
   state items: list<type.Item>;
-  effect addItem on items.post;
+  read itemById(id: type.ItemId): type.Item? on items;
+  effect addItem(item: type.Item) on items.post;
 
   // 配線: 戻り値は model（零値は構造体）。引数は、別の名前空間の型
   @rate.limited
@@ -30,13 +31,19 @@ namespace shop {
   @rate.limited
   export op ping();
 
-  // 葉（状態の単位の命令）: 戻り値がない
+  // 配線（効果を呼ぶ）: 戻り値がない
   @rate.limited
-  export op add(item: type.Item) effects addItem;
+  export op add(item: type.Item)
+  {
+    addItem(item);
+  }
 
-  // 葉（状態の単位の問い合わせ）: 戻り値の零値が、ポインタ（nil）
+  // 配線（read を呼ぶ）: 戻り値の零値が、ポインタ（nil）
   @rate.limited
-  export op lookup(id: type.ItemId): type.Item? reads items;
+  export op lookup(id: type.ItemId): type.Item?
+  {
+    return itemById(id);
+  }
 
   // 戻り値の零値: スライス（nil）、文字列（""）、数（0）、真偽値（false）、time.Time（time.Time{}）、scalar（""）
   @rate.limited
