@@ -448,7 +448,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 		// LoggedIn: session は type.Session
 		return o.RequireFresh(ctx, *session)
 	}
-	// default
+	// LoggedOut
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
 }
 ```
@@ -566,7 +566,7 @@ if err != nil {
 
 - 対象が状態なら、先に「状態の参照」で読む。対象が名前でない `Atom`（リテラル、レコードリテラル、`none`）なら、`v<n>` に束縛してから分ける。
 - **二つに分ける形**（`if`）は、アームを書いた順によらず、値のある場合を `if` の枝にする。`return match` では、`else` を書かず、もう一方をそのまま後ろに続ける（どの枝も `return` で終わる）。それ以外では `if … { … } else { … }`。枝の中身がないとき（文の `match` の `none` のアーム）は、その枝を書かない（`if` の枝がなければ、条件を逆にして `if <対象> == nil` / `if len(<対象>) == 0` にする）。一つのアームが両方のケースを並べていれば（`Empty | HasItems => f();`）、分けずに、そのアームの本体だけを書く。
-- **`switch` の形**は、アームごとに `case` を一つ。並びは、アームの最初のケースの、分類の宣言での順。`default` のアームは最後。複数のケースを並べたアームは `case A, B:`。`return match` で、`default` の節を持たない `switch` の後ろには、`return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` を置く（判定関数が先に同じ誤りを返すので、ここには来ない。Go が、関数の終わりの `return` を求めるため）。
+- **`switch` の形**は、アームごとに `case` を一つ。並びは、アームの最初のケースの、分類の宣言での順。`default` のアームは最後。複数のケースを並べたアームは `case A, B:`。`return match` で、`default` の節を持たない `switch` の後ろには、`return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` を置く（判定関数が先に同じ誤りを返すので、ここには来ない。Go が、関数の終わりの `return` を求めるため）。残りのケースの節は `default:` ではないので、`variant` の `switch` は、残りのケースがあっても `default` の節を持たない: union の値がない（`nil`）のは、どのアームでもなく、残りのケースにも当たらずに、この `return` に来る。
 - それぞれの枝（`if` の枝、後ろに続く部分、`else` の枝）の頭に、ケースの名前をコメントで書く: `// <ケース名>`（複数なら ` | ` でつなぐ。`default` は `default`。残りのケースは、ほかのケースと同じく、その名前）。対象が絞り込まれるアームは `// <ケース名>: <対象> は <型>`（型の書き方は「コメント」の「型の表示」）。`switch` の節には書かない（`case` が名前を持つ）。
 
 **絞り込んだ値**（アームの中で、対象と同じ `Atom` を値として使う位置の式。フィールドを読むだけなら、Go がポインタを辿るので、元の式のまま）:
