@@ -169,11 +169,9 @@ commands:
 
 N のパッケージと、その型・メソッドの名前と形は `plugin/golang`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。この文書は、基底の規則を書き写さない（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
 
-## 未決
+## 補う値と制約
 
-まだ決めていないところは一つ。`go-http` の同じ問い（`docs/plugin-go-http.md`「未決」の 1）と、一緒に決める。
-
-**`@cli.default` の値が、制約に合うか**。今は、生成するときには、値をフィールドの制約（`@valid.*`）で確かめない。入れた値も、与えられた値と同じに、実行時に確かめられる（「引数の解釈」の、制約の検査。合わなければ、そのフィールドを与えない呼び出しは、いつも 64）。選べる形は、`go-http` の文書に書いた二つ。
+`@cli.default` の値は、生成するときに、そのフィールドの制約（`@valid.*`）で確かめる。合わなければ CLI-14。決まりと理由は `go-http` と同じ（`docs/plugin-go-http.md`「補う値と制約」）。
 
 ## 診断
 
@@ -192,6 +190,7 @@ N のパッケージと、その型・メソッドの名前と形は `plugin/gol
 | CLI-11 | error | `@cli.required` か `@cli.default` の付いたフィールドの型が、省略可能（`T?`。「対象」）。位置は model |
 | CLI-12 | error | 一つのフィールドに、`@cli.required` と `@cli.default` の両方がある。位置は model |
 | CLI-13 | error | `@cli.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。位置は model |
+| CLI-14 | error | `@cli.default` の値が、フィールドの制約（`@valid.*`）に合わない（「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。位置は model |
 
 warning（コードは `PLUGIN`）は一つ: `@cli.command` の op が一つもない。
 

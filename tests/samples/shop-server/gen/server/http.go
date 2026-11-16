@@ -361,7 +361,7 @@ func httpWriteJSON(w http.ResponseWriter, status int, v any) {
 
 // httpWriteResult は、op が成功したときの応答。何を返すかは、実行時に、out で決める:
 // 返す値がない（戻り値のない op は nil を渡す。省略可能な戻り値で、値がない）なら、204 で本文なし。
-// あれば、200 と、その JSON。値のない配列（nil）は、空の配列 [] にする。
+// あれば、200 と、その JSON。値のない配列（nil）は空の配列 [] に、値のない record（nil）は空の record {} にする。
 func httpWriteResult(w http.ResponseWriter, out any) {
 	v := reflect.ValueOf(out)
 	switch {
@@ -370,6 +370,8 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 		return
 	case v.Kind() == reflect.Slice && v.IsNil():
 		out = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	case v.Kind() == reflect.Map && v.IsNil():
+		out = reflect.MakeMap(v.Type()).Interface()
 	}
 	httpWriteJSON(w, http.StatusOK, out)
 }

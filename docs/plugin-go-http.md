@@ -164,7 +164,7 @@ func NewHandler(ops Ops) http.Handler {
 ```go
 // httpWriteResult は、op が成功したときの応答。何を返すかは、実行時に、out で決める:
 // 返す値がない（戻り値のない op は nil を渡す。省略可能な戻り値で、値がない）なら、204 で本文なし。
-// あれば、200 と、その JSON。値のない配列（nil）は、空の配列 [] にする。
+// あれば、200 と、その JSON。値のない配列（nil）は空の配列 [] に、値のない record（nil）は空の record {} にする。
 func httpWriteResult(w http.ResponseWriter, out any) {
 	v := reflect.ValueOf(out)
 	switch {
@@ -173,6 +173,8 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 		return
 	case v.Kind() == reflect.Slice && v.IsNil():
 		out = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	case v.Kind() == reflect.Map && v.IsNil():
+		out = reflect.MakeMap(v.Type()).Interface()
 	}
 	httpWriteJSON(w, http.StatusOK, out)
 }
@@ -248,7 +250,7 @@ func httpWriteError(w http.ResponseWriter, err error) {
 
 - 一つの op が、呼び出しによって 200 も 204 も返す（省略可能な戻り値）。op の型では決まらず、返す値で決まる。`null` は返さない。
 - 省略可能な配列と record（`T[]?`、`Record<K, V>?`）を返す op は、経路にできない（GOHTTP-16。「対象」）: 値がないことと、空であることを、分けて返せない。
-- 値のない配列（Go の `nil`）は、空の配列で、`[]` を返す。値のない record（Go の `nil` のマップ）は、今は `null` を返す（「未決」の 2）。
+- 値のない配列（Go の `nil`）は、空の配列で、`[]` を返す。値のない record（Go の `nil` のマップ）は、空の record で、`{}` を返す。
 
 ### 失敗の応答
 
@@ -290,12 +292,9 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 - 入力の model が**別の名前空間 M のもの**で、`Validate` を持つ型（`govalid.HasValidate`。`docs/plugin-go-valid.md`「Validate を持つ型」）なら、`Validate` は M の型の置き場（`docs/config.md`「型の置き場」）の定義のパッケージのメソッドなので、その単位も `transpilers` に `go-valid` を並べていなければならない。並べていなければ GOHTTP-11: 生成したコードはコンパイルできるが、`validate = true` と書いたのに、その入力は確かめられないまま op に渡る。書いたものの食い違いなので、error にする。置き場の単位の `transpilers` は `View.namespaces` にあるので、`View` だけから分かる（`govalid.Unlisted`。`docs/packages.md`「`plugin/govalid`（公開）」）。N の model は、自分の単位が `go-valid` を並べている（CFG-19）。
 - 制約に合わない入力で投げる `http.BadRequest` は、設定で増える例外で、呼ぶ側の名前空間が仕様から計算する `throws` には現れない。読めない要求の `http.BadRequest` も同じ（`@http.get` / `@http.post` の `throws` に、まだ入れていない。`docs/vocab.md`「同梱する語彙」）。
 
-## 未決
+## 補う値と制約
 
-まだ決めていないところ。決めるまで、この文書とサンプルは、ここに書いた今の形のままにしてある。
-
-1. **`@http.default` の値が、制約に合うか**。フィールドの既定値を言語からなくしたので、既定値を制約（`@valid.*`）で確かめていた `go-valid` の GOVALID-2 は、欠番になった（`docs/plugin-go-valid.md`「診断」）。今は、`@http.default` の値を、生成するときには制約で確かめない: `validate = true` なら、入れた値も、読んだ値と同じに、実行時に確かめられる（合わなければ、その項目のない要求は、いつも 400）。`validate = false` なら、確かめられずに op に渡る。選べる形は二つ: このトランスパイラが、生成するときに、値をフィールドの制約で確かめて、合わなければ error にする（`plugin/govalid` に、値一つを制約で確かめる関数が要る）。今のまま、実行時の検査に任せる。
-2. **値のない record の結果**。record（`Record<K, V>`）を返す op が、値のないマップ（Go の `nil`）を返すと、今の補助は 200 と `null` を返す。配列は、同じとき `[]` を返す（「補助」の `httpWriteResult`）。省略可能な record を結果にできなくした（GOHTTP-16）ので、`nil` のマップが表すのは「空」だけだが、`{}` にそろえると、今の応答（`null`）が変わる。選べる形は二つ: `{}` を返す（「値の JSON」の、record はオブジェクト、という行に合う）。`null` のままにして、「値の JSON」に、読む側は `null` も空の record と読む、と足す。
+`@http.default` の値は、生成するときに、そのフィールドの制約（`@valid.*`。フィールドに付いたものと、型の scalar に付いたもの）で確かめる。合わなければ GOHTTP-19。書いたものどうしの矛盾なので、実行時の検査（合わなければ、その項目のない要求がいつも 400 になる）には任せない。`validate` の設定によらない。確かめるのは `plugin/govalid` の、値一つを制約で確かめる関数（`docs/packages.md`「`plugin/govalid`（公開）」）で、`go-cli` の `@cli.default` も同じ関数を使う（`docs/plugin-go-cli.md`「補う値と制約」）。
 
 ## 診断
 
@@ -321,6 +320,7 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | GOHTTP-16 | error | 経路の op の結果の型が、省略可能な配列か、省略可能な record（`T[]?`、`Record<K, V>?`）。位置は op |
 | GOHTTP-17 | error | 一つのフィールドに、`@http.required` と `@http.default` の両方がある。見るフィールドは GOHTTP-14 と同じ。位置は model |
 | GOHTTP-18 | error | `@http.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。位置は model |
+| GOHTTP-19 | error | `@http.default` の値が、フィールドの制約（`@valid.*`）に合わない（「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。位置は model |
 
 warning（コードは `PLUGIN`）は一つ: 経路の op が一つもない。
 
