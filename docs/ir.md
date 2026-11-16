@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.4";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.5";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -38,7 +38,7 @@ interface DeclBase {
   kind: "model" | "scalar" | "union" | "state" | "exception" | "effect" | "classify" | "decorator" | "op";
   name: string;                   // FQN
   description?: Doc;
-  decorators: Application[];      // 付いたデコレータ。順序の意味は「デコレータの適用」
+  decorators: Application[];      // 付いたデコレータ。順序の意味は「デコレータの適用」。付けられる宣言は Decorator.targets の種類（DEC-1）
   span: Span;
 }
 
@@ -173,18 +173,23 @@ interface CaseTyping {            // ケースの `対象 as T`（docs/check.md�
 interface Decorator extends DeclBase {
   kind: "decorator";
   params: Param[];
-  targets: ("op" | "field" | "state" | "exception" | "scalar" | "model")[];   // 省略時は ["op"]
+  targets: ("op" | "field" | "state" | "exception" | "scalar" | "model" | "effect")[];   // 省略時は ["op"]
   external: boolean;              // @external が付いているか（DEC-10）
   throws: ThrowsClause[];
   catches: CatchesClause[];
+  reads: string[];                // `reads` の節の要素（書かれた順。節が複数なら連結）。基底の状態の FQN か、デコレータの引数名 "$param:名前"。なければ []
+  effects: string[];              // `effects` の節の要素（同じ）。効果の FQN（ユニオンは展開済み）か "$param:名前"。なければ []
+                                  // 付いた op に何が運ばれるかは Op.carried（docs/check.md「デコレータが運ぶ reads と effects」）
   alias?: { target: string; args: Arg[] };   // 名前付きデコレータ。target は汎用デコレータの FQN。
-                                             // alias を持つ宣言は params / targets / throws / catches を持たず、target のものを使う
+                                             // alias を持つ宣言は params / targets / throws / catches / reads / effects を持たず、target のものを使う
 }
 
 interface Param {
   name: string;
   type: ParamType;
   optional: boolean;              // 説明は DeclBase.description.params から引く
+  rest: boolean;                  // 残りの引数（`...名前: 型`。docs/grammar.md「decorator の宣言」）。params の最後の一つだけが true になりうる。
+                                  // true なら optional は false で、type は渡す値一つの型
 }
 
 type ParamType =
@@ -212,8 +217,13 @@ interface Op extends DeclBase {
   exported: boolean;              // `export` が付いているか（docs/check.md「export」）
   params: OpParam[];
   returns: Type | null;           // null は void。決して返さない op は { kind: "never" }
-  effects: string[];              // 書かれた effects（FQN）。配線で省略していれば []
-  reads: string[];                // 書かれた reads（基底の状態の FQN。書かれた順、重複は最初の出現に寄せる）。書いていなければ []
+  effects: string[];              // 書かれた effects（FQN）。配線で省略していれば []。デコレータが運ぶものは含まない
+  reads: string[];                // 書かれた reads（基底の状態の FQN。書かれた順、重複は最初の出現に寄せる）。書いていなければ []。同上
+  carried: {                      // デコレータの reads / effects の節が、この op に運ぶもの（docs/check.md「デコレータが運ぶ reads と effects」）。
+    reads: string[];              // 基底の状態の FQN。decorators の順、節の順、引数に書いた順。重複は最初の出現に寄せる。なければ []
+    effects: string[];            // 効果の FQN（ユニオンは展開済み）。同じ順。なければ []
+  };                              // op が直に読む状態は reads の後ろに carried.reads、直に持つ効果は effects の後ろに carried.effects
+                                  // （どちらも、重複は最初の出現に寄せる）。書いたものと運ばれたものの区別は、この二組の項目にだけある
   throws: ThrowsClause[];         // 書かれた throws
   body: Wiring | null;            // null は葉
   signature: Signature;           // 計算結果。自分の名前空間から見た関数の型（docs/check.md「計算」）
@@ -223,11 +233,11 @@ interface OpParam { name: string; type: Type; span: Span; }   // 説明は Op.de
 
 interface Signature {                   // docs/check.md「計算」の Sig(O, v) の結果。Op.signature は v = op の名前空間
   exceptions: string[];           // v から見て投げうる例外
-  effects: string[];              // 伝播を含むすべての効果と、デコレータの halts の効果
+  effects: string[];              // 伝播を含むすべての効果（op が書いたものと、デコレータが運ぶもの）と、デコレータの halts の効果
   relations: { exception: string; effect: string; state: "prevented" | "kept" | "unknown" }[];
                                   // exceptions × effects のすべての組
   successEffects: { effect: string; state: "kept" | "prevented" | "unknown" }[];   // 成功のアームでの効果の状態
-  reads: string[];                // 読む基底の状態の FQN。伝播を含む（docs/check.md「reads」の R）。v によらない
+  reads: string[];                // 読む基底の状態の FQN。伝播と、デコレータが運ぶものを含む（docs/check.md「reads」の R）。v によらない
   pure: boolean;                  // 純粋か（docs/check.md「純粋」）。v によらない
 }
 ```
@@ -304,7 +314,8 @@ type Literal =
 interface Application {
   decorator: string;              // 汎用デコレータの FQN。名前付きなら展開済み
   via?: string;                   // 名前付きデコレータを通して付けたなら、その FQN
-  args: Arg[];                    // 引数名に対応付け済み。省略された省略可能な引数は含まない
+  args: Arg[];                    // 引数名に対応付け済み。省略された省略可能な引数は含まない。
+                                  // 残りの引数（Param.rest）は、いつも一つの Arg で、value は list（渡した値を書いた順に。0 個なら items が []）
   span: Span;
 }
 
@@ -361,6 +372,9 @@ interface Bind {
 | `effects A \| B` | FQN の列 |
 | `@redirectToLogin`（名前付き） | `decorator: "browser.redirectOn"`、`via: "browser.redirectToLogin"`、`args` は固定した引数 |
 | デコレータの位置で書いた引数 | `param` に対応付け |
+| 残りの引数に渡した値（`@db.effects(a, b)`） | 残りの引数の名前の `Arg` 一つ。`value` は `list` で、`items` は渡した値を書いた順に（一つずつ `ref` か `refs`） |
+| デコレータの宣言の `reads a, b`、`effects A \| B`、複数の節 | `Decorator.reads` / `Decorator.effects` の列一つずつ（書かれた順に連結。効果のユニオンは展開。引数名は `$param:名前`） |
+| op に付いたデコレータの `reads` / `effects` の節 | `Op.carried`（`$param:` を適用の引数で置き換えたもの）。`Op.reads` / `Op.effects` には足さない |
 | `{ item }` | `{ item: item }` |
 | 呼び出しの引数（位置だけ。`docs/grammar.md`「配線」） | 順に `param` に対応付け |
 | 複数行の `throws` | `ThrowsClause` の列（まとめない。`Relation` が節ごとに違うため） |
@@ -377,7 +391,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.4";
+  version: "0.5";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -435,9 +449,10 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.4"`。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.5"`。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.5 | `Decorator.targets` に `effect`（効果の宣言の `decorators` が空でなくなりうる）。`Decorator.reads`、`Decorator.effects`。`Param.rest` と、残りの引数の `Arg`（`list`）。`Op.carried`。`Signature.reads` / `Signature.effects` が、デコレータが運ぶものを含む。`View` とやり取りの形は 0.4 と同じ |
 | 0.4 | `NamespaceConfig` に `index`、`base`、`options`、`seams`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
 | 0.3 | `Type` に `never`。`Model.derivedFrom` をやめて `Model.extends`。`State.type`。`Classify.subject` に `op`、`cases[].as`、`decidedBy`。`Op.exported`、`Op.reads`。`Signature.reads`、`Signature.pure`。`Atom` に `state`。`Match.subject` の `state` をやめる（`value` の `atom` が `state`）。`Match.arms[].body` に `atom` と `throw`、`Match.arms[].narrowed` |

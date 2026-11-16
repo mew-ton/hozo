@@ -154,7 +154,7 @@ classify Registration of findUser {     // findUser(email: Email): User?
 2. `throws` の例外（ユニオンを展開した後）が、ちょうど一つ。
 3. その例外が値を運ばない（`Exception.value` がない）。
 4. 引数を持たない。
-5. `effects` も `reads` も持たない。
+5. `effects` も `reads` も持たない（デコレータが運ぶものを含めて。「計算」の「デコレータが運ぶ reads と effects」）。
 6. `catches` を持つデコレータが付いていない。
 
 この op の中身は「その例外を投げる」と決まる（中身を出すのはトランスパイラ）。呼び出しの式の型は「返らない」で（`docs/types.md`「式の型」）、どの型の `match` のアームにも、どの型の `return` にも書ける。文として書けるのは本体の最後だけ（WIRE-9）。
@@ -184,6 +184,17 @@ classify Registration of findUser {     // findUser(email: Email): User?
 
 記法: op を O、O の名前空間を ns(O)、O に付いたデコレータの適用を内側から順に d₁ … dₙ（`Op.decorators` の末尾から先頭へ）。各 dᵢ の宣言を D(dᵢ) とし、`$param:` の参照はその適用の引数で置き換えてから使う。見る側の名前空間を v とする。
 
+### デコレータが運ぶ reads と effects
+
+デコレータの宣言の `reads` / `effects` の節（`docs/grammar.md`「decorator の宣言」）は、そのデコレータを付けた op の中身が読む状態と持つ効果を、op の代わりに言う（`docs/decisions.md`「決めたこと」98）。op は、同じものを自分の `reads` / `effects` に書かなくてよい。書いてもよく、重複は一つと数える。
+
+- **運ばれるもの**（`Op.carried`。`docs/ir.md`「op」）: O に付いたデコレータを書かれた順（`Op.decorators` の順）に、その宣言の節を書かれた順に見て、節の要素を並べたもの。`$param:` の要素は、その適用の引数の値で置き換える: 残りの引数なら、渡した値を書いた順にすべて。省略可能な引数を省いていれば、何も足さない。効果のユニオンは展開する。`reads` の要素は `carried.reads` に、`effects` の要素は `carried.effects` に入れ、それぞれ重複を最初の出現に寄せる。
+- O が**直に読む状態**は、`Op.reads` の後ろに `Op.carried.reads` を並べ、重複を最初の出現に寄せたもの。**直に持つ効果**は、`Op.effects` と `Op.carried.effects` で同じ。呼び出し先から伝わるもの（配線）と、`halts` の効果（手順 i）は含まない。
+- 運ぶ節を持つデコレータを付けられるのは、葉の op だけ。配線に付ければ DEC-17: 配線が読む状態と効果は、本体の呼び出しから決まる事実で、節で足すものではない。配線の計算は、運ばれるものを使わない。
+- 運ばれたものも、op が書いたものと同じに確かめる: 別の名前空間の状態なら READS-1、別の名前空間の効果なら STATE-2。
+- EFF-3（葉の op が自分で書ける効果は一つまで）が数えるのは `Op.effects` だけ。運ばれる効果はいくつでもよい: 順序はデコレータの引数に書いた順で、それらをどう行うか（一体か、どの順か）は、そのデコレータを読むトランスパイラが決める（`@db.effects` は、書いた順の、一つのトランザクション。`docs/plugin-go-sqlite.md`「op の中身」）。
+- 呼び出し元への伝わり方は、op が書いたものと同じ（EFF-1、「reads」）。デコレータの付いた op は、もともと純粋でない（「純粋」の 1）ので、純粋さは変わらない。
+
 ### Sig(O, v)
 
 名前空間 v から O を呼んだときの関数の型。六つの値を持つ。
@@ -202,7 +213,7 @@ R と pure は v によらない（どの名前空間から見ても同じ）。
 葉の op:
 
 - E = `Op.throws` の例外（`Declared(O)` と呼ぶ）。
-- F = `Op.effects`。
+- F = O が直に持つ効果（`Op.effects` と、デコレータが運ぶ `Op.carried.effects`。「デコレータが運ぶ reads と effects」）。
 - rel(X, e) = X を含む `ThrowsClause` の `relations` に `prevents` があれば `prevented`、`keeps` があれば `kept`。どちらもなければ `unknown`。両方あれば REL-5。
 - succ(e) = `kept`。
 
@@ -220,7 +231,7 @@ R と pure は v によらない（どの名前空間から見ても同じ）。
 
 **手順 i = 1..n（デコレータ dᵢ を内側から）**
 
-D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節をすべて適用する。
+D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節をすべて適用する。`reads` / `effects` の節は、ここでは適用しない（手順 0 と「reads」で、op の中身の分として数えてある）。
 
 - `catches Xs mode`: 各 X ∈ Xs について、X ∉ E なら DEC-16（吸収する相手がない）。X ∈ E なら:
   - `recovers` / `ignores`: 各 e ∈ F について rel(X, e) ≠ `kept` なら succ(e) = `unknown`（§8.2「効果が不明な例外を `recovers` で吸収すると、成功のアームでもその効果は不明になる」）。X を E から除く。
@@ -231,11 +242,11 @@ D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節
 
 ### reads
 
-op が読む状態。`effects`（書く）と対になる、事実の記録（`docs/decisions.md`「設計書を変える決定」S15）。状態を読むための別の宣言はなく、状態を読むのは op。`reads` を持ち、効果を持たない op を**読む op** と呼ぶ（`op findUser(email: Email): User? reads users;`）。葉の op は、`reads` と効果を両方持ってよい（読んでから書く op）。
+op が読む状態。`effects`（書く）と対になる、事実の記録（`docs/decisions.md`「設計書を変える決定」S15）。状態を読むための別の宣言はなく、状態を読むのは op。状態を読み（R が空でない）、効果を持たない op を**読む op** と呼ぶ（`op findUser(email: Email): User? reads users;`。デコレータが運ぶ形なら `@db.find(users, "email") op findUser(email: Email): User?;`）。葉の op は、読む状態と効果を両方持ってよい（読んでから書く op）。
 
-R は基底の状態の FQN の列で、op ごとに次のように決まる。デコレータは R を変えない。
+R は基底の状態の FQN の列で、op ごとに次のように決まる。デコレータが R に足すのは、`reads` の節が運ぶものだけ（「デコレータが運ぶ reads と effects」）。`throws` / `catches` の節は R を変えない。
 
-葉の op: R = `Op.reads`（書かれた順。重複は最初の出現に寄せる）。葉の op が読めるのは自分の名前空間の状態だけで、別の名前空間の状態を書けば READS-1。
+葉の op: R = O が直に読む状態（`Op.reads` の後ろに `Op.carried.reads`。重複は最初の出現に寄せる）。葉の op が読めるのは自分の名前空間の状態だけで、別の名前空間の状態なら READS-1。
 
 配線の op: 本体を行の順に見て、次を出現順に集め、重複を最初の出現に寄せる。一つの行の中の順は 1、2 の順。
 
@@ -314,12 +325,12 @@ NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使え�
 | STATE-1 | error | 組み込みの効果の `operation` が、その状態の形にない（「状態の形」の表。`single` に `post` / `delete`） |
 | STATE-3 | error | 状態の要素の型（`State.element`）が `optional`。形が型から決まるようになった（「状態の形」）ので、当たるのは `list` の状態だけ（`list<T?>`、`T?[]`）: 列は値を持つ。`single<T?>` と `nullable<T?>` は `T?`（`nullable<T>`）と同じ型なので当たらない（`docs/types.md`「形の書き方」）。当たった状態は、`list<T>` として残りの検査を続ける |
 | STATE-4 | error | 遷移の前か後のケースが、宛先の分類のケースでない（宛先が基底の状態なら `Empty` / `HasItems`）。宛先が `single` の状態（組み込みの分類がない）。前と後のどちらかのケースの並びに重複がある |
-| STATE-2 | error | 葉の op O の `Op.effects` の効果 e について、e の名前空間が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」） |
+| STATE-2 | error | 葉の op O が直に持つ効果 e（`Op.effects` と、デコレータが運ぶ `Op.carried.effects`）について、e の名前空間が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」）。位置は、op が書いた効果ならその名前、デコレータのものならその適用 |
 | EFF-1 | — | 計算（Sig の F）で行う。診断なし |
 | EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Sig(O, ns(O)).effects と等しくない。足りないもの・余分なものを `Data.missing` / `Data.extra` に |
-| READS-1 | error | 葉の op O の `Op.reads` の状態の名前空間が ns(O) と違う（計算「reads」。`Signature` を要しないので `internal/sema` が出す）。位置はその状態の名前 |
+| READS-1 | error | 葉の op O が直に読む状態（`Op.reads` と、デコレータが運ぶ `Op.carried.reads`）の名前空間が ns(O) と違う（計算「reads」。`Signature` を要しないので `internal/sema` が出す）。位置は、op が書いた状態ならその名前、デコレータが運ぶものならその適用 |
 | READS-2 | error | 配線の O で `Op.reads` が空でなく、集合として Sig(O, ns(O)).reads と等しくない（計算「reads」）。足りないもの・余分なものを `Data.missing` / `Data.extra` に。位置は O の名前 |
-| EFF-3 | error | 葉の op の `Op.effects`（ユニオンを展開した後。同じ効果の重複は一つと数える）が二つ以上（`Signature` を要しないので `internal/sema` が出す）。複数の効果を持つ処理は、効果ごとの葉の op を配線でつなぐ（効果は伝播する。§7.2）。複数の基底の状態を一体として変えるなら、それらを対象にした状態の分類の遷移一つにする（「効果の宛先」） |
+| EFF-3 | error | 葉の op が自分で書いた `Op.effects`（ユニオンを展開した後。同じ効果の重複は一つと数える）が二つ以上（`Signature` を要しないので `internal/sema` が出す）。デコレータが運ぶ効果（`Op.carried.effects`）は数えない（計算「デコレータが運ぶ reads と effects」）。op が自分で書く形で複数の効果を持つ処理は、効果ごとの葉の op を配線でつなぐ（効果は伝播する。§7.2）。複数の基底の状態を一体として変えるなら、それらを対象にした状態の分類の遷移一つにするか（「効果の宛先」）、効果を並べて一体に行うと言うデコレータを付ける |
 
 ### throws
 
@@ -327,7 +338,7 @@ NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使え�
 |---|---|---|
 | THROWS-1 | error | 配線の O について `Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ, ns(O))`（Sc は本体の各呼び出しの Sig(callee, ns(O))。アームの本体の `throw X` は、例外が X だけの呼び出しとして数える（計算の手順 0）。`external` なデコレータの `throws` は Sig と同じく数えない）。空でなければ、位置は O の名前、メッセージに Missing の FQN、`Related` に各例外の出どころの呼び出し、`Data.missing` に FQN の列 |
 | THROWS-2 | — | 診断なし。多めの宣言は許す |
-| THROWS-3 | error | `never` を返す op が、「op の宣言と本体」の「never を返す op」の条件 1〜6 のどれかを満たさない（`Signature` を要しないので `internal/sema` が出す）。満たさない条件ごとに一つ。位置は、1 は op の名前、2 と 3 は `throws`（なければ op の名前）、4 は最初の引数、5 はその節、6 はそのデコレータ |
+| THROWS-3 | error | `never` を返す op が、「op の宣言と本体」の「never を返す op」の条件 1〜6 のどれかを満たさない（`Signature` を要しないので `internal/sema` が出す）。満たさない条件ごとに一つ。位置は、1 は op の名前、2 と 3 は `throws`（なければ op の名前）、4 は最初の引数、5 はその節（デコレータが運ぶものなら、そのデコレータ）、6 はそのデコレータ |
 | REL-1 | error | `Op.throws`（またはデコレータの `throws`）の全節を通して同じ例外が二度ある（`Signature` を要しないので `internal/sema` が出す。REL-5 も同じ） |
 | REL-2 | warning | Sig(O, ns(O)).effects が空の op の `Op.throws` に `relations` がある。デコレータの `throws` の `relations` は対象外（§7.3） |
 | REL-4 | error | 計算の手順 0 の「配線の `Op.throws` に `relations` が書かれていれば」の比較。`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組を示す |
@@ -339,8 +350,8 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。`union` / `effect` / `classify` / `decorator` に付けたら常に DEC-1（`namespace` と `bind` は文法で閉じる。`docs/grammar.md`「ファイルと宣言」） |
-| DEC-2 | error | `targets` に `op` を含まない宣言が `throws` か `catches` を持つ |
+| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。`union` / `classify` / `decorator` に付けたら常に DEC-1（`namespace` と `bind` は文法で閉じる。`docs/grammar.md`「ファイルと宣言」） |
+| DEC-2 | error | `targets` に `op` を含まない宣言が `throws`、`catches`、`reads`、`effects` のどれかの節を持つ |
 | DEC-3 | — | 文法で閉じる |
 | DEC-4 | error | `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている |
 | DEC-5 | warning | 計算の手順 i で `recovers` が succ(e) を `unknown` にした（F が空なら起きない） |
@@ -355,6 +366,7 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 | DEC-14 | warning | `external` なデコレータが `throws` を持たない |
 | DEC-15 | error | `@external` がデコレータの宣言以外に付いている（文法で閉じる。索引として残す） |
 | DEC-16 | warning | 計算の手順 i で、`catches` の例外がそこまでの E にない |
+| DEC-17 | error | `reads` か `effects` の節を持つデコレータが、配線の op（本体を持つ op）に付いている（計算「デコレータが運ぶ reads と effects」。`Signature` を要しないので `internal/sema` が出す）。位置はそのデコレータの適用 |
 
 ### 配線
 

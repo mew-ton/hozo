@@ -20,7 +20,7 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 
 - `fs` / `proc` の語彙は標準の語彙（`docs/vocab.md`「同梱する語彙」）に、`cli` の語彙は go-cli プラグインが提供する語彙（同「同梱しない語彙」）になったので、どれも `cli.hozo` では宣言しない。
 - `lsp` を足す。言語サーバーを別のバイナリにしない（`docs/requirements.md`「言語サーバー」）ので、hozoc のサブコマンドとして境界に書く。
-- `writeOutputs` の三つの効果（追加・書き換え・削除）は、葉の op が持てる効果が一つまで（`docs/check.md` EFF-3）なので、`outputs` を対象にした分類 `OutputsSync` の遷移 `syncOutputs` 一つにする。述語 `UpToDate` は「生成し直して差分がない」で、`docs/testing.md`「生成物の一致」の検査と同じ中身。
+- `writeOutputs` の三つの効果（追加・書き換え・削除）は、葉の op が自分で書ける効果が一つまで（`docs/check.md` EFF-3）なので、`outputs` を対象にした分類 `OutputsSync` の遷移 `syncOutputs` 一つにする。述語 `UpToDate` は「生成し直して差分がない」で、`docs/testing.md`「生成物の一致」の検査と同じ中身。
 - 出力の形式を選ぶ `format` のフラグを足す。診断を機械が読めるようにするため（`docs/diagnostics.md`「json」）。
 - 例外 `UnknownNamespace` を足す。`emit` の引数の名前空間の書き間違いを、何も書かずに成功したことにしないため（「emit」の 1）。
 - 環境変数 `HOZO_PLUGIN_PATH` を、`check` / `emit` / `lsp` の入力のフィールド `pluginPath` として足す。プラグインの探索が見るプロジェクトの外の場所（`docs/plugin-protocol.md`「探索」の 2）も、ほかの環境変数（`HOZO_CONFIG`）と同じく境界の入力として書き、葉の op の実装がプロセスの環境を自分で読まないようにするため（同じ入力から同じ結果になり、テストが実行する人の環境に左右されない）。

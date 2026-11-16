@@ -23,7 +23,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 |---|---|---|
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
 | `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / body / query / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下） |
-| `vocab/db.hozo` | グローバルの `decorator db for state;` と `namespace db { key / unique / ref }` | §4.2 |
+| `vocab/db.hozo` | グローバルの `decorator db for state;` と `namespace db { key / unique / ref / find / list / insert / update / delete / effects }` | §4.2。`find` から後ろの六つは足したもの（下の「`db` の読み書きのデコレータ」） |
 | `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
 | `vocab/page.hozo` | `namespace page { Aborted / Route / path / query / route / dialog / fallback / interaction }` | §4.2 |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
@@ -41,7 +41,46 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
   exception BadRequest: { message: string; violations: Violation[]; };
 ```
 
+- `db` には、出典にないデコレータを六つ足す。中身は「`db` の読み書きのデコレータ」。
 - `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator stdio throws Crashed | MalformedOutput;`）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
+
+### `db` の読み書きのデコレータ
+
+op が表から何を引き、効果が表に何をするかを、仕様が言うためのデコレータ（`docs/decisions.md`「決めたこと」92〜95）。`vocab/db.hozo` の全文は次のとおり。`find` から後ろが足したもの。
+
+```ts
+/** この状態を DB が持つ */
+decorator db for state;
+
+namespace db {
+  decorator key for field;
+  decorator unique for field;
+  /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
+  decorator ref(target: any model) for field;
+
+  /** この op は、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
+  decorator find(table: any state, column: string) for op reads table;
+  /** この op は、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
+  decorator list(table: any state, column: string?) for op reads table;
+
+  /** この効果は、表 table に行を一つ足す */
+  decorator insert(table: any state) for effect;
+  /** この効果は、表 table の、キー（@db.key）が同じ行を書き換える */
+  decorator update(table: any state) for effect;
+  /** この効果は、表 table から、列 column が引数の値と同じ行を消す */
+  decorator delete(table: any state, column: string) for effect;
+
+  /** この op は、並べた効果を、書いた順に、一つのトランザクションで行う。n 番目の効果が、op の n 番目の引数を受け取る */
+  decorator effects(...targets: any effect) for op effects targets;
+}
+```
+
+- `find` と `list` は、表の状態を `reads` で、`effects` は、並べた効果を `effects` で op に運ぶ（`docs/check.md`「デコレータが運ぶ reads と effects」）。これらを付けた op は、`reads` も `effects` も自分では書かない。
+- 表は状態の名前で、列は文字列で渡す。列は一つだけ（複数の列の条件は、要るサンプルが出てから。そのときは `column` の型を `string | string[]` に広げる。今の書き方は、そのまま通る）。
+- 列を渡す引数の名前を `by` にしないのは、`by` が予約語で、引数の名前（`Ident`）に書けないため（`docs/grammar.md`「予約語」）。
+- `list` と `effects` は予約語、`delete` は文脈キーワードだが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
+- 何を生成するかと、書いたものの整合の検査（表は `@db` の状態か、列はあるか、引数と戻り値の型は合うか）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「op の中身」「診断」）。hozoc は、デコレータの引数の種類（`docs/types.md`「デコレータの引数」）だけを確かめる。
+- **`vocab/db.hozo` のファイルは、言語の実装（デコレータの `reads` / `effects` の節、残りの引数、対象 `effect`、予約語のデコレータ名）と一緒に、この全文に置き換える。** それまでは、今のパーサーが読める今の中身（`db`、`key`、`unique`、`ref`）のまま（`docs/requirements.md`「作り直しの段階」の R3）。
 
 ## 同梱しない語彙
 

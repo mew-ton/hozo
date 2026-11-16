@@ -218,7 +218,7 @@ type Shape struct {                               // 一つの出力の、op と
 type OpShape struct {
     FQN, Method string
     Exported   bool
-    Place      Place                              // Wiring / Never / StateCommand / StateQuery / SharedQuery / Leaf（同「op の置き場」の 1〜6）
+    Place      Place                              // Wiring / Never / StateCommand / SharedCommand / StateQuery / SharedQuery / Leaf（同「op の置き場」の 1〜6。3 は、宛先の単位が一つなら StateCommand、分かれれば SharedCommand）
     Unit       string                             // Place が状態の単位なら、その状態（か分類）の FQN
     Ctx, Err   bool                               // ctx を取るか、error を返すか
     Seams      []string                           // この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない
