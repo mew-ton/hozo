@@ -74,19 +74,19 @@ namespace staff {
   /** そのログイン名の担当者がいるか */
   classify Account of Member? {
     Enrolled: Member? as Member;
-    default;
+    Unknown: Member? as else;
   }
 
   /** 要求が、トークンを持ってきたか */
   classify Credential of type.Token? {
     Presented: type.Token? as type.Token;
-    default;
+    Absent: type.Token? as else;
   }
 
   /** そのトークンでログインしているか */
   classify Login of Session? {
     LoggedIn: Session? as Session;
-    default;
+    LoggedOut: Session? as else;
   }
 
   /** 製作の担当か */
@@ -113,7 +113,7 @@ namespace staff {
     const member = memberByLoginName(loginName);
     return match member by Account {
       Enrolled => issueSession(member, password);
-      default  => throw InvalidCredentials;
+      Unknown  => throw InvalidCredentials;
     };
   }
 
@@ -143,7 +143,7 @@ namespace staff {
   export op logout(token: type.Token?) {
     match token by Credential {
       Presented => deleteSession(token);
-      default   => none;
+      Absent    => none;
     };
   }
 
@@ -155,7 +155,7 @@ namespace staff {
   {
     return match token by Credential {
       Presented => memberOf(token);
-      default   => throw type.Unauthorized;
+      Absent    => throw type.Unauthorized;
     };
   }
 
@@ -165,8 +165,8 @@ namespace staff {
   {
     const session = sessionByToken(token);
     return match session by Login {
-      LoggedIn => freshMember(session);
-      default  => throw type.Unauthorized;
+      LoggedIn  => freshMember(session);
+      LoggedOut => throw type.Unauthorized;
     };
   }
 
@@ -179,7 +179,7 @@ namespace staff {
     const member = memberById(fresh.memberId);
     return match member by Account {
       Enrolled => member;
-      default  => throw type.Unauthorized;
+      Unknown  => throw type.Unauthorized;
     };
   }
 

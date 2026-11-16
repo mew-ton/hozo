@@ -19,7 +19,7 @@ namespace hooks {
     const secured = payment.record(in.event);
     match secured by payment.Securing {
       NewlySecured => fulfilment.secured(secured);
-      default      => none;
+      NoChange     => none;
     };
   }
 

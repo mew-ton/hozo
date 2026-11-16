@@ -129,31 +129,31 @@ namespace shipping {
     /** すべての品目が、そろえ場所にある */
     Complete;
     /** まだ待っている品目がある */
-    default;
+    Awaiting;
   }
 
   /** 梱包したか（荷物の行があるか） */
   classify Packing of Parcel? {
     Packed: Parcel? as Parcel;
-    default;
+    Unpacked: Parcel? as else;
   }
 
   /** 送り状を買ったか（送り状の行があるか） */
   classify Labelling of Label? {
     Labelled: Label? as Label;
-    default;
+    Unlabelled: Label? as else;
   }
 
   /** 引いた出荷があるか */
   classify Known of Shipment? {
     Found: Shipment? as Shipment;
-    default;
+    Missing: Shipment? as else;
   }
 
   /** 引いた箱の種類があるか */
   classify Stocked of Box? {
     InUse: Box? as Box;
-    default;
+    Unlisted: Box? as else;
   }
 
   /** 出荷を、配送業者に渡したか */
@@ -297,7 +297,7 @@ namespace shipping {
     const found = shipmentById(id);
     return match found by Known {
       Found   => found;
-      default => throw NoShipment;
+      Missing => throw NoShipment;
     };
   }
 
@@ -321,7 +321,7 @@ namespace shipping {
     const found = shipmentOfOrder(orderId);
     return match found by Known {
       Found   => progressOf(found);
-      default => none;
+      Missing => none;
     };
   }
 
@@ -359,7 +359,7 @@ namespace shipping {
     const now = clock.now();
     const gathered = match found by Known {
       Found   => place(found, line, measured, now);
-      default => throw NoShipment;
+      Missing => throw NoShipment;
     };
     saveShipment(gathered);
     return gathered;
@@ -404,8 +404,8 @@ namespace shipping {
     const shipment = find(id);
     const existing = parcelOf(id);
     return match existing by Packing {
-      Packed  => throw AlreadyPacked;
-      default => packGathered(shipment, box, weight);
+      Packed   => throw AlreadyPacked;
+      Unpacked => packGathered(shipment, box, weight);
     };
   }
 
@@ -415,7 +415,7 @@ namespace shipping {
   {
     return match shipment by Gathered {
       Complete => packInto(shipment, box, weight);
-      default  => throw NotGathered;
+      Awaiting => throw NotGathered;
     };
   }
 
@@ -425,8 +425,8 @@ namespace shipping {
   {
     const box = boxByCode(code);
     return match box by Stocked {
-      InUse   => seal(shipment, box, weight);
-      default => throw UnknownBox;
+      InUse    => seal(shipment, box, weight);
+      Unlisted => throw UnknownBox;
     };
   }
 
@@ -459,8 +459,8 @@ namespace shipping {
     const shipment = find(id);
     const bought = labelOf(id);
     return match bought by Labelling {
-      Labelled => throw AlreadyLabelled;
-      default  => withParcel(shipment);
+      Labelled   => throw AlreadyLabelled;
+      Unlabelled => withParcel(shipment);
     };
   }
 
@@ -470,8 +470,8 @@ namespace shipping {
   {
     const packed = parcelOf(shipment.id);
     return match packed by Packing {
-      Packed  => { shipment: shipment, parcel: packed };
-      default => throw NotPacked;
+      Packed   => { shipment: shipment, parcel: packed };
+      Unpacked => throw NotPacked;
     };
   }
 
@@ -498,8 +498,8 @@ namespace shipping {
     const packed = withParcel(shipment);
     const bought = labelOf(id);
     return match bought by Labelling {
-      Labelled => release(packed, bought);
-      default  => throw NotLabelled;
+      Labelled   => release(packed, bought);
+      Unlabelled => throw NotLabelled;
     };
   }
 
@@ -523,8 +523,8 @@ namespace shipping {
   export op delivered(trackingNumber: TrackingNumber, at: Time) {
     const bought = labelByTracking(trackingNumber);
     match bought by Labelling {
-      Labelled => arrive(bought.shipmentId, at);
-      default  => none;
+      Labelled   => arrive(bought.shipmentId, at);
+      Unlabelled => none;
     };
   }
 
@@ -533,7 +533,7 @@ namespace shipping {
     const found = shipmentById(id);
     match found by Known {
       Found   => markDelivered(found, at);
-      default => none;
+      Missing => none;
     };
   }
 

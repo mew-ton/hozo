@@ -279,7 +279,8 @@ namespace backoffice {
   classify Overrun of type.Yen? {
     /** 超える。超えた分は、店が持つ */
     OverCeiling: type.Yen? as type.Yen;
-    default;
+    /** 超えない */
+    WithinCeiling: type.Yen? as else;
   }
 
   /**
@@ -295,8 +296,8 @@ namespace backoffice {
     throws page.Aborted
   {
     match option.overCeiling by Overrun {
-      OverCeiling => confirmAbsorb(option.overCeiling);
-      default     => none;
+      OverCeiling   => confirmAbsorb(option.overCeiling);
+      WithinCeiling => none;
     };
     const parcel = staffApi.pack({ id, box: option.box.code, weight });
     sealed(parcel);

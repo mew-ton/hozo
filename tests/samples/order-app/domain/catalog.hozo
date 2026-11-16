@@ -87,6 +87,6 @@ namespace catalog {
     /** あるが、並べていない */
     Withdrawn: Product? as Product;
     /** ない */
-    default;
+    Absent;
   }
 }

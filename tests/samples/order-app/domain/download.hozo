@@ -26,7 +26,7 @@ namespace download {
   /** 引いた権利があるか */
   classify Entitlement of Grant? {
     Granted: Grant? as Grant;
-    default;
+    Ungranted: Grant? as else;
   }
 
   /** その行を取る権利は、ない */
@@ -73,8 +73,8 @@ namespace download {
   {
     const found = grantOf(orderId, line);
     return match found by Entitlement {
-      Granted => linkOf(found);
-      default => throw NotGranted;
+      Granted   => linkOf(found);
+      Ungranted => throw NotGranted;
     };
   }
 

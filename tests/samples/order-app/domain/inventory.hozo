@@ -146,7 +146,7 @@ namespace inventory {
   /** 引いた取り置きがあるか */
   classify Held of Reservation? {
     Reserved: Reservation? as Reservation;
-    default;
+    Unreserved: Reservation? as else;
   }
 
   /** 取り置きを、もう棚から出したか */
@@ -160,7 +160,7 @@ namespace inventory {
   /** 引いた在庫の数があるか */
   classify Stocked of Level? {
     Counted: Level? as Level;
-    default;
+    Uncounted: Level? as else;
   }
 
   /** 取り置いた行を、棚から出した。在庫の数を減らす */
@@ -170,8 +170,8 @@ namespace inventory {
   {
     const found = reservationOf(orderId, line);
     match found by Held {
-      Reserved => pickReserved(found);
-      default  => throw NotReserved;
+      Reserved   => pickReserved(found);
+      Unreserved => throw NotReserved;
     };
   }
 
@@ -193,8 +193,8 @@ namespace inventory {
     const now = clock.now();
     const picked = pickedAt(reservation, now);
     match level by Stocked {
-      Counted => shipOut(level, picked);
-      default => throw NotReserved;
+      Counted   => shipOut(level, picked);
+      Uncounted => throw NotReserved;
     };
     saveReservation(picked);
   }

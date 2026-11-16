@@ -84,7 +84,7 @@ namespace carrier {
   /** 引いた配送業者があるか */
   classify Registered of Carrier? {
     Known: Carrier? as Carrier;
-    default;
+    Unknown: Carrier? as else;
   }
 
   /** 配送業者を、いま使っているか */
@@ -96,7 +96,7 @@ namespace carrier {
   /** いま使っている配送業者があるか */
   classify Fleet of Carrier[] {
     Available;
-    default;
+    Unavailable;
   }
 
   // ---- 管理する ----
@@ -113,7 +113,7 @@ namespace carrier {
     const existing = carrierByCode(carrier.code);
     match existing by Registered {
       Known   => throw AlreadyRegistered;
-      default => addCarrier(carrier);
+      Unknown => addCarrier(carrier);
     };
   }
 
@@ -124,7 +124,7 @@ namespace carrier {
     const found = carrierByCode(code);
     const changed = match found by Registered {
       Known   => switched(found, enabled);
-      default => throw UnknownCarrier;
+      Unknown => throw UnknownCarrier;
     };
     saveCarrier(changed);
     return changed;
@@ -141,8 +141,8 @@ namespace carrier {
   {
     const fleet = enabledCarriers();
     return match fleet by Fleet {
-      Available => rate(fleet, parcel, origin, destination);
-      default   => throw NoCarrier;
+      Available   => rate(fleet, parcel, origin, destination);
+      Unavailable => throw NoCarrier;
     };
   }
 
@@ -164,7 +164,7 @@ namespace carrier {
     const found = carrierByCode(choice.carrier);
     return match found by Registered {
       Known   => bookWith(found, choice, parcel, origin, destination);
-      default => throw UnknownCarrier;
+      Unknown => throw UnknownCarrier;
     };
   }
 

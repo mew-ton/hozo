@@ -70,7 +70,7 @@ namespace ordering {
     /** 箱で送るものがある */
     ToShip: PhysicalPart? as PhysicalPart;
     /** ダウンロードだけ */
-    default;
+    NothingToShip: PhysicalPart? as else;
   }
 
   /** 注文の受け付けの状態 */
@@ -86,7 +86,7 @@ namespace ordering {
   /** 引いた注文があるか */
   classify Known of Order? {
     Found: Order? as Order;
-    default;
+    Missing: Order? as else;
   }
 
   // ---- 客の入力 ----
@@ -136,7 +136,7 @@ namespace ordering {
   /** 届け先が書いてあるか */
   classify Destination of type.Address? {
     Given: type.Address? as type.Address;
-    default;
+    Omitted: type.Address? as else;
   }
 
   // ---- 例外 ----
@@ -228,7 +228,7 @@ namespace ordering {
   {
     return match destination by Destination {
       Given   => withShipping(sorted, destination);
-      default => throw DestinationRequired;
+      Omitted => throw DestinationRequired;
     };
   }
 
@@ -259,7 +259,7 @@ namespace ordering {
     const sent = orderByRequest(checkout.requestId);
     return match sent by Known {
       Found   => sent;
-      default => placeNew(checkout);
+      Missing => placeNew(checkout);
     };
   }
 
@@ -289,8 +289,8 @@ namespace ordering {
     throws inventory.OutOfStock
   {
     match order.physical by Delivery {
-      ToShip  => inventory.reserve(order.id, order.physical.stocked);
-      default => none;
+      ToShip        => inventory.reserve(order.id, order.physical.stocked);
+      NothingToShip => none;
     };
   }
 
@@ -303,7 +303,7 @@ namespace ordering {
     const found = orderByKey(key);
     return match found by Known {
       Found   => found;
-      default => throw NoOrder;
+      Missing => throw NoOrder;
     };
   }
 
@@ -319,7 +319,7 @@ namespace ordering {
     const found = orderById(id);
     return match found by Known {
       Found   => found;
-      default => throw NoOrder;
+      Missing => throw NoOrder;
     };
   }
 

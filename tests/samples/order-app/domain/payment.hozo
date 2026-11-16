@@ -67,13 +67,13 @@ namespace payment {
   /** 引いた支払いがあるか */
   classify Known of Payment? {
     Found: Payment? as Payment;
-    default;
+    Missing: Payment? as else;
   }
 
   /** その通知は、もう扱ったか */
   classify Redelivery of Seen? {
     Redelivered: Seen? as Seen;
-    default;
+    FirstDelivery: Seen? as else;
   }
 
   // ---- 例外 ----
@@ -136,7 +136,7 @@ namespace payment {
     const existing = paymentOf(order.id);
     return match existing by Known {
       Found   => reopen(order, existing, returnTo);
-      default => openFirst(order, returnTo);
+      Missing => openFirst(order, returnTo);
     };
   }
 
@@ -175,8 +175,8 @@ namespace payment {
     throws ProviderUnavailable
   {
     return match order.physical by ordering.Delivery {
-      ToShip  => openHold(order, order.physical, returnTo);
-      default => openCharge(order, returnTo);
+      ToShip        => openHold(order, order.physical, returnTo);
+      NothingToShip => openCharge(order, returnTo);
     };
   }
 
@@ -211,7 +211,7 @@ namespace payment {
   /** その通知で、新しく支払いの枠を確保できた注文 */
   classify Securing of type.OrderId? {
     NewlySecured: type.OrderId? as type.OrderId;
-    default;
+    NoChange: type.OrderId? as else;
   }
 
   /**
@@ -222,8 +222,8 @@ namespace payment {
   export op record(event: psp.Event): type.OrderId? {
     const delivered = seenEvent(event.id);
     return match delivered by Redelivery {
-      Redelivered => none;
-      default     => recordNew(event);
+      Redelivered   => none;
+      FirstDelivery => recordNew(event);
     };
   }
 
@@ -242,7 +242,7 @@ namespace payment {
     const payment = paymentBySession(event.session);
     return match payment by Known {
       Found   => secureFound(payment, event, now);
-      default => none;
+      Missing => none;
     };
   }
 
@@ -281,7 +281,7 @@ namespace payment {
     const found = paymentOf(orderId);
     return match found by Known {
       Found   => found;
-      default => throw NoPayment;
+      Missing => throw NoPayment;
     };
   }
 
@@ -357,7 +357,7 @@ namespace payment {
     const next = nextExpiringHold(deadline);
     match next by Known {
       Found   => prepayHeld(next, now);
-      default => none;
+      Missing => none;
     };
   }
 

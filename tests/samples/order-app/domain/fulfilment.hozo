@@ -36,8 +36,8 @@ namespace fulfilment {
   op begin(order: ordering.Order) {
     download.grant(order.id, order.digital);
     match order.physical by ordering.Delivery {
-      ToShip  => beginPhysical(order.id, order.physical);
-      default => none;
+      ToShip        => beginPhysical(order.id, order.physical);
+      NothingToShip => none;
     };
   }
 
@@ -95,8 +95,8 @@ namespace fulfilment {
   /** まだ梱包していない出荷には、箱の選択肢を出す */
   op optionsFor(progress: shipping.Progress): shipping.BoxOption[]? {
     return match progress.parcel by shipping.Packing {
-      Packed  => none;
-      default => optionsIfGathered(progress.shipment);
+      Packed   => none;
+      Unpacked => optionsIfGathered(progress.shipment);
     };
   }
 
@@ -104,7 +104,7 @@ namespace fulfilment {
   op optionsIfGathered(shipment: shipping.Shipment): shipping.BoxOption[]? {
     return match shipment by shipping.Gathered {
       Complete => shipping.boxOptions(shipment);
-      default  => none;
+      Awaiting => none;
     };
   }
 
@@ -113,8 +113,8 @@ namespace fulfilment {
     throws carrier.NoCarrier, http.NetworkError, http.ServerError
   {
     return match progress.label by shipping.Labelling {
-      Labelled => none;
-      default  => offersIfPacked(progress);
+      Labelled   => none;
+      Unlabelled => offersIfPacked(progress);
     };
   }
 
@@ -123,8 +123,8 @@ namespace fulfilment {
     throws carrier.NoCarrier, http.NetworkError, http.ServerError
   {
     return match progress.parcel by shipping.Packing {
-      Packed  => offers(progress.parcel, progress.shipment.destination);
-      default => none;
+      Packed   => offers(progress.parcel, progress.shipment.destination);
+      Unpacked => none;
     };
   }
 

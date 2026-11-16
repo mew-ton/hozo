@@ -40,7 +40,7 @@ namespace production {
   /** 引いた仕事があるか */
   classify Known of Job? {
     Found: Job? as Job;
-    default;
+    Missing: Job? as else;
   }
 
   /** その仕事は、ない */
@@ -106,7 +106,7 @@ namespace production {
     const found = jobById(id);
     return match found by Known {
       Found   => found;
-      default => throw NoJob;
+      Missing => throw NoJob;
     };
   }
 

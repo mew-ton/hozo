@@ -24,7 +24,7 @@ namespace shopApi {
     return match found by catalog.Offer {
       OnSale    => found;
       Withdrawn => none;
-      default   => none;
+      Absent    => none;
     };
   }
 
@@ -212,7 +212,7 @@ namespace shopApi {
     const found = ordering.peek(in.key);
     return match found by ordering.Known {
       Found   => statusOf(found);
-      default => none;
+      Missing => none;
     };
   }
 
