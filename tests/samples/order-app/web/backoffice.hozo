@@ -1,0 +1,397 @@
+// サンプル order-app の仕様（README.md「画面」）。担当者の画面の名前空間 backoffice（ブラウザ）。
+// 三つの仕事の画面: 製作（仕事の一覧）、そろえる（棚から出すものの一覧）、梱包の台（出荷一つ）。管理の画面が一つ: 配送業者。
+// 梱包の台のページ（StationPage）のアームが、「箱は、そろうまで決められない。送料は、箱で決まる」の順番を、そのまま画面にしたもの。
+
+/** 担当者の画面。作る、そろえる、梱包する、渡す、配送業者を管理する */
+namespace backoffice {
+  // ---- 状態 ----
+
+  /** ログインのトークン。空なら、ログインしていない */
+  @localStorage
+  state token: nullable<type.Token>;
+
+  // staffApi への呼び出しでは、入力のうち Token 型の位置を token で埋める
+  bind token to staffApi.*;
+
+  /** 操作が通らなかった理由。次の操作で消える */
+  state problem: nullable<Problem>;
+
+  @page.path
+  state location: single<page.Route>;
+
+  @page.query
+  state query: single<Record<string, string[]>>;
+
+  /** 操作が通らなかった理由（値の集合は、下の効果の名前が決める） */
+  model Problem {
+    reason: string;
+  }
+
+  // ---- 効果 ----
+
+  /** トークンを保存する */
+  effect saveToken(token: type.Token) on token: Empty -> HasItems;
+
+  /** トークンを消す */
+  effect removeToken() on token.delete;
+
+  /** 理由を消す */
+  effect clearProblem() on problem.delete;
+
+  /** ログイン名かパスワードが違う */
+  effect sayWrongCredentials() on problem.put;
+
+  /** その操作は、もうできない（ほかの人が先に進めた）。開き直せば、いまの状態が出る */
+  effect sayStale() on problem.put;
+
+  /** 入れた値が、受け付けられない（箱の種類がない、重すぎる、もう登録してある） */
+  effect sayRejected() on problem.put;
+
+  /** 客に請求できない: 支払いの枠の期限が過ぎている。送り状は買っていない。管理の担当に渡す */
+  effect sayCannotCharge() on problem.put;
+
+  /** 配送業者が、その荷物を引き受けない。送り状は買っていない。請求は、確定している。ほかの見積もりを選ぶ */
+  effect sayCarrierRefused() on problem.put;
+
+  /** 外部の仕組みに届かなかった。請求と送り状が、どこまで進んだかは、分からない。開き直して、確かめる */
+  effect sayUnknownOutcome() on problem.put;
+
+  /** 画面を移す */
+  effect goToLogin() on location.put;
+  effect goToShipments() on location.put;
+  effect goToStation(id: shipping.ShipmentId) on location.put;
+  /** 同じ画面を、開き直す */
+  effect reload() on location.put;
+
+  // ---- デコレータ ----
+
+  /**
+   * error が起きたら、op を終わらせて、then の効果を行う。
+   *
+   * @param error 受ける例外
+   * @param then  代わりに行う効果
+   */
+  @repeatable
+  decorator recover(error: any exception, then: any effect)
+    catches error halts then;
+
+  /** 一時的に表示できない */
+  model Unavailable {}
+
+  /** サーバーに届かないときは、ページの代わりに Unavailable を描く */
+  decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);
+
+  /** ログインしていない、またはその仕事の担当でないときは、ログインの画面へ移す */
+  decorator staffOnly = recover(type.Unauthorized | type.Forbidden, goToLogin);
+
+  // ---- ログイン ----
+
+  /** ログインのページ */
+  union LoginPage {
+    Form: { problem: Problem?; };
+  }
+
+  op loginVm(problem: Problem?): LoginPage;
+
+  @page.route("/login")
+  op openLogin(): LoginPage {
+    return loginVm(problem);
+  }
+
+  /** ログインする */
+  @page.interaction(page: openLogin, when: LoginPage.Form)
+  @recover(staff.InvalidCredentials, sayWrongCredentials)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onLogin(loginName: string, password: staff.Password) {
+    const ok = staffApi.login({ body: { loginName, password } });
+    saveToken(ok.token);
+    clearProblem();
+    goToShipments();
+  }
+
+  /** ログアウトする。サーバーに届かなくても、手元のトークンは消す */
+  op onLogout() {
+    requestLogout();
+    removeToken();
+    goToLogin();
+  }
+
+  /** サーバーのセッションを消してもらう。結果は見ない */
+  @ignoreFailure
+  op requestLogout() {
+    staffApi.logout({});
+  }
+
+  /** 結果を見ない呼び出し */
+  decorator ignoreFailure
+    catches http.NetworkError, http.ServerError ignores;
+
+  // ---- 製作 ----
+
+  /** 製作のページ。仕事を、納期の近い順に並べる */
+  union ProductionPage {
+    Ready: { queued: production.Job[]; inProduction: production.Job[]; problem: Problem?; };
+    /** 作るものがない */
+    Empty: {};
+    Unavailable: Unavailable;
+  }
+
+  op productionVm(jobs: production.Job[], problem: Problem?): ProductionPage;
+
+  @staffOnly
+  @unavailableOnFailure
+  @page.route("/production")
+  op openProduction(): ProductionPage {
+    const jobs = staffApi.jobs({});
+    return productionVm(jobs, problem);
+  }
+
+  /** 作り始めた */
+  @page.interaction(page: openProduction, when: ProductionPage.Ready)
+  @staffOnly
+  @recover(production.NoJob | production.NotQueued, sayStale)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onStartJob(id: production.JobId) {
+    const started = staffApi.startJob({ id });
+    seen(started);
+    reload();
+  }
+
+  /** 作り終えた。出来上がりを量って、入れる。ここで入れた大きさと重さが、箱と送料を決める材料になる */
+  @page.interaction(page: openProduction, when: ProductionPage.Ready)
+  @staffOnly
+  @recover(production.NoJob | production.NotInProduction | shipping.NoShipment | shipping.UnknownItem, sayStale)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onFinishJob(job: production.Job)
+    throws page.Aborted
+  {
+    const measured = askMeasurement(job);
+    const shipment = staffApi.finishJob({ id: job.id, measured });
+    placedIn(shipment);
+    reload();
+  }
+
+  /** 出来上がりの大きさと重さを聞く */
+  @page.dialog("MeasurementDialog")
+  op askMeasurement(job: production.Job): type.Measurement;
+
+  /** 始めた仕事を、画面に出す（描き方は、ここでは決めない） */
+  op seen(job: production.Job);
+
+  /** 品目を置いた出荷を、画面に出す: どのそろえ場所に置くか、あと何を待っているか */
+  op placedIn(shipment: shipping.Shipment);
+
+  // ---- そろえる ----
+
+  /** 棚から出すもののページ */
+  union PickingPage {
+    Ready: { picks: inventory.Reservation[]; problem: Problem?; };
+    Empty: {};
+    Unavailable: Unavailable;
+  }
+
+  op pickingVm(picks: inventory.Reservation[], problem: Problem?): PickingPage;
+
+  @staffOnly
+  @unavailableOnFailure
+  @page.route("/picking")
+  op openPicking(): PickingPage {
+    const picks = staffApi.picks({});
+    return pickingVm(picks, problem);
+  }
+
+  /** 棚から出して、そろえ場所に置いた */
+  @page.interaction(page: openPicking, when: PickingPage.Ready)
+  @staffOnly
+  @recover(inventory.NotReserved | inventory.AlreadyPicked | shipping.NoShipment | shipping.UnknownItem, sayStale)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onPicked(pick: inventory.Reservation) {
+    const shipment = staffApi.picked({ orderId: pick.orderId, line: pick.line });
+    placedIn(shipment);
+    reload();
+  }
+
+  // ---- 出荷の一覧 ----
+
+  /** 出荷の一覧のページ。そろうのを待っているもの、梱包できるもの、渡すのを待っているものに分ける */
+  union ShipmentsPage {
+    Ready: { waiting: shipping.Progress[]; toPack: shipping.Progress[]; toHandOver: shipping.Progress[]; };
+    Empty: {};
+    Unavailable: Unavailable;
+  }
+
+  op shipmentsVm(all: shipping.Progress[]): ShipmentsPage;
+
+  @staffOnly
+  @unavailableOnFailure
+  @page.route("/shipments")
+  op openShipments(): ShipmentsPage {
+    const all = staffApi.shipments({});
+    return shipmentsVm(all);
+  }
+
+  /** 出荷一つの、梱包の台を開く */
+  @page.interaction(page: openShipments, when: ShipmentsPage.Ready)
+  op onOpenStation(id: shipping.ShipmentId) {
+    clearProblem();
+    goToStation(id);
+  }
+
+  // ---- 梱包の台 ----
+
+  /** 梱包の台のページの query（/station?id=…） */
+  model StationQuery {
+    id: shipping.ShipmentId;
+  }
+
+  /**
+   * 梱包の台のページ。アームは、出荷の進み具合で、アームごとに、できる操作が一つずつ違う。
+   * 箱を選べるのは ChooseBox だけ。配送業者を選べるのは ChooseCarrier だけ。
+   */
+  union StationPage {
+    /** まだそろっていない。置いてある品目と、待っている品目を見せる。箱は、選べない */
+    Waiting: { shipment: shipping.Shipment; };
+    /**
+     * そろった。入る箱の種類を、小さい順に、それぞれの送料と一緒に見せる。客に約束した見積もりと上限も見せる。
+     * 上限を超える箱には、「超えた分は、店が持つ」と出す
+     */
+    ChooseBox: { shipment: shipping.Shipment; options: shipping.BoxOption[]; problem: Problem?; };
+    /** 梱包した。送料が決まった。配送業者の見積もりを見せる。選ぶと、客への請求が確定して、送り状を買う */
+    ChooseCarrier: { shipment: shipping.Shipment; parcel: shipping.Parcel; offers: carrier.Quote[]; charge: payment.Payment?; problem: Problem?; };
+    /** 送り状を買った。印刷して、貼って、渡す */
+    HandOver: { shipment: shipping.Shipment; parcel: shipping.Parcel; label: shipping.Label; problem: Problem?; };
+    /** 渡した */
+    Gone: { shipment: shipping.Shipment; label: shipping.Label; };
+    Unavailable: Unavailable;
+  }
+
+  op stationVm(station: fulfilment.Station, problem: Problem?): StationPage;
+
+  @staffOnly
+  @page.fallback(shipping.NoShipment | carrier.NoCarrier | http.NetworkError | http.ServerError, Unavailable)
+  @page.route("/station", from: query)
+  op openStation(query: StationQuery): StationPage {
+    const station = staffApi.station({ id: query.id });
+    return stationVm(station, problem);
+  }
+
+  /** 選んだ箱の送料が、客に約束した上限を超えるか */
+  classify Overrun of type.Yen? {
+    /** 超える。超えた分は、店が持つ */
+    OverCeiling: type.Yen? as type.Yen;
+    default;
+  }
+
+  /**
+   * 梱包した: 選んだ箱の種類と、量った重さを入れる。送料が、ここで決まる。
+   * 上限を超える箱を選んだときは、店が持つ額を見せて、確かめてから進む。
+   */
+  @page.interaction(page: openStation, when: StationPage.ChooseBox)
+  @staffOnly
+  @recover(shipping.NoShipment | shipping.NotGathered | shipping.AlreadyPacked, sayStale)
+  @recover(shipping.UnknownBox | shipping.OverWeight | shipping.Undeliverable, sayRejected)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onPack(id: shipping.ShipmentId, option: shipping.BoxOption, weight: type.Grams)
+    throws page.Aborted
+  {
+    match option.overCeiling by Overrun {
+      OverCeiling => confirmAbsorb(option.overCeiling);
+      default     => none;
+    };
+    const parcel = staffApi.pack({ id, box: option.box.code, weight });
+    sealed(parcel);
+    reload();
+  }
+
+  /** 店が持つ額を見せて、確かめる。やめれば、梱包は記録しない */
+  @page.dialog("AbsorbOverCeilingDialog")
+  op confirmAbsorb(over: type.Yen);
+
+  /** 決まった送料を、画面に出す */
+  op sealed(parcel: shipping.Parcel);
+
+  /**
+   * 配送業者を選んで、送り状を買う。先に、客への請求が確定する。
+   * 通らなかったときの理由は、三つに分ける: 請求できない（送り状は買っていない）、配送業者が引き受けない（請求は確定している）、
+   * 届かなかった（どこまで進んだか分からない）。
+   */
+  @page.interaction(page: openStation, when: StationPage.ChooseCarrier)
+  @staffOnly
+  @recover(shipping.NoShipment | shipping.NotPacked | shipping.AlreadyLabelled, sayStale)
+  @recover(payment.NoPayment | payment.NotSecured | psp.HoldExpired, sayCannotCharge)
+  @recover(carrier.UnknownCarrier | carrier.NotEnabled | carriergw.Refused, sayCarrierRefused)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onBuyLabel(id: shipping.ShipmentId, offer: carrier.Quote) {
+    const label = staffApi.buyLabel({ id, carrier: offer.carrier, service: offer.service });
+    printLabel(label.document);
+    reload();
+  }
+
+  /** 送り状を印刷する */
+  @nav.save
+  op printLabel(document: type.Url);
+
+  /** 配送業者に渡した */
+  @page.interaction(page: openStation, when: StationPage.HandOver)
+  @staffOnly
+  @recover(shipping.NoShipment | shipping.NotPacked | shipping.NotLabelled | shipping.AlreadyHandedOver | ordering.NoOrder, sayStale)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onHandOver(id: shipping.ShipmentId) {
+    const shipment = staffApi.handOver({ id });
+    gone(shipment);
+    goToShipments();
+  }
+
+  /** 渡した出荷を、画面に出す */
+  op gone(shipment: shipping.Shipment);
+
+  // ---- 配送業者の管理 ----
+
+  /** 配送業者のページ */
+  union CarriersPage {
+    Ready: { carriers: carrier.Carrier[]; problem: Problem?; };
+    /** 一つも登録していない */
+    Empty: { problem: Problem?; };
+    Unavailable: Unavailable;
+  }
+
+  op carriersVm(carriers: carrier.Carrier[], problem: Problem?): CarriersPage;
+
+  @staffOnly
+  @unavailableOnFailure
+  @page.route("/carriers")
+  op openCarriers(): CarriersPage {
+    const carriers = staffApi.carriers({});
+    return carriersVm(carriers, problem);
+  }
+
+  /** 配送業者を登録する */
+  @staffOnly
+  @recover(carrier.AlreadyRegistered, sayRejected)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onRegisterCarrier()
+    throws page.Aborted
+  {
+    const carrier = askCarrier();
+    staffApi.registerCarrier({ carrier });
+    reload();
+  }
+
+  /** 配送業者の名前と、契約の番号を聞く */
+  @page.dialog("CarrierDialog")
+  op askCarrier(): carrier.Carrier;
+
+  /** 配送業者を使う、使わないを切り替える */
+  @page.interaction(page: openCarriers, when: CarriersPage.Ready)
+  @staffOnly
+  @recover(carrier.UnknownCarrier, sayStale)
+  @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
+  op onSwitchCarrier(code: carrier.CarrierCode, enabled: boolean) {
+    const changed = staffApi.setCarrierEnabled({ code, enabled });
+    switched(changed);
+    reload();
+  }
+
+  /** 切り替えた配送業者を、画面に出す */
+  op switched(changed: carrier.Carrier);
+}
