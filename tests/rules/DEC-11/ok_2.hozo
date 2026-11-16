@@ -1,0 +1,33 @@
+// DEC-11（docs/types.md「デコレータの引数」、docs/grammar.md「デコレータの適用」）: 宣言が残りの引数を持てば、ほかの Param の
+// 数を超えて位置で渡した値は、書いた順に、残りの引数の値になる。0 個でもよい。名前付きのデコレータの固定した引数も同じ
+namespace a {
+  state s: list<string>;
+  state t: nullable<string>;
+  effect e1 on s.post;
+  effect e2 on t.put;
+  union Both { e1; e2; }
+  decorator all(...targets: any effect) for op effects targets;
+  decorator some(first: int, second: string?, ...more: string | int);
+  @all
+  op rest0();
+  @all()
+  op rest0b();
+  @all(e1)
+  op rest1(x: string);
+  @all(e1, e2)
+  op rest2(x: string, y: string);
+  @all(e1 | e2, Both)
+  op restSets(x: string);
+  @some(1, "s", "a", 2, "c")
+  op restAfterFixed();
+  @some(1)
+  op restAfterFixed0();
+  @some(second: "t", first: 1)
+  op restNone();
+  decorator fixed = some(1, "s", "a", "b");
+  decorator fixedAll = all(e1, e2);
+  @fixed
+  op restAlias();
+  @fixedAll
+  op restAlias2(x: string, y: string);
+}

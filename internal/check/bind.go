@@ -7,10 +7,9 @@ import (
 
 // position は bind で埋める位置（docs/check.md「bind」の Pos(b, O) の一つ）。
 type position struct {
-	path       []string // ["in", "token"]。先頭は引数名
-	typ        ir.Type  // その位置の型（optional を含む）
-	hasDefault bool     // フィールドで default があるか
-	span       ir.Span  // 引数か、最後のフィールドの位置
+	path []string // ["in", "token"]。先頭は引数名
+	typ  ir.Type  // その位置の型（optional を含む）
+	span ir.Span  // 引数か、最後のフィールドの位置
 }
 
 type bindOpKey struct {
@@ -64,14 +63,14 @@ func (t *bindTable) compute(bi int, o *ir.Op) []position {
 	var out []position
 	visiting := map[string]bool{}
 	for _, p := range o.Params {
-		t.collect([]string{p.Name}, p.Type, false, p.Span, tau, visiting, &out)
+		t.collect([]string{p.Name}, p.Type, p.Span, tau, visiting, &out)
 	}
 	return out
 }
 
 // collect は型 typ の位置 path から、τ または optional(τ) の位置を集める。model（と model の optional）は
 // フィールドを再帰的に辿り、array と record の中は辿らない。辿っている途中で同じ model に戻ったら止める。
-func (t *bindTable) collect(path []string, typ ir.Type, hasDefault bool, span ir.Span, tau ir.Type, visiting map[string]bool, out *[]position) {
+func (t *bindTable) collect(path []string, typ ir.Type, span ir.Span, tau ir.Type, visiting map[string]bool, out *[]position) {
 	if typ == nil {
 		return
 	}
@@ -80,7 +79,7 @@ func (t *bindTable) collect(path []string, typ ir.Type, hasDefault bool, span ir
 		base = opt.Of
 	}
 	if ir.TypeEqual(base, tau) {
-		*out = append(*out, position{path: append([]string(nil), path...), typ: typ, hasDefault: hasDefault, span: span})
+		*out = append(*out, position{path: append([]string(nil), path...), typ: typ, span: span})
 		return
 	}
 	m := t.ix.modelOf(base)
@@ -89,7 +88,7 @@ func (t *bindTable) collect(path []string, typ ir.Type, hasDefault bool, span ir
 	}
 	visiting[m.Name] = true
 	for _, f := range m.Fields {
-		t.collect(append(append([]string(nil), path...), f.Name), f.Type, f.Default != nil, f.Span, tau, visiting, out)
+		t.collect(append(append([]string(nil), path...), f.Name), f.Type, f.Span, tau, visiting, out)
 	}
 	delete(visiting, m.Name)
 }
@@ -179,7 +178,7 @@ func checkBind6(ix *index, bi int, r *reporter) {
 }
 
 // checkBind1And2 は BIND-1（位置が二つ以上。Related に各位置）と BIND-2（状態の形が nullable で、位置の型が
-// optional でなく default もない）。計算「bind」5。位置は Bind。
+// optional でない）。計算「bind」5。位置は Bind。
 func checkBind1And2(ix *index, t *bindTable, bi int, o *ir.Op, r *reporter) {
 	b := ix.p.Binds[bi]
 	pos := t.positions(bi, o)
@@ -200,7 +199,7 @@ func checkBind1And2(ix *index, t *bindTable, bi int, o *ir.Op, r *reporter) {
 			return
 		}
 		p := pos[0]
-		if !isOptional(p.typ) && !p.hasDefault {
+		if !isOptional(p.typ) {
 			r.report(diag.Error, "BIND-2", b.Span,
 				sprintf("bind %s は nullable で空になりうるが、%s の位置 %s は省略できない", b.State, o.Name, joinPath(p.path)),
 				[]related{{span: p.span, msg: sprintf("位置: %s", joinPath(p.path))}}, nil)
@@ -296,7 +295,7 @@ func checkRecordFits(ix *index, path []string, rec ir.RecordAtom, m *ir.Model, b
 			}
 		}
 		if !found {
-			required := !isOptional(f.Type) && f.Default == nil
+			required := !isOptional(f.Type)
 			if required && !hasPath(bound, fpath) {
 				missing = append(missing, fpath)
 			}

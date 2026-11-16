@@ -283,7 +283,7 @@ pure(O) が真なのは、次のすべてを満たすとき。
 2. s の `shape` が `list` → BIND-6。
 3. τ = s の `element`。
 4. O の各引数から、型が τ または `optional(τ)` の位置を集める。型が model（または model の `optional`）ならフィールドを再帰的に辿る。`array` と `record` の中は辿らない。辿っている途中で同じ model に戻ったら、そこで止める。位置はパス（`["in", "token"]`）。
-5. 位置が 2 以上 → BIND-1。1 で、s の `shape` が `nullable` で、位置の型が `optional` でなく `default` もない → BIND-2。
+5. 位置が 2 以上 → BIND-1。1 で、s の `shape` が `nullable` で、位置の型が `optional` でない → BIND-2。
 6. 二つの `Bind` が同じ op の同じ位置に当たる → BIND-5。
 
 A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべての `Bind` の Pos(b, O) から、c が明示している位置を除いたもの（BIND-3）。位置が明示されているのは、パスの引数が `name` か `state` の `Atom` で渡されている（中身は分からないので明示とみなす）か、レコードリテラルの連なりがパスのフィールドを持つとき。

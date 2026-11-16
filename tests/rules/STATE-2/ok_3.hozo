@@ -1,0 +1,18 @@
+// STATE-2（docs/check.md「状態と効果」）: デコレータが運ぶ効果が、付けた op と同じ名前空間のもの。別の名前空間の配線には
+// 伝播する（EFF-1）
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state s: list<M>;
+  @db.insert(s)
+  effect e on s.post;
+  @db.delete(s, "id")
+  effect f on s.delete;
+  @db.effects(f, e)
+  export op replace(id: string, m: M);
+}
+namespace b {
+  op wiring(id: string, m: a.M) effects a.f | a.e {
+    a.replace(id, m);
+  }
+}

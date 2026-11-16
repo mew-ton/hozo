@@ -1,7 +1,7 @@
-// DEC-1（docs/check.md「デコレータ」）: for に書いた対象（省略は op）にだけ付ける
+// DEC-1（docs/check.md「デコレータ」）: for に書いた対象（省略は op）にだけ付ける。対象 effect は、効果の宣言
 namespace a {
-  model M { @db.key id: string; }
-  @db
+  model M { @db.key @db.text id: string; }
+  @db.table(M)
   state s: list<M>;
   @http.status(404)
   exception NotFound;
@@ -9,7 +9,15 @@ namespace a {
   scalar PosInt extends int;
   decorator onlyOp;
   decorator forField for field;
-  @onlyOp
+  decorator forEffect for effect;
+  decorator opOrEffect for op | effect;
+  @onlyOp @opOrEffect
   op f(): void;
   model N { @forField id: string; }
+  @forEffect @opOrEffect @db.insert(s)
+  effect add on s.post;
+  @db.update(s)
+  effect change on s.put;
+  @db.delete(s, "id")
+  effect remove on s.delete;
 }

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -87,10 +86,10 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.getOrders
 	mux.HandleFunc("GET /orders", func(w http.ResponseWriter, r *http.Request) {
-		in := NewGetOrdersInput()
+		var in GetOrdersInput
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
-		req.query("page", &in.Page)
+		req.query("page", &in.Page, httpDefault(1))
 		if !req.ok(w) {
 			return
 		}
@@ -174,11 +173,17 @@ type httpViolation struct {
 // httpPlace は、入力の model のフィールドと、それを読む通信の上の場所の組。
 type httpPlace struct{ field, place string }
 
-// httpOption は、項目の読み方に、フィールドのデコレータが足すこと。
-type httpOption int
+// httpOption は、項目がないときの扱い。フィールドのデコレータ（@http.required、@http.default）が言う。
+type httpOption struct {
+	required bool // @http.required
+	value    any  // @http.default の値。なければ nil
+}
 
 // httpRequired は @http.required: その項目がなければ、読めない要求（"<場所> <名前>: missing"）。
-const httpRequired httpOption = 1
+var httpRequired = httpOption{required: true}
+
+// httpDefault は @http.default(v): その項目がなければ、フィールドを v にする。
+func httpDefault(v any) httpOption { return httpOption{value: v} }
 
 // httpRequest は、要求一つを、入力のフィールドに読む。読めなかった最初の理由を fail に持ち、その後は何も読まない。
 type httpRequest struct {
@@ -218,7 +223,7 @@ func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 	}
 	raw, present := q.items[name]
 	if !present {
-		q.missing("body", name, opts)
+		q.missing("body", name, dst, opts)
 		return
 	}
 	if err := json.Unmarshal(raw, dst); err != nil {
@@ -240,11 +245,18 @@ func (q *httpRequest) bodyObj(dst any) {
 	}
 }
 
-// missing は、項目がなかったときの扱い。読む先には、何も書かない。
-// @http.required（httpRequired）の項目なら、読めない要求。型は見ない。
-func (q *httpRequest) missing(place, name string, opts []httpOption) {
-	if slices.Contains(opts, httpRequired) {
-		q.fail = place + " " + name + ": missing"
+// missing は、項目がなかったときの扱い。決めるのは、行に渡された opts だけで、dst の型は見ない:
+// httpRequired なら、読めない要求。httpDefault(v) なら、dst（フィールドへのポインタ）の指す先を v にする。
+// どちらもなければ、何も書かない（フィールドは零値のまま）。
+func (q *httpRequest) missing(place, name string, dst any, opts []httpOption) {
+	for _, o := range opts {
+		switch {
+		case o.required:
+			q.fail = place + " " + name + ": missing"
+		case o.value != nil:
+			v := reflect.ValueOf(dst).Elem()
+			v.Set(reflect.ValueOf(o.value).Convert(v.Type()))
+		}
 	}
 }
 
@@ -256,7 +268,7 @@ func (q *httpRequest) text(place, name, text string, present bool, dst any, opts
 		return
 	}
 	if !present {
-		q.missing(place, name, opts)
+		q.missing(place, name, dst, opts)
 		return
 	}
 	v := reflect.ValueOf(dst).Elem()

@@ -1,7 +1,7 @@
 // SYNTAX（docs/grammar.md「op」「配線」「型」「model」）: export は op の前だけ、throw はアームの本体だけ、
-// never は戻り値の型と override のなくす印だけ、override に既定値は書けない
+// never は戻り値の型と override のなくす印だけ、フィールドにも override にも既定値は書けない
 namespace a {
-  model M { id: string; n: int = 1; }
+  model M { id: string; n: int; }
   exception E;
   classify C of M { A; B; }
   export model X { id: string; }       // ERROR: SYNTAX

@@ -78,10 +78,6 @@ func model(fqn string, fields ...ir.Field) *ir.Model {
 
 func field(name string, t ir.Type) ir.Field { return ir.Field{Name: name, Type: t} }
 
-func fieldDef(name string, t ir.Type, def ir.Literal) ir.Field {
-	return ir.Field{Name: name, Type: t, Default: def}
-}
-
 func param(name string, t ir.Type) ir.OpParam {
 	return ir.OpParam{Name: name, Type: t, Span: sp("p." + name)}
 }

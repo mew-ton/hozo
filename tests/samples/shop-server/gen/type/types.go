@@ -35,24 +35,12 @@ type User struct {
 	Hash string `json:"hash"`
 }
 
-// NewUser は User の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewUser() User {
-	m := User{}
-	return m
-}
-
 // PublicUser は外に見せるユーザー（ハッシュを持たない）
 // type.User を継承し（extends）、hash をなくしたもの。type.User とは別の型で、暗黙には渡せない。
 type PublicUser struct {
 	Id    UserId `json:"id"`
 	Email Email  `json:"email"`
 	Name  string `json:"name"`
-}
-
-// NewPublicUser は PublicUser の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewPublicUser() PublicUser {
-	m := PublicUser{}
-	return m
 }
 
 // Session はログインセッション
@@ -62,22 +50,10 @@ type Session struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// NewSession は Session の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewSession() Session {
-	m := Session{}
-	return m
-}
-
 // OrderLine は注文の一行
 type OrderLine struct {
 	Item     ItemId `json:"item"`
 	Quantity int64  `json:"quantity"`
-}
-
-// NewOrderLine は OrderLine の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewOrderLine() OrderLine {
-	m := OrderLine{}
-	return m
 }
 
 // Order は注文
@@ -88,22 +64,10 @@ type Order struct {
 	PlacedAt time.Time   `json:"placedAt"`
 }
 
-// NewOrder は Order の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewOrder() Order {
-	m := Order{}
-	return m
-}
-
 // Notification はユーザーへの通知
 type Notification struct {
 	UserId  UserId `json:"userId"`
 	Message string `json:"message"`
-}
-
-// NewNotification は Notification の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewNotification() Notification {
-	m := Notification{}
-	return m
 }
 
 // InvalidCredentials: メールアドレスかパスワードが一致しない

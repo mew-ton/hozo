@@ -4,7 +4,7 @@
 
 `cli` の語彙（このプラグインの語彙のファイル `plugins/go-cli/cli.hozo`。リポジトリ直下の `cli.hozo`（hozoc 自身の仕様。`docs/cli.md`）とは別のファイル。出典は設計書の `examples/hozoc.hozo`）を Go の CLI の骨組みにするトランスパイラ `go-cli`。Go の基底 `go`（`docs/plugin-go.md`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。プラグインは `plugins/go-cli/`。hozoc 自身の骨組みもこれで生成する（`docs/requirements.md`「自己展開」）。
 
-デコレータが出すコードは、型に依らない（`docs/requirements.md`「出力を推論しない」）: コマンドごと、フィールドごと、例外ごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ形（同じ補助の呼び出し）にする。値を取らないフラグかどうか、文字列の読み方は、共通の補助が、実行時に決める（「コマンドごとの関数」）。値が与えられないことを誤りにするかどうかは、デコレータ（`@cli.required`）が言う（「引数の解釈」）。型は、書いたものが食い違っていないかを確かめるのにだけ使う（「診断」）。
+デコレータが出すコードは、型に依らない（`docs/requirements.md`「出力を推論しない」）: コマンドごと、フィールドごと、例外ごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ形（同じ補助の呼び出し）にする。値を取らないフラグかどうか、文字列の読み方は、共通の補助が、実行時に決める（「コマンドごとの関数」）。値が与えられなかったときの扱い（誤りにする、決まった値を入れる）は、デコレータ（`@cli.required`、`@cli.default`）が言う（「引数の解釈」）。型は、書いたものが食い違っていないかを確かめるのにだけ使う（「診断」）。
 
 ## マニフェスト
 
@@ -23,14 +23,14 @@ requires = ["go", "go-valid"]
 
 - 提供するトランスパイラは `go-cli` の一つ（`hozo.toml` の `transpilers = ["go", "go-valid", "go-cli"]` で選ぶ）。要求の `transpiler` がそれ以外なら `code: "unsupported"`（`docs/plugin-protocol.md`「要求と応答」）。
 - `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`plugins/go-cli/cli.hozo`（マニフェストの `vocabulary = ["cli.hozo"]` はマニフェストからの相対パス）の中身は「語彙」。
-- 読む語彙は、`cli` の `command` / `arg` / `flag` / `env` / `required` / `exitCode`（「語彙」）。`@proc.stdio` などのほかの語彙は読まない（基底が、付いた op を人が実装する葉として出す）。
+- 読む語彙は、`cli` の `command` / `arg` / `flag` / `env` / `required` / `default` / `exitCode`（「語彙」）。`@proc.stdio` などのほかの語彙は読まない（基底が、付いた op を人が実装する葉として出す）。
 - `go-valid` に依存するのは、解釈した入力の制約を確かめるため（「引数の解釈」）。
 - オプションはない。`[emit.options.go-cli]` にキーがあれば CLI-8。
 - `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため（配布のしかたは `docs/plugin-go.md`「マニフェスト」）。
 
 ## 語彙
 
-`plugins/go-cli/cli.hozo` の宣言は次のとおり（説明のコメントは略した）。出典は `examples/hozoc.hozo` の `namespace cli` で、変えたのは `arg`、`flag`、`env` の引数（`docs/decisions.md`「決めたこと」109）、足したのは `required`（同 114）。
+`plugins/go-cli/cli.hozo` の宣言は次のとおり（説明のコメントは略した）。出典は `examples/hozoc.hozo` の `namespace cli` で、変えたのは `arg`、`flag`、`env` の引数（`docs/decisions.md`「決めたこと」109）、足したのは `required` と `default`（同 114、115）。
 
 ```ts
 namespace cli {
@@ -41,16 +41,18 @@ namespace cli {
   decorator flag(name: string?) for field;
   /** 環境変数から受け取る。name を省けば、フィールドの名前 */
   decorator env(name: string?) for field;
-  /** このフィールドに値が与えられなければ、誤り。付けていないフィールドは、与えられなくてもよい */
+  /** このフィールドに値が与えられなければ、誤り */
   decorator required for field;
+  /** このフィールドに値が与えられなければ、value にする */
+  decorator default(value: string | int | float | boolean) for field;
   decorator exitCode(code: int) for exception;
 }
 ```
 
 - **位置引数は、位置を引数で言う**（`@cli.arg(1) source`、`@cli.arg(2) target`）。フィールドの宣言の順からは読まない。位置は 1 から、重なりも抜けもなく続く（そうでなければ CLI-10）。
 - **名前を取るデコレータ**（`flag`、`env`）は、`http` の語彙の項目の形（`docs/vocab.md`「`http` の語彙」）と同じ決まり: 名前を省けば、フィールドの名前（`@cli.flag verbose` は `--verbose`）。
-- **値が与えられないことを誤りにするのは、`@cli.required` だけ**（`@cli.required @cli.arg(1) source`）。フィールドの型（省略可能かどうか）からは決めない。`http` の語彙の `@http.required`（`docs/vocab.md`「`http` の語彙」）と同じ決まり: 値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）を持つフィールドに足し、省略可能なフィールド（`T?`）には付けられない（「対象」）。
-- **`plugins/go-cli/cli.hozo` のファイルと、リポジトリ直下の `cli.hozo` の `@cli.arg namespaces`（`@cli.arg(1) namespaces` になる。`docs/cli.md`「cli.hozo」）は、`go-cli` の実装と一緒に、この形に置き換える。** それまでは、今の中身（引数のない `arg`、`flag(name: string)`、`env(name: string)`。`required` はない）のまま（`docs/requirements.md`「作り直しの段階」の R3）。リポジトリ直下の `cli.hozo` に、`@cli.required` を足すフィールドはない: 入力のフィールドは、どれも省略可能か、残りを受け取る配列（0 個でよい）。
+- **値が与えられなかったときの扱いは、二つのデコレータが言う**: `@cli.required`（誤り。`@cli.required @cli.arg(1) source`）と、`@cli.default(<リテラル>)`（その値にする。`@cli.flag @cli.default("text") format`）。どちらもないフィールドは、零値のまま op に渡る。フィールドの型（省略可能かどうか）からは決めず、型の宣言に書く既定値は、言語にない（`docs/decisions.md`「設計書を変える決定」S24）。`http` の語彙の `@http.required` / `@http.default`（`docs/vocab.md`「`http` の語彙」）と同じ決まりで、確かめるのは、このトランスパイラ（「対象」）。`value` の型は、フィールドに書ける型（「対象」）のリテラルの型。
+- **`plugins/go-cli/cli.hozo` のファイルと、リポジトリ直下の `cli.hozo` の `@cli.arg namespaces`（`@cli.arg(1) namespaces` になる。`docs/cli.md`「cli.hozo」）は、`go-cli` の実装と一緒に、この形に置き換える。** それまでは、今の中身（引数のない `arg`、`flag(name: string)`、`env(name: string)`。`required` と `default` はない）のまま（`docs/requirements.md`「作り直しの段階」の R3）。リポジトリ直下の `cli.hozo` に、`@cli.required` か `@cli.default` を足すフィールドはない: 入力のフィールドは、どれも省略可能か、残りを受け取る配列（0 個でよい）で、既定値を持つフィールドもない。
 
 ## 出力
 
@@ -87,12 +89,12 @@ type JSONPresenter struct{}
 - 引数は 0 個か、model 一つ。それ以外は CLI-1。
 - 引数の model の各フィールドは、`@cli.arg(position)`、`@cli.flag`、`@cli.env` のどれかを持つ。`@cli.env` は `@cli.arg` か `@cli.flag` と一緒に付けられる（与えられなかったときの代わり）。`@cli.arg` と `@cli.flag` の両方、またはどれもなければ CLI-2。
 - フィールドの型は `string`、`boolean`、`int`、`float`、元がこれらの `scalar`、またはそれらの `optional`、`@cli.arg` に限り `string`（と `string` の scalar）の `array`（`optional` は付けない。0 個を表せるため）。それ以外（model、`Record`、`Time`、`optional` の `array`）は CLI-3。
-- `@cli.required` は、省略可能なフィールド（`T?`）に付けられない。付いていれば CLI-11（型は「なくてよい」と言い、デコレータは「なければ誤り」と言っている）。値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）を一つも持たないフィールドに付いていれば、そのフィールドは CLI-2。
+- `@cli.required` と `@cli.default` は、省略可能なフィールド（`T?`）に付けられない。付いていれば CLI-11（型は「なくてよい」と言っている: なければ誤りにするなら、また、なければ値を入れるなら、省略可能にしない）。一つのフィールドに、両方は付けられない（CLI-12）。`@cli.default` のリテラルは、フィールドの型（scalar は元の核の型）に渡せなければならない（`docs/types.md`「互換」の 10。渡せなければ CLI-13。`array` のフィールドに渡せるリテラルはない）。値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）を一つも持たないフィールドは、この二つが付いていても CLI-2。
 - `@cli.arg` の位置は、1 から、重なりも抜けもなく続く（一つなら 1、三つなら 1、2、3）。1 より小さい位置、同じ位置が二つ、抜けた位置があれば CLI-10。
 - `@cli.arg` の `array` のフィールド（残りの引数をすべて受け取る）は、いちばん後ろの位置の一つだけ。違えば CLI-4。
 - `@cli.arg` に `boolean` は付けられない（CLI-3）。
 - 同じフラグの名前（`@cli.flag` の引数。省いていれば、フィールドの名前）、同じ `@cli.command` の名前が二つあれば CLI-5。
-- 型についての決まり（CLI-3、CLI-4、CLI-11）は、書いたものの整合の検査で、出力を変えない（どの型でも、同じ補助の呼び出しになる。「コマンドごとの関数」）。
+- 型についての決まり（CLI-3、CLI-4、CLI-11、CLI-13）は、書いたものの整合の検査で、出力を変えない（どの型でも、同じ補助の呼び出しになる。「コマンドごとの関数」）。
 
 CLI-* は emit の応答の `errors` で返す（`docs/plugin-protocol.md`「emit」）ので、どれも error の診断になる。
 
@@ -105,12 +107,12 @@ hozoc <command> [flags] [args]
 - `<command>` がなければ使い方を標準エラーに出して 64。`help` か `--help` / `-h` なら使い方を標準出力に出して 0。`<command> --help` はそのコマンドの使い方。
 - フラグは `--name value`、`--name=value`。`boolean` は `--name` で true（値は取らない。`--name=false` は取れる）。値を取らないフラグかどうかは、補助が、実行時に、読む先の Go の型が真偽値（か、そのポインタ）かどうかで見る。同じフラグが二度あれば後のものが勝つ。`-x` の形はフラグではなく位置引数（`-h` を除く。負の数を渡せるようにするため）。`--` 以降は位置引数。
 - 知らないフラグ、フラグの値がない、値を型に変換できない（`int` に `"x"`）、必須のフィールド（下）に値が与えられない、位置引数が多い → 使い方を標準エラーに出して 64。
-- 必須: `@cli.required` の付いたフィールド。フラグでも、位置引数でも、`@cli.env` の環境変数でも値が与えられなければ、誤り（上）。残りを受け取る `array` の `@cli.arg` に付ければ、位置引数が一つは要る。付けていないフィールドは、与えられなくても誤りにせず、読む先に何も書かない（足りない位置引数も同じ）。フィールドの型も、初めの値も、見ない。**何も書かれなかったフィールドが、op にどの値で渡るか（入力の初めの値）は、まだ決めていない**（「未決」。今の形では、下の「入力の初めの値」が入れた値のまま）。
+- 値が与えられなかったフィールド（フラグでも、位置引数でも、`@cli.env` の環境変数でも）の扱いは、デコレータだけで決まる。`@cli.required`（必須）なら、誤り（上）。残りを受け取る `array` の `@cli.arg` に付ければ、位置引数が一つは要る。`@cli.default(v)` なら、読む先を v にする。どちらもなければ、読む先に何も書かない（零値のまま。足りない位置引数も同じ）。フィールドの型は、見ない。
 - `@cli.env` は、フラグが与えられなかったときに環境変数の値を使う（フラグが優先）。環境変数が空文字列なら「ない」とみなす。
 - `@cli.arg(n)` は、n 番目の位置引数を受け取る。`array` は、その位置から後ろの残りすべて（0 個でもよい）。残りを受け取るかどうかは、補助が、実行時に、読む先がスライスかどうかで見る。
 - 値の変換: `int` は `strconv.ParseInt(v, 10, 64)`、`float` は `ParseFloat`、`boolean` は `ParseBool`。scalar は元の型で変換してから scalar の型にする。
 - 解釈した入力の制約を確かめる。入力が `Validate` を持つかどうかで、出すコードを変えない: 入力を持つどのコマンドにも、同じ補助の呼び出しを出し、補助が、実行時に、入力が `Validate() error` を持つかを見る（持たなければ、確かめるものがない）。違反は 64（メッセージに `Violation` の `Path` と `Constraint`。使い方は出さない）。
-- 入力の初めの値は、既定値を持つ model なら基底の `New<Model>()`、そうでなければ零値。この分け方は、model の宣言を見ている（「未決」）。
+- 入力は `var in <Model>` で置き、どのフィールドも零値で始まる。基底は、初めの値を入れる関数を出さない（`docs/plugin-go.md`「model」）。
 - 入力の model が**別の名前空間 M のもの**で、`Validate` を持つ型（`govalid.HasValidate`。`docs/plugin-go-valid.md`「Validate を持つ型」）なら、M の型の置き場（`docs/config.md`「型の置き場」）の単位も `transpilers` に `go-valid` を並べていなければならない。並べていなければ CLI-9（その入力が、確かめられないまま op に渡るのを、先に報告する。`go-http` の GOHTTP-11 と同じ。`docs/plugin-go-http.md`「制約の検査」。確かめ方は `govalid.Unlisted`）。N の model は、自分の単位が `go-valid` を並べている（CFG-19）。
 
 ## コマンドごとの関数
@@ -131,8 +133,8 @@ func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args 
 }
 ```
 
-- **フィールドの読み方**は、フィールドに付いた `cli` のデコレータごとに一行で、フィールドの順、その中はデコレータを書いた順: `@cli.flag` は `line.flag("<名前>", &in.<F>)`、`@cli.env` は `line.env("<名前>", &in.<F>)`、`@cli.arg(n)` は `line.arg(<n>, &in.<F>)`、`@cli.required` は `line.required(&in.<F>)`。`<名前>` は、デコレータの引数。省いていれば、フィールドの名前。行に書くのは、デコレータが言ったことだけで、フィールドの型で変わるものは、何も書かない。
-- 補助 `cliLine` は、並べた行（名前か位置と、読む先）を覚え、その後で、引数の並びを一度に解釈する（「引数の解釈」）。読む先の Go の型は、実行時に見る（`reflect`）: 真偽値なら値を取らないフラグ、スライスなら残りの位置引数、ポインタなら省略可能。同じ読む先に `flag` と `env` があれば、フラグが優先。`required` の行のある読む先に、どの行からも値が与えられなければ、必須が足りない（「引数の解釈」）。型では決めない。
+- **フィールドの読み方**は、フィールドに付いた `cli` のデコレータごとに一行で、フィールドの順、その中はデコレータを書いた順: `@cli.flag` は `line.flag("<名前>", &in.<F>)`、`@cli.env` は `line.env("<名前>", &in.<F>)`、`@cli.arg(n)` は `line.arg(<n>, &in.<F>)`、`@cli.required` は `line.required(&in.<F>)`、`@cli.default(<リテラル>)` は `line.orDefault(&in.<F>, <リテラル>)`。`<名前>` は、デコレータの引数。省いていれば、フィールドの名前。`<リテラル>` の Go での書き方は、基底と同じ（`docs/plugin-go.md`「値」の表の `literal` の行）で、フィールドの型への変換は書かない（補助が、実行時に、読む先の型に変える）。行に書くのは、デコレータが言ったことだけで、フィールドの型で変わるものは、何も書かない。
+- 補助 `cliLine` は、並べた行（名前か位置と、読む先）を覚え、その後で、引数の並びを一度に解釈する（「引数の解釈」）。読む先の Go の型は、実行時に見る（`reflect`）: 真偽値なら値を取らないフラグ、スライスなら残りの位置引数、ポインタなら省略可能。同じ読む先に `flag` と `env` があれば、フラグが優先。どの行からも値が与えられなかった読む先は、`required` の行があれば、必須が足りない。`orDefault` の行があれば、その値にする（「引数の解釈」）。型では決めない。
 - **制約の検査**は、入力を持つどのコマンドにも、同じ補助の呼び出し一つ（「引数の解釈」）。
 - **例外**は、`fail<Op>` の中で、`Signature.exceptions` の順に、例外ごとに一行の同じ形: 型引数に例外の型を、引数に終了コード（`@cli.exitCode(code)` の `code`。なければ 70）を渡す補助の呼び出し。補助は、`errors.As` で例外の値の型を見分け、`Failure` の `Name`（例外の FQN。`HozoException()`）と `Value`（フィールド `Value` を持つかどうかを、実行時に見る）を入れる。
 
@@ -169,16 +171,16 @@ N のパッケージと、その型・メソッドの名前と形は `plugin/gol
 
 ## 未決
 
-まだ決めていないところは一つ。`go-http` の同じ問い（`docs/plugin-go-http.md`「未決」の 1）と、一緒に決める。決めるまで、この文書は、ここに書いた今の形のままにしてある。
+まだ決めていないところは一つ。`go-http` の同じ問い（`docs/plugin-go-http.md`「未決」の 1）と、一緒に決める。
 
-**入力の初めの値**。今は、既定値を持つ model は `New<Model>()`、持たない model は零値（「引数の解釈」）。コマンドごとのコードの形が、model の宣言で変わっている。フィールドの既定値を言語に残すかどうかを見直していて、それが決まるまで、決めない。`@cli.required` のないフィールドに値が与えられなかったときに、op にどの値で渡るかも、これと一緒に決まる。
+**`@cli.default` の値が、制約に合うか**。今は、生成するときには、値をフィールドの制約（`@valid.*`）で確かめない。入れた値も、与えられた値と同じに、実行時に確かめられる（「引数の解釈」の、制約の検査。合わなければ、そのフィールドを与えない呼び出しは、いつも 64）。選べる形は、`go-http` の文書に書いた二つ。
 
 ## 診断
 
 | ID | 重さ | 意味 |
 |---|---|---|
 | CLI-1 | error | `@cli.command` の op の引数が、0 個でも model 一つでもない。位置は op |
-| CLI-2 | error | 入力の model のフィールドに、値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）が一つもない（`@cli.required` だけのフィールドを含む）、または `@cli.arg` と `@cli.flag` の両方がある。位置は model |
+| CLI-2 | error | 入力の model のフィールドに、値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）が一つもない（`@cli.required` か `@cli.default` だけのフィールドを含む）、または `@cli.arg` と `@cli.flag` の両方がある。位置は model |
 | CLI-3 | error | フィールドの型が受け付けられない。位置は model |
 | CLI-4 | error | `array` の `@cli.arg` が、いちばん後ろの位置でない（二つ以上あるときを含む）。位置は model |
 | CLI-5 | error | フラグ名（`@cli.flag` の引数。省いていれば、フィールドの名前）かコマンド名の重複。位置は、フラグ名なら model、コマンド名なら後ろの op |
@@ -187,10 +189,12 @@ N のパッケージと、その型・メソッドの名前と形は `plugin/gol
 | CLI-8 | error | `[emit.options.go-cli]` に、知らないキーがある。位置なし |
 | CLI-9 | error | `Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（「引数の解釈」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op |
 | CLI-10 | error | `@cli.arg` の位置が、1 から、重なりも抜けもなく続いていない（1 より小さい、同じ位置が二つ、抜けている。「対象」）。位置は model |
-| CLI-11 | error | `@cli.required` の付いたフィールドの型が、省略可能（`T?`。「対象」）。位置は model |
+| CLI-11 | error | `@cli.required` か `@cli.default` の付いたフィールドの型が、省略可能（`T?`。「対象」）。位置は model |
+| CLI-12 | error | 一つのフィールドに、`@cli.required` と `@cli.default` の両方がある。位置は model |
+| CLI-13 | error | `@cli.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。位置は model |
 
 warning（コードは `PLUGIN`）は一つ: `@cli.command` の op が一つもない。
 
-- 入力の model の診断（CLI-2〜CLI-5 のフラグ名、CLI-10、CLI-11）は、同じ model を二つのサブコマンドが使っていても、一度だけ返す。
+- 入力の model の診断（CLI-2〜CLI-5 のフラグ名、CLI-10〜CLI-13）は、同じ model を二つのサブコマンドが使っていても、一度だけ返す。
 - Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。上の診断は、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

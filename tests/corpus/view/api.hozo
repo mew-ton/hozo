@@ -29,8 +29,8 @@ namespace api {
 
   model Session { token: Token; userId: UserId; }
 
-  @db state users: list<User>;
-  @db state sessions: list<Session>;
+  @db.table(User) state users: list<User>;
+  @db.table(Session) state sessions: list<Session>;
 
   // docs/ir.md「正規化」: 例外のその場の model は `api.Invalid.Value` に合成し、value を ref にする
   /** 入力が不正 */
@@ -79,7 +79,7 @@ namespace api {
     throws NotFound;
 
   model Credentials { name: string; password: string; }
-  model LoginInput { creds: Credentials; remember: boolean = false; }
+  model LoginInput { creds: Credentials; remember: boolean?; }
 
   // docs/check.md「計算」手順 0（葉）: rel(Invalid, createSession) = prevented
   @remote
@@ -116,7 +116,7 @@ namespace api {
     @db.unique override name;
     @db.unique override secret;
     override hash: never;
-    level: int = 1;
+    level: int;
   }
 
   // docs/ir.md「正規化」: `export op f()` は exported。`reads a, b`、複数の reads は FQN の列一つ
@@ -176,5 +176,54 @@ namespace api {
       Yes     => current;
       default => unauthorized();
     };
+  }
+
+  // ---- docs/ir.md「版」の 0.5 で足した形 ----
+
+  // docs/ir.md「decorator」: reads / effects の節（引数名は `$param:名前`。効果のユニオンは展開）、残りの引数（Param.rest）、
+  // 対象 effect。docs/grammar.md「識別子」: 予約語のデコレータ名（宣言、適用、別名の先、@see）
+  /** 表から、列が引数の値と同じ一行を引く */
+  decorator find(table: any state, column: string?) for op reads table;
+  /** 並べた効果を、書いた順に行う */
+  decorator effects(...targets: any effect) for op effects targets reads sessions;
+  /** この効果が書く表 */
+  decorator into(table: any state) for effect;
+  // docs/ir.md「正規化」: 名前付きデコレータの固定した引数も、残りの引数は list の Arg 一つ
+  decorator both = effects(createSession, Cleanup);
+
+  // docs/ir.md「decorator」の targets の effect: 効果の宣言の decorators
+  /** 名前を変える */
+  @into(users)
+  effect renameUser on users.put;
+  union Cleanup { deleteSession; renameUser; }
+
+  // docs/ir.md「正規化」: op に付いたデコレータの reads / effects の節は Op.carried（Op.reads / Op.effects には足さない）
+  // docs/check.md「デコレータが運ぶ reads と effects」: 直に読む状態は、Op.reads の後ろに Op.carried.reads
+  /**
+   * 名前からユーザーを引く。
+   *
+   * @see find
+   * @see api.effects
+   */
+  @find(users, "name")
+  export op findByName(name: string): User? reads sessions;
+  // docs/ir.md「正規化」: 残りの引数に渡した値は list の Arg 一つ（一つずつ ref か refs）
+  // docs/check.md EFF-3: 運ばれる効果は数えない（自分で書いた効果は一つまで）
+  @effects(createSession, deleteSession | renameUser)
+  export op rotate(old: Token, id: UserId)
+    effects touchUser
+    throws Invalid prevents effects;
+  // 残りの引数に何も渡さない（items は []）。reads の節の sessions だけが運ばれる
+  @effects
+  op idle();
+  @both
+  op viaAlias(session: Session);
+
+  // docs/check.md「計算」手順 0（配線）と「reads」: 運ばれた効果と状態は、op が書いたものと同じに呼び出し元へ伝わる
+  op renew(old: Token, id: UserId): User?
+    throws Invalid
+  {
+    rotate(old, id);
+    return findByName("x");
   }
 }

@@ -16,13 +16,13 @@ namespace a {
   scalar Email extends string;
   scalar Token extends string;
   scalar Mail2 extends Email;
-  model User { id: string; email: Email; hash: string; nick: string?; page: int = 1; }
+  model User { id: string; email: Email; hash: string; nick: string?; page: int; }
   model PublicUser extends User { override hash: never; }
   model Other { name: string; }
   model Same { name: string; }
   model Admin extends User { }
   model SuperAdmin extends Admin { level: int; }
-  model HasDefault { id: string; limit: int = 10; }
+  model HasDefault { id: string; limit: int; }
   union Page { Ready: User; Missing: Other; }
   classify C of User { A; B; }
   classify D of User { A; }

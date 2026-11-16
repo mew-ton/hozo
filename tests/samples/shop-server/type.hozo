@@ -1,6 +1,6 @@
 // サンプル shop-server の仕様（README.md）。共有の型の名前空間 type。
 // 保存（store.hozo）、サーバー（server.hozo）、配送（mailer.hozo）が同じ型を使う。
-// 書き方は docs/decisions.md の P1〜P39 と、決定 91〜120 の後の形。まだ実装のない書き方（db の語彙のデコレータで言う読み書きと、列のしまい方）を含む（README.md「まだないもの」）。
+// 書き方は docs/decisions.md の P1〜P39 と、決定 91〜122 の後の形。まだ実装のない書き方（db の語彙のデコレータで言う読み書きと、列のしまい方）を含む（README.md「まだないもの」）。
 // 表の model（User、Session、Order、Notification）のフィールドは、しまい方のデコレータ（@db.text、@db.time、@db.json）をちょうど一つ持つ（docs/plugin-go-sqlite.md「しまい方」）。どのフィールドも省略可能でないので、@db.nullable は一つもなく、どの列も NOT NULL（同「表」）。
 
 /** 共有の型。どの担い手にも属さない */

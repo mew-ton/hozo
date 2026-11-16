@@ -96,7 +96,6 @@ interface Field {
   name: string;
   description?: Doc;
   type: Type;                     // 省略可能なら optional
-  default?: Literal;
   decorators: Application[];
   span: Span;                     // 受け継いだままのフィールドは元の model のフィールドの位置。`override` したフィールドは `override` の位置
 }
@@ -358,7 +357,7 @@ interface Bind {
 | `T??` | `T?`（`optional` は入れ子にしない） |
 | `list<T>` / `nullable<T>` / `single<T>`（どの型の位置でも） | `array(T)` / `optional(T)` / T（`docs/types.md`「形の書き方」）。`nullable<T?>` と `single<T?>` は `optional(T)` |
 | `state s: T;`（形の語でも、`?` / `[]` でも） | `type` に正規化した型を置き、`shape` と `element` をそこから決める |
-| `model D extends B { override a: never; override b: T; c: U; }` | `fields` に、`B` の `fields` を写して `Override` を当て、足したフィールドを末尾に足したもの（`docs/types.md`「継承した model」の「フィールド」）。`extends` に `base`、`removed`、`overridden` を記録。受け継いだフィールドのデコレータ・説明・既定値も写す |
+| `model D extends B { override a: never; override b: T; c: U; }` | `fields` に、`B` の `fields` を写して `Override` を当て、足したフィールドを末尾に足したもの（`docs/types.md`「継承した model」の「フィールド」）。`extends` に `base`、`removed`、`overridden` を記録。受け継いだフィールドのデコレータ・説明も写す |
 | `export op f()` | `exported: true` |
 | `reads a, b`、複数の `reads` | 基底の状態の FQN の列一つ（重複は最初の出現に寄せる） |
 | ケースの `X as T` | `as` の `CaseTyping`。`X` が状態なら `state` にその FQN、型か op なら `state` を持たない |
@@ -453,6 +452,6 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 | 版 | 変わったこと |
 |---|---|
-| 0.5 | `Decorator.targets` に `effect`（効果の宣言の `decorators` が空でなくなりうる）。`Decorator.reads`、`Decorator.effects`。`Param.rest` と、残りの引数の `Arg`（`list`）。`Op.carried`。`Signature.reads` / `Signature.effects` が、デコレータが運ぶものを含む。`View` とやり取りの形は 0.4 と同じ |
+| 0.5 | `Decorator.targets` に `effect`（効果の宣言の `decorators` が空でなくなりうる）。`Decorator.reads`、`Decorator.effects`。`Param.rest` と、残りの引数の `Arg`（`list`）。`Op.carried`。`Signature.reads` / `Signature.effects` が、デコレータが運ぶものを含む。`Field.default` をなくした（フィールドの既定値を、言語からなくした。`docs/grammar.md`「決めたこと」）。`View` とやり取りの形は 0.4 と同じ |
 | 0.4 | `NamespaceConfig` に `index`、`base`、`options`、`seams`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
 | 0.3 | `Type` に `never`。`Model.derivedFrom` をやめて `Model.extends`。`State.type`。`Classify.subject` に `op`、`cases[].as`、`decidedBy`。`Op.exported`、`Op.reads`。`Signature.reads`、`Signature.pure`。`Atom` に `state`。`Match.subject` の `state` をやめる（`value` の `atom` が `state`）。`Match.arms[].body` に `atom` と `throw`、`Match.arms[].narrowed` |

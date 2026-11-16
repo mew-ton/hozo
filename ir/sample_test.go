@@ -109,9 +109,8 @@ func sampleProgram() *Program {
 							{Name: "token", Type: Optional(Ref("server.Token")), Span: span(f, 9, 3, 9, 16)},
 							{Name: "tags", Type: Array(String()), Span: span(f, 10, 3, 10, 17)},
 							{
-								Name:    "limit",
-								Type:    Int(),
-								Default: IntLiteral{Value: 10},
+								Name: "limit",
+								Type: Int(),
 								Decorators: []Application{{
 									Decorator: "valid.min",
 									Args:      []Arg{{Param: "min", Value: LiteralValue{Literal: FloatLiteral{Value: 0.5}}}},

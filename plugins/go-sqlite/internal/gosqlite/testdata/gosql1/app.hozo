@@ -7,13 +7,13 @@ namespace app {
   model Row { @db.key id: Id; }
 
   // 核の型
-  @db state names: list<string>;
+  @db.table(Row) state names: list<string>;
   // scalar
-  @db state ids: list<Id>;
+  @db.table(Row) state ids: list<Id>;
   // union
-  @db state shapes: list<Shape>;
+  @db.table(Row) state shapes: list<Shape>;
   // array
-  @db state groups: list<Row[]>;
+  @db.table(Row) state groups: list<Row[]>;
   // model は通る
-  @db state rows: list<Row>;
+  @db.table(Row) state rows: list<Row>;
 }

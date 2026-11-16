@@ -1,0 +1,17 @@
+// THROWS-3（docs/check.md「never を返す op」の条件 5）: never を返す op は、デコレータが運ぶ reads / effects も持てない。
+// 位置はそのデコレータ
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state s: list<M>;
+  @db.insert(s)
+  effect add on s.post;
+  exception E;
+  decorator mark;
+  @mark
+  @db.list(s)                          // ERROR: THROWS-3
+  op carriesRead(): never throws E;
+  @db.effects(add)                     // ERROR: THROWS-3
+  op carriesEffect(): never throws E;
+  op ok(): never throws E;
+}

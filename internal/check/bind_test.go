@@ -15,7 +15,6 @@ func bindFixture(serverOps []ir.Decl, browserOps []ir.Decl, binds ...ir.Bind) *i
 		model("server.Body", field("email", ir.String())),
 		model("server.LoginInput", field("token", ir.Optional(ir.Ref("server.Token"))), field("body", ir.Ref("server.Body"))),
 		model("server.StrictInput", field("token", ir.Ref("server.Token"))),
-		model("server.DefaultInput", fieldDef("token", ir.Ref("server.Token"), ir.StringLiteral{Value: "x"})),
 		model("server.Node", field("next", ir.Optional(ir.Ref("server.Node"))), field("token", ir.Optional(ir.Ref("server.Token")))),
 	}
 	browser := []ir.Decl{
@@ -101,10 +100,9 @@ func TestBindRules(t *testing.T) {
 		leaf("server.login", nil, param("in", ir.Ref("server.LoginInput"))),
 		leaf("server.two", nil, param("a", ir.Ref("server.Token")), param("b", ir.Ref("server.Token"))),
 		leaf("server.strict", nil, param("in", ir.Ref("server.StrictInput"))),
-		leaf("server.withDefault", nil, param("in", ir.Ref("server.DefaultInput"))),
 	}
 	t.Run("ok", func(t *testing.T) {
-		p := bindFixture([]ir.Decl{ops[0], ops[3]}, nil, bind("browser", "browser.token", "server", false))
+		p := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", "browser.token", "server", false))
 		diags := Check(p, cfgFor("server", "browser"))
 		for _, c := range []string{"BIND-1", "BIND-2", "BIND-5", "BIND-6"} {
 			wantNoCode(t, diags, c)
@@ -121,14 +119,14 @@ func TestBindRules(t *testing.T) {
 		}
 	})
 	t.Run("BIND-2", func(t *testing.T) {
-		// 状態の形が nullable で、位置（StrictInput.token）が optional でなく default もない
+		// 状態の形が nullable で、位置（StrictInput.token）が optional でない
 		p := bindFixture([]ir.Decl{ops[2]}, nil, bind("browser", "browser.token", "server", false))
 		wantOneCode(t, Check(p, cfgFor("server", "browser")), "BIND-2")
 		// 状態の形が single なら、同じ位置でも BIND-2 にならない（常に一列）
 		p2 := bindFixture([]ir.Decl{ops[2]}, nil, bind("browser", "browser.session", "server", false))
 		wantNoCode(t, Check(p2, cfgFor("server", "browser")), "BIND-2")
-		// nullable でも、位置が optional（LoginInput.token）か default を持つ（DefaultInput.token）なら通る
-		p3 := bindFixture([]ir.Decl{ops[0], ops[3]}, nil, bind("browser", "browser.token", "server", false))
+		// nullable でも、位置が optional（LoginInput.token）なら通る
+		p3 := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", "browser.token", "server", false))
 		wantNoCode(t, Check(p3, cfgFor("server", "browser")), "BIND-2")
 	})
 	t.Run("BIND-5", func(t *testing.T) {
@@ -201,13 +199,13 @@ func TestBind4(t *testing.T) {
 	tok := leaf("server.tok", nil, param("t", ir.Ref("server.Token")), param("o", ir.Optional(ir.Int())))
 	deep := leaf("server.deep", nil, param("in", ir.Ref("server.Outer")))
 	outer := model("server.Outer", field("inner", ir.Ref("server.Inner")), field("opt", ir.Optional(ir.String())))
-	inner := model("server.Inner", field("token", ir.Optional(ir.Ref("server.Token"))), field("email", ir.String()), fieldDef("page", ir.Int(), ir.IntLiteral{Value: 1}))
+	inner := model("server.Inner", field("token", ir.Optional(ir.Ref("server.Token"))), field("email", ir.String()), field("page", ir.Optional(ir.Int())))
 	w := wire("browser.w", nil, nil,
 		cs(call("server.login", carg("in", rec()))),                                            // body がない
 		cs(call("server.login", carg("in", rec(rf("body", rec()))))),                           // body.email がない
 		cs(call("server.login")),                                                               // in がない
 		cs(call("server.tok")),                                                                 // t は bind で埋まる。o は optional
-		cs(call("server.deep", carg("in", rec(rf("inner", rec()))))),                           // inner.email がない（token は bind、page は default）
+		cs(call("server.deep", carg("in", rec(rf("inner", rec()))))),                           // inner.email がない（token は bind、page は optional）
 		cs(call("server.deep", carg("in", rec(rf("inner", rec(rf("email", nameAtom("x")))))))), // ok
 		cs(call("server.login", carg("in", rec(rf("body", nameAtom("b")))))),                   // name は中身が分からないので ok
 	)

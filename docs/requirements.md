@@ -116,11 +116,12 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 - **機械的に生成するものは、仕様がデコレータで言う。** 型や、仕様の書かれ方から、プラグインが当てることはしない（引数の型と等しい型のフィールドを探して列に結ぶ、op の `reads` や効果の宛先や戻り値の型から SELECT / INSERT / DELETE を選ぶ、フィールドの型から列の型を選ぶ、など）。当たらなかったときに黙って何も出さない（か warning にする）形も取らない: 書いた人は、どの規則に当たったか（当たらなかったか）を、出力を見るまで知れない。
 - **値で変わる振る舞いは、共通のコードが、実行時に決める。** トランスパイラは、型を見て、出すコードの形を切り替えない。op ごと、フィールドごとに出すコードは、どの型でも同じ形（同じ補助の呼び出し）で、違い（値があるかないか、文字列をどう読むか、値をどう書くか）は、補助の中にある。補助は、型引数と制約で書いても、実行時に値の型を見て（Go なら `reflect`）書いてもよい。書き忘れがコンパイルエラーになる形にできるなら、そちらを取る。
 - **同じことを、型でもう一度言っているように見えても、デコレータで言う。** フィールドの型が `string` でも、列にしまうなら `@db.text` を書く。型は、それが食い違っていないかを確かめる側（`string` のフィールドに `@db.int` は error）。
+- **値がないときの扱いも、型からは決めない。** フィールドが省略可能かどうかから、「なければ誤り」や `NOT NULL` を決めない。なければ誤りか（`@http.required`、`@cli.required`）、何を入れるか（`@http.default`、`@cli.default`）、列が値を持たなくてよいか（`@db.nullable`）は、デコレータが言い、型は、それと食い違っていないかを確かめる側（省略可能なフィールドに `@http.required` は error）。型の宣言に書く既定値は、言語にない: 誰が値を入れるかは、境界の振る舞い（`docs/decisions.md`「設計書を変える決定」S24）。
 - **デコレータを付けていない宣言には、何も生成しない。** warning も出さない: 付けないのは、中身を人が書くと、仕様を書いた人が選んだこと。
 - 言語が形から決めている約束（状態の形ごとの組み込みの分類と問い合わせ。`docs/check.md`「状態の形」）を出力にするのは、この原則の外: デコレータが出すコードではない。型そのものを出す基底（`docs/plugin-go.md`「型」）も同じ。
 - 相乗りが、基底の出したものを名指しする（op のメソッドを呼ぶ、型の名前を書く）のは、型で出力を決めることではない。名前と形は、基底の規則の写し（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）から求める。
 
-当てはめたプラグインは、デコレータを読む三つ: `go-sqlite`（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」）、`go-http`（`docs/plugin-go-http.md`「出力」）、`go-cli`（`docs/plugin-go-cli.md`「コマンドごとの関数」）。型に依らない形にすると今の振る舞いが変わるか、デコレータの引数のほかの宣言を見ないと決められないところは、決めずに、それぞれの文書の「未決」に置いてある。`go-valid`（`Validate` を持つ型を、型の構造から決める。フィールドの型で、確かめるコードの形が変わる）と、継ぎ目の中身を出す相乗り（op のメソッドの形に合わせる）は、まだ見直していない。
+当てはめたプラグインは、デコレータを読む三つ: `go-sqlite`（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」）、`go-http`（`docs/plugin-go-http.md`「出力」）、`go-cli`（`docs/plugin-go-cli.md`「コマンドごとの関数」）。まだ決めていないところは、`docs/plugin-go-http.md` と `docs/plugin-go-cli.md` の「未決」にある。`go-valid`（`Validate` を持つ型を、型の構造から決める。フィールドの型で、確かめるコードの形が変わる）と、継ぎ目の中身を出す相乗り（op のメソッドの形に合わせる）は、まだ見直していない。
 
 ## リポジトリの構成
 
@@ -152,7 +153,7 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 |---|---|---|
 | R1 | 言語の変更（`docs/decisions.md`「設計書を変える決定」S15〜S23） | 済み。`reads`、純粋さ、op の分類、ケースの型、`throw`、`never`、状態の参照、形の型、model の継承、`export` を、解析・検査・IR が持つ |
 | R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜88） | 済み。hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としもなく、すべて通る（サンプルの中のプラグイン `go-ratelimit` の分を含む）。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
-| R3 | デコレータで言う読み書きと、型に依らない出力（同「決めたこと」91〜113） | **文書とサンプルだけが先にある。実装は、まだない。** 終わったと言える条件: 言語（デコレータの対象 `effect`、`reads` / `effects` の節、残りの引数、予約語のデコレータ名、DEC-17、`Op.carried`、版 0.5）を、解析・検査・IR・スキーマ・SDK が持つ。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の読み書きのデコレータ」の全文）、`vocab/http.hozo`（同「`http` の語彙」）、`plugins/go-cli/cli.hozo`（`docs/plugin-go-cli.md`「語彙」）。今の語彙で書いてある仕様を、それに合わせて直す: リポジトリ直下の `cli.hozo` と、その写し（`docs/cli.md`「cli.hozo」の `@cli.arg(1)`）、コーパスと規則ごとのテストとプラグインの単体テストの入力のうち、`@db state …`、引数のない `@cli.arg`、一つの `@http.body` を「本文そのもの」と読ませているもの。基底 `go` が op の置き場を直に持つ効果と読む状態で決め（`SharedState` の命令）、`go-sqlite`、`go-http`、`go-cli` が、それぞれの文書の通りに出す（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」、`docs/plugin-go-http.md`「出力」「通信の形」、`docs/plugin-go-cli.md`「コマンドごとの関数」）。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が 0.5 になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（今は、`check` と `transpilers/*` を、版の違いを名指しして飛ばしている。`tests/samples/README.md`「移行の間」）。三つのプラグインの文書の「未決」は、実装の前に決める |
+| R3 | デコレータで言う読み書きと、型に依らない出力（同「決めたこと」91〜122、「設計書を変える決定」S24） | **文書とサンプルだけが先にある。実装は、まだない。** 終わったと言える条件: 言語（デコレータの対象 `effect`、`reads` / `effects` の節、残りの引数、予約語のデコレータ名、DEC-17、`Op.carried`、版 0.5。フィールドの既定値がないこと）を、解析・検査・IR・スキーマ・SDK が持つ。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の読み書きのデコレータ」の全文）、`vocab/http.hozo`（同「`http` の語彙」）、`plugins/go-cli/cli.hozo`（`docs/plugin-go-cli.md`「語彙」）。三つとも、値がないときの扱いのデコレータ（`db.nullable`、`http.required` / `http.default`、`cli.required` / `cli.default`）を持つ。今の語彙で書いてある仕様を、それに合わせて直す: リポジトリ直下の `cli.hozo` と、その写し（`docs/cli.md`「cli.hozo」の `@cli.arg(1)`）、コーパスと規則ごとのテストとプラグインの単体テストの入力のうち、`@db state …`、引数のない `@cli.arg`、一つの `@http.body` を「本文そのもの」と読ませているもの、フィールドの既定値（`= 1`）、`@db.nullable` のない省略可能な列、`@http.required` / `@cli.required` を書かずに「なければ誤り」を当てにしているもの。基底 `go` が op の置き場を直に持つ効果と読む状態で決め（`SharedState` の命令）、`New<Model>` を出さず、`go-sqlite`、`go-http`、`go-cli` が、それぞれの文書の通りに出す（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」、`docs/plugin-go-http.md`「出力」「入力の読み方」「通信の形」、`docs/plugin-go-cli.md`「引数の解釈」「コマンドごとの関数」）。`go-valid` が GOVALID-2 を返さない。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が 0.5 になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（今は、`check` と `transpilers/*` を、版の違いを名指しして飛ばしている。`tests/samples/README.md`「移行の間」）。`docs/plugin-go-http.md` と `docs/plugin-go-cli.md` の「未決」は、実装の前に決める |
 
 R2 の成果物:
 
@@ -227,6 +228,8 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL | 本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（`docs/decisions.md` の 80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書 | `docs/plugin-go.md`「診断」 |
 | NS-4 | `classify` は宣言した名前空間の中でだけ使える（§3.2、§10.1）。分類の置き場を自由にした（S18）ときになくなった | `docs/check.md`「名前空間」 |
 | GOSQL-5 | 状態の単位のメソッドの名前が、`go-sqlite` の型のフィールド `db` と当たること（op `db`）。起きない条件だったので、`go-sqlite` を実装したときになくした（メソッドの名前は op 名の先頭を大文字にした `Db` で、フィールド `db` とは別の名前） | `docs/plugin-go-sqlite.md`「診断」 |
+| TYPE-13 | 既定値のリテラルが、フィールドの型（`scalar` なら元の型）に渡せないこと。フィールドの既定値を言語からなくしたときになくなった（値がないときに何を入れるかは、境界のデコレータが言う） | `docs/types.md`「診断」、`docs/grammar.md`「決めたこと」 |
+| GOVALID-2 | フィールドの既定値が、その型かフィールドの制約に合わないこと。フィールドの既定値を言語からなくした（`docs/decisions.md`「設計書を変える決定」S24）ときになくなった | `docs/plugin-go-valid.md`「診断」 |
 
 | ID | 規則（設計書の言葉を短く） | 節 |
 |---|---|---|

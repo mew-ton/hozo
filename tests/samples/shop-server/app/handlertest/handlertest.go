@@ -252,7 +252,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		order := func(n, item string) string {
 			return `{"id":"order-` + n + `","userId":"u1","lines":[{"item":"` + item + `","quantity":1}],"placedAt":"2026-01-02T03:04:05Z"}`
 		}
-		// page を書かなければ既定値の 1
+		// page を書かなければ、@http.default(1) の 1
 		s.get(t, "/orders", token).want(t, 200, `[`+order("1", "apple")+`,`+order("2", "pear")+`]`)
 		s.get(t, "/orders?page=1", token).want(t, 200, `[`+order("1", "apple")+`,`+order("2", "pear")+`]`)
 		s.get(t, "/orders?page=2", token).want(t, 200, `[`+order("3", "plum")+`]`)
@@ -299,7 +299,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 			want(t, 401, `{"error":"type.Unauthorized"}`)
 		s.do(t, context.Background(), http.MethodGet, "/me", "", "", "Authorization", token).
 			want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
-		// クエリ: @http.query page。名前を省いたので、フィールドの名前で読む。ほかの名前（p）は読まず、既定値の 1 のまま
+		// クエリ: @http.query page。名前を省いたので、フィールドの名前で読む。ほかの名前（p）は読まず、page は @http.default(1) の 1
 		s.get(t, "/orders?page=2", token).want(t, 200, `[`+order("3", "plum")+`]`)
 		s.get(t, "/orders?p=2", token).want(t, 200, `[`+order("1", "apple")+`,`+order("2", "pear")+`]`)
 		// 本文の項目: @http.body lines。本文はオブジェクトで、フィールドの名前がキー。ほかのキー（items）は読まないので、
@@ -314,7 +314,8 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 				`{"path":"body.email","constraint":"format"},{"path":"body.password","constraint":"length"}]}}`)
 	})
 
-	// 項目がないことが誤りかどうかは、@http.required が付いているかどうかだけで決まる（フィールドの型では決まらない）
+	// 項目がないときの扱いは、フィールドのデコレータだけで決まる（フィールドの型では決まらない）:
+	// @http.required なら 400、@http.default(v) なら v、どちらもなければ零値
 	t.Run("required", func(t *testing.T) {
 		t.Parallel()
 		s := start(t)
@@ -331,7 +332,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 			want(t, 200, `{"id":"order-1","userId":"u1","lines":[],"placedAt":"2026-01-02T03:04:05Z"}`)
 		s.count(t, 1, 1)
 		// @http.required のない項目（ヘッダ Authorization、クエリ page）は、なくても読めない要求にならない: op が呼ばれ、
-		// トークンがないことは op が決める（401）。page のない一覧も、op まで届く
+		// トークンがないことは op が決める（401）。page は @http.default(1) なので、なければ 1 ページ目
 		s.get(t, "/me", "").want(t, 401, `{"error":"type.Unauthorized"}`)
 		s.get(t, "/orders", "").want(t, 401, `{"error":"type.Unauthorized"}`)
 		s.get(t, "/orders", token).

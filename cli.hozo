@@ -97,7 +97,7 @@ namespace hozoc {
     /** 表示の形式 */
     @cli.flag("format") format: OutputFormat?;
     /** 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す */
-    @cli.arg namespaces: string[];
+    @cli.arg(1) namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */

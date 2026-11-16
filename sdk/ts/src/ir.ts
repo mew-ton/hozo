@@ -56,7 +56,8 @@ export type CatchMode = "recovers" | "halts" | "ignores";
  */
 export type ParamType = TypeParam | AnyParam;
 export type AnyOf = "exception" | "effect" | "state" | "op" | "model" | "variant";
-export type DecoratorTarget = "op" | "field" | "state" | "exception" | "scalar" | "model";
+export type DecoratorTarget =
+  "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect";
 export type RelationKind = "prevents" | "keeps";
 /**
  * 配線の文（docs/ir.md「配線」）。kind で分ける。
@@ -90,7 +91,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.4";
+  version: "0.5";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -238,7 +239,6 @@ export interface ModelExtends {
  */
 export interface Field {
   decorators: Application[];
-  default?: Literal;
   description?: Doc;
   name: string;
   span: Span;
@@ -453,10 +453,12 @@ export interface Decorator {
   catches: CatchesClause[];
   decorators: Application[];
   description?: Doc;
+  effects: string[];
   external: boolean;
   kind: "decorator";
   name: string;
   params: Param[];
+  reads: string[];
   span: Span;
   targets: DecoratorTarget[];
   throws: ThrowsClause[];
@@ -482,6 +484,7 @@ export interface CatchesClause {
 export interface Param {
   name: string;
   optional: boolean;
+  rest: boolean;
   type: ParamType;
 }
 /**
@@ -524,6 +527,7 @@ export interface Relation {
  */
 export interface Op {
   body: Wiring | null;
+  carried: Carried;
   decorators: Application[];
   description?: Doc;
   effects: string[];
@@ -683,6 +687,10 @@ export interface MatchStmt {
   match: Match;
   span: Span;
 }
+export interface Carried {
+  effects: string[];
+  reads: string[];
+}
 /**
  * op の引数（docs/ir.md「op」）。
  */
@@ -730,7 +738,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.4";
+  version: "0.5";
   viewer: string;
 }
 /**

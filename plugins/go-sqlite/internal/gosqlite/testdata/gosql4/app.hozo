@@ -5,7 +5,7 @@
 namespace fixed {
   model Schema { @db.key id: string; }
   exception CreateTables;
-  @db state rows: list<Schema>;
+  @db.table(Schema) state rows: list<Schema>;
 }
 
 // <状態>Table が scalar と、New<状態>Table が model と、既定値を持つ model の New<Model> と当たる
@@ -13,39 +13,39 @@ namespace table {
   model Row { @db.key id: string; }
   scalar UsersTable extends string;
   model NewUsersTable { n: int; }
-  model OrdersTable { n: int = 1; }
-  @db state users: list<Row>;
-  @db state orders: list<Row>;
+  model OrdersTable { n: int; }
+  @db.table(Row) state users: list<Row>;
+  @db.table(Row) state orders: list<Row>;
 }
 
 // <状態>Table が、effect の定数、述語で決まる分類のケースの定数、判定関数、union のアームを包む型と当たる
 namespace consts {
   model Row { @db.key id: string; }
-  @db state effectLog: list<Row>;
+  @db.table(Row) state effectLog: list<Row>;
   effect logTable on effectLog.post;
-  @db state kind: list<Row>;
+  @db.table(Row) state kind: list<Row>;
   classify Kind of string {
     Table;
     Other;
   }
-  @db state classifyKinds: list<Row>;
+  @db.table(Row) state classifyKinds: list<Row>;
   classify KindsTable of int {
     Small;
     Large;
   }
-  @db state shape: list<Row>;
+  @db.table(Row) state shape: list<Row>;
   union Shape { Table: string; Circle: int; }
 }
 
 // このトランスパイラの公開の名前どうし: 状態 users の New<状態>Table と、状態 newUsers の <状態>Table
 namespace own {
   model Row { @db.key id: string; }
-  @db state users: list<Row>;
-  @db state newUsers: list<Row>;
+  @db.table(Row) state users: list<Row>;
+  @db.table(Row) state newUsers: list<Row>;
 }
 
 // 当たらない名前空間には、出ない
 namespace clean {
   model Row { @db.key id: string; }
-  @db state users: list<Row>;
+  @db.table(Row) state users: list<Row>;
 }

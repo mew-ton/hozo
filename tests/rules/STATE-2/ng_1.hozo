@@ -1,4 +1,5 @@
-// STATE-2（docs/check.md「状態と効果」）: 持ち主でない名前空間の葉の op が、その状態への効果を effects に宣言した
+// STATE-2（docs/check.md「状態と効果」）: 持ち主でない名前空間の葉の op が、その状態への効果を effects に宣言した。
+// 位置は、op が書いた効果の名前
 namespace a {
   state s: list<string>;
   effect e on s.post;
@@ -6,4 +7,8 @@ namespace a {
 }
 namespace b {
   op g() effects a.e;                  // ERROR: STATE-2
+  decorator mark;
+  @mark
+  op h()
+    effects a.e;                       // ERROR: STATE-2
 }

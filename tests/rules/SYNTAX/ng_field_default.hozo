@@ -1,0 +1,20 @@
+// SYNTAX（docs/grammar.md「model」「決めたこと」）: フィールドの既定値（`page: int = 1`）はなくした書き方。
+// 値がないときに何を入れるかは、境界のデコレータで言う（@http.default(値)、@cli.default(値)）
+namespace a {
+  scalar PosInt extends int;
+  model Query {
+    id: string;
+    page: PosInt = 1;                  // ERROR: SYNTAX
+    name: string = "x";                // ERROR: SYNTAX
+    strict: boolean? = false;          // ERROR: SYNTAX
+    status: string?;
+  }
+  union Page {
+    Ready: { count: int = 0; };        // ERROR: SYNTAX
+  }
+  exception Bad: { reason: string = "?"; };    // ERROR: SYNTAX
+  model Sub extends Query {
+    override id = "x";                 // ERROR: SYNTAX
+  }
+  op f(q: Query): Query;
+}

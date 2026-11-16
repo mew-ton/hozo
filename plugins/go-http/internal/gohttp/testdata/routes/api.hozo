@@ -48,11 +48,11 @@ namespace api {
     @http.header(name: "X-Tenant") tenant: string;
     @http.header(name: "Authorization") token: type.Token;
     @http.header(name: "X-Request-Id") requestId: string?;
-    @http.header(name: "Accept-Language") lang: string = "en";
+    @http.header(name: "Accept-Language") @http.default("en") lang: string;
     @http.body item: type.Item;
     @http.query dryRun: boolean;
     @http.body note: string?;
-    @http.body copies: int = 1;
+    @http.body @http.default(1) copies: int;
     @http.body labels: Record<string, type.Name>;
   }
 
@@ -66,16 +66,16 @@ namespace api {
     @http.query q: string;
     @http.query name: type.Name?;
     @http.query tag: string?;
-    @http.query owner: type.Token = "nobody";
-    @http.query page: type.Page = 1;
+    @http.query @http.default("nobody") owner: type.Token;
+    @http.query @http.default(1) page: type.Page;
     @http.query limit: int?;
     @http.query size: type.Page?;
     @http.query offset: int;
     @http.query min: float;
-    @http.query ratio: type.Ratio = 0.5;
+    @http.query @http.default(0.5) ratio: type.Ratio;
     @http.query max: float?;
     @http.query scale: type.Ratio?;
-    @http.query exact: boolean = false;
+    @http.query @http.default(false) exact: boolean;
     @http.query deep: boolean?;
     @http.query flag: type.Flag?;
   }
@@ -128,7 +128,7 @@ namespace strict {
 
   // 本文が二つ以上: body.<フィールド名>。クエリとヘッダの値の制約も確かめる
   model EditInput {
-    @http.query page: type.Page = 1;
+    @http.query @http.default(1) page: type.Page;
     @http.header(name: "X-Name") name: type.Name?;
     @http.body item: type.Item;
     @http.body extra: type.Item?;

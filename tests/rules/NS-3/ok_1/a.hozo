@@ -1,5 +1,5 @@
 // NS-3（docs/check.md「名前空間」）: 標準の語彙だけ（プラグインを読まない）なら衝突しない
 namespace a {
-  @db
+  @localStorage
   state s: list<string>;
 }

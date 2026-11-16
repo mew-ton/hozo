@@ -309,12 +309,12 @@ func TestSession(t *testing.T) {
 	}
 	// ホバー: フィールド、ケース、引数
 	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: positionOf(t, enc, browserText, "page, status", 0)}, &hov)
-	if hov == nil || !strings.Contains(hov.Contents.Value, "```hozo\nmodel OrdersQuery\n  page: PosInt = 1\n```") {
+	if hov == nil || !strings.Contains(hov.Contents.Value, "```hozo\nmodel OrdersQuery\n  page: PosInt\n```") {
 		t.Errorf("hover(field page) = %+v", hov)
 	}
 	// 別の名前空間の model のフィールド（説明付き）: server.GetOrdersInput.page の宣言名
-	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(serverURI), Position: positionOf(t, enc, serverText, "page: int = 1", 0)}, &hov)
-	if hov == nil || !strings.Contains(hov.Contents.Value, "model GetOrdersInput\n  page: int = 1") || !strings.Contains(hov.Contents.Value, "1 から数えるページ番号") {
+	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(serverURI), Position: positionOf(t, enc, serverText, "page: int;", 0)}, &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "model GetOrdersInput\n  page: int\n") || !strings.Contains(hov.Contents.Value, "1 から数えるページ番号") {
 		t.Errorf("hover(field GetOrdersInput.page) = %+v", hov)
 	}
 	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: positionOf(t, enc, browserText, "Yamada     =>", 0)}, &hov)

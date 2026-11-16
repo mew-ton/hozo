@@ -291,7 +291,13 @@ func TestValidationPrecedesOp(t *testing.T) {
 type seenInputs struct {
 	server.Ops
 	logouts     []server.AuthInput
+	getOrders   []server.GetOrdersInput
 	placeOrders []server.PlaceOrderInput
+}
+
+func (s *seenInputs) GetOrders(_ context.Context, in server.GetOrdersInput) ([]pkgtype.Order, error) {
+	s.getOrders = append(s.getOrders, in)
+	return nil, nil
 }
 
 func (s *seenInputs) Logout(_ context.Context, in server.AuthInput) error {
@@ -304,13 +310,34 @@ func (s *seenInputs) PlaceOrder(_ context.Context, in server.PlaceOrderInput) (p
 	return pkgtype.Order{}, nil
 }
 
-// TestRequiredDecidesMissing は、項目がないことの扱いが、@http.required だけで決まること（go-http）。
-// 付いた項目（PlaceOrderInput の lines）がなければ、op を呼ばずに 400。付いていない項目（どの入力でも token）は、
-// なくても op を呼び、そのフィールドには何も書かれていない。
-func TestRequiredDecidesMissing(t *testing.T) {
+// TestMissingItems は、要求に項目がないときの扱いが、フィールドのデコレータだけで決まること（go-http）:
+// @http.required の項目（PlaceOrderInput の lines）がなければ、op を呼ばずに 400。
+// @http.default(1) の項目（GetOrdersInput の page）がなければ、op に 1 が渡る。
+// どちらもない項目（どの入力でも token）がなければ、op に零値（省略可能なので nil）が渡る。
+func TestMissingItems(t *testing.T) {
 	t.Parallel()
 	seen := &seenInputs{}
 	handler := server.NewHandler(seen)
+
+	// @http.default の項目: なければ、デコレータの値。あれば、読んだ値。空の値は「ある」ので、既定値にはならず、読めない要求
+	for _, c := range []struct {
+		target string
+		status int
+	}{{"/orders", 200}, {"/orders?p=2", 200}, {"/orders?page=3", 200}, {"/orders?page=", 400}} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, c.target, nil))
+		if rec.Code != c.status {
+			t.Errorf("GET %s: %d %s（期待は %d）", c.target, rec.Code, rec.Body, c.status)
+		}
+	}
+	if len(seen.getOrders) != 3 {
+		t.Fatalf("GetOrders に渡った入力: %+v（期待は三つ）", seen.getOrders)
+	}
+	for i, page := range []int64{1, 1, 3} {
+		if in := seen.getOrders[i]; in.Page != page || in.Token != nil {
+			t.Errorf("GetOrders に渡った %d 番目の入力: %+v（期待は、Page が %d で、Token が nil）", i+1, in, page)
+		}
+	}
 	post := func(path, token, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 		if token != "" {
@@ -333,7 +360,7 @@ func TestRequiredDecidesMissing(t *testing.T) {
 		t.Fatalf("lines のない要求で op が呼ばれた: %+v", seen.placeOrders)
 	}
 
-	// @http.required のない項目（token）がない: op は呼ばれ、フィールドは nil のまま。あれば、その値
+	// @http.required も @http.default もない項目（token）がない: op は呼ばれ、フィールドは零値（nil）のまま。あれば、その値
 	if rec := post("/logout", "", ""); rec.Code != 204 {
 		t.Errorf("トークンのない POST /logout: %d %s", rec.Code, rec.Body)
 	}

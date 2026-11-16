@@ -1131,11 +1131,7 @@ func renderLiteral(l ir.Literal) string {
 func renderFields(m *ir.Model) []string {
 	out := []string{}
 	for _, f := range m.Fields {
-		s := f.Name + ": " + typeStr(f.Type)
-		if f.Default != nil {
-			s += " = " + renderLiteral(f.Default)
-		}
-		out = append(out, s)
+		out = append(out, f.Name+": "+typeStr(f.Type))
 	}
 	return out
 }

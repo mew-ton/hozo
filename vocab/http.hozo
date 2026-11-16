@@ -30,5 +30,10 @@ namespace http {
   /** このフィールド（model）で、本文の全体を受け取る。本文が、その model の JSON */
   decorator bodyObj for field;
 
+  /** このフィールドの項目が要求になければ、誤り（op は呼ばれない） */
+  decorator required for field;
+  /** このフィールドの項目が要求になければ、value にする */
+  decorator default(value: string | int | float | boolean | Duration) for field;
+
   decorator retry(times: int);
 }

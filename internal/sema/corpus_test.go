@@ -33,7 +33,7 @@ func TestCorpusDesign(t *testing.T) {
 		t.Fatal("JSON が空")
 	}
 	// 設計書の例の要点が IR に残っている。
-	for _, fqn := range []string{"server.User", "server.PublicUser", "browser.OrderPage.Ready", "browser.openOrders", "browser.WarrantyAvailable", "db", "page.fallback"} {
+	for _, fqn := range []string{"server.User", "server.PublicUser", "browser.OrderPage.Ready", "browser.openOrders", "browser.WarrantyAvailable", "db.table", "localStorage", "page.fallback"} {
 		if res.Program.Lookup(fqn) == nil {
 			t.Errorf("%s が Program にない", fqn)
 		}

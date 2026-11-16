@@ -261,8 +261,6 @@ type Field struct {
 	// Name は FieldName（予約語も書ける）。
 	Name Ident
 	Type Type
-	// Default は既定値。なければ nil。
-	Default *Literal
 }
 
 // NodeSpan は Node の実装。

@@ -149,7 +149,7 @@ func (a *analyzer) finalizeModel(j *modelJob) {
 			case !ok || bf.Type == nil:
 				bad = true
 			default:
-				widened, can := a.changeable(bf.Type, t)
+				_, can := a.changeable(bf.Type, t)
 				switch {
 				case !can:
 					a.errorf("TYPE-15", o.Type.NodeSpan(), "フィールド %s の型 %s を %s には変えられない（変えられるのは、元の型をアームに持つ union に広げるか、元の型を継承した型に差し替えるか。docs/types.md「変えられる型」）", o.Name.Name, typeName(bf.Type), typeName(t))
@@ -157,9 +157,6 @@ func (a *analyzer) finalizeModel(j *modelJob) {
 				case !ir.TypeEqual(bf.Type, t):
 					f.Type = t
 					changed = true
-					if widened {
-						f.Default = nil // 広げた型（union）のフィールドは既定値を持てない
-					}
 				}
 			}
 		}
@@ -257,7 +254,7 @@ func fieldIndex(fields []ir.Field, name string) int {
 }
 
 // changeable は docs/types.md「変えられる型」: 元の型 o を n に変えられるか。widened は、変更が「広げる」（規則 2）を
-// 含むか（含めば、既定値は受け継がない）。
+// 含むか。
 func (a *analyzer) changeable(o, n ir.Type) (widened, ok bool) {
 	// 1. 等しい
 	if ir.TypeEqual(o, n) {

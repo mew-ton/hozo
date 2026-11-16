@@ -1,6 +1,6 @@
-// BIND-4（docs/check.md「必須の入力」）: 省略可能な引数と、default を持つフィールドは埋めなくてよい
+// BIND-4（docs/check.md「必須の入力」）: 省略可能な引数と、省略可能なフィールドは埋めなくてよい
 namespace a {
-  model In { id: string; page: int = 1; status: string?; }
+  model In { id: string; page: int?; status: string?; }
   op take(in: In, extra: string?);
   op f() {
     take({ id: "x" });

@@ -1,0 +1,13 @@
+// DEC-17（docs/check.md「デコレータ」「デコレータが運ぶ reads と effects」）: reads の節を持つデコレータが、配線の op
+// （本体を持つ op）に付いている。位置はそのデコレータの適用
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state rows: list<M>;
+  @db.find(rows, "id")
+  op find(id: string): M?;
+  @db.list(rows)                       // ERROR: DEC-17
+  op all(): M? {
+    return find("x");
+  }
+}

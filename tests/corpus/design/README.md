@@ -8,7 +8,7 @@
 | `server.hozo` | `namespace server` の例すべてと、§6.5 の `namespace valid { decorator checkDigit ... }` |
 | `browser.hozo` | `namespace browser` の例すべて |
 
-設計書の言葉とドキュメンテーションコメントはそのまま写した。各ブロックの上の `// §n.m` が出典、`// 追加:` が設計書にない宣言。標準の語彙（`http` / `db` / `page` / `valid` と、グローバルの `db` / `localStorage`。§4.2）は hozoc が同梱する（`docs/vocab.md`）ので、ここには写していない。
+設計書の言葉とドキュメンテーションコメントはそのまま写した。各ブロックの上の `// §n.m` が出典、`// 追加:` が設計書にない宣言。標準の語彙（`http` / `db` / `page` / `valid` と、グローバルの `localStorage`。§4.2）は hozoc が同梱する（`docs/vocab.md`）ので、ここには写していない。
 
 `docs/testing.md`「コーパス」は一覧の置き場を `tests/corpus/README.md` としているが、コーパスごとに分けるためこのディレクトリに置いた。
 
@@ -34,6 +34,9 @@
 | 14 | §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;`（葉の op） | 葉の op `saveOrder`（`effects createOrder`）と `sendOrderNotice`（`effects notifyUser`、`throws NotificationFailed prevents effects`）を足し、`placeOrder` はその二つを順に呼ぶ配線（`throws NotificationFailed`。`effects` も `prevents` / `keeps` も書かない） | 葉の op が直に持つ効果は高々一つ（`docs/decisions.md`「設計書を変える決定」S8、`docs/check.md` EFF-3）。`prevents` / `keeps` の目的語は `effects` だけで、効果を名前で書き分ける形はない（同 S9、`docs/grammar.md`「決めたこと」）。原文のままだと SYNTAX。配線にすると、`Signature.relations` は `NotificationFailed` × `createOrder` = `kept`、`NotificationFailed` × `notifyUser` = `prevented` と計算され（`docs/check.md`「計算」手順 0 の配線）、原文が手で書いていた関係と同じになる（`tests/view_test.go` の `TestDesignPlaceOrderRelations`） |
 | 15 | §5.2 `model PublicUser is User omit hash;` | `model PublicUser extends User { override hash: never; }` | `model A is B omit …` はなくなり、継承した model は `extends` と `override` で書く（`docs/decisions.md`「設計書を変える決定」S22、`docs/grammar.md`「model」）。写したままだと SYNTAX |
 | 16 | §5.3、§9〜§11 の、`browser` が呼ぶ `server` の op（`op logout(...)`、追加した `getMe` / `getOrders` / `getItem` / `addToCart` / `attachWarranty`） | `export op ...` | 別の名前空間から呼べる op には `export` を付ける（S23、`docs/check.md`「export」）。付けなければ NS-5。`server` の中からしか呼ばない op（`login`、`placeOrder` など）には付けていない |
+| 17 | §5.2 `@db state users: list<User>;`、`@db state sessions: list<Session>;`（追加した状態も同じ） | `@db.table(User) state users: list<User>;` のように、表の model を引数で言う | グローバルのデコレータ `db` はなくなり、表は `@db.table(<要素の model>)` で言う（`docs/vocab.md`「`db` の表と、しまい方」、`docs/decisions.md`「決めたこと」104）。写したままだと RES-1。しまい方（`@db.text` など）と `@db.find` などは書いていない: このコーパスは `go-sqlite` を並べず、`db` の語彙のデコレータは印のまま（下の「出力」） |
+| 18 | §7.1 `model LoginInput { ... @http.body body: LoginInputBody; }`（一つの `@http.body` を、本文そのものと読ませる例）。追加した `AddToCartInput` の `@http.body item: Item` も同じ | `@http.bodyObj body: LoginInputBody;`、`@http.bodyObj item: Item;` | 本文の全体を一つの model で受け取るのは `@http.bodyObj`。`@http.body` は本文のキー一つ（`docs/vocab.md`「`http` の語彙」、`docs/decisions.md`「決めたこと」107）。二つの `@http.body` を持つ `AttachWarrantyInput` は、項目の形のまま |
+| 19 | §11.2 `model OrdersQuery { page: PosInt = 1; status?: server.OrderStatus; }`（フィールドの既定値） | `page: PosInt;`（既定値を書かない）。追加した `server.GetOrdersInput` の `page` は、境界のデコレータで `@http.default(1) @http.query page: int;` | フィールドの既定値は書けない（`docs/grammar.md`「model」「決めたこと」）。値がないときに何を入れるかは、境界のデコレータが言う。`browser.OrdersQuery` は `@page.query` の状態の型で、`page` の語彙には値を埋めるデコレータがないので、既定値を落とした（書けなかったこと） |
 
 ## 追加した宣言
 
@@ -65,7 +68,7 @@
 | `gen/browser/` | 同じく `inner/` と入口。述語で決まる分類（`WarrantyKind`、`WarrantyAvailable`）の `classify.go`、`server` の op の口 `ServerOps`、`server` の入口のパッケージの型の import |
 | `gen/http/`、`gen/page/` | 語彙の型（`http` の例外、`page.Route` など）だけ。op を持たないので、`inner/` はない |
 
-相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。
+相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。
 
 ## 設計書の例が規則に触れるところ
 
@@ -75,10 +78,11 @@
 |---|---|---|
 | §5.2 `state token: single<Token?>;`（`browser`） | §3.2「別の名前空間の宣言は、常に名前空間で修飾して参照する」。`docs/resolve.md` RES-1「名前が見つからない」。`docs/check.md` STATE-3「状態の要素の型が `optional`」 | 表の 4。`docs/decisions.md`「設計書へ返すこと」の「`Token` の修飾」と「状態を分類で表す」（S2） |
 | §9 `effect removeToken on token.put;   // none を入れる` | `docs/check.md`「状態の形」: `put` は列数を変えない。空にするのは `delete`（S2） | 表の 13。`docs/decisions.md`「設計書へ返すこと」の「状態を分類で表す」 |
-| §11.2 `Ready: { userName: string; orders: OrderRow[] };` | `docs/grammar.md`「model」`Field = [ DocComment ] { Decorator } Ident ":" Type [ "=" Literal ] ";"` | 表の 6。同じく返す候補 |
+| §11.2 `Ready: { userName: string; orders: OrderRow[] };` | `docs/grammar.md`「model」`Field = [ DocComment ] { Decorator } FieldName ":" Type ";"` | 表の 6。同じく返す候補 |
 | §6.5 `model User { @valid.length(min: 1, max: 100) name: string; }` | `docs/resolve.md`「同じ名前空間に同じ名前の宣言が二つあれば RES-6」 | 表の 5。設計書では「フィールドに付けた制約」の説明のための抜粋と読める |
 | §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;` | `docs/grammar.md`「decorator の宣言」`Relation = ( "prevents" \| "keeps" ) "effects"`（効果の名前は SYNTAX）。`docs/check.md` EFF-3「葉の op の `Op.effects` が二つ以上」 | 表の 14。`docs/decisions.md`「設計書へ返すこと」の「状態を分類で表す」（S8、S9） |
-| §11.2 `model OrdersQuery { page: PosInt = 1; ... }`（`PosInt` は `@valid.min(1) scalar PosInt extends int;`） | `docs/types.md` TYPE-1「核の型（リテラルを含む）の値を `scalar` の位置に渡した」。同「互換」10 はリテラルを核の型にしか渡さない。フィールドの既定値（`docs/grammar.md`「model」`[ "=" Literal ]`）をどう照合するかは `docs/types.md` に書かれていない | そのまま写した。既定値のリテラルは `scalar` の元の型（`base`）に対して照合する、と `docs/types.md` で決める必要がある。決めなければ設計書の例が TYPE-1 に落ちる |
+| §11.2 `model OrdersQuery { page: PosInt = 1; ... }` | `docs/grammar.md`「model」: フィールドに既定値は書けない（SYNTAX） | 表の 19 |
+| §5.2 `@db state users: list<User>;` | `docs/resolve.md` RES-1（グローバルのデコレータ `db` はない） | 表の 17 |
 | §8.1 `decorator redirectOn(error: ApiError, to: RedirectByError)` | `docs/grammar.md`「予約語」の `to` | 表の 7（`docs/decisions.md` に既にある） |
 | §10.2 `@page.interaction(page: openProduct, when: ProductPage.Ready)`、§11.2 `orders: OrderRow[]`、§7.3 の `CancelInput` / `Order` / `refund` など | 宣言がないので RES-1 | 「追加した宣言」で補った |
 | §11.1 `fetchMe` の `@redirectToLogin`（`catches server.Unauthorized halts transitionToLogin`） | `server.getMe` が `server.Unauthorized` を投げること（`@requiresAuth`）を前提にしているが、`getMe` の宣言は設計書にない | 表の 9 |

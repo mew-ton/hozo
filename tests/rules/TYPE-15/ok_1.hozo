@@ -16,8 +16,8 @@ namespace a {
     maybe: Profile?;
     list1: Profile[];
     attrs: Record<string, Profile>;
-    name: string = "x";
-    count: int = 1;
+    name: string;
+    count: int;
   }
   model D extends User {
     // 2. 広げる
@@ -29,7 +29,7 @@ namespace a {
     override maybe: Wide?;
     override list1: Wider[];
     override attrs: Record<string, Status>;
-    // 3. 核の型を継承した scalar。既定値は受け継ぐ
+    // 3. 核の型を継承した scalar
     override name: Email;
   }
   op f(): D;

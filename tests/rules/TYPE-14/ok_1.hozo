@@ -4,7 +4,7 @@ namespace a {
   model User { id: string; name: string; hash: string; }
   model P extends User {
     nick: string?;
-    level: int = 1;
+    level: int;
   }
   model Q extends User { override hash: never; }
   model R extends Q { hash: int; }

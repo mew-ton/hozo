@@ -393,12 +393,18 @@ func (c *computer) sig(o *ir.Op, viewer string) *sigState {
 	return s
 }
 
-// leafStep0 は手順 0（葉の op）。E = Declared(O)、F = Op.effects、rel は Op.throws の relations、succ は kept。
+// leafStep0 は手順 0（葉の op）。E = Declared(O)、F = O が直に持つ効果（Op.effects と、デコレータが運ぶ
+// Op.carried.effects。docs/check.md「デコレータが運ぶ reads と effects」）、rel は Op.throws の relations、succ は kept。
+// 呼び出しが循環している op（WIRE-7）は配線なので、運ばれるものを使わず、F = Op.effects。
 func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 	for _, x := range declared(o) {
 		s.addE(x)
 	}
-	for _, e := range o.Effects {
+	effects := o.Effects
+	if o.Body == nil {
+		effects = o.DirectEffects()
+	}
+	for _, e := range effects {
 		s.addF(e)
 	}
 	for _, x := range s.E {
@@ -727,8 +733,9 @@ func (c *computer) returningArms(r row) int {
 	return n
 }
 
-// readsOf は op が読む状態 R（docs/check.md「reads」）。基底の状態の FQN の列で、デコレータは R を変えない。
-// 葉の op（と、呼び出しが循環している op）は Op.reads。配線の op は、本体を行の順に見て集める。
+// readsOf は op が読む状態 R（docs/check.md「reads」）。基底の状態の FQN の列で、デコレータが R に足すのは、reads の節が
+// 運ぶものだけ（throws / catches の節は R を変えない）。葉の op は直に読む状態（Op.reads の後ろに Op.carried.reads）、
+// 呼び出しが循環している op は Op.reads。配線の op は、本体を行の順に見て集める（運ばれるものは使わない）。
 func (c *computer) readsOf(o *ir.Op) []string {
 	if r, ok := c.reads[o.Name]; ok {
 		return r
@@ -742,7 +749,12 @@ func (c *computer) readsOf(o *ir.Op) []string {
 			}
 		}
 	}
-	if o.Body == nil || c.cyclic[o.Name] {
+	if o.Body == nil {
+		add(o.DirectReads()...)
+		c.reads[o.Name] = out
+		return out
+	}
+	if c.cyclic[o.Name] {
 		add(o.Reads...)
 		c.reads[o.Name] = out
 		return out

@@ -672,9 +672,6 @@ func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, boun
 		case exact != nil && b.e.isPointer(exact.typ) && !b.e.nilable(fd.Type) && post != nil:
 			// 値があるときだけ埋める。なければ既定値のまま
 			*post = append(*post, postAssign{path: fpath[1:], bound: *exact, typ: fd.Type})
-			if fd.Default != nil {
-				value = b.f.literal(fd.Default, fd.Type)
-			}
 		case exact != nil:
 			value = b.convert(exact.expr, exact.typ, fd.Type)
 		case written[fd.Name] != nil:
@@ -685,8 +682,6 @@ func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, boun
 			}
 		case below:
 			value = b.record(nil, fd.Type, fpath, bounds, post)
-		case fd.Default != nil:
-			value = b.f.literal(fd.Default, fd.Type)
 		}
 		if value != "" {
 			fields = append(fields, golang.FieldName(fd.Name)+": "+value)

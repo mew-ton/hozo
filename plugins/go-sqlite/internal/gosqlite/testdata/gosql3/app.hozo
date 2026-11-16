@@ -23,6 +23,6 @@ namespace app {
     circle: Circle;
   }
 
-  @db state bads: list<Bad>;
-  @db state more: list<Bad>;
+  @db.table(Bad) state bads: list<Bad>;
+  @db.table(Bad) state more: list<Bad>;
 }

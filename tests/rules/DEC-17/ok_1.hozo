@@ -1,0 +1,37 @@
+// DEC-17（docs/check.md「デコレータ」）: reads / effects の節を持つデコレータは、葉の op に付ける。運ばれた状態と効果は、
+// op が書いたものと同じに配線へ伝わる（配線は reads / effects を書かなくてよく、書けば計算と照合する: READS-2 / EFF-2）。
+// 節を持たないデコレータ（throws / catches だけのものを含む）は、配線にも付けられる
+namespace a {
+  model M { @db.key @db.text id: string; }
+  @db.table(M)
+  state rows: list<M>;
+  @db.insert(rows)
+  effect add on rows.post;
+  @db.delete(rows, "id")
+  effect remove on rows.delete;
+  exception Missing;
+  decorator plain;
+  decorator guarded throws Missing prevents effects;
+
+  @db.find(rows, "id")
+  op find(id: string): M?;
+  @db.list(rows)
+  op all(): M[];
+  @db.effects(add)
+  op insert(m: M);
+  @db.effects(remove, add)
+  op replace(id: string, m: M);
+  @db.effects
+  op nothing();
+
+  @plain
+  @guarded
+  op move(id: string, m: M): M[] {
+    replace(id, m);
+    return all();
+  }
+  op moveDeclared(id: string, m: M): M? reads rows effects remove | add {
+    replace(id, m);
+    return find(id);
+  }
+}

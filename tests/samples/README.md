@@ -108,8 +108,8 @@ tests/samples/<名前>/
 | サブテスト | 今 | なぜ |
 |---|---|---|
 | `files`、`go` | 通る | hozoc を使わない。手で書いた期待する出力が、人が書いたコードと合わせて動く |
-| `check` | 飛ぶ（通せない） | `store.hozo` と `type.hozo` が、今のパーサーの読めない書き方を使う（効果の宣言に付けたデコレータ、`@db.list` / `@db.effects` / `@db.int` のような予約語の名前のデコレータ）。語彙 `db` と `http` の新しいデコレータ（`@db.table`、しまい方、`@http.bodyObj`、引数を省いた `@http.query`）も、`vocab/` のファイルにまだない |
-| `transpilers/*`（`go`、`go-valid`、`go-sqlite`、`go-http`、`go-ratelimit`、`all`） | 飛ぶ（通せない） | `hozoc emit` は、検査を通らない仕様からは何も書き出さない。通ったとしても、基底 `go` の `SharedState` の命令と、`go-sqlite` と `go-http` の、デコレータの引数だけで決まる（型に依らない）出力は、まだ実装がない |
+| `check` | 飛ぶ（通せない） | `store.hozo` と `type.hozo` が、今のパーサーの読めない書き方を使う（効果の宣言に付けたデコレータ、`@db.list` / `@db.effects` / `@db.int` のような予約語の名前のデコレータ）。語彙 `db` と `http` の新しいデコレータ（`@db.table`、しまい方、`@http.bodyObj`、引数を省いた `@http.query`、`@http.required`、`@http.default`）も、`vocab/` のファイルにまだない |
+| `transpilers/*`（`go`、`go-valid`、`go-sqlite`、`go-http`、`go-ratelimit`、`all`） | 飛ぶ（通せない） | `hozoc emit` は、検査を通らない仕様からは何も書き出さない。通ったとしても、基底 `go` の `SharedState` の命令と、`New<Model>` を出さない形、`go-sqlite` と `go-http` の、デコレータの引数だけで決まる（型に依らない）出力は、まだ実装がない |
 
 飛ばす理由は、テストが、二つの版を名指しして出す（「飛ばす条件」の一行目）。実装が版 0.5 になれば、テストもサンプルも変えずに、すべてが走る。そのとき、サブテストが飛ぶか、代役が置かれるなら、それは後戻り。
 

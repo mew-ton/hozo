@@ -290,7 +290,7 @@ function walkDecl(d: Decl): void {
     case "model":
       for (const f of d.fields) {
         walkType(f.type);
-        if (f.default) walkLiteral(f.default);
+        assert.ok(!("default" in f), "Field.default は 0.5 でなくなった");
       }
       if (d.extends) {
         seen.add("model:extends");
@@ -318,6 +318,8 @@ function walkDecl(d: Decl): void {
       if (d.value) walkType(d.value);
       return;
     case "effect":
+      // 効果の宣言にも、デコレータが付く（Decorator.targets の effect。版 0.5）
+      if (d.decorators.length > 0) seen.add("effect:decorated");
       walkEffectTarget(d.target);
       assert.ok(d.writes.length > 0);
       for (const st of d.writes) assert.equal(typeof st, "string");
@@ -334,7 +336,20 @@ function walkDecl(d: Decl): void {
       }
       return;
     case "decorator":
-      d.params.forEach((p) => walkParamType(p.type));
+      d.params.forEach((p, i) => {
+        walkParamType(p.type);
+        // 残りの引数（版 0.5）は、params の最後の一つだけで、省略可能にならない
+        assert.equal(typeof p.rest, "boolean");
+        if (p.rest) {
+          seen.add("param:rest");
+          assert.equal(i, d.params.length - 1);
+          assert.equal(p.optional, false);
+        }
+      });
+      // reads / effects の節（版 0.5）。なければ []
+      assert.ok(Array.isArray(d.reads) && Array.isArray(d.effects));
+      if (d.reads.length > 0) seen.add("decorator:reads");
+      if (d.effects.length > 0) seen.add("decorator:effects");
       for (const t of d.throws) {
         // Relation は kind だけ（目的語は常にその op のすべての効果。docs/ir.md「decorator」）
         for (const r of t.relations) {
@@ -343,7 +358,8 @@ function walkDecl(d: Decl): void {
         }
       }
       for (const target of d.targets) {
-        assert.ok(["op", "field", "state", "exception", "scalar", "model"].includes(target));
+        assert.ok(["op", "field", "state", "exception", "scalar", "model", "effect"].includes(target));
+        seen.add(`target:${target}`);
       }
       if (d.alias) d.alias.args.forEach((a) => walkArgValue(a.value));
       return;
@@ -354,6 +370,18 @@ function walkDecl(d: Decl): void {
       assert.equal(typeof d.exported, "boolean");
       if (d.exported) seen.add("op:exported");
       assert.ok(Array.isArray(d.reads) && Array.isArray(d.signature.reads));
+      // デコレータが運ぶもの（版 0.5）。書いたもの（reads / effects）とは分けて持つ
+      assert.ok(Array.isArray(d.carried.reads) && Array.isArray(d.carried.effects));
+      if (d.carried.reads.length > 0 || d.carried.effects.length > 0) {
+        seen.add("op:carried");
+        // 残りの引数は、一つの list の Arg
+        for (const app of d.decorators) {
+          for (const a of app.args) if (a.value.kind === "list") seen.add("arg:list");
+        }
+        // 運ばれたものは、Signature に入る
+        for (const st of d.carried.reads) assert.ok(d.signature.reads.includes(st));
+        for (const e of d.carried.effects) assert.ok(d.signature.effects.includes(e));
+      }
       assert.equal(typeof d.signature.pure, "boolean");
       return;
     default:
@@ -362,7 +390,7 @@ function walkDecl(d: Decl): void {
 }
 
 function walkProgram(p: Program): void {
-  assert.equal(p.version, "0.4");
+  assert.equal(p.version, "0.5");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
     // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
@@ -382,7 +410,7 @@ test("program.golden.json reads as Program and round-trips", () => {
 test("view.golden.json reads as View and round-trips", () => {
   const text = golden("view.golden.json");
   const view: View = JSON.parse(text);
-  assert.equal(view.version, "0.4");
+  assert.equal(view.version, "0.5");
   assert.equal(typeof view.viewer, "string");
   // files は単位の in に合ったファイル。namespaces の値は、その名前空間を出力する単位ごとの設定（設定の順）
   assert.ok(view.files.every((f) => typeof f === "string"));
@@ -420,6 +448,14 @@ test("goldens cover every kind of every union", () => {
     "standardClassify:nullable",
     "model:extends",
     "op:exported",
+    // 版 0.5 で足した形（docs/ir.md「版」）
+    "target:effect",
+    "effect:decorated",
+    "param:rest",
+    "decorator:reads",
+    "decorator:effects",
+    "op:carried",
+    "arg:list",
   ];
   for (const k of want) assert.ok(seen.has(k), `goldens contain no ${k}`);
 });

@@ -35,4 +35,18 @@ namespace a {
   @mark
   @swallow                             // ERROR: THROWS-3
   op caught(): never throws E;
+  // 5. デコレータが運ぶ reads / effects も持てない（位置はそのデコレータ）
+  decorator reading(table: any state) for op reads table;
+  decorator writing(...targets: any effect) for op effects targets;
+  @mark
+  @reading(s)                          // ERROR: THROWS-3
+  op carriesRead(): never throws E;
+  @writing(add)                        // ERROR: THROWS-3
+  op carriesEffect(): never throws E;
+  // 残りの引数に何も渡していなければ、運ぶものがない
+  @writing
+  op carriesNothing(): never throws E;
+  // 節に書いたものと両方あれば、節の位置に一つ
+  @reading(s)
+  op both(): never reads s throws E;   // ERROR: THROWS-3
 }

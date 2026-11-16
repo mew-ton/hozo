@@ -27,7 +27,7 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 - 設定を単位の一覧にした（`docs/config.md`「単位」）のに合わせて、`EmitRequest` に `transpiler` を足し、`LanguageMismatch` と `UnknownNamespace` の意味を単位の言葉に直す。
 - プラグインとやり取りする model（`EmitRequest` / `EmitResponse`）は `docs/plugin-protocol.md`「要求と応答」の JSON をそのまま写す。応答の `select` をなくした（同「選択をなくしたこと」）のに合わせて、`Select` と `Wrap` を持たない。
 - `check` / `emit` / `lsp` に `export` を付ける。`@cli.command` の付いた op は、`go-cli` の `Main` が、名前空間の外から入口の `Ops` を通して呼ぶ（`docs/plugin-go-cli.md`「対象」の CLI-6）。`writeOutputs` と `runEmit` は内部の op のまま。
-- **`go-cli` の実装（`docs/requirements.md`「作り直しの段階」の R3）と一緒に変わる行が一つある**: `EmitInput` の `@cli.arg namespaces: string[];` は、位置を引数で言う `@cli.arg(1) namespaces: string[];` になる（`docs/plugin-go-cli.md`「語彙」）。下のブロックとリポジトリ直下の `cli.hozo` は、今の hozoc が読む今の書き方のままにしてある。フラグと環境変数の行は、名前を書いているので、そのまま通る。
+- `EmitInput` の位置引数は、位置を引数で言う（`@cli.arg(1) namespaces: string[];`。`docs/plugin-go-cli.md`「語彙」）。フラグと環境変数の行は、名前を書いている。
 
 ```ts
 /** hozo の仕様を検査し、各言語のコードに展開する CLI */
@@ -129,7 +129,7 @@ namespace hozoc {
     /** 表示の形式 */
     @cli.flag("format") format: OutputFormat?;
     /** 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す */
-    @cli.arg namespaces: string[];
+    @cli.arg(1) namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */

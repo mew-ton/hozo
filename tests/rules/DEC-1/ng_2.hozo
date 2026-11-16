@@ -1,0 +1,24 @@
+// DEC-1（docs/check.md「デコレータ」、docs/grammar.md「decorator の宣言」）: 対象 effect のデコレータは、効果の宣言にだけ付く。
+// 効果の宣言には、対象に effect を持つデコレータだけが付く。union / classify / decorator に付けたら常に DEC-1
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state s: list<M>;
+  decorator onlyEffect for effect;
+  @onlyEffect                          // ERROR: DEC-1
+  op notEffect(): void;
+  @db.insert(s)                        // ERROR: DEC-1
+  state notEffect2: list<M>;
+  @db.find(s, "id")                    // ERROR: DEC-1
+  effect notOp on s.delete;
+  @db.text                             // ERROR: DEC-1
+  effect notField on s.put;
+  @onlyEffect                          // ERROR: DEC-1
+  union V { Ready: M; }
+  @onlyEffect                          // ERROR: DEC-1
+  classify D of M { A; }
+  @onlyEffect                          // ERROR: DEC-1
+  decorator another;
+  @onlyEffect
+  effect ok on s.post;
+}

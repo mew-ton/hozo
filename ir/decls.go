@@ -34,9 +34,7 @@ type Field struct {
 	Name        string `json:"name"`
 	Description *Doc   `json:"description,omitempty"`
 	// Type はフィールドの型。省略可能なら optional。
-	Type Type `json:"type"`
-	// Default は既定値。
-	Default    Literal       `json:"default,omitempty"`
+	Type       Type          `json:"type"`
 	Decorators []Application `json:"decorators"`
 	// Span は位置。受け継いだままのフィールドは元の model のフィールドの位置、`override` したフィールドは `override` の位置。
 	Span Span `json:"span"`

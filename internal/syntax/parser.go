@@ -503,11 +503,13 @@ func (p *parser) parseMembers(parseOne func()) {
 
 // parseMember は Member = Field | Override を読む。どちらか一方を返す。
 //
-//	Field    = [ DocComment ] { Decorator } FieldName ":" Type [ "=" Literal ] ";" ;
+//	Field    = [ DocComment ] { Decorator } FieldName ":" Type ";" ;
 //	Override = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "never" ) ] ";" ;
 //
 // フィールドの名前は FieldName なので予約語も書ける（`op: string;`。docs/grammar.md「識別子」）。
 // メンバーの頭の override は、直後が ":" ならフィールドの名前、そうでなければ Override の頭。
+// フィールドの既定値（`page: int = 1`）はなくした書き方で、型の直後の "=" は、今の書き方を示して誤りにする
+// （docs/grammar.md「model」「決めたこと」）。
 func (p *parser) parseMember() (*ast.Field, *ast.Override) {
 	doc := p.parseLeadingDoc()
 	start := p.tok().Span.Start
@@ -530,7 +532,7 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override) {
 			}
 		}
 		if p.at(token.Assign) {
-			p.fail(p.tok().Span, "override に既定値は書けない（docs/grammar.md「model」）")
+			p.failFieldDefault(o.Name)
 		}
 		p.expect(token.Semicolon)
 		o.Span = p.spanFrom(start)
@@ -539,12 +541,17 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override) {
 	f := &ast.Field{Doc: doc, Decorators: decorators, Name: p.parseFieldName()}
 	p.expect(token.Colon)
 	f.Type = p.parseType()
-	if p.got(token.Assign) {
-		f.Default = p.parseLiteral()
+	if p.at(token.Assign) {
+		p.failFieldDefault(f.Name)
 	}
 	p.expect(token.Semicolon)
 	f.Span = p.spanFrom(start)
 	return f, nil
+}
+
+// failFieldDefault は、フィールドの型の直後の "="（なくした書き方の既定値）を、今の書き方を示して誤りにする。
+func (p *parser) failFieldDefault(name ast.Ident) {
+	p.fail(p.tok().Span, fmt.Sprintf("フィールド %s に既定値は書けない。値がないときに何を入れるかは、境界のデコレータで言う（@http.default(値)、@cli.default(値)。docs/grammar.md「model」）", name.Name))
 }
 
 // parseScalar は ScalarDecl = "scalar" Ident "extends" Type ";" を読む（docs/grammar.md「scalar」）。

@@ -6,7 +6,7 @@
 
 この文書は二つを決める: 生成する Go のコード（「出力」）と、**通信の上の形**（「通信の形」）。後ろの方は、このサーバーを呼ぶどの実装（別の言語のクライアントのトランスパイラを含む）も合わせる規範で、Go のコードの都合で変えない。
 
-デコレータが出すコードは、型に依らない（`docs/requirements.md`「出力を推論しない」）: 経路ごと、フィールドごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ形（同じ補助の呼び出し）にする。値で変わる振る舞い（値がなければ 204、文字列の読み方）は、共通の補助が、実行時に決める（「補助」）。項目がないことを誤りにするかどうかは、デコレータ（`@http.required`）が言い、補助に引数で渡す（「入力の読み方」）。型は、書いたものが食い違っていないかを確かめるのにだけ使う（「診断」）。
+デコレータが出すコードは、型に依らない（`docs/requirements.md`「出力を推論しない」）: 経路ごと、フィールドごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ形（同じ補助の呼び出し）にする。値で変わる振る舞い（値がなければ 204、文字列の読み方）は、共通の補助が、実行時に決める（「補助」）。要求に項目がないときの扱い（誤りにする、決まった値を入れる）は、デコレータ（`@http.required`、`@http.default`）が言い、補助に引数で渡す（「入力の読み方」）。型は、書いたものが食い違っていないかを確かめるのにだけ使う（「診断」）。
 
 ## マニフェスト
 
@@ -21,7 +21,7 @@ language = "go"
 requires = ["go", "go-valid"]
 ```
 
-- 読む語彙は、標準の `http`: op の `@http.get(path)` / `@http.post(path)`、フィールドの `@http.header` / `@http.query` / `@http.body`（項目の形）と `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`（全体の形）と `@http.required`、例外の `@http.status(code)`。`@http.retry` は読まない（印）。語彙は提供しない。
+- 読む語彙は、標準の `http`: op の `@http.get(path)` / `@http.post(path)`、フィールドの `@http.header` / `@http.query` / `@http.body`（項目の形）と `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`（全体の形）、`@http.required` と `@http.default(value)`（項目がないときの扱い）、例外の `@http.status(code)`。`@http.retry` は読まない（印）。語彙は提供しない。
 - `go-valid` への依存は、オプションによらない（`docs/config.md`「基底と相乗り」）。`validate = false` でも、単位の `transpilers` に `go-valid` が要る。
 
 ## オプション
@@ -41,9 +41,11 @@ N の単位の対象の op（`docs/config.md`「in」）のうち、`@http.get` 
 - 入力の model の各フィールドは、要求のどこから読むかを言う六つのデコレータのどれかを、**ちょうど一つ**持つ。そうでなければ GOHTTP-3。六つは、三つの場所（ヘッダ、クエリ、本文）ごとの、**項目の形**（`@http.header` / `@http.query` / `@http.body`。名前を省けば、フィールドの名前）と、**全体の形**（`@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）。意味の持ち主は `docs/vocab.md`「`http` の語彙」で、そこが言う二つの決まりを、このトランスパイラが確かめる:
   - 全体の形は、型が model のフィールドにだけ付けられる（省略可能な model、配列は、model ではない）。そうでなければ GOHTTP-12。
   - 全体の形は、一つの場所に高々一つで、同じ場所の項目の形とは一緒に書けない（`@http.bodyObj` と `@http.body` を、一つの入力の model に書けない）。そうでなければ GOHTTP-13。
-- **`@http.required`** は、項目の形を持つフィールドに足す印: その項目が要求になければ、op を呼ばずに 400 を返す（「入力の読み方」の「項目がないとき」）。付けていない項目は、なくても誤りにしない。項目がないことを誤りにするのは、このデコレータだけで、フィールドの型（省略可能かどうか）からは決めない。意味の持ち主は `docs/vocab.md`「`http` の語彙」で、そこが言う二つの決まりを、このトランスパイラが確かめる:
-  - 付けられるのは、項目の形（`@http.header` / `@http.query` / `@http.body`）を持つフィールドだけ。そうでなければ GOHTTP-14。全体の形のフィールドにも、全体の形で受け取る model の中のフィールドにも、付けられない: 全体の形の中の項目は、ないことを誤りにできない（誤りにしたい項目は、項目の形で書く）。
-  - 省略可能なフィールド（`T?`）には付けられない。付いていれば GOHTTP-15（型は「なくてよい」と言い、デコレータは「なければ誤り」と言っている）。
+- **要求に項目がないときの扱い**は、項目の形を持つフィールドに足す、二つのデコレータが言う（意味の持ち主は `docs/vocab.md`「`http` の語彙」）: `@http.required` は、op を呼ばずに 400 を返す。`@http.default(<リテラル>)` は、フィールドをその値にする。どちらもないフィールドは、零値のまま op に渡る（省略可能なフィールドは、値がない）。フィールドの型（省略可能かどうか）からは決めない。型の宣言に書く既定値（`page: int = 1`）は、言語にない（`docs/decisions.md`「設計書を変える決定」S24）: 値を入れるのは、要求を読むこの境界で、それを言うのがデコレータ。このトランスパイラが確かめる決まりは四つ:
+  - 二つのデコレータを付けられるのは、項目の形（`@http.header` / `@http.query` / `@http.body`）を持つフィールドだけ。そうでなければ GOHTTP-14。全体の形のフィールドにも、全体の形で受け取る model の中のフィールドにも、付けられない: 全体の形の中の項目は、なければ、いつも零値のまま（扱いを言いたい項目は、項目の形で書く）。
+  - 省略可能なフィールド（`T?`）には、どちらも付けられない。付いていれば GOHTTP-15。型は「なくてよい」と言っている: なければ誤りにするなら、また、なければ値を入れるなら、省略可能にしない。
+  - 一つのフィールドに、両方は付けられない。付いていれば GOHTTP-17。
+  - `@http.default` のリテラルは、フィールドの型（scalar は元の核の型）に渡せなければならない（`docs/types.md`「互換」の 10: 整数のリテラルは `float` にも渡せる）。渡せなければ GOHTTP-18。
 - フィールドの型（scalar は元の核の型で見る）。全体の形では、その model のフィールドの一つずつを、同じ場所の項目として見る:
 
 | 場所 | 受け付ける型 | それ以外 |
@@ -73,10 +75,10 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.getOrders
 	mux.HandleFunc("GET /orders", func(w http.ResponseWriter, r *http.Request) {
-		in := NewGetOrdersInput()
+		var in GetOrdersInput
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
-		req.query("page", &in.Page)
+		req.query("page", &in.Page, httpDefault(1))
 		if !req.ok(w) {
 			return
 		}
@@ -101,9 +103,9 @@ func NewHandler(ops Ops) http.Handler {
 - op には `r.Context()` を渡す（経路の op はデコレータを持つので、いつも `ctx` を取り、`error` を返す）。
 - `NewHandler` とハンドラの中の局所の名前（`ops`、`mux`、`w`、`r`、`in`、`req`、`out`、`err`）が、このファイルが import するパッケージの名前（型と例外の名前空間のパッケージ）と当たれば、局所の名前の方の末尾に `_` を足す（`docs/plugin-go.md`「名前」の「局所の名前」と同じ扱い）。
 
-ハンドラの中は、この順。2、3、5 の行は、フィールドの型と、戻り値の型によらず、同じ形。4 は、二つの形を持つが、振る舞いは同じ。1 は、まだ二つの形を持つ（「未決」の 1）。
+ハンドラの中は、この順。1、2、3、5 の行は、入力の model の宣言と、フィールドの型と、戻り値の型によらず、同じ形。4 は、二つの形を持つが、振る舞いは同じ。
 
-1. **入力の初めの値**: 入力の model が既定値を持つなら `in := New<Model>()`（基底の関数）、そうでなければ `var in <Model>`。引数のない op は、入力を持たず、1〜3 を出さない。この分け方は、model の宣言を見ている（「未決」の 1）。
+1. **入力を置く**: `var in <Model>`。どのフィールドも零値で始まる。基底は、初めの値を入れる関数を出さない（`docs/plugin-go.md`「model」）。引数のない op は、入力を持たず、1〜3 を出さない。
 2. **入力を読む**: `req := httpRequest{r: r}` の後、フィールドの順に、フィールドごとに一行（「入力の読み方」）。その後に `if !req.ok(w) { return }`: 読めなかった最初の理由で 400 を返して終わる。
 3. **制約の検査**（`validate = true` のとき、入力を持つすべての経路に）: `if !httpValidate(w, in, <場所の一覧>) { return }`。場所の一覧は、入力の model のすべてのフィールドについて、フィールドの順に `httpPlace{"<フィールド名>", "<場所>"}`。入力が `Validate` を持つかどうかは、補助が実行時に見る（「制約の検査」）。
 4. **op を呼ぶ**: 戻り値があれば `out, err := ops.<Op>(r.Context(), in)`、なければ `if err := ops.<Op>(r.Context(), in); err != nil { … }`（引数のない op は、`in` を渡さない）。失敗は `httpWriteError(w, err)`。**行の形が二つあるのは、呼ぶ相手の、基底のメソッドの形（引数と戻り値を持つか。`plugin/golang` の `Signature`）を写しているからで、行の形は、振る舞いを運ばない**: どちらの形も、op を呼び、失敗なら `httpWriteError` に渡すだけ。何を返すかは、5 の補助が決める。
@@ -124,15 +126,22 @@ func NewHandler(ops Ops) http.Handler {
 
 `<名前>` は、デコレータの引数。省いていれば、フィールドの名前。
 
-**`@http.required` の付いたフィールドは、同じ行の最後の引数に `httpRequired` を足す**（`req.body("lines", &in.Lines, httpRequired)`）。行に足すのは、デコレータが言ったことだけで、フィールドの型で変わるものは、何も足さない。
+**項目がないときの扱いを言うデコレータは、同じ行の最後の引数になる。** 行に足すのは、デコレータが言ったことだけで、フィールドの型で変わるものは、何も足さない。
+
+| デコレータ | 足す引数 | 例 |
+|---|---|---|
+| `@http.required` | `httpRequired` | `req.body("lines", &in.Lines, httpRequired)` |
+| `@http.default(<リテラル>)` | `httpDefault(<リテラル>)` | `req.query("page", &in.Page, httpDefault(1))` |
+
+`<リテラル>` の Go での書き方は、基底と同じ（`docs/plugin-go.md`「値」の表の `literal` の行。`Duration` は `time.Duration(<ナノ秒>)`）。フィールドの型への変換は書かない: 補助が、実行時に、読む先の型に変える。
 
 読み方は、補助 `httpRequest` が、実行時に、読む先の Go の型を見て決める（`reflect`）:
 
 - **ヘッダとクエリの項目**（文字列一つを読む）: 読む先がポインタ（省略可能）なら、値を置く先を作ってから読む。文字列はそのまま、整数は `strconv.ParseInt(v, 10, 64)`、小数は `strconv.ParseFloat(v, 64)`、真偽値は `strconv.ParseBool(v)`。読めなければ、文言 `<場所> <名前>: invalid <int / float / boolean>`（`query page: invalid int`）。クエリの同じ名前が二度あれば、最初の値。ヘッダの値は、そのまま読む（`Bearer ` などの前置きを外さない）。空の文字列のヘッダは、ないものと読む。
-- **項目がないとき**（ヘッダ、クエリ、本文の項目のどれも同じ）: 読む先には、何も書かない。行に `httpRequired` があれば（`@http.required`）、読めない要求で、文言 `<場所> <名前>: missing`（`header Authorization: missing`、`body lines: missing`）。なければ、誤りにしない。読む先の型も、初めの値も、見ない。**何も書かれなかったフィールドが、op にどの値で渡るか（入力の初めの値）は、まだ決めていない**（「未決」の 1。今の形では、1 の行が入れた値のまま: 既定値を持つフィールドは既定値、ほかは零値）。
+- **項目がないとき**（ヘッダ、クエリ、本文の項目のどれも同じ）: 行に `httpRequired` があれば、読めない要求で、文言 `<場所> <名前>: missing`（`header Authorization: missing`、`body lines: missing`）。`httpDefault(v)` があれば、読む先を v にする（`reflect` で、読む先の型に変える）。どちらもなければ、読む先に何も書かない（1 で置いた零値のまま）。読む先の型は、見ない。
 - **本文の項目**（`req.body`）: 本文は JSON のオブジェクトで、初めて呼ばれたときに一度だけ読む。キーの値を、`encoding/json` で読む先に読む。キーがなければ、項目がない（上）。キーがあれば、値が `null` でも、あるものと読む。本文が JSON のオブジェクトとして読めない、キーの値の型が合わないときは、文言 `body: invalid JSON`。
-- **本文の全体**（`req.bodyObj`）: 本文を、`encoding/json` で、読む先の model に読む。読めなければ `body: invalid JSON`。知らないキーは無視し、ないキーは初めの値のままにする（`encoding/json` の既定）。
-- **ヘッダとクエリの全体**（`req.headerObj`、`req.queryObj`）: 読む先の model（Go の構造体）のフィールドごとに、その `json` タグの名前（仕様のフィールドの名前。基底が付ける）の項目を、項目の形と同じに読む。その項目は `httpRequired` を持たないので、なくても誤りにしない（「対象」の GOHTTP-14）。
+- **本文の全体**（`req.bodyObj`）: 本文を、`encoding/json` で、読む先の model に読む。読めなければ `body: invalid JSON`。知らないキーは無視し、ないキーのフィールドは零値のままにする（`encoding/json` の既定）。
+- **ヘッダとクエリの全体**（`req.headerObj`、`req.queryObj`）: 読む先の model（Go の構造体）のフィールドごとに、その `json` タグの名前（仕様のフィールドの名前。基底が付ける）の項目を、項目の形と同じに読む。その項目には、`httpRequired` も `httpDefault` も渡らないので、なければ、零値のまま（「対象」の GOHTTP-14）。
 - 本文の大きさは制限しない。
 - 場所（`httpPlace` の二つ目と、違反の `path` の先頭）は、項目の形が `header.<名前>`、`query.<名前>`、`body.<名前>`、全体の形が `header`、`query`、`body`。
 
@@ -144,8 +153,8 @@ func NewHandler(ops Ops) http.Handler {
 |---|---|
 | `httpErrorBody`、`httpBadRequest`、`httpViolation` | 失敗の応答の本文の形（「通信の形」） |
 | `httpPlace` | 入力の model のフィールドと、通信の上の場所の組 |
-| `httpOption`、`httpRequired` | 項目の読み方に、フィールドのデコレータが足すこと（`type httpOption int`）と、`@http.required` の印（`const httpRequired httpOption = 1`）。`missing` を出すときに出す |
-| `httpRequest` | 要求一つを、入力のフィールドに読む。読めなかった最初の理由を持ち、その後は何も読まない。メソッドは、使うものだけを、`header`、`query`、`body`、`headerObj`、`queryObj`、`bodyObj`、`missing`（項目がないときの扱い。ヘッダ、クエリ、本文の項目の、どの読み方も使う）、`text`（ヘッダとクエリの値を読む共通の中身）、`ok` の順。項目の形のメソッドは `header(name string, dst any, opts ...httpOption)`（`query`、`body` も同じ引数）で、`opts` に `httpRequired` があるかどうかだけを、`missing` が見る |
+| `httpOption`、`httpRequired`、`httpDefault(v any) httpOption` | 項目がないときの扱い（`httpOption`）と、それを作る二つ: `@http.required` の `httpRequired` と、`@http.default(v)` の `httpDefault(v)`。`missing` を出すときに、三つとも出す |
+| `httpRequest` | 要求一つを、入力のフィールドに読む。読めなかった最初の理由を持ち、その後は何も読まない。メソッドは、使うものだけを、`header`、`query`、`body`、`headerObj`、`queryObj`、`bodyObj`、`missing`（項目がないときの扱い。ヘッダ、クエリ、本文の項目の、どの読み方も使う）、`text`（ヘッダとクエリの値を読む共通の中身）、`ok` の順。項目の形のメソッドは `header(name string, dst any, opts ...httpOption)`（`query`、`body` も同じ引数）で、`opts` を見るのは `missing` だけ |
 | `httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool` | 入力の制約を確かめる。`in` が `Validate() error` を持つかどうかを、実行時に見る（持たなければ、何もせず `true`）。違反があれば 400 を返して `false`。`validate = true` のときだけ出す |
 | `httpWriteJSON(w http.ResponseWriter, status int, v any)` | 値を JSON にして返す |
 | `httpWriteResult(w http.ResponseWriter, out any)` | 成功の応答。返す値があるかどうかを、実行時に見る（「通信の形」の「成功の応答」） |
@@ -193,15 +202,23 @@ func httpWriteError(w http.ResponseWriter, err error) {
 | 部分 | 形 |
 |---|---|
 | メソッドとパス | `@http.get(path)` は `GET <path>`、`@http.post(path)` は `POST <path>` |
-| `@http.header` のフィールド | ヘッダ `<名前>`。値は、フィールドの値の文字列そのまま。値がない（省略可能で、ない）、または既定値のままでよいなら、ヘッダを送らない。空の文字列のヘッダは、ないものとして読まれる |
-| `@http.query` のフィールド | クエリの `<名前>=<値>`。`string` はそのまま（URL のエンコードだけ）、`int` は 10 進、`float` は 10 進の小数か指数、`boolean` は `true` / `false`。値がない、または既定値のままでよいなら、送らない |
+| `@http.header` のフィールド | ヘッダ `<名前>`。値は、フィールドの値の文字列そのまま。値がない（省略可能で、ない）なら、ヘッダを送らない。空の文字列のヘッダは、ないものとして読まれる |
+| `@http.query` のフィールド | クエリの `<名前>=<値>`。`string` はそのまま（URL のエンコードだけ）、`int` は 10 進、`float` は 10 進の小数か指数、`boolean` は `true` / `false`。値がないなら、送らない |
 | `@http.body` のフィールド | 本文が、JSON のオブジェクトで、キー `<名前>` の値が、フィールドの値の JSON。`@http.body` のフィールドが一つでも、オブジェクトで包む。省略可能で値がないフィールドは、キーを省く。`Content-Type: application/json` |
 | `@http.headerObj` / `@http.queryObj` のフィールド | その model のフィールドの一つずつが、フィールドの名前の、ヘッダ一つ、クエリの項目一つ（上の二行と同じ） |
 | `@http.bodyObj` のフィールド | 本文が、その model の JSON（「値の JSON」）。フィールドの名前では包まない。`Content-Type: application/json` |
 
 `<名前>` は、デコレータの引数。省いていれば、フィールドの名前（「対象」）。
 
-**`@http.required` の付いた項目は、必ず送る。** なければ、サーバーは op を呼ばずに 400 を返す（「op を呼ぶ前の失敗」）。付いていない項目は、送らなくても、誤りにならない。
+**要求に項目がないときに、サーバーがどう読むかは、フィールドのデコレータで決まる。**
+
+| フィールド | 項目を送らないと |
+|---|---|
+| `@http.required` | op は呼ばれず、400（「op を呼ぶ前の失敗」）。呼ぶ側は、必ず送る |
+| `@http.default(v)` | サーバーが、v として読む。呼ぶ側は、v でよければ、送らなくてよい |
+| どちらもない | サーバーは、零値として読む（省略可能なフィールドは、値がない） |
+
+値を入れるのは、要求を読むサーバーで、呼ぶ側は、`@http.default` の値を自分では入れない。
 
 ### 値の JSON
 
@@ -277,7 +294,7 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 
 まだ決めていないところ。決めるまで、この文書とサンプルは、ここに書いた今の形のままにしてある。
 
-1. **入力の初めの値**。今は、既定値を持つ model は `New<Model>()`、持たない model は `var`（「出力」の 1）。経路ごとのコードの形が、model の宣言で変わっている。フィールドの既定値（`page: int = 1`）を言語に残すかどうかを見直していて、それが決まるまで、決めない。`@http.required` のない項目がなかったときに、フィールドが op にどの値で渡るか（「入力の読み方」の「項目がないとき」）も、これと一緒に決まる。
+1. **`@http.default` の値が、制約に合うか**。フィールドの既定値を言語からなくしたので、既定値を制約（`@valid.*`）で確かめていた `go-valid` の GOVALID-2 は、欠番になった（`docs/plugin-go-valid.md`「診断」）。今は、`@http.default` の値を、生成するときには制約で確かめない: `validate = true` なら、入れた値も、読んだ値と同じに、実行時に確かめられる（合わなければ、その項目のない要求は、いつも 400）。`validate = false` なら、確かめられずに op に渡る。選べる形は二つ: このトランスパイラが、生成するときに、値をフィールドの制約で確かめて、合わなければ error にする（`plugin/govalid` に、値一つを制約で確かめる関数が要る）。今のまま、実行時の検査に任せる。
 2. **値のない record の結果**。record（`Record<K, V>`）を返す op が、値のないマップ（Go の `nil`）を返すと、今の補助は 200 と `null` を返す。配列は、同じとき `[]` を返す（「補助」の `httpWriteResult`）。省略可能な record を結果にできなくした（GOHTTP-16）ので、`nil` のマップが表すのは「空」だけだが、`{}` にそろえると、今の応答（`null`）が変わる。選べる形は二つ: `{}` を返す（「値の JSON」の、record はオブジェクト、という行に合う）。`null` のままにして、「値の JSON」に、読む側は `null` も空の record と読む、と足す。
 
 ## 診断
@@ -295,16 +312,18 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | GOHTTP-7 | error | パスが `/` で始まらない、または `{` か `}` を含む。位置は op |
 | GOHTTP-8 | error | 同じメソッドとパスの経路が二つある。位置は後ろの op |
 | GOHTTP-9 | error | `[emit.options.go-http]` に、知らないキーか、型の違う値がある。位置なし |
-| GOHTTP-10 | error | `NewHandler` が、N の定義のパッケージの名前（既定値を持つ model `Handler` の `NewHandler` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言 |
+| GOHTTP-10 | error | `NewHandler` が、N の定義のパッケージの名前（model `NewHandler` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言 |
 | GOHTTP-11 | error | `validate = true` で、`Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（「制約の検査」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op |
 | GOHTTP-12 | error | 全体の形（`@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）を付けたフィールドの型が、model でない（「対象」）。位置は model |
 | GOHTTP-13 | error | 入力の model の一つの場所に、全体の形が二つ以上ある、または、全体の形と項目の形の両方がある（「対象」）。位置は model |
-| GOHTTP-14 | error | `@http.required` の付いたフィールドが、項目の形（`@http.header` / `@http.query` / `@http.body`）を持たない。入力の model のフィールドと、全体の形で受け取る model のフィールドを見る（「対象」）。位置は model |
-| GOHTTP-15 | error | `@http.required` の付いたフィールドの型が、省略可能（`T?`）。見るフィールドは GOHTTP-14 と同じ。位置は model |
+| GOHTTP-14 | error | `@http.required` か `@http.default` の付いたフィールドが、項目の形（`@http.header` / `@http.query` / `@http.body`）を持たない。入力の model のフィールドと、全体の形で受け取る model のフィールドを見る（「対象」）。位置は model |
+| GOHTTP-15 | error | `@http.required` か `@http.default` の付いたフィールドの型が、省略可能（`T?`）。見るフィールドは GOHTTP-14 と同じ。位置は model |
 | GOHTTP-16 | error | 経路の op の結果の型が、省略可能な配列か、省略可能な record（`T[]?`、`Record<K, V>?`）。位置は op |
+| GOHTTP-17 | error | 一つのフィールドに、`@http.required` と `@http.default` の両方がある。見るフィールドは GOHTTP-14 と同じ。位置は model |
+| GOHTTP-18 | error | `@http.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。位置は model |
 
 warning（コードは `PLUGIN`）は一つ: 経路の op が一つもない。
 
-- GOHTTP-3〜GOHTTP-6、GOHTTP-11〜GOHTTP-16 は、書いたものの整合の検査: デコレータが言ったことと、model と op の宣言が食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。
+- GOHTTP-3〜GOHTTP-6、GOHTTP-11〜GOHTTP-18 は、書いたものの整合の検査: デコレータが言ったことと、model と op の宣言が食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。
 - Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。上の診断は、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

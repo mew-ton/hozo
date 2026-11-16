@@ -36,12 +36,12 @@ namespace app {
 
   // 「model」既定値を持つ model（New<Model>）: 核の型ごとの既定値と、scalar の既定値
   model Options {
-    limit: int = 10;
-    label: string = "none";
-    ratio: float = 1.5;
-    wait: Duration = 5s;
-    on: boolean = true;
-    id: Id = "x";
+    limit: int;
+    label: string;
+    ratio: float;
+    wait: Duration;
+    on: boolean;
+    id: Id;
     note: string?;
   }
 

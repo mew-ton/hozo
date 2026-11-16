@@ -45,16 +45,11 @@ func checkReads2(o *ir.Op, r *reporter) {
 	r.report(diag.Error, "READS-2", o.Span, msg, nil, map[string]any{"missing": missing, "extra": extra})
 }
 
-// checkState2 は STATE-2: 葉の op O の Op.effects の効果 e の名前空間が ns(O) と違う。デコレータの halts の効果
-// （宣言に書いたもの、any effect の引数で渡したもの）も、デコレータを付けた op の名前空間と違えば同じ。
+// checkState2 は STATE-2 のうち、デコレータの halts の効果の分: halts の効果（宣言に書いたもの、any effect の引数で
+// 渡したもの）の名前空間が、デコレータを付けた op の名前空間と違う。位置はその適用。
+// 葉の op が直に持つ効果（自分で書いたものと、デコレータが運ぶもの）の分は、名前の位置を持つ internal/sema が出す
+// （docs/check.md「状態と効果」の STATE-2 の位置）。
 func checkState2(ix *index, o *ir.Op, ns string, r *reporter) {
-	if o.Body == nil {
-		for _, e := range o.Effects {
-			if ix.effect(e) != nil && ix.namespaceOf(e) != ns {
-				r.errorAt("STATE-2", o.Span, sprintf("%s は名前空間 %s の持ち主ではないので、効果 %s を effects に宣言できない", o.Name, ix.namespaceOf(e), e))
-			}
-		}
-	}
 	for ai := range o.Decorators {
 		app := &o.Decorators[ai]
 		d, args := ix.decorator(app.Decorator)

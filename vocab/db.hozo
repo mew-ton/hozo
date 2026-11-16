@@ -15,6 +15,9 @@ namespace db {
   /** このフィールドを、JSON にして一つの列にしまう */
   decorator json for field;
 
+  /** この列は、値がなくてよい。付けていない列は、いつも値を持つ */
+  decorator nullable for field;
+
   decorator key for field;
   decorator unique for field;
   /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */

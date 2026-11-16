@@ -8,6 +8,9 @@ namespace a {
   op unauthorized(): never throws Unauthorized;
   @mark
   export op denied(): never throws Unauthorized;
+  // 節を持つデコレータでも、運ぶものがなければ付けられる（残りの引数に何も渡していない）
+  @db.effects
+  op nothing(): never throws Unauthorized;
   op keep(m: M): M;
   op f(m: M): M throws Unauthorized {
     return match m by Kind {

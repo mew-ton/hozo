@@ -327,10 +327,7 @@ func (g *generator) model(decl *ir.Model) *model {
 		if fd.Description != nil {
 			f.summary = oneLine(fd.Description.Summary)
 		}
-		if fd.Default != nil {
-			m.hasDefault = true
-			f.def = literalString(fd.Default)
-		}
+		// IR にフィールドの既定値はなくなった（版 0.5。docs/ir.md「版」）ので、既定値の表示（f.def、m.hasDefault）は付かない
 		hasFlag, hasEnv := false, false
 		if app := application(fd.Decorators, cliFlag); app != nil {
 			hasFlag = true
@@ -361,7 +358,7 @@ func (g *generator) model(decl *ir.Model) *model {
 		if !g.fieldType(decl, fd, f) {
 			continue
 		}
-		f.required = !f.optional && !f.array && fd.Default == nil
+		f.required = !f.optional && !f.array
 		m.fields = append(m.fields, f)
 		if f.arg {
 			m.args = append(m.args, f)

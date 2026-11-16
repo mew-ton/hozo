@@ -24,8 +24,8 @@ namespace shop {
     count: int;
   }
 
-  @db state items: list<Item>;
-  @db state stock: list<Stock>;
+  @db.table(Item) state items: list<Item>;
+  @db.table(Stock) state stock: list<Stock>;
 
   // 一行を引く: 対応した列が @db.key
   export op findItem(id: ItemId): Item? reads items;

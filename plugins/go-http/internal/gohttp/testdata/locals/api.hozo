@@ -40,7 +40,7 @@ namespace api {
     @http.header(name: "Authorization") token: v.Token?;
     @http.header(name: "X-Trace") trace: mux.Trace;
     @http.query page: x.Page?;
-    @http.query size: strconv.Size = 10;
+    @http.query @http.default(10) size: strconv.Size;
     @http.query flag: q.Flag?;
     @http.query ratio: r.Ratio;
     @http.body item: out.Item;

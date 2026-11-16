@@ -1,0 +1,57 @@
+// SYNTAX（docs/grammar.md「識別子」「decorator の宣言」「デコレータの適用」）: 予約語のデコレータ名（宣言、適用、別名の先、@see）、
+// 対象 effect、reads / effects の節、残りの引数
+namespace a {
+  model Row { @text @int id: string; }
+  @table(Row)
+  state rows: list<Row>;
+  state logs: list<Row>;
+  exception Busy;
+
+  // 予約語の名前の宣言（節の頭、核の型と形、宣言の頭）
+  decorator table(element: any model) for state;
+  decorator text for field;
+  decorator int for field;
+  decorator list(table: any state, column: string?) for op reads table;
+  decorator effects(...targets: any effect) for op effects targets;
+  decorator effect(table: any state) for effect;
+  decorator op for op;
+  decorator for for op;
+  // 節は何度でも、どの順でも書ける。prevents / keeps の目的語の effects の後ろに、effects の節
+  decorator both(extra: any state?, ...more: any effect)
+    reads logs, extra
+    throws Busy prevents effects effects more | add
+    reads rows;
+  decorator tags(first: string, ...more: string | int) for op | effect;
+  // 別名の先
+  decorator everything = list(rows);
+  decorator nothing = effects();
+
+  @effect(rows) @tags("a")
+  effect add on rows.post;
+  @a.effect(logs)
+  effect log on logs.post;
+
+  /**
+   * 全部を引く。
+   *
+   * @see list
+   * @see a.effects
+   */
+  @list(rows) @op @for
+  op all(): Row[];
+  @a.list(rows, "id")
+  op byId(id: string): Row[];
+  @effects(add, log)
+  op write(row: Row, entry: Row);
+  @effects
+  op idle();
+  @effects()
+  op idle2();
+  @both(logs, log)
+  op audited(entry: Row) throws Busy;
+  @tags("x", 1, "y")
+  @everything
+  op tagged(): Row[];
+  @nothing
+  op idle3();
+}

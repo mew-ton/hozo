@@ -2,7 +2,7 @@
 # （emit の応答は空の files と warnings だけ）。sh で動く（go run を待たないため）。
 name     = "none"
 command  = ["sh", "-c", "cat >/dev/null; printf '%s' '{\"files\":[],\"warnings\":[]}'"]
-protocol = "0.4"
+protocol = "0.5"
 
 [[transpiler]]
 name     = "none"

@@ -130,7 +130,9 @@ func TestEff2(t *testing.T) {
 	wantStrings(t, "missing (halts)", d2.Data["missing"].([]string), []string{"server.h"})
 }
 
-// TestState2 は STATE-2: 葉の op が持ち主でない名前空間の効果を宣言する。デコレータの halts の効果も同じ。
+// TestState2 は STATE-2 のうち、このパッケージが出す分: デコレータの halts の効果が、付けた op の名前空間と違う。
+// 葉の op が直に持つ効果（自分で書いたものと、デコレータが運ぶもの）の分は、名前の位置を持つ internal/sema が出す
+// （internal/sema の testdata/rules/STATE-2.hozo と tests/rules/STATE-2 が確かめる）ので、ここでは重ねて出さない。
 func TestState2(t *testing.T) {
 	foreign := leaf("browser.l", nil)
 	foreign.Effects = []string{"server.e1"}
@@ -150,11 +152,11 @@ func TestState2(t *testing.T) {
 	p := program(nil, namespace("server", append(serverBase(), own, h, ok)...), namespace("browser", foreign, decorated, wiring))
 	diags := Check(p, cfgFor("server", "browser"))
 	s2 := withCode(diags, "STATE-2")
-	if len(s2) != 2 {
-		t.Fatalf("STATE-2 count = %d, want 2\n%s", len(s2), messages(diags))
+	if len(s2) != 1 {
+		t.Fatalf("STATE-2 count = %d, want 1\n%s", len(s2), messages(diags))
 	}
-	if !strings.Contains(s2[0].Message, "browser.l") || !strings.Contains(s2[1].Message, "browser.m") {
-		t.Errorf("STATE-2 messages: %q / %q", s2[0].Message, s2[1].Message)
+	if !strings.Contains(s2[0].Message, "browser.m") {
+		t.Errorf("STATE-2 message: %q", s2[0].Message)
 	}
 	wantNoCode(t, diags, "EFF-2")
 }

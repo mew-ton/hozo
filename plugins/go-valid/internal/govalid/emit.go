@@ -421,20 +421,7 @@ func (g *generator) scalarConstraints(t ir.Type) []constraint {
 }
 
 // checkDefault は GOVALID-2: フィールド f の既定値を、その型（scalar の制約）と、フィールドに付いた制約で確かめる。
+// IR にフィールドの既定値はなくなった（版 0.5。docs/ir.md「版」）ので、確かめる既定値がない（GOVALID-2 の扱いは、go-valid を
+// 作り直す段で決める）。
 func (g *generator) checkDefault(m *ir.Model, f *ir.Field) {
-	if f.Default == nil {
-		return
-	}
-	subject := fmt.Sprintf("model %s のフィールド %s", m.Name, f.Name)
-	for _, c := range g.scalarConstraints(unwrap(f.Type)) {
-		if !c.satisfied(f.Default) {
-			g.errorf(codeValidDefault, m.Name, "%s の既定値 %s が、その型の制約 %s（%s）に合わない", subject, displayLiteral(f.Default), c.describe(), c.owner)
-		}
-	}
-	cons, _ := g.fieldConstraints(f, subject)
-	for _, c := range cons {
-		if !c.satisfied(f.Default) {
-			g.errorf(codeValidDefault, m.Name, "%s の既定値 %s が、フィールドの制約 %s に合わない", subject, displayLiteral(f.Default), c.describe())
-		}
-	}
 }

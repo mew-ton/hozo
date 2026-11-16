@@ -1,0 +1,22 @@
+// EFF-3（docs/check.md「状態と効果」「デコレータが運ぶ reads と effects」）: 数えるのは、葉の op が自分で書いた効果だけ。
+// デコレータが運ぶ効果はいくつでもよい（順序はデコレータの引数に書いた順）。自分で書いた一つと合わせてもよい
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state s: list<M>;
+  @db.table(M)
+  state t: list<M>;
+  @db.insert(s) effect e on s.post;
+  @db.insert(t) effect f on t.post;
+  @db.delete(t, "id") effect g on t.delete;
+  union Both { e; f; }
+  decorator doing(...targets: any effect) for op effects targets;
+  @db.effects(e, f, g)
+  op carried(x: M, y: M, z: string);
+  @doing(Both)
+  op carriedUnion(x: M);
+  @db.effects(e, f)
+  op carriedAndOne(x: M, y: M) effects g;
+  @db.effects(e, f)
+  op carriedAndSame(x: M, y: M) effects e;
+}

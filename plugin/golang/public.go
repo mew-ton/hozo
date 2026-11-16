@@ -97,13 +97,8 @@ func PublicNames(view *ir.View) []PublicName {
 					continue // View が見る側のために合成した model は、基底が出さない（docs/plugin-go.md「出力の対象」）
 				}
 			}
+			// IR にフィールドの既定値はなくなった（版 0.5。docs/ir.md「版」）ので、New<Model>（PublicNewModel）は並べない
 			add(typeName(name), PublicType, name, "", "model "+name)
-			for _, f := range x.Fields {
-				if f.Default != nil {
-					add("New"+typeName(name), PublicNewModel, name, "", "model "+name+" の New"+typeName(name))
-					break
-				}
-			}
 		case *ir.Scalar, *ir.Exception:
 			add(typeName(name), PublicType, name, "", d.Kind()+" "+name)
 		case *ir.Union:

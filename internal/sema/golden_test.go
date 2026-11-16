@@ -40,7 +40,7 @@ namespace a {
     /** 名前 */
     name: string;
     /** 段階 */
-    level: int = 1;
+    level: int;
     since: Time;
   }
   model Admin extends Member {

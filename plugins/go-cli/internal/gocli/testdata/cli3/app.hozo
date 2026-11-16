@@ -10,20 +10,20 @@ namespace app {
     @cli.flag("model") model_: Point;
     @cli.flag("record") record: Record<string, string>;
     @cli.flag("time") time: Time;
-    @cli.arg duration: Duration;
+    @cli.arg(1) duration: Duration;
     @cli.flag("when") when: When?;
     @cli.flag("flags") flags: string[];
     @cli.env("ENVS") envs: string[];
-    @cli.arg flag: boolean;
-    @cli.arg maybe: boolean?;
-    @cli.arg points: Point[];
-    @cli.arg counts: int[];
-    @cli.arg rest: string[]?;
+    @cli.arg(2) flag: boolean;
+    @cli.arg(3) maybe: boolean?;
+    @cli.arg(4) points: Point[];
+    @cli.arg(5) counts: int[];
+    @cli.arg(6) rest: string[]?;
   }
   @cli.command("run")
   export op run(in: In);
 
-  // 受け付ける型: string / boolean / int / float、その scalar、その省略可能、@cli.arg の string（と string の scalar）の array
+  // 受け付ける型: string / boolean / int / float、その scalar、その省略可能、@cli.arg(7) の string（と string の scalar）の array
   model Fine {
     @cli.flag("s") s: string;
     @cli.flag("b") b: boolean;
@@ -35,8 +35,8 @@ namespace app {
     @cli.flag("of") of: float?;
     @cli.flag("sc") sc: Count2;
     @cli.flag("osc") osc: Path?;
-    @cli.arg a: int;
-    @cli.arg rest: Path[];
+    @cli.arg(1) a: int;
+    @cli.arg(2) rest: Path[];
   }
   @cli.command("fine")
   export op fine(in: Fine);

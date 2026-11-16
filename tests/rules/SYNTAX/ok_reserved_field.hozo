@@ -11,11 +11,11 @@ namespace a {
     op: string;
     decorator: string;
     state: Target;
-    match: int = 1;
+    match: int;
     /** 型の位置の予約語と同じ名前でもよい */
     string: string;
     list: string[];
-    default: boolean = false;
+    default: boolean;
     true: boolean?;
   }
   // override の後ろの名前

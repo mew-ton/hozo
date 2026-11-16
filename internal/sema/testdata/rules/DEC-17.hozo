@@ -1,0 +1,43 @@
+// DEC-17（docs/check.md「デコレータ」「デコレータが運ぶ reads と effects」）: reads か effects の節を持つデコレータを付けられるのは
+// 葉の op だけ。配線の op（本体を持つ op）に付ければ error。位置はそのデコレータの適用
+namespace a {
+  model M { id: string; }
+  state s: list<M>;
+  effect add on s.post;
+  decorator reading(table: any state) for op reads table;
+  decorator writing(...targets: any effect) for op effects targets;
+  decorator fixed for op reads s effects add;
+  decorator plain for op;
+  exception E;
+  decorator throwing throws E;
+
+  @reading(s) op leafRead(): M[];
+  @writing(add) op leafWrite(m: M);
+  @fixed op leafBoth(m: M): M[];
+
+  @reading(s)                          // ERROR: DEC-17
+  op wireRead(): M[] {
+    return leafRead();
+  }
+  @plain
+  @writing(add)                        // ERROR: DEC-17
+  op wireWrite(m: M) {
+    leafWrite(m);
+  }
+  @fixed                               // ERROR: DEC-17
+  @reading(s)                          // ERROR: DEC-17
+  op wireBoth(m: M): M[] {
+    return leafBoth(m);
+  }
+  // 残りの引数に何も渡していなくても、節を持つデコレータは配線に付けられない
+  @writing                             // ERROR: DEC-17
+  op wireNothing() {
+    leafWrite({ id: "x" });
+  }
+  // 節を持たないデコレータ（throws / catches だけのものを含む）は配線に付けられる
+  @plain
+  @throwing
+  op wireOk(m: M) {
+    leafWrite(m);
+  }
+}

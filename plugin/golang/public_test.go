@@ -10,8 +10,8 @@ import (
 // docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前を、種類ごとに一つずつ。
 // 並びは、宣言順（宣言ごとの名前）、状態の単位、Ops、New、Leaves、SharedState、Seams、別の名前空間の口。
 func TestPublicNames(t *testing.T) {
+	// フィールドの既定値は IR にない（版 0.5）ので、New<Model> は公開の名前に並ばない
 	withDefault := model("shop.Page", field("size", ir.Int()))
-	withDefault.Fields[0].Default = ir.IntLiteral{Value: 10}
 	synthesized := model("shop.leaf$in")
 	synthesized.SynthesizedFrom = "shop.leaf"
 	arm := model("shop.Shape.Circle") // その場で書いたアームの model（op からの合成ではない）
@@ -50,7 +50,6 @@ func TestPublicNames(t *testing.T) {
 	want := []row{
 		{"Item", PublicType, "shop.Item", "", "model shop.Item"},
 		{"Page", PublicType, "shop.Page", "", "model shop.Page"},
-		{"NewPage", PublicNewModel, "shop.Page", "", "model shop.Page の NewPage"},
 		{"ShapeCircle", PublicType, "shop.Shape.Circle", "", "model shop.Shape.Circle"},
 		{"Sku", PublicType, "shop.Sku", "", "scalar shop.Sku"},
 		{"Missing", PublicType, "shop.Missing", "", "exception shop.Missing"},

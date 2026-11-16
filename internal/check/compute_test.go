@@ -567,3 +567,89 @@ func TestComputeIdempotent(t *testing.T) {
 		t.Errorf("signature changed on recompute")
 	}
 }
+
+// TestSigCarried は docs/check.md「デコレータが運ぶ reads と effects」: 葉の op の F は直に持つ効果（Op.effects の後ろに
+// Op.carried.effects。重複は最初の出現）、R は直に読む状態（Op.reads の後ろに Op.carried.reads）。呼び出し元へは、op が
+// 書いたものと同じに伝わる（EFF-1）。手順 i（catches / throws）は、運ばれた効果を op の中身の分として扱う。
+// 配線の計算は、運ばれるものを使わない（循環していて葉として計算する op も、配線なので使わない）。
+func TestSigCarried(t *testing.T) {
+	doing := decorator("server.doing")
+	doing.Reads = []string{"$param:table"}
+	doing.Effects = []string{"$param:targets"}
+	doing.Throws = []ir.ThrowsClause{throws([]string{"server.Y"}, prevents())}
+
+	carried := leaf("server.carried", nil)
+	carried.Decorators = []ir.Application{app("server.doing")}
+	carried.Effects = []string{"server.e2"}
+	carried.Reads = []string{"server.sB"}
+	carried.Carried = ir.Carried{Reads: []string{"server.sA", "server.sB"}, Effects: []string{"server.e1", "server.e2", "server.e3"}}
+	carried.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
+
+	caller := wire("server.caller", nil, nil, cs(call("server.carried")))
+	caller.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y"})}
+
+	// 配線に運ばれたもの（DEC-17 の誤りの形）は、計算に入らない
+	wired := wire("server.wired", nil, nil, cs(call("server.plain")))
+	wired.Carried = ir.Carried{Reads: []string{"server.sA"}, Effects: []string{"server.e4"}}
+	plain := leaf("server.plain", nil)
+
+	// 循環上の op は葉として計算するが、配線なので運ばれるものは使わない
+	loop := wire("server.loop", nil, nil, cs(call("server.loop")))
+	loop.Effects = []string{"server.e1"}
+	loop.Reads = []string{"server.sA"}
+	loop.Carried = ir.Carried{Reads: []string{"server.sB"}, Effects: []string{"server.e2"}}
+
+	p := serverWith(doing, carried, caller, wired, plain, loop)
+	Compute(p)
+
+	sig := sigOf(t, p, "server.carried")
+	wantStrings(t, "葉の F（書いたもの、運ばれたもの）", sig.Effects, []string{"server.e2", "server.e1", "server.e3"})
+	wantStrings(t, "葉の R（書いたもの、運ばれたもの）", sig.Reads, []string{"server.sB", "server.sA"})
+	wantStrings(t, "葉の E", sig.Exceptions, []string{"server.X", "server.Y"})
+	for _, e := range sig.Effects {
+		if got := relOf(t, sig, "server.X", e); got != ir.Kept {
+			t.Errorf("rel(X, %s) = %s, want kept（op の throws の relations は、運ばれた効果にも掛かる）", e, got)
+		}
+		if got := relOf(t, sig, "server.Y", e); got != ir.Prevented {
+			t.Errorf("rel(Y, %s) = %s, want prevented（デコレータの throws の relations も同じ）", e, got)
+		}
+		if got := succOf(t, sig, e); got != ir.Kept {
+			t.Errorf("succ(%s) = %s, want kept", e, got)
+		}
+	}
+	if sig.Pure {
+		t.Error("デコレータの付いた op は純粋でない")
+	}
+	// Op.reads / Op.effects / Op.carried は書き換えない
+	wantStrings(t, "Op.effects", carried.Effects, []string{"server.e2"})
+	wantStrings(t, "Op.carried.effects", carried.Carried.Effects, []string{"server.e1", "server.e2", "server.e3"})
+
+	up := sigOf(t, p, "server.caller")
+	wantStrings(t, "呼び出し元の F", up.Effects, []string{"server.e2", "server.e1", "server.e3"})
+	wantStrings(t, "呼び出し元の R", up.Reads, []string{"server.sB", "server.sA"})
+
+	w := sigOf(t, p, "server.wired")
+	wantStrings(t, "配線の F は本体から", w.Effects, nil)
+	wantStrings(t, "配線の R は本体から", w.Reads, nil)
+
+	l := sigOf(t, p, "server.loop")
+	wantStrings(t, "循環上の op の F は Op.effects", l.Effects, []string{"server.e1"})
+	wantStrings(t, "循環上の op の R は Op.reads", l.Reads, []string{"server.sA"})
+}
+
+// TestCarriedReadsOnly はデコレータが運ぶ状態だけを読む op（読む op）: R が空でなく、効果を持たない。
+func TestCarriedReadsOnly(t *testing.T) {
+	find := leaf("server.find", ir.Optional(ir.String()))
+	find.Carried = ir.Carried{Reads: []string{"server.sA"}}
+	find.Decorators = []ir.Application{app("server.finder")}
+	finder := decorator("server.finder")
+	finder.Reads = []string{"server.sA"}
+	w := wire("server.w", ir.Optional(ir.String()), nil, ret(call("server.find")))
+	w.Reads = []string{"server.sA"}
+	p := serverWith(finder, find, w)
+	diags := Check(p, cfgFor("server"))
+	wantStrings(t, "R(find)", sigOf(t, p, "server.find").Reads, []string{"server.sA"})
+	wantStrings(t, "F(find)", sigOf(t, p, "server.find").Effects, nil)
+	wantStrings(t, "R(w)", sigOf(t, p, "server.w").Reads, []string{"server.sA"})
+	wantNoCode(t, diags, "READS-2") // 配線に書いた reads は、運ばれた状態を含む計算と等しい
+}

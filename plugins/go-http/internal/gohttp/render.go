@@ -192,12 +192,8 @@ func (f *file) route(r *route, ops, w, req string) string {
 }
 
 // hasDefaults は、既定値を持つフィールドが一つでもあるか（基底が New<Model> を出す model。docs/plugin-go.md「model」）。
+// IR にフィールドの既定値はなくなった（版 0.5。docs/ir.md「版」）ので、いつも false。
 func hasDefaults(m *ir.Model) bool {
-	for _, f := range m.Fields {
-		if f.Default != nil {
-			return true
-		}
-	}
 	return false
 }
 
@@ -216,7 +212,7 @@ func (f *file) convert(expr string, t ir.Type) string {
 }
 
 // required は、フィールド x が、要求になければならないか（省略可能でも、既定値持ちでもない）。
-func required(x *input) bool { return !x.optional && x.field.Default == nil }
+func required(x *input) bool { return !x.optional }
 
 // readHeader は @http.header のフィールド（docs/plugin-go-http.md「入力の読み方」の表の上の二行）。値は、そのまま型にする。
 // 空の文字列のヘッダは、ないものとして読む。

@@ -33,10 +33,10 @@ namespace vault {
     sql: Duration;
   }
 
-  @db state secrets: list<Secret>;
+  @db.table(Secret) state secrets: list<Secret>;
   /** 同じ名前の model（a.Entry と b.Entry）: 補助の名前は、後の方に 2 を付ける */
-  @db state entriesA: list<a.Entry>;
-  @db state entriesB: list<b.Entry>;
+  @db.table(a.Entry) state entriesA: list<a.Entry>;
+  @db.table(b.Entry) state entriesB: list<b.Entry>;
 
   // 引数の名前がレシーバの t と当たる
   export op find(t: Key): Secret? reads secrets;

@@ -5,9 +5,9 @@
 namespace app {
   scalar Email extends string;
   model Address { city: string; zip: string?; tags: string[]; }
-  model Profile { name: string; address: Address?; nick: string?; age: int = 20; active: boolean = true; }
+  model Profile { name: string; address: Address?; nick: string?; age: int; active: boolean; }
   model Account { id: string; profile: Profile?; email: Email; }
-  model Options { limit: int = 10; label: string = "none"; ratio: float = 1.5; wait: Duration = 5s; note: string?; }
+  model Options { limit: int; label: string; ratio: float; wait: Duration; note: string?; }
   /** 大きさ（述語で決まる分類。ケースで絞り込んだ型 Size.Big<Address> を作るため） */
   classify Size of Address {
     Big;

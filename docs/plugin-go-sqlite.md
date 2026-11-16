@@ -309,7 +309,7 @@ func (t SessionsTable) RemoveSession(ctx context.Context, token pkgtype.Token) e
 | GOSQL-1 | error | `@db.table(M)` の付いた状態の要素の型が、M と等しくない（要素が model でないときを含む）。位置は状態 |
 | GOSQL-2 | error | `@db.table` の付いた状態の形が `list` でない（`nullable`、`single`）。位置は状態 |
 | GOSQL-3 | error | 表の model に、どのしまい方でも列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model |
-| GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`<状態>Table`、`New<状態>Table`、出すなら `SharedTable`、`NewSharedTable`、`<C>Table`、`New<C>Table`）が、N の定義のパッケージの名前（型、`New<Model>` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`。状態 `shared` の `SharedTable` と、`SharedState` の `SharedTable`）も同じで、位置は後ろの宣言 |
+| GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`<状態>Table`、`New<状態>Table`、出すなら `SharedTable`、`NewSharedTable`、`<C>Table`、`New<C>Table`）が、N の定義のパッケージの名前（型など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`。状態 `shared` の `SharedTable` と、`SharedState` の `SharedTable`）も同じで、位置は後ろの宣言 |
 | GOSQL-6 | error | `[emit.options.go-sqlite]` に、知らないキーがある。位置なし |
 | GOSQL-7 | error | `db` の語彙のデコレータ（`@db.find`、`@db.list`、`@db.insert`、`@db.update`、`@db.delete`）の引数の状態が、N の表の状態でない（`@db.table` が付いていない、別の名前空間の状態）。位置はデコレータを付けた宣言 |
 | GOSQL-8 | error | デコレータの引数の列の名前が、その表の model のフィールドにない。位置はデコレータを付けた宣言 |

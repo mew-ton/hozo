@@ -123,7 +123,7 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.UnionVariant]():    {"arms", "set"},
 	typeOf[ir.StateShape]():      {"list", "nullable", "single"},
 	typeOf[ir.Operation]():       {"post", "put", "delete"},
-	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model"},
+	typeOf[ir.DecoratorTarget](): {"op", "field", "state", "exception", "scalar", "model", "effect"},
 	typeOf[ir.AnyOf]():           {"exception", "effect", "state", "op", "model", "variant"},
 	typeOf[ir.RelationKind]():    {"prevents", "keeps"},
 	typeOf[ir.CatchMode]():       {"recovers", "halts", "ignores"},

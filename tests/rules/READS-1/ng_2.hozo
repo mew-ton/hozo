@@ -1,0 +1,27 @@
+// READS-1（docs/check.md「状態と効果」「デコレータが運ぶ reads と effects」）: デコレータが運ぶ状態も、op が書いたものと同じに
+// 確かめる。葉の op に運ばれた状態が別の名前空間のものなら READS-1。位置はそのデコレータの適用
+state shared: list<string>;
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state own: list<M>;
+  decorator fromRows for op reads b.rows;
+  @db.find(b.rows, "id")               // ERROR: READS-1
+  op k(id: string): b.Row?;
+  @db.list(shared)                     // ERROR: READS-1
+  op l(): string[];
+  @fromRows                            // ERROR: READS-1
+  op m(): b.Row[];
+  @db.list(b.rows)                     // ERROR: READS-1
+  op n(): b.Row[]
+    reads b.rows;                      // ERROR: READS-1
+  @db.find(own, "id")
+  op ok(id: string): M?;
+}
+namespace b {
+  model Row { @db.text id: string; }
+  @db.table(Row)
+  state rows: list<Row>;
+  @a.fromRows
+  op own(): Row[];
+}

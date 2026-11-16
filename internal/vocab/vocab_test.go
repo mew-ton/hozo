@@ -10,9 +10,16 @@ import (
 
 // docs/vocab.md「同梱する語彙」の表。
 var expected = map[string][]string{
-	"hozo:vocab/valid.hozo":        {"namespace valid {", "decorator min(", "decorator max(", "decorator length(min: int?, max: int?)", "decorator pattern(", "decorator format("},
-	"hozo:vocab/http.hozo":         {"namespace http {", "exception ServerError;", "exception NetworkError;", "@external\n  decorator get(", "@external\n  decorator post(", "decorator status(", "decorator header(", "decorator body for field;", "decorator query for field;", "decorator retry("},
-	"hozo:vocab/db.hozo":           {"decorator db for state;", "namespace db {", "decorator key for field;", "decorator unique for field;", "decorator ref(target: any model) for field;"},
+	"hozo:vocab/valid.hozo": {"namespace valid {", "decorator min(", "decorator max(", "decorator length(min: int?, max: int?)", "decorator pattern(", "decorator format("},
+	"hozo:vocab/http.hozo": {"namespace http {", "exception ServerError;", "exception NetworkError;", "model Violation {", "exception BadRequest:", "@external\n  decorator get(", "@external\n  decorator post(", "decorator status(",
+		"decorator header(name: string?) for field;", "decorator query(name: string?) for field;", "decorator body(name: string?) for field;",
+		"decorator headerObj for field;", "decorator queryObj for field;", "decorator bodyObj for field;", "decorator required for field;", "decorator default(value:", "decorator retry("},
+	"hozo:vocab/db.hozo": {"namespace db {", "decorator table(element: any model) for state;",
+		"decorator text for field;", "decorator int for field;", "decorator float for field;", "decorator bool for field;", "decorator time for field;", "decorator json for field;", "decorator nullable for field;",
+		"decorator key for field;", "decorator unique for field;", "decorator ref(target: any model) for field;",
+		"decorator find(table: any state, column: string) for op reads table;", "decorator list(table: any state, column: string?) for op reads table;",
+		"decorator insert(table: any state) for effect;", "decorator update(table: any state) for effect;", "decorator delete(table: any state, column: string) for effect;",
+		"decorator effects(...targets: any effect) for op effects targets;"},
 	"hozo:vocab/localstorage.hozo": {"decorator localStorage for state;"},
 	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator route(path: string, from: any state?, onInvalid: any effect?);", "decorator dialog(", "decorator fallback(", "decorator interaction("},
 	"hozo:vocab/fs.hozo":           {"namespace fs {", "decorator files(glob: string) for state;"},
@@ -44,6 +51,10 @@ func TestFiles(t *testing.T) {
 		// docs/vocab.md「同梱する語彙」: x?: T は書かない。cache は同梱しない。proc.stdio は @external でなく引数もない。
 		if regexp.MustCompile(`\w\?:`).MatchString(s) {
 			t.Errorf("%s: uses x?: T", f.Path)
+		}
+		// グローバルのデコレータ db（`@db state …`）は、db.table に替えた（docs/vocab.md「`db` の表と、しまい方」）
+		if regexp.MustCompile(`(?m)^decorator db\b`).MatchString(s) {
+			t.Errorf("%s: declares the global decorator db", f.Path)
 		}
 		if strings.Contains(s, "cache") {
 			t.Errorf("%s: contains cache", f.Path)

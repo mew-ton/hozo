@@ -1,7 +1,7 @@
 // docs/config.md「単位の対象」: hozo.toml の単位の対象の名前空間（出力する側）
 /** 店（コードを生成する側） */
 namespace shop {
-  model Line { item: string; count: int = 1; }
+  model Line { item: string; count: int; }
   // docs/requirements.md「モデルが先」決まったこと: 印は宣言に付ける（名前空間には付けられない。docs/grammar.md「ファイルと宣言」）
   // docs/ir.md「デコレータの適用」: DeclBase.decorators
   /** 注文 */

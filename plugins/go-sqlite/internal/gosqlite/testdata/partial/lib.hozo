@@ -19,11 +19,11 @@ namespace lib {
   /** キーだけの model */
   model Mark { @db.key book: BookId; @db.key page: int; }
 
-  @db state books: list<Book>;
-  @db state notes: list<Note>;
-  @db state marks: list<Mark>;
+  @db.table(Book) state books: list<Book>;
+  @db.table(Note) state notes: list<Note>;
+  @db.table(Mark) state marks: list<Mark>;
   /** op がどれも規則に当たる状態（var _ を出す） */
-  @db state archive: list<Book>;
+  @db.table(Book) state archive: list<Book>;
 
   // ---- books ----
 

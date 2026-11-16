@@ -1,0 +1,24 @@
+// SYNTAX（docs/grammar.md「識別子」「decorator の宣言」）: デコレータを指す名前で予約語を書けるのは、最後の要素だけ。
+// 残りの引数は最後に一つだけで、型は渡す値一つの型（? も [] も付けない）。op の引数には書けない。
+// reads の節の区切りは ","、effects の節の区切りは "|"
+namespace a {
+  state rows: list<string>;
+  effect add on rows.post;
+  decorator ok(...targets: any effect) for op effects targets;
+  decorator notLast(...xs: any effect, y: string);                 // ERROR: SYNTAX
+  decorator twoRests(...xs: any effect, ...ys: any state);         // ERROR: SYNTAX
+  decorator optionalRest(...xs: any effect?);                      // ERROR: SYNTAX
+  decorator optionalRest2(...xs: string?);                         // ERROR: SYNTAX
+  decorator arrayRest(...xs: string[]);                            // ERROR: SYNTAX
+  decorator keywordParam(...to: string);                           // ERROR: SYNTAX
+  decorator readsPipe(a: any state, b: any state) reads a | b;     // ERROR: SYNTAX
+  decorator effectsComma(a: any effect, b: any effect) effects a, b;   // ERROR: SYNTAX
+  decorator noElement reads;                                       // ERROR: SYNTAX
+  decorator a.qualified;                                           // ERROR: SYNTAX
+  decorator badTarget for namespace;                               // ERROR: SYNTAX
+  op rest(...xs: string);                                          // ERROR: SYNTAX
+  @a.op.x                                                          // ERROR: SYNTAX
+  op middle();
+  @ok(add)
+  op good(x: string);
+}

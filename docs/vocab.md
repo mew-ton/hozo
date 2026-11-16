@@ -22,7 +22,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | ファイル | 中身 | 出典 |
 |---|---|---|
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
-| `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required` は、出典から変えたか、足したもの（「`http` の語彙」） |
+| `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
 | `vocab/db.hozo` | `namespace db { table / text / int / float / bool / time / json / nullable / key / unique / ref / find / list / insert / update / delete / effects }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の読み書きのデコレータ」「`db` の表と、しまい方」） |
 | `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
 | `vocab/page.hozo` | `namespace page { Aborted / Route / path / query / route / dialog / fallback / interaction }` | §4.2 |
@@ -47,7 +47,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 ### `db` の読み書きのデコレータ
 
-状態が表であること、フィールドを列にどうしまうか、列が値を持たなくてよいか（「`db` の表と、しまい方」）、op が表から何を引き、効果が表に何をするか（この節）を、仕様が言うためのデコレータ（`docs/decisions.md`「決めたこと」92〜95、104、105、117）。`vocab/db.hozo` の全文は次のとおり。出典にあるのは `key` / `unique` / `ref` だけ。
+状態が表であること、フィールドを列にどうしまうか、列が値を持たなくてよいか（「`db` の表と、しまい方」）、op が表から何を引き、効果が表に何をするか（この節）を、仕様が言うためのデコレータ（`docs/decisions.md`「決めたこと」92〜95、104、105、119）。`vocab/db.hozo` の全文は次のとおり。出典にあるのは `key` / `unique` / `ref` だけ。
 
 ```ts
 namespace db {
@@ -109,7 +109,7 @@ namespace db {
 
 ### `http` の語彙
 
-入力の model のフィールドを、要求のどこから読むかと、その項目がなければ誤りかを言うデコレータ（`docs/decisions.md`「決めたこと」107、114）。場所は三つ（ヘッダ、クエリ、本文）で、どれも同じ二つの形を持つ。`vocab/http.hozo` の、この部分は次のとおり（ほかの宣言は、出典のまま）。
+入力の model のフィールドを、要求のどこから読むかと、その項目が要求にないときの扱いを言うデコレータ（`docs/decisions.md`「決めたこと」107、114、115）。場所は三つ（ヘッダ、クエリ、本文）で、どれも同じ二つの形を持つ。`vocab/http.hozo` の、この部分は次のとおり（ほかの宣言は、出典のまま）。
 
 ```ts
   /** このフィールドを、要求のヘッダ一つから読む。name を省けば、フィールドの名前 */
@@ -126,8 +126,10 @@ namespace db {
   /** このフィールド（model）で、本文の全体を受け取る。本文が、その model の JSON */
   decorator bodyObj for field;
 
-  /** このフィールドの項目が要求になければ、誤り（op は呼ばれない）。付けていない項目は、なくてもよい */
+  /** このフィールドの項目が要求になければ、誤り（op は呼ばれない） */
   decorator required for field;
+  /** このフィールドの項目が要求になければ、value にする */
+  decorator default(value: string | int | float | boolean | Duration) for field;
 ```
 
 | 場所 | 項目一つ | 場所の全体を、一つの model で |
@@ -138,14 +140,20 @@ namespace db {
 
 - **項目の形**は、名前を引数に取り、省けば、フィールドの名前（`@http.query page` は `page`、`@http.query("q") keyword` は `q`）。
 - **全体の形**（`…Obj`）は、型が model のフィールドにだけ付けられ、項目の名前は、その model のフィールドの名前。一つの場所に高々一つで、同じ場所の項目の形とは一緒に書けない。
-- **`@http.required`** は、項目の形（`@http.header` / `@http.query` / `@http.body`）を持つフィールドに足す（`@http.required @http.query id: int`）。その項目が要求になければ、op を呼ぶ前の失敗（`http.BadRequest`）。付けていない項目は、なくても誤りにしない。項目がないことを誤りにするのは、このデコレータだけで、フィールドの型（省略可能かどうか）からは決めない。型は、食い違いを確かめるのにだけ使う: 項目の形を持たないフィールド（全体の形のフィールドと、その model の中のフィールドを含む）に付けられず、省略可能なフィールド（`T?`）にも付けられない。出典にないデコレータ。
+- **項目が要求にないときの扱い**は、項目の形（`@http.header` / `@http.query` / `@http.body`）を持つフィールドに足す、二つのデコレータが言う。どちらも出典にない。
+  - `@http.required`（`@http.required @http.body lines: OrderLine[]`）: op を呼ぶ前の失敗（`http.BadRequest`）。
+  - `@http.default(<リテラル>)`（`@http.query @http.default(1) page: int`）: フィールドを、その値にする。`value` の型は、リテラルの型のすべて（`docs/grammar.md`「リテラル」の `Literal`）。
+  - どちらもないフィールドは、零値のまま（省略可能なフィールドは、値がない）。
+- **型の宣言に書く既定値（`page: int = 1`）は、言語にない**（`docs/decisions.md`「設計書を変える決定」S24）。共有の型の既定値は、その型を使うすべての名前空間（ブラウザも、サーバーも）が入れることになる。誰が入れるかは振る舞いなので、境界のデコレータと、それを読むプラグインが言う: HTTP の要求なら、読むサーバーが入れる（`docs/plugin-go-http.md`「通信の形」の「要求」）。
+- 項目がないときの扱いは、フィールドの型（省略可能かどうか）からは決めない。型は、食い違いを確かめるのにだけ使う: 二つのデコレータは、項目の形を持たないフィールド（全体の形のフィールドと、その model の中のフィールドを含む）にも、省略可能なフィールド（`T?`）にも付けられず、一つのフィールドに両方は付けられず、`default` のリテラルは、フィールドの型に渡せなければならない（確かめるのは、語彙を読むトランスパイラ）。
+- `default` は予約語だが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
 - 出典（§4.2）から変えたところ: `header` の `name` を省けるようにし、`query` と `body` に、同じ `name` を足した。「`@http.body` が一つなら、本文がその値。二つ以上なら、フィールドの名前をキーにしたオブジェクト」という、数で形が変わる読み方は、やめた: 本文そのものを一つの model で受け取るなら `@http.bodyObj`、キー一つなら `@http.body`。
 - 通信の上の形と、書いたものの整合の検査は、語彙を読むトランスパイラが決める（`docs/plugin-go-http.md`「対象」「通信の形」「診断」）。
-- **`vocab/http.hozo` のファイルは、`go-http` の実装と一緒に、この形に置き換える。** それまでは、今の中身（`header(name: string)`、引数のない `body` と `query`。`required` はない）のまま（`docs/requirements.md`「作り直しの段階」の R3）。
+- **`vocab/http.hozo` のファイルは、`go-http` の実装と一緒に、この形に置き換える。** それまでは、今の中身（`header(name: string)`、引数のない `body` と `query`。`required` と `default` はない）のまま（`docs/requirements.md`「作り直しの段階」の R3）。
 
 ## 同梱しない語彙
 
-- `cli`（`examples/hozoc.hozo` の `namespace cli { command / arg / flag / env / exitCode }`）: go-cli プラグインが `vocabulary` で提供する（`plugins/go-cli/cli.hozo`。宣言の全文と、出典から変えたところ（`arg` の位置、`flag` と `env` の省ける名前、足した `required`）の持ち主は `docs/plugin-go-cli.md`「語彙」）。`http` や `page` と同じく、意味をコードにするプラグインが語彙の持ち主になる。hozoc 自身は `hozo.toml` の単位の `transpilers = ["go", "go-valid", "go-cli"]` で読む。
+- `cli`（`examples/hozoc.hozo` の `namespace cli { command / arg / flag / env / exitCode }`）: go-cli プラグインが `vocabulary` で提供する（`plugins/go-cli/cli.hozo`。宣言の全文と、出典から変えたところ（`arg` の位置、`flag` と `env` の省ける名前、足した `required` と `default`）の持ち主は `docs/plugin-go-cli.md`「語彙」）。`http` や `page` と同じく、意味をコードにするプラグインが語彙の持ち主になる。hozoc 自身は `hozo.toml` の単位の `transpilers = ["go", "go-valid", "go-cli"]` で読む。
 - `cache`（§4.2）: 今のスコープでは考えない（`docs/decisions.md`「スコープ外にした設計書の例」）。
 
 ## 語彙の意味の実装

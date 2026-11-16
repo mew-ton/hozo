@@ -1,0 +1,14 @@
+// EFF-3（docs/check.md「状態と効果」）: デコレータが運ぶ効果があっても、葉の op が自分で書いた効果が二つ以上なら EFF-3。
+// 複数の効果を一体に行うなら、効果を並べて行うと言うデコレータに並べる（@db.effects(e, f, g)）
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state s: list<M>;
+  @db.table(M)
+  state t: list<M>;
+  @db.insert(s) effect e on s.post;
+  @db.insert(t) effect f on t.post;
+  @db.delete(t, "id") effect g on t.delete;
+  @db.effects(e)                       // ERROR: EFF-3
+  op carriedAndTwo(x: M) effects f | g;
+}

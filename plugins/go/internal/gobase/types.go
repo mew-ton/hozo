@@ -89,13 +89,9 @@ func newModelComment(name string) string {
 	return comment("New" + name + " は既定値を入れた " + name + " を返す。")
 }
 
-// hasDefaults は、既定値を持つフィールドが一つでもあるか。
+// hasDefaults は、既定値を持つフィールドが一つでもあるか。IR にフィールドの既定値はなくなった（版 0.5。docs/ir.md「版」）ので、
+// いつも false（New<Model> は出ない。出す仕組みそのものは、基底を作り直す段でなくす）。
 func hasDefaults(m *ir.Model) bool {
-	for _, f := range m.Fields {
-		if f.Default != nil {
-			return true
-		}
-	}
 	return false
 }
 
@@ -195,11 +191,6 @@ func (e *emitter) genModel(f *fileGen, m *ir.Model) {
 	}
 	f.print(newModelComment(name))
 	f.printf("func New%s() %s {\n\tm := %s{}\n", name, name, name)
-	for _, fd := range m.Fields {
-		if fd.Default != nil {
-			f.printf("\tm.%s = %s\n", golang.FieldName(fd.Name), f.literal(fd.Default, fd.Type))
-		}
-	}
 	f.print("\treturn m\n}\n\n")
 }
 

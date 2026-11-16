@@ -557,10 +557,6 @@
                   "kind": "core",
                   "name": "int"
                 },
-                "default": {
-                  "kind": "int",
-                  "value": 10
-                },
                 "decorators": [
                   {
                     "decorator": "valid.min",

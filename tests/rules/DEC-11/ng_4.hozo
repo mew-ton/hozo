@@ -1,0 +1,16 @@
+// DEC-11（docs/types.md「デコレータの引数」）: 残りの引数には、名前では渡せない。残りの引数のほかの必須の Param は要る。
+// 残りの引数のほかの Param に二度渡せない
+namespace a {
+  state s: list<string>;
+  effect e1 on s.post;
+  decorator all(...targets: any effect) for op effects targets;
+  decorator some(first: int, second: string?, ...more: string);
+  @all(targets: e1)                    // ERROR: DEC-11
+  op restNamed(x: string);
+  @some                                // ERROR: DEC-11
+  op restMissingFixed();
+  @some(1, "s", more: "a")             // ERROR: DEC-11
+  op restNamed2();
+  @some(1, "s", "a", second: "t")      // ERROR: DEC-11
+  op restTwice();
+}

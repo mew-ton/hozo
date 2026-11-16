@@ -28,6 +28,16 @@ namespace cli {
    */
   decorator env(name: string?) for field;
 
+  /** このフィールドに値が与えられなければ、誤り */
+  decorator required for field;
+
+  /**
+   * このフィールドに値が与えられなければ、value にする
+   *
+   * @param value 値が与えられなかったときに入れる値
+   */
+  decorator default(value: string | int | float | boolean) for field;
+
   /**
    * この例外で終了するときの終了コード。
    *

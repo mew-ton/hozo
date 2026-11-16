@@ -1,5 +1,5 @@
 {
-  "version": "0.4",
+  "version": "0.5",
   "viewer": "browser",
   "config": {
     "index": 2,
@@ -68,7 +68,7 @@
     ]
   },
   "program": {
-    "version": "0.4",
+    "version": "0.5",
     "namespaces": [
       {
         "name": "http",
@@ -132,7 +132,8 @@
                     }
                   ]
                 },
-                "optional": false
+                "optional": false,
+                "rest": false
               }
             ],
             "targets": [
@@ -148,7 +149,9 @@
                 "relations": []
               }
             ],
-            "catches": []
+            "catches": [],
+            "reads": [],
+            "effects": []
           },
           {
             "kind": "decorator",
@@ -177,7 +180,8 @@
                     }
                   ]
                 },
-                "optional": false
+                "optional": false,
+                "rest": false
               }
             ],
             "targets": [
@@ -193,7 +197,9 @@
                 "relations": []
               }
             ],
-            "catches": []
+            "catches": [],
+            "reads": [],
+            "effects": []
           }
         ]
       },
@@ -436,6 +442,10 @@
               "server.deleteSession"
             ],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [],
             "body": null,
             "signature": {
@@ -632,6 +642,10 @@
             },
             "effects": [],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [],
             "body": null,
             "signature": {
@@ -722,6 +736,10 @@
               "browser.removeToken"
             ],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [],
             "body": null,
             "signature": {
@@ -769,7 +787,9 @@
                 ],
                 "mode": "ignores"
               }
-            ]
+            ],
+            "reads": [],
+            "effects": []
           },
           {
             "kind": "op",
@@ -807,6 +827,10 @@
             "returns": null,
             "effects": [],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [],
             "body": {
               "statements": [
@@ -907,6 +931,10 @@
             "returns": null,
             "effects": [],
             "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
             "throws": [],
             "body": {
               "statements": [

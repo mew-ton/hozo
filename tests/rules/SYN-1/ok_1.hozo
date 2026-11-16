@@ -1,6 +1,6 @@
 // SYN-1: デコレータは宣言の上に書く
 namespace a {
-  @db
+  @localStorage
   state s: list<string>;
   op f();
 }

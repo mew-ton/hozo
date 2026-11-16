@@ -85,14 +85,14 @@ namespace app {
     @db.key @db.ref(Link) self: string?;
   }
 
-  @db state cores: list<Core>;
-  @db state nameds: list<Named>;
-  @db state docs: list<Doc>;
-  @db state sparses: list<Sparse>;
-  @db state pairs: list<Pair>;
-  @db state sharedA: list<Shared>;
-  @db state sharedB: list<Shared>;
-  @db state links: list<Link>;
+  @db.table(Core) state cores: list<Core>;
+  @db.table(Named) state nameds: list<Named>;
+  @db.table(Doc) state docs: list<Doc>;
+  @db.table(Sparse) state sparses: list<Sparse>;
+  @db.table(Pair) state pairs: list<Pair>;
+  @db.table(Shared) state sharedA: list<Shared>;
+  @db.table(Shared) state sharedB: list<Shared>;
+  @db.table(Link) state links: list<Link>;
   /** @db のない状態は、表にならない */
   state plain: list<Core>;
 

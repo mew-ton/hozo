@@ -1,0 +1,29 @@
+// STATE-2（docs/check.md「状態と効果」「デコレータが運ぶ reads と effects」）: デコレータが運ぶ効果も、op が書いたものと同じに
+// 確かめる。葉の op に運ばれた効果が別の名前空間のものなら STATE-2。位置はそのデコレータの適用
+namespace a {
+  model M { @db.text id: string; }
+  @db.table(M)
+  state s: list<M>;
+  @db.insert(s)
+  effect e on s.post;
+  @db.delete(s, "id")
+  effect f on s.delete;
+  union Both { e; f; }
+  decorator doingE for op effects e;
+  op x();
+}
+namespace b {
+  @db.table(a.M)
+  state u: list<a.M>;
+  @db.insert(u)
+  effect g on u.post;
+  @db.effects(a.e)                     // ERROR: STATE-2
+  op carried(m: a.M);
+  @db.effects(g, a.Both)               // ERROR: STATE-2
+  op carriedUnion(m: a.M, n: a.M, id: string);
+  @a.doingE                            // ERROR: STATE-2
+  op carriedFixed();
+  @db.effects(a.f)                     // ERROR: STATE-2
+  op both(id: string)
+    effects a.e;                       // ERROR: STATE-2
+}

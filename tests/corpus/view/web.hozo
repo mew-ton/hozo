@@ -51,9 +51,11 @@ namespace web {
   /** メールアドレスを確認済み */
   condition Verified of api.PublicUser;
 
-  // docs/ir.md「正規化」: 既定値のリテラル（int、Duration のナノ秒、boolean）
+  // docs/ir.md「正規化」: デコレータの引数のリテラル（int、Duration のナノ秒、boolean）
+  decorator limits(page: int, timeout: Duration, strict: boolean) for model;
   /** 問い合わせ */
-  model Query { id: api.UserId; page: int = 1; timeout: Duration = 30s; strict: boolean = false; }
+  @limits(1, 30s, false)
+  model Query { id: api.UserId; page: int?; timeout: Duration?; strict: boolean?; }
 
   // 葉の op
   op userPageVm(user: api.PublicUser): UserPage;

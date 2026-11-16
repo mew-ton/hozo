@@ -1,7 +1,7 @@
 // LIT-1（docs/types.md「診断」）: 整数リテラルが 64 ビット符号付きの範囲を超える
 namespace a {
-  model M {
-    big: int = 9223372036854775808;    // ERROR: LIT-1
-  }
+  model M { id: string; }
+  decorator limit(max: int);
+  @limit(9223372036854775808)          // ERROR: LIT-1
   op f(): M;
 }

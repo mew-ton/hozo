@@ -35,7 +35,7 @@ import (
 // （[hozo].plugin_dirs = ["plugins"] と組み合わせて CFG-6 / CFG-11 / CFG-14〜CFG-16 / NS-3 を起こす）。
 //
 // 注釈の形は internal/sema/annot_test.go と同じ: `// ERROR: A, B`、`// WARN: A`、`// ERROR(-1): A`（相対の行）。
-// 加えて `// ERROR(hozo:vocab/db.hozo:2): NS-3` で別のファイルの行を指せる（埋め込まれた語彙に出る診断のため）。
+// 加えて `// ERROR(hozo:vocab/localstorage.hozo:2): NS-3` で別のファイルの行を指せる（埋め込まれた語彙に出る診断のため）。
 // hozo.toml の診断は位置（行）を持たないので、hozo.toml の中では `# ERROR: CFG-12` と書き、ファイル hozo.toml の
 // 行 0 の期待にする。
 //
@@ -45,7 +45,7 @@ import (
 
 const rulesDir = "rules"
 
-// annotRE は `// ERROR: A, B` / `// WARN: A` / `// ERROR(-1): A`（相対の行）/ `// ERROR(hozo:vocab/db.hozo:2): A`
+// annotRE は `// ERROR: A, B` / `// WARN: A` / `// ERROR(-1): A`（相対の行）/ `// ERROR(hozo:vocab/localstorage.hozo:2): A`
 // （別のファイルの行。注釈を書けない語彙のファイルに出る診断のため）。hozo.toml では `#` で始める。
 var annotRE = regexp.MustCompile(`(?://|#)\s*(ERROR|WARN)(?:\(([+-]\d+)\)|\(([^()\s]+):(\d+)\))?:\s*([A-Z0-9-]+(?:\s*,\s*[A-Z0-9-]+)*)`)
 

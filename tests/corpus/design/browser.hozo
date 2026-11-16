@@ -178,7 +178,7 @@ namespace browser {
 
   // ---- §11.2 ページとルーティング ----
 
-  model OrdersQuery { page: PosInt = 1; status: server.OrderStatus?; }
+  model OrdersQuery { page: PosInt; status: server.OrderStatus?; }
 
   /** 一時的に表示できない */
   model Unavailable {}

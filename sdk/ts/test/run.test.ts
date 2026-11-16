@@ -135,7 +135,7 @@ test("protocol mismatch: {error:{code:protocol}} on stdout and exit 2", async ()
   const out = JSON.parse(r.stdout);
   assert.equal(out.error.code, "protocol");
   assert.match(out.error.message, /0\.1/);
-  assert.match(out.error.message, /0\.4/);
+  assert.match(out.error.message, /0\.5/);
 });
 
 test("protocol missing: exit 2 with code protocol (checked before direction)", async () => {

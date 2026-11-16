@@ -5,9 +5,9 @@
 namespace api {
   scalar Token extends string;
   model GetInput { token: Token?; id: string; }
-  model Auth { token: Token?; locale: string = "ja"; }
+  model Auth { token: Token?; locale: string; }
   model NestedInput { auth: Auth; id: string; }
-  model Guest { token: Token = "guest"; id: string = "0"; }
+  model Guest { token: Token; id: string; }
   /** 印。付いた op は純粋でなくなる */
   decorator remote;
 

@@ -5,7 +5,7 @@
 namespace shop {
   /** ログインセッションのトークン */
   scalar Token extends string;
-  model Line { item: string; count: int = 1; }
+  model Line { item: string; count: int; }
   model Order { id: string; }
 
   // docs/check.md「状態の形」基底の状態: 形は列数の範囲。list は 0 以上、nullable は 0 か 1、single はちょうど 1

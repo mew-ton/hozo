@@ -107,10 +107,6 @@ func (a *analyzer) lowerFields(fields []*ast.Field, owner string, sc *scope) []i
 		if t, ok := a.lowerType(f.Type, sc); ok {
 			fld.Type = t
 		}
-		if f.Default != nil {
-			fld.Default = a.lowerLiteral(f.Default)
-			a.checkDefault(f, fld.Type)
-		}
 		a.fields[owner][f.Name.Name] = f.Name.Span
 		out = append(out, fld)
 	}
@@ -121,21 +117,6 @@ func (a *analyzer) lowerFields(fields []*ast.Field, owner string, sc *scope) []i
 		}
 	}
 	return out
-}
-
-// checkDefault は TYPE-13（docs/types.md「既定値」）: 既定値のリテラルは、フィールドの型が scalar への ref ならその元の型に、
-// そうでなければフィールドの型に渡せること。
-func (a *analyzer) checkDefault(f *ast.Field, t ir.Type) {
-	if t == nil {
-		return
-	}
-	target := a.scalarBase(stripOptional(t))
-	if target == nil {
-		return
-	}
-	if a.assign(literalType(f.Default.Kind), target) != assignOK {
-		a.errorf("TYPE-13", f.Default.Span, "フィールド %s の既定値 %s は型 %s に渡せない", f.Name.Name, f.Default.Raw, typeName(t))
-	}
 }
 
 // checkLiteralRange は LIT-1（docs/types.md「診断」）: 整数リテラルと Duration（ナノ秒）が 64 ビット符号付きの範囲を超える。

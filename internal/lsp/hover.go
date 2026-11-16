@@ -368,13 +368,9 @@ func (r *renderer) rels(fqns []string) string {
 	return strings.Join(out, " | ")
 }
 
-// field は `name: Type` か `name: Type = 既定値`。省略可能は型の `?` で書く（docs/grammar.md「model」）。
+// field は `name: Type`。省略可能は型の `?` で書く（docs/grammar.md「model」）。
 func (r *renderer) field(f ir.Field) string {
-	s := f.Name + ": " + r.typ(f.Type)
-	if f.Default != nil {
-		s += " = " + literal(f.Default)
-	}
-	return s
+	return f.Name + ": " + r.typ(f.Type)
 }
 
 // paramType はデコレータの引数の型（docs/grammar.md「decorator の宣言」の ParamType）。

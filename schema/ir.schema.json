@@ -362,6 +362,28 @@
       ],
       "type": "object"
     },
+    "Carried": {
+      "additionalProperties": false,
+      "properties": {
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reads": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "reads",
+        "effects"
+      ],
+      "type": "object"
+    },
     "CaseSet": {
       "description": "遷移の前か後のケースの集合。\"any\" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。",
       "oneOf": [
@@ -496,7 +518,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.4"
+          "const": "0.5"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -750,6 +772,12 @@
         "description": {
           "$ref": "#/$defs/Doc"
         },
+        "effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "external": {
           "type": "boolean"
         },
@@ -762,6 +790,12 @@
         "params": {
           "items": {
             "$ref": "#/$defs/Param"
+          },
+          "type": "array"
+        },
+        "reads": {
+          "items": {
+            "type": "string"
           },
           "type": "array"
         },
@@ -790,7 +824,9 @@
         "targets",
         "external",
         "throws",
-        "catches"
+        "catches",
+        "reads",
+        "effects"
       ],
       "type": "object"
     },
@@ -821,7 +857,8 @@
         "state",
         "exception",
         "scalar",
-        "model"
+        "model",
+        "effect"
       ],
       "type": "string"
     },
@@ -1027,7 +1064,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.4"
+          "const": "0.5"
         },
         "transpiler": {
           "type": "string"
@@ -1131,9 +1168,6 @@
           },
           "type": "array"
         },
-        "default": {
-          "$ref": "#/$defs/Literal"
-        },
         "description": {
           "$ref": "#/$defs/Doc"
         },
@@ -1205,7 +1239,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.4"
+          "const": "0.5"
         }
       },
       "required": [
@@ -1679,6 +1713,9 @@
             }
           ]
         },
+        "carried": {
+          "$ref": "#/$defs/Carried"
+        },
         "decorators": {
           "items": {
             "$ref": "#/$defs/Application"
@@ -1748,6 +1785,7 @@
         "returns",
         "effects",
         "reads",
+        "carried",
         "throws",
         "body",
         "signature"
@@ -1831,6 +1869,9 @@
         "optional": {
           "type": "boolean"
         },
+        "rest": {
+          "type": "boolean"
+        },
         "type": {
           "$ref": "#/$defs/ParamType"
         }
@@ -1838,7 +1879,8 @@
       "required": [
         "name",
         "type",
-        "optional"
+        "optional",
+        "rest"
       ],
       "type": "object"
     },
@@ -1917,7 +1959,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.4"
+          "const": "0.5"
         }
       },
       "required": [
@@ -2655,7 +2697,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.4"
+          "const": "0.5"
         },
         "viewer": {
           "type": "string"

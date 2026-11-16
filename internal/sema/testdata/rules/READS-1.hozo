@@ -1,4 +1,5 @@
-// READS-1（tests/rules/READS-1/ng_1.hozo と同じ。docs/check.md「状態と効果」「reads」）: 葉の op が読めるのは自分の名前空間の状態だけ。位置はその状態の名前
+// READS-1（tests/rules/READS-1/ng_1.hozo と同じ。docs/check.md「状態と効果」「reads」）: 葉の op が読めるのは自分の名前空間の状態だけ。
+// 位置は、op が書いた状態ならその名前、デコレータが運ぶものならその適用
 state shared: list<string>;
 namespace a {
   state own: list<string>;
@@ -8,8 +9,25 @@ namespace a {
   op i(): string[]
     reads own
     reads b.users, b.token;                      // ERROR: READS-1
+  // デコレータが運ぶ状態も同じに確かめる
+  decorator from(table: any state) for op reads table;
+  decorator fromUsers for op reads b.users;
+  @from(own)
+  op j(): string[];
+  @from(b.users)                                 // ERROR: READS-1
+  op k(): string[];
+  @from(shared)                                  // ERROR: READS-1
+  op l(): string[];
+  @fromUsers                                     // ERROR: READS-1
+  op m(): string[];
+  @from(b.token)                                 // ERROR: READS-1
+  op n(): string[]
+    reads b.users;                               // ERROR: READS-1
 }
 namespace b {
   state users: list<string>;
   state token: nullable<string>;
+  // 自分の名前空間の葉に付ければ通る
+  @a.fromUsers
+  op own(): string[];
 }

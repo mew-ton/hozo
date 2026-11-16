@@ -346,10 +346,6 @@
                 "kind": "core",
                 "name": "int"
               },
-              "default": {
-                "kind": "int",
-                "value": 1
-              },
               "decorators": [],
               "span": {
                 "file": "a.hozo",
@@ -359,7 +355,7 @@
                 },
                 "end": {
                   "line": 18,
-                  "col": 20
+                  "col": 16
                 }
               }
             },

@@ -68,10 +68,10 @@ namespace server {
     override hash: never;
   }
 
-  @db
+  @db.table(User)
   state users: list<User>;
 
-  @db
+  @db.table(Session)
   state sessions: list<Session>;
 
   // 追加: §7.3 / §10.2 / §11 が参照する model と状態
@@ -126,19 +126,19 @@ namespace server {
     expiresAt: Time;
   }
 
-  @db
+  @db.table(Item)
   state items: list<Item>;
 
-  @db
+  @db.table(CartLine)
   state carts: list<CartLine>;
 
-  @db
+  @db.table(Order)
   state orders: list<Order>;
 
-  @db
+  @db.table(Notification)
   state notifications: list<Notification>;
 
-  @db
+  @db.table(PasswordReset)
   state passwordResets: list<PasswordReset>;
 
   // ---- §6.1 exception ----
@@ -178,7 +178,7 @@ namespace server {
 
   model LoginInput {
     @http.header(name: "Authorization") token: Token?;
-    @http.body body: LoginInputBody;
+    @http.bodyObj body: LoginInputBody;
   }
   model LoginInputBody { email: Email; password: Password; }
   model LoginOk { user: PublicUser; token: Token; }
@@ -306,7 +306,7 @@ namespace server {
   model GetOrdersInput {
     @http.header(name: "Authorization") token: Token?;
     /** 1 から数えるページ番号 */
-    @http.query page: int = 1;
+    @http.default(1) @http.query page: int;
     /** 絞り込む状態。省略すればすべて */
     @http.query status: OrderStatus?;
   }
@@ -327,7 +327,7 @@ namespace server {
   /** カートに入れる入力 */
   model AddToCartInput {
     @http.header(name: "Authorization") token: Token?;
-    @http.body item: Item;
+    @http.bodyObj item: Item;
   }
 
   /** カートに一行足す */

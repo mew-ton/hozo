@@ -232,8 +232,8 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.4","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.4","direction":"emit","format":"openapi","files":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.5","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.5","direction":"emit","format":"openapi","files":[]}`, false},
 		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {
@@ -285,9 +285,22 @@ func TestNegativeMutations(t *testing.T) {
 		{"op without body", func() any { p := program(); delete(firstDecl(p, "op"), "body"); return p }},
 		{"op body as string", func() any { p := program(); firstDecl(p, "op")["body"] = "leaf"; return p }},
 		{"op without signature", func() any { p := program(); delete(firstDecl(p, "op"), "signature"); return p }},
-		{"model field default null", func() any {
+		// フィールドの既定値は版 0.5 でなくした（docs/ir.md「版」）: default は知らないキー
+		{"model field with default", func() any {
 			p := program()
-			firstDecl(p, "model")["fields"].([]any)[0].(map[string]any)["default"] = nil
+			firstDecl(p, "model")["fields"].([]any)[0].(map[string]any)["default"] = map[string]any{"kind": "int", "value": 1}
+			return p
+		}},
+		{"op without carried", func() any { p := program(); delete(firstDecl(p, "op"), "carried"); return p }},
+		{"op carried without effects", func() any {
+			p := program()
+			delete(firstDecl(p, "op")["carried"].(map[string]any), "effects")
+			return p
+		}},
+		{"decorator without reads", func() any { p := program(); delete(firstDecl(p, "decorator"), "reads"); return p }},
+		{"decorator param without rest", func() any {
+			p := program()
+			delete(firstDecl(p, "decorator")["params"].([]any)[0].(map[string]any), "rest")
 			return p
 		}},
 		{"decl description null", func() any { p := program(); firstDecl(p, "scalar")["description"] = nil; return p }},
@@ -440,7 +453,7 @@ func TestEnumsMatchGo(t *testing.T) {
 		typeOf[ir.UnionVariant]():    {string(ir.UnionArms), string(ir.UnionSet)},
 		typeOf[ir.StateShape]():      {string(ir.StateList), string(ir.StateNullable), string(ir.StateSingle)},
 		typeOf[ir.Operation]():       {string(ir.OpPost), string(ir.OpPut), string(ir.OpDelete)},
-		typeOf[ir.DecoratorTarget](): {string(ir.TargetOp), string(ir.TargetField), string(ir.TargetState), string(ir.TargetException), string(ir.TargetScalar), string(ir.TargetModel)},
+		typeOf[ir.DecoratorTarget](): {string(ir.TargetOp), string(ir.TargetField), string(ir.TargetState), string(ir.TargetException), string(ir.TargetScalar), string(ir.TargetModel), string(ir.TargetEffect)},
 		typeOf[ir.AnyOf]():           {string(ir.AnyException), string(ir.AnyEffect), string(ir.AnyState), string(ir.AnyOp), string(ir.AnyModel), string(ir.AnyVariant)},
 		typeOf[ir.RelationKind]():    {string(ir.Prevents), string(ir.Keeps)},
 		typeOf[ir.CatchMode]():       {string(ir.Recovers), string(ir.Halts), string(ir.Ignores)},

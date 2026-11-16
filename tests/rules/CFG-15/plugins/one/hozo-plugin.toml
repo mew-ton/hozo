@@ -1,7 +1,7 @@
 # テストの fixture: トランスパイラ dup を提供するプラグイン（one と two の両方が同じ名前を提供する）。起動しない
 name     = "one"
 command  = ["true"]
-protocol = "0.4"
+protocol = "0.5"
 
 [[transpiler]]
 name     = "dup"

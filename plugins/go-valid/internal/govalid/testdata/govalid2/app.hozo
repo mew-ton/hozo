@@ -11,21 +11,21 @@ namespace app {
 
   model Paging {
     // 型（scalar）の制約に合わない
-    page: Page = 0;
-    contact: Email = "nobody";
+    page: Page;
+    contact: Email;
     // 元の scalar の制約に合わない（辿ったすべての scalar の制約で確かめる）
-    code: Tiny = "toolong";
+    code: Tiny;
     // フィールドに付いた制約に合わない
-    @valid.max(100) size: int = 500;
-    @valid.pattern("^[a-z]+$") sort: string = "ID";
-    @valid.min(0.5) ratio: float = 0.25;
-    @valid.length(min: 2, max: 4) tag: string = "x";
+    @valid.max(100) size: int;
+    @valid.pattern("^[a-z]+$") sort: string;
+    @valid.min(0.5) ratio: float;
+    @valid.length(min: 2, max: 4) tag: string;
     // 型とフィールドの両方に合わない
-    @valid.length(min: 5) both: Tiny = "ABCD";
+    @valid.length(min: 5) both: Tiny;
     // 合う既定値は、診断にならない
-    ok: Page = 3;
-    @valid.length(min: 2) name: Tiny = "abc";
-    plain: string = "";
+    ok: Page;
+    @valid.length(min: 2) name: Tiny;
+    plain: string;
   }
 
   // 継承した model は、受け継いだ既定値を、自分の位置で確かめる

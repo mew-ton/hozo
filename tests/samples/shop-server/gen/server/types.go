@@ -7,35 +7,17 @@ import "example.com/shop-server/gen/server/inner"
 // Credentials はログインの本文
 type Credentials = inner.Credentials
 
-// NewCredentials は Credentials の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewCredentials() Credentials { return inner.NewCredentials() }
-
 // LoginInput はログインの入力
 type LoginInput = inner.LoginInput
-
-// NewLoginInput は LoginInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewLoginInput() LoginInput { return inner.NewLoginInput() }
 
 // LoginOk はログインの結果
 type LoginOk = inner.LoginOk
 
-// NewLoginOk は LoginOk の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewLoginOk() LoginOk { return inner.NewLoginOk() }
-
 // AuthInput はトークンだけを運ぶ入力
 type AuthInput = inner.AuthInput
-
-// NewAuthInput は AuthInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewAuthInput() AuthInput { return inner.NewAuthInput() }
 
 // GetOrdersInput は注文一覧の入力
 type GetOrdersInput = inner.GetOrdersInput
 
-// NewGetOrdersInput は GetOrdersInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewGetOrdersInput() GetOrdersInput { return inner.NewGetOrdersInput() }
-
 // PlaceOrderInput は注文の入力
 type PlaceOrderInput = inner.PlaceOrderInput
-
-// NewPlaceOrderInput は PlaceOrderInput の初めの値を返す: 既定値を持つフィールドは既定値、ほかは零値。
-func NewPlaceOrderInput() PlaceOrderInput { return inner.NewPlaceOrderInput() }

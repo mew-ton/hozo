@@ -234,7 +234,7 @@ func TestDecoratorApplicationReject(t *testing.T) {
 // --- model ---
 
 func TestModel(t *testing.T) {
-	m := firstDecl[*ast.ModelDecl](t, "model User {\n  /** 鍵 */\n  @db.key id: UserId;\n  name: string = \"n\";\n  page: PosInt = 1;\n  field: string;\n  tags: string[]?;\n}")
+	m := firstDecl[*ast.ModelDecl](t, "model User {\n  /** 鍵 */\n  @db.key id: UserId;\n  name: string;\n  @http.default(1) page: PosInt;\n  field: string;\n  tags: string[]?;\n}")
 	if m.Name.Name != "User" || m.Body == nil || m.Extends != nil {
 		t.Fatalf("Model = %+v", m)
 	}
@@ -242,14 +242,15 @@ func TestModel(t *testing.T) {
 	if len(f) != 5 {
 		t.Fatalf("Fields = %d", len(f))
 	}
-	if f[0].Doc == nil || f[0].Doc.Body != "鍵" || len(f[0].Decorators) != 1 || f[0].Name.Name != "id" || typeString(f[0].Type) != "UserId" || f[0].Default != nil {
+	if f[0].Doc == nil || f[0].Doc.Body != "鍵" || len(f[0].Decorators) != 1 || f[0].Name.Name != "id" || typeString(f[0].Type) != "UserId" {
 		t.Errorf("Field 0 = %+v", f[0])
 	}
-	if f[1].Default == nil || f[1].Default.Kind != ast.StringLit || f[1].Default.Str != "n" {
-		t.Errorf("Field 1 default = %+v", f[1].Default)
+	if f[1].Name.Name != "name" || typeString(f[1].Type) != "string" || len(f[1].Decorators) != 0 {
+		t.Errorf("Field 1 = %+v", f[1])
 	}
-	if f[2].Default == nil || f[2].Default.Int != 1 {
-		t.Errorf("Field 2 default = %+v", f[2].Default)
+	// 値がないときに入れる値は、境界のデコレータが言う（フィールドの既定値は書けない）
+	if len(f[2].Decorators) != 1 || f[2].Decorators[0].Name.String() != "http.default" || f[2].Decorators[0].Args[0].Value.Terms[0].Literal.Int != 1 {
+		t.Errorf("Field 2 = %+v", f[2])
 	}
 	if f[3].Name.Name != "field" {
 		t.Errorf("文脈キーワード field がフィールド名にならない: %+v", f[3].Name)
@@ -331,8 +332,12 @@ func TestModelReject(t *testing.T) {
 		{"is without omit", "model A is B;", "model A is ... omit ... は書けない"},
 		{"extends without body", "model A extends B;", "「{」が必要だが「;」がある"},
 		{"extends without name", "model A extends { }", "名前が必要"},
-		{"override default", "model A extends B { override f: int = 1; }", "override に既定値は書けない"},
-		{"override default without type", "model A extends B { override f = 1; }", "override に既定値は書けない"},
+		// フィールドの既定値はなくした書き方（docs/grammar.md「model」「決めたこと」）
+		{"field default", "model A { page: int = 1; }", "フィールド page に既定値は書けない"},
+		{"field default string", "model A { name: string = \"n\"; }", "境界のデコレータで言う（@http.default(値)、@cli.default(値)"},
+		{"field default on reserved name", "model A { default: int = 1; }", "フィールド default に既定値は書けない"},
+		{"override default", "model A extends B { override f: int = 1; }", "フィールド f に既定値は書けない"},
+		{"override default without type", "model A extends B { override f = 1; }", "フィールド f に既定値は書けない"},
 		{"override without name", "model A extends B { override; }", "フィールド名が必要"},
 		{"override qualified", "model A extends B { override a.b; }", "修飾しない識別子"},
 		{"never field type", "model A { f: never; }", "never は op の戻り値の型と、override のなくす印にだけ書ける"},
@@ -340,7 +345,7 @@ func TestModelReject(t *testing.T) {
 		{"optional on name", "model A { x?: T; }", "「:」が必要だが「?」がある"},
 		{"missing semicolon", "model A { x: T }", "「;」が必要だが「}」がある"},
 		{"missing type", "model A { x: ; }", "型が必要"},
-		{"default not literal", "model A { x: int = y; }", "リテラルが必要"},
+		{"field default, not a literal", "model A { x: int = y; }", "フィールド x に既定値は書けない"},
 		{"no body", "model A;", "「{」か「extends」が必要"},
 		{"qualified field name", "model A { a.b: string; }", "修飾しない識別子"},
 		{"dangling doc in body", "model A { /** x */ }", "付く先のない"},
@@ -1450,15 +1455,14 @@ func TestLiteral(t *testing.T) {
 		{"1d", func(l *ast.Literal) bool { return l.Duration == 24*3600*1_000_000_000 }},
 	}
 	for _, tt := range tests {
-		m := firstDecl[*ast.ModelDecl](t, "model M { x: T = "+tt.src+"; }")
-		l := m.Body.Fields[0].Default
+		m := firstDecl[*ast.ModelDecl](t, "@d("+tt.src+") model M {}")
+		l := m.Decorators[0].Args[0].Value.Terms[0].Literal
 		if l == nil || !tt.check(l) {
 			t.Errorf("%s: Literal = %+v", tt.src, l)
 		}
 	}
-	mustFail(t, "model M { x: T = 9223372036854775808; }", "整数が 64 ビットに収まらない")
-	mustFail(t, "model M { x: T = none; }", "リテラルが必要")
-	mustFail(t, "model M { x: T = y; }", "リテラルが必要")
+	mustFail(t, "@d(9223372036854775808) model M {}", "整数が 64 ビットに収まらない")
+	mustFail(t, "@d(none) model M {}", "引数の値（リテラルか名前）が必要")
 }
 
 // --- 識別子 ---
@@ -1507,21 +1511,21 @@ func TestFieldName(t *testing.T) {
 		}
 	}
 
-	// デコレータ・説明・既定値・型との組み合わせ。フィールド名と同じ語が型の位置にあっても読める。
+	// デコレータ・説明・型との組み合わせ。フィールド名と同じ語が型の位置にあっても読める。
 	m = firstDecl[*ast.ModelDecl](t, `model Wrap {
   /** 包む op */
-  @valid.length(min: 1) op: string = "x";
+  @valid.length(min: 1) op: string;
   string: string;
   list: Item[];
   decorator: string?;
-  default: int = 1;
-  true: boolean = true;
+  default: int;
+  true: boolean;
 }`)
 	if len(m.Body.Fields) != 6 {
 		t.Fatalf("Fields = %d", len(m.Body.Fields))
 	}
 	op := m.Body.Fields[0]
-	if op.Name.Name != "op" || op.Doc == nil || len(op.Decorators) != 1 || op.Default == nil || op.Default.Str != "x" {
+	if op.Name.Name != "op" || op.Doc == nil || len(op.Decorators) != 1 {
 		t.Errorf("Fields[0] = %+v", op)
 	}
 	if ct, ok := m.Body.Fields[1].Type.(*ast.CoreType); !ok || ct.Name != "string" || m.Body.Fields[1].Name.Name != "string" {
@@ -1915,7 +1919,7 @@ classify K of T { A; 5; B; }
 
 func TestRecoverLexError(t *testing.T) {
 	// 字句の誤りは字句解析器が一つ出し、構文解析器は重ねて出さない。
-	src := "model A { x: string = \"a\\qb\"; }\nmodel B {}\nmodel C { y: int = 5w; }\nmodel D {}"
+	src := "model A { @d(\"a\\qb\") x: string; }\nmodel B {}\nmodel C { @d(5w) y: int; }\nmodel D {}"
 	file, diags := parseSrc(t, src)
 	if got := strings.Join(declNames(file), ", "); got != "model A, model B, model C, model D" {
 		t.Errorf("Decls = %s", got)

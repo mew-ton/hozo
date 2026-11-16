@@ -44,7 +44,7 @@ namespace tool {
     /** 設定ファイルの場所 */
     @cli.flag("config") @cli.env("TOOL_CONFIG") config: Path?;
     /** 書き出す名前（一つもなければすべて） */
-    @cli.arg names: string[];
+    @cli.arg(1) names: string[];
     /** 書き出さずに、予定だけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
   }
@@ -105,11 +105,11 @@ namespace demo {
   /** add の入力。既定値を持つ（初めの値は NewAddInput()） */
   model AddInput {
     /** 左 */
-    @cli.arg a: int;
+    @cli.arg(1) a: int;
     /** 右 */
-    @cli.arg b: float?;
+    @cli.arg(2) b: float?;
     /** 回数 */
-    @cli.flag("count") count: Count = 1;
+    @cli.flag("count") @cli.default(1) count: Count;
     /** 詳しく */
     @cli.flag("verbose") verbose: boolean;
     /** 名札 */
@@ -125,13 +125,13 @@ namespace demo {
   /** copy の入力。scalar の値と、環境変数を代わりに持つ位置引数、string の scalar の array */
   model CopyInput {
     /** 元 */
-    @cli.arg @cli.env("DEMO_FROM") from: Name;
+    @cli.arg(1) @cli.env("DEMO_FROM") from: Name;
     @cli.flag("steps") @cli.env("DEMO_STEPS") steps: Steps?;
-    @cli.flag("ratio") ratio: Ratio = 0.5;
+    @cli.flag("ratio") @cli.default(0.5) ratio: Ratio;
     @cli.flag("force") @cli.env("DEMO_FORCE") force: Flag?;
-    @cli.flag("offset") offset: int = -1;
+    @cli.flag("offset") @cli.default(-1) offset: int;
     /** 先 */
-    @cli.arg to: Name[];
+    @cli.arg(2) to: Name[];
   }
 
   @cli.command("copy")

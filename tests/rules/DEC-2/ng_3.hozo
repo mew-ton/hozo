@@ -1,0 +1,10 @@
+// DEC-2（docs/check.md「デコレータ」）: targets に op を含まない宣言が reads か effects の節を持つ
+namespace a {
+  state s: list<string>;
+  effect e on s.post;
+  decorator r(table: any state) for effect reads table;            // ERROR: DEC-2
+  decorator w(...targets: any effect) for state effects targets;   // ERROR: DEC-2
+  decorator r2 for field | effect reads s;                         // ERROR: DEC-2
+  decorator w2 for model effects e;                                // ERROR: DEC-2
+  op f();
+}

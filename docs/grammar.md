@@ -125,12 +125,12 @@ ArgTerm   = Literal | QualifiedName ;
 ModelDecl   = "model" Ident [ "extends" QualifiedName ] ModelBody ;
 ModelBody   = "{" { Member } "}" ;
 Member      = Field | Override ;
-Field       = [ DocComment ] { Decorator } FieldName ":" Type [ "=" Literal ] ";" ;
+Field       = [ DocComment ] { Decorator } FieldName ":" Type ";" ;
 Override    = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "never" ) ] ";" ;
 ```
 
 - 省略可能なフィールドは型の `?` で書く（`token: Token?`）。名前に `?` を付ける書き方はない（「決めたこと」）。
-- 既定値（`page: PosInt = 1`。§11.2）は `Literal` だけ。
+- フィールドに既定値は書けない（`page: PosInt = 1`。なくした書き方。「決めたこと」）。パーサーは、型の直後に `=` が来たら、値がないときに何を入れるかは境界のデコレータで言うこと（`@http.default(1)`、`@cli.default(1)`）をメッセージで示して SYNTAX にする。
 - `extends` を持つ model は、既存の model を継承した別の型（`model PublicUser extends User { override hash: never; }`）。本体が空でもよい（`model Admin extends User { }`）。何を受け継ぎ、本体に何を書けるかは `docs/types.md`「継承した model」。
 - `Override` は、元の model のフィールドに触れるメンバー。形は三つ。
 
@@ -141,7 +141,6 @@ Override    = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "
   | `override hash: never;` | そのフィールドをなくす。`never` はここでは型ではなく、なくす印 |
 
 - メンバーの頭（`DocComment` とデコレータの後ろ）の `override` は、直後が `:` ならフィールドの名前（`override: string;`。`FieldName` は予約語も書ける）、そうでなければ `Override` の頭。`override override: never;` は、`override` という名前のフィールドをなくす。
-- `Override` に既定値（`= Literal`）は書けない。
 - `Override` は文法ではどの `ModelBody` にも書けるが、`extends` のない model と、その場で書く model（「union」「exception / effect」）には元の model がないので、検査でエラーになる（TYPE-10。`docs/types.md`「診断」）。
 - `model A is B omit f;` は書けない（なくした書き方。「決めたこと」）。パーサーは、`model` の名前の直後に `is` という識別子が来たら、`extends` と `override f: never;` で書くことをメッセージで示して SYNTAX にする。
 
@@ -369,7 +368,8 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 付く先のない `DocComment` はエラー | 説明が IR から落ちることに気づけるようにする（§2「書き忘れ・曖昧さは構文や検査器で検出し」） |
 | `model A is B omit f;` をなくし、`model A extends B { override f: never; }` と書く。`is` と `omit` は予約語から外す | 継承した型でできること（足す、なくす、型を変える）を一つの書き方にまとめた（`docs/decisions.md`「設計書を変える決定」S22）。どの生成規則も使わない語を予約したままにすると、名前に使える語を減らすだけになる |
 | 本体が空の `model A extends B { }` は書ける | 継承した model は元の model とは別の型（`docs/types.md`「継承した model」）で、別名ではない。以前の「`omit` のない `is` は書けない」の理由（別名にしかならない）が当たらない |
-| `override` の型は省略でき、省略は「型を変えない」。なくす書き方は `override f: never;`。`override` に既定値は書けない | デコレータを足すだけのときに、元の型を書き写させない（元の型を変えたときに、書き写した側が食い違う）。`never` は「そのフィールドに入る値がない」と読める。既定値を変えることは、継承した型でできることに入っていない（`docs/types.md`「継承した model」） |
+| `override` の型は省略でき、省略は「型を変えない」。なくす書き方は `override f: never;` | デコレータを足すだけのときに、元の型を書き写させない（元の型を変えたときに、書き写した側が食い違う）。`never` は「そのフィールドに入る値がない」と読める |
+| フィールドの既定値（`page: PosInt = 1`）をなくした | 共有する型に書いた既定値は、その型を使うすべての名前空間が埋めることになる。値がないときに誰が何を入れるかは振る舞いで、型ではなく、境界のデコレータが言う（`@http.default`、`@cli.default`。`docs/vocab.md`「`http` の語彙」、`docs/plugin-go-cli.md`「語彙」。`docs/decisions.md`「設計書を変える決定」S24）。呼び出しの位置を状態で埋める `bind`（「bind」）は別の仕組みで、変えない |
 | `reads` `as` `never` `throw` `override` `export` は予約語。綴りは仮で、後で別の語に変えうる | どれも構文の骨（節の頭、文の頭、核の型、修飾）で、識別子が来る位置の名詞ではないので、文脈キーワードの基準（下の行）に当たらない。`never` は `void` と同じく型の位置に来るので、予約しないと同じ名前の型と区別できない。`override` は予約してもフィールド名には書ける（`FieldName`）。綴りを変えるときは、この表と「予約語」の表を変える |
 | `export` と `override` は、予約語の表の「修飾」の行に置く | 宣言やフィールドの頭の語の前に置いて性質を足す語で、宣言の頭でも節の頭でもない。色分けも分ける（`docs/editors.md`「TextMate の文法」） |
 | `export` を書けるのは `op` の前だけ | 別の名前空間から隠せるのは op だけ（`docs/check.md`「export」）。ほかの宣言に書ける形にしておくと、意味のない `export` が検査まで残る |

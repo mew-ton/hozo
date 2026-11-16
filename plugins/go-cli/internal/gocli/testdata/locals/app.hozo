@@ -16,9 +16,9 @@ namespace env {
   @valid.min(1)
   scalar Level extends int;
   model RunInput {
-    @cli.flag("level") @cli.env("LEVEL") level: Level = 1;
+    @cli.flag("level") @cli.env("LEVEL") @cli.default(1) level: Level;
     @cli.flag("name") name: string?;
-    @cli.arg rest: string[];
+    @cli.arg(1) rest: string[];
   }
   /** 走らせる */
   @cli.command("run")
@@ -28,7 +28,7 @@ namespace env {
 /** 入力の変数 in と同じ名前のパッケージ */
 namespace in {
   model GoInput {
-    @cli.arg n: int;
+    @cli.arg(1) n: int;
     @cli.flag("deep") deep: boolean?;
   }
   @cli.command("go")

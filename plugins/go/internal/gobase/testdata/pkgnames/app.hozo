@@ -21,7 +21,7 @@ namespace more.ops {
 /** 分けない出力 */
 namespace flat {
   // types.go が ops と ptr を import し、補助 ptr を使う（省略可能なフィールドの既定値）
-  model Plan { job: ops.Job; target: ptr.Target?; step: more.ops.Step; label: string? = "x"; }
+  model Plan { job: ops.Job; target: ptr.Target?; step: more.ops.Step; label: string?; }
   // states.go が ptr を import する
   state target: nullable<ptr.Target>;
   // ops.go（Leaves）が ops と ptr を import する
@@ -37,7 +37,7 @@ namespace flat {
 
 /** 分けた出力 */
 namespace split {
-  model Plan { job: ops.Job; target: ptr.Target?; label: string? = "x"; }
+  model Plan { job: ops.Job; target: ptr.Target?; label: string?; }
   state target: nullable<ptr.Target>;
   export op pick(job: ops.Job): ptr.Ref;
   op keep(target: ptr.Target?);
@@ -65,7 +65,7 @@ namespace k0 { model Key { n: int; } }
 
 namespace bodies {
   // New<Model> の m: 既定値の式が、パッケージ m の型を書く
-  model Plan { level: m.Level? = 3; }
+  model Plan { level: m.Level?; }
 
   model Inner { name: string; }
   model Outer { inner: Inner?; }
