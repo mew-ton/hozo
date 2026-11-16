@@ -333,7 +333,7 @@ Throw    = "throw" QualifiedName ;
 
 ```
 DocComment の中身 = { 本文の行 } { タグの行 } ;
-タグの行 = "@param" Ident 説明 | "@throws" QualifiedName 説明 | "@see" QualifiedName ;
+タグの行 = "@param" Ident 説明 | "@throws" QualifiedName 説明 | "@see" ( QualifiedName | DecoratorRef ) ;
 ```
 
 - 各行の先頭の空白と `*` と、その後ろの空白一つを落としてから読む。

@@ -23,7 +23,7 @@
 
 1. **先頭のセグメント `a` を決める。** 次の順で最初に当たったもの。
    1. P が配線の中で、`a` がその行より上で束縛された名前、または op の引数名 → 値の参照（`Atom.name`）。
-   2. P がデコレータの宣言の `throws` / `catches` の中で、`a` がそのデコレータの引数名 → `$param:a`。
+   2. P がデコレータの宣言の `throws` / `catches` / `reads` / `effects` の中で、`a` がそのデコレータの引数名 → `$param:a`。
    3. P が op に付いたデコレータの引数の値で、その引数の `Param.type` が `type`（`any ...` でない）で、`a` がその op の引数名 → `$param:a`。`any ...` の引数ではこの段を飛ばす（§11.2 の `@page.route(from: query)` は状態 `browser.query` を指すため）。
    4. セグメントが二つ以上あり、`a` がルートの名前空間の名前 → 名前空間のパス。以降のセグメントは名前空間の子か、その名前空間の宣言。セグメントが一つだけのとき名前空間は候補にならない（`@db` はグローバルの `db`。§3.2）。
    5. `a` が現在の名前空間の宣言 → その宣言。
@@ -63,9 +63,9 @@
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
 | `catches` の要素 | `throws` と同じ |
 | `halts e` の `e` | `effect`、デコレータの宣言の中なら `any effect` の引数 |
-| `effects` の要素 | `effect`、`union`（`set` で要素が効果） |
-| `reads` の要素 | `state`（基底の状態。どの名前空間のものでも解決する）。状態でなければ RES-4（状態の分類も書けない）。葉の op が別の名前空間の状態を書けば READS-1、配線の op に書いたものが計算と食い違えば READS-2（`docs/check.md`「状態と効果」） |
-| `@name`（`@external` を除く。`docs/grammar.md`「予約語」） | `decorator`。付ける先の種類との照合は DEC-1 |
+| `effects` の要素 | `effect`、`union`（`set` で要素が効果）、デコレータの宣言の中なら `any effect` の引数（残りの引数でもよい） |
+| `reads` の要素 | `state`（基底の状態。どの名前空間のものでも解決する）、デコレータの宣言の中なら `any state` の引数（残りの引数でもよい）。どちらでもなければ RES-4（状態の分類も書けない）。葉の op が別の名前空間の状態を読めば READS-1（デコレータが運ぶものを含む）、配線の op に書いたものが計算と食い違えば READS-2（`docs/check.md`「状態と効果」） |
+| `@name`（`@external` を除く。`docs/grammar.md`「予約語」） | `decorator`。名前の最後の要素は予約語でもよい（`@db.effects`。`docs/grammar.md`「識別子」の `DecoratorRef`）。付ける先の種類との照合は DEC-1 |
 | デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」）。`any op` の引数に渡した op が、デコレータを付けた宣言とは別の名前空間の、`export` のない op なら NS-5 |
 | `match x by C` の `C` | `classify`（値の分類、op の分類、状態の分類）。どの名前空間のものでもよく、別の名前空間のものは修飾して書く。対象の有無と分類の種類の照合は MATCH-7 |
 | `match by C` の `C` | 同上。状態の分類が別の名前空間のものなら `RES-5` |
