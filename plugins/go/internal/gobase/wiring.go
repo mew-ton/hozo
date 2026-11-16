@@ -1345,8 +1345,9 @@ func (b *bodyGen) narrow(p *matchPlan, a *ir.MatchArm) string {
 		texts = append(texts, text+" は "+golang.TypeDisplay(n.Type))
 		ov.value, ov.base = subject, subject
 		if !b.sameGo(from, n.Type) {
-			switch p.narrowBy(a, n.State) {
-			case ir.NarrowByVariant:
+			switch by := p.narrowBy(a, n.State); {
+			// 残りのケースで対象の型が変わるのは、残りのアームがちょうど一つの variant だけで、式は variant と同じ
+			case by == ir.NarrowByVariant, by == ir.NarrowByElse:
 				if u := b.e.unionOf(from); u != nil {
 					if arm, ok := b.e.variantArm(u, n.Type, p.m.Classify); ok {
 						ov.value = subject + ".(" + b.e.armGoType(b.f, u, arm) + ")"
@@ -1604,9 +1605,14 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	m := p.m
 	valueCase, otherCase := ir.CaseHasItems, ir.CaseEmpty
 	if p.classify != nil {
+		// presence の分類は、型を書いたケースが一つだけ。もう一方は、残りのケース（対象 as else）か default
 		valueCase, otherCase = "", ""
 		for _, cs := range p.classify.Cases {
-			valueCase = cs.Name // presence の分類は、名前の付いたケースが一つだけ
+			if cs.IsElse() {
+				otherCase = cs.Name
+			} else {
+				valueCase = cs.Name
+			}
 		}
 	}
 	valueArm, otherArm := armFor(m, valueCase), armFor(m, otherCase)
@@ -1715,6 +1721,13 @@ func (b *bodyGen) matchSwitch(p *matchPlan, mode matchMode, x string, t ir.Type)
 			for _, k := range a.Cases.Cases {
 				cs := c.Case(k)
 				if u == nil || cs == nil || len(cs.As) == 0 {
+					continue
+				}
+				if cs.IsElse() {
+					// 残りのケース: 残りのアームの Go の型を、union の宣言の順に並べる
+					for _, arm := range e.remainingArms(u, c) {
+						types = append(types, e.armGoType(b.f, u, arm))
+					}
 					continue
 				}
 				if arm, ok := e.variantArm(u, cs.As[0].Type, c.Name); ok {

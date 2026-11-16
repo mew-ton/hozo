@@ -1,0 +1,176 @@
+// docs/plugin-go.md「match」「分類」の、残りのケース（対象 as else。docs/check.md「残りのケース」）を持つ、型で決まる分類を、
+// 一か所ずつ使う: 二つに分ける形（presence）の、もう一方の枝。switch の形（variant）の、残りのアームを並べた case。
+// 絞り込んだ値（残りのアームがちょうど一つのとき）。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** 残りのケースで分ける match */
+namespace app {
+  model User { name: string; }
+  model Card { number: string; }
+  model Bank { account: string; }
+  /** 支払いの手段。アームの型: 宣言した model 二つと、核の型（包む型） */
+  union Payment {
+    ByCard: Card;
+    ByBank: Bank;
+    ByCode: string;
+  }
+  /** 結果。アームの型: 宣言した model と、核の型（包む型） */
+  union Result {
+    Done: User;
+    Fail: string;
+  }
+  exception Unknown;
+  /** 印。付いた op は純粋でなくなる */
+  decorator mark;
+
+  /** ログインしている人 */
+  state session: nullable<User>;
+  /** 今の結果 */
+  state stage: single<Result>;
+
+  /** 型で決まる op の分類（presence）。残りのケースは、値がないとき */
+  classify Registration of findUser {
+    Registered: findUser as User;
+    /** 未登録 */
+    Unregistered: findUser as else;
+  }
+  /** 型で決まる値の分類（presence）。残りのケースを先に書いても、値のある場合が if の枝 */
+  classify Given of string? {
+    Blank: string? as else;
+    Filled: string? as string;
+  }
+  /** 型で決まる状態の分類（presence） */
+  classify Login of session {
+    LoggedIn: session as User;
+    LoggedOut: session as else;
+  }
+  /** 型で決まる値の分類（variant）。残りのアームが二つ（ByBank、ByCode）: 残りのケースでも、対象の型は変わらない */
+  classify Method of Payment {
+    Plastic: Payment as Card;
+    Other: Payment as else;
+  }
+  /** 型で決まる値の分類（variant）。残りのアームがちょうど一つ（Fail。包む型）: 残りのケースで、対象は string */
+  classify Outcome of Result {
+    Ok: Result as User;
+    Failed: Result as else;
+  }
+  /** 型で決まる値の分類（variant）。残りのアームがちょうど一つ（Done。宣言した model）: 残りのケースで、対象は User */
+  classify Failure of Result {
+    Message: Result as string;
+    Rest: Result as else;
+  }
+  /** 型で決まる状態の分類（variant） */
+  classify Stage of stage {
+    Succeeded: stage as User;
+    NotYet: stage as else;
+  }
+
+  @mark export op findUser(name: string): User?;
+  export op nameOf(user: User): string;
+  export op cardText(card: Card): string;
+  export op describe(payment: Payment): string;
+  export op shout(text: string): string;
+  export op show(text: string);
+
+  // presence の return match: アームを書いた順によらず、値のある場合が if の枝。残りのケースは、else を書かずに後ろに続け、
+  // 頭のコメントは、default ではなく、ケースの名前
+  @mark export op login(name: string): string
+    throws Unknown
+  {
+    const user = findUser(name);
+    return match user by Registration {
+      Unregistered => throw Unknown;
+      Registered   => nameOf(user);
+    };
+  }
+
+  // presence の const（残りのケースのアームの値）と、文（none のアーム。if の枝がなければ、条件を逆にする）
+  @mark export op greet(name: string, title: string?): string
+  {
+    const user = findUser(name);
+    const who = match user by Registration {
+      Registered   => nameOf(user);
+      Unregistered => "guest";
+    };
+    match title by Given {
+      Filled => show(title);
+      Blank  => none;
+    };
+    match title by Given {
+      Filled => none;
+      Blank  => show("no title");
+    };
+    return who;
+  }
+
+  // 一つのアームが、型を書いたケースと残りのケースを並べる: 分けずに、そのアームの本体だけを書く
+  export op both(title: string?): string
+  {
+    return match title by Given {
+      Filled | Blank => "any";
+    };
+  }
+
+  // 型で決まる状態の分類（presence）: 対象の状態を読んでから分ける
+  export op current(): string
+  {
+    return match by Login {
+      LoggedIn  => nameOf(session);
+      LoggedOut => "nobody";
+    };
+  }
+
+  // variant の return match: 残りのケースは、残りのアームの Go の型を、union の宣言の順に並べた case。対象の型は変わらない。
+  // default の節がないので、switch の後ろに return <零値>, &runtime.ClassificationError{…}
+  export op method(payment: Payment): string
+  {
+    return match payment by Method {
+      Other   => describe(payment);
+      Plastic => cardText(payment);
+    };
+  }
+
+  // variant で、残りのアームがちょうど一つ: 残りのケースのアームで、対象はそのアームの型（包む型は .Value）
+  export op outcome(result: Result): string
+  {
+    return match result by Outcome {
+      Ok     => nameOf(result);
+      Failed => shout(result);
+    };
+  }
+
+  // variant で、残りのアームがちょうど一つ（宣言した model）: フィールドを読む
+  export op failure(result: Result): string
+  {
+    return match result by Failure {
+      Message => result;
+      Rest    => result.name;
+    };
+  }
+
+  // variant の const と文。型を書いたケースと残りのケースを並べたアーム（case に、すべての型を並べる）
+  @mark export op variants(payment: Payment, result: Result): string?
+  {
+    const text = match payment by Method {
+      Plastic => cardText(payment);
+      Other   => none;
+    };
+    match result by Outcome {
+      Ok | Failed => show("done");
+    };
+    match payment by Method {
+      Plastic => none;
+      Other   => show("other");
+    };
+    return text;
+  }
+
+  // 型で決まる状態の分類（variant）: 対象の状態を読んでから分ける
+  export op stageText(): string
+  {
+    return match by Stage {
+      Succeeded => nameOf(stage);
+      NotYet    => shout(stage);
+    };
+  }
+}

@@ -27,6 +27,7 @@ var goldenFixtures = []struct {
 	{name: "bind", covers: "「bind で埋まる位置」の 1〜4、「別の名前空間の op」"},
 	{name: "matchif", covers: "「match」の二つに分ける形（nullable、list、presence）と、アームの本体の組"},
 	{name: "matchswitch", covers: "「match」の switch の形（variant、述語で決まる分類）、「絞り込んだ値」、「分類」", behavior: true},
+	{name: "matchelse", covers: "「match」の、残りのケース（対象 as else）を持つ型で決まる分類: 二つに分ける形のもう一方の枝（presence）、残りのアームを並べた case と絞り込んだ値（variant）。「分類」（何も出さない）", behavior: true},
 	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
 }

@@ -1,5 +1,5 @@
 {
-  "version": "0.6",
+  "version": "0.7",
   "viewer": "browser",
   "config": {
     "index": 2,
@@ -68,7 +68,7 @@
     ]
   },
   "program": {
-    "version": "0.6",
+    "version": "0.7",
     "namespaces": [
       {
         "name": "http",

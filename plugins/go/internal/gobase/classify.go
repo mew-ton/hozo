@@ -72,6 +72,29 @@ func (e *emitter) variantArm(u *ir.Union, t ir.Type, at string) (armType, bool) 
 	return armType{}, false
 }
 
+// remainingArms は、分類 c（union u の variant で決まる分類）の残りのアーム（docs/check.md「残りのケース」）: 型が、ほかの
+// ケースが as に書いた型のどれとも等しくないアーム。union の宣言の順。同じ Go の型（同じ model を指す二つのアーム）は一度だけ。
+func (e *emitter) remainingArms(u *ir.Union, c *ir.Classify) []armType {
+	var out []armType
+	seen := map[string]bool{}
+	for _, a := range e.armTypes(u) {
+		named := false
+		for _, cs := range c.Cases {
+			for _, as := range cs.As {
+				if as.By != ir.NarrowByElse && ir.TypeEqual(as.Type, a.typ) {
+					named = true
+				}
+			}
+		}
+		if named || seen[a.goName] {
+			continue
+		}
+		seen[a.goName] = true
+		out = append(out, a)
+	}
+	return out
+}
+
 // unionOf は、型 t（case と optional を外したもの）が union（arms）への ref なら、その union。
 func (e *emitter) unionOf(t ir.Type) *ir.Union {
 	for {
