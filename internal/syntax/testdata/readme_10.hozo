@@ -36,7 +36,7 @@ namespace browser {
 
   @page.interaction(page: openProduct, when: ProductPage.Ready)
   op onAddToCart(item: server.Item)
-    throws page.Aborted | http.NetworkError | http.ServerError
+    throws page.Aborted, http.NetworkError, http.ServerError
   {
     const line = server.addToCart({ item });
     const warranty = match item by WarrantyKind {
@@ -49,7 +49,7 @@ namespace browser {
 
   op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
     : server.WarrantyLine
-    throws page.Aborted | http.NetworkError | http.ServerError
+    throws page.Aborted, http.NetworkError, http.ServerError
   {
     const plan = askYamadaWarranty(item);
     return server.attachWarranty({ line, plan });

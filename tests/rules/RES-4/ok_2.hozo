@@ -13,7 +13,7 @@ namespace a {
   classify Both of rows, cur { Ready; default; }
   decorator ok(t: any state, u: any state?, e: any effect, ...es: any effect on rows.post)
     reads t, u, rows, b.other
-    effects e | es | add | Writes;
+    effects e, es, add, Writes;
   decorator okRest(...ts: any state) reads ts;
 }
 namespace b {

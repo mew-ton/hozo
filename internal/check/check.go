@@ -220,6 +220,27 @@ func (ix *index) effect(fqn string) *ir.Effect {
 	return e
 }
 
+// readStates は reads の要素ごとの状態（read の宣言ならその宛先、直に書いた状態ならその状態。docs/check.md「直に書く要素」）を
+// 同じ順に並べ、重複を最初の出現に寄せたもの。宛先の決まらない read は飛ばす。
+func (ix *index) readStates(refs []ir.ReadRef) []string {
+	var out []string
+	for _, r := range refs {
+		state := ""
+		switch x := r.(type) {
+		case ir.DirectRead:
+			state = x.State
+		case ir.NamedRead:
+			if d, ok := ix.decls[x.Read].(*ir.Read); ok {
+				state = d.State
+			}
+		}
+		if state != "" {
+			out = appendUnique(out, state)
+		}
+	}
+	return out
+}
+
 // namespaceOf は宣言 FQN の名前空間。知らない宣言なら FQN の最後のセグメントを落としたもの。
 func (ix *index) namespaceOf(fqn string) string {
 	if ns, ok := ix.nsOf[fqn]; ok {
@@ -278,7 +299,7 @@ func joinPath(path []string) string {
 }
 
 // contains は列に s があるか。
-func contains(list []string, s string) bool {
+func contains[T comparable](list []T, s T) bool {
 	for _, x := range list {
 		if x == s {
 			return true
@@ -288,7 +309,7 @@ func contains(list []string, s string) bool {
 }
 
 // appendUnique は列に s がなければ末尾に足す。
-func appendUnique(list []string, s string) []string {
+func appendUnique[T comparable](list []T, s T) []T {
 	if contains(list, s) {
 		return list
 	}

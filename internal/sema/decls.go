@@ -53,6 +53,8 @@ func (a *analyzer) lower(s *symbol) ir.Decl {
 		s.decl = a.lowerException(s, d, sc)
 	case *ast.EffectDecl:
 		s.decl = a.lowerEffect(s, d, sc)
+	case *ast.ReadDecl:
+		s.decl = a.lowerRead(s, d, sc)
 	case *ast.ClassifyDecl:
 		s.decl = a.lowerClassify(s, d, sc)
 	case *ast.ConditionDecl:
@@ -365,6 +367,23 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 	return e
 }
 
+// lowerRead は read（docs/ir.md「read」）。宛先は現在の名前空間の基底の状態一つ（docs/check.md「読むことの宛先」）。
+// 別の名前空間の状態なら RES-5、状態でなければ（状態の分類を含む）RES-4。宛先が決まらなければ State は空のまま。
+func (a *analyzer) lowerRead(s *symbol, d *ast.ReadDecl, sc *scope) ir.Decl {
+	rd := &ir.Read{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
+	a.addSite(d.Decorators, siteRead, sc, &rd.DeclBase.Decorators)
+	r, ok := a.resolve(d.On, sc, acState)
+	if !ok {
+		return rd
+	}
+	if r.sym.ns != s.ns {
+		a.errorf("RES-5", d.On.Span, "read %s の on は別の名前空間の状態 %s を指している（read は状態の持ち主の名前空間に宣言する）", s.fqn, r.sym.fqn)
+		return rd
+	}
+	rd.State = r.sym.fqn
+	return rd
+}
+
 // lowerBuiltinTarget は `on s.op`。s は現在の名前空間の state（別の名前空間なら RES-5）。STATE-1。
 // 書き込むのはその状態（docs/check.md「状態の形」の「効果が書き込む状態」）。
 func (a *analyzer) lowerBuiltinTarget(s *symbol, e *ir.Effect, on *ast.StateOpRef, sc *scope) {
@@ -378,7 +397,7 @@ func (a *analyzer) lowerBuiltinTarget(s *symbol, e *ir.Effect, on *ast.StateOpRe
 	}
 	e.Target = ir.BuiltinTarget{State: r.sym.fqn, Operation: operationOf(on.Op)}
 	e.Writes = []string{r.sym.fqn}
-	a.checkSTATE1(r.sym, on)
+	a.checkSTATE1(r.sym, operationOf(on.Op), on.OpSpan)
 }
 
 // builtinOperations は形ごとの組み込みの効果（docs/check.md「状態の形」の表）。
@@ -389,13 +408,12 @@ var builtinOperations = map[ir.StateShape][]ir.Operation{
 }
 
 // checkSTATE1 は STATE-1（docs/check.md「状態と効果」）: 組み込みの効果の operation が、その状態の形にない
-// （single に post / delete）。
-func (a *analyzer) checkSTATE1(state *symbol, on *ast.StateOpRef) {
+// （single に post / delete）。effect の宣言の宛先にも、effects に直に書いた「状態.操作」にも掛かる。span は操作の語。
+func (a *analyzer) checkSTATE1(state *symbol, op ir.Operation, span source.Span) {
 	st, ok := a.lower(state).(*ir.State)
 	if !ok {
 		return
 	}
-	op := operationOf(on.Op)
 	allowed := builtinOperations[st.Shape]
 	for _, o := range allowed {
 		if o == op {
@@ -406,7 +424,7 @@ func (a *analyzer) checkSTATE1(state *symbol, on *ast.StateOpRef) {
 	for i, o := range allowed {
 		names[i] = string(o)
 	}
-	a.errorf("STATE-1", on.OpSpan, "状態 %s は %s なので %s はできない（%s にできるのは %s だけ。docs/check.md「状態の形」）", state.fqn, st.Shape, op, st.Shape, strings.Join(names, " / "))
+	a.errorf("STATE-1", span, "状態 %s は %s なので %s はできない（%s にできるのは %s だけ。docs/check.md「状態の形」）", state.fqn, st.Shape, op, st.Shape, strings.Join(names, " / "))
 }
 
 // lowerTransition は `on X: A -> B`（docs/resolve.md「位置ごとに受け付ける種類」）。X は現在の名前空間の、状態を
@@ -1005,7 +1023,11 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 		case *ast.EffectsClause:
 			op.Effects = append(op.Effects, a.lowerOpEffects(s, d, c, sc)...)
 		case *ast.ReadsClause:
-			op.Reads = a.lowerReads(s, d, c, op.Reads, sc)
+			for _, r := range a.lowerReads(s, d, c, sc) {
+				if !containsRef(op.Reads, r) {
+					op.Reads = append(op.Reads, r)
+				}
+			}
 		case *ast.ThrowsClause:
 			op.Throws = append(op.Throws, a.lowerThrows(c, sc))
 		}
@@ -1021,43 +1043,97 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 	return op
 }
 
-// lowerOpEffects は op の effects の一節（docs/ir.md「op」の effects）。要素は effect か、効果の union（展開）。
-// STATE-2（docs/check.md「状態と効果」）のうち、葉の op が自分で書いた効果の分: 効果の名前空間が op の名前空間と違う。
-// 位置はその効果の名前。デコレータが運ぶ効果の分は carry、halts の効果の分は internal/check が出す。
-func (a *analyzer) lowerOpEffects(s *symbol, d *ast.OpDecl, c *ast.EffectsClause, sc *scope) []string {
-	var out []string
+// lowerOpEffects は op の effects の一節（docs/ir.md「op」の effects）。要素は、名前で書いた効果（effect か、効果の union。
+// 展開する）か、直に書いた「状態.操作」（docs/check.md「直に書く要素」）。
+// STATE-2（docs/check.md「状態と効果」）のうち、葉の op が自分で書いた効果の分: 効果の名前空間（直に書いた効果なら、その
+// 状態の名前空間）が op の名前空間と違う。位置はその要素。デコレータが運ぶ効果の分は carry、halts の効果の分は
+// internal/check が出す。
+func (a *analyzer) lowerOpEffects(s *symbol, d *ast.OpDecl, c *ast.EffectsClause, sc *scope) []ir.EffectRef {
+	var out []ir.EffectRef
 	for _, n := range c.Effects {
 		r, ok := a.resolve(n, sc, acEffectsPos)
 		if !ok {
 			continue
 		}
-		for _, e := range a.expandSet(r, kindEffect, n.Span) {
+		for _, e := range a.effectRefs(r, n) {
 			out = append(out, e)
-			if ef := a.syms[e]; d.Body == nil && ef != nil && ef.ns != s.ns {
-				a.errorf("STATE-2", n.Span, "%s は名前空間 %s の持ち主ではないので、効果 %s を effects に宣言できない", s.fqn, nsName(ef.ns), e)
+			if owner := a.effectOwner(e); d.Body == nil && owner != nil && owner != s.ns {
+				a.errorf("STATE-2", n.Span, "%s は名前空間 %s の持ち主ではないので、効果 %s を effects に宣言できない", s.fqn, nsName(owner), e)
 			}
 		}
 	}
 	return out
 }
 
-// lowerReads は reads の一節を、ここまでの並び reads に足す（docs/ir.md「正規化」: 重複は最初の出現に寄せる）。
-// 要素は state（基底の状態。どの名前空間のものでも解決する。状態でなければ RES-4）。
-// READS-1（docs/check.md「状態と効果」）: 葉の op が別の名前空間の状態を書いた。位置はその状態の名前。
-func (a *analyzer) lowerReads(s *symbol, d *ast.OpDecl, c *ast.ReadsClause, reads []string, sc *scope) []string {
-	for _, n := range c.States {
-		r, ok := a.resolve(n, sc, acState)
+// effectRefs は effects の要素 n の解決の結果 r を EffectRef の列にする: effect は名前で書いた要素一つ、効果の union は
+// 展開したメンバー、「状態.操作」は直に書いた要素一つ（操作がその状態の形になければ STATE-1。位置は操作の語）。
+func (a *analyzer) effectRefs(r resolved, n ast.QualifiedName) []ir.EffectRef {
+	if r.kind == rStateOp {
+		a.checkSTATE1(r.sym, r.op, n.Last().Span)
+		return []ir.EffectRef{ir.DirectEffect{State: r.sym.fqn, Operation: r.op}}
+	}
+	return ir.NamedEffects(a.expandSet(r, kindEffect, n.Span)...)
+}
+
+// effectOwner は効果 e の持ち主の名前空間: 名前で書いた効果ならその宣言の名前空間、直に書いた効果ならその状態の名前空間。
+// 宣言が表になければ nil。
+func (a *analyzer) effectOwner(e ir.EffectRef) *namespace {
+	fqn := ""
+	switch x := e.(type) {
+	case ir.NamedEffect:
+		fqn = x.Effect
+	case ir.DirectEffect:
+		fqn = x.State
+	}
+	if sym := a.syms[fqn]; sym != nil {
+		return sym.ns
+	}
+	return nil
+}
+
+// lowerReads は reads の一節（docs/ir.md「op」の reads）。要素は、名前で書いた read か、直に書いた state（基底の状態）。
+// どちらも、どの名前空間のものでも解決する（どちらでもなければ RES-4）。
+// READS-1（docs/check.md「状態と効果」）: 葉の op が別の名前空間の状態（か、その read）を書いた。位置はその要素。
+func (a *analyzer) lowerReads(s *symbol, d *ast.OpDecl, c *ast.ReadsClause, sc *scope) []ir.ReadRef {
+	var out []ir.ReadRef
+	for _, n := range c.Reads {
+		r, ok := a.resolve(n, sc, acReadsPos)
 		if !ok {
 			continue
 		}
+		ref := readRef(r.sym)
 		if d.Body == nil && r.sym.ns != s.ns {
-			a.errorf("READS-1", n.Span, "葉の op %s が、別の名前空間の状態 %s を reads に書いている（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", s.fqn, r.sym.fqn, nsName(s.ns))
+			a.errorf("READS-1", n.Span, "葉の op %s が、別の名前空間の%sを reads に書いている（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", s.fqn, readRefText(ref), nsName(s.ns))
 		}
-		if !contains(reads, r.sym.fqn) {
-			reads = append(reads, r.sym.fqn)
+		out = append(out, ref)
+	}
+	return out
+}
+
+// readRef は reads の要素が指す宣言 sym（read か state）を ReadRef にする。
+func readRef(sym *symbol) ir.ReadRef {
+	if sym.kind == kindRead {
+		return ir.NamedRead{Read: sym.fqn}
+	}
+	return ir.DirectRead{State: sym.fqn}
+}
+
+// readRefText は診断のメッセージの中の言い方（「状態 a.s」か「read a.r」。前後に空白を持つ）。
+func readRefText(r ir.ReadRef) string {
+	if _, ok := r.(ir.NamedRead); ok {
+		return " read " + r.String() + " "
+	}
+	return "状態 " + r.String() + " "
+}
+
+// containsRef は列 list に x があるか。
+func containsRef[T comparable](list []T, x T) bool {
+	for _, y := range list {
+		if y == x {
+			return true
 		}
 	}
-	return reads
+	return false
 }
 
 // neverOp は never を返す op。デコレータの適用が下りてから確かめる（THROWS-3 の条件 6）。
@@ -1164,25 +1240,28 @@ func paramNames(params []*ast.OpParam) map[string]bool {
 	return m
 }
 
-// checkEFF3 は EFF-3（docs/check.md「状態と効果」）: 葉の op が自分で書いた Op.effects（ユニオンを展開した後）が二つ以上。
+// checkEFF3 は EFF-3（docs/check.md「状態と効果」）: 葉の op が自分で書いた Op.effects（ユニオンを展開した後。名前で書いたものも、
+// 直に書いたものも数える）が二つ以上。
 // 葉かどうか（本体がない）と展開後の効果の列だけで決まり、Signature を要しないので、REL-1 / REL-5 と同じく
 // internal/sema が出す。同じ効果を二度書いたものは一つと数える。デコレータが運ぶ効果（Op.carried.effects）は数えない
 // （順序はデコレータの引数に書いてある）。配線の op（本体を持つ）は伝播した効果をいくつ書いてもよい（EFF-2 が照合する）。
 // 位置は op の宣言。
-func (a *analyzer) checkEFF3(s *symbol, d *ast.OpDecl, effects []string) {
+func (a *analyzer) checkEFF3(s *symbol, d *ast.OpDecl, effects []ir.EffectRef) {
 	if d.Body != nil {
 		return
 	}
-	var distinct []string
+	var distinct []ir.EffectRef
+	var names []string
 	for _, e := range effects {
-		if !contains(distinct, e) {
+		if !containsRef(distinct, e) {
 			distinct = append(distinct, e)
+			names = append(names, e.String())
 		}
 	}
 	if len(distinct) < 2 {
 		return
 	}
-	a.errorf("EFF-3", d.Span, "葉の op %s が効果を二つ以上書いている（%s）。葉の op が自分で書ける効果は一つまで。効果ごとの葉の op を配線でつなぐか、まとめて変える状態を対象にした分類の遷移一つにするか、効果を並べて一体に行うと言うデコレータを付ける", s.fqn, join(distinct))
+	a.errorf("EFF-3", d.Span, "葉の op %s が効果を二つ以上書いている（%s）。葉の op が自分で書ける効果は一つまで。効果ごとの葉の op を配線でつなぐか、まとめて変える状態を対象にした分類の遷移一つにするか、効果を並べて一体に行うと言うデコレータを付ける", s.fqn, join(names))
 }
 
 // lowerThrows は throws の一節（docs/ir.md「decorator」の ThrowsClause）。REL-5 もここで確かめる。

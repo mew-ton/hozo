@@ -78,7 +78,11 @@ func opFacts(o *ir.Op, sig *ir.Signature) []string {
 		facts = append(facts, "Reads: "+strings.Join(sig.Reads, ", "))
 	}
 	if len(sig.Effects) > 0 {
-		facts = append(facts, "Effects: "+strings.Join(sig.Effects, ", "))
+		effects := make([]string, len(sig.Effects))
+		for i, fx := range sig.Effects {
+			effects[i] = fx.String() // 宣言は FQN、直に書いた効果は <状態の FQN>.<操作>
+		}
+		facts = append(facts, "Effects: "+strings.Join(effects, ", "))
 	}
 	if o.Signature.Pure {
 		if len(o.Signature.Exceptions) == 0 {

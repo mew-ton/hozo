@@ -1,7 +1,7 @@
 // 設計書 §9 配線。
 
 op loadOrderPage(query: OrdersQuery): OrderPage
-  throws http.NetworkError | http.ServerError
+  throws http.NetworkError, http.ServerError
 {
   const me     = fetchMe();
   const orders = fetchOrders(query);

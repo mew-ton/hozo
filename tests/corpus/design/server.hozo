@@ -194,7 +194,7 @@ namespace server {
   @validated
   op login(in: LoginInput): LoginOk
     effects createSession
-    throws InvalidCredentials | NotVerified | Suspended | AlreadyLoggedIn prevents effects;
+    throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn prevents effects;
 
   // ---- §7.3 例外と効果の関係 ----
 

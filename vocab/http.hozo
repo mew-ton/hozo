@@ -10,9 +10,9 @@ namespace http {
   exception BadRequest: { message: string; violations: Violation[]; };
 
   @external
-  decorator get(path: string) throws ServerError | NetworkError;
+  decorator get(path: string) throws ServerError, NetworkError;
   @external
-  decorator post(path: string) throws ServerError | NetworkError;
+  decorator post(path: string) throws ServerError, NetworkError;
 
   decorator status(code: int) for exception;
 

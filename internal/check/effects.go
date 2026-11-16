@@ -10,24 +10,25 @@ func checkStates(ix *index, c *computer, r *reporter) {
 	for i, o := range ix.ops {
 		checkState2(ix, o, ix.opsNS[i], r)
 		checkEff2(o, r)
-		checkReads2(o, r)
+		checkReads2(ix, o, r)
 	}
 }
 
-// checkReads2 は READS-2: 配線の O で Op.reads が空でなく、集合として Sig(O, ns(O)).reads と等しくない。
-// 足りないもの・余分なものを Data.missing / Data.extra に。位置は O。
-func checkReads2(o *ir.Op, r *reporter) {
+// checkReads2 は READS-2: 配線の O で Op.reads が空でなく、その要素の状態（read の宣言なら、その宛先）の集合が
+// Sig(O, ns(O)).reads と等しくない。足りないもの・余分なものを Data.missing / Data.extra に。位置は O。
+func checkReads2(ix *index, o *ir.Op, r *reporter) {
 	if o.Body == nil || len(o.Reads) == 0 {
 		return
 	}
+	written := ix.readStates(o.Reads)
 	missing := []string{}
 	extra := []string{}
 	for _, s := range o.Signature.Reads {
-		if !contains(o.Reads, s) {
+		if !contains(written, s) {
 			missing = append(missing, s)
 		}
 	}
-	for _, s := range o.Reads {
+	for _, s := range written {
 		if !contains(o.Signature.Reads, s) {
 			extra = appendUnique(extra, s)
 		}
@@ -73,8 +74,9 @@ func checkState2(ix *index, o *ir.Op, ns string, r *reporter) {
 	}
 }
 
-// checkEff2 は EFF-2: 配線の O で Op.effects が空でなく、集合として Sig(O, ns(O)).effects と等しくない。
-// 足りないもの・余分なものを Data.missing / Data.extra に。
+// checkEff2 は EFF-2: 配線の O で Op.effects が空でなく、集合として Sig(O, ns(O)).effects と等しくない（効果の数え方は
+// docs/check.md「直に書く要素」: 直に書いた効果と、同じ宛先の宣言は別）。足りないもの・余分なものを Data.missing /
+// Data.extra に（宣言は FQN、直に書いた効果は "<状態の FQN>.<操作>"）。
 func checkEff2(o *ir.Op, r *reporter) {
 	if o.Body == nil || len(o.Effects) == 0 {
 		return
@@ -83,12 +85,12 @@ func checkEff2(o *ir.Op, r *reporter) {
 	extra := []string{}
 	for _, e := range o.Signature.Effects {
 		if !contains(o.Effects, e) {
-			missing = append(missing, e)
+			missing = append(missing, e.String())
 		}
 	}
 	for _, e := range o.Effects {
 		if !contains(o.Signature.Effects, e) {
-			extra = appendUnique(extra, e)
+			extra = appendUnique(extra, e.String())
 		}
 	}
 	if len(missing) == 0 && len(extra) == 0 {

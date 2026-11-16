@@ -227,7 +227,7 @@ interface Op extends DeclBase {
   exported: boolean;              // `export` が付いているか（docs/check.md「export」）
   params: OpParam[];
   returns: Type | null;           // null は void。決して返さない op は { kind: "never" }
-  effects: EffectRef[];           // 書かれた effects（書かれた順。ユニオンは展開済み。重複は最初の出現に寄せる）。配線で省略していれば []。
+  effects: EffectRef[];           // 書かれた effects（書かれた順。ユニオンは展開済み）。配線で省略していれば []。
                                   // デコレータが運ぶものは含まない
   reads: ReadRef[];               // 書かれた reads（書かれた順、重複は最初の出現に寄せる）。書いていなければ []。同上
   carried: {                      // デコレータの reads / effects の節が、この op に運ぶもの（docs/check.md「デコレータが運ぶ reads と effects」）。
@@ -390,7 +390,7 @@ interface Bind {
 | `Unavailable: Unavailable` | そのまま `ref`（新しい model は作らない） |
 | ユニオンのメンバーにユニオン | メンバーを展開して平らにする |
 | `throws A, B` にユニオン | 例外の FQN に展開 |
-| `effects a, b`、複数の `effects` | `EffectRef` の列一つ（重複は最初の出現に寄せる）。`effect` の宣言の名前は `named`（ユニオンは展開）、`状態.操作` は `direct` |
+| `effects a, b`、複数の `effects` | `EffectRef` の列一つ（書かれた順に連結）。`effect` の宣言の名前は `named`（ユニオンは展開）、`状態.操作` は `direct` |
 | `@redirectToLogin`（名前付き） | `decorator: "browser.redirectOn"`、`via: "browser.redirectToLogin"`、`args` は固定した引数 |
 | デコレータの位置で書いた引数 | `param` に対応付け |
 | 残りの引数に渡した値（`@db.effects(a, b)`） | 残りの引数の名前の `Arg` 一つ。`value` は `list` で、`items` は渡した値を書いた順に（一つずつ `ref` か `refs`） |

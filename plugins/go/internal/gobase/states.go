@@ -28,13 +28,19 @@ func (e *emitter) sharedComment() string {
 
 // commandComment は、命令（効果を持つ葉。状態の単位のものも、SharedState のものも）のメソッドのコメント:
 // 「<メソッド名> は命令: 効果 <効果の句>を持つ葉の op <op の FQN>。」。効果の句は、直に持つ効果（op が書いたものと、デコレータが
-// 運ぶもの。ir.Op.DirectEffects）ごとの `<効果の FQN>（on <宛先>）` を、その順に「、」でつないだもの。
+// 運ぶもの。ir.Op.DirectEffects）ごとの `<効果の FQN>（on <宛先>）` を、その順に「、」でつないだもの。直に書いた効果
+// （docs/ir.md「op」の EffectRef の direct）は、名前を持たないので、`<状態の FQN>.<操作>` だけ。
 func (e *emitter) commandComment(o *ir.Op) string {
 	var clauses []string
-	for _, fqn := range o.DirectEffects() {
-		eff, ok := e.lookup(fqn).(*ir.Effect)
+	for _, fx := range o.DirectEffects() {
+		named, ok := fx.(ir.NamedEffect)
 		if !ok {
-			e.errorf(codeInternal, o.Name, "op %s の効果 %s が Program にない（検査を通った IR には来ないはずの形）", o.Name, fqn)
+			clauses = append(clauses, fx.String())
+			continue
+		}
+		eff, ok := e.lookup(named.Effect).(*ir.Effect)
+		if !ok {
+			e.errorf(codeInternal, o.Name, "op %s の効果 %s が Program にない（検査を通った IR には来ないはずの形）", o.Name, named.Effect)
 			continue
 		}
 		clauses = append(clauses, eff.Name+"（on "+effectTarget(eff)+"）")
@@ -44,9 +50,9 @@ func (e *emitter) commandComment(o *ir.Op) string {
 
 // queryComment は、op の問い合わせ（効果を持たず、状態を読む葉。状態の単位のものも、SharedState のものも）のメソッドのコメント:
 // 「<メソッド名> は問い合わせ: <状態の FQN を「、」で> を読む（reads）葉の op <op の FQN>。」。状態は、直に読む状態
-// （op が書いたものと、デコレータが運ぶもの。ir.Op.DirectReads）。
-func queryComment(o *ir.Op) string {
-	return golang.MethodName(o.Name) + " は問い合わせ: " + joinJa(o.DirectReads()) + " を読む（reads）葉の op " + o.Name + "。"
+// （op が書いたものと、デコレータが運ぶもの。read の宣言は、その宛先の状態として数える。ir.Program.ReadStates）。
+func (e *emitter) queryComment(o *ir.Op) string {
+	return golang.MethodName(o.Name) + " は問い合わせ: " + joinJa(e.p.ReadStates(o.DirectReads())) + " を読む（reads）葉の op " + o.Name + "。"
 }
 
 // genStates は定義のパッケージの states.go。状態の単位も SharedState もなければ nil。
@@ -80,7 +86,7 @@ func (e *emitter) genStates() *fileGen {
 		// op の問い合わせ（宣言順）、命令（宣言順）
 		for _, fqn := range u.Queries {
 			o := e.op(fqn)
-			f.printf("\t// %s\n\t%s\n", queryComment(o), f.signature(o))
+			f.printf("\t// %s\n\t%s\n", e.queryComment(o), f.signature(o))
 		}
 		for _, fqn := range u.Commands {
 			o := e.op(fqn)
@@ -94,7 +100,7 @@ func (e *emitter) genStates() *fileGen {
 		f.print("type SharedState interface {\n")
 		for _, fqn := range s.Shared {
 			o := e.op(fqn)
-			text := queryComment(o)
+			text := e.queryComment(o)
 			if e.ops[fqn].Place == golang.SharedCommand {
 				text = e.commandComment(o)
 			}

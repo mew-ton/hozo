@@ -30,7 +30,7 @@ namespace a {
     replace(id, m);
     return all();
   }
-  op moveDeclared(id: string, m: M): M? reads rows effects remove | add {
+  op moveDeclared(id: string, m: M): M? reads rows effects remove, add {
     replace(id, m);
     return find(id);
   }

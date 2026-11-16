@@ -7,5 +7,5 @@ namespace a {
   union Both { e; f; }
   union One { e; }
   op viaUnion() effects Both;          // ERROR: EFF-3
-  op viaMixed() effects One | f;       // ERROR: EFF-3
+  op viaMixed() effects One, f;       // ERROR: EFF-3
 }

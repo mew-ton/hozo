@@ -24,7 +24,7 @@ namespace shapea {
 
   /** 走らせる */
   @cli.command("run")
-  export op run(in: RunInput): Note throws Broken | Lost;
+  export op run(in: RunInput): Note throws Broken, Lost;
 }
 
 namespace shapeb {
@@ -52,5 +52,5 @@ namespace shapeb {
 
   /** 走らせる */
   @cli.command("run")
-  export op run(in: RunInput): Note? throws Broken | Lost;
+  export op run(in: RunInput): Note? throws Broken, Lost;
 }

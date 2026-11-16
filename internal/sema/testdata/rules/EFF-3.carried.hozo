@@ -13,5 +13,5 @@ namespace a {
   @doing(e, f) op carriedAndOne(x: string, y: string) effects g;
   @doing(e, f) op carriedAndSame(x: string, y: string) effects e;
   @doing(e)                                     // 自分で書いた分が二つなら、運ばれた分があっても EFF-3
-  op carriedAndTwo(x: string) effects f | g;    // ERROR(-1): EFF-3
+  op carriedAndTwo(x: string) effects f, g;    // ERROR(-1): EFF-3
 }

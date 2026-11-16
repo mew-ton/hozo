@@ -116,6 +116,9 @@ func (s *server) declIndex(id source.FileID) []declEntry {
 			case *ast.EffectDecl:
 				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
 				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: joinNS(ns, d.Name.Name)})
+			case *ast.ReadDecl:
+				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
+				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: joinNS(ns, d.Name.Name)})
 			case *ast.ClassifyDecl:
 				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
 				fqn := joinNS(ns, d.Name.Name)

@@ -648,7 +648,7 @@ type Op struct {
 	Params   []OpParam `json:"params"`
 	// Returns は戻り値の型。nil は void（JSON では null）。決して返さない op は [NeverType]。
 	Returns Type `json:"returns"`
-	// Effects は書かれた effects（書かれた順。ユニオンは展開済み。重複は最初の出現に寄せる）。配線で省略していれば空。
+	// Effects は書かれた effects（書かれた順。ユニオンは展開済み）。配線で省略していれば空。
 	// デコレータが運ぶものは含まない。
 	Effects []EffectRef `json:"effects"`
 	// Reads は書かれた reads（書かれた順、重複は最初の出現に寄せる）。書いていなければ空。

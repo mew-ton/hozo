@@ -37,7 +37,7 @@ namespace shop {
   // 呼び先の例外は、どの名前空間のものでも宣言する（THROWS-1）
   /** 注文を確定して、配送業者に渡す */
   export op fulfill(): Order
-    throws marks.NotApproved | carrier.Closed
+    throws marks.NotApproved, carrier.Closed
   {
     const order = placeOrder();
     carrier.pickup(order);

@@ -18,7 +18,7 @@ namespace a {
     f(Kind);                           // ERROR: RES-4
   }
   // throw に書けるのは例外一つ（例外のユニオンは書けない）
-  op ng5(m: M): M throws E | F {
+  op ng5(m: M): M throws E, F {
     return match m by Kind {
       A => throw Errors;               // ERROR: RES-4
       B => throw E;

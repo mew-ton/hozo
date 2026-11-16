@@ -195,14 +195,14 @@ func (e *emitter) collectOps() {
 // carried は GOSQL-14: op が直に読む状態と直に持つ効果は、db の op のデコレータ decorator が運ぶもの（reads か effects）だけ。
 func (e *emitter) carried(op *ir.Op, decorator string, reads, effects []string) {
 	var extra []string
-	for _, r := range op.DirectReads() {
+	for _, r := range e.view.Program.ReadStates(op.DirectReads()) {
 		if !contains(reads, r) {
 			extra = append(extra, "状態 "+r+" を読む")
 		}
 	}
 	for _, x := range op.DirectEffects() {
-		if !contains(effects, x) {
-			extra = append(extra, "効果 "+x+" を持つ")
+		if !contains(effects, x.String()) {
+			extra = append(extra, "効果 "+x.String()+" を持つ")
 		}
 	}
 	if len(extra) > 0 {

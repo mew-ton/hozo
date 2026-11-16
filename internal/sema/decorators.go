@@ -21,13 +21,14 @@ const (
 	siteModel
 	siteUnion
 	siteEffect
+	siteRead
 	siteClassify
 	siteDecorator
 )
 
 // String は設計書の語。
 func (k siteKind) String() string {
-	return [...]string{"op", "field", "state", "exception", "scalar", "model", "union", "effect", "classify", "decorator"}[k]
+	return [...]string{"op", "field", "state", "exception", "scalar", "model", "union", "effect", "read", "classify", "decorator"}[k]
 }
 
 // target は対応する Decorator.targets の値。付けられない種類なら ok が false。
@@ -47,6 +48,8 @@ func (k siteKind) target() (ir.DecoratorTarget, bool) {
 		return ir.TargetModel, true
 	case siteEffect:
 		return ir.TargetEffect, true
+	case siteRead:
+		return ir.TargetRead, true
 	}
 	return "", false
 }
@@ -103,11 +106,12 @@ type carrier struct {
 
 // carry は docs/check.md「デコレータが運ぶ reads と effects」: 適用 app のデコレータの reads / effects の節の要素を、
 // `$param:` を適用の引数の値で置き換えて（残りの引数なら渡した値を書いた順にすべて、省いた省略可能な引数なら何も足さない）、
-// Op.carried に足す。重複は最初の出現に寄せる。Op.reads / Op.effects には足さない（docs/ir.md「正規化」）。
+// Op.carried に足す。any read と any effect の引数の値は名前で書いた要素に、any state の引数の値は直に書いた状態になる。
+// 重複は最初の出現に寄せる。Op.reads / Op.effects には足さない（docs/ir.md「正規化」）。
 //
 // 運ばれたものも、op が書いたものと同じに確かめる（どれも Signature を要しない）。位置はその適用。
 //   - DEC-17: 節を持つデコレータが、配線の op（本体を持つ op）に付いている。
-//   - READS-1: 葉の op に運ばれた状態が、別の名前空間のもの。
+//   - READS-1: 葉の op に運ばれた状態（か、その read）が、別の名前空間のもの。
 //   - STATE-2: 葉の op に運ばれた効果が、別の名前空間のもの。
 func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
 	sym := a.syms[app.Decorator]
@@ -125,26 +129,26 @@ func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
 	}
 	carried := false
 	for _, raw := range dec.Reads {
-		for _, state := range carriedTargets(raw, app.Args) {
+		for _, read := range carriedReads(raw, app.Args) {
 			carried = true
-			if contains(op.Carried.Reads, state) {
+			if containsRef(op.Carried.Reads, read) {
 				continue
 			}
-			op.Carried.Reads = append(op.Carried.Reads, state)
-			if st := a.syms[state]; leaf && st != nil && st.ns != site.sym.ns {
-				a.errorf("READS-1", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の状態 %s を reads として運んでいる（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", name, dec.Name, state, nsName(site.sym.ns))
+			op.Carried.Reads = append(op.Carried.Reads, read)
+			if rs := a.syms[read.String()]; leaf && rs != nil && rs.ns != site.sym.ns {
+				a.errorf("READS-1", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の%sを reads として運んでいる（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", name, dec.Name, readRefText(read), nsName(site.sym.ns))
 			}
 		}
 	}
 	for _, raw := range dec.Effects {
-		for _, effect := range carriedTargets(raw, app.Args) {
+		for _, effect := range carriedEffects(raw, app.Args) {
 			carried = true
-			if contains(op.Carried.Effects, effect) {
+			if containsRef(op.Carried.Effects, effect) {
 				continue
 			}
 			op.Carried.Effects = append(op.Carried.Effects, effect)
-			if ef := a.syms[effect]; leaf && ef != nil && ef.ns != site.sym.ns {
-				a.errorf("STATE-2", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の効果 %s を運んでいる（%s は名前空間 %s の持ち主ではない）", name, dec.Name, effect, name, nsName(ef.ns))
+			if owner := a.effectOwner(effect); leaf && owner != nil && owner != site.sym.ns {
+				a.errorf("STATE-2", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の効果 %s を運んでいる（%s は名前空間 %s の持ち主ではない）", name, dec.Name, effect, name, nsName(owner))
 			}
 		}
 	}
@@ -153,8 +157,29 @@ func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
 	}
 }
 
-// carriedTargets はデコレータの reads / effects の節の要素一つが、適用の引数 args のもとで指す宣言の FQN の列。
-// `$param:名前` でなければその FQN 一つ。`$param:名前` なら、その引数の値: ref は一つ、refs と list（残りの引数）は
+// carriedReads はデコレータの reads の節の要素一つが、適用の引数 args のもとで指す ReadRef の列。FQN の位置が
+// `$param:名前` でなければその要素一つ。`$param:名前` なら、その引数の値ごとに、同じ種類の要素（carriedTargets）。
+func carriedReads(element ir.ReadRef, args []ir.Arg) []ir.ReadRef {
+	switch x := element.(type) {
+	case ir.NamedRead:
+		return ir.NamedReads(carriedTargets(x.Read, args)...)
+	case ir.DirectRead:
+		return ir.StateReads(carriedTargets(x.State, args)...)
+	}
+	return nil
+}
+
+// carriedEffects はデコレータの effects の節の要素一つが、適用の引数 args のもとで指す EffectRef の列。直に書いた要素は
+// そのまま一つ。名前で書いた要素は、FQN の位置が `$param:名前` なら、その引数の値ごとに一つ（carriedTargets）。
+func carriedEffects(element ir.EffectRef, args []ir.Arg) []ir.EffectRef {
+	if x, ok := element.(ir.NamedEffect); ok {
+		return ir.NamedEffects(carriedTargets(x.Effect, args)...)
+	}
+	return []ir.EffectRef{element}
+}
+
+// carriedTargets はデコレータの reads / effects の節の要素一つの FQN の位置 element が、適用の引数 args のもとで指す宣言の
+// FQN の列。`$param:名前` でなければその FQN 一つ。`$param:名前` なら、その引数の値: ref は一つ、refs と list（残りの引数）は
 // 書かれた順にすべて。渡されていない引数（省いた省略可能な引数）は空。
 func carriedTargets(element string, args []ir.Arg) []string {
 	param, isParam := strings.CutPrefix(element, "$param:")
@@ -454,6 +479,8 @@ func anyAccept(of ir.AnyOf) accept {
 		return acException | acUnionSet
 	case ir.AnyEffect:
 		return acEffect | acUnionSet
+	case ir.AnyRead:
+		return acRead
 	case ir.AnyState:
 		return acState
 	case ir.AnyOp:
@@ -678,30 +705,36 @@ func setOf(m map[string]*ast.Param) map[string]bool {
 	return out
 }
 
-// lowerDecoReads はデコレータの宣言の reads の一節（docs/ir.md「decorator」の reads）。要素は state（基底の状態。
-// どの名前空間のものでも解決する）か、any state の引数（残りの引数でもよい。`$param:名前`）。どちらでもなければ RES-4。
-func (a *analyzer) lowerDecoReads(c *ast.ReadsClause, sc *scope) []string {
-	var out []string
-	for _, n := range c.States {
-		r, ok := a.resolve(n, sc, acState|acDecoParam)
+// lowerDecoReads はデコレータの宣言の reads の一節（docs/ir.md「decorator」の reads）。要素は op の節と同じ（read か、
+// 直に書いた state。どの名前空間のものでも解決する）か、any read / any state の引数（残りの引数でもよい。`$param:名前`:
+// any read は名前で書いた要素、any state は直に書いた要素の位置に置く）。どれでもなければ RES-4。
+func (a *analyzer) lowerDecoReads(c *ast.ReadsClause, sc *scope) []ir.ReadRef {
+	var out []ir.ReadRef
+	for _, n := range c.Reads {
+		r, ok := a.resolve(n, sc, acReadsPos|acDecoParam)
 		if !ok {
 			continue
 		}
-		if r.kind == rDecoParam {
-			if a.checkAnyParam(sc, r.name, ir.AnyState, n.Span) {
-				out = append(out, "$param:"+r.name)
-			}
+		if r.kind != rDecoParam {
+			out = append(out, readRef(r.sym))
 			continue
 		}
-		out = append(out, r.sym.fqn)
+		switch p, _ := sc.decoParams.types[r.name].(ir.AnyParam); p.Of {
+		case ir.AnyRead:
+			out = append(out, ir.NamedRead{Read: "$param:" + r.name})
+		case ir.AnyState:
+			out = append(out, ir.DirectRead{State: "$param:" + r.name})
+		default:
+			a.errorf("RES-4", n.Span, "デコレータの引数 %s は any read でも any state でもないので、この位置では指せない", r.name)
+		}
 	}
 	return out
 }
 
-// lowerDecoEffects はデコレータの宣言の effects の一節（docs/ir.md「decorator」の effects）。要素は effect、効果の union
-// （展開）、any effect の引数（残りの引数でもよい。`$param:名前`）。
-func (a *analyzer) lowerDecoEffects(c *ast.EffectsClause, sc *scope) []string {
-	var out []string
+// lowerDecoEffects はデコレータの宣言の effects の一節（docs/ir.md「decorator」の effects）。要素は op の節と同じ（effect、
+// 効果の union（展開）、直に書いた「状態.操作」）か、any effect の引数（残りの引数でもよい。`$param:名前`）。
+func (a *analyzer) lowerDecoEffects(c *ast.EffectsClause, sc *scope) []ir.EffectRef {
+	var out []ir.EffectRef
 	for _, n := range c.Effects {
 		r, ok := a.resolve(n, sc, acEffectsPos|acDecoParam)
 		if !ok {
@@ -709,11 +742,11 @@ func (a *analyzer) lowerDecoEffects(c *ast.EffectsClause, sc *scope) []string {
 		}
 		if r.kind == rDecoParam {
 			if a.checkAnyParam(sc, r.name, ir.AnyEffect, n.Span) {
-				out = append(out, "$param:"+r.name)
+				out = append(out, ir.NamedEffect{Effect: "$param:" + r.name})
 			}
 			continue
 		}
-		out = append(out, a.expandSet(r, kindEffect, n.Span)...)
+		out = append(out, a.effectRefs(r, n)...)
 	}
 	return out
 }

@@ -21,6 +21,7 @@ const (
 	acState
 	acException
 	acEffect
+	acRead
 	acClassify
 	acDecorator
 	acOp
@@ -30,9 +31,9 @@ const (
 	acDecoParam // デコレータの宣言の引数（$param:）
 	acOpParam   // op の引数（デコレータの適用の引数。$param:）
 	acNamespace // 名前空間（bind の対象）
-	acStateOp   // 状態への操作（どの位置も受け付けない。手続き 2 の表のため）
+	acStateOp   // 状態への操作（effects の要素に直に書いた「状態.操作」。手続き 2 の表）
 
-	acAnyDecl = acModel | acScalar | acUnionArms | acUnionSet | acState | acException | acEffect | acClassify | acDecorator | acOp
+	acAnyDecl = acModel | acScalar | acUnionArms | acUnionSet | acState | acException | acEffect | acRead | acClassify | acDecorator | acOp
 )
 
 // rkind は解決の結果の種類。
@@ -425,6 +426,8 @@ func symAccept(s *symbol) accept {
 		return acException
 	case kindEffect:
 		return acEffect
+	case kindRead:
+		return acRead
 	case kindClassify:
 		return acClassify
 	case kindDecorator:
@@ -591,8 +594,11 @@ const (
 	acTypePos = acModel | acScalar | acUnionArms | acCase
 	// acThrowsPos は throws / catches の要素。デコレータの宣言の中では any exception の引数も（lowerExceptions が確かめる）。
 	acThrowsPos = acException | acUnionSet | acDecoParam
-	// acEffectsPos は effects / prevents / keeps の要素。
-	acEffectsPos = acEffect | acUnionSet
+	// acEffectsPos は effects の要素: 名前で書いた効果（effect、効果の union）か、直に書いた「状態.操作」
+	// （docs/resolve.md「effects の要素の読み分け」）。
+	acEffectsPos = acEffect | acUnionSet | acStateOp
+	// acReadsPos は reads の要素: 名前で書いた read か、直に書いた状態。
+	acReadsPos = acRead | acState
 	// acHaltsPos は halts の効果。デコレータの宣言の中では any effect の引数も。
 	acHaltsPos = acEffect | acDecoParam
 	// acMemberPos はユニオンのメンバー。

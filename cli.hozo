@@ -135,8 +135,8 @@ namespace hozoc {
    */
   @cli.command("check")
   export op check(in: CheckInput): CheckResult
-    throws CheckFailed | ConfigInvalid | LanguageMismatch
-    throws proc.Crashed | proc.MalformedOutput;
+    throws CheckFailed, ConfigInvalid, LanguageMismatch
+    throws proc.Crashed, proc.MalformedOutput;
 
   /**
    * 検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
@@ -150,8 +150,8 @@ namespace hozoc {
    */
   op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
     effects syncOutputs
-    throws CheckFailed | OutputConflict | UnknownNamespace prevents effects
-    throws proc.Crashed | proc.MalformedOutput prevents effects;
+    throws CheckFailed, OutputConflict, UnknownNamespace prevents effects
+    throws proc.Crashed, proc.MalformedOutput prevents effects;
 
   /**
    * 仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
@@ -161,8 +161,8 @@ namespace hozoc {
    */
   @cli.command("emit")
   export op emit(in: EmitInput): EmitResult
-    throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict | UnknownNamespace prevents effects
-    throws proc.Crashed | proc.MalformedOutput prevents effects
+    throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
+    throws proc.Crashed, proc.MalformedOutput prevents effects
   {
     const checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
     return writeOutputs(in, checked);

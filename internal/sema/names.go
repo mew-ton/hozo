@@ -9,7 +9,7 @@ import (
 )
 
 // checkName は NAME-1（docs/check.md「名前空間」。warning）: model / scalar / exception / union / classify の名前は
-// 先頭が大文字、state / op / effect / decorator は先頭が小文字。`_` で始まる名前も警告。語彙は対象外。
+// 先頭が大文字、state / op / effect / read / decorator は先頭が小文字。`_` で始まる名前も警告。語彙は対象外。
 func (a *analyzer) checkName(s *symbol) {
 	if s.vocab {
 		return

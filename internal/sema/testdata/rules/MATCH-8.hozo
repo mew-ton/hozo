@@ -6,7 +6,7 @@ namespace a {
   exception WithModel: Detail;
   exception Inline: { reason: string; };
   classify Kind of M { A; B; C; }
-  op f(m: M): M throws Plain | WithModel | Inline {
+  op f(m: M): M throws Plain, WithModel, Inline {
     return match m by Kind {
       A => throw WithModel;            // ERROR: MATCH-8
       B => throw Inline;               // ERROR: MATCH-8

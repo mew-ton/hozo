@@ -19,5 +19,5 @@ namespace browser {
 
   // 結果を見ない呼び出し（ログアウトの依頼など）
   decorator ignoreFailure
-    catches http.NetworkError | http.ServerError ignores;
+    catches http.NetworkError, http.ServerError ignores;
 }

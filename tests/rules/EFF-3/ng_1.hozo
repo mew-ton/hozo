@@ -5,6 +5,6 @@ namespace a {
   effect e on s.post;
   effect f on t.post;
   exception E;
-  op two() effects e | f;                                // ERROR: EFF-3
-  op three() effects e | f throws E prevents effects;    // ERROR: EFF-3
+  op two() effects e, f;                                // ERROR: EFF-3
+  op three() effects e, f throws E prevents effects;    // ERROR: EFF-3
 }

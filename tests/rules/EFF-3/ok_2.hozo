@@ -8,7 +8,7 @@ namespace a {
   union Both { e; f; }
   op doE() effects e;
   op doF() effects f;
-  op wiring() effects e | f {
+  op wiring() effects e, f {
     doE();
     doF();
   }

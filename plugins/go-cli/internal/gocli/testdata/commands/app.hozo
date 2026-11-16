@@ -62,7 +62,7 @@ namespace tool {
    */
   @cli.command("check")
   export op check(in: CheckInput): CheckResult
-    throws CheckFailed | ConfigInvalid | Busy
+    throws CheckFailed, ConfigInvalid, Busy
     throws fail.Crashed;
 
   /** 書き出す（内部の op。サブコマンドではない） */
@@ -75,7 +75,7 @@ namespace tool {
    */
   @cli.command("emit")
   export op emit(in: EmitInput): EmitResult
-    throws CheckFailed | ConfigInvalid | Busy | UnknownName
+    throws CheckFailed, ConfigInvalid, Busy, UnknownName
     throws fail.Crashed
   {
     const checked = check({ config: in.config });
@@ -127,7 +127,7 @@ namespace demo {
 
   /** 足す */
   @cli.command("add")
-  export op add(in: AddInput): Sum throws Overflow | Tired;
+  export op add(in: AddInput): Sum throws Overflow, Tired;
 
   /** copy の入力。scalar の値と、環境変数を代わりに持つ位置引数、string の scalar の array */
   model CopyInput {

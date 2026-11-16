@@ -10,5 +10,5 @@ namespace a {
   @db.insert(t) effect f on t.post;
   @db.delete(t, "id") effect g on t.delete;
   @db.effects(e)                       // ERROR: EFF-3
-  op carriedAndTwo(x: M) effects f | g;
+  op carriedAndTwo(x: M) effects f, g;
 }

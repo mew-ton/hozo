@@ -12,7 +12,7 @@ namespace a {
   export op replace(id: string, m: M);
 }
 namespace b {
-  op wiring(id: string, m: a.M) effects a.f | a.e {
+  op wiring(id: string, m: a.M) effects a.f, a.e {
     a.replace(id, m);
   }
 }

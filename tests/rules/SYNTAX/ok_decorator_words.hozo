@@ -19,7 +19,7 @@ namespace a {
   // 節は何度でも、どの順でも書ける。prevents / keeps の目的語の effects の後ろに、effects の節
   decorator both(extra: any state?, ...more: any effect)
     reads logs, extra
-    throws Busy prevents effects effects more | add
+    throws Busy prevents effects effects more, add
     reads rows;
   decorator tags(first: string, ...more: string | int) for op | effect;
   // 別名の先

@@ -83,7 +83,7 @@ namespace api {
   /** 品物を作る */
   @http.post("/items")
   export op create(in: CreateInput): type.Item
-    throws type.Conflict | type.Rejected;
+    throws type.Conflict, type.Rejected;
 
   // クエリの項目: string / int / float / boolean と、その scalar。@http.required、@http.default、どちらもない
   model SearchInput {

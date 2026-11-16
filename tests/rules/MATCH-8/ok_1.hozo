@@ -7,7 +7,7 @@ namespace a {
   exception WithModel: Detail;
   classify Kind of M { A; B; C; }
   op reject(m: M): M throws WithModel;
-  op f(m: M): M throws Plain | WithModel | b.Remote {
+  op f(m: M): M throws Plain, WithModel, b.Remote {
     return match m by Kind {
       A => throw Plain;
       B => throw b.Remote;

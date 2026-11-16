@@ -315,7 +315,7 @@ func place(p *ir.Program, o *ir.Op, target bool, units map[string]int) (Place, s
 		}
 		return StateCommand, unit
 	}
-	switch reads := o.DirectReads(); {
+	switch reads := p.ReadStates(o.DirectReads()); { // 直に読む状態（read の宣言は、その宛先の状態として数える）
 	case len(reads) == 1: // 4
 		if _, ok := units[reads[0]]; ok {
 			return StateQuery, reads[0]
@@ -327,11 +327,18 @@ func place(p *ir.Program, o *ir.Op, target bool, units map[string]int) (Place, s
 	return Leaf, "" // 6
 }
 
-// effectUnit は、効果 fqn の宛先の単位（docs/plugin-go.md「op の置き場」の「効果の宛先の単位」）: 組み込みの効果か、基底の状態の
+// effectUnit は、効果 fx の宛先の単位（docs/plugin-go.md「op の置き場」の「効果の宛先の単位」）: 組み込みの効果か、基底の状態の
 // 遷移なら、その基底の状態。状態の分類の遷移なら、その分類が述語で決まるならその分類、型で決まるなら、その分類のただ一つの
-// 対象の状態。分からなければ ""。
-func effectUnit(p *ir.Program, fqn string) string {
-	e, ok := p.Lookup(fqn).(*ir.Effect)
+// 対象の状態。直に書いた効果（docs/ir.md「op」の EffectRef の direct）は、組み込みの効果なので、その状態。分からなければ ""。
+func effectUnit(p *ir.Program, fx ir.EffectRef) string {
+	named, ok := fx.(ir.NamedEffect)
+	if !ok {
+		if direct, ok := fx.(ir.DirectEffect); ok {
+			return direct.State
+		}
+		return ""
+	}
+	e, ok := p.Lookup(named.Effect).(*ir.Effect)
 	if !ok {
 		return ""
 	}

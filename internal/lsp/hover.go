@@ -202,9 +202,9 @@ func (r *renderer) signature(op *ir.Op) string {
 				}
 				switch rel.State {
 				case ir.Prevented:
-					prevented = append(prevented, r.rel(rel.Effect))
+					prevented = append(prevented, r.effectRef(rel.Effect))
 				case ir.Kept:
-					kept = append(kept, r.rel(rel.Effect))
+					kept = append(kept, r.effectRef(rel.Effect))
 				}
 			}
 			var notes []string
@@ -226,7 +226,7 @@ func (r *renderer) signature(op *ir.Op) string {
 	} else {
 		b.WriteString("\n")
 		for _, ef := range sig.Effects {
-			fmt.Fprintf(&b, "- `%s`\n", r.rel(ef))
+			fmt.Fprintf(&b, "- `%s`\n", r.effectRef(ef))
 		}
 	}
 	if len(sig.Reads) > 0 {
@@ -288,6 +288,11 @@ func (r *renderer) head(d ir.Decl) string {
 		return s
 	case *ir.Effect:
 		return "effect " + name + r.effectTarget(d.Target)
+	case *ir.Read:
+		if d.State == "" {
+			return "read " + name
+		}
+		return "read " + name + " on " + r.rel(d.State)
 	case *ir.Classify:
 		if d.FromCondition {
 			return "condition " + name + " of " + r.classifySubject(d.Subject)
@@ -348,18 +353,31 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 			b.WriteString(" " + r.rel(c.Halts))
 		}
 	}
-	// デコレータが op に運ぶ reads / effects の節（docs/grammar.md「decorator の宣言」）。区切りは op の節と同じ
+	// デコレータが op に運ぶ reads / effects の節（docs/grammar.md「decorator の宣言」）。要素と区切りは op の節と同じ
 	if len(d.Reads) > 0 {
-		var states []string
-		for _, st := range d.Reads {
-			states = append(states, r.rel(st))
+		var reads []string
+		for _, rd := range d.Reads {
+			reads = append(reads, r.rel(rd.String()))
 		}
-		b.WriteString(" reads " + strings.Join(states, ", "))
+		b.WriteString(" reads " + strings.Join(reads, ", "))
 	}
 	if len(d.Effects) > 0 {
-		b.WriteString(" effects " + r.rels(d.Effects))
+		var effects []string
+		for _, e := range d.Effects {
+			effects = append(effects, r.effectRef(e))
+		}
+		b.WriteString(" effects " + strings.Join(effects, ", "))
 	}
 	return b.String()
+}
+
+// effectRef は effects の要素を Hozo の構文で書く（docs/grammar.md「op」の EffectElem）: 名前で書いた効果は、見ている
+// 名前空間から見た名前。直に書いた効果は `状態.操作`。
+func (r *renderer) effectRef(e ir.EffectRef) string {
+	if d, ok := e.(ir.DirectEffect); ok {
+		return r.rel(d.State) + "." + string(d.Operation)
+	}
+	return r.rel(e.String())
 }
 
 // param はデコレータの引数の宣言。残りの引数は `...名前: 型`（docs/grammar.md「decorator の宣言」の RestParam）。
@@ -371,7 +389,7 @@ func (r *renderer) param(p ir.Param) string {
 	return s
 }
 
-// throwsClause は `throws A | B prevents effects` の形。
+// throwsClause は `throws A, B prevents effects` の形。
 func (r *renderer) throwsClause(c ir.ThrowsClause) string {
 	s := "throws " + r.rels(c.Exceptions)
 	for _, rel := range c.Relations {
@@ -380,12 +398,13 @@ func (r *renderer) throwsClause(c ir.ThrowsClause) string {
 	return s
 }
 
+// rels は節の並び（throws / catches の例外）を Hozo の構文で書く。区切りは `,`（docs/grammar.md「op」）。
 func (r *renderer) rels(fqns []string) string {
 	var out []string
 	for _, f := range fqns {
 		out = append(out, r.rel(f))
 	}
-	return strings.Join(out, " | ")
+	return strings.Join(out, ", ")
 }
 
 // field は `name: Type`。省略可能は型の `?` で書く（docs/grammar.md「model」）。
@@ -474,7 +493,12 @@ func (r *renderer) argValue(v ir.ArgValue) string {
 	case ir.RefValue:
 		return r.rel(v.Target)
 	case ir.RefsValue:
-		return r.rels(v.Targets)
+		// 一つの引数に渡した宣言の集合の区切りは `|`（docs/grammar.md「デコレータの適用」）
+		names := make([]string, len(v.Targets))
+		for i, t := range v.Targets {
+			names[i] = r.rel(t)
+		}
+		return strings.Join(names, " | ")
 	case ir.VariantValue:
 		return r.rel(v.Union) + "." + v.Arm
 	case ir.ListValue:

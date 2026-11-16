@@ -75,7 +75,7 @@ namespace web {
   // docs/check.md「bind」: 明示していない位置 in.token が Call.bound に入る（BIND-3）
   @offlineFallback
   op fetchUser(q: Query): api.PublicUser
-    throws api.NotFound | api.Unauthorized
+    throws api.NotFound, api.Unauthorized
   {
     return api.getUser({ id: q.id });
   }
@@ -92,7 +92,7 @@ namespace web {
   // docs/check.md「計算」手順 0（配線）: 出どころが二つ（行 1 では prevented、行 2 では kept）で rel が unknown
   // docs/ir.md「正規化」: 複数行の throws は ThrowsClause の列のまま（まとめない）
   op reload(id: api.UserId): api.PublicUser
-    throws api.NotFound | api.Unauthorized
+    throws api.NotFound, api.Unauthorized
     throws Offline
   {
     const user = fetchUser({ id });
@@ -114,7 +114,7 @@ namespace web {
   @redirectToLogin
   @traced(id, 5m)
   op openUser(id: api.UserId): UserPage
-    throws Offline | api.NotFound
+    throws Offline, api.NotFound
   {
     const user = fetchUser({ id });
     const page = match user by UserKind {

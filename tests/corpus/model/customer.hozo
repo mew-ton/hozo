@@ -17,7 +17,7 @@ namespace customer {
   // docs/check.md「計算」手順 0（配線）: 効果も例外も、名前空間をまたいで伝播する
   /** ほしいものをカートに入れて、注文する */
   op buy(): shop.Order
-    throws shop.OutOfStock | marks.NotApproved | carrier.Closed
+    throws shop.OutOfStock, marks.NotApproved, carrier.Closed
   {
     const line = pick();
     shop.addToCart(line);

@@ -7,16 +7,16 @@ namespace a {
   union Both { e; f; }
   union One { e; }
   exception E;
-  op two() effects e | f;                       // ERROR: EFF-3
+  op two() effects e, f;                       // ERROR: EFF-3
   op viaUnion() effects Both;                   // ERROR: EFF-3
-  op viaMixed() effects One | f throws E;       // ERROR: EFF-3
+  op viaMixed() effects One, f throws E;       // ERROR: EFF-3
   op one() effects e;
   op oneViaUnion() effects One;
-  op twice() effects e | One;
+  op twice() effects e, One;
   op other() effects f throws E prevents effects;
   op zero();
   // 配線の op は伝播した効果をいくつ書いてもよい（EFF-2 が照合する）
-  op wire() effects e | f throws E {
+  op wire() effects e, f throws E {
     one();
     other();
   }

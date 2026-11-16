@@ -5,7 +5,7 @@ namespace a {
   exception E;
   exception F;
   op a1() effects e throws E prevents effects keeps effects;     // ERROR: REL-5
-  op a2() effects e throws E | F keeps effects prevents effects; // ERROR: REL-5
+  op a2() effects e throws E, F keeps effects prevents effects; // ERROR: REL-5
   decorator d throws E keeps effects prevents effects;           // ERROR: REL-5
   op ok() effects e throws E prevents effects throws F keeps effects;
   op same() effects e throws E prevents effects prevents effects;

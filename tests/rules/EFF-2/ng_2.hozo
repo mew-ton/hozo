@@ -4,7 +4,7 @@ namespace a {
   effect e on s.post;
   effect f on s.post;
   op doE() effects e;
-  op wiring() effects e | f {          // ERROR: EFF-2
+  op wiring() effects e, f {          // ERROR: EFF-2
     doE();
   }
 }

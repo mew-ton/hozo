@@ -311,6 +311,7 @@ const (
 	SymbolInterface     SymbolKind = 11
 	SymbolFunction      SymbolKind = 12
 	SymbolVariable      SymbolKind = 13
+	SymbolKey           SymbolKind = 20
 	SymbolEnumMember    SymbolKind = 22
 	SymbolStruct        SymbolKind = 23
 	SymbolEvent         SymbolKind = 24

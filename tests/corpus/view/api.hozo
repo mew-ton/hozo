@@ -92,7 +92,7 @@ namespace api {
   export op logout(token: Token?)
     effects deleteSession;
 
-  // docs/check.md「計算」手順 0（葉）: ユニオンを展開した E と keeps。docs/ir.md「正規化」の `throws A | B にユニオン`
+  // docs/check.md「計算」手順 0（葉）: ユニオンを展開した E と keeps。docs/ir.md「正規化」の `throws A, B にユニオン`
   export op touch(id: UserId)
     effects touchUser
     throws ClientError keeps effects;

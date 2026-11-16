@@ -1,6 +1,6 @@
 // SYNTAX（docs/grammar.md「識別子」「decorator の宣言」）: デコレータを指す名前で予約語を書けるのは、最後の要素だけ。
 // 残りの引数は最後に一つだけで、型は渡す値一つの型（? も [] も付けない）。op の引数には書けない。
-// reads の節の区切りは ","、effects の節の区切りは "|"
+// reads と effects の節の区切りは ","（"|" は、なくした書き方。docs/grammar.md「op」）
 namespace a {
   state rows: list<string>;
   effect add on rows.post;
@@ -12,7 +12,7 @@ namespace a {
   decorator arrayRest(...xs: string[]);                            // ERROR: SYNTAX
   decorator keywordParam(...to: string);                           // ERROR: SYNTAX
   decorator readsPipe(a: any state, b: any state) reads a | b;     // ERROR: SYNTAX
-  decorator effectsComma(a: any effect, b: any effect) effects a, b;   // ERROR: SYNTAX
+  decorator effectsPipe(a: any effect, b: any effect) effects a | b;   // ERROR: SYNTAX
   decorator noElement reads;                                       // ERROR: SYNTAX
   decorator a.qualified;                                           // ERROR: SYNTAX
   decorator badTarget for namespace;                               // ERROR: SYNTAX

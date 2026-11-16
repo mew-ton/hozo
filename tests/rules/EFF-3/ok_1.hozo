@@ -7,6 +7,6 @@ namespace a {
   op one() effects e;
   op withThrows() effects e throws E prevents effects;
   op viaUnion() effects One;
-  op twice() effects e | One;
+  op twice() effects e, One;
   op zero();
 }

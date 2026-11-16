@@ -10,5 +10,5 @@ namespace proc {
    * 外部プロセスを起動し、標準入力に入力を JSON で渡し、標準出力の JSON を出力として受け取る。
    * 起動するコマンドは、このデコレータを付けた op の入力で渡す。
    */
-  decorator stdio throws Crashed | MalformedOutput;
+  decorator stdio throws Crashed, MalformedOutput;
 }

@@ -9,5 +9,5 @@ namespace a {
    * @throws E 一つ目
    * @throws F 二つ目
    */
-  op f(m: M, n: M): M throws E | F;
+  op f(m: M, n: M): M throws E, F;
 }

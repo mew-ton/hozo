@@ -146,6 +146,8 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 				detail = "on " + b.text(d.Transition)
 			}
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolEvent, d.Span, d.Name.Span, detail))
+		case *ast.ReadDecl:
+			out = append(out, b.sym(d.Name.Name, protocol.SymbolKey, d.Span, d.Name.Span, "on "+d.On.String()))
 		case *ast.ClassifyDecl:
 			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.subject(d.Of))
 			for _, c := range d.Cases {

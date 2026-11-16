@@ -21,21 +21,21 @@ type sigKey struct{ op, viewer string }
 // sigState は Sig(O, v) の値（docs/check.md「Sig(O, v)」）のうち、見る側によるもの。
 // R と pure は見る側によらないので、computer が op ごとに持つ（computer.reads、computer.pure）。
 type sigState struct {
-	E    []string                             // 例外の列
-	F    []string                             // 効果の列
-	rel  map[string]map[string]ir.EffectState // rel[X][e]。ないものは unknown
-	succ map[string]ir.EffectState            // succ[e]。ないものは kept
+	E    []string                                   // 例外の列
+	F    []ir.EffectRef                             // 効果の列（効果の数え方は docs/check.md「直に書く要素」）
+	rel  map[string]map[ir.EffectRef]ir.EffectState // rel[X][e]。ないものは unknown
+	succ map[ir.EffectRef]ir.EffectState            // succ[e]。ないものは kept
 }
 
 func newSigState() *sigState {
-	return &sigState{rel: map[string]map[string]ir.EffectState{}, succ: map[string]ir.EffectState{}}
+	return &sigState{rel: map[string]map[ir.EffectRef]ir.EffectState{}, succ: map[ir.EffectRef]ir.EffectState{}}
 }
 
-func (s *sigState) hasE(x string) bool { return contains(s.E, x) }
-func (s *sigState) hasF(e string) bool { return contains(s.F, e) }
+func (s *sigState) hasE(x string) bool       { return contains(s.E, x) }
+func (s *sigState) hasF(e ir.EffectRef) bool { return contains(s.F, e) }
 
-func (s *sigState) addE(x string) { s.E = appendUnique(s.E, x) }
-func (s *sigState) addF(e string) { s.F = appendUnique(s.F, e) }
+func (s *sigState) addE(x string)       { s.E = appendUnique(s.E, x) }
+func (s *sigState) addF(e ir.EffectRef) { s.F = appendUnique(s.F, e) }
 
 func (s *sigState) removeE(x string) {
 	out := s.E[:0:0]
@@ -48,7 +48,7 @@ func (s *sigState) removeE(x string) {
 	delete(s.rel, x)
 }
 
-func (s *sigState) relOf(x, e string) ir.EffectState {
+func (s *sigState) relOf(x string, e ir.EffectRef) ir.EffectState {
 	if m, ok := s.rel[x]; ok {
 		if st, ok := m[e]; ok {
 			return st
@@ -57,16 +57,16 @@ func (s *sigState) relOf(x, e string) ir.EffectState {
 	return ir.Unknown
 }
 
-func (s *sigState) setRel(x, e string, st ir.EffectState) {
+func (s *sigState) setRel(x string, e ir.EffectRef, st ir.EffectState) {
 	m, ok := s.rel[x]
 	if !ok {
-		m = map[string]ir.EffectState{}
+		m = map[ir.EffectRef]ir.EffectState{}
 		s.rel[x] = m
 	}
 	m[e] = st
 }
 
-func (s *sigState) succOf(e string) ir.EffectState {
+func (s *sigState) succOf(e ir.EffectRef) ir.EffectState {
 	if st, ok := s.succ[e]; ok {
 		return st
 	}
@@ -76,7 +76,7 @@ func (s *sigState) succOf(e string) ir.EffectState {
 // signature は ir.Signature にする。relations は E × F のすべての組を E の順、F の順に、
 // successEffects は F の順に並べる。
 func (s *sigState) signature() ir.Signature {
-	sig := ir.Signature{Exceptions: append([]string{}, s.E...), Effects: append([]string{}, s.F...)}
+	sig := ir.Signature{Exceptions: append([]string{}, s.E...), Effects: append([]ir.EffectRef{}, s.F...)}
 	sig.Relations = make([]ir.SignatureRelation, 0, len(s.E)*len(s.F))
 	for _, x := range s.E {
 		for _, e := range s.F {
@@ -462,7 +462,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 		s.addE(x)
 	}
 	// 行 j < i の呼び出しの effects にあるか
-	before := func(e string, i int) bool {
+	before := func(e ir.EffectRef, i int) bool {
 		for j := 0; j < i; j++ {
 			for _, sc := range info.sigs[j] {
 				if sc != nil && sc.hasF(e) {
@@ -569,7 +569,7 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 						for _, e := range s.F {
 							if s.relOf(x, e) != ir.Kept {
 								s.succ[e] = ir.Unknown
-								lost = append(lost, e)
+								lost = append(lost, e.String())
 							}
 						}
 						if emit && cl.Mode == ir.Recovers && len(lost) > 0 {
@@ -578,7 +578,8 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 						s.removeE(x)
 					case ir.Halts:
 						s.removeE(x)
-						for _, h := range subst(cl.Halts) {
+						for _, name := range subst(cl.Halts) {
+							var h ir.EffectRef = ir.NamedEffect{Effect: name} // halts の効果は、いつも宣言
 							if s.hasF(h) {
 								continue
 							}
@@ -734,8 +735,9 @@ func (c *computer) returningArms(r row) int {
 }
 
 // readsOf は op が読む状態 R（docs/check.md「reads」）。基底の状態の FQN の列で、デコレータが R に足すのは、reads の節が
-// 運ぶものだけ（throws / catches の節は R を変えない）。葉の op は直に読む状態（Op.reads の後ろに Op.carried.reads）、
-// 呼び出しが循環している op は Op.reads。配線の op は、本体を行の順に見て集める（運ばれるものは使わない）。
+// 運ぶものだけ（throws / catches の節は R を変えない）。葉の op は直に読む状態（Op.reads の後ろに Op.carried.reads の、
+// 要素ごとの状態。read の宣言は、その宛先の状態として数える）、呼び出しが循環している op は Op.reads の要素の状態。
+// 配線の op は、本体を行の順に見て集める（運ばれるものは使わない）。
 func (c *computer) readsOf(o *ir.Op) []string {
 	if r, ok := c.reads[o.Name]; ok {
 		return r
@@ -750,12 +752,12 @@ func (c *computer) readsOf(o *ir.Op) []string {
 		}
 	}
 	if o.Body == nil {
-		add(o.DirectReads()...)
+		add(c.ix.readStates(o.DirectReads())...)
 		c.reads[o.Name] = out
 		return out
 	}
 	if c.cyclic[o.Name] {
-		add(o.Reads...)
+		add(c.ix.readStates(o.Reads)...)
 		c.reads[o.Name] = out
 		return out
 	}

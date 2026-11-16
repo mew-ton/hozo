@@ -59,7 +59,7 @@ namespace browser {
 
   // 結果を見ない呼び出し（ログアウトの依頼など）
   decorator ignoreFailure
-    catches http.NetworkError | http.ServerError ignores;
+    catches http.NetworkError, http.ServerError ignores;
 
   // ---- §9 配線（browser 側） ----
 
@@ -119,7 +119,7 @@ namespace browser {
 
   @page.interaction(page: openProduct, when: ProductPage.Ready)
   op onAddToCart(item: server.Item)
-    throws page.Aborted | http.NetworkError | http.ServerError
+    throws page.Aborted, http.NetworkError, http.ServerError
   {
     const line = server.addToCart({ item });
     const warranty = match item by WarrantyKind {
@@ -132,7 +132,7 @@ namespace browser {
 
   op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
     : server.WarrantyLine
-    throws page.Aborted | http.NetworkError | http.ServerError
+    throws page.Aborted, http.NetworkError, http.ServerError
   {
     const plan = askYamadaWarranty(item);
     return server.attachWarranty({ line, plan });
@@ -165,13 +165,13 @@ namespace browser {
   // @redirectToLogin と @cache はスコープ外（docs/decisions.md）なので外し、配線だけを残す
 
   op fetchMe(): server.PublicUser
-    throws http.NetworkError | http.ServerError
+    throws http.NetworkError, http.ServerError
   {
     return server.getMe({});
   }
 
   op fetchOrders(query: OrdersQuery): server.OrderSummary[]
-    throws http.NetworkError | http.ServerError
+    throws http.NetworkError, http.ServerError
   {
     return server.getOrders({ page: query.page, status: query.status });
   }
@@ -246,7 +246,7 @@ namespace browser {
   op productPageVm(item: server.Item): ProductPage;
 
   op fetchItem(query: ProductQuery): server.Item
-    throws http.NetworkError | http.ServerError
+    throws http.NetworkError, http.ServerError
   {
     return server.getItem({ id: query.id });
   }

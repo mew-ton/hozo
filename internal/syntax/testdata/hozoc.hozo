@@ -71,7 +71,7 @@ namespace proc {
    * @param command 起動するコマンド
    */
   @external
-  decorator stdio(command: string) throws Crashed | MalformedOutput;
+  decorator stdio(command: string) throws Crashed, MalformedOutput;
 }
 
 /** hozo の仕様を検査し、各言語のコードに展開する CLI */
@@ -172,7 +172,7 @@ namespace hozoc {
    */
   @cli.command("check")
   op check(in: CheckInput): CheckResult
-    throws CheckFailed | ConfigInvalid;
+    throws CheckFailed, ConfigInvalid;
 
   // 書けなかったもの: 名前空間ごと・プラグインごとに runEmit を呼ぶ繰り返しは、配線（ループを持たない。../README.md §9）で書けないので、葉の op にする
   /**
@@ -187,8 +187,8 @@ namespace hozoc {
   @cli.command("emit")
   op emit(in: EmitInput): CheckResult
     effects syncOutputs
-    throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict prevents effects
-    throws proc.Crashed | proc.MalformedOutput;
+    throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict prevents effects
+    throws proc.Crashed, proc.MalformedOutput;
 
   /** IR（../README.md §2）。中身はこの例では書かない */
   model Ir {}

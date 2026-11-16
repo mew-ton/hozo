@@ -17,7 +17,7 @@ namespace a {
   op leaf(): never throws E;
   // 2. 例外がちょうど一つでない（位置は throws。なければ op の名前）
   op none1(): never;                   // ERROR: THROWS-3
-  op two(): never throws E | F;        // ERROR: THROWS-3
+  op two(): never throws E, F;        // ERROR: THROWS-3
   op viaUnion(): never throws Both;       // ERROR: THROWS-3
   op twoClauses(): never
     throws E                           // ERROR: THROWS-3

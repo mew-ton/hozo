@@ -19,6 +19,7 @@ const (
 	kindState
 	kindException
 	kindEffect
+	kindRead
 	kindClassify
 	kindDecorator
 	kindOp
@@ -26,7 +27,7 @@ const (
 
 // String は設計書の語（"model" など）。
 func (k declKind) String() string {
-	return [...]string{"model", "scalar", "union", "state", "exception", "effect", "classify", "decorator", "op"}[k]
+	return [...]string{"model", "scalar", "union", "state", "exception", "effect", "read", "classify", "decorator", "op"}[k]
 }
 
 // namespace は表の一つの名前空間。暗黙の親（`namespace a.b {}` の a）も持つが、declared が false なら Program には出さない。
@@ -225,6 +226,8 @@ func declInfo(d ast.Decl) (declKind, ast.Ident, bool) {
 		return kindException, d.Name, true
 	case *ast.EffectDecl:
 		return kindEffect, d.Name, true
+	case *ast.ReadDecl:
+		return kindRead, d.Name, true
 	case *ast.ClassifyDecl:
 		return kindClassify, d.Name, true
 	case *ast.ConditionDecl:
