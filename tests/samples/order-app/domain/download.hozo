@@ -1,0 +1,99 @@
+// サンプル order-app の仕様（README.md）。ダウンロードの名前空間 download。
+// ダウンロードの行は、箱が要らない。注文を受け付けたときに、すぐ渡す（権利を足す）。
+
+/** ダウンロード。ダウンロードで渡す商品の、取る権利 */
+namespace download {
+  /** 取る権利。注文のダウンロードの行一つに、一つ */
+  model Grant {
+    @db.key orderId: type.OrderId;
+    @db.key line: type.LineId;
+    asset: type.AssetId;
+    name: string;
+    grantedAt: Time;
+    /** 取れる期限 */
+    expiresAt: Time;
+  }
+
+  @db.table
+  state grants: list<Grant>;
+
+  /** 取る権利を、いつまで持てるか */
+  state grantLifetime: single<Duration>;
+
+  /** 一度に作る URL が、使える長さ */
+  state linkLifetime: single<Duration>;
+
+  /** 引いた権利があるか */
+  classify Entitlement of Grant? {
+    Granted: Grant? as Grant;
+    default;
+  }
+
+  /** その行を取る権利は、ない */
+  @http.status(404)
+  exception NotGranted;
+
+  /** 取れる期限が過ぎた */
+  @http.status(410)
+  exception GrantExpired;
+
+  /** ファイルの置き場に届かない */
+  @http.status(503)
+  exception AssetsUnavailable;
+
+  /** その注文の権利 */
+  @db.list
+  read grantsOfOrder(orderId: type.OrderId): Grant[] on grants;
+
+  /** その行の権利 */
+  @db.find
+  read grantOf(orderId: type.OrderId, line: type.LineId): Grant? on grants;
+
+  /** 権利を、まとめて足す */
+  effect addGrants(added: Grant[]) on grants.post;
+
+  /** ダウンロードの行を、取れるようにする。行がなければ、何も足さない */
+  export op grant(orderId: type.OrderId, lines: ordering.DigitalLine[]) {
+    const now = clock.now();
+    const entitled = entitle(orderId, lines, now, grantLifetime);
+    addGrants(entitled);
+  }
+
+  /** 行ごとに権利を作り、期限を決める（人が書く） */
+  op entitle(orderId: type.OrderId, lines: ordering.DigitalLine[], now: Time, lifetime: Duration): Grant[];
+
+  /** 注文の権利の一覧 */
+  export op granted(orderId: type.OrderId): Grant[] {
+    return grantsOfOrder(orderId);
+  }
+
+  /** その行のファイルを取る URL を作る。URL は、短い間だけ使える */
+  export op link(orderId: type.OrderId, line: type.LineId): type.Url
+    throws NotGranted, GrantExpired, AssetsUnavailable
+  {
+    const found = grantOf(orderId, line);
+    return match found by Entitlement {
+      Granted => linkOf(found);
+      default => throw NotGranted;
+    };
+  }
+
+  /** 期限の内の権利だけが、URL になる */
+  op linkOf(grant: Grant): type.Url
+    throws GrantExpired, AssetsUnavailable
+  {
+    const now = clock.now();
+    const request = stillValid(grant, now, linkLifetime);
+    return fetchLink(request);
+  }
+
+  /** 期限を確かめて、URL の依頼にする（人が書く）。期限が過ぎていれば GrantExpired */
+  op stillValid(grant: Grant, now: Time, lifetime: Duration): assets.LinkRequest
+    throws GrantExpired;
+
+  /** ファイルの置き場に、URL を頼む */
+  @outside.failsAs(AssetsUnavailable)
+  op fetchLink(request: assets.LinkRequest): type.Url {
+    return assets.link(request);
+  }
+}

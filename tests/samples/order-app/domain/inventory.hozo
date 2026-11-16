@@ -1,0 +1,213 @@
+// サンプル order-app の仕様（README.md）。在庫の名前空間 inventory。
+// 在庫の行は、注文のときに取り置き、棚から出したとき（ピッキング）に減らす。
+
+/** 在庫。棚に何がいくつあり、どの注文のために取り置いてあるか */
+namespace inventory {
+  /** 商品ごとの在庫の数 */
+  model Level {
+    @db.key sku: type.Sku;
+    /** 棚にある数 */
+    onHand: int;
+    /** そのうち、注文のために取り置いてある数 */
+    reserved: int;
+  }
+
+  /** 取り置き。注文の在庫の行一つに、一つ */
+  model Reservation {
+    @db.key orderId: type.OrderId;
+    @db.key line: type.LineId;
+    sku: type.Sku;
+    name: string;
+    quantity: type.Quantity;
+    /** 注文を受け付けて、棚から出してよくなった時刻。支払いを待っている間は、ない */
+    confirmedAt: Time?;
+    /** 棚から出した時刻。まだ出していなければ、ない */
+    pickedAt: Time?;
+  }
+
+  @db.table
+  state levels: list<Level>;
+
+  @db.table
+  state reservations: list<Reservation>;
+
+  /** 在庫が足りない */
+  @http.status(409)
+  exception OutOfStock(sku: type.Sku);
+
+  /** その行の取り置きは、ない */
+  @http.status(404)
+  exception NotReserved;
+
+  /** もう棚から出してある */
+  @http.status(409)
+  exception AlreadyPicked;
+
+  // ---- 状態に触れるもの ----
+
+  /** skus のどれかに当たる在庫の数（人が書く: 集合に入っているか） */
+  read levelsOf(skus: type.Sku[]): Level[] on levels;
+
+  /** その商品の在庫の数 */
+  @db.find
+  read levelOf(sku: type.Sku): Level? on levels;
+
+  /** その行の取り置き */
+  @db.find
+  read reservationOf(orderId: type.OrderId, line: type.LineId): Reservation? on reservations;
+
+  /** いくつかの注文の取り置き（人が書く: 集合に入っているか） */
+  read reservationsOfOrders(orderIds: type.OrderId[]): Reservation[] on reservations;
+
+  /** 棚から出してよくなった取り置きのうち、まだ出していないもの（人が書く: 値があること、ないこと） */
+  read toPick(): Reservation[] on reservations;
+
+  /** 在庫の数を、まとめて書き換える */
+  effect saveLevels(changed: Level[]) on levels.put;
+
+  /** 取り置きを、まとめて足す */
+  effect addReservations(added: Reservation[]) on reservations.post;
+
+  /** 取り置きを書き換える */
+  @db.update
+  effect saveReservation(reservation: Reservation) on reservations.put;
+
+  /** その注文の取り置きに、棚から出してよくなった時刻を入れる */
+  effect confirmReservations(orderId: type.OrderId, at: Time) on reservations.put;
+
+  /** いくつかの注文の取り置きを消す */
+  effect dropReservations(orderIds: type.OrderId[]) on reservations.delete;
+
+  // ---- 取り置く ----
+
+  /** 取り置きの結果: 書き換える在庫の数と、足す取り置き */
+  model Allocation {
+    levels: Level[];
+    reservations: Reservation[];
+  }
+
+  /** 注文の在庫の行を取り置く。一つでも足りなければ、どれも取り置かない */
+  @db.transaction
+  export op reserve(orderId: type.OrderId, lines: ordering.StockedLine[])
+    throws OutOfStock
+  {
+    const skus = skusOf(lines);
+    const current = levelsOf(skus);
+    const allocation = allocate(orderId, lines, current);
+    saveLevels(allocation.levels);
+    addReservations(allocation.reservations);
+  }
+
+  /** 行の商品の識別子（人が書く） */
+  op skusOf(lines: ordering.StockedLine[]): type.Sku[];
+
+  /** 取り置く数を数える。足りない商品があれば OutOfStock（人が書く） */
+  op allocate(orderId: type.OrderId, lines: ordering.StockedLine[], current: Level[]): Allocation
+    throws OutOfStock;
+
+  // ---- 戻す ----
+
+  /** 期限切れになった注文の取り置きを、まとめて戻す */
+  @db.transaction
+  export op release(orders: ordering.Order[]) {
+    const orderIds = idsOf(orders);
+    const held = reservationsOfOrders(orderIds);
+    const skus = skusOfHeld(held);
+    const current = levelsOf(skus);
+    const restored = restore(held, current);
+    saveLevels(restored);
+    dropReservations(orderIds);
+  }
+
+  /** 注文の識別子（人が書く） */
+  op idsOf(orders: ordering.Order[]): type.OrderId[];
+
+  /** 取り置きの商品の識別子（人が書く） */
+  op skusOfHeld(held: Reservation[]): type.Sku[];
+
+  /** 取り置いた数を、在庫の数に戻す（人が書く） */
+  op restore(held: Reservation[], current: Level[]): Level[];
+
+  // ---- 受け付けたとき ----
+
+  /** 注文を受け付けた。取り置いた行を、棚から出してよくする */
+  export op confirm(orderId: type.OrderId) {
+    const now = clock.now();
+    confirmReservations(orderId, now);
+  }
+
+  // ---- 棚から出す ----
+
+  /** 棚から出すものの一覧 */
+  export op pickList(): Reservation[] {
+    return toPick();
+  }
+
+  /** 引いた取り置きがあるか */
+  classify Held of Reservation? {
+    Reserved: Reservation? as Reservation;
+    default;
+  }
+
+  /** 取り置きを、もう棚から出したか */
+  classify Picking of Reservation {
+    /** まだ棚にある */
+    OnShelf;
+    /** 棚から出した */
+    Picked;
+  }
+
+  /** 引いた在庫の数があるか */
+  classify Stocked of Level? {
+    Counted: Level? as Level;
+    default;
+  }
+
+  /** 取り置いた行を、棚から出した。在庫の数を減らす */
+  @db.transaction
+  export op pick(orderId: type.OrderId, line: type.LineId)
+    throws NotReserved, AlreadyPicked
+  {
+    const found = reservationOf(orderId, line);
+    match found by Held {
+      Reserved => pickReserved(found);
+      default  => throw NotReserved;
+    };
+  }
+
+  /** まだ棚にある取り置きだけを、出せる */
+  op pickReserved(reservation: Reservation)
+    throws NotReserved, AlreadyPicked
+  {
+    match reservation by Picking {
+      OnShelf => takeFromShelf(reservation);
+      Picked  => throw AlreadyPicked;
+    };
+  }
+
+  /** 在庫の数を減らし、取り置きに、出した時刻を入れる */
+  op takeFromShelf(reservation: Picking.OnShelf<Reservation>)
+    throws NotReserved
+  {
+    const level = levelOf(reservation.sku);
+    const now = clock.now();
+    const picked = pickedAt(reservation, now);
+    match level by Stocked {
+      Counted => shipOut(level, picked);
+      default => throw NotReserved;
+    };
+    saveReservation(picked);
+  }
+
+  /** 出した時刻を入れる（人が書く） */
+  op pickedAt(reservation: Picking.OnShelf<Reservation>, now: Time): Reservation;
+
+  /** 出した分を、棚の数と取り置きの数から引く */
+  op shipOut(level: Level, picked: Reservation) {
+    const changed = minus(level, picked);
+    saveLevels(changed);
+  }
+
+  /** 出した分を引いた在庫の数（人が書く） */
+  op minus(level: Level, picked: Reservation): Level[];
+}

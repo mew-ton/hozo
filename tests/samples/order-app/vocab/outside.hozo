@@ -1,0 +1,22 @@
+// サンプル order-app の語彙（README.md「語彙」）。仕様の外の仕組みが、その中で行うことを、op に言わせる。
+// 読むトランスパイラはない。節（effects）を持つので、印ではなく、付いた op の効果に加わる（docs/check.md「デコレータが運ぶ reads と effects」）。
+
+/** 仕様の外の仕組み（外部のサービス）の語彙 */
+namespace outside {
+  /**
+   * この op は、外部の仕組みの中で、targets の効果を行う。op の中身は、仕様の外にある。
+   *
+   * @param targets 外部の仕組みが持つ状態への効果
+   */
+  decorator does(...targets: any effect) for op effects targets;
+
+  /**
+   * この op が呼ぶ外部の仕組みに届かなかった、または相手が壊れていたとき（http.NetworkError、http.ServerError）を、error に言い換える。
+   * 相手の中で何が起きたかは、分からないまま。
+   *
+   * @param error 言い換えた先の例外
+   */
+  decorator failsAs(error: any exception) for op
+    catches http.NetworkError, http.ServerError recovers
+    throws error;
+}

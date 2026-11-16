@@ -1,0 +1,550 @@
+// サンプル order-app の仕様（README.md「難しい問題」）。出荷の名前空間 shipping。
+// 箱は、送る品目がすべてそろうまで決められない。送料は、箱の大きさで決まる。だから、送料も、そろうまで決まらない。
+// この名前空間は、その順を、事実が足されていく形で持つ: 出荷（shipments。何を待っているか）→ 荷物（parcels。箱と重さと送料が決まった）
+// → 送り状（labels。配送業者が決まった）。荷物の行は、そろった出荷（Gathered.Complete）からしか作れない。
+
+/** 出荷。箱で送る部分を、そろえて、梱包して、渡す */
+namespace shipping {
+  // ---- 値 ----
+
+  /** 出荷の識別子 */
+  scalar ShipmentId extends string;
+
+  /** 箱の種類の識別子 */
+  scalar BoxCode extends string;
+
+  /** 荷物の大きさの区分（三辺の合計で決まる。"60"、"80"、"100" …。値の集合は、料金表の行が決める） */
+  scalar SizeClass extends string;
+
+  /** 届け先の地帯（都道府県から決まる。値の集合は、料金表の行が決める） */
+  scalar Zone extends string;
+
+  /** 配送業者の追跡番号 */
+  scalar TrackingNumber extends string;
+
+  /** 店が持っている箱の種類 */
+  model Box {
+    @db.key code: BoxCode;
+    name: string;
+    /** 内側の大きさ。品目が入るかを決める */
+    inner: type.Dimensions;
+    /** 外側の大きさ。大きさの区分と、配送業者の見積もりを決める */
+    outer: type.Dimensions;
+    sizeClass: SizeClass;
+    /** 入れられる重さ */
+    maxWeight: type.Grams;
+  }
+
+  /** 店の送料の表の一行: 荷物の大きさの区分と、届け先の地帯から、客に請求する送料が決まる */
+  model Tariff {
+    @db.key sizeClass: SizeClass;
+    @db.key zone: Zone;
+    fee: type.Yen;
+  }
+
+  /** 注文のときに客に見せる送料の約束。請求する送料は、上限を超えない */
+  model FeeQuote {
+    /** 見積もり: ふつうに出来上がって、いちばん小さく詰められたときの送料 */
+    estimate: type.Yen;
+    /** 上限: いちばん大きく出来上がったときの送料。客が同意するのは、この額 */
+    ceiling: type.Yen;
+  }
+
+  /** 出荷する品目。注文の、箱で送る行一つに、一つ */
+  model Item {
+    line: type.LineId;
+    sku: type.Sku;
+    name: string;
+    quantity: type.Quantity;
+    /** 大きさと重さ（行の全部の分）。在庫の品目は、はじめから分かっている。受注製作の品目は、出来上がるまで、ない */
+    measured: type.Measurement?;
+    /** そろえ場所に置いた時刻。まだなら、ない */
+    gatheredAt: Time?;
+  }
+
+  /** 出荷。注文の、箱で送る部分一つに、一つ */
+  model Shipment {
+    @db.key    id: ShipmentId;
+    @db.unique orderId: type.OrderId;
+    destination: type.Address;
+    /** 客に約束した送料の見積もりと上限 */
+    terms: FeeQuote;
+    items: Item[];
+    /** 配送業者に渡した時刻 */
+    handedOverAt: Time?;
+    /** 届いた時刻 */
+    deliveredAt: Time?;
+  }
+
+  /** 荷物。梱包して、箱と重さが決まったもの。ここで、送料が決まる */
+  model Parcel {
+    @db.key shipmentId: ShipmentId;
+    box: BoxCode;
+    /** 箱の外側の大きさ */
+    size: type.Dimensions;
+    sizeClass: SizeClass;
+    weight: type.Grams;
+    /** 箱の大きさの区分と、届け先の地帯から決まった送料（店の料金表のとおり。上限で切る前） */
+    fee: type.Yen;
+    packedAt: Time;
+  }
+
+  /** 送り状。配送業者に頼んで、追跡番号が決まったもの */
+  model Label {
+    @db.key    shipmentId: ShipmentId;
+    carrier: carrier.CarrierCode;
+    service: carrier.ServiceCode;
+    @db.unique trackingNumber: TrackingNumber;
+    /** 店が配送業者に払う額。客に請求する送料（Parcel.fee）とは別 */
+    cost: type.Yen;
+    /** 印刷する送り状 */
+    document: type.Url;
+    boughtAt: Time;
+  }
+
+  // ---- 状態 ----
+
+  @db.table
+  state shipments: list<Shipment>;
+
+  @db.table
+  state parcels: list<Parcel>;
+
+  @db.table
+  state labels: list<Label>;
+
+  @db.table
+  state boxes: list<Box>;
+
+  @db.table
+  state tariffs: list<Tariff>;
+
+  /** 出荷元の住所 */
+  state origin: single<type.Address>;
+
+  // ---- 分類: 出荷の進み具合は、足された事実で決まる ----
+
+  /** 出荷する品目が、すべてそろったか。箱を決められるのは、Complete のときだけ */
+  classify Gathered of Shipment {
+    /** すべての品目が、そろえ場所にある */
+    Complete;
+    /** まだ待っている品目がある */
+    default;
+  }
+
+  /** 梱包したか（荷物の行があるか） */
+  classify Packing of Parcel? {
+    Packed: Parcel? as Parcel;
+    default;
+  }
+
+  /** 送り状を買ったか（送り状の行があるか） */
+  classify Labelling of Label? {
+    Labelled: Label? as Label;
+    default;
+  }
+
+  /** 引いた出荷があるか */
+  classify Known of Shipment? {
+    Found: Shipment? as Shipment;
+    default;
+  }
+
+  /** 引いた箱の種類があるか */
+  classify Stocked of Box? {
+    InUse: Box? as Box;
+    default;
+  }
+
+  /** 出荷を、配送業者に渡したか */
+  classify Custody of Shipment {
+    /** まだ店にある */
+    InHouse;
+    /** 配送業者に渡した */
+    WithCarrier;
+    /** 届いた */
+    Delivered;
+  }
+
+  // ---- 例外 ----
+
+  /** その届け先には、送れない（料金表に、地帯がない） */
+  @http.status(422)
+  exception Undeliverable;
+
+  /** いちばん大きい箱にも入らない */
+  @http.status(422)
+  exception TooLarge;
+
+  /** その出荷は、ない */
+  @http.status(404)
+  exception NoShipment;
+
+  /** その行は、この出荷の品目にない */
+  @http.status(404)
+  exception UnknownItem;
+
+  /** まだそろっていない品目があるので、梱包できない */
+  @http.status(409)
+  exception NotGathered;
+
+  /** もう梱包してある */
+  @http.status(409)
+  exception AlreadyPacked;
+
+  /** まだ梱包していない */
+  @http.status(409)
+  exception NotPacked;
+
+  /** その箱の種類は、ない */
+  @http.status(422)
+  exception UnknownBox;
+
+  /** 箱に入れられる重さを超えている */
+  @http.status(422)
+  exception OverWeight;
+
+  /** もう送り状を買ってある */
+  @http.status(409)
+  exception AlreadyLabelled;
+
+  /** まだ送り状を買っていない */
+  @http.status(409)
+  exception NotLabelled;
+
+  /** もう配送業者に渡してある */
+  @http.status(409)
+  exception AlreadyHandedOver;
+
+  // ---- 状態に触れるもの ----
+
+  /** その識別子の出荷 */
+  @db.find
+  read shipmentById(id: ShipmentId): Shipment? on shipments;
+
+  /** その注文の出荷 */
+  @db.find
+  read shipmentOfOrder(orderId: type.OrderId): Shipment? on shipments;
+
+  /** まだ配送業者に渡していない出荷（人が書く: 値がないこと） */
+  read shipmentsInHouse(): Shipment[] on shipments;
+
+  /** その出荷の荷物 */
+  @db.find
+  read parcelOf(shipmentId: ShipmentId): Parcel? on parcels;
+
+  /** その出荷の送り状 */
+  @db.find
+  read labelOf(shipmentId: ShipmentId): Label? on labels;
+
+  /** その追跡番号の送り状 */
+  @db.find
+  read labelByTracking(trackingNumber: TrackingNumber): Label? on labels;
+
+  /** その箱の種類 */
+  @db.find
+  read boxByCode(code: BoxCode): Box? on boxes;
+
+  /** 出荷を作る */
+  @db.insert
+  effect createShipment(shipment: Shipment) on shipments.post;
+
+  /** 出荷を書き換える */
+  @db.update
+  effect saveShipment(shipment: Shipment) on shipments.put;
+
+  /** 荷物を作る。箱と送料が、ここで決まる */
+  @db.insert
+  effect createParcel(parcel: Parcel) on parcels.post;
+
+  /** 送り状を記録する */
+  @db.insert
+  effect createLabel(label: Label) on labels.post;
+
+  // ---- 注文のとき: 送料の見積もりと上限 ----
+
+  /**
+   * 箱で送る行と届け先から、送料の見積もりと上限を出す。箱はまだ決められないので、どちらも、行の大きさからの見込み。
+   * 届け先の地帯が料金表になければ Undeliverable。いちばん大きく出来上がると、どの箱にも入らないなら TooLarge。
+   */
+  export op estimate(made: ordering.MadeLine[], stocked: ordering.StockedLine[], destination: type.Address): FeeQuote
+    throws Undeliverable, TooLarge
+  {
+    return foresee(made, stocked, destination, boxes, tariffs);
+  }
+
+  /** 見積もり（在庫の行の大きさと、受注製作の行のふつうの大きさ）と、上限（受注製作の行がいちばん大きく出来た場合）を数える（人が書く） */
+  op foresee(made: ordering.MadeLine[], stocked: ordering.StockedLine[], destination: type.Address, boxes: Box[], tariffs: Tariff[]): FeeQuote
+    throws Undeliverable, TooLarge;
+
+  // ---- 受け付けたとき: 出荷を開く ----
+
+  /** 注文の、箱で送る部分の出荷を開く。在庫の品目は大きさが分かっていて、受注製作の品目は、まだ分からない */
+  export op open(orderId: type.OrderId, part: ordering.PhysicalPart) {
+    const shipment = toGather(orderId, part);
+    createShipment(shipment);
+  }
+
+  /** 識別子を決めて、品目の一覧を作る（人が書く） */
+  op toGather(orderId: type.OrderId, part: ordering.PhysicalPart): Shipment;
+
+  // ---- 引く ----
+
+  /** 出荷を引く */
+  export op find(id: ShipmentId): Shipment
+    throws NoShipment
+  {
+    const found = shipmentById(id);
+    return match found by Known {
+      Found   => found;
+      default => throw NoShipment;
+    };
+  }
+
+  /** 出荷と、そこまでに足された事実。荷物は梱包するまで、送り状は買うまで、ない */
+  model Progress {
+    shipment: Shipment;
+    parcel: Parcel?;
+    label: Label?;
+  }
+
+  /** 出荷の進み具合を引く */
+  export op progress(id: ShipmentId): Progress
+    throws NoShipment
+  {
+    const shipment = find(id);
+    return progressOf(shipment);
+  }
+
+  /** 注文の出荷の進み具合を引く。ダウンロードだけの注文には、ない */
+  export op progressOfOrder(orderId: type.OrderId): Progress? {
+    const found = shipmentOfOrder(orderId);
+    return match found by Known {
+      Found   => progressOf(found);
+      default => none;
+    };
+  }
+
+  /** 出荷に、荷物と送り状を添える */
+  op progressOf(shipment: Shipment): Progress {
+    const packed = parcelOf(shipment.id);
+    const bought = labelOf(shipment.id);
+    return { shipment: shipment, parcel: packed, label: bought };
+  }
+
+  /** まだ店にある出荷の一覧（そろえている途中のものも、梱包を待っているものも） */
+  export op inHouse(): Shipment[] {
+    return shipmentsInHouse();
+  }
+
+  /** 出荷元の住所 */
+  export op shipFrom(): type.Address {
+    return origin;
+  }
+
+  // ---- そろえる ----
+
+  /**
+   * 品目を一つ、そろえ場所に置いた。受注製作の品目は、出来上がりを量った大きさと重さ（measured）を持ってくる。
+   * 在庫の品目は、もう分かっているので、持ってこない。
+   */
+  export op gather(orderId: type.OrderId, line: type.LineId, measured: type.Measurement?): Shipment
+    throws NoShipment, UnknownItem
+  {
+    const found = shipmentOfOrder(orderId);
+    const now = clock.now();
+    const gathered = match found by Known {
+      Found   => place(found, line, measured, now);
+      default => throw NoShipment;
+    };
+    saveShipment(gathered);
+    return gathered;
+  }
+
+  /** 品目に、置いた時刻と、量った大きさを入れる（人が書く）。その行が品目になければ UnknownItem */
+  op place(shipment: Shipment, line: type.LineId, measured: type.Measurement?, now: Time): Shipment
+    throws UnknownItem;
+
+  // ---- 梱包する: 箱と重さを決める。送料が、ここで決まる ----
+
+  /** 箱の種類一つを選んだら、送料がいくらになるか */
+  model BoxOption {
+    box: Box;
+    /** この箱で梱包したときの送料（料金表のとおり） */
+    fee: type.Yen;
+    /** 送料が、客に約束した上限を超える分。超えなければ、ない。超えた分は、店が持つ */
+    overCeiling: type.Yen?;
+  }
+
+  /**
+   * そろった出荷が入る箱の種類と、それぞれの送料。小さい順。梱包する人は、ここから選ぶ。
+   * そろっていない出荷は、引数に渡せない（箱は、そろうまで決められない）。
+   */
+  export op boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
+    return fitting(shipment, boxes, tariffs);
+  }
+
+  /** 品目の大きさから、入る箱の種類を選び、料金表で送料を付ける（人が書く） */
+  op fitting(shipment: Gathered.Complete<Shipment>, boxes: Box[], tariffs: Tariff[]): BoxOption[];
+
+  /**
+   * 梱包した: 箱の種類と、量った重さを記録する。送料は、箱の大きさの区分と届け先の地帯から、料金表で決まる。
+   * そろっていない出荷は、梱包できない。梱包は一度だけ。
+   */
+  @db.transaction
+  export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
+    throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable
+  {
+    const shipment = find(id);
+    const existing = parcelOf(id);
+    return match existing by Packing {
+      Packed  => throw AlreadyPacked;
+      default => packGathered(shipment, box, weight);
+    };
+  }
+
+  /** そろった出荷だけを、梱包できる */
+  op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
+    throws NotGathered, UnknownBox, OverWeight, Undeliverable
+  {
+    return match shipment by Gathered {
+      Complete => packInto(shipment, box, weight);
+      default  => throw NotGathered;
+    };
+  }
+
+  /** 箱の種類を引く */
+  op packInto(shipment: Gathered.Complete<Shipment>, code: BoxCode, weight: type.Grams): Parcel
+    throws UnknownBox, OverWeight, Undeliverable
+  {
+    const box = boxByCode(code);
+    return match box by Stocked {
+      InUse   => seal(shipment, box, weight);
+      default => throw UnknownBox;
+    };
+  }
+
+  /** 荷物を作る */
+  op seal(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams): Parcel
+    throws OverWeight, Undeliverable
+  {
+    const now = clock.now();
+    const parcel = weighed(shipment, box, weight, tariffs, now);
+    createParcel(parcel);
+    return parcel;
+  }
+
+  /** 箱の大きさの区分と届け先の地帯から、料金表で送料を決めて、荷物にする（人が書く）。重さが箱の上限を超えていれば OverWeight */
+  op weighed(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams, tariffs: Tariff[], now: Time): Parcel
+    throws OverWeight, Undeliverable;
+
+  // ---- 送り状を買う前に: 梱包が済んでいて、まだ送り状がないこと ----
+
+  /** 梱包が済んで、送り状を待っている出荷と、その荷物 */
+  model Sealed {
+    shipment: Shipment;
+    parcel: Parcel;
+  }
+
+  /** 梱包が済んで、まだ送り状を買っていない出荷を、荷物と一緒に引く */
+  export op sealed(id: ShipmentId): Sealed
+    throws NoShipment, NotPacked, AlreadyLabelled
+  {
+    const shipment = find(id);
+    const bought = labelOf(id);
+    return match bought by Labelling {
+      Labelled => throw AlreadyLabelled;
+      default  => withParcel(shipment);
+    };
+  }
+
+  /** 出荷に、荷物を添える */
+  op withParcel(shipment: Shipment): Sealed
+    throws NotPacked
+  {
+    const packed = parcelOf(shipment.id);
+    return match packed by Packing {
+      Packed  => { shipment: shipment, parcel: packed };
+      default => throw NotPacked;
+    };
+  }
+
+  /** 買った送り状を記録する */
+  export op attachLabel(label: Label) {
+    createLabel(label);
+  }
+
+  // ---- 渡す、届く ----
+
+  /** 配送業者に渡した出荷と、その荷物と送り状 */
+  model Dispatched {
+    shipment: Shipment;
+    parcel: Parcel;
+    label: Label;
+  }
+
+  /** 配送業者に渡した */
+  @db.transaction
+  export op handOver(id: ShipmentId): Dispatched
+    throws NoShipment, NotPacked, NotLabelled, AlreadyHandedOver
+  {
+    const shipment = find(id);
+    const packed = withParcel(shipment);
+    const bought = labelOf(id);
+    return match bought by Labelling {
+      Labelled => release(packed, bought);
+      default  => throw NotLabelled;
+    };
+  }
+
+  /** まだ店にある出荷だけを、渡せる */
+  op release(packed: Sealed, label: Label): Dispatched
+    throws AlreadyHandedOver
+  {
+    const now = clock.now();
+    const released = match packed.shipment by Custody {
+      InHouse                 => handedOverAt(packed.shipment, now);
+      WithCarrier | Delivered => throw AlreadyHandedOver;
+    };
+    saveShipment(released);
+    return { shipment: released, parcel: packed.parcel, label: label };
+  }
+
+  /** 渡した時刻を入れる（人が書く） */
+  op handedOverAt(shipment: Custody.InHouse<Shipment>, now: Time): Shipment;
+
+  /** 配送業者が、届けたと知らせてきた。知らない追跡番号と、もう届いている出荷は、何もしない */
+  export op delivered(trackingNumber: TrackingNumber, at: Time) {
+    const bought = labelByTracking(trackingNumber);
+    match bought by Labelling {
+      Labelled => arrive(bought.shipmentId, at);
+      default  => none;
+    };
+  }
+
+  /** 出荷に、届いた時刻を入れる */
+  op arrive(id: ShipmentId, at: Time) {
+    const found = shipmentById(id);
+    match found by Known {
+      Found   => markDelivered(found, at);
+      default => none;
+    };
+  }
+
+  /** 配送業者に渡してある出荷だけが、届く */
+  op markDelivered(shipment: Shipment, at: Time) {
+    match shipment by Custody {
+      WithCarrier         => saveArrival(shipment, at);
+      InHouse | Delivered => none;
+    };
+  }
+
+  /** 届いた時刻を記録する */
+  op saveArrival(shipment: Custody.WithCarrier<Shipment>, at: Time) {
+    const arrived = deliveredAt(shipment, at);
+    saveShipment(arrived);
+  }
+
+  /** 届いた時刻を入れる（人が書く） */
+  op deliveredAt(shipment: Custody.WithCarrier<Shipment>, at: Time): Shipment;
+}

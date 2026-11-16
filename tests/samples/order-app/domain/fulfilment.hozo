@@ -1,0 +1,184 @@
+// サンプル order-app の仕様（README.md「難しい問題」）。受け付けた後の流れの名前空間 fulfilment。
+// 状態を持たない。概念（注文、支払い、在庫、製作、ダウンロード、出荷、配送業者、知らせ）をまたぐ順番だけを持つ。
+// 混ざった注文は、ここで、種類ごとの担い手に分かれる: ダウンロードは、すぐ渡す。受注製作は、仕事にする。在庫は、棚から出してよくする。
+// 箱で送る二つは、一つの出荷にまとめて、そろうのを待つ。
+
+/** 受け付けた後の流れ。注文を、渡し終えるまで進める */
+namespace fulfilment {
+  // ---- 客が支払いに同意した ----
+
+  /**
+   * 客の同意が取れた注文を、受け付けて、渡す準備を始める。
+   * 期限切れにした後で同意が届いた注文は、受け付けない: 確保した枠を手放す（在庫は、もう戻してある）。
+   */
+  export op secured(orderId: type.OrderId)
+    throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
+  {
+    const order = ordering.byId(orderId);
+    match order by ordering.Standing {
+      AwaitingPayment => acceptAndBegin(order);
+      Accepted        => none;
+      Expired         => payment.release(order.id);
+    };
+  }
+
+  /** 受け付けて、始めて、知らせる */
+  @db.transaction
+  op acceptAndBegin(order: ordering.Standing.AwaitingPayment<ordering.Order>) {
+    const accepted = ordering.accept(order);
+    begin(accepted);
+    notice.accepted(accepted);
+  }
+
+  /** 混ざった注文を、種類ごとの担い手に分ける。ダウンロードの行は、ここで渡し終える */
+  op begin(order: ordering.Order) {
+    download.grant(order.id, order.digital);
+    match order.physical by ordering.Delivery {
+      ToShip  => beginPhysical(order.id, order.physical);
+      default => none;
+    };
+  }
+
+  /** 箱で送る部分: 受注製作の行は仕事に、在庫の行は棚から出してよくし、両方をそろえる出荷を開く */
+  op beginPhysical(orderId: type.OrderId, part: ordering.PhysicalPart) {
+    production.enqueue(orderId, part.made);
+    inventory.confirm(orderId);
+    shipping.open(orderId, part);
+  }
+
+  // ---- そろえる: 二つの入口が、同じ出荷に品目を置く ----
+
+  /** 在庫の行を、棚から出して、そろえ場所に置いた */
+  @db.transaction
+  export op picked(orderId: type.OrderId, line: type.LineId): shipping.Shipment
+    throws inventory.NotReserved, inventory.AlreadyPicked, shipping.NoShipment, shipping.UnknownItem
+  {
+    inventory.pick(orderId, line);
+    return shipping.gather(orderId, line, none);
+  }
+
+  /** 受注製作の行を、作り終えて、量って、そろえ場所に置いた。出来上がりの大きさが、ここで出荷に届く */
+  @db.transaction
+  export op made(id: production.JobId, measured: type.Measurement): shipping.Shipment
+    throws production.NoJob, production.NotInProduction, shipping.NoShipment, shipping.UnknownItem
+  {
+    const job = production.finish(id, measured);
+    return shipping.gather(job.orderId, job.line, measured);
+  }
+
+  // ---- 梱包の台: 出荷一つについて、いま何ができるか ----
+
+  /** 梱包の台に見せるもの。進み具合によって、ある項目が違う */
+  model Station {
+    progress: shipping.Progress;
+    /** そろっていて、まだ梱包していないとき: 入る箱の種類と、それぞれの送料 */
+    options: shipping.BoxOption[]?;
+    /** 梱包が済んで、まだ送り状を買っていないとき: 配送業者の見積もり */
+    offers: carrier.Quote[]?;
+    /** 注文の支払い。送料の上限と、請求が確定したかを見せる */
+    charge: payment.Payment?;
+  }
+
+  /** 梱包の台に見せるものを集める */
+  export op station(id: shipping.ShipmentId): Station
+    throws shipping.NoShipment, carrier.NoCarrier, http.NetworkError, http.ServerError
+  {
+    const progress = shipping.progress(id);
+    const options = optionsFor(progress);
+    const offers = offersFor(progress);
+    const charge = payment.ofOrder(progress.shipment.orderId);
+    return { progress: progress, options: options, offers: offers, charge: charge };
+  }
+
+  /** まだ梱包していない出荷には、箱の選択肢を出す */
+  op optionsFor(progress: shipping.Progress): shipping.BoxOption[]? {
+    return match progress.parcel by shipping.Packing {
+      Packed  => none;
+      default => optionsIfGathered(progress.shipment);
+    };
+  }
+
+  /** 箱の選択肢を出せるのは、そろった出荷だけ */
+  op optionsIfGathered(shipment: shipping.Shipment): shipping.BoxOption[]? {
+    return match shipment by shipping.Gathered {
+      Complete => shipping.boxOptions(shipment);
+      default  => none;
+    };
+  }
+
+  /** まだ送り状を買っていない出荷には、見積もりを出す */
+  op offersFor(progress: shipping.Progress): carrier.Quote[]?
+    throws carrier.NoCarrier, http.NetworkError, http.ServerError
+  {
+    return match progress.label by shipping.Labelling {
+      Labelled => none;
+      default  => offersIfPacked(progress);
+    };
+  }
+
+  /** 見積もりを取れるのは、荷物（箱と重さ）が決まった後だけ */
+  op offersIfPacked(progress: shipping.Progress): carrier.Quote[]?
+    throws carrier.NoCarrier, http.NetworkError, http.ServerError
+  {
+    return match progress.parcel by shipping.Packing {
+      Packed  => offers(progress.parcel, progress.shipment.destination);
+      default => none;
+    };
+  }
+
+  /** 荷物の見積もりを、いま使っている配送業者から取る */
+  op offers(parcel: shipping.Parcel, destination: type.Address): carrier.Quote[]
+    throws carrier.NoCarrier, http.NetworkError, http.ServerError
+  {
+    const origin = shipping.shipFrom();
+    return carrier.quotes(parcel, origin, destination);
+  }
+
+  // ---- 送り状を買う: 送料が決まったので、先に請求を確定する ----
+
+  /**
+   * 選んだ配送業者で、送り状を買う。
+   * 順番: 決まった送料で、客への請求を確定する → 配送業者から送り状を買う（店の金が動く）→ 記録する。
+   * 請求できない荷物（枠の期限切れ）には、送り状を買わない。途中で失敗したら、もう一度呼べる: 請求の確定は、二度は起きない。
+   */
+  export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
+    throws shipping.NoShipment, shipping.NotPacked, shipping.AlreadyLabelled,
+           payment.NoPayment, payment.NotSecured, psp.HoldExpired,
+           carrier.UnknownCarrier, carrier.NotEnabled, carriergw.Refused,
+           http.NetworkError, http.ServerError
+  {
+    const sealed = shipping.sealed(id);
+    payment.settle(sealed.shipment.orderId, sealed.parcel.fee);
+    const origin = shipping.shipFrom();
+    const label = carrier.book(choice, sealed.parcel, origin, sealed.shipment.destination);
+    shipping.attachLabel(label);
+    return label;
+  }
+
+  // ---- 渡す、届く ----
+
+  /** 配送業者に渡した。客に、決まった送料と、確定した請求と、追跡番号を知らせる */
+  export op handedOver(id: shipping.ShipmentId): shipping.Shipment
+    throws shipping.NoShipment, shipping.NotPacked, shipping.NotLabelled, shipping.AlreadyHandedOver, ordering.NoOrder
+  {
+    const dispatched = shipping.handOver(id);
+    const order = ordering.byId(dispatched.shipment.orderId);
+    const charge = payment.ofOrder(order.id);
+    notice.shipped(order, dispatched.parcel, dispatched.label, charge);
+    return dispatched.shipment;
+  }
+
+  /** 配送業者の通知が、届いたことを言っているか */
+  classify Arrival of Time? {
+    Arrived: Time? as Time;
+    default;
+  }
+
+  /** 配送業者から、荷物の動きの通知が届いた。届いたという通知だけを使う */
+  export op tracked(event: carriergw.TrackingEvent) {
+    match event.deliveredAt by Arrival {
+      Arrived => shipping.delivered(event.trackingNumber, event.deliveredAt);
+      default => none;
+    };
+  }
+}

@@ -1,0 +1,15 @@
+// サンプル order-app の語彙（README.md「語彙」）。外部の仕組みが、こちらを呼ぶ入口。読むトランスパイラはない。
+
+/** 外部の仕組みからの通知（webhook）の語彙 */
+namespace webhook {
+  /** 通知の署名が合わない（op の中身は呼ばれていない） */
+  @http.status(401)
+  exception BadSignature;
+
+  /**
+   * この op は、外部の仕組み sender が呼ぶ。要求の署名を、sender と決めた秘密で確かめ、合わなければ op の中身を呼ばない。
+   *
+   * @param sender 呼ぶ仕組みの名前（秘密は、動かす環境が持つ）
+   */
+  decorator signed(sender: string) for op throws BadSignature prevents effects;
+}

@@ -1,0 +1,63 @@
+// サンプル order-app の仕様（README.md）。配送業者の API をまとめて引き受ける外部の仕組み carriergw。
+// 出力の単位を置かない（コードを出さない）。op は、相手の HTTP の口を、こちらが呼ぶ形で書いたもの: @http.post は @external なので、
+// 呼ぶ側（carrier）には http.NetworkError と http.ServerError が加わる。
+// 買った送り状は、相手の持つ状態（labels）で、買うことは、その効果（issueLabel）。店の金が動くことを、仕様の効果として見えるようにする。
+
+/** 配送業者の API をまとめる外部の仕組み */
+namespace carriergw {
+  /** 見積もりの依頼 */
+  model RateRequest {
+    carriers: carrier.CarrierCode[];
+    size: type.Dimensions;
+    weight: type.Grams;
+    origin: type.Address;
+    destination: type.Address;
+  }
+
+  /** 送り状の依頼 */
+  model LabelRequest {
+    carrier: carrier.CarrierCode;
+    account: string;
+    service: carrier.ServiceCode;
+    size: type.Dimensions;
+    weight: type.Grams;
+    origin: type.Address;
+    destination: type.Address;
+  }
+
+  /** 買った送り状 */
+  model BoughtLabel {
+    carrier: carrier.CarrierCode;
+    service: carrier.ServiceCode;
+    trackingNumber: shipping.TrackingNumber;
+    cost: type.Yen;
+    document: type.Url;
+  }
+
+  /** 荷物の動きの通知 */
+  model TrackingEvent {
+    trackingNumber: shipping.TrackingNumber;
+    /** 届いた時刻。届く前の通知には、ない */
+    deliveredAt: Time?;
+  }
+
+  /** 相手が持つ、買った送り状 */
+  state labels: list<BoughtLabel>;
+
+  /** 送り状を発行する（店への請求が立つ） */
+  effect issueLabel() on labels.post;
+
+  /** 配送業者が、その荷物を引き受けない（大きすぎる、届け先が対象の外、サービスがない） */
+  @http.status(422)
+  exception Refused;
+
+  /** いくつかの配送業者の見積もりを、まとめて取る */
+  @http.post("/rates")
+  export op rates(request: RateRequest): carrier.Quote[];
+
+  /** 送り状を買う */
+  @outside.does(issueLabel)
+  @http.post("/labels")
+  export op buyLabel(request: LabelRequest): BoughtLabel
+    throws Refused;
+}

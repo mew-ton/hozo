@@ -1,0 +1,92 @@
+// サンプル order-app の仕様（README.md）。商品の名前空間 catalog。
+// 商品の三つの種類（ダウンロード、受注製作、在庫）は、渡し方 Fulfilment のアームで、種類ごとに、持っている事実が違う。
+
+/** 商品。何を売っていて、どう渡すか */
+namespace catalog {
+  /** ダウンロードで渡す。箱は要らない */
+  model DigitalGoods {
+    asset: type.AssetId;
+  }
+
+  /** 注文を受けてから作る。出来上がりの大きさと重さは、作り終えるまで決まらない。決まっているのは、納期と、いちばん大きく出来た場合 */
+  model MadeGoods {
+    /** 注文から出来上がりまでの、長くてもの日数。支払いの与信の期限より短い（README.md「難しい問題」） */
+    leadTime: Duration;
+    /** いちばん大きく出来た場合の、一個の大きさと重さ。送料の上限を出すのに使う */
+    largest: type.Measurement;
+  }
+
+  /** 棚の在庫から出す。一個の大きさと重さは、登録してある */
+  model StockedGoods {
+    unit: type.Measurement;
+  }
+
+  /** 渡し方。商品の種類 */
+  union Fulfilment {
+    Digital: DigitalGoods;
+    Made: MadeGoods;
+    Stocked: StockedGoods;
+  }
+
+  /** 商品の種類。渡し方の型で決まる */
+  classify Kind of Fulfilment {
+    /** ダウンロードで渡す商品 */
+    Digital: Fulfilment as DigitalGoods;
+    /** 受注製作の商品 */
+    Made: Fulfilment as MadeGoods;
+    /** 在庫の商品 */
+    Stocked: Fulfilment as StockedGoods;
+  }
+
+  /** 商品 */
+  model Product {
+    @db.key sku: type.Sku;
+    @valid.length(min: 1, max: 100) name: string;
+    description: string;
+    /** 一個の値段 */
+    price: type.Yen;
+    fulfilment: Fulfilment;
+    /** 店に並べているか */
+    listed: boolean;
+  }
+
+  @db.table
+  state products: list<Product>;
+
+  /** 店に並べている商品 */
+  @db.list
+  @db.where("listed", true)
+  read listedProducts(): Product[] on products;
+
+  /** その識別子の商品 */
+  @db.find
+  read productBySku(sku: type.Sku): Product? on products;
+
+  /** skus のどれかに当たる商品（「集合に入っている」は db の語彙で言えないので、人が書く） */
+  read productsBySkus(skus: type.Sku[]): Product[] on products;
+
+  /** 店に並べている商品の一覧 */
+  export op listed(): Product[] {
+    return listedProducts();
+  }
+
+  /** 商品を一つ引く。並べていない商品も引ける */
+  export op find(sku: type.Sku): Product? {
+    return productBySku(sku);
+  }
+
+  /** いくつかの商品を、まとめて引く。ない識別子の分は、結果にない */
+  export op lookup(skus: type.Sku[]): Product[] {
+    return productsBySkus(skus);
+  }
+
+  /** 引いた商品を、客に売れるか */
+  classify Offer of Product? {
+    /** 店に並べている */
+    OnSale: Product? as Product;
+    /** あるが、並べていない */
+    Withdrawn: Product? as Product;
+    /** ない */
+    default;
+  }
+}

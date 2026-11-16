@@ -1,0 +1,92 @@
+// サンプル order-app の仕様（README.md）。共有の型の名前空間 type。
+// 二つ以上の概念と、画面が使う「値」だけを置く。行を持つ model（注文、出荷、支払い…）は、その状態の持ち主の名前空間に置く（README.md「粒度」）。
+
+/** 共有の型。どの概念にも属さない値 */
+namespace type {
+  // ---- 識別子 ----
+
+  /** 注文の識別子（店の中で使う） */
+  scalar OrderId extends string;
+
+  /** 客が自分の注文を見るための鍵。URL に入る秘密で、アカウントの代わり */
+  scalar OrderKey extends string;
+
+  /** 注文の一行の識別子 */
+  scalar LineId extends string;
+
+  /** 商品の識別子 */
+  scalar Sku extends string;
+
+  /** ダウンロードで渡すファイルの識別子 */
+  scalar AssetId extends string;
+
+  /** 担当者のログインセッションのトークン */
+  scalar Token extends string;
+
+  /** 客の画面が、注文の送信ごとに作る識別子。同じ送信が二度届いても、注文は一つ */
+  scalar RequestId extends string;
+
+  // ---- 値 ----
+
+  /** メールアドレス */
+  @valid.format("email")
+  scalar Email extends string;
+
+  /** URL */
+  @valid.format("uri")
+  scalar Url extends string;
+
+  /** 円の金額（税込み）。負にならない */
+  @valid.min(0)
+  scalar Yen extends int;
+
+  /** 個数 */
+  @valid.min(1)
+  @valid.max(99)
+  scalar Quantity extends int;
+
+  /** 重さ（グラム） */
+  @valid.min(1)
+  scalar Grams extends int;
+
+  /** 長さ（ミリメートル） */
+  @valid.min(1)
+  scalar Millimetres extends int;
+
+  /** 郵便番号 */
+  @valid.pattern("^[0-9]{3}-?[0-9]{4}$")
+  scalar PostalCode extends string;
+
+  /** 届け先と、出荷元の住所 */
+  model Address {
+    @valid.length(min: 1, max: 100) name: string;
+    postalCode: PostalCode;
+    @valid.length(min: 1, max: 20) prefecture: string;
+    @valid.length(min: 1, max: 200) street: string;
+    building: string?;
+    @valid.length(min: 1, max: 20) phone: string;
+  }
+
+  /** 三辺の長さ */
+  model Dimensions {
+    length: Millimetres;
+    width: Millimetres;
+    height: Millimetres;
+  }
+
+  /** 物の大きさと重さ */
+  model Measurement {
+    size: Dimensions;
+    weight: Grams;
+  }
+
+  // ---- 例外 ----
+
+  /** 認証されていない */
+  @http.status(401)
+  exception Unauthorized;
+
+  /** その仕事の担当ではない */
+  @http.status(403)
+  exception Forbidden;
+}

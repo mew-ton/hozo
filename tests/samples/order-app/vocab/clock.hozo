@@ -1,0 +1,18 @@
+// サンプル order-app の語彙（README.md「語彙」）。時計と、時刻で動く op。読むトランスパイラはないので、印。
+
+/** 時計の語彙 */
+namespace clock {
+  /** この op は、動いている計算機の時計を読む。付いた op は純粋でなくなる */
+  decorator system for op;
+
+  /**
+   * この op を、誰にも呼ばれずに、every の間隔で動かす。
+   *
+   * @param every 動かす間隔
+   */
+  decorator tick(every: Duration) for op;
+
+  /** 今の時刻 */
+  @system
+  export op now(): Time;
+}

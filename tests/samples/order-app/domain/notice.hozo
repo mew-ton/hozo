@@ -1,0 +1,29 @@
+// サンプル order-app の仕様（README.md）。客への知らせの名前空間 notice。
+// 知らせが送れなくても、注文と出荷の流れは止めない（@bestEffort）。何を書くかは、葉の op の中。
+
+/** 知らせ。客に、何が起きたかを伝える */
+namespace notice {
+  /** 送れなかったことを、呼び出し元に伝えない（値を返さない op にだけ付く） */
+  decorator bestEffort
+    catches mailer.Undelivered ignores;
+
+  /** 注文を受け付けた。見るための鍵、ダウンロード、送料の見積もりと上限と「梱包の後に決まる」こと、納期を伝える */
+  @bestEffort
+  export op accepted(order: ordering.Order) {
+    const mail = acceptedMail(order);
+    mailer.send(mail);
+  }
+
+  /** 発送した。決まった送料と、請求を確定した額と、追跡番号を伝える。送料が見積もりと違うときは、その理由も */
+  @bestEffort
+  export op shipped(order: ordering.Order, parcel: shipping.Parcel, label: shipping.Label, charge: payment.Payment?) {
+    const mail = shippedMail(order, parcel, label, charge);
+    mailer.send(mail);
+  }
+
+  /** 受け付けの知らせを書く（人が書く） */
+  op acceptedMail(order: ordering.Order): mailer.Mail;
+
+  /** 発送の知らせを書く（人が書く） */
+  op shippedMail(order: ordering.Order, parcel: shipping.Parcel, label: shipping.Label, charge: payment.Payment?): mailer.Mail;
+}

@@ -1,0 +1,416 @@
+// サンプル order-app の仕様（README.md「難しい問題」）。支払いの名前空間 payment。
+// 送料は梱包するまで決まらないので、注文のときに請求する額は決まらない。決まっているのは、上限（商品の代金 + 送料の上限）だけ。
+//   注文のとき   : 客は、上限の額に同意する。相手（psp）は、その額の枠を確保する。金は動かない（Held）。
+//   送料が決まる : 商品の代金 + 送料（上限で切る）で、請求を確定する（Settled）。上限を超えた分は、店が持つ（absorbed）。
+//   枠の期限が近い: 受注製作が長引いたときは、上限の額で先に確定し（Prepaid）、送料が決まったら、差額を返す。
+//   ダウンロードだけの注文は、送料がないので、客が同意したその場で請求が確定する。
+
+/** 支払い。客が何に同意し、いくら請求したか */
+namespace payment {
+  /** 注文一つの支払い */
+  model Payment {
+    @db.key    orderId: type.OrderId;
+    @db.unique session: psp.SessionId;
+    /** 商品の代金 */
+    itemsTotal: type.Yen;
+    /** 送料の上限。ダウンロードだけの注文は 0 */
+    shippingCeiling: type.Yen;
+    /** 客が同意する額: 商品の代金 + 送料の上限。請求は、これを超えない */
+    limit: type.Yen;
+    /** 客が同意して、枠を確保した時刻 */
+    securedAt: Time?;
+    /** 枠の期限 */
+    holdExpiresAt: Time?;
+    /** 請求を確定した額 */
+    captured: type.Yen?;
+    /** 決まった送料のうち、客に請求する額（上限で切った後） */
+    shippingCharged: type.Yen?;
+    /** 決まった送料が上限を超えた分。店が持つ */
+    absorbed: type.Yen?;
+    /** 返した額（上限の額で先に確定したときの差額） */
+    refunded: type.Yen?;
+    /** 送料が決まって、請求する額が最後まで決まった時刻 */
+    settledAt: Time?;
+  }
+
+  /** 相手から届いた通知。同じ通知を二度扱わないための記録 */
+  model Seen {
+    @db.key id: psp.EventId;
+    at: Time;
+  }
+
+  @db.table
+  state payments: list<Payment>;
+
+  @db.table
+  state seen: list<Seen>;
+
+  /** 枠の期限の、どれだけ前に、先に請求を確定するか */
+  state holdMargin: single<Duration>;
+
+  // ---- 分類 ----
+
+  /** 支払いの状態 */
+  classify Standing of Payment {
+    /** 支払いの画面を開いた。客は、まだ同意していない */
+    Pending;
+    /** 客が同意して、枠を確保した。請求は、まだ確定していない */
+    Held;
+    /** 枠の期限が近かったので、上限の額で、先に請求を確定した。送料が決まったら、差額を返す */
+    Prepaid;
+    /** 請求する額が、最後まで決まった */
+    Settled;
+    /** 枠を手放した。請求しない */
+    Released;
+  }
+
+  /** 引いた支払いがあるか */
+  classify Known of Payment? {
+    Found: Payment? as Payment;
+    default;
+  }
+
+  /** その通知は、もう扱ったか */
+  classify Redelivery of Seen? {
+    Redelivered: Seen? as Seen;
+    default;
+  }
+
+  // ---- 例外 ----
+
+  /**
+   * 支払いの画面を開けない（支払いを引き受ける仕組みに届かない）。金は動いていない。
+   * 金が動く呼び出し（請求の確定、返金、枠を手放す）の失敗は、言い換えない: http.NetworkError と http.ServerError のまま伝える。
+   * そのとき、金が動いたかどうかは、分からない（README.md「分かったこと」）。
+   */
+  @http.status(503)
+  exception ProviderUnavailable;
+
+  /** その注文の支払いは、ない */
+  @http.status(404)
+  exception NoPayment;
+
+  /** 客が、もう同意している */
+  @http.status(409)
+  exception AlreadySecured;
+
+  /** 客が、まだ同意していない（か、枠を手放した）ので、請求できない */
+  @http.status(409)
+  exception NotSecured;
+
+  // ---- 状態に触れるもの ----
+
+  /** その注文の支払い */
+  @db.find
+  read paymentOf(orderId: type.OrderId): Payment? on payments;
+
+  /** その支払いの画面の支払い */
+  @db.find
+  read paymentBySession(session: psp.SessionId): Payment? on payments;
+
+  /** 枠の期限が deadline より前の、まだ請求を確定していない支払いのうち、期限がいちばん近いもの（人が書く: 比較と並べ方） */
+  read nextExpiringHold(deadline: Time): Payment? on payments;
+
+  /** その識別子の通知の記録 */
+  @db.find
+  read seenEvent(id: psp.EventId): Seen? on seen;
+
+  /** 支払いを作る */
+  @db.insert
+  effect createPayment(payment: Payment) on payments.post;
+
+  /** 支払いを書き換える */
+  @db.update
+  effect savePayment(payment: Payment) on payments.put;
+
+  /** 通知を、扱ったと記録する */
+  @db.insert
+  effect remember(event: Seen) on seen.post;
+
+  // ---- 注文のとき: 支払いの画面を開く ----
+
+  /** 注文の支払いの画面を開く。まだ同意していない注文なら、何度でも開き直せる */
+  export op begin(order: ordering.Order, returnTo: type.Url): psp.Session
+    throws AlreadySecured, ProviderUnavailable
+  {
+    const existing = paymentOf(order.id);
+    return match existing by Known {
+      Found   => reopen(order, existing, returnTo);
+      default => openFirst(order, returnTo);
+    };
+  }
+
+  /** はじめて開く */
+  op openFirst(order: ordering.Order, returnTo: type.Url): psp.Session
+    throws ProviderUnavailable
+  {
+    const session = openSession(order, returnTo);
+    const payment = pending(order, session);
+    createPayment(payment);
+    return session;
+  }
+
+  /** 開き直せるのは、まだ同意していない支払いだけ */
+  op reopen(order: ordering.Order, payment: Payment, returnTo: type.Url): psp.Session
+    throws AlreadySecured, ProviderUnavailable
+  {
+    return match payment by Standing {
+      Pending                             => replaceSession(order, payment, returnTo);
+      Held | Prepaid | Settled | Released => throw AlreadySecured;
+    };
+  }
+
+  /** 新しい支払いの画面に差し替える */
+  op replaceSession(order: ordering.Order, payment: Standing.Pending<Payment>, returnTo: type.Url): psp.Session
+    throws ProviderUnavailable
+  {
+    const session = openSession(order, returnTo);
+    const renewed = withSession(payment, session);
+    savePayment(renewed);
+    return session;
+  }
+
+  /** 箱で送るものがあれば、上限の額の枠を確保する画面。ダウンロードだけなら、その場で請求する画面 */
+  op openSession(order: ordering.Order, returnTo: type.Url): psp.Session
+    throws ProviderUnavailable
+  {
+    return match order.physical by ordering.Delivery {
+      ToShip  => openHold(order, order.physical, returnTo);
+      default => openCharge(order, returnTo);
+    };
+  }
+
+  /** 商品の代金 + 送料の上限の枠を確保する画面を開く */
+  @outside.failsAs(ProviderUnavailable)
+  op openHold(order: ordering.Order, part: ordering.PhysicalPart, returnTo: type.Url): psp.Session {
+    const request = limitOf(order, part, returnTo);
+    return psp.openHold(request);
+  }
+
+  /** 商品の代金を、その場で請求する画面を開く */
+  @outside.failsAs(ProviderUnavailable)
+  op openCharge(order: ordering.Order, returnTo: type.Url): psp.Session {
+    const request = totalOf(order, returnTo);
+    return psp.openCharge(request);
+  }
+
+  /** 商品の代金 + 送料の上限を、同意する額にする（人が書く） */
+  op limitOf(order: ordering.Order, part: ordering.PhysicalPart, returnTo: type.Url): psp.SessionRequest;
+
+  /** 商品の代金を、同意する額にする（人が書く） */
+  op totalOf(order: ordering.Order, returnTo: type.Url): psp.SessionRequest;
+
+  /** まだ同意していない支払いを作る（人が書く） */
+  op pending(order: ordering.Order, session: psp.Session): Payment;
+
+  /** 支払いの画面を差し替える（人が書く） */
+  op withSession(payment: Standing.Pending<Payment>, session: psp.Session): Payment;
+
+  // ---- 相手からの通知: 客が同意した ----
+
+  /** その通知で、新しく支払いの枠を確保できた注文 */
+  classify Securing of type.OrderId? {
+    NewlySecured: type.OrderId? as type.OrderId;
+    default;
+  }
+
+  /**
+   * 相手からの通知を扱う。同じ通知が二度届いても、二度は扱わない。
+   * この通知で、新しく、客の同意が取れた注文があれば、その識別子を返す。なければ、ない。
+   */
+  @db.transaction
+  export op record(event: psp.Event): type.OrderId? {
+    const delivered = seenEvent(event.id);
+    return match delivered by Redelivery {
+      Redelivered => none;
+      default     => recordNew(event);
+    };
+  }
+
+  /** はじめて届いた通知 */
+  op recordNew(event: psp.Event): type.OrderId? {
+    const now = clock.now();
+    remember({ id: event.id, at: now });
+    return match event by psp.Meaning {
+      Secured => secure(event, now);
+      default => none;
+    };
+  }
+
+  /** 客の同意の通知。知らない支払いの画面のものは、何もしない */
+  op secure(event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
+    const payment = paymentBySession(event.session);
+    return match payment by Known {
+      Found   => secureFound(payment, event, now);
+      default => none;
+    };
+  }
+
+  /** まだ同意していなかった支払いだけが、新しく確保される */
+  op secureFound(payment: Payment, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
+    return match payment by Standing {
+      Pending                             => markSecured(payment, event, now);
+      Held | Prepaid | Settled | Released => none;
+    };
+  }
+
+  /** 同意を記録する */
+  op markSecured(payment: Standing.Pending<Payment>, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId {
+    const secured = securedBy(payment, event, now);
+    savePayment(secured);
+    return secured.orderId;
+  }
+
+  /**
+   * 同意した時刻と、枠の期限を入れる（人が書く）。
+   * 送料の上限が 0 の支払い（ダウンロードだけ）は、その場で請求が確定しているので、額も入れる（Settled になる）。
+   */
+  op securedBy(payment: Standing.Pending<Payment>, event: psp.Meaning.Secured<psp.Event>, now: Time): Payment;
+
+  // ---- 引く ----
+
+  /** 注文の支払い。支払いの画面をまだ開いていなければ、ない */
+  export op ofOrder(orderId: type.OrderId): Payment? {
+    return paymentOf(orderId);
+  }
+
+  /** 注文の支払い。なければ NoPayment */
+  op require(orderId: type.OrderId): Payment
+    throws NoPayment
+  {
+    const found = paymentOf(orderId);
+    return match found by Known {
+      Found   => found;
+      default => throw NoPayment;
+    };
+  }
+
+  // ---- 送料が決まった: 請求する額を、最後まで決める ----
+
+  /**
+   * 送料が決まったので、請求する額を決める。客に請求する送料は、fee と上限の小さい方。上限を超えた分は、店が持つ。
+   * 枠を確保してあれば、商品の代金 + 請求する送料で、請求を確定する。上限の額で先に確定してあれば、差額を返す。
+   * もう決まっていれば、何もしない（二度呼んでも、請求は一度）。
+   */
+  export op settle(orderId: type.OrderId, fee: type.Yen)
+    throws NoPayment, NotSecured, psp.HoldExpired, http.NetworkError, http.ServerError
+  {
+    const payment = require(orderId);
+    match payment by Standing {
+      Held               => capture(payment, fee);
+      Prepaid            => refundDifference(payment, fee);
+      Settled            => none;
+      Pending | Released => throw NotSecured;
+    };
+  }
+
+  /** 枠から、請求を確定する。枠の期限が過ぎていれば、金は動かず、記録も変わらない。相手に届かなければ、金が動いたかどうかは、分からない */
+  op capture(payment: Standing.Held<Payment>, fee: type.Yen)
+    throws psp.HoldExpired prevents effects
+    throws http.NetworkError, http.ServerError
+  {
+    const now = clock.now();
+    const settled = charged(payment, fee, now);
+    const request = captureOf(settled);
+    psp.capture(request);
+    savePayment(settled);
+  }
+
+
+  /** 先に確定した上限の額と、決まった額の差を、返す */
+  op refundDifference(payment: Standing.Prepaid<Payment>, fee: type.Yen)
+    throws http.NetworkError, http.ServerError
+  {
+    const now = clock.now();
+    const settled = charged(payment, fee, now);
+    const request = refundOf(settled);
+    psp.refund(request);
+    savePayment(settled);
+  }
+
+  /**
+   * 請求する額を決める（人が書く）: 請求する送料 = fee と送料の上限の小さい方。店が持つ分 = fee が上限を超えた分。
+   * 請求する額 = 商品の代金 + 請求する送料。先に上限の額で確定してあれば、返す額 = 上限の額 - 請求する額。
+   */
+  op charged(payment: Payment, fee: type.Yen, now: Time): Payment;
+
+  /** 請求を確定する額の依頼（人が書く） */
+  op captureOf(settled: Payment): psp.AmountRequest;
+
+  /** 返す額の依頼（人が書く）。差が 0 でも、依頼は作る */
+  op refundOf(settled: Payment): psp.AmountRequest;
+
+  // ---- 枠の期限が近い: 上限の額で、先に確定する ----
+
+  /**
+   * 枠の期限が近い支払いを一つ、上限の額で、先に請求を確定する。誰にも呼ばれずに動く。
+   * 一度に扱うのは、期限がいちばん近い一つだけ（配線は、一覧の一つずつに外部の仕組みを呼べない）。
+   */
+  @clock.tick(every: 10m)
+  op prepayExpiring()
+    throws psp.HoldExpired, http.NetworkError, http.ServerError
+  {
+    const now = clock.now();
+    const deadline = ahead(now, holdMargin);
+    const next = nextExpiringHold(deadline);
+    match next by Known {
+      Found   => prepayHeld(next, now);
+      default => none;
+    };
+  }
+
+  /** now から margin だけ先の時刻（人が書く） */
+  op ahead(now: Time, margin: Duration): Time;
+
+  /** 枠を確保してある支払いだけを、先に確定する */
+  op prepayHeld(payment: Payment, now: Time)
+    throws psp.HoldExpired, http.NetworkError, http.ServerError
+  {
+    match payment by Standing {
+      Held                                   => prepay(payment, now);
+      Pending | Prepaid | Settled | Released => none;
+    };
+  }
+
+  /** 上限の額で、請求を確定する */
+  op prepay(payment: Standing.Held<Payment>, now: Time)
+    throws psp.HoldExpired, http.NetworkError, http.ServerError
+  {
+    const prepaid = chargedInFull(payment, now);
+    const request = captureOf(prepaid);
+    psp.capture(request);
+    savePayment(prepaid);
+  }
+
+  /** 上限の額を、確定した額にする（人が書く）。送料は、まだ決まっていない */
+  op chargedInFull(payment: Standing.Held<Payment>, now: Time): Payment;
+
+  // ---- 枠を手放す ----
+
+  /** 期限切れにした注文に、後から同意が届いたとき: 枠を手放す。請求しない */
+  export op release(orderId: type.OrderId)
+    throws NoPayment, http.NetworkError, http.ServerError
+  {
+    const payment = require(orderId);
+    match payment by Standing {
+      Held                                   => letGo(payment);
+      Pending | Prepaid | Settled | Released => none;
+    };
+  }
+
+  /** 枠を手放して、記録する */
+  op letGo(payment: Standing.Held<Payment>)
+    throws http.NetworkError, http.ServerError
+  {
+    const released = withoutHold(payment);
+    const request = holdOf(released);
+    psp.release(request);
+    savePayment(released);
+  }
+
+  /** 手放したことを入れる（人が書く） */
+  op withoutHold(payment: Standing.Held<Payment>): Payment;
+
+  /** 手放す枠の依頼（人が書く） */
+  op holdOf(released: Payment): psp.SessionRef;
+}

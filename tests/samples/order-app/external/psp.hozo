@@ -1,0 +1,110 @@
+// サンプル order-app の仕様（README.md「難しい問題」）。支払いを引き受ける外部の仕組み psp。出力の単位を置かない。
+// 相手の振る舞いとして、この仕様が当てにしていること:
+//   1. 客は、相手の支払いの画面（Session.url）で、額に同意する。こちらの画面は、カードの情報に触れない。
+//   2. 枠の確保（openHold）は、同意した額までを、後から一度だけ請求できるようにする。枠には期限がある（Event.holdExpiresAt）。
+//   3. 請求の確定（capture）は、枠ごとに一度だけ。額は、確保した額以下。残りは、相手が手放す。
+//   4. 確定した請求は、一部だけ返せる（refund）。
+//   5. 客の同意は、通知（Event）で届く。同じ通知が二度届くことがある。
+// 金の動きは、相手の持つ状態（ledger、holds）への効果として書く。こちらの op の効果に、金が動くことが現れる。
+
+/** 支払いを引き受ける外部の仕組み */
+namespace psp {
+  /** 支払いの画面の識別子 */
+  scalar SessionId extends string;
+
+  /** 通知の識別子 */
+  scalar EventId extends string;
+
+  /** 支払いの画面を開く依頼 */
+  model SessionRequest {
+    orderId: type.OrderId;
+    /** 客が同意する額。枠の確保なら、請求の上限 */
+    amount: type.Yen;
+    /** 同意の後に、客を戻す先 */
+    returnTo: type.Url;
+  }
+
+  /** 支払いの画面 */
+  model Session {
+    id: SessionId;
+    url: type.Url;
+    expiresAt: Time;
+  }
+
+  /** 額を伴う依頼（請求の確定、返金） */
+  model AmountRequest {
+    session: SessionId;
+    amount: type.Yen;
+  }
+
+  /** 額を伴わない依頼（枠を手放す） */
+  model SessionRef {
+    session: SessionId;
+  }
+
+  /** 通知 */
+  model Event {
+    id: EventId;
+    session: SessionId;
+    /** 何が起きたか（"secured" など。値の集合は、相手が決める） */
+    kind: string;
+    /** 枠の期限。枠の確保でない通知には、ない */
+    holdExpiresAt: Time?;
+  }
+
+  /** 通知の意味 */
+  classify Meaning of Event {
+    /** 客が同意して、枠の確保か、その場の請求が済んだ */
+    Secured;
+    /** ほかの通知。この仕様は使わない */
+    default;
+  }
+
+  /** 客の口座と店の間の、金の動き */
+  model Movement {
+    session: SessionId;
+    amount: type.Yen;
+  }
+
+  /** 相手が持つ、金の動きの記録 */
+  state ledger: list<Movement>;
+
+  /** 相手が持つ、確保した枠 */
+  state holds: list<SessionRef>;
+
+  /** 客から店へ、金が動く */
+  effect takeMoney() on ledger.post;
+
+  /** 店から客へ、金が戻る */
+  effect returnMoney() on ledger.post;
+
+  /** 枠がなくなる */
+  effect dropHold() on holds.delete;
+
+  /** 枠の期限が過ぎていて、請求を確定できない */
+  exception HoldExpired;
+
+  /** 枠の確保を頼む支払いの画面を開く。金は、まだ動かない */
+  @http.post("/sessions/hold")
+  export op openHold(request: SessionRequest): Session;
+
+  /** その場で請求する支払いの画面を開く。金が動くのは、客が同意したとき */
+  @http.post("/sessions/charge")
+  export op openCharge(request: SessionRequest): Session;
+
+  /** 枠から、請求を確定する。一度だけ。額は、確保した額以下 */
+  @outside.does(takeMoney, dropHold)
+  @http.post("/captures")
+  export op capture(request: AmountRequest)
+    throws HoldExpired prevents effects;
+
+  /** 確定した請求の一部を返す */
+  @outside.does(returnMoney)
+  @http.post("/refunds")
+  export op refund(request: AmountRequest);
+
+  /** 枠を手放す。金は動かない */
+  @outside.does(dropHold)
+  @http.post("/releases")
+  export op release(request: SessionRef);
+}

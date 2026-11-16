@@ -1,0 +1,7 @@
+// サンプル order-app の語彙（README.md「語彙」）。shop-server の smtp と同じ印。
+
+/** SMTP でメールを送る仕組みの語彙 */
+namespace smtp {
+  /** この op は、SMTP のサーバーにメールを送る。付いた op は純粋でなくなる */
+  decorator sendMail for op;
+}

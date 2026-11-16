@@ -1,0 +1,19 @@
+// サンプル order-app の仕様（README.md）。メールを外へ届ける仕組み mailer。出力の単位を置かない。
+
+/** メールの配送 */
+namespace mailer {
+  /** メール一通 */
+  model Mail {
+    recipient: type.Email;
+    subject: string;
+    body: string;
+  }
+
+  /** 送れなかった */
+  exception Undelivered;
+
+  /** メールを送る */
+  @smtp.sendMail
+  export op send(mail: Mail)
+    throws Undelivered;
+}

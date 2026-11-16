@@ -1,0 +1,340 @@
+// サンプル order-app の仕様（README.md）。注文の名前空間 ordering。
+// 一つの注文に、三つの種類の商品が混ざる。混ざり方は、注文の型に書いてある: ダウンロードの行（digital）と、箱で送る部分（physical）。
+// 箱で送る部分があるときだけ、届け先と、送料の約束（見積もりと上限）がある。送料そのものは、ここにない: 梱包するまで決まらない（shipping）。
+
+/** 注文。客が何を頼み、何を約束されたか */
+namespace ordering {
+  // ---- 注文の行。種類ごとに、後の担い手が要る事実を持つ ----
+
+  /** 注文の一行に共通の事実。値段は、注文したときのもの */
+  model Line {
+    id: type.LineId;
+    sku: type.Sku;
+    name: string;
+    unitPrice: type.Yen;
+    quantity: type.Quantity;
+  }
+
+  /** ダウンロードの行 */
+  model DigitalLine extends Line {
+    asset: type.AssetId;
+  }
+
+  /** 受注製作の行 */
+  model MadeLine extends Line {
+    /** 客が書いた、作り方の希望 */
+    request: string?;
+    leadTime: Duration;
+    largest: type.Measurement;
+  }
+
+  /** 在庫の行 */
+  model StockedLine extends Line {
+    unit: type.Measurement;
+  }
+
+  /** 箱で送る部分。届け先と、送料の約束は、この部分があるときだけある */
+  model PhysicalPart {
+    made: MadeLine[];
+    stocked: StockedLine[];
+    destination: type.Address;
+    /** 注文のときに客に見せて、客が同意した送料の見積もりと上限 */
+    terms: shipping.FeeQuote;
+  }
+
+  /** 注文 */
+  model Order {
+    @db.key    id: type.OrderId;
+    @db.unique key: type.OrderKey;
+    @db.unique requestId: type.RequestId;
+    email: type.Email;
+    digital: DigitalLine[];
+    /** 箱で送る部分。ダウンロードだけの注文には、ない */
+    physical: PhysicalPart?;
+    /** 商品の代金の合計。送料を含まない */
+    itemsTotal: type.Yen;
+    placedAt: Time;
+    /** 支払いの枠を確保できて、注文を受け付けた時刻 */
+    acceptedAt: Time?;
+    /** 支払いがないまま、期限が過ぎた時刻 */
+    expiredAt: Time?;
+  }
+
+  @db.table
+  state orders: list<Order>;
+
+  // ---- 分類 ----
+
+  /** 注文に、箱で送る部分があるか */
+  classify Delivery of PhysicalPart? {
+    /** 箱で送るものがある */
+    ToShip: PhysicalPart? as PhysicalPart;
+    /** ダウンロードだけ */
+    default;
+  }
+
+  /** 注文の受け付けの状態 */
+  classify Standing of Order {
+    /** 支払いを待っている。在庫は取り置いてある */
+    AwaitingPayment;
+    /** 受け付けた。渡す準備が始まっている */
+    Accepted;
+    /** 支払いがないまま期限が過ぎた。取り置きは戻してある */
+    Expired;
+  }
+
+  /** 引いた注文があるか */
+  classify Known of Order? {
+    Found: Order? as Order;
+    default;
+  }
+
+  // ---- 客の入力 ----
+
+  /** カートの一行 */
+  model CartLine {
+    sku: type.Sku;
+    quantity: type.Quantity;
+    /** 受注製作の商品への希望 */
+    @valid.length(max: 500) request: string?;
+  }
+
+  /** 注文の申し込み */
+  model Checkout {
+    requestId: type.RequestId;
+    email: type.Email;
+    @valid.length(min: 1, max: 50) lines: CartLine[];
+    /** 箱で送るものがあるときに要る */
+    destination: type.Address?;
+    /** 客が画面で見て同意した、送料の上限。箱で送るものがあるときに要る */
+    agreedCeiling: type.Yen?;
+  }
+
+  /** 値段を付けた注文の中身。まだ注文ではない */
+  model Priced {
+    digital: DigitalLine[];
+    physical: PhysicalPart?;
+    itemsTotal: type.Yen;
+  }
+
+  /** カートを、商品の種類ごとに分けて、値段を付けたもの */
+  model Sorted {
+    digital: DigitalLine[];
+    made: MadeLine[];
+    stocked: StockedLine[];
+    itemsTotal: type.Yen;
+  }
+
+  /** 分けたカートに、箱で送るものがあるか */
+  classify Mix of Sorted {
+    /** 受注製作か在庫の行が、一つはある */
+    NeedsBox;
+    /** ダウンロードの行だけ */
+    DigitalOnly;
+  }
+
+  /** 届け先が書いてあるか */
+  classify Destination of type.Address? {
+    Given: type.Address? as type.Address;
+    default;
+  }
+
+  // ---- 例外 ----
+
+  /** カートの商品が、ない */
+  @http.status(422)
+  exception UnknownProduct(sku: type.Sku);
+
+  /** カートの商品を、いまは売っていない */
+  @http.status(422)
+  exception NotForSale(sku: type.Sku);
+
+  /** 箱で送るものがあるのに、届け先がない */
+  @http.status(422)
+  exception DestinationRequired;
+
+  /** 客が同意した送料の上限が、いまの上限と違う（見てから送るまでの間に、料金表か商品が変わった）。いまの約束を運ぶ */
+  @http.status(409)
+  exception TermsChanged(terms: shipping.FeeQuote);
+
+  /** その注文は、ない */
+  @http.status(404)
+  exception NoOrder;
+
+  // ---- 状態に触れるもの ----
+
+  /** その鍵の注文 */
+  @db.find
+  read orderByKey(key: type.OrderKey): Order? on orders;
+
+  /** その識別子の注文 */
+  @db.find
+  read orderById(id: type.OrderId): Order? on orders;
+
+  /** その送信で、もう作った注文 */
+  @db.find
+  read orderByRequest(requestId: type.RequestId): Order? on orders;
+
+  /** deadline より前に申し込まれて、まだ支払いを待っている注文（比較は db の語彙で言えないので、人が書く） */
+  read unpaidBefore(deadline: Time): Order[] on orders;
+
+  /** 注文を作る */
+  @db.insert
+  effect createOrder(order: Order) on orders.post;
+
+  /** 注文を書き換える */
+  @db.update
+  effect saveOrder(order: Order) on orders.put;
+
+  /** いくつかの注文を、まとめて書き換える */
+  effect saveOrders(changed: Order[]) on orders.put;
+
+  // ---- 値段を付ける ----
+
+  /** カートに値段を付ける。箱で送るものがあれば、届け先から、送料の見積もりと上限を出す */
+  export op price(lines: CartLine[], destination: type.Address?): Priced
+    throws UnknownProduct, NotForSale, DestinationRequired, shipping.Undeliverable, shipping.TooLarge
+  {
+    const skus = skusOf(lines);
+    const products = catalog.lookup(skus);
+    const sorted = sort(lines, products);
+    return match sorted by Mix {
+      NeedsBox    => priceToShip(sorted, destination);
+      DigitalOnly => withoutShipping(sorted);
+    };
+  }
+
+  /** カートの商品の識別子（人が書く） */
+  op skusOf(lines: CartLine[]): type.Sku[];
+
+  /** カートの行を、商品の種類ごとに分け、注文したときの値段と、種類ごとの事実を写す（人が書く）。混ざった注文は、ここで三つに分かれる */
+  op sort(lines: CartLine[], products: catalog.Product[]): Sorted
+    throws UnknownProduct, NotForSale;
+
+  /** 箱で送るものがあるカートは、届け先が要る */
+  op priceToShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address?): Priced
+    throws DestinationRequired, shipping.Undeliverable, shipping.TooLarge
+  {
+    return match destination by Destination {
+      Given   => withShipping(sorted, destination);
+      default => throw DestinationRequired;
+    };
+  }
+
+  /** 送料の見積もりと上限を、shipping に出してもらう */
+  op withShipping(sorted: Mix.NeedsBox<Sorted>, destination: type.Address): Priced
+    throws shipping.Undeliverable, shipping.TooLarge
+  {
+    const terms = shipping.estimate(sorted.made, sorted.stocked, destination);
+    return toShip(sorted, destination, terms);
+  }
+
+  /** 箱で送る部分を組み立てる（人が書く） */
+  op toShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address, terms: shipping.FeeQuote): Priced;
+
+  /** ダウンロードだけの中身にする（人が書く） */
+  op withoutShipping(sorted: Mix.DigitalOnly<Sorted>): Priced;
+
+  // ---- 注文する ----
+
+  /** 注文する。同じ送信（requestId）が二度届いても、注文は一つ。在庫の行は、ここで取り置く */
+  @db.transaction
+  export op place(checkout: Checkout): Order
+    throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
+           shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
+  {
+    const sent = orderByRequest(checkout.requestId);
+    return match sent by Known {
+      Found   => sent;
+      default => placeNew(checkout);
+    };
+  }
+
+  /** 新しい注文を作る。効果は、取り置きの後に、注文を足す */
+  op placeNew(checkout: Checkout): Order
+    throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
+           shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
+  {
+    const priced = price(checkout.lines, checkout.destination);
+    const now = clock.now();
+    const order = draft(checkout, priced, now);
+    holdStock(order);
+    createOrder(order);
+    return order;
+  }
+
+  /**
+   * 識別子と鍵を決めて、注文を作る（人が書く）。
+   * 箱で送る部分があるのに、客が同意した上限（agreedCeiling）がいまの上限と違えば、いまの約束を運ぶ TermsChanged。
+   */
+  op draft(checkout: Checkout, priced: Priced, now: Time): Order
+    throws TermsChanged;
+
+  /** 在庫の行を取り置く。箱で送る部分がなければ、何もしない */
+  op holdStock(order: Order)
+    throws inventory.OutOfStock
+  {
+    match order.physical by Delivery {
+      ToShip  => inventory.reserve(order.id, order.physical.stocked);
+      default => none;
+    };
+  }
+
+  // ---- 引く ----
+
+  /** 鍵から注文を引く */
+  export op byKey(key: type.OrderKey): Order
+    throws NoOrder
+  {
+    const found = orderByKey(key);
+    return match found by Known {
+      Found   => found;
+      default => throw NoOrder;
+    };
+  }
+
+  /** 識別子から注文を引く */
+  export op byId(id: type.OrderId): Order
+    throws NoOrder
+  {
+    const found = orderById(id);
+    return match found by Known {
+      Found   => found;
+      default => throw NoOrder;
+    };
+  }
+
+  // ---- 受け付けと、期限切れ ----
+
+  /** 注文を受け付ける（支払いの枠を確保できた） */
+  export op accept(order: Standing.AwaitingPayment<Order>): Order {
+    const now = clock.now();
+    const accepted = acceptedAt(order, now);
+    saveOrder(accepted);
+    return accepted;
+  }
+
+  /** 受け付けた時刻を入れる（人が書く） */
+  op acceptedAt(order: Standing.AwaitingPayment<Order>, now: Time): Order;
+
+  /** 支払いを待つ長さ。これを過ぎた注文は、期限切れにする */
+  state paymentWindow: single<Duration>;
+
+  /** 支払いがないまま期限が過ぎた注文を、期限切れにして、取り置きを戻す。誰にも呼ばれずに動く */
+  @clock.tick(every: 5m)
+  @db.transaction
+  op expireUnpaid() {
+    const now = clock.now();
+    const deadline = before(now, paymentWindow);
+    const stale = unpaidBefore(deadline);
+    const expired = expiredAt(stale, now);
+    saveOrders(expired);
+    inventory.release(expired);
+  }
+
+  /** now から window だけ前の時刻（人が書く） */
+  op before(now: Time, window: Duration): Time;
+
+  /** 期限切れの時刻を入れる（人が書く） */
+  op expiredAt(stale: Order[], now: Time): Order[];
+}

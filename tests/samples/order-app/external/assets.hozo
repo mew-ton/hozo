@@ -1,0 +1,15 @@
+// サンプル order-app の仕様（README.md）。ダウンロードで渡すファイルを置いてある外部の仕組み assets。出力の単位を置かない。
+
+/** ダウンロードで渡すファイルの置き場 */
+namespace assets {
+  /** 期限付きの URL の依頼 */
+  model LinkRequest {
+    asset: type.AssetId;
+    /** URL が使える長さ */
+    lifetime: Duration;
+  }
+
+  /** そのファイルを、期限の間だけ取れる URL を作る */
+  @http.post("/links")
+  export op link(request: LinkRequest): type.Url;
+}

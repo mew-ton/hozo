@@ -1,0 +1,196 @@
+// サンプル order-app の仕様（README.md）。配送業者の名前空間 carrier。
+// 店が契約している配送業者と、その使い分け。配送業者の API は、まとめて引き受ける外部の仕組み（carriergw）を通して呼ぶ。
+// 配送業者を選ぶのは、荷物（箱と重さ）が決まった後。客に請求する送料は、ここでは決まらない（shipping の料金表が決める）。
+
+/** 配送業者。誰に運んでもらえるか */
+namespace carrier {
+  /** 配送業者の識別子 */
+  scalar CarrierCode extends string;
+
+  /** 配送業者のサービス（通常便、速達など）の識別子 */
+  scalar ServiceCode extends string;
+
+  /** 配送業者 */
+  model Carrier {
+    @db.key code: CarrierCode;
+    @valid.length(min: 1, max: 100) name: string;
+    /** 配送業者との契約の番号 */
+    account: string;
+    /** いま使うか。使わない配送業者には、見積もりも、送り状も頼まない */
+    enabled: boolean;
+  }
+
+  /** 荷物一つを運ぶ見積もり */
+  model Quote {
+    carrier: CarrierCode;
+    service: ServiceCode;
+    name: string;
+    /** 店が配送業者に払う額 */
+    cost: type.Yen;
+    /** 届く見込み */
+    arrivesBy: Time?;
+  }
+
+  /** 梱包する人が選んだ、配送業者とサービス */
+  model Choice {
+    carrier: CarrierCode;
+    service: ServiceCode;
+  }
+
+  @db.table
+  state carriers: list<Carrier>;
+
+  /** その配送業者は、登録していない */
+  @http.status(404)
+  exception UnknownCarrier;
+
+  /** その配送業者は、もう登録してある */
+  @http.status(409)
+  exception AlreadyRegistered;
+
+  /** その配送業者は、いま使っていない */
+  @http.status(409)
+  exception NotEnabled;
+
+  /** いま使っている配送業者が、一つもない */
+  @http.status(409)
+  exception NoCarrier;
+
+  // ---- 状態に触れるもの ----
+
+  /** 登録してある配送業者のすべて */
+  @db.list
+  read allCarriers(): Carrier[] on carriers;
+
+  /** いま使っている配送業者 */
+  @db.list
+  @db.where("enabled", true)
+  read enabledCarriers(): Carrier[] on carriers;
+
+  /** その識別子の配送業者 */
+  @db.find
+  read carrierByCode(code: CarrierCode): Carrier? on carriers;
+
+  /** 配送業者を登録する */
+  @db.insert
+  effect addCarrier(carrier: Carrier) on carriers.post;
+
+  /** 配送業者を書き換える */
+  @db.update
+  effect saveCarrier(carrier: Carrier) on carriers.put;
+
+  // ---- 分類 ----
+
+  /** 引いた配送業者があるか */
+  classify Registered of Carrier? {
+    Known: Carrier? as Carrier;
+    default;
+  }
+
+  /** 配送業者を、いま使っているか */
+  classify Use of Carrier {
+    InUse;
+    Suspended;
+  }
+
+  /** いま使っている配送業者があるか */
+  classify Fleet of Carrier[] {
+    Available;
+    default;
+  }
+
+  // ---- 管理する ----
+
+  /** 登録してある配送業者の一覧 */
+  export op all(): Carrier[] {
+    return allCarriers();
+  }
+
+  /** 配送業者を登録する */
+  export op register(carrier: Carrier)
+    throws AlreadyRegistered
+  {
+    const existing = carrierByCode(carrier.code);
+    match existing by Registered {
+      Known   => throw AlreadyRegistered;
+      default => addCarrier(carrier);
+    };
+  }
+
+  /** 配送業者を使う、使わないを切り替える */
+  export op setEnabled(code: CarrierCode, enabled: boolean): Carrier
+    throws UnknownCarrier
+  {
+    const found = carrierByCode(code);
+    const changed = match found by Registered {
+      Known   => switched(found, enabled);
+      default => throw UnknownCarrier;
+    };
+    saveCarrier(changed);
+    return changed;
+  }
+
+  /** 使う、使わないを入れる（人が書く） */
+  op switched(carrier: Carrier, enabled: boolean): Carrier;
+
+  // ---- 使う ----
+
+  /** いま使っている配送業者の、この荷物の見積もり */
+  export op quotes(parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
+    throws NoCarrier, http.NetworkError, http.ServerError
+  {
+    const fleet = enabledCarriers();
+    return match fleet by Fleet {
+      Available => rate(fleet, parcel, origin, destination);
+      default   => throw NoCarrier;
+    };
+  }
+
+  /** 外部の仕組みに、見積もりを頼む */
+  op rate(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
+    throws http.NetworkError, http.ServerError
+  {
+    const request = rateRequest(fleet, parcel, origin, destination);
+    return carriergw.rates(request);
+  }
+
+  /** 見積もりの依頼を組み立てる（人が書く） */
+  op rateRequest(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.RateRequest;
+
+  /** 選んだ配送業者とサービスで、送り状を買う。店の金が動く */
+  export op book(choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
+    throws UnknownCarrier, NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
+  {
+    const found = carrierByCode(choice.carrier);
+    return match found by Registered {
+      Known   => bookWith(found, choice, parcel, origin, destination);
+      default => throw UnknownCarrier;
+    };
+  }
+
+  /** いま使っている配送業者にだけ、頼める */
+  op bookWith(carrier: Carrier, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
+    throws NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
+  {
+    return match carrier by Use {
+      InUse     => buy(carrier, choice, parcel, origin, destination);
+      Suspended => throw NotEnabled;
+    };
+  }
+
+  /** 外部の仕組みから、送り状を買う */
+  op buy(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
+    throws carriergw.Refused, http.NetworkError, http.ServerError
+  {
+    const request = labelRequest(carrier, choice, parcel, origin, destination);
+    const bought = carriergw.buyLabel(request);
+    const now = clock.now();
+    return toLabel(parcel, bought, now);
+  }
+
+  /** 送り状の依頼を組み立てる（人が書く） */
+  op labelRequest(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.LabelRequest;
+
+  /** 買った送り状を、出荷の送り状の形に写す（人が書く） */
+  op toLabel(parcel: shipping.Parcel, bought: carriergw.BoughtLabel, now: Time): shipping.Label;
+}

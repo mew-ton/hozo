@@ -1,0 +1,148 @@
+// サンプル order-app の仕様（README.md）。製作の名前空間 production。
+// 受注製作の行一つに、製作の仕事が一つ。作り終えたときに、出来上がりを量る: 大きさと重さが決まるのは、ここ。
+
+/** 製作。注文を受けてから作るものの仕事 */
+namespace production {
+  /** 製作の仕事の識別子 */
+  scalar JobId extends string;
+
+  /** 製作の仕事 */
+  model Job {
+    @db.key id: JobId;
+    orderId: type.OrderId;
+    line: type.LineId;
+    sku: type.Sku;
+    name: string;
+    quantity: type.Quantity;
+    /** 客が書いた、作り方の希望 */
+    request: string?;
+    /** 納期。受け付けた時刻 + 商品の納期 */
+    dueAt: Time;
+    startedAt: Time?;
+    finishedAt: Time?;
+    /** 出来上がりを量った大きさと重さ（行の全部の分） */
+    measured: type.Measurement?;
+  }
+
+  @db.table
+  state jobs: list<Job>;
+
+  /** 製作の仕事の進み具合 */
+  classify Progress of Job {
+    /** まだ手を付けていない */
+    Queued;
+    /** 作っている */
+    InProduction;
+    /** 作り終えて、量った */
+    Finished;
+  }
+
+  /** 引いた仕事があるか */
+  classify Known of Job? {
+    Found: Job? as Job;
+    default;
+  }
+
+  /** その仕事は、ない */
+  @http.status(404)
+  exception NoJob;
+
+  /** まだ手を付けていない仕事ではない */
+  @http.status(409)
+  exception NotQueued;
+
+  /** 作っている途中の仕事ではない */
+  @http.status(409)
+  exception NotInProduction;
+
+  // ---- 状態に触れるもの ----
+
+  /** その識別子の仕事 */
+  @db.find
+  read jobById(id: JobId): Job? on jobs;
+
+  /** その注文の仕事 */
+  @db.list
+  read jobsOfOrder(orderId: type.OrderId): Job[] on jobs;
+
+  /** 作り終えていない仕事。納期の近い順（人が書く: 値がないことと、古い順の並べ方） */
+  read openJobs(): Job[] on jobs;
+
+  /** 仕事を、まとめて足す */
+  effect addJobs(added: Job[]) on jobs.post;
+
+  /** 仕事を書き換える */
+  @db.update
+  effect saveJob(job: Job) on jobs.put;
+
+  // ---- 受け付けたとき ----
+
+  /** 受注製作の行を、仕事にする。行がなければ、何も足さない */
+  export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
+    const now = clock.now();
+    const planned = plan(orderId, lines, now);
+    addJobs(planned);
+  }
+
+  /** 行ごとに仕事を作り、納期を決める（人が書く） */
+  op plan(orderId: type.OrderId, lines: ordering.MadeLine[], now: Time): Job[];
+
+  // ---- 引く ----
+
+  /** 作り終えていない仕事の一覧。納期の近い順 */
+  export op queue(): Job[] {
+    return openJobs();
+  }
+
+  /** 注文の仕事の一覧 */
+  export op ofOrder(orderId: type.OrderId): Job[] {
+    return jobsOfOrder(orderId);
+  }
+
+  /** 仕事を引く */
+  op require(id: JobId): Job
+    throws NoJob
+  {
+    const found = jobById(id);
+    return match found by Known {
+      Found   => found;
+      default => throw NoJob;
+    };
+  }
+
+  // ---- 作る ----
+
+  /** 作り始めた */
+  export op start(id: JobId): Job
+    throws NoJob, NotQueued
+  {
+    const job = require(id);
+    const now = clock.now();
+    const started = match job by Progress {
+      Queued                  => startedAt(job, now);
+      InProduction | Finished => throw NotQueued;
+    };
+    saveJob(started);
+    return started;
+  }
+
+  /** 作り終えて、量った。出来上がりの大きさと重さが、ここで決まる */
+  export op finish(id: JobId, measured: type.Measurement): Job
+    throws NoJob, NotInProduction
+  {
+    const job = require(id);
+    const now = clock.now();
+    const finished = match job by Progress {
+      InProduction      => finishedAt(job, measured, now);
+      Queued | Finished => throw NotInProduction;
+    };
+    saveJob(finished);
+    return finished;
+  }
+
+  /** 始めた時刻を入れる（人が書く） */
+  op startedAt(job: Progress.Queued<Job>, now: Time): Job;
+
+  /** 終えた時刻と、量った大きさを入れる（人が書く） */
+  op finishedAt(job: Progress.InProduction<Job>, measured: type.Measurement, now: Time): Job;
+}
