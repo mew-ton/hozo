@@ -1,8 +1,8 @@
-# テスト用のプラグイン。トランスパイラ none は何も書かず、何も選ばない（emit の応答は空の files と warnings だけ）。
-# sh で動く（go run を待たないため）。
+# テスト用のプラグイン。トランスパイラ none は、requires を持たない、テストのための基底で、ファイルを返さない
+# （emit の応答は空の files と warnings だけ）。sh で動く（go run を待たないため）。
 name     = "none"
 command  = ["sh", "-c", "cat >/dev/null; printf '%s' '{\"files\":[],\"warnings\":[]}'"]
-protocol = "0.3"
+protocol = "0.4"
 
 [[transpiler]]
 name     = "none"

@@ -1,11 +1,10 @@
 # コーパス `state`
 
-状態を分類で表す決定（`docs/decisions.md`「設計書を変える決定」S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc check` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の既定の出力（`docs/emit-go.md`）の形を確かめる。
+状態を分類で表す決定（`docs/decisions.md`「設計書を変える決定」S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc check` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の基底 `go` の出力（`docs/plugin-go.md`）の形を確かめる。
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | 単位が一つ: `namespace = "shop"`、`transpilers = ["pick"]`、`out = "gen/shop"` |
-| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`。トランスパイラ `pick` を提供する）のマニフェストと `pick.json`（`"all": true`）。すべての op を起点にし、すべての状態（基底の状態と状態の分類）を選ぶ。既定の出力はプラグインが選んだ宣言だけを出す（`docs/emit-go.md`「出力の対象」）ので、これがなければ何も出力されない |
+| `hozo.toml` | 単位が一つ: `namespace = "shop"`、`transpilers = ["go"]`（Go の基底。リポジトリの `plugins/go`。テストが `HOZO_PLUGIN_PATH` として渡す）、`out = "gen/shop"` |
 | `shop.hozo` | `namespace shop`。三つの形の基底の状態、状態の分類、組み込みの効果と遷移の効果、状態での `match` |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。更新は `go test ./tests -update` |
 | `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン（同 `TestCorpusEmitGolden`。書き出した Go は一時のモジュールで `go vet` も通す） |
@@ -40,18 +39,18 @@
 
 `hozoc check` の error も warning もない。
 
-## 既定の出力
+## 出力
 
-`testdata/expected/emit/gen/shop/` の、`docs/emit-go.md` の見出しごとの対応。
+`testdata/expected/emit/gen/shop/` の、`docs/plugin-go.md` の見出しごとの対応。`shop` は `export` の op を持たない（すべて内部の op）ので、定義は内側のフォルダ `inner/` にあり、入口の `Ops` はメソッドを持たない（「内側のフォルダと入口」）。
 
-| `docs/emit-go.md` の見出し | 構文 | 出力 |
+| `docs/plugin-go.md` の見出し | 構文 | 出力（`inner/`） |
 |---|---|---|
-| 「state」の状態の単位 | `state carts: list<Line>;`、`state token: nullable<Token>;`、`state title: single<string>;` | `states.go` の `CartsState`（`IsEmpty`）、`TokenState`（`IsEmpty`、`Get`）、`TitleState`（`Get`）。束ねる `StateSet` と、パッケージの変数 `States`（宣言の順） |
-| 「state」の命令 | `op addToCart(line: Line) effects addLine;`、`op submitOrder(): Order effects placeOrder ...;`、`op markLoggedIn() effects signIn;` | 効果を持つ葉の op は、その効果の宛先の状態の単位のフィールド（`CartsState.AddToCart`、`CheckoutState.SubmitOrder`、`LoggedInState.MarkLoggedIn`）。`Leaves` に載るのは効果を持たない葉（`showLogin` など）だけ |
-| 「state」「classify」の状態の分類 | `classify Checkout of carts, orders { ... }`、`condition LoggedIn of token;` | `classify.go` に列挙の型と定数、`states.go` に `CheckoutState` / `LoggedInState`（ケースごとの述語）と `ClassifyCheckout()` / `ClassifyLoggedIn()`。値の分類 `LineKind` は `LineKindCases` と `ClassifyLineKind(c, v)`、`Classifiers` |
-| 「effect」の遷移のコメント | `effect placeOrder on Checkout: Shopping -> Ordered;` など | `types.go` の定数のコメントに `// on shop.Checkout: Shopping -> Ordered`（`any`、基底の状態が宛先の `on shop.carts: HasItems -> Empty` も）。出るのは選ばれた op の効果の定数だけ（`rename` と `touchCheckout` はどの op も持たないので出ない） |
-| 「match」の `match s by list` / `by nullable` | `openTop`、`openCart` | `wiring.go`: `empty, err := States.<S>.IsEmpty()` と `if empty { ... } else { ... }` |
-| 「match」の `match by C` | `checkout`（値の形。`none` のアームがあるので `*Order`）、`add`（文の形。`default` のアーム） | `wiring.go`: `kind, err := Classify<C>()` と `switch` |
-| 「実装の単位」 | すべて | 生成したコードは `context` を引数に取らない。`New(leaves, classifiers)` は状態を引数に取らず、配線は `States` を読む |
+| 「状態の単位」の問い合わせ | `state carts: list<Line>;`、`state token: nullable<Token>;`、`state title: single<string>;` | `states.go` の `CartsState`（`IsEmpty`、`Get`）、`TokenState`（`IsEmpty`、`Get`）、`TitleState`（`Get`） |
+| 「状態の単位」の命令 | `op addToCart(line: Line) effects addLine;`、`op submitOrder(): Order effects placeOrder ...;`、`op markLoggedIn() effects signIn;` | 効果を持つ葉の op は、その効果の宛先の状態の単位のメソッド（`CartsState.AddToCart`、`CheckoutState.SubmitOrder`、`LoggedInState.MarkLoggedIn`）。`Leaves` に載るのは、状態を読まず効果も持たない葉（`showLogin` など）だけ |
+| 「状態の単位」「分類」の状態の分類 | `classify Checkout of carts, orders { ... }`、`condition LoggedIn of token;` | `classify.go` に列挙の型と定数、`ClassifyCheckout(ctx, s)` / `ClassifyLoggedIn(ctx, s)`。`states.go` に `CheckoutState` / `LoggedInState`（ケースごとの述語）。値の分類 `LineKind` は `LineKindCases` と `ClassifyLineKind(c, v)` |
+| 「effect」とコメント | `effect placeOrder on Checkout: Shopping -> Ordered;` など | `types.go` の効果の定数（宣言したものすべて）。遷移は、命令のコメントに `（on shop.Checkout: Shopping -> Ordered）`（`any`、基底の状態が宛先の `on shop.carts: HasItems -> Empty` も） |
+| 「match」の `match s by list` / `by nullable` | `openTop`、`openCart` | `wiring.go`: `o.<状態>.Get(ctx)` で読み、`if token != nil { ... } else { ... }` / `if len(carts) != 0 { ... } else { ... }` |
+| 「match」の `match by C` | `checkout`（値の形。`none` のアームがあるので `*Order`）、`add`（値の分類の値の形と、状態の分類の文の形。`default` のアーム） | `wiring.go`: `k<n>, err := Classify<C>(...)` と `switch` |
+| 「New」 | すべて | `New(leaves, carts, orders, token, title, checkout, loggedIn, lineKind)`: 状態の単位（基底の状態、状態の分類の順）と、述語で決まる分類の述語を、引数で受け取る |
 
-出力の細かい形（`none` のアームの枝を書かない、一つのアームに両方のケース、アームの中での `bind`）、選ばれなかった状態が出ないこと、入れていないフィールドが `*runtime.MissingError` になることは、`internal/emit/golang` の golden `testdata/state`（手で組んだ `View`）と、生成したコードを動かす `testdata/state/behavior_test.go`、単体テストが確かめる。
+出力の細かい形（`bind` で埋まる位置、アームの本体の組、継ぎ目、GO-* の診断）は、`plugins/go` の単体テスト（`internal/gobase` のゴールデンと、生成したコードを動かす振る舞いのテスト）が確かめる（`docs/testing.md`「単体テスト」）。

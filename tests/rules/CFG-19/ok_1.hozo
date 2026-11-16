@@ -1,0 +1,4 @@
+// CFG-19（docs/config.md「基底と相乗り」）: 依存は、すべて transpilers に書く。書く順にはよらない（ok_1.toml）
+namespace a {
+  op f();
+}

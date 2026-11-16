@@ -1,6 +1,7 @@
 // Package config は hozo.toml（設計書 §4.5 を出力の単位の一覧に変えたもの）の読み込み。形と読み方、設定だけで
-// 検出できる検査（CFG-*）は docs/config.md。プログラムが要る検査（CFG-6 / CFG-8 / CFG-10）は internal/check が、
-// マニフェストと読んだファイルが要る検査（CFG-11 / CFG-14〜CFG-16 / CFG-18）は internal/project が、この Config を見て行う。
+// 検出できる検査（CFG-7 / CFG-12 / CFG-17 / CFG-21）は docs/config.md。プログラムが要る検査（CFG-6 / CFG-10 / CFG-22）は
+// internal/check が、マニフェストと読んだファイルが要る検査（CFG-14〜CFG-16 / CFG-18〜CFG-20 / CFG-23）は internal/project が、
+// この Config を見て行う（docs/packages.md「internal/config」の表）。
 package config
 
 import (
@@ -58,6 +59,10 @@ type Unit struct {
 	Transpilers []string
 	// Out は出力先（ルートからの相対パス。書かれたまま）。
 	Out string
+	// Options は [emit.options.<名前>]（docs/config.md「オプション」）: トランスパイラの名前 → そのトランスパイラへのオプションの
+	// テーブル（TOML の値のまま: 文字列、int64、float64、真偽値、[]any、map[string]any）。書かれていなければ空（nil ではない）。
+	// 名前が transpilers にないもの（CFG-21）は入れない。中身（キーと値の型）は確かめない（確かめるのはトランスパイラ）。
+	Options map[string]map[string]any
 }
 
 // Label は診断で単位を指す言い方（docs/config.md「診断」）: 何番目の [[emit]] かと、その namespace と out。
@@ -94,7 +99,8 @@ func Find(startDir string) (string, bool) {
 }
 
 // Load は path の hozo.toml を読む（docs/config.md「形」）。診断は CFG-7（知らないキー、値の型違い、TOML の構文エラー、
-// transpilers の重複、ルートの下でない out）、CFG-12（単位の必須のキーがない、または空）、CFG-17（二つの単位の out が同じか入れ子）。
+// transpilers の重複、ルートの下でない out、options の形）、CFG-12（単位の必須のキーがない、または空）、
+// CFG-17（二つの単位の out が同じか入れ子）、CFG-21（options の名前が単位の transpilers にない）。
 // error の診断があっても、読めた範囲の Config を返す（nil は返さない）。読めなかった部分は既定値。
 func Load(path string) (*Config, []diag.Diagnostic) {
 	abs, err := filepath.Abs(path)
@@ -158,7 +164,7 @@ func (c *Config) Dir(unit int, namespace string) string {
 	return out + "/" + rest
 }
 
-// UnitNamespaces は単位の namespace を、重複なしの辞書順で返す。CFG-8 / CFG-10 と、診断の順序を決定的にするためのもの。
+// UnitNamespaces は単位の namespace を、重複なしの辞書順で返す。CFG-10 と、診断の順序を決定的にするためのもの。
 func (c *Config) UnitNamespaces() []string {
 	seen := map[string]bool{}
 	var names []string
@@ -279,10 +285,11 @@ func (l *loader) loadHozo(t map[string]any) {
 	}
 }
 
-// loadUnit は index 番目（1 始まり）の [[emit]]（docs/config.md「形」「単位」）。知らないキー、値の型違い、ルートの下でない out は CFG-7、
-// namespace / transpilers / out のどれかがない、または空なら CFG-12。どちらかがあれば、その単位は Units に入れない。
+// loadUnit は index 番目（1 始まり）の [[emit]]（docs/config.md「形」「単位」「オプション」）。知らないキー、値の型違い、
+// ルートの下でない out、options の形は CFG-7、namespace / transpilers / out のどれかがない、または空なら CFG-12。
+// どちらかがあれば、その単位は Units に入れない。options の名前が transpilers になければ CFG-21（単位は使う）。
 func (l *loader) loadUnit(index int, t map[string]any) {
-	u := Unit{Index: index}
+	u := Unit{Index: index, Options: map[string]map[string]any{}}
 	ok := true
 	where := fmt.Sprintf("%d 番目の [[emit]]", index)
 	for _, key := range sortedKeys(t) {
@@ -326,8 +333,15 @@ func (l *loader) loadUnit(index int, t map[string]any) {
 				seen[name] = true
 			}
 			u.Transpilers = v
+		case "options":
+			// 中身は transpilers を読んだ後で見る（キーは辞書順に回るので、"options" は "transpilers" より前に来る）
 		default:
 			l.errorf("CFG-7", "知らないキー %s（%s）", key, where)
+			ok = false
+		}
+	}
+	if raw, written := t["options"]; written {
+		if !l.loadOptions(where, raw, &u) {
 			ok = false
 		}
 	}
@@ -372,6 +386,96 @@ func (l *loader) loadUnit(index int, t map[string]any) {
 	if ok {
 		l.cfg.Units = append(l.cfg.Units, u)
 	}
+}
+
+// loadOptions は単位の options（docs/config.md「オプション」）を u.Options に読む。options がテーブルでない、
+// options.<名前> がテーブルでない、値が日時なら CFG-7 で false（その単位は使わない）。<名前> が単位の transpilers になければ
+// CFG-21（その名前のオプションは捨てるが、単位は使う）。
+func (l *loader) loadOptions(where string, raw any, u *Unit) bool {
+	table, isTable := raw.(map[string]any)
+	if !isTable {
+		l.errorf("CFG-7", "%s の options はテーブルでなければならない（%s）", where, typeName(raw))
+		return false
+	}
+	ok := true
+	for _, name := range sortedKeys(table) {
+		opts, isTable := table[name].(map[string]any)
+		if !isTable {
+			l.errorf("CFG-7", "%s の options.%s はテーブルでなければならない（%s）", where, name, typeName(table[name]))
+			ok = false
+			continue
+		}
+		clean, bad := optionValue(opts, "options."+name)
+		if bad != "" {
+			l.errorf("CFG-7", "%s の %s は日時で、オプションの値に書けない（書けるのは、文字列、整数、小数、真偽値、それらの配列とテーブル）", where, bad)
+			ok = false
+			continue
+		}
+		listed := false
+		for _, t := range u.Transpilers {
+			listed = listed || t == name
+		}
+		if !listed {
+			// CFG-21
+			label := where
+			if u.Namespace != "" {
+				label = fmt.Sprintf("%s（namespace = %q）", where, u.Namespace)
+			}
+			l.errorf("CFG-21", "%sの [emit.options.%s] の %s が、その単位の transpilers %s にない", label, name, name, quoteList(u.Transpilers))
+			continue
+		}
+		u.Options[name] = clean.(map[string]any)
+	}
+	return ok
+}
+
+// optionValue はオプションの値 v を、JSON にそのまま写せる形にして返す（テーブルの配列は []any にそろえる）。
+// 書けない値（日時）があれば、その場所（"options.go.at" の形）を bad に返す。
+func optionValue(v any, where string) (clean any, bad string) {
+	switch x := v.(type) {
+	case string, int64, float64, bool:
+		return x, ""
+	case []any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			c, bad := optionValue(item, fmt.Sprintf("%s[%d]", where, i))
+			if bad != "" {
+				return nil, bad
+			}
+			out[i] = c
+		}
+		return out, ""
+	case []map[string]any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			c, bad := optionValue(item, fmt.Sprintf("%s[%d]", where, i))
+			if bad != "" {
+				return nil, bad
+			}
+			out[i] = c
+		}
+		return out, ""
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for _, k := range sortedKeys(x) {
+			c, bad := optionValue(x[k], where+"."+k)
+			if bad != "" {
+				return nil, bad
+			}
+			out[k] = c
+		}
+		return out, ""
+	}
+	return nil, where // time.Time と、TOML の日付・時刻
+}
+
+// quoteList は文字列の列を ["a", "b"] の形にする。
+func quoteList(list []string) string {
+	quoted := make([]string, len(list))
+	for i, s := range list {
+		quoted[i] = fmt.Sprintf("%q", s)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 // badOut は単位の out が出力先にできない理由を返す（CFG-7。docs/config.md「形」）: 絶対パス、ルートの外へ出るパス、

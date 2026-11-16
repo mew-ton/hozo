@@ -1,0 +1,10 @@
+// CFG-22: 出力が使う宣言の名前空間が、その単位の基底の出力を持たない（既定の設定: 単位は a だけ）。
+// 単位と、足りない名前空間の組ごとに一つ（b の型をいくつ使っても一つ）
+namespace a {
+  model Input { owner: b.M; other: b.N[]; }
+  export op f(in: Input): b.M?;
+}
+namespace b {
+  model M { id: string; }
+  model N { id: string; }
+}

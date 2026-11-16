@@ -1,0 +1,5 @@
+// GO-5（docs/plugin-go.md「マニフェスト」）: go にオプションはない。
+
+namespace a {
+  model Thing { x: int; }
+}

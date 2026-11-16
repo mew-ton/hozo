@@ -1,0 +1,25 @@
+// GO-6（docs/plugin-go.md「match」）: union Pair の二つのアームが同じ型 Item。as Item の絞り込みは、どのアームかを型で分けられない。
+// 位置は分類。
+
+namespace a {
+  model Item { x: int; }
+  model Other { y: int; }
+  union Pair {
+    First: Item;
+    Second: Item;
+    Third: Other;
+  }
+  /** 型で決まる分類（variant） */
+  classify Kind of Pair {
+    IsItem: Pair as Item;
+    default;
+  }
+  export op pick(item: Item): int;
+  export op choose(pair: Pair): int
+  {
+    return match pair by Kind {
+      IsItem  => pick(pair);
+      default => 0;
+    };
+  }
+}

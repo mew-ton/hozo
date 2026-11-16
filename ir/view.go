@@ -16,9 +16,9 @@ type View struct {
 	Viewer string `json:"viewer"`
 	// Config は、この View の単位での viewer の設定。
 	Config NamespaceConfig `json:"config"`
-	// Files は、この View の単位の in に合ったファイル（docs/config.md「in」）。Span.File と同じ形で、辞書順。
-	// in を省いた単位なら、読み込んだユーザーのファイルのすべて。viewer の宣言のうち Span.File がここにあるものが、
-	// 単位の対象の宣言（[View.InUnit]）。
+	// Files は、この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル（docs/config.md「in」）。
+	// Span.File と同じ形で、ユーザーのファイルを辞書順に、その後に語彙のファイルを辞書順に。in を省いた単位なら、
+	// 読み込んだすべてのファイル。viewer の宣言のうち Span.File がここにあるものが、単位の対象の宣言（[View.InUnit]）。
 	Files []string `json:"files"`
 	// Namespaces は出力のあるすべての名前空間（viewer を含む）。キーは FQN。JSON ではキーを辞書順に出す。
 	// 値は、その名前空間を出力する単位ごとの設定（設定の順）。トランスパイラが別の名前空間（と別の単位）の言語と
@@ -33,14 +33,24 @@ type View struct {
 
 // NamespaceConfig は単位 U での名前空間 N の設定（docs/ir.md「その名前空間から見た IR」の NamespaceConfig）。
 type NamespaceConfig struct {
-	// Language は U の言語（そのトランスパイラの language。docs/config.md「単位」）。
+	// Index は U が何番目の [[emit]] か（1 始まり）。診断のメッセージと、単位どうしを見分けるのに使う。
+	Index int `json:"index"`
+	// Language は U の言語（U の基底の language。docs/config.md「基底と相乗り」）。
 	Language string `json:"language"`
+	// Base は U の基底のトランスパイラの名前（同上）。
+	Base string `json:"base"`
 	// Out は U の out。
 	Out string `json:"out"`
 	// Dir は Dir(U, N)。U での N のファイルを置くディレクトリ（ルートからの相対パス、`/` 区切り。docs/config.md「単位の対象」）。
 	Dir string `json:"dir"`
-	// Transpilers は U の transpilers。
+	// Transpilers は U の transpilers（書かれた順）。
 	Transpilers []string `json:"transpilers"`
+	// Options は U の options（docs/config.md「オプション」）。キーはトランスパイラの名前、値は hozo.toml のテーブルを
+	// JSON に写したもの。オプションを書いていないトランスパイラのキーはない。JSON ではキーを辞書順に出す（入れ子のテーブルも）。
+	Options map[string]map[string]any `json:"options"`
+	// Seams は U の継ぎ目（docs/config.md「継ぎ目」）。キーは継ぎ目を持つデコレータの FQN、値はそれをマニフェストの seams で
+	// 宣言した U のトランスパイラの名前。JSON ではキーを辞書順に出す。なければ {}。
+	Seams map[string]string `json:"seams"`
 }
 
 // ViewedSignature は viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」の ViewedSignature）。

@@ -5,7 +5,7 @@ namespace shop {
   /** 集計 */
   model Report { count: int; }
 
-  // 単位 3（pick-batch）の起点。単位 2 では in の外なので起点に選べない（選べば PLG-3）
+  // 単位 3 では配線の本体が出る。単位 2 では in の外なので、open が呼ぶ分の口だけが出る
   /** 夜間の片付け */
   @t.batch
   op nightly(item: Item)

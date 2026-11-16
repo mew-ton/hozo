@@ -1,6 +1,0 @@
-{
-  "roots": ["t.entry"],
-  "stops": ["t.stop"],
-  "states": ["t.store"],
-  "wraps": ["t.cache"]
-}

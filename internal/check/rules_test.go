@@ -219,9 +219,9 @@ func TestCfg13(t *testing.T) {
 	wantCodes(t, Check(mixed, cfgFor("server", "server", "server.admin")))
 }
 
-// TestCfg8And10 は CFG-8（語彙の名前空間、state も op もない名前空間を単位の namespace に書いた）と
-// CFG-10（.hozo にない名前空間を単位の namespace に書いた）。
-func TestCfg8And10(t *testing.T) {
+// TestCfg10 は CFG-10（.hozo にも語彙のファイルにもない名前空間を単位の namespace に書いた）。語彙の名前空間と、
+// state も op も持たない型だけの名前空間は、単位の namespace に書ける（CFG-8 は欠番。docs/config.md「単位の対象」）。
+func TestCfg10(t *testing.T) {
 	p := program(nil,
 		httpVocab(),
 		namespace("server.admin", leaf("server.admin.o", nil)),
@@ -230,23 +230,130 @@ func TestCfg8And10(t *testing.T) {
 	cfg := cfgFor("http", "server", "server.admin", "types", "nowhere", "nowhere")
 	cfg.Path = "/root/hozo.toml"
 	diags := Check(p, cfg)
-	c8 := withCode(diags, "CFG-8")
-	if len(c8) != 2 {
-		t.Fatalf("CFG-8 count = %d, want 2 (http, types)\n%s", len(c8), messages(diags))
-	}
+	wantNoCode(t, diags, "CFG-8")
 	// 同じ namespace の単位が二つあっても一度だけ。設定ファイルのパスが File になる
 	d10 := wantOneCode(t, diags, "CFG-10")
 	if !strings.Contains(d10.Message, "nowhere") || d10.File != "/root/hozo.toml" || d10.Span != nil {
 		t.Errorf("CFG-10 = %+v", d10)
 	}
-	// server の単位は、子孫 server.admin が op を持つのでよい
-	for _, d := range c8 {
-		if strings.Contains(d.Message, "名前空間 server ") {
-			t.Errorf("unexpected CFG-8 for the ancestor unit: %q", d.Message)
-		}
+	// server の単位は、子孫 server.admin があるのでよい。語彙の http、型だけの types もよい
+	wantCodes(t, Check(p, cfgFor("http", "server", "server.admin", "types")))
+}
+
+// TestCfg22 は CFG-22（docs/config.md「型の置き場」）: 出力が使う宣言の名前空間が、その単位の基底の出力を持たない。
+// 表の行（何を数えるか）ごとに一つ。
+func TestCfg22(t *testing.T) {
+	const T = "types.T"
+	ref := ir.Ref(T)
+	types := func() ir.Namespace {
+		return namespace("types", model(T), exc("types.E"), &ir.Classify{DeclBase: ir.DeclBase{Name: "types.K", Span: sp("types.K")},
+			Subject: ir.TypeSubject{Type: ir.String()}, DecidedBy: ir.DecidedByPredicate, HasDefault: true})
 	}
-	wantNoCode(t, Check(p, cfgFor("server.admin")), "CFG-8")
-	wantNoCode(t, Check(p, cfgFor("server.admin")), "CFG-10")
+	classifyOf := func(fqn string, subject ir.ClassifySubject, as ...ir.CaseTyping) *ir.Classify {
+		return &ir.Classify{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Subject: subject, HasDefault: true,
+			Cases: []ir.ClassifyCase{{Name: "A", As: as}}, DecidedBy: ir.DecidedByPredicate}
+	}
+	withThrows := func(o *ir.Op, x string) *ir.Op {
+		o.Throws = []ir.ThrowsClause{throws([]string{x})}
+		return o
+	}
+	outOfUnit := func(o *ir.Op) *ir.Op {
+		o.Span.File = "batch.hozo"
+		return o
+	}
+	cases := []struct {
+		name  string
+		decls []ir.Decl
+		want  bool // CFG-22 が出るか
+	}{
+		// 1: N のすべての model / scalar / union / exception
+		{"フィールドの型", []ir.Decl{model("server.M", field("f", ref))}, true},
+		{"型の中の型（array、optional、record）は辿る", []ir.Decl{model("server.M", field("f", ir.Record(ir.String(), ir.Array(ir.Optional(ref)))))}, true},
+		{"scalar の元の型", []ir.Decl{scalar("server.S", ir.Ref("types.T"))}, true},
+		{"union のアームの型", []ir.Decl{&ir.Union{DeclBase: ir.DeclBase{Name: "server.U", Span: sp("server.U")}, Variant: ir.UnionArms,
+			Arms: []ir.UnionArm{{Name: "A", Type: ref}}}}, true},
+		{"例外が運ぶ値の型", []ir.Decl{&ir.Exception{DeclBase: ir.DeclBase{Name: "server.X", Span: sp("server.X")}, Value: ref}}, true},
+		// 2: N のすべての状態と分類
+		{"状態の型", []ir.Decl{state("server.s", ir.StateList, ref)}, true},
+		{"分類の対象の型", []ir.Decl{classifyOf("server.C", ir.TypeSubject{Type: ref})}, true},
+		{"ケースの as の型", []ir.Decl{classifyOf("server.C", ir.TypeSubject{Type: ir.String()}, ir.CaseTyping{Type: ref, By: ir.NarrowByPredicate})}, true},
+		// 3: 単位の対象の op
+		{"op の引数の型", []ir.Decl{leaf("server.o", nil, param("p", ref))}, true},
+		{"op の戻り値の型", []ir.Decl{leaf("server.o", ref)}, true},
+		{"op の signature の例外", []ir.Decl{withThrows(leaf("server.o", nil), "types.E")}, true},
+		{"単位の対象でない op は数えない", []ir.Decl{leaf("server.keep", nil), outOfUnit(leaf("server.o", ref))}, false},
+		// 4: 単位の対象の配線が呼ぶ op
+		{"配線が呼ぶ、単位の対象でない op の型", []ir.Decl{outOfUnit(leaf("server.o", ref)), wire("server.w", nil, nil, cs(call("server.o")))}, true},
+		{"配線が呼ぶ、別の名前空間の op の型", []ir.Decl{wire("server.w", nil, nil, cs(call("other.o")))}, true},
+		// 5: 単位の対象の配線の match
+		{"述語で決まる、別の名前空間の分類", []ir.Decl{wire("server.w", nil, []ir.OpParam{param("v", ir.String())},
+			ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("v")}, Classify: "types.K",
+				Arms: []ir.MatchArm{{Cases: ir.DefaultArm(), Body: ir.NoneBody{}}}}})}, true},
+		// 数えないもの
+		{"デコレータの適用とその引数", []ir.Decl{func() ir.Decl {
+			o := leaf("server.o", nil)
+			o.Decorators = []ir.Application{app("types.dec", refArg("x", "types.E"))}
+			return o
+		}()}, false},
+		{"別の名前空間の op そのもの（型を持たない）", []ir.Decl{wire("server.w", nil, nil, cs(call("other.plain")))}, false},
+		{"同じ名前空間の宣言", []ir.Decl{model("server.A"), model("server.M", field("f", ir.Ref("server.A")))}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			lineCounter = 2000
+			p := program(nil, namespace("server", c.decls...), types(),
+				namespace("other", leaf("other.o", ref), leaf("other.plain", nil)))
+			Compute(p)
+			cfg := cfgFor("server")
+			cfg.Path = "/root/hozo.toml"
+			units := []Unit{{Language: "go", Base: "go", Files: []string{"server.hozo", "types.hozo", "other.hozo"}}}
+			diags := Checker{}.CheckHomes(p, cfg, units)
+			if !c.want {
+				wantCodes(t, diags)
+				return
+			}
+			d := wantOneCode(t, diags, "CFG-22")
+			if d.Severity != diag.Error || d.File != "/root/hozo.toml" || d.Span != nil ||
+				!strings.Contains(d.Message, "1 番目の [[emit]]") || !strings.Contains(d.Message, `namespace = "types"`) {
+				t.Errorf("CFG-22 = %+v", d)
+			}
+			// types を出力する同じ基底の単位を足せば出ない。基底が違う単位では足りない
+			cfg2 := cfgFor("server", "types")
+			both := []Unit{units[0], {Language: "go", Base: "go", Files: units[0].Files}}
+			wantCodes(t, Checker{}.CheckHomes(p, cfg2, both))
+			both[1].Base = "go-b"
+			wantOneCode(t, Checker{}.CheckHomes(p, cfg2, both), "CFG-22")
+		})
+	}
+}
+
+// TestCfg22Units は CFG-22 の数え方: 単位と、足りない名前空間の組ごとに一つ。基底の決まらない単位（CFG-20）では出さない。
+// 祖先の単位が対象にしている名前空間は、出力を持つ。
+func TestCfg22Units(t *testing.T) {
+	lineCounter = 3000
+	p := program(nil,
+		namespace("server", model("server.M", field("a", ir.Ref("shop.types.T")), field("b", ir.Ref("shop.types.T")), field("c", ir.Ref("lib.L")))),
+		namespace("server.admin", model("server.admin.M", field("a", ir.Ref("shop.types.T")))),
+		namespace("shop.types", model("shop.types.T")),
+		namespace("lib", model("lib.L")),
+	)
+	files := []string{"server.hozo", "shop.hozo", "lib.hozo"}
+	unit := Unit{Language: "go", Base: "go", Files: files}
+	// server の単位は server と server.admin を出力し、どちらも shop.types を使う: shop.types について一つ、lib について一つ
+	diags := Checker{}.CheckHomes(p, cfgFor("server"), []Unit{unit})
+	if got := withCode(diags, "CFG-22"); len(got) != 2 || len(diags) != 2 {
+		t.Fatalf("CFG-22 = %d\n%s", len(got), messages(diags))
+	}
+	// 祖先の単位（shop）が shop.types を出力する
+	diags = Checker{}.CheckHomes(p, cfgFor("server", "shop", "lib"), []Unit{unit, unit, unit})
+	wantCodes(t, diags)
+	// 基底の決まらない単位では出さない
+	wantCodes(t, Checker{}.CheckHomes(p, cfgFor("server"), []Unit{{Language: "go", Files: files}}))
+	// in のせいで出力でない名前空間は、置き場にならない
+	diags = Checker{}.CheckHomes(p, cfgFor("server", "shop", "lib"), []Unit{unit, {Language: "go", Base: "go", Files: []string{"server.hozo"}}, unit})
+	if d := wantOneCode(t, diags, "CFG-22"); !strings.Contains(d.Message, "shop.types") {
+		t.Errorf("CFG-22 = %+v", d)
+	}
 }
 
 // TestCfg6 は CFG-6: unsupported にあるデコレータが、名前空間の宣言（フィールドを含む）のうち単位の対象のものに付いている。

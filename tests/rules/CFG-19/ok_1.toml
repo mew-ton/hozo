@@ -1,0 +1,8 @@
+# go-y は go と go-x を要り、go-x は go を要る。どれも書いてある（依存しているものを先に書く必要はない）
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go-y", "go-x", "go"]
+out         = "gen/a"

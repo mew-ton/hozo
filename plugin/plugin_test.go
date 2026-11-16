@@ -67,7 +67,7 @@ type refusal struct {
 }
 
 func viewJSON(viewer string) string {
-	return fmt.Sprintf(`{"version":%q,"viewer":%q,"config":{"language":"go","out":"gen","dir":"gen","transpilers":["cli"]},"files":[],"namespaces":{},"program":{"version":%q,"namespaces":[],"binds":[]},"ops":{}}`,
+	return fmt.Sprintf(`{"version":%q,"viewer":%q,"config":{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go","cli"],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":%q,"namespaces":[],"binds":[]},"ops":{}}`,
 		ir.Version, viewer, ir.Version)
 }
 
@@ -96,40 +96,76 @@ func TestEmit(t *testing.T) {
 	if _, ok := got["errors"]; ok {
 		t.Errorf("errors must be omitted when empty, got %s", got["errors"])
 	}
-	// select は選ばなくても四つの列を [] で書く（docs/plugin-protocol.md「emit」の応答の例）
-	if string(got["select"]) != `{"roots":[],"stops":[],"states":[],"wraps":[]}` {
-		t.Errorf("select = %s", got["select"])
+	// 応答に select はない（版 0.4 でなくした。docs/plugin-protocol.md「選択をなくしたこと」）
+	if _, ok := got["select"]; ok {
+		t.Errorf("select must not be written, got %s", got["select"])
 	}
 }
 
-// docs/plugin-protocol.md「選択」: select の四つの項目がそのまま応答に載る。
-func TestEmitSelect(t *testing.T) {
-	h := &fake{emit: func(*EmitRequest) (*EmitResponse, error) {
-		return &EmitResponse{Select: Select{
-			Roots:  []string{"browser.onAddToCart"},
-			Stops:  []string{"browser.askYamadaWarranty"},
-			States: []string{"browser.token"},
-			Wraps:  []Wrap{{Op: "browser.fetchMe", Decorator: "cache"}},
-		}}, nil
-	}}
-	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","view":%s}`, ir.Version, viewJSON("browser")))
-	if code != 0 {
-		t.Fatalf("code = %d", code)
+// docs/packages.md「`plugin`（公開）」の Options: req.View.Config.Options[req.Transpiler] を、json タグで結んだ構造体に読む。
+// 書かれていなければ into はそのまま。戻り値は into にないキー（辞書順）。型の違う値は error。
+func TestOptions(t *testing.T) {
+	type opts struct {
+		Validate bool   `json:"validate"`
+		Prefix   string `json:"prefix"`
+		Limits   struct {
+			Max int `json:"max"`
+		} `json:"limits"`
 	}
-	want := `{"files":[],"warnings":[],"select":{"roots":["browser.onAddToCart"],"stops":["browser.askYamadaWarranty"],"states":["browser.token"],"wraps":[{"op":"browser.fetchMe","decorator":"cache"}]}}` + "\n"
-	if out != want {
-		t.Errorf("stdout = %s\nwant %s", out, want)
+	req := func(transpiler string, options map[string]map[string]any) *EmitRequest {
+		return &EmitRequest{Transpiler: transpiler, View: &ir.View{Config: ir.NamespaceConfig{Options: options}}}
 	}
-	// 読み戻しても同じ。select を省いた応答は何も選ばない
-	var back EmitResponse
-	decode(t, out, &back)
-	if len(back.Select.Roots) != 1 || len(back.Select.Wraps) != 1 || back.Select.Wraps[0].Decorator != "cache" {
-		t.Errorf("select not decoded: %+v", back.Select)
-	}
-	var none EmitResponse
-	decode(t, `{"files":[],"warnings":[]}`, &none)
-	if len(none.Select.Roots)+len(none.Select.Stops)+len(none.Select.States)+len(none.Select.Wraps) != 0 {
-		t.Errorf("omitted select must select nothing: %+v", none.Select)
+	t.Run("書かれたキーを読む", func(t *testing.T) {
+		o := opts{Prefix: "keep"}
+		unknown, err := Options(req("go-http", map[string]map[string]any{
+			"go-http": {"validate": true, "limits": map[string]any{"max": int64(3)}},
+			"go":      {"other": 1},
+		}), &o)
+		if err != nil || len(unknown) != 0 {
+			t.Fatalf("unknown = %v, err = %v", unknown, err)
+		}
+		if !o.Validate || o.Prefix != "keep" || o.Limits.Max != 3 {
+			t.Errorf("options = %+v", o)
+		}
+	})
+	t.Run("書かれていなければそのまま", func(t *testing.T) {
+		o := opts{Validate: true, Prefix: "p"}
+		for _, r := range []*EmitRequest{req("go-http", nil), req("go-http", map[string]map[string]any{"go": {"x": 1}}), {Transpiler: "go-http"}} {
+			unknown, err := Options(r, &o)
+			if err != nil || len(unknown) != 0 || !o.Validate || o.Prefix != "p" {
+				t.Errorf("unknown = %v, err = %v, options = %+v", unknown, err, o)
+			}
+		}
+	})
+	t.Run("知らないキーは辞書順で返す", func(t *testing.T) {
+		var o opts
+		unknown, err := Options(req("go-http", map[string]map[string]any{"go-http": {"zeta": 1, "validate": true, "alpha": "x"}}), &o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Join(unknown, ",") != "alpha,zeta" || !o.Validate {
+			t.Errorf("unknown = %v, options = %+v", unknown, o)
+		}
+	})
+	t.Run("型の違う値は error", func(t *testing.T) {
+		var o opts
+		if _, err := Options(req("go-http", map[string]map[string]any{"go-http": {"validate": "yes"}}), &o); err == nil {
+			t.Error("want error")
+		}
+	})
+	t.Run("into が構造体でなければ、すべてのキーが知らないキー", func(t *testing.T) {
+		var o struct{}
+		unknown, err := Options(req("go", map[string]map[string]any{"go": {"b": 1, "a": 2}}), &o)
+		if err != nil || strings.Join(unknown, ",") != "a,b" {
+			t.Errorf("unknown = %v, err = %v", unknown, err)
+		}
+	})
+}
+
+// Version は、このリポジトリのプラグインの版（docs/packages.md「`plugin`（公開）」）。生成したファイルのヘッダに書く。
+func TestVersion(t *testing.T) {
+	if Version != "0.0.0-dev" {
+		t.Errorf("Version = %q", Version)
 	}
 }
 
@@ -147,7 +183,7 @@ func TestOpsWith(t *testing.T) {
 			op("web.plain"),
 			&ir.Model{DeclBase: ir.DeclBase{Name: "web.M", Decorators: []ir.Application{app("t.entry", "")}, Span: ir.Span{File: "web.hozo"}}},
 			op("web.viaNamed", app("page.route", "t.entry")),
-			// in の外（batch.hozo）で宣言された op は、デコレータが付いていても返さない（select に書けば PLG-3）
+			// in の外（batch.hozo）で宣言された op は、デコレータが付いていても返さない
 			opIn("batch.hozo", "web.nightly", app("t.entry", "")),
 			op("web.both", app("t.entry", ""), app("t.other", "")),
 		}},
@@ -180,7 +216,7 @@ func TestEmitErrorsAndWarnings(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code = %d", code)
 	}
-	want := `{"files":[],"warnings":[{"at":"hozoc.emit","message":"w"}],"errors":[{"code":"CLI-1","at":"hozoc.check","message":"e"}],"select":{"roots":[],"stops":[],"states":[],"wraps":[]}}` + "\n"
+	want := `{"files":[],"warnings":[{"at":"hozoc.emit","message":"w"}],"errors":[{"code":"CLI-1","at":"hozoc.check","message":"e"}]}` + "\n"
 	if out != want {
 		t.Errorf("stdout = %s\nwant %s", out, want)
 	}

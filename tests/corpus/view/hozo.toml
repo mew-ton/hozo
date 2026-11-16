@@ -1,17 +1,23 @@
 # View のコーパス（docs/testing.md「コーパス」、tests/view_test.go）。
-# api と web は本来 server / browser の関係だが、TS の既定の出力は段階 5 までないので（CFG-11）どちらも Go のトランスパイラ。
-# web の単位には view-dump（plugins/view-dump のトランスパイラ）を書き、トランスパイラが受け取る View を書き出させる。
-# api の単位の view-none は同じプラグインのもう一つのトランスパイラで、何も選ばない（api は何も出力しない）。
+# api と web は本来 server / browser の関係だが、TS の基底はまだないので、どちらも同じ（Go の）基底にする。
+# どちらの単位も view-dump（plugins/view-dump の、テストのための基底）を使い、トランスパイラが受け取る View を書き出させる。
+# web は api の型を使うので、api も同じ基底の出力を持つ（docs/config.md「型の置き場」）。
 
 [hozo]
 plugin_dirs = ["plugins"]
 
 [[emit]]
 namespace   = "api"
-transpilers = ["view-none"]
+transpilers = ["view-dump"]
 out         = "gen/api"
 
 [[emit]]
 namespace   = "web"
 transpilers = ["view-dump"]
 out         = "gen/web"
+
+# web は語彙 page の型（page.Route）も使うので、page にも同じ基底の単位を置く（docs/config.md「型の置き場」）
+[[emit]]
+namespace   = "page"
+transpilers = ["view-dump"]
+out         = "gen/page"

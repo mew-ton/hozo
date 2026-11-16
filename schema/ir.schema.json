@@ -496,7 +496,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.3"
+          "const": "0.4"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1027,7 +1027,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.3"
+          "const": "0.4"
         },
         "transpiler": {
           "type": "string"
@@ -1046,7 +1046,7 @@
     },
     "EmitResponse": {
       "additionalProperties": false,
-      "description": "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。select を省けば何も選ばない。",
+      "description": "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。",
       "properties": {
         "errors": {
           "items": {
@@ -1059,9 +1059,6 @@
             "$ref": "#/$defs/File"
           },
           "type": "array"
-        },
-        "select": {
-          "$ref": "#/$defs/Select"
         },
         "warnings": {
           "items": {
@@ -1208,7 +1205,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.3"
+          "const": "0.4"
         }
       },
       "required": [
@@ -1552,16 +1549,35 @@
     },
     "NamespaceConfig": {
       "additionalProperties": false,
-      "description": "単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。",
+      "description": "単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。index は何番目の [[emit]] か、base は単位の基底、options は単位のオプション（トランスパイラの名前 → テーブル）、seams は単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ）。",
       "properties": {
+        "base": {
+          "type": "string"
+        },
         "dir": {
           "type": "string"
+        },
+        "index": {
+          "type": "integer"
         },
         "language": {
           "type": "string"
         },
+        "options": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
         "out": {
           "type": "string"
+        },
+        "seams": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
         },
         "transpilers": {
           "items": {
@@ -1571,10 +1587,14 @@
         }
       },
       "required": [
+        "index",
         "language",
+        "base",
         "out",
         "dir",
-        "transpilers"
+        "transpilers",
+        "options",
+        "seams"
       ],
       "type": "object"
     },
@@ -1897,7 +1917,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.3"
+          "const": "0.4"
         }
       },
       "required": [
@@ -2091,43 +2111,6 @@
         "decorators",
         "span",
         "base"
-      ],
-      "type": "object"
-    },
-    "Select": {
-      "additionalProperties": false,
-      "description": "既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN は view.viewer の名前空間の、単位の対象の宣言。",
-      "properties": {
-        "roots": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "states": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "stops": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "wraps": {
-          "items": {
-            "$ref": "#/$defs/Wrap"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "roots",
-        "stops",
-        "states",
-        "wraps"
       ],
       "type": "object"
     },
@@ -2672,7 +2655,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.3"
+          "const": "0.4"
         },
         "viewer": {
           "type": "string"
@@ -2781,23 +2764,6 @@
       },
       "required": [
         "statements"
-      ],
-      "type": "object"
-    },
-    "Wrap": {
-      "additionalProperties": false,
-      "description": "トランスパイラが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。",
-      "properties": {
-        "decorator": {
-          "type": "string"
-        },
-        "op": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "op",
-        "decorator"
       ],
       "type": "object"
     }

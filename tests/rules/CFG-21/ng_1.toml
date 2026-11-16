@@ -1,0 +1,12 @@
+# go-x は、この単位の transpilers にない → CFG-21
+# ERROR: CFG-21
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[emit.options.go-x]
+validate = true

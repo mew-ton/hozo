@@ -1,0 +1,13 @@
+// CFG-22（docs/config.md「型の置き場」）: 使う型の名前空間は、同じ基底の出力を持つ（ok_1.toml）。語彙の名前空間の型も同じ規則で、
+// 使うなら、その名前空間に単位を置く。型を持たない語彙（デコレータだけの valid）は、使っても置き場は要らない
+namespace a {
+  model Input {
+    @valid.min(1) n: int;
+    owner: b.M;
+  }
+  export op f(in: Input): b.M
+    throws http.ServerError;
+}
+namespace b {
+  model M { id: string; }
+}

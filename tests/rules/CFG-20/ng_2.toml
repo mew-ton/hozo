@@ -1,0 +1,9 @@
+# loop-a は loop-b を、loop-b は loop-a を要る（どちらも書いてあるので CFG-19 は出ない）。基底が一つもない → CFG-20
+# ERROR: CFG-20
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["loop-a", "loop-b"]
+out         = "gen/a"

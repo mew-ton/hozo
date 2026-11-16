@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-// CheckFormat は valid.format(name) の実装（docs/emit-go.md「scalar」の表）。
+// CheckFormat は valid.format(name) の実装（docs/plugin-go-valid.md「runtime」）。
 // name は "email" / "uri" / "uuid" / "date-time" のどれかで、v がその形なら true。
-// 知らない name は false を返す（生成の時点で GOEMIT-3 になるので、ここに来るのは生成器の不具合）。
+// 知らない name は false を返す（生成の時点で診断になるので、ここに来るのは生成器の不具合）。
 //
 //   - "email": `local@domain`。local は RFC 5322 の dot-atom（atext を `.` でつないだもの。先頭・末尾・連続の `.` は不可）、
 //     domain は `.` でつないだ 2 つ以上のラベル（英数字とハイフン。先頭・末尾のハイフンは不可、各 63 文字以内）。

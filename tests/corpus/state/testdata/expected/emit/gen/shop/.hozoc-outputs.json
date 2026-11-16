@@ -1,9 +1,13 @@
 [
   "gen/shop/classify.go",
   "gen/shop/doc.go",
+  "gen/shop/inner/classify.go",
+  "gen/shop/inner/doc.go",
+  "gen/shop/inner/ops.go",
+  "gen/shop/inner/states.go",
+  "gen/shop/inner/types.go",
+  "gen/shop/inner/wiring.go",
   "gen/shop/ops.go",
   "gen/shop/states.go",
-  "gen/shop/types.go",
-  "gen/shop/validate.go",
-  "gen/shop/wiring.go"
+  "gen/shop/types.go"
 ]

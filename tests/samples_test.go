@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -25,7 +26,8 @@ import (
 // 仕様になる（docs/testing.md「トランスパイラのテスト」）。
 //
 // テストは最後の形で書いてある。サンプルは、まだないトランスパイラと、今の hozoc がまだ読めない設定で書かれて
-// いてよい。そのサンプルで通せないサブテストは、足りないもの（sampleProject.missing）を名指しして飛ばし、
+// いてよい。まだないトランスパイラは、ファイルを返さない代役（sampleProject.standIns）に置き換えて、あるトランスパイラの分だけを
+// 走らせる。それでも通せないサブテストは、足りないもの（sampleProject.blocked、sampleProject.absent）を名指しして飛ばし、
 // 足りないものがそろえば、このファイルを変えずに走る（tests/samples/README.md「テスト」）。
 
 // samplesDir はサンプルの置き場（tests/ からの相対パス）。
@@ -55,15 +57,35 @@ type sampleProject struct {
 	cfg *config.Config
 	// unreadable は、cfg を読んだときの診断。空でなければ、今の hozoc はこの hozo.toml をまだ読めず、cfg の単位は欠けている。
 	unreadable []string
-	// missing は、このサンプルに hozoc check / emit を掛けるのに足りないもの: unreadable と、まだないトランスパイラ、
-	// 今の hozoc が読めないマニフェスト。空なら、hozoc を本物の hozo.toml で走らせるサブテストが走る。
-	missing []string
+	// absent は、サンプルのトランスパイラ（sample.json の名前）のうち、今は動かせないものと、その理由: プラグインがまだない、
+	// マニフェストを読めない、実装がまだない。
+	absent map[string]string
+	// standIns は、absent のトランスパイラを、ファイルを返さない代役に置き換える手順（tests/samples/README.md「飛ばす条件」）。
+	// copyInputs の後で、写したプロジェクトに当てる。
+	standIns []standIn
+	// blocked は、このサンプルに、本物の hozo.toml で hozoc check / emit を掛けられない理由: unreadable と、代役を置けない
+	// トランスパイラ（その単位に、動かせる基底がない）。空なら、hozoc を本物の hozo.toml で走らせるサブテストが走る。
+	blocked []string
 }
 
-// loadSample は、サンプルの sample.json と hozo.toml を読み、足りないもの（missing）を調べる。
+// standIn は、まだ動かせないトランスパイラ一つを、ファイルを返さない代役に置き換える手順。
+type standIn struct {
+	transpiler string
+	// manifest は、実装のないプラグインのマニフェスト（サンプルのルートからの相対パス）。command だけを代役のものに書き換える
+	// （語彙、requires、seams は本物のまま）。プラグインそのものがなければ ""。
+	manifest string
+	// language と requires は、プラグインそのものがないときに作る代役のマニフェストの中身: その単位の基底の言語と、基底の名前。
+	language string
+	requires []string
+}
+
+// standInCommand は、代役のプラグインの command: 要求を読み捨て、ファイルも warning も返さない（sh で動く）。
+const standInCommand = `command = ["sh", "-c", "cat >/dev/null; printf '%s' '{\"files\":[],\"warnings\":[]}'"]`
+
+// loadSample は、サンプルの sample.json と hozo.toml を読み、足りないもの（absent、blocked）を調べる。
 func loadSample(t *testing.T, name string) *sampleProject {
 	t.Helper()
-	s := &sampleProject{name: name, dir: filepath.Join(samplesDir, name), files: map[string][]string{}, owner: map[string]string{}}
+	s := &sampleProject{name: name, dir: filepath.Join(samplesDir, name), files: map[string][]string{}, owner: map[string]string{}, absent: map[string]string{}}
 	data, err := os.ReadFile(filepath.Join(s.dir, sampleManifestFile))
 	if err != nil {
 		t.Fatal(err)
@@ -103,8 +125,8 @@ func loadSample(t *testing.T, name string) *sampleProject {
 	for _, d := range diags {
 		s.unreadable = append(s.unreadable, fmt.Sprintf("今の hozoc（internal/config）が、%s/%s を読めない: %s", s.dir, config.FileName, diagText(d)))
 	}
-	s.missing = append(s.missing, s.unreadable...)
-	s.missing = append(s.missing, s.missingTranspilers(t)...)
+	s.blocked = append(s.blocked, s.unreadable...)
+	s.findTranspilers(t)
 	return s
 }
 
@@ -124,15 +146,20 @@ func (s *sampleProject) pluginDirs() []string {
 	return append(dirs, repoPluginsDir)
 }
 
-// missingTranspilers は、サンプルのトランスパイラ（sample.json の名前）のうち、今は動かせないものと、その理由。
-// 動かせるのは、pluginDirs のどれかのプラグインのマニフェストを今の hozoc が読め、そのマニフェストがその名前の
-// トランスパイラを提供し、プラグインに実装があるとき。
-func (s *sampleProject) missingTranspilers(t *testing.T) []string {
+// findTranspilers は、サンプルのトランスパイラ（sample.json の名前）のうち、今は動かせないもの（absent）を調べ、それぞれを
+// 代役に置き換える手順（standIns）を作る。動かせるのは、pluginDirs のどれかのプラグインのマニフェストを今の hozoc が読め、
+// そのマニフェストがその名前のトランスパイラを提供し、プラグインに実装があるとき。
+//
+// 代役は、ファイルを返さないトランスパイラ: マニフェストはあるが実装のないプラグインは、command だけを書き換える。プラグイン
+// そのものがなければ、その単位の（動かせる）基底に相乗りするマニフェストを作る。単位に動かせる基底がなければ、代役を置けない
+// （blocked）。
+func (s *sampleProject) findTranspilers(t *testing.T) {
 	t.Helper()
-	var reasons []string
-	var unreadable []string       // リポジトリのプラグインのうち、マニフェストを読めなかったもの
-	provided := map[string]bool{} // 動かせるトランスパイラ
-	seen := map[string]bool{}     // プラグインの名前。近い場所のものを優先する（docs/plugin-protocol.md「探索」）
+	var unreadable []string                         // マニフェストを読めなかったプラグイン
+	provided := map[string]*hostplugin.Transpiler{} // 動かせるトランスパイラ
+	unimplemented := map[string]string{}            // 実装のないプラグインのトランスパイラ → マニフェスト（サンプルのルートからの相対パス）
+	unimplementedPlugin := map[string]string{}      // 同じく → プラグインのディレクトリ（理由に書く）
+	seen := map[string]bool{}                       // プラグインの名前。近い場所のものを優先する（docs/plugin-protocol.md「探索」）
 	for _, dir := range s.pluginDirs() {
 		manifests, err := filepath.Glob(filepath.Join(dir, "*", hostplugin.ManifestFileName))
 		if err != nil {
@@ -147,49 +174,128 @@ func (s *sampleProject) missingTranspilers(t *testing.T) []string {
 			}
 			seen[plugin] = true
 			m, diags := hostplugin.LoadManifest(p)
-			if len(diags) > 0 {
-				// 読めない（MAN-4）か、protocol が合わない（MAN-2）。どちらも、今の hozoc はこのプラグインを使えない。
-				// サンプルの中のプラグインは、サンプルが使うものなので、いつも理由に挙げる。リポジトリのプラグインは、
-				// サンプルが使うものかどうかが、読めなければ分からないので、足りないトランスパイラがあるときにだけ添える
+			if len(diags) > 0 || m == nil {
+				// 読めない（MAN-4）か、protocol が合わない（MAN-2）。どちらも、今の hozoc はこのプラグインを使えない
 				for _, d := range diags {
-					text := fmt.Sprintf("今の hozoc（internal/plugin）が、マニフェスト %s を読めない: %s", filepath.ToSlash(filepath.Clean(p)), diagText(d))
-					if dir == repoPluginsDir {
-						unreadable = append(unreadable, text)
-					} else {
-						reasons = append(reasons, text)
-					}
+					unreadable = append(unreadable, fmt.Sprintf("今の hozoc（internal/plugin）が、マニフェスト %s を読めない: %s", filepath.ToSlash(filepath.Clean(p)), diagText(d)))
 				}
 				continue
 			}
-			if m == nil {
-				continue
-			}
-			if !pluginImplemented(t, m, pluginDir) {
-				reasons = append(reasons, fmt.Sprintf("プラグイン %s の実装がまだない（%s に、マニフェストの command が go run で動かす Go のファイルがない）",
-					plugin, filepath.ToSlash(pluginDir)))
-				continue
-			}
-			for _, tr := range m.Transpilers {
-				provided[tr.Name] = true
+			implemented := pluginImplemented(t, m, pluginDir)
+			for i := range m.Transpilers {
+				tr := &m.Transpilers[i]
+				switch {
+				case implemented:
+					provided[tr.Name] = tr
+				case dir != repoPluginsDir:
+					if rel, err := filepath.Rel(s.dir, p); err == nil {
+						unimplemented[tr.Name] = filepath.ToSlash(rel)
+						unimplementedPlugin[tr.Name] = filepath.ToSlash(pluginDir)
+					}
+				}
 			}
 		}
 	}
-	var absent []string
+	var dirs []string
+	for _, d := range s.pluginDirs() {
+		dirs = append(dirs, filepath.ToSlash(filepath.Clean(d)))
+	}
 	for _, name := range s.names() {
-		if !provided[name] {
-			absent = append(absent, name)
+		if provided[name] != nil {
+			continue
+		}
+		if manifest, ok := unimplemented[name]; ok {
+			s.absent[name] = fmt.Sprintf("プラグインの実装がまだない（%s に、マニフェストの command が go run で動かす Go のファイルがない）", unimplementedPlugin[name])
+			s.standIns = append(s.standIns, standIn{transpiler: name, manifest: manifest})
+			continue
+		}
+		s.absent[name] = fmt.Sprintf("トランスパイラ %s がまだない（%s の、今の hozoc が動かせるどのプラグインも提供していない）", name, strings.Join(dirs, " と "))
+		if len(unreadable) > 0 {
+			s.absent[name] += "\n    " + strings.Join(unreadable, "\n    ")
+		}
+		// その単位の、動かせる基底に相乗りする代役
+		in := standIn{transpiler: name}
+		for _, u := range s.cfg.Units {
+			listed := false
+			for _, n := range u.Transpilers {
+				listed = listed || n == name
+			}
+			if !listed {
+				continue
+			}
+			base := ""
+			for _, n := range u.Transpilers {
+				if tr := provided[n]; tr != nil && tr.IsBase() {
+					base, in.language = n, tr.Language
+				}
+			}
+			if base == "" {
+				s.blocked = append(s.blocked, fmt.Sprintf("%s（%d 番目の [[emit]] に、動かせる基底がないので、代役も置けない）", s.absent[name], u.Index))
+				continue
+			}
+			if !containsString(in.requires, base) {
+				in.requires = append(in.requires, base)
+			}
+		}
+		s.standIns = append(s.standIns, in)
+	}
+}
+
+func containsString(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
 		}
 	}
-	if len(absent) > 0 {
-		var dirs []string
-		for _, d := range s.pluginDirs() {
-			dirs = append(dirs, filepath.ToSlash(filepath.Clean(d)))
+	return false
+}
+
+// absentReasons は、動かせないトランスパイラの理由（名前の辞書順）。
+func (s *sampleProject) absentReasons() []string {
+	var out []string
+	for _, name := range s.names() {
+		if why, ok := s.absent[name]; ok {
+			out = append(out, why)
 		}
-		reasons = append(reasons, fmt.Sprintf("トランスパイラ %s がまだない（%s の、今の hozoc が動かせるどのプラグインも提供していない）",
-			strings.Join(absent, "、"), strings.Join(dirs, " と ")))
-		reasons = append(reasons, unreadable...)
 	}
-	return reasons
+	return out
+}
+
+// placeStandIns は、root に写したプロジェクトに、代役を置く（tests/samples/README.md「飛ばす条件」）: 実装のないプラグインの
+// マニフェストは command を書き換え、プラグインそのものがないトランスパイラは、dir（HOZO_PLUGIN_PATH で渡すディレクトリ）に
+// 代役のプラグインを作る。
+func (s *sampleProject) placeStandIns(t *testing.T, root, dir string) {
+	t.Helper()
+	command := regexp.MustCompile(`(?m)^command\s*=.*$`)
+	for _, in := range s.standIns {
+		if in.manifest != "" {
+			p := filepath.Join(root, filepath.FromSlash(in.manifest))
+			data, err := os.ReadFile(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !command.Match(data) {
+				t.Fatalf("%s に command の行がない", in.manifest)
+			}
+			if err := os.WriteFile(p, command.ReplaceAllLiteral(data, []byte(standInCommand)), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		quoted := make([]string, len(in.requires))
+		for i, r := range in.requires {
+			quoted[i] = fmt.Sprintf("%q", r)
+		}
+		manifest := fmt.Sprintf("# TestSamples が置いた代役（tests/samples/README.md「飛ばす条件」）。ファイルを返さない\nname = %q\n%s\nprotocol = %q\n\n[[transpiler]]\nname = %q\nlanguage = %q\nrequires = [%s]\n",
+			in.transpiler, standInCommand, hostplugin.Protocol, in.transpiler, in.language, strings.Join(quoted, ", "))
+		p := filepath.Join(dir, in.transpiler, hostplugin.ManifestFileName)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(manifest), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 // pluginImplemented は、マニフェスト m のプラグインに、動かすものがあるか。サンプルは、マニフェストと語彙と期待する出力を、
@@ -213,11 +319,11 @@ func pluginImplemented(t *testing.T, m *hostplugin.Manifest, dir string) bool {
 	return false
 }
 
-// skipIfMissing は、hozoc を本物の hozo.toml で走らせるサブテストを、足りないものがあれば、それを名指しして飛ばす。
-func (s *sampleProject) skipIfMissing(t *testing.T, what string) {
+// skipIfBlocked は、hozoc を本物の hozo.toml で走らせるサブテストを、走らせられない理由があれば、それを名指しして飛ばす。
+func (s *sampleProject) skipIfBlocked(t *testing.T, what string) {
 	t.Helper()
-	if len(s.missing) > 0 {
-		t.Skipf("飛ばす（%s）。足りないもの:\n  - %s\nそろえば、何も変えずに走る", what, strings.Join(s.missing, "\n  - "))
+	if len(s.blocked) > 0 {
+		t.Skipf("飛ばす（%s）。足りないもの:\n  - %s\nそろえば、何も変えずに走る", what, strings.Join(s.blocked, "\n  - "))
 	}
 }
 
@@ -369,16 +475,26 @@ func hozocMainEnv(dir string, env func(string) string, args []string, stdout, st
 }
 
 // project は、サンプルの入力を一時ディレクトリに写し、そのルートと、hozoc に渡す環境（リポジトリの plugins/ を
-// HOZO_PLUGIN_PATH に持つ。docs/plugin-protocol.md「探索」の 2）を返す。hozo.toml は本物のまま。
+// HOZO_PLUGIN_PATH に持つ。docs/plugin-protocol.md「探索」の 2）を返す。hozo.toml は本物のまま。まだ動かせないトランスパイラが
+// あれば、代役を置く（placeStandIns）: 代役のプラグインのディレクトリは、HOZO_PLUGIN_PATH の、リポジトリの plugins/ の後ろ。
 func (s *sampleProject) project(t *testing.T) (string, func(string) string) {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "project")
+	tmp := t.TempDir()
+	root := filepath.Join(tmp, "project")
 	s.copyInputs(t, root)
 	plugins, err := filepath.Abs(repoPluginsDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return root, pluginPathEnv(plugins)
+	if len(s.standIns) == 0 {
+		return root, pluginPathEnv(plugins)
+	}
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh がない（まだないトランスパイラの代役を動かせない）")
+	}
+	standIns := filepath.Join(tmp, "stand-ins")
+	s.placeStandIns(t, root, standIns)
+	return root, pluginPathEnv(plugins + string(filepath.ListSeparator) + standIns)
 }
 
 // TestSamples は tests/samples/ の各サンプルについて、次を確かめる（tests/samples/README.md「テスト」）。
@@ -389,8 +505,9 @@ func (s *sampleProject) project(t *testing.T) (string, func(string) string) {
 //   - transpilers/<名前>: hozoc emit の出力のうち、そのトランスパイラのファイルが、期待する出力とバイト単位で同じ。
 //   - transpilers/all: hozoc emit の出力の全体が、期待する出力と同じ（余分なファイルがなく、記録が同じ）。
 //
-// go は飛ばさない。ほかは、足りないものがあれば、それを名指しして飛ばす。check だけは、飛ばす代わりに、
-// 設定を使わない言語の検査に落として通す（testCheck）。
+// go は飛ばさない。まだないトランスパイラは、ファイルを返さない代役に置き換えて、check と、あるトランスパイラの
+// transpilers/<名前> を走らせる。まだないトランスパイラの transpilers/<名前> と transpilers/all は、足りないものを名指しして
+// 飛ばす。本物の hozo.toml を読めないときは、どれも飛ばし、check だけは、設定を使わない言語の検査に落として通す（testCheck）。
 func TestSamples(t *testing.T) {
 	requireGo(t)
 	manifests, err := filepath.Glob(filepath.Join(samplesDir, "*", sampleManifestFile))
@@ -414,20 +531,24 @@ func TestSamples(t *testing.T) {
 
 // testCheck は、サンプルの仕様と設定が hozoc check を error なしで通ること。サンプルの入力を一時ディレクトリに写し、
 // 本物の hozo.toml のまま、サンプルの中のプラグインと、リポジトリの plugins/ のプラグインで確かめる。warning は許し、表示する。
+// まだないトランスパイラは、代役に置き換える（project）。代役は、マニフェストだけが要る（check はトランスパイラを起動しない）。
 //
-// 足りないもの（missing）がある間は、本物の hozo.toml では走らせられない（まだないトランスパイラは CFG-14、まだ読めない
-// 設定は CFG-7 になる）。その間は、**言語の検査だけ**に落とす: すべての .hozo（サンプルの中のプラグインの語彙を含む）
-// だけを写し、設定なしで hozoc check を通す（hozo.toml がなければ、hozoc は設定の検査 CFG-* をしない。docs/config.md
-// 「置き場と探し方」）。落としたことと、足りないものは、ログに書く。足りないものがそろえば、本物の設定での検査に戻る。
+// 本物の hozo.toml を今の hozoc が読めない（blocked）間は、**言語の検査だけ**に落とす: すべての .hozo（サンプルの中の
+// プラグインの語彙を含む）だけを写し、設定なしで hozoc check を通す（hozo.toml がなければ、hozoc は設定の検査 CFG-* を
+// しない。docs/config.md「置き場と探し方」）。落としたことと、足りないものは、ログに書く。足りないものがそろえば、本物の設定での
+// 検査に戻る。
 func (s *sampleProject) testCheck(t *testing.T) {
 	root, env := "", func(string) string { return "" }
-	if len(s.missing) > 0 {
+	if len(s.blocked) > 0 {
 		t.Logf("言語の検査だけに落とした（設定 %s と、プラグインの検査は、まだ確かめていない）。足りないもの:\n  - %s\nそろえば、本物の hozo.toml で走る",
-			config.FileName, strings.Join(s.missing, "\n  - "))
+			config.FileName, strings.Join(s.blocked, "\n  - "))
 		root = filepath.Join(t.TempDir(), "project")
 		s.copySpecs(t, root)
 	} else {
 		root, env = s.project(t)
+		if len(s.absent) > 0 {
+			t.Logf("まだないトランスパイラを、ファイルを返さない代役に置き換えた:\n  - %s", strings.Join(s.absentReasons(), "\n  - "))
+		}
 	}
 	var stdout, stderr bytes.Buffer
 	if code := hozocMainEnv(root, env, []string{"check"}, &stdout, &stderr); code != 0 {
@@ -556,16 +677,22 @@ func (s *sampleProject) testGo(t *testing.T) {
 //   - transpilers/all: 出力の全体が同じ。どのトランスパイラの files にもないファイルが書かれていない。期待する出力の
 //     ファイルが、すべて書かれている。出力先ごとの記録が同じ。
 //
-// 足りないもの（missing）があれば、hozoc emit は何も書き出さない（一つの単位の誤りで、全体が止まる）ので、
-// どのサブテストも、足りないものを名指しして飛ばす。期待する出力が仕様なので、-update では書き直さない。
+// まだないトランスパイラ（absent）は、ファイルを返さない代役に置き換えて、hozoc emit を走らせる（どのトランスパイラも、自分の
+// 出力の View だけから応答を作るので、あるトランスパイラの出力は、代役がいても変わらない。docs/plugin-protocol.md「起動」）。
+// その transpilers/<名前> と、transpilers/all は、足りないものを名指しして飛ばす。本物の hozo.toml で走らせられない（blocked）か、
+// 動かせるトランスパイラが一つもなければ、どのサブテストも飛ばす。期待する出力が仕様なので、-update では書き直さない。
 func (s *sampleProject) testTranspilers(t *testing.T) {
 	var got, want map[string][]byte
-	if len(s.missing) == 0 {
+	runnable := len(s.blocked) == 0 && len(s.absent) < len(s.files)
+	if runnable {
 		got, want = s.emit(t), s.expected(t)
 	}
 	for _, name := range s.names() {
 		t.Run(name, func(t *testing.T) {
-			s.skipIfMissing(t, "hozoc emit を、このサンプルに掛けられない")
+			s.skipIfBlocked(t, "hozoc emit を、このサンプルに掛けられない")
+			if why, absent := s.absent[name]; absent {
+				t.Skipf("飛ばす（トランスパイラ %s を動かせない）。足りないもの:\n  - %s\nそろえば、何も変えずに走る", name, why)
+			}
 			for _, p := range s.files[name] {
 				w, inWant := want[p]
 				g, inGot := got[p]
@@ -578,10 +705,26 @@ func (s *sampleProject) testTranspilers(t *testing.T) {
 					t.Errorf("%s/%s が期待する出力と違う（%s のファイル）:\n%s", s.dir, p, name, firstDiff(string(w), string(g)))
 				}
 			}
+			// このトランスパイラのファイルでないものを、このトランスパイラの名前で書いていないこと（ほかのトランスパイラが代役の間も、
+			// 余分なファイルを見逃さない）: 書かれたファイルは、どれも、動かせるどれかのトランスパイラのもの
+			if len(s.absent) > 0 {
+				for _, p := range sortedKeys(got) {
+					if path.Base(p) == app.OutputsFile {
+						continue
+					}
+					if owner := s.owner[p]; owner == "" || s.absent[owner] != "" {
+						t.Errorf("%s/%s は emit が書くが、動かせるどのトランスパイラのファイルでもない（%s）", s.dir, p, sampleManifestFile)
+					}
+				}
+			}
 		})
 	}
 	t.Run(transpilersAll, func(t *testing.T) {
-		s.skipIfMissing(t, "hozoc emit を、このサンプルに掛けられない")
+		s.skipIfBlocked(t, "hozoc emit を、このサンプルに掛けられない")
+		if len(s.absent) > 0 {
+			t.Skipf("飛ばす（出力の全体は、すべてのトランスパイラがそろってから比べる）。足りないもの:\n  - %s\nそろえば、何も変えずに走る",
+				strings.Join(s.absentReasons(), "\n  - "))
+		}
 		for _, p := range sortedKeys(want, got) {
 			w, inWant := want[p]
 			g, inGot := got[p]

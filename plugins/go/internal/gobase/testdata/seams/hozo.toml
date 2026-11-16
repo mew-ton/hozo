@@ -1,0 +1,21 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「継ぎ目」の各行。
+[hozo]
+plugin_dirs = ["plugins"]
+
+# 1: shop。単位の継ぎ目は t.limited（go-rate）と、t.traced、t.unused（go-trace）
+[[emit]]
+namespace   = "shop"
+transpilers = ["go", "go-rate", "go-trace"]
+out         = "gen/shop"
+
+# 2: 同じ shop を、継ぎ目を宣言したトランスパイラを並べずに出力する。継ぎ目を持つのは 1 の出力だけ
+[[emit]]
+namespace   = "shop"
+transpilers = ["go"]
+out         = "gen/plain"
+
+# 3: front。shop の op を呼ぶ。単位の継ぎ目に t.limited があっても、shop の op の継ぎ目は出さない
+[[emit]]
+namespace   = "front"
+transpilers = ["go", "go-rate"]
+out         = "gen/front"

@@ -1,0 +1,13 @@
+# a の出力が b の型（例外、分類、model）を使うので、b にも同じ基底の単位を置く（docs/config.md「型の置き場」）
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go"]
+out         = "gen/b"

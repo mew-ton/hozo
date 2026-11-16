@@ -1,0 +1,23 @@
+# CFG-23 のための fixture: 同じデコレータ a.dec を seams に書いた二つのトランスパイラ（seam-a、seam-b）と、
+# 別のデコレータを書いた seam-other。どれも基底 go に相乗りする
+name     = "seams"
+command  = ["true"]
+protocol = "0.4"
+
+[[transpiler]]
+name     = "seam-a"
+language = "go"
+requires = ["go"]
+seams    = ["a.dec"]
+
+[[transpiler]]
+name     = "seam-b"
+language = "go"
+requires = ["go"]
+seams    = ["a.dec", "a.other"]
+
+[[transpiler]]
+name     = "seam-other"
+language = "go"
+requires = ["go"]
+seams    = ["x.unknown"]

@@ -14,12 +14,12 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 | ないもの | 作るもの | 今のテスト |
 |---|---|---|
-| 四つのトランスパイラ `go`、`go-valid`、`go-sqlite`、`go-http` | リポジトリの `plugins/` のプラグイン（`docs/requirements.md`「作り直しの段階」の R2） | `transpilers/*` を飛ばす |
-| サンプルの中のプラグイン `go-ratelimit` の実装 | `plugins/go-ratelimit/` の `main` パッケージ（「サンプルの中のプラグイン」の「これから作るもの」） | `transpilers/*` を飛ばす |
-| hozoc 本体が、この `hozo.toml` を読むこと: `[emit.options.<トランスパイラ>]`、基底と相乗り（CFG-19、CFG-20）、語彙の名前空間 `rate` と型だけの名前空間 `type` の単位（CFG-8 の廃止）、型の置き場（CFG-22） | `docs/config.md` の実装 | `files` を飛ばす。`check` は、言語の検査だけに落とす |
-| hozoc 本体が、`plugins/go-ratelimit/hozo-plugin.toml` を読むこと: `requires`、`seams`、`protocol = "0.4"`。単位の継ぎ目を `View.config.seams` で渡すこと（CFG-23） | `docs/plugin-protocol.md`、`docs/config.md`「継ぎ目」の実装 | 同上 |
+| 三つの相乗り `go-valid`、`go-sqlite`、`go-http` | リポジトリの `plugins/` のプラグイン（`docs/requirements.md`「作り直しの段階」の R2） | それぞれの `transpilers/<名前>` と、`transpilers/all` を飛ばす |
+| サンプルの中のプラグイン `go-ratelimit` の実装 | `plugins/go-ratelimit/` の `main` パッケージ（「サンプルの中のプラグイン」の「これから作るもの」） | `transpilers/go-ratelimit` と、`transpilers/all` を飛ばす |
 
-`TestSamples` のサブテストは、最後の形で書いてあり、足りないものを名指しして飛ばす（`../README.md`「テスト」）。今、通るのは `check`（言語の検査だけ）と `go`（このモジュールの `go vet` と `go test`）。足りないものがそろえば、何も変えずに、すべてが走る。`sample.json` に、保留を書くところはない。
+できたもの: hozoc 本体が、この `hozo.toml`（`[emit.options.<トランスパイラ>]`、基底と相乗り、語彙の名前空間 `rate` と型だけの名前空間 `type` の単位、型の置き場）と、`plugins/go-ratelimit/hozo-plugin.toml`（`requires`、`seams`、`protocol = "0.4"`）を読み、単位の継ぎ目を `View.config.seams` で渡すこと。基底 `go`（`docs/plugin-go.md`）。
+
+`TestSamples` のサブテストは、最後の形で書いてあり、足りないものを名指しして飛ばす（`../README.md`「テスト」）。今、通るのは `check`（本物の `hozo.toml` で。まだないトランスパイラは、ファイルを返さない代役に置き換える）、`files`、`go`（このモジュールの `go vet` と `go test`）、`transpilers/go`（基底の出力が、期待する出力とバイト単位で同じ）。足りないものがそろえば、何も変えずに、すべてが走る。`sample.json` に、保留を書くところはない。
 
 ## 入力
 
@@ -126,7 +126,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 
 `plugins/go-ratelimit/` に、`main` パッケージ（`example.com/shop-server/plugins/go-ratelimit`。マニフェストの `command` が `go run` で動かす）を作る。サンプルのモジュールの中のパッケージで、リポジトリの公開の SDK（`plugin`、`plugin/golang`）を、`go.mod` の `replace` を通して import する。ほかのトランスパイラと同じく、テストが先にある: `TestSamples` の `transpilers/go-ratelimit` が、`gen/server/ratelimit.go` とバイト単位で比べる。実装を置くと、`go`（このモジュールの `go vet` と `go test`）が、そのパッケージも見るようになる。
 
-本体の側に要るもの（マニフェストの `seams` と `requires`、`View.config.seams`、基底 `go` の二層と `Seams`）は、「まだないもの」。
+本体の側に要るもの（マニフェストの `seams` と `requires`、`View.config.seams`、基底 `go` の二層と `Seams`）は、できている（「まだないもの」）。
 
 ## ファイルの出どころ
 

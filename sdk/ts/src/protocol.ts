@@ -5,7 +5,7 @@
 import type { Program, View } from "./ir.js";
 
 /** プロトコルの版。docs/ir.md の version（view.version）と同じ値。 */
-export const PROTOCOL = "0.3" as const;
+export const PROTOCOL = "0.4" as const;
 
 export type Direction = "emit" | "check" | "import";
 
@@ -51,45 +51,21 @@ export interface EmitRequest {
    * プラグインは、この名前で処理を分ける。知らない名前なら UnsupportedDirectionError を投げる。
    */
   transpiler: string;
-  /** 対象の名前空間は view.viewer。その単位での設定は view.config、単位の対象のファイルは view.files。 */
+  /**
+   * 対象の名前空間は view.viewer。その単位での設定は view.config（オプションは view.config.options。index の options(req) で読む）、
+   * 単位の対象のファイルは view.files。
+   */
   view: View;
 }
 
-/** トランスパイラが包む関数を実装するデコレータの適用（docs/plugin-protocol.md「選択」の wraps）。op とデコレータの FQN。 */
-export interface Wrap {
-  op: string;
-  /** デコレータの FQN。名前付きデコレータを通して付けたなら、その FQN でもよい。 */
-  decorator: string;
-}
-
 /**
- * 既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN はどれも view.viewer の名前空間の宣言で、
- * 単位の対象のもの（inUnit）。そこにない FQN や、wraps がその op に付いていないデコレータを指していれば PLG-3。
+ * emit の応答。何を出すかを hozoc に伝える項目（版 0.3 までの select）はない（docs/plugin-protocol.md「選択をなくしたこと」）。
  */
-export interface Select {
-  /** 起点にする op。 */
-  roots: string[];
-  /**
-   * 起点から辿られたときに、本体を辿らず実装を差し込む口だけを出す op。起点ではないので、どこからも
-   * 辿られなければ選ばれない（docs/emit-go.md「出力の対象」の 2）。
-   */
-  stops: string[];
-  /** 起点にする状態（基底の状態か、状態の分類）。 */
-  states: string[];
-  /** このトランスパイラが包む関数を実装するデコレータの適用。 */
-  wraps: Wrap[];
-}
-
 export interface EmitResponse {
   files: File[];
   warnings: Warning[];
   /** 一つでもあれば hozoc は files を書き出さない。 */
   errors?: EmitError[];
-  /**
-   * 出力の対象の選択。省けば何も選ばない。Handler は使う項目だけを書けばよく、run が残りを [] にして
-   * 四つの列を持つ形で書く（Go の plugin.Run と同じ）。
-   */
-  select?: Partial<Select>;
 }
 
 export interface CheckRequest {

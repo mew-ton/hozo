@@ -23,7 +23,7 @@ const designCorpus = "corpus/design"
 // loadClean はコーパス root を internal/project で解析する。診断が一つでもあれば失敗（error も warning も想定しない）。
 func loadClean(t *testing.T, root string) *project.Project {
 	t.Helper()
-	p := project.LoadWith(project.Options{Root: root, Stderr: io.Discard})
+	p := project.LoadWith(project.Options{Root: root, Stderr: io.Discard, PluginPath: repoPlugins(t)})
 	if len(p.Diags) > 0 {
 		var b strings.Builder
 		for _, d := range p.Diags {
@@ -125,16 +125,17 @@ func TestModelCorpus(t *testing.T) {
 	})
 
 	t.Run("config.md 単位の対象", func(t *testing.T) {
-		// View を持つ（出力する）のは、単位の対象の shop だけ。View.namespaces にも、どの単位の対象でもない名前空間は入らない
+		// View を持つ（出力する）のは、単位の対象の名前空間: shop と、shop が使う型の置き場の carrier と marks
+		// （docs/config.md「型の置き場」）。View.namespaces にも、どの単位の対象でもない名前空間（customer）は入らない
 		views := viewsOf(p)
-		expect(t, "単位の数", len(p.Views()), 1)
-		expect(t, "View を持つ名前空間", keysOf(views), []string{"shop"})
-		expect(t, "View.namespaces", keysOf(views["shop"].Namespaces), []string{"shop"})
+		expect(t, "単位の数", len(p.Views()), 3)
+		expect(t, "View を持つ名前空間", keysOf(views), []string{"carrier", "marks", "shop"})
+		expect(t, "View.namespaces", keysOf(views["shop"].Namespaces), []string{"carrier", "marks", "shop"})
+		if n := len(p.Config.Covering("customer")); n != 0 {
+			t.Errorf("customer を対象にする単位が %d ある（単位の対象でない名前空間は出力先を持たない）", n)
+		}
 		for _, ns := range []string{"marks", "carrier", "customer"} {
-			if n := len(p.Config.Covering(ns)); n != 0 {
-				t.Errorf("%s を対象にする単位が %d ある（単位の対象でない名前空間は出力先を持たない）", ns, n)
-			}
-			// 単位の対象でない名前空間も Program にはそのまま入る（トランスパイラは全体を読める）
+			// どの名前空間も Program にはそのまま入る（トランスパイラは全体を読める）
 			if views["shop"].Program.Namespace(ns) == nil {
 				t.Errorf("View(shop).program に名前空間 %s がない", ns)
 			}
@@ -193,10 +194,11 @@ func TestModelCorpus(t *testing.T) {
 		})
 	})
 
-	t.Run("emit-go.md 出力の対象/何も選ばれなかった名前空間は何も出力しない", func(t *testing.T) {
-		// shop は単位の対象（出力する名前空間）だが、その単位のトランスパイラ none は何も選ばない。出力するのはトランスパイラが
-		// 選んだ宣言だけなので、emit は何も書かない。印のデコレータ（@marks.*）も何も生成しない（docs/emit-go.md「デコレータ」）。
-		// 前回の出力（.hozoc-outputs.json にあるもの）は古いファイルとして消え、記録も残らない（docs/cli.md「emit」の 6 と 8）。
+	t.Run("cli.md emit/どのトランスパイラもファイルを返さなければ、何も書かない", func(t *testing.T) {
+		// shop は単位の対象（出力する名前空間）だが、その単位のトランスパイラ none はファイルを返さない。hozoc 本体は
+		// コードを出力しない（docs/plugin-protocol.md「この文書が決めること」）ので、emit は何も書かない。印のデコレータ
+		// （@marks.*）も何も生成しない。前回の出力（.hozoc-outputs.json にあるもの）は古いファイルとして消え、記録も残らない
+		// （docs/cli.md「emit」の 5 と 7）。
 		requireSh(t)
 		dir := t.TempDir()
 		copyHozo(t, modelCorpus, dir)

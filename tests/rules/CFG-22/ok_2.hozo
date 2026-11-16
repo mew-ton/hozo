@@ -1,0 +1,24 @@
+// CFG-22: 数えないもの: デコレータの適用とその引数、効果、別の名前空間の op そのもの（型を使わない呼び出し）、型で決まる分類。
+// どの単位の対象でもない名前空間（b）は出力せず、エラーにもしない（既定の設定: 単位は a だけ）
+namespace a {
+  @b.mark(b.E)
+  export op f() {
+    b.g();
+  }
+  op h(x: string?): string {
+    return match x by b.Present {
+      Some => keep(x);
+      default => keep("none");
+    };
+  }
+  op keep(x: string): string;
+}
+namespace b {
+  exception E;
+  decorator mark(e: any exception);
+  export op g();
+  classify Present of string? {
+    Some: string? as string;
+    default;
+  }
+}

@@ -10,15 +10,19 @@ import (
 	"strings"
 )
 
-// ErrNoGoMod は ImportPath が go.mod を見つけられなかったこと。呼ぶ側は GOEMIT-1 にする。
+// ErrNoGoMod は ImportPath が go.mod を見つけられなかったこと。基底のプラグインは GO-1 にする（docs/plugin-go.md「診断」）。
 var ErrNoGoMod = errors.New("no go.mod found")
 
-// ImportPath は `<root>/<out>` に置くパッケージの import パス（docs/emit-go.md「配置」）。
-// `<root>/<out>` から親へ向かって最初に見つかる go.mod の `module` に、そのディレクトリから
-// `<root>/<out>` への相対パスを `/` でつないだもの。out には、単位での名前空間の出力先 Dir(U, N)
-// （View.config.dir。docs/config.md「単位の対象」）を渡す。go.mod が見つからなければ ErrNoGoMod を包んだ誤り（GOEMIT-1）。
-// go.mod が読めない、または `module` 行がなければその誤り。ディレクトリは存在しなくてよい。
-func ImportPath(root, out string) (string, error) {
+// ImportPath は `<root>/<dir>` に置くパッケージの import パス（docs/plugin-go.md「パッケージと import パス」）。
+// `<root>/<dir>` から親へ向かって最初に見つかる go.mod の `module` に、そのディレクトリから
+// `<root>/<dir>` への相対パスを `/` でつないだもの。dir には、出力先 Dir(U, N)（View.config.dir。docs/config.md「単位の対象」）か、
+// その下のディレクトリを渡す。root はプロジェクトのルート（HOZO_PROJECT_ROOT）。go.mod が見つからなければ ErrNoGoMod を
+// 包んだ誤り（GO-1）。go.mod が読めない、または `module` 行がなければその誤り。ディレクトリは存在しなくてよい。
+func ImportPath(root, dir string) (string, error) {
+	return importPath(root, dir)
+}
+
+func importPath(root, out string) (string, error) {
 	dir, err := filepath.Abs(filepath.Join(root, out))
 	if err != nil {
 		return "", err

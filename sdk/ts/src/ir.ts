@@ -90,7 +90,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.3";
+  version: "0.4";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -730,16 +730,26 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.3";
+  version: "0.4";
   viewer: string;
 }
 /**
- * 単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。
+ * 単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。index は何番目の [[emit]] か、base は単位の基底、options は単位のオプション（トランスパイラの名前 → テーブル）、seams は単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ）。
  */
 export interface NamespaceConfig {
+  base: string;
   dir: string;
+  index: number;
   language: string;
+  options: {
+    [k: string]: {
+      [k: string]: unknown;
+    };
+  };
   out: string;
+  seams: {
+    [k: string]: string;
+  };
   transpilers: string[];
 }
 /**

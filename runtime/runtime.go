@@ -1,7 +1,7 @@
 // Package runtime は、hozoc が生成した Go のコードが import する型と関数を持つ。
 //
-// 形は docs/emit-go.md「runtime パッケージ」。生成したコードのヘッダに書く hozoc の版
-// （docs/emit-go.md「配置」）と合わせて互換を保つので、API を変えるときはそちらも見る。
+// 形は docs/plugin-go.md「runtime パッケージ」（Violation、ValidationError、CheckFormat は docs/plugin-go-valid.md「runtime」）。
+// 生成したコードのヘッダに書く版（docs/plugin-go.md「ファイル」）と合わせて互換を保つので、API を変えるときはそちらも見る。
 // 標準ライブラリにだけ依存する（docs/packages.md「依存の向き」）。
 package runtime
 
@@ -12,17 +12,17 @@ import (
 
 // Effect は効果の名前（FQN）。生成したコードは効果ごとに
 // `const EffectCreateSession runtime.Effect = "server.createSession"` を出す
-// （docs/emit-go.md「effect」）。
+// （docs/plugin-go.md「effect」）。
 type Effect string
 
-// Exception は、生成した例外の型が満たすインターフェース（docs/emit-go.md「exception」）。
+// Exception は、生成した例外の型が満たすインターフェース（docs/plugin-go.md「exception」）。
 // HozoException は例外の FQN を返す。
 type Exception interface {
 	error
 	HozoException() string
 }
 
-// Violation は valid.* の制約への違反が一つ（docs/emit-go.md「scalar」「model の Validate」）。
+// Violation は valid.* の制約への違反が一つ（docs/plugin-go-valid.md「runtime」）。
 // Path は違反したフィールドへの道（scalar 自身なら ""、model なら "body.email" や "items[2].id"）、
 // Constraint は制約の名前（"min"、"length"、"pattern"、"format"、ユーザーが足した制約の名前）。
 type Violation struct {
@@ -38,7 +38,7 @@ func (v Violation) String() string {
 }
 
 // ValidationError は Validate が返す誤り。Violations は検査した順で、空にはならない
-// （違反がなければ Validate は nil を返す。docs/emit-go.md「scalar」）。
+// （違反がなければ Validate は nil を返す。docs/plugin-go-valid.md「runtime」）。
 type ValidationError struct {
 	Violations []Violation
 }
@@ -52,7 +52,7 @@ func (e *ValidationError) Error() string {
 	return "validation failed: " + strings.Join(parts, "; ")
 }
 
-// ClassificationError は分類の判定関数が返す誤り（docs/emit-go.md「classify」）。
+// ClassificationError は分類の判定関数が返す誤り（docs/plugin-go.md「分類」）。
 // Classify は分類の FQN、Hits は真になったケースの名前（書かれた順）。
 // default のない分類で真が一つもなければ Hits は空、どの分類でも真が二つ以上ならそのすべて。
 type ClassificationError struct {
@@ -69,7 +69,8 @@ func (e *ClassificationError) Error() string {
 	return fmt.Sprintf("classification %s: %d cases matched (%s)", e.Classify, len(e.Hits), strings.Join(e.Hits, ", "))
 }
 
-// MissingError は、生成したコードが要る実装が埋められていなかったときの誤り（docs/emit-go.md「実装の単位」）。
+// MissingError は、生成したコードが要る実装が埋められていなかったときの誤り。基底 go の出力は、もう使わない
+// （docs/plugin-go.md「runtime パッケージ」: なくす）。コミット済みの古い形の生成物 internal/gen/hozoc が使っている間だけ残す。
 // 束ねる構造体（Leaves / Deps / States / Wrappers / Classifiers / ConstraintFuncs）のフィールドは使わなければ nil の
 // ままでよく、実行時に nil のフィールドが要るところへ来たら、生成したコードは panic せずにこれを返す。
 //

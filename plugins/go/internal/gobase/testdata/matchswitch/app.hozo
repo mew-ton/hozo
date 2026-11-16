@@ -1,0 +1,214 @@
+// docs/plugin-go.md「match」の switch の形（絞り込みが variant の型で決まる分類、述語で決まる値の分類・op の分類・状態の分類）と、
+// 「絞り込んだ値」「分類」を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** switch で分ける match */
+namespace app {
+  scalar Email extends string;
+  model Item { name: string; price: int; }
+  model Problem { reason: string; }
+  model Receipt { total: int; }
+  model Title { title: string; }
+  /** 画面。アームの型: 宣言した model、その場の model、核の型（包む型）、省略可能（包む型） */
+  union Page {
+    Ready: Title;
+    Blank: { hint: string; };
+    Failed: Problem;
+    Code: int;
+    Note: string?;
+  }
+  /** 結果 */
+  union Result {
+    Done: Receipt;
+    Fail: Problem;
+  }
+  exception Bad;
+  /** 印。付いた op は純粋でなくなる */
+  decorator mark;
+
+  /** 今の画面 */
+  state stage: single<Page>;
+  /** カート */
+  state carts: list<Item>;
+  /** 注文 */
+  state orders: list<Item>;
+
+  /** 型で決まる値の分類（variant。default がある） */
+  classify PageKind of Page {
+    IsReady: Page as Title;
+    IsFailed: Page as Problem;
+    IsCode: Page as int;
+    default;
+  }
+  /** 型で決まる値の分類（variant。すべてのアームを覆うので default がない） */
+  classify Outcome of Result {
+    Ok: Result as Receipt;
+    Err: Result as Problem;
+  }
+  /** 型で決まる状態の分類（variant） */
+  classify Stage of stage {
+    Showing: stage as Title;
+    Broken: stage as Problem;
+    default;
+  }
+  /** 述語で決まる値の分類（default がない） */
+  classify Size of Item {
+    /** 大きい */
+    Big;
+    Small;
+    Tiny;
+  }
+  /** 述語で決まる値の分類（default がある）。絞り込みは predicate（string を Email に） */
+  classify Address of string {
+    Valid: string as Email;
+    default;
+  }
+  /** 述語で決まる値の分類。型で決まる絞り込み（presence）の as を持つケースと、predicate の as を持つケース */
+  classify Contact of string? {
+    Mail: string? as Email;
+    Text: string? as string;
+    default;
+  }
+  /** 述語で決まる op の分類（同じ型に絞り込むケースが二つ） */
+  classify Stock of findItem {
+    InStock: findItem as Item;
+    SoldOut: findItem as Item;
+    default;
+  }
+  /** 述語で決まる状態の分類 */
+  classify Checkout of carts, orders {
+    Shopping;
+    Ordered;
+  }
+
+  @mark export op findItem(name: string): Item?;
+  @mark export op load(name: string): string;
+  export op titleOf(ready: Title): string;
+  export op codeText(code: int): string;
+  export op receiptText(receipt: Receipt): string;
+  export op send(addr: Email): string;
+  export op priceOf(item: Item): int;
+  export op bigOnly(item: Size.Big<Item>): string;
+  export op show(text: string);
+  export op fail(): never throws Bad;
+
+  // variant の return match: switch <対象>.(type)。絞り込んだ値（アームの型、包む型の .Value）、フィールドを読む、default
+  export op describe(page: Page): string
+  {
+    return match page by PageKind {
+      IsCode   => codeText(page);
+      IsReady  => titleOf(page);
+      IsFailed => page.reason;
+      default  => "other";
+    };
+  }
+
+  // variant の return match で、default の節がない（純粋で失敗しない配線）
+  export op outcome(result: Result): string
+  {
+    return match result by Outcome {
+      Ok  => receiptText(result);
+      Err => result.reason;
+    };
+  }
+
+  // variant の const と文。複数のケースを並べたアーム（対象の型は変わらない）
+  @mark export op variants(page: Page): string
+  {
+    const text = match page by PageKind {
+      IsReady | IsFailed => load("page");
+      IsCode             => codeText(page);
+      default            => none;
+    };
+    match page by PageKind {
+      IsReady           => show("ready");
+      IsFailed | IsCode => none;
+      default           => none;
+    };
+    return "done";
+  }
+
+  // 型で決まる状態の分類（variant）: 対象の状態を読んでから分ける
+  export op stageText(): string
+  {
+    return match by Stage {
+      Showing => titleOf(stage);
+      Broken  => stage.reason;
+      default => "none";
+    };
+  }
+
+  // 述語で決まる値の分類の return match: 判定関数と失敗の扱い、switch k<n>。default の節がないので、後ろに return を置く。
+  // ケースで絞り込んだ型（Size.Big<Item>）は、Go では同じ型
+  @mark export op sizeLabel(item: Item): string
+  {
+    return match item by Size {
+      Small => "small";
+      Big   => bigOnly(item);
+      Tiny  => load(item.name);
+    };
+  }
+
+  // 述語で決まる分類を、純粋で失敗しない配線が使う（判定の誤りを返す先がない）
+  export op pureLabel(item: Item): string
+  {
+    return match item by Size {
+      Big | Small => "normal";
+      Tiny        => "tiny";
+    };
+  }
+
+  // 絞り込みが predicate: Go の型が違えば <絞り込んだ型>(<対象>)、省略可能を外すなら *<対象>
+  export op mail(addr: string, contact: string?): string
+    throws Bad
+  {
+    const first = match addr by Address {
+      Valid   => send(addr);
+      default => "invalid";
+    };
+    show(first);
+    return match contact by Contact {
+      Mail    => send(contact);
+      Text    => contact;
+      default => fail();
+    };
+  }
+
+  // 述語で決まる op の分類: const と、「返らない」呼び出し・throw のアーム
+  @mark export op price(name: string): int
+    throws Bad
+  {
+    const item = findItem(name);
+    const value = match item by Stock {
+      InStock => priceOf(item);
+      SoldOut => throw Bad;
+      default => fail();
+    };
+    return value;
+  }
+
+  // 対象が名前でない Atom（リテラル、レコードリテラル）: v<n> に束縛してから分ける
+  export op literalSubjects(): string
+    throws Bad
+  {
+    const a = match "x@example.com" by Address {
+      Valid   => "ok";
+      default => "ng";
+    };
+    show(a);
+    return match { name: "box", price: 3 } by Size {
+      Big     => "big";
+      Small   => "small";
+      Tiny    => throw Bad;
+    };
+  }
+
+  // 述語で決まる状態の分類: 文の match（error を返す呼び出しと、none のアーム）
+  export op checkoutNote()
+  {
+    match by Checkout {
+      Shopping => show("shopping");
+      Ordered  => none;
+    };
+  }
+}

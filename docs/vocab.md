@@ -38,7 +38,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
   /** 制約の違反一つ。path は通信の上の場所、constraint は valid の語彙のデコレータの名前 */
   model Violation { path: string; constraint: string; }
   /** 要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない） */
-  exception BadRequest: { message: string; violations: Violation[]; }
+  exception BadRequest: { message: string; violations: Violation[]; };
 ```
 
 - `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator stdio throws Crashed | MalformedOutput;`）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。

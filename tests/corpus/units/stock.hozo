@@ -1,4 +1,4 @@
-// docs/emit-go.md「配置」: shop の出力（gen/api）が、この名前空間の出力（gen/stock）の型を import する。
+// docs/config.md「型の置き場」: shop の出力（gen/api、gen/batch）が、この名前空間の出力（gen/stock）の型を import する。
 // stock の出力は shop の型を使わないので、import は一方向。
 
 /** 在庫 */

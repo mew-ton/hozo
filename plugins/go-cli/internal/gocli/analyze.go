@@ -52,7 +52,7 @@ func (k kind) label() string {
 type program struct {
 	Namespace string // 見る側の名前空間の FQN
 	Package   string // 名前空間のパッケージの名前（import に使う名前。Imports.Add の戻り値）
-	Imports   *golang.Imports
+	Imports   *cliImports
 	Commands  []*command // 宣言順
 }
 
@@ -126,7 +126,7 @@ func analyze(view *ir.View, nsImportPath string) (*program, error) {
 		return nil, &analyzeError{Err: fmt.Errorf("namespace %q is not in the program", view.Viewer)}
 	}
 	a := &analyzer{view: view, prog: view.Program}
-	a.imports = &golang.Imports{Viewer: view.Viewer, Resolve: a.resolve}
+	a.imports = &cliImports{Viewer: view.Viewer, Resolve: a.resolve}
 	for _, p := range stdImports {
 		a.imports.Add(p, p[strings.LastIndexByte(p, '/')+1:])
 	}
@@ -177,7 +177,7 @@ var stdImports = []string{
 type analyzer struct {
 	view         *ir.View
 	prog         *ir.Program
-	imports      *golang.Imports
+	imports      *cliImports
 	nsImportPath string
 	pkg          string
 	errors       []plugin.Diagnostic
@@ -188,7 +188,7 @@ func (a *analyzer) errorf(code, at, format string, args ...any) {
 	a.errors = append(a.errors, plugin.Diagnostic{Code: code, At: at, Message: fmt.Sprintf(format, args...)})
 }
 
-// resolve は参照の FQN をすべて見る側の名前空間のパッケージの型にする（golang.Resolver）。
+// resolve は参照の FQN をすべて見る側の名前空間のパッケージの型にする（resolver）。
 // 別の名前空間の型は、既定の出力が見る側のパッケージに複製する（docs/emit-go.md「配置」）ものとして、
 // その宣言の名前空間でセグメントを切った名前にする。
 func (a *analyzer) resolve(fqn string) (namespace, pkgPath, pkgName string, local bool) {
@@ -212,7 +212,7 @@ func (a *analyzer) namespaceOf(fqn string) string {
 
 // typeName は宣言の FQN を、見る側のパッケージで修飾した Go の型にする。
 func (a *analyzer) typeName(fqn string) string {
-	return golang.GoType(ir.Ref(fqn), a.imports)
+	return goType(ir.Ref(fqn), a.imports)
 }
 
 // command は op 一つを command にする。CLI-1 なら nil（誤りは a.errors に足す）。

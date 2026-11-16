@@ -1,0 +1,15 @@
+# a（基底 go）は、配線が呼ぶ b.g の引数の型 b.M と、match に使う述語で決まる分類 c.Kind を使う。
+# b の単位は基底が go-b で、c には単位がない → CFG-22 が二つ（b と c）
+# ERROR: CFG-22
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go-b"]
+out         = "gen/b"

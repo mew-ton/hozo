@@ -13,7 +13,6 @@ import {
   type ImportRequest,
   type ImportResponse,
   type PluginError,
-  type Select,
 } from "./protocol.js";
 import type { Decl, Namespace, Program, View, ViewedSignature } from "./ir.js";
 
@@ -82,13 +81,6 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
         const r = (await handler.emit(head as EmitRequest)) ?? ({} as Partial<EmitResponse>);
         const out: EmitResponse = { files: r.files ?? [], warnings: r.warnings ?? [] };
         if (r.errors && r.errors.length > 0) out.errors = r.errors;
-        // select は常に四つの列を持つ形で書く（空でも []。docs/plugin-protocol.md「emit」の例）。
-        out.select = {
-          roots: r.select?.roots ?? [],
-          stops: r.select?.stops ?? [],
-          states: r.select?.states ?? [],
-          wraps: r.select?.wraps ?? [],
-        } satisfies Select;
         resp = out;
         break;
       }
@@ -151,8 +143,8 @@ export function signature(view: View, op: string): ViewedSignature | undefined {
 /**
  * view.viewer の名前空間の op のうち、単位の対象（span.file が view.files にある。docs/config.md「in」）で、
  * デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。名前付きデコレータを通して付いたもの
- * （Application の via）も数える。デコレータで起点を選ぶトランスパイラのための道具で、返す op はどれも select に書ける
- * （docs/plugin-protocol.md「選択」。Go の plugin.OpsWith と同じ）。
+ * （Application の via）も数える。相乗りが自分の対象を探すための道具（docs/plugin-protocol.md「選択をなくしたこと」。
+ * Go の plugin.OpsWith と同じ）。
  */
 export function opsWith(view: View, decorator: string): string[] {
   const out: string[] = [];
@@ -163,6 +155,16 @@ export function opsWith(view: View, decorator: string): string[] {
     if (decl.decorators.some((a) => a.decorator === decorator || a.via === decorator)) out.push(decl.name);
   }
   return out;
+}
+
+/**
+ * 起動されたトランスパイラへのオプション request.view.config.options[request.transpiler]（docs/config.md「オプション」、
+ * docs/plugin-protocol.md「emit」）。書かれていなければ空のテーブル。キーと値の型を確かめるのは呼ぶ側で、知らないキーと
+ * 型の違う値は、emit の応答の errors で返す（Go の plugin.Options に当たる）。
+ */
+export function options(request: EmitRequest): Record<string, unknown> {
+  const all = request.view?.config?.options ?? {};
+  return Object.hasOwn(all, request.transpiler) ? (all[request.transpiler] ?? {}) : {};
 }
 
 /**

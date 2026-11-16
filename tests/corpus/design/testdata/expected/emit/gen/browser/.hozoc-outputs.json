@@ -1,8 +1,13 @@
 [
   "gen/browser/classify.go",
+  "gen/browser/doc.go",
+  "gen/browser/inner/classify.go",
+  "gen/browser/inner/doc.go",
+  "gen/browser/inner/ops.go",
+  "gen/browser/inner/states.go",
+  "gen/browser/inner/types.go",
+  "gen/browser/inner/wiring.go",
   "gen/browser/ops.go",
   "gen/browser/states.go",
-  "gen/browser/types.go",
-  "gen/browser/validate.go",
-  "gen/browser/wiring.go"
+  "gen/browser/types.go"
 ]

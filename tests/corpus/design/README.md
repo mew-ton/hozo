@@ -4,8 +4,7 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | 単位（`[[emit]]`）が二つ: `namespace = "server"` と `namespace = "browser"`。どちらも `transpilers = ["pick"]`（Go のトランスパイラ。下の表の 1） |
-| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`。トランスパイラ `pick` を提供する）のマニフェストと `pick.json`。設計書のプラグインの代わりに、既定の出力の対象を語彙のデコレータで選ぶ（下の「既定の出力」） |
+| `hozo.toml` | 単位（`[[emit]]`）が四つ: `namespace = "server"`、`"browser"` と、使う型の置き場の `"http"`、`"page"`。どれも `transpilers = ["go"]`（Go の基底。リポジトリの `plugins/go`。テストが `HOZO_PLUGIN_PATH` として渡す。下の表の 1） |
 | `server.hozo` | `namespace server` の例すべてと、§6.5 の `namespace valid { decorator checkDigit ... }` |
 | `browser.hozo` | `namespace browser` の例すべて |
 
@@ -19,7 +18,7 @@
 
 | # | 設計書の箇所と原文 | このコーパスでの書き方 | 理由 |
 |---|---|---|---|
-| 1 | §4.5 `[browser] language = "ts"`、`plugins = [...]`（名前空間ごとのテーブル） | 単位の一覧（`[[emit]]`）で、`server` も `browser` も `transpilers = ["pick"]`（テスト用の Go のトランスパイラ） | `hozo.toml` は名前空間ごとのテーブルではなく単位の一覧（`docs/config.md`「形」、`docs/decisions.md`「設計書を変える決定」S14）。言語はトランスパイラが持つ。TS の既定の出力は段階 5 まで存在せず、TS のトランスパイラを書けば CFG-11 のエラー（`docs/config.md`「診断」、`docs/decisions.md` 6）。設計書のプラグイン（http のサーバー、ルーター、db）はまだないので、そのトランスパイラを書けば CFG-14。出力の対象を選ぶために、テスト用のプラグインを置く（下の「既定の出力」） |
+| 1 | §4.5 `[browser] language = "ts"`、`plugins = [...]`（名前空間ごとのテーブル） | 単位の一覧（`[[emit]]`）で、`server` も `browser` も `transpilers = ["go"]`（Go の基底）。語彙の `http` と `page` にも `go` の単位を足す | `hozo.toml` は名前空間ごとのテーブルではなく単位の一覧（`docs/config.md`「形」、`docs/decisions.md`「設計書を変える決定」S14）。言語はトランスパイラが持つ。TS の基底はまだないので、`browser` も Go で出力する。設計書のプラグイン（http のサーバー、ルーター、db）は並べない（相乗りの `go-http` などは、このコーパスの語彙の使い方を対象にしていない）。`http` と `page` の単位は、`server` と `browser` が使う語彙の型（例外、`page.Route`）の置き場（`docs/config.md`「型の置き場」。なければ CFG-22） |
 | 2 | §7.1 `model LoginInput { @http.header(name: "Authorization") token?: Token; ... }`、§9 `model LogoutInput { ... token?: Token; }`、§11.2 `model OrdersQuery { page: PosInt = 1; status?: server.OrderStatus; }` | `token: Token?`、`status: server.OrderStatus?` | 省略可能は型の `?` だけで書く（`docs/grammar.md`「決めたこと」、`docs/decisions.md` 8、「設計書へ返すこと」の「省略可能の書き方」） |
 | 3 | §5.2 `@page.path state location: single<Route>;` | `single<page.Route>` | `Route` は語彙 `page` の宣言なので修飾する（`docs/resolve.md`「手続き」、`docs/decisions.md`「設計書へ返すこと」の「`location` の型」） |
 | 4 | §5.2 `namespace browser { @localStorage state token: single<Token?>; }` | `nullable<server.Token>` | 二つの理由。(a) `Token` は `server` の scalar（§6.5）。別の名前空間の宣言は常に修飾する（§3.2、NS-1）。写したままだと RES-1（`docs/resolve.md`「診断」、`docs/decisions.md`「設計書へ返すこと」の「`Token` の修飾」）。(b) 空になりうる状態は `nullable<T>` と書く（`docs/decisions.md`「設計書を変える決定」S2）。`single<T?>` も同じ型（`nullable<T>`）として読める（S21）が、コーパスは形の語で書く |
@@ -56,17 +55,17 @@
 - union: `ProductPage`（§10.2 `when: ProductPage.Ready`）
 - op: `chooseStandardWarranty`（§10.2 の `match` のアーム。葉）、`chooseWarrantyPlan`（表の 12）、`askWarrantyPlan`（`@page.dialog`）、`productPageVm`、`fetchItem`、`openProduct`（§10.2 `page: openProduct`。`@unavailableOnFailure` と `@page.route("/product", from: query)` を付けた配線）
 
-## 既定の出力
+## 出力
 
-既定の出力は、プラグインが選んだ宣言だけを出す（`docs/emit-go.md`「出力の対象」）。設計書のプラグインがまだないので、テスト用の `pick`（`tests/plugins/pick`）が、`plugins/pick/pick.json` に書いた語彙のデコレータで選ぶ。設計書の例（`docs/plugin-protocol.md`「選択」の `roots` / `stops` / `states`）に合わせた選び方:
+`testdata/expected/emit/` は、基底 `go` が出したもの（`docs/plugin-go.md`）。実装が書いたものを `-update` で置いた、後戻りの検出のためのゴールデン（`docs/testing.md`「コーパス」）。
 
-| `select` | デコレータ | 選ばれるもの |
-|---|---|---|
-| `roots` | `http.get`、`http.post`（http のサーバー）、`page.route`、`page.interaction`（ルーター） | `server` は `login` などの API の op。`browser` は `openOrders` / `openProfile` / `openProduct` と `onAddToCart`、そこから配線で辿られる op |
-| `stops` | `page.dialog` | `browser` の `askYamadaWarranty` / `askWarrantyPlan`（口だけを出す） |
-| `states` | `db` | `server` の `@db` の状態 |
+| 出力 | 中身 |
+|---|---|
+| `gen/server/` | `server` は内部の op を持つので、定義は内側のフォルダ `inner/`、入口は `export` の op だけの `Ops` と、型・状態の単位の再公開（`docs/plugin-go.md`「内側のフォルダと入口」）。すべての op が出る（配線は `inner/wiring.go`、本体のない op は置き場ごとの口） |
+| `gen/browser/` | 同じく `inner/` と入口。述語で決まる分類（`WarrantyKind`、`WarrantyAvailable`）の `classify.go`、`server` の op の口 `ServerOps`、`server` の入口のパッケージの型の import |
+| `gen/http/`、`gen/page/` | 語彙の型（`http` の例外、`page.Route` など）だけ。op を持たないので、`inner/` はない |
 
-選ばれない宣言は出力されない: `server` の `placeOrder` / `saveOrder` / `sendOrderNotice` / `cancelOrder`（`@http.*` が付いていない）、`browser` の `logout` / `requestLogout` / `clearToken`（どの起点からも辿られない）。`@page.route` や `@page.fallback` などのデコレータは、どのプラグインも `wraps` で引き受けていないので、包む関数にならない。`browser` は、`server` の出力が持つ型（API の op から辿れるもの）を import する。
+相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。
 
 ## 設計書の例が規則に触れるところ
 

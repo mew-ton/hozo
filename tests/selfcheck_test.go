@@ -35,8 +35,8 @@ func TestSelfCheck(t *testing.T) {
 	t.Logf("hozoc check:\n%s", stdout.String())
 }
 
-// TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、既定の出力（internal/gen/hozoc/ の下）と
-// go-cli の internal/gen/hozoc/cli/cli.go を書く予定にすること。go-cli は `go run` で動く（docs/plugin-go-cli.md）ので、
+// TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、二つの単位の出力（基底 go の internal/gen/hozoc/ と
+// internal/gen/proc/ の下）と、go-cli の internal/gen/hozoc/cli/cli.go を書く予定にすること。go-cli は `go run` で動く（docs/plugin-go-cli.md）ので、
 // go がなければ飛ばす。
 func TestSelfEmitDryRun(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
@@ -58,8 +58,8 @@ func TestSelfEmitDryRun(t *testing.T) {
 	}
 	cli := false
 	for _, p := range written {
-		if !strings.HasPrefix(p, "internal/gen/hozoc/") {
-			t.Errorf("%s は internal/gen/hozoc/ の下にない", p)
+		if !strings.HasPrefix(p, "internal/gen/hozoc/") && !strings.HasPrefix(p, "internal/gen/proc/") {
+			t.Errorf("%s は internal/gen/hozoc/ にも internal/gen/proc/ にもない", p)
 		}
 		if p == "internal/gen/hozoc/cli/cli.go" {
 			cli = true

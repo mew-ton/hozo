@@ -1,0 +1,19 @@
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-x"]
+out         = "gen/a"
+
+[emit.options.go-x]
+validate = true
+limits   = { max = 3, tags = ["a", "b"] }
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go-b"]
+out         = "gen/b"
+
+[emit.options.go-b]
+ratio = 0.5

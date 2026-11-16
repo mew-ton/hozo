@@ -9,16 +9,16 @@ import (
 )
 
 // TestUnitsCorpus は tests/corpus/units（単位のコーパス。README.md）を実物の `hozoc emit` で展開し、hozo.toml の単位の一覧
-// （docs/config.md「単位」「単位の対象」「in」）がそのとおりに出力になることを確かめる。トランスパイラは tests/plugins/pick の
-// 四つ（一つのプラグインが提供する。要求の transpiler で規則が分かれる）。出力の全体は TestCorpusEmitGolden のゴールデンが、
-// 書き出した Go がコンパイルできることは同じテストの go vet が確かめる。
+// （docs/config.md「単位」「単位の対象」「in」「型の置き場」）がそのとおりに出力になることを確かめる。トランスパイラは、四つの単位とも、
+// リポジトリの plugins/ の基底 go。出力の全体は TestCorpusEmitGolden のゴールデンが、書き出した Go がコンパイルできることは
+// 同じテストの go vet が確かめる。
 func TestUnitsCorpus(t *testing.T) {
 	requireGo(t)
 	root, before := copyCorpusAsModule(t, "units")
 	emit := func(t *testing.T, args ...string) (map[string][]byte, string) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := hozocMainIn(root, append([]string{"emit"}, args...), &stdout, &stderr); code != 0 {
+		if code := hozocCorpus(t, root, append([]string{"emit"}, args...), &stdout, &stderr); code != 0 {
 			t.Fatalf("hozoc emit %v の終了コード %d\n%s%s", args, code, stdout.String(), stderr.String())
 		}
 		got := readTree(t, root)
@@ -48,56 +48,63 @@ func TestUnitsCorpus(t *testing.T) {
 		}
 	}
 
-	t.Run("config.md 単位/同じ名前空間の二つの単位は、別のトランスパイラで別の out に独立に出力する", func(t *testing.T) {
-		// 単位 2（pick-api、gen/api）: 起点は @t.api の open
-		want(t, "gen/api/ops.go", []string{"type OpenFunc func(", "type SaveFunc func(", "type IssueFunc func("}, []string{"ReportFunc", "SweepFunc"})
-		// 単位 3（pick-batch、gen/batch）: 起点は @t.batch の nightly と report。open は選んでいない
-		want(t, "gen/batch/ops.go", []string{"type NightlyFunc func(", "type SweepFunc func(", "type ReportFunc func("}, []string{"OpenFunc", "IssueFunc"})
-		// それぞれが自分の Item を持つ。同じ名前空間を出力する別の単位のパッケージは import しない
-		want(t, "gen/api/types.go", []string{"type Item struct {", "type Receipt struct {"}, []string{"gen/batch", "type Report struct"})
-		want(t, "gen/batch/types.go", []string{"type Item struct {", "type Report struct {"}, []string{"gen/api", "type Receipt struct"})
+	t.Run("config.md 単位/同じ名前空間の二つの単位は、別の out に独立に出力する", func(t *testing.T) {
+		// 単位 2（gen/api）と単位 3（gen/batch）は、どちらも shop。shop は内部の op を持つので、定義は内側のフォルダ inner
+		// （docs/plugin-go.md「内側のフォルダと入口」）。それぞれが自分の型をすべて持ち、同じ名前空間を出力する別の単位の
+		// パッケージは import しない
+		for _, dir := range []string{"gen/api", "gen/batch"} {
+			want(t, dir+"/inner/types.go", []string{"type Item struct {", "type Receipt struct {", "type Report struct {"}, []string{"gen/api", "gen/batch"})
+			want(t, dir+"/types.go", []string{"type Item = inner.Item", "type Report = inner.Report"}, nil)
+		}
 		for _, dir := range []string{"gen/stock", "gen/api", "gen/batch", "gen/admin"} {
 			if file(dir+"/.hozoc-outputs.json") == "" {
 				t.Errorf("%s/.hozoc-outputs.json がない（記録は出力ごと）", dir)
 			}
 		}
 	})
-	t.Run("config.md in と emit-go.md 出力の対象 2/in の外の op は口だけを出す", func(t *testing.T) {
-		// nightly は shop/batch.hozo の配線。単位 2 の in は shop/api.hozo だけなので、open から辿られて選ばれるが、
-		// 本体は出さず Leaves の口になる。本体が呼ぶ sweep は選ばれない
-		want(t, "gen/api/ops.go", []string{"type NightlyFunc func(item Item) error", "return o.leaves.Nightly(item)"}, []string{"Sweep"})
-		want(t, "gen/api/wiring.go", []string{"func (o *ops) Open(item Item) (Receipt, error) {", "o.Nightly(item)"}, []string{"func (o *ops) Nightly("})
-		// 単位 3 は in を省いているので、同じ nightly の本体を出す
-		want(t, "gen/batch/wiring.go", []string{"func (o *ops) Nightly(item Item) error {", "o.Sweep(item)"}, nil)
-		// pick-api は @t.batch も読む（pick.json）が、SDK の plugin.OpsWith は単位の対象の op だけを返すので、
-		// in の外の nightly と report は起点にならない（PLG-3 にもならない）
-		want(t, "gen/api/ops.go", nil, []string{"ReportFunc"})
-	})
-	t.Run("emit-go.md 出力の対象/選ばれた宣言が参照する型は in の外でも出力する", func(t *testing.T) {
-		// 単位 3 の nightly（batch.hozo）の引数の型 Item は api.hozo の宣言。in を絞った単位でも同じ規則（app の TestEmitIn）
-		want(t, "gen/batch/types.go", []string{"type Item struct {"}, nil)
+	t.Run("config.md in と plugin-go.md 出力の対象/in が絞るのは op だけ", func(t *testing.T) {
+		// 単位 2 の in は shop/api.hozo だけ。型（Report は batch.hozo の宣言）と状態は、in によらずすべて出る（上のサブテスト）。
+		// op は、単位の対象のもの（open、save、issue）と、単位の対象の配線 open が呼んでいる nightly（batch.hozo の配線）。
+		// nightly は、本体を出さず、人が実装する葉（Leaves の口）として出す。nightly が呼ぶ sweep と、呼ばれていない report は出ない
+		want(t, "gen/api/inner/ops.go", []string{"\tNightly(ctx context.Context, item Item) error", "return o.leaves.Nightly(ctx, item)"}, []string{"Sweep", "Report"})
+		want(t, "gen/api/inner/wiring.go", []string{"func (o *ops) Open(ctx context.Context, item Item) (Receipt, error) {", "o.Nightly(ctx, item)"}, []string{"func (o *ops) Nightly("})
+		// 単位 3 は in を省いているので、同じ nightly の本体を出し、sweep（純粋で失敗しない葉: ctx も error もない）と report も出す
+		want(t, "gen/batch/inner/wiring.go", []string{"func (o *ops) Nightly(ctx context.Context, item Item) error {", "o.Sweep(item)"}, nil)
+		want(t, "gen/batch/inner/ops.go", []string{"\tSweep(item Item)\n", "\tReport(ctx context.Context) (Report, error)"}, nil)
 	})
 	t.Run("config.md 単位の対象/別の単位が名指しした子孫は外れる", func(t *testing.T) {
-		want(t, "gen/admin/ops.go", []string{"package admin", "type BanFunc func("}, nil)
+		want(t, "gen/admin/inner/ops.go", []string{"package inner", "\tBan(ctx context.Context, item shop.Item) error"}, nil)
+		want(t, "gen/admin/doc.go", []string{"package admin"}, nil)
 		for p := range got {
 			if strings.HasPrefix(p, "gen/api/admin/") || strings.HasPrefix(p, "gen/batch/admin/") {
 				t.Errorf("祖先の単位が shop.admin を出力した: %s", p)
 			}
 		}
 	})
-	t.Run("emit-go.md 配置/単位をまたぐ import は一方向で、設定の順で最初にその型を持つ単位から", func(t *testing.T) {
-		// shop（gen/api、gen/batch）→ stock（gen/stock）: Item.id の型 stock.ItemId
-		want(t, "gen/api/types.go", []string{`"github.com/mew-ton/hozo/gen/stock"`, "stock.ItemId"}, []string{"type ItemId string"})
-		want(t, "gen/batch/types.go", []string{`"github.com/mew-ton/hozo/gen/stock"`}, nil)
-		// shop.admin（gen/admin）→ shop: shop を出力する単位は 2（gen/api）と 3（gen/batch）で、どちらの出力も Item を持つ。
-		// 設定の順で最初の 2 から import する
-		want(t, "gen/admin/ops.go", []string{`"github.com/mew-ton/hozo/gen/api"`, "item shop.Item"}, []string{"gen/batch"})
+	t.Run("config.md 型の置き場/単位をまたぐ import は一方向で、置き場は設定の順で最初の単位", func(t *testing.T) {
+		// shop（gen/api、gen/batch）→ stock（gen/stock）: Item.id の型 stock.ItemId。複製しない
+		want(t, "gen/api/inner/types.go", []string{`"github.com/mew-ton/hozo/gen/stock"`, "stock.ItemId"}, []string{"type ItemId string"})
+		want(t, "gen/batch/inner/types.go", []string{`"github.com/mew-ton/hozo/gen/stock"`}, []string{"type ItemId string"})
+		// shop.admin（gen/admin）→ shop: shop を出力する単位は 2（gen/api）と 3（gen/batch）。設定の順で最初の 2 の、入口のパッケージを
+		// import する（内側は import しない）
+		want(t, "gen/admin/inner/ops.go", []string{`shop "github.com/mew-ton/hozo/gen/api"`, "item shop.Item"}, []string{"gen/batch", "gen/api/inner"})
 		// stock は誰も import しない
 		for p, content := range got {
 			if strings.HasPrefix(p, "gen/stock/") && (strings.Contains(string(content), "gen/api") || strings.Contains(string(content), "gen/batch")) {
 				t.Errorf("%s が shop の出力を import している", p)
 			}
 		}
+	})
+	t.Run("plugin-go.md 内側のフォルダと入口/内部の op を持たない出力は分けない", func(t *testing.T) {
+		// stock の op は reserve だけで、export。一つのパッケージがすべての定義を持つ
+		want(t, "gen/stock/ops.go", []string{"package stock", "\tReserve(ctx context.Context, id ItemId) error"}, nil)
+		for p := range got {
+			if strings.HasPrefix(p, "gen/stock/inner/") {
+				t.Errorf("内部の op を持たない出力に、内側のフォルダがある: %s", p)
+			}
+		}
+		// 入口の Ops は export の op だけ。shop の op はどれも内部なので、入口の Ops は空
+		want(t, "gen/api/ops.go", []string{"type Ops interface{}", "return inner.New(leaves, items, stock)"}, nil)
 	})
 	t.Run("cli.md emit 1/引数は名前空間で、それを出力するすべての単位の分を書き出す", func(t *testing.T) {
 		full := got
@@ -121,39 +128,8 @@ func TestUnitsCorpus(t *testing.T) {
 		}
 		// どの単位の対象でもない名前空間（語彙の t）は UnknownNamespace（64）
 		var out, errOut bytes.Buffer
-		if code := hozocMainIn(root, []string{"emit", "t"}, &out, &errOut); code != 64 || !strings.Contains(errOut.String(), "どの単位の対象でもない") {
+		if code := hozocCorpus(t, root, []string{"emit", "t"}, &out, &errOut); code != 64 || !strings.Contains(errOut.String(), "どの単位の対象でもない") {
 			t.Errorf("emit t: code=%d stderr=%q", code, errOut.String())
-		}
-		emit(t) // 以降のサブテストのために、すべてを書き直す
-	})
-	t.Run("plugin-protocol.md 選択/単位の対象でない宣言を選べば PLG-3", func(t *testing.T) {
-		// pick の fqnRoots は FQN を確かめずに roots に入れる。report は batch.hozo の宣言で、単位 2 の in の外
-		rules := filepath.Join(root, "plugins", "pick", "pick.json")
-		orig, err := os.ReadFile(rules)
-		if err != nil {
-			t.Fatal(err)
-		}
-		bad := strings.Replace(string(orig), `"pick-api": { "roots": ["t.api", "t.batch"] }`, `"pick-api": { "roots": ["t.api"], "fqnRoots": ["shop.report"] }`, 1)
-		if bad == string(orig) {
-			t.Fatal("pick.json の pick-api の規則を書き換えられない")
-		}
-		if err := os.WriteFile(rules, []byte(bad), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		var stdout, stderr bytes.Buffer
-		code := hozocMainIn(root, []string{"emit"}, &stdout, &stderr)
-		if code != 70 || stdout.String() != "" || !strings.Contains(stderr.String(), "PLG-3") ||
-			!strings.Contains(stderr.String(), `roots の "shop.report" は単位の対象でない（in の外の shop/batch.hozo で宣言されている）`) {
-			t.Errorf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
-		}
-		// 同じ FQN でも、in を省いた単位 3（pick-batch）なら選べる
-		ok := strings.Replace(string(orig), `"pick-batch": { "roots": ["t.batch"] }`, `"pick-batch": { "fqnRoots": ["shop.report", "shop.nightly"] }`, 1)
-		if err := os.WriteFile(rules, []byte(ok), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		again, _ := emit(t)
-		if !bytes.Equal(again["gen/batch/ops.go"], got["gen/batch/ops.go"]) {
-			t.Errorf("FQN で選んだ gen/batch/ops.go が、デコレータで選んだときと違う")
 		}
 	})
 }

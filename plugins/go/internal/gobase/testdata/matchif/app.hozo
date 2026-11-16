@@ -1,0 +1,163 @@
+// docs/plugin-go.md「match」の、二つに分ける形（標準の分類 nullable / list と、絞り込みが presence の型で決まる分類）と、
+// 使われ方（return / const / 文）ごとのアームの本体の組を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** 二つに分ける match */
+namespace app {
+  scalar Token extends string;
+  model User { name: string; nick: string?; }
+  model Line { item: string; }
+  model Input { user: User?; id: string; }
+  exception Missing;
+  exception Denied;
+  /** 印。付いた op は純粋でなくなる */
+  decorator mark;
+
+  /** 手元のトークン */
+  state token: nullable<Token>;
+
+  @mark export op findUser(id: string): User?;
+  export op lookup(id: string): User?;
+  export op nameOf(user: User): string;
+  @mark export op loadName(user: User): string;
+  export op deny(): never throws Denied;
+  export op show(text: string);
+  @mark export op record(text: string);
+  export op countOf(lines: Line[]): int;
+  export op countTags(tags: string[]): int;
+  export op useToken(token: Token): string;
+  export op takeOptionalUser(user: User?);
+
+  /** 型で決まる op の分類（絞り込みは presence） */
+  classify Lookup of findUser {
+    Found: findUser as User;
+    default;
+  }
+  /** 型で決まる値の分類（絞り込みは presence） */
+  classify Present of nullable<User> {
+    Some: nullable<User> as User;
+    default;
+  }
+  /** 型で決まる状態の分類（絞り込みは presence） */
+  classify SignedIn of token {
+    Yes: token as Token;
+    default;
+  }
+
+  // return match: 呼び出し（error を返す）と throw。アームを書いた順によらず、値のある場合が if の枝。else を書かない
+  @mark export op nameById(id: string): string
+    throws Missing
+  {
+    const user = findUser(id);
+    return match user by Lookup {
+      default => throw Missing;
+      Found   => loadName(user);
+    };
+  }
+
+  // return match: 値（絞り込んだ対象のフィールドを読むだけなら、元の式のまま）と none
+  export op nickOf(user: User?): string?
+  {
+    return match user by nullable {
+      HasItems => user.nick;
+      Empty    => none;
+    };
+  }
+
+  // return match: 呼び出し（error を返さない。絞り込んだ値は *<対象>）と「返らない」呼び出し
+  export op pureName(user: User?): string
+    throws Denied
+  {
+    return match user by Present {
+      Some    => nameOf(user);
+      default => deny();
+    };
+  }
+
+  // return match: 呼び出しの結果の型をそろえる（string → string?）。対象がパス
+  @mark export op widened(in: Input): string?
+  {
+    return match in.user by nullable {
+      HasItems => loadName(in.user);
+      Empty    => none;
+    };
+  }
+
+  // return match: 絞り込みで Go の型が変わらない対象（array）
+  export op tagCount(tags: string[]?): int
+  {
+    return match tags by nullable {
+      HasItems => countTags(tags);
+      Empty    => 0;
+    };
+  }
+
+  // return match: 対象が状態（先に読む）。型で決まる状態の分類は、対象の状態を読んでから分ける
+  export op tokenText(): string
+  {
+    return match token by nullable {
+      HasItems => useToken(token);
+      Empty    => "none";
+    };
+  }
+  export op signedInText(): string
+  {
+    return match by SignedIn {
+      Yes     => useToken(token);
+      default => "anonymous";
+    };
+  }
+
+  // const x = match: var x <match の型> を先に置く。呼び出し（error を返す / 返さない）、値、none（何も書かない）、
+  // throw、使っていない束縛（match の後ろに _ = x）
+  @mark export op constForms(id: string, lines: Line[]): string
+    throws Missing
+  {
+    const user = lookup(id);
+    const name = match user by nullable {
+      HasItems => loadName(user);
+      Empty    => "nobody";
+    };
+    const count = match lines by list {
+      HasItems => countOf(lines);
+      Empty    => 0;
+    };
+    const maybe = match user by nullable {
+      HasItems => nameOf(user);
+      Empty    => none;
+    };
+    const strict = match user by nullable {
+      HasItems => user.name;
+      Empty    => throw Missing;
+    };
+    show(name);
+    takeOptionalUser(user);
+    return strict;
+  }
+
+  // 文の match: 呼び出し（error を返す / 返さない）、none のアーム（枝を書かない。if の枝がなければ条件を逆にする）、
+  // 「返らない」呼び出し、throw、一つのアームが両方のケース（分けない）、絞り込んだ値を省略可能な位置へ
+  @mark export op statementForms(user: User?, lines: Line[])
+    throws Denied
+  {
+    match user by nullable {
+      HasItems => record(user.name);
+      Empty    => show("none");
+    };
+    match lines by list {
+      HasItems => show("some");
+      Empty    => none;
+    };
+    match user by nullable {
+      HasItems => none;
+      Empty    => deny();
+    };
+    match lines by list {
+      Empty | HasItems => show("any");
+    };
+    match user by nullable {
+      HasItems => takeOptionalUser(user);
+      Empty    => throw Denied;
+    };
+  }
+}

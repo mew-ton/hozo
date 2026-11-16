@@ -1,124 +1,145 @@
 package golang
 
 import (
-	"errors"
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/mew-ton/hozo/ir"
 )
 
+// docs/plugin-go.md「パッケージと import パス」の「import の名前」: import のブロックは、標準ライブラリ、空行、それ以外の順で、
+// それぞれパスの辞書順。一つなら一行。名前がパスの最後の要素と違えば、名前を書く。
 func TestImportsRender(t *testing.T) {
-	var im Imports
+	im := &Imports{}
 	if got := im.Render(); got != "" {
-		t.Errorf("empty Render() = %q", got)
+		t.Errorf("empty Render = %q", got)
 	}
-	if got := im.Add("time", "time"); got != "time" {
-		t.Errorf("Add(time) = %q", got)
+	if name := im.Add("time", "time"); name != "time" {
+		t.Errorf("Add = %q", name)
 	}
 	if got := im.Render(); got != "import \"time\"\n" {
-		t.Errorf("single Render() = %q", got)
+		t.Errorf("一つなら一行: %q", got)
 	}
 	im.Add("github.com/mew-ton/hozo/runtime", "runtime")
 	im.Add("context", "context")
-	im.Add("example.com/app/gen/server", "server")
-	want := "import (\n\t\"context\"\n\t\"time\"\n\n\t\"example.com/app/gen/server\"\n\t\"github.com/mew-ton/hozo/runtime\"\n)\n"
+	im.Add("example.com/shop-server/gen/type", "pkgtype")
+	im.Add("example.com/shop-server/gen/server/inner", "inner")
+	want := "import (\n\t\"context\"\n\t\"time\"\n\n\t\"example.com/shop-server/gen/server/inner\"\n\tpkgtype \"example.com/shop-server/gen/type\"\n\t\"github.com/mew-ton/hozo/runtime\"\n)\n"
 	if got := im.Render(); got != want {
-		t.Errorf("Render() =\n%s\nwant\n%s", got, want)
+		t.Errorf("Render = %q\nwant %q", got, want)
 	}
-	if got := im.Paths(); len(got) != 4 || got[0] != "context" || got[3] != "time" {
-		t.Errorf("Paths() = %v", got)
+	if im.Name("time") != "time" || im.Name("example.com/shop-server/gen/type") != "pkgtype" || im.Name("nope") != "" {
+		t.Errorf("Name: %q %q %q", im.Name("time"), im.Name("example.com/shop-server/gen/type"), im.Name("nope"))
 	}
-}
-
-func TestImportsAlias(t *testing.T) {
-	var im Imports
-	// パッケージ名がパスの最後の要素と違う。
-	if got := im.Add("example.com/app/gen/my-api", "myapi"); got != "myapi" {
-		t.Errorf("Add = %q", got)
+	if got := strings.Join(im.Paths(), ","); got != "context,example.com/shop-server/gen/server/inner,example.com/shop-server/gen/type,github.com/mew-ton/hozo/runtime,time" {
+		t.Errorf("Paths = %s", got)
 	}
-	// 同じ名前のパッケージが二つ。
-	if got := im.Add("example.com/app/gen/a/server", "server"); got != "server" {
-		t.Errorf("Add first server = %q", got)
+	if got := strings.Join(im.Names(), ","); got != "context,inner,pkgtype,runtime,time" {
+		t.Errorf("Names = %s", got)
 	}
-	if got := im.Add("example.com/app/gen/b/server", "server"); got != "server2" {
-		t.Errorf("Add second server = %q", got)
-	}
-	if got := im.Add("example.com/app/gen/a/server", "server"); got != "server" {
-		t.Errorf("Add same path again = %q", got)
-	}
-	if got := im.Name("example.com/app/gen/b/server"); got != "server2" {
-		t.Errorf("Name = %q", got)
-	}
-	if got := im.Name("missing"); got != "" {
-		t.Errorf("Name(missing) = %q", got)
-	}
-	want := "import (\n\t\"example.com/app/gen/a/server\"\n\tserver2 \"example.com/app/gen/b/server\"\n\tmyapi \"example.com/app/gen/my-api\"\n)\n"
-	if got := im.Render(); got != want {
-		t.Errorf("Render() =\n%s\nwant\n%s", got, want)
+	// 同じパスを二度足しても同じ名前
+	if im.Add("time", "time") != "time" || len(im.Paths()) != 5 {
+		t.Error("Add twice")
 	}
 }
 
-func TestImportsDeterministic(t *testing.T) {
-	var a, b Imports
-	for _, p := range []string{"time", "example.com/x/b", "example.com/x/a", "context"} {
-		a.Add(p, filepath.Base(p))
+// collisionView は、パッケージ名の当たる名前空間（a.store と b.store、標準ライブラリと同じ time、内側と同じ x.inner）の型を使う
+// 見る側 server の View。
+func collisionView() *ir.View {
+	v := viewOf("server",
+		namespace("server", with(op("server.f", nil), internal())),
+		namespace("a.store", model("a.store.A")), namespace("b.store", model("b.store.B")),
+		namespace("time", model("time.Slot")), namespace("x.inner", model("x.inner.I")),
+	)
+	for i, ns := range []string{"a.store", "b.store", "time", "x.inner"} {
+		v.Namespaces[ns] = []ir.NamespaceConfig{conf(i+2, "gen/"+strings.ReplaceAll(ns, ".", "/"))}
 	}
-	for _, p := range []string{"context", "example.com/x/a", "example.com/x/b", "time"} {
-		b.Add(p, filepath.Base(p))
-	}
-	if a.Render() != b.Render() {
-		t.Errorf("Render depends on insertion order:\n%s\n%s", a.Render(), b.Render())
-	}
+	return v
 }
 
-func TestImportPath(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("// comment\nmodule example.com/app // trailing\n\ngo 1.24\n"), 0o644); err != nil {
+// 一つのファイルの中で名前が当たるときは、名前空間の FQN の辞書順に名前を決めていき、当たった方に 2、3、… を付ける。
+// 標準ライブラリ、runtime、inner の名前は変えない。Canonical が、足した順によらず、その名前にする。
+func TestImportsCollision(t *testing.T) {
+	root := projectRoot(t)
+	v := collisionView()
+	l, err := LayoutOf(v, root)
+	if err != nil || !l.HasInner {
+		t.Fatalf("layout = %+v, %v", l, err)
+	}
+	// 入口のパッケージのファイル。型を書いた順は、辞書順と逆
+	im := NewImports(v, l, root, false)
+	for _, fqn := range []string{"x.inner.I", "time.Slot", "b.store.B", "a.store.A"} {
+		GoType(ir.Ref(fqn), im)
+	}
+	GoType(ir.Time(), im) // 標準ライブラリの time を、名前空間 time の後で足す
+	im.Add(l.DefPath, l.DefName)
+	if err := im.Err(); err != nil {
 		t.Fatal(err)
 	}
-	tests := []struct{ out, want string }{
-		{"gen", "example.com/app/gen"},
-		{"gen/server/admin", "example.com/app/gen/server/admin"},
-		{".", "example.com/app"},
-		{"", "example.com/app"},
-	}
-	for _, tt := range tests {
-		got, err := ImportPath(root, tt.out)
-		if err != nil || got != tt.want {
-			t.Errorf("ImportPath(root, %q) = %q, %v; want %q", tt.out, got, err, tt.want)
+	c := im.Canonical()
+	for fqn, want := range map[string]string{
+		"a.store.A": "store.A", "b.store.B": "store2.B", // FQN の辞書順で a.store が先
+		"time.Slot": "time2.Slot", // 標準ライブラリの time の名前は変えない
+		"x.inner.I": "inner2.I",   // 内側のパッケージ inner の名前は変えない
+	} {
+		if got := GoType(ir.Ref(fqn), c); got != want {
+			t.Errorf("GoType(%s) = %q, want %q", fqn, got, want)
 		}
 	}
-	// 下のディレクトリに別の go.mod があれば近いほうを使う。
-	sub := filepath.Join(root, "gen", "cli")
-	if err := os.MkdirAll(sub, 0o755); err != nil {
-		t.Fatal(err)
+	if got := GoType(ir.Time(), c); got != "time.Time" {
+		t.Errorf("GoType(Time) = %q", got)
 	}
-	if err := os.WriteFile(filepath.Join(sub, "go.mod"), []byte("module \"example.com/cli\"\n"), 0o644); err != nil {
-		t.Fatal(err)
+	got := c.Render()
+	for _, line := range []string{
+		"\t\"time\"\n\n",
+		"\t\"example.com/app/gen/a/store\"\n",
+		"\tstore2 \"example.com/app/gen/b/store\"\n",
+		"\t\"example.com/app/gen/server/inner\"\n",
+		"\ttime2 \"example.com/app/gen/time\"\n",
+		"\tinner2 \"example.com/app/gen/x/inner\"\n",
+	} {
+		if !strings.Contains(got, line) {
+			t.Errorf("Render に %q がない:\n%s", line, got)
+		}
 	}
-	if got, err := ImportPath(root, "gen/cli/internal"); err != nil || got != "example.com/cli/internal" {
-		t.Errorf("nested = %q, %v", got, err)
+	// 同じ import の集まりなら、Canonical は足した順によらず同じ
+	im2 := NewImports(v, l, root, false)
+	im2.Add(l.DefPath, l.DefName)
+	GoType(ir.Time(), im2)
+	for _, fqn := range []string{"a.store.A", "b.store.B", "time.Slot", "x.inner.I"} {
+		GoType(ir.Ref(fqn), im2)
 	}
-	// 存在しないディレクトリでも上へ辿る。
-	if got, err := ImportPath(root, "not/yet/created"); err != nil || got != "example.com/app/not/yet/created" {
-		t.Errorf("missing dir = %q, %v", got, err)
+	if im2.Canonical().Render() != got {
+		t.Errorf("Canonical が足した順による:\n%s\n%s", im2.Canonical().Render(), got)
+	}
+	// 入口のファイルでは、内側のパッケージを import していなくても、inner の名前は使わせない
+	im3 := NewImports(v, l, root, false)
+	if got := GoType(ir.Ref("x.inner.I"), im3); got != "inner2.I" {
+		t.Errorf("入口のファイルの x.inner: %q", got)
+	}
+	// 定義のパッケージ（内側）のファイルでは、当たるものがなければそのまま
+	im4 := NewImports(v, l, root, true)
+	if got := GoType(ir.Ref("x.inner.I"), im4); got != "inner.I" {
+		t.Errorf("定義のファイルの x.inner: %q", got)
 	}
 }
 
-func TestImportPathNoGoMod(t *testing.T) {
-	root := t.TempDir() // t.TempDir は /tmp の下で、その上に go.mod はないものとする
-	_, err := ImportPath(root, "gen")
-	if !errors.Is(err, ErrNoGoMod) {
-		t.Errorf("err = %v, want ErrNoGoMod", err)
+// Qualifier は、別の名前空間の宣言を書くときの前置き。N の宣言は修飾なし。置き場がなければ Err。
+func TestImportsQualifier(t *testing.T) {
+	root := projectRoot(t)
+	v := typesView()
+	l, _ := LayoutOf(v, root)
+	im := NewImports(v, l, root, true)
+	if got := im.Qualifier("server"); got != "" {
+		t.Errorf("Qualifier(viewer) = %q", got)
 	}
-}
-
-func TestImportPathNoModuleLine(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("go 1.24\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if got := im.Qualifier("type"); got != "pkgtype." || im.Err() != nil {
+		t.Errorf("Qualifier(type) = %q, %v", got, im.Err())
 	}
-	if _, err := ImportPath(root, "gen"); err == nil || errors.Is(err, ErrNoGoMod) {
-		t.Errorf("err = %v, want a 'no module line' error", err)
+	// 置き場のない名前空間: 修飾なしの名前を返し、Err が報告する（CFG-22 が通したはずのもの）
+	v.Program.Namespaces = append(v.Program.Namespaces, namespace("lost", model("lost.M")))
+	im = NewImports(v, l, root, true)
+	if got := GoType(ir.Ref("lost.M"), im); got != "M" || im.Err() == nil || !strings.Contains(im.Err().Error(), "lost") {
+		t.Errorf("置き場がない: %q, %v", got, im.Err())
 	}
 }

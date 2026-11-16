@@ -1,14 +1,14 @@
-// テストの語彙。plugins/pick のトランスパイラが、このデコレータを読んで起点を選ぶ（plugins/pick/pick.json）。
-// どの単位の対象でもない名前空間（出力しない）。
+// テストの語彙。どのトランスパイラも読まない印のデコレータ（読む者がなければ、何も出ない。docs/plugin-go.md「デコレータ」）。
+// 付いた op は純粋でなくなる（ctx を取り、error を返す）。どの単位の対象でもない名前空間（出力しない）。
 
 /** テストの語彙 */
 namespace t {
-  /** pick-stock が起点にする op */
+  /** stock の入口の印 */
   decorator stock;
-  /** pick-api が起点にする op */
+  /** shop の API の入口の印 */
   decorator api;
-  /** pick-batch が起点にする op。pick-api も読むが、api の単位の in の外の op は選べない */
+  /** shop のバッチの入口の印 */
   decorator batch;
-  /** pick-admin が起点にする op */
+  /** 管理の入口の印 */
   decorator admin;
 }

@@ -12,8 +12,8 @@ namespace shop {
   /** 品物を足す */
   effect addItem on items.post;
 
-  // docs/emit-go.md「出力の対象」2: nightly は shop/batch.hozo で宣言した配線。単位 2 では in の外なので、
-  // 辿られたら選ぶが本体は辿らず、口だけを出す。単位 3（in なし）では本体を出す
+  // docs/plugin-go.md「出力の対象」: nightly は shop/batch.hozo で宣言した配線。単位 2 では in の外（単位の対象でない）なので、
+  // 単位の対象の配線 open が呼んでいる分だけ、本体のない op（Leaves の口）として出す。単位 3（in なし）では本体を出す
   /** 品物を売る */
   @t.api
   op open(item: Item): Receipt

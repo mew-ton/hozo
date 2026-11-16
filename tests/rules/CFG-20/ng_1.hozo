@@ -1,0 +1,4 @@
+// CFG-20: 基底が二つ以上（ng_1.toml）
+namespace a {
+  op f();
+}

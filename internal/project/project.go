@@ -41,7 +41,7 @@ type Project struct {
 	Diags []diag.Diagnostic
 	// Plugins は入っているプラグイン（docs/plugin-protocol.md「探索」。探した順）。設定なしなら空。
 	Plugins []*hostplugin.Plugin
-	// Units は解決した単位（Config.Units と同じ順）: 言語、解決できたトランスパイラ、in に合ったファイル。
+	// Units は解決した単位（Config.Units と同じ順）: 言語、基底、解決できたトランスパイラ、単位の継ぎ目、in に合ったファイル。
 	Units []Unit
 	// RunErr はプラグインの check が proc.Crashed / proc.MalformedOutput（internal/plugin の ErrCrashed /
 	// ErrMalformedOutput）で終わったときのその誤り。最初の一つで止め、以降のプラグインは呼ばない。なければ nil。
@@ -51,11 +51,19 @@ type Project struct {
 // Unit は解決した単位（docs/config.md「単位」）。設定の単位に、マニフェストと読んだファイルから決まるものを足したもの。
 type Unit struct {
 	*config.Unit
-	// Language は単位の言語（解決できた最初のトランスパイラの language）。一つも解決できなければ ""。
+	// Language は単位の言語（単位の基底の language。docs/config.md「基底と相乗り」）。基底が決まらなければ、解決できた最初の
+	// トランスパイラの language。一つも解決できなければ ""。
 	Language string
+	// Base は単位の基底のトランスパイラの名前（requires が空の、ただ一つのトランスパイラ）。決まらなければ（CFG-20。
+	// CFG-14 / CFG-15 のある単位も）""。
+	Base string
 	// Transpilers は transpilers の名前のうち解決できたもの（書いた順）。
 	Transpilers []Transpiler
-	// Files は in に合ったファイル（Project.Sources の形、辞書順）。in を省いた単位なら Sources のすべて。
+	// Seams は単位の継ぎ目（docs/config.md「継ぎ目」）: 継ぎ目を持つデコレータの FQN → それをマニフェストの seams で宣言した
+	// 単位のトランスパイラの名前。二つ以上が宣言していれば（CFG-23）、設定の順で最初のもの。なければ空（nil ではない）。
+	Seams map[string]string
+	// Files は in に合ったユーザーのファイル（Project.Sources の形、辞書順）と、その後に、読み込んだすべての語彙のファイル
+	// （辞書順。docs/config.md「in」）。in を省いた単位なら、読み込んだすべてのファイル。
 	Files []string
 }
 
@@ -159,6 +167,10 @@ func LoadWith(opts Options) *Project {
 	checker := check.Checker{Locate: check.FileSetLocator(p.Files)}
 	diags = append(diags, checker.Check(p.Sema.Program, p.Config)...)
 	diags = append(diags, p.checkPlugins(checker)...)
+	if !p.NoConfig {
+		// CFG-22（docs/config.md「型の置き場」）
+		diags = append(diags, checker.CheckHomes(p.Sema.Program, p.Config, p.checkUnits())...)
+	}
 
 	// 4. プラグインの check（docs/cli.md「check」の 4）
 	pds, err := p.runPluginChecks(opts)
@@ -181,11 +193,16 @@ func (p *Project) Views() []map[string]*ir.View {
 	if p.Sema == nil {
 		return make([]map[string]*ir.View, len(p.Units))
 	}
+	return check.Views(p.Sema.Program, p.Config, p.checkUnits())
+}
+
+// checkUnits は、解決した単位を internal/check に渡す形にする（言語、基底、継ぎ目、in に合ったファイル）。
+func (p *Project) checkUnits() []check.Unit {
 	units := make([]check.Unit, len(p.Units))
 	for i := range p.Units {
-		units[i] = check.Unit{Language: p.Units[i].Language, Files: p.Units[i].Files}
+		units[i] = check.Unit{Language: p.Units[i].Language, Base: p.Units[i].Base, Seams: p.Units[i].Seams, Files: p.Units[i].Files}
 	}
-	return check.Views(p.Sema.Program, p.Config, units)
+	return units
 }
 
 // ManifestPath はプラグイン pl のマニフェストのパス（診断の File に使う形: ルートからの相対パス）。
@@ -211,10 +228,11 @@ func (p *Project) usedPlugins() []*hostplugin.Plugin {
 }
 
 // resolveUnits は入っているプラグインのマニフェストを探して読み（docs/plugin-protocol.md「探索」）、各単位の transpilers の
-// 名前をトランスパイラに解決して p.Units を作る（docs/config.md「単位」）。設定なしなら探索しない。
+// 名前をトランスパイラに解決して p.Units を作る（docs/config.md「単位」「基底と相乗り」「継ぎ目」）。設定なしなら探索しない。
 // 診断は MAN-3 / MAN-4（入っているプラグインのすべて）、MAN-2（使うプラグインだけ）、CFG-14（どのプラグインも提供して
 // いない）、CFG-15（二つ以上のプラグインが提供している。以降は探した順で最初のものを使う）、CFG-16（一つの単位の
-// トランスパイラの language がそろっていない）、CFG-11（単位の言語が ts）。
+// トランスパイラの language がそろっていない）、CFG-19（requires の名前が単位の transpilers にない）、CFG-20（基底が
+// ちょうど一つでない）、CFG-23（二つ以上のトランスパイラが同じデコレータの継ぎ目を宣言している）。
 func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	if p.NoConfig {
@@ -231,7 +249,11 @@ func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 	p.Units = make([]Unit, len(p.Config.Units))
 	for i := range p.Config.Units {
 		cu := &p.Config.Units[i]
-		u := Unit{Unit: cu}
+		u := Unit{Unit: cu, Seams: map[string]string{}}
+		// certain は、名前がただ一つのプラグインに解決できたトランスパイラ（CFG-14 でも CFG-15 でもない）。
+		// requires と seams を見るのは、これだけ（docs/config.md「診断」の CFG-19 / CFG-23）。
+		var certain []Transpiler
+		unresolved := false
 		for _, name := range cu.Transpilers {
 			var providers []*hostplugin.Plugin
 			for _, pl := range p.Plugins {
@@ -244,6 +266,7 @@ func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 				// CFG-14
 				errorf("CFG-14", "%sの transpilers の %s を提供するプラグインが入っていない（plugin_dirs、%s、~/.hozo/plugins を探した）",
 					cu.Label(), name, hostplugin.PluginPathEnv)
+				unresolved = true
 				continue
 			case len(providers) > 1:
 				// CFG-15
@@ -252,8 +275,13 @@ func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 					where = append(where, fmt.Sprintf("%s（%s）", pl.Name, p.ManifestPath(pl)))
 				}
 				errorf("CFG-15", "%sの transpilers の %s を、二つ以上のプラグインが提供している: %s", cu.Label(), name, strings.Join(where, "、"))
+				unresolved = true
 			}
-			u.Transpilers = append(u.Transpilers, Transpiler{Name: name, Plugin: providers[0], Decl: providers[0].Manifest.Transpiler(name)})
+			t := Transpiler{Name: name, Plugin: providers[0], Decl: providers[0].Manifest.Transpiler(name)}
+			u.Transpilers = append(u.Transpilers, t)
+			if len(providers) == 1 {
+				certain = append(certain, t)
+			}
 		}
 		if len(u.Transpilers) > 0 {
 			u.Language = u.Transpilers[0].Decl.Language
@@ -265,13 +293,68 @@ func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 					mixed = true
 				}
 			}
-			switch {
-			case mixed:
+			if mixed {
 				// CFG-16
 				errorf("CFG-16", "%sのトランスパイラの language がそろっていない: %s", cu.Label(), strings.Join(langs, "、"))
-			case u.Language == "ts":
-				// CFG-11: TS の既定の出力はまだない（段階 5 まで）
-				errorf("CFG-11", "%sの言語が \"ts\" だが、TS の出力はまだない", cu.Label())
+			}
+		}
+		// CFG-19: requires の名前が、単位の transpilers にない。足りない名前ごとに一つ（要るトランスパイラを並べる）
+		listed := map[string]bool{}
+		for _, name := range cu.Transpilers {
+			listed[name] = true
+		}
+		var missing []string
+		needs := map[string][]string{}
+		for _, t := range certain {
+			for _, r := range t.Decl.Requires {
+				if listed[r] {
+					continue
+				}
+				if _, seen := needs[r]; !seen {
+					missing = append(missing, r)
+				}
+				needs[r] = append(needs[r], t.Name)
+			}
+		}
+		for _, r := range missing {
+			errorf("CFG-19", "%sの %s は %s を要るが、transpilers にない（依存は、すべて transpilers に書く）",
+				cu.Label(), strings.Join(needs[r], "、"), r)
+		}
+		// CFG-20: 基底（requires が空）がちょうど一つでない。解決できなかった名前があれば出さない（それが基底かもしれない）
+		if !unresolved {
+			var bases []string
+			for _, t := range certain {
+				if t.Decl.IsBase() {
+					bases = append(bases, t.Name)
+				}
+			}
+			switch len(bases) {
+			case 1:
+				u.Base = bases[0]
+				u.Language = p.transpilerOf(&u, u.Base).Decl.Language
+			case 0:
+				errorf("CFG-20", "%sの transpilers に、基底（マニフェストの requires が空のトランスパイラ）が一つもない", cu.Label())
+			default:
+				errorf("CFG-20", "%sの transpilers に、基底（マニフェストの requires が空のトランスパイラ）が二つ以上ある: %s",
+					cu.Label(), strings.Join(bases, "、"))
+			}
+		}
+		// 単位の継ぎ目と CFG-23: 二つ以上のトランスパイラが、同じデコレータを seams に書いている。単位とデコレータの組ごとに一つ
+		var decorators []string
+		declarers := map[string][]string{}
+		for _, t := range certain {
+			for _, fqn := range t.Decl.Seams {
+				if _, seen := declarers[fqn]; !seen {
+					decorators = append(decorators, fqn)
+					u.Seams[fqn] = t.Name
+				}
+				declarers[fqn] = append(declarers[fqn], t.Name)
+			}
+		}
+		for _, fqn := range decorators {
+			if len(declarers[fqn]) > 1 {
+				errorf("CFG-23", "%sの二つ以上のトランスパイラが、デコレータ %s の継ぎ目を宣言している: %s",
+					cu.Label(), fqn, strings.Join(declarers[fqn], "、"))
 			}
 		}
 		p.Units[i] = u
@@ -283,27 +366,47 @@ func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 	return diags
 }
 
-// matchUnitFiles は各単位の in を読み込んだファイル（p.Sources）に照らして Files を決める（docs/config.md「in」）。
-// in を省いた単位は Sources のすべて。in の glob がどのファイルにも合わなければ CFG-18。
+// transpilerOf は単位 u の解決できたトランスパイラのうち、名前が name のもの。
+func (p *Project) transpilerOf(u *Unit, name string) *Transpiler {
+	for i := range u.Transpilers {
+		if u.Transpilers[i].Name == name {
+			return &u.Transpilers[i]
+		}
+	}
+	return nil
+}
+
+// matchUnitFiles は各単位の in を読み込んだユーザーのファイル（p.Sources）に照らして Files を決める（docs/config.md「in」）。
+// in を省いた単位は Sources のすべて。語彙のファイル（"hozo:" のパス）は、in によらず、いつも合ったものとして後ろに足す。
+// in の glob がユーザーのファイルのどれにも合わなければ CFG-18。
 func (p *Project) matchUnitFiles() []diag.Diagnostic {
 	var diags []diag.Diagnostic
+	var vocabFiles []string
+	for i := 0; i < p.Files.Len(); i++ {
+		if path := p.Files.Path(source.FileID(i)); vocab.IsVocab(path) {
+			vocabFiles = append(vocabFiles, path)
+		}
+	}
+	sort.Strings(vocabFiles)
 	for i := range p.Units {
 		u := &p.Units[i]
 		u.Files = []string{}
 		if u.In == nil {
 			u.Files = append(u.Files, p.Sources...)
-			continue
-		}
-		for _, src := range p.Sources {
-			if matchesAny(u.In, nil, src) {
-				u.Files = append(u.Files, src)
+		} else {
+			for _, src := range p.Sources {
+				if matchesAny(u.In, nil, src) {
+					u.Files = append(u.Files, src)
+				}
+			}
+			if len(u.Files) == 0 {
+				// CFG-18
+				diags = append(diags, diag.Diagnostic{Severity: diag.Error, Code: "CFG-18", File: p.Config.Path,
+					Message: fmt.Sprintf("%sの in %s が、読み込んだファイルのどれにも合わない", u.Label(), quoteList(u.In))})
+				continue // 何にも合わない単位は、語彙の名前空間も出力しない
 			}
 		}
-		if len(u.Files) == 0 {
-			// CFG-18
-			diags = append(diags, diag.Diagnostic{Severity: diag.Error, Code: "CFG-18", File: p.Config.Path,
-				Message: fmt.Sprintf("%sの in %s が、読み込んだファイルのどれにも合わない", u.Label(), quoteList(u.In))})
-		}
+		u.Files = append(u.Files, vocabFiles...)
 	}
 	return diags
 }

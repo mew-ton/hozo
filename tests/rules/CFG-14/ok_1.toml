@@ -3,5 +3,5 @@ plugin_dirs = ["plugins"]
 
 [[emit]]
 namespace   = "a"
-transpilers = ["go", "go-b"]
+transpilers = ["go", "go-x"]
 out         = "gen/a"

@@ -1,0 +1,137 @@
+// docs/plugin-go.md「呼び出し」「文」の表の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（内部の op がなければ、出力は一つのパッケージ。「内側のフォルダと入口」は、入力 layout が確かめる）。
+
+/** 文と呼び出しの形 */
+namespace app {
+  scalar Id extends string;
+  scalar Count extends int;
+  model Item { id: Id; count: int; }
+  union Shape { Thing: Item; Key: Id; }
+  exception Broken;
+  exception Gone;
+  /** 印。読むトランスパイラはない。付いた op は純粋でなくなる（ctx を取り、error を返す） */
+  decorator mark;
+
+  // 葉: error を返す
+  @mark export op load(id: Id): Item;
+  @mark export op save(item: Item);
+  @mark export op touch();
+  @mark export op find(id: Id, limit: int?, tag: string?): Item?;
+  // 葉: 純粋で失敗しない（ctx を取らず、error を返さない）
+  export op make(id: Id): Item;
+  export op note(item: Item);
+  // 葉: 純粋だが失敗する（ctx を取らず、error を返す）
+  export op parse(text: string): Id throws Broken;
+  // never を返す op
+  export op fail(): never throws Gone;
+
+  // 「文」const x = 呼び出し（error を返す op、返さない op）、使っていない束縛（WIRE-8）、const x = 値、呼び出しの文
+  @mark export op consts(id: Id): Item
+  {
+    const a = load(id);
+    const b = make(id);
+    const unused = load(id);
+    const c = b;
+    const n = 3;
+    note(a);
+    save(c);
+    return c;
+  }
+
+  // 「文」return 呼び出し: 戻り値の並びが同じ
+  @mark export op sameShape(id: Id): Item
+  {
+    return load(id);
+  }
+
+  // 「文」return 呼び出し: 呼ぶ op だけが error を返さない
+  @mark export op calleeOnlyPure(id: Id): Item
+  {
+    return make(id);
+  }
+
+  // 「文」return 呼び出し: どちらも error を返さない
+  export op bothPure(id: Id): Item
+  {
+    return make(id);
+  }
+
+  // 「文」return 呼び出し: 型をそろえる必要がある（Item → Item?）
+  @mark export op widen(id: Id): Item?
+  {
+    return load(id);
+  }
+
+  // 「文」return 値: error を返す配線と、返さない配線
+  @mark export op valueWithError(item: Item): Item
+  {
+    return item;
+  }
+  export op valueOnly(item: Item): Item
+  {
+    return item;
+  }
+
+  // 「文」「返らない」呼び出しの return と、文（戻り値のない配線。最後に return nil を足さない）
+  export op stop(id: Id): Item
+    throws Gone
+  {
+    const a = make(id);
+    note(a);
+    return fail();
+  }
+  export op stopStatement()
+    throws Gone
+  {
+    fail();
+  }
+
+  // 「文」本体の終わり: error を返す配線は return nil、返さない配線は何も足さない
+  @mark export op endWithError(item: Item)
+  {
+    save(item);
+  }
+  export op endQuiet(item: Item)
+  {
+    note(item);
+  }
+
+  // 「呼び出し」純粋だが失敗する op（ctx を渡さず、失敗の扱いを置く）、渡されていない省略可能な引数は nil、別の名前空間の op
+  @mark export op calls(text: string): Item?
+    throws Broken
+  {
+    const id = parse(text);
+    const found = find(id);
+    const fetched = dep.fetch(id);
+    note(fetched);
+    return found;
+  }
+
+  // 「呼び出し」零値: 失敗の扱いの return の、戻り値の型ごとの零値
+  export op asTime(): Time;
+  export op asDuration(): Duration;
+  export op asId(): Id;
+  export op asCount(): Count;
+  export op asFloat(): float;
+  export op asBool(): boolean;
+  export op asItems(): Item[];
+  export op asTable(): Record<string, int>;
+  export op asOptional(): Item?;
+  export op asShape(): Shape;
+  @mark export op zeroTime(): Time { touch(); return asTime(); }
+  @mark export op zeroDuration(): Duration { touch(); return asDuration(); }
+  @mark export op zeroId(): Id { touch(); return asId(); }
+  @mark export op zeroCount(): Count { touch(); return asCount(); }
+  @mark export op zeroFloat(): float { touch(); return asFloat(); }
+  @mark export op zeroBool(): boolean { touch(); return asBool(); }
+  @mark export op zeroItems(): Item[] { touch(); return asItems(); }
+  @mark export op zeroTable(): Record<string, int> { touch(); return asTable(); }
+  @mark export op zeroOptional(): Item? { touch(); return asOptional(); }
+  @mark export op zeroShape(): Shape { touch(); return asShape(); }
+  @mark export op zeroItem(id: Id): Item { touch(); return make(id); }
+}
+
+/** 別の名前空間。単位を持たない（app が、その op の口 DepOps を持つ） */
+namespace dep {
+  @app.mark export op fetch(id: app.Id): app.Item;
+}

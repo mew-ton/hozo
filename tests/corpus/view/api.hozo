@@ -97,7 +97,7 @@ namespace api {
     effects touchUser
     throws ClientError keeps effects;
 
-  // ---- docs/ir.md「版」の 0.3 で足した形。api は何も出力しない（view-none）ので、Go の既定の出力には掛からない ----
+  // ---- docs/ir.md「版」の 0.3 で足した形 ----
 
   // docs/ir.md「正規化」: 形の語（どの型の位置でも）は array / optional / そのままの型。`nullable<T?>` は optional(T)
   model Shapes { ids: list<UserId>; nick: nullable<string>; one: single<Token>; twice: nullable<string?>; }

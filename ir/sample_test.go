@@ -404,19 +404,23 @@ func sampleView() *View {
 	return &View{
 		Version: Version,
 		Viewer:  "browser",
-		Config:  NamespaceConfig{Language: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"go-cli"}},
-		Files:   []string{"browser.hozo", "server.hozo"},
+		Config: NamespaceConfig{Index: 1, Language: "go", Base: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"go", "go-cli"},
+			Options: map[string]map[string]any{"go-cli": {"z": true, "a": float64(1), "nested": map[string]any{"y": "s", "x": 1.5}}},
+			Seams:   map[string]string{"rate.limited": "go-ratelimit"}},
+		Files: []string{"browser.hozo", "server.hozo", "hozo:vocab/http.hozo"},
 		// server は二つの単位が出力する（設定の順）。server.admin は server の単位の対象で、Dir(U, server.admin) は
 		// <out>/admin（docs/config.md「単位の対象」）
 		Namespaces: map[string][]NamespaceConfig{
-			"browser": {{Language: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"go-cli"}}},
+			"browser": {{Index: 1, Language: "go", Base: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"go", "go-cli"},
+				Options: map[string]map[string]any{"go-cli": {"z": true, "a": float64(1), "nested": map[string]any{"y": "s", "x": 1.5}}},
+				Seams:   map[string]string{"rate.limited": "go-ratelimit"}}},
 			"server": {
-				{Language: "go", Out: "gen/server", Dir: "gen/server", Transpilers: []string{"go-http", "sqlc"}},
-				{Language: "go", Out: "cmd/gen", Dir: "cmd/gen", Transpilers: []string{"go-cli"}},
+				{Index: 2, Language: "go", Base: "go", Out: "gen/server", Dir: "gen/server", Transpilers: []string{"go", "go-http"}},
+				{Index: 3, Language: "go", Base: "go", Out: "cmd/gen", Dir: "cmd/gen", Transpilers: []string{"go", "go-cli"}},
 			},
 			"server.admin": {
-				{Language: "go", Out: "gen/server", Dir: "gen/server/admin", Transpilers: []string{"go-http", "sqlc"}},
-				{Language: "go", Out: "cmd/gen", Dir: "cmd/gen/admin", Transpilers: []string{"go-cli"}},
+				{Index: 2, Language: "go", Base: "go", Out: "gen/server", Dir: "gen/server/admin", Transpilers: []string{"go", "go-http"}},
+				{Index: 3, Language: "go", Base: "go", Out: "cmd/gen", Dir: "cmd/gen/admin", Transpilers: []string{"go", "go-cli"}},
 			},
 		},
 		Program: p,

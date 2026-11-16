@@ -1,8 +1,11 @@
 [
   "gen/api/doc.go",
+  "gen/api/inner/doc.go",
+  "gen/api/inner/ops.go",
+  "gen/api/inner/states.go",
+  "gen/api/inner/types.go",
+  "gen/api/inner/wiring.go",
   "gen/api/ops.go",
   "gen/api/states.go",
-  "gen/api/types.go",
-  "gen/api/validate.go",
-  "gen/api/wiring.go"
+  "gen/api/types.go"
 ]

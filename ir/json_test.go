@@ -405,7 +405,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.3","namespaces":[],"binds":[]}`
+	want := `{"version":"0.4","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -413,7 +413,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.3","viewer":"","config":{"language":"","out":"","dir":"","transpilers":[]},"files":[],"namespaces":{},"program":{"version":"0.3","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.4","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.4","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -521,7 +521,7 @@ func TestNamespacesKeysSorted(t *testing.T) {
 		}
 		last = j
 	}
-	if !strings.Contains(s, `"a":[{"language":"go","out":"gen","dir":"gen/a","transpilers":[]},{"language":"go","out":"cmd","dir":"cmd","transpilers":["t"]}]`) {
+	if !strings.Contains(s, `"a":[{"index":0,"language":"go","base":"","out":"gen","dir":"gen/a","transpilers":[],"options":{},"seams":{}},{"index":0,"language":"go","base":"","out":"cmd","dir":"cmd","transpilers":["t"],"options":{},"seams":{}}]`) {
 		t.Errorf("namespace config shape: %s", b)
 	}
 	var back View
@@ -650,5 +650,34 @@ func TestKinds(t *testing.T) {
 				t.Errorf("%T: %q", v, v.Kind())
 			}
 		}
+	}
+}
+
+// TestNamespaceConfigJSON は NamespaceConfig の JSON（docs/ir.md「その名前空間から見た IR」）: 項目の並び、options と seams の
+// キーの辞書順（入れ子のテーブルも）、なければ {}。
+func TestNamespaceConfigJSON(t *testing.T) {
+	c := NamespaceConfig{Index: 5, Language: "go", Base: "go", Out: "gen/server", Dir: "gen/server/admin",
+		Transpilers: []string{"go", "go-http"},
+		Options:     map[string]map[string]any{"go-http": {"validate": true, "limits": map[string]any{"b": int64(2), "a": 1.5}}, "go": {}},
+		Seams:       map[string]string{"trace.span": "go-trace", "rate.limited": "go-ratelimit"}}
+	b, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"index":5,"language":"go","base":"go","out":"gen/server","dir":"gen/server/admin","transpilers":["go","go-http"],` +
+		`"options":{"go":{},"go-http":{"limits":{"a":1.5,"b":2},"validate":true}},"seams":{"rate.limited":"go-ratelimit","trace.span":"go-trace"}}`
+	if string(b) != want {
+		t.Errorf("got  %s\nwant %s", b, want)
+	}
+	var back NamespaceConfig
+	if err := json.Unmarshal(b, &back); err != nil {
+		t.Fatal(err)
+	}
+	if back.Index != 5 || back.Base != "go" || back.Seams["rate.limited"] != "go-ratelimit" || back.Options["go-http"]["validate"] != true {
+		t.Errorf("読み戻した値が違う: %+v", back)
+	}
+	empty, _ := json.Marshal(NamespaceConfig{})
+	if want := `{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}}`; string(empty) != want {
+		t.Errorf("got  %s\nwant %s", empty, want)
 	}
 }

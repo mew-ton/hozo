@@ -1,10 +1,11 @@
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.3"
+protocol = "0.4"
 
 vocabulary = ["cli.hozo"]       # cli の語彙はこのプラグインが提供する（docs/vocab.md「同梱しない語彙」）
 
-# 提供するトランスパイラは一つ。何を出力の対象に選ぶかは emit の応答の select で返す（docs/plugin-go-cli.md「マニフェスト」）
+# 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-cli.md「マニフェスト」）
 [[transpiler]]
 name     = "go-cli"
 language = "go"
+requires = ["go"]

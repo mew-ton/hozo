@@ -1,7 +1,11 @@
 [
   "gen/batch/doc.go",
+  "gen/batch/inner/doc.go",
+  "gen/batch/inner/ops.go",
+  "gen/batch/inner/states.go",
+  "gen/batch/inner/types.go",
+  "gen/batch/inner/wiring.go",
   "gen/batch/ops.go",
-  "gen/batch/types.go",
-  "gen/batch/validate.go",
-  "gen/batch/wiring.go"
+  "gen/batch/states.go",
+  "gen/batch/types.go"
 ]

@@ -1,9 +1,0 @@
-# 単位のトランスパイラ ts の language が "ts" → CFG-11（TS の既定の出力は段階 5 まで）
-# ERROR: CFG-11
-[hozo]
-plugin_dirs = ["plugins"]
-
-[[emit]]
-namespace   = "a"
-transpilers = ["ts"]
-out         = "gen/a"

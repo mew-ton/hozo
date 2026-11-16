@@ -1,43 +1,76 @@
 {
-  "version": "0.3",
+  "version": "0.4",
   "viewer": "web",
   "config": {
+    "index": 2,
     "language": "go",
+    "base": "view-dump",
     "out": "gen/web",
     "dir": "gen/web",
     "transpilers": [
       "view-dump"
-    ]
+    ],
+    "options": {},
+    "seams": {}
   },
   "files": [
     "api.hozo",
     "t.hozo",
-    "web.hozo"
+    "web.hozo",
+    "hozo:vocab/db.hozo",
+    "hozo:vocab/fs.hozo",
+    "hozo:vocab/http.hozo",
+    "hozo:vocab/localstorage.hozo",
+    "hozo:vocab/page.hozo",
+    "hozo:vocab/proc.hozo",
+    "hozo:vocab/valid.hozo"
   ],
   "namespaces": {
     "api": [
       {
+        "index": 1,
         "language": "go",
+        "base": "view-dump",
         "out": "gen/api",
         "dir": "gen/api",
         "transpilers": [
-          "view-none"
-        ]
+          "view-dump"
+        ],
+        "options": {},
+        "seams": {}
+      }
+    ],
+    "page": [
+      {
+        "index": 3,
+        "language": "go",
+        "base": "view-dump",
+        "out": "gen/page",
+        "dir": "gen/page",
+        "transpilers": [
+          "view-dump"
+        ],
+        "options": {},
+        "seams": {}
       }
     ],
     "web": [
       {
+        "index": 2,
         "language": "go",
+        "base": "view-dump",
         "out": "gen/web",
         "dir": "gen/web",
         "transpilers": [
           "view-dump"
-        ]
+        ],
+        "options": {},
+        "seams": {}
       }
     ]
   },
   "program": {
-    "version": "0.3",
+    "version": "0.4",
     "namespaces": [
       {
         "name": "",
@@ -5930,17 +5963,167 @@
             }
           },
           {
+            "kind": "model",
+            "name": "http.Violation",
+            "description": {
+              "summary": "制約の違反一つ。path は通信の上の場所、constraint は valid の語彙のデコレータの名前",
+              "body": "制約の違反一つ。path は通信の上の場所、constraint は valid の語彙のデコレータの名前",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 8,
+                "col": 3
+              },
+              "end": {
+                "line": 8,
+                "col": 56
+              }
+            },
+            "fields": [
+              {
+                "name": "path",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "hozo:vocab/http.hozo",
+                  "start": {
+                    "line": 8,
+                    "col": 21
+                  },
+                  "end": {
+                    "line": 8,
+                    "col": 34
+                  }
+                }
+              },
+              {
+                "name": "constraint",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "hozo:vocab/http.hozo",
+                  "start": {
+                    "line": 8,
+                    "col": 35
+                  },
+                  "end": {
+                    "line": 8,
+                    "col": 54
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "exception",
+            "name": "http.BadRequest",
+            "description": {
+              "summary": "要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない）",
+              "body": "要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない）",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 10,
+                "col": 3
+              },
+              "end": {
+                "line": 10,
+                "col": 71
+              }
+            },
+            "value": {
+              "kind": "ref",
+              "target": "http.BadRequest.Value"
+            }
+          },
+          {
+            "kind": "model",
+            "name": "http.BadRequest.Value",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 10,
+                "col": 25
+              },
+              "end": {
+                "line": 10,
+                "col": 70
+              }
+            },
+            "fields": [
+              {
+                "name": "message",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "hozo:vocab/http.hozo",
+                  "start": {
+                    "line": 10,
+                    "col": 27
+                  },
+                  "end": {
+                    "line": 10,
+                    "col": 43
+                  }
+                }
+              },
+              {
+                "name": "violations",
+                "type": {
+                  "kind": "array",
+                  "of": {
+                    "kind": "ref",
+                    "target": "http.Violation"
+                  }
+                },
+                "decorators": [],
+                "span": {
+                  "file": "hozo:vocab/http.hozo",
+                  "start": {
+                    "line": 10,
+                    "col": 44
+                  },
+                  "end": {
+                    "line": 10,
+                    "col": 68
+                  }
+                }
+              }
+            ],
+            "synthesizedFrom": "http.BadRequest"
+          },
+          {
             "kind": "decorator",
             "name": "http.get",
             "decorators": [],
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 7,
+                "line": 12,
                 "col": 3
               },
               "end": {
-                "line": 8,
+                "line": 13,
                 "col": 65
               }
             },
@@ -5981,11 +6164,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 9,
+                "line": 14,
                 "col": 3
               },
               "end": {
-                "line": 10,
+                "line": 15,
                 "col": 66
               }
             },
@@ -6026,11 +6209,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 12,
+                "line": 17,
                 "col": 3
               },
               "end": {
-                "line": 12,
+                "line": 17,
                 "col": 45
               }
             },
@@ -6063,11 +6246,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 13,
+                "line": 18,
                 "col": 3
               },
               "end": {
-                "line": 13,
+                "line": 18,
                 "col": 44
               }
             },
@@ -6100,11 +6283,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 14,
+                "line": 19,
                 "col": 3
               },
               "end": {
-                "line": 14,
+                "line": 19,
                 "col": 28
               }
             },
@@ -6123,11 +6306,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 15,
+                "line": 20,
                 "col": 3
               },
               "end": {
-                "line": 15,
+                "line": 20,
                 "col": 29
               }
             },
@@ -6146,11 +6329,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 16,
+                "line": 21,
                 "col": 3
               },
               "end": {
-                "line": 16,
+                "line": 21,
                 "col": 31
               }
             },

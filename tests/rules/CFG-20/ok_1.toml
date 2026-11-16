@@ -1,0 +1,18 @@
+# 単位ごとに基底が一つ。別の単位なら、別の基底でよい
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go-x", "go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go-b"]
+out         = "gen/b"
+
+[[emit]]
+namespace   = "a"
+transpilers = ["ts"]
+out         = "gen/ts"

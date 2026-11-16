@@ -1,0 +1,9 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-5（[emit.options.go] に、知らないキーがある）。
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[emit.options.go]
+tabs   = true
+indent = 2

@@ -344,7 +344,7 @@ func documentedCodes(t *testing.T) (codes map[string]docCode, noSeverity []strin
 }
 
 // TestDiagnosticCodesAreDocumented は、Go のコードが出しうる診断のコードがどれも設計文書の「診断」の表にあり、
-// 表の重さがコードの重さと合っていることを確かめる。規則の ID でないコード（SYNTAX、IO、PLUGIN、GOEMIT-INTERNAL）も同じ。
+// 表の重さがコードの重さと合っていることを確かめる。規則の ID でないコード（SYNTAX、IO、PLUGIN、GO-INTERNAL）も同じ。
 // 例外のメッセージにだけ書く ID（PLG-*）は、表の重さが「—」（診断にならない）であること。
 func TestDiagnosticCodesAreDocumented(t *testing.T) {
 	uses := collectCodeUses(t)
@@ -357,7 +357,7 @@ func TestDiagnosticCodesAreDocumented(t *testing.T) {
 		seen[u.code] = true
 	}
 	// 拾えていることの確かめ: 作り方の違う代表が入っている
-	for _, want := range []string{"SYNTAX", "IO", "PLUGIN", "GOEMIT-INTERNAL", "LSP-1", "CFG-7", "CFG-5", "MAN-5", "PLG-1", "PLG-3", "THROWS-1", "RES-1", "WIRE-8", "GOEMIT-5", "CLI-1"} {
+	for _, want := range []string{"SYNTAX", "IO", "PLUGIN", "GO-INTERNAL", "LSP-1", "CFG-7", "CFG-5", "MAN-5", "PLG-1", "PLG-2", "CFG-19", "CFG-22", "THROWS-1", "RES-1", "WIRE-8", "GO-3", "GO-6", "CLI-1"} {
 		if !seen[want] {
 			t.Errorf("コードから %s を拾えていない（集め方が合っていない）", want)
 		}

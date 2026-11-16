@@ -191,8 +191,16 @@ type Layout struct {                              // 一つの出力 (U, N) の�
 }
 func LayoutOf(view *ir.View, root string) (*Layout, error)                  // この View の出力の置き場
 func HomeOf(view *ir.View, namespace, root string) (*Layout, bool, error)   // view の単位から見た、別の名前空間の型の置き場（docs/config.md「型の置き場」）。なければ false
-type Imports struct{ … }                          // 一つのファイルの import。名前の決め方は同「パッケージと import パス」。Add / Name / Paths / Render()
+type Imports struct{ … }                          // 一つのファイルの import。名前の決め方は同「パッケージと import パス」
 func NewImports(view *ir.View, layout *Layout, root string, inDef bool) *Imports   // inDef は、書くファイルが定義のパッケージのものか（入口のものなら、N の型は入口の名前で修飾なし）
+func (*Imports) Add(pkgPath, pkgName string) string   // import に足し、修飾に使う名前を返す
+func (*Imports) Name(pkgPath string) string           // 修飾に使う名前。足していなければ ""
+func (*Imports) Names() []string                      // 修飾に使う名前のすべて（辞書順）。局所の名前が避ける名前
+func (*Imports) Paths() []string
+func (*Imports) Render() string                       // import のブロック
+func (*Imports) Qualifier(namespace string) string    // その名前空間の宣言を、このファイルから書くときの前置き（N なら ""、別の名前空間なら置き場の入口を import して `<名前>.`）
+func (*Imports) Canonical() *Imports                  // 同じ import を、文書の決まりの順（名前空間の FQN の辞書順）で足し直したもの。ファイルを一度作って import の集まりを知り、これで作り直すと、名前が決まりどおりになる
+func (*Imports) Err() error                           // GoType / Zero / Qualifier が、型の置き場を求められなかった名前空間があれば、その誤り
 
 // op と口の形（同「op の形」「実装を受け取る口」）
 type Shape struct {                               // 一つの出力の、op と口のすべて
@@ -221,8 +229,11 @@ type Param struct { Name, Type string }
 func ShapeOf(view *ir.View) *Shape
 func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // メソッドの引数と戻り値のテキスト（ctx と error を含む）
 func SeamSignature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // 継ぎ目のメソッドの引数（op の引数の後ろに body）と戻り値のテキスト
+func SeamBodyParam(op *ir.Op, reserved map[string]bool) string   // 継ぎ目のメソッドの最後の引数の名前: body。op の引数の局所の名前と当たれば、末尾に _ を足したもの
 ```
 
+- `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは入口のパッケージなので、import には効かない。
+- `Param.Type` は、定義のパッケージの中での書き方。別の名前空間の分類の述語（`<C>Cases`）は修飾なしの名前で、書く側が `Imports.Qualifier` で修飾する。
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
@@ -321,7 +332,7 @@ func FileSetLocator(fs *source.FileSet) Locator
 type Checker struct { Locate Locator }
 func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic   // Compute を呼んでから規則を検査する。Locate が nil なら Span は nil で File だけ
 func (c Checker) CheckUnsupported(p *ir.Program, ns string, files []string, unsupported []string) []diag.Diagnostic   // CFG-6。files は単位の in に合ったファイル、unsupported はマニフェストから
-type Unit struct { Language, Base string; Files []string }   // 設定の外で決まる単位の情報: 言語と基底の名前（マニフェストから）と、in に合ったファイル
+type Unit struct { Language, Base string; Seams map[string]string; Files []string }   // 設定の外で決まる単位の情報: 言語と基底の名前、単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ。どれもマニフェストから）と、in に合ったファイル
 func (c Checker) CheckHomes(p *ir.Program, cfg *config.Config, units []Unit) []diag.Diagnostic   // CFG-22
 func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.View   // 単位ごと（cfg.Units と同じ順）の、出力する名前空間 → View
 ```
@@ -445,6 +456,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `schema/ir.schema.json` | `sdk/ts/src/ir.ts`（IR の型） | `json-schema-to-typescript`（`sdk/ts` の `npm run generate`） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
 | `cli.hozo` | `internal/gen/hozoc/**`、`internal/gen/proc/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
+| `plugins/` の下の `testdata/<名前>/` の `hozo.toml` と `.hozo` | `testdata/<名前>/views.json`（プラグインの単体テストの入力の `View`） | `tests/pluginviews_test.go` の `TestPluginViewFixtures`（`go test ./tests -run TestPluginViewFixtures -update`。遅れていれば、このテストが落ちる。`docs/testing.md`「単体テスト」） |
 
 生成物はコミットする。CI で生成し直して差分がないことを確かめる（`docs/testing.md`「生成物の一致」）。
 

@@ -1,0 +1,2 @@
+GO-5		1 番目の [[emit]] の [emit.options.go] に、知らないキー indent がある（go にオプションはない）
+GO-5		1 番目の [[emit]] の [emit.options.go] に、知らないキー tabs がある（go にオプションはない）

@@ -1,0 +1,4 @@
+// CFG-20: 基底が一つもない。requires を辿って元に戻る輪は、その単位に基底がないことになる（ng_2.toml、plugins/loop）
+namespace a {
+  op f();
+}

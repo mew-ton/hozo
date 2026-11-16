@@ -7,7 +7,7 @@ max_bindings = 5
 [[emit]]
 in          = ["*.hozo"]
 namespace   = "a"
-transpilers = ["go", "go-b"]
+transpilers = ["go", "go-x"]
 out         = "gen/a"
 
 [[emit]]

@@ -153,7 +153,7 @@ func TestEmitUsesDir(t *testing.T) {
 func TestEmitNoGoMod(t *testing.T) {
 	dir := t.TempDir()
 	resp := emit(t, handlerFor(dir), hozocView())
-	if len(resp.Files) != 0 || len(resp.Errors) != 1 || resp.Errors[0].Code != "GOEMIT-1" || resp.Errors[0].At != "hozoc" {
+	if len(resp.Files) != 0 || len(resp.Errors) != 1 || resp.Errors[0].Code != "GO-1" || resp.Errors[0].At != "hozoc" {
 		t.Errorf("resp = %+v", resp)
 	}
 }
@@ -193,7 +193,7 @@ func TestEmitUnknownTranspiler(t *testing.T) {
 }
 
 // TestEmitOnlyUnitOps は docs/plugin-go-cli.md「対象」: サブコマンドにするのは単位の対象の op（View.files のファイルに
-// 書かれたもの）だけ。in の外の @cli.command の op は、起点にも選ばない（選べば PLG-3）。
+// 書かれたもの）だけ。
 func TestEmitOnlyUnitOps(t *testing.T) {
 	ns := hozocNamespace()
 	extra := opDecl("hozoc.batch", "in の外で宣言したコマンド。", nil, nil, nil, cliCommand("batch"))
@@ -205,15 +205,15 @@ func TestEmitOnlyUnitOps(t *testing.T) {
 	if len(resp.Errors) != 0 || len(resp.Files) != 1 {
 		t.Fatalf("resp = %+v", resp)
 	}
-	if strings.Contains(resp.Files[0].Content, "Batch") || strings.Contains(strings.Join(resp.Select.Roots, ","), "hozoc.batch") {
-		t.Errorf("op outside in became a command: roots = %v", resp.Select.Roots)
+	if strings.Contains(resp.Files[0].Content, "Batch") {
+		t.Errorf("op outside in became a command")
 	}
 	checkGolden(t, "hozoc_cli.go.golden", resp.Files[0].Content) // in の外の op がなかったときと同じ
 	// in を省いた単位なら、サブコマンドになる
 	v.Files = []string{"batch.hozo", "cli.hozo"}
 	resp = emit(t, handlerFor(repoRoot(t)), v)
-	if len(resp.Files) != 1 || !strings.Contains(resp.Files[0].Content, "Batch") || !strings.Contains(strings.Join(resp.Select.Roots, ","), "hozoc.batch") {
-		t.Errorf("op in the unit is not a command: roots = %v", resp.Select.Roots)
+	if len(resp.Files) != 1 || !strings.Contains(resp.Files[0].Content, "Batch") {
+		t.Errorf("op in the unit is not a command")
 	}
 }
 

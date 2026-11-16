@@ -1,7 +1,0 @@
-// CFG-8（docs/config.md「診断」）: 単位の namespace の名前空間が自分では持たなくても、子孫が state か op を持っていればよい（ok_1.toml）
-namespace a {
-  model M { id: string; }
-}
-namespace a.sub {
-  op f(): a.M;
-}

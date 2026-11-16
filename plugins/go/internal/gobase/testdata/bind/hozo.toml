@@ -1,0 +1,11 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「bind で埋まる位置」の 1〜5 と、「別の名前空間の op」。
+[[emit]]
+namespace   = "web"
+transpilers = ["go"]
+out         = "gen/web"
+
+# web が使う型（api.Token、api の model）の置き場（docs/config.md「型の置き場」）
+[[emit]]
+namespace   = "api"
+transpilers = ["go"]
+out         = "gen/api"

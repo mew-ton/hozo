@@ -9,26 +9,23 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// GoType は IR の型を Go の型の文字列にする（docs/emit-go.md「型」の表）。必要な import を imports に足す。
+// GoType は IR の型を Go の型の文字列にする（docs/plugin-go.md「型」の表）。必要な import を imports に足す。
 //
 //	string / boolean / int / float   → string / bool / int64 / float64
 //	Time / Duration                  → time.Time / time.Duration（"time" を import）
-//	optional(T)                      → T が array か record ならそのまま、それ以外は *T
+//	optional(T)                      → T が array、record、union（arms）への ref ならそのまま（nil が「なし」）。それ以外は *T
 //	array(T)                         → []T
 //	record(K, V)                     → map[K]V
-//	ref                              → 型の名前（model は構造体、scalar は名前付きの型、union はインターフェース。
-//	                                   どれも名前の規則は同じ TypeName）
-//	case(C, cases, of)               → of の型（絞り込みは Go の型にしない。docs/decisions.md 29）
+//	ref                              → 型の名前（model は構造体、scalar は名前付きの型、union はインターフェース）
+//	case(C, cases, of)               → of の型（絞り込みは Go の型にしない）
 //
-// optional の中の case は of を見て判断する（`optional(case(C, c, array(T)))` は `[]T`）。
-//
-// ref の修飾は imports の Resolve に従う（Resolver の説明）: ローカルなら TypeName だけ、
-// 別の Go のパッケージなら imports.Add したパッケージの名前で修飾する。imports が nil なら
-// import は記録せず、すべての ref をローカル（Viewer は ""）として名前にする。
-// nil の型（void）は "" を返す。
+// ref の修飾は imports が決める: 見る側の名前空間 N の型は修飾なし（定義のパッケージでも、入口のパッケージでも。入口は別名を持つ）、
+// 別の名前空間 M の型は、M の型の置き場（docs/config.md「型の置き場」）の入口のパッケージを import して、その名前で修飾する。
+// 置き場がなければ、修飾なしの名前を返し、imports.Err がそれを報告する（CFG-22 が通したはずのもの。基底は GO-INTERNAL にする）。
+// imports が nil なら import は記録せず、すべての ref を修飾なしの名前にする。nil の型（void）と never は "" を返す。
 func GoType(t ir.Type, imports *Imports) string {
 	switch x := t.(type) {
-	case nil:
+	case nil, ir.NeverType:
 		return ""
 	case ir.CoreType:
 		switch x.Name {
@@ -47,10 +44,10 @@ func GoType(t ir.Type, imports *Imports) string {
 		}
 		panic(fmt.Sprintf("golang: unknown core type %q", x.Name))
 	case ir.RefType:
-		return refType(x.Target, imports)
+		return imports.ref(x.Target)
 	case ir.OptionalType:
 		inner := GoType(x.Of, imports)
-		if IsNillable(x.Of) {
+		if IsNillable(x.Of, imports.program()) {
 			return inner
 		}
 		return "*" + inner
@@ -64,16 +61,100 @@ func GoType(t ir.Type, imports *Imports) string {
 	panic(fmt.Sprintf("golang: unknown ir.Type %T", t))
 }
 
-// IsNillable は、その型の Go の零値 nil が「なし」を表せるか（array と record。case は of を見る。docs/emit-go.md「型」の
-// optional の行）。optional(T) が *T にならず T のままになるのは、T がこれに当たるとき。
-func IsNillable(t ir.Type) bool {
+// IsNillable は、その型の Go の零値 nil が「なし」を表せるか（docs/plugin-go.md「型」の optional の行）: array、record、
+// union（arms）への ref。case は of を見る。optional(T) が *T にならず T のままになるのは、T がこれに当たるとき。
+// p は ref が union かどうかを引くための Program（nil なら、ref はどれも当たらないとする）。
+func IsNillable(t ir.Type, p *ir.Program) bool {
 	switch x := t.(type) {
 	case ir.ArrayType, ir.RecordType:
 		return true
+	case ir.RefType:
+		if p == nil {
+			return false
+		}
+		u, ok := p.Lookup(x.Target).(*ir.Union)
+		return ok && u.Variant == ir.UnionArms
 	case ir.CaseType:
-		return IsNillable(x.Of)
+		return IsNillable(x.Of, p)
 	}
 	return false
+}
+
+// Zero は型の零値の Go の式（docs/plugin-go.md「呼び出し」の「零値」）: ポインタ・インターフェース・スライス・マップは nil、
+// 構造体は `<型>{}`、time.Time は `time.Time{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
+// 必要な import を imports に足す。nil の型（void）と never は ""。
+func Zero(t ir.Type, imports *Imports) string {
+	switch x := t.(type) {
+	case nil, ir.NeverType:
+		return ""
+	case ir.OptionalType, ir.ArrayType, ir.RecordType:
+		return "nil"
+	case ir.CaseType:
+		return Zero(x.Of, imports)
+	case ir.CoreType:
+		return coreZero(x, GoType(x, imports))
+	case ir.RefType:
+		switch d := imports.program().Lookup(x.Target).(type) {
+		case *ir.Union:
+			return "nil"
+		case *ir.Scalar:
+			// 元の型を核の型まで辿る（scalar の元は、核の型か、別の scalar）
+			base := d.Base
+			for depth := 0; depth < 32; depth++ {
+				r, isRef := base.(ir.RefType)
+				if !isRef {
+					break
+				}
+				next, isScalar := imports.program().Lookup(r.Target).(*ir.Scalar)
+				if !isScalar {
+					break
+				}
+				base = next.Base
+			}
+			if core, ok := base.(ir.CoreType); ok {
+				return coreZero(core, GoType(x, imports))
+			}
+		}
+		return GoType(x, imports) + "{}"
+	}
+	return "nil"
+}
+
+// coreZero は核の型 c の零値。goType は、その値の Go の型（time.Time か、Time が元の scalar の名前）。
+func coreZero(c ir.CoreType, goType string) string {
+	switch c.Name {
+	case ir.CoreString:
+		return `""`
+	case ir.CoreBoolean:
+		return "false"
+	case ir.CoreTime:
+		return goType + "{}"
+	}
+	return "0"
+}
+
+// TypeDisplay は、コメントの中の型の書き方（docs/plugin-go.md「コメント」の「型の表示」）: 核の型は名前、ref は FQN、
+// optional(T) は `T?`、array(T) は `T[]`、record(K, V) は `Record<K, V>`、case はその of。
+func TypeDisplay(t ir.Type) string {
+	switch x := t.(type) {
+	case nil:
+		return ""
+	case ir.CoreType:
+		return string(x.Name)
+	case ir.RefType:
+		return x.Target
+	case ir.OptionalType:
+		return TypeDisplay(x.Of) + "?"
+	case ir.ArrayType:
+		return TypeDisplay(x.Of) + "[]"
+	case ir.RecordType:
+		return "Record<" + TypeDisplay(x.Key) + ", " + TypeDisplay(x.Value) + ">"
+	case ir.CaseType:
+		return TypeDisplay(x.Of)
+	case ir.NeverType:
+		return "never"
+	}
+	return ""
 }
 
 // qualify は imports に pkgPath を足し、修飾に使う名前を返す。imports が nil ならパッケージ名そのまま。
@@ -84,26 +165,8 @@ func qualify(imports *Imports, pkgPath, pkgName string) string {
 	return imports.Add(pkgPath, pkgName)
 }
 
-// refType は ref の FQN を Go の型の名前にする（GoType の説明）。
-func refType(fqn string, imports *Imports) string {
-	if imports == nil {
-		return TypeName(fqn, "")
-	}
-	if imports.Resolve != nil {
-		namespace, pkgPath, pkgName, local := imports.Resolve(fqn)
-		if local {
-			return TypeName(fqn, namespace)
-		}
-		return imports.Add(pkgPath, pkgName) + "." + TypeName(fqn, namespace)
-	}
-	if imports.Viewer == "" || strings.HasPrefix(fqn, imports.Viewer+".") {
-		return TypeName(fqn, imports.Viewer)
-	}
-	return TypeName(fqn, guessNamespace(fqn))
-}
-
 // guessNamespace は FQN の名前空間を、先頭が大文字でないセグメントの先頭からの並びとみなす
-// （Resolve がないときの補い。宣言名は大文字で始まる慣習 NAME-1 に頼る）。
+// （Program がないときの補い。宣言名は大文字で始まる慣習 NAME-1 に頼る）。
 // `server.OrderPage.Ready` → `server`、`server.admin.Report` → `server.admin`、`Db` → ""（空）。
 func guessNamespace(fqn string) string {
 	segs := strings.Split(fqn, ".")

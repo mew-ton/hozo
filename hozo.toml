@@ -2,7 +2,17 @@
 sources     = ["cli.hozo"]      # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 
+# 移行の間の形（docs/cli.md「cli.hozo」の hozo.toml から、まだないトランスパイラ go-valid を除いたもの）。
+# go-valid と、基底 go の形に合わせた go-cli がそろうまで、internal/gen/** は生成し直さない（make generate は置き場を変えない）。
+
+# 1: hozoc 自身。型と op の形は基底 go、コマンドラインは go-cli
 [[emit]]
 namespace   = "hozoc"
-transpilers = ["go-cli"]
+transpilers = ["go", "go-cli"]
 out         = "internal/gen/hozoc"
+
+# 2: hozoc の op が投げる proc.Crashed / proc.MalformedOutput の型の置き場（docs/config.md「型の置き場」）
+[[emit]]
+namespace   = "proc"
+transpilers = ["go"]
+out         = "internal/gen/proc"

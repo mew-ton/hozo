@@ -11,9 +11,11 @@ import {
   inUnit,
   lookup,
   namespace,
+  options,
   opsWith,
   run,
   signature,
+  type EmitRequest,
   type Handler,
   type View,
 } from "../src/index.js";
@@ -35,9 +37,6 @@ async function exec(handler: Handler, input: string | object) {
   const code = await run(handler, Readable.from([raw]), stdout, stderr);
   return { code, stdout: stdout.text, stderr: stderr.text };
 }
-
-/** 何も選ばない select（run は四つの列を [] で書く。docs/plugin-protocol.md「emit」の例）。 */
-const noSelect = { roots: [], stops: [], states: [], wraps: [] };
 
 const full: Handler = {
   emit: (req) => ({
@@ -61,37 +60,37 @@ test("emit: writes the response and exits 0", async () => {
   assert.deepEqual(JSON.parse(r.stdout), {
     files: [{ path: "gen/browser/out.ts", content: "// browser\n" }],
     warnings: [],
-    select: noSelect,
   });
 });
 
-test("emit: writes select with all four lists (docs/plugin-protocol.md「選択」)", async () => {
+test("emit: the response has no select (docs/plugin-protocol.md「選択をなくしたこと」)", async () => {
+  // 版 0.3 までの select を返す Handler があっても、run は書かない（応答は files / warnings / errors だけ）
   const handler: Handler = {
-    emit: () => ({
-      files: [],
-      warnings: [],
-      select: { roots: ["browser.openMe"], wraps: [{ op: "browser.openMe", decorator: "browser.retry" }] },
-    }),
+    emit: () => ({ files: [], warnings: [], select: { roots: ["browser.openMe"] } }) as unknown as never,
   };
   const r = await exec(handler, { protocol: PROTOCOL, direction: "emit", transpiler: "t", view });
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.stdout), {
-    files: [],
-    warnings: [],
-    select: {
-      roots: ["browser.openMe"],
-      stops: [],
-      states: [],
-      wraps: [{ op: "browser.openMe", decorator: "browser.retry" }],
-    },
-  });
+  assert.deepEqual(JSON.parse(r.stdout), { files: [], warnings: [] });
+});
+
+test("options: the options of the invoked transpiler (docs/config.md「オプション」)", () => {
+  const withOptions: View = {
+    ...view,
+    config: { ...view.config, options: { "go-http": { validate: true, limits: { max: 3 } }, go: {} } },
+  };
+  const req = (transpiler: string, v: View): EmitRequest => ({ protocol: PROTOCOL, direction: "emit", transpiler, view: v });
+  assert.deepEqual(options(req("go-http", withOptions)), { validate: true, limits: { max: 3 } });
+  assert.deepEqual(options(req("go", withOptions)), {});
+  // 書かれていなければ、空のテーブル
+  assert.deepEqual(options(req("go-valid", withOptions)), {});
+  assert.deepEqual(options(req("toString", withOptions)), {});
 });
 
 test("emit: fills files/warnings with [] and drops empty errors (like Go)", async () => {
   const handler: Handler = { emit: () => ({ errors: [] }) as unknown as never };
   const r = await exec(handler, { protocol: PROTOCOL, direction: "emit", transpiler: "t", view });
   assert.equal(r.code, 0);
-  assert.deepEqual(JSON.parse(r.stdout), { files: [], warnings: [], select: noSelect });
+  assert.deepEqual(JSON.parse(r.stdout), { files: [], warnings: [] });
 });
 
 test("emit: keeps non-empty errors", async () => {
@@ -104,7 +103,6 @@ test("emit: keeps non-empty errors", async () => {
     files: [],
     warnings: [],
     errors: [{ code: "CLI-1", at: "a.b", message: "bad" }],
-    select: noSelect,
   });
 });
 
@@ -137,7 +135,7 @@ test("protocol mismatch: {error:{code:protocol}} on stdout and exit 2", async ()
   const out = JSON.parse(r.stdout);
   assert.equal(out.error.code, "protocol");
   assert.match(out.error.message, /0\.1/);
-  assert.match(out.error.message, /0\.3/);
+  assert.match(out.error.message, /0\.4/);
 });
 
 test("protocol missing: exit 2 with code protocol (checked before direction)", async () => {
@@ -231,14 +229,14 @@ test("emit: the request carries the transpiler; an unknown one is refused with t
   const handler: Handler = {
     emit: (req) => {
       if (req.transpiler === "a") return { files: [{ path: "a.txt", content: "a" }], warnings: [] };
-      if (req.transpiler === "b") return { files: [], warnings: [], select: { roots: ["server.findUser"] } };
+      if (req.transpiler === "b") return { files: [], warnings: [{ at: "server.findUser", message: "b" }] };
       throw new UnsupportedDirectionError(`transpiler ${JSON.stringify(req.transpiler)} is not provided`);
     },
   };
   const a = await exec(handler, { protocol: PROTOCOL, direction: "emit", transpiler: "a", view });
   assert.deepEqual(JSON.parse(a.stdout).files, [{ path: "a.txt", content: "a" }]);
   const b = await exec(handler, { protocol: PROTOCOL, direction: "emit", transpiler: "b", view });
-  assert.deepEqual(JSON.parse(b.stdout).select.roots, ["server.findUser"]);
+  assert.deepEqual(JSON.parse(b.stdout).warnings, [{ at: "server.findUser", message: "b" }]);
   const c = await exec(handler, { protocol: PROTOCOL, direction: "emit", transpiler: "c", view });
   assert.equal(c.code, 2);
   const out = JSON.parse(c.stdout);

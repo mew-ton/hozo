@@ -1,19 +1,28 @@
 # 設計書 §5〜§11 の例のコーパス（docs/testing.md「コーパス」）。
-# 設計書 §4.5 では browser は TS だが、TS の既定の出力は段階 5 まで存在せず
-# docs/config.md CFG-11 がエラーにするので、今は両方とも Go のトランスパイラにする（README.md）。
-# トランスパイラはテスト用の pick（plugins/pick）: 設計書のプラグイン（http のサーバー、ルーター、db）の代わりに、
-# 既定の出力の対象を語彙のデコレータで選ぶ（README.md「既定の出力」）。
+# 設計書 §4.5 では browser は TS だが、TS の基底はまだないので、今は両方とも Go の基底 go で出力する（README.md）。
+# go は、リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す（docs/testing.md「コーパス」）。
+# 設計書のプラグイン（http のサーバー、ルーター、db）は並べないので、語彙のデコレータは印のまま（docs/plugin-go.md「デコレータ」）。
 
 [hozo]
-sources     = ["**/*.hozo"]
-plugin_dirs = ["plugins"]
+sources = ["**/*.hozo"]
 
 [[emit]]
 namespace   = "server"
-transpilers = ["pick"]
+transpilers = ["go"]
 out         = "gen/server"
 
 [[emit]]
 namespace   = "browser"
-transpilers = ["pick"]
+transpilers = ["go"]
 out         = "gen/browser"
+
+# 使う型の置き場（docs/config.md「型の置き場」）: browser と server が、語彙 http と page の型（例外、page.Route）を使う
+[[emit]]
+namespace   = "http"
+transpilers = ["go"]
+out         = "gen/http"
+
+[[emit]]
+namespace   = "page"
+transpilers = ["go"]
+out         = "gen/page"

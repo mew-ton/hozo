@@ -63,8 +63,8 @@ func TestLoadExample(t *testing.T) {
 		t.Errorf("Hozo = %+v, want %+v", cfg.Hozo, wantHozo)
 	}
 	want := []Unit{
-		{Index: 1, In: []string{"api/**/*.hozo"}, Namespace: "server", Transpilers: []string{"go-http", "sqlc"}, Out: "api/internal/generated"},
-		{Index: 2, Namespace: "server", Transpilers: []string{"go-cli"}, Out: "cmd/gen"}, // in を省けば nil
+		{Index: 1, In: []string{"api/**/*.hozo"}, Namespace: "server", Transpilers: []string{"go-http", "sqlc"}, Out: "api/internal/generated", Options: map[string]map[string]any{}},
+		{Index: 2, Namespace: "server", Transpilers: []string{"go-cli"}, Out: "cmd/gen", Options: map[string]map[string]any{}}, // in を省けば nil。options を書かなければ空
 	}
 	if !reflect.DeepEqual(cfg.Units, want) {
 		t.Errorf("Units = %+v, want %+v", cfg.Units, want)
@@ -301,5 +301,105 @@ func TestDefault(t *testing.T) {
 	}
 	if got := cfg.Covering("server"); got != nil {
 		t.Errorf("Default must not cover any namespace: %v", got)
+	}
+}
+
+// docs/config.md「オプション」: [emit.options.<名前>] は直前の [[emit]] の単位に付き、値は JSON にそのまま写せるもの。
+func TestLoadOptions(t *testing.T) {
+	p := write(t, `
+[[emit]]
+namespace   = "server"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/server"
+
+[emit.options.go-http]
+validate = true
+prefix   = "/api"
+retries  = 3
+ratio    = 0.5
+tags     = ["a", "b"]
+
+[emit.options.go-http.limits]
+max = 10
+
+[[emit.options.go-http.routes]]
+path = "/x"
+
+[[emit]]
+namespace   = "type"
+transpilers = ["go"]
+out         = "gen/type"
+`)
+	cfg, diags := Load(p)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %+v", diags)
+	}
+	if len(cfg.Units) != 2 {
+		t.Fatalf("Units = %+v", cfg.Units)
+	}
+	want := map[string]map[string]any{"go-http": {
+		"validate": true, "prefix": "/api", "retries": int64(3), "ratio": 0.5, "tags": []any{"a", "b"},
+		"limits": map[string]any{"max": int64(10)},
+		"routes": []any{map[string]any{"path": "/x"}},
+	}}
+	if !reflect.DeepEqual(cfg.Units[0].Options, want) {
+		t.Errorf("Options = %#v\nwant %#v", cfg.Units[0].Options, want)
+	}
+	if got := cfg.Units[1].Options; got == nil || len(got) != 0 {
+		t.Errorf("オプションのない単位の Options は空の写像: %#v", got)
+	}
+}
+
+// docs/config.md「診断」の CFG-21: [emit.options.<名前>] の <名前> が、その単位の transpilers にない。単位は使う。
+func TestOptionsUnknownTranspiler(t *testing.T) {
+	cfg, diags := Load(write(t, `
+[[emit]]
+namespace   = "server"
+transpilers = ["go", "go-http"]
+out         = "gen/server"
+
+[emit.options.go-htpp]
+validate = true
+
+[emit.options.go-http]
+validate = true
+`))
+	if got := codes(diags); !reflect.DeepEqual(got, []string{"CFG-21"}) {
+		t.Fatalf("codes = %v: %+v", got, diags)
+	}
+	if !strings.Contains(diags[0].Message, "go-htpp") || !strings.Contains(diags[0].Message, "1 番目の [[emit]]") {
+		t.Errorf("メッセージに名前と単位がない: %s", diags[0].Message)
+	}
+	if len(cfg.Units) != 1 {
+		t.Fatalf("CFG-21 の単位は使う: %+v", cfg.Units)
+	}
+	if _, ok := cfg.Units[0].Options["go-htpp"]; ok {
+		t.Errorf("transpilers にない名前のオプションは持たない: %#v", cfg.Units[0].Options)
+	}
+	if cfg.Units[0].Options["go-http"]["validate"] != true {
+		t.Errorf("Options = %#v", cfg.Units[0].Options)
+	}
+}
+
+// docs/config.md「オプション」「診断」の CFG-7: options がテーブルのテーブルでない、オプションの値が日時。その単位は使わない。
+func TestOptionsShape(t *testing.T) {
+	head := "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"go\"]\nout = \"gen\"\n"
+	for name, body := range map[string]string{
+		"options がテーブルでない":      "options = 1\n",
+		"options.<名前> がテーブルでない": "[emit.options]\ngo = true\n",
+		"値が日時":          "[emit.options.go]\nat = 2024-01-02T03:04:05Z\n",
+		"値が日付":          "[emit.options.go]\nat = 2024-01-02\n",
+		"配列の中の日時":       "[emit.options.go]\nat = [1979-05-27T07:32:00Z]\n",
+		"入れ子のテーブルの中の日時": "[emit.options.go.x]\nat = 07:32:00\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, diags := Load(write(t, head+body))
+			if got := codes(diags); !reflect.DeepEqual(got, []string{"CFG-7"}) {
+				t.Fatalf("codes = %v: %+v", got, diags)
+			}
+			if len(cfg.Units) != 0 {
+				t.Errorf("CFG-7 の単位は使わない: %+v", cfg.Units)
+			}
+		})
 	}
 }

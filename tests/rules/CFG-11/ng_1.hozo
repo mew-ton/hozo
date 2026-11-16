@@ -1,4 +1,0 @@
-// CFG-11（docs/config.md「診断」）: 単位の言語が "ts"（ng_1.toml のトランスパイラ ts）
-namespace a {
-  op f();
-}

@@ -1,0 +1,6 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-4（内側のフォルダ inner が、子の名前空間 N.inner の出力先と重なる）。
+# 単位は n とその子孫（n.inner）を出力する: Dir(U, n) は gen/n、Dir(U, n.inner) は gen/n/inner。
+[[emit]]
+namespace   = "n"
+transpilers = ["go"]
+out         = "gen/n"

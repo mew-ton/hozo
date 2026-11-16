@@ -1,0 +1,16 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-3（出力どうしの import が循環する）。
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go"]
+out         = "gen/b"
+
+# 輪に入らない出力（a を import するだけ）には、GO-3 を出さない
+[[emit]]
+namespace   = "c"
+transpilers = ["go"]
+out         = "gen/c"

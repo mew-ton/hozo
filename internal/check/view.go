@@ -7,12 +7,36 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Unit は、設定の外で決まる単位の情報（docs/config.md「単位」「in」）。cfg.Units と同じ順に並べて Views に渡す。
+// Unit は、設定の外で決まる単位の情報（docs/config.md「単位」「基底と相乗り」「継ぎ目」「in」）。cfg.Units と同じ順に並べて
+// Views と CheckHomes に渡す。
 type Unit struct {
-	// Language は単位の言語（そのトランスパイラの language。マニフェストから）。
+	// Language は単位の言語（単位の基底の language。マニフェストから）。
 	Language string
-	// Files は単位の in に合ったファイル（Span.File と同じ形、辞書順）。in を省いた単位なら読み込んだユーザーのファイルのすべて。
+	// Base は単位の基底のトランスパイラの名前（マニフェストから）。基底が決まらない単位（CFG-20）では ""。
+	Base string
+	// Seams は単位の継ぎ目: 継ぎ目を持つデコレータの FQN → それを宣言した単位のトランスパイラの名前（マニフェストの seams から）。
+	Seams map[string]string
+	// Files は単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル（Span.File と同じ形で、ユーザーのファイルを
+	// 辞書順に、その後に語彙のファイルを辞書順に）。in を省いた単位なら、読み込んだすべてのファイル。
 	Files []string
+}
+
+// outputs は、単位ごと（cfg.Units と同じ順）の、その単位が出力する名前空間（Program の順）: 単位の対象の名前空間
+// （docs/config.md「単位の対象」）のうち、Files のファイルに宣言を一つでも持つもの（同「in」）。
+func outputs(p *ir.Program, cfg *config.Config, units []Unit) [][]string {
+	out := make([][]string, len(cfg.Units))
+	for ni := range p.Namespaces {
+		ns := &p.Namespaces[ni]
+		if ns.Name == "" {
+			continue
+		}
+		for _, i := range cfg.Covering(ns.Name) {
+			if i < len(units) && declaredIn(ns, units[i].Files) {
+				out[i] = append(out[i], ns.Name)
+			}
+		}
+	}
+	return out
 }
 
 // Views は、単位ごと（cfg.Units と同じ順）の、その単位が出力する名前空間 → View
@@ -20,7 +44,8 @@ type Unit struct {
 // うち、Files のファイルに宣言を一つでも持つもの（同「in」）。
 // 計算（Compute）を行ってから作る。program は全体そのままに、params が合成する model を見る側の
 // Namespace.decls の末尾に足したもの。ops はすべての op について Sig(O, viewer) と、bind で埋まる位置を取り除いた引数。
-// units が cfg.Units より短ければ、足りない単位は Language が空で Files は nil（どの名前空間も出力しない）。
+// config は、単位の番号、言語、基底、out、Dir(U, N)、transpilers、options（cfg から）、seams（units から）。
+// units が cfg.Units より短ければ、足りない単位はどの名前空間も出力しない。
 func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.View {
 	if cfg == nil {
 		cfg = config.Default("")
@@ -32,38 +57,22 @@ func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.Vie
 	if p == nil {
 		return views
 	}
-	unit := func(i int) Unit {
-		if i < len(units) {
-			return units[i]
-		}
-		return Unit{}
-	}
 	// 単位 i が出力する名前空間（Program の順）と、その設定
-	outputs := make([][]string, len(cfg.Units))
+	outs := outputs(p, cfg, units)
 	namespaces := map[string][]ir.NamespaceConfig{}
 	confs := make([]map[string]ir.NamespaceConfig, len(cfg.Units))
-	for i := range confs {
+	for i := range cfg.Units {
 		confs[i] = map[string]ir.NamespaceConfig{}
-	}
-	for ni := range p.Namespaces {
-		ns := &p.Namespaces[ni]
-		if ns.Name == "" {
-			continue
+		for _, name := range outs[i] {
+			confs[i][name] = namespaceConfig(cfg, i, name, units[i])
 		}
-		for _, i := range cfg.Covering(ns.Name) {
-			u := unit(i)
-			if !declaredIn(ns, u.Files) {
-				continue
+	}
+	for ni := range p.Namespaces { // namespaces[N] は設定の順
+		name := p.Namespaces[ni].Name
+		for i := range cfg.Units {
+			if conf, ok := confs[i][name]; ok {
+				namespaces[name] = append(namespaces[name], conf)
 			}
-			conf := ir.NamespaceConfig{
-				Language:    u.Language,
-				Out:         cfg.Units[i].Out,
-				Dir:         cfg.Dir(i, ns.Name),
-				Transpilers: append([]string{}, cfg.Units[i].Transpilers...),
-			}
-			outputs[i] = append(outputs[i], ns.Name)
-			confs[i][ns.Name] = conf
-			namespaces[ns.Name] = append(namespaces[ns.Name], conf)
 		}
 	}
 	ix := newIndex(p)
@@ -71,7 +80,7 @@ func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.Vie
 	c.computeAll()
 	base := map[string]*ir.View{} // viewer → 単位によらない部分
 	for i := range cfg.Units {
-		for _, viewer := range outputs[i] {
+		for _, viewer := range outs[i] {
 			b := base[viewer]
 			if b == nil {
 				b = c.view(viewer)
@@ -79,7 +88,7 @@ func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.Vie
 			}
 			v := *b
 			v.Config = confs[i][viewer]
-			v.Files = append([]string{}, unit(i).Files...)
+			v.Files = append([]string{}, units[i].Files...)
 			v.Namespaces = make(map[string][]ir.NamespaceConfig, len(namespaces))
 			for k, list := range namespaces {
 				v.Namespaces[k] = append([]ir.NamespaceConfig(nil), list...)
@@ -88,6 +97,28 @@ func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.Vie
 		}
 	}
 	return views
+}
+
+// namespaceConfig は単位 i（cfg.Units の添字）での名前空間 name の設定（docs/ir.md「その名前空間から見た IR」の NamespaceConfig）。
+func namespaceConfig(cfg *config.Config, i int, name string, u Unit) ir.NamespaceConfig {
+	cu := &cfg.Units[i]
+	conf := ir.NamespaceConfig{
+		Index:       cu.Index,
+		Language:    u.Language,
+		Base:        u.Base,
+		Out:         cu.Out,
+		Dir:         cfg.Dir(i, name),
+		Transpilers: append([]string{}, cu.Transpilers...),
+		Options:     map[string]map[string]any{},
+		Seams:       map[string]string{},
+	}
+	for k, v := range cu.Options {
+		conf.Options[k] = v
+	}
+	for k, v := range u.Seams {
+		conf.Seams[k] = v
+	}
+	return conf
 }
 
 // declaredIn は、名前空間 ns が files のファイルに宣言を一つでも持つか。

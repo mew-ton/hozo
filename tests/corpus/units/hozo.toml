@@ -1,31 +1,28 @@
 # 単位のコーパス（docs/testing.md「コーパス」、README.md）: hozo.toml は出力の単位の一覧（docs/config.md「単位」）。
-# トランスパイラはどれもテスト用のプラグイン pick（plugins/pick）のもので、単位ごとに別のデコレータの op を起点に選ぶ
-# （plugins/pick/pick.json）。
+# 四つの単位とも、トランスパイラは Go の基底 go（リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す）。
 
-[hozo]
-plugin_dirs = ["plugins"]
-
-# 1: stock。shop の出力が、この出力の型（ItemId）を import する（単位をまたぐ一方向の import）
+# 1: stock。shop の出力が、この出力の型（ItemId、Short）を import する（単位をまたぐ一方向の import）
 [[emit]]
 namespace   = "stock"
-transpilers = ["pick-stock"]
+transpilers = ["go"]
 out         = "gen/stock"
 
-# 2: shop のうち shop/api.hozo に書かれた宣言だけ（in）。batch.hozo の op は、辿られたら口だけが出る
+# 2: shop のうち shop/api.hozo に書かれた宣言だけ（in）。batch.hozo の op は、呼ばれていれば本体のない op（Leaves の口）だけが出る。
+# 型と状態は、in によらずすべて出る
 [[emit]]
 in          = ["shop/api.hozo"]
 namespace   = "shop"
-transpilers = ["pick-api"]
+transpilers = ["go"]
 out         = "gen/api"
 
-# 3: 同じ shop を、別のトランスパイラで別の out に。2 とは独立に、自分の出力のすべてを持つ
+# 3: 同じ shop を、別の out に。2 とは独立に、自分の出力のすべてを持つ
 [[emit]]
 namespace   = "shop"
-transpilers = ["pick-batch"]
+transpilers = ["go"]
 out         = "gen/batch"
 
-# 4: 子孫 shop.admin を名指しする単位。shop.admin は 2 と 3 の対象から外れる
+# 4: 子孫 shop.admin を名指しする単位。shop.admin は 2 と 3 の対象から外れる。shop の型の置き場は、設定の順で最初の 2
 [[emit]]
 namespace   = "shop.admin"
-transpilers = ["pick-admin"]
+transpilers = ["go"]
 out         = "gen/admin"

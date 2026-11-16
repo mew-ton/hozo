@@ -1,0 +1,85 @@
+// docs/plugin-go.md「継ぎ目」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+
+/** テストの語彙 */
+namespace t {
+  /** 継ぎ目を要る（go-rate） */
+  decorator limited;
+  /** 継ぎ目を要る（go-trace） */
+  decorator traced;
+  /** 単位の継ぎ目にあるが、どの op にも付いていない（go-trace） */
+  decorator unused;
+  /** どのトランスパイラも読まない印 */
+  decorator plain;
+}
+
+/** 継ぎ目を持つ op の名前空間 */
+namespace shop {
+  model Item { id: string; }
+  /** 閉店している */
+  exception Closed;
+  /** 品物 */
+  state items: list<Item>;
+  /** 店の名前 */
+  state title: single<string>;
+  effect addItem on items.post;
+
+  // 「中身」置き場 1（配線）: wiring.go の buyBody。継ぎ目を持つ op を同じ名前空間の配線から呼ぶと、外側を通る
+  /**
+   * 品物を買う
+   *
+   * @param id 品物の識別子
+   */
+  @t.limited
+  export op buy(id: string): Item
+  {
+    const item = find(id);
+    add(item);
+    return item;
+  }
+
+  // 「中身」置き場 2（never を返す op）: ops.go の、外側のすぐ後ろの closedBody
+  @t.limited
+  export op closed(): never throws Closed;
+
+  // 「中身」置き場 3〜6（葉）: 口のメソッドの値（状態の命令、状態の問い合わせ、SharedState、Leaves）
+  @t.limited
+  export op add(item: Item) effects addItem;
+  @t.limited
+  export op count(): int reads items;
+  @t.limited
+  export op summary(): string reads items, title;
+  @t.limited
+  export op notify(item: Item);
+
+  // 「外側」二つの継ぎ目の入れ子（先に書かれたものほど外側）と、間の継ぎ目を持たないデコレータ
+  @t.traced
+  @t.plain
+  @t.limited
+  export op find(id: string): Item
+  {
+    return lookup(id);
+  }
+  export op lookup(id: string): Item;
+
+  // 「内側のフォルダと、別の名前空間」内部の op も継ぎ目を持つ（二層と Seams は内側のパッケージ）
+  @t.traced
+  op audit(item: Item);
+
+  // 「Seams」body という名前が op の引数の局所の名前と当たる
+  @t.limited
+  export op post(body: string, body_: string): string;
+
+  // 継ぎ目にないデコレータだけの op は、継ぎ目を持たない
+  @t.plain
+  export op plain(id: string): Item;
+}
+
+/** shop の op を呼ぶ側 */
+namespace front {
+  // 「内側のフォルダと、別の名前空間」別の名前空間の op の継ぎ目について、呼ぶ側は何も出さない
+  @t.plain
+  export op order(id: string): shop.Item
+  {
+    return shop.buy(id);
+  }
+}

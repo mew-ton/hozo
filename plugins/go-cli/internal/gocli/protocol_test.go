@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -31,7 +30,6 @@ func TestProtocolRun(t *testing.T) {
 		Files    []plugin.File       `json:"files"`
 		Warnings []plugin.Warning    `json:"warnings"`
 		Errors   []plugin.Diagnostic `json:"errors"`
-		Select   *plugin.Select      `json:"select"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, out.String())
@@ -49,14 +47,9 @@ func TestProtocolRun(t *testing.T) {
 	if resp.Files[0].Content != string(golden) {
 		t.Errorf("content differs from golden")
 	}
-	// docs/plugin-go-cli.md「マニフェスト」の「選ぶもの」: roots は @cli.command の op、stops は @proc.stdio の op。
-	// states と wraps は空（[] で書く）
-	want := plugin.Select{Roots: []string{"hozoc.check", "hozoc.emit", "hozoc.lsp"}, Stops: []string{"hozoc.runEmit"}, States: []string{}, Wraps: []plugin.Wrap{}}
-	if resp.Select == nil || !reflect.DeepEqual(*resp.Select, want) {
-		t.Errorf("select = %+v, want %+v", resp.Select, want)
-	}
-	if !strings.Contains(out.String(), `"select":{"roots":["hozoc.check","hozoc.emit","hozoc.lsp"],"stops":["hozoc.runEmit"],"states":[],"wraps":[]}`) {
-		t.Errorf("select の JSON が違う: %s", out.String()[len(out.String())-200:])
+	// 応答に select はない（版 0.4 でなくした。docs/plugin-protocol.md「選択をなくしたこと」）
+	if strings.Contains(out.String(), `"select"`) {
+		t.Errorf("select を書いている: %s", out.String()[len(out.String())-200:])
 	}
 }
 
@@ -123,6 +116,8 @@ func TestManifest(t *testing.T) {
 		"protocol": regexp.MustCompile(`(?m)^protocol\s*=\s*"` + regexp.QuoteMeta(ir.Version) + `"$`),
 		// 提供するトランスパイラは一つ: 名前は TranspilerName、言語は go
 		"transpiler": regexp.MustCompile(`(?m)^\[\[transpiler\]\]\nname\s*=\s*"` + regexp.QuoteMeta(TranspilerName) + `"\nlanguage\s*=\s*"go"$`),
+		// Go の基底 go に相乗りする（docs/plugin-go-cli.md「マニフェスト」。go-valid への依存は、go-cli の作り直しのときに足す）
+		"requires": regexp.MustCompile(`(?m)^requires\s*=\s*\["go"`),
 	}
 	for name, re := range checks {
 		if !re.MatchString(s) {

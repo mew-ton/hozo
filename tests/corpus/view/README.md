@@ -4,14 +4,14 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]` と、単位が二つ: `namespace = "api"`（`transpilers = ["view-none"]`）と `namespace = "web"`（`transpilers = ["view-dump"]`）。どちらも Go のトランスパイラ（TS の既定の出力は段階 5 までないので CFG-11） |
-| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。`view-dump` が起点に選ぶ op の印。標準の語彙にない名前空間で、どの単位の対象でもないので出力しない（`docs/config.md`「単位の対象」） |
-| `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる（呼ばれる op は `export`）。`docs/ir.md`「版」の 0.3 で足した形（継承した model の `override`、形の語、状態の型、`reads`、op の分類とケースの `as`、状態の参照、アームの値と `throw`、`never`）はここに置く: `api` は何も出力しないので、Go の既定の出力（`docs/emit-go.md`「移行の間の扱い」の GOEMIT-6）には掛からない |
-| `web.hozo` | ブラウザ側 `namespace web`。`view-dump` の viewer。`@t.entry` の付いた op が起点 |
-| `plugins/view-dump/` | テスト用のプラグイン。トランスパイラを二つ提供する（要求の `transpiler` で処理が分かれる）。`view-none` は何も書かず、何も選ばない。`view-dump` は、受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す。`emit` の応答の `select`（`docs/plugin-protocol.md`「選択」）で、`@t.entry` の付いた op を `roots` に選ぶ |
+| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]` と、単位が三つ: `namespace = "api"`、`"web"`、`"page"`。どれも `transpilers = ["view-dump"]`（TS の基底はまだないので、`api` と `web` を同じ基底にする）。`api` と `page` の単位は、`web` が使う型の置き場（`docs/config.md`「型の置き場」。なければ CFG-22） |
+| `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。`plugin.OpsWith` が探す op の印。標準の語彙にない名前空間で、どの単位の対象でもないので出力しない（`docs/config.md`「単位の対象」） |
+| `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる（呼ばれる op は `export`）。`docs/ir.md`「版」の 0.3 で足した形（継承した model の `override`、形の語、状態の型、`reads`、op の分類とケースの `as`、状態の参照、アームの値と `throw`、`never`）はここに置く |
+| `web.hozo` | ブラウザ側 `namespace web`。テストが見る `View` の viewer。`@t.entry` の付いた op が、`plugin.OpsWith` の対象 |
+| `plugins/view-dump/` | テスト用のプラグイン。トランスパイラ `view-dump`（`requires` を持たない、テストのための基底）を提供する: 受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す。ほかの名前の `transpiler` は `code: "unsupported"` |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（下の warning を含む） |
 | `testdata/expected/view.web.json` | `Views()["web"]` の JSON のゴールデン（`tests/view_test.go` の `TestViewFromEntry`） |
-| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン。既定の出力（`gen/web`。起点の `openUser` / `signOut` から辿った宣言だけ）と、プラグインの `gen/web/view.json`（`view.web.json` と同じ内容）。`api` の単位のトランスパイラ `view-none` は何も選ばないので `api` は何も出力せず（`docs/emit-go.md`「出力の対象」）、`web` は `api` の型を自分のパッケージに複製し、`api` の op を `Deps` の口にする。ゴールデンが `testdata` の下にあるのは、Go のツールが `.go` をパッケージとして拾わないため |
+| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン: 単位ごとの `view.json`（`gen/api`、`gen/web`、`gen/page`。`gen/web/view.json` は `view.web.json` と同じ内容）と記録。Go のファイルは出ない（hozoc 本体はコードを出力しない。`docs/plugin-protocol.md`「この文書が決めること」） |
 
 ゴールデンの更新は `go test ./tests -update`。`.hozo` の各ブロックの上の `// docs/...「見出し」` のコメントが、その構文が確かめる文書の見出し。
 
@@ -56,11 +56,11 @@
 | 同 手順 i: `catches ... ignores` | `@ignoreTimeout op signOut` | 例外を除き、`kept` でない効果の succ を `unknown` に |
 | 同 手順 i: `throws`（DEC-10） | `@external decorator remote` を `api.getUser` / `login` / `logout` に | `Program` の `signature` に `Timeout` はなく、`web` から見た `ops` にはある。`api` から見た `View` は `Program` と一致 |
 | `docs/check.md`「bind」 | `bind token to api.*;`、`api.getUser(in: GetUserInput { token: Token?; id })`、`api.logout(token: Token?)`、`api.touch(id)` | Pos が model のフィールドなら `web.getUser$in` を合成して `ref`、引数そのものなら引数を除く、位置のない op はそのまま。`Call.bound` は明示していない位置だけ（BIND-3） |
-| `docs/plugin-protocol.md`「選択」 | `plugins/view-dump` と `@t.entry` | `TestViewFromEntry` と `TestViewDeliveredToPlugin`: プラグインの応答の `select.roots` は `@t.entry` の付いた op（`plugin.OpsWith`）。既定の出力はそこから辿った op だけで、`greet` / `welcome` / `reload` / `login` は出力しない。`gen/api` はできない |
+| `docs/packages.md`「`plugin`（公開）」の `OpsWith` | `@t.entry` | `TestViewFromEntry`: `plugin.OpsWith(view, "t.entry")` は、viewer の op のうち `@t.entry` の付いたもの（`openUser`、`signOut`）を返す。相乗りは、これで自分の対象を探す |
 | `docs/plugin-protocol.md`「要求と応答」 | `plugins/view-dump` | `TestViewDeliveredToPlugin`: 実物の `hozoc emit` がトランスパイラ `view-dump` に渡す `View` が、`internal/project` の `web` の `View` とバイト単位で同じ。`protocol` が違えば `code: "protocol"`（MAN-2）、`import` と、知らない `transpiler` は `code: "unsupported"`（MAN-5） |
-| `docs/config.md`「単位の対象」 | `hozo.toml` | `View.config.dir = "gen/web"`、`namespaces[api][0].dir = "gen/api"` |
+| `docs/config.md`「単位の対象」、`docs/ir.md`「その名前空間から見た IR」の `NamespaceConfig` | `hozo.toml` | `View.config`: `index = 2`、`base = "view-dump"`、`dir = "gen/web"`、`options` と `seams` は空。`namespaces[api][0].dir = "gen/api"`。`View.files` は、語彙のファイル（`hozo:vocab/...`）を含む |
 
-このコーパスに一か所しかない構文: 対象が複数の状態の分類、遷移の効果（`Effect.target` の `transition`）、状態の分類での `match` の計算（効果を持つアーム）は、専用のコーパス `tests/corpus/state` に置いた（その `README.md`。IR は `TestStateCorpusIR`、Go の既定の出力は `TestCorpusEmitGolden` が確かめる）。ここへ足すと `view.web.json` のゴールデンと `TestViewFromEntry` の見出しごとの期待値をまとめて書き直すことになるので、分けたままにしている。
+このコーパスに一か所しかない構文: 対象が複数の状態の分類、遷移の効果（`Effect.target` の `transition`）、状態の分類での `match` の計算（効果を持つアーム）は、専用のコーパス `tests/corpus/state` に置いた（その `README.md`。IR は `TestStateCorpusIR`、基底 `go` の出力は `TestCorpusEmitGolden` が確かめる）。ここへ足すと `view.web.json` のゴールデンと `TestViewFromEntry` の見出しごとの期待値をまとめて書き直すことになるので、分けたままにしている。
 
 ## 想定する warning
 
@@ -72,9 +72,9 @@
 
 ## 書けなかったこと
 
-文書の要求を満たすために書きたかったが、今の実装では error になる（または出力が壊れる）ため外した構文。文書と実装の食い違いの候補（`docs/decisions.md`「設計書へ返すこと」ではなく、実装の側を直すもの）。
+文書の要求を満たすために書きたかったが、外したままの構文。
 
 | 文書 | 書きたかった構文 | 今の実装 |
 |---|---|---|
-| `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | `View` は `web.getUser$in` と `web.getUser$in$auth` を正しく合成するが、Go の既定の出力が `web.getUser$in$auth` を `GetUserIn$authInput` にして `go/format` に失敗する（GOEMIT-INTERNAL）。`docs/emit-go.md`「名前」は一段の `browser.getMe$in` → `GetMeInInput` しか決めていない |
+| `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | 外した理由（本体に組み込んでいた Go の出力が、合成した `web.getUser$in$auth` の名前を作れなかった）は、なくなった: このコーパスは Go を出さず、基底 `go` は合成した model を出さない（`docs/plugin-go.md`「出力の対象」）。足すと `view.web.json` と `TestViewFromEntry` の期待値を書き直すことになるので、まだ足していない |
 | `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストの `command = ["go", "run", ...]` のまま `protocol` の不一致を MAN-2 にする | `go run` はプログラムの終了コードを伝えず 0 以外を 1 にするので、`proc.Crashed` になる。`TestViewDeliveredToPlugin` の protocol のサブテストは `go build` した実行ファイルで起動する |

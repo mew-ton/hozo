@@ -13,6 +13,23 @@ import (
 
 const corpusDir = "../../tests/corpus/design"
 
+// repoPlugins は、リポジトリの plugins/（基底 go のマニフェストがある）。コーパスの単位のトランスパイラは、ここから
+// HOZO_PLUGIN_PATH として渡して探す（docs/testing.md「コーパス」）。検査では起動しない。
+func repoPlugins(t *testing.T) string {
+	t.Helper()
+	abs, err := filepath.Abs("../../plugins")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return abs
+}
+
+// loadCorpus は dir のプロジェクトを、リポジトリの plugins/ を HOZO_PLUGIN_PATH にして解析する。
+func loadCorpus(t *testing.T, dir, configPath string, overlay map[string][]byte) *Project {
+	t.Helper()
+	return LoadWith(Options{Root: dir, ConfigPath: configPath, Overlay: overlay, PluginPath: repoPlugins(t)})
+}
+
 // codes は診断のコードの列。
 func codes(diags []diag.Diagnostic) []string {
 	var out []string
@@ -74,7 +91,7 @@ func copyCorpus(t *testing.T) string {
 // TestDesignCorpus は設計書のコーパス（docs/testing.md「コーパス」）: error も warning もない
 // （tests/corpus/design/README.md の想定。§7.3 の placeOrder を配線に直した経緯はその表の 14）。
 func TestDesignCorpus(t *testing.T) {
-	p := Load(corpusDir, "", nil)
+	p := loadCorpus(t, corpusDir, "", nil)
 	if p.NoConfig {
 		t.Fatal("NoConfig = true")
 	}
@@ -87,14 +104,15 @@ func TestDesignCorpus(t *testing.T) {
 	if got := strings.Join(p.Sources, ","); got != "browser.hozo,server.hozo" {
 		t.Fatalf("Sources = %v", p.Sources)
 	}
-	// 単位は二つ（server、browser）。どちらもトランスパイラ pick（Go）で、in を省いているので Files は Sources のすべて
-	if len(p.Units) != 2 || p.Units[0].Namespace != "server" || p.Units[0].Language != "go" ||
-		len(p.Units[0].Transpilers) != 1 || p.Units[0].Transpilers[0].Name != "pick" || p.Units[0].Transpilers[0].Plugin.Name != "pick" ||
-		strings.Join(p.Units[0].Files, ",") != "browser.hozo,server.hozo" {
+	// 単位は四つ（server、browser と、使う型の置き場の http、page）。どれも基底 go で、in を省いているので
+	// Files は Sources のすべてと、語彙のファイル
+	if len(p.Units) != 4 || p.Units[0].Namespace != "server" || p.Units[0].Language != "go" || p.Units[0].Base != "go" ||
+		len(p.Units[0].Transpilers) != 1 || p.Units[0].Transpilers[0].Name != "go" || p.Units[0].Transpilers[0].Plugin.Name != "go" ||
+		!strings.HasPrefix(strings.Join(p.Units[0].Files, ","), "browser.hozo,server.hozo,hozo:vocab/") {
 		t.Fatalf("Units = %+v", p.Units)
 	}
 	views := p.Views()
-	if len(views) != 2 || views[0]["server"] == nil || views[1]["browser"] == nil || len(views[0]) != 1 {
+	if len(views) != 4 || views[0]["server"] == nil || views[1]["browser"] == nil || len(views[0]) != 1 {
 		t.Fatalf("Views = %v", views)
 	}
 	if d := views[0]["server"].Config.Dir; d != "gen/server" {
@@ -109,7 +127,7 @@ func TestConfigPath(t *testing.T) {
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	p := Load(sub, "../hozo.toml", nil)
+	p := loadCorpus(t, sub, "../hozo.toml", nil)
 	if p.NoConfig || p.Errors() != 0 {
 		t.Fatalf("NoConfig=%v errors:\n%s", p.NoConfig, text(p))
 	}
@@ -214,7 +232,7 @@ func TestUncoveredNamespace(t *testing.T) {
 func TestOverlay(t *testing.T) {
 	dir := copyCorpus(t)
 	broken := "namespace server {\n  model Broken { x: \n}\n"
-	p := Load(dir, "", map[string][]byte{
+	p := loadCorpus(t, dir, "", map[string][]byte{
 		"server.hozo":                      []byte(broken),
 		filepath.Join(dir, "extra.hozo"):   []byte("namespace extra {\n  model E { x: string; }\n}\n"),
 		"gen/server/ignored.hozo":          []byte("garbage"), // out の下は除く
@@ -301,7 +319,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int, t
 		transpilers = []string{name}
 	}
 	script := "cat >/dev/null; printf '%s' '" + stdout + "'; exit " + string(rune('0'+exit))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.3\"\n" + extra
+	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.4\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
@@ -310,7 +328,10 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int, t
 
 // TestPluginCheck はプラグインの探索、使うプラグインの語彙の読み込み、[check] enabled の起動と診断の変換。
 func TestPluginCheck(t *testing.T) {
-	dir := copyCorpus(t)
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  model M { id: string; }\n  /** 注文する */\n  op placeOrder(m: M);\n}\n")
+	write(t, filepath.Join(dir, "browser.hozo"), "namespace browser {\n  op open();\n}\n")
+	fakePlugin(t, dir, "pick", "go", "", `{}`, 0)
 	config := func(serverTranspilers ...string) string {
 		return pluginDirs + unit("server", "gen/server", serverTranspilers...) + unit("browser", "gen/browser", "pick")
 	}
@@ -339,10 +360,10 @@ func TestPluginCheck(t *testing.T) {
 	}
 	got := text(p)
 	for _, want := range []string{
-		"server.hozo:246:3: warning[CHK-1]: by fqn", // FQN → 宣言の位置
-		"server.hozo:3:5: error[CHK-2]: by pos",     // file:line:col
-		"hozoc: error[CHK-3]: unknown",              // 位置なし
-		"extra.hozo:2:9: warning[NAME-1]",           // hozoc の診断と一緒に並ぶ
+		"server.hozo:4:3: warning[CHK-1]: by fqn", // FQN → 宣言の位置
+		"server.hozo:3:5: error[CHK-2]: by pos",   // file:line:col
+		"hozoc: error[CHK-3]: unknown",            // 位置なし
+		"extra.hozo:2:9: warning[NAME-1]",         // hozoc の診断と一緒に並ぶ
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("want %q in:\n%s", want, got)
@@ -350,6 +371,10 @@ func TestPluginCheck(t *testing.T) {
 	}
 	if !hasFile(p, "hozo:plugin/chk/v.hozo") {
 		t.Error("使うプラグインの語彙 hozo:plugin/chk/v.hozo が読まれていない")
+	}
+	// 語彙のファイルは、どの単位の Files にも入る（in によらず、いつも合ったものとして扱う。docs/config.md「in」）
+	if files := strings.Join(p.Units[1].Files, ","); !strings.Contains(files, "hozo:plugin/chk/v.hozo") || !strings.Contains(files, "hozo:vocab/http.hozo") {
+		t.Errorf("Units[1].Files = %v", files)
 	}
 
 	// check はプラグインと名前空間の組ごとに一回: 同じ名前空間の単位が二つあっても、診断は一度だけ（docs/plugin-protocol.md「起動」）
@@ -378,15 +403,33 @@ func TestPluginCheck(t *testing.T) {
 	}
 }
 
-// TestResolveTranspilers は docs/config.md「単位」と docs/plugin-protocol.md「探索」: 単位の transpilers の名前を、
+// manifest は、起動しないプラグイン name のマニフェストを plugins/<name> に置く。transpilers は [[transpiler]] の中身
+// （name と language のほかの行: requires、seams など）を、トランスパイラの名前 → 行で。
+func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
+	t.Helper()
+	m := "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.4\"\n"
+	for _, tr := range transpilers {
+		lang := "go"
+		if strings.HasPrefix(tr[0], "ts") {
+			lang = "ts"
+		}
+		m += "\n[[transpiler]]\nname = \"" + tr[0] + "\"\nlanguage = \"" + lang + "\"\n" + tr[1]
+	}
+	write(t, filepath.Join(dir, "plugins", name, "hozo-plugin.toml"), m)
+}
+
+// TestResolveTranspilers は docs/config.md「単位」「基底と相乗り」と docs/plugin-protocol.md「探索」: 単位の transpilers の名前を、
 // 入っているすべてのプラグインのトランスパイラから探す。CFG-14（どのプラグインも提供していない）、CFG-15（二つ以上の
-// プラグインが提供している）、CFG-16（一つの単位の言語がそろっていない）、CFG-11（単位の言語が ts）。
+// プラグインが提供している）、CFG-16（一つの単位の言語がそろっていない）、CFG-19（requires の名前が transpilers にない）、
+// CFG-20（基底がちょうど一つでない）。
 func TestResolveTranspilers(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
-	// kit は二つのトランスパイラ（go-a、go-b）を提供する。ts-kit は言語の違うトランスパイラ
-	fakePlugin(t, dir, "kit", "go", "", `{}`, 0, "go-a", "go-b")
-	fakePlugin(t, dir, "ts-kit", "ts", "", `{}`, 0, "ts-a")
+	// kit は基底 go と、それに相乗りする go-x（requires = ["go"]）、go と go-x に相乗りする go-y を提供する。
+	// kit2 は、もう一つの基底 go-b。ts-kit は言語の違う基底 ts と、それに相乗りする ts-x、言語の違う基底に相乗りする ts-on-go
+	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-x", "requires = [\"go\"]\n"}, [2]string{"go-y", "requires = [\"go\", \"go-x\"]\n"})
+	manifest(t, dir, "kit2", [2]string{"go-b", ""})
+	manifest(t, dir, "ts-kit", [2]string{"ts", ""}, [2]string{"ts-x", "requires = [\"ts\"]\n"}, [2]string{"ts-on-go", "requires = [\"go\"]\n"})
 	load := func(units string) *Project {
 		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)
 		return Load(dir, "", nil)
@@ -403,43 +446,170 @@ func TestResolveTranspilers(t *testing.T) {
 		}
 	}
 
-	// トランスパイラの名前はプラグインの名前と別。一つのプラグインの二つのトランスパイラを同じ単位に書ける
-	p := load(unit("a", "gen/a", "go-a", "go-b"))
+	// トランスパイラの名前はプラグインの名前と別。一つのプラグインの二つのトランスパイラを同じ単位に書ける。
+	// 単位の基底は、requires が空のただ一つのトランスパイラで、単位の言語は、その language。書いた順にはよらない
+	p := load(unit("a", "gen/a", "go-y", "go-x", "go"))
 	want(p, "")
-	if u := p.Units[0]; u.Language != "go" || len(u.Transpilers) != 2 || u.Transpilers[0].Plugin.Name != "kit" || u.Transpilers[1].Decl.Name != "go-b" {
+	if u := p.Units[0]; u.Language != "go" || u.Base != "go" || len(u.Transpilers) != 3 || u.Transpilers[0].Plugin.Name != "kit" || u.Transpilers[1].Decl.Name != "go-x" {
 		t.Errorf("Units[0] = %+v", u)
 	}
-	// CFG-14: プラグインの名前（kit）はトランスパイラの名前ではない
-	p = load(unit("a", "gen/a", "kit", "go-a", "nope"))
-	want(p, "CFG-14,CFG-14")
+	// CFG-14: プラグインの名前（kit）はトランスパイラの名前ではない。解決できない名前のある単位では、CFG-20 を出さない
+	p = load(unit("a", "gen/a", "kit", "go-x", "nope"))
+	want(p, "CFG-14,CFG-14,CFG-19")
 	if !strings.Contains(text(p), `1 番目の [[emit]]（namespace = "a"、out = "gen/a"）の transpilers の kit を提供するプラグインが入っていない`) {
 		t.Errorf("CFG-14 のメッセージ:\n%s", text(p))
 	}
-	if len(p.Units[0].Transpilers) != 1 { // 解決できたものだけが残る
-		t.Errorf("Transpilers = %+v", p.Units[0].Transpilers)
+	if len(p.Units[0].Transpilers) != 1 || p.Units[0].Base != "" { // 解決できたものだけが残る。基底は決まらない
+		t.Errorf("Units[0] = %+v", p.Units[0])
 	}
-	// CFG-16: 一つの単位に go と ts。CFG-11 は出さない（言語が決まらない）
-	p = load(unit("a", "gen/a", "go-a", "ts-a"))
+	// CFG-16: 一つの単位に go と ts
+	p = load(unit("a", "gen/a", "go", "ts-on-go"))
 	want(p, "CFG-16")
-	if !strings.Contains(text(p), `go-a は "go"、ts-a は "ts"`) {
+	if !strings.Contains(text(p), `go は "go"、ts-on-go は "ts"`) {
 		t.Errorf("CFG-16 のメッセージ:\n%s", text(p))
 	}
-	// 単位が違えば言語が違ってよい（ただし ts はまだ出力がないので CFG-11）
-	p = load(unit("a", "gen/a", "go-a") + unit("a", "gen/ts", "ts-a"))
-	want(p, "CFG-11")
-	if p.Units[1].Language != "ts" {
-		t.Errorf("Units[1].Language = %q", p.Units[1].Language)
+	// 単位が違えば言語が違ってよい。言語の名前の一覧は持たない（CFG-11 は欠番）
+	p = load(unit("a", "gen/a", "go") + unit("a", "gen/ts", "ts", "ts-x"))
+	want(p, "")
+	if p.Units[1].Language != "ts" || p.Units[1].Base != "ts" {
+		t.Errorf("Units[1] = %+v", p.Units[1])
+	}
+	// CFG-19: requires の名前が transpilers にない。足りない名前ごとに一つで、要るトランスパイラを示す
+	p = load(unit("a", "gen/a", "go-y"))
+	want(p, "CFG-19,CFG-19,CFG-20")
+	if !strings.Contains(text(p), "go-y は go-x を要るが、transpilers にない") || !strings.Contains(text(p), "go-y は go を要るが、transpilers にない") {
+		t.Errorf("CFG-19 のメッセージ:\n%s", text(p))
+	}
+	p = load(unit("a", "gen/a", "go", "go-y"))
+	want(p, "CFG-19")
+	// CFG-20: 基底がない（相乗りだけ）、基底が二つ
+	p = load(unit("a", "gen/a", "go-b", "go-x"))
+	want(p, "CFG-19")
+	p = load(unit("a", "gen/a", "go", "go-b"))
+	want(p, "CFG-20")
+	if !strings.Contains(text(p), "基底（マニフェストの requires が空のトランスパイラ）が二つ以上ある: go、go-b") || p.Units[0].Base != "" {
+		t.Errorf("CFG-20 のメッセージ:\n%s", text(p))
 	}
 	// CFG-15: 同じ名前のトランスパイラを二つのプラグインが提供している。使っていなければ出ない
-	fakePlugin(t, dir, "other", "go", "", `{}`, 0, "go-a")
-	want(load(unit("a", "gen/a", "go-b")), "")
-	p = load(unit("a", "gen/a", "go-a"))
-	want(p, "CFG-15")
+	manifest(t, dir, "other", [2]string{"go-x", "requires = [\"missing\"]\n"})
+	want(load(unit("a", "gen/a", "go")), "")
+	p = load(unit("a", "gen/a", "go", "go-x"))
+	want(p, "CFG-15") // 解決できなかったトランスパイラの requires は見ず（CFG-19 なし）、CFG-20 も出さない
 	if !strings.Contains(text(p), "kit（plugins/kit/hozo-plugin.toml）、other（plugins/other/hozo-plugin.toml）") {
 		t.Errorf("CFG-15 のメッセージ:\n%s", text(p))
 	}
-	if p.Units[0].Transpilers[0].Plugin.Name != "kit" { // 以降の処理は、探した順で最初のプラグインのもの
-		t.Errorf("Plugin = %s", p.Units[0].Transpilers[0].Plugin.Name)
+	if p.Units[0].Transpilers[1].Plugin.Name != "kit" { // 以降の処理は、探した順で最初のプラグインのもの
+		t.Errorf("Plugin = %s", p.Units[0].Transpilers[1].Plugin.Name)
+	}
+}
+
+// TestSeams は docs/config.md「継ぎ目」: 単位の継ぎ目は、単位のトランスパイラのマニフェストの seams を合わせたもの。
+// 同じ単位の二つのトランスパイラが同じデコレータを宣言していれば CFG-23（単位とデコレータの組ごとに一つ）。別の単位なら
+// 重なってよい。解決できなかったトランスパイラの seams は見ない。View の config に、単位ごとの継ぎ目が載る。
+func TestSeams(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	manifest(t, dir, "kit", [2]string{"go", ""},
+		[2]string{"go-rate", "requires = [\"go\"]\nseams = [\"rate.limited\", \"rate.slow\"]\n"},
+		[2]string{"go-trace", "requires = [\"go\"]\nseams = [\"trace.span\", \"rate.limited\"]\n"},
+		[2]string{"go-base-seam", "seams = [\"own.dec\"]\n"})
+	load := func(units string) *Project {
+		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)
+		return Load(dir, "", nil)
+	}
+	// 宣言されているか（rate.limited というデコレータがあるか）、付いているかは確かめない
+	p := load(unit("a", "gen/a", "go", "go-rate") + unit("a", "gen/b", "go", "go-trace") + unit("a", "gen/c", "go-base-seam"))
+	if len(p.Diags) != 0 {
+		t.Fatalf("diags:\n%s", text(p))
+	}
+	if got := p.Units[0].Seams; len(got) != 2 || got["rate.limited"] != "go-rate" || got["rate.slow"] != "go-rate" {
+		t.Errorf("Units[0].Seams = %v", got)
+	}
+	if got := p.Units[1].Seams; len(got) != 2 || got["rate.limited"] != "go-trace" { // 別の単位なら、別のトランスパイラが宣言してよい
+		t.Errorf("Units[1].Seams = %v", got)
+	}
+	if got := p.Units[2].Seams; got["own.dec"] != "go-base-seam" { // 基底も宣言できる
+		t.Errorf("Units[2].Seams = %v", got)
+	}
+	views := p.Views()
+	if got := views[0]["a"].Config.Seams; len(got) != 2 || got["rate.limited"] != "go-rate" {
+		t.Errorf("View.config.seams = %v", got)
+	}
+	// namespaces[N] の要素ごとに、その単位の継ぎ目を持つ
+	if got := views[0]["a"].Namespaces["a"]; len(got) != 3 || got[1].Seams["rate.limited"] != "go-trace" || len(got[2].Seams) != 1 {
+		t.Errorf("View.namespaces[a] = %+v", got)
+	}
+	// CFG-23: 同じ単位の二つのトランスパイラが rate.limited を宣言している。継ぎ目は、設定の順で最初のもの
+	p = load(unit("a", "gen/a", "go", "go-trace", "go-rate"))
+	if got := strings.Join(codes(p.Diags), ","); got != "CFG-23" || p.Diags[0].File != "hozo.toml" {
+		t.Fatalf("codes = %v, want [CFG-23]\n%s", got, text(p))
+	}
+	if !strings.Contains(text(p), "デコレータ rate.limited の継ぎ目を宣言している: go-trace、go-rate") || p.Units[0].Seams["rate.limited"] != "go-trace" {
+		t.Errorf("CFG-23 のメッセージ:\n%s（Seams = %v）", text(p), p.Units[0].Seams)
+	}
+	// 解決できなかった（CFG-15 の）トランスパイラの seams は見ない
+	manifest(t, dir, "other", [2]string{"go-rate", "requires = [\"go\"]\nseams = [\"trace.span\"]\n"})
+	p = load(unit("a", "gen/a", "go", "go-trace", "go-rate"))
+	if got := strings.Join(codes(p.Diags), ","); got != "CFG-15" {
+		t.Fatalf("codes = %v, want [CFG-15]\n%s", got, text(p))
+	}
+}
+
+// TestViewConfig は View の config（docs/ir.md「その名前空間から見た IR」）: index、base、options、seams。
+// オプションの値は hozo.toml のテーブルのままで、書いていないトランスパイラのキーはない。
+func TestViewConfig(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-x", "requires = [\"go\"]\nseams = [\"a.dec\"]\n"})
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/first")+
+		unit("a", "gen/a", "go-x", "go")+"\n[emit.options.go-x]\nvalidate = true\nmax = 3\n")
+	p := LoadWith(Options{Root: dir})
+	if len(p.Diags) != 1 || p.Diags[0].Code != "CFG-14" { // 一つ目の単位のトランスパイラ t はない
+		t.Fatalf("diags:\n%s", text(p))
+	}
+	c := p.Views()[1]["a"].Config
+	if c.Index != 2 || c.Base != "go" || c.Language != "go" || c.Out != "gen/a" || c.Dir != "gen/a" ||
+		strings.Join(c.Transpilers, ",") != "go-x,go" || c.Seams["a.dec"] != "go-x" || len(c.Options) != 1 ||
+		c.Options["go-x"]["validate"] != true || c.Options["go-x"]["max"] != int64(3) {
+		t.Errorf("config = %+v", c)
+	}
+}
+
+// TestHomes は CFG-22（docs/config.md「型の置き場」）: 出力が使う宣言の名前空間が、その単位の基底の出力を持たない。
+// 語彙の名前空間の型も同じ規則で、使うなら、その名前空間の単位を置く。表の各行は internal/check の TestCfg22。
+func TestHomes(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "type.hozo"), "namespace type {\n  model User { id: string; }\n}\n")
+	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  @http.status(404)\n  exception Gone;\n  export op get(): type.User throws Gone | http.BadRequest;\n}\n")
+	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-b", ""})
+	load := func(units string) *Project {
+		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)
+		return Load(dir, "", nil)
+	}
+	p := load(unit("server", "gen/server", "go"))
+	if got := strings.Join(codes(p.Diags), ","); got != "CFG-22,CFG-22" {
+		t.Fatalf("codes = %v, want [CFG-22 CFG-22]\n%s", got, text(p))
+	}
+	for _, want := range []string{
+		`1 番目の [[emit]]（namespace = "server"）は type.User を使うが、type を出力する go の単位がない。[[emit]] namespace = "type"、transpilers = ["go"] の単位を足す`,
+		`http.BadRequest を使うが、http を出力する go の単位がない`,
+	} {
+		if !strings.Contains(text(p), want) {
+			t.Errorf("want %q in:\n%s", want, text(p))
+		}
+	}
+	// 型だけの名前空間と、語彙の名前空間に単位を置けば通る（CFG-8 は欠番）
+	p = load(unit("server", "gen/server", "go") + unit("type", "gen/type", "go") + unit("http", "gen/http", "go"))
+	if len(p.Diags) != 0 {
+		t.Fatalf("diags:\n%s", text(p))
+	}
+	if v := p.Views()[2]["http"]; v == nil || !v.InUnit("http.BadRequest") {
+		t.Error("語彙の名前空間の単位が出力を持たない")
+	}
+	// 基底の違う単位は、置き場にならない
+	p = load(unit("server", "gen/server", "go") + unit("type", "gen/type", "go-b") + unit("http", "gen/http", "go"))
+	if got := strings.Join(codes(p.Diags), ","); got != "CFG-22" {
+		t.Fatalf("codes = %v, want [CFG-22]\n%s", got, text(p))
 	}
 }
 
@@ -470,8 +640,9 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 
 	// 渡せば探す。順は plugin_dirs、PluginPath、Home（同じ名前は近いものだけ）
 	envDir, home := t.TempDir(), t.TempDir()
+	// env-t と home-t は、基底 t に相乗りする（一つの単位は、基底をちょうど一つ持つ）
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.3\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\n"
+		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.4\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -520,7 +691,7 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.3\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.4\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
@@ -546,11 +717,15 @@ func TestUnitIn(t *testing.T) {
 	if got := strings.Join(p.Sources, ","); got != "shop/api.hozo,shop/batch.hozo" {
 		t.Fatalf("Sources = %v（in は読むファイルを変えない）", got)
 	}
-	if got := strings.Join(p.Units[0].Files, ","); got != "shop/api.hozo" {
+	// Files は、in に合ったユーザーのファイルの後に、語彙のファイル（in によらず、いつも合ったものとして扱う）
+	if got := userFiles(p.Units[0].Files); got != "shop/api.hozo" {
 		t.Errorf("Units[0].Files = %v", got)
 	}
-	if got := strings.Join(p.Units[1].Files, ","); got != "shop/api.hozo,shop/batch.hozo" {
+	if got := userFiles(p.Units[1].Files); got != "shop/api.hozo,shop/batch.hozo" {
 		t.Errorf("Units[1].Files = %v（in を省けば読み込んだすべてのファイル）", got)
+	}
+	if all := strings.Join(p.Units[0].Files, ","); !strings.HasPrefix(all, "shop/api.hozo,hozo:vocab/") || !strings.Contains(all, "hozo:vocab/valid.hozo") {
+		t.Errorf("Units[0].Files = %v（語彙のファイルがない）", all)
 	}
 	views := p.Views()
 	// 単位 0 は shop だけ（shop.jobs は in に合うファイルに宣言がない）。単位 1 は両方
@@ -558,7 +733,7 @@ func TestUnitIn(t *testing.T) {
 		t.Fatalf("Views = %v", views)
 	}
 	v := views[0]["shop"]
-	if strings.Join(v.Files, ",") != "shop/api.hozo" || !v.InUnit("shop.open") || v.InUnit("shop.nightly") {
+	if userFiles(v.Files) != "shop/api.hozo" || !v.InUnit("shop.open") || v.InUnit("shop.nightly") {
 		t.Errorf("View.files = %v, InUnit(open) = %v, InUnit(nightly) = %v", v.Files, v.InUnit("shop.open"), v.InUnit("shop.nightly"))
 	}
 	if v.Program.Lookup("shop.nightly") == nil {
@@ -566,7 +741,7 @@ func TestUnitIn(t *testing.T) {
 	}
 	// glob（** と *）
 	write(t, filepath.Join(dir, "hozo.toml"), in(`"shop/**/*.hozo"`))
-	if p = Load(dir, "", nil); len(p.Diags) != 0 || len(p.Units[0].Files) != 2 {
+	if p = Load(dir, "", nil); len(p.Diags) != 0 || userFiles(p.Units[0].Files) != "shop/api.hozo,shop/batch.hozo" {
 		t.Errorf("glob: Files = %v\n%s", p.Units[0].Files, text(p))
 	}
 	// CFG-18: in がどのファイルにも合わない（空の in も同じ）
@@ -582,12 +757,23 @@ func TestUnitIn(t *testing.T) {
 	}
 }
 
+// userFiles は files のうち、ユーザーのファイル（語彙でないもの）を「,」でつないだもの。
+func userFiles(files []string) string {
+	var out []string
+	for _, f := range files {
+		if !strings.HasPrefix(f, "hozo:") {
+			out = append(out, f)
+		}
+	}
+	return strings.Join(out, ",")
+}
+
 // TestUnsupported は CFG-6（docs/config.md「診断」）: 単位のトランスパイラの unsupported にあるデコレータが、その単位の
 // 対象の宣言に付いている。同じ宣言を二つの単位が対象にしていても一度だけ。in の外の宣言には出ない。
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.3\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.4\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator legacy;\n  @legacy op f();\n}\n")
 	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy op g();\n}\n")
 	count := func(units string) int {

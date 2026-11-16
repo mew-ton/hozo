@@ -1,0 +1,4 @@
+// CFG-20（docs/config.md「基底と相乗り」）: 一つの単位は、基底（requires が空のトランスパイラ）をちょうど一つ持つ（ok_1.toml）
+namespace a {
+  op f();
+}

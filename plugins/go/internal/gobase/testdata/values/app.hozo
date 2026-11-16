@@ -1,0 +1,107 @@
+// docs/plugin-go.md「値」の表の各行と、「型をそろえる」の表の各行、「省略可能を通るパス」を、一か所ずつ使う。
+// 各 op の上のコメントが、その op が確かめる行。op はどれも export（出力は一つのパッケージ）。
+
+/** 値の形 */
+namespace app {
+  scalar Email extends string;
+  model Address { city: string; zip: string?; tags: string[]; }
+  model Profile { name: string; address: Address?; nick: string?; age: int = 20; active: boolean = true; }
+  model Account { id: string; profile: Profile?; email: Email; }
+  model Options { limit: int = 10; label: string = "none"; ratio: float = 1.5; wait: Duration = 5s; note: string?; }
+  /** 大きさ（述語で決まる分類。ケースで絞り込んだ型 Size.Big<Address> を作るため） */
+  classify Size of Address {
+    Big;
+    Small;
+  }
+
+  // 値を受け取る葉（純粋で失敗しない）
+  export op takeString(v: string);
+  export op takeInt(v: int);
+  export op takeFloat(v: float);
+  export op takeBool(v: boolean);
+  export op takeDuration(v: Duration);
+  export op takeAccount(v: Account);
+  export op takeProfile(v: Profile);
+  export op takeAddress(v: Address);
+  export op takeOptions(v: Options);
+  export op takeOptionalString(v: string?);
+  export op takeOptionalInt(v: int?);
+  export op takeOptionalProfile(v: Profile?);
+  export op takeOptionalTags(v: string[]?);
+  export op takeStrings(v: string[]);
+  export op takeOptionalStrings(v: string?[]);
+  export op takeTable(v: Record<string, string>);
+
+  // 「値」name（パスなし）、name のパス、none
+  export op names(account: Account)
+  {
+    takeAccount(account);
+    takeString(account.id);
+    takeOptionalString(none);
+  }
+
+  // 「値」literal: 文字列（エスケープ）、整数、小数（. も e も含まなければ .0 を足す）、真偽値、Duration
+  export op literals()
+  {
+    takeString("a\"b\n");
+    takeInt(42);
+    takeInt(-7);
+    takeFloat(1.5);
+    takeFloat(2.0);
+    takeFloat(1000000000000000000000.0);
+    takeBool(true);
+    takeBool(false);
+    takeDuration(5m);
+  }
+
+  // 「値」record: 並びは model のフィールドの順、書かれていない既定値、値を省いたフィールド、入れ子、省略可能なら &
+  export op records(name: string, email: Email)
+  {
+    takeProfile({ active: false, name });
+    takeOptions({});
+    takeOptions({ note: "n", limit: 3 });
+    takeAccount({ email, profile: { name: "inner" }, id: "1" });
+    takeOptionalProfile({ name: "p" });
+  }
+
+  // 「型をそろえる」T → optional(T) で Go の型が *T（リテラルは型を付ける）、Go の型がそのままのもの（array）
+  export op toOptional(name: string, tags: string[])
+  {
+    takeOptionalString(name);
+    takeOptionalString("lit");
+    takeOptionalInt(3);
+    takeOptionalTags(tags);
+  }
+
+  // 「型をそろえる」scalar → その元の型
+  export op toBase(email: Email)
+  {
+    takeString(email);
+    takeOptionalString(email);
+  }
+
+  // 「型をそろえる」array / record の要素をそろえる（その文の前のループ。nil は nil のまま）
+  export op elements(emails: Email[], names: string[], byName: Record<string, Email>)
+  {
+    takeStrings(emails);
+    takeOptionalStrings(names);
+    takeTable(byName);
+  }
+
+  // 「型をそろえる」case(…) → of（Go では同じ型）
+  export op fromCase(big: Size.Big<Address>)
+  {
+    takeAddress(big);
+  }
+
+  // 「省略可能を通るパス」ポインタにする型、既に nil を持てる型、入れ子、return と const
+  export op optionalPaths(account: Account): string?
+  {
+    takeOptionalString(account.profile.name);
+    takeOptionalString(account.profile.nick);
+    takeOptionalTags(account.profile.address.tags);
+    const city = account.profile.address.city;
+    takeOptionalString(city);
+    return account.profile.address.zip;
+  }
+}

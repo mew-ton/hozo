@@ -1,0 +1,73 @@
+// docs/plugin-go.md「bind で埋まる位置」の 1〜5 を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（出力は、名前空間ごとに一つのパッケージ）。
+
+/** 呼ばれる側。bind の位置を持つ op */
+namespace api {
+  scalar Token extends string;
+  model GetInput { token: Token?; id: string; }
+  model Auth { token: Token?; locale: string = "ja"; }
+  model NestedInput { auth: Auth; id: string; }
+  model Guest { token: Token = "guest"; id: string = "0"; }
+  /** 印。付いた op は純粋でなくなる */
+  decorator remote;
+
+  @remote export op logout(token: Token?);
+  @remote export op get(in: GetInput): string;
+  @remote export op nested(in: NestedInput): string;
+  @remote export op ping(auth: Auth?): string;
+  @remote export op enter(guest: Guest): string;
+  @remote export op plain(id: string): string;
+}
+
+/** 呼ぶ側。状態を bind で埋める */
+namespace web {
+  scalar Locale extends string;
+  /** 手元のトークン */
+  state token: nullable<api.Token>;
+  /** 表示の言語 */
+  state locale: single<Locale>;
+
+  bind token to api.*;
+  bind locale to web.*;
+
+  export op greet(name: string, locale: Locale): string;
+
+  // 2: 位置が引数そのもの
+  export op signOut()
+  {
+    api.logout();
+  }
+
+  // 3: 位置が、レコードリテラルで渡した引数の中のフィールド（入れ子のレコードリテラルも）
+  export op fetch(id: string): string
+  {
+    const a = api.get({ id });
+    const b = api.nested({ auth: { locale: "en" }, id });
+    return api.nested({ auth: {}, id: a });
+  }
+
+  // 4: 位置が、渡されていない引数の中のフィールド（その引数の型の構造体リテラルを作る。既定値も書く）
+  export op check(): string
+  {
+    return api.ping();
+  }
+
+  // 5: 状態の形が nullable で、位置の型が省略可能でない（既定値を持つ位置）: 値があるときだけ埋める
+  export op enter(id: string): string
+  {
+    return api.enter({ id });
+  }
+
+  // 名前で渡した引数の中の位置は、明示した位置（埋めない）。位置のない op はそのまま
+  export op explicit(in: api.GetInput, id: string): string
+  {
+    const a = api.get(in);
+    return api.plain(id);
+  }
+
+  // 同じ名前空間の op への呼び出しも、配線が埋める（形が single の状態）
+  export op hello(name: string): string
+  {
+    return greet(name);
+  }
+}

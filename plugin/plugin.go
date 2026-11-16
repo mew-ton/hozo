@@ -13,6 +13,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/mew-ton/hozo/ir"
 )
@@ -41,40 +44,69 @@ type EmitRequest struct {
 }
 
 // EmitResponse は "emit" の応答。Errors が一つでもあれば hozoc は Files を書き出さない。
-// Select は出力の対象の選択（docs/plugin-protocol.md「選択」）。省けば何も選ばない。
+// 何を出すかを hozoc に伝える項目（版 0.3 までの select）はない（docs/plugin-protocol.md「選択をなくしたこと」）。
 type EmitResponse struct {
 	Files    []File       `json:"files"`
 	Warnings []Warning    `json:"warnings"`
 	Errors   []Diagnostic `json:"errors,omitempty"`
-	Select   Select       `json:"select,omitzero"`
 }
 
-// Select は、既定の出力の対象にする宣言の選択（docs/plugin-protocol.md「選択」）。FQN はどれも View.Viewer の
-// 名前空間の宣言で、単位の対象のもの（View.InUnit）。そこにない FQN や、Wraps がその op に付いていないデコレータを
-// 指していれば PLG-3。
-// hozoc がここから出力の対象を決める手順は docs/emit-go.md「出力の対象」。
-type Select struct {
-	// Roots は起点にする op。
-	Roots []string `json:"roots"`
-	// Stops は、起点から辿られたときに、本体を辿らず実装を差し込む口だけを出す op。起点ではないので、
-	// どこからも辿られなければ選ばれない（docs/emit-go.md「出力の対象」の 2）。
-	Stops []string `json:"stops"`
-	// States は起点にする状態（基底の状態か、状態の分類）。
-	States []string `json:"states"`
-	// Wraps は、このトランスパイラが包む関数を実装するデコレータの適用。
-	Wraps []Wrap `json:"wraps"`
-}
+// Version は、このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）。
+const Version = "0.0.0-dev"
 
-// Wrap はデコレータの適用一つ: op Op に付いたデコレータ Decorator（FQN。名前付きデコレータを通して付けたなら、その FQN でもよい）。
-type Wrap struct {
-	Op        string `json:"op"`
-	Decorator string `json:"decorator"`
+// Options は、起動されたトランスパイラへのオプション req.View.Config.Options[req.Transpiler]（docs/config.md「オプション」、
+// docs/plugin-protocol.md「emit」）を into に読む。into は構造体へのポインタで、フィールドは json タグで結ぶ。
+// オプションが書かれていなければ（キーがない、View がない）into はそのまま。戻り値は、into にないキー（辞書順）。
+// 型の違う値は error。知らないキーと error を診断にするのは呼ぶ側（それぞれのプラグインの文書の「オプション」「診断」）。
+func Options(req *EmitRequest, into any) ([]string, error) {
+	if req == nil || req.View == nil {
+		return nil, nil
+	}
+	table, ok := req.View.Config.Options[req.Transpiler]
+	if !ok || len(table) == 0 {
+		return nil, nil
+	}
+	known := map[string]bool{}
+	if t := reflect.TypeOf(into); t != nil && t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct {
+		for i := 0; i < t.Elem().NumField(); i++ {
+			f := t.Elem().Field(i)
+			if !f.IsExported() {
+				continue
+			}
+			name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			if name == "-" {
+				continue
+			}
+			if name == "" {
+				name = f.Name
+			}
+			known[name] = true
+		}
+	}
+	var unknown []string
+	rest := map[string]any{}
+	for k, v := range table {
+		if known[k] {
+			rest[k] = v
+		} else {
+			unknown = append(unknown, k)
+		}
+	}
+	sort.Strings(unknown)
+	data, err := json.Marshal(rest)
+	if err != nil {
+		return unknown, err
+	}
+	if err := json.Unmarshal(data, into); err != nil {
+		return unknown, fmt.Errorf("options of %s: %w", req.Transpiler, err)
+	}
+	return unknown, nil
 }
 
 // OpsWith は view.Viewer の名前空間の op のうち、単位の対象（Span.File が view.Files にある。docs/config.md「in」）で、
 // デコレータ decorator（FQN）が付いたものの FQN を宣言の順で返す。名前付きデコレータを通して付いたもの
-// （Application.Via）も数える。デコレータで起点を選ぶトランスパイラのための道具（docs/plugin-protocol.md「選択」）で、
-// 返す op はどれも select に書ける。一つもなければ空の列（nil ではない）。
+// （Application.Via）も数える。相乗りが自分の対象を探すための道具（docs/plugin-protocol.md「選択をなくしたこと」）。
+// 一つもなければ空の列（nil ではない）。
 func OpsWith(view *ir.View, decorator string) []string {
 	out := []string{}
 	if view == nil || view.Program == nil {
@@ -213,19 +245,6 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 		}
 		if r.Warnings == nil {
 			r.Warnings = []Warning{}
-		}
-		// select は常に四つの列を持つ形で書く（空でも []。docs/plugin-protocol.md「emit」の例）。
-		if r.Select.Roots == nil {
-			r.Select.Roots = []string{}
-		}
-		if r.Select.Stops == nil {
-			r.Select.Stops = []string{}
-		}
-		if r.Select.States == nil {
-			r.Select.States = []string{}
-		}
-		if r.Select.Wraps == nil {
-			r.Select.Wraps = []Wrap{}
 		}
 		resp = r
 	case "check":

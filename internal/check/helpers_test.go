@@ -233,33 +233,40 @@ func bind(ns, st, target string, deep bool) ir.Bind {
 func cfgFor(nss ...string) *config.Config {
 	c := config.Default("/root")
 	for _, n := range nss {
-		c.Units = append(c.Units, config.Unit{Index: len(c.Units) + 1, Namespace: n, Transpilers: []string{"t"}, Out: "gen/" + n})
+		c.Units = append(c.Units, config.Unit{Index: len(c.Units) + 1, Namespace: n, Transpilers: []string{"t"}, Out: "gen/" + n, Options: map[string]map[string]any{}})
 	}
 	return c
 }
 
-// allFiles は Program の宣言のファイル（Span.File）のうち、ユーザーのファイル（語彙でないもの）のすべてを辞書順で返す
-// （in を省いた単位の Files）。
+// allFiles は Program の宣言のファイル（Span.File）のすべてを、ユーザーのファイルを辞書順に、その後に語彙のファイルを辞書順に
+// 並べて返す（in を省いた単位の Files。docs/ir.md「その名前空間から見た IR」の View.files）。
 func allFiles(p *ir.Program) []string {
 	seen := map[string]bool{}
-	var out []string
+	var user, vocab []string
 	for i := range p.Namespaces {
 		for _, d := range p.Namespaces[i].Decls {
-			if f := d.Common().Span.File; !seen[f] && !strings.HasPrefix(f, "hozo:") {
-				seen[f] = true
-				out = append(out, f)
+			f := d.Common().Span.File
+			if seen[f] {
+				continue
+			}
+			seen[f] = true
+			if strings.HasPrefix(f, "hozo:") {
+				vocab = append(vocab, f)
+			} else {
+				user = append(user, f)
 			}
 		}
 	}
-	sort.Strings(out)
-	return out
+	sort.Strings(user)
+	sort.Strings(vocab)
+	return append(user, vocab...)
 }
 
-// goUnits は cfg の単位のすべてを、言語が go で in を省いたもの（Files は Program のすべてのファイル）にする。
+// goUnits は cfg の単位のすべてを、言語が go、基底が go で、in を省いたもの（Files は Program のすべてのファイル）にする。
 func goUnits(p *ir.Program, cfg *config.Config) []Unit {
 	units := make([]Unit, len(cfg.Units))
 	for i := range units {
-		units[i] = Unit{Language: "go", Files: allFiles(p)}
+		units[i] = Unit{Language: "go", Base: "go", Files: allFiles(p)}
 	}
 	return units
 }

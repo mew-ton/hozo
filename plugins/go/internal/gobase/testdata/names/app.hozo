@@ -1,0 +1,74 @@
+// docs/plugin-go.md「名前」の「局所の名前」、「パッケージと import パス」の「import の名前」、「New」の引数の名前を、
+// 当たる名前で確かめる。op はどれも export（出力は、名前空間ごとに一つのパッケージ）。
+
+namespace type {
+  scalar Token extends string;
+  /** 印。付いた op は純粋でなくなる */
+  decorator mark;
+  @mark export op issue(): Token;
+}
+
+namespace a.util {
+  model Box { x: int; }
+  @type.mark export op make(): Box;
+}
+
+namespace b.util {
+  model Box { y: int; }
+  @type.mark export op make(): Box;
+}
+
+namespace context {
+  model Info { z: int; }
+  @type.mark export op info(): Info;
+}
+
+/** 当たる名前を持つ名前空間 */
+namespace app {
+  // 「New」状態の名前（leaves、Go の予約語 func）と、分類の名前（shared）が、ほかの引数の名前と当たる。
+  // 先に並んだ引数と当たれば、後ろの方に _ を足す
+  state leaves: single<string>;
+  state extra: single<string>;
+  state func: single<string>;
+  export op both(): string reads leaves, extra;
+  classify Shared of string {
+    Yes;
+    No;
+  }
+
+  export op show(text: string);
+  export op showToken(token: type.Token);
+
+  // 「局所の名前」引数名が、Go の予約語、事前宣言の識別子、o、ctx、err、ptr、import するパッケージの名前と当たる
+  export op locals(o: string, ctx: string, err: string, ptr: string, func: string, len: string, error: string, util: string, context: string, pkgtype: string, runtime: string)
+  {
+    show(o);
+    show(ctx);
+    show(err);
+    show(ptr);
+    show(func);
+    show(len);
+    show(error);
+    show(util);
+    show(context);
+    show(pkgtype);
+    show(runtime);
+  }
+
+  // 「局所の名前」束縛名と、状態を読んだ値の変数の名前（状態 func は予約語なので func_）。
+  // 「import の名前」同じパッケージ名の二つの名前空間（util と util2）、標準ライブラリと同じ名前（context2）、予約語（pkgtype）
+  export op bindings(): type.Token
+  {
+    const var = a.util.make();
+    const range = b.util.make();
+    const nil = context.info();
+    const v0 = type.issue();
+    show(func);
+    showToken(v0);
+    match "x" by Shared {
+      Yes => show("yes");
+      No  => none;
+    };
+    return type.issue();
+  }
+}

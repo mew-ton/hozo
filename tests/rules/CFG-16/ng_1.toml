@@ -1,9 +1,9 @@
-# go の language は "go"、ts の language は "ts" → CFG-16（言語が決まらないので CFG-11 は出ない）
+# 基底 go の language は "go"、それに相乗りする ts-on-go（plugins/mixed）の language は "ts" → CFG-16
 # ERROR: CFG-16
 [hozo]
 plugin_dirs = ["plugins"]
 
 [[emit]]
 namespace   = "a"
-transpilers = ["go", "ts"]
+transpilers = ["go", "ts-on-go"]
 out         = "gen/a"

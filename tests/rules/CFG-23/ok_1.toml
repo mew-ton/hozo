@@ -1,0 +1,12 @@
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "seam-a", "seam-other"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "seam-b"]
+out         = "gen/b"

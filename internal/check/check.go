@@ -246,31 +246,6 @@ func shortName(fqn string) string {
 	return fqn[i+1:]
 }
 
-// isVocab は名前空間のすべての宣言が語彙（Span.file が "hozo:" で始まる。docs/ir.md「Program」）か。
-// 宣言のない名前空間は語彙ではない。
-func isVocab(ns *ir.Namespace) bool {
-	if len(ns.Decls) == 0 {
-		return false
-	}
-	for _, d := range ns.Decls {
-		if d == nil || !strings.HasPrefix(d.Common().Span.File, "hozo:") {
-			return false
-		}
-	}
-	return true
-}
-
-// hasStateOrOp は名前空間が自分の宣言に state か op を持つか。
-func hasStateOrOp(ns *ir.Namespace) bool {
-	for _, d := range ns.Decls {
-		switch d.(type) {
-		case *ir.State, *ir.Op:
-			return true
-		}
-	}
-	return false
-}
-
 // isDescendant は ns が root と等しいか、root の子孫か（`**` の意味。§5.3）。
 func isDescendant(ns, root string) bool {
 	return ns == root || strings.HasPrefix(ns, root+".")

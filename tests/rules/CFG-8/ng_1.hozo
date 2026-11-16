@@ -1,7 +1,0 @@
-// CFG-8（docs/config.md「診断」）: 単位の namespace の名前空間もその子孫も state と op を持たない（ng_1.toml の二つ目の単位の b）
-namespace a {
-  op f();
-}
-namespace b {
-  model M { id: string; }
-}

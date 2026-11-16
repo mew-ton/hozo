@@ -1,0 +1,7 @@
+name     = "go"
+command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
+protocol = "0.4"
+
+[[transpiler]]
+name     = "go"
+language = "go"

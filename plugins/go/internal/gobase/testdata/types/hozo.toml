@@ -1,0 +1,11 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「型」（model、scalar、union、exception、effect）と「コメント」。
+[[emit]]
+namespace   = "app"
+transpilers = ["go"]
+out         = "gen/app"
+
+# app が使う型の置き場（docs/config.md「型の置き場」）。名前空間の名前が Go の予約語（パッケージ名は pkgtype）
+[[emit]]
+namespace   = "type"
+transpilers = ["go"]
+out         = "gen/type"

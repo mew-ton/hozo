@@ -1,0 +1,28 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「名前」（局所の名前）、「パッケージと import パス」（import の名前）、
+# 「New」（引数の名前）、「別の名前空間の op」。
+[[emit]]
+namespace   = "app"
+transpilers = ["go"]
+out         = "gen/app"
+
+# app が使う型の置き場。パッケージ名は、名前空間の最後のセグメントから決まる:
+# type は Go の予約語（pkgtype）、a.util と b.util は同じ名前（util）、context は標準ライブラリと同じ名前
+[[emit]]
+namespace   = "type"
+transpilers = ["go"]
+out         = "gen/type"
+
+[[emit]]
+namespace   = "a.util"
+transpilers = ["go"]
+out         = "gen/a/util"
+
+[[emit]]
+namespace   = "b.util"
+transpilers = ["go"]
+out         = "gen/b/util"
+
+[[emit]]
+namespace   = "context"
+transpilers = ["go"]
+out         = "gen/context"

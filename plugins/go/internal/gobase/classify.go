@@ -1,0 +1,209 @@
+package gobase
+
+import (
+	"strconv"
+
+	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin/golang"
+)
+
+// このファイルは classify.go（docs/plugin-go.md「分類」）: 述語で決まる分類の、列挙の型と定数、述語のインターフェース、判定関数
+// （宣言順）。型で決まる分類は、何も出さない。定義のパッケージのもの（genClassify）と、分けた出力の入口の再公開（genEntryClassify）。
+
+// predicateClassifies は、N の述語で決まる分類（宣言順）。
+func (e *emitter) predicateClassifies() []*ir.Classify {
+	var out []*ir.Classify
+	for _, d := range e.ns.Decls {
+		if c, ok := d.(*ir.Classify); ok && c.DecidedBy == ir.DecidedByPredicate {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+func (e *emitter) classifyComment(c *ir.Classify) string {
+	return comment(describe(e.typeName(c.Name), c.Description, "classify "+c.Name+"。"))
+}
+
+func casesComment(name, fqn string) string {
+	return comment(name + "Cases は分類 " + fqn + " のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。")
+}
+
+func classifyFuncComment(name, fqn string, state bool) string {
+	if state {
+		return comment("Classify" + name + " は、状態の分類 " + fqn + " の今のケースを返す。すべての述語を呼び、真になった数を数える。")
+	}
+	return comment("Classify" + name + " は v を " + fqn + " で分類する。すべての述語を呼び、真になった数を数える。")
+}
+
+// caseConsts は、分類 c の列挙の定数の名前とコメント（ケースの宣言順。hasDefault なら、最後に <C>Default）。
+func (e *emitter) caseConsts(c *ir.Classify) (names, comments []string) {
+	name := e.typeName(c.Name)
+	for _, cs := range c.Cases {
+		names = append(names, golang.CaseConst(name, cs.Name))
+		comments = append(comments, comment(body(cs.Description)))
+	}
+	if c.HasDefault {
+		names = append(names, golang.CaseConst(name, "default"))
+		comments = append(comments, comment(body(c.DefaultDescription)))
+	}
+	return names, comments
+}
+
+// variantArm は、union u のアームのうち、型が t と等しいもの。二つ以上あれば GO-6（どのアームかを、型で分けられない）。
+// at は分類の FQN（診断の位置）。
+func (e *emitter) variantArm(u *ir.Union, t ir.Type, at string) (armType, bool) {
+	var found []armType
+	for _, a := range e.armTypes(u) {
+		if ir.TypeEqual(a.typ, t) {
+			found = append(found, a)
+		}
+	}
+	switch len(found) {
+	case 1:
+		return found[0], true
+	case 0:
+		e.errorf(codeInternal, at, "分類 %s の variant の絞り込みの型 %s と等しい型のアームが、union %s にない（検査を通った IR には来ないはずの形）", at, golang.TypeDisplay(t), u.Name)
+	default:
+		e.errorf(codeVariant, at, "分類 %s の絞り込みの型 %s と等しい型のアームが、union %s に二つ以上ある（%s と %s）。どのアームかを、型で分けられない",
+			at, golang.TypeDisplay(t), u.Name, found[0].name, found[1].name)
+	}
+	return armType{}, false
+}
+
+// unionOf は、型 t（case と optional を外したもの）が union（arms）への ref なら、その union。
+func (e *emitter) unionOf(t ir.Type) *ir.Union {
+	for {
+		switch x := t.(type) {
+		case ir.CaseType:
+			t = x.Of
+			continue
+		case ir.OptionalType:
+			t = x.Of
+			continue
+		case ir.RefType:
+			u, _ := e.lookup(x.Target).(*ir.Union)
+			return u
+		}
+		return nil
+	}
+}
+
+// armGoType は、アーム a（union u のもの）の Go の型を、ファイル f から書いた名前（別の名前空間の union なら修飾する）。
+func (e *emitter) armGoType(f *fileGen, u *ir.Union, a armType) string {
+	return f.im.Qualifier(e.declNS[u.Name]) + a.goName
+}
+
+// genClassify は定義のパッケージの classify.go。述語で決まる分類がなければ nil。
+func (e *emitter) genClassify() *fileGen {
+	cs := e.predicateClassifies()
+	if len(cs) == 0 {
+		return nil
+	}
+	f := e.newFile(fileClassify, true)
+	rt := func() string { return f.im.Add(runtimePath, "runtime") }
+	for _, c := range cs {
+		name := e.typeName(c.Name)
+		// 列挙の型と定数
+		f.print(e.classifyComment(c))
+		f.printf("type %s int\n\nconst (\n", name)
+		names, comments := e.caseConsts(c)
+		for i, n := range names {
+			f.print(indent(comments[i]))
+			if i == 0 {
+				f.printf("\t%s %s = iota\n", n, name)
+			} else {
+				f.printf("\t%s\n", n)
+			}
+		}
+		f.print(")\n\n")
+		_, isState := c.SubjectStates()
+		if !isState {
+			// 述語のインターフェース。引数は、分類の対象の型
+			subject := c.SubjectType()
+			f.print(casesComment(name, c.Name))
+			f.printf("type %sCases interface {\n", name)
+			for _, cs := range c.Cases {
+				f.printf("\t// %s はケース %s の述語。\n\t%s(v %s) bool\n", golang.Capitalize(cs.Name), cs.Name, golang.Capitalize(cs.Name), f.goType(subject))
+			}
+			f.print("}\n\n")
+			// 判定関数: すべての述語を宣言順に呼び、真の数を数える
+			f.print(classifyFuncComment(name, c.Name, false))
+			f.printf("func Classify%s(c %sCases, v %s) (%s, error) {\n\tvar hits []string\n\tvar kind %s\n", name, name, f.goType(subject), name, name)
+			for _, cs := range c.Cases {
+				cond := "c." + golang.Capitalize(cs.Name) + "(v)"
+				// 型で決まる絞り込みの as を持つケースは、値がその型に当たらなければ、述語を呼ばずに偽とする
+				if len(cs.As) > 0 {
+					switch cs.As[0].By {
+					case ir.NarrowByPresence:
+						cond = "v != nil && " + cond
+					case ir.NarrowByVariant:
+						if u := e.unionOf(subject); u != nil {
+							if a, ok := e.variantArm(u, cs.As[0].Type, c.Name); ok {
+								cond = "_, ok := v.(" + e.armGoType(f, u, a) + "); ok && " + cond
+							}
+						}
+					}
+				}
+				f.printf("\tif %s {\n\t\thits = append(hits, %s)\n\t\tkind = %s\n\t}\n", cond, strconv.Quote(cs.Name), golang.CaseConst(name, cs.Name))
+			}
+			e.classifyTail(f, c, name, rt())
+			continue
+		}
+		// 状態の分類: 述語は状態の単位 <C>State のメソッド。述語がエラーを返したら、残りも呼んだうえで最初のエラーを返す
+		f.print(classifyFuncComment(name, c.Name, true))
+		f.printf("func Classify%s(ctx %s.Context, s %s) (%s, error) {\n\tvar hits []string\n\tvar kind %s\n\tvar first error\n",
+			name, f.im.Add("context", "context"), golang.StateUnitName(c.Name), name, name)
+		for _, cs := range c.Cases {
+			f.printf("\tif ok, err := s.%s(ctx); err != nil {\n\t\tif first == nil {\n\t\t\tfirst = err\n\t\t}\n\t} else if ok {\n\t\thits = append(hits, %s)\n\t\tkind = %s\n\t}\n",
+				golang.Capitalize(cs.Name), strconv.Quote(cs.Name), golang.CaseConst(name, cs.Name))
+		}
+		f.print("\tif first != nil {\n\t\treturn kind, first\n\t}\n")
+		e.classifyTail(f, c, name, rt())
+	}
+	return f
+}
+
+// classifyTail は、判定関数の終わり: 真が一つならそのケース、0 で hasDefault なら <C>Default。hasDefault が false なら、真が
+// ちょうど一つでなければ、true なら、真が二つ以上なら、*runtime.ClassificationError。
+func (e *emitter) classifyTail(f *fileGen, c *ir.Classify, name, rt string) {
+	f.print("\tswitch len(hits) {\n\tcase 1:\n\t\treturn kind, nil\n")
+	if c.HasDefault {
+		f.printf("\tcase 0:\n\t\treturn %s, nil\n", golang.CaseConst(name, "default"))
+	}
+	f.printf("\t}\n\treturn kind, &%s.ClassificationError{Classify: %s, Hits: hits}\n}\n\n", rt, strconv.Quote(c.Name))
+}
+
+// genEntryClassify は、分けた出力の入口の classify.go: 列挙の型の別名、定数、述語のインターフェースの別名、内側の判定関数を
+// 呼んで返す関数。なければ nil。
+func (e *emitter) genEntryClassify() *fileGen {
+	cs := e.predicateClassifies()
+	if len(cs) == 0 {
+		return nil
+	}
+	f := e.newFile(fileClassify, false)
+	inner := f.im.Add(e.layout.DefPath, e.layout.DefName)
+	for _, c := range cs {
+		name := e.typeName(c.Name)
+		f.print(e.classifyComment(c))
+		f.printf("type %s = %s.%s\n\nconst (\n", name, inner, name)
+		names, comments := e.caseConsts(c)
+		for i, n := range names {
+			f.print(indent(comments[i]))
+			f.printf("\t%s = %s.%s\n", n, inner, n)
+		}
+		f.print(")\n\n")
+		if _, isState := c.SubjectStates(); isState {
+			f.print(classifyFuncComment(name, c.Name, true))
+			f.printf("func Classify%s(ctx %s.Context, s %s) (%s, error) {\n\treturn %s.Classify%s(ctx, s)\n}\n\n",
+				name, f.im.Add("context", "context"), golang.StateUnitName(c.Name), name, inner, name)
+			continue
+		}
+		f.print(casesComment(name, c.Name))
+		f.printf("type %sCases = %s.%sCases\n\n", name, inner, name)
+		f.print(classifyFuncComment(name, c.Name, false))
+		f.printf("func Classify%s(c %sCases, v %s) (%s, error) {\n\treturn %s.Classify%s(c, v)\n}\n\n",
+			name, name, f.goType(c.SubjectType()), name, inner, name)
+	}
+	return f
+}

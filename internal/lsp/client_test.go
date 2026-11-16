@@ -12,6 +12,7 @@ import (
 
 	"github.com/mew-ton/hozo/internal/lsp/jsonrpc"
 	"github.com/mew-ton/hozo/internal/lsp/protocol"
+	"github.com/mew-ton/hozo/internal/project"
 )
 
 func init() {
@@ -48,6 +49,10 @@ func startServer(t *testing.T, opts Options) *testClient {
 	c := &testClient{t: t, w: jsonrpc.NewWriter(inW), in: inW, msgs: make(chan *jsonrpc.Message, 1024), done: make(chan struct{}), logBuf: &syncWriter{b: &strings.Builder{}}}
 	if opts.Log == nil {
 		opts.Log = c.logBuf
+	}
+	if opts.PluginPath == "" {
+		// コーパスの出力単位が指す基盤のトランスパイラ（go）は、リポジトリの plugins/ にある
+		opts.PluginPath = repoPlugins(t)
 	}
 	go func() {
 		_ = Serve(inR, outW, opts)
@@ -243,6 +248,22 @@ func corpusDir(t *testing.T) string {
 	return dir
 }
 
+// repoPlugins はリポジトリの plugins/（HOZO_PLUGIN_PATH に渡す場所。コーパスの hozo.toml が指す go はここにある）。
+func repoPlugins(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.Abs(filepath.Join("..", "..", "plugins"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// loadCorpus は check と同じ結果（project.LoadWith）。プラグインの探索は、テストのサーバー（startServer）と同じ場所を見る。
+func loadCorpus(t *testing.T, root string) *project.Project {
+	t.Helper()
+	return project.LoadWith(project.Options{Root: root, PluginPath: repoPlugins(t)})
+}
+
 // warnFile は corpusWithWarning が足すファイル。設計書のコーパスには診断がない（error も warning もない。
 // tests/corpus/design/README.md の想定）ので、診断の発行と check との一致を空でない集合で
 // 確かめるために、意図した warning を一つ持たせる: 効果を持たない op の prevents effects（REL-2。docs/check.md「throws」）。
@@ -254,8 +275,8 @@ namespace server {
 }
 `
 
-// corpusWithWarning は tests/corpus/design の直下のファイルと、hozo.toml が設定しているプラグインのマニフェスト
-// （plugins/。検査では起動しない）を一時ディレクトリに写し、warn.hozo（warnFile）を足したプロジェクトのルート。
+// corpusWithWarning は tests/corpus/design の直下のファイルを一時ディレクトリに写し、warn.hozo（warnFile）を足した
+// プロジェクトのルート。
 func corpusWithWarning(t *testing.T) string {
 	t.Helper()
 	src := corpusDir(t)
@@ -272,7 +293,7 @@ func corpusWithWarning(t *testing.T) string {
 			return err
 		}
 		if d.IsDir() {
-			if rel != "." && rel != "plugins" && !strings.HasPrefix(filepath.ToSlash(rel), "plugins/") {
+			if rel != "." {
 				return filepath.SkipDir
 			}
 			return nil

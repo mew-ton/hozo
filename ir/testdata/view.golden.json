@@ -1,70 +1,121 @@
 {
-  "version": "0.3",
+  "version": "0.4",
   "viewer": "browser",
   "config": {
+    "index": 1,
     "language": "go",
+    "base": "go",
     "out": "gen/browser",
     "dir": "gen/browser",
     "transpilers": [
+      "go",
       "go-cli"
-    ]
+    ],
+    "options": {
+      "go-cli": {
+        "a": 1,
+        "nested": {
+          "x": 1.5,
+          "y": "s"
+        },
+        "z": true
+      }
+    },
+    "seams": {
+      "rate.limited": "go-ratelimit"
+    }
   },
   "files": [
     "browser.hozo",
-    "server.hozo"
+    "server.hozo",
+    "hozo:vocab/http.hozo"
   ],
   "namespaces": {
     "browser": [
       {
+        "index": 1,
         "language": "go",
+        "base": "go",
         "out": "gen/browser",
         "dir": "gen/browser",
         "transpilers": [
+          "go",
           "go-cli"
-        ]
+        ],
+        "options": {
+          "go-cli": {
+            "a": 1,
+            "nested": {
+              "x": 1.5,
+              "y": "s"
+            },
+            "z": true
+          }
+        },
+        "seams": {
+          "rate.limited": "go-ratelimit"
+        }
       }
     ],
     "server": [
       {
+        "index": 2,
         "language": "go",
+        "base": "go",
         "out": "gen/server",
         "dir": "gen/server",
         "transpilers": [
-          "go-http",
-          "sqlc"
-        ]
+          "go",
+          "go-http"
+        ],
+        "options": {},
+        "seams": {}
       },
       {
+        "index": 3,
         "language": "go",
+        "base": "go",
         "out": "cmd/gen",
         "dir": "cmd/gen",
         "transpilers": [
+          "go",
           "go-cli"
-        ]
+        ],
+        "options": {},
+        "seams": {}
       }
     ],
     "server.admin": [
       {
+        "index": 2,
         "language": "go",
+        "base": "go",
         "out": "gen/server",
         "dir": "gen/server/admin",
         "transpilers": [
-          "go-http",
-          "sqlc"
-        ]
+          "go",
+          "go-http"
+        ],
+        "options": {},
+        "seams": {}
       },
       {
+        "index": 3,
         "language": "go",
+        "base": "go",
         "out": "cmd/gen",
         "dir": "cmd/gen/admin",
         "transpilers": [
+          "go",
           "go-cli"
-        ]
+        ],
+        "options": {},
+        "seams": {}
       }
     ]
   },
   "program": {
-    "version": "0.3",
+    "version": "0.4",
     "namespaces": [
       {
         "name": "",

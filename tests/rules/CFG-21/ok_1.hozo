@@ -1,0 +1,5 @@
+// CFG-21（docs/config.md「オプション」）: [emit.options.<名前>] の <名前> は、その単位の transpilers に書いた名前（ok_1.toml）。
+// 中身（キーと値の型）を確かめるのは、そのトランスパイラ
+namespace a {
+  op f();
+}

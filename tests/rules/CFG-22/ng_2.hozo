@@ -1,0 +1,5 @@
+// CFG-22: 語彙の名前空間の型（http の例外）も同じ規則。op の signature の例外を数える（ng_2.toml）
+namespace a {
+  export op f()
+    throws http.ServerError;
+}

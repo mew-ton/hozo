@@ -1,0 +1,1 @@
+GO-6	a.Kind	分類 a.Kind の絞り込みの型 a.Item と等しい型のアームが、union a.Pair に二つ以上ある（First と Second）。どのアームかを、型で分けられない

@@ -19,6 +19,9 @@ func TestEmitShape(t *testing.T) {
 		`{"files":[],"warnings":[],"select":{}}`,
 		`{"files":[],"warnings":[],"select":{"roots":["a.f"]}}`,
 		`{"files":[],"warnings":[],"select":{"roots":null,"wraps":null}}`,
+		// 版 0.3 までの select は、知らない項目として読まれないだけで通る。中身の形も見ない（docs/plugin-protocol.md「応答の形」）
+		`{"files":[],"warnings":[],"select":[]}`,
+		`{"files":[],"warnings":[],"select":{"roots":"a.f","wraps":[{"op":1}]}}`,
 		// 知らない項目は、どの階層でも無視する
 		`{"files":[{"path":"p","content":"c","mode":"0644"}],"warnings":[{"message":"m","severity":"info"}],"future":{"x":1},"select":{"roots":[],"hints":[1,2]}}`,
 		// emit の errors の severity は見ない
@@ -43,25 +46,17 @@ func TestEmitShape(t *testing.T) {
 		`{"files":{},"warnings":[]}`:       "files が配列でない",
 		`{"files":"a.go","warnings":[]}`:   "files が配列でない",
 		`{"files":["a.go"],"warnings":[]}`: "files[0] がオブジェクトでない",
-		`{"files":[{"content":"c"}],"warnings":[]}`:                         "files[0] に path がない",
-		`{"files":[{"path":"p"}],"warnings":[]}`:                            "files[0] に content がない",
-		`{"files":[{"path":1,"content":"c"}],"warnings":[]}`:                "files[0] の path が文字列でない",
-		`{"files":[{"path":"p","content":null}],"warnings":[]}`:             "files[0] に content がない",
-		`{"files":[{"path":"p","content":["c"]}],"warnings":[]}`:            "files[0] の content が文字列でない",
-		`{"files":[],"warnings":["careful"]}`:                               "warnings[0] がオブジェクトでない",
-		`{"files":[],"warnings":[{"at":"a.f"}]}`:                            "warnings[0] に message がない",
-		`{"files":[],"warnings":[{"at":3,"message":"m"}]}`:                  "warnings[0] の at が文字列でない",
-		`{"files":[],"warnings":[],"errors":{}}`:                            "errors が配列でない",
-		`{"files":[],"warnings":[],"errors":[{"message":"m"}]}`:             "errors[0] に code がない",
-		`{"files":[],"warnings":[],"errors":[{"code":"X-1"}]}`:              "errors[0] に message がない",
-		`{"files":[],"warnings":[],"select":[]}`:                            "select がオブジェクトでない",
-		`{"files":[],"warnings":[],"select":{"roots":"a.f"}}`:               "select.roots が配列でない",
-		`{"files":[],"warnings":[],"select":{"stops":[1]}}`:                 "select.stops[0] が文字列でない",
-		`{"files":[],"warnings":[],"select":{"states":[null]}}`:             "select.states[0] が文字列でない",
-		`{"files":[],"warnings":[],"select":{"wraps":{}}}`:                  "select.wraps が配列でない",
-		`{"files":[],"warnings":[],"select":{"wraps":["a.f"]}}`:             "select.wraps[0] がオブジェクトでない",
-		`{"files":[],"warnings":[],"select":{"wraps":[{"op":"a.f"}]}}`:      "select.wraps[0] に decorator がない",
-		`{"files":[],"warnings":[],"select":{"wraps":[{"decorator":"d"}]}}`: "select.wraps[0] に op がない",
+		`{"files":[{"content":"c"}],"warnings":[]}`:              "files[0] に path がない",
+		`{"files":[{"path":"p"}],"warnings":[]}`:                 "files[0] に content がない",
+		`{"files":[{"path":1,"content":"c"}],"warnings":[]}`:     "files[0] の path が文字列でない",
+		`{"files":[{"path":"p","content":null}],"warnings":[]}`:  "files[0] に content がない",
+		`{"files":[{"path":"p","content":["c"]}],"warnings":[]}`: "files[0] の content が文字列でない",
+		`{"files":[],"warnings":["careful"]}`:                    "warnings[0] がオブジェクトでない",
+		`{"files":[],"warnings":[{"at":"a.f"}]}`:                 "warnings[0] に message がない",
+		`{"files":[],"warnings":[{"at":3,"message":"m"}]}`:       "warnings[0] の at が文字列でない",
+		`{"files":[],"warnings":[],"errors":{}}`:                 "errors が配列でない",
+		`{"files":[],"warnings":[],"errors":[{"message":"m"}]}`:  "errors[0] に code がない",
+		`{"files":[],"warnings":[],"errors":[{"code":"X-1"}]}`:   "errors[0] に message がない",
 	}
 	for in, want := range ng {
 		err := checkShape([]byte(in), &sdk.EmitResponse{})
@@ -124,8 +119,7 @@ func TestRunResponseShape(t *testing.T) {
 	err = run(map[string]any{"mode": "echo", "future": 1, "warnings": []any{},
 		"files":  []any{map[string]any{"path": "gen/a.txt", "content": "hi", "mode": "0644"}},
 		"select": map[string]any{"roots": []any{"a.f"}}}, &emit)
-	if err != nil || len(emit.Files) != 1 || emit.Files[0].Path != "gen/a.txt" || emit.Files[0].Content != "hi" ||
-		len(emit.Select.Roots) != 1 || emit.Select.Roots[0] != "a.f" {
+	if err != nil || len(emit.Files) != 1 || emit.Files[0].Path != "gen/a.txt" || emit.Files[0].Content != "hi" {
 		t.Errorf("emit, 知らない項目: err = %v resp = %+v", err, emit)
 	}
 

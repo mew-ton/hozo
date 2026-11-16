@@ -45,18 +45,11 @@ const mapping: Record<string, string> = {
   Warning: "Warning",
   Diagnostic: "EmitError",
   CheckDiagnostic: "Diagnostic",
-  Select: "Select",
-  Wrap: "Wrap",
   PluginError: "PluginError",
 };
 
-/**
- * 写しがスキーマとわざと違う箇所（interface.項目 → protocol.ts の型の正規形）。
- * EmitResponse.select: Handler は使う列だけを書けばよく、run が残りを [] にしてスキーマの形（四つの列）で書く。
- */
-const deviations: Record<string, string> = {
-  "EmitResponse.select": "Partial<Select>",
-};
+/** 写しがスキーマとわざと違う箇所（interface.項目 → protocol.ts の型の正規形）。今はない。 */
+const deviations: Record<string, string> = {};
 
 // --- protocol.ts の側
 

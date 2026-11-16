@@ -1,0 +1,89 @@
+// docs/plugin-go.md「状態の単位」（問い合わせ、命令、SharedState）と「状態の参照」を、一か所ずつ使う。
+// 各 op の上のコメントが、その op が確かめる行。op はどれも export（出力は一つのパッケージ）。
+
+/** 状態を読む配線 */
+namespace app {
+  scalar Token extends string;
+  model Line { item: string; count: int; }
+  model Owner { name: string; }
+  model Settings { title: string; owner: Owner?; }
+
+  /** 手元のトークン */
+  state token: nullable<Token>;
+  /** カートの行 */
+  state lines: list<Line>;
+  /** 店の設定 */
+  state settings: single<Settings>;
+
+  effect addLine on lines.post;
+  effect dropToken on token.delete;
+
+  // 「状態の単位」命令（効果を持つ葉）、op の問い合わせ（reads が一つの葉）、SharedState（reads が二つ以上の葉）
+  export op add(line: Line) effects addLine;
+  export op logout() effects dropToken;
+  export op countLines(): int reads lines;
+  export op summary(): string reads lines, settings;
+
+  // 値を受け取る葉（純粋で失敗しない）
+  export op show(title: string);
+  export op showOwner(name: string?);
+  export op showToken(token: Token?);
+  export op showBoth(a: Token?, b: Token?);
+  export op showLines(lines: Line[]);
+
+  // 「状態の参照」Atom の state とパス（省略可能を通るパスも）。別の文なら、もう一度読む（同じ変数に = で代入する）
+  export op header()
+  {
+    show(settings.title);
+    showOwner(settings.owner.name);
+  }
+
+  // 「状態の参照」一つの文の中の同じ状態は、一度だけ読む。二つの状態を使う文は、書かれた順に読む
+  export op once()
+  {
+    showBoth(token, token);
+    add({ item: settings.title, count: 1 });
+    showToken(token);
+  }
+
+  // 「状態の参照」const と return。戻り値の型の零値で失敗を返す
+  export op current(): Token?
+  {
+    const t = token;
+    showToken(t);
+    return token;
+  }
+  export op title(): string
+  {
+    return settings.title;
+  }
+
+  // 「状態の参照」読んだ値の変数の名前が、引数と当たる（末尾に _）。同じ名前の引数があれば、名前はそちらを指す
+  export op shadowed(token: Token?, lines: Line[])
+  {
+    showLines(lines);
+    showBoth(token, app.token);
+  }
+
+  // 「状態の参照」match の対象が状態なら、match の前に一度読み、アームの中の同じ状態はその値を使う。
+  // アームの本体だけが使う状態は、そのアームの枝の中で読む
+  export op branches()
+  {
+    match lines by list {
+      HasItems => showLines(lines);
+      Empty    => show(settings.title);
+    };
+    match token by nullable {
+      HasItems => logout();
+      Empty    => showToken(token);
+    };
+  }
+
+  // 状態を読む葉と、効果を持つ葉を呼ぶ配線（Reads と Effects のコメント）
+  export op report(line: Line): string
+  {
+    add(line);
+    const n = countLines();
+    return summary();
+  }
+}

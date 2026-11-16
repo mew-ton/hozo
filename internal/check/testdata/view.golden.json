@@ -1,51 +1,74 @@
 {
-  "version": "0.3",
+  "version": "0.4",
   "viewer": "browser",
   "config": {
+    "index": 2,
     "language": "go",
+    "base": "go",
     "out": "gen/browser",
     "dir": "gen/browser",
     "transpilers": [
       "react-router"
-    ]
+    ],
+    "options": {},
+    "seams": {}
   },
   "files": [
     "browser.hozo",
-    "server.hozo"
+    "server.hozo",
+    "hozo:vocab/http.hozo"
   ],
   "namespaces": {
     "browser": [
       {
+        "index": 2,
         "language": "go",
+        "base": "go",
         "out": "gen/browser",
         "dir": "gen/browser",
         "transpilers": [
           "react-router"
-        ]
+        ],
+        "options": {},
+        "seams": {}
       },
       {
+        "index": 3,
         "language": "go",
+        "base": "go",
         "out": "gen/browser2",
         "dir": "gen/browser2",
         "transpilers": [
           "vue-router",
           "pinia"
-        ]
+        ],
+        "options": {
+          "pinia": {
+            "strict": true
+          }
+        },
+        "seams": {
+          "cache.cached": "pinia"
+        }
       }
     ],
     "server": [
       {
+        "index": 1,
         "language": "go",
+        "base": "go",
         "out": "gen/server",
         "dir": "gen/server",
         "transpilers": [
           "t"
-        ]
+        ],
+        "options": {},
+        "seams": {}
       }
     ]
   },
   "program": {
-    "version": "0.3",
+    "version": "0.4",
     "namespaces": [
       {
         "name": "http",

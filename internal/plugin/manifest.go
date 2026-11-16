@@ -33,13 +33,17 @@ type Manifest struct {
 }
 
 // Transpiler は [[transpiler]] 一つ（docs/plugin-protocol.md「マニフェスト」）: プラグインが提供する、名前の付いた変換。
-// hozo.toml の単位が transpilers に Name を書いて選ぶ（docs/config.md「単位」）。何を出力の対象に選ぶかは
-// マニフェストには書かず、emit の応答の select で返す（同「選択」）。
+// hozo.toml の単位が transpilers に Name を書いて選ぶ（docs/config.md「単位」）。
 type Transpiler struct {
 	Name        string   // hozo.toml の transpilers に書く名前
-	Language    string   // 出力する言語。"go" か "ts"
+	Language    string   // 出力する言語。空でない文字列（名前は基底が決め、hozoc は中身を見ない）
+	Requires    []string // 出力の形を前提にするトランスパイラの名前。空なら基底、空でなければ相乗り（docs/config.md「基底と相乗り」）
 	Unsupported []string // 意味を保てない記法（デコレータの FQN）。使われていれば CFG-6
+	Seams       []string // 継ぎ目を要るデコレータの FQN（docs/config.md「継ぎ目」）
 }
+
+// IsBase は、このトランスパイラが基底か（requires が空。docs/config.md「基底と相乗り」）。
+func (t *Transpiler) IsBase() bool { return len(t.Requires) == 0 }
 
 // Check は [check] テーブル。Enabled なら hozoc check / emit で direction "check" を呼ぶ。
 type Check struct {
@@ -75,8 +79,10 @@ type rawManifest struct {
 	Vocabulary []string       `toml:"vocabulary"`
 	Transpiler []struct {
 		Name        string   `toml:"name"`
-		Language    string   `toml:"language"`
+		Language    *string  `toml:"language"`
+		Requires    []string `toml:"requires"`
 		Unsupported []string `toml:"unsupported"`
+		Seams       []string `toml:"seams"`
 	} `toml:"transpiler"`
 	Check struct {
 		Enabled bool `toml:"enabled"`
@@ -87,7 +93,8 @@ type rawManifest struct {
 }
 
 // LoadManifest は path のマニフェストを読む。診断は MAN-4（TOML の誤り、知らないキー、command が空、値の型違い、
-// [[transpiler]] に name か language がない、language が go でも ts でもない、同じ名前の [[transpiler]] が二つ）と
+// [[transpiler]] に name か language がない、language が空、requires に自分の名前か同じ名前が二度ある、
+// seams に空の文字列か同じ FQN が二度ある、同じ名前の [[transpiler]] が二つ）と
 // MAN-2（protocol が Protocol と違う）。MAN-4 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
 // 設計書 §4.6 の [emit]（decorate / entry / stop）とトップレベルの language は持たないので、書いてあれば知らないキー（MAN-4）。
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
@@ -169,16 +176,44 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 			continue
 		}
 		seen[t.Name] = true
-		switch t.Language {
-		case "go", "ts":
-		case "":
+		switch {
+		case t.Language == nil:
 			errorf("MAN-4", "マニフェストの [[transpiler]] %s に language がない", t.Name)
 			continue
-		default:
-			errorf("MAN-4", "マニフェストの [[transpiler]] %s の language は \"go\" か \"ts\" でなければならない（%q）", t.Name, t.Language)
+		case *t.Language == "":
+			errorf("MAN-4", "マニフェストの [[transpiler]] %s の language が空", t.Name)
 			continue
 		}
-		m.Transpilers = append(m.Transpilers, Transpiler{Name: t.Name, Language: t.Language, Unsupported: orEmpty(t.Unsupported)})
+		bad := false
+		required := map[string]bool{}
+		for _, r := range t.Requires {
+			switch {
+			case r == t.Name:
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の requires に、自分の名前がある", t.Name)
+				bad = true
+			case required[r]:
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の requires に %s が二度ある", t.Name, r)
+				bad = true
+			}
+			required[r] = true
+		}
+		declared := map[string]bool{}
+		for _, fqn := range t.Seams {
+			switch {
+			case fqn == "":
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の seams に空の文字列がある", t.Name)
+				bad = true
+			case declared[fqn]:
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の seams に %s が二度ある", t.Name, fqn)
+				bad = true
+			}
+			declared[fqn] = true
+		}
+		if bad {
+			continue
+		}
+		m.Transpilers = append(m.Transpilers, Transpiler{Name: t.Name, Language: *t.Language,
+			Requires: orEmpty(t.Requires), Unsupported: orEmpty(t.Unsupported), Seams: orEmpty(t.Seams)})
 	}
 	m.Check.Enabled = raw.Check.Enabled
 	m.Import.Formats = orEmpty(raw.Import.Formats)

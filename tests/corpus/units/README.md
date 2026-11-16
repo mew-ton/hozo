@@ -5,11 +5,10 @@
 | ファイル | 中身 |
 |---|---|
 | `hozo.toml` | 単位が四つ（下の表） |
-| `t.hozo` | テストの語彙 `namespace t`。トランスパイラごとの起点の印 `stock` / `api` / `batch` / `admin`。どの単位の対象でもない |
+| `t.hozo` | テストの語彙 `namespace t`。印のデコレータ `stock` / `api` / `batch` / `admin`（どのトランスパイラも読まないので、何も出ない。付いた op は純粋でなくなる）。どの単位の対象でもない |
 | `stock.hozo` | `namespace stock`。`shop` の出力がその型を import する相手 |
 | `shop/api.hozo` | `namespace shop` の前半。単位 2 の `in` に合うただ一つのファイル |
 | `shop/batch.hozo` | `namespace shop` の後半と、子の名前空間 `shop.admin` |
-| `plugins/pick/` | テスト用のプラグイン（`tests/plugins/pick`）のマニフェストと `pick.json`。一つのプラグインが四つのトランスパイラを提供し、`pick.json` の `transpilers` がトランスパイラごとに読むデコレータを決める。ファイルは出さない |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン |
 | `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン（`gen/stock`、`gen/api`、`gen/batch`、`gen/admin`）。`TestCorpusEmitGolden` が、書き出した Go を `go vet` にも通す |
 
@@ -17,12 +16,14 @@
 
 ## 単位
 
-| # | `in` | `namespace` | `transpilers` | `out` | 起点（`pick.json`） |
+四つの単位とも、トランスパイラは Go の基底 `go`（リポジトリの `plugins/go`。テストが `HOZO_PLUGIN_PATH` として渡す）。
+
+| # | `in` | `namespace` | `transpilers` | `out` | 出るもの |
 |---|---|---|---|---|---|
-| 1 | — | `stock` | `pick-stock` | `gen/stock` | `@t.stock` の `reserve` |
-| 2 | `shop/api.hozo` | `shop` | `pick-api` | `gen/api` | `@t.api` の `open`（`@t.batch` も読むが、`in` の外の op は選べない） |
-| 3 | — | `shop` | `pick-batch` | `gen/batch` | `@t.batch` の `nightly` と `report` |
-| 4 | — | `shop.admin` | `pick-admin` | `gen/admin` | `@t.admin` の `ban` |
+| 1 | — | `stock` | `go` | `gen/stock` | `stock` のすべて。op は `export` の `reserve` だけなので、内側のフォルダはない |
+| 2 | `shop/api.hozo` | `shop` | `go` | `gen/api` | `shop` の型と状態のすべてと、`shop/api.hozo` の op。`in` の外の op は、呼ばれている `nightly` の口だけ |
+| 3 | — | `shop` | `go` | `gen/batch` | `shop` のすべて |
+| 4 | — | `shop.admin` | `go` | `gen/admin` | `shop.admin` のすべて |
 
 ## 見出し → 構文
 
@@ -30,15 +31,14 @@
 
 | 文書の見出し | 構文（ファイル） | 確かめること |
 |---|---|---|
-| `docs/config.md`「単位」 | 単位 2 と 3（どちらも `namespace = "shop"`） | 同じ名前空間を、別のトランスパイラで別の `out` に、互いに独立に出力する。`gen/api` は `open` から、`gen/batch` は `nightly` と `report` から辿った宣言を持ち、どちらも自分の `Item` を持つ。記録（`.hozoc-outputs.json`）は出力ごと |
-| `docs/config.md`「in」、`docs/emit-go.md`「出力の対象」2 | 単位 2 の `in = ["shop/api.hozo"]` と、`open` が呼ぶ `nightly`（`shop/batch.hozo` の配線） | `gen/api` では `nightly` は `Leaves` の口だけで、本体も、本体が呼ぶ `sweep` も出ない。`gen/batch` では同じ `nightly` の本体が出る。`pick-api` は `@t.batch` も読むが、`plugin.OpsWith` は単位の対象の op だけを返すので、`nightly` と `report` は起点にならない |
-| `docs/emit-go.md`「出力の対象」（`in` の外の型） | `nightly(item: Item)`（`Item` は `shop/api.hozo` の宣言） | 選ばれた宣言が参照する型は、宣言されたファイルによらず出力する |
+| `docs/config.md`「単位」 | 単位 2 と 3（どちらも `namespace = "shop"`） | 同じ名前空間を、別の `out` に、互いに独立に出力する。どちらも自分の型（`Item`、`Receipt`、`Report`）をすべて持ち、相手のパッケージは import しない。記録（`.hozoc-outputs.json`）は出力ごと |
+| `docs/config.md`「in」、`docs/plugin-go.md`「出力の対象」 | 単位 2 の `in = ["shop/api.hozo"]` と、`open` が呼ぶ `nightly`（`shop/batch.hozo` の配線） | `in` が絞るのは op だけ。`gen/api` では、型（`Report` は `shop/batch.hozo` の宣言）と状態はすべて出て、`nightly` は `Leaves` の口だけで、本体も、本体が呼ぶ `sweep` も、呼ばれていない `report` も出ない。`gen/batch` では同じ `nightly` の本体と、`sweep`、`report` が出る |
 | `docs/config.md`「単位の対象」 | 単位 4（`namespace = "shop.admin"`） | `shop.admin` は単位 4 だけが出力する（`gen/admin`）。`gen/api/admin` も `gen/batch/admin` もできない |
-| `docs/emit-go.md`「配置」 | `model Item { id: stock.ItemId; ... }`、`op ban(item: shop.Item)` | `gen/api` と `gen/batch` は `gen/stock` の `ItemId` を import する（単位をまたぐ一方向の import）。`gen/admin` は、`shop` を出力する単位のうち設定の順で最初に `Item` を持つ単位 2 の `gen/api` を import する。`gen/stock` は誰も import しない |
+| `docs/config.md`「型の置き場」 | `model Item { id: stock.ItemId; ... }`、`op ban(item: shop.Item)` | `gen/api` と `gen/batch` は `gen/stock` の `ItemId` を import する（単位をまたぐ一方向の import。複製しない）。`gen/admin` は、`shop` を出力する単位のうち設定の順で最初の単位 2 の、入口のパッケージ `gen/api` を import する（内側は import しない）。`gen/stock` は誰も import しない |
+| `docs/plugin-go.md`「内側のフォルダと入口」 | `stock`（op は `export` の `reserve` だけ）と `shop`（op はどれも内部） | `gen/stock` は一つのパッケージで、`inner/` を持たない。`gen/api` は定義が `inner/` にあり、入口の `Ops` はメソッドを持たない |
 | `docs/cli.md`「emit」の 1 | `hozoc emit shop`、`hozoc emit t` | 引数は名前空間。`shop` とその子孫を出力する単位 2・3・4 の分を書き出し、内容はすべてを対象にしたときと同じ。どの単位の対象でもない `t` は `UnknownNamespace` |
-| `docs/plugin-protocol.md`「選択」（PLG-3） | `pick.json` の `fqnRoots` で、単位 2 に `shop.report`（`in` の外）を選ばせる | `proc.MalformedOutput`（70）。`in` を省いた単位 3 なら同じ FQN を選べる |
 
-単位の規則のうち設定だけで決まるもの（CFG-12、CFG-14〜CFG-18）は `tests/rules/` が、出力どうしの import の循環（GOEMIT-5）は `internal/app` の `TestEmitImportCycle` が確かめる。
+単位の規則のうち設定だけで決まるもの（CFG-12、CFG-14〜CFG-23）は `tests/rules/` が、出力どうしの import の循環（GO-3）は `plugins/go` の単体テストが確かめる。
 
 ## 想定する診断
 

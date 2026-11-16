@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"flag"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -15,25 +16,45 @@ import (
 var update = flag.Bool("update", false, "update golden files (docs/testing.md「コーパス」)")
 
 // corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は emit が `go run` のプラグインを起動するもの。
-// noOutput は、emit が何も書かないもの（emit のゴールデンは持たない）。
+// noOutput は、emit が何も書かないもの（emit のゴールデンは持たない）。noGoOutput は、書き出すものに Go のファイルがないもの
+// （書き出した Go の go vet をしない）。
 //
-// 既定の出力は、トランスパイラが選んだ宣言だけを出す（docs/emit-go.md「出力の対象」）。emit のゴールデンを持つコーパスは、
-// どれも選ぶトランスパイラを単位に書いている: design / state / select / units は tests/plugins/pick（コーパスの
-// plugins/pick/pick.json のデコレータで選ぶ）、view は plugins/view-dump（@t.entry の op を起点にする）。
+// 書き出すファイルは、どれもトランスパイラが返したもの（docs/plugin-protocol.md「この文書が決めること」）。design / state / units の
+// 単位のトランスパイラは、リポジトリの plugins/ の本物の基底 go で、テストが HOZO_PLUGIN_PATH として渡す（hozocCorpus）。
+// view は、コーパスの plugins/view-dump。emit のゴールデンは、実装が書いたものを -update で置き、差分をレビューで見る、
+// 後戻りの検出のためのもの（サンプルの期待する出力とは役目が違う）。
 var corpora = []struct {
-	name     string
-	needsGo  bool
-	noOutput bool
+	name       string
+	needsGo    bool
+	noOutput   bool
+	noGoOutput bool
 }{
-	{name: "design", needsGo: true}, // 語彙のデコレータ（http / page / db）で選ぶ
-	{name: "view", needsGo: true},   // plugins/view-dump。api の単位のトランスパイラ view-none は何も選ばない
-	{name: "state", needsGo: true},  // 状態の分類・遷移の効果・状態での match。すべての op と状態を選ぶ
-	{name: "select", needsGo: true}, // 出力の対象: 起点、stops、wraps、states、別の名前空間の op
+	{name: "design", needsGo: true}, // 設計書の例。server と browser と、使う型の置き場の http と page
+	// plugins/view-dump（`go run` で動く、テストのための基底）が、受け取った View を view.json に書き出す
+	{name: "view", needsGo: true, noGoOutput: true},
+	{name: "state", needsGo: true}, // 状態の分類・遷移の効果・状態での match
 	// 単位: 同じ名前空間の二つの単位、in、子孫を名指しする単位、単位をまたぐ一方向の import（docs/config.md「単位」）
 	{name: "units", needsGo: true},
-	// モデルが先: 出力しない名前空間、宣言に付けた印のデコレータ。shop の単位のトランスパイラ none（sh で動く）は
-	// 何も選ばないので、emit は何も書かない（docs/emit-go.md「出力の対象」）
+	// モデルが先: 出力しない名前空間、宣言に付けた印のデコレータ。単位のトランスパイラ none（sh で動く、テストのための基底）は
+	// ファイルを返さないので、emit は何も書かない
 	{name: "model", noOutput: true},
+}
+
+// repoPlugins は、リポジトリの plugins/ の絶対パス（HOZO_PLUGIN_PATH として渡す）。
+func repoPlugins(t *testing.T) string {
+	t.Helper()
+	plugins, err := filepath.Abs(repoPluginsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plugins
+}
+
+// hozocCorpus は、コーパス（か、それを写したディレクトリ）dir で hozoc を走らせる。リポジトリの plugins/ を HOZO_PLUGIN_PATH として
+// 渡す（docs/testing.md「コーパス」: 単位のトランスパイラは、リポジトリの plugins/ の本物）。ほかの環境は渡さない。
+func hozocCorpus(t *testing.T, dir string, args []string, stdout, stderr io.Writer) int {
+	t.Helper()
+	return hozocMainEnv(dir, pluginPathEnv(repoPlugins(t)), args, stdout, stderr)
 }
 
 // corpusDir はコーパス name のディレクトリ（tests/ からの相対パス）。
@@ -49,7 +70,7 @@ func TestCorpusCheckGolden(t *testing.T) {
 	for _, c := range corpora {
 		t.Run(c.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			code := hozocMainIn(corpusDir(c.name), []string{"check"}, &stdout, &stderr)
+			code := hozocCorpus(t, corpusDir(c.name), []string{"check"}, &stdout, &stderr)
 			if code != 0 {
 				t.Fatalf("hozoc check の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 			}
@@ -72,7 +93,7 @@ func TestCorpusEmitGolden(t *testing.T) {
 			}
 			root, before := copyCorpusAsModule(t, c.name)
 			var stdout, stderr bytes.Buffer
-			code := hozocMainIn(root, []string{"emit"}, &stdout, &stderr)
+			code := hozocCorpus(t, root, []string{"emit"}, &stdout, &stderr)
 			if code != 0 {
 				t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 			}
@@ -81,7 +102,7 @@ func TestCorpusEmitGolden(t *testing.T) {
 				delete(got, p) // 入力（.hozo、hozo.toml、go.mod など）は書き出したものではない
 			}
 			if c.noOutput {
-				// 何も選ばれない: 終了コード 0 で、何も書かない（.hozoc-outputs.json も置かない）
+				// どのトランスパイラもファイルを返さない: 終了コード 0 で、何も書かない（.hozoc-outputs.json も置かない）
 				if len(got) != 0 || stdout.String() != "" {
 					t.Errorf("emit が書いた: %v\n%s", sortedKeys(got), stdout.String())
 				}
@@ -94,7 +115,9 @@ func TestCorpusEmitGolden(t *testing.T) {
 				t.Fatalf("emit が何も書かなかった:\n%s%s", stdout.String(), stderr.String())
 			}
 			compareTree(t, filepath.Join(goldenDir(c.name), "emit"), got)
-			vetEmitted(t, root, got)
+			if !c.noGoOutput {
+				vetEmitted(t, root, got)
+			}
 		})
 	}
 }
@@ -153,10 +176,12 @@ func requireGo(t *testing.T) {
 }
 
 // copyCorpusAsModule はコーパス name を一時ディレクトリに写し、そこを Go のモジュールのルートにする:
-// リポジトリの go.mod と go.sum を複製し、ir/、plugin/、tests/ をシンボリックリンクで足す（tests/generated_test.go と同じやり方）。
-// こうすると、コーパスのプラグインのマニフェストの `go run github.com/mew-ton/hozo/tests/corpus/<名前>/plugins/<p>` が、
-// プロジェクトのルート（= 作業ディレクトリ）から同じモジュールのパッケージとして解決でき、既定の出力の import パス
-// （docs/emit-go.md「配置」: out の上の go.mod の module）も `github.com/mew-ton/hozo/<out>` に決まる。
+// リポジトリの go.mod と go.sum を複製し、ir/、plugin/、plugins/、tests/ をシンボリックリンクで足す（tests/generated_test.go と
+// 同じやり方。コーパスが自分の plugins/ を持つなら、そちらを使い、リポジトリの plugins/ は足さない）。
+// こうすると、プラグインのマニフェストの `go run github.com/mew-ton/hozo/plugins/go`（と、コーパスのプラグインの
+// `go run github.com/mew-ton/hozo/tests/corpus/<名前>/plugins/<p>`）が、プロジェクトのルート（= 作業ディレクトリ）から同じ
+// モジュールのパッケージとして解決でき、生成したコードの import パス（docs/plugin-go.md「パッケージと import パス」: Dir(U, N) の
+// 上の go.mod の module）も `github.com/mew-ton/hozo/<out>` に決まる。
 // `testdata/`（ゴールデン）は写さない。戻り値は一時ディレクトリと、emit の前にあったファイル（readTree の形）。
 func copyCorpusAsModule(t *testing.T, name string) (string, map[string][]byte) {
 	t.Helper()
@@ -198,7 +223,10 @@ func copyCorpusAsModule(t *testing.T, name string) (string, map[string][]byte) {
 			t.Fatal(err)
 		}
 	}
-	for _, dir := range []string{"ir", "plugin", "tests"} {
+	for _, dir := range []string{"ir", "plugin", "plugins", "tests"} {
+		if _, err := os.Lstat(filepath.Join(root, dir)); err == nil {
+			continue // コーパスが自分で持つディレクトリ（plugins/）
+		}
 		if err := os.Symlink(filepath.Join(repo, dir), filepath.Join(root, dir)); err != nil {
 			t.Skipf("シンボリックリンクを作れない: %v", err)
 		}

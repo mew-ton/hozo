@@ -1,0 +1,9 @@
+# seam-a と seam-b は、どちらも a.dec の継ぎ目を宣言している → CFG-23
+# ERROR: CFG-23
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "seam-a", "seam-b"]
+out         = "gen/a"

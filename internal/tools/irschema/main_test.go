@@ -211,9 +211,14 @@ func TestNegative(t *testing.T) {
 		{"arg value variant", "ArgValue", `{"kind":"variant","union":"a.U","arm":"Ready"}`, true},
 		{"arg value list nested", "ArgValue", `{"kind":"list","items":[{"kind":"ref","target":"x"},{"kind":"refs","targets":[]}]}`, true},
 		{"arg value literal null", "ArgValue", `{"kind":"literal","literal":null}`, false},
-		{"namespace config", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen","transpilers":["go-cli"]}`, true},
-		{"namespace config missing transpilers", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen"}`, false},
-		{"namespace config with plugins", "NamespaceConfig", `{"language":"go","out":"gen","dir":"gen","plugins":[]}`, false},
+		{"namespace config", "NamespaceConfig", `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go","go-cli"],"options":{"go-cli":{"x":1,"y":{"z":[true,"s"]}}},"seams":{"rate.limited":"go-ratelimit"}}`, true},
+		{"namespace config empty options and seams", "NamespaceConfig", `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go"],"options":{},"seams":{}}`, true},
+		{"namespace config missing transpilers", "NamespaceConfig", `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","options":{},"seams":{}}`, false},
+		{"namespace config missing base", "NamespaceConfig", `{"index":1,"language":"go","out":"gen","dir":"gen","transpilers":["go"],"options":{},"seams":{}}`, false},
+		{"namespace config missing seams", "NamespaceConfig", `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go"],"options":{}}`, false},
+		{"namespace config options not a table of tables", "NamespaceConfig", `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go"],"options":{"go":1},"seams":{}}`, false},
+		{"namespace config seams value not a string", "NamespaceConfig", `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go"],"options":{},"seams":{"a.b":1}}`, false},
+		{"namespace config with plugins", "NamespaceConfig", `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go"],"options":{},"seams":{},"plugins":[]}`, false},
 		{"bind", "Bind", `{"namespace":"browser","state":"db","target":{"namespace":"server","deep":true},"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
 		{"bind deep string", "Bind", `{"namespace":"browser","state":"db","target":{"namespace":"server","deep":"true"},"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		// プラグインのプロトコル（docs/plugin-protocol.md「要求と応答」「起動」）。
@@ -227,8 +232,8 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.3","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.3","direction":"emit","format":"openapi","files":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.4","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.4","direction":"emit","format":"openapi","files":[]}`, false},
 		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {

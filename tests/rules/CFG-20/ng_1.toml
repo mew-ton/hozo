@@ -1,0 +1,9 @@
+# go と go-b は、どちらも基底 → CFG-20（型と op の形を出すのは基底だけで、二つあれば同じものを二度出す）
+# ERROR: CFG-20
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-b"]
+out         = "gen/a"

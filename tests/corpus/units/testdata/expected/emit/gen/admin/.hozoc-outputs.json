@@ -1,4 +1,6 @@
 [
   "gen/admin/doc.go",
+  "gen/admin/inner/doc.go",
+  "gen/admin/inner/ops.go",
   "gen/admin/ops.go"
 ]

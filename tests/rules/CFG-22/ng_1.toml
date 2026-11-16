@@ -1,0 +1,9 @@
+# a は b.M を使うが、b を出力する go の単位がない → CFG-22
+# ERROR: CFG-22
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

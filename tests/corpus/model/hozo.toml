@@ -1,7 +1,9 @@
 # 「モデルが先」（docs/requirements.md「モデルが先」、docs/decisions.md「設計書を変える決定」S10〜S12）のコーパス
-# （docs/testing.md「コーパス」、README.md）。単位があるのは shop だけ。印の語彙 marks、人の操作 customer、
-# 外部のシステム carrier はどの単位の対象でもなく、出力しない（docs/config.md「単位の対象」）。検査は同じに掛かる。
-# shop の単位のトランスパイラ none（plugins/none）は何も選ばないので、shop も何も出力しない。
+# （docs/testing.md「コーパス」、README.md）。出力したい名前空間は shop だけ。人の操作 customer は、どの単位の対象でもなく、
+# 出力しない（docs/config.md「単位の対象」）。検査は同じに掛かる。
+# shop は、印の語彙 marks と、外部のシステム carrier の例外（marks.NotApproved、carrier.Closed）を使うので、その二つには、
+# 型の置き場として同じ基底の単位が要る（docs/config.md「型の置き場」）。
+# 単位のトランスパイラ none（plugins/none。sh で動く、テストのための基底）はファイルを返さないので、どの単位も何も出力しない。
 
 [hozo]
 plugin_dirs = ["plugins"]
@@ -10,3 +12,13 @@ plugin_dirs = ["plugins"]
 namespace   = "shop"
 transpilers = ["none"]
 out         = "gen/shop"
+
+[[emit]]
+namespace   = "carrier"
+transpilers = ["none"]
+out         = "gen/carrier"
+
+[[emit]]
+namespace   = "marks"
+transpilers = ["none"]
+out         = "gen/marks"

@@ -1,0 +1,94 @@
+// GO-2（docs/plugin-go.md「名前」の「名前が当たれば GO-2」）の条件を、名前空間ごとに一つずつ。どれも hozoc の検査は通る
+// （NAME-1 は warning）。直すのは仕様の名前。
+
+/** 継ぎ目の語彙 */
+namespace x {
+  decorator limited;
+}
+namespace rate.x {
+  decorator limited;
+}
+
+namespace c {
+}
+
+// 公開の名前どうし: 大文字化で同じになる宣言の名前
+namespace c.caps {
+  scalar id extends string;
+  scalar Id extends string;
+}
+
+// 公開の名前どうし: 合成した名前と宣言の名前
+namespace c.synth {
+  union Page { Ready: { title: string; }; }
+  model PageReady { title: string; }
+}
+
+// 公開の名前どうし: New<Model> と型
+namespace c.defaults {
+  model Options { limit: int = 10; }
+  model NewOptions { x: int; }
+}
+
+// 公開の名前どうし: Effect… と型、<状態>State と型
+namespace c.states {
+  model Row { id: string; }
+  state rows: list<Row>;
+  effect addRow on rows.post;
+  model EffectAddRow { x: int; }
+  model RowsState { x: int; }
+}
+
+// 公開の名前どうし: Ops、Leaves と型。<Ns>Ops と型
+namespace c.ops {
+  model Ops { x: int; }
+  model Leaves { x: int; }
+  model CDepOps { x: int; }
+  export op run(): int;
+  export op call(): int
+  {
+    return c.dep.work();
+  }
+}
+namespace c.dep {
+  export op work(): int;
+}
+
+// 公開の名前どうし: 分類の名前（列挙の定数、述語のインターフェース、判定関数）と型
+namespace c.kinds {
+  model Item { x: int; }
+  classify Size of Item {
+    Big;
+    Small;
+  }
+  model SizeBig { x: int; }
+  model SizeCases { x: int; }
+  model ClassifySize { x: int; }
+}
+
+// 一つの構造体のフィールドどうし
+namespace c.fields {
+  model Row { id: string; Id: string; }
+}
+
+// 一つのインターフェースのメソッドどうし: Ops の中の foo と Foo、状態の単位の Get と op
+namespace c.methods {
+  model Row { id: string; }
+  state rows: list<Row>;
+  export op foo(): int;
+  export op Foo(): int;
+  export op get(): int reads rows;
+}
+
+// Seams の中のメソッドどうし（op loginRate の @x.limited と、op login の @rate.x.limited。どちらも LoginRateXLimited）と、
+// 構造体 ops のフィールドと中身のメソッド（状態 loginBody と、継ぎ目を持つ配線 login）
+namespace c.seams {
+  state loginBody: single<string>;
+  @x.limited
+  export op loginRate(): int;
+  @rate.x.limited
+  export op login(): int
+  {
+    return loginRate();
+  }
+}

@@ -6,174 +6,141 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-func TestGoTypeCore(t *testing.T) {
-	tests := []struct {
-		t    ir.Type
-		want string
-	}{
-		{ir.String(), "string"},
-		{ir.Boolean(), "bool"},
-		{ir.Int(), "int64"},
-		{ir.Float(), "float64"},
-		{ir.Time(), "time.Time"},
-		{ir.Duration(), "time.Duration"},
-		{nil, ""},
-	}
-	for _, tt := range tests {
-		var im Imports
-		if got := GoType(tt.t, &im); got != tt.want {
-			t.Errorf("GoType(%v) = %q, want %q", tt.t, got, tt.want)
-		}
-		if got := GoType(tt.t, nil); got != tt.want {
-			t.Errorf("GoType(%v, nil) = %q, want %q", tt.t, got, tt.want)
-		}
-	}
-	var im Imports
-	GoType(ir.Time(), &im)
-	GoType(ir.Duration(), &im)
-	if got := im.Render(); got != "import \"time\"\n" {
-		t.Errorf("Time/Duration must import time once: %q", got)
-	}
-	var none Imports
-	GoType(ir.Int(), &none)
-	if none.Render() != "" {
-		t.Errorf("int must not import anything: %q", none.Render())
-	}
+// typesView は、型のテストの View: 見る側 server（model、scalar、union、合成 model）と、別の名前空間 type（単位 2 が出力する）。
+func typesView() *ir.View {
+	v := viewOf("server",
+		namespace("server",
+			model("server.User"), scalar("server.Email", ir.String()), scalar("server.Count", ir.Int()),
+			scalar("server.When", ir.Time()), scalar("server.Alias", ir.Ref("server.Email")), scalar("server.Flag", ir.Boolean()),
+			union("server.Page", ir.UnionArm{Name: "Ready", Type: ir.Ref("server.Page.Ready")}),
+			model("server.Page.Ready"),
+		),
+		namespace("type", model("type.Session"), scalar("type.Token", ir.String()), union("type.Shape")),
+	)
+	v.Namespaces["type"] = []ir.NamespaceConfig{conf(2, "gen/type")}
+	return v
 }
 
-func TestGoTypeComposite(t *testing.T) {
-	im := &Imports{Viewer: "server"}
-	user := ir.Ref("server.User")
+// docs/plugin-go.md「型」の表の行に一つずつ。
+func TestGoType(t *testing.T) {
+	root := projectRoot(t)
+	v := typesView()
+	l, err := LayoutOf(v, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := NewImports(v, l, root, true)
 	tests := []struct {
 		t    ir.Type
 		want string
 	}{
-		{user, "User"},
-		{ir.Ref("server.OrderPage.Ready"), "OrderPageReady"},
-		{ir.Ref("server.getMe$in"), "GetMeInInput"},
-		{ir.Optional(user), "*User"},
+		{ir.String(), "string"}, {ir.Boolean(), "bool"}, {ir.Int(), "int64"}, {ir.Float(), "float64"},
+		{ir.Time(), "time.Time"}, {ir.Duration(), "time.Duration"},
+		// optional(T): array、record、union（arms）への ref はそのまま。それ以外は *T
 		{ir.Optional(ir.String()), "*string"},
-		{ir.Optional(ir.Int()), "*int64"},
-		{ir.Optional(ir.Time()), "*time.Time"},
-		{ir.Optional(ir.Array(user)), "[]User"},
-		{ir.Optional(ir.Record(ir.String(), user)), "map[string]User"},
-		{ir.Array(user), "[]User"},
-		{ir.Array(ir.Optional(user)), "[]*User"},
-		{ir.Array(ir.Array(ir.Int())), "[][]int64"},
-		{ir.Record(ir.String(), ir.Array(ir.Float())), "map[string][]float64"},
-		{ir.Record(ir.Ref("server.UserId"), ir.Optional(ir.Boolean())), "map[UserId]*bool"},
-		{ir.Case("server.WarrantyKind", []string{"Standard"}, ir.Ref("server.Item")), "Item"},
-		{ir.Optional(ir.Case("server.WarrantyKind", []string{"Standard"}, ir.Ref("server.Item"))), "*Item"},
-		{ir.Optional(ir.Case("server.C", []string{"A"}, ir.Array(ir.Int()))), "[]int64"},
-		{ir.Array(ir.Case("server.C", []string{"A", "B"}, ir.Duration())), "[]time.Duration"},
+		{ir.Optional(ir.Ref("server.User")), "*User"},
+		{ir.Optional(ir.Ref("server.Email")), "*Email"},
+		{ir.Optional(ir.Array(ir.String())), "[]string"},
+		{ir.Optional(ir.Record(ir.String(), ir.Int())), "map[string]int64"},
+		{ir.Optional(ir.Ref("server.Page")), "Page"},
+		{ir.Optional(ir.Ref("type.Shape")), "pkgtype.Shape"},
+		{ir.Array(ir.Ref("server.User")), "[]User"},
+		{ir.Array(ir.Optional(ir.Int())), "[]*int64"},
+		{ir.Record(ir.Ref("server.Email"), ir.Array(ir.Time())), "map[Email][]time.Time"},
+		// ref: model は構造体、scalar は名前付きの型、union はインターフェース。合成 model は連結した名前
+		{ir.Ref("server.User"), "User"}, {ir.Ref("server.Email"), "Email"}, {ir.Ref("server.Page"), "Page"},
+		{ir.Ref("server.Page.Ready"), "PageReady"},
+		// 別の名前空間の型は、置き場の入口のパッケージの名前で修飾する
+		{ir.Ref("type.Session"), "pkgtype.Session"},
+		{ir.Optional(ir.Ref("type.Token")), "*pkgtype.Token"},
+		// case(C, cases, of) は of の型
+		{ir.Case("server.Kind", []string{"A"}, ir.Ref("server.User")), "User"},
+		{ir.Optional(ir.Case("server.Kind", []string{"A"}, ir.Array(ir.String()))), "[]string"},
 	}
 	for _, tt := range tests {
 		if got := GoType(tt.t, im); got != tt.want {
-			t.Errorf("GoType(%v) = %q, want %q", tt.t, got, tt.want)
+			t.Errorf("GoType(%s) = %q, want %q", tt.t, got, tt.want)
 		}
+	}
+	// void と never は型にならない
+	if got := GoType(nil, im); got != "" {
+		t.Errorf("GoType(nil) = %q", got)
+	}
+	if got := GoType(ir.Never(), im); got != "" {
+		t.Errorf("GoType(never) = %q", got)
+	}
+	if err := im.Err(); err != nil {
+		t.Errorf("Err = %v", err)
+	}
+	// 使った import だけが入る
+	want := "import (\n\t\"time\"\n\n\tpkgtype \"example.com/app/gen/type\"\n)\n"
+	if got := im.Render(); got != want {
+		t.Errorf("Render = %q, want %q", got, want)
+	}
+	// imports が nil なら修飾なし
+	if got := GoType(ir.Optional(ir.Ref("type.Session")), nil); got != "*Session" {
+		t.Errorf("GoType(nil imports) = %q", got)
 	}
 }
 
-func TestGoTypeRefWithoutResolver(t *testing.T) {
-	// Resolve がなければ、viewer の下はローカル、ほかは先頭が大文字でないセグメントを名前空間とみなしてローカル（複製した型）。
-	im := &Imports{Viewer: "browser"}
-	tests := []struct{ fqn, want string }{
-		{"browser.OrdersQuery", "OrdersQuery"},
-		{"browser.OrderPage.Ready", "OrderPageReady"},
-		{"server.User", "User"},
-		{"server.admin.Report", "Report"},
-		{"server.OrderPage.Ready", "OrderPageReady"},
-		{"Db", "Db"},
-		{"db", "Db"},
-	}
-	for _, tt := range tests {
-		if got := GoType(ir.Ref(tt.fqn), im); got != tt.want {
-			t.Errorf("GoType(ref %q) = %q, want %q", tt.fqn, got, tt.want)
+func TestIsNillable(t *testing.T) {
+	p := typesView().Program
+	for _, tt := range []struct {
+		t    ir.Type
+		want bool
+	}{
+		{ir.Array(ir.String()), true}, {ir.Record(ir.String(), ir.String()), true}, {ir.Ref("server.Page"), true},
+		{ir.Case("c", nil, ir.Array(ir.String())), true},
+		{ir.String(), false}, {ir.Ref("server.User"), false}, {ir.Ref("server.Email"), false}, {ir.Time(), false},
+	} {
+		if got := IsNillable(tt.t, p); got != tt.want {
+			t.Errorf("IsNillable(%s) = %v, want %v", tt.t, got, tt.want)
 		}
 	}
-	if im.Render() != "" {
-		t.Errorf("no imports expected without a resolver: %q", im.Render())
-	}
-	// imports が nil なら Viewer "" でローカル。
-	if got := GoType(ir.Ref("server.User"), nil); got != "ServerUser" {
-		t.Errorf("GoType(ref, nil) = %q", got)
+	if IsNillable(ir.Ref("server.Page"), nil) {
+		t.Error("Program がなければ、ref は nil にならない型として扱う")
 	}
 }
 
-func TestGoTypeRefWithResolver(t *testing.T) {
-	im := &Imports{
-		Viewer: "browser",
-		Resolve: func(fqn string) (namespace, pkgPath, pkgName string, local bool) {
-			switch {
-			case hasPrefix(fqn, "browser."):
-				return "browser", "", "", true
-			case hasPrefix(fqn, "server.admin."):
-				return "server.admin", "example.com/app/gen/server/admin", "admin", false
-			case hasPrefix(fqn, "server."):
-				return "server", "example.com/app/gen/server", "server", false
-			case hasPrefix(fqn, "ts."):
-				// TS の名前空間の型は browser のパッケージに複製されている（§4.5）。
-				return "ts", "", "", true
-			}
-			return "", "", "", true
-		},
-	}
-	tests := []struct {
+// docs/plugin-go.md「呼び出し」の「零値」。
+func TestZero(t *testing.T) {
+	root := projectRoot(t)
+	v := typesView()
+	l, _ := LayoutOf(v, root)
+	im := NewImports(v, l, root, true)
+	for _, tt := range []struct {
 		t    ir.Type
 		want string
 	}{
-		{ir.Ref("browser.OrdersQuery"), "OrdersQuery"},
-		{ir.Ref("server.User"), "server.User"},
-		{ir.Ref("server.OrderPage.Ready"), "server.OrderPageReady"},
-		{ir.Optional(ir.Ref("server.Token")), "*server.Token"},
-		{ir.Array(ir.Ref("server.admin.Report")), "[]admin.Report"},
-		{ir.Ref("ts.Widget"), "Widget"},
-		{ir.Ref("db"), "Db"},
-		{ir.Record(ir.Ref("server.UserId"), ir.Time()), "map[server.UserId]time.Time"},
-	}
-	for _, tt := range tests {
-		if got := GoType(tt.t, im); got != tt.want {
-			t.Errorf("GoType(%v) = %q, want %q", tt.t, got, tt.want)
+		{ir.Optional(ir.Ref("server.User")), "nil"}, {ir.Ref("server.Page"), "nil"}, {ir.Array(ir.Int()), "nil"},
+		{ir.Record(ir.String(), ir.Int()), "nil"}, {ir.Optional(ir.Ref("server.Page")), "nil"},
+		{ir.Ref("server.User"), "User{}"}, {ir.Ref("type.Session"), "pkgtype.Session{}"}, {ir.Ref("server.Page.Ready"), "PageReady{}"},
+		{ir.Time(), "time.Time{}"}, {ir.Ref("server.When"), "When{}"},
+		{ir.String(), `""`}, {ir.Ref("server.Email"), `""`}, {ir.Ref("server.Alias"), `""`}, {ir.Ref("type.Token"), `""`},
+		{ir.Int(), "0"}, {ir.Float(), "0"}, {ir.Duration(), "0"}, {ir.Ref("server.Count"), "0"},
+		{ir.Boolean(), "false"}, {ir.Ref("server.Flag"), "false"},
+		{ir.Case("c", nil, ir.Ref("server.User")), "User{}"},
+		{nil, ""}, {ir.Never(), ""},
+	} {
+		if got := Zero(tt.t, im); got != tt.want {
+			t.Errorf("Zero(%v) = %q, want %q", tt.t, got, tt.want)
 		}
 	}
-	want := "import (\n\t\"time\"\n\n\t\"example.com/app/gen/server\"\n\t\"example.com/app/gen/server/admin\"\n)\n"
-	if got := im.Render(); got != want {
-		t.Errorf("Render() =\n%s\nwant\n%s", got, want)
-	}
 }
 
-func TestGoTypeResolverAlias(t *testing.T) {
-	// 同じパッケージ名が二つの名前空間から来るとき、二つ目は別名で修飾する。
-	im := &Imports{
-		Viewer: "app",
-		Resolve: func(fqn string) (namespace, pkgPath, pkgName string, local bool) {
-			if hasPrefix(fqn, "a.core.") {
-				return "a.core", "example.com/x/a/core", "core", false
-			}
-			return "b.core", "example.com/x/b/core", "core", false
-		},
-	}
-	if got := GoType(ir.Ref("a.core.T"), im); got != "core.T" {
-		t.Errorf("first = %q", got)
-	}
-	if got := GoType(ir.Ref("b.core.U"), im); got != "core2.U" {
-		t.Errorf("second = %q", got)
-	}
-	if got := im.Render(); got != "import (\n\t\"example.com/x/a/core\"\n\tcore2 \"example.com/x/b/core\"\n)\n" {
-		t.Errorf("Render() = %q", got)
-	}
-}
-
-func hasPrefix(s, p string) bool { return len(s) >= len(p) && s[:len(p)] == p }
-
-func TestGuessNamespace(t *testing.T) {
-	tests := []struct{ fqn, want string }{
-		{"server.User", "server"}, {"server.OrderPage.Ready", "server"}, {"server.admin.Report", "server.admin"},
-		{"Db", ""}, {"db", ""}, {"a.b.c", "a.b"},
-	}
-	for _, tt := range tests {
-		if got := guessNamespace(tt.fqn); got != tt.want {
-			t.Errorf("guessNamespace(%q) = %q, want %q", tt.fqn, got, tt.want)
+// docs/plugin-go.md「コメント」の「型の表示」。
+func TestTypeDisplay(t *testing.T) {
+	for _, tt := range []struct {
+		t    ir.Type
+		want string
+	}{
+		{ir.String(), "string"}, {ir.Time(), "Time"}, {ir.Ref("type.User"), "type.User"},
+		{ir.Optional(ir.Ref("type.User")), "type.User?"}, {ir.Array(ir.Ref("type.Order")), "type.Order[]"},
+		{ir.Record(ir.String(), ir.Array(ir.Int())), "Record<string, int[]>"},
+		{ir.Case("store.Login", []string{"LoggedIn"}, ir.Ref("type.Session")), "type.Session"},
+	} {
+		if got := TypeDisplay(tt.t); got != tt.want {
+			t.Errorf("TypeDisplay(%s) = %q, want %q", tt.t, got, tt.want)
 		}
 	}
 }

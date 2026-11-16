@@ -1,0 +1,9 @@
+# go-y は go-x を要るが、transpilers にない → CFG-19（hozoc が黙って足すことはしない）
+# ERROR: CFG-19
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-y"]
+out         = "gen/a"

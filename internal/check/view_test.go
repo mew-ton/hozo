@@ -34,30 +34,37 @@ func TestViewsGolden(t *testing.T) {
 	cfg.Units[1].Transpilers = []string{"react-router"}
 	cfg.Units[2].Transpilers = []string{"vue-router", "pinia"}
 	cfg.Units[2].Out = "gen/browser2"
+	cfg.Units[2].Options = map[string]map[string]any{"pinia": {"strict": true}}
 
-	all := Views(p, cfg, goUnits(p, cfg))
+	units := goUnits(p, cfg)
+	units[2].Seams = map[string]string{"cache.cached": "pinia"}
+	all := Views(p, cfg, units)
 	if len(all) != 4 || len(all[0]) != 1 || len(all[1]) != 1 || len(all[2]) != 1 || len(all[3]) != 0 {
 		t.Fatalf("views = %v, want one view each for the units of server, browser, browser, and none for server.admin", all)
 	}
 	views := map[string]*ir.View{"server": all[0]["server"], "browser": all[1]["browser"]}
 	v := views["browser"]
-	want1 := ir.NamespaceConfig{Language: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"react-router"}}
+	// config は、単位の番号、言語、基底、out、Dir(U, N)、transpilers、options、seams（docs/ir.md「その名前空間から見た IR」）
+	want1 := ir.NamespaceConfig{Index: 2, Language: "go", Base: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"react-router"},
+		Options: map[string]map[string]any{}, Seams: map[string]string{}}
 	if v.Viewer != "browser" || !reflect.DeepEqual(v.Config, want1) {
 		t.Errorf("config = %+v", v.Config)
 	}
-	if !reflect.DeepEqual(v.Files, []string{"browser.hozo", "server.hozo"}) {
+	if !reflect.DeepEqual(v.Files, []string{"browser.hozo", "server.hozo", "hozo:vocab/http.hozo"}) {
 		t.Errorf("files = %v", v.Files)
 	}
 	// namespaces は出力のあるすべての名前空間（viewer を含む）。値は、その名前空間を出力する単位ごとの設定（設定の順）
 	if len(v.Namespaces) != 2 || len(v.Namespaces["server"]) != 1 || len(v.Namespaces["browser"]) != 2 {
 		t.Errorf("namespaces = %+v", v.Namespaces)
 	}
+	// namespaces[viewer] のうち index が config.index と同じ要素が、この View の単位のもの
 	if !reflect.DeepEqual(v.Namespaces["browser"][0], v.Config) {
 		t.Errorf("namespaces[viewer][0] = %+v, config = %+v", v.Namespaces["browser"][0], v.Config)
 	}
 	// 同じ名前空間の二つ目の単位の View は、config だけが違う
 	second := all[2]["browser"]
-	want2 := ir.NamespaceConfig{Language: "go", Out: "gen/browser2", Dir: "gen/browser2", Transpilers: []string{"vue-router", "pinia"}}
+	want2 := ir.NamespaceConfig{Index: 3, Language: "go", Base: "go", Out: "gen/browser2", Dir: "gen/browser2", Transpilers: []string{"vue-router", "pinia"},
+		Options: map[string]map[string]any{"pinia": {"strict": true}}, Seams: map[string]string{"cache.cached": "pinia"}}
 	if !reflect.DeepEqual(second.Config, want2) || !reflect.DeepEqual(v.Namespaces["browser"][1], want2) {
 		t.Errorf("second unit: config = %+v, namespaces = %+v", second.Config, v.Namespaces["browser"])
 	}
@@ -257,5 +264,31 @@ func TestViewsCoverage(t *testing.T) {
 	// Program は全体そのまま（in の外の宣言も読める）
 	if v.Program.Lookup("shop.nightly") == nil || v.Ops["shop.nightly"] == nil {
 		t.Error("declarations outside in must stay in View.program and View.ops")
+	}
+}
+
+// TestViewsVocabulary は docs/config.md「in」「単位の対象」: 語彙のファイルは in によらず、いつも合ったものとして扱い、
+// 語彙の名前空間の単位も出力を持つ。View.files は、in に合ったユーザーのファイルの後に、語彙のファイル。
+func TestViewsVocabulary(t *testing.T) {
+	p := program(nil, namespace("server", leaf("server.o", nil)), httpVocab())
+	cfg := cfgFor("server", "http")
+	units := []Unit{
+		{Language: "go", Base: "go", Files: []string{"server.hozo", "hozo:vocab/http.hozo"}},
+		// in が、語彙でないファイルにしか合わなくても、語彙のファイルは Files にある（internal/project が足す）
+		{Language: "go", Base: "go", Files: []string{"hozo:vocab/http.hozo"}},
+	}
+	all := Views(p, cfg, units)
+	if all[1]["http"] == nil {
+		t.Fatalf("語彙の名前空間の単位が出力を持たない: %v", all)
+	}
+	v := all[1]["http"]
+	if v.Config.Index != 2 || v.Config.Dir != "gen/http" || !reflect.DeepEqual(v.Files, []string{"hozo:vocab/http.hozo"}) {
+		t.Errorf("config = %+v, files = %v", v.Config, v.Files)
+	}
+	if !v.InUnit("http.ServerError") {
+		t.Error("語彙の宣言は、単位の対象の宣言")
+	}
+	if got := all[0]["server"].Namespaces["http"]; len(got) != 1 || got[0].Index != 2 {
+		t.Errorf("namespaces[http] = %+v", got)
 	}
 }
