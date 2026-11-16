@@ -162,7 +162,8 @@ func TestIncomplete(t *testing.T) {
 	if out, err := runGo(t, root, "build", "./probe"); err != nil {
 		t.Fatalf("すべてのメソッドを持つ型が、単位を満たさない: %v\n%s", err, out)
 	}
-	for impl, missing := range map[string]string{"BooksTable": "NewestBooks", "NotesTable": "FirstNote"} {
+	// Go が言うのは、足りないメソッドのうち、名前の順で最初のもの
+	for impl, missing := range map[string]string{"BooksTable": "ClearBooks", "NotesTable": "FirstNote"} {
 		unit := strings.TrimSuffix(impl, "Table") + "State"
 		writeFile(t, filepath.Join(root, "probe", "probe.go"), probe(unit, impl))
 		out, err := runGo(t, root, "build", "./probe")

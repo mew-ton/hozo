@@ -224,8 +224,7 @@ func TestPost(t *testing.T) {
 	}
 }
 
-// TestUnmarshalable は、行の値を列の形にできなければ、文を実行しないこと（dbArgs<Model> のエラーを、先に返す）。
-// ここでは、@db.json の列に、JSON にできない値は入らないので、中断された ctx で確かめる: 文は実行されず、行は足されない。
+// TestCancelled は、文を、受け取った ctx で実行すること: 中断された ctx では、行は足されない。
 func TestCancelled(t *testing.T) {
 	tb, ctx := open(t)
 	cancelled, cancel := context.WithCancel(ctx)

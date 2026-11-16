@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go-sqlite`）: 六つのしまい方（列の型と、値の変え方）、
-// @db.nullable の列（NULL の読み書きと、NOT NULL の有無）、制約（docs/plugin-go-sqlite.md「表」「しまい方」「補助」）を、
+// 省略可能なフィールドの列（NULL の読み書きと、NOT NULL の有無）、制約（docs/plugin-go-sqlite.md「表」「しまい方」「補助」）を、
 // 本物の SQLite の上で確かめる。plugins/go-sqlite の TestBehavior が、基底の出力と go-sqlite の出力を置いたモジュールのルートに
 // 置いて走らせる。
 package behavior
@@ -56,7 +56,14 @@ func TestUnits(t *testing.T) {
 	db, ctx := openDB(t)
 	ops := app.New(app.NewCoresTable(db), app.NewNamedsTable(db), app.NewDocsTable(db), app.NewSparsesTable(db),
 		app.NewPairsTable(db), app.NewSharedATable(db), app.NewSharedBTable(db), app.NewLinksTable(db), plain{})
-	if err := ops.AddSharedA(ctx, app.Shared{Id: "x"}); err != nil {
+	// 配線の op は、効果のメソッドを呼ぶ
+	if err := ops.AddCore(ctx, app.Core{S: "via op"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := app.NewCoresTable(db).Get(ctx); err != nil || len(got) != 1 || got[0].S != "via op" {
+		t.Errorf("cores の Get = %v, %v", got, err)
+	}
+	if err := app.NewSharedATable(db).CreateSharedA(ctx, app.Shared{Id: "x"}); err != nil {
 		t.Fatal(err)
 	}
 	// 同じ db から作った値は、同じ表を読み書きする。同じ model の別の表（sharedB）には入らない
@@ -94,19 +101,19 @@ func notNull(t *testing.T, db *sql.DB, table string) map[string]bool {
 	return out
 }
 
-// TestNotNull は、NOT NULL が、@db.nullable を付けていない、すべての列に付き、付けた列には付かないこと。
+// TestNotNull は、NOT NULL が、フィールドの型が省略可能（T?）でない、すべての列に付き、省略可能なフィールドの列には付かないこと。
 func TestNotNull(t *testing.T) {
 	db, _ := openDB(t)
 	for _, table := range []string{"cores", "nameds", "docs", "pairs"} {
 		for col, flag := range notNull(t, db, table) {
 			if !flag {
-				t.Errorf("表 %s の列 %s に NOT NULL がない（@db.nullable を付けていない）", table, col)
+				t.Errorf("表 %s の列 %s に NOT NULL がない（フィールドは、省略可能でない）", table, col)
 			}
 		}
 	}
 	for col, flag := range notNull(t, db, "sparses") {
 		if flag {
-			t.Errorf("表 sparses の列 %s に NOT NULL がある（@db.nullable を付けた）", col)
+			t.Errorf("表 sparses の列 %s に NOT NULL がある（フィールドは、省略可能）", col)
 		}
 	}
 	if got := notNull(t, db, "links"); !got["id"] || !got["core"] || got["parent"] {
@@ -121,10 +128,10 @@ func TestCore(t *testing.T) {
 	cores := app.NewCoresTable(db)
 	at := time.Date(2026, 1, 2, 12, 4, 5, 120000000, time.FixedZone("JST", 9*60*60))
 	want := app.Core{S: "a", I: -42, D: 90 * time.Second, F: 2.5, B: true, T: at}
-	if err := cores.AddCore(ctx, want); err != nil {
+	if err := cores.CreateCore(ctx, want); err != nil {
 		t.Fatal(err)
 	}
-	if err := cores.AddCore(ctx, app.Core{S: "b", T: at.Add(time.Nanosecond)}); err != nil {
+	if err := cores.CreateCore(ctx, app.Core{S: "b", T: at.Add(time.Nanosecond)}); err != nil {
 		t.Fatal(err)
 	}
 	var types, text string
@@ -165,7 +172,7 @@ func TestNamed(t *testing.T) {
 	nameds := app.NewNamedsTable(db)
 	at := time.Date(2026, 3, 4, 5, 6, 7, 8, time.UTC)
 	want := app.Named{Name: "n", Count: 7, Span: kinds.Span(time.Minute), Ratio: 0.25, Flag: true, Stamp: kinds.Stamp(at), Label: "l"}
-	if err := nameds.AddNamed(ctx, want); err != nil {
+	if err := nameds.CreateNamed(ctx, want); err != nil {
 		t.Fatal(err)
 	}
 	var types, stamp string
@@ -200,11 +207,11 @@ func TestDoc(t *testing.T) {
 		Nested: []kinds.Tag{{Key: "n", Value: "1"}},
 		Tree:   app.Tree{Label: "root", Children: []app.Tree{{Label: "leaf"}}},
 	}
-	if err := docs.AddDoc(ctx, want); err != nil {
+	if err := docs.CreateDoc(ctx, want); err != nil {
 		t.Fatal(err)
 	}
-	// @db.nullable のない列では、値のないスライスとマップも、しまい方のまま書く（JSON の null という文字列。NULL ではない）
-	if err := docs.AddDoc(ctx, app.Doc{}); err != nil {
+	// 省略可能でないフィールドの列では、値のないスライスとマップも、しまい方のまま書く（JSON の null という文字列。NULL ではない）
+	if err := docs.CreateDoc(ctx, app.Doc{}); err != nil {
 		t.Fatal(err)
 	}
 	var tags, attrs, tag, nested string
@@ -235,12 +242,12 @@ func TestDoc(t *testing.T) {
 
 func ptr[T any](v T) *T { return &v }
 
-// TestSparse は、@db.nullable の列（しまい方ごと）: 値がなければ NULL で、読めば nil。@db.json でも、JSON の null という文字列には
-// しない。値があれば、@db.nullable のない列と同じ値。
+// TestSparse は、省略可能なフィールドの列（しまい方ごと）: 値がなければ NULL で、読めば nil。@db.json でも、JSON の null という
+// 文字列にはしない。値があれば、省略可能でないフィールドの列と同じ値。
 func TestSparse(t *testing.T) {
 	db, ctx := openDB(t)
 	sparses := app.NewSparsesTable(db)
-	if err := sparses.AddSparse(ctx, app.Sparse{}); err != nil {
+	if err := sparses.CreateSparse(ctx, app.Sparse{}); err != nil {
 		t.Fatal(err)
 	}
 	var nulls int
@@ -258,7 +265,7 @@ func TestSparse(t *testing.T) {
 		Flag: ptr(kinds.Flag(true)), Stamp: ptr(kinds.Stamp(at)),
 		Tags: []string{}, Attrs: map[string]int64{"a": 1}, Tag: &kinds.Tag{Key: "k"},
 	}
-	if err := sparses.AddSparse(ctx, full); err != nil {
+	if err := sparses.CreateSparse(ctx, full); err != nil {
 		t.Fatal(err)
 	}
 	var types, tags string
@@ -286,7 +293,7 @@ func TestSparse(t *testing.T) {
 	}
 }
 
-// TestNullWithoutNullable は、@db.nullable のない列に NULL があれば、読むときにエラーになること（その列は NOT NULL なので、
+// TestNullWithoutNullable は、省略可能でないフィールドの列に NULL があれば、読むときにエラーになること（その列は NOT NULL なので、
 // Schema で作った表では起きない。ここでは、NOT NULL のない表を手で作る）。
 func TestNullWithoutNullable(t *testing.T) {
 	db, ctx := rawDB(t)
@@ -306,8 +313,8 @@ func TestNullWithoutNullable(t *testing.T) {
 		if _, err := db.Exec(`UPDATE "cores" SET "` + col + `" = NULL`); err != nil {
 			t.Fatal(err)
 		}
-		if got, err := app.NewCoresTable(db).Get(ctx); err == nil || !strings.Contains(err.Error(), "NULL in a column without @db.nullable") {
-			t.Errorf("列 %s が NULL の行の Get = %v, %v（期待は、@db.nullable のない列の NULL のエラー）", col, got, err)
+		if got, err := app.NewCoresTable(db).Get(ctx); err == nil || !strings.Contains(err.Error(), "NULL in a NOT NULL column") {
+			t.Errorf("列 %s が NULL の行の Get = %v, %v（期待は、NOT NULL の列の NULL のエラー）", col, got, err)
 		}
 	}
 }
@@ -317,14 +324,14 @@ func TestPair(t *testing.T) {
 	db, ctx := openDB(t)
 	pairs := app.NewPairsTable(db)
 	for _, p := range []app.Pair{{Left: "a", Right: 1, Note: "x"}, {Left: "a", Right: 2, Note: "y"}, {Left: "b", Right: 1, Note: "z"}} {
-		if err := pairs.AddPair(ctx, p); err != nil {
+		if err := pairs.CreatePair(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := pairs.AddPair(ctx, app.Pair{Left: "a", Right: 1, Note: "w"}); err == nil || !strings.Contains(err.Error(), "UNIQUE") {
+	if err := pairs.CreatePair(ctx, app.Pair{Left: "a", Right: 1, Note: "w"}); err == nil || !strings.Contains(err.Error(), "UNIQUE") {
 		t.Errorf("同じキーの組の行を足したときのエラーが %v", err)
 	}
-	if err := pairs.AddPair(ctx, app.Pair{Left: "c", Right: 3, Note: "x"}); err == nil || !strings.Contains(err.Error(), "UNIQUE") {
+	if err := pairs.CreatePair(ctx, app.Pair{Left: "c", Right: 3, Note: "x"}); err == nil || !strings.Contains(err.Error(), "UNIQUE") {
 		t.Errorf("同じ @db.unique の値の行を足したときのエラーが %v", err)
 	}
 	if got, err := pairs.Get(ctx); err != nil || len(got) != 3 || got[0].Note != "x" || got[2].Left != "b" {
@@ -332,33 +339,33 @@ func TestPair(t *testing.T) {
 	}
 }
 
-// TestLink は @db.ref: 先の表の、ただ一つのキーへの REFERENCES。自分の表も指せる。@db.nullable の列は、値がなければ、先を持たない。
+// TestLink は @db.ref: 先の表の、ただ一つのキーへの REFERENCES。自分の表も指せる。省略可能なフィールドの列は、値がなければ、先を持たない。
 func TestLink(t *testing.T) {
 	db, ctx := openDB(t)
 	links := app.NewLinksTable(db)
 	// 先の行がない: core は cores の s を指す
-	err := links.AddLink(ctx, app.Link{Id: "l0", Core: "nobody"})
+	err := links.CreateLink(ctx, app.Link{Id: "l0", Core: "nobody"})
 	if err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
 		t.Fatalf("先のない行を足したときのエラーが %v", err)
 	}
-	if err := app.NewCoresTable(db).AddCore(ctx, app.Core{S: "c1"}); err != nil {
+	if err := app.NewCoresTable(db).CreateCore(ctx, app.Core{S: "c1"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := links.AddLink(ctx, app.Link{Id: "l1", Core: "c1"}); err != nil {
+	if err := links.CreateLink(ctx, app.Link{Id: "l1", Core: "c1"}); err != nil {
 		t.Fatalf("parent が NULL の行を足せない: %v", err)
 	}
-	if err := links.AddLink(ctx, app.Link{Id: "l2", Core: "c1", Parent: ptr("l1")}); err != nil {
+	if err := links.CreateLink(ctx, app.Link{Id: "l2", Core: "c1", Parent: ptr("l1")}); err != nil {
 		t.Fatal(err)
 	}
 	// parent は links の id を指す
-	if err := links.AddLink(ctx, app.Link{Id: "l3", Core: "c1", Parent: ptr("missing")}); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
+	if err := links.CreateLink(ctx, app.Link{Id: "l3", Core: "c1", Parent: ptr("missing")}); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
 		t.Errorf("parent の先のない行を足したときのエラーが %v", err)
 	}
-	// @db.unique は、@db.nullable と一緒でも効く（NULL どうしは、重ならない）
-	if err := links.AddLink(ctx, app.Link{Id: "l4", Core: "c1", Parent: ptr("l1")}); err == nil || !strings.Contains(err.Error(), "UNIQUE") {
+	// @db.unique は、省略可能なフィールドの列でも効く（NULL どうしは、重ならない）
+	if err := links.CreateLink(ctx, app.Link{Id: "l4", Core: "c1", Parent: ptr("l1")}); err == nil || !strings.Contains(err.Error(), "UNIQUE") {
 		t.Errorf("同じ parent の行を足したときのエラーが %v", err)
 	}
-	if err := links.AddLink(ctx, app.Link{Id: "l5", Core: "c1"}); err != nil {
+	if err := links.CreateLink(ctx, app.Link{Id: "l5", Core: "c1"}); err != nil {
 		t.Fatalf("parent が NULL の二つ目の行を足せない: %v", err)
 	}
 	got, err := links.Get(ctx)
