@@ -1,5 +1,5 @@
 // 型に依らない形の確かめ（docs/requirements.md「出力を推論しない」）の二つ目: scalar、省略可能なフィールド、
-// 値を運ぶ例外、省略可能な戻り値の op。uniforma/app.hozo と、型だけが違う。
+// 引数を持つ例外（一つと、二つ以上。省略可能な引数）、省略可能な戻り値の op。uniforma/app.hozo と、型だけが違う。
 namespace app {
   scalar Token extends string;
   @valid.min(1)
@@ -16,7 +16,7 @@ namespace app {
   @http.status(404)
   exception Missing(value: Item);
   @http.status(409)
-  exception Clash(existing: string);
+  exception Clash(existing: Item[], count: Page, note: string?);
 
   model FindInput {
     @http.header("Authorization") token: Token?;

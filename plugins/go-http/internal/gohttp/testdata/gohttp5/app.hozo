@@ -24,16 +24,23 @@ namespace app {
   @http.get("/shapes")
   export op getShapes(): Shape[];
 
-  // @http.status を持つ例外の値
+  // @http.status を持つ例外の引数の型: 引数ごとに見る（union を中に持つ引数だけが当たる）
   @http.status(409)
   exception Clash(value: Drawing);
   @http.get("/clash")
   export op clash(): string
     throws Clash;
+  @http.status(422)
+  exception Refused(card: Card, shapes: Shape[]?, reason: string, album: Album);
+  @http.get("/refused")
+  export op refused(): string
+    throws Refused;
 
-  // ステータスを持たない例外の値は、通信に現れないので、当たらない。union を持たない型も、当たらない
+  // ステータスを持たない例外の引数は、通信に現れないので、当たらない。union を持たない型も、当たらない
   exception Quiet(value: Drawing);
+  @http.status(404)
+  exception Missing(card: Card, cards: Record<string, Card[]>?);
   @http.get("/quiet")
   export op quiet(): Card
-    throws Quiet;
+    throws Quiet, Missing;
 }

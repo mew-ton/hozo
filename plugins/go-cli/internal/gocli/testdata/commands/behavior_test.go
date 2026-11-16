@@ -10,7 +10,8 @@
 //   - 値が与えられなかったときの三つの扱い: @cli.required（誤り。64）、@cli.default（その値）、どちらもない（零値のまま）。
 //     フラグ、位置引数、環境変数だけのフィールド、残りを受け取る array で。
 //   - 「実行と表示」: 成功は Present を呼んで 0。例外は Signature の順に値の型で見分けて Failure を作り、@cli.exitCode か 70。
-//     見分けられなければ 70。Present / PresentError の失敗は 70。JSONPresenter の形。
+//     見分けられなければ 70。Present / PresentError の失敗は 70。JSONPresenter の形。Failure の Value は、引数を持つ例外の
+//     値そのもの（表示の value は、引数の名前をキーにしたオブジェクト）で、引数を持たない例外は nil（value を出さない）。
 //   - 「使い方の表示」: 全体とコマンドごと。プログラム名は filepath.Base(os.Args[0])。
 package behavior
 
@@ -55,19 +56,19 @@ func str[T ~string](p *T) string {
 	return string(*p)
 }
 
-func notes(code string) tool.Notes {
-	return tool.Notes{Items: []tool.Note{{Code: code, Message: "m"}}}
+func notes(code string) []tool.Note {
+	return []tool.Note{{Code: code, Message: "m"}}
 }
 
 func (l *toolLeaves) Check(ctx context.Context, in tool.CheckInput) (tool.CheckResult, error) {
 	l.ctx, l.check, l.calls = ctx, in, append(l.calls, "check")
 	switch str(in.Config) {
 	case "x1":
-		return tool.CheckResult{}, tool.CheckFailed{Value: notes("T-1")}
+		return tool.CheckResult{}, tool.CheckFailed{Notes: notes("T-1")}
 	case "x2":
-		return tool.CheckResult{}, fmt.Errorf("wrapped: %w", tool.ConfigInvalid{Value: notes("CFG-12")}) // 包んでも見分ける
+		return tool.CheckResult{}, fmt.Errorf("wrapped: %w", tool.ConfigInvalid{File: "x2", Notes: notes("CFG-12")}) // 包んでも見分ける
 	case "x3":
-		return tool.CheckResult{}, &tool.ConfigInvalid{Value: notes("CFG-12")} // ポインタで返した例外は見分けない（例外は値で返す）
+		return tool.CheckResult{}, &tool.ConfigInvalid{File: "x3", Notes: notes("CFG-12")} // ポインタで返した例外は見分けない（例外は値で返す）
 	case "x5":
 		return tool.CheckResult{}, fail.Crashed{}
 	case "x6":
@@ -231,13 +232,13 @@ func TestTool(t *testing.T) {
 		// 実行と表示
 		{name: "成功は Present して 0", args: []string{"check", "--format", "json"}, code: 0, stdout: []string{`"warnings"`, "config= format=json path="}, stderrEmpty: true, calls: "check"},
 		{name: "--name=value", args: []string{"check", "--format=text"}, code: 0, stdout: []string{"format=text"}},
-		{name: "値を運ぶ例外と @cli.exitCode", args: []string{"check", "--config", "x1"}, code: 1, stdoutEmpty: true, stderr: []string{`"error": "tool.CheckFailed"`, `"value"`, `"T-1"`}},
-		{name: "包んだ例外も見分ける", args: []string{"check", "--config", "x2"}, code: 2, stderr: []string{`"error": "tool.ConfigInvalid"`, `"CFG-12"`}},
+		{name: "引数を持つ例外と @cli.exitCode", args: []string{"check", "--config", "x1"}, code: 1, stdoutEmpty: true, stderr: []string{"{\n  \"error\": \"tool.CheckFailed\",\n  \"value\": {\n    \"notes\": [\n      {\n        \"code\": \"T-1\",\n        \"message\": \"m\"\n      }\n    ]\n  }\n}\n"}},
+		{name: "包んだ例外も見分ける（引数が三つ。値のない省略可能な引数は、キーを省く）", args: []string{"check", "--config", "x2"}, code: 2, stderr: []string{"{\n  \"error\": \"tool.ConfigInvalid\",\n  \"value\": {\n    \"file\": \"x2\",\n    \"notes\": [\n", `"CFG-12"`}, notStderr: []string{`"hint"`}},
 		{name: "ポインタで返した例外は見分けない", args: []string{"check", "--config", "x3"}, code: 70, stderr: []string{`"error": "tool.ConfigInvalid"`}, notStderr: []string{`"value"`}},
 		{name: "別の名前空間の例外（終了コードなし）", args: []string{"check", "--config", "x5"}, code: 70, stderr: []string{`"error": "fail.Crashed"`}},
 		{name: "宣言にない誤り", args: []string{"check", "--config", "x6"}, code: 70, stderr: []string{`"error": "boom"`}},
 		{name: "終了コードのない例外は 70", args: []string{"check", "--config", "x7"}, code: 70, stderr: []string{`"error": "tool.Busy"`}, notStderr: []string{`"value"`}},
-		{name: "値を運ばない例外", args: []string{"emit", "--config", "x4"}, code: 64, stdoutEmpty: true, stderr: []string{`"error": "tool.UnknownName"`}, notStderr: []string{`"value"`}, calls: "check write"},
+		{name: "引数を持たない例外", args: []string{"emit", "--config", "x4"}, code: 64, stdoutEmpty: true, stderr: []string{`"error": "tool.UnknownName"`}, notStderr: []string{`"value"`}, calls: "check write"},
 		{name: "配線の先の例外", args: []string{"emit", "--config", "x1"}, code: 1, stderr: []string{`"error": "tool.CheckFailed"`}, calls: "check"},
 		{name: "void の成功", args: []string{"serve"}, code: 0, stdoutEmpty: true, stderrEmpty: true, calls: "serve"},
 		{name: "void の失敗", args: []string{"serve", "--log", "x6"}, code: 70, stderr: []string{`"error": "boom"`}},
@@ -522,16 +523,17 @@ func TestPresenter(t *testing.T) {
 	if code != 2 || out != "" || errOut != "failed" || rec.failure == nil {
 		t.Fatalf("例外: code=%d stdout=%q stderr=%q", code, out, errOut)
 	}
-	if v, ok := rec.failure.Value.(tool.Notes); rec.failure.Name != "tool.ConfigInvalid" || !ok || v.Items[0].Code != "CFG-12" {
+	// Value は、引数を持つ例外の、値そのもの（包んだ error ではなく、見分けた例外の値）
+	if v, ok := rec.failure.Value.(tool.ConfigInvalid); rec.failure.Name != "tool.ConfigInvalid" || !ok || v.File != "x2" || v.Notes[0].Code != "CFG-12" || v.Hint != nil {
 		t.Errorf("Failure = %+v", rec.failure)
 	}
 	if rec.failure.Err == nil || rec.failure.Err.Error() != "wrapped: tool.ConfigInvalid" {
 		t.Errorf("Failure.Err = %v（op が返した error そのもの）", rec.failure.Err)
 	}
-	// 値を運ばない例外の Value は nil。宣言にない誤りは Name が空で Err だけ
+	// 引数を持たない例外の Value は nil。宣言にない誤りは Name が空で Err だけ
 	rec = &recorder{}
 	if code, _, _, _ = invoke(rec, nil, "check", "--config", "x7"); code != 70 || rec.failure.Name != "tool.Busy" || rec.failure.Value != nil || rec.failure.Err == nil {
-		t.Errorf("値を運ばない例外: code=%d Failure=%+v", code, rec.failure)
+		t.Errorf("引数を持たない例外: code=%d Failure=%+v", code, rec.failure)
 	}
 	rec = &recorder{}
 	if code, _, _, _ = invoke(rec, nil, "check", "--config", "x6"); code != 70 || rec.failure.Name != "" || rec.failure.Value != nil || rec.failure.Err.Error() != "boom" {
@@ -563,10 +565,13 @@ func TestJSONPresenter(t *testing.T) {
 	if err := p.Present(&b, "serve", nil, nil); err != nil || b.Len() != 0 {
 		t.Errorf("nil の result: %q, %v", b.String(), err)
 	}
+	hint := "h"
 	for want, f := range map[string]toolcli.Failure{
-		"{\n  \"error\": \"tool.CheckFailed\",\n  \"value\": {\n    \"items\": null\n  }\n}\n": {Name: "tool.CheckFailed", Value: tool.Notes{}, Err: errors.New("x")},
-		"{\n  \"error\": \"tool.UnknownName\"\n}\n":                                            {Name: "tool.UnknownName", Err: errors.New("x")},
-		"{\n  \"error\": \"boom\"\n}\n":                                                        {Err: errors.New("boom")},
+		// value は、例外の引数の名前をキーにしたオブジェクト（例外の値そのものの JSON）。キーの並びは、宣言の引数の順
+		"{\n  \"error\": \"tool.CheckFailed\",\n  \"value\": {\n    \"notes\": null\n  }\n}\n": {Name: "tool.CheckFailed", Value: tool.CheckFailed{}, Err: errors.New("x")},
+		"{\n  \"error\": \"tool.ConfigInvalid\",\n  \"value\": {\n    \"file\": \"f\",\n    \"notes\": null,\n    \"hint\": \"h\"\n  }\n}\n": {Name: "tool.ConfigInvalid", Value: tool.ConfigInvalid{File: "f", Hint: &hint}, Err: errors.New("x")},
+		"{\n  \"error\": \"tool.UnknownName\"\n}\n": {Name: "tool.UnknownName", Err: errors.New("x")},
+		"{\n  \"error\": \"boom\"\n}\n":             {Err: errors.New("boom")},
 	} {
 		b.Reset()
 		if err := p.PresentError(&b, "check", nil, f); err != nil || b.String() != want {

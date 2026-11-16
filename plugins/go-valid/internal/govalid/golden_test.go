@@ -10,6 +10,8 @@ import (
 
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
+	"github.com/mew-ton/hozo/plugin/golang"
+	"github.com/mew-ton/hozo/plugin/govalid"
 )
 
 // goldenFixtures は、出力をゴールデンと比べる入力（testdata/<名前>/）と、それが確かめる docs/plugin-go-valid.md の見出し。
@@ -19,7 +21,7 @@ var goldenFixtures = []struct {
 	covers   string
 	behavior bool
 }{
-	{name: "constraints", covers: "「制約」の表の各行、「scalar」「model」（省略可能、array、record）、「出力」の置き場と補助の関数", behavior: true},
+	{name: "constraints", covers: "「制約」の表の各行、「scalar」「model」（省略可能、array、record）、「出力」の置き場と補助の関数、「Validate を持つ型」（その場で書いた model、union と exception）", behavior: true},
 	{name: "locals", covers: "元の scalar のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前）"},
 }
 
@@ -95,6 +97,65 @@ func TestPlacement(t *testing.T) {
 	}
 }
 
+// TestTargets は「Validate を持つ型」: メソッドを出すのは、N の scalar と model だけ。その場で書いた model（union のアームの
+// `{ … }`）は、普通の model として数える。union と exception には出さない: 例外は、引数の型が Validate を持つ型でも（scalar、model、
+// 別の名前空間の型、包まれた型）、持たない（例外の値を確かめる者は、いない）。
+func TestTargets(t *testing.T) {
+	_, files := emitFixture(t, "constraints")
+	content := files["gen/app/validate.go"]
+	var view *ir.View
+	for _, v := range loadViews(t, "constraints") {
+		if v.Viewer == "app" {
+			view = v
+		}
+	}
+	// 入力が、確かめたい形を持っていること: 引数の型が Validate を持つ例外と、その場で書いた model
+	rejected, ok := view.Program.Lookup("app.Rejected").(*ir.Exception)
+	if !ok || len(rejected.Params) < 2 {
+		t.Fatalf("入力に、引数を二つ以上持つ例外 app.Rejected がない")
+	}
+	validated := 0
+	for _, p := range rejected.Params {
+		if r, isRef := through(p.Type).(ir.RefType); isRef && govalid.HasValidate(view.Program, r.Target) {
+			validated++
+		}
+	}
+	if validated < 2 {
+		t.Errorf("例外 app.Rejected の引数のうち、型が Validate を持つものが %d 個（二つ以上のはず）", validated)
+	}
+	if m, ok := view.Program.Lookup("app.Outcome.Failed").(*ir.Model); !ok || m.SynthesizedFrom != "app.Outcome" {
+		t.Fatalf("入力に、union app.Outcome のアームの、その場で書いた model がない")
+	}
+	for _, want := range []string{"func (m OutcomeFailed) Validate() error {", "func (m Item) Validate() error {", "func (v Percent) Validate() error {"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("gen/app/validate.go に、%q がない", want)
+		}
+	}
+	for _, banned := range []string{"Rejected)", "Plainly)", "OutcomeSkipped)", "Outcome)", "Shape)", "OutcomeDone)"} {
+		if strings.Contains(content, banned+" Validate()") {
+			t.Errorf("gen/app/validate.go が、%s Validate() を出した", banned)
+		}
+	}
+	// メソッドのレシーバは、Validate を持つ N の scalar と model の、ちょうどすべて（宣言順）
+	var want, got []string
+	for _, d := range view.Program.Namespace("app").Decls {
+		switch d.(type) {
+		case *ir.Scalar, *ir.Model:
+			if govalid.HasValidate(view.Program, d.Common().Name) {
+				want = append(want, golang.TypeName(d.Common().Name, "app"))
+			}
+		}
+	}
+	for _, line := range strings.Split(content, "\n") {
+		if rest, isMethod := strings.CutPrefix(line, "func ("); isMethod {
+			got = append(got, strings.TrimSuffix(strings.Fields(rest)[1], ")"))
+		}
+	}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("gen/app/validate.go のメソッドのレシーバ = %v, want %v", got, want)
+	}
+}
+
 // TestNone は「出力」: Validate を持つ型が N に一つもなければ、何も出さない（診断も warning もない）。
 func TestNone(t *testing.T) {
 	root := newRoot(t)
@@ -121,6 +182,25 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"govalid5", codeValidCustom}, // 標準でない valid の制約が付いている
 	{"govalid6", codeValidField},  // Validate を持つ model が、validate という名前のフィールドを持つ
 	{"govalid7", codeValidOption}, // [emit.options.go-valid] に、知らないキーがある
+}
+
+// TestDiagnosticCodes は、「診断」の表の ID（GOVALID-1〜GOVALID-7。GOVALID-2 は欠番）のどれもが、入力を一つ持つこと。
+func TestDiagnosticCodes(t *testing.T) {
+	seen := map[string]bool{}
+	for _, fx := range diagnosticFixtures {
+		seen[fx.code] = true
+	}
+	for _, code := range []string{codeValidConstraint, codeValidHome, codeValidUnion, codeValidCustom, codeValidField, codeValidOption} {
+		if !seen[code] {
+			t.Errorf("%s の入力がない", code)
+		}
+	}
+	if seen["GOVALID-2"] {
+		t.Error("欠番の GOVALID-2 の入力がある")
+	}
+	if len(seen) != 6 {
+		t.Errorf("診断の入力のコードが %d 種類（6 のはず）", len(seen))
+	}
 }
 
 // TestDiagnostics は docs/plugin-go-valid.md「診断」の GOVALID-1〜GOVALID-7: 診断のコード・位置・メッセージがゴールデンと同じで、

@@ -27,9 +27,9 @@ func (l *limiter) Allow(_ context.Context, op string) bool {
 	return l.allow
 }
 
-// leaves は shop の葉の実装。呼ばれたものを log に残す。ここに書いていないメソッドは、埋め込んだ（nil の）インターフェースのもの。
+// leaves は shop の葉の実装。呼ばれたものを log に残す。葉のメソッドは、すべてここに書く（インターフェースを埋め込まない:
+// 一つでも足りなければ、New に渡すところでコンパイルできない）。
 type leaves struct {
-	shop.Leaves
 	log *[]string
 }
 
@@ -52,19 +52,22 @@ func (l leaves) Clash(_ context.Context, s, ctx, body, context_ string, id pkgty
 	return s + ctx + body + context_ + string(id), nil
 }
 
-// items は状態 shop.items の単位の実装。
+// items は状態 shop.items の単位の実装: 形で決まる問い合わせ（IsEmpty、Get）と、read shop.itemById と、効果 shop.addItem
+// （docs/plugin-go.md「状態の単位」）。単位のメソッドは、すべてここに書く（インターフェースを埋め込まない: 一つでも足りないか、
+// 名前が違えば、New に渡すところでコンパイルできない）。
 type items struct {
-	shop.ItemsState
 	log *[]string
 }
 
-func (s items) Add(_ context.Context, item pkgtype.Item) error {
-	*s.log = append(*s.log, "add "+string(item.Id))
-	return nil
-}
-func (s items) Lookup(_ context.Context, id pkgtype.ItemId) (*pkgtype.Item, error) {
-	*s.log = append(*s.log, "lookup "+string(id))
+func (s items) IsEmpty(context.Context) (bool, error)       { return true, nil }
+func (s items) Get(context.Context) ([]pkgtype.Item, error) { return nil, nil }
+func (s items) ItemById(_ context.Context, id pkgtype.ItemId) (*pkgtype.Item, error) {
+	*s.log = append(*s.log, "itemById "+string(id))
 	return &pkgtype.Item{Id: id}, nil
+}
+func (s items) AddItem(_ context.Context, item pkgtype.Item) error {
+	*s.log = append(*s.log, "addItem "+string(item.Id))
+	return nil
 }
 
 // newShop は、RateSeams をそのまま基底の New に渡した shop（RateSeams だけで Seams を満たす。満たさなければ、ここで
@@ -100,7 +103,7 @@ func TestAllowed(t *testing.T) {
 	if want := []string{"shop.buy", "shop.ping", "shop.add", "shop.lookup", "shop.audit", "shop.clash"}; !reflect.DeepEqual(lim.asked, want) {
 		t.Errorf("limiter が聞かれた op が %v（期待は %v）", lim.asked, want)
 	}
-	if want := []string{"find i1", "ping", "add i2", "lookup i3", "audit n"}; !reflect.DeepEqual(*log, want) {
+	if want := []string{"find i1", "ping", "addItem i2", "itemById i3", "audit n"}; !reflect.DeepEqual(*log, want) {
 		t.Errorf("呼ばれた中身が %v（期待は %v）", *log, want)
 	}
 }

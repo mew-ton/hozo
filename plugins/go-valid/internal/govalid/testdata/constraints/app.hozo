@@ -144,9 +144,6 @@ namespace app {
     parent: Tree?;
   }
 
-  // その場で書いた model（合成した model）も、普通の model
-  exception Rejected(code: int, reason: string);
-
   // 制約のない model は Validate を持たない
   model Free { id: Plain; at: Time; free: Free?; }
 
@@ -156,6 +153,18 @@ namespace app {
     Label: string;
   }
   model Drawing { shape: Shape; @valid.min(1) layer: int; }
+
+  // 例外の引数の型が Validate を持つ型でも（scalar、model、別の名前空間の型、包まれた型）、例外の構造体には出さない
+  exception Rejected(code: Percent, item: Item, seller: type.Email?, others: Item[], reason: string);
+  exception Plainly;
+
+  // その場で書いた model（union のアームの { … }）も、普通の model: 制約があれば Validate を持ち、なければ持たない。
+  // union そのものは持たない（フィールドの型にしなければ、GOVALID-4 にも当たらない）
+  union Outcome {
+    Failed: { @valid.min(400) code: int; @valid.length(min: 1) reason: string; item: Item?; };
+    Skipped: { why: string; };
+    Done: string;
+  }
 
   // pattern の変数の名前が当たる（model Item のフィールド color と、scalar ItemColor）: 後ろの方に 2 を付ける
   @valid.pattern("^[a-z]+$")

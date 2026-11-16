@@ -162,8 +162,9 @@ type Presenter interface {
 	PresentError(w ` + io + `.Writer, command string, input any, f Failure) error
 }
 
-// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（なければ nil）、Err は op が返した error そのもの
-// （Presenter がメッセージに使える）。Main が、例外の値の型を見分けて入れる。宣言にない例外なら Name は空で Err だけ。
+// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（引数を持つ例外の、値そのもの。引数のない例外は nil）、
+// Err は op が返した error そのもの（Presenter がメッセージに使える）。Main が、例外の値の型を見分けて入れる。
+// 宣言にない例外なら Name は空で Err だけ。
 type Failure struct {
 	Name  string
 	Value any
@@ -187,7 +188,7 @@ func (JSONPresenter) Present(w ` + io + `.Writer, command string, input any, res
 }
 
 // PresentError は、Name があれば {"error": "<Name>", "value": <Value>}（Value が nil なら value を省く）を、
-// なければ {"error": "<Err.Error()>"} を w に出す。
+// なければ {"error": "<Err.Error()>"} を w に出す。value は、例外の引数の名前をキーにしたオブジェクト（例外の値の JSON）。
 func (JSONPresenter) PresentError(w ` + io + `.Writer, command string, input any, f Failure) error {
 	body := struct {
 		Error string ` + "`json:\"error\"`" + `
@@ -252,7 +253,7 @@ func (f *file) main(commands []command) string {
 }
 
 // command は、サブコマンド一つの run<Op>、fail<Op>、usage<Op>（docs/plugin-go-cli.md「コマンドごとの関数」「実行と表示」）。
-// 中は、フィールドの型と、例外が値を運ぶかどうかによらず、同じ形: 出すテキストは、名前と、デコレータの引数と、説明だけから作る。
+// 中は、フィールドの型と、例外が引数を持つかどうかによらず、同じ形: 出すテキストは、名前と、デコレータの引数と、説明だけから作る。
 func (f *file) command(c *command) string {
 	s := f.signature()
 	context, io, fmt_ := f.pkg("context"), f.pkg("io"), f.pkg("fmt")
@@ -318,7 +319,7 @@ func (f *file) command(c *command) string {
 
 // fail は fail<Op>（docs/plugin-go-cli.md「実行と表示」の 3 と 4）: 例外を、Signature.exceptions の順に、例外ごとに一行の同じ形
 // （型引数に例外の型を、引数に終了コードを渡す cliThrown）で見分けて Failure を作り、終了コードを決めてから、p.PresentError を呼ぶ。
-// 値を運ぶ例外かどうかは、書かない（補助が、実行時に見る）。
+// 引数を持つ例外かどうかは、書かない（補助が、実行時に見る）。
 func (f *file) fail(c *command, s signature) string {
 	io, fmt_ := f.pkg("io"), f.pkg("fmt")
 	input, err, fl, code := f.local("input"), f.local("err"), f.local("f"), f.local("code")
@@ -383,7 +384,7 @@ func (l *cliLine) orDefault(dst any, value any) { l.field(dst).fallback = value 
 
 // helpers は、コマンドごとの関数の後ろの補助。cliProgramName、cliUsageError、cliHelp、cliField、cliLine（と read、parse、usage）は
 // いつも、ほかは使うものだけを出す。型で変わる振る舞い（値を取らないフラグか、残りの位置引数か、省略可能か、文字列の読み方、
-// 入力が Validate を持つか、例外が値を運ぶか）は、どれもここにあり、実行時に決める（docs/plugin-go-cli.md「コマンドごとの関数」）。
+// 入力が Validate を持つか、例外が引数を持つか）は、どれもここにあり、実行時に決める（docs/plugin-go-cli.md「コマンドごとの関数」）。
 func (f *file) helpers() string {
 	// 補助のテキストは、標準ライブラリと runtime のパッケージを、その名前のまま書く: 最後に描くとき（render の二度目）は、それらを
 	// 先に import に足すので、名前は変わらない（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
@@ -780,17 +781,16 @@ func cliValidate(w io.Writer, prog string, in any) bool {
 		f.pkg("errors")
 		f.pkg(runtimePath)
 		b.WriteString(`// cliThrown は、err が例外 E（値）なら、f に Failure（Name は例外の FQN、Value は運ぶ値）を、code に終了コード exit を入れて
-// true。値を運ぶ例外かどうか（フィールド Value を持つか）は、実行時に見る。
+// true。運ぶ値は、例外の値そのもの。引数を持つ例外かどうか（例外の構造体が、フィールドを一つでも持つか）は、実行時に見る:
+// 持たなければ、Value は nil のまま。
 func cliThrown[E runtime.Exception](err error, exit int, f *Failure, code *int) bool {
 	var e E
 	if !errors.As(err, &e) {
 		return false
 	}
 	*f, *code = Failure{Name: e.HozoException(), Err: err}, exit
-	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
-		if value := v.FieldByName("Value"); value.IsValid() {
-			f.Value = value.Interface()
-		}
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct && v.NumField() > 0 {
+		f.Value = e
 	}
 	return true
 }

@@ -51,13 +51,10 @@ type RelatedInfo struct {
 	Message string   `json:"message"`
 }
 
-// Diagnostics は指摘の一覧
-type Diagnostics struct {
-	Items []Diagnostic `json:"items"`
-}
-
 // CheckFailed: 仕様に構文か型の誤りがある
-type CheckFailed struct{ Value Diagnostics }
+type CheckFailed struct {
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
 
 func (CheckFailed) Error() string         { return "hozoc.CheckFailed" }
 func (CheckFailed) HozoException() string { return "hozoc.CheckFailed" }
@@ -65,7 +62,9 @@ func (CheckFailed) HozoException() string { return "hozoc.CheckFailed" }
 var _ runtime.Exception = CheckFailed{}
 
 // ConfigInvalid: hozo.toml がない、または設定が誤っている（docs/config.md の CFG-*）
-type ConfigInvalid struct{ Value Diagnostics }
+type ConfigInvalid struct {
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
 
 func (ConfigInvalid) Error() string         { return "hozoc.ConfigInvalid" }
 func (ConfigInvalid) HozoException() string { return "hozoc.ConfigInvalid" }
@@ -73,7 +72,9 @@ func (ConfigInvalid) HozoException() string { return "hozoc.ConfigInvalid" }
 var _ runtime.Exception = ConfigInvalid{}
 
 // LanguageMismatch: 一つの単位のトランスパイラの language がそろっていない
-type LanguageMismatch struct{ Value Diagnostics }
+type LanguageMismatch struct {
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
 
 func (LanguageMismatch) Error() string         { return "hozoc.LanguageMismatch" }
 func (LanguageMismatch) HozoException() string { return "hozoc.LanguageMismatch" }
@@ -81,7 +82,9 @@ func (LanguageMismatch) HozoException() string { return "hozoc.LanguageMismatch"
 var _ runtime.Exception = LanguageMismatch{}
 
 // OutputConflict: 複数の出どころが同じファイルに書こうとした
-type OutputConflict struct{ Value Diagnostics }
+type OutputConflict struct {
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
 
 func (OutputConflict) Error() string         { return "hozoc.OutputConflict" }
 func (OutputConflict) HozoException() string { return "hozoc.OutputConflict" }
@@ -144,7 +147,15 @@ type LspInput struct {
 	PluginPath *string `json:"pluginPath,omitempty"`
 }
 
-// EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）
+// EmitPlan は書き出す予定: 単位ごとにトランスパイラを呼んで集めたファイルと、そこまでの warning
+type EmitPlan struct {
+	Warnings []Diagnostic `json:"warnings"`
+	Files    []OutputFile `json:"files"`
+	// 書き出さずに、書き出す予定だけを返す
+	DryRun *bool `json:"dryRun,omitempty"`
+}
+
+// EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
 // on hozoc.OutputsSync: any -> UpToDate
 const EffectSyncOutputs runtime.Effect = "hozoc.syncOutputs"
 

@@ -274,16 +274,24 @@ func TestCheckWithoutConfig(t *testing.T) {
 	if err != nil || len(res.Warnings) != 1 || res.Warnings[0].Code != "NAME-1" {
 		t.Fatalf("Check = %+v, %v", res, err)
 	}
-	// その後の WriteOutputs（内部の op。内側のパッケージの Ops から呼ぶ）は ConfigInvalid（CFG-7）。述語 UpToDate も、
-	// 生成し直せないので同じ例外
+	// その後の WriteOutputs（内部の op。内側のパッケージの Ops から呼ぶ）は ConfigInvalid（CFG-7）: 配線の最初の collectOutputs
+	// （葉の op）が投げる。述語 UpToDate も、生成し直せないので同じ例外
+	cfg7 := func(what string, err error) {
+		t.Helper()
+		var ci hozoc.ConfigInvalid
+		if !errors.As(err, &ci) {
+			t.Fatalf("%s err = %v, want ConfigInvalid", what, err)
+		}
+		if diags, _ := carriedBy(ci); len(diags) != 2 || diags[0].Code != "CFG-7" || diags[1].Code != "NAME-1" {
+			t.Fatalf("%s の診断 = %+v, want CFG-7 と、check の warning", what, diags)
+		}
+	}
 	_, err = innerOps(l).WriteOutputs(ctx, hozoc.EmitInput{}, res)
-	var ci hozoc.ConfigInvalid
-	if !errors.As(err, &ci) || len(ci.Value.Items) != 2 || ci.Value.Items[0].Code != "CFG-7" {
-		t.Fatalf("WriteOutputs err = %v", err)
-	}
-	if _, err = l.OutputsSync().UpToDate(ctx); !errors.As(err, &ci) || ci.Value.Items[0].Code != "CFG-7" {
-		t.Fatalf("UpToDate err = %v", err)
-	}
+	cfg7("WriteOutputs", err)
+	_, err = l.CollectOutputs(hozoc.EmitInput{}, res)
+	cfg7("CollectOutputs", err)
+	_, err = l.OutputsSync().UpToDate(ctx)
+	cfg7("UpToDate", err)
 }
 
 func TestCheckInvalidConfig(t *testing.T) {
@@ -327,8 +335,11 @@ func TestCheckLanguageMismatch(t *testing.T) {
 	l := &App{Dir: dir}
 	_, err := l.Check(context.Background(), hozoc.CheckInput{})
 	var lm hozoc.LanguageMismatch
-	if !errors.As(err, &lm) || len(lm.Value.Items) == 0 {
+	if !errors.As(err, &lm) {
 		t.Fatalf("err = %v", err)
+	}
+	if diags, ok := carriedBy(lm); !ok || len(diags) == 0 || diags[0].Code != "CFG-16" {
+		t.Fatalf("LanguageMismatch の診断 = %+v", diags)
 	}
 	// 知らないトランスパイラ（CFG-14）も一緒なら、設定の誤り（ConfigInvalid）
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base", "tsp", "nope"`))
@@ -815,8 +826,8 @@ func TestUpToDate(t *testing.T) {
 	if got := sync(); got != hozoc.OutputsSyncDefault {
 		t.Fatalf("emit の前: %v", got)
 	}
-	// 配線の emit（check → writeOutputs）。writeOutputs は状態の分類 OutputsSync の単位の命令で、効果 syncOutputs は
-	// どの場合からも UpToDate に移す
+	// 配線の emit（check → writeOutputs → collectOutputs、outputChanges、syncOutputs）。効果 syncOutputs は、状態の分類
+	// OutputsSync の単位の命令で、どの場合からも UpToDate に移す
 	res, err := ops.Emit(ctx, hozoc.EmitInput{})
 	if err != nil || len(res.Written) == 0 {
 		t.Fatalf("Emit = %+v, %v", res, err)
@@ -865,6 +876,109 @@ func TestUpToDate(t *testing.T) {
 	var cf hozoc.CheckFailed
 	if _, err := hozoc.ClassifyOutputsSync(ctx, c.OutputsSync()); !errors.As(err, &cf) {
 		t.Errorf("誤りのある仕様: err = %v, want CheckFailed", err)
+	}
+}
+
+// TestWriteOutputsSteps は、配線 writeOutputs が呼ぶ三つ（docs/cli.md「emit」「手で書くもの」）を、一つずつ動かす: 葉の op collectOutputs
+// は、ファイルに触れずに、書き出す予定を集める。read outputChanges（状態 outputs の単位の問い合わせ）は、予定を今のファイルと比べて、
+// 書くファイルと消すファイルを決めるだけで、何も変えない。効果 syncOutputs（状態の分類 OutputsSync の単位の命令）が、書き出す。
+// dryRun の予定では、消すファイルを決めず、書き出さない。予定は、直前の collectOutputs が返したものでなければ、誤り。
+func TestWriteOutputsSteps(t *testing.T) {
+	dir := copyCorpus(t)
+	gen := filepath.Join(dir, "gen")
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base", "fake"`))
+	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/extra.txt","content":"hi"}],"warnings":[{"at":"server.placeOrder","message":"careful"}]}`, 0)
+	ctx := context.Background()
+	a := &App{Dir: dir, Stderr: &bytes.Buffer{}}
+	ops := innerOps(a)
+	if _, err := ops.Emit(ctx, hozoc.EmitInput{}); err != nil {
+		t.Fatal(err)
+	}
+	// fake を単位から外す: gen/server/extra.txt は、前回書いて、今回は書かないファイル。基底は、内容を変える
+	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base"`))
+	fakePlugin(t, dir, "base", "go", "", `{"files":[{"path":"@DIR@/out.txt","content":"new @NS@"}],"warnings":[{"message":"again"}]}`, 0)
+	checked, err := ops.Check(ctx, hozoc.CheckInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, beforeTimes := readAll(t, gen), mtimes(t, gen)
+	unchanged := func(what string) {
+		t.Helper()
+		if !reflect.DeepEqual(readAll(t, gen), before) || !reflect.DeepEqual(mtimes(t, gen), beforeTimes) {
+			t.Fatalf("%s が、生成したファイルに触れた", what)
+		}
+	}
+	paths := []hozoc.Path{"gen/browser/out.txt", "gen/http/out.txt", "gen/page/out.txt", "gen/server/out.txt"}
+
+	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning にトランスパイラの warning を足したもの
+	plan, err := ops.CollectOutputs(hozoc.EmitInput{}, checked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged("CollectOutputs")
+	var planned []hozoc.Path
+	for _, f := range plan.Files {
+		planned = append(planned, f.Path)
+	}
+	if !reflect.DeepEqual(planned, paths) || plan.Files[3].Content != "new server" || plan.DryRun != nil {
+		t.Fatalf("plan.Files = %+v, DryRun = %v", plan.Files, plan.DryRun)
+	}
+	if len(plan.Warnings) != len(checked.Warnings)+4 || plan.Warnings[0].Code != "PLUGIN" {
+		t.Fatalf("plan.Warnings = %+v（check の %d 個と、四つの出力の基底の warning）", plan.Warnings, len(checked.Warnings))
+	}
+
+	// outputChanges: 書くファイルは、予定のすべて（内容が同じでも）。消すファイルは、前回書いて、今回は書かないもの
+	changes, err := a.Outputs().OutputChanges(ctx, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged("OutputChanges")
+	if !reflect.DeepEqual(changes.Written, paths) || !reflect.DeepEqual(changes.Removed, []hozoc.Path{"gen/server/extra.txt"}) ||
+		!reflect.DeepEqual(changes.Warnings, plan.Warnings) {
+		t.Fatalf("OutputChanges = %+v", changes)
+	}
+
+	// dryRun の予定: 書くファイルだけを返し（消すファイルは決めない）、syncOutputs は何もしない
+	yes := true
+	dry, err := ops.CollectOutputs(hozoc.EmitInput{DryRun: &yes}, checked)
+	if err != nil || dry.DryRun == nil || !*dry.DryRun {
+		t.Fatalf("dryRun の plan = %+v, %v", dry, err)
+	}
+	if changes, err = a.Outputs().OutputChanges(ctx, dry); err != nil || !reflect.DeepEqual(changes.Written, paths) || changes.Removed == nil || len(changes.Removed) != 0 {
+		t.Fatalf("dryRun の OutputChanges = %+v, %v", changes, err)
+	}
+	if err := a.OutputsSync().SyncOutputs(ctx, dry); err != nil {
+		t.Fatal(err)
+	}
+	unchanged("dryRun の SyncOutputs")
+
+	// 予定は、直前の collectOutputs が返したもの（ここでは dry）でなければ、誤り。何も変えない
+	stale := plan
+	stale.Files = plan.Files[:1]
+	if _, err := a.Outputs().OutputChanges(ctx, stale); err == nil {
+		t.Error("直前の CollectOutputs の結果でない予定で、OutputChanges が通った")
+	}
+	if err := a.OutputsSync().SyncOutputs(ctx, stale); err == nil {
+		t.Error("直前の CollectOutputs の結果でない予定で、SyncOutputs が通った")
+	}
+	unchanged("誤った予定の SyncOutputs")
+
+	// syncOutputs: 余分なファイルを消し、古いファイルを書き換え、記録を書く。その後は UpToDate で、消すファイルはない
+	if plan, err = ops.CollectOutputs(hozoc.EmitInput{}, checked); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.OutputsSync().SyncOutputs(ctx, plan); err != nil {
+		t.Fatal(err)
+	}
+	after := readAll(t, gen)
+	if _, left := after["server/extra.txt"]; left || after["server/out.txt"] != "new server" || after["server/.hozoc-outputs.json"] != "[\n  \"gen/server/out.txt\"\n]\n" {
+		t.Fatalf("SyncOutputs の後の gen = %v", after)
+	}
+	if got, err := hozoc.ClassifyOutputsSync(ctx, a.OutputsSync()); err != nil || got != hozoc.OutputsSyncUpToDate {
+		t.Errorf("SyncOutputs の後の OutputsSync = %v, %v", got, err)
+	}
+	if changes, err = a.Outputs().OutputChanges(ctx, plan); err != nil || len(changes.Removed) != 0 || !reflect.DeepEqual(changes.Written, paths) {
+		t.Errorf("SyncOutputs の後の OutputChanges = %+v, %v", changes, err)
 	}
 }
 

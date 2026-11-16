@@ -8,9 +8,9 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは docs/plugin-go-sqlite.md「表」「しまい方」: 表の状態と、表の model の列（しまい方、@db.nullable、制約）と、
-// Schema の SQL。列の型も、列の値の読み書きも、フィールドのデコレータだけから作る。フィールドの型は、デコレータと食い違って
-// いないかを確かめるのにだけ使う（GOSQL-3、GOSQL-17〜GOSQL-19）。
+// このファイルは docs/plugin-go-sqlite.md「表」「しまい方」: 表の状態と、表の model の列（しまい方、値がなくてよいか、制約）と、
+// Schema の SQL。表の model は、状態の要素の型。列が値を持たなくてよいかは、フィールドの型の ?。しまい方だけは、型から当てない:
+// フィールドのデコレータが言い、型は、それに合うかを確かめるのにだけ使う（GOSQL-3、GOSQL-16、GOSQL-17）。
 
 // storage は、しまい方一つ（docs/plugin-go-sqlite.md「しまい方」の表の行）。
 type storage struct {
@@ -35,9 +35,9 @@ var storages = []*storage{
 type column struct {
 	name     string   // 列の名前（= フィールドの名前）
 	field    string   // Go のフィールドの名前
-	typ      ir.Type  // フィールドの型（整合の検査にだけ使う）
+	typ      ir.Type  // フィールドの型（省略可能なら optional のまま）
 	store    *storage // しまい方（ちょうど一つでなければ nil。GOSQL-16）
-	nullable bool     // @db.nullable
+	nullable bool     // フィールドの型が省略可能（T?）: 列は、値がなくてよい
 	key      bool     // @db.key
 	unique   bool     // @db.unique
 	ref      string   // @db.ref の指す model の FQN。なければ ""
@@ -49,9 +49,9 @@ type column struct {
 type model struct {
 	decl  *ir.Model
 	cols  []column
-	table string // その model を @db.table で名指しした最初の表の状態の、表の名前（補助のコメントに書く）
+	table string // その model を要素に持つ、最初の表の状態の、表の名前（補助のコメントに書く）
 	// argsName と scanName は、補助 dbArgs<Model> と dbScan<Model> の名前。usesArgs は、dbArgs<Model> を使うメソッド
-	// （@db.insert か @db.update の効果を持つ op）を出すか（使う補助だけを出す）。
+	// （@db.insert か @db.update の効果か、形で決まる Post）を出すか（使う補助だけを出す）。
 	argsName, scanName string
 	usesArgs           bool
 }
@@ -85,33 +85,33 @@ type table struct {
 }
 
 // collectTables は、N の @db.table の付いた基底の状態から、表の状態（e.tables）と、表の model（e.models）を作る。
-// 形が list でなければ GOSQL-2、要素の型が、名指しした model と等しくなければ GOSQL-1。model のフィールドの検査は columns、
-// @db.ref の先は resolveRefs。戻り値は、@db.table の付いた状態の数（診断を返したものを含む）。
+// 表の model は、状態の要素の型（@db.table は引数を持たない）。形が list でなければ GOSQL-2、要素の型が model でなければ GOSQL-1。
+// model のフィールドの検査は columns、@db.ref の先は resolveRefs。戻り値は、@db.table の付いた状態の数（診断を返したものを含む）。
 func (e *emitter) collectTables() (marked int) {
-	// perModel は、model の FQN → それを @db.table で名指しした N の状態の数（診断を返したものを含む。GOSQL-20 が重ねて出ないように）
+	// perModel は、model の FQN → それを要素に持つ、@db.table の付いた N の状態の数（診断を返したものを含む。GOSQL-20 が重ねて出ないように）
 	perModel := map[string]int{}
 	for _, d := range e.ns.Decls {
 		st, ok := d.(*ir.State)
-		if !ok {
-			continue
-		}
-		apps := applications(st.Decorators, decoratorTable)
-		if len(apps) == 0 {
+		if !ok || len(applications(st.Decorators, decoratorTable)) == 0 {
 			continue
 		}
 		marked++
 		e.marked[st.Name] = true
-		target := refArg(apps[0], "element")
-		perModel[target]++
+		var decl *ir.Model
+		if ref, isRef := st.Element.(ir.RefType); isRef {
+			decl, _ = e.p.Lookup(ref.Target).(*ir.Model)
+		}
+		if decl != nil {
+			perModel[decl.Name]++
+		}
 		valid := true
 		if st.Shape != ir.StateList {
 			e.errorf(codeSQLShape, st.Name, "@db.table の状態 %s の形が %s（表にできるのは list だけ。一行だけの表の形は、まだ決めていない）", st.Name, st.Shape)
 			valid = false
 		}
-		decl, _ := e.p.Lookup(target).(*ir.Model)
-		if decl == nil || !ir.TypeEqual(st.Element, ir.Ref(target)) {
-			e.errorf(codeSQLElement, st.Name, "@db.table(%s) の状態 %s の要素の型 %s が、%s と等しくない（表の列は、名指しした model のフィールドから作る）",
-				target, st.Name, golang.TypeDisplay(st.Element), target)
+		if decl == nil {
+			e.errorf(codeSQLElement, st.Name, "@db.table の状態 %s の要素の型 %s が、model でない（表の列は、要素の model のフィールドから作る）",
+				st.Name, golang.TypeDisplay(st.Element))
 			valid = false
 		}
 		if !valid {
@@ -136,16 +136,13 @@ func (e *emitter) collectTables() (marked int) {
 
 // columns は、表の model m のフィールドから列を作り、フィールドのデコレータと型の食い違いを確かめる（どれも、位置は model）:
 // どのしまい方でも列にできない型（union と、union を中に持つ型）は GOSQL-3、しまい方がちょうど一つでなければ GOSQL-16、
-// しまい方が型に合わなければ GOSQL-17、@db.nullable の付いた、省略可能でないフィールドは GOSQL-18、@db.nullable のない、
-// 省略可能なフィールドは GOSQL-19。列の形（しまい方、@db.nullable、制約）は、デコレータだけから決める。
+// しまい方が型に合わなければ GOSQL-17。列が値を持たなくてよいかは、フィールドの型の ? から決める。
 func (e *emitter) columns(m *model) {
 	for _, f := range m.decl.Fields {
 		c := column{name: f.Name, field: golang.FieldName(f.Name), typ: f.Type}
 		var stores []*storage
 		for _, a := range f.Decorators {
 			switch a.Decorator {
-			case decoratorNullable:
-				c.nullable = true
 			case decoratorKey:
 				c.key = true
 			case decoratorUnique:
@@ -163,9 +160,9 @@ func (e *emitter) columns(m *model) {
 		if len(stores) == 1 {
 			c.store = stores[0]
 		}
-		inner, optional := f.Type, false
+		inner := f.Type
 		if o, ok := f.Type.(ir.OptionalType); ok {
-			inner, optional = o.Of, true
+			inner, c.nullable = o.Of, true
 		}
 		union := e.hasUnion(inner, map[string]bool{})
 		if union {
@@ -182,14 +179,6 @@ func (e *emitter) columns(m *model) {
 		case !union && !fits(c.store, e.typeClass(inner)):
 			e.errorf(codeSQLFit, m.decl.Name, "model %s のフィールド %s のしまい方 @%s が、型 %s に合わない（@%s に合う型は %s）",
 				m.decl.Name, f.Name, c.store.decorator, golang.TypeDisplay(f.Type), c.store.decorator, c.store.fits)
-		}
-		switch {
-		case c.nullable && !optional:
-			e.errorf(codeSQLNullable, m.decl.Name, "model %s のフィールド %s に @db.nullable が付いているが、型 %s は省略可能でない（値がなくてよい列は、型も省略可能にする）",
-				m.decl.Name, f.Name, golang.TypeDisplay(f.Type))
-		case optional && !c.nullable:
-			e.errorf(codeSQLOptional, m.decl.Name, "model %s のフィールド %s の型 %s は省略可能だが、@db.nullable がない（値がなくてよい列は、@db.nullable で言う）",
-				m.decl.Name, f.Name, golang.TypeDisplay(f.Type))
 		}
 		m.cols = append(m.cols, c)
 	}
@@ -272,9 +261,9 @@ func (e *emitter) hasUnion(t ir.Type, seen map[string]bool) bool {
 	return false
 }
 
-// resolveRefs は、@db.ref(M2) の指す先（docs/plugin-go-sqlite.md「表」）: @db.table(M2) の付いた表の状態が N にちょうど一つあり、
+// resolveRefs は、@db.ref(M2) の指す先（docs/plugin-go-sqlite.md「表」）: 要素の型が M2 の表の状態が N にちょうど一つあり、
 // M2 が @db.key をちょうど一つ持つとき、その表のその列。そうでなければ GOSQL-20（位置は model）。黙って制約を省くことはしない。
-// perModel は、model を @db.table で名指しした N の状態の数（診断を返して、表にならなかったものを含む）。
+// perModel は、model を要素に持つ、@db.table の付いた N の状態の数（診断を返して、表にならなかったものを含む）。
 func (e *emitter) resolveRefs(perModel map[string]int) {
 	tablesOf := map[string][]*table{}
 	for _, t := range e.tables {
@@ -288,11 +277,11 @@ func (e *emitter) resolveRefs(perModel map[string]int) {
 			}
 			switch n := perModel[c.ref]; {
 			case n == 0:
-				e.errorf(codeSQLRef, m.decl.Name, "model %s のフィールド %s の @db.ref(%s) の指す先が決まらない: 名前空間 %s に、@db.table(%s) の付いた状態がない",
+				e.errorf(codeSQLRef, m.decl.Name, "model %s のフィールド %s の @db.ref(%s) の指す先が決まらない: 名前空間 %s に、要素の型が %s の @db.table の状態がない",
 					m.decl.Name, c.name, c.ref, e.view.Viewer, c.ref)
 				continue
 			case n > 1:
-				e.errorf(codeSQLRef, m.decl.Name, "model %s のフィールド %s の @db.ref(%s) の指す先が決まらない: 名前空間 %s に、@db.table(%s) の付いた状態が %d 個ある",
+				e.errorf(codeSQLRef, m.decl.Name, "model %s のフィールド %s の @db.ref(%s) の指す先が決まらない: 名前空間 %s に、要素の型が %s の @db.table の状態が %d 個ある",
 					m.decl.Name, c.name, c.ref, e.view.Viewer, c.ref, n)
 				continue
 			}
@@ -339,7 +328,7 @@ func columnList(m *model) string {
 }
 
 // schema は Schema の SQL: 表の状態ごとの CREATE TABLE IF NOT EXISTS（docs/plugin-go-sqlite.md「表」）。列の定義は
-// `"<名前>" <型>[ NOT NULL][ PRIMARY KEY][ UNIQUE][ REFERENCES …]`。NOT NULL は、@db.nullable を付けていない、すべての列に付ける。
+// `"<名前>" <型>[ NOT NULL][ PRIMARY KEY][ UNIQUE][ REFERENCES …]`。NOT NULL は、フィールドの型が省略可能でない、すべての列に付ける。
 func (e *emitter) schema() string {
 	var b strings.Builder
 	for _, t := range e.tables {

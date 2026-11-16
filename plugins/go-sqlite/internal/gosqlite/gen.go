@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/format"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,31 +12,33 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは db.go のテキスト（docs/plugin-go-sqlite.md「出力」「状態ごとの型」「状態をまたぐ単位の型」「トランザクション」
-// 「補助」「メソッドの形とコメント」）。並びは: Schema、CreateTables、単位ごとの型（型、New…、あれば var _、メソッド）、
-// 表の model ごとの dbArgs<Model> と dbScan<Model>、補助（使うものだけ）。
+// このファイルは db.go のテキスト（docs/plugin-go-sqlite.md「出力」「状態ごとの型」「read の中身」「効果の中身」「トランザクション」
+// 「補助」「メソッドの形とコメント」）。並びは: Schema、CreateTables、Querier、Conn、表の状態ごとの型（型、New…、あれば var _、
+// メソッド）、DbSeams（型、NewDbSeams、あれば var _、メソッド）、表の model ごとの dbArgs<Model> と dbScan<Model>、補助（使うものだけ）。
 //
-// 列ごと、op ごとに出すコードは、型によらず同じ形（docs/requirements.md「出力を推論しない」）: ここは、フィールドの型も、引数の型も
-// 見ない。書くのは、デコレータの言ったこと（しまい方の補助の名前、dbNullable、表と列の名前）だけで、値で変わる振る舞いは、補助が
-// 実行時に決める。型の Go の名前を書くのは、基底の形の写し（メソッドの形、model の型の名前）だけ。
+// 表のメソッド（read、効果、形で決まるもの）は、宣言の全体から作る。列ごと、メソッドごとに出すコードは同じ形で、値で変わる振る舞い
+// （値がなければ NULL）は、補助が実行時に決める。継ぎ目のメソッドは op のデコレータの分なので、op の中身に触れず、型にも依らない:
+// 本体の形は、戻り値の有無の二つだけ（docs/requirements.md「出力を推論しない」）。メソッドの名前と形は、基底の規則の写し
+// （plugin/golang）から求める。
+
+// runtimePath は、生成したコードが import する runtime パッケージ（トランザクションの鍵 runtime.DBTxKey）。
+const runtimePath = "github.com/mew-ton/hozo/runtime"
 
 // 補助の名前（docs/plugin-go-sqlite.md「補助」の表の順）。しまい方の補助（dbText など）は storages（tables.go）。
 const (
-	helperRow        = "dbRow"
-	helperOption     = "dbOption"
-	helperNullable   = "dbNullable"
-	helperCol        = "dbCol"
-	helperArgs       = "dbArgs"
-	helperString     = "dbString"
-	helperTimeLayout = "dbTimeLayout"
-	helperExec       = "dbExec"
-	helperIsEmpty    = "dbIsEmpty"
-	helperGet        = "dbGet"
-	helperList       = "dbList"
+	helperRow         = "dbRow"
+	helperOption      = "dbOption"
+	helperNullable    = "dbNullable"
+	helperCol         = "dbCol"
+	helperArgs        = "dbArgs"
+	helperString      = "dbString"
+	helperTimeLayout  = "dbTimeLayout"
+	helperTransaction = "dbTransaction"
+	helperExec        = "dbExec"
+	helperIsEmpty     = "dbIsEmpty"
+	helperGet         = "dbGet"
+	helperList        = "dbList"
 )
-
-// numberedArgs は、トランザクションの中の、行の値の変数の名前 args<数>。
-var numberedArgs = regexp.MustCompile(`^args[1-9][0-9]*$`)
 
 // generate は db.go の内容を作る。import の名前と、局所の名前が避ける名前を決めるために、二度作る（基底と同じ。
 // docs/plugin-go.md「パッケージと import パス」の「import の名前」）: 一度目で import の集まりを知り、名前を文書の順で決め直してから、
@@ -74,21 +75,20 @@ type fileGen struct {
 	used map[string]bool
 }
 
-// build は、db.go の本体（import より後ろ）を一通り作る。標準ライブラリの名前は、そのまま書く（import の名前を決め直した二度目では、
-// 標準ライブラリの名前は変わらない。docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
+// build は、db.go の本体（import より後ろ）を一通り作る。標準ライブラリと runtime の名前は、そのまま書く（import の名前を決め直した
+// 二度目でも、その名前は変わらない。docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
 func (e *emitter) build(im *golang.Imports) string {
 	f := &fileGen{e: e, im: im, imports: map[string]bool{}, private: map[string]bool{}, used: map[string]bool{}}
 	im.Add("context", "context")
 	im.Add("database/sql", "sql")
+	im.Add(runtimePath, "runtime")
 	for _, n := range im.Names() {
 		f.imports[n] = true
 	}
-	for _, h := range []string{helperRow, helperOption, helperNullable, helperCol, helperArgs, helperString, helperTimeLayout,
-		helperExec, helperIsEmpty, helperGet, helperList} {
-		f.private[h] = true
-	}
-	for _, s := range storages {
-		f.private[s.helper] = true
+	for _, h := range helperTexts {
+		for _, n := range h.names {
+			f.private[n] = true
+		}
 	}
 	for _, m := range e.models {
 		f.private[m.argsName], f.private[m.scanName] = true, true
@@ -98,8 +98,12 @@ func (e *emitter) build(im *golang.Imports) string {
 	f.printf("const Schema = `%s`\n\n", e.schema())
 	f.printf("// CreateTables は db に、@db.table の状態の表を作る（Schema を実行する）。すでにある表には触れない。\n")
 	f.printf("func CreateTables(ctx context.Context, db *sql.DB) error {\n\t_, err := db.ExecContext(ctx, Schema)\n\treturn err\n}\n\n")
+	f.printf("%s\n", connText)
 	for _, u := range e.units {
 		f.unit(u)
+	}
+	if len(e.seams) > 0 {
+		f.seams()
 	}
 	for _, m := range e.models {
 		if m.usesArgs {
@@ -110,6 +114,25 @@ func (e *emitter) build(im *golang.Imports) string {
 	f.helpers()
 	return f.b.String()
 }
+
+// connText は Querier と Conn（docs/plugin-go-sqlite.md「トランザクション」）。いつも出す。
+const connText = `// Querier は *sql.DB と *sql.Tx が共に持つ、文の実行。
+type Querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Conn は、ctx で文を実行する先: ctx が db のトランザクション（@db.transaction の継ぎ目が始めたもの）を運んでいれば、それ。なければ db。
+// このファイルの型のメソッドは、どれもこれを通す。人が書き足すメソッドも、db を直に使わずに、これを通す（通さなければ、トランザクションに入らない）。
+// 鍵は runtime.DBTxKey（db ごとに一つ。どの名前空間の出力も同じ鍵を使う）なので、別の名前空間の継ぎ目が、同じ db に始めたトランザクションにも入る。
+func Conn(ctx context.Context, db *sql.DB) Querier {
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		return tx
+	}
+	return db
+}
+`
 
 func (f *fileGen) printf(format string, args ...any) { fmt.Fprintf(&f.b, format, args...) }
 
@@ -122,8 +145,8 @@ func (f *fileGen) use(name string) string {
 // goType は型 t の、このファイルでの Go の型。
 func (f *fileGen) goType(t ir.Type) string { return golang.GoType(t, f.im) }
 
-// col は、列 c の値一つを読み書きする式: 列のしまい方の補助で、Go の値の式 expr を包む。列が @db.nullable を持てば、dbNullable を足す
-// （docs/plugin-go-sqlite.md「補助」）。どの型の値でも、同じ形。
+// col は、列 c の値一つを読み書きする式: 列のしまい方の補助で、Go の値の式 expr を包む。列のフィールドが省略可能なら、dbNullable を
+// 足す（docs/plugin-go-sqlite.md「補助」）。scalar か核の型かでは、書き分けない。
 func (f *fileGen) col(c *column, expr string) string {
 	f.used[c.store.helper] = true
 	if c.nullable {
@@ -132,172 +155,97 @@ func (f *fileGen) col(c *column, expr string) string {
 	return c.store.helper + "(" + expr + ")"
 }
 
-// unit は、型一つ（<状態>Table、<C>Table、SharedTable）と、そのメソッド（docs/plugin-go-sqlite.md「状態ごとの型」
-// 「状態をまたぐ単位の型」「メソッドの形とコメント」）。
+// reserved は、メソッドの引数の局所の名前が避ける名前（docs/plugin-go-sqlite.md「補助」の末尾）: 表のメソッドのレシーバ t、継ぎ目の
+// メソッドのレシーバ s、ctx、args、err、import するパッケージの名前、このファイルの非公開の名前。呼ぶたびに新しい集まりを返す。
+func (f *fileGen) reserved() map[string]bool {
+	out := map[string]bool{"t": true, "s": true, "ctx": true, "args": true, "err": true}
+	for n := range f.imports {
+		out[n] = true
+	}
+	for n := range f.private {
+		out[n] = true
+	}
+	return out
+}
+
+// unit は、型一つ（<状態>Table）と、そのメソッド（docs/plugin-go-sqlite.md「状態ごとの型」「メソッドの形とコメント」）。メソッドの
+// 並びは、基底の単位と同じ: 形で決まる問い合わせ、形で決まる命令、read、効果。
 func (f *fileGen) unit(u *unit) {
 	clause := "この単位では、すべて"
 	if len(u.missing) > 0 {
 		names := make([]string, len(u.missing))
-		for i, op := range u.missing {
-			names[i] = short(op)
+		for i, fqn := range u.missing {
+			names[i] = short(fqn)
 		}
-		clause = "付けていない op: " + strings.Join(names, "、")
+		clause = "付けていないもの: " + strings.Join(names, "、")
 	}
-	name := u.goName
-	switch u.kind {
-	case unitTable:
-		tbl := quote(u.table.name)
-		f.printf("// %s は状態 %s の単位（%s）の、表 %s の上の実装。\n", name, u.fqn, u.iface, tbl)
-		f.printf("// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（%s）。\n", clause)
-		f.printf("type %s struct{ db *sql.DB }\n\n", name)
-		f.printf("// New%s は db の表 %s の上の %s を返す。表は CreateTables が作る。\n", name, tbl, name)
-	case unitClassify:
-		f.printf("// %s は状態の分類 %s の単位（%s）の命令の、db の上の実装。\n", name, u.fqn, u.iface)
-		f.printf("// メソッドは、%s の命令のうち、db の語彙のデコレータを付けたもの（%s）。ケースの述語は、埋め込んで書き足す。\n", u.iface, clause)
-		f.printf("type %s struct{ db *sql.DB }\n\n", name)
-		f.printf("// New%s は db の上の %s を返す。表は CreateTables が作る。\n", name, name)
-	case unitShared:
-		f.printf("// %s は、複数の状態にまたがる葉の op（%s）の、db の上の実装。\n", name, u.iface)
-		f.printf("// メソッドは、%s の op のうち、db の語彙のデコレータを付けたもの（%s）。\n", u.iface, clause)
-		f.printf("type %s struct{ db *sql.DB }\n\n", name)
-		f.printf("// New%s は db の上の %s を返す。表は CreateTables が作る。\n", name, name)
+	shaped := "形で決まる問い合わせ（IsEmpty、Get）"
+	if len(u.builtins) > 0 {
+		methods := make([]string, len(u.builtins))
+		for i, op := range u.builtins {
+			methods[i] = golang.BuiltinMethod(op)
+		}
+		shaped += "と命令（" + strings.Join(methods, "、") + "）"
 	}
+	name, tbl, m := u.goName, quote(u.table.name), u.table.model
+	f.printf("// %s は状態 %s の単位（%s）の、表 %s の上の実装。\n", name, u.fqn, u.iface, tbl)
+	f.printf("// メソッドは、%sと、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（%s）。\n", shaped, clause)
+	f.printf("type %s struct{ db *sql.DB }\n\n", name)
+	f.printf("// New%s は db の表 %s の上の %s を返す。表は CreateTables が作る。\n", name, tbl, name)
 	f.printf("func New%s(db *sql.DB) %s { return %s{db: db} }\n\n", name, name, name)
 	if u.complete() {
 		// 基底のメソッドをすべて持つ型だけ（持たなければ、基底の New に渡す行がコンパイルできず、人が、埋め込んで書き足す）
 		f.printf("var _ %s = %s{}\n\n", u.iface, name)
 	}
 
-	if u.kind == unitTable {
-		// 形で決まる問い合わせ（list）。状態の宣言の形から決まるもので、デコレータは要らない
-		tbl, m := quote(u.table.name), u.table.model
-		f.printf("// IsEmpty は形で決まる問い合わせ: 表 %s に行が一つもなければ true。\n", tbl)
-		f.printf("func (t %s) IsEmpty(ctx context.Context) (bool, error) {\n\treturn %s(ctx, t.db, `SELECT COUNT(*) FROM %s`)\n}\n\n",
-			name, f.use(helperIsEmpty), tbl)
-		f.printf("// Get は形で決まる問い合わせ: 表 %s の行を、足した順にすべて引く。\n", tbl)
-		f.printf("func (t %s) Get(ctx context.Context) ([]%s, error) {\n\treturn %s(ctx, t.db, %s,\n\t\t`SELECT %s FROM %s ORDER BY rowid`)\n}\n\n",
-			name, f.goType(ir.Ref(m.decl.Name)), f.use(helperList), m.scanName, columnList(m), tbl)
+	// 形で決まるメソッド（list）。状態の宣言の形から決まるもので、デコレータは要らない
+	f.printf("// IsEmpty は形で決まる問い合わせ: 表 %s に行が一つもなければ true。\n", tbl)
+	f.printf("func (t %s) IsEmpty(ctx context.Context) (bool, error) {\n\treturn %s(ctx, t.db, `SELECT COUNT(*) FROM %s`)\n}\n\n",
+		name, f.use(helperIsEmpty), tbl)
+	f.printf("// Get は形で決まる問い合わせ: 表 %s の行を、足した順にすべて引く。\n", tbl)
+	f.printf("func (t %s) Get(ctx context.Context) ([]%s, error) {\n\treturn %s(ctx, t.db, %s,\n\t\t`SELECT %s FROM %s ORDER BY rowid`)\n}\n\n",
+		name, f.goType(ir.Ref(m.decl.Name)), f.use(helperList), m.scanName, columnList(m), tbl)
+	for _, op := range u.builtins {
+		// 表の状態は list なので、単位に現れる形で決まる命令は Post だけ（list の put と delete は、直には呼べない。STATE-6）
+		params, results := golang.BuiltinSignature(u.table.state, op, f.im)
+		method := golang.BuiltinMethod(op)
+		f.printf("// %s は形で決まる命令: 表 %s に、引数 %s の行を足す。\n", method, tbl, ir.DirectEffectParam)
+		f.printf("func (t %s) %s(%s) %s {\n", name, method, params, results)
+		f.rowExec(m, ir.DirectEffectParam, insertSQL(u.table))
 	}
-	for _, m := range u.methods {
-		f.method(u, m)
+	for _, r := range u.reads {
+		f.read(u, r)
 	}
-}
-
-// method は、db の op のデコレータを付けた op のメソッド（docs/plugin-go-sqlite.md「op の中身」「トランザクション」
-// 「メソッドの形とコメント」）。名前と形は、基底のメソッドのまま（golang.MethodName、golang.Signature）。中身は、デコレータの引数だけから作る。
-func (f *fileGen) method(u *unit, m *method) {
-	op := m.op
-	name := golang.MethodName(op.Name)
-	// このファイルが使う名前: レシーバの t、ctx、args、args<数>、tx、err、import するパッケージの名前、このファイルの非公開の名前
-	reserved := map[string]bool{"t": true, "ctx": true, "args": true, "tx": true, "err": true}
-	for n := range f.imports {
-		reserved[n] = true
-	}
-	for n := range f.private {
-		reserved[n] = true
-	}
-	for _, p := range op.Params {
-		if numberedArgs.MatchString(p.Name) {
-			reserved[p.Name] = true
-		}
-	}
-	params, results := golang.Signature(op, f.im, reserved)
-	local := func(p ir.OpParam) string { return golang.LocalName(p.Name, reserved) }
-	head := "// " + name + " は op " + op.Name + "（@" + m.kind + "）: "
-	open := "func (t " + u.goName + ") " + name + "(" + params + ") " + results + " {\n"
-
-	switch m.kind {
-	case decoratorFind:
-		tbl, c := quote(m.table.name), m.column
-		by := "@" + decoratorUnique
-		if c.key && len(m.table.model.keys()) == 1 {
-			by = "@" + decoratorKey
-		}
-		f.printf("%s表 %s から、%s（%s）が引数 %s と同じ行を引く。なければ nil。\n", head, tbl, quote(c.name), by, op.Params[0].Name)
-		f.printf("%s\treturn %s(ctx, t.db, %s,\n\t\t`SELECT %s FROM %s WHERE %s IS ?1`, %s)\n}\n\n", open,
-			f.use(helperGet), m.table.model.scanName, columnList(m.table.model), tbl, quote(c.name), f.col(c, local(op.Params[0])))
-	case decoratorList:
-		tbl, c := quote(m.table.name), m.column
-		if c == nil {
-			f.printf("%s表 %s の行を、足した順にすべて引く。\n", head, tbl)
-			f.printf("%s\treturn %s(ctx, t.db, %s,\n\t\t`SELECT %s FROM %s ORDER BY rowid`)\n}\n\n", open,
-				f.use(helperList), m.table.model.scanName, columnList(m.table.model), tbl)
-			return
-		}
-		f.printf("%s表 %s から、%s が引数 %s と同じ行を、足した順にすべて引く。\n", head, tbl, quote(c.name), op.Params[0].Name)
-		f.printf("%s\treturn %s(ctx, t.db, %s,\n\t\t`SELECT %s FROM %s WHERE %s IS ?1 ORDER BY rowid`, %s)\n}\n\n", open,
-			f.use(helperList), m.table.model.scanName, columnList(m.table.model), tbl, quote(c.name), f.col(c, local(op.Params[0])))
-	case decoratorEffects:
-		var clauses strings.Builder
-		for _, s := range m.steps {
-			clauses.WriteString(effectClause(s))
-		}
-		if len(m.steps) == 1 {
-			// 効果が一つ: 文一つを dbExec で実行する
-			s := m.steps[0]
-			query, rows := statement(s.effect)
-			f.printf("%s%s\n%s", head, clauses.String(), open)
-			if rows {
-				f.printf("\targs, err := %s(%s)\n\tif err != nil {\n\t\treturn err\n\t}\n", s.effect.table.model.argsName, local(s.param))
-				f.printf("\treturn %s(ctx, t.db,\n\t\t`%s`, args...)\n}\n\n", f.use(helperExec), query)
-			} else {
-				f.printf("\treturn %s(ctx, t.db, `%s`, %s)\n}\n\n", f.use(helperExec), query, f.col(s.effect.column, local(s.param)))
-			}
-			return
-		}
-		// 効果が二つ以上: 一つのトランザクションで、書いた順に（「トランザクション」の 1〜5）
-		f.printf("%s一つのトランザクションで、書いた順に行う。%sどれかが失敗すれば、どれも残らない。\n%s", head, clauses.String(), open)
-		for i, s := range m.steps {
-			if _, rows := statement(s.effect); rows {
-				f.printf("\targs%d, err := %s(%s)\n\tif err != nil {\n\t\treturn err\n\t}\n", i+1, s.effect.table.model.argsName, local(s.param))
-			}
-		}
-		f.printf("\ttx, err := t.db.BeginTx(ctx, nil)\n\tif err != nil {\n\t\treturn err\n\t}\n\tdefer tx.Rollback()\n")
-		for i, s := range m.steps {
-			if query, rows := statement(s.effect); rows {
-				f.printf("\tif _, err := tx.ExecContext(ctx,\n\t\t`%s`, args%d...); err != nil {\n\t\treturn err\n\t}\n", query, i+1)
-			} else {
-				f.printf("\tif _, err := tx.ExecContext(ctx, `%s`, %s); err != nil {\n\t\treturn err\n\t}\n", query, f.col(s.effect.column, local(s.param)))
-			}
-		}
-		f.printf("\treturn tx.Commit()\n}\n\n")
+	for _, x := range u.effects {
+		f.effect(u, x)
 	}
 }
 
-// effectClause は、コメントの「効果の句」（docs/plugin-go-sqlite.md「メソッドの形とコメント」）: 効果のデコレータごとに一文。
-func effectClause(s step) string {
-	x := s.effect
-	head := "効果 " + x.decl.Name + "（@" + x.kind + "）で、表 " + quote(x.table.name)
-	switch x.kind {
-	case decoratorInsert:
-		return head + " に、引数 " + s.param.Name + " の行を足す。"
-	case decoratorUpdate:
-		return head + " の、キーが引数 " + s.param.Name + " と同じ行を書き換える。行がなければ何もしない。"
-	}
-	return head + " から、" + quote(x.column.name) + " が引数 " + s.param.Name + " と同じ行を消す。行がなければ何もしない。"
+// rowExec は、行を受け取るメソッド（@db.insert、@db.update、Post）の本体: 先に、行の値を列の形にして（できなければ、文を実行
+// しない）、文を dbExec で実行する。閉じる波括弧まで書く。
+func (f *fileGen) rowExec(m *model, local, query string) {
+	f.used[m.argsName] = true
+	f.printf("\targs, err := %s(%s)\n\tif err != nil {\n\t\treturn err\n\t}\n", m.argsName, local)
+	f.printf("\treturn %s(ctx, t.db,\n\t\t`%s`, args...)\n}\n\n", f.use(helperExec), query)
 }
 
-// statement は、効果 x のデコレータの言う文（docs/plugin-go-sqlite.md「op の中身」の、効果のデコレータの表）と、その文が、行の値
-// （dbArgs<Model> の、列の順の値）を受け取るか。@db.delete の文は、列と比べる値一つを受け取る。
-// 条件は、型によらず、いつも `"c" IS ?n`（「列と引数の型」）。
-func statement(x *effect) (query string, rows bool) {
-	tbl, m := quote(x.table.name), x.table.model
-	switch x.kind {
-	case decoratorInsert:
-		return "INSERT INTO " + tbl + " (" + columnList(m) + ") VALUES (" + placeholders(len(m.cols)) + ")", true
-	case decoratorUpdate:
-		// キーでない列を SET に、キーの列を WHERE に。プレースホルダの番号は、列の順（値は dbArgs<Model> の、列の順のまま渡す）
-		var set, where []string
-		for i, c := range m.cols {
-			if c.key {
-				where = append(where, quote(c.name)+" IS ?"+strconv.Itoa(i+1))
-			} else {
-				set = append(set, quote(c.name)+" = ?"+strconv.Itoa(i+1))
-			}
+// insertSQL は、表 t に行を足す文（@db.insert の効果と、形で決まる Post が同じ文を使う）。
+func insertSQL(t *table) string {
+	return "INSERT INTO " + quote(t.name) + " (" + columnList(t.model) + ") VALUES (" + placeholders(len(t.model.cols)) + ")"
+}
+
+// updateSQL は、表 t の、キーが引数の行と同じ行を書き換える文。キーでない列を SET に、キーの列を WHERE に。プレースホルダの番号は、
+// 列の順（値は dbArgs<Model> の、列の順のまま渡す）。条件は、型によらず、いつも `"c" IS ?n`（「列と引数の型」）。
+func updateSQL(t *table) string {
+	var set, where []string
+	for i, c := range t.model.cols {
+		if c.key {
+			where = append(where, quote(c.name)+" IS ?"+strconv.Itoa(i+1))
+		} else {
+			set = append(set, quote(c.name)+" = ?"+strconv.Itoa(i+1))
 		}
-		return "UPDATE " + tbl + " SET " + strings.Join(set, ", ") + " WHERE " + strings.Join(where, " AND "), true
 	}
-	return "DELETE FROM " + tbl + " WHERE " + quote(x.column.name) + " IS ?1", false
+	return "UPDATE " + quote(t.name) + " SET " + strings.Join(set, ", ") + " WHERE " + strings.Join(where, " AND ")
 }
 
 // placeholders は ?1, ?2, …, ?n。
@@ -309,10 +257,97 @@ func placeholders(n int) string {
 	return strings.Join(ps, ", ")
 }
 
-// rowLocals は、dbArgs<Model> と dbScan<Model> の中の局所の名前 names を、このファイルが import するパッケージの名前と当たれば、
-// 当たらなくなるまで末尾に _ を足したもの（その名前のパッケージの型を、本体が書けなくなるのを防ぐ。相乗りのファイルは、
-// 自分の局所の名前の方を変える。docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
-func (f *fileGen) rowLocals(names ...string) []string {
+// where は、条件 conds の SQL（` WHERE "a" IS ?1 AND "b" IS ?2`。条件がなければ ""）と、文に渡す値の式（条件の順。`, dbText(a), …`）と、
+// コメントの `<条件>`（`"a" が引数 a と同じで、"b" が "x" と同じ`）。local は、引数の局所の名前。
+func (f *fileGen) where(conds []condition, local func(ir.OpParam) string) (sql, args, comment string) {
+	var clauses, texts []string
+	for i, c := range conds {
+		clauses = append(clauses, quote(c.column.name)+" IS ?"+strconv.Itoa(i+1))
+		if c.param != nil {
+			args += ", " + f.col(c.column, local(*c.param))
+			texts = append(texts, quote(c.column.name)+" が引数 "+c.param.Name+" と同じ")
+		} else {
+			args += ", " + f.col(c.column, goLiteral(c.literal, c.column))
+			texts = append(texts, quote(c.column.name)+" が "+literalText(c.literal)+" と同じ")
+		}
+	}
+	if len(clauses) > 0 {
+		sql = " WHERE " + strings.Join(clauses, " AND ")
+	}
+	return sql, args, strings.Join(texts, "で、")
+}
+
+// read は、@db.find か @db.list を付けた read のメソッド（docs/plugin-go-sqlite.md「read の中身」「メソッドの形とコメント」）。
+// 名前と形は、基底のメソッドのまま（golang.MethodName、golang.ReadSignature）。
+func (f *fileGen) read(u *unit, r *read) {
+	decl, m, tbl := r.decl, r.table.model, quote(r.table.name)
+	reserved := f.reserved()
+	params, results := golang.ReadSignature(decl, f.im, reserved)
+	where, args, conds := f.where(r.conds, func(p ir.OpParam) string { return golang.LocalName(p.Name, reserved) })
+	name := golang.MethodName(decl.Name)
+
+	var clause, order, helper string
+	switch {
+	case r.kind == decoratorFind && r.latest != nil && conds != "":
+		clause = "表 " + tbl + " から、" + conds + "行のうち、" + quote(r.latest.name) + " がいちばん新しい行を引く。なければ nil。"
+	case r.kind == decoratorFind && r.latest != nil:
+		clause = "表 " + tbl + " から、" + quote(r.latest.name) + " がいちばん新しい行を引く。なければ nil。"
+	case r.kind == decoratorFind:
+		clause = "表 " + tbl + " から、" + conds + "行を引く。なければ nil。"
+	case r.latest != nil && conds != "":
+		clause = "表 " + tbl + " から、" + conds + "行を、" + quote(r.latest.name) + " の新しい順にすべて引く。"
+	case r.latest != nil:
+		clause = "表 " + tbl + " の行を、" + quote(r.latest.name) + " の新しい順にすべて引く。"
+	case conds != "":
+		clause = "表 " + tbl + " から、" + conds + "行を、足した順にすべて引く。"
+	default:
+		clause = "表 " + tbl + " の行を、足した順にすべて引く。"
+	}
+	if r.kind == decoratorFind {
+		helper = f.use(helperGet)
+		if r.latest != nil {
+			order = " ORDER BY " + quote(r.latest.name) + " DESC, rowid DESC LIMIT 1"
+		}
+	} else {
+		helper = f.use(helperList)
+		order = " ORDER BY rowid"
+		if r.latest != nil {
+			order = " ORDER BY " + quote(r.latest.name) + " DESC, rowid DESC"
+		}
+	}
+	f.printf("// %s は read %s（%s）: %s\n", name, decl.Name, decoratorNames(r.apps), clause)
+	f.printf("func (t %s) %s(%s) %s {\n", u.goName, name, params, results)
+	f.printf("\treturn %s(ctx, t.db, %s,\n\t\t`SELECT %s FROM %s%s%s`%s)\n}\n\n", helper, m.scanName, columnList(m), tbl, where, order, args)
+}
+
+// effect は、効果のデコレータを付けた効果のメソッド（docs/plugin-go-sqlite.md「効果の中身」「メソッドの形とコメント」）。
+// 名前と形は、基底のメソッドのまま（golang.MethodName、golang.EffectSignature）。
+func (f *fileGen) effect(u *unit, x *effect) {
+	decl, tbl := x.decl, quote(x.table.name)
+	reserved := f.reserved()
+	params, results := golang.EffectSignature(decl, f.im, reserved)
+	local := func(p ir.OpParam) string { return golang.LocalName(p.Name, reserved) }
+	name := golang.MethodName(decl.Name)
+	head := "// " + name + " は効果 " + decl.Name + "（@" + x.kind + "）: "
+	open := "func (t " + u.goName + ") " + name + "(" + params + ") " + results + " {\n"
+	switch x.kind {
+	case decoratorInsert:
+		f.printf("%s表 %s に、引数 %s の行を足す。\n%s", head, tbl, decl.Params[0].Name, open)
+		f.rowExec(x.table.model, local(decl.Params[0]), insertSQL(x.table))
+	case decoratorUpdate:
+		f.printf("%s表 %s の、キーが引数 %s と同じ行を書き換える。行がなければ何もしない。\n%s", head, tbl, decl.Params[0].Name, open)
+		f.rowExec(x.table.model, local(decl.Params[0]), updateSQL(x.table))
+	case decoratorDelete:
+		where, args, conds := f.where(x.conds, local)
+		f.printf("%s表 %s から、%s行を消す。行がなければ何もしない。\n%s", head, tbl, conds, open)
+		f.printf("\treturn %s(ctx, t.db, `DELETE FROM %s%s`%s)\n}\n\n", f.use(helperExec), tbl, where, args)
+	}
+}
+
+// locals は、補助と継ぎ目のメソッドの中の局所の名前 names を、このファイルが import するパッケージの名前と当たれば、当たらなくなるまで
+// 末尾に _ を足したもの（その名前のパッケージの型を、本体が書けなくなるのを防ぐ。相乗りのファイルは、自分の局所の名前の方を変える。
+// docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
+func (f *fileGen) locals(names ...string) []string {
 	out := make([]string, len(names))
 	for i, n := range names {
 		for f.imports[n] {
@@ -323,10 +358,65 @@ func (f *fileGen) rowLocals(names ...string) []string {
 	return out
 }
 
+// seams は DbSeams: @db.transaction の継ぎ目の実装（docs/plugin-go-sqlite.md「トランザクション」）。メソッドは、基底の Seams の
+// メソッドのうち、このトランスパイラが宣言した継ぎ目のもの。並びも、名前と形（golang.SeamSignature）も、基底のまま。
+// op のデコレータの分なので、op の中身は決めない: 本体は、受け取った引数を、そのまま body に渡し、body の戻り値を、そのまま返す。
+// 形は、戻り値の有無の二つだけで、op の引数と戻り値の型のほかに、変わるところはない。
+func (f *fileGen) seams() {
+	f.printf("// DbSeams は、@db.transaction の継ぎ目（Seams のメソッドのうち、このデコレータの分）の、db の上の実装。New の引数 seams に渡す。\n")
+	f.printf("// トランザクションに入るのは、中身が、受け取った ctx で、同じ db に、Conn を通してすること（このファイルの型のメソッドは、どれもそう）。\n")
+	f.printf("type DbSeams struct{ db *sql.DB }\n\n")
+	f.printf("// NewDbSeams は db の上の DbSeams を返す。状態の単位の実装（New<状態>Table）に渡したのと同じ db を渡す。\n")
+	f.printf("func NewDbSeams(db *sql.DB) DbSeams { return DbSeams{db: db} }\n\n")
+	if f.e.allSeams {
+		// 基底の Seams のメソッドが、すべて、このトランスパイラのもの（そうでなければ、人が、それぞれの型を一つの構造体に埋め込む）
+		f.printf("var _ Seams = DbSeams{}\n\n")
+	}
+	transaction := f.use(helperTransaction)
+	for _, seam := range f.e.seams {
+		op, _ := f.e.p.Lookup(seam.Op).(*ir.Op)
+		if op == nil {
+			continue
+		}
+		// 本体が、戻り値の型を書く（関数リテラル）ので、局所の名前（レシーバ、ctx、err、body）は、import するパッケージの名前を避ける
+		names := f.locals("s", "ctx", "err")
+		recv, ctx, err := names[0], names[1], names[2]
+		reserved := f.reserved()
+		reserved[recv], reserved[ctx], reserved[err] = true, true, true
+		params, results := golang.SeamSignature(op, f.im, reserved)
+		taken := map[string]bool{recv: true, ctx: true, err: true}
+		call := []string{ctx}
+		for _, p := range op.Params {
+			local := golang.LocalName(p.Name, reserved)
+			taken[local] = true
+			call = append(call, local)
+		}
+		base := golang.SeamBodyParam(op, reserved)
+		body := base
+		for f.imports[body] || (body != base && taken[body]) {
+			body += "_"
+		}
+		// 基底の形（golang.SeamSignature）の ctx と body を、このメソッドの局所の名前に（当たる名前がなければ、基底の形のまま）
+		params = ctx + strings.TrimPrefix(params, "ctx")
+		if i := strings.LastIndex(params, ", "+base+" func("); i >= 0 && body != base {
+			params = params[:i] + ", " + body + params[i+len(", "+base):]
+		}
+		f.printf("// %s は op %s に付いた @%s の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。\n", seam.Method, op.Name, seam.Decorator)
+		f.printf("func (%s DbSeams) %s(%s) %s {\n", recv, seam.Method, params, results)
+		if ret := f.goType(op.Returns); ret != "" {
+			f.printf("\treturn %s(%s, %s.db, func(%s context.Context) (%s, error) {\n\t\treturn %s(%s)\n\t})\n}\n\n",
+				transaction, ctx, recv, ctx, ret, body, strings.Join(call, ", "))
+			continue
+		}
+		f.printf("\t_, %s := %s(%s, %s.db, func(%s context.Context) (struct{}, error) {\n\t\treturn struct{}{}, %s(%s)\n\t})\n\treturn %s\n}\n\n",
+			err, transaction, ctx, recv, ctx, body, strings.Join(call, ", "), err)
+	}
+}
+
 // argsFunc は dbArgs<Model>: model を、列の順の値にする（docs/plugin-go-sqlite.md「補助」）。フィールドごとに、しまい方の補助の
-// 呼び出し一つ。フィールドの型は、形を変えない。
+// 呼び出し一つ。省略可能なフィールドは、dbNullable を足す。
 func (f *fileGen) argsFunc(m *model) {
-	row := f.rowLocals("row")[0]
+	row := f.locals("row")[0]
 	typ := f.goType(ir.Ref(m.decl.Name))
 	values := make([]string, len(m.cols))
 	for i := range m.cols {
@@ -337,9 +427,9 @@ func (f *fileGen) argsFunc(m *model) {
 }
 
 // scanFunc は dbScan<Model>: 列の順の値を model に読む（docs/plugin-go-sqlite.md「補助」）。フィールドごとに、しまい方の補助の
-// 呼び出し一つ。フィールドの型は、形を変えない。
+// 呼び出し一つ。省略可能なフィールドは、dbNullable を足す。
 func (f *fileGen) scanFunc(m *model) {
-	names := f.rowLocals("r", "row", "err")
+	names := f.locals("r", "row", "err")
 	r, row, err := names[0], names[1], names[2]
 	typ := f.goType(ir.Ref(m.decl.Name))
 	dests := make([]string, len(m.cols))

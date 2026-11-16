@@ -29,6 +29,8 @@ type OutputsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: hozoc.outputs の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]OutputFile, error)
+	// OutputChanges は問い合わせ（read hozoc.outputChanges）: 書き出す予定を、今の生成したファイルと比べて、書くファイルと消すファイルを決める。
+	OutputChanges(ctx context.Context, plan EmitPlan) (EmitResult, error)
 }
 
 // OutputsSyncState は状態の分類 hozoc.OutputsSync（hozoc.outputs を対象にした classify）の単位。実装は New の引数 outputsSync に渡す。
@@ -36,6 +38,6 @@ type OutputsState interface {
 type OutputsSyncState interface {
 	// UpToDate は問い合わせ: ケース UpToDate の述語。
 	UpToDate(ctx context.Context) (bool, error)
-	// WriteOutputs は命令: 効果 hozoc.syncOutputs（on hozoc.OutputsSync: any -> UpToDate）を持つ葉の op hozoc.writeOutputs。
-	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
+	// SyncOutputs は命令（効果 hozoc.syncOutputs、on hozoc.OutputsSync: any -> UpToDate）: 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
+	SyncOutputs(ctx context.Context, plan EmitPlan) error
 }

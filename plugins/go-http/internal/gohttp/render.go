@@ -15,7 +15,7 @@ import (
 // 描く。期待する出力の実物は、サンプル tests/samples/shop-server/ の gen/server/http.go。
 //
 // 経路ごと、フィールドごとに出す行は、デコレータの引数（と、フィールドの名前）だけから作る: ここでは、フィールドの型も、戻り値の型も、
-// 例外が値を運ぶかも、入力が Validate を持つかも、見ない（docs/requirements.md「出力を推論しない」）。見るのは、呼ぶ相手の、基底の
+// 例外の引数（数も、名前も、型も）も、入力が Validate を持つかも、見ない（docs/requirements.md「出力を推論しない」）。見るのは、呼ぶ相手の、基底の
 // メソッドの形（引数と戻り値を持つか）だけ（「出力」のハンドラの中の 4）。
 
 // runtimePath は、生成したコードが import する runtime パッケージ（*runtime.ValidationError、runtime.Exception。
@@ -271,7 +271,8 @@ func (f *file) helpers(routes []route) string {
 }
 
 // writeError は補助 httpWriteError（docs/plugin-go-http.md「補助」）: @http.status を持つ例外を、最初に現れた順に、例外ごとに一行
-// `case httpThrown[<例外の型>](w, err, <code>):`。値を運ぶ例外も、運ばない例外も、同じ形（補助 httpThrown が、実行時に見る）。
+// `case httpThrown[<例外の型>](w, err, <code>):`。引数を持つ例外も、持たない例外も、同じ形で、引数の数と型は、行を変えない
+// （例外の値をどう応答にするかは、補助 httpThrown が、実行時に見る）。
 // 一つもなければ、switch を書かず、いつも 500。引数の名前（w、err）は、例外の名前空間のパッケージの名前と当たれば、末尾に _ を足す。
 func (f *file) writeError(statuses []status) string {
 	w, err := f.local("w"), f.local("err")

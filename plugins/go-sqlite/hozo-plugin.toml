@@ -8,3 +8,5 @@ protocol = "0.6"
 name     = "go-sqlite"
 language = "go"
 requires = ["go"]
+# @db.transaction は継ぎ目: 基底が、付いた op を二層で出し、このトランスパイラが、その中身（DbSeams）を出す（同「トランザクション」）
+seams    = ["db.transaction"]

@@ -12,7 +12,7 @@ import (
 
 // Check は cli.hozo の op check（docs/cli.md「check」）。hozoc.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
 // error が一つでもあれば例外（値は error と warning のすべて）、なければ CheckResult（warning）。
-// 解析した Project は WriteOutputs のために a.checked に置く。
+// 解析した Project は CollectOutputs のために a.checked に置く。
 //
 // hozo.toml が見つからず、--config / HOZO_CONFIG の指定もなければ「設定なし」で検査する（docs/config.md「置き場と探し方」）:
 // 作業ディレクトリがルート、sources は既定で、CFG-* は出ない（internal/project が除く）。例外になるかどうかは
@@ -29,7 +29,7 @@ func (a *App) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult
 	if err := ctx.Err(); err != nil {
 		return hozoc.CheckResult{}, err
 	}
-	a.checked = nil
+	a.checked, a.planned = nil, nil
 	a.pluginPath = str(in.PluginPath)
 	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, Env: a.Env,
 		PluginPath: a.pluginPath, Home: a.Home})
@@ -62,11 +62,11 @@ func classify(diags []diag.Diagnostic, fs *source.FileSet) error {
 	}
 	switch {
 	case cfgErrors > 0 && mismatchOnly:
-		return hozoc.LanguageMismatch{Value: diagnostics(diags, fs)}
+		return languageMismatch(diags, fs)
 	case cfgErrors > 0:
-		return hozoc.ConfigInvalid{Value: diagnostics(diags, fs)}
+		return configInvalid(diags, fs)
 	}
-	return hozoc.CheckFailed{Value: diagnostics(diags, fs)}
+	return checkFailed(diags, fs)
 }
 
 // isConfigCode は設定とマニフェストの診断のコードか（CFG-*、MAN-*）。CFG-5 は OutputConflict なので除く。

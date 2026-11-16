@@ -4,4 +4,6 @@ GOHTTP-5	app.putAlbum	経路の op app.putAlbum の本文（model app.AlbumIn �
 GOHTTP-5	app.putDrawing	経路の op app.putDrawing の本文（model app.DrawingIn のフィールド drawing）の型 app.Drawing が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
 GOHTTP-5	app.getDrawing	経路の op app.getDrawing の結果の型 app.Drawing? が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
 GOHTTP-5	app.getShapes	経路の op app.getShapes の結果の型 app.Shape[] が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.clash	経路の op app.clash の例外 app.Clash の値の型 app.Drawing が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
+GOHTTP-5	app.clash	経路の op app.clash の例外 app.Clash の引数 value の型 app.Drawing が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
+GOHTTP-5	app.refused	経路の op app.refused の例外 app.Refused の引数 shapes の型 app.Shape[]? が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
+GOHTTP-5	app.refused	経路の op app.refused の例外 app.Refused の引数 album の型 app.Album が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）

@@ -38,8 +38,9 @@ type Presenter interface {
 	PresentError(w io.Writer, command string, input any, f Failure) error
 }
 
-// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（なければ nil）、Err は op が返した error そのもの
-// （Presenter がメッセージに使える）。Main が、例外の値の型を見分けて入れる。宣言にない例外なら Name は空で Err だけ。
+// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（引数を持つ例外の、値そのもの。引数のない例外は nil）、
+// Err は op が返した error そのもの（Presenter がメッセージに使える）。Main が、例外の値の型を見分けて入れる。
+// 宣言にない例外なら Name は空で Err だけ。
 type Failure struct {
 	Name  string
 	Value any
@@ -63,7 +64,7 @@ func (JSONPresenter) Present(w io.Writer, command string, input any, result any)
 }
 
 // PresentError は、Name があれば {"error": "<Name>", "value": <Value>}（Value が nil なら value を省く）を、
-// なければ {"error": "<Err.Error()>"} を w に出す。
+// なければ {"error": "<Err.Error()>"} を w に出す。value は、例外の引数の名前をキーにしたオブジェクト（例外の値の JSON）。
 func (JSONPresenter) PresentError(w io.Writer, command string, input any, f Failure) error {
 	body := struct {
 		Error string `json:"error"`
@@ -537,17 +538,16 @@ func cliValidate(w io.Writer, prog string, in any) bool {
 }
 
 // cliThrown は、err が例外 E（値）なら、f に Failure（Name は例外の FQN、Value は運ぶ値）を、code に終了コード exit を入れて
-// true。値を運ぶ例外かどうか（フィールド Value を持つか）は、実行時に見る。
+// true。運ぶ値は、例外の値そのもの。引数を持つ例外かどうか（例外の構造体が、フィールドを一つでも持つか）は、実行時に見る:
+// 持たなければ、Value は nil のまま。
 func cliThrown[E runtime.Exception](err error, exit int, f *Failure, code *int) bool {
 	var e E
 	if !errors.As(err, &e) {
 		return false
 	}
 	*f, *code = Failure{Name: e.HozoException(), Err: err}, exit
-	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
-		if value := v.FieldByName("Value"); value.IsValid() {
-			f.Value = value.Interface()
-		}
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct && v.NumField() > 0 {
+		f.Value = e
 	}
 	return true
 }

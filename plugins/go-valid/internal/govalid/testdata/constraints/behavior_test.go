@@ -7,6 +7,8 @@
 //   - 「model」: フィールドの順に、型の Validate（1）、フィールドの制約（2）。Path はフィールド名を . でつないだもの。
 //   - 省略可能（nil は確かめない）、array（Path に添字）、record（キーの辞書順。Path にキー）。
 //   - Validate を持たない型には、メソッドがない。入口のパッケージの別名からも、そのまま呼べる。
+//   - 「Validate を持つ型」: その場で書いた model（union のアーム）は、普通の model。union と exception は Validate を持たない
+//     （例外の引数の型が Validate を持つ型でも）。
 package behavior
 
 import (
@@ -131,9 +133,12 @@ func TestModel(t *testing.T) {
 	// 制約に合う値と、零値（初めの値を入れる関数はない。docs/plugin-go.md「model」）
 	expect(t, app.Paging{Page: 1, Size: 20, Sort: "id", Link: "https://example.com/"})
 	expect(t, app.Paging{}, "page: min", "size: min", "sort: length", "link: format")
-	// その場で書いた model
-	expect(t, app.RejectedValue{Code: 200}, "code: min")
 	expect(t, app.Drawing{Layer: 0}, "layer: min")
+	// その場で書いた model（union のアーム）は、普通の model: フィールドの制約と、フィールドの型の Validate
+	expect(t, app.OutcomeFailed{Code: 404, Reason: "gone"})
+	failed := validItem()
+	failed.Name = ""
+	expect(t, app.OutcomeFailed{Code: 200, Item: &failed}, "code: min", "reason: length", "item.name: length")
 }
 
 func TestOptional(t *testing.T) {
@@ -195,11 +200,25 @@ func TestRecord(t *testing.T) {
 }
 
 func TestNoValidate(t *testing.T) {
-	for _, v := range []any{app.Plain(""), app.PlainCount(0), app.Free{}, app.Bare{}, app.Rejected{}, app.ShapeLabel{}, pkgtype.Address{}.City} {
+	for _, v := range []any{
+		app.Plain(""), app.PlainCount(0), app.Free{}, app.Bare{}, app.ShapeLabel{}, pkgtype.Address{}.City,
+		// 例外は、引数の型が Validate を持つ型でも、Validate を持たない（引数のない例外も）
+		app.Rejected{Code: 0, Item: app.Item{}, Seller: ptr(pkgtype.Email("x")), Others: []app.Item{{}}}, &app.Rejected{}, app.Plainly{},
+		// その場で書いた model も、制約がなければ持たない。union のアームを包む型も持たない
+		app.OutcomeSkipped{}, app.OutcomeDone{},
+	} {
 		if _, has := reflect.TypeOf(v).MethodByName("Validate"); has {
 			t.Errorf("%T が Validate を持つ", v)
 		}
 	}
+	// union（インターフェース）も持たない
+	for _, u := range []reflect.Type{reflect.TypeOf((*app.Outcome)(nil)).Elem(), reflect.TypeOf((*app.Shape)(nil)).Elem()} {
+		if _, has := u.MethodByName("Validate"); has {
+			t.Errorf("union %s が Validate を持つ", u)
+		}
+	}
+	// 例外の引数の値は、それぞれの型の Validate で、呼ぶ人が確かめられる（例外の値を確かめる者は、いない）
+	expect(t, app.Rejected{}.Code, "min")
 }
 
 // 内部の op を持つ名前空間: メソッドは内側のパッケージの型に付き、入口の別名から、そのまま呼べる。

@@ -17,4 +17,6 @@ namespace app {
   }
   // アームに Validate を持つ型のない union は、当たらない
   model Fine { free: Free; frees: Free[]; }
+  // 例外の引数の型は、当たらない（例外は Validate を持たない）
+  exception Refused(contact: Contact, cards: Cards?);
 }

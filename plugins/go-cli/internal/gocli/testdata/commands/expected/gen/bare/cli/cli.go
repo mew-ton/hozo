@@ -33,8 +33,9 @@ type Presenter interface {
 	PresentError(w io.Writer, command string, input any, f Failure) error
 }
 
-// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（なければ nil）、Err は op が返した error そのもの
-// （Presenter がメッセージに使える）。Main が、例外の値の型を見分けて入れる。宣言にない例外なら Name は空で Err だけ。
+// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（引数を持つ例外の、値そのもの。引数のない例外は nil）、
+// Err は op が返した error そのもの（Presenter がメッセージに使える）。Main が、例外の値の型を見分けて入れる。
+// 宣言にない例外なら Name は空で Err だけ。
 type Failure struct {
 	Name  string
 	Value any
@@ -58,7 +59,7 @@ func (JSONPresenter) Present(w io.Writer, command string, input any, result any)
 }
 
 // PresentError は、Name があれば {"error": "<Name>", "value": <Value>}（Value が nil なら value を省く）を、
-// なければ {"error": "<Err.Error()>"} を w に出す。
+// なければ {"error": "<Err.Error()>"} を w に出す。value は、例外の引数の名前をキーにしたオブジェクト（例外の値の JSON）。
 func (JSONPresenter) PresentError(w io.Writer, command string, input any, f Failure) error {
 	body := struct {
 		Error string `json:"error"`

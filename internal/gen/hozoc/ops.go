@@ -24,6 +24,7 @@ type Ops interface {
 	//   - in: コマンドの入力
 	//
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
+	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
 	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
 
@@ -34,7 +35,7 @@ type Ops interface {
 	Lsp(ctx context.Context, in LspInput) error
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves = inner.Leaves
 

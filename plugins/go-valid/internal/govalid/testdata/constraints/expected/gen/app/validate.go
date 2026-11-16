@@ -403,11 +403,11 @@ func (m Leaf) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は app.Rejected.Value の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m RejectedValue) Validate() error {
+// Validate は app.Drawing の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m Drawing) Validate() error {
 	var violations []runtime.Violation
-	if int64(m.Code) < 400 {
-		violations = append(violations, runtime.Violation{Path: "code", Constraint: "min"})
+	if int64(m.Layer) < 1 {
+		violations = append(violations, runtime.Violation{Path: "layer", Constraint: "min"})
 	}
 	if len(violations) == 0 {
 		return nil
@@ -415,11 +415,17 @@ func (m RejectedValue) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は app.Drawing の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m Drawing) Validate() error {
+// Validate は app.Outcome.Failed の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m OutcomeFailed) Validate() error {
 	var violations []runtime.Violation
-	if int64(m.Layer) < 1 {
-		violations = append(violations, runtime.Violation{Path: "layer", Constraint: "min"})
+	if int64(m.Code) < 400 {
+		violations = append(violations, runtime.Violation{Path: "code", Constraint: "min"})
+	}
+	if l := utf8.RuneCountInString(string(m.Reason)); l < 1 {
+		violations = append(violations, runtime.Violation{Path: "reason", Constraint: "length"})
+	}
+	if m.Item != nil {
+		violations = validAppend(violations, "item", (*m.Item).Validate())
 	}
 	if len(violations) == 0 {
 		return nil

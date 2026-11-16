@@ -26,7 +26,7 @@ func (l *envLeaves) Run(ctx context.Context, input env.RunInput) (string, error)
 	l.got = input
 	switch {
 	case input.Name != nil && *input.Name == "lost":
-		return "", pkgerrors.Lost{Value: pkgerrors.Where{Path: "p"}}
+		return "", pkgerrors.Lost{Where: pkgerrors.Where{Path: "p"}}
 	case input.Name != nil && *input.Name == "wide":
 		return "", pkgfmt.Wide{}
 	}
@@ -68,7 +68,7 @@ func TestEnv(t *testing.T) {
 		t.Errorf("Validate: code=%d stderr=%q", code, errOut)
 	}
 	// 標準ライブラリと同じ名前のパッケージの例外
-	if code, _, errOut, _ = run(nil, "run", "--name", "lost"); code != 3 || !strings.Contains(errOut, `"error": "errors.Lost"`) || !strings.Contains(errOut, `"path": "p"`) {
+	if code, _, errOut, _ = run(nil, "run", "--name", "lost"); code != 3 || !strings.Contains(errOut, "\"error\": \"errors.Lost\",\n  \"value\": {\n    \"where\": {\n      \"path\": \"p\"\n    }\n  }") {
 		t.Errorf("errors.Lost: code=%d stderr=%q", code, errOut)
 	}
 	if code, _, errOut, _ = run(nil, "run", "--name", "wide"); code != 70 || !strings.Contains(errOut, `"error": "fmt.Wide"`) {

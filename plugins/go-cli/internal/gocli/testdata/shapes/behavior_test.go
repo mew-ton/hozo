@@ -2,7 +2,7 @@
 // 置いて走らせる）。shapea と shapeb の cli.go は、名前空間の名前のほかは同じテキスト（plugins/go-cli の TestSameShape）。
 // ここでは、型の違いが、実行時に出ることを確かめる（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）:
 // 値を取らないフラグか（読む先が真偽値か）、残りの位置引数か（読む先がスライスか）、省略可能か（読む先がポインタか）、
-// 文字列の読み方（int / float / scalar）、補う値の型、入力が Validate を持つか、例外が値を運ぶか。
+// 文字列の読み方（int / float / scalar）、補う値の型、入力が Validate を持つか、例外が引数を持つか。
 package behavior
 
 import (
@@ -167,15 +167,16 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-// TestThrown: 例外ごとの行は同じ形。値を運ぶかどうかは、実行時に決まる。
+// TestThrown: 例外ごとの行は同じ形。引数を持つかどうか（表示に value を出すか）は、実行時に決まる。value は、引数の名前を
+// キーにしたオブジェクトで、引数の名前が value でも、同じ（value の中の、キー value）。
 func TestThrown(t *testing.T) {
 	code, out, errOut, _ := runA(home, "run", "broken")
-	if code != 3 || out != "" || !strings.Contains(errOut, `"error": "shapea.Broken"`) || strings.Contains(errOut, `"value"`) {
-		t.Errorf("shapea.Broken（値を運ばない）: code=%d stderr=%q", code, errOut)
+	if code != 3 || out != "" || errOut != "{\n  \"error\": \"shapea.Broken\"\n}\n" {
+		t.Errorf("shapea.Broken（引数を持たない）: code=%d stderr=%q", code, errOut)
 	}
 	code, out, errOut, _ = runB(home, "run", "3")
-	if code != 3 || out != "" || !strings.Contains(errOut, `"error": "shapeb.Broken"`) || !strings.Contains(errOut, `"text": "why"`) {
-		t.Errorf("shapeb.Broken（値を運ぶ）: code=%d stderr=%q", code, errOut)
+	if code != 3 || out != "" || errOut != "{\n  \"error\": \"shapeb.Broken\",\n  \"value\": {\n    \"value\": {\n      \"text\": \"why\"\n    }\n  }\n}\n" {
+		t.Errorf("shapeb.Broken（引数を持つ）: code=%d stderr=%q", code, errOut)
 	}
 	if code, _, errOut, _ = runA(home, "run", "lost"); code != 70 || !strings.Contains(errOut, `"error": "shapea.Lost"`) {
 		t.Errorf("shapea.Lost: code=%d stderr=%q", code, errOut)

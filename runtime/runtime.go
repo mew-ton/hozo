@@ -1,6 +1,7 @@
 // Package runtime は、hozoc が生成した Go のコードが import する型と関数を持つ。
 //
-// 形は docs/plugin-go.md「runtime パッケージ」（Violation、ValidationError、CheckFormat は docs/plugin-go-valid.md「runtime」）。
+// 形は docs/plugin-go.md「runtime パッケージ」（Violation、ValidationError、CheckFormat は docs/plugin-go-valid.md「runtime」、
+// DBTxKey は docs/plugin-go-sqlite.md「トランザクション」）。
 // 生成したコードのヘッダに書く版（docs/plugin-go.md「ファイル」）と合わせて互換を保つので、API を変えるときはそちらも見る。
 // 標準ライブラリにだけ依存する（docs/packages.md「依存の向き」）。
 package runtime

@@ -23,7 +23,7 @@ var goldenFixtures = []struct {
 	behavior bool
 }{
 	{name: "commands", covers: "「出力」「引数の解釈」「コマンドごとの関数」「実行と表示」「使い方の表示」の各行", behavior: true},
-	{name: "shapes", covers: "「コマンドごとの関数」: フィールドの型と、例外が値を運ぶかどうかによらず、同じ形（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）", behavior: true},
+	{name: "shapes", covers: "「コマンドごとの関数」: フィールドの型と、例外が引数を持つかどうかによらず、同じ形（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）", behavior: true},
 	{name: "locals", covers: "名前空間のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前）", behavior: true},
 }
 
@@ -202,7 +202,7 @@ func TestLines(t *testing.T) {
 	}
 	if err := ops.Ping(ctx); err != nil {
 `},
-		{tool, "tool の check の例外（値を運ぶもの、運ばないもの、別の名前空間のもの）", `	f, code := Failure{Err: err}, 70
+		{tool, "tool の check の例外（引数を持つもの、持たないもの、別の名前空間のもの）", `	f, code := Failure{Err: err}, 70
 	switch {
 	case cliThrown[tool.CheckFailed](err, 1, &f, &code):
 	case cliThrown[tool.ConfigInvalid](err, 2, &f, &code):
@@ -268,7 +268,7 @@ func TestHelpers(t *testing.T) {
 
 // TestSameShape は、型に依らない形の確かめ（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」）: 入力 shapes の
 // 二つの名前空間は、宣言の名前と cli のデコレータが同じで、型だけが違う（核の型と scalar、省略可能とそうでないもの、文字列と真偽値、
-// 一つの値と array、値を運ぶ例外と運ばない例外、戻り値と省略可能な戻り値、制約を持つ入力と持たない入力）。出る cli.go は、
+// 一つの値と array、引数を持つ例外と持たない例外、戻り値と省略可能な戻り値、制約を持つ入力と持たない入力）。出る cli.go は、
 // 名前空間の名前のほかは、同じテキスト。違いが実行時に出ることは、testdata/shapes/behavior_test.go が確かめる。
 func TestSameShape(t *testing.T) {
 	_, files := emitFixture(t, "shapes")

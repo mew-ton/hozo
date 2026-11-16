@@ -429,23 +429,23 @@ func httpWriteError(w http.ResponseWriter, err error) {
 	case httpThrown[pkgtype.Conflict](w, err, 409):
 	case httpThrown[pkgtype.Rejected](w, err, 422):
 	case httpThrown[pkgtype.NotFound](w, err, 404):
+	case httpThrown[pkgtype.Limited](w, err, 429):
+	case httpThrown[pkgtype.Gone](w, err, 410):
 	default:
 		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
 	}
 }
 
 // httpThrown は、err が例外 E（値）なら、status と、例外の FQN（と運ぶ値）を返して true。
-// 値を運ぶ例外かどうかは、実行時に見る（フィールド Value を持つ）。
+// 値を運ぶ例外かどうかは、実行時に見る（引数ごとのフィールドを、一つでも持つ）。運ぶ値は、引数の名前をキーにしたオブジェクト。
 func httpThrown[E runtime.Exception](w http.ResponseWriter, err error, status int) bool {
 	var e E
 	if !errors.As(err, &e) {
 		return false
 	}
 	body := httpErrorBody{Error: e.HozoException()}
-	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
-		if f := v.FieldByName("Value"); f.IsValid() {
-			body.Value = f.Interface()
-		}
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct && v.NumField() > 0 {
+		body.Value = e
 	}
 	httpWriteJSON(w, status, body)
 	return true

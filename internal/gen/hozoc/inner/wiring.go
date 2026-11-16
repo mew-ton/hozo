@@ -4,12 +4,38 @@ package inner
 
 import "context"
 
+// WriteOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+// 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+//
+// 引数:
+//   - in: コマンドの入力
+//   - checked: 検査の結果
+//
+// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+// Reads: hozoc.outputs
+// Effects: hozoc.syncOutputs
+func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error) {
+	plan, err := o.CollectOutputs(in, checked)
+	if err != nil {
+		return EmitResult{}, err
+	}
+	result, err := o.outputs.OutputChanges(ctx, plan)
+	if err != nil {
+		return EmitResult{}, err
+	}
+	if err := o.outputsSync.SyncOutputs(ctx, plan); err != nil {
+		return EmitResult{}, err
+	}
+	return result, nil
+}
+
 // Emit は仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
 //
 // 引数:
 //   - in: コマンドの入力
 //
 // Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
+// Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
 func (o *ops) Emit(ctx context.Context, in EmitInput) (EmitResult, error) {
 	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath})

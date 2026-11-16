@@ -19,17 +19,25 @@ namespace type {
     at: Time?;
   }
 
-  /** 見つからない */
+  /** 見つからない（引数のない例外） */
   @http.status(404)
   exception NotFound;
-  /** 既にある（その場で書いた値を運ぶ） */
+  /** 既にある（引数が二つ） */
   @http.status(409)
   exception Conflict(existing: string, count: int);
-  /** 受け付けられない（宣言した model の値を運ぶ） */
+  /** 受け付けられない（引数が一つ。型は model） */
   @http.status(422)
   exception Rejected(value: Item);
+  /** 多すぎる（省略可能な引数を持つ。scalar の引数は、元の型の JSON） */
+  @http.status(429)
+  exception Limited(retryAfter: Wait, hint: string?, until: Time?);
+  /** もうない（引数が、どれも省略可能） */
+  @http.status(410)
+  exception Gone(since: Time?);
   /** ステータスを持たない例外 */
   exception Broken;
+  /** ステータスを持たない例外は、引数を持っていても、通信に現れない */
+  exception Leaky(secret: string);
 
   /** 別の名前空間の入力の model */
   model Lookup {
@@ -108,12 +116,12 @@ namespace api {
   /** 品物を探す。結果は配列（空でも [] を返す） */
   @http.get("/items")
   export op search(in: SearchInput): type.Item[]
-    throws type.Broken;
+    throws type.Broken, type.Leaky;
 
   /** 最初の品物。省略可能な戻り値（なければ 204）。入力は、別の名前空間の model */
   @http.get("/items/first")
   export op first(in: type.Lookup): type.Item?
-    throws type.NotFound;
+    throws type.NotFound, type.Limited, type.Gone;
 
   // 本文の項目が一つでも、本文は、キーを持つオブジェクト。戻り値がない（204）
   model ReplaceInput {

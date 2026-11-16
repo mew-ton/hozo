@@ -25,9 +25,6 @@ type Diagnostic = inner.Diagnostic
 // RelatedInfo は指摘に関連する位置
 type RelatedInfo = inner.RelatedInfo
 
-// Diagnostics は指摘の一覧
-type Diagnostics = inner.Diagnostics
-
 // CheckFailed: 仕様に構文か型の誤りがある
 type CheckFailed = inner.CheckFailed
 
@@ -58,7 +55,10 @@ type EmitInput = inner.EmitInput
 // LspInput は lsp の入力
 type LspInput = inner.LspInput
 
-// EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）
+// EmitPlan は書き出す予定: 単位ごとにトランスパイラを呼んで集めたファイルと、そこまでの warning
+type EmitPlan = inner.EmitPlan
+
+// EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
 // on hozoc.OutputsSync: any -> UpToDate
 const EffectSyncOutputs = inner.EffectSyncOutputs
 

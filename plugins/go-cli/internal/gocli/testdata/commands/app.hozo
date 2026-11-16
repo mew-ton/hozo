@@ -15,12 +15,13 @@ namespace tool {
   scalar Format extends string;
 
   model Note { code: string; message: string; }
-  model Notes { items: Note[]; }
 
+  /** 引数を一つ持つ例外（表示の value は、引数が一つでも、引数の名前をキーにしたオブジェクト） */
   @cli.exitCode(1)
-  exception CheckFailed(value: Notes);
+  exception CheckFailed(notes: Note[]);
+  /** 引数を三つ持つ例外（キーの並びは、宣言の引数の順。省略可能な引数で値がなければ、キーを省く） */
   @cli.exitCode(2)
-  exception ConfigInvalid(value: Notes);
+  exception ConfigInvalid(file: Path, notes: Note[], hint: string?);
   @cli.exitCode(64)
   exception UnknownName;
   /** 終了コードを書いていない例外 */

@@ -1,12 +1,12 @@
 // 型に依らない形の確かめ（docs/testing.md「単体テスト」の「型に依らない形の確かめ」、docs/requirements.md「出力を推論しない」）。
 // 二つの名前空間は、宣言の名前と、cli のデコレータが同じで、違うのは型だけ: フィールドの型（核の型と scalar、省略可能と
-// そうでないもの、文字列と真偽値、一つの値と array）、例外が値を運ぶか、戻り値が省略可能か、入力が制約を持つか。
+// そうでないもの、文字列と真偽値、一つの値と array）、例外が引数を持つか、戻り値が省略可能か、入力が制約を持つか。
 // 出る cli.go は、名前空間の名前のほかは、同じテキスト（TestSameShape）。違いは、実行時に出る（behavior_test.go）。
 
 namespace shapea {
   model Note { text: string; }
 
-  /** 値を運ばない */
+  /** 引数を持たない */
   @cli.exitCode(3)
   exception Broken;
   exception Lost;
@@ -30,7 +30,7 @@ namespace shapea {
 namespace shapeb {
   model Note { text: string; }
 
-  /** 値を運ぶ */
+  /** 引数を持つ。引数の名前 value は、特別ではない（表示の value の中の、キー value になる） */
   @cli.exitCode(3)
   exception Broken(value: Note);
   exception Lost;

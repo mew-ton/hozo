@@ -20,7 +20,7 @@ import (
 //     `hozoc: <メッセージ>`（Failure.Err のメッセージ。なければ例外の FQN）。
 //   - json: CheckResult は {"warnings": [...]}、EmitResult は {"warnings": [...], "written": [...], "removed": [...]}。
 //     例外は {"error": "<FQN>", "value": {...}} で、診断を運ぶ例外の value は docs/diagnostics.md「表示」の json
-//     （{"diagnostics", "errors", "warnings"}）。それ以外は cli.JSONPresenter と同じ。
+//     （{"diagnostics", "errors", "warnings"}）。例外の引数の名前は、表示に出さない。それ以外は cli.JSONPresenter と同じ。
 //
 // 診断の text と json の形は internal/diag が持つ（diag.Rendered、diag.WriteRenderedText、diag.Report）。ここは、
 // cli.hozo の model Diagnostic をその形に写して呼び、結果と例外ごとの包み（warnings / written / removed、error / value）
@@ -69,7 +69,8 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 
 // PresentError は例外を w に出す。
 func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Failure) error {
-	d, carries := f.Value.(hozoc.Diagnostics)
+	// f.Value は、引数を持つ例外の、値そのもの（docs/plugin-go-cli.md「コマンドごとの関数」）。診断を運ぶ例外かどうかは carriedBy が見る
+	diags, carries := carriedBy(f.Value)
 	if isJSON(input) {
 		if !carries {
 			return cli.JSONPresenter{}.PresentError(w, command, input, f)
@@ -77,10 +78,10 @@ func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Fail
 		return writeJSON(w, struct {
 			Error string      `json:"error"`
 			Value diag.Report `json:"value"`
-		}{f.Name, diag.NewReport(rendered(d.Items))})
+		}{f.Name, diag.NewReport(rendered(diags))})
 	}
 	if carries {
-		return diag.WriteRenderedText(w, rendered(d.Items))
+		return diag.WriteRenderedText(w, rendered(diags))
 	}
 	msg := f.Name
 	if f.Err != nil {

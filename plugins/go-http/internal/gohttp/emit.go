@@ -19,7 +19,7 @@ const (
 	codeHTTPParams     = "GOHTTP-2"  // 経路の op の引数が、0 個でも model 一つでもない
 	codeHTTPPlace      = "GOHTTP-3"  // 入力の model のフィールドが、場所の六つのデコレータのどれも持たない、または二つ以上持つ
 	codeHTTPFieldType  = "GOHTTP-4"  // ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない
-	codeHTTPJSON       = "GOHTTP-5"  // 本文、結果、@http.status を持つ例外の値に、JSON にできない型がある
+	codeHTTPJSON       = "GOHTTP-5"  // 本文、結果、@http.status を持つ例外の引数の型に、JSON にできない型がある
 	codeHTTPGetBody    = "GOHTTP-6"  // @http.get の op の入力が、本文のデコレータ（@http.body、@http.bodyObj）のフィールドを持つ
 	codeHTTPPath       = "GOHTTP-7"  // パスが / で始まらない、または { か } を含む
 	codeHTTPDuplicate  = "GOHTTP-8"  // 同じメソッドとパスの経路が二つある
@@ -243,17 +243,17 @@ func (g *generator) check() []route {
 				g.checkValidateHome(op, model)
 			}
 		}
-		// GOHTTP-5: 本文、結果、@http.status を持つ例外の値
+		// GOHTTP-5: 本文、結果、@http.status を持つ例外の引数の型
 		for i := range r.inputs {
 			if in := &r.inputs[i]; in.place == inBody {
-				g.checkJSON(op, in.field.Type, fmt.Sprintf("本文（model %s のフィールド %s）", model.Name, in.field.Name))
+				g.checkJSON(op, in.field.Type, fmt.Sprintf("本文（model %s のフィールド %s）の型", model.Name, in.field.Name))
 			}
 		}
-		g.checkJSON(op, op.Returns, "結果")
+		g.checkJSON(op, op.Returns, "結果の型")
 		for _, s := range g.statuses([]route{r}) {
-			// 例外の引数ごとの形は、まだ決めていない: 引数（IR 0.6 の Exception.Params）の型を一つずつ確かめる
+			// 例外の value は、引数の名前をキーにしたオブジェクト（「通信の形」の「失敗の応答」）: 引数（Exception.params）の型を、一つずつ見る
 			for _, p := range s.exception.Params {
-				g.checkJSON(op, p.Type, fmt.Sprintf("例外 %s の値", s.exception.Name))
+				g.checkJSON(op, p.Type, fmt.Sprintf("例外 %s の引数 %s の型", s.exception.Name, p.Name))
 			}
 		}
 		// GOHTTP-16
@@ -405,10 +405,10 @@ func (g *generator) statuses(routes []route) []status {
 	return out
 }
 
-// checkJSON は GOHTTP-5: 型 t（what: 本文、結果、例外の値）が JSON にできる型でなければ、op の位置に報告する。
+// checkJSON は GOHTTP-5: 型 t（what: 本文、結果、例外の引数の、どの型か）が JSON にできる型でなければ、op の位置に報告する。
 func (g *generator) checkJSON(op *ir.Op, t ir.Type, what string) {
 	if union, bad := g.unionIn(t, map[string]bool{}); bad {
-		g.errorf(codeHTTPJSON, op.Name, "経路の op %s の%sの型 %s が、union %s を中に持つ（union の通信の上の形を、まだ決めていない）",
+		g.errorf(codeHTTPJSON, op.Name, "経路の op %s の%s %s が、union %s を中に持つ（union の通信の上の形を、まだ決めていない）",
 			op.Name, what, golang.TypeDisplay(t), union)
 	}
 }

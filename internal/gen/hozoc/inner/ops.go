@@ -14,13 +14,25 @@ type Ops interface {
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
 
-	// WriteOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+	// CollectOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを集める。ファイルには触れない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
 	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+	// 純粋（ctx を取らない）
+	CollectOutputs(in EmitInput, checked CheckResult) (EmitPlan, error)
+
+	// WriteOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+	// 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+	//
+	// 引数:
+	//   - in: コマンドの入力
+	//   - checked: 検査の結果
+	//
+	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
 	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
 
@@ -30,6 +42,7 @@ type Ops interface {
 	//   - in: コマンドの入力
 	//
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
+	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
 	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
 
@@ -49,7 +62,7 @@ type Ops interface {
 	RunEmit(ctx context.Context, plugin Plugin, req EmitRequest) (EmitResponse, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// Check は仕様を検査する。ファイルは書き出さない。
@@ -59,6 +72,16 @@ type Leaves interface {
 	//
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
+
+	// CollectOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを集める。ファイルには触れない。
+	//
+	// 引数:
+	//   - in: コマンドの入力
+	//   - checked: 検査の結果
+	//
+	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+	// 純粋（ctx を取らない）
+	CollectOutputs(in EmitInput, checked CheckResult) (EmitPlan, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
@@ -95,8 +118,8 @@ func (o *ops) Check(ctx context.Context, in CheckInput) (CheckResult, error) {
 	return o.leaves.Check(ctx, in)
 }
 
-func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error) {
-	return o.outputsSync.WriteOutputs(ctx, in, checked)
+func (o *ops) CollectOutputs(in EmitInput, checked CheckResult) (EmitPlan, error) {
+	return o.leaves.CollectOutputs(in, checked)
 }
 
 func (o *ops) Lsp(ctx context.Context, in LspInput) error {

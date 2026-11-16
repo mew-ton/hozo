@@ -10,7 +10,9 @@
 //     Validate を持たない入力は、同じ補助を通って、そのまま op に届く。
 //   - 「成功の応答」: 返す値があれば 200 と JSON（値のない配列は []、値のない record は {}、零値も値）、なければ 204 で本文なし
 //     （戻り値のない op、省略可能な戻り値で値がないとき）。一つの op が、呼び出しによって 200 も 204 も返す。
-//   - 「失敗の応答」: @http.status を持つ例外は、そのステータスと FQN（と値）。それ以外は 500 `internal`。ポインタで返した例外も 500。
+//   - 「失敗の応答」: @http.status を持つ例外は、そのステータスと FQN。引数を持つ例外は、引数の名前をキーにしたオブジェクトを value に
+//     （引数が一つでも包む。省略可能な引数で値がなければ、キーを省く）。引数のない例外に、value はない。それ以外（ステータスを
+//     持たない例外は、引数を持っていても）は 500 `internal`。ポインタで返した例外も 500。
 //   - 経路にない要求は 404、メソッドの合わない要求は 405（net/http の既定）。/ で終わるパスは、そのパスだけに合う。
 //   - op には、要求の context をそのまま渡す。
 package behavior
@@ -441,21 +443,35 @@ func TestResults(t *testing.T) {
 
 func TestErrors(t *testing.T) {
 	leaves, h := newAPI()
+	until := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	for name, tc := range map[string]struct {
 		err    error
 		status int
 		body   string
 	}{
-		"値を運ばない例外":      {pkgtype.NotFound{}, 404, `{"error":"type.NotFound"}`},
-		"その場で書いた値を運ぶ例外": {pkgtype.Conflict{Value: pkgtype.ConflictValue{Existing: "pen", Count: 2}}, 409, `{"error":"type.Conflict","value":{"existing":"pen","count":2}}`},
-		"model の値を運ぶ例外": {pkgtype.Rejected{Value: pkgtype.Item{Name: "x", Quantity: 1}}, 422, `{"error":"type.Rejected","value":{"name":"x","quantity":1,"tags":null}}`},
-		"包んだ例外":         {fmt.Errorf("wrapped: %w", pkgtype.NotFound{}), 404, `{"error":"type.NotFound"}`},
-		// それ以外は 500 で、中身を出さない
-		"ステータスを持たない例外": {pkgtype.Broken{}, 500, `{"error":"internal"}`},
-		"ほかのエラー":       {errors.New("secret detail"), 500, `{"error":"internal"}`},
-		"中断":           {context.Canceled, 500, `{"error":"internal"}`},
+		// 引数のない例外: value はない
+		"引数のない例外": {pkgtype.NotFound{}, 404, `{"error":"type.NotFound"}`},
+		// 引数を持つ例外: value は、引数の名前をキーにしたオブジェクト。キーの並びは、宣言の引数の順
+		"引数が二つの例外": {pkgtype.Conflict{Existing: "pen", Count: 2}, 409, `{"error":"type.Conflict","value":{"existing":"pen","count":2}}`},
+		"引数の零値も、値": {pkgtype.Conflict{}, 409, `{"error":"type.Conflict","value":{"existing":"","count":0}}`},
+		// 引数が一つでも、オブジェクトで包む（引数の名前 value が、キーになる）。model の引数は、その JSON
+		"引数が一つの例外": {pkgtype.Rejected{Value: pkgtype.Item{Name: "x", Quantity: 1}}, 422, `{"error":"type.Rejected","value":{"value":{"name":"x","quantity":1,"tags":null}}}`},
+		// 省略可能な引数で値がなければ、キーを省く。scalar の引数は元の型の JSON（Duration は、整数のナノ秒）、Time は RFC 3339
+		"省略可能な引数に値がない": {pkgtype.Limited{RetryAfter: pkgtype.Wait(30 * time.Second)}, 429, `{"error":"type.Limited","value":{"retryAfter":30000000000}}`},
+		"省略可能な引数に値がある": {pkgtype.Limited{RetryAfter: pkgtype.Wait(time.Second), Hint: ptr("slow down"), Until: &until}, 429,
+			`{"error":"type.Limited","value":{"retryAfter":1000000000,"hint":"slow down","until":"2026-01-02T03:04:05Z"}}`},
+		// 引数を持つ例外は、どの引数にも値がなくても、value を持つ（空のオブジェクト）
+		"どの引数にも値がない":  {pkgtype.Gone{}, 410, `{"error":"type.Gone","value":{}}`},
+		"包んだ例外":       {fmt.Errorf("wrapped: %w", pkgtype.NotFound{}), 404, `{"error":"type.NotFound"}`},
+		"包んだ、引数を持つ例外": {fmt.Errorf("wrapped: %w", pkgtype.Conflict{Existing: "ink", Count: 1}), 409, `{"error":"type.Conflict","value":{"existing":"ink","count":1}}`},
+		// それ以外は 500 で、中身を出さない。ステータスを持たない例外は、引数を持っていても、その値を出さない
+		"ステータスを持たない例外":       {pkgtype.Broken{}, 500, `{"error":"internal"}`},
+		"ステータスを持たない、引数を持つ例外": {pkgtype.Leaky{Secret: "secret detail"}, 500, `{"error":"internal"}`},
+		"ほかのエラー":             {errors.New("secret detail"), 500, `{"error":"internal"}`},
+		"中断":                 {context.Canceled, 500, `{"error":"internal"}`},
 		// 例外は値の型で見分ける: ポインタで返せば、見分けられずに 500
-		"ポインタで返した例外": {&pkgtype.NotFound{}, 500, `{"error":"internal"}`},
+		"ポインタで返した例外":       {&pkgtype.NotFound{}, 500, `{"error":"internal"}`},
+		"ポインタで返した、引数を持つ例外": {&pkgtype.Conflict{Existing: "pen", Count: 2}, 500, `{"error":"internal"}`},
 	} {
 		leaves.err = tc.err
 		// 経路の op のどれかが投げうる例外は、どの経路でも同じに見分ける（補助は一つ）。戻り値のある op も、ない op も、同じ
@@ -466,6 +482,28 @@ func TestErrors(t *testing.T) {
 			}
 		}
 	}
+}
+
+// 例外の構造体は、引数ごとにフィールド一つ（docs/plugin-go.md「exception」）。値を一つに包むフィールドは、ない。
+var (
+	_ = pkgtype.Conflict{Existing: "", Count: int64(0)}
+	_ = pkgtype.Limited{RetryAfter: pkgtype.Wait(0), Hint: (*string)(nil), Until: (*time.Time)(nil)}
+	_ = pkgtype.NotFound(struct{}{})
+)
+
+// op を呼ぶ前の失敗 http.BadRequest の形は、例外の形そのもの（value は、二つの引数 message と violations をキーにしたオブジェクト）で、
+// どの例外の引数の形にも依らない: 引数を持つ例外を投げうる経路でも、同じ本文。violations は、空でも []。
+func TestBadRequestShape(t *testing.T) {
+	leaves, h := newAPI()
+	leaves.err = pkgtype.Conflict{Existing: "pen", Count: 2}
+	expectJSON(t, call(t, h, "GET", "/items/first", ""), 400, `{"error":"http.BadRequest","value":{"message":"query id: missing","violations":[]}}`)
+	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `[`, createHeaders...), 400, `{"error":"http.BadRequest","value":{"message":"body: invalid JSON","violations":[]}}`)
+	if len(leaves.calls) != 0 {
+		t.Errorf("読めない要求で、op が呼ばれた: %v", leaves.calls)
+	}
+	strictHandler := strict.NewHandler(strict.New(&strictLeaves{}))
+	expectJSON(t, call(t, strictHandler, "POST", "/orders", `{"lines":[{"name":"","quantity":1}]}`), 400,
+		`{"error":"http.BadRequest","value":{"message":"invalid input","violations":[{"path":"body.lines[0].name","constraint":"length"}]}}`)
 }
 
 // strictLeaves は strict の葉の op。

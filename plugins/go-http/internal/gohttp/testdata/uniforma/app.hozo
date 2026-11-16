@@ -1,5 +1,5 @@
 // 型に依らない形の確かめ（docs/requirements.md「出力を推論しない」）の一つ目: 核の型、省略可能でないフィールド、
-// 値を運ばない例外、戻り値のある op。uniformb/app.hozo と、型だけが違う。
+// 引数のない例外、戻り値のある op。uniformb/app.hozo と、型だけが違う。
 namespace app {
   model Paging { page: int; q: string; }
   model Meta { tenant: string; }

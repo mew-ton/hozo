@@ -77,7 +77,10 @@ func TestHasValidate(t *testing.T) {
 			// union と exception は Validate を持たない。union をフィールドに持つ model も、それだけでは持たない
 			&ir.Union{DeclBase: decl("app.Contact"), Variant: ir.UnionArms, Arms: []ir.UnionArm{{Name: "Mail", Type: ir.Ref("type.Email")}}},
 			model("app.Holder", field("contact", ir.Ref("app.Contact"))),
+			// 例外は、引数の型が Validate を持つ型でも（scalar、model、包まれた型）、持たない
 			&ir.Exception{DeclBase: decl("app.Bad"), Params: []ir.OpParam{{Name: "value", Type: ir.Ref("app.Named")}}},
+			&ir.Exception{DeclBase: decl("app.Bad3"), Params: []ir.OpParam{
+				{Name: "email", Type: ir.Ref("type.Email")}, {Name: "named", Type: ir.Optional(ir.Ref("app.Named"))}, {Name: "list", Type: ir.Array(ir.Ref("app.Direct"))}}},
 			// その場で書いた model（合成した model。ユニオンのアーム）は、普通の model
 			&ir.Model{DeclBase: decl("app.Page.Ready"), SynthesizedFrom: "app.Page", Fields: []ir.Field{field("n", ir.Int(), "valid.max")}},
 			&ir.Exception{DeclBase: decl("app.Bad2"), Params: []ir.OpParam{{Name: "n", Type: ir.Int()}}},
@@ -95,7 +98,7 @@ func TestHasValidate(t *testing.T) {
 		"app.Keyed": false, "app.NoCheck": false,
 		"app.Outer": true, "app.Mid": true, "app.Ping": true, "app.Pong": true, "app.Loop": false,
 		"app.Contact": false, "app.Holder": false, "app.Bad": false,
-		"app.Page.Ready": true, "app.Bad2": false,
+		"app.Page.Ready": true, "app.Bad2": false, "app.Bad3": false,
 		"app.send": false, "app.send$in": false,
 		"app.Nowhere": false, "": false,
 	}

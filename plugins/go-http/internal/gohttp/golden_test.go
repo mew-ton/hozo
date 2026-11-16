@@ -22,8 +22,8 @@ var goldenFixtures = []struct {
 }{
 	{name: "routes", covers: "「出力」のハンドラの中の 1〜5、「入力の読み方」の二つの表の各行（三つの場所の二つの形、名前を書いた項目と省いた項目、項目がないときの三つの扱い）、「補助」（使うものだけ）、「通信の形」、「制約の検査」", behavior: true},
 	{name: "locals", covers: "名前空間のパッケージの名前が、NewHandler とハンドラの中の局所の名前や、標準ライブラリのパッケージの名前と当たるとき（「出力」。docs/plugin-go.md「パッケージと import パス」の import の名前）"},
-	{name: "uniforma", covers: "型に依らない形の確かめ（docs/testing.md「単体テスト」）の一つ目: 核の型、省略可能でないフィールド、値を運ばない例外、戻り値のある op"},
-	{name: "uniformb", covers: "同、二つ目: scalar、省略可能なフィールド、値を運ぶ例外、省略可能な戻り値の op。uniforma と同じテキストになる（TestUniform）"},
+	{name: "uniforma", covers: "型に依らない形の確かめ（docs/testing.md「単体テスト」）の一つ目: 核の型、省略可能でないフィールド、引数のない例外、戻り値のある op"},
+	{name: "uniformb", covers: "同、二つ目: scalar、省略可能なフィールド、引数を持つ例外（一つと、二つ以上。省略可能な引数）、省略可能な戻り値の op。uniforma と同じテキストになる（TestUniform）"},
 }
 
 // TestGolden は、入力ごとに、出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形で
@@ -223,8 +223,9 @@ func contains(list []string, s string) bool {
 
 // TestUniform は、型に依らない形の確かめ（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」）: 入力 uniforma と
 // uniformb は、同じ名前のフィールドと op に、同じデコレータを書き、型だけを変えてある（核の型と scalar、省略可能とそうでないもの、
-// 値を運ぶ例外と運ばない例外、戻り値のある op と省略可能な戻り値の op、配列と record の結果）。二つの http.go は、フィールドごと・
-// op ごと・例外ごとの行だけでなく、ファイルの全体が、同じテキストになる。違いが実行時に出ることは、behavior_test.go が確かめる。
+// 引数を持つ例外（一つと、二つ以上。省略可能な引数）と持たない例外、戻り値のある op と省略可能な戻り値の op、配列と record の結果）。
+// 二つの http.go は、フィールドごと・op ごと・例外ごとの行だけでなく、ファイルの全体が、同じテキストになる。違いが実行時に出ることは、
+// behavior_test.go が確かめる。
 func TestUniform(t *testing.T) {
 	_, a := emitFixture(t, "uniforma")
 	_, b := emitFixture(t, "uniformb")
@@ -233,6 +234,29 @@ func TestUniform(t *testing.T) {
 	}
 	if a["gen/app/http.go"] != b["gen/app/http.go"] {
 		t.Errorf("型だけが違う二つの入力の http.go が、違うテキストになった:\n%s", firstDiff(a["gen/app/http.go"], b["gen/app/http.go"]))
+	}
+	// 二つの入力が、確かめたい違いを持っていること: 同じ例外が、片方では引数を持たず、もう片方では持つ（一つと、二つ以上。省略可能な引数）
+	params := func(name, fqn string) []ir.OpParam {
+		x, ok := loadViews(t, name)[0].Program.Lookup(fqn).(*ir.Exception)
+		if !ok {
+			t.Fatalf("%s に、例外 %s がない", name, fqn)
+		}
+		return x.Params
+	}
+	for _, fqn := range []string{"app.Missing", "app.Clash"} {
+		if n := len(params("uniforma", fqn)); n != 0 {
+			t.Errorf("uniforma の例外 %s が、引数を %d 個持つ（持たないはず）", fqn, n)
+		}
+	}
+	if n := len(params("uniformb", "app.Missing")); n != 1 {
+		t.Errorf("uniformb の例外 app.Missing の引数が %d 個（一つのはず）", n)
+	}
+	clash := params("uniformb", "app.Clash")
+	if len(clash) < 2 {
+		t.Fatalf("uniformb の例外 app.Clash の引数が %d 個（二つ以上のはず）", len(clash))
+	}
+	if _, optional := clash[len(clash)-1].Type.(ir.OptionalType); !optional {
+		t.Errorf("uniformb の例外 app.Clash の最後の引数 %s が、省略可能でない", clash[len(clash)-1].Name)
 	}
 	// 比べたものが、確かめたい行を持っていること
 	for _, line := range []string{
@@ -246,6 +270,59 @@ func TestUniform(t *testing.T) {
 	} {
 		if !strings.Contains(a["gen/app/http.go"], line) {
 			t.Errorf("uniforma の http.go に、行 %s がない", line)
+		}
+	}
+}
+
+// TestThrown は「補助」の httpWriteError と httpThrown、「通信の形」の「失敗の応答」: 例外ごとの行は、@http.status を持つ例外を、最初に
+// 現れた順（op の宣言順、その中は exceptions の順）に、例外の型とステータスだけで書く。引数の数も、名前も、型も、行に現れない。
+// 例外の値を応答にするところ（補助 httpThrown）は、どの出力でも同じテキストで、例外の値そのものを JSON にする（引数の名前を
+// キーにしたオブジェクト。フィールドを名指ししない）。@http.status を持たない例外は、引数を持っていても、行を持たない。
+func TestThrown(t *testing.T) {
+	_, files := emitFixture(t, "routes")
+	api := files["gen/api/http.go"]
+	start, end := strings.Index(api, "func httpWriteError("), strings.Index(api, "// httpThrown は")
+	if start < 0 || end < start {
+		t.Fatal("gen/api/http.go に、httpWriteError と httpThrown がない")
+	}
+	want := `func httpWriteError(w http.ResponseWriter, err error) {
+	switch {
+	case httpThrown[pkgtype.Conflict](w, err, 409):
+	case httpThrown[pkgtype.Rejected](w, err, 422):
+	case httpThrown[pkgtype.NotFound](w, err, 404):
+	case httpThrown[pkgtype.Limited](w, err, 429):
+	case httpThrown[pkgtype.Gone](w, err, 410):
+	default:
+		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+	}
+}
+
+`
+	if got := api[start:end]; got != want {
+		t.Errorf("httpWriteError =\n%s\nwant\n%s", got, want)
+	}
+	// 補助 httpThrown は、型にも、仕様にも依らない: 引数を持つ例外だけの出力でも、持たない例外だけの出力でも、同じテキスト
+	thrown := func(content string) string {
+		i := strings.Index(content, "// httpThrown は")
+		if i < 0 {
+			t.Fatal("httpThrown がない")
+		}
+		return content[i:]
+	}
+	_, a := emitFixture(t, "uniforma")
+	_, b := emitFixture(t, "uniformb")
+	if thrown(api) != thrown(a["gen/app/http.go"]) || thrown(api) != thrown(b["gen/app/http.go"]) {
+		t.Error("補助 httpThrown のテキストが、出力によって違う")
+	}
+	for _, line := range []string{"func httpThrown[E runtime.Exception](w http.ResponseWriter, err error, status int) bool {", "body.Value = e\n"} {
+		if !strings.Contains(thrown(api), line) {
+			t.Errorf("httpThrown に、%q がない", line)
+		}
+	}
+	// 例外の構造体のフィールドを、名前で引かない（値を一つに包むフィールド Value は、もうない。docs/plugin-go.md「exception」）
+	for _, banned := range []string{"FieldByName", `"Value"`, ".Field("} {
+		if strings.Contains(thrown(api), banned) {
+			t.Errorf("httpThrown が、%q を書いている（例外の値は、そのまま JSON にする）", banned)
 		}
 	}
 }
@@ -356,7 +433,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gohttp2", codeHTTPParams},      // 経路の op の引数が、0 個でも model 一つでもない
 	{"gohttp3", codeHTTPPlace},       // 入力の model のフィールドが、場所の六つのデコレータのどれも持たない、または二つ以上持つ
 	{"gohttp4", codeHTTPFieldType},   // ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない
-	{"gohttp5", codeHTTPJSON},        // 本文、結果、@http.status を持つ例外の値に、JSON にできない型がある
+	{"gohttp5", codeHTTPJSON},        // 本文、結果、@http.status を持つ例外の引数の型に、JSON にできない型がある
 	{"gohttp6", codeHTTPGetBody},     // @http.get の op の入力が、本文のデコレータのフィールドを持つ
 	{"gohttp7", codeHTTPPath},        // パスが / で始まらない、または { か } を含む
 	{"gohttp8", codeHTTPDuplicate},   // 同じメソッドとパスの経路が二つある
@@ -418,7 +495,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		"gohttp3": {"app.In"},
 		// 全体の形で受け取る model のフィールドの型は、その model の位置
 		"gohttp4":  {"app.HeaderIn", "app.QueryIn", "app.Meta", "app.Paging"},
-		"gohttp5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.clash"},
+		"gohttp5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.clash", "app.refused"},
 		"gohttp6":  {"app.fetch", "app.both", "app.whole"},
 		"gohttp7":  {"app.relative", "app.empty", "app.absolute", "app.byId", "app.brace"},
 		"gohttp8":  {"app.second", "app.third", "app.again"},

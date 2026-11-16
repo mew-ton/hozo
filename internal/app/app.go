@@ -4,20 +4,21 @@
 // internal/gen/hozoc（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と internal/gen/hozoc/cli（go-cli。
 // docs/plugin-go-cli.md）が持ち、ここは、生成した口を満たす [App] と、cli.Presenter の実装 [Presenter] を持つ:
 //
-//   - 効果も reads も持たない葉の check、lsp、runEmit は hozoc.Leaves のメソッドで、*App がそれを満たす。
-//   - 効果 syncOutputs を持つ葉の writeOutputs は、その宛先の状態の分類 OutputsSync の単位（hozoc.OutputsSyncState）の命令。
-//     同じ単位の問い合わせ（述語 UpToDate）と一緒に、[App.OutputsSync] が返す値が持つ。
-//   - 状態 sources、config、outputs の単位（形で決まる問い合わせ IsEmpty と Get だけ）は、[App.Sources]、[App.Config]、
-//     [App.Outputs] が返す値。
-//   - 配線の emit は、生成した本体が持つ。
+//   - 葉の op（状態に触れない）check、collectOutputs、lsp、runEmit は hozoc.Leaves のメソッドで、*App がそれを満たす。
+//   - 状態に触れるのは、状態の単位のメソッドだけ（docs/plugin-go.md「状態の単位」）。read outputChanges は、その状態 outputs の単位
+//     （hozoc.OutputsState）の問い合わせで、形で決まる問い合わせ（IsEmpty と Get）と一緒に、[App.Outputs] が返す値が持つ。
+//     効果 syncOutputs は、その宛先の状態の分類 OutputsSync の単位（hozoc.OutputsSyncState）の命令で、同じ単位の問い合わせ
+//     （述語 UpToDate）と一緒に、[App.OutputsSync] が返す値が持つ。
+//   - 状態 sources、config の単位（形で決まる問い合わせ IsEmpty と Get だけ）は、[App.Sources]、[App.Config] が返す値。
+//   - 配線の writeOutputs（collectOutputs、outputChanges、syncOutputs を、この順に呼ぶ）と emit は、生成した本体が持つ。
 //
 // [App.Ops] が、これらを hozoc.New に渡す。口はどれもインターフェースで、実装は New の位置引数なので、メソッドの書き忘れも、
 // 渡し忘れも、コンパイルできない。cmd/hozoc/main.go は、その結果を cli.Main に渡す。
 //
 // 境界の型は生成したもの（hozoc.CheckInput、hozoc.Diagnostic、hozoc.CheckFailed など）で、中の豊かな型
 // （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型を値で
-// 返す（hozoc.CheckFailed{Value: hozoc.Diagnostics{...}} など。proc の例外は internal/gen/proc の型）。cli.go はそれを
-// errors.As で見分けて @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
+// 返す（診断を運ぶ四つの例外は、このパッケージの exceptions.go の関数で作る。proc の例外は internal/gen/proc の型）。cli.go は
+// それを errors.As で見分けて @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
 package app
 
 import (
@@ -41,8 +42,9 @@ import (
 // App は葉の op の実装（docs/cli.md「手で書くもの」の internal/app）と、それらが共有するもの。零値で使える。
 //
 // cli.hozo の model は境界だけを書く（docs/requirements.md「自己展開」）ので、op をまたいで要る中身は
-// App の中に持つ: Check が解析した Project（WriteOutputs が使う）。プラグインに渡す IR（cli.hozo の model View は
-// 中身を持たない）は、その Project から作る。hozoc は一度の実行で一つのコマンドを走らせるので、同時に使われることはない。
+// App の中に持つ: Check が解析した Project（CollectOutputs が使う）と、CollectOutputs が集めた書き出す予定の、置き場を含む形
+// （OutputChanges と SyncOutputs が使う）。プラグインに渡す IR（cli.hozo の model View は中身を持たない）は、その Project から
+// 作る。hozoc は一度の実行で一つのコマンドを走らせるので、同時に使われることはない。
 type App struct {
 	// Dir は作業ディレクトリ。hozo.toml を探し始める場所で、--config の相対パスの基準。空なら os の作業ディレクトリ。
 	Dir string
@@ -62,12 +64,18 @@ type App struct {
 	// 状態の単位の IsEmpty / Get）が、自分で解析するときに使う。
 	pluginPath string
 
-	// checked は直前の Check が解析した Project。WriteOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
+	// checked は直前の Check が解析した Project。CollectOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
 	// なので、Program・設定・マニフェストはここから取る。Check が失敗すれば nil。
 	checked *project.Project
+
+	// planned は直前の CollectOutputs が集めた書き出す予定。それが返す hozoc.EmitPlan は warning とファイルだけなので、
+	// OutputChanges と SyncOutputs は、置き場（ルートと、出力ごとの Dir(U, N)）をここから取る（[App.plannedFor]）。
+	// Check をやり直すか、CollectOutputs が失敗すれば nil。
+	planned *outputPlan
 }
 
-// *App は、人が実装する葉の op（check、lsp、runEmit）の口を満たす。メソッドが一つでも足りなければ、ここでコンパイルできない。
+// *App は、人が実装する葉の op（check、collectOutputs、lsp、runEmit）の口を満たす。メソッドが一つでも足りなければ、ここで
+// コンパイルできない。
 var _ hozoc.Leaves = (*App)(nil)
 
 // Ops は a の実装で hozoc の Ops を組み立てる（docs/cli.md「手で書くもの」）: hozoc.New に、葉の op（a 自身）と、状態の単位を
@@ -112,12 +120,7 @@ func (a *App) Lsp(ctx context.Context, in hozoc.LspInput) error {
 	return lsp.Serve(stdin, stdout, opts)
 }
 
-// 例外の値と誤りの写し（cli.hozo の exception ↔ 中の型）。
-
-// diagnostics は診断の列を cli.hozo の model Diagnostics にする。
-func diagnostics(diags []diag.Diagnostic, fs *source.FileSet) hozoc.Diagnostics {
-	return hozoc.Diagnostics{Items: toDiagnostics(diags, fs)}
-}
+// 診断と誤りの写し（cli.hozo の model と exception ↔ 中の型）。診断を運ぶ例外そのものは exceptions.go。
 
 // toDiagnostics は診断の列を cli.hozo の model Diagnostic の列にする。位置は行と列に直す（docs/diagnostics.md「構造」）。
 func toDiagnostics(diags []diag.Diagnostic, fs *source.FileSet) []hozoc.Diagnostic {
@@ -174,7 +177,7 @@ func stringList(v any) []string {
 	return []string{fmt.Sprint(v)}
 }
 
-// unknownNamespace は hozoc.UnknownNamespace（値を運ばない）に、表示のための名前を添えたもの。
+// unknownNamespace は hozoc.UnknownNamespace（引数を持たない）に、表示のための名前を添えたもの。
 // errors.As は Unwrap を通して hozoc.UnknownNamespace を見つける。
 type unknownNamespace struct{ names []string }
 

@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"testing"
 )
@@ -112,5 +114,22 @@ func TestCheckFormat(t *testing.T) {
 	}
 	if CheckFormat("unknown", "x") {
 		t.Error("unknown format must be false")
+	}
+}
+
+// TestDBTxKey は、ctx が運ぶトランザクションの鍵（docs/plugin-go-sqlite.md「トランザクション」）: 同じ *sql.DB から作った鍵は等しく
+// （どのパッケージで作っても、同じ値を引く）、別の *sql.DB の鍵は別。
+func TestDBTxKey(t *testing.T) {
+	db, other := new(sql.DB), new(sql.DB)
+	tx := new(sql.Tx)
+	ctx := context.WithValue(context.Background(), DBTxKey{DB: db}, tx)
+	if got, ok := ctx.Value(DBTxKey{DB: db}).(*sql.Tx); !ok || got != tx {
+		t.Errorf("同じ db の鍵で引いた値 = %v, %v（期待は、置いた *sql.Tx）", got, ok)
+	}
+	if got := ctx.Value(DBTxKey{DB: other}); got != nil {
+		t.Errorf("別の db の鍵で引いた値 = %v（期待は nil）", got)
+	}
+	if got := ctx.Value(DBTxKey{}); got != nil {
+		t.Errorf("db のない鍵で引いた値 = %v（期待は nil）", got)
 	}
 }
