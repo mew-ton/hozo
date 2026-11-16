@@ -132,7 +132,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "fetchUser が呼ぶ op（修飾なしの参照も FQN）", renderBody(opOf(t, prog, "web.openUser").Body)[0], "const user = web.fetchUser(q: {id: id})")
 		expect(t, "web.goLogin の宛先（状態は FQN）", declOf(t, prog, "web.goLogin").(*ir.Effect).Target, ir.EffectTarget(ir.BuiltinTarget{State: "web.location", Operation: ir.OpPut}))
 		expect(t, "web.goLogin が書き込む状態", declOf(t, prog, "web.goLogin").(*ir.Effect).Writes, []string{"web.location"})
-		// 空にするのは delete（docs/decisions.md「設計書を変える決定」S2）
+		// 空にするのは delete（docs/decisions.md「設計書から離れた決定」S2）
 		expect(t, "web.removeToken の宛先", declOf(t, prog, "web.removeToken").(*ir.Effect).Target, ir.EffectTarget(ir.BuiltinTarget{State: "web.token", Operation: ir.OpDelete}))
 		// 複数回の `namespace web { }` は一つの Namespace。二つ目のブロックの宣言（LoginForm、login）は一つ目の末尾に続く
 		expect(t, "web は一つの Namespace", countNamespaces(prog, "web"), 1)
@@ -768,7 +768,7 @@ func TestViewFromEntry(t *testing.T) {
 // stateCorpus は tests/corpus/state（その README.md に見出し → 構文の対応がある）。
 const stateCorpus = "corpus/state"
 
-// TestStateCorpusIR は、状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）の構文が、文書どおりの形で
+// TestStateCorpusIR は、状態を分類で表す決定（docs/decisions.md「設計書から離れた決定」S1〜S5）の構文が、文書どおりの形で
 // IR（internal/project の Load → Sema.Program）に載ることを確かめる。サブテストの名前は要求の文書の見出し。
 // このコーパスは check だけを確かめる（emit は tests/corpus/state/README.md「emit のゴールデンがない理由」）。
 func TestStateCorpusIR(t *testing.T) {

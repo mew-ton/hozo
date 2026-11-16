@@ -36,7 +36,7 @@ func logoutProgram() *ir.Program {
 			serverLogout,
 		),
 		namespace("browser",
-			// 空になりうる状態は nullable<T>、空にするのは delete（docs/decisions.md「設計書を変える決定」S2）
+			// 空になりうる状態は nullable<T>、空にするのは delete（docs/decisions.md「設計書から離れた決定」S2）
 			state("browser.token", ir.StateNullable, ir.Ref("server.Token")),
 			eff("browser.removeToken", "browser.token", ir.OpDelete),
 			clearToken,

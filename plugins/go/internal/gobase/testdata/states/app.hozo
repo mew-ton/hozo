@@ -227,4 +227,20 @@ namespace app {
     showCount(n);
     return summary();
   }
+
+  // 配線に付いたデコレータが運ぶ reads と effects（docs/check.md「デコレータが運ぶ reads と effects」）: その配線の Reads と Effects の
+  // コメントに、本体が行き着くものの後ろに並ぶ（コメントは Op.signature から書く）。出すコードは変わらない: 配線の本体は、
+  // 書かれた呼び出しだけで、運ばれたものを起こすのは、デコレータを読むトランスパイラ
+  @looks(settings)
+  @does(dropToken)
+  export op keep(line: Line)
+  {
+    addLine(line);
+  }
+  // それを呼ぶ配線にも伝わる
+  export op keepTwice(line: Line)
+  {
+    keep(line);
+    keep(line);
+  }
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// bindFixture は §5.3 の形: browser.token（nullable<server.Token>。docs/decisions.md「設計書を変える決定」S2）を
+// bindFixture は §5.3 の形: browser.token（nullable<server.Token>。docs/decisions.md「設計書から離れた決定」S2）を
 // server.* に bind する。
 func bindFixture(serverOps []ir.Decl, browserOps []ir.Decl, binds ...ir.Bind) *ir.Program {
 	server := []ir.Decl{

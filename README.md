@@ -2,8 +2,8 @@
 
 Hozo は、プログラムを「状態」と「入出力」だけで記述する仕様言語。このリポジトリはその実装のモノレポで、仕様を検査して各言語のコードに展開する CLI `hozoc`、IDE 向けの言語サーバー（`hozoc lsp`）、エディタの対応（シンタックスハイライト）、プラグイン、標準の語彙を持つ。実装言語は `docs/requirements.md`「実装言語」。
 
-- 設計書: `mew-ton/drafts` の `hozo/README.md`（https://github.com/mew-ton/drafts/blob/main/hozo/README.md ）
-- 設計文書: [`docs/README.md`](docs/README.md)（要件、文法、IR、検査、プラグインと Go の基底、CLI、言語サーバー、テスト）
+- 仕様と設計の文書: [`docs/README.md`](docs/README.md)（要件、文法、IR、検査、プラグインと Go の基底、CLI、言語サーバー、テスト）。言語の仕様の持ち主は、この `docs/`
+- 文書が「設計書」と呼ぶもの: `mew-ton/drafts` の `hozo/README.md`。この言語の出発点になった、粗いアイデアの集まりで、保守されておらず、仕様の持ち主ではない（`docs/README.md`「設計書という呼び名」）
 
 ## 開発
 

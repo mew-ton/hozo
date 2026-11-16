@@ -188,7 +188,7 @@ type User struct {
 - フィールドは `Model.fields` の順。フィールドの説明は、フィールドの前の行のコメント。
 - **継承した model**（`Model.extends`）は、元の model とは別の、普通の構造体。フィールドは展開済みの `fields`（なくしたフィールドは、もうない）。元の model から写す関数は出さない。コメントに継承の一行を足す（「コメント」）。
 - union のアームの合成 model には、union のマーカーメソッドを足す（「union」）。
-- model から出すのは、構造体だけ。値を作る関数（初めの値を入れる関数）は出さない: フィールドの既定値は、言語にない（`docs/decisions.md`「設計書を変える決定」S24）。使う側は、零値（`var in <Model>`、`<Model>{}`）から始め、決まった値を入れるのは、それを言うデコレータを読む相乗り（`docs/plugin-go-http.md`「入力の読み方」、`docs/plugin-go-cli.md`「引数の解釈」）。
+- model から出すのは、構造体だけ。値を作る関数（初めの値を入れる関数）は出さない: フィールドの既定値は、言語にない（`docs/decisions.md`「設計書から離れた決定」S24）。使う側は、零値（`var in <Model>`、`<Model>{}`）から始め、決まった値を入れるのは、それを言うデコレータを読む相乗り（`docs/plugin-go-http.md`「入力の読み方」、`docs/plugin-go-cli.md`「引数の解釈」）。
 
 ### scalar
 

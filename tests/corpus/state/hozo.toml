@@ -1,4 +1,4 @@
-# 状態を分類で表す決定（docs/decisions.md「設計書を変える決定」S1〜S5）のコーパス（docs/testing.md「コーパス」、README.md）。
+# 状態を分類で表す決定（docs/decisions.md「設計書から離れた決定」S1〜S5）のコーパス（docs/testing.md「コーパス」、README.md）。
 # check と、Go の基底 go の出力（docs/plugin-go.md「状態の単位」「分類」「match」）のゴールデンを確かめる。
 # go は、リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す。
 

@@ -597,7 +597,7 @@ func shift(p protocol.Position, n int) protocol.Position {
 	return p
 }
 
-// TestStateClassification は、状態を分類で表す決定（docs/decisions.md「設計書を変える決定」）の構文に対する、
+// TestStateClassification は、状態を分類で表す決定（docs/decisions.md「設計書から離れた決定」）の構文に対する、
 // 診断の一致・ホバーの見出し（docs/lsp.md「ホバー」）・定義へジャンプ・ドキュメントのシンボル。
 // コーパスは tests/corpus/state（README.md）。
 func TestStateClassification(t *testing.T) {
@@ -982,7 +982,9 @@ namespace store {
 }
 
 // TestCarryingDecorators は、版 0.5 の構文（予約語のデコレータ名、reads / effects の節、残りの引数、対象 effect）について、
-// 定義へジャンプ（docs/lsp.md「定義へジャンプ」の表）、ホバーの見出し（同「ホバー」）、ドキュメントのシンボル、診断（DEC-17）を確かめる。
+// 定義へジャンプ（docs/lsp.md「定義へジャンプ」の表）、ホバーの見出し（同「ホバー」）、ドキュメントのシンボル、診断を確かめる。
+// 運ぶ節を持つデコレータは、配線の op にも付けられる（docs/check.md「デコレータが運ぶ reads と effects」）: 付けただけでは診断は出ず、
+// 運ばれたものは、その配線と、それを呼ぶ配線のホバーに出る。書いた節が運ばれたものを落としていれば EFF-2。
 func TestCarryingDecorators(t *testing.T) {
 	root := t.TempDir()
 	text := `namespace store {
@@ -1041,6 +1043,17 @@ func TestCarryingDecorators(t *testing.T) {
   op wired(): Row[] {
     return all();
   }
+  @effects(add)
+  op wiredWrite(): Row[] {
+    return all();
+  }
+  op viaWired(): Row[] {
+    return wiredWrite();
+  }
+  @effects(add)
+  op wiredShort(row: Row) effects rows.post {
+    rows.post(row);
+  }
 }
 `
 	path := filepath.Join(root, "a.hozo")
@@ -1048,19 +1061,23 @@ func TestCarryingDecorators(t *testing.T) {
 	c := startServer(t, Options{})
 	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
 	uri, enc := fileURI(path), encUTF16
-	// 診断: 運ぶ節を持つデコレータを配線に付けた DEC-17 だけ（位置はその適用）
+	// 診断: 運ぶ節を持つデコレータを配線に付けた wired と wiredWrite には、何も出ない。出るのは、書いた effects が、運ばれた add を
+	// 落としている wiredShort の EFF-2 だけ（位置は op。デコレータの適用から始まる）
 	var codes []string
 	for _, d := range byURI[uri] {
 		if d.Code == codeNoConfig {
 			continue
 		}
 		codes = append(codes, d.Code)
-		if want := positionOf(t, enc, text, "@list(rows)\n  op wired", 0); d.Code == "DEC-17" && d.Range.Start != want {
-			t.Errorf("DEC-17 の位置 = %+v, want %+v", d.Range.Start, want)
+		if want := positionOf(t, enc, text, "@effects(add)\n  op wiredShort", 0); d.Code == "EFF-2" && d.Range.Start != want {
+			t.Errorf("EFF-2 の位置 = %+v, want %+v", d.Range.Start, want)
+		}
+		if d.Code == "EFF-2" && !strings.Contains(d.Message, "足りない: store.add") {
+			t.Errorf("EFF-2 のメッセージ = %q, want 運ばれた store.add が足りないこと", d.Message)
 		}
 	}
-	if strings.Join(codes, ",") != "DEC-17" {
-		t.Fatalf("診断 = %v, want [DEC-17]", codes)
+	if strings.Join(codes, ",") != "EFF-2" {
+		t.Fatalf("診断 = %v, want [EFF-2]", codes)
 	}
 	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
 		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
@@ -1145,6 +1162,18 @@ func TestCarryingDecorators(t *testing.T) {
 	c.result(protocol.MethodHover, at("op insert(", len("op ")), &hov)
 	if hov == nil || !strings.Contains(hov.Contents.Value, "effects:\n- `add`") || !strings.Contains(hov.Contents.Value, "reads:\n- `rows`") {
 		t.Errorf("hover(op insert) = %+v", hov)
+	}
+	// 配線の op のホバー: 本体（all を呼ぶだけ）は効果を持たないので、effects は、デコレータが運んだ add。それを呼ぶ配線にも伝わる。
+	// reads の節だけを運ぶデコレータの付いた配線 wired は、効果を持たない
+	for _, name := range []string{"wiredWrite", "viaWired"} {
+		c.result(protocol.MethodHover, at("op "+name+"(", len("op ")), &hov)
+		if hov == nil || !strings.Contains(hov.Contents.Value, "effects:\n- `add`") || !strings.Contains(hov.Contents.Value, "reads:\n- `rows`") {
+			t.Errorf("hover(op %s) = %+v", name, hov)
+		}
+	}
+	c.result(protocol.MethodHover, at("op wired(", len("op ")), &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "effects: なし") || !strings.Contains(hov.Contents.Value, "reads:\n- `rows`") {
+		t.Errorf("hover(op wired) = %+v", hov)
 	}
 	// ドキュメントのシンボル: 予約語の名前のデコレータも Interface、効果は Event
 	var syms []protocol.DocumentSymbol

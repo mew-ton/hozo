@@ -2,13 +2,13 @@
 
 ## この文書が決めること
 
-`hozoc check` と `hozoc lsp` が IR（`docs/ir.md`）の上で行う計算と、規則ごとの検査の手続き・診断を決める。規則の ID は `docs/requirements.md`「検査の規則の一覧」のもので、規則の意味の持ち主は設計書の節。ここでは手続きだけを書く。設計書にない規則はこの文書の「診断」の各表が持ち主。名前の解決（`RES-*`）と型（`TYPE-*`、`LIT-1`）はそれぞれ `docs/resolve.md`「診断」、`docs/types.md`「診断」。
+`hozoc check` と `hozoc lsp` が IR（`docs/ir.md`）の上で行う計算と、規則ごとの検査の手続き・診断を決める。規則の ID と、短く言った意味は `docs/requirements.md`「検査の規則の一覧」にあり、ここでは、その手続きを書く。その一覧にない規則は、この文書の「診断」の各表が持ち主。名前の解決（`RES-*`）と型（`TYPE-*`、`LIT-1`）はそれぞれ `docs/resolve.md`「診断」、`docs/types.md`「診断」。
 
 検査は IR が作れた後に行う。IR を作る途中（解析、解決、正規化）の誤りがあるファイルでも、作れた部分には検査を行う（`docs/requirements.md`「言語サーバー」）。一つの検査で見つかる誤りはすべて報告する。
 
 ## 状態の形
 
-設計書 §5.2 の状態の形を、状態を分類で表す決定と、形と型を揃える決定（`docs/decisions.md`「設計書を変える決定」S1〜S9、S21）に合わせて定める。
+設計書 §5.2 の状態の形を、状態を分類で表す決定と、形と型を揃える決定（`docs/decisions.md`「設計書から離れた決定」S1〜S9、S21）に合わせて定める。
 
 ### 基底の状態
 
@@ -128,7 +128,7 @@
 
 ## 分類
 
-`classify`（と糖衣の `condition`）の対象、置き場、ケースの型、ケースの判定を定める。設計書 §10.1〜§10.3 に、`docs/decisions.md`「設計書を変える決定」の S3、S16、S18、S21 を当てたもの。構文は `docs/grammar.md`「classify / condition」、型の規則は `docs/types.md`「絞り込み」。
+`classify`（と糖衣の `condition`）の対象、置き場、ケースの型、ケースの判定を定める。設計書 §10.1〜§10.3 に、`docs/decisions.md`「設計書から離れた決定」の S3、S16、S18、S21 を当てたもの。構文は `docs/grammar.md`「classify / condition」、型の規則は `docs/types.md`「絞り込み」。
 
 ### 対象
 
@@ -204,7 +204,7 @@ classify Registration of findUser {     // findUser(email: Email): User?
 
 ## op の宣言と本体
 
-`export`、`never` を返す op、アームの `throw`、状態の参照の規則。`docs/decisions.md`「設計書を変える決定」の S17、S19、S20、S23 に、例外が引数を持つこと（`docs/grammar.md`「exception / effect / read」）を当てたもの。構文は `docs/grammar.md`「op」「配線」。
+`export`、`never` を返す op、アームの `throw`、状態の参照の規則。`docs/decisions.md`「設計書から離れた決定」の S17、S19、S20、S23 に、例外が引数を持つこと（`docs/grammar.md`「exception / effect / read」）を当てたもの。構文は `docs/grammar.md`「op」「配線」。
 
 ### export
 
@@ -337,7 +337,7 @@ D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節
 
 ### reads
 
-op が読む状態。`effects`（書く）と対になる、事実の記録（`docs/decisions.md`「設計書を変える決定」S15）。状態を読むのは、配線が呼ぶ `read` と、配線が名前で書いた状態（「状態に触れるもの」の「read と効果」）で、op の R は、その op の本体が行き着くものと、付いたデコレータが運ぶもの（「デコレータが運ぶ reads と effects」）を集めたもの。
+op が読む状態。`effects`（書く）と対になる、事実の記録（`docs/decisions.md`「設計書から離れた決定」S15）。状態を読むのは、配線が呼ぶ `read` と、配線が名前で書いた状態（「状態に触れるもの」の「read と効果」）で、op の R は、その op の本体が行き着くものと、付いたデコレータが運ぶもの（「デコレータが運ぶ reads と effects」）を集めたもの。
 
 R は基底の状態の FQN の列で、op ごとに次のように決まる。デコレータが R に足すのは、`reads` の節が運ぶものだけ（「デコレータが運ぶ reads と effects」）。`throws` / `catches` の節は R を変えない。
 
@@ -393,7 +393,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 
 ## 診断
 
-各表の「手続き」が条件。「重さ」は error か warning。計算の結果（`Signature`、`Call.bound`）を要する規則は `internal/check` が、要しない規則は IR を作るときに `internal/sema` が出す（S15〜S23 で足した規則では、READS-2 だけが前者）。位置は、表に書いてなければ規則の対象（宣言、フィールド、呼び出し、アーム）の `Span`。設計書にある規則の意味は `docs/requirements.md`「検査の規則の一覧」の節を、ない規則の意味はこの表を持ち主とする。`hozo.toml` がないとき（`docs/config.md`「置き場と探し方」）は、呼び出す側（`internal/project`）が CFG-* を除く。
+各表の「手続き」が条件。「重さ」は error か warning。計算の結果（`Signature`、`Call.bound`）を要する規則は `internal/check` が、要しない規則は IR を作るときに `internal/sema` が出す（S15〜S23 で足した規則では、READS-2 だけが前者）。位置は、表に書いてなければ規則の対象（宣言、フィールド、呼び出し、アーム）の `Span`。`docs/requirements.md`「検査の規則の一覧」にある規則の意味は、その表の「規則」の列と、この表の手続き。その一覧にない規則の意味は、この表が持ち主。`hozo.toml` がないとき（`docs/config.md`「置き場と探し方」）は、呼び出す側（`internal/project`）が CFG-* を除く。
 
 ### 名前空間
 
@@ -404,12 +404,12 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | NS-3 | error | RES-6 のうち、両方の出どころが語彙（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）のもの。メッセージに語彙の出どころ（標準か、どのプラグインか）を出す |
 | NS-5 | error | 別の名前空間の、`export` のない op を呼んだ（「op の宣言と本体」の「export」の表の二つ: 配線の呼び出し、デコレータの引数に渡した op）。位置は呼び出しの op の名前（デコレータの引数ならその引数の値）。`Related` にその op の宣言 |
 | NS-6 | error | 配線が、別の名前空間の `read` か効果（`effect` の宣言）を呼んだ（「状態に触れるもの」の「配線からの呼び出し」）。位置は呼び出しの名前。`Related` にその宣言。メッセージに、その名前空間の op を通すことを示す。`Signature` を要しないので `internal/sema` が出す |
-| NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `read` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。warning にするのは、設計書が強さを決めていないため |
+| NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `read` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。強さは、ここで warning と決めた |
 | DOC-1 | error | `@param` が引数名にない（op、デコレータ、`exception`、`effect`、`read` の引数。引数を持たない種類の宣言に書いた `@param` も）、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いた `external` なデコレータの `throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。デコレータの宣言の `@param` は `Param` の名前 |
 | DOC-2 | error | 同じ `@param` 名、同じ `@throws` 例外が二度ある |
 | UNION-1 | error | `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複 |
 
-NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使える」（型の位置の `C.Case<T>` の C と、`match` の C が、現在の名前空間の `classify` でなければエラー）という規則で、分類の置き場を自由にした（`docs/decisions.md`「設計書を変える決定」S18）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使える」（型の位置の `C.Case<T>` の C と、`match` の C が、現在の名前空間の `classify` でなければエラー）という規則で、分類の置き場を自由にした（`docs/decisions.md`「設計書から離れた決定」S18）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 
 ### 設定
 
@@ -444,7 +444,7 @@ EFF-3 は欠番。「葉の op が自分で書いた `effects` が二つ以上�
 | REL-4 | error | 計算の手順 0 の「配線の `Op.throws` に `relations` が書かれていれば」の比較。`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組を示す |
 | REL-5 | error | 一つの `ThrowsClause` に `prevents` と `keeps` の両方がある |
 
-REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別に書く形についての規則（REL-3: 名前の列で書いたら warning、REL-6: その名前が Sig の effects にない）で、目的語を `effects` だけにした（`docs/decisions.md`「設計書を変える決定」S9）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別に書く形についての規則（REL-3: 名前の列で書いたら warning、REL-6: その名前が Sig の effects にない）で、目的語を `effects` だけにした（`docs/decisions.md`「設計書から離れた決定」S9）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 
 ### デコレータ
 
@@ -478,7 +478,7 @@ DEC-17 は欠番。「`reads` か `effects` の節を持つデコレータが、
 | WIRE-3 | error | O の `returns` が `null` なのに `return` がある。`returns` が `null` でないのに、本体の最後の文が `return` でない。`return` が最後以外の文にある（下の行が評価されないため） |
 | WIRE-4 | error | 同じ名前を二度束縛。引数と同じ名前を束縛。束縛より上の行で使っている（RES-1 として出る） |
 | WIRE-5 | — | 文法で閉じる |
-| WIRE-6 | warning | 本体の `const` の数が `hozo.toml` の `[hozo].max_bindings`（`docs/config.md`「形」）を超える。既定は 5。設計書が値を決めていないため、ここで決める |
+| WIRE-6 | warning | 本体の `const` の数が `hozo.toml` の `[hozo].max_bindings`（`docs/config.md`「形」）を超える。既定は 5（ここで決めた値） |
 | WIRE-7 | error | 配線の呼び出しが循環している。循環上の op をすべて `Related` に示す |
 | WIRE-8 | warning | 束縛した名前が下の行で使われていない |
 | WIRE-9 | error | 「返らない」式の文（`unauthorized();`、すべてのアームが返らない `match ... ;`）が、本体の最後以外にある（下の行が評価されないため。WIRE-3 の `return` と同じ理由）。位置はその文 |

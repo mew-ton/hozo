@@ -135,6 +135,18 @@ type Ops interface {
 	// Reads: app.lines, app.settings
 	// Effects: app.addLine, app.dropToken, app.lines.post, app.refresh
 	Finish(ctx context.Context, line Line) (string, error)
+
+	// Keep は op app.keep。
+	//
+	// Reads: app.settings
+	// Effects: app.addLine, app.dropToken
+	Keep(ctx context.Context, line Line) error
+
+	// KeepTwice は op app.keepTwice。
+	//
+	// Reads: app.settings
+	// Effects: app.addLine, app.dropToken
+	KeepTwice(ctx context.Context, line Line) error
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。

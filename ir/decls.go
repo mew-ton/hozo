@@ -686,13 +686,13 @@ func (x Carried) MarshalJSON() ([]byte, error) { type alias Carried; return mars
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (x *Carried) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
 
-// DirectReads は op が直に読むもの: Reads の後ろに Carried.Reads を並べ、重複を最初の出現に寄せたもの
-// （docs/check.md「デコレータが運ぶ reads と effects」）。呼び出し先から伝わるものは含まない。
-// 直に読む状態は [Program.ReadStates] で求める。
+// DirectReads は葉の op が直に読むもの: Reads の後ろに Carried.Reads を並べ、重複を最初の出現に寄せたもの
+// （docs/check.md「デコレータが運ぶ reads と effects」）。配線の op が読むものは、本体が行き着くものを含む
+// Signature.Reads にあり、これでは求まらない。直に読む状態は [Program.ReadStates] で求める。
 func (o *Op) DirectReads() []ReadRef { return mergeUnique(o.Reads, o.Carried.Reads) }
 
-// DirectEffects は op が直に持つ効果: Effects の後ろに Carried.Effects を並べ、重複を最初の出現に寄せたもの
-// （同上）。呼び出し先から伝わるものと、デコレータの halts の効果は含まない。
+// DirectEffects は葉の op が直に持つ効果: Effects の後ろに Carried.Effects を並べ、重複を最初の出現に寄せたもの
+// （同上）。配線の op の効果は Signature.Effects にある。デコレータの halts の効果は含まない。
 func (o *Op) DirectEffects() []EffectRef { return mergeUnique(o.Effects, o.Carried.Effects) }
 
 // mergeUnique は二つの列を順に並べ、重複を最初の出現に寄せる。

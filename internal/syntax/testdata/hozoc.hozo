@@ -1,7 +1,7 @@
 // 設計書の examples/hozoc.hozo。`x?: T` は `x: T?` に直した（docs/grammar.md「決めたこと」）。
 // `namespace: string;` のフィールドは予約語なので `namespaceName` に直した。
 // `emit` の三つの効果（`addOutputs | replaceOutputs | removeStaleOutputs`）は、`outputs` を対象にした分類 `OutputsSync` の遷移
-// `syncOutputs` 一つに直した（docs/decisions.md「設計書を変える決定」S8）。
+// `syncOutputs` 一つに直した（docs/decisions.md「設計書から離れた決定」S8）。
 // このファイルは構文だけを確かめる入力: 葉の op に書いた `effects` の節は、パーサーは受け取り、検査が STATE-5 にする（docs/check.md「葉の op」）。
 // hozoc 自身の設計を Hozo で書いた叩き台。
 //

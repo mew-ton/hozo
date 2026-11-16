@@ -331,4 +331,29 @@ func (o *ops) Finish(ctx context.Context, line Line) (string, error) {
 	return o.Summary(ctx)
 }
 
+// Keep は op app.keep。
+//
+// Reads: app.settings
+// Effects: app.addLine, app.dropToken
+func (o *ops) Keep(ctx context.Context, line Line) error {
+	if err := o.lines.AddLine(ctx, line); err != nil {
+		return err
+	}
+	return nil
+}
+
+// KeepTwice は op app.keepTwice。
+//
+// Reads: app.settings
+// Effects: app.addLine, app.dropToken
+func (o *ops) KeepTwice(ctx context.Context, line Line) error {
+	if err := o.Keep(ctx, line); err != nil {
+		return err
+	}
+	if err := o.Keep(ctx, line); err != nil {
+		return err
+	}
+	return nil
+}
+
 func ptr[T any](v T) *T { return &v }

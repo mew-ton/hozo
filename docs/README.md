@@ -1,6 +1,14 @@
 # 設計文書
 
-Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主は設計書（`mew-ton/drafts` の `hozo/README.md`。各文書の「§n」はその節）で、ここにあるのは実装のための決定。設計書にない決定の一覧は `decisions.md`。
+Hozo の言語と、その実装（このリポジトリ）の設計。言語の意味（何が正しい Hozo か）の持ち主は、ここに並ぶ文書。決定の一覧は `decisions.md`。
+
+## 設計書という呼び名
+
+これらの文書と、コードやテストのコメントが「設計書」と書くのは、`mew-ton/drafts` の `hozo/README.md`（https://github.com/mew-ton/drafts/blob/main/hozo/README.md ）と、それに付いた例のファイル `examples/hozoc.hozo`。「§n」は、その `README.md` の節番号で、読んだのはコミット `19e0820` の内容。
+
+**名前は設計書だが、設計書ではない。** この言語の出発点になった、粗いアイデアの集まりで、実装を始めた時点で古くなっていて、保守されていない。仕様の持ち主ではない: Hozo の仕様の持ち主は、このリポジトリの `docs/` で、食い違えば `docs/` が正しい。
+
+「設計書 §n」「設計書の例」は、その考えや例の出どころを指すだけ。設計書へ返すことはなく、設計書との違いを追う一覧も持たない（`decisions.md`「決めたこと」150）。
 
 ## 読む順
 
@@ -26,7 +34,7 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | [`packages.md`](packages.md) | ディレクトリ、Go のパッケージと API、依存の向き、生成するもの | 全体 |
 | [`testing.md`](testing.md) | テストの置き場と書き方、CI | `tests/`、`.github/workflows` |
 | [`editors.md`](editors.md) | VS Code 拡張と TextMate の文法 | `editors/vscode` |
-| [`decisions.md`](decisions.md) | 設計書にない決定と、設計書へ返すこと | — |
+| [`decisions.md`](decisions.md) | 決定と、その持ち主の一覧 | — |
 
 ## 言葉
 
@@ -34,6 +42,7 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 
 | 言葉 | 持ち主 |
 |---|---|
+| 設計書、§n（出発点のアイデア集の呼び名。仕様の持ち主ではない） | この文書の「設計書という呼び名」 |
 | プラグイン（入れるもの）、トランスパイラ（設定が選ぶ変換） | `plugin-protocol.md`「この文書が決めること」 |
 | 入っているプラグイン、使うプラグイン | `plugin-protocol.md`「探索」 |
 | 単位 | `config.md`「単位」 |

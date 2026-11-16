@@ -1,6 +1,6 @@
 # コーパス `design`
 
-設計書（`mew-ton/drafts` の `hozo/README.md`。以下「§n」はその節）§3.4、§5〜§11 の例を、名前空間ごとに一つのファイルにまとめたプロジェクト（`docs/testing.md`「コーパス」）。
+設計書（出発点のアイデア集で、仕様の持ち主ではない。`docs/README.md`「設計書という呼び名」。以下「§n」はその節）§3.4、§5〜§11 の例を、名前空間ごとに一つのファイルにまとめたプロジェクト（`docs/testing.md`「コーパス」）。
 
 | ファイル | 中身 |
 |---|---|
@@ -18,10 +18,10 @@
 
 | # | 設計書の箇所と原文 | このコーパスでの書き方 | 理由 |
 |---|---|---|---|
-| 1 | §4.5 `[browser] language = "ts"`、`plugins = [...]`（名前空間ごとのテーブル） | 単位の一覧（`[[emit]]`）で、`server` も `browser` も `transpilers = ["go"]`（Go の基底）。語彙の `http` と `page` にも `go` の単位を足す | `hozo.toml` は名前空間ごとのテーブルではなく単位の一覧（`docs/config.md`「形」、`docs/decisions.md`「設計書を変える決定」S14）。言語はトランスパイラが持つ。TS の基底はまだないので、`browser` も Go で出力する。設計書のプラグイン（http のサーバー、ルーター、db）は並べない（相乗りの `go-http` などは、このコーパスの語彙の使い方を対象にしていない）。`http` と `page` の単位は、`server` と `browser` が使う語彙の型（例外、`page.Route`）の置き場（`docs/config.md`「型の置き場」。なければ CFG-22） |
-| 2 | §7.1 `model LoginInput { @http.header(name: "Authorization") token?: Token; ... }`、§9 `model LogoutInput { ... token?: Token; }`、§11.2 `model OrdersQuery { page: PosInt = 1; status?: server.OrderStatus; }` | `token: Token?`、`status: server.OrderStatus?` | 省略可能は型の `?` だけで書く（`docs/grammar.md`「決めたこと」、`docs/decisions.md` 8、「設計書へ返すこと」の「省略可能の書き方」） |
-| 3 | §5.2 `@page.path state location: single<Route>;` | `single<page.Route>` | `Route` は語彙 `page` の宣言なので修飾する（`docs/resolve.md`「手続き」、`docs/decisions.md`「設計書へ返すこと」の「`location` の型」） |
-| 4 | §5.2 `namespace browser { @localStorage state token: single<Token?>; }` | `nullable<server.Token>` | 二つの理由。(a) `Token` は `server` の scalar（§6.5）。別の名前空間の宣言は常に修飾する（§3.2、NS-1）。写したままだと RES-1（`docs/resolve.md`「診断」、`docs/decisions.md`「設計書へ返すこと」の「`Token` の修飾」）。(b) 空になりうる状態は `nullable<T>` と書く（`docs/decisions.md`「設計書を変える決定」S2）。`single<T?>` も同じ型（`nullable<T>`）として読める（S21）が、コーパスは形の語で書く |
+| 1 | §4.5 `[browser] language = "ts"`、`plugins = [...]`（名前空間ごとのテーブル） | 単位の一覧（`[[emit]]`）で、`server` も `browser` も `transpilers = ["go"]`（Go の基底）。語彙の `http` と `page` にも `go` の単位を足す | `hozo.toml` は名前空間ごとのテーブルではなく単位の一覧（`docs/config.md`「形」、`docs/decisions.md`「設計書から離れた決定」S14）。言語はトランスパイラが持つ。TS の基底はまだないので、`browser` も Go で出力する。設計書のプラグイン（http のサーバー、ルーター、db）は並べない（相乗りの `go-http` などは、このコーパスの語彙の使い方を対象にしていない）。`http` と `page` の単位は、`server` と `browser` が使う語彙の型（例外、`page.Route`）の置き場（`docs/config.md`「型の置き場」。なければ CFG-22） |
+| 2 | §7.1 `model LoginInput { @http.header(name: "Authorization") token?: Token; ... }`、§9 `model LogoutInput { ... token?: Token; }`、§11.2 `model OrdersQuery { page: PosInt = 1; status?: server.OrderStatus; }` | `token: Token?`、`status: server.OrderStatus?` | 省略可能は型の `?` だけで書く（`docs/grammar.md`「決めたこと」、`docs/decisions.md` 8） |
+| 3 | §5.2 `@page.path state location: single<Route>;` | `single<page.Route>` | `Route` は語彙 `page` の宣言なので修飾する（`docs/resolve.md`「手続き」） |
+| 4 | §5.2 `namespace browser { @localStorage state token: single<Token?>; }` | `nullable<server.Token>` | 二つの理由。(a) `Token` は `server` の scalar（§6.5）。別の名前空間の宣言は常に修飾する（§3.2、NS-1）。写したままだと RES-1（`docs/resolve.md`「診断」）。(b) 空になりうる状態は `nullable<T>` と書く（`docs/decisions.md`「設計書から離れた決定」S2）。`single<T?>` も同じ型（`nullable<T>`）として読める（S21）が、コーパスは形の語で書く |
 | 5 | §6.5 `model User { @valid.length(min: 1, max: 100) name: string; }`（§5.2 の `model User` と別に書かれている） | §5.2 の `User` の `name` に `@valid.length(min: 1, max: 100)` を付けて一つにした | 同じ名前空間に同じ名前の宣言が二つあれば RES-6（`docs/resolve.md`「名前空間の併合と重複」） |
 | 6 | §11.2 `Ready: { userName: string; orders: OrderRow[] };`、`Empty: { userName: string };` | `Ready: { userName: string; orders: OrderRow[]; };`、`Empty: { userName: string; };` | その場で書く model のフィールドは `;` で終わる（`docs/grammar.md`「model」`Field = ... ";"`）。`ProfilePage.Ready` も同じ |
 | 7 | §8.1 `decorator redirectOn(error: ApiError, to: RedirectByError) catches error halts to;`、`decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);` | 書かない | スコープ外（`docs/decisions.md`「スコープ外にした設計書の例」1 行目）。引数名 `to` は予約語（`docs/grammar.md`「予約語」） |
@@ -30,9 +30,9 @@
 | 10 | §6.5 `namespace valid { decorator checkDigit for scalar \| field; }` | `server.hozo` の先頭に置いた | `server.EmployeeCode` が使う。`valid` は語彙の名前空間なので専用のファイルにせず、使う側のファイルに置いた（§3.2「語彙プラグインの名前空間にも、ユーザーが宣言を足せる」、`docs/vocab.md`「読み込み」） |
 | 11 | §3.4 `op requestPasswordReset(email: Email) effects sendResetMail throws RateLimited prevents effects;`（名前空間の記述なし） | `server` に置いた | `@see login` が `server.login` を指すため |
 | 12 | §10.2 の文の断片 `const plan = match item by WarrantyAvailable { WarrantyAvailable => askWarrantyPlan(item); default => none; };` | 追加した `op chooseWarrantyPlan` の本体に置いた | 文は op の本体にしか書けない（`docs/grammar.md`「配線」）。`condition` と `default` のアームの例を残すため |
-| 13 | §9 `effect removeToken on token.put;   // none を入れる` | `effect removeToken() on token.delete;` | 空にするのは `delete`（`docs/decisions.md`「設計書を変える決定」S2、`docs/check.md`「状態の形」の表: `nullable` の `delete` は `HasItems` → `Empty`）。`put` は列数を変えない組み込みの効果なので、空にする意味にならない |
-| 14 | §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;`（葉の op） | 効果を一つずつ呼ぶ配線 `saveOrder`（`effects createOrder`）と `sendOrderNotice`（`effects notifyUser`、`throws NotificationFailed prevents effects`）を足し、`placeOrder` はその二つを順に呼ぶ配線（`throws NotificationFailed`。`effects` も `prevents` / `keeps` も書かない） | `prevents` / `keeps` の目的語は `effects` だけで、効果を名前で書き分ける形はない（`docs/decisions.md`「設計書を変える決定」S9）。例外ごとの効果の状態は、配線の行の順から計算される（`docs/check.md`「計算」手順 0）。葉の op が `effects` を書けないことは、表の 20 |
-| 15 | §5.2 `model PublicUser is User omit hash;` | `model PublicUser extends User { override hash: never; }` | `model A is B omit …` はなくなり、継承した model は `extends` と `override` で書く（`docs/decisions.md`「設計書を変える決定」S22、`docs/grammar.md`「model」）。写したままだと SYNTAX |
+| 13 | §9 `effect removeToken on token.put;   // none を入れる` | `effect removeToken() on token.delete;` | 空にするのは `delete`（`docs/decisions.md`「設計書から離れた決定」S2、`docs/check.md`「状態の形」の表: `nullable` の `delete` は `HasItems` → `Empty`）。`put` は列数を変えない組み込みの効果なので、空にする意味にならない |
+| 14 | §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;`（葉の op） | 効果を一つずつ呼ぶ配線 `saveOrder`（`effects createOrder`）と `sendOrderNotice`（`effects notifyUser`、`throws NotificationFailed prevents effects`）を足し、`placeOrder` はその二つを順に呼ぶ配線（`throws NotificationFailed`。`effects` も `prevents` / `keeps` も書かない） | `prevents` / `keeps` の目的語は `effects` だけで、効果を名前で書き分ける形はない（`docs/decisions.md`「設計書から離れた決定」S9）。例外ごとの効果の状態は、配線の行の順から計算される（`docs/check.md`「計算」手順 0）。葉の op が `effects` を書けないことは、表の 20 |
+| 15 | §5.2 `model PublicUser is User omit hash;` | `model PublicUser extends User { override hash: never; }` | `model A is B omit …` はなくなり、継承した model は `extends` と `override` で書く（`docs/decisions.md`「設計書から離れた決定」S22、`docs/grammar.md`「model」）。写したままだと SYNTAX |
 | 16 | §5.3、§9〜§11 の、`browser` が呼ぶ `server` の op（`op logout(...)`、追加した `getMe` / `getOrders` / `getItem` / `addToCart` / `attachWarranty`） | `export op ...` | 別の名前空間から呼べる op には `export` を付ける（S23、`docs/check.md`「export」）。付けなければ NS-5。`server` の中からしか呼ばない op（`login`、`placeOrder` など）には付けていない |
 | 17 | §5.2 `@db state users: list<User>;`、`@db state sessions: list<Session>;`（追加した状態も同じ） | `@db.table state users: list<User>;` | グローバルのデコレータ `db` はなくなり、表は `@db.table` で言う（`docs/vocab.md`「`db` の表と、しまい方」）。写したままだと RES-1。しまい方（`@db.text` など）と `@db.find` などは書いていない: このコーパスは `go-sqlite` を並べず、`db` の語彙のデコレータは印のまま（下の「出力」） |
 | 18 | §7.1 `model LoginInput { ... @http.body body: LoginInputBody; }`（一つの `@http.body` を、本文そのものと読ませる例）。追加した `AddToCartInput` の `@http.body item: Item` も同じ | `@http.bodyObj body: LoginInputBody;`、`@http.bodyObj item: Item;` | 本文の全体を一つの model で受け取るのは `@http.bodyObj`。`@http.body` は本文のキー一つ（`docs/vocab.md`「`http` の語彙」、`docs/decisions.md`「決めたこと」107）。二つの `@http.body` を持つ `AttachWarrantyInput` は、項目の形のまま |
@@ -80,11 +80,11 @@
 
 | 設計書 | 規則 | 扱い |
 |---|---|---|
-| §5.2 `state token: single<Token?>;`（`browser`） | §3.2「別の名前空間の宣言は、常に名前空間で修飾して参照する」。`docs/resolve.md` RES-1「名前が見つからない」。`docs/check.md` STATE-3「状態の要素の型が `optional`」 | 表の 4。`docs/decisions.md`「設計書へ返すこと」の「`Token` の修飾」と「状態を分類で表す」（S2） |
-| §9 `effect removeToken on token.put;   // none を入れる` | `docs/check.md`「状態の形」: `put` は列数を変えない。空にするのは `delete`（S2） | 表の 13。`docs/decisions.md`「設計書へ返すこと」の「状態を分類で表す」 |
-| §11.2 `Ready: { userName: string; orders: OrderRow[] };` | `docs/grammar.md`「model」`Field = [ DocComment ] { Decorator } FieldName ":" Type ";"` | 表の 6。同じく返す候補 |
+| §5.2 `state token: single<Token?>;`（`browser`） | §3.2「別の名前空間の宣言は、常に名前空間で修飾して参照する」。`docs/resolve.md` RES-1「名前が見つからない」。`docs/check.md` STATE-3「状態の要素の型が `optional`」 | 表の 4（`docs/decisions.md`「設計書から離れた決定」S2） |
+| §9 `effect removeToken on token.put;   // none を入れる` | `docs/check.md`「状態の形」: `put` は列数を変えない。空にするのは `delete`（S2） | 表の 13 |
+| §11.2 `Ready: { userName: string; orders: OrderRow[] };` | `docs/grammar.md`「model」`Field = [ DocComment ] { Decorator } FieldName ":" Type ";"` | 表の 6 |
 | §6.5 `model User { @valid.length(min: 1, max: 100) name: string; }` | `docs/resolve.md`「同じ名前空間に同じ名前の宣言が二つあれば RES-6」 | 表の 5。設計書では「フィールドに付けた制約」の説明のための抜粋と読める |
-| §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;` | `docs/grammar.md`「decorator の宣言」`Relation = ( "prevents" \| "keeps" ) "effects"`（効果の名前は SYNTAX）。`docs/check.md` STATE-5「葉の op が `reads` / `effects` の節を書いた」 | 表の 14、20。`docs/decisions.md`「設計書へ返すこと」の「状態を分類で表す」（S8、S9） |
+| §7.3 `op placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;` | `docs/grammar.md`「decorator の宣言」`Relation = ( "prevents" \| "keeps" ) "effects"`（効果の名前は SYNTAX）。`docs/check.md` STATE-5「葉の op が `reads` / `effects` の節を書いた」 | 表の 14、20（`docs/decisions.md`「設計書から離れた決定」S8、S9） |
 | §11.2 `model OrdersQuery { page: PosInt = 1; ... }` | `docs/grammar.md`「model」: フィールドに既定値は書けない（SYNTAX） | 表の 19 |
 | §5.2 `@db state users: list<User>;` | `docs/resolve.md` RES-1（グローバルのデコレータ `db` はない） | 表の 17 |
 | §8.1 `decorator redirectOn(error: ApiError, to: RedirectByError)` | `docs/grammar.md`「予約語」の `to` | 表の 7（`docs/decisions.md` に既にある） |

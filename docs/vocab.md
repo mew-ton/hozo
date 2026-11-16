@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読み込み方。語彙の宣言の意味の持ち主は設計書 §4.2 と `examples/hozoc.hozo`。ここに置く `.hozo` はそれを写したもの。
+hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読み込み方。語彙の宣言の持ち主は、この文書と `vocab/*.hozo`。出どころは、設計書 §4.2 と `examples/hozoc.hozo`（`docs/README.md`「設計書という呼び名」）で、そこから変えたものがある。
 
 ## 読み込み
 
@@ -29,7 +29,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
 | `vocab/proc.hozo` | `namespace proc { Crashed / MalformedOutput / stdio }` | `examples/hozoc.hozo` |
 
-- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator get(path: string) throws ServerError, NetworkError;`。`docs/decisions.md`「設計書を変える決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
+- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator get(path: string) throws ServerError, NetworkError;`。`docs/decisions.md`「設計書から離れた決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
 - `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイルとプラグインの起動）なので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
 - `@http.get` / `@http.post` の `@external` はそのまま写す。
 - `http` には、出典にない例外を一つ足す: op を呼ぶ前の失敗（要求を入力に読めない、入力が制約に合わない）を伝える `BadRequest`。運ぶ値は、例外の引数で書く（`docs/grammar.md`「exception / effect / read」）。HTTP のサーバーのトランスパイラが返し（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）、通信の上の名前 `http.BadRequest` と値の形の持ち主になる。`@http.get` / `@http.post` の `throws`（外から見たときに加わる例外）には、まだ入れない: 入れると、HTTP の op を呼ぶすべての配線が `http.BadRequest` を書くことになる。呼ぶ側のトランスパイラを作るときに決める。
@@ -173,7 +173,7 @@ effect deleteSession(token: type.Token) on sessions.delete;
   - `@http.required`（`@http.required @http.body lines: OrderLine[]`）: op を呼ぶ前の失敗（`http.BadRequest`）。
   - `@http.default(<リテラル>)`（`@http.query @http.default(1) page: int`）: フィールドを、その値にする。`value` の型は、リテラルの型のすべて（`docs/grammar.md`「リテラル」の `Literal`）。
   - どちらもないフィールドは、零値のまま（省略可能なフィールドは、値がない）。
-- **型の宣言に書く既定値（`page: int = 1`）は、言語にない**（`docs/decisions.md`「設計書を変える決定」S24）。共有の型の既定値は、その型を使うすべての名前空間（ブラウザも、サーバーも）が入れることになる。誰が入れるかは振る舞いなので、境界のデコレータと、それを読むプラグインが言う: HTTP の要求なら、読むサーバーが入れる（`docs/plugin-go-http.md`「通信の形」の「要求」）。
+- **型の宣言に書く既定値（`page: int = 1`）は、言語にない**（`docs/decisions.md`「設計書から離れた決定」S24）。共有の型の既定値は、その型を使うすべての名前空間（ブラウザも、サーバーも）が入れることになる。誰が入れるかは振る舞いなので、境界のデコレータと、それを読むプラグインが言う: HTTP の要求なら、読むサーバーが入れる（`docs/plugin-go-http.md`「通信の形」の「要求」）。
 - 項目がないときの扱いは、フィールドの型（省略可能かどうか）からは決めない。型は、食い違いを確かめるのにだけ使う: 二つのデコレータは、項目の形を持たないフィールド（全体の形のフィールドと、その model の中のフィールドを含む）にも、省略可能なフィールド（`T?`）にも付けられず、一つのフィールドに両方は付けられず、`default` のリテラルは、フィールドの型に渡せなければならない（確かめるのは、語彙を読むトランスパイラ）。
 - `default` は予約語だが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
 - 出典（§4.2）から変えたところ: `header` の `name` を省けるようにし、`query` と `body` に、同じ `name` を足した。「`@http.body` が一つなら、本文がその値。二つ以上なら、フィールドの名前をキーにしたオブジェクト」という、数で形が変わる読み方は、やめた: 本文そのものを一つの model で受け取るなら `@http.bodyObj`、キー一つなら `@http.body`。

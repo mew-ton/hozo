@@ -68,7 +68,7 @@ func copyHozo(t *testing.T, src, dst string) {
 	}
 }
 
-// TestModelCorpus は「モデルが先」の決定（docs/decisions.md「設計書を変える決定」S10〜S12）が IR と検査に現れることを、
+// TestModelCorpus は「モデルが先」の決定（docs/decisions.md「設計書から離れた決定」S10〜S12）が IR と検査に現れることを、
 // tests/corpus/model で確かめる: 宣言に付けた印のデコレータ（名前空間には付けられない）、どの単位の対象でもない名前空間（出力しない。検査は同じ）、
 // どのプラグインも読まない印のデコレータ（throws を宣言していれば Signature に効く）。
 // サブテストの名前は tests/corpus/model/README.md の「見出し → 構文」の表の見出し。

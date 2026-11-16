@@ -232,6 +232,7 @@ namespace lib {
   op touchIt(r: Row) effects touch { touch(r); }
   @scan(logs) op scanned(): Row[];
   @scan(rows, logs) op scanned2(): Row[];
+  @scan(rows) op scannedWired(): Row[] { return rows; }
   classify Load of Row { Heavy; default; }
   op wired(r: Row): Row? effects rows.post, touch, lib.title.put reads rowById throws Busy {
     write(r);
@@ -372,6 +373,14 @@ func TestNormalizeRefs(t *testing.T) {
 	})
 	eq("any state? を渡した", op("scanned2").Carried.Reads,
 		[]ir.ReadRef{state("lib.logs"), state("lib.rows"), named("lib.rowById")})
+	// 配線の op にも運ばれる（docs/check.md「デコレータが運ぶ reads と effects」）。Op.reads / Op.effects は、書いたもの（空）のまま
+	wiredScan := op("scannedWired")
+	eq("配線の op の carried", wiredScan.Carried, ir.Carried{
+		Reads:   []ir.ReadRef{state("lib.rows"), named("lib.rowById"), state("lib.logs")},
+		Effects: []ir.EffectRef{ir.DirectEffect{State: "lib.logs", Operation: ir.OpPost}, touch},
+	})
+	eq("配線の op の carried は Op.reads / Op.effects に足さない", []any{wiredScan.Body != nil, wiredScan.Reads, wiredScan.Effects},
+		[]any{true, []ir.ReadRef(nil), []ir.EffectRef(nil)})
 }
 
 // TestNormalizeGolden は正規化の結果を testdata/normalize.golden.json と比べる。更新は go test ./internal/sema -update。
