@@ -139,14 +139,10 @@ func LocalName(name string, reserved map[string]bool) string {
 func EffectConst(name string) string { return "Effect" + Capitalize(short(name)) }
 
 // CaseConst は分類のケースの定数の名前（docs/plugin-go.md「名前」の「分類 C の列挙と述語」）。
-// classify はその分類の Go の型名（TypeName の結果）、caseName はケース名か "default":
+// classify はその分類の Go の型名（TypeName の結果）、caseName はケース名:
 //
-//	CaseConst("WarrantyKind", "yamada")   → "WarrantyKindYamada"
-//	CaseConst("WarrantyKind", "default")  → "WarrantyKindDefault"
+//	CaseConst("WarrantyKind", "yamada")  → "WarrantyKindYamada"
 func CaseConst(classify, caseName string) string {
-	if caseName == "default" {
-		return classify + "Default"
-	}
 	return classify + Capitalize(caseName)
 }
 

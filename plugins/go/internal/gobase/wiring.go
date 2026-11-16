@@ -1198,12 +1198,10 @@ type matchPlan struct {
 	freshState bool
 }
 
-// armCasesText は、アームのケースの名前（` | ` でつなぐ。default は `default`）。
+// armCasesText は、アームが受けるケースの名前（`, ` でつなぐ）。else のアームも、受けるケースの名前
+// （docs/plugin-go.md「match」: else のアームは、受けるケースを名前で並べたアームと、同じコードになる）。
 func armCasesText(a *ir.MatchArm) string {
-	if a.Cases.Default {
-		return "default"
-	}
-	return strings.Join(a.Cases.Cases, " | ")
+	return strings.Join(a.Cases, ", ")
 }
 
 // plan は、match の分け方と対象を決め、対象を読む（状態なら Get、名前でない Atom なら v<n> に束縛）。
@@ -1300,7 +1298,7 @@ func (p *matchPlan) narrowBy(a *ir.MatchArm, state string) ir.NarrowBy {
 	if p.classify == nil {
 		return ir.NarrowByPresence
 	}
-	for _, name := range a.Cases.Cases {
+	for _, name := range a.Cases {
 		if cs := p.classify.Case(name); cs != nil {
 			for _, as := range cs.As {
 				if as.State == state || as.State == "" {
@@ -1546,20 +1544,32 @@ func (b *bodyGen) branch(p *matchPlan, a *ir.MatchArm, mode matchMode, x string,
 	return text, terminated
 }
 
-// armFor は、ケース name のアーム: そのケースを並べたアーム。なければ default のアーム。
+// armFor は、ケース name を受けるアーム（MatchArm.cases。else のアームも、受けるケースを cases に持つ）。なければ nil。
 func armFor(m *ir.Match, name string) *ir.MatchArm {
-	var def *ir.MatchArm
 	for i := range m.Arms {
-		if m.Arms[i].Cases.Default {
-			def = &m.Arms[i]
-		}
-		for _, c := range m.Arms[i].Cases.Cases {
+		for _, c := range m.Arms[i].Cases {
 			if c == name {
 				return &m.Arms[i]
 			}
 		}
 	}
-	return def
+	return nil
+}
+
+// classificationError は、分類の誤りの値（docs/plugin-go.md「match」の「分類の誤りの枝」「switch の形」）。
+func (b *bodyGen) classificationError(classify string) string {
+	return "&" + b.f.im.Add(runtimePath, "runtime") + ".ClassificationError{Classify: " + strconv.Quote(classify) + "}"
+}
+
+// errorBranch は、分類の誤りの枝（docs/plugin-go.md「match」の「分類の誤りの枝」）の中身のテキスト:
+// `return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` の一行。枝の頭のコメントは書かない。
+func (b *bodyGen) errorBranch(classify string) string {
+	saved, terminated := b.buf, b.terminated
+	b.buf = &strings.Builder{}
+	b.returnErr(b.classificationError(classify))
+	text := b.buf.String()
+	b.buf, b.terminated = saved, terminated
+	return text
 }
 
 // match は match を書く（docs/plugin-go.md「match」）: 分類の種類ごとの分け方と、使われ方ごとのアームの本体の組み合わせ。
@@ -1605,7 +1615,8 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	m := p.m
 	valueCase, otherCase := ir.CaseHasItems, ir.CaseEmpty
 	if p.classify != nil {
-		// presence の分類は、型を書いたケースが一つだけ。もう一方は、残りのケース（対象 as else）か default
+		// presence の分類は、型を書いたケースが一つだけ。もう一方は、残りのケース（対象 as else）。残りのケースがなければ、
+		// もう一方は、どのケースでもない（分類の誤りの枝）
 		valueCase, otherCase = "", ""
 		for _, cs := range p.classify.Cases {
 			if cs.IsElse() {
@@ -1615,8 +1626,12 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 			}
 		}
 	}
-	valueArm, otherArm := armFor(m, valueCase), armFor(m, otherCase)
-	if valueArm == nil || otherArm == nil {
+	valueArm := armFor(m, valueCase)
+	var otherArm *ir.MatchArm
+	if otherCase != "" {
+		otherArm = armFor(m, otherCase)
+	}
+	if valueArm == nil || (otherCase != "" && otherArm == nil) {
 		b.e.errorf(codeInternal, b.op.Name, "op %s の配線の match（%s）のアームが、すべてのケースを尽くしていない（検査を通った IR には来ないはずの形）", b.op.Name, m.Classify)
 		return
 	}
@@ -1625,7 +1640,7 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 		cond, neg = "len("+p.subject+") != 0", "len("+p.subject+") == 0"
 	}
 	if valueArm == otherArm {
-		// 一つのアームが両方のケースを並べていれば、分けずに、そのアームの本体だけを書く
+		// 一つのアームが両方のケースを受けていれば、分けずに、そのアームの本体だけを書く
 		text, terminated := b.branch(p, valueArm, mode, x, t, false)
 		if text == "" && p.freshState {
 			b.line("_ = " + p.subject)
@@ -1633,6 +1648,13 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 		b.buf.WriteString(text)
 		b.terminated = terminated
 		return
+	}
+	// otherBranch は、もう一方の枝: そのケースのアームか、ケースがなければ、分類の誤りの枝
+	otherBranch := func() (string, bool) {
+		if otherArm == nil {
+			return b.errorBranch(m.Classify), true
+		}
+		return b.branch(p, otherArm, mode, x, t, true)
 	}
 	if mode == modeReturn {
 		// else を書かず、もう一方をそのまま後ろに続ける（どの枝も return で終わる）
@@ -1642,14 +1664,14 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 		b.line("if " + cond + " {")
 		b.buf.WriteString(value)
 		b.line("}")
-		other, _ := b.branch(p, otherArm, mode, x, t, true)
+		other, _ := otherBranch()
 		b.buf.WriteString(other)
 		b.terminated = true
 		return
 	}
 	b.depth++
 	value, valueEnds := b.branch(p, valueArm, mode, x, t, true)
-	other, otherEnds := b.branch(p, otherArm, mode, x, t, true)
+	other, otherEnds := otherBranch()
 	b.depth--
 	switch {
 	case value != "" && other != "":
@@ -1673,7 +1695,9 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	}
 }
 
-// matchSwitch は `switch` の形: アームごとに case を一つ。並びは、アームの最初のケースの、分類の宣言での順。default のアームは最後。
+// matchSwitch は `switch` の形: アームごとに case を一つ。並びは、アームが受ける最初のケースの、分類の宣言での順。
+// else のアームも、受けるケース（MatchArm.cases）を並べた case になる（Go の default: は使わない）。
+// 型の switch は、いつも最後に default: の節（分類の誤りの枝）を持つ。
 func (b *bodyGen) matchSwitch(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	e, m, c := b.e, p.m, p.classify
 	order := map[string]int{}
@@ -1685,16 +1709,15 @@ func (b *bodyGen) matchSwitch(p *matchPlan, mode matchMode, x string, t ir.Type)
 		arms[i] = &m.Arms[i]
 	}
 	rank := func(a *ir.MatchArm) int {
-		if a.Cases.Default || len(a.Cases.Cases) == 0 {
+		if len(a.Cases) == 0 {
 			return len(c.Cases)
 		}
-		return order[a.Cases.Cases[0]]
+		return order[a.Cases[0]]
 	}
 	sort.SliceStable(arms, func(i, j int) bool { return rank(arms[i]) < rank(arms[j]) })
 
 	qualifier := b.f.im.Qualifier(e.declNS[c.Name])
 	name := e.typeName(c.Name)
-	hasDefaultClause := false
 	switch p.form {
 	case "type":
 		b.line("switch " + p.subject + ".(type) {")
@@ -1711,14 +1734,17 @@ func (b *bodyGen) matchSwitch(p *matchPlan, mode matchMode, x string, t ir.Type)
 	}
 	allEnd := true
 	for _, a := range arms {
-		switch {
-		case p.form == "type" && a.Cases.Default:
-			b.line("default:")
-			hasDefaultClause = true
-		case p.form == "type":
+		if p.form == "type" {
 			var types []string
+			seen := map[string]bool{}
+			add := func(typ string) {
+				if !seen[typ] {
+					seen[typ] = true
+					types = append(types, typ)
+				}
+			}
 			u := e.unionOf(p.subjectType)
-			for _, k := range a.Cases.Cases {
+			for _, k := range a.Cases {
 				cs := c.Case(k)
 				if u == nil || cs == nil || len(cs.As) == 0 {
 					continue
@@ -1726,21 +1752,18 @@ func (b *bodyGen) matchSwitch(p *matchPlan, mode matchMode, x string, t ir.Type)
 				if cs.IsElse() {
 					// 残りのケース: 残りのアームの Go の型を、union の宣言の順に並べる
 					for _, arm := range e.remainingArms(u, c) {
-						types = append(types, e.armGoType(b.f, u, arm))
+						add(e.armGoType(b.f, u, arm))
 					}
 					continue
 				}
 				if arm, ok := e.variantArm(u, cs.As[0].Type, c.Name); ok {
-					types = append(types, e.armGoType(b.f, u, arm))
+					add(e.armGoType(b.f, u, arm))
 				}
 			}
 			b.line("case " + strings.Join(types, ", ") + ":")
-		default:
+		} else {
 			var consts []string
-			if a.Cases.Default {
-				consts = append(consts, qualifier+golang.CaseConst(name, "default"))
-			}
-			for _, k := range a.Cases.Cases {
+			for _, k := range a.Cases {
 				consts = append(consts, qualifier+golang.CaseConst(name, k))
 			}
 			b.line("case " + strings.Join(consts, ", ") + ":")
@@ -1751,12 +1774,22 @@ func (b *bodyGen) matchSwitch(p *matchPlan, mode matchMode, x string, t ir.Type)
 		b.buf.WriteString(text)
 		allEnd = allEnd && ends
 	}
+	if p.form == "type" {
+		// 型の switch の最後の節は、いつも、分類の誤りの枝: どのケースも as に書かなかった型のアームの値と、union の値が
+		// ない（nil）とき
+		b.line("default:")
+		b.depth++
+		b.buf.WriteString(b.errorBranch(c.Name))
+		b.depth--
+		b.line("}")
+		b.terminated = mode == modeReturn || allEnd
+		return
+	}
 	b.line("}")
-	// どの節も関数を抜ける switch で、default の節を持たないものの後ろには、`return <零値>, &runtime.ClassificationError{…}` を置く
-	// （判定関数が先に同じ誤りを返すので、ここには来ない。Go が、関数の終わりの return を求めるため）
-	if (mode == modeReturn || allEnd) && !hasDefaultClause {
-		b.returnErr("&" + b.f.im.Add(runtimePath, "runtime") + ".ClassificationError{Classify: " + strconv.Quote(c.Name) + "}")
-	} else if mode == modeReturn || allEnd {
-		b.terminated = true
+	// 述語で決まる分類の switch は default: の節を持たない。どの節も関数を抜けるなら、後ろに
+	// `return <零値>, &runtime.ClassificationError{…}` を置く（判定関数が先に同じ誤りを返すので、ここには来ない。Go が、
+	// 関数の終わりの return を求めるため）
+	if mode == modeReturn || allEnd {
+		b.returnErr(b.classificationError(c.Name))
 	}
 }

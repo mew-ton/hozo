@@ -37,16 +37,12 @@ func classifyFuncComment(name, fqn string, state bool) string {
 	return comment("Classify" + name + " は v を " + fqn + " で分類する。すべての述語を呼び、真になった数を数える。")
 }
 
-// caseConsts は、分類 c の列挙の定数の名前とコメント（ケースの宣言順。hasDefault なら、最後に <C>Default）。
+// caseConsts は、分類 c の列挙の定数の名前とコメント（ケースの宣言順。宣言したケースの数だけ）。
 func (e *emitter) caseConsts(c *ir.Classify) (names, comments []string) {
 	name := e.typeName(c.Name)
 	for _, cs := range c.Cases {
 		names = append(names, golang.CaseConst(name, cs.Name))
 		comments = append(comments, comment(body(cs.Description)))
-	}
-	if c.HasDefault {
-		names = append(names, golang.CaseConst(name, "default"))
-		comments = append(comments, comment(body(c.DefaultDescription)))
 	}
 	return names, comments
 }
@@ -177,7 +173,7 @@ func (e *emitter) genClassify() *fileGen {
 				}
 				f.print(call)
 			}
-			e.classifyTail(f, c, name, rt())
+			e.classifyTail(f, c, rt())
 			continue
 		}
 		// 状態の分類: 述語は状態の単位 <C>State のメソッド
@@ -187,7 +183,7 @@ func (e *emitter) genClassify() *fileGen {
 		for _, cs := range c.Cases {
 			f.print(classifyCase("s."+golang.Capitalize(cs.Name)+"(ctx)", cs.Name, golang.CaseConst(name, cs.Name)))
 		}
-		e.classifyTail(f, c, name, rt())
+		e.classifyTail(f, c, rt())
 	}
 	return f
 }
@@ -199,15 +195,12 @@ func classifyCase(call, caseName, caseConst string) string {
 		"hits = append(hits, " + strconv.Quote(caseName) + ")\nkind = " + caseConst + "\n}\n"
 }
 
-// classifyTail は、判定関数の終わり: 述語が error を返していれば、最初のもの。そうでなければ、真が一つならそのケース、0 で
-// hasDefault なら <C>Default。hasDefault が false なら、真がちょうど一つでなければ、true なら、真が二つ以上なら、
+// classifyTail は、判定関数の終わり（docs/plugin-go.md「分類」）: 述語が error を返していれば、最初のもの。そうでなければ、
+// 真がちょうど一つなら、そのケース。0（値が、宣言したケースの外にある）か、二つ以上（述語が排他でない）なら、
 // *runtime.ClassificationError。
-func (e *emitter) classifyTail(f *fileGen, c *ir.Classify, name, rt string) {
+func (e *emitter) classifyTail(f *fileGen, c *ir.Classify, rt string) {
 	f.print("\tif first != nil {\n\t\treturn kind, first\n\t}\n")
 	f.print("\tswitch len(hits) {\n\tcase 1:\n\t\treturn kind, nil\n")
-	if c.HasDefault {
-		f.printf("\tcase 0:\n\t\treturn %s, nil\n", golang.CaseConst(name, "default"))
-	}
 	f.printf("\t}\n\treturn kind, &%s.ClassificationError{Classify: %s, Hits: hits}\n}\n\n", rt, strconv.Quote(c.Name))
 }
 

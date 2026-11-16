@@ -1,0 +1,42 @@
+// SYNTAX（docs/grammar.md「配線」の ElseArm）: else のアームは、ケースを名前で並べたアームを一つ以上書いた後ろに、最後に一つだけ
+namespace a {
+  model M { id: string; }
+  classify K of M { A; B; C; }
+  op use(m: M);
+  op f();
+  // else のアームの後ろに、アームは書けない（後ろのアームは捨てられ、else が残りを受ける）
+  op elseNotLast(m: M) {
+    match m by K {
+      A    => use(m);
+      else => none;
+      B    => f();                               // ERROR: SYNTAX
+    };
+  }
+  op twoElse(m: M) {
+    match m by K {
+      A    => use(m);
+      else => none;
+      else => f();                               // ERROR: SYNTAX
+    };
+  }
+  // else だけの match、else から始まる match は書けない
+  op elseOnly(m: M) {
+    match m by K {
+      else => f();                               // ERROR: SYNTAX
+    };
+  }
+  // else は、ケースの並びの中には書けない（予約語）
+  op elseInList(m: M) {
+    match m by K {
+      A, else => f();                            // ERROR: SYNTAX
+      B, C    => none;
+    };
+  }
+  // else は、遷移のケースにも、束縛の名前にも書けない
+  state carts: list<M>;
+  effect clear() on carts: else -> Empty;        // ERROR: SYNTAX
+  op bindElse(m: M) {
+    const else = f2(m);                          // ERROR: SYNTAX
+  }
+  op f2(m: M): M;
+}

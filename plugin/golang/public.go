@@ -19,7 +19,7 @@ const (
 	PublicEffect
 	// PublicClassify は、述語で決まる分類の列挙の型 `<C>`。
 	PublicClassify
-	// PublicCase は、そのケースの定数 `<C><ケース名>`（default は `<C>Default`）。
+	// PublicCase は、そのケースの定数 `<C><ケース名>`。
 	PublicCase
 	// PublicClassifyFunc は判定関数 `Classify<C>`。
 	PublicClassifyFunc
@@ -45,7 +45,7 @@ type PublicName struct {
 	// Decl は、その名前を生んだ宣言の FQN（状態の単位なら、状態か状態の分類）。診断の位置に使う。生成したコードが決めた名前
 	// （Ops、New、Leaves、Seams）と、別の名前空間の口なら ""。
 	Decl string
-	// Detail は、PublicArm ならアーム名、PublicCase ならケース名（default は "default"）、PublicDep なら名前空間の FQN。ほかは ""。
+	// Detail は、PublicArm ならアーム名、PublicCase ならケース名、PublicDep なら名前空間の FQN。ほかは ""。
 	Detail string
 	// What は、その名前を生んだものの、診断のメッセージ用の言い方（`model store.Schema`、`インターフェース Ops`）。
 	What string
@@ -122,10 +122,6 @@ func PublicNames(view *ir.View) []PublicName {
 			for _, c := range x.Cases {
 				k := CaseConst(typ, c.Name)
 				add(k, PublicCase, name, c.Name, "classify "+name+" のケースの定数 "+k)
-			}
-			if x.HasDefault {
-				k := CaseConst(typ, "default")
-				add(k, PublicCase, name, "default", "classify "+name+" のケースの定数 "+k)
 			}
 			add("Classify"+typ, PublicClassifyFunc, name, "", "classify "+name+" の判定関数")
 			if _, isState := x.SubjectStates(); !isState {

@@ -1,8 +1,8 @@
-// CLS-1（docs/check.md「classify / match」「残りのケース」）: 残りを言うものは高々一つ。残りのケース（as else）が一つだけなら、
-// default はなくてよい
+// CLS-1（docs/check.md「classify / match」「残りのケース」）: 残りのケース（as else）は高々一つ。一つでも、なくてもよい
+// （なければ、値がない側は、どのケースでもない。docs/check.md「ケースの判定」）
 namespace a {
   model M { id: string; }
   op find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
-  classify Hit2 of find { Found: find as M; default; }
+  classify Hit2 of find { Found: find as M; }
 }

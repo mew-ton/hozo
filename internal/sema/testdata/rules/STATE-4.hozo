@@ -5,17 +5,17 @@ namespace a {
   state clock: single<string>;
   state orders: list<string>;
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
-  condition CartFilled of carts;
+  classify CartFilled of carts { CartFilled; NotCartFilled; }
 
   // 通る例: 分類の遷移、基底の状態の組み込みの分類の遷移、any、ケースの和
   effect placeOrder() on Checkout: Shopping -> Ordered;
   effect ship() on Checkout: Ordered -> Shipped;
   effect reset() on Checkout: any -> Shopping;
-  effect touch() on Checkout: Shopping | Ordered -> any;
+  effect touch() on Checkout: Shopping, Ordered -> any;
   effect same() on Checkout: Shopping -> Shopping;
   effect clearCart() on carts: HasItems -> Empty;
   effect login() on token: Empty -> HasItems;
-  effect anyCart() on carts: any -> Empty | HasItems;
+  effect anyCart() on carts: any -> Empty, HasItems;
   effect fill() on CartFilled: any -> CartFilled;
 
   // 前か後のケースが、宛先の分類のケースでない
@@ -29,7 +29,7 @@ namespace a {
   effect ng6() on clock: Empty -> HasItems;               // ERROR: STATE-4
   effect ng7() on clock: any -> any;                      // ERROR: STATE-4
   // 前と後のどちらかのケースの並びに重複がある
-  effect ng8() on Checkout: Shopping | Shopping -> Ordered;        // ERROR: STATE-4
-  effect ng9() on Checkout: Shopping -> Ordered | Shipped | Ordered;   // ERROR: STATE-4
-  effect ng10() on carts: any -> Empty | Empty;           // ERROR: STATE-4
+  effect ng8() on Checkout: Shopping, Shopping -> Ordered;         // ERROR: STATE-4
+  effect ng9() on Checkout: Shopping -> Ordered, Shipped, Ordered;     // ERROR: STATE-4
+  effect ng10() on carts: any -> Empty, Empty;            // ERROR: STATE-4
 }

@@ -1,16 +1,16 @@
-// MATCH-2（docs/check.md「classify / match」）: 状態の分類での match も、ケースの集合が分類のケースと等しいこと
+// MATCH-2（docs/check.md「classify / match」）: 状態の分類での match も、どのケースも、ちょうど一つのアームが受けること
 namespace a {
   state carts: list<string>;
   state orders: list<string>;
   state token: nullable<string>;
   classify Checkout of carts, orders { Shopping; Ordered; }
-  classify Session of token { LoggedIn; default; }
+  classify Session of token { LoggedIn; LoggedOut; }
   op f();
   op ng() {
     match by Checkout {                // ERROR: MATCH-2
       Shopping => f();
     };
-    // 状態の分類のケースに、組み込みの分類のケースは混ざらない
+    // 状態の分類のケースに、標準の分類のケースは混ざらない
     match by Checkout {                // ERROR: MATCH-2
       Shopping => f();
       Ordered => none;

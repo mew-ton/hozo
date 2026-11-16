@@ -466,9 +466,6 @@ func (g *generator) checkName() {
 			what = "classify " + n.Decl + " の型"
 		case golang.PublicCase:
 			what = "classify " + n.Decl + " のケース " + n.Detail + " の定数"
-			if n.Detail == "default" {
-				what = "classify " + n.Decl + " の default の定数"
-			}
 		case golang.PublicClassifyFunc:
 			what = "classify " + n.Decl + " の判定関数"
 		case golang.PublicCases:

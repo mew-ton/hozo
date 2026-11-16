@@ -35,7 +35,7 @@ namespace a {
 
   classify Kind of Target {
     Core;
-    default;
+    Other;
   }
 
   op fetch(): Wrap;
@@ -52,7 +52,7 @@ namespace a {
     const name = label(res.state, res.op);
     const kind = match res.state by Kind {
       Core => describe(res.state);
-      default => none;
+      else    => none;
     };
     const saved = store({
       op: name,

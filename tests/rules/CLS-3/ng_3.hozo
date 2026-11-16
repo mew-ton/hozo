@@ -4,5 +4,5 @@ namespace a {
   state orders: list<string>;
   classify Twice of carts, carts { A; }          // ERROR: CLS-3
   classify Apart of carts, orders, carts { A; }  // ERROR: CLS-3
-  condition Cond of orders, orders;              // ERROR: CLS-3
+  classify Cond of orders, orders { Cond; NotCond; } // ERROR: CLS-3
 }

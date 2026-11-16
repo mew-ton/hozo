@@ -18,10 +18,9 @@ func TestPublicNames(t *testing.T) {
 	arm.SynthesizedFrom = "shop.Shape"
 	set := union("shop.Errors")
 	set.Variant = ir.UnionSet
-	kind := classify("shop.Kind", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "Big")
-	kind.HasDefault = true
-	sync := classify("shop.Sync", ir.StatesSubject{States: []string{"shop.items"}}, ir.DecidedByPredicate, "UpToDate")
-	sync.HasDefault = false
+	// 分類の定数は、宣言したケースの数だけ（docs/plugin-go.md「分類」。<C>Default はない）
+	kind := classify("shop.Kind", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "Big", "Small")
+	sync := classify("shop.Sync", ir.StatesSubject{States: []string{"shop.items"}}, ir.DecidedByPredicate, "UpToDate", "OutOfDate")
 	v := viewOf("shop",
 		namespace("shop",
 			model("shop.Item"), page, synthesized, arm,
@@ -60,11 +59,12 @@ func TestPublicNames(t *testing.T) {
 		{"EffectAddItem", PublicEffect, "shop.addItem", "", "effect shop.addItem"},
 		{"Kind", PublicClassify, "shop.Kind", "", "classify shop.Kind"},
 		{"KindBig", PublicCase, "shop.Kind", "Big", "classify shop.Kind のケースの定数 KindBig"},
-		{"KindDefault", PublicCase, "shop.Kind", "default", "classify shop.Kind のケースの定数 KindDefault"},
+		{"KindSmall", PublicCase, "shop.Kind", "Small", "classify shop.Kind のケースの定数 KindSmall"},
 		{"ClassifyKind", PublicClassifyFunc, "shop.Kind", "", "classify shop.Kind の判定関数"},
 		{"KindCases", PublicCases, "shop.Kind", "", "classify shop.Kind の述語のインターフェース"},
 		{"Sync", PublicClassify, "shop.Sync", "", "classify shop.Sync"},
 		{"SyncUpToDate", PublicCase, "shop.Sync", "UpToDate", "classify shop.Sync のケースの定数 SyncUpToDate"},
+		{"SyncOutOfDate", PublicCase, "shop.Sync", "OutOfDate", "classify shop.Sync のケースの定数 SyncOutOfDate"},
 		{"ClassifySync", PublicClassifyFunc, "shop.Sync", "", "classify shop.Sync の判定関数"}, // 状態の分類は <C>Cases を持たない（述語は状態の単位）
 		{"SyncState", PublicStateUnit, "shop.Sync", "", "状態の単位 shop.Sync"},                // 状態の単位は宣言順（分類 Sync が、状態より先に宣言されている）
 		{"ItemsState", PublicStateUnit, "shop.items", "", "状態の単位 shop.items"},

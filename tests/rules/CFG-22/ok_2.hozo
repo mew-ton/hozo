@@ -8,7 +8,7 @@ namespace a {
   op h(x: string?): string {
     return match x by b.Present {
       Some => keep(x);
-      default => keep("none");
+      else    => keep("none");
     };
   }
   op keep(x: string): string;
@@ -19,6 +19,6 @@ namespace b {
   export op g();
   classify Present of string? {
     Some: string? as string;
-    default;
+    Other: string? as else;
   }
 }

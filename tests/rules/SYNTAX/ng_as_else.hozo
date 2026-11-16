@@ -1,5 +1,5 @@
-// SYNTAX（docs/grammar.md「classify / condition」「予約語」）: else は予約語で、書けるのは as の後ろ（とフィールド名の位置）だけ。
-// 宣言の名前、引数の名前、型の位置には書けない。default と condition には as を書けない。else の後ろに型の続きは書けない
+// SYNTAX（docs/grammar.md「classify」「予約語」）: else は予約語で、書けるのは as の後ろと、match の最後のアームの頭
+// （とフィールド名の位置）だけ。宣言の名前、引数の名前、型の位置、ケースの名前には書けない。else の後ろに型の続きは書けない
 namespace a {
   model M { id: string; }
   op find(): M?;
@@ -8,7 +8,7 @@ namespace a {
   op byType(m: else);                                  // ERROR: SYNTAX
   classify D of find {
     Found: find as M;
-    default: find as else;                             // ERROR: SYNTAX
+    else: find as else;                                // ERROR: SYNTAX
   }
   classify Q of find {
     Found: find as M;
@@ -18,5 +18,4 @@ namespace a {
     Found: find as M;
     Missing: else;                                     // ERROR: SYNTAX
   }
-  condition C of find as else;                         // ERROR: SYNTAX
 }

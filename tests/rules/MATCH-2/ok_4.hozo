@@ -1,4 +1,5 @@
-// MATCH-2（docs/check.md「classify / match」「残りのケース」）: 残りのケース（as else）は名前の付いたケース。アームに名前で並べる
+// MATCH-2（docs/check.md「classify / match」「残りのケース」）: 残りのケース（as else）も、ほかのケースと同じ。アームに名前で並べるか、
+// else のアームが受ける
 namespace a {
   model M { id: string; }
   state token: nullable<string>;
@@ -10,7 +11,8 @@ namespace a {
   op ok() {
     const m = find();
     match m by Hit { Found => use(m); Missing => none; };
-    match m by Hit { Found | Missing => f(); };
+    match m by Hit { Found, Missing => f(); };
+    match m by Hit { Found => use(m); else => none; };
     match by Session { LoggedOut => f(); LoggedIn => none; };
   }
 }

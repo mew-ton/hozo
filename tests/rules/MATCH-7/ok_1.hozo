@@ -6,7 +6,7 @@ namespace a {
   state token: nullable<string>;
   classify Kind of M { A; B; }
   classify Checkout of carts, orders { Shopping; Ordered; }
-  condition LoggedIn of token;
+  classify LoggedIn of token { LoggedIn; NotLoggedIn; }
   op f();
   op g(m: M);
   op ok(m: M) {
@@ -17,6 +17,6 @@ namespace a {
     match token by nullable { Empty => f(); HasItems => none; };
     // 状態の分類: 対象は書かない
     match by Checkout { Shopping => f(); Ordered => none; };
-    match by LoggedIn { LoggedIn => f(); default => none; };
+    match by LoggedIn { LoggedIn => f(); else => none; };
   }
 }

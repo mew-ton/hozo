@@ -1,12 +1,18 @@
-// MATCH-2（docs/check.md「classify / match」）: hasDefault が false なのに default のアームがある
+// MATCH-2（docs/check.md「アームが受けるケース」）: else のアームがあっても、名前で並べたケースは、その分類のケースで、
+// 一つの match に一度だけ（else のアームが消すのは「足りない」だけ）
 namespace a {
   model M { id: string; }
-  classify C of M { A; B; }
+  classify D of M { A; B; C; D; E; }
   op use(m: M): void;
-  op noDefault(m: M): void {
-    match m by C {                     // ERROR: MATCH-2
-      A | B => use(m);
-      default => none;
+  op unknownWithElse(m: M): void {
+    match m by D {                     // ERROR: MATCH-2
+      A, Z => use(m);
+      else => none;
+    };
+    match m by D {                     // ERROR: MATCH-2
+      A => use(m);
+      B, A => none;
+      else => none;
     };
   }
 }

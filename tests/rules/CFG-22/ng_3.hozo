@@ -3,7 +3,7 @@ namespace a {
   op f(x: string) {
     match x by c.Kind {
       A => b.g();
-      default => none;
+      else    => none;
     };
   }
 }
@@ -12,5 +12,5 @@ namespace b {
   export op g(m: M?);
 }
 namespace c {
-  classify Kind of string { A; default; }
+  classify Kind of string { A; Other; }
 }

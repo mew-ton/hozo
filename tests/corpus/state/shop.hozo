@@ -30,7 +30,7 @@ namespace shop {
   }
   // docs/grammar.md「classify / condition」: condition も状態を対象にできる（ClassifySubject）
   /** ログインしている */
-  condition LoggedIn of token;
+  classify LoggedIn of token { LoggedIn; NotLoggedIn; }
   // 値の分類（§10.1）は今まで通り。subject は { kind: "type", type }
   /** 行の種類 */
   classify LineKind of Line {
@@ -56,7 +56,7 @@ namespace shop {
   /** 買い物をやり直す */
   effect startOver() on Checkout: any -> Shopping;
   /** 進み具合を記録し直す */
-  effect touchCheckout() on Checkout: Shopping | Ordered -> any;
+  effect touchCheckout() on Checkout: Shopping, Ordered -> any;
   // condition の遷移（ケースは condition の名前）
   /** ログインする */
   effect signIn() on LoggedIn: any -> LoggedIn;
@@ -142,7 +142,7 @@ namespace shop {
     };
     match by LoggedIn {
       LoggedIn => addToCart(normalized);
-      default  => showLogin();
+      else     => showLogin();
     };
   }
 }

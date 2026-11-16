@@ -428,8 +428,8 @@ namespace a {
   state users: list<t.User>;
   state current: t.User?;
   export op find(id: string): t.User? reads users, a.current { return first(users, current); } op first(us: t.User[], c: t.User?): t.User?;
-  classify Found of find { Hit: find as t.User; default; }
-  classify Session of current { In: current as t.User; default; }
+  classify Found of find { Hit: find as t.User; Miss: find as else; }
+  classify Session of current { In: current as t.User; Out: current as else; }
 }
 namespace b {
   op keep(u: t.User): t.User;
@@ -437,7 +437,7 @@ namespace b {
     const u = a.find(id);
     return match u by a.Found {
       Hit     => keep(u);
-      default => throw t.Gone;
+      Miss    => throw t.Gone;
     };
   }
 }`}, false)
@@ -483,7 +483,7 @@ namespace a {
   read byId(id: string): M? on rows;
   effect add(m: M) on rows.post;
   op keep(m: M?): M?;
-  classify K of M { A; default; }
+  classify K of M { A; B; }
   op f(m: M): M? throws Busy {
     add(m);
     rows.post(m);
@@ -491,7 +491,7 @@ namespace a {
     const found = a.byId(m.id);
     return match m by K {
       A => throw Busy(5m);
-      default => keep(found);
+      else    => keep(found);
     };
   }
 }`}, false)

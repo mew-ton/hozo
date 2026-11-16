@@ -1,0 +1,23 @@
+// MATCH-9（docs/check.md「classify / match」「アームが受けるケース」）: else のアームが受けるケースが一つもない
+// （ほかのアームが、分類のすべてのケースを並べている）。位置は else のアーム
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  classify One of M { Only; }
+  op use(m: M): void;
+  op ng(m: M): void {
+    match m by C {
+      A, B => use(m);
+      else => none;                    // ERROR: MATCH-9
+    };
+    match m by C {
+      A => use(m);
+      B => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+    match m by One {
+      Only => use(m);
+      else => none;                    // ERROR: MATCH-9
+    };
+  }
+}

@@ -4,19 +4,19 @@ namespace a {
   state orders: list<string>;
   state token: nullable<string>;
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
-  condition CartFilled of carts;
+  classify CartFilled of carts { CartFilled; NotCartFilled; }
 
   effect placeOrder() on Checkout: Shopping -> Ordered;
   effect ship() on Checkout: Ordered -> Shipped;
   // any と、ケースの和。前と後が同じケースでもよい
   effect reset() on Checkout: any -> Shopping;
-  effect touch() on Checkout: Shopping | Ordered -> any;
+  effect touch() on Checkout: Shopping, Ordered -> any;
   effect keep() on Checkout: Shopping -> Shopping;
-  effect move() on Checkout: Shopping | Ordered -> Ordered | Shipped;
+  effect move() on Checkout: Shopping, Ordered -> Ordered, Shipped;
   // condition のケースは condition の名前
   effect fill() on CartFilled: any -> CartFilled;
   // 基底の状態の組み込みの分類（list / nullable）
   effect clearCart() on carts: HasItems -> Empty;
   effect login() on token: Empty -> HasItems;
-  effect anyCart() on carts: any -> Empty | HasItems;
+  effect anyCart() on carts: any -> Empty, HasItems;
 }

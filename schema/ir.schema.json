@@ -531,7 +531,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.7"
+          "const": "0.8"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1154,7 +1154,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.7"
+          "const": "0.8"
         },
         "transpiler": {
           "type": "string"
@@ -1333,7 +1333,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.7"
+          "const": "0.8"
         }
       },
       "required": [
@@ -2102,7 +2102,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.7"
+          "const": "0.8"
         }
       },
       "required": [
@@ -2918,7 +2918,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.7"
+          "const": "0.8"
         },
         "viewer": {
           "type": "string"

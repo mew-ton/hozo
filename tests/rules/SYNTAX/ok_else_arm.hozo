@@ -1,0 +1,30 @@
+// SYNTAX（docs/grammar.md「配線」「exception / effect / read」「予約語」）: else のアーム、ケースの並びの区切り ","。
+// condition は予約語ではないので、名前に使える（宣言の頭でだけ、なくした書き方として見分ける）
+namespace a {
+  model M { id: string; condition: string; }
+  state carts: list<M>;
+  state orders: list<M>;
+  classify K of M { A; B; C; D; E; }
+  classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
+  effect touch() on Checkout: Shopping, Ordered -> any;
+  effect move() on Checkout: any -> Ordered, Shipped;
+  op use(m: M);
+  op f();
+  op check(condition: string): string;
+  op g(m: M): string effects touch, move {
+    match m by K {
+      A    => use(m);
+      else => none;
+    };
+    match m by K {
+      A, B => use(m);
+      C    => f();
+      else => none;
+    };
+    match m by K { A, B, C => f(); D, E => none; };
+    match carts by list { HasItems => f(); else => none; };
+    match by Checkout { Shopping => touch(); else => move(); };
+    const condition = check(m.condition);
+    return condition;
+  }
+}

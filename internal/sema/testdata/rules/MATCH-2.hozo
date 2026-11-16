@@ -1,8 +1,8 @@
-// MATCH-2: アームのケースの集合が分類のケースと等しくない、default の有無（docs/check.md「classify / match」）
+// MATCH-2: アームが、分類のケースを、ちょうど一度ずつ受けていない（docs/check.md「classify / match」「アームが受けるケース」）
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
-  classify D of M { A; default; }
+  classify D of M { A; B; C; D; E; }
   op use(m: M): void;
   op missing(m: M): void {
     match m by C {                     // ERROR: MATCH-2
@@ -11,39 +11,44 @@ namespace a {
   }
   op unknown(m: M): void {
     match m by C {                     // ERROR: MATCH-2
-      A | B | Z => use(m);
+      A, B, Z => use(m);
     };
   }
   op dup(m: M): void {
     match m by C {                     // ERROR: MATCH-2
       A => use(m);
-      B | A => use(m);
+      B, A => use(m);
     };
   }
-  op noDefault(m: M): void {
-    match m by C {                     // ERROR: MATCH-2
-      A | B => use(m);
-      default => none;
+  // else のアームがあっても、名前で並べたケースは、その分類のケースで、一度だけ
+  op unknownWithElse(m: M): void {
+    match m by D {                     // ERROR: MATCH-2
+      A, Z => use(m);
+      else => none;
     };
-  }
-  op needsDefault(m: M): void {
     match m by D {                     // ERROR: MATCH-2
       A => use(m);
+      B, A => none;
+      else => none;
     };
   }
   op ok(m: M): void {
     match m by C { A => use(m); B => none; };
-    match m by D { A => use(m); default => none; };
+    // else のアームがあれば、足りないケースはない: 並べなかったケースのすべてを受ける
+    match m by D { A => use(m); else => none; };
+    match m by D { A, B => use(m); C => none; else => none; };
+    match m by C { A => use(m); else => none; };
   }
 
-  // 組み込みの分類のケースは Empty / HasItems で、default はない
+  // 標準の分類のケースは Empty / HasItems
   state carts: list<M>;
   state token: nullable<string>;
   op f(): void;
   op builtinOk(): void {
     match carts by list { Empty => f(); HasItems => none; };
     match token by nullable { HasItems => f(); Empty => none; };
-    match carts by list { Empty | HasItems => f(); };
+    match carts by list { Empty, HasItems => f(); };
+    match carts by list { Empty => f(); else => none; };
   }
   op builtinMissing(): void {
     match carts by list {              // ERROR: MATCH-2
@@ -67,28 +72,17 @@ namespace a {
   op builtinDup(): void {
     match carts by list {              // ERROR: MATCH-2
       Empty => f();
-      HasItems | Empty => none;
-    };
-  }
-  op builtinDefault(): void {
-    match carts by list {              // ERROR: MATCH-2
-      Empty => f();
-      default => none;
-    };
-    match token by nullable {          // ERROR: MATCH-2
-      Empty => f();
-      HasItems => none;
-      default => none;
+      HasItems, Empty => none;
     };
   }
 
   // 状態の分類も、値の分類と同じ
   state orders: list<M>;
   classify Checkout of carts, orders { Shopping; Ordered; }
-  classify Session of token { LoggedIn; default; }
+  classify Session of token { LoggedIn; LoggedOut; }
   op stateOk(): void {
     match by Checkout { Shopping => f(); Ordered => none; };
-    match by Session { LoggedIn => f(); default => none; };
+    match by Session { LoggedIn => f(); else => none; };
   }
   op stateNg(): void {
     match by Checkout {                // ERROR: MATCH-2
@@ -101,6 +95,21 @@ namespace a {
     };
     match by Session {                 // ERROR: MATCH-2
       LoggedIn => f();
+    };
+  }
+
+  // 残りのケース（as else）も、ほかのケースと同じ: 名前で並べるか、else のアームが受ける
+  op find(): M?;
+  classify Hit of find { Found: find as M; Missing: find as else; }
+  op restOk(): void {
+    const m = find();
+    match m by Hit { Found => use(m); Missing => none; };
+    match m by Hit { Found => use(m); else => none; };
+  }
+  op restNg(): void {
+    const m = find();
+    match m by Hit {                   // ERROR: MATCH-2
+      Found => use(m);
     };
   }
 }

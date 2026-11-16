@@ -25,9 +25,9 @@ namespace shop {
   classify Checkout of carts, orders {
     Shopping;
     Ordered;
-    default;
+    Idle;
   }
-  condition LoggedIn of token;
+  classify LoggedIn of token { LoggedIn; LoggedOut; }
   classify LineKind of Line { Gift; Normal; }
 
   effect addLine() on carts.post;
@@ -35,7 +35,7 @@ namespace shop {
   effect logout() on token.delete;
   effect placeOrder() on Checkout: Shopping -> Ordered;
   effect reset() on Checkout: any -> Shopping;
-  effect touch() on Checkout: Ordered | Shopping -> any;
+  effect touch() on Checkout: Ordered, Shopping -> any;
   effect clearCart() on carts: HasItems -> Empty;
   effect login() on token: Empty -> HasItems;
   effect signIn() on LoggedIn: any -> LoggedIn;
@@ -62,12 +62,12 @@ namespace shop {
       Normal => normal(line);
     };
     const placed = match by Checkout {
-      Shopping | Ordered => order();
-      default => order();
+      Shopping, Ordered => order();
+      else => order();
     };
     match by LoggedIn {
       LoggedIn => showCart();
-      default => none;
+      LoggedOut => none;
     };
     return placed;
   }
@@ -145,12 +145,12 @@ func TestClassifySubject(t *testing.T) {
 	jsonEq(t, "値の分類", p.Lookup("shop.LineKind").(*ir.Classify).Subject, ir.TypeSubject{Type: ir.Ref("shop.Line")})
 	checkout := p.Lookup("shop.Checkout").(*ir.Classify)
 	jsonEq(t, "状態の分類", checkout.Subject, ir.StatesSubject{States: []string{"shop.carts", "shop.orders"}})
-	if !checkout.HasDefault || len(checkout.Cases) != 2 {
+	if len(checkout.Cases) != 3 || checkout.Cases[2].Name != "Idle" {
 		t.Errorf("Checkout = %+v", checkout)
 	}
 	cond := p.Lookup("shop.LoggedIn").(*ir.Classify)
-	jsonEq(t, "状態の condition", cond.Subject, ir.StatesSubject{States: []string{"shop.token"}})
-	if !cond.FromCondition || !cond.HasDefault || cond.Cases[0].Name != "LoggedIn" {
+	jsonEq(t, "二つに分かれる状態の分類", cond.Subject, ir.StatesSubject{States: []string{"shop.token"}})
+	if len(cond.Cases) != 2 || cond.Cases[0].Name != "LoggedIn" || cond.Cases[1].Name != "LoggedOut" || cond.DecidedBy != ir.DecidedByPredicate {
 		t.Errorf("LoggedIn = %+v", cond)
 	}
 }
@@ -284,8 +284,8 @@ func TestMatchSubjects(t *testing.T) {
 	if byList.Classify != "list" {
 		t.Errorf("by list の classify = %q", byList.Classify)
 	}
-	jsonEq(t, "by list のアーム", []ir.ArmCases{byList.Arms[0].Cases, byList.Arms[1].Cases},
-		[]ir.ArmCases{{Cases: []string{"Empty"}}, {Cases: []string{"HasItems"}}})
+	jsonEq(t, "by list のアーム", [][]string{byList.Arms[0].Cases, byList.Arms[1].Cases},
+		[][]string{{"Empty"}, {"HasItems"}})
 
 	byNullable := stmts[1].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
 	jsonEq(t, "by nullable の subject", byNullable.Subject, ir.ValueSubject{Atom: ir.StateAtom{State: "shop.token", Span: byNullable.Subject.(ir.ValueSubject).Atom.(ir.StateAtom).Span}})
@@ -294,7 +294,7 @@ func TestMatchSubjects(t *testing.T) {
 	}
 	// アームは書かれた順
 	jsonEq(t, "by nullable のアーム", []any{byNullable.Arms[0].Cases, byNullable.Arms[1].Cases, byNullable.Arms[1].Body},
-		[]any{ir.ArmCases{Cases: []string{"HasItems"}}, ir.ArmCases{Cases: []string{"Empty"}}, ir.NoneBody{}})
+		[]any{[]string{"HasItems"}, []string{"Empty"}, ir.NoneBody{}})
 
 	byValue := stmts[2].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
 	value, ok := byValue.Subject.(ir.ValueSubject)
@@ -313,13 +313,14 @@ func TestMatchSubjects(t *testing.T) {
 	if byClassify.Classify != "shop.Checkout" {
 		t.Errorf("match by C の classify = %q", byClassify.Classify)
 	}
-	jsonEq(t, "match by C のアーム", []ir.ArmCases{byClassify.Arms[0].Cases, byClassify.Arms[1].Cases},
-		[]ir.ArmCases{{Cases: []string{"Shopping", "Ordered"}}, ir.DefaultArm()})
+	// 状態の分類での match の else のアーム: cases は、並べなかったケース
+	jsonEq(t, "match by C のアーム", []any{byClassify.Arms[0].Cases, byClassify.Arms[0].Else, byClassify.Arms[1].Cases, byClassify.Arms[1].Else},
+		[]any{[]string{"Shopping", "Ordered"}, false, []string{"Idle"}, true})
 
 	byCondition := stmts[4].(ir.MatchStmt).Match
-	jsonEq(t, "match by condition の subject", byCondition.Subject, ir.ClassifyOwnedSubject{})
+	jsonEq(t, "二つに分かれる状態の分類での match の subject", byCondition.Subject, ir.ClassifyOwnedSubject{})
 	if byCondition.Classify != "shop.LoggedIn" {
-		t.Errorf("match by condition の classify = %q", byCondition.Classify)
+		t.Errorf("二つに分かれる状態の分類での match の classify = %q", byCondition.Classify)
 	}
 
 	// 読み戻しても同じ（docs/ir.md「JSON」）

@@ -154,9 +154,11 @@ func TestNegative(t *testing.T) {
 		// Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）。
 		{"namespace", "Namespace", `{"name":"a","decls":[]}`, true},
 		{"namespace with decorators", "Namespace", `{"name":"a","decorators":[],"decls":[]}`, false},
-		{"arm cases default", "ArmCases", `"default"`, true},
-		{"arm cases list", "ArmCases", `["A","B"]`, true},
-		{"arm cases other word", "ArmCases", `"other"`, false},
+		// アームのケースは、いつもケース名の列。else のアームは else: true で、cases は、それが受けるケース（docs/ir.md「配線」の MatchArm）。
+		{"match arm", "MatchArm", `{"cases":["A","B"],"else":false,"body":{"kind":"none"},"narrowed":[],"span":{"file":"a.hozo","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
+		{"match arm else", "MatchArm", `{"cases":["C"],"else":true,"body":{"kind":"none"},"narrowed":[],"span":{"file":"a.hozo","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
+		{"match arm cases default", "MatchArm", `{"cases":"default","else":false,"body":{"kind":"none"},"narrowed":[],"span":{"file":"a.hozo","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
+		{"match arm without else", "MatchArm", `{"cases":["A"],"body":{"kind":"none"},"narrowed":[],"span":{"file":"a.hozo","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		// 状態を分類で表す決定の形（docs/ir.md「state / exception / effect」「classify」「配線」）。
 		{"state shape nullable", "StateShape", `"nullable"`, true},
 		{"state shape unknown", "StateShape", `"maybe"`, false},
@@ -255,8 +257,8 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.7","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.7","direction":"emit","format":"openapi","files":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.8","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.8","direction":"emit","format":"openapi","files":[]}`, false},
 		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {

@@ -53,9 +53,10 @@ func (e *ValidationError) Error() string {
 	return "validation failed: " + strings.Join(parts, "; ")
 }
 
-// ClassificationError は分類の判定関数が返す誤り（docs/plugin-go.md「分類」）。
-// Classify は分類の FQN、Hits は真になったケースの名前（書かれた順）。
-// default のない分類で真が一つもなければ Hits は空、どの分類でも真が二つ以上ならそのすべて。
+// ClassificationError は分類の誤り（docs/plugin-go.md「分類」「match」の「分類の誤りの枝」）: 値が、分類が宣言したケースの
+// どれにも当たらないか、二つ以上の述語が真になった。判定関数と、型で決まる分類の match が返す。
+// Classify は分類の FQN、Hits は真になったケースの名前（書かれた順）。どのケースにも当たらなければ空、
+// 真が二つ以上ならそのすべて。
 type ClassificationError struct {
 	Classify string
 	Hits     []string

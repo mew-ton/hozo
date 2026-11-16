@@ -1,0 +1,47 @@
+// SYNTAX（docs/grammar.md「classify」「exception / effect / read」「配線」）: 分類を閉じたときになくした書き方は、新しい書き方を
+// メッセージで示して構文エラーにする。誤りのあるケースと宣言は捨てられ、残りは検査される
+namespace a {
+  model M { id: string; }
+  state carts: list<M>;
+  state orders: list<M>;
+  op find(): M?;
+  op use(m: M);
+  op f();
+  // 名前のないケース default は書けない: ケースには名前を付ける。値がない側なら、残りのケース（<名前>: <対象> as else;）
+  classify K of M {
+    A;
+    B;
+    default;                                     // ERROR: SYNTAX
+  }
+  classify Hit of find {
+    Found: find as M;
+    /** 見つからなかった */
+    default;                                     // ERROR: SYNTAX
+  }
+  classify WithAs of find {
+    Found: find as M;
+    default: find as else;                       // ERROR: SYNTAX
+  }
+  // condition の宣言は書けない: 両側に名前を付けた classify で書く
+  condition Fresh of M;                          // ERROR: SYNTAX
+  /** 説明 */
+  condition CartFilled of carts, orders;         // ERROR: SYNTAX
+  // default のアームは書けない: 受けるケースを名前で並べるか、最後のアームを else => … と書く
+  op oldDefault(m: M) {
+    match m by K {
+      A       => use(m);
+      default => none;                           // ERROR: SYNTAX
+    };
+  }
+  // ケースの並びの区切りは ","（"|" は、なくした書き方）。"," として読み進めるので、op と効果は残る
+  classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
+  effect touch() on Checkout: Shopping | Ordered -> any;                 // ERROR: SYNTAX
+  effect move() on Checkout: any -> Ordered | Shipped;                   // ERROR: SYNTAX
+  op oldPipe(m: M) effects touch, move {
+    match m by K {
+      A | B => use(m);                           // ERROR: SYNTAX
+    };
+    touch();
+    move();
+  }
+}

@@ -1,7 +1,7 @@
 # テストの fixture: トランスパイラ goplug は a.legacy に対応しない。起動しない
 name     = "goplug"
 command  = ["true"]
-protocol = "0.7"
+protocol = "0.8"
 
 [[transpiler]]
 name        = "goplug"

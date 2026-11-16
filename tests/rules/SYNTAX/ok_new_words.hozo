@@ -18,12 +18,12 @@ namespace a {
   export op find(is: string): User? reads users { return byId(is); }
   op gone(): never throws Gone;
   op nameOf(u: User): string;
-  classify Found of find { Hit: find as User; default; }
+  classify Found of find { Hit: find as User; Other: find as else; }
   op name(is: string): string throws Gone {
     const u = find(is);
     return match u by a.Found {
       Hit     => nameOf(u);
-      default => throw Gone;
+      else    => throw Gone;
     };
   }
   op title(): string {

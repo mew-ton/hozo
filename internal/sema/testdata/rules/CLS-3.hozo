@@ -13,35 +13,35 @@ namespace a {
   // 通る例: 型一つ（値の分類）、今の名前空間の基底の状態一つ以上（状態の分類）。形は問わない
   classify Kind of M { A; B; }
   classify KindList of M[] { A; B; }
-  condition Fresh of M;
+  classify Fresh of M { Fresh; NotFresh; }
   classify Checkout of carts, orders { Shopping; Ordered; }
   classify Session of token { Anonymous; LoggedIn; }
-  classify All of carts, orders, token, clock { X; default; }
-  condition CartFilled of carts;
-  condition Busy of carts, orders;
+  classify All of carts, orders, token, clock { X; Other; }
+  classify CartFilled of carts { CartFilled; NotCartFilled; }
+  classify Busy of carts, orders { Busy; NotBusy; }
 
   // 対象が二つ以上なのに状態でないものがある
   classify Ng1 of M, M { A; }                    // ERROR: CLS-3, CLS-3
   classify Ng2 of string, int { A; }             // ERROR: CLS-3, CLS-3
-  condition Ng3 of M, string;                    // ERROR: CLS-3, CLS-3
+  classify Ng3 of M, string { Ng3; NotNg3; }     // ERROR: CLS-3, CLS-3
   // 型と状態が混ざっている
   classify Ng4 of carts, M { A; }                // ERROR: CLS-3
   classify Ng5 of M, carts, orders { A; }        // ERROR: CLS-3
   classify Ng6 of carts, M[] { A; }              // ERROR: CLS-3
-  condition Ng7 of string, token;                // ERROR: CLS-3
+  classify Ng7 of string, token { Ng7; NotNg7; } // ERROR: CLS-3
   // 同じ状態が二度ある
   classify Ng8 of carts, carts { A; }            // ERROR: CLS-3
   classify Ng9 of carts, orders, carts { A; }    // ERROR: CLS-3
-  condition Ng10 of token, token;                // ERROR: CLS-3
+  classify Ng10 of token, token { Ng10; NotNg10; } // ERROR: CLS-3
   // 対象が別の名前空間の状態（グローバルの状態も別の名前空間）
   classify Ng11 of other.remote { A; }           // ERROR: CLS-3
   classify Ng12 of carts, other.remote { A; }    // ERROR: CLS-3
   classify Ng13 of shared { A; }                 // ERROR: CLS-3
-  condition Ng14 of other.remote;                // ERROR: CLS-3
+  classify Ng14 of other.remote { Ng14; NotNg14; } // ERROR: CLS-3
   // 対象が状態の分類
   classify Ng15 of Checkout { A; }               // ERROR: CLS-3
   classify Ng16 of carts, Session { A; }         // ERROR: CLS-3
-  condition Ng17 of Checkout;                    // ERROR: CLS-3
+  classify Ng17 of Checkout { Ng17; NotNg17; }   // ERROR: CLS-3
 }
 // グローバルの状態は、グローバルの classify の対象にできる
 classify SharedKind of shared { None; Some; }

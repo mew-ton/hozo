@@ -5,5 +5,5 @@ namespace a {
   classify Checkout of carts, orders { Shopping; Ordered; }
   classify Phase of Checkout { Early; Late; }    // ERROR: CLS-3
   classify Wide of carts, Checkout { A; }        // ERROR: CLS-3
-  condition Done of Checkout;                    // ERROR: CLS-3
+  classify Done of Checkout { Done; NotDone; }   // ERROR: CLS-3
 }

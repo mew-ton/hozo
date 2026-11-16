@@ -11,14 +11,14 @@ namespace a {
   op maybePage(): Page?;
   op raw(): string?;
   classify Kind of M { A; B; }
-  classify V1 of M? { Has: M? as M; default; }
-  classify V2 of string { Valid: string as Email; default; }
-  classify V3 of M { Same: M as M; default; }
-  classify V4 of M { Narrow: M as Kind.A<M>; default; }
-  classify O1 of find { Hit: find as M; default; }
+  classify V1 of M? { Has: M? as M; }
+  classify V2 of string { Valid: string as Email; }
+  classify V3 of M { Same: M as M; }
+  classify V4 of M { Narrow: M as Kind.A<M>; }
+  classify O1 of find { Hit: find as M; }
   classify O2 of page { Ready: page as M; Missing: page as N; }
-  classify O3 of maybePage { Ready: maybePage as M; default; }
-  classify O4 of raw { Valid: raw as Email; default; }
-  classify S1 of token { In: token as Email; default; }
+  classify O3 of maybePage { Ready: maybePage as M; }
+  classify O4 of raw { Valid: raw as Email; }
+  classify S1 of token { In: token as Email; }
   op f(): M;
 }

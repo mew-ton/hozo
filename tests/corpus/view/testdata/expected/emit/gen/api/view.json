@@ -1,5 +1,5 @@
 {
-  "version": "0.7",
+  "version": "0.8",
   "viewer": "api",
   "config": {
     "index": 1,
@@ -70,7 +70,7 @@
     ]
   },
   "program": {
-    "version": "0.7",
+    "version": "0.8",
     "namespaces": [
       {
         "name": "",

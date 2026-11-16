@@ -114,12 +114,12 @@ func depComment(o *ir.Op, viewed *ir.ViewedSignature) string {
 	return comment(strings.Join(append([]string{first}, opFacts(o, sig)...), "\n\n"))
 }
 
-// caseSet は遷移のケースの集合の書き方: `any` か `A | B`。
+// caseSet は遷移のケースの集合の書き方: `any` か `A, B`。
 func caseSet(s ir.CaseSet) string {
 	if s.Any {
 		return "any"
 	}
-	return strings.Join(s.Cases, " | ")
+	return strings.Join(s.Cases, ", ")
 }
 
 // effectTarget は、効果の宛先の書き方（状態の単位の命令のコメント、effect の定数のコメント）: 組み込みの効果なら

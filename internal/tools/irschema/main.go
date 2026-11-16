@@ -141,10 +141,6 @@ var specials = map[reflect.Type]map[string]any{
 		"description": "遷移の前か後のケースの集合。\"any\" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。",
 		"oneOf":       []any{map[string]any{"const": "any"}, arrayOf(map[string]any{"type": "string"})},
 	},
-	typeOf[ir.ArmCases](): {
-		"description": "match のアームが受けるケース。\"default\" か、ケース名の列（docs/ir.md「配線」の Match）。",
-		"oneOf":       []any{map[string]any{"const": "default"}, arrayOf(map[string]any{"type": "string"})},
-	},
 }
 
 // overrides はフィールドごとの手書きのスキーマ。キーは "<Go の型名>.<JSON のフィールド名>"。

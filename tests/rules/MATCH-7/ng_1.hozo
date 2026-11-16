@@ -2,10 +2,10 @@
 namespace a {
   model M { id: string; }
   classify Kind of M { A; B; }
-  condition Fresh of M;
+  classify Fresh of M { Fresh; NotFresh; }
   op f();
   op ng() {
     match by Kind { A => f(); B => none; };            // ERROR: MATCH-7
-    match by Fresh { Fresh => f(); default => none; }; // ERROR: MATCH-7
+    match by Fresh { Fresh => f(); else => none; };    // ERROR: MATCH-7
   }
 }

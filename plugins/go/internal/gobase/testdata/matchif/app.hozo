@@ -31,17 +31,17 @@ namespace app {
   /** 型で決まる op の分類（絞り込みは presence） */
   classify Lookup of findUser {
     Found: findUser as User;
-    default;
+    Other: findUser as else;
   }
   /** 型で決まる値の分類（絞り込みは presence） */
   classify Present of nullable<User> {
     Some: nullable<User> as User;
-    default;
+    Other: nullable<User> as else;
   }
   /** 型で決まる状態の分類（絞り込みは presence） */
   classify SignedIn of token {
     Yes: token as Token;
-    default;
+    Other: token as else;
   }
 
   // return match: 呼び出し（純粋でない op）と throw。アームを書いた順によらず、値のある場合が if の枝。else を書かない
@@ -50,7 +50,7 @@ namespace app {
   {
     const user = findUser(id);
     return match user by Lookup {
-      default => throw Missing;
+      else    => throw Missing;
       Found   => loadName(user);
     };
   }
@@ -70,7 +70,7 @@ namespace app {
   {
     return match user by Present {
       Some    => nameOf(user);
-      default => deny();
+      else    => deny();
     };
   }
 
@@ -104,7 +104,7 @@ namespace app {
   {
     return match by SignedIn {
       Yes     => useToken(token);
-      default => "anonymous";
+      else    => "anonymous";
     };
   }
 
@@ -153,7 +153,7 @@ namespace app {
       Empty    => deny();
     };
     match lines by list {
-      Empty | HasItems => show("any");
+      Empty, HasItems  => show("any");
     };
     match user by nullable {
       HasItems => takeOptionalUser(user);

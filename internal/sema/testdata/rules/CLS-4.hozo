@@ -4,11 +4,11 @@ namespace a {
   op run();
   op run2(): void;
   op fail(): never throws E;
-  classify A1 of run { X; default; }             // ERROR: CLS-4
-  classify A2 of run2 { X; default; }            // ERROR: CLS-4
-  classify A3 of fail { X; default; }            // ERROR: CLS-4
-  classify A4 of b.quiet { X; default; }         // ERROR: CLS-4
-  condition C1 of run;                           // ERROR: CLS-4
+  classify A1 of run { X; Other; }               // ERROR: CLS-4
+  classify A2 of run2 { X; Other; }              // ERROR: CLS-4
+  classify A3 of fail { X; Other; }              // ERROR: CLS-4
+  classify A4 of b.quiet { X; Other; }           // ERROR: CLS-4
+  classify C1 of run { C1; NotC1; }              // ERROR: CLS-4
 }
 namespace b {
   op quiet();

@@ -1,4 +1,4 @@
-// CLS-2（docs/check.md「classify / match」）: 名前の付いたケースがある
+// CLS-2（docs/check.md「classify / match」）: ケースがある。一つでもよい（そのケースでない値は、分類の誤り。docs/check.md「閉じた分類」）
 namespace a {
   model M { id: string; }
   classify Ok of M { A; }

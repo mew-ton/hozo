@@ -6,7 +6,7 @@ namespace a {
   op dup(m: M): void {
     match m by C {                     // ERROR: MATCH-2
       A => use(m);
-      B | A => use(m);
+      B, A => use(m);
     };
   }
 }

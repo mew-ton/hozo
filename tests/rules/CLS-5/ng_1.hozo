@@ -10,17 +10,17 @@ namespace a {
   op find(): M?;
   op find2(): M?;
   // 値の分類: as の前は subject の型と等しい型
-  classify V1 of M? { Has: M as M; default; }                    // ERROR: CLS-5
-  classify V2 of string { Valid: Email as Email; default; }      // ERROR: CLS-5
-  classify V3 of M? { Has: find as M; default; }                 // ERROR: CLS-5
+  classify V1 of M? { Has: M as M; }                             // ERROR: CLS-5
+  classify V2 of string { Valid: Email as Email; }               // ERROR: CLS-5
+  classify V3 of M? { Has: find as M; }                          // ERROR: CLS-5
   // op の分類: as の前はその op
-  classify O1 of find { Hit: find2 as M; default; }              // ERROR: CLS-5
-  classify O2 of find { Hit: M? as M; default; }                 // ERROR: CLS-5
+  classify O1 of find { Hit: find2 as M; }                       // ERROR: CLS-5
+  classify O2 of find { Hit: M? as M; }                          // ERROR: CLS-5
   // 状態の分類: as の前は対象の状態のどれか
-  classify S1 of token, profile { Ready: other as M; default; }  // ERROR: CLS-5
-  classify S2 of token { In: string? as string; default; }       // ERROR: CLS-5
+  classify S1 of token, profile { Ready: other as M; }           // ERROR: CLS-5
+  classify S2 of token { In: string? as string; }                // ERROR: CLS-5
   // 同じ対象の as が二度
-  classify D1 of find { Hit: find as M, find as M; default; }    // ERROR: CLS-5
-  classify D2 of token, profile { Ready: token as string, token as string; default; }   // ERROR: CLS-5
+  classify D1 of find { Hit: find as M, find as M; }             // ERROR: CLS-5
+  classify D2 of token, profile { Ready: token as string, token as string; }            // ERROR: CLS-5
   op f(): N;
 }

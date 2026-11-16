@@ -19,18 +19,18 @@ namespace a {
     const r1 = match x by C { A => m(x); B => throw E; D => fail(); };
     useM(r1);
     // T と T? は T?
-    const r2 = match x by C { A => m(x); B | D => opt(x); };
+    const r2 = match x by C { A => m(x); B, D => opt(x); };
     use(r2);
     // 絞り込んだ型 case(C, [A], M) と M は M
-    const r3 = match x by C { A => x; B | D => m(x); };
+    const r3 = match x by C { A => x; B, D => m(x); };
     useM(r3);
   }
   op f2(x: M): void {
     // リテラルだけなら、その種類の核の型
-    const r4 = match x by C { A => 1; B | D => 2; };
+    const r4 = match x by C { A => 1; B, D => 2; };
     useInt(r4);
     // scalar の値は元の型に渡せるので、Email と string は string にそろう
-    const r5 = match x by C { A => email(); B | D => name(x); };
+    const r5 = match x by C { A => email(); B, D => name(x); };
     useString(r5);
     // レコードリテラルは、型の決まったアームの型に当てはめる。none があれば optional
     const r6 = match x by C { A => m(x); B => { id: "new" }; D => none; };
@@ -38,6 +38,6 @@ namespace a {
   }
   // すべてのアームが返らない match は「返らない」
   op g(x: M): M throws E {
-    return match x by C { A | B => throw E; D => fail(); };
+    return match x by C { A, B => throw E; D => fail(); };
   }
 }

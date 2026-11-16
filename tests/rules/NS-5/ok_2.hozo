@@ -9,7 +9,7 @@ namespace a {
   decorator toOpen = fallback(b.open);
   op local();
   // 対象にすることは呼び出しではない
-  classify Found of b.find { Hit; default; }
+  classify Found of b.find { Hit; Other; }
   /**
    * @see b.find
    */

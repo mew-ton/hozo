@@ -1,4 +1,4 @@
-// SYNTAX（docs/grammar.md「classify / condition」「予約語」）: as の後ろの else（残りのケース）。else は予約語だが、
+// SYNTAX（docs/grammar.md「classify」「予約語」）: as の後ろの else（残りのケース）。else は予約語だが、
 // フィールド名の位置には書ける
 namespace a {
   model M { id: string; else: string; }

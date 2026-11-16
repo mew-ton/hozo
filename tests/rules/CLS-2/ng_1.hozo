@@ -1,9 +1,6 @@
-// CLS-2（docs/check.md「classify / match」）: 名前の付いたケースが一つもない。internal/sema/testdata/rules/CLS-2.hozo から
+// CLS-2（docs/check.md「classify / match」）: ケースが一つもない。internal/sema/testdata/rules/CLS-2.hozo から
 namespace a {
   model M { id: string; }
-  classify C of M {                    // ERROR: CLS-2
-    default;
-  }
   classify D of M { }                  // ERROR: CLS-2
   op use(m: M);
 }

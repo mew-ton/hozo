@@ -5,16 +5,16 @@ namespace a {
   op find(id: string): M?;
   op list1(): M[];
   op g(m: M?);
-  classify Found of find { Hit; default; }
+  classify Found of find { Hit; Other; }
   classify Any of list1 { Some; None; }
-  classify Remote of b.lookup { Hit; default; }
-  condition Known of find;
+  classify Remote of b.lookup { Hit; Other; }
+  classify Known of find { Known; NotKnown; }
   op f(id: string, given: M?) {
     const m = find(id);
-    match m by Found { Hit => g(m); default => none; };
-    match given by Found { Hit => g(given); default => none; };
-    match given by Remote { Hit => g(given); default => none; };
-    match given by Known { Known => g(given); default => none; };
+    match m by Found { Hit => g(m); else => none; };
+    match given by Found { Hit => g(given); else => none; };
+    match given by Remote { Hit => g(given); else => none; };
+    match given by Known { Known => g(given); else => none; };
   }
 }
 namespace b {

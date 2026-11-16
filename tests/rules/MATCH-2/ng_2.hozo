@@ -5,7 +5,7 @@ namespace a {
   op use(m: M): void;
   op unknown(m: M): void {
     match m by C {                     // ERROR: MATCH-2
-      A | B | Z => use(m);
+      A, B, Z => use(m);
     };
   }
 }

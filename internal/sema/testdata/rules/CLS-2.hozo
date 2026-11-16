@@ -1,9 +1,6 @@
-// CLS-2: 名前の付いたケースが一つもない（docs/check.md「classify / match」）
+// CLS-2: ケースが一つもない（docs/check.md「classify / match」）
 namespace a {
   model M { id: string; }
-  classify C of M {                    // ERROR: CLS-2
-    default;
-  }
   classify D of M { }                  // ERROR: CLS-2
   classify Ok of M { A; }
 }

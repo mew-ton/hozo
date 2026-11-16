@@ -1,32 +1,49 @@
-// MATCH-4（docs/types.md「残りのケースでの対象の型」「アームの中の対象の型」）: 残りのケース（as else）のアームの中の対象の型。
-// variant で残りのアームがちょうど一つなら、そのアームの型。presence と、残りのアームが二つ以上の variant は、外のまま
+// MATCH-4（docs/types.md「アームの中の対象の型」の 1）: else のアームが受けるケースがちょうど一つなら、そのケースを名前で書いた
+// アームと同じに絞り込まれる。二つ以上なら、外の型のままで、その型で渡せる引数には渡せる
 namespace a {
   model M { id: string; }
   model N { id: string; }
   model O { id: string; }
-  union Two { Ready: M; Missing: N; }
   union Three { Ready: M; Missing: N; Broken: O; }
+  classify K of M { A; B; C; D; E; }
+  classify Whole of Three { IsReady: Three as M; IsMissing: Three as N; IsBroken: Three as O; }
   op find(): M?;
-  classify Hit of find { Found: find as M; NotFound: find as else; }
-  classify K2 of Two { IsReady: Two as M; Rest: Two as else; }
-  classify K3 of Three { IsReady: Three as M; Rest: Three as else; }
+  classify Hit of find { Found: find as M; Missing: find as else; }
+  op onA(m: K.A<M>): void;
   op takeM(m: M): void;
-  op takeN(n: N): void;
-  op takeOpt(m: M?): void;
+  op takeO(o: O): void;
   op takeThree(t: Three): void;
-  op f(two: Two, three: Three): void {
-    const m = find();
-    match m by Hit {
-      Found    => takeM(m);
-      NotFound => takeOpt(m);
+  op f(m: M, three: Three): void {
+    // else は A だけを受ける: m は K.A<M>
+    match m by K {
+      B, C, D, E => none;
+      else       => onA(m);
     };
-    match two by K2 {
-      IsReady => takeM(two);
-      Rest    => takeN(two);
+    // else は B〜E を受ける: m は M のまま
+    match m by K {
+      A    => onA(m);
+      else => takeM(m);
     };
-    match three by K3 {
+    // else は IsBroken だけを受ける: three は O
+    match three by Whole {
+      IsReady, IsMissing => none;
+      else               => takeO(three);
+    };
+    // else は IsMissing と IsBroken を受ける: three は Three のまま
+    match three by Whole {
       IsReady => takeM(three);
-      Rest    => takeThree(three);
+      else    => takeThree(three);
+    };
+    // else は Found だけを受ける: x は M
+    const x = find();
+    match x by Hit {
+      Missing => none;
+      else    => takeM(x);
+    };
+    // 標準の分類でも同じ: else は HasItems だけを受け、x は M
+    match x by nullable {
+      Empty => none;
+      else  => takeM(x);
     };
   }
 }

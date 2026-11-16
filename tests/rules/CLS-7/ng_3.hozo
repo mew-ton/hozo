@@ -1,4 +1,4 @@
-// CLS-7（docs/check.md「残りのケース」）: 残りのケースのほかに、名前の付いたケースが一つもない（default だけでも同じ）
+// CLS-7（docs/check.md「残りのケース」）: 残りのケースのほかに、名前の付いたケースが一つもない
 namespace a {
   model M { id: string; }
   classify Only of M? {

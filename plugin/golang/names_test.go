@@ -108,7 +108,7 @@ func TestCaseConst(t *testing.T) {
 		{"WarrantyKind", "Yamada", "WarrantyKindYamada"},
 		{"WarrantyKind", "standard", "WarrantyKindStandard"},
 		{"WarrantyKind", "noWarranty", "WarrantyKindNoWarranty"},
-		{"WarrantyKind", "default", "WarrantyKindDefault"},
+		// Default という名前のケースは、ほかのケースと同じ（名前のないケース default は、言語にない）
 		{"IsAdult", "Default", "IsAdultDefault"},
 	}
 	for _, tt := range tests {

@@ -5,5 +5,5 @@ namespace a {
   state items: list<M>;
   classify Pair of M, N { A; }                   // ERROR: CLS-3, CLS-3
   classify Core of string, int { A; }            // ERROR: CLS-3, CLS-3
-  condition Both of M, N;                        // ERROR: CLS-3, CLS-3
+  classify Both of M, N { Both; NotBoth; }       // ERROR: CLS-3, CLS-3
 }

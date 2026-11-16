@@ -1,0 +1,40 @@
+// MATCH-9（docs/check.md「アームが受けるケース」）: 標準の分類、状態の分類、型で決まる分類でも同じ。
+// else のアームが受けるのは、宣言したケースだけ: 残りのケースを書かない分類（Arrival）の「値がない」は、どのケースでもなく、
+// else のアームは受けない（docs/check.md「閉じた分類」）
+namespace a {
+  model M { id: string; }
+  op find(): M?;
+  op use(m: M): void;
+  op f(): void;
+  classify Hit of find { Found: find as M; Missing: find as else; }
+  classify Arrival of find { Arrived: find as M; }
+  state carts: list<M>;
+  state token: nullable<string>;
+  classify Session of token { LoggedIn; LoggedOut; }
+  op ng(): void {
+    const x = find();
+    match x by Hit {
+      Found => use(x);
+      Missing => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+    match x by Arrival {
+      Arrived => use(x);
+      else => none;                    // ERROR: MATCH-9
+    };
+    match carts by list {
+      Empty, HasItems => f();
+      else => none;                    // ERROR: MATCH-9
+    };
+    match token by nullable {
+      Empty => f();
+      HasItems => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+    match by Session {
+      LoggedIn => f();
+      LoggedOut => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+  }
+}

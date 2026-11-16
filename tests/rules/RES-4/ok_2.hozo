@@ -10,7 +10,7 @@ namespace a {
   exception E;
   union Writes { add; set; }
   union Errors { E; }
-  classify Both of rows, cur { Ready; default; }
+  classify Both of rows, cur { Ready; Other; }
   decorator ok(t: any state, u: any state?, e: any effect, ...es: any effect on rows.post)
     reads t, u, rows, b.other
     effects e, es, add, Writes;

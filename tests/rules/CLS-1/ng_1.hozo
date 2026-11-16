@@ -1,10 +1,11 @@
-// CLS-1（docs/check.md「classify / match」）: default が二つ以上。internal/sema/testdata/rules/CLS-1.hozo から
+// CLS-1（docs/check.md「classify / match」）: 同じケース名が三度。位置は、二度目からの名前のそれぞれ
 namespace a {
   model M { id: string; }
   classify C of M {
     A;
-    default;
-    default;                           // ERROR: CLS-1
+    B;
+    A;                                 // ERROR: CLS-1
+    A;                                 // ERROR: CLS-1
   }
   op use(m: M);
 }

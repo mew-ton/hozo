@@ -1,0 +1,70 @@
+// MATCH-9: else のアームが受けるケースが一つもない（docs/check.md「classify / match」「アームが受けるケース」）。位置は else のアーム
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  classify One of M { Only; }
+  op use(m: M): void;
+  op f(): void;
+  op find(): M?;
+  classify Hit of find { Found: find as M; Missing: find as else; }
+  // 残りのケースを書かない分類: 値がない側は、どのケースでもなく、else のアームも受けない
+  classify Arrival of find { Arrived: find as M; }
+  state carts: list<M>;
+  state token: nullable<string>;
+  classify Session of token { LoggedIn; LoggedOut; }
+
+  op ng(m: M): void {
+    match m by C {
+      A, B => use(m);
+      else => none;                    // ERROR: MATCH-9
+    };
+    match m by C {
+      A => use(m);
+      B => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+    match m by One {
+      Only => use(m);
+      else => none;                    // ERROR: MATCH-9
+    };
+    const x = find();
+    match x by Hit {
+      Found => use(x);
+      Missing => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+    match x by Arrival {
+      Arrived => use(x);
+      else => none;                    // ERROR: MATCH-9
+    };
+    match carts by list {
+      Empty, HasItems => f();
+      else => none;                    // ERROR: MATCH-9
+    };
+    match token by nullable {
+      Empty => f();
+      HasItems => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+    match by Session {
+      LoggedIn => f();
+      LoggedOut => none;
+      else => none;                    // ERROR: MATCH-9
+    };
+  }
+  // 知らない名前のアーム（MATCH-2）があっても、else のアームが受けるケースが残っていれば、MATCH-9 は出ない
+  op unknownButRest(m: M): void {
+    match m by C {                     // ERROR: MATCH-2
+      A, Z => use(m);
+      else => none;
+    };
+  }
+  op ok(m: M): void {
+    match m by C { A => use(m); else => none; };
+    const x = find();
+    match x by Hit { Found => use(x); else => none; };
+    match x by Hit { Missing => none; else => use(x); };
+    match carts by list { HasItems => f(); else => none; };
+    match by Session { LoggedIn => f(); else => none; };
+  }
+}

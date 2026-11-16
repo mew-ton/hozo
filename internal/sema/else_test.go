@@ -27,7 +27,7 @@ namespace a {
   classify S of token { LoggedIn: token as string; LoggedOut: token as else; }
   classify P2 of Two { IsReady: Two as M; Rest: Two as else; }
   classify P3 of Three { IsReady: Three as M; Rest: Three as else; }
-  classify D of find { Found: find as M; default; }
+  classify D of find { Found: find as M; }
 
   effect logout() on S: LoggedIn -> LoggedOut;
 
@@ -36,7 +36,7 @@ namespace a {
     match m by F { Found => takeM(m); NotFound => none; };
     match two by P2 { IsReady => takeM(two); Rest => takeN(two); };
     match three by P3 { IsReady => takeM(three); Rest => none; };
-    match two by P2 { IsReady | Rest => f(); };
+    match two by P2 { IsReady, Rest => f(); };
     match by S { LoggedIn => f(); LoggedOut => none; };
   }
 }
@@ -85,15 +85,15 @@ func TestElseCaseTyping(t *testing.T) {
 		if !cs.IsElse() || c.ElseCase() != cs {
 			t.Errorf("%s: IsElse / ElseCase が残りのケース %s を指さない", tt.classify, tt.elseCase)
 		}
-		// 残りのケースは名前の付いたケースで、default ではない。分類は型で決まる
-		if c.HasDefault || c.DecidedBy != ir.DecidedByType {
-			t.Errorf("%s: hasDefault = %v、decidedBy = %s（期待は false、type）", tt.classify, c.HasDefault, c.DecidedBy)
+		// 残りのケースは、ほかのケースと同じに cases に入る。分類は型で決まる
+		if len(c.Cases) != 2 || c.DecidedBy != ir.DecidedByType {
+			t.Errorf("%s: cases = %d、decidedBy = %s（期待は 2、type）", tt.classify, len(c.Cases), c.DecidedBy)
 		}
 	}
-	// default の分類には、残りのケースがない
+	// 残りのケースを書かない分類には、残りのケースがない。それでも、型で決まる（docs/check.md「ケースの判定」）
 	d := p.Lookup("a.D").(*ir.Classify)
-	if d.ElseCase() != nil || !d.HasDefault || len(d.Cases) != 1 {
-		t.Errorf("a.D: ElseCase = %v、hasDefault = %v、cases = %d", d.ElseCase(), d.HasDefault, len(d.Cases))
+	if d.ElseCase() != nil || d.DecidedBy != ir.DecidedByType || len(d.Cases) != 1 {
+		t.Errorf("a.D: ElseCase = %v、decidedBy = %s、cases = %d", d.ElseCase(), d.DecidedBy, len(d.Cases))
 	}
 	// 説明は、ほかのケースと同じに付く
 	if cs := p.Lookup("a.V").(*ir.Classify).Case("Lacks"); cs.Description == nil || cs.Description.Summary != "ない" {
@@ -141,7 +141,7 @@ func TestElseArmNarrowing(t *testing.T) {
 	// variant で残りのアームが二つ以上: 外のまま
 	one("P3.Rest", arms(3)[1], nil)
 	// 型を書いたケースと残りのケースを並べたアーム: 型が等しくないので、型を書かないケースと同じ絞り込み（規則 4）
-	one("P2.IsReady | Rest", arms(4)[0], ir.Case("a.P2", []string{"IsReady", "Rest"}, ir.Ref("a.Two")))
+	one("P2.IsReady, Rest", arms(4)[0], ir.Case("a.P2", []string{"IsReady", "Rest"}, ir.Ref("a.Two")))
 	// 状態の分類: 残りのケースは外のまま
 	one("S.LoggedOut", arms(5)[1], nil)
 }

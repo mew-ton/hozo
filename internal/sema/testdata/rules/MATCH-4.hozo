@@ -13,7 +13,7 @@ namespace a {
   }
   op g(m: M): void {
     match m by C {
-      A | B => onA(m);                 // ERROR: MATCH-4
+      A, B => onA(m);                  // ERROR: MATCH-4
     };
   }
   op h(m: M, n: M): void {

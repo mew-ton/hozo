@@ -1,11 +1,14 @@
-// MATCH-2（docs/check.md「classify / match」）: 名前の付いたケースをすべて並べ、default は classify にあるときだけ書く
+// MATCH-2（docs/check.md「アームが受けるケース」）: どのケースも、ちょうど一つのアームが受ける。すべてのケースを名前で並べるか、
+// 最後の else のアームが、並べなかったケースのすべてを受ける
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
-  classify D of M { A; default; }
+  classify D of M { A; B; C; D; E; }
   op use(m: M): void;
   op ok(m: M): void {
     match m by C { A => use(m); B => none; };
-    match m by D { A => use(m); default => none; };
+    match m by D { A => use(m); else => none; };
+    match m by D { A, B => use(m); C => none; else => none; };
+    match m by D { A => use(m); B, C => none; D, E => none; };
   }
 }

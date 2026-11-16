@@ -16,14 +16,14 @@ namespace a.child {
   }
 }
 namespace b {
-  classify K of a.M { One; default; }
+  classify K of a.M { One; Other; }
   op g(m: a.M): a.M? {
     a.add(m);                            // ERROR: NS-6
     global();                            // ERROR: NS-6
     const found = a.byId(m.id);          // ERROR: NS-6
     return match m by K {
       One     => a.byId(m.id);           // ERROR: NS-6
-      default => found;
+      else    => found;
     };
   }
 }

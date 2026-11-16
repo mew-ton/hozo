@@ -22,7 +22,5 @@ namespace a {
   op h(): int reads s | t {            // ERROR: SYNTAX
     return count(s, t);
   }
-  classify K of M { A; default: M as M; }      // ERROR: SYNTAX
-  condition Q of M: M as M;            // ERROR: SYNTAX
   op ok(m: M): M;
 }

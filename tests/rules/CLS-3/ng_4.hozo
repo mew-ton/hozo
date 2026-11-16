@@ -6,5 +6,5 @@ namespace a {
   state carts: list<string>;
   classify Remote of other.remote { A; }         // ERROR: CLS-3
   classify Both of carts, other.remote { A; }    // ERROR: CLS-3
-  condition Cond of other.remote;                // ERROR: CLS-3
+  classify Cond of other.remote { Cond; NotCond; } // ERROR: CLS-3
 }

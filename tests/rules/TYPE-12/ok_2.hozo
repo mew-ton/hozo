@@ -2,7 +2,7 @@
 namespace a {
   model M { id: string; }
   op find(): M?;
-  classify Found of find { Hit; default; }
+  classify Found of find { Hit; Other; }
   classify Kind of M { A; B; }
   op ok1(m: Found.Hit<M?>): void;
   op ok2(m: Found.Hit<M>): void;

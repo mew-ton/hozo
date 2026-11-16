@@ -7,8 +7,8 @@ namespace a {
   model Wrap { m: M; note: string?; }
   state current: M?;
   op find(): M?;
-  classify Found of find { Hit: find as M; default; }
-  classify Session of current { In: current as M; default; }
+  classify Found of find { Hit: find as M; Miss: find as else; }
+  classify Session of current { In: current as M; Out: current as else; }
   op takeM(m: M): void;
   op takeString(s: string): void;
   op takeWrap(w: Wrap): void;
@@ -16,22 +16,22 @@ namespace a {
     const m = find();
     match m by Found {
       Hit     => takeM(m);
-      default => none;
+      else    => none;
     };
     // より長いパス（m.id、m.profile.nick）は、絞り込まれた型から辿る
     match m by Found {
       Hit     => takeString(m.profile.nick);
-      default => none;
+      else    => none;
     };
     // レコードリテラルの中の値
     match m by Found {
       Hit     => takeWrap({ m: m, note: m.id });
-      default => none;
+      else    => none;
     };
     // 対象がフィールドのパスでも同じ
     match in.m by Found {
       Hit     => takeM(in.m);
-      default => none;
+      else    => none;
     };
     match in.m by nullable {
       HasItems => takeString(in.m.id);
@@ -46,7 +46,7 @@ namespace a {
     };
     match by Session {
       In      => takeString(current.id);
-      default => none;
+      else    => none;
     };
   }
   // アームの本体の値にも掛かる
@@ -54,7 +54,7 @@ namespace a {
     const m = find();
     return match m by Found {
       Hit     => m;
-      default => none;
+      else    => none;
     };
   }
 }

@@ -74,8 +74,8 @@ namespace a {
     Missing: User;
   }
 
-  condition IsActive of User;
-  classify Kind of User { A; /** B の説明 */ B; /** それ以外 */ default; }
+  classify IsActive of User { Active; Inactive; }
+  classify Kind of User { A; /** B の説明 */ B; /** それ以外 */ C; }
 
   @external
   decorator get(path: string) throws Unauthorized;
@@ -113,13 +113,13 @@ namespace a {
   }
   op nameOf(u: User): string;
   op gone(): never throws Unauthorized;
-  classify Found of find2 { Hit: find2 as User; default; }
-  classify Session of token { In: token as string; default; }
+  classify Found of find2 { Hit: find2 as User; Miss: find2 as else; }
+  classify Session of token { In: token as string; Out: token as else; }
   op wire2(id: string): string throws Unauthorized {
     const u = find2(id);
     return match u by Found {
       Hit => nameOf(u);
-      default => throw Unauthorized;
+      else => throw Unauthorized;
     };
   }
   op wire3(): string? {
@@ -127,7 +127,7 @@ namespace a {
   }
   op wire4(): string { return a.title; }
   op wire5(): string {
-    return match by Session { In => token; default => gone(); };
+    return match by Session { In => token; Out => gone(); };
   }
 
   @unavailable
@@ -136,8 +136,8 @@ namespace a {
     const u = find(id);
     take({ id, email: u.email, hash: "x" });
     const w = match u by Kind {
-      A | B => fromIn(u);
-      default => none;
+      A, B => fromIn(u);
+      else => none;
     };
     return u;
   }
@@ -233,14 +233,14 @@ namespace lib {
   @scan(logs) op scanned(): Row[];
   @scan(rows, logs) op scanned2(): Row[];
   @scan(rows) op scannedWired(): Row[] { return rows; }
-  classify Load of Row { Heavy; default; }
+  classify Load of Row { Heavy; Light; }
   op wired(r: Row): Row? effects rows.post, touch, lib.title.put reads rowById throws Busy {
     write(r);
     touchIt(r);
     rename("t");
     return match r by Load {
       Heavy => throw Busy(5m, "heavy");
-      default => named(r.id);
+      Light => named(r.id);
     };
   }
 }
@@ -510,11 +510,11 @@ func TestNormalizeExpectations(t *testing.T) {
 	// ユニオンのメンバーにユニオン → 展開
 	eq("AllErrors のメンバー", memberNames(p.Lookup("a.AllErrors").(*ir.Union)), []string{"a.Unauthorized", "a.Invalid", "a.Wrapped"})
 
-	// condition → classify
+	// 二つに分かれる分類も、両側が名前の付いたケース（docs/check.md「閉じた分類」）
 	cond := p.Lookup("a.IsActive").(*ir.Classify)
-	eq("condition", []any{cond.FromCondition, cond.HasDefault, cond.Cases[0].Name}, []any{true, true, "IsActive"})
+	eq("二つのケース", []any{len(cond.Cases), cond.Cases[0].Name, cond.Cases[1].Name}, []any{2, "Active", "Inactive"})
 	kind := p.Lookup("a.Kind").(*ir.Classify)
-	eq("default の説明", kind.DefaultDescription.Summary, "それ以外")
+	eq("ケースの説明", []any{len(kind.Cases), kind.Cases[2].Description.Summary}, []any{3, "それ以外"})
 	eq("as のないケースは as: []、述語で決まる", []any{len(kind.Cases[0].As), kind.DecidedBy, cond.DecidedBy}, []any{0, ir.DecidedByPredicate, ir.DecidedByPredicate})
 
 	// op の分類、ケースの X as T、型で決まる分類
@@ -591,13 +591,14 @@ func TestNormalizeExpectations(t *testing.T) {
 	eq("{ id } の展開", rec.Fields[0], ir.RecordField{Name: "id", Value: ir.NameAtom{Path: []string{"id"}, Span: rec.Fields[0].Value.(ir.NameAtom).Span}})
 	eq("bound は check が埋める", call.Bound, []ir.BoundPosition(nil))
 	m := stmts[2].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
-	eq("match", []any{m.Classify, m.Arms[0].Cases, m.Arms[1].Cases, m.Arms[1].Body}, []any{"a.Kind", ir.ArmCases{Cases: []string{"A", "B"}}, ir.DefaultArm(), ir.NoneBody{}})
+	// else のアームの cases は、それが受けるケース（ほかのアームが並べなかったもの。docs/ir.md「配線」）
+	eq("match", []any{m.Classify, m.Arms[0].Cases, m.Arms[0].Else, m.Arms[1].Cases, m.Arms[1].Else, m.Arms[1].Body}, []any{"a.Kind", []string{"A", "B"}, false, []string{"C"}, true, ir.NoneBody{}})
 	if !reflect.DeepEqual(stmts[3].(ir.ReturnStmt).Expr.(ir.AtomExpr).Atom.(ir.NameAtom).Path, []string{"u"}) {
 		t.Errorf("return u のパス")
 	}
-	// 型を書かないケースの絞り込みは case(C, Ks, X)。default のアームは外のまま
+	// 型を書かないケースの絞り込みは case(C, Ks, X)。受けるケースが一つの else のアームは、そのケースのアームと同じ
 	eq("narrowed（型を書かないケース）", m.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.Case("a.Kind", []string{"A", "B"}, ir.Ref("a.User"))}})
-	eq("narrowed（default）", m.Arms[1].Narrowed, []ir.Narrowing(nil))
+	eq("narrowed（else、ケース一つ）", m.Arms[1].Narrowed, []ir.Narrowing{{Type: ir.Case("a.Kind", []string{"C"}, ir.Ref("a.User"))}})
 
 	// アームの本体の throw、as で絞り込んだ型
 	m2 := p.Lookup("a.wire2").(*ir.Op).Body.Statements[1].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match

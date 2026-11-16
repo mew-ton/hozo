@@ -8,5 +8,5 @@ namespace a {
   // 分類の遷移に、組み込みの分類のケースは書けない
   effect builtin() on Checkout: Empty -> Ordered;     // ERROR: STATE-4
   // 和の中の一つでも同じ
-  effect oneOf() on Checkout: Shopping | Paid -> any; // ERROR: STATE-4
+  effect oneOf() on Checkout: Shopping, Paid -> any;  // ERROR: STATE-4
 }

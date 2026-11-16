@@ -52,7 +52,7 @@ func read(fqn, stateFQN string, returns ir.Type, params ...ir.OpParam) *ir.Read 
 
 // classify は分類。subject は ir.TypeSubject / ir.OpSubject / ir.StatesSubject。
 func classify(fqn string, subject ir.ClassifySubject, by ir.DecidedBy, cases ...string) *ir.Classify {
-	c := &ir.Classify{DeclBase: base(fqn, fileOf(fqn)), Subject: subject, DecidedBy: by, HasDefault: true}
+	c := &ir.Classify{DeclBase: base(fqn, fileOf(fqn)), Subject: subject, DecidedBy: by}
 	for _, name := range cases {
 		c.Cases = append(c.Cases, ir.ClassifyCase{Name: name})
 	}
@@ -133,12 +133,12 @@ func matchBy(classifyFQN string, arms ...ir.MatchArm) ir.Statement {
 
 // armDirect は、直に呼ぶ組み込みの効果を本体にしたアーム。
 func armDirect(stateFQN string, operation ir.Operation, cases ...string) ir.MatchArm {
-	return ir.MatchArm{Cases: ir.ArmCases{Cases: cases},
+	return ir.MatchArm{Cases: cases,
 		Body: ir.CallExpr{Call: ir.Call{Callee: ir.EffectCallee{Effect: ir.DirectEffect{State: stateFQN, Operation: operation}}}}}
 }
 
 func armCall(opFQN string, cases ...string) ir.MatchArm {
-	return ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.CallExpr{Call: ir.Call{Callee: ir.OpCallee{Op: opFQN}}}}
+	return ir.MatchArm{Cases: cases, Body: ir.CallExpr{Call: ir.Call{Callee: ir.OpCallee{Op: opFQN}}}}
 }
 
 func namespace(name string, decls ...ir.Decl) ir.Namespace {

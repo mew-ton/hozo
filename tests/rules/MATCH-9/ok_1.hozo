@@ -1,0 +1,27 @@
+// MATCH-9（docs/check.md「アームが受けるケース」）: else のアームは、ほかのアームが並べなかったケースを、一つ以上受ける。
+// 残りのケースを書かない分類（Arrival）は、ケースを名前で並べる
+namespace a {
+  model M { id: string; }
+  classify C of M { A; B; }
+  classify D of M { A; B; C; D; E; }
+  op find(): M?;
+  op use(m: M): void;
+  op f(): void;
+  classify Hit of find { Found: find as M; Missing: find as else; }
+  classify Arrival of find { Arrived: find as M; }
+  state carts: list<M>;
+  state token: nullable<string>;
+  classify Session of token { LoggedIn; LoggedOut; }
+  op ok(m: M): void {
+    match m by C { A => use(m); else => none; };
+    match m by D { A => use(m); else => none; };
+    match m by D { A, B, C, D => use(m); else => none; };
+    const x = find();
+    match x by Hit { Found => use(x); else => none; };
+    match x by Hit { Missing => none; else => use(x); };
+    match x by Arrival { Arrived => use(x); };
+    match carts by list { HasItems => f(); else => none; };
+    match token by nullable { Empty => f(); else => none; };
+    match by Session { LoggedIn => f(); else => none; };
+  }
+}

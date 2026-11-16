@@ -1,31 +1,24 @@
-// CLS-1: 残りを言うもの（default と、残りのケース as else）は合わせて高々一つ、ケース名の重複（docs/check.md「classify / match」「残りのケース」）
+// CLS-1: ケース名の重複、残りのケース（as else）が二つ以上（docs/check.md「classify / match」「残りのケース」）
 namespace a {
   model M { id: string; }
-  classify C of M {
-    A;
-    default;
-    default;                           // ERROR: CLS-1
-  }
   classify D of M {
     A;
     A;                                 // ERROR: CLS-1
   }
-  classify Ok of M { A; B; default; }
+  classify Thrice of M {
+    A;
+    B;
+    A;                                 // ERROR: CLS-1
+    A;                                 // ERROR: CLS-1
+  }
+  classify Ok of M { A; B; C; }
   op find(): M?;
   classify TwoElse of find {
     Found: find as M;
     Missing: find as else;
     Gone: find as else;                // ERROR: CLS-1
   }
-  classify ElseThenDefault of find {
-    Found: find as M;
-    Missing: find as else;
-    default;                           // ERROR: CLS-1
-  }
-  classify DefaultThenElse of find {
-    Found: find as M;
-    default;
-    Missing: find as else;             // ERROR: CLS-1
-  }
   classify OkElse of find { Found: find as M; Missing: find as else; }
+  // 残りのケースを書かない分類は、型を書いたケースだけ（値がない側は、どのケースでもない。docs/check.md「ケースの判定」）
+  classify OkNoRest of find { Found: find as M; }
 }

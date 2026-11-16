@@ -49,7 +49,7 @@ namespace web {
     Member;
   }
   /** メールアドレスを確認済み */
-  condition Verified of api.PublicUser;
+  classify Verified of api.PublicUser { Verified; NotVerified; }
 
   // docs/ir.md「正規化」: デコレータの引数のリテラル（int、Duration のナノ秒、boolean）
   decorator limits(page: int, timeout: Duration, strict: boolean) for model;
@@ -86,7 +86,7 @@ namespace web {
   {
     match user by Verified {
       Verified => greet(user);
-      default  => none;
+      else     => none;
     };
   }
 

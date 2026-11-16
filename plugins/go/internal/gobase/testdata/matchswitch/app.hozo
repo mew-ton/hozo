@@ -38,7 +38,7 @@ namespace app {
     IsReady: Page as Title;
     IsFailed: Page as Problem;
     IsCode: Page as int;
-    default;
+    Other: Page as else;
   }
   /** 型で決まる値の分類（variant。すべてのアームを覆うので default がない） */
   classify Outcome of Result {
@@ -49,7 +49,7 @@ namespace app {
   classify Stage of stage {
     Showing: stage as Title;
     Broken: stage as Problem;
-    default;
+    Other: stage as else;
   }
   /** 述語で決まる値の分類（default がない） */
   classify Size of Item {
@@ -61,19 +61,19 @@ namespace app {
   /** 述語で決まる値の分類（default がある）。絞り込みは predicate（string を Email に） */
   classify Address of string {
     Valid: string as Email;
-    default;
+    Other: string as else;
   }
   /** 述語で決まる値の分類。型で決まる絞り込み（presence）の as を持つケースと、predicate の as を持つケース */
   classify Contact of string? {
     Mail: string? as Email;
     Text: string? as string;
-    default;
+    Other: string? as else;
   }
   /** 述語で決まる op の分類（同じ型に絞り込むケースが二つ） */
   classify Stock of findItem {
     InStock: findItem as Item;
     SoldOut: findItem as Item;
-    default;
+    Other: findItem as else;
   }
   /** 述語で決まる状態の分類 */
   classify Checkout of carts, orders {
@@ -99,7 +99,7 @@ namespace app {
       IsCode   => codeText(page);
       IsReady  => titleOf(page);
       IsFailed => page.reason;
-      default  => "other";
+      else     => "other";
     };
   }
 
@@ -116,14 +116,14 @@ namespace app {
   @mark export op variants(page: Page): string
   {
     const text = match page by PageKind {
-      IsReady | IsFailed => load("page");
+      IsReady, IsFailed  => load("page");
       IsCode             => codeText(page);
-      default            => none;
+      else               => none;
     };
     match page by PageKind {
       IsReady           => show("ready");
-      IsFailed | IsCode => none;
-      default           => none;
+      IsFailed, IsCode  => none;
+      else              => none;
     };
     return "done";
   }
@@ -134,7 +134,7 @@ namespace app {
     return match by Stage {
       Showing => titleOf(stage);
       Broken  => stage.reason;
-      default => "none";
+      else    => "none";
     };
   }
 
@@ -153,7 +153,7 @@ namespace app {
   export op pureLabel(item: Item): string
   {
     return match item by Size {
-      Big | Small => "normal";
+      Big, Small  => "normal";
       Tiny        => "tiny";
     };
   }
@@ -164,13 +164,13 @@ namespace app {
   {
     const first = match addr by Address {
       Valid   => send(addr);
-      default => "invalid";
+      else    => "invalid";
     };
     show(first);
     return match contact by Contact {
       Mail    => send(contact);
       Text    => contact;
-      default => fail();
+      else    => fail();
     };
   }
 
@@ -182,7 +182,7 @@ namespace app {
     const value = match item by Stock {
       InStock => priceOf(item);
       SoldOut => throw Bad;
-      default => fail();
+      else    => fail();
     };
     return value;
   }
@@ -193,7 +193,7 @@ namespace app {
   {
     const a = match "x@example.com" by Address {
       Valid   => "ok";
-      default => "ng";
+      else    => "ng";
     };
     show(a);
     return match { name: "box", price: 3 } by Size {

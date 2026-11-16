@@ -9,11 +9,11 @@ namespace a {
 
   classify Kind of M { A; B; }
   classify Batch of M[] { Small; Large; }
-  condition Fresh of M;
+  classify Fresh of M { Fresh; NotFresh; }
 
   classify Checkout of carts, orders { Shopping; Ordered; }
   classify Session of token { Anonymous; LoggedIn; }
-  classify Everything of carts, orders, token, title { Quiet; default; }
-  condition CartFilled of carts;
-  condition Busy of carts, orders;
+  classify Everything of carts, orders, token, title { Quiet; Other; }
+  classify CartFilled of carts { CartFilled; NotCartFilled; }
+  classify Busy of carts, orders { Busy; NotBusy; }
 }

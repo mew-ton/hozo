@@ -7,7 +7,7 @@ namespace a {
   op ng(n: C.A<N>): void;              // ERROR: TYPE-12
   // op の分類の対象の型は、その op の returns
   op find(): M?;
-  classify Found of find { Hit; default; }
+  classify Found of find { Hit; Other; }
   op ok2(m: Found.Hit<M?>): void;
   op ok3(m: Found.Hit<M>): void;
   op ng3(n: Found.Hit<N>): void;       // ERROR: TYPE-12

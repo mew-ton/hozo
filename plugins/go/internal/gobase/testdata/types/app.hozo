@@ -102,7 +102,7 @@ namespace app {
   // 型で決まる分類と decorator の宣言は、何も出さない
   classify Known of User? {
     Yes: User? as User;
-    default;
+    Other: User? as else;
   }
   decorator mark for model | op;
 }

@@ -534,9 +534,9 @@ type matchClass struct {
 	// name は IR の Match.classify: classify の FQN か、標準の分類なら "list" / "nullable"。
 	name string
 	// classify は classify の宣言。標準の分類なら nil。
-	classify   *ir.Classify
-	cases      []string
-	hasDefault bool
+	classify *ir.Classify
+	// cases は分類のケースのすべて（宣言順。標準の分類は Empty、HasItems）。
+	cases []string
 }
 
 // label は診断に出す分類の呼び名。後ろに「のケース」と続ける形。
@@ -548,21 +548,21 @@ func (c *matchClass) label() string {
 }
 
 func classOf(c *ir.Classify) *matchClass {
-	mc := &matchClass{name: c.Name, classify: c, hasDefault: c.HasDefault}
+	mc := &matchClass{name: c.Name, classify: c}
 	for _, cs := range c.Cases {
 		mc.cases = append(mc.cases, cs.Name)
 	}
 	return mc
 }
 
-// standardClass は標準の分類（list / nullable）。ケースは Empty / HasItems で、default はない。
+// standardClass は標準の分類（list / nullable）。ケースは Empty / HasItems。
 func standardClass(name string) *matchClass {
 	return &matchClass{name: name, cases: ir.BuiltinCases()}
 }
 
 // evalMatch は match。形は三つ（docs/grammar.md「配線」の表。合わなければ MATCH-7）: 値を対象にした、値の分類か
 // op の分類での match。値を対象にした、標準の分類での match（by list / by nullable）。状態の分類での match
-// （対象を書かない）。MATCH-2 はどの形にも、MATCH-4 / MATCH-6 は値を対象にした match に掛かる。
+// （対象を書かない）。MATCH-2 と MATCH-9 はどの形にも、MATCH-4 / MATCH-6 は値を対象にした match に掛かる。
 // アームの中の対象の型は docs/types.md「アームの中の対象の型」、アームの型の集め方は同「match の型」。
 // ret は match が `return` の式なら nil でない。
 func (a *analyzer) evalMatch(w *wiring, m *ast.Match, ret *returnContext) (exprType, ir.Match) {
@@ -581,15 +581,16 @@ func (a *analyzer) evalMatch(w *wiring, m *ast.Match, ret *returnContext) (exprT
 		}
 		out.Subject, value = a.matchSubject(w, m, c)
 	}
+	var rest []string
 	if class != nil {
-		a.checkMATCH2(class, m)
+		rest = a.checkArmCases(class, m)
 	}
 	var arms []armResult
 	for _, arm := range m.Arms {
 		if arm == nil {
 			continue
 		}
-		t, ia := a.evalArm(w, arm, class, value)
+		t, ia := a.evalArm(w, arm, class, value, rest)
 		arms = append(arms, armResult{typ: t, span: arm.Span})
 		out.Arms = append(out.Arms, ia)
 	}
@@ -700,19 +701,24 @@ func (a *analyzer) checkMATCH6(subject exprType, c *ir.Classify, m *ast.Match) {
 	}
 }
 
-// checkMATCH2 は MATCH-2（docs/check.md「classify / match」）: アームに並べたケースの集合が分類のケース（標準の分類なら
-// Empty / HasItems で、default はない）と等しくない（足りない・知らない名前・重複）。default は hasDefault の
-// ときだけ書け、あるときは必ず書く。Data.missing / Data.extra。
-func (a *analyzer) checkMATCH2(c *matchClass, m *ast.Match) {
+// checkArmCases は、match のアームが受けるケースを確かめる（docs/check.md「アームが受けるケース」）。戻り値は、else のアームが
+// 受けるケース: 分類のケースのうち、どのアームも名前で並べなかったもの（宣言順）。else のアームがなければ nil。
+//
+// MATCH-2: 名前で並べたケースが分類のケース（標準の分類なら Empty / HasItems）でない、または二度並んでいる（Data.extra）。
+// else のアームがなく、どのアームも並べていないケースがある（Data.missing）。
+// MATCH-9: else のアームが受けるケースが一つもない。
+func (a *analyzer) checkArmCases(c *matchClass, m *ast.Match) []string {
 	seen := map[string]bool{}
 	var extra []string
-	defaults := 0
+	var elseArm *ast.MatchArm
 	for _, arm := range m.Arms {
 		if arm == nil {
 			continue
 		}
-		if arm.Default {
-			defaults++
+		if arm.Else {
+			if elseArm == nil {
+				elseArm = arm
+			}
 			continue
 		}
 		for _, cs := range arm.Cases {
@@ -726,11 +732,18 @@ func (a *analyzer) checkMATCH2(c *matchClass, m *ast.Match) {
 			}
 		}
 	}
-	var missing []string
+	var unnamed []string
 	for _, name := range c.cases {
 		if !seen[name] {
-			missing = append(missing, name)
+			unnamed = append(unnamed, name)
 		}
+	}
+	// else のアームがあれば、並べなかったケースは、そのアームが受ける。足りないケースはない
+	var missing, rest []string
+	if elseArm != nil {
+		rest = unnamed
+	} else {
+		missing = unnamed
 	}
 	var problems []string
 	if len(missing) > 0 {
@@ -739,24 +752,14 @@ func (a *analyzer) checkMATCH2(c *matchClass, m *ast.Match) {
 	if len(extra) > 0 {
 		problems = append(problems, "知らないか重複したケース: "+join(extra))
 	}
-	if c.hasDefault && defaults == 0 {
-		problems = append(problems, "default のアームがない")
+	if len(problems) > 0 {
+		d := a.errorf("MATCH-2", m.Classifier.Span, "match のアームが %sのケース（%s）と合わない（%s）", c.label(), strings.Join(c.cases, " / "), strings.Join(problems, "。"))
+		d.Data = map[string]any{"missing": orEmpty(missing), "extra": orEmpty(extra)}
 	}
-	if !c.hasDefault && defaults > 0 {
-		if c.classify == nil {
-			problems = append(problems, "標準の分類に default はないのに default のアームがある")
-		} else {
-			problems = append(problems, "classify に default がないのに default のアームがある")
-		}
+	if elseArm != nil && len(rest) == 0 {
+		a.errorf("MATCH-9", elseArm.Span, "else のアームが受けるケースがない（ほかのアームが、%sのすべてのケース（%s）を並べている。else のアームは要らない）", c.label(), strings.Join(c.cases, " / "))
 	}
-	if defaults > 1 {
-		problems = append(problems, "default のアームが二つ以上ある")
-	}
-	if len(problems) == 0 {
-		return
-	}
-	d := a.errorf("MATCH-2", m.Classifier.Span, "match のアームが %sのケース（%s）と合わない（%s）", c.label(), strings.Join(c.cases, " / "), strings.Join(problems, "。"))
-	d.Data = map[string]any{"missing": orEmpty(missing), "extra": orEmpty(extra)}
+	return rest
 }
 
 func orEmpty(s []string) []string {
@@ -773,13 +776,15 @@ type armResult struct {
 }
 
 // evalArm はアーム。本体は呼び出し一つ、値一つ、throw 一つのどれか（docs/grammar.md「配線」の ArmBody）。
-// 本体は、アームの中の対象の型（narrowArm）のもとで評価する。
-func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, value *matchValue) (exprType, ir.MatchArm) {
-	out := ir.MatchArm{Span: a.irSpan(arm.Span)}
-	label := "default"
+// 本体は、アームの中の対象の型（narrowArm）のもとで評価する。rest は、else のアームが受けるケース（checkArmCases）。
+func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, value *matchValue, rest []string) (exprType, ir.MatchArm) {
+	out := ir.MatchArm{Span: a.irSpan(arm.Span), Else: arm.Else}
 	var cases []string
-	if arm.Default {
-		out.Cases = ir.DefaultArm()
+	label := ""
+	if arm.Else {
+		// else のアームの cases は、それが受けるケース（宣言順。docs/ir.md「配線」）
+		cases = append(cases, rest...)
+		label = "else（" + strings.Join(cases, ", ") + "）"
 	} else {
 		cases = make([]string, 0, len(arm.Cases))
 		for _, cs := range arm.Cases {
@@ -788,14 +793,14 @@ func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, valu
 				a.addRef(cs.Span, Target{Kind: TargetCase, Decl: class.name, Name: cs.Name, Span: a.caseSpan(class.classify, cs.Name)})
 			}
 		}
-		out.Cases = ir.ArmCases{Cases: cases}
-		label = strings.Join(cases, " | ")
+		label = strings.Join(cases, ", ")
 	}
+	out.Cases = cases
 	var ctx *armContext
 	if value != nil {
 		ctx = &armContext{subject: value.key, cases: label}
 	}
-	narrow, narrowed := a.narrowArm(arm.Default, cases, class, value)
+	narrow, narrowed := a.narrowArm(arm.Else, cases, class, value)
 	out.Narrowed = narrowed
 	w.scope.narrow = narrow
 	defer func() { w.scope.narrow = nil }()
@@ -839,12 +844,17 @@ func (a *analyzer) lowerThrow(w *wiring, t *ast.Throw, arm *armContext) ir.ArmBo
 	return body
 }
 
-// narrowArm は docs/types.md「アームの中の対象の型」: アーム（ケースの並び cases。default なら isDefault）の中での対象の型。
-// 外と型が違う対象だけを、スコープに掛ける表（narrowKey → 型）と IR の Narrowing の列で返す。
+// narrowArm は docs/types.md「アームの中の対象の型」: アーム（受けるケースの並び cases。else のアームなら isElse）の中での
+// 対象の型。外と型が違う対象だけを、スコープに掛ける表（narrowKey → 型）と IR の Narrowing の列で返す。
 // 値を対象にした match（value が nil でない）なら対象はその Atom、状態の分類での match なら分類の対象の状態のそれぞれ。
-func (a *analyzer) narrowArm(isDefault bool, cases []string, class *matchClass, value *matchValue) (map[string]exprType, []ir.Narrowing) {
-	if isDefault || class == nil {
-		return nil, nil // 1. default のアームは外のまま
+func (a *analyzer) narrowArm(isElse bool, cases []string, class *matchClass, value *matchValue) (map[string]exprType, []ir.Narrowing) {
+	if class == nil {
+		return nil, nil
+	}
+	if isElse && len(cases) != 1 {
+		// 1. else のアームで、受けるケースが二つ以上なら、外のまま。ちょうど一つなら、そのケースを名前で書いたアームと同じ
+		// （受けるケースがないのは MATCH-9）
+		return nil, nil
 	}
 	if value != nil {
 		if value.typ.kind != etValue || value.key == "" {

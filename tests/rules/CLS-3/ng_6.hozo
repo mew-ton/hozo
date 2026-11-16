@@ -4,8 +4,8 @@ namespace a {
   state items: list<M>;
   op find(): M?;
   op find2(): M?;
-  classify A1 of find, find2 { X; default; }     // ERROR: CLS-3, CLS-3
-  classify A2 of find, items { X; default; }     // ERROR: CLS-3
-  classify A3 of items, find { X; default; }     // ERROR: CLS-3
-  classify A4 of find, M { X; default; }         // ERROR: CLS-3, CLS-3
+  classify A1 of find, find2 { X; Other; }       // ERROR: CLS-3, CLS-3
+  classify A2 of find, items { X; Other; }       // ERROR: CLS-3
+  classify A3 of items, find { X; Other; }       // ERROR: CLS-3
+  classify A4 of find, M { X; Other; }           // ERROR: CLS-3, CLS-3
 }

@@ -106,11 +106,11 @@ namespace browser {
     Spring;
     Summer;
     /** キャンペーンの対象外 */
-    default;
+    Other;
   }
 
-  /** 二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; default; } と同じ */
-  condition WarrantyAvailable of server.Item;
+  /** 二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; Other; } と同じ */
+  classify WarrantyAvailable of server.Item { WarrantyAvailable; NotWarrantyAvailable; }
 
   // ---- §10.2 match ----
 
@@ -158,7 +158,7 @@ namespace browser {
   {
     const plan = match item by WarrantyAvailable {
       WarrantyAvailable => askWarrantyPlan(item);
-      default           => none;
+      else              => none;
     };
     return plan;
   }
