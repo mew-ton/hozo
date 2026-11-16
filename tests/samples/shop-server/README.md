@@ -62,6 +62,22 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 - 「分かったこと」の N8〜N13 と N60 は、前の形（純粋さで形を分ける）の記録。その後は、同じ節の「op の中身に立ち入らない（決定 145〜148）」。
 - **実装も入った**（基底 `go` と `plugin/golang`）。`TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: 上の表の三つのファイルは、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。
 
+### 残りのケースで変えたこと
+
+意味のある状態には名前を付ける指針（`docs/requirements.md`「書き方の指針」。`docs/decisions.md`「決めたこと」153）と、型で決まる分類の残りに名前を付ける書き方（残りのケース `対象 as else`。`docs/check.md`「残りのケース」。同 152）を、このサンプルに入れた。期待する出力は、生成器を直す前に、手で直した。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `store.hozo` | 三つの分類の `default;` を、残りのケースに: `Registration` は `Unregistered: findUser as else;`、`Account` は `Missing: findUserById as else;`、`Login` は `LoggedOut: findSession as else;` | `docs/check.md`「残りのケース」 |
+| `server.hozo` | 分類 `Credential` の `default;` を `Absent: type.Token? as else;` に。四つの `match`（`login`、`authenticate`、`sessionOf`、`getMe`）の `default =>` のアームを、残りのケースの名前のアームに | 同、`docs/check.md`「classify / match」の MATCH-2 |
+| `gen/server/inner/wiring.go` | 四つの `match` の、値がない側の枝の頭のコメントが、`// default` から、残りのケースの名前に（`// Unregistered`、`// Absent`、`// LoggedOut`、`// Missing`）。ほかの行は同じ | `docs/plugin-go.md`「match」 |
+| `app/inner_test.go` | いないユーザーのログインの説明のコメント一行（「`default` のアーム」を「残りのケース `Unregistered` のアーム」に） | 「人が書いたもの」 |
+| `plugins/go-ratelimit/hozo-plugin.toml`、`plugins/go-ratelimit/testdata/**/views.json`、`testdata/seams/plugins/tracer/hozo-plugin.toml` | `protocol` と `View` の版が `"0.7"`（`CaseTyping.by` に `else` が足された） | `docs/ir.md`「版」 |
+
+- この仕様の `default;` は、なくなった: 四つの残りは、どれも意味のある状態（未登録、その識別子のユーザーがいない、ログインしていない、トークンがない）だった。
+- `gen/` のほかのファイルは、変わらない: 型で決まる分類について、基底は何も出さず（残りのケースを持っていても同じ）、分類とケースの名前は、配線のコメントにだけ残る。動きも変わらないので、`app/` のテストは、コメントのほかは変えていない。
+- **実装も入った**（言語、IR の版 0.7、基底 `go`）。`TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/server/inner/wiring.go` は、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。
@@ -449,7 +465,7 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
   - **`requireFresh` は時計を使うが、仕様の上では純粋**（N9）で、メソッドは `ctx` を取らない。
   - **切れたセッションは消えない**（v1 の 23）。`logout` も `authenticate` を通るので、切れたトークンでは 401 になり、その行を消せない。
   - **値のアーム（P14）を使うところが、この仕様からなくなった**。`LoggedIn => session;` が、ただ一つの値のアームだった。基底の規則には形を残した（「アーム」）が、期待する出力には現れない。
-- **N4 三つの分類が同じ意味**。`Registration`、`Account`、`Login` は、どれも「`T?` が `T` である場合と、それ以外」（`store.hozo:36-51`）。P20 の `by nullable` と変わらず、違うのは場合の名前だけ（P21 の指針どおり）。`match user by store.Registration` の `user` が `findUser` の結果でなければならないのか（P2 の「その op が返した値の分類」）は決まっていない。基底の出力は、どちらでも同じ（N23）。
+- **N4 三つの分類が同じ意味**。`Registration`、`Account`、`Login` は、どれも「`T?` が `T` である場合と、それ以外」（`store.hozo:36-51`）。P20 の `by nullable` と変わらず、違うのは場合の名前だけ（P21 の指針どおり）。その後、「それ以外」の側にも名前を付けた（残りのケース `Unregistered`、`Missing`、`LoggedOut`。「残りのケースで変えたこと」）。`match user by store.Registration` の `user` が `findUser` の結果でなければならないのか（P2 の「その op が返した値の分類」）は決まっていない。基底の出力は、どちらでも同じ（N23）。
 - **N5（解決: 決定 96。`findSession` は `type.Token` を取り、トークンがない場合は `server` の分類 `Credential` が断る）`findSession(token: type.Token?)` は下書きのまま**（`store.hozo:28`）。受ける側を `T?` にしたので、`go-sqlite` に「省略可能な引数」の規則が要った（N38）。P20 で `in.token` を先に絞り込めば、`findSession(token: type.Token)` にでき、その規則は要らない。
 - **N6 継承した model は、語彙のデコレータも受け継ぐ**。`type.PublicUser` のフィールドは `@db.key`、`@db.unique`、`@valid.length` を持ったまま（`type.hozo:41-43`）。外すことはできない（P25 は足すことだけ）。`go-valid` は `PublicUser` にも同じ検査を出す（`gen/type/validate.go:50-61`）。
 - **N7 `logout` は、トークンがなければ 401**。下書きの配線が `authenticate` を通るため（`server.hozo:93-97`）。v1 は 204 だった。決定の帰結ではなく、下書きの仕様の変更（`app/handlertest/handlertest.go:272-274`）。
@@ -478,7 +494,7 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
   - **共通のテストへの渡し方**（解決: P32）。P32 の前は、二つの出力の `StateSet` が別の型で、共通のテスト（`app/storetest`）へは、口を一つずつ渡していた。今は、どちらの実装の型も、共通のテストのインターフェース（`storetest.List[T]`: `IsEmpty` と `Get`）をそのまま満たすので、`store.New` に渡したのと同じ値を渡す（`app/onsqlite/store_test.go:24-29`、`app/onmem/compose_test.go:44-48`）。
   - **`list<T>` の `Get`** は、`docs/emit-go.md`「state」の表にない（そこでは `list<T>` は `IsEmpty` だけ）。状態を名前で読むと `T[]` の値になる（P4、P22）ことから足した。
   - **`Get` は、すべての要素を返す**。件数や条件で絞る書き方はない（N37）。
-- **N23 分類について、基底は何も出さない**、と決めた（規則は「基底 `go` が従う規則」の「分類」）。`store.Registration` などの名前は、`gen/server/inner/wiring.go:17,51,89` のコメントにだけ残る。決まっていないこと: 絞り込む場合と、人が述語を書く場合が混ざった分類の形、人が書く述語をどのインターフェースに置き、`New` のどの引数で受け取るか（P32 は葉の op と状態の単位について決めた。P6 は分類の置き場を自由にした）。
+- **N23 分類について、基底は何も出さない**、と決めた（規則は「基底 `go` が従う規則」の「分類」）。`store.Registration` などの名前は、`gen/server/inner/wiring.go:17,51,89` のコメントにだけ残る。残りのケースの名前も同じ（値がない側の枝の頭のコメント。「残りのケースで変えたこと」）。決まっていないこと: 絞り込む場合と、人が述語を書く場合が混ざった分類の形、人が書く述語をどのインターフェースに置き、`New` のどの引数で受け取るか（P32 は葉の op と状態の単位について決めた。P6 は分類の置き場を自由にした）。
 - **N24 `match` は `nil` の検査になった**。`return match` はアームごとの `return`（`gen/server/inner/wiring.go:17-23`）、絞り込んだ値は使う位置で `*user`、`*session`（`:24`、`:58`、`:96`）。値を束縛する `match`（`const x = match …`）はこの仕様になく、形を決めていない。
 - **N25 `throw` は例外を値で返す**（`gen/server/inner/wiring.go:23,57,95`）。v1 の「分かったこと」43（値かポインタか）は、生成したコードについては決まった。値を運ぶ例外の `throw` は、この仕様に出てこない（P13 の未定のまま）。
 - **N26（解決: P33）`Ops` に、業務の途中の op がすべて載っていた**（P11）。P33 の前は、`Authenticate`、`IssueSession`、`Notify` と、七つの葉が、`login` などの入口と同じ `Ops` のメソッドだった。`go-http` の `NewHandler(ops Ops)` も十五のメソッドを受け取り、五つだけ呼んでいた。入口とそうでない op を分ける書き方が、仕様になかった。→ P33: 外から呼べる op に `export` を付ける。`server.Ops` は、`export` を付けた五つの入口だけ（`gen/server/ops.go:12-46`）。途中の十は、入口の `Ops` にはない（`app/both_test.go` の `TestOpsHoldExportedOpsOnly`）。その後（P35）: 途中の十を、`ops` の非公開のメソッドにする形はやめ、内側のパッケージ `gen/server/inner` の `Ops`（十五のすべて）に置いた（N68、N71）。P31、P32 の後の形での続きは N61、この形で分かったことは N66〜N75。

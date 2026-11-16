@@ -134,6 +134,8 @@ tests/samples/<名前>/
 
 **その次の段階（同 R5: 基底は op の中身に立ち入らず、どの関数も `ctx` を取り、`error` を返す）も、文書とサンプルを、実装より先に書いた。** 言語も、文書の版も、変わらないので、飛ばすサブテストはない: 実装が入るまでの間は、`files` と `go`（手で書いた期待する出力と、人が書いたコード）が通り、`transpilers/go` と `transpilers/all` が、`gen/server/inner/ops.go`、`gen/server/inner/wiring.go`、`gen/server/ops.go` の違いで落ちる。実装が入った後は、すべてのサブテストが通る（`shop-server/README.md`「R5 で変えたこと」）。
 
+**残りのケース（`docs/decisions.md`「決めたこと」152、153）は、文書とサンプルと実装を、一緒に入れた。** 版は 0.7 になり（`CaseTyping.by` に `else`）、hozoc と、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）を、一緒に上げた。サンプル `shop-server` の期待する出力は、生成器より先に手で直し（`shop-server/README.md`「残りのケースで変えたこと」）、`TestSamples` は、すべてのサブテストが、飛ばしも、代役もなく通る。
+
 ## サンプルの一覧
 
 | サンプル | 中身 |

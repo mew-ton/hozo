@@ -117,19 +117,19 @@ namespace store {
 
   /** その email が登録済みか */
   classify Registration of findUser {
-    Registered: findUser as type.User;
-    default;
+    Registered:   findUser as type.User;
+    Unregistered: findUser as else;
   }
 
   /** その識別子のユーザーがいるか */
   classify Account of findUserById {
-    Found: findUserById as type.User;
-    default;
+    Found:   findUserById as type.User;
+    Missing: findUserById as else;
   }
 
   /** そのトークンでログインしているか */
   classify Login of findSession {
-    LoggedIn: findSession as type.Session;
-    default;
+    LoggedIn:  findSession as type.Session;
+    LoggedOut: findSession as else;
   }
 }

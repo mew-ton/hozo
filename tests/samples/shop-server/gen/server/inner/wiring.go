@@ -19,7 +19,7 @@ func (o *ops) loginBody(ctx context.Context, in LoginInput) (LoginOk, error) {
 		// Registered: user は type.User
 		return o.IssueSession(ctx, *user, in.Body.Password)
 	}
-	// default
+	// Unregistered
 	return LoginOk{}, pkgtype.InvalidCredentials{}
 }
 
@@ -55,7 +55,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 		// Presented: token は type.Token
 		return o.SessionOf(ctx, *token)
 	}
-	// default
+	// Absent
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
 }
 
@@ -73,7 +73,7 @@ func (o *ops) SessionOf(ctx context.Context, token pkgtype.Token) (pkgtype.Sessi
 		// LoggedIn: session は type.Session
 		return o.RequireFresh(ctx, *session)
 	}
-	// default
+	// LoggedOut
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
 }
 
@@ -111,7 +111,7 @@ func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, erro
 		// Found: user は type.User
 		return o.ToPublicUser(ctx, *user)
 	}
-	// default
+	// Missing
 	return pkgtype.PublicUser{}, pkgtype.Unauthorized{}
 }
 

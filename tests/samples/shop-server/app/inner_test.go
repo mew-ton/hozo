@@ -129,7 +129,7 @@ func TestBodyBehindSeam(t *testing.T) {
 
 	var invalid pkgtype.InvalidCredentials
 	for i := range handlertest.LoginLimit * 2 {
-		// いないユーザー: 中身の match の default のアームが type.InvalidCredentials を投げる
+		// いないユーザー: 中身の match の、残りのケース Unregistered のアームが type.InvalidCredentials を投げる
 		in := inner.LoginInput{Body: inner.Credentials{Email: "bob@example.com", Password: handlertest.AlicePassword}}
 		if _, err := ops.Login(ctx, in); !errors.As(err, &invalid) {
 			t.Fatalf("%d 回目の Login（いないユーザー）= %v（期待は type.InvalidCredentials）", i+1, err)

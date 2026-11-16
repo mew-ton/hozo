@@ -106,8 +106,8 @@ func TestViewFromEntry(t *testing.T) {
 		// ops はすべての op について
 		expect(t, "ops のキー（export の有無によらず、すべての op）", keysOf(v.Ops), []string{
 			"api.currentName", "api.findByName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.idle", "api.issue", "api.keep",
-			"api.login", "api.logout", "api.mint", "api.nameOf",
-			"api.renew", "api.renewAgain", "api.renewAudited", "api.renewDeclared", "api.rotate", "api.sessionOf", "api.signIn", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.verify", "api.viaAlias", "api.whenLive",
+			"api.login", "api.logout", "api.memberName", "api.mint", "api.nameOf",
+			"api.renew", "api.renewAgain", "api.renewAudited", "api.renewDeclared", "api.rotate", "api.sessionOf", "api.shownName", "api.signIn", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.verify", "api.viaAlias", "api.whenLive",
 			"web.adminPageVm", "web.clearToken", "web.fetchUser", "web.greet", "web.login", "web.openUser",
 			"web.reload", "web.signOut", "web.userPageVm", "web.welcome",
 		})
@@ -289,6 +289,43 @@ func TestViewFromEntry(t *testing.T) {
 		// 型を書かないケースの絞り込みは case(C, Ks, X)
 		open := opOf(t, prog, "web.openUser").Body.Statements[1].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
 		expect(t, "型を書かないケースの narrowed", narrowed(open.Arms[0].Narrowed), []string{"web.UserKind.Admin<api.PublicUser>"})
+	})
+
+	t.Run("ir.md classify/残りのケース", func(t *testing.T) {
+		typing := func(c *ir.Classify, name string) []any {
+			cs := c.Case(name)
+			if cs == nil || len(cs.As) != 1 {
+				t.Fatalf("%s のケース %s の as = %+v", c.Name, name, cs)
+			}
+			return []any{cs.As[0].State, typeStr(cs.As[0].Type), cs.As[0].By}
+		}
+		// presence: 残りのケースは cases に入り、by は else、type は対象の型のまま。hasDefault は false で、型で決まる
+		m := declOf(t, prog, "api.Membership").(*ir.Classify)
+		expect(t, "cases（残りのケースを含む）", []string{m.Cases[0].Name, m.Cases[1].Name}, []string{"Member", "Stranger"})
+		expect(t, "残りのケースの as（presence）", typing(m, "Stranger"), []any{"", "api.User?", ir.NarrowByElse})
+		expect(t, "hasDefault と decidedBy", []any{m.HasDefault, m.DecidedBy}, []any{false, ir.DecidedByType})
+		// variant: 残りのアームがちょうど一つなら、type はそのアームの型
+		d := declOf(t, prog, "api.Detail").(*ir.Classify)
+		expect(t, "型を書いたケースの as（variant）", typing(d, "Short"), []any{"", "string", ir.NarrowByVariant})
+		expect(t, "残りのケースの as（variant、残りのアームが一つ）", typing(d, "Full"), []any{"", "api.User", ir.NarrowByElse})
+		expect(t, "hasDefault と decidedBy", []any{d.HasDefault, d.DecidedBy}, []any{false, ir.DecidedByType})
+		// 配線: 残りのケースのアームは、名前で書く。narrowed は、対象の型が外と違うアームにだけ出る
+		expect(t, "memberName の本体", renderBody(opOf(t, prog, "api.memberName").Body), []string{
+			"const user = api.findUser(id: id)",
+			"return match user by api.Membership { Member => api.nameOf(user: user); Stranger => throw api.NotFound }",
+		})
+		arms := func(op string) []ir.MatchArm {
+			return opOf(t, prog, op).Body.Statements[len(opOf(t, prog, op).Body.Statements)-1].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match.Arms
+		}
+		types := func(ns []ir.Narrowing) []string {
+			out := []string{}
+			for _, n := range ns {
+				out = append(out, typeStr(n.Type))
+			}
+			return out
+		}
+		expect(t, "presence の残りのケースのアームは外のまま", types(arms("api.memberName")[1].Narrowed), []string{})
+		expect(t, "variant の残りのケースのアーム（残りのアームが一つ）は、そのアームの型", types(arms("api.shownName")[1].Narrowed), []string{"api.User"})
 	})
 
 	t.Run("ir.md state / exception / effect と read/引数", func(t *testing.T) {

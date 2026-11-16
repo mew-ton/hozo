@@ -47,8 +47,8 @@ namespace server {
   {
     const user = store.findUser(in.body.email);
     return match user by store.Registration {
-      Registered => issueSession(user, in.body.password);
-      default    => throw type.InvalidCredentials;
+      Registered   => issueSession(user, in.body.password);
+      Unregistered => throw type.InvalidCredentials;
     };
   }
 
@@ -78,7 +78,7 @@ namespace server {
   /** 要求がトークンを持ってきたか */
   classify Credential of type.Token? {
     Presented: type.Token? as type.Token;
-    default;
+    Absent:    type.Token? as else;
   }
 
   /** 呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
@@ -87,7 +87,7 @@ namespace server {
   {
     return match token by Credential {
       Presented => sessionOf(token);
-      default   => throw type.Unauthorized;
+      Absent    => throw type.Unauthorized;
     };
   }
 
@@ -97,8 +97,8 @@ namespace server {
   {
     const session = store.findSession(token);
     return match session by store.Login {
-      LoggedIn => requireFresh(session);
-      default  => throw type.Unauthorized;
+      LoggedIn  => requireFresh(session);
+      LoggedOut => throw type.Unauthorized;
     };
   }
 
@@ -124,7 +124,7 @@ namespace server {
     const user = store.findUserById(session.userId);
     return match user by store.Account {
       Found   => toPublicUser(user);
-      default => throw type.Unauthorized;
+      Missing => throw type.Unauthorized;
     };
   }
 
