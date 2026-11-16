@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.6";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.7";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -165,17 +165,17 @@ interface Classify extends DeclBase {
   subject: { kind: "type"; type: Type }             // 値の分類
          | { kind: "op"; op: string; type: Type }   // op の分類。op は FQN、type はその op の returns（対象の型）
          | { kind: "states"; states: string[] };    // 状態の分類。基底の状態の FQN（書かれた順）
-  cases: { name: string; description?: Doc; as: CaseTyping[]; span: Span }[];   // default は含まない。as は書かれた順（なければ []）
+  cases: { name: string; description?: Doc; as: CaseTyping[]; span: Span }[];   // default は含まない。残りのケース（`対象 as else`）は含む。as は書かれた順（なければ []）
   hasDefault: boolean;
   defaultDescription?: Doc;       // default に付いた DocComment
   fromCondition: boolean;         // condition の糖衣から来たか（cases は一つ、hasDefault は true）
   decidedBy: "type" | "predicate";   // ケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない
 }
 
-interface CaseTyping {            // ケースの `対象 as T`（docs/check.md「ケースの型」）
+interface CaseTyping {            // ケースの `対象 as T` と `対象 as else`（docs/check.md「ケースの型」「残りのケース」）
   state?: string;                 // 状態の分類のとき、その対象の状態の FQN。値の分類と op の分類では持たない（対象は一つ）
-  type: Type;                     // そのケースでの対象の型
-  by: "presence" | "variant" | "predicate";   // 絞り込みの種類（docs/types.md「型で決まる絞り込み」）
+  type: Type;                     // そのケースでの対象の型。`as else` なら、書いた型がないので、docs/types.md「残りのケースでの対象の型」
+  by: "presence" | "variant" | "predicate" | "else";   // 絞り込みの種類（docs/types.md「型で決まる絞り込み」）。else は `as else`
   span: Span;
 }
 ```
@@ -429,7 +429,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.6";
+  version: "0.7";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -487,10 +487,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.6"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.7"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.7 | `CaseTyping.by` に `else`（残りのケース `対象 as else`。`docs/check.md`「残りのケース」）。そのときの `CaseTyping.type` は、書いた型ではなく、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。残りのケースは `Classify.cases` に入り、`hasDefault` には数えない。`View` とやり取りの形は 0.6 と同じ |
 | 0.6 | 宣言の種類 `read`（`Read`: `params`、`returns`、`state`）。`Exception.value` をやめて `Exception.params`（例外のその場の model `<例外の FQN>.Value` は、もう合成しない）。`Effect.params`。`Call.op` をやめて `Call.callee`（`op` / `read` / `effect`）。`Match.arms[].body` の `throw` に `args`。`Decorator.targets` に `read`。`Decorator.repeatable`（同じデコレータの `Application` が、一つの宣言に複数並びうる）。`reads` と `effects` の要素が、文字列（FQN）から `ReadRef` / `EffectRef` に変わった: `Op.reads`、`Op.effects`、`Op.carried`、`Decorator.reads`、`Decorator.effects`、`Signature.effects`、`Signature.relations[].effect`、`Signature.successEffects[].effect`。`Signature.reads` は、基底の状態の FQN の列のまま。葉の op の `Op.reads` / `Op.effects` は、いつも空になった（STATE-5）。`View` とやり取りの形は 0.5 と同じ |
 | 0.5 | `Decorator.targets` に `effect`（効果の宣言の `decorators` が空でなくなりうる）。`Decorator.reads`、`Decorator.effects`。`Param.rest` と、残りの引数の `Arg`（`list`）。`Op.carried`。`Signature.reads` / `Signature.effects` が、デコレータが運ぶものを含む。`Field.default` をなくした（フィールドの既定値を、言語からなくした。`docs/grammar.md`「決めたこと」）。`View` とやり取りの形は 0.4 と同じ |
 | 0.4 | `NamespaceConfig` に `index`、`base`、`options`、`seams`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
