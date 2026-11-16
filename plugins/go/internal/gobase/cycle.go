@@ -68,7 +68,9 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 				typ(a.Type)
 			}
 		case *ir.Exception:
-			typ(x.Value)
+			for _, p := range x.Params {
+				typ(p.Type)
+			}
 		case *ir.State: // 2
 			typ(x.Type)
 		case *ir.Classify:
@@ -91,7 +93,7 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 			}
 			for _, st := range x.Body.Statements {
 				eachCallIn(st, func(c *ir.Call) { // 4
-					if callee := e.op(c.Op); callee != nil {
+					if callee := e.op(c.CalledOp()); callee != nil {
 						signature(callee)
 					}
 				})

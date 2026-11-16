@@ -30,15 +30,15 @@ namespace shop {
   condition LoggedIn of token;
   classify LineKind of Line { Gift; Normal; }
 
-  effect addLine on carts.post;
-  effect tick on clock.put;
-  effect logout on token.delete;
-  effect placeOrder on Checkout: Shopping -> Ordered;
-  effect reset on Checkout: any -> Shopping;
-  effect touch on Checkout: Ordered | Shopping -> any;
-  effect clearCart on carts: HasItems -> Empty;
-  effect login on token: Empty -> HasItems;
-  effect signIn on LoggedIn: any -> LoggedIn;
+  effect addLine() on carts.post;
+  effect tick() on clock.put;
+  effect logout() on token.delete;
+  effect placeOrder() on Checkout: Shopping -> Ordered;
+  effect reset() on Checkout: any -> Shopping;
+  effect touch() on Checkout: Ordered | Shopping -> any;
+  effect clearCart() on carts: HasItems -> Empty;
+  effect login() on token: Empty -> HasItems;
+  effect signIn() on LoggedIn: any -> LoggedIn;
 
   op showEmpty(): void;
   op showCart(): void;
@@ -229,8 +229,8 @@ func TestEffectTargetRefs(t *testing.T) {
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  effect start on Phase: Idle -> Busy;
-  effect drain on s: HasItems -> Empty;
+  effect start() on Phase: Idle -> Busy;
+  effect drain() on s: HasItems -> Empty;
 }`}, false)
 	noErrors(t, res, fs)
 	hasRef(t, res, fs, "a.hozo:5:19 decl a.Phase")
@@ -252,10 +252,10 @@ namespace a {
   state clock: single<string>;
   state items: list<M>;
   classify Kind of M { A; B; }
-  effect onSingle on clock: Empty -> HasItems; // ERROR: STATE-4
-  effect value on Kind: A -> B;                // ERROR: RES-4
-  effect unknown on nothing: A -> B;           // ERROR: RES-1
-  effect badCase on items: Empty -> Full;      // ERROR: STATE-4
+  effect onSingle() on clock: Empty -> HasItems; // ERROR: STATE-4
+  effect value() on Kind: A -> B;                // ERROR: RES-4
+  effect unknown() on nothing: A -> B;           // ERROR: RES-1
+  effect badCase() on items: Empty -> Full;      // ERROR: STATE-4
 }`}, false)
 	for _, name := range []string{"a.onSingle", "a.value", "a.unknown"} {
 		e := res.Program.Lookup(name).(*ir.Effect)
@@ -413,8 +413,8 @@ func TestEffectOnAcceptsOnlyBuiltin(t *testing.T) {
 	res := runAnnotated(t, project{"a.hozo": `
 namespace a {
   state location: list<string>;
-  effect go on location.put;
-  effect leave on location: HasItems -> Empty;
+  effect go() on location.put;
+  effect leave() on location: HasItems -> Empty;
   decorator nav(target: any effect on location.put);
   @nav(go)
   op ok(): void;

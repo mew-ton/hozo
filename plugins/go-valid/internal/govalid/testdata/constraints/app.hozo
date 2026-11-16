@@ -145,7 +145,7 @@ namespace app {
   }
 
   // その場で書いた model（合成した model）も、普通の model
-  exception Rejected: { @valid.min(400) code: int; reason: string; };
+  exception Rejected(code: int, reason: string);
 
   // 制約のない model は Validate を持たない
   model Free { id: Plain; at: Time; free: Free?; }

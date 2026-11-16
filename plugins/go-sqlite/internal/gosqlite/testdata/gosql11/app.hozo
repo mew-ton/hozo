@@ -11,24 +11,24 @@ namespace app {
   // ---- 組み込みの効果: 操作が合わない ----
 
   @db.insert(rows)
-  effect insertOnPut on rows.put;
+  effect insertOnPut() on rows.put;
   @db.insert(rows)
-  effect insertOnDelete on rows.delete;
+  effect insertOnDelete() on rows.delete;
   @db.update(rows)
-  effect updateOnPost on rows.post;
+  effect updateOnPost() on rows.post;
   @db.update(rows)
-  effect updateOnDelete on rows.delete;
+  effect updateOnDelete() on rows.delete;
   @db.delete(rows, "id")
-  effect deleteOnPost on rows.post;
+  effect deleteOnPost() on rows.post;
   @db.delete(rows, "id")
-  effect deleteOnPut on rows.put;
+  effect deleteOnPut() on rows.put;
 
   // ---- 組み込みの効果: 状態が、デコレータの表でない ----
 
   @db.insert(copies)
-  effect insertElsewhere on rows.post;
+  effect insertElsewhere() on rows.post;
   @db.delete(copies, "id")
-  effect deleteElsewhere on rows.delete;
+  effect deleteElsewhere() on rows.delete;
 
   // ---- 遷移: デコレータの表が、効果の書き込む状態にない ----
 
@@ -37,9 +37,9 @@ namespace app {
     Differ;
   }
   @db.insert(logs)
-  effect logSync on Sync: Differ -> Same;
+  effect logSync() on Sync: Differ -> Same;
   @db.update(copies)
-  effect fillRows on rows: Empty -> HasItems;
+  effect fillRows() on rows: Empty -> HasItems;
 
   // op に並べても、効果ごとに一度だけ
   @db.effects(insertOnPut)
@@ -48,14 +48,14 @@ namespace app {
   // ---- 通るもの ----
 
   @db.insert(rows)
-  effect createRow on rows.post;
+  effect createRow() on rows.post;
   @db.update(rows)
-  effect updateRow on rows.put;
+  effect updateRow() on rows.put;
   @db.delete(rows, "id")
-  effect deleteRow on rows.delete;
+  effect deleteRow() on rows.delete;
   // 遷移なら、操作の名前との照合はない
   @db.delete(copies, "id")
-  effect copyOver on Sync: Differ -> Same;
+  effect copyOver() on Sync: Differ -> Same;
   @db.update(rows)
-  effect touchRows on rows: HasItems -> HasItems;
+  effect touchRows() on rows: HasItems -> HasItems;
 }

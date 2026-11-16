@@ -76,7 +76,7 @@ func TestResolveStep1_2(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {
   state s: single<string>;
-  effect e on s.put;
+  effect e() on s.put;
   decorator d(error: any exception, target: any effect) catches error halts target throws error;
 }`}, false)
 	noErrors(t, res, fs)

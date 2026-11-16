@@ -80,14 +80,15 @@ type use struct {
 // uses は、名前空間 nsName の出力（単位の in に合ったファイルが files）が使う、別の名前空間の宣言
 // （docs/config.md「型の置き場」の表）を、名前空間ごとに最初の一つずつ、見つけた順で返す。
 //
-//  1. N のすべての model / scalar / union / exception: フィールドの型、scalar の元の型、アームの型、例外が運ぶ値の型。
-//  2. N のすべての状態と分類: 状態の型、分類の対象の型、ケースの as の型。
+//  1. N のすべての model / scalar / union / exception: フィールドの型、scalar の元の型、アームの型、例外の引数の型。
+//  2. N のすべての状態、分類、read、効果: 状態の型、分類の対象の型、ケースの as の型、read と効果の引数の型、read の結果の型。
 //  3. 単位の対象の op: 引数と戻り値の型、Op.signature.exceptions の例外。
 //  4. 単位の対象の配線が呼ぶ op（別の名前空間のものを含む）: 引数と戻り値の型。
 //  5. 単位の対象の配線の match: 述語で決まる分類のうち、別の名前空間のもの。
 //
 // 数えるのは、型（ref）、例外、5 の分類が指す宣言の名前空間が N でないもの。型の中の型（array、optional、record、case の of）は
-// 辿るが、参照先の宣言の中までは辿らない。デコレータの適用とその引数、効果、別の名前空間の op そのもの、型で決まる分類は数えない。
+// 辿るが、参照先の宣言の中までは辿らない。デコレータの適用とその引数、別の名前空間の効果と read の宣言そのもの、別の名前空間の op そのもの、
+// 型で決まる分類は数えない。
 func uses(ix *index, nsName string, files []string) []use {
 	ns := ix.p.Namespace(nsName)
 	if ns == nil {
@@ -122,10 +123,13 @@ func uses(ix *index, nsName string, files []string) []use {
 			typ(x.Of)
 		}
 	}
-	signature := func(o *ir.Op) {
-		for _, p := range o.Params {
+	params := func(ps []ir.OpParam) {
+		for _, p := range ps {
 			typ(p.Type)
 		}
+	}
+	signature := func(o *ir.Op) {
+		params(o.Params)
 		typ(o.Returns)
 	}
 	for _, d := range ns.Decls {
@@ -141,9 +145,14 @@ func uses(ix *index, nsName string, files []string) []use {
 				typ(a.Type)
 			}
 		case *ir.Exception:
-			typ(x.Value)
+			params(x.Params)
 		case *ir.State: // 2
 			typ(x.Type)
+		case *ir.Read:
+			params(x.Params)
+			typ(x.Returns)
+		case *ir.Effect:
+			params(x.Params)
 		case *ir.Classify:
 			typ(x.SubjectType())
 			for _, cs := range x.Cases {
@@ -163,7 +172,7 @@ func uses(ix *index, nsName string, files []string) []use {
 				continue
 			}
 			eachCall(x.Body, func(c *ir.Call) { // 4
-				if callee := ix.op(c.Op); callee != nil {
+				if callee := ix.op(c.CalledOp()); callee != nil {
 					signature(callee)
 				}
 			})

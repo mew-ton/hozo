@@ -1,12 +1,14 @@
 // RES-5（docs/resolve.md「診断」）: 配線の値の位置で、別の名前空間（かグローバル）の状態は名前で読めない。
-// match by C の状態の分類も、宣言した名前空間の配線だけが読める
+// match by C の状態の分類も、宣言した名前空間の配線だけが読める。組み込みの効果を直に呼べるのも、持ち主の名前空間の配線だけ
 state shared: list<string>;
 classify Shared of shared { None; Some; }
 namespace a {
   state s: list<string>;
   state t: nullable<string>;
   classify Phase of s { Idle; Busy; }
-  export op all(): string[] reads s;
+  export op all(): string[] reads s { return s; }
+  effect add(x: string) on s.post;
+  read first(): string? on s;
 }
 namespace b {
   op f(xs: string[]);
@@ -17,5 +19,7 @@ namespace b {
     match a.t by nullable { Empty => g(); HasItems => none; }; // ERROR: RES-5
     match by a.Phase { Idle => g(); Busy => none; };           // ERROR: RES-5
     match by Shared { None => g(); Some => none; };            // ERROR: RES-5
+    a.s.post("x");                                             // ERROR: RES-5
+    shared.post("x");                                          // ERROR: RES-5
   }
 }

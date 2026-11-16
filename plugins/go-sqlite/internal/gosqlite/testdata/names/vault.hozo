@@ -67,13 +67,13 @@ namespace vault {
   op touch(row: Key): Secret?;
 
   @db.insert(secrets)
-  effect createSecret on secrets.post;
+  effect createSecret() on secrets.post;
   @db.update(secrets)
-  effect updateSecret on secrets.put;
+  effect updateSecret() on secrets.put;
   @db.delete(secrets, "row")
-  effect deleteSecret on secrets.delete;
+  effect deleteSecret() on secrets.delete;
   @db.delete(secrets, "r")
-  effect deleteByNum on secrets.delete;
+  effect deleteByNum() on secrets.delete;
 
   // 引数の名前が、行の値の変数 args、err と当たる
   @db.effects(createSecret)
@@ -92,9 +92,9 @@ namespace vault {
   export op mix2(t: Key, ctx: Num, err: Secret);
 
   @db.insert(entriesA)
-  effect createA on entriesA.post;
+  effect createA() on entriesA.post;
   @db.insert(entriesB)
-  effect createB on entriesB.post;
+  effect createB() on entriesB.post;
   @db.effects(createA)
   export op addA(entry: row.Entry);
   @db.effects(createB)

@@ -12,22 +12,22 @@ namespace app {
   @db.table(Row) state rows: list<Row>;
 
   @db.update(notes)
-  effect updateNote on notes.put;
+  effect updateNote() on notes.put;
   /** op に並べられていない効果のデコレータも、同じに確かめる */
   @db.update(marks)
-  effect updateMark on marks.put;
+  effect updateMark() on marks.put;
   // op に並べても、効果ごとに一度だけ
   @db.effects(updateNote)
   export op saveNote(note: Note);
 
   // 通るもの
   @db.update(rows)
-  effect updateRow on rows.put;
+  effect updateRow() on rows.put;
   @db.effects(updateRow)
   export op saveRow(row: Row);
   // @db.insert と @db.delete は、キーを要らない
   @db.insert(notes)
-  effect createNote on notes.post;
+  effect createNote() on notes.post;
   @db.delete(marks, "book")
-  effect deleteMark on marks.delete;
+  effect deleteMark() on marks.delete;
 }

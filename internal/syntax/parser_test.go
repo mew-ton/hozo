@@ -1789,6 +1789,19 @@ func TestReservedWordReject(t *testing.T) {
 
 // --- ドキュメンテーションコメント ---
 
+// TestDocTagShortName は、タグの語（@param）の中にも現れる短い名前（r、a、am）を、タグの語の後ろから探すこと。
+func TestDocTagShortName(t *testing.T) {
+	src := "/** @param r 触る行 */\nop f(r: T);"
+	o := firstDecl[*ast.OpDecl](t, src)
+	if len(o.Doc.Tags) != 1 {
+		t.Fatalf("Tags = %+v", o.Doc.Tags)
+	}
+	tag := o.Doc.Tags[0]
+	if tag.Name.String() != "r" || tag.Text != "触る行" || string(src[tag.Name.Span.Start:tag.Name.Span.End]) != "r" || src[tag.Name.Span.Start-1] != ' ' {
+		t.Errorf("Tag = %+v（名前の位置 %q）", tag, src[tag.Name.Span.Start:tag.Name.Span.End])
+	}
+}
+
 func TestDocComment(t *testing.T) {
 	src := `/**
  * パスワードの再設定メールを送る。

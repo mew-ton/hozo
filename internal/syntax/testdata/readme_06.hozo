@@ -10,7 +10,7 @@ namespace server {
 
   /** 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ） */
   @http.status(400)
-  exception ClientError: Violations;
+  exception ClientError(value: Violations);
 
   /** 認証されていない */
   @http.status(401)
@@ -23,15 +23,15 @@ namespace server {
 
 namespace server {
   /** ログインセッションを作成する */
-  effect createSession on sessions.post;
+  effect createSession() on sessions.post;
 }
 
 namespace browser {
   /** ログイン画面へ遷移する */
-  effect transitionToLogin on location.put;
+  effect transitionToLogin() on location.put;
 
   /** 権限がないことを示す画面へ遷移する */
-  effect transitionToForbidden on location.put;
+  effect transitionToForbidden() on location.put;
 }
 
 namespace browser {

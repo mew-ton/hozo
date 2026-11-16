@@ -1,8 +1,8 @@
 // EFF-2（docs/check.md「状態と効果」）: 配線の effects は省ける（効果は自動で伝播する。EFF-1）
 namespace a {
   state s: list<string>;
-  effect e on s.post;
-  op doE() effects e;
+  effect e() on s.post;
+  op doE() effects e { e(); }
   op wiring() {
     doE();
   }

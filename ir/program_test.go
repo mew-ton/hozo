@@ -23,9 +23,9 @@ func TestLookup(t *testing.T) {
 	}
 	// 戻り値は Program の要素を指すので、書き換えが反映する。
 	if op, ok := p.Lookup("server.notify").(*Op); ok {
-		op.Signature.Effects = []string{"x"}
+		op.Signature.Effects = NamedEffects("x")
 	}
-	if got := p.Lookup("server.notify").(*Op).Signature.Effects; len(got) != 1 || got[0] != "x" {
+	if got := p.Lookup("server.notify").(*Op).Signature.Effects; len(got) != 1 || got[0] != (NamedEffect{Effect: "x"}) {
 		t.Error("Lookup must return a pointer into the program")
 	}
 	var nilP *Program
@@ -77,7 +77,7 @@ func TestViewSignature(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	if Version != "0.5" {
+	if Version != "0.6" {
 		t.Errorf("Version = %q", Version)
 	}
 }

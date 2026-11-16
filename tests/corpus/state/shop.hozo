@@ -41,46 +41,51 @@ namespace shop {
   // docs/check.md「状態の形」効果の宛先: 基底の状態の組み込みの効果。書き込むのはその状態
   // docs/ir.md「state / exception / effect」: target は { kind: "builtin", state, operation }
   /** カートに行を足す */
-  effect addLine on carts.post;
+  effect addLine(line: Line) on carts.post;
   /** 店の名前を変える */
-  effect rename on title.put;
+  effect rename() on title.put;
   // 空にするのは delete（docs/decisions.md S2）
   /** 手元のトークンを消す */
-  effect removeToken on token.delete;
+  effect removeToken() on token.delete;
 
   // docs/grammar.md「exception / effect」Transition: 状態の分類の遷移。書き込むのは分類の対象のすべての基底の状態
   // docs/ir.md「state / exception / effect」: target は { kind: "transition", of, from, to }
   /** 注文を確定する */
-  effect placeOrder on Checkout: Shopping -> Ordered;
+  effect placeOrder() on Checkout: Shopping -> Ordered;
   // CaseSet: any と、ケースの和
   /** 買い物をやり直す */
-  effect startOver on Checkout: any -> Shopping;
+  effect startOver() on Checkout: any -> Shopping;
   /** 進み具合を記録し直す */
-  effect touchCheckout on Checkout: Shopping | Ordered -> any;
+  effect touchCheckout() on Checkout: Shopping | Ordered -> any;
   // condition の遷移（ケースは condition の名前）
   /** ログインする */
-  effect signIn on LoggedIn: any -> LoggedIn;
+  effect signIn() on LoggedIn: any -> LoggedIn;
 
   // docs/grammar.md「exception / effect」Transition: 基底の状態の組み込みの分類の遷移（ケースは Empty / HasItems）。
   // 書き込むのはその状態
   /** カートを空にする */
-  effect clearCart on carts: HasItems -> Empty;
+  effect clearCart() on carts: HasItems -> Empty;
   /** トークンを保存する */
-  effect saveToken on token: Empty -> HasItems;
+  effect saveToken(token: Token) on token: Empty -> HasItems;
 
   /** カートが空 */
   exception EmptyCart;
 
-  // 葉の op。効果の宛先が組み込みの効果でも遷移でも、effects の書き方は同じ
-  op addToCart(line: Line) effects addLine;
-  op submitOrder(): Order effects placeOrder throws EmptyCart prevents effects;
-  op emptyCart() effects clearCart;
-  op restart() effects startOver;
-  // docs/check.md「状態と効果」EFF-3: 葉の op が直に持つ効果は一つまで。二つの効果を持つ処理は、
-  // 効果ごとの葉の op を配線でつなぐ（下の login。効果は伝播する）
-  op storeToken(token: Token) effects saveToken;
-  op markLoggedIn() effects signIn;
-  op logout() effects removeToken;
+  // docs/check.md「配線からの呼び出し」: 効果を呼ぶ配線。効果の宛先が組み込みの効果でも遷移でも、呼び方は同じ。
+  // 書いた effects は、本体が行う効果と照合する（EFF-2）
+  op addToCart(line: Line) effects addLine { addLine(line); }
+  // docs/check.md「葉の op」: 葉は状態に触れない（注文を作るだけ）。効果は、それを呼ぶ配線が行う
+  op newOrder(): Order throws EmptyCart;
+  op submitOrder(): Order effects placeOrder throws EmptyCart prevents effects {
+    const order = newOrder();
+    placeOrder();
+    return order;
+  }
+  op emptyCart() effects clearCart { clearCart(); }
+  op restart() effects startOver { startOver(); }
+  op storeToken(token: Token) effects saveToken { saveToken(token); }
+  op markLoggedIn() effects signIn { signIn(); }
+  op logout() effects removeToken { removeToken(); }
   op showLogin();
   op showCart();
   op showEmpty();

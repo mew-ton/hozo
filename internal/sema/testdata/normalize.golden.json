@@ -244,6 +244,7 @@
             "field"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -825,9 +826,29 @@
             },
             "end": {
               "line": 36,
-              "col": 28
+              "col": 37
             }
           },
+          "params": [
+            {
+              "name": "u",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 36,
+                  "col": 14
+                },
+                "end": {
+                  "line": 36,
+                  "col": 21
+                }
+              }
+            }
+          ],
           "target": {
             "kind": "builtin",
             "state": "a.users",
@@ -849,9 +870,29 @@
             },
             "end": {
               "line": 37,
-              "col": 27
+              "col": 38
             }
           },
+          "params": [
+            {
+              "name": "t",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 37,
+                  "col": 14
+                },
+                "end": {
+                  "line": 37,
+                  "col": 23
+                }
+              }
+            }
+          ],
           "target": {
             "kind": "builtin",
             "state": "a.token",
@@ -875,7 +916,8 @@
               "line": 39,
               "col": 26
             }
-          }
+          },
+          "params": []
         },
         {
           "kind": "exception",
@@ -889,51 +931,29 @@
             },
             "end": {
               "line": 40,
-              "col": 41
+              "col": 36
             }
           },
-          "value": {
-            "kind": "ref",
-            "target": "a.Invalid.Value"
-          }
-        },
-        {
-          "kind": "model",
-          "name": "a.Invalid.Value",
-          "decorators": [],
-          "span": {
-            "file": "a.hozo",
-            "start": {
-              "line": 40,
-              "col": 22
-            },
-            "end": {
-              "line": 40,
-              "col": 40
-            }
-          },
-          "fields": [
+          "params": [
             {
               "name": "field",
               "type": {
                 "kind": "core",
                 "name": "string"
               },
-              "decorators": [],
               "span": {
                 "file": "a.hozo",
                 "start": {
                   "line": 40,
-                  "col": 24
+                  "col": 21
                 },
                 "end": {
                   "line": 40,
-                  "col": 38
+                  "col": 34
                 }
               }
             }
-          ],
-          "synthesizedFrom": "a.Invalid"
+          ]
         },
         {
           "kind": "exception",
@@ -947,13 +967,50 @@
             },
             "end": {
               "line": 41,
-              "col": 27
+              "col": 44
             }
           },
-          "value": {
-            "kind": "ref",
-            "target": "a.User"
-          }
+          "params": [
+            {
+              "name": "user",
+              "type": {
+                "kind": "ref",
+                "target": "a.User"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 41,
+                  "col": 21
+                },
+                "end": {
+                  "line": 41,
+                  "col": 31
+                }
+              }
+            },
+            {
+              "name": "at",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "core",
+                  "name": "Time"
+                }
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 41,
+                  "col": 33
+                },
+                "end": {
+                  "line": 41,
+                  "col": 42
+                }
+              }
+            }
+          ]
         },
         {
           "kind": "union",
@@ -1364,6 +1421,7 @@
             "op"
           ],
           "external": true,
+          "repeatable": false,
           "throws": [
             {
               "exceptions": [
@@ -1416,6 +1474,7 @@
             "field"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [
             {
@@ -1446,6 +1505,7 @@
           "params": [],
           "targets": [],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -1526,6 +1586,7 @@
             "op"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -1570,6 +1631,7 @@
             "model"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -1777,7 +1839,7 @@
             },
             "end": {
               "line": 75,
-              "col": 75
+              "col": 63
             }
           },
           "exported": false,
@@ -1805,12 +1867,7 @@
             "kind": "ref",
             "target": "a.PublicUser"
           },
-          "effects": [
-            {
-              "kind": "named",
-              "effect": "a.add"
-            }
-          ],
+          "effects": [],
           "reads": [],
           "carried": {
             "reads": [],
@@ -1852,25 +1909,99 @@
             },
             "end": {
               "line": 76,
-              "col": 29
+              "col": 37
             }
           },
           "exported": false,
-          "params": [],
-          "returns": null,
-          "effects": [
+          "params": [
             {
-              "kind": "named",
-              "effect": "a.set"
+              "name": "t",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 76,
+                  "col": 15
+                },
+                "end": {
+                  "line": 76,
+                  "col": 24
+                }
+              }
             }
           ],
+          "returns": null,
+          "effects": [],
           "reads": [],
           "carried": {
             "reads": [],
             "effects": []
           },
           "throws": [],
-          "body": null,
+          "body": {
+            "statements": [
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "named",
+                      "effect": "a.set"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "t",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "t"
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 76,
+                            "col": 32
+                          },
+                          "end": {
+                            "line": 76,
+                            "col": 33
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 76,
+                      "col": 28
+                    },
+                    "end": {
+                      "line": 76,
+                      "col": 34
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 76,
+                    "col": 28
+                  },
+                  "end": {
+                    "line": 76,
+                    "col": 35
+                  }
+                }
+              }
+            ]
+          },
           "signature": {
             "exceptions": [],
             "effects": [],
@@ -1891,7 +2022,7 @@
               "col": 3
             },
             "end": {
-              "line": 80,
+              "line": 81,
               "col": 4
             }
           },
@@ -1950,8 +2081,35 @@
               {
                 "kind": "call",
                 "call": {
-                  "op": "a.setToken",
-                  "args": [],
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "named",
+                      "effect": "a.add"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "u",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "u"
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 78,
+                            "col": 9
+                          },
+                          "end": {
+                            "line": 78,
+                            "col": 10
+                          }
+                        }
+                      }
+                    }
+                  ],
                   "bound": [],
                   "span": {
                     "file": "a.hozo",
@@ -1961,7 +2119,7 @@
                     },
                     "end": {
                       "line": 78,
-                      "col": 15
+                      "col": 11
                     }
                   }
                 },
@@ -1973,7 +2131,62 @@
                   },
                   "end": {
                     "line": 78,
-                    "col": 16
+                    "col": 12
+                  }
+                }
+              },
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "op",
+                    "op": "a.setToken"
+                  },
+                  "args": [
+                    {
+                      "param": "t",
+                      "value": {
+                        "kind": "literal",
+                        "literal": {
+                          "kind": "string",
+                          "value": "x"
+                        },
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 79,
+                            "col": 14
+                          },
+                          "end": {
+                            "line": 79,
+                            "col": 17
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 79,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 79,
+                      "col": 18
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 79,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 79,
+                    "col": 19
                   }
                 }
               },
@@ -1982,7 +2195,10 @@
                 "expr": {
                   "kind": "call",
                   "call": {
-                    "op": "a.leaf",
+                    "callee": {
+                      "kind": "op",
+                      "op": "a.leaf"
+                    },
                     "args": [
                       {
                         "param": "u",
@@ -1994,11 +2210,11 @@
                           "span": {
                             "file": "a.hozo",
                             "start": {
-                              "line": 79,
+                              "line": 80,
                               "col": 17
                             },
                             "end": {
-                              "line": 79,
+                              "line": 80,
                               "col": 18
                             }
                           }
@@ -2009,11 +2225,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 79,
+                        "line": 80,
                         "col": 12
                       },
                       "end": {
-                        "line": 79,
+                        "line": 80,
                         "col": 19
                       }
                     }
@@ -2022,11 +2238,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 79,
+                    "line": 80,
                     "col": 5
                   },
                   "end": {
-                    "line": 79,
+                    "line": 80,
                     "col": 20
                   }
                 }
@@ -2049,11 +2265,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 81,
+              "line": 82,
               "col": 3
             },
             "end": {
-              "line": 81,
+              "line": 82,
               "col": 27
             }
           },
@@ -2068,11 +2284,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 81,
+                  "line": 82,
                   "col": 11
                 },
                 "end": {
-                  "line": 81,
+                  "line": 82,
                   "col": 19
                 }
               }
@@ -2103,11 +2319,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 82,
+              "line": 83,
               "col": 3
             },
             "end": {
-              "line": 82,
+              "line": 83,
               "col": 29
             }
           },
@@ -2122,11 +2338,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 82,
+                  "line": 83,
                   "col": 13
                 },
                 "end": {
-                  "line": 82,
+                  "line": 83,
                   "col": 21
                 }
               }
@@ -2154,18 +2370,62 @@
           }
         },
         {
+          "kind": "read",
+          "name": "a.userById",
+          "decorators": [],
+          "span": {
+            "file": "a.hozo",
+            "start": {
+              "line": 85,
+              "col": 3
+            },
+            "end": {
+              "line": 85,
+              "col": 45
+            }
+          },
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 85,
+                  "col": 17
+                },
+                "end": {
+                  "line": 85,
+                  "col": 27
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "a.User"
+            }
+          },
+          "state": "a.users"
+        },
+        {
           "kind": "op",
           "name": "a.find2",
           "decorators": [],
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 84,
+              "line": 86,
               "col": 3
             },
             "end": {
-              "line": 84,
-              "col": 69
+              "line": 88,
+              "col": 4
             }
           },
           "exported": true,
@@ -2179,11 +2439,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 84,
+                  "line": 86,
                   "col": 19
                 },
                 "end": {
-                  "line": 84,
+                  "line": 86,
                   "col": 29
                 }
               }
@@ -2212,7 +2472,149 @@
             "effects": []
           },
           "throws": [],
-          "body": null,
+          "body": {
+            "statements": [
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "value",
+                      "atom": {
+                        "kind": "state",
+                        "state": "a.token",
+                        "path": [],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 87,
+                            "col": 18
+                          },
+                          "end": {
+                            "line": 87,
+                            "col": 23
+                          }
+                        }
+                      }
+                    },
+                    "classify": "nullable",
+                    "arms": [
+                      {
+                        "cases": [
+                          "HasItems"
+                        ],
+                        "body": {
+                          "kind": "call",
+                          "call": {
+                            "callee": {
+                              "kind": "read",
+                              "read": "a.userById"
+                            },
+                            "args": [
+                              {
+                                "param": "id",
+                                "value": {
+                                  "kind": "name",
+                                  "path": [
+                                    "id"
+                                  ],
+                                  "span": {
+                                    "file": "a.hozo",
+                                    "start": {
+                                      "line": 87,
+                                      "col": 59
+                                    },
+                                    "end": {
+                                      "line": 87,
+                                      "col": 61
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "bound": [],
+                            "span": {
+                              "file": "a.hozo",
+                              "start": {
+                                "line": 87,
+                                "col": 50
+                              },
+                              "end": {
+                                "line": 87,
+                                "col": 62
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "core",
+                              "name": "string"
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 87,
+                            "col": 38
+                          },
+                          "end": {
+                            "line": 87,
+                            "col": 63
+                          }
+                        }
+                      },
+                      {
+                        "cases": [
+                          "Empty"
+                        ],
+                        "body": {
+                          "kind": "none"
+                        },
+                        "narrowed": [],
+                        "span": {
+                          "file": "a.hozo",
+                          "start": {
+                            "line": 87,
+                            "col": 64
+                          },
+                          "end": {
+                            "line": 87,
+                            "col": 78
+                          }
+                        }
+                      }
+                    ],
+                    "span": {
+                      "file": "a.hozo",
+                      "start": {
+                        "line": 87,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 87,
+                        "col": 80
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "a.hozo",
+                  "start": {
+                    "line": 87,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 87,
+                    "col": 81
+                  }
+                }
+              }
+            ]
+          },
           "signature": {
             "exceptions": [],
             "effects": [],
@@ -2229,11 +2631,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 85,
+              "line": 89,
               "col": 3
             },
             "end": {
-              "line": 85,
+              "line": 89,
               "col": 30
             }
           },
@@ -2248,11 +2650,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 85,
+                  "line": 89,
                   "col": 13
                 },
                 "end": {
-                  "line": 85,
+                  "line": 89,
                   "col": 20
                 }
               }
@@ -2286,11 +2688,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 86,
+              "line": 90,
               "col": 3
             },
             "end": {
-              "line": 86,
+              "line": 90,
               "col": 40
             }
           },
@@ -2330,11 +2732,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 87,
+              "line": 91,
               "col": 3
             },
             "end": {
-              "line": 87,
+              "line": 91,
               "col": 59
             }
           },
@@ -2362,11 +2764,11 @@
                   "span": {
                     "file": "a.hozo",
                     "start": {
-                      "line": 87,
+                      "line": 91,
                       "col": 34
                     },
                     "end": {
-                      "line": 87,
+                      "line": 91,
                       "col": 47
                     }
                   }
@@ -2375,11 +2777,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 87,
+                  "line": 91,
                   "col": 29
                 },
                 "end": {
-                  "line": 87,
+                  "line": 91,
                   "col": 48
                 }
               }
@@ -2396,11 +2798,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 88,
+              "line": 92,
               "col": 3
             },
             "end": {
-              "line": 88,
+              "line": 92,
               "col": 62
             }
           },
@@ -2424,11 +2826,11 @@
                   "span": {
                     "file": "a.hozo",
                     "start": {
-                      "line": 88,
+                      "line": 92,
                       "col": 35
                     },
                     "end": {
-                      "line": 88,
+                      "line": 92,
                       "col": 50
                     }
                   }
@@ -2437,11 +2839,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 88,
+                  "line": 92,
                   "col": 31
                 },
                 "end": {
-                  "line": 88,
+                  "line": 92,
                   "col": 51
                 }
               }
@@ -2458,11 +2860,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 89,
+              "line": 93,
               "col": 3
             },
             "end": {
-              "line": 95,
+              "line": 99,
               "col": 4
             }
           },
@@ -2477,11 +2879,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 89,
+                  "line": 93,
                   "col": 12
                 },
                 "end": {
-                  "line": 89,
+                  "line": 93,
                   "col": 22
                 }
               }
@@ -2513,7 +2915,10 @@
                 "expr": {
                   "kind": "call",
                   "call": {
-                    "op": "a.find2",
+                    "callee": {
+                      "kind": "op",
+                      "op": "a.find2"
+                    },
                     "args": [
                       {
                         "param": "id",
@@ -2525,11 +2930,11 @@
                           "span": {
                             "file": "a.hozo",
                             "start": {
-                              "line": 90,
+                              "line": 94,
                               "col": 21
                             },
                             "end": {
-                              "line": 90,
+                              "line": 94,
                               "col": 23
                             }
                           }
@@ -2540,11 +2945,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 90,
+                        "line": 94,
                         "col": 15
                       },
                       "end": {
-                        "line": 90,
+                        "line": 94,
                         "col": 24
                       }
                     }
@@ -2553,11 +2958,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 90,
+                    "line": 94,
                     "col": 5
                   },
                   "end": {
-                    "line": 90,
+                    "line": 94,
                     "col": 25
                   }
                 }
@@ -2577,11 +2982,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 91,
+                            "line": 95,
                             "col": 18
                           },
                           "end": {
-                            "line": 91,
+                            "line": 95,
                             "col": 19
                           }
                         }
@@ -2596,7 +3001,10 @@
                         "body": {
                           "kind": "call",
                           "call": {
-                            "op": "a.nameOf",
+                            "callee": {
+                              "kind": "op",
+                              "op": "a.nameOf"
+                            },
                             "args": [
                               {
                                 "param": "u",
@@ -2608,11 +3016,11 @@
                                   "span": {
                                     "file": "a.hozo",
                                     "start": {
-                                      "line": 92,
+                                      "line": 96,
                                       "col": 21
                                     },
                                     "end": {
-                                      "line": 92,
+                                      "line": 96,
                                       "col": 22
                                     }
                                   }
@@ -2623,11 +3031,11 @@
                             "span": {
                               "file": "a.hozo",
                               "start": {
-                                "line": 92,
+                                "line": 96,
                                 "col": 14
                               },
                               "end": {
-                                "line": 92,
+                                "line": 96,
                                 "col": 23
                               }
                             }
@@ -2644,11 +3052,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 92,
+                            "line": 96,
                             "col": 7
                           },
                           "end": {
-                            "line": 92,
+                            "line": 96,
                             "col": 24
                           }
                         }
@@ -2658,14 +3066,15 @@
                         "body": {
                           "kind": "throw",
                           "exception": "a.Unauthorized",
+                          "args": [],
                           "span": {
                             "file": "a.hozo",
                             "start": {
-                              "line": 93,
+                              "line": 97,
                               "col": 18
                             },
                             "end": {
-                              "line": 93,
+                              "line": 97,
                               "col": 36
                             }
                           }
@@ -2674,11 +3083,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 93,
+                            "line": 97,
                             "col": 7
                           },
                           "end": {
-                            "line": 93,
+                            "line": 97,
                             "col": 37
                           }
                         }
@@ -2687,11 +3096,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 91,
+                        "line": 95,
                         "col": 12
                       },
                       "end": {
-                        "line": 94,
+                        "line": 98,
                         "col": 6
                       }
                     }
@@ -2700,11 +3109,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 91,
+                    "line": 95,
                     "col": 5
                   },
                   "end": {
-                    "line": 94,
+                    "line": 98,
                     "col": 7
                   }
                 }
@@ -2727,11 +3136,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 96,
+              "line": 100,
               "col": 3
             },
             "end": {
-              "line": 98,
+              "line": 102,
               "col": 4
             }
           },
@@ -2767,11 +3176,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 97,
+                            "line": 101,
                             "col": 18
                           },
                           "end": {
-                            "line": 97,
+                            "line": 101,
                             "col": 23
                           }
                         }
@@ -2792,11 +3201,11 @@
                             "span": {
                               "file": "a.hozo",
                               "start": {
-                                "line": 97,
+                                "line": 101,
                                 "col": 50
                               },
                               "end": {
-                                "line": 97,
+                                "line": 101,
                                 "col": 55
                               }
                             }
@@ -2813,11 +3222,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 97,
+                            "line": 101,
                             "col": 38
                           },
                           "end": {
-                            "line": 97,
+                            "line": 101,
                             "col": 56
                           }
                         }
@@ -2833,11 +3242,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 97,
+                            "line": 101,
                             "col": 57
                           },
                           "end": {
-                            "line": 97,
+                            "line": 101,
                             "col": 71
                           }
                         }
@@ -2846,11 +3255,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 97,
+                        "line": 101,
                         "col": 12
                       },
                       "end": {
-                        "line": 97,
+                        "line": 101,
                         "col": 73
                       }
                     }
@@ -2859,11 +3268,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 97,
+                    "line": 101,
                     "col": 5
                   },
                   "end": {
-                    "line": 97,
+                    "line": 101,
                     "col": 74
                   }
                 }
@@ -2886,11 +3295,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 99,
+              "line": 103,
               "col": 3
             },
             "end": {
-              "line": 99,
+              "line": 103,
               "col": 41
             }
           },
@@ -2920,11 +3329,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 99,
+                        "line": 103,
                         "col": 31
                       },
                       "end": {
-                        "line": 99,
+                        "line": 103,
                         "col": 38
                       }
                     }
@@ -2933,11 +3342,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 99,
+                    "line": 103,
                     "col": 24
                   },
                   "end": {
-                    "line": 99,
+                    "line": 103,
                     "col": 39
                   }
                 }
@@ -2960,11 +3369,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 100,
+              "line": 104,
               "col": 3
             },
             "end": {
-              "line": 102,
+              "line": 106,
               "col": 4
             }
           },
@@ -3006,11 +3415,11 @@
                             "span": {
                               "file": "a.hozo",
                               "start": {
-                                "line": 101,
+                                "line": 105,
                                 "col": 37
                               },
                               "end": {
-                                "line": 101,
+                                "line": 105,
                                 "col": 42
                               }
                             }
@@ -3028,11 +3437,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 101,
+                            "line": 105,
                             "col": 31
                           },
                           "end": {
-                            "line": 101,
+                            "line": 105,
                             "col": 43
                           }
                         }
@@ -3042,17 +3451,20 @@
                         "body": {
                           "kind": "call",
                           "call": {
-                            "op": "a.gone",
+                            "callee": {
+                              "kind": "op",
+                              "op": "a.gone"
+                            },
                             "args": [],
                             "bound": [],
                             "span": {
                               "file": "a.hozo",
                               "start": {
-                                "line": 101,
+                                "line": 105,
                                 "col": 55
                               },
                               "end": {
-                                "line": 101,
+                                "line": 105,
                                 "col": 61
                               }
                             }
@@ -3062,11 +3474,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 101,
+                            "line": 105,
                             "col": 44
                           },
                           "end": {
-                            "line": 101,
+                            "line": 105,
                             "col": 62
                           }
                         }
@@ -3075,11 +3487,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 101,
+                        "line": 105,
                         "col": 12
                       },
                       "end": {
-                        "line": 101,
+                        "line": 105,
                         "col": 64
                       }
                     }
@@ -3088,11 +3500,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 101,
+                    "line": 105,
                     "col": 5
                   },
                   "end": {
-                    "line": 101,
+                    "line": 105,
                     "col": 65
                   }
                 }
@@ -3138,11 +3550,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 104,
+                  "line": 108,
                   "col": 3
                 },
                 "end": {
-                  "line": 104,
+                  "line": 108,
                   "col": 15
                 }
               }
@@ -3183,11 +3595,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 105,
+                  "line": 109,
                   "col": 3
                 },
                 "end": {
-                  "line": 105,
+                  "line": 109,
                   "col": 28
                 }
               }
@@ -3196,11 +3608,11 @@
           "span": {
             "file": "a.hozo",
             "start": {
-              "line": 104,
+              "line": 108,
               "col": 3
             },
             "end": {
-              "line": 114,
+              "line": 118,
               "col": 4
             }
           },
@@ -3215,11 +3627,11 @@
               "span": {
                 "file": "a.hozo",
                 "start": {
-                  "line": 106,
+                  "line": 110,
                   "col": 11
                 },
                 "end": {
-                  "line": 106,
+                  "line": 110,
                   "col": 21
                 }
               }
@@ -3244,7 +3656,10 @@
                 "expr": {
                   "kind": "call",
                   "call": {
-                    "op": "a.find",
+                    "callee": {
+                      "kind": "op",
+                      "op": "a.find"
+                    },
                     "args": [
                       {
                         "param": "id",
@@ -3256,11 +3671,11 @@
                           "span": {
                             "file": "a.hozo",
                             "start": {
-                              "line": 107,
+                              "line": 111,
                               "col": 20
                             },
                             "end": {
-                              "line": 107,
+                              "line": 111,
                               "col": 22
                             }
                           }
@@ -3271,11 +3686,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 107,
+                        "line": 111,
                         "col": 15
                       },
                       "end": {
-                        "line": 107,
+                        "line": 111,
                         "col": 23
                       }
                     }
@@ -3284,11 +3699,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 107,
+                    "line": 111,
                     "col": 5
                   },
                   "end": {
-                    "line": 107,
+                    "line": 111,
                     "col": 24
                   }
                 }
@@ -3296,7 +3711,10 @@
               {
                 "kind": "call",
                 "call": {
-                  "op": "a.take",
+                  "callee": {
+                    "kind": "op",
+                    "op": "a.take"
+                  },
                   "args": [
                     {
                       "param": "in",
@@ -3313,11 +3731,11 @@
                               "span": {
                                 "file": "a.hozo",
                                 "start": {
-                                  "line": 108,
+                                  "line": 112,
                                   "col": 12
                                 },
                                 "end": {
-                                  "line": 108,
+                                  "line": 112,
                                   "col": 14
                                 }
                               }
@@ -3334,11 +3752,11 @@
                               "span": {
                                 "file": "a.hozo",
                                 "start": {
-                                  "line": 108,
+                                  "line": 112,
                                   "col": 23
                                 },
                                 "end": {
-                                  "line": 108,
+                                  "line": 112,
                                   "col": 30
                                 }
                               }
@@ -3355,11 +3773,11 @@
                               "span": {
                                 "file": "a.hozo",
                                 "start": {
-                                  "line": 108,
+                                  "line": 112,
                                   "col": 38
                                 },
                                 "end": {
-                                  "line": 108,
+                                  "line": 112,
                                   "col": 41
                                 }
                               }
@@ -3369,11 +3787,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 108,
+                            "line": 112,
                             "col": 10
                           },
                           "end": {
-                            "line": 108,
+                            "line": 112,
                             "col": 43
                           }
                         }
@@ -3384,11 +3802,11 @@
                   "span": {
                     "file": "a.hozo",
                     "start": {
-                      "line": 108,
+                      "line": 112,
                       "col": 5
                     },
                     "end": {
-                      "line": 108,
+                      "line": 112,
                       "col": 44
                     }
                   }
@@ -3396,11 +3814,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 108,
+                    "line": 112,
                     "col": 5
                   },
                   "end": {
-                    "line": 108,
+                    "line": 112,
                     "col": 45
                   }
                 }
@@ -3421,11 +3839,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 109,
+                            "line": 113,
                             "col": 21
                           },
                           "end": {
-                            "line": 109,
+                            "line": 113,
                             "col": 22
                           }
                         }
@@ -3441,7 +3859,10 @@
                         "body": {
                           "kind": "call",
                           "call": {
-                            "op": "a.fromIn",
+                            "callee": {
+                              "kind": "op",
+                              "op": "a.fromIn"
+                            },
                             "args": [
                               {
                                 "param": "in",
@@ -3453,11 +3874,11 @@
                                   "span": {
                                     "file": "a.hozo",
                                     "start": {
-                                      "line": 110,
+                                      "line": 114,
                                       "col": 23
                                     },
                                     "end": {
-                                      "line": 110,
+                                      "line": 114,
                                       "col": 24
                                     }
                                   }
@@ -3468,11 +3889,11 @@
                             "span": {
                               "file": "a.hozo",
                               "start": {
-                                "line": 110,
+                                "line": 114,
                                 "col": 16
                               },
                               "end": {
-                                "line": 110,
+                                "line": 114,
                                 "col": 25
                               }
                             }
@@ -3497,11 +3918,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 110,
+                            "line": 114,
                             "col": 7
                           },
                           "end": {
-                            "line": 110,
+                            "line": 114,
                             "col": 26
                           }
                         }
@@ -3515,11 +3936,11 @@
                         "span": {
                           "file": "a.hozo",
                           "start": {
-                            "line": 111,
+                            "line": 115,
                             "col": 7
                           },
                           "end": {
-                            "line": 111,
+                            "line": 115,
                             "col": 23
                           }
                         }
@@ -3528,11 +3949,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 109,
+                        "line": 113,
                         "col": 15
                       },
                       "end": {
-                        "line": 112,
+                        "line": 116,
                         "col": 6
                       }
                     }
@@ -3541,11 +3962,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 109,
+                    "line": 113,
                     "col": 5
                   },
                   "end": {
-                    "line": 112,
+                    "line": 116,
                     "col": 7
                   }
                 }
@@ -3562,11 +3983,11 @@
                     "span": {
                       "file": "a.hozo",
                       "start": {
-                        "line": 113,
+                        "line": 117,
                         "col": 12
                       },
                       "end": {
-                        "line": 113,
+                        "line": 117,
                         "col": 13
                       }
                     }
@@ -3575,11 +3996,11 @@
                 "span": {
                   "file": "a.hozo",
                   "start": {
-                    "line": 113,
+                    "line": 117,
                     "col": 5
                   },
                   "end": {
-                    "line": 113,
+                    "line": 117,
                     "col": 14
                   }
                 }
@@ -3879,6 +4300,7 @@
             "state"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -3904,6 +4326,7 @@
             "field"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -3953,6 +4376,7 @@
             "op"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [
@@ -4007,6 +4431,7 @@
             "op"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [
@@ -4047,6 +4472,7 @@
             "effect"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -4082,6 +4508,7 @@
             "op"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -4122,6 +4549,7 @@
             "op"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [
@@ -4207,6 +4635,7 @@
             "effect"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -4230,6 +4659,7 @@
           "params": [],
           "targets": [],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -4295,9 +4725,29 @@
             },
             "end": {
               "line": 17,
-              "col": 44
+              "col": 52
             }
           },
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "store.Row"
+              },
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 17,
+                  "col": 31
+                },
+                "end": {
+                  "line": 17,
+                  "col": 37
+                }
+              }
+            }
+          ],
           "target": {
             "kind": "builtin",
             "state": "store.rows",
@@ -4376,9 +4826,29 @@
             },
             "end": {
               "line": 18,
-              "col": 52
+              "col": 60
             }
           },
+          "params": [
+            {
+              "name": "l",
+              "type": {
+                "kind": "ref",
+                "target": "store.Row"
+              },
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 18,
+                  "col": 39
+                },
+                "end": {
+                  "line": 18,
+                  "col": 45
+                }
+              }
+            }
+          ],
           "target": {
             "kind": "builtin",
             "state": "store.logs",
@@ -4400,9 +4870,10 @@
             },
             "end": {
               "line": 19,
-              "col": 28
+              "col": 30
             }
           },
+          "params": [],
           "target": {
             "kind": "builtin",
             "state": "store.rows",
@@ -5046,7 +5517,7 @@
             },
             "end": {
               "line": 34,
-              "col": 80
+              "col": 57
             }
           },
           "exported": false,
@@ -5077,18 +5548,8 @@
               "target": "store.Row"
             }
           },
-          "effects": [
-            {
-              "kind": "named",
-              "effect": "store.log"
-            }
-          ],
-          "reads": [
-            {
-              "kind": "direct",
-              "state": "store.rows"
-            }
-          ],
+          "effects": [],
+          "reads": [],
           "carried": {
             "reads": [
               {
@@ -5379,18 +5840,46 @@
           }
         },
         {
+          "kind": "state",
+          "name": "lib.cursor",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 7,
+              "col": 3
+            },
+            "end": {
+              "line": 7,
+              "col": 31
+            }
+          },
+          "type": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "shape": "nullable",
+          "element": {
+            "kind": "ref",
+            "target": "lib.Row"
+          }
+        },
+        {
           "kind": "decorator",
           "name": "lib.find",
           "decorators": [],
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 8,
+              "line": 9,
               "col": 3
             },
             "end": {
-              "line": 8,
-              "col": 61
+              "line": 9,
+              "col": 45
             }
           },
           "params": [
@@ -5402,7 +5891,34 @@
               },
               "optional": false,
               "rest": false
+            }
+          ],
+          "targets": [
+            "read"
+          ],
+          "external": false,
+          "repeatable": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "lib.where",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 10,
+              "col": 3
             },
+            "end": {
+              "line": 10,
+              "col": 77
+            }
+          },
+          "params": [
             {
               "name": "column",
               "type": {
@@ -5416,55 +5932,34 @@
               },
               "optional": false,
               "rest": false
+            },
+            {
+              "name": "value",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  },
+                  {
+                    "kind": "core",
+                    "name": "int"
+                  }
+                ]
+              },
+              "optional": false,
+              "rest": false
             }
           ],
           "targets": [
             "read"
           ],
           "external": false,
+          "repeatable": true,
           "throws": [],
           "catches": [],
           "reads": [],
-          "effects": []
-        },
-        {
-          "kind": "decorator",
-          "name": "lib.reads",
-          "decorators": [],
-          "span": {
-            "file": "d.hozo",
-            "start": {
-              "line": 9,
-              "col": 3
-            },
-            "end": {
-              "line": 9,
-              "col": 62
-            }
-          },
-          "params": [
-            {
-              "name": "targets",
-              "type": {
-                "kind": "any",
-                "of": "read"
-              },
-              "optional": false,
-              "rest": true
-            }
-          ],
-          "targets": [
-            "op"
-          ],
-          "external": false,
-          "throws": [],
-          "catches": [],
-          "reads": [
-            {
-              "kind": "named",
-              "read": "$param:targets"
-            }
-          ],
           "effects": []
         },
         {
@@ -5474,11 +5969,11 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 10,
+              "line": 11,
               "col": 3
             },
             "end": {
-              "line": 12,
+              "line": 13,
               "col": 30
             }
           },
@@ -5496,7 +5991,7 @@
               "name": "via",
               "type": {
                 "kind": "any",
-                "of": "read"
+                "of": "state"
               },
               "optional": true,
               "rest": false
@@ -5506,12 +6001,13 @@
             "op"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [
             {
-              "kind": "named",
-              "read": "$param:via"
+              "kind": "direct",
+              "state": "$param:via"
             },
             {
               "kind": "direct",
@@ -5544,7 +6040,12 @@
           "description": {
             "summary": "id で一行を引く",
             "body": "id で一行を引く",
-            "params": [],
+            "params": [
+              {
+                "name": "id",
+                "text": "引く行の識別子"
+              }
+            ],
             "throws": [],
             "see": []
           },
@@ -5558,7 +6059,23 @@
                     "kind": "ref",
                     "target": "lib.rows"
                   }
+                }
+              ],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 3
                 },
+                "end": {
+                  "line": 20,
+                  "col": 14
+                }
+              }
+            },
+            {
+              "decorator": "lib.where",
+              "args": [
                 {
                   "param": "column",
                   "value": {
@@ -5568,17 +6085,63 @@
                       "value": "id"
                     }
                   }
+                },
+                {
+                  "param": "value",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "x"
+                    }
+                  }
                 }
               ],
               "span": {
                 "file": "d.hozo",
                 "start": {
-                  "line": 15,
-                  "col": 3
+                  "line": 20,
+                  "col": 15
                 },
                 "end": {
-                  "line": 15,
-                  "col": 20
+                  "line": 20,
+                  "col": 32
+                }
+              }
+            },
+            {
+              "decorator": "lib.where",
+              "args": [
+                {
+                  "param": "column",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "kind"
+                    }
+                  }
+                },
+                {
+                  "param": "value",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "int",
+                      "value": 1
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 33
+                },
+                "end": {
+                  "line": 20,
+                  "col": 50
                 }
               }
             }
@@ -5586,12 +6149,39 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 15,
+              "line": 20,
               "col": 3
             },
             "end": {
-              "line": 15,
-              "col": 42
+              "line": 20,
+              "col": 90
+            }
+          },
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 64
+                },
+                "end": {
+                  "line": 20,
+                  "col": 74
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
             }
           },
           "state": "lib.rows"
@@ -5603,12 +6193,20 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 16,
+              "line": 21,
               "col": 3
             },
             "end": {
-              "line": 16,
-              "col": 24
+              "line": 21,
+              "col": 33
+            }
+          },
+          "params": [],
+          "returns": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
             }
           },
           "state": "lib.logs"
@@ -5616,18 +6214,50 @@
         {
           "kind": "effect",
           "name": "lib.touch",
+          "description": {
+            "summary": "",
+            "body": "",
+            "params": [
+              {
+                "name": "r",
+                "text": "触る行"
+              }
+            ],
+            "throws": [],
+            "see": []
+          },
           "decorators": [],
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 17,
+              "line": 23,
               "col": 3
             },
             "end": {
-              "line": 17,
-              "col": 28
+              "line": 23,
+              "col": 36
             }
           },
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "lib.Row"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 23,
+                  "col": 16
+                },
+                "end": {
+                  "line": 23,
+                  "col": 22
+                }
+              }
+            }
+          ],
           "target": {
             "kind": "builtin",
             "state": "lib.rows",
@@ -5638,18 +6268,87 @@
           ]
         },
         {
+          "kind": "exception",
+          "name": "lib.Busy",
+          "description": {
+            "summary": "",
+            "body": "",
+            "params": [
+              {
+                "name": "wait",
+                "text": "待つ時間"
+              }
+            ],
+            "throws": [],
+            "see": []
+          },
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 25,
+              "col": 3
+            },
+            "end": {
+              "line": 25,
+              "col": 49
+            }
+          },
+          "params": [
+            {
+              "name": "wait",
+              "type": {
+                "kind": "core",
+                "name": "Duration"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 18
+                },
+                "end": {
+                  "line": 25,
+                  "col": 32
+                }
+              }
+            },
+            {
+              "name": "note",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "core",
+                  "name": "string"
+                }
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 34
+                },
+                "end": {
+                  "line": 25,
+                  "col": 47
+                }
+              }
+            }
+          ]
+        },
+        {
           "kind": "op",
           "name": "lib.named",
           "decorators": [],
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 19,
+              "line": 27,
               "col": 3
             },
             "end": {
-              "line": 19,
-              "col": 44
+              "line": 27,
+              "col": 67
             }
           },
           "exported": false,
@@ -5663,11 +6362,11 @@
               "span": {
                 "file": "d.hozo",
                 "start": {
-                  "line": 19,
+                  "line": 27,
                   "col": 12
                 },
                 "end": {
-                  "line": 19,
+                  "line": 27,
                   "col": 22
                 }
               }
@@ -5692,7 +6391,67 @@
             "effects": []
           },
           "throws": [],
-          "body": null,
+          "body": {
+            "statements": [
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "callee": {
+                      "kind": "read",
+                      "read": "lib.rowById"
+                    },
+                    "args": [
+                      {
+                        "param": "id",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "id"
+                          ],
+                          "span": {
+                            "file": "d.hozo",
+                            "start": {
+                              "line": 27,
+                              "col": 61
+                            },
+                            "end": {
+                              "line": 27,
+                              "col": 63
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [],
+                    "span": {
+                      "file": "d.hozo",
+                      "start": {
+                        "line": 27,
+                        "col": 53
+                      },
+                      "end": {
+                        "line": 27,
+                        "col": 64
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 27,
+                    "col": 46
+                  },
+                  "end": {
+                    "line": 27,
+                    "col": 65
+                  }
+                }
+              }
+            ]
+          },
           "signature": {
             "exceptions": [],
             "effects": [],
@@ -5709,12 +6468,12 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 20,
+              "line": 28,
               "col": 3
             },
             "end": {
-              "line": 20,
-              "col": 33
+              "line": 28,
+              "col": 49
             }
           },
           "exported": false,
@@ -5738,6 +6497,147 @@
             "effects": []
           },
           "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "atom",
+                  "atom": {
+                    "kind": "state",
+                    "state": "lib.rows",
+                    "path": [],
+                    "span": {
+                      "file": "d.hozo",
+                      "start": {
+                        "line": 28,
+                        "col": 42
+                      },
+                      "end": {
+                        "line": 28,
+                        "col": 46
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 28,
+                    "col": 35
+                  },
+                  "end": {
+                    "line": 28,
+                    "col": 47
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.pick",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 29,
+              "col": 3
+            },
+            "end": {
+              "line": 29,
+              "col": 49
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "row",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "ref",
+                  "target": "lib.Row"
+                }
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 29,
+                  "col": 11
+                },
+                "end": {
+                  "line": 29,
+                  "col": 20
+                }
+              }
+            },
+            {
+              "name": "a",
+              "type": {
+                "kind": "array",
+                "of": {
+                  "kind": "ref",
+                  "target": "lib.Row"
+                }
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 29,
+                  "col": 22
+                },
+                "end": {
+                  "line": 29,
+                  "col": 30
+                }
+              }
+            },
+            {
+              "name": "b",
+              "type": {
+                "kind": "array",
+                "of": {
+                  "kind": "ref",
+                  "target": "lib.Row"
+                }
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 29,
+                  "col": 32
+                },
+                "end": {
+                  "line": 29,
+                  "col": 40
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
           "body": null,
           "signature": {
             "exceptions": [],
@@ -5755,16 +6655,35 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 21,
+              "line": 30,
               "col": 3
             },
             "end": {
-              "line": 21,
-              "col": 74
+              "line": 34,
+              "col": 4
             }
           },
           "exported": false,
-          "params": [],
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 30,
+                  "col": 12
+                },
+                "end": {
+                  "line": 30,
+                  "col": 22
+                }
+              }
+            }
+          ],
           "returns": {
             "kind": "array",
             "of": {
@@ -5792,7 +6711,201 @@
             "effects": []
           },
           "throws": [],
-          "body": null,
+          "body": {
+            "statements": [
+              {
+                "kind": "const",
+                "name": "row",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "callee": {
+                      "kind": "read",
+                      "read": "lib.rowById"
+                    },
+                    "args": [
+                      {
+                        "param": "id",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "id"
+                          ],
+                          "span": {
+                            "file": "d.hozo",
+                            "start": {
+                              "line": 31,
+                              "col": 25
+                            },
+                            "end": {
+                              "line": 31,
+                              "col": 27
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [],
+                    "span": {
+                      "file": "d.hozo",
+                      "start": {
+                        "line": 31,
+                        "col": 17
+                      },
+                      "end": {
+                        "line": 31,
+                        "col": 28
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 31,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 31,
+                    "col": 29
+                  }
+                }
+              },
+              {
+                "kind": "const",
+                "name": "logged",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "callee": {
+                      "kind": "read",
+                      "read": "lib.allLogs"
+                    },
+                    "args": [],
+                    "bound": [],
+                    "span": {
+                      "file": "d.hozo",
+                      "start": {
+                        "line": 32,
+                        "col": 20
+                      },
+                      "end": {
+                        "line": 32,
+                        "col": 29
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 32,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 32,
+                    "col": 30
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "callee": {
+                      "kind": "op",
+                      "op": "lib.pick"
+                    },
+                    "args": [
+                      {
+                        "param": "row",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "row"
+                          ],
+                          "span": {
+                            "file": "d.hozo",
+                            "start": {
+                              "line": 33,
+                              "col": 17
+                            },
+                            "end": {
+                              "line": 33,
+                              "col": 20
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "param": "a",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "logged"
+                          ],
+                          "span": {
+                            "file": "d.hozo",
+                            "start": {
+                              "line": 33,
+                              "col": 22
+                            },
+                            "end": {
+                              "line": 33,
+                              "col": 28
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "param": "b",
+                        "value": {
+                          "kind": "state",
+                          "state": "lib.rows",
+                          "path": [],
+                          "span": {
+                            "file": "d.hozo",
+                            "start": {
+                              "line": 33,
+                              "col": 30
+                            },
+                            "end": {
+                              "line": 33,
+                              "col": 34
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [],
+                    "span": {
+                      "file": "d.hozo",
+                      "start": {
+                        "line": 33,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 33,
+                        "col": 35
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 33,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 33,
+                    "col": 36
+                  }
+                }
+              }
+            ]
+          },
           "signature": {
             "exceptions": [],
             "effects": [],
@@ -5809,12 +6922,12 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 22,
+              "line": 35,
               "col": 3
             },
             "end": {
-              "line": 22,
-              "col": 38
+              "line": 35,
+              "col": 55
             }
           },
           "exported": false,
@@ -5828,11 +6941,11 @@
               "span": {
                 "file": "d.hozo",
                 "start": {
-                  "line": 22,
+                  "line": 35,
                   "col": 12
                 },
                 "end": {
-                  "line": 22,
+                  "line": 35,
                   "col": 18
                 }
               }
@@ -5852,7 +6965,68 @@
             "effects": []
           },
           "throws": [],
-          "body": null,
+          "body": {
+            "statements": [
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "direct",
+                      "state": "lib.rows",
+                      "operation": "post"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "value",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "r"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 35,
+                            "col": 50
+                          },
+                          "end": {
+                            "line": 35,
+                            "col": 51
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 35,
+                      "col": 40
+                    },
+                    "end": {
+                      "line": 35,
+                      "col": 52
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 35,
+                    "col": 40
+                  },
+                  "end": {
+                    "line": 35,
+                    "col": 53
+                  }
+                }
+              }
+            ]
+          },
           "signature": {
             "exceptions": [],
             "effects": [],
@@ -5869,16 +7043,35 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 23,
+              "line": 36,
               "col": 3
             },
             "end": {
-              "line": 23,
-              "col": 33
+              "line": 36,
+              "col": 59
             }
           },
           "exported": false,
-          "params": [],
+          "params": [
+            {
+              "name": "t",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 36,
+                  "col": 13
+                },
+                "end": {
+                  "line": 36,
+                  "col": 22
+                }
+              }
+            }
+          ],
           "returns": null,
           "effects": [
             {
@@ -5893,7 +7086,316 @@
             "effects": []
           },
           "throws": [],
-          "body": null,
+          "body": {
+            "statements": [
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "direct",
+                      "state": "lib.title",
+                      "operation": "put"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "value",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "t"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 36,
+                            "col": 54
+                          },
+                          "end": {
+                            "line": 36,
+                            "col": 55
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 36,
+                      "col": 44
+                    },
+                    "end": {
+                      "line": 36,
+                      "col": 56
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 36,
+                    "col": 44
+                  },
+                  "end": {
+                    "line": 36,
+                    "col": 57
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.forget",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 37,
+              "col": 3
+            },
+            "end": {
+              "line": 37,
+              "col": 35
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "direct",
+                      "state": "lib.cursor",
+                      "operation": "delete"
+                    }
+                  },
+                  "args": [],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 37,
+                      "col": 17
+                    },
+                    "end": {
+                      "line": 37,
+                      "col": 32
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 37,
+                    "col": 17
+                  },
+                  "end": {
+                    "line": 37,
+                    "col": 33
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.remember",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 38,
+              "col": 3
+            },
+            "end": {
+              "line": 38,
+              "col": 61
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "lib.Row"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 38,
+                  "col": 15
+                },
+                "end": {
+                  "line": 38,
+                  "col": 21
+                }
+              }
+            }
+          ],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "direct",
+                      "state": "lib.cursor",
+                      "operation": "post"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "value",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "r"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 38,
+                            "col": 37
+                          },
+                          "end": {
+                            "line": 38,
+                            "col": 38
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 38,
+                      "col": 25
+                    },
+                    "end": {
+                      "line": 38,
+                      "col": 39
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 38,
+                    "col": 25
+                  },
+                  "end": {
+                    "line": 38,
+                    "col": 40
+                  }
+                }
+              },
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "direct",
+                      "state": "lib.cursor",
+                      "operation": "put"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "value",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "r"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 38,
+                            "col": 56
+                          },
+                          "end": {
+                            "line": 38,
+                            "col": 57
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 38,
+                      "col": 41
+                    },
+                    "end": {
+                      "line": 38,
+                      "col": 58
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 38,
+                    "col": 41
+                  },
+                  "end": {
+                    "line": 38,
+                    "col": 59
+                  }
+                }
+              }
+            ]
+          },
           "signature": {
             "exceptions": [],
             "effects": [],
@@ -5910,16 +7412,35 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 24,
+              "line": 39,
               "col": 3
             },
             "end": {
-              "line": 24,
-              "col": 30
+              "line": 39,
+              "col": 49
             }
           },
           "exported": false,
-          "params": [],
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "lib.Row"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 39,
+                  "col": 14
+                },
+                "end": {
+                  "line": 39,
+                  "col": 20
+                }
+              }
+            }
+          ],
           "returns": null,
           "effects": [
             {
@@ -5933,109 +7454,67 @@
             "effects": []
           },
           "throws": [],
-          "body": null,
-          "signature": {
-            "exceptions": [],
-            "effects": [],
-            "relations": [],
-            "successEffects": [],
-            "reads": [],
-            "pure": false
-          }
-        },
-        {
-          "kind": "op",
-          "name": "lib.carried",
-          "decorators": [
-            {
-              "decorator": "lib.reads",
-              "args": [
-                {
-                  "param": "targets",
-                  "value": {
-                    "kind": "list",
-                    "items": [
-                      {
-                        "kind": "ref",
-                        "target": "lib.rowById"
-                      },
-                      {
-                        "kind": "ref",
-                        "target": "lib.allLogs"
+          "body": {
+            "statements": [
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "named",
+                      "effect": "lib.touch"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "r",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "r"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 39,
+                            "col": 44
+                          },
+                          "end": {
+                            "line": 39,
+                            "col": 45
+                          }
+                        }
                       }
-                    ]
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 39,
+                      "col": 38
+                    },
+                    "end": {
+                      "line": 39,
+                      "col": 46
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 39,
+                    "col": 38
+                  },
+                  "end": {
+                    "line": 39,
+                    "col": 47
                   }
                 }
-              ],
-              "span": {
-                "file": "d.hozo",
-                "start": {
-                  "line": 25,
-                  "col": 3
-                },
-                "end": {
-                  "line": 25,
-                  "col": 27
-                }
               }
-            }
-          ],
-          "span": {
-            "file": "d.hozo",
-            "start": {
-              "line": 25,
-              "col": 3
-            },
-            "end": {
-              "line": 25,
-              "col": 57
-            }
+            ]
           },
-          "exported": false,
-          "params": [
-            {
-              "name": "id",
-              "type": {
-                "kind": "core",
-                "name": "string"
-              },
-              "span": {
-                "file": "d.hozo",
-                "start": {
-                  "line": 25,
-                  "col": 39
-                },
-                "end": {
-                  "line": 25,
-                  "col": 49
-                }
-              }
-            }
-          ],
-          "returns": {
-            "kind": "optional",
-            "of": {
-              "kind": "ref",
-              "target": "lib.Row"
-            }
-          },
-          "effects": [],
-          "reads": [],
-          "carried": {
-            "reads": [
-              {
-                "kind": "named",
-                "read": "lib.rowById"
-              },
-              {
-                "kind": "named",
-                "read": "lib.allLogs"
-              }
-            ],
-            "effects": []
-          },
-          "throws": [],
-          "body": null,
           "signature": {
             "exceptions": [],
             "effects": [],
@@ -6063,11 +7542,11 @@
               "span": {
                 "file": "d.hozo",
                 "start": {
-                  "line": 26,
+                  "line": 40,
                   "col": 3
                 },
                 "end": {
-                  "line": 26,
+                  "line": 40,
                   "col": 14
                 }
               }
@@ -6076,11 +7555,11 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 26,
+              "line": 40,
               "col": 3
             },
             "end": {
-              "line": 26,
+              "line": 40,
               "col": 35
             }
           },
@@ -6147,19 +7626,19 @@
                   "param": "via",
                   "value": {
                     "kind": "ref",
-                    "target": "lib.allLogs"
+                    "target": "lib.logs"
                   }
                 }
               ],
               "span": {
                 "file": "d.hozo",
                 "start": {
-                  "line": 27,
+                  "line": 41,
                   "col": 3
                 },
                 "end": {
-                  "line": 27,
-                  "col": 23
+                  "line": 41,
+                  "col": 20
                 }
               }
             }
@@ -6167,12 +7646,12 @@
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 27,
+              "line": 41,
               "col": 3
             },
             "end": {
-              "line": 27,
-              "col": 45
+              "line": 41,
+              "col": 42
             }
           },
           "exported": false,
@@ -6189,8 +7668,8 @@
           "carried": {
             "reads": [
               {
-                "kind": "named",
-                "read": "lib.allLogs"
+                "kind": "direct",
+                "state": "lib.logs"
               },
               {
                 "kind": "direct",
@@ -6199,10 +7678,6 @@
               {
                 "kind": "named",
                 "read": "lib.rowById"
-              },
-              {
-                "kind": "direct",
-                "state": "lib.logs"
               }
             ],
             "effects": [
@@ -6229,17 +7704,60 @@
           }
         },
         {
+          "kind": "classify",
+          "name": "lib.Load",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 42,
+              "col": 3
+            },
+            "end": {
+              "line": 42,
+              "col": 43
+            }
+          },
+          "subject": {
+            "kind": "type",
+            "type": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "cases": [
+            {
+              "name": "Heavy",
+              "as": [],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 42,
+                  "col": 26
+                },
+                "end": {
+                  "line": 42,
+                  "col": 32
+                }
+              }
+            }
+          ],
+          "hasDefault": true,
+          "fromCondition": false,
+          "decidedBy": "predicate"
+        },
+        {
           "kind": "op",
           "name": "lib.wired",
           "decorators": [],
           "span": {
             "file": "d.hozo",
             "start": {
-              "line": 28,
+              "line": 43,
               "col": 3
             },
             "end": {
-              "line": 33,
+              "line": 51,
               "col": 4
             }
           },
@@ -6254,11 +7772,11 @@
               "span": {
                 "file": "d.hozo",
                 "start": {
-                  "line": 28,
+                  "line": 43,
                   "col": 12
                 },
                 "end": {
-                  "line": 28,
+                  "line": 43,
                   "col": 18
                 }
               }
@@ -6297,13 +7815,23 @@
             "reads": [],
             "effects": []
           },
-          "throws": [],
+          "throws": [
+            {
+              "exceptions": [
+                "lib.Busy"
+              ],
+              "relations": []
+            }
+          ],
           "body": {
             "statements": [
               {
                 "kind": "call",
                 "call": {
-                  "op": "lib.write",
+                  "callee": {
+                    "kind": "op",
+                    "op": "lib.write"
+                  },
                   "args": [
                     {
                       "param": "r",
@@ -6315,11 +7843,11 @@
                         "span": {
                           "file": "d.hozo",
                           "start": {
-                            "line": 29,
+                            "line": 44,
                             "col": 11
                           },
                           "end": {
-                            "line": 29,
+                            "line": 44,
                             "col": 12
                           }
                         }
@@ -6330,11 +7858,11 @@
                   "span": {
                     "file": "d.hozo",
                     "start": {
-                      "line": 29,
+                      "line": 44,
                       "col": 5
                     },
                     "end": {
-                      "line": 29,
+                      "line": 44,
                       "col": 13
                     }
                   }
@@ -6342,11 +7870,11 @@
                 "span": {
                   "file": "d.hozo",
                   "start": {
-                    "line": 29,
+                    "line": 44,
                     "col": 5
                   },
                   "end": {
-                    "line": 29,
+                    "line": 44,
                     "col": 14
                   }
                 }
@@ -6354,102 +7882,298 @@
               {
                 "kind": "call",
                 "call": {
-                  "op": "lib.touchIt",
-                  "args": [],
+                  "callee": {
+                    "kind": "op",
+                    "op": "lib.touchIt"
+                  },
+                  "args": [
+                    {
+                      "param": "r",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "r"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 45,
+                            "col": 13
+                          },
+                          "end": {
+                            "line": 45,
+                            "col": 14
+                          }
+                        }
+                      }
+                    }
+                  ],
                   "bound": [],
                   "span": {
                     "file": "d.hozo",
                     "start": {
-                      "line": 30,
+                      "line": 45,
                       "col": 5
                     },
                     "end": {
-                      "line": 30,
-                      "col": 14
+                      "line": 45,
+                      "col": 15
                     }
                   }
                 },
                 "span": {
                   "file": "d.hozo",
                   "start": {
-                    "line": 30,
+                    "line": 45,
                     "col": 5
                   },
                   "end": {
-                    "line": 30,
-                    "col": 15
+                    "line": 45,
+                    "col": 16
                   }
                 }
               },
               {
                 "kind": "call",
                 "call": {
-                  "op": "lib.rename",
-                  "args": [],
+                  "callee": {
+                    "kind": "op",
+                    "op": "lib.rename"
+                  },
+                  "args": [
+                    {
+                      "param": "t",
+                      "value": {
+                        "kind": "literal",
+                        "literal": {
+                          "kind": "string",
+                          "value": "t"
+                        },
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 46,
+                            "col": 12
+                          },
+                          "end": {
+                            "line": 46,
+                            "col": 15
+                          }
+                        }
+                      }
+                    }
+                  ],
                   "bound": [],
                   "span": {
                     "file": "d.hozo",
                     "start": {
-                      "line": 31,
+                      "line": 46,
                       "col": 5
                     },
                     "end": {
-                      "line": 31,
-                      "col": 13
+                      "line": 46,
+                      "col": 16
                     }
                   }
                 },
                 "span": {
                   "file": "d.hozo",
                   "start": {
-                    "line": 31,
+                    "line": 46,
                     "col": 5
                   },
                   "end": {
-                    "line": 31,
-                    "col": 14
+                    "line": 46,
+                    "col": 17
                   }
                 }
               },
               {
                 "kind": "return",
                 "expr": {
-                  "kind": "call",
-                  "call": {
-                    "op": "lib.named",
-                    "args": [
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "value",
+                      "atom": {
+                        "kind": "name",
+                        "path": [
+                          "r"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 47,
+                            "col": 18
+                          },
+                          "end": {
+                            "line": 47,
+                            "col": 19
+                          }
+                        }
+                      }
+                    },
+                    "classify": "lib.Load",
+                    "arms": [
                       {
-                        "param": "id",
-                        "value": {
-                          "kind": "name",
-                          "path": [
-                            "r",
-                            "id"
+                        "cases": [
+                          "Heavy"
+                        ],
+                        "body": {
+                          "kind": "throw",
+                          "exception": "lib.Busy",
+                          "args": [
+                            {
+                              "param": "wait",
+                              "value": {
+                                "kind": "literal",
+                                "literal": {
+                                  "kind": "duration",
+                                  "value": 300000000000
+                                },
+                                "span": {
+                                  "file": "d.hozo",
+                                  "start": {
+                                    "line": 48,
+                                    "col": 27
+                                  },
+                                  "end": {
+                                    "line": 48,
+                                    "col": 29
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "param": "note",
+                              "value": {
+                                "kind": "literal",
+                                "literal": {
+                                  "kind": "string",
+                                  "value": "heavy"
+                                },
+                                "span": {
+                                  "file": "d.hozo",
+                                  "start": {
+                                    "line": 48,
+                                    "col": 31
+                                  },
+                                  "end": {
+                                    "line": 48,
+                                    "col": 38
+                                  }
+                                }
+                              }
+                            }
                           ],
                           "span": {
                             "file": "d.hozo",
                             "start": {
-                              "line": 32,
-                              "col": 18
+                              "line": 48,
+                              "col": 16
                             },
                             "end": {
-                              "line": 32,
-                              "col": 22
+                              "line": 48,
+                              "col": 39
                             }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "lib.Load",
+                              "cases": [
+                                "Heavy"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "lib.Row"
+                              }
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 48,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 48,
+                            "col": 40
+                          }
+                        }
+                      },
+                      {
+                        "cases": "default",
+                        "body": {
+                          "kind": "call",
+                          "call": {
+                            "callee": {
+                              "kind": "op",
+                              "op": "lib.named"
+                            },
+                            "args": [
+                              {
+                                "param": "id",
+                                "value": {
+                                  "kind": "name",
+                                  "path": [
+                                    "r",
+                                    "id"
+                                  ],
+                                  "span": {
+                                    "file": "d.hozo",
+                                    "start": {
+                                      "line": 49,
+                                      "col": 24
+                                    },
+                                    "end": {
+                                      "line": 49,
+                                      "col": 28
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "bound": [],
+                            "span": {
+                              "file": "d.hozo",
+                              "start": {
+                                "line": 49,
+                                "col": 18
+                              },
+                              "end": {
+                                "line": 49,
+                                "col": 29
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 49,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 49,
+                            "col": 30
                           }
                         }
                       }
                     ],
-                    "bound": [],
                     "span": {
                       "file": "d.hozo",
                       "start": {
-                        "line": 32,
+                        "line": 47,
                         "col": 12
                       },
                       "end": {
-                        "line": 32,
-                        "col": 23
+                        "line": 50,
+                        "col": 6
                       }
                     }
                   }
@@ -6457,12 +8181,12 @@
                 "span": {
                   "file": "d.hozo",
                   "start": {
-                    "line": 32,
+                    "line": 47,
                     "col": 5
                   },
                   "end": {
-                    "line": 32,
-                    "col": 24
+                    "line": 50,
+                    "col": 7
                   }
                 }
               }

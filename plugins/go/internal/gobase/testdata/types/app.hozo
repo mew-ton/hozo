@@ -78,8 +78,8 @@ namespace app {
   // 「exception」値のない例外、その場の model の値、宣言した model の値
   exception Plain;
   /** 入力が不正 */
-  exception Invalid: { reason: string; at: int?; };
-  exception Wrapped: Problem;
+  exception Invalid(reason: string, at: int?);
+  exception Wrapped(value: Problem);
   // variant が set の union は、Go の型にしない
   union Errors { Plain; Invalid; }
 
@@ -87,8 +87,8 @@ namespace app {
   /** 利用者 */
   state users: list<User>;
   /** 利用者を足す */
-  effect addUser on users.post;
-  effect clearUsers on users: HasItems -> Empty;
+  effect addUser() on users.post;
+  effect clearUsers() on users: HasItems -> Empty;
 
   // 型で決まる分類と decorator の宣言は、何も出さない
   classify Known of User? {

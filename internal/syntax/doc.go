@@ -80,7 +80,10 @@ func (p *parser) parseDocTag(text string, span source.Span) (*ast.DocTag, bool) 
 		p.errorAt(span, fields[0]+" の後ろに名前がない")
 		return nil, false
 	}
-	nameStart := int(span.Start) + strings.Index(text, fields[1])
+	// 名前は、タグの語の後ろから探す（"@param r" の r を、"@param" の中の r と取り違えない）
+	tagEnd := strings.Index(text, fields[0]) + len(fields[0])
+	nameAt := tagEnd + strings.Index(text[tagEnd:], fields[1])
+	nameStart := int(span.Start) + nameAt
 	// @see の名前は QualifiedName か DecoratorRef で、最後の要素にだけ予約語を書ける（@see db.list。
 	// docs/grammar.md「ドキュメンテーションコメント」）。
 	name, ok := qualifiedNameOf(fields[1], p.file, nameStart, kind == ast.DocSee)
@@ -89,7 +92,7 @@ func (p *parser) parseDocTag(text string, span source.Span) (*ast.DocTag, bool) 
 		return nil, false
 	}
 	tag := &ast.DocTag{Span: span, Kind: kind, Name: name}
-	rest := strings.TrimSpace(text[strings.Index(text, fields[1])+len(fields[1]):])
+	rest := strings.TrimSpace(text[nameAt+len(fields[1]):])
 	if kind == ast.DocSee {
 		if rest != "" {
 			p.errorAt(span, "@see は名前だけを書く")

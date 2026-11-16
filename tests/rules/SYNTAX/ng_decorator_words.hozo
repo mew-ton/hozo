@@ -3,7 +3,7 @@
 // reads と effects の節の区切りは ","（"|" は、なくした書き方。docs/grammar.md「op」）
 namespace a {
   state rows: list<string>;
-  effect add on rows.post;
+  effect add() on rows.post;
   decorator ok(...targets: any effect) for op effects targets;
   decorator notLast(...xs: any effect, y: string);                 // ERROR: SYNTAX
   decorator twoRests(...xs: any effect, ...ys: any state);         // ERROR: SYNTAX

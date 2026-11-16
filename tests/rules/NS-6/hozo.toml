@@ -1,0 +1,14 @@
+# 状態の持ち主 a と、持ち主でない b の二つの名前空間を使う（b が a の型を使うので、a にも同じ基底の単位を置く。docs/config.md「型の置き場」）
+
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go"]
+out         = "gen/b"

@@ -101,10 +101,11 @@ type humanUsers struct {
 	added *int
 }
 
-// CreateUser は、人が書いた効果 store.createUser の本体。
+// CreateUser は、人が書いた効果 store.createUser の本体。文は、db を直に使わずに、store.Conn を通して実行する:
+// ctx が @db.transaction のトランザクションを運んでいれば、それに入る。
 func (u humanUsers) CreateUser(ctx context.Context, user pkgtype.User) error {
 	*u.added++
-	_, err := u.db.ExecContext(ctx, `INSERT INTO "users" ("id", "email", "name", "hash") VALUES (?1, ?2, ?3, ?4)`,
+	_, err := store.Conn(ctx, u.db).ExecContext(ctx, `INSERT INTO "users" ("id", "email", "name", "hash") VALUES (?1, ?2, ?3, ?4)`,
 		string(user.Id), string(user.Email), user.Name, user.Hash)
 	return err
 }
@@ -141,6 +142,23 @@ func TestHumanCompletesPluginType(t *testing.T) {
 	}
 	if user, err := s.FindUser(ctx, "alice@example.com"); err != nil || user == nil || user.Id != "u1" {
 		t.Errorf("FindUser = %v, %v", user, err)
+	}
+
+	// 人が書いたメソッドも、store.Conn を通せば、トランザクションに入る: 継ぎ目の中で足した行は、中身が失敗すれば残らない。
+	// 接続は一つだけ（openDB）なので、db を直に使えば、トランザクションの外の接続を待って、戻ってこない
+	failed := errors.New("中身の失敗")
+	seams := store.NewDbSeams(db)
+	err := seams.PlaceOrderDbTransaction(ctx, pkgtype.Order{}, pkgtype.Notification{}, func(ctx context.Context, _ pkgtype.Order, _ pkgtype.Notification) error {
+		if err := users.CreateUser(ctx, pkgtype.User{Id: "u2", Email: "bob@example.com", Name: "Bob", Hash: "h"}); err != nil {
+			return err
+		}
+		return failed
+	})
+	if !errors.Is(err, failed) {
+		t.Fatalf("継ぎ目のエラーが %v（期待は、中身の失敗）", err)
+	}
+	if got, err := users.Get(ctx); err != nil || len(got) != 1 {
+		t.Errorf("中身が失敗した後の users = %+v, %v（期待は、u1 だけ）", got, err)
 	}
 }
 

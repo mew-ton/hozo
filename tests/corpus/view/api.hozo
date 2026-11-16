@@ -29,13 +29,17 @@ namespace api {
 
   model Session { token: Token; userId: UserId; }
 
-  @db.table(User) state users: list<User>;
-  @db.table(Session) state sessions: list<Session>;
+  @db.table state users: list<User>;
+  @db.table state sessions: list<Session>;
 
-  // docs/ir.md「正規化」: 例外のその場の model は `api.Invalid.Value` に合成し、value を ref にする
-  /** 入力が不正 */
+  // docs/ir.md「state / exception / effect」: 引数を持つ例外（運ぶ値は params）。値を運ばない例外の params は []
+  /**
+   * 入力が不正
+   *
+   * @param reason 不正の理由
+   */
   @http.status(400)
-  exception Invalid: { reason: string; };
+  exception Invalid(reason: string);
   /** 認証されていない */
   @http.status(401)
   exception Unauthorized;
@@ -49,12 +53,27 @@ namespace api {
   union ClientError { Unauthorized; NotFound; }
   union AnyError { ClientError; Timeout; }
 
+  // docs/ir.md「state / exception / effect」: 効果の params（受け取る値）
   /** セッションを作る */
-  effect createSession on sessions.post;
+  effect createSession(session: Session) on sessions.post;
   /** セッションを消す */
-  effect deleteSession on sessions.delete;
+  effect deleteSession(token: Token?) on sessions.delete;
   /** 最終アクセスを更新する */
-  effect touchUser on users.put;
+  effect touchUser(id: UserId) on users.put;
+
+  // docs/ir.md「read」: read の宣言（params、returns、state）。docs/grammar.md「decorator の宣言」: 対象 read と @repeatable
+  /**
+   * 識別子が同じユーザー
+   *
+   * @param id 引くユーザーの識別子
+   */
+  @db.find
+  read userById(id: UserId): User? on users;
+  /** そのユーザーの、生きているセッション */
+  @db.list
+  @db.where("revoked", false)
+  @db.where("kind", "web")
+  read sessionsOf(userId: UserId): Session[] on sessions;
 
   // docs/check.md「計算」手順 i の throws（DEC-10）: external の例外は、境界の外（web）から見たときだけ Sig に入る
   /** ネットワーク越しに呼ぶ */
@@ -81,21 +100,39 @@ namespace api {
   model Credentials { name: string; password: string; }
   model LoginInput { creds: Credentials; remember: boolean?; }
 
-  // docs/check.md「計算」手順 0（葉）: rel(Invalid, createSession) = prevented
+  // docs/check.md「葉の op」: 葉は状態に触れない（reads / effects の節を書けない）。throws は書ける
+  op issue(in: LoginInput): Session throws Invalid;
+  op verify(id: UserId) throws ClientError;
+
+  // docs/check.md「配線からの呼び出し」: 効果の呼び出し。docs/check.md「計算」手順 0（配線）: 上の行の issue が Invalid を
+  // 投げるとき、下の行の createSession は prevented（書いた relations は計算と照合する。REL-4）
   @remote
   export op login(in: LoginInput): Session
     effects createSession
-    throws Invalid prevents effects;
+    throws Invalid prevents effects
+  {
+    const session = issue(in);
+    createSession(session);
+    return session;
+  }
 
   // docs/check.md「bind」4: 引数そのものが位置（path ["token"]）。web から見た params は空になる
   @remote
   export op logout(token: Token?)
-    effects deleteSession;
+    effects deleteSession
+  {
+    deleteSession(token);
+  }
 
-  // docs/check.md「計算」手順 0（葉）: ユニオンを展開した E と keeps。docs/ir.md「正規化」の `throws A, B にユニオン`
+  // docs/check.md「計算」手順 0（配線）: ユニオンを展開した E。上の行の touchUser は、下の行の verify の例外のとき kept。
+  // docs/ir.md「正規化」の `throws A, B にユニオン`
   export op touch(id: UserId)
     effects touchUser
-    throws ClientError keeps effects;
+    throws ClientError keeps effects
+  {
+    touchUser(id);
+    verify(id);
+  }
 
   // ---- docs/ir.md「版」の 0.3 で足した形 ----
 
@@ -119,10 +156,16 @@ namespace api {
     level: int;
   }
 
-  // docs/ir.md「正規化」: `export op f()` は exported。`reads a, b`、複数の reads は FQN の列一つ
-  // docs/check.md「reads」: 葉の op の R は Op.reads
+  // docs/ir.md「正規化」: `export op f()` は exported。`reads a, b`、複数の reads は ReadRef の列一つ（直に書いた状態は direct、
+  // read の名前は named。重複は最初の出現に寄せる）
+  // docs/check.md「reads」: 配線の R は、呼んだ read の宛先の状態（行の順）。書いた reads は、状態の集合で照合する（READS-2）
+  op whenLive(user: User?, live: Session[]): User?;
   /** 識別子からユーザーを引く */
-  export op findUser(id: UserId): User? reads users, sessions reads users;
+  export op findUser(id: UserId): User? reads users, sessionsOf reads users {
+    const user = userById(id);
+    const live = sessionsOf(id);
+    return whenLive(user, live);
+  }
   // docs/ir.md「型」: never は Op.returns にだけ現れる。docs/check.md「純粋」: throws は純粋さを変えない
   op unauthorized(): never throws Unauthorized;
   // docs/check.md「純粋」: デコレータがなく、状態を読まず、効果を持たない
@@ -194,11 +237,11 @@ namespace api {
   // docs/ir.md「decorator」の targets の effect: 効果の宣言の decorators
   /** 名前を変える */
   @into(users)
-  effect renameUser on users.put;
+  effect renameUser(id: UserId, name: string) on users.put;
   union Cleanup { deleteSession; renameUser; }
 
   // docs/ir.md「正規化」: op に付いたデコレータの reads / effects の節は Op.carried（Op.reads / Op.effects には足さない）
-  // docs/check.md「デコレータが運ぶ reads と effects」: 直に読む状態は、Op.reads の後ろに Op.carried.reads
+  // docs/check.md「デコレータが運ぶ reads と effects」: 葉の op が直に読む状態は、Op.carried.reads の要素の状態
   /**
    * 名前からユーザーを引く。
    *
@@ -206,12 +249,11 @@ namespace api {
    * @see api.effects
    */
   @find(users, "name")
-  export op findByName(name: string): User? reads sessions;
+  export op findByName(name: string): User?;
   // docs/ir.md「正規化」: 残りの引数に渡した値は list の Arg 一つ（一つずつ ref か refs）
-  // docs/check.md EFF-3: 運ばれる効果は数えない（自分で書いた効果は一つまで）
+  // docs/check.md「計算」手順 0（葉）: F は運ばれた効果、rel は op の throws の relations
   @effects(createSession, deleteSession | renameUser)
   export op rotate(id: UserId, name: string)
-    effects touchUser
     throws Invalid prevents effects;
   // 残りの引数に何も渡さない（items は []）。reads の節の sessions だけが運ばれる
   @effects
@@ -225,5 +267,40 @@ namespace api {
   {
     rotate(id, name);
     return findByName(name);
+  }
+
+  // ---- docs/ir.md「版」の 0.6 で足した形 ----
+
+  // docs/ir.md「正規化」: 配線の呼び出しの callee（read、効果の宣言、直に呼ぶ組み込みの効果）、`throw E(a, b)` の args
+  // docs/check.md「直に呼ぶ組み込みの効果」: nullable の post / put は要素の型の値一つ、delete は引数なし。list の post も値一つ
+  // docs/check.md「節に書く要素」: 直に呼んだ効果は direct で、同じ宛先の宣言（createSession）とは別の効果
+  classify Strength of Credentials { Weak; default; }
+  op mint(user: User): Token;
+  op sessionOf(user: User, token: Token): Session;
+  export op signIn(id: UserId, creds: Credentials): Token?
+    effects sessions.post, current.post, current.put, current.delete
+    reads userById
+    throws Invalid, NotFound
+  {
+    const user = userById(id);
+    const token = match user by Lookup {
+      Found   => mint(user);
+      default => throw NotFound;
+    };
+    const session = match user by Lookup {
+      Found   => sessionOf(user, token);
+      default => throw NotFound;
+    };
+    sessions.post(session);
+    current.post(token);
+    api.current.put(token);
+    return match creds by Strength {
+      Weak    => throw Invalid("weak password");
+      default => keep(token);
+    };
+  }
+  op keep(token: Token): Token? {
+    current.delete();
+    return token;
   }
 }

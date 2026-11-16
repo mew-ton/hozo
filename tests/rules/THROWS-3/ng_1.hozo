@@ -1,13 +1,13 @@
-// THROWS-3（docs/check.md「throws」「never を返す op」）: never を返す op は、値を運ばない例外をちょうど一つ投げる葉で、
-// 引数も effects も reads も、catches を持つデコレータも持たない。満たさない条件ごとに一つ
+// THROWS-3（docs/check.md「throws」「never を返す op」）: never を返す op は、引数を持たない例外をちょうど一つ投げる葉で、
+// 引数も、reads / effects を運ぶデコレータも、catches を持つデコレータも持たない。満たさない条件ごとに一つ
 namespace a {
   model Detail { reason: string; }
   exception E;
   exception F;
-  exception WithValue: Detail;
+  exception WithValue(value: Detail);
   union Both { E; F; }
   state s: list<string>;
-  effect add on s.post;
+  effect add(x: string) on s.post;
   decorator swallow catches E recovers;
   decorator mark;
   // 1. 葉でない（位置は op の名前）
@@ -22,17 +22,25 @@ namespace a {
   op twoClauses(): never
     throws E                           // ERROR: THROWS-3
     throws F;
-  // 3. 例外が値を運ぶ
+  // 3. 例外が引数を持つ（引数を持つ例外は、配線のアームで値を渡して投げる）
   op carries(): never throws WithValue;    // ERROR: THROWS-3
   // 4. 引数を持つ（位置は最初の引数）
   op params(x: string, y: int): never throws E;    // ERROR: THROWS-3
-  // 5. effects か reads を持つ（位置はその節）
-  op effects1(): never effects add throws E;       // ERROR: THROWS-3
-  op reads1(): never
-    reads s                            // ERROR: THROWS-3
-    throws E;
   // 6. catches を持つデコレータが付いている（位置はそのデコレータ）
   @mark
   @swallow                             // ERROR: THROWS-3
   op caught(): never throws E;
+  // 5. デコレータが運ぶ reads / effects を持てない（位置はそのデコレータ）
+  decorator reading(table: any state) for op reads table;
+  decorator writing(...targets: any effect) for op effects targets;
+  @mark
+  @reading(s)                          // ERROR: THROWS-3
+  op carriesRead(): never throws E;
+  @writing(add)                        // ERROR: THROWS-3
+  op carriesEffect(): never throws E;
+  // 残りの引数に何も渡していなければ、運ぶものがない
+  @writing
+  op carriesNothing(): never throws E;
+  // 節に書いたものは、葉なので STATE-5（THROWS-3 は重ねない）
+  op written(): never reads s throws E;   // ERROR: STATE-5
 }

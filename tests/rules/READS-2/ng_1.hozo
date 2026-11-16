@@ -3,7 +3,8 @@
 namespace a {
   state users: list<string>;
   state token: nullable<string>;
-  op find(name: string): string? reads users;
+  read byName(name: string): string? on users;
+  op find(name: string): string? reads users { return byName(name); }
   op pure(name: string): string;
   op show(t: string?);
   // 足りない

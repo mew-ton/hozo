@@ -10,7 +10,7 @@ op loadOrderPage(query: OrdersQuery): OrderPage
 
 namespace server {
   /** ログインセッションを削除する */
-  effect deleteSession on sessions.delete;
+  effect deleteSession() on sessions.delete;
 
   model LogoutInput {
     @http.header(name: "Authorization") token: Token?;
@@ -24,7 +24,7 @@ namespace server {
 
 namespace browser {
   /** 手元のトークンを消す */
-  effect removeToken on token.put;   // none を入れる
+  effect removeToken() on token.put;   // none を入れる
 
   op clearToken()
     effects removeToken;

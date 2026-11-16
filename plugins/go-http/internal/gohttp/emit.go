@@ -251,7 +251,10 @@ func (g *generator) check() []route {
 		}
 		g.checkJSON(op, op.Returns, "結果")
 		for _, s := range g.statuses([]route{r}) {
-			g.checkJSON(op, s.exception.Value, fmt.Sprintf("例外 %s の値", s.exception.Name))
+			// 例外の引数ごとの形は、まだ決めていない: 引数（IR 0.6 の Exception.Params）の型を一つずつ確かめる
+			for _, p := range s.exception.Params {
+				g.checkJSON(op, p.Type, fmt.Sprintf("例外 %s の値", s.exception.Name))
+			}
 		}
 		// GOHTTP-16
 		g.checkResult(op)

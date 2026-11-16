@@ -330,20 +330,14 @@ func (a *analyzer) checkSTATE3(s *symbol, d *ast.StateDecl, t ir.Type) ir.Type {
 	return ir.Array(opt.Of)
 }
 
-// lowerDeclParams は exception / effect / read の引数の並び（docs/ir.md の OpParam）。型は「型」の位置と同じに解決する。
-// 同じ名前の引数が二つあれば RES-6。
-func (a *analyzer) lowerDeclParams(s *symbol, params []*ast.OpParam, sc *scope) []ir.OpParam {
+// lowerDeclParams は exception / effect / read の引数の並び（docs/ir.md の OpParam）。型は「型」の位置と同じに解決する
+// （op の引数と同じ扱い）。
+func (a *analyzer) lowerDeclParams(params []*ast.OpParam, sc *scope) []ir.OpParam {
 	var out []ir.OpParam
-	seen := map[string]source.Span{}
 	for _, p := range params {
 		if p == nil {
 			continue
 		}
-		if first, dup := seen[p.Name.Name]; dup {
-			a.errorf("RES-6", p.Name.Span, "%s %s の引数 %s が二度ある", s.kind, s.fqn, p.Name.Name).Related = []diag.Related{related(first, "最初の定義")}
-			continue
-		}
-		seen[p.Name.Name] = p.Name.Span
 		param := ir.OpParam{Name: p.Name.Name, Span: a.irSpan(p.Span)}
 		if t, ok := a.lowerType(p.Type, sc); ok {
 			param.Type = t
@@ -357,7 +351,7 @@ func (a *analyzer) lowerDeclParams(s *symbol, params []*ast.OpParam, sc *scope) 
 func (a *analyzer) lowerException(s *symbol, d *ast.ExceptionDecl, sc *scope) ir.Decl {
 	e := &ir.Exception{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
 	a.addSite(d.Decorators, siteException, sc, &e.DeclBase.Decorators)
-	e.Params = a.lowerDeclParams(s, d.Params, sc)
+	e.Params = a.lowerDeclParams(d.Params, sc)
 	return e
 }
 
@@ -367,7 +361,7 @@ func (a *analyzer) lowerException(s *symbol, d *ast.ExceptionDecl, sc *scope) ir
 func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl {
 	e := &ir.Effect{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
 	a.addSite(d.Decorators, siteEffect, sc, &e.DeclBase.Decorators)
-	e.Params = a.lowerDeclParams(s, d.Params, sc)
+	e.Params = a.lowerDeclParams(d.Params, sc)
 	switch {
 	case d.On != nil:
 		a.lowerBuiltinTarget(s, e, d.On, sc)
@@ -383,7 +377,7 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 func (a *analyzer) lowerRead(s *symbol, d *ast.ReadDecl, sc *scope) ir.Decl {
 	rd := &ir.Read{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
 	a.addSite(d.Decorators, siteRead, sc, &rd.DeclBase.Decorators)
-	rd.Params = a.lowerDeclParams(s, d.Params, sc)
+	rd.Params = a.lowerDeclParams(d.Params, sc)
 	if d.Result != nil {
 		if t, ok := a.lowerType(d.Result, sc); ok {
 			rd.Returns = t
@@ -425,16 +419,17 @@ var builtinOperations = map[ir.StateShape][]ir.Operation{
 }
 
 // checkSTATE1 は STATE-1（docs/check.md「状態と効果」）: 組み込みの効果の operation が、その状態の形にない
-// （single に post / delete）。effect の宣言の宛先にも、effects に直に書いた「状態.操作」にも掛かる。span は操作の語。
-func (a *analyzer) checkSTATE1(state *symbol, op ir.Operation, span source.Span) {
+// （single に post / delete）。effect の宣言の宛先にも、effects に直に書いた「状態.操作」にも、配線で直に呼んだ
+// 「状態.操作(…)」にも掛かる。span は操作の語。形にある操作なら true。
+func (a *analyzer) checkSTATE1(state *symbol, op ir.Operation, span source.Span) bool {
 	st, ok := a.lower(state).(*ir.State)
 	if !ok {
-		return
+		return false
 	}
 	allowed := builtinOperations[st.Shape]
 	for _, o := range allowed {
 		if o == op {
-			return
+			return true
 		}
 	}
 	names := make([]string, len(allowed))
@@ -442,6 +437,7 @@ func (a *analyzer) checkSTATE1(state *symbol, op ir.Operation, span source.Span)
 		names[i] = string(o)
 	}
 	a.errorf("STATE-1", span, "状態 %s は %s なので %s はできない（%s にできるのは %s だけ。docs/check.md「状態の形」）", state.fqn, st.Shape, op, st.Shape, strings.Join(names, " / "))
+	return false
 }
 
 // lowerTransition は `on X: A -> B`（docs/resolve.md「位置ごとに受け付ける種類」）。X は現在の名前空間の、状態を
@@ -1067,11 +1063,11 @@ func (a *analyzer) checkSTATE5(s *symbol, d *ast.OpDecl, span source.Span, claus
 	if d.Body != nil {
 		return
 	}
-	what := "read"
+	what := "read を"
 	if clause == "effects" {
-		what = "効果（effect）"
+		what = "効果（effect）を"
 	}
-	a.errorf("STATE-5", span, "葉の op %s は %s の節を書けない（葉は状態に触れない。%s を宣言して、配線で呼ぶ。docs/check.md「葉の op」）", s.fqn, clause, what)
+	a.errorf("STATE-5", span, "葉の op %s は %s の節を書けない（葉は状態に触れない。%s宣言して、配線で呼ぶ。docs/check.md「葉の op」）", s.fqn, clause, what)
 }
 
 // lowerOpEffects は op の effects の一節（docs/ir.md「op」の effects）。要素は、名前で書いた効果（effect か、効果の union。

@@ -14,7 +14,7 @@ namespace app {
 
   // 表にならなかった状態を名指しするデコレータは、重ねて報告しない
   @db.update(config)
-  effect saveConfig on config.put;
+  effect saveConfig() on config.put;
   @db.effects(saveConfig)
   export op setConfig(row: Row);
 }

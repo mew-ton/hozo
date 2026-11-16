@@ -172,8 +172,9 @@ var ErrUnsupported error
 // 名前（docs/plugin-go.md「名前」）
 func TypeName(fqn, namespace string) string       // namespace は宣言した名前空間。合成 model（`.`）の連結を含む
 func FieldName(name string) string
-func MethodName(opName string) string             // export の有無によらず、先頭を大文字に
-func LocalName(name string, reserved map[string]bool) string   // 引数名・束縛名。Go の予約語か事前宣言の識別子か reserved にあれば末尾に _
+func MethodName(name string) string               // op、read、効果の名前から、メソッドの名前。export の有無によらず、先頭を大文字に
+func BuiltinMethod(operation string) string       // 直に呼ぶ組み込みの効果の、状態の単位のメソッド: post から Post（同「状態の単位」）
+func LocalName(name string, reserved map[string]bool) string   // op・read・効果の引数名と、束縛名。Go の予約語か事前宣言の識別子か reserved にあれば末尾に _
 func EffectConst(name string) string
 func CaseConst(classify, caseName string) string
 func StateUnitName(stateOrClassify string) string // <状態>State
@@ -221,7 +222,6 @@ type Shape struct {                               // 一つの出力の、op と
     Ops      []OpShape                            // N の op（単位の対象の op と、本体のない op として出すもの）。宣言順
     Leaves   []string                             // Leaves のメソッドになる op の FQN
     States   []StateUnit                          // 状態の単位（基底の状態と、述語で決まる状態の分類）。宣言順
-    Shared   []string                             // SharedState のメソッドになる op の FQN
     Classify []string                             // New が述語を受け取る、値の分類と op の分類の FQN（辞書順）
     Deps     []Dep                                // 別の名前空間の口（FQN の辞書順）
     Seams    []Seam                               // Seams のメソッド（op の宣言順、その中はデコレータの書かれた順）。空なら Seams も New の引数 seams もない（同「継ぎ目」）
@@ -230,18 +230,27 @@ type Shape struct {                               // 一つの出力の、op と
 type OpShape struct {
     FQN, Method string
     Exported   bool
-    Place      Place                              // Wiring / Never / StateCommand / SharedCommand / StateQuery / SharedQuery / Leaf（同「op の置き場」の 1〜6。3 は、宛先の単位が一つなら StateCommand、分かれれば SharedCommand）
-    Unit       string                             // Place が状態の単位なら、その状態（か分類）の FQN
+    Place      Place                              // Wiring / Never / Leaf（同「op の置き場」の 1〜3）
     Ctx, Err   bool                               // ctx を取るか、error を返すか
     Seams      []string                           // この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない
     Body       string                             // 継ぎ目を持ち、基底が中身を出す op（Wiring / Never）の、中身のメソッドの名前。それ以外は ""
 }
-type StateUnit struct { FQN, TypeName, Param string; Shape string; Queries, Commands []string; Predicates []string }
+type StateUnit struct {                           // 状態の単位一つ（同「状態の単位」）。メソッドの並びは、形で決まる問い合わせ、Builtins、Reads、Effects
+    FQN, TypeName, Param string
+    Shape      string                             // 基底の状態の形。状態の分類なら ""
+    Builtins   []string                           // 形で決まる命令: 単位の対象の配線が直に呼ぶ操作（post、put、delete の順）
+    Reads      []string                           // この状態を読む read の FQN（宣言順）
+    Effects    []string                           // この単位を宛先にする効果の FQN（宣言順）
+    Predicates []string                           // 状態の分類のケースの述語（宣言順）
+}
 type Dep struct { Namespace, TypeName, Param string; Ops []string }
 type Seam struct { Op, Decorator, Transpiler, Method string }   // 継ぎ目一つ: op の FQN、デコレータの FQN、宣言したトランスパイラ（View.config.seams の値）、Seams のメソッドの名前
 type Param struct { Name, Type string }
 func ShapeOf(view *ir.View) *Shape
-func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // メソッドの引数と戻り値のテキスト（ctx と error を含む）
+func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // op のメソッドの引数と戻り値のテキスト（ctx と error を含む）
+func ReadSignature(r *ir.Read, imports *Imports, reserved map[string]bool) (params, results string)       // read のメソッド（いつも ctx を取り、結果と error を返す）
+func EffectSignature(e *ir.Effect, imports *Imports, reserved map[string]bool) (params, results string)   // 効果のメソッド（いつも ctx を取り、error を返す）
+func BuiltinSignature(s *ir.State, operation string, imports *Imports) (params, results string)           // 形で決まる命令のメソッド（値を取る操作は value <要素の型>）
 func SeamSignature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // 継ぎ目のメソッドの引数（op の引数の後ろに body）と戻り値のテキスト
 func SeamBodyParam(op *ir.Op, reserved map[string]bool) string   // 継ぎ目のメソッドの最後の引数の名前: body。op の引数の局所の名前と当たれば、末尾に _ を足したもの
 
@@ -249,8 +258,8 @@ func SeamBodyParam(op *ir.Op, reserved map[string]bool) string   // 継ぎ目の
 type PublicName struct {
     Name   string                                 // Go の名前
     Kind   PublicKind                             // PublicType / PublicArm / PublicEffect / PublicClassify / PublicCase / PublicClassifyFunc / PublicCases /
-                                                  // PublicStateUnit / PublicOps / PublicNew / PublicLeaves / PublicShared / PublicSeams / PublicDep
-    Decl   string                                 // その名前を生んだ宣言の FQN（状態の単位なら、状態か状態の分類）。診断の位置に使う。Ops、New、Leaves、SharedState、Seams と、別の名前空間の口なら ""
+                                                  // PublicStateUnit / PublicOps / PublicNew / PublicLeaves / PublicSeams / PublicDep
+    Decl   string                                 // その名前を生んだ宣言の FQN（状態の単位なら、状態か状態の分類）。診断の位置に使う。Ops、New、Leaves、Seams と、別の名前空間の口なら ""
     Detail string                                 // PublicArm ならアーム名、PublicCase ならケース名（default は "default"）、PublicDep なら名前空間の FQN
     What   string                                 // その名前を生んだものの、診断のメッセージ用の言い方（`model store.Schema`、`インターフェース Ops`）
 }
@@ -260,9 +269,10 @@ func PublicNames(view *ir.View) []PublicName      // 出力 (U, N) の定義の�
 - `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは入口のパッケージなので、import には効かない。
 - `Param.Type` は、定義のパッケージの中での書き方。別の名前空間の分類の述語（`<C>Cases`）は修飾なしの名前で、書く側が `Imports.Qualifier` で修飾する。
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
+- 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
-- `PublicNames` は、`docs/plugin-go.md`「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`SharedState`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
+- `PublicNames` は、`docs/plugin-go.md`「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
 
 ### `plugin/govalid`（公開）
 

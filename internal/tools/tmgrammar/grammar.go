@@ -240,7 +240,7 @@ func Build() Grammar {
 
 		// ---- 記号 ----
 		{Key: "arrow", Rule: Rule{
-			Comment: "-> は遷移（docs/grammar.md「exception / effect」の Transition）、=> は match のアーム（同「配線」の MatchArm）",
+			Comment: "-> は遷移（docs/grammar.md「exception / effect / read」の Transition）、=> は match のアーム（同「配線」の MatchArm）",
 			Name:    "keyword.operator.arrow.hozo",
 			Match:   `->|=>`,
 		}},

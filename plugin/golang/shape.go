@@ -147,12 +147,17 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 			continue
 		}
 		eachCall(o.Body, func(c *ir.Call) {
-			called[c.Op] = true
-			if m, known := declNS[c.Op]; known && m != viewer {
+			// read と効果の呼び出し（IR 0.6 の Callee）は、まだ形を決めていない: op の呼び出しだけを数える
+			name := c.CalledOp()
+			if name == "" {
+				return
+			}
+			called[name] = true
+			if m, known := declNS[name]; known && m != viewer {
 				if depOps[m] == nil {
 					depOps[m] = map[string]bool{}
 				}
-				depOps[m][c.Op] = true
+				depOps[m][name] = true
 			}
 		})
 		eachMatch(o.Body, func(m *ir.Match) {

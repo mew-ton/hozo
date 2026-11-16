@@ -1,0 +1,17 @@
+// DEC-13（docs/check.md「デコレータ」、docs/grammar.md「decorator の宣言」）: 何度も付けられるのは、宣言に @repeatable を持つ
+// デコレータだけ。印は汎用デコレータのものを見る（印のないデコレータの別名を重ねても DEC-13）
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  decorator once(column: string) for read | effect | exception;
+  decorator alias = once("id");
+  @once("a")
+  @once("b")                           // ERROR: DEC-13
+  read twice(): M[] on rows;
+  @alias
+  @alias                               // ERROR: DEC-13
+  effect twiceEffect(m: M) on rows.post;
+  @once("a")
+  @alias                               // ERROR: DEC-13
+  exception Twice;
+}

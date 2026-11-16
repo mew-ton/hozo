@@ -1,7 +1,7 @@
 // RES-5（docs/resolve.md「診断」）: 効果は状態の持ち主の名前空間に宣言する
 namespace a {
   state s: list<string>;
-  effect ok on s.post;
+  effect ok() on s.post;
 }
 namespace b {
   op f();

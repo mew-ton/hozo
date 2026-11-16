@@ -803,13 +803,15 @@ type callInfo struct {
 // 読んであること。
 func (b *bodyGen) call(c *ir.Call) callInfo {
 	e := b.e
-	callee := e.op(c.Op)
+	// read と効果の呼び出し（IR 0.6 の Callee）の形は、まだ決めていない。来たら、op がないのと同じに誤りにする
+	name := c.CalledOp()
+	callee := e.op(name)
 	if callee == nil {
-		e.errorf(codeInternal, b.op.Name, "op %s の配線が呼ぶ op %s が Program にない", b.op.Name, c.Op)
+		e.errorf(codeInternal, b.op.Name, "op %s の配線が呼ぶ %s は op ではないか、Program にない（read と効果の呼び出しの出力は、まだない）", b.op.Name, c.Callee)
 		return callInfo{expr: "nil"}
 	}
 	recv := "o."
-	if ns := e.declNS[c.Op]; ns != e.view.Viewer {
+	if ns := e.declNS[name]; ns != e.view.Viewer {
 		recv = "o." + e.fields.deps[ns] + "."
 	}
 	var bounds []boundValue
@@ -861,7 +863,7 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 		}
 		args = append(args, arg)
 	}
-	ci := callInfo{expr: recv + golang.MethodName(c.Op) + "(" + strings.Join(args, ", ") + ")",
+	ci := callInfo{expr: recv + golang.MethodName(name) + "(" + strings.Join(args, ", ") + ")",
 		hasErr: !(callee.Signature.Pure && len(callee.Signature.Exceptions) == 0), never: ir.IsNever(callee.Returns)}
 	if callee.Returns != nil && !ci.never {
 		ci.ret = callee.Returns
@@ -1333,7 +1335,7 @@ func armStates(a *ir.MatchArm) []string {
 func (b *bodyGen) armType(p *matchPlan, a *ir.MatchArm) ir.Type {
 	switch body := a.Body.(type) {
 	case ir.CallExpr:
-		if callee := b.e.op(body.Call.Op); callee != nil && callee.Returns != nil && !ir.IsNever(callee.Returns) {
+		if callee := b.e.op(body.Call.CalledOp()); callee != nil && callee.Returns != nil && !ir.IsNever(callee.Returns) {
 			return callee.Returns
 		}
 	case ir.AtomExpr:

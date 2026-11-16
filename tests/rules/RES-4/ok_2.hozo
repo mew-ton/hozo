@@ -5,8 +5,8 @@ namespace a {
   model M { id: string; }
   state rows: list<M>;
   state cur: nullable<M>;
-  effect add on rows.post;
-  effect set on cur.post;
+  effect add() on rows.post;
+  effect set() on cur.post;
   exception E;
   union Writes { add; set; }
   union Errors { E; }

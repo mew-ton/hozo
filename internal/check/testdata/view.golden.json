@@ -87,7 +87,8 @@
                 "line": 1015,
                 "col": 10
               }
-            }
+            },
+            "params": []
           },
           {
             "kind": "exception",
@@ -103,7 +104,8 @@
                 "line": 1016,
                 "col": 10
               }
-            }
+            },
+            "params": []
           },
           {
             "kind": "decorator",
@@ -140,6 +142,7 @@
               "op"
             ],
             "external": true,
+            "repeatable": false,
             "throws": [
               {
                 "exceptions": [
@@ -188,6 +191,7 @@
               "op"
             ],
             "external": true,
+            "repeatable": false,
             "throws": [
               {
                 "exceptions": [
@@ -325,6 +329,7 @@
                 "col": 10
               }
             },
+            "params": [],
             "target": {
               "kind": "builtin",
               "state": "server.sessions",
@@ -714,6 +719,7 @@
                 "col": 10
               }
             },
+            "params": [],
             "target": {
               "kind": "builtin",
               "state": "browser.token",
@@ -796,6 +802,7 @@
               "op"
             ],
             "external": false,
+            "repeatable": false,
             "throws": [],
             "catches": [
               {
@@ -855,7 +862,10 @@
                 {
                   "kind": "call",
                   "call": {
-                    "op": "server.logout",
+                    "callee": {
+                      "kind": "op",
+                      "op": "server.logout"
+                    },
                     "args": [
                       {
                         "param": "in",
@@ -965,7 +975,10 @@
                 {
                   "kind": "call",
                   "call": {
-                    "op": "browser.requestLogout",
+                    "callee": {
+                      "kind": "op",
+                      "op": "browser.requestLogout"
+                    },
                     "args": [],
                     "bound": [],
                     "span": {
@@ -995,7 +1008,10 @@
                 {
                   "kind": "call",
                   "call": {
-                    "op": "browser.clearToken",
+                    "callee": {
+                      "kind": "op",
+                      "op": "browser.clearToken"
+                    },
                     "args": [],
                     "bound": [],
                     "span": {

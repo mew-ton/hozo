@@ -95,8 +95,9 @@ func (t *bindTable) collect(path []string, typ ir.Type, span ir.Span, tau ir.Typ
 
 // boundOf は名前空間 ns の配線の呼び出し call の Call.bound（docs/check.md「bind」の末尾。BIND-3）。
 // ns のすべての Bind の Pos(b, callee) から、call が明示している位置を除く。同じ位置は最初の Bind のものだけ。
+// 位置を持つのは op だけで、read と効果の呼び出しの Call.bound は、いつも空。
 func (t *bindTable) boundOf(ns string, call *ir.Call) []ir.BoundPosition {
-	callee := t.ix.op(call.Op)
+	callee := t.ix.op(call.CalledOp())
 	if callee == nil {
 		return nil
 	}
@@ -163,7 +164,7 @@ func checkBinds(ix *index, c *computer, r *reporter) {
 			for _, cr := range row.calls {
 				call := cr.call
 				call.Bound = c.binds.boundOf(ix.opsNS[i], &call)
-				checkBind4(ix, &call, r)
+				checkBind4(ix, cr.throw, &call, r)
 			}
 		}
 	}
@@ -233,16 +234,60 @@ func checkBind5(ix *index, t *bindTable, o *ir.Op, r *reporter) {
 	}
 }
 
-// checkBind4 は BIND-4（docs/check.md「必須の入力」）。callee の各引数 p について、optional でなく、args にも
-// Call.bound の [p] にもなければ足りない。レコードリテラルで渡した引数は「当てはまる」の手続きで必須のフィールドを
-// 再帰的に確かめる。位置は呼び出し。Data.missing に足りないパスの列。
-func checkBind4(ix *index, call *ir.Call, r *reporter) {
-	callee := ix.op(call.Op)
-	if callee == nil {
+// calleeParams は呼び出し先の引数の並びと、診断での呼び名（docs/types.md「呼び出しの引数」の表）。throw が空でなければ、
+// アームの本体の throw で、引数は例外の params。直に呼ぶ組み込みの効果は、値を取る操作（list の post、nullable の
+// post / put、single の put）なら状態の要素の型の引数一つ。呼び出し先が引けなければ ok は false。
+func (ix *index) calleeParams(throw string, call *ir.Call) (params []ir.OpParam, what string, ok bool) {
+	if throw != "" {
+		if e, isException := ix.decls[throw].(*ir.Exception); isException {
+			return e.Params, "throw " + throw + " の引数", true
+		}
+		return nil, "", false
+	}
+	switch callee := call.Callee.(type) {
+	case ir.OpCallee:
+		if o := ix.op(callee.Op); o != nil {
+			return o.Params, o.Name + " の呼び出し", true
+		}
+	case ir.ReadCallee:
+		if rd, isRead := ix.decls[callee.Read].(*ir.Read); isRead {
+			return rd.Params, "read " + rd.Name + " の呼び出し", true
+		}
+	case ir.EffectCallee:
+		switch e := callee.Effect.(type) {
+		case ir.NamedEffect:
+			if d := ix.effect(e.Effect); d != nil {
+				return d.Params, "効果 " + d.Name + " の呼び出し", true
+			}
+		case ir.DirectEffect:
+			st := ix.state(e.State)
+			if st == nil || st.Element == nil {
+				return nil, "", false
+			}
+			takesValue := e.Operation == ir.OpPost || (e.Operation == ir.OpPut && st.Shape != ir.StateList)
+			if st.Shape == ir.StateSingle && e.Operation != ir.OpPut {
+				takesValue = false // STATE-1 で報告済み
+			}
+			if takesValue {
+				params = []ir.OpParam{{Name: ir.DirectEffectParam, Type: st.Element}}
+			}
+			return params, e.String() + " の呼び出し", true
+		}
+	}
+	return nil, "", false
+}
+
+// checkBind4 は BIND-4（docs/check.md「必須の入力」）。呼び出し先（op、read、効果、アームの本体の throw）の各引数 p に
+// ついて、optional でなく、args にも Call.bound の [p] にもなければ足りない。レコードリテラルで渡した引数は
+// 「当てはまる」の手続きで必須のフィールドを再帰的に確かめる。位置は呼び出し（throw なら、その throw）。
+// Data.missing に足りないパスの列。
+func checkBind4(ix *index, throw string, call *ir.Call, r *reporter) {
+	params, what, ok := ix.calleeParams(throw, call)
+	if !ok {
 		return
 	}
 	var missing [][]string
-	for _, p := range callee.Params {
+	for _, p := range params {
 		path := []string{p.Name}
 		var given ir.Atom
 		found := false
@@ -272,7 +317,7 @@ func checkBind4(ix *index, call *ir.Call, r *reporter) {
 		names = append(names, joinPath(m))
 	}
 	r.report(diag.Error, "BIND-4", call.Span,
-		sprintf("%s の呼び出しで必須の入力 %s が明示でも bind でも埋まっていない", call.Op, joinNames(names)),
+		sprintf("%sで必須の入力 %s が明示でも bind でも埋まっていない", what, joinNames(names)),
 		nil, map[string]any{"missing": missing})
 }
 

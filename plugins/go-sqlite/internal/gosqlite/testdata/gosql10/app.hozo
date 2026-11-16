@@ -33,7 +33,7 @@ namespace app {
   // ---- @db.effects は戻り値なし ----
 
   @db.insert(rows)
-  effect createRow on rows.post;
+  effect createRow() on rows.post;
   @db.effects(createRow)
   export op addAndReturn(row: Row): Row;
   @db.effects(createRow)

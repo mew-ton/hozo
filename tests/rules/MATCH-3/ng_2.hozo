@@ -1,5 +1,5 @@
 // MATCH-3（docs/grammar.md「配線」の ArmBody。文法で閉じる）: アームの本体に match、const、複数の文は書けない。
-// throw の後ろは例外の名前一つ
+// throw の後ろは例外の名前一つと、その引数（Atom）。引数に呼び出しは書けない
 namespace a {
   model M { id: string; }
   exception E;
@@ -13,7 +13,7 @@ namespace a {
   }
   op g(m: M): M throws E {
     return match m by C {              // ERROR: MATCH-2
-      A => throw use(m);               // ERROR: SYNTAX
+      A => throw E(use(m));            // ERROR: SYNTAX
       B => m;
     };
   }

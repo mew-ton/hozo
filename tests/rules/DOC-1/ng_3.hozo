@@ -1,0 +1,21 @@
+// DOC-1（docs/check.md「名前空間」）: exception、effect、read の @param は、その宣言の引数名。引数にない名前は DOC-1
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  /**
+   * 忙しい
+   *
+   * @param delay 待つ時間
+   */
+  exception Busy(wait: Duration);        // ERROR(-2): DOC-1
+  /**
+   * 引数のない例外に @param は書けない
+   *
+   * @param wait 待つ時間
+   */
+  exception Plain;                       // ERROR(-2): DOC-1
+  /** @param row 足す行 */
+  effect add(m: M) on rows.post;         // ERROR(-1): DOC-1
+  /** @param key 引く行 */
+  read byId(id: string): M? on rows;     // ERROR(-1): DOC-1
+}

@@ -34,11 +34,11 @@ namespace plain {
   export op byJ(j: string[]): Row[];
 
   @db.insert(rows)
-  effect create on rows.post;
+  effect create() on rows.post;
   @db.update(rows)
-  effect change on rows.put;
+  effect change() on rows.put;
   @db.delete(rows, "at")
-  effect drop on rows.delete;
+  effect drop() on rows.delete;
 
   @db.effects(create)
   export op add(row: Row);
@@ -88,11 +88,11 @@ namespace named {
   export op byJ(j: Record<string, Tag>): Row[];
 
   @db.insert(rows)
-  effect create on rows.post;
+  effect create() on rows.post;
   @db.update(rows)
-  effect change on rows.put;
+  effect change() on rows.put;
   @db.delete(rows, "at")
-  effect drop on rows.delete;
+  effect drop() on rows.delete;
 
   @db.effects(create)
   export op add(row: Row);
@@ -136,11 +136,11 @@ namespace sparse {
   export op byJ(j: Tag?): Row[];
 
   @db.insert(rows)
-  effect create on rows.post;
+  effect create() on rows.post;
   @db.update(rows)
-  effect change on rows.put;
+  effect change() on rows.put;
   @db.delete(rows, "at")
-  effect drop on rows.delete;
+  effect drop() on rows.delete;
 
   @db.effects(create)
   export op add(row: Row);

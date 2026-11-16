@@ -26,12 +26,12 @@ namespace app {
     default;
   }
 
-  effect addLine on lines.post;
-  effect dropToken on token.delete;
+  effect addLine() on lines.post;
+  effect dropToken() on token.delete;
   /** カートを空にする */
-  effect clearLines on lines: HasItems -> Empty;
-  effect refresh on Sync: Stale -> Fresh;
-  effect signIn on SignedIn: any -> Yes;
+  effect clearLines() on lines: HasItems -> Empty;
+  effect refresh() on Sync: Stale -> Fresh;
+  effect signIn() on SignedIn: any -> Yes;
 
   // 読む状態と効果を運ぶデコレータ（docs/check.md「デコレータが運ぶ reads と effects」）。基底は、デコレータの名前を見ずに、
   // hozoc が IR に置いた Op.carried で、op の置き場を決める

@@ -1,0 +1,16 @@
+// SYNTAX（docs/grammar.md「decorator の宣言」の CoreMark）: @external と @repeatable は並べてよく、順は問わない
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  exception Offline;
+  @repeatable
+  decorator where(column: string, value: string | int | float | boolean) for read;
+  @external @repeatable
+  decorator viaNetwork(host: string) throws Offline;
+  @repeatable @external
+  decorator viaProxy(host: string) throws Offline;
+  @where("kind", "a") @where("size", 1) @where("ratio", 0.5) @where("open", true)
+  read some(): M[] on rows;
+  @viaNetwork("a") @viaProxy("p") @viaNetwork("b")
+  op fetch(): M[];
+}

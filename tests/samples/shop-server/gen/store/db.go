@@ -46,6 +46,22 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
+// Querier は *sql.DB と *sql.Tx が共に持つ、文の実行。
+type Querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Conn は、ctx で文を実行する先: ctx が db のトランザクション（@db.transaction の継ぎ目が始めたもの）を運んでいれば、それ。なければ db。
+// このファイルの型のメソッドは、どれもこれを通す。人が書き足すメソッドも、db を直に使わずに、これを通す（通さなければ、トランザクションに入らない）。
+func Conn(ctx context.Context, db *sql.DB) Querier {
+	if tx, ok := ctx.Value(dbTxKey{db: db}).(*sql.Tx); ok {
+		return tx
+	}
+	return db
+}
+
 // UsersTable は状態 store.users の単位（UsersState）の、表 "users" の上の実装。
 // メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type UsersTable struct{ db *sql.DB }
@@ -202,7 +218,7 @@ func (t NotificationsTable) NotifyUser(ctx context.Context, notification pkgtype
 }
 
 // DbSeams は、@db.transaction の継ぎ目（Seams のメソッドのうち、このデコレータの分）の、db の上の実装。New の引数 seams に渡す。
-// トランザクションに入るのは、中身が、受け取った ctx で、同じ db の上のこのパッケージの型（<状態>Table）にすること。
+// トランザクションに入るのは、中身が、受け取った ctx で、同じ db に、Conn を通してすること（このファイルの型のメソッドは、どれもそう）。
 type DbSeams struct{ db *sql.DB }
 
 // NewDbSeams は db の上の DbSeams を返す。状態の単位の実装（New<状態>Table）に渡したのと同じ db を渡す。
@@ -401,23 +417,8 @@ func dbJSON(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbQuerier は *sql.DB と *sql.Tx が共に持つ、文の実行。
-type dbQuerier interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
-
 // dbTxKey は、ctx が運ぶトランザクションの鍵。db ごとに一つ。
 type dbTxKey struct{ db *sql.DB }
-
-// dbConn は、文を実行する先: ctx が db のトランザクション（dbTransaction が始めたもの）を運んでいれば、それ。なければ db。
-func dbConn(ctx context.Context, db *sql.DB) dbQuerier {
-	if tx, ok := ctx.Value(dbTxKey{db: db}).(*sql.Tx); ok {
-		return tx
-	}
-	return db
-}
 
 // dbTransaction は、body を、db の一つのトランザクションの中で呼ぶ: 始めて、body を呼び、確定する。
 // トランザクションは、body に渡す ctx が運ぶ。body が失敗すれば（確定に失敗しても）取り消して、零値とそのエラーを返す。
@@ -444,14 +445,14 @@ func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context
 
 // dbExec は行を返さない文を実行する。
 func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {
-	_, err := dbConn(ctx, db).ExecContext(ctx, query, args...)
+	_, err := Conn(ctx, db).ExecContext(ctx, query, args...)
 	return err
 }
 
 // dbIsEmpty は、行の数を返す問い合わせの結果が 0 かどうか。
 func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 	var n int64
-	if err := dbConn(ctx, db).QueryRowContext(ctx, query).Scan(&n); err != nil {
+	if err := Conn(ctx, db).QueryRowContext(ctx, query).Scan(&n); err != nil {
 		return false, err
 	}
 	return n == 0, nil
@@ -459,7 +460,7 @@ func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 
 // dbGet は問い合わせの一行を scan で読む。行がなければ nil。
 func dbGet[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) (*R, error) {
-	row, err := scan(dbConn(ctx, db).QueryRowContext(ctx, query, args...))
+	row, err := scan(Conn(ctx, db).QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -471,7 +472,7 @@ func dbGet[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), 
 
 // dbList は問い合わせのすべての行を scan で読む。
 func dbList[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) ([]R, error) {
-	rows, err := dbConn(ctx, db).QueryContext(ctx, query, args...)
+	rows, err := Conn(ctx, db).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

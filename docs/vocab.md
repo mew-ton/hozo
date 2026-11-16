@@ -23,7 +23,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 |---|---|---|
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
 | `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
-| `vocab/db.hozo` | `namespace db { table / text / int / float / bool / time / json / nullable / key / unique / ref / find / list / insert / update / delete / reads / effects }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の読み書きのデコレータ」「`db` の表と、しまい方」） |
+| `vocab/db.hozo` | `namespace db { table / text / int / float / bool / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
 | `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
 | `vocab/page.hozo` | `namespace page { Aborted / Route / path / query / route / dialog / fallback / interaction }` | §4.2 |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
@@ -32,27 +32,27 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 - 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator get(path: string) throws ServerError, NetworkError;`。`docs/decisions.md`「設計書を変える決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
 - `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイルとプラグインの起動）なので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
 - `@http.get` / `@http.post` の `@external` はそのまま写す。
-- `http` には、出典にない例外を一つ足す: op を呼ぶ前の失敗（要求を入力に読めない、入力が制約に合わない）を伝える `BadRequest` と、それが運ぶ値。HTTP のサーバーのトランスパイラが返し（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）、通信の上の名前 `http.BadRequest` と値の形の持ち主になる。`@http.get` / `@http.post` の `throws`（外から見たときに加わる例外）には、まだ入れない: 入れると、HTTP の op を呼ぶすべての配線が `http.BadRequest` を書くことになる。呼ぶ側のトランスパイラを作るときに決める。
+- `http` には、出典にない例外を一つ足す: op を呼ぶ前の失敗（要求を入力に読めない、入力が制約に合わない）を伝える `BadRequest`。運ぶ値は、例外の引数で書く（`docs/grammar.md`「exception / effect / read」）。HTTP のサーバーのトランスパイラが返し（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）、通信の上の名前 `http.BadRequest` と値の形の持ち主になる。`@http.get` / `@http.post` の `throws`（外から見たときに加わる例外）には、まだ入れない: 入れると、HTTP の op を呼ぶすべての配線が `http.BadRequest` を書くことになる。呼ぶ側のトランスパイラを作るときに決める。
 
 ```ts
   /** 制約の違反一つ。path は通信の上の場所、constraint は valid の語彙のデコレータの名前 */
   model Violation { path: string; constraint: string; }
   /** 要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない） */
-  exception BadRequest: { message: string; violations: Violation[]; };
+  exception BadRequest(message: string, violations: Violation[]);
 ```
 
-- `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の読み書きのデコレータ」「`db` の表と、しまい方」。
+- `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の語彙」。
 - `http` は、要求のどこから読むかを言うフィールドのデコレータを、出典から変える。中身は「`http` の語彙」。
 - `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator stdio throws Crashed, MalformedOutput;`。節の区切りは `docs/grammar.md`「decorator の宣言」）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
 
-### `db` の読み書きのデコレータ
+### `db` の語彙
 
-状態が表であること、フィールドを列にどうしまうか、列が値を持たなくてよいか（「`db` の表と、しまい方」）、`read` が表から何を引き、効果が表に何をし、op がどの `read` と効果を行うか（この節）を、仕様が言うためのデコレータ（`docs/decisions.md`「決めたこと」93〜95、104、105、119、128）。`vocab/db.hozo` の全文は次のとおり。出典にあるのは `key` / `unique` / `ref` だけ。
+状態が表であること、フィールドを列にどうしまうか（「`db` の表と、しまい方」）、`read` が表から何を引き、効果が表に何をするか、op のすることを一つのトランザクションにするか（「`db` の read と効果」）を、仕様が言うためのデコレータ（`docs/decisions.md`「決めたこと」134〜138）。`vocab/db.hozo` の全文は次のとおり。出典にあるのは `key` / `unique` / `ref` だけ。
 
 ```ts
 namespace db {
-  /** この状態を、element の行の表として、DB が持つ。列は、element のフィールド */
-  decorator table(element: any model) for state;
+  /** この状態を、表として、DB が持つ。行は、状態の要素の model で、列は、そのフィールド */
+  decorator table for state;
 
   /** このフィールドを、文字列の列にしまう */
   decorator text for field;
@@ -67,62 +67,78 @@ namespace db {
   /** このフィールドを、JSON にして一つの列にしまう */
   decorator json for field;
 
-  /** この列は、値がなくてよい。付けていない列は、いつも値を持つ */
-  decorator nullable for field;
-
   decorator key for field;
   decorator unique for field;
   /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
   decorator ref(target: any model) for field;
 
-  /** この read は、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
-  decorator find(table: any state, column: string) for read;
-  /** この read は、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
-  decorator list(table: any state, column: string?) for read;
+  /** この read は、on の状態の表から、一行を引く。引数の名前が列で、どの列も引数の値と同じ行。なければ、ない */
+  decorator find for read;
+  /** この read は、on の状態の表から、行を引く。引数の名前が列で、どの列も引数の値と同じ行のすべて。引数がなければ、すべての行 */
+  decorator list for read;
+  /** この read が引くのは、列 column が value と同じ行だけ。何度でも書ける */
+  @repeatable
+  decorator where(column: string, value: string | int | float | boolean) for read;
+  /** この read は、列 column の新しい順に引く */
+  decorator latest(column: string) for read;
 
-  /** この効果は、表 table に行を一つ足す */
-  decorator insert(table: any state) for effect;
-  /** この効果は、表 table の、キー（@db.key）が同じ行を書き換える */
-  decorator update(table: any state) for effect;
-  /** この効果は、表 table から、列 column が引数の値と同じ行を消す */
-  decorator delete(table: any state, column: string) for effect;
+  /** この効果は、on の状態の表に、引数の行を足す */
+  decorator insert for effect;
+  /** この効果は、on の状態の表の、キー（@db.key）が引数の行と同じ行を、引数の行に書き換える */
+  decorator update for effect;
+  /** この効果は、on の状態の表から、行を消す。引数の名前が列で、どの列も引数の値と同じ行 */
+  decorator delete for effect;
 
-  /** この op は、並べた read で、表から引く。read が一つなら、op の引数をその read が受け取り、op は、その read が引いたものを返す */
-  decorator reads(...targets: any read) for op reads targets;
-  /** この op は、並べた効果を、書いた順に、一つのトランザクションで行う。n 番目の効果が、op の n 番目の引数を受け取る */
-  decorator effects(...targets: any effect) for op effects targets;
+  /** この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない */
+  decorator transaction for op;
 }
 ```
 
-- **読む側も、書く側も、二段**（`docs/decisions.md`「決めたこと」128）: 何をするかは、名前を付けた `read`（`read userByEmail on users;`）と効果（`effect createUser on users.post;`）の宣言に付けたデコレータが言い、op は、行う `read` と効果を `@db.reads` / `@db.effects` で並べる。二段にする理由（`read`・効果のデコレータは、それを行う op の実装に働く。デコレータのない op には、中身を出さない）の持ち主は `docs/requirements.md`「出力を推論しない」。
-
-  ```ts
-  @db.find(users, "email")
-  read userByEmail on users;
-
-  @db.reads(userByEmail)
-  export op findUser(email: type.Email): type.User?;
-  ```
-
-- `reads` は、並べた `read` を `reads` で、`effects` は、並べた効果を `effects` で op に運ぶ（`docs/check.md`「デコレータが運ぶ reads と effects」）。これらを付けた op は、`reads` も `effects` も自分では書かない。`find` と `list` は、`read` の宣言に付けるもので、op には付けられない（DEC-1）。
-- `reads` に `read` を二つ以上並べたときと、op の戻り値の型が `read` の引くものと違うときの意味は、まだ決めていない（`docs/plugin-go-sqlite.md`「未決: 複数の `read` と、戻り値の型」）。
-- 表は状態の名前で、列は文字列で渡す。`read` の宣言の `on <状態>` と、効果の宛先に状態が書いてあっても、表は、デコレータの引数でもう一度名指しする（出力を決めるのは、デコレータの引数だけ。`docs/requirements.md`「出力を推論しない」。食い違いは、語彙を読むトランスパイラの error）。列の名前は、フィールドの名前。列は一つだけ（複数の列の条件は、要るサンプルが出てから。そのときは `column` の型を `string | string[]` に広げる。今の書き方は、そのまま通る）。
-- 列を渡す引数の名前を `by` にしないのは、`by` が予約語で、引数の名前（`Ident`）に書けないため（`docs/grammar.md`「予約語」）。
-- `int`、`float`、`list`、`nullable`、`reads`、`effects` は予約語、`delete` は文脈キーワードだが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
-- 何を生成するかと、書いたものの整合の検査（表は `@db.table` の状態か、列はあるか、引数と戻り値の型は合うか、デコレータの表は、`read` の `on` の状態や効果の宛先と合うか）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「op の中身」「診断」）。hozoc は、デコレータの引数の種類（`docs/types.md`「デコレータの引数」）だけを確かめる。
-- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（`read` の宣言、デコレータの対象 `read` と `effect`、引数の種類 `any read`、デコレータの `reads` / `effects` の節、残りの引数、予約語のデコレータ名）は hozoc が読む。語彙を読んで出力にするのは `go-sqlite`（`docs/plugin-go-sqlite.md`）。
+- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（`read` と効果の宣言と引数、デコレータの対象 `read` と `effect`、核の印 `@repeatable`、予約語のデコレータ名）は hozoc が読む（`docs/grammar.md`「exception / effect / read」「decorator の宣言」）。語彙を読んで出力にするのは `go-sqlite`（`docs/plugin-go-sqlite.md`）。
+- `int`、`float`、`list` は予約語、`delete` は文脈キーワードだが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
+- hozoc が確かめるのは、付ける対象（`for`）と、引数の種類と型（`docs/types.md`「デコレータの引数」）と、`@repeatable` のないデコレータを一つの宣言に二度付けていないこと（DEC-13）だけ。書いたものどうしの整合（表は `@db.table` の状態か、列はあるか、型は合うか）は、語彙を読むトランスパイラが確かめる（`docs/plugin-go-sqlite.md`「診断」）。
 
 ### `db` の表と、しまい方
 
-- **表**は、状態に `@db.table(<要素の model>)` を付けて言う（`@db.table(type.Order) state orders: list<type.Order>;`）。出典のグローバルのデコレータ `db`（`@db state …`）は、なくした: 表の列を決める model を、状態の型から読ませずに、引数で言わせる（`docs/requirements.md`「出力を推論しない」）。引数の名前が `element` なのは、`model` が予約語で、引数の名前（`Ident`）に書けないため。
-- **しまい方**（`text` / `int` / `float` / `bool` / `time` / `json`）は、フィールドを列にどうしまうかの種類で、保存先の製品に依らない名前。表の model のフィールドは、どれか一つを、ちょうど一つ持つ。保存先の列の型と、値の読み書きは、語彙を読むトランスパイラが、この種類だけから決める（`docs/plugin-go-sqlite.md`「しまい方」。フィールドの型は、種類に合うかの検査にだけ使う）。同じ種類の中で、型によって変え方が分かれるようになったら、種類を足す。
-- **値がなくてよい列**は、表の model のフィールドに `@db.nullable` を付けて言う（`@db.nullable @db.text nickname: string?`）。付けていない列は、いつも値を持つ。フィールドの型（省略可能かどうか）からは決めない: 型は、食い違いを確かめるのにだけ使い、省略可能でないフィールドの `@db.nullable` も、`@db.nullable` のない省略可能なフィールドも、語彙を読むトランスパイラの error。
-- **`@db.ref(M)`** の指す先（M の表と、その列）が一つに決まらなければ、語彙を読むトランスパイラの error（黙って何も出さない、ということはない）。
-- 書いたものの整合の検査（状態の要素は表の model か、フィールドはしまい方をちょうど一つ持つか、しまい方は型に合うか、`@db.nullable` は省略可能なフィールドと合っているか、`@db.ref` の先は決まるか）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「表」「しまい方」「診断」）。
+表の model のフィールドに書くデコレータ（`docs/decisions.md`「決めたこと」105、134）。何を出すかと、整合の検査の持ち主は `docs/plugin-go-sqlite.md`「表」「しまい方」。
+
+- **表**は、状態に `@db.table` を付けて言う（`@db.table state orders: list<type.Order>;`）。引数はない: 表の行の model（**表の model**）は、状態の要素の型（`docs/ir.md`「state / exception / effect」の `State.element`）。出典のグローバルのデコレータ `db`（`@db state …`）は、名前空間 `db` の中の `table` にした。
+- **しまい方**（`text` / `int` / `float` / `bool` / `time` / `json`）は、フィールドを列にどうしまうかの種類で、保存先の製品に依らない名前。表の model のフィールドは、どれか一つを、ちょうど一つ持つ。**しまい方は、フィールドの型からは当てない**: `string` のフィールドでも `@db.text` を書く（同じ型を、文字列でも JSON でもしまえる。どれにするかは、書いた人が決める）。型は、種類に合うかの検査にだけ使う。同じ種類の中で、型によって変え方が分かれるようになったら、種類を足す。
+- **値がなくてよい列**かどうかは、フィールドの型の `?` が言う（`@db.text nickname: string?` の列は、値がなくてよい。`?` のないフィールドの列は、いつも値を持つ）。型に書いてあることで、当てるのではないので、別のデコレータは要らない。
+- **`@db.key`** は、行を一つに決める列（の組）。**`@db.unique`** は、その列だけで行が一つに決まる列。**`@db.ref(M)`** は、M の表の行を指す列で、指す先（M の表と、その列）が一つに決まらなければ、語彙を読むトランスパイラの error。
+
+### `db` の read と効果
+
+`read` と効果の宣言（`docs/check.md`「read と効果」）に付けて、その中身を言うデコレータと、op に付ける `transaction`（`docs/decisions.md`「決めたこと」135〜138）。付けた宣言の中身は、語彙を読むトランスパイラが出し、付けていない宣言の中身は、人が書く。何を出すかと、整合の検査の持ち主は `docs/plugin-go-sqlite.md`「read の中身」「効果の中身」「トランザクション」。
+
+```ts
+/** email が同じユーザー */
+@db.find
+read userByEmail(email: type.Email): type.User? on users;
+
+/** そのユーザーの、支払いの済んだ請求。新しい順 */
+@db.list
+@db.where("paid", true)
+@db.latest("issuedAt")
+read paidInvoicesOf(userId: type.UserId): Invoice[] on invoices;
+
+/** そのトークンのセッションを消す */
+@db.delete
+effect deleteSession(token: type.Token) on sessions.delete;
+```
+
+- **デコレータは、宣言がすでに言っていることを、もう一度言わない**（`docs/requirements.md`「出力を推論しない」）: 表は、宣言の `on` の状態。列は、引数の名前（表の model の、同じ名前のフィールド）。引くものの型は、`read` の結果の型。表を引数でもう一度名指しする書き方（`@db.find(users, "email")`）は、なくした。
+- **引数が二つ以上なら、どの列も同じ行**（かつ）。`find` と `list` と `delete` に共通。
+- **`where`** は、引数にならない、決まった値の条件（列 `column` が、リテラル `value` と同じ）。`find` か `list` を付けた `read` に、いくつでも足せる（`@repeatable`）。引数の条件と合わせて、どれも満たす行。
+- **`latest`** は、並べ方。`list` に足せば、列 `column` の新しい順（付けていない `list` は、足した順）。`find` に足せば、条件に合う行のうち、いちばん新しい一行。
+- **`find`** は、一行に決まるものでなければならない（決まるかどうかの確かめ方は `docs/plugin-go-sqlite.md`「read の中身」）。
+- **`insert`** は宛先が `<状態>.post`、**`update`** は `<状態>.put`、**`delete`** は `<状態>.delete` の効果に付ける。`insert` と `update` の効果の引数は、表の model の行一つ。
+- **`transaction`** は、op に付ける。その op が DB にすることが、一つのトランザクションで起きる。op のデコレータなので、op の中身は決めず、中身の前後に処理を足すだけ（継ぎ目。`docs/config.md`「継ぎ目」）。どこまでがトランザクションに入るかと、入れ子の扱いは、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「トランザクション」）。
+- 等しいかどうかでない比較、件数と位置、二つ以上の列での並べ方は、この語彙では言えない。その `read` か効果には `db` のデコレータを付けず、人が書く。
 
 ### `http` の語彙
 
-入力の model のフィールドを、要求のどこから読むかと、その項目が要求にないときの扱いを言うデコレータ（`docs/decisions.md`「決めたこと」107、114、115）。場所は三つ（ヘッダ、クエリ、本文）で、どれも同じ二つの形を持つ。`vocab/http.hozo` の、この部分は次のとおり（ほかの宣言は、出典のまま）。
+入力の model のフィールドを、要求のどこから読むかと、その項目が要求にないときの扱いを言うデコレータ（`docs/decisions.md`「決めたこと」107、114、115）。場所は三つ（ヘッダ、クエリ、本文）で、どれも同じ二つの形を持つ。`vocab/http.hozo` の、この部分は次のとおり（ほかの宣言は「同梱する語彙」）。
 
 ```ts
   /** このフィールドを、要求のヘッダ一つから読む。name を省けば、フィールドの名前 */

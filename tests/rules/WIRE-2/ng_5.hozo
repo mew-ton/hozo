@@ -1,0 +1,14 @@
+// WIRE-2（docs/check.md「配線」「配線からの呼び出し」）: read の呼び出しは値を持つので、束縛せずには書けない。効果の呼び出しは
+// 値を持たないので、束縛も return もできない
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  read byId(id: string): M? on rows;
+  effect add(m: M) on rows.post;
+  op f(m: M): M? {
+    byId(m.id);                          // ERROR: WIRE-2
+    const done = add(m);                 // ERROR: WIRE-2 // WARN: WIRE-8
+    const done2 = rows.post(m);          // ERROR: WIRE-2 // WARN: WIRE-8
+    return add(m);                       // ERROR: WIRE-2
+  }
+}

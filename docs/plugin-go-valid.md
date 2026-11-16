@@ -11,7 +11,7 @@
 ```toml
 name     = "go-valid"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-valid"]
-protocol = "0.5"
+protocol = "0.6"
 
 [[transpiler]]
 name     = "go-valid"
@@ -34,9 +34,9 @@ requires = ["go"]
 4. `Validate` を持つ型を、フィールドの型に持つ model。フィールドの型は、`optional`、`array`、`record` の値を通して見る（`T?`、`T[]`、`Record<K, T>`）。
 
 - 継承した model は、展開済みのフィールド（受け継いだデコレータを含む）で判定する。受け継いだ制約は外せない。
-- union と exception は `Validate` を持たない。フィールドの型（上の 4 と同じに通して見たもの）が union（`arms`）で、そのアームの型のどれかが `Validate` を持つなら GOVALID-4（インターフェースにメソッドを足せないので、まだ形がない）。
+- union と exception は `Validate` を持たない（例外の引数の型が `Validate` を持つ型でも、例外の構造体には出さない。例外の値を確かめる者は、いない）。フィールドの型（上の 4 と同じに通して見たもの）が union（`arms`）で、そのアームの型のどれかが `Validate` を持つなら GOVALID-4（インターフェースにメソッドを足せないので、まだ形がない）。
 - 結果の型にも出る（入力にしか使わない型かどうかは見ない）。
-- その場で書いた model（union のアームや例外の値の `{ … }`。`docs/ir.md`「正規化」）は、普通の model として数える。`View` が見る側のために合成した model（`docs/plugin-go.md`「出力の対象」）は、Go の型にならないので、数えない。
+- その場で書いた model（union のアームの `{ … }`。`docs/ir.md`「正規化」）は、普通の model として数える。例外は、その場の model を持たない: 運ぶ値は、引数（`docs/grammar.md`「exception / effect / read」）。`View` が見る側のために合成した model（`docs/plugin-go.md`「出力の対象」）は、Go の型にならないので、数えない。
 
 ## 出力
 

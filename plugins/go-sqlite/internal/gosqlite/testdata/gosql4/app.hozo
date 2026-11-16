@@ -21,7 +21,7 @@ namespace table {
 namespace consts {
   model Row { @db.key @db.text id: string; }
   @db.table(Row) state effectLog: list<Row>;
-  effect logTable on effectLog.post;
+  effect logTable() on effectLog.post;
   @db.table(Row) state kind: list<Row>;
   classify Kind of string {
     Table;
@@ -51,9 +51,9 @@ namespace across {
   @db.table(Row) state shared: list<Row>;
   @db.table(Row) state other: list<Row>;
   @db.insert(shared)
-  effect createShared on shared.post;
+  effect createShared() on shared.post;
   @db.insert(other)
-  effect createOther on other.post;
+  effect createOther() on other.post;
   @db.effects(createShared, createOther)
   export op addBoth(first: Row, second: Row);
 }
@@ -75,8 +75,8 @@ namespace sorted {
     Moving;
   }
   @db.insert(rows)
-  effect sortRows on Order: Mixed -> Sorted;
-  effect settle on Quiet: Moving -> Still;
+  effect sortRows() on Order: Mixed -> Sorted;
+  effect settle() on Quiet: Moving -> Still;
   @db.effects(sortRows)
   export op insertSorted(row: Row);
   export op calm() effects settle;

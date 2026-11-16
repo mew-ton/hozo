@@ -1,0 +1,13 @@
+// STATE-1（docs/check.md「状態と効果」「直に呼ぶ組み込みの効果」）: 配線で直に呼んだ「状態.操作(…)」と、配線の op の effects に
+// 直に書いた「状態.操作」にも掛かる。位置は操作の語
+namespace a {
+  state title: single<string>;
+  op f() {
+    title.post("t");                     // ERROR: STATE-1
+    title.delete();                      // ERROR: STATE-1
+    title.put("t");
+  }
+  op g() effects title.put, title.post { // ERROR: STATE-1, EFF-2
+    title.put("t");
+  }
+}

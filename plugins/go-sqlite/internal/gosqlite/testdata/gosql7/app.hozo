@@ -21,23 +21,23 @@ namespace app {
 
   // @db.insert、@db.update、@db.delete（op に並べられていない効果のデコレータも、同じに確かめる）
   @db.insert(plain)
-  effect createPlain on plain.post;
+  effect createPlain() on plain.post;
   @db.update(plain)
-  effect updatePlain on plain.put;
+  effect updatePlain() on plain.put;
   @db.delete(plain, "id")
-  effect deletePlain on plain.delete;
+  effect deletePlain() on plain.delete;
   @db.effects(createPlain)
   export op addPlain(row: Row);
 
   // 別の名前空間の状態
   @db.insert(far.rows)
-  effect createFar on rows.post;
+  effect createFar() on rows.post;
 
   // 通るもの
   @db.find(rows, "id")
   export op findRow(id: string): Row?;
   @db.insert(rows)
-  effect createRow on rows.post;
+  effect createRow() on rows.post;
   @db.effects(createRow)
   export op addRow(row: Row);
 }

@@ -1,0 +1,28 @@
+// DOC-1（docs/check.md「名前空間」）: exception、effect、read の @param は、その宣言の引数名。@see は read と効果も指せる
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  /**
+   * 忙しい
+   *
+   * @param wait 待つ時間
+   * @param note 補足
+   */
+  exception Busy(wait: Duration, note: string?);
+  /**
+   * 行を足す
+   *
+   * @param m 足す行
+   * @see byId
+   */
+  effect add(m: M) on rows.post;
+  /**
+   * 行を引く
+   *
+   * @param id 引く行の識別子
+   * @see add
+   * @see Busy
+   */
+  read byId(id: string): M? on rows;
+  op f(m: M): M? { add(m); return byId(m.id); }
+}

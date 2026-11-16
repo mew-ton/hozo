@@ -48,8 +48,7 @@ func checkReads2(ix *index, o *ir.Op, r *reporter) {
 
 // checkState2 は STATE-2 のうち、デコレータの halts の効果の分: halts の効果（宣言に書いたもの、any effect の引数で
 // 渡したもの）の名前空間が、デコレータを付けた op の名前空間と違う。位置はその適用。
-// 葉の op が直に持つ効果（自分で書いたものと、デコレータが運ぶもの）の分は、名前の位置を持つ internal/sema が出す
-// （docs/check.md「状態と効果」の STATE-2 の位置）。
+// 葉の op にデコレータが運ぶ効果の分は、internal/sema が出す（docs/check.md「状態と効果」の STATE-2）。
 func checkState2(ix *index, o *ir.Op, ns string, r *reporter) {
 	for ai := range o.Decorators {
 		app := &o.Decorators[ai]
@@ -75,7 +74,7 @@ func checkState2(ix *index, o *ir.Op, ns string, r *reporter) {
 }
 
 // checkEff2 は EFF-2: 配線の O で Op.effects が空でなく、集合として Sig(O, ns(O)).effects と等しくない（効果の数え方は
-// docs/check.md「直に書く要素」: 直に書いた効果と、同じ宛先の宣言は別）。足りないもの・余分なものを Data.missing /
+// docs/check.md「節に書く要素」: 直に書いた効果と、同じ宛先の宣言は別）。足りないもの・余分なものを Data.missing /
 // Data.extra に（宣言は FQN、直に書いた効果は "<状態の FQN>.<操作>"）。
 func checkEff2(o *ir.Op, r *reporter) {
 	if o.Body == nil || len(o.Effects) == 0 {
@@ -96,7 +95,7 @@ func checkEff2(o *ir.Op, r *reporter) {
 	if len(missing) == 0 && len(extra) == 0 {
 		return
 	}
-	msg := sprintf("%s に書いた effects が伝播した効果と食い違う", o.Name)
+	msg := sprintf("%s に書いた effects が、本体から計算した効果と食い違う", o.Name)
 	if len(missing) > 0 {
 		msg += sprintf("（足りない: %s）", joinNames(missing))
 	}

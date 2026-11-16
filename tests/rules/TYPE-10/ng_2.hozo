@@ -11,8 +11,10 @@ namespace a {
       override x: never;               // ERROR: TYPE-10
     };
   }
-  exception E: {
-    override x: string;                // ERROR: TYPE-10
-  };
+  union V {
+    Other: {
+      override y: string;              // ERROR: TYPE-10
+    };
+  }
   op f(): Plain;
 }

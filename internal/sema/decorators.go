@@ -106,10 +106,11 @@ type carrier struct {
 
 // carry は docs/check.md「デコレータが運ぶ reads と effects」: 適用 app のデコレータの reads / effects の節の要素を、
 // `$param:` を適用の引数の値で置き換えて（残りの引数なら渡した値を書いた順にすべて、省いた省略可能な引数なら何も足さない）、
-// Op.carried に足す。any read と any effect の引数の値は名前で書いた要素に、any state の引数の値は直に書いた状態になる。
-// 重複は最初の出現に寄せる。Op.reads / Op.effects には足さない（docs/ir.md「正規化」）。
+// Op.carried に足す。any effect の引数の値は名前で書いた効果に、any state の引数の値は直に書いた状態になる。
+// 重複は最初の出現に寄せる。同じデコレータを何度も付けていれば（@repeatable）、適用ごとに足す。
+// Op.reads / Op.effects には足さない（docs/ir.md「正規化」）。
 //
-// 運ばれたものも、op が書いたものと同じに確かめる（どれも Signature を要しない）。位置はその適用。
+// 運ばれたものは、付いた op の名前空間のものでなければならない（どれも Signature を要しない）。位置はその適用。
 //   - DEC-17: 節を持つデコレータが、配線の op（本体を持つ op）に付いている。
 //   - READS-1: 葉の op に運ばれた状態（か、その read）が、別の名前空間のもの。
 //   - STATE-2: 葉の op に運ばれた効果が、別の名前空間のもの。
@@ -220,11 +221,16 @@ func argTargets(v ir.ArgValue) []string {
 	return nil
 }
 
-// checkDEC13 は DEC-13（docs/check.md「デコレータ」）: 同じデコレータが同じ宣言に二度付いている（引数が違っても）。
-// 名前付きデコレータは展開後の汎用デコレータで比べる。
+// checkDEC13 は DEC-13（docs/check.md「デコレータ」）: @repeatable の印のないデコレータが、同じ宣言に二度付いている
+// （引数が違っても）。名前付きデコレータは展開後の汎用デコレータで比べ、印も汎用デコレータのものを見る。
 func (a *analyzer) checkDEC13(app ir.Application, d *ast.Decorator, seen map[string]source.Span) {
+	if sym := a.syms[app.Decorator]; sym != nil {
+		if dec, ok := a.lower(sym).(*ir.Decorator); ok && dec.Repeatable {
+			return
+		}
+	}
 	if first, dup := seen[app.Decorator]; dup {
-		a.errorf("DEC-13", d.Name.Span, "デコレータ %s が同じ宣言に二度付いている", app.Decorator).Related = append([]diag.Related{}, related(first, "最初の適用"))
+		a.errorf("DEC-13", d.Name.Span, "デコレータ %s が同じ宣言に二度付いている（何度も付けられるのは、宣言に @repeatable を持つデコレータだけ）", app.Decorator).Related = append([]diag.Related{}, related(first, "最初の適用"))
 		return
 	}
 	seen[app.Decorator] = d.Name.Span
@@ -479,8 +485,6 @@ func anyAccept(of ir.AnyOf) accept {
 		return acException | acUnionSet
 	case ir.AnyEffect:
 		return acEffect | acUnionSet
-	case ir.AnyRead:
-		return acRead
 	case ir.AnyState:
 		return acState
 	case ir.AnyOp:
@@ -659,7 +663,7 @@ func typesString(ts []ir.Type) string {
 
 // lowerDecoratorDecl は decorator の宣言。名前付き（別名）なら Alias だけを持つ。
 func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope) ir.Decl {
-	dec := &ir.Decorator{External: d.External}
+	dec := &ir.Decorator{External: d.External, Repeatable: d.Repeatable}
 	if d.Alias != nil {
 		dec.DeclBase = a.base(s, d.Doc, d.Span, docContext{})
 		a.addSite(d.Decorators, siteDecorator, sc, &dec.DeclBase.Decorators)
@@ -706,8 +710,8 @@ func setOf(m map[string]*ast.Param) map[string]bool {
 }
 
 // lowerDecoReads はデコレータの宣言の reads の一節（docs/ir.md「decorator」の reads）。要素は op の節と同じ（read か、
-// 直に書いた state。どの名前空間のものでも解決する）か、any read / any state の引数（残りの引数でもよい。`$param:名前`:
-// any read は名前で書いた要素、any state は直に書いた要素の位置に置く）。どれでもなければ RES-4。
+// 直に書いた state。どの名前空間のものでも解決する）か、any state の引数（残りの引数でもよい。`$param:名前` を、
+// 直に書いた要素の位置に置く）。どれでもなければ RES-4。
 func (a *analyzer) lowerDecoReads(c *ast.ReadsClause, sc *scope) []ir.ReadRef {
 	var out []ir.ReadRef
 	for _, n := range c.Reads {
@@ -719,13 +723,8 @@ func (a *analyzer) lowerDecoReads(c *ast.ReadsClause, sc *scope) []ir.ReadRef {
 			out = append(out, readRef(r.sym))
 			continue
 		}
-		switch p, _ := sc.decoParams.types[r.name].(ir.AnyParam); p.Of {
-		case ir.AnyRead:
-			out = append(out, ir.NamedRead{Read: "$param:" + r.name})
-		case ir.AnyState:
+		if a.checkAnyParam(sc, r.name, ir.AnyState, n.Span) {
 			out = append(out, ir.DirectRead{State: "$param:" + r.name})
-		default:
-			a.errorf("RES-4", n.Span, "デコレータの引数 %s は any read でも any state でもないので、この位置では指せない", r.name)
 		}
 	}
 	return out

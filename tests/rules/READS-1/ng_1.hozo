@@ -1,15 +1,36 @@
-// READS-1（docs/check.md「状態と効果」「reads」）: 葉の op が読めるのは自分の名前空間の状態だけ。位置はその状態の名前
+// READS-1（docs/check.md「状態と効果」「デコレータが運ぶ reads と effects」）: 葉の op にデコレータが運ぶ reads は、付いた op の
+// 名前空間の状態（か、その read）でなければならない。位置はそのデコレータの適用
 state shared: list<string>;
 namespace a {
   state own: list<string>;
-  op f(): string[] reads b.users;                // ERROR: READS-1
-  op g(): string[] reads own, b.users;           // ERROR: READS-1
-  op h(): string[] reads shared;                 // ERROR: READS-1
-  op i(): string[]
-    reads own
-    reads b.users, b.token;                      // ERROR: READS-1
+  read first(): string? on own;
+  decorator from(table: any state) for op reads table;
+  decorator fromUsers for op reads b.users;
+  decorator fromRead for op reads b.firstUser;
+  decorator fromOwnRead for op reads first;
+  @from(own)
+  op j(): string[];
+  @fromOwnRead
+  op j2(): string?;
+  @from(b.users)                                 // ERROR: READS-1
+  op k(): string[];
+  @from(shared)                                  // ERROR: READS-1
+  op l(): string[];
+  @fromUsers                                     // ERROR: READS-1
+  op m(): string[];
+  @fromRead                                      // ERROR: READS-1
+  op m2(): string?;
+  @from(b.token)                                 // ERROR: READS-1
+  @fromOwnRead
+  op n(): string[];
 }
 namespace b {
   state users: list<string>;
   state token: nullable<string>;
+  read firstUser(): string? on users;
+  // 自分の名前空間の葉に付ければ通る
+  @a.fromUsers
+  op own(): string[];
+  @a.fromRead
+  op own2(): string?;
 }

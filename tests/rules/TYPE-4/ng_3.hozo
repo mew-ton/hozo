@@ -3,10 +3,10 @@
 namespace a {
   state rows: list<string>;
   state cur: nullable<string>;
-  effect add on rows.post;
-  effect add2 on rows.post;
-  effect set on cur.post;
-  effect drop on rows.delete;
+  effect add() on rows.post;
+  effect add2() on rows.post;
+  effect set() on cur.post;
+  effect drop() on rows.delete;
   union Posts { add; add2; }
   decorator posts(...es: any effect on rows.post) for op effects es;
   decorator tags(first: string, ...more: string | int);

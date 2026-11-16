@@ -8,11 +8,11 @@ namespace app {
   @db.table(Row) state copies: list<Row>;
 
   @db.insert(rows)
-  effect createRow on rows.post;
+  effect createRow() on rows.post;
   @db.insert(copies)
-  effect createCopy on copies.post;
+  effect createCopy() on copies.post;
   @db.delete(rows, "id")
-  effect deleteRow on rows.delete;
+  effect deleteRow() on rows.delete;
 
   // ---- db の op のデコレータを二つ以上持つ（同じデコレータを二度付けるのは、hozoc の DEC-13） ----
 

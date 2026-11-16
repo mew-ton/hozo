@@ -147,14 +147,13 @@ func sampleProgram() *Program {
 					&Exception{
 						DeclBase: DeclBase{Name: "server.Unauthorized", Span: span(f, 21, 1, 21, 30)},
 					},
+					// 引数を持つ例外（運ぶ値。docs/ir.md「state / exception / effect」の Exception.params）
 					&Exception{
 						DeclBase: DeclBase{Name: "server.Unavailable", Span: span(f, 22, 1, 22, 40)},
-						Value:    Ref("server.Unavailable.Value"),
-					},
-					&Model{
-						DeclBase:        DeclBase{Name: "server.Unavailable.Value", Span: span(f, 22, 25, 22, 40)},
-						Fields:          []Field{{Name: "reason", Type: String(), Span: span(f, 22, 27, 22, 38)}},
-						SynthesizedFrom: "server.Unavailable",
+						Params: []OpParam{
+							{Name: "reason", Type: String(), Span: span(f, 22, 22, 22, 36)},
+							{Name: "wait", Type: Optional(Duration()), Span: span(f, 22, 38, 22, 53)},
+						},
 					},
 					&Effect{
 						DeclBase: DeclBase{
@@ -167,8 +166,16 @@ func sampleProgram() *Program {
 							}},
 							Span: span(f, 24, 1, 24, 40),
 						},
+						Params: []OpParam{{Name: "user", Type: Ref("server.User"), Span: span(f, 24, 22, 24, 32)}},
 						Target: BuiltinTarget{State: "db", Operation: OpPost},
 						Writes: []string{"db"},
+					},
+					// read の宣言（docs/ir.md「read」）
+					&Read{
+						DeclBase: DeclBase{Name: "server.userById", Span: span(f, 25, 1, 25, 50)},
+						Params:   []OpParam{{Name: "id", Type: String(), Span: span(f, 25, 15, 25, 25)}},
+						Returns:  Optional(Ref("server.User")),
+						State:    "db",
 					},
 					&Union{
 						DeclBase: DeclBase{Name: "server.ApiError", Span: span(f, 26, 1, 28, 2)},
@@ -228,7 +235,6 @@ func sampleProgram() *Program {
 					},
 					&Decorator{
 						DeclBase: DeclBase{Name: "server.retryThrice", Span: span(f, 43, 1, 43, 50)},
-						External: true,
 						Alias: &DecoratorAlias{
 							Target: "server.retry",
 							Args: []Arg{
@@ -250,8 +256,8 @@ func sampleProgram() *Program {
 							{Name: "targets", Type: AnyParam{Of: AnyEffect}, Rest: true},
 						},
 						Targets: []DecoratorTarget{TargetOp},
-						Reads:   []string{"$param:table", "session"},
-						Effects: []string{"$param:targets"},
+						Reads:   StateReads("$param:table", "session"),
+						Effects: NamedEffects("$param:targets"),
 					},
 					&Op{
 						DeclBase: DeclBase{
@@ -290,19 +296,25 @@ func sampleProgram() *Program {
 						Exported: true,
 						Params:   []OpParam{{Name: "id", Type: Int(), Span: span(f, 47, 15, 47, 22)}},
 						Returns:  Optional(Ref("server.User")),
-						Effects:  []string{"server.UserCreated"},
-						Reads:    []string{"db"},
-						Throws:   []ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
-						Body:     nil,
+						// 節に書いた effects / reads（名前で書いた要素と、直に書いた要素。docs/ir.md「op」の EffectRef / ReadRef）
+						Effects: []EffectRef{NamedEffect{Effect: "server.UserCreated"}, DirectEffect{State: "session", Operation: OpDelete}},
+						Reads:   []ReadRef{NamedRead{Read: "server.userById"}, DirectRead{State: "session"}},
+						Throws:  []ThrowsClause{{Exceptions: []string{"server.Unauthorized"}}},
+						Body:    nil,
 						Signature: Signature{
 							Exceptions: []string{"server.Unauthorized", "server.Unavailable"},
-							Effects:    []string{"server.UserCreated"},
+							Effects:    []EffectRef{NamedEffect{Effect: "server.UserCreated"}, DirectEffect{State: "session", Operation: OpDelete}},
 							Relations: []SignatureRelation{
-								{Exception: "server.Unauthorized", Effect: "server.UserCreated", State: Prevented},
-								{Exception: "server.Unavailable", Effect: "server.UserCreated", State: Unknown},
+								{Exception: "server.Unauthorized", Effect: NamedEffect{Effect: "server.UserCreated"}, State: Prevented},
+								{Exception: "server.Unauthorized", Effect: DirectEffect{State: "session", Operation: OpDelete}, State: Prevented},
+								{Exception: "server.Unavailable", Effect: NamedEffect{Effect: "server.UserCreated"}, State: Unknown},
+								{Exception: "server.Unavailable", Effect: DirectEffect{State: "session", Operation: OpDelete}, State: Kept},
 							},
-							SuccessEffects: []SuccessEffect{{Effect: "server.UserCreated", State: Kept}},
-							Reads:          []string{"db"},
+							SuccessEffects: []SuccessEffect{
+								{Effect: NamedEffect{Effect: "server.UserCreated"}, State: Kept},
+								{Effect: DirectEffect{State: "session", Operation: OpDelete}, State: Kept},
+							},
+							Reads: []string{"db", "session"},
 						},
 					},
 					&Op{
@@ -330,15 +342,15 @@ func sampleProgram() *Program {
 						},
 						Params: []OpParam{{Name: "in", Type: Ref("server.User"), Span: span(f, 48, 100, 48, 115)}},
 						Carried: Carried{
-							Reads:   []string{"db", "session"},
-							Effects: []string{"server.UserCreated", "login", "logout"},
+							Reads:   StateReads("db", "session"),
+							Effects: NamedEffects("server.UserCreated", "login", "logout"),
 						},
 						Signature: Signature{
-							Effects: []string{"server.UserCreated", "login", "logout"},
+							Effects: NamedEffects("server.UserCreated", "login", "logout"),
 							SuccessEffects: []SuccessEffect{
-								{Effect: "server.UserCreated", State: Kept},
-								{Effect: "login", State: Kept},
-								{Effect: "logout", State: Kept},
+								{Effect: NamedEffect{Effect: "server.UserCreated"}, State: Kept},
+								{Effect: NamedEffect{Effect: "login"}, State: Kept},
+								{Effect: NamedEffect{Effect: "logout"}, State: Kept},
 							},
 							Reads: []string{"db", "session"},
 						},
@@ -359,15 +371,15 @@ func sampleProgram() *Program {
 							ConstStmt{
 								Name: "user",
 								Expr: CallExpr{Call: Call{
-									Op:   "server.findUser",
-									Args: []CallArg{{Param: "id", Value: NameAtom{Path: []string{"id"}, Span: span(f, 52, 32, 52, 34)}}},
-									Span: span(f, 52, 16, 52, 35),
+									Callee: OpCallee{Op: "server.findUser"},
+									Args:   []CallArg{{Param: "id", Value: NameAtom{Path: []string{"id"}, Span: span(f, 52, 32, 52, 34)}}},
+									Span:   span(f, 52, 16, 52, 35),
 								}},
 								Span: span(f, 52, 3, 52, 36),
 							},
 							CallStmt{
 								Call: Call{
-									Op: "server.notify",
+									Callee: OpCallee{Op: "server.notify"},
 									Args: []CallArg{{Param: "in", Value: RecordAtom{
 										Fields: []RecordField{
 											{Name: "id", Value: NameAtom{Path: []string{"user", "id"}, Span: span(f, 53, 22, 53, 29)}},
@@ -386,7 +398,7 @@ func sampleProgram() *Program {
 									Subject:  ValueSubject{Atom: NameAtom{Path: []string{"user"}, Span: span(f, 54, 9, 54, 13)}},
 									Classify: "server.IsAdmin",
 									Arms: []MatchArm{
-										{Cases: ArmCases{Cases: []string{"IsAdmin"}}, Body: CallExpr{Call: Call{Op: "server.notify", Args: []CallArg{{Param: "in", Value: NameAtom{Path: []string{"user"}, Span: span(f, 55, 30, 55, 34)}}}, Span: span(f, 55, 16, 55, 35)}}, Span: span(f, 55, 5, 55, 36)},
+										{Cases: ArmCases{Cases: []string{"IsAdmin"}}, Body: CallExpr{Call: Call{Callee: OpCallee{Op: "server.notify"}, Args: []CallArg{{Param: "in", Value: NameAtom{Path: []string{"user"}, Span: span(f, 55, 30, 55, 34)}}}, Span: span(f, 55, 16, 55, 35)}}, Span: span(f, 55, 5, 55, 36)},
 										{Cases: DefaultArm(), Body: NoneBody{}, Span: span(f, 56, 5, 56, 20)},
 									},
 									Span: span(f, 54, 3, 57, 4),
@@ -398,7 +410,7 @@ func sampleProgram() *Program {
 									Subject:  ValueSubject{Atom: NameAtom{Path: []string{"user"}, Span: span(f, 58, 16, 58, 20)}},
 									Classify: "server.Status",
 									Arms: []MatchArm{
-										{Cases: ArmCases{Cases: []string{"Active", "Banned"}}, Body: CallExpr{Call: Call{Op: "server.findUser", Args: []CallArg{{Param: "id", Value: LiteralAtom{Literal: StringLiteral{Value: "x"}, Span: span(f, 59, 40, 59, 43)}}}, Span: span(f, 59, 24, 59, 44)}}, Span: span(f, 59, 5, 59, 45)},
+										{Cases: ArmCases{Cases: []string{"Active", "Banned"}}, Body: CallExpr{Call: Call{Callee: OpCallee{Op: "server.findUser"}, Args: []CallArg{{Param: "id", Value: LiteralAtom{Literal: StringLiteral{Value: "x"}, Span: span(f, 59, 40, 59, 43)}}}, Span: span(f, 59, 24, 59, 44)}}, Span: span(f, 59, 5, 59, 45)},
 									},
 									Span: span(f, 58, 10, 60, 4),
 								}},
@@ -416,7 +428,7 @@ func sampleProgram() *Program {
 										{Cases: ArmCases{Cases: []string{CaseEmpty}}, Body: NoneBody{}, Span: span(f, 63, 5, 63, 19)},
 										{
 											Cases:    ArmCases{Cases: []string{CaseHasItems}},
-											Body:     CallExpr{Call: Call{Op: "server.notify", Span: span(f, 64, 17, 64, 32)}},
+											Body:     CallExpr{Call: Call{Callee: OpCallee{Op: "server.notify"}, Span: span(f, 64, 17, 64, 32)}},
 											Narrowed: []Narrowing{{Type: Ref("server.Token")}},
 											Span:     span(f, 64, 5, 64, 33),
 										},
@@ -425,12 +437,42 @@ func sampleProgram() *Program {
 								},
 								Span: span(f, 62, 3, 65, 5),
 							},
+							// read と効果の呼び出し（docs/ir.md「配線」の Callee）: read、効果の宣言、直に呼ぶ組み込みの効果
+							ConstStmt{
+								Name: "found",
+								Expr: CallExpr{Call: Call{
+									Callee: ReadCallee{Read: "server.userById"},
+									Args:   []CallArg{{Param: "id", Value: NameAtom{Path: []string{"id"}, Span: span(f, 65, 30, 65, 32)}}},
+									Span:   span(f, 65, 17, 65, 33),
+								}},
+								Span: span(f, 65, 3, 65, 34),
+							},
+							CallStmt{
+								Call: Call{
+									Callee: EffectCallee{Effect: NamedEffect{Effect: "server.UserCreated"}},
+									Args:   []CallArg{{Param: "user", Value: NameAtom{Path: []string{"user"}, Span: span(f, 65, 50, 65, 54)}}},
+									Span:   span(f, 65, 36, 65, 55),
+								},
+								Span: span(f, 65, 36, 65, 56),
+							},
+							CallStmt{
+								Call: Call{
+									Callee: EffectCallee{Effect: DirectEffect{State: "session", Operation: OpDelete}},
+									Span:   span(f, 65, 58, 65, 74),
+								},
+								Span: span(f, 65, 58, 65, 75),
+							},
 							MatchStmt{
 								Match: Match{
 									Subject:  ClassifyOwnedSubject{},
 									Classify: "Login",
 									Arms: []MatchArm{
-										{Cases: ArmCases{Cases: []string{"Anonymous"}}, Body: ThrowBody{Exception: "server.Unauthorized", Span: span(f, 67, 18, 67, 43)}, Span: span(f, 67, 5, 67, 44)},
+										// 引数を持つ throw（docs/ir.md「配線」の MatchArm の body の throw の args）
+										{Cases: ArmCases{Cases: []string{"Anonymous"}}, Body: ThrowBody{
+											Exception: "server.Unavailable",
+											Args:      []CallArg{{Param: "reason", Value: LiteralAtom{Literal: StringLiteral{Value: "anonymous"}, Span: span(f, 67, 37, 67, 48)}}},
+											Span:      span(f, 67, 18, 67, 49),
+										}, Span: span(f, 67, 5, 67, 50)},
 										{
 											Cases:    ArmCases{Cases: []string{"LoggedIn"}},
 											Body:     AtomExpr{Atom: StateAtom{State: "session", Path: []string{"value"}, Span: span(f, 67, 58, 67, 71)}},

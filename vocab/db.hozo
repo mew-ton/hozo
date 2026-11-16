@@ -1,6 +1,6 @@
 namespace db {
-  /** この状態を、element の行の表として、DB が持つ。列は、element のフィールド */
-  decorator table(element: any model) for state;
+  /** この状態を、表として、DB が持つ。行は、状態の要素の model で、列は、そのフィールド */
+  decorator table for state;
 
   /** このフィールドを、文字列の列にしまう */
   decorator text for field;
@@ -15,28 +15,28 @@ namespace db {
   /** このフィールドを、JSON にして一つの列にしまう */
   decorator json for field;
 
-  /** この列は、値がなくてよい。付けていない列は、いつも値を持つ */
-  decorator nullable for field;
-
   decorator key for field;
   decorator unique for field;
   /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
   decorator ref(target: any model) for field;
 
-  /** この read は、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
-  decorator find(table: any state, column: string) for read;
-  /** この read は、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
-  decorator list(table: any state, column: string?) for read;
+  /** この read は、on の状態の表から、一行を引く。引数の名前が列で、どの列も引数の値と同じ行。なければ、ない */
+  decorator find for read;
+  /** この read は、on の状態の表から、行を引く。引数の名前が列で、どの列も引数の値と同じ行のすべて。引数がなければ、すべての行 */
+  decorator list for read;
+  /** この read が引くのは、列 column が value と同じ行だけ。何度でも書ける */
+  @repeatable
+  decorator where(column: string, value: string | int | float | boolean) for read;
+  /** この read は、列 column の新しい順に引く */
+  decorator latest(column: string) for read;
 
-  /** この効果は、表 table に行を一つ足す */
-  decorator insert(table: any state) for effect;
-  /** この効果は、表 table の、キー（@db.key）が同じ行を書き換える */
-  decorator update(table: any state) for effect;
-  /** この効果は、表 table から、列 column が引数の値と同じ行を消す */
-  decorator delete(table: any state, column: string) for effect;
+  /** この効果は、on の状態の表に、引数の行を足す */
+  decorator insert for effect;
+  /** この効果は、on の状態の表の、キー（@db.key）が引数の行と同じ行を、引数の行に書き換える */
+  decorator update for effect;
+  /** この効果は、on の状態の表から、行を消す。引数の名前が列で、どの列も引数の値と同じ行 */
+  decorator delete for effect;
 
-  /** この op は、並べた read で、表から引く。read が一つなら、op の引数をその read が受け取り、op は、その read が引いたものを返す */
-  decorator reads(...targets: any read) for op reads targets;
-  /** この op は、並べた効果を、書いた順に、一つのトランザクションで行う。n 番目の効果が、op の n 番目の引数を受け取る */
-  decorator effects(...targets: any effect) for op effects targets;
+  /** この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない */
+  decorator transaction for op;
 }

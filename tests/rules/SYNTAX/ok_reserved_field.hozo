@@ -26,12 +26,12 @@ namespace a {
     override true: never;
   }
 
-  // その場で書く model（ユニオンのアーム、例外の値）
+  // その場で書く model（ユニオンのアーム）。例外の引数の名前は Ident なので、予約語は書けない
   union Page {
     Ready: { state: string; op: string; };
     Failed: Slim;
   }
-  exception Rejected: { by: string; none: string?; };
+  exception Rejected(reason: string, detail: string?);
 
   classify Kind of Target {
     Core;

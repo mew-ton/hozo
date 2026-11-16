@@ -58,6 +58,21 @@ func (s *server) declIndex(id source.FileID) []declEntry {
 			}
 		}
 	}
+	// declWithParams は引数を持つ宣言（exception、effect、read）の名前と引数の名前。引数は op の引数と同じ種類の
+	// 解決先（sema.TargetOpParam。Decl は持ち主の宣言の FQN）にし、@param の名前もそこへ結ぶ。
+	declWithParams := func(ns string, name ast.Ident, ps []*ast.OpParam, doc *ast.DocComment) {
+		fqn := joinNS(ns, name.Name)
+		add(name.Span, sema.Target{Kind: sema.TargetDecl, Decl: fqn})
+		params := map[string]source.Span{}
+		for _, p := range ps {
+			if p == nil {
+				continue
+			}
+			add(p.Name.Span, sema.Target{Kind: sema.TargetOpParam, Decl: fqn, Name: p.Name.Name})
+			params[p.Name.Name] = p.Name.Span
+		}
+		docTags(doc, ns, fqn, params, sema.TargetOpParam)
+	}
 	var walk func(decls []ast.Decl, ns string)
 	walk = func(decls []ast.Decl, ns string) {
 		for _, d := range decls {
@@ -105,20 +120,11 @@ func (s *server) declIndex(id source.FileID) []declEntry {
 				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
 				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: joinNS(ns, d.Name.Name)})
 			case *ast.ExceptionDecl:
-				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
-				fqn := joinNS(ns, d.Name.Name)
-				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: fqn})
-				if d.Value != nil && d.Value.Body != nil {
-					for _, f := range d.Value.Body.Fields {
-						add(f.Name.Span, sema.Target{Kind: sema.TargetField, Decl: fqn + ".Value", Name: f.Name.Name})
-					}
-				}
+				declWithParams(ns, d.Name, d.Params, d.Doc)
 			case *ast.EffectDecl:
-				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
-				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: joinNS(ns, d.Name.Name)})
+				declWithParams(ns, d.Name, d.Params, d.Doc)
 			case *ast.ReadDecl:
-				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
-				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: joinNS(ns, d.Name.Name)})
+				declWithParams(ns, d.Name, d.Params, d.Doc)
 			case *ast.ClassifyDecl:
 				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
 				fqn := joinNS(ns, d.Name.Name)

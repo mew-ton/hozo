@@ -43,13 +43,13 @@ namespace app {
   // ---- @db.effects: 引数の数は効果の数と同じで、n 番目の型が、n 番目の効果の受け取るもの ----
 
   @db.insert(rows)
-  effect createRow on rows.post;
+  effect createRow() on rows.post;
   @db.update(rows)
-  effect updateRow on rows.put;
+  effect updateRow() on rows.put;
   @db.delete(rows, "id")
-  effect deleteRow on rows.delete;
+  effect deleteRow() on rows.delete;
   @db.delete(rows, "rank")
-  effect deleteRank on rows.delete;
+  effect deleteRank() on rows.delete;
 
   // 引数が足りない
   @db.effects(createRow)

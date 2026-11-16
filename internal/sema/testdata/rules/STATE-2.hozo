@@ -1,22 +1,20 @@
-// STATE-2（docs/check.md「状態と効果」）のうち、op が直に持つ効果の分: 葉の op が直に持つ効果（自分で書いたものと、
-// デコレータが運ぶもの）の名前空間が、op の名前空間と違う。位置は、op が書いた効果ならその名前、デコレータのものならその適用
+// STATE-2（docs/check.md「状態と効果」）のうち、デコレータが運ぶ効果の分: 葉の op に運ばれた効果の名前空間（直に書いた効果なら、
+// その状態の名前空間）が、op の名前空間と違う。位置はそのデコレータの適用
 namespace a {
   state s: list<string>;
   state t: nullable<string>;
-  effect e on s.post;
-  effect f on t.post;
+  effect e(x: string) on s.post;
+  effect f(x: string) on t.post;
   union Both { e; f; }
   decorator doing(...targets: any effect) for op effects targets;
   decorator doingE for op effects e;
-  export op own() effects e;
+  decorator posting for op effects s.post;
   @doing(e, f) op ownCarried(x: string, y: string);
+  @doingE @posting export op own();
 }
 namespace b {
   state u: list<string>;
-  effect g on u.post;
-  op written() effects a.e;                      // ERROR: STATE-2
-  op writtenLater()
-    effects a.e;                                 // ERROR: STATE-2
+  effect g(x: string) on u.post;
   @a.doing(g)
   op carriedOwn(x: string);
   @a.doing(a.e)                                  // ERROR: STATE-2
@@ -25,11 +23,10 @@ namespace b {
   op carriedUnion(x: string, y: string, z: string);
   @a.doingE                                      // ERROR: STATE-2
   op carriedFixed();
-  @a.doing(a.f)                                  // ERROR: STATE-2
-  op both()
-    effects a.e;                                 // ERROR: STATE-2
-  // 配線の op は、別の名前空間の効果を書ける（伝播した効果。EFF-2 が照合する）
-  op wire() effects a.e {
+  @a.posting                                     // ERROR: STATE-2
+  op carriedDirect();
+  // 配線の op の節には、別の名前空間の効果を書ける（呼び出し先から伝わった効果。EFF-2 が照合する）
+  op wire() effects a.e, a.s.post {
     a.own();
   }
 }

@@ -27,9 +27,9 @@ namespace a {
   decorator nothing = effects();
 
   @effect(rows) @tags("a")
-  effect add on rows.post;
+  effect add() on rows.post;
   @a.effect(logs)
-  effect log on logs.post;
+  effect log() on logs.post;
 
   /**
    * 全部を引く。

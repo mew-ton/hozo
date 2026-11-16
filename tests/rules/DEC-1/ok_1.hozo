@@ -1,10 +1,13 @@
-// DEC-1（docs/check.md「デコレータ」）: for に書いた対象（省略は op）にだけ付ける。対象 effect は、効果の宣言。対象 read は、read の宣言
+// DEC-1（docs/check.md「デコレータ」）: for に書いた対象（省略は op）にだけ付ける。対象 effect は、効果の宣言。対象 read は、
+// read の宣言。対象 exception は、例外の宣言（op が使う三つの単位のどれにも、デコレータを付けられる）
 namespace a {
-  model M { @db.key @db.text id: string; }
-  @db.table(M)
+  model M { @db.key @db.text id: string; @db.text name: string; }
+  @db.table
   state s: list<M>;
   @http.status(404)
   exception NotFound;
+  @http.status(429)
+  exception Busy(wait: Duration);
   @valid.min(1)
   scalar PosInt extends int;
   decorator onlyOp;
@@ -13,19 +16,24 @@ namespace a {
   decorator opOrEffect for op | effect;
   decorator forRead for read;
   decorator readOrEffect for read | effect;
+  decorator forAll for exception | effect | read;
   @onlyOp @opOrEffect
   op f(): void;
   model N { @forField id: string; }
-  @forEffect @opOrEffect @db.insert(s)
-  effect add on s.post;
-  @db.update(s)
-  effect change on s.put;
-  @readOrEffect @db.delete(s, "id")
-  effect remove on s.delete;
-  @forRead @readOrEffect @db.find(s, "id")
-  read byId on s;
-  @db.list(s)
-  read all on s;
-  @db.reads(byId)
-  op find(id: string): M?;
+  @forEffect @opOrEffect @db.insert
+  effect add(m: M) on s.post;
+  @db.update
+  effect change(m: M) on s.put;
+  @readOrEffect @db.delete @forAll
+  effect remove(id: string) on s.delete;
+  @forRead @readOrEffect @db.find @forAll
+  read byId(id: string): M? on s;
+  @db.list @db.where("name", "x") @db.where("id", "y") @db.latest("name")
+  read named(): M[] on s;
+  @forAll
+  exception Marked;
+  @db.transaction
+  op find(id: string): M? {
+    return byId(id);
+  }
 }

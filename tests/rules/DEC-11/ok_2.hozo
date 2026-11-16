@@ -3,8 +3,8 @@
 namespace a {
   state s: list<string>;
   state t: nullable<string>;
-  effect e1 on s.post;
-  effect e2 on t.put;
+  effect e1() on s.post;
+  effect e2() on t.put;
   union Both { e1; e2; }
   decorator all(...targets: any effect) for op effects targets;
   decorator some(first: int, second: string?, ...more: string | int);

@@ -24,10 +24,10 @@ namespace type {
   exception NotFound;
   /** 既にある（その場で書いた値を運ぶ） */
   @http.status(409)
-  exception Conflict: { existing: string; count: int; };
+  exception Conflict(existing: string, count: int);
   /** 受け付けられない（宣言した model の値を運ぶ） */
   @http.status(422)
-  exception Rejected: Item;
+  exception Rejected(value: Item);
   /** ステータスを持たない例外 */
   exception Broken;
 

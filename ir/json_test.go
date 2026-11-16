@@ -116,8 +116,8 @@ func TestRoundTripAtoms(t *testing.T) {
 }
 
 func TestRoundTripExprsAndStatements(t *testing.T) {
-	call := Call{Op: "s.f", Args: []CallArg{{Param: "x", Value: NoneAtom{Span: sp()}}}, Bound: []BoundPosition{{Path: []string{"x", "y"}, State: "db"}}, Span: sp()}
-	callJSON := `{"op":"s.f","args":[{"param":"x","value":{"kind":"none",` + spJSON + `}}],"bound":[{"path":["x","y"],"state":"db"}],` + spJSON + `}`
+	call := Call{Callee: OpCallee{Op: "s.f"}, Args: []CallArg{{Param: "x", Value: NoneAtom{Span: sp()}}}, Bound: []BoundPosition{{Path: []string{"x", "y"}, State: "db"}}, Span: sp()}
+	callJSON := `{"callee":{"kind":"op","op":"s.f"},"args":[{"param":"x","value":{"kind":"none",` + spJSON + `}}],"bound":[{"path":["x","y"],"state":"db"}],` + spJSON + `}`
 	match := Match{
 		Subject:  ValueSubject{Atom: NameAtom{Path: []string{"u"}, Span: sp()}},
 		Classify: "s.C",
@@ -140,7 +140,27 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 	unionRoundTrip(t, ArmBody(AtomExpr{Atom: NameAtom{Path: []string{"session"}, Span: sp()}}), UnmarshalArmBody,
 		`{"kind":"atom","atom":{"kind":"name","path":["session"],`+spJSON+`}}`)
 	unionRoundTrip(t, ArmBody(ThrowBody{Exception: "type.Unauthorized", Span: sp()}), UnmarshalArmBody,
-		`{"kind":"throw","exception":"type.Unauthorized",`+spJSON+`}`)
+		`{"kind":"throw","exception":"type.Unauthorized","args":[],`+spJSON+`}`)
+	// 引数を持つ throw（docs/ir.md「配線」の MatchArm の body）
+	unionRoundTrip(t, ArmBody(ThrowBody{Exception: "rate.LimitExceeded", Args: []CallArg{{Param: "wait", Value: NameAtom{Path: []string{"wait"}, Span: sp()}}}, Span: sp()}), UnmarshalArmBody,
+		`{"kind":"throw","exception":"rate.LimitExceeded","args":[{"param":"wait","value":{"kind":"name","path":["wait"],`+spJSON+`}}],`+spJSON+`}`)
+
+	// 呼び出し先（docs/ir.md「配線」の Callee）: op、read、効果（宣言と、直に呼ぶ組み込みの効果）
+	unionRoundTrip(t, Callee(OpCallee{Op: "s.f"}), UnmarshalCallee, `{"kind":"op","op":"s.f"}`)
+	unionRoundTrip(t, Callee(ReadCallee{Read: "s.userByEmail"}), UnmarshalCallee, `{"kind":"read","read":"s.userByEmail"}`)
+	unionRoundTrip(t, Callee(EffectCallee{Effect: NamedEffect{Effect: "s.createOrder"}}), UnmarshalCallee,
+		`{"kind":"effect","effect":{"kind":"named","effect":"s.createOrder"}}`)
+	unionRoundTrip(t, Callee(EffectCallee{Effect: DirectEffect{State: "s.orders", Operation: OpPost}}), UnmarshalCallee,
+		`{"kind":"effect","effect":{"kind":"direct","state":"s.orders","operation":"post"}}`)
+	direct := Call{Callee: EffectCallee{Effect: DirectEffect{State: "s.orders", Operation: OpPost}},
+		Args: []CallArg{{Param: DirectEffectParam, Value: NameAtom{Path: []string{"order"}, Span: sp()}}}, Span: sp()}
+	if b := roundTrip(t, direct); string(b) != `{"callee":{"kind":"effect","effect":{"kind":"direct","state":"s.orders","operation":"post"}},`+
+		`"args":[{"param":"value","value":{"kind":"name","path":["order"],`+spJSON+`}}],"bound":[],`+spJSON+`}` {
+		t.Errorf("direct effect call: %s", b)
+	}
+	if call.CalledOp() != "s.f" || direct.CalledOp() != "" || (Call{}).CalledOp() != "" {
+		t.Errorf("CalledOp: %q %q", call.CalledOp(), direct.CalledOp())
+	}
 	// アームの中で絞り込まれた型（docs/ir.md「配線」の Narrowing）。状態の分類での match だけが state を持つ。
 	narrowed := MatchArm{Cases: ArmCases{Cases: []string{"A"}}, Body: NoneBody{}, Narrowed: []Narrowing{{Type: Ref("s.T")}, {State: "s.token", Type: Int()}}, Span: sp()}
 	if b := roundTrip(t, narrowed); string(b) != `{"cases":["A"],"body":{"kind":"none"},"narrowed":[{"type":{"kind":"ref","target":"s.T"}},{"state":"s.token","type":{"kind":"core","name":"int"}}],`+spJSON+`}` {
@@ -220,9 +240,9 @@ func TestRoundTripEffectTargets(t *testing.T) {
 	unionRoundTrip(t, EffectTarget(TransitionTarget{Of: "shop.carts", From: Cases("HasItems"), To: AnyCase()}), UnmarshalEffectTarget,
 		`{"kind":"transition","of":"shop.carts","from":["HasItems"],"to":"any"}`)
 
-	// writes は空でも [] で出す。target は kind で分かれる。
+	// params と writes は空でも [] で出す。target は kind で分かれる。
 	b := roundTrip(t, Effect{DeclBase: DeclBase{Name: "e", Span: sp()}, Target: BuiltinTarget{State: "s", Operation: OpPut}})
-	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"target":{"kind":"builtin","state":"s","operation":"put"},"writes":[]}`; string(b) != want {
+	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":[]}`; string(b) != want {
 		t.Errorf("effect\nwant %s\ngot  %s", want, b)
 	}
 	b = roundTrip(t, Effect{
@@ -230,7 +250,7 @@ func TestRoundTripEffectTargets(t *testing.T) {
 		Target:   TransitionTarget{Of: "C", From: Cases("A"), To: AnyCase()},
 		Writes:   []string{"s1", "s2"},
 	})
-	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"target":{"kind":"transition","of":"C","from":["A"],"to":"any"},"writes":["s1","s2"]}`; string(b) != want {
+	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[],"target":{"kind":"transition","of":"C","from":["A"],"to":"any"},"writes":["s1","s2"]}`; string(b) != want {
 		t.Errorf("effect\nwant %s\ngot  %s", want, b)
 	}
 
@@ -405,7 +425,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.5","namespaces":[],"binds":[]}`
+	want := `{"version":"0.6","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -413,7 +433,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.5","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.5","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.6","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.6","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -446,8 +466,21 @@ func TestEmptySlicesAndOptionals(t *testing.T) {
 		t.Errorf("field: %s", b)
 	}
 	b, _ = json.Marshal(&Exception{DeclBase: DeclBase{Name: "e", Span: sp()}})
-	if strings.Contains(string(b), "value") {
-		t.Errorf("exception without value: %s", b)
+	if !strings.Contains(string(b), `"params":[]`) || strings.Contains(string(b), "value") {
+		t.Errorf("exception without params: %s", b)
+	}
+	b, _ = json.Marshal(&Effect{DeclBase: DeclBase{Name: "e", Span: sp()}})
+	if !strings.Contains(string(b), `"params":[]`) {
+		t.Errorf("effect without params: %s", b)
+	}
+	b, _ = json.Marshal(&Read{DeclBase: DeclBase{Name: "r", Span: sp()}, Returns: Optional(Ref("s.User")), State: "s.users"})
+	if !strings.Contains(string(b), `"kind":"read"`) || !strings.Contains(string(b), `"params":[]`) ||
+		!strings.Contains(string(b), `"returns":{"kind":"optional","of":{"kind":"ref","target":"s.User"}}`) || !strings.Contains(string(b), `"state":"s.users"`) {
+		t.Errorf("read: %s", b)
+	}
+	b, _ = json.Marshal(&Decorator{DeclBase: DeclBase{Name: "d", Span: sp()}, Repeatable: true})
+	if !strings.Contains(string(b), `"repeatable":true`) || !strings.Contains(string(b), `"external":false`) {
+		t.Errorf("repeatable decorator: %s", b)
 	}
 	b, _ = json.Marshal(Application{Decorator: "d", Span: sp()})
 	if strings.Contains(string(b), "via") {
@@ -599,7 +632,7 @@ func TestKinds(t *testing.T) {
 		"string": StringLiteral{}, "int": IntLiteral{}, "float": FloatLiteral{}, "boolean": BooleanLiteral{}, "duration": DurationLiteral{},
 		"refs": RefsValue{}, "variant": VariantValue{}, "list": ListValue{},
 		"builtin": BuiltinTarget{}, "transition": TransitionTarget{}, "states": StatesSubject{}, "value": ValueSubject{},
-		"model": &Model{}, "scalar": &Scalar{}, "union": &Union{}, "state": &State{}, "exception": &Exception{}, "effect": &Effect{}, "classify": &Classify{}, "decorator": &Decorator{}, "op": &Op{},
+		"model": &Model{}, "scalar": &Scalar{}, "union": &Union{}, "state": &State{}, "exception": &Exception{}, "effect": &Effect{}, "read": &Read{}, "classify": &Classify{}, "decorator": &Decorator{}, "op": &Op{},
 	}
 	for want, v := range cases {
 		if v.Kind() != want {
@@ -684,19 +717,20 @@ func TestNamespaceConfigJSON(t *testing.T) {
 
 // TestVersion05Fields は版 0.5 で足した項目（docs/ir.md「版」）の JSON の形: Decorator.targets の effect、
 // Decorator.reads / effects、Param.rest、Op.carried。空の列は [] で出し、読み戻すと同じ値になる。
+// 要素の形は、版 0.6 の ReadRef / EffectRef（TestVersion06Refs）。
 func TestVersion05Fields(t *testing.T) {
 	dec := &Decorator{
 		DeclBase: DeclBase{Name: "db.effects", Span: sp()},
 		Params:   []Param{{Name: "targets", Type: AnyParam{Of: AnyEffect}, Rest: true}},
 		Targets:  []DecoratorTarget{TargetOp, TargetEffect},
-		Effects:  []string{"$param:targets"},
+		Effects:  NamedEffects("$param:targets"),
 	}
 	b := roundTrip(t, *dec)
 	for _, want := range []string{
 		`"params":[{"name":"targets","type":{"kind":"any","of":"effect"},"optional":false,"rest":true}]`,
 		`"targets":["op","effect"]`,
 		`"reads":[]`,
-		`"effects":["$param:targets"]`,
+		`"effects":[{"kind":"named","effect":"$param:targets"}]`,
 	} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("decorator の JSON に %s がない: %s", want, b)
@@ -714,19 +748,21 @@ func TestVersion05Fields(t *testing.T) {
 	}
 	op := &Op{
 		DeclBase: DeclBase{Name: "store.placeOrder", Span: sp()},
-		Reads:    []string{"store.users"},
-		Effects:  []string{"store.e1"},
-		Carried:  Carried{Reads: []string{"store.orders", "store.users"}, Effects: []string{"store.e1", "store.e2"}},
+		Reads:    StateReads("store.users"),
+		Effects:  NamedEffects("store.e1"),
+		Carried:  Carried{Reads: StateReads("store.orders", "store.users"), Effects: NamedEffects("store.e1", "store.e2")},
 	}
 	b = roundTrip(t, *op)
-	if want := `"effects":["store.e1"],"reads":["store.users"],"carried":{"reads":["store.orders","store.users"],"effects":["store.e1","store.e2"]}`; !strings.Contains(string(b), want) {
+	if want := `"effects":[{"kind":"named","effect":"store.e1"}],"reads":[{"kind":"direct","state":"store.users"}],` +
+		`"carried":{"reads":[{"kind":"direct","state":"store.orders"},{"kind":"direct","state":"store.users"}],` +
+		`"effects":[{"kind":"named","effect":"store.e1"},{"kind":"named","effect":"store.e2"}]}`; !strings.Contains(string(b), want) {
 		t.Errorf("op の JSON に %s がない: %s", want, b)
 	}
-	// 直に読む状態と直に持つ効果は、書いたものの後ろに運ばれたものを並べ、重複を最初の出現に寄せる。
-	if got := op.DirectReads(); !reflect.DeepEqual(got, []string{"store.users", "store.orders"}) {
+	// 直に読むものと直に持つ効果は、書いたものの後ろに運ばれたものを並べ、重複を最初の出現に寄せる。
+	if got := op.DirectReads(); !reflect.DeepEqual(got, StateReads("store.users", "store.orders")) {
 		t.Errorf("DirectReads = %v", got)
 	}
-	if got := op.DirectEffects(); !reflect.DeepEqual(got, []string{"store.e1", "store.e2"}) {
+	if got := op.DirectEffects(); !reflect.DeepEqual(got, NamedEffects("store.e1", "store.e2")) {
 		t.Errorf("DirectEffects = %v", got)
 	}
 	if got := (&Op{}).DirectReads(); got != nil {
@@ -736,5 +772,45 @@ func TestVersion05Fields(t *testing.T) {
 	b, _ = json.Marshal(Carried{})
 	if string(b) != `{"reads":[],"effects":[]}` {
 		t.Errorf("carried: %s", b)
+	}
+}
+
+// TestVersion06Refs は版 0.6 の reads / effects の要素（docs/ir.md「op」の ReadRef / EffectRef）と、その引き方
+// （docs/packages.md「ir（公開）」）。名前で書いた要素と直に書いた要素は kind で分かれ、== で比べられる。
+func TestVersion06Refs(t *testing.T) {
+	unionRoundTrip(t, ReadRef(NamedRead{Read: "s.userByEmail"}), UnmarshalReadRef, `{"kind":"named","read":"s.userByEmail"}`)
+	unionRoundTrip(t, ReadRef(DirectRead{State: "s.users"}), UnmarshalReadRef, `{"kind":"direct","state":"s.users"}`)
+	unionRoundTrip(t, EffectRef(NamedEffect{Effect: "s.addUser"}), UnmarshalEffectRef, `{"kind":"named","effect":"s.addUser"}`)
+	unionRoundTrip(t, EffectRef(DirectEffect{State: "s.users", Operation: OpPost}), UnmarshalEffectRef,
+		`{"kind":"direct","state":"s.users","operation":"post"}`)
+	if EffectRef(DirectEffect{State: "s.users", Operation: OpPost}) == EffectRef(NamedEffect{Effect: "s.users.post"}) {
+		t.Error("直に書いた効果と、同じ名前の宣言は、別の効果")
+	}
+	if got := (DirectEffect{State: "s.users", Operation: OpPut}).String(); got != "s.users.put" {
+		t.Errorf("DirectEffect.String = %q", got)
+	}
+	p := &Program{Namespaces: []Namespace{{Name: "s", Decls: []Decl{
+		&State{DeclBase: DeclBase{Name: "s.users"}},
+		&Read{DeclBase: DeclBase{Name: "s.userByEmail"}, State: "s.users"},
+		&Effect{DeclBase: DeclBase{Name: "s.addUser"}, Writes: []string{"s.users", "s.log"}},
+	}}}}
+	if got := p.ReadState(NamedRead{Read: "s.userByEmail"}); got != "s.users" {
+		t.Errorf("ReadState(named) = %q", got)
+	}
+	if got := p.ReadState(DirectRead{State: "s.users"}); got != "s.users" {
+		t.Errorf("ReadState(direct) = %q", got)
+	}
+	if got := p.ReadState(NamedRead{Read: "s.nothing"}); got != "" {
+		t.Errorf("ReadState(宣言のない read) = %q", got)
+	}
+	// 読む状態は、書き方によらない: read の宣言は、その宛先の状態として数え、重複は最初の出現に寄せる
+	if got := p.ReadStates([]ReadRef{NamedRead{Read: "s.userByEmail"}, DirectRead{State: "s.users"}, DirectRead{State: "s.log"}}); !reflect.DeepEqual(got, []string{"s.users", "s.log"}) {
+		t.Errorf("ReadStates = %v", got)
+	}
+	if got := p.EffectWrites(NamedEffect{Effect: "s.addUser"}); !reflect.DeepEqual(got, []string{"s.users", "s.log"}) {
+		t.Errorf("EffectWrites(named) = %v", got)
+	}
+	if got := p.EffectWrites(DirectEffect{State: "s.users", Operation: OpDelete}); !reflect.DeepEqual(got, []string{"s.users"}) {
+		t.Errorf("EffectWrites(direct) = %v", got)
 	}
 }

@@ -14,9 +14,9 @@ namespace app {
   model Item { @valid.length(min: 1) name: Name; tags: string[]; at: Time?; }
 
   @http.status(404)
-  exception Missing: Item;
+  exception Missing(value: Item);
   @http.status(409)
-  exception Clash: { existing: string; };
+  exception Clash(existing: string);
 
   model FindInput {
     @http.header("Authorization") token: Token?;

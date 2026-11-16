@@ -107,13 +107,15 @@ tests/samples/<名前>/
 
 その段階の実装も済み、hozoc と、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）が版 0.5 になって、サンプル `shop-server` の `TestSamples` は、テストもサンプルも変えずに、すべてのサブテストが、飛ばしも、代役もなく通った。
 
-**その次の段階（同 R4: 節の区切りの統一、名前を付けた `read`、`db` の語彙の読む側の二段）も、文書とサンプルを、実装より先に書いた。実装は、まだない。** サンプル `shop-server` は、文書の版（`docs/ir.md`「版」）の言語で書いてあり、版 0.5 の hozoc は、その仕様を読めない（節の `,`、`read` の宣言）。実装が入るまでの `TestSamples` は、テストもサンプルも変えずに、次のとおり。
+**その次の段階（同 R4: 例外、効果、`read` を同じ書き方にし、状態に触れるのを `read` と効果だけにする）も、文書とサンプルを、実装より先に書いた。実装は、まだない。** サンプル `shop-server` は、文書の版（`docs/ir.md`「版」）の言語で書いてあり、版 0.5 の hozoc は、その仕様を読めない（節の `,`、引数を持つ `read` と効果の宣言、それを呼ぶ配線）。実装が入るまでの `TestSamples` は、テストもサンプルも変えずに、次のとおり。
 
 | サブテスト | hozoc の版が、文書の版より前の間 | hozoc の版が、文書の版になった後 |
 |---|---|---|
-| `files`、`go` | 通る（hozoc を使わない。手で書いた期待する出力が、人が書いたコードと合わせて動く） | 通る |
+| `files`、`go` | 通る（hozoc を使わない。手で書いた期待する出力が、人が書いたコードと合わせて動く）。ただし `go` のうち、サンプルの中のプラグイン `go-ratelimit` の単体テストは、リポジトリの `ir` と `plugin/golang` で `views.json` を読むので、その二つだけが先に新しい版になっている間は、前の版の `views.json` を読めずに落ちる（下の箇条） | 通る |
 | `check` | 飛ぶ（「飛ばす条件」の表の一行目。二つの版を名指しする） | 走る。プラグインのマニフェストの `protocol` が前の版のままなら、それを名指しして、言語の検査に落ちるか、代役が置かれる（同じ表の、マニフェストとトランスパイラの行） |
-| `transpilers/*`（`go`、`go-valid`、`go-sqlite`、`go-http`、`go-ratelimit`、`all`） | 飛ぶ（同じ） | マニフェストの `protocol` が前の版のトランスパイラの分は、それを名指しして飛ぶ。上げた後は走り、`go-sqlite` が `docs/plugin-go-sqlite.md`「op の中身」の読む側（`read` の `@db.find` / `@db.list` と、op の `@db.reads`）を出すようになるまで、`transpilers/go-sqlite` と `transpilers/all` は**落ちる**（飛ばない） |
+| `transpilers/*`（`go`、`go-valid`、`go-sqlite`、`go-http`、`go-ratelimit`、`all`） | 飛ぶ（同じ） | マニフェストの `protocol` が前の版のトランスパイラの分は、それを名指しして飛ぶ。上げた後は走り、基底 `go`（`read` と効果のメソッド、配線）、`go-sqlite`（宣言から作る中身と、`@db.transaction` の継ぎ目）、`go-http`（`httpThrown`）が文書の形を出すようになるまで、その `transpilers/<名前>` と `transpilers/all` は**落ちる**（飛ばない） |
+
+- サンプルの中のプラグイン `go-ratelimit` の単体テストの入力（`shop-server/plugins/go-ratelimit/testdata/`）は、仕様（`.hozo`）だけを先に直してあり、`views.json` は前の版のまま（`shop-server/README.md`「R4 で、まだないもの」）。hozoc が R4 の言語を読めるようになったら、`go test ./tests -run TestPluginViewFixtures -update` で置き直す。それまで、`TestPluginViewFixtures` は、この入力で落ちる。置き直した後、`go-ratelimit` の、生成したコードを動かすテスト（`testdata/seams/behavior_test.go`）は、基底 `go` が R4 の形を出すまで、基底のファイルと合わずに落ちる。
 
 R4 の実装が済めば、どのサブテストも、飛ばしも、代役もなく通る（`docs/requirements.md`「作り直しの段階」の R4 の条件）。そこから、サブテストが飛ぶか、代役が置かれるなら、それは後戻り。
 
@@ -121,4 +123,4 @@ R4 の実装が済めば、どのサブテストも、飛ばしも、代役も�
 
 | サンプル | 中身 |
 |---|---|
-| [`shop-server`](shop-server/README.md) | 共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go`（`docs/plugin-go.md`）と、それに相乗りする `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`。`database/sql` の上の表と、`db` の語彙のデコレータで言った `store` の op の中身。二つの効果を一つのトランザクションで行う op を含む）、`go-http`（`docs/plugin-go-http.md`。`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。サンプルの中のプラグイン `go-ratelimit` が、語彙 `rate` と、デコレータ `@rate.limited` の継ぎ目（`docs/plugin-go.md`「継ぎ目」）の中身を出す |
+| [`shop-server`](shop-server/README.md) | 共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go`（`docs/plugin-go.md`）と、それに相乗りする `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`。`database/sql` の上の表と、`db` の語彙のデコレータを付けた `store` の `read` と効果の中身と、二つの効果を呼ぶ op を一つのトランザクションにする継ぎ目）、`go-http`（`docs/plugin-go-http.md`。`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。サンプルの中のプラグイン `go-ratelimit` が、語彙 `rate` と、デコレータ `@rate.limited` の継ぎ目（`docs/plugin-go.md`「継ぎ目」）の中身を出す |

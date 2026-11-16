@@ -32,7 +32,7 @@ namespace shapeb {
 
   /** 値を運ぶ */
   @cli.exitCode(3)
-  exception Broken: Note;
+  exception Broken(value: Note);
   exception Lost;
 
   @valid.length(min: 2)

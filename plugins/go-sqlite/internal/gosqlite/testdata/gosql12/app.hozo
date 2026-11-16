@@ -6,18 +6,18 @@ namespace app {
   @db.table(Row) state rows: list<Row>;
 
   /** デコレータを持たない効果 */
-  effect bare on rows.post;
+  effect bare() on rows.post;
   /** 二つ持つ効果 */
   @db.insert(rows)
   @db.update(rows)
-  effect both on rows.post;
+  effect both() on rows.post;
   /** 三つとも持つ効果（op に並べられていなくても、確かめる。同じデコレータを二度付けるのは、hozoc の DEC-13） */
   @db.insert(rows)
   @db.update(rows)
   @db.delete(rows, "id")
-  effect all on rows.delete;
+  effect all() on rows.delete;
   @db.insert(rows)
-  effect createRow on rows.post;
+  effect createRow() on rows.post;
 
   // 並べた効果が、どれも持たない
   @db.effects(bare)

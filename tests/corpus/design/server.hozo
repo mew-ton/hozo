@@ -68,10 +68,10 @@ namespace server {
     override hash: never;
   }
 
-  @db.table(User)
+  @db.table
   state users: list<User>;
 
-  @db.table(Session)
+  @db.table
   state sessions: list<Session>;
 
   // 追加: §7.3 / §10.2 / §11 が参照する model と状態
@@ -126,19 +126,19 @@ namespace server {
     expiresAt: Time;
   }
 
-  @db.table(Item)
+  @db.table
   state items: list<Item>;
 
-  @db.table(CartLine)
+  @db.table
   state carts: list<CartLine>;
 
-  @db.table(Order)
+  @db.table
   state orders: list<Order>;
 
-  @db.table(Notification)
+  @db.table
   state notifications: list<Notification>;
 
-  @db.table(PasswordReset)
+  @db.table
   state passwordResets: list<PasswordReset>;
 
   // ---- §6.1 exception ----
@@ -152,7 +152,7 @@ namespace server {
 
   /** 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ） */
   @http.status(400)
-  exception ClientError: Violations;
+  exception ClientError(value: Violations);
 
   /** 認証されていない */
   @http.status(401)
@@ -165,7 +165,7 @@ namespace server {
   // ---- §6.2 effect ----
 
   /** ログインセッションを作成する */
-  effect createSession on sessions.post;
+  effect createSession(login: LoginOk) on sessions.post;
 
   // ---- §8.1 デコレータの宣言 ----
 
@@ -190,11 +190,22 @@ namespace server {
   @http.status(409)
   exception AlreadyLoggedIn;
 
+  // 追加: login の、状態に触れない部分（入力の照合）。葉の op は reads / effects を書けない（STATE-5。README.md の表の 15）
+  op authenticate(in: LoginInput): LoginOk
+    throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn;
+
+  // §7.1 の原文は葉の op。効果を持つので、葉 authenticate と効果 createSession を呼ぶ配線にした。
+  // 上の行の例外のとき、下の行の効果が起きていないこと（prevents effects）は、検査器が本体から確かめる（REL-4）
   @http.post("/login")
   @validated
   op login(in: LoginInput): LoginOk
     effects createSession
-    throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn prevents effects;
+    throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn prevents effects
+  {
+    const ok = authenticate(in);
+    createSession(ok);
+    return ok;
+  }
 
   // ---- §7.3 例外と効果の関係 ----
 
@@ -211,13 +222,13 @@ namespace server {
   }
 
   /** 返金する（注文の状態を返金済みにする） */
-  effect refund on orders.put;
+  effect refund(orderId: OrderId) on orders.put;
 
   /** 注文を作成する */
-  effect createOrder on orders.post;
+  effect createOrder(order: Order) on orders.post;
 
   /** ユーザーに通知する */
-  effect notifyUser on notifications.post;
+  effect notifyUser(notice: Notification) on notifications.post;
 
   /** 返金の処理は受け付けたが、完了の確認が取れない */
   exception RefundPending;
@@ -225,22 +236,46 @@ namespace server {
   /** 通知を送れなかった */
   exception NotificationFailed;
 
+  // 追加: §7.3 の例の、状態に触れない部分（葉の op。README.md の表の 15）
+  /** 返金の完了を確かめ、取り消した注文を返す */
+  op confirmRefund(in: CancelInput): Order
+    throws RefundPending;
+  /** 入力から注文を作る */
+  op newOrder(in: OrderInput): Order;
+  /** 注文の通知を作る */
+  op composeNotice(order: Order): Notification
+    throws NotificationFailed;
+
+  // 効果 refund を呼んだ後の行が RefundPending を投げるので、そのとき refund は起きている（keeps effects）
   op cancelOrder(in: CancelInput): Order
     effects refund
-    throws RefundPending keeps effects;   // 返金の処理は受け付けたが、完了の確認が取れない
+    throws RefundPending keeps effects   // 返金の処理は受け付けたが、完了の確認が取れない
+  {
+    refund(in.orderId);
+    return confirmRefund(in);
+  }
 
-  // 追加: §7.3 の `placeOrder` の二つの効果を、効果ごとの葉の op に分けたもの（README.md の表の 14）
+  // 追加: §7.3 の `placeOrder` の二つの効果を、効果ごとの op に分けたもの（README.md の表の 14）
   /** 注文を保存する */
   op saveOrder(in: OrderInput): Order
-    effects createOrder;
+    effects createOrder
+  {
+    const order = newOrder(in);
+    createOrder(order);
+    return order;
+  }
 
   /** 注文したユーザーに通知する */
   op sendOrderNotice(order: Order)
     effects notifyUser
-    throws NotificationFailed prevents effects;
+    throws NotificationFailed prevents effects
+  {
+    const notice = composeNotice(order);
+    notifyUser(notice);
+  }
 
   // §7.3 の原文は葉の op に `effects createOrder | notifyUser` と
-  // `throws NotificationFailed keeps createOrder prevents notifyUser` を書く。葉の op が直に持てる効果は一つまでで、
+  // `throws NotificationFailed keeps createOrder prevents notifyUser` を書く。葉の op は効果を書けず、
   // prevents / keeps の目的語は effects だけなので、配線にした。NotificationFailed のとき createOrder は
   // 起きていて（kept）、notifyUser は起きていない（prevented）ことは、検査器が本体から計算する。
   op placeOrder(in: OrderInput): Order
@@ -255,7 +290,11 @@ namespace server {
 
   // 追加: §3.4 の例が参照する効果と例外
   /** 再設定メールを送る */
-  effect sendResetMail on passwordResets.post;
+  effect sendResetMail(reset: PasswordReset) on passwordResets.post;
+
+  // 追加: requestPasswordReset の、状態に触れない部分（README.md の表の 15）
+  op newPasswordReset(email: Email): PasswordReset
+    throws RateLimited;
 
   /** 同じアドレスに短時間で送りすぎた */
   @http.status(429)
@@ -271,14 +310,18 @@ namespace server {
   @http.post("/password-reset")
   op requestPasswordReset(email: Email)
     effects sendResetMail
-    throws RateLimited prevents effects;
+    throws RateLimited prevents effects
+  {
+    const reset = newPasswordReset(email);
+    sendResetMail(reset);
+  }
 
   // 仕様に入らない、書き手向けのメモ
 
   // ---- §9 配線（server 側） ----
 
   /** ログインセッションを削除する */
-  effect deleteSession on sessions.delete;
+  effect deleteSession(token: Token?) on sessions.delete;
 
   model LogoutInput {
     @http.header(name: "Authorization") token: Token?;
@@ -287,7 +330,10 @@ namespace server {
   // トークンがない・無効な場合のログアウトは何もしない（401 にしない）
   @http.post("/logout")
   export op logout(in: LogoutInput)
-    effects deleteSession;
+    effects deleteSession
+  {
+    deleteSession(in.token);
+  }
 
   // ---- 追加: browser（§10.2、§11）が呼ぶ server の op ----
   // §11.1 の fetchMe に付く @redirectToLogin がスコープ外（docs/decisions.md）なので、
@@ -331,12 +377,20 @@ namespace server {
   }
 
   /** カートに一行足す */
-  effect addCartLine on carts.post;
+  effect addCartLine(line: CartLine) on carts.post;
+
+  // 追加: addToCart の、状態に触れない部分（README.md の表の 15）
+  op newCartLine(in: AddToCartInput): CartLine;
 
   /** 商品をカートに入れる */
   @http.post("/cart")
   export op addToCart(in: AddToCartInput): CartLine
-    effects addCartLine;
+    effects addCartLine
+  {
+    const line = newCartLine(in);
+    addCartLine(line);
+    return line;
+  }
 
   /** 保証を付ける入力 */
   model AttachWarrantyInput {
@@ -346,10 +400,18 @@ namespace server {
   }
 
   /** カートの一行に保証を付ける */
-  effect attachWarrantyToLine on carts.put;
+  effect attachWarrantyToLine(line: WarrantyLine) on carts.put;
+
+  // 追加: attachWarranty の、状態に触れない部分（README.md の表の 15）
+  op withWarranty(in: AttachWarrantyInput): WarrantyLine;
 
   /** カートの一行に保証プランを付ける */
   @http.post("/cart/warranty")
   export op attachWarranty(in: AttachWarrantyInput): WarrantyLine
-    effects attachWarrantyToLine;
+    effects attachWarrantyToLine
+  {
+    const line = withWarranty(in);
+    attachWarrantyToLine(line);
+    return line;
+  }
 }

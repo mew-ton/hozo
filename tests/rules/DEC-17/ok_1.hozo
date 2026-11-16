@@ -1,41 +1,44 @@
 // DEC-17（docs/check.md「デコレータ」）: reads / effects の節を持つデコレータは、葉の op に付ける。運ばれた状態と効果は、
-// op が書いたものと同じに配線へ伝わる（配線は reads / effects を書かなくてよく、書けば計算と照合する: READS-2 / EFF-2）。
-// 節を持たないデコレータ（throws / catches だけのものを含む）は、配線にも付けられる
+// 配線が呼んだ read と効果と同じに、呼び出し元の配線へ伝わる（配線は reads / effects を書かなくてよく、書けば計算と
+// 照合する: READS-2 / EFF-2）。節を持たないデコレータ（throws / catches だけのものを含む）は、配線にも付けられる
 namespace a {
-  model M { @db.key @db.text id: string; }
-  @db.table(M)
+  model M { id: string; }
   state rows: list<M>;
-  @db.insert(rows)
-  effect add on rows.post;
-  @db.delete(rows, "id")
-  effect remove on rows.delete;
+  state log: list<string>;
+  effect add(m: M) on rows.post;
+  effect remove(id: string) on rows.delete;
+  effect note(line: string) on log.post;
   exception Missing;
   decorator plain;
   decorator guarded throws Missing prevents effects;
+  decorator counting(table: any state) for op reads table;
+  decorator logging(...targets: any effect) for op effects targets;
 
-  @db.find(rows, "id")
-  read byId on rows;
-  @db.list(rows)
-  read every on rows;
-  @db.reads(byId)
-  op find(id: string): M?;
-  @db.reads(every)
-  op all(): M[];
-  @db.effects(add)
-  op insert(m: M);
-  @db.effects(remove, add)
-  op replace(id: string, m: M);
-  @db.effects
+  read byId(id: string): M? on rows;
+  read every(): M[] on rows;
+
+  @counting(rows)
+  op count(): int;
+  @logging(note)
+  op audit(line: string);
+  @logging
   op nothing();
 
   @plain
   @guarded
   op move(id: string, m: M): M[] {
-    replace(id, m);
-    return all();
+    remove(id);
+    add(m);
+    audit("moved");
+    return every();
   }
-  op moveDeclared(id: string, m: M): M? reads rows effects remove, add {
-    replace(id, m);
-    return find(id);
+  op moveDeclared(id: string, m: M): M? reads rows effects remove, add, note {
+    remove(id);
+    add(m);
+    audit("moved");
+    return byId(id);
+  }
+  op size(): int reads rows {
+    return count();
   }
 }

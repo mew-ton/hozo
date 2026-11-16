@@ -3,7 +3,7 @@
 namespace a {
   exception E;
   state s: list<string>;
-  effect e on s.post;
+  effect e() on s.post;
   decorator ok for op | field throws E;
   decorator ok2 throws E;
   decorator ok3(table: any state) for op reads table;

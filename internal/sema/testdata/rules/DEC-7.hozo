@@ -2,8 +2,8 @@
 namespace a {
   state s: single<string>;
   state t: list<string>;
-  effect put on s.put;
-  effect post on t.post;
+  effect put() on s.put;
+  effect post() on t.post;
   exception E;
   exception F;
   exception G;
@@ -25,10 +25,10 @@ namespace a {
 
   // any effect on s.op を満たすのは、宛先が組み込みの効果 { state: s, operation: op } の効果だけ。
   // 同じ状態に書き込む遷移の効果は満たさない
-  effect tput on t.put;
-  effect drain on t: HasItems -> Empty;
+  effect tput() on t.put;
+  effect drain() on t: HasItems -> Empty;
   classify Phase of t { Idle; Busy; }
-  effect start on Phase: Idle -> Busy;
+  effect start() on Phase: Idle -> Busy;
   decorator onListPut(e: any effect on t.put);
   @onListPut(tput)
   op ok4(): void;

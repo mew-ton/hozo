@@ -148,7 +148,7 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		}
 		t, call, ok := a.evalCall(w, s.Call, nil)
 		if ok && hasValue(t) {
-			a.errorf("WIRE-2", s.Call.Span, "呼び出し %s は値を返すので、束縛せずに書けない（設計書 §9）", call.Op)
+			a.errorf("WIRE-2", s.Call.Span, "呼び出し %s は値を返すので、束縛せずに書けない（設計書 §9）", call.Callee)
 		}
 		a.checkWIRE9(t, s.Span, last)
 		if !ok {
@@ -267,31 +267,134 @@ type armContext struct {
 	cases   string
 }
 
-// evalCall は呼び出し。op を解決し、位置の引数を引数名に対応付け（docs/ir.md「正規化」）、型を照合する（TYPE-4、MATCH-4）。
-// 別の名前空間の、export のない op なら NS-5。Bound は nil のまま（docs/check.md「bind」が埋める）。
+// callTarget は呼び出し先の、引数の並びと呼び名（docs/types.md「呼び出しの引数」の表の一行）。
+type callTarget struct {
+	// what は診断での呼び名（"op a.f"、"read a.r"、"効果 a.e"、"状態 a.s の post"、"例外 a.E"）。
+	what   string
+	params []ir.OpParam
+}
+
+// evalCall は配線の呼び出し（docs/check.md「配線からの呼び出し」）。名前を解決し、行き着いたものの種類で、何を呼ぶかを
+// 決める（docs/resolve.md「呼び出しの読み分け」）: op、read、効果（effect の宣言）、直に呼ぶ組み込みの効果（状態.操作）。
+// 位置の引数を、呼び出し先の引数名に対応付け（docs/ir.md「正規化」）、型を照合する（TYPE-4、MATCH-4）。
+// 別の名前空間の、export のない op なら NS-5、別の名前空間の read か効果なら NS-6。Bound は nil のまま
+// （docs/check.md「bind」が、op の呼び出しにだけ埋める）。
 func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, ir.Call, bool) {
 	call := ir.Call{Span: a.irSpan(c.Span)}
 	args := a.evalArgs(w, c.Args)
-	r, ok := a.resolve(c.Callee, w.sc, acOp)
+	r, ok := a.resolve(c.Callee, w.sc, acCallPos)
 	if !ok {
 		return unknownType(), call, false
 	}
-	op, ok := a.lower(r.sym).(*ir.Op)
-	if !ok {
+	var target callTarget
+	var result exprType
+	switch {
+	case r.kind == rStateOp:
+		direct, ok := a.directEffect(w, r, c.Callee)
+		if !ok {
+			return unknownType(), call, false
+		}
+		call.Callee = ir.EffectCallee{Effect: direct.effect}
+		if !direct.valid {
+			// 呼べない操作（STATE-1 / STATE-6）には、引数の誤りを重ねて報告しない
+			return noValue(), call, true
+		}
+		target, result = direct.target, noValue()
+	case r.sym.kind == kindOp:
+		op, ok := a.lower(r.sym).(*ir.Op)
+		if !ok {
+			return unknownType(), call, false
+		}
+		a.checkNS5(r.sym, w.sc.ns, c.Callee.Span)
+		call.Callee = ir.OpCallee{Op: op.Name}
+		target, result = callTarget{what: "op " + op.Name, params: op.Params}, callType(op.Returns)
+	case r.sym.kind == kindRead:
+		rd, ok := a.lower(r.sym).(*ir.Read)
+		if !ok {
+			return unknownType(), call, false
+		}
+		a.checkNS6(r.sym, w.sc.ns, c.Callee.Span)
+		call.Callee = ir.ReadCallee{Read: rd.Name}
+		target, result = callTarget{what: "read " + rd.Name, params: rd.Params}, unknownType()
+		if rd.Returns != nil {
+			result = valueType(rd.Returns)
+		}
+	case r.sym.kind == kindEffect:
+		e, ok := a.lower(r.sym).(*ir.Effect)
+		if !ok {
+			return unknownType(), call, false
+		}
+		a.checkNS6(r.sym, w.sc.ns, c.Callee.Span)
+		call.Callee = ir.EffectCallee{Effect: ir.NamedEffect{Effect: e.Name}}
+		target, result = callTarget{what: "効果 " + e.Name, params: e.Params}, noValue()
+	default:
 		return unknownType(), call, false
 	}
-	a.checkNS5(r.sym, w.sc.ns, c.Callee.Span)
-	call.Op = op.Name
+	call.Args = a.bindArgs(target, args, arm)
+	return result, call, true
+}
+
+// bindArgs は位置で渡した値を、呼び出し先の引数名に対応付け、型を照合する（docs/types.md「呼び出しの引数」）。
+// 渡した値の数が引数の数を超えれば TYPE-4（位置は、超えた最初の値）。足りない必須の引数（BIND-4）は internal/check が見る。
+func (a *analyzer) bindArgs(target callTarget, args []evaluatedArg, arm *armContext) []ir.CallArg {
+	var out []ir.CallArg
 	for i, arg := range args {
-		if i >= len(op.Params) {
-			a.errorf("TYPE-4", arg.span, "op %s の引数は %d 個で、渡した引数が多い", op.Name, len(op.Params))
+		if i >= len(target.params) {
+			a.errorf("TYPE-4", arg.span, "%s の引数は %d 個で、渡した引数が多い", target.what, len(target.params))
 			break
 		}
-		p := op.Params[i]
-		call.Args = append(call.Args, ir.CallArg{Param: p.Name, Value: arg.atom})
-		a.checkArg(op, p, arg, arm)
+		p := target.params[i]
+		out = append(out, ir.CallArg{Param: p.Name, Value: arg.atom})
+		a.checkArg(target.what, p, arg, arm)
 	}
-	return callType(op.Returns), call, true
+	return out
+}
+
+// directCall は直に呼ぶ組み込みの効果（docs/check.md「直に呼ぶ組み込みの効果」）。
+type directCall struct {
+	effect ir.DirectEffect
+	target callTarget
+	// valid は、その状態の形で直に呼べる操作か（STATE-1 にも STATE-6 にも当たらない）。
+	valid bool
+}
+
+// directEffect は配線で直に呼んだ「状態.操作(…)」。状態は今の名前空間の基底の状態（別の名前空間のものなら RES-5）。
+// 操作がその状態の形になければ STATE-1、list の put / delete なら STATE-6（どの列かを引数から決める規則がない）。
+// 引数は、値を取る操作なら状態の要素の型の値一つ（名前は ir.DirectEffectParam）、nullable の delete はなし。
+func (a *analyzer) directEffect(w *wiring, r resolved, callee ast.QualifiedName) (directCall, bool) {
+	if r.sym.ns != w.sc.ns {
+		a.errorf("RES-5", callee.Span, "状態 %s は別の名前空間のもので、その操作は直には呼べない（状態を書けるのは持ち主の名前空間 %s の配線だけ。その名前空間の op を通す）", r.sym.fqn, nsName(r.sym.ns))
+		return directCall{}, false
+	}
+	st, ok := a.lower(r.sym).(*ir.State)
+	if !ok {
+		return directCall{}, false
+	}
+	opSpan := callee.Last().Span
+	out := directCall{
+		effect: ir.DirectEffect{State: st.Name, Operation: r.op},
+		target: callTarget{what: fmt.Sprintf("状態 %s の %s", st.Name, r.op)},
+	}
+	if !a.checkSTATE1(r.sym, r.op, opSpan) {
+		return out, true
+	}
+	if st.Shape == ir.StateList && r.op != ir.OpPost {
+		a.errorf("STATE-6", opSpan, "list の状態 %s の %s は、直には呼べない（どの列かを、引数から決める規則がない。名前を付けた effect を宣言して呼ぶ: effect 名前(…) on %s.%s;。docs/check.md「直に呼ぶ組み込みの効果」）", st.Name, r.op, lastSegment(st.Name), r.op)
+		return out, true
+	}
+	if r.op != ir.OpDelete && st.Element != nil {
+		out.target.params = []ir.OpParam{{Name: ir.DirectEffectParam, Type: st.Element}}
+	}
+	out.valid = true
+	return out, true
+}
+
+// lastSegment は FQN の最後の要素。
+func lastSegment(fqn string) string {
+	if i := strings.LastIndex(fqn, "."); i >= 0 {
+		return fqn[i+1:]
+	}
+	return fqn
 }
 
 // checkNS5 は NS-5（docs/check.md「名前空間」）: 別の名前空間の、export のない op を呼んだ。位置は呼び出しの op の名前
@@ -303,6 +406,16 @@ func (a *analyzer) checkNS5(op *symbol, from *namespace, span source.Span) {
 	}
 	a.errorf("NS-5", span, "op %s は名前空間 %s の内部の op で、別の名前空間 %s からは呼べない（呼べるようにするには export を付ける）", op.fqn, nsName(op.ns), nsName(from)).
 		Related = []diag.Related{related(op.nameSpan, "op %s の宣言", op.fqn)}
+}
+
+// checkNS6 は NS-6（docs/check.md「名前空間」）: 配線が、別の名前空間の read か効果（effect の宣言）を呼んだ。
+// read と効果を使えるのは、宣言した名前空間（状態の持ち主）の配線だけ。位置は呼び出しの名前。Related にその宣言。
+func (a *analyzer) checkNS6(decl *symbol, from *namespace, span source.Span) {
+	if decl.ns == from {
+		return
+	}
+	a.errorf("NS-6", span, "%s %s は名前空間 %s のもので、別の名前空間 %s の配線からは呼べない（read と効果を呼べるのは、宣言した名前空間の配線だけ。その名前空間の op を通す）", decl.kind, decl.fqn, nsName(decl.ns), nsName(from)).
+		Related = []diag.Related{related(decl.nameSpan, "%s %s の宣言", decl.kind, decl.fqn)}
 }
 
 // evaluatedArg は評価した引数。
@@ -329,7 +442,7 @@ func (a *analyzer) evalArgs(w *wiring, atoms []ast.Atom) []evaluatedArg {
 
 // checkArg は引数の型の照合（TYPE-4 / TYPE-1）。アームの中の対象は、絞り込まれた型で評価されている。
 // 対象と同じ Atom をそのまま渡していて渡せなければ MATCH-4。
-func (a *analyzer) checkArg(op *ir.Op, p ir.OpParam, arg evaluatedArg, arm *armContext) {
+func (a *analyzer) checkArg(what string, p ir.OpParam, arg evaluatedArg, arm *armContext) {
 	if p.Type == nil {
 		return
 	}
@@ -338,10 +451,10 @@ func (a *analyzer) checkArg(op *ir.Op, p ir.OpParam, arg evaluatedArg, arm *armC
 		return
 	}
 	if arm != nil && arm.subject != "" && arg.key == arm.subject {
-		a.errorf("MATCH-4", arg.span, "アーム %s の中で %s の型は %s で、op %s の引数 %s の型 %s に渡せない", arm.cases, arg.text, exprName(arg.typ), op.Name, p.Name, typeName(p.Type))
+		a.errorf("MATCH-4", arg.span, "アーム %s の中で %s の型は %s で、%s の引数 %s の型 %s に渡せない", arm.cases, arg.text, exprName(arg.typ), what, p.Name, typeName(p.Type))
 		return
 	}
-	a.errorf(string(fail), arg.span, "%s", failMessage(fail, fmt.Sprintf("op %s の引数 %s", op.Name, p.Name), arg.typ, p.Type))
+	a.errorf(string(fail), arg.span, "%s", failMessage(fail, fmt.Sprintf("%s の引数 %s", what, p.Name), arg.typ, p.Type))
 }
 
 // evalAtom は Atom の型と IR。
@@ -693,7 +806,7 @@ func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, valu
 		out.Body = ir.CallExpr{Call: call}
 		return t, out
 	case *ast.Throw:
-		out.Body = a.lowerThrow(w, body)
+		out.Body = a.lowerThrow(w, body, ctx)
 		return neverType(), out
 	case *ast.NoneAtom:
 		// アームの本体の none は body の none（atom にはしない。docs/ir.md「正規化」）
@@ -709,17 +822,19 @@ func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, valu
 	return unknownType(), out
 }
 
-// lowerThrow はアームの本体の `throw E`（docs/check.md「throw」）。E は例外一つ（どの名前空間のものでも。例外の
-// ユニオンとデコレータの引数は RES-4）。MATCH-8: E が値を運ぶ例外。
-func (a *analyzer) lowerThrow(w *wiring, t *ast.Throw) ir.ArmBody {
+// lowerThrow はアームの本体の `throw E`、`throw E(値, …)`（docs/check.md「throw」）。E は例外一つ（どの名前空間の
+// ものでも。例外のユニオンとデコレータの引数は RES-4）。引数は、例外の宣言の引数に位置で対応付け、呼び出しと同じ規則で
+// 確かめる（docs/types.md「呼び出しの引数」）。
+func (a *analyzer) lowerThrow(w *wiring, t *ast.Throw, arm *armContext) ir.ArmBody {
 	body := ir.ThrowBody{Span: a.irSpan(t.Span)}
+	args := a.evalArgs(w, t.Args)
 	r, ok := a.resolve(t.Exception, &scope{ns: w.sc.ns}, acException)
 	if !ok {
 		return body
 	}
 	body.Exception = r.sym.fqn
-	if e, ok := a.lower(r.sym).(*ir.Exception); ok && e.Value != nil {
-		a.errorf("MATCH-8", t.Exception.Span, "例外 %s は値を運ぶので、throw では投げられない（値を運ぶ例外を投げるのは、葉の op）", e.Name)
+	if e, ok := a.lower(r.sym).(*ir.Exception); ok {
+		body.Args = a.bindArgs(callTarget{what: "例外 " + e.Name, params: e.Params}, args, arm)
 	}
 	return body
 }

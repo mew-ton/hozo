@@ -2,7 +2,7 @@
 namespace a {
   exception E;
   state s: list<string>;
-  effect e on s.post;
+  effect e() on s.post;
   decorator d for field throws E;                  // ERROR: DEC-2
   decorator c for state | scalar catches E ignores; // ERROR: DEC-2
   decorator r(table: any state) for effect reads table;        // ERROR: DEC-2

@@ -9,9 +9,14 @@ namespace a {
   classify Kind of M { A; B; }
   // 状態の分類のケースで絞り込んだ型は書けない
   op ng1(m: Stock.Some<M>): void;      // ERROR: RES-4
-  // reads の要素は状態だけ（状態の分類も書けない）
-  op ng2(): M? reads Stock;            // ERROR: RES-4
-  op ng3(): M? reads M;                // ERROR: RES-4
+  // reads の要素は read か状態だけ（状態の分類も書けない）
+  op pick(): M?;
+  op ng2(): M? reads Stock {           // ERROR: RES-4
+    return pick();
+  }
+  op ng3(): M? reads M {               // ERROR: RES-4
+    return pick();
+  }
   op f(m: M): void;
   // 配線の値の位置に書けるのは、束縛、引数、今の名前空間の状態
   op ng4(): void {

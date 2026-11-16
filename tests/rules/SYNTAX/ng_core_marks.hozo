@@ -1,0 +1,23 @@
+// SYNTAX（docs/grammar.md「decorator の宣言」の CoreMark）: 核の印 @external / @repeatable は、デコレータの宣言の直前にだけ書け、
+// 引数を取らず、同じ印は一度まで。別名の形には付けられない
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  @repeatable                                    // ERROR: SYNTAX
+  model N { id: string; }
+  @repeatable()                                  // ERROR: SYNTAX
+  decorator withArgs for read;
+  @repeatable @repeatable                        // ERROR: SYNTAX
+  decorator twice for read;
+  @external @repeatable @external                // ERROR: SYNTAX
+  decorator twiceExternal;
+  decorator plain(column: string) for read;
+  @repeatable                                    // ERROR: SYNTAX
+  decorator alias = plain("id");
+  @repeatable                                    // ERROR: SYNTAX
+  read marked(): M[] on rows;
+  model F { @repeatable x: int; }                // ERROR: SYNTAX
+  @repeatable decorator ok(column: string) for read;
+  @ok("a") @ok("b")
+  read all(): M[] on rows;
+}

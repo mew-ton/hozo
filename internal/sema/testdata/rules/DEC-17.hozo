@@ -3,7 +3,7 @@
 namespace a {
   model M { id: string; }
   state s: list<M>;
-  effect add on s.post;
+  effect add() on s.post;
   decorator reading(table: any state) for op reads table;
   decorator writing(...targets: any effect) for op effects targets;
   decorator fixed for op reads s effects add;

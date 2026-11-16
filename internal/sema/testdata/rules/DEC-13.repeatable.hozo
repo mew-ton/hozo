@@ -1,0 +1,19 @@
+// DEC-13（docs/check.md「デコレータ」）: @repeatable の印を持つデコレータは、一つの宣言に何度でも付けられる。印は、展開した
+// 汎用デコレータのものを見る
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  @repeatable
+  decorator tag(name: string) for read | op;
+  decorator once(name: string) for read | op;
+  decorator hot = tag("hot");
+  decorator cold = once("cold");
+  @tag("a") @tag("b") @hot @hot
+  read some(): M[] on rows;
+  @once("a")
+  @once("b")                           // ERROR: DEC-13
+  read twice(): M[] on rows;
+  @cold
+  @once("x")                           // ERROR: DEC-13
+  op f(): M[];
+}

@@ -3,8 +3,8 @@ namespace a {
   state carts: list<string>;
   state token: nullable<string>;
   classify Session of token { Anonymous; LoggedIn; }
-  effect clear on carts: Full -> Empty;             // ERROR: STATE-4
-  effect login on token: Empty -> Some;             // ERROR: STATE-4
+  effect clear() on carts: Full -> Empty;             // ERROR: STATE-4
+  effect login() on token: Empty -> Some;             // ERROR: STATE-4
   // 状態の分類のケースは、基底の状態の遷移には書けない
-  effect signIn on token: Anonymous -> LoggedIn;    // ERROR: STATE-4
+  effect signIn() on token: Anonymous -> LoggedIn;    // ERROR: STATE-4
 }

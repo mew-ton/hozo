@@ -8,9 +8,9 @@ namespace a {
   state a4: single<string??>;
   // T[]? は nullable（要素は T[]）
   state a5: single<string[]?>;
-  effect fill on a1.post;
-  effect clear on a1.delete;
-  effect drop on a3.delete;
+  effect fill() on a1.post;
+  effect clear() on a1.delete;
+  effect drop() on a3.delete;
   op first(): M? {
     return a1;
   }

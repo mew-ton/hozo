@@ -3,9 +3,9 @@
 namespace a {
   state t: list<string>;
   classify Phase of t { Idle; Busy; }
-  effect put on t.put;
-  effect drain on t: HasItems -> Empty;
-  effect start on Phase: Idle -> Busy;
+  effect put() on t.put;
+  effect drain() on t: HasItems -> Empty;
+  effect start() on Phase: Idle -> Busy;
   decorator onPut(e: any effect on t.put);
   @onPut(put)
   op ok1(): void;

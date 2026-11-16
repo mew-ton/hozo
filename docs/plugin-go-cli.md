@@ -11,7 +11,7 @@
 ```toml
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.5"
+protocol = "0.6"
 
 vocabulary = ["cli.hozo"]
 
@@ -68,7 +68,7 @@ type Presenter interface {
     PresentError(w io.Writer, command string, input any, f Failure) error
 }
 
-// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値、Err は op が返した error そのもの（Presenter がメッセージに使える）。
+// Failure は例外の内容。Name は例外の FQN、Value は運ぶ値（引数を持つ例外の、値そのもの。引数のない例外は nil）、Err は op が返した error そのもの（Presenter がメッセージに使える）。
 // 生成した cli.go が例外の型を見分けて入れる。宣言にない例外なら Name は空で Err だけ
 type Failure struct { Name string; Value any; Err error }
 
@@ -117,7 +117,7 @@ hozoc <command> [flags] [args]
 
 ## コマンドごとの関数
 
-`run<Op>` と `fail<Op>` の中は、フィールドの型と、例外が値を運ぶかどうかによらず、同じ形。細部のテキストは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`internal/gen/hozoc/cli/cli.go`）が固定する（`docs/testing.md`「単体テスト」「生成物の一致」）。
+`run<Op>` と `fail<Op>` の中は、フィールドの型と、例外が引数を持つかどうかによらず、同じ形。細部のテキストは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`internal/gen/hozoc/cli/cli.go`）が固定する（`docs/testing.md`「単体テスト」「生成物の一致」）。
 
 ```go
 func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
@@ -136,7 +136,7 @@ func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args 
 - **フィールドの読み方**は、フィールドに付いた `cli` のデコレータごとに一行で、フィールドの順、その中はデコレータを書いた順: `@cli.flag` は `line.flag("<名前>", &in.<F>)`、`@cli.env` は `line.env("<名前>", &in.<F>)`、`@cli.arg(n)` は `line.arg(<n>, &in.<F>)`、`@cli.required` は `line.required(&in.<F>)`、`@cli.default(<リテラル>)` は `line.orDefault(&in.<F>, <リテラル>)`。`<名前>` は、デコレータの引数。省いていれば、フィールドの名前。`<リテラル>` の Go での書き方は、基底と同じ（`docs/plugin-go.md`「値」の表の `literal` の行）で、フィールドの型への変換は書かない（補助が、実行時に、読む先の型に変える）。行に書くのは、デコレータが言ったことだけで、フィールドの型で変わるものは、何も書かない。
 - 補助 `cliLine` は、並べた行（名前か位置と、読む先）を覚え、その後で、引数の並びを一度に解釈する（「引数の解釈」）。読む先の Go の型は、実行時に見る（`reflect`）: 真偽値なら値を取らないフラグ、スライスなら残りの位置引数、ポインタなら省略可能。同じ読む先に `flag` と `env` があれば、フラグが優先。どの行からも値が与えられなかった読む先は、`required` の行があれば、必須が足りない。`orDefault` の行があれば、その値にする（「引数の解釈」）。型では決めない。
 - **制約の検査**は、入力を持つどのコマンドにも、同じ補助の呼び出し一つ（「引数の解釈」）。
-- **例外**は、`fail<Op>` の中で、`Signature.exceptions` の順に、例外ごとに一行の同じ形: 型引数に例外の型を、引数に終了コード（`@cli.exitCode(code)` の `code`。なければ 70）を渡す補助の呼び出し。補助は、`errors.As` で例外の値の型を見分け、`Failure` の `Name`（例外の FQN。`HozoException()`）と `Value`（フィールド `Value` を持つかどうかを、実行時に見る）を入れる。
+- **例外**は、`fail<Op>` の中で、`Signature.exceptions` の順に、例外ごとに一行の同じ形: 型引数に例外の型を、引数に終了コード（`@cli.exitCode(code)` の `code`。なければ 70）を渡す補助の呼び出し。補助は、`errors.As` で例外の値の型を見分け、`Failure` の `Name`（例外の FQN。`HozoException()`）と `Value` を入れる。`Value` は、例外の構造体が、引数ごとのフィールド（`docs/plugin-go.md`「exception」）を一つでも持てば、その例外の値そのもの、持たなければ `nil`（実行時に見る）。
 
 
 
@@ -150,7 +150,7 @@ func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args 
 `JSONPresenter`:
 
 - `Present`: `result` を `json.MarshalIndent(result, "", "  ")` で標準出力に。`nil` なら何も出さない。
-- `PresentError`: `Name` があれば `{"error": "<Name>", "value": <Value>}`（`Value` が `nil` なら `value` を省く）を、なければ `{"error": "<Err.Error()>"}` を標準エラーに。
+- `PresentError`: `Name` があれば `{"error": "<Name>", "value": <Value>}`（`Value` が `nil` なら `value` を省く）を、なければ `{"error": "<Err.Error()>"}` を標準エラーに。`value` は、例外の引数の名前をキーにしたオブジェクトで、形は `go-http` の失敗の応答と同じ（`docs/plugin-go-http.md`「失敗の応答」）。
 
 ## 使い方の表示
 

@@ -1,30 +1,36 @@
 // DEC-1（docs/check.md「デコレータ」、docs/grammar.md「decorator の宣言」）: 対象 effect のデコレータは、効果の宣言にだけ付く。
 // 効果の宣言には、対象に effect を持つデコレータだけが付く。対象 read も同じ（read の宣言にだけ。op には付かない）。
-// union / classify / decorator に付けたら常に DEC-1
+// 対象 exception も同じ。union / classify / decorator に付けたら常に DEC-1
 namespace a {
   model M { @db.text id: string; }
-  @db.table(M)
+  @db.table
   state s: list<M>;
   decorator onlyEffect for effect;
+  decorator onlyRead for read;
+  decorator onlyException for exception;
   @onlyEffect                          // ERROR: DEC-1
   op notEffect(): void;
-  @db.insert(s)                        // ERROR: DEC-1
+  @db.insert                           // ERROR: DEC-1
   state notEffect2: list<M>;
-  @db.find(s, "id")                    // ERROR: DEC-1
-  effect notRead on s.delete;
-  @db.find(s, "id")                    // ERROR: DEC-1
+  @db.find                             // ERROR: DEC-1
+  effect notRead(id: string) on s.delete;
+  @db.find                             // ERROR: DEC-1
   op notRead2(id: string): M?;
-  @db.list(s)                          // ERROR: DEC-1
+  @db.list                             // ERROR: DEC-1
   state notRead3: list<M>;
   @onlyEffect                          // ERROR: DEC-1
-  @db.reads(byId)                      // ERROR: DEC-1
-  read notOp on s;
-  @db.insert(s)                        // ERROR: DEC-1
-  read notEffect3 on s;
-  @db.find(s, "id")
-  read byId on s;
+  @onlyException                       // ERROR: DEC-1
+  read notOp(): M[] on s;
+  @db.insert                           // ERROR: DEC-1
+  read notEffect3(): M[] on s;
+  @db.find @onlyRead
+  read byId(id: string): M? on s;
   @db.text                             // ERROR: DEC-1
-  effect notField on s.put;
+  effect notField(m: M) on s.put;
+  @onlyRead                            // ERROR: DEC-1
+  exception NotRead;
+  @onlyException                       // ERROR: DEC-1
+  effect notException(m: M) on s.post;
   @onlyEffect                          // ERROR: DEC-1
   union V { Ready: M; }
   @onlyEffect                          // ERROR: DEC-1
@@ -32,5 +38,7 @@ namespace a {
   @onlyEffect                          // ERROR: DEC-1
   decorator another;
   @onlyEffect
-  effect ok on s.post;
+  effect ok(m: M) on s.post;
+  @onlyException
+  exception Ok(reason: string);
 }

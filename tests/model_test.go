@@ -281,7 +281,7 @@ func TestDesignPlaceOrderRelations(t *testing.T) {
 		"return order",
 	})
 	// 配線には effects も relations も書いていない（計算される）
-	expect(t, "placeOrder の effects（宣言）", orEmptyStrings(place.Effects), []string{})
+	expect(t, "placeOrder の effects（宣言）", effectStrings(place.Effects), []string{})
 	expect(t, "placeOrder の throws（宣言）", renderThrows(place.Throws), []string{"throws server.NotificationFailed"})
 	want := sig{
 		E: []string{"server.NotificationFailed"},

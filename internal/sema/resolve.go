@@ -31,7 +31,7 @@ const (
 	acDecoParam // デコレータの宣言の引数（$param:）
 	acOpParam   // op の引数（デコレータの適用の引数。$param:）
 	acNamespace // 名前空間（bind の対象）
-	acStateOp   // 状態への操作（effects の要素に直に書いた「状態.操作」。手続き 2 の表）
+	acStateOp   // 状態への操作（effects の要素に直に書いた「状態.操作」と、配線で直に呼ぶ「状態.操作(…)」。手続き 2 の表）
 
 	acAnyDecl = acModel | acScalar | acUnionArms | acUnionSet | acState | acException | acEffect | acRead | acClassify | acDecorator | acOp
 )
@@ -599,6 +599,9 @@ const (
 	acEffectsPos = acEffect | acUnionSet | acStateOp
 	// acReadsPos は reads の要素: 名前で書いた read か、直に書いた状態。
 	acReadsPos = acRead | acState
+	// acCallPos は配線の呼び出しの名前: op、read、effect か、直に呼ぶ「状態.操作」
+	// （docs/resolve.md「呼び出しの読み分け」）。
+	acCallPos = acOp | acRead | acEffect | acStateOp
 	// acHaltsPos は halts の効果。デコレータの宣言の中では any effect の引数も。
 	acHaltsPos = acEffect | acDecoParam
 	// acMemberPos はユニオンのメンバー。

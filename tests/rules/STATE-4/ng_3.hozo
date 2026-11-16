@@ -1,8 +1,8 @@
 // STATE-4（docs/check.md「状態と効果」）: 宛先が single の状態（組み込みの分類がない。常に一列）
 namespace a {
   state title: single<string>;
-  effect rename on title: HasItems -> HasItems;     // ERROR: STATE-4
-  effect touch on title: any -> any;                // ERROR: STATE-4
+  effect rename() on title: HasItems -> HasItems;     // ERROR: STATE-4
+  effect touch() on title: any -> any;                // ERROR: STATE-4
   // single を変えるのは組み込みの効果 put
-  effect put on title.put;
+  effect put() on title.put;
 }

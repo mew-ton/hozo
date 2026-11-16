@@ -12,8 +12,8 @@ namespace a.sub {
 /** 画面を操作する利用者 */
 namespace user {
   state memo: nullable<string>;
-  effect writeMemo on memo.post;
-  op note(text: string) effects writeMemo;
+  effect writeMemo() on memo.post;
+  op note(text: string) effects writeMemo { writeMemo(); }
   op submit(text: string) throws a.Busy {
     note(text);
     a.save(text);

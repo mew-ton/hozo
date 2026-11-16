@@ -1,0 +1,29 @@
+// NS-6（docs/check.md「名前空間」「配線からの呼び出し」）: read と効果を呼べるのは、宣言した名前空間（状態の持ち主）の配線だけ。
+// 別の名前空間は、その名前空間の op を通す。位置は呼び出しの名前
+effect global() on shared.post;
+state shared: list<string>;
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  read byId(id: string): M? on rows;
+  effect add(m: M) on rows.post;
+  export op find(id: string): M? { return byId(id); }
+}
+namespace a.child {
+  op f(m: a.M): a.M? {
+    a.add(m);                            // ERROR: NS-6
+    return a.byId(m.id);                 // ERROR: NS-6
+  }
+}
+namespace b {
+  classify K of a.M { One; default; }
+  op g(m: a.M): a.M? {
+    a.add(m);                            // ERROR: NS-6
+    global();                            // ERROR: NS-6
+    const found = a.byId(m.id);          // ERROR: NS-6
+    return match m by K {
+      One     => a.byId(m.id);           // ERROR: NS-6
+      default => found;
+    };
+  }
+}

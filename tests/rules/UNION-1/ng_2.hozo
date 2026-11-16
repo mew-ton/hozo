@@ -3,7 +3,7 @@ namespace a {
   model M { id: string; }
   exception E;
   state s: list<M>;
-  effect e on s.post;
+  effect e() on s.post;
   union ExcEff {                       // ERROR: UNION-1
     E;
     e;

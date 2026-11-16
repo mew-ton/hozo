@@ -68,6 +68,19 @@ func (e *emitter) unionComment(u *ir.Union) string {
 	return comment(describe(e.typeName(u.Name), u.Description, "union "+u.Name+"。"))
 }
 
+// exceptionValue は、例外の構造体の Value の型。IR 0.6 で例外は引数の並び（Exception.Params）を持つようになったが、
+// 引数ごとのフィールドの形は、まだ決めていない: 引数が一つの例外だけを、今までの形（Value 一つ）で出し、二つ以上は誤りにする。
+func (e *emitter) exceptionValue(x *ir.Exception) ir.Type {
+	switch len(x.Params) {
+	case 0:
+		return nil
+	case 1:
+		return x.Params[0].Type
+	}
+	e.errorf(codeInternal, x.Name, "例外 %s は引数を %d 個持つ（引数を二つ以上持つ例外の出力は、まだない）", x.Name, len(x.Params))
+	return nil
+}
+
 // exceptionComment は「<型名>: <説明>」。説明がなければ「<型名> は exception <FQN>。」。
 func (e *emitter) exceptionComment(x *ir.Exception) string {
 	if b := body(x.Description); b != "" {
@@ -133,8 +146,8 @@ func (e *emitter) genTypes() *fileGen {
 		case *ir.Exception:
 			name := e.typeName(x.Name)
 			f.print(e.exceptionComment(x))
-			if x.Value != nil {
-				f.printf("type %s struct{ Value %s }\n\n", name, f.goType(x.Value))
+			if value := e.exceptionValue(x); value != nil {
+				f.printf("type %s struct{ Value %s }\n\n", name, f.goType(value))
 			} else {
 				f.printf("type %s struct{}\n\n", name)
 			}

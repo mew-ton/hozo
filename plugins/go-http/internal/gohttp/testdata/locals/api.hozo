@@ -7,7 +7,7 @@ namespace w {
 namespace err {
   model Note { text: string; }
   @http.status(409)
-  exception Conflict: Note;
+  exception Conflict(value: Note);
 }
 namespace in {
   model Note { @http.required @http.body text: string; }

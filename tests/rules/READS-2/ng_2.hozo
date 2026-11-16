@@ -1,5 +1,5 @@
 // READS-2（docs/check.md「reads」）: 名前で書いた状態、match の対象、match by C の対象の状態、bind で埋まる位置の状態も、
-// その配線が読む状態に入る。別の名前空間の op が読む状態も伝わる
+// その配線が読む状態に入る。呼んだ read の宛先の状態と、別の名前空間の op が読む状態も入る
 namespace a {
   scalar Token extends string;
   state token: nullable<Token>;
@@ -23,8 +23,12 @@ namespace a {
   op across(): string[] reads rows {           // ERROR: READS-2
     return b.all();
   }
+  read first(): string? on rows;
+  op byRead(): string? reads token {           // ERROR: READS-2
+    return first();
+  }
 }
 namespace b {
   state items: list<string>;
-  export op all(): string[] reads items;
+  export op all(): string[] reads items { return items; }
 }

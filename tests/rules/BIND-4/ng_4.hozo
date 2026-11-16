@@ -1,0 +1,30 @@
+// BIND-4（docs/check.md「必須の入力」）: read、効果（宣言と、直に呼ぶ組み込みの効果）、throw にも掛かる。bind は、op でない
+// 呼び出し先の引数を埋めない（op の引数 viaOp の t は埋まる）
+namespace a {
+  scalar Token extends string;
+  model M { id: string; note: string; }
+  exception Busy(wait: Duration, note: string?);
+  state token: single<Token>;
+  state rows: list<M>;
+  bind token to a.*;
+  read byToken(t: Token, id: string?): M? on rows;
+  effect add(m: M) on rows.post;
+  classify K of M { A; B; }
+  op viaOp(t: Token): M?;
+  op f(m: M): M? throws Busy {
+    add();                               // ERROR: BIND-4
+    add({ id: "x" });                    // ERROR: BIND-4
+    rows.post();                         // ERROR: BIND-4
+    const found = byToken();             // ERROR: BIND-4
+    const bound = viaOp();
+    use(found, bound);
+    return match m by K {
+      A => throw Busy;                   // ERROR: BIND-4
+      B => byToken(token, m.id);
+    };
+  }
+  op use(m: M?, n: M?);
+}
+namespace b {
+  op noop();
+}

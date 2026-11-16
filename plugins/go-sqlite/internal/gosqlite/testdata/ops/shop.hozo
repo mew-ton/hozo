@@ -72,24 +72,24 @@ namespace shop {
   // ---- 効果: 表に何をするか ----
 
   @db.insert(items)
-  effect createItem on items.post;
+  effect createItem() on items.post;
   @db.update(items)
-  effect updateItem on items.put;
+  effect updateItem() on items.put;
   @db.delete(items, "id")
-  effect deleteItem on items.delete;
+  effect deleteItem() on items.delete;
   @db.delete(items, "note")
-  effect deleteNoted on items.delete;
+  effect deleteNoted() on items.delete;
   @db.insert(stock)
-  effect createStock on stock.post;
+  effect createStock() on stock.post;
   @db.update(stock)
-  effect updateStock on stock.put;
+  effect updateStock() on stock.put;
   @db.delete(stock, "item")
-  effect deleteStock on stock.delete;
+  effect deleteStock() on stock.delete;
   @db.insert(audits)
-  effect createAudit on audits.post;
+  effect createAudit() on audits.post;
   /** op に並べられていない効果のデコレータも、同じに確かめる（何も出さない） */
   @db.delete(audits, "item")
-  effect deleteAudit on audits.delete;
+  effect deleteAudit() on audits.delete;
 
   // ---- 書く op: 効果が一つ ----
 

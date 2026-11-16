@@ -2,7 +2,7 @@
 // 残りの引数のほかの Param に二度渡せない
 namespace a {
   state s: list<string>;
-  effect e1 on s.post;
+  effect e1() on s.post;
   decorator all(...targets: any effect) for op effects targets;
   decorator some(first: int, second: string?, ...more: string);
   @all(targets: e1)                    // ERROR: DEC-11

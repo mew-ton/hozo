@@ -140,8 +140,9 @@ func declared(o *ir.Op) []string {
 	return out
 }
 
-// callRef は配線の本体の一つの呼び出し。アームの本体の `throw X` も、例外が X だけで効果を持たない呼び出しとして
-// 数える（docs/check.md「手順 0」）。そのときは throw に X が入り、call は Op が空で、Span がその throw の位置。
+// callRef は配線の本体の一つの呼び出し（op、read、効果）。アームの本体の `throw X` も、例外が X だけで効果を持たない
+// 呼び出しとして数える（docs/check.md「手順 0」）。そのときは throw に X が入り、call は Callee が nil で、Args が
+// その throw の引数、Span がその throw の位置。
 type callRef struct {
 	row   int     // 行（0 始まり）
 	arm   int     // match のアーム（アームでなければ -1）
@@ -190,7 +191,7 @@ func rowsOf(w *ir.Wiring) []row {
 					r.calls = append(r.calls, callRef{row: i, arm: j, call: body.Call, stmt: span})
 				case ir.ThrowBody:
 					if body.Exception != "" {
-						r.calls = append(r.calls, callRef{row: i, arm: j, call: ir.Call{Span: body.Span}, throw: body.Exception, stmt: span})
+						r.calls = append(r.calls, callRef{row: i, arm: j, call: ir.Call{Args: body.Args, Span: body.Span}, throw: body.Exception, stmt: span})
 					}
 				}
 			}
@@ -313,8 +314,8 @@ func (c *computer) detectCycles() {
 		}
 		for _, r := range rowsOf(o.Body) {
 			for _, cr := range r.calls {
-				if ix.op(cr.call.Op) != nil {
-					out = appendUnique(out, cr.call.Op)
+				if name := cr.call.CalledOp(); ix.op(name) != nil {
+					out = appendUnique(out, name)
 				}
 			}
 		}
@@ -393,9 +394,10 @@ func (c *computer) sig(o *ir.Op, viewer string) *sigState {
 	return s
 }
 
-// leafStep0 は手順 0（葉の op）。E = Declared(O)、F = O が直に持つ効果（Op.effects と、デコレータが運ぶ
-// Op.carried.effects。docs/check.md「デコレータが運ぶ reads と effects」）、rel は Op.throws の relations、succ は kept。
-// 呼び出しが循環している op（WIRE-7）は配線なので、運ばれるものを使わず、F = Op.effects。
+// leafStep0 は手順 0（葉の op）。E = Declared(O)、F = O が直に持つ効果（デコレータが運ぶ Op.carried.effects。
+// STATE-5 に当たった葉は、節に書いた Op.effects を前に並べる。docs/check.md「デコレータが運ぶ reads と effects」）、
+// rel は Op.throws の relations、succ は kept。
+// 呼び出しが循環している op（WIRE-7）は配線なので、運ばれるものを使わず、F = Op.effects（節に書いたもの）。
 func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 	for _, x := range declared(o) {
 		s.addE(x)
@@ -423,15 +425,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 	info.sigs = make([][]*sigState, len(info.rows))
 	for i, r := range info.rows {
 		for _, cr := range r.calls {
-			var sc *sigState
-			if cr.throw != "" {
-				// アームの本体の throw X: 例外が X だけで、効果を持たない呼び出し
-				sc = newSigState()
-				sc.addE(cr.throw)
-			} else if callee := c.ix.op(cr.call.Op); callee != nil {
-				sc = c.sig(callee, ns)
-			}
-			info.sigs[i] = append(info.sigs[i], sc)
+			info.sigs[i] = append(info.sigs[i], c.callSig(cr, ns))
 		}
 	}
 	// F: 各 Sc.effects を行の順、アームの順に連結し、重複を最初の出現に寄せる
@@ -540,6 +534,33 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 		checkRel4(o, s, c.r)
 		checkThrows1(c, o, info)
 	}
+}
+
+// callSig は手順 0 の表の Sc: 配線の呼び出し一つの、例外・効果・rel・succ（docs/check.md「Sig(O, v)」）。
+// op の呼び出しは Sig(callee, ns)。効果の呼び出しは、例外がなく、効果がその効果一つで、succ は kept。read の呼び出しは
+// 何も持たない。アームの本体の throw X は、例外が X だけ。呼び出し先が引けなければ nil。
+func (c *computer) callSig(cr callRef, ns string) *sigState {
+	if cr.throw != "" {
+		sc := newSigState()
+		sc.addE(cr.throw)
+		return sc
+	}
+	switch callee := cr.call.Callee.(type) {
+	case ir.OpCallee:
+		if o := c.ix.op(callee.Op); o != nil {
+			return c.sig(o, ns)
+		}
+	case ir.EffectCallee:
+		if callee.Effect != nil {
+			sc := newSigState()
+			sc.addF(callee.Effect)
+			sc.succ[callee.Effect] = ir.Kept
+			return sc
+		}
+	case ir.ReadCallee:
+		return newSigState()
+	}
+	return nil
 }
 
 // decoratorSteps は手順 i = 1..n。Op.decorators の末尾（最も内側）から順に、catches の節、次に throws の節を適用する。
@@ -713,7 +734,7 @@ func (c *computer) neverReturns(cr callRef) bool {
 	if cr.throw != "" {
 		return true
 	}
-	callee := c.ix.op(cr.call.Op)
+	callee := c.ix.op(cr.call.CalledOp())
 	return callee != nil && ir.IsNever(callee.Returns)
 }
 
@@ -725,7 +746,7 @@ func (c *computer) returningArms(r row) int {
 		case ir.ThrowBody:
 			continue
 		case ir.CallExpr:
-			if callee := c.ix.op(b.Call.Op); callee != nil && ir.IsNever(callee.Returns) {
+			if callee := c.ix.op(b.Call.CalledOp()); callee != nil && ir.IsNever(callee.Returns) {
 				continue
 			}
 		}
@@ -735,9 +756,11 @@ func (c *computer) returningArms(r row) int {
 }
 
 // readsOf は op が読む状態 R（docs/check.md「reads」）。基底の状態の FQN の列で、デコレータが R に足すのは、reads の節が
-// 運ぶものだけ（throws / catches の節は R を変えない）。葉の op は直に読む状態（Op.reads の後ろに Op.carried.reads の、
-// 要素ごとの状態。read の宣言は、その宛先の状態として数える）、呼び出しが循環している op は Op.reads の要素の状態。
-// 配線の op は、本体を行の順に見て集める（運ばれるものは使わない）。
+// 運ぶものだけ（throws / catches の節は R を変えない）。葉の op は直に読む状態（デコレータが運ぶ Op.carried.reads の、
+// 要素ごとの状態。read の宣言は、その宛先の状態として数える。STATE-5 に当たった葉は、節に書いた Op.reads を前に並べる）、
+// 呼び出しが循環している op は Op.reads の要素の状態。
+// 配線の op は、本体を行の順に見て集める（運ばれるものは使わない）: 名前で書いた状態、bind で埋まる位置の状態、
+// 呼んだ read の宛先の状態、呼んだ op の R。
 func (c *computer) readsOf(o *ir.Op) []string {
 	if r, ok := c.reads[o.Name]; ok {
 		return r
@@ -762,15 +785,23 @@ func (c *computer) readsOf(o *ir.Op) []string {
 		return out
 	}
 	call := func(call ir.Call) {
-		// 2.1 引数の Atom が参照する状態、2.2 Call.bound の状態、2.3 呼び出し先の R
+		// 2.1 引数の Atom が参照する状態、2.2 Call.bound の状態、2.3 呼び出し先が op ならその R、read ならその宛先の状態
+		// （効果は何も足さない）
 		for _, a := range call.Args {
 			add(atomStates(a.Value)...)
 		}
 		for _, b := range call.Bound {
 			add(b.State)
 		}
-		if callee := c.ix.op(call.Op); callee != nil {
-			add(c.readsOf(callee)...)
+		switch callee := call.Callee.(type) {
+		case ir.OpCallee:
+			if o := c.ix.op(callee.Op); o != nil {
+				add(c.readsOf(o)...)
+			}
+		case ir.ReadCallee:
+			if rd, ok := c.ix.decls[callee.Read].(*ir.Read); ok {
+				add(rd.State)
+			}
 		}
 	}
 	expr := func(e ir.Expr) {
@@ -795,6 +826,11 @@ func (c *computer) readsOf(o *ir.Op) []string {
 					call(body.Call)
 				case ir.AtomExpr:
 					add(atomStates(body.Atom)...)
+				case ir.ThrowBody:
+					// throw の引数の Atom が参照する状態
+					for _, a := range body.Args {
+						add(atomStates(a.Value)...)
+					}
 				}
 			}
 		}
@@ -841,7 +877,7 @@ func (c *computer) pureOf(o *ir.Op) bool {
 	if pure && o.Body != nil && !c.cyclic[o.Name] {
 		for _, r := range rowsOf(o.Body) {
 			for _, cr := range r.calls {
-				if callee := c.ix.op(cr.call.Op); callee != nil && !c.pureOf(callee) {
+				if callee := c.ix.op(cr.call.CalledOp()); callee != nil && !c.pureOf(callee) {
 					pure = false
 				}
 			}

@@ -1,7 +1,7 @@
 // STATE-2（docs/check.md「状態と効果」）: デコレータの halts の効果（any effect の引数で渡したもの）が、付けた op の名前空間と違う
 namespace a {
   state s: single<string>;
-  effect e on s.put;
+  effect e() on s.put;
   op f();
 }
 namespace b {

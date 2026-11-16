@@ -29,7 +29,7 @@ namespace browser {
 
 namespace browser {
   /** 支払い画面へ遷移する */
-  effect transitionToPayment on location.put;
+  effect transitionToPayment() on location.put;
 
   op goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
     effects transitionToPayment;

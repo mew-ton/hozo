@@ -1,15 +1,16 @@
-// THROWS-3（docs/check.md「never を返す op」）: 値を運ばない例外を一つ投げる、引数のない葉。catches を持たないデコレータは付けられる。
+// THROWS-3（docs/check.md「never を返す op」）: 引数を持たない例外を一つ投げる、引数のない葉。catches を持たないデコレータは付けられる。
 // 呼び出しの式の型は「返らない」で、どの型のアームにも、どの型の return にも書ける
 namespace a {
   model M { id: string; }
   exception Unauthorized;
   decorator mark;
+  decorator writing(...targets: any effect) for op effects targets;
   classify Kind of M { A; B; }
   op unauthorized(): never throws Unauthorized;
   @mark
   export op denied(): never throws Unauthorized;
   // 節を持つデコレータでも、運ぶものがなければ付けられる（残りの引数に何も渡していない）
-  @db.effects
+  @writing
   op nothing(): never throws Unauthorized;
   op keep(m: M): M;
   op f(m: M): M throws Unauthorized {

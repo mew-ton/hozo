@@ -987,7 +987,7 @@ func TestCarryingDecorators(t *testing.T) {
   decorator into(table: any state) for effect;
   decorator everything = list(rows);
   @into(rows)
-  effect add on rows.post;
+  effect add() on rows.post;
   /**
    * 全部を引く。
    *
@@ -1051,7 +1051,7 @@ func TestCarryingDecorators(t *testing.T) {
 		{"effects の節の、残りの引数の名前", at("for op effects targets", len("for op effects ")), "targets: any effect) for op", 0, []string{effectsHead, "  ...targets: any effect", "行う効果"}},
 		{"節に書いた状態の名前", at("effects targets reads rows;", len("effects targets reads ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
 		{"残りの引数の宣言", at("...targets: any effect", len("...")), "targets: any effect) for op", 0, []string{"  ...targets: any effect"}},
-		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add on rows.post;", 0, []string{"effect add on rows.post"}},
+		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add on rows.post;", 0, []string{"effect add() on rows.post"}},
 		{"効果の宣言に付けたデコレータ", at("@into(rows)", 1), "decorator into(", len("decorator "), []string{"decorator into(table: any state) for effect"}},
 		{"別名の先の予約語", at("= list(rows);", len("= ")), "decorator list(", len("decorator "), []string{listHead}},
 		{"@see の予約語のデコレータ名", at("@see list", len("@see ")), "decorator list(", len("decorator "), []string{listHead}},

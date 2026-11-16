@@ -1,5 +1,5 @@
 {
-  "version": "0.5",
+  "version": "0.6",
   "namespaces": [
     {
       "name": "",
@@ -200,6 +200,7 @@
               "col": 50
             }
           },
+          "params": [],
           "target": {
             "kind": "transition",
             "of": "Login",
@@ -230,6 +231,7 @@
               "col": 50
             }
           },
+          "params": [],
           "target": {
             "kind": "transition",
             "of": "session",
@@ -693,7 +695,8 @@
               "line": 21,
               "col": 30
             }
-          }
+          },
+          "params": []
         },
         {
           "kind": "exception",
@@ -710,48 +713,47 @@
               "col": 40
             }
           },
-          "value": {
-            "kind": "ref",
-            "target": "server.Unavailable.Value"
-          }
-        },
-        {
-          "kind": "model",
-          "name": "server.Unavailable.Value",
-          "decorators": [],
-          "span": {
-            "file": "server.hozo",
-            "start": {
-              "line": 22,
-              "col": 25
-            },
-            "end": {
-              "line": 22,
-              "col": 40
-            }
-          },
-          "fields": [
+          "params": [
             {
               "name": "reason",
               "type": {
                 "kind": "core",
                 "name": "string"
               },
-              "decorators": [],
               "span": {
                 "file": "server.hozo",
                 "start": {
                   "line": 22,
-                  "col": 27
+                  "col": 22
                 },
                 "end": {
                   "line": 22,
+                  "col": 36
+                }
+              }
+            },
+            {
+              "name": "wait",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "core",
+                  "name": "Duration"
+                }
+              },
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 22,
                   "col": 38
+                },
+                "end": {
+                  "line": 22,
+                  "col": 53
                 }
               }
             }
-          ],
-          "synthesizedFrom": "server.Unavailable"
+          ]
         },
         {
           "kind": "effect",
@@ -792,6 +794,26 @@
               "col": 40
             }
           },
+          "params": [
+            {
+              "name": "user",
+              "type": {
+                "kind": "ref",
+                "target": "server.User"
+              },
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 24,
+                  "col": 22
+                },
+                "end": {
+                  "line": 24,
+                  "col": 32
+                }
+              }
+            }
+          ],
           "target": {
             "kind": "builtin",
             "state": "db",
@@ -800,6 +822,50 @@
           "writes": [
             "db"
           ]
+        },
+        {
+          "kind": "read",
+          "name": "server.userById",
+          "decorators": [],
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 25,
+              "col": 1
+            },
+            "end": {
+              "line": 25,
+              "col": 50
+            }
+          },
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 15
+                },
+                "end": {
+                  "line": 25,
+                  "col": 25
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "server.User"
+            }
+          },
+          "state": "db"
         },
         {
           "kind": "union",
@@ -1092,6 +1158,7 @@
             "field"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [
             {
               "exceptions": [
@@ -1155,7 +1222,8 @@
           },
           "params": [],
           "targets": [],
-          "external": true,
+          "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -1216,6 +1284,7 @@
             "effect"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [],
@@ -1260,14 +1329,24 @@
             "op"
           ],
           "external": false,
+          "repeatable": false,
           "throws": [],
           "catches": [],
           "reads": [
-            "$param:table",
-            "session"
+            {
+              "kind": "direct",
+              "state": "$param:table"
+            },
+            {
+              "kind": "direct",
+              "state": "session"
+            }
           ],
           "effects": [
-            "$param:targets"
+            {
+              "kind": "named",
+              "effect": "$param:targets"
+            }
           ]
         },
         {
@@ -1422,10 +1501,25 @@
             }
           },
           "effects": [
-            "server.UserCreated"
+            {
+              "kind": "named",
+              "effect": "server.UserCreated"
+            },
+            {
+              "kind": "direct",
+              "state": "session",
+              "operation": "delete"
+            }
           ],
           "reads": [
-            "db"
+            {
+              "kind": "named",
+              "read": "server.userById"
+            },
+            {
+              "kind": "direct",
+              "state": "session"
+            }
           ],
           "carried": {
             "reads": [],
@@ -1446,28 +1540,72 @@
               "server.Unavailable"
             ],
             "effects": [
-              "server.UserCreated"
+              {
+                "kind": "named",
+                "effect": "server.UserCreated"
+              },
+              {
+                "kind": "direct",
+                "state": "session",
+                "operation": "delete"
+              }
             ],
             "relations": [
               {
                 "exception": "server.Unauthorized",
-                "effect": "server.UserCreated",
+                "effect": {
+                  "kind": "named",
+                  "effect": "server.UserCreated"
+                },
+                "state": "prevented"
+              },
+              {
+                "exception": "server.Unauthorized",
+                "effect": {
+                  "kind": "direct",
+                  "state": "session",
+                  "operation": "delete"
+                },
                 "state": "prevented"
               },
               {
                 "exception": "server.Unavailable",
-                "effect": "server.UserCreated",
+                "effect": {
+                  "kind": "named",
+                  "effect": "server.UserCreated"
+                },
                 "state": "unknown"
+              },
+              {
+                "exception": "server.Unavailable",
+                "effect": {
+                  "kind": "direct",
+                  "state": "session",
+                  "operation": "delete"
+                },
+                "state": "kept"
               }
             ],
             "successEffects": [
               {
-                "effect": "server.UserCreated",
+                "effect": {
+                  "kind": "named",
+                  "effect": "server.UserCreated"
+                },
+                "state": "kept"
+              },
+              {
+                "effect": {
+                  "kind": "direct",
+                  "state": "session",
+                  "operation": "delete"
+                },
                 "state": "kept"
               }
             ],
             "reads": [
-              "db"
+              "db",
+              "session"
             ],
             "pure": false
           }
@@ -1602,13 +1740,28 @@
           "reads": [],
           "carried": {
             "reads": [
-              "db",
-              "session"
+              {
+                "kind": "direct",
+                "state": "db"
+              },
+              {
+                "kind": "direct",
+                "state": "session"
+              }
             ],
             "effects": [
-              "server.UserCreated",
-              "login",
-              "logout"
+              {
+                "kind": "named",
+                "effect": "server.UserCreated"
+              },
+              {
+                "kind": "named",
+                "effect": "login"
+              },
+              {
+                "kind": "named",
+                "effect": "logout"
+              }
             ]
           },
           "throws": [],
@@ -1616,22 +1769,40 @@
           "signature": {
             "exceptions": [],
             "effects": [
-              "server.UserCreated",
-              "login",
-              "logout"
+              {
+                "kind": "named",
+                "effect": "server.UserCreated"
+              },
+              {
+                "kind": "named",
+                "effect": "login"
+              },
+              {
+                "kind": "named",
+                "effect": "logout"
+              }
             ],
             "relations": [],
             "successEffects": [
               {
-                "effect": "server.UserCreated",
+                "effect": {
+                  "kind": "named",
+                  "effect": "server.UserCreated"
+                },
                 "state": "kept"
               },
               {
-                "effect": "login",
+                "effect": {
+                  "kind": "named",
+                  "effect": "login"
+                },
                 "state": "kept"
               },
               {
-                "effect": "logout",
+                "effect": {
+                  "kind": "named",
+                  "effect": "logout"
+                },
                 "state": "kept"
               }
             ],
@@ -1776,7 +1947,10 @@
                 "expr": {
                   "kind": "call",
                   "call": {
-                    "op": "server.findUser",
+                    "callee": {
+                      "kind": "op",
+                      "op": "server.findUser"
+                    },
                     "args": [
                       {
                         "param": "id",
@@ -1828,7 +2002,10 @@
               {
                 "kind": "call",
                 "call": {
-                  "op": "server.notify",
+                  "callee": {
+                    "kind": "op",
+                    "op": "server.notify"
+                  },
                   "args": [
                     {
                       "param": "in",
@@ -1974,7 +2151,10 @@
                       "body": {
                         "kind": "call",
                         "call": {
-                          "op": "server.notify",
+                          "callee": {
+                            "kind": "op",
+                            "op": "server.notify"
+                          },
                           "args": [
                             {
                               "param": "in",
@@ -2102,7 +2282,10 @@
                         "body": {
                           "kind": "call",
                           "call": {
-                            "op": "server.findUser",
+                            "callee": {
+                              "kind": "op",
+                              "op": "server.findUser"
+                            },
                             "args": [
                               {
                                 "param": "id",
@@ -2265,7 +2448,10 @@
                       "body": {
                         "kind": "call",
                         "call": {
-                          "op": "server.notify",
+                          "callee": {
+                            "kind": "op",
+                            "op": "server.notify"
+                          },
                           "args": [],
                           "bound": [],
                           "span": {
@@ -2327,6 +2513,158 @@
                 }
               },
               {
+                "kind": "const",
+                "name": "found",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "callee": {
+                      "kind": "read",
+                      "read": "server.userById"
+                    },
+                    "args": [
+                      {
+                        "param": "id",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "id"
+                          ],
+                          "span": {
+                            "file": "server.hozo",
+                            "start": {
+                              "line": 65,
+                              "col": 30
+                            },
+                            "end": {
+                              "line": 65,
+                              "col": 32
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [],
+                    "span": {
+                      "file": "server.hozo",
+                      "start": {
+                        "line": 65,
+                        "col": 17
+                      },
+                      "end": {
+                        "line": 65,
+                        "col": 33
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 65,
+                    "col": 3
+                  },
+                  "end": {
+                    "line": 65,
+                    "col": 34
+                  }
+                }
+              },
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "named",
+                      "effect": "server.UserCreated"
+                    }
+                  },
+                  "args": [
+                    {
+                      "param": "user",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "user"
+                        ],
+                        "span": {
+                          "file": "server.hozo",
+                          "start": {
+                            "line": 65,
+                            "col": 50
+                          },
+                          "end": {
+                            "line": 65,
+                            "col": 54
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 65,
+                      "col": 36
+                    },
+                    "end": {
+                      "line": 65,
+                      "col": 55
+                    }
+                  }
+                },
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 65,
+                    "col": 36
+                  },
+                  "end": {
+                    "line": 65,
+                    "col": 56
+                  }
+                }
+              },
+              {
+                "kind": "call",
+                "call": {
+                  "callee": {
+                    "kind": "effect",
+                    "effect": {
+                      "kind": "direct",
+                      "state": "session",
+                      "operation": "delete"
+                    }
+                  },
+                  "args": [],
+                  "bound": [],
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 65,
+                      "col": 58
+                    },
+                    "end": {
+                      "line": 65,
+                      "col": 74
+                    }
+                  }
+                },
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 65,
+                    "col": 58
+                  },
+                  "end": {
+                    "line": 65,
+                    "col": 75
+                  }
+                }
+              },
+              {
                 "kind": "match",
                 "match": {
                   "subject": {
@@ -2340,7 +2678,30 @@
                       ],
                       "body": {
                         "kind": "throw",
-                        "exception": "server.Unauthorized",
+                        "exception": "server.Unavailable",
+                        "args": [
+                          {
+                            "param": "reason",
+                            "value": {
+                              "kind": "literal",
+                              "literal": {
+                                "kind": "string",
+                                "value": "anonymous"
+                              },
+                              "span": {
+                                "file": "server.hozo",
+                                "start": {
+                                  "line": 67,
+                                  "col": 37
+                                },
+                                "end": {
+                                  "line": 67,
+                                  "col": 48
+                                }
+                              }
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "server.hozo",
                           "start": {
@@ -2349,7 +2710,7 @@
                           },
                           "end": {
                             "line": 67,
-                            "col": 43
+                            "col": 49
                           }
                         }
                       },
@@ -2362,7 +2723,7 @@
                         },
                         "end": {
                           "line": 67,
-                          "col": 44
+                          "col": 50
                         }
                       }
                     },

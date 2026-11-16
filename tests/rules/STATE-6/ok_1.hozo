@@ -1,0 +1,19 @@
+// STATE-6（docs/check.md「直に呼ぶ組み込みの効果」）: 直に呼べるのは、list の post、nullable の post / put / delete、single の put。
+// list の行を書き換える、消すには、名前を付けた effect を宣言して呼ぶ（どの列かは、その宣言の実装が決める）
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  state cur: nullable<M>;
+  state title: single<string>;
+  effect change(m: M) on rows.put;
+  effect remove(id: string) on rows.delete;
+  op f(m: M) effects rows.post, cur.post, cur.put, cur.delete, title.put, change, remove {
+    rows.post(m);
+    cur.post(m);
+    cur.put({ id: "x" });
+    cur.delete();
+    title.put("t");
+    change(m);
+    remove(m.id);
+  }
+}

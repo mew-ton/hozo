@@ -2,20 +2,20 @@
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  effect ok on s.post;
-  effect okTransition on s: Empty -> HasItems;
-  effect okPhase on Phase: Idle -> Busy;
+  effect ok() on s.post;
+  effect okTransition() on s: Empty -> HasItems;
+  effect okPhase() on Phase: Idle -> Busy;
 }
 namespace b {
-  effect e on a.s.post;                // ERROR: RES-5
-  effect t on a.s: Empty -> HasItems;  // ERROR: RES-5
-  effect p on a.Phase: Idle -> Busy;   // ERROR: RES-5
+  effect e() on a.s.post;                // ERROR: RES-5
+  effect t() on a.s: Empty -> HasItems;  // ERROR: RES-5
+  effect p() on a.Phase: Idle -> Busy;   // ERROR: RES-5
 }
 state g: list<string>;
 classify G of g { None; Some; }
-effect okGlobal on G: None -> Some;
+effect okGlobal() on G: None -> Some;
 namespace c {
-  effect e on g.post;                  // ERROR: RES-5
-  effect t on g: any -> Empty;         // ERROR: RES-5
-  effect p on G: None -> Some;         // ERROR: RES-5
+  effect e() on g.post;                  // ERROR: RES-5
+  effect t() on g: any -> Empty;         // ERROR: RES-5
+  effect p() on G: None -> Some;         // ERROR: RES-5
 }

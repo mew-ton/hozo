@@ -18,9 +18,9 @@ namespace tool {
   model Notes { items: Note[]; }
 
   @cli.exitCode(1)
-  exception CheckFailed: Notes;
+  exception CheckFailed(value: Notes);
   @cli.exitCode(2)
-  exception ConfigInvalid: Notes;
+  exception ConfigInvalid(value: Notes);
   @cli.exitCode(64)
   exception UnknownName;
   /** 終了コードを書いていない例外 */

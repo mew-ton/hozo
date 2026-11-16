@@ -13,7 +13,7 @@
 ```toml
 name     = "go-http"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-http"]
-protocol = "0.5"
+protocol = "0.6"
 
 [[transpiler]]
 name     = "go-http"
@@ -58,7 +58,7 @@ N の単位の対象の op（`docs/config.md`「in」）のうち、`@http.get` 
 - 経路の op の結果の型は、省略可能な配列（`T[]?`）でも、省略可能な record（`Record<K, V>?`）でもいけない。そうなら GOHTTP-16。Go では、どちらも `nil` が「値がない」を表すので、補助は、実行時に、値がない（204）ことと、空である（200）ことを見分けられない。省略可能な model と scalar（`type.Order?`）は、結果にできる（「通信の形」の「成功の応答」）。
 - この表は、書いたものの整合の検査で、出力を変えない（どの型でも、同じ補助の呼び出しになる。「入力の読み方」）。
 - パスは、`/` で始まる、決まった文字列。`{` か `}` を含むパス（パスの中の値）は、それを入力のフィールドに結ぶ語彙がまだないので GOHTTP-7。同じメソッドとパスの組が二つあれば GOHTTP-8。
-- **JSON にできる型**: 核の型、scalar、model、`optional`、`array`、`record` と、それらの組み合わせ。union（`arms`）と、union を中に持つ型は、通信の上の形をまだ決めていないので、本文（`@http.body`、`@http.bodyObj`）、結果、`@http.status` を持つ例外が運ぶ値のどこに現れても GOHTTP-5。
+- **JSON にできる型**: 核の型、scalar、model、`optional`、`array`、`record` と、それらの組み合わせ。union（`arms`）と、union を中に持つ型は、通信の上の形をまだ決めていないので、本文（`@http.body`、`@http.bodyObj`）、結果、`@http.status` を持つ例外の引数の型のどこに現れても GOHTTP-5。
 
 ## 出力
 
@@ -159,7 +159,7 @@ func NewHandler(ops Ops) http.Handler {
 | `httpWriteJSON(w http.ResponseWriter, status int, v any)` | 値を JSON にして返す |
 | `httpWriteResult(w http.ResponseWriter, out any)` | 成功の応答。返す値があるかどうかを、実行時に見る（「通信の形」の「成功の応答」） |
 | `httpWriteError(w http.ResponseWriter, err error)` | op が返したエラーを応答にする |
-| `httpThrown[E runtime.Exception](w http.ResponseWriter, err error, status int) bool` | `err` が例外 E（値）なら、そのステータスと、例外の FQN（`E` の `HozoException()`）と、運ぶ値を返して `true`。値を運ぶ例外かどうか（フィールド `Value` を持つか）は、実行時に見る |
+| `httpThrown[E runtime.Exception](w http.ResponseWriter, err error, status int) bool` | `err` が例外 E（値）なら、そのステータスと、例外の FQN（`E` の `HozoException()`）と、運ぶ値を返して `true`。値を運ぶ例外かどうか（例外の構造体が、引数ごとのフィールドを一つでも持つか。`docs/plugin-go.md`「exception」）は、実行時に見る。運ぶ値は、例外の値そのものの JSON（「失敗の応答」） |
 
 ```go
 // httpWriteResult は、op が成功したときの応答。何を返すかは、実行時に、out で決める:
@@ -191,7 +191,7 @@ func httpWriteError(w http.ResponseWriter, err error) {
 ```
 
 - `httpValidate` は、`Validate` が返した `*runtime.ValidationError` の違反ごとに、`Path` の先頭（入力の model のフィールド名）を、場所の一覧の通りに置き換える（項目の形のフィールド `lines` の `lines[1].quantity` は `body.lines[1].quantity` に。全体の形のフィールド `body` の `body.email` は、場所が `body` なので `body.email` のまま）。
-- `httpWriteError` は、経路の op のどれかが投げうる例外（`Op.signature.exceptions`）のうち、`@http.status(code)` を持つものを、最初に現れた順（op の宣言順、その中は `exceptions` の順）に、例外ごとに一行 `case httpThrown[<例外の型>](w, err, <code>):`。値を運ぶ例外も、運ばない例外も、同じ形。例外の型は、その名前空間の型の置き場の入口のパッケージから import する。`@http.status` を持つ例外が一つもなければ、`switch` を書かず、いつも 500。
+- `httpWriteError` は、経路の op のどれかが投げうる例外（`Op.signature.exceptions`）のうち、`@http.status(code)` を持つものを、最初に現れた順（op の宣言順、その中は `exceptions` の順）に、例外ごとに一行 `case httpThrown[<例外の型>](w, err, <code>):`。引数を持つ例外も、持たない例外も、同じ形（引数の数と型は、行を変えない）。例外の型は、その名前空間の型の置き場の入口のパッケージから import する。`@http.status` を持つ例外が一つもなければ、`switch` を書かず、いつも 500。
 - 例外は値の型で見分ける。葉の実装が例外をポインタで返せば、見分けられずに 500 になる（基底の `throw` は値で返す。`docs/plugin-go.md`「exception」）。
 - 補助に、受け付けない型の値が渡ることは、GOHTTP-4 と GOHTTP-5 が先に断るので、ない（そのときの振る舞いは、決めない）。読む先を型引数にしないのは、省略可能な読む先（`**T`）と、そうでない読む先（`*T`）を、一つの関数で、型を書かずに受け取れないため（Go は、その二つの和の制約から T を推論できない）。
 
@@ -257,14 +257,15 @@ func httpWriteError(w http.ResponseWriter, err error) {
 本文は、どれも `Content-Type: application/json` の、例外の形:
 
 ```json
-{ "error": "<例外の FQN>", "value": <例外が運ぶ値の JSON> }
+{ "error": "<例外の FQN>", "value": { "<引数の名前>": <その値の JSON>, … } }
 ```
 
-`value` は、値を運ばない例外にはない。
+- `value` は、**例外の引数の名前をキーにしたオブジェクト**（`exception LimitExceeded(retryAfter: Duration);` なら `{"error":"rate.LimitExceeded","value":{"retryAfter":30000000000}}`）。キーの並びは、宣言の引数の順。値の形は「値の JSON」で、省略可能な引数で値がなければ、キーを省く。引数が一つでも、オブジェクトで包む。
+- `value` は、引数のない例外にはない。
 
 | 場合 | ステータス | 本文 |
 |---|---|---|
-| op が、`@http.status(n)` を持つ例外を投げた | n | `{"error":"<FQN>"}`。値を運ぶなら `value` を足す |
+| op が、`@http.status(n)` を持つ例外を投げた | n | `{"error":"<FQN>"}`。引数を持つ例外なら `value` を足す |
 | op を呼ぶ前の失敗（下） | 400 | `{"error":"http.BadRequest","value":{"message":…,"violations":[…]}}` |
 | それ以外（`@http.status` を持たない例外、保存先のエラー、中断を含むほかのエラー） | 500 | `{"error":"internal"}`（中身を出さない。`internal` は例外の FQN ではない） |
 
@@ -273,7 +274,7 @@ func httpWriteError(w http.ResponseWriter, err error) {
 
 ### op を呼ぶ前の失敗
 
-op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`docs/vocab.md`「同梱する語彙」）で伝える。運ぶ値は `{"message": string, "violations": [{"path": string, "constraint": string}]}`（`violations` は、空でも `[]`）。op は呼ばない。
+op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`docs/vocab.md`「同梱する語彙」）で伝える。`value` は、その二つの引数: `{"message": string, "violations": [{"path": string, "constraint": string}]}`（`violations` は、空でも `[]`）。op は呼ばない。
 
 | 場合 | `message` | `violations` |
 |---|---|---|
@@ -306,7 +307,7 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | GOHTTP-2 | error | 経路の op の引数が、0 個でも model 一つでもない。位置は op |
 | GOHTTP-3 | error | 入力の model のフィールドが、要求のどこから読むかを言う六つのデコレータ（`@http.header` / `@http.query` / `@http.body` / `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）のどれも持たない、または二つ以上持つ。位置は model |
 | GOHTTP-4 | error | ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない（「対象」の表）。位置は、そのフィールドを持つ model（全体の形なら、全体の形で受け取る model） |
-| GOHTTP-5 | error | 本文、結果、`@http.status` を持つ例外の値に、JSON にできない型（union と、union を中に持つ型）がある。位置は op |
+| GOHTTP-5 | error | 本文、結果、`@http.status` を持つ例外の引数の型に、JSON にできない型（union と、union を中に持つ型）がある。位置は op |
 | GOHTTP-6 | error | `@http.get` の op の入力が、本文のデコレータ（`@http.body`、`@http.bodyObj`）のフィールドを持つ。位置は op |
 | GOHTTP-7 | error | パスが `/` で始まらない、または `{` か `}` を含む。位置は op |
 | GOHTTP-8 | error | 同じメソッドとパスの経路が二つある。位置は後ろの op |

@@ -4,15 +4,15 @@ namespace a {
   state s: list<M>;
   @http.status(400)                    // ERROR: DEC-1
   op f(): void;
-  @db.table(M)                         // ERROR: DEC-1
+  @db.table                            // ERROR: DEC-1
   union U { Ready: M; }
   @http.retry(3)                       // ERROR: DEC-1
   model N { @http.get("/x") id: string; }   // ERROR: DEC-1
-  @db.table(M)
+  @db.table
   state okState: list<M>;
   decorator onlyOp;
   @onlyOp                              // ERROR: DEC-1
-  effect e on s.post;
+  effect e() on s.post;
   @onlyOp                              // ERROR: DEC-1
   classify C of M { A; }
   @onlyOp                              // ERROR: DEC-1

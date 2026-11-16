@@ -118,7 +118,7 @@ namespace hozoc {
 
   /** 仕様に構文か型の誤りがある */
   @cli.exitCode(1)
-  exception CheckFailed: Diagnostics;
+  exception CheckFailed(value: Diagnostics);
 
   /** hozo.toml がない、または名前空間と言語の対応が足りない */
   @cli.exitCode(2)
@@ -162,7 +162,7 @@ namespace hozoc {
   }
 
   /** 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す） */
-  effect syncOutputs on OutputsSync: any -> UpToDate;
+  effect syncOutputs() on OutputsSync: any -> UpToDate;
 
   /**
    * 仕様を検査する。ファイルは書き出さない。

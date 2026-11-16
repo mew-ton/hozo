@@ -2,8 +2,8 @@
 namespace a {
   state s: single<string>;
   state t: list<string>;
-  effect put on s.put;
-  effect post on t.post;
+  effect put() on s.put;
+  effect post() on t.post;
   decorator onPut(e: any effect on s.put);
   @onPut(put)
   op ok1(): void;

@@ -14,7 +14,8 @@ namespace a {
   exception Gone;
   state users: list<User>;
   state omit: string;
-  export op find(is: string): User? reads users;
+  read byId(is: string): User? on users;
+  export op find(is: string): User? reads users { return byId(is); }
   op gone(): never throws Gone;
   op nameOf(u: User): string;
   classify Found of find { Hit: find as User; default; }

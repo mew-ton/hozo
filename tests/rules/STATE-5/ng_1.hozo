@@ -1,0 +1,18 @@
+// STATE-5（docs/check.md「状態と効果」「葉の op」）: 葉の op（本体を持たない op）は reads と effects の節を書けない。
+// 節ごとに一つ。位置はその節
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  effect add(m: M) on rows.post;
+  read byId(id: string): M? on rows;
+  op find(id: string): M? reads rows;                  // ERROR: STATE-5
+  op named(id: string): M? reads byId;                 // ERROR: STATE-5
+  op insert(m: M) effects add;                         // ERROR: STATE-5
+  op direct(m: M) effects rows.post;                   // ERROR: STATE-5
+  op upsert(m: M)
+    reads rows                                         // ERROR: STATE-5
+    effects add;                                       // ERROR: STATE-5
+  export op twice(): M[]
+    reads rows                                         // ERROR: STATE-5
+    reads byId;                                        // ERROR: STATE-5
+}

@@ -27,7 +27,7 @@ namespace app {
   @db.find(names, "id")
   export op findName(id: Id): Row?;
   @db.insert(others)
-  effect createOther on others.post;
+  effect createOther() on others.post;
   @db.effects(createOther)
   export op addOther(other: Other);
 }

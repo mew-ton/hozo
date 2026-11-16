@@ -123,31 +123,28 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			}
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolVariable, d.Span, d.Name.Span, detail))
 		case *ast.ExceptionDecl:
+			// 引数のない例外は括弧を書かない（docs/grammar.md「exception / effect / read」）
 			detail := ""
-			if d.Value != nil {
-				if d.Value.Body != nil {
-					detail = "{ ... }"
-				} else {
-					detail = b.text(d.Value)
-				}
+			if len(d.Params) > 0 {
+				detail = b.params(d.Params)
 			}
-			sym := b.sym(d.Name.Name, protocol.SymbolClass, d.Span, d.Name.Span, detail)
-			if d.Value != nil && d.Value.Body != nil {
-				sym.Children = b.members(d.Value.Body)
-			}
-			out = append(out, sym)
+			out = append(out, b.sym(d.Name.Name, protocol.SymbolClass, d.Span, d.Name.Span, detail))
 		case *ast.EffectDecl:
-			// 宛先は組み込みの効果（on s.post）か遷移（on X: A -> B）のどちらか（docs/grammar.md「exception / effect」）
-			detail := ""
+			// 宛先は組み込みの効果（on s.post）か遷移（on X: A -> B）のどちらか（docs/grammar.md「exception / effect / read」）
+			detail := b.params(d.Params)
 			switch {
 			case d.On != nil:
-				detail = "on " + d.On.State.String() + "." + d.On.Op.String()
+				detail += " on " + d.On.State.String() + "." + d.On.Op.String()
 			case d.Transition != nil:
-				detail = "on " + b.text(d.Transition)
+				detail += " on " + b.text(d.Transition)
 			}
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolEvent, d.Span, d.Name.Span, detail))
 		case *ast.ReadDecl:
-			out = append(out, b.sym(d.Name.Name, protocol.SymbolKey, d.Span, d.Name.Span, "on "+d.On.String()))
+			detail := b.params(d.Params)
+			if d.Result != nil {
+				detail += ": " + b.text(d.Result)
+			}
+			out = append(out, b.sym(d.Name.Name, protocol.SymbolKey, d.Span, d.Name.Span, detail+" on "+d.On.String()))
 		case *ast.ClassifyDecl:
 			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.subject(d.Of))
 			for _, c := range d.Cases {
@@ -163,11 +160,7 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 		case *ast.DecoratorDecl:
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolInterface, d.Span, d.Name.Span, b.declTail(d.Span, d.Name.Span)))
 		case *ast.OpDecl:
-			var params []string
-			for _, p := range d.Params {
-				params = append(params, b.text(p))
-			}
-			detail := "(" + strings.Join(params, ", ") + ")"
+			detail := b.params(d.Params)
 			if d.Return != nil {
 				detail += ": " + b.text(d.Return)
 			}
@@ -175,6 +168,17 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 		}
 	}
 	return out
+}
+
+// params は引数の並びの元の文字列 `(a: T, b: U)`（op、exception、effect、read の detail）。
+func (b *symbolBuilder) params(ps []*ast.OpParam) string {
+	var params []string
+	for _, p := range ps {
+		if p != nil {
+			params = append(params, b.text(p))
+		}
+	}
+	return "(" + strings.Join(params, ", ") + ")"
 }
 
 // members は model の本体に書いたメンバー（Field と Override）を、書かれた順に子にする。構文木から引くので、

@@ -3,13 +3,13 @@ namespace a {
   state s: single<string>;
   state l: list<string>;
   state n: nullable<string>;
-  effect put on s.put;
-  effect post on s.post;               // ERROR: STATE-1
-  effect del on s.delete;              // ERROR: STATE-1
-  effect lpost on l.post;
-  effect lput on l.put;
-  effect ldel on l.delete;
-  effect npost on n.post;
-  effect nput on n.put;
-  effect ndel on n.delete;
+  effect put() on s.put;
+  effect post() on s.post;               // ERROR: STATE-1
+  effect del() on s.delete;              // ERROR: STATE-1
+  effect lpost() on l.post;
+  effect lput() on l.put;
+  effect ldel() on l.delete;
+  effect npost() on n.post;
+  effect nput() on n.put;
+  effect ndel() on n.delete;
 }

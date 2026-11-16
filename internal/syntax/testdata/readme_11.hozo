@@ -24,7 +24,7 @@ namespace browser {
   op orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
 
   /** 注文一覧の既定の URL に置き換える */
-  effect transitionToOrders on location.put;
+  effect transitionToOrders() on location.put;
 
   // このページだけ別の表示にする。fallback が吸収するので throws は書かない
   // OrdersUnavailable は OrderPage のアームの型

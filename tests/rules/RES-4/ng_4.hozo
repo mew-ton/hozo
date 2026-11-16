@@ -1,33 +1,24 @@
-// RES-4（docs/resolve.md「位置ごとに受け付ける種類」）: デコレータの宣言の reads / effects の要素: reads は state（基底の状態。どの
-// 名前空間のものでも）か any state の引数、effects は effect、効果の union、any effect の引数（どちらも残りの引数でよい）。
-// それ以外は RES-4（状態の分類も書けない）
+// RES-4（docs/resolve.md「位置ごとに受け付ける種類」の「配線の呼び出しの名前」「呼び出しの読み分け」）: 呼べるのは、op、read、
+// effect と、状態から辿った post / put / delete。効果の union、操作を付けない状態、classify（遷移は直に呼べない）、
+// 例外、型は呼べない。束縛や引数の名前が先に当たれば、値を指す（値は呼べない）
 namespace a {
   model M { id: string; }
+  exception E;
   state rows: list<M>;
   state cur: nullable<M>;
-  effect add on rows.post;
-  effect set on cur.post;
-  exception E;
+  effect add(m: M) on rows.post;
+  effect set(m: M) on cur.post;
   union Writes { add; set; }
-  union Errors { E; }
-  classify Both of rows, cur { Ready; default; }
-  decorator ok(t: any state, u: any state?, e: any effect, ...es: any effect on rows.post)
-    reads t, u, rows, b.other
-    effects e, es, add, Writes;
-  decorator okRest(...ts: any state) reads ts;
-  decorator r1(m: any model) reads m;            // ERROR: RES-4
-  decorator r2(s: string) reads s;               // ERROR: RES-4
-  decorator r3(e: any effect) reads e;           // ERROR: RES-4
-  decorator r4 reads Both;                       // ERROR: RES-4
-  decorator r5 reads add;                        // ERROR: RES-4
-  decorator r7 reads rows.post;                  // ERROR: RES-4
-  decorator e1(t: any state) effects t;          // ERROR: RES-4
-  decorator e2 effects rows;                     // ERROR: RES-4
-  decorator e3 effects Errors;                   // ERROR: RES-4
-  decorator e4 effects E;                        // ERROR: RES-4
-  decorator e5(x: any exception) effects x;      // ERROR: RES-4
-  decorator e6(...xs: string) effects xs;        // ERROR: RES-4
-}
-namespace b {
-  state other: list<string>;
+  classify Stock of rows { None; Some; }
+  op f(m: M, rows: M[]) {
+    Writes(m);                           // ERROR: RES-4
+    cur(m);                              // ERROR: RES-4
+    Stock(m);                            // ERROR: RES-4
+    E(m);                                // ERROR: RES-4
+    M(m);                                // ERROR: RES-4
+    m(m);                                // ERROR: RES-4
+    rows.post(m);                        // ERROR: RES-3
+    cur.get(m);                          // ERROR: RES-3
+    a.rows.post(m);
+  }
 }

@@ -26,13 +26,13 @@ namespace app {
 
   // @http.status を持つ例外の値
   @http.status(409)
-  exception Clash: Drawing;
+  exception Clash(value: Drawing);
   @http.get("/clash")
   export op clash(): string
     throws Clash;
 
   // ステータスを持たない例外の値は、通信に現れないので、当たらない。union を持たない型も、当たらない
-  exception Quiet: Drawing;
+  exception Quiet(value: Drawing);
   @http.get("/quiet")
   export op quiet(): Card
     throws Quiet;

@@ -34,7 +34,7 @@ namespace c.models {
 namespace c.states {
   model Row { id: string; }
   state rows: list<Row>;
-  effect addRow on rows.post;
+  effect addRow() on rows.post;
   model EffectAddRow { x: int; }
   model RowsState { x: int; }
 }

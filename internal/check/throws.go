@@ -28,7 +28,7 @@ func checkThrows1(c *computer, o *ir.Op, info *bodyInfo) {
 				rel = append(rel, related{span: src.ref.call.Span, msg: sprintf("出どころ: アームの throw（%s）", x)})
 				continue
 			}
-			rel = append(rel, related{span: src.ref.call.Span, msg: sprintf("出どころ: %s の呼び出し（%s）", src.ref.call.Op, x)})
+			rel = append(rel, related{span: src.ref.call.Span, msg: sprintf("出どころ: %s の呼び出し（%s）", src.ref.call.Callee, x)})
 		}
 	}
 	c.r.report(diag.Error, "THROWS-1", o.Span,

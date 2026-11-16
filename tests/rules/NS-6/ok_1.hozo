@@ -1,0 +1,22 @@
+// NS-6（docs/check.md「配線からの呼び出し」）: 宣言した名前空間の配線は、read と効果を、修飾しても修飾しなくても呼べる。
+// 別の名前空間は、export の op を通す。呼ぶのでなければ、read と効果の名前はどこからでも書ける（配線の op の節、@see）
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  read byId(id: string): M? on rows;
+  effect add(m: M) on rows.post;
+  export op find(id: string): M? { return a.byId(id); }
+  export op insert(m: M) { add(m); }
+}
+namespace b {
+  /**
+   * 足してから引く。
+   *
+   * @see a.byId
+   * @see a.add
+   */
+  op upsert(m: a.M): a.M? reads a.byId effects a.add {
+    a.insert(m);
+    return a.find(m.id);
+  }
+}

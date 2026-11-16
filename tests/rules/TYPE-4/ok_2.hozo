@@ -1,0 +1,32 @@
+// TYPE-4（docs/types.md「呼び出しの引数」）: read、効果、throw の引数。位置で渡し、省略可能な引数は省ける。
+// レコードリテラルは引数の型の model に当てはめる。アームの中の対象は絞り込まれた型で渡す
+namespace a {
+  model M { id: string; note: string?; }
+  exception Busy(wait: Duration, note: string?);
+  exception NotFound(id: string);
+  state rows: list<M>;
+  state cur: nullable<M>;
+  read byId(id: string): M? on rows;
+  read all(): M[] on rows;
+  effect add(m: M) on rows.post;
+  effect touch(m: M, at: Time?) on rows.put;
+  classify K of M { A; B; }
+  op f(m: M, id: string): M[] throws Busy, NotFound {
+    add(m);
+    add({ id: "x" });
+    touch(m);
+    rows.post({ id });
+    cur.post(m);
+    cur.put({ id: "y", note: none });
+    cur.delete();
+    const found = byId(m.id);
+    match found by nullable {
+      HasItems => add(found);
+      Empty    => throw NotFound(id);
+    };
+    return match m by K {
+      A => throw Busy(5m, "busy");
+      B => all();
+    };
+  }
+}

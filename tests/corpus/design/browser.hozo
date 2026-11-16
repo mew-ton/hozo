@@ -24,10 +24,10 @@ namespace browser {
   // ---- §6.2 effect ----
 
   /** ログイン画面へ遷移する */
-  effect transitionToLogin on location.put;
+  effect transitionToLogin() on location.put;
 
   /** 権限がないことを示す画面へ遷移する */
-  effect transitionToForbidden on location.put;
+  effect transitionToForbidden() on location.put;
 
   // ---- §6.4 union ----
 
@@ -64,10 +64,13 @@ namespace browser {
   // ---- §9 配線（browser 側） ----
 
   /** 手元のトークンを消す */
-  effect removeToken on token.delete;   // 空にする（設計書では token.put で none を入れる）
+  effect removeToken() on token.delete;   // 空にする（設計書では token.put で none を入れる）
 
   op clearToken()
-    effects removeToken;
+    effects removeToken
+  {
+    removeToken();
+  }
 
   /** サーバーのセッションの削除を依頼する。結果は見ない */
   @ignoreFailure
@@ -112,10 +115,13 @@ namespace browser {
   // ---- §10.2 match ----
 
   /** 支払い画面へ遷移する */
-  effect transitionToPayment on location.put;
+  effect transitionToPayment() on location.put;
 
   op goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
-    effects transitionToPayment;
+    effects transitionToPayment
+  {
+    transitionToPayment();
+  }
 
   @page.interaction(page: openProduct, when: ProductPage.Ready)
   op onAddToCart(item: server.Item)
@@ -205,7 +211,7 @@ namespace browser {
   op orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
 
   /** 注文一覧の既定の URL に置き換える */
-  effect transitionToOrders on location.put;
+  effect transitionToOrders() on location.put;
 
   // このページだけ別の表示にする。fallback が吸収するので throws は書かない
   // OrdersUnavailable は OrderPage のアームの型

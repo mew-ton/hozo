@@ -12,11 +12,11 @@ namespace web {
   bind token to api.*;
 
   /** ログイン画面へ */
-  effect goLogin on location.put;
+  effect goLogin() on location.put;
   /** ホームへ */
-  effect goHome on location.put;
+  effect goHome() on location.put;
   /** 手元のトークンを消す */
-  effect removeToken on token.delete;
+  effect removeToken() on token.delete;
 
   /** 一時的に表示できない */
   model Unavailable {}
@@ -61,8 +61,9 @@ namespace web {
   op userPageVm(user: api.PublicUser): UserPage;
   // docs/ir.md「型」: 絞り込まれた型 case
   op adminPageVm(user: UserKind.Admin<api.PublicUser>): UserPage;
-  op greet(user: api.PublicUser) effects goHome;
-  op clearToken() effects removeToken;
+  // docs/check.md「配線からの呼び出し」: 効果を呼ぶ配線。書いていない effects は、本体の呼び出しから決まる
+  op greet(user: api.PublicUser) { goHome(); }
+  op clearToken() { removeToken(); }
 
   /**
    * ユーザーを取る。

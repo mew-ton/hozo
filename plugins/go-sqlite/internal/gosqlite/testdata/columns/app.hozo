@@ -95,13 +95,13 @@ namespace app {
   /** @db.table のない状態は、表にならない */
   state plain: list<Core>;
 
-  @db.insert(cores) effect createCore on cores.post;
-  @db.insert(nameds) effect createNamed on nameds.post;
-  @db.insert(docs) effect createDoc on docs.post;
-  @db.insert(sparses) effect createSparse on sparses.post;
-  @db.insert(pairs) effect createPair on pairs.post;
-  @db.insert(sharedA) effect createSharedA on sharedA.post;
-  @db.insert(links) effect createLink on links.post;
+  @db.insert(cores) effect createCore() on cores.post;
+  @db.insert(nameds) effect createNamed() on nameds.post;
+  @db.insert(docs) effect createDoc() on docs.post;
+  @db.insert(sparses) effect createSparse() on sparses.post;
+  @db.insert(pairs) effect createPair() on pairs.post;
+  @db.insert(sharedA) effect createSharedA() on sharedA.post;
+  @db.insert(links) effect createLink() on links.post;
 
   @db.effects(createCore) export op addCore(core: Core);
   @db.effects(createNamed) export op addNamed(named: Named);

@@ -3,11 +3,16 @@
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  export op all(): string[] reads s;
+  export op all(): string[] reads s { return s; }
   op own(): string[] {
     return a.s;
   }
   op g();
+  // 組み込みの効果を直に呼べるのも、持ち主の名前空間の配線（修飾して書いても同じ）
+  op push(x: string) {
+    s.post(x);
+    a.s.post(x);
+  }
   op phase() {
     match by a.Phase { Idle => g(); Busy => none; };
   }

@@ -21,7 +21,7 @@ namespace shop {
   state items: list<Item>;
   /** 店の名前 */
   state title: single<string>;
-  effect addItem on items.post;
+  effect addItem() on items.post;
 
   // 「中身」置き場 1（配線）: wiring.go の buyBody。継ぎ目を持つ op を同じ名前空間の配線から呼ぶと、外側を通る
   /**

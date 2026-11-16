@@ -1,0 +1,43 @@
+// SYNTAX（docs/grammar.md「exception / effect / read」「op」「配線」）: なくした書き方は、新しい書き方をメッセージで示して
+// 構文エラーにする。誤りのある宣言は捨てられ、残りの宣言は検査される
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  // 例外が運ぶ値は、引数で書く（exception X(value: T);）
+  exception Old: M;                              // ERROR: SYNTAX
+  exception OldInline: { reason: string; };      // ERROR: SYNTAX
+  // 引数のない例外は括弧を書かない
+  exception Empty();                             // ERROR: SYNTAX
+  // 効果は、引数がなくても括弧を書く
+  effect old on rows.post;                       // ERROR: SYNTAX
+  // read は、括弧と結果の型が要る。結果の型に void / never は書けない
+  read noParens on rows;                         // ERROR: SYNTAX
+  read noResult() on rows;                       // ERROR: SYNTAX
+  read voidResult(): void on rows;               // ERROR: SYNTAX
+  read neverResult(): never on rows;             // ERROR: SYNTAX
+  // any read という引数の種類はない
+  decorator anyRead(target: any read);           // ERROR: SYNTAX
+  exception E;
+  exception F;
+  classify K of M { A; B; }
+  // 節の並びの区切りは ","（"|" は、なくした書き方）。"," として読み進めるので、op は残る
+  op pipes(m: M): M throws E | F {               // ERROR: SYNTAX
+    return match m by K {
+      A => throw E;
+      B => throw F;
+    };
+  }
+  // 引数のない例外を投げるときも、括弧を書かない
+  op parens(m: M): M throws E {
+    return match m by K {
+      A => throw E();                            // ERROR: SYNTAX
+      B => m;
+    };
+  }
+  effect add(m: M) on rows.post;
+  read all(): M[] on rows;
+  op ok(m: M): M[] {
+    add(m);
+    return all();
+  }
+}

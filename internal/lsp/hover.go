@@ -143,14 +143,25 @@ func (r *renderer) hover(t sema.Target) (string, bool) {
 			}
 		}
 	case sema.TargetOpParam:
-		op, ok := r.prog.Lookup(t.Decl).(*ir.Op)
-		if !ok {
+		// op のほか、exception、effect、read の引数も同じ形（docs/ir.md の OpParam）
+		owner := r.prog.Lookup(t.Decl)
+		var params []ir.OpParam
+		switch d := owner.(type) {
+		case *ir.Op:
+			params = d.Params
+		case *ir.Exception:
+			params = d.Params
+		case *ir.Effect:
+			params = d.Params
+		case *ir.Read:
+			params = d.Params
+		default:
 			return "", false
 		}
-		for _, p := range op.Params {
+		for _, p := range params {
 			if p.Name == t.Name {
-				code(r.head(op), "  "+p.Name+": "+r.typ(p.Type))
-				r.paramDoc(&b, op.Description, p.Name)
+				code(r.head(owner), "  "+p.Name+": "+r.typ(p.Type))
+				r.paramDoc(&b, owner.Common().Description, p.Name)
 				return b.String(), true
 			}
 		}
@@ -281,18 +292,22 @@ func (r *renderer) head(d ir.Decl) string {
 		// 状態の見出しだけは、形の語で書く（docs/lsp.md「ホバー」）
 		return "state " + name + ": " + string(d.Shape) + "<" + r.typ(d.Element) + ">"
 	case *ir.Exception:
-		s := "exception " + name
-		if d.Value != nil {
-			s += ": " + r.typ(d.Value)
+		// 引数のない例外は括弧を書かない（docs/grammar.md「exception / effect / read」）
+		if len(d.Params) == 0 {
+			return "exception " + name
+		}
+		return "exception " + name + r.params(d.Params)
+	case *ir.Effect:
+		return "effect " + name + r.params(d.Params) + r.effectTarget(d.Target)
+	case *ir.Read:
+		s := "read " + name + r.params(d.Params)
+		if d.Returns != nil {
+			s += ": " + r.typ(d.Returns)
+		}
+		if d.State != "" {
+			s += " on " + r.rel(d.State)
 		}
 		return s
-	case *ir.Effect:
-		return "effect " + name + r.effectTarget(d.Target)
-	case *ir.Read:
-		if d.State == "" {
-			return "read " + name
-		}
-		return "read " + name + " on " + r.rel(d.State)
 	case *ir.Classify:
 		if d.FromCondition {
 			return "condition " + name + " of " + r.classifySubject(d.Subject)
@@ -301,11 +316,7 @@ func (r *renderer) head(d ir.Decl) string {
 	case *ir.Decorator:
 		return r.decoratorHead(name, d)
 	case *ir.Op:
-		var params []string
-		for _, p := range d.Params {
-			params = append(params, p.Name+": "+r.typ(p.Type))
-		}
-		s := "op " + name + "(" + strings.Join(params, ", ") + ")"
+		s := "op " + name + r.params(d.Params)
 		if d.Exported {
 			s = "export " + s
 		}
@@ -315,6 +326,15 @@ func (r *renderer) head(d ir.Decl) string {
 		return s
 	}
 	return name
+}
+
+// params は引数の並び `(a: T, b: U)`（op、exception、effect、read の見出し）。
+func (r *renderer) params(ps []ir.OpParam) string {
+	var params []string
+	for _, p := range ps {
+		params = append(params, p.Name+": "+r.typ(p.Type))
+	}
+	return "(" + strings.Join(params, ", ") + ")"
 }
 
 func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
@@ -328,6 +348,9 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 	var b strings.Builder
 	if d.External {
 		b.WriteString("@external ")
+	}
+	if d.Repeatable {
+		b.WriteString("@repeatable ")
 	}
 	b.WriteString("decorator " + name)
 	if len(d.Params) > 0 {
@@ -580,7 +603,22 @@ func (r *renderer) call(c ir.Call) string {
 	for _, a := range c.Args {
 		args = append(args, r.atom(a.Value))
 	}
-	return r.rel(c.Op) + "(" + strings.Join(args, ", ") + ")"
+	return r.callee(c.Callee) + "(" + strings.Join(args, ", ") + ")"
+}
+
+// callee は呼び出し先の名前: op、read、効果の宣言は見ている名前空間から見た名前、直に呼ぶ組み込みの効果は「状態.操作」。
+func (r *renderer) callee(c ir.Callee) string {
+	switch c := c.(type) {
+	case ir.OpCallee:
+		return r.rel(c.Op)
+	case ir.ReadCallee:
+		return r.rel(c.Read)
+	case ir.EffectCallee:
+		if c.Effect != nil {
+			return r.effectRef(c.Effect)
+		}
+	}
+	return "?"
 }
 
 func (r *renderer) atom(a ir.Atom) string {

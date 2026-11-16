@@ -274,8 +274,11 @@ func TestCfg22(t *testing.T) {
 		{"scalar の元の型", []ir.Decl{scalar("server.S", ir.Ref("types.T"))}, true},
 		{"union のアームの型", []ir.Decl{&ir.Union{DeclBase: ir.DeclBase{Name: "server.U", Span: sp("server.U")}, Variant: ir.UnionArms,
 			Arms: []ir.UnionArm{{Name: "A", Type: ref}}}}, true},
-		{"例外が運ぶ値の型", []ir.Decl{&ir.Exception{DeclBase: ir.DeclBase{Name: "server.X", Span: sp("server.X")}, Value: ref}}, true},
-		// 2: N のすべての状態と分類
+		{"例外の引数の型", []ir.Decl{&ir.Exception{DeclBase: ir.DeclBase{Name: "server.X", Span: sp("server.X")}, Params: []ir.OpParam{param("value", ref)}}}, true},
+		// 2: N のすべての状態、分類、read、効果
+		{"read の引数の型", []ir.Decl{&ir.Read{DeclBase: ir.DeclBase{Name: "server.r", Span: sp("server.r")}, Params: []ir.OpParam{param("key", ref)}, Returns: ir.String()}}, true},
+		{"read の結果の型", []ir.Decl{&ir.Read{DeclBase: ir.DeclBase{Name: "server.r", Span: sp("server.r")}, Returns: ir.Optional(ref)}}, true},
+		{"効果の引数の型", []ir.Decl{&ir.Effect{DeclBase: ir.DeclBase{Name: "server.e", Span: sp("server.e")}, Params: []ir.OpParam{param("row", ref)}}}, true},
 		{"状態の型", []ir.Decl{state("server.s", ir.StateList, ref)}, true},
 		{"分類の対象の型", []ir.Decl{classifyOf("server.C", ir.TypeSubject{Type: ref})}, true},
 		{"ケースの as の型", []ir.Decl{classifyOf("server.C", ir.TypeSubject{Type: ir.String()}, ir.CaseTyping{Type: ref, By: ir.NarrowByPredicate})}, true},

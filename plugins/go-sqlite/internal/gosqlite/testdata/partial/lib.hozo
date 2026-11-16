@@ -43,9 +43,9 @@ namespace lib {
   export op countBooks(): int reads books;
 
   @db.insert(books)
-  effect createBook on books.post;
+  effect createBook() on books.post;
   /** デコレータを付けていない効果 */
-  effect deleteBook on books.delete;
+  effect deleteBook() on books.delete;
 
   @db.effects(createBook)
   export op addBook(book: Book);
@@ -55,9 +55,9 @@ namespace lib {
   // ---- notes: 基底の状態の遷移を宛先にする効果。操作の名前との照合はなく、表が、効果の書き込む状態にあればよい ----
 
   @db.insert(notes)
-  effect firstNote on notes: Empty -> HasItems;
+  effect firstNote() on notes: Empty -> HasItems;
   @db.delete(notes, "text")
-  effect lastNote on notes: HasItems -> Empty;
+  effect lastNote() on notes: HasItems -> Empty;
 
   @db.effects(firstNote)
   export op startNotes(note: Note);
@@ -67,7 +67,7 @@ namespace lib {
   // ---- stamps: 消すだけ ----
 
   @db.delete(stamps, "at")
-  effect dropStamp on stamps.delete;
+  effect dropStamp() on stamps.delete;
   @db.effects(dropStamp)
   export op unstamp(at: Time);
 
@@ -87,10 +87,10 @@ namespace lib {
 
   /** 状態の分類の遷移を宛先にする効果: 表（loans）は、効果の書き込む状態（books、loans）の一つ */
   @db.insert(loans)
-  effect lend on Lending: Free -> Lent;
+  effect lend() on Lending: Free -> Lent;
   @db.update(books)
-  effect retitle on Lending: any -> any;
-  effect giveBack on Lending: Lent -> Free;
+  effect retitle() on Lending: any -> any;
+  effect giveBack() on Lending: Lent -> Free;
 
   @db.effects(lend)
   export op lendBook(loan: Loan);
@@ -106,7 +106,7 @@ namespace lib {
     Closed;
   }
   @db.insert(archive)
-  effect shelve on Shelving: Open -> Closed;
+  effect shelve() on Shelving: Open -> Closed;
   @db.effects(shelve)
   export op shelveBook(book: Archived);
 
