@@ -1,0 +1,4 @@
+CLI-10	app.Zero	入力の model app.Zero のフィールド a の @cli.arg の位置 0 が、1 より小さい（位置は、1 から数える）
+CLI-10	app.Twice	入力の model app.Twice の @cli.arg の位置 1 が重なっている: フィールド a と b
+CLI-10	app.Gap	入力の model app.Gap の @cli.arg の位置が、1 から 4 まで続いていない: 位置 2、3 がない
+CLI-10	app.Late	入力の model app.Late の @cli.arg の位置が、1 から 2 まで続いていない: 位置 1 がない

@@ -22,7 +22,8 @@ var goldenFixtures = []struct {
 	covers   string
 	behavior bool
 }{
-	{name: "commands", covers: "「出力」「引数の解釈」「実行と表示」「使い方の表示」の各行", behavior: true},
+	{name: "commands", covers: "「出力」「引数の解釈」「コマンドごとの関数」「実行と表示」「使い方の表示」の各行", behavior: true},
+	{name: "shapes", covers: "「コマンドごとの関数」: フィールドの型と、例外が値を運ぶかどうかによらず、同じ形（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）", behavior: true},
 	{name: "locals", covers: "名前空間のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前）", behavior: true},
 }
 
@@ -85,7 +86,7 @@ func TestBehavior(t *testing.T) {
 // 非公開の名前は、パッケージ名になりうる形（小文字と数字だけ）にしない（名前空間のパッケージの import の名前と当たらないように）。
 func TestPlacement(t *testing.T) {
 	_, files := emitFixture(t, "commands")
-	if got := strings.Join(sortedPaths(files), " "); got != "gen/demo/cli/cli.go gen/tool/cli/cli.go" {
+	if got := strings.Join(sortedPaths(files), " "); got != "gen/bare/cli/cli.go gen/demo/cli/cli.go gen/tool/cli/cli.go" {
 		t.Fatalf("ファイル = %s", got)
 	}
 	tool := files["gen/tool/cli/cli.go"]
@@ -136,23 +137,150 @@ func TestPlacement(t *testing.T) {
 	}
 }
 
-// TestHelpers: 補助の関数と import は、使うものだけを出す（使わない import はコンパイルできない）。
-func TestHelpers(t *testing.T) {
+// TestLines は「コマンドごとの関数」: run<Op> は `var in <Model>` と `line := cliLine{…}` で始まり、フィールドに付いた cli の
+// デコレータごとに一行を、フィールドの順、その中はデコレータを書いた順に並べる。行に書くのは、デコレータの引数（名前を省いて
+// いれば、フィールドの名前）と、読む先だけ。fail<Op> は、Signature.exceptions の順に、例外ごとに一行。
+func TestLines(t *testing.T) {
 	_, files := emitFixture(t, "commands")
 	tool, demo := files["gen/tool/cli/cli.go"], files["gen/demo/cli/cli.go"]
-	// tool は、値の変換が boolean だけで、既定値を持つ model も、array でない位置引数もない
-	if !strings.Contains(tool, "\t\"strconv\"\n") || strings.Contains(tool, "ParseInt") || strings.Contains(tool, "func cliLookupArg(") {
-		t.Error("gen/tool/cli/cli.go: 使わない補助を出したか、使う import がない")
+	for _, c := range []struct{ file, name, want string }{
+		{tool, "tool の emit", `	var in tool.EmitInput
+	line := cliLine{args: args, getenv: env}
+	line.flag("config", &in.Config)
+	line.env("TOOL_CONFIG", &in.Config)
+	line.arg(1, &in.Names)
+	line.flag("dry-run", &in.DryRun)
+	if code, done := line.read(prog, usageEmit(), stdout, stderr); done {
+		return code
 	}
-	if !strings.Contains(demo, "func cliLookupArg(") || !strings.Contains(demo, "demo.NewAddInput()") || !strings.Contains(demo, "demo.NewCopyInput()") {
-		t.Error("gen/demo/cli/cli.go: 位置引数の補助か、既定値を持つ model の初めの値がない")
+	if !cliValidate(stderr, prog, in) {
+		return 64
 	}
-	// Validate を呼ぶのは、Validate を持つ入力だけ（tool では CheckInput。EmitInput と ServeInput は持たない）
-	if n := strings.Count(tool, ".Validate()"); n != 1 {
-		t.Errorf("gen/tool/cli/cli.go: Validate() が %d 回（Validate を持つ入力は CheckInput だけ）", n)
+	result, err := ops.Emit(ctx, in)
+`},
+		{demo, "demo の add（@cli.required、@cli.default、名前を省いた @cli.flag / @cli.env）", `	var in demo.AddInput
+	line := cliLine{args: args, getenv: env}
+	line.required(&in.A)
+	line.arg(1, &in.A)
+	line.arg(2, &in.B)
+	line.flag("count", &in.Count)
+	line.orDefault(&in.Count, 1)
+	line.flag("verbose", &in.Verbose)
+	line.flag("label", &in.Label)
+	line.env("DEMO_LABEL", &in.Label)
+	line.env("DEMO_SCALE", &in.Scale)
+	line.flag("mode", &in.Mode)
+	line.required(&in.Mode)
+	line.env("tag", &in.Tag)
+	line.orDefault(&in.Tag, "none")
+	if code, done := line.read(prog, usageAdd(), stdout, stderr); done {
+`},
+		{demo, "demo の copy（補う値のリテラル）", `	line.flag("ratio", &in.Ratio)
+	line.orDefault(&in.Ratio, 0.5)
+	line.flag("force", &in.Force)
+	line.env("DEMO_FORCE", &in.Force)
+	line.flag("offset", &in.Offset)
+	line.orDefault(&in.Offset, -1)
+	line.arg(2, &in.To)
+`},
+		{demo, "demo の move（フィールドの順。位置の順ではない）", `	line.arg(3, &in.Rest)
+	line.env("DEMO_REST", &in.Rest)
+	line.required(&in.Rest)
+	line.arg(2, &in.To)
+	line.arg(1, &in.From)
+	line.flag("keep", &in.Keep)
+	line.orDefault(&in.Keep, true)
+	line.flag("suffix", &in.Suffix)
+	line.orDefault(&in.Suffix, "~")
+	line.flag("weight", &in.Weight)
+	line.orDefault(&in.Weight, 2)
+`},
+		{demo, "引数のない op（入力も、制約の検査もない）", `func runPing(ctx context.Context, ops demo.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
+	line := cliLine{args: args, getenv: env}
+	if code, done := line.read(prog, usagePing(), stdout, stderr); done {
+		return code
 	}
-	if n := strings.Count(demo, ".Validate()"); n != 2 {
-		t.Errorf("gen/demo/cli/cli.go: Validate() が %d 回（Validate を持つ入力は AddInput と CopyInput）", n)
+	if err := ops.Ping(ctx); err != nil {
+`},
+		{tool, "tool の check の例外（値を運ぶもの、運ばないもの、別の名前空間のもの）", `	f, code := Failure{Err: err}, 70
+	switch {
+	case cliThrown[tool.CheckFailed](err, 1, &f, &code):
+	case cliThrown[tool.ConfigInvalid](err, 2, &f, &code):
+	case cliThrown[tool.Busy](err, 70, &f, &code):
+	case cliThrown[fail.Crashed](err, 70, &f, &code):
+	}
+	if err := p.PresentError(stderr, "check", input, f); err != nil {
+`},
+		{tool, "例外を持たない op", `	f, code := Failure{Err: err}, 70
+	if err := p.PresentError(stderr, "serve", input, f); err != nil {
+`},
+	} {
+		if !strings.Contains(c.file, c.want) {
+			t.Errorf("%s: 次のテキストがない:\n%s", c.name, c.want)
+		}
+	}
+}
+
+// TestHelpers: 補助と import は、使うものだけを出す（使わない import はコンパイルできない）。何を使うかは、付いたデコレータと、
+// 入力と例外の有無で決まり、型では決まらない: 入力を持つコマンドは、入力が Validate を持つかどうかによらず、同じ補助 cliValidate を呼ぶ。
+// 基底は、初めの値を入れる関数を出さない（New<Model> を呼ばない）。
+func TestHelpers(t *testing.T) {
+	_, files := emitFixture(t, "commands")
+	tool, demo, bare := files["gen/tool/cli/cli.go"], files["gen/demo/cli/cli.go"], files["gen/bare/cli/cli.go"]
+	methods := map[string]string{"flag": "func (l *cliLine) flag(", "env": "func (l *cliLine) env(", "arg": "func (l *cliLine) arg(",
+		"required": "func (l *cliLine) required(", "orDefault": "func (l *cliLine) orDefault("}
+	newModel := regexp.MustCompile(`\.New[A-Z]\w*\(\)`)
+	for _, c := range []struct {
+		name, file string
+		methods    string // 出す行のメソッド（空白区切り）
+		validate   int    // cliValidate の呼び出しの数（入力を持つコマンドの数）
+		thrown     bool   // cliThrown を出すか（例外を持つコマンドがあるか）
+	}{
+		{"tool", tool, "flag env arg", 3, true},                    // @cli.required も @cli.default もない
+		{"demo", demo, "flag env arg required orDefault", 3, true}, // add、copy、move（ping と quit は入力を持たない）
+		{"bare", bare, "", 0, false},                               // 入力も例外もないコマンドだけ
+	} {
+		for name, decl := range methods {
+			if want := strings.Contains(" "+c.methods+" ", " "+name+" "); strings.Contains(c.file, decl) != want {
+				t.Errorf("%s: cliLine の %s を出すか = %v, want %v", c.name, name, !want, want)
+			}
+		}
+		if n := strings.Count(c.file, "\tif !cliValidate(stderr, prog, in) {\n"); n != c.validate {
+			t.Errorf("%s: cliValidate の呼び出しが %d 回, want %d（入力を持つコマンドごとに一つ）", c.name, n, c.validate)
+		}
+		if got := strings.Contains(c.file, "\nfunc cliValidate("); got != (c.validate > 0) {
+			t.Errorf("%s: cliValidate を出すか = %v", c.name, got)
+		}
+		if got := strings.Contains(c.file, "\nfunc cliThrown["); got != c.thrown {
+			t.Errorf("%s: cliThrown を出すか = %v, want %v", c.name, got, c.thrown)
+		}
+		if got := strings.Contains(c.file, "\t\"github.com/mew-ton/hozo/runtime\"\n"); got != (c.validate > 0 || c.thrown) {
+			t.Errorf("%s: runtime を import するか = %v", c.name, got)
+		}
+		if strings.Contains(c.file, "in.Validate()") {
+			t.Errorf("%s: 入力の Validate を、補助を通さずに呼んでいる", c.name)
+		}
+		if newModel.MatchString(c.file) {
+			t.Errorf("%s: 初めの値を入れる関数（New<Model>）を呼んでいる", c.name)
+		}
+	}
+}
+
+// TestSameShape は、型に依らない形の確かめ（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」）: 入力 shapes の
+// 二つの名前空間は、宣言の名前と cli のデコレータが同じで、型だけが違う（核の型と scalar、省略可能とそうでないもの、文字列と真偽値、
+// 一つの値と array、値を運ぶ例外と運ばない例外、戻り値と省略可能な戻り値、制約を持つ入力と持たない入力）。出る cli.go は、
+// 名前空間の名前のほかは、同じテキスト。違いが実行時に出ることは、testdata/shapes/behavior_test.go が確かめる。
+func TestSameShape(t *testing.T) {
+	_, files := emitFixture(t, "shapes")
+	a, b := files["gen/shapea/cli/cli.go"], files["gen/shapeb/cli/cli.go"]
+	if a == "" || b == "" {
+		t.Fatalf("ファイル = %v", sortedPaths(files))
+	}
+	if !strings.Contains(a, "shapea.RunInput") || !strings.Contains(b, "shapeb.RunInput") {
+		t.Fatal("入力の model の名前がない")
+	}
+	if got := strings.ReplaceAll(b, "shapeb", "shapea"); got != a {
+		t.Errorf("型だけが違う二つの入力から、違うテキストが出た:\n%s", firstDiff(a, got))
 	}
 }
 
@@ -215,18 +343,23 @@ func TestDir(t *testing.T) {
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"cli1", codeCLIParams},    // @cli.command の op の引数が、0 個でも model 一つでもない
-	{"cli2", codeCLIDecorator}, // 入力の model のフィールドに cli のデコレータがない、または @cli.arg と @cli.flag の両方がある
-	{"cli3", codeCLIFieldType}, // フィールドの型が受け付けられない
-	{"cli4", codeCLIArrayArg},  // array の @cli.arg が最後でない、または二つ以上
-	{"cli5", codeCLIDuplicate}, // フラグ名かコマンド名の重複
-	{"cli6", codeCLIExport},    // @cli.command の付いた op に export がない
-	{"cli7", codeCLIDir},       // ディレクトリ cli が、同じ単位が出力する子の名前空間 N.cli の出力先と重なる
-	{"cli8", codeCLIOption},    // [emit.options.go-cli] に、知らないキーがある
-	{"cli9", codeCLIValidate},  // Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
+	{"cli1", codeCLIParams},       // @cli.command の op の引数が、0 個でも model 一つでもない
+	{"cli2", codeCLISource},       // 入力の model のフィールドに値の出どころがない、または @cli.arg と @cli.flag の両方がある
+	{"cli3", codeCLIFieldType},    // フィールドの型が受け付けられない
+	{"cli4", codeCLIArrayArg},     // array の @cli.arg が、いちばん後ろの位置でない
+	{"cli5", codeCLIDuplicate},    // フラグ名かコマンド名の重複
+	{"cli6", codeCLIExport},       // @cli.command の付いた op に export がない
+	{"cli7", codeCLIDir},          // ディレクトリ cli が、同じ単位が出力する子の名前空間 N.cli の出力先と重なる
+	{"cli8", codeCLIOption},       // [emit.options.go-cli] に、知らないキーがある
+	{"cli9", codeCLIValidate},     // Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
+	{"cli10", codeCLIPosition},    // @cli.arg の位置が、1 から、重なりも抜けもなく続いていない
+	{"cli11", codeCLIOptional},    // @cli.required か @cli.default の付いたフィールドの型が、省略可能
+	{"cli12", codeCLIBoth},        // 一つのフィールドに、@cli.required と @cli.default の両方がある
+	{"cli13", codeCLIDefaultType}, // @cli.default のリテラルが、フィールドの型に渡せない
+	{"cli14", codeCLIDefault},     // @cli.default の値が、フィールドの制約（@valid.*）に合わない
 }
 
-// TestDiagnostics は docs/plugin-go-cli.md「診断」の CLI-1〜CLI-9: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は docs/plugin-go-cli.md「診断」の CLI-1〜CLI-14:診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルも warning も返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -253,15 +386,20 @@ func TestDiagnostics(t *testing.T) {
 // TestDiagnosticPositions は、診断の位置と数（docs/plugin-go-cli.md「診断」の表）: 表に書いた宣言の FQN。CLI-7 と CLI-8 は位置なし。
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
-		"cli1": {"app.two", "app.core", "app.named", "app.optional", "app.many"},
-		"cli2": {"app.In", "app.In"},
-		"cli3": {"app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In"},
-		"cli4": {"app.Early", "app.Twice"},
-		"cli5": {"app.In", "app.again", "app.third"},
-		"cli6": {"app.hidden", "app.also"},
-		"cli7": {""},
-		"cli8": {"", ""},
-		"cli9": {"app.a", "app.b"},
+		"cli1":  {"app.two", "app.core", "app.named", "app.optional", "app.many"},
+		"cli2":  {"app.In", "app.In", "app.In", "app.In"},
+		"cli3":  {"app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In"},
+		"cli4":  {"app.Early", "app.Twice", "app.Order"},
+		"cli5":  {"app.In", "app.again", "app.third"},
+		"cli6":  {"app.hidden", "app.also"},
+		"cli7":  {""},
+		"cli8":  {"", ""},
+		"cli9":  {"app.a", "app.b"},
+		"cli10": {"app.Zero", "app.Twice", "app.Gap", "app.Late"},
+		"cli11": {"app.In", "app.In", "app.In", "app.In"},
+		"cli12": {"app.In", "app.In"},
+		"cli13": {"app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In"},
+		"cli14": {"app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In"},
 	} {
 		_, diags, _ := emitViews(t, newRoot(t), loadViews(t, name))
 		var got []string

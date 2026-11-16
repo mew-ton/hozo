@@ -123,7 +123,7 @@ func (g *generator) inputs(m *ir.Model) []input {
 				// GOHTTP-4（本文の全体は、op の位置の GOHTTP-5）
 				g.checkPlaceType(whole, inner, in.place, fmt.Sprintf("@%s で受け取る model %s のフィールド %s", in.decorator, whole.Name, inner.Name))
 				// GOHTTP-14 ほか: 全体の形で受け取る model の中のフィールドには、付けられない
-				g.checkMissing(whole, inner, false, fmt.Sprintf("（model %s が、@%s で受け取る）", m.Name, in.decorator))
+				g.checkMissing(whole, inner, false, fmt.Sprintf("model %s が、この model を @%s（全体の形）で受け取る", m.Name, in.decorator))
 			}
 		} else {
 			// GOHTTP-4
@@ -195,7 +195,7 @@ func (g *generator) checkWholes(m *ir.Model, inputs []input) {
 
 // checkMissing は、model m のフィールド f の、項目がないときの扱いを言うデコレータ（@http.required、@http.default）を読み、
 // 四つの決まり（docs/plugin-go-http.md「対象」）と、補う値の制約（同「補う値と制約」）を確かめる。item は、f が項目の形のデコレータを
-// 持つか。via は、f が、全体の形で受け取る model の中のフィールドのときの、メッセージの添え書き。
+// 持つか。via は、f が、全体の形で受け取る model の中のフィールドのときの、メッセージに書く、その受け取り方（そのとき、item は false）。
 // 戻り値は、デコレータが言ったこと: required（@http.required があるか）と、def（@http.default のリテラル。なければ nil）。
 func (g *generator) checkMissing(m *ir.Model, f *ir.Field, item bool, via string) (required bool, def ir.Literal) {
 	var found []string
@@ -217,8 +217,12 @@ func (g *generator) checkMissing(m *ir.Model, f *ir.Field, item bool, via string
 	subject := fmt.Sprintf("model %s のフィールド %s", m.Name, f.Name)
 	// GOHTTP-14
 	if !item {
-		g.errorf(codeHTTPNoItem, m.Name, "%s に %s が付いているが、項目の形（@%s / @%s / @%s）を持たない%s（全体の形の中の項目は、なければ、いつも零値のまま。扱いを言いたい項目は、項目の形で書く）",
-			subject, strings.Join(found, " と "), httpHeader, httpQuery, httpBody, via)
+		why := fmt.Sprintf("項目の形（@%s / @%s / @%s）を持たない", httpHeader, httpQuery, httpBody)
+		if via != "" {
+			why = via
+		}
+		g.errorf(codeHTTPNoItem, m.Name, "%s に %s が付いているが、%s（全体の形の中の項目は、なければ、いつも零値のまま。扱いを言いたい項目は、項目の形で書く）",
+			subject, strings.Join(found, " と "), why)
 	}
 	// GOHTTP-15
 	if _, optional := f.Type.(ir.OptionalType); optional {
@@ -253,7 +257,7 @@ func (g *generator) checkDefault(m *ir.Model, f *ir.Field, lit ir.Literal) {
 		if x.Scalar != "" {
 			owner = "型の scalar " + x.Scalar + " の制約"
 		}
-		g.errorf(codeHTTPConstraint, m.Name, "model %s のフィールド %s の @%s の値 %s が、%s %s に合わない（その項目のない要求は、いつも制約に合わない入力になる）",
+		g.errorf(codeHTTPConstraint, m.Name, "model %s のフィールド %s の @%s の値 %s が、%s %s に合わない（補う値は、制約に合う値にする）",
 			m.Name, f.Name, httpDefault, literalDisplay(lit), owner, x.Text)
 	}
 }

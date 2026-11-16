@@ -1,0 +1,8 @@
+CLI-14	app.In	入力の model app.In のフィールド format の @cli.default の値 "xml" が、型 app.Format の制約 @valid.pattern("^(text|json)$") に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）
+CLI-14	app.In	入力の model app.In のフィールド count の @cli.default の値 0 が、型 app.Count の制約 @valid.min(1) に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）
+CLI-14	app.In	入力の model app.In のフィールド low の @cli.default の値 0 が、型 app.Count の制約 @valid.min(1) に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）
+CLI-14	app.In	入力の model app.In のフィールド high の @cli.default の値 11 が、型 app.Small の制約 @valid.max(10) に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）
+CLI-14	app.In	入力の model app.In のフィールド name の @cli.default の値 "x" が、フィールドの制約 @valid.length(min: 2) に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）
+CLI-14	app.In	入力の model app.In のフィールド ratio の @cli.default の値 1 が、フィールドの制約 @valid.max(0.5) に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）
+CLI-14	app.In	入力の model app.In のフィールド both の @cli.default の値 0 が、型 app.Count の制約 @valid.min(1) に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）
+CLI-14	app.In	入力の model app.In のフィールド both の @cli.default の値 0 が、フィールドの制約 @valid.min(5) に合わない（このフィールドを与えない呼び出しが、いつも誤りになる）

@@ -139,7 +139,7 @@ func NewHandler(ops Ops) http.Handler {
 
 - **ヘッダとクエリの項目**（文字列一つを読む）: 読む先がポインタ（省略可能）なら、値を置く先を作ってから読む。文字列はそのまま、整数は `strconv.ParseInt(v, 10, 64)`、小数は `strconv.ParseFloat(v, 64)`、真偽値は `strconv.ParseBool(v)`。読めなければ、文言 `<場所> <名前>: invalid <int / float / boolean>`（`query page: invalid int`）。クエリの同じ名前が二度あれば、最初の値。ヘッダの値は、そのまま読む（`Bearer ` などの前置きを外さない）。空の文字列のヘッダは、ないものと読む。
 - **項目がないとき**（ヘッダ、クエリ、本文の項目のどれも同じ）: 行に `httpRequired` があれば、読めない要求で、文言 `<場所> <名前>: missing`（`header Authorization: missing`、`body lines: missing`）。`httpDefault(v)` があれば、読む先を v にする（`reflect` で、読む先の型に変える）。どちらもなければ、読む先に何も書かない（1 で置いた零値のまま）。読む先の型は、見ない。
-- **本文の項目**（`req.body`）: 本文は JSON のオブジェクトで、初めて呼ばれたときに一度だけ読む。キーの値を、`encoding/json` で読む先に読む。キーがなければ、項目がない（上）。キーがあれば、値が `null` でも、あるものと読む。本文が JSON のオブジェクトとして読めない、キーの値の型が合わないときは、文言 `body: invalid JSON`。
+- **本文の項目**（`req.body`）: 本文は JSON のオブジェクトで、初めて呼ばれたときに一度だけ読む。キーの値を、`encoding/json` で読む先に読む。キーがなければ、項目がない（上）。キーがあれば、値が `null` でも、あるものと読む。本文が JSON のオブジェクトとして読めない（空の本文、配列、本文の全体が `null` のときを含む）、キーの値の型が合わないときは、文言 `body: invalid JSON`。
 - **本文の全体**（`req.bodyObj`）: 本文を、`encoding/json` で、読む先の model に読む。読めなければ `body: invalid JSON`。知らないキーは無視し、ないキーのフィールドは零値のままにする（`encoding/json` の既定）。
 - **ヘッダとクエリの全体**（`req.headerObj`、`req.queryObj`）: 読む先の model（Go の構造体）のフィールドごとに、その `json` タグの名前（仕様のフィールドの名前。基底が付ける）の項目を、項目の形と同じに読む。その項目には、`httpRequired` も `httpDefault` も渡らないので、なければ、零値のまま（「対象」の GOHTTP-14）。
 - 本文の大きさは制限しない。
@@ -305,7 +305,7 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | GOHTTP-1 | error | `@http.get` / `@http.post` の付いた op に `export` がない。位置は op |
 | GOHTTP-2 | error | 経路の op の引数が、0 個でも model 一つでもない。位置は op |
 | GOHTTP-3 | error | 入力の model のフィールドが、要求のどこから読むかを言う六つのデコレータ（`@http.header` / `@http.query` / `@http.body` / `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）のどれも持たない、または二つ以上持つ。位置は model |
-| GOHTTP-4 | error | ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない（「対象」の表）。位置は model |
+| GOHTTP-4 | error | ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない（「対象」の表）。位置は、そのフィールドを持つ model（全体の形なら、全体の形で受け取る model） |
 | GOHTTP-5 | error | 本文、結果、`@http.status` を持つ例外の値に、JSON にできない型（union と、union を中に持つ型）がある。位置は op |
 | GOHTTP-6 | error | `@http.get` の op の入力が、本文のデコレータ（`@http.body`、`@http.bodyObj`）のフィールドを持つ。位置は op |
 | GOHTTP-7 | error | パスが `/` で始まらない、または `{` か `}` を含む。位置は op |
@@ -315,15 +315,15 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | GOHTTP-11 | error | `validate = true` で、`Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（「制約の検査」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op |
 | GOHTTP-12 | error | 全体の形（`@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）を付けたフィールドの型が、model でない（「対象」）。位置は model |
 | GOHTTP-13 | error | 入力の model の一つの場所に、全体の形が二つ以上ある、または、全体の形と項目の形の両方がある（「対象」）。位置は model |
-| GOHTTP-14 | error | `@http.required` か `@http.default` の付いたフィールドが、項目の形（`@http.header` / `@http.query` / `@http.body`）を持たない。入力の model のフィールドと、全体の形で受け取る model のフィールドを見る（「対象」）。位置は model |
-| GOHTTP-15 | error | `@http.required` か `@http.default` の付いたフィールドの型が、省略可能（`T?`）。見るフィールドは GOHTTP-14 と同じ。位置は model |
+| GOHTTP-14 | error | `@http.required` か `@http.default` の付いたフィールドが、項目の形（`@http.header` / `@http.query` / `@http.body`）を持たない。入力の model のフィールドと、全体の形で受け取る model のフィールドを見る（「対象」）。位置は、そのフィールドを持つ model |
+| GOHTTP-15 | error | `@http.required` か `@http.default` の付いたフィールドの型が、省略可能（`T?`）。見るフィールドと位置は GOHTTP-14 と同じ |
 | GOHTTP-16 | error | 経路の op の結果の型が、省略可能な配列か、省略可能な record（`T[]?`、`Record<K, V>?`）。位置は op |
-| GOHTTP-17 | error | 一つのフィールドに、`@http.required` と `@http.default` の両方がある。見るフィールドは GOHTTP-14 と同じ。位置は model |
-| GOHTTP-18 | error | `@http.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。位置は model |
-| GOHTTP-19 | error | `@http.default` の値が、フィールドの制約（`@valid.*`）に合わない（「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。位置は model |
+| GOHTTP-17 | error | 一つのフィールドに、`@http.required` と `@http.default` の両方がある。見るフィールドと位置は GOHTTP-14 と同じ |
+| GOHTTP-18 | error | `@http.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。見るフィールドと位置は GOHTTP-14 と同じ |
+| GOHTTP-19 | error | `@http.default` の値が、フィールドの制約（`@valid.*`）に合わない（「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。リテラルが型に渡せないフィールド（GOHTTP-18）は、見ない。見るフィールドと位置は GOHTTP-14 と同じ |
 
 warning（コードは `PLUGIN`）は一つ: 経路の op が一つもない。
 
-- GOHTTP-3〜GOHTTP-6、GOHTTP-11〜GOHTTP-18 は、書いたものの整合の検査: デコレータが言ったことと、model と op の宣言が食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。
+- GOHTTP-3〜GOHTTP-6、GOHTTP-11〜GOHTTP-19 は、書いたものの整合の検査: デコレータが言ったことと、model と op の宣言が食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。
 - Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。上の診断は、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

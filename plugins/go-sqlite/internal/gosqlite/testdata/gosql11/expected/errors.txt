@@ -1,0 +1,10 @@
+GOSQL-11	app.insertOnPut	効果 app.insertOnPut の @db.insert が、効果の宛先 app.rows.put の操作と合わない（@db.insert は post）
+GOSQL-11	app.insertOnDelete	効果 app.insertOnDelete の @db.insert が、効果の宛先 app.rows.delete の操作と合わない（@db.insert は post）
+GOSQL-11	app.updateOnPost	効果 app.updateOnPost の @db.update が、効果の宛先 app.rows.post の操作と合わない（@db.update は put）
+GOSQL-11	app.updateOnDelete	効果 app.updateOnDelete の @db.update が、効果の宛先 app.rows.delete の操作と合わない（@db.update は put）
+GOSQL-11	app.deleteOnPost	効果 app.deleteOnPost の @db.delete が、効果の宛先 app.rows.post の操作と合わない（@db.delete は delete）
+GOSQL-11	app.deleteOnPut	効果 app.deleteOnPut の @db.delete が、効果の宛先 app.rows.put の操作と合わない（@db.delete は delete）
+GOSQL-11	app.insertElsewhere	効果 app.insertElsewhere の @db.insert の表 app.copies が、効果の宛先 app.rows.post の状態でない
+GOSQL-11	app.deleteElsewhere	効果 app.deleteElsewhere の @db.delete の表 app.copies が、効果の宛先 app.rows.delete の状態でない
+GOSQL-11	app.logSync	効果 app.logSync の @db.insert の表 app.logs が、効果の書き込む状態（app.rows、app.copies）にない
+GOSQL-11	app.fillRows	効果 app.fillRows の @db.update の表 app.copies が、効果の書き込む状態（app.rows）にない

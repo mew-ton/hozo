@@ -172,3 +172,10 @@ namespace demo {
   @cli.command("quit")
   export op quit(): never throws Overflow;
 }
+
+/** 入力も例外も持たないコマンドだけの名前空間（使わない補助と import を出さない） */
+namespace bare {
+  /** 何もしない */
+  @cli.command("noop")
+  export op noop();
+}

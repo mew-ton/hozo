@@ -445,19 +445,6 @@ const (
 	kindFloat
 )
 
-// label は、診断のメッセージに出す型の名前。
-func (k kind) label() string {
-	switch k {
-	case kindBoolean:
-		return "boolean"
-	case kindInt:
-		return "int"
-	case kindFloat:
-		return "float"
-	}
-	return "string"
-}
-
 // shape は、受け付けたフィールドの型の形。検査（CLI-4、CLI-11、CLI-13）にだけ使い、出力には渡さない。
 type shape struct {
 	kind     kind // 値（array なら要素）の、元の核の型

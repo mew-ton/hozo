@@ -17,6 +17,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -110,29 +112,17 @@ func cliUsage(prog string) string {
 
 // runCheck はサブコマンド check（op hozoc.check）。
 func runCheck(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	flags, pos, help, err := cliParseArgs(args, map[string]bool{"config": false, "format": false})
-	if err != nil {
-		return cliUsageError(stderr, prog, usageCheck(prog), err.Error())
-	}
-	if help {
-		fmt.Fprint(stdout, usageCheck(prog))
-		return 0
-	}
-	if len(pos) > 0 {
-		return cliUsageError(stderr, prog, usageCheck(prog), fmt.Sprintf("too many arguments: %d given, at most 0 expected", len(pos)))
-	}
 	var in hozoc.CheckInput
-	if v, ok := cliLookup(flags, "config", env, "HOZO_CONFIG"); ok {
-		in.Config = cliPtr(hozoc.Path(v))
+	line := cliLine{args: args, getenv: env}
+	line.flag("config", &in.Config)
+	line.env("HOZO_CONFIG", &in.Config)
+	line.flag("format", &in.Format)
+	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
+	if code, done := line.read(prog, usageCheck(), stdout, stderr); done {
+		return code
 	}
-	if v, ok := cliLookup(flags, "format", env, ""); ok {
-		in.Format = cliPtr(hozoc.OutputFormat(v))
-	}
-	if v, ok := cliLookup(flags, "", env, "HOZO_PLUGIN_PATH"); ok {
-		in.PluginPath = cliPtr(v)
-	}
-	if err := in.Validate(); err != nil {
-		return cliUsageError(stderr, prog, "", "invalid input: "+cliValidationMessage(err))
+	if !cliValidate(stderr, prog, in) {
+		return 64
 	}
 	result, err := ops.Check(ctx, in)
 	if err != nil {
@@ -148,24 +138,12 @@ func runCheck(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args
 // failCheck は check の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
 func failCheck(p Presenter, prog string, input any, err error, stderr io.Writer) int {
 	f, code := Failure{Err: err}, 70
-	var (
-		e0 hozoc.CheckFailed
-		e1 hozoc.ConfigInvalid
-		e2 hozoc.LanguageMismatch
-		e3 proc.Crashed
-		e4 proc.MalformedOutput
-	)
 	switch {
-	case errors.As(err, &e0):
-		f, code = Failure{Name: "hozoc.CheckFailed", Value: e0.Value, Err: err}, 1
-	case errors.As(err, &e1):
-		f, code = Failure{Name: "hozoc.ConfigInvalid", Value: e1.Value, Err: err}, 2
-	case errors.As(err, &e2):
-		f, code = Failure{Name: "hozoc.LanguageMismatch", Value: e2.Value, Err: err}, 2
-	case errors.As(err, &e3):
-		f, code = Failure{Name: "proc.Crashed", Err: err}, 70
-	case errors.As(err, &e4):
-		f, code = Failure{Name: "proc.MalformedOutput", Err: err}, 70
+	case cliThrown[hozoc.CheckFailed](err, 1, &f, &code):
+	case cliThrown[hozoc.ConfigInvalid](err, 2, &f, &code):
+	case cliThrown[hozoc.LanguageMismatch](err, 2, &f, &code):
+	case cliThrown[proc.Crashed](err, 70, &f, &code):
+	case cliThrown[proc.MalformedOutput](err, 70, &f, &code):
 	}
 	if err := p.PresentError(stderr, "check", input, f); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
@@ -174,43 +152,30 @@ func failCheck(p Presenter, prog string, input any, err error, stderr io.Writer)
 	return code
 }
 
-// usageCheck は check の使い方。
-func usageCheck(prog string) string {
-	return "usage: " + prog + " check [flags]\n\n仕様を検査する。ファイルは書き出さない\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n\nenvironment:\n  HOZO_PLUGIN_PATH   プラグインを探すディレクトリ（OS のパス区切りで複数）\n"
+// usageCheck は check の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageCheck() cliHelp {
+	return cliHelp{command: "check", summary: "仕様を検査する。ファイルは書き出さない", fields: [][2]string{
+		{"config", "設定ファイルの場所"},
+		{"format", "表示の形式"},
+		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
+	}}
 }
 
 // runEmit はサブコマンド emit（op hozoc.emit）。
 func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	flags, pos, help, err := cliParseArgs(args, map[string]bool{"config": false, "format": false, "dry-run": true})
-	if err != nil {
-		return cliUsageError(stderr, prog, usageEmit(prog), err.Error())
-	}
-	if help {
-		fmt.Fprint(stdout, usageEmit(prog))
-		return 0
-	}
 	var in hozoc.EmitInput
-	if v, ok := cliLookup(flags, "config", env, "HOZO_CONFIG"); ok {
-		in.Config = cliPtr(hozoc.Path(v))
+	line := cliLine{args: args, getenv: env}
+	line.flag("config", &in.Config)
+	line.env("HOZO_CONFIG", &in.Config)
+	line.flag("format", &in.Format)
+	line.arg(1, &in.Namespaces)
+	line.flag("dry-run", &in.DryRun)
+	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
+	if code, done := line.read(prog, usageEmit(), stdout, stderr); done {
+		return code
 	}
-	if v, ok := cliLookup(flags, "format", env, ""); ok {
-		in.Format = cliPtr(hozoc.OutputFormat(v))
-	}
-	if len(pos) > 0 {
-		in.Namespaces = pos
-	}
-	if v, ok := cliLookup(flags, "dry-run", env, ""); ok {
-		x, err := strconv.ParseBool(v)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageEmit(prog), fmt.Sprintf("invalid value %q for --dry-run: want boolean", v))
-		}
-		in.DryRun = cliPtr(x)
-	}
-	if v, ok := cliLookup(flags, "", env, "HOZO_PLUGIN_PATH"); ok {
-		in.PluginPath = cliPtr(v)
-	}
-	if err := in.Validate(); err != nil {
-		return cliUsageError(stderr, prog, "", "invalid input: "+cliValidationMessage(err))
+	if !cliValidate(stderr, prog, in) {
+		return 64
 	}
 	result, err := ops.Emit(ctx, in)
 	if err != nil {
@@ -226,30 +191,14 @@ func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args 
 // failEmit は emit の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
 func failEmit(p Presenter, prog string, input any, err error, stderr io.Writer) int {
 	f, code := Failure{Err: err}, 70
-	var (
-		e0 hozoc.CheckFailed
-		e1 hozoc.ConfigInvalid
-		e2 hozoc.LanguageMismatch
-		e3 proc.Crashed
-		e4 proc.MalformedOutput
-		e5 hozoc.OutputConflict
-		e6 hozoc.UnknownNamespace
-	)
 	switch {
-	case errors.As(err, &e0):
-		f, code = Failure{Name: "hozoc.CheckFailed", Value: e0.Value, Err: err}, 1
-	case errors.As(err, &e1):
-		f, code = Failure{Name: "hozoc.ConfigInvalid", Value: e1.Value, Err: err}, 2
-	case errors.As(err, &e2):
-		f, code = Failure{Name: "hozoc.LanguageMismatch", Value: e2.Value, Err: err}, 2
-	case errors.As(err, &e3):
-		f, code = Failure{Name: "proc.Crashed", Err: err}, 70
-	case errors.As(err, &e4):
-		f, code = Failure{Name: "proc.MalformedOutput", Err: err}, 70
-	case errors.As(err, &e5):
-		f, code = Failure{Name: "hozoc.OutputConflict", Value: e5.Value, Err: err}, 3
-	case errors.As(err, &e6):
-		f, code = Failure{Name: "hozoc.UnknownNamespace", Err: err}, 64
+	case cliThrown[hozoc.CheckFailed](err, 1, &f, &code):
+	case cliThrown[hozoc.ConfigInvalid](err, 2, &f, &code):
+	case cliThrown[hozoc.LanguageMismatch](err, 2, &f, &code):
+	case cliThrown[proc.Crashed](err, 70, &f, &code):
+	case cliThrown[proc.MalformedOutput](err, 70, &f, &code):
+	case cliThrown[hozoc.OutputConflict](err, 3, &f, &code):
+	case cliThrown[hozoc.UnknownNamespace](err, 64, &f, &code):
 	}
 	if err := p.PresentError(stderr, "emit", input, f); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
@@ -258,33 +207,31 @@ func failEmit(p Presenter, prog string, input any, err error, stderr io.Writer) 
 	return code
 }
 
-// usageEmit は emit の使い方。
-func usageEmit(prog string) string {
-	return "usage: " + prog + " emit [flags] [NAMESPACES...]\n\n仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n\narguments:\n  NAMESPACES...   生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す\n\nflags:\n  --config <Path>           設定ファイルの場所 (env: HOZO_CONFIG)\n  --format <OutputFormat>   表示の形式\n  --dry-run                 書き出さずに、書き出す予定のファイルだけを表示する\n\nenvironment:\n  HOZO_PLUGIN_PATH   プラグインを探すディレクトリ（OS のパス区切りで複数）\n"
+// usageEmit は emit の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageEmit() cliHelp {
+	return cliHelp{command: "emit", summary: "仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す", fields: [][2]string{
+		{"config", "設定ファイルの場所"},
+		{"format", "表示の形式"},
+		{"namespaces", "生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す"},
+		{"dryRun", "書き出さずに、書き出す予定のファイルだけを表示する"},
+		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
+	}}
 }
 
 // runLsp はサブコマンド lsp（op hozoc.lsp）。
 func runLsp(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	flags, pos, help, err := cliParseArgs(args, map[string]bool{"config": false, "log": false})
-	if err != nil {
-		return cliUsageError(stderr, prog, usageLsp(prog), err.Error())
-	}
-	if help {
-		fmt.Fprint(stdout, usageLsp(prog))
-		return 0
-	}
-	if len(pos) > 0 {
-		return cliUsageError(stderr, prog, usageLsp(prog), fmt.Sprintf("too many arguments: %d given, at most 0 expected", len(pos)))
-	}
 	var in hozoc.LspInput
-	if v, ok := cliLookup(flags, "config", env, "HOZO_CONFIG"); ok {
-		in.Config = cliPtr(hozoc.Path(v))
+	line := cliLine{args: args, getenv: env}
+	line.flag("config", &in.Config)
+	line.env("HOZO_CONFIG", &in.Config)
+	line.flag("log", &in.Log)
+	line.env("HOZO_LSP_LOG", &in.Log)
+	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
+	if code, done := line.read(prog, usageLsp(), stdout, stderr); done {
+		return code
 	}
-	if v, ok := cliLookup(flags, "log", env, "HOZO_LSP_LOG"); ok {
-		in.Log = cliPtr(hozoc.Path(v))
-	}
-	if v, ok := cliLookup(flags, "", env, "HOZO_PLUGIN_PATH"); ok {
-		in.PluginPath = cliPtr(v)
+	if !cliValidate(stderr, prog, in) {
+		return 64
 	}
 	if err := ops.Lsp(ctx, in); err != nil {
 		return failLsp(p, prog, in, err, stderr)
@@ -306,9 +253,13 @@ func failLsp(p Presenter, prog string, input any, err error, stderr io.Writer) i
 	return code
 }
 
-// usageLsp は lsp の使い方。
-func usageLsp(prog string) string {
-	return "usage: " + prog + " lsp [flags]\n\n言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n\nflags:\n  --config <Path>   設定ファイルの場所 (env: HOZO_CONFIG)\n  --log <Path>      ログの書き出し先 (env: HOZO_LSP_LOG)\n\nenvironment:\n  HOZO_PLUGIN_PATH   プラグインを探すディレクトリ（OS のパス区切りで複数）\n"
+// usageLsp は lsp の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageLsp() cliHelp {
+	return cliHelp{command: "lsp", summary: "言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない", fields: [][2]string{
+		{"config", "設定ファイルの場所"},
+		{"log", "ログの書き出し先"},
+		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
+	}}
 }
 
 // cliProgramName は、使い方に出すプログラム名（filepath.Base(os.Args[0])）。
@@ -317,61 +268,6 @@ func cliProgramName() string {
 		return filepath.Base(os.Args[0])
 	}
 	return "hozoc"
-}
-
-// cliParseArgs は args をフラグと位置引数に分ける。specs は、フラグ名 → boolean か。フラグは --name value か --name=value で、
-// boolean は --name だけで true（値は取らない。--name=false は取れる）。同じフラグが二度あれば、後のものが勝つ。-x の形は
-// フラグではなく位置引数（負の数を渡せるように）。-- 以降は、すべて位置引数。--help か -h があれば help が true。
-// 知らないフラグと、値のないフラグは誤り。
-func cliParseArgs(args []string, specs map[string]bool) (flags map[string]string, pos []string, help bool, err error) {
-	flags = map[string]string{}
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--" {
-			pos = append(pos, args[i+1:]...)
-			break
-		}
-		if a == "--help" || a == "-h" {
-			return nil, nil, true, nil
-		}
-		if !strings.HasPrefix(a, "--") {
-			pos = append(pos, a)
-			continue
-		}
-		name, value, hasValue := strings.Cut(a[2:], "=")
-		boolean, known := specs[name]
-		if !known {
-			return nil, nil, false, fmt.Errorf("unknown flag --%s", name)
-		}
-		if !hasValue {
-			if boolean {
-				value = "true"
-			} else {
-				if i+1 >= len(args) {
-					return nil, nil, false, fmt.Errorf("flag --%s needs a value", name)
-				}
-				i++
-				value = args[i]
-			}
-		}
-		flags[name] = value
-	}
-	return flags, pos, false, nil
-}
-
-// cliLookup は、フラグ flag の値、なければ環境変数 name の値（空でなければ）を返す。フラグが優先。
-func cliLookup(flags map[string]string, flag string, env func(string) string, name string) (string, bool) {
-	if flag != "" {
-		if v, ok := flags[flag]; ok {
-			return v, true
-		}
-	}
-	if name != "" && env != nil {
-		if v := env(name); v != "" {
-			return v, true
-		}
-	}
-	return "", false
 }
 
 // cliUsageError は、使い方の誤りを w（標準エラー）に出して 64 を返す。usage が空なら、使い方は出さない。
@@ -383,18 +279,383 @@ func cliUsageError(w io.Writer, prog, usage, message string) int {
 	return 64
 }
 
-// cliValidationMessage は、Validate の誤りを「path: constraint; …」にする。
-func cliValidationMessage(err error) string {
-	var invalid *runtime.ValidationError
-	if !errors.As(err, &invalid) {
-		return err.Error()
-	}
-	parts := make([]string, len(invalid.Violations))
-	for i, v := range invalid.Violations {
-		parts[i] = v.String()
-	}
-	return strings.Join(parts, "; ")
+// cliHelp は、コマンドの使い方に出す説明（usage<Op> が返す）: コマンドの名前と一行の説明と、入力のフィールドの順に、
+// フィールドの名前と一行の説明。
+type cliHelp struct {
+	command, summary string
+	fields           [][2]string
 }
 
-// cliPtr は v を指すポインタ（省略可能なフィールドの値）。
-func cliPtr[T any](v T) *T { return &v }
+// cliField は、読む先一つ（入力のフィールド）と、それに並べた行。
+type cliField struct {
+	ptr      any           // 行に渡された、読む先へのポインタ
+	dst      reflect.Value // 読む先
+	name     string        // フィールドの名前（位置引数の表示名にする）
+	summary  string        // 一行の説明
+	flag     string        // @cli.flag の名前。行がなければ ""
+	env      string        // @cli.env の名前。行がなければ ""
+	position int           // @cli.arg の位置。行がなければ 0
+	required bool          // @cli.required の行がある
+	fallback any           // @cli.default の値。行がなければ nil
+}
+
+// kind は、読む先の値の Go の型の種類。省略可能（ポインタ）と、残りの位置引数（スライス）は、中の型で見る。
+func (f *cliField) kind() reflect.Kind { return cliValueType(f.dst.Type()).Kind() }
+
+// rest は、読む先が、残りの位置引数をすべて受け取るか（スライスか）。
+func (f *cliField) rest() bool { return f.dst.Kind() == reflect.Slice }
+
+// label は、位置引数の表示名: フィールドの名前を、大文字と _ にしたもの（dryRun は DRY_RUN）。
+func (f *cliField) label() string {
+	var b strings.Builder
+	for i, r := range f.name {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			b.WriteByte('_')
+		}
+		b.WriteString(strings.ToUpper(string(r)))
+	}
+	return b.String()
+}
+
+// source は、誤りの文言で、このフィールドの値の出どころを指す言葉。
+func (f *cliField) source() string {
+	switch {
+	case f.position > 0:
+		return "argument " + f.label()
+	case f.flag != "":
+		return "flag --" + f.flag
+	}
+	return "environment variable " + f.env
+}
+
+// cliValueType は、読む先の型 t の、値一つの型: 省略可能（ポインタ）と、残りの位置引数（スライス）の、中の型。
+func cliValueType(t reflect.Type) reflect.Type {
+	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice {
+		t = t.Elem()
+	}
+	return t
+}
+
+// cliTypeName は、使い方と誤りの文言に出す、値の型の名前: 名前付きの型（scalar）ならその名前、そうでなければ、種類の名前。
+func cliTypeName(t reflect.Type, named bool) string {
+	if named && t.PkgPath() != "" {
+		return t.Name()
+	}
+	switch t.Kind() {
+	case reflect.Bool:
+		return "boolean"
+	case reflect.Int64:
+		return "int"
+	case reflect.Float64:
+		return "float"
+	}
+	return "string"
+}
+
+// cliLine は、コマンドライン一つを、入力のフィールドに読む。フィールドに付いた cli のデコレータごとの行（flag、env、arg、
+// required、orDefault）を並べてから、read で、引数の並びを一度に解釈する。読む先の Go の型は、実行時に見る: 真偽値なら値を
+// 取らないフラグ、スライスなら残りの位置引数、ポインタなら省略可能。値が与えられなかった読む先の扱いは、並べた行（required、
+// orDefault）だけで決め、型では決めない。
+type cliLine struct {
+	args   []string
+	getenv func(string) string
+	fields []*cliField // 読む先ごと。初めて行を並べた順（入力のフィールドの順）
+}
+
+// field は、読む先 dst（入力のフィールドへのポインタ）に並べた行の集まり。初めての読む先なら、足す。
+func (l *cliLine) field(dst any) *cliField {
+	for _, f := range l.fields {
+		if f.ptr == dst {
+			return f
+		}
+	}
+	f := &cliField{ptr: dst, dst: reflect.ValueOf(dst).Elem()}
+	l.fields = append(l.fields, f)
+	return f
+}
+
+// flag は @cli.flag の行: フラグ --name の値を dst に読む。
+func (l *cliLine) flag(name string, dst any) { l.field(dst).flag = name }
+
+// env は @cli.env の行: フラグも位置引数も与えられなければ、環境変数 name の値（空でなければ）を dst に読む。
+func (l *cliLine) env(name string, dst any) { l.field(dst).env = name }
+
+// arg は @cli.arg の行: position 番目（1 から数える）の位置引数を dst に読む。
+func (l *cliLine) arg(position int, dst any) { l.field(dst).position = position }
+
+// read は、並べた行に従って、引数の並びを解釈し、読む先に値を入れる。終わりなら、終了コードと true を返す: --help か -h が
+// あれば、使い方を stdout に出して 0。使い方の誤りは、文言と使い方を stderr に出して 64。読めたら、false。
+func (l *cliLine) read(prog string, help cliHelp, stdout, stderr io.Writer) (int, bool) {
+	for i, f := range l.fields {
+		if i < len(help.fields) {
+			f.name, f.summary = help.fields[i][0], help.fields[i][1]
+		}
+	}
+	asked, err := l.parse()
+	if err != nil {
+		return cliUsageError(stderr, prog, l.usage(prog, help), err.Error()), true
+	}
+	if asked {
+		fmt.Fprint(stdout, l.usage(prog, help))
+		return 0, true
+	}
+	return 0, false
+}
+
+// parse は、引数の並びを一度に解釈する。フラグは --name value か --name=value で、読む先が真偽値なら --name だけで true
+// （値は取らない。--name=false は取れる）。同じフラグが二度あれば、後のものが勝つ。-x の形はフラグではなく位置引数（負の数を
+// 渡せるように）。-- 以降は、すべて位置引数。--help か -h があれば asked が true。読む先ごとの値は、フラグ、位置引数、環境変数
+// （空でなければ）の順に探す。どこからも与えられなければ、required の行があれば誤り、orDefault の行があればその値、どちらも
+// なければ、読む先に何も書かない。
+func (l *cliLine) parse() (asked bool, err error) {
+	flags := map[string]*cliField{}
+	most, rest := 0, false
+	for _, f := range l.fields {
+		if f.flag != "" {
+			flags[f.flag] = f
+		}
+		if f.position > most {
+			most = f.position
+		}
+		rest = rest || f.position > 0 && f.rest()
+	}
+	given := map[*cliField]string{}
+	var pos []string
+	for i := 0; i < len(l.args); i++ {
+		a := l.args[i]
+		if a == "--" {
+			pos = append(pos, l.args[i+1:]...)
+			break
+		}
+		if a == "--help" || a == "-h" {
+			return true, nil
+		}
+		if !strings.HasPrefix(a, "--") {
+			pos = append(pos, a)
+			continue
+		}
+		name, value, hasValue := strings.Cut(a[2:], "=")
+		f := flags[name]
+		if f == nil {
+			return false, fmt.Errorf("unknown flag --%s", name)
+		}
+		if !hasValue {
+			if f.kind() == reflect.Bool {
+				value = "true"
+			} else {
+				if i+1 >= len(l.args) {
+					return false, fmt.Errorf("flag --%s needs a value", name)
+				}
+				i++
+				value = l.args[i]
+			}
+		}
+		given[f] = value
+	}
+	if !rest && len(pos) > most {
+		return false, fmt.Errorf("too many arguments: %d given, at most %d expected", len(pos), most)
+	}
+	for _, f := range l.fields {
+		var values []string
+		var from string
+		if v, ok := given[f]; ok {
+			values, from = []string{v}, "--"+f.flag
+		} else if f.position > 0 && len(pos) >= f.position {
+			values, from = pos[f.position-1:f.position], f.label()
+			if f.rest() {
+				values = pos[f.position-1:]
+			}
+		} else if v := l.lookup(f.env); v != "" {
+			values, from = []string{v}, f.env
+		} else if f.required {
+			return false, fmt.Errorf("missing required %s", f.source())
+		} else if f.fallback != nil {
+			f.dst.Set(reflect.ValueOf(f.fallback).Convert(f.dst.Type()))
+			continue
+		} else {
+			continue
+		}
+		if err := cliStore(f.dst, values, from); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// lookup は、環境変数 name の値。name が空か、環境変数を見ない（getenv が nil）なら ""。
+func (l *cliLine) lookup(name string) string {
+	if name == "" || l.getenv == nil {
+		return ""
+	}
+	return l.getenv(name)
+}
+
+// cliStore は、与えられた文字列 values を、読む先 dst に読む。読み方は、dst の型で決める: ポインタ（省略可能）なら、値を置く先を
+// 作ってから読む。スライス（残りの位置引数）なら、一つずつ読む。文字列はそのまま、整数は strconv.ParseInt(v, 10, 64)、小数は
+// strconv.ParseFloat(v, 64)、真偽値は strconv.ParseBool(v)。名前付きの型（scalar）は、元の型で読んでから、その型にする。
+// from は、誤りの文言に出す、値の出どころ。
+func cliStore(dst reflect.Value, values []string, from string) error {
+	switch dst.Kind() {
+	case reflect.Pointer:
+		p := reflect.New(dst.Type().Elem())
+		if err := cliStore(p.Elem(), values, from); err != nil {
+			return err
+		}
+		dst.Set(p)
+		return nil
+	case reflect.Slice:
+		s := reflect.MakeSlice(dst.Type(), len(values), len(values))
+		for i := range values {
+			if err := cliStore(s.Index(i), values[i:i+1], from); err != nil {
+				return err
+			}
+		}
+		dst.Set(s)
+		return nil
+	}
+	v := values[0]
+	switch dst.Kind() {
+	case reflect.Bool:
+		if x, err := strconv.ParseBool(v); err == nil {
+			dst.SetBool(x)
+			return nil
+		}
+	case reflect.Int64:
+		if x, err := strconv.ParseInt(v, 10, 64); err == nil {
+			dst.SetInt(x)
+			return nil
+		}
+	case reflect.Float64:
+		if x, err := strconv.ParseFloat(v, 64); err == nil {
+			dst.SetFloat(x)
+			return nil
+		}
+	default:
+		dst.SetString(v)
+		return nil
+	}
+	return fmt.Errorf("invalid value %q for %s: want %s", v, from, cliTypeName(dst.Type(), false))
+}
+
+// usage は、コマンドの使い方: 一行目、コマンドの説明、位置引数（位置の順）、フラグ、環境変数だけのフィールド。並べた行から作る。
+func (l *cliLine) usage(prog string, help cliHelp) string {
+	var args, flags, envs []*cliField
+	for _, f := range l.fields {
+		switch {
+		case f.position > 0:
+			args = append(args, f)
+		case f.flag != "":
+			flags = append(flags, f)
+		default:
+			envs = append(envs, f)
+		}
+	}
+	sort.SliceStable(args, func(i, j int) bool { return args[i].position < args[j].position })
+	var b strings.Builder
+	b.WriteString("usage: " + prog + " " + help.command)
+	if len(flags) > 0 {
+		b.WriteString(" [flags]")
+	}
+	shown := func(f *cliField) string {
+		if f.rest() {
+			return f.label() + "..."
+		}
+		return f.label()
+	}
+	for _, f := range args {
+		if f.required {
+			b.WriteString(" " + shown(f))
+		} else {
+			b.WriteString(" [" + shown(f) + "]")
+		}
+	}
+	b.WriteString("\n")
+	if help.summary != "" {
+		b.WriteString("\n" + help.summary + "\n")
+	}
+	section := func(title string, fields []*cliField, left func(*cliField) string) {
+		if len(fields) == 0 {
+			return
+		}
+		b.WriteString("\n" + title + ":\n")
+		width := 0
+		for _, f := range fields {
+			if n := len(left(f)); n > width {
+				width = n
+			}
+		}
+		for _, f := range fields {
+			var notes []string
+			if f.required {
+				notes = append(notes, "required")
+			}
+			if f.fallback != nil {
+				notes = append(notes, fmt.Sprintf("default: %v", f.fallback))
+			}
+			if f.env != "" && (f.flag != "" || f.position > 0) {
+				notes = append(notes, "env: "+f.env)
+			}
+			right := f.summary
+			if len(notes) > 0 {
+				if right != "" {
+					right += " "
+				}
+				right += "(" + strings.Join(notes, ", ") + ")"
+			}
+			if right == "" {
+				b.WriteString("  " + left(f) + "\n")
+				continue
+			}
+			b.WriteString("  " + left(f) + strings.Repeat(" ", width+3-len(left(f))) + right + "\n")
+		}
+	}
+	section("arguments", args, shown)
+	section("flags", flags, func(f *cliField) string {
+		if f.kind() == reflect.Bool {
+			return "--" + f.flag
+		}
+		return "--" + f.flag + " <" + cliTypeName(cliValueType(f.dst.Type()), true) + ">"
+	})
+	section("environment", envs, func(f *cliField) string { return f.env })
+	return b.String()
+}
+
+// cliValidate は、解釈した入力 in の制約を確かめる。in が Validate() error を持つかどうかは、実行時に見る（持たなければ、
+// 確かめるものがない）。違反があれば、「path: constraint; …」を w（標準エラー）に出して false（使い方は出さない）。
+func cliValidate(w io.Writer, prog string, in any) bool {
+	v, ok := in.(interface{ Validate() error })
+	if !ok {
+		return true
+	}
+	err := v.Validate()
+	if err == nil {
+		return true
+	}
+	message := err.Error()
+	var invalid *runtime.ValidationError
+	if errors.As(err, &invalid) {
+		parts := make([]string, len(invalid.Violations))
+		for i, violation := range invalid.Violations {
+			parts[i] = violation.String()
+		}
+		message = strings.Join(parts, "; ")
+	}
+	cliUsageError(w, prog, "", "invalid input: "+message)
+	return false
+}
+
+// cliThrown は、err が例外 E（値）なら、f に Failure（Name は例外の FQN、Value は運ぶ値）を、code に終了コード exit を入れて
+// true。値を運ぶ例外かどうか（フィールド Value を持つか）は、実行時に見る。
+func cliThrown[E runtime.Exception](err error, exit int, f *Failure, code *int) bool {
+	var e E
+	if !errors.As(err, &e) {
+		return false
+	}
+	*f, *code = Failure{Name: e.HozoException(), Err: err}, exit
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
+		if value := v.FieldByName("Value"); value.IsValid() {
+			f.Value = value.Interface()
+		}
+	}
+	return true
+}

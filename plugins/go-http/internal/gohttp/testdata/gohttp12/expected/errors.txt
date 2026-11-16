@@ -1,0 +1,6 @@
+GOHTTP-12	app.In	入力の model app.In の @http.headerObj のフィールド meta の型 app.Item? が、model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model と配列は、model ではない）
+GOHTTP-12	app.In	入力の model app.In の @http.queryObj のフィールド paging の型 app.Item[] が、model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model と配列は、model ではない）
+GOHTTP-12	app.In	入力の model app.In の @http.bodyObj のフィールド attrs の型 Record<string, app.Item> が、model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model と配列は、model ではない）
+GOHTTP-12	app.More	入力の model app.More の @http.headerObj のフィールド text の型 string が、model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model と配列は、model ではない）
+GOHTTP-12	app.More	入力の model app.More の @http.queryObj のフィールド name の型 app.Name が、model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model と配列は、model ではない）
+GOHTTP-12	app.More	入力の model app.More の @http.bodyObj のフィールド shape の型 app.Shape が、model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model と配列は、model ではない）

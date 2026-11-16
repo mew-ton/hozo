@@ -261,7 +261,7 @@ func (g *generator) custom(app *ir.Application, at, subject string) {
 }
 
 // checkModel は model m の診断を、フィールドの順に: フィールドに付いた制約（GOVALID-5、GOVALID-1）、フィールドの型
-// （GOVALID-4、GOVALID-3）、既定値（GOVALID-2）。最後に、フィールドの名前（GOVALID-6）。
+// （GOVALID-4、GOVALID-3）。最後に、フィールドの名前（GOVALID-6）。
 func (g *generator) checkModel(m *ir.Model) {
 	for i := range m.Fields {
 		f := &m.Fields[i]
@@ -382,38 +382,4 @@ func (g *generator) checkHome(fqn, at, what string) {
 		g.errorf(codeValidHome, at, "%s は %s を持つが、名前空間 %s の型の置き場の単位（%d 番目の [[emit]]）が、transpilers に %s を並べていない（メソッドは、型の定義のパッケージにしか書けない）",
 			what, method, m, unit, TranspilerName)
 	}
-}
-
-// scalarConstraints は、型 t が scalar なら、その継承を辿ったすべての scalar に付いた valid の標準の制約（元の方から順に）。
-// 「制約」の表に合わないものは飛ばす（その scalar の出力が GOVALID-1 を返す）。
-func (g *generator) scalarConstraints(t ir.Type) []constraint {
-	var chain []*ir.Scalar
-	for depth := 0; depth < 64; depth++ {
-		r, ok := t.(ir.RefType)
-		if !ok {
-			break
-		}
-		s, ok := g.p.Lookup(r.Target).(*ir.Scalar)
-		if !ok {
-			break
-		}
-		chain = append(chain, s)
-		t = s.Base
-	}
-	var cons []constraint
-	for i := len(chain) - 1; i >= 0; i-- {
-		s := chain[i]
-		core, ok := g.coreOf(s.Base)
-		for j := range s.Decorators {
-			app := &s.Decorators[j]
-			if !g.vocab[app.Decorator] || !govalid.Standard(app.Decorator) {
-				continue
-			}
-			if c, problem := parse(app, core, ok, "scalar "+s.Name); problem == "" {
-				c.owner = "scalar " + s.Name
-				cons = append(cons, c)
-			}
-		}
-	}
-	return cons
 }

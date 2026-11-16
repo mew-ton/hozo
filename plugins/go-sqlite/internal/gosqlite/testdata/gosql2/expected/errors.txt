@@ -1,0 +1,2 @@
+GOSQL-2	app.current	@db.table の状態 app.current の形が nullable（表にできるのは list だけ。一行だけの表の形は、まだ決めていない）
+GOSQL-2	app.config	@db.table の状態 app.config の形が single（表にできるのは list だけ。一行だけの表の形は、まだ決めていない）

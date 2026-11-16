@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	"example.com/app/gen/bare"
+	barecli "example.com/app/gen/bare/cli"
 	"example.com/app/gen/demo"
 	democli "example.com/app/gen/demo/cli"
 	"example.com/app/gen/fail"
@@ -308,7 +310,7 @@ func TestDemo(t *testing.T) {
 			stdout: []string{"usage: " + prog + " copy [flags] FROM [TO...]\n\narguments:\n  FROM    元 (required, env: DEMO_FROM)\n  TO...   先\n\nflags:\n  --steps <Steps>   (env: DEMO_STEPS)\n  --ratio <Ratio>   (default: 0.5)\n  --force           (env: DEMO_FORCE)\n  --offset <int>    (default: -1)\n"}},
 		{name: "必須の、残りを受け取る位置引数がない", args: []string{"move", "a", "b"}, code: 64, stderr: []string{"missing required argument REST", "usage: " + prog + " move"}, calls: "-"},
 		{name: "move の使い方（位置の順）", args: []string{"move", "-h"}, code: 0,
-			stdout: []string{"usage: " + prog + " move [flags] [FROM] [TO] REST...\n\n動かす\n\narguments:\n  FROM      元\n  TO        先\n  REST...   残り (required, env: DEMO_REST)\n\nflags:\n  --keep              (default: true)\n  --suffix <Name>     (default: ~)\n  --weight <float>    (default: 2)\n"}},
+			stdout: []string{"usage: " + prog + " move [flags] [FROM] [TO] REST...\n\n動かす\n\narguments:\n  FROM      元\n  TO        先\n  REST...   残り (required, env: DEMO_REST)\n\nflags:\n  --keep             (default: true)\n  --suffix <Name>    (default: ~)\n  --weight <float>   (default: 2)\n"}},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
@@ -424,6 +426,36 @@ func TestMoveInput(t *testing.T) {
 		}
 		if !reflect.DeepEqual(l.move, c.want) {
 			t.Errorf("%s: 入力 = %+v, want %+v", name, l.move, c.want)
+		}
+	}
+}
+
+// bareLeaves は bare の葉の op。
+type bareLeaves struct{ calls int }
+
+func (l *bareLeaves) Noop(ctx context.Context) error {
+	l.calls++
+	return nil
+}
+
+// TestBare: 入力も例外も持たないコマンドだけの名前空間でも、引数の解釈は同じ（位置引数とフラグは誤り、--help は使い方）。
+func TestBare(t *testing.T) {
+	for _, c := range []struct {
+		args  []string
+		code  int
+		calls int
+		want  string // stdout か stderr に含まれるべき部分文字列
+	}{
+		{[]string{"noop"}, 0, 1, ""},
+		{[]string{"noop", "x"}, 64, 0, "too many arguments: 1 given, at most 0 expected"},
+		{[]string{"noop", "--x"}, 64, 0, "unknown flag --x"},
+		{[]string{"noop", "-h"}, 0, 0, "usage: " + prog + " noop\n\n何もしない\n"},
+	} {
+		l := &bareLeaves{}
+		var out, errOut bytes.Buffer
+		code := barecli.Main(context.Background(), bare.New(l), barecli.JSONPresenter{}, c.args, nil, &out, &errOut)
+		if code != c.code || l.calls != c.calls || !strings.Contains(out.String()+errOut.String(), c.want) {
+			t.Errorf("%v: code=%d calls=%d stdout=%q stderr=%q", c.args, code, l.calls, out.String(), errOut.String())
 		}
 	}
 }

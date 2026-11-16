@@ -128,8 +128,8 @@ func TestModel(t *testing.T) {
 	// 継承した model は、受け継いだ制約と、足したフィールドの制約を確かめる
 	expect(t, app.PublicItem{Sku: "AB-1", Name: "pen", Color: "#00ff00", Image: "https://example.com/", Code: "abc",
 		Seller: "s@example.com", From: pkgtype.Address{City: "Tokyo"}, Stock: 0}, "stock: min")
-	// 既定値を入れた値は、制約に合う
-	expect(t, app.NewPaging())
+	// 制約に合う値と、零値（初めの値を入れる関数はない。docs/plugin-go.md「model」）
+	expect(t, app.Paging{Page: 1, Size: 20, Sort: "id", Link: "https://example.com/"})
 	expect(t, app.Paging{}, "page: min", "size: min", "sort: length", "link: format")
 	// その場で書いた model
 	expect(t, app.RejectedValue{Code: 200}, "code: min")

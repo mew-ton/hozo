@@ -14,7 +14,7 @@ namespace app {
     @http.queryObj paging: Paging;
     // 項目の形なら、当たらない
     @http.header("X-Trace") @http.required trace: string;
-    @http.query @http.default("x") q: string;
+    @http.header @http.default("x") lang: string;
   }
   @http.post("/in")
   export op take(in: In);

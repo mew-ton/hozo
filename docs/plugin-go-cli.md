@@ -52,7 +52,7 @@ namespace cli {
 - **位置引数は、位置を引数で言う**（`@cli.arg(1) source`、`@cli.arg(2) target`）。フィールドの宣言の順からは読まない。位置は 1 から、重なりも抜けもなく続く（そうでなければ CLI-10）。
 - **名前を取るデコレータ**（`flag`、`env`）は、`http` の語彙の項目の形（`docs/vocab.md`「`http` の語彙」）と同じ決まり: 名前を省けば、フィールドの名前（`@cli.flag verbose` は `--verbose`）。
 - **値が与えられなかったときの扱いは、二つのデコレータが言う**: `@cli.required`（誤り。`@cli.required @cli.arg(1) source`）と、`@cli.default(<リテラル>)`（その値にする。`@cli.flag @cli.default("text") format`）。どちらもないフィールドは、零値のまま op に渡る。フィールドの型（省略可能かどうか）からは決めず、型の宣言に書く既定値は、言語にない（`docs/decisions.md`「設計書を変える決定」S24）。`http` の語彙の `@http.required` / `@http.default`（`docs/vocab.md`「`http` の語彙」）と同じ決まりで、確かめるのは、このトランスパイラ（「対象」）。`value` の型は、フィールドに書ける型（「対象」）のリテラルの型。
-- **`plugins/go-cli/cli.hozo` のファイルは、この宣言を持ち**（説明のコメントは、ファイルの方が詳しい。`tests/parse_test.go` の `TestDocsEmbedVocabulary` が、宣言の一致を確かめる）、**リポジトリ直下の `cli.hozo` は、`@cli.arg(1) namespaces` と書いてある**（`docs/cli.md`「cli.hozo」）。`go-cli` の出力は、まだこの語彙になっていない（`docs/requirements.md`「作り直しの段階」の R3）。リポジトリ直下の `cli.hozo` に、`@cli.required` か `@cli.default` を足すフィールドはない: 入力のフィールドは、どれも省略可能か、残りを受け取る配列（0 個でよい）で、既定値を持つフィールドもない。
+- **`plugins/go-cli/cli.hozo` のファイルは、この宣言を持ち**（説明のコメントは、ファイルの方が詳しい。`tests/parse_test.go` の `TestDocsEmbedVocabulary` が、宣言の一致を確かめる）、**リポジトリ直下の `cli.hozo` は、`@cli.arg(1) namespaces` と書いてある**（`docs/cli.md`「cli.hozo」）。リポジトリ直下の `cli.hozo` に、`@cli.required` か `@cli.default` を足すフィールドはない: 入力のフィールドは、どれも省略可能か、残りを受け取る配列（0 個でよい）で、既定値を持つフィールドもない。
 
 ## 出力
 
@@ -78,7 +78,7 @@ type JSONPresenter struct{}
 - `Main` は `package main` ではない。人が書く `main.go` は、実装を組み立てて `os.Exit(cli.Main(ctx, ops, p, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))` を呼ぶだけ。
 - `ops` の型は、N の入口の `Ops`（`docs/plugin-go.md`「Ops」）。基底の `New` の戻り値を、そのまま渡す。
 - 同じ単位が、N の子の名前空間 `N.cli` を出力するなら CLI-7（Dir(U, N.cli) が、このパッケージのディレクトリと重なる）。
-- パッケージ `cli` の非公開の名前は、コマンドごとの `run<Op>` / `fail<Op>` / `usage<Op>`（`<Op>` は op 名を先頭大文字にしたもの）と、補助の `cli<名前>`（`cliUsage`、`cliParseArgs` など。使うものだけを出す）。どれも大文字を含むので、import する名前空間のパッケージの名前（小文字と数字だけ）とは当たらない。パッケージの変数は持たない。
+- パッケージ `cli` の非公開の名前は、コマンドごとの `run<Op>` / `fail<Op>` / `usage<Op>`（`<Op>` は op 名を先頭大文字にしたもの）と、補助の `cli<名前>`（`cliUsage`、`cliLine` など。使うものだけを出す）。どれも大文字を含むので、import する名前空間のパッケージの名前（小文字と数字だけ）とは当たらない。パッケージの変数は持たない。
 - `Main` とコマンドごとの関数の中の局所の名前（`ctx`、`ops`、`p`、`args`、`env`、`in`、`err` など）が、このファイルが import するパッケージの名前（N と、例外の名前空間のパッケージ）と当たれば、局所の名前の方の末尾に `_` を足す（`docs/plugin-go.md`「名前」の「局所の名前」と同じ扱い。名前空間 `env` なら、`Main` の引数は `env_`）。
 
 ## 対象
@@ -108,8 +108,8 @@ hozoc <command> [flags] [args]
 - フラグは `--name value`、`--name=value`。`boolean` は `--name` で true（値は取らない。`--name=false` は取れる）。値を取らないフラグかどうかは、補助が、実行時に、読む先の Go の型が真偽値（か、そのポインタ）かどうかで見る。同じフラグが二度あれば後のものが勝つ。`-x` の形はフラグではなく位置引数（`-h` を除く。負の数を渡せるようにするため）。`--` 以降は位置引数。
 - 知らないフラグ、フラグの値がない、値を型に変換できない（`int` に `"x"`）、必須のフィールド（下）に値が与えられない、位置引数が多い → 使い方を標準エラーに出して 64。
 - 値が与えられなかったフィールド（フラグでも、位置引数でも、`@cli.env` の環境変数でも）の扱いは、デコレータだけで決まる。`@cli.required`（必須）なら、誤り（上）。残りを受け取る `array` の `@cli.arg` に付ければ、位置引数が一つは要る。`@cli.default(v)` なら、読む先を v にする。どちらもなければ、読む先に何も書かない（零値のまま。足りない位置引数も同じ）。フィールドの型は、見ない。
-- `@cli.env` は、フラグが与えられなかったときに環境変数の値を使う（フラグが優先）。環境変数が空文字列なら「ない」とみなす。
-- `@cli.arg(n)` は、n 番目の位置引数を受け取る。`array` は、その位置から後ろの残りすべて（0 個でもよい）。残りを受け取るかどうかは、補助が、実行時に、読む先がスライスかどうかで見る。
+- `@cli.env` は、フラグ（`@cli.arg` と一緒なら、その位置引数）が与えられなかったときに環境変数の値を使う（フラグと位置引数が優先）。環境変数が空文字列なら「ない」とみなす。
+- `@cli.arg(n)` は、n 番目の位置引数を受け取る。`array` は、その位置から後ろの残りすべて（0 個でもよい）。残りを受け取るかどうかは、補助が、実行時に、読む先がスライスかどうかで見る。残りを受け取る読む先に、環境変数から値が与えられたときは、その値一つだけを要素にする。
 - 値の変換: `int` は `strconv.ParseInt(v, 10, 64)`、`float` は `ParseFloat`、`boolean` は `ParseBool`。scalar は元の型で変換してから scalar の型にする。
 - 解釈した入力の制約を確かめる。入力が `Validate` を持つかどうかで、出すコードを変えない: 入力を持つどのコマンドにも、同じ補助の呼び出しを出し、補助が、実行時に、入力が `Validate() error` を持つかを見る（持たなければ、確かめるものがない）。違反は 64（メッセージに `Violation` の `Path` と `Constraint`。使い方は出さない）。
 - 入力は `var in <Model>` で置き、どのフィールドも零値で始まる。基底は、初めの値を入れる関数を出さない（`docs/plugin-go.md`「model」）。
@@ -122,7 +122,7 @@ hozoc <command> [flags] [args]
 ```go
 func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
 	var in hozoc.EmitInput
-	line := cliLine{args: args, env: env}
+	line := cliLine{args: args, getenv: env}
 	line.flag("config", &in.Config)
 	line.env("HOZO_CONFIG", &in.Config)
 	line.flag("format", &in.Format)
@@ -162,7 +162,8 @@ commands:
   emit    仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す
 ```
 
-- コマンドの一行は `Op.description.summary`。コマンドごとの使い方は、フィールドの `description.summary` を `--flag` / `ARG` / `ENV` と並べる。
+- コマンドの一行は `Op.description.summary`。コマンドごとの使い方は、フィールドの `description.summary` を `--flag` / `ARG` / `ENV` と並べる。`ARG` は、フィールドの名前を大文字と `_` にしたもの（`dryRun` は `DRY_RUN`）。
+- コマンドごとの使い方も、型に依らない形で出す: `usage<Op>` が返すのは、説明だけ（コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明）。フラグ、位置引数（位置の順）、環境変数の並びと、付記（`required`、`default: <値>`、`env: <名前>`）は、補助 `cliLine` が、並べた行（「コマンドごとの関数」）から、実行時に作る。読む先の型で変わるところ（値を取らないフラグは `--name` だけ、ほかは `--name <型の名前>`。残りを受け取る位置引数は `ARG...`）も、そこで決まる。
 - 使い方に出すプログラム名は `filepath.Base(os.Args[0])`。`Main` の `args` は `os.Args[1:]` の約束で、プログラム名を含まない。
 
 ## Go の名前

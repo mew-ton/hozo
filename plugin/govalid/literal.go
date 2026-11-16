@@ -107,13 +107,13 @@ func satisfies(app *ir.Application, lit ir.Literal) bool {
 			return true
 		}
 		l := int64(utf8.RuneCountInString(s.Value))
-		if min, ok := argLiteral(app, "min"); ok {
-			if v, isInt := min.(ir.IntLiteral); isInt && l < v.Value {
+		if lo, ok := argLiteral(app, "min"); ok {
+			if v, isInt := lo.(ir.IntLiteral); isInt && l < v.Value {
 				return false
 			}
 		}
-		if max, ok := argLiteral(app, "max"); ok {
-			if v, isInt := max.(ir.IntLiteral); isInt && l > v.Value {
+		if hi, ok := argLiteral(app, "max"); ok {
+			if v, isInt := hi.(ir.IntLiteral); isInt && l > v.Value {
 				return false
 			}
 		}

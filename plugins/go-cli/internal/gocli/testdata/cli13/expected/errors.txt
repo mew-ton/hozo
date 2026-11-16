@@ -1,0 +1,10 @@
+CLI-13	app.In	入力の model app.In のフィールド a の @cli.default のリテラル 1（int）は、フィールドの型 string に渡せない
+CLI-13	app.In	入力の model app.In のフィールド b の @cli.default のリテラル "x"（string）は、フィールドの型 int に渡せない
+CLI-13	app.In	入力の model app.In のフィールド c の @cli.default のリテラル 0.5（float）は、フィールドの型 int に渡せない
+CLI-13	app.In	入力の model app.In のフィールド d の @cli.default のリテラル true（boolean）は、フィールドの型 float に渡せない
+CLI-13	app.In	入力の model app.In のフィールド e の @cli.default のリテラル "true"（string）は、フィールドの型 boolean に渡せない
+CLI-13	app.In	入力の model app.In のフィールド f の @cli.default のリテラル 1（int）は、フィールドの型 app.Name に渡せない
+CLI-13	app.In	入力の model app.In のフィールド g の @cli.default のリテラル 1.5（float）は、フィールドの型 app.Count に渡せない
+CLI-13	app.In	入力の model app.In のフィールド h の @cli.default のリテラル "x"（string）は、フィールドの型 app.Ratio に渡せない
+CLI-13	app.In	入力の model app.In のフィールド i の @cli.default のリテラル 0（int）は、フィールドの型 app.Flag に渡せない
+CLI-13	app.In	入力の model app.In のフィールド rest の @cli.default のリテラル "x"（string）は、フィールドの型 string[] に渡せない

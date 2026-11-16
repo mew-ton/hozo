@@ -20,3 +20,14 @@ out         = "gen/errors"
 namespace   = "fmt"
 transpilers = ["go"]
 out         = "gen/fmt"
+
+# in の op が投げる例外の型の置き場。パッケージ名が、補助の使う標準ライブラリ（reflect）や、cli.go の局所の名前（line）と同じ
+[[emit]]
+namespace   = "reflect"
+transpilers = ["go"]
+out         = "gen/reflect"
+
+[[emit]]
+namespace   = "line"
+transpilers = ["go"]
+out         = "gen/line"

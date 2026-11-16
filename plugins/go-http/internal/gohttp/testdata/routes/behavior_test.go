@@ -1,11 +1,15 @@
 // 入力 routes の出力を動かす（plugins/go-http の TestBehavior が、基底 go・go-valid・go-http の出力を書いたモジュールのルートに
 // 置いて走らせる）。確かめること（docs/plugin-go-http.md）:
 //
-//   - 「入力の読み方」: ヘッダ（必須、省略可能、既定値持ち。空の文字列は、ないもの）、クエリ（string / int / float / boolean と scalar。
-//     必須、省略可能、既定値持ち。同じ名前が二度あれば最初の値）、本文（一つ、二つ以上。知らないキーは無視、ないキーは初めの値）。
+//   - 「入力の読み方」と「通信の形」の「要求」: 三つの場所（ヘッダ、クエリ、本文）の、項目の形（名前を書いたものと、省いたもの）と、
+//     全体の形。項目がないときの三つの扱い（@http.required は 400、@http.default はその値、どちらもなければ零値）を、三つの場所で。
+//     ヘッダの空の文字列は、ないもの。クエリの同じ名前が二度あれば最初の値。本文の項目は、キーがあれば、値が null でも、あるもの。
+//     読み方（文字列、整数、小数、真偽値。省略可能と scalar）は、補助が、実行時に、読む先の型で決める。
 //   - 「op を呼ぶ前の失敗」: 読めない要求は 400 `http.BadRequest` と決まった文言で、op を呼ばない。読めない要求が先で、次に制約の検査。
 //   - 「制約の検査」: validate = true のときだけ。違反の path は、通信の上の場所。validate = false なら、確かめずに op を呼ぶ。
-//   - 「成功の応答」: 戻り値があれば 200 と JSON（空の配列は []、省略可能でなければ null）、なければ 204。
+//     Validate を持たない入力は、同じ補助を通って、そのまま op に届く。
+//   - 「成功の応答」: 返す値があれば 200 と JSON（値のない配列は []、値のない record は {}、零値も値）、なければ 204 で本文なし
+//     （戻り値のない op、省略可能な戻り値で値がないとき）。一つの op が、呼び出しによって 200 も 204 も返す。
 //   - 「失敗の応答」: @http.status を持つ例外は、そのステータスと FQN（と値）。それ以外は 500 `internal`。ポインタで返した例外も 500。
 //   - 経路にない要求は 404、メソッドの合わない要求は 405（net/http の既定）。/ で終わるパスは、そのパスだけに合う。
 //   - op には、要求の context をそのまま渡す。
@@ -39,8 +43,12 @@ type apiLeaves struct {
 	search  api.SearchInput
 	lookup  pkgtype.Lookup
 	replace api.ReplaceInput
+	list    api.ListInput
+	put     api.PutInput
 	items   []pkgtype.Item
 	first   *pkgtype.Item
+	counts  map[string]int64
+	token   *pkgtype.Token
 	err     error
 }
 
@@ -72,6 +80,16 @@ func (l *apiLeaves) Replace(ctx context.Context, in api.ReplaceInput) error {
 	l.replace = in
 	return l.err
 }
+func (l *apiLeaves) ListAll(ctx context.Context, in api.ListInput) (map[string]int64, error) {
+	l.called(ctx, "listAll")
+	l.list = in
+	return l.counts, l.err
+}
+func (l *apiLeaves) Put(ctx context.Context, in api.PutInput) (*pkgtype.Token, error) {
+	l.called(ctx, "put")
+	l.put = in
+	return l.token, l.err
+}
 func (l *apiLeaves) Reset(ctx context.Context) error {
 	l.called(ctx, "reset")
 	return l.err
@@ -79,6 +97,10 @@ func (l *apiLeaves) Reset(ctx context.Context) error {
 func (l *apiLeaves) Ping(ctx context.Context) (bool, error) {
 	l.called(ctx, "ping")
 	return true, l.err
+}
+func (l *apiLeaves) Count(ctx context.Context) (int64, error) {
+	l.called(ctx, "count")
+	return 0, l.err
 }
 func (l *apiLeaves) Version() string                           { return "1" }
 func (l *apiLeaves) Flaky(ctx context.Context) (string, error) { return "", nil }
@@ -117,6 +139,14 @@ func expectJSON(t *testing.T, got response, status int, body string) {
 	}
 }
 
+// expectEmpty は、応答が、204 で、本文も Content-Type もないことを確かめる。
+func expectEmpty(t *testing.T, got response) {
+	t.Helper()
+	if got.status != 204 || got.body != "" || got.contentType != "" {
+		t.Errorf("応答 = %d %q（Content-Type %q）, want 204 で本文なし", got.status, got.body, got.contentType)
+	}
+}
+
 // badRequest は、読めない要求の本文（docs/plugin-go-http.md「op を呼ぶ前の失敗」）。
 func badRequest(message string) string {
 	return `{"error":"http.BadRequest","value":{"message":"` + message + `","violations":[]}}`
@@ -129,9 +159,11 @@ func newAPI() (*apiLeaves, http.Handler) {
 
 func ptr[T any](v T) *T { return &v }
 
-const createBody = `{"item":{"name":"pen","quantity":2,"tags":["a"]},"note":"memo","labels":{"k":"v"},"unknown":true}`
+// createBody は、POST /items の、@http.required の項目（labels）だけを持つ本文。
+const createBody = `{"labels":{"k":"v"}}`
 
-var createHeaders = []string{"X-Tenant", "acme", "Authorization", "Bearer abc"}
+// createHeaders は、POST /items の、@http.required のヘッダ（X-Tenant）だけ。
+var createHeaders = []string{"X-Tenant", "acme"}
 
 func TestNoInput(t *testing.T) {
 	leaves, h := newAPI()
@@ -143,11 +175,11 @@ func TestNoInput(t *testing.T) {
 	// 一つの op の二つの経路
 	expectJSON(t, call(t, h, "GET", "/ping", ""), 200, `true`)
 	expectJSON(t, call(t, h, "POST", "/ping", ""), 200, `true`)
+	// 零値の結果も、値: 200
+	expectJSON(t, call(t, h, "GET", "/count", ""), 200, `0`)
 	// 引数も戻り値もない: 204 で、本文はない
-	if got := call(t, h, "POST", "/reset/", ""); got.status != 204 || got.body != "" {
-		t.Errorf("POST /reset/ = %+v, want 204 で本文なし", got)
-	}
-	if want := []string{"health", "ping", "ping", "reset"}; !reflect.DeepEqual(leaves.calls, want) {
+	expectEmpty(t, call(t, h, "POST", "/reset/", ""))
+	if want := []string{"health", "ping", "ping", "count", "reset"}; !reflect.DeepEqual(leaves.calls, want) {
 		t.Errorf("呼ばれた op = %v, want %v", leaves.calls, want)
 	}
 }
@@ -161,8 +193,9 @@ func TestRouting(t *testing.T) {
 		// / で終わるパスは、その下のパスには合わない
 		"POST /reset/extra": 404} {
 		method, path, _ := strings.Cut(target, " ")
-		if got := call(t, h, method, path, ""); got.status != want {
-			t.Errorf("%s = %d, want %d", target, got.status, want)
+		got := call(t, h, method, path, "")
+		if got.status != want || got.contentType == "application/json" {
+			t.Errorf("%s = %d（Content-Type %q）, want %d（JSON ではない）", target, got.status, got.contentType, want)
 		}
 	}
 	if len(leaves.calls) != 0 {
@@ -176,38 +209,50 @@ func TestRouting(t *testing.T) {
 	}
 }
 
+// ヘッダと本文の項目: 名前を書いたものと省いたもの、項目がないときの三つの扱い。
 func TestHeadersAndBodies(t *testing.T) {
 	leaves, h := newAPI()
+	// @http.required の項目だけを送る
 	got := call(t, h, "POST", "/items?dryRun=true", createBody, createHeaders...)
 	// 戻り値の JSON: キーはフィールド名、省略可能で値がないフィールドは省く
-	expectJSON(t, got, 200, `{"name":"pen","quantity":2,"tags":["a"]}`)
+	expectJSON(t, got, 200, `{"name":"","quantity":0,"tags":null}`)
 	want := api.CreateInput{
-		Tenant: "acme", Token: "Bearer abc", // ヘッダの値は、そのまま型にする（前置きを外さない）
-		RequestId: nil,  // 省略可能なヘッダで、ない
-		Lang:      "en", // 既定値持ちのヘッダで、ない: 初めの値のまま
-		Item:      pkgtype.Item{Name: "pen", Quantity: 2, Tags: []string{"a"}},
-		DryRun:    true,
-		Note:      ptr("memo"),
-		Copies:    1, // 本文にないキーは、初めの値（既定値）のまま
-		Labels:    map[string]pkgtype.Name{"k": "v"},
+		Tenant: "acme",
+		// どちらもない項目は、零値のまま（省略可能なフィールドは、値がない）
+		Token: "", RequestId: nil, Trace: nil, Item: pkgtype.Item{}, Note: nil,
+		// @http.default の項目は、その値（補助が、読む先の型に変える: 整数のリテラルを float に、文字列を scalar に、期間を Duration に）
+		Lang: "en", Copies: 1, Weight: 2, Scale: 1.5, Active: true, Timeout: 30 * time.Second, Wait: pkgtype.Wait(5 * time.Minute), Owner: "anon",
+		DryRun: true,
+		Labels: map[string]pkgtype.Name{"k": "v"},
 	}
 	if !reflect.DeepEqual(leaves.create, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.create, want)
 	}
 
-	// すべてを送る。省略可能な本文のフィールドの null は「ない」
-	call(t, h, "POST", "/items?dryRun=0", `{"item":{"name":"x","quantity":1,"tags":null,"at":"2024-01-02T03:04:05Z"},"note":null,"copies":3,"labels":null}`,
-		"X-Tenant", "t", "Authorization", "a", "X-Request-Id", "r1", "Accept-Language", "ja")
+	// すべてを送る。名前を省いた項目は、フィールドの名前（ヘッダ trace、本文 item）。名前を書いた項目は、その名前（本文 memo）。
+	// フィールドの名前 note は、通信に現れない。知らないキーは無視する。ヘッダの値は、そのまま読む（前置きを外さない）
+	body := `{"item":{"name":"x","quantity":1,"tags":["a"],"at":"2024-01-02T03:04:05Z"},"memo":"m","note":"ignored","copies":3,"labels":{},
+		"weight":0.5,"scale":2,"active":false,"timeout":1000,"wait":2000,"owner":"me","unknown":true}`
+	call(t, h, "POST", "/items?dryRun=0", body,
+		"X-Tenant", "t", "Authorization", "Bearer abc", "X-Request-Id", "r1", "Accept-Language", "ja", "Trace", "t1")
 	at := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
-	want = api.CreateInput{Tenant: "t", Token: "a", RequestId: ptr("r1"), Lang: "ja",
-		Item: pkgtype.Item{Name: "x", Quantity: 1, At: &at}, Copies: 3}
+	want = api.CreateInput{Tenant: "t", Token: "Bearer abc", RequestId: ptr("r1"), Lang: "ja", Trace: ptr("t1"),
+		Item: pkgtype.Item{Name: "x", Quantity: 1, Tags: []string{"a"}, At: &at}, Note: ptr("m"), Copies: 3,
+		Labels: map[string]pkgtype.Name{}, Weight: 0.5, Scale: 2, Active: false, Timeout: 1000, Wait: 2000, Owner: "me"}
 	if !reflect.DeepEqual(leaves.create, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.create, want)
+	}
+
+	// 本文の項目は、キーがあれば、値が null でも、あるものと読む: @http.default の値を入れず、@http.required でも誤りにしない
+	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":null,"copies":null,"active":null,"memo":null,"item":null}`, createHeaders...),
+		200, `{"name":"","quantity":0,"tags":null}`)
+	if c := leaves.create; c.Labels != nil || c.Copies != 0 || c.Active || c.Note != nil || c.Weight != 2 {
+		t.Errorf("null の項目: 入力 = %+v, want labels は nil、copies は 0、active は false（null は、あるもの）、weight は 2（キーがない）", c)
 	}
 
 	// validate = false: 制約に合わない入力でも、確かめずに op を呼ぶ
 	leaves.calls = nil
-	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"item":{"name":"","quantity":0,"tags":[]}}`, createHeaders...), 200, `{"name":"","quantity":0,"tags":[]}`)
+	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":{"k":""},"item":{"name":"","quantity":0,"tags":[]}}`, createHeaders...), 200, `{"name":"","quantity":0,"tags":[]}`)
 	if len(leaves.calls) != 1 {
 		t.Errorf("validate = false なのに、op が呼ばれなかった")
 	}
@@ -220,16 +265,21 @@ func TestUnreadableRequests(t *testing.T) {
 		headers      []string
 		message      string
 	}{
-		"必須のヘッダがない":          {"/items?dryRun=true", createBody, []string{"Authorization", "a"}, "header X-Tenant: missing"},
-		"必須のヘッダが空":           {"/items?dryRun=true", createBody, []string{"X-Tenant", "", "Authorization", "a"}, "header X-Tenant: missing"},
-		"必須の scalar のヘッダがない": {"/items?dryRun=true", createBody, []string{"X-Tenant", "t"}, "header Authorization: missing"},
-		"本文が JSON でない":       {"/items?dryRun=true", `{"item":`, createHeaders, "body: invalid JSON"},
-		"本文が空":               {"/items?dryRun=true", ``, createHeaders, "body: invalid JSON"},
-		"本文の型が違う":            {"/items?dryRun=true", `{"copies":"three"}`, createHeaders, "body: invalid JSON"},
-		"本文がオブジェクトでない":       {"/items?dryRun=true", `[1]`, createHeaders, "body: invalid JSON"},
-		"必須のクエリがない":          {"/items", createBody, createHeaders, "query dryRun: missing"},
-		"boolean のクエリが読めない":  {"/items?dryRun=maybe", createBody, createHeaders, "query dryRun: invalid boolean"},
-		// フィールドの順に読む: 先のフィールド（ヘッダ）の失敗が先
+		// 項目がないとき: @http.required の項目だけが、誤り（三つの場所で）
+		"required のヘッダがない":   {"/items?dryRun=true", createBody, []string{"Authorization", "a"}, "header X-Tenant: missing"},
+		"required のヘッダが空":    {"/items?dryRun=true", createBody, []string{"X-Tenant", ""}, "header X-Tenant: missing"},
+		"required のクエリがない":   {"/items", createBody, createHeaders, "query dryRun: missing"},
+		"required の本文の項目がない": {"/items?dryRun=true", `{"item":{"name":"x","quantity":1,"tags":[]}}`, createHeaders, "body labels: missing"},
+		"本文が空のオブジェクト":        {"/items?dryRun=true", `{}`, createHeaders, "body labels: missing"},
+		// 本文が JSON のオブジェクトとして読めない、キーの値の型が合わない
+		"本文が JSON でない":      {"/items?dryRun=true", `{"item":`, createHeaders, "body: invalid JSON"},
+		"本文が空":              {"/items?dryRun=true", ``, createHeaders, "body: invalid JSON"},
+		"本文がオブジェクトでない":      {"/items?dryRun=true", `[1]`, createHeaders, "body: invalid JSON"},
+		"本文が null":          {"/items?dryRun=true", `null`, createHeaders, "body: invalid JSON"},
+		"本文の項目の型が違う":        {"/items?dryRun=true", `{"labels":{},"copies":"three"}`, createHeaders, "body: invalid JSON"},
+		"本文の項目の中の型が違う":      {"/items?dryRun=true", `{"labels":{},"item":{"quantity":"x"}}`, createHeaders, "body: invalid JSON"},
+		"boolean のクエリが読めない": {"/items?dryRun=maybe", createBody, createHeaders, "query dryRun: invalid boolean"},
+		// フィールドの順に読み、読めなかった最初の理由で終わる
 		"ヘッダも本文も読めない": {"/items", `{`, nil, "header X-Tenant: missing"},
 		"本文もクエリも読めない": {"/items", `{`, createHeaders, "body: invalid JSON"},
 	} {
@@ -239,80 +289,153 @@ func TestUnreadableRequests(t *testing.T) {
 		}
 	}
 	for target, message := range map[string]string{
-		"/items?offset=0&min=1":               "query q: missing",
-		"/items?q=x&min=1":                    "query offset: missing",
-		"/items?q=x&offset=0":                 "query min: missing",
-		"/items?q=x&offset=zero&min=1":        "query offset: invalid int",
-		"/items?q=x&offset=1.5&min=1":         "query offset: invalid int",
-		"/items?q=x&offset=0&min=1&page=":     "query page: invalid int",
-		"/items?q=x&offset=0&min=1&limit=a":   "query limit: invalid int",
-		"/items?q=x&offset=0&min=1&size=a":    "query size: invalid int",
-		"/items?q=x&offset=0&min=one":         "query min: invalid float",
-		"/items?q=x&offset=0&min=1&ratio=r":   "query ratio: invalid float",
-		"/items?q=x&offset=0&min=1&max=m":     "query max: invalid float",
-		"/items?q=x&offset=0&min=1&scale=s":   "query scale: invalid float",
-		"/items?q=x&offset=0&min=1&exact=yes": "query exact: invalid boolean",
-		"/items?q=x&offset=0&min=1&deep=2":    "query deep: invalid boolean",
-		"/items?q=x&offset=0&min=1&flag=":     "query flag: invalid boolean",
-		"/items/first":                        "query id: missing",
+		"/items?min=1":                 "query q: missing",
+		"/items?q=x":                   "query min: missing",
+		"/items?q=x&min=1&offset=zero": "query offset: invalid int",
+		"/items?q=x&min=1&offset=1.5":  "query offset: invalid int",
+		"/items?q=x&min=1&page=":       "query page: invalid int",
+		"/items?q=x&min=1&limit=a":     "query limit: invalid int",
+		"/items?q=x&min=1&size=a":      "query size: invalid int",
+		"/items?q=x&min=one":           "query min: invalid float",
+		"/items?q=x&min=1&ratio=r":     "query ratio: invalid float",
+		"/items?q=x&min=1&max=m":       "query max: invalid float",
+		"/items?q=x&min=1&scale=s":     "query scale: invalid float",
+		"/items?q=x&min=1&factor=f":    "query factor: invalid float",
+		"/items?q=x&min=1&exact=yes":   "query exact: invalid boolean",
+		"/items?q=x&min=1&deep=2":      "query deep: invalid boolean",
+		"/items?q=x&min=1&flag=":       "query flag: invalid boolean",
+		"/items/first":                 "query id: missing",
+		// 全体の形の中の項目も、項目の形と同じに読む: 文言は、その model のフィールドの名前
+		"/list?page=p":                  "query page: invalid int",
+		"/list?size=big":                "query size: invalid int",
+		"/list?exact=perhaps":           "query exact: invalid boolean",
+		"/list?ratio=half":              "query ratio: invalid float",
+		"/items?q=x&min=1&n=ok&name=no": "", // 名前を書いた項目 n だけを読む（フィールドの名前 name は、通信に現れない）
 	} {
-		expectJSON(t, call(t, h, "GET", target, ""), 400, badRequest(message))
+		got := call(t, h, "GET", target, "")
+		if message == "" {
+			if got.status != 200 {
+				t.Errorf("%s = %+v, want 200", target, got)
+			}
+			leaves.calls = nil
+			continue
+		}
+		expectJSON(t, got, 400, badRequest(message))
 		if len(leaves.calls) != 0 {
 			t.Fatalf("%s: 読めない要求で、op が呼ばれた", target)
 		}
 	}
-	for body, name := range map[string]string{`{}`: "配列でない", `[{"quantity":"x"}]`: "要素の型が違う", `[`: "JSON でない"} {
+	// 本文の項目が一つでも、本文は、キーを持つオブジェクト（配列そのものは、読めない）。本文の全体が null なら、オブジェクトではない
+	for body, name := range map[string]string{`[{"name":"a","quantity":1}]`: "配列そのもの", `{"items":[{"quantity":"x"}]}`: "要素の型が違う",
+		`{"items":{}}`: "項目が配列でない", `[`: "JSON でない", `null`: "null"} {
 		expectJSON(t, call(t, h, "POST", "/items/replace", body), 400, badRequest("body: invalid JSON"))
 		if len(leaves.calls) != 0 {
 			t.Fatalf("本文が%s: 読めない要求で、op が呼ばれた", name)
 		}
 	}
+	// 本文の全体（@http.bodyObj）: encoding/json で読めなければ、同じ文言
+	for _, body := range []string{``, `{"name":`, `[1]`, `{"quantity":"x"}`, `"text"`} {
+		expectJSON(t, call(t, h, "POST", "/put", body), 400, badRequest("body: invalid JSON"))
+	}
+	if len(leaves.calls) != 0 {
+		t.Fatalf("読めない要求で、op が呼ばれた: %v", leaves.calls)
+	}
 }
 
+// クエリの項目: 型ごとの読み方と、項目がないときの三つの扱い。
 func TestQuery(t *testing.T) {
 	leaves, h := newAPI()
-	// 必須のものだけ: 既定値持ちは初めの値のまま、省略可能は nil。結果の空の配列は、必ず [] で返す
-	expectJSON(t, call(t, h, "GET", "/items?q=&offset=0&min=1.5", ""), 200, `[]`)
-	want := api.SearchInput{Q: "", Owner: "nobody", Page: 1, Offset: 0, Min: 1.5, Ratio: 0.5, Exact: false}
+	// @http.required のものだけ: @http.default は、その値。どちらもなければ、零値（省略可能は nil）。結果の値のない配列は、[] で返す
+	expectJSON(t, call(t, h, "GET", "/items?q=&min=1.5", ""), 200, `[]`)
+	want := api.SearchInput{Q: "", Owner: "nobody", Page: 1, Offset: 0, Min: 1.5, Ratio: 0.5, Exact: true, Factor: 3}
 	if !reflect.DeepEqual(leaves.search, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.search, want)
 	}
-	// すべて。同じ名前が二度あれば、最初の値。float は指数も読む
+	// すべて。同じ名前が二度あれば、最初の値。float は指数も読む。名前を書いた項目は、その名前（n）
 	leaves.items = []pkgtype.Item{{Name: "a", Quantity: 1}}
-	got := call(t, h, "GET", "/items?q=pen%20case&name=n&tag=first&tag=second&owner=me&page=3&limit=10&size=5&offset=-7&min=0.25&ratio=2&max=1e3&scale=0.1&exact=true&deep=false&flag=1", "")
+	got := call(t, h, "GET", "/items?q=pen%20case&n=nn&tag=first&tag=second&owner=me&page=3&limit=10&size=5&offset=-7&min=0.25&ratio=2&max=1e3&scale=0.1&exact=false&deep=false&flag=1&factor=0", "")
 	expectJSON(t, got, 200, `[{"name":"a","quantity":1,"tags":null}]`)
-	want = api.SearchInput{Q: "pen case", Name: ptr(pkgtype.Name("n")), Tag: ptr("first"), Owner: "me", Page: 3, Limit: ptr(int64(10)),
+	want = api.SearchInput{Q: "pen case", Name: ptr(pkgtype.Name("nn")), Tag: ptr("first"), Owner: "me", Page: 3, Limit: ptr(int64(10)),
 		Size: ptr(pkgtype.Page(5)), Offset: -7, Min: 0.25, Ratio: 2, Max: ptr(1000.0), Scale: ptr(pkgtype.Ratio(0.1)),
-		Exact: true, Deep: ptr(false), Flag: ptr(pkgtype.Flag(true))}
+		Exact: false, Deep: ptr(false), Flag: ptr(pkgtype.Flag(true)), Factor: 0}
 	if !reflect.DeepEqual(leaves.search, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.search, want)
 	}
-	// 省略可能な string のクエリは、空の値でも「ある」
-	call(t, h, "GET", "/items?q=x&offset=0&min=1&tag=", "")
-	if leaves.search.Tag == nil || *leaves.search.Tag != "" {
-		t.Errorf("tag = %v, want 空の文字列へのポインタ", leaves.search.Tag)
+	// クエリは、空の値でも「ある」: @http.default の値を入れない。省略可能な string は、空の文字列へのポインタ
+	call(t, h, "GET", "/items?q=x&min=1&tag=&owner=", "")
+	if leaves.search.Tag == nil || *leaves.search.Tag != "" || leaves.search.Owner != "" {
+		t.Errorf("tag = %v、owner = %q, want 空の文字列へのポインタと、空の文字列", leaves.search.Tag, leaves.search.Owner)
+	}
+	// 空の配列（nil でない）も、[]
+	leaves.items = []pkgtype.Item{}
+	expectJSON(t, call(t, h, "GET", "/items?q=x&min=1", ""), 200, `[]`)
+}
+
+// 全体の形: ヘッダ、クエリ、本文を、一つずつの model で受け取る。
+func TestWholeForms(t *testing.T) {
+	leaves, h := newAPI()
+	// 何も送らない: 全体の形の中の項目は、なければ、いつも零値のまま。値のない record の結果は、{} で返す
+	expectJSON(t, call(t, h, "GET", "/list", ""), 200, `{}`)
+	if want := (api.ListInput{}); !reflect.DeepEqual(leaves.list, want) {
+		t.Errorf("入力 = %+v, want 零値", leaves.list)
+	}
+	// 項目の名前は、その model のフィールドの名前。読み方は、項目の形と同じ（省略可能、scalar、空のヘッダはないもの）
+	leaves.counts = map[string]int64{"a": 1}
+	got := call(t, h, "GET", "/list?page=2&size=10&q=pen&exact=true&ratio=0.5&page=9&paging=x", "", "Tenant", "acme", "Trace", "t1", "Meta", "x")
+	expectJSON(t, got, 200, `{"a":1}`)
+	want := api.ListInput{
+		Meta:   pkgtype.Meta{Tenant: "acme", Trace: ptr(pkgtype.Token("t1"))},
+		Paging: pkgtype.Paging{Page: ptr(int64(2)), Size: 10, Q: "pen", Exact: ptr(pkgtype.Flag(true)), Ratio: 0.5},
+	}
+	if !reflect.DeepEqual(leaves.list, want) {
+		t.Errorf("入力 = %+v, want %+v", leaves.list, want)
+	}
+	call(t, h, "GET", "/list", "", "Tenant", "", "Trace", "")
+	if leaves.list.Meta.Tenant != "" || leaves.list.Meta.Trace != nil {
+		t.Errorf("空のヘッダ: 入力 = %+v, want ないもの", leaves.list.Meta)
+	}
+	// 空の record（nil でない）も、{}
+	leaves.counts = map[string]int64{}
+	expectJSON(t, call(t, h, "GET", "/list", ""), 200, `{}`)
+
+	// 本文の全体: 本文が、その model の JSON（フィールドの名前 item では包まない）。知らないキーは無視し、ないキーは零値のまま。
+	// ほかの場所の項目の形とは、一緒に読める
+	expectEmpty(t, call(t, h, "POST", "/put", `{"name":"pen","tags":["a"],"item":{"name":"no"},"unknown":1}`, "X-Tenant", "acme"))
+	if want := (api.PutInput{Item: pkgtype.Item{Name: "pen", Tags: []string{"a"}}, Tenant: ptr("acme")}); !reflect.DeepEqual(leaves.put, want) {
+		t.Errorf("入力 = %+v, want %+v", leaves.put, want)
+	}
+	// 本文の全体が null なら、model は零値のまま（encoding/json の読み方）
+	expectEmpty(t, call(t, h, "POST", "/put", `null`))
+	if want := (api.PutInput{}); !reflect.DeepEqual(leaves.put, want) {
+		t.Errorf("本文が null: 入力 = %+v, want 零値", leaves.put)
 	}
 }
 
 func TestResults(t *testing.T) {
 	leaves, h := newAPI()
-	// 別の名前空間の入力の model。省略可能な戻り値で、値がなければ null
-	expectJSON(t, call(t, h, "GET", "/items/first?id=7", "", "X-Trace", "t1"), 200, `null`)
+	// 別の名前空間の入力の model。省略可能な戻り値で、値がなければ 204 で本文なし（null は返さない）
+	expectEmpty(t, call(t, h, "GET", "/items/first?id=7", "", "X-Trace", "t1"))
 	if want := (pkgtype.Lookup{Id: "7", Trace: ptr("t1")}); !reflect.DeepEqual(leaves.lookup, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.lookup, want)
 	}
+	// 同じ op が、値があれば 200 と、その JSON
 	leaves.first = &pkgtype.Item{Name: "a", Quantity: 1, Tags: []string{}}
 	expectJSON(t, call(t, h, "GET", "/items/first?id=7", ""), 200, `{"name":"a","quantity":1,"tags":[]}`)
-	// 本文が一つ（配列）。戻り値がなければ 204
-	if got := call(t, h, "POST", "/items/replace", `[{"name":"a","quantity":1,"tags":["x"],"extra":1}]`); got.status != 204 || got.body != "" {
-		t.Errorf("POST /items/replace = %+v, want 204 で本文なし", got)
-	}
+	// 省略可能な scalar の戻り値も同じ
+	expectEmpty(t, call(t, h, "POST", "/put", `{}`))
+	leaves.token = ptr(pkgtype.Token(""))
+	expectJSON(t, call(t, h, "POST", "/put", `{}`), 200, `""`)
+	// 本文の項目が一つ: キー items の値が配列。戻り値がなければ 204
+	expectEmpty(t, call(t, h, "POST", "/items/replace", `{"items":[{"name":"a","quantity":1,"tags":["x"],"extra":1}]}`))
 	if want := (api.ReplaceInput{Items: []pkgtype.Item{{Name: "a", Quantity: 1, Tags: []string{"x"}}}}); !reflect.DeepEqual(leaves.replace, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.replace, want)
 	}
-	// 配列の null は、空の配列と読む
-	if got := call(t, h, "POST", "/items/replace", `null`); got.status != 204 || len(leaves.replace.Items) != 0 {
-		t.Errorf("POST /items/replace（null）= %+v、入力 %+v", got, leaves.replace)
+	// どちらもない項目は、キーがなくても誤りにしない（零値のまま）。配列の null は、空の配列と読む
+	for _, body := range []string{`{}`, `{"items":null}`} {
+		expectEmpty(t, call(t, h, "POST", "/items/replace", body))
+		if len(leaves.replace.Items) != 0 {
+			t.Errorf("POST /items/replace（%s）の入力 = %+v", body, leaves.replace)
+		}
 	}
 }
 
@@ -335,8 +458,8 @@ func TestErrors(t *testing.T) {
 		"ポインタで返した例外": {&pkgtype.NotFound{}, 500, `{"error":"internal"}`},
 	} {
 		leaves.err = tc.err
-		// 経路の op のどれかが投げうる例外は、どの経路でも同じに見分ける（補助は一つ）
-		for _, req := range [][2]string{{"GET", "/items/first?id=1"}, {"GET", "/health"}, {"POST", "/reset/"}} {
+		// 経路の op のどれかが投げうる例外は、どの経路でも同じに見分ける（補助は一つ）。戻り値のある op も、ない op も、同じ
+		for _, req := range [][2]string{{"GET", "/items/first?id=1"}, {"GET", "/health"}, {"POST", "/reset/"}, {"GET", "/list"}} {
 			got := call(t, h, req[0], req[1], "")
 			if got.status != tc.status || got.body != tc.body || got.contentType != "application/json" {
 				t.Errorf("%s（%s %s）: 応答 = %+v, want %d %s", name, req[0], req[1], got, tc.status, tc.body)
@@ -350,6 +473,7 @@ type strictLeaves struct {
 	calls []string
 	order strict.OrderInput
 	edit  strict.EditInput
+	bulk  strict.BulkInput
 }
 
 func (l *strictLeaves) Order(ctx context.Context, in strict.OrderInput) (int64, error) {
@@ -360,9 +484,17 @@ func (l *strictLeaves) Edit(ctx context.Context, in strict.EditInput) error {
 	l.calls, l.edit = append(l.calls, "edit"), in
 	return nil
 }
+func (l *strictLeaves) Bulk(ctx context.Context, in strict.BulkInput) error {
+	l.calls, l.bulk = append(l.calls, "bulk"), in
+	return nil
+}
 func (l *strictLeaves) Plain(ctx context.Context, in strict.PlainInput) (string, error) {
 	l.calls = append(l.calls, "plain")
 	return "plain", nil
+}
+func (l *strictLeaves) Now(ctx context.Context) (string, error) {
+	l.calls = append(l.calls, "now")
+	return "now", nil
 }
 
 // invalid は、制約に合わない入力の本文（docs/plugin-go-http.md「op を呼ぶ前の失敗」）。violations は、path と constraint を交互に。
@@ -377,29 +509,39 @@ func invalid(violations ...string) string {
 func TestValidate(t *testing.T) {
 	leaves := &strictLeaves{}
 	h := strict.NewHandler(strict.New(leaves))
-	// 本文が一つ: 違反の path は body と、その中のパス（入力の model のフィールド名 lines は出さない）。確かめた順
-	got := call(t, h, "POST", "/orders", `[{"name":"a","quantity":1},{"name":"","quantity":0}]`, "Authorization", "t")
-	expectJSON(t, got, 400, invalid("body[1].name", "length", "body[1].quantity", "min"))
-	// 本文が二つ以上: body.<フィールド名>。クエリの値の制約も、通信の上の場所で
-	got = call(t, h, "POST", "/edit?page=0", `{"item":{"name":"","quantity":1},"extra":{"name":"x","quantity":0}}`, "X-Name", "n")
-	expectJSON(t, got, 400, invalid("query.page", "min", "body.item.name", "length", "body.extra.quantity", "min"))
+	// 項目の形: 違反の path は、通信の上の場所（body.lines）と、その中のパス。確かめた順
+	got := call(t, h, "POST", "/orders", `{"lines":[{"name":"a","quantity":1},{"name":"","quantity":0}]}`, "Authorization", "t")
+	expectJSON(t, got, 400, invalid("body.lines[1].name", "length", "body.lines[1].quantity", "min"))
+	// 名前を書いた項目は、その名前で（フィールドの名前 extra は出さない）。クエリとヘッダの値の制約も、通信の上の場所で
+	got = call(t, h, "POST", "/edit?page=0", `{"item":{"name":"","quantity":1},"more":{"name":"x","quantity":0}}`, "X-Name", "")
+	expectJSON(t, got, 400, invalid("query.page", "min", "body.item.name", "length", "body.more.quantity", "min"))
+	// 全体の形: 場所は body、query（フィールドの名前 payload、paging は出さない）
+	got = call(t, h, "POST", "/bulk?size=0", `{"name":"","quantity":1}`)
+	expectJSON(t, got, 400, invalid("body.name", "length", "query.size", "min"))
 	// 読めない要求が先で、次に制約の検査
 	expectJSON(t, call(t, h, "POST", "/edit?page=0", `{`), 400, badRequest("body: invalid JSON"))
 	expectJSON(t, call(t, h, "POST", "/edit?page=x", `{"item":{"name":"","quantity":0}}`), 400, badRequest("query page: invalid int"))
+	expectJSON(t, call(t, h, "POST", "/orders", `{}`), 400, badRequest("body lines: missing"))
+	// どちらもない項目（item）がなければ、零値のまま確かめる: 零値が制約に合わなければ、違反
+	expectJSON(t, call(t, h, "POST", "/edit", `{}`), 400, invalid("body.item.name", "length", "body.item.quantity", "min"))
 	if len(leaves.calls) != 0 {
 		t.Fatalf("制約に合わない入力か、読めない要求で、op が呼ばれた: %v", leaves.calls)
 	}
 	// 制約に合う入力は、op に届く
-	expectJSON(t, call(t, h, "POST", "/orders", `[{"name":"a","quantity":1},{"name":"b","quantity":2}]`), 200, `2`)
-	if got := call(t, h, "POST", "/edit", `{"item":{"name":"a","quantity":1}}`); got.status != 204 {
-		t.Errorf("POST /edit = %+v, want 204", got)
-	}
+	expectJSON(t, call(t, h, "POST", "/orders", `{"lines":[{"name":"a","quantity":1},{"name":"b","quantity":2}]}`), 200, `2`)
+	expectEmpty(t, call(t, h, "POST", "/edit", `{"item":{"name":"a","quantity":1}}`))
+	// @http.default の値（page は 1）は、制約に合う（生成するときに確かめてある。GOHTTP-19）
 	if leaves.edit.Page != 1 || leaves.edit.Name != nil || leaves.edit.Extra != nil || leaves.edit.Item.Name != "a" {
 		t.Errorf("入力 = %+v", leaves.edit)
 	}
-	// Validate を持たない入力は、確かめずに呼ぶ
+	expectEmpty(t, call(t, h, "POST", "/bulk?size=3&q=x", `{"name":"a","quantity":2}`))
+	if want := (strict.BulkInput{Payload: pkgtype.Item{Name: "a", Quantity: 2}, Paging: pkgtype.Paging{Size: 3, Q: "x"}}); !reflect.DeepEqual(leaves.bulk, want) {
+		t.Errorf("入力 = %+v, want %+v", leaves.bulk, want)
+	}
+	// Validate を持たない入力は、同じ補助を通って、確かめるものがないまま op に届く。入力のない経路も、そのまま
 	expectJSON(t, call(t, h, "GET", "/plain", ""), 200, `"plain"`)
-	if want := []string{"order", "edit", "plain"}; !reflect.DeepEqual(leaves.calls, want) {
+	expectJSON(t, call(t, h, "GET", "/now", ""), 200, `"now"`)
+	if want := []string{"order", "edit", "bulk", "plain", "now"}; !reflect.DeepEqual(leaves.calls, want) {
 		t.Errorf("呼ばれた op = %v, want %v", leaves.calls, want)
 	}
 }

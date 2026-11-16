@@ -17,10 +17,11 @@ var goldenFixtures = []struct {
 	covers   string
 	behavior bool
 }{
-	{name: "columns", covers: "「表」の列の型の表の各行（核の型と scalar）、省略可能な列、制約（複数の @db.key、@db.unique、@db.ref）", behavior: true},
-	{name: "ops", covers: "「op の中身」の規則の各行と、省略可能な引数、「メソッドの形とコメント」", behavior: true},
-	{name: "partial", covers: "「状態ごとの型」の、規則に当たらない op があるとき（warning、var _ を出さない、出していない op の句）", behavior: true},
-	{name: "names", covers: "「補助」の、当たる名前（引数、途中の変数、同じ名前の model）と、内側のフォルダを持つ出力"},
+	{name: "columns", covers: "「しまい方」の表の各行（六つのしまい方。核の型と scalar）、@db.nullable の列（しまい方ごと）、「表」の制約（複数の @db.key、@db.unique、@db.ref）", behavior: true},
+	{name: "ops", covers: "「op の中身」の表の各行、「列と引数の型」、「トランザクション」、「メソッドの形とコメント」", behavior: true},
+	{name: "partial", covers: "「状態ごとの型」の、デコレータを付けていない op があるとき（var _ を出さない、付けていない op の句、warning を出さない）、「状態をまたぐ単位の型」（SharedTable、<C>Table）", behavior: true},
+	{name: "names", covers: "「補助」の、当たる名前（引数、同じ名前の model、局所の名前と同じ名前のパッケージ）と、内側のフォルダを持つ出力", behavior: true},
+	{name: "uniform", covers: "docs/requirements.md「出力を推論しない」: フィールドの型だけを変えた入力から、名前と型のほかは同じテキスト（TestUniform）", behavior: true},
 }
 
 // TestGolden は、入力ごとに、出力（db.go と warning）がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を
@@ -39,8 +40,9 @@ func TestGolden(t *testing.T) {
 			for p, content := range res.files {
 				got[p] = content
 			}
-			if len(res.warnings) > 0 {
-				got["warnings.txt"] = warningsText(res.warnings)
+			// warning は出さない: db の語彙のデコレータを付けていない op は、仕様を書いた人が、中身を人が書くと選んだもの
+			for _, w := range res.warnings {
+				t.Errorf("warning を返した（%s）: %s", w.At, w.Message)
 			}
 			compareTree(t, fx.name, got)
 			// 決定性: もう一度、別のルート（同じモジュールのパス）で出力しても、同じバイト列
@@ -120,17 +122,32 @@ func TestOtherDir(t *testing.T) {
 }
 
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
-// （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
+// （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。docs/plugin-go-sqlite.md「診断」の表の行ごとに一つ
+// （GOSQL-5 は欠番）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"gosql1", codeSQLElement},   // @db の状態の要素が model でない
-	{"gosql2", codeSQLShape},     // @db の状態の形が list でない
-	{"gosql3", codeSQLColumn},    // 列にできない型のフィールドがある
+	{"gosql1", codeSQLElement},   // @db.table(M) の状態の要素の型が、M と等しくない
+	{"gosql2", codeSQLShape},     // @db.table の状態の形が list でない
+	{"gosql3", codeSQLColumn},    // どのしまい方でも列にできない型のフィールドがある
 	{"gosql4", codeSQLCollision}, // 公開の名前が当たる（条件ごとに名前空間が一つ。当たらない名前空間には出ない）
 	{"gosql6", codeSQLOption},    // [emit.options.go-sqlite] に、知らないキーがある
+	{"gosql7", codeSQLTable},     // デコレータの引数の状態が、N の表の状態でない
+	{"gosql8", codeSQLName},      // デコレータの引数の列の名前が、表の model のフィールドにない
+	{"gosql9", codeSQLParams},    // op の引数が、デコレータの言うものと合わない
+	{"gosql10", codeSQLReturns},  // op の戻り値が、デコレータの言うものと合わない
+	{"gosql11", codeSQLTarget},   // 効果のデコレータが、効果の宛先と合わない
+	{"gosql12", codeSQLEffect},   // 並べた効果が効果のデコレータを持たない。または、一つの効果が二つ以上持つ
+	{"gosql13", codeSQLUnique},   // @db.find の列が、一行に決まる列でない
+	{"gosql14", codeSQLCarried},  // op が、db の op のデコレータの言う以外のものを読み書きする
+	{"gosql15", codeSQLUpdate},   // @db.update の表の model が、キーか、キーでない列を持たない
+	{"gosql16", codeSQLStorage},  // フィールドが、しまい方のデコレータを、ちょうど一つ持たない
+	{"gosql17", codeSQLFit},      // しまい方が、フィールドの型に合わない
+	{"gosql18", codeSQLNullable}, // @db.nullable の付いたフィールドの型が、省略可能でない
+	{"gosql19", codeSQLOptional}, // 省略可能なフィールドに、@db.nullable がない
+	{"gosql20", codeSQLRef},      // @db.ref の指す先が、一つに決まらない
 }
 
-// TestDiagnostics は docs/plugin-go-sqlite.md「診断」の GOSQL-1〜GOSQL-4、GOSQL-6: 診断のコード・位置・メッセージがゴールデンと
-// 同じで、診断を返した出力がファイルを返さないこと（emitViews が確かめる）。
+// TestDiagnostics は docs/plugin-go-sqlite.md「診断」の表の各行: 診断のコード・位置・メッセージがゴールデンと同じで、
+// 診断を返した出力がファイルを返さないこと（emitViews が確かめる）。入力は、そのコードの診断だけを返す。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
 		t.Run(fx.name, func(t *testing.T) {
@@ -149,7 +166,7 @@ func TestDiagnostics(t *testing.T) {
 }
 
 // TestDiagnosedOutputsOnly は、診断が、条件に当たった出力にだけ出ること: GOSQL-4 の入力の、当たらない名前空間 clean は、
-// ファイルを返す。
+// ファイルを返す（model SharedTable を持つが、SharedTable を出さないので、当たらない）。
 func TestDiagnosedOutputsOnly(t *testing.T) {
 	for _, v := range ours(t, loadViews(t, "gosql4")) {
 		res := emitViews(t, newRoot(t), []*ir.View{v})

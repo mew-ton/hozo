@@ -1,0 +1,3 @@
+GOHTTP-14	app.In	model app.In のフィールド item に @http.required が付いているが、項目の形（@http.header / @http.query / @http.body）を持たない（全体の形の中の項目は、なければ、いつも零値のまま。扱いを言いたい項目は、項目の形で書く）
+GOHTTP-14	app.Paging	model app.Paging のフィールド page に @http.required が付いているが、model app.In が、この model を @http.queryObj（全体の形）で受け取る（全体の形の中の項目は、なければ、いつも零値のまま。扱いを言いたい項目は、項目の形で書く）
+GOHTTP-14	app.Paging	model app.Paging のフィールド q に @http.default が付いているが、model app.In が、この model を @http.queryObj（全体の形）で受け取る（全体の形の中の項目は、なければ、いつも零値のまま。扱いを言いたい項目は、項目の形で書く）

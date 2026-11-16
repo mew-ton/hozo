@@ -6,14 +6,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/mew-ton/hozo/ir"
-	"github.com/mew-ton/hozo/runtime"
 )
 
-// このファイルは docs/plugin-go-valid.md「制約」の表: valid の標準の制約一つを、読んで（parse）、Go の条件にし（condition）、
-// 既定値のリテラルに当てる（satisfied）。
+// このファイルは docs/plugin-go-valid.md「制約」の表: valid の標準の制約一つを、読んで（parse）、Go の条件にする（condition）。
+// 値一つを制約で確かめるのは、ここではない（境界のデコレータが補う値は、それを読む相乗りが、公開の plugin/govalid の CheckLiteral で確かめる）。
 
 // valid の標準の制約（デコレータの FQN）。
 const (
@@ -52,8 +50,6 @@ type constraint struct {
 	regex, variable string
 	// format は format の引数。
 	format string
-	// owner は、制約の持ち主（「scalar type.Email」。既定値の検査のメッセージ用）。
-	owner string
 }
 
 // parse は、適用 app（valid の標準の制約）を読む。core は付いた先の元の型で、coreOK が false なら、付いた先は核の型を元に
@@ -186,69 +182,6 @@ func (c constraint) condition(value string, f *file) string {
 	return "false"
 }
 
-// satisfied は、既定値のリテラル lit が制約 c に合うか（GOVALID-2）。リテラルの型が合うことは、hozoc が確かめている（TYPE-13）。
-func (c constraint) satisfied(lit ir.Literal) bool {
-	switch c.decorator {
-	case validMin, validMax:
-		var v float64
-		switch x := lit.(type) {
-		case ir.IntLiteral:
-			v = float64(x.Value)
-		case ir.FloatLiteral:
-			v = x.Value
-		default:
-			return true
-		}
-		if c.decorator == validMin {
-			return v >= c.bound
-		}
-		return v <= c.bound
-	case validLength:
-		s, ok := lit.(ir.StringLiteral)
-		if !ok {
-			return true
-		}
-		l := int64(utf8.RuneCountInString(s.Value))
-		return !(c.hasMin && l < c.min) && !(c.hasMax && l > c.max)
-	case validPattern:
-		s, ok := lit.(ir.StringLiteral)
-		if !ok {
-			return true
-		}
-		re, err := regexp.Compile(c.regex)
-		return err != nil || re.MatchString(s.Value)
-	case validFormat:
-		s, ok := lit.(ir.StringLiteral)
-		if !ok {
-			return true
-		}
-		return runtime.CheckFormat(c.format, s.Value)
-	}
-	return true
-}
-
-// describe は、メッセージに書く、制約 c の書き方（`@valid.length(min: 1, max: 100)`）。
-func (c constraint) describe() string {
-	switch c.decorator {
-	case validMin, validMax:
-		return "@" + c.decorator + "(" + c.boundText + ")"
-	case validLength:
-		var args []string
-		if c.hasMin {
-			args = append(args, "min: "+strconv.FormatInt(c.min, 10))
-		}
-		if c.hasMax {
-			args = append(args, "max: "+strconv.FormatInt(c.max, 10))
-		}
-		return "@" + c.decorator + "(" + strings.Join(args, ", ") + ")"
-	case validPattern:
-		return "@" + c.decorator + "(" + strconv.Quote(c.regex) + ")"
-	case validFormat:
-		return "@" + c.decorator + "(" + strconv.Quote(c.format) + ")"
-	}
-	return "@" + c.decorator
-}
-
 // formatFloat は小数を Go のリテラルにする（docs/plugin-go.md「値」の小数と同じ書き方）。
 func formatFloat(v float64) string {
 	s := strconv.FormatFloat(v, 'g', -1, 64)
@@ -258,7 +191,7 @@ func formatFloat(v float64) string {
 	return s
 }
 
-// displayLiteral は、メッセージに書く、既定値のリテラル。
+// displayLiteral は、メッセージと条件に書く、制約の引数のリテラル。
 func displayLiteral(lit ir.Literal) string {
 	switch x := lit.(type) {
 	case ir.StringLiteral:

@@ -1,2 +1,2 @@
-GOHTTP-11	app.a	経路の op app.a の入力 plain.In は Validate を持つが、名前空間 plain の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（validate = true のハンドラは、入力の Validate を呼ぶ。メソッドは、型の定義のパッケージにしか書けない）
-GOHTTP-11	app.b	経路の op app.b の入力 plain.In は Validate を持つが、名前空間 plain の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（validate = true のハンドラは、入力の Validate を呼ぶ。メソッドは、型の定義のパッケージにしか書けない）
+GOHTTP-11	app.a	経路の op app.a の入力 plain.In は Validate を持つが、名前空間 plain の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（validate = true と書いたのに、この入力は、確かめられないまま op に渡る。メソッドは、型の定義のパッケージにしか書けない）
+GOHTTP-11	app.b	経路の op app.b の入力 plain.In は Validate を持つが、名前空間 plain の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（validate = true と書いたのに、この入力は、確かめられないまま op に渡る。メソッドは、型の定義のパッケージにしか書けない）

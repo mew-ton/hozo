@@ -1,0 +1,2 @@
+GOSQL-15	app.updateNote	効果 app.updateNote の @db.update の表 app.notes の model app.Note が、@db.key を一つも持たない（書き換える行を選べない）
+GOSQL-15	app.updateMark	効果 app.updateMark の @db.update の表 app.marks の model app.Mark が、キーでない列を一つも持たない（書き換えるものがない）

@@ -1,0 +1,5 @@
+GOSQL-16	app.Row	model app.Row のフィールド note が、しまい方のデコレータ（@db.text / @db.int / @db.float / @db.bool / @db.time / @db.json）を持たない（表の model のフィールドは、ちょうど一つ要る）
+GOSQL-16	app.Row	model app.Row のフィールド code が、しまい方のデコレータ（@db.text / @db.int / @db.float / @db.bool / @db.time / @db.json）を持たない（表の model のフィールドは、ちょうど一つ要る）
+GOSQL-16	app.Row	model app.Row のフィールド rank が、しまい方のデコレータ（@db.text / @db.int / @db.float / @db.bool / @db.time / @db.json）を持たない（表の model のフィールドは、ちょうど一つ要る）
+GOSQL-16	app.Row	model app.Row のフィールド doc が、しまい方のデコレータを二つ以上持つ（@db.text / @db.json。ちょうど一つ要る）
+GOSQL-16	app.Row	model app.Row のフィールド count が、しまい方のデコレータを二つ以上持つ（@db.int / @db.float / @db.bool。ちょうど一つ要る）

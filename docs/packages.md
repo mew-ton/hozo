@@ -86,7 +86,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugins/go` | `plugin`、`plugins/go/internal/gobase` |
 | `plugins/go/internal/gobase` | `ir`、`plugin`、`plugin/golang` |
 | `plugins/go-valid` | `plugin`、`plugins/go-valid/internal/govalid` |
-| `plugins/go-valid/internal/govalid` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`runtime` |
+| `plugins/go-valid/internal/govalid` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid` |
 | `plugins/go-sqlite` | `plugin`、`plugins/go-sqlite/internal/gosqlite` |
 | `plugins/go-sqlite/internal/gosqlite` | `ir`、`plugin`、`plugin/golang` |
 | `plugins/go-http` | `plugin`、`plugins/go-http/internal/gohttp` |

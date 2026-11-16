@@ -1,0 +1,5 @@
+GOSQL-1	app.names	@db.table(app.Row) の状態 app.names の要素の型 string が、app.Row と等しくない（表の列は、名指しした model のフィールドから作る）
+GOSQL-1	app.ids	@db.table(app.Row) の状態 app.ids の要素の型 app.Id が、app.Row と等しくない（表の列は、名指しした model のフィールドから作る）
+GOSQL-1	app.groups	@db.table(app.Row) の状態 app.groups の要素の型 app.Row[] が、app.Row と等しくない（表の列は、名指しした model のフィールドから作る）
+GOSQL-1	app.others	@db.table(app.Row) の状態 app.others の要素の型 app.Other が、app.Row と等しくない（表の列は、名指しした model のフィールドから作る）
+GOSQL-1	app.wides	@db.table(app.Row) の状態 app.wides の要素の型 app.Wide が、app.Row と等しくない（表の列は、名指しした model のフィールドから作る）

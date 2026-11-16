@@ -120,8 +120,14 @@ func (e *emitter) effectOf(fqn string) *effect {
 		x.column = e.columnArg(x.table, name, x.kind, "効果", fqn)
 	}
 
-	// GOSQL-11: 宛先が組み込みの効果なら、状態と操作が合う。遷移なら、表が、効果の書き込む状態の一つ
-	switch target := decl.Target.(type) {
+	// GOSQL-11: 宛先が組み込みの効果なら、状態と操作が合う。遷移なら、表が、効果の書き込む状態の一つ。
+	// 引数の状態が N の表の状態でない（GOSQL-7 を返した）なら、重ねて報告しない
+	target := decl.Target
+	if x.table == nil && !e.marked[state] {
+		target = nil
+	}
+	switch target := target.(type) {
+	case nil:
 	case ir.BuiltinTarget:
 		want := map[string]ir.Operation{decoratorInsert: ir.OpPost, decoratorUpdate: ir.OpPut, decoratorDelete: ir.OpDelete}[x.kind]
 		switch {
@@ -245,18 +251,13 @@ func (e *emitter) readOp(m *method, app ir.Application) {
 	if m.kind == decoratorFind {
 		want = ir.OptionalType{Of: row}
 	}
-	if !ir.TypeEqual(op.Returns, want) {
-		e.errorf(codeSQLReturns, op.Name, "op %s の戻り値 %s が、@%s の言うもの（%s）でない", op.Name, displayReturns(op.Returns), m.kind, golang.TypeDisplay(want))
+	switch {
+	case op.Returns == nil:
+		e.errorf(codeSQLReturns, op.Name, "op %s に戻り値がない（@%s の言う戻り値は %s）", op.Name, m.kind, golang.TypeDisplay(want))
+	case !ir.TypeEqual(op.Returns, want):
+		e.errorf(codeSQLReturns, op.Name, "op %s の戻り値 %s が、@%s の言うもの（%s）でない", op.Name, golang.TypeDisplay(op.Returns), m.kind, golang.TypeDisplay(want))
 	}
 	m.ok = true
-}
-
-// displayReturns は、診断に書く戻り値の型。戻り値がなければ「なし」。
-func displayReturns(t ir.Type) string {
-	if t == nil {
-		return "なし"
-	}
-	return golang.TypeDisplay(t)
 }
 
 // columnParam は「列と引数の型」（docs/plugin-go-sqlite.md）: 列 c と比べる引数 p の型は、列の型と等しい。列の型が T? なら、T でもよい。

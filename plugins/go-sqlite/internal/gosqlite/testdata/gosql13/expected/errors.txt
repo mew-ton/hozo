@@ -1,0 +1,3 @@
+GOSQL-13	app.findByNote	op app.findByNote の @db.find の列 "note" が、一行に決まる列でない（model app.Row のただ一つの @db.key でも、@db.unique でもない。並びを引くなら @db.list）
+GOSQL-13	app.findByLeft	op app.findByLeft の @db.find の列 "left" が、一行に決まる列でない（model app.Pair のただ一つの @db.key でも、@db.unique でもない。並びを引くなら @db.list）
+GOSQL-13	app.findLine	op app.findLine の @db.find の列 "line" が、一行に決まる列でない（model app.Log のただ一つの @db.key でも、@db.unique でもない。並びを引くなら @db.list）

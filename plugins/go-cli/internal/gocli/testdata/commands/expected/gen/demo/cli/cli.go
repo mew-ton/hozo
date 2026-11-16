@@ -17,6 +17,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -96,6 +98,8 @@ func Main(ctx context.Context, ops demo.Ops, p Presenter, args []string, env fun
 		return runAdd(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	case "copy":
 		return runCopy(ctx, ops, p, prog, args[1:], env, stdout, stderr)
+	case "move":
+		return runMove(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	case "ping":
 		return runPing(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	case "quit":
@@ -106,67 +110,31 @@ func Main(ctx context.Context, ops demo.Ops, p Presenter, args []string, env fun
 
 // cliUsage は全体の使い方。
 func cliUsage(prog string) string {
-	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  add    足す\n  copy\n  ping   何もしない\n  quit   いつも失敗する\n"
+	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  add    足す\n  copy\n  move   動かす\n  ping   何もしない\n  quit   いつも失敗する\n"
 }
 
 // runAdd はサブコマンド add（op demo.add）。
 func runAdd(ctx context.Context, ops demo.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	flags, pos, help, err := cliParseArgs(args, map[string]bool{"count": false, "verbose": true, "label": false})
-	if err != nil {
-		return cliUsageError(stderr, prog, usageAdd(prog), err.Error())
+	var in demo.AddInput
+	line := cliLine{args: args, getenv: env}
+	line.required(&in.A)
+	line.arg(1, &in.A)
+	line.arg(2, &in.B)
+	line.flag("count", &in.Count)
+	line.orDefault(&in.Count, 1)
+	line.flag("verbose", &in.Verbose)
+	line.flag("label", &in.Label)
+	line.env("DEMO_LABEL", &in.Label)
+	line.env("DEMO_SCALE", &in.Scale)
+	line.flag("mode", &in.Mode)
+	line.required(&in.Mode)
+	line.env("tag", &in.Tag)
+	line.orDefault(&in.Tag, "none")
+	if code, done := line.read(prog, usageAdd(), stdout, stderr); done {
+		return code
 	}
-	if help {
-		fmt.Fprint(stdout, usageAdd(prog))
-		return 0
-	}
-	if len(pos) > 2 {
-		return cliUsageError(stderr, prog, usageAdd(prog), fmt.Sprintf("too many arguments: %d given, at most 2 expected", len(pos)))
-	}
-	in := demo.NewAddInput()
-	if v, ok := cliLookupArg(pos, 0, env, ""); ok {
-		x, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageAdd(prog), fmt.Sprintf("invalid value %q for A: want int", v))
-		}
-		in.A = x
-	} else {
-		return cliUsageError(stderr, prog, usageAdd(prog), "missing required argument A")
-	}
-	if v, ok := cliLookupArg(pos, 1, env, ""); ok {
-		x, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageAdd(prog), fmt.Sprintf("invalid value %q for B: want float", v))
-		}
-		in.B = cliPtr(x)
-	}
-	if v, ok := cliLookup(flags, "count", env, ""); ok {
-		x, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageAdd(prog), fmt.Sprintf("invalid value %q for --count: want int", v))
-		}
-		in.Count = demo.Count(x)
-	}
-	if v, ok := cliLookup(flags, "verbose", env, ""); ok {
-		x, err := strconv.ParseBool(v)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageAdd(prog), fmt.Sprintf("invalid value %q for --verbose: want boolean", v))
-		}
-		in.Verbose = x
-	} else {
-		return cliUsageError(stderr, prog, usageAdd(prog), "missing required flag --verbose")
-	}
-	if v, ok := cliLookup(flags, "label", env, "DEMO_LABEL"); ok {
-		in.Label = cliPtr(v)
-	}
-	if v, ok := cliLookup(flags, "", env, "DEMO_SCALE"); ok {
-		x, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageAdd(prog), fmt.Sprintf("invalid value %q for DEMO_SCALE: want float", v))
-		}
-		in.Scale = cliPtr(x)
-	}
-	if err := in.Validate(); err != nil {
-		return cliUsageError(stderr, prog, "", "invalid input: "+cliValidationMessage(err))
+	if !cliValidate(stderr, prog, in) {
+		return 64
 	}
 	result, err := ops.Add(ctx, in)
 	if err != nil {
@@ -182,15 +150,9 @@ func runAdd(ctx context.Context, ops demo.Ops, p Presenter, prog string, args []
 // failAdd は add の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
 func failAdd(p Presenter, prog string, input any, err error, stderr io.Writer) int {
 	f, code := Failure{Err: err}, 70
-	var (
-		e0 demo.Overflow
-		e1 demo.Tired
-	)
 	switch {
-	case errors.As(err, &e0):
-		f, code = Failure{Name: "demo.Overflow", Err: err}, 5
-	case errors.As(err, &e1):
-		f, code = Failure{Name: "demo.Tired", Err: err}, 70
+	case cliThrown[demo.Overflow](err, 5, &f, &code):
+	case cliThrown[demo.Tired](err, 70, &f, &code):
 	}
 	if err := p.PresentError(stderr, "add", input, f); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
@@ -199,62 +161,41 @@ func failAdd(p Presenter, prog string, input any, err error, stderr io.Writer) i
 	return code
 }
 
-// usageAdd は add の使い方。
-func usageAdd(prog string) string {
-	return "usage: " + prog + " add [flags] A [B]\n\n足す\n\narguments:\n  A   左 (required)\n  B   右\n\nflags:\n  --count <Count>    回数 (default: 1)\n  --verbose          詳しく (required)\n  --label <string>   名札 (env: DEMO_LABEL)\n\nenvironment:\n  DEMO_SCALE   倍率\n"
+// usageAdd は add の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageAdd() cliHelp {
+	return cliHelp{command: "add", summary: "足す", fields: [][2]string{
+		{"a", "左"},
+		{"b", "右"},
+		{"count", "回数"},
+		{"verbose", "詳しく"},
+		{"label", "名札"},
+		{"scale", "倍率"},
+		{"mode", "動かし方"},
+		{"tag", "札（環境変数 tag）"},
+	}}
 }
 
 // runCopy はサブコマンド copy（op demo.copy）。
 func runCopy(ctx context.Context, ops demo.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	flags, pos, help, err := cliParseArgs(args, map[string]bool{"steps": false, "ratio": false, "force": true, "offset": false})
-	if err != nil {
-		return cliUsageError(stderr, prog, usageCopy(prog), err.Error())
+	var in demo.CopyInput
+	line := cliLine{args: args, getenv: env}
+	line.arg(1, &in.From)
+	line.env("DEMO_FROM", &in.From)
+	line.required(&in.From)
+	line.flag("steps", &in.Steps)
+	line.env("DEMO_STEPS", &in.Steps)
+	line.flag("ratio", &in.Ratio)
+	line.orDefault(&in.Ratio, 0.5)
+	line.flag("force", &in.Force)
+	line.env("DEMO_FORCE", &in.Force)
+	line.flag("offset", &in.Offset)
+	line.orDefault(&in.Offset, -1)
+	line.arg(2, &in.To)
+	if code, done := line.read(prog, usageCopy(), stdout, stderr); done {
+		return code
 	}
-	if help {
-		fmt.Fprint(stdout, usageCopy(prog))
-		return 0
-	}
-	in := demo.NewCopyInput()
-	if v, ok := cliLookupArg(pos, 0, env, "DEMO_FROM"); ok {
-		in.From = demo.Name(v)
-	} else {
-		return cliUsageError(stderr, prog, usageCopy(prog), "missing required argument FROM")
-	}
-	if v, ok := cliLookup(flags, "steps", env, "DEMO_STEPS"); ok {
-		x, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageCopy(prog), fmt.Sprintf("invalid value %q for --steps: want int", v))
-		}
-		in.Steps = cliPtr(demo.Steps(x))
-	}
-	if v, ok := cliLookup(flags, "ratio", env, ""); ok {
-		x, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageCopy(prog), fmt.Sprintf("invalid value %q for --ratio: want float", v))
-		}
-		in.Ratio = demo.Ratio(x)
-	}
-	if v, ok := cliLookup(flags, "force", env, "DEMO_FORCE"); ok {
-		x, err := strconv.ParseBool(v)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageCopy(prog), fmt.Sprintf("invalid value %q for --force: want boolean", v))
-		}
-		in.Force = cliPtr(demo.Flag(x))
-	}
-	if v, ok := cliLookup(flags, "offset", env, ""); ok {
-		x, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return cliUsageError(stderr, prog, usageCopy(prog), fmt.Sprintf("invalid value %q for --offset: want int", v))
-		}
-		in.Offset = x
-	}
-	if len(pos) > 1 {
-		for _, v := range pos[1:] {
-			in.To = append(in.To, demo.Name(v))
-		}
-	}
-	if err := in.Validate(); err != nil {
-		return cliUsageError(stderr, prog, "", "invalid input: "+cliValidationMessage(err))
+	if !cliValidate(stderr, prog, in) {
+		return 64
 	}
 	result, err := ops.Copy(ctx, in)
 	if err != nil {
@@ -277,23 +218,77 @@ func failCopy(p Presenter, prog string, input any, err error, stderr io.Writer) 
 	return code
 }
 
-// usageCopy は copy の使い方。
-func usageCopy(prog string) string {
-	return "usage: " + prog + " copy [flags] FROM [TO...]\n\narguments:\n  FROM    元 (required, env: DEMO_FROM)\n  TO...   先\n\nflags:\n  --steps <Steps>   (env: DEMO_STEPS)\n  --ratio <Ratio>   (default: 0.5)\n  --force           (env: DEMO_FORCE)\n  --offset <int>    (default: -1)\n"
+// usageCopy は copy の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageCopy() cliHelp {
+	return cliHelp{command: "copy", summary: "", fields: [][2]string{
+		{"from", "元"},
+		{"steps", ""},
+		{"ratio", ""},
+		{"force", ""},
+		{"offset", ""},
+		{"to", "先"},
+	}}
+}
+
+// runMove はサブコマンド move（op demo.move）。
+func runMove(ctx context.Context, ops demo.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
+	var in demo.MoveInput
+	line := cliLine{args: args, getenv: env}
+	line.arg(3, &in.Rest)
+	line.env("DEMO_REST", &in.Rest)
+	line.required(&in.Rest)
+	line.arg(2, &in.To)
+	line.arg(1, &in.From)
+	line.flag("keep", &in.Keep)
+	line.orDefault(&in.Keep, true)
+	line.flag("suffix", &in.Suffix)
+	line.orDefault(&in.Suffix, "~")
+	line.flag("weight", &in.Weight)
+	line.orDefault(&in.Weight, 2)
+	if code, done := line.read(prog, usageMove(), stdout, stderr); done {
+		return code
+	}
+	if !cliValidate(stderr, prog, in) {
+		return 64
+	}
+	result, err := ops.Move(ctx, in)
+	if err != nil {
+		return failMove(p, prog, in, err, stderr)
+	}
+	if err := p.Present(stdout, "move", in, result); err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
+		return 70
+	}
+	return 0
+}
+
+// failMove は move の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
+func failMove(p Presenter, prog string, input any, err error, stderr io.Writer) int {
+	f, code := Failure{Err: err}, 70
+	if err := p.PresentError(stderr, "move", input, f); err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
+		return 70
+	}
+	return code
+}
+
+// usageMove は move の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageMove() cliHelp {
+	return cliHelp{command: "move", summary: "動かす", fields: [][2]string{
+		{"rest", "残り"},
+		{"to", "先"},
+		{"from", "元"},
+		{"keep", ""},
+		{"suffix", ""},
+		{"weight", ""},
+	}}
 }
 
 // runPing はサブコマンド ping（op demo.ping）。
 func runPing(ctx context.Context, ops demo.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	_, pos, help, err := cliParseArgs(args, nil)
-	if err != nil {
-		return cliUsageError(stderr, prog, usagePing(prog), err.Error())
-	}
-	if help {
-		fmt.Fprint(stdout, usagePing(prog))
-		return 0
-	}
-	if len(pos) > 0 {
-		return cliUsageError(stderr, prog, usagePing(prog), fmt.Sprintf("too many arguments: %d given, at most 0 expected", len(pos)))
+	line := cliLine{args: args, getenv: env}
+	if code, done := line.read(prog, usagePing(), stdout, stderr); done {
+		return code
 	}
 	if err := ops.Ping(ctx); err != nil {
 		return failPing(p, prog, nil, err, stderr)
@@ -315,23 +310,16 @@ func failPing(p Presenter, prog string, input any, err error, stderr io.Writer) 
 	return code
 }
 
-// usagePing は ping の使い方。
-func usagePing(prog string) string {
-	return "usage: " + prog + " ping\n\n何もしない\n"
+// usagePing は ping の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usagePing() cliHelp {
+	return cliHelp{command: "ping", summary: "何もしない"}
 }
 
 // runQuit はサブコマンド quit（op demo.quit）。
 func runQuit(ctx context.Context, ops demo.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	_, pos, help, err := cliParseArgs(args, nil)
-	if err != nil {
-		return cliUsageError(stderr, prog, usageQuit(prog), err.Error())
-	}
-	if help {
-		fmt.Fprint(stdout, usageQuit(prog))
-		return 0
-	}
-	if len(pos) > 0 {
-		return cliUsageError(stderr, prog, usageQuit(prog), fmt.Sprintf("too many arguments: %d given, at most 0 expected", len(pos)))
+	line := cliLine{args: args, getenv: env}
+	if code, done := line.read(prog, usageQuit(), stdout, stderr); done {
+		return code
 	}
 	if err := ops.Quit(ctx); err != nil {
 		return failQuit(p, prog, nil, err, stderr)
@@ -346,12 +334,8 @@ func runQuit(ctx context.Context, ops demo.Ops, p Presenter, prog string, args [
 // failQuit は quit の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
 func failQuit(p Presenter, prog string, input any, err error, stderr io.Writer) int {
 	f, code := Failure{Err: err}, 70
-	var (
-		e0 demo.Overflow
-	)
 	switch {
-	case errors.As(err, &e0):
-		f, code = Failure{Name: "demo.Overflow", Err: err}, 5
+	case cliThrown[demo.Overflow](err, 5, &f, &code):
 	}
 	if err := p.PresentError(stderr, "quit", input, f); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
@@ -360,9 +344,9 @@ func failQuit(p Presenter, prog string, input any, err error, stderr io.Writer) 
 	return code
 }
 
-// usageQuit は quit の使い方。
-func usageQuit(prog string) string {
-	return "usage: " + prog + " quit\n\nいつも失敗する\n"
+// usageQuit は quit の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageQuit() cliHelp {
+	return cliHelp{command: "quit", summary: "いつも失敗する"}
 }
 
 // cliProgramName は、使い方に出すプログラム名（filepath.Base(os.Args[0])）。
@@ -371,69 +355,6 @@ func cliProgramName() string {
 		return filepath.Base(os.Args[0])
 	}
 	return "demo"
-}
-
-// cliParseArgs は args をフラグと位置引数に分ける。specs は、フラグ名 → boolean か。フラグは --name value か --name=value で、
-// boolean は --name だけで true（値は取らない。--name=false は取れる）。同じフラグが二度あれば、後のものが勝つ。-x の形は
-// フラグではなく位置引数（負の数を渡せるように）。-- 以降は、すべて位置引数。--help か -h があれば help が true。
-// 知らないフラグと、値のないフラグは誤り。
-func cliParseArgs(args []string, specs map[string]bool) (flags map[string]string, pos []string, help bool, err error) {
-	flags = map[string]string{}
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--" {
-			pos = append(pos, args[i+1:]...)
-			break
-		}
-		if a == "--help" || a == "-h" {
-			return nil, nil, true, nil
-		}
-		if !strings.HasPrefix(a, "--") {
-			pos = append(pos, a)
-			continue
-		}
-		name, value, hasValue := strings.Cut(a[2:], "=")
-		boolean, known := specs[name]
-		if !known {
-			return nil, nil, false, fmt.Errorf("unknown flag --%s", name)
-		}
-		if !hasValue {
-			if boolean {
-				value = "true"
-			} else {
-				if i+1 >= len(args) {
-					return nil, nil, false, fmt.Errorf("flag --%s needs a value", name)
-				}
-				i++
-				value = args[i]
-			}
-		}
-		flags[name] = value
-	}
-	return flags, pos, false, nil
-}
-
-// cliLookup は、フラグ flag の値、なければ環境変数 name の値（空でなければ）を返す。フラグが優先。
-func cliLookup(flags map[string]string, flag string, env func(string) string, name string) (string, bool) {
-	if flag != "" {
-		if v, ok := flags[flag]; ok {
-			return v, true
-		}
-	}
-	if name != "" && env != nil {
-		if v := env(name); v != "" {
-			return v, true
-		}
-	}
-	return "", false
-}
-
-// cliLookupArg は、i 番目の位置引数、なければ環境変数 name の値（空でなければ）を返す。
-func cliLookupArg(pos []string, i int, env func(string) string, name string) (string, bool) {
-	if i < len(pos) {
-		return pos[i], true
-	}
-	return cliLookup(nil, "", env, name)
 }
 
 // cliUsageError は、使い方の誤りを w（標準エラー）に出して 64 を返す。usage が空なら、使い方は出さない。
@@ -445,18 +366,389 @@ func cliUsageError(w io.Writer, prog, usage, message string) int {
 	return 64
 }
 
-// cliValidationMessage は、Validate の誤りを「path: constraint; …」にする。
-func cliValidationMessage(err error) string {
-	var invalid *runtime.ValidationError
-	if !errors.As(err, &invalid) {
-		return err.Error()
-	}
-	parts := make([]string, len(invalid.Violations))
-	for i, v := range invalid.Violations {
-		parts[i] = v.String()
-	}
-	return strings.Join(parts, "; ")
+// cliHelp は、コマンドの使い方に出す説明（usage<Op> が返す）: コマンドの名前と一行の説明と、入力のフィールドの順に、
+// フィールドの名前と一行の説明。
+type cliHelp struct {
+	command, summary string
+	fields           [][2]string
 }
 
-// cliPtr は v を指すポインタ（省略可能なフィールドの値）。
-func cliPtr[T any](v T) *T { return &v }
+// cliField は、読む先一つ（入力のフィールド）と、それに並べた行。
+type cliField struct {
+	ptr      any           // 行に渡された、読む先へのポインタ
+	dst      reflect.Value // 読む先
+	name     string        // フィールドの名前（位置引数の表示名にする）
+	summary  string        // 一行の説明
+	flag     string        // @cli.flag の名前。行がなければ ""
+	env      string        // @cli.env の名前。行がなければ ""
+	position int           // @cli.arg の位置。行がなければ 0
+	required bool          // @cli.required の行がある
+	fallback any           // @cli.default の値。行がなければ nil
+}
+
+// kind は、読む先の値の Go の型の種類。省略可能（ポインタ）と、残りの位置引数（スライス）は、中の型で見る。
+func (f *cliField) kind() reflect.Kind { return cliValueType(f.dst.Type()).Kind() }
+
+// rest は、読む先が、残りの位置引数をすべて受け取るか（スライスか）。
+func (f *cliField) rest() bool { return f.dst.Kind() == reflect.Slice }
+
+// label は、位置引数の表示名: フィールドの名前を、大文字と _ にしたもの（dryRun は DRY_RUN）。
+func (f *cliField) label() string {
+	var b strings.Builder
+	for i, r := range f.name {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			b.WriteByte('_')
+		}
+		b.WriteString(strings.ToUpper(string(r)))
+	}
+	return b.String()
+}
+
+// source は、誤りの文言で、このフィールドの値の出どころを指す言葉。
+func (f *cliField) source() string {
+	switch {
+	case f.position > 0:
+		return "argument " + f.label()
+	case f.flag != "":
+		return "flag --" + f.flag
+	}
+	return "environment variable " + f.env
+}
+
+// cliValueType は、読む先の型 t の、値一つの型: 省略可能（ポインタ）と、残りの位置引数（スライス）の、中の型。
+func cliValueType(t reflect.Type) reflect.Type {
+	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice {
+		t = t.Elem()
+	}
+	return t
+}
+
+// cliTypeName は、使い方と誤りの文言に出す、値の型の名前: 名前付きの型（scalar）ならその名前、そうでなければ、種類の名前。
+func cliTypeName(t reflect.Type, named bool) string {
+	if named && t.PkgPath() != "" {
+		return t.Name()
+	}
+	switch t.Kind() {
+	case reflect.Bool:
+		return "boolean"
+	case reflect.Int64:
+		return "int"
+	case reflect.Float64:
+		return "float"
+	}
+	return "string"
+}
+
+// cliLine は、コマンドライン一つを、入力のフィールドに読む。フィールドに付いた cli のデコレータごとの行（flag、env、arg、
+// required、orDefault）を並べてから、read で、引数の並びを一度に解釈する。読む先の Go の型は、実行時に見る: 真偽値なら値を
+// 取らないフラグ、スライスなら残りの位置引数、ポインタなら省略可能。値が与えられなかった読む先の扱いは、並べた行（required、
+// orDefault）だけで決め、型では決めない。
+type cliLine struct {
+	args   []string
+	getenv func(string) string
+	fields []*cliField // 読む先ごと。初めて行を並べた順（入力のフィールドの順）
+}
+
+// field は、読む先 dst（入力のフィールドへのポインタ）に並べた行の集まり。初めての読む先なら、足す。
+func (l *cliLine) field(dst any) *cliField {
+	for _, f := range l.fields {
+		if f.ptr == dst {
+			return f
+		}
+	}
+	f := &cliField{ptr: dst, dst: reflect.ValueOf(dst).Elem()}
+	l.fields = append(l.fields, f)
+	return f
+}
+
+// flag は @cli.flag の行: フラグ --name の値を dst に読む。
+func (l *cliLine) flag(name string, dst any) { l.field(dst).flag = name }
+
+// env は @cli.env の行: フラグも位置引数も与えられなければ、環境変数 name の値（空でなければ）を dst に読む。
+func (l *cliLine) env(name string, dst any) { l.field(dst).env = name }
+
+// arg は @cli.arg の行: position 番目（1 から数える）の位置引数を dst に読む。
+func (l *cliLine) arg(position int, dst any) { l.field(dst).position = position }
+
+// required は @cli.required の行: dst に値が与えられなければ、誤り。
+func (l *cliLine) required(dst any) { l.field(dst).required = true }
+
+// orDefault は @cli.default の行: dst に値が与えられなければ、value にする。
+func (l *cliLine) orDefault(dst any, value any) { l.field(dst).fallback = value }
+
+// read は、並べた行に従って、引数の並びを解釈し、読む先に値を入れる。終わりなら、終了コードと true を返す: --help か -h が
+// あれば、使い方を stdout に出して 0。使い方の誤りは、文言と使い方を stderr に出して 64。読めたら、false。
+func (l *cliLine) read(prog string, help cliHelp, stdout, stderr io.Writer) (int, bool) {
+	for i, f := range l.fields {
+		if i < len(help.fields) {
+			f.name, f.summary = help.fields[i][0], help.fields[i][1]
+		}
+	}
+	asked, err := l.parse()
+	if err != nil {
+		return cliUsageError(stderr, prog, l.usage(prog, help), err.Error()), true
+	}
+	if asked {
+		fmt.Fprint(stdout, l.usage(prog, help))
+		return 0, true
+	}
+	return 0, false
+}
+
+// parse は、引数の並びを一度に解釈する。フラグは --name value か --name=value で、読む先が真偽値なら --name だけで true
+// （値は取らない。--name=false は取れる）。同じフラグが二度あれば、後のものが勝つ。-x の形はフラグではなく位置引数（負の数を
+// 渡せるように）。-- 以降は、すべて位置引数。--help か -h があれば asked が true。読む先ごとの値は、フラグ、位置引数、環境変数
+// （空でなければ）の順に探す。どこからも与えられなければ、required の行があれば誤り、orDefault の行があればその値、どちらも
+// なければ、読む先に何も書かない。
+func (l *cliLine) parse() (asked bool, err error) {
+	flags := map[string]*cliField{}
+	most, rest := 0, false
+	for _, f := range l.fields {
+		if f.flag != "" {
+			flags[f.flag] = f
+		}
+		if f.position > most {
+			most = f.position
+		}
+		rest = rest || f.position > 0 && f.rest()
+	}
+	given := map[*cliField]string{}
+	var pos []string
+	for i := 0; i < len(l.args); i++ {
+		a := l.args[i]
+		if a == "--" {
+			pos = append(pos, l.args[i+1:]...)
+			break
+		}
+		if a == "--help" || a == "-h" {
+			return true, nil
+		}
+		if !strings.HasPrefix(a, "--") {
+			pos = append(pos, a)
+			continue
+		}
+		name, value, hasValue := strings.Cut(a[2:], "=")
+		f := flags[name]
+		if f == nil {
+			return false, fmt.Errorf("unknown flag --%s", name)
+		}
+		if !hasValue {
+			if f.kind() == reflect.Bool {
+				value = "true"
+			} else {
+				if i+1 >= len(l.args) {
+					return false, fmt.Errorf("flag --%s needs a value", name)
+				}
+				i++
+				value = l.args[i]
+			}
+		}
+		given[f] = value
+	}
+	if !rest && len(pos) > most {
+		return false, fmt.Errorf("too many arguments: %d given, at most %d expected", len(pos), most)
+	}
+	for _, f := range l.fields {
+		var values []string
+		var from string
+		if v, ok := given[f]; ok {
+			values, from = []string{v}, "--"+f.flag
+		} else if f.position > 0 && len(pos) >= f.position {
+			values, from = pos[f.position-1:f.position], f.label()
+			if f.rest() {
+				values = pos[f.position-1:]
+			}
+		} else if v := l.lookup(f.env); v != "" {
+			values, from = []string{v}, f.env
+		} else if f.required {
+			return false, fmt.Errorf("missing required %s", f.source())
+		} else if f.fallback != nil {
+			f.dst.Set(reflect.ValueOf(f.fallback).Convert(f.dst.Type()))
+			continue
+		} else {
+			continue
+		}
+		if err := cliStore(f.dst, values, from); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// lookup は、環境変数 name の値。name が空か、環境変数を見ない（getenv が nil）なら ""。
+func (l *cliLine) lookup(name string) string {
+	if name == "" || l.getenv == nil {
+		return ""
+	}
+	return l.getenv(name)
+}
+
+// cliStore は、与えられた文字列 values を、読む先 dst に読む。読み方は、dst の型で決める: ポインタ（省略可能）なら、値を置く先を
+// 作ってから読む。スライス（残りの位置引数）なら、一つずつ読む。文字列はそのまま、整数は strconv.ParseInt(v, 10, 64)、小数は
+// strconv.ParseFloat(v, 64)、真偽値は strconv.ParseBool(v)。名前付きの型（scalar）は、元の型で読んでから、その型にする。
+// from は、誤りの文言に出す、値の出どころ。
+func cliStore(dst reflect.Value, values []string, from string) error {
+	switch dst.Kind() {
+	case reflect.Pointer:
+		p := reflect.New(dst.Type().Elem())
+		if err := cliStore(p.Elem(), values, from); err != nil {
+			return err
+		}
+		dst.Set(p)
+		return nil
+	case reflect.Slice:
+		s := reflect.MakeSlice(dst.Type(), len(values), len(values))
+		for i := range values {
+			if err := cliStore(s.Index(i), values[i:i+1], from); err != nil {
+				return err
+			}
+		}
+		dst.Set(s)
+		return nil
+	}
+	v := values[0]
+	switch dst.Kind() {
+	case reflect.Bool:
+		if x, err := strconv.ParseBool(v); err == nil {
+			dst.SetBool(x)
+			return nil
+		}
+	case reflect.Int64:
+		if x, err := strconv.ParseInt(v, 10, 64); err == nil {
+			dst.SetInt(x)
+			return nil
+		}
+	case reflect.Float64:
+		if x, err := strconv.ParseFloat(v, 64); err == nil {
+			dst.SetFloat(x)
+			return nil
+		}
+	default:
+		dst.SetString(v)
+		return nil
+	}
+	return fmt.Errorf("invalid value %q for %s: want %s", v, from, cliTypeName(dst.Type(), false))
+}
+
+// usage は、コマンドの使い方: 一行目、コマンドの説明、位置引数（位置の順）、フラグ、環境変数だけのフィールド。並べた行から作る。
+func (l *cliLine) usage(prog string, help cliHelp) string {
+	var args, flags, envs []*cliField
+	for _, f := range l.fields {
+		switch {
+		case f.position > 0:
+			args = append(args, f)
+		case f.flag != "":
+			flags = append(flags, f)
+		default:
+			envs = append(envs, f)
+		}
+	}
+	sort.SliceStable(args, func(i, j int) bool { return args[i].position < args[j].position })
+	var b strings.Builder
+	b.WriteString("usage: " + prog + " " + help.command)
+	if len(flags) > 0 {
+		b.WriteString(" [flags]")
+	}
+	shown := func(f *cliField) string {
+		if f.rest() {
+			return f.label() + "..."
+		}
+		return f.label()
+	}
+	for _, f := range args {
+		if f.required {
+			b.WriteString(" " + shown(f))
+		} else {
+			b.WriteString(" [" + shown(f) + "]")
+		}
+	}
+	b.WriteString("\n")
+	if help.summary != "" {
+		b.WriteString("\n" + help.summary + "\n")
+	}
+	section := func(title string, fields []*cliField, left func(*cliField) string) {
+		if len(fields) == 0 {
+			return
+		}
+		b.WriteString("\n" + title + ":\n")
+		width := 0
+		for _, f := range fields {
+			if n := len(left(f)); n > width {
+				width = n
+			}
+		}
+		for _, f := range fields {
+			var notes []string
+			if f.required {
+				notes = append(notes, "required")
+			}
+			if f.fallback != nil {
+				notes = append(notes, fmt.Sprintf("default: %v", f.fallback))
+			}
+			if f.env != "" && (f.flag != "" || f.position > 0) {
+				notes = append(notes, "env: "+f.env)
+			}
+			right := f.summary
+			if len(notes) > 0 {
+				if right != "" {
+					right += " "
+				}
+				right += "(" + strings.Join(notes, ", ") + ")"
+			}
+			if right == "" {
+				b.WriteString("  " + left(f) + "\n")
+				continue
+			}
+			b.WriteString("  " + left(f) + strings.Repeat(" ", width+3-len(left(f))) + right + "\n")
+		}
+	}
+	section("arguments", args, shown)
+	section("flags", flags, func(f *cliField) string {
+		if f.kind() == reflect.Bool {
+			return "--" + f.flag
+		}
+		return "--" + f.flag + " <" + cliTypeName(cliValueType(f.dst.Type()), true) + ">"
+	})
+	section("environment", envs, func(f *cliField) string { return f.env })
+	return b.String()
+}
+
+// cliValidate は、解釈した入力 in の制約を確かめる。in が Validate() error を持つかどうかは、実行時に見る（持たなければ、
+// 確かめるものがない）。違反があれば、「path: constraint; …」を w（標準エラー）に出して false（使い方は出さない）。
+func cliValidate(w io.Writer, prog string, in any) bool {
+	v, ok := in.(interface{ Validate() error })
+	if !ok {
+		return true
+	}
+	err := v.Validate()
+	if err == nil {
+		return true
+	}
+	message := err.Error()
+	var invalid *runtime.ValidationError
+	if errors.As(err, &invalid) {
+		parts := make([]string, len(invalid.Violations))
+		for i, violation := range invalid.Violations {
+			parts[i] = violation.String()
+		}
+		message = strings.Join(parts, "; ")
+	}
+	cliUsageError(w, prog, "", "invalid input: "+message)
+	return false
+}
+
+// cliThrown は、err が例外 E（値）なら、f に Failure（Name は例外の FQN、Value は運ぶ値）を、code に終了コード exit を入れて
+// true。値を運ぶ例外かどうか（フィールド Value を持つか）は、実行時に見る。
+func cliThrown[E runtime.Exception](err error, exit int, f *Failure, code *int) bool {
+	var e E
+	if !errors.As(err, &e) {
+		return false
+	}
+	*f, *code = Failure{Name: e.HozoException(), Err: err}, exit
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
+		if value := v.FieldByName("Value"); value.IsValid() {
+			f.Value = value.Interface()
+		}
+	}
+	return true
+}

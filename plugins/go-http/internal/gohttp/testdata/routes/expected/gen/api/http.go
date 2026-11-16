@@ -7,9 +7,13 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"reflect"
 	"strconv"
+	"strings"
+	"time"
 
 	pkgtype "example.com/app/gen/type"
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
@@ -19,9 +23,12 @@ import (
 //	GET /items           api.search
 //	GET /items/first     api.first
 //	POST /items/replace  api.replace
+//	GET /list            api.listAll
+//	POST /put            api.put
 //	POST /reset/         api.reset
 //	GET /ping            api.ping
 //	POST /ping           api.ping
+//	GET /count           api.count
 func NewHandler(ops Ops) http.Handler {
 	mux := http.NewServeMux()
 
@@ -32,53 +39,30 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
 	})
 
 	// api.create
 	mux.HandleFunc("POST /items", func(w http.ResponseWriter, r *http.Request) {
-		in := NewCreateInput()
-		if v := r.Header.Get("X-Tenant"); v != "" {
-			in.Tenant = v
-		} else {
-			httpWriteBadRequest(w, "header X-Tenant: missing")
-			return
-		}
-		if v := r.Header.Get("Authorization"); v != "" {
-			in.Token = pkgtype.Token(v)
-		} else {
-			httpWriteBadRequest(w, "header Authorization: missing")
-			return
-		}
-		if v := r.Header.Get("X-Request-Id"); v != "" {
-			in.RequestId = &v
-		}
-		if v := r.Header.Get("Accept-Language"); v != "" {
-			in.Lang = v
-		}
-		body := struct {
-			Item   pkgtype.Item            `json:"item"`
-			Note   *string                 `json:"note,omitempty"`
-			Copies int64                   `json:"copies"`
-			Labels map[string]pkgtype.Name `json:"labels"`
-		}{Item: in.Item, Note: in.Note, Copies: in.Copies, Labels: in.Labels}
-		if err := httpReadBody(r, &body); err != nil {
-			httpWriteBadRequest(w, "body: invalid JSON")
-			return
-		}
-		in.Item = body.Item
-		in.Note = body.Note
-		in.Copies = body.Copies
-		in.Labels = body.Labels
-		if q := r.URL.Query(); q.Has("dryRun") {
-			x, err := strconv.ParseBool(q.Get("dryRun"))
-			if err != nil {
-				httpWriteBadRequest(w, "query dryRun: invalid boolean")
-				return
-			}
-			in.DryRun = x
-		} else {
-			httpWriteBadRequest(w, "query dryRun: missing")
+		var in CreateInput
+		req := httpRequest{r: r}
+		req.header("X-Tenant", &in.Tenant, httpRequired)
+		req.header("Authorization", &in.Token)
+		req.header("X-Request-Id", &in.RequestId)
+		req.header("Accept-Language", &in.Lang, httpDefault("en"))
+		req.header("trace", &in.Trace)
+		req.body("item", &in.Item)
+		req.query("dryRun", &in.DryRun, httpRequired)
+		req.body("memo", &in.Note)
+		req.body("copies", &in.Copies, httpDefault(1))
+		req.body("labels", &in.Labels, httpRequired)
+		req.body("weight", &in.Weight, httpDefault(2))
+		req.body("scale", &in.Scale, httpDefault(1.5))
+		req.body("active", &in.Active, httpDefault(true))
+		req.body("timeout", &in.Timeout, httpDefault(time.Duration(30000000000)))
+		req.body("wait", &in.Wait, httpDefault(time.Duration(300000000000)))
+		req.body("owner", &in.Owner, httpDefault("anon"))
+		if !req.ok(w) {
 			return
 		}
 		out, err := ops.Create(r.Context(), in)
@@ -86,169 +70,104 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
 	})
 
 	// api.search
 	mux.HandleFunc("GET /items", func(w http.ResponseWriter, r *http.Request) {
-		in := NewSearchInput()
-		if q := r.URL.Query(); q.Has("q") {
-			in.Q = q.Get("q")
-		} else {
-			httpWriteBadRequest(w, "query q: missing")
+		var in SearchInput
+		req := httpRequest{r: r}
+		req.query("q", &in.Q, httpRequired)
+		req.query("n", &in.Name)
+		req.query("tag", &in.Tag)
+		req.query("owner", &in.Owner, httpDefault("nobody"))
+		req.query("page", &in.Page, httpDefault(1))
+		req.query("limit", &in.Limit)
+		req.query("size", &in.Size)
+		req.query("offset", &in.Offset)
+		req.query("min", &in.Min, httpRequired)
+		req.query("ratio", &in.Ratio, httpDefault(0.5))
+		req.query("max", &in.Max)
+		req.query("scale", &in.Scale)
+		req.query("exact", &in.Exact, httpDefault(true))
+		req.query("deep", &in.Deep)
+		req.query("flag", &in.Flag)
+		req.query("factor", &in.Factor, httpDefault(3))
+		if !req.ok(w) {
 			return
-		}
-		if q := r.URL.Query(); q.Has("name") {
-			x := pkgtype.Name(q.Get("name"))
-			in.Name = &x
-		}
-		if q := r.URL.Query(); q.Has("tag") {
-			x := q.Get("tag")
-			in.Tag = &x
-		}
-		if q := r.URL.Query(); q.Has("owner") {
-			in.Owner = pkgtype.Token(q.Get("owner"))
-		}
-		if q := r.URL.Query(); q.Has("page") {
-			x, err := strconv.ParseInt(q.Get("page"), 10, 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query page: invalid int")
-				return
-			}
-			in.Page = pkgtype.Page(x)
-		}
-		if q := r.URL.Query(); q.Has("limit") {
-			x, err := strconv.ParseInt(q.Get("limit"), 10, 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query limit: invalid int")
-				return
-			}
-			in.Limit = &x
-		}
-		if q := r.URL.Query(); q.Has("size") {
-			x, err := strconv.ParseInt(q.Get("size"), 10, 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query size: invalid int")
-				return
-			}
-			y := pkgtype.Page(x)
-			in.Size = &y
-		}
-		if q := r.URL.Query(); q.Has("offset") {
-			x, err := strconv.ParseInt(q.Get("offset"), 10, 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query offset: invalid int")
-				return
-			}
-			in.Offset = x
-		} else {
-			httpWriteBadRequest(w, "query offset: missing")
-			return
-		}
-		if q := r.URL.Query(); q.Has("min") {
-			x, err := strconv.ParseFloat(q.Get("min"), 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query min: invalid float")
-				return
-			}
-			in.Min = x
-		} else {
-			httpWriteBadRequest(w, "query min: missing")
-			return
-		}
-		if q := r.URL.Query(); q.Has("ratio") {
-			x, err := strconv.ParseFloat(q.Get("ratio"), 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query ratio: invalid float")
-				return
-			}
-			in.Ratio = pkgtype.Ratio(x)
-		}
-		if q := r.URL.Query(); q.Has("max") {
-			x, err := strconv.ParseFloat(q.Get("max"), 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query max: invalid float")
-				return
-			}
-			in.Max = &x
-		}
-		if q := r.URL.Query(); q.Has("scale") {
-			x, err := strconv.ParseFloat(q.Get("scale"), 64)
-			if err != nil {
-				httpWriteBadRequest(w, "query scale: invalid float")
-				return
-			}
-			y := pkgtype.Ratio(x)
-			in.Scale = &y
-		}
-		if q := r.URL.Query(); q.Has("exact") {
-			x, err := strconv.ParseBool(q.Get("exact"))
-			if err != nil {
-				httpWriteBadRequest(w, "query exact: invalid boolean")
-				return
-			}
-			in.Exact = x
-		}
-		if q := r.URL.Query(); q.Has("deep") {
-			x, err := strconv.ParseBool(q.Get("deep"))
-			if err != nil {
-				httpWriteBadRequest(w, "query deep: invalid boolean")
-				return
-			}
-			in.Deep = &x
-		}
-		if q := r.URL.Query(); q.Has("flag") {
-			x, err := strconv.ParseBool(q.Get("flag"))
-			if err != nil {
-				httpWriteBadRequest(w, "query flag: invalid boolean")
-				return
-			}
-			y := pkgtype.Flag(x)
-			in.Flag = &y
 		}
 		out, err := ops.Search(r.Context(), in)
 		if err != nil {
 			httpWriteError(w, err)
 			return
 		}
-		if out == nil {
-			out = []pkgtype.Item{}
-		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
 	})
 
 	// api.first
 	mux.HandleFunc("GET /items/first", func(w http.ResponseWriter, r *http.Request) {
 		var in pkgtype.Lookup
-		if q := r.URL.Query(); q.Has("id") {
-			in.Id = q.Get("id")
-		} else {
-			httpWriteBadRequest(w, "query id: missing")
+		req := httpRequest{r: r}
+		req.query("id", &in.Id, httpRequired)
+		req.header("X-Trace", &in.Trace)
+		if !req.ok(w) {
 			return
-		}
-		if v := r.Header.Get("X-Trace"); v != "" {
-			in.Trace = &v
 		}
 		out, err := ops.First(r.Context(), in)
 		if err != nil {
 			httpWriteError(w, err)
 			return
 		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
 	})
 
 	// api.replace
 	mux.HandleFunc("POST /items/replace", func(w http.ResponseWriter, r *http.Request) {
 		var in ReplaceInput
-		if err := httpReadBody(r, &in.Items); err != nil {
-			httpWriteBadRequest(w, "body: invalid JSON")
+		req := httpRequest{r: r}
+		req.body("items", &in.Items)
+		if !req.ok(w) {
 			return
 		}
 		if err := ops.Replace(r.Context(), in); err != nil {
 			httpWriteError(w, err)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		httpWriteResult(w, nil)
+	})
+
+	// api.listAll
+	mux.HandleFunc("GET /list", func(w http.ResponseWriter, r *http.Request) {
+		var in ListInput
+		req := httpRequest{r: r}
+		req.headerObj(&in.Meta)
+		req.queryObj(&in.Paging)
+		if !req.ok(w) {
+			return
+		}
+		out, err := ops.ListAll(r.Context(), in)
+		if err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, out)
+	})
+
+	// api.put
+	mux.HandleFunc("POST /put", func(w http.ResponseWriter, r *http.Request) {
+		var in PutInput
+		req := httpRequest{r: r}
+		req.bodyObj(&in.Item)
+		req.header("X-Tenant", &in.Tenant)
+		if !req.ok(w) {
+			return
+		}
+		out, err := ops.Put(r.Context(), in)
+		if err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, out)
 	})
 
 	// api.reset
@@ -257,7 +176,7 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		httpWriteResult(w, nil)
 	})
 
 	// api.ping
@@ -267,7 +186,7 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
 	})
 
 	// api.ping
@@ -277,7 +196,17 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
+	})
+
+	// api.count
+	mux.HandleFunc("GET /count", func(w http.ResponseWriter, r *http.Request) {
+		out, err := ops.Count(r.Context())
+		if err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, out)
 	})
 
 	return mux
@@ -301,19 +230,168 @@ type httpBadRequest struct {
 
 // httpViolation は制約の違反一つ。
 type httpViolation struct {
-	// 通信の上の場所: body、query.<名前>、header.<名前> と、その中のパス（body.email、body[0].quantity）。
+	// 通信の上の場所: body、query、header と、その中のパス（body.email、body.lines[0].quantity、query.page）。
 	Path string `json:"path"`
 	// 違反した制約の名前（valid の語彙のデコレータの名前）。
 	Constraint string `json:"constraint"`
 }
 
-// httpReadBody は要求の本文を JSON の値一つとして v に読む。
-func httpReadBody(r *http.Request, v any) error {
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		return err
+// httpOption は、項目がないときの扱い。フィールドのデコレータ（@http.required、@http.default）が言う。
+type httpOption struct {
+	required bool // @http.required
+	value    any  // @http.default の値。なければ nil
+}
+
+// httpRequired は @http.required: その項目がなければ、読めない要求（"<場所> <名前>: missing"）。
+var httpRequired = httpOption{required: true}
+
+// httpDefault は @http.default(v): その項目がなければ、フィールドを v にする。
+func httpDefault(v any) httpOption { return httpOption{value: v} }
+
+// httpRequest は、要求一つを、入力のフィールドに読む。読めなかった最初の理由を fail に持ち、その後は何も読まない。
+type httpRequest struct {
+	r     *http.Request
+	fail  string                     // 読めなかった理由（http.BadRequest の message）。読めていれば空
+	items map[string]json.RawMessage // 本文のオブジェクト。body が、初めて呼ばれたときに読む
+}
+
+// header は、ヘッダ name の値を dst（フィールドへのポインタ）に読む（@http.header）。空の値は、ないものと読む。
+func (q *httpRequest) header(name string, dst any, opts ...httpOption) {
+	text := q.r.Header.Get(name)
+	q.text("header", name, text, text != "", dst, opts)
+}
+
+// query は、クエリ name の値を dst（フィールドへのポインタ）に読む（@http.query）。同じ名前が二度あれば、最初の値。
+func (q *httpRequest) query(name string, dst any, opts ...httpOption) {
+	values := q.r.URL.Query()
+	q.text("query", name, values.Get(name), values.Has(name), dst, opts)
+}
+
+// body は、本文（JSON のオブジェクト）のキー name の値を dst（フィールドへのポインタ）に読む（@http.body）。
+// キーがあれば、値が null でも、あるものと読む。
+func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
+	if q.fail != "" {
+		return
 	}
-	return json.Unmarshal(data, v)
+	if q.items == nil {
+		data, err := io.ReadAll(q.r.Body)
+		if err == nil {
+			err = json.Unmarshal(data, &q.items)
+		}
+		if err != nil || q.items == nil {
+			q.fail = "body: invalid JSON"
+			return
+		}
+	}
+	raw, present := q.items[name]
+	if !present {
+		q.missing("body", name, dst, opts)
+		return
+	}
+	if err := json.Unmarshal(raw, dst); err != nil {
+		q.fail = "body: invalid JSON"
+	}
+}
+
+// headerObj は、ヘッダの全体を dst（model のフィールドへのポインタ）に読む（@http.headerObj）: model のフィールドごとに、
+// その json タグの名前（仕様のフィールドの名前）のヘッダを、header と同じに読む。ないヘッダのフィールドは、零値のまま。
+func (q *httpRequest) headerObj(dst any) {
+	v := reflect.ValueOf(dst).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		name, _, _ := strings.Cut(v.Type().Field(i).Tag.Get("json"), ",")
+		q.header(name, v.Field(i).Addr().Interface())
+	}
+}
+
+// queryObj は、クエリの全体を dst（model のフィールドへのポインタ）に読む（@http.queryObj）: model のフィールドごとに、
+// その json タグの名前（仕様のフィールドの名前）のクエリを、query と同じに読む。ないクエリのフィールドは、零値のまま。
+func (q *httpRequest) queryObj(dst any) {
+	v := reflect.ValueOf(dst).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		name, _, _ := strings.Cut(v.Type().Field(i).Tag.Get("json"), ",")
+		q.query(name, v.Field(i).Addr().Interface())
+	}
+}
+
+// bodyObj は、本文の全体を、JSON の値一つとして dst（model のフィールドへのポインタ）に読む（@http.bodyObj）。
+func (q *httpRequest) bodyObj(dst any) {
+	if q.fail != "" {
+		return
+	}
+	data, err := io.ReadAll(q.r.Body)
+	if err == nil {
+		err = json.Unmarshal(data, dst)
+	}
+	if err != nil {
+		q.fail = "body: invalid JSON"
+	}
+}
+
+// missing は、項目がなかったときの扱い。決めるのは、行に渡された opts だけで、dst の型は見ない:
+// httpRequired なら、読めない要求。httpDefault(v) なら、dst（フィールドへのポインタ）の指す先を v にする。
+// どちらもなければ、何も書かない（フィールドは零値のまま）。
+func (q *httpRequest) missing(place, name string, dst any, opts []httpOption) {
+	for _, o := range opts {
+		switch {
+		case o.required:
+			q.fail = place + " " + name + ": missing"
+		case o.value != nil:
+			v := reflect.ValueOf(dst).Elem()
+			v.Set(reflect.ValueOf(o.value).Convert(v.Type()))
+		}
+	}
+}
+
+// text は、通信の上の文字列（ヘッダとクエリの値）一つを dst（フィールドへのポインタ）に読む。読み方は、実行時に、dst の指す型で決める:
+// ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。
+// 値がない（present が false）ときの扱いは、missing。
+func (q *httpRequest) text(place, name, text string, present bool, dst any, opts []httpOption) {
+	if q.fail != "" {
+		return
+	}
+	if !present {
+		q.missing(place, name, dst, opts)
+		return
+	}
+	v := reflect.ValueOf(dst).Elem()
+	if v.Kind() == reflect.Pointer {
+		v.Set(reflect.New(v.Type().Elem()))
+		v = v.Elem()
+	}
+	switch v.Kind() {
+	case reflect.String:
+		v.SetString(text)
+	case reflect.Int64:
+		x, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			q.fail = place + " " + name + ": invalid int"
+		}
+		v.SetInt(x)
+	case reflect.Float64:
+		x, err := strconv.ParseFloat(text, 64)
+		if err != nil {
+			q.fail = place + " " + name + ": invalid float"
+		}
+		v.SetFloat(x)
+	case reflect.Bool:
+		x, err := strconv.ParseBool(text)
+		if err != nil {
+			q.fail = place + " " + name + ": invalid boolean"
+		}
+		v.SetBool(x)
+	}
+}
+
+// ok は、要求を読めたかどうか。読めなかったなら、400（http.BadRequest）を返して false。op は呼ばない。
+func (q *httpRequest) ok(w http.ResponseWriter) bool {
+	if q.fail == "" {
+		return true
+	}
+	httpWriteJSON(w, http.StatusBadRequest, httpErrorBody{
+		Error: "http.BadRequest",
+		Value: httpBadRequest{Message: q.fail, Violations: []httpViolation{}},
+	})
+	return false
 }
 
 // httpWriteJSON は v を JSON にして status で返す。
@@ -327,30 +405,48 @@ func httpWriteJSON(w http.ResponseWriter, status int, v any) {
 	_, _ = w.Write(data)
 }
 
-// httpWriteBadRequest は、要求を op の入力に読めなかったときの 400。op は呼ばない。
-func httpWriteBadRequest(w http.ResponseWriter, message string) {
-	httpWriteJSON(w, http.StatusBadRequest, httpErrorBody{
-		Error: "http.BadRequest",
-		Value: httpBadRequest{Message: message, Violations: []httpViolation{}},
-	})
+// httpWriteResult は、op が成功したときの応答。何を返すかは、実行時に、out で決める:
+// 返す値がない（戻り値のない op は nil を渡す。省略可能な戻り値で、値がない）なら、204 で本文なし。
+// あれば、200 と、その JSON。値のない配列（nil）は空の配列 [] に、値のない record（nil）は空の record {} にする。
+func httpWriteResult(w http.ResponseWriter, out any) {
+	v := reflect.ValueOf(out)
+	switch {
+	case !v.IsValid(), v.Kind() == reflect.Pointer && v.IsNil():
+		w.WriteHeader(http.StatusNoContent)
+		return
+	case v.Kind() == reflect.Slice && v.IsNil():
+		out = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	case v.Kind() == reflect.Map && v.IsNil():
+		out = reflect.MakeMap(v.Type()).Interface()
+	}
+	httpWriteJSON(w, http.StatusOK, out)
 }
 
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
 // それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
 func httpWriteError(w http.ResponseWriter, err error) {
-	var (
-		e0 pkgtype.Conflict
-		e1 pkgtype.Rejected
-		e2 pkgtype.NotFound
-	)
 	switch {
-	case errors.As(err, &e0):
-		httpWriteJSON(w, 409, httpErrorBody{Error: "type.Conflict", Value: e0.Value})
-	case errors.As(err, &e1):
-		httpWriteJSON(w, 422, httpErrorBody{Error: "type.Rejected", Value: e1.Value})
-	case errors.As(err, &e2):
-		httpWriteJSON(w, 404, httpErrorBody{Error: "type.NotFound"})
+	case httpThrown[pkgtype.Conflict](w, err, 409):
+	case httpThrown[pkgtype.Rejected](w, err, 422):
+	case httpThrown[pkgtype.NotFound](w, err, 404):
 	default:
 		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
 	}
+}
+
+// httpThrown は、err が例外 E（値）なら、status と、例外の FQN（と運ぶ値）を返して true。
+// 値を運ぶ例外かどうかは、実行時に見る（フィールド Value を持つ）。
+func httpThrown[E runtime.Exception](w http.ResponseWriter, err error, status int) bool {
+	var e E
+	if !errors.As(err, &e) {
+		return false
+	}
+	body := httpErrorBody{Error: e.HozoException()}
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
+		if f := v.FieldByName("Value"); f.IsValid() {
+			body.Value = f.Interface()
+		}
+	}
+	httpWriteJSON(w, status, body)
+	return true
 }

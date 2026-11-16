@@ -1,13 +1,16 @@
-GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド count の型 int は受け付けられない（string か、その省略可能）
-GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド scalarCount の型 app.Count? は受け付けられない（string か、その省略可能）
-GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド flag の型 boolean? は受け付けられない（string か、その省略可能）
-GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド at の型 Time は受け付けられない（string か、その省略可能）
-GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド list の型 string[] は受け付けられない（string か、その省略可能）
-GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド inner の型 app.Inner? は受け付けられない（string か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド at の型 Time? は受け付けられない（string / int / float / boolean か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド when の型 app.When は受け付けられない（string / int / float / boolean か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド wait の型 Duration? は受け付けられない（string / int / float / boolean か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド list の型 string[] は受け付けられない（string / int / float / boolean か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド later の型 int[]? は受け付けられない（string / int / float / boolean か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド attrs の型 Record<string, string>? は受け付けられない（string / int / float / boolean か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド inner の型 app.Inner? は受け付けられない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド count の型 int は、ヘッダから読めない（string か、その省略可能）
+GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド scalarCount の型 app.Count? は、ヘッダから読めない（string か、その省略可能）
+GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド flag の型 boolean? は、ヘッダから読めない（string か、その省略可能）
+GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド at の型 Time は、ヘッダから読めない（string か、その省略可能）
+GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド list の型 string[] は、ヘッダから読めない（string か、その省略可能）
+GOHTTP-4	app.HeaderIn	入力の model app.HeaderIn の @http.header のフィールド inner の型 app.Inner? は、ヘッダから読めない（string か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド at の型 Time? は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド when の型 app.When は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド wait の型 Duration? は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド list の型 string[] は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド later の型 int[]? は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド attrs の型 Record<string, string>? は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド inner の型 app.Inner? は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.Meta	@http.headerObj で受け取る model app.Meta のフィールド retries の型 int は、ヘッダから読めない（string か、その省略可能）
+GOHTTP-4	app.Paging	@http.queryObj で受け取る model app.Paging のフィールド tags の型 string[] は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.Paging	@http.queryObj で受け取る model app.Paging のフィールド inner の型 app.Inner は、クエリから読めない（string / int / float / boolean か、その省略可能）

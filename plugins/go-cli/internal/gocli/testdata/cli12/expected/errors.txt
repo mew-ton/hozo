@@ -1,0 +1,2 @@
+CLI-12	app.In	入力の model app.In のフィールド a が、@cli.required と @cli.default の両方を持つ（値が与えられなかったときの扱いは、どちらか一つ）
+CLI-12	app.In	入力の model app.In のフィールド b が、@cli.required と @cli.default の両方を持つ（値が与えられなかったときの扱いは、どちらか一つ）

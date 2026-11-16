@@ -1,0 +1,5 @@
+GOSQL-8	app.deleteRow	効果 app.deleteRow の @db.delete の引数の列 "key" が、表 app.rows の model app.Row のフィールドにない
+GOSQL-8	app.deleteByRowid	効果 app.deleteByRowid の @db.delete の引数の列 "rowid" が、表 app.rows の model app.Row のフィールドにない
+GOSQL-8	app.findRow	op app.findRow の @db.find の引数の列 "ID" が、表 app.rows の model app.Row のフィールドにない
+GOSQL-8	app.listRows	op app.listRows の @db.list の引数の列 "notes" が、表 app.rows の model app.Row のフィールドにない
+GOSQL-8	app.listAll	op app.listAll の @db.list の引数の列 "" が、表 app.rows の model app.Row のフィールドにない

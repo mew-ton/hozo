@@ -1,0 +1,3 @@
+GOHTTP-16	app.items	経路の op app.items の結果の型 app.Item[]? が、省略可能な配列（Go では、値がないことと、空であることを見分けられないので、204 か 200 かを決められない。省略可能にしないか、model で包む）
+GOHTTP-16	app.byName	経路の op app.byName の結果の型 Record<string, app.Item>? が、省略可能な record（Go では、値がないことと、空であることを見分けられないので、204 か 200 かを決められない。省略可能にしないか、model で包む）
+GOHTTP-16	app.names	経路の op app.names の結果の型 string[]? が、省略可能な配列（Go では、値がないことと、空であることを見分けられないので、204 か 200 かを決められない。省略可能にしないか、model で包む）

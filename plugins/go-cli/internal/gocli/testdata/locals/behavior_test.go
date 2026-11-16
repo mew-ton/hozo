@@ -16,6 +16,8 @@ import (
 	pkgfmt "example.com/app/gen/fmt"
 	"example.com/app/gen/in"
 	incli "example.com/app/gen/in/cli"
+	pkgline "example.com/app/gen/line"
+	pkgreflect "example.com/app/gen/reflect"
 )
 
 type envLeaves struct{ got env.RunInput }
@@ -35,8 +37,13 @@ type inLeaves struct{ got in.GoInput }
 
 func (l *inLeaves) Go(ctx context.Context, input in.GoInput) error {
 	l.got = input
-	if input.N == 0 {
+	switch input.N {
+	case 0:
 		return pkgerrors.Lost{}
+	case 4:
+		return pkgreflect.Bent{}
+	case 5:
+		return pkgline.Cut{}
 	}
 	return nil
 }
@@ -53,9 +60,9 @@ func TestEnv(t *testing.T) {
 	if code != 0 || out != "\"ran\"\n" || errOut != "" || !reflect.DeepEqual(got, env.RunInput{Level: 4, Name: &name, Rest: []string{"a", "b"}}) {
 		t.Errorf("code=%d stdout=%q stderr=%q 入力=%+v", code, out, errOut, got)
 	}
-	// 既定値（NewRunInput）と、Validate
+	// 補う値（@cli.default）と、Validate
 	if _, _, _, got = run(nil, "run"); got.Level != 1 {
-		t.Errorf("既定値: %+v", got)
+		t.Errorf("補う値: %+v", got)
 	}
 	if code, _, errOut, _ = run(nil, "run", "--level", "0"); code != 64 || !strings.Contains(errOut, "invalid input: level: min") {
 		t.Errorf("Validate: code=%d stderr=%q", code, errOut)
@@ -85,5 +92,12 @@ func TestIn(t *testing.T) {
 	}
 	if code, errOut, _ := run("go"); code != 64 || !strings.Contains(errOut, "missing required argument N") {
 		t.Errorf("位置引数が足りない: code=%d stderr=%q", code, errOut)
+	}
+	// 補助が使う標準ライブラリ（reflect）や、局所の名前（line）と同じ名前のパッケージの例外
+	if code, errOut, _ := run("go", "4"); code != 4 || !strings.Contains(errOut, `"error": "reflect.Bent"`) {
+		t.Errorf("reflect.Bent: code=%d stderr=%q", code, errOut)
+	}
+	if code, errOut, _ := run("go", "5"); code != 5 || !strings.Contains(errOut, `"error": "line.Cut"`) {
+		t.Errorf("line.Cut: code=%d stderr=%q", code, errOut)
 	}
 }

@@ -1,0 +1,2 @@
+GOSQL-6		1 番目の [[emit]] の [emit.options.go-sqlite] に、知らないキー driver がある（go-sqlite にオプションはない）
+GOSQL-6		1 番目の [[emit]] の [emit.options.go-sqlite] に、知らないキー wal がある（go-sqlite にオプションはない）

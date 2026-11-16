@@ -1,2 +1,3 @@
-CLI-4	app.Early	入力の model app.Early の array の @cli.arg のフィールド rest が、@cli.arg のフィールドの最後でない（array は、残りの位置引数をすべて受け取るので、最後の一つだけ）
-CLI-4	app.Twice	入力の model app.Twice の array の @cli.arg のフィールド a が、@cli.arg のフィールドの最後でない（array は、残りの位置引数をすべて受け取るので、最後の一つだけ）
+CLI-4	app.Early	入力の model app.Early の array の @cli.arg(1) のフィールド rest が、いちばん後ろの位置（2）でない（array は、残りの位置引数をすべて受け取るので、いちばん後ろの一つだけ）
+CLI-4	app.Twice	入力の model app.Twice の array の @cli.arg(1) のフィールド a が、いちばん後ろの位置（2）でない（array は、残りの位置引数をすべて受け取るので、いちばん後ろの一つだけ）
+CLI-4	app.Order	入力の model app.Order の array の @cli.arg(1) のフィールド rest が、いちばん後ろの位置（2）でない（array は、残りの位置引数をすべて受け取るので、いちばん後ろの一つだけ）

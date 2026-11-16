@@ -211,12 +211,11 @@ func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 		return
 	}
 	if q.items == nil {
-		q.items = map[string]json.RawMessage{}
 		data, err := io.ReadAll(q.r.Body)
 		if err == nil {
 			err = json.Unmarshal(data, &q.items)
 		}
-		if err != nil {
+		if err != nil || q.items == nil {
 			q.fail = "body: invalid JSON"
 			return
 		}

@@ -1,0 +1,4 @@
+GOSQL-19	app.Row	model app.Row のフィールド note の型 string? は省略可能だが、@db.nullable がない（値がなくてよい列は、@db.nullable で言う）
+GOSQL-19	app.Row	model app.Row のフィールド name の型 app.Name? は省略可能だが、@db.nullable がない（値がなくてよい列は、@db.nullable で言う）
+GOSQL-19	app.Row	model app.Row のフィールド tags の型 string[]? は省略可能だが、@db.nullable がない（値がなくてよい列は、@db.nullable で言う）
+GOSQL-19	app.Row	model app.Row のフィールド tag の型 app.Tag? は省略可能だが、@db.nullable がない（値がなくてよい列は、@db.nullable で言う）

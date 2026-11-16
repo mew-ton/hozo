@@ -2,8 +2,12 @@
 //
 // Handler が plugin.Handler を実装し、View（出力ごとに一つ。見る側は出力する名前空間 N）から、N の入口のパッケージの http.go を
 // 作る: `@http.get` / `@http.post` の付いた op ごとに経路を一つ持つ、net/http のハンドラ。置き場と名前は公開の SDK
-// plugin/golang で、どの型が `Validate` を持つかは plugin/govalid で求める（基底と go-valid の出力は見ない。
-// docs/plugin-protocol.md「相乗りが基底の形を知る方法」）。語彙の使い方の誤りは、診断（GOHTTP-*）で返す。
+// plugin/golang で求める（基底と go-valid の出力は見ない。docs/plugin-protocol.md「相乗りが基底の形を知る方法」）。
+//
+// 経路ごと、フィールドごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ補助の呼び出しにする
+// （docs/requirements.md「出力を推論しない」）: 値で変わる振る舞いは、http.go の補助（helpers.go）が、実行時に決める。
+// 型を見るのは、書いたものの整合の検査（emit.go、inputs.go）だけで、食い違いは、診断（GOHTTP-*）で返す。どの型が `Validate` を
+// 持つか（GOHTTP-11）と、補う値が制約に合うか（GOHTTP-19）は、plugin/govalid で求める。
 package gohttp
 
 import (

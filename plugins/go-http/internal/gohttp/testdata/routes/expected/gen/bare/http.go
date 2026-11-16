@@ -5,6 +5,7 @@ package bare
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 )
 
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
@@ -23,7 +24,7 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
 	})
 
 	// bare.touch
@@ -32,7 +33,7 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		httpWriteResult(w, nil)
 	})
 
 	// bare.viaAlias
@@ -42,7 +43,7 @@ func NewHandler(ops Ops) http.Handler {
 			httpWriteError(w, err)
 			return
 		}
-		httpWriteJSON(w, http.StatusOK, out)
+		httpWriteResult(w, out)
 	})
 
 	return mux
@@ -65,6 +66,23 @@ func httpWriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(data)
+}
+
+// httpWriteResult は、op が成功したときの応答。何を返すかは、実行時に、out で決める:
+// 返す値がない（戻り値のない op は nil を渡す。省略可能な戻り値で、値がない）なら、204 で本文なし。
+// あれば、200 と、その JSON。値のない配列（nil）は空の配列 [] に、値のない record（nil）は空の record {} にする。
+func httpWriteResult(w http.ResponseWriter, out any) {
+	v := reflect.ValueOf(out)
+	switch {
+	case !v.IsValid(), v.Kind() == reflect.Pointer && v.IsNil():
+		w.WriteHeader(http.StatusNoContent)
+		return
+	case v.Kind() == reflect.Slice && v.IsNil():
+		out = reflect.MakeSlice(v.Type(), 0, 0).Interface()
+	case v.Kind() == reflect.Map && v.IsNil():
+		out = reflect.MakeMap(v.Type()).Interface()
+	}
+	httpWriteJSON(w, http.StatusOK, out)
 }
 
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。

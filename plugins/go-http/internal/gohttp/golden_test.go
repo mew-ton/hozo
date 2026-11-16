@@ -281,7 +281,7 @@ func TestLines(t *testing.T) {
 		}
 	}
 	// ハンドラは、ステータスも、型も書かない（補助の中だけ）
-	handlers := api[:strings.Index(api, "// httpErrorBody は")]
+	handlers := api[strings.Index(api, "func NewHandler("):strings.Index(api, "// httpErrorBody は")]
 	for _, banned := range []string{"Status", "WriteHeader", "strconv", "json.", "int64", "Validate", "== nil"} {
 		if strings.Contains(handlers, banned) {
 			t.Errorf("gen/api/http.go の NewHandler が、%q を書いている（経路ごとの行は、補助の呼び出しだけ）", banned)
@@ -413,8 +413,8 @@ func TestDiagnostics(t *testing.T) {
 // TestDiagnosticPositions は、診断の位置（docs/plugin-go-http.md「診断」の表）: 表に書いた宣言の FQN。GOHTTP-9 は位置なし。
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
-		"gohttp1":  {"app.hidden", "app.also"},
-		"gohttp2":  {"app.two", "app.core", "app.byId", "app.optional", "app.many", "app.either"},
+		"gohttp1": {"app.hidden", "app.also"},
+		"gohttp2": {"app.two", "app.core", "app.byId", "app.optional", "app.many", "app.either"},
 		"gohttp3": {"app.In"},
 		// 全体の形で受け取る model のフィールドの型は、その model の位置
 		"gohttp4":  {"app.HeaderIn", "app.QueryIn", "app.Meta", "app.Paging"},

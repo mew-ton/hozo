@@ -18,7 +18,7 @@ namespace app {
     @valid.length(min: 2, max: 3) @http.query @http.default("abcd") code: string;
     @valid.pattern("^[a-z]+$") @http.body @http.default("ABC") name: string;
     // 両方に合わない
-    @valid.max(5) @http.body @http.default(0) both: Page;
+    @valid.min(3) @http.body @http.default(0) both: Page;
     // 合う値は、当たらない。制約のないフィールドも、@http.default のないフィールドも、当たらない
     @http.query @http.default(1) first: Page;
     @valid.length(max: 3) @http.query @http.default("abc") short: string;

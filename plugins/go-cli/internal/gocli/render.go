@@ -765,8 +765,8 @@ func cliValidate(w io.Writer, prog string, in any) bool {
 	var invalid *runtime.ValidationError
 	if errors.As(err, &invalid) {
 		parts := make([]string, len(invalid.Violations))
-		for i, v := range invalid.Violations {
-			parts[i] = v.String()
+		for i, violation := range invalid.Violations {
+			parts[i] = violation.String()
 		}
 		message = strings.Join(parts, "; ")
 	}

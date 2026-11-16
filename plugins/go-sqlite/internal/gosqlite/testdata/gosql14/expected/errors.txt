@@ -1,0 +1,8 @@
+GOSQL-14	app.findOrList	op app.findOrList が、db の op のデコレータを二つ以上持つ（@db.find、@db.list。ちょうど一つ）
+GOSQL-14	app.findAndAdd	op app.findAndAdd が、db の op のデコレータを二つ以上持つ（@db.find、@db.effects。ちょうど一つ）
+GOSQL-14	app.listAndAdd	op app.listAndAdd が、db の op のデコレータを二つ以上持つ（@db.list、@db.effects。ちょうど一つ）
+GOSQL-14	app.takeRow	op app.takeRow が、@db.find の言う以外のものを読み書きする: 効果 app.deleteRow を持つ（op の中身は、デコレータの言うことだけ）
+GOSQL-14	app.listBoth	op app.listBoth が、@db.list の言う以外のものを読み書きする: 状態 app.copies を読む（op の中身は、デコレータの言うことだけ）
+GOSQL-14	app.addIfNew	op app.addIfNew が、@db.effects の言う以外のものを読み書きする: 状態 app.rows を読む（op の中身は、デコレータの言うことだけ）
+GOSQL-14	app.addAndCopy	op app.addAndCopy が、@db.effects の言う以外のものを読み書きする: 効果 app.createCopy を持つ（op の中身は、デコレータの言うことだけ）
+GOSQL-14	app.nothing	op app.nothing の @db.effects に、効果が一つもない（行う効果を並べる）

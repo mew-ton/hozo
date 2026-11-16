@@ -1,5 +1,5 @@
-// 名前空間のパッケージの名前が、cli.go の局所の名前（env、in、ops、p、args、err など）や、cli.go が import する標準ライブラリの
-// パッケージの名前（errors、fmt）と当たるとき: 局所の名前の方の末尾に _ を足し、名前空間のパッケージの方に 2 を付ける。
+// 名前空間のパッケージの名前が、cli.go の局所の名前（env、in、line、ops、p、args、err など）や、cli.go が import する標準ライブラリの
+// パッケージの名前（errors、fmt、reflect）と当たるとき: 局所の名前の方の末尾に _ を足し、名前空間のパッケージの方に 2 を付ける。
 
 namespace errors {
   model Where { path: string; }
@@ -9,6 +9,18 @@ namespace errors {
 
 namespace fmt {
   exception Wide;
+}
+
+/** 補助が使う標準ライブラリと同じ名前のパッケージ */
+namespace reflect {
+  @cli.exitCode(4)
+  exception Bent;
+}
+
+/** 引数の並びを読む変数 line と同じ名前のパッケージ */
+namespace line {
+  @cli.exitCode(5)
+  exception Cut;
 }
 
 /** Main の引数 env と同じ名前のパッケージ */
@@ -28,9 +40,9 @@ namespace env {
 /** 入力の変数 in と同じ名前のパッケージ */
 namespace in {
   model GoInput {
-    @cli.arg(1) n: int;
+    @cli.arg(1) @cli.required n: int;
     @cli.flag("deep") deep: boolean?;
   }
   @cli.command("go")
-  export op go(in: GoInput) throws errors.Lost;
+  export op go(in: GoInput) throws errors.Lost | reflect.Bent | line.Cut;
 }
