@@ -10,4 +10,8 @@ namespace app {
   }
   @cli.command("run")
   export op run(in: In);
+
+  // 同じ model を使う、もう一つのコマンド（入力の model の診断は、一度だけ返す）
+  @cli.command("again")
+  export op again(in: In): string;
 }

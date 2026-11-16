@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"time"
 )
 
 // Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。
@@ -28,6 +29,9 @@ CREATE TABLE IF NOT EXISTS "loans" (
 );
 CREATE TABLE IF NOT EXISTS "archive" (
   "id" TEXT NOT NULL PRIMARY KEY
+);
+CREATE TABLE IF NOT EXISTS "stamps" (
+  "at" TEXT NOT NULL
 );
 `
 
@@ -160,6 +164,31 @@ func (t ArchiveTable) IsEmpty(ctx context.Context) (bool, error) {
 func (t ArchiveTable) Get(ctx context.Context) ([]Archived, error) {
 	return dbList(ctx, t.db, dbScanArchived,
 		`SELECT "id" FROM "archive" ORDER BY rowid`)
+}
+
+// StampsTable は状態 lib.stamps の単位（StampsState）の、表 "stamps" の上の実装。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+type StampsTable struct{ db *sql.DB }
+
+// NewStampsTable は db の表 "stamps" の上の StampsTable を返す。表は CreateTables が作る。
+func NewStampsTable(db *sql.DB) StampsTable { return StampsTable{db: db} }
+
+var _ StampsState = StampsTable{}
+
+// IsEmpty は形で決まる問い合わせ: 表 "stamps" に行が一つもなければ true。
+func (t StampsTable) IsEmpty(ctx context.Context) (bool, error) {
+	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "stamps"`)
+}
+
+// Get は形で決まる問い合わせ: 表 "stamps" の行を、足した順にすべて引く。
+func (t StampsTable) Get(ctx context.Context) ([]Stamp, error) {
+	return dbList(ctx, t.db, dbScanStamp,
+		`SELECT "at" FROM "stamps" ORDER BY rowid`)
+}
+
+// Unstamp は op lib.unstamp（@db.effects）: 効果 lib.dropStamp（@db.delete）で、表 "stamps" から、"at" が引数 at と同じ行を消す。行がなければ何もしない。
+func (t StampsTable) Unstamp(ctx context.Context, at time.Time) error {
+	return dbExec(ctx, t.db, `DELETE FROM "stamps" WHERE "at" IS ?1`, dbTime(at))
 }
 
 // LendingTable は状態の分類 lib.Lending の単位（LendingState）の命令の、db の上の実装。
@@ -337,6 +366,15 @@ func dbScanArchived(r dbRow) (Archived, error) {
 	return row, nil
 }
 
+// dbScanStamp は、表 "stamps" の列の順の値を lib.Stamp に読む。
+func dbScanStamp(r dbRow) (Stamp, error) {
+	var row Stamp
+	if err := r.Scan(dbTime(&row.At)); err != nil {
+		return Stamp{}, err
+	}
+	return row, nil
+}
+
 // dbRow は *sql.Row と *sql.Rows が共に持つ読み出し。
 type dbRow interface {
 	Scan(dest ...any) error
@@ -438,6 +476,28 @@ func dbInt(v any, opts ...dbOption) dbCol {
 			return err
 		}
 		dst.SetInt(n.Int64)
+		return nil
+	}}
+}
+
+// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+
+// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
+func dbTime(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
+		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
+		return t.UTC().Format(dbTimeLayout), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(t).Convert(dst.Type()))
 		return nil
 	}}
 }

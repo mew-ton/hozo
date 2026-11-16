@@ -195,6 +195,6 @@ N のパッケージと、その型・メソッドの名前と形は `plugin/gol
 
 warning（コードは `PLUGIN`）は一つ: `@cli.command` の op が一つもない。
 
-- 入力の model の診断（CLI-2〜CLI-5 のフラグ名、CLI-10〜CLI-13）は、同じ model を二つのサブコマンドが使っていても、一度だけ返す。
+- 入力の model の診断（CLI-2〜CLI-5 のフラグ名、CLI-10〜CLI-14）は、同じ model を二つのサブコマンドが使っていても、一度だけ返す。
 - Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。上の診断は、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

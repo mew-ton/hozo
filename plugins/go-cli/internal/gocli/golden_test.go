@@ -390,7 +390,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		"cli2":  {"app.In", "app.In", "app.In", "app.In"},
 		"cli3":  {"app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In"},
 		"cli4":  {"app.Early", "app.Twice", "app.Order"},
-		"cli5":  {"app.In", "app.again", "app.third"},
+		"cli5":  {"app.In", "app.again", "app.third", "app.Implied"},
 		"cli6":  {"app.hidden", "app.also"},
 		"cli7":  {""},
 		"cli8":  {"", ""},

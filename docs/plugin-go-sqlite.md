@@ -205,7 +205,7 @@ func (t SharedTable) PlaceOrder(ctx context.Context, order pkgtype.Order, notifi
 
 | 名前 | 中身 |
 |---|---|
-| `dbArgs<Model>(row <Model>) ([]any, error)` | model を、列の順の値にする。本体は `return dbArgs(<列>, …)` の一行で、`<列>` は、フィールドごとに `<しまい方の補助>(row.<F>)`。`@db.nullable` の付いたフィールドは `<しまい方の補助>(row.<F>, dbNullable)` |
+| `dbArgs<Model>(row <Model>) ([]any, error)` | model を、列の順の値にする。本体は `return dbArgs(<列>, …)` の一行で、`<列>` は、フィールドごとに `<しまい方の補助>(row.<F>)`。`@db.nullable` の付いたフィールドは `<しまい方の補助>(row.<F>, dbNullable)`。使うものだけ: 出すメソッドのどれかが、その model の行を受け取る（`@db.insert` か `@db.update` の効果を持つ）ときに出す（`dbScan<Model>` は、`Get` が使うので、いつも出る） |
 | `dbScan<Model>(r dbRow) (<Model>, error)` | 列の順の値を model に読む。本体は `r.Scan(<列>, …)` で、`<列>` は、フィールドごとに `<しまい方の補助>(&row.<F>)`。`@db.nullable` の付いたフィールドは `<しまい方の補助>(&row.<F>, dbNullable)` |
 | `dbRow` | `*sql.Row` と `*sql.Rows` が共に持つ `Scan(dest ...any) error` |
 | `dbOption`、`dbNullable` | 列の読み書きに、フィールドのデコレータが足すこと（`type dbOption int`）と、`@db.nullable` の印（`const dbNullable dbOption = 1`）。`dbCol` と一緒に、いつも出す |
@@ -241,7 +241,7 @@ func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 - しまい方の補助に、合わない型の値が渡ることは、GOSQL-17 が先に断るので、ない（そのときの振る舞いは、決めない）。`dbNullable` のない列に、省略可能なフィールドの値が渡ることも、GOSQL-19 が先に断るので、ない。型の食い違いをコンパイルエラーにする形（型引数）にしないのは、省略可能な値と、そうでない値を、一つの関数で、型を書かずに受け取れないため（`docs/plugin-go-http.md`「補助」の末尾と同じ理由）。
 - 補助の中身は、サンプルの `gen/store/db.go` の通り（`dbInt`、`dbFloat`、`dbBool` は、サンプルが使わないので、`go-sqlite` の単体テストのゴールデンが固定する。`docs/testing.md`「単体テスト」）。
 
-メソッドの引数の名前は、基底と同じ規則で仕様の引数名から作る。このファイルが使う名前（レシーバの `t`、`ctx`、`args`、`args<数>`、`tx`、`err`、import するパッケージの名前、このファイルの非公開の名前）と当たれば、末尾に `_` を付ける。`<Model>` は model の Go の型の名前で、別の名前空間の同じ名前の model と当たれば、後の方に `2`、`3`、… を付ける。
+メソッドの引数の名前は、基底と同じ規則で仕様の引数名から作る。このファイルが使う名前（レシーバの `t`、`ctx`、`args`、`args<数>`、`tx`、`err`、import するパッケージの名前、このファイルの非公開の名前）と当たれば、末尾に `_` を付ける。`dbArgs<Model>` と `dbScan<Model>` の中の局所の名前（`row`、`r`、`err`）は、import するパッケージの名前と当たれば、当たらなくなるまで末尾に `_` を付ける（その名前のパッケージの型を、本体が書けなくなるため。`docs/plugin-go.md`「パッケージと import パス」の「import の名前」の、相乗りの側の決まり）。`<Model>` は model の Go の型の名前で、別の名前空間の同じ名前の model と当たれば、後の方に `2`、`3`、… を付ける。
 
 ### メソッドの形とコメント
 

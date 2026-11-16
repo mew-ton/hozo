@@ -21,6 +21,7 @@ var goldenFixtures = []struct {
 	{name: "ops", covers: "「op の中身」の表の各行、「列と引数の型」、「トランザクション」、「メソッドの形とコメント」", behavior: true},
 	{name: "partial", covers: "「状態ごとの型」の、デコレータを付けていない op があるとき（var _ を出さない、付けていない op の句、warning を出さない）、「状態をまたぐ単位の型」（SharedTable、<C>Table）", behavior: true},
 	{name: "names", covers: "「補助」の、当たる名前（引数、同じ名前の model、局所の名前と同じ名前のパッケージ）と、内側のフォルダを持つ出力", behavior: true},
+	{name: "minimal", covers: "「補助」の、使うものだけを出すこと（op を一つも持たない表。出る補助と import が、いちばん少ない）"},
 	{name: "uniform", covers: "docs/requirements.md「出力を推論しない」: フィールドの型だけを変えた入力から、名前と型のほかは同じテキスト（TestUniform）", behavior: true},
 }
 
@@ -89,6 +90,76 @@ func TestBehavior(t *testing.T) {
 				t.Fatalf("生成したコードのテストが一つも走らなかった:\n%s", out)
 			}
 		})
+	}
+}
+
+// TestUniform は「型に依らない形の確かめ」（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」）: 入力 uniform の
+// 三つの名前空間は、宣言の名前もデコレータも op も同じで、フィールドと引数の型だけが違う（plain は核の型、named は scalar、sparse は
+// 省略可能で @db.nullable を持つ）。三つの db.go は、名前空間の名前と、基底の形の写しであるメソッドの形（引数の型）のほかは、同じ
+// テキスト。sparse は、それに加えて、@db.nullable の足すもの（補助の引数 dbNullable と、NOT NULL がないこと）だけが違う。
+// 違いが実行時に出ること（値がなければ NULL）は、testdata/uniform/behavior_test.go が確かめる。
+func TestUniform(t *testing.T) {
+	_, res := emitFixture(t, "uniform")
+	lines := func(ns string) []string {
+		src, ok := res.files["gen/"+ns+"/db.go"]
+		if !ok {
+			t.Fatalf("gen/%s/db.go を出力しなかった", ns)
+		}
+		out := strings.Split(src, "\n")
+		for i, l := range out {
+			switch {
+			case l == "package "+ns:
+				out[i] = "package NS"
+			case strings.HasPrefix(l, "//"):
+				out[i] = strings.ReplaceAll(l, ns+".", "NS.") // コメントの中の FQN
+			}
+		}
+		return out
+	}
+	// signature は、メソッドの形の行（基底の形の写し。引数の型が違う）なら、その引数の並びの前まで。
+	signature := func(l string) (string, bool) {
+		if !strings.HasPrefix(l, "func (t RowsTable) ") {
+			return "", false
+		}
+		return l[:strings.Index(l, "(ctx")], true
+	}
+	// nullable は、@db.nullable の足すもの（補助の引数と、NOT NULL がないこと）を除いた行。
+	nullable := strings.NewReplacer(", dbNullable", "", " NOT NULL", "").Replace
+	plain := lines("plain")
+	for _, other := range []struct {
+		ns       string
+		nullable bool // @db.nullable の足すものだけの違いを許すか
+	}{{"named", false}, {"sparse", true}} {
+		got := lines(other.ns)
+		if len(got) != len(plain) {
+			t.Fatalf("%s の db.go が %d 行（plain は %d 行）", other.ns, len(got), len(plain))
+		}
+		signatures, nullables := 0, 0
+		for i := range plain {
+			a, b := plain[i], got[i]
+			if a == b {
+				continue
+			}
+			if sa, ok := signature(a); ok {
+				if sb, _ := signature(b); sa == sb {
+					signatures++
+					continue
+				}
+			}
+			if other.nullable && nullable(a) == nullable(b) {
+				nullables++
+				continue
+			}
+			t.Errorf("%s の db.go の %d 行目が、型で変わっている:\n  plain: %s\n  %s: %s", other.ns, i+1, a, other.ns, b)
+		}
+		// 引数を持つ読む op が七つ、@db.delete の引数を持つ書く op が二つ
+		if signatures != 9 {
+			t.Errorf("%s の db.go の、形が違うメソッドが %d 個（期待は 9。入力が、型を変えていない）", other.ns, signatures)
+		}
+		// Schema の七つの列、dbArgsRow と dbScanRow、条件に引数を渡す九つのメソッド（swap は一行）
+		if want := map[bool]int{false: 0, true: 18}[other.nullable]; nullables != want {
+			t.Errorf("%s の db.go の、@db.nullable の足すものだけが違う行が %d 行（期待は %d）", other.ns, nullables, want)
+		}
 	}
 }
 

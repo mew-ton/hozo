@@ -1,0 +1,8 @@
+// docs/plugin-go-sqlite.md「補助」: 補助は、使うものだけを出す。op を一つも持たない表では、形で決まる問い合わせ（IsEmpty、Get）の
+// 使うものだけ: dbScan<Model>、dbRow、dbOption、dbNullable、dbCol、列のしまい方の補助（ここでは dbInt だけ。dbString も出ない）、
+// dbIsEmpty、dbList。dbArgs<Model>、dbArgs、dbExec、dbGet は出ない。
+
+namespace app {
+  model Tick { @db.int n: int; }
+  @db.table(Tick) state ticks: list<Tick>;
+}

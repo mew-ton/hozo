@@ -16,6 +16,8 @@ namespace lib {
 
   model Archived { @db.key @db.text id: BookId; }
 
+  model Stamp { @db.time at: Time; }
+
   model Loan {
     @db.key @db.ref(Book) @db.text book: BookId;
     @db.text member: string;
@@ -26,6 +28,8 @@ namespace lib {
   @db.table(Loan) state loans: list<Loan>;
   /** op を一つも持たない表の状態（句は「この単位では、すべて」。var _ を出す）。命令は、分類 Shelving の単位に置かれる */
   @db.table(Archived) state archive: list<Archived>;
+  /** 行を受け取る op（@db.insert、@db.update）を持たない表: dbScan<Model> だけが出て、dbArgs<Model> は出ない（使う補助だけを出す） */
+  @db.table(Stamp) state stamps: list<Stamp>;
   /** @db.table のない状態は、表にならない（単位は、人が書く） */
   state drafts: list<Note>;
 
@@ -59,6 +63,13 @@ namespace lib {
   export op startNotes(note: Note);
   @db.effects(lastNote, firstNote)
   export op swapNote(text: string, note: Note);
+
+  // ---- stamps: 消すだけ ----
+
+  @db.delete(stamps, "at")
+  effect dropStamp on stamps.delete;
+  @db.effects(dropStamp)
+  export op unstamp(at: Time);
 
   // ---- drafts: 表でない状態の op は、どの型にも出ない ----
 

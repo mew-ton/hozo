@@ -1,4 +1,4 @@
-// docs/plugin-go-cli.md「出力」「引数の解釈」「実行と表示」「使い方の表示」を、二つの名前空間で一通り使う。
+// docs/plugin-go-cli.md「出力」「引数の解釈」「コマンドごとの関数」「実行と表示」「使い方の表示」を、三つの名前空間（tool、demo、bare）で一通り使う。
 // 振る舞いは behavior_test.go が、生成した cli.Main を動かして確かめる。
 
 namespace fail {

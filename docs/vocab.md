@@ -97,7 +97,7 @@ namespace db {
 - 列を渡す引数の名前を `by` にしないのは、`by` が予約語で、引数の名前（`Ident`）に書けないため（`docs/grammar.md`「予約語」）。
 - `int`、`float`、`list`、`nullable`、`effects` は予約語、`delete` は文脈キーワードだが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
 - 何を生成するかと、書いたものの整合の検査（表は `@db.table` の状態か、列はあるか、引数と戻り値の型は合うか）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「op の中身」「診断」）。hozoc は、デコレータの引数の種類（`docs/types.md`「デコレータの引数」）だけを確かめる。
-- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（デコレータの `reads` / `effects` の節、残りの引数、対象 `effect`、予約語のデコレータ名）は hozoc が読む。語彙を読む `go-sqlite` の出力は、まだこの語彙になっていない（`docs/requirements.md`「作り直しの段階」の R3）。
+- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（デコレータの `reads` / `effects` の節、残りの引数、対象 `effect`、予約語のデコレータ名）は hozoc が読む。語彙を読んで出力にするのは `go-sqlite`（`docs/plugin-go-sqlite.md`）。
 
 ### `db` の表と、しまい方
 

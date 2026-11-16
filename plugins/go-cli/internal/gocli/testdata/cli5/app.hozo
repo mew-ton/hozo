@@ -18,4 +18,14 @@ namespace app {
   model Else { @cli.flag("name") name: string?; }
   @cli.command("else")
   export op else_(in: Else);
+
+  // 名前を省いた @cli.flag は、フィールドの名前がフラグ名（書いた名前と当たる）
+  model Implied {
+    @cli.flag("verbose") loud: boolean?;
+    @cli.flag verbose: boolean?;
+    // 環境変数の名前は、フラグ名と比べない
+    @cli.env("verbose") quiet: string?;
+  }
+  @cli.command("implied")
+  export op implied(in: Implied);
 }

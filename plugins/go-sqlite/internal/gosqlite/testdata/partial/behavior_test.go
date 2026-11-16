@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"example.com/app/gen/lib"
 
@@ -164,7 +165,7 @@ func newLib(t *testing.T) (lib.Ops, *sql.DB, context.Context) {
 	if err := lib.CreateTables(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	ops := lib.New(books{lib.NewBooksTable(db), db}, lib.NewNotesTable(db), lib.NewLoansTable(db), lib.NewArchiveTable(db), drafts{},
+	ops := lib.New(books{lib.NewBooksTable(db), db}, lib.NewNotesTable(db), lib.NewLoansTable(db), lib.NewArchiveTable(db), lib.NewStampsTable(db), drafts{},
 		lending{lib.NewLendingTable(db), db}, shelving{lib.NewShelvingTable(db)}, shared{lib.NewSharedTable(db), db})
 	return ops, db, ctx
 }
@@ -255,6 +256,18 @@ func TestEmbedded(t *testing.T) {
 	}
 	if got, err := lib.NewArchiveTable(db).Get(ctx); err != nil || len(got) != 1 || got[0].Id != "old" {
 		t.Errorf("archive = %v, %v", got, err)
+	}
+
+	// 行を受け取る op を持たない表（dbArgsStamp は出ない）: 読むことと、消すことはできる
+	stampAt := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
+	if _, err := db.Exec(`INSERT INTO "stamps" ("at") VALUES ('2026-02-03T04:05:06.000000000Z'), ('2026-02-03T04:05:07.000000000Z')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := ops.Unstamp(ctx, stampAt); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := lib.NewStampsTable(db).Get(ctx); err != nil || len(got) != 1 || !got[0].At.Equal(stampAt.Add(time.Second)) {
+		t.Errorf("Unstamp の後の stamps = %v, %v", got, err)
 	}
 
 	// 人が書いた命令

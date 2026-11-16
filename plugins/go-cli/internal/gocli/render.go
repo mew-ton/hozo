@@ -12,7 +12,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは cli.go のテキスト（docs/plugin-go-cli.md「出力」「引数の解釈」「実行と表示」「使い方の表示」）。検査（emit.go）を
+// このファイルは cli.go のテキスト（docs/plugin-go-cli.md「出力」「引数の解釈」「コマンドごとの関数」「実行と表示」「使い方の表示」）。検査（emit.go）を
 // 通った入力だけを描く。
 //
 // cli.go は自分のパッケージ（cli）なので、非公開の名前に前置きの決まりはない（docs/plugin-go.md「相乗りのファイル」）。ただし、
