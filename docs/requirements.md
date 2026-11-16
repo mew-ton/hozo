@@ -31,9 +31,9 @@ UML に足しているのは、つながりの整合（例外と効果の伝播�
 
 | 要件 | 中身 | 今の状態 |
 |---|---|---|
-| 出力しない op | op は、どの言語にも出力されなくてよい。ブラウザを操作する利用者の行動のような、人の操作を op として書ける | 書ける。単位のトランスパイラが選ばなかった op は出力しない（`docs/emit-go.md`「出力の対象」）。人そのものを担い手とする名前空間は、`hozo.toml` のどの単位の対象にもしなければ出力されない（「決まったこと」） |
+| 出力しない op | op は、どの言語にも出力されなくてよい。ブラウザを操作する利用者の行動のような、人の操作を op として書ける | 書ける。出力するのは、単位の対象の op だけ（単位を置かない名前空間の op と、`in` で外した op は出力しない。`docs/config.md`「単位の対象」「in」）。人そのものを担い手とする名前空間は、`hozo.toml` のどの単位の対象にもしなければ出力されない（「決まったこと」） |
 | 出力しない名前空間 | 名前空間は、出力先を持たなくてよい。検査は出力する名前空間と同じに掛かる | 「決まったこと」 |
-| 何も生成しないデコレータ | どのトランスパイラからも読まれないデコレータを、印として付けられる。要求（PRD）、ドメイン、分かれた文脈（境界づけられたコンテキスト）の管理に使う | 書ける。包む関数は、トランスパイラが `select` の `wraps` で引き受けたデコレータの適用にだけ作る（`docs/emit-go.md`「デコレータ」）。付ける先は宣言で、名前空間には付けられない（「決まったこと」） |
+| 何も生成しないデコレータ | どのトランスパイラからも読まれないデコレータを、印として付けられる。要求（PRD）、ドメイン、分かれた文脈（境界づけられたコンテキスト）の管理に使う | 書ける。基底はデコレータについて何も生成せず、意味を形にするのは、それを読む相乗りだけ（`docs/plugin-go.md`「デコレータ」）。付ける先は宣言で、名前空間には付けられない（「決まったこと」） |
 | 設定なしの検査 | 設計だけの段階では、`hozo.toml` がなくても `hozoc check` できる | できる（`docs/config.md`。`hozoc emit` は CFG-7）。言語サーバーも設定なしで動く（`docs/lsp.md`「プロジェクト」） |
 | 図への展開 | 仕様から図（ステートマシン、シーケンス、アクティビティ、ユースケース）を出す。プラグインの展開先の一つとして扱う | ない |
 | 文面への書き戻し | IR から `.hozo` の文面を作れる。UI での編集は IR を変えて文面に書き戻す | ない。`//` のコメントは IR に入らない（§3.4）。扱いは「決まったこと」 |
@@ -44,8 +44,8 @@ UML に足しているのは、つながりの整合（例外と効果の伝播�
 |---|---|
 | `hozo.toml` は出力の単位（`[[emit]]`）の一覧で、単位はトランスパイラを名前で選ぶ。プラグインは入れるもので、トランスパイラを提供する | `docs/config.md`「単位」、`docs/plugin-protocol.md`「この文書が決めること」「マニフェスト」 |
 | どの単位の対象でもない名前空間は出力しない。エラーにもしない | `docs/config.md`「単位の対象」 |
-| 出力するのは、単位のトランスパイラが選んだ宣言だけ。どのトランスパイラも参照しなかった op は出力しない | `docs/emit-go.md`「出力の対象」 |
-| どのトランスパイラも読まないデコレータは印で、何も生成しない。`throws` / `catches` を宣言していても同じ | `docs/emit-go.md`「デコレータ」 |
+| 出力するものは、設定だけで決まる。基底は、出力する名前空間の型のすべてと、単位の対象の op のすべてを出す。コードにしたくない op は、単位を置かない名前空間に書くか、`in` で外す | `docs/config.md`「in」「型の置き場」、`docs/plugin-go.md`「出力の対象」 |
+| どのトランスパイラも読まないデコレータは印で、何も生成しない。`throws` / `catches` を宣言していても同じ | `docs/plugin-go.md`「デコレータ」 |
 | デコレータは名前空間には付けられない。印は中の宣言（op、model など）に付ける（理由は持ち主の文書） | `docs/grammar.md`「ファイルと宣言」「決めたこと」 |
 | 人の操作を、担い手ごとの名前空間として書くか、op に印を付けて書くかは、言語が決めない。書いてみて分かりやすい方を選ぶ | — |
 | `hozo.toml` がなくても `hozoc check` できる | `docs/config.md`「置き場と探し方」 |
@@ -75,14 +75,14 @@ UML に足しているのは、つながりの整合（例外と効果の伝播�
 
 | 成果物 | 役割 | 設計書 |
 |---|---|---|
-| 本体のライブラリ | パーサー、IR、検査器、既定の出力（単位のトランスパイラが `select` で選んだ宣言を、トランスパイラどうしが共有する形で出す。`docs/emit-go.md`「出力の対象」）。`hozoc` と言語サーバーが共有する | §2、§4.3 |
+| 本体のライブラリ | パーサー、IR、検査器、設定の解決、プラグインの起動。特定の言語のコードは出力しない（`docs/plugin-protocol.md`「この文書が決めること」）。`hozoc` と言語サーバーが共有する | §2 |
 | `hozoc` | CLI。サブコマンドは `check` / `emit` / `import` / `extract` と、言語サーバーとして動く `lsp` | §17.1 |
 | 言語サーバー | `hozoc lsp`。IDE に診断・定義へのジャンプ・ホバーなどを提供する（LSP） | この文書の「言語サーバー」 |
 | エディタの対応 | シンタックスハイライトの文法と、`hozoc lsp` に接続する薄いクライアント。最初は VS Code | この文書の「シンタックスハイライト」 |
-| プラグイン | 展開・取り込みの実行ファイル。「標準入出力で JSON をやり取りする実行ファイル」（§4.6）。モノレポの中で一つずつ別の実行ファイルとして作る。プラグインはトランスパイラ（`hozo.toml` の単位が名前で選ぶ変換）を提供し、トランスパイラは自分のファイルと、既定の出力の対象の選択（`select`）を返す（`docs/plugin-protocol.md`）。今あるのは go-cli（`docs/plugin-go-cli.md`） | §4.3、§4.6 |
+| プラグイン | 展開・取り込みの実行ファイル。「標準入出力で JSON をやり取りする実行ファイル」（§4.6）。モノレポの中で一つずつ別の実行ファイルとして作る。プラグインはトランスパイラ（`hozo.toml` の単位が名前で選ぶ変換）を提供し、トランスパイラは自分のファイルを返す（`docs/plugin-protocol.md`）。トランスパイラは、言語ごとの基底と、それに相乗りするものに分かれる（`docs/config.md`「基底と相乗り」）。Go は、基底 `go`（`docs/plugin-go.md`）と、相乗りの `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`）、`go-http`（`docs/plugin-go-http.md`）、`go-cli`（`docs/plugin-go-cli.md`） | §4.3、§4.6 |
 | 標準の語彙 | `valid` などの語彙の `.hozo` | §4.2、§6.5 |
-| プラグイン SDK | プラグインが IR を受け取り、ファイルと warning と選択を返すための型と読み書き。Go（`ir`、`plugin`）と TS（`sdk/ts`） | この文書の「プラグインの書き方」 |
-| 生成したコードと Go のプラグインが使う公開のパッケージ | `runtime`（生成した Go のコードが import する型）と `plugin/golang`（Go の名前と型の規則。既定の出力と Go のプラグインが共有する） | `docs/emit-go.md`「runtime パッケージ」「名前」「型」 |
+| プラグイン SDK | プラグインが IR を受け取り、ファイルと warning と error を返すための型と読み書き。Go（`ir`、`plugin`）と TS（`sdk/ts`） | この文書の「プラグインの書き方」 |
+| 生成したコードと Go のプラグインが使う公開のパッケージ | `runtime`（生成した Go のコードが import する型）、`plugin/golang`（Go の基底の形の規則。基底と相乗りが共有する）、`plugin/govalid`（`go-valid` の形の規則） | `docs/plugin-go.md`「runtime パッケージ」「相乗りのファイル」、`docs/packages.md`「`plugin/golang`（公開）」 |
 
 ## 自己展開
 
@@ -90,11 +90,11 @@ hozoc は自分自身の境界（コマンド、ファイル、プラグイン�
 
 進め方は三つ:
 
-1. **仮の CLI**: 手で書いた Go で、`.hozo` を解析・検査し、Go の既定の出力（§4.3）を書き出せるところまで作る。`cli` の語彙（`examples/hozoc.hozo` の `cli.command` / `cli.arg` / `cli.flag` / `cli.env` / `cli.exitCode`）を Go の CLI の骨組み（サブコマンドの振り分け、フラグと環境変数の読み取り、終了コード）にするプラグイン `plugins/go-cli/` もここで作る。
+1. **仮の CLI**: 手で書いた Go で、`.hozo` を解析・検査し、Go のコード（§4.3 の、言語ごとの既定の出力。今は基底のプラグイン `plugins/go/` が出す）を書き出せるところまで作る。`cli` の語彙（`examples/hozoc.hozo` の `cli.command` / `cli.arg` / `cli.flag` / `cli.env` / `cli.exitCode`）を Go の CLI の骨組み（サブコマンドの振り分け、フラグと環境変数の読み取り、終了コード）にするプラグイン `plugins/go-cli/` もここで作る。
 2. **hozoc を `.hozo` で書く**: `examples/hozoc.hozo` を元に、リポジトリ直下の `cli.hozo` と `hozo.toml` を書く。`lsp` サブコマンドもここに op として入れる。仮の CLI の `check` を通す。
 3. **置き換え**: 仮の CLI が `cli.hozo` から Go を生成し、`cmd/hozoc` の手書きの骨組みをそれで置き換える。葉の op（解析、検査、展開、プラグインの呼び出し、言語サーバー）の中身は手で書いたものをつなぐ。以降、CLI の骨組みの変更は `cli.hozo` を変えて生成し直す。
 
-この順番にする理由は、最初の利用者を hozoc 自身にして、既定の出力とプラグインのプロトコルを本物の入力で確かめるため。`examples/hozoc.hozo` が「書けなかったもの」として挙げた三つの解き方は `docs/cli.md`「cli.hozo」。
+この順番にする理由は、最初の利用者を hozoc 自身にして、基底の出力とプラグインのプロトコルを本物の入力で確かめるため。`examples/hozoc.hozo` が「書けなかったもの」として挙げた三つの解き方は `docs/cli.md`「cli.hozo」。
 
 ## プラグインの書き方
 
@@ -113,18 +113,39 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 | 段階 | 入口 | 終わったと言える条件 |
 |---|---|---|
 | 0 | 詳細設計 | `docs/README.md` に並ぶ設計文書がそろい、実装の判断を残さない。設計書にない決定は `docs/decisions.md` にある |
-| 1 | 仮の CLI（「自己展開」の 1） | `tests/corpus/` の設計書の例（`docs/testing.md`「コーパス」）がすべて `check` を通り、「検査の規則の一覧」のうち語彙に固有でない規則が `docs/testing.md`「規則ごとのテスト」の形で確かめられている。`hozo.toml`（`docs/config.md`）を読み、Go の既定の出力（`docs/emit-go.md`）を書き出せる。プラグインのプロトコル（`docs/plugin-protocol.md`）で `plugins/go-cli/` を呼べる |
+| 1 | 仮の CLI（「自己展開」の 1） | `tests/corpus/` の設計書の例（`docs/testing.md`「コーパス」）がすべて `check` を通り、「検査の規則の一覧」のうち語彙に固有でない規則が `docs/testing.md`「規則ごとのテスト」の形で確かめられている。`hozo.toml`（`docs/config.md`）を読み、Go のコード（`docs/plugin-go.md`）を書き出せる。プラグインのプロトコル（`docs/plugin-protocol.md`）で `plugins/go-cli/` を呼べる |
 | 2 | hozoc を `.hozo` で書く（「自己展開」の 2） | `cli.hozo` が仮の CLI の `check` を通る |
 | 3 | 置き換え（「自己展開」の 3） | `cmd/hozoc` の骨組みが `cli.hozo` から生成したもので、`hozoc check` と `hozoc emit` が生成後も同じ結果を返す。生成物が `cli.hozo` から遅れていないことをテストで確かめる |
 | 4 | `hozoc lsp`、シンタックスハイライト | 「言語サーバー」の段階 4 の機能が VS Code で動き、`.hozo` に色が付く |
-| 5 | TS の既定の出力と、TS 向けの一次プラグイン | 言語が `ts` の単位（設計書の例の `browser`）に対して、react-router などの最初のトランスパイラが一つ動く。TS の単位でも、出力の衝突（CFG-5）・単位の言語の不一致（CFG-16）・`unsupported` の warning（CFG-6）が Go の単位と同じに働く（`docs/config.md`「診断」） |
+| 5 | TS の基底のプラグインと、TS 向けの一次プラグイン | 言語が `ts` の単位（設計書の例の `browser`）に対して、react-router などの最初のトランスパイラが一つ動く。TS の単位でも、出力の衝突（CFG-5）・単位の言語の不一致（CFG-16）・`unsupported` の warning（CFG-6）が Go の単位と同じに働く（`docs/config.md`「診断」） |
 | 6 | `hozoc import` / `hozoc extract`、§12 のアサーションとカバレッジ | 段階 5 が終わってから要件を書く |
 
 段階 0 が済むまで実装に入らない。段階 1 からの各パッケージは、`docs/packages.md` が指す設計文書を写す。
 
 「モデルが先」の要件（図への展開、文面への書き戻し）は、作る段階をまだ割り当てていない。UI での編集は将来の目標で、段階には入れない。
 
-これから作るトランスパイラ（段階 5 の TS 向けのものを含む）は、後の一つの段階でまとめて、テストを先に書いて作る。テストの方針は `docs/testing.md`「トランスパイラのテスト」。その段階を、上の表のほかの作業に対してどの順に置くかは、まだ割り当てていない。
+トランスパイラは、テストを先に書いて作る（`docs/testing.md`「トランスパイラのテスト」）。
+
+### 作り直しの段階
+
+段階 4 までを作った後で、サンプル（`tests/samples/README.md`）を書きながら決めたこと（`docs/decisions.md`「P の番号との対応」）を、二つの段階に分けて入れる。上の表の段階 5 より前に置く（TS の基底は、ここで決めた基底と相乗りの形の上に作る）。
+
+| 段階 | 入口 | 終わったと言える条件 |
+|---|---|---|
+| R1 | 言語の変更（`docs/decisions.md`「設計書を変える決定」S15〜S23） | 済み。`reads`、純粋さ、op の分類、ケースの型、`throw`、`never`、状態の参照、形の型、model の継承、`export` を、解析・検査・IR が持つ |
+| R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜83） | hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、保留も飛ばしもなく、すべて通る。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
+
+R2 の成果物:
+
+| 成果物 | 文書 |
+|---|---|
+| 設定: `[emit.options]`、基底と相乗り（CFG-19〜CFG-21）、型の置き場（CFG-22）、語彙の名前空間の単位 | `docs/config.md` |
+| プロトコル: 版 0.4（`requires`、`View.config` の `index` / `base` / `options`、`select` の廃止） | `docs/plugin-protocol.md`、`docs/ir.md`「その名前空間から見た IR」 |
+| 公開の SDK: `plugin`（`Options`）、`plugin/golang`（形の規則）、`plugin/govalid`、`sdk/ts`（同じ変更） | `docs/packages.md` |
+| プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md` |
+| `emit` の手順（本体は出力を作らない）、`cli.hozo` と `hozo.toml`、`internal/app` | `docs/cli.md` |
+| 語彙: `http.BadRequest` | `docs/vocab.md`「同梱する語彙」 |
+| テスト: サンプルのサブテスト、コーパスのゴールデンの作り直し、`select` のコーパスと `pick` の削除 | `docs/testing.md`、`tests/samples/README.md` |
 
 ## 最初に決めること
 
@@ -156,7 +177,8 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | `hozo.toml` の全体の設定と、出力の単位 | §4.5（名前空間ごとの設定と継承。単位の一覧に変えた。`docs/decisions.md`「設計書を変える決定」S14） | `docs/config.md` |
 | 語彙の宣言の読み込み元 | なし | `docs/vocab.md` |
 | プラグインの探索、マニフェストの追加項目（トランスパイラの一覧を含む）、語彙に固有の検査 | §4.6 に形だけ | `docs/plugin-protocol.md` |
-| 既定の出力の担い手と言語ごとの形 | §4.3 に方針 | 担い手は hozoc 本体で、最初の言語は Go（「自己展開」のため）。形は `docs/emit-go.md`。TS は段階 5 |
+| 言語ごとの出力の担い手と形 | §4.3 に方針 | 担い手は、言語ごとの基底のトランスパイラ（`docs/config.md`「基底と相乗り」）。本体は言語を知らない。Go の形は `docs/plugin-go.md`。TS は段階 5 |
+| 語彙ごとの出力（検証、HTTP、DB） | §4.2、§4.3 に方針 | `docs/plugin-go-valid.md`、`docs/plugin-go-http.md`（通信の形を含む）、`docs/plugin-go-sqlite.md` |
 | `cli` の語彙の意味 | `examples/hozoc.hozo` | `docs/plugin-go-cli.md` |
 | 診断の形と終了コード | `examples/hozoc.hozo` に一部 | `docs/diagnostics.md` |
 | hozoc の振る舞いと `cli.hozo` | `examples/hozoc.hozo` | `docs/cli.md` |
@@ -169,7 +191,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 
 **設計書を変える決定（`docs/decisions.md`「設計書を変える決定」の S1〜S23）が書き換えた節については、規則の意味の持ち主は設計書の節ではなく、その決定の「持ち主」の列の文書。** この表の「規則」の列は今の規則を短く言ったもので、変わる前の設計書の言葉は書かない。決定で意味が変わった行は、「節」の列に決定の番号と持ち主の文書を添える。
 
-設計書にない規則は、それぞれの設計文書の「診断」の表（`docs/check.md`、`docs/resolve.md`、`docs/types.md`、`docs/config.md`、`docs/plugin-protocol.md`、`docs/emit-go.md`、`docs/plugin-go-cli.md`、`docs/lsp.md`、規則の ID でないコードは `docs/diagnostics.md`「規則の ID でないコード」）が持ち主で、この表には載せない。
+設計書にない規則は、それぞれの設計文書の「診断」の表（`docs/check.md`、`docs/resolve.md`、`docs/types.md`、`docs/config.md`、`docs/plugin-protocol.md`、`docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md`、`docs/lsp.md`、規則の ID でないコードは `docs/diagnostics.md`「規則の ID でないコード」）が持ち主で、この表には載せない。
 
 欠番（なくなった規則の ID。番号は別の意味に使い回さない。`docs/decisions.md` の 52）:
 
@@ -178,7 +200,11 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | CFG-1〜CFG-4 | §4.5 の名前空間ごとの設定・使えない名前・継承と、§4.6 の言語の照合。設定を単位の一覧に変えた（S14）ときになくなった。代わりの規則（単位の言語、対象の手続きなど）は `docs/config.md`「診断」が持つ | `docs/config.md`「診断」 |
 | CFG-9 | `plugins` の名前の探索。同じく S14 でなくなった | `docs/config.md`「診断」 |
 | REL-3、REL-6 | `prevents` / `keeps` の目的語に効果の名前を個別に書く形についての規則。目的語を `effects` だけにした（S9）ときになくなった | `docs/check.md`「throws」 |
-| MAN-1 | マニフェストの `[emit]` の `entry` も `decorate` も空であること。出力の対象を応答の `select` で返す形にした（`docs/decisions.md` の 28）ときになくなった | `docs/plugin-protocol.md`「診断」 |
+| MAN-1 | マニフェストの `[emit]` の `entry` も `decorate` も空であること。`[emit]` を `[[transpiler]]` に替えた（`docs/decisions.md` の 28）ときになくなった | `docs/plugin-protocol.md`「診断」 |
+| PLG-3 | `emit` の応答の `select` が、選べない宣言を指していること。`select` をなくした（`docs/decisions.md` の 77）ときになくなった | `docs/plugin-protocol.md`「診断」 |
+| CFG-8 | 単位の `namespace` が語彙の名前空間である、または `state` も `op` も持たないこと。型を基底ごとに一度だけ出力する形にした（`docs/decisions.md` の 67、76）ときになくなった | `docs/config.md`「診断」 |
+| CFG-11 | 単位の言語が `ts` だが、TS の既定の出力がないこと。出力をトランスパイラに任せた（`docs/decisions.md` の 68）ときになくなった | `docs/config.md`「診断」 |
+| GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL | 本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（`docs/decisions.md` の 80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書 | `docs/plugin-go.md`「診断」 |
 | NS-4 | `classify` は宣言した名前空間の中でだけ使える（§3.2、§10.1）。分類の置き場を自由にした（S18）ときになくなった | `docs/check.md`「名前空間」 |
 
 | ID | 規則（設計書の言葉を短く） | 節 |
@@ -190,7 +216,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | NS-3 | 複数の語彙（標準の語彙、プラグインの語彙）が同じ名前をグローバルに宣言したらエラー | §3.2 |
 | NAME-1 | 型の位置は UpperCamelCase、実行・適用されるものは lowerCamelCase | §3.3 |
 | DOC-1 | `@param` / `@throws` / `@see` が存在しない名前を指したらエラー。説明の有無は警告しない | §3.4 |
-| CFG-5 | 二つ以上の出どころ（既定の出力、単位の各トランスパイラ）が同じファイルに書こうとしたらエラー | §4.3。S14: `docs/config.md`「診断」 |
+| CFG-5 | 二つ以上のトランスパイラが同じファイルに書こうとしたらエラー | §4.3。S14: `docs/config.md`「診断」 |
 | CFG-6 | 単位のトランスパイラの `unsupported` に当たる箇所は warning | §4.3。S14: `docs/config.md`「診断」 |
 | STATE-1 | 状態への操作は形で決まる（形と操作の表は `docs/check.md`「状態の形」） | §5.2。S1: `docs/check.md`「状態の形」 |
 | STATE-2 | 持ち主でない名前空間の葉の op が、その状態への効果を `effects` に宣言したらエラー | §5.1、§6.2 |

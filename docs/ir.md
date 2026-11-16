@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.3";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.4";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -377,11 +377,12 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.3";
+  version: "0.4";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
-  files: string[];                // この View の単位の in に合ったファイル（docs/config.md「in」）。Span.file と同じ形、辞書順。
-                                  // in を省いた単位なら、読み込んだユーザーのファイルのすべて。
+  files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
+                                  // （docs/config.md「in」）。Span.file と同じ形で、ユーザーのファイルを辞書順に、その後に語彙のファイルを辞書順に。
+                                  // in を省いた単位なら、読み込んだすべてのファイル。
                                   // viewer の宣言のうち span.file がここにあるものが、単位の対象の宣言
   namespaces: Record<string, NamespaceConfig[]>; // 出力のあるすべての名前空間（viewer を含む）。キーは FQN、順序は辞書順。
                                                  // 値は、その名前空間を出力する単位ごとの設定（設定の順）。
@@ -392,10 +393,15 @@ interface View {
 }
 
 interface NamespaceConfig {       // 単位 U での名前空間 N の設定
-  language: string;               // U の言語（docs/config.md「単位」）
+  index: number;                  // U が何番目の [[emit]] か（1 始まり）。診断のメッセージと、単位どうしを見分けるのに使う
+  language: string;               // U の言語（docs/config.md「基底と相乗り」）
+  base: string;                   // U の基底のトランスパイラの名前（同上）
   out: string;                    // U の out
   dir: string;                    // Dir(U, N)。U での N のファイルを置くディレクトリ（ルートからの相対パス。docs/config.md「単位の対象」）
-  transpilers: string[];          // U の transpilers
+  transpilers: string[];          // U の transpilers（書かれた順）
+  options: Record<string, Record<string, unknown>>;   // U の options（docs/config.md「オプション」）。キーはトランスパイラの名前、
+                                  // 値は hozo.toml のテーブルを JSON に写したもの（整数と小数は number）。オプションを書いていないトランスパイラのキーはない。
+                                  // 順序は、キーの辞書順（入れ子のテーブルも）
 }
 
 interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
@@ -407,9 +413,10 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 }
 ```
 
-- `Program` 全体を渡すのは、トランスパイラが参照先（別の名前空間の型、語彙の宣言、`in` の外の宣言）を自分で探さなくて済むようにするため。何を出力の対象にするかは、トランスパイラが `emit` の応答の `select` で返す（`docs/plugin-protocol.md`「選択」）。
+- `Program` 全体を渡すのは、トランスパイラが参照先（別の名前空間の型、語彙の宣言、`in` の外の宣言）を自分で探さなくて済むようにするため。何を出力するかは、基底が `View` だけから決める（Go なら `docs/plugin-go.md`「出力の対象」）。`View` のうち、相乗りが基底の形を知るのに使う項目は `docs/plugin-protocol.md`「相乗りが基底の形を知る方法」。
 - `files` は、トランスパイラが単位の対象の宣言を見分けるための最小の情報。宣言ごとの印を `Program` に足さないのは、`Program` を単位によらず同じにするため。合成した model（`<viewer>.<op 名>$<引数名>`）の `span` は元の引数のもので、op と同じファイルになる。
-- `namespaces` に入るのは、どれかの単位が出力する名前空間（`docs/config.md`「単位の対象」「in」）。同じ名前空間を複数の単位が出力していれば、値は複数の要素を持つ。`namespaces[viewer]` のうち `dir` が `config.dir` と同じ要素が、この View の単位のもの。
+- `namespaces` に入るのは、どれかの単位が出力する名前空間（`docs/config.md`「単位の対象」「in」）。同じ名前空間を複数の単位が出力していれば、値は複数の要素を持つ。`namespaces[viewer]` のうち `index` が `config.index` と同じ要素が、この View の単位のもの。別の名前空間の型の置き場（`docs/config.md`「型の置き場」）は、`namespaces[M]` の要素のうち、`index` が `config.index` と同じもの、なければ `base` が `config.base` と同じ最初のもの。
+- `ViewedSignature.params` と、それが合成する model（`<viewer>.<op 名>$<引数名>`）は、`bind` で埋まる位置を呼ぶ側の引数から消した形が要るトランスパイラ（別のプロセスの op を呼ぶ口を作るもの）のためのもの。Go の基底は使わない（`docs/plugin-go.md`「出力の対象」）。
 - `ops` の `Signature` は `docs/check.md`「計算」の Sig(O, viewer)。viewer が op の名前空間と同じなら `Program` の `signature` と一致する。`reads` と `pure` は viewer によらず、`Program` の `signature` と同じ値。
 - `ops` は、`export` の有無によらずすべての op を持つ。viewer が呼べる op かどうかは `Op.exported` と名前空間から分かる（`docs/check.md`「export」）。
 - `params` に反映する `bind` は `viewer` の名前空間の `Bind` だけ（`bind` は呼び出す側の宣言。§5.3）。
@@ -425,8 +432,9 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造が変わったら上げる。今の版は `"0.3"`。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.4"`。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.4 | `NamespaceConfig` に `index`、`base`、`options`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
 | 0.3 | `Type` に `never`。`Model.derivedFrom` をやめて `Model.extends`。`State.type`。`Classify.subject` に `op`、`cases[].as`、`decidedBy`。`Op.exported`、`Op.reads`。`Signature.reads`、`Signature.pure`。`Atom` に `state`。`Match.subject` の `state` をやめる（`value` の `atom` が `state`）。`Match.arms[].body` に `atom` と `throw`、`Match.arms[].narrowed` |

@@ -134,16 +134,16 @@ namespace hozoc {
    * @see emit
    */
   @cli.command("check")
-  op check(in: CheckInput): CheckResult
+  export op check(in: CheckInput): CheckResult
     throws CheckFailed | ConfigInvalid | LanguageMismatch
     throws proc.Crashed | proc.MalformedOutput;
 
   /**
-   * 検査を通った仕様から、単位ごとに既定の出力とトランスパイラの出力を作り、書き出す。
+   * 検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
-   * @throws CheckFailed トランスパイラが errors を返した、または既定の出力が作れない（GOEMIT-*）。ファイルは書き出さない
+   * @throws CheckFailed トランスパイラが errors を返した。ファイルは書き出さない
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした。ファイルは書き出さない
    * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない。ファイルは書き出さない
    * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
@@ -160,7 +160,7 @@ namespace hozoc {
    * @see check
    */
   @cli.command("emit")
-  op emit(in: EmitInput): EmitResult
+  export op emit(in: EmitInput): EmitResult
     throws CheckFailed | ConfigInvalid | LanguageMismatch | OutputConflict | UnknownNamespace prevents effects
     throws proc.Crashed | proc.MalformedOutput prevents effects
   {
@@ -174,7 +174,7 @@ namespace hozoc {
    * @param in コマンドの入力
    */
   @cli.command("lsp")
-  op lsp(in: LspInput);
+  export op lsp(in: LspInput);
 
   /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ */
   model Plugin { name: string; command: string[]; dir: Path; root: Path; }
@@ -182,7 +182,7 @@ namespace hozoc {
   /** IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない */
   model View {}
 
-  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）。transpiler は起動するトランスパイラの名前 */
+  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）。transpiler は起動するトランスパイラの名前。単位のオプションは view の中にある */
   model EmitRequest { protocol: string; direction: string; transpiler: string; view: View; }
 
   /** トランスパイラの warning（同「emit」の応答の warnings の要素） */
@@ -191,14 +191,8 @@ namespace hozoc {
   /** トランスパイラの error（同「emit」の応答の errors の要素） */
   model PluginError { code: string; at: string; message: string; }
 
-  /** トランスパイラが包む関数を実装するデコレータの適用（同「選択」の wraps の要素） */
-  model Wrap { op: string; decorator: string; }
-
-  /** トランスパイラが選んだ出力の対象（同「選択」） */
-  model Select { roots: string[]; stops: string[]; states: string[]; wraps: Wrap[]; }
-
   /** 展開のときのプラグインからの出力（同「emit」の応答） */
-  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; select: Select; }
+  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; }
 
   /**
    * プラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
