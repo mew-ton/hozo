@@ -1,0 +1,35 @@
+// GOSQL-29（docs/plugin-go-sqlite.md「出力」）: N の単位の対象の op に @db.transaction が付いているのに、N に表の状態が一つもない
+// （基底は、その op を二層で出すが、継ぎ目の実装 DbSeams を出すファイルがない）。位置は op。warning は出さない。
+
+namespace app {
+  model Row { @db.key @db.text id: string; }
+  /** @db.table のない状態 */
+  state rows: list<Row>;
+  effect createRow(row: Row) on rows.post;
+
+  // 配線
+  @db.transaction
+  export op add(row: Row) {
+    createRow(row);
+  }
+  // 葉
+  @db.transaction
+  export op importRows(rows: Row[]): int;
+
+  // @db.transaction のない op は、かまわない
+  export op addOne(row: Row) {
+    createRow(row);
+  }
+}
+
+// 表の状態があれば、通る
+namespace ok {
+  model Row { @db.key @db.text id: string; }
+  @db.table state rows: list<Row>;
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+  @db.transaction
+  export op add(row: Row) {
+    createRow(row);
+  }
+}

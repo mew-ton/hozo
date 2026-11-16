@@ -1,0 +1,3 @@
+GOSQL-22	app.rowById	read app.rowById が、@db.find と @db.list の両方を持つ（一行を引くか、行の並びを引くかの、どちらか一つ）
+GOSQL-22	app.rowsByNote	read app.rowsByNote が、@db.find と @db.list の両方を持つ（一行を引くか、行の並びを引くかの、どちらか一つ）
+GOSQL-22	app.plainRows	read app.plainRows が、@db.find と @db.list の両方を持つ（一行を引くか、行の並びを引くかの、どちらか一つ）

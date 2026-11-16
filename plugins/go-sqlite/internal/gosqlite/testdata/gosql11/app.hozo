@@ -1,12 +1,10 @@
-// GOSQL-11（docs/plugin-go-sqlite.md「op の中身」）: 効果のデコレータが、効果の宛先と合わない。位置は効果。
-// 宛先が組み込みの効果なら、状態がデコレータの表で、操作が合う（@db.insert は post、@db.update は put、@db.delete は delete）。
-// 宛先が遷移なら、デコレータの表が、その効果の書き込む状態（Effect.writes）にある。
+// GOSQL-11（docs/plugin-go-sqlite.md「効果の中身」）: 効果のデコレータが、効果の宛先と合わない: 宛先が組み込みの効果でない
+// （分類の遷移）か、操作が合わない（@db.insert は post、@db.update は put、@db.delete は delete）。位置は効果。
 
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
   @db.table state rows: list<Row>;
   @db.table state copies: list<Row>;
-  @db.table state logs: list<Row>;
 
   // ---- 組み込みの効果: 操作が合わない ----
 
@@ -23,25 +21,20 @@ namespace app {
   @db.delete
   effect deleteOnPut(id: string) on rows.put;
 
-  // ---- 組み込みの効果: 状態が、デコレータの表でない ----
-
-  @db.insert
-  effect insertElsewhere(row: Row) on rows.post;
-  @db.delete
-  effect deleteElsewhere(id: string) on rows.delete;
-
-  // ---- 遷移: デコレータの表が、効果の書き込む状態にない ----
+  // ---- 宛先が、分類の遷移（基底の状態の組み込みの分類と、状態の分類） ----
 
   classify Sync of rows, copies {
     Same;
     Differ;
   }
   @db.insert
-  effect logSync(row: Row) on Sync: Differ -> Same;
-  @db.update
   effect fillRows(row: Row) on rows: Empty -> HasItems;
+  @db.update
+  effect touchRows(row: Row) on rows: HasItems -> HasItems;
+  @db.delete
+  effect copyOver(id: string) on Sync: Differ -> Same;
 
-  // op に並べても、効果ごとに一度だけ
+  // 配線が呼んでも、効果ごとに一度だけ
   export op addWrong(row: Row) {
     insertOnPut(row);
   }
@@ -54,9 +47,6 @@ namespace app {
   effect updateRow(row: Row) on rows.put;
   @db.delete
   effect deleteRow(id: string) on rows.delete;
-  // 遷移なら、操作の名前との照合はない
-  @db.delete
-  effect copyOver(id: string) on Sync: Differ -> Same;
-  @db.update
-  effect touchRows(row: Row) on rows: HasItems -> HasItems;
+  /** デコレータを付けていない、遷移の効果は、見ない（人が書く） */
+  effect syncRows() on Sync: Differ -> Same;
 }

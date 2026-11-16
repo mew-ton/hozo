@@ -568,10 +568,10 @@ func TestJSONPresenter(t *testing.T) {
 	hint := "h"
 	for want, f := range map[string]toolcli.Failure{
 		// value は、例外の引数の名前をキーにしたオブジェクト（例外の値そのものの JSON）。キーの並びは、宣言の引数の順
-		"{\n  \"error\": \"tool.CheckFailed\",\n  \"value\": {\n    \"notes\": null\n  }\n}\n": {Name: "tool.CheckFailed", Value: tool.CheckFailed{}, Err: errors.New("x")},
+		"{\n  \"error\": \"tool.CheckFailed\",\n  \"value\": {\n    \"notes\": null\n  }\n}\n":                                               {Name: "tool.CheckFailed", Value: tool.CheckFailed{}, Err: errors.New("x")},
 		"{\n  \"error\": \"tool.ConfigInvalid\",\n  \"value\": {\n    \"file\": \"f\",\n    \"notes\": null,\n    \"hint\": \"h\"\n  }\n}\n": {Name: "tool.ConfigInvalid", Value: tool.ConfigInvalid{File: "f", Hint: &hint}, Err: errors.New("x")},
-		"{\n  \"error\": \"tool.UnknownName\"\n}\n": {Name: "tool.UnknownName", Err: errors.New("x")},
-		"{\n  \"error\": \"boom\"\n}\n":             {Err: errors.New("boom")},
+		"{\n  \"error\": \"tool.UnknownName\"\n}\n":                                                                                          {Name: "tool.UnknownName", Err: errors.New("x")},
+		"{\n  \"error\": \"boom\"\n}\n": {Err: errors.New("boom")},
 	} {
 		b.Reset()
 		if err := p.PresentError(&b, "check", nil, f); err != nil || b.String() != want {

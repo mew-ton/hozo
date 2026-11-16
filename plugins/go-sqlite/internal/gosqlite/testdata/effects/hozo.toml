@@ -1,0 +1,6 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「効果の中身」の表の各行
+# （@db.insert、@db.update、@db.delete）と、「状態ごとの型」の、形で決まる命令 Post。
+[[emit]]
+namespace   = "depot"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/depot"

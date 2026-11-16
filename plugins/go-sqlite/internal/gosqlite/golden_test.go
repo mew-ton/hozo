@@ -3,6 +3,7 @@ package gosqlite
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -17,12 +18,13 @@ var goldenFixtures = []struct {
 	covers   string
 	behavior bool
 }{
-	{name: "columns", covers: "「しまい方」の表の各行（六つのしまい方。核の型と scalar）、@db.nullable の列（しまい方ごと）、「表」の制約（複数の @db.key、@db.unique、@db.ref）", behavior: true},
-	{name: "ops", covers: "「op の中身」の表の各行、「列と引数の型」、「トランザクション」、「メソッドの形とコメント」", behavior: true},
-	{name: "partial", covers: "「状態ごとの型」の、デコレータを付けていない op があるとき（var _ を出さない、付けていない op の句、warning を出さない）、「状態をまたぐ単位の型」（SharedTable、<C>Table）", behavior: true},
+	{name: "columns", covers: "「しまい方」の表の各行（六つのしまい方。核の型と scalar）、省略可能なフィールドの列（しまい方ごと）、「表」の制約（複数の @db.key、@db.unique、@db.ref）", behavior: true},
+	{name: "reads", covers: "「read の中身」の各行（@db.find、@db.list、@db.where、@db.latest と、その組み合わせ。二つ以上の引数）、「列と引数の型」、「メソッドの形とコメント」の read の句", behavior: true},
+	{name: "effects", covers: "「効果の中身」の表の各行（@db.insert、@db.update、一つと二つ以上の列の @db.delete）、「状態ごとの型」の、形で決まる命令 Post", behavior: true},
+	{name: "transaction", covers: "「トランザクション」（継ぎ目のメソッドの二つの形、確定と取り消し、入れ子、同じ db の上の二つの名前空間、var _ Seams を出すとき）", behavior: true},
+	{name: "partial", covers: "「状態ごとの型」の、デコレータを付けていない read と効果があるとき（var _ を出さない、付けていないものの句、warning を出さない。人が埋め込んで書き足し、Conn を通す）と、型を出さない単位", behavior: true},
 	{name: "names", covers: "「補助」の、当たる名前（引数、同じ名前の model、局所の名前と同じ名前のパッケージ）と、内側のフォルダを持つ出力", behavior: true},
-	{name: "minimal", covers: "「補助」の、使うものだけを出すこと（op を一つも持たない表。出る補助と import が、いちばん少ない）"},
-	{name: "uniform", covers: "docs/requirements.md「出力を推論しない」: フィールドの型だけを変えた入力から、名前と型のほかは同じテキスト（TestUniform）", behavior: true},
+	{name: "minimal", covers: "「補助」の、使うものだけを出すこと（read も効果も持たない表。出る補助と import が、いちばん少ない）"},
 }
 
 // TestGolden は、入力ごとに、出力（db.go と warning）がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を
@@ -41,7 +43,7 @@ func TestGolden(t *testing.T) {
 			for p, content := range res.files {
 				got[p] = content
 			}
-			// warning は出さない: db の語彙のデコレータを付けていない op は、仕様を書いた人が、中身を人が書くと選んだもの
+			// warning は出さない: db の語彙のデコレータを付けていない read と効果は、仕様を書いた人が、中身を人が書くと選んだもの
 			for _, w := range res.warnings {
 				t.Errorf("warning を返した（%s）: %s", w.At, w.Message)
 			}
@@ -93,72 +95,82 @@ func TestBehavior(t *testing.T) {
 	}
 }
 
-// TestUniform は「型に依らない形の確かめ」（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」）: 入力 uniform の
-// 三つの名前空間は、宣言の名前もデコレータも op も同じで、フィールドと引数の型だけが違う（plain は核の型、named は scalar、sparse は
-// 省略可能で @db.nullable を持つ）。三つの db.go は、名前空間の名前と、基底の形の写しであるメソッドの形（引数の型）のほかは、同じ
-// テキスト。sparse は、それに加えて、@db.nullable の足すもの（補助の引数 dbNullable と、NOT NULL がないこと）だけが違う。
-// 違いが実行時に出ること（値がなければ NULL）は、testdata/uniform/behavior_test.go が確かめる。
-func TestUniform(t *testing.T) {
-	_, res := emitFixture(t, "uniform")
-	lines := func(ns string) []string {
-		src, ok := res.files["gen/"+ns+"/db.go"]
-		if !ok {
-			t.Fatalf("gen/%s/db.go を出力しなかった", ns)
-		}
-		out := strings.Split(src, "\n")
-		for i, l := range out {
-			switch {
-			case l == "package "+ns:
-				out[i] = "package NS"
-			case strings.HasPrefix(l, "//"):
-				out[i] = strings.ReplaceAll(l, ns+".", "NS.") // コメントの中の FQN
-			}
-		}
-		return out
+// TestSeamsUniform は「型に依らない形の確かめ」（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」の、op を包む側）:
+// @db.transaction の継ぎ目のメソッドは、op のデコレータの分なので、op の中身にも、型にも依らない。入力 transaction の bank の継ぎ目の
+// メソッド（引数と戻り値の型が、どれも違う: model、省略可能な model、配列、scalar、省略可能な値、別の名前空間の model。配線と葉）は、
+// 名前と、基底の形の写しである引数と戻り値の型のほかは、同じテキスト。本体の形は、戻り値の有無の二つだけ。
+func TestSeamsUniform(t *testing.T) {
+	_, res := emitFixture(t, "transaction")
+	src, ok := res.files["gen/bank/db.go"]
+	if !ok {
+		t.Fatal("gen/bank/db.go を出力しなかった")
 	}
-	// signature は、メソッドの形の行（基底の形の写し。引数の型が違う）なら、その引数の並びの前まで。
-	signature := func(l string) (string, bool) {
-		if !strings.HasPrefix(l, "func (t RowsTable) ") {
-			return "", false
+	signature := regexp.MustCompile(`^func \(s DbSeams\) (\w+)\(ctx context\.Context(.*), body func\(ctx context\.Context(.*)\) (.+)\) (.+) \{$`)
+	const (
+		returning = "\treturn dbTransaction(ctx, s.db, func(ctx context.Context) (RESULT, error) {\n\t\treturn body(ctx ARGS)\n\t})\n}"
+		void      = "\t_, err := dbTransaction(ctx, s.db, func(ctx context.Context) (struct{}, error) {\n\t\treturn struct{}{}, body(ctx ARGS)\n\t})\n\treturn err\n}"
+	)
+	lines := strings.Split(src, "\n")
+	forms := map[string]int{}
+	for i, l := range lines {
+		m := signature.FindStringSubmatch(l)
+		if m == nil {
+			continue
 		}
-		return l[:strings.Index(l, "(ctx")], true
+		name, params, results := m[1], m[2], m[5]
+		if m[3] != params || m[4] != results {
+			t.Errorf("%s の body の形が、メソッドの形（op の形）と違う: %s", name, l)
+		}
+		// 引数の並び（`, a T, b U`）から、名前だけを取り出す。型に `,` を含むもの（Record）は、この入力にない
+		args := ""
+		for _, p := range strings.Split(strings.TrimPrefix(params, ", "), ", ") {
+			if p != "" {
+				args += ", " + strings.Fields(p)[0]
+			}
+		}
+		end := i + 1
+		for lines[end] != "}" {
+			end++
+		}
+		body := strings.Join(lines[i+1:end+1], "\n")
+		want, form := strings.ReplaceAll(void, "ARGS", args), "戻り値がない"
+		if results != "error" {
+			result := strings.TrimSuffix(strings.TrimPrefix(results, "("), ", error)")
+			want, form = strings.ReplaceAll(strings.ReplaceAll(returning, "ARGS", args), "RESULT", result), "戻り値がある"
+		}
+		if body != want {
+			t.Errorf("%s（%s）の本体が、決まった形でない:\n%s\n---- 期待 ----\n%s", name, form, body, want)
+		}
+		forms[form]++
 	}
-	// nullable は、@db.nullable の足すもの（補助の引数と、NOT NULL がないこと）を除いた行。
-	nullable := strings.NewReplacer(", dbNullable", "", " NOT NULL", "").Replace
-	plain := lines("plain")
-	for _, other := range []struct {
-		ns       string
-		nullable bool // @db.nullable の足すものだけの違いを許すか
-	}{{"named", false}, {"sparse", true}} {
-		got := lines(other.ns)
-		if len(got) != len(plain) {
-			t.Fatalf("%s の db.go が %d 行（plain は %d 行）", other.ns, len(got), len(plain))
+	// bank の継ぎ目を持つ op は九つ: 戻り値のあるものが三つ（省略可能な model、配列、scalar）、ないものが六つ
+	if forms["戻り値がある"] != 3 || forms["戻り値がない"] != 6 {
+		t.Errorf("継ぎ目のメソッドの数が %v（期待は、戻り値がある 3、戻り値がない 6。入力が、形を変えていない）", forms)
+	}
+}
+
+// TestIncomplete は、db の語彙のデコレータを付けていない read か効果のある型が、基底の単位を満たさないこと（docs/plugin-go-sqlite.md
+// 「状態ごとの型」: 足りなければコンパイルエラーになる。warning は出さない）: 入力 partial の BooksTable（read newestBooks、countBooks と
+// 効果 retitle、clearBooks を持たない）を lib.BooksState の位置に置いたファイルは、コンパイルできない。すべてを持つ StampsTable は、通る。
+func TestIncomplete(t *testing.T) {
+	root, res := emitFixture(t, "partial")
+	writeProject(t, root, "partial", res.files)
+	probe := func(unit, impl string) string {
+		return "package probe\n\nimport \"example.com/app/gen/lib\"\n\nvar _ lib." + unit + " = lib." + impl + "{}\n"
+	}
+	writeFile(t, filepath.Join(root, "probe", "probe.go"), probe("StampsState", "StampsTable"))
+	if out, err := runGo(t, root, "build", "./probe"); err != nil {
+		t.Fatalf("すべてのメソッドを持つ型が、単位を満たさない: %v\n%s", err, out)
+	}
+	for impl, missing := range map[string]string{"BooksTable": "NewestBooks", "NotesTable": "FirstNote"} {
+		unit := strings.TrimSuffix(impl, "Table") + "State"
+		writeFile(t, filepath.Join(root, "probe", "probe.go"), probe(unit, impl))
+		out, err := runGo(t, root, "build", "./probe")
+		if err == nil {
+			t.Fatalf("メソッドの足りない型 %s が、単位 %s を満たした（コンパイルできた）", impl, unit)
 		}
-		signatures, nullables := 0, 0
-		for i := range plain {
-			a, b := plain[i], got[i]
-			if a == b {
-				continue
-			}
-			if sa, ok := signature(a); ok {
-				if sb, _ := signature(b); sa == sb {
-					signatures++
-					continue
-				}
-			}
-			if other.nullable && nullable(a) == nullable(b) {
-				nullables++
-				continue
-			}
-			t.Errorf("%s の db.go の %d 行目が、型で変わっている:\n  plain: %s\n  %s: %s", other.ns, i+1, a, other.ns, b)
-		}
-		// 引数を持つ読む op が七つ、@db.delete の引数を持つ書く op が二つ
-		if signatures != 9 {
-			t.Errorf("%s の db.go の、形が違うメソッドが %d 個（期待は 9。入力が、型を変えていない）", other.ns, signatures)
-		}
-		// Schema の七つの列、dbArgsRow と dbScanRow、条件に引数を渡す九つのメソッド（swap は一行）
-		if want := map[bool]int{false: 0, true: 18}[other.nullable]; nullables != want {
-			t.Errorf("%s の db.go の、@db.nullable の足すものだけが違う行が %d 行（期待は %d）", other.ns, nullables, want)
+		if !strings.Contains(out, "does not implement") || !strings.Contains(out, "missing method "+missing) {
+			t.Errorf("%s のコンパイルエラーが、足りないメソッド %s を言っていない:\n%s", impl, missing, out)
 		}
 	}
 }
@@ -178,7 +190,7 @@ func TestNoTables(t *testing.T) {
 // TestOtherDir は、同じ名前空間を別の out に出力しても、ファイルの中身が、パスを除いて同じこと（db.go は、自分のパッケージの
 // import パスを書かない）。
 func TestOtherDir(t *testing.T) {
-	view := ours(t, loadViews(t, "ops"))[0]
+	view := ours(t, loadViews(t, "reads"))[0]
 	root := newRoot(t)
 	first := emitViews(t, root, []*ir.View{view})
 	other := *view
@@ -194,27 +206,31 @@ func TestOtherDir(t *testing.T) {
 
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。docs/plugin-go-sqlite.md「診断」の表の行ごとに一つ
-// （GOSQL-5 は欠番）。
+// （GOSQL-5、GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 は欠番）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"gosql1", codeSQLElement},   // @db.table(M) の状態の要素の型が、M と等しくない
-	{"gosql2", codeSQLShape},     // @db.table の状態の形が list でない
-	{"gosql3", codeSQLColumn},    // どのしまい方でも列にできない型のフィールドがある
-	{"gosql4", codeSQLCollision}, // 公開の名前が当たる（条件ごとに名前空間が一つ。当たらない名前空間には出ない）
-	{"gosql6", codeSQLOption},    // [emit.options.go-sqlite] に、知らないキーがある
-	{"gosql7", codeSQLTable},     // デコレータの引数の状態が、N の表の状態でない
-	{"gosql8", codeSQLName},      // デコレータの引数の列の名前が、表の model のフィールドにない
-	{"gosql9", codeSQLParams},    // op の引数が、デコレータの言うものと合わない
-	{"gosql10", codeSQLReturns},  // op の戻り値が、デコレータの言うものと合わない
-	{"gosql11", codeSQLTarget},   // 効果のデコレータが、効果の宛先と合わない
-	{"gosql12", codeSQLEffect},   // 並べた効果が効果のデコレータを持たない。または、一つの効果が二つ以上持つ
-	{"gosql13", codeSQLUnique},   // @db.find の列が、一行に決まる列でない
-	{"gosql14", codeSQLCarried},  // op が、db の op のデコレータの言う以外のものを読み書きする
-	{"gosql15", codeSQLUpdate},   // @db.update の表の model が、キーか、キーでない列を持たない
-	{"gosql16", codeSQLStorage},  // フィールドが、しまい方のデコレータを、ちょうど一つ持たない
-	{"gosql17", codeSQLFit},      // しまい方が、フィールドの型に合わない
-	{"gosql18", codeSQLNullable}, // @db.nullable の付いたフィールドの型が、省略可能でない
-	{"gosql19", codeSQLOptional}, // 省略可能なフィールドに、@db.nullable がない
-	{"gosql20", codeSQLRef},      // @db.ref の指す先が、一つに決まらない
+	{"gosql1", codeSQLElement},      // @db.table の状態の要素の型が、model でない
+	{"gosql2", codeSQLShape},        // @db.table の状態の形が list でない
+	{"gosql3", codeSQLColumn},       // どのしまい方でも列にできない型のフィールドがある
+	{"gosql4", codeSQLCollision},    // 公開の名前が当たる（条件ごとに名前空間が一つ。当たらない名前空間には出ない）
+	{"gosql6", codeSQLOption},       // [emit.options.go-sqlite] に、知らないキーがある
+	{"gosql7", codeSQLTable},        // read の on の状態か、効果の宛先の状態が、N の表の状態でない
+	{"gosql8", codeSQLName},         // 列を名指しするものが、表の model のフィールドにない
+	{"gosql9", codeSQLParams},       // 引数が、デコレータの言うものと合わない
+	{"gosql10", codeSQLReturns},     // read の結果の型が、デコレータの言うものと合わない
+	{"gosql11", codeSQLTarget},      // 効果のデコレータが、効果の宛先と合わない
+	{"gosql12", codeSQLEffect},      // 一つの効果が、効果のデコレータを二つ以上持つ
+	{"gosql13", codeSQLUnique},      // @db.find の read が、一行に決まらない
+	{"gosql15", codeSQLUpdate},      // @db.update の表の model が、キーか、キーでない列を持たない
+	{"gosql16", codeSQLStorage},     // フィールドが、しまい方のデコレータを、ちょうど一つ持たない
+	{"gosql17", codeSQLFit},         // しまい方が、フィールドの型に合わない
+	{"gosql20", codeSQLRef},         // @db.ref の指す先が、一つに決まらない
+	{"gosql22", codeSQLBoth},        // 一つの read が、@db.find と @db.list の両方を持つ
+	{"gosql24", codeSQLNeither},     // @db.where か @db.latest の付いた read が、@db.find も @db.list も持たない
+	{"gosql25", codeSQLTwice},       // 一つの read の条件が、同じ列を二度名指ししている
+	{"gosql26", codeSQLLiteral},     // @db.where のリテラルが、列の型に渡せない
+	{"gosql27", codeSQLLatest},      // @db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない
+	{"gosql28", codeSQLDeleteAll},   // @db.delete の効果が、引数を一つも持たない
+	{"gosql29", codeSQLTransaction}, // op に @db.transaction が付いているのに、N に表の状態が一つもない
 }
 
 // TestDiagnostics は docs/plugin-go-sqlite.md「診断」の表の各行: 診断のコード・位置・メッセージがゴールデンと同じで、
@@ -225,6 +241,10 @@ func TestDiagnostics(t *testing.T) {
 			res := emitViews(t, newRoot(t), ours(t, loadViews(t, fx.name)))
 			if len(res.errors) == 0 {
 				t.Fatal("診断がない")
+			}
+			// 診断を返すとき、warning は返さない（表の状態が一つもないことの warning は、GOSQL-29 のときは出さない）
+			for _, w := range res.warnings {
+				t.Errorf("warning を返した（%s）: %s", w.At, w.Message)
 			}
 			for _, d := range res.errors {
 				if d.Code != fx.code {
@@ -237,12 +257,14 @@ func TestDiagnostics(t *testing.T) {
 }
 
 // TestDiagnosedOutputsOnly は、診断が、条件に当たった出力にだけ出ること: GOSQL-4 の入力の、当たらない名前空間 clean は、
-// ファイルを返す（model SharedTable を持つが、SharedTable を出さないので、当たらない）。
+// ファイルを返す（model DbSeams を持つが、DbSeams を出さないので、当たらない）。GOSQL-29 の入力の、表の状態を持つ名前空間 ok も同じ。
 func TestDiagnosedOutputsOnly(t *testing.T) {
-	for _, v := range ours(t, loadViews(t, "gosql4")) {
-		res := emitViews(t, newRoot(t), []*ir.View{v})
-		if clean := v.Viewer == "clean"; clean != (len(res.errors) == 0) || clean != (len(res.files) == 1) {
-			t.Errorf("%s: files=%d errors=%d", v.Viewer, len(res.files), len(res.errors))
+	for fixture, clean := range map[string]string{"gosql4": "clean", "gosql29": "ok"} {
+		for _, v := range ours(t, loadViews(t, fixture)) {
+			res := emitViews(t, newRoot(t), []*ir.View{v})
+			if ok := v.Viewer == clean; ok != (len(res.errors) == 0) || ok != (len(res.files) == 1) {
+				t.Errorf("%s の %s: files=%d errors=%d", fixture, v.Viewer, len(res.files), len(res.errors))
+			}
 		}
 	}
 }
@@ -250,7 +272,7 @@ func TestDiagnosedOutputsOnly(t *testing.T) {
 // TestNoGoMod は、Dir(U, N) の上に go.mod がないとき: 報告するのは基底（GO-1。docs/plugin-go.md「診断」）で、go-sqlite は、
 // ファイルも診断も返さない（型のパッケージの import パスを求められないので、何も出せない）。
 func TestNoGoMod(t *testing.T) {
-	res := emitViews(t, t.TempDir(), ours(t, loadViews(t, "ops")))
+	res := emitViews(t, t.TempDir(), ours(t, loadViews(t, "reads")))
 	if len(res.files) != 0 || len(res.errors) != 0 || len(res.warnings) != 0 {
 		t.Fatalf("files=%d errors=%v warnings=%v, want どれも空", len(res.files), res.errors, res.warnings)
 	}
@@ -259,7 +281,7 @@ func TestNoGoMod(t *testing.T) {
 // TestMalformedView は、View が欠けている（Program がない、viewer の名前空間が Program にない）とき: 利用者の仕様の誤りではないので、
 // 診断ではなく誤りを返す（プラグインは終了コード 1 で終わる。docs/plugin-protocol.md「起動」）。
 func TestMalformedView(t *testing.T) {
-	view := ours(t, loadViews(t, "ops"))[0]
+	view := ours(t, loadViews(t, "reads"))[0]
 	for name, v := range map[string]*ir.View{
 		"Program がない":          {Version: ir.Version, Viewer: "shop", Config: view.Config},
 		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
@@ -280,7 +302,7 @@ func TestHandler(t *testing.T) {
 		}
 		return ""
 	}}
-	view := ours(t, loadViews(t, "ops"))[0]
+	view := ours(t, loadViews(t, "reads"))[0]
 	resp, err := h.Emit(request(view))
 	if err != nil {
 		t.Fatal(err)

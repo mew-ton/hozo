@@ -1,0 +1,26 @@
+// GOSQL-28（docs/plugin-go-sqlite.md「効果の中身」の未決）: @db.delete の効果が、引数を一つも持たない（すべての行を消す形は、
+// まだ決めていない）。位置は効果。
+
+namespace app {
+  model Row { @db.key @db.text id: string; }
+  @db.table state rows: list<Row>;
+  @db.table state logs: list<Row>;
+
+  @db.delete
+  effect clearRows() on rows.delete;
+  /** 配線が呼んでも、効果ごとに一度だけ */
+  @db.delete
+  effect clearLogs() on logs.delete;
+  export op reset() {
+    clearLogs();
+  }
+
+  // 通るもの
+  @db.delete
+  effect deleteRow(id: string) on rows.delete;
+  /** デコレータを付けていなければ、人が書く（すべての行を消す効果は、こう書く） */
+  effect truncate() on rows.delete;
+  /** 条件のない @db.list は、決まっている（すべての行） */
+  @db.list
+  read allRows(): Row[] on rows;
+}

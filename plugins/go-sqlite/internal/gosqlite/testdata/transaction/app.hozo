@@ -1,0 +1,166 @@
+// docs/plugin-go-sqlite.md「トランザクション」: @db.transaction の付いた op の継ぎ目の実装 DbSeams。
+// 継ぎ目のメソッドの本体は、戻り値の有無の二つの形だけで、op の引数と戻り値の型のほかは、同じテキスト（plugins/go-sqlite の
+// TestSeamsUniform）。入れ子と、同じ db の上の二つの名前空間（bank と audit）は、振る舞いのテストで確かめる。
+
+/** 継ぎ目を宣言する、もう一つの相乗り go-trace のデコレータ */
+namespace t {
+  decorator traced for op;
+}
+
+/** bank と audit が使う型 */
+namespace kinds {
+  scalar AccountId extends string;
+  scalar Amount extends int;
+}
+
+/** 記録。bank と同じ db の上の、別の名前空間 */
+namespace audit {
+  model Entry {
+    @db.text account: kinds.AccountId;
+    @db.text what: string;
+  }
+
+  @db.table state entries: list<Entry>;
+
+  @db.insert
+  effect createEntry(entry: Entry) on entries.post;
+
+  @db.list
+  read entriesOf(account: kinds.AccountId): Entry[] on entries;
+
+  /** 継ぎ目を持たない op: 呼んだ側の ctx が運ぶトランザクションに入る */
+  export op record(entry: Entry) {
+    createEntry(entry);
+  }
+
+  /** 継ぎ目を持つ op: 別の名前空間のトランザクションの中から呼ばれれば、新しく始めずに、それに加わる */
+  @db.transaction
+  export op recordTwice(first: Entry, second: Entry) {
+    createEntry(first);
+    createEntry(second);
+  }
+
+  /** 口座の記録 */
+  export op history(account: kinds.AccountId): Entry[] {
+    return entriesOf(account);
+  }
+}
+
+/** 口座 */
+namespace bank {
+  model Account {
+    @db.key @db.text id: kinds.AccountId;
+    @db.int balance: kinds.Amount;
+  }
+
+  @db.table state accounts: list<Account>;
+
+  @db.find
+  read accountById(id: kinds.AccountId): Account? on accounts;
+
+  @db.insert
+  effect createAccount(account: Account) on accounts.post;
+
+  @db.update
+  effect updateAccount(account: Account) on accounts.put;
+
+  // ---- 継ぎ目のメソッドの二つの形 ----
+
+  /** 戻り値がない。二つの効果を、一つのトランザクションで */
+  @db.transaction
+  export op open(first: Account, second: Account) {
+    createAccount(first);
+    createAccount(second);
+  }
+
+  /** 戻り値がある（省略可能な model）。op の中の read は、同じ op が先に書いたものを見る */
+  @db.transaction
+  export op openAndFind(account: Account): Account? {
+    createAccount(account);
+    return accountById(account.id);
+  }
+
+  /** 戻り値がある（配列）。引数がない */
+  @db.transaction
+  export op snapshot(): Account[] {
+    return accounts;
+  }
+
+  /** 戻り値がある（scalar）。葉の op: 継ぎ目は、人が書いた中身（Leaves のメソッド）を包む */
+  @db.transaction
+  export op deposit(id: kinds.AccountId, amount: kinds.Amount): kinds.Amount;
+
+  /** 戻り値がない、葉の op。引数は、省略可能な値と配列 */
+  @db.transaction
+  export op closeAll(ids: kinds.AccountId[], note: string?);
+
+  // ---- 入れ子: 継ぎ目を持つ op が、継ぎ目を持つ op を呼ぶ ----
+
+  /** 外側が足してから、内側（open）を呼ぶ。内側が失敗すれば、外側が足したものも残らない */
+  @db.transaction
+  export op openThree(first: Account, second: Account, third: Account) {
+    createAccount(first);
+    open(second, third);
+  }
+
+  /** 内側（open）が成功した後に、外側が失敗すれば、内側が足したものも残らない（確定するのは、いちばん外側） */
+  @db.transaction
+  export op openThenReplace(first: Account, second: Account, replaced: Account, extra: Account) {
+    open(first, second);
+    updateAccount(replaced);
+    createAccount(extra);
+  }
+
+  // ---- 別の名前空間（audit）をまたぐ: 同じ db の上なら、同じトランザクション ----
+
+  /** audit の、継ぎ目を持たない op を呼ぶ */
+  @db.transaction
+  export op openLogged(account: Account, entry: audit.Entry) {
+    audit.record(entry);
+    createAccount(account);
+  }
+
+  /** audit の、継ぎ目を持つ op を呼ぶ（入れ子が、名前空間をまたぐ） */
+  @db.transaction
+  export op openLoggedTwice(account: Account, first: audit.Entry, second: audit.Entry) {
+    audit.recordTwice(first, second);
+    createAccount(account);
+  }
+
+  /** 継ぎ目を持たない op: トランザクションは始めない */
+  export op find(id: kinds.AccountId): Account? {
+    return accountById(id);
+  }
+}
+
+/** 継ぎ目を宣言したトランスパイラが二つ並ぶ単位: 基底の Seams は、二つの相乗りのメソッドを持つ */
+namespace mixed {
+  model Row {
+    @db.key @db.text id: string;
+  }
+
+  @db.table state rows: list<Row>;
+
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+
+  /** go-sqlite の継ぎ目だけ */
+  @db.transaction
+  export op add(row: Row) {
+    createRow(row);
+  }
+
+  /** go-trace の継ぎ目だけ（DbSeams は、このメソッドを持たない） */
+  @t.traced
+  export op touch(row: Row) {
+    createRow(row);
+  }
+
+  /** 二つの継ぎ目: 外側が @t.traced、内側が @db.transaction */
+  @t.traced
+  @db.transaction
+  export op addTwo(first: Row, second: Row) {
+    createRow(first);
+    createRow(second);
+  }
+}

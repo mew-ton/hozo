@@ -1,0 +1,29 @@
+// GOSQL-25（docs/plugin-go-sqlite.md「read の中身」）: 一つの read の条件が、同じ列を二度名指ししている（引数と @db.where、
+// 二つの @db.where）。位置は read。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; @db.int rank: int; @db.time at: Time; }
+  @db.table state rows: list<Row>;
+
+  // 引数と @db.where
+  @db.list
+  @db.where("note", "x")
+  read rowsNoted(note: string): Row[] on rows;
+  // 二つの @db.where（値が同じでも）
+  @db.list
+  @db.where("rank", 1)
+  @db.where("rank", 1)
+  read topRows(): Row[] on rows;
+  // 三度
+  @db.find
+  @db.where("id", "a")
+  @db.where("id", "b")
+  read fixedRow(id: string): Row? on rows;
+
+  // 通るもの: 別の列。@db.latest の列は、条件ではない
+  @db.list
+  @db.where("note", "x")
+  @db.where("rank", 1)
+  @db.latest("at")
+  read rowsAt(at: Time): Row[] on rows;
+}

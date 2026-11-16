@@ -1,0 +1,46 @@
+// GOSQL-27（docs/plugin-go-sqlite.md「read の中身」）: @db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない。
+// 位置は read。
+
+namespace app {
+  model Row {
+    @db.key @db.text id: string;
+    @db.bool flag: boolean;
+    @db.json tags: string[];
+    @db.text note: string?;
+    @db.time at: Time;
+    @db.int rank: int;
+    @db.int span: Duration;
+    @db.float score: float?;
+  }
+  @db.table state rows: list<Row>;
+
+  // @db.text
+  @db.list
+  @db.latest("id")
+  read byId(): Row[] on rows;
+  @db.find
+  @db.latest("note")
+  read lastNoted(): Row? on rows;
+  // @db.bool
+  @db.list
+  @db.latest("flag")
+  read byFlag(): Row[] on rows;
+  // @db.json
+  @db.list
+  @db.latest("tags")
+  read byTags(): Row[] on rows;
+
+  // 通るもの: @db.time、@db.int（Duration も）、@db.float（省略可能でも）
+  @db.list
+  @db.latest("at")
+  read newest(): Row[] on rows;
+  @db.list
+  @db.latest("rank")
+  read ranked(): Row[] on rows;
+  @db.list
+  @db.latest("span")
+  read longest(): Row[] on rows;
+  @db.find
+  @db.latest("score")
+  read best(): Row? on rows;
+}

@@ -1,5 +1,6 @@
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「状態ごとの型」の
-# 「デコレータを付けていない op があるとき」と、「状態をまたぐ単位の型」（SharedTable と <C>Table。足りないメソッドのあるものと、ないもの）。
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「状態ごとの型」の、db の語彙の
+# デコレータを付けていない read と効果があるとき（その型は、メソッドを持たず、var _ を出さない。warning も出さない）と、
+# 型を出さない単位（表の状態でない状態、述語で決まる状態の分類）。
 [[emit]]
 namespace   = "lib"
 transpilers = ["go", "go-sqlite"]

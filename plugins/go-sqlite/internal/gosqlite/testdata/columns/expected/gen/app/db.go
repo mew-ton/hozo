@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"slices"
 	"time"
+
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。
@@ -80,8 +82,25 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
+// Querier は *sql.DB と *sql.Tx が共に持つ、文の実行。
+type Querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Conn は、ctx で文を実行する先: ctx が db のトランザクション（@db.transaction の継ぎ目が始めたもの）を運んでいれば、それ。なければ db。
+// このファイルの型のメソッドは、どれもこれを通す。人が書き足すメソッドも、db を直に使わずに、これを通す（通さなければ、トランザクションに入らない）。
+// 鍵は runtime.DBTxKey（db ごとに一つ。どの名前空間の出力も同じ鍵を使う）なので、別の名前空間の継ぎ目が、同じ db に始めたトランザクションにも入る。
+func Conn(ctx context.Context, db *sql.DB) Querier {
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		return tx
+	}
+	return db
+}
+
 // CoresTable は状態 app.cores の単位（CoresState）の、表 "cores" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type CoresTable struct{ db *sql.DB }
 
 // NewCoresTable は db の表 "cores" の上の CoresTable を返す。表は CreateTables が作る。
@@ -100,9 +119,9 @@ func (t CoresTable) Get(ctx context.Context) ([]Core, error) {
 		`SELECT "s", "i", "d", "f", "b", "t" FROM "cores" ORDER BY rowid`)
 }
 
-// AddCore は op app.addCore（@db.effects）: 効果 app.createCore（@db.insert）で、表 "cores" に、引数 core の行を足す。
-func (t CoresTable) AddCore(ctx context.Context, core Core) error {
-	args, err := dbArgsCore(core)
+// CreateCore は効果 app.createCore（@db.insert）: 表 "cores" に、引数 row の行を足す。
+func (t CoresTable) CreateCore(ctx context.Context, row Core) error {
+	args, err := dbArgsCore(row)
 	if err != nil {
 		return err
 	}
@@ -111,7 +130,7 @@ func (t CoresTable) AddCore(ctx context.Context, core Core) error {
 }
 
 // NamedsTable は状態 app.nameds の単位（NamedsState）の、表 "nameds" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type NamedsTable struct{ db *sql.DB }
 
 // NewNamedsTable は db の表 "nameds" の上の NamedsTable を返す。表は CreateTables が作る。
@@ -130,9 +149,9 @@ func (t NamedsTable) Get(ctx context.Context) ([]Named, error) {
 		`SELECT "name", "count", "span", "ratio", "flag", "stamp", "label" FROM "nameds" ORDER BY rowid`)
 }
 
-// AddNamed は op app.addNamed（@db.effects）: 効果 app.createNamed（@db.insert）で、表 "nameds" に、引数 named の行を足す。
-func (t NamedsTable) AddNamed(ctx context.Context, named Named) error {
-	args, err := dbArgsNamed(named)
+// CreateNamed は効果 app.createNamed（@db.insert）: 表 "nameds" に、引数 row の行を足す。
+func (t NamedsTable) CreateNamed(ctx context.Context, row Named) error {
+	args, err := dbArgsNamed(row)
 	if err != nil {
 		return err
 	}
@@ -141,7 +160,7 @@ func (t NamedsTable) AddNamed(ctx context.Context, named Named) error {
 }
 
 // DocsTable は状態 app.docs の単位（DocsState）の、表 "docs" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type DocsTable struct{ db *sql.DB }
 
 // NewDocsTable は db の表 "docs" の上の DocsTable を返す。表は CreateTables が作る。
@@ -160,9 +179,9 @@ func (t DocsTable) Get(ctx context.Context) ([]Doc, error) {
 		`SELECT "tags", "attrs", "tag", "nested", "tree" FROM "docs" ORDER BY rowid`)
 }
 
-// AddDoc は op app.addDoc（@db.effects）: 効果 app.createDoc（@db.insert）で、表 "docs" に、引数 doc の行を足す。
-func (t DocsTable) AddDoc(ctx context.Context, doc Doc) error {
-	args, err := dbArgsDoc(doc)
+// CreateDoc は効果 app.createDoc（@db.insert）: 表 "docs" に、引数 row の行を足す。
+func (t DocsTable) CreateDoc(ctx context.Context, row Doc) error {
+	args, err := dbArgsDoc(row)
 	if err != nil {
 		return err
 	}
@@ -171,7 +190,7 @@ func (t DocsTable) AddDoc(ctx context.Context, doc Doc) error {
 }
 
 // SparsesTable は状態 app.sparses の単位（SparsesState）の、表 "sparses" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type SparsesTable struct{ db *sql.DB }
 
 // NewSparsesTable は db の表 "sparses" の上の SparsesTable を返す。表は CreateTables が作る。
@@ -190,9 +209,9 @@ func (t SparsesTable) Get(ctx context.Context) ([]Sparse, error) {
 		`SELECT "s", "i", "d", "f", "b", "t", "name", "count", "span", "ratio", "flag", "stamp", "tags", "attrs", "tag" FROM "sparses" ORDER BY rowid`)
 }
 
-// AddSparse は op app.addSparse（@db.effects）: 効果 app.createSparse（@db.insert）で、表 "sparses" に、引数 sparse の行を足す。
-func (t SparsesTable) AddSparse(ctx context.Context, sparse Sparse) error {
-	args, err := dbArgsSparse(sparse)
+// CreateSparse は効果 app.createSparse（@db.insert）: 表 "sparses" に、引数 row の行を足す。
+func (t SparsesTable) CreateSparse(ctx context.Context, row Sparse) error {
+	args, err := dbArgsSparse(row)
 	if err != nil {
 		return err
 	}
@@ -201,7 +220,7 @@ func (t SparsesTable) AddSparse(ctx context.Context, sparse Sparse) error {
 }
 
 // PairsTable は状態 app.pairs の単位（PairsState）の、表 "pairs" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type PairsTable struct{ db *sql.DB }
 
 // NewPairsTable は db の表 "pairs" の上の PairsTable を返す。表は CreateTables が作る。
@@ -220,9 +239,9 @@ func (t PairsTable) Get(ctx context.Context) ([]Pair, error) {
 		`SELECT "left", "right", "note" FROM "pairs" ORDER BY rowid`)
 }
 
-// AddPair は op app.addPair（@db.effects）: 効果 app.createPair（@db.insert）で、表 "pairs" に、引数 pair の行を足す。
-func (t PairsTable) AddPair(ctx context.Context, pair Pair) error {
-	args, err := dbArgsPair(pair)
+// CreatePair は効果 app.createPair（@db.insert）: 表 "pairs" に、引数 row の行を足す。
+func (t PairsTable) CreatePair(ctx context.Context, row Pair) error {
+	args, err := dbArgsPair(row)
 	if err != nil {
 		return err
 	}
@@ -231,7 +250,7 @@ func (t PairsTable) AddPair(ctx context.Context, pair Pair) error {
 }
 
 // SharedATable は状態 app.sharedA の単位（SharedAState）の、表 "sharedA" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type SharedATable struct{ db *sql.DB }
 
 // NewSharedATable は db の表 "sharedA" の上の SharedATable を返す。表は CreateTables が作る。
@@ -250,9 +269,9 @@ func (t SharedATable) Get(ctx context.Context) ([]Shared, error) {
 		`SELECT "id" FROM "sharedA" ORDER BY rowid`)
 }
 
-// AddSharedA は op app.addSharedA（@db.effects）: 効果 app.createSharedA（@db.insert）で、表 "sharedA" に、引数 shared の行を足す。
-func (t SharedATable) AddSharedA(ctx context.Context, shared Shared) error {
-	args, err := dbArgsShared(shared)
+// CreateSharedA は効果 app.createSharedA（@db.insert）: 表 "sharedA" に、引数 row の行を足す。
+func (t SharedATable) CreateSharedA(ctx context.Context, row Shared) error {
+	args, err := dbArgsShared(row)
 	if err != nil {
 		return err
 	}
@@ -261,7 +280,7 @@ func (t SharedATable) AddSharedA(ctx context.Context, shared Shared) error {
 }
 
 // SharedBTable は状態 app.sharedB の単位（SharedBState）の、表 "sharedB" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type SharedBTable struct{ db *sql.DB }
 
 // NewSharedBTable は db の表 "sharedB" の上の SharedBTable を返す。表は CreateTables が作る。
@@ -281,7 +300,7 @@ func (t SharedBTable) Get(ctx context.Context) ([]Shared, error) {
 }
 
 // LinksTable は状態 app.links の単位（LinksState）の、表 "links" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type LinksTable struct{ db *sql.DB }
 
 // NewLinksTable は db の表 "links" の上の LinksTable を返す。表は CreateTables が作る。
@@ -300,9 +319,9 @@ func (t LinksTable) Get(ctx context.Context) ([]Link, error) {
 		`SELECT "id", "core", "parent" FROM "links" ORDER BY rowid`)
 }
 
-// AddLink は op app.addLink（@db.effects）: 効果 app.createLink（@db.insert）で、表 "links" に、引数 link の行を足す。
-func (t LinksTable) AddLink(ctx context.Context, link Link) error {
-	args, err := dbArgsLink(link)
+// CreateLink は効果 app.createLink（@db.insert）: 表 "links" に、引数 row の行を足す。
+func (t LinksTable) CreateLink(ctx context.Context, row Link) error {
+	args, err := dbArgsLink(row)
 	if err != nil {
 		return err
 	}
@@ -413,13 +432,13 @@ type dbRow interface {
 	Scan(dest ...any) error
 }
 
-// dbOption は、列の読み書きに、フィールドのデコレータが足すこと。
+// dbOption は、列の読み書きに、フィールドの宣言が足すこと。
 type dbOption int
 
-// dbNullable は @db.nullable: その列は、値がなくてよい（NULL）。
+// dbNullable は、省略可能な（T?）フィールドの列: 値がなくてよい（NULL）。
 const dbNullable dbOption = 1
 
-// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドのデコレータが足したこと opts。
+// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドの宣言が足したこと opts。
 // v は、書くときはフィールドの値（か、列と比べる引数）、読むときはフィールドへのポインタ。
 // database/sql が、書くときに Value を、読むときに Scan を呼ぶ。
 type dbCol struct {
@@ -430,7 +449,7 @@ type dbCol struct {
 }
 
 // Value は、列に書く値。値があるかどうかは、実行時に見る: 値のないポインタは NULL。
-// @db.nullable（dbNullable）の列では、値のないスライスとマップも NULL。
+// 省略可能なフィールド（dbNullable）の列では、値のないスライスとマップも NULL。
 func (c dbCol) Value() (driver.Value, error) {
 	v := reflect.ValueOf(c.v)
 	switch v.Kind() {
@@ -447,13 +466,13 @@ func (c dbCol) Value() (driver.Value, error) {
 	return c.write(v)
 }
 
-// Scan は、列の値 src を、読む先に読む。NULL は、@db.nullable（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
-// ほかの列に NULL があれば、エラー。読む先がポインタ（省略可能）かどうかは、実行時に見る。
+// Scan は、列の値 src を、読む先に読む。NULL は、省略可能なフィールド（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
+// ほかの列（NOT NULL）に NULL があれば、エラー。読む先がポインタかどうかは、実行時に見る。
 func (c dbCol) Scan(src any) error {
 	dst := reflect.ValueOf(c.v).Elem()
 	if src == nil {
 		if !slices.Contains(c.opts, dbNullable) {
-			return fmt.Errorf("db: NULL in a column without @db.nullable (read into %s)", dst.Type())
+			return fmt.Errorf("db: NULL in a NOT NULL column (read into %s)", dst.Type())
 		}
 		dst.SetZero()
 		return nil
@@ -582,14 +601,14 @@ func dbJSON(v any, opts ...dbOption) dbCol {
 
 // dbExec は行を返さない文を実行する。
 func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {
-	_, err := db.ExecContext(ctx, query, args...)
+	_, err := Conn(ctx, db).ExecContext(ctx, query, args...)
 	return err
 }
 
 // dbIsEmpty は、行の数を返す問い合わせの結果が 0 かどうか。
 func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 	var n int64
-	if err := db.QueryRowContext(ctx, query).Scan(&n); err != nil {
+	if err := Conn(ctx, db).QueryRowContext(ctx, query).Scan(&n); err != nil {
 		return false, err
 	}
 	return n == 0, nil
@@ -597,7 +616,7 @@ func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 
 // dbList は問い合わせのすべての行を scan で読む。
 func dbList[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) ([]R, error) {
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := Conn(ctx, db).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

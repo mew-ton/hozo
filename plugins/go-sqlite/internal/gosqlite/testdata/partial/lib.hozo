@@ -1,11 +1,6 @@
-// docs/plugin-go-sqlite.md「状態ごとの型」「状態をまたぐ単位の型」: db の語彙のデコレータを付けていない op があるとき、その型は、
-// その op のメソッドを持たず、var _ を出さない。warning も出さない。述語で決まる状態の分類の単位の命令は <C>Table、
-// 宛先の単位が分かれる op は SharedTable。
-
-// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
-// （docs/check.md「デコレータが運ぶ reads と effects」）
-decorator reading(...tables: any state) for op reads tables;
-decorator doing(...targets: any effect) for op effects targets;
+// docs/plugin-go-sqlite.md「状態ごとの型」: db の語彙のデコレータを付けていない read と効果があるとき、その型は、そのメソッドを
+// 持たず、var _ を出さない（人が、型を埋め込んで書き足す。足りなければ、基底の New に渡す行がコンパイルできない）。warning も出さない。
+// 表の状態でない状態の単位と、述語で決まる状態の分類の単位の型は、出さない。
 
 /** 図書館 */
 namespace lib {
@@ -17,128 +12,116 @@ namespace lib {
     @db.int pages: int;
   }
 
-  model Note { @db.text text: string; @db.int stars: int; }
+  model Note {
+    @db.text text: string;
+    @db.int stars: int;
+  }
 
-  model Archived { @db.key @db.text id: BookId; }
-
-  model Stamp { @db.time at: Time; }
-
-  model Loan {
-    @db.key @db.ref(Book) @db.text book: BookId;
-    @db.text member: string;
+  model Stamp {
+    @db.time at: Time;
   }
 
   @db.table state books: list<Book>;
   @db.table state notes: list<Note>;
-  @db.table state loans: list<Loan>;
-  /** op を一つも持たない表の状態（句は「この単位では、すべて」。var _ を出す）。命令は、分類 Shelving の単位に置かれる */
-  @db.table state archive: list<Archived>;
-  /** 行を受け取る op（@db.insert、@db.update）を持たない表: dbScan<Model> だけが出て、dbArgs<Model> は出ない（使う補助だけを出す） */
+  /** 行を受け取るメソッド（@db.insert、@db.update、Post）を持たない表: dbScan<Model> だけが出て、dbArgs<Model> は出ない */
   @db.table state stamps: list<Stamp>;
   /** @db.table のない状態は、表にならない（単位は、人が書く） */
   state drafts: list<Note>;
 
-  // ---- books: デコレータを付けた op と、付けていない op ----
+  // ---- books: デコレータを付けた read と効果と、付けていない read と効果 ----
 
   @db.find
-  read findBookRow(id: BookId): Book? on books;
-  export op findBook(id: BookId): Book? {
-    return findBookRow(id);
-  }
-  // 付けていない: 順序と件数は、デコレータで言えない
-  @reading(books) export op newestBooks(limit: int): Book[];
-  // 付けていない
-  @reading(books) export op countBooks(): int;
+  read bookById(id: BookId): Book? on books;
+
+  /** 付けていない: 件数と位置は、この語彙で言えない */
+  read newestBooks(limit: int): Book[] on books;
+
+  /** 付けていない: 行でないものを引く */
+  read countBooks(): int on books;
 
   @db.insert
-  effect createBook(row: Book) on books.post;
-  /** デコレータを付けていない効果 */
-  effect deleteBook() on books.delete;
+  effect createBook(book: Book) on books.post;
 
-  export op addBook(book: Book) {
-    createBook(book);
-  }
-  // 付けていない
-  @doing(deleteBook) export op clearBooks();
+  /** 付けていない: 条件に合う行の、一つの列だけの書き換え */
+  effect retitle(id: BookId, title: string) on books.put;
 
-  // ---- notes: 基底の状態の遷移を宛先にする効果には、db のデコレータを付けない（docs/plugin-go-sqlite.md「効果の中身」: 宛先は、
-  // 組み込みの効果でなければならない）。人が書く ----
+  /** 付けていない: すべての行を消す */
+  effect clearBooks() on books.delete;
 
+  // ---- notes: read は付け、効果は付けていない ----
+
+  @db.list
+  read notesWith(stars: int): Note[] on notes;
+
+  /** 基底の状態の遷移を宛先にする効果には、db のデコレータを付けられない（付ければ GOSQL-11）。人が書く */
   effect firstNote(note: Note) on notes: Empty -> HasItems;
-  effect lastNote(text: string) on notes: HasItems -> Empty;
 
-  export op startNotes(note: Note) {
-    firstNote(note);
-  }
-  @db.transaction
-  export op swapNote(text: string, note: Note) {
-    lastNote(text);
-    firstNote(note);
-  }
-
-  // ---- stamps: 消すだけ ----
+  // ---- stamps: すべてに付けた（消すだけ） ----
 
   @db.delete
   effect dropStamp(at: Time) on stamps.delete;
-  export op unstamp(at: Time) {
-    dropStamp(at);
-  }
 
-  // ---- drafts: 表でない状態の op は、どの型にも出ない ----
+  // ---- drafts: 表でない状態の read と効果は、どの型にも出ない ----
 
-  @reading(drafts) export op listDrafts(): Note[];
+  read draftsWith(stars: int): Note[] on drafts;
+  effect createDraft(note: Note) on drafts.post;
 
-  // ---- 述語で決まる状態の分類の単位: <C>Table ----
+  // ---- 述語で決まる状態の分類の単位（LendingState）: 型は出さない ----
 
-  /** 貸し出しの進み具合（books と loans にまたがる） */
-  classify Lending of books, loans {
+  /** 貸し出しの進み具合 */
+  classify Lending of books, notes {
     /** 貸し出していない */
     Free;
     /** 貸し出している */
     Lent;
   }
 
-  /** 状態の分類の遷移を宛先にする効果: 書き込む状態は books と loans。db のデコレータは付けない */
-  effect lend(loan: Loan) on Lending: Free -> Lent;
-  effect retitle(book: Book) on Lending: any -> any;
-  effect giveBack() on Lending: Lent -> Free;
+  /** 状態の分類の遷移を宛先にする効果。人が書く */
+  effect lend(book: Book) on Lending: Free -> Lent;
 
-  export op lendBook(loan: Loan) {
-    lend(loan);
-  }
-  // 二つの効果の宛先の単位が、どちらも Lending で、一つのトランザクション
-  @db.transaction
-  export op lendRenamed(book: Book, loan: Loan) {
-    retitle(book);
-    lend(loan);
-  }
-  // 付けていない
-  @doing(giveBack) export op returnBook(book: BookId);
+  // ---- op: read と効果を呼ぶ配線 ----
 
-  /** 一つの状態だけにまたがる、述語で決まる状態の分類 */
-  classify Shelving of archive {
-    Open;
-    Closed;
-  }
-  effect shelve(book: Archived) on Shelving: Open -> Closed;
-  export op shelveBook(book: Archived) {
-    shelve(book);
+  /** 本を引く */
+  export op findBook(id: BookId): Book? {
+    return bookById(id);
   }
 
-  // ---- SharedState: 宛先の単位が分かれる op と、複数の状態を読む op ----
+  /** 新しい本 */
+  export op newest(limit: int): Book[] {
+    return newestBooks(limit);
+  }
 
-  // 宛先の単位が books と notes: SharedTable のメソッド
-  @db.transaction
-  export op addWithNote(book: Book, note: Note) {
+  /** 本を足す */
+  export op addBook(book: Book) {
     createBook(book);
-    firstNote(note);
   }
-  // 宛先の単位が books と Lending（Lending は books にもまたがるが、単位は別）
+
+  /** 本の題を変える */
+  export op rename(id: BookId, title: string) {
+    retitle(id, title);
+  }
+
+  /** 本を足して、題を変える。人が書いた効果（retitle）も、Conn を通せば、同じトランザクションに入る */
   @db.transaction
-  export op addAndLend(book: Book, loan: Loan) {
+  export op addRenamed(book: Book, title: string) {
     createBook(book);
-    lend(loan);
+    retitle(book.id, title);
   }
-  // 付けていない: 複数の状態を読む葉は、SharedState の op（読む op のデコレータは、表一つしか読めない）
-  @reading(books, loans) export op overdue(): Book[];
+
+  /** 題を変えてから、本を足す。後の効果が失敗すれば、人が書いた効果のしたことも残らない */
+  @db.transaction
+  export op renameThenAdd(id: BookId, title: string, book: Book) {
+    retitle(id, title);
+    createBook(book);
+  }
+
+  /** 下書きを足す */
+  export op draft(note: Note) {
+    createDraft(note);
+  }
+
+  /** 本を貸す */
+  export op lendBook(book: Book) {
+    lend(book);
+  }
 }

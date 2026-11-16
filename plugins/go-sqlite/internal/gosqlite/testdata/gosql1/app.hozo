@@ -1,13 +1,10 @@
-// GOSQL-1（docs/plugin-go-sqlite.md「表」）: @db.table(M) の付いた状態の要素の型が、M と等しくない（要素が model でないときを含む）。
+// GOSQL-1（docs/plugin-go-sqlite.md「表」）: @db.table の付いた状態の要素の型が、model でない（表の model は、状態の要素の型）。
 // 位置は状態。
 
 namespace app {
   scalar Id extends string;
   model Row { @db.key @db.text id: Id; }
-  /** 形は同じでも、別の model */
-  model Other { @db.key @db.text id: Id; }
-  /** Row を継承した model も、別の model */
-  model Wide extends Row { @db.text note: string; }
+  union Shape { Circle: Row; Other: string; }
 
   // 核の型
   @db.table state names: list<string>;
@@ -15,23 +12,18 @@ namespace app {
   @db.table state ids: list<Id>;
   // array
   @db.table state groups: list<Row[]>;
-  // 別の model
-  @db.table state others: list<Other>;
-  // 継承した model
-  @db.table state wides: list<Wide>;
-  // 等しければ通る
+  // record
+  @db.table state byName: list<Record<string, Row>>;
+  // union
+  @db.table state shapes: list<Shape>;
+  // model なら通る
   @db.table state rows: list<Row>;
-  @db.table state all: list<Wide>;
+  // @db.table がなければ、見ない
+  state plain: list<string>;
 
-  // 表にならなかった状態を名指しするデコレータは、重ねて報告しない
+  // 表にならなかった状態を宛先にする read と効果は、重ねて報告しない
   @db.find
-  read findNameRow(id: Id): Row? on names;
-  export op findName(id: Id): Row? {
-    return findNameRow(id);
-  }
+  read nameById(id: Id): Row? on names;
   @db.insert
-  effect createOther(row: Other) on others.post;
-  export op addOther(other: Other) {
-    createOther(other);
-  }
+  effect createId(row: Row) on ids.post;
 }

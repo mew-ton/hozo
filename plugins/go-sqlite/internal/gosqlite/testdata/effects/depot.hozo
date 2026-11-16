@@ -1,0 +1,106 @@
+// docs/plugin-go-sqlite.md「効果の中身」の表の各行と、「状態ごとの型」の、形で決まる命令 Post、「メソッドの形とコメント」の効果の句。
+// 表は、効果の宛先の状態。@db.insert と @db.update の引数は、表の model の行一つ。@db.delete の引数は、条件（名前が列）。
+
+/** 倉庫 */
+namespace depot {
+  scalar Code extends string;
+
+  model Crate {
+    @db.key @db.text code: Code;
+    @db.text label: string;
+    @db.int weight: int;
+    /** 値がなくてよい列 */
+    @db.text zone: string?;
+    @db.json contents: string[];
+  }
+
+  /** キーが二つ */
+  model Slot {
+    @db.key @db.text aisle: string;
+    @db.key @db.int level: int;
+    @db.text crate: Code?;
+    @db.bool locked: boolean;
+  }
+
+  /** キーがない */
+  model Event {
+    @db.text crate: Code;
+    @db.text what: string;
+    @db.time at: Time;
+  }
+
+  @db.table state crates: list<Crate>;
+  @db.table state slots: list<Slot>;
+  @db.table state events: list<Event>;
+
+  // ---- crates ----
+
+  /** @db.insert */
+  @db.insert
+  effect createCrate(crate: Crate) on crates.post;
+
+  /** @db.update: キーが一つ */
+  @db.update
+  effect updateCrate(crate: Crate) on crates.put;
+
+  /** @db.delete: 列が一つ */
+  @db.delete
+  effect deleteCrate(code: Code) on crates.delete;
+
+  /** @db.delete: 列が二つ（どの条件も満たす行をすべて消す） */
+  @db.delete
+  effect deleteLabelled(label: string, weight: int) on crates.delete;
+
+  /** @db.delete: 省略可能な列に、T? の引数（値がなければ、値のない行を消す） */
+  @db.delete
+  effect deleteInZone(zone: string?) on crates.delete;
+
+  @db.find
+  read crateByCode(code: Code): Crate? on crates;
+
+  // ---- slots ----
+
+  @db.insert
+  effect createSlot(slot: Slot) on slots.post;
+
+  /** @db.update: キーが二つ */
+  @db.update
+  effect updateSlot(slot: Slot) on slots.put;
+
+  /** @db.delete: 二つのキー */
+  @db.delete
+  effect deleteSlot(aisle: string, level: int) on slots.delete;
+
+  // ---- events ----
+
+  /** 配線が呼んでいない効果も、状態の単位のメソッドになる */
+  @db.delete
+  effect deleteEventsOf(crate: Code) on events.delete;
+
+  // ---- op: 効果を呼ぶ配線 ----
+
+  /** 木箱を足す */
+  export op addCrate(crate: Crate) {
+    createCrate(crate);
+  }
+
+  /** 木箱を書き換える */
+  export op saveCrate(crate: Crate) {
+    updateCrate(crate);
+  }
+
+  /** 木箱を消す */
+  export op removeCrate(code: Code) {
+    deleteCrate(code);
+  }
+
+  /** 棚の段を書き換える */
+  export op saveSlot(slot: Slot) {
+    updateSlot(slot);
+  }
+
+  /** 出来事を記録する。形で決まる命令 Post: 配線が、組み込みの効果を直に呼ぶ */
+  export op logEvent(event: Event) {
+    events.post(event);
+  }
+}

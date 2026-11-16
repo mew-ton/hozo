@@ -1,7 +1,0 @@
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「op の中身」の表の各行
-# （@db.find、@db.list、@db.effects と、効果の @db.insert / @db.update / @db.delete）、「列と引数の型」、「トランザクション」。
-# どの op も db の語彙のデコレータを持つ（どの型も、基底の単位を満たす）。
-[[emit]]
-namespace   = "shop"
-transpilers = ["go", "go-sqlite"]
-out         = "gen/shop"

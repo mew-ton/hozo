@@ -1,11 +1,12 @@
 // Package gosqlite は go-sqlite プラグインの中身（docs/plugin-go-sqlite.md）。
 //
 // Handler が plugin.Handler を実装し、View（出力ごとに一つ。見る側は出力する名前空間 N）から、N の入口のパッケージの db.go を
-// 作る: @db.table の付いた状態（表の状態）ごとの表（Schema、CreateTables）と、基底 go の状態の単位（<状態>State）と
-// SharedState を満たす型（<状態>Table、SharedTable、<C>Table）。出すものは、仕様が db の語彙のデコレータで言ったものと、
-// 状態の形で決まる問い合わせだけで、デコレータの引数だけから作る。型は、書いたものが食い違っていないかを確かめるのにだけ使う
-// （docs/requirements.md「出力を推論しない」）。基底の形（置き場、名前、型、op の置き場と形）は、公開の SDK plugin/golang で
-// 求める。基底の応答は見ない（docs/plugin-protocol.md「相乗りが基底の形を知る方法」）。
+// 作る: @db.table の付いた状態（表の状態）ごとの表（Schema、CreateTables）と、基底 go の状態の単位（<状態>State）を満たす型
+// （<状態>Table）と、@db.transaction の継ぎ目の実装（DbSeams）。出すものは、付ける先で二つに分かれる（docs/requirements.md
+// 「出力を推論しない」）: op 以外（状態、表の model のフィールド、read、効果）は、宣言の全体から中身を作り、デコレータは、宣言が
+// 言っていないことだけを言う。op（@db.transaction）は、中身を決めず、前後にトランザクションの始めと終わりを足すだけで、出すコードは
+// 型に依らない。基底の形（置き場、名前、型、状態の単位のメソッド、継ぎ目）は、公開の SDK plugin/golang で求める。基底の応答は
+// 見ない（docs/plugin-protocol.md「相乗りが基底の形を知る方法」）。
 package gosqlite
 
 import (

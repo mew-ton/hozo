@@ -2,7 +2,7 @@
 
 小さな店のサーバー（ログイン、自分の情報、注文）を、サンプルを書きながら決めたこと（`docs/decisions.md`「サンプルを書きながら決めたこと（P の番号との対応）」の P1〜P39）を**当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書を変える決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124、132〜143 と S25〜S28: 節の区切りは `,` 一つ。状態に触れるのは、引数を持つ `read` と効果だけで、その中身は `db` の語彙のデコレータが宣言から作る。op は、それを呼ぶ配線か、状態に触れない葉。op のデコレータは、包むだけ）も、このサンプルと設計文書を先に書いた。こちらは、実装がまだない**（同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
+P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書を変える決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124、132〜143 と S25〜S28: 節の区切りは `,` 一つ。状態に触れるのは、引数を持つ `read` と効果だけで、その中身は `db` の語彙のデコレータが宣言から作る。op は、それを呼ぶ配線か、状態に触れない葉。op のデコレータは、包むだけ）も、このサンプルと設計文書を先に書き、その後に実装を入れた**（書いたときになかったものと、今の状態は、同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
 
 **生成するコードの規則の持ち主は、トランスパイラごとの設計文書**（「各トランスパイラの規則」）。この文書が持つのは、ファイルの出どころ、この仕様に固有の事実、サンプルの中のプラグイン `go-ratelimit` の規則、書いて分かったこと。期待する出力（`gen/`）は、設計文書の形のとおりに書いてある（文書と違うところは、残していない）。
 
@@ -30,7 +30,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 ### R4 で、まだないもの
 
-`docs/requirements.md`「作り直しの段階」の R4（`docs/decisions.md`「決めたこと」124、132〜143）も、実装より先に、このサンプルに入れた。**次の表のものは、実装がまだない。**
+`docs/requirements.md`「作り直しの段階」の R4（`docs/decisions.md`「決めたこと」124、132〜143）も、実装より先に、このサンプルに入れた。**次の表は、書いたときになかったもの。** 今の状態は、表の後ろの箇条。
 
 | ないもの | このサンプルで使っているところ | 文書 |
 |---|---|---|
@@ -42,10 +42,10 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | `go-http`: 例外の値を、引数の名前をキーにしたオブジェクトで返す | `gen/server/http.go` の `httpThrown`（この仕様の例外は、どれも引数を持たないので、応答は変わらない） | `docs/plugin-go-http.md`「失敗の応答」 |
 | 文書の版（`docs/ir.md`「版」） | `plugins/go-ratelimit/hozo-plugin.toml` の `protocol`。hozoc と、リポジトリのプラグインのマニフェストと、一緒に上げる | `docs/ir.md`「版」 |
 
-- その間に `TestSamples` のどのサブテストが通らないかの持ち主は、`../README.md`「移行の間」。
+- **表のどの行にも、このサンプルが使う分の実装が入った**（版 0.6 の hozoc と、基底 `go`、`go-valid`、`go-sqlite`、`go-http`、サンプルの中の `go-ratelimit`）。このサンプルの `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る。`go-sqlite` は、これを書いたとき、サンプルが使わない場合（単体テストの入力と診断）を直している途中だった。実装が入るまでの間に、どのサブテストが通らなかったかの記録と、段階の全体の持ち主は、`../README.md`「移行の間」と、`docs/requirements.md`「作り直しの段階」の R4 の行。
 - **表のうち、基底 `go` の行は、実装が入った。** 基底のファイル（`sample.json` の `go` の 21 個）は、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。確かめたのは、相乗りを代役（ファイルを返さないトランスパイラ。`../README.md`「飛ばす条件」）に置き換えた形で、`go-sqlite` の代役のマニフェストには、文書のとおり `seams = ["db.transaction"]` を足した。本物の `go-sqlite` のマニフェストが `seams` を宣言するまで、`gen/store` の `ops.go` と `wiring.go` は、継ぎ目のない形（`gen/storemem` と同じ形）で出る。
-- **`plugins/go-ratelimit/testdata/` は、入力の仕様だけを直した**（`seams/app.hozo` の、状態に触れる二つの op を、`read` と効果を呼ぶ配線に）。`views.json`（hozoc が置く `View`）と、それに合わせてある `seams/behavior_test.go`（状態の単位の見立て）は、前の版のまま: `go-ratelimit` の出力（継ぎ目のメソッド）は、op の形が同じなので変わらない。二つは、R4 の実装と一緒に直す（「サンプルの中のプラグイン」の「実装」）。
-- この段階の期待する出力は、どの hozoc でも確かめていない（「分かったこと」N121）。`files` と `go`（このモジュールの `go vet` と `go test`）は、hozoc を使わないので、今も通る。
+- **`plugins/go-ratelimit/testdata/` は、先に、入力の仕様だけを直してあった**（`seams/app.hozo` の、状態に触れる二つの op を、`read` と効果を呼ぶ配線に）。R4 の実装と一緒に、`views.json`（hozoc が置く `View`）を置き直し、`seams/behavior_test.go` の、状態の単位の見立てを、`read` と効果のメソッド（`ItemById`、`AddItem`）に直した（「サンプルの中のプラグイン」の「実装」）。`go-ratelimit` のコード（`emit.go`）と、その出力（ゴールデン `expected/` と、`gen/server/ratelimit.go`）は、変えていない: 継ぎ目のメソッドは、op の形が同じなので変わらない。
+- この段階の期待する出力を書いたときは、どの hozoc でも確かめていなかった（「分かったこと」N121）。今は、`TestSamples` の `transpilers/*` が、`hozoc emit` の出力とバイト単位で比べている。
 
 ## 入力
 
@@ -175,7 +175,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 - **ブラックボックスのテスト**は、リポジトリの `TestSamples` の `transpilers/go-ratelimit`: `gen/server/ratelimit.go` とバイト単位で比べる。
 - **単体テスト**は `emit_test.go`（このモジュールの `go test ./...` が走らせる。`TestSamples` の `go`）。サンプルが使わない場合を、小さな入力 `testdata/<名前>/`（`hozo.toml` と `.hozo`）とゴールデン `testdata/<名前>/expected/` で確かめる: `seams`（戻り値のない op、零値の各行、当たる引数名、内部の op、継ぎ目を宣言したトランスパイラがもう一つある単位、対象のない名前空間）、`gorate1`、`gorate2`（診断）。生成したコードは、基底のプラグインをビルドして出させた基底のファイルと合わせて、一時のモジュールで `go vet` を通し、`testdata/seams/behavior_test.go` で動かす（制限を超えれば中身を呼ばず、零値と `rate.LimitExceeded` を返す。許せば、引数と戻り値をそのまま通す）。
 - 入力の `View`（`testdata/<名前>/views.json`）は、リポジトリの `tests/pluginviews_test.go` が置く（`../README.md`「置き方」）。仕様を変えたら、リポジトリのルートで `go test ./tests -run TestPluginViewFixtures -update`、その後に、このディレクトリで `GOTOOLCHAIN=local go test ./plugins/go-ratelimit -update`。
-- **今、`testdata/seams/app.hozo` は、`views.json` より先にある**（「R4 で、まだないもの」）: 仕様は、状態に触れる op（`add`、`lookup`）を、`read` と効果を呼ぶ配線に書き直してあり、`views.json` は、前の版の hozoc が、前の書き方から置いたもの。R4 の実装が入ったら、上の二つの `-update` で `views.json` を置き直し、`testdata/seams/behavior_test.go` の、状態の単位の見立て（`items` の `Add` と `Lookup`）を、`read` と効果のメソッド（`ItemById`、`AddItem`）に直す。ゴールデン（`expected/`）は、変わらないはず: `add` と `lookup` の op の形は、同じ。
+- `testdata/seams/app.hozo` の、状態に触れる op（`add`、`lookup`）は、`read`（`itemById`）と効果（`addItem`）を呼ぶ配線（「R4 で、まだないもの」）。`testdata/seams/behavior_test.go` の、状態の単位の見立て `items` は、単位 `shop.ItemsState` のメソッド（形で決まる `IsEmpty` と `Get`、`ItemById`、`AddItem`）を、すべて自分で書く。葉の見立て `leaves` も同じで、どちらも、生成したインターフェースを埋め込まない: メソッドが足りないか、名前が違えば、`New` に渡すところでコンパイルできない（埋め込んでいた間は、名前の違うメソッドが、実行のときの nil の呼び出しになっていた）。ゴールデン（`expected/`）は、R4 で変わっていない: `add` と `lookup` の op の形は、同じ。
 
 本体の側に要るもの（マニフェストの `seams` と `requires`、`View.config.seams`、基底 `go` の二層と `Seams`）は、できている（「まだないもの」）。継ぎ目を宣言する二つ目の例は、リポジトリの `go-sqlite` の `@db.transaction`（`docs/plugin-go-sqlite.md`「トランザクション」）。
 

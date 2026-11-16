@@ -1,4 +1,4 @@
-// GOSQL-15（docs/plugin-go-sqlite.md「op の中身」）: @db.update の表の model が、@db.key を一つも持たないか、キーでない列を
+// GOSQL-15（docs/plugin-go-sqlite.md「効果の中身」）: @db.update の表の model が、@db.key を一つも持たないか、キーでない列を
 // 一つも持たない。位置は効果。
 
 namespace app {
@@ -13,10 +13,10 @@ namespace app {
 
   @db.update
   effect updateNote(row: Note) on notes.put;
-  /** op に並べられていない効果のデコレータも、同じに確かめる */
+  /** 配線が呼んでいない効果も、同じに確かめる */
   @db.update
   effect updateMark(row: Mark) on marks.put;
-  // op に並べても、効果ごとに一度だけ
+  // 配線が呼んでも、効果ごとに一度だけ
   export op saveNote(note: Note) {
     updateNote(note);
   }
@@ -24,9 +24,6 @@ namespace app {
   // 通るもの
   @db.update
   effect updateRow(row: Row) on rows.put;
-  export op saveRow(row: Row) {
-    updateRow(row);
-  }
   // @db.insert と @db.delete は、キーを要らない
   @db.insert
   effect createNote(row: Note) on notes.post;

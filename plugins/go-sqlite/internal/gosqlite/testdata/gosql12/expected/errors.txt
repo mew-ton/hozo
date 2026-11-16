@@ -1,4 +1,2 @@
-GOSQL-12	app.both	効果 app.both が、効果のデコレータを二つ以上持つ（@db.insert、@db.update。@db.insert / @db.update / @db.delete のうち、ちょうど一つ）
-GOSQL-12	app.all	効果 app.all が、効果のデコレータを二つ以上持つ（@db.insert、@db.update、@db.delete。@db.insert / @db.update / @db.delete のうち、ちょうど一つ）
-GOSQL-12	app.addBare	op app.addBare の @db.effects に並べた効果 app.bare が、@db.insert / @db.update / @db.delete のどれも持たない（表に何をするかを、効果に言う）
-GOSQL-12	app.addThenBare	op app.addThenBare の @db.effects に並べた効果 app.bare が、@db.insert / @db.update / @db.delete のどれも持たない（表に何をするかを、効果に言う）
+GOSQL-12	app.both	効果 app.both が、効果のデコレータを二つ以上持つ（@db.insert、@db.update。@db.insert / @db.update / @db.delete のうち、高々一つ）
+GOSQL-12	app.all	効果 app.all が、効果のデコレータを二つ以上持つ（@db.insert、@db.update、@db.delete。@db.insert / @db.update / @db.delete のうち、高々一つ）

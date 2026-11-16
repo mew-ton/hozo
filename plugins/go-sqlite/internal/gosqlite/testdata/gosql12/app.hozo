@@ -1,48 +1,28 @@
-// GOSQL-12（docs/plugin-go-sqlite.md「op の中身」）: @db.effects に並べた効果が、@db.insert / @db.update / @db.delete のどれも
-// 持たない（位置は op）。または、一つの効果が、その三つのうち二つ以上を持つ（位置は効果）。
-
-// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
-// （docs/check.md「デコレータが運ぶ reads と effects」）
-decorator reading(...tables: any state) for op reads tables;
-decorator doing(...targets: any effect) for op effects targets;
+// GOSQL-12（docs/plugin-go-sqlite.md「効果の中身」）: 一つの効果が、@db.insert / @db.update / @db.delete のうち二つ以上を持つ。
+// 位置は効果。同じデコレータを二度付けるのは、hozoc の DEC-13。
 
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
   @db.table state rows: list<Row>;
 
-  /** デコレータを持たない効果 */
-  effect bare() on rows.post;
   /** 二つ持つ効果 */
   @db.insert
   @db.update
   effect both(row: Row) on rows.post;
-  /** 三つとも持つ効果（op に並べられていなくても、確かめる。同じデコレータを二度付けるのは、hozoc の DEC-13） */
+  /** 三つとも持つ効果（配線が呼んでいなくても、確かめる） */
   @db.insert
   @db.update
   @db.delete
   effect all(id: string) on rows.delete;
-  @db.insert
-  effect createRow(row: Row) on rows.post;
 
-  // 並べた効果が、どれも持たない
-  export op addBare(row: Row) {
-    bare();
-  }
-  // 二つ目だけが持たない
-  @db.transaction
-  export op addThenBare(row: Row, other: Row) {
-    createRow(row);
-    bare();
-  }
-  // 二つ持つ効果を並べた op には、重ねて報告しない（報告は効果に）
+  // 配線が呼んでも、効果ごとに一度だけ
   export op addBoth(row: Row) {
     both(row);
   }
 
   // 通るもの
-  export op addRow(row: Row) {
-    createRow(row);
-  }
-  /** デコレータを持たない効果を、デコレータのない op が持つのは、かまわない */
-  @doing(bare) export op addByHand(row: Row);
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+  /** デコレータを持たない効果 */
+  effect bare() on rows.delete;
 }

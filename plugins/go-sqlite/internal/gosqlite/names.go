@@ -2,10 +2,9 @@ package gosqlite
 
 import "github.com/mew-ton/hozo/plugin/golang"
 
-// このファイルは GOSQL-4（docs/plugin-go-sqlite.md「診断」）: このトランスパイラの公開の名前（Schema、CreateTables、
-// <状態>Table、New<状態>Table、出すなら SharedTable、NewSharedTable、<C>Table、New<C>Table）が、N の定義のパッケージの名前
-// （docs/plugin-go.md「名前」）と、または互いに当たる。db.go は入口のパッケージに置くが、入口は定義のすべての名前を再公開するので、
-// 当たる相手は定義のパッケージの名前。
+// このファイルは GOSQL-4（docs/plugin-go-sqlite.md「診断」）: このトランスパイラの公開の名前（Schema、CreateTables、Querier、Conn、
+// <状態>Table、New<状態>Table、出すなら DbSeams、NewDbSeams）が、N の定義のパッケージの名前（docs/plugin-go.md「名前」）と、
+// または互いに当たる。db.go は入口のパッケージに置くが、入口は定義のすべての名前を再公開するので、当たる相手は定義のパッケージの名前。
 
 // owned は、パッケージの名前一つと、それを生んだもの。
 type owned struct {
@@ -27,7 +26,7 @@ func (e *emitter) baseNames() map[string]owned {
 }
 
 // checkNames は GOSQL-4。位置は、当たった宣言: 基底の名前を生んだ宣言。このトランスパイラの名前どうしなら、後ろの宣言
-// （型を出させた状態か、状態の分類。SharedTable は、それを出させた最初の op）。
+// （型を出させた状態。DbSeams と NewDbSeams は、それを出させた最初の op）。
 func (e *emitter) checkNames() {
 	if len(e.units) == 0 {
 		return
@@ -37,18 +36,19 @@ func (e *emitter) checkNames() {
 	ours := []public{
 		{"Schema", "go-sqlite の定数 Schema", ""},
 		{"CreateTables", "go-sqlite の関数 CreateTables", ""},
+		{"Querier", "go-sqlite の型 Querier", ""},
+		{"Conn", "go-sqlite の関数 Conn", ""},
 	}
 	for _, u := range e.units {
-		from := "SharedState"
-		switch u.kind {
-		case unitTable:
-			from = "状態 " + u.fqn
-		case unitClassify:
-			from = "状態の分類 " + u.fqn
-		}
 		ours = append(ours,
-			public{u.goName, "go-sqlite の型 " + u.goName + "（" + from + "）", u.at},
-			public{"New" + u.goName, "go-sqlite の関数 New" + u.goName + "（" + from + "）", u.at})
+			public{u.goName, "go-sqlite の型 " + u.goName + "（状態 " + u.fqn + "）", u.fqn},
+			public{"New" + u.goName, "go-sqlite の関数 New" + u.goName + "（状態 " + u.fqn + "）", u.fqn})
+	}
+	if len(e.seams) > 0 {
+		at := e.seams[0].Op
+		ours = append(ours,
+			public{"DbSeams", "go-sqlite の型 DbSeams（@db.transaction の継ぎ目）", at},
+			public{"NewDbSeams", "go-sqlite の関数 NewDbSeams（@db.transaction の継ぎ目）", at})
 	}
 	for _, p := range ours {
 		prev, taken := names[p.name]

@@ -9,7 +9,7 @@ namespace app {
     @db.key @db.text id: string;
     // 一つもない
     note: string;
-    // ほかの db の語彙のデコレータは、しまい方ではない
+    // ほかの db の語彙のデコレータは、しまい方ではない。省略可能かどうかにも、よらない
     @db.unique code: string;
     rank: int?;
     // 二つ以上

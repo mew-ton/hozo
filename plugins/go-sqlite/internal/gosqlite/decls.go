@@ -48,20 +48,16 @@ type effect struct {
 }
 
 // tableOf は、状態 state の表。N の表の状態でなければ GOSQL-7（位置は、デコレータを付けた宣言 at。what は、その種類と、状態の
-// 言い方: 「read store.x の on の状態」）。@db.table は付いているが、表にならなかった状態（GOSQL-1 か GOSQL-2 を返している）は、
-// 重ねて報告しない。
+// 言い方: 「read store.x の on の状態」）。read の on の状態も、効果の宛先の状態も、宣言した名前空間の状態（docs/check.md「read の宛先」
+// 「効果の宛先」）なので、表の状態でないのは、@db.table が付いていない状態。@db.table は付いているが、表にならなかった状態
+// （GOSQL-1 か GOSQL-2 を返している）は、重ねて報告しない。
 func (e *emitter) tableOf(state, what, at string) *table {
 	if t := e.byState[state]; t != nil {
 		return t
 	}
-	if e.marked[state] {
-		return nil
+	if !e.marked[state] {
+		e.errorf(codeSQLTable, at, "%s %s が、名前空間 %s の表の状態でない（@db.table が付いていない）", what, state, e.view.Viewer)
 	}
-	why := "@db.table が付いていない"
-	if e.declNS[state] != e.view.Viewer {
-		why = "別の名前空間の状態"
-	}
-	e.errorf(codeSQLTable, at, "%s %s が、名前空間 %s の表の状態でない（%s）", what, state, e.view.Viewer, why)
 	return nil
 }
 
@@ -143,6 +139,7 @@ func (e *emitter) collectReads() {
 
 		// 条件: 引数（宣言の順）の後ろに、@db.where（書いた順）
 		r.conds = e.paramConditions(r.table, decl.Params, what, fqn)
+		named := len(decl.Params) + len(wheres) // 条件が名指しした列の数（フィールドになかったものを含む）
 		for _, w := range wheres {
 			name, lit := stringArg(w, "column"), literalArg(w, "value")
 			c := e.columnOf(r.table, name, what+" の @db.where の列 "+strconv.Quote(name), fqn)
@@ -156,9 +153,10 @@ func (e *emitter) collectReads() {
 			}
 		}
 		// GOSQL-25: 一つの列を、二つの条件に書けない
-		seen := map[*column]bool{}
+		seen, twice := map[*column]bool{}, map[*column]bool{}
 		for _, cond := range r.conds {
-			if seen[cond.column] {
+			if seen[cond.column] && !twice[cond.column] {
+				twice[cond.column] = true
 				e.errorf(codeSQLTwice, fqn, "read %s の条件が、列 %q を二度名指ししている（一つの列に書ける条件は、引数か @db.where の、どちらか一つ）", fqn, cond.column.name)
 			}
 			seen[cond.column] = true
@@ -185,8 +183,8 @@ func (e *emitter) collectReads() {
 			e.errorf(codeSQLReturns, fqn, "read %s の結果の型 %s が、@%s の言うもの（%s。表 %s の model の行）でない", fqn, golang.TypeDisplay(decl.Returns), r.kind, golang.TypeDisplay(want), r.table.state.Name)
 		}
 
-		// GOSQL-13: @db.find は、一行に決まる
-		if r.kind == decoratorFind && len(latests) == 0 && !single(m, seen) {
+		// GOSQL-13: @db.find は、一行に決まる。条件の列がフィールドになかった（GOSQL-8 を返した）なら、決まるかどうかは言えない
+		if r.kind == decoratorFind && len(latests) == 0 && len(r.conds) == named && !single(m, seen) {
 			e.errorf(codeSQLUnique, fqn, "read %s（@db.find）が、一行に決まらない: 条件の列が、model %s の @db.key のすべても、@db.unique の列も含まず、@db.latest もない（並びを引くなら @db.list）",
 				fqn, m.decl.Name)
 		}

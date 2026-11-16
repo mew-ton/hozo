@@ -1,14 +1,32 @@
-// docs/plugin-go-sqlite.md「補助」: メソッドの引数の名前が、このファイルが使う名前（レシーバの t、ctx、args、args<数>、tx、err、
-// import するパッケージの名前、このファイルの非公開の名前）と当たれば、末尾に _。
+// docs/plugin-go-sqlite.md「補助」の末尾: メソッドの引数の名前が、このファイルが使う名前（表のメソッドのレシーバ t、継ぎ目の
+// メソッドのレシーバ s、ctx、args、err、import するパッケージの名前、このファイルの非公開の名前）と当たれば、末尾に _。
+// 補助と継ぎ目のメソッドの中の局所の名前は、import するパッケージの名前と当たれば、当たらなくなるまで末尾に _。
 // vault は内部の op（touch）を持つので、出力は内側のフォルダと入口に分かれる。db.go は入口のパッケージで、型は入口の別名で書く。
 
-// パッケージの名前が、dbArgs<Model> / dbScan<Model> の中の局所の名前（row、r）と同じ名前空間
+// パッケージの名前が、dbArgs<Model> / dbScan<Model> の中の局所の名前（row、r）と同じ名前空間。同じ名前の model を持つ
 namespace row {
   model Entry { @db.key @db.text id: string; @db.time at: Time; }
 }
 
 namespace r {
   model Entry { @db.key @db.int code: int; @db.json tags: string[]; }
+}
+
+// パッケージの名前が、継ぎ目のメソッドの中の局所の名前（s、ctx、err、body）と同じ名前空間
+namespace s {
+  model Mark { n: int; }
+}
+
+namespace ctx {
+  model Info { n: int; }
+}
+
+namespace err {
+  model Fault { n: int; }
+}
+
+namespace body {
+  model Part { n: int; }
 }
 
 /** 当たる名前を持つ名前空間 */
@@ -20,18 +38,23 @@ namespace vault {
 
   model Tag { name: string; }
 
-  /** フィールドの名前が、Go の予約語、事前宣言の識別子、import するパッケージの名前、このファイルの局所の名前と同じ */
+  /** フィールドの名前が、Go の予約語、事前宣言の識別子、import するパッケージの名前、このファイルが使う名前と同じ */
   model Secret {
-    @db.key @db.text row: Key;
-    @db.int r: Num;
+    @db.key @db.text t: Key;
+    @db.int ctx: Num;
     @db.float err: Ratio;
-    @db.bool data: Flag;
+    @db.bool args: Flag;
     @db.time type: Time;
     @db.json string: Tag[];
     @db.json json: Record<string, string>;
     @db.json any: Tag?;
     @db.time time: Time?;
     @db.int sql: Duration;
+    @db.text runtime: string;
+    @db.text dbGet: string;
+    @db.text dbScanSecret: string;
+    @db.text s: string;
+    @db.text value: string;
   }
 
   @db.table state secrets: list<Secret>;
@@ -39,115 +62,84 @@ namespace vault {
   @db.table state entriesA: list<row.Entry>;
   @db.table state entriesB: list<r.Entry>;
 
-  // 引数の名前がレシーバの t と当たる
-  @db.find
-  read findRow(row: Key): Secret? on secrets;
-  export op find(t: Key): Secret? {
-    return findRow(t);
-  }
-  // 引数の名前が ctx と当たる
-  @db.list
-  read scanRows(r: Num): Secret[] on secrets;
-  export op scan(ctx: Num): Secret[] {
-    return scanRows(ctx);
-  }
-  // 引数の名前が err と当たる
-  @db.list
-  read nearRows(err: Ratio): Secret[] on secrets;
-  export op near(err: Ratio): Secret[] {
-    return nearRows(err);
-  }
-  // 引数の名前が import するパッケージの名前と当たる
-  @db.list
-  read listAtRows(type: Time): Secret[] on secrets;
-  export op listAt(time: Time): Secret[] {
-    return listAtRows(time);
-  }
-  @db.list
-  read listJsonRows(json: Record<string, string>): Secret[] on secrets;
-  export op listJson(json: Record<string, string>): Secret[] {
-    return listJsonRows(json);
-  }
-  @db.list
-  read listSqlRows(sql: Duration): Secret[] on secrets;
-  export op listSql(sql: Duration): Secret[] {
-    return listSqlRows(sql);
-  }
-  @db.list
-  read listDataRows(data: Flag): Secret[] on secrets;
-  export op listData(reflect: Flag): Secret[] {
-    return listDataRows(reflect);
-  }
-  // 引数の名前が、このファイルの非公開の名前と当たる
-  @db.find
-  read openRow(row: Key): Secret? on secrets;
-  export op open(dbGet: Key): Secret? {
-    return openRow(dbGet);
-  }
-  @db.list
-  read countRows(r: Num): Secret[] on secrets;
-  export op count(dbScanSecret: Num): Secret[] {
-    return countRows(dbScanSecret);
-  }
-  // 内部の op（export がない）: 状態の単位のメソッドは、export の有無によらず公開
-  @db.find
-  read touchRow(row: Key): Secret? on secrets;
-  op touch(row: Key): Secret? {
-    return touchRow(row);
-  }
+  // ---- read: 引数の名前（= 列の名前）が、このファイルが使う名前と当たる ----
 
+  /** レシーバの t */
+  @db.find
+  read byT(t: Key): Secret? on secrets;
+
+  /** ctx、err、args */
+  @db.list
+  read byLocals(ctx: Num, err: Ratio, args: Flag): Secret[] on secrets;
+
+  /** Go の予約語と、事前宣言の識別子（仕様の予約語 string、any の列は、引数の名前に書けない） */
+  @db.list
+  read byWords(type: Time): Secret[] on secrets;
+
+  /** import するパッケージの名前 */
+  @db.list
+  read byImports(json: Record<string, string>, time: Time?, sql: Duration, runtime: string): Secret[] on secrets;
+
+  /** このファイルの非公開の名前と、継ぎ目のメソッドのレシーバ s */
+  @db.list
+  read byPrivates(dbGet: string, dbScanSecret: string, s: string): Secret[] on secrets;
+
+  // ---- 効果 ----
+
+  /** 行の引数の名前が、行の値の変数 args と当たる */
   @db.insert
-  effect createSecret(row: Secret) on secrets.post;
-  @db.update
-  effect updateSecret(row: Secret) on secrets.put;
-  @db.delete
-  effect deleteSecret(row: Key) on secrets.delete;
-  @db.delete
-  effect deleteByNum(r: Num) on secrets.delete;
+  effect createSecret(args: Secret) on secrets.post;
 
-  // 引数の名前が、行の値の変数 args、err と当たる
-  export op add(args: Secret) {
-    createSecret(args);
-  }
-  export op save(err: Secret) {
-    updateSecret(err);
-  }
-  // 引数の名前が、このファイルの非公開の名前、import するパッケージの名前と当たる
-  export op drop(dbExec: Key) {
-    deleteSecret(dbExec);
-  }
-  export op dropNum(context: Num) {
-    deleteByNum(context);
-  }
-  // トランザクションの中の名前（args<数>、tx、err、t、ctx）と当たる
-  @db.transaction
-  export op mix(args1: Secret, tx: Secret, args2: Key, args: Num) {
-    createSecret(args1);
-    updateSecret(tx);
-    deleteSecret(args2);
-    deleteByNum(args);
-  }
-  @db.transaction
-  export op mix2(t: Key, ctx: Num, err: Secret) {
-    deleteSecret(t);
-    deleteByNum(ctx);
-    createSecret(err);
-  }
+  /** err と当たる */
+  @db.update
+  effect updateSecret(err: Secret) on secrets.put;
+
+  /** @db.delete の引数（= 列の名前） */
+  @db.delete
+  effect deleteSecret(t: Key, ctx: Num, dbGet: string) on secrets.delete;
 
   @db.insert
   effect createA(row: row.Entry) on entriesA.post;
   @db.insert
-  effect createB(row: r.Entry) on entriesB.post;
-  export op addA(entry: row.Entry) {
-    createA(entry);
+  effect createB(r: r.Entry) on entriesB.post;
+
+  // ---- op ----
+
+  /** 内部の op（export がない）: 出力は、内側のフォルダと入口に分かれる */
+  op touch(t: Key): Secret? {
+    return byT(t);
   }
-  export op addB(entry: r.Entry) {
-    createB(entry);
+
+  /** 引く */
+  export op find(t: Key): Secret? {
+    return touch(t);
   }
-  // 宛先の単位が分かれる: SharedTable
+
+  /** 足す。形で決まる命令 Post（引数の名前は、いつも value） */
+  export op add(secret: Secret) {
+    secrets.post(secret);
+  }
+
+  /** 継ぎ目のメソッドの引数の名前が、このファイルが使う名前と当たる */
   @db.transaction
-  export op addBoth(row: row.Entry, r: r.Entry) {
-    createA(row);
-    createB(r);
+  export op mix(s: Secret, t: Secret, ctx: Key, err: Num, body: string, args: row.Entry, dbTransaction: r.Entry) {
+    createSecret(s);
+    updateSecret(t);
+    deleteSecret(ctx, err, body);
+    createA(args);
+    createB(dbTransaction);
   }
+
+  // 継ぎ目のメソッドの本体が書く戻り値の型のパッケージの名前が、その中の局所の名前（s、ctx、err、body）と当たる。葉の op
+  @db.transaction
+  export op mark(t: Key): s.Mark;
+  @db.transaction
+  export op info(t: Key): ctx.Info?;
+  @db.transaction
+  export op faults(t: Key): err.Fault[];
+  @db.transaction
+  export op part(s: Key, body: Key): body.Part;
+  /** 戻り値がない形の局所の変数 err も、パッケージ err と当たる */
+  @db.transaction
+  export op report(fault: err.Fault);
 }

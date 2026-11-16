@@ -1,16 +1,13 @@
-// GOSQL-4（docs/plugin-go-sqlite.md「診断」）: このトランスパイラの公開の名前（Schema、CreateTables、<状態>Table、
-// New<状態>Table、出すなら SharedTable、NewSharedTable、<C>Table、New<C>Table）が、N の定義のパッケージの名前と、または互いに当たる。
+// GOSQL-4（docs/plugin-go-sqlite.md「診断」）: このトランスパイラの公開の名前（Schema、CreateTables、Querier、Conn、<状態>Table、
+// New<状態>Table、出すなら DbSeams、NewDbSeams）が、N の定義のパッケージの名前と、または互いに当たる。
 // 位置は当たった宣言（このトランスパイラの名前どうしなら、後ろの宣言）。
 
-// Schema と CreateTables が、型の名前と当たる
-// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
-// （docs/check.md「デコレータが運ぶ reads と effects」）
-decorator reading(...tables: any state) for op reads tables;
-decorator doing(...targets: any effect) for op effects targets;
-
+// Schema、CreateTables、Querier、Conn が、型の名前と当たる
 namespace fixed {
   model Schema { @db.key @db.text id: string; }
   exception CreateTables;
+  scalar Querier extends string;
+  union Conn { Open: string; Closed: int; }
   @db.table state rows: list<Schema>;
 }
 
@@ -26,7 +23,7 @@ namespace table {
 namespace consts {
   model Row { @db.key @db.text id: string; }
   @db.table state effectLog: list<Row>;
-  effect logTable() on effectLog.post;
+  effect logTable() on effectLog.delete;
   @db.table state kind: list<Row>;
   classify Kind of string {
     Table;
@@ -48,52 +45,23 @@ namespace own {
   @db.table state newUsers: list<Row>;
 }
 
-// SharedTable と NewSharedTable: 出すとき（SharedState の op に @db.effects がある）だけ、当たる。
-// 状態 shared の <状態>Table とも、model の名前とも当たる
-namespace across {
+// DbSeams と NewDbSeams: 出すとき（@db.transaction の付いた op がある）だけ、当たる
+namespace seamed {
   model Row { @db.key @db.text id: string; }
-  model NewSharedTable { n: int; }
-  @db.table state shared: list<Row>;
-  @db.table state other: list<Row>;
-  @db.insert
-  effect createShared(row: Row) on shared.post;
-  @db.insert
-  effect createOther(row: Row) on other.post;
-  @db.transaction
-  export op addBoth(first: Row, second: Row) {
-    createShared(first);
-    createOther(second);
-  }
-}
-
-// <C>Table と New<C>Table: 出すとき（述語で決まる状態の分類の命令に @db.effects がある）だけ、当たる
-namespace sorted {
-  model Row { @db.key @db.text id: string; }
-  model OrderTable { n: int; }
-  exception NewOrderTable;
-  /** 命令に @db.effects のない分類の <C>Table は出さないので、当たらない */
-  model QuietTable { n: int; }
+  model DbSeams { n: int; }
+  exception NewDbSeams;
   @db.table state rows: list<Row>;
-  classify Order of rows {
-    Sorted;
-    Mixed;
-  }
-  classify Quiet of rows {
-    Still;
-    Moving;
-  }
   @db.insert
-  effect sortRows(row: Row) on Order: Mixed -> Sorted;
-  effect settle() on Quiet: Moving -> Still;
-  export op insertSorted(row: Row) {
-    sortRows(row);
+  effect createRow(row: Row) on rows.post;
+  @db.transaction
+  export op add(row: Row) {
+    createRow(row);
   }
-  @doing(settle) export op calm();
 }
 
-// 当たらない名前空間には、出ない。SharedTable を出さないなら、model SharedTable とも当たらない
+// 当たらない名前空間には、出ない。DbSeams を出さないなら、model DbSeams とも当たらない
 namespace clean {
   model Row { @db.key @db.text id: string; }
-  model SharedTable { n: int; }
+  model DbSeams { n: int; }
   @db.table state users: list<Row>;
 }

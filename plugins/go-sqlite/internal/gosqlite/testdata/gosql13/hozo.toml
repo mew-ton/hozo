@@ -1,4 +1,4 @@
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-13（@db.find の列が、一行に決まる列でない）。
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-13（@db.find の read が、一行に決まらない）。
 [[emit]]
 namespace   = "app"
 transpilers = ["go", "go-sqlite"]

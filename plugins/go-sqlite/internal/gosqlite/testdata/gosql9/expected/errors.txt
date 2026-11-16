@@ -1,19 +1,14 @@
-GOSQL-9	app.findNone	op app.findNone の引数が 0 個（@db.find の op の引数は、列 "id" と比べる値一つ）
-GOSQL-9	app.findTwo	op app.findTwo の引数が 2 個（@db.find の op の引数は、列 "id" と比べる値一つ）
-GOSQL-9	app.findByString	op app.findByString の引数 id の型 string が、@db.find の列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
-GOSQL-9	app.findMaybe	op app.findMaybe の引数 id の型 app.Id? が、@db.find の列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
-GOSQL-9	app.listNone	op app.listNone の引数が 0 個（@db.list の op の引数は、列 "note" と比べる値一つ）
-GOSQL-9	app.listByInt	op app.listByInt の引数 note の型 int が、@db.list の列 "note" の型 string に合わない（列の型と等しいか、列が T? なら T）
-GOSQL-9	app.listByRank	op app.listByRank の引数 rank の型 string? が、@db.list の列 "rank" の型 int? に合わない（列の型と等しいか、列が T? なら T）
-GOSQL-9	app.listWith	op app.listWith の引数が 1 個（列を渡さない @db.list の op は、引数を持たない）
-GOSQL-9	app.addNone	op app.addNone の引数が 0 個（@db.effects に並べた効果は 1 個。n 番目の効果が、n 番目の引数を受け取る）
-GOSQL-9	app.addAndRemove	op app.addAndRemove の引数が 1 個（@db.effects に並べた効果は 2 個。n 番目の効果が、n 番目の引数を受け取る）
-GOSQL-9	app.addTwo	op app.addTwo の引数が 2 個（@db.effects に並べた効果は 1 個。n 番目の効果が、n 番目の引数を受け取る）
-GOSQL-9	app.addOther	op app.addOther の引数 other の型 app.Other が、効果 app.createRow（@db.insert）の受け取るもの（表 app.rows の model app.Row の行）でない
-GOSQL-9	app.addMaybe	op app.addMaybe の引数 row の型 app.Row? が、効果 app.createRow（@db.insert）の受け取るもの（表 app.rows の model app.Row の行）でない
-GOSQL-9	app.addMany	op app.addMany の引数 rows の型 app.Row[] が、効果 app.createRow（@db.insert）の受け取るもの（表 app.rows の model app.Row の行）でない
-GOSQL-9	app.saveId	op app.saveId の引数 id の型 app.Id が、効果 app.updateRow（@db.update）の受け取るもの（表 app.rows の model app.Row の行）でない
-GOSQL-9	app.removeByString	op app.removeByString の引数 id の型 string が、@db.delete の列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
-GOSQL-9	app.removeRow	op app.removeRow の引数 row の型 app.Row が、@db.delete の列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
-GOSQL-9	app.swapped	op app.swapped の引数 id の型 app.Id が、効果 app.createRow（@db.insert）の受け取るもの（表 app.rows の model app.Row の行）でない
-GOSQL-9	app.swapped	op app.swapped の引数 row の型 app.Row が、@db.delete の列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.rowByString	read app.rowByString の引数 id の型 string が、列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.rowByCode	read app.rowByCode の引数 id の型 app.Code が、列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.rowByMaybe	read app.rowByMaybe の引数 id の型 app.Id? が、列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.rowsByIntNote	read app.rowsByIntNote の引数 note の型 int が、列 "note" の型 string に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.rowsByStringRank	read app.rowsByStringRank の引数 rank の型 string? が、列 "rank" の型 int? に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.rowByIdAndRank	read app.rowByIdAndRank の引数 rank の型 float が、列 "rank" の型 int? に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.deleteByString	効果 app.deleteByString の引数 id の型 string が、列 "id" の型 app.Id に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.deleteByMaybeNote	効果 app.deleteByMaybeNote の引数 note の型 string? が、列 "note" の型 string に合わない（列の型と等しいか、列が T? なら T）
+GOSQL-9	app.createNothing	効果 app.createNothing の引数（なし）が、@db.insert の受け取るもの（表 app.rows の model app.Row の行一つ）でない
+GOSQL-9	app.createTwo	効果 app.createTwo の引数（first: app.Row, second: app.Row）が、@db.insert の受け取るもの（表 app.rows の model app.Row の行一つ）でない
+GOSQL-9	app.createOther	効果 app.createOther の引数（row: app.Other）が、@db.insert の受け取るもの（表 app.rows の model app.Row の行一つ）でない
+GOSQL-9	app.updateMaybe	効果 app.updateMaybe の引数（row: app.Row?）が、@db.update の受け取るもの（表 app.rows の model app.Row の行一つ）でない
+GOSQL-9	app.updateMany	効果 app.updateMany の引数（rows: app.Row[]）が、@db.update の受け取るもの（表 app.rows の model app.Row の行一つ）でない
+GOSQL-9	app.updateNote	効果 app.updateNote の引数（id: app.Id, note: string）が、@db.update の受け取るもの（表 app.rows の model app.Row の行一つ）でない

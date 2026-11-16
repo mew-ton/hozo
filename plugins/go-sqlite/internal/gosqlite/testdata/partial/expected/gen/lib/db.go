@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"slices"
 	"time"
+
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。
@@ -23,13 +25,6 @@ CREATE TABLE IF NOT EXISTS "notes" (
   "text" TEXT NOT NULL,
   "stars" INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS "loans" (
-  "book" TEXT NOT NULL PRIMARY KEY REFERENCES "books" ("id"),
-  "member" TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS "archive" (
-  "id" TEXT NOT NULL PRIMARY KEY
-);
 CREATE TABLE IF NOT EXISTS "stamps" (
   "at" TEXT NOT NULL
 );
@@ -41,8 +36,25 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
+// Querier は *sql.DB と *sql.Tx が共に持つ、文の実行。
+type Querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Conn は、ctx で文を実行する先: ctx が db のトランザクション（@db.transaction の継ぎ目が始めたもの）を運んでいれば、それ。なければ db。
+// このファイルの型のメソッドは、どれもこれを通す。人が書き足すメソッドも、db を直に使わずに、これを通す（通さなければ、トランザクションに入らない）。
+// 鍵は runtime.DBTxKey（db ごとに一つ。どの名前空間の出力も同じ鍵を使う）なので、別の名前空間の継ぎ目が、同じ db に始めたトランザクションにも入る。
+func Conn(ctx context.Context, db *sql.DB) Querier {
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		return tx
+	}
+	return db
+}
+
 // BooksTable は状態 lib.books の単位（BooksState）の、表 "books" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（付けていない op: newestBooks、countBooks、clearBooks）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（付けていないもの: newestBooks、countBooks、retitle、clearBooks）。
 type BooksTable struct{ db *sql.DB }
 
 // NewBooksTable は db の表 "books" の上の BooksTable を返す。表は CreateTables が作る。
@@ -59,14 +71,14 @@ func (t BooksTable) Get(ctx context.Context) ([]Book, error) {
 		`SELECT "id", "title", "pages" FROM "books" ORDER BY rowid`)
 }
 
-// FindBook は op lib.findBook（@db.find）: 表 "books" から、"id"（@db.key）が引数 id と同じ行を引く。なければ nil。
-func (t BooksTable) FindBook(ctx context.Context, id BookId) (*Book, error) {
+// BookById は read lib.bookById（@db.find）: 表 "books" から、"id" が引数 id と同じ行を引く。なければ nil。
+func (t BooksTable) BookById(ctx context.Context, id BookId) (*Book, error) {
 	return dbGet(ctx, t.db, dbScanBook,
 		`SELECT "id", "title", "pages" FROM "books" WHERE "id" IS ?1`, dbText(id))
 }
 
-// AddBook は op lib.addBook（@db.effects）: 効果 lib.createBook（@db.insert）で、表 "books" に、引数 book の行を足す。
-func (t BooksTable) AddBook(ctx context.Context, book Book) error {
+// CreateBook は効果 lib.createBook（@db.insert）: 表 "books" に、引数 book の行を足す。
+func (t BooksTable) CreateBook(ctx context.Context, book Book) error {
 	args, err := dbArgsBook(book)
 	if err != nil {
 		return err
@@ -76,13 +88,11 @@ func (t BooksTable) AddBook(ctx context.Context, book Book) error {
 }
 
 // NotesTable は状態 lib.notes の単位（NotesState）の、表 "notes" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（付けていないもの: firstNote）。
 type NotesTable struct{ db *sql.DB }
 
 // NewNotesTable は db の表 "notes" の上の NotesTable を返す。表は CreateTables が作る。
 func NewNotesTable(db *sql.DB) NotesTable { return NotesTable{db: db} }
-
-var _ NotesState = NotesTable{}
 
 // IsEmpty は形で決まる問い合わせ: 表 "notes" に行が一つもなければ true。
 func (t NotesTable) IsEmpty(ctx context.Context) (bool, error) {
@@ -95,79 +105,14 @@ func (t NotesTable) Get(ctx context.Context) ([]Note, error) {
 		`SELECT "text", "stars" FROM "notes" ORDER BY rowid`)
 }
 
-// StartNotes は op lib.startNotes（@db.effects）: 効果 lib.firstNote（@db.insert）で、表 "notes" に、引数 note の行を足す。
-func (t NotesTable) StartNotes(ctx context.Context, note Note) error {
-	args, err := dbArgsNote(note)
-	if err != nil {
-		return err
-	}
-	return dbExec(ctx, t.db,
-		`INSERT INTO "notes" ("text", "stars") VALUES (?1, ?2)`, args...)
-}
-
-// SwapNote は op lib.swapNote（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 lib.lastNote（@db.delete）で、表 "notes" から、"text" が引数 text と同じ行を消す。行がなければ何もしない。効果 lib.firstNote（@db.insert）で、表 "notes" に、引数 note の行を足す。どれかが失敗すれば、どれも残らない。
-func (t NotesTable) SwapNote(ctx context.Context, text string, note Note) error {
-	args2, err := dbArgsNote(note)
-	if err != nil {
-		return err
-	}
-	tx, err := t.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM "notes" WHERE "text" IS ?1`, dbText(text)); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "notes" ("text", "stars") VALUES (?1, ?2)`, args2...); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// LoansTable は状態 lib.loans の単位（LoansState）の、表 "loans" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
-type LoansTable struct{ db *sql.DB }
-
-// NewLoansTable は db の表 "loans" の上の LoansTable を返す。表は CreateTables が作る。
-func NewLoansTable(db *sql.DB) LoansTable { return LoansTable{db: db} }
-
-var _ LoansState = LoansTable{}
-
-// IsEmpty は形で決まる問い合わせ: 表 "loans" に行が一つもなければ true。
-func (t LoansTable) IsEmpty(ctx context.Context) (bool, error) {
-	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "loans"`)
-}
-
-// Get は形で決まる問い合わせ: 表 "loans" の行を、足した順にすべて引く。
-func (t LoansTable) Get(ctx context.Context) ([]Loan, error) {
-	return dbList(ctx, t.db, dbScanLoan,
-		`SELECT "book", "member" FROM "loans" ORDER BY rowid`)
-}
-
-// ArchiveTable は状態 lib.archive の単位（ArchiveState）の、表 "archive" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
-type ArchiveTable struct{ db *sql.DB }
-
-// NewArchiveTable は db の表 "archive" の上の ArchiveTable を返す。表は CreateTables が作る。
-func NewArchiveTable(db *sql.DB) ArchiveTable { return ArchiveTable{db: db} }
-
-var _ ArchiveState = ArchiveTable{}
-
-// IsEmpty は形で決まる問い合わせ: 表 "archive" に行が一つもなければ true。
-func (t ArchiveTable) IsEmpty(ctx context.Context) (bool, error) {
-	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "archive"`)
-}
-
-// Get は形で決まる問い合わせ: 表 "archive" の行を、足した順にすべて引く。
-func (t ArchiveTable) Get(ctx context.Context) ([]Archived, error) {
-	return dbList(ctx, t.db, dbScanArchived,
-		`SELECT "id" FROM "archive" ORDER BY rowid`)
+// NotesWith は read lib.notesWith（@db.list）: 表 "notes" から、"stars" が引数 stars と同じ行を、足した順にすべて引く。
+func (t NotesTable) NotesWith(ctx context.Context, stars int64) ([]Note, error) {
+	return dbList(ctx, t.db, dbScanNote,
+		`SELECT "text", "stars" FROM "notes" WHERE "stars" IS ?1 ORDER BY rowid`, dbInt(stars))
 }
 
 // StampsTable は状態 lib.stamps の単位（StampsState）の、表 "stamps" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type StampsTable struct{ db *sql.DB }
 
 // NewStampsTable は db の表 "stamps" の上の StampsTable を返す。表は CreateTables が作る。
@@ -186,128 +131,34 @@ func (t StampsTable) Get(ctx context.Context) ([]Stamp, error) {
 		`SELECT "at" FROM "stamps" ORDER BY rowid`)
 }
 
-// Unstamp は op lib.unstamp（@db.effects）: 効果 lib.dropStamp（@db.delete）で、表 "stamps" から、"at" が引数 at と同じ行を消す。行がなければ何もしない。
-func (t StampsTable) Unstamp(ctx context.Context, at time.Time) error {
+// DropStamp は効果 lib.dropStamp（@db.delete）: 表 "stamps" から、"at" が引数 at と同じ行を消す。行がなければ何もしない。
+func (t StampsTable) DropStamp(ctx context.Context, at time.Time) error {
 	return dbExec(ctx, t.db, `DELETE FROM "stamps" WHERE "at" IS ?1`, dbTime(at))
 }
 
-// LendingTable は状態の分類 lib.Lending の単位（LendingState）の命令の、db の上の実装。
-// メソッドは、LendingState の命令のうち、db の語彙のデコレータを付けたもの（付けていない op: returnBook）。ケースの述語は、埋め込んで書き足す。
-type LendingTable struct{ db *sql.DB }
+// DbSeams は、@db.transaction の継ぎ目（Seams のメソッドのうち、このデコレータの分）の、db の上の実装。New の引数 seams に渡す。
+// トランザクションに入るのは、中身が、受け取った ctx で、同じ db に、Conn を通してすること（このファイルの型のメソッドは、どれもそう）。
+type DbSeams struct{ db *sql.DB }
 
-// NewLendingTable は db の上の LendingTable を返す。表は CreateTables が作る。
-func NewLendingTable(db *sql.DB) LendingTable { return LendingTable{db: db} }
+// NewDbSeams は db の上の DbSeams を返す。状態の単位の実装（New<状態>Table）に渡したのと同じ db を渡す。
+func NewDbSeams(db *sql.DB) DbSeams { return DbSeams{db: db} }
 
-// LendBook は op lib.lendBook（@db.effects）: 効果 lib.lend（@db.insert）で、表 "loans" に、引数 loan の行を足す。
-func (t LendingTable) LendBook(ctx context.Context, loan Loan) error {
-	args, err := dbArgsLoan(loan)
-	if err != nil {
-		return err
-	}
-	return dbExec(ctx, t.db,
-		`INSERT INTO "loans" ("book", "member") VALUES (?1, ?2)`, args...)
+var _ Seams = DbSeams{}
+
+// AddRenamedDbTransaction は op lib.addRenamed に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s DbSeams) AddRenamedDbTransaction(ctx context.Context, book Book, title string, body func(ctx context.Context, book Book, title string) error) error {
+	_, err := dbTransaction(ctx, s.db, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, body(ctx, book, title)
+	})
+	return err
 }
 
-// LendRenamed は op lib.lendRenamed（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 lib.retitle（@db.update）で、表 "books" の、キーが引数 book と同じ行を書き換える。行がなければ何もしない。効果 lib.lend（@db.insert）で、表 "loans" に、引数 loan の行を足す。どれかが失敗すれば、どれも残らない。
-func (t LendingTable) LendRenamed(ctx context.Context, book Book, loan Loan) error {
-	args1, err := dbArgsBook(book)
-	if err != nil {
-		return err
-	}
-	args2, err := dbArgsLoan(loan)
-	if err != nil {
-		return err
-	}
-	tx, err := t.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE "books" SET "title" = ?2, "pages" = ?3 WHERE "id" IS ?1`, args1...); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "loans" ("book", "member") VALUES (?1, ?2)`, args2...); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// ShelvingTable は状態の分類 lib.Shelving の単位（ShelvingState）の命令の、db の上の実装。
-// メソッドは、ShelvingState の命令のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。ケースの述語は、埋め込んで書き足す。
-type ShelvingTable struct{ db *sql.DB }
-
-// NewShelvingTable は db の上の ShelvingTable を返す。表は CreateTables が作る。
-func NewShelvingTable(db *sql.DB) ShelvingTable { return ShelvingTable{db: db} }
-
-// ShelveBook は op lib.shelveBook（@db.effects）: 効果 lib.shelve（@db.insert）で、表 "archive" に、引数 book の行を足す。
-func (t ShelvingTable) ShelveBook(ctx context.Context, book Archived) error {
-	args, err := dbArgsArchived(book)
-	if err != nil {
-		return err
-	}
-	return dbExec(ctx, t.db,
-		`INSERT INTO "archive" ("id") VALUES (?1)`, args...)
-}
-
-// SharedTable は、複数の状態にまたがる葉の op（SharedState）の、db の上の実装。
-// メソッドは、SharedState の op のうち、db の語彙のデコレータを付けたもの（付けていない op: overdue）。
-type SharedTable struct{ db *sql.DB }
-
-// NewSharedTable は db の上の SharedTable を返す。表は CreateTables が作る。
-func NewSharedTable(db *sql.DB) SharedTable { return SharedTable{db: db} }
-
-// AddWithNote は op lib.addWithNote（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 lib.createBook（@db.insert）で、表 "books" に、引数 book の行を足す。効果 lib.firstNote（@db.insert）で、表 "notes" に、引数 note の行を足す。どれかが失敗すれば、どれも残らない。
-func (t SharedTable) AddWithNote(ctx context.Context, book Book, note Note) error {
-	args1, err := dbArgsBook(book)
-	if err != nil {
-		return err
-	}
-	args2, err := dbArgsNote(note)
-	if err != nil {
-		return err
-	}
-	tx, err := t.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "books" ("id", "title", "pages") VALUES (?1, ?2, ?3)`, args1...); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "notes" ("text", "stars") VALUES (?1, ?2)`, args2...); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// AddAndLend は op lib.addAndLend（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 lib.createBook（@db.insert）で、表 "books" に、引数 book の行を足す。効果 lib.lend（@db.insert）で、表 "loans" に、引数 loan の行を足す。どれかが失敗すれば、どれも残らない。
-func (t SharedTable) AddAndLend(ctx context.Context, book Book, loan Loan) error {
-	args1, err := dbArgsBook(book)
-	if err != nil {
-		return err
-	}
-	args2, err := dbArgsLoan(loan)
-	if err != nil {
-		return err
-	}
-	tx, err := t.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "books" ("id", "title", "pages") VALUES (?1, ?2, ?3)`, args1...); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "loans" ("book", "member") VALUES (?1, ?2)`, args2...); err != nil {
-		return err
-	}
-	return tx.Commit()
+// RenameThenAddDbTransaction は op lib.renameThenAdd に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s DbSeams) RenameThenAddDbTransaction(ctx context.Context, id BookId, title string, book Book, body func(ctx context.Context, id BookId, title string, book Book) error) error {
+	_, err := dbTransaction(ctx, s.db, func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, body(ctx, id, title, book)
+	})
+	return err
 }
 
 // dbArgsBook は lib.Book を、表 "books" の列の順の値にする。
@@ -324,44 +175,11 @@ func dbScanBook(r dbRow) (Book, error) {
 	return row, nil
 }
 
-// dbArgsNote は lib.Note を、表 "notes" の列の順の値にする。
-func dbArgsNote(row Note) ([]any, error) {
-	return dbArgs(dbText(row.Text), dbInt(row.Stars))
-}
-
 // dbScanNote は、表 "notes" の列の順の値を lib.Note に読む。
 func dbScanNote(r dbRow) (Note, error) {
 	var row Note
 	if err := r.Scan(dbText(&row.Text), dbInt(&row.Stars)); err != nil {
 		return Note{}, err
-	}
-	return row, nil
-}
-
-// dbArgsLoan は lib.Loan を、表 "loans" の列の順の値にする。
-func dbArgsLoan(row Loan) ([]any, error) {
-	return dbArgs(dbText(row.Book), dbText(row.Member))
-}
-
-// dbScanLoan は、表 "loans" の列の順の値を lib.Loan に読む。
-func dbScanLoan(r dbRow) (Loan, error) {
-	var row Loan
-	if err := r.Scan(dbText(&row.Book), dbText(&row.Member)); err != nil {
-		return Loan{}, err
-	}
-	return row, nil
-}
-
-// dbArgsArchived は lib.Archived を、表 "archive" の列の順の値にする。
-func dbArgsArchived(row Archived) ([]any, error) {
-	return dbArgs(dbText(row.Id))
-}
-
-// dbScanArchived は、表 "archive" の列の順の値を lib.Archived に読む。
-func dbScanArchived(r dbRow) (Archived, error) {
-	var row Archived
-	if err := r.Scan(dbText(&row.Id)); err != nil {
-		return Archived{}, err
 	}
 	return row, nil
 }
@@ -380,13 +198,13 @@ type dbRow interface {
 	Scan(dest ...any) error
 }
 
-// dbOption は、列の読み書きに、フィールドのデコレータが足すこと。
+// dbOption は、列の読み書きに、フィールドの宣言が足すこと。
 type dbOption int
 
-// dbNullable は @db.nullable: その列は、値がなくてよい（NULL）。
+// dbNullable は、省略可能な（T?）フィールドの列: 値がなくてよい（NULL）。
 const dbNullable dbOption = 1
 
-// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドのデコレータが足したこと opts。
+// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドの宣言が足したこと opts。
 // v は、書くときはフィールドの値（か、列と比べる引数）、読むときはフィールドへのポインタ。
 // database/sql が、書くときに Value を、読むときに Scan を呼ぶ。
 type dbCol struct {
@@ -397,7 +215,7 @@ type dbCol struct {
 }
 
 // Value は、列に書く値。値があるかどうかは、実行時に見る: 値のないポインタは NULL。
-// @db.nullable（dbNullable）の列では、値のないスライスとマップも NULL。
+// 省略可能なフィールド（dbNullable）の列では、値のないスライスとマップも NULL。
 func (c dbCol) Value() (driver.Value, error) {
 	v := reflect.ValueOf(c.v)
 	switch v.Kind() {
@@ -414,13 +232,13 @@ func (c dbCol) Value() (driver.Value, error) {
 	return c.write(v)
 }
 
-// Scan は、列の値 src を、読む先に読む。NULL は、@db.nullable（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
-// ほかの列に NULL があれば、エラー。読む先がポインタ（省略可能）かどうかは、実行時に見る。
+// Scan は、列の値 src を、読む先に読む。NULL は、省略可能なフィールド（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
+// ほかの列（NOT NULL）に NULL があれば、エラー。読む先がポインタかどうかは、実行時に見る。
 func (c dbCol) Scan(src any) error {
 	dst := reflect.ValueOf(c.v).Elem()
 	if src == nil {
 		if !slices.Contains(c.opts, dbNullable) {
-			return fmt.Errorf("db: NULL in a column without @db.nullable (read into %s)", dst.Type())
+			return fmt.Errorf("db: NULL in a NOT NULL column (read into %s)", dst.Type())
 		}
 		dst.SetZero()
 		return nil
@@ -502,16 +320,39 @@ func dbTime(v any, opts ...dbOption) dbCol {
 	}}
 }
 
+// dbTransaction は、body を、db の一つのトランザクションの中で呼ぶ: 始めて、body を呼び、確定する。
+// トランザクションは、body に渡す ctx が運ぶ（鍵は runtime.DBTxKey）。body が失敗すれば（確定に失敗しても）取り消して、零値とそのエラーを返す。
+// ctx が、すでに db のトランザクションを運んでいれば（入れ子。別の名前空間の継ぎ目が始めたものでも）、新しく始めずに、それに加わる: 確定も取り消しも、いちばん外側がする。
+func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context.Context) (R, error)) (R, error) {
+	if _, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		return body(ctx)
+	}
+	var zero R
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return zero, err
+	}
+	defer tx.Rollback()
+	out, err := body(context.WithValue(ctx, runtime.DBTxKey{DB: db}, tx))
+	if err != nil {
+		return zero, err
+	}
+	if err := tx.Commit(); err != nil {
+		return zero, err
+	}
+	return out, nil
+}
+
 // dbExec は行を返さない文を実行する。
 func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {
-	_, err := db.ExecContext(ctx, query, args...)
+	_, err := Conn(ctx, db).ExecContext(ctx, query, args...)
 	return err
 }
 
 // dbIsEmpty は、行の数を返す問い合わせの結果が 0 かどうか。
 func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 	var n int64
-	if err := db.QueryRowContext(ctx, query).Scan(&n); err != nil {
+	if err := Conn(ctx, db).QueryRowContext(ctx, query).Scan(&n); err != nil {
 		return false, err
 	}
 	return n == 0, nil
@@ -519,7 +360,7 @@ func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 
 // dbGet は問い合わせの一行を scan で読む。行がなければ nil。
 func dbGet[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) (*R, error) {
-	row, err := scan(db.QueryRowContext(ctx, query, args...))
+	row, err := scan(Conn(ctx, db).QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -531,7 +372,7 @@ func dbGet[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), 
 
 // dbList は問い合わせのすべての行を scan で読む。
 func dbList[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) ([]R, error) {
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := Conn(ctx, db).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

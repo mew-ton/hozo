@@ -1,13 +1,10 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -20,10 +17,6 @@ import (
 	"github.com/mew-ton/hozo/ir"
 	sdk "github.com/mew-ton/hozo/plugin"
 )
-
-// OutputsFile は、出力（単位と名前空間の組）ごとの Dir(U, N) に置く、前回書いたパスの一覧（docs/cli.md「emit」の 5 と 7）。
-// JSON の文字列の配列で、パスはルートからの相対パス（"/" 区切り）、辞書順。
-const OutputsFile = ".hozoc-outputs.json"
 
 // outputKey は出力一つ: 単位（Project.Units の添字）と、その単位が出力する名前空間（docs/cli.md「emit」）。
 type outputKey struct {
@@ -40,18 +33,12 @@ type output struct {
 	dir     string // その出力の Dir(U, N)。記録（.hozoc-outputs.json）の置き場
 }
 
-// OutputsSync は、状態の分類 OutputsSync（cli.hozo の `classify OutputsSync of outputs`）の単位の実装: 述語 UpToDate
-// （問い合わせ）と、効果 syncOutputs を持つ葉の op writeOutputs（命令）。hozoc.New の引数 outputsSync に渡す（[App.Ops]）。
-func (a *App) OutputsSync() hozoc.OutputsSyncState { return outputsSync{a} }
-
-// outputsSync は [App.OutputsSync] が返す値。
-type outputsSync struct{ a *App }
-
-// WriteOutputs は cli.hozo の op writeOutputs（docs/cli.md「emit」の 1〜7）。効果 syncOutputs を持つ葉の op なので、
-// 生成したコードでは、状態の分類 OutputsSync の単位の命令になる。内部の op で、配線の emit が、check の後に呼ぶ（テストは、
-// 内側のパッケージ internal/gen/hozoc/inner の Ops から呼ぶ）。checked は Check が返したもの
-// （warning）で、その中身（Program、設定、マニフェスト）は Check が a.checked に置いた Project から取る。
-// 書き出すファイルは、どれもトランスパイラが返したもので、hozoc が自分で作るファイルは、出力先ごとの記録だけ。
+// CollectOutputs は cli.hozo の op collectOutputs（docs/cli.md「emit」の 1〜3）: 検査を通った仕様から、出力ごとにトランスパイラを
+// 呼び、返ったファイルを集める。hozoc.Leaves のメソッド。葉の op なので、状態（生成したファイル）には触れない: 読むのも書くのも、
+// 配線 writeOutputs が、この後に呼ぶ read outputChanges（[App.Outputs]）と効果 syncOutputs（[App.OutputsSync]）。内部の op で、
+// テストは、内側のパッケージ internal/gen/hozoc/inner の Ops から呼ぶ。checked は Check が返したもの（warning）で、その中身
+// （Program、設定、マニフェスト）は Check が a.checked に置いた Project から取る。集めるファイルは、どれもトランスパイラが
+// 返したもの。
 //
 //  0. 設定なし（hozo.toml が見つからない。docs/config.md「置き場と探し方」）なら、書き出すものがないので CFG-7 を
 //     一つ作って ConfigInvalid（docs/cli.md「手で書くもの」）。check の warning も一緒に運ぶ。
@@ -60,155 +47,63 @@ type outputsSync struct{ a *App }
 //  2. 対象の各出力について、単位の各トランスパイラを起動し、files と warnings と errors を集める。
 //     errors は集めておき、すべて起動し終えてから CheckFailed にする。
 //  3. すべての出力のファイルを集めてからパスの重複を確かめる（CFG-5 → OutputConflict）。
-//  4. dryRun なら書く予定のパスを Written に入れて返す。
-//  5. 対象の各出力の <Dir(U, N)>/.hozoc-outputs.json を読み、今回書かないパスのファイルを消す。空になったディレクトリも、
-//     Dir(U, N) の下の範囲で消す。
-//  6. 辞書順にファイルを書く。内容が同じなら書き直さない（Written には入れる）。
-//  7. .hozoc-outputs.json を書く。書くものが一つもない出力では作らず、前回のものがあれば消す。
 //
-// 1〜3 は [App.plan]。
-func (s outputsSync) WriteOutputs(ctx context.Context, in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitResult, error) {
-	a := s.a
-	if err := ctx.Err(); err != nil {
-		return hozoc.EmitResult{}, err
-	}
+// 1〜3 は [App.collect]。返す予定（hozoc.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun。置き場を含む形は
+// a.planned に置く（[App.plannedFor]）。
+//
+// 仕様の collectOutputs は純粋な op（デコレータを持たない葉）なので、このメソッドは ctx を取らない（docs/plugin-go.md
+// 「op の形」）。トランスパイラの起動の間に、中断を見ることはできない。
+func (a *App) CollectOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
+	a.planned = nil
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
-		return hozoc.EmitResult{}, errors.New("hozoc: WriteOutputs の checked が直前の Check の結果でない")
+		return hozoc.EmitPlan{}, errors.New("hozoc: CollectOutputs の checked が直前の Check の結果でない")
 	}
 	// 0. 設定なし
 	if p.NoConfig {
-		return hozoc.EmitResult{}, noConfig(p)
+		return hozoc.EmitPlan{}, noConfig(p)
 	}
-	pl, err := a.plan(ctx, p, in.Namespaces)
+	pl, err := a.collect(context.Background(), p, in.Namespaces)
 	if err != nil {
-		return hozoc.EmitResult{}, err
+		return hozoc.EmitPlan{}, err
 	}
-
-	result := hozoc.EmitResult{Warnings: toDiagnostics(pl.warnings, p.Files), Written: []hozoc.Path{}, Removed: []hozoc.Path{}}
+	a.planned = pl
+	plan := hozoc.EmitPlan{Warnings: toDiagnostics(pl.warnings, p.Files), Files: make([]hozoc.OutputFile, 0, len(pl.outputs)), DryRun: in.DryRun}
 	for _, o := range pl.outputs {
-		result.Written = append(result.Written, hozoc.Path(o.path))
+		plan.Files = append(plan.Files, hozoc.OutputFile{Path: hozoc.Path(o.path), Content: string(o.content)})
 	}
-
-	// 4. dry-run
-	if in.DryRun != nil && *in.DryRun {
-		return result, nil
-	}
-
-	// 5. 前回の出力のうち今回書かないものを消す
-	current := map[string]bool{}
-	for _, o := range pl.outputs {
-		current[o.path] = true
-	}
-	for _, dir := range pl.dirs {
-		previous, err := readOutputsFile(p.Root, dir)
-		if err != nil {
-			return result, err
-		}
-		for _, prev := range previous {
-			// 記録のパスに従うのは、その記録の持ち主の Dir(U, N) の下のものだけ（docs/cli.md「emit」の 5）。
-			// それ以外（`..`、絶対パス、別のディレクトリ）は hozoc がこの記録に書くはずのないパスなので、
-			// 消さず、報告もしない。
-			if current[prev] || !config.Under(prev, dir) {
-				continue
-			}
-			abs := filepath.Join(p.Root, filepath.FromSlash(prev))
-			if err := os.Remove(abs); err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
-				return result, fmt.Errorf("hozoc: %s を消せない: %w", prev, err)
-			}
-			result.Removed = append(result.Removed, hozoc.Path(prev))
-			removeEmptyDirs(p.Root, dir, prev)
-		}
-	}
-	sort.Slice(result.Removed, func(i, j int) bool { return result.Removed[i] < result.Removed[j] })
-
-	// 6. 書く（内容が同じなら書き直さない）
-	for _, o := range pl.outputs {
-		if err := writeIfChanged(filepath.Join(p.Root, filepath.FromSlash(o.path)), o.content); err != nil {
-			return result, fmt.Errorf("hozoc: %s を書けない: %w", o.path, err)
-		}
-	}
-
-	// 7. .hozoc-outputs.json
-	for _, dir := range pl.dirs {
-		record := filepath.Join(p.Root, filepath.FromSlash(dir), OutputsFile)
-		data := pl.record(dir)
-		if data == nil {
-			// 何も書かない出力（どのトランスパイラもファイルを返さなかった、in で出力でなくなった）には記録も置かない
-			if err := os.Remove(record); err != nil && !os.IsNotExist(err) {
-				return result, fmt.Errorf("hozoc: %s/%s を消せない: %w", dir, OutputsFile, err)
-			}
-			continue
-		}
-		if err := writeIfChanged(record, data); err != nil {
-			return result, fmt.Errorf("hozoc: %s/%s を書けない: %w", dir, OutputsFile, err)
-		}
-	}
-	return result, nil
+	return plan, nil
 }
 
-// UpToDate は cli.hozo の分類 OutputsSync の述語（docs/cli.md「cli.hozo」「手で書くもの」）: 生成したファイルが、今の仕様と
-// 設定から生成し直したものと一致しているか。生成したコードでは、状態の分類 OutputsSync の単位の問い合わせになり、判定関数
-// hozoc.ClassifyOutputsSync が呼ぶ。
-//
-// すべての出力について書き出す予定（[App.plan]。トランスパイラも起動する）を作り、ディスクと比べる。一致していると言うのは、
-// 書く予定のファイルがすべて同じ内容であり、.hozoc-outputs.json が今回の一覧と同じで（何も書かない出力にはなく）、
-// 前回書いて今回は書かないファイルが残っていないとき。emit を走らせても何も書かず何も消さない、ということ。
-// 仕様や設定に誤りがあって生成し直せなければ、その例外を返す（check / emit と同じもの）。
-//
-// 見るのは、直前の Check が解析した Project（同じ App で check か emit を走らせた後）。なければ、作業ディレクトリから
-// hozo.toml を探して解析する。
-func (s outputsSync) UpToDate(ctx context.Context) (bool, error) {
-	a := s.a
-	if err := ctx.Err(); err != nil {
-		return false, err
+// plannedFor は、境界の予定 plan（hozoc.EmitPlan。warning とファイルだけ）の、置き場を含む形: 直前の CollectOutputs が a.planned に
+// 置いたもの。plan が、その CollectOutputs の返したものでなければ（ファイルの並びが違う）、誤り。
+func (a *App) plannedFor(plan hozoc.EmitPlan) (*outputPlan, error) {
+	pl := a.planned
+	same := pl != nil && len(plan.Files) == len(pl.outputs)
+	for i := 0; same && i < len(plan.Files); i++ {
+		same = string(plan.Files[i].Path) == pl.outputs[i].path
 	}
-	p := a.checked
-	if p == nil {
-		var err error
-		if p, err = a.load(); err != nil {
-			return false, err
-		}
+	if !same {
+		return nil, errors.New("hozoc: plan が直前の CollectOutputs の結果でない")
 	}
-	if p.NoConfig {
-		return false, noConfig(p)
-	}
-	pl, err := a.plan(ctx, p, nil)
-	if err != nil {
-		return false, err
-	}
-	current := map[string]bool{}
-	for _, o := range pl.outputs {
-		current[o.path] = true
-		if old, err := os.ReadFile(filepath.Join(p.Root, filepath.FromSlash(o.path))); err != nil || !bytes.Equal(old, o.content) {
-			return false, nil // 足りないか、古い
-		}
-	}
-	for _, dir := range pl.dirs {
-		record, err := os.ReadFile(filepath.Join(p.Root, filepath.FromSlash(dir), OutputsFile))
-		if err != nil && !os.IsNotExist(err) {
-			return false, fmt.Errorf("hozoc: %s/%s を読めない: %w", dir, OutputsFile, err)
-		}
-		if want := pl.record(dir); !bytes.Equal(record, want) {
-			// 記録が今回の一覧と違う。前回書いて今回は書かないファイルが残っていれば、それは余分
-			return false, nil
-		}
-	}
-	return true, nil
+	return pl, nil
 }
+
+// dryRun は、予定 plan が、書き出さずに、書き出す予定だけを返すものか（cli.hozo の EmitPlan.dryRun）。
+func dryRun(plan hozoc.EmitPlan) bool { return plan.DryRun != nil && *plan.DryRun }
 
 // noConfig は、設定なしで emit しようとしたときの ConfigInvalid（CFG-7。docs/cli.md「手で書くもの」）。
 func noConfig(p *project.Project) error {
 	missing := diag.Diagnostic{Severity: diag.Error, Code: "CFG-7", File: config.FileName,
 		Message: "hozo.toml が見つからないので、書き出す単位がない（作業ディレクトリから親へ向かって探した。--config か HOZO_CONFIG で指定できる）"}
-	return hozoc.ConfigInvalid{Value: diagnostics(append([]diag.Diagnostic{missing}, p.Diags...), p.Files)}
+	return configInvalid(append([]diag.Diagnostic{missing}, p.Diags...), p.Files)
 }
 
-// plan は一度の emit が書き出す予定のすべて（docs/cli.md「emit」の 1〜3 の結果）。
-type plan struct {
+// outputPlan は一度の emit が書き出す予定のすべて（docs/cli.md「emit」の 1〜3 の結果）。境界の hozoc.EmitPlan が持たない、
+// 置き場（ルートと、出力ごとの Dir(U, N)）を持つ。
+type outputPlan struct {
+	// root はプロジェクトのルート（パスの基準）。
+	root string
 	// dirs は対象の出力の Dir(U, N)（ルートからの相対パス。単位の設定の順、名前空間の IR の順）。対象の単位の対象の名前空間で、
 	// in のせいで出力でなくなったものの Dir(U, N) も含む（前回のファイルを消すため。docs/cli.md「emit」の 5）。
 	dirs []string
@@ -220,7 +115,7 @@ type plan struct {
 
 // record は出力先 dir の .hozoc-outputs.json の中身（今回書くパスの一覧。辞書順の JSON の配列）。
 // 書くものが一つもなければ nil（記録を置かない）。
-func (pl *plan) record(dir string) []byte {
+func (pl *outputPlan) record(dir string) []byte {
 	var paths []string
 	for _, o := range pl.outputs {
 		if o.dir == dir {
@@ -238,8 +133,8 @@ func (pl *plan) record(dir string) []byte {
 	return append(data, '\n')
 }
 
-// plan は docs/cli.md「emit」の 1〜3: 対象を決め、対象の出力ごとに単位のトランスパイラを起動して files と warnings と errors を
-// 集め、パスの重複を確かめる。何も書かない。誤りは cli.hozo の例外で返す（UnknownNamespace、proc.Crashed /
+// collect は docs/cli.md「emit」の 1〜3: 対象を決め、対象の出力ごとに単位のトランスパイラを起動して files と warnings と errors を
+// 集め、パスの重複を確かめる。ファイルには触れない。誤りは cli.hozo の例外で返す（UnknownNamespace、proc.Crashed /
 // proc.MalformedOutput、ConfigInvalid、CheckFailed、OutputConflict）。
 //
 // hozoc 本体はコードを出力しない（docs/plugin-protocol.md「この文書が決めること」）。どのトランスパイラも、自分の出力の View だけ
@@ -248,13 +143,13 @@ func (pl *plan) record(dir string) []byte {
 // トランスパイラの files の path はルートからの相対パスで、その起動の Dir(U, N) の下でなければならない
 // （docs/plugin-protocol.md「emit」）。そうでないもの（`..`、絶対パス、別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの）は
 // PLG-1、同じ応答の中の重複は PLG-2 で、どちらも proc.MalformedOutput。
-func (a *App) plan(ctx context.Context, p *project.Project, namespaces []string) (*plan, error) {
+func (a *App) collect(ctx context.Context, p *project.Project, namespaces []string) (*outputPlan, error) {
 	views := p.Views()
 
 	// 1. 対象の出力。引数 n が選ぶのは、仕様にある名前空間のうち n 自身と n の子孫で、どれかの単位の対象のもの
 	// （その名前空間を対象にするすべての単位の分）。n 自身がどの単位の対象でなくても、子孫を対象にする単位があればよい。
 	// 一つも選ばない引数（仕様にない名前、どの単位の対象でもない名前空間）があれば UnknownNamespace。
-	pl := &plan{}
+	pl := &outputPlan{root: p.Root}
 	var targets []outputKey
 	matched := map[string]bool{}
 	for u := range p.Units {
@@ -313,7 +208,7 @@ func (a *App) plan(ctx context.Context, p *project.Project, namespaces []string)
 				var pe *hostplugin.PluginError
 				if errors.As(err, &pe) {
 					d := pe.Diagnostic(p.ManifestPath(t.Plugin))
-					return nil, hozoc.ConfigInvalid{Value: diagnostics(append(append([]diag.Diagnostic{}, warnings...), d), p.Files)}
+					return nil, configInvalid(append(append([]diag.Diagnostic{}, warnings...), d), p.Files)
 				}
 				return nil, err
 			}
@@ -345,7 +240,7 @@ func (a *App) plan(ctx context.Context, p *project.Project, namespaces []string)
 	if len(failures) > 0 {
 		all := append(append([]diag.Diagnostic{}, failures...), warnings...)
 		diag.Sort(all, p.Files, nil)
-		return nil, hozoc.CheckFailed{Value: diagnostics(all, p.Files)}
+		return nil, checkFailed(all, p.Files)
 	}
 	diag.Sort(warnings, p.Files, nil)
 	sort.SliceStable(outputs, func(i, j int) bool { return outputs[i].path < outputs[j].path })
@@ -353,7 +248,7 @@ func (a *App) plan(ctx context.Context, p *project.Project, namespaces []string)
 	// 3. CFG-5
 	if conflicts := findConflicts(outputs); len(conflicts) > 0 {
 		all := append(conflicts, warnings...)
-		return nil, hozoc.OutputConflict{Value: diagnostics(all, p.Files)}
+		return nil, outputConflict(all, p.Files)
 	}
 	pl.outputs, pl.warnings = outputs, warnings
 	return pl, nil
@@ -377,7 +272,7 @@ func (a *App) transpile(p *project.Project, t project.Transpiler, view *ir.View)
 // hozoc.Leaves のメソッド。どの配線からも呼ばれない内部の op で、プラグインとの境界の記述としてある（docs/cli.md
 // 「手で書くもの」）: plugin を起動し（作業ディレクトリは plugin.root、マニフェストのディレクトリは plugin.dir）、req を JSON にして
 // 送り、応答を hozoc.EmitResponse に読んで返す。hozoc.View は中身のない model なので、この入口から送る要求の view は空の
-// オブジェクトになる。hozoc 自身の emit は、この入口を呼ばず、[App.transpile] を使う。
+// オブジェクトになる。hozoc 自身の emit（[App.CollectOutputs]）は、この入口を呼ばず、[App.transpile] を使う。
 // 起動の失敗と異常終了は proc.Crashed、応答の形の誤りは proc.MalformedOutput。
 func (a *App) RunEmit(ctx context.Context, plugin hozoc.Plugin, req hozoc.EmitRequest) (hozoc.EmitResponse, error) {
 	if err := ctx.Err(); err != nil {
@@ -449,46 +344,4 @@ func findConflicts(outputs []output) []diag.Diagnostic {
 		i = j
 	}
 	return diags
-}
-
-// readOutputsFile は <root>/<dir>/.hozoc-outputs.json を読む。ファイルがなければ空。パスは正規化するだけで、
-// dir の下かどうかは確かめない（従うかどうかは呼ぶ側が決める。WriteOutputs の 5）。
-func readOutputsFile(root, dir string) ([]string, error) {
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(dir), OutputsFile))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("hozoc: %s/%s を読めない: %w", dir, OutputsFile, err)
-	}
-	var paths []string
-	if err := json.Unmarshal(data, &paths); err != nil {
-		return nil, fmt.Errorf("hozoc: %s/%s を読めない: %w", dir, OutputsFile, err)
-	}
-	for i, p := range paths {
-		paths[i] = config.CleanRel(p)
-	}
-	return paths, nil
-}
-
-// removeEmptyDirs は、消したファイル removed（ルートからの相対パス）のディレクトリが空になっていれば、出力先 dir の下の範囲で、
-// そのディレクトリも消す（docs/cli.md「emit」の 5: Go の基底の内側のフォルダ inner が要らなくなったとき）。親へ向かって、
-// 空でないディレクトリか dir そのものに当たるまで続ける。dir そのものは消さない。
-func removeEmptyDirs(root, dir, removed string) {
-	for d := path.Dir(removed); config.Under(d, dir); d = path.Dir(d) {
-		if err := os.Remove(filepath.Join(root, filepath.FromSlash(d))); err != nil {
-			return // 空でない（か、消せない）。そこで止める
-		}
-	}
-}
-
-// writeIfChanged は内容が違うときだけ書く。ディレクトリは作る。
-func writeIfChanged(abs string, content []byte) error {
-	if old, err := os.ReadFile(abs); err == nil && bytes.Equal(old, content) {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(abs, content, 0o644)
 }

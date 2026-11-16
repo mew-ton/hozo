@@ -224,7 +224,6 @@ func (f *fileGen) unit(u *unit) {
 // rowExec は、行を受け取るメソッド（@db.insert、@db.update、Post）の本体: 先に、行の値を列の形にして（できなければ、文を実行
 // しない）、文を dbExec で実行する。閉じる波括弧まで書く。
 func (f *fileGen) rowExec(m *model, local, query string) {
-	f.used[m.argsName] = true
 	f.printf("\targs, err := %s(%s)\n\tif err != nil {\n\t\treturn err\n\t}\n", m.argsName, local)
 	f.printf("\treturn %s(ctx, t.db,\n\t\t`%s`, args...)\n}\n\n", f.use(helperExec), query)
 }
@@ -378,24 +377,28 @@ func (f *fileGen) seams() {
 		if op == nil {
 			continue
 		}
-		// 本体が、戻り値の型を書く（関数リテラル）ので、局所の名前（レシーバ、ctx、err、body）は、import するパッケージの名前を避ける
-		names := f.locals("s", "ctx", "err")
-		recv, ctx, err := names[0], names[1], names[2]
+		// 本体が、戻り値の型を書く（関数リテラル）ので、このメソッドの局所の名前（レシーバ s、ctx、err、body）は、import する
+		// パッケージの名前を避ける: 当たれば、当たらなくなるまで末尾に _（引数の局所の名前とも当たらないように）
 		reserved := f.reserved()
-		reserved[recv], reserved[ctx], reserved[err] = true, true, true
 		params, results := golang.SeamSignature(op, f.im, reserved)
-		taken := map[string]bool{recv: true, ctx: true, err: true}
-		call := []string{ctx}
+		taken := map[string]bool{}
+		var call []string
 		for _, p := range op.Params {
 			local := golang.LocalName(p.Name, reserved)
 			taken[local] = true
 			call = append(call, local)
 		}
-		base := golang.SeamBodyParam(op, reserved)
-		body := base
-		for f.imports[body] || (body != base && taken[body]) {
-			body += "_"
+		pick := func(name string) string {
+			for f.imports[name] || taken[name] {
+				name += "_"
+			}
+			taken[name] = true
+			return name
 		}
+		recv, ctx, err := pick("s"), pick("ctx"), pick("err")
+		base := golang.SeamBodyParam(op, reserved)
+		body := pick(base)
+		call = append([]string{ctx}, call...)
 		// 基底の形（golang.SeamSignature）の ctx と body を、このメソッドの局所の名前に（当たる名前がなければ、基底の形のまま）
 		params = ctx + strings.TrimPrefix(params, "ctx")
 		if i := strings.LastIndex(params, ", "+base+" func("); i >= 0 && body != base {

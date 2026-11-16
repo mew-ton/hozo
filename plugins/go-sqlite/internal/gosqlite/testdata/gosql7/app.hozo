@@ -1,11 +1,5 @@
-// GOSQL-7（docs/plugin-go-sqlite.md「診断」）: db の語彙のデコレータ（@db.find、@db.list、@db.insert、@db.update、@db.delete）の
-// 引数の状態が、N の表の状態でない（@db.table が付いていない、別の名前空間の状態）。位置はデコレータを付けた宣言。
-
-/** 別の名前空間の表 */
-namespace far {
-  model Row { @db.key @db.text id: string; }
-  @db.table state rows: list<Row>;
-}
+// GOSQL-7（docs/plugin-go-sqlite.md「診断」）: db のデコレータを付けた read の on の状態か、効果の宛先の状態が、N の表の状態でない
+// （@db.table が付いていない）。位置は、その read か効果。
 
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
@@ -13,19 +7,15 @@ namespace app {
   /** @db.table が付いていない状態 */
   state plain: list<Row>;
 
-  // @db.find、@db.list
+  // read: @db.find、@db.list
   @db.find
-  read findPlainRow(id: string): Row? on plain;
-  export op findPlain(id: string): Row? {
-    return findPlainRow(id);
-  }
+  read plainById(id: string): Row? on plain;
   @db.list
-  read listPlainRows(): Row[] on plain;
-  export op listPlain(): Row[] {
-    return listPlainRows();
-  }
+  @db.where("note", "x")
+  @db.latest("note")
+  read plainRows(): Row[] on plain;
 
-  // @db.insert、@db.update、@db.delete（op に並べられていない効果のデコレータも、同じに確かめる）
+  // 効果: @db.insert、@db.update、@db.delete（配線が呼んでいない効果も、同じに確かめる）
   @db.insert
   effect createPlain(row: Row) on plain.post;
   @db.update
@@ -36,19 +26,12 @@ namespace app {
     createPlain(row);
   }
 
-  // 別の名前空間の状態
-  @db.insert
-  effect createFar(row: Row) on rows.post;
-
   // 通るもの
   @db.find
-  read findRowRow(id: string): Row? on rows;
-  export op findRow(id: string): Row? {
-    return findRowRow(id);
-  }
+  read rowById(id: string): Row? on rows;
   @db.insert
   effect createRow(row: Row) on rows.post;
-  export op addRow(row: Row) {
-    createRow(row);
-  }
+  /** デコレータを付けていない read と効果は、見ない */
+  read plainCount(): int on plain;
+  effect clearPlain() on plain.delete;
 }

@@ -1,0 +1,4 @@
+GOSQL-27	app.byId	read app.byId の @db.latest の列 "id" のしまい方が @db.text（新しい順に並べられるのは @db.time / @db.int / @db.float の列）
+GOSQL-27	app.lastNoted	read app.lastNoted の @db.latest の列 "note" のしまい方が @db.text（新しい順に並べられるのは @db.time / @db.int / @db.float の列）
+GOSQL-27	app.byFlag	read app.byFlag の @db.latest の列 "flag" のしまい方が @db.bool（新しい順に並べられるのは @db.time / @db.int / @db.float の列）
+GOSQL-27	app.byTags	read app.byTags の @db.latest の列 "tags" のしまい方が @db.json（新しい順に並べられるのは @db.time / @db.int / @db.float の列）

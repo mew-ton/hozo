@@ -1,4 +1,0 @@
-GOSQL-18	app.Row	model app.Row のフィールド note に @db.nullable が付いているが、型 string は省略可能でない（値がなくてよい列は、型も省略可能にする）
-GOSQL-18	app.Row	model app.Row のフィールド name に @db.nullable が付いているが、型 app.Name は省略可能でない（値がなくてよい列は、型も省略可能にする）
-GOSQL-18	app.Row	model app.Row のフィールド tags に @db.nullable が付いているが、型 string[] は省略可能でない（値がなくてよい列は、型も省略可能にする）
-GOSQL-18	app.Row	model app.Row のフィールド tag に @db.nullable が付いているが、型 app.Tag は省略可能でない（値がなくてよい列は、型も省略可能にする）

@@ -1,104 +1,82 @@
-// GOSQL-9 の入力だったもの。op の引数と、read / 効果の引数の食い違い（数、型）は、今は hozoc が確かめる（docs/types.md「呼び出しの
-// 引数」の TYPE-4、BIND-4）ので、検査を通る仕様には書けない。ここに残すのは、read と効果の引数の型が、表の列の型と合わない宣言と、
-// それを、引数の型どおりに呼ぶ op。
+// GOSQL-9（docs/plugin-go-sqlite.md「列と引数の型」「効果の中身」）: 条件の引数（read と、@db.delete の効果）の型が、列に合わない
+// （引数の型は、列の型と等しい。列の型が T? なら、T でもよい。列より広い引数は合わない）。@db.insert / @db.update の効果の引数が、
+// 表の model の行一つでない。位置は、その read か効果。
 
 namespace app {
   scalar Id extends string;
+  scalar Code extends string;
   model Row {
     @db.key @db.text id: Id;
     @db.text note: string;
     @db.int rank: int?;
   }
-  model Other { @db.key @db.text id: Id; }
+  /** 形は同じでも、別の model */
+  model Other {
+    @db.key @db.text id: Id;
+    @db.text note: string;
+    @db.int rank: int?;
+  }
   @db.table state rows: list<Row>;
 
-  // ---- @db.find: 引数は一つで、型が列に合う ----
+  // ---- read の引数 ----
 
-  // 引数が二つ
+  // scalar は名前で比べる（Id の列に string、別の scalar）
   @db.find
-  read findTwoRow(id: Id): Row? on rows;
-  export op findTwo(id: Id, note: string): Row? {
-    return findTwoRow(id);
-  }
-  // scalar は名前で比べる（Id の列に string）
+  read rowByString(id: string): Row? on rows;
   @db.find
-  read findByStringRow(id: string): Row? on rows;
-  export op findByString(id: string): Row? {
-    return findByStringRow(id);
-  }
+  read rowByCode(id: Code): Row? on rows;
   // 列より広い引数（T の列に T?）
   @db.find
-  read findMaybeRow(id: Id?): Row? on rows;
-  export op findMaybe(id: Id?): Row? {
-    return findMaybeRow(id);
-  }
-
-  // ---- @db.list ----
-
+  read rowByMaybe(id: Id?): Row? on rows;
   // 型が違う
   @db.list
-  read listByIntRows(note: int): Row[] on rows;
-  export op listByInt(note: int): Row[] {
-    return listByIntRows(note);
-  }
+  read rowsByIntNote(note: int): Row[] on rows;
   // T? の列に、別の型
   @db.list
-  read listByRankRows(rank: string?): Row[] on rows;
-  export op listByRank(rank: string?): Row[] {
-    return listByRankRows(rank);
-  }
-  // 列を渡さないのに、引数がある
-  @db.list
-  read listWithRows(): Row[] on rows;
-  export op listWith(note: string): Row[] {
-    return listWithRows();
-  }
+  read rowsByStringRank(rank: string?): Row[] on rows;
+  // 二つの引数の、一つだけが合わない
+  @db.find
+  read rowByIdAndRank(id: Id, rank: float): Row? on rows;
 
-  // ---- @db.effects: 引数の数は効果の数と同じで、n 番目の型が、n 番目の効果の受け取るもの ----
+  // ---- @db.delete の効果の引数 ----
 
+  @db.delete
+  effect deleteByString(id: string) on rows.delete;
+  @db.delete
+  effect deleteByMaybeNote(note: string?) on rows.delete;
+
+  // ---- @db.insert / @db.update の効果の引数: 表の model の行一つ ----
+
+  // 引数がない
   @db.insert
-  effect createRow(row: Row) on rows.post;
+  effect createNothing() on rows.post;
+  // 二つ
+  @db.insert
+  effect createTwo(first: Row, second: Row) on rows.post;
+  // 別の model
+  @db.insert
+  effect createOther(row: Other) on rows.post;
+  // 省略可能な行、行の並び
   @db.update
-  effect updateRow(row: Row) on rows.put;
-  @db.delete
-  effect deleteRow(id: Id) on rows.delete;
-  @db.delete
-  effect deleteRank(rank: int?) on rows.delete;
-
-  // 引数が多い op は、効果に渡すものを選ぶ
-  export op addTwo(row: Row, other: Row) {
-    createRow(row);
-  }
-  // 二つの効果を、一つのトランザクションで
-  @db.transaction
-  export op swapped(id: Id, row: Row) {
-    createRow(row);
-    deleteRow(id);
-  }
+  effect updateMaybe(row: Row?) on rows.put;
+  @db.update
+  effect updateMany(rows: Row[]) on rows.put;
+  // 行でなく、列の値
+  @db.update
+  effect updateNote(id: Id, note: string) on rows.put;
 
   // ---- 通るもの ----
 
   @db.find
-  read findRowRow(id: Id): Row? on rows;
-  export op findRow(id: Id): Row? {
-    return findRowRow(id);
-  }
+  read rowById(id: Id): Row? on rows;
   @db.list
-  read listRankRows(rank: int): Row[] on rows;
-  export op listRank(rank: int): Row[] {
-    return listRankRows(rank);
-  }
+  read rowsByRank(rank: int): Row[] on rows;
   @db.list
-  read listRankOrNoneRows(rank: int?): Row[] on rows;
-  export op listRankOrNone(rank: int?): Row[] {
-    return listRankOrNoneRows(rank);
-  }
-  export op removeRank(rank: int?) {
-    deleteRank(rank);
-  }
-  @db.transaction
-  export op replace(id: Id, row: Row) {
-    deleteRow(id);
-    createRow(row);
-  }
+  read rowsByRankOrNone(rank: int?): Row[] on rows;
+  @db.delete
+  effect deleteByRank(id: Id, rank: int?) on rows.delete;
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+  @db.update
+  effect updateRow(row: Row) on rows.put;
 }

@@ -1,6 +1,6 @@
-// Command go-sqlite は、db の語彙（docs/vocab.md「`db` の読み書きのデコレータ」「`db` の表と、しまい方」）の付いた状態を、SQLite の表と、
+// Command go-sqlite は、db の語彙（docs/vocab.md「`db` の語彙」）の付いた状態を、SQLite の表と、
 // その上の読み書きにするプラグイン（docs/plugin-go-sqlite.md）。トランスパイラ go-sqlite を提供する: Go の基底 go に相乗りし、
-// 基底の状態の単位（<状態>State）と SharedState を満たす型を db.go に出す。中身は internal/gosqlite。
+// 基底の状態の単位（<状態>State）を満たす型と、@db.transaction の継ぎ目の実装を db.go に出す。中身は internal/gosqlite。
 package main
 
 import (

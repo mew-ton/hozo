@@ -1,0 +1,13 @@
+GOSQL-26	app.intToText	read app.intToText の @db.where の列 "id" に、リテラル 1 を渡せない（列の型は string。渡せるのは文字列のリテラル）
+GOSQL-26	app.boolToName	read app.boolToName の @db.where の列 "name" に、リテラル true を渡せない（列の型は app.Name。渡せるのは文字列のリテラル）
+GOSQL-26	app.textToInt	read app.textToInt の @db.where の列 "count" に、リテラル "1" を渡せない（列の型は app.Count。渡せるのは整数のリテラル）
+GOSQL-26	app.floatToInt	read app.floatToInt の @db.where の列 "count" に、リテラル 1.5 を渡せない（列の型は app.Count。渡せるのは整数のリテラル）
+GOSQL-26	app.textToFloat	read app.textToFloat の @db.where の列 "ratio" に、リテラル "0.5" を渡せない（列の型は float。渡せるのは整数か小数のリテラル）
+GOSQL-26	app.intToBool	read app.intToBool の @db.where の列 "flag" に、リテラル 1 を渡せない（列の型は boolean。渡せるのは true か false）
+GOSQL-26	app.textToBool	read app.textToBool の @db.where の列 "flag" に、リテラル "true" を渡せない（列の型は boolean。渡せるのは true か false）
+GOSQL-26	app.intToDuration	read app.intToDuration の @db.where の列 "span" に、リテラル 60 を渡せない（列の型は Duration。この型の列に渡せるリテラルはない）
+GOSQL-26	app.textToTime	read app.textToTime の @db.where の列 "at" に、リテラル "2026-01-02T03:04:05Z" を渡せない（列の型は Time。この型の列に渡せるリテラルはない）
+GOSQL-26	app.textToJSON	read app.textToJSON の @db.where の列 "tags" に、リテラル "[]" を渡せない（列の型は string[]。この型の列に渡せるリテラルはない）
+GOSQL-26	app.textToModel	read app.textToModel の @db.where の列 "tag" に、リテラル "{}" を渡せない（列の型は app.Tag。この型の列に渡せるリテラルはない）
+GOSQL-26	app.intToMaybeText	read app.intToMaybeText の @db.where の列 "note" に、リテラル 0 を渡せない（列の型は string?。渡せるのは文字列のリテラル）
+GOSQL-26	app.mixed	read app.mixed の @db.where の列 "rank" に、リテラル "high" を渡せない（列の型は int?。渡せるのは整数のリテラル）

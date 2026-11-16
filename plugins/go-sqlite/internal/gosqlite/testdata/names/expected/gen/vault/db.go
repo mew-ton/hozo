@@ -13,22 +13,32 @@ import (
 	"slices"
 	"time"
 
+	"example.com/app/gen/body"
+	"example.com/app/gen/ctx"
+	"example.com/app/gen/err"
 	"example.com/app/gen/r"
 	"example.com/app/gen/row"
+	"example.com/app/gen/s"
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。
 const Schema = `CREATE TABLE IF NOT EXISTS "secrets" (
-  "row" TEXT NOT NULL PRIMARY KEY,
-  "r" INTEGER NOT NULL,
+  "t" TEXT NOT NULL PRIMARY KEY,
+  "ctx" INTEGER NOT NULL,
   "err" REAL NOT NULL,
-  "data" INTEGER NOT NULL,
+  "args" INTEGER NOT NULL,
   "type" TEXT NOT NULL,
   "string" TEXT NOT NULL,
   "json" TEXT NOT NULL,
   "any" TEXT,
   "time" TEXT,
-  "sql" INTEGER NOT NULL
+  "sql" INTEGER NOT NULL,
+  "runtime" TEXT NOT NULL,
+  "dbGet" TEXT NOT NULL,
+  "dbScanSecret" TEXT NOT NULL,
+  "s" TEXT NOT NULL,
+  "value" TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS "entriesA" (
   "id" TEXT NOT NULL PRIMARY KEY,
@@ -46,8 +56,25 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
+// Querier は *sql.DB と *sql.Tx が共に持つ、文の実行。
+type Querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Conn は、ctx で文を実行する先: ctx が db のトランザクション（@db.transaction の継ぎ目が始めたもの）を運んでいれば、それ。なければ db。
+// このファイルの型のメソッドは、どれもこれを通す。人が書き足すメソッドも、db を直に使わずに、これを通す（通さなければ、トランザクションに入らない）。
+// 鍵は runtime.DBTxKey（db ごとに一つ。どの名前空間の出力も同じ鍵を使う）なので、別の名前空間の継ぎ目が、同じ db に始めたトランザクションにも入る。
+func Conn(ctx context.Context, db *sql.DB) Querier {
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		return tx
+	}
+	return db
+}
+
 // SecretsTable は状態 vault.secrets の単位（SecretsState）の、表 "secrets" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と命令（Post）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type SecretsTable struct{ db *sql.DB }
 
 // NewSecretsTable は db の表 "secrets" の上の SecretsTable を返す。表は CreateTables が作る。
@@ -63,157 +90,76 @@ func (t SecretsTable) IsEmpty(ctx context.Context) (bool, error) {
 // Get は形で決まる問い合わせ: 表 "secrets" の行を、足した順にすべて引く。
 func (t SecretsTable) Get(ctx context.Context) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" ORDER BY rowid`)
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" ORDER BY rowid`)
 }
 
-// Find は op vault.find（@db.find）: 表 "secrets" から、"row"（@db.key）が引数 t と同じ行を引く。なければ nil。
-func (t SecretsTable) Find(ctx context.Context, t_ Key) (*Secret, error) {
+// Post は形で決まる命令: 表 "secrets" に、引数 value の行を足す。
+func (t SecretsTable) Post(ctx context.Context, value Secret) error {
+	args, err := dbArgsSecret(value)
+	if err != nil {
+		return err
+	}
+	return dbExec(ctx, t.db,
+		`INSERT INTO "secrets" ("t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`, args...)
+}
+
+// ByT は read vault.byT（@db.find）: 表 "secrets" から、"t" が引数 t と同じ行を引く。なければ nil。
+func (t SecretsTable) ByT(ctx context.Context, t_ Key) (*Secret, error) {
 	return dbGet(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "row" IS ?1`, dbText(t_))
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "t" IS ?1`, dbText(t_))
 }
 
-// Scan は op vault.scan（@db.list）: 表 "secrets" から、"r" が引数 ctx と同じ行を、足した順にすべて引く。
-func (t SecretsTable) Scan(ctx context.Context, ctx_ Num) ([]Secret, error) {
+// ByLocals は read vault.byLocals（@db.list）: 表 "secrets" から、"ctx" が引数 ctx と同じで、"err" が引数 err と同じで、"args" が引数 args と同じ行を、足した順にすべて引く。
+func (t SecretsTable) ByLocals(ctx context.Context, ctx_ Num, err_ Ratio, args_ Flag) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "r" IS ?1 ORDER BY rowid`, dbInt(ctx_))
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "ctx" IS ?1 AND "err" IS ?2 AND "args" IS ?3 ORDER BY rowid`, dbInt(ctx_), dbFloat(err_), dbBool(args_))
 }
 
-// Near は op vault.near（@db.list）: 表 "secrets" から、"err" が引数 err と同じ行を、足した順にすべて引く。
-func (t SecretsTable) Near(ctx context.Context, err_ Ratio) ([]Secret, error) {
+// ByWords は read vault.byWords（@db.list）: 表 "secrets" から、"type" が引数 type と同じ行を、足した順にすべて引く。
+func (t SecretsTable) ByWords(ctx context.Context, type_ time.Time) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "err" IS ?1 ORDER BY rowid`, dbFloat(err_))
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "type" IS ?1 ORDER BY rowid`, dbTime(type_))
 }
 
-// ListAt は op vault.listAt（@db.list）: 表 "secrets" から、"type" が引数 time と同じ行を、足した順にすべて引く。
-func (t SecretsTable) ListAt(ctx context.Context, time_ time.Time) ([]Secret, error) {
+// ByImports は read vault.byImports（@db.list）: 表 "secrets" から、"json" が引数 json と同じで、"time" が引数 time と同じで、"sql" が引数 sql と同じで、"runtime" が引数 runtime と同じ行を、足した順にすべて引く。
+func (t SecretsTable) ByImports(ctx context.Context, json_ map[string]string, time_ *time.Time, sql_ time.Duration, runtime_ string) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "type" IS ?1 ORDER BY rowid`, dbTime(time_))
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "json" IS ?1 AND "time" IS ?2 AND "sql" IS ?3 AND "runtime" IS ?4 ORDER BY rowid`, dbJSON(json_), dbTime(time_, dbNullable), dbInt(sql_), dbText(runtime_))
 }
 
-// ListJson は op vault.listJson（@db.list）: 表 "secrets" から、"json" が引数 json と同じ行を、足した順にすべて引く。
-func (t SecretsTable) ListJson(ctx context.Context, json_ map[string]string) ([]Secret, error) {
+// ByPrivates は read vault.byPrivates（@db.list）: 表 "secrets" から、"dbGet" が引数 dbGet と同じで、"dbScanSecret" が引数 dbScanSecret と同じで、"s" が引数 s と同じ行を、足した順にすべて引く。
+func (t SecretsTable) ByPrivates(ctx context.Context, dbGet_ string, dbScanSecret_ string, s_ string) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "json" IS ?1 ORDER BY rowid`, dbJSON(json_))
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "dbGet" IS ?1 AND "dbScanSecret" IS ?2 AND "s" IS ?3 ORDER BY rowid`, dbText(dbGet_), dbText(dbScanSecret_), dbText(s_))
 }
 
-// ListSql は op vault.listSql（@db.list）: 表 "secrets" から、"sql" が引数 sql と同じ行を、足した順にすべて引く。
-func (t SecretsTable) ListSql(ctx context.Context, sql_ time.Duration) ([]Secret, error) {
-	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "sql" IS ?1 ORDER BY rowid`, dbInt(sql_))
-}
-
-// ListData は op vault.listData（@db.list）: 表 "secrets" から、"data" が引数 reflect と同じ行を、足した順にすべて引く。
-func (t SecretsTable) ListData(ctx context.Context, reflect_ Flag) ([]Secret, error) {
-	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "data" IS ?1 ORDER BY rowid`, dbBool(reflect_))
-}
-
-// Open は op vault.open（@db.find）: 表 "secrets" から、"row"（@db.key）が引数 dbGet と同じ行を引く。なければ nil。
-func (t SecretsTable) Open(ctx context.Context, dbGet_ Key) (*Secret, error) {
-	return dbGet(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "row" IS ?1`, dbText(dbGet_))
-}
-
-// Count は op vault.count（@db.list）: 表 "secrets" から、"r" が引数 dbScanSecret と同じ行を、足した順にすべて引く。
-func (t SecretsTable) Count(ctx context.Context, dbScanSecret_ Num) ([]Secret, error) {
-	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "r" IS ?1 ORDER BY rowid`, dbInt(dbScanSecret_))
-}
-
-// Touch は op vault.touch（@db.find）: 表 "secrets" から、"row"（@db.key）が引数 row と同じ行を引く。なければ nil。
-func (t SecretsTable) Touch(ctx context.Context, row_ Key) (*Secret, error) {
-	return dbGet(ctx, t.db, dbScanSecret,
-		`SELECT "row", "r", "err", "data", "type", "string", "json", "any", "time", "sql" FROM "secrets" WHERE "row" IS ?1`, dbText(row_))
-}
-
-// Add は op vault.add（@db.effects）: 効果 vault.createSecret（@db.insert）で、表 "secrets" に、引数 args の行を足す。
-func (t SecretsTable) Add(ctx context.Context, args_ Secret) error {
+// CreateSecret は効果 vault.createSecret（@db.insert）: 表 "secrets" に、引数 args の行を足す。
+func (t SecretsTable) CreateSecret(ctx context.Context, args_ Secret) error {
 	args, err := dbArgsSecret(args_)
 	if err != nil {
 		return err
 	}
 	return dbExec(ctx, t.db,
-		`INSERT INTO "secrets" ("row", "r", "err", "data", "type", "string", "json", "any", "time", "sql") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`, args...)
+		`INSERT INTO "secrets" ("t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`, args...)
 }
 
-// Save は op vault.save（@db.effects）: 効果 vault.updateSecret（@db.update）で、表 "secrets" の、キーが引数 err と同じ行を書き換える。行がなければ何もしない。
-func (t SecretsTable) Save(ctx context.Context, err_ Secret) error {
+// UpdateSecret は効果 vault.updateSecret（@db.update）: 表 "secrets" の、キーが引数 err と同じ行を書き換える。行がなければ何もしない。
+func (t SecretsTable) UpdateSecret(ctx context.Context, err_ Secret) error {
 	args, err := dbArgsSecret(err_)
 	if err != nil {
 		return err
 	}
 	return dbExec(ctx, t.db,
-		`UPDATE "secrets" SET "r" = ?2, "err" = ?3, "data" = ?4, "type" = ?5, "string" = ?6, "json" = ?7, "any" = ?8, "time" = ?9, "sql" = ?10 WHERE "row" IS ?1`, args...)
+		`UPDATE "secrets" SET "ctx" = ?2, "err" = ?3, "args" = ?4, "type" = ?5, "string" = ?6, "json" = ?7, "any" = ?8, "time" = ?9, "sql" = ?10, "runtime" = ?11, "dbGet" = ?12, "dbScanSecret" = ?13, "s" = ?14, "value" = ?15 WHERE "t" IS ?1`, args...)
 }
 
-// Drop は op vault.drop（@db.effects）: 効果 vault.deleteSecret（@db.delete）で、表 "secrets" から、"row" が引数 dbExec と同じ行を消す。行がなければ何もしない。
-func (t SecretsTable) Drop(ctx context.Context, dbExec_ Key) error {
-	return dbExec(ctx, t.db, `DELETE FROM "secrets" WHERE "row" IS ?1`, dbText(dbExec_))
-}
-
-// DropNum は op vault.dropNum（@db.effects）: 効果 vault.deleteByNum（@db.delete）で、表 "secrets" から、"r" が引数 context と同じ行を消す。行がなければ何もしない。
-func (t SecretsTable) DropNum(ctx context.Context, context_ Num) error {
-	return dbExec(ctx, t.db, `DELETE FROM "secrets" WHERE "r" IS ?1`, dbInt(context_))
-}
-
-// Mix は op vault.mix（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 vault.createSecret（@db.insert）で、表 "secrets" に、引数 args1 の行を足す。効果 vault.updateSecret（@db.update）で、表 "secrets" の、キーが引数 tx と同じ行を書き換える。行がなければ何もしない。効果 vault.deleteSecret（@db.delete）で、表 "secrets" から、"row" が引数 args2 と同じ行を消す。行がなければ何もしない。効果 vault.deleteByNum（@db.delete）で、表 "secrets" から、"r" が引数 args と同じ行を消す。行がなければ何もしない。どれかが失敗すれば、どれも残らない。
-func (t SecretsTable) Mix(ctx context.Context, args1_ Secret, tx_ Secret, args2_ Key, args_ Num) error {
-	args1, err := dbArgsSecret(args1_)
-	if err != nil {
-		return err
-	}
-	args2, err := dbArgsSecret(tx_)
-	if err != nil {
-		return err
-	}
-	tx, err := t.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "secrets" ("row", "r", "err", "data", "type", "string", "json", "any", "time", "sql") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`, args1...); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE "secrets" SET "r" = ?2, "err" = ?3, "data" = ?4, "type" = ?5, "string" = ?6, "json" = ?7, "any" = ?8, "time" = ?9, "sql" = ?10 WHERE "row" IS ?1`, args2...); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM "secrets" WHERE "row" IS ?1`, dbText(args2_)); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM "secrets" WHERE "r" IS ?1`, dbInt(args_)); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// Mix2 は op vault.mix2（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 vault.deleteSecret（@db.delete）で、表 "secrets" から、"row" が引数 t と同じ行を消す。行がなければ何もしない。効果 vault.deleteByNum（@db.delete）で、表 "secrets" から、"r" が引数 ctx と同じ行を消す。行がなければ何もしない。効果 vault.createSecret（@db.insert）で、表 "secrets" に、引数 err の行を足す。どれかが失敗すれば、どれも残らない。
-func (t SecretsTable) Mix2(ctx context.Context, t_ Key, ctx_ Num, err_ Secret) error {
-	args3, err := dbArgsSecret(err_)
-	if err != nil {
-		return err
-	}
-	tx, err := t.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM "secrets" WHERE "row" IS ?1`, dbText(t_)); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM "secrets" WHERE "r" IS ?1`, dbInt(ctx_)); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "secrets" ("row", "r", "err", "data", "type", "string", "json", "any", "time", "sql") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`, args3...); err != nil {
-		return err
-	}
-	return tx.Commit()
+// DeleteSecret は効果 vault.deleteSecret（@db.delete）: 表 "secrets" から、"t" が引数 t と同じで、"ctx" が引数 ctx と同じで、"dbGet" が引数 dbGet と同じ行を消す。行がなければ何もしない。
+func (t SecretsTable) DeleteSecret(ctx context.Context, t_ Key, ctx_ Num, dbGet_ string) error {
+	return dbExec(ctx, t.db, `DELETE FROM "secrets" WHERE "t" IS ?1 AND "ctx" IS ?2 AND "dbGet" IS ?3`, dbText(t_), dbInt(ctx_), dbText(dbGet_))
 }
 
 // EntriesATable は状態 vault.entriesA の単位（EntriesAState）の、表 "entriesA" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type EntriesATable struct{ db *sql.DB }
 
 // NewEntriesATable は db の表 "entriesA" の上の EntriesATable を返す。表は CreateTables が作る。
@@ -232,9 +178,9 @@ func (t EntriesATable) Get(ctx context.Context) ([]row.Entry, error) {
 		`SELECT "id", "at" FROM "entriesA" ORDER BY rowid`)
 }
 
-// AddA は op vault.addA（@db.effects）: 効果 vault.createA（@db.insert）で、表 "entriesA" に、引数 entry の行を足す。
-func (t EntriesATable) AddA(ctx context.Context, entry row.Entry) error {
-	args, err := dbArgsEntry(entry)
+// CreateA は効果 vault.createA（@db.insert）: 表 "entriesA" に、引数 row の行を足す。
+func (t EntriesATable) CreateA(ctx context.Context, row_ row.Entry) error {
+	args, err := dbArgsEntry(row_)
 	if err != nil {
 		return err
 	}
@@ -243,7 +189,7 @@ func (t EntriesATable) AddA(ctx context.Context, entry row.Entry) error {
 }
 
 // EntriesBTable は状態 vault.entriesB の単位（EntriesBState）の、表 "entriesB" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type EntriesBTable struct{ db *sql.DB }
 
 // NewEntriesBTable は db の表 "entriesB" の上の EntriesBTable を返す。表は CreateTables が作る。
@@ -262,9 +208,9 @@ func (t EntriesBTable) Get(ctx context.Context) ([]r.Entry, error) {
 		`SELECT "code", "tags" FROM "entriesB" ORDER BY rowid`)
 }
 
-// AddB は op vault.addB（@db.effects）: 効果 vault.createB（@db.insert）で、表 "entriesB" に、引数 entry の行を足す。
-func (t EntriesBTable) AddB(ctx context.Context, entry r.Entry) error {
-	args, err := dbArgsEntry2(entry)
+// CreateB は効果 vault.createB（@db.insert）: 表 "entriesB" に、引数 r の行を足す。
+func (t EntriesBTable) CreateB(ctx context.Context, r_ r.Entry) error {
+	args, err := dbArgsEntry2(r_)
 	if err != nil {
 		return err
 	}
@@ -272,51 +218,69 @@ func (t EntriesBTable) AddB(ctx context.Context, entry r.Entry) error {
 		`INSERT INTO "entriesB" ("code", "tags") VALUES (?1, ?2)`, args...)
 }
 
-// SharedTable は、複数の状態にまたがる葉の op（SharedState）の、db の上の実装。
-// メソッドは、SharedState の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
-type SharedTable struct{ db *sql.DB }
+// DbSeams は、@db.transaction の継ぎ目（Seams のメソッドのうち、このデコレータの分）の、db の上の実装。New の引数 seams に渡す。
+// トランザクションに入るのは、中身が、受け取った ctx で、同じ db に、Conn を通してすること（このファイルの型のメソッドは、どれもそう）。
+type DbSeams struct{ db *sql.DB }
 
-// NewSharedTable は db の上の SharedTable を返す。表は CreateTables が作る。
-func NewSharedTable(db *sql.DB) SharedTable { return SharedTable{db: db} }
+// NewDbSeams は db の上の DbSeams を返す。状態の単位の実装（New<状態>Table）に渡したのと同じ db を渡す。
+func NewDbSeams(db *sql.DB) DbSeams { return DbSeams{db: db} }
 
-var _ SharedState = SharedTable{}
+var _ Seams = DbSeams{}
 
-// AddBoth は op vault.addBoth（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 vault.createA（@db.insert）で、表 "entriesA" に、引数 row の行を足す。効果 vault.createB（@db.insert）で、表 "entriesB" に、引数 r の行を足す。どれかが失敗すれば、どれも残らない。
-func (t SharedTable) AddBoth(ctx context.Context, row_ row.Entry, r_ r.Entry) error {
-	args1, err := dbArgsEntry(row_)
-	if err != nil {
-		return err
-	}
-	args2, err := dbArgsEntry2(r_)
-	if err != nil {
-		return err
-	}
-	tx, err := t.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "entriesA" ("id", "at") VALUES (?1, ?2)`, args1...); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO "entriesB" ("code", "tags") VALUES (?1, ?2)`, args2...); err != nil {
-		return err
-	}
-	return tx.Commit()
+// MixDbTransaction は op vault.mix に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s__ DbSeams) MixDbTransaction(ctx__ context.Context, s_ Secret, t_ Secret, ctx_ Key, err_ Num, body_ string, args_ row.Entry, dbTransaction_ r.Entry, body__ func(ctx context.Context, s_ Secret, t_ Secret, ctx_ Key, err_ Num, body_ string, args_ row.Entry, dbTransaction_ r.Entry) error) error {
+	_, err__ := dbTransaction(ctx__, s__.db, func(ctx__ context.Context) (struct{}, error) {
+		return struct{}{}, body__(ctx__, s_, t_, ctx_, err_, body_, args_, dbTransaction_)
+	})
+	return err__
+}
+
+// MarkDbTransaction は op vault.mark に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s_ DbSeams) MarkDbTransaction(ctx_ context.Context, t_ Key, body_ func(ctx context.Context, t_ Key) (s.Mark, error)) (s.Mark, error) {
+	return dbTransaction(ctx_, s_.db, func(ctx_ context.Context) (s.Mark, error) {
+		return body_(ctx_, t_)
+	})
+}
+
+// InfoDbTransaction は op vault.info に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s_ DbSeams) InfoDbTransaction(ctx_ context.Context, t_ Key, body_ func(ctx context.Context, t_ Key) (*ctx.Info, error)) (*ctx.Info, error) {
+	return dbTransaction(ctx_, s_.db, func(ctx_ context.Context) (*ctx.Info, error) {
+		return body_(ctx_, t_)
+	})
+}
+
+// FaultsDbTransaction は op vault.faults に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s_ DbSeams) FaultsDbTransaction(ctx_ context.Context, t_ Key, body_ func(ctx context.Context, t_ Key) ([]err.Fault, error)) ([]err.Fault, error) {
+	return dbTransaction(ctx_, s_.db, func(ctx_ context.Context) ([]err.Fault, error) {
+		return body_(ctx_, t_)
+	})
+}
+
+// PartDbTransaction は op vault.part に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s__ DbSeams) PartDbTransaction(ctx_ context.Context, s_ Key, body_ Key, body__ func(ctx context.Context, s_ Key, body_ Key) (body.Part, error)) (body.Part, error) {
+	return dbTransaction(ctx_, s__.db, func(ctx_ context.Context) (body.Part, error) {
+		return body__(ctx_, s_, body_)
+	})
+}
+
+// ReportDbTransaction は op vault.report に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。
+func (s_ DbSeams) ReportDbTransaction(ctx_ context.Context, fault err.Fault, body_ func(ctx context.Context, fault err.Fault) error) error {
+	_, err_ := dbTransaction(ctx_, s_.db, func(ctx_ context.Context) (struct{}, error) {
+		return struct{}{}, body_(ctx_, fault)
+	})
+	return err_
 }
 
 // dbArgsSecret は vault.Secret を、表 "secrets" の列の順の値にする。
 func dbArgsSecret(row_ Secret) ([]any, error) {
-	return dbArgs(dbText(row_.Row), dbInt(row_.R), dbFloat(row_.Err), dbBool(row_.Data), dbTime(row_.Type), dbJSON(row_.String), dbJSON(row_.Json), dbJSON(row_.Any, dbNullable), dbTime(row_.Time, dbNullable), dbInt(row_.Sql))
+	return dbArgs(dbText(row_.T), dbInt(row_.Ctx), dbFloat(row_.Err), dbBool(row_.Args), dbTime(row_.Type), dbJSON(row_.String), dbJSON(row_.Json), dbJSON(row_.Any, dbNullable), dbTime(row_.Time, dbNullable), dbInt(row_.Sql), dbText(row_.Runtime), dbText(row_.DbGet), dbText(row_.DbScanSecret), dbText(row_.S), dbText(row_.Value))
 }
 
 // dbScanSecret は、表 "secrets" の列の順の値を vault.Secret に読む。
 func dbScanSecret(r_ dbRow) (Secret, error) {
 	var row_ Secret
-	if err := r_.Scan(dbText(&row_.Row), dbInt(&row_.R), dbFloat(&row_.Err), dbBool(&row_.Data), dbTime(&row_.Type), dbJSON(&row_.String), dbJSON(&row_.Json), dbJSON(&row_.Any, dbNullable), dbTime(&row_.Time, dbNullable), dbInt(&row_.Sql)); err != nil {
-		return Secret{}, err
+	if err_ := r_.Scan(dbText(&row_.T), dbInt(&row_.Ctx), dbFloat(&row_.Err), dbBool(&row_.Args), dbTime(&row_.Type), dbJSON(&row_.String), dbJSON(&row_.Json), dbJSON(&row_.Any, dbNullable), dbTime(&row_.Time, dbNullable), dbInt(&row_.Sql), dbText(&row_.Runtime), dbText(&row_.DbGet), dbText(&row_.DbScanSecret), dbText(&row_.S), dbText(&row_.Value)); err_ != nil {
+		return Secret{}, err_
 	}
 	return row_, nil
 }
@@ -329,8 +293,8 @@ func dbArgsEntry(row_ row.Entry) ([]any, error) {
 // dbScanEntry は、表 "entriesA" の列の順の値を row.Entry に読む。
 func dbScanEntry(r_ dbRow) (row.Entry, error) {
 	var row_ row.Entry
-	if err := r_.Scan(dbText(&row_.Id), dbTime(&row_.At)); err != nil {
-		return row.Entry{}, err
+	if err_ := r_.Scan(dbText(&row_.Id), dbTime(&row_.At)); err_ != nil {
+		return row.Entry{}, err_
 	}
 	return row_, nil
 }
@@ -343,8 +307,8 @@ func dbArgsEntry2(row_ r.Entry) ([]any, error) {
 // dbScanEntry2 は、表 "entriesB" の列の順の値を r.Entry に読む。
 func dbScanEntry2(r_ dbRow) (r.Entry, error) {
 	var row_ r.Entry
-	if err := r_.Scan(dbInt(&row_.Code), dbJSON(&row_.Tags)); err != nil {
-		return r.Entry{}, err
+	if err_ := r_.Scan(dbInt(&row_.Code), dbJSON(&row_.Tags)); err_ != nil {
+		return r.Entry{}, err_
 	}
 	return row_, nil
 }
@@ -354,13 +318,13 @@ type dbRow interface {
 	Scan(dest ...any) error
 }
 
-// dbOption は、列の読み書きに、フィールドのデコレータが足すこと。
+// dbOption は、列の読み書きに、フィールドの宣言が足すこと。
 type dbOption int
 
-// dbNullable は @db.nullable: その列は、値がなくてよい（NULL）。
+// dbNullable は、省略可能な（T?）フィールドの列: 値がなくてよい（NULL）。
 const dbNullable dbOption = 1
 
-// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドのデコレータが足したこと opts。
+// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドの宣言が足したこと opts。
 // v は、書くときはフィールドの値（か、列と比べる引数）、読むときはフィールドへのポインタ。
 // database/sql が、書くときに Value を、読むときに Scan を呼ぶ。
 type dbCol struct {
@@ -371,7 +335,7 @@ type dbCol struct {
 }
 
 // Value は、列に書く値。値があるかどうかは、実行時に見る: 値のないポインタは NULL。
-// @db.nullable（dbNullable）の列では、値のないスライスとマップも NULL。
+// 省略可能なフィールド（dbNullable）の列では、値のないスライスとマップも NULL。
 func (c dbCol) Value() (driver.Value, error) {
 	v := reflect.ValueOf(c.v)
 	switch v.Kind() {
@@ -388,13 +352,13 @@ func (c dbCol) Value() (driver.Value, error) {
 	return c.write(v)
 }
 
-// Scan は、列の値 src を、読む先に読む。NULL は、@db.nullable（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
-// ほかの列に NULL があれば、エラー。読む先がポインタ（省略可能）かどうかは、実行時に見る。
+// Scan は、列の値 src を、読む先に読む。NULL は、省略可能なフィールド（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
+// ほかの列（NOT NULL）に NULL があれば、エラー。読む先がポインタかどうかは、実行時に見る。
 func (c dbCol) Scan(src any) error {
 	dst := reflect.ValueOf(c.v).Elem()
 	if src == nil {
 		if !slices.Contains(c.opts, dbNullable) {
-			return fmt.Errorf("db: NULL in a column without @db.nullable (read into %s)", dst.Type())
+			return fmt.Errorf("db: NULL in a NOT NULL column (read into %s)", dst.Type())
 		}
 		dst.SetZero()
 		return nil
@@ -521,16 +485,39 @@ func dbJSON(v any, opts ...dbOption) dbCol {
 	}}
 }
 
+// dbTransaction は、body を、db の一つのトランザクションの中で呼ぶ: 始めて、body を呼び、確定する。
+// トランザクションは、body に渡す ctx が運ぶ（鍵は runtime.DBTxKey）。body が失敗すれば（確定に失敗しても）取り消して、零値とそのエラーを返す。
+// ctx が、すでに db のトランザクションを運んでいれば（入れ子。別の名前空間の継ぎ目が始めたものでも）、新しく始めずに、それに加わる: 確定も取り消しも、いちばん外側がする。
+func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context.Context) (R, error)) (R, error) {
+	if _, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		return body(ctx)
+	}
+	var zero R
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return zero, err
+	}
+	defer tx.Rollback()
+	out, err := body(context.WithValue(ctx, runtime.DBTxKey{DB: db}, tx))
+	if err != nil {
+		return zero, err
+	}
+	if err := tx.Commit(); err != nil {
+		return zero, err
+	}
+	return out, nil
+}
+
 // dbExec は行を返さない文を実行する。
 func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {
-	_, err := db.ExecContext(ctx, query, args...)
+	_, err := Conn(ctx, db).ExecContext(ctx, query, args...)
 	return err
 }
 
 // dbIsEmpty は、行の数を返す問い合わせの結果が 0 かどうか。
 func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 	var n int64
-	if err := db.QueryRowContext(ctx, query).Scan(&n); err != nil {
+	if err := Conn(ctx, db).QueryRowContext(ctx, query).Scan(&n); err != nil {
 		return false, err
 	}
 	return n == 0, nil
@@ -538,7 +525,7 @@ func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 
 // dbGet は問い合わせの一行を scan で読む。行がなければ nil。
 func dbGet[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) (*R, error) {
-	row, err := scan(db.QueryRowContext(ctx, query, args...))
+	row, err := scan(Conn(ctx, db).QueryRowContext(ctx, query, args...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -550,7 +537,7 @@ func dbGet[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), 
 
 // dbList は問い合わせのすべての行を scan で読む。
 func dbList[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) ([]R, error) {
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := Conn(ctx, db).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

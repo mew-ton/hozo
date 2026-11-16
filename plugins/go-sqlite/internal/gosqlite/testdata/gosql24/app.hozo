@@ -1,0 +1,30 @@
+// GOSQL-24（docs/plugin-go-sqlite.md「read の中身」）: @db.where か @db.latest の付いた read が、@db.find も @db.list も持たない。
+// 位置は read。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; @db.time at: Time; }
+  @db.table state rows: list<Row>;
+
+  // @db.where だけ
+  @db.where("note", "x")
+  read notedRows(): Row[] on rows;
+  // 二つの @db.where
+  @db.where("note", "x")
+  @db.where("id", "a")
+  read fixedRow(): Row? on rows;
+  // @db.latest だけ
+  @db.latest("at")
+  read lastRow(): Row? on rows;
+  // 両方
+  @db.where("note", "x")
+  @db.latest("at")
+  read lastNoted(): Row? on rows;
+
+  // 通るもの
+  @db.list
+  @db.where("note", "x")
+  @db.latest("at")
+  read newestNoted(): Row[] on rows;
+  /** デコレータを付けていない read は、人が書く */
+  read rowCount(): int on rows;
+}

@@ -1,0 +1,10 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-29（op に @db.transaction が付いているのに、N に表の状態が一つもない）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/app"
+
+[[emit]]
+namespace   = "ok"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/ok"

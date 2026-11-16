@@ -1,11 +1,10 @@
-GOSQL-10	app.findSure	op app.findSure の戻り値 app.Row が、@db.find の言うもの（app.Row?）でない
-GOSQL-10	app.findMany	op app.findMany の戻り値 app.Row[] が、@db.find の言うもの（app.Row?）でない
-GOSQL-10	app.findOther	op app.findOther の戻り値 app.Other? が、@db.find の言うもの（app.Row?）でない
-GOSQL-10	app.findNote	op app.findNote の戻り値 string? が、@db.find の言うもの（app.Row?）でない
-GOSQL-10	app.findNothing	op app.findNothing に戻り値がない（@db.find の言う戻り値は app.Row?）
-GOSQL-10	app.listOne	op app.listOne の戻り値 app.Row? が、@db.list の言うもの（app.Row[]）でない
-GOSQL-10	app.listMaybe	op app.listMaybe の戻り値 app.Row[]? が、@db.list の言うもの（app.Row[]）でない
-GOSQL-10	app.listOthers	op app.listOthers の戻り値 app.Other[] が、@db.list の言うもの（app.Row[]）でない
-GOSQL-10	app.listNothing	op app.listNothing に戻り値がない（@db.list の言う戻り値は app.Row[]）
-GOSQL-10	app.addAndReturn	op app.addAndReturn の戻り値 app.Row が、@db.effects の言うもの（戻り値なし）でない
-GOSQL-10	app.addAndCount	op app.addAndCount の戻り値 int が、@db.effects の言うもの（戻り値なし）でない
+GOSQL-10	app.sureRow	read app.sureRow の結果の型 app.Row が、@db.find の言うもの（app.Row?。表 app.rows の model の行）でない
+GOSQL-10	app.manyRows	read app.manyRows の結果の型 app.Row[] が、@db.find の言うもの（app.Row?。表 app.rows の model の行）でない
+GOSQL-10	app.otherRow	read app.otherRow の結果の型 app.Other? が、@db.find の言うもの（app.Row?。表 app.rows の model の行）でない
+GOSQL-10	app.noteOf	read app.noteOf の結果の型 string? が、@db.find の言うもの（app.Row?。表 app.rows の model の行）でない
+GOSQL-10	app.lastNote	read app.lastNote の結果の型 string が、@db.find の言うもの（app.Row?。表 app.rows の model の行）でない
+GOSQL-10	app.oneRow	read app.oneRow の結果の型 app.Row? が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
+GOSQL-10	app.maybeRows	read app.maybeRows の結果の型 app.Row[]? が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
+GOSQL-10	app.otherRows	read app.otherRows の結果の型 app.Other[] が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
+GOSQL-10	app.rowCount	read app.rowCount の結果の型 int が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
+GOSQL-10	app.rowsByNote	read app.rowsByNote の結果の型 Record<string, app.Row> が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない

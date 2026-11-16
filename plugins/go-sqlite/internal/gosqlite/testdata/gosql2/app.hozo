@@ -12,7 +12,7 @@ namespace app {
   // @db.table がなければ、見ない
   state other: single<Row>;
 
-  // 表にならなかった状態を名指しするデコレータは、重ねて報告しない
+  // 表にならなかった状態を宛先にする効果は、重ねて報告しない
   @db.update
   effect saveConfig(row: Row) on config.put;
   export op setConfig(row: Row) {

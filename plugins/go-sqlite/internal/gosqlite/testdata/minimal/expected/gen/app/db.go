@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。
@@ -23,8 +25,25 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
+// Querier は *sql.DB と *sql.Tx が共に持つ、文の実行。
+type Querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Conn は、ctx で文を実行する先: ctx が db のトランザクション（@db.transaction の継ぎ目が始めたもの）を運んでいれば、それ。なければ db。
+// このファイルの型のメソッドは、どれもこれを通す。人が書き足すメソッドも、db を直に使わずに、これを通す（通さなければ、トランザクションに入らない）。
+// 鍵は runtime.DBTxKey（db ごとに一つ。どの名前空間の出力も同じ鍵を使う）なので、別の名前空間の継ぎ目が、同じ db に始めたトランザクションにも入る。
+func Conn(ctx context.Context, db *sql.DB) Querier {
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		return tx
+	}
+	return db
+}
+
 // TicksTable は状態 app.ticks の単位（TicksState）の、表 "ticks" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type TicksTable struct{ db *sql.DB }
 
 // NewTicksTable は db の表 "ticks" の上の TicksTable を返す。表は CreateTables が作る。
@@ -57,13 +76,13 @@ type dbRow interface {
 	Scan(dest ...any) error
 }
 
-// dbOption は、列の読み書きに、フィールドのデコレータが足すこと。
+// dbOption は、列の読み書きに、フィールドの宣言が足すこと。
 type dbOption int
 
-// dbNullable は @db.nullable: その列は、値がなくてよい（NULL）。
+// dbNullable は、省略可能な（T?）フィールドの列: 値がなくてよい（NULL）。
 const dbNullable dbOption = 1
 
-// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドのデコレータが足したこと opts。
+// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v と、フィールドの宣言が足したこと opts。
 // v は、書くときはフィールドの値（か、列と比べる引数）、読むときはフィールドへのポインタ。
 // database/sql が、書くときに Value を、読むときに Scan を呼ぶ。
 type dbCol struct {
@@ -74,7 +93,7 @@ type dbCol struct {
 }
 
 // Value は、列に書く値。値があるかどうかは、実行時に見る: 値のないポインタは NULL。
-// @db.nullable（dbNullable）の列では、値のないスライスとマップも NULL。
+// 省略可能なフィールド（dbNullable）の列では、値のないスライスとマップも NULL。
 func (c dbCol) Value() (driver.Value, error) {
 	v := reflect.ValueOf(c.v)
 	switch v.Kind() {
@@ -91,13 +110,13 @@ func (c dbCol) Value() (driver.Value, error) {
 	return c.write(v)
 }
 
-// Scan は、列の値 src を、読む先に読む。NULL は、@db.nullable（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
-// ほかの列に NULL があれば、エラー。読む先がポインタ（省略可能）かどうかは、実行時に見る。
+// Scan は、列の値 src を、読む先に読む。NULL は、省略可能なフィールド（dbNullable）の列でだけ読めて、読む先は、値がない（nil）。
+// ほかの列（NOT NULL）に NULL があれば、エラー。読む先がポインタかどうかは、実行時に見る。
 func (c dbCol) Scan(src any) error {
 	dst := reflect.ValueOf(c.v).Elem()
 	if src == nil {
 		if !slices.Contains(c.opts, dbNullable) {
-			return fmt.Errorf("db: NULL in a column without @db.nullable (read into %s)", dst.Type())
+			return fmt.Errorf("db: NULL in a NOT NULL column (read into %s)", dst.Type())
 		}
 		dst.SetZero()
 		return nil
@@ -126,7 +145,7 @@ func dbInt(v any, opts ...dbOption) dbCol {
 // dbIsEmpty は、行の数を返す問い合わせの結果が 0 かどうか。
 func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 	var n int64
-	if err := db.QueryRowContext(ctx, query).Scan(&n); err != nil {
+	if err := Conn(ctx, db).QueryRowContext(ctx, query).Scan(&n); err != nil {
 		return false, err
 	}
 	return n == 0, nil
@@ -134,7 +153,7 @@ func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 
 // dbList は問い合わせのすべての行を scan で読む。
 func dbList[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error), query string, args ...any) ([]R, error) {
-	rows, err := db.QueryContext(ctx, query, args...)
+	rows, err := Conn(ctx, db).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

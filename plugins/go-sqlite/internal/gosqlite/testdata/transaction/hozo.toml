@@ -1,0 +1,28 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「トランザクション」
+# （継ぎ目のメソッドの二つの形、入れ子、同じ db の上の二つの名前空間、var _ Seams を出すとき）。
+[hozo]
+plugin_dirs = ["plugins"]
+
+# 1: bank。@db.transaction の付いた op を持つ。継ぎ目を宣言したのは go-sqlite だけ（var _ Seams を出す）
+[[emit]]
+namespace   = "bank"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/bank"
+
+# 2: audit。bank と同じ db の上の、別の名前空間。bank の op が、ここの op を呼ぶ
+[[emit]]
+namespace   = "audit"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/audit"
+
+# 3: mixed。継ぎ目を宣言したトランスパイラが、もう一つ並ぶ（go-trace の t.traced）: DbSeams だけでは Seams を満たさない
+[[emit]]
+namespace   = "mixed"
+transpilers = ["go", "go-sqlite", "go-trace"]
+out         = "gen/mixed"
+
+# bank と audit が使う型の置き場
+[[emit]]
+namespace   = "kinds"
+transpilers = ["go"]
+out         = "gen/kinds"

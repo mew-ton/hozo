@@ -1,0 +1,2 @@
+GOSQL-29	app.add	op app.add に @db.transaction が付いているが、名前空間 app に @db.table の付いた状態が一つもない（継ぎ目の実装を出す db.go がない）
+GOSQL-29	app.importRows	op app.importRows に @db.transaction が付いているが、名前空間 app に @db.table の付いた状態が一つもない（継ぎ目の実装を出す db.go がない）

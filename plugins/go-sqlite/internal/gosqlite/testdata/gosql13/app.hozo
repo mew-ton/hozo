@@ -1,55 +1,61 @@
-// GOSQL-13（docs/plugin-go-sqlite.md「op の中身」）: @db.find の列が、一行に決まる列でない（表の model のただ一つの @db.key でも、
-// @db.unique でもない）。位置は op。
+// GOSQL-13（docs/plugin-go-sqlite.md「read の中身」）: @db.find の read が、一行に決まらない: 条件の列（引数と @db.where）が、
+// 表の model の @db.key のすべても、@db.unique の列も含まず、@db.latest もない。位置は read。
 
 namespace app {
-  model Row { @db.key @db.text id: string; @db.unique @db.text code: string; @db.text note: string; }
+  model Row { @db.key @db.text id: string; @db.unique @db.text code: string; @db.text note: string; @db.time at: Time; }
   /** キーが二つ */
-  model Pair { @db.key @db.text left: string; @db.key @db.text right: string; @db.unique @db.key @db.text both: string; }
-  /** キーがない */
-  model Log { @db.text line: string; }
+  model Pair { @db.key @db.text left: string; @db.key @db.text right: string; @db.text note: string; }
+  /** キーも、一意の列もない */
+  model Log { @db.text line: string; @db.time at: Time; }
   @db.table state rows: list<Row>;
   @db.table state pairs: list<Pair>;
   @db.table state logs: list<Log>;
 
   // キーでも一意でもない列
   @db.find
-  read findByNoteRow(note: string): Row? on rows;
-  export op findByNote(note: string): Row? {
-    return findByNoteRow(note);
-  }
-  // 複数の @db.key の一つ
+  read rowByNote(note: string): Row? on rows;
+  // 条件がない
   @db.find
-  read findByLeftRow(left: string): Pair? on pairs;
-  export op findByLeft(left: string): Pair? {
-    return findByLeftRow(left);
-  }
-  // キーのない model
+  read anyRow(): Row? on rows;
+  // @db.where の条件だけで、キーでも一意でもない列
   @db.find
-  read findLineRow(line: string): Log? on logs;
-  export op findLine(line: string): Log? {
-    return findLineRow(line);
-  }
+  @db.where("note", "x")
+  read notedRow(): Row? on rows;
+  // 二つの @db.key の一つ
+  @db.find
+  read pairByLeft(left: string): Pair? on pairs;
+  // 二つの @db.key の一つと、キーでない列
+  @db.find
+  read pairByLeftAndNote(left: string, note: string): Pair? on pairs;
+  // キーのない model（どの列を並べても、決まらない）
+  @db.find
+  read logByLine(line: string, at: Time): Log? on logs;
 
-  // 通るもの: ただ一つの @db.key、@db.unique、複数の @db.key の一つでも @db.unique を持つ列
+  // ---- 通るもの ----
+
+  // 1: @db.key のすべて
   @db.find
-  read findRowRow(id: string): Row? on rows;
-  export op findRow(id: string): Row? {
-    return findRowRow(id);
-  }
+  read rowById(id: string): Row? on rows;
   @db.find
-  read findByCodeRow(code: string): Row? on rows;
-  export op findByCode(code: string): Row? {
-    return findByCodeRow(code);
-  }
+  read pairByBoth(left: string, right: string): Pair? on pairs;
+  // 引数と @db.where を合わせて、@db.key のすべて
   @db.find
-  read findByBothRow(both: string): Pair? on pairs;
-  export op findByBoth(both: string): Pair? {
-    return findByBothRow(both);
-  }
-  // @db.list なら、どの列でもよい
+  @db.where("right", "r")
+  read pairOnRight(left: string): Pair? on pairs;
+  // 2: @db.unique の列
+  @db.find
+  read rowByCode(code: string): Row? on rows;
+  @db.find
+  @db.where("code", "c")
+  read fixedRow(note: string): Row? on rows;
+  // 3: @db.latest（条件がなくてもよい）
+  @db.find
+  @db.latest("at")
+  read lastLog(): Log? on logs;
+  @db.find
+  @db.latest("at")
+  read lastRowNoted(note: string): Row? on rows;
+  // @db.list なら、どの条件でもよい
   @db.list
-  read listByNoteRows(note: string): Row[] on rows;
-  export op listByNote(note: string): Row[] {
-    return listByNoteRows(note);
-  }
+  read rowsByNote(note: string): Row[] on rows;
 }

@@ -1,5 +1,5 @@
-// docs/plugin-go-sqlite.md「表」「しまい方」: 六つのしまい方（表の各行。核の型と scalar）、@db.nullable の列（しまい方ごと）、制約。
-// どの表にも、行を足す op を置く（dbArgs<Model> が出る）。読むのは、形で決まる問い合わせ Get。
+// docs/plugin-go-sqlite.md「表」「しまい方」: 六つのしまい方（表の各行。核の型と scalar）、省略可能なフィールドの列（しまい方ごと。
+// NOT NULL が付かない）、制約。どの表にも、行を足す効果を置く（dbArgs<Model> が出る）。読むのは、形で決まる問い合わせ Get。
 
 namespace kinds {
   scalar Name extends string;
@@ -11,7 +11,7 @@ namespace kinds {
   /** scalar の元が scalar（元の核の型は string） */
   scalar Label extends Name;
 
-  /** 表の model でない model: フィールドの db の語彙のデコレータは、読まない（合わないしまい方も、@db.nullable のない省略可能も） */
+  /** 表の model でない model: フィールドの db の語彙のデコレータは、読まない（合わないしまい方も、しまい方のないフィールドも） */
   model Tag { @db.int key: string; value: string; note: string?; }
 }
 
@@ -48,7 +48,7 @@ namespace app {
   }
   model Tree { label: string; children: Tree[]; }
 
-  /** @db.nullable の列: しまい方ごと（核の型と scalar）。NOT NULL が付かない */
+  /** 省略可能なフィールドの列: しまい方ごと（核の型と scalar）。NOT NULL が付かない */
   model Sparse {
     @db.text s: string?;
     @db.int i: int?;
@@ -77,7 +77,7 @@ namespace app {
   /** 二つの表の model（補助は一度だけ出る） */
   model Shared { @db.key @db.text id: string; }
 
-  /** @db.ref: 先の表と、そのただ一つのキーへの REFERENCES。自分の表も指せる。@db.nullable と @db.unique と一緒にも書ける */
+  /** @db.ref: 先の表と、そのただ一つのキーへの REFERENCES。自分の表も指せる。省略可能なフィールドにも、@db.unique と一緒にも書ける */
   model Link {
     @db.key @db.text id: string;
     @db.ref(Core) @db.text core: string;
@@ -103,25 +103,8 @@ namespace app {
   @db.insert effect createSharedA(row: Shared) on sharedA.post;
   @db.insert effect createLink(row: Link) on links.post;
 
+  /** 効果を呼ぶ配線（効果は、配線が呼んでいなくても、状態の単位のメソッドになる） */
   export op addCore(core: Core) {
     createCore(core);
-  }
-  export op addNamed(named: Named) {
-    createNamed(named);
-  }
-  export op addDoc(doc: Doc) {
-    createDoc(doc);
-  }
-  export op addSparse(sparse: Sparse) {
-    createSparse(sparse);
-  }
-  export op addPair(pair: Pair) {
-    createPair(pair);
-  }
-  export op addSharedA(shared: Shared) {
-    createSharedA(shared);
-  }
-  export op addLink(link: Link) {
-    createLink(link);
   }
 }

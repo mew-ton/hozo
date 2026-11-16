@@ -1,3 +1,6 @@
-GOSQL-13	app.findByNote	op app.findByNote の @db.find の列 "note" が、一行に決まる列でない（model app.Row のただ一つの @db.key でも、@db.unique でもない。並びを引くなら @db.list）
-GOSQL-13	app.findByLeft	op app.findByLeft の @db.find の列 "left" が、一行に決まる列でない（model app.Pair のただ一つの @db.key でも、@db.unique でもない。並びを引くなら @db.list）
-GOSQL-13	app.findLine	op app.findLine の @db.find の列 "line" が、一行に決まる列でない（model app.Log のただ一つの @db.key でも、@db.unique でもない。並びを引くなら @db.list）
+GOSQL-13	app.rowByNote	read app.rowByNote（@db.find）が、一行に決まらない: 条件の列が、model app.Row の @db.key のすべても、@db.unique の列も含まず、@db.latest もない（並びを引くなら @db.list）
+GOSQL-13	app.anyRow	read app.anyRow（@db.find）が、一行に決まらない: 条件の列が、model app.Row の @db.key のすべても、@db.unique の列も含まず、@db.latest もない（並びを引くなら @db.list）
+GOSQL-13	app.notedRow	read app.notedRow（@db.find）が、一行に決まらない: 条件の列が、model app.Row の @db.key のすべても、@db.unique の列も含まず、@db.latest もない（並びを引くなら @db.list）
+GOSQL-13	app.pairByLeft	read app.pairByLeft（@db.find）が、一行に決まらない: 条件の列が、model app.Pair の @db.key のすべても、@db.unique の列も含まず、@db.latest もない（並びを引くなら @db.list）
+GOSQL-13	app.pairByLeftAndNote	read app.pairByLeftAndNote（@db.find）が、一行に決まらない: 条件の列が、model app.Pair の @db.key のすべても、@db.unique の列も含まず、@db.latest もない（並びを引くなら @db.list）
+GOSQL-13	app.logByLine	read app.logByLine（@db.find）が、一行に決まらない: 条件の列が、model app.Log の @db.key のすべても、@db.unique の列も含まず、@db.latest もない（並びを引くなら @db.list）

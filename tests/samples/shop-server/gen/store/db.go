@@ -14,6 +14,7 @@ import (
 	"time"
 
 	pkgtype "example.com/shop-server/gen/type"
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。
@@ -55,8 +56,9 @@ type Querier interface {
 
 // Conn は、ctx で文を実行する先: ctx が db のトランザクション（@db.transaction の継ぎ目が始めたもの）を運んでいれば、それ。なければ db。
 // このファイルの型のメソッドは、どれもこれを通す。人が書き足すメソッドも、db を直に使わずに、これを通す（通さなければ、トランザクションに入らない）。
+// 鍵は runtime.DBTxKey（db ごとに一つ。どの名前空間の出力も同じ鍵を使う）なので、別の名前空間の継ぎ目が、同じ db に始めたトランザクションにも入る。
 func Conn(ctx context.Context, db *sql.DB) Querier {
-	if tx, ok := ctx.Value(dbTxKey{db: db}).(*sql.Tx); ok {
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
 		return tx
 	}
 	return db
@@ -417,14 +419,11 @@ func dbJSON(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTxKey は、ctx が運ぶトランザクションの鍵。db ごとに一つ。
-type dbTxKey struct{ db *sql.DB }
-
 // dbTransaction は、body を、db の一つのトランザクションの中で呼ぶ: 始めて、body を呼び、確定する。
-// トランザクションは、body に渡す ctx が運ぶ。body が失敗すれば（確定に失敗しても）取り消して、零値とそのエラーを返す。
-// ctx が、すでに db のトランザクションを運んでいれば（入れ子）、新しく始めずに、それに加わる: 確定も取り消しも、いちばん外側がする。
+// トランザクションは、body に渡す ctx が運ぶ（鍵は runtime.DBTxKey）。body が失敗すれば（確定に失敗しても）取り消して、零値とそのエラーを返す。
+// ctx が、すでに db のトランザクションを運んでいれば（入れ子。別の名前空間の継ぎ目が始めたものでも）、新しく始めずに、それに加わる: 確定も取り消しも、いちばん外側がする。
 func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context.Context) (R, error)) (R, error) {
-	if _, ok := ctx.Value(dbTxKey{db: db}).(*sql.Tx); ok {
+	if _, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
 		return body(ctx)
 	}
 	var zero R
@@ -433,7 +432,7 @@ func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context
 		return zero, err
 	}
 	defer tx.Rollback()
-	out, err := body(context.WithValue(ctx, dbTxKey{db: db}, tx))
+	out, err := body(context.WithValue(ctx, runtime.DBTxKey{DB: db}, tx))
 	if err != nil {
 		return zero, err
 	}
