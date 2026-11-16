@@ -96,7 +96,7 @@ func internal(o *ir.Op) *ir.Op {
 
 // reads は o に reads を足す。
 func reads(o *ir.Op, states ...string) *ir.Op {
-	o.Reads = append(o.Reads, states...)
+	o.Reads = append(o.Reads, ir.StateReads(states...)...)
 	return o
 }
 
@@ -311,10 +311,18 @@ func sigOf(t *testing.T, p *ir.Program, fqn string) ir.Signature {
 	return o.Signature
 }
 
-func relOf(t *testing.T, sig ir.Signature, x, e string) ir.EffectState {
+// effectOf は、テストが効果を書く二つの形を EffectRef にする: 文字列は宣言の FQN（名前で書いた効果）、EffectRef はそのまま。
+func effectOf(e any) ir.EffectRef {
+	if s, ok := e.(string); ok {
+		return ir.NamedEffect{Effect: s}
+	}
+	return e.(ir.EffectRef)
+}
+
+func relOf(t *testing.T, sig ir.Signature, x string, e any) ir.EffectState {
 	t.Helper()
 	for _, r := range sig.Relations {
-		if r.Exception == x && r.Effect == e {
+		if r.Exception == x && r.Effect == effectOf(e) {
 			return r.State
 		}
 	}
@@ -322,10 +330,10 @@ func relOf(t *testing.T, sig ir.Signature, x, e string) ir.EffectState {
 	return ""
 }
 
-func succOf(t *testing.T, sig ir.Signature, e string) ir.EffectState {
+func succOf(t *testing.T, sig ir.Signature, e any) ir.EffectState {
 	t.Helper()
 	for _, s := range sig.SuccessEffects {
-		if s.Effect == e {
+		if s.Effect == effectOf(e) {
 			return s.State
 		}
 	}
@@ -388,4 +396,13 @@ func messages(diags []diag.Diagnostic) string {
 		b.WriteString("  " + d.Severity.String() + "[" + d.Code + "] " + d.Message + "\n")
 	}
 	return b.String()
+}
+
+// effectNames は効果の列を、表示の文字列（宣言は FQN、直に書いた効果は "<状態の FQN>.<操作>"）の列にする。
+func effectNames(effects []ir.EffectRef) []string {
+	out := make([]string, len(effects))
+	for i, e := range effects {
+		out[i] = e.String()
+	}
+	return out
 }

@@ -8,8 +8,10 @@ namespace a {
   effect add on s.post;
   exception E;
   decorator mark;
+  @db.list(s)
+  read every on s;
   @mark
-  @db.list(s)                          // ERROR: THROWS-3
+  @db.reads(every)                     // ERROR: THROWS-3
   op carriesRead(): never throws E;
   @db.effects(add)                     // ERROR: THROWS-3
   op carriesEffect(): never throws E;

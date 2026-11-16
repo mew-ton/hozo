@@ -14,8 +14,12 @@ namespace a {
   decorator guarded throws Missing prevents effects;
 
   @db.find(rows, "id")
-  op find(id: string): M?;
+  read byId on rows;
   @db.list(rows)
+  read every on rows;
+  @db.reads(byId)
+  op find(id: string): M?;
+  @db.reads(every)
   op all(): M[];
   @db.effects(add)
   op insert(m: M);

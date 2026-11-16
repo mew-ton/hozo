@@ -1,5 +1,6 @@
 // DEC-1（docs/check.md「デコレータ」、docs/grammar.md「decorator の宣言」）: 対象 effect のデコレータは、効果の宣言にだけ付く。
-// 効果の宣言には、対象に effect を持つデコレータだけが付く。union / classify / decorator に付けたら常に DEC-1
+// 効果の宣言には、対象に effect を持つデコレータだけが付く。対象 read も同じ（read の宣言にだけ。op には付かない）。
+// union / classify / decorator に付けたら常に DEC-1
 namespace a {
   model M { @db.text id: string; }
   @db.table(M)
@@ -10,7 +11,18 @@ namespace a {
   @db.insert(s)                        // ERROR: DEC-1
   state notEffect2: list<M>;
   @db.find(s, "id")                    // ERROR: DEC-1
-  effect notOp on s.delete;
+  effect notRead on s.delete;
+  @db.find(s, "id")                    // ERROR: DEC-1
+  op notRead2(id: string): M?;
+  @db.list(s)                          // ERROR: DEC-1
+  state notRead3: list<M>;
+  @onlyEffect                          // ERROR: DEC-1
+  @db.reads(byId)                      // ERROR: DEC-1
+  read notOp on s;
+  @db.insert(s)                        // ERROR: DEC-1
+  read notEffect3 on s;
+  @db.find(s, "id")
+  read byId on s;
   @db.text                             // ERROR: DEC-1
   effect notField on s.put;
   @onlyEffect                          // ERROR: DEC-1

@@ -652,7 +652,7 @@ func TestDecoratorDecl(t *testing.T) {
 			t.Errorf("For[%d] = %s, want %s", i, d.For[i].Kind, w)
 		}
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "@external decorator get(path: string) throws ServerError | NetworkError;")
+	d = firstDecl[*ast.DecoratorDecl](t, "@external decorator get(path: string) throws ServerError, NetworkError;")
 	if !d.External || d.ExternalSpan.Start != 0 || d.ExternalSpan.End != 9 || len(d.Clauses) != 1 {
 		t.Fatalf("Decorator = %+v", d)
 	}
@@ -670,9 +670,9 @@ func TestDecoratorDeclClauses(t *testing.T) {
 	d := firstDecl[*ast.DecoratorDecl](t, `decorator fallbackToCache
     catches http.NetworkError recovers
     throws OfflineCacheMiss prevents effects
-    catches A | B ignores
+    catches A, B ignores
     catches C halts transitionToLogin
-    throws X | Y keeps effects;`)
+    throws X, Y keeps effects;`)
 	if len(d.Clauses) != 5 {
 		t.Fatalf("Clauses = %d", len(d.Clauses))
 	}
@@ -777,7 +777,7 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 		t.Fatalf("Clauses = %d", len(d.Clauses))
 	}
 	r := d.Clauses[0].(*ast.ReadsClause)
-	if names(r.States) != "table" {
+	if names(r.Reads) != "table" {
 		t.Errorf("reads = %+v", r)
 	}
 	if got := r.Span; got.End-got.Start != source.Offset(len("reads table")) {
@@ -800,17 +800,17 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 	if names(e.Effects) != "targets" {
 		t.Errorf("effects = %+v", e)
 	}
-	// 節は何度でも、どの順でも書ける。区切りは op の節と同じ（reads は ","、effects は "|"）
+	// 節は何度でも、どの順でも書ける。要素と区切りは op の節と同じ（区切りは ","。effects には直に書いた「状態.操作」も）
 	d = firstDecl[*ast.DecoratorDecl](t, `decorator both(a: any state, b: any state, ...es: any effect)
     reads a, b, store.users
-    throws X prevents effects effects es | store.e
+    throws X prevents effects effects es, store.e, store.users.post
     catches Y recovers
     reads carts
     effects U;`)
 	if len(d.Clauses) != 6 {
 		t.Fatalf("Clauses = %d", len(d.Clauses))
 	}
-	if r := d.Clauses[0].(*ast.ReadsClause); names(r.States) != "a|b|store.users" {
+	if r := d.Clauses[0].(*ast.ReadsClause); names(r.Reads) != "a|b|store.users" {
 		t.Errorf("Clause 0 = %+v", r)
 	}
 	// `throws X prevents effects effects e`: Relation の後ろに DecoEffectsClause
@@ -818,13 +818,13 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 	if names(th.Exceptions) != "X" || len(th.Relations) != 1 || th.Relations[0].Kind != ast.Prevents {
 		t.Errorf("Clause 1 = %+v", th)
 	}
-	if e := d.Clauses[2].(*ast.EffectsClause); names(e.Effects) != "es|store.e" {
+	if e := d.Clauses[2].(*ast.EffectsClause); names(e.Effects) != "es|store.e|store.users.post" {
 		t.Errorf("Clause 2 = %+v", e)
 	}
 	if _, ok := d.Clauses[3].(*ast.CatchesClause); !ok {
 		t.Errorf("Clause 3 = %T", d.Clauses[3])
 	}
-	if r := d.Clauses[4].(*ast.ReadsClause); names(r.States) != "carts" {
+	if r := d.Clauses[4].(*ast.ReadsClause); names(r.Reads) != "carts" {
 		t.Errorf("Clause 4 = %+v", r)
 	}
 	if e := d.Clauses[5].(*ast.EffectsClause); names(e.Effects) != "U" {
@@ -926,8 +926,11 @@ func TestDecoratorDeclReject(t *testing.T) {
 		{"optional non-any type with pipe", "decorator a(x: int |);", "型が必要"},
 		{"missing semicolon", "decorator a", "「;」が必要"},
 		{"reads without name", "decorator a reads;", "名前が必要"},
-		{"reads separated by pipe", "decorator a reads x | y;", "「;」が必要だが「|」がある"},
-		{"effects separated by comma", "decorator a effects x, y;", "「;」が必要だが「,」がある"},
+		{"reads separated by pipe", "decorator a reads x | y;", "reads の並びの区切りは「,」で、「|」ではない"},
+		{"effects separated by pipe", "decorator a effects x | y;", "effects の並びの区切りは「,」で、「|」ではない"},
+		{"throws separated by pipe", "decorator a throws X | Y;", "throws の並びの区切りは「,」で、「|」ではない"},
+		{"catches separated by pipe", "decorator a catches X | Y recovers;", "catches の並びの区切りは「,」で、「|」ではない"},
+		{"effects trailing comma", "decorator a effects x,;", "名前が必要"},
 		{"effects without name", "decorator a effects;", "名前が必要"},
 		{"qualified name", "decorator a.b;", "修飾しない識別子"},
 		{"no name", "decorator ;", "デコレータの名前が必要"},
@@ -952,8 +955,8 @@ func TestDecoratorDeclReject(t *testing.T) {
 func TestOp(t *testing.T) {
 	o := firstDecl[*ast.OpDecl](t, `@http.post("/login") @validated
 op login(in: LoginInput, n: int): LoginOk
-  effects createSession | notify
-  throws InvalidCredentials | NotVerified prevents effects
+  effects createSession, notify
+  throws InvalidCredentials, NotVerified prevents effects
   throws Other keeps effects;`)
 	if o.Name.Name != "login" || len(o.Params) != 2 || o.Params[0].Name.Name != "in" || typeString(o.Params[1].Type) != "int" {
 		t.Fatalf("Op = %+v", o)
@@ -1000,10 +1003,10 @@ op login(in: LoginInput, n: int): LoginOk
 	if len(o.Clauses) != 3 {
 		t.Fatalf("Clauses = %d", len(o.Clauses))
 	}
-	if r := o.Clauses[0].(*ast.ReadsClause); names(r.States) != "users|sessions" {
+	if r := o.Clauses[0].(*ast.ReadsClause); names(r.Reads) != "users|sessions" {
 		t.Errorf("Reads 0 = %+v", r)
 	}
-	if r := o.Clauses[1].(*ast.ReadsClause); names(r.States) != "store.orders" {
+	if r := o.Clauses[1].(*ast.ReadsClause); names(r.Reads) != "store.orders" {
 		t.Errorf("Reads 1 = %+v", r)
 	}
 	// Span は export から。
@@ -1017,6 +1020,85 @@ op login(in: LoginInput, n: int): LoginOk
 	o = firstDecl[*ast.OpDecl](t, "op unauthorized(): never throws Unauthorized;")
 	if o.Export || o.Return == nil || !o.Return.Never || o.Return.Void || o.Return.Type != nil {
 		t.Errorf("Op = %+v（Return = %+v）", o, o.Return)
+	}
+}
+
+// TestClauseSeparators は節の並び（docs/grammar.md「op」）: 区切りは "," で、effects の要素には直に書いた「状態.操作」、
+// reads の要素には read の名前か状態の名前を書ける（どちらかは名前の解決が決めるので、構文木では名前のまま）。
+// なくした書き方 "|" は SYNTAX にするが、"," として読み進めるので、宣言は残る。
+func TestClauseSeparators(t *testing.T) {
+	o := firstDecl[*ast.OpDecl](t, "op f() effects addUser, users.post, store.users.delete reads userByEmail, users, store.sessions throws A, b.B;")
+	if len(o.Clauses) != 3 {
+		t.Fatalf("Clauses = %d", len(o.Clauses))
+	}
+	if e := o.Clauses[0].(*ast.EffectsClause); names(e.Effects) != "addUser|users.post|store.users.delete" {
+		t.Errorf("effects = %+v", e)
+	}
+	if r := o.Clauses[1].(*ast.ReadsClause); names(r.Reads) != "userByEmail|users|store.sessions" {
+		t.Errorf("reads = %+v", r)
+	}
+	if th := o.Clauses[2].(*ast.ThrowsClause); names(th.Exceptions) != "A|b.B" {
+		t.Errorf("throws = %+v", th)
+	}
+
+	file, diags := parseSrc(t, "op f() throws A | B effects e | users.post reads s | t;\nop g();")
+	if len(diags) != 3 {
+		t.Fatalf("診断 = %d 件, want 3（節ごとに一つ）: %v", len(diags), diags)
+	}
+	for i, clause := range []string{"throws", "effects", "reads"} {
+		if !strings.Contains(diags[i].Message, clause+" の並びの区切りは「,」で、「|」ではない") {
+			t.Errorf("診断 %d = %q", i, diags[i].Message)
+		}
+	}
+	if len(file.Decls) != 2 {
+		t.Fatalf("読めた宣言 = %d, want 2（\"|\" は \",\" として読み進める）", len(file.Decls))
+	}
+	f := file.Decls[0].(*ast.OpDecl)
+	if th := f.Clauses[0].(*ast.ThrowsClause); names(th.Exceptions) != "A|B" {
+		t.Errorf("throws = %+v", th)
+	}
+	if e := f.Clauses[1].(*ast.EffectsClause); names(e.Effects) != "e|users.post" {
+		t.Errorf("effects = %+v", e)
+	}
+}
+
+// TestReadDecl は ReadDecl = "read" Ident "on" QualifiedName ";"（docs/grammar.md「read」）。
+func TestReadDecl(t *testing.T) {
+	r := firstDecl[*ast.ReadDecl](t, "/** メールで引く */ @db.find(users, \"email\") read userByEmail on users;")
+	if r.Name.Name != "userByEmail" || r.On.String() != "users" || r.Doc == nil || len(r.Decorators) != 1 {
+		t.Fatalf("Read = %+v", r)
+	}
+	if r.Span.Start != r.Decorators[0].Span.Start {
+		t.Errorf("Span はデコレータから: %+v", r.Span)
+	}
+	r = firstDecl[*ast.ReadDecl](t, "read all on store.users;")
+	if r.On.String() != "store.users" || r.Doc != nil || len(r.Decorators) != 0 {
+		t.Errorf("Read = %+v", r)
+	}
+
+	// read は予約語だが、フィールド名とデコレータの名前には書ける（docs/grammar.md「識別子」）
+	m := firstDecl[*ast.ModelDecl](t, "model M { read: boolean; }")
+	if len(m.Body.Fields) != 1 || m.Body.Fields[0].Name.Name != "read" {
+		t.Errorf("Model = %+v", m)
+	}
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator read(target: any read, ...rest: any read) for read | op reads target;")
+	if d.Name.Name != "read" || d.Params[0].Type.Any.Kind != ast.AnyRead || d.Params[1].Type.Any.Kind != ast.AnyRead {
+		t.Fatalf("Decorator = %+v", d)
+	}
+	if len(d.For) != 2 || d.For[0].Kind != ast.TargetRead || d.For[1].Kind != ast.TargetOp {
+		t.Errorf("For = %+v", d.For)
+	}
+
+	tests := []struct{ name, src, want string }{
+		{"no on", "read r;", "「on」が必要"},
+		{"no state", "read r on;", "読む状態の名前が必要"},
+		{"with body", "read r on users {}", "「;」が必要"},
+		{"export", "export read r on users;", "export を付けられるのは op だけ"},
+		{"qualified name", "read a.r on users;", "修飾しない識別子"},
+		{"keyword as op name", "op read();", "read は予約語で、識別子には使えない"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
 }
 
@@ -1035,7 +1117,10 @@ func TestOpReject(t *testing.T) {
 		{"export on namespace", "export namespace a {}", "export を付けられるのは op だけ"},
 		{"export before decorator", "export @d op a();", "export を付けられるのは op だけ"},
 		{"export twice", "export export op a();", "export を付けられるのは op だけ"},
-		{"reads with pipe", "op a() reads s | t;", "「;」か配線の「{」が必要"},
+		{"reads with pipe", "op a() reads s | t;", "reads の並びの区切りは「,」で、「|」ではない"},
+		{"effects with pipe", "op a() effects e | users.post;", "effects の並びの区切りは「,」で、「|」ではない"},
+		{"throws with pipe", "op a() throws X | Y;", "throws の並びの区切りは「,」で、「|」ではない"},
+		{"throws trailing comma", "op a() throws X,;", "名前が必要"},
 		{"reads without name", "op a() reads;", "名前が必要"},
 		{"reads trailing comma", "op a() reads s,;", "名前が必要"},
 		{"never param", "op a(x: never);", "never は op の戻り値の型と"},

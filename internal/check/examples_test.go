@@ -13,11 +13,11 @@ func logoutProgram() *ir.Program {
 	ignoreFailure.Catches = []ir.CatchesClause{catches(ir.Ignores, "", "http.NetworkError", "http.ServerError")}
 
 	serverLogout := leaf("server.logout", nil, param("in", ir.Ref("server.LogoutInput")))
-	serverLogout.Effects = []string{"server.deleteSession"}
+	serverLogout.Effects = ir.NamedEffects("server.deleteSession")
 	serverLogout.Decorators = []ir.Application{app("http.post", ir.Arg{Param: "path", Value: ir.LiteralValue{Literal: ir.StringLiteral{Value: "/logout"}}})}
 
 	clearToken := leaf("browser.clearToken", nil)
-	clearToken.Effects = []string{"browser.removeToken"}
+	clearToken.Effects = ir.NamedEffects("browser.removeToken")
 
 	requestLogout := wire("browser.requestLogout", nil, nil, cs(call("server.logout", carg("in", rec()))))
 	requestLogout.Decorators = []ir.Application{app("browser.ignoreFailure")}
@@ -56,14 +56,14 @@ func TestExampleLogout(t *testing.T) {
 
 	rl := sigOf(t, p, "browser.requestLogout")
 	wantStrings(t, "requestLogout.E", rl.Exceptions, nil)
-	wantStrings(t, "requestLogout.F", rl.Effects, []string{"server.deleteSession"})
+	wantStrings(t, "requestLogout.F", effectNames(rl.Effects), []string{"server.deleteSession"})
 	if got := succOf(t, rl, "server.deleteSession"); got != ir.Unknown {
 		t.Errorf("requestLogout succ(deleteSession) = %s, want unknown", got)
 	}
 
 	lo := sigOf(t, p, "browser.logout")
 	wantStrings(t, "logout.E", lo.Exceptions, nil)
-	wantStrings(t, "logout.F", lo.Effects, []string{"server.deleteSession", "browser.removeToken"})
+	wantStrings(t, "logout.F", effectNames(lo.Effects), []string{"server.deleteSession", "browser.removeToken"})
 	if got := succOf(t, lo, "server.deleteSession"); got != ir.Unknown {
 		t.Errorf("logout succ(deleteSession) = %s, want unknown", got)
 	}
@@ -123,9 +123,9 @@ func TestExamplePlaceOrder(t *testing.T) {
 
 	// 効果ごとに葉の op を分けて配線でつなぐと、状態は §9 の規則で計算される
 	create := leaf("server.createOrderOp", ir.Ref("server.Order"), param("in", ir.Ref("server.OrderInput")))
-	create.Effects = []string{"server.createOrder"}
+	create.Effects = ir.NamedEffects("server.createOrder")
 	notify := leaf("server.notify", nil, param("order", ir.Ref("server.Order")))
-	notify.Effects = []string{"server.notifyUser"}
+	notify.Effects = ir.NamedEffects("server.notifyUser")
 	notify.Throws = []ir.ThrowsClause{throws([]string{"server.NotificationFailed"}, prevents())}
 	wired := func(cl ...ir.ThrowsClause) *ir.Program {
 		w := wire("server.placeOrder", ir.Ref("server.Order"), []ir.OpParam{param("in", ir.Ref("server.OrderInput"))},
@@ -139,7 +139,7 @@ func TestExamplePlaceOrder(t *testing.T) {
 	p2 := wired(throws([]string{"server.NotificationFailed"}))
 	wantCodes(t, Check(p2, cfgFor("server")))
 	sig2 := sigOf(t, p2, "server.placeOrder")
-	wantStrings(t, "F", sig2.Effects, []string{"server.createOrder", "server.notifyUser"})
+	wantStrings(t, "F", effectNames(sig2.Effects), []string{"server.createOrder", "server.notifyUser"})
 	if got := relOf(t, sig2, "server.NotificationFailed", "server.createOrder"); got != ir.Kept {
 		t.Errorf("wired rel(NotificationFailed, createOrder) = %s, want kept (上の行)", got)
 	}

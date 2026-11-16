@@ -1,5 +1,5 @@
 {
-  "version": "0.5",
+  "version": "0.6",
   "viewer": "browser",
   "config": {
     "index": 2,
@@ -68,7 +68,7 @@
     ]
   },
   "program": {
-    "version": "0.5",
+    "version": "0.6",
     "namespaces": [
       {
         "name": "http",
@@ -439,7 +439,10 @@
             ],
             "returns": null,
             "effects": [
-              "server.deleteSession"
+              {
+                "kind": "named",
+                "effect": "server.deleteSession"
+              }
             ],
             "reads": [],
             "carried": {
@@ -451,12 +454,18 @@
             "signature": {
               "exceptions": [],
               "effects": [
-                "server.deleteSession"
+                {
+                  "kind": "named",
+                  "effect": "server.deleteSession"
+                }
               ],
               "relations": [],
               "successEffects": [
                 {
-                  "effect": "server.deleteSession",
+                  "effect": {
+                    "kind": "named",
+                    "effect": "server.deleteSession"
+                  },
                   "state": "kept"
                 }
               ],
@@ -733,7 +742,10 @@
             "params": [],
             "returns": null,
             "effects": [
-              "browser.removeToken"
+              {
+                "kind": "named",
+                "effect": "browser.removeToken"
+              }
             ],
             "reads": [],
             "carried": {
@@ -745,12 +757,18 @@
             "signature": {
               "exceptions": [],
               "effects": [
-                "browser.removeToken"
+                {
+                  "kind": "named",
+                  "effect": "browser.removeToken"
+                }
               ],
               "relations": [],
               "successEffects": [
                 {
-                  "effect": "browser.removeToken",
+                  "effect": {
+                    "kind": "named",
+                    "effect": "browser.removeToken"
+                  },
                   "state": "kept"
                 }
               ],
@@ -896,12 +914,18 @@
             "signature": {
               "exceptions": [],
               "effects": [
-                "server.deleteSession"
+                {
+                  "kind": "named",
+                  "effect": "server.deleteSession"
+                }
               ],
               "relations": [],
               "successEffects": [
                 {
-                  "effect": "server.deleteSession",
+                  "effect": {
+                    "kind": "named",
+                    "effect": "server.deleteSession"
+                  },
                   "state": "unknown"
                 }
               ],
@@ -1003,17 +1027,29 @@
             "signature": {
               "exceptions": [],
               "effects": [
-                "server.deleteSession",
-                "browser.removeToken"
+                {
+                  "kind": "named",
+                  "effect": "server.deleteSession"
+                },
+                {
+                  "kind": "named",
+                  "effect": "browser.removeToken"
+                }
               ],
               "relations": [],
               "successEffects": [
                 {
-                  "effect": "server.deleteSession",
+                  "effect": {
+                    "kind": "named",
+                    "effect": "server.deleteSession"
+                  },
                   "state": "unknown"
                 },
                 {
-                  "effect": "browser.removeToken",
+                  "effect": {
+                    "kind": "named",
+                    "effect": "browser.removeToken"
+                  },
                   "state": "kept"
                 }
               ],
@@ -1165,12 +1201,18 @@
     "browser.clearToken": {
       "exceptions": [],
       "effects": [
-        "browser.removeToken"
+        {
+          "kind": "named",
+          "effect": "browser.removeToken"
+        }
       ],
       "relations": [],
       "successEffects": [
         {
-          "effect": "browser.removeToken",
+          "effect": {
+            "kind": "named",
+            "effect": "browser.removeToken"
+          },
           "state": "kept"
         }
       ],
@@ -1182,17 +1224,29 @@
     "browser.logout": {
       "exceptions": [],
       "effects": [
-        "server.deleteSession",
-        "browser.removeToken"
+        {
+          "kind": "named",
+          "effect": "server.deleteSession"
+        },
+        {
+          "kind": "named",
+          "effect": "browser.removeToken"
+        }
       ],
       "relations": [],
       "successEffects": [
         {
-          "effect": "server.deleteSession",
+          "effect": {
+            "kind": "named",
+            "effect": "server.deleteSession"
+          },
           "state": "unknown"
         },
         {
-          "effect": "browser.removeToken",
+          "effect": {
+            "kind": "named",
+            "effect": "browser.removeToken"
+          },
           "state": "kept"
         }
       ],
@@ -1206,12 +1260,18 @@
     "browser.requestLogout": {
       "exceptions": [],
       "effects": [
-        "server.deleteSession"
+        {
+          "kind": "named",
+          "effect": "server.deleteSession"
+        }
       ],
       "relations": [],
       "successEffects": [
         {
-          "effect": "server.deleteSession",
+          "effect": {
+            "kind": "named",
+            "effect": "server.deleteSession"
+          },
           "state": "unknown"
         }
       ],
@@ -1272,23 +1332,35 @@
         "http.NetworkError"
       ],
       "effects": [
-        "server.deleteSession"
+        {
+          "kind": "named",
+          "effect": "server.deleteSession"
+        }
       ],
       "relations": [
         {
           "exception": "http.ServerError",
-          "effect": "server.deleteSession",
+          "effect": {
+            "kind": "named",
+            "effect": "server.deleteSession"
+          },
           "state": "unknown"
         },
         {
           "exception": "http.NetworkError",
-          "effect": "server.deleteSession",
+          "effect": {
+            "kind": "named",
+            "effect": "server.deleteSession"
+          },
           "state": "unknown"
         }
       ],
       "successEffects": [
         {
-          "effect": "server.deleteSession",
+          "effect": {
+            "kind": "named",
+            "effect": "server.deleteSession"
+          },
           "state": "kept"
         }
       ],

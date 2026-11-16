@@ -23,7 +23,7 @@ func storeProgram(serverOps ...ir.Decl) *ir.Program {
 			Subject: ir.StatesSubject{States: []string{"store.token", "store.sessions"}}, Cases: []ir.ClassifyCase{{Name: "In"}}, HasDefault: true},
 	}
 	add := leaf("store.addUser", nil, param("user", user))
-	add.Effects = []string{"store.createUser"}
+	add.Effects = ir.NamedEffects("store.createUser")
 	store = append(store, add)
 	return program(nil,
 		namespace("type", model("type.User", field("id", ir.String())), model("type.Session", field("token", ir.String())), exc("type.Unauthorized")),
@@ -191,7 +191,7 @@ func TestPure(t *testing.T) {
 // THROWS-1、succ の「返らないアームは数えない」。
 func TestThrowArm(t *testing.T) {
 	issue := leaf("server.issue", ir.String())
-	issue.Effects = []string{"server.e1"}
+	issue.Effects = ir.NamedEffects("server.e1")
 	issue.Throws = []ir.ThrowsClause{throws([]string{"server.Y"}, prevents())}
 	never := leaf("server.unauthorized", ir.Never())
 	never.Throws = []ir.ThrowsClause{throws([]string{"server.Z"})}
@@ -206,7 +206,7 @@ func TestThrowArm(t *testing.T) {
 		wantNoCode(t, Check(p, cfgFor("server")), "THROWS-1")
 		sig := sigOf(t, p, "server.w")
 		wantStrings(t, "E", sig.Exceptions, []string{"server.Y", "server.X", "server.Z"})
-		wantStrings(t, "F", sig.Effects, []string{"server.e1"})
+		wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1"})
 		// throw の出どころでは、e1 は同じ行の別のアームにあるだけ → prevented
 		if got := relOf(t, sig, "server.X", "server.e1"); got != ir.Prevented {
 			t.Errorf("rel(X, e1) = %s, want prevented", got)

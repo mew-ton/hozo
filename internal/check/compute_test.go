@@ -31,7 +31,7 @@ func serverWith(decls ...ir.Decl) *ir.Program {
 // 効果が複数の IR で確かめる。
 func TestSigLeaf(t *testing.T) {
 	o := leaf("server.op", nil)
-	o.Effects = []string{"server.e1", "server.e2", "server.e3"}
+	o.Effects = ir.NamedEffects("server.e1", "server.e2", "server.e3")
 	o.Throws = []ir.ThrowsClause{
 		throws([]string{"server.X"}, prevents()),
 		throws([]string{"server.Y"}, keeps()),
@@ -42,7 +42,7 @@ func TestSigLeaf(t *testing.T) {
 	Compute(p)
 	sig := sigOf(t, p, "server.op")
 	wantStrings(t, "E", sig.Exceptions, []string{"server.X", "server.Y", "server.Z", "server.W"})
-	wantStrings(t, "F", sig.Effects, []string{"server.e1", "server.e2", "server.e3"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.e2", "server.e3"})
 	if len(sig.Relations) != 12 {
 		t.Errorf("relations = %d, want 12 (E × F)", len(sig.Relations))
 	}
@@ -64,7 +64,7 @@ func TestSigLeaf(t *testing.T) {
 		}
 	}
 	// 配線でない op の Call.Bound 埋めは何もしない。Signature の順は E の順、F の順。
-	if sig.Relations[0] != (ir.SignatureRelation{Exception: "server.X", Effect: "server.e1", State: ir.Prevented}) {
+	if sig.Relations[0] != (ir.SignatureRelation{Exception: "server.X", Effect: ir.NamedEffect{Effect: "server.e1"}, State: ir.Prevented}) {
 		t.Errorf("relations[0] = %+v", sig.Relations[0])
 	}
 }
@@ -73,10 +73,10 @@ func TestSigLeaf(t *testing.T) {
 // 出どころのない例外は Op.throws から。
 func TestSigWiringRows(t *testing.T) {
 	a := leaf("server.a", ir.String())
-	a.Effects = []string{"server.e1", "server.e2"}
+	a.Effects = ir.NamedEffects("server.e1", "server.e2")
 	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
 	b := leaf("server.b", ir.String())
-	b.Effects = []string{"server.e2", "server.e3"}
+	b.Effects = ir.NamedEffects("server.e2", "server.e3")
 	b.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
 	w := wire("server.w", ir.String(), nil,
 		cst("x", call("server.a")),
@@ -87,7 +87,7 @@ func TestSigWiringRows(t *testing.T) {
 	p := serverWith(a, b, w)
 	Compute(p)
 	sig := sigOf(t, p, "server.w")
-	wantStrings(t, "F", sig.Effects, []string{"server.e1", "server.e2", "server.e3"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.e2", "server.e3"})
 	wantStrings(t, "E", sig.Exceptions, []string{"server.X", "server.Y", "server.Z"})
 	cases := []struct {
 		x, e string
@@ -119,13 +119,13 @@ func TestSigWiringRows(t *testing.T) {
 // TestSigMultipleSources は同じ例外が複数の出どころから出るとき、状態が同じならその状態、違えば unknown。
 func TestSigMultipleSources(t *testing.T) {
 	a := leaf("server.a", nil)
-	a.Effects = []string{"server.e1"}
+	a.Effects = ir.NamedEffects("server.e1")
 	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
 	b := leaf("server.b", nil)
-	b.Effects = []string{"server.e2"}
+	b.Effects = ir.NamedEffects("server.e2")
 	b.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	c := leaf("server.c", nil)
-	c.Effects = []string{"server.e3"}
+	c.Effects = ir.NamedEffects("server.e3")
 	c.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
 	w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")), cs(call("server.c")))
 	w.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
@@ -150,12 +150,12 @@ func TestSigMultipleSources(t *testing.T) {
 // 別のアームの効果は出どころから見て prevented。
 func TestSigMatchArms(t *testing.T) {
 	a := leaf("server.a", ir.String())
-	a.Effects = []string{"server.e1"}
+	a.Effects = ir.NamedEffects("server.e1")
 	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	b := leaf("server.b", ir.String())
-	b.Effects = []string{"server.e1", "server.e2"}
+	b.Effects = ir.NamedEffects("server.e1", "server.e2")
 	d := leaf("server.d", nil)
-	d.Effects = []string{"server.e3"}
+	d.Effects = ir.NamedEffects("server.e3")
 	ca, cb := call("server.a"), call("server.b")
 	cls := &ir.Classify{DeclBase: ir.DeclBase{Name: "server.C", Span: sp("server.C")}, Subject: ir.TypeSubject{Type: ir.String()},
 		Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}, HasDefault: true}
@@ -167,7 +167,7 @@ func TestSigMatchArms(t *testing.T) {
 	p := serverWith(cls, a, b, d, w)
 	Compute(p)
 	sig := sigOf(t, p, "server.w")
-	wantStrings(t, "F", sig.Effects, []string{"server.e1", "server.e2", "server.e3"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.e2", "server.e3"})
 	if got := succOf(t, sig, "server.e1"); got != ir.Unknown {
 		t.Errorf("succ(e1) = %s, want unknown (none のアームにはない)", got)
 	}
@@ -203,12 +203,12 @@ func TestSigMatchArms(t *testing.T) {
 // （docs/check.md「状態の形」の「検査器が遷移を使う範囲」）ので、効果の宛先が組み込みの効果でも遷移でも Sig は同じ。
 func TestSigStateMatch(t *testing.T) {
 	a := leaf("server.a", nil)
-	a.Effects = []string{"server.e1"}
+	a.Effects = ir.NamedEffects("server.e1")
 	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	b := leaf("server.b", nil)
-	b.Effects = []string{"server.e1", "server.move"}
+	b.Effects = ir.NamedEffects("server.e1", "server.move")
 	d := leaf("server.d", nil)
-	d.Effects = []string{"server.drain"}
+	d.Effects = ir.NamedEffects("server.drain")
 	decls := []ir.Decl{
 		state("server.items", ir.StateList, ir.String()),
 		&ir.Classify{DeclBase: ir.DeclBase{Name: "server.Phase", Span: sp("server.Phase")},
@@ -236,7 +236,7 @@ func TestSigStateMatch(t *testing.T) {
 			p := serverWith(append(append([]ir.Decl{}, decls...), w)...)
 			Compute(p)
 			sig := sigOf(t, p, "server.w")
-			wantStrings(t, "F", sig.Effects, []string{"server.e1", "server.move", "server.drain"})
+			wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.move", "server.drain"})
 			wantStrings(t, "E", sig.Exceptions, []string{"server.X"})
 			if got := succOf(t, sig, "server.e1"); got != ir.Kept {
 				t.Errorf("succ(e1) = %s, want kept (すべてのアームにある)", got)
@@ -271,14 +271,14 @@ func TestSigSuccPrevented(t *testing.T) {
 	pp.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	pp.Decorators = []ir.Application{app("server.stop")}
 	q := leaf("server.q", nil)
-	q.Effects = []string{"server.h"}
+	q.Effects = ir.NamedEffects("server.h")
 	w1 := wire("server.w1", nil, nil, cs(call("server.p")))
 	w2 := wire("server.w2", nil, nil, cs(call("server.p")), cs(call("server.q")))
 	p := serverWith(stop, pp, q, w1, w2)
 	Compute(p)
 	ps := sigOf(t, p, "server.p")
 	wantStrings(t, "p.E", ps.Exceptions, nil)
-	wantStrings(t, "p.F", ps.Effects, []string{"server.h"})
+	wantStrings(t, "p.F", effectNames(ps.Effects), []string{"server.h"})
 	if got := succOf(t, ps, "server.h"); got != ir.Prevented {
 		t.Errorf("succ(p, h) = %s, want prevented (halts)", got)
 	}
@@ -297,9 +297,9 @@ func TestSigCatchesRecovers(t *testing.T) {
 	// 効果ごとの葉の op: first は e1、l は e2 と例外。w は first; l の順に呼ぶので、X のとき e1 は kept（上の行）、
 	// e2 は l の宣言（relations なし）から unknown
 	first := leaf("server.first", nil)
-	first.Effects = []string{"server.e1"}
+	first.Effects = ir.NamedEffects("server.e1")
 	l := leaf("server.l", ir.String())
-	l.Effects = []string{"server.e2"}
+	l.Effects = ir.NamedEffects("server.e2")
 	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"}), throws([]string{"server.Y"})}
 	w := wire("server.w", ir.String(), nil, cs(call("server.first")), ret(call("server.l")))
 	w.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
@@ -336,7 +336,7 @@ func TestSigCatchesIgnores(t *testing.T) {
 	ig := decorator("server.ignore")
 	ig.Catches = []ir.CatchesClause{catches(ir.Ignores, "", "server.X")}
 	l := leaf("server.l", nil)
-	l.Effects = []string{"server.e1"}
+	l.Effects = ir.NamedEffects("server.e1")
 	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	w := wire("server.w", nil, nil, cs(call("server.l")))
 	w.Decorators = []ir.Application{app("server.ignore")}
@@ -362,7 +362,7 @@ func TestSigCatchesHalts(t *testing.T) {
 	h := decorator("server.halt")
 	h.Catches = []ir.CatchesClause{catches(ir.Halts, "server.h", "server.X")}
 	l := leaf("server.l", nil)
-	l.Effects = []string{"server.e1"}
+	l.Effects = ir.NamedEffects("server.e1")
 	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"}), throws([]string{"server.Y"}, prevents())}
 	w := wire("server.w", nil, nil, cs(call("server.l")))
 	w.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
@@ -371,7 +371,7 @@ func TestSigCatchesHalts(t *testing.T) {
 	Compute(p)
 	sig := sigOf(t, p, "server.w")
 	wantStrings(t, "E", sig.Exceptions, []string{"server.Y"})
-	wantStrings(t, "F", sig.Effects, []string{"server.e1", "server.h"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.h"})
 	if got := relOf(t, sig, "server.Y", "server.h"); got != ir.Prevented {
 		t.Errorf("rel(Y, h) = %s, want prevented", got)
 	}
@@ -386,11 +386,11 @@ func TestSigCatchesHalts(t *testing.T) {
 	}
 
 	// h が既に F にあればそのまま
-	l.Effects = []string{"server.h", "server.e1"}
+	l.Effects = ir.NamedEffects("server.h", "server.e1")
 	p2 := serverWith(h, l, w)
 	Compute(p2)
 	sig2 := sigOf(t, p2, "server.w")
-	wantStrings(t, "F", sig2.Effects, []string{"server.h", "server.e1"})
+	wantStrings(t, "F", effectNames(sig2.Effects), []string{"server.h", "server.e1"})
 	if got := succOf(t, sig2, "server.h"); got != ir.Kept {
 		t.Errorf("succ(h) = %s, want kept (already in F)", got)
 	}
@@ -411,7 +411,7 @@ func TestSigThrowsClause(t *testing.T) {
 	tx := decorator("server.tx")
 	tx.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
 	l := leaf("server.l", nil)
-	l.Effects = []string{"server.e1", "server.e2"}
+	l.Effects = ir.NamedEffects("server.e1", "server.e2")
 	l.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y"}, keeps())}
 	l.Decorators = []ir.Application{app("server.tp"), app("server.tk"), app("server.ty"), app("server.tx")}
 	p := serverWith(tp, tk, ty, tx, l)
@@ -488,7 +488,7 @@ func TestSigParamSubstitution(t *testing.T) {
 	Compute(p)
 	sig := sigOf(t, p, "browser.l")
 	wantStrings(t, "E", sig.Exceptions, []string{"server.Z"})
-	wantStrings(t, "F", sig.Effects, []string{"browser.go"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"browser.go"})
 	if got := relOf(t, sig, "server.Z", "browser.go"); got != ir.Prevented {
 		t.Errorf("rel(Z, go) = %s, want prevented", got)
 	}
@@ -522,7 +522,7 @@ func TestSigDecoratorOrder(t *testing.T) {
 // TestSigCycle は WIRE-7: 配線の呼び出しの循環。循環上の op は葉として計算し、Related に循環上のすべての op を示す。
 func TestSigCycle(t *testing.T) {
 	a := wire("server.a", nil, nil, cs(call("server.b")))
-	a.Effects = []string{"server.e1"}
+	a.Effects = ir.NamedEffects("server.e1")
 	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	b := wire("server.b", nil, nil, cs(call("server.c")))
 	c := wire("server.c", nil, nil, cs(call("server.a")))
@@ -542,7 +542,7 @@ func TestSigCycle(t *testing.T) {
 	}
 	sa := sigOf(t, p, "server.a")
 	wantStrings(t, "a.E (as leaf)", sa.Exceptions, []string{"server.X"})
-	wantStrings(t, "a.F (as leaf)", sa.Effects, []string{"server.e1"})
+	wantStrings(t, "a.F (as leaf)", effectNames(sa.Effects), []string{"server.e1"})
 	wantStrings(t, "b.E", sigOf(t, p, "server.b").Exceptions, nil)
 	wantStrings(t, "d.E", sigOf(t, p, "server.d").Exceptions, []string{"server.X"})
 	wantNoCode(t, diags, "EFF-2") // 循環上の配線の effects は自分の宣言と一致する
@@ -554,7 +554,7 @@ func TestSigCycle(t *testing.T) {
 // TestComputeIdempotent は Compute を二度呼んでも同じ結果になること（Check は Compute を含む）。
 func TestComputeIdempotent(t *testing.T) {
 	a := leaf("server.a", nil)
-	a.Effects = []string{"server.e1"}
+	a.Effects = ir.NamedEffects("server.e1")
 	w := wire("server.w", nil, nil, cs(call("server.a")))
 	p := serverWith(a, w)
 	Compute(p)
@@ -562,7 +562,7 @@ func TestComputeIdempotent(t *testing.T) {
 	Compute(p)
 	Check(p, cfgFor("server"))
 	second := sigOf(t, p, "server.w")
-	wantStrings(t, "F", second.Effects, first.Effects)
+	wantStrings(t, "F", effectNames(second.Effects), effectNames(first.Effects))
 	if len(second.Relations) != len(first.Relations) || len(second.SuccessEffects) != len(first.SuccessEffects) {
 		t.Errorf("signature changed on recompute")
 	}
@@ -574,15 +574,15 @@ func TestComputeIdempotent(t *testing.T) {
 // 配線の計算は、運ばれるものを使わない（循環していて葉として計算する op も、配線なので使わない）。
 func TestSigCarried(t *testing.T) {
 	doing := decorator("server.doing")
-	doing.Reads = []string{"$param:table"}
-	doing.Effects = []string{"$param:targets"}
+	doing.Reads = ir.StateReads("$param:table")
+	doing.Effects = ir.NamedEffects("$param:targets")
 	doing.Throws = []ir.ThrowsClause{throws([]string{"server.Y"}, prevents())}
 
 	carried := leaf("server.carried", nil)
 	carried.Decorators = []ir.Application{app("server.doing")}
-	carried.Effects = []string{"server.e2"}
-	carried.Reads = []string{"server.sB"}
-	carried.Carried = ir.Carried{Reads: []string{"server.sA", "server.sB"}, Effects: []string{"server.e1", "server.e2", "server.e3"}}
+	carried.Effects = ir.NamedEffects("server.e2")
+	carried.Reads = ir.StateReads("server.sB")
+	carried.Carried = ir.Carried{Reads: ir.StateReads("server.sA", "server.sB"), Effects: ir.NamedEffects("server.e1", "server.e2", "server.e3")}
 	carried.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
 
 	caller := wire("server.caller", nil, nil, cs(call("server.carried")))
@@ -590,20 +590,20 @@ func TestSigCarried(t *testing.T) {
 
 	// 配線に運ばれたもの（DEC-17 の誤りの形）は、計算に入らない
 	wired := wire("server.wired", nil, nil, cs(call("server.plain")))
-	wired.Carried = ir.Carried{Reads: []string{"server.sA"}, Effects: []string{"server.e4"}}
+	wired.Carried = ir.Carried{Reads: ir.StateReads("server.sA"), Effects: ir.NamedEffects("server.e4")}
 	plain := leaf("server.plain", nil)
 
 	// 循環上の op は葉として計算するが、配線なので運ばれるものは使わない
 	loop := wire("server.loop", nil, nil, cs(call("server.loop")))
-	loop.Effects = []string{"server.e1"}
-	loop.Reads = []string{"server.sA"}
-	loop.Carried = ir.Carried{Reads: []string{"server.sB"}, Effects: []string{"server.e2"}}
+	loop.Effects = ir.NamedEffects("server.e1")
+	loop.Reads = ir.StateReads("server.sA")
+	loop.Carried = ir.Carried{Reads: ir.StateReads("server.sB"), Effects: ir.NamedEffects("server.e2")}
 
 	p := serverWith(doing, carried, caller, wired, plain, loop)
 	Compute(p)
 
 	sig := sigOf(t, p, "server.carried")
-	wantStrings(t, "葉の F（書いたもの、運ばれたもの）", sig.Effects, []string{"server.e2", "server.e1", "server.e3"})
+	wantStrings(t, "葉の F（書いたもの、運ばれたもの）", effectNames(sig.Effects), []string{"server.e2", "server.e1", "server.e3"})
 	wantStrings(t, "葉の R（書いたもの、運ばれたもの）", sig.Reads, []string{"server.sB", "server.sA"})
 	wantStrings(t, "葉の E", sig.Exceptions, []string{"server.X", "server.Y"})
 	for _, e := range sig.Effects {
@@ -621,35 +621,35 @@ func TestSigCarried(t *testing.T) {
 		t.Error("デコレータの付いた op は純粋でない")
 	}
 	// Op.reads / Op.effects / Op.carried は書き換えない
-	wantStrings(t, "Op.effects", carried.Effects, []string{"server.e2"})
-	wantStrings(t, "Op.carried.effects", carried.Carried.Effects, []string{"server.e1", "server.e2", "server.e3"})
+	wantStrings(t, "Op.effects", effectNames(carried.Effects), []string{"server.e2"})
+	wantStrings(t, "Op.carried.effects", effectNames(carried.Carried.Effects), []string{"server.e1", "server.e2", "server.e3"})
 
 	up := sigOf(t, p, "server.caller")
-	wantStrings(t, "呼び出し元の F", up.Effects, []string{"server.e2", "server.e1", "server.e3"})
+	wantStrings(t, "呼び出し元の F", effectNames(up.Effects), []string{"server.e2", "server.e1", "server.e3"})
 	wantStrings(t, "呼び出し元の R", up.Reads, []string{"server.sB", "server.sA"})
 
 	w := sigOf(t, p, "server.wired")
-	wantStrings(t, "配線の F は本体から", w.Effects, nil)
+	wantStrings(t, "配線の F は本体から", effectNames(w.Effects), nil)
 	wantStrings(t, "配線の R は本体から", w.Reads, nil)
 
 	l := sigOf(t, p, "server.loop")
-	wantStrings(t, "循環上の op の F は Op.effects", l.Effects, []string{"server.e1"})
+	wantStrings(t, "循環上の op の F は Op.effects", effectNames(l.Effects), []string{"server.e1"})
 	wantStrings(t, "循環上の op の R は Op.reads", l.Reads, []string{"server.sA"})
 }
 
 // TestCarriedReadsOnly はデコレータが運ぶ状態だけを読む op（読む op）: R が空でなく、効果を持たない。
 func TestCarriedReadsOnly(t *testing.T) {
 	find := leaf("server.find", ir.Optional(ir.String()))
-	find.Carried = ir.Carried{Reads: []string{"server.sA"}}
+	find.Carried = ir.Carried{Reads: ir.StateReads("server.sA")}
 	find.Decorators = []ir.Application{app("server.finder")}
 	finder := decorator("server.finder")
-	finder.Reads = []string{"server.sA"}
+	finder.Reads = ir.StateReads("server.sA")
 	w := wire("server.w", ir.Optional(ir.String()), nil, ret(call("server.find")))
-	w.Reads = []string{"server.sA"}
+	w.Reads = ir.StateReads("server.sA")
 	p := serverWith(finder, find, w)
 	diags := Check(p, cfgFor("server"))
 	wantStrings(t, "R(find)", sigOf(t, p, "server.find").Reads, []string{"server.sA"})
-	wantStrings(t, "F(find)", sigOf(t, p, "server.find").Effects, nil)
+	wantStrings(t, "F(find)", effectNames(sigOf(t, p, "server.find").Effects), nil)
 	wantStrings(t, "R(w)", sigOf(t, p, "server.w").Reads, []string{"server.sA"})
 	wantNoCode(t, diags, "READS-2") // 配線に書いた reads は、運ばれた状態を含む計算と等しい
 }

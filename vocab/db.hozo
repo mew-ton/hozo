@@ -23,10 +23,10 @@ namespace db {
   /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
   decorator ref(target: any model) for field;
 
-  /** この op は、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
-  decorator find(table: any state, column: string) for op reads table;
-  /** この op は、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
-  decorator list(table: any state, column: string?) for op reads table;
+  /** この read は、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
+  decorator find(table: any state, column: string) for read;
+  /** この read は、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
+  decorator list(table: any state, column: string?) for read;
 
   /** この効果は、表 table に行を一つ足す */
   decorator insert(table: any state) for effect;
@@ -35,6 +35,8 @@ namespace db {
   /** この効果は、表 table から、列 column が引数の値と同じ行を消す */
   decorator delete(table: any state, column: string) for effect;
 
+  /** この op は、並べた read で、表から引く。read が一つなら、op の引数をその read が受け取り、op は、その read が引いたものを返す */
+  decorator reads(...targets: any read) for op reads targets;
   /** この op は、並べた効果を、書いた順に、一つのトランザクションで行う。n 番目の効果が、op の n 番目の引数を受け取る */
   decorator effects(...targets: any effect) for op effects targets;
 }

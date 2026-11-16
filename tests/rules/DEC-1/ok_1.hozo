@@ -1,4 +1,4 @@
-// DEC-1（docs/check.md「デコレータ」）: for に書いた対象（省略は op）にだけ付ける。対象 effect は、効果の宣言
+// DEC-1（docs/check.md「デコレータ」）: for に書いた対象（省略は op）にだけ付ける。対象 effect は、効果の宣言。対象 read は、read の宣言
 namespace a {
   model M { @db.key @db.text id: string; }
   @db.table(M)
@@ -11,6 +11,8 @@ namespace a {
   decorator forField for field;
   decorator forEffect for effect;
   decorator opOrEffect for op | effect;
+  decorator forRead for read;
+  decorator readOrEffect for read | effect;
   @onlyOp @opOrEffect
   op f(): void;
   model N { @forField id: string; }
@@ -18,6 +20,12 @@ namespace a {
   effect add on s.post;
   @db.update(s)
   effect change on s.put;
-  @db.delete(s, "id")
+  @readOrEffect @db.delete(s, "id")
   effect remove on s.delete;
+  @forRead @readOrEffect @db.find(s, "id")
+  read byId on s;
+  @db.list(s)
+  read all on s;
+  @db.reads(byId)
+  op find(id: string): M?;
 }

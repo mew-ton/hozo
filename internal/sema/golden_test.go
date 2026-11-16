@@ -156,7 +156,7 @@ namespace store {
   decorator list(table: any state, column: string?) for op reads table;
   decorator insert(table: any state) for effect;
   decorator effects(...targets: any effect) for op effects targets;
-  decorator audited(extra: any state?) for op reads logs, extra reads rows effects Writes | log;
+  decorator audited(extra: any state?) for op reads logs, extra reads rows effects Writes, log;
   decorator tags(first: string, ...more: string | int) for op | effect;
   decorator both = effects(addRow, Writes);
 
@@ -181,6 +181,106 @@ namespace store {
   @audited(logs) @tags("x", 1, "y") op audit();
 }
 `
+}
+
+// normalizeSource に足す、版 0.6 の行（docs/ir.md「正規化」の「reads a, b」「effects a, b」「デコレータの宣言の reads / effects」
+// 「op に付いたデコレータの reads / effects の節」）: read の宣言、名前で書いた要素と直に書いた要素、対象 read、any read。
+func init() {
+	normalizeSource["d.hozo"] = `
+namespace lib {
+  model Row { id: string; }
+  state rows: list<Row>;
+  state logs: list<Row>;
+  state title: single<string>;
+
+  decorator find(table: any state, column: string) for read;
+  decorator reads(...targets: any read) for op reads targets;
+  decorator scan(table: any state, via: any read?) for op
+    reads via, table, rowById reads logs
+    effects logs.post, touch;
+
+  /** id で一行を引く */
+  @find(rows, "id") read rowById on rows;
+  read allLogs on logs;
+  effect touch on rows.put;
+
+  op named(id: string): Row? reads rowById;
+  op direct(): Row[] reads rows;
+  op mixed(): Row[] reads rowById, rows, lib.allLogs reads rows, rowById;
+  op write(r: Row) effects rows.post;
+  op rename() effects title.put;
+  op touchIt() effects touch;
+  @reads(rowById, allLogs) op carried(id: string): Row?;
+  @scan(logs) op scanned(): Row[];
+  @scan(rows, allLogs) op scanned2(): Row[];
+  op wired(r: Row): Row? effects rows.post, touch, lib.title.put reads rowById {
+    write(r);
+    touchIt();
+    rename();
+    return named(r.id);
+  }
+}
+`
+}
+
+// TestNormalizeRefs は、reads と effects の要素（docs/ir.md「op」の ReadRef / EffectRef）の正規化を、手で組んだ期待と比べる:
+// 名前で書いた要素は named、直に書いた要素は direct。デコレータの引数は、any read が named、any state が direct の位置に入る。
+func TestNormalizeRefs(t *testing.T) {
+	res, fs := analyzeProject(t, normalizeSource, false)
+	noErrors(t, res, fs)
+	p := res.Program
+	eq := func(name string, got, want any) {
+		t.Helper()
+		g, _ := json.Marshal(got)
+		w, _ := json.Marshal(want)
+		if !bytes.Equal(g, w) {
+			t.Errorf("%s:\n got  %s\n want %s", name, g, w)
+		}
+	}
+	op := func(name string) *ir.Op { return p.Lookup("lib." + name).(*ir.Op) }
+	named := func(fqn string) ir.ReadRef { return ir.NamedRead{Read: fqn} }
+	state := func(fqn string) ir.ReadRef { return ir.DirectRead{State: fqn} }
+	post := ir.DirectEffect{State: "lib.rows", Operation: ir.OpPost}
+	touch := ir.NamedEffect{Effect: "lib.touch"}
+
+	// read の宣言: 宛先の状態、説明、付けたデコレータ（対象 read）
+	read := p.Lookup("lib.rowById").(*ir.Read)
+	eq("read の宛先", read.State, "lib.rows")
+	eq("read の説明", read.Description.Summary, "id で一行を引く")
+	eq("read に付けたデコレータ", []any{len(read.Decorators), read.Decorators[0].Decorator}, []any{1, "lib.find"})
+	eq("対象 read", p.Lookup("lib.find").(*ir.Decorator).Targets, []ir.DecoratorTarget{ir.TargetRead})
+	eq("read は、状態の後ろ、効果の前（出現順）", declAfter(p, "lib.allLogs"), "lib.touch")
+
+	// op の reads: 名前で書いた要素と、直に書いた要素。重複は最初の出現に寄せる（read と、その状態は別の要素）
+	eq("名前で書いた reads", op("named").Reads, []ir.ReadRef{named("lib.rowById")})
+	eq("直に書いた reads", op("direct").Reads, []ir.ReadRef{state("lib.rows")})
+	eq("混ぜた reads", op("mixed").Reads, []ir.ReadRef{named("lib.rowById"), state("lib.rows"), named("lib.allLogs")})
+
+	// op の effects: 直に書いた「状態.操作」。配線には、別の書き方の要素を並べられる
+	eq("直に書いた effects", op("write").Effects, []ir.EffectRef{post})
+	eq("single の状態の put", op("rename").Effects, []ir.EffectRef{ir.DirectEffect{State: "lib.title", Operation: ir.OpPut}})
+	eq("配線の effects", op("wired").Effects, []ir.EffectRef{post, touch, ir.DirectEffect{State: "lib.title", Operation: ir.OpPut}})
+	eq("配線の reads", op("wired").Reads, []ir.ReadRef{named("lib.rowById")})
+
+	// デコレータの宣言の節: any read の引数は named、any state の引数は direct の位置に $param:
+	reads := p.Lookup("lib.reads").(*ir.Decorator)
+	eq("any read の残りの引数", reads.Params[0], ir.Param{Name: "targets", Type: ir.AnyParam{Of: ir.AnyRead}, Rest: true})
+	eq("reads の節（any read）", reads.Reads, []ir.ReadRef{named("$param:targets")})
+	scan := p.Lookup("lib.scan").(*ir.Decorator)
+	eq("reads の節（引数、read、状態。節は書かれた順に連結）", scan.Reads,
+		[]ir.ReadRef{named("$param:via"), state("$param:table"), named("lib.rowById"), state("lib.logs")})
+	eq("effects の節（直に書いた効果と、効果の名前）", scan.Effects,
+		[]ir.EffectRef{ir.DirectEffect{State: "lib.logs", Operation: ir.OpPost}, touch})
+
+	// 運ばれるもの: $param: を適用の引数で置き換える。省いた省略可能な引数は足さない。重複は最初の出現に寄せる
+	eq("any read の引数で運ぶ reads", op("carried").Carried, ir.Carried{Reads: []ir.ReadRef{named("lib.rowById"), named("lib.allLogs")}})
+	eq("carried は Op.reads に足さない", op("carried").Reads, []ir.ReadRef(nil))
+	eq("省いた any read? は足さない", op("scanned").Carried, ir.Carried{
+		Reads:   []ir.ReadRef{state("lib.logs"), named("lib.rowById")},
+		Effects: []ir.EffectRef{ir.DirectEffect{State: "lib.logs", Operation: ir.OpPost}, touch},
+	})
+	eq("any read? を渡した", op("scanned2").Carried.Reads,
+		[]ir.ReadRef{named("lib.allLogs"), state("lib.rows"), named("lib.rowById"), state("lib.logs")})
 }
 
 // TestNormalizeGolden は正規化の結果を testdata/normalize.golden.json と比べる。更新は go test ./internal/sema -update。
@@ -355,7 +455,7 @@ func TestNormalizeExpectations(t *testing.T) {
 		See:     []string{"a.User"},
 	})
 	leaf := p.Lookup("a.leaf").(*ir.Op)
-	eq("葉の effects", leaf.Effects, []string{"a.add"})
+	eq("葉の effects", leaf.Effects, ir.NamedEffects("a.add"))
 	eq("throws のユニオンと keeps effects", leaf.Throws[0], ir.ThrowsClause{
 		Exceptions: []string{"a.Unauthorized", "a.Invalid", "a.Wrapped"},
 		Relations:  []ir.Relation{{Kind: ir.Keeps}},
@@ -363,11 +463,11 @@ func TestNormalizeExpectations(t *testing.T) {
 	// export、reads、never
 	find2 := p.Lookup("a.find2").(*ir.Op)
 	eq("export", []bool{find2.Exported, find.Exported}, []bool{true, false})
-	eq("reads（複数の節、重複は最初の出現に寄せる）", find2.Reads, []string{"a.users", "a.token"})
-	eq("reads を書いていなければ空", find.Reads, []string(nil))
+	eq("reads（複数の節、重複は最初の出現に寄せる）", find2.Reads, ir.StateReads("a.users", "a.token"))
+	eq("reads を書いていなければ空", find.Reads, []ir.ReadRef(nil))
 	eq("never", p.Lookup("a.gone").(*ir.Op).Returns, ir.Never())
 	// 効果のユニオンを書けるのは、二つ以上の効果を持てる配線の op（葉は EFF-3。docs/decisions.md S8）
-	eq("effects のユニオン", p.Lookup("a.both").(*ir.Op).Effects, []string{"a.add", "a.set"})
+	eq("effects のユニオン", p.Lookup("a.both").(*ir.Op).Effects, ir.NamedEffects("a.add", "a.set"))
 	eq("Signature は零値", find.Signature, ir.Signature{})
 
 	// 適用: 名前付きの展開、位置→名前、$param:、Duration

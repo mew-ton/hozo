@@ -63,7 +63,7 @@ func TestRel2(t *testing.T) {
 	o := leaf("server.o", nil)
 	o.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
 	wantOneCode(t, Check(serverWith(o), cfgFor("server")), "REL-2")
-	o.Effects = []string{"server.e1"}
+	o.Effects = ir.NamedEffects("server.e1")
 	wantNoCode(t, Check(serverWith(o), cfgFor("server")), "REL-2")
 	d := decorator("server.d")
 	d.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
@@ -73,12 +73,12 @@ func TestRel2(t *testing.T) {
 // TestRel4 は REL-4: 配線の throws に書いた prevents / keeps が計算と食い違う。目的語は常にすべての効果。
 func TestRel4(t *testing.T) {
 	a := leaf("server.a", nil)
-	a.Effects = []string{"server.e1"}
+	a.Effects = ir.NamedEffects("server.e1")
 	b := leaf("server.b", nil)
-	b.Effects = []string{"server.e2"}
+	b.Effects = ir.NamedEffects("server.e2")
 	b.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
 	k := leaf("server.k", nil)
-	k.Effects = []string{"server.e2"}
+	k.Effects = ir.NamedEffects("server.e2")
 	k.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
 	mk := func(cl ir.ThrowsClause, callees ...string) *ir.Program {
 		var stmts []ir.Statement
@@ -109,13 +109,13 @@ func TestRel4(t *testing.T) {
 // TestEff2 は EFF-2: 配線の effects が伝播した効果と集合として等しくない。Data.missing / Data.extra。
 func TestEff2(t *testing.T) {
 	a := leaf("server.a", nil)
-	a.Effects = []string{"server.e1", "server.e2"}
+	a.Effects = ir.NamedEffects("server.e1", "server.e2")
 	w := wire("server.w", nil, nil, cs(call("server.a")))
-	w.Effects = []string{"server.e2", "server.e3"}
+	w.Effects = ir.NamedEffects("server.e2", "server.e3")
 	d := wantOneCode(t, Check(serverWith(a, w), cfgFor("server")), "EFF-2")
 	wantStrings(t, "missing", d.Data["missing"].([]string), []string{"server.e1"})
 	wantStrings(t, "extra", d.Data["extra"].([]string), []string{"server.e3"})
-	w.Effects = []string{"server.e2", "server.e1"} // 順序は問わない
+	w.Effects = ir.NamedEffects("server.e2", "server.e1") // 順序は問わない
 	wantNoCode(t, Check(serverWith(a, w), cfgFor("server")), "EFF-2")
 	w.Effects = nil // 省略は検査しない
 	wantNoCode(t, Check(serverWith(a, w), cfgFor("server")), "EFF-2")
@@ -125,7 +125,7 @@ func TestEff2(t *testing.T) {
 	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	w2 := wire("server.w2", nil, nil, cs(call("server.a")))
 	w2.Decorators = []ir.Application{app("server.halt")}
-	w2.Effects = []string{"server.e1", "server.e2"}
+	w2.Effects = ir.NamedEffects("server.e1", "server.e2")
 	d2 := wantOneCode(t, Check(serverWith(a, h, w2), cfgFor("server")), "EFF-2")
 	wantStrings(t, "missing (halts)", d2.Data["missing"].([]string), []string{"server.h"})
 }
@@ -135,9 +135,9 @@ func TestEff2(t *testing.T) {
 // （internal/sema の testdata/rules/STATE-2.hozo と tests/rules/STATE-2 が確かめる）ので、ここでは重ねて出さない。
 func TestState2(t *testing.T) {
 	foreign := leaf("browser.l", nil)
-	foreign.Effects = []string{"server.e1"}
+	foreign.Effects = ir.NamedEffects("server.e1")
 	own := leaf("server.l", nil)
-	own.Effects = []string{"server.e1"}
+	own.Effects = ir.NamedEffects("server.e1")
 	h := decorator("server.halt")
 	h.Catches = []ir.CatchesClause{catches(ir.Halts, "server.h", "server.X")}
 	decorated := leaf("browser.m", nil)
@@ -148,7 +148,7 @@ func TestState2(t *testing.T) {
 	ok.Decorators = []ir.Application{app("server.halt")}
 	// 伝播した効果は別の名前空間の配線に現れてよい
 	wiring := wire("browser.w", nil, nil, cs(call("server.l")))
-	wiring.Effects = []string{"server.e1"}
+	wiring.Effects = ir.NamedEffects("server.e1")
 	p := program(nil, namespace("server", append(serverBase(), own, h, ok)...), namespace("browser", foreign, decorated, wiring))
 	diags := Check(p, cfgFor("server", "browser"))
 	s2 := withCode(diags, "STATE-2")

@@ -1,5 +1,5 @@
 {
-  "version": "0.5",
+  "version": "0.6",
   "namespaces": [
     {
       "name": "",
@@ -1806,7 +1806,10 @@
             "target": "a.PublicUser"
           },
           "effects": [
-            "a.add"
+            {
+              "kind": "named",
+              "effect": "a.add"
+            }
           ],
           "reads": [],
           "carried": {
@@ -1856,7 +1859,10 @@
           "params": [],
           "returns": null,
           "effects": [
-            "a.set"
+            {
+              "kind": "named",
+              "effect": "a.set"
+            }
           ],
           "reads": [],
           "carried": {
@@ -1915,8 +1921,14 @@
             "target": "a.PublicUser"
           },
           "effects": [
-            "a.add",
-            "a.set"
+            {
+              "kind": "named",
+              "effect": "a.add"
+            },
+            {
+              "kind": "named",
+              "effect": "a.set"
+            }
           ],
           "reads": [],
           "carried": {
@@ -2186,8 +2198,14 @@
           },
           "effects": [],
           "reads": [
-            "a.users",
-            "a.token"
+            {
+              "kind": "direct",
+              "state": "a.users"
+            },
+            {
+              "kind": "direct",
+              "state": "a.token"
+            }
           ],
           "carried": {
             "reads": [],
@@ -3938,7 +3956,10 @@
           "throws": [],
           "catches": [],
           "reads": [
-            "$param:table"
+            {
+              "kind": "direct",
+              "state": "$param:table"
+            }
           ],
           "effects": []
         },
@@ -3989,7 +4010,10 @@
           "throws": [],
           "catches": [],
           "reads": [
-            "$param:table"
+            {
+              "kind": "direct",
+              "state": "$param:table"
+            }
           ],
           "effects": []
         },
@@ -4062,7 +4086,10 @@
           "catches": [],
           "reads": [],
           "effects": [
-            "$param:targets"
+            {
+              "kind": "named",
+              "effect": "$param:targets"
+            }
           ]
         },
         {
@@ -4077,7 +4104,7 @@
             },
             "end": {
               "line": 13,
-              "col": 97
+              "col": 96
             }
           },
           "params": [
@@ -4098,14 +4125,32 @@
           "throws": [],
           "catches": [],
           "reads": [
-            "store.logs",
-            "$param:extra",
-            "store.rows"
+            {
+              "kind": "direct",
+              "state": "store.logs"
+            },
+            {
+              "kind": "direct",
+              "state": "$param:extra"
+            },
+            {
+              "kind": "direct",
+              "state": "store.rows"
+            }
           ],
           "effects": [
-            "store.addRow",
-            "store.touch",
-            "store.log"
+            {
+              "kind": "named",
+              "effect": "store.addRow"
+            },
+            {
+              "kind": "named",
+              "effect": "store.touch"
+            },
+            {
+              "kind": "named",
+              "effect": "store.log"
+            }
           ]
         },
         {
@@ -4506,7 +4551,10 @@
           "reads": [],
           "carried": {
             "reads": [
-              "store.rows"
+              {
+                "kind": "direct",
+                "state": "store.rows"
+              }
             ],
             "effects": []
           },
@@ -4573,7 +4621,10 @@
           "reads": [],
           "carried": {
             "reads": [
-              "store.rows"
+              {
+                "kind": "direct",
+                "state": "store.rows"
+              }
             ],
             "effects": []
           },
@@ -4691,9 +4742,18 @@
           "carried": {
             "reads": [],
             "effects": [
-              "store.addRow",
-              "store.touch",
-              "store.log"
+              {
+                "kind": "named",
+                "effect": "store.addRow"
+              },
+              {
+                "kind": "named",
+                "effect": "store.touch"
+              },
+              {
+                "kind": "named",
+                "effect": "store.log"
+              }
             ]
           },
           "throws": [],
@@ -4904,8 +4964,14 @@
           "carried": {
             "reads": [],
             "effects": [
-              "store.addRow",
-              "store.touch"
+              {
+                "kind": "named",
+                "effect": "store.addRow"
+              },
+              {
+                "kind": "named",
+                "effect": "store.touch"
+              }
             ]
           },
           "throws": [],
@@ -5012,20 +5078,41 @@
             }
           },
           "effects": [
-            "store.log"
+            {
+              "kind": "named",
+              "effect": "store.log"
+            }
           ],
           "reads": [
-            "store.rows"
+            {
+              "kind": "direct",
+              "state": "store.rows"
+            }
           ],
           "carried": {
             "reads": [
-              "store.logs",
-              "store.rows"
+              {
+                "kind": "direct",
+                "state": "store.logs"
+              },
+              {
+                "kind": "direct",
+                "state": "store.rows"
+              }
             ],
             "effects": [
-              "store.addRow",
-              "store.touch",
-              "store.log"
+              {
+                "kind": "named",
+                "effect": "store.addRow"
+              },
+              {
+                "kind": "named",
+                "effect": "store.touch"
+              },
+              {
+                "kind": "named",
+                "effect": "store.log"
+              }
             ]
           },
           "throws": [],
@@ -5133,17 +5220,1254 @@
           "reads": [],
           "carried": {
             "reads": [
-              "store.logs",
-              "store.rows"
+              {
+                "kind": "direct",
+                "state": "store.logs"
+              },
+              {
+                "kind": "direct",
+                "state": "store.rows"
+              }
             ],
             "effects": [
-              "store.addRow",
-              "store.touch",
-              "store.log"
+              {
+                "kind": "named",
+                "effect": "store.addRow"
+              },
+              {
+                "kind": "named",
+                "effect": "store.touch"
+              },
+              {
+                "kind": "named",
+                "effect": "store.log"
+              }
             ]
           },
           "throws": [],
           "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "lib",
+      "decls": [
+        {
+          "kind": "model",
+          "name": "lib.Row",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 3,
+              "col": 3
+            },
+            "end": {
+              "line": 3,
+              "col": 28
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 3,
+                  "col": 15
+                },
+                "end": {
+                  "line": 3,
+                  "col": 26
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "state",
+          "name": "lib.rows",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 4,
+              "col": 3
+            },
+            "end": {
+              "line": 4,
+              "col": 25
+            }
+          },
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "shape": "list",
+          "element": {
+            "kind": "ref",
+            "target": "lib.Row"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "lib.logs",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 5,
+              "col": 3
+            },
+            "end": {
+              "line": 5,
+              "col": 25
+            }
+          },
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "shape": "list",
+          "element": {
+            "kind": "ref",
+            "target": "lib.Row"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "lib.title",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 6,
+              "col": 3
+            },
+            "end": {
+              "line": 6,
+              "col": 31
+            }
+          },
+          "type": {
+            "kind": "core",
+            "name": "string"
+          },
+          "shape": "single",
+          "element": {
+            "kind": "core",
+            "name": "string"
+          }
+        },
+        {
+          "kind": "decorator",
+          "name": "lib.find",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 8,
+              "col": 3
+            },
+            "end": {
+              "line": 8,
+              "col": 61
+            }
+          },
+          "params": [
+            {
+              "name": "table",
+              "type": {
+                "kind": "any",
+                "of": "state"
+              },
+              "optional": false,
+              "rest": false
+            },
+            {
+              "name": "column",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                ]
+              },
+              "optional": false,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "read"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "lib.reads",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 9,
+              "col": 3
+            },
+            "end": {
+              "line": 9,
+              "col": 62
+            }
+          },
+          "params": [
+            {
+              "name": "targets",
+              "type": {
+                "kind": "any",
+                "of": "read"
+              },
+              "optional": false,
+              "rest": true
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [
+            {
+              "kind": "named",
+              "read": "$param:targets"
+            }
+          ],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "lib.scan",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 10,
+              "col": 3
+            },
+            "end": {
+              "line": 12,
+              "col": 30
+            }
+          },
+          "params": [
+            {
+              "name": "table",
+              "type": {
+                "kind": "any",
+                "of": "state"
+              },
+              "optional": false,
+              "rest": false
+            },
+            {
+              "name": "via",
+              "type": {
+                "kind": "any",
+                "of": "read"
+              },
+              "optional": true,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [
+            {
+              "kind": "named",
+              "read": "$param:via"
+            },
+            {
+              "kind": "direct",
+              "state": "$param:table"
+            },
+            {
+              "kind": "named",
+              "read": "lib.rowById"
+            },
+            {
+              "kind": "direct",
+              "state": "lib.logs"
+            }
+          ],
+          "effects": [
+            {
+              "kind": "direct",
+              "state": "lib.logs",
+              "operation": "post"
+            },
+            {
+              "kind": "named",
+              "effect": "lib.touch"
+            }
+          ]
+        },
+        {
+          "kind": "read",
+          "name": "lib.rowById",
+          "description": {
+            "summary": "id で一行を引く",
+            "body": "id で一行を引く",
+            "params": [],
+            "throws": [],
+            "see": []
+          },
+          "decorators": [
+            {
+              "decorator": "lib.find",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "lib.rows"
+                  }
+                },
+                {
+                  "param": "column",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "id"
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 15,
+                  "col": 3
+                },
+                "end": {
+                  "line": 15,
+                  "col": 20
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 15,
+              "col": 3
+            },
+            "end": {
+              "line": 15,
+              "col": 42
+            }
+          },
+          "state": "lib.rows"
+        },
+        {
+          "kind": "read",
+          "name": "lib.allLogs",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 16,
+              "col": 3
+            },
+            "end": {
+              "line": 16,
+              "col": 24
+            }
+          },
+          "state": "lib.logs"
+        },
+        {
+          "kind": "effect",
+          "name": "lib.touch",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 17,
+              "col": 3
+            },
+            "end": {
+              "line": 17,
+              "col": 28
+            }
+          },
+          "target": {
+            "kind": "builtin",
+            "state": "lib.rows",
+            "operation": "put"
+          },
+          "writes": [
+            "lib.rows"
+          ]
+        },
+        {
+          "kind": "op",
+          "name": "lib.named",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 19,
+              "col": 3
+            },
+            "end": {
+              "line": 19,
+              "col": 44
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 19,
+                  "col": 12
+                },
+                "end": {
+                  "line": 19,
+                  "col": 22
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [],
+          "reads": [
+            {
+              "kind": "named",
+              "read": "lib.rowById"
+            }
+          ],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.direct",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 20,
+              "col": 3
+            },
+            "end": {
+              "line": 20,
+              "col": 33
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [],
+          "reads": [
+            {
+              "kind": "direct",
+              "state": "lib.rows"
+            }
+          ],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.mixed",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 21,
+              "col": 3
+            },
+            "end": {
+              "line": 21,
+              "col": 74
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [],
+          "reads": [
+            {
+              "kind": "named",
+              "read": "lib.rowById"
+            },
+            {
+              "kind": "direct",
+              "state": "lib.rows"
+            },
+            {
+              "kind": "named",
+              "read": "lib.allLogs"
+            }
+          ],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.write",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 22,
+              "col": 3
+            },
+            "end": {
+              "line": 22,
+              "col": 38
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "lib.Row"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 22,
+                  "col": 12
+                },
+                "end": {
+                  "line": 22,
+                  "col": 18
+                }
+              }
+            }
+          ],
+          "returns": null,
+          "effects": [
+            {
+              "kind": "direct",
+              "state": "lib.rows",
+              "operation": "post"
+            }
+          ],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.rename",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 23,
+              "col": 3
+            },
+            "end": {
+              "line": 23,
+              "col": 33
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": null,
+          "effects": [
+            {
+              "kind": "direct",
+              "state": "lib.title",
+              "operation": "put"
+            }
+          ],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.touchIt",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 24,
+              "col": 3
+            },
+            "end": {
+              "line": 24,
+              "col": 30
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": null,
+          "effects": [
+            {
+              "kind": "named",
+              "effect": "lib.touch"
+            }
+          ],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.carried",
+          "decorators": [
+            {
+              "decorator": "lib.reads",
+              "args": [
+                {
+                  "param": "targets",
+                  "value": {
+                    "kind": "list",
+                    "items": [
+                      {
+                        "kind": "ref",
+                        "target": "lib.rowById"
+                      },
+                      {
+                        "kind": "ref",
+                        "target": "lib.allLogs"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 3
+                },
+                "end": {
+                  "line": 25,
+                  "col": 27
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 25,
+              "col": 3
+            },
+            "end": {
+              "line": 25,
+              "col": 57
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 39
+                },
+                "end": {
+                  "line": 25,
+                  "col": 49
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [
+              {
+                "kind": "named",
+                "read": "lib.rowById"
+              },
+              {
+                "kind": "named",
+                "read": "lib.allLogs"
+              }
+            ],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.scanned",
+          "decorators": [
+            {
+              "decorator": "lib.scan",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "lib.logs"
+                  }
+                }
+              ],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 26,
+                  "col": 3
+                },
+                "end": {
+                  "line": 26,
+                  "col": 14
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 26,
+              "col": 3
+            },
+            "end": {
+              "line": 26,
+              "col": 35
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [
+              {
+                "kind": "direct",
+                "state": "lib.logs"
+              },
+              {
+                "kind": "named",
+                "read": "lib.rowById"
+              }
+            ],
+            "effects": [
+              {
+                "kind": "direct",
+                "state": "lib.logs",
+                "operation": "post"
+              },
+              {
+                "kind": "named",
+                "effect": "lib.touch"
+              }
+            ]
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.scanned2",
+          "decorators": [
+            {
+              "decorator": "lib.scan",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "lib.rows"
+                  }
+                },
+                {
+                  "param": "via",
+                  "value": {
+                    "kind": "ref",
+                    "target": "lib.allLogs"
+                  }
+                }
+              ],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 27,
+                  "col": 3
+                },
+                "end": {
+                  "line": 27,
+                  "col": 23
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 27,
+              "col": 3
+            },
+            "end": {
+              "line": 27,
+              "col": 45
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [
+              {
+                "kind": "named",
+                "read": "lib.allLogs"
+              },
+              {
+                "kind": "direct",
+                "state": "lib.rows"
+              },
+              {
+                "kind": "named",
+                "read": "lib.rowById"
+              },
+              {
+                "kind": "direct",
+                "state": "lib.logs"
+              }
+            ],
+            "effects": [
+              {
+                "kind": "direct",
+                "state": "lib.logs",
+                "operation": "post"
+              },
+              {
+                "kind": "named",
+                "effect": "lib.touch"
+              }
+            ]
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "lib.wired",
+          "decorators": [],
+          "span": {
+            "file": "d.hozo",
+            "start": {
+              "line": 28,
+              "col": 3
+            },
+            "end": {
+              "line": 33,
+              "col": 4
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "lib.Row"
+              },
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 12
+                },
+                "end": {
+                  "line": 28,
+                  "col": 18
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "lib.Row"
+            }
+          },
+          "effects": [
+            {
+              "kind": "direct",
+              "state": "lib.rows",
+              "operation": "post"
+            },
+            {
+              "kind": "named",
+              "effect": "lib.touch"
+            },
+            {
+              "kind": "direct",
+              "state": "lib.title",
+              "operation": "put"
+            }
+          ],
+          "reads": [
+            {
+              "kind": "named",
+              "read": "lib.rowById"
+            }
+          ],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "call",
+                "call": {
+                  "op": "lib.write",
+                  "args": [
+                    {
+                      "param": "r",
+                      "value": {
+                        "kind": "name",
+                        "path": [
+                          "r"
+                        ],
+                        "span": {
+                          "file": "d.hozo",
+                          "start": {
+                            "line": 29,
+                            "col": 11
+                          },
+                          "end": {
+                            "line": 29,
+                            "col": 12
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 29,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 29,
+                      "col": 13
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 29,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 29,
+                    "col": 14
+                  }
+                }
+              },
+              {
+                "kind": "call",
+                "call": {
+                  "op": "lib.touchIt",
+                  "args": [],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 30,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 30,
+                      "col": 14
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 30,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 30,
+                    "col": 15
+                  }
+                }
+              },
+              {
+                "kind": "call",
+                "call": {
+                  "op": "lib.rename",
+                  "args": [],
+                  "bound": [],
+                  "span": {
+                    "file": "d.hozo",
+                    "start": {
+                      "line": 31,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 31,
+                      "col": 13
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 31,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 31,
+                    "col": 14
+                  }
+                }
+              },
+              {
+                "kind": "return",
+                "expr": {
+                  "kind": "call",
+                  "call": {
+                    "op": "lib.named",
+                    "args": [
+                      {
+                        "param": "id",
+                        "value": {
+                          "kind": "name",
+                          "path": [
+                            "r",
+                            "id"
+                          ],
+                          "span": {
+                            "file": "d.hozo",
+                            "start": {
+                              "line": 32,
+                              "col": 18
+                            },
+                            "end": {
+                              "line": 32,
+                              "col": 22
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "bound": [],
+                    "span": {
+                      "file": "d.hozo",
+                      "start": {
+                        "line": 32,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 32,
+                        "col": 23
+                      }
+                    }
+                  }
+                },
+                "span": {
+                  "file": "d.hozo",
+                  "start": {
+                    "line": 32,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 32,
+                    "col": 24
+                  }
+                }
+              }
+            ]
+          },
           "signature": {
             "exceptions": [],
             "effects": [],

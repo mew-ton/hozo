@@ -153,7 +153,7 @@ func TestViewsUncoveredNamespace(t *testing.T) {
 	sync.Throws = []ir.ThrowsClause{throws([]string{"ext.Down"})}
 	// ext（設定なし）: 状態と効果と例外を持つ葉
 	push := leaf("ext.push", nil)
-	push.Effects = []string{"ext.record"}
+	push.Effects = ir.NamedEffects("ext.record")
 	push.Throws = []ir.ThrowsClause{throws([]string{"ext.Down"}, prevents())}
 	// user（設定なし）: 人の操作。server の op を呼ぶ配線
 	open := wire("user.open", ir.String(), nil, ret(call("server.getMe")))
@@ -172,11 +172,11 @@ func TestViewsUncoveredNamespace(t *testing.T) {
 	// 単位の対象でない名前空間の op の Signature も計算されている
 	wantStrings(t, "Sig(user.open).E", sigOf(t, p, "user.open").Exceptions, []string{"http.ServerError", "http.NetworkError"})
 	pressSig := sigOf(t, p, "user.press")
-	wantStrings(t, "Sig(user.press).F", pressSig.Effects, []string{"ext.record"})
+	wantStrings(t, "Sig(user.press).F", effectNames(pressSig.Effects), []string{"ext.record"})
 	if got := relOf(t, pressSig, "ext.Down", "ext.record"); got != ir.Prevented {
 		t.Errorf("rel(Down, record) = %s, want prevented", got)
 	}
-	wantStrings(t, "Sig(server.sync).F", sigOf(t, p, "server.sync").Effects, []string{"ext.record"})
+	wantStrings(t, "Sig(server.sync).F", effectNames(sigOf(t, p, "server.sync").Effects), []string{"ext.record"})
 
 	// View は単位の対象の server だけ。namespaces にも、対象でない名前空間は入らない
 	views := viewsOf(p, cfg)
@@ -194,7 +194,7 @@ func TestViewsUncoveredNamespace(t *testing.T) {
 		}
 	}
 	wantStrings(t, "View(server).ext.push.E", v.Ops["ext.push"].Exceptions, []string{"ext.Down"})
-	wantStrings(t, "View(server).ext.push.F", v.Ops["ext.push"].Effects, []string{"ext.record"})
+	wantStrings(t, "View(server).ext.push.F", effectNames(v.Ops["ext.push"].Effects), []string{"ext.record"})
 	// Program は全体そのまま（単位の対象でない名前空間の宣言も読める）
 	if v.Program.Lookup("user.press") == nil || v.Program.Lookup("ext.log") == nil {
 		t.Error("View.program に、単位の対象でない名前空間の宣言がない")
