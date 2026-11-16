@@ -19,7 +19,7 @@ language = "go"
 requires = ["go"]
 ```
 
-- 読む語彙は、状態の `@db.table`、フィールドの、しまい方（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.time` / `@db.json`）と `@db.nullable` と `@db.key` / `@db.unique` / `@db.ref`、op の `@db.find` / `@db.list` / `@db.effects`、効果の `@db.insert` / `@db.update` / `@db.delete`。語彙は提供しない。
+- 読む語彙は、状態の `@db.table`、フィールドの、しまい方（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.time` / `@db.json`）と `@db.nullable` と `@db.key` / `@db.unique` / `@db.ref`、op の `@db.reads` / `@db.effects`、読み（`read` の宣言。「op の中身」）の `@db.find` / `@db.list`、効果の `@db.insert` / `@db.update` / `@db.delete`。語彙は提供しない。
 - オプションはない。`[emit.options.go-sqlite]` にキーがあれば GOSQL-6。
 - 制約（`@valid.*`）は確かめない（`go-valid` に依存しない）。足す前に確かめるかどうかは、境界を持つ相乗りの仕事（`docs/plugin-go-valid.md`「この文書が決めること」）。
 
@@ -84,7 +84,7 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 
 ### 状態ごとの型
 
-`<状態>Table` のメソッドは、基底のその状態の単位（`docs/plugin-go.md`「状態の単位」）のメソッドのうち、形で決まる問い合わせ（いつも）と、**`db` の語彙の op のデコレータ（`@db.find`、`@db.list`、`@db.effects`）を付けた op**（「op の中身」）。どの op がどの単位のメソッドになるか（op の置き場）は基底が決め、このトランスパイラは変えない。名前と形（`ctx`、引数、戻り値）は、基底のメソッドのまま（`plugin/golang` で求める）。受け取った `ctx` で `QueryContext` / `QueryRowContext` / `ExecContext` / `BeginTx` を呼ぶ。op に `export` が付いているかは見ない。
+`<状態>Table` のメソッドは、基底のその状態の単位（`docs/plugin-go.md`「状態の単位」）のメソッドのうち、形で決まる問い合わせ（いつも）と、**`db` の語彙の op のデコレータ（`@db.reads`、`@db.effects`）を付けた op**（「op の中身」）。どの op がどの単位のメソッドになるか（op の置き場）は基底が決め、このトランスパイラは変えない。名前と形（`ctx`、引数、戻り値）は、基底のメソッドのまま（`plugin/golang` で求める）。受け取った `ctx` で `QueryContext` / `QueryRowContext` / `ExecContext` / `BeginTx` を呼ぶ。op に `export` が付いているかは見ない。
 
 - 基底のメソッドをすべて持つ型には、`var _ <状態>State = <状態>Table{}` を出す。
 - **デコレータを付けていない op があるとき**、その型は、その op のメソッドを持たない。型は `<状態>State` を満たさず、基底の `New` に渡す行がコンパイルできない。人は、この型を自分の型に埋め込み、足りないメソッドを書き足して、その型を `New` に渡す。`var _` は出さない。**warning も出さない**: デコレータを付けないのは、その op の中身を人が書くと、仕様を書いた人が選んだこと。
@@ -107,20 +107,35 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 | 述語で決まる状態の分類 C の単位 `<C>State`（C の遷移を宛先にする効果の op） | `<C>Table`、`New<C>Table(db *sql.DB) <C>Table` | `<C>State` の命令に、`@db.effects` を付けたものが一つでもある | 出さない（述語は人が書くので、`<C>State` を満たさない） |
 
 - メソッドの足りない型の扱いは、「状態ごとの型」と同じ: 人が自分の型に埋め込んで、足りないメソッド（`<C>Table` なら、ケースの述語も）を書き足す。warning は出さない。
-- 読む op（`@db.find`、`@db.list`）は、いつも表の状態の単位に置かれる（読む状態は、名指しした表一つ。GOSQL-14）ので、ここには来ない。
+- 読みを一つ並べた `@db.reads` の op は、いつも表の状態の単位に置かれる（読む状態は、その読みの表一つ。GOSQL-14、GOSQL-21）ので、ここには来ない。読みを二つ以上並べた op は「未決: 複数の読みと、戻り値の型」。
 - 型で決まる状態の分類の遷移と、基底の状態の遷移を宛先にする効果の op は、基底がその状態の単位に置くので、`<状態>Table` のメソッドになる。
 
 ### op の中身
 
-op の中身は、op に付けた `db` の語彙のデコレータの引数だけで決まる。表は状態の名前で、列は文字列（表の model のフィールドの名前）で渡す。以下、表の状態を T、その表の model を M とする。
+op の中身は、op に付けた `db` の語彙のデコレータ（`@db.reads`、`@db.effects`）と、それが並べた読みと効果の宣言に付けたデコレータの、引数だけで決まる。読む側も書く側も二段で、理由の持ち主は `docs/requirements.md`「出力を推論しない」（読み・効果のデコレータは、それを行う op の実装に働く。デコレータのない op には、中身を出さない）。表は状態の名前で、列は文字列（表の model のフィールドの名前）で渡す。以下、表の状態を T、その表の model を M とする。
 
-**読む op**（デコレータが、T を op の `reads` として運ぶ。op は `reads` を書かない）:
+**読み**は、名前を付けた `read` の宣言（`read userByEmail on users;`。言語の持ち主は `docs/grammar.md`「read」、`docs/check.md`「reads」）。
 
-| デコレータ | op の形（合わなければ「診断」） | SQL |
-|---|---|---|
-| `@db.find(T, "c")` | 引数は一つで、型は列 c に合う（「列と引数の型」）。戻り値は `M?`。c は、M のただ一つの `@db.key` か、`@db.unique` | `SELECT <すべての列> FROM "<表>" WHERE "c" IS ?1`。行がなければ `nil` |
-| `@db.list(T, "c")` | 引数は一つで、型は列 c に合う。戻り値は `M[]` | `SELECT <すべての列> FROM "<表>" WHERE "c" IS ?1 ORDER BY rowid`（足した順） |
-| `@db.list(T)` | 引数はない。戻り値は `M[]` | `SELECT <すべての列> FROM "<表>" ORDER BY rowid` |
+**読む op** は、行う読みを `@db.reads(r)` で名指しする（デコレータが、r を op の `reads` として運ぶ。op は `reads` を書かない）。読みの宣言が、表から何を引くかを `@db.find` / `@db.list` で言う。**op は、読みが受け取るものを引数に取り、読みが引くものを返す。** この節が決めるのは、読みを一つ並べ、op の戻り値の型が、その読みの引くものと等しいとき。そうでないときは「未決: 複数の読みと、戻り値の型」。
+
+```ts
+@db.find(users, "email")
+read userByEmail on users;
+
+@db.reads(userByEmail)
+export op findUser(email: type.Email): type.User?;
+```
+
+| 読みのデコレータ | 読みの宣言（合わなければ GOSQL-21） | 読みが受け取るもの（op の引数。合わなければ GOSQL-9） | 読みが引くもの | SQL |
+|---|---|---|---|---|
+| `@db.find(T, "c")` | `on T`。c は、M のただ一つの `@db.key` か、`@db.unique`（GOSQL-13） | 列 c に合う型の値一つ（「列と引数の型」） | `M?` | `SELECT <すべての列> FROM "<表>" WHERE "c" IS ?1`。行がなければ `nil` |
+| `@db.list(T, "c")` | `on T` | 列 c に合う型の値一つ | `M[]` | `SELECT <すべての列> FROM "<表>" WHERE "c" IS ?1 ORDER BY rowid`（足した順） |
+| `@db.list(T)` | `on T` | なし（op は引数を持たない） | `M[]` | `SELECT <すべての列> FROM "<表>" ORDER BY rowid` |
+
+- 表を、読みの宣言の `on` から読まずに引数で名指しさせるのは、書く側と同じく、出力を決めるのがデコレータの引数だけだから。`on` の状態は、食い違いを確かめるのにだけ使う（GOSQL-21）。
+- 読みは、`@db.find` / `@db.list` のうち、ちょうど一つを持つ（`@db.reads` に並べた読みがどちらも持たないか、一つの読みが二つ持てば GOSQL-22）。op に並べられていない読みのデコレータも、同じに確かめる（何も出さない）。
+- 一つの読みを、二つ以上の op が `@db.reads` で名指ししてよい（同じ文のメソッドが、op ごとに出る）。
+- **`@db.reads` のない op には、読みにデコレータが付いていても、中身を出さない**（`@db.find(users, "email") read userByEmail on users;` と `op findUser(email: type.Email): type.User? reads userByEmail;`。状態を直に書いた `reads users` も同じ）。読みのデコレータは、`@db.reads` でそれを行う op の中身の材料で、op のデコレータの代わりにはならない。その op は、人が書き足す（「状態ごとの型」）。
 
 **書く op** は、行う効果を `@db.effects(e₁, …, eₙ)` で並べる（デコレータが、それらを op の `effects` として運ぶ。op は `effects` を書かない）。効果の宣言が、表に何をするかを `@db.insert` / `@db.update` / `@db.delete` で言う。**n 番目の効果が、op の n 番目の引数を受け取る。** 引数の数は効果の数と同じで、戻り値はない。
 
@@ -133,13 +148,25 @@ op の中身は、op に付けた `db` の語彙のデコレータの引数だ�
 - 表を、効果の宛先から読まずに引数で名指しさせるのは、出力を決めるのがデコレータの引数だけだから。効果の宛先が、状態の分類の遷移や基底の状態の遷移のとき（一つの効果が複数の状態に触れ、表はその一部、という場合を含む）は、操作の名前との照合はなく、T がその効果の書き込む状態（`Effect.writes`）の一つであればよい。
 - 効果は、`@db.insert` / `@db.update` / `@db.delete` のうち、ちょうど一つを持つ（`@db.effects` に並べた効果が一つも持たないか、一つの効果が二つ以上持てば GOSQL-12）。op に並べられていない効果のデコレータも、同じに確かめる（何も出さない）。
 - **効果が一つ**なら、文一つを `dbExec` で実行する。**二つ以上なら、一つのトランザクション**（「トランザクション」）。同じ効果を二度並べてもよい（文が二つになる）。
-- 条件に書いた引数の値は、名指しした列のしまい方の補助で包んで渡す（列 `email` が `@db.text` なら `dbText(email)`。「補助」）。列が `@db.nullable` を持てば、フィールドと同じに `dbNullable` を足す（`dbText(email, dbNullable)`）。引数の型では、形を変えない。
-- op は、デコレータが言う以外のものを読み書きしない: `db` の op のデコレータはちょうど一つで、op が直に読む状態と直に持つ効果（`docs/check.md`「デコレータが運ぶ reads と effects」）は、そのデコレータが運ぶものだけ。そうでなければ GOSQL-14（`@db.find` の op が自分で `effects` を書いている、など）。`@db.effects()` に効果が一つもないときも同じ。
+- 条件に書いた引数の値は、読む側も書く側も、名指しした列のしまい方の補助で包んで渡す（列 `email` が `@db.text` なら `dbText(email)`。「補助」）。列が `@db.nullable` を持てば、フィールドと同じに `dbNullable` を足す（`dbText(email, dbNullable)`）。引数の型では、形を変えない。
+- op は、デコレータが言う以外のものを読み書きしない: `db` の op のデコレータ（`@db.reads`、`@db.effects`）はちょうど一つで、op が直に読むものと直に持つ効果（`docs/check.md`「デコレータが運ぶ reads と effects」）は、そのデコレータが運ぶものだけ。そうでなければ GOSQL-14（`@db.reads` の op が自分で `effects` を書いている、運ばれる読みのほかに `reads users` を書いている、など）。`@db.reads()` に読みが、`@db.effects()` に効果が、一つもないときも同じ。
 - デコレータで言えないもの（順序、件数と位置、等しいかどうかでない比較、複数の列の条件、一意の違反を例外に写すこと）は、その op にデコレータを付けず、人が書く。
+
+### 未決: 複数の読みと、戻り値の型
+
+`@db.reads` は、読みを二つ以上並べられ（`@db.reads(userById, ordersOfUser)`。いくつかの行を合わせた型を返す op のため）、op の戻り値の型は、読みの引くもの（`M?`、`M[]`）と等しくなくてよい（`docs/decisions.md`「決めたこと」129）。この二つの形で何を出すかは、次の二点が決まっていないので、まだ決めていない。
+
+| 決まっていないこと | 決められない理由 |
+|---|---|
+| 戻り値の型が、読みの引くものと違うとき、op の返す値を、誰が、読みの結果から作るか | 型を見て組み立て方を決めることは、できない（`docs/requirements.md`「出力を推論しない」） |
+| 読みを二つ以上並べたとき、op のどの引数が、どの読みに渡るか | 書く側の「n 番目の効果が、n 番目の引数」は、そのままは当てはまらない: 引数を受け取らない読み（列のない `@db.list`）と、同じ引数を受け取る二つの読みがありうる |
+
+- 決まるまで、この二つの形を error にする診断は、持たない（GOSQL-9 と GOSQL-10 の `@db.reads` の分は、読みが一つのときの引数だけ）。何を出すかも、決めていない。
+- サンプルと、このトランスパイラの単体テストは、決まるまで、この二つの形を入力にしない。
 
 ### 列と引数の型
 
-値を、名指しした列と比べるところ（`@db.find`、`@db.list`、`@db.delete` の条件）のすべてに掛かる、ただ一つの規則（`docs/decisions.md`「決めたこと」96）:
+値を、名指しした列と比べるところ（読みの `@db.find`、`@db.list` と、効果の `@db.delete` の条件）のすべてに掛かる、ただ一つの規則（`docs/decisions.md`「決めたこと」96）。「引数」は、その読みか効果が受け取る、op の引数:
 
 **引数の型は、列の型（M のそのフィールドの型）と等しくなければならない。列の型が union なら、引数は、その一部でよい。** `T?` は「T」と「値がない」の union と数える。向きは一方だけで、列より広い引数は GOSQL-9。
 
@@ -246,7 +273,7 @@ func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 ### メソッドの形とコメント
 
 ```go
-// FindUser は op store.findUser（@db.find）: 表 "users" から、"email"（@db.unique）が引数 email と同じ行を引く。なければ nil。
+// FindUser は op store.findUser（@db.reads）: 読み store.userByEmail（@db.find）で、表 "users" から、"email"（@db.unique）が引数 email と同じ行を引く。なければ nil。
 func (t UsersTable) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
 	return dbGet(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "email" IS ?1`, dbText(email))
@@ -284,11 +311,18 @@ func (t SessionsTable) RemoveSession(ctx context.Context, token pkgtype.Token) e
 | `New<C>Table` | `// New<C>Table は db の上の <C>Table を返す。表は CreateTables が作る。` |
 | `IsEmpty` | `// IsEmpty は形で決まる問い合わせ: 表 "<表>" に行が一つもなければ true。` |
 | `Get` | `// Get は形で決まる問い合わせ: 表 "<表>" の行を、足した順にすべて引く。` |
-| `@db.find` の op | `// <メソッド名> は op <FQN>（@db.find）: 表 "<表>" から、"<列>"（<@db.key か @db.unique>）が引数 <引数名> と同じ行を引く。なければ nil。` |
-| `@db.list` の op | `// <メソッド名> は op <FQN>（@db.list）: 表 "<表>" から、"<列>" が引数 <引数名> と同じ行を、足した順にすべて引く。`。列がなければ `// <メソッド名> は op <FQN>（@db.list）: 表 "<表>" の行を、足した順にすべて引く。` |
+| `@db.reads` の op（読みが一つ） | `// <メソッド名> は op <FQN>（@db.reads）: <読みの句>` |
 | `@db.effects` の op（効果が一つ） | `// <メソッド名> は op <FQN>（@db.effects）: <効果の句>` |
 | `@db.effects` の op（効果が二つ以上） | `// <メソッド名> は op <FQN>（@db.effects）: 一つのトランザクションで、書いた順に行う。<効果の句を、効果の順に、区切りなしで>どれかが失敗すれば、どれも残らない。` |
 | `dbArgs<Model>` / `dbScan<Model>` | `// dbArgs<Model> は <model の FQN> を、表 "<表>" の列の順の値にする。` / `// dbScan<Model> は、表 "<表>" の列の順の値を <model の FQN> に読む。`（表は、その model を `@db.table` で名指しした最初の表の状態） |
+
+読みの句は、読みのデコレータごとに一文（列のない `@db.list` は、最後の行）:
+
+| 読みのデコレータ | 読みの句 |
+|---|---|
+| `@db.find` | `読み <読みの FQN>（@db.find）で、表 "<表>" から、"<列>"（<@db.key か @db.unique>）が引数 <引数名> と同じ行を引く。なければ nil。` |
+| `@db.list`（列がある） | `読み <読みの FQN>（@db.list）で、表 "<表>" から、"<列>" が引数 <引数名> と同じ行を、足した順にすべて引く。` |
+| `@db.list`（列がない） | `読み <読みの FQN>（@db.list）で、表 "<表>" の行を、足した順にすべて引く。` |
 
 効果の句は、効果のデコレータごとに一文:
 
@@ -311,23 +345,25 @@ func (t SessionsTable) RemoveSession(ctx context.Context, token pkgtype.Token) e
 | GOSQL-3 | error | 表の model に、どのしまい方でも列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model |
 | GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`<状態>Table`、`New<状態>Table`、出すなら `SharedTable`、`NewSharedTable`、`<C>Table`、`New<C>Table`）が、N の定義のパッケージの名前（型など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`。状態 `shared` の `SharedTable` と、`SharedState` の `SharedTable`）も同じで、位置は後ろの宣言 |
 | GOSQL-6 | error | `[emit.options.go-sqlite]` に、知らないキーがある。位置なし |
-| GOSQL-7 | error | `db` の語彙のデコレータ（`@db.find`、`@db.list`、`@db.insert`、`@db.update`、`@db.delete`）の引数の状態が、N の表の状態でない（`@db.table` が付いていない、別の名前空間の状態）。位置はデコレータを付けた宣言 |
-| GOSQL-8 | error | デコレータの引数の列の名前が、その表の model のフィールドにない。位置はデコレータを付けた宣言 |
-| GOSQL-9 | error | op の引数が、デコレータの言うものと合わない（「op の中身」「列と引数の型」）: `@db.find` と、列を渡した `@db.list` は、引数が一つで、型が列に合う。列のない `@db.list` は、引数がない。`@db.effects` は、引数の数が並べた効果の数と同じで、n 番目の型が、n 番目の効果の受け取るもの（`@db.insert` / `@db.update` は表の model、`@db.delete` は列に合う型）。位置は op |
-| GOSQL-10 | error | op の戻り値が、デコレータの言うものと合わない: `@db.find` は `M?`、`@db.list` は `M[]`（M は表の model）、`@db.effects` は戻り値なし。位置は op |
+| GOSQL-7 | error | `db` の語彙のデコレータ（`@db.find`、`@db.list`、`@db.insert`、`@db.update`、`@db.delete`）の引数の状態が、N の表の状態でない（`@db.table` が付いていない、別の名前空間の状態）。位置はデコレータを付けた宣言（読みか効果） |
+| GOSQL-8 | error | デコレータの引数の列の名前が、その表の model のフィールドにない。位置はデコレータを付けた宣言（読みか効果） |
+| GOSQL-9 | error | op の引数が、デコレータの言うものと合わない（「op の中身」「列と引数の型」）: 読みを一つ並べた `@db.reads` は、その読みが `@db.find` か、列を渡した `@db.list` なら、引数が一つで、型が列に合う。列のない `@db.list` なら、引数がない（読みを二つ以上並べた op には、掛けない。「未決: 複数の読みと、戻り値の型」）。`@db.effects` は、引数の数が並べた効果の数と同じで、n 番目の型が、n 番目の効果の受け取るもの（`@db.insert` / `@db.update` は表の model、`@db.delete` は列に合う型）。位置は op |
+| GOSQL-10 | error | op の戻り値が、デコレータの言うものと合わない: `@db.effects` は戻り値なし。位置は op。`@db.reads` の op の戻り値には、掛けない（読みの引くもの `M?` / `M[]` と等しくなくてよい。「未決: 複数の読みと、戻り値の型」。`@db.find` / `@db.list` を op に付けていたときの「`@db.find` は `M?`、`@db.list` は `M[]`」は、なくした） |
 | GOSQL-11 | error | 効果のデコレータが、効果の宛先と合わない（「op の中身」）: 宛先が組み込みの効果なのに、状態がデコレータの表でないか、操作が合わない（`@db.insert` は `post`、`@db.update` は `put`、`@db.delete` は `delete`）。宛先が遷移なのに、デコレータの表が、その効果の書き込む状態（`Effect.writes`）にない。位置は効果 |
 | GOSQL-12 | error | `@db.effects` に並べた効果が、`@db.insert` / `@db.update` / `@db.delete` のどれも持たない（位置は op）。または、一つの効果が、その三つのうち二つ以上を持つ（位置は効果） |
-| GOSQL-13 | error | `@db.find` の列が、一行に決まる列でない（表の model のただ一つの `@db.key` でも、`@db.unique` でもない）。位置は op |
-| GOSQL-14 | error | op が、`db` の op のデコレータ（`@db.find`、`@db.list`、`@db.effects`）の言う以外のものを読み書きする: そのデコレータを二つ以上持つ。op が直に読む状態か直に持つ効果に、そのデコレータが運ぶもの以外がある。`@db.effects` に効果が一つもない。位置は op |
+| GOSQL-13 | error | `@db.find` の列が、一行に決まる列でない（表の model のただ一つの `@db.key` でも、`@db.unique` でもない）。位置は読み |
+| GOSQL-14 | error | op が、`db` の op のデコレータ（`@db.reads`、`@db.effects`）の言う以外のものを読み書きする: そのデコレータを二つ以上持つ。op が直に読むものか直に持つ効果に、そのデコレータが運ぶもの以外がある。`@db.reads` に読みが、`@db.effects` に効果が、一つもない。位置は op |
 | GOSQL-15 | error | `@db.update` の表の model が、`@db.key` を一つも持たないか、キーでない列を一つも持たない。位置は効果 |
 | GOSQL-16 | error | 表の model のフィールドが、しまい方のデコレータ（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.time` / `@db.json`）を一つも持たないか、二つ以上持つ（「しまい方」）。位置は model |
 | GOSQL-17 | error | しまい方が、フィールドの型に合わない（「しまい方」の表）。メッセージに、フィールド、しまい方、型を示す。位置は model |
 | GOSQL-18 | error | 表の model の、`@db.nullable` の付いたフィールドの型が、省略可能でない（「表」）。位置は model |
 | GOSQL-19 | error | 表の model の、省略可能なフィールド（`T?`）に、`@db.nullable` がない（「表」）。位置は model |
 | GOSQL-20 | error | 表の model のフィールドの `@db.ref(M2)` の指す先が、一つに決まらない: `@db.table(M2)` の付いた表の状態が、N にないか、二つ以上ある。または、M2 の `@db.key` が一つでない（「表」）。位置は model |
+| GOSQL-21 | error | 読みのデコレータ（`@db.find`、`@db.list`）の表が、その読みの宣言の `on` の状態でない（「op の中身」）。位置は読み |
+| GOSQL-22 | error | `@db.reads` に並べた読みが、`@db.find` も `@db.list` も持たない（位置は op）。または、一つの読みが、その二つを両方持つ（位置は読み） |
 
 - GOSQL-5 は欠番。「状態の単位のメソッドの名前が、このファイルの型のフィールド `db` と当たる（op `db`）」という規則だったが、起きない: メソッドの名前は op 名の先頭を大文字にしたもの（`Db`。`docs/plugin-go.md`「名前」）で、フィールド `db` とは別の名前。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
-- GOSQL-1、GOSQL-3、GOSQL-7〜GOSQL-20 は、書いたものの整合の検査: デコレータが言ったことと、状態・model・op・効果の宣言が食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。`db` の op のデコレータを配線の op に付けたときは、hozoc が先に DEC-17 を返す（`docs/check.md`「デコレータ」）。
+- GOSQL-1、GOSQL-3、GOSQL-7〜GOSQL-22 は、書いたものの整合の検査: デコレータが言ったことと、状態・model・op・読み・効果の宣言が食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。`db` の op のデコレータを配線の op に付けたときは、hozoc が先に DEC-17 を、`@db.find` / `@db.list` を読みでない宣言（op など）に付けたときは、DEC-1 を返す（`docs/check.md`「デコレータ」）。GOSQL-7〜GOSQL-10、GOSQL-13、GOSQL-14 は、`@db.find` / `@db.list` を読みに、`@db.reads` を op に付ける形（`docs/decisions.md`「決めたこと」128）に合わせて、同じ規則を書き直した。
 - warning（コードは `PLUGIN`）は一つ: 表の状態が一つもない。`db` の語彙のデコレータを付けていない op には、warning を出さない（「状態ごとの型」）。
 - Dir(U, N) の上に `go.mod` がないことは、基底が報告する（GO-1。`docs/plugin-go.md`「診断」）。このトランスパイラは、型のパッケージの import パスを求められないので、ファイルも診断も返さない。
 - `@db.table` は、どの保存先かを言わない。同じ `@db.table` の状態を別の保存先にするのは、別のトランスパイラを並べた別の単位（か、人が書く実装）。`@db.key` / `@db.unique` / `@db.ref` の意味（重なれば失敗する、など）は、このトランスパイラの出力にしかなく、ほかの実装が同じ振る舞いをすることは、仕様からは言えない。
