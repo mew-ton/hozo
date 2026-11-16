@@ -1,0 +1,140 @@
+package govalid
+
+import (
+	"testing"
+
+	"github.com/mew-ton/hozo/ir"
+)
+
+// このファイルは docs/plugin-go-valid.md「Validate を持つ型」の規則の各行を、手で組み立てた小さな IR で確かめる
+// （docs/testing.md「単体テスト」の `plugin/govalid`）。
+
+func decl(fqn string, decorators ...string) ir.DeclBase {
+	b := ir.DeclBase{Name: fqn}
+	for _, d := range decorators {
+		b.Decorators = append(b.Decorators, ir.Application{Decorator: d})
+	}
+	return b
+}
+
+func scalar(fqn string, base ir.Type, decorators ...string) *ir.Scalar {
+	return &ir.Scalar{DeclBase: decl(fqn, decorators...), Base: base}
+}
+
+func model(fqn string, fields ...ir.Field) *ir.Model {
+	return &ir.Model{DeclBase: decl(fqn), Fields: fields}
+}
+
+func field(name string, t ir.Type, decorators ...string) ir.Field {
+	f := ir.Field{Name: name, Type: t}
+	for _, d := range decorators {
+		f.Decorators = append(f.Decorators, ir.Application{Decorator: d})
+	}
+	return f
+}
+
+func program(namespaces map[string][]ir.Decl, order ...string) *ir.Program {
+	p := &ir.Program{}
+	for _, name := range order {
+		p.Namespaces = append(p.Namespaces, ir.Namespace{Name: name, Decls: namespaces[name]})
+	}
+	return p
+}
+
+func TestHasValidate(t *testing.T) {
+	p := program(map[string][]ir.Decl{
+		"type": {
+			// 1: @valid.* が付いた scalar
+			scalar("type.Email", ir.String(), "valid.format"),
+			// 利用者が valid に足した制約も、@valid.* の一つ（使われていれば、go-valid が GOVALID-5 を返す）
+			scalar("type.Code", ir.String(), "valid.checkDigit"),
+			// valid の語彙でないデコレータは数えない（名前空間 valid.sub、valid で始まるだけの名前空間、グローバル）
+			scalar("type.Plain", ir.String(), "db.key", "valid.sub.x", "validx.min", "valid"),
+			// 2: 元の型が Validate を持つ scalar。その先も
+			scalar("type.WorkEmail", ir.Ref("type.Email")),
+			scalar("type.BossEmail", ir.Ref("type.WorkEmail")),
+			scalar("type.PlainId", ir.Ref("type.Plain")),
+		},
+		"app": {
+			// 3: @valid.* が付いたフィールドを持つ model
+			model("app.Named", field("name", ir.String(), "valid.length")),
+			model("app.Marked", field("id", ir.String(), "db.key")),
+			// 4: Validate を持つ型をフィールドの型に持つ model。optional、array、record の値を通して見る
+			model("app.Direct", field("email", ir.Ref("type.Email"))),
+			model("app.Opt", field("email", ir.Optional(ir.Ref("type.Email")))),
+			model("app.List", field("emails", ir.Array(ir.Ref("type.Email")))),
+			model("app.Map", field("emails", ir.Record(ir.String(), ir.Ref("type.Email")))),
+			model("app.Deep", field("x", ir.Optional(ir.Array(ir.Record(ir.String(), ir.Array(ir.Optional(ir.Ref("app.Named")))))))),
+			// record のキーは見ない（値だけ）
+			model("app.Keyed", field("byEmail", ir.Record(ir.Ref("type.Email"), ir.String()))),
+			model("app.NoCheck", field("id", ir.Ref("type.PlainId")), field("at", ir.Time()), field("m", ir.Ref("app.Marked"))),
+			// 当たるものがなくなるまで繰り返す: 順に辿る model と、互いを参照する model
+			model("app.Outer", field("mid", ir.Ref("app.Mid"))),
+			model("app.Mid", field("inner", ir.Array(ir.Ref("app.Named")))),
+			model("app.Ping", field("pong", ir.Optional(ir.Ref("app.Pong")))),
+			model("app.Pong", field("ping", ir.Optional(ir.Ref("app.Ping"))), field("n", ir.Int(), "valid.min")),
+			model("app.Loop", field("self", ir.Optional(ir.Ref("app.Loop")))),
+			// union と exception は Validate を持たない。union をフィールドに持つ model も、それだけでは持たない
+			&ir.Union{DeclBase: decl("app.Contact"), Variant: ir.UnionArms, Arms: []ir.UnionArm{{Name: "Mail", Type: ir.Ref("type.Email")}}},
+			model("app.Holder", field("contact", ir.Ref("app.Contact"))),
+			&ir.Exception{DeclBase: decl("app.Bad"), Value: ir.Ref("app.Named")},
+			// その場で書いた model（合成した model）は、普通の model
+			&ir.Model{DeclBase: decl("app.Bad2.Value"), SynthesizedFrom: "app.Bad2", Fields: []ir.Field{field("n", ir.Int(), "valid.max")}},
+			&ir.Exception{DeclBase: decl("app.Bad2"), Value: ir.Ref("app.Bad2.Value")},
+			// View が見る側のために合成した model（synthesizedFrom が op の FQN）は、Go の型にならないので持たない
+			&ir.Op{DeclBase: decl("app.send")},
+			&ir.Model{DeclBase: decl("app.send$in"), SynthesizedFrom: "app.send", Fields: []ir.Field{field("email", ir.Ref("type.Email"))}},
+		},
+	}, "type", "app")
+
+	want := map[string]bool{
+		"type.Email": true, "type.Code": true, "type.Plain": false,
+		"type.WorkEmail": true, "type.BossEmail": true, "type.PlainId": false,
+		"app.Named": true, "app.Marked": false,
+		"app.Direct": true, "app.Opt": true, "app.List": true, "app.Map": true, "app.Deep": true,
+		"app.Keyed": false, "app.NoCheck": false,
+		"app.Outer": true, "app.Mid": true, "app.Ping": true, "app.Pong": true, "app.Loop": false,
+		"app.Contact": false, "app.Holder": false, "app.Bad": false,
+		"app.Bad2.Value": true, "app.Bad2": false,
+		"app.send": false, "app.send$in": false,
+		"app.Nowhere": false, "": false,
+	}
+	for fqn, w := range want {
+		if got := HasValidate(p, fqn); got != w {
+			t.Errorf("HasValidate(%q) = %v, want %v", fqn, got, w)
+		}
+	}
+	if HasValidate(nil, "type.Email") {
+		t.Error("Program が nil なのに true")
+	}
+}
+
+// 継承した model は、展開済みのフィールド（受け継いだデコレータを含む）で判定する。
+func TestHasValidateExtends(t *testing.T) {
+	p := program(map[string][]ir.Decl{"app": {
+		model("app.User", field("name", ir.String(), "valid.length"), field("hash", ir.String())),
+		&ir.Model{DeclBase: decl("app.Public"), Extends: &ir.ModelExtends{Base: "app.User", Removed: []string{"hash"}},
+			Fields: []ir.Field{field("name", ir.String(), "valid.length")}},
+		// 制約の付いたフィールドをなくした model は、もう持たない
+		&ir.Model{DeclBase: decl("app.Bare"), Extends: &ir.ModelExtends{Base: "app.User", Removed: []string{"name"}},
+			Fields: []ir.Field{field("hash", ir.String())}},
+	}}, "app")
+	for fqn, w := range map[string]bool{"app.User": true, "app.Public": true, "app.Bare": false} {
+		if got := HasValidate(p, fqn); got != w {
+			t.Errorf("HasValidate(%q) = %v, want %v", fqn, got, w)
+		}
+	}
+}
+
+func TestStandard(t *testing.T) {
+	for _, d := range []string{"valid.min", "valid.max", "valid.length", "valid.pattern", "valid.format"} {
+		if !Standard(d) {
+			t.Errorf("Standard(%q) = false", d)
+		}
+	}
+	for _, d := range []string{"valid.checkDigit", "min", "valid", "valid.", "http.query", "valid.sub.min", "x.valid.min", ""} {
+		if Standard(d) {
+			t.Errorf("Standard(%q) = true", d)
+		}
+	}
+}

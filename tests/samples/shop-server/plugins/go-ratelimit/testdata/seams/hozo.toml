@@ -1,0 +1,33 @@
+# サンプル shop-server の中のプラグイン go-ratelimit の単体テストの入力（../../../../README.md「サンプルの中のプラグイン」の
+# 「出力の規則」）。View は、リポジトリの tests/pluginviews_test.go が views.json に置く（docs/testing.md「単体テスト」）。
+[hozo]
+plugin_dirs = ["plugins"]       # 継ぎ目を宣言する、もう一つのトランスパイラ go-trace（起動しない代役）
+
+# 1: shop。Seams のメソッドは、どれも @rate.limited のもの（RateSeams だけで Seams を満たす）
+[[emit]]
+namespace   = "shop"
+transpilers = ["go", "go-ratelimit"]
+out         = "gen/shop"
+
+# 2: mixed。単位に、継ぎ目を宣言したトランスパイラがもう一つある（RateSeams だけでは Seams を満たさない）
+[[emit]]
+namespace   = "mixed"
+transpilers = ["go", "go-ratelimit", "go-trace"]
+out         = "gen/mixed"
+
+# 3: plain。@rate.limited の付いた op がない（ファイルを出さない）
+[[emit]]
+namespace   = "plain"
+transpilers = ["go", "go-ratelimit"]
+out         = "gen/plain"
+
+# 型の置き場: 語彙 rate の例外と、shop が使う型
+[[emit]]
+namespace   = "rate"
+transpilers = ["go"]
+out         = "gen/rate"
+
+[[emit]]
+namespace   = "type"
+transpilers = ["go"]
+out         = "gen/type"

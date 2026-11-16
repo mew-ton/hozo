@@ -1,0 +1,5 @@
+// GOVALID-7: 位置なし。
+namespace app {
+  @valid.min(1)
+  scalar Count extends int;
+}

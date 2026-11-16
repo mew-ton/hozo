@@ -1,0 +1,2 @@
+GORATE-1		1 番目の [[emit]] の [emit.options.go-ratelimit] に、知らないキー max がある（go-ratelimit にオプションはない）
+GORATE-1		1 番目の [[emit]] の [emit.options.go-ratelimit] に、知らないキー window がある（go-ratelimit にオプションはない）

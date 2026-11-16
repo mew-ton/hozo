@@ -1,0 +1,3 @@
+GORATE-2	types.RateLimiter	入口のパッケージ（gen/types）の名前 RateLimiter が当たる: model types.RateLimiter と go-ratelimit のインターフェース RateLimiter（直すのは仕様の名前）
+GORATE-2	types.RateSeams	入口のパッケージ（gen/types）の名前 RateSeams が当たる: exception types.RateSeams と go-ratelimit の型 RateSeams（直すのは仕様の名前）
+GORATE-2	funcs.NewRateSeams	入口のパッケージ（gen/funcs）の名前 NewRateSeams が当たる: scalar funcs.NewRateSeams と go-ratelimit の関数 NewRateSeams（直すのは仕様の名前）

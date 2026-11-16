@@ -1,0 +1,19 @@
+// GOSQL-1（docs/plugin-go-sqlite.md「表」）: @db の状態の要素が、model への ref でない。位置は状態。
+
+namespace app {
+  scalar Id extends string;
+  model Circle { r: float; }
+  union Shape { Circle: Circle; Other: string; }
+  model Row { @db.key id: Id; }
+
+  // 核の型
+  @db state names: list<string>;
+  // scalar
+  @db state ids: list<Id>;
+  // union
+  @db state shapes: list<Shape>;
+  // array
+  @db state groups: list<Row[]>;
+  // model は通る
+  @db state rows: list<Row>;
+}

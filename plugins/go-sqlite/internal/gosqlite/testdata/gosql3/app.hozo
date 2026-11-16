@@ -1,0 +1,28 @@
+// GOSQL-3（docs/plugin-go-sqlite.md「表」）: 列にできない型のフィールドがある（union と、union を中に持つ array / record / model）。
+// 位置は model。フィールドごとに一つ。同じ model を要素に持つ表の状態が二つあっても、一度だけ。
+
+namespace app {
+  model Circle { r: float; }
+  union Shape { Circle: Circle; Other: string; }
+  /** union を中に持つ model */
+  model Frame { shape: Shape; }
+  /** union を、model を二つ辿った先に持つ model */
+  model Album { frames: Frame[]; }
+  /** 自分を指す model（union を持たない） */
+  model Tree { children: Tree[]; }
+
+  model Bad {
+    @db.key id: string;
+    shape: Shape;
+    maybe: Shape?;
+    shapes: Shape[];
+    byName: Record<string, Shape>;
+    frame: Frame;
+    albums: Album[]?;
+    tree: Tree;
+    circle: Circle;
+  }
+
+  @db state bads: list<Bad>;
+  @db state more: list<Bad>;
+}

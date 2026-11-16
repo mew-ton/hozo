@@ -1,0 +1,29 @@
+// GORATE-2（../../../../README.md「サンプルの中のプラグイン」の「出力の規則」）: このトランスパイラの公開の名前
+// （RateLimiter、RateSeams、NewRateSeams）が、N の定義のパッケージの名前と当たる。位置は当たった宣言。
+
+// RateLimiter と RateSeams が、型の名前と当たる
+namespace types {
+  model RateLimiter { max: int; }
+  exception RateSeams;
+  @rate.limited
+  export op ping();
+}
+
+// NewRateSeams が、型の名前と当たる
+namespace funcs {
+  scalar NewRateSeams extends string;
+  @rate.limited
+  export op ping();
+}
+
+// @rate.limited の付いた op がなければ（ファイルを出さないので）、当たらない
+namespace quiet {
+  model RateLimiter { max: int; }
+  export op ping();
+}
+
+// 当たらない名前空間には、出ない
+namespace clean {
+  @rate.limited
+  export op ping();
+}

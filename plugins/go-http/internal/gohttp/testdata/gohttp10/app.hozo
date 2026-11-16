@@ -1,0 +1,27 @@
+// GOHTTP-10: 位置は、当たった宣言。
+namespace app {
+  // 既定値を持つ model Handler の NewHandler
+  model Handler { retries: int = 3; }
+  @http.get("/a")
+  export op a(): string;
+}
+
+namespace typed {
+  // 型の名前そのもの
+  scalar NewHandler extends string;
+  @http.get("/b")
+  export op b(): string;
+}
+
+namespace wrapped {
+  // union New のアーム Handler を包む型 NewHandler
+  union New { Handler: string; Other: int; }
+  @http.get("/c")
+  export op c(): string;
+}
+
+namespace quiet {
+  // 経路の op がなければ、NewHandler を出さないので、当たらない
+  model Handler { retries: int = 3; }
+  export op d(): string;
+}

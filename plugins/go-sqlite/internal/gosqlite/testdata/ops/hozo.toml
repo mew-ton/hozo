@@ -1,0 +1,6 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「op の中身」の規則の各行
+# （一行を引く、並びを引く、足す、書き換える、消す）と、省略可能な引数。どの op も規則に当たる。
+[[emit]]
+namespace   = "shop"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/shop"

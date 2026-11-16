@@ -1,0 +1,25 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-4（公開の名前が当たる）。条件ごとに名前空間が一つ。
+[[emit]]
+namespace   = "fixed"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/fixed"
+
+[[emit]]
+namespace   = "table"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/table"
+
+[[emit]]
+namespace   = "consts"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/consts"
+
+[[emit]]
+namespace   = "own"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/own"
+
+[[emit]]
+namespace   = "clean"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/clean"

@@ -1,0 +1,2 @@
+GOVALID-7		1 番目の [[emit]] の [emit.options.go-valid] に、知らないキー level がある（go-valid にオプションはない）
+GOVALID-7		1 番目の [[emit]] の [emit.options.go-valid] に、知らないキー strict がある（go-valid にオプションはない）

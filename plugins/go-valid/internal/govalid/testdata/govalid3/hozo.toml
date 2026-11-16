@@ -1,0 +1,31 @@
+# plugins/go-valid の単体テストの入力（docs/testing.md「単体テスト」）: GOVALID-3（Validate を持つ別の名前空間の型をフィールドに
+# 持つが、その名前空間の型の置き場の単位が go-valid を並べていない）。
+
+# 1: type の型の置き場（基底が go で type を出力する最初の単位）。go-valid を並べていない
+[[emit]]
+namespace   = "type"
+transpilers = ["go"]
+out         = "gen/type"
+
+# 2: app。type の型の Validate を呼ぶ
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-valid"]
+out         = "gen/app"
+
+# 3: 同じ type を、go-valid を並べて出力する。app から見た置き場は 1 なので、これでは足りない
+[[emit]]
+namespace   = "type"
+transpilers = ["go", "go-valid"]
+out         = "gen/checked"
+
+# 4、5: front と、その型の名前空間 front.type。front.type の置き場（5 番目）は go-valid を並べているので、当たらない
+[[emit]]
+namespace   = "front"
+transpilers = ["go", "go-valid"]
+out         = "gen/front"
+
+[[emit]]
+namespace   = "front.type"
+transpilers = ["go", "go-valid"]
+out         = "gen/fronttype"

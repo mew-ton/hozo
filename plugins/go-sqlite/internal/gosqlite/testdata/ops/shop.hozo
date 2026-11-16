@@ -1,0 +1,72 @@
+// docs/plugin-go-sqlite.md「op の中身」の規則の各行。各 op の上のコメントが、その op が確かめる行。
+// どの op も規則に当たる（どの型も、基底の状態の単位を満たす）。
+
+/** 店の在庫 */
+namespace shop {
+  scalar ItemId extends string;
+  scalar Sku extends string;
+  scalar Shelf extends int;
+
+  model Item {
+    @db.key id: ItemId;
+    @db.unique sku: Sku;
+    shelf: Shelf;
+    name: string;
+    active: boolean;
+    addedAt: Time;
+    tags: string[];
+  }
+
+  /** キーが二つ */
+  model Stock {
+    @db.key item: ItemId;
+    @db.key shelf: Shelf;
+    count: int;
+  }
+
+  @db state items: list<Item>;
+  @db state stock: list<Stock>;
+
+  // 一行を引く: 対応した列が @db.key
+  export op findItem(id: ItemId): Item? reads items;
+  // 一行を引く: 対応した列が @db.unique
+  export op findBySku(sku: Sku): Item? reads items;
+  // 一行を引く: 引数が二つ（どれかが @db.key か @db.unique であればよい）。条件は引数の順
+  export op findOnShelf(shelf: Shelf, sku: Sku): Item? reads items;
+  // 一行を引く: 省略可能な引数（なければ、問い合わせずに nil）。核の型 string の列は一つなので、対応する
+  export op findNamed(id: ItemId?, name: string?): Item? reads items;
+  // 一行を引く: 複数の @db.key
+  export op findStock(item: ItemId, shelf: Shelf): Stock? reads stock;
+
+  // 並びを引く: 引数なし
+  export op listItems(): Item[] reads items;
+  // 並びを引く: 引数が一つ
+  export op listOnShelf(shelf: Shelf): Item[] reads items;
+  // 並びを引く: 真偽値の列と、省略可能な引数（なければ、問い合わせずに空の並び）
+  export op listActive(active: boolean, shelf: Shelf?): Item[] reads items;
+  // 並びを引く: Time の列（書く値は dbTime）
+  export op listAddedAt(at: Time): Item[] reads items;
+  // 並びを引く: JSON の列（書く値は json.Marshal した文字列）。省略可能な引数は nil のスライス
+  export op listTagged(tags: string[]?): Item[] reads items;
+
+  effect createItem on items.post;
+  effect updateItem on items.put;
+  effect deleteItem on items.delete;
+  effect updateStock on stock.put;
+  effect createStock on stock.post;
+  effect deleteStock on stock.delete;
+
+  // 足す
+  export op addItem(item: Item) effects createItem;
+  export op addStock(stock: Stock) effects createStock;
+  // 書き換える: キーが一つ
+  export op saveItem(item: Item) effects updateItem;
+  // 書き換える: キーが二つ
+  export op saveStock(stock: Stock) effects updateStock;
+  // 消す: 引数が一つ
+  export op removeItem(id: ItemId) effects deleteItem;
+  // 消す: 引数が二つ
+  export op removeFromShelf(shelf: Shelf, active: boolean) effects deleteItem;
+  // 消す: 省略可能な引数（なければ、何もしない）
+  export op removeStock(item: ItemId?, shelf: Shelf) effects deleteStock;
+}

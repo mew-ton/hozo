@@ -1,0 +1,18 @@
+// GOHTTP-6: 位置は op。
+namespace app {
+  model In {
+    @http.query id: string?;
+    @http.body item: string;
+  }
+  @http.get("/item")
+  export op read(in: In): string;
+
+  // 一つの op の @http.get と @http.post のうち、当たるのは GET の経路
+  @http.get("/both")
+  @http.post("/both")
+  export op both(in: In): string;
+
+  // @http.post なら、当たらない
+  @http.post("/item")
+  export op write(in: In): string;
+}

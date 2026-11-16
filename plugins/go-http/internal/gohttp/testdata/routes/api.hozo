@@ -1,0 +1,157 @@
+// docs/plugin-go-http.md「出力」「入力の読み方」「補助」の各行を、一か所ずつ使う。
+
+/** 共有の型と例外 */
+namespace type {
+  scalar Token extends string;
+  @valid.min(1)
+  scalar Page extends int;
+  scalar Ratio extends float;
+  scalar Flag extends boolean;
+  @valid.length(min: 1)
+  scalar Name extends string;
+
+  /** 品物 */
+  model Item {
+    @valid.length(min: 1) name: string;
+    @valid.min(1) quantity: int;
+    tags: string[];
+    at: Time?;
+  }
+
+  /** 見つからない */
+  @http.status(404)
+  exception NotFound;
+  /** 既にある（その場で書いた値を運ぶ） */
+  @http.status(409)
+  exception Conflict: { existing: string; count: int; };
+  /** 受け付けられない（宣言した model の値を運ぶ） */
+  @http.status(422)
+  exception Rejected: Item;
+  /** ステータスを持たない例外 */
+  exception Broken;
+
+  /** 別の名前空間の入力の model */
+  model Lookup {
+    @http.query id: string;
+    @http.header(name: "X-Trace") trace: string?;
+  }
+}
+
+/** 入力の読み方のすべて（validate は既定の false） */
+namespace api {
+  // 引数がなく、戻り値がある
+  @http.get("/health")
+  export op health(): string;
+
+  // ヘッダ（必須の string、必須の scalar、省略可能な string、既定値持ち）、二つ以上の @http.body（省略可能、既定値持ちを含む）、必須の boolean のクエリ
+  model CreateInput {
+    @http.header(name: "X-Tenant") tenant: string;
+    @http.header(name: "Authorization") token: type.Token;
+    @http.header(name: "X-Request-Id") requestId: string?;
+    @http.header(name: "Accept-Language") lang: string = "en";
+    @http.body item: type.Item;
+    @http.query dryRun: boolean;
+    @http.body note: string?;
+    @http.body copies: int = 1;
+    @http.body labels: Record<string, type.Name>;
+  }
+
+  /** 品物を作る */
+  @http.post("/items")
+  export op create(in: CreateInput): type.Item
+    throws type.Conflict | type.Rejected;
+
+  // クエリ: string / int / float / boolean と、その scalar。必須、省略可能、既定値持ち
+  model SearchInput {
+    @http.query q: string;
+    @http.query name: type.Name?;
+    @http.query tag: string?;
+    @http.query owner: type.Token = "nobody";
+    @http.query page: type.Page = 1;
+    @http.query limit: int?;
+    @http.query size: type.Page?;
+    @http.query offset: int;
+    @http.query min: float;
+    @http.query ratio: type.Ratio = 0.5;
+    @http.query max: float?;
+    @http.query scale: type.Ratio?;
+    @http.query exact: boolean = false;
+    @http.query deep: boolean?;
+    @http.query flag: type.Flag?;
+  }
+
+  /** 品物を探す。結果は配列（空でも [] を返す） */
+  @http.get("/items")
+  export op search(in: SearchInput): type.Item[]
+    throws type.Broken;
+
+  /** 最初の品物。省略可能な戻り値（なければ null）。入力は、別の名前空間の model */
+  @http.get("/items/first")
+  export op first(in: type.Lookup): type.Item?
+    throws type.NotFound;
+
+  // 本文が一つ（配列）。戻り値がない（204）
+  model ReplaceInput {
+    @http.body items: type.Item[];
+  }
+  @http.post("/items/replace")
+  export op replace(in: ReplaceInput)
+    throws type.NotFound;
+
+  // 引数も戻り値もない。/ で終わるパスは、そのパスだけに合う
+  @http.post("/reset/")
+  export op reset();
+
+  // 一つの op に、二つの経路
+  @http.get("/ping")
+  @http.post("/ping")
+  export op ping(): boolean;
+
+  // @http.* のない export の op は、経路にならない。@http.retry は読まない（印）
+  export op version(): string;
+  @http.retry(3)
+  export op flaky(): string;
+
+  // 内部の op
+  op helper(n: int): int;
+}
+
+/** 制約の検査（validate = true） */
+namespace strict {
+  // 本文が一つ: 違反の path は body と、その中のパス
+  model OrderInput {
+    @http.header(name: "Authorization") token: type.Token?;
+    @http.body lines: type.Item[];
+  }
+  @http.post("/orders")
+  export op order(in: OrderInput): int;
+
+  // 本文が二つ以上: body.<フィールド名>。クエリとヘッダの値の制約も確かめる
+  model EditInput {
+    @http.query page: type.Page = 1;
+    @http.header(name: "X-Name") name: type.Name?;
+    @http.body item: type.Item;
+    @http.body extra: type.Item?;
+  }
+  @http.post("/edit")
+  export op edit(in: EditInput);
+
+  // Validate を持たない入力は、validate = true でも確かめない
+  model PlainInput {
+    @http.query id: string?;
+  }
+  @http.get("/plain")
+  export op plain(in: PlainInput): string;
+}
+
+/** 入力も、@http.status を持つ例外もない */
+namespace bare {
+  exception Unknown;
+
+  @http.get("/")
+  export op root(): string;
+
+  @http.post("/touch")
+  export op touch()
+    throws Unknown;
+}

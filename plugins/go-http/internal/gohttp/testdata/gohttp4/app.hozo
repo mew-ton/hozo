@@ -1,0 +1,33 @@
+// GOHTTP-4: 位置は model。
+namespace app {
+  scalar Count extends int;
+  scalar When extends Time;
+  model Inner { x: int; }
+
+  model HeaderIn {
+    // @http.header は、string と、その省略可能だけ
+    @http.header(name: "X-Count") count: int;
+    @http.header(name: "X-Scalar") scalarCount: Count?;
+    @http.header(name: "X-Flag") flag: boolean?;
+    @http.header(name: "X-At") at: Time;
+    @http.header(name: "X-List") list: string[];
+    @http.header(name: "X-Inner") inner: Inner?;
+    @http.header(name: "X-Ok") ok: string?;
+  }
+  @http.get("/header")
+  export op header(in: HeaderIn);
+
+  model QueryIn {
+    // @http.query は、string / int / float / boolean と、その省略可能だけ
+    @http.query at: Time?;
+    @http.query when: When;
+    @http.query wait: Duration?;
+    @http.query list: string[];
+    @http.query later: int[]?;
+    @http.query attrs: Record<string, string>?;
+    @http.query inner: Inner?;
+    @http.query ok: Count?;
+  }
+  @http.get("/query")
+  export op query(in: QueryIn);
+}

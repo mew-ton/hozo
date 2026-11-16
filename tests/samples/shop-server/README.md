@@ -2,7 +2,7 @@
 
 小さな店のサーバー（ログイン、自分の情報、注文）を、サンプルを書きながら決めたこと（`docs/decisions.md`「サンプルを書きながら決めたこと（P の番号との対応）」の P1〜P39）を**当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）は実装が済んでいる。ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`）は、設計文書（`go-ratelimit` は、この README）があり、実装はまだない。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
+言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）は実装が済んでいる。ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`）は、設計文書（`go-ratelimit` は、この README）があり、どれも実装が済んでいる。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
 
 **生成するコードの規則の持ち主は、トランスパイラごとの設計文書**（「各トランスパイラの規則」）。この文書が持つのは、ファイルの出どころ、この仕様に固有の事実、サンプルの中のプラグイン `go-ratelimit` の規則、書いて分かったこと。期待する出力（`gen/`）は、設計文書の形のとおりに書いてある（文書と違うところは、残していない）。
 
@@ -10,16 +10,11 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 ## まだないもの
 
-このサンプルは、実装より先に書いてある（`docs/testing.md`「トランスパイラのテスト」）。今は、次がない。
+このサンプルは、実装より先に書いてある（`docs/testing.md`「トランスパイラのテスト」）。今は、ないものはない（五つのトランスパイラが、すべてそろった）。
 
-| ないもの | 作るもの | 今のテスト |
-|---|---|---|
-| 三つの相乗り `go-valid`、`go-sqlite`、`go-http` | リポジトリの `plugins/` のプラグイン（`docs/requirements.md`「作り直しの段階」の R2） | それぞれの `transpilers/<名前>` と、`transpilers/all` を飛ばす |
-| サンプルの中のプラグイン `go-ratelimit` の実装 | `plugins/go-ratelimit/` の `main` パッケージ（「サンプルの中のプラグイン」の「これから作るもの」） | `transpilers/go-ratelimit` と、`transpilers/all` を飛ばす |
+できたもの: hozoc 本体が、この `hozo.toml`（`[emit.options.<トランスパイラ>]`、基底と相乗り、語彙の名前空間 `rate` と型だけの名前空間 `type` の単位、型の置き場）と、`plugins/go-ratelimit/hozo-plugin.toml`（`requires`、`seams`、`protocol = "0.4"`）を読み、単位の継ぎ目を `View.config.seams` で渡すこと。基底 `go`（`docs/plugin-go.md`）。相乗り `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`）、`go-http`（`docs/plugin-go-http.md`）。サンプルの中のプラグイン `go-ratelimit` の実装（`plugins/go-ratelimit/` の `main` パッケージ。「サンプルの中のプラグイン」の「実装」）。
 
-できたもの: hozoc 本体が、この `hozo.toml`（`[emit.options.<トランスパイラ>]`、基底と相乗り、語彙の名前空間 `rate` と型だけの名前空間 `type` の単位、型の置き場）と、`plugins/go-ratelimit/hozo-plugin.toml`（`requires`、`seams`、`protocol = "0.4"`）を読み、単位の継ぎ目を `View.config.seams` で渡すこと。基底 `go`（`docs/plugin-go.md`）。
-
-`TestSamples` のサブテストは、最後の形で書いてあり、足りないものを名指しして飛ばす（`../README.md`「テスト」）。今、通るのは `check`（本物の `hozo.toml` で。まだないトランスパイラは、ファイルを返さない代役に置き換える）、`files`、`go`（このモジュールの `go vet` と `go test`）、`transpilers/go`（基底の出力が、期待する出力とバイト単位で同じ）。足りないものがそろえば、何も変えずに、すべてが走る。`sample.json` に、保留を書くところはない。
+`TestSamples` のサブテストは、最後の形で書いてあり、足りないものを名指しして飛ばす（`../README.md`「テスト」）。今は、飛ばしも、代役もなく、すべてが通る: `check`（本物の `hozo.toml` で）、`files`、`go`（このモジュールの `go vet` と `go test`）、五つの `transpilers/<名前>`（それぞれの出力が、期待する出力とバイト単位で同じ）、`transpilers/all`（出力の全体が同じ）。`sample.json` に、保留を書くところはない。
 
 ## 入力
 
@@ -85,7 +80,8 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 |---|---|---|
 | `plugins/go-ratelimit/hozo-plugin.toml` | マニフェスト: 語彙 `rate.hozo` と、トランスパイラ `go-ratelimit`（`language = "go"`、`requires = ["go"]`、`seams = ["rate.limited"]`） | ある |
 | `plugins/go-ratelimit/rate.hozo` | 語彙 `rate`: 例外 `LimitExceeded`（`@http.status(429)`）と、デコレータ `limited for op throws LimitExceeded prevents effects` | ある |
-| `plugins/go-ratelimit/main.go`（と、あれば下のパッケージ） | トランスパイラの実装 | **まだない**（下の「これから作るもの」） |
+| `plugins/go-ratelimit/main.go`、`emit.go` | トランスパイラの実装（下の「実装」） | ある |
+| `plugins/go-ratelimit/emit_test.go`、`testdata/` | 実装の単体テストと、その入力・ゴールデン（下の「実装」） | ある |
 | `gen/server/ratelimit.go` | 期待する出力 | ある |
 
 ### 語彙と、型の置き場
@@ -116,15 +112,19 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 - **`var _ Seams = RateSeams{}`** は、基底の `Seams` のメソッドが、すべて自分の対象のときだけ出す（単位に、継ぎ目を宣言したほかのトランスパイラがいれば、`RateSeams` だけでは `Seams` を満たさない。そのときは、人が、それぞれの型を一つの構造体に埋め込む。`docs/plugin-go.md`「継ぎ目の実装」）。
 - op の入力と出力の値は変えない（`docs/requirements.md`「書き方の指針」）: 受け取った引数を、そのまま `body` に渡し、`body` の戻り値を、そのまま返す。
 - コメントは、期待する出力のとおり（`RateLimiter` と、そのメソッド、`RateSeams`、`NewRateSeams` は決まった文。メソッドは `// <メソッド名> は op <FQN> に付いた @rate.limited の継ぎ目: limiter が許さなければ、中身を呼ばずに rate.LimitExceeded。許せば、中身をそのまま呼ぶ。`）。
-- オプションはない。診断（`[emit.options.go-ratelimit]` にキーがある、公開の名前が N の定義のパッケージの名前と当たる）の ID は、実装するときに決める。
+- オプションはない。診断は二つで、どちらも error（`emit` の応答の `errors`）: **GORATE-1** は、`[emit.options.go-ratelimit]` に、知らないキーがある（位置なし）。**GORATE-2** は、公開の名前（`RateLimiter`、`RateSeams`、`NewRateSeams`）が、N の定義のパッケージの名前（型、`New<Model>` など。`docs/plugin-go.md`「名前」）と当たる（位置は当たった宣言。対象がなく、ファイルを出さない出力には出ない）。warning は返さない。Dir(U, N) の上に `go.mod` がないことは、基底が報告し（GO-1）、このトランスパイラは何も返さない。
 
 ### 数え方は、人が渡す
 
 制限の数え方（何回まで、どの間隔で、何ごとに）は、仕様にも、プラグインにもない。`go-ratelimit` の出力は、インターフェース `server.RateLimiter` を出すだけで、実装は人が書く: `app/limiter.go` の `app.Limiter`（op ごとに、`Window` の間に `Max` 回まで）。組み立ては、`server.NewRateSeams(limiter)` を、`server.New` の最後の引数 `seams` に渡す一行（`app/onsqlite/compose.go:25`、`app/onmem/compose.go:21`）。葉の op（`Leaves`）と同じく、渡し忘れはコンパイルエラーになる。
 
-### これから作るもの
+### 実装
 
-`plugins/go-ratelimit/` に、`main` パッケージ（`example.com/shop-server/plugins/go-ratelimit`。マニフェストの `command` が `go run` で動かす）を作る。サンプルのモジュールの中のパッケージで、リポジトリの公開の SDK（`plugin`、`plugin/golang`）を、`go.mod` の `replace` を通して import する。ほかのトランスパイラと同じく、テストが先にある: `TestSamples` の `transpilers/go-ratelimit` が、`gen/server/ratelimit.go` とバイト単位で比べる。実装を置くと、`go`（このモジュールの `go vet` と `go test`）が、そのパッケージも見るようになる。
+`plugins/go-ratelimit/` の `main` パッケージ（`example.com/shop-server/plugins/go-ratelimit`。マニフェストの `command` が `go run` で動かす）。サンプルのモジュールの中のパッケージで、リポジトリの公開の SDK（`plugin`、`plugin/golang`）を、`go.mod` の `replace` を通して import する。`main.go` が入口、`emit.go` が中身。
+
+- **ブラックボックスのテスト**は、リポジトリの `TestSamples` の `transpilers/go-ratelimit`: `gen/server/ratelimit.go` とバイト単位で比べる。
+- **単体テスト**は `emit_test.go`（このモジュールの `go test ./...` が走らせる。`TestSamples` の `go`）。サンプルが使わない場合を、小さな入力 `testdata/<名前>/`（`hozo.toml` と `.hozo`）とゴールデン `testdata/<名前>/expected/` で確かめる: `seams`（戻り値のない op、零値の各行、当たる引数名、内部の op、継ぎ目を宣言したトランスパイラがもう一つある単位、対象のない名前空間）、`gorate1`、`gorate2`（診断）。生成したコードは、基底のプラグインをビルドして出させた基底のファイルと合わせて、一時のモジュールで `go vet` を通し、`testdata/seams/behavior_test.go` で動かす（制限を超えれば中身を呼ばず、零値と `rate.LimitExceeded` を返す。許せば、引数と戻り値をそのまま通す）。
+- 入力の `View`（`testdata/<名前>/views.json`）は、リポジトリの `tests/pluginviews_test.go` が置く（`../README.md`「置き方」）。仕様を変えたら、リポジトリのルートで `go test ./tests -run TestPluginViewFixtures -update`、その後に、このディレクトリで `GOTOOLCHAIN=local go test ./plugins/go-ratelimit -update`。
 
 本体の側に要るもの（マニフェストの `seams` と `requires`、`View.config.seams`、基底 `go` の二層と `Seams`）は、できている（「まだないもの」）。
 

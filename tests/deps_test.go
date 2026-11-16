@@ -166,7 +166,7 @@ func TestDependencyRules(t *testing.T) {
 		return strings.HasPrefix(pkg, "plugins/") || strings.HasPrefix(pkg, "tests/plugins/") || strings.Contains(pkg, "/plugins/")
 	}
 	// プラグインが使えるパッケージ（と、自分のディレクトリの下のパッケージ）
-	forPlugins := map[string]bool{"ir": true, "plugin": true, "plugin/golang": true, "runtime": true}
+	forPlugins := map[string]bool{"ir": true, "plugin": true, "plugin/golang": true, "plugin/govalid": true, "runtime": true}
 	for _, tests := range []bool{false, true} {
 		for pkg, deps := range moduleImports(t, tests) {
 			for _, dep := range deps {
@@ -174,15 +174,15 @@ func TestDependencyRules(t *testing.T) {
 				if strings.HasPrefix(dep, "internal/") && !strings.HasPrefix(pkg, "internal/") && pkg != "cmd/hozoc" && pkg != "tests" {
 					t.Errorf("%s が %s を import している（internal/ は cmd/hozoc、internal/、tests からだけ）", pkg, dep)
 				}
-				// プラグインが使えるのは ir、plugin、plugin/golang、runtime
+				// プラグインが使えるのは ir、plugin、plugin/golang、plugin/govalid、runtime
 				if isPlugin(pkg) {
 					own := strings.SplitN(strings.TrimPrefix(pkg, "plugins/"), "/", 2)[0]
 					if !forPlugins[dep] && !(strings.HasPrefix(pkg, "plugins/") && strings.HasPrefix(dep, "plugins/"+own+"/")) {
-						t.Errorf("プラグイン %s が %s を import している（使えるのは ir、plugin、plugin/golang、runtime）", pkg, dep)
+						t.Errorf("プラグイン %s が %s を import している（使えるのは ir、plugin、plugin/golang、plugin/govalid、runtime）", pkg, dep)
 					}
 				}
 				// 公開のパッケージは internal/ にも、hozoc の側のパッケージにも依存しない
-				if public := map[string]bool{"ir": true, "plugin": true, "plugin/golang": true, "runtime": true, "vocab": true}; public[pkg] && !public[dep] {
+				if public := map[string]bool{"ir": true, "plugin": true, "plugin/golang": true, "plugin/govalid": true, "runtime": true, "vocab": true}; public[pkg] && !public[dep] {
 					t.Errorf("公開のパッケージ %s が %s を import している", pkg, dep)
 				}
 			}

@@ -1,0 +1,24 @@
+// 元の scalar のパッケージの名前が、生成したコードの名前と当たる入力。
+namespace v {
+  @valid.min(1)
+  scalar Major extends int;
+}
+namespace violations {
+  @valid.length(min: 1)
+  scalar Reason extends string;
+}
+namespace errors {
+  @valid.max(599)
+  scalar Code extends int;
+}
+
+namespace app {
+  // レシーバ v と当たる: レシーバの方の末尾に _ を足す
+  scalar Version extends v.Major;
+  // 局所の変数 violations と当たる
+  scalar Why extends violations.Reason;
+  // 標準ライブラリのパッケージ errors と当たる: 名前空間のパッケージの方に 2 が付く
+  @valid.min(100)
+  scalar Status extends errors.Code;
+  model Report { version: Version; why: Why?; status: Status; }
+}

@@ -1,0 +1,25 @@
+# go-ratelimit の単体テストの入力: GORATE-2（公開の名前が当たる）。条件ごとに名前空間が一つ。
+[[emit]]
+namespace   = "types"
+transpilers = ["go", "go-ratelimit"]
+out         = "gen/types"
+
+[[emit]]
+namespace   = "funcs"
+transpilers = ["go", "go-ratelimit"]
+out         = "gen/funcs"
+
+[[emit]]
+namespace   = "quiet"
+transpilers = ["go", "go-ratelimit"]
+out         = "gen/quiet"
+
+[[emit]]
+namespace   = "clean"
+transpilers = ["go", "go-ratelimit"]
+out         = "gen/clean"
+
+[[emit]]
+namespace   = "rate"
+transpilers = ["go"]
+out         = "gen/rate"

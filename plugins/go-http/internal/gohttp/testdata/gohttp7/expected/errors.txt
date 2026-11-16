@@ -1,0 +1,5 @@
+GOHTTP-7	app.relative	op app.relative の @http.get のパス "items" が / で始まらない
+GOHTTP-7	app.empty	op app.empty の @http.post のパス "" が / で始まらない
+GOHTTP-7	app.absolute	op app.absolute の @http.get のパス "http://example.com/items" が / で始まらない
+GOHTTP-7	app.byId	op app.byId の @http.get のパス "/items/{id}" が { か } を含む（パスの中の値を入力のフィールドに結ぶ語彙が、まだない）
+GOHTTP-7	app.brace	op app.brace の @http.post のパス "/items/}" が { か } を含む（パスの中の値を入力のフィールドに結ぶ語彙が、まだない）

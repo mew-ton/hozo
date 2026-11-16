@@ -1,0 +1,4 @@
+GOVALID-3	app.User	model app.User のフィールド email の型 type.Email は Validate を持つが、名前空間 type の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（メソッドは、型の定義のパッケージにしか書けない）
+GOVALID-3	app.User	model app.User のフィールド homes の型 type.Address は Validate を持つが、名前空間 type の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（メソッドは、型の定義のパッケージにしか書けない）
+GOVALID-3	app.User	model app.User のフィールド byId の型 type.Address は Validate を持つが、名前空間 type の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（メソッドは、型の定義のパッケージにしか書けない）
+GOVALID-3	app.WorkEmail	scalar app.WorkEmail の元の型 type.Email は Validate を持つが、名前空間 type の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（メソッドは、型の定義のパッケージにしか書けない）

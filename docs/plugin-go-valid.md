@@ -43,8 +43,9 @@ requires = ["go"]
 
 - メソッドは、宣言順に、型ごとに一つ: `func (v <Scalar>) Validate() error`、`func (m <Model>) Validate() error`。値のレシーバ。入口のパッケージの別名からも、そのまま呼べる。
 - 違反は `*runtime.ValidationError`（「runtime」）で返す。違反がなければ `nil`。違反は、確かめた順にすべて集める（最初の一つで止めない）。
-- **別の名前空間の型**の `Validate` は、その型のメソッドを呼ぶ。メソッドは型の定義のパッケージにしか書けないので、その名前空間の型の置き場（`docs/config.md`「型の置き場」）の単位も、`transpilers` に `go-valid` を並べていなければならない。並べていなければ GOVALID-3（黙って確かめずに済ませない）。
-- 非公開の名前は `valid` で始める。補助の関数 `validAppend` は、model の `Validate` が使うときだけ、パッケージごとに一つ、ファイルの末尾に出す。`pattern` の正規表現は、パッケージの変数 `validPattern<型名>`（フィールドの制約なら `validPattern<Model><フィールド名を先頭大文字に>`）に `regexp.MustCompile(…)` で一度だけ作り、ファイルの先頭（import の後）に宣言順で並べる。
+- **別の名前空間の型**の `Validate` は、その型のメソッドを呼ぶ。メソッドは型の定義のパッケージにしか書けないので、その名前空間の型の置き場（`docs/config.md`「型の置き場」）の単位も、`transpilers` に `go-valid` を並べていなければならない。並べていなければ GOVALID-3（黙って確かめずに済ませない）。scalar の元の型（「scalar」）が、別の名前空間の scalar のときも同じ。
+- 非公開の名前は `valid` で始める。補助の関数は、`validAppend`（「runtime」）と `validKeys`（record のキーを辞書順に並べる。「model」）の二つで、使うときだけ、パッケージごとに一つずつ、この順でファイルの末尾に出す（`validAppend` は、元の scalar が `Validate` を持つ scalar も使う）。`pattern` の正規表現は、パッケージの変数 `validPattern<型名>`（フィールドの制約なら `validPattern<Model><フィールド名を先頭大文字に>`）に `regexp.MustCompile(…)` で一度だけ作り、ファイルの先頭（import の後）に宣言順で並べる。変数の名前が当たれば（model `Item` のフィールド `color` と、scalar `ItemColor`）、後ろの方に `2`、`3`、… を付ける。
+- メソッドの中の局所の名前（レシーバ `v` / `m`、違反を集める `violations`）が、このファイルが import するパッケージの名前（元の scalar の名前空間のパッケージ）と当たれば、局所の名前の方の末尾に `_` を足す（`docs/plugin-go.md`「名前」の「局所の名前」と同じ扱い）。
 
 ### scalar
 
@@ -92,13 +93,16 @@ func (m User) Validate() error {
 |---|---|
 | `optional(T)`（Go でポインタ） | `if m.<F> != nil { … }` の中で、値を `*m.<F>` として、上の 1 と 2 |
 | `array(T)` | `for i0, x0 := range m.<F> { … }` の中で、要素 `x0` について 1。`Path` は `"<フィールド名>["+strconv.Itoa(i0)+"]"`。入れ子の配列は `i1`、`x1`、…。配列そのものに付いた `@valid.*` は GOVALID-1（下の表の、型の合わない制約） |
-| `record(K, T)` | `for k0, x0 := range m.<F> { … }` を、キーの辞書順に回して（キーを並べ替えてから）、値 `x0` について 1。`Path` は `"<フィールド名>["+string(k0)+"]"` |
+| `record(K, T)` | `for _, k0 := range validKeys(m.<F>) { x0 := m.<F>[k0]; … }`（キーの辞書順に回す。`validKeys` は、キーを並べ替えて返す補助の関数）の中で、値 `x0` について 1。`Path` は `"<フィールド名>["+string(k0)+"]"`。キーは確かめない。record そのものに付いた `@valid.*` は GOVALID-1 |
+
+- 省略可能な array と record は、Go でポインタにならない（`docs/plugin-go.md`「型」）ので、`nil` を確かめずに、上の array と record の行のまま回す。
+- 包まれた型は、入れ子にできる（`T?[]`、`Record<K, T[]>`）。入れ子の番号は、配列と record で通しに振る（`x0` の中の `k1`、`x1`）。
 
 ### 制約
 
 | `valid` | 条件（違反のとき真） | 付けられる元の型（違えば GOVALID-1） |
 |---|---|---|
-| `min(value)` | `<数の型>(<値>) < <value>` | `int`（`int64(…)`）か `float`（`float64(…)`） |
+| `min(value)` | `<数の型>(<値>) < <value>` | `int`（`int64(…)`）か `float`（`float64(…)`）。`int` に付けた `value` が整数でなければ GOVALID-1 |
 | `max(value)` | `<数の型>(<値>) > <value>` | 同上 |
 | `length(min?, max?)` | `l := utf8.RuneCountInString(string(<値>)); l < <min> \|\| l > <max>`（片方だけなら、その比較だけ。どちらもなければ GOVALID-1） | `string` |
 | `pattern(regex)` | `!validPattern….MatchString(string(<値>))`。RE2 で解釈できなければ GOVALID-1 | `string` |
@@ -132,10 +136,13 @@ func CheckFormat(name, v string) bool                   // "email" / "uri" / "uu
 
 | ID | 重さ | 意味 |
 |---|---|---|
-| GOVALID-1 | error | 制約が元の型に合わない（「制約」の表）、`length` に `min` も `max` もない、`pattern` が RE2 でない、`format` の名前を知らない、配列か record そのものに制約が付いている。位置は、付いた scalar か model |
+| GOVALID-1 | error | 制約が元の型に合わない（「制約」の表）、元の型が `int` の `min` / `max` の `value` が整数でない、`length` に `min` も `max` もない、`pattern` が RE2 でない、`format` の名前を知らない、配列か record そのものに制約が付いている。位置は、付いた scalar か model |
 | GOVALID-2 | error | フィールドの既定値が、その型かフィールドの制約に合わない。位置は model |
-| GOVALID-3 | error | `Validate` を持つ別の名前空間の型をフィールドに持つが、その名前空間の型の置き場の単位が `go-valid` を並べていない。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は model |
+| GOVALID-3 | error | `Validate` を持つ別の名前空間の型を、フィールドに持つか、scalar の元の型にするが、その名前空間の型の置き場の単位が `go-valid` を並べていない。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は model（元の型なら、その scalar） |
 | GOVALID-4 | error | フィールドの型が union で、そのアームに `Validate` を持つ型がある（「Validate を持つ型」）。位置は model |
 | GOVALID-5 | error | 標準でない `valid` の制約（利用者が `valid` に足したデコレータ）が付いている。位置は、付いた scalar か model |
 | GOVALID-6 | error | `Validate` を持つ model が、`validate` という名前のフィールドを持つ（Go で、フィールド `Validate` とメソッド `Validate` が当たる）。位置は model |
 | GOVALID-7 | error | `[emit.options.go-valid]` に、知らないキーがある。位置なし |
+
+- Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。置き場を求められないので、GOVALID-3 は確かめない。ほかの診断は、そのときも返す。
+- 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

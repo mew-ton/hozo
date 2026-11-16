@@ -1,0 +1,17 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「補助」の、当たる名前
+# （引数、読み書きの途中の変数、同じ名前の model）と、内側のフォルダを持つ出力（db.go は入口のパッケージ）。
+[[emit]]
+namespace   = "vault"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/vault"
+
+# vault が使う型の置き場（同じ名前の model Entry を持つ二つの名前空間）
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go"]
+out         = "gen/b"

@@ -1,0 +1,7 @@
+// GORATE-1（../../../../README.md「サンプルの中のプラグイン」の「出力の規則」）: go-ratelimit にオプションはない
+// （数え方は、仕様にもプラグインにもなく、人が RateLimiter で渡す）。
+
+namespace shop {
+  @rate.limited
+  export op ping();
+}

@@ -1,0 +1,5 @@
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-6（@http.get の op の入力が @http.body のフィールドを持つ）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/app"

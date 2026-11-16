@@ -1,0 +1,6 @@
+GOSQL-3	app.Bad	model app.Bad のフィールド shape の型 app.Shape は、列にできない（union と、union を中に持つ型。JSON での union の形を、まだ決めていない）
+GOSQL-3	app.Bad	model app.Bad のフィールド maybe の型 app.Shape? は、列にできない（union と、union を中に持つ型。JSON での union の形を、まだ決めていない）
+GOSQL-3	app.Bad	model app.Bad のフィールド shapes の型 app.Shape[] は、列にできない（union と、union を中に持つ型。JSON での union の形を、まだ決めていない）
+GOSQL-3	app.Bad	model app.Bad のフィールド byName の型 Record<string, app.Shape> は、列にできない（union と、union を中に持つ型。JSON での union の形を、まだ決めていない）
+GOSQL-3	app.Bad	model app.Bad のフィールド frame の型 app.Frame は、列にできない（union と、union を中に持つ型。JSON での union の形を、まだ決めていない）
+GOSQL-3	app.Bad	model app.Bad のフィールド albums の型 app.Album[]? は、列にできない（union と、union を中に持つ型。JSON での union の形を、まだ決めていない）

@@ -1,0 +1,32 @@
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-http.md「出力」「入力の読み方」「補助」の各行
+# （サンプルが使わない、複数の @http.body・必須のヘッダとクエリ・int 以外のクエリ・値を運ぶ例外・省略可能な戻り値・validate = false を含む）。
+
+# 1: 共有の型と例外。api と strict の Validate が、ここの型のメソッドを呼ぶ
+[[emit]]
+namespace   = "type"
+transpilers = ["go", "go-valid"]
+out         = "gen/type"
+
+# 2: 入力の読み方のすべて。オプションを書かない（validate は既定の false）。内部の op を持つので、定義は内側のパッケージ
+[[emit]]
+namespace   = "api"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/api"
+
+# 3: 制約の検査（validate = true）
+[[emit]]
+namespace   = "strict"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/strict"
+
+[emit.options.go-http]
+validate = true
+
+# 4: 入力も、@http.status を持つ例外もない名前空間（補助は、使うものだけ）
+[[emit]]
+namespace   = "bare"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/bare"
+
+[emit.options.go-http]
+validate = true

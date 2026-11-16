@@ -1,0 +1,4 @@
+GOVALID-5	app.Jan	scalar app.Jan に、標準でない valid の制約 @valid.checkDigit が付いている（利用者が valid に足した制約を確かめる形は、まだない）
+GOVALID-5	app.Order	model app.Order のフィールド qty に、標準でない valid の制約 @valid.even が付いている（利用者が valid に足した制約を確かめる形は、まだない）
+GOVALID-5	app.Order	model app.Order のフィールド code に、標準でない valid の制約 @valid.checkDigit が付いている（利用者が valid に足した制約を確かめる形は、まだない）
+GOVALID-5	app.Order	model app.Order のフィールド boxes に、標準でない valid の制約 @valid.even が付いている（利用者が valid に足した制約を確かめる形は、まだない）

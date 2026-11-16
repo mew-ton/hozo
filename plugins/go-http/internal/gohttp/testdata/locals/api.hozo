@@ -1,0 +1,54 @@
+// 名前空間のパッケージの名前が、ハンドラの中の局所の名前（w、r、in、out、err、v、x、q、body、mux）と当たる入力。
+namespace v {
+  scalar Token extends string;
+}
+namespace w {
+  @http.status(404)
+  exception NotFound;
+}
+namespace out {
+  model Item { @valid.length(min: 1) name: string; }
+}
+namespace x {
+  scalar Page extends int;
+}
+namespace in {
+  model Note { text: string; }
+}
+namespace err {
+  @http.status(409)
+  exception Conflict: in.Note;
+}
+namespace body {
+  scalar Label extends string;
+}
+namespace mux {
+  scalar Trace extends string;
+}
+namespace q {
+  scalar Flag extends boolean;
+}
+namespace r {
+  scalar Ratio extends float;
+}
+namespace strconv {
+  scalar Size extends int;
+}
+
+namespace api {
+  model In {
+    @http.header(name: "Authorization") token: v.Token?;
+    @http.header(name: "X-Trace") trace: mux.Trace;
+    @http.query page: x.Page?;
+    @http.query size: strconv.Size = 10;
+    @http.query flag: q.Flag?;
+    @http.query ratio: r.Ratio;
+    @http.body item: out.Item;
+    @http.body note: in.Note?;
+    @http.body label: body.Label?;
+  }
+
+  @http.post("/items")
+  export op create(in: In): out.Item[]
+    throws w.NotFound | err.Conflict;
+}

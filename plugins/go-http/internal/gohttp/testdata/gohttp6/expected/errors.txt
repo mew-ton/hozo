@@ -1,0 +1,2 @@
+GOHTTP-6	app.read	@http.get の op app.read の入力 app.In が、@http.body のフィールドを持つ（GET の要求は、本文を持たない）
+GOHTTP-6	app.both	@http.get の op app.both の入力 app.In が、@http.body のフィールドを持つ（GET の要求は、本文を持たない）

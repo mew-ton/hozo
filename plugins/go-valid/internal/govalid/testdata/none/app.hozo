@@ -1,0 +1,8 @@
+// Validate を持つ型が一つもない: 制約のない scalar と model、union、exception、op。
+namespace app {
+  scalar Id extends string;
+  model User { @db.key id: Id; name: string; tags: string[]; }
+  union Page { Ready: { title: string; }; Empty: User; }
+  exception Missing: { id: Id; };
+  export op find(id: Id): User? ;
+}

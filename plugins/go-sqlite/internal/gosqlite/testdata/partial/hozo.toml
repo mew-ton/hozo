@@ -1,0 +1,6 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「状態ごとの型」の
+# 「規則に当たらない op があるとき」と、「op の中身」の条件の、当たらない側。
+[[emit]]
+namespace   = "lib"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/lib"

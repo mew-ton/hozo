@@ -1,0 +1,41 @@
+// GOVALID-2: 位置は model。
+namespace app {
+  @valid.min(1)
+  scalar Page extends int;
+  @valid.format("email")
+  scalar Email extends string;
+  @valid.length(max: 3)
+  scalar Short extends string;
+  @valid.pattern("^[a-z]+$")
+  scalar Tiny extends Short;
+
+  model Paging {
+    // 型（scalar）の制約に合わない
+    page: Page = 0;
+    contact: Email = "nobody";
+    // 元の scalar の制約に合わない（辿ったすべての scalar の制約で確かめる）
+    code: Tiny = "toolong";
+    // フィールドに付いた制約に合わない
+    @valid.max(100) size: int = 500;
+    @valid.pattern("^[a-z]+$") sort: string = "ID";
+    @valid.min(0.5) ratio: float = 0.25;
+    @valid.length(min: 2, max: 4) tag: string = "x";
+    // 型とフィールドの両方に合わない
+    @valid.length(min: 5) both: Tiny = "ABCD";
+    // 合う既定値は、診断にならない
+    ok: Page = 3;
+    @valid.length(min: 2) name: Tiny = "abc";
+    plain: string = "";
+  }
+
+  // 継承した model は、受け継いだ既定値を、自分の位置で確かめる
+  model Small extends Paging {
+    override contact: never;
+    override code: never;
+    override size: never;
+    override sort: never;
+    override ratio: never;
+    override tag: never;
+    override both: never;
+  }
+}

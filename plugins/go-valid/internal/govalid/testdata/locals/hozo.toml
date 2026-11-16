@@ -1,0 +1,21 @@
+# plugins/go-valid の単体テストの入力（docs/testing.md「単体テスト」）: 元の scalar のパッケージの名前が、生成したコードの局所の名前
+# （レシーバ v、違反を集める violations）や、標準ライブラリのパッケージの名前（errors）と同じとき。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-valid"]
+out         = "gen/app"
+
+[[emit]]
+namespace   = "v"
+transpilers = ["go", "go-valid"]
+out         = "gen/v"
+
+[[emit]]
+namespace   = "violations"
+transpilers = ["go", "go-valid"]
+out         = "gen/violations"
+
+[[emit]]
+namespace   = "errors"
+transpilers = ["go", "go-valid"]
+out         = "gen/errors"

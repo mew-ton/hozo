@@ -1,0 +1,83 @@
+// go-ratelimit の「出力の規則」（../../../../README.md「サンプルの中のプラグイン」）を、一か所ずつ使う。
+// 各 op の上のコメントが、その op が確かめる行。
+
+/** テストの語彙 */
+namespace t {
+  /** 継ぎ目を要る（go-trace） */
+  decorator traced;
+}
+
+namespace type {
+  scalar ItemId extends string;
+  model Item { id: ItemId; name: string; }
+}
+
+/** 継ぎ目を持つ op の名前空間。内部の op（audit）を持つので、出力は内側のフォルダと入口に分かれる */
+namespace shop {
+  model Receipt { item: type.Item; count: int; }
+  state items: list<type.Item>;
+  effect addItem on items.post;
+
+  // 配線: 戻り値は model（零値は構造体）。引数は、別の名前空間の型
+  @rate.limited
+  export op buy(id: type.ItemId, count: int): Receipt
+  {
+    const item = find(id);
+    return { item: item, count: count };
+  }
+
+  // 葉（Leaves）: 引数も戻り値もない
+  @rate.limited
+  export op ping();
+
+  // 葉（状態の単位の命令）: 戻り値がない
+  @rate.limited
+  export op add(item: type.Item) effects addItem;
+
+  // 葉（状態の単位の問い合わせ）: 戻り値の零値が、ポインタ（nil）
+  @rate.limited
+  export op lookup(id: type.ItemId): type.Item? reads items;
+
+  // 戻り値の零値: スライス（nil）、文字列（""）、数（0）、真偽値（false）、time.Time（time.Time{}）、scalar（""）
+  @rate.limited
+  export op names(): string[];
+  @rate.limited
+  export op title(): string;
+  @rate.limited
+  export op total(): int;
+  @rate.limited
+  export op open(): boolean;
+  @rate.limited
+  export op since(): Time;
+  @rate.limited
+  export op firstId(): type.ItemId;
+
+  // 引数の名前が、このファイルが使う名前（レシーバの s、ctx、import するパッケージの名前）と当たれば、末尾に _。
+  // body という名前の引数があれば、op の中身の引数の方に _ を足す
+  @rate.limited
+  export op clash(s: string, ctx: string, body: string, context: string, pkgtype: type.ItemId): string;
+
+  // 内部の op（export がない）にも、継ぎ目は付く
+  @rate.limited
+  op audit(note: string);
+
+  // @rate.limited のない op は、対象でない
+  export op find(id: type.ItemId): type.Item;
+}
+
+/** 継ぎ目を宣言したトランスパイラが二つある単位の名前空間 */
+namespace mixed {
+  // 二つの継ぎ目: 自分の分（@rate.limited）だけを出す
+  @t.traced
+  @rate.limited
+  export op both(n: int): int;
+
+  // ほかのトランスパイラの継ぎ目だけの op は、対象でない
+  @t.traced
+  export op traced(n: int): int;
+}
+
+/** @rate.limited の付いた op のない名前空間 */
+namespace plain {
+  export op hello(name: string): string;
+}

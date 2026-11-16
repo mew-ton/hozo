@@ -1,0 +1,6 @@
+// GOSQL-6（docs/plugin-go-sqlite.md「マニフェスト」）: go-sqlite にオプションはない。
+
+namespace app {
+  model Row { @db.key id: string; }
+  @db state rows: list<Row>;
+}

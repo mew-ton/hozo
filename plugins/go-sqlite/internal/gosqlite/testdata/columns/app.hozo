@@ -1,0 +1,114 @@
+// docs/plugin-go-sqlite.md「表」: 列の型の表の各行（核の型と scalar）、省略可能な列、制約。
+// どの表にも「足す」op を置く（dbArgs<Model> が出る）。読むのは、形で決まる問い合わせ Get。
+
+namespace kinds {
+  scalar Name extends string;
+  scalar Count extends int;
+  scalar Ratio extends float;
+  scalar Flag extends boolean;
+  scalar Span extends Duration;
+  scalar Stamp extends Time;
+  /** scalar の元が scalar（元の核の型は string） */
+  scalar Label extends Name;
+
+  model Tag { key: string; value: string; }
+}
+
+/** 列の型 */
+namespace app {
+  /** 核の型の列 */
+  model Core {
+    @db.key s: string;
+    i: int;
+    f: float;
+    b: boolean;
+    d: Duration;
+    t: Time;
+  }
+
+  /** scalar の列（元の核の型で見る） */
+  model Named {
+    @db.key name: kinds.Name;
+    count: kinds.Count;
+    ratio: kinds.Ratio;
+    flag: kinds.Flag;
+    span: kinds.Span;
+    stamp: kinds.Stamp;
+    label: kinds.Label;
+  }
+
+  /** JSON の列（array、record、model）。自分を指す model も JSON */
+  model Doc {
+    tags: string[];
+    attrs: Record<string, int>;
+    tag: kinds.Tag;
+    nested: kinds.Tag[];
+    tree: Tree;
+  }
+  model Tree { label: string; children: Tree[]; }
+
+  /** 省略可能な列: 核の型、scalar、Time、JSON の型 */
+  model Sparse {
+    s: string?;
+    i: int?;
+    f: float?;
+    b: boolean?;
+    d: Duration?;
+    t: Time?;
+    name: kinds.Name?;
+    count: kinds.Count?;
+    ratio: kinds.Ratio?;
+    flag: kinds.Flag?;
+    span: kinds.Span?;
+    stamp: kinds.Stamp?;
+    tags: string[]?;
+    attrs: Record<string, int>?;
+    tag: kinds.Tag?;
+  }
+
+  /** 複数の @db.key（表の末尾の PRIMARY KEY）と @db.unique */
+  model Pair {
+    @db.key left: kinds.Name;
+    @db.key right: kinds.Count;
+    @db.unique note: string;
+  }
+
+  /** 二つの表の要素（@db.ref の先にならない） */
+  model Shared { @db.key id: string; }
+
+  /** @db.ref: 先の表がちょうど一つで、キーがちょうど一つのときだけ REFERENCES */
+  model Link {
+    @db.ref(Core) core: string;
+    @db.ref(Pair) pair: kinds.Name;
+    @db.ref(kinds.Tag) tag: string;
+    @db.ref(Shared) shared: string;
+    @db.key @db.ref(Link) self: string?;
+  }
+
+  @db state cores: list<Core>;
+  @db state nameds: list<Named>;
+  @db state docs: list<Doc>;
+  @db state sparses: list<Sparse>;
+  @db state pairs: list<Pair>;
+  @db state sharedA: list<Shared>;
+  @db state sharedB: list<Shared>;
+  @db state links: list<Link>;
+  /** @db のない状態は、表にならない */
+  state plain: list<Core>;
+
+  effect createCore on cores.post;
+  effect createNamed on nameds.post;
+  effect createDoc on docs.post;
+  effect createSparse on sparses.post;
+  effect createPair on pairs.post;
+  effect createSharedA on sharedA.post;
+  effect createLink on links.post;
+
+  export op addCore(core: Core) effects createCore;
+  export op addNamed(named: Named) effects createNamed;
+  export op addDoc(doc: Doc) effects createDoc;
+  export op addSparse(sparse: Sparse) effects createSparse;
+  export op addPair(pair: Pair) effects createPair;
+  export op addSharedA(shared: Shared) effects createSharedA;
+  export op addLink(link: Link) effects createLink;
+}

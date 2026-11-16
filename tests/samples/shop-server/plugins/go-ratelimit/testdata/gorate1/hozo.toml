@@ -1,0 +1,14 @@
+# go-ratelimit の単体テストの入力: GORATE-1（[emit.options.go-ratelimit] に、知らないキーがある）。
+[[emit]]
+namespace   = "shop"
+transpilers = ["go", "go-ratelimit"]
+out         = "gen/shop"
+
+[emit.options.go-ratelimit]
+max    = 3
+window = "1m"
+
+[[emit]]
+namespace   = "rate"
+transpilers = ["go"]
+out         = "gen/rate"

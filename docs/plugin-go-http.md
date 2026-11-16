@@ -32,7 +32,7 @@ requires = ["go", "go-valid"]
 
 ## 対象
 
-N の単位の対象の op（`docs/config.md`「in」）のうち、`@http.get` か `@http.post` の付いたものが**経路の op**。一つもなければ、ファイルを出さず warning を一つ返す。
+N の単位の対象の op（`docs/config.md`「in」）のうち、`@http.get` か `@http.post` の付いたものが**経路の op**。一つもなければ、ファイルを出さず warning を一つ返す。経路は、op に付いた `@http.get` / `@http.post` ごとに一つ（両方が付いた op は、書かれた順に二つの経路を持つ）。
 
 - **経路の op は `export` が付いていなければならない。** ハンドラは、名前空間の外からの呼び出しを op に届ける入口で、op は基底の入口の `Ops`（`export` の op だけ）のメソッドとして呼ぶ。付いていなければ GOHTTP-1。黙ってその経路を飛ばすことはしない（仕様に書いた経路が、気づかないうちにサーバーから消える）。`@http.*` が付いていれば `export` と見なすこともしない（語彙のデコレータが、本体の検査の結果を変えることになる）。
 - 経路の op の引数は、0 個か、model 一つ（**入力の model**）。それ以外は GOHTTP-2。
@@ -87,8 +87,9 @@ func NewHandler(ops Ops) http.Handler {
 
 - `NewHandler` が受け取るのは、基底の入口の `Ops`（`New` の戻り値を、そのまま渡す）。経路の op だけのインターフェースは作らない。
 - コメントの二行目は、`validate = true` のときだけ。経路の一覧は、`<メソッド> <パス>` を、いちばん長いものに合わせて空白で埋め、二つの空白の後に op の FQN。
-- 経路ごとに、`// <op の FQN>` のコメントと、`mux.HandleFunc("<メソッド> <パス>", …)`。メソッドは `@http.get` なら `GET`、`@http.post` なら `POST`。経路の間は一行空ける。
+- 経路ごとに、`// <op の FQN>` のコメントと、`mux.HandleFunc("<メソッド> <パス>", …)`。メソッドは `@http.get` なら `GET`、`@http.post` なら `POST`。経路の間は一行空ける。`/` で終わるパス（`/` そのものを含む）は、`http.ServeMux` のパターンではその下のすべてのパスに合ってしまうので、パターンの末尾に `{$}` を足して、そのパスだけに合わせる（`"GET /{$}"`。コメントの経路の一覧には、仕様のパスのまま書く）。
 - op には `r.Context()` を渡す（経路の op はデコレータを持つので、いつも `ctx` を取り、`error` を返す）。
+- `NewHandler` とハンドラと `httpWriteError` の中の局所の名前（`ops`、`mux`、`w`、`r`、`in`、`out`、`err`、`v`、`x`、`q`、`body`、`e0` など）が、このファイルが import するパッケージの名前（型と例外の名前空間のパッケージ）と当たれば、局所の名前の方の末尾に `_` を足す（`docs/plugin-go.md`「名前」の「局所の名前」と同じ扱い）。
 
 ハンドラの中は、この順。
 
@@ -103,10 +104,10 @@ func NewHandler(ops Ops) http.Handler {
 | フィールド | Go |
 |---|---|
 | `@http.header(name)`、省略可能 | `if v := r.Header.Get("<name>"); v != "" { x := <型>(v); in.<F> = &x }`（核の `string` なら `in.<F> = &v`） |
-| `@http.header(name)`、必須 | `v := r.Header.Get("<name>")` が空なら、文言 `header <name>: missing`。あれば `in.<F> = <型>(v)` |
+| `@http.header(name)`、省略可能でない | `if v := r.Header.Get("<name>"); v != "" { in.<F> = <型>(v) }`。なければ（空なら）、既定値持ちのフィールドは初めの値のまま、省略可能でも既定値持ちでもないフィールドは、文言 `header <name>: missing` |
 | `@http.query` | `if q := r.URL.Query(); q.Has("<フィールド名>") { … }` の中で、`q.Get("<フィールド名>")` をフィールドの型で読んで入れる。なければ、初めの値のまま。省略可能でも既定値持ちでもないフィールドで、なければ、文言 `query <フィールド名>: missing` |
 | `@http.body`（入力の model に一つだけ） | `httpReadBody(r, &in.<F>)`。本文の JSON が、そのフィールドの値 |
-| `@http.body`（二つ以上） | 本文は、フィールド名をキーにした JSON のオブジェクト。`@http.body` のフィールドだけを、同じ名前と型と `json` タグで持つ無名の構造体 `body` に、初めの値を入れてから `httpReadBody(r, &body)` で読み、フィールドに写す |
+| `@http.body`（二つ以上） | 本文は、フィールド名をキーにした JSON のオブジェクト。`@http.body` のフィールドだけを、同じ名前と型と `json` タグで持つ無名の構造体 `body` に、初めの値を入れてから `httpReadBody(r, &body)` で読み、フィールドに写す。読むのは、最初の `@http.body` のフィールドの位置で、一度だけ |
 
 - クエリの値の読み方: `string` はそのまま、`int` は `strconv.ParseInt(v, 10, 64)`、`float` は `strconv.ParseFloat(v, 64)`、`boolean` は `strconv.ParseBool(v)`。scalar は、元の型で読んでから scalar の型にする。読めなければ、文言 `query <フィールド名>: invalid <int / float / boolean>`。同じ名前が二度あれば、最初の値。
 - 本文が JSON として読めない、型が合わないときは、文言 `body: invalid JSON`。知らないキーは無視し、ないキーは初めの値のままにする（`encoding/json` の既定）。本文の大きさは制限しない。
@@ -130,7 +131,7 @@ func NewHandler(ops Ops) http.Handler {
 | 部分 | 形 |
 |---|---|
 | メソッドとパス | `@http.get(path)` は `GET <path>`、`@http.post(path)` は `POST <path>` |
-| `@http.header(name)` のフィールド | ヘッダ `<name>`。値は、フィールドの値の文字列そのまま。値がない（省略可能で、ない）なら、ヘッダを送らない。空の文字列のヘッダは、ないものとして読まれる |
+| `@http.header(name)` のフィールド | ヘッダ `<name>`。値は、フィールドの値の文字列そのまま。値がない（省略可能で、ない）、または既定値のままでよいなら、ヘッダを送らない。空の文字列のヘッダは、ないものとして読まれる |
 | `@http.query` のフィールド | クエリの `<フィールド名>=<値>`。`string` はそのまま（URL のエンコードだけ）、`int` は 10 進、`float` は 10 進の小数か指数、`boolean` は `true` / `false`。値がない、または既定値のままでよいなら、送らない |
 | `@http.body` のフィールド（一つ） | 本文が、その値の JSON。`Content-Type: application/json` |
 | `@http.body` のフィールド（二つ以上） | 本文が、フィールド名をキーにした JSON のオブジェクト。省略可能で値がないフィールドは、キーを省く |
@@ -217,3 +218,6 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | GOHTTP-10 | error | `NewHandler` が、N の定義のパッケージの名前（既定値を持つ model `Handler` の `NewHandler` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言 |
 
 warning（コードは `PLUGIN`）は一つ: 経路の op が一つもない。
+
+- Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。上の診断は、そのときも返す。
+- 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

@@ -1,0 +1,2 @@
+GOVALID-6	app.Form	model app.Form は Validate を持つが、フィールド validate が、Go でメソッド Validate と同じ名前になる（直すのは仕様の名前）
+GOVALID-6	app.Outer	model app.Outer は Validate を持つが、フィールド validate が、Go でメソッド Validate と同じ名前になる（直すのは仕様の名前）

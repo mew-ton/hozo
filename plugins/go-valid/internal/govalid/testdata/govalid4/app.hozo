@@ -1,0 +1,20 @@
+// GOVALID-4: 位置は model。
+namespace app {
+  @valid.format("email")
+  scalar Email extends string;
+  model Card { @valid.min(1) n: int; }
+
+  union Contact { Mail: Email; Other: string; }
+  union Nested { Inner: Contact; None: string; }
+  union Cards { Many: Card[]; One: Record<string, Card?>; }
+  union Free { A: string; B: int; }
+
+  model Holder { contact: Contact; }
+  model Lists {
+    contacts: Contact[];
+    byName: Record<string, Nested>?;
+    cards: Cards?;
+  }
+  // アームに Validate を持つ型のない union は、当たらない
+  model Fine { free: Free; frees: Free[]; }
+}

@@ -1,0 +1,65 @@
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: 名前空間のパッケージの名前が、生成したコードの局所の名前
+# （w、in、out、err、v、x など）と同じとき。局所の名前の方の末尾に _ を足す。
+[[emit]]
+namespace   = "api"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/api"
+
+[emit.options.go-http]
+validate = true
+
+[[emit]]
+namespace   = "v"
+transpilers = ["go", "go-valid"]
+out         = "gen/v"
+
+[[emit]]
+namespace   = "w"
+transpilers = ["go", "go-valid"]
+out         = "gen/w"
+
+[[emit]]
+namespace   = "out"
+transpilers = ["go", "go-valid"]
+out         = "gen/out"
+
+[[emit]]
+namespace   = "x"
+transpilers = ["go", "go-valid"]
+out         = "gen/x"
+
+[[emit]]
+namespace   = "in"
+transpilers = ["go", "go-valid"]
+out         = "gen/in"
+
+[[emit]]
+namespace   = "err"
+transpilers = ["go", "go-valid"]
+out         = "gen/err"
+
+# パッケージの名前が、標準ライブラリのパッケージと同じ名前空間: 名前空間の方に 2 が付く
+[[emit]]
+namespace   = "strconv"
+transpilers = ["go", "go-valid"]
+out         = "gen/strconv"
+
+[[emit]]
+namespace   = "body"
+transpilers = ["go", "go-valid"]
+out         = "gen/body"
+
+[[emit]]
+namespace   = "mux"
+transpilers = ["go", "go-valid"]
+out         = "gen/mux"
+
+[[emit]]
+namespace   = "q"
+transpilers = ["go", "go-valid"]
+out         = "gen/q"
+
+[[emit]]
+namespace   = "r"
+transpilers = ["go", "go-valid"]
+out         = "gen/r"

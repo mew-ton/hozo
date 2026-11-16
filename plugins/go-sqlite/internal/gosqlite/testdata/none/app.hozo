@@ -1,0 +1,8 @@
+// docs/plugin-go-sqlite.md「出力」: @db の付いた状態が一つもなければ、ファイルを出さず warning を一つ。
+
+namespace app {
+  model Row { @db.key id: string; }
+  /** @db のない状態は、表の状態ではない */
+  state rows: list<Row>;
+  export op findRow(id: string): Row? reads rows;
+}

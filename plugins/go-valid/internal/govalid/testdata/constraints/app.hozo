@@ -1,0 +1,170 @@
+// docs/plugin-go-valid.md「制約」の表の各行と、「scalar」「model」の形を、一か所ずつ使う。
+
+/** 共有の型 */
+namespace type {
+  @valid.format("email")
+  scalar Email extends string;
+  @valid.pattern("^[a-z]+$")
+  scalar Slug extends string;
+  /** 住所 */
+  model Address {
+    @valid.length(min: 1) city: string;
+  }
+}
+
+namespace app {
+  // ---- scalar ----
+
+  // 「制約」min / max: 元の型が int（int64(…)）と float（float64(…)）。書かれた順に確かめる
+  @valid.min(1)
+  @valid.max(100)
+  scalar Percent extends int;
+  @valid.max(10)
+  @valid.min(0.5)
+  scalar Ratio extends float;
+
+  // 「制約」length: min だけ、max だけ（片方だけなら、その比較だけ）
+  @valid.length(min: 3)
+  scalar Code extends string;
+  @valid.length(max: 5)
+  scalar Short extends string;
+
+  // 「制約」pattern: パッケージの変数 validPattern<型名>
+  @valid.pattern("^[A-Z]{2}-[0-9]+$")
+  scalar Sku extends string;
+
+  // 「制約」format: runtime が知っている名前
+  @valid.format("uri")
+  scalar Link extends string;
+  @valid.format("uuid")
+  scalar Uid extends string;
+  @valid.format("date-time")
+  scalar Stamp extends string;
+
+  // 「scalar」元の scalar が Validate を持つ: 自分の制約がないもの、あるもの（元が先）、別の名前空間の scalar、その先
+  scalar Tiny extends Short;
+  @valid.length(min: 2)
+  scalar TinyCode extends Short;
+  scalar WorkEmail extends type.Email;
+  @valid.length(max: 8)
+  scalar ShortSlug extends type.Slug;
+  scalar BossEmail extends WorkEmail;
+
+  // 名前付きデコレータを通して付けた制約も、展開した制約として確かめる
+  decorator positive = valid.min(1);
+  @positive
+  scalar Count extends int;
+
+  // 制約のない scalar は Validate を持たない
+  scalar Plain extends string;
+  scalar PlainCount extends int;
+
+  // ---- model ----
+
+  // 「model」フィールドの型の Validate（1）と、フィールドに付いた制約（2）。どちらもないフィールドは飛ばす
+  model Item {
+    sku: Sku;
+    @valid.length(min: 1, max: 40) name: string;
+    @valid.min(0) @valid.max(9999.5) price: float;
+    @valid.max(10) count: PlainCount;
+    @valid.pattern("^#[0-9a-f]{6}$") color: string;
+    @valid.format("uri") image: Plain;
+    note: string;
+    plain: Plain;
+    // 1 の後に 2: 型の Validate を呼んでから、フィールドの制約
+    @valid.length(max: 4) code: Code;
+    // 別の名前空間の型
+    seller: type.Email;
+    from: type.Address;
+  }
+
+  // 「model」省略可能（Go でポインタ）: scalar、核の型に付いた制約、model、その両方
+  model Optionals {
+    link: Link?;
+    @valid.min(1) limit: int?;
+    @valid.length(min: 2) nick: string?;
+    item: Item?;
+    @valid.length(max: 4) code: Code?;
+    address: type.Address?;
+    plain: Plain?;
+  }
+
+  // 「model」array: 要素の Validate。入れ子の配列（i1、x1）、省略可能な要素、省略可能な配列（Go でそのまま）
+  model Lists {
+    items: Item[];
+    grid: Percent[][];
+    maybe: Item?[];
+    later: Uid[]?;
+    names: string[];
+    plains: Plain[][];
+  }
+
+  // 「model」record: キーの辞書順。値の Validate。scalar のキー、配列の値、record の配列
+  model Maps {
+    byName: Record<string, Item>;
+    bySku: Record<Sku, Percent>;
+    groups: Record<string, Item[]>;
+    pages: Record<string, Ratio>[];
+    opt: Record<string, Link?>?;
+    labels: Record<string, string>;
+    // キーが Validate を持っていても、キーは確かめない
+    counts: Record<Sku, int>;
+  }
+
+  // 既定値は、制約に合っていれば通る（GOVALID-2 は testdata/govalid2）
+  model Paging {
+    page: Percent = 1;
+    @valid.min(1) @valid.max(200) size: int = 20;
+    @valid.length(min: 1) sort: string = "id";
+    link: Link = "https://example.com/";
+  }
+
+  // 継承した model は、展開済みのフィールド（受け継いだ制約を含む）で、別のメソッドを持つ
+  model PublicItem extends Item {
+    override note: never;
+    override plain: never;
+    @valid.min(1) stock: int;
+  }
+  // 制約の付いたフィールドをすべてなくせば、Validate を持たない
+  model Bare extends Paging {
+    override page: never;
+    override size: never;
+    override sort: never;
+    override link: never;
+    label: string;
+  }
+
+  // 互いを参照する model（当たるものがなくなるまで繰り返して決める）
+  model Tree {
+    children: Tree[];
+    leaf: Leaf?;
+  }
+  model Leaf {
+    @valid.min(0) weight: int;
+    parent: Tree?;
+  }
+
+  // その場で書いた model（合成した model）も、普通の model
+  exception Rejected: { @valid.min(400) code: int; reason: string; };
+
+  // 制約のない model は Validate を持たない
+  model Free { id: Plain; at: Time; free: Free?; }
+
+  // union と exception は Validate を持たない。アームに Validate を持つ型のない union は、フィールドに持てる
+  union Shape {
+    Dot: Free;
+    Label: string;
+  }
+  model Drawing { shape: Shape; @valid.min(1) layer: int; }
+
+  // pattern の変数の名前が当たる（model Item のフィールド color と、scalar ItemColor）: 後ろの方に 2 を付ける
+  @valid.pattern("^[a-z]+$")
+  scalar ItemColor extends string;
+}
+
+/** 内部の op を持つ名前空間 */
+namespace split {
+  model Input { @valid.length(min: 1) name: string; contact: type.Email?; }
+  export op run(in: Input): string { return hidden(in); }
+  op hidden(in: Input): string;
+}

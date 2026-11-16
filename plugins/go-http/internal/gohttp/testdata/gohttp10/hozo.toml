@@ -1,0 +1,21 @@
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-10（NewHandler が、N の定義のパッケージの名前と当たる）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/app"
+
+[[emit]]
+namespace   = "typed"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/typed"
+
+[[emit]]
+namespace   = "wrapped"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/wrapped"
+
+# 経路の op がなければ、NewHandler を出さないので、当たらない
+[[emit]]
+namespace   = "quiet"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/quiet"

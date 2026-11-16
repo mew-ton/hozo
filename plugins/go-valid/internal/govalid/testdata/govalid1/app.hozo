@@ -1,0 +1,55 @@
+// GOVALID-1: 位置は、付いた scalar か model。
+namespace app {
+  // 制約が元の型に合わない（「制約」の表の「付けられる元の型」）
+  @valid.min(1)
+  scalar Name extends string;
+  @valid.max(1)
+  scalar Wait extends Duration;
+  @valid.length(min: 1)
+  scalar Count extends int;
+  @valid.pattern("x")
+  scalar Flag extends boolean;
+  @valid.format("email")
+  scalar At extends Time;
+  scalar Nick extends Name;
+  @valid.max(3)
+  scalar Alias extends Nick;
+
+  // int に付けた min / max の value が整数でない
+  @valid.min(0.5)
+  scalar Half extends int;
+
+  // length に min も max もない
+  @valid.length
+  scalar Any extends string;
+
+  // pattern が RE2 でない（後読み）
+  @valid.pattern("(?<!a)b")
+  scalar Look extends string;
+
+  // format の名前を知らない
+  @valid.format("phone")
+  scalar Phone extends string;
+
+  model Inner { x: int; }
+
+  model Form {
+    // 配列か record そのものに制約が付いている（省略可能でも同じ）
+    @valid.min(1) tags: string[];
+    @valid.length(max: 3) attrs: Record<string, string>;
+    @valid.min(1) later: int[]?;
+    // フィールドの型（scalar なら元の型）に合わない
+    @valid.min(1) name: string;
+    @valid.length(min: 1) inner: Inner;
+    @valid.max(3) nick: string?;
+    @valid.format("uri") count: Count;
+    @valid.pattern("[") code: string;
+    @valid.length note: string;
+    // 合っている制約は、診断にならない
+    @valid.min(1) ok: int;
+  }
+
+  // 正しい宣言は、診断にならない
+  @valid.min(1)
+  scalar Good extends int;
+}

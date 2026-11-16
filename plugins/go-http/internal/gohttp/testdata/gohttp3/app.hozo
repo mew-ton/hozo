@@ -1,0 +1,23 @@
+// GOHTTP-3: 位置は model。
+namespace app {
+  model In {
+    // どれも持たない
+    bare: string;
+    @db.key marked: string;
+    // 二つ以上持つ
+    @http.query @http.body both: string;
+    @http.header(name: "X-All") @http.query @http.body all: string?;
+    // ちょうど一つなら、当たらない
+    @http.query ok: string?;
+  }
+
+  @http.post("/in")
+  export op take(in: In);
+
+  // 同じ model を二つの経路が使っても、診断は一度
+  @http.post("/again")
+  export op again(in: In);
+
+  // 経路の op の入力でない model は、見ない
+  model Other { free: string; }
+}

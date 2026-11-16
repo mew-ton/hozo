@@ -1,0 +1,11 @@
+GOSQL-4	fixed.Schema	入口のパッケージ（gen/fixed）の名前 Schema が当たる: model fixed.Schema と go-sqlite の定数 Schema（直すのは仕様の名前）
+GOSQL-4	fixed.CreateTables	入口のパッケージ（gen/fixed）の名前 CreateTables が当たる: exception fixed.CreateTables と go-sqlite の関数 CreateTables（直すのは仕様の名前）
+GOSQL-4	table.UsersTable	入口のパッケージ（gen/table）の名前 UsersTable が当たる: scalar table.UsersTable と go-sqlite の型 UsersTable（状態 table.users）（直すのは仕様の名前）
+GOSQL-4	table.NewUsersTable	入口のパッケージ（gen/table）の名前 NewUsersTable が当たる: model table.NewUsersTable と go-sqlite の関数 NewUsersTable（状態 table.users）（直すのは仕様の名前）
+GOSQL-4	table.OrdersTable	入口のパッケージ（gen/table）の名前 OrdersTable が当たる: model table.OrdersTable と go-sqlite の型 OrdersTable（状態 table.orders）（直すのは仕様の名前）
+GOSQL-4	table.OrdersTable	入口のパッケージ（gen/table）の名前 NewOrdersTable が当たる: model table.OrdersTable の NewOrdersTable と go-sqlite の関数 NewOrdersTable（状態 table.orders）（直すのは仕様の名前）
+GOSQL-4	consts.logTable	入口のパッケージ（gen/consts）の名前 EffectLogTable が当たる: effect consts.logTable と go-sqlite の型 EffectLogTable（状態 consts.effectLog）（直すのは仕様の名前）
+GOSQL-4	consts.Kind	入口のパッケージ（gen/consts）の名前 KindTable が当たる: classify consts.Kind のケースの定数 KindTable と go-sqlite の型 KindTable（状態 consts.kind）（直すのは仕様の名前）
+GOSQL-4	consts.KindsTable	入口のパッケージ（gen/consts）の名前 ClassifyKindsTable が当たる: classify consts.KindsTable の判定関数 と go-sqlite の型 ClassifyKindsTable（状態 consts.classifyKinds）（直すのは仕様の名前）
+GOSQL-4	consts.Shape	入口のパッケージ（gen/consts）の名前 ShapeTable が当たる: union consts.Shape のアーム Table を包む型 と go-sqlite の型 ShapeTable（状態 consts.shape）（直すのは仕様の名前）
+GOSQL-4	own.newUsers	入口のパッケージ（gen/own）の名前 NewUsersTable が当たる: go-sqlite の関数 NewUsersTable（状態 own.users） と go-sqlite の型 NewUsersTable（状態 own.newUsers）（直すのは仕様の名前）

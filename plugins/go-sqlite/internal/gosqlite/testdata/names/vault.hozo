@@ -1,0 +1,65 @@
+// docs/plugin-go-sqlite.md「補助」: メソッドの引数の名前が、このファイルが使う名前（レシーバの t、ctx、args、err、import する
+// パッケージの名前、このファイルの非公開の名前）と当たれば、末尾に _。読み書きの途中の変数（フィールドの名前から作る）も同じ。
+// vault は内部の op（touch）を持つので、出力は内側のフォルダと入口に分かれる。db.go は入口のパッケージで、型は入口の別名で書く。
+
+namespace a {
+  model Entry { @db.key id: string; at: Time; }
+}
+
+namespace b {
+  model Entry { @db.key code: int; tags: string[]; }
+}
+
+/** 当たる名前を持つ名前空間 */
+namespace vault {
+  scalar Key extends string;
+  scalar Num extends int;
+  scalar Ratio extends float;
+  scalar Flag extends boolean;
+
+  model Tag { name: string; }
+
+  /** フィールドの名前が、dbArgs / dbScan の中の名前（row、r、err、data）、Go の予約語、事前宣言の識別子、import と当たる */
+  model Secret {
+    @db.key row: Key;
+    r: Num;
+    err: Ratio;
+    data: Flag;
+    type: Time;
+    string: Tag[];
+    json: Record<string, string>;
+    any: Tag?;
+    time: Time?;
+    sql: Duration;
+  }
+
+  @db state secrets: list<Secret>;
+  /** 同じ名前の model（a.Entry と b.Entry）: 補助の名前は、後の方に 2 を付ける */
+  @db state entriesA: list<a.Entry>;
+  @db state entriesB: list<b.Entry>;
+
+  // 引数の名前がレシーバの t と当たる
+  export op find(t: Key): Secret? reads secrets;
+  // 引数の名前が ctx、args、err と当たる
+  export op scan(ctx: Num, args: Ratio, err: Flag): Secret[] reads secrets;
+  // 引数の名前が import するパッケージの名前と当たる。JSON の列の途中の変数（json_JSON）
+  export op listAt(time: Time, json: Record<string, string>, sql: Duration): Secret[] reads secrets;
+  // 引数の名前が、このファイルの非公開の名前と当たる
+  export op open(dbGet: Key, dbScanSecret: Num): Secret? reads secrets;
+  // 内部の op（export がない）: 状態の単位のメソッドは、export の有無によらず公開
+  op touch(row: Key): Secret? reads secrets;
+
+  effect createSecret on secrets.post;
+  effect updateSecret on secrets.put;
+  effect deleteSecret on secrets.delete;
+  // 引数の名前が、足す op と書き換える op の中の args、err と当たる
+  export op add(args: Secret) effects createSecret;
+  export op save(err: Secret) effects updateSecret;
+  // 引数の名前が、このファイルの非公開の名前と当たる
+  export op drop(dbExec: Key, context: Num) effects deleteSecret;
+
+  effect createA on entriesA.post;
+  effect createB on entriesB.post;
+  export op addA(entry: a.Entry) effects createA;
+  export op addB(entry: b.Entry) effects createB;
+}

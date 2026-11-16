@@ -1,0 +1,4 @@
+GOHTTP-3	app.In	入力の model app.In のフィールド bare が、@http.header、@http.query、@http.body のどれも持たない（ちょうど一つ要る）
+GOHTTP-3	app.In	入力の model app.In のフィールド marked が、@http.header、@http.query、@http.body のどれも持たない（ちょうど一つ要る）
+GOHTTP-3	app.In	入力の model app.In のフィールド both が、@http.query と @http.body を持つ（ちょうど一つ要る）
+GOHTTP-3	app.In	入力の model app.In のフィールド all が、@http.header と @http.query と @http.body を持つ（ちょうど一つ要る）

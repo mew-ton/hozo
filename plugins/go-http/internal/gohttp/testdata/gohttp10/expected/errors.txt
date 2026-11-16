@@ -1,0 +1,3 @@
+GOHTTP-10	app.Handler	既定値を持つ model app.Handler の関数 NewHandler が、go-http が入口のパッケージに足す関数 NewHandler と当たる（直すのは仕様の名前）
+GOHTTP-10	typed.NewHandler	scalar typed.NewHandler の型 NewHandler が、go-http が入口のパッケージに足す関数 NewHandler と当たる（直すのは仕様の名前）
+GOHTTP-10	wrapped.New	union wrapped.New のアーム Handler を包む型 NewHandler が、go-http が入口のパッケージに足す関数 NewHandler と当たる（直すのは仕様の名前）

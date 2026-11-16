@@ -51,13 +51,13 @@ N の `@db` の付いた基底の状態（**表の状態**）が一つもなけ�
 | `string` | `TEXT` | 核の型なら `row.<F>`、scalar なら `string(row.<F>)` | `&row.<F>` に直に読む |
 | `int` | `INTEGER` | `row.<F>` / `int64(row.<F>)` | 同上 |
 | `float` | `REAL` | `row.<F>` / `float64(row.<F>)` | 同上 |
-| `boolean` | `INTEGER`（0 か 1） | `row.<F>` / `bool(row.<F>)` | 同上 |
+| `boolean` | `INTEGER`（0 か 1） | `row.<F>` / `bool(row.<F>)` | 核の型なら同上。scalar なら `(*bool)(&row.<F>)`（`database/sql` は、名前付きの真偽値の型には整数を読めない） |
 | `Duration` | `INTEGER`（ナノ秒） | `int64(row.<F>)` | 同上 |
-| `Time` | `TEXT`（RFC 3339、UTC、小数部はいつも 9 桁。文字列の順が時刻の順になる） | `dbTime(row.<F>)` | 文字列の変数に読んでから `dbParseTime` |
+| `Time` | `TEXT`（RFC 3339、UTC、小数部はいつも 9 桁。文字列の順が時刻の順になる） | `dbTime(row.<F>)` / `dbTime(time.Time(row.<F>))` | 文字列の変数に読んでから `dbParseTime` |
 | `array`、`record`、model | `TEXT`（`encoding/json` の JSON） | `json.Marshal` した文字列 | 文字列の変数に読んでから `json.Unmarshal` |
 | union（`arms`）と、union を中に持つ `array` / `record` / model | — | GOSQL-3（JSON での union の形を、まだ決めていない） | |
 
-- 省略可能でない列は `NOT NULL`。**省略可能な列**は `NOT NULL` を付けず、値がなければ `NULL`。書く値は `dbOpt(row.<F>)`（`nil` なら `nil`、あれば上の表の値）、`Time` は `dbOptTime(row.<F>)`、JSON の型は `nil` なら `nil`。読むときは、直に読める型は `&row.<F>`（`database/sql` が `NULL` を `nil` のポインタにする）、`Time` と JSON の型は `sql.NullString` に読んで、`Valid` のときだけ変える。
+- 省略可能でない列は `NOT NULL`。**省略可能な列**は `NOT NULL` を付けず、値がなければ `NULL`。書く値は `dbOpt(row.<F>)`（`nil` なら `nil`、あれば上の表の値）、`Time` は `dbOptTime(row.<F>)`、JSON の型は `nil` なら `nil`。Go で名前付きの型（scalar と、`Duration`）は、ポインタを、書く値の型へのポインタに変えて渡す（`dbOpt((*string)(row.<F>))`、`dbOptTime((*time.Time)(row.<F>))`）。読むときは、直に読める型は `&row.<F>`（`database/sql` が `NULL` を `nil` のポインタにする）、`Time` と JSON の型は `sql.NullString` に読んで、`Valid` のときだけ変える。`boolean` が元の scalar は、`*bool` の変数に読んでから、ポインタの型を変える。
 - 制約: `@db.key` は `PRIMARY KEY`、`@db.unique` は `UNIQUE`。`@db.key` の付いたフィールドが二つ以上なら、列には付けず、表の末尾に `PRIMARY KEY ("a", "b")`。`@db.ref(M)` は、要素が `M` である表の状態が N に**ちょうど一つ**あり、`M` が `@db.key` をちょうど一つ持つとき、その表のその列への `REFERENCES "<表>" ("<列>")`。そうでなければ制約なし。
 - 列の定義は `"<名前>" <型>[ NOT NULL][ PRIMARY KEY][ UNIQUE][ REFERENCES …]`。表は、列を二つの空白で字下げして一行ずつ、`,` で区切る。
 
@@ -99,7 +99,7 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 | 一行を引く | `reads` が S だけで、効果がない。戻り値が `M?`。引数は一つ以上で、どれも列に対応し、対応した列のどれかが `@db.key` か `@db.unique` | `SELECT <すべての列> FROM "<表>" WHERE "<列>" = ?1 [AND "<列>" = ?2 …]`。行がなければ `nil` |
 | 並びを引く | `reads` が S だけで、効果がない。戻り値が `M[]`。引数（なくてもよい）は、どれも列に対応する | `SELECT <すべての列> FROM "<表>" [WHERE …] ORDER BY rowid`（足した順） |
 | 足す | `reads` がなく、効果の宛先が `S.post`。引数は M の一つだけで、戻り値がない | `INSERT INTO "<表>" (<すべての列>) VALUES (?1, …)` |
-| 書き換える | `reads` がなく、効果の宛先が `S.put`。引数は M の一つだけで、戻り値がなく、M が `@db.key` を一つ以上持つ | `UPDATE "<表>" SET <キーでない列> = ?… WHERE <キーの列> = ?…`。行がなければ何もしない |
+| 書き換える | `reads` がなく、効果の宛先が `S.put`。引数は M の一つだけで、戻り値がなく、M が `@db.key` を一つ以上と、キーでない列（書き換えるもの）を一つ以上持つ | `UPDATE "<表>" SET <キーでない列> = ?… WHERE <キーの列> = ?…`。行がなければ何もしない |
 | 消す | `reads` がなく、効果の宛先が `S.delete`。引数は一つ以上で、どれも列に対応し、戻り値がない | `DELETE FROM "<表>" WHERE "<列>" = ?1 [AND …]`。行がなければ何もしない |
 
 - 条件に書いた引数の値は、列の「書く値」の形で渡す（`string(email)`）。プレースホルダは `?1`、`?2`、… で、引数の順。
@@ -123,7 +123,7 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 | `dbGet[R]` | 問い合わせの一行を読む。行がなければ（`sql.ErrNoRows`）`nil` |
 | `dbList[R]` | 問い合わせのすべての行を読む |
 
-メソッドの引数の名前は、基底と同じ規則で仕様の引数名から作る。このファイルが使う名前（レシーバの `t`、`ctx`、`args`、`err`、import するパッケージの名前）と当たれば、末尾に `_` を付ける。
+メソッドの引数の名前は、基底と同じ規則で仕様の引数名から作る。このファイルが使う名前（レシーバの `t`、`ctx`、`args`、`err`、import するパッケージの名前、このファイルの非公開の名前）と当たれば、末尾に `_` を付ける。`dbArgs<Model>` と `dbScan<Model>` の中の変数（`Time` と JSON の列の値。名前はフィールドの名前）も同じ。`<Model>` は model の Go の型の名前で、別の名前空間の同じ名前の model と当たれば、後の方に `2`、`3`、… を付ける。
 
 ### メソッドの形とコメント
 
@@ -156,12 +156,12 @@ func (t UsersTable) AddUser(ctx context.Context, user pkgtype.User) error {
 | `New<状態>Table` | `// New<状態>Table は db の表 "<表>" の上の <状態>Table を返す。表は CreateTables が作る。` |
 | `IsEmpty` | `// IsEmpty は形で決まる問い合わせ: 表 "<表>" に行が一つもなければ true。` |
 | `Get` | `// Get は形で決まる問い合わせ: 表 "<表>" の行を、足した順にすべて引く。` |
-| 一行を引く | `// <メソッド名> は op <FQN>: 表 "<表>" から、<列の句> が同じ行を引く。なければ nil。` |
-| 並びを引く | `// <メソッド名> は op <FQN>: 表 "<表>" から、<列の句> が同じ行を、足した順にすべて引く。`。引数がなければ `// <メソッド名> は op <FQN>: 表 "<表>" の行を、足した順にすべて引く。` |
+| 一行を引く | `// <メソッド名> は op <FQN>: 表 "<表>" から、<列の句>が同じ行を引く。なければ nil。` |
+| 並びを引く | `// <メソッド名> は op <FQN>: 表 "<表>" から、<列の句>が同じ行を、足した順にすべて引く。`。引数がなければ `// <メソッド名> は op <FQN>: 表 "<表>" の行を、足した順にすべて引く。` |
 | 足す | `// <メソッド名> は op <FQN>（効果 <効果の FQN> は <状態名>.post）: 表 "<表>" に行を一つ足す。` |
 | 書き換える | `// <メソッド名> は op <FQN>（効果 <効果の FQN> は <状態名>.put）: 表 "<表>" の、キーが同じ行を書き換える。行がなければ何もしない。` |
-| 消す | `// <メソッド名> は op <FQN>（効果 <効果の FQN> は <状態名>.delete）: 表 "<表>" から、<列の句> が同じ行を消す。行がなければ何もしない。` |
-| 省略可能な引数（二行目） | `// <引数名> は省略可能で、なければ問い合わせずに <nil / 空の並び / 何もしない>。`（引数ごとに一行） |
+| 消す | `// <メソッド名> は op <FQN>（効果 <効果の FQN> は <状態名>.delete）: 表 "<表>" から、<列の句>が同じ行を消す。行がなければ何もしない。` |
+| 省略可能な引数（二行目） | `// <引数名> は省略可能で、なければ問い合わせずに <nil / 空の並び / 何もしない>。`（引数ごとに一行。`nil` の前だけ、空白を一つ置く） |
 | `dbArgs<Model>` / `dbScan<Model>` | `// dbArgs<Model> は <model の FQN> を、表 "<表>" の列の順の値にする。` / `// dbScan<Model> は、表 "<表>" の列の順の値を <model の FQN> に読む。`（表は、その model を要素に持つ最初の表の状態） |
 
 列の句は、条件に使う列を「、」でつないだもので、列ごとに `"<列>"（引数 <引数名> と型が合う列）`。引く op では、その列が `@db.key` か `@db.unique` なら、括弧の中の末尾に `。@db.key` / `。@db.unique` を足す。補助のコメントは、サンプルの通り。
@@ -175,9 +175,10 @@ func (t UsersTable) AddUser(ctx context.Context, user pkgtype.User) error {
 | GOSQL-1 | error | `@db` の状態の要素が model でない。位置は状態 |
 | GOSQL-2 | error | `@db` の状態の形が `list` でない（`nullable`、`single`）。位置は状態 |
 | GOSQL-3 | error | 列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model |
-| GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`<状態>Table`、`New<状態>Table`）が、N の定義のパッケージの名前（型、`New<Model>` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言 |
-| GOSQL-5 | error | 状態の単位のメソッドの名前が、このファイルの型のフィールド `db` と当たる（op `db`）。位置は op |
+| GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`<状態>Table`、`New<状態>Table`）が、N の定義のパッケージの名前（型、`New<Model>` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`）も同じで、位置は後ろの状態 |
 | GOSQL-6 | error | `[emit.options.go-sqlite]` に、知らないキーがある。位置なし |
 
+- GOSQL-5 は欠番。「状態の単位のメソッドの名前が、このファイルの型のフィールド `db` と当たる（op `db`）」という規則だったが、起きない: メソッドの名前は op 名の先頭を大文字にしたもの（`Db`。`docs/plugin-go.md`「名前」）で、フィールド `db` とは別の名前。そのうえ、op `db` を持つ名前空間では、`@db` がその op を指すので（RES-4）、表の状態を書けない。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 - warning（コードは `PLUGIN`）は二つ: 表の状態が一つもない、規則に当たらない op がある（「状態ごとの型」）。
+- Dir(U, N) の上に `go.mod` がないことは、基底が報告する（GO-1。`docs/plugin-go.md`「診断」）。このトランスパイラは、型のパッケージの import パスを求められないので、ファイルも診断も返さない。
 - `@db` は、どの保存先かを言わない。同じ `@db` の状態を別の保存先にするのは、別のトランスパイラを並べた別の単位（か、人が書く実装）。`@db.key` / `@db.unique` / `@db.ref` の意味（重なれば失敗する、など）は、このトランスパイラの出力にしかなく、ほかの実装が同じ振る舞いをすることは、仕様からは言えない。

@@ -1,0 +1,14 @@
+// GOSQL-2（docs/plugin-go-sqlite.md「表」）: @db の状態の形が list でない（nullable、single）。位置は状態。
+
+namespace app {
+  model Row { @db.key id: string; }
+
+  // nullable
+  @db state current: nullable<Row>;
+  // single
+  @db state config: single<Row>;
+  // list は通る
+  @db state rows: list<Row>;
+  // @db がなければ、見ない
+  state other: single<Row>;
+}

@@ -1,0 +1,8 @@
+// GOVALID-6: 位置は model。
+namespace app {
+  model Form { @valid.length(min: 1) validate: string; }
+  // Validate を持たない model なら、当たらない（メソッドがない）
+  model Free { validate: boolean; }
+  // フィールドの型が Validate を持つ model も、当たる
+  model Outer { validate: boolean; form: Form?; }
+}

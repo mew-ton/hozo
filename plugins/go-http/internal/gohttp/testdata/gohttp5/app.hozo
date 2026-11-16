@@ -1,0 +1,34 @@
+// GOHTTP-5: 位置は op。
+namespace app {
+  model Card { n: int; }
+  union Shape { Dot: Card; Label: string; }
+  model Drawing { title: string; shape: Shape; }
+  model Album { drawings: Drawing[]; }
+
+  // 本文: union そのもの、union を中に持つ model
+  model ShapeIn { @http.body shape: Shape; }
+  @http.post("/shape")
+  export op putShape(in: ShapeIn);
+  model AlbumIn { @http.query id: string?; @http.body album: Album?; @http.body byName: Record<string, Shape[]>; }
+  @http.post("/album")
+  export op putAlbum(in: AlbumIn);
+
+  // 結果
+  @http.get("/drawing")
+  export op getDrawing(): Drawing?;
+  @http.get("/shapes")
+  export op getShapes(): Shape[];
+
+  // @http.status を持つ例外の値
+  @http.status(409)
+  exception Clash: Drawing;
+  @http.get("/clash")
+  export op clash(): string
+    throws Clash;
+
+  // ステータスを持たない例外の値は、通信に現れないので、当たらない。union を持たない型も、当たらない
+  exception Quiet: Drawing;
+  @http.get("/quiet")
+  export op quiet(): Card
+    throws Quiet;
+}
