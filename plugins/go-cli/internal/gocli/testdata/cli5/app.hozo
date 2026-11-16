@@ -1,0 +1,21 @@
+// CLI-5: 位置は、フラグ名なら model、コマンド名なら後ろの op。
+namespace app {
+  model In {
+    @cli.flag("name") first: string?;
+    @cli.flag("name") second: string?;
+    @cli.flag("other") other: string?;
+  }
+  @cli.command("run")
+  export op run(in: In);
+
+  // 同じコマンド名
+  @cli.command("run")
+  export op again();
+  @cli.command("run")
+  export op third();
+
+  // 別の model の同じフラグ名は、重複ではない
+  model Else { @cli.flag("name") name: string?; }
+  @cli.command("else")
+  export op else_(in: Else);
+}

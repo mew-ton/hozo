@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -471,7 +472,7 @@ func pluginPathEnv(dir string) func(string) string {
 // hozocMainEnv は hozocMainIn と同じ組み立てで、環境変数を env から読む（プロセスの環境は読まない）。
 func hozocMainEnv(dir string, env func(string) string, args []string, stdout, stderr io.Writer) int {
 	a := &app.App{Dir: dir, Stderr: stderr}
-	return cli.Main(a.Ops(), app.Presenter{}, args, env, stdout, stderr)
+	return cli.Main(context.Background(), a.Ops(), app.Presenter{}, args, env, stdout, stderr)
 }
 
 // project は、サンプルの入力を一時ディレクトリに写し、そのルートと、hozoc に渡す環境（リポジトリの plugins/ を

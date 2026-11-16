@@ -1,0 +1,5 @@
+CLI-1	app.two	@cli.command の op app.two の引数が 2 個ある（引数は、0 個か、入力の model 一つ）
+CLI-1	app.core	@cli.command の op app.core の引数 a の型 string が model でない（引数は、0 個か、入力の model 一つ）
+CLI-1	app.named	@cli.command の op app.named の引数 a の型 app.Name が model でない（引数は、0 個か、入力の model 一つ）
+CLI-1	app.optional	@cli.command の op app.optional の引数 a の型 app.In? が model でない（引数は、0 個か、入力の model 一つ）
+CLI-1	app.many	@cli.command の op app.many の引数 a の型 app.In[] が model でない（引数は、0 個か、入力の model 一つ）

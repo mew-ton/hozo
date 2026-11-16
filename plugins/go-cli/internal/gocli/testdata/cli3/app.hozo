@@ -1,0 +1,43 @@
+// CLI-3: 位置は model。
+namespace app {
+  model Point { x: int; }
+  scalar Path extends string;
+  scalar Count extends int;
+  scalar Count2 extends Count;
+  scalar When extends Time;
+
+  model In {
+    @cli.flag("model") model_: Point;
+    @cli.flag("record") record: Record<string, string>;
+    @cli.flag("time") time: Time;
+    @cli.arg duration: Duration;
+    @cli.flag("when") when: When?;
+    @cli.flag("flags") flags: string[];
+    @cli.env("ENVS") envs: string[];
+    @cli.arg flag: boolean;
+    @cli.arg maybe: boolean?;
+    @cli.arg points: Point[];
+    @cli.arg counts: int[];
+    @cli.arg rest: string[]?;
+  }
+  @cli.command("run")
+  export op run(in: In);
+
+  // 受け付ける型: string / boolean / int / float、その scalar、その省略可能、@cli.arg の string（と string の scalar）の array
+  model Fine {
+    @cli.flag("s") s: string;
+    @cli.flag("b") b: boolean;
+    @cli.flag("i") i: int;
+    @cli.flag("f") f: float;
+    @cli.flag("os") os: string?;
+    @cli.flag("ob") ob: boolean?;
+    @cli.flag("oi") oi: int?;
+    @cli.flag("of") of: float?;
+    @cli.flag("sc") sc: Count2;
+    @cli.flag("osc") osc: Path?;
+    @cli.arg a: int;
+    @cli.arg rest: Path[];
+  }
+  @cli.command("fine")
+  export op fine(in: Fine);
+}

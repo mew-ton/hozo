@@ -129,6 +129,7 @@ func CheckFormat(name, v string) bool                   // "email" / "uri" / "uu
 ## ほかの相乗りとの約束
 
 - `Validate` を呼ぶ相乗りは、`requires` に `go-valid` を書き、どの型が `Validate` を持つかを `govalid.HasValidate(program, <型の FQN>)` で求める（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。自分の単位は `go-valid` を並べている（CFG-19）ので、N の型のメソッドは必ずある。
+- **別の名前空間 M の型**の `Validate` を呼ぶなら、M の型の置き場の単位も `go-valid` を並べていなければならない（「出力」の GOVALID-3 と同じ理由）。並べていなければ、呼ぶ側が自分の診断にする（`go-http` の GOHTTP-11、`go-cli` の CLI-9）。確かめ方は、`go-valid` と同じ `govalid.Unlisted(view, <名前空間>)`。
 - 違反を自分の語彙の形にするのは、呼ぶ側（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）。
 
 ## 診断

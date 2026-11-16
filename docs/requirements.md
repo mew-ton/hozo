@@ -134,7 +134,7 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 | 段階 | 入口 | 終わったと言える条件 |
 |---|---|---|
 | R1 | 言語の変更（`docs/decisions.md`「設計書を変える決定」S15〜S23） | 済み。`reads`、純粋さ、op の分類、ケースの型、`throw`、`never`、状態の参照、形の型、model の継承、`export` を、解析・検査・IR が持つ |
-| R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜88） | hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としもなく、すべて通る（サンプルの中のプラグイン `go-ratelimit` の分を含む）。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
+| R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜88） | 済み。hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としもなく、すべて通る（サンプルの中のプラグイン `go-ratelimit` の分を含む）。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
 
 R2 の成果物:
 

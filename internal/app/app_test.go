@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
+	"github.com/mew-ton/hozo/internal/gen/hozoc/inner"
+	"github.com/mew-ton/hozo/internal/gen/proc"
 )
 
 var update = flag.Bool("update", false, "ゴールデンを更新する")
@@ -123,8 +126,14 @@ func runHome(t *testing.T, dir, home string, env map[string]string, args ...stri
 	}
 	defer func() { _ = os.Chdir(wd) }()
 	a := &App{Stderr: &errOut, Stdin: strings.NewReader(""), Home: home} // lsp は入力の終わりで戻る
-	code = cli.Main(a.Ops(), Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
+	code = cli.Main(context.Background(), a.Ops(), Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
 	return code, out.String(), errOut.String()
+}
+
+// innerOps は、a の実装で、内側のパッケージの Ops（内部の op writeOutputs と runEmit も持つ）を組み立てる。内部の op のテストは、
+// ここから呼ぶ（docs/cli.md「手で書くもの」、docs/plugin-go.md「内側のフォルダと入口」）。引数は App.Ops と同じ。
+func innerOps(a *App) inner.Ops {
+	return inner.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())
 }
 
 func golden(t *testing.T, name, got string) {
@@ -260,17 +269,19 @@ func TestCheckWithoutConfig(t *testing.T) {
 	}
 	// 設定なしの App.Check は例外なしで結果（warning）を返す
 	l := &App{Dir: dir}
-	res, err := l.Check(hozoc.CheckInput{})
+	ctx := context.Background()
+	res, err := l.Check(ctx, hozoc.CheckInput{})
 	if err != nil || len(res.Warnings) != 1 || res.Warnings[0].Code != "NAME-1" {
 		t.Fatalf("Check = %+v, %v", res, err)
 	}
-	// その後の WriteOutputs は ConfigInvalid（CFG-7）。述語 UpToDate も、生成し直せないので同じ例外
-	_, err = l.WriteOutputs(hozoc.EmitInput{}, res)
+	// その後の WriteOutputs（内部の op。内側のパッケージの Ops から呼ぶ）は ConfigInvalid（CFG-7）。述語 UpToDate も、
+	// 生成し直せないので同じ例外
+	_, err = innerOps(l).WriteOutputs(ctx, hozoc.EmitInput{}, res)
 	var ci hozoc.ConfigInvalid
 	if !errors.As(err, &ci) || len(ci.Value.Items) != 2 || ci.Value.Items[0].Code != "CFG-7" {
 		t.Fatalf("WriteOutputs err = %v", err)
 	}
-	if _, err = l.UpToDate(); !errors.As(err, &ci) || ci.Value.Items[0].Code != "CFG-7" {
+	if _, err = l.OutputsSync().UpToDate(ctx); !errors.As(err, &ci) || ci.Value.Items[0].Code != "CFG-7" {
 		t.Fatalf("UpToDate err = %v", err)
 	}
 }
@@ -314,14 +325,14 @@ func TestCheckLanguageMismatch(t *testing.T) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	l := &App{Dir: dir}
-	_, err := l.Check(hozoc.CheckInput{})
+	_, err := l.Check(context.Background(), hozoc.CheckInput{})
 	var lm hozoc.LanguageMismatch
 	if !errors.As(err, &lm) || len(lm.Value.Items) == 0 {
 		t.Fatalf("err = %v", err)
 	}
 	// 知らないトランスパイラ（CFG-14）も一緒なら、設定の誤り（ConfigInvalid）
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base", "tsp", "nope"`))
-	_, err = l.Check(hozoc.CheckInput{})
+	_, err = l.Check(context.Background(), hozoc.CheckInput{})
 	var ci hozoc.ConfigInvalid
 	if !errors.As(err, &ci) {
 		t.Fatalf("err = %v, want ConfigInvalid", err)
@@ -776,7 +787,7 @@ func TestEmitNothing(t *testing.T) {
 }
 
 // TestUpToDate は cli.hozo の分類 OutputsSync の述語 UpToDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した内容と
-// ディスクの内容を比べる。生成したコードの判定関数 hozoc.ClassifyOutputsSync が、App.Ops が hozoc.States に入れた
+// ディスクの内容を比べる。生成したコードの判定関数 hozoc.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
 // 述語を呼ぶ。
 func TestUpToDate(t *testing.T) {
 	dir := copyCorpus(t)
@@ -788,11 +799,13 @@ func TestUpToDate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Chdir(wd) }()
+	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
 	ops := a.Ops()
+	unit := a.OutputsSync() // 判定関数に渡す、状態の分類の単位（hozoc.New に渡したものと同じ App のもの）
 	sync := func() hozoc.OutputsSync {
 		t.Helper()
-		got, err := hozoc.ClassifyOutputsSync()
+		got, err := hozoc.ClassifyOutputsSync(ctx, unit)
 		if err != nil {
 			t.Fatalf("ClassifyOutputsSync: %v", err)
 		}
@@ -802,9 +815,9 @@ func TestUpToDate(t *testing.T) {
 	if got := sync(); got != hozoc.OutputsSyncDefault {
 		t.Fatalf("emit の前: %v", got)
 	}
-	// 配線の emit（check → writeOutputs）。writeOutputs は hozoc.States.OutputsSync の命令で、効果 syncOutputs は
+	// 配線の emit（check → writeOutputs）。writeOutputs は状態の分類 OutputsSync の単位の命令で、効果 syncOutputs は
 	// どの場合からも UpToDate に移す
-	res, err := ops.Emit(hozoc.EmitInput{})
+	res, err := ops.Emit(ctx, hozoc.EmitInput{})
 	if err != nil || len(res.Written) == 0 {
 		t.Fatalf("Emit = %+v, %v", res, err)
 	}
@@ -836,11 +849,11 @@ func TestUpToDate(t *testing.T) {
 	// 余分（前回書いて、今回は書かないファイルが残っている）: 基底が、ファイルを返さなくなる
 	fakePlugin(t, dir, "base", "go", "", `{"files":[],"warnings":[]}`, 0)
 	b := &App{Stderr: &bytes.Buffer{}} // 設定を読み直すために新しい App（直前の Check の結果を持たない）
-	ops = b.Ops()
+	ops, unit = b.Ops(), b.OutputsSync()
 	if got := sync(); got != hozoc.OutputsSyncDefault {
 		t.Errorf("基底がファイルを返さなくなった後: %v", got)
 	}
-	if _, err := ops.Emit(hozoc.EmitInput{}); err != nil {
+	if _, err := ops.Emit(ctx, hozoc.EmitInput{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := sync(); got != hozoc.OutputsSyncUpToDate {
@@ -849,9 +862,8 @@ func TestUpToDate(t *testing.T) {
 	// 仕様に誤りがあって生成し直せなければ、その例外
 	write(t, filepath.Join(dir, "bad.hozo"), "namespace server {\n  model Bad { x: Nope; }\n}\n")
 	c := &App{Stderr: &bytes.Buffer{}}
-	c.Ops()
 	var cf hozoc.CheckFailed
-	if _, err := hozoc.ClassifyOutputsSync(); !errors.As(err, &cf) {
+	if _, err := hozoc.ClassifyOutputsSync(ctx, c.OutputsSync()); !errors.As(err, &cf) {
 		t.Errorf("誤りのある仕様: err = %v, want CheckFailed", err)
 	}
 }
@@ -1372,5 +1384,189 @@ func TestEmitIn(t *testing.T) {
 	}
 	if reqs := requests(t, dir, "extra"); len(reqs) != 1 { // 最初の emit の一回だけ。出力でなくなってからは起動しない
 		t.Errorf("トランスパイラ extra が %d 回起動された（want 1）", len(reqs))
+	}
+}
+
+// TestRunEmit は cli.hozo の op runEmit（hozoc.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
+// して送り、応答を hozoc.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。作業ディレクトリは
+// plugin.root、マニフェストのディレクトリは plugin.dir。hozoc.View は中身のない model なので、要求の view は空のオブジェクト。
+// 異常終了は proc.Crashed、形の違う応答は proc.MalformedOutput（どちらも internal/gen/proc の型）。
+func TestRunEmit(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh がない")
+	}
+	root := t.TempDir()
+	dir := filepath.Join(root, "plugins", "echo")
+	// 受け取った要求と、作業ディレクトリを記録して、決まった応答を返す
+	write(t, filepath.Join(dir, "plugin.sh"), `cat >"$HOZO_PLUGIN_DIR/request.json"
+pwd >"$HOZO_PLUGIN_DIR/cwd"
+printf '%s' "$HOZO_PROJECT_ROOT" >"$HOZO_PLUGIN_DIR/root"
+cat "$HOZO_PLUGIN_DIR/response.json"
+exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
+`)
+	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/x.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
+	write(t, filepath.Join(dir, "exit"), "0")
+	plugin := hozoc.Plugin{Name: "echo", Command: []string{"sh", "-c", `. "$HOZO_PLUGIN_DIR/plugin.sh"`}, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
+	req := hozoc.EmitRequest{Protocol: "0.4", Direction: "emit", Transpiler: "echo"}
+	ctx := context.Background()
+	a := &App{Stderr: &bytes.Buffer{}}
+	ops := innerOps(a)
+
+	resp, err := ops.RunEmit(ctx, plugin, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := hozoc.EmitResponse{
+		Files:    []hozoc.OutputFile{{Path: "gen/a/x.go", Content: "package a\n"}},
+		Warnings: []hozoc.PluginWarning{{At: "a.f", Message: "w"}},
+		Errors:   []hozoc.PluginError{{Code: "X-1", At: "a.g", Message: "e"}},
+	}
+	if !reflect.DeepEqual(resp, want) {
+		t.Errorf("応答 = %+v, want %+v", resp, want)
+	}
+	sent, err := os.ReadFile(filepath.Join(dir, "request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.4","direction":"emit","transpiler":"echo","view":{}}` {
+		t.Errorf("送った要求 = %s", got)
+	}
+	absRoot, _ := filepath.EvalSymlinks(root)
+	for _, name := range []string{"cwd", "root"} {
+		got, _ := os.ReadFile(filepath.Join(dir, name))
+		if real, _ := filepath.EvalSymlinks(strings.TrimSpace(string(got))); real != absRoot {
+			t.Errorf("%s = %q, want %q", name, got, absRoot)
+		}
+	}
+
+	// 異常終了は proc.Crashed
+	write(t, filepath.Join(dir, "exit"), "3")
+	var crashed proc.Crashed
+	if _, err = ops.RunEmit(ctx, plugin, req); !errors.As(err, &crashed) {
+		t.Errorf("異常終了: err = %v, want proc.Crashed", err)
+	}
+	// 起動できないコマンドも、空のコマンドも proc.Crashed
+	for _, command := range [][]string{{filepath.Join(root, "no-such-command")}, nil} {
+		broken := plugin
+		broken.Command = command
+		if _, err = ops.RunEmit(ctx, broken, req); !errors.As(err, &crashed) {
+			t.Errorf("コマンド %v: err = %v, want proc.Crashed", command, err)
+		}
+	}
+	// 形の違う応答（必須の files がない）と、JSON でない応答は proc.MalformedOutput
+	write(t, filepath.Join(dir, "exit"), "0")
+	var malformed proc.MalformedOutput
+	for _, body := range []string{`{"warnings":[]}`, `not json`} {
+		write(t, filepath.Join(dir, "response.json"), body)
+		if _, err = ops.RunEmit(ctx, plugin, req); !errors.As(err, &malformed) {
+			t.Errorf("応答 %s: err = %v, want proc.MalformedOutput", body, err)
+		}
+	}
+	// 中断された ctx では、起動しない
+	if err := os.Remove(filepath.Join(dir, "request.json")); err != nil {
+		t.Fatal(err)
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err = ops.RunEmit(cancelled, plugin, req); !errors.Is(err, context.Canceled) {
+		t.Errorf("中断された ctx: err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "request.json")); !os.IsNotExist(err) {
+		t.Error("中断された ctx で、プラグインを起動した")
+	}
+}
+
+// TestStateUnits は、cli.hozo の状態 sources、config、outputs の単位の、形で決まる問い合わせ（IsEmpty と Get。docs/cli.md
+// 「手で書くもの」の表）: 作業ディレクトリから探した設定で、ディスクから読む。outputs は、出力先ごとの記録に載っているファイルで、
+// 効果 syncOutputs（emit）の結果を判定できる。
+func TestStateUnits(t *testing.T) {
+	dir := copyCorpus(t)
+	ctx := context.Background()
+	a := &App{Dir: dir, Stderr: &bytes.Buffer{}}
+
+	// sources: 設定の sources の glob に合うファイル（辞書順。語彙のファイルは含まない）
+	sources, err := a.Sources().Get(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, f := range sources {
+		names = append(names, string(f.Path))
+		if disk, err := os.ReadFile(filepath.Join(dir, string(f.Path))); err != nil || string(disk) != f.Content {
+			t.Errorf("sources の %s の内容が、ディスクと違う（%v）", f.Path, err)
+		}
+	}
+	var want []string
+	for _, f := range listFiles(t, dir) {
+		if strings.HasSuffix(f, ".hozo") && !strings.HasPrefix(f, "plugins/") {
+			want = append(want, f)
+		}
+	}
+	sort.Strings(want)
+	if len(want) == 0 || !reflect.DeepEqual(names, want) {
+		t.Errorf("sources = %v, want %v", names, want)
+	}
+	if empty, err := a.Sources().IsEmpty(ctx); err != nil || empty {
+		t.Errorf("sources.IsEmpty = %v, %v", empty, err)
+	}
+
+	// config: hozo.toml
+	cfg, err := a.Config().Get(ctx)
+	disk, _ := os.ReadFile(filepath.Join(dir, "hozo.toml"))
+	if err != nil || cfg == nil || cfg.Path != "hozo.toml" || cfg.Content != string(disk) {
+		t.Errorf("config = %+v, %v", cfg, err)
+	}
+	if empty, err := a.Config().IsEmpty(ctx); err != nil || empty {
+		t.Errorf("config.IsEmpty = %v, %v", empty, err)
+	}
+
+	// outputs: emit の前は空。emit の後は、書き出したファイル（記録に載っているもの）
+	if empty, err := a.Outputs().IsEmpty(ctx); err != nil || !empty {
+		t.Errorf("emit の前の outputs.IsEmpty = %v, %v", empty, err)
+	}
+	res, err := a.Ops().Emit(ctx, hozoc.EmitInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs, err := a.Outputs().Get(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, f := range outputs {
+		got[string(f.Path)] = f.Content
+	}
+	if len(got) != len(res.Written) || len(got) == 0 {
+		t.Errorf("outputs = %d 個, want emit が書いた %d 個", len(got), len(res.Written))
+	}
+	for _, p := range res.Written {
+		disk, err := os.ReadFile(filepath.Join(dir, string(p)))
+		if content, ok := got[string(p)]; !ok || err != nil || content != string(disk) {
+			t.Errorf("outputs に %s がないか、内容がディスクと違う（%v）", p, err)
+		}
+	}
+	// 記録にあってもディスクにないファイルは、返さない
+	if err := os.Remove(filepath.Join(dir, "gen", "server", "out.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if outputs, err = a.Outputs().Get(ctx); err != nil || len(outputs) != len(res.Written)-1 {
+		t.Errorf("一つ消した後の outputs = %d 個, %v", len(outputs), err)
+	}
+
+	// 設定なし: config は空（nil）、outputs も空。sources は既定の glob
+	bare := t.TempDir()
+	write(t, filepath.Join(bare, "a.hozo"), "namespace a { op f(); }\n")
+	b := &App{Dir: bare, Stderr: &bytes.Buffer{}}
+	if cfg, err := b.Config().Get(ctx); err != nil || cfg != nil {
+		t.Errorf("設定なしの config = %+v, %v", cfg, err)
+	}
+	if empty, err := b.Config().IsEmpty(ctx); err != nil || !empty {
+		t.Errorf("設定なしの config.IsEmpty = %v, %v", empty, err)
+	}
+	if sources, err := b.Sources().Get(ctx); err != nil || len(sources) != 1 || sources[0].Path != "a.hozo" {
+		t.Errorf("設定なしの sources = %+v, %v", sources, err)
+	}
+	if empty, err := b.Outputs().IsEmpty(ctx); err != nil || !empty {
+		t.Errorf("設定なしの outputs.IsEmpty = %v, %v", empty, err)
 	}
 }

@@ -1,0 +1,17 @@
+// CLI-7: 位置なし。
+namespace app {
+  @cli.command("run")
+  export op run();
+}
+
+namespace app.cli {
+  model Thing { x: int; }
+}
+
+namespace quiet {
+  export op run();
+}
+
+namespace quiet.cli {
+  model Thing { x: int; }
+}

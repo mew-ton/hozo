@@ -229,7 +229,7 @@ func TestValidationPrecedesOp(t *testing.T) {
 }
 
 // TestNilIsNotChecked は、New が引数を確かめないこと。渡し忘れ（引数が足りない、メソッドが足りない）はコンパイルできないが、
-// nil を書いて渡すことはできる。そのときは *runtime.MissingError ではなく、その実装を使う op を呼んだところで panic になる。
+// nil を書いて渡すことはできる。そのときは、その実装を使う op を呼んだところで panic になる。
 // 使わない op は呼べる（上の TestReplaceOneLeaf は、seams が nil のまま notify を呼んでいる）。
 func TestNilIsNotChecked(t *testing.T) {
 	t.Parallel()

@@ -1,0 +1,2 @@
+CLI-2	app.In	入力の model app.In のフィールド bare が、@cli.arg、@cli.flag、@cli.env のどれも持たない
+CLI-2	app.In	入力の model app.In のフィールド both が、@cli.arg と @cli.flag の両方を持つ（位置引数か、フラグか、どちらか一つ）

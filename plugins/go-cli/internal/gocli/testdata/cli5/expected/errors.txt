@@ -1,0 +1,3 @@
+CLI-5	app.In	入力の model app.In のフラグ名 --name が重複している: フィールド first と second
+CLI-5	app.again	コマンド名 "run" が重複している: op app.run と op app.again
+CLI-5	app.third	コマンド名 "run" が重複している: op app.run と op app.third

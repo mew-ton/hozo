@@ -1,0 +1,9 @@
+# plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: CLI-8（[emit.options.go-cli] に、知らないキーがある）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-valid", "go-cli"]
+out         = "gen/app"
+
+[emit.options.go-cli]
+color = true
+width = 80

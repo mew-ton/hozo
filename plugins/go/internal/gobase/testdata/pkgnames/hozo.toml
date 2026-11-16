@@ -1,0 +1,67 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「パッケージと import パス」の「import の名前」のうち、
+# 名前空間のパッケージ名が、基底が決まった名前で使う識別子と同じとき: 定義のパッケージに宣言する非公開の名前（構造体 ops、補助 ptr）と、
+# 関数の本体の中の名前（レシーバ o、ctx、err、New<Model> の m、途中の値 v0、判定の結果 k0）。
+
+# 1: flat。内部の op を持たない（定義のパッケージが入口でもある）。ops と ptr の型を使い、ops の op を呼ぶ
+[[emit]]
+namespace   = "flat"
+transpilers = ["go"]
+out         = "gen/flat"
+
+# 2: split。内部の op を持つ（内側のフォルダと入口に分かれる）。入口のファイルも ops と ptr の型を使う
+[[emit]]
+namespace   = "split"
+transpilers = ["go"]
+out         = "gen/split"
+
+# 3: bodies。関数の本体の中で、決まった名前と同じ名前のパッケージの型を使う
+[[emit]]
+namespace   = "bodies"
+transpilers = ["go"]
+out         = "gen/bodies"
+
+# 4〜: flat、split、bodies が使う型の置き場。パッケージ名は、名前空間の最後のセグメントから決まる
+[[emit]]
+namespace   = "ops"
+transpilers = ["go"]
+out         = "gen/ops"
+
+[[emit]]
+namespace   = "ptr"
+transpilers = ["go"]
+out         = "gen/ptr"
+
+[[emit]]
+namespace   = "more.ops"
+transpilers = ["go"]
+out         = "gen/more/ops"
+
+[[emit]]
+namespace   = "o"
+transpilers = ["go"]
+out         = "gen/o"
+
+[[emit]]
+namespace   = "ctx"
+transpilers = ["go"]
+out         = "gen/ctx"
+
+[[emit]]
+namespace   = "err"
+transpilers = ["go"]
+out         = "gen/err"
+
+[[emit]]
+namespace   = "m"
+transpilers = ["go"]
+out         = "gen/m"
+
+[[emit]]
+namespace   = "v0"
+transpilers = ["go"]
+out         = "gen/v0"
+
+[[emit]]
+namespace   = "k0"
+transpilers = ["go"]
+out         = "gen/k0"

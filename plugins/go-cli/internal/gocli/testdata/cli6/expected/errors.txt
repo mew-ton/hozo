@@ -1,0 +1,2 @@
+CLI-6	app.hidden	op app.hidden に @cli.command が付いているが、export がない（Main は、入口の Ops のメソッドとして op を呼ぶ。サブコマンドを黙って飛ばすことはしない）
+CLI-6	app.also	op app.also に @cli.command が付いているが、export がない（Main は、入口の Ops のメソッドとして op を呼ぶ。サブコマンドを黙って飛ばすことはしない）

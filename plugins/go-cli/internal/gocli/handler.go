@@ -1,56 +1,32 @@
-// Package gocli は go-cli プラグインの中身（docs/plugin-go-cli.md）。
+// Package gocli は、コマンドラインのトランスパイラ go-cli の中身（docs/plugin-go-cli.md）。
 //
-// Handler が plugin.Handler を実装し、View の見る側の名前空間の @cli.command の op を
-// cli/cli.go（パッケージ cli）にする。「対象」の CLI-1〜CLI-5 は emit の応答の errors。
-// 何を出すかを hozoc に伝える select は、版 0.4 でなくなった（docs/plugin-protocol.md「選択をなくしたこと」）。
+// Handler が plugin.Handler を実装し、View（出力ごとに一つ。見る側は出力する名前空間 N）から、`<Dir(U, N)>/cli/cli.go`
+// （パッケージ cli）を作る: `@cli.command` の付いた op ごとにサブコマンドを一つ持つ Main。N のパッケージの置き場と名前は公開の SDK
+// plugin/golang で、どの型が `Validate` を持つかは plugin/govalid で求める（基底と go-valid の出力は見ない。
+// docs/plugin-protocol.md「相乗りが基底の形を知る方法」）。語彙の使い方の誤りは、診断（CLI-*）で返す。
 package gocli
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"path"
-	"path/filepath"
 
-	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
-	"github.com/mew-ton/hozo/plugin/golang"
 )
 
 // TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（docs/plugin-go-cli.md「マニフェスト」）。
-// hozo.toml の単位の transpilers に書く名前で、emit の要求の transpiler に入ってくる。
 const TranspilerName = "go-cli"
-
-// OutputPath は生成するファイルの、View.config.dir（単位での Dir(U, N)。docs/config.md「単位の対象」）からの
-// 相対パス（docs/plugin-go-cli.md「出力」）。応答に書くパスは [OutputPathFor]。
-const OutputPath = "cli/cli.go"
-
-// OutputPathFor は view の名前空間の cli.go の、プロジェクトのルートからの相対パス（`/` 区切り）: `<View.config.dir>/cli/cli.go`。
-func OutputPathFor(view *ir.View) string {
-	return path.Join(dirOf(view), OutputPath)
-}
-
-// dirOf は View.config.dir（Dir(U, N)）。空なら View.config.out（単位の namespace 自身の Dir と同じ。hozoc の View では常に dir がある）。
-func dirOf(view *ir.View) string {
-	d := view.Config.Dir
-	if d == "" {
-		d = view.Config.Out
-	}
-	return path.Clean(filepath.ToSlash(d))
-}
 
 // Handler は go-cli の plugin.Handler。emit だけを実装する。
 type Handler struct {
-	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を
-	// 名前空間のパッケージの import パスを求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
+	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を、import パスを
+	// 求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
 	Getenv func(string) string
 }
 
 var _ plugin.Handler = Handler{}
 
-// Emit は View.viewer の名前空間の CLI の骨組みを `<View.config.dir>/cli/cli.go` にする（docs/plugin-go-cli.md「出力」）。
-// 見るのは単位の対象の op だけ（docs/config.md「in」）。@cli.command の op が一つもなければファイルを出さず warning を一つ返す。
-// CLI-* があれば Files は空で Errors にそれを入れる。go.mod が見つからなければ GO-1（docs/plugin-go.md「診断」。基底 go と同じ条件）。
+// Emit は View.viewer の名前空間の cli/cli.go を作る（docs/plugin-go-cli.md「出力」）。診断（CLI-*）があれば Files は空で、
+// Errors にそれを入れる。`@cli.command` の op が一つもなければ、ファイルを出さず warning を一つ返す。
 // 要求の transpiler が [TranspilerName] でなければ plugin.ErrUnsupported（code "unsupported"）。
 func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req == nil || req.View == nil {
@@ -59,7 +35,6 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req.Transpiler != TranspilerName {
 		return nil, fmt.Errorf("transpiler %q is not provided by go-cli (it provides %q): %w", req.Transpiler, TranspilerName, plugin.ErrUnsupported)
 	}
-	view := req.View
 	getenv := h.Getenv
 	if getenv == nil {
 		getenv = os.Getenv
@@ -68,39 +43,17 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if root == "" {
 		root = "."
 	}
-	dir := dirOf(view)
-	importPath, err := golang.ImportPath(root, dir)
-	if err != nil {
-		if errors.Is(err, golang.ErrNoGoMod) {
-			return &plugin.EmitResponse{Errors: []plugin.Diagnostic{{
-				Code: "GO-1", At: view.Viewer,
-				Message: fmt.Sprintf("名前空間 %s の出力先 %q の上に go.mod がない（%v）", view.Viewer, dir, err),
-			}}}, nil
-		}
-		return nil, fmt.Errorf("emit: import path of %s: %w", dir, err)
-	}
-
-	prog, err := analyze(view, importPath)
-	if err != nil {
-		var ae *analyzeError
-		if errors.As(err, &ae) && ae.Err == nil {
-			return &plugin.EmitResponse{Errors: ae.Errors}, nil
-		}
-		return nil, fmt.Errorf("emit: %w", err)
-	}
-	if len(prog.Commands) == 0 {
-		return &plugin.EmitResponse{Warnings: []plugin.Warning{{
-			At: view.Viewer, Message: fmt.Sprintf("名前空間 %s に @cli.command の op がないので cli.go を生成しない", view.Viewer),
-		}}}, nil
-	}
-	src, err := generate(prog)
+	out, err := Emit(req, root)
 	if err != nil {
 		return nil, fmt.Errorf("emit: %w", err)
 	}
-	return &plugin.EmitResponse{Files: []plugin.File{{Path: OutputPathFor(view), Content: string(src)}}}, nil
+	if len(out.Errors) > 0 {
+		return &plugin.EmitResponse{Errors: out.Errors}, nil
+	}
+	return &plugin.EmitResponse{Files: out.Files, Warnings: out.Warnings}, nil
 }
 
-// Check は実装しない（語彙に固有の検査はない）。
+// Check は実装しない（語彙の使い方の誤りは、emit の応答の errors で返す）。
 func (Handler) Check(*plugin.CheckRequest) (*plugin.CheckResponse, error) {
 	return nil, plugin.ErrUnsupported
 }

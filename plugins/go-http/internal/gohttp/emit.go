@@ -25,6 +25,7 @@ const (
 	codeHTTPDuplicate = "GOHTTP-8"  // 同じメソッドとパスの経路が二つある
 	codeHTTPOption    = "GOHTTP-9"  // [emit.options.go-http] に、知らないキーか、型の違う値がある
 	codeHTTPName      = "GOHTTP-10" // NewHandler が、N の定義のパッケージの名前と当たる
+	codeHTTPValidate  = "GOHTTP-11" // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
 )
 
 // FileName は、このトランスパイラが出すただ一つのファイルの名前（docs/plugin-go.md「相乗りのファイル」）。入口のパッケージに置く。
@@ -218,7 +219,7 @@ type status struct {
 	code      int64
 }
 
-// check は、N の単位の対象の op を宣言順に見て、診断（GOHTTP-1〜GOHTTP-8、GOHTTP-10）を集め、経路を返す
+// check は、N の単位の対象の op を宣言順に見て、診断（GOHTTP-1〜GOHTTP-8、GOHTTP-10、GOHTTP-11）を集め、経路を返す
 // （docs/plugin-go-http.md「対象」）。
 func (g *generator) check() []route {
 	var routes []route
@@ -263,6 +264,10 @@ func (g *generator) check() []route {
 		}
 		r := route{op: op, model: model, inputs: inputs}
 		r.validate = g.opts.Validate && model != nil && govalid.HasValidate(g.p, model.Name)
+		// GOHTTP-11
+		if r.validate {
+			g.checkValidateHome(op, model)
+		}
 		// GOHTTP-5: 本文、結果、@http.status を持つ例外の値
 		for i := range inputs {
 			if inputs[i].place == inBody {
@@ -304,6 +309,21 @@ func (g *generator) check() []route {
 		g.checkName()
 	}
 	return routes
+}
+
+// checkValidateHome は GOHTTP-11: 制約を確かめる経路の op の入力の model m（Validate を持つ）が、別の名前空間 M のものなら、M の型の
+// 置き場（docs/config.md「型の置き場」）の単位が、transpilers に go-valid を並べていなければならない（Validate は、型の定義の
+// パッケージにしか書けない。並べていなければ、ハンドラの in.Validate() がコンパイルできない）。N の model は、自分の単位が go-valid を
+// 並べている（CFG-19）。置き場は、View だけから求まる（govalid.Unlisted）。
+func (g *generator) checkValidateHome(op *ir.Op, m *ir.Model) {
+	ns := g.declNS[m.Name]
+	if ns == g.view.Viewer {
+		return
+	}
+	if unit, unlisted := govalid.Unlisted(g.view, ns); unlisted {
+		g.errorf(codeHTTPValidate, op.Name, "経路の op %s の入力 %s は Validate を持つが、名前空間 %s の型の置き場の単位（%d 番目の [[emit]]）が、transpilers に %s を並べていない（validate = true のハンドラは、入力の Validate を呼ぶ。メソッドは、型の定義のパッケージにしか書けない）",
+			op.Name, m.Name, ns, unit, govalid.Transpiler)
+	}
 }
 
 // inputs は、入力の model m のフィールドの読み方（フィールドの順）。GOHTTP-3 と GOHTTP-4 を報告する（位置は model）。
@@ -471,65 +491,36 @@ func (g *generator) unionIn(t ir.Type, visited map[string]bool) (string, bool) {
 }
 
 // checkName は GOHTTP-10: NewHandler が、N の定義のパッケージの公開の名前（docs/plugin-go.md「名前」。入口のパッケージは、その
-// すべてを再公開する）と当たる。位置は、当たった宣言。名前は、基底と同じ関数（plugin/golang）で求める。
+// すべてを再公開する）と当たる。位置は、当たった宣言。名前の一覧は、基底と共有する golang.PublicNames。
 func (g *generator) checkName() {
-	clash := func(name, at, what string) {
-		if name == handlerName {
-			g.errorf(codeHTTPName, at, "%s %s が、%s が入口のパッケージに足す関数 %s と当たる（直すのは仕様の名前）", what, name, TranspilerName, handlerName)
-		}
-	}
-	typeName := func(fqn string) string { return golang.TypeName(fqn, g.declNS[fqn]) }
-	for _, d := range g.ns.Decls {
-		if d == nil {
+	for _, n := range golang.PublicNames(g.view) {
+		if n.Name != handlerName {
 			continue
 		}
-		name := d.Common().Name
-		switch x := d.(type) {
-		case *ir.Model:
-			if x.SynthesizedFrom != "" {
-				if _, isOp := g.p.Lookup(x.SynthesizedFrom).(*ir.Op); isOp {
-					continue // View が見る側のために合成した model は、Go の型にならない
-				}
+		var what string
+		switch n.Kind {
+		case golang.PublicType:
+			what = g.p.Lookup(n.Decl).Kind() + " " + n.Decl + " の型"
+		case golang.PublicNewModel:
+			what = "既定値を持つ model " + n.Decl + " の関数"
+		case golang.PublicArm:
+			what = "union " + n.Decl + " のアーム " + n.Detail + " を包む型"
+		case golang.PublicEffect:
+			what = "effect " + n.Decl + " の定数"
+		case golang.PublicClassify:
+			what = "classify " + n.Decl + " の型"
+		case golang.PublicCase:
+			what = "classify " + n.Decl + " のケース " + n.Detail + " の定数"
+			if n.Detail == "default" {
+				what = "classify " + n.Decl + " の default の定数"
 			}
-			clash(typeName(name), name, "model "+name+" の型")
-			for _, f := range x.Fields {
-				if f.Default != nil {
-					clash("New"+typeName(name), name, "既定値を持つ model "+name+" の関数")
-					break
-				}
-			}
-		case *ir.Scalar, *ir.Exception:
-			clash(typeName(name), name, d.Kind()+" "+name+" の型")
-		case *ir.Union:
-			if x.Variant != ir.UnionArms {
-				continue
-			}
-			clash(typeName(name), name, "union "+name+" の型")
-			for _, a := range x.Arms {
-				// アームの型が N の model への ref でなければ、包む型 <Union><アーム名>（docs/plugin-go.md「union」）
-				if r, ok := a.Type.(ir.RefType); ok {
-					if m, isModel := g.p.Lookup(r.Target).(*ir.Model); isModel && g.declNS[m.Name] == g.declNS[name] {
-						continue
-					}
-				}
-				clash(typeName(name)+golang.Capitalize(a.Name), name, "union "+name+" のアーム "+a.Name+" を包む型")
-			}
-		case *ir.Effect:
-			clash(golang.EffectConst(name), name, "effect "+name+" の定数")
-		case *ir.Classify:
-			if x.DecidedBy != ir.DecidedByPredicate {
-				continue
-			}
-			c := typeName(name)
-			clash(c, name, "classify "+name+" の型")
-			clash("Classify"+c, name, "classify "+name+" の判定関数")
-			clash(c+"Cases", name, "classify "+name+" の述語のインターフェース")
-			for _, k := range x.Cases {
-				clash(golang.CaseConst(c, k.Name), name, "classify "+name+" のケース "+k.Name+" の定数")
-			}
-			if x.HasDefault {
-				clash(golang.CaseConst(c, "default"), name, "classify "+name+" の default の定数")
-			}
+		case golang.PublicClassifyFunc:
+			what = "classify " + n.Decl + " の判定関数"
+		case golang.PublicCases:
+			what = "classify " + n.Decl + " の述語のインターフェース"
+		default:
+			what = n.What // 状態の単位、Ops、New など（NewHandler とは当たらない形の名前）
 		}
+		g.errorf(codeHTTPName, n.Decl, "%s %s が、%s が入口のパッケージに足す関数 %s と当たる（直すのは仕様の名前）", what, n.Name, TranspilerName, handlerName)
 	}
 }

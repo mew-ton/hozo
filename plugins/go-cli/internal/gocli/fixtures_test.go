@@ -1,238 +1,389 @@
 package gocli
 
 import (
-	"github.com/mew-ton/hozo/ir"
+	"bytes"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"go/format"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin"
 )
 
-// このファイルはテストの入力の View を手で組み立てる。hozocView は docs/cli.md「cli.hozo」を写したもの、
-// demoView は cli.hozo にない型（int / float / boolean の必須・既定値・位置引数）を確かめるための小さな名前空間。
-
-func sp(line int) ir.Span {
-	return ir.Span{File: "cli.hozo", Start: ir.Pos{Line: line, Col: 3}, End: ir.Pos{Line: line, Col: 40}}
-}
-
-func doc(summary string) *ir.Doc { return &ir.Doc{Summary: summary, Body: summary} }
-
-func strLit(s string) ir.ArgValue { return ir.LiteralValue{Literal: ir.StringLiteral{Value: s}} }
-func intLit(n int64) ir.ArgValue  { return ir.LiteralValue{Literal: ir.IntLiteral{Value: n}} }
-
-func app(decorator string, args ...ir.Arg) ir.Application {
-	return ir.Application{Decorator: decorator, Args: args, Span: sp(0)}
-}
-
-func cliCommand(name string) ir.Application {
-	return app("cli.command", ir.Arg{Param: "name", Value: strLit(name)})
-}
-func cliFlag(name string) ir.Application {
-	return app("cli.flag", ir.Arg{Param: "name", Value: strLit(name)})
-}
-func cliEnv(name string) ir.Application {
-	return app("cli.env", ir.Arg{Param: "name", Value: strLit(name)})
-}
-func cliArg() ir.Application { return app("cli.arg") }
-func cliExitCode(code int64) ir.Application {
-	return app("cli.exitCode", ir.Arg{Param: "code", Value: intLit(code)})
-}
-
-func fld(name, summary string, t ir.Type, decs ...ir.Application) ir.Field {
-	f := ir.Field{Name: name, Type: t, Decorators: decs, Span: sp(0)}
-	if summary != "" {
-		f.Description = doc(summary)
-	}
-	return f
-}
-
-func mdl(fqn, summary string, fields ...ir.Field) *ir.Model {
-	m := &ir.Model{DeclBase: ir.DeclBase{Name: fqn, Span: sp(0)}, Fields: fields}
-	if summary != "" {
-		m.Description = doc(summary)
-	}
-	return m
-}
-
-func scl(fqn string, base ir.Type, decs ...ir.Application) *ir.Scalar {
-	return &ir.Scalar{DeclBase: ir.DeclBase{Name: fqn, Span: sp(0), Decorators: decs}, Base: base}
-}
-
-func exc(fqn string, value ir.Type, decs ...ir.Application) *ir.Exception {
-	return &ir.Exception{DeclBase: ir.DeclBase{Name: fqn, Span: sp(0), Decorators: decs}, Value: value}
-}
-
-func opDecl(fqn, summary string, params []ir.OpParam, returns ir.Type, exceptions []string, decs ...ir.Application) *ir.Op {
-	o := &ir.Op{
-		DeclBase:  ir.DeclBase{Name: fqn, Span: sp(0), Decorators: decs},
-		Params:    params,
-		Returns:   returns,
-		Signature: ir.Signature{Exceptions: exceptions},
-	}
-	if summary != "" {
-		o.Description = doc(summary)
-	}
-	return o
-}
-
-func param(name, model string) []ir.OpParam {
-	return []ir.OpParam{{Name: name, Type: ir.Ref(model), Span: sp(0)}}
-}
-
-// vocabNamespaces は cli と proc の語彙（plugins/go-cli/cli.hozo、vocab/proc.hozo）のうちテストに要る宣言。
-func vocabNamespaces() []ir.Namespace {
-	dec := func(fqn string, targets []ir.DecoratorTarget, params ...ir.Param) ir.Decl {
-		return &ir.Decorator{DeclBase: ir.DeclBase{Name: fqn, Span: sp(0)}, Params: params, Targets: targets}
-	}
-	str := ir.Param{Name: "name", Type: ir.TypeParam{Types: []ir.Type{ir.String()}}}
-	return []ir.Namespace{
-		{Name: "cli", Decls: []ir.Decl{
-			dec("cli.command", []ir.DecoratorTarget{ir.TargetOp}, str),
-			dec("cli.arg", []ir.DecoratorTarget{ir.TargetField}),
-			dec("cli.flag", []ir.DecoratorTarget{ir.TargetField}, str),
-			dec("cli.env", []ir.DecoratorTarget{ir.TargetField}, str),
-			dec("cli.exitCode", []ir.DecoratorTarget{ir.TargetException}, ir.Param{Name: "code", Type: ir.TypeParam{Types: []ir.Type{ir.Int()}}}),
-		}},
-		{Name: "proc", Decls: []ir.Decl{
-			exc("proc.Crashed", nil),
-			exc("proc.MalformedOutput", nil),
-			dec("proc.stdio", []ir.DecoratorTarget{ir.TargetOp}),
-		}},
-	}
-}
-
-// view は名前空間 ns を見る側にした View。単位の namespace 自身なので Dir = out。in を省いた単位として、files は ns の宣言の
-// ファイルのすべて。ops は各 op の Signature をそのまま写す。
-func view(ns ir.Namespace, out string) *ir.View {
-	conf := ir.NamespaceConfig{Language: "go", Out: out, Dir: out, Transpilers: []string{TranspilerName}}
-	files := []string{}
-	seen := map[string]bool{}
-	for _, d := range ns.Decls {
-		if f := d.Common().Span.File; !seen[f] {
-			seen[f] = true
-			files = append(files, f)
-		}
-	}
-	sort.Strings(files)
-	v := &ir.View{
-		Version:    ir.Version,
-		Viewer:     ns.Name,
-		Config:     conf,
-		Files:      files,
-		Namespaces: map[string][]ir.NamespaceConfig{ns.Name: {conf}},
-		Program:    &ir.Program{Version: ir.Version, Namespaces: append([]ir.Namespace{{Name: ""}}, append(vocabNamespaces(), ns)...)},
-		Ops:        map[string]*ir.ViewedSignature{},
-	}
-	for _, d := range ns.Decls {
-		if o, ok := d.(*ir.Op); ok {
-			v.Ops[o.Name] = &ir.ViewedSignature{Signature: o.Signature, Params: o.Params}
-		}
-	}
-	return v
-}
-
-// hozocNamespace は docs/cli.md「cli.hozo」の namespace hozoc（CLI に関わる宣言）。
-func hozocNamespace() ir.Namespace {
-	const path = "hozoc.Path"
-	diags := ir.Ref("hozoc.Diagnostics")
-	return ir.Namespace{
-		Name:        "hozoc",
-		Description: doc("hozo の仕様を検査し、各言語のコードに展開する CLI"),
-		Decls: []ir.Decl{
-			scl(path, ir.String()),
-			scl("hozoc.OutputFormat", ir.String(), app("valid.pattern", ir.Arg{Param: "regex", Value: strLit("^(text|json)$")})),
-			mdl("hozoc.Position", "位置（1 始まりの行と列）", fld("line", "", ir.Int()), fld("col", "", ir.Int())),
-			mdl("hozoc.Diagnostic", "検査やプラグインが報告する一件の指摘",
-				fld("severity", "error か warning", ir.String()),
-				fld("code", "規則の ID", ir.String()),
-				fld("message", "", ir.String()),
-				fld("file", "", ir.Optional(ir.Ref(path))),
-				fld("start", "", ir.Optional(ir.Ref("hozoc.Position"))),
-				fld("end", "", ir.Optional(ir.Ref("hozoc.Position"))),
-			),
-			mdl("hozoc.Diagnostics", "指摘の一覧", fld("items", "", ir.Array(ir.Ref("hozoc.Diagnostic")))),
-			exc("hozoc.CheckFailed", diags, cliExitCode(1)),
-			exc("hozoc.ConfigInvalid", diags, cliExitCode(2)),
-			exc("hozoc.LanguageMismatch", diags, cliExitCode(2)),
-			exc("hozoc.OutputConflict", diags, cliExitCode(3)),
-			exc("hozoc.UnknownNamespace", nil, cliExitCode(64)),
-			mdl("hozoc.CheckResult", "検査の結果（誤りではない指摘）", fld("warnings", "", ir.Array(ir.Ref("hozoc.Diagnostic")))),
-			mdl("hozoc.EmitResult", "書き出しの結果",
-				fld("warnings", "", ir.Array(ir.Ref("hozoc.Diagnostic"))),
-				fld("written", "書いたファイル（新規と更新）", ir.Array(ir.Ref(path))),
-				fld("removed", "消したファイル", ir.Array(ir.Ref(path))),
-			),
-			mdl("hozoc.CheckInput", "check の入力",
-				fld("config", "設定ファイルの場所", ir.Optional(ir.Ref(path)), cliFlag("config"), cliEnv("HOZO_CONFIG")),
-				fld("format", "表示の形式", ir.Optional(ir.Ref("hozoc.OutputFormat")), cliFlag("format")),
-				fld("pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）", ir.Optional(ir.String()), cliEnv("HOZO_PLUGIN_PATH")),
-			),
-			mdl("hozoc.EmitInput", "emit の入力",
-				fld("config", "設定ファイルの場所", ir.Optional(ir.Ref(path)), cliFlag("config"), cliEnv("HOZO_CONFIG")),
-				fld("format", "表示の形式", ir.Optional(ir.Ref("hozoc.OutputFormat")), cliFlag("format")),
-				fld("namespaces", "生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す", ir.Array(ir.String()), cliArg()),
-				fld("dryRun", "書き出さずに、書き出す予定のファイルだけを表示する", ir.Optional(ir.Boolean()), cliFlag("dry-run")),
-				fld("pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）", ir.Optional(ir.String()), cliEnv("HOZO_PLUGIN_PATH")),
-			),
-			mdl("hozoc.LspInput", "lsp の入力",
-				fld("config", "設定ファイルの場所", ir.Optional(ir.Ref(path)), cliFlag("config"), cliEnv("HOZO_CONFIG")),
-				fld("log", "ログの書き出し先", ir.Optional(ir.Ref(path)), cliFlag("log"), cliEnv("HOZO_LSP_LOG")),
-				fld("pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）", ir.Optional(ir.String()), cliEnv("HOZO_PLUGIN_PATH")),
-			),
-			opDecl("hozoc.check", "仕様を検査する。ファイルは書き出さない。", param("in", "hozoc.CheckInput"), ir.Ref("hozoc.CheckResult"),
-				[]string{"hozoc.CheckFailed", "hozoc.ConfigInvalid", "hozoc.LanguageMismatch", "proc.Crashed", "proc.MalformedOutput"},
-				cliCommand("check")),
-			opDecl("hozoc.writeOutputs", "", []ir.OpParam{
-				{Name: "in", Type: ir.Ref("hozoc.EmitInput"), Span: sp(0)},
-				{Name: "checked", Type: ir.Ref("hozoc.CheckResult"), Span: sp(0)},
-			}, ir.Ref("hozoc.EmitResult"),
-				[]string{"hozoc.CheckFailed", "hozoc.OutputConflict", "hozoc.UnknownNamespace", "proc.Crashed", "proc.MalformedOutput"}),
-			opDecl("hozoc.emit", "仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。", param("in", "hozoc.EmitInput"), ir.Ref("hozoc.EmitResult"),
-				[]string{"hozoc.CheckFailed", "hozoc.ConfigInvalid", "hozoc.LanguageMismatch", "hozoc.OutputConflict", "hozoc.UnknownNamespace", "proc.Crashed", "proc.MalformedOutput"},
-				cliCommand("emit")),
-			opDecl("hozoc.lsp", "言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。", param("in", "hozoc.LspInput"), nil, nil,
-				cliCommand("lsp")),
-			// プロセスの境界を越える op。@cli.command ではないので cli.go には出ず、選択の stops になる
-			opDecl("hozoc.runEmit", "プラグインを一つ起動して、トランスパイラ一つに展開させる。", nil, nil, []string{"proc.Crashed", "proc.MalformedOutput"}, app("proc.stdio")),
-		},
-	}
-}
-
-func hozocView() *ir.View { return view(hozocNamespace(), "internal/gen/hozoc") }
-
-// demoNamespace は変換と必須・既定値・位置引数を確かめる名前空間。
+// このファイルは、単体テストの入力と、ゴールデンの比べ方（docs/testing.md「単体テスト」の `plugins/go-cli`）。
 //
-//	@cli.command("add") op add(in: AddInput): Sum throws Overflow;
-//	model AddInput {
-//	  @cli.arg a: int;                       // 必須の位置引数
-//	  @cli.arg b: float?;                    // 省略可能な位置引数
-//	  @cli.flag("count") count: Count = 1;   // 既定値を持つ scalar（int）
-//	  @cli.flag("verbose") verbose: boolean; // 必須でない（既定値 false）... ではなく必須の boolean フラグ
-//	  @cli.flag("label") @cli.env("DEMO_LABEL") label: string?;
-//	  @cli.env("DEMO_SCALE") scale: float?;  // 環境変数だけ
-//	}
-//	@cli.command("ping") op ping();          // 引数なし、void
-func demoNamespace() ir.Namespace {
-	return ir.Namespace{
-		Name: "demo",
-		Decls: []ir.Decl{
-			scl("demo.Count", ir.Int(), app("valid.min", ir.Arg{Param: "value", Value: intLit(0)})),
-			mdl("demo.Sum", "", fld("total", "", ir.Float())),
-			exc("demo.Overflow", nil, cliExitCode(5)),
-			exc("demo.Tired", nil),
-			mdl("demo.AddInput", "add の入力",
-				fld("a", "左", ir.Int(), cliArg()),
-				fld("b", "右", ir.Optional(ir.Float()), cliArg()),
-				func() ir.Field {
-					f := fld("count", "回数", ir.Ref("demo.Count"), cliFlag("count"))
-					f.Default = ir.IntLiteral{Value: 1}
-					return f
-				}(),
-				fld("verbose", "詳しく", ir.Boolean(), cliFlag("verbose")),
-				fld("label", "名札", ir.Optional(ir.String()), cliFlag("label"), cliEnv("DEMO_LABEL")),
-				fld("scale", "倍率", ir.Optional(ir.Float()), cliEnv("DEMO_SCALE")),
-			),
-			opDecl("demo.add", "足す", param("in", "demo.AddInput"), ir.Ref("demo.Sum"), []string{"demo.Overflow", "demo.Tired"}, cliCommand("add")),
-			opDecl("demo.ping", "何もしない", nil, nil, nil, cliCommand("ping")),
-		},
+// 入力は testdata/<名前>/ の小さなプロジェクト（hozo.toml と .hozo）。このパッケージは internal/ を import できない
+// （docs/packages.md「依存の向き」）ので、.hozo を自分では解析しない: hozoc がトランスパイラに渡すのと同じ View を、
+// tests/pluginviews_test.go の TestPluginViewFixtures が testdata/<名前>/views.json に置き、ここではそれを読む。
+// 期待する出力は testdata/<名前>/expected/（プロジェクトのルートからの相対パスの木）。仕様を変えたら
+// `go test ./tests -run TestPluginViewFixtures -update`、その後に `go test ./plugins/go-cli/... -update`。
+//
+// go-cli の出力は、View だけから作る（基底と go-valid の応答を受け取らない。docs/plugin-protocol.md「起動」）。出力がコンパイル
+// できることと、振る舞いを確かめるときだけ、基底 go と go-valid の実行ファイルを、hozoc と同じに（標準入出力の JSON で）起動し、
+// その出力と合わせる: 相乗りが、依存するトランスパイラと同じ置き場と名前を、自分で求められていることの確かめになる。
+
+var update = flag.Bool("update", false, "ゴールデン（testdata/<名前>/expected/）を書き直す")
+
+// modulePath は、テストが作るプロジェクトのモジュールのパス（import パスに現れる）。
+const modulePath = "example.com/app"
+
+// repoRoot はリポジトリのルート（生成したコードが import する runtime と、基底のプラグインの置き場）。
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+// newRoot は、go.mod だけを持つプロジェクトのルートを作る。生成したコードが import する runtime は、リポジトリのものを replace で指す。
+func newRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	gomod := fmt.Sprintf("module %s\n\ngo 1.24\n\nrequire github.com/mew-ton/hozo v0.0.0\n\nreplace github.com/mew-ton/hozo => %s\n", modulePath, filepath.ToSlash(repoRoot(t)))
+	writeFile(t, filepath.Join(root, "go.mod"), gomod)
+	return root
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func demoView() *ir.View { return view(demoNamespace(), "gen/demo") }
+// loadViews は、入力 name の View の列（単位の順、その中は名前空間の辞書順）を読む。
+func loadViews(t *testing.T, name string) []*ir.View {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name, "views.json"))
+	if err != nil {
+		t.Fatalf("%v（`go test ./tests -run TestPluginViewFixtures -update` で作る）", err)
+	}
+	var views []*ir.View
+	if err := json.Unmarshal(data, &views); err != nil {
+		t.Fatalf("testdata/%s/views.json を読めない: %v", name, err)
+	}
+	if len(views) == 0 {
+		t.Fatalf("testdata/%s/views.json に View がない", name)
+	}
+	return views
+}
+
+// request は、hozoc がトランスパイラ transpiler に送る emit の要求（docs/plugin-protocol.md「emit」）。
+func request(view *ir.View, transpiler string) *plugin.EmitRequest {
+	return &plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: transpiler, View: view}
+}
+
+// listed は、view の単位が、transpilers に transpiler を並べているか（hozoc が、その出力に transpiler を起動するか）。
+func listed(view *ir.View, transpiler string) bool {
+	for _, name := range view.Config.Transpilers {
+		if name == transpiler {
+			return true
+		}
+	}
+	return false
+}
+
+// emitViews は、views のうち go-cli を並べた単位のものを、root のプロジェクトとして出力し、ファイル（パス → 内容）と、
+// 診断と、warning を集める。
+func emitViews(t *testing.T, root string, views []*ir.View) (map[string]string, []plugin.Diagnostic, []plugin.Warning) {
+	t.Helper()
+	files := map[string]string{}
+	var diags []plugin.Diagnostic
+	var warnings []plugin.Warning
+	for _, v := range views {
+		if !listed(v, TranspilerName) {
+			continue
+		}
+		out, err := Emit(request(v, TranspilerName), root)
+		if err != nil {
+			t.Fatalf("%s: %v", v.Viewer, err)
+		}
+		diags = append(diags, out.Errors...)
+		warnings = append(warnings, out.Warnings...)
+		if len(out.Errors) > 0 && (len(out.Files) > 0 || len(out.Warnings) > 0) {
+			t.Errorf("%s: 診断があるのに、ファイルか warning を返した", v.Viewer)
+		}
+		for _, f := range out.Files {
+			if _, dup := files[f.Path]; dup {
+				t.Errorf("二つの出力が同じパス %s を返した", f.Path)
+			}
+			files[f.Path] = f.Content
+		}
+	}
+	return files, diags, warnings
+}
+
+// emitFixture は、入力 name を新しいプロジェクトのルートで出力する。診断があれば失敗。
+func emitFixture(t *testing.T, name string) (root string, files map[string]string) {
+	t.Helper()
+	root = newRoot(t)
+	files, diags, _ := emitViews(t, root, loadViews(t, name))
+	for _, d := range diags {
+		t.Errorf("診断 %s（%s）: %s", d.Code, d.At, d.Message)
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+	return root, files
+}
+
+// sortedPaths は files のパスの辞書順。
+func sortedPaths(files map[string]string) []string {
+	paths := make([]string, 0, len(files))
+	for p := range files {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// readTree は dir の下のファイル（dir からの相対パス → 内容）。dir がなければ空。
+func readTree(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return filepath.SkipAll
+			}
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			return err
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		out[filepath.ToSlash(rel)] = string(data)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// compareTree は、出力 got を、入力 name のゴールデン testdata/<name>/expected/ と比べる。-update なら、先に書き直す。
+func compareTree(t *testing.T, name string, got map[string]string) {
+	t.Helper()
+	dir := filepath.Join("testdata", name, "expected")
+	if *update {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+		for p, content := range got {
+			writeFile(t, filepath.Join(dir, filepath.FromSlash(p)), content)
+		}
+	}
+	want := readTree(t, dir)
+	if len(want) == 0 {
+		t.Fatalf("ゴールデン %s がない（-update で作る）", dir)
+	}
+	for _, p := range sortedPaths(want) {
+		if _, ok := got[p]; !ok {
+			t.Errorf("%s を出力しなかった", p)
+		}
+	}
+	for _, p := range sortedPaths(got) {
+		w, ok := want[p]
+		if !ok {
+			t.Errorf("ゴールデンにない %s を出力した", p)
+			continue
+		}
+		if got[p] != w {
+			t.Errorf("%s がゴールデンと違う（-update で更新）:\n%s", p, firstDiff(w, got[p]))
+		}
+	}
+}
+
+// firstDiff は、want と got の最初に違う行を示す。
+func firstDiff(want, got string) string {
+	w, g := strings.Split(want, "\n"), strings.Split(got, "\n")
+	for i := 0; i < len(w) || i < len(g); i++ {
+		var wl, gl string
+		if i < len(w) {
+			wl = w[i]
+		}
+		if i < len(g) {
+			gl = g[i]
+		}
+		if wl != gl {
+			return fmt.Sprintf("  %d 行目\n    want: %q\n    got:  %q", i+1, wl, gl)
+		}
+	}
+	return "  （違いなし）"
+}
+
+// checkFormatted は、生成した Go が go/format を通した形で、一行目がヘッダであること（docs/plugin-go-cli.md「出力」）を確かめる。
+func checkFormatted(t *testing.T, files map[string]string) {
+	t.Helper()
+	for _, p := range sortedPaths(files) {
+		if !strings.HasSuffix(p, "/"+OutputPath) {
+			t.Errorf("%s でないファイル %s を出力した", OutputPath, p)
+			continue
+		}
+		formatted, err := format.Source([]byte(files[p]))
+		if err != nil {
+			t.Errorf("%s を go/format で整形できない: %v", p, err)
+			continue
+		}
+		if string(formatted) != files[p] {
+			t.Errorf("%s は go/format を通した形でない", p)
+		}
+		if !strings.HasPrefix(files[p], "// Code generated by hozoc go-cli "+plugin.Version+"; DO NOT EDIT.\n") {
+			t.Errorf("%s の一行目がヘッダでない", p)
+		}
+	}
+}
+
+// goTool は go のコマンド。なければテストを飛ばす。
+func goTool(t *testing.T) string {
+	t.Helper()
+	goBin, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go が PATH にない")
+	}
+	return goBin
+}
+
+// runGo は、root のモジュールで go のコマンドを走らせる。モジュールの解決はオフライン。
+func runGo(t *testing.T, root string, args ...string) (string, error) {
+	t.Helper()
+	cmd := exec.Command(goTool(t), args...)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off")
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// writeFiles は files を root の下に書く。
+func writeFiles(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for p, content := range files {
+		writeFile(t, filepath.Join(root, filepath.FromSlash(p)), content)
+	}
+}
+
+// built は、依存するトランスパイラ（基底 go と go-valid）のプラグインの実行ファイル（テストの間に一度だけビルドする）。
+var built struct {
+	once sync.Once
+	dir  string
+	err  error
+}
+
+// dependencies は、go-cli が依存するトランスパイラ（マニフェストの requires）と、そのプラグインのパッケージ。
+var dependencies = []struct{ transpiler, pkg string }{
+	{"go", "github.com/mew-ton/hozo/plugins/go"},
+	{"go-valid", "github.com/mew-ton/hozo/plugins/go-valid"},
+}
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if built.dir != "" {
+		os.RemoveAll(built.dir)
+	}
+	os.Exit(code)
+}
+
+// dependencyFiles は、views のそれぞれについて、単位に並んだ依存するトランスパイラ（基底 go と go-valid）の実行ファイルを、hozoc と
+// 同じに起動し（要求を標準入力に、応答を標準出力から。docs/plugin-protocol.md「起動」）、返ったファイルを集める。go-cli の出力と
+// 合わせて、コンパイルできることを確かめるためのもの。
+func dependencyFiles(t *testing.T, root string, views []*ir.View) map[string]string {
+	t.Helper()
+	goBin := goTool(t)
+	built.once.Do(func() {
+		built.dir, built.err = os.MkdirTemp("", "hozo-plugins")
+		if built.err != nil {
+			return
+		}
+		for _, dep := range dependencies {
+			cmd := exec.Command(goBin, "build", "-o", filepath.Join(built.dir, dep.transpiler), dep.pkg)
+			cmd.Dir = repoRoot(t)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				built.err = fmt.Errorf("プラグイン %s をビルドできない: %v\n%s", dep.transpiler, err, out)
+				return
+			}
+		}
+	})
+	if built.err != nil {
+		t.Fatal(built.err)
+	}
+	files := map[string]string{}
+	for _, v := range views {
+		for _, dep := range dependencies {
+			if !listed(v, dep.transpiler) {
+				continue
+			}
+			req, err := json.Marshal(request(v, dep.transpiler))
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command(filepath.Join(built.dir, dep.transpiler))
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "HOZO_PROJECT_ROOT="+root)
+			cmd.Stdin = bytes.NewReader(req)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			if err := cmd.Run(); err != nil {
+				t.Fatalf("%s（%s）: %v\n%s", dep.transpiler, v.Viewer, err, stderr.String())
+			}
+			var resp plugin.EmitResponse
+			if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+				t.Fatalf("%s（%s）の応答を読めない: %v", dep.transpiler, v.Viewer, err)
+			}
+			for _, d := range resp.Errors {
+				t.Errorf("%s（%s）の診断 %s: %s", dep.transpiler, v.Viewer, d.Code, d.Message)
+			}
+			for _, f := range resp.Files {
+				if _, dup := files[f.Path]; dup {
+					t.Errorf("二つのトランスパイラが同じパス %s を返した", f.Path)
+				}
+				files[f.Path] = f.Content
+			}
+		}
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
+	return files
+}
+
+// compose は、root に、依存するトランスパイラの出力と、go-cli の出力 files を書く（hozoc emit が書き出すものと同じ木）。
+func compose(t *testing.T, root string, views []*ir.View, files map[string]string) {
+	t.Helper()
+	deps := dependencyFiles(t, root, views)
+	for p := range files {
+		if _, clash := deps[p]; clash {
+			t.Errorf("依存するトランスパイラと同じパス %s を返した（CFG-5）", p)
+		}
+	}
+	writeFiles(t, root, deps)
+	writeFiles(t, root, files)
+}
+
+// vet は、依存するトランスパイラの出力と合わせて、生成したコードが `go vet` を通る（コンパイルできる）ことを確かめる。
+func vet(t *testing.T, root string, views []*ir.View, files map[string]string) {
+	t.Helper()
+	compose(t, root, views, files)
+	if out, err := runGo(t, root, "vet", "./..."); err != nil {
+		t.Errorf("生成したコードが go vet を通らない: %v\n%s", err, out)
+	}
+}

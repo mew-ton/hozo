@@ -138,3 +138,39 @@ func TestStandard(t *testing.T) {
 		}
 	}
 }
+
+// docs/plugin-go-valid.md「出力」の GOVALID-3 と、それを前提にする相乗り（GOHTTP-11、CLI-9）が共有する規則: 別の名前空間の型の
+// Validate を呼べるのは、その名前空間の型の置き場（docs/config.md「型の置き場」）の単位が go-valid を並べているときだけ。
+func TestUnlisted(t *testing.T) {
+	conf := func(index int, base string, transpilers ...string) ir.NamespaceConfig {
+		return ir.NamespaceConfig{Index: index, Language: "go", Base: base, Transpilers: transpilers}
+	}
+	view := &ir.View{
+		Viewer: "app",
+		Config: conf(3, "go", "go", "go-valid", "go-http"),
+		Namespaces: map[string][]ir.NamespaceConfig{
+			"app": {conf(3, "go", "go", "go-valid", "go-http")},
+			// 置き場は、基底が同じ最初の単位（2 番目。1 番目は基底が違う）
+			"plain":   {conf(1, "ts", "ts", "go-valid"), conf(2, "go", "go"), conf(4, "go", "go", "go-valid")},
+			"checked": {conf(2, "go", "go", "go-valid")},
+			// 自分の単位も出力しているなら、置き場は自分の単位（設定の順で前に、並べていない単位があっても）
+			"own": {conf(2, "go", "go"), conf(3, "go", "go", "go-valid", "go-http")},
+			// 基底の違う単位だけ: 置き場がない
+			"other": {conf(1, "ts", "ts")},
+		},
+	}
+	for ns, want := range map[string]int{"plain": 2, "checked": 0, "own": 0, "other": 0, "nowhere": 0, "app": 0} {
+		unit, ok := Unlisted(view, ns)
+		if unit != want || ok != (want != 0) {
+			t.Errorf("Unlisted(%s) = %d, %v, want %d", ns, unit, ok, want)
+		}
+	}
+	// 見る側の名前空間は、View.config で見る
+	view.Config = conf(3, "go", "go")
+	if unit, ok := Unlisted(view, "app"); unit != 3 || !ok {
+		t.Errorf("Unlisted(viewer) = %d, %v, want 3", unit, ok)
+	}
+	if unit, ok := Unlisted(nil, "app"); unit != 0 || ok {
+		t.Errorf("Unlisted(nil) = %d, %v", unit, ok)
+	}
+}

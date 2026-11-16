@@ -1,0 +1,466 @@
+package gocli
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"testing"
+
+	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin"
+)
+
+// goldenFixtures は、出力をゴールデンと比べる入力（testdata/<名前>/）と、それが確かめる docs/plugin-go-cli.md の見出し。
+// behavior は、生成したコードを動かすテスト testdata/<名前>/behavior_test.go を持つもの。
+var goldenFixtures = []struct {
+	name     string
+	covers   string
+	behavior bool
+}{
+	{name: "commands", covers: "「出力」「引数の解釈」「実行と表示」「使い方の表示」の各行", behavior: true},
+	{name: "locals", covers: "名前空間のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前）", behavior: true},
+}
+
+// TestGolden は、入力ごとに、出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形で
+// あること、同じ View から同じバイト列を返すこと、依存するトランスパイラ（基底 go と go-valid）の出力と合わせてコンパイルできる
+// （一時のモジュールで go vet を通る）ことを確かめる。
+func TestGolden(t *testing.T) {
+	for _, fx := range goldenFixtures {
+		t.Run(fx.name, func(t *testing.T) {
+			t.Parallel()
+			views := loadViews(t, fx.name)
+			root, files := emitFixture(t, fx.name)
+			checkFormatted(t, files)
+			compareTree(t, fx.name, files)
+			// 決定性: もう一度、別のルート（同じモジュールのパス）で出力しても、同じバイト列
+			again, _, _ := emitViews(t, newRoot(t), views)
+			if len(again) != len(files) {
+				t.Errorf("二度目の出力のファイルの数が違う: %d と %d", len(files), len(again))
+			}
+			for p, content := range files {
+				if again[p] != content {
+					t.Errorf("%s が、二度目の出力で変わった", p)
+				}
+			}
+			vet(t, root, views, files)
+		})
+	}
+}
+
+// TestBehavior は、生成したコードを一時のモジュールで実際に動かす（docs/testing.md「単体テスト」）: 入力の behavior_test.go を、
+// 依存するトランスパイラの出力と go-cli の出力を書いたモジュールのルートに置いて、go test を走らせる。確かめることは、
+// それぞれのファイルの頭。
+func TestBehavior(t *testing.T) {
+	for _, fx := range goldenFixtures {
+		if !fx.behavior {
+			continue
+		}
+		t.Run(fx.name, func(t *testing.T) {
+			t.Parallel()
+			root, files := emitFixture(t, fx.name)
+			compose(t, root, loadViews(t, fx.name), files)
+			test, err := os.ReadFile(filepath.Join("testdata", fx.name, "behavior_test.go"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeFile(t, filepath.Join(root, "behavior_test.go"), string(test))
+			out, err := runGo(t, root, "test", "-count=1", "-v", ".")
+			if err != nil {
+				t.Fatalf("生成したコードのテストが落ちた: %v\n%s", err, out)
+			}
+			if !strings.Contains(out, "--- PASS: Test") {
+				t.Fatalf("生成したコードのテストが一つも走らなかった:\n%s", out)
+			}
+		})
+	}
+}
+
+// TestPlacement は「出力」の置き場と、公開の名前: cli.go は、Dir(U, N) の下のディレクトリ cli に一つ（パッケージ cli）。
+// N の入口のパッケージを import し、内側のパッケージは import しない。公開の名前は Main、Presenter、Failure、JSONPresenter。
+// 非公開の名前は、パッケージ名になりうる形（小文字と数字だけ）にしない（名前空間のパッケージの import の名前と当たらないように）。
+func TestPlacement(t *testing.T) {
+	_, files := emitFixture(t, "commands")
+	if got := strings.Join(sortedPaths(files), " "); got != "gen/demo/cli/cli.go gen/tool/cli/cli.go" {
+		t.Fatalf("ファイル = %s", got)
+	}
+	tool := files["gen/tool/cli/cli.go"]
+	for _, want := range []string{
+		"\npackage cli\n",
+		"\t\"example.com/app/gen/tool\"\n",
+		"\t\"example.com/app/gen/fail\"\n",
+		"\nfunc Main(ctx context.Context, ops tool.Ops, p Presenter, args []string, env func(string) string, stdout, stderr io.Writer) int {\n",
+		"\ntype Presenter interface {\n",
+		"\tPresent(w io.Writer, command string, input any, result any) error\n",
+		"\tPresentError(w io.Writer, command string, input any, f Failure) error\n",
+		"\ntype Failure struct {\n\tName  string\n\tValue any\n\tErr   error\n}\n",
+		"\ntype JSONPresenter struct{}\n",
+	} {
+		if !strings.Contains(tool, want) {
+			t.Errorf("gen/tool/cli/cli.go に %q がない", want)
+		}
+	}
+	if strings.Contains(tool, "/inner\"") {
+		t.Error("gen/tool/cli/cli.go が、内側のパッケージを import している")
+	}
+	public := map[string]bool{"Main": true, "Presenter": true, "Failure": true, "JSONPresenter": true}
+	lower := regexp.MustCompile(`^[a-z0-9]+$`)
+	for p, content := range files {
+		for _, line := range strings.Split(content, "\n") {
+			var name string
+			switch {
+			case strings.HasPrefix(line, "func ") && !strings.HasPrefix(line, "func ("):
+				name = strings.TrimPrefix(line, "func ")
+			case strings.HasPrefix(line, "type "):
+				name = strings.TrimPrefix(line, "type ")
+			case strings.HasPrefix(line, "var "), strings.HasPrefix(line, "const "):
+				t.Errorf("%s: パッケージの変数か定数を持つ: %s", p, line)
+				continue
+			default:
+				continue
+			}
+			name = name[:strings.IndexAny(name, "([ ")]
+			switch {
+			case name[0] >= 'A' && name[0] <= 'Z':
+				if !public[name] {
+					t.Errorf("%s: 文書にない公開の名前 %s", p, name)
+				}
+			case lower.MatchString(name):
+				t.Errorf("%s: 非公開の名前 %s が、パッケージ名になりうる形（小文字と数字だけ）", p, name)
+			}
+		}
+	}
+}
+
+// TestHelpers: 補助の関数と import は、使うものだけを出す（使わない import はコンパイルできない）。
+func TestHelpers(t *testing.T) {
+	_, files := emitFixture(t, "commands")
+	tool, demo := files["gen/tool/cli/cli.go"], files["gen/demo/cli/cli.go"]
+	// tool は、値の変換が boolean だけで、既定値を持つ model も、array でない位置引数もない
+	if !strings.Contains(tool, "\t\"strconv\"\n") || strings.Contains(tool, "ParseInt") || strings.Contains(tool, "func cliLookupArg(") {
+		t.Error("gen/tool/cli/cli.go: 使わない補助を出したか、使う import がない")
+	}
+	if !strings.Contains(demo, "func cliLookupArg(") || !strings.Contains(demo, "demo.NewAddInput()") || !strings.Contains(demo, "demo.NewCopyInput()") {
+		t.Error("gen/demo/cli/cli.go: 位置引数の補助か、既定値を持つ model の初めの値がない")
+	}
+	// Validate を呼ぶのは、Validate を持つ入力だけ（tool では CheckInput。EmitInput と ServeInput は持たない）
+	if n := strings.Count(tool, ".Validate()"); n != 1 {
+		t.Errorf("gen/tool/cli/cli.go: Validate() が %d 回（Validate を持つ入力は CheckInput だけ）", n)
+	}
+	if n := strings.Count(demo, ".Validate()"); n != 2 {
+		t.Errorf("gen/demo/cli/cli.go: Validate() が %d 回（Validate を持つ入力は AddInput と CopyInput）", n)
+	}
+}
+
+// TestNoCommands は「出力」: @cli.command の op が一つもなければ、ファイルを出さず warning を一つ返す。
+func TestNoCommands(t *testing.T) {
+	root := newRoot(t)
+	files, diags, warnings := emitViews(t, root, loadViews(t, "nocommands"))
+	if len(files) != 0 || len(diags) != 0 || len(warnings) != 1 {
+		t.Fatalf("files=%v 診断=%+v warnings=%+v, want warning が一つだけ", sortedPaths(files), diags, warnings)
+	}
+	if warnings[0].At != "app" || !strings.Contains(warnings[0].Message, "@cli.command") {
+		t.Errorf("warning = %+v", warnings[0])
+	}
+}
+
+// TestUnitTargets は「対象」: サブコマンドにするのは、単位の対象の op（View.files にあるファイルの op。docs/config.md「in」）だけ。
+// 単位の対象でない op は、@cli.command が付いていても、サブコマンドにならない。
+func TestUnitTargets(t *testing.T) {
+	var demo *ir.View
+	for _, v := range loadViews(t, "commands") {
+		if v.Viewer == "demo" {
+			demo = v
+		}
+	}
+	root := newRoot(t)
+	files, diags, warnings := emitViews(t, root, []*ir.View{demo})
+	if len(files) != 1 || len(diags) != 0 || len(warnings) != 0 {
+		t.Fatalf("files=%v 診断=%+v warnings=%+v, want ファイルが一つ", sortedPaths(files), diags, warnings)
+	}
+	outside := *demo
+	outside.Files = []string{"elsewhere.hozo"}
+	files, diags, warnings = emitViews(t, root, []*ir.View{&outside})
+	if len(files) != 0 || len(diags) != 0 || len(warnings) != 1 {
+		t.Errorf("単位の対象でない op だけ: files=%v 診断=%+v warnings=%+v, want warning が一つだけ", sortedPaths(files), diags, warnings)
+	}
+}
+
+// TestDir は「出力」: 置き場と import パスは View.config.dir（Dir(U, N)）から求める。単位の namespace の子孫では、dir が out の
+// サブディレクトリになっている。
+func TestDir(t *testing.T) {
+	var demo *ir.View
+	for _, v := range loadViews(t, "commands") {
+		if v.Viewer == "demo" {
+			demo = v
+		}
+	}
+	moved := *demo
+	moved.Config.Out, moved.Config.Dir = "out", "out/sub/demo"
+	moved.Namespaces = map[string][]ir.NamespaceConfig{"demo": {moved.Config}}
+	files, diags, _ := emitViews(t, newRoot(t), []*ir.View{&moved})
+	if len(diags) != 0 {
+		t.Fatalf("診断 %+v", diags)
+	}
+	content, ok := files["out/sub/demo/cli/cli.go"]
+	if !ok || !strings.Contains(content, "\t\""+modulePath+"/out/sub/demo\"\n") {
+		t.Errorf("ファイル = %v（import パスは dir から）", sortedPaths(files))
+	}
+}
+
+// diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
+// （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
+var diagnosticFixtures = []struct{ name, code string }{
+	{"cli1", codeCLIParams},    // @cli.command の op の引数が、0 個でも model 一つでもない
+	{"cli2", codeCLIDecorator}, // 入力の model のフィールドに cli のデコレータがない、または @cli.arg と @cli.flag の両方がある
+	{"cli3", codeCLIFieldType}, // フィールドの型が受け付けられない
+	{"cli4", codeCLIArrayArg},  // array の @cli.arg が最後でない、または二つ以上
+	{"cli5", codeCLIDuplicate}, // フラグ名かコマンド名の重複
+	{"cli6", codeCLIExport},    // @cli.command の付いた op に export がない
+	{"cli7", codeCLIDir},       // ディレクトリ cli が、同じ単位が出力する子の名前空間 N.cli の出力先と重なる
+	{"cli8", codeCLIOption},    // [emit.options.go-cli] に、知らないキーがある
+	{"cli9", codeCLIValidate},  // Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
+}
+
+// TestDiagnostics は docs/plugin-go-cli.md「診断」の CLI-1〜CLI-9: 診断のコード・位置・メッセージがゴールデンと同じで、
+// 診断を返した出力がファイルも warning も返さないこと（emitViews が確かめる）。
+func TestDiagnostics(t *testing.T) {
+	for _, fx := range diagnosticFixtures {
+		t.Run(fx.name, func(t *testing.T) {
+			_, diags, _ := emitViews(t, newRoot(t), loadViews(t, fx.name))
+			if len(diags) == 0 {
+				t.Fatal("診断がない")
+			}
+			var b bytes.Buffer
+			for _, d := range diags {
+				if d.Code != fx.code {
+					t.Errorf("コード %s の診断がある（%s だけのはず）: %s", d.Code, fx.code, d.Message)
+				}
+				if d.Message == "" {
+					t.Errorf("%s（%s）にメッセージがない", d.Code, d.At)
+				}
+				b.WriteString(d.Code + "\t" + d.At + "\t" + d.Message + "\n")
+			}
+			compareTree(t, fx.name, map[string]string{"errors.txt": b.String()})
+		})
+	}
+}
+
+// TestDiagnosticPositions は、診断の位置と数（docs/plugin-go-cli.md「診断」の表）: 表に書いた宣言の FQN。CLI-7 と CLI-8 は位置なし。
+func TestDiagnosticPositions(t *testing.T) {
+	for name, want := range map[string][]string{
+		"cli1": {"app.two", "app.core", "app.named", "app.optional", "app.many"},
+		"cli2": {"app.In", "app.In"},
+		"cli3": {"app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In", "app.In"},
+		"cli4": {"app.Early", "app.Twice"},
+		"cli5": {"app.In", "app.again", "app.third"},
+		"cli6": {"app.hidden", "app.also"},
+		"cli7": {""},
+		"cli8": {"", ""},
+		"cli9": {"app.a", "app.b"},
+	} {
+		_, diags, _ := emitViews(t, newRoot(t), loadViews(t, name))
+		var got []string
+		for _, d := range diags {
+			got = append(got, d.At)
+		}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("%s: 位置 = %q, want %q", name, got, want)
+		}
+	}
+}
+
+// TestAllErrorsAreReported: 一つの出力に複数の誤りがあれば、止まらずにすべて報告する（別の規則のものも）。
+func TestAllErrorsAreReported(t *testing.T) {
+	view := *loadViews(t, "cli6")[0]
+	view.Config.Options = map[string]map[string]any{TranspilerName: {"color": true}}
+	_, diags, _ := emitViews(t, newRoot(t), []*ir.View{&view})
+	var codes []string
+	for _, d := range diags {
+		codes = append(codes, d.Code)
+	}
+	if got := strings.Join(codes, " "); got != "CLI-8 CLI-6 CLI-6" {
+		t.Errorf("診断 = %s", got)
+	}
+}
+
+// TestNoGoMod: Dir(U, N) の上に go.mod がないとき（基底が GO-1 を返す）、go-cli は、ファイルも診断も返さない。
+// 仕様だけで決まる診断は、go.mod がなくても返す。
+func TestNoGoMod(t *testing.T) {
+	files, diags, warnings := emitViews(t, t.TempDir(), loadViews(t, "commands"))
+	if len(files) != 0 || len(diags) != 0 || len(warnings) != 0 {
+		t.Errorf("files=%v 診断=%+v warnings=%+v, want どれも空（GO-1 は基底が返す）", sortedPaths(files), diags, warnings)
+	}
+	_, diags, _ = emitViews(t, t.TempDir(), loadViews(t, "cli6"))
+	if len(diags) == 0 || diags[0].Code != codeCLIExport {
+		t.Errorf("診断 = %+v, want CLI-6", diags)
+	}
+}
+
+// TestBrokenView: View が欠けている（Program がない、viewer の名前空間が Program にない）のは、利用者の仕様の誤りではないので、
+// 診断ではなく error で終わる（hozoc からは proc.Crashed）。
+func TestBrokenView(t *testing.T) {
+	view := loadViews(t, "commands")[0]
+	for name, v := range map[string]*ir.View{
+		"Program がない":          {Version: ir.Version, Viewer: "tool", Config: view.Config},
+		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
+	} {
+		out, err := Emit(request(v, TranspilerName), newRoot(t))
+		if err == nil || out != nil {
+			t.Errorf("%s: out=%+v err=%v, want error だけ", name, out, err)
+		}
+	}
+}
+
+// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力し、診断は応答の errors で返す
+// （docs/plugin-protocol.md「emit」）。提供するトランスパイラは go-cli の一つ。check と import は持たない。
+func TestHandler(t *testing.T) {
+	view := loadViews(t, "commands")[0]
+	root := newRoot(t)
+	h := Handler{Getenv: func(key string) string {
+		if key == "HOZO_PROJECT_ROOT" {
+			return root
+		}
+		return ""
+	}}
+	resp, err := h.Emit(request(view, TranspilerName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Files) != 1 || len(resp.Errors) != 0 || len(resp.Warnings) != 0 {
+		t.Fatalf("files=%d errors=%v warnings=%v", len(resp.Files), resp.Errors, resp.Warnings)
+	}
+	want, _, _ := emitViews(t, root, []*ir.View{view})
+	if f := resp.Files[0]; f.Path != "gen/tool/cli/cli.go" || want[f.Path] != f.Content {
+		t.Errorf("%s が Emit の結果と違う", f.Path)
+	}
+	// 診断は errors で返し、ファイルは返さない
+	resp, err = h.Emit(request(loadViews(t, "cli8")[0], TranspilerName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Files) != 0 || len(resp.Errors) == 0 || resp.Errors[0].Code != codeCLIOption {
+		t.Errorf("files=%d errors=%+v, want CLI-8", len(resp.Files), resp.Errors)
+	}
+	// ほかのトランスパイラの名前は unsupported
+	for _, name := range []string{"", "go", "go-http"} {
+		if _, err := h.Emit(request(view, name)); !errors.Is(err, plugin.ErrUnsupported) {
+			t.Errorf("transpiler %q の err = %v, want ErrUnsupported", name, err)
+		}
+	}
+	if _, err := h.Emit(&plugin.EmitRequest{Transpiler: TranspilerName}); err == nil {
+		t.Error("View のない要求で、エラーにならない")
+	}
+	if _, err := h.Check(&plugin.CheckRequest{}); err != plugin.ErrUnsupported {
+		t.Errorf("Check の err = %v, want ErrUnsupported", err)
+	}
+	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
+		t.Errorf("Import の err = %v, want ErrUnsupported", err)
+	}
+}
+
+// TestProtocol は、JSON の要求を plugin.Run に通したときの応答の形（docs/plugin-protocol.md「emit」「要求と応答」）。
+func TestProtocol(t *testing.T) {
+	root := newRoot(t)
+	h := Handler{Getenv: func(string) string { return root }}
+	run := func(view *ir.View) string {
+		t.Helper()
+		req, err := json.Marshal(request(view, TranspilerName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out, errOut bytes.Buffer
+		if code := plugin.Run(h, bytes.NewReader(req), &out, &errOut); code != 0 || errOut.Len() != 0 {
+			t.Fatalf("code = %d, stderr = %q", code, errOut.String())
+		}
+		return out.String()
+	}
+	// 成功: warnings は空でも [] で出し、errors は省く。select は書かない（版 0.4 でなくした）
+	out := run(loadViews(t, "commands")[0])
+	var resp plugin.EmitResponse
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		t.Fatalf("応答が JSON でない: %v\n%s", err, out)
+	}
+	if len(resp.Files) != 1 || resp.Files[0].Path != "gen/tool/cli/cli.go" {
+		t.Fatalf("files = %+v", resp.Files)
+	}
+	if !strings.Contains(out, `"warnings":[]`) || strings.Contains(out, `"errors"`) || strings.Contains(out, `"select"`) {
+		t.Errorf("warnings は []、errors と select は書かない: %.200s", out)
+	}
+	// 診断: files は []
+	out = run(loadViews(t, "cli6")[0])
+	if want := `{"files":[],"warnings":[],"errors":[{"code":"CLI-6","at":"app.hidden","message":`; !strings.HasPrefix(out, want) {
+		t.Errorf("応答 = %s\nwant 先頭が %s", out, want)
+	}
+	// 実装しない direction
+	for _, dir := range []string{"check", "import"} {
+		var o, e bytes.Buffer
+		code := plugin.Run(Handler{}, strings.NewReader(`{"protocol":"`+ir.Version+`","direction":"`+dir+`"}`), &o, &e)
+		if code != 2 || !strings.Contains(o.String(), `"code":"unsupported"`) {
+			t.Errorf("%s: code = %d, stdout = %s", dir, code, o.String())
+		}
+	}
+}
+
+// TestPluginBinary は、プラグインの main を go run で起動し、標準入出力で一往復する（docs/plugin-protocol.md「起動」）。
+func TestPluginBinary(t *testing.T) {
+	goBin := goTool(t)
+	root := newRoot(t)
+	view := loadViews(t, "commands")[0]
+	req, err := json.Marshal(request(view, TranspilerName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(goBin, "run", "github.com/mew-ton/hozo/plugins/go-cli")
+	cmd.Dir = repoRoot(t)
+	cmd.Env = append(os.Environ(), "HOZO_PROJECT_ROOT="+root, "HOZO_PLUGIN_DIR="+filepath.Join(repoRoot(t), "plugins", "go-cli"))
+	cmd.Stdin = bytes.NewReader(req)
+	var out, errOut bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("go run: %v\n%s", err, errOut.String())
+	}
+	var resp plugin.EmitResponse
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("応答が JSON でない: %v\n%s", err, out.String())
+	}
+	want, _, _ := emitViews(t, root, []*ir.View{view})
+	if len(resp.Files) != 1 || resp.Files[0].Path != "gen/tool/cli/cli.go" || resp.Files[0].Content != want["gen/tool/cli/cli.go"] {
+		t.Errorf("応答が Emit の結果と違う: %d 個のファイル", len(resp.Files))
+	}
+}
+
+// TestManifest は、マニフェスト（docs/plugin-go-cli.md「マニフェスト」）。外部の TOML は使えないので、行で見る。
+func TestManifest(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "hozo-plugin.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	checks := map[string]*regexp.Regexp{
+		"name":     regexp.MustCompile(`(?m)^name\s*=\s*"go-cli"$`),
+		"command":  regexp.MustCompile(`(?m)^command\s*=\s*\["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"\]$`),
+		"protocol": regexp.MustCompile(`(?m)^protocol\s*=\s*"` + regexp.QuoteMeta(ir.Version) + `"$`),
+		// 提供するトランスパイラは一つ: 名前は TranspilerName、言語は go
+		"transpiler": regexp.MustCompile(`(?m)^\[\[transpiler\]\]\nname\s*=\s*"` + regexp.QuoteMeta(TranspilerName) + `"\nlanguage\s*=\s*"go"$`),
+		// Go の基底 go と、検証の go-valid に相乗りする
+		"requires": regexp.MustCompile(`(?m)^requires\s*=\s*\["go", "go-valid"\]$`),
+		// cli の語彙は、このプラグインが提供する
+		"vocabulary": regexp.MustCompile(`(?m)^vocabulary\s*=\s*\["cli\.hozo"\]`),
+	}
+	for name, re := range checks {
+		if !re.MatchString(s) {
+			t.Errorf("マニフェストに %s がない:\n%s", name, s)
+		}
+	}
+	if strings.Count(s, "[[transpiler]]") != 1 {
+		t.Errorf("提供するトランスパイラは一つ:\n%s", s)
+	}
+	if _, err := os.Stat(filepath.Join("..", "..", "cli.hozo")); err != nil {
+		t.Errorf("plugins/go-cli/cli.hozo がない: %v", err)
+	}
+}

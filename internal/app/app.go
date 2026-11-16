@@ -1,25 +1,27 @@
 // Package app は hozoc の葉の op の実装と表示（docs/cli.md「手で書くもの」）。
 //
-// 骨組み（引数の解釈、例外の見分けと終了コード、使い方の表示）は cli.hozo から生成した
-// internal/gen/hozoc（既定の出力。docs/emit-go.md）と internal/gen/hozoc/cli（go-cli。docs/plugin-go-cli.md）が持ち、
-// ここは生成した実装の単位を埋める [App] と、cli.Presenter の実装 [Presenter] を持つ。go-cli が選ぶのは @cli.command の
-// check / emit / lsp と、emit の配線から辿られる writeOutputs:
+// 骨組み（型、op の形、実装を受け取る口、配線、引数の解釈、例外の見分けと終了コード、使い方の表示）は cli.hozo から生成した
+// internal/gen/hozoc（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と internal/gen/hozoc/cli（go-cli。
+// docs/plugin-go-cli.md）が持ち、ここは、生成した口を満たす [App] と、cli.Presenter の実装 [Presenter] を持つ:
 //
-//   - 効果を持たない葉の check と lsp は hozoc.Leaves のフィールド（[App.Leaves]）。
-//   - 効果 syncOutputs を持つ葉の writeOutputs は、その宛先の状態の単位 hozoc.States.OutputsSync の命令。同じ単位の
-//     問い合わせ（分類 OutputsSync の述語 UpToDate）と一緒に [App.States] が返す。
-//   - 配線の emit は生成した ops が持つ。
-//   - どの配線からも呼ばれない runEmit は生成の対象にならないので、このパッケージの中の関数（emit.go）。
+//   - 効果も reads も持たない葉の check、lsp、runEmit は hozoc.Leaves のメソッドで、*App がそれを満たす。
+//   - 効果 syncOutputs を持つ葉の writeOutputs は、その宛先の状態の分類 OutputsSync の単位（hozoc.OutputsSyncState）の命令。
+//     同じ単位の問い合わせ（述語 UpToDate）と一緒に、[App.OutputsSync] が返す値が持つ。
+//   - 状態 sources、config、outputs の単位（形で決まる問い合わせ IsEmpty と Get だけ）は、[App.Sources]、[App.Config]、
+//     [App.Outputs] が返す値。
+//   - 配線の emit は、生成した本体が持つ。
 //
-// [App.Ops] がこれらを組み立てる（hozoc.States に入れるのはそこだけ）。cmd/hozoc/main.go はその結果を cli.Main に渡す。
+// [App.Ops] が、これらを hozoc.New に渡す。口はどれもインターフェースで、実装は New の位置引数なので、メソッドの書き忘れも、
+// 渡し忘れも、コンパイルできない。cmd/hozoc/main.go は、その結果を cli.Main に渡す。
 //
 // 境界の型は生成したもの（hozoc.CheckInput、hozoc.Diagnostic、hozoc.CheckFailed など）で、中の豊かな型
-// （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型で
-// 返す（hozoc.CheckFailed{Value: hozoc.Diagnostics{...}} など）。cli.go はそれを errors.As で見分けて
-// @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
+// （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型を値で
+// 返す（hozoc.CheckFailed{Value: hozoc.Diagnostics{...}} など。proc の例外は internal/gen/proc の型）。cli.go はそれを
+// errors.As で見分けて @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +31,7 @@ import (
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/proc"
 	"github.com/mew-ton/hozo/internal/lsp"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
@@ -55,8 +58,8 @@ type App struct {
 	Stdin  io.Reader
 	Stdout io.Writer
 
-	// pluginPath は直前の Check か Lsp の入力の pluginPath（HOZO_PLUGIN_PATH）。入力を取らない UpToDate が、
-	// 自分で解析するときに使う。
+	// pluginPath は直前の Check か Lsp の入力の pluginPath（HOZO_PLUGIN_PATH）。入力を取らない問い合わせ（UpToDate と、
+	// 状態の単位の IsEmpty / Get）が、自分で解析するときに使う。
 	pluginPath string
 
 	// checked は直前の Check が解析した Project。WriteOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
@@ -64,23 +67,13 @@ type App struct {
 	checked *project.Project
 }
 
-// Leaves は効果を持たない葉の op（check、lsp）の実装を入れた hozoc.Leaves。
-func (a *App) Leaves() hozoc.Leaves {
-	return hozoc.Leaves{Check: a.Check, Lsp: a.Lsp}
-}
+// *App は、人が実装する葉の op（check、lsp、runEmit）の口を満たす。メソッドが一つでも足りなければ、ここでコンパイルできない。
+var _ hozoc.Leaves = (*App)(nil)
 
-// States は hozoc の状態の単位の実装: 状態の分類 OutputsSync の述語 UpToDate（問い合わせ）と、
-// 効果 syncOutputs を持つ葉の op writeOutputs（命令）。
-func (a *App) States() hozoc.StateSet {
-	return hozoc.StateSet{OutputsSync: hozoc.OutputsSyncState{UpToDate: a.UpToDate, WriteOutputs: a.WriteOutputs}}
-}
-
-// Ops は a の実装で hozoc の Ops を組み立てる（docs/cli.md「手で書くもの」の cmd/hozoc/main.go の中身）:
-// パッケージの変数 hozoc.States に a.States() を入れ、hozoc.New(a.Leaves()) を返す。hozoc.States に入れるのはここだけ。
-// 変数は一つなので、最後に Ops を呼んだ App が効く（hozoc は一度の実行で App を一つだけ作る）。
+// Ops は a の実装で hozoc の Ops を組み立てる（docs/cli.md「手で書くもの」）: hozoc.New に、葉の op（a 自身）と、状態の単位を
+// 宣言順に渡す。返る値は a だけを持ち、パッケージの変数は使わない（App を二つ作れば、互いに何も共有しない）。
 func (a *App) Ops() hozoc.Ops {
-	hozoc.States = a.States()
-	return hozoc.New(a.Leaves())
+	return hozoc.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())
 }
 
 // Lsp は cli.hozo の op lsp: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
@@ -88,7 +81,10 @@ func (a *App) Ops() hozoc.Ops {
 // hozo.toml の場所で、なければクライアントの rootUri から探す。log（--log / HOZO_LSP_LOG）はログの書き出し先で、
 // 開けなければその誤りを返す（宣言にない例外なので 70。docs/diagnostics.md「終了コード」）。
 // 標準エラーには書かない（docs/lsp.md「通信」）。
-func (a *App) Lsp(in hozoc.LspInput) error {
+func (a *App) Lsp(ctx context.Context, in hozoc.LspInput) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	a.pluginPath = str(in.PluginPath)
 	opts := lsp.Options{Root: a.Dir, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home}
 	if in.Config != nil && *in.Config != "" {
@@ -189,10 +185,10 @@ func (e *unknownNamespace) Error() string {
 func (e *unknownNamespace) Unwrap() error { return hozoc.UnknownNamespace{} }
 
 // procError は internal/plugin の誤り（ErrCrashed / ErrMalformedOutput）を cli.hozo の proc.Crashed /
-// proc.MalformedOutput（hozoc のパッケージに複製された型。docs/emit-go.md「配置」）としても見分けられるようにしたもの。
-// メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
+// proc.MalformedOutput（proc の単位の出力 internal/gen/proc の型。hozoc のパッケージには複製されない。docs/config.md
+// 「型の置き場」）としても見分けられるようにしたもの。メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
 type procError struct {
-	exc   error // hozoc.Crashed{} か hozoc.MalformedOutput{}
+	exc   error // proc.Crashed{} か proc.MalformedOutput{}
 	cause error
 }
 
@@ -205,9 +201,9 @@ func asProc(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, hostplugin.ErrCrashed):
-		return &procError{exc: hozoc.Crashed{}, cause: err}
+		return &procError{exc: proc.Crashed{}, cause: err}
 	case errors.Is(err, hostplugin.ErrMalformedOutput):
-		return &procError{exc: hozoc.MalformedOutput{}, cause: err}
+		return &procError{exc: proc.MalformedOutput{}, cause: err}
 	}
 	return err
 }

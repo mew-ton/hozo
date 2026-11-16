@@ -1,0 +1,12 @@
+CLI-3	app.In	入力の model app.In のフィールド model_ の型 app.Point は受け付けられない: 値を、コマンドラインの一つの文字列から読めない（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド record の型 Record<string, string> は受け付けられない: 値を、コマンドラインの一つの文字列から読めない（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド time の型 Time は受け付けられない: 値を、コマンドラインの一つの文字列から読めない（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド duration の型 Duration は受け付けられない: 値を、コマンドラインの一つの文字列から読めない（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド when の型 app.When? は受け付けられない: 値を、コマンドラインの一つの文字列から読めない（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド flags の型 string[] は受け付けられない: array は @cli.arg にだけ付けられる（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド envs の型 string[] は受け付けられない: array は @cli.arg にだけ付けられる（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド flag の型 boolean は受け付けられない: @cli.arg に boolean は付けられない（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド maybe の型 boolean? は受け付けられない: @cli.arg に boolean は付けられない（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド points の型 app.Point[] は受け付けられない: array の要素は、string か、string の scalar（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド counts の型 int[] は受け付けられない: array の要素は、string か、string の scalar（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）
+CLI-3	app.In	入力の model app.In のフィールド rest の型 string[]? は受け付けられない: array に省略可能は付けられない（0 個を表せる）（受け付けるのは、string / boolean / int / float、元がこれらの scalar、その省略可能、@cli.arg に限り string の array）

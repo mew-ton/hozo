@@ -98,7 +98,7 @@ tests/samples/<名前>/
 
 ## 移行の間
 
-この文書と `tests/samples_test.go` は、トランスパイラを作る段階（`docs/requirements.md`「作り直しの段階」の R2）の後の形で書いてある。その段階の実装が済むまで、サンプル `shop-server` では、まだないトランスパイラの `transpilers/<名前>` と `transpilers/all` が飛ぶ（足りないものは、`shop-server/README.md`「まだないもの」）。R2 が済んだと言える条件の一つは、`TestSamples` が、飛ばしも、落としもなく、すべて通ること。
+この文書と `tests/samples_test.go` は、トランスパイラを作る段階（`docs/requirements.md`「作り直しの段階」の R2）の後の形で書いてある。その段階の実装は済み、今は、サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としも、代役もなく、すべて通る（`shop-server/README.md`「まだないもの」）。「飛ばす条件」は、これから足すサンプル（まだないトランスパイラのために、先に書くもの）のために残してある。足りないものがなくなったサンプルで、サブテストが飛ぶか、代役が置かれるなら、それは後戻り。
 
 ## サンプルの一覧
 

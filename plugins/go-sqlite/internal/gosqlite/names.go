@@ -1,9 +1,6 @@
 package gosqlite
 
-import (
-	"github.com/mew-ton/hozo/ir"
-	"github.com/mew-ton/hozo/plugin/golang"
-)
+import "github.com/mew-ton/hozo/plugin/golang"
 
 // このファイルは GOSQL-4（docs/plugin-go-sqlite.md「診断」）: このトランスパイラの公開の名前（Schema、CreateTables、
 // <状態>Table、New<状態>Table）が、N の定義のパッケージの名前（docs/plugin-go.md「名前」）と、または互いに当たる。
@@ -16,88 +13,14 @@ type owned struct {
 	ours bool   // このトランスパイラの名前か（そうでなければ、基底の名前）
 }
 
-// baseNames は、基底 go が N の定義のパッケージに出す公開の名前（docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べるもの）。
-// 名前は plugin/golang の関数で作る。
+// baseNames は、基底 go が N の定義のパッケージに出す公開の名前（docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べるもの。
+// 一覧は、基底と共有する golang.PublicNames）。同じ名前が二つあれば、先のもの。
 func (e *emitter) baseNames() map[string]owned {
 	names := map[string]owned{}
-	add := func(name, what, at string) {
-		if _, dup := names[name]; !dup {
-			names[name] = owned{what: what, at: at}
+	for _, n := range golang.PublicNames(e.view) {
+		if _, dup := names[n.Name]; !dup {
+			names[n.Name] = owned{what: n.What, at: n.Decl}
 		}
-	}
-	for _, d := range e.ns.Decls {
-		name := d.Common().Name
-		switch x := d.(type) {
-		case *ir.Model:
-			if x.SynthesizedFrom != "" {
-				if _, fromOp := e.p.Lookup(x.SynthesizedFrom).(*ir.Op); fromOp {
-					continue // View が見る側のために合成した model は、基底が出さない（docs/plugin-go.md「出力の対象」）
-				}
-			}
-			add(e.typeName(name), "model "+name, name)
-			for _, f := range x.Fields {
-				if f.Default != nil {
-					add("New"+e.typeName(name), "model "+name+" の New"+e.typeName(name), name)
-					break
-				}
-			}
-		case *ir.Scalar, *ir.Exception:
-			add(e.typeName(name), d.Kind()+" "+name, name)
-		case *ir.Union:
-			if x.Variant != ir.UnionArms {
-				continue
-			}
-			add(e.typeName(name), "union "+name, name)
-			for _, a := range x.Arms {
-				// アームの型が、union を宣言した名前空間の model への ref でなければ、包む型 <Union><アーム名>（同「union」）
-				if r, ok := a.Type.(ir.RefType); ok {
-					if m, isModel := e.p.Lookup(r.Target).(*ir.Model); isModel && e.declNS[m.Name] == e.declNS[name] {
-						continue
-					}
-				}
-				add(e.typeName(name)+golang.Capitalize(a.Name), "union "+name+" のアーム "+a.Name+" を包む型", name)
-			}
-		case *ir.Effect:
-			add(golang.EffectConst(name), "effect "+name, name)
-		case *ir.Classify:
-			if x.DecidedBy != ir.DecidedByPredicate {
-				continue
-			}
-			typ := e.typeName(name)
-			add(typ, "classify "+name, name)
-			for _, c := range x.Cases {
-				k := golang.CaseConst(typ, c.Name)
-				add(k, "classify "+name+" のケースの定数 "+k, name)
-			}
-			if x.HasDefault {
-				k := golang.CaseConst(typ, "default")
-				add(k, "classify "+name+" のケースの定数 "+k, name)
-			}
-			add("Classify"+typ, "classify "+name+" の判定関数", name)
-			if _, isState := x.SubjectStates(); !isState {
-				add(typ+"Cases", "classify "+name+" の述語のインターフェース", name)
-			}
-		}
-	}
-	s := e.shape
-	for _, u := range s.States {
-		add(u.TypeName, "状態の単位 "+u.FQN, u.FQN)
-	}
-	if len(s.Ops) > 0 {
-		add("Ops", "インターフェース Ops", "")
-		add("New", "関数 New", "")
-	}
-	if len(s.Leaves) > 0 {
-		add("Leaves", "インターフェース Leaves", "")
-	}
-	if len(s.Shared) > 0 {
-		add("SharedState", "インターフェース SharedState", "")
-	}
-	if len(s.Seams) > 0 {
-		add("Seams", "インターフェース Seams", "")
-	}
-	for _, d := range s.Deps {
-		add(d.TypeName, "別の名前空間 "+d.Namespace+" の口", "")
 	}
 	return names
 }

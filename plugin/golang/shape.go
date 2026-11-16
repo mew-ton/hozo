@@ -243,7 +243,8 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 	}
 
 	// New の引数（docs/plugin-go.md「New」の表）。名前は、先に並んだ引数と当たらなくなるまで末尾に _ を足す
-	taken := map[string]bool{}
+	// New の本体は、構造体 ops のリテラルを書く（`&ops{…}`）ので、引数に ops という名前を使わない
+	taken := map[string]bool{"ops": true}
 	hasInner := false
 	for _, o := range s.Ops {
 		hasInner = hasInner || !o.Exported

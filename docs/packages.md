@@ -193,6 +193,8 @@ func LayoutOf(view *ir.View, root string) (*Layout, error)                  // �
 func HomeOf(view *ir.View, namespace, root string) (*Layout, bool, error)   // view の単位から見た、別の名前空間の型の置き場（docs/config.md「型の置き場」）。なければ false
 type Imports struct{ … }                          // 一つのファイルの import。名前の決め方は同「パッケージと import パス」
 func NewImports(view *ir.View, layout *Layout, root string, inDef bool) *Imports   // inDef は、書くファイルが定義のパッケージのものか（入口のものなら、N の型は入口の名前で修飾なし）
+func (*Imports) Reserve(names ...string)              // このファイルの import の名前に使わせない名前を足す（ファイルを書くトランスパイラが、関数の本体の中で決まった名前で使う識別子。
+                                                      // 基底の o、ctx、err、m）。基底の非公開の名前 ops と ptr は、Reserve しなくても、どのファイルでも使わせない
 func (*Imports) Add(pkgPath, pkgName string) string   // import に足し、修飾に使う名前を返す
 func (*Imports) Name(pkgPath string) string           // 修飾に使う名前。足していなければ ""
 func (*Imports) Names() []string                      // 修飾に使う名前のすべて（辞書順）。局所の名前が避ける名前
@@ -230,6 +232,17 @@ func ShapeOf(view *ir.View) *Shape
 func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // メソッドの引数と戻り値のテキスト（ctx と error を含む）
 func SeamSignature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // 継ぎ目のメソッドの引数（op の引数の後ろに body）と戻り値のテキスト
 func SeamBodyParam(op *ir.Op, reserved map[string]bool) string   // 継ぎ目のメソッドの最後の引数の名前: body。op の引数の局所の名前と当たれば、末尾に _ を足したもの
+
+// 定義のパッケージの公開の名前（同「名前」の「名前が当たれば GO-2」）
+type PublicName struct {
+    Name   string                                 // Go の名前
+    Kind   PublicKind                             // PublicType / PublicNewModel / PublicArm / PublicEffect / PublicClassify / PublicCase / PublicClassifyFunc / PublicCases /
+                                                  // PublicStateUnit / PublicOps / PublicNew / PublicLeaves / PublicShared / PublicSeams / PublicDep
+    Decl   string                                 // その名前を生んだ宣言の FQN（状態の単位なら、状態か状態の分類）。診断の位置に使う。Ops、New、Leaves、SharedState、Seams と、別の名前空間の口なら ""
+    Detail string                                 // PublicArm ならアーム名、PublicCase ならケース名（default は "default"）、PublicDep なら名前空間の FQN
+    What   string                                 // その名前を生んだものの、診断のメッセージ用の言い方（`model store.Schema`、`インターフェース Ops`）
+}
+func PublicNames(view *ir.View) []PublicName      // 出力 (U, N) の定義のパッケージの公開の名前のすべて。当たる名前も、そのまま二つ返す
 ```
 
 - `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは入口のパッケージなので、import には効かない。
@@ -237,6 +250,7 @@ func SeamBodyParam(op *ir.Op, reserved map[string]bool) string   // 継ぎ目の
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
+- `PublicNames` は、`docs/plugin-go.md`「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、`New<Model>`、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`SharedState`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
 
 ### `plugin/govalid`（公開）
 
@@ -245,11 +259,16 @@ func SeamBodyParam(op *ir.Op, reserved map[string]bool) string   // 継ぎ目の
 ```go
 func HasValidate(p *ir.Program, typeFQN string) bool   // その scalar か model が Validate を持つか。仕様だけで決まる
 func Standard(decorator string) bool                   // valid の標準の制約（min / max / length / pattern / format）の FQN か
+const Transpiler = "go-valid"                          // Validate を出すトランスパイラの名前
+func Unlisted(view *ir.View, namespace string) (unit int, ok bool)   // view の単位から見た namespace の型の置き場の単位が、transpilers に go-valid を並べていなければ、
+                                                       // その単位が何番目の [[emit]] かと true。並べていれば、または置き場がなければ、0 と false
 ```
+
+- `Unlisted` は、別の名前空間の型の `Validate` を呼べるかを見る、ただ一つの写し（`docs/plugin-go-valid.md`「出力」）: `Validate` は型の定義のパッケージにしか書けないので、呼ぶコードは、その型の置き場（`docs/config.md`「型の置き場」）の単位が `go-valid` を並べているときにだけコンパイルできる。`go-valid` の GOVALID-3、`go-http` の GOHTTP-11、`go-cli` の CLI-9 が、これで確かめる。置き場は `View.namespaces` と `View.config` だけから求まる。
 
 ### `runtime`（公開）
 
-`docs/plugin-go.md`「runtime パッケージ」と `docs/plugin-go-valid.md`「runtime」。`MissingError` はなくす。
+`docs/plugin-go.md`「runtime パッケージ」と `docs/plugin-go-valid.md`「runtime」。`MissingError` はなくした。
 
 ### `internal/source`
 

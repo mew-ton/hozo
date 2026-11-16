@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
@@ -9,7 +10,7 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// Check は cli.hozo の op check（docs/cli.md「check」）。internal/project.Load が 1〜4 を行い、ここは 5:
+// Check は cli.hozo の op check（docs/cli.md「check」）。hozoc.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
 // error が一つでもあれば例外（値は error と warning のすべて）、なければ CheckResult（warning）。
 // 解析した Project は WriteOutputs のために a.checked に置く。
 //
@@ -24,7 +25,10 @@ import (
 // error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-16 なら LanguageMismatch、
 // そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
 // プラグインの check が異常終了すれば proc.Crashed / proc.MalformedOutput（asProc）。
-func (a *App) Check(in hozoc.CheckInput) (hozoc.CheckResult, error) {
+func (a *App) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult, error) {
+	if err := ctx.Err(); err != nil {
+		return hozoc.CheckResult{}, err
+	}
 	a.checked = nil
 	a.pluginPath = str(in.PluginPath)
 	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, Env: a.Env,

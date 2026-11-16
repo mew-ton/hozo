@@ -1,17 +1,17 @@
-// Command selfgen は `make generate` の中身: hozoc 自身の仕様 cli.hozo から internal/gen/hozoc/** を生成し直す
-// （docs/packages.md「生成するもの」「自己生成の手順」）。
+// Command selfgen は `make generate` の中身: hozoc 自身の仕様 cli.hozo から internal/gen/hozoc/** と internal/gen/proc/**
+// （hozo.toml の二つの単位の out。以下、合わせて「置き場」）を生成し直す（docs/packages.md「生成するもの」「自己生成の手順」）。
 //
-// internal/gen/hozoc は cmd/hozoc が import するパッケージなので、hozoc がそこへ直に書くと、生成器の不具合で
+// 置き場は cmd/hozoc が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合で
 // コンパイルできない Go が出たときに、hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、
 // 置き場には、コンパイルできると確かめたものしか置かない:
 //
-//  1. 今のソース（今の internal/gen/hozoc を含む）で hozoc をビルドする。
+//  1. 今のソース（今の置き場を含む）で hozoc をビルドする。
 //  2. 一時ディレクトリに仕様と設定（cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインが要るディレクトリ
 //     （ir、plugin、plugins、runtime）をシンボリックリンクで足して、そこで hozoc emit を走らせる。
 //     go.mod が同じなので、生成されるコードの import パスはリポジトリで生成したときと同じになる。
-//  3. 生成した internal/gen/hozoc/** を、その一時ディレクトリで vet に通し、次に、リポジトリの今のものの代わりに
+//  3. 生成した置き場の中身を、その一時ディレクトリで vet に通し、次に、リポジトリの今のものの代わりに
 //     置いたつもりで（go の -overlay）、それを使うパッケージ（cmd/hozoc、internal/app）ごとビルドする。
-//  4. 通ったときだけ、リポジトリの internal/gen/hozoc を生成したものに置き換える。通らなければ何も変えず、
+//  4. 通ったときだけ、リポジトリの置き場を生成したものに置き換える。通らなければ何も変えず、
 //     生成したものを残した一時ディレクトリの場所を示して失敗する。
 //
 // 使い方（リポジトリのルートで）: go run ./internal/tools/selfgen
@@ -34,14 +34,15 @@ import (
 
 // 自己生成の入力と出力（リポジトリのルートからの相対パス）。
 var (
-	// genDir は cli.hozo からの生成物の置き場（hozo.toml の単位の out）。
-	genDir = filepath.Join("internal", "gen", "hozoc")
+	// genDirs は cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out。docs/cli.md「cli.hozo」）: 名前空間 hozoc の出力
+	// （入口、内側の inner、go-cli の cli）と、語彙 proc の例外の型。
+	genDirs = []string{filepath.Join("internal", "gen", "hozoc"), filepath.Join("internal", "gen", "proc")}
 	// inputs は一時ディレクトリに写すファイル。
 	inputs = []string{"cli.hozo", "hozo.toml", "go.mod", "go.sum"}
-	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（go-cli を `go run` で動かすのに要る）。
+	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインを `go run` で動かすのに要る）。
 	links = []string{"ir", "plugin", "plugins", "runtime"}
 	// users は、生成物を置き換えたつもりでビルドするパッケージ: 生成物そのものと、それを import するもの。
-	users = []string{"./internal/gen/hozoc/...", "./internal/app/...", "./cmd/hozoc"}
+	users = []string{"./internal/gen/...", "./internal/app/...", "./cmd/hozoc"}
 )
 
 func main() {
@@ -77,7 +78,7 @@ func run(repo string, stdout, stderr io.Writer) error {
 	// 1. 今のソースで hozoc をビルドする
 	hozoc := filepath.Join(tmp, "hozoc")
 	if err := command(repo, stdout, stderr, "go", "build", "-o", hozoc, "./cmd/hozoc"); err != nil {
-		return fmt.Errorf("hozoc をビルドできない（internal/gen/hozoc が壊れているなら、git で元に戻してからやり直す）: %w", err)
+		return fmt.Errorf("hozoc をビルドできない（internal/gen/ が壊れているなら、git で元に戻してからやり直す）: %w", err)
 	}
 
 	// 2. 一時ディレクトリで emit する
@@ -109,26 +110,39 @@ func run(repo string, stdout, stderr io.Writer) error {
 	if err := commandEnv(work, env, io.Discard, stderr, hozoc, "emit"); err != nil {
 		return fmt.Errorf("hozoc emit が失敗した: %w", err)
 	}
-	fresh := filepath.Join(work, genDir)
 
 	// 3. vet と、置き換えたつもりでのビルド
-	if err := verify(repo, genDir, work, users, tmp, stderr); err != nil {
+	if err := verify(repo, genDirs, work, users, tmp, stderr); err != nil {
 		keep = true
-		return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", filepath.ToSlash(genDir), fresh, err)
+		return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", places(), work, err)
 	}
 
 	// 4. 置き換える
-	changed, err := replace(filepath.Join(repo, genDir), fresh)
-	for _, c := range changed {
-		fmt.Fprintln(stdout, strings.Replace(c, ": ", ": "+filepath.ToSlash(genDir)+"/", 1))
+	for _, dir := range genDirs {
+		changed, err := replace(filepath.Join(repo, dir), filepath.Join(work, dir))
+		for _, c := range changed {
+			fmt.Fprintln(stdout, strings.Replace(c, ": ", ": "+filepath.ToSlash(dir)+"/", 1))
+		}
+		if err != nil {
+			return err
+		}
 	}
-	return err
+	return nil
+}
+
+// places は、置き場の一覧（メッセージ用）。
+func places() string {
+	var out []string
+	for _, dir := range genDirs {
+		out = append(out, filepath.ToSlash(dir))
+	}
+	return strings.Join(out, " と ")
 }
 
 // isolatedEnv は、生成のために hozoc を走らせるときの環境変数: 今の環境から、プラグインの探索が見る場所
 // （docs/plugin-protocol.md「探索」の HOZO_PLUGIN_PATH とホーム）を外したもの。生成物が、実行する人の環境に入っている
 // プラグインに左右されないようにする（使うのは hozo.toml の plugin_dirs のものだけ）。ホームを空のディレクトリ home に
-// 向けるので、go（go-cli を `go run` で動かす）がホームから決めるキャッシュの場所は、今の値を明示して渡す。
+// 向けるので、go（プラグインを `go run` で動かす）がホームから決めるキャッシュの場所は、今の値を明示して渡す。
 func isolatedEnv(repo, home string) ([]string, error) {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return nil, err
@@ -148,34 +162,42 @@ func isolatedEnv(repo, home string) ([]string, error) {
 	return append(env, "HOME="+home, "USERPROFILE="+home, "HOZO_PLUGIN_PATH=", "HOZO_CONFIG="), nil
 }
 
-// verify は、work の rel に生成したもの（work はリポジトリと同じ go.mod を持つ）がコンパイルできることを確かめる:
-// まず work で、生成したパッケージを vet に通す。次に、リポジトリ repo の rel の中身をそれに置き換えたつもりで、
-// パッケージ pkgs（生成物と、それを import するもの）をビルドする。ディスクの上の repo の rel には触れない
-// （go の -overlay で差し替える。なくなるファイルは消えたものとして扱う）。scratch は overlay の JSON を置く一時ディレクトリ。
-func verify(repo, rel, work string, pkgs []string, scratch string, stderr io.Writer) error {
-	fresh := filepath.Join(work, rel)
-	oldFiles, err := tree(filepath.Join(repo, rel))
-	if err != nil {
-		return err
-	}
-	newFiles, err := tree(fresh)
-	if err != nil {
-		return err
-	}
-	if len(newFiles) == 0 {
-		return errors.New("何も生成されなかった")
-	}
-	if err := command(work, io.Discard, stderr, "go", "vet", "./"+filepath.ToSlash(rel)+"/..."); err != nil {
-		return err
-	}
+// verify は、work の rels（置き場。リポジトリのルートからの相対パス）に生成したもの（work はリポジトリと同じ go.mod を持つ）が
+// コンパイルできることを確かめる: まず work で、生成したパッケージを vet に通す。次に、リポジトリ repo の置き場の中身をそれに
+// 置き換えたつもりで、パッケージ pkgs（生成物と、それを import するもの）をビルドする。ディスクの上の repo の置き場には触れない
+// （go の -overlay で差し替える。なくなるファイルは消えたものとして扱う）。置き場の一つにでも何も生成されていなければ、誤り。
+// scratch は overlay の JSON を置く一時ディレクトリ。
+func verify(repo string, rels []string, work string, pkgs []string, scratch string, stderr io.Writer) error {
 	overlay := struct {
 		Replace map[string]string
 	}{Replace: map[string]string{}}
-	for f := range oldFiles {
-		overlay.Replace[filepath.Join(repo, rel, f)] = "" // なくなるファイル
+	vet := []string{"vet"}
+	for _, rel := range rels {
+		fresh := filepath.Join(work, rel)
+		oldFiles, err := tree(filepath.Join(repo, rel))
+		if err != nil {
+			return err
+		}
+		newFiles, err := tree(fresh)
+		if err != nil {
+			return err
+		}
+		if len(newFiles) == 0 {
+			return fmt.Errorf("%s に何も生成されなかった", filepath.ToSlash(rel))
+		}
+		for f := range oldFiles {
+			overlay.Replace[filepath.Join(repo, rel, f)] = "" // なくなるファイル
+		}
+		for f := range newFiles {
+			overlay.Replace[filepath.Join(repo, rel, f)] = filepath.Join(fresh, f)
+		}
+		vet = append(vet, "./"+filepath.ToSlash(rel)+"/...")
 	}
-	for f := range newFiles {
-		overlay.Replace[filepath.Join(repo, rel, f)] = filepath.Join(fresh, f)
+	if len(rels) == 0 {
+		return errors.New("置き場がない")
+	}
+	if err := command(work, io.Discard, stderr, "go", vet...); err != nil {
+		return err
 	}
 	data, err := json.Marshal(overlay)
 	if err != nil {

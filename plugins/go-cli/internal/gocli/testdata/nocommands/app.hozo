@@ -1,0 +1,5 @@
+// @cli.command の op が一つもなければ、ファイルを出さず warning を一つ返す。
+namespace app {
+  model In { @cli.flag("x") x: string?; }
+  export op run(in: In): string;
+}

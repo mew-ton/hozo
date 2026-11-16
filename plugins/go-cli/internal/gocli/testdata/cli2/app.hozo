@@ -1,0 +1,19 @@
+// CLI-2: 位置は model。
+namespace app {
+  model In {
+    // どれもない
+    bare: string;
+    // @cli.arg と @cli.flag の両方
+    @cli.arg @cli.flag("both") both: string;
+    // @cli.env だけ、@cli.env と @cli.flag、@cli.env と @cli.arg は受け付ける
+    @cli.env("ONLY") only: string?;
+    @cli.flag("named") @cli.env("NAMED") named: string?;
+    @cli.arg @cli.env("PLACED") placed: string?;
+  }
+  @cli.command("run")
+  export op run(in: In);
+
+  // サブコマンドの入力でない model は見ない
+  model Other { bare: string; }
+  export op other(in: Other);
+}

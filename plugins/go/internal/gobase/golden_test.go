@@ -20,6 +20,7 @@ var goldenFixtures = []struct {
 }{
 	{name: "types", covers: "「型」（model、scalar、union、exception、effect）と「コメント」、予約語の名前空間のパッケージ名"},
 	{name: "names", covers: "「名前」の局所の名前、「パッケージと import パス」の import の名前、「New」の引数の名前、「別の名前空間の op」"},
+	{name: "pkgnames", covers: "「パッケージと import パス」の import の名前のうち、名前空間のパッケージ名が、基底が決まった名前で使う識別子（ops、ptr、o、ctx、err、m）や、途中の値（v0、k0）と同じとき。「New」の引数の名前 ops"},
 	{name: "statements", covers: "「呼び出し」「文」の表の各行、失敗の扱いの零値"},
 	{name: "values", covers: "「値」の表の各行、「型をそろえる」、「省略可能を通るパス」"},
 	{name: "states", covers: "「状態の単位」「状態の参照」", behavior: true},

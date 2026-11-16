@@ -1,0 +1,103 @@
+// docs/plugin-go.md「パッケージと import パス」の「import の名前」: 名前空間のパッケージ名が、基底が定義のパッケージに宣言する
+// 非公開の名前（New が返す構造体 ops、値をポインタにする補助 ptr）と同じとき。Go では、パッケージの宣言と、そのパッケージの
+// どのファイルの import の名前も、同じ名前ならコンパイルできないので、名前空間のパッケージの方を ops2、ptr2 で import する。
+
+namespace ops {
+  model Job { id: int; }
+  /** 印。付いた op は純粋でなくなる */
+  decorator mark;
+  @mark export op run(job: Job): Job;
+}
+
+namespace ptr {
+  scalar Ref extends string;
+  model Target { ref: Ref; note: string?; }
+}
+
+namespace more.ops {
+  model Step { n: int; }
+}
+
+/** 分けない出力 */
+namespace flat {
+  // types.go が ops と ptr を import し、補助 ptr を使う（省略可能なフィールドの既定値）
+  model Plan { job: ops.Job; target: ptr.Target?; step: more.ops.Step; label: string? = "x"; }
+  // states.go が ptr を import する
+  state target: nullable<ptr.Target>;
+  // ops.go（Leaves）が ops と ptr を import する
+  export op pick(job: ops.Job): ptr.Ref;
+  export op keep(target: ptr.Target?, step: more.ops.Step);
+  // wiring.go が ops と ptr を import し、補助 ptr を使う。New の引数 ops（別の名前空間の口）
+  export op go(job: ops.Job, target: ptr.Target): ops.Job
+  {
+    keep(target, { n: 1 });
+    return ops.run(job);
+  }
+}
+
+/** 分けた出力 */
+namespace split {
+  model Plan { job: ops.Job; target: ptr.Target?; label: string? = "x"; }
+  state target: nullable<ptr.Target>;
+  export op pick(job: ops.Job): ptr.Ref;
+  op keep(target: ptr.Target?);
+  export op go(job: ops.Job, target: ptr.Target): ops.Job
+  {
+    keep(target);
+    return ops.run(job);
+  }
+}
+
+// 関数の本体の中で、基底が決まった名前で使う識別子と同じ名前のパッケージ。本体がそのパッケージの型を書くと、局所の名前に隠れて
+// コンパイルできないので、基底のファイルでは、名前空間のパッケージの方を o2、ctx2、err2、m2 で import する。
+// 途中の値 v0 と、判定の結果 k0 は、import の名前を飛ばして v1、k1 から振る。
+namespace o {
+  model Thing { x: int; }
+  /** 印。付いた op は純粋でなくなる */
+  decorator mark;
+  @mark export op make(): Thing;
+}
+namespace ctx { model Info { y: int; } }
+namespace err { model Fault { z: int; } }
+namespace m { scalar Level extends int; }
+namespace v0 { model Zero { n: int; } }
+namespace k0 { model Key { n: int; } }
+
+namespace bodies {
+  // New<Model> の m: 既定値の式が、パッケージ m の型を書く
+  model Plan { level: m.Level? = 3; }
+
+  model Inner { name: string; }
+  model Outer { inner: Inner?; }
+  classify Size of string { Big; Small; }
+
+  export op keep(thing: o.Thing, info: ctx.Info?, fault: err.Fault);
+  export op takeName(name: string?);
+  export op takeZero(zero: v0.Zero);
+  export op takeKey(key: k0.Key);
+  @o.mark export op load(): ctx.Info;
+
+  // メソッドの o、ctx、err: 失敗の扱いの零値と、レコードリテラルが、パッケージの型を書く
+  export op go(thing: o.Thing): ctx.Info
+  {
+    const made = o.make();
+    keep(made, none, { z: 1 });
+    return load();
+  }
+
+  // 途中の値（省略可能を通るパス）の後ろで、パッケージ v0 の型を書く
+  export op temps(outer: Outer)
+  {
+    takeName(outer.inner.name);
+    takeZero({ n: 1 });
+  }
+
+  // 判定の結果（述語で決まる分類での match）の後ろで、パッケージ k0 の型を書く
+  export op kinds(text: string)
+  {
+    match text by Size {
+      Big   => takeKey({ n: 1 });
+      Small => takeKey({ n: 2 });
+    };
+  }
+}

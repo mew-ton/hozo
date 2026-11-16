@@ -1,0 +1,13 @@
+// CLI-6: 位置は op。
+namespace app {
+  model In { @cli.flag("x") x: string?; }
+
+  @cli.command("hidden")
+  op hidden(in: In);
+
+  @cli.command("also")
+  op also();
+
+  @cli.command("shown")
+  export op shown();
+}

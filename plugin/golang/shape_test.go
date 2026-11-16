@@ -219,6 +219,17 @@ func TestShapeDepsAndNew(t *testing.T) {
 	if s := ShapeOf(v); s.New[1].Name != "inner" {
 		t.Errorf("分けない出力の状態 inner の引数 = %+v", s.New)
 	}
+	// 引数の名前に ops を使わない（New の本体が、構造体 ops のリテラルを書く）。状態でも、別の名前空間でも
+	v = viewOf("a", namespace("a", state("a.ops", ir.String()), op("a.f", nil)))
+	if s := ShapeOf(v); s.New[1].Name != "ops_" || s.States[0].Param != "ops_" {
+		t.Errorf("状態 ops の引数 = %+v", s.New)
+	}
+	v = viewOf("a",
+		namespace("a", with(op("a.f", nil), wired(call("ops.run")))),
+		namespace("ops", with(op("ops.run", nil), decorated("t.mark"))))
+	if s := ShapeOf(v); len(s.New) != 1 || s.New[0].Name != "ops_" || s.Deps[0].Param != "ops_" {
+		t.Errorf("別の名前空間 ops の引数 = %+v", s.New)
+	}
 }
 
 // docs/plugin-go.md「継ぎ目」: 継ぎ目を持つ op は、N の単位の対象の op のうち、単位の継ぎ目にあるデコレータが付いたもの。

@@ -1,0 +1,27 @@
+// CLI-4: 位置は model。
+namespace app {
+  // array の @cli.arg の後ろに、@cli.arg がある
+  model Early {
+    @cli.arg rest: string[];
+    @cli.arg last: string;
+  }
+  @cli.command("early")
+  export op early(in: Early);
+
+  // array の @cli.arg が二つ
+  model Twice {
+    @cli.arg a: string[];
+    @cli.arg b: string[];
+  }
+  @cli.command("twice")
+  export op twice(in: Twice);
+
+  // array の @cli.arg が @cli.arg の中で最後なら、後ろにフラグがあってもよい
+  model Fine {
+    @cli.arg first: string;
+    @cli.arg rest: string[];
+    @cli.flag("after") after: string?;
+  }
+  @cli.command("fine")
+  export op fine(in: Fine);
+}

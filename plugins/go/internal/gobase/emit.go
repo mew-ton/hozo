@@ -313,10 +313,17 @@ func (e *emitter) newFile(name string, inDef bool) *fileGen {
 	f.im = e.imports[f.key]
 	if f.im == nil {
 		f.im = golang.NewImports(e.view, e.layout, e.root, inDef)
+		f.im.Reserve(bodyNames...)
 		e.imports[f.key] = f.im
 	}
 	return f
 }
+
+// bodyNames は、基底が、関数の本体の中で決まった名前で使う識別子のうち、本体が名前空間のパッケージの型を書きうるもの: メソッドの
+// レシーバ o、ctx、err と、New<Model> の m。その名前の局所の変数が、同じ名前のパッケージを隠すので、基底のファイルでは、import の
+// 名前に使わない（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。パッケージに宣言する ops と ptr は、
+// plugin/golang が、どのファイルでも避ける。
+var bodyNames = []string{"o", "ctx", "err", "m"}
 
 func (f *fileGen) printf(format string, args ...any) { fmt.Fprintf(&f.body, format, args...) }
 func (f *fileGen) print(s string)                    { f.body.WriteString(s) }

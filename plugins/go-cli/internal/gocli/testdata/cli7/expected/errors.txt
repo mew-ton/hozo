@@ -1,0 +1,1 @@
+CLI-7		名前空間 app の cli.go を置くディレクトリ gen/app/cli が、同じ単位（1 番目の [[emit]]）が出力する子の名前空間 app.cli の出力先と重なる

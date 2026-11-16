@@ -1,0 +1,22 @@
+# plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: 名前空間のパッケージの名前が、生成した cli.go の局所の名前や、
+# cli.go が import する標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前、「名前」の局所の名前）。
+[[emit]]
+namespace   = "env"
+transpilers = ["go", "go-valid", "go-cli"]
+out         = "gen/env"
+
+[[emit]]
+namespace   = "in"
+transpilers = ["go", "go-valid", "go-cli"]
+out         = "gen/in"
+
+# env と in の op が投げる例外の型の置き場。パッケージ名が、標準ライブラリ（errors、fmt）と同じ
+[[emit]]
+namespace   = "errors"
+transpilers = ["go"]
+out         = "gen/errors"
+
+[[emit]]
+namespace   = "fmt"
+transpilers = ["go"]
+out         = "gen/fmt"

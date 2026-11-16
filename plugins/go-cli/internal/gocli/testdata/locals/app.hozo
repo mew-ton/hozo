@@ -1,0 +1,36 @@
+// 名前空間のパッケージの名前が、cli.go の局所の名前（env、in、ops、p、args、err など）や、cli.go が import する標準ライブラリの
+// パッケージの名前（errors、fmt）と当たるとき: 局所の名前の方の末尾に _ を足し、名前空間のパッケージの方に 2 を付ける。
+
+namespace errors {
+  model Where { path: string; }
+  @cli.exitCode(3)
+  exception Lost: Where;
+}
+
+namespace fmt {
+  exception Wide;
+}
+
+/** Main の引数 env と同じ名前のパッケージ */
+namespace env {
+  @valid.min(1)
+  scalar Level extends int;
+  model RunInput {
+    @cli.flag("level") @cli.env("LEVEL") level: Level = 1;
+    @cli.flag("name") name: string?;
+    @cli.arg rest: string[];
+  }
+  /** 走らせる */
+  @cli.command("run")
+  export op run(in: RunInput): string throws errors.Lost | fmt.Wide;
+}
+
+/** 入力の変数 in と同じ名前のパッケージ */
+namespace in {
+  model GoInput {
+    @cli.arg n: int;
+    @cli.flag("deep") deep: boolean?;
+  }
+  @cli.command("go")
+  export op go(in: GoInput) throws errors.Lost;
+}

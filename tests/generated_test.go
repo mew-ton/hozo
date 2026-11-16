@@ -12,15 +12,16 @@ import (
 	"testing"
 )
 
-// generatedDir は cli.hozo からの生成物の置き場（hozo.toml の単位 [[emit]] の out。docs/packages.md「生成するもの」）。
-const generatedDir = "internal/gen/hozoc"
+// generatedDirs は cli.hozo からの生成物の置き場（hozo.toml の二つの単位 [[emit]] の out。docs/packages.md「生成するもの」）:
+// 名前空間 hozoc の出力（入口、内側の inner、go-cli の cli）と、語彙 proc の例外の型。
+var generatedDirs = []string{"internal/gen/hozoc", "internal/gen/proc"}
 
-// TestGeneratedUpToDate は、コミットされた internal/gen/hozoc/** が cli.hozo から遅れていないこと
+// TestGeneratedUpToDate は、コミットされた internal/gen/hozoc/** と internal/gen/proc/** が cli.hozo から遅れていないこと
 // （docs/testing.md「生成物の一致」、docs/requirements.md「段階」の 3）。`go test ./...` だけで分かるように、
 // CI の `make generate && git diff --exit-code` と同じことをここでも確かめる。
 //
-// リポジトリを一時ディレクトリに写し（cli.hozo、hozo.toml、go.mod、go.sum は複製。go-cli を `go run` で動かすために
-// 要る ir/、plugin/、plugins/、runtime/ はシンボリックリンク）、そこで hozoc emit を走らせ、出た internal/gen/hozoc/** を
+// リポジトリを一時ディレクトリに写し（cli.hozo、hozo.toml、go.mod、go.sum は複製。プラグインを `go run` で動かすために
+// 要る ir/、plugin/、plugins/、runtime/ はシンボリックリンク）、そこで hozoc emit を走らせ、出た置き場の中身を
 // コミット済みのものとバイト単位で比べる。go.mod が同じ module なので import パスも同じになる。
 // 差があれば `make generate` で生成し直してコミットする。
 func TestGeneratedUpToDate(t *testing.T) {
@@ -56,21 +57,33 @@ func TestGeneratedUpToDate(t *testing.T) {
 		t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 
-	want := readTree(t, filepath.Join(repo, filepath.FromSlash(generatedDir)))
-	got := readTree(t, filepath.Join(root, filepath.FromSlash(generatedDir)))
-	if len(want) == 0 {
-		t.Fatalf("%s がコミットされていない", generatedDir)
+	for _, generatedDir := range generatedDirs {
+		want := readTree(t, filepath.Join(repo, filepath.FromSlash(generatedDir)))
+		got := readTree(t, filepath.Join(root, filepath.FromSlash(generatedDir)))
+		if len(want) == 0 {
+			t.Fatalf("%s がコミットされていない", generatedDir)
+		}
+		for _, p := range sortedKeys(want, got) {
+			w, inWant := want[p]
+			g, inGot := got[p]
+			switch {
+			case !inGot:
+				t.Errorf("%s/%s はコミットされているが、cli.hozo からは生成されない（make generate で消える）", generatedDir, p)
+			case !inWant:
+				t.Errorf("%s/%s は cli.hozo から生成されるが、コミットされていない（make generate）", generatedDir, p)
+			case !bytes.Equal(w, g):
+				t.Errorf("%s/%s が cli.hozo から遅れている（make generate）:\n%s", generatedDir, p, firstDiff(string(w), string(g)))
+			}
+		}
 	}
-	for _, p := range sortedKeys(want, got) {
-		w, inWant := want[p]
-		g, inGot := got[p]
-		switch {
-		case !inGot:
-			t.Errorf("%s/%s はコミットされているが、cli.hozo からは生成されない（make generate で消える）", generatedDir, p)
-		case !inWant:
-			t.Errorf("%s/%s は cli.hozo から生成されるが、コミットされていない（make generate）", generatedDir, p)
-		case !bytes.Equal(w, g):
-			t.Errorf("%s/%s が cli.hozo から遅れている（make generate）:\n%s", generatedDir, p, firstDiff(string(w), string(g)))
+	// 置き場の外には、何も書き出さない
+	for p := range readTree(t, filepath.Join(root, "internal")) {
+		inPlace := false
+		for _, generatedDir := range generatedDirs {
+			inPlace = inPlace || strings.HasPrefix("internal/"+p, generatedDir+"/")
+		}
+		if !inPlace {
+			t.Errorf("置き場の外の internal/%s を書き出した", p)
 		}
 	}
 }

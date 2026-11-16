@@ -153,3 +153,45 @@ func viewSynthesized(m *ir.Model, decls map[string]ir.Decl) bool {
 	_, isOp := decls[m.SynthesizedFrom].(*ir.Op)
 	return isOp
 }
+
+// Transpiler は、Validate を出すトランスパイラの名前（docs/plugin-go-valid.md「マニフェスト」）。
+const Transpiler = "go-valid"
+
+// Unlisted は、view の単位から見た、名前空間 namespace の型の置き場（docs/config.md「型の置き場」）の単位が、transpilers に
+// go-valid を並べていなければ、その単位が何番目の [[emit]] か（1 始まり）と true を返す。並べていれば、または置き場がなければ
+// （CFG-22 が通したはずのもの）、0 と false。
+//
+// Validate は、型の定義のパッケージにしか書けないので、別の名前空間の型の Validate を呼ぶコードは、その型の置き場の単位が go-valid を
+// 並べているときにだけコンパイルできる。呼ぶ側（go-valid の GOVALID-3、go-http の GOHTTP-11、go-cli の CLI-9）は、これが true なら
+// 診断にする。置き場は View だけから求まる（docs/ir.md「その名前空間から見た IR」: View.namespaces の要素のうち、index が
+// config.index と同じもの、なければ base が config.base と同じ最初のもの）。namespace が view.Viewer なら、View.config を見る。
+func Unlisted(view *ir.View, namespace string) (unit int, ok bool) {
+	if view == nil {
+		return 0, false
+	}
+	home := &view.Config
+	if namespace != view.Viewer {
+		home = nil
+		list := view.Namespaces[namespace]
+		for i := range list {
+			if list[i].Index == view.Config.Index {
+				home = &list[i]
+				break
+			}
+		}
+		for i := range list {
+			if home == nil && list[i].Base == view.Config.Base {
+				home = &list[i]
+			}
+		}
+	}
+	if home == nil {
+		return 0, false
+	}
+	for _, t := range home.Transpilers {
+		if t == Transpiler {
+			return 0, false
+		}
+	}
+	return home.Index, true
+}

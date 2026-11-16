@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"path/filepath"
 
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
@@ -367,7 +366,7 @@ func (g *generator) checkHome(fqn, at, what string) {
 	if m == g.view.Viewer || g.layout == nil {
 		return
 	}
-	home, ok, err := golang.HomeOf(g.view, m, g.root)
+	_, ok, err := golang.HomeOf(g.view, m, g.root)
 	if err != nil {
 		if !errors.Is(err, golang.ErrNoGoMod) && g.fatal == nil {
 			g.fatal = fmt.Errorf("名前空間 %s の型の置き場を求められない: %w", m, err)
@@ -380,18 +379,10 @@ func (g *generator) checkHome(fqn, at, what string) {
 		}
 		return
 	}
-	for _, c := range g.view.Namespaces[m] {
-		if path.Clean(filepath.ToSlash(c.Dir)) != home.Dir {
-			continue
-		}
-		for _, t := range c.Transpilers {
-			if t == TranspilerName {
-				return
-			}
-		}
+	// 置き場の単位が go-valid を並べているかは、Validate を呼ぶほかの相乗り（go-http、go-cli）と同じ関数で見る
+	if unit, unlisted := govalid.Unlisted(g.view, m); unlisted {
 		g.errorf(codeValidHome, at, "%s は %s を持つが、名前空間 %s の型の置き場の単位（%d 番目の [[emit]]）が、transpilers に %s を並べていない（メソッドは、型の定義のパッケージにしか書けない）",
-			what, method, m, c.Index, TranspilerName)
-		return
+			what, method, m, unit, TranspilerName)
 	}
 }
 

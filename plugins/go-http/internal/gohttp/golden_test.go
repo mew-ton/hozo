@@ -199,9 +199,10 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gohttp8", codeHTTPDuplicate}, // 同じメソッドとパスの経路が二つある
 	{"gohttp9", codeHTTPOption},    // [emit.options.go-http] に、知らないキーか、型の違う値がある
 	{"gohttp10", codeHTTPName},     // NewHandler が、N の定義のパッケージの名前と当たる
+	{"gohttp11", codeHTTPValidate}, // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
 }
 
-// TestDiagnostics は docs/plugin-go-http.md「診断」の GOHTTP-1〜GOHTTP-10: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は docs/plugin-go-http.md「診断」の GOHTTP-1〜GOHTTP-11: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルも warning も返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -235,6 +236,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		"gohttp8":  {"app.second", "app.third", "app.again"},
 		"gohttp9":  {""},
 		"gohttp10": {"app.Handler", "typed.NewHandler", "wrapped.New"},
+		"gohttp11": {"app.a", "app.b"},
 	} {
 		_, diags, _ := emitViews(t, newRoot(t), loadViews(t, name))
 		got := map[string]bool{}
@@ -249,6 +251,30 @@ func TestDiagnosticPositions(t *testing.T) {
 				t.Errorf("%s: 位置 %q の診断がない（%v）", name, w, got)
 			}
 		}
+	}
+}
+
+// TestValidateHome は GOHTTP-11 の条件: 診断を返すのは、validate = true の単位の出力だけ。同じ名前空間を validate = false で出力する
+// 単位は、Validate を呼ばないので、診断なしにファイルを返す。置き場は View だけから求まるので、go.mod がなくても返す。
+func TestValidateHome(t *testing.T) {
+	views := loadViews(t, "gohttp11")
+	files, diags, _ := emitViews(t, newRoot(t), views)
+	if _, ok := files["gen/loose/http.go"]; !ok || len(files) != 1 {
+		t.Errorf("ファイル = %v, want gen/loose/http.go だけ", sortedPaths(files))
+	}
+	if strings.Contains(files["gen/loose/http.go"], "Validate()") {
+		t.Error("validate = false の出力が Validate を呼ぶ")
+	}
+	if len(diags) != 2 {
+		t.Errorf("診断 = %+v, want GOHTTP-11 が二つ", diags)
+	}
+	for _, d := range diags {
+		if !strings.Contains(d.Message, "1 番目の [[emit]]") || !strings.Contains(d.Message, "plain.In") {
+			t.Errorf("メッセージが、置き場の単位と入力の model を示さない: %s", d.Message)
+		}
+	}
+	if _, diags, _ = emitViews(t, t.TempDir(), views); len(diags) != 2 || diags[0].Code != codeHTTPValidate {
+		t.Errorf("go.mod がないとき: 診断 = %+v, want GOHTTP-11 が二つ", diags)
 	}
 }
 

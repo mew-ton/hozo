@@ -1,0 +1,2 @@
+CLI-9	app.a	@cli.command の op app.a の入力 plain.In は Validate を持つが、名前空間 plain の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（Main は、解釈した入力の Validate を呼ぶ。メソッドは、型の定義のパッケージにしか書けない）
+CLI-9	app.b	@cli.command の op app.b の入力 plain.In は Validate を持つが、名前空間 plain の型の置き場の単位（1 番目の [[emit]]）が、transpilers に go-valid を並べていない（Main は、解釈した入力の Validate を呼ぶ。メソッドは、型の定義のパッケージにしか書けない）

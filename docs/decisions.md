@@ -96,6 +96,7 @@
 | 86 | Go の継ぎ目の形: インターフェース `Seams`（継ぎ目を持つ op とデコレータの組ごとに、op の引数と `body` を取るメソッド `<Op><Decorator>`）と、`New` の最後の位置引数 `seams`。外側は `ops` の公開のメソッド。基底が出す中身（配線、`never` を返す op）は非公開のメソッド `<op>Body`、葉の中身は口のメソッドのまま（名前を変えない）。複数の継ぎ目は、デコレータの適用順（DEC-9）で入れ子にする。別の名前空間の op の継ぎ目は、呼ぶ側には出さない。基底の warning（`catches` を持つデコレータ）はやめる | `docs/plugin-go.md`「継ぎ目」 |
 | 87 | 原則として、デコレータは op の入力と出力の値を変えない。規則ではなく書き方の指針で、検査しない（P39） | `docs/requirements.md`「書き方の指針」 |
 | 88 | デコレータの出力は、実装より先に定義し、テストの側（サンプルの期待する出力とハーネス）を先に直す（P36。59 の当てはめ）。サンプル `shop-server` に、継ぎ目の例（サンプルの中のプラグイン `go-ratelimit` と、その語彙 `rate`）を入れ、期待する出力を文書の形にそろえる。`TestSamples` は最後の形で書き、まだ通せないサブテストは、足りないものを名指しして飛ばす | `docs/testing.md`「トランスパイラのテスト」、`tests/samples/README.md`「テスト」 |
+| 89 | R2 の仕上げで足した規則: （a）Go の import の名前は、基底が決まった名前で使う識別子を避ける: 定義のパッケージに宣言する非公開の名前 `ops`、`ptr` は、どのファイルでも（名前空間 `ops` は `ops2`）。関数の本体の中の `o`、`ctx`、`err`、`m` は、基底のファイルで。途中の値 `v<n>`、`k<n>` は、import の名前に当たる番号を飛ばす。`New` の引数は `ops` を避ける（`ops_`）。（b）定義のパッケージの公開の名前の一覧は `golang.PublicNames` 一つで、基底（GO-2）と相乗り（GOSQL-4、GOHTTP-10、サンプルの GORATE-2）が共有する。（c）`Validate` を呼ぶ相乗りは、入力の model が別の名前空間のもので、その型の置き場の単位が `go-valid` を並べていなければ、コンパイルできない出力の代わりに診断を返す: 新しい ID は GOHTTP-11 と CLI-9（80 の一覧に足す）。置き場の単位の `transpilers` は `View.namespaces` にあるので、プロトコルは変えない。確かめ方は、`go-valid` の GOVALID-3 と共有する `govalid.Unlisted` | `docs/plugin-go.md`「パッケージと import パス」「New」、`docs/packages.md`「`plugin/golang`（公開）」「`plugin/govalid`（公開）」、`docs/plugin-go-http.md`「制約の検査」「診断」、`docs/plugin-go-cli.md`「引数の解釈」「診断」 |
 
 ## 設計書を変える決定
 

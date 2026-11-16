@@ -1,0 +1,147 @@
+// docs/plugin-go-cli.md「出力」「引数の解釈」「実行と表示」「使い方の表示」を、二つの名前空間で一通り使う。
+// 振る舞いは behavior_test.go が、生成した cli.Main を動かして確かめる。
+
+namespace fail {
+  /** 外の仕組みが止まった */
+  exception Crashed;
+}
+
+/** ファイルを調べて書き出す道具 */
+namespace tool {
+  scalar Path extends string;
+
+  /** 表示の形式。text か json */
+  @valid.pattern("^(text|json)$")
+  scalar Format extends string;
+
+  model Note { code: string; message: string; }
+  model Notes { items: Note[]; }
+
+  @cli.exitCode(1)
+  exception CheckFailed: Notes;
+  @cli.exitCode(2)
+  exception ConfigInvalid: Notes;
+  @cli.exitCode(64)
+  exception UnknownName;
+  /** 終了コードを書いていない例外 */
+  exception Busy;
+
+  model CheckResult { warnings: Note[]; }
+  model EmitResult { written: Path[]; removed: Path[]; }
+
+  /** check の入力 */
+  model CheckInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("TOOL_CONFIG") config: Path?;
+    /** 表示の形式 */
+    @cli.flag("format") format: Format?;
+    /** 探す場所 */
+    @cli.env("TOOL_PATH") searchPath: string?;
+  }
+
+  /** emit の入力 */
+  model EmitInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("TOOL_CONFIG") config: Path?;
+    /** 書き出す名前（一つもなければすべて） */
+    @cli.arg names: string[];
+    /** 書き出さずに、予定だけを表示する */
+    @cli.flag("dry-run") dryRun: boolean?;
+  }
+
+  /** serve の入力。制約を持たない（Validate を持たない model） */
+  model ServeInput {
+    /** ログの書き出し先 */
+    @cli.flag("log") @cli.env("TOOL_LOG") log: Path?;
+  }
+
+  /**
+   * 調べる。ファイルは書き出さない。
+   *
+   * @param in コマンドの入力
+   */
+  @cli.command("check")
+  export op check(in: CheckInput): CheckResult
+    throws CheckFailed | ConfigInvalid | Busy
+    throws fail.Crashed;
+
+  /** 書き出す（内部の op。サブコマンドではない） */
+  op write(in: EmitInput, checked: CheckResult): EmitResult
+    throws UnknownName;
+
+  /**
+   * 調べてから、
+   * 書き出す。
+   */
+  @cli.command("emit")
+  export op emit(in: EmitInput): EmitResult
+    throws CheckFailed | ConfigInvalid | Busy | UnknownName
+    throws fail.Crashed
+  {
+    const checked = check({ config: in.config });
+    return write(in, checked);
+  }
+
+  /** 標準入出力で動き続ける */
+  @cli.command("serve")
+  export op serve(in: ServeInput);
+}
+
+namespace demo {
+  @valid.min(0)
+  scalar Count extends int;
+  /** scalar を元にした scalar（元の型で変換してから、scalar の型にする） */
+  scalar Steps extends Count;
+  scalar Ratio extends float;
+  scalar Flag extends boolean;
+  scalar Name extends string;
+
+  model Sum { total: float; }
+
+  @cli.exitCode(5)
+  exception Overflow;
+  exception Tired;
+
+  /** add の入力。既定値を持つ（初めの値は NewAddInput()） */
+  model AddInput {
+    /** 左 */
+    @cli.arg a: int;
+    /** 右 */
+    @cli.arg b: float?;
+    /** 回数 */
+    @cli.flag("count") count: Count = 1;
+    /** 詳しく */
+    @cli.flag("verbose") verbose: boolean;
+    /** 名札 */
+    @cli.flag("label") @cli.env("DEMO_LABEL") label: string?;
+    /** 倍率 */
+    @cli.env("DEMO_SCALE") scale: float?;
+  }
+
+  /** 足す */
+  @cli.command("add")
+  export op add(in: AddInput): Sum throws Overflow | Tired;
+
+  /** copy の入力。scalar の値と、環境変数を代わりに持つ位置引数、string の scalar の array */
+  model CopyInput {
+    /** 元 */
+    @cli.arg @cli.env("DEMO_FROM") from: Name;
+    @cli.flag("steps") @cli.env("DEMO_STEPS") steps: Steps?;
+    @cli.flag("ratio") ratio: Ratio = 0.5;
+    @cli.flag("force") @cli.env("DEMO_FORCE") force: Flag?;
+    @cli.flag("offset") offset: int = -1;
+    /** 先 */
+    @cli.arg to: Name[];
+  }
+
+  @cli.command("copy")
+  export op copy(in: CopyInput): string;
+
+  /** 何もしない */
+  @cli.command("ping")
+  export op ping();
+
+  /** いつも失敗する */
+  @cli.command("quit")
+  export op quit(): never throws Overflow;
+}

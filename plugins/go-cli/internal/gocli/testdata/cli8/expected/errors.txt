@@ -1,0 +1,2 @@
+CLI-8		1 番目の [[emit]] の [emit.options.go-cli] に、知らないキー color がある（go-cli にオプションはない）
+CLI-8		1 番目の [[emit]] の [emit.options.go-cli] に、知らないキー width がある（go-cli にオプションはない）

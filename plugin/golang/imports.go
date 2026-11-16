@@ -25,13 +25,20 @@ type Imports struct {
 	inDef  bool
 
 	paths    map[string]string // import パス → 使う名前
-	names    map[string]string // 使う名前 → import パス
+	names    map[string]string // 使う名前 → import パス（import に使わせない名前は ""）
+	reserved []string          // Reserve で足した、import に使わせない名前
 	pkgNames map[string]string // import パス → パッケージの名前（Add に渡されたもの）
 	nsOf     map[string]string // 名前空間のパッケージの import パス → 名前空間の FQN
 	declNS   map[string]string // 宣言の FQN → 宣言した名前空間（view.Program から。最初に引いたときに作る）
 	homes    map[string]*Layout
 	err      error
 }
+
+// basePrivateNames は、基底が定義のパッケージに宣言する非公開の名前のうち、パッケージ名になりうるもの（小文字と数字だけの名前）:
+// New が返す構造体 ops と、値をポインタにする補助 ptr（docs/plugin-go.md「New」「値」）。Go では、パッケージの宣言と、その
+// パッケージのどのファイルの import の名前も、同じ名前ならコンパイルできないので、どのファイルの import も、この名前を使わない
+// （同「パッケージと import パス」の「import の名前」）。
+var basePrivateNames = []string{"ops", "ptr"}
 
 // NewImports は、view の出力の一つのファイルの import を作る。layout は、その出力の置き場（LayoutOf(view, root)）、
 // root はプロジェクトのルート。inDef は、書くファイルが定義のパッケージのものか。入口のパッケージのファイル（分けた出力の
@@ -46,9 +53,31 @@ func (im *Imports) init() {
 		return
 	}
 	im.paths, im.names, im.pkgNames, im.nsOf = map[string]string{}, map[string]string{}, map[string]string{}, map[string]string{}
+	// 基底が定義のパッケージに宣言する非公開の名前は、import の名前に使わせない（当たれば、名前空間のパッケージに 2、3、… が付く）
+	for _, name := range basePrivateNames {
+		im.names[name] = ""
+	}
+	for _, name := range im.reserved {
+		im.names[name] = ""
+	}
 	if im.layout != nil && im.layout.HasInner && !im.inDef {
 		// 入口のファイルでは、inner は内側のパッケージの名前（「標準ライブラリ、runtime、inner の名前は変えない」）
 		im.names[innerDir] = im.layout.DefPath
+	}
+}
+
+// Reserve は、names を、このファイルの import の名前に使わせない名前に足す: パッケージ名がそれと同じ名前空間は、2、3、… を付けて
+// import される（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。ファイルを書くトランスパイラが、関数の本体の
+// 中で決まった名前で使う識別子（基底の、メソッドのレシーバ o、ctx、err など）を渡す。その名前の局所の変数が、同じ名前のパッケージを
+// 隠して、本体がそのパッケージの型を書けなくなるのを防ぐ。import を一つも足していないうちに呼ぶ。Canonical にも引き継ぐ。
+func (im *Imports) Reserve(names ...string) {
+	im.reserved = append(im.reserved, names...)
+	if im.paths != nil {
+		for _, name := range names {
+			if _, taken := im.names[name]; !taken {
+				im.names[name] = ""
+			}
+		}
 	}
 }
 
@@ -151,7 +180,8 @@ func (im *Imports) Render() string {
 // その後に、名前空間のパッケージを、名前空間の FQN の辞書順に。名前が当たれば、後の方に 2、3、… が付く。
 // ファイルを一度作って import の集まりを知り、返った Imports で作り直せば、名前は、足した順（型を書いた順）によらない。
 func (im *Imports) Canonical() *Imports {
-	out := &Imports{view: im.view, layout: im.layout, root: im.root, inDef: im.inDef, declNS: im.declNS, homes: im.homes}
+	out := &Imports{view: im.view, layout: im.layout, root: im.root, inDef: im.inDef, declNS: im.declNS, homes: im.homes,
+		reserved: append([]string(nil), im.reserved...)}
 	out.init()
 	var plain, spaces []string
 	for _, p := range im.Paths() {

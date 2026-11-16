@@ -198,6 +198,7 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 制約は型の性質で、いつ確かめるかを決めるのは、境界を持つこのトランスパイラ（`docs/plugin-go-valid.md`「この文書が決めること」）。
 
 - 確かめるのは、単位のオプション `validate = true` のときだけ。確かめる相手は、入力の model（`Validate` を持つとき）。結果は確かめない。
+- 入力の model が**別の名前空間 M のもの**なら、`Validate` は M の型の置き場（`docs/config.md`「型の置き場」）の定義のパッケージのメソッドなので、その単位も `transpilers` に `go-valid` を並べていなければならない。並べていなければ GOHTTP-11（生成した `in.Validate()` がコンパイルできなくなるのを、先に報告する。`go-valid` の GOVALID-3 と同じ理由。`docs/plugin-go-valid.md`「出力」）。置き場の単位の `transpilers` は `View.namespaces` にあるので、`View` だけから分かる（`govalid.Unlisted`。`docs/packages.md`「`plugin/govalid`（公開）」）。N の model は、自分の単位が `go-valid` を並べている（CFG-19）。
 - 制約に合わない入力で投げる `http.BadRequest` は、設定で増える例外で、呼ぶ側の名前空間が仕様から計算する `throws` には現れない。読めない要求の `http.BadRequest` も同じ（`@http.get` / `@http.post` の `throws` に、まだ入れていない。`docs/vocab.md`「同梱する語彙」）。
 
 ## 診断
@@ -216,6 +217,7 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | GOHTTP-8 | error | 同じメソッドとパスの経路が二つある。位置は後ろの op |
 | GOHTTP-9 | error | `[emit.options.go-http]` に、知らないキーか、型の違う値がある。位置なし |
 | GOHTTP-10 | error | `NewHandler` が、N の定義のパッケージの名前（既定値を持つ model `Handler` の `NewHandler` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言 |
+| GOHTTP-11 | error | `validate = true` で、`Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（「制約の検査」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op |
 
 warning（コードは `PLUGIN`）は一つ: 経路の op が一つもない。
 

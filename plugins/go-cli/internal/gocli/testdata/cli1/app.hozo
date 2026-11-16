@@ -1,0 +1,31 @@
+// CLI-1: 位置は op。
+namespace app {
+  model In { @cli.flag("x") x: string?; }
+  scalar Name extends string;
+
+  // 引数が二つ
+  @cli.command("two")
+  export op two(a: In, b: In);
+
+  // 核の型
+  @cli.command("core")
+  export op core(a: string);
+
+  // scalar
+  @cli.command("named")
+  export op named(a: Name);
+
+  // 省略可能な model
+  @cli.command("optional")
+  export op optional(a: In?);
+
+  // model の配列
+  @cli.command("many")
+  export op many(a: In[]);
+
+  // 0 個と、model 一つは受け付ける
+  @cli.command("none")
+  export op none_();
+  @cli.command("one")
+  export op one(a: In);
+}

@@ -129,12 +129,13 @@ func (b *bodyGen) fresh(base string) string {
 	return name
 }
 
-// temp は途中の値の変数 v0、v1、…（メソッドの中の通し番号）。kind は分類の判定の結果 k0、k1、…。
+// temp は途中の値の変数 v0、v1、…（メソッドの中の通し番号）。kind は分類の判定の結果 k0、k1、…。引数名、束縛名、先に作った
+// 変数と、import するパッケージの名前（b.e.reserved）に当たる番号は、飛ばす。
 func (b *bodyGen) temp() string {
 	for {
 		name := "v" + strconv.Itoa(b.vn)
 		b.vn++
-		if !b.taken[name] {
+		if !b.taken[name] && !b.e.reserved[name] {
 			b.taken[name] = true
 			return name
 		}
@@ -145,7 +146,7 @@ func (b *bodyGen) kind() string {
 	for {
 		name := "k" + strconv.Itoa(b.kn)
 		b.kn++
-		if !b.taken[name] {
+		if !b.taken[name] && !b.e.reserved[name] {
 			b.taken[name] = true
 			return name
 		}

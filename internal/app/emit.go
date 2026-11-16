@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,8 +40,16 @@ type output struct {
 	dir     string // その出力の Dir(U, N)。記録（.hozoc-outputs.json）の置き場
 }
 
+// OutputsSync は、状態の分類 OutputsSync（cli.hozo の `classify OutputsSync of outputs`）の単位の実装: 述語 UpToDate
+// （問い合わせ）と、効果 syncOutputs を持つ葉の op writeOutputs（命令）。hozoc.New の引数 outputsSync に渡す（[App.Ops]）。
+func (a *App) OutputsSync() hozoc.OutputsSyncState { return outputsSync{a} }
+
+// outputsSync は [App.OutputsSync] が返す値。
+type outputsSync struct{ a *App }
+
 // WriteOutputs は cli.hozo の op writeOutputs（docs/cli.md「emit」の 1〜7）。効果 syncOutputs を持つ葉の op なので、
-// 生成したコードでは状態の単位 hozoc.States.OutputsSync の命令になる（[App.States]）。checked は Check が返したもの
+// 生成したコードでは、状態の分類 OutputsSync の単位の命令になる。内部の op で、配線の emit が、check の後に呼ぶ（テストは、
+// 内側のパッケージ internal/gen/hozoc/inner の Ops から呼ぶ）。checked は Check が返したもの
 // （warning）で、その中身（Program、設定、マニフェスト）は Check が a.checked に置いた Project から取る。
 // 書き出すファイルは、どれもトランスパイラが返したもので、hozoc が自分で作るファイルは、出力先ごとの記録だけ。
 //
@@ -48,7 +57,7 @@ type output struct {
 //     一つ作って ConfigInvalid（docs/cli.md「手で書くもの」）。check の warning も一緒に運ぶ。
 //  1. namespaces が空でなければ、名前空間がそのどれかと同じか子孫である出力だけを対象にする。引数とその子孫のどれも、
 //     どの単位の対象でもなければ UnknownNamespace。
-//  2. 対象の各出力について、単位の各トランスパイラを runEmit で起動し、files と warnings と errors を集める。
+//  2. 対象の各出力について、単位の各トランスパイラを起動し、files と warnings と errors を集める。
 //     errors は集めておき、すべて起動し終えてから CheckFailed にする。
 //  3. すべての出力のファイルを集めてからパスの重複を確かめる（CFG-5 → OutputConflict）。
 //  4. dryRun なら書く予定のパスを Written に入れて返す。
@@ -58,7 +67,11 @@ type output struct {
 //  7. .hozoc-outputs.json を書く。書くものが一つもない出力では作らず、前回のものがあれば消す。
 //
 // 1〜3 は [App.plan]。
-func (a *App) WriteOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitResult, error) {
+func (s outputsSync) WriteOutputs(ctx context.Context, in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitResult, error) {
+	a := s.a
+	if err := ctx.Err(); err != nil {
+		return hozoc.EmitResult{}, err
+	}
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
 		return hozoc.EmitResult{}, errors.New("hozoc: WriteOutputs の checked が直前の Check の結果でない")
@@ -67,7 +80,7 @@ func (a *App) WriteOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc
 	if p.NoConfig {
 		return hozoc.EmitResult{}, noConfig(p)
 	}
-	pl, err := a.plan(p, in.Namespaces)
+	pl, err := a.plan(ctx, p, in.Namespaces)
 	if err != nil {
 		return hozoc.EmitResult{}, err
 	}
@@ -138,7 +151,8 @@ func (a *App) WriteOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc
 }
 
 // UpToDate は cli.hozo の分類 OutputsSync の述語（docs/cli.md「cli.hozo」「手で書くもの」）: 生成したファイルが、今の仕様と
-// 設定から生成し直したものと一致しているか。生成したコードでは状態の単位 hozoc.States.OutputsSync の問い合わせになる。
+// 設定から生成し直したものと一致しているか。生成したコードでは、状態の分類 OutputsSync の単位の問い合わせになり、判定関数
+// hozoc.ClassifyOutputsSync が呼ぶ。
 //
 // すべての出力について書き出す予定（[App.plan]。トランスパイラも起動する）を作り、ディスクと比べる。一致していると言うのは、
 // 書く予定のファイルがすべて同じ内容であり、.hozoc-outputs.json が今回の一覧と同じで（何も書かない出力にはなく）、
@@ -147,21 +161,22 @@ func (a *App) WriteOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc
 //
 // 見るのは、直前の Check が解析した Project（同じ App で check か emit を走らせた後）。なければ、作業ディレクトリから
 // hozo.toml を探して解析する。
-func (a *App) UpToDate() (bool, error) {
+func (s outputsSync) UpToDate(ctx context.Context) (bool, error) {
+	a := s.a
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	p := a.checked
 	if p == nil {
-		p = project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home})
-		if p.RunErr != nil {
-			return false, asProc(p.RunErr)
-		}
-		if err := classify(p.Diags, p.Files); err != nil {
+		var err error
+		if p, err = a.load(); err != nil {
 			return false, err
 		}
 	}
 	if p.NoConfig {
 		return false, noConfig(p)
 	}
-	pl, err := a.plan(p, nil)
+	pl, err := a.plan(ctx, p, nil)
 	if err != nil {
 		return false, err
 	}
@@ -233,7 +248,7 @@ func (pl *plan) record(dir string) []byte {
 // トランスパイラの files の path はルートからの相対パスで、その起動の Dir(U, N) の下でなければならない
 // （docs/plugin-protocol.md「emit」）。そうでないもの（`..`、絶対パス、別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの）は
 // PLG-1、同じ応答の中の重複は PLG-2 で、どちらも proc.MalformedOutput。
-func (a *App) plan(p *project.Project, namespaces []string) (*plan, error) {
+func (a *App) plan(ctx context.Context, p *project.Project, namespaces []string) (*plan, error) {
 	views := p.Views()
 
 	// 1. 対象の出力。引数 n が選ぶのは、仕様にある名前空間のうち n 自身と n の子孫で、どれかの単位の対象のもの
@@ -290,7 +305,10 @@ func (a *App) plan(p *project.Project, namespaces []string) (*plan, error) {
 		dir := p.Config.Dir(k.unit, k.ns)
 		nested := otherDirs(k)
 		for _, t := range p.Units[k.unit].Transpilers {
-			resp, err := a.runEmit(p, t, view)
+			if err := ctx.Err(); err != nil {
+				return nil, err // 中断されたら、残りのトランスパイラを起動しない
+			}
+			resp, err := a.transpile(p, t, view)
 			if err != nil {
 				var pe *hostplugin.PluginError
 				if errors.As(err, &pe) {
@@ -341,18 +359,49 @@ func (a *App) plan(p *project.Project, namespaces []string) (*plan, error) {
 	return pl, nil
 }
 
-// runEmit は cli.hozo の op runEmit: プラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
-// どの配線からも呼ばれない、プラグインとの境界の記述としての op（docs/cli.md「手で書くもの」）。ここでは、その中身を、本物の
-// View を持つ要求で、そのまま関数にする: 起動は internal/plugin.Runner で、
+// transpile は、トランスパイラ t を一度起動して、出力一つ（view）を展開させる（docs/plugin-protocol.md「起動」）。cli.hozo の op
+// runEmit（[App.RunEmit]）と同じ起動を、本物の View（ir.View）を持つ要求で、internal/plugin.Runner を直に使って行う
+// （docs/cli.md「手で書くもの」: cli.hozo の model View は中身を持たないので、runEmit の入口からは IR を渡せない）。
 // 作業ディレクトリはプロジェクトのルート、要求の transpiler はトランスパイラの名前、view は単位での名前空間から見た IR。
 // 誤りは proc.Crashed / proc.MalformedOutput（asProc）か、終了コード 2 の *hostplugin.PluginError（呼ぶ側が MAN-* にする）。
-func (a *App) runEmit(p *project.Project, t project.Transpiler, view *ir.View) (*sdk.EmitResponse, error) {
+func (a *App) transpile(p *project.Project, t project.Transpiler, view *ir.View) (*sdk.EmitResponse, error) {
 	req := sdk.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", Transpiler: t.Name, View: view}
 	var resp sdk.EmitResponse
 	if err := (hostplugin.Runner{Root: p.Root, Stderr: a.Stderr, Env: a.Env}).Run(t.Plugin.Manifest, t.Plugin.Dir, &req, &resp); err != nil {
 		return nil, asProc(err)
 	}
 	return &resp, nil
+}
+
+// RunEmit は cli.hozo の op runEmit: プラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
+// hozoc.Leaves のメソッド。どの配線からも呼ばれない内部の op で、プラグインとの境界の記述としてある（docs/cli.md
+// 「手で書くもの」）: plugin を起動し（作業ディレクトリは plugin.root、マニフェストのディレクトリは plugin.dir）、req を JSON にして
+// 送り、応答を hozoc.EmitResponse に読んで返す。hozoc.View は中身のない model なので、この入口から送る要求の view は空の
+// オブジェクトになる。hozoc 自身の emit は、この入口を呼ばず、[App.transpile] を使う。
+// 起動の失敗と異常終了は proc.Crashed、応答の形の誤りは proc.MalformedOutput。
+func (a *App) RunEmit(ctx context.Context, plugin hozoc.Plugin, req hozoc.EmitRequest) (hozoc.EmitResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return hozoc.EmitResponse{}, err
+	}
+	if len(plugin.Command) == 0 {
+		return hozoc.EmitResponse{}, asProc(&hostplugin.CrashedError{Plugin: plugin.Name, ExitCode: -1, Err: errors.New("command が空")})
+	}
+	manifest := &hostplugin.Manifest{Name: plugin.Name, Command: plugin.Command, Protocol: req.Protocol}
+	var resp sdk.EmitResponse
+	if err := (hostplugin.Runner{Root: string(plugin.Root), Stderr: a.Stderr, Env: a.Env}).Run(manifest, string(plugin.Dir), &req, &resp); err != nil {
+		return hozoc.EmitResponse{}, asProc(err)
+	}
+	out := hozoc.EmitResponse{Files: []hozoc.OutputFile{}, Warnings: []hozoc.PluginWarning{}, Errors: []hozoc.PluginError{}}
+	for _, f := range resp.Files {
+		out.Files = append(out.Files, hozoc.OutputFile{Path: hozoc.Path(f.Path), Content: f.Content})
+	}
+	for _, w := range resp.Warnings {
+		out.Warnings = append(out.Warnings, hozoc.PluginWarning{At: w.At, Message: w.Message})
+	}
+	for _, e := range resp.Errors {
+		out.Errors = append(out.Errors, hozoc.PluginError{Code: e.Code, At: e.At, Message: e.Message})
+	}
+	return out, nil
 }
 
 // underAny は ns が names のどれかと等しいか、その子孫か。当たった names の要素を matched に記す（すべて見る）。

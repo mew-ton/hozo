@@ -50,6 +50,8 @@ type JSONPresenter struct{}
 - `Main` は `package main` ではない。人が書く `main.go` は、実装を組み立てて `os.Exit(cli.Main(ctx, ops, p, os.Args[1:], os.Getenv, os.Stdout, os.Stderr))` を呼ぶだけ。
 - `ops` の型は、N の入口の `Ops`（`docs/plugin-go.md`「Ops」）。基底の `New` の戻り値を、そのまま渡す。
 - 同じ単位が、N の子の名前空間 `N.cli` を出力するなら CLI-7（Dir(U, N.cli) が、このパッケージのディレクトリと重なる）。
+- パッケージ `cli` の非公開の名前は、コマンドごとの `run<Op>` / `fail<Op>` / `usage<Op>`（`<Op>` は op 名を先頭大文字にしたもの）と、補助の `cli<名前>`（`cliUsage`、`cliParseArgs` など。使うものだけを出す）。どれも大文字を含むので、import する名前空間のパッケージの名前（小文字と数字だけ）とは当たらない。パッケージの変数は持たない。
+- `Main` とコマンドごとの関数の中の局所の名前（`ctx`、`ops`、`p`、`args`、`env`、`in`、`err` など）が、このファイルが import するパッケージの名前（N と、例外の名前空間のパッケージ）と当たれば、局所の名前の方の末尾に `_` を足す（`docs/plugin-go.md`「名前」の「局所の名前」と同じ扱い。名前空間 `env` なら、`Main` の引数は `env_`）。
 
 ## 対象
 
@@ -78,7 +80,8 @@ hozoc <command> [flags] [args]
 - `@cli.env` は、フラグが与えられなかったときに環境変数の値を使う（フラグが優先）。環境変数が空文字列なら「ない」とみなす。
 - `@cli.arg` は `@cli.arg` のフィールドの宣言順に位置引数を当てる。`array` は残りすべて（0 個でもよい）。
 - 値の変換: `int` は `strconv.ParseInt(v, 10, 64)`、`float` は `ParseFloat`、`boolean` は `ParseBool`。scalar は元の型で変換してから scalar の型にする。
-- 解釈した入力の model が `Validate` を持つなら（`govalid.HasValidate`。`docs/plugin-go-valid.md`「Validate を持つ型」）、`Validate()` を呼び、違反は 64（メッセージに `Violation` の `Path` と `Constraint`）。入力の初めの値は、既定値を持つ model なら基底の `New<Model>()`、そうでなければ零値。
+- 解釈した入力の model が `Validate` を持つなら（`govalid.HasValidate`。`docs/plugin-go-valid.md`「Validate を持つ型」）、`Validate()` を呼び、違反は 64（メッセージに `Violation` の `Path` と `Constraint`。使い方は出さない）。入力の初めの値は、既定値を持つ model なら基底の `New<Model>()`、そうでなければ零値。
+- 入力の model が**別の名前空間 M のもの**なら、`Validate` は M の型の置き場（`docs/config.md`「型の置き場」）の定義のパッケージのメソッドなので、その単位も `transpilers` に `go-valid` を並べていなければならない。並べていなければ CLI-9（生成した `in.Validate()` がコンパイルできなくなるのを、先に報告する。`go-http` の GOHTTP-11 と同じ。`docs/plugin-go-http.md`「制約の検査」。確かめ方は `govalid.Unlisted`）。N の model は、自分の単位が `go-valid` を並べている（CFG-19）。
 
 ## 実行と表示
 
@@ -113,11 +116,18 @@ N のパッケージと、その型・メソッドの名前と形は `plugin/gol
 
 | ID | 重さ | 意味 |
 |---|---|---|
-| CLI-1 | error | `@cli.command` の op の引数が、0 個でも model 一つでもない |
-| CLI-2 | error | 入力の model のフィールドに `cli` のデコレータがない |
-| CLI-3 | error | フィールドの型が受け付けられない |
-| CLI-4 | error | `array` の `@cli.arg` が最後でない、または二つ以上 |
-| CLI-5 | error | フラグ名かコマンド名の重複 |
+| CLI-1 | error | `@cli.command` の op の引数が、0 個でも model 一つでもない。位置は op |
+| CLI-2 | error | 入力の model のフィールドに `cli` のデコレータがない、または `@cli.arg` と `@cli.flag` の両方がある。位置は model |
+| CLI-3 | error | フィールドの型が受け付けられない。位置は model |
+| CLI-4 | error | `array` の `@cli.arg` が最後でない、または二つ以上。位置は model |
+| CLI-5 | error | フラグ名かコマンド名の重複。位置は、フラグ名なら model、コマンド名なら後ろの op |
 | CLI-6 | error | `@cli.command` の付いた op に `export` がない。位置は op |
 | CLI-7 | error | このトランスパイラのディレクトリ `cli` が、同じ単位が出力する子の名前空間 `N.cli` の出力先と重なる。位置なし |
 | CLI-8 | error | `[emit.options.go-cli]` に、知らないキーがある。位置なし |
+| CLI-9 | error | `Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（「引数の解釈」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op |
+
+warning（コードは `PLUGIN`）は一つ: `@cli.command` の op が一つもない。
+
+- 入力の model の診断（CLI-2〜CLI-5 のフラグ名）は、同じ model を二つのサブコマンドが使っていても、一度だけ返す。
+- Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。上の診断は、そのときも返す。
+- 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

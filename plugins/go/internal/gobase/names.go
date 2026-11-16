@@ -44,61 +44,10 @@ func (s *nameSet) add(name, owner, at string) {
 // checkNames は GO-2。
 func (e *emitter) checkNames() {
 	s := e.shape
-	// 定義のパッケージの公開の名前どうし
+	// 定義のパッケージの公開の名前どうし（一覧は、相乗りと共有する golang.PublicNames）
 	pkg := e.names("定義のパッケージ（" + e.layout.DefDir + "）")
-	for _, d := range e.ns.Decls {
-		if e.typeDecl(d) {
-			name := d.Common().Name
-			switch x := d.(type) {
-			case *ir.Effect:
-				pkg.add(golang.EffectConst(name), "effect "+name, name)
-			case *ir.Model:
-				pkg.add(e.typeName(name), "model "+name, name)
-				if hasDefaults(x) {
-					pkg.add("New"+e.typeName(name), "model "+name+" の New"+e.typeName(name), name)
-				}
-			case *ir.Union:
-				pkg.add(e.typeName(name), "union "+name, name)
-				for _, a := range e.armTypes(x) {
-					if a.wrapped {
-						pkg.add(a.goName, "union "+name+" のアーム "+a.name+" を包む型", name)
-					}
-				}
-			default:
-				pkg.add(e.typeName(name), d.Kind()+" "+name, name)
-			}
-		}
-		if c, ok := d.(*ir.Classify); ok && c.DecidedBy == ir.DecidedByPredicate {
-			name := e.typeName(c.Name)
-			pkg.add(name, "classify "+c.Name, c.Name)
-			consts, _ := e.caseConsts(c)
-			for _, k := range consts {
-				pkg.add(k, "classify "+c.Name+" のケースの定数 "+k, c.Name)
-			}
-			pkg.add("Classify"+name, "classify "+c.Name+" の判定関数", c.Name)
-			if _, isState := c.SubjectStates(); !isState {
-				pkg.add(name+"Cases", "classify "+c.Name+" の述語のインターフェース", c.Name)
-			}
-		}
-	}
-	for _, u := range s.States {
-		pkg.add(u.TypeName, "状態の単位 "+u.FQN, u.FQN)
-	}
-	if len(s.Ops) > 0 {
-		pkg.add("Ops", "インターフェース Ops", "")
-		pkg.add("New", "関数 New", "")
-	}
-	if len(s.Leaves) > 0 {
-		pkg.add("Leaves", "インターフェース Leaves", "")
-	}
-	if len(s.Shared) > 0 {
-		pkg.add("SharedState", "インターフェース SharedState", "")
-	}
-	if len(s.Seams) > 0 {
-		pkg.add("Seams", "インターフェース Seams", "")
-	}
-	for _, d := range s.Deps {
-		pkg.add(d.TypeName, "別の名前空間 "+d.Namespace+" の口", "")
+	for _, n := range golang.PublicNames(e.view) {
+		pkg.add(n.Name, n.What, n.Decl)
 	}
 
 	// 一つの構造体のフィールドどうし
