@@ -111,6 +111,7 @@ func TestKeywordsCovered(t *testing.T) {
 		"any":       "keyword.control.hozo",
 		"const":     "keyword.control.hozo",
 		"default":   "keyword.control.hozo",
+		"else":      "keyword.control.hozo",
 		"throw":     "keyword.control.hozo",
 		"string":    "support.type.primitive.hozo",
 		"never":     "support.type.primitive.hozo",

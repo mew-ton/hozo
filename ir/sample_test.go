@@ -213,15 +213,19 @@ func sampleProgram() *Program {
 						DecidedBy:          DecidedByPredicate,
 					},
 					&Classify{
-						DeclBase: DeclBase{Name: "server.Registration", Span: span(f, 34, 1, 34, 80)},
+						DeclBase: DeclBase{Name: "server.Registration", Span: span(f, 34, 1, 34, 105)},
 						Subject:  OpSubject{Op: "server.findUser", Type: Optional(Ref("server.User"))},
+						// 残りのケース（`対象 as else`）は cases に入り、hasDefault には数えない（docs/ir.md「classify」）
 						Cases: []ClassifyCase{{
 							Name: "Registered",
 							As:   []CaseTyping{{Type: Ref("server.User"), By: NarrowByPresence, Span: span(f, 34, 50, 34, 70)}},
 							Span: span(f, 34, 38, 34, 71),
+						}, {
+							Name: "Unregistered",
+							As:   []CaseTyping{{Type: Optional(Ref("server.User")), By: NarrowByElse, Span: span(f, 34, 86, 34, 102)}},
+							Span: span(f, 34, 72, 34, 103),
 						}},
-						HasDefault: true,
-						DecidedBy:  DecidedByType,
+						DecidedBy: DecidedByType,
 					},
 					&Classify{
 						DeclBase:      DeclBase{Name: "server.IsAdmin", Span: span(f, 35, 1, 35, 30)},

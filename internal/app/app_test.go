@@ -1156,7 +1156,7 @@ func fakeTranspiler(t *testing.T, dir, name, lang, extra, transpilerExtra, stdou
 	write(t, filepath.Join(pluginDir, "plugin.sh"), fakeScript)
 	write(t, filepath.Join(pluginDir, "response.json"), stdout)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \". \\\"$HOZO_PLUGIN_DIR/plugin.sh\\\"\"]\nprotocol = \"0.6\"\n" + extra +
+	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \". \\\"$HOZO_PLUGIN_DIR/plugin.sh\\\"\"]\nprotocol = \"0.7\"\n" + extra +
 		"\n[[transpiler]]\nname = \"" + name + "\"\nlanguage = \"" + lang + "\"\n" + transpilerExtra
 	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"), manifest)
 }
@@ -1346,7 +1346,7 @@ func TestEmitUnits(t *testing.T) {
 			}
 			r := reqs[0]
 			cfg := r.View.Config
-			if r.Protocol != "0.6" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
+			if r.Protocol != "0.7" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
 				cfg.Index != c.index || cfg.Language != "go" || cfg.Base != c.base || strings.Join(cfg.Transpilers, ",") != c.transpilers ||
 				userFiles(r.View.Files) != c.files || !containsStr(r.View.Files, "hozo:vocab/http.hozo") {
 				t.Errorf("%s: 要求 = %+v", c.name, r)
@@ -1533,7 +1533,7 @@ exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
 	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/x.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
 	write(t, filepath.Join(dir, "exit"), "0")
 	plugin := hozoc.Plugin{Name: "echo", Command: []string{"sh", "-c", `. "$HOZO_PLUGIN_DIR/plugin.sh"`}, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
-	req := hozoc.EmitRequest{Protocol: "0.6", Direction: "emit", Transpiler: "echo"}
+	req := hozoc.EmitRequest{Protocol: "0.7", Direction: "emit", Transpiler: "echo"}
 	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
 	ops := innerOps(a)
@@ -1554,7 +1554,7 @@ exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.6","direction":"emit","transpiler":"echo","view":{}}` {
+	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.7","direction":"emit","transpiler":"echo","view":{}}` {
 		t.Errorf("送った要求 = %s", got)
 	}
 	absRoot, _ := filepath.EvalSymlinks(root)

@@ -333,4 +333,41 @@ namespace api {
     current.delete();
     return token;
   }
+
+  // ---- docs/ir.md「版」の 0.7 で足した形 ----
+
+  // docs/ir.md「classify」: 残りのケース（`対象 as else`）は cases に入り、as の by は else。hasDefault は false
+  // docs/check.md「残りのケース」: presence の残りは、値がないとき。docs/types.md「残りのケースでの対象の型」: 対象の型のまま
+  classify Membership of findUser {
+    Member: findUser as User;
+    Stranger: findUser as else;
+  }
+  /** 見せ方。名前だけか、ユーザーの全体 */
+  union Shown {
+    Brief: string;
+    Whole: User;
+  }
+  // docs/check.md「残りのケース」: variant の残りは、ほかのケースが書いていない型のアーム。
+  // docs/types.md「残りのケースでの対象の型」: 残りのアームがちょうど一つなら、そのアームの型
+  classify Detail of Shown {
+    Short: Shown as string;
+    Full: Shown as else;
+  }
+  // docs/ir.md「配線」: 残りのケースのアームは、名前で書く（default のアームではない）。narrowed は、対象の型が外と違うアームにだけ出る
+  op memberName(id: UserId): string
+    throws NotFound
+  {
+    const user = findUser(id);
+    return match user by Membership {
+      Member   => nameOf(user);
+      Stranger => throw NotFound;
+    };
+  }
+  op shownName(shown: Shown): string
+  {
+    return match shown by Detail {
+      Short => shown;
+      Full  => nameOf(shown);
+    };
+  }
 }

@@ -6,7 +6,7 @@
 |---|---|
 | `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]` と、単位が三つ: `namespace = "api"`、`"web"`、`"page"`。どれも `transpilers = ["view-dump"]`（TS の基底はまだないので、`api` と `web` を同じ基底にする）。`api` と `page` の単位は、`web` が使う型の置き場（`docs/config.md`「型の置き場」。なければ CFG-22） |
 | `t.hozo` | テストの語彙 `namespace t { decorator entry; }`。`plugin.OpsWith` が探す op の印。標準の語彙にない名前空間で、どの単位の対象でもないので出力しない（`docs/config.md`「単位の対象」） |
-| `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる（呼ばれる op は `export`）。`docs/ir.md`「版」の 0.3 で足した形（継承した model の `override`、形の語、状態の型、`reads`、op の分類とケースの `as`、状態の参照、アームの値と `throw`、`never`）と、0.6 で足した形（`read` の宣言、引数を持つ例外と効果、`read` と効果の呼び出し、直に呼ぶ組み込みの効果、引数を渡す `throw`、`@repeatable`）はここに置く |
+| `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる（呼ばれる op は `export`）。`docs/ir.md`「版」の 0.3 で足した形（継承した model の `override`、形の語、状態の型、`reads`、op の分類とケースの `as`、状態の参照、アームの値と `throw`、`never`）と、0.6 で足した形（`read` の宣言、引数を持つ例外と効果、`read` と効果の呼び出し、直に呼ぶ組み込みの効果、引数を渡す `throw`、`@repeatable`）と、0.7 で足した形（残りのケース `対象 as else`。`presence` と `variant`）はここに置く |
 | `web.hozo` | ブラウザ側 `namespace web`。テストが見る `View` の viewer。`@t.entry` の付いた op が、`plugin.OpsWith` の対象 |
 | `plugins/view-dump/` | テスト用のプラグイン。トランスパイラ `view-dump`（`requires` を持たない、テストのための基底）を提供する: 受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す。ほかの名前の `transpiler` は `code: "unsupported"` |
 | `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（下の warning を含む） |

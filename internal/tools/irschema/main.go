@@ -132,7 +132,7 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.CatchMode]():       {"recovers", "halts", "ignores"},
 	typeOf[ir.EffectState]():     {"prevented", "kept", "unknown"},
 	typeOf[ir.DecidedBy]():       {"type", "predicate"},
-	typeOf[ir.NarrowBy]():        {"presence", "variant", "predicate"},
+	typeOf[ir.NarrowBy]():        {"presence", "variant", "predicate", "else"},
 }
 
 // specials は MarshalJSON が構造体の形を出さない型。手で書いたスキーマを $defs に置く。
@@ -202,9 +202,9 @@ var descriptions = map[string]string{
 	"TransitionTarget":     "分類の遷移（docs/ir.md「state / exception / effect」の EffectTarget kind \"transition\"）。of は状態の分類の FQN か、組み込みの分類を持つ基底の状態の FQN。",
 	"Classify":             "classify 宣言（docs/ir.md「classify」）。cases に default は含まない。",
 	"ClassifyCase":         "classify のケース（docs/ir.md「classify」）。as は `対象 as T` の並び（なければ []）。",
-	"CaseTyping":           "ケースの `対象 as T`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。",
+	"CaseTyping":           "ケースの `対象 as T` と `対象 as else`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。",
 	"DecidedBy":            "分類のケースが何で決まるか（docs/ir.md「classify」の decidedBy、docs/check.md「ケースの判定」）。type なら述語を持たない。",
-	"NarrowBy":             "絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。",
+	"NarrowBy":             "絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`。",
 	"OpSubject":            "op の分類の対象（docs/ir.md「classify」の subject kind \"op\"）。op は FQN、type はその op の returns。",
 	"ClassifySubject":      "分類の対象（docs/ir.md「classify」の subject）。kind で分ける。",
 	"TypeSubject":          "値の分類の対象の型（docs/ir.md「classify」の subject kind \"type\"）。",

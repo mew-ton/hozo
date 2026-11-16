@@ -305,6 +305,21 @@ func TestRoundTripClassifySubjects(t *testing.T) {
 	if b := roundTrip(t, CaseTyping{State: "s.token", Type: Int(), By: NarrowByPredicate, Span: sp()}); string(b) != `{"state":"s.token","type":{"kind":"core","name":"int"},"by":"predicate",`+spJSON+`}` {
 		t.Errorf("case typing with state: %s", b)
 	}
+	// 残りのケース `対象 as else`（版 0.7）: by は else、type は、そのケースでの対象の型。IsElse / ElseCase で引ける
+	rest := ClassifyCase{Name: "Unregistered", As: []CaseTyping{{Type: Optional(Ref("type.User")), By: NarrowByElse, Span: sp()}}, Span: sp()}
+	if b := roundTrip(t, rest); string(b) != `{"name":"Unregistered","as":[{"type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}},"by":"else",`+spJSON+`}],`+spJSON+`}` {
+		t.Errorf("else case: %s", b)
+	}
+	if !rest.IsElse() || cs.IsElse() {
+		t.Errorf("IsElse: 残りのケース = %v、型を書いたケース = %v", rest.IsElse(), cs.IsElse())
+	}
+	oc.Cases = []ClassifyCase{cs, rest}
+	if got := oc.ElseCase(); got == nil || got.Name != "Unregistered" {
+		t.Errorf("ElseCase = %+v", got)
+	}
+	if (&Classify{Cases: []ClassifyCase{cs}}).ElseCase() != nil {
+		t.Error("ElseCase of a classify without an else case")
+	}
 
 	c := &Classify{Subject: TypeSubject{Type: Int()}}
 	if c.SubjectType() == nil {
@@ -425,7 +440,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.6","namespaces":[],"binds":[]}`
+	want := `{"version":"0.7","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -433,7 +448,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.6","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.6","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.7","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.7","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

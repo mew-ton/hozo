@@ -441,7 +441,7 @@
     },
     "CaseTyping": {
       "additionalProperties": false,
-      "description": "ケースの `対象 as T`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。",
+      "description": "ケースの `対象 as T` と `対象 as else`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。",
       "properties": {
         "by": {
           "$ref": "#/$defs/NarrowBy"
@@ -531,7 +531,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.6"
+          "const": "0.7"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1154,7 +1154,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.6"
+          "const": "0.7"
         },
         "transpiler": {
           "type": "string"
@@ -1333,7 +1333,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.6"
+          "const": "0.7"
         }
       },
       "required": [
@@ -1759,11 +1759,12 @@
       "type": "object"
     },
     "NarrowBy": {
-      "description": "絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。",
+      "description": "絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`。",
       "enum": [
         "presence",
         "variant",
-        "predicate"
+        "predicate",
+        "else"
       ],
       "type": "string"
     },
@@ -2101,7 +2102,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.6"
+          "const": "0.7"
         }
       },
       "required": [
@@ -2917,7 +2918,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.6"
+          "const": "0.7"
         },
         "viewer": {
           "type": "string"

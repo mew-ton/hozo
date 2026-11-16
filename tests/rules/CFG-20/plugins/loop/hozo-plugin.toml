@@ -1,7 +1,7 @@
 # CFG-20 のための fixture: 互いを requires に書いた二つのトランスパイラ（依存の輪）
 name     = "loop"
 command  = ["true"]
-protocol = "0.6"
+protocol = "0.7"
 
 [[transpiler]]
 name     = "loop-a"

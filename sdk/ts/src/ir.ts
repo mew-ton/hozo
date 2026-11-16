@@ -40,9 +40,9 @@ export type Operation = "post" | "put" | "delete";
  */
 export type CaseSet = "any" | string[];
 /**
- * 絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。
+ * 絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`。
  */
-export type NarrowBy = "presence" | "variant" | "predicate";
+export type NarrowBy = "presence" | "variant" | "predicate" | "else";
 /**
  * 分類のケースが何で決まるか（docs/ir.md「classify」の decidedBy、docs/check.md「ケースの判定」）。type なら述語を持たない。
  */
@@ -95,7 +95,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.6";
+  version: "0.7";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -438,7 +438,7 @@ export interface ClassifyCase {
   span: Span;
 }
 /**
- * ケースの `対象 as T`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。
+ * ケースの `対象 as T` と `対象 as else`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。
  */
 export interface CaseTyping {
   by: NarrowBy;
@@ -784,7 +784,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.6";
+  version: "0.7";
   viewer: string;
 }
 /**

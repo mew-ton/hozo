@@ -486,8 +486,9 @@ func (r *renderer) typ(t ir.Type) string {
 	return t.String()
 }
 
-// caseLine は分類のケースを Hozo の構文で書く。as を持つケースなら `Registered: findUser as type.User`
-// （docs/lsp.md「ホバー」）。as の前は、値の分類なら対象の型、op の分類ならその op、状態の分類ならその状態。
+// caseLine は分類のケースを Hozo の構文で書く。as を持つケースなら `Registered: findUser as type.User`、残りのケースなら
+// `Unregistered: findUser as else`（docs/lsp.md「ホバー」）。as の前は、値の分類なら対象の型、op の分類ならその op、
+// 状態の分類ならその状態。
 func (r *renderer) caseLine(c *ir.Classify, cs ir.ClassifyCase) string {
 	if len(cs.As) == 0 {
 		return cs.Name
@@ -502,6 +503,11 @@ func (r *renderer) caseLine(c *ir.Classify, cs ir.ClassifyCase) string {
 			subject = r.rel(s.Op)
 		case ir.StatesSubject:
 			subject = r.rel(as.State)
+		}
+		if as.By == ir.NarrowByElse {
+			// 残りのケースは、型を書いていない（as.Type は、そのケースでの対象の型）
+			parts = append(parts, subject+" as else")
+			continue
 		}
 		parts = append(parts, subject+" as "+r.typ(as.Type))
 	}

@@ -565,7 +565,7 @@ func TestClassify(t *testing.T) {
 	if !c.Cases[2].Default || c.Cases[2].Name != nil || c.Cases[2].Doc == nil || c.Cases[2].Doc.Body != "d" {
 		t.Errorf("Case 2 = %+v", c.Cases[2])
 	}
-	// ケースの型（CaseTyping = Type "as" Type）。
+	// ケースの型（CaseTyping = Type "as" ( Type | "else" )）。
 	c = firstDecl[*ast.ClassifyDecl](t, `classify Registration of findUser {
   /** 登録済み */
   Registered: findUser as type.User;
@@ -588,6 +588,23 @@ func TestClassify(t *testing.T) {
 	if typeString(c.Of[0]) != "nullable<User>" || typeString(c.Cases[0].As[0].Subject) != "nullable<User>" {
 		t.Errorf("Classify = %+v", c)
 	}
+	// 残りのケース（CaseTyping = Type "as" ( Type | "else" )）。else は型ではなく、Type は nil
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Registration of findUser { Registered: findUser as type.User; /** 未登録 */ Unregistered: findUser as else; }")
+	if as := c.Cases[1].As; len(as) != 1 || !as[0].Else || as[0].Type != nil || typeString(as[0].Subject) != "findUser" ||
+		as[0].ElseSpan.End-as[0].ElseSpan.Start != 4 || c.Cases[1].Default || c.Cases[1].Doc == nil {
+		t.Errorf("Case 1 = %+v", c.Cases[1])
+	}
+	if as := c.Cases[0].As; len(as) != 1 || as[0].Else || as[0].Type == nil {
+		t.Errorf("Case 0 = %+v", c.Cases[0])
+	}
+	// else は予約語（docs/grammar.md「予約語」）: 書けるのは as の後ろと、フィールド名の位置だけ
+	mustFail(t, "classify A of T { X: T as else?; }", "「;」が必要")
+	mustFail(t, "classify A of T { X: else; }", "型が必要")
+	mustFail(t, "classify A of T { default: T as else; }", "default には as を書けない")
+	mustFail(t, "condition A of T as else;", "condition には as を書けない")
+	mustFail(t, "model else { id: string; }", "else は予約語で、識別子には使えない")
+	mustFail(t, "op f(m: else);", "型が必要")
+	firstDecl[*ast.ModelDecl](t, "model M { else: string; }")
 	mustFail(t, "classify A of T { X: T; }", "「as」が必要")
 	mustFail(t, "classify A of T { X: as U; }", "型が必要")
 	mustFail(t, "classify A of T { X: T as; }", "型が必要")

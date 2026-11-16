@@ -1,5 +1,5 @@
 {
-  "version": "0.6",
+  "version": "0.7",
   "namespaces": [
     {
       "name": "",
@@ -1052,7 +1052,7 @@
             },
             "end": {
               "line": 34,
-              "col": 80
+              "col": 105
             }
           },
           "subject": {
@@ -1100,9 +1100,46 @@
                   "col": 71
                 }
               }
+            },
+            {
+              "name": "Unregistered",
+              "as": [
+                {
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "ref",
+                      "target": "server.User"
+                    }
+                  },
+                  "by": "else",
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 34,
+                      "col": 86
+                    },
+                    "end": {
+                      "line": 34,
+                      "col": 102
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 34,
+                  "col": 72
+                },
+                "end": {
+                  "line": 34,
+                  "col": 103
+                }
+              }
             }
           ],
-          "hasDefault": true,
+          "hasDefault": false,
           "fromCondition": false,
           "decidedBy": "type"
         },

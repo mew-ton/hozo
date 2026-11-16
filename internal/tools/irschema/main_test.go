@@ -183,6 +183,8 @@ func TestNegative(t *testing.T) {
 		{"classify subject op without type", "ClassifySubject", `{"kind":"op","op":"a.find"}`, false},
 		{"case typing", "CaseTyping", `{"type":{"kind":"ref","target":"a.M"},"by":"presence","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
 		{"case typing with state", "CaseTyping", `{"state":"a.s","type":{"kind":"ref","target":"a.M"},"by":"predicate","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
+		// 版 0.7: 残りのケース `対象 as else`（docs/ir.md「版」）
+		{"case typing else", "CaseTyping", `{"type":{"kind":"optional","of":{"kind":"ref","target":"a.M"}},"by":"else","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, true},
 		{"case typing bad by", "CaseTyping", `{"type":{"kind":"ref","target":"a.M"},"by":"guess","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		{"classify case without as", "ClassifyCase", `{"name":"A","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		{"decided by", "DecidedBy", `"type"`, true},
@@ -253,8 +255,8 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.6","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.6","direction":"emit","format":"openapi","files":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.7","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.7","direction":"emit","format":"openapi","files":[]}`, false},
 		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {
@@ -480,7 +482,7 @@ func TestEnumsMatchGo(t *testing.T) {
 		typeOf[ir.CatchMode]():       {string(ir.Recovers), string(ir.Halts), string(ir.Ignores)},
 		typeOf[ir.EffectState]():     {string(ir.Prevented), string(ir.Kept), string(ir.Unknown)},
 		typeOf[ir.DecidedBy]():       {string(ir.DecidedByType), string(ir.DecidedByPredicate)},
-		typeOf[ir.NarrowBy]():        {string(ir.NarrowByPresence), string(ir.NarrowByVariant), string(ir.NarrowByPredicate)},
+		typeOf[ir.NarrowBy]():        {string(ir.NarrowByPresence), string(ir.NarrowByVariant), string(ir.NarrowByPredicate), string(ir.NarrowByElse)},
 	}
 	if len(want) != len(enums) {
 		t.Errorf("enums table has %d entries, test knows %d", len(enums), len(want))

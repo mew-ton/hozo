@@ -77,7 +77,7 @@ func TestViewSignature(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	if Version != "0.6" {
+	if Version != "0.7" {
 		t.Errorf("Version = %q", Version)
 	}
 }

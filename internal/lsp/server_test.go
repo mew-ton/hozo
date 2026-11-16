@@ -813,6 +813,10 @@ namespace store {
     LoggedIn: current as type.User;
     default;
   }
+  classify Account of findUser {
+    Known: findUser as type.User;
+    Unknown: findUser as else;
+  }
   op whoAmI(): type.User? {
     return match current by nullable {
       HasItems => current;
@@ -831,6 +835,15 @@ namespace server {
     return match user by store.Registration {
       Registered => store.nameOf2(user);
       default    => throw type.Unauthorized;
+    };
+  }
+  export op lookup(id: string): string
+    throws type.Unauthorized
+  {
+    const user = store.findUser(id);
+    return match user by store.Account {
+      Known   => store.nameOf2(user);
+      Unknown => throw type.Unauthorized;
     };
   }
 }
@@ -883,6 +896,10 @@ namespace store {
 		{"Registration of findUser", len("Registration of "), []string{"```hozo\nexport op findUser(id: string): type.User?\n```"}, nil},
 		{"Registered: findUser as", len("Registered: "), []string{"```hozo\nexport op findUser(id: string): type.User?\n```"}, nil},
 		{"LoggedIn: current as", len("LoggedIn: "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
+		// 残りのケース（as else）: 見出しは、書いたとおり `対象 as else`。as の前は、ほかのケースと同じ
+		{"Unknown => throw", 0, []string{"classify store.Account of store.findUser\n  Unknown: store.findUser as else"}, []string{"type.User?"}},
+		{"Unknown: findUser as else", 0, []string{"classify Account of findUser\n  Unknown: findUser as else"}, nil},
+		{"Unknown: findUser as else", len("Unknown: "), []string{"```hozo\nexport op findUser(id: string): type.User?\n```"}, nil},
 		// 状態の見出しだけは形の語で書く（T? と書いた状態も nullable<T>、T と書いた状態は single<T>）。アームの中で
 		// 絞り込まれていても、見出しは宣言のまま
 		{"match current by nullable", len("match "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
@@ -936,6 +953,8 @@ namespace store {
 		{"配線の値の位置の状態（return）", "return title;", len("return "), "title: string;"},
 		{"match x by ns.C の C", "by store.Registration", len("by store."), "Registration of findUser"},
 		{"アームのケース名", "Registered => store.nameOf2", 0, "Registered: findUser as"},
+		{"残りのケースの X as else の X", "Unknown: findUser as else", len("Unknown: "), "findUser(id: string)"},
+		{"アームのケース名（残りのケース）", "Unknown => throw", 0, "Unknown: findUser as else"},
 		{"throw E の E", "throw type.Unauthorized", len("throw type."), "Unauthorized;\n}"},
 	} {
 		var loc *protocol.Location
@@ -948,7 +967,9 @@ namespace store {
 	for _, tt := range []struct {
 		needle  string
 		shiftBy int
-	}{{"by nullable {", len("by ")}, {"HasItems => current;", 0}, {"Empty    => none;", 0}} {
+	}{{"by nullable {", len("by ")}, {"HasItems => current;", 0}, {"Empty    => none;", 0},
+		// 残りのケースの `X as else` の else も、宣言を持たない（docs/lsp.md「定義へジャンプ」）
+		{"Unknown: findUser as else", len("Unknown: findUser as ")}} {
 		var loc *protocol.Location
 		c.result(protocol.MethodDefinition, at(tt.needle, tt.shiftBy), &loc)
 		if loc != nil {
