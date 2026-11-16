@@ -1,0 +1,222 @@
+// サンプル order-app の仕様（README.md）。担当者の画面（backoffice）が呼ぶ HTTP の入口 staffApi。
+// どの op も、はじめに、呼んだ人がその仕事の担当かを確かめる（staff.asMaker / asPacker / asAdmin）。業務の規則は持たない。
+
+/** 担当者の画面のための入口 */
+namespace staffApi {
+  // ---- ログイン ----
+
+  /** ログインの本文 */
+  model Credentials {
+    loginName: string;
+    password: staff.Password;
+  }
+
+  /** ログインの入力 */
+  model LoginInput {
+    @http.bodyObj body: Credentials;
+  }
+
+  /** ログインする */
+  @http.post("/staff/login")
+  export op login(in: LoginInput): staff.LoggedIn
+    throws staff.InvalidCredentials
+  {
+    return staff.login(in.body.loginName, in.body.password);
+  }
+
+  /** トークンだけを運ぶ入力 */
+  model AuthInput {
+    @http.header("Authorization") token: type.Token?;
+  }
+
+  /** ログアウトする */
+  @http.post("/staff/logout")
+  export op logout(in: AuthInput) {
+    staff.logout(in.token);
+  }
+
+  // ---- 製作 ----
+
+  /** 作り終えていない仕事の一覧。納期の近い順 */
+  @http.get("/staff/jobs")
+  export op jobs(in: AuthInput): production.Job[]
+    throws type.Unauthorized, type.Forbidden
+  {
+    staff.asMaker(in.token);
+    return production.queue();
+  }
+
+  /** 仕事一つを指す入力 */
+  model JobInput extends AuthInput {
+    @http.required @http.body id: production.JobId;
+  }
+
+  /** 作り始めた */
+  @http.post("/staff/jobs/start")
+  export op startJob(in: JobInput): production.Job
+    throws type.Unauthorized, type.Forbidden, production.NoJob, production.NotQueued
+  {
+    staff.asMaker(in.token);
+    return production.start(in.id);
+  }
+
+  /** 作り終えた入力。出来上がりを量った大きさと重さを持つ */
+  model FinishInput extends AuthInput {
+    @http.required @http.body id: production.JobId;
+    @http.required @http.body measured: type.Measurement;
+  }
+
+  /** 作り終えて、量って、そろえ場所に置いた */
+  @http.post("/staff/jobs/finish")
+  export op finishJob(in: FinishInput): shipping.Shipment
+    throws type.Unauthorized, type.Forbidden,
+           production.NoJob, production.NotInProduction, shipping.NoShipment, shipping.UnknownItem
+  {
+    staff.asMaker(in.token);
+    return fulfilment.made(in.id, in.measured);
+  }
+
+  // ---- そろえる ----
+
+  /** 棚から出すものの一覧 */
+  @http.get("/staff/picks")
+  export op picks(in: AuthInput): inventory.Reservation[]
+    throws type.Unauthorized, type.Forbidden
+  {
+    staff.asPacker(in.token);
+    return inventory.pickList();
+  }
+
+  /** 棚から出した行を指す入力 */
+  model PickInput extends AuthInput {
+    @http.required @http.body orderId: type.OrderId;
+    @http.required @http.body line: type.LineId;
+  }
+
+  /** 棚から出して、そろえ場所に置いた */
+  @http.post("/staff/picks/done")
+  export op picked(in: PickInput): shipping.Shipment
+    throws type.Unauthorized, type.Forbidden,
+           inventory.NotReserved, inventory.AlreadyPicked, shipping.NoShipment, shipping.UnknownItem
+  {
+    staff.asPacker(in.token);
+    return fulfilment.picked(in.orderId, in.line);
+  }
+
+  // ---- 梱包して、渡す ----
+
+  /** まだ店にある出荷の一覧。それぞれの進み具合が付く */
+  @http.get("/staff/shipments")
+  export op shipments(in: AuthInput): shipping.Progress[]
+    throws type.Unauthorized, type.Forbidden
+  {
+    staff.asPacker(in.token);
+    return shipping.inHouse();
+  }
+
+  /** 出荷一つを指す入力（クエリ） */
+  model ShipmentQuery extends AuthInput {
+    @http.required @http.query id: shipping.ShipmentId;
+  }
+
+  /** 梱包の台に見せるもの: 出荷一つについて、いま何ができるか */
+  @http.get("/staff/shipments/station")
+  export op station(in: ShipmentQuery): fulfilment.Station
+    throws type.Unauthorized, type.Forbidden, shipping.NoShipment, carrier.NoCarrier, http.NetworkError, http.ServerError
+  {
+    staff.asPacker(in.token);
+    return fulfilment.station(in.id);
+  }
+
+  /** 梱包の入力: 選んだ箱の種類と、量った重さ */
+  model PackInput extends AuthInput {
+    @http.required @http.body id: shipping.ShipmentId;
+    @http.required @http.body box: shipping.BoxCode;
+    @http.required @http.body weight: type.Grams;
+  }
+
+  /** 梱包した。送料が、ここで決まる */
+  @http.post("/staff/shipments/pack")
+  export op pack(in: PackInput): shipping.Parcel
+    throws type.Unauthorized, type.Forbidden,
+           shipping.NoShipment, shipping.NotGathered, shipping.AlreadyPacked, shipping.UnknownBox, shipping.OverWeight, shipping.Undeliverable
+  {
+    staff.asPacker(in.token);
+    return shipping.pack(in.id, in.box, in.weight);
+  }
+
+  /** 送り状を買う入力: 選んだ配送業者とサービス */
+  model LabelInput extends AuthInput {
+    @http.required @http.body id: shipping.ShipmentId;
+    @http.required @http.body carrier: carrier.CarrierCode;
+    @http.required @http.body service: carrier.ServiceCode;
+  }
+
+  /** 客への請求を確定して、送り状を買う */
+  @http.post("/staff/shipments/label")
+  export op buyLabel(in: LabelInput): shipping.Label
+    throws type.Unauthorized, type.Forbidden,
+           shipping.NoShipment, shipping.NotPacked, shipping.AlreadyLabelled,
+           payment.NoPayment, payment.NotSecured, psp.HoldExpired,
+           carrier.UnknownCarrier, carrier.NotEnabled, carriergw.Refused,
+           http.NetworkError, http.ServerError
+  {
+    staff.asPacker(in.token);
+    return fulfilment.dispatch(in.id, { carrier: in.carrier, service: in.service });
+  }
+
+  /** 出荷一つを指す入力（本文） */
+  model ShipmentInput extends AuthInput {
+    @http.required @http.body id: shipping.ShipmentId;
+  }
+
+  /** 配送業者に渡した */
+  @http.post("/staff/shipments/handover")
+  export op handOver(in: ShipmentInput): shipping.Shipment
+    throws type.Unauthorized, type.Forbidden,
+           shipping.NoShipment, shipping.NotPacked, shipping.NotLabelled, shipping.AlreadyHandedOver, ordering.NoOrder
+  {
+    staff.asPacker(in.token);
+    return fulfilment.handedOver(in.id);
+  }
+
+  // ---- 配送業者の管理 ----
+
+  /** 登録してある配送業者の一覧 */
+  @http.get("/staff/carriers")
+  export op carriers(in: AuthInput): carrier.Carrier[]
+    throws type.Unauthorized, type.Forbidden
+  {
+    staff.asAdmin(in.token);
+    return carrier.all();
+  }
+
+  /** 配送業者を登録する入力 */
+  model RegisterInput extends AuthInput {
+    @http.bodyObj carrier: carrier.Carrier;
+  }
+
+  /** 配送業者を登録する */
+  @http.post("/staff/carriers")
+  export op registerCarrier(in: RegisterInput)
+    throws type.Unauthorized, type.Forbidden, carrier.AlreadyRegistered
+  {
+    staff.asAdmin(in.token);
+    carrier.register(in.carrier);
+  }
+
+  /** 配送業者を使う、使わないを切り替える入力 */
+  model SwitchInput extends AuthInput {
+    @http.required @http.body code: carrier.CarrierCode;
+    @http.required @http.body enabled: boolean;
+  }
+
+  /** 配送業者を使う、使わないを切り替える */
+  @http.post("/staff/carriers/enabled")
+  export op setCarrierEnabled(in: SwitchInput): carrier.Carrier
+    throws type.Unauthorized, type.Forbidden, carrier.UnknownCarrier
+  {
+    staff.asAdmin(in.token);
+    return carrier.setEnabled(in.code, in.enabled);
+  }
+}

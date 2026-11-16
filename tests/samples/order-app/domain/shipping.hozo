@@ -332,10 +332,14 @@ namespace shipping {
     return { shipment: shipment, parcel: packed, label: bought };
   }
 
-  /** まだ店にある出荷の一覧（そろえている途中のものも、梱包を待っているものも） */
-  export op inHouse(): Shipment[] {
-    return shipmentsInHouse();
+  /** まだ店にある出荷の一覧（そろえている途中のものも、梱包を待っているものも）。それぞれの進み具合を添える */
+  export op inHouse(): Progress[] {
+    const waiting = shipmentsInHouse();
+    return together(waiting, parcels, labels);
   }
+
+  /** 出荷ごとに、荷物と送り状を添える（人が書く） */
+  op together(waiting: Shipment[], parcels: Parcel[], labels: Label[]): Progress[];
 
   /** 出荷元の住所 */
   export op shipFrom(): type.Address {

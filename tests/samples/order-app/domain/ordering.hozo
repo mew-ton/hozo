@@ -161,6 +161,10 @@ namespace ordering {
   @http.status(404)
   exception NoOrder;
 
+  /** その注文は、支払いがないまま期限が過ぎた。もう支払えない */
+  @http.status(410)
+  exception OrderExpired;
+
   // ---- 状態に触れるもの ----
 
   /** その鍵の注文 */
@@ -191,13 +195,20 @@ namespace ordering {
 
   // ---- 値段を付ける ----
 
+  /** カートを、商品の種類ごとに分けて、商品の代金を出す。送料は、まだ出さない（届け先が要る） */
+  export op itemise(lines: CartLine[]): Sorted
+    throws UnknownProduct, NotForSale
+  {
+    const skus = skusOf(lines);
+    const products = catalog.lookup(skus);
+    return sort(lines, products);
+  }
+
   /** カートに値段を付ける。箱で送るものがあれば、届け先から、送料の見積もりと上限を出す */
   export op price(lines: CartLine[], destination: type.Address?): Priced
     throws UnknownProduct, NotForSale, DestinationRequired, shipping.Undeliverable, shipping.TooLarge
   {
-    const skus = skusOf(lines);
-    const products = catalog.lookup(skus);
-    const sorted = sort(lines, products);
+    const sorted = itemise(lines);
     return match sorted by Mix {
       NeedsBox    => priceToShip(sorted, destination);
       DigitalOnly => withoutShipping(sorted);
@@ -291,6 +302,11 @@ namespace ordering {
       Found   => found;
       default => throw NoOrder;
     };
+  }
+
+  /** 鍵から注文を引く。なければ、値がない */
+  export op peek(key: type.OrderKey): Order? {
+    return orderByKey(key);
   }
 
   /** 識別子から注文を引く */

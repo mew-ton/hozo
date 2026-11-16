@@ -218,7 +218,6 @@ namespace payment {
    * 相手からの通知を扱う。同じ通知が二度届いても、二度は扱わない。
    * この通知で、新しく、客の同意が取れた注文があれば、その識別子を返す。なければ、ない。
    */
-  @db.transaction
   export op record(event: psp.Event): type.OrderId? {
     const delivered = seenEvent(event.id);
     return match delivered by Redelivery {

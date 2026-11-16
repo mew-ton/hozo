@@ -1,0 +1,247 @@
+// サンプル order-app の仕様（README.md）。客の画面（storefront）が呼ぶ HTTP の入口 shopApi。
+// 状態は、店の画面の URL だけ。業務の規則は持たない: 概念の op を呼んで、客に見せる形にする。
+// 客はログインしない。注文は、鍵（type.OrderKey）を知っている人が見る。
+
+/** 客の画面のための入口 */
+namespace shopApi {
+  // ---- 商品 ----
+
+  /** 店に並べている商品の一覧 */
+  @http.get("/products")
+  export op products(): catalog.Product[] {
+    return catalog.listed();
+  }
+
+  /** 商品を一つ引く入力 */
+  model ProductInput {
+    @http.required @http.query sku: type.Sku;
+  }
+
+  /** 商品を一つ引く。並べていない商品は、ないものとして、値がない */
+  @http.get("/products/item")
+  export op product(in: ProductInput): catalog.Product? {
+    const found = catalog.find(in.sku);
+    return match found by catalog.Offer {
+      OnSale    => found;
+      Withdrawn => none;
+      default   => none;
+    };
+  }
+
+  // ---- カートの値段 ----
+
+  /** カートの中身だけの入力 */
+  model CartInput {
+    @http.required @http.body lines: ordering.CartLine[];
+  }
+
+  /** カートを種類ごとに分けて、商品の代金を出す。送料は出さない */
+  @http.post("/cart/items")
+  export op itemise(in: CartInput): ordering.Sorted
+    throws ordering.UnknownProduct, ordering.NotForSale
+  {
+    return ordering.itemise(in.lines);
+  }
+
+  /** 見積もりの入力 */
+  model QuoteInput {
+    @http.required @http.body lines: ordering.CartLine[];
+    @http.body destination: type.Address?;
+  }
+
+  /**
+   * 注文の前に、客に見せる値段を出す。箱で送るものがあれば、送料の見積もりと上限が付く（Priced.physical.terms）。
+   * 請求する送料は、梱包の後に決まり、上限を超えない。
+   */
+  @http.post("/quote")
+  export op quote(in: QuoteInput): ordering.Priced
+    throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired,
+           shipping.Undeliverable, shipping.TooLarge
+  {
+    return ordering.price(in.lines, in.destination);
+  }
+
+  // ---- 注文と支払い ----
+
+  /** 店の画面の URL。支払いの画面から客を戻す先を作るのに使う */
+  state site: single<type.Url>;
+
+  /** 注文の入力 */
+  model CheckoutInput {
+    @http.bodyObj checkout: ordering.Checkout;
+  }
+
+  /** 注文できた。続きは、支払いの画面 */
+  model Placed {
+    key: type.OrderKey;
+    /** 支払いの画面の URL。客は、ここで、上限の額（商品の代金 + 送料の上限）に同意する */
+    payAt: type.Url;
+  }
+
+  /** 注文して、支払いの画面を開く。同じ送信が二度届いても、注文は一つ */
+  @http.post("/orders")
+  export op checkout(in: CheckoutInput): Placed
+    throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired, ordering.TermsChanged,
+           ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
+           payment.AlreadySecured, payment.ProviderUnavailable
+  {
+    const order = ordering.place(in.checkout);
+    return payFor(order);
+  }
+
+  /** 鍵だけを運ぶ入力（本文） */
+  model KeyInput {
+    @http.required @http.body key: type.OrderKey;
+  }
+
+  /** 支払いの画面を、開き直す（客が、支払いの画面を閉じてしまったとき） */
+  @http.post("/orders/pay")
+  export op pay(in: KeyInput): Placed
+    throws ordering.NoOrder, ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
+  {
+    const order = ordering.byKey(in.key);
+    return payFor(order);
+  }
+
+  /** 支払いを待っている注文にだけ、支払いの画面を開く */
+  op payFor(order: ordering.Order): Placed
+    throws ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
+  {
+    return match order by ordering.Standing {
+      AwaitingPayment => openPayment(order);
+      Accepted        => throw payment.AlreadySecured;
+      Expired         => throw ordering.OrderExpired;
+    };
+  }
+
+  /** 支払いの画面を開く */
+  op openPayment(order: ordering.Standing.AwaitingPayment<ordering.Order>): Placed
+    throws payment.AlreadySecured, payment.ProviderUnavailable
+  {
+    const returnTo = orderPage(site, order.key);
+    const session = payment.begin(order, returnTo);
+    return { key: order.key, payAt: session.url };
+  }
+
+  /** 注文の画面の URL（人が書く） */
+  op orderPage(site: type.Url, key: type.OrderKey): type.Url;
+
+  // ---- 注文のいま ----
+
+  /** ダウンロードの行の、いま */
+  model DigitalView {
+    line: type.LineId;
+    name: string;
+    quantity: type.Quantity;
+    unitPrice: type.Yen;
+    /** 取れる期限。まだ取れなければ、ない */
+    availableUntil: Time?;
+  }
+
+  /** 受注製作の行の、いま */
+  model MadeView {
+    line: type.LineId;
+    name: string;
+    quantity: type.Quantity;
+    unitPrice: type.Yen;
+    request: string?;
+    /** 納期。受け付けるまで、ない */
+    dueAt: Time?;
+    startedAt: Time?;
+    finishedAt: Time?;
+  }
+
+  /** 在庫の行の、いま */
+  model StockedView {
+    line: type.LineId;
+    name: string;
+    quantity: type.Quantity;
+    unitPrice: type.Yen;
+    /** 棚から出して、そろえ場所に置いた時刻 */
+    gatheredAt: Time?;
+  }
+
+  /** 箱で送る部分の、いま。送料は、梱包するまで、見積もりと上限しかない */
+  model ShippingView {
+    destination: type.Address;
+    /** 注文のときに同意した、見積もりと上限 */
+    terms: shipping.FeeQuote;
+    /** 梱包して決まった送料のうち、請求する額（上限を超えない）。梱包するまで、ない */
+    fee: type.Yen?;
+    packedAt: Time?;
+    carrierName: string?;
+    trackingNumber: shipping.TrackingNumber?;
+    handedOverAt: Time?;
+    deliveredAt: Time?;
+  }
+
+  /** 支払いの、いま */
+  model MoneyView {
+    itemsTotal: type.Yen;
+    /** 同意した上限の額。請求は、これを超えない */
+    limit: type.Yen;
+    /** 確定した請求の額。確定するまで、ない */
+    captured: type.Yen?;
+    /** 返した額 */
+    refunded: type.Yen?;
+  }
+
+  /** 客に見せる、注文のいま。店の中の事実（店が配送業者に払う額、店が持った分）は、見せない */
+  model OrderView {
+    key: type.OrderKey;
+    placedAt: Time;
+    acceptedAt: Time?;
+    expiredAt: Time?;
+    digital: DigitalView[];
+    made: MadeView[];
+    stocked: StockedView[];
+    /** 箱で送る部分がなければ、ない */
+    shipping: ShippingView?;
+    /** 支払いの画面を開くまで、ない */
+    money: MoneyView?;
+  }
+
+  /** 鍵だけを運ぶ入力（クエリ） */
+  model KeyQuery {
+    @http.required @http.query key: type.OrderKey;
+  }
+
+  /** 注文のいまを返す。その鍵の注文がなければ、値がない */
+  @http.get("/orders/status")
+  export op status(in: KeyQuery): OrderView? {
+    const found = ordering.peek(in.key);
+    return match found by ordering.Known {
+      Found   => statusOf(found);
+      default => none;
+    };
+  }
+
+  /** 概念ごとの事実を集めて、客に見せる形にする */
+  op statusOf(order: ordering.Order): OrderView {
+    const charge = payment.ofOrder(order.id);
+    const progress = shipping.progressOfOrder(order.id);
+    const jobs = production.ofOrder(order.id);
+    const grants = download.granted(order.id);
+    return view(order, charge, progress, jobs, grants);
+  }
+
+  /** 客に見せる形に写す（人が書く） */
+  op view(order: ordering.Order, charge: payment.Payment?, progress: shipping.Progress?, jobs: production.Job[], grants: download.Grant[]): OrderView;
+
+  // ---- ダウンロード ----
+
+  /** ダウンロードの入力 */
+  model DownloadInput {
+    @http.required @http.query key: type.OrderKey;
+    @http.required @http.query line: type.LineId;
+  }
+
+  /** ダウンロードの行のファイルを取る URL。短い間だけ使える */
+  @http.get("/orders/download")
+  export op download(in: DownloadInput): type.Url
+    throws ordering.NoOrder, download.NotGranted, download.GrantExpired, download.AssetsUnavailable
+  {
+    const order = ordering.byKey(in.key);
+    return download.link(order.id, in.line);
+  }
+}

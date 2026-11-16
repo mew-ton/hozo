@@ -1,0 +1,406 @@
+// サンプル order-app の仕様（README.md「画面」）。客の画面の名前空間 storefront（ブラウザ）。
+// 画面は、ページの op（@page.route。返す union のアームが、画面の状態）と、客の操作の op（@page.interaction。どのページの、どの状態で
+// できるか）で書く。描き方（部品、文言、見た目）は書かない。
+// カートは、ブラウザが持つ。サーバーは、注文するまで知らない。客が同意する送料の上限は、状態 offer に見えているもの。
+
+/** 客の画面。商品を選び、注文し、注文のいまを見る */
+namespace storefront {
+  // ---- 状態 ----
+
+  /** カート */
+  @localStorage
+  state cart: list<ordering.CartLine>;
+
+  /** 最後に注文した鍵。注文の画面へ戻るために覚える */
+  @localStorage
+  state lastOrder: nullable<type.OrderKey>;
+
+  /** 注文の画面で、客に見せている値段。送料の見積もりと上限は、ここにある。カートか届け先が変われば、捨てる */
+  state offer: nullable<Offer>;
+
+  /** 注文が通らなかった理由。次の操作で消える */
+  state problem: nullable<Problem>;
+
+  @page.path
+  state location: single<page.Route>;
+
+  @page.query
+  state query: single<Record<string, string[]>>;
+
+  /** 客に見せて、同意を求めている値段 */
+  model Offer {
+    /** この申し込みの識別子。同じ申し込みを二度送っても、注文は一つ */
+    requestId: type.RequestId;
+    email: type.Email;
+    destination: type.Address?;
+    priced: ordering.Priced;
+  }
+
+  /** 注文が通らなかった理由（"sold-out" など。値の集合は、下の効果の名前が決める） */
+  model Problem {
+    reason: string;
+  }
+
+  // ---- 効果 ----
+
+  /** カートに一行足す。同じ商品で、希望も同じ行があれば、個数を足す */
+  effect addLine(line: ordering.CartLine) on cart.post;
+
+  /** カートの行の個数を変える */
+  effect changeQuantity(sku: type.Sku, quantity: type.Quantity) on cart.put;
+
+  /** カートから行を消す */
+  effect removeLine(sku: type.Sku) on cart.delete;
+
+  /** カートを空にする */
+  effect emptyCart() on cart: HasItems -> Empty;
+
+  /** 見せる値段を置く */
+  effect showOffer(offer: Offer) on offer: Empty -> HasItems;
+
+  /** 見せている値段を捨てる。同意は、取り直しになる */
+  effect forgetOffer() on offer.delete;
+
+  /** 注文の鍵を覚える */
+  effect rememberOrder(key: type.OrderKey) on lastOrder.put;
+
+  /** 理由を消す */
+  effect clearProblem() on problem.delete;
+
+  /** カートの商品が、もう売っていない */
+  effect sayCartOutdated() on problem.put;
+
+  /** その届け先には送れない、または大きすぎる */
+  effect sayCannotDeliver() on problem.put;
+
+  /** 在庫が足りない */
+  effect saySoldOut() on problem.put;
+
+  /** 見せた送料の上限が、変わっていた。見せている値段を捨てて、取り直させる */
+  effect sayTermsChanged() on offer.delete;
+
+  /** いまは注文できない（サーバーか、支払いの仕組みに届かない） */
+  effect sayTryLater() on problem.put;
+
+  /** 画面を移す */
+  effect goToCart() on location.put;
+  effect goToCheckout() on location.put;
+  effect goToOrder(key: type.OrderKey) on location.put;
+  /** 同じ画面を、開き直す */
+  effect reload() on location.put;
+
+  // ---- デコレータ ----
+
+  /**
+   * error が起きたら、op を終わらせて、then の効果を行う。画面に理由を出すために使う。
+   *
+   * @param error 受ける例外
+   * @param then  代わりに行う効果
+   */
+  @repeatable
+  decorator recover(error: any exception, then: any effect)
+    catches error halts then;
+
+  /** 一時的に表示できない */
+  model Unavailable {}
+
+  /** サーバーに届かないときは、ページの代わりに Unavailable を描く */
+  decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);
+
+  // ---- 商品の一覧 ----
+
+  /** 商品の一覧のページ */
+  union CatalogPage {
+    Ready: { products: catalog.Product[]; };
+    /** 並べている商品がない */
+    Empty: {};
+    Unavailable: Unavailable;
+  }
+
+  op catalogVm(products: catalog.Product[]): CatalogPage;
+
+  @unavailableOnFailure
+  @page.route("/")
+  op openCatalog(): CatalogPage {
+    const products = shopApi.products();
+    return catalogVm(products);
+  }
+
+  // ---- 商品 ----
+
+  /** 商品のページの query（/product?sku=…） */
+  model ProductQuery {
+    sku: type.Sku;
+  }
+
+  /** 商品のページ */
+  union ProductPage {
+    /** 種類ごとに、見せる事実が違う: 受注製作なら納期と「大きさは作るまで決まらない」こと、在庫なら大きさ、ダウンロードなら「箱は要らない」こと */
+    Ready: { product: catalog.Product; };
+    /** その商品は、ない（か、並べていない） */
+    Missing: {};
+    Unavailable: Unavailable;
+  }
+
+  op productVm(product: catalog.Product?): ProductPage;
+
+  @unavailableOnFailure
+  @page.route("/product", from: query)
+  op openProduct(query: ProductQuery): ProductPage {
+    const product = shopApi.product({ sku: query.sku });
+    return productVm(product);
+  }
+
+  /** カートに入れる。受注製作の商品は、作り方の希望を聞いてから入れる */
+  @page.interaction(page: openProduct, when: ProductPage.Ready)
+  op onAddToCart(product: catalog.Product, quantity: type.Quantity)
+    throws page.Aborted
+  {
+    const line = match product.fulfilment by catalog.Kind {
+      Made              => askRequest(product, quantity);
+      Digital | Stocked => lineOf(product, quantity);
+    };
+    addLine(line);
+    forgetOffer();
+    goToCart();
+  }
+
+  /** 作り方の希望を聞く */
+  @page.dialog("MadeToOrderRequestDialog")
+  op askRequest(product: catalog.Product, quantity: type.Quantity): ordering.CartLine;
+
+  /** 希望のない行を作る */
+  op lineOf(product: catalog.Product, quantity: type.Quantity): ordering.CartLine;
+
+  // ---- カート ----
+
+  /** カートのページ */
+  union CartPage {
+    /** 商品の代金まで見せる。送料は「届け先を入れると、見積もりと上限が出る。決まるのは梱包の後」とだけ */
+    Filled: { sorted: ordering.Sorted; problem: Problem?; };
+    Empty: {};
+    Unavailable: Unavailable;
+  }
+
+  op filledCartVm(sorted: ordering.Sorted, problem: Problem?): CartPage;
+  op emptyCartVm(): CartPage;
+
+  @unavailableOnFailure
+  @page.route("/cart")
+  op openCart(): CartPage
+    throws ordering.UnknownProduct, ordering.NotForSale
+  {
+    return match cart by list {
+      Empty    => emptyCartVm();
+      HasItems => filledCart();
+    };
+  }
+
+  /** カートの中身に、いまの値段を付けてもらう */
+  op filledCart(): CartPage
+    throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
+  {
+    const sorted = shopApi.itemise({ lines: cart });
+    return filledCartVm(sorted, problem);
+  }
+
+  /** 個数を変える */
+  @page.interaction(page: openCart, when: CartPage.Filled)
+  op onChangeQuantity(sku: type.Sku, quantity: type.Quantity) {
+    changeQuantity(sku, quantity);
+    forgetOffer();
+    reload();
+  }
+
+  /** 行を消す */
+  @page.interaction(page: openCart, when: CartPage.Filled)
+  op onRemoveLine(sku: type.Sku) {
+    removeLine(sku);
+    forgetOffer();
+    reload();
+  }
+
+  /** 注文へ進む */
+  @page.interaction(page: openCart, when: CartPage.Filled)
+  op onProceed() {
+    clearProblem();
+    goToCheckout();
+  }
+
+  // ---- 注文 ----
+
+  /** 注文のページ。客が同意するのは、Quoted に見えている額 */
+  union CheckoutPage {
+    /** メールアドレスと、箱で送るものがあれば届け先を、入れる。送料は、まだ見せられない */
+    Entering: { sorted: ordering.Sorted; problem: Problem?; };
+    /**
+     * 値段を見せて、同意を待つ。箱で送るものがあれば: 商品の代金、送料の見積もり、送料の上限、
+     * 「送料は梱包の後に決まる。請求は、商品の代金 + 上限を超えない。いまは、その額の枠を確保するだけ」。
+     * ダウンロードだけなら: 商品の代金と、「同意したときに請求する」。
+     */
+    Quoted: { offer: Offer; problem: Problem?; };
+    EmptyCart: {};
+    Unavailable: Unavailable;
+  }
+
+  op enteringVm(sorted: ordering.Sorted, problem: Problem?): CheckoutPage;
+  op quotedVm(offer: Offer, problem: Problem?): CheckoutPage;
+  op emptyCheckoutVm(): CheckoutPage;
+
+  @unavailableOnFailure
+  @page.route("/checkout")
+  op openCheckout(): CheckoutPage
+    throws ordering.UnknownProduct, ordering.NotForSale
+  {
+    return match cart by list {
+      Empty    => emptyCheckoutVm();
+      HasItems => checkout();
+    };
+  }
+
+  /** 値段を見せているか、まだか */
+  op checkout(): CheckoutPage
+    throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
+  {
+    return match offer by nullable {
+      HasItems => quotedVm(offer, problem);
+      Empty    => entering();
+    };
+  }
+
+  /** 入力を待つ */
+  op entering(): CheckoutPage
+    throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
+  {
+    const sorted = shopApi.itemise({ lines: cart });
+    return enteringVm(sorted, problem);
+  }
+
+  /** 客が入れた連絡先 */
+  model Contact {
+    email: type.Email;
+    destination: type.Address?;
+  }
+
+  /** 値段を見せてもらう。箱で送るものがあれば、届け先から、送料の見積もりと上限が出る */
+  @page.interaction(page: openCheckout, when: CheckoutPage.Entering)
+  @recover(ordering.UnknownProduct | ordering.NotForSale, sayCartOutdated)
+  @recover(ordering.DestinationRequired | shipping.Undeliverable | shipping.TooLarge, sayCannotDeliver)
+  @recover(http.NetworkError | http.ServerError, sayTryLater)
+  op onAskQuote(contact: Contact) {
+    const priced = shopApi.quote({ lines: cart, destination: contact.destination });
+    const requestId = newRequestId();
+    showOffer({ requestId: requestId, email: contact.email, destination: contact.destination, priced: priced });
+    reload();
+  }
+
+  /** 申し込みの識別子を作る */
+  op newRequestId(): type.RequestId;
+
+  /** 連絡先を直す。見せている値段は捨てる */
+  @page.interaction(page: openCheckout, when: CheckoutPage.Quoted)
+  op onEditContact() {
+    forgetOffer();
+    reload();
+  }
+
+  /**
+   * 見えている値段に同意して、注文する。続きは、支払いの画面（アプリの外）。
+   * 通らなかったときは、理由を出す。送料の上限が変わっていたときは、見せている値段を捨てて、取り直させる。
+   */
+  @page.interaction(page: openCheckout, when: CheckoutPage.Quoted)
+  @recover(ordering.UnknownProduct | ordering.NotForSale, sayCartOutdated)
+  @recover(ordering.DestinationRequired | shipping.Undeliverable | shipping.TooLarge, sayCannotDeliver)
+  @recover(inventory.OutOfStock, saySoldOut)
+  @recover(ordering.TermsChanged, sayTermsChanged)
+  @recover(ordering.OrderExpired | payment.AlreadySecured | payment.ProviderUnavailable | http.NetworkError | http.ServerError, sayTryLater)
+  op onPlaceOrder() {
+    match offer by nullable {
+      HasItems => placeOrder(offer);
+      Empty    => none;
+    };
+  }
+
+  /** 注文して、カートを空にして、支払いの画面へ出る */
+  op placeOrder(agreed: Offer)
+    throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired, ordering.TermsChanged,
+           ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
+           payment.AlreadySecured, payment.ProviderUnavailable, http.NetworkError, http.ServerError
+  {
+    const placed = shopApi.checkout({ checkout: {
+      requestId: agreed.requestId,
+      email: agreed.email,
+      lines: cart,
+      destination: agreed.destination,
+      agreedCeiling: agreed.priced.physical.terms.ceiling,
+    } });
+    rememberOrder(placed.key);
+    emptyCart();
+    forgetOffer();
+    leaveTo(placed.payAt);
+  }
+
+  /** アプリの外の URL へ移る */
+  @nav.leave
+  op leaveTo(url: type.Url);
+
+  // ---- 注文のいま ----
+
+  /** 注文のページの query（/order?key=…） */
+  model OrderQuery {
+    key: type.OrderKey;
+  }
+
+  /** 注文のページ。アームは、客ができる操作で分けてある。品目ごとの進み具合は、view の中 */
+  union OrderPage {
+    /** まだ同意が届いていない。支払いの画面から戻った直後も、ここ（通知が届くまで）。できるのは、支払いの画面を開き直すことと、開き直すこと */
+    AwaitingPayment: { view: shopApi.OrderView; };
+    /**
+     * 受け付けた。ダウンロードの行は、取れる。受注製作と在庫の行は、それぞれの進み具合を見せる。
+     * 送料は、梱包するまで「見積もり ○ 円（上限 ○ 円）。梱包の後に決まります」。梱包した後は、決まった額と、確定した請求を見せる
+     */
+    Accepted: { view: shopApi.OrderView; };
+    /** 支払いがないまま、期限が過ぎた */
+    Expired: { view: shopApi.OrderView; };
+    /** その鍵の注文は、ない */
+    Missing: {};
+    Unavailable: Unavailable;
+  }
+
+  op orderVm(view: shopApi.OrderView?): OrderPage;
+
+  @unavailableOnFailure
+  @page.route("/order", from: query)
+  op openOrder(query: OrderQuery): OrderPage {
+    const view = shopApi.status({ key: query.key });
+    return orderVm(view);
+  }
+
+  /** 支払いの画面を開き直す */
+  @page.interaction(page: openOrder, when: OrderPage.AwaitingPayment)
+  @recover(ordering.NoOrder | ordering.OrderExpired | payment.AlreadySecured, reload)
+  @recover(payment.ProviderUnavailable | http.NetworkError | http.ServerError, sayTryLater)
+  op onPay(key: type.OrderKey) {
+    const placed = shopApi.pay({ key });
+    leaveTo(placed.payAt);
+  }
+
+  /** 開き直す（同意の通知が届いたかを見る） */
+  @page.interaction(page: openOrder, when: OrderPage.AwaitingPayment)
+  op onRefresh() {
+    reload();
+  }
+
+  /** ダウンロードの行のファイルを取る */
+  @page.interaction(page: openOrder, when: OrderPage.Accepted)
+  @recover(ordering.NoOrder | download.NotGranted | download.GrantExpired, reload)
+  @recover(download.AssetsUnavailable | http.NetworkError | http.ServerError, sayTryLater)
+  op onDownload(key: type.OrderKey, line: type.LineId) {
+    const url = shopApi.download({ key, line });
+    saveFrom(url);
+  }
+
+  /** URL のファイルを保存させる */
+  @nav.save
+  op saveFrom(url: type.Url);
+}

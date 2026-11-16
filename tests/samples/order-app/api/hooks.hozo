@@ -1,0 +1,37 @@
+// サンプル order-app の仕様（README.md）。外部の仕組みが、こちらを呼ぶ入口 hooks。
+// 通知は、同じものが二度届くことがあり、届く順も決まっていない。二度扱わないことは、payment.record と shipping.delivered が持つ。
+// 入口は、通知の扱いの全体を、一つのトランザクションにする: 途中で失敗したら、通知を「扱った」と記録しない（相手が、もう一度送る）。
+
+/** 外部の仕組みからの通知の入口 */
+namespace hooks {
+  /** 支払いの通知の入力 */
+  model PaymentInput {
+    @http.bodyObj event: psp.Event;
+  }
+
+  /** 支払いを引き受ける仕組みからの通知。客の同意が、新しく取れたら、注文を受け付けて、渡す準備を始める */
+  @webhook.signed("psp")
+  @http.post("/hooks/payment")
+  @db.transaction
+  export op paymentEvent(in: PaymentInput)
+    throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
+  {
+    const secured = payment.record(in.event);
+    match secured by payment.Securing {
+      NewlySecured => fulfilment.secured(secured);
+      default      => none;
+    };
+  }
+
+  /** 荷物の動きの通知の入力 */
+  model TrackingInput {
+    @http.bodyObj event: carriergw.TrackingEvent;
+  }
+
+  /** 配送業者の API をまとめる仕組みからの通知 */
+  @webhook.signed("carriergw")
+  @http.post("/hooks/tracking")
+  export op trackingEvent(in: TrackingInput) {
+    fulfilment.tracked(in.event);
+  }
+}
