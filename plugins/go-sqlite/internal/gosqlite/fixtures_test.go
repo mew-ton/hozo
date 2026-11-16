@@ -57,7 +57,7 @@ func newRoot(t *testing.T) string {
 
 // addDriver は、root のモジュールに、SQLite のドライバを足す（生成したコードを本物の SQLite の上で動かすテストのため）。
 // ドライバと版は、サンプル shop-server が使うもの（tests/samples/shop-server/go.mod。cgo の要らない modernc.org/sqlite）で、
-// その go.mod と go.sum を、モジュールのパスと replace だけを書き換えて写す。モジュールキャッシュにあれば、ネットワークは要らない。
+// その go.mod と go.sum を、モジュールのパスと replace だけを書き換えて写す。モジュールキャッシュになければ、go が GOPROXY から取りに行く（[runGo]）。
 func addDriver(t *testing.T, root string) {
 	t.Helper()
 	sample := filepath.Join(repoRoot(t), "tests", "samples", "shop-server")
@@ -322,12 +322,15 @@ func goTool(t *testing.T) string {
 	return goBin
 }
 
-// runGo は、root のモジュールで go のコマンドを走らせる。モジュールの解決はオフライン。
+// runGo は、root のモジュールで go のコマンドを走らせる。
+// SQLite のドライバ（[addDriver]）は、サンプルの go.sum の通りのものをモジュールキャッシュから使う。キャッシュにあれば
+// ネットワークは要らない。なければ go が GOPROXY から取りに行く（サンプルの go のサブテストと同じ。tests/samples/README.md「テスト」）。
+// ツールチェーンは取りに行かない（GOTOOLCHAIN=local）。
 func runGo(t *testing.T, root string, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.Command(goTool(t), args...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOPROXY=off", "GOWORK=off", "GOTOOLCHAIN=local")
+	cmd.Env = append(os.Environ(), "GOFLAGS=-mod=mod", "GOWORK=off", "GOTOOLCHAIN=local")
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
