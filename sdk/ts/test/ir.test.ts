@@ -391,6 +391,20 @@ function walkDecl(d: Decl, program: Program): void {
       d.params.forEach((p) => walkType(p.type));
       assert.ok(d.writes.length > 0);
       for (const st of d.writes) assert.equal(typeof st, "string");
+      // 行の遷移（版 0.9）: 行の引数、分類（名指ししない形では持たない）、前のケース（"any" か列）、後のケース（決まっていなければ持たない）
+      if (d.row) {
+        seen.add("effect:row");
+        assert.equal(d.target.kind, "builtin");
+        assert.ok(d.params.some((p) => p.name === d.row!.param));
+        if (d.row.from === "any") seen.add("row:fromAny");
+        else {
+          seen.add("row:fromCases");
+          for (const c of d.row.from) assert.equal(typeof c, "string");
+        }
+        if (d.row.classify === undefined) seen.add("row:noClassify");
+        if (d.row.to === undefined) seen.add("row:noTo");
+        else assert.equal(typeof d.row.to, "string");
+      }
       return;
     case "read":
       // read の宣言（版 0.6）: 引数、結果の型、読む基底の状態
@@ -404,6 +418,11 @@ function walkDecl(d: Decl, program: Program): void {
       // 版 0.8: 分類は閉じていて、hasDefault / defaultDescription / fromCondition はない
       for (const key of ["hasDefault", "defaultDescription", "fromCondition"]) {
         assert.ok(!(key in d), `Classify.${key} は 0.8 でなくなった`);
+      }
+      // 版 0.9: ない側のケースの名前。あれば、cases のどれか
+      if (d.absent !== undefined) {
+        seen.add("classify:absent");
+        assert.ok(d.cases.some((c) => c.name === d.absent));
       }
       for (const c of d.cases) {
         assert.ok(Array.isArray(c.as));
@@ -479,7 +498,7 @@ function walkDecl(d: Decl, program: Program): void {
 }
 
 function walkProgram(p: Program): void {
-  assert.equal(p.version, "0.8");
+  assert.equal(p.version, "0.9");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
     // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
@@ -499,7 +518,7 @@ test("program.golden.json reads as Program and round-trips", () => {
 test("view.golden.json reads as View and round-trips", () => {
   const text = golden("view.golden.json");
   const view: View = JSON.parse(text);
-  assert.equal(view.version, "0.8");
+  assert.equal(view.version, "0.9");
   assert.equal(typeof view.viewer, "string");
   // files は単位の in に合ったファイル。namespaces の値は、その名前空間を出力する単位ごとの設定（設定の順）
   assert.ok(view.files.every((f) => typeof f === "string"));
@@ -558,6 +577,14 @@ test("goldens cover every kind of every union", () => {
     "narrowBy:else",
     // 版 0.8 で足した形（同上）: match の else のアーム
     "arm:else",
+    // 版 0.9 で足した形（同上）: 行の遷移、ない側のケース
+    "effect:row",
+    "row:fromCases",
+    "row:fromAny",
+    "row:noClassify",
+    "row:noTo",
+    "classify:absent",
+    "narrowBy:none",
   ];
   for (const k of want) assert.ok(seen.has(k), `goldens contain no ${k}`);
 });

@@ -1,0 +1,23 @@
+// STATE-7（docs/check.md「行の遷移」の「結びつき」）: as のケースの分類は、書き込む状態の要素の型 T（か T?）を対象にした
+// 値の分類。効果の引数のうち、型が T のものが、ちょうど一つ（行の引数）。別の名前空間の分類でもよい
+namespace a {
+  model Order { id: string; }
+  state orders: list<Order>;
+  state draft: nullable<Order>;
+  state current: single<Order>;
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  effect accept(order: Order) on orders.post as Stage.Accepted;
+  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect cancel(reason: string, order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect patch(order: Order) on orders.put as any -> else;
+  effect close(order: Order) on orders.put as Life.Open -> Life.Closed;
+  effect keep(order: Order) on draft.post as b.Kind.Fresh;
+  effect touch(order: Order) on current.put as any -> a.Stage.Shipped;
+  // as を書かない効果は、行の引数を持たなくてよい
+  effect saveAll(changed: Order[]) on orders.put;
+  effect remove(id: string) on orders.delete;
+}
+namespace b {
+  classify Kind of a.Order { Fresh; Old; }
+}

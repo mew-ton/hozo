@@ -1,9 +1,12 @@
 // CLS-7（docs/check.md「残りのケース」）: 述語のケースの隣には、残りのケースを書けない
-// （as を持たないケース、述語の要る絞り込みのケース、同じ型を書いた二つのケース）
+// （as を持たないケース、述語の要る絞り込みのケース、「残りが、ちょうど値がない」に当たらない分類で同じ型を書いた二つのケース）
 namespace a {
   model M { id: string; }
+  model N { id: string; }
+  model O { id: string; }
+  union Page { Ready: M; Missing: N; Broken: O; }
   scalar Email extends string;
-  op find(): M?;
+  state token: nullable<string>;
   classify NoAs of M? {
     Has;
     Lacks: M? as else;                 // ERROR: CLS-7
@@ -12,9 +15,19 @@ namespace a {
     Valid: string as Email;
     Invalid: string as else;           // ERROR: CLS-7
   }
-  classify SameType of find {
-    Fresh: find as M;
-    Stale: find as M;
-    Missing: find as else;             // ERROR: CLS-7
+  classify MixedAs of M? {
+    Fresh: M? as M;
+    Odd;
+    Missing: M? as else;               // ERROR: CLS-7
+  }
+  classify SameArm of Page {
+    Fresh: Page as M;
+    Stale: Page as M;
+    Other: Page as else;               // ERROR: CLS-7
+  }
+  classify SameTypeState of token {
+    Fresh: token as string;
+    Stale: token as string;
+    LoggedOut: token as else;          // ERROR: CLS-7
   }
 }

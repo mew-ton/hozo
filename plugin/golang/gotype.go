@@ -133,6 +133,40 @@ func coreZero(c ir.CoreType, goType string) string {
 	return "0"
 }
 
+// RowDisplay は、コメントの中の行の遷移の書き方（docs/plugin-go.md「コメント」の「行の遷移の表示」）: 仕様の書き方で、
+// IR（Effect.row）から組み立てる。ケースは `<分類の FQN>.<ケース名>`、前のケースの並びの区切りは `, `。
+// post は `as <後>`、put は `as <前> -> <後>`（後が決まっていなければ else）、delete は、前が any なら `as <後>`、
+// そうでなければ `as <前> -> <後>`。行の遷移を持たない効果（と、宛先が組み込みの効果でない効果）は ""。
+func RowDisplay(e *ir.Effect) string {
+	target, ok := e.Target.(ir.BuiltinTarget)
+	if !ok || e.Row == nil {
+		return ""
+	}
+	row := e.Row
+	name := func(c string) string { return row.Classify + "." + c }
+	after := "else"
+	if row.To != "" {
+		after = name(row.To)
+	}
+	before := "any"
+	if !row.From.Any {
+		names := make([]string, len(row.From.Cases))
+		for i, c := range row.From.Cases {
+			names[i] = name(c)
+		}
+		before = strings.Join(names, ", ")
+	}
+	switch target.Operation {
+	case ir.OpPost:
+		return "as " + after
+	case ir.OpDelete:
+		if row.From.Any {
+			return "as " + after
+		}
+	}
+	return "as " + before + " -> " + after
+}
+
 // TypeDisplay は、コメントの中の型の書き方（docs/plugin-go.md「コメント」の「型の表示」）: 核の型は名前、ref は FQN、
 // optional(T) は `T?`、array(T) は `T[]`、record(K, V) は `Record<K, V>`、case はその of。
 func TypeDisplay(t ir.Type) string {

@@ -328,17 +328,22 @@ func (f *fileGen) effect(u *unit, x *effect) {
 	local := func(p ir.OpParam) string { return golang.LocalName(p.Name, reserved) }
 	name := golang.MethodName(decl.Name)
 	head := "// " + name + " は効果 " + decl.Name + "（@" + x.kind + "）: "
-	open := "func (t " + u.goName + ") " + name + "(" + params + ") " + results + " {\n"
+	// 行の遷移を持つ効果は、効果の句の後ろに、確かめないことを言う一文を足す（SQL は変わらない）
+	open := ""
+	if row := golang.RowDisplay(decl); row != "" {
+		open = "行の遷移（" + row + "）は、確かめない。"
+	}
+	open += "\nfunc (t " + u.goName + ") " + name + "(" + params + ") " + results + " {\n"
 	switch x.kind {
 	case decoratorInsert:
-		f.printf("%s表 %s に、引数 %s の行を足す。\n%s", head, tbl, decl.Params[0].Name, open)
+		f.printf("%s表 %s に、引数 %s の行を足す。%s", head, tbl, decl.Params[0].Name, open)
 		f.rowExec(x.table.model, local(decl.Params[0]), insertSQL(x.table))
 	case decoratorUpdate:
-		f.printf("%s表 %s の、キーが引数 %s と同じ行を書き換える。行がなければ何もしない。\n%s", head, tbl, decl.Params[0].Name, open)
+		f.printf("%s表 %s の、キーが引数 %s と同じ行を書き換える。行がなければ何もしない。%s", head, tbl, decl.Params[0].Name, open)
 		f.rowExec(x.table.model, local(decl.Params[0]), updateSQL(x.table))
 	case decoratorDelete:
 		where, args, conds := f.where(x.conds, local)
-		f.printf("%s表 %s から、%s行を消す。行がなければ何もしない。\n%s", head, tbl, conds, open)
+		f.printf("%s表 %s から、%s行を消す。行がなければ何もしない。%s", head, tbl, conds, open)
 		f.printf("\treturn %s(ctx, t.db, `DELETE FROM %s%s`%s)\n}\n\n", f.use(helperExec), tbl, where, args)
 	}
 }

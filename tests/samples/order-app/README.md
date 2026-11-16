@@ -66,7 +66,7 @@
 
 ## 名前空間の地図
 
-27 の名前空間、約 4,200 行。op は 269（別の名前空間から呼べる `export` が 96、配線が 179、人が書く葉が 90）、状態は 35、`read` は 34、効果は 56。数は、この文書を書いたときのもの。
+27 の名前空間、約 4,300 行。op は 262（別の名前空間から呼べる `export` が 96、配線が 184、人が書く葉が 78）、状態は 35、`read` は 34、効果は 64（そのうち、行の遷移を持つものが 22）。数は、この文書を書いたときのもの。
 
 「op」の列は「全部（`export` / 配線 / 葉）」。「read」と「効果」の括弧は、`db` の語彙のデコレータで中身を言えた数。
 
@@ -74,14 +74,14 @@
 |---|---|---|---|---|---|---|
 | `type` | 共有の値（識別子、金額、住所、寸法）と、認証の例外 | — | — | — | — | — |
 | `catalog` | 商品と、その種類 | `products` | 3（2） | 0 | 3（3 / 3 / 0） | サーバー |
-| `ordering` | 注文: 何を頼み、何を約束されたか | `orders`、`paymentWindow` | 4（3） | 3（2） | 20（7 / 12 / 8） | サーバー |
-| `inventory` | 在庫の数と、取り置き | `levels`、`reservations` | 5（2） | 5（1） | 15（5 / 8 / 7） | サーバー |
-| `payment` | 支払い: 何に同意し、いくら請求したか | `payments`、`seen`、`holdMargin` | 4（3） | 3（3） | 34（5 / 22 / 12） | サーバー |
-| `production` | 受注製作の仕事 | `jobs` | 3（2） | 2（1） | 9（5 / 6 / 3） | サーバー |
+| `ordering` | 注文: 何を頼み、何を約束されたか | `orders`、`paymentWindow` | 4（3） | 3（1） | 20（7 / 14 / 6） | サーバー |
+| `inventory` | 在庫の数と、取り置き | `levels`、`reservations` | 5（3） | 5（1） | 13（5 / 8 / 5） | サーバー |
+| `payment` | 支払い: 何に同意し、いくら請求したか | `payments`、`seen`、`holdMargin` | 4（3） | 8（2） | 31（5 / 22 / 9） | サーバー |
+| `production` | 受注製作の仕事 | `jobs` | 3（2） | 3（0） | 7（5 / 6 / 1） | サーバー |
 | `download` | ダウンロードの権利 | `grants`、`grantLifetime`、`linkLifetime` | 2（2） | 1（0） | 7（3 / 5 / 2） | サーバー |
-| `shipping` | 出荷: そろえる、梱包する、渡す。箱と料金表 | `shipments`、`parcels`、`labels`、`boxes`、`tariffs`、`origin` | 7（6） | 4（4） | 31（14 / 23 / 8） | サーバー |
-| `carrier` | 契約している配送業者と、その使い分け | `carriers` | 3（3） | 2（2） | 12（5 / 8 / 4） | サーバー |
-| `staff` | 担当者と、してよい仕事 | `members`、`sessions` | 3（3） | 2（2） | 13（5 / 9 / 4） | サーバー |
+| `shipping` | 出荷: そろえる、梱包する、渡す。箱と料金表 | `shipments`、`parcels`、`labels`、`boxes`、`tariffs`、`origin` | 7（6） | 6（3） | 30（14 / 24 / 6） | サーバー |
+| `carrier` | 契約している配送業者と、その使い分け | `carriers` | 3（3） | 2（1） | 12（5 / 9 / 3） | サーバー |
+| `staff` | 担当者と、してよい仕事 | `members`、`sessions` | 3（3） | 2（1） | 14（5 / 10 / 4） | サーバー |
 | `notice` | 客への知らせ | — | — | — | 4（2 / 2 / 2） | サーバー |
 | `fulfilment` | 受け付けた後の流れ。概念をまたぐ順番だけ | — | — | — | 15（7 / 15 / 0） | サーバー |
 | `shopApi` | 客の画面のための入口 | `site` | — | — | 13（8 / 11 / 2） | サーバー（HTTP） |
@@ -191,7 +191,7 @@ psp, carriergw ─▶ hooks ┘     │                 ├─▶ payment  ─�
 
 ### モデル: 事実が、足されていく
 
-出荷の進み具合は、状態の列ではなく、**足された事実**で持つ。前の事実がなければ、次の事実を作る op に渡せる値が、手に入らない。
+出荷の進み具合は、**足された事実**で持つ。前の事実がなければ、次の事実を作る op に渡せる値が、手に入らない。事実を足す効果は、行の遷移（`docs/check.md`「行の遷移」）で、どのケースの行に足せるかを言う: 品目を置けるのは、まだ待っている出荷（`recordPlacement`: `Gathered.Awaiting -> else`）、渡せるのは、店にある出荷（`recordHandOver`: `Custody.InHouse -> Custody.WithCarrier`）、荷物を作れるのは、荷物のない出荷（`createParcel`: `Packing.Unpacked -> Packing.Packed`）。「行の遷移で書いた進み具合」に、一覧がある。
 
 ```
 shipments（何を待っているか）──[すべてそろった: Gathered.Complete]──▶ parcels（箱、重さ、送料）
@@ -287,8 +287,78 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 | 注文のときに、上限の額で請求を確定し、差額を、いつも返す | 納期が枠の期限を超える注文でも成り立つが、ほとんどの注文で返金が起きる。枠の期限が近いときだけ、この形にした（「枠の期限と、納期」） |
 | 送料が見積もりを超えたら、客の同意を取り直す | 梱包した箱が、同意を待つ状態になる。上限に、はじめに同意してもらう形にした |
 | 出荷の進み具合を、一つの値（`stage`）の列で持つ | 値の集合を言う型がなく（F8）、「この段階では荷物がある」を型で言えない（F9）。事実ごとの表にすると、存在の分類が、型で決まる |
-| 出荷の進み具合を、状態の分類と、効果の遷移で書く | 遷移の宛先にできるのは、状態の全体を対象にした分類だけで、表の一行の場合は書けない（F1） |
+| 出荷の進み具合を、状態の分類の遷移（`on C: A -> B`）で書く | 状態の分類が言うのは、状態の全体の場合で、表の一行の場合ではない。一行の場合は、値の分類と、効果の行の遷移で書いた（F1） |
 | 梱包を、荷物を返す葉一つにして、中で確かめる | 葉は状態に触れないので、そろったことと、まだ梱包していないことを、配線が読んで渡すことになる。確かめる場所が、仕様から見えなくなる |
+
+### 行の遷移で書いた進み具合
+
+行の型の分類と、その分類のケースを進める効果。効果は、どれも、前の行と、足す事実を受け取る（`effect startJob(job: Job, at: Time) …`）。「前」にケースを並べた効果は、そのケースを受ける `match` のアームの中か、型が `C.K<T>` の値でしか呼べない（STATE-9）。
+
+| 行 | 分類 | 効果 | 行の遷移 |
+|---|---|---|---|
+| 注文（`ordering.orders`） | `Standing` | `createOrder` | `post as Standing.AwaitingPayment` |
+| | | `acceptOrder` | `put as Standing.AwaitingPayment -> Standing.Accepted` |
+| | | `expireOrder` | `put as Standing.AwaitingPayment -> Standing.Expired` |
+| 支払い（`payment.payments`） | `Standing` | `createPayment` | `post as Standing.Pending` |
+| | | `replaceSessionOf` | `put as Standing.Pending -> Standing.Pending`（ケースを変えない。できるのは、まだ同意していない支払いだけ） |
+| | | `holdSecured` | `put as Standing.Pending -> Standing.Held` |
+| | | `chargeSecured` | `put as Standing.Pending -> Standing.Settled` |
+| | | `recordPrepaid` | `put as Standing.Held -> Standing.Prepaid` |
+| | | `recordSettled` | `put as Standing.Held, Standing.Prepaid -> Standing.Settled` |
+| | | `recordReleased` | `put as Standing.Held -> Standing.Released` |
+| 製作の仕事（`production.jobs`） | `Progress` | `startJob` | `put as Progress.Queued -> Progress.InProduction` |
+| | | `finishJob` | `put as Progress.InProduction -> Progress.Finished` |
+| 出荷（`shipping.shipments`） | `Custody` | `createShipment` | `post as Custody.InHouse` |
+| | | `recordHandOver` | `put as Custody.InHouse -> Custody.WithCarrier` |
+| | | `recordDelivery` | `put as Custody.WithCarrier -> Custody.Delivered` |
+| | `Gathered` | `recordPlacement` | `put as Gathered.Awaiting -> else`（そろうか、まだ待つかは、残りの品目による） |
+| 荷物（`shipping.parcels`） | `Packing`（`Parcel?`） | `createParcel` | `post as Packing.Unpacked -> Packing.Packed` |
+| 送り状（`shipping.labels`） | `Labelling`（`Label?`） | `createLabel` | `post as Labelling.Unlabelled -> Labelling.Labelled` |
+| 取り置き（`inventory.reservations`） | `Picking` | `markPicked` | `put as Picking.OnShelf -> Picking.Picked` |
+| セッション（`staff.sessions`） | `Login`（`Session?`） | `createSession` | `post as Login.LoggedOut -> Login.LoggedIn` |
+| | | `deleteSession` | `delete as Login.LoggedIn -> Login.LoggedOut` |
+| 配送業者（`carrier.carriers`） | `Use` | `switchCarrier` | `put as any -> else`（後のケースが、引数の値で決まる。F53） |
+
+`as` を書かない `put`（`inventory.confirmReservations`、`inventory.saveLevels`）は、行のケースを変えない: 取り置きを「棚から出してよい」にしても、`Picking` は `OnShelf` のまま。
+
+**消すものと、消さないもの**（`docs/requirements.md`「書き方の指針」）。期限切れの注文は、消さずに、ケース `Expired` を持つ（客が、注文のいまを見る。後から届いた同意の枠を、手放す）。荷物と送り状は、作るだけで、消さない。消すのは、なくなることが意味であるもの: ログアウトしたセッション（`deleteSession`）と、戻した取り置き（`dropReservations`）。行がないことを、遷移の端になる、名前のある状態として扱うのは、三つ（`Packing.Unpacked`、`Labelling.Unlabelled`、`Login.LoggedOut`）で、どれも `as none` で書いた。「引いたものがあるか」の分類の、ない側（`Missing` など）は、`as else` のまま: 行がないことを、遷移の端として使っていない。
+
+製作の仕事の、前と後（`domain/production.hozo`。説明のコメントを省いた抜粋）:
+
+```ts
+// 前: 値の分類と、行の全体を書き換える効果と、時刻を入れる葉
+@db.update
+effect saveJob(job: Job) on jobs.put;
+
+export op start(id: JobId): Job throws NoJob, NotQueued {
+  const job = require(id);
+  const now = clock.now();
+  const started = match job by Progress {
+    Queued                  => startedAt(job, now);
+    InProduction, Finished => throw NotQueued;
+  };
+  saveJob(started);
+  return started;
+}
+
+op startedAt(job: Progress.Queued<Job>, now: Time): Job;   // 人が書く
+```
+
+```ts
+// 後: 効果が、どのケースからどのケースへ進めるかを言う
+effect startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.InProduction;
+effect finishJob(job: Job, measured: type.Measurement, at: Time) on jobs.put as Progress.InProduction -> Progress.Finished;
+
+export op start(id: JobId): Job throws NoJob, NotQueued {
+  const job = require(id);
+  const now = clock.now();
+  match job by Progress {
+    Queued                 => startJob(job, now);      // Queued のアームの中でしか、呼べない
+    InProduction, Finished => throw NotQueued;
+  };
+  return require(id);
+}
+```
 
 ### 言語が言えなかったこと
 
@@ -297,7 +367,10 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 | 言えなかったこと | 代わりにしたこと | 項目 |
 |---|---|---|
 | 請求は上限を超えない、請求する送料 = min(送料, 上限) | 葉のコメントと、印 `@prd.promise` | F11 |
-| 出荷の一行が、どのケースからどのケースへ進むか | 値の分類と、`put` の効果と、時刻を入れる葉 | F1 |
+| 行のケースを、宣言した向きのほかには変えないこと | 効果の中身は、人が書く。宣言と、呼ぶ側の検査（STATE-9）まで | F1、F51 |
+| いくつかの行のケースを、一度に変える | 時計で、一行ずつ | F50 |
+| 後のケースが、引数の値で決まる遷移 | 何も約束しない `as any -> else` | F53 |
+| 一つの行の、二つの分類を一度に言う | 片方だけを書く | F52 |
 | 荷物は、そろった出荷からしか作れない | 荷物を返す葉 `weighed` の引数の型。効果 `createParcel` は、どの荷物でも受け取る | F10 |
 | 混ざった注文の行を、種類ごとに分ける | 葉 `ordering.sort`。分けた結果の形（`Sorted`）だけが仕様 | F2 |
 | 上限が変わっていたときの、新しい上限を、画面に出す | 例外は値を運ぶ（`TermsChanged(terms)`）が、画面は、見せている値段を捨てるだけ | F4 |
@@ -310,9 +383,9 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 ### 言語
 
-- **F1 表の一行の進み具合を、遷移で書けない。** `effect … on C: A -> B` の宛先は、状態を対象にした分類だけ（値の分類を書くと RES-4「遷移の宛先にできるのは状態を対象にした classify だけ」）。注文、支払い、仕事、出荷は、どれも表の一行の話。→ 値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉になった。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からない。遷移を書けたのは、ブラウザの状態だけ（`storefront.emptyCart`、`storefront.showOffer`、`backoffice.saveToken`）。
-- **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`、`ordering.saveOrders`、`inventory.release`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものは、時計で一件ずつ（`payment.prepayExpiring`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。
-- **F3 判断一つにつき、op が一つ要る。** アームの本体は呼び出し一つで、呼び出しの引数に呼び出しを書けない。→ `shipping.pack` は `packGathered`、`packInto`、`seal` の四段。`payment` の 34 の op のうち 22 が配線。PRD に名前のない op（`packInto`、`secureFound`、`offersIfPacked`）に、名前を付けることになる。
+- **F1 表の一行の進み具合を、遷移で書けなかった。→ 行の遷移で、書けるようになった。** はじめは、`effect … on C: A -> B` の宛先が、状態を対象にした分類だけだった。注文、支払い、仕事、出荷は、どれも表の一行の話で、値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉で近づけていた。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からなかった。→ いまは、効果が、宛先の後ろの `as` で言う（`docs/check.md`「行の遷移」）。22 の効果が行の遷移を持ち、行の全体を書き換えていた七つの効果（`saveOrder`、`saveOrders`、`savePayment`、`saveJob`、`saveShipment`、`saveReservation`、`saveCarrier`）は、なくなった。一覧は「行の遷移で書いた進み具合」。分かったことは F50〜F57。
+- **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものと、行のケースを変えるもの（F50）は、時計で一件ずつ（`payment.prepayExpiring`、`ordering.expireUnpaid`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。
+- **F3 判断一つにつき、op が一つ要る。** アームの本体は呼び出し一つで、呼び出しの引数に呼び出しを書けない。→ `shipping.pack` は `packGathered`、`packInto`、`seal` の四段。`payment` の 31 の op のうち 22 が配線。PRD に名前のない op（`packInto`、`secureFound`、`offersIfPacked`）に、名前を付けることになる。
 - **F4 例外を、配線で受けられない。受けられるのはデコレータだけで、例外の値は使えない。** → 値を運ぶ例外（`ordering.TermsChanged(terms)`、`inventory.OutOfStock(sku)`、`ordering.UnknownProduct(sku)`）の値は、画面に届かない: `storefront.sayTermsChanged` は見せている値段を捨てるだけで、`storefront.Outdated` は、どの商品かを持たない。画面を分けたい結果は、例外ではなく値で返す形に寄った（`shopApi.product` と `shopApi.status` は `T?`）。
 - **F5 例外を、別の名前に言い換える書き方がない。** `catches A recovers throws B` と書くと、A を「吸収した」ことになり、効果を持つ op では DEC-5（成功のアームでも効果が不明）。金が動く三つの呼び出しに付けたら、warning が六つ出た。→ 言い換えたのは、金が動かない呼び出しだけ（`payment.openHold`、`payment.openCharge`、`download.fetchLink` の `@outside.failsAs`）。請求の確定、返金、枠を手放す、送り状を買う、の失敗は、`http.NetworkError` / `http.ServerError` のまま `staffApi.buyLabel` まで伝わる。ブラウザから見ると、自分の通信の失敗と、サーバーの先の失敗が、同じ名前になる。
 - **F6 外部の仕組みの中で起きること（金が動く）は、効果ではない。** → 相手の状態を、相手の名前空間に置いた（`psp.ledger`、`psp.holds`、`carriergw.labels`）。相手の op に `@outside.does(…)` で効果を運ばせる。得たもの: `fulfilment.dispatch` の効果に `psp.takeMoney` と `carriergw.issueLabel` が並び、`payment.capture` の `throws psp.HoldExpired prevents effects` を、検査器が本体から確かめる（REL-4）。払ったもの: 相手の内側の状態を、こちらが作った。
@@ -338,8 +411,8 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 - **F23 `http` の語彙に足りなかったもの。** パスの中の引数（`/orders/:key`）→ クエリにした。POST と GET のほかのメソッド → POST にした。外へ呼ぶときの、相手の場所、鍵、やり直しても二度起きないための識別子のヘッダ、待つ長さ → 書いていない。`@http.retry` は、金が動く呼び出しに、その識別子なしでは付けられないので、使っていない。
 - **F24 外へ呼ぶ HTTP は、相手の名前空間の op に `@http.post` を付けて書けた。こちらの入口と、相手の口が、同じ書き方になる。** `@external` が、呼ぶ側に `http.NetworkError` と `http.ServerError` を足す（`external/psp.hozo`、`external/carriergw.hozo`）。違いは、`hozo.toml` に単位があるかだけ。このサンプルには単位がないので、どれがこちらのサーバーかは、ディレクトリの名前と、この文書にしかない。
 - **F25 二度届く通知は、配線で書けた。届く順は、書けない。** `payment.seen` と分類 `Redelivery`、`payment.Securing`。「もう扱った」と記録する行と、扱う行が、一つのトランザクションに入ることは、F19 のとおり、仕様の外。
-- **F26 時刻。** `clock.now()` と `@clock.tick` を作った。「期限の N 日前」は、時刻を作る葉（`ordering.before`、`payment.ahead`）と、比較を人が書く `read`（`unpaidBefore`、`nextExpiringHold`）。`Duration` の上限は、`valid` で言えない（`@valid.max(45d)` は TYPE-4）。
-- **F27 `db` の語彙で言えなかった読み書き。** サーバーの 34 の `read` のうち 8、22 の効果のうち 7 に、デコレータを付けられなかった: 集合に入っているか（`productsBySkus`、`levelsOf`）、比較（`unpaidBefore`）、値がないこと（`toPick`、`shipmentsInHouse`、`openJobs`）、まとめて書く（`saveLevels`、`addJobs`）、キーでない列で書き換える（`confirmReservations`）。列のしまい方（`@db.text` など）は、一つも書いていない（G1）。
+- **F26 時刻。** `clock.now()` と `@clock.tick` を作った。「期限の N 日前」は、時刻を作る葉（`ordering.before`、`payment.ahead`）と、比較を人が書く `read`（`oldestUnpaidBefore`、`nextExpiringHold`）。`Duration` の上限は、`valid` で言えない（`@valid.max(45d)` は TYPE-4）。
+- **F27 `db` の語彙で言えなかった読み書き。** サーバーの 34 の `read` のうち 7、30 の効果のうち 21 に、デコレータを付けられなかった: 集合に入っているか（`productsBySkus`、`levelsOf`）、比較（`oldestUnpaidBefore`）、値がないこと（`toPick`、`shipmentsInHouse`、`openJobs`）、まとめて書く（`saveLevels`、`addJobs`）、キーでない列で書き換える（`confirmReservations`）。効果の 21 のうち 16 は、行のケースを変える効果で、`@db.update` と `@db.delete` の形に合わない（F51、F54）。列のしまい方（`@db.text` など）は、一つも書いていない（G1）。
 - **F28 「後で、必ず」がない。** 通知の入口は、受け付けて、分けて、メールを送るまでを、その場で行う（`hooks.paymentEvent`）。失敗したら、相手がもう一度送ることに頼る。
 - **F29 金額。** `type.Yen` は整数の scalar。足し算も比較も配線にないので、合計と差額は、どれも葉（`payment.limitOf`、`payment.charged`、`payment.refundOf`）。
 - **F30 `page` の語彙。**
@@ -354,7 +427,7 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 ### 検査器
 
-- **F33 検査器が error にしたのは、言語の限りを確かめた実験だけ。** F1、F8、F9、F12、F16、F22、F26、F30 の書き方は、このサンプルの外で確かめた。サンプルの約 4,200 行は、まだ書いていない名前空間を引いたとき（RES-1）のほかは、書いたまま通った。順番の誤り（請求の確定より先に、送り状を買う）は、通る。
+- **F33 検査器が error にしたのは、言語の限りを確かめた実験だけ。** F1、F8、F9、F12、F16、F22、F26、F30 の書き方は、このサンプルの外で確かめた。サンプルの約 4,300 行は、まだ書いていない名前空間を引いたとき（RES-1）のほかは、書いたまま通った。順番の誤り（請求の確定より先に、送り状を買う）は、通る。
 - **F34 書く量をいちばん増やしたのは THROWS-1。** `staffApi.buyLabel` の `throws` は 13、`storefront.placeOrder` は 12。同じ並びを、`fulfilment.dispatch`、`staffApi.buyLabel`、`backoffice.onBuyLabel` の `@recover` で、三度書く。例外のユニオンでまとめることは、していない（G8）。
 - **F35 DEC-16 は、画面で役に立った。** `@recover` の相手を、その op が投げない例外にすると warning。
 - **F36 op が値を返すかどうかが、呼ぶ側の都合で決まった。** 確かめるためだけに呼ぶ op は、値を返せない（WIRE-2 と WIRE-8）。→ `staff.asPacker`、`inventory.pick`、`payment.settle` を、値を返さない op に直した。
@@ -370,15 +443,27 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 - **F41 「外部の仕組みの op には、その仕組みの語彙のデコレータ」。** `@http.post` を付けると、相手の口の宣言になり、通信の形（パス、本文）まで仕様に入る（`psp`、`carriergw`、`assets`）。印だけにすると（`mailer.send` の `@smtp.sendMail`）、入らない。どちらにするかの基準は、指針にない。
 - **F42 入口の名前空間を、呼ぶ相手ごとに分けた（`shopApi`、`staffApi`、`hooks`）。指針にない。** `staffApi` の 15 の op のうち 13 は、担当を確かめて、一つ呼ぶだけ（残りは、ログインとログアウト）。概念の op に `@http.*` を直に付ければ消えるが、要求のどこから読むか（`@http.header` のトークン）と認証が、概念に入る。
 - **F43 状態を持たない、流れの名前空間 `fulfilment` を作った。指針にない。** 概念どうしが直に呼び合う（`production` が `shipping` を呼ぶ）代わりに、順番を一か所に置いた。`ordering` は `inventory` と `shipping` を直に呼んでいて、そろっていない。
-- **F44 分類を閉じると（`docs/check.md`「閉じた分類」）、名前のないケースは、なくなった。** はじめに 24 あった `default` のうち、22 は意味のある状態で、名前を付けた: 19 は型で決まる分類の残りのケース（`Missing: Order? as else;`。同「残りのケース」）、3 は述語のケース（`shipping.Gathered` の `Awaiting`、`carrier.Fleet` の `Unavailable`、`catalog.Offer` の `Absent`）。残りの 2 は、この仕様が使わない場合で、ケースごと消した: `psp.Meaning`（客の同意のほかの通知）と、`fulfilment.Arrival`（「届いた」のほかの、荷物の動きの通知）。振る舞いが変わったのは、この 2 だけ（F47）。「ない」側の名前は、分類ごとにばらついた（`Missing` が四つ、`Unknown` が二つ、`Absent`、`Unlisted`、`Unreserved`、`Uncounted`、`Ungranted`、`LoggedOut`）: 同じ意味の分類が並ぶこと（F12、F40）が、名前の数だけ目立つ。例外と同じことを二度言うアームもできた（`Ungranted => throw NotGranted;`、`Unknown => throw UnknownCarrier;`）。
-- **F45 述語で決まる分類は、ケースの数だけ、人が述語を書く。** `classify Gathered of Shipment { Complete; Awaiting; }` は、`Awaiting` の述語も人が書き、二つが排他で、どの出荷もどちらかに当たることは、書く人が担保する（`docs/plugin-go.md`「分類」: 真がちょうど一つでなければ、分類の誤り）。`Awaiting` が `Complete` の否定であることは、仕様のどこにも書けない。`carrier.Fleet` の `Unavailable` も同じ。三つの `condition`（`staff.Maker`、`Packer`、`Admin`）を、両側に名前のある分類に直したので、否定の側の述語が、さらに三つ増えた（`NotMaker`、`NotPacker`、`NotAdmin`）: 35 の分類のうち、述語で決まるものは 14 で、人が書く述語は、31 から 34 になった。
-- **F46 型で決まる側が、述語のケースになった。** `catalog.Offer`（`OnSale` と `Withdrawn` が、どちらも `Product? as Product`）の「ない」は、値がないことで、型から決まる。それでも、残りのケースは述語のケースの隣に書けない（CLS-7）ので、名前を付けるには、`as` のないケース `Absent;` にするしかなく、「値がない」という述語を人が書く。「あるか」（型で決まる）と「並べているか」（述語）の二つの分類に分ければ避けられるが、アームの本体は呼び出し一つなので、配線が一段増える（F3）。
-- **F47 使わない通知を宣言しないと、通知の入口が、その通知で失敗する。** 分類を閉じる前は、`payment.recordNew` は、客の同意のほかの通知を「覚えて、何もしない」、`fulfilment.tracked` は、「届いた」のほかの通知を「何もしない」だった。いまは、どちらも、分類の誤りで失敗する（`psp.Meaning` のケースは `Secured` だけ、`fulfilment.Arrival` のケースは `Arrived` だけ）。
+- **F44 分類を閉じると（`docs/check.md`「閉じた分類」）、名前のないケースは、なくなった。** はじめに 24 あった `default` のうち、22 は意味のある状態で、名前を付けた: 19 は型で決まる分類の残りのケース（`Missing: Order? as else;`。同「残りのケース」）、3 は述語のケース（`shipping.Gathered` の `Awaiting`、`carrier.Fleet` の `Unavailable`、`catalog.Offer` の `Absent`）。残りの 2 は、はじめ、この仕様が使わない場合だと考えて、ケースごと消した: `psp.Meaning`（客の同意のほかの通知）と、`fulfilment.Arrival`（「届いた」のほかの、荷物の動きの通知）。振る舞いが変わったのは、この 2 だけで、その後、どちらにも、名前のあるケースを戻した（F47）。「ない」側の名前は、分類ごとにばらついた（`Missing` が四つ、`Unknown` が二つ、`Absent`、`Unlisted`、`Unreserved`、`Uncounted`、`Ungranted`、`LoggedOut`）: 同じ意味の分類が並ぶこと（F12、F40）が、名前の数だけ目立つ。例外と同じことを二度言うアームもできた（`Ungranted => throw NotGranted;`、`Unknown => throw UnknownCarrier;`）。
+- **F45 述語で決まる分類は、ケースの数だけ、人が述語を書く。** `classify Gathered of Shipment { Complete; Awaiting; }` は、`Awaiting` の述語も人が書き、二つが排他で、どの出荷もどちらかに当たることは、書く人が担保する（`docs/plugin-go.md`「分類」: 真がちょうど一つでなければ、分類の誤り）。`Awaiting` が `Complete` の否定であることは、仕様のどこにも書けない。`carrier.Fleet` の `Unavailable` も同じ。三つの `condition`（`staff.Maker`、`Packer`、`Admin`）を、両側に名前のある分類に直したので、否定の側の述語が、さらに三つ増えた（`NotMaker`、`NotPacker`、`NotAdmin`）。いまは、36 の分類のうち、述語で決まるものは 15 で、人が書く述語は 36（行の遷移のために足した `payment.Billing` の二つと、`psp.Meaning.Echo` で三つ増え、`catalog.Offer.Absent` で一つ減った: F46、F47、F56）。
+- **F46 型で決まる側が、述語のケースになっていた。→ ない側のケースで、型で決まるようになった。** `catalog.Offer`（`OnSale` と `Withdrawn` が、どちらも `Product? as Product`）の「ない」は、値がないことで、型から決まる。はじめは、残りのケースを述語のケースの隣に書けず（CLS-7）、`as` のないケース `Absent;` にして、「値がない」という述語を人が書いていた。→ いまは、`Absent: Product? as none;` と書ける（`docs/check.md`「ない側のケース」）: 値がなければ `Absent`（述語を呼ばない）、あれば、`OnSale` か `Withdrawn` かを述語が決める。
+- **F47 使わない通知を宣言しないと、通知の入口が、その通知で失敗した。→ 受け取るだけの通知に、名前のあるケースを戻した。** 分類を閉じたとき、`psp.Meaning` のケースを `Secured` だけ、`fulfilment.Arrival` のケースを `Arrived` だけにした。すると、`payment.recordNew` と `fulfilment.tracked` は、ほかの通知で、分類の誤りになって失敗した。
   - `hooks.paymentEvent` は `@db.transaction` なので、失敗すれば、`payment.remember` も取り消される。通知を「扱った」と記録しないので、相手は同じ通知を送り直し、そのたびに同じ失敗になる。
   - `hooks.trackingEvent` は、運んでいる途中、不在、返送の通知のたびに失敗する。配送業者は、荷物一つにつき、そういう通知をいくつも送る。
-  - 分類の誤りは、仕様の例外ではない（`docs/check.md`「閉じた分類」）ので、`throws` に書けず、`@http.status` で応答を決められず、デコレータの `catches` でも受けられない。「使わない通知は、受け取ったとだけ答える」を、仕様に書く場所がない（Q11）。
+  - 分類の誤りは、仕様が扱わない、ありえないことが起きた誤りで、`throws` に書かず、受けることもできない。**当たらない値に対して何かをしたい（ここでは、受け取ったとだけ答える）なら、それは分類できるということなので、ケースとして宣言して、枝に書く**（`docs/requirements.md`「書き方の指針」）。二つの通知は、どちらも、これに当たった:
+    - `psp.Meaning`: `Echo;` を足した（こちらが頼んだことの結果の知らせ: 請求の確定、返金、枠の解放）。述語で決まる（`kind` は文字列）。`payment.recordNew` は、`Echo => none;` で、通知を「扱った」と記録して、何もしない。
+    - `fulfilment.Arrival`: `Underway: Time? as else;` を足した（届いた時刻のない通知: 運んでいる途中、不在、返送）。型で決まる。`fulfilment.tracked` は、`Underway => none;`。
+  - 宣言しないままにしたものは、ない: この二つの入口のほかに、「来るはずのない値」を受けている分類は、このサンプルにない（ほかの分類の、ケースの外の値は、述語の実装の誤りで、仕様が何かをする場合ではない）。Q11 は、これで閉じた。
 - **F48 仕事の分類は、一つの `Role` にしなかった。** 担当者は、三つの仕事を、いくつでも持てる（`Member.maker`、`packer`、`admin` は、別々の真偽値）。`classify Role of Member { Maker; Packer; Admin; }` は、製作と梱包の両方をする担当者で、二つの述語が真になり、分類の誤りになる（ケースは排他）。仕事ごとに、「してよい / してはいけない」の分類を一つずつ持った。「してはいけない」側の名前（`NotMaker`）は、業務の言葉になかった。
 - **F49 `match` の `else` のアームが合ったのは、`payment.Standing` だけ。** 五つのケースから一つを取り出して、残りの四つを同じに扱う `match` が四つあり（`reopen`、`secureFound`、`prepayHeld`、`release`）、`else` にした（`docs/requirements.md`「書き方の指針」の「1 : 4」）。`payment.settle` は「1 : 1 : 1 : 2」なので、どのアームも名前で並べた。三つのケースの「1 : 2」（`production.start` と `finish`、`shipping.release` と `markDelivered`、`storefront.onAddToCart`）も、名前で並べた: 並べる名前が二つなら、`else` にしても短くならず、ケースを足したときに MATCH-2 が尋ねる方がよい。
+- **F50 行のケースを変える効果は、行を一つずつ受け取る。** 行の遷移を書く効果は、行の引数（型が、状態の要素の型の引数）を、ちょうど一つ持つ（STATE-7）。行の並びを受け取る効果（`saveOrders(changed: Order[])`）には `as` を書けず、`as` を書かない `put` は「行のケースを変えない」という意味になる。→ 期限切れは、時計で一件ずつにした（`ordering.expireUnpaid` は、いちばん古い一つを `expireOrder` に渡す。間隔を 5 分から 1 分にした）。`inventory.release` は、注文一つの取り置きを戻す形になり、葉 `idsOf` と、集合で引く `read` が要らなくなった。まとめて足す `post`（`production.addJobs`、`inventory.addReservations`、`download.addGrants`）は、入るケースを書けないまま（どれも、はじめのケースで作ることは、葉のコメント）。
+- **F51 `@db.update` は、行のケースを変える効果の、どれにも合わなかった。** 呼ぶ側の検査（STATE-9）が求めるのは、前のケースにあると分かっている行、つまり、書き換える前の行。`@db.update` は、渡した行の全体を書く（`docs/plugin-go-sqlite.md`「効果の中身」）ので、前の行を渡せば、何も変わらない。→ ケースを変える効果は、前の行と、足す事実を受け取る形にして（`startJob(job, at)`、`recordSettled(payment, charge, at)`）、中身は、人が書く。`db` のデコレータを付けた効果は、15 から 9 に減った。引き換えに、変えた行を作るだけの葉が 11 なくなった（H2。人が書く葉は、90 から 78 に減った）: 「行をどう変えるか」を書く場所が、葉から、効果の中身に移った。足す事実が込み入っているところは、事実を数える葉と、それを運ぶ model が要る（`payment.Charge`、`shipping.Placement`。F18 が、二つ増えた）。「この列に、この値を入れる」と言う `db` の語彙があれば、中身も宣言から出せる。
+- **F52 一つの `as` が言うのは、一つの分類。** 出荷は、二つの分類を持つ（`Custody` と `Gathered`）。`createShipment` は `as Custody.InHouse` と書き、「まだ待っている（`Gathered.Awaiting`）で入る」は、書けなかった。`recordHandOver`（`Custody` を進める）が `Gathered` を変えないことは、「ほかの分類については、`as` を書かない効果と同じ」という決まりから来る。
+- **F53 後のケースが、引数の値で決まる遷移は、約束できない。** `carrier.setEnabled(code, enabled)` は、`enabled` の値で、`InUse` にも `Suspended` にもする。配線は、真偽値で分けられない（F8）。→ `switchCarrier(carrier, enabled)` を、何も約束しない `as any -> else` にした。このサンプルで、抜け道を使ったのは、ここだけ。op を二つ（使う、止める）に分ければ、二つの遷移として書けるが、画面の操作（スイッチ一つ）と形が離れる。
+- **F54 行を受け取る `@db.delete` がない。** `delete` に行の遷移を書くと、効果は行を受け取る。`@db.delete` の引数は、列の条件（`docs/plugin-go-sqlite.md`「効果の中身」）。→ `staff.deleteSession(session: Session)` は、デコレータなしで、人が書く。ログアウトは、消す前に、セッションを読むことになった（`endSession`: `LoggedIn => deleteSession(session); LoggedOut => none;`）。「あれば消す」が、仕様に見えるようになったとも言える。
+- **F55 変えた後の行を返す op は、読み直す。** 効果は値を返さず、渡した行は、前の行。→ `production.start`、`shipping.gather`、`carrier.setEnabled` は、効果の後で、もう一度引いて返す（`return require(id);`）。`ordering.accept` は、読み直しのために `throws NoOrder` が増え、`fulfilment.acceptAndBegin` に伝わった（いま書き換えた行なので、起きない例外）。
+- **F56 一つの op が、場合によって二つのケースへ進めていたところは、分類が一つ増えた。** 客の同意を記録する `payment.markSecured` は、箱で送るものがあれば `Held`、なければ `Settled` にしていた（葉 `securedBy` の中）。後のケースは一つなので、効果を二つにし（`holdSecured`、`chargeSecured`）、どちらを呼ぶかを分ける分類 `Billing { Deferred; Immediate; }` を足した。葉の中にあった分かれ道が、仕様に出た。`-> else` で一つにまとめることもできたが、「決まっていない」のではなく、「二つのどちらかに、決まる」ので、そうしなかった（`recordPlacement` の `Gathered.Awaiting -> else` は、残りの品目で決まり、宣言からは決まらないので、`else`）。
+- **F57 `post` の「前」は、検査されない。** `createParcel` の `as Packing.Unpacked -> Packing.Packed` は、「梱包は一度だけ」と読めるが、呼ぶ側の検査は、`post` には掛からない（渡す行は、入る行で、「まだない」ことを示す値ではない）。一度だけであることは、今までどおり、`shipping.pack` の `match existing by Packing { Packed => throw AlreadyPacked; … }` が担う。
+- **F58 呼ぶ側の検査（STATE-9）は、書き直しの間、error を一つも出さなかった。** 行を進める op は、もともと、`match` のアームの中で、絞り込んだ型（`Progress.Queued<Job>`）の葉を呼ぶ形だった（F10）。その葉を効果に置き換えただけで、検査を通った。確かめたのは、逆の向き: アームの外に効果の呼び出しを出すと STATE-9（このサンプルの外の小さな仕様で確かめた）。検査が守るのは「どの行に対して呼べるか」までで、効果の中身が、宣言したとおりに行を変えることは、まだ誰も確かめない（`docs/requirements.md`「段階」の、行の遷移の保証）。
 
 ## 粒度: 仕様は、どこまで書くか
 
@@ -417,12 +502,12 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 - **G8 例外のユニオン**（F34 の並びに、名前を付ける）。
 - **G9 `effects` と `reads` の節**。一つも書いていない。`prevents effects` は、一か所だけ（`payment.capture`）。
 - **G10 通知の種類の値**（`psp.Event.kind`）と、荷物の動きの、届いた以外の通知。
-- **G11 受け付けた後のキャンセル。** 枠を手放す op（`payment.release`）は、期限切れの注文のためにだけある。
+- **G11 受け付けた後のキャンセル。** 枠を手放す op（`payment.release`）は、期限切れの注文のためにだけある。作るものに入れるなら、取り消した注文は、消さずに、`ordering.Standing` のケース（`Cancelled`）と、そこへ進める効果（`as Standing.Accepted -> Standing.Cancelled`）を足す（期限切れの `Expired` と同じ形。`docs/requirements.md`「書き方の指針」）。
 
 ### 実装に見えたが、書いたもの
 
 - **H1 「引いて、なければ投げる」op**（`ordering.byId`、`shipping.find`、`payment.require`、`production.require`）。
-- **H2 時刻を入れるだけの葉**（`startedAt`、`acceptedAt`、`handedOverAt`、`deliveredAt`、`pickedAt`）。効果が行の全体を受け取るので、変えた行を作る葉が要る。
+- **H2 時刻を入れるだけの葉は、なくなった。** 効果が行の全体を受け取っていた間は、変えた行を作る葉（`startedAt`、`acceptedAt`、`handedOverAt`、`deliveredAt`、`pickedAt`）が要った。行の遷移を持つ効果は、前の行と、足す事実（時刻など）を受け取るので、葉は要らない（F51）。残っているのは、足す事実を数える葉（`payment.charged`、`shipping.place`）。
 - **H3 相手の型に写す葉**（`payment.captureOf`、`refundOf`、`holdOf`、`carrier.rateRequest`、`labelRequest`、`toLabel`）。
 - **H4 一覧から項目を抜く葉**（`ordering.skusOf`、`inventory.idsOf`、`skusOfHeld`）。
 - **H5 判断の段ごとの配線**（F3）。
@@ -460,19 +545,13 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 ### Q1 表の一行の進み具合を、遷移として書けるようにするか
 
-出荷、支払い、注文、仕事は、どれも「一行が、いくつかの場合を進む」もので、このサンプルの中心。今は、効果の宛先に書けない（F1）。
+**決まった: 書ける。** 効果が、宛先（`on 状態.操作`）の後ろの `as` で、受け取った行のケースをどう変えるかを言う（行の遷移。`docs/check.md`「行の遷移」、`docs/decisions.md`「決めたこと」163〜173）。このサンプルの書き直しは「難しい問題」の「行の遷移で書いた進み具合」、分かったことは F1 と F50〜F58。事実ごとの表で持つ書き方（`parcels`、`labels`）は、そのまま使っている。
 
-- **(a) 今のまま。** 値の分類と、`put` の効果と、`match`。
-  ```ts
-  @db.update effect saveShipment(shipment: Shipment) on shipments.put;
-  ```
-- **(b) 値の分類を、遷移の宛先に書ける。** 効果が、行をどの場合からどの場合へ進めるかを言う。
-  ```ts
-  effect handOver(shipment: Shipment) on shipments: Custody.InHouse -> Custody.WithCarrier;
-  ```
-- **(c) 事実ごとの表で持つ書き方を、指針にする**（このサンプルの `parcels`、`labels`）。言語は変えない。
+残っている問い（どれも、決めていない）:
 
-勧め: **(b)**。`docs/requirements.md`「価値と位置づけ」の表の「ステートマシン図」が、サーバーの側で、当たるものを持たない。(c) は、(b) があっても使える。
+- **行の並びを受け取る効果に、行の遷移を書けるようにするか**（F50）。今は、一行ずつ。
+- **一つの効果が、二つの分類について言えるようにするか**（F52）。今は、一つの `as` に、一つの分類。
+- **行のケースを変える効果の中身を、`db` の語彙で言えるようにするか**（F51、F54）。今は、人が書く。
 
 ### Q2 仕様に書く深さの規則を、どれにするか
 
@@ -595,17 +674,7 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 ### Q11 宣言したケースの外の値を、仕様の上で受けられるようにするか
 
-通知の入口は、この仕様が使わない種類の通知で、分類の誤りになって失敗する（F47）。相手は、失敗した通知を送り直す。
-
-- **(a) 今のまま。** 使わない通知は誤りにし、相手の側（通知の設定）で、送る種類を絞ってもらう。仕様は、相手がそうしていることを、コメントで当てにする。
-- **(b) 分類の誤りを、言語の例外にする**（核の例外を一つ。`throws` に書け、デコレータが `catches` で受けられる）。
-  ```ts
-  @webhook.acknowledgeUnknown   // catches ClassificationFailed ignores
-  export op trackingEvent(in: TrackingInput) { … }
-  ```
-- **(c) 使わない場合にも、ケースを宣言する**（`Ignored;`）。「仕様が使う場合だけを宣言する」（`docs/requirements.md`「書き方の指針」）から外れる。
-
-勧め: **(a)** のまま、(b) を検討する。(c) は、なくした `default` を、名前を変えて戻すことになる。
+**閉じた: 受けられるようには、しない。** 分類の誤りは、仕様が扱わない、ありえないことが起きた誤りで、受ける例外は、言語に足さない。当たらない値に対して何かをしたいなら、それは分類できるということなので、ケースとして宣言して、枝に書く（`docs/requirements.md`「書き方の指針」）。このサンプルの二つの通知の入口は、受け取るだけの通知に、名前のあるケースを足した（`psp.Meaning.Echo`、`fulfilment.Arrival.Underway`。F47）。
 
 ## 近づけたもの
 
@@ -613,7 +682,8 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 | 言いたかったこと | 書いたもの |
 |---|---|
-| 表の一行の遷移 | 値の分類と `put` の効果（F1） |
+| 行のケースを変える効果の中身 | 人が書く効果（`db` の語彙は、行の全体を書くか、列の条件で消す。F51、F54） |
+| いくつかの行のケースを、一度に変える | 時計で、一行ずつ（F50） |
 | 設定の値 | `single` の状態（F14） |
 | 「あれば置き換え、なければ入れる」 | `nullable` の `put`（F17） |
 | 相手の中で金が動くこと | 相手の名前空間の状態と、`@outside.does`（F6） |

@@ -1,0 +1,25 @@
+// CLS-8（docs/check.md「ない側のケース」）: as none を書けない分類
+namespace a {
+  model M { id: string; }
+  scalar Email extends string;
+  state token: nullable<string>;
+  classify NotOptional of M {
+    Has: M as M;
+    Gone: M as none;                   // ERROR: CLS-8
+  }
+  classify Only of M? {
+    Gone: M? as none;                  // ERROR: CLS-8
+  }
+  classify NoAs of M? {
+    Has;
+    Gone: M? as none;                  // ERROR: CLS-8
+  }
+  classify Predicate of string? {
+    Valid: string? as Email;
+    Gone: string? as none;             // ERROR: CLS-8
+  }
+  classify OfState of token {
+    LoggedIn: token as string;
+    LoggedOut: token as none;          // ERROR: CLS-8
+  }
+}

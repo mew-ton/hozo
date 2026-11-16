@@ -170,6 +170,22 @@ func sampleProgram() *Program {
 						Target: BuiltinTarget{State: "db", Operation: OpPost},
 						Writes: []string{"db"},
 					},
+					// 行の遷移を持つ効果（docs/ir.md「state / exception / effect」の RowTransition）: 前のケースの並び、後のケース
+					&Effect{
+						DeclBase: DeclBase{Name: "server.promote", Span: span(f, 25, 1, 25, 90)},
+						Params:   []OpParam{{Name: "user", Type: Ref("server.User"), Span: span(f, 25, 16, 25, 26)}},
+						Target:   BuiltinTarget{State: "db", Operation: OpPut},
+						Writes:   []string{"db"},
+						Row:      &RowTransition{Param: "user", Classify: "server.IsAdmin", From: Cases("NotAdmin"), To: "IsAdmin"},
+					},
+					// 分類を名指ししない行の遷移（`as any -> else`）は、classify も to も持たない
+					&Effect{
+						DeclBase: DeclBase{Name: "server.patch", Span: span(f, 26, 1, 26, 60)},
+						Params:   []OpParam{{Name: "user", Type: Ref("server.User"), Span: span(f, 26, 14, 26, 24)}},
+						Target:   BuiltinTarget{State: "db", Operation: OpPut},
+						Writes:   []string{"db"},
+						Row:      &RowTransition{Param: "user", From: AnyCase()},
+					},
 					// read の宣言（docs/ir.md「read」）
 					&Read{
 						DeclBase: DeclBase{
@@ -224,6 +240,28 @@ func sampleProgram() *Program {
 							Span: span(f, 34, 72, 34, 103),
 						}},
 						DecidedBy: DecidedByType,
+						// 残りが「値がない」の残りのケースは、ない側のケース（docs/ir.md「classify」の absent）
+						Absent: "Unregistered",
+					},
+					// ない側のケース（`対象 as none`）を持つ、述語で決まる分類: Fresh と Stale は述語、Gone は、値がないことで決まる
+					&Classify{
+						DeclBase: DeclBase{Name: "server.Freshness", Span: span(f, 36, 1, 36, 110)},
+						Subject:  TypeSubject{Type: Optional(Ref("server.User"))},
+						Cases: []ClassifyCase{{
+							Name: "Fresh",
+							As:   []CaseTyping{{Type: Ref("server.User"), By: NarrowByPresence, Span: span(f, 36, 40, 36, 60)}},
+							Span: span(f, 36, 33, 36, 61),
+						}, {
+							Name: "Stale",
+							As:   []CaseTyping{{Type: Ref("server.User"), By: NarrowByPresence, Span: span(f, 36, 69, 36, 89)}},
+							Span: span(f, 36, 62, 36, 90),
+						}, {
+							Name: "Gone",
+							As:   []CaseTyping{{Type: Optional(Ref("server.User")), By: NarrowByNone, Span: span(f, 36, 97, 36, 107)}},
+							Span: span(f, 36, 91, 36, 108),
+						}},
+						DecidedBy: DecidedByPredicate,
+						Absent:    "Gone",
 					},
 					&Classify{
 						DeclBase: DeclBase{Name: "server.IsAdmin", Span: span(f, 35, 1, 35, 51)},

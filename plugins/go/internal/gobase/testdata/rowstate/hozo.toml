@@ -1,0 +1,5 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（形は変わらず、コメントに行の遷移の表示）と、「分類」の、ない側のケースを持つ分類（述語を持たないケース）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go"]
+out         = "gen/app"

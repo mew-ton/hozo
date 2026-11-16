@@ -1,0 +1,18 @@
+// STATE-8（docs/check.md「行の遷移」の「操作ごとに書ける形」「行がないこと」）: delete の、書けない形。
+// ない側のケースを持たない分類では、delete の効果に as を書けない。後は、ない側のケースだけ
+namespace a {
+  model Order { id: string; }
+  state orders: list<Order>;
+  classify Stage of Order { Draft; Accepted; Shipped; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  classify Present of Order? { Here: Order? as Order; }
+  effect d1(order: Order) on orders.delete as Stage.Draft -> Stage.Shipped;   // ERROR: STATE-8
+  effect d2(order: Order) on orders.delete as Stage.Shipped;              // ERROR: STATE-8
+  effect d3(order: Order) on orders.delete as Present.Here;               // ERROR: STATE-8
+  effect d4(order: Order) on orders.delete as Life.Open;                  // ERROR: STATE-8
+  effect d5(order: Order) on orders.delete as Life.Open -> Life.Closed;   // ERROR: STATE-8
+  effect d6(order: Order) on orders.delete as Life.Open -> else;          // ERROR: STATE-8
+  effect d7(order: Order) on orders.delete as any;                        // ERROR: STATE-8
+  effect d8(order: Order) on orders.delete as any -> else;                // ERROR: STATE-8
+  effect d9(order: Order) on orders.delete as Life.Absent -> Life.Absent; // ERROR: STATE-8
+}

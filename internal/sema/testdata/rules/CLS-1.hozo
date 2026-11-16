@@ -18,6 +18,11 @@ namespace a {
     Missing: find as else;
     Gone: find as else;                // ERROR: CLS-1
   }
+  classify TwoNone of find {
+    Found: find as M;
+    Missing: find as none;
+    Gone: find as none;                // ERROR: CLS-1
+  }
   classify OkElse of find { Found: find as M; Missing: find as else; }
   // 残りのケースを書かない分類は、型を書いたケースだけ（値がない側は、どのケースでもない。docs/check.md「ケースの判定」）
   classify OkNoRest of find { Found: find as M; }

@@ -253,7 +253,7 @@ func Build() Grammar {
 
 		// ---- 記号 ----
 		{Key: "arrow", Rule: Rule{
-			Comment: "-> は遷移（docs/grammar.md「exception / effect / read」の Transition）、=> は match のアーム（同「配線」の MatchArm）",
+			Comment: "-> は遷移と行の遷移（docs/grammar.md「exception / effect / read」の Transition と RowClause）、=> は match のアーム（同「配線」の MatchArm）",
 			Name:    "keyword.operator.arrow.hozo",
 			Match:   `->|=>`,
 		}},
@@ -400,13 +400,17 @@ func Build() Grammar {
 				Patterns: []Rule{{Include: "#type"}},
 			},
 			{
-				Comment: "ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping）。, で次の CaseTyping が続く",
+				Comment: "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、行の遷移のケース（同「exception / effect / read」の RowClause: as C.A, C.B -> C.D。-> は矢印、any と else は予約語）。; か { まで続く",
 				Begin:   `\b(as)\b`,
-				End:     `(?=[;{,])`,
+				End:     `(?=[;{])`,
 				BeginCaptures: Captures{
 					"1": {Name: "keyword.control.hozo"},
 				},
-				Patterns: []Rule{{Include: "#type"}},
+				Patterns: []Rule{
+					{Include: "#arrow"},
+					{Include: "#type"},
+					{Include: "#keywords"},
+				},
 			},
 			{
 				Comment: "match の by の後ろの分類の名前（修飾できる。docs/grammar.md「配線」の Match）。標準の分類 list / nullable は形の語として塗る",

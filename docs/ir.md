@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.8";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.9";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -137,6 +137,8 @@ interface Effect extends DeclBase {
   params: OpParam[];              // 受け取る値（`effect e(order: Order) on …;`）。なければ []
   target: EffectTarget;           // 宛先は一つだけ
   writes: string[];               // この効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）
+  row?: RowTransition;            // 行の遷移（`as` の節。docs/check.md「行の遷移」）。書いていなければ持たない。
+                                  // 持つのは、target が builtin の効果だけ
 }
 
 type EffectTarget =
@@ -144,7 +146,20 @@ type EffectTarget =
   | { kind: "transition"; of: string; from: CaseSet; to: CaseSet };            // 分類の遷移。of は状態の分類の FQN か、
                                                                                // 組み込みの分類を持つ基底の状態の FQN
 type CaseSet = "any" | string[];  // ケース名の列（書かれた順）
+
+interface RowTransition {         // 効果が、受け取った行の状態をどう変えるか。書き込む状態と操作は、Effect.target にある
+  param: string;                  // 行の引数の名前（Effect.params のうち、型が状態の要素の型と等しい、ただ一つのもの）
+  classify?: string;              // 行の分類の FQN（値の分類。対象の型は、状態の要素の型 T か T?）。
+                                  // 分類を名指ししない形（`as any -> else`）では持たない
+  from: CaseSet;                  // 効果の前のケース。"any" は、どのケースの行でも。
+                                  // ケースの列なら、呼ぶ側が、そのどれかにあると分かっている行を渡す（STATE-9）。post では、いつも "any"
+  to?: string;                    // 効果の後のケースの名前。持たなければ、決まっていない（put の `-> else`）。post では、いつも持つ。
+                                  // delete では、いつも、分類のない側のケース（Classify.absent）
+}
 ```
+
+- `RowTransition` は、行の遷移を、生成したテストで確かめる段階（`docs/requirements.md`「段階」）が要るものを持つ: 状態と操作（`Effect.target`）、分類、前のケース、後のケース、行の引数。
+- `row` を持たない効果の意味は、操作から決まる（`docs/check.md`「行の遷移」の「操作ごとに書ける形」の「`as` を書かない」の列）。
 
 ### read
 
@@ -167,12 +182,14 @@ interface Classify extends DeclBase {
          | { kind: "states"; states: string[] };    // 状態の分類。基底の状態の FQN（書かれた順）
   cases: { name: string; description?: Doc; as: CaseTyping[]; span: Span }[];   // 宣言したケースのすべて（docs/check.md「閉じた分類」）。宣言順。as は書かれた順（なければ []）
   decidedBy: "type" | "predicate";   // ケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない
+  absent?: string;                // ない側のケース（docs/check.md「ない側のケース」）の名前。なければ持たない。
+                                  // decidedBy が predicate でも、このケースだけは述語を持たず、値がないことで決まる
 }
 
-interface CaseTyping {            // ケースの `対象 as T` と `対象 as else`（docs/check.md「ケースの型」「残りのケース」）
+interface CaseTyping {            // ケースの `対象 as T`、`対象 as else`、`対象 as none`（docs/check.md「ケースの型」「残りのケース」「ない側のケース」）
   state?: string;                 // 状態の分類のとき、その対象の状態の FQN。値の分類と op の分類では持たない（対象は一つ）
-  type: Type;                     // そのケースでの対象の型。`as else` なら、書いた型がないので、docs/types.md「残りのケースでの対象の型」
-  by: "presence" | "variant" | "predicate" | "else";   // 絞り込みの種類（docs/types.md「型で決まる絞り込み」）。else は `as else`
+  type: Type;                     // そのケースでの対象の型。`as else` と `as none` なら、書いた型がないので、docs/types.md「残りのケースでの対象の型」
+  by: "presence" | "variant" | "predicate" | "else" | "none";   // 絞り込みの種類（docs/types.md「型で決まる絞り込み」）。else は `as else`、none は `as none`
   span: Span;
 }
 ```
@@ -398,6 +415,12 @@ interface Bind {
 | ケースの `X as T` | `as` の `CaseTyping`。`X` が状態なら `state` にその FQN、型か op なら `state` を持たない |
 | ケースの `X as else`（残りのケース） | `as` の `CaseTyping`。`by` は `else`、`type` は、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。`state` は上の行と同じ。そのケースは、ほかのケースと同じに `cases` に入る |
 | 配線の値の位置の、状態の名前（`f(token)`、`token.value`、`match token by nullable`） | `Atom` の `state`。修飾して書いても同じ |
+| ケースの `X as none`（ない側のケース） | `as` の `CaseTyping`。`by` は `none`、`type` は対象の型のまま。`Classify.absent` に、そのケースの名前。ない側のケースを `X as else` で書いた分類（`docs/check.md`「ない側のケース」の表の二行目）も、`absent` を持つ（`by` は `else` のまま） |
+| `effect e(o: T) on s.put as C.A, C.B -> C.D` | `row` に `{ param: "o", classify: C の FQN, from: ["A", "B"], to: "D" }`。前の `any` は `from: "any"`、後ろの `else` は `to` なし |
+| `effect e(o: T) on s.post as C.X`、`… as C.N -> C.X`（N は、ない側のケース） | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "X" }`。`post` の前は、IR に残さない（入る前の行は、ない） |
+| `effect e(o: T) on s.put as any -> else` | `row` に `{ param: "o", from: "any" }`（`classify` も `to` も持たない） |
+| `effect e(o: T) on s.post as any` | `row` を持たない（`as` を書かない `post` と同じ意味: 入るケースは、決まっていない。行の引数があることは、確かめてある: STATE-7） |
+| `effect e(o: T) on s.delete as C.N`、`… as any -> C.N` | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "N" }` |
 | アームの `A, B => …` | `cases: ["A", "B"]`（書かれた順）、`else: false` |
 | アームの `else => …` | `cases` に、ほかのアームが並べなかったケースを宣言の順で、`else: true`。受けるケースがなければ（MATCH-9）`cases: []` |
 | アームの本体の `none` | `body` の `none`（`atom` にはしない） |
@@ -430,7 +453,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.8";
+  version: "0.9";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -488,10 +511,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.8"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.9"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.9 | `Effect.row`（`RowTransition`: 行の遷移。`docs/check.md`「行の遷移」）。`CaseTyping.by` に `none`（ない側のケース `対象 as none`。同「ない側のケース」）。`Classify.absent`。述語で決まる分類（`decidedBy` が `predicate`）が、述語を持たないケース（`absent` のケース）を持ちうる。`View` とやり取りの形は 0.8 と同じ |
 | 0.8 | `Classify.hasDefault`、`Classify.defaultDescription`、`Classify.fromCondition` をなくした（分類を閉じた。`docs/check.md`「閉じた分類」）。`MatchArm.cases` は、いつもケース名の列（`"default"` をなくした）。`MatchArm.else`（`else` のアーム。`cases` は、それが受けるケース）。`View` とやり取りの形は 0.7 と同じ |
 | 0.7 | `CaseTyping.by` に `else`（残りのケース `対象 as else`。`docs/check.md`「残りのケース」）。そのときの `CaseTyping.type` は、書いた型ではなく、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。残りのケースは `Classify.cases` に入り、`hasDefault` には数えない。`View` とやり取りの形は 0.6 と同じ |
 | 0.6 | 宣言の種類 `read`（`Read`: `params`、`returns`、`state`）。`Exception.value` をやめて `Exception.params`（例外のその場の model `<例外の FQN>.Value` は、もう合成しない）。`Effect.params`。`Call.op` をやめて `Call.callee`（`op` / `read` / `effect`）。`Match.arms[].body` の `throw` に `args`。`Decorator.targets` に `read`。`Decorator.repeatable`（同じデコレータの `Application` が、一つの宣言に複数並びうる）。`reads` と `effects` の要素が、文字列（FQN）から `ReadRef` / `EffectRef` に変わった: `Op.reads`、`Op.effects`、`Op.carried`、`Decorator.reads`、`Decorator.effects`、`Signature.effects`、`Signature.relations[].effect`、`Signature.successEffects[].effect`。`Signature.reads` は、基底の状態の FQN の列のまま。葉の op の `Op.reads` / `Op.effects` は、いつも空になった（STATE-5）。`View` とやり取りの形は 0.5 と同じ |

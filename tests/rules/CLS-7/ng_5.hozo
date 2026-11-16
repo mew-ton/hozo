@@ -1,0 +1,9 @@
+// CLS-7（docs/check.md「残りのケース」「ない側のケース」）: as none のある分類には、残りがない
+namespace a {
+  model M { id: string; }
+  classify Both of M? {
+    Has: M? as M;
+    Gone: M? as none;
+    Rest: M? as else;                  // ERROR: CLS-7
+  }
+}

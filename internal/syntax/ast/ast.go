@@ -411,6 +411,8 @@ type EffectDecl struct {
 	On *StateOpRef
 	// Transition は分類の遷移（"X: A -> B"）。組み込みの効果なら nil。
 	Transition *Transition
+	// Row は行の遷移（On の後ろの "as …"。docs/grammar.md「exception / effect / read」の RowClause）。書いていなければ nil。
+	Row *RowClause
 }
 
 // NodeSpan は Node の実装。
@@ -458,6 +460,44 @@ type CaseSet struct {
 // NodeSpan は Node の実装。
 func (n *CaseSet) NodeSpan() source.Span { return n.Span }
 
+// RowClause は行の遷移 "as <後>" か "as <前> -> <後>"（docs/grammar.md「exception / effect / read」の RowClause）。
+// 意味は docs/check.md「行の遷移」。
+type RowClause struct {
+	// Span は as から、後の終わりまで（";" は含まない）。
+	Span source.Span
+	// AsSpan は as の語。
+	AsSpan source.Span
+	// Arrow は矢印のある形（"as <前> -> <後>"）か。
+	Arrow bool
+	// Before は矢印の前（RowBefore）。矢印のない形では nil。
+	Before *RowBefore
+	// After は効果の後。
+	After RowAfter
+}
+
+// NodeSpan は Node の実装。
+func (n *RowClause) NodeSpan() source.Span { return n.Span }
+
+// RowBefore は行の遷移の矢印の前: "any" か、ケース（分類の名前とケースの名前）の並び。Any なら Cases は空。
+type RowBefore struct {
+	Span  source.Span
+	Any   bool
+	Cases []QualifiedName
+}
+
+// NodeSpan は Node の実装。
+func (n *RowBefore) NodeSpan() source.Span { return n.Span }
+
+// RowAfter は行の遷移の後: ケース一つ（Case）、矢印の後ろの "else"（Else）、矢印のない形の "any"（Any）のどれか一つ。
+// 解析できなかったときは、どれでもない。
+type RowAfter struct {
+	Span source.Span
+	Any  bool
+	Else bool
+	// Case は "分類の名前.ケースの名前"。Any か Else なら nil。
+	Case *QualifiedName
+}
+
 // ClassifyDecl は classify（docs/grammar.md「classify」）。
 type ClassifyDecl struct {
 	Span       source.Span
@@ -478,23 +518,26 @@ type ClassifyCase struct {
 	Span source.Span
 	Doc  *DocComment
 	Name Ident
-	// As は "対象 as 型" と "対象 as else" の並び（CaseTyping）。なければ空。
+	// As は "対象 as 型"、"対象 as else"、"対象 as none" の並び（CaseTyping）。なければ空。
 	As []*CaseTyping
 }
 
 // NodeSpan は Node の実装。
 func (n *ClassifyCase) NodeSpan() source.Span { return n.Span }
 
-// CaseTyping はケースの "対象 as 型" と "対象 as else"（docs/grammar.md「classify」）。
+// CaseTyping はケースの "対象 as 型"、"対象 as else"、"対象 as none"（docs/grammar.md「classify」）。
 // Subject は宣言の of の後ろと同じに書いた対象（型か op か状態の名前。名前の解決が決める）。
 type CaseTyping struct {
 	Span    source.Span
 	Subject Type
-	// Type は as の後ろの型。Else なら nil。
+	// Type は as の後ろの型。Else か None なら nil。
 	Type Type
 	// Else は、as の後ろが型ではなく else（残りのケース。docs/check.md「残りのケース」）。ElseSpan は、その else の位置。
 	Else     bool
 	ElseSpan source.Span
+	// None は、as の後ろが型ではなく none（ない側のケース。docs/check.md「ない側のケース」）。NoneSpan は、その none の位置。
+	None     bool
+	NoneSpan source.Span
 }
 
 // NodeSpan は Node の実装。

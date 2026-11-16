@@ -24,7 +24,9 @@ namespace fulfilment {
 
   /** 受け付けて、始めて、知らせる */
   @db.transaction
-  op acceptAndBegin(order: ordering.Standing.AwaitingPayment<ordering.Order>) {
+  op acceptAndBegin(order: ordering.Standing.AwaitingPayment<ordering.Order>)
+    throws ordering.NoOrder
+  {
     const accepted = ordering.accept(order);
     begin(accepted);
     notice.accepted(accepted);
@@ -172,17 +174,22 @@ namespace fulfilment {
   }
 
   /**
-   * 配送業者の通知が言っている、届いた時刻。
-   * この仕様が使うのは、届いたという通知だけ: 届いた時刻のない通知（運んでいる途中、不在、返送など）は、どのケースでもなく、分類の誤りになる。
+   * 配送業者の通知が言っている、荷物の動き。届いた時刻があるかどうかで、型から決まる。
+   * 通知は、荷物一つにつき、いくつも届く（運んでいる途中、不在、返送など）。店がすることがあるのは、届いたという通知だけで、
+   * ほかの通知は、受け取ったとだけ答える: 答えなければ、相手が送り直し続ける。だから、その場合にも名前を付けて、何もしない枝を書く。
    */
   classify Arrival of Time? {
+    /** 届いた */
     Arrived: Time? as Time;
+    /** まだ届いていない（運んでいる途中、不在、返送など）。店は、何もしない */
+    Underway: Time? as else;
   }
 
-  /** 配送業者から、届いたという通知が届いた。ほかの動きの通知は受けない（分類の誤りで失敗する） */
+  /** 配送業者から、荷物の動きの通知が届いた。届いたという通知なら、出荷に記録する。ほかの動きの通知は、受け取るだけ */
   export op tracked(event: carriergw.TrackingEvent) {
     match event.deliveredAt by Arrival {
-      Arrived => shipping.delivered(event.trackingNumber, event.deliveredAt);
+      Arrived  => shipping.delivered(event.trackingNumber, event.deliveredAt);
+      Underway => none;
     };
   }
 }

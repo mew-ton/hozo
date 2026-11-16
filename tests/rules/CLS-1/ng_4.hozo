@@ -1,0 +1,9 @@
+// CLS-1（docs/check.md「classify / match」「ない側のケース」）: as none が二つ。位置は二つ目の none
+namespace a {
+  model M { id: string; }
+  classify Life of M? {
+    Has: M? as M;
+    Gone: M? as none;
+    Lost: M? as none;                  // ERROR: CLS-1
+  }
+}

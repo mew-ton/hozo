@@ -339,6 +339,50 @@ test('矢印（遷移の -> と match のアームの =>）', () => {
   assert.ok(!t[0].tokens.some((tk) => tk.scopes.includes('keyword.operator.arrow.hozo')));
 });
 
+test('行の遷移（effect … on 状態.操作 as …）と、ケースの as none', () => {
+  // docs/grammar.md「exception / effect / read」の RowClause: as の後ろの型の位置は ; まで続き、ケース（分類の名前とケースの名前）は
+  // 型の位置の名前、-> は矢印、any と else は予約語（docs/editors.md「TextMate の文法」）
+  const put = tokensOf('  effect cancel(order: Order) on orders.put as Stage.Draft, kind.Stage.Accepted -> Stage.Cancelled;');
+  assertScope(put, 'effect cancel', 'effect', 'keyword.declaration.hozo');
+  assertScope(put, 'effect cancel', 'cancel', 'entity.name.function.hozo');
+  assertScope(put, 'effect cancel', 'on', 'keyword.control.hozo');
+  assertScope(put, 'effect cancel', 'put', 'keyword.other.hozo');
+  assertScope(put, 'effect cancel', 'as', 'keyword.control.hozo');
+  assertScope(put, 'effect cancel', 'Stage.Draft', 'entity.name.type.hozo');
+  assertScope(put, 'effect cancel', 'kind.Stage.Accepted', 'entity.name.type.hozo');
+  assertScope(put, 'effect cancel', '->', 'keyword.operator.arrow.hozo');
+  assertScope(put, 'effect cancel', 'Stage.Cancelled', 'entity.name.type.hozo');
+  // 矢印の前の any と、後ろの else
+  const hatch = tokensOf('effect patch(order: Order) on orders.put as any -> else;');
+  assertScope(hatch, 'effect patch', 'as', 'keyword.control.hozo');
+  assertScope(hatch, 'effect patch', 'any', 'keyword.control.hozo');
+  assertScope(hatch, 'effect patch', '->', 'keyword.operator.arrow.hozo');
+  assertScope(hatch, 'effect patch', 'else', 'keyword.control.hozo');
+  // 矢印のない形
+  const post = tokensOf('effect accept(order: Order) on orders.post as Stage.Accepted;\neffect bring(order: Order) on orders.post as any;');
+  assertScope(post, 'effect accept', 'post', 'keyword.other.hozo');
+  assertScope(post, 'effect accept', 'Stage.Accepted', 'entity.name.type.hozo');
+  assertScope(post, 'effect bring', 'any', 'keyword.control.hozo');
+  // 行の遷移は ; で終わる: 次の宣言は、今まで通り
+  const next = tokensOf('effect a(o: O) on s.delete as Life.Open -> Life.Absent;\nstate rows: list<Row>;');
+  assertScope(next, 'effect a', 'delete', 'keyword.other.hozo');
+  assertScope(next, 'effect a', 'Life.Absent', 'entity.name.type.hozo');
+  assertScope(next, 'state rows', 'state', 'keyword.declaration.hozo');
+  assertScope(next, 'state rows', 'rows', 'variable.other.hozo');
+  // ない側のケース: as の後ろの none は、値の none と同じ scope（docs/grammar.md「classify」）
+  const none = tokensOf('classify Life of Order? { Open: Order? as Order; Absent: Order? as none; }');
+  assertScope(none, 'classify Life', 'as', 'keyword.control.hozo', 1);
+  assertScope(none, 'classify Life', 'none', 'constant.language.hozo');
+  assertScope(none, 'classify Life', 'Order', 'entity.name.type.hozo', 3);
+  // 実物: コーパスの行の遷移と、ない側のケース
+  const api = linesOf(files.api);
+  assertScope(api, 'effect rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', 'Standing.Active', 'entity.name.type.hozo');
+  assertScope(api, 'effect rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(api, 'effect amend(user: User) on users.put as Standing.Idle -> else;', 'else', 'keyword.control.hozo');
+  assertScope(api, 'effect closeUser(user: User) on users.put as any -> Standing.Closed;', 'any', 'keyword.control.hozo');
+  assertScope(api, 'Unknown: User? as none;', 'none', 'constant.language.hozo');
+});
+
 test('形の語と、標準の分類のケース', () => {
   const st = linesOf(files.state);
   assertScope(st, 'state token: nullable<Token>;', 'nullable', 'support.type.primitive.hozo');

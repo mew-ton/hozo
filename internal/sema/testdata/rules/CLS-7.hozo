@@ -1,4 +1,4 @@
-// CLS-7: 残りのケース（対象 as else）を書けるのは、型で決まる分類だけ（docs/check.md「残りのケース」）
+// CLS-7: 残りのケース（対象 as else）を書けるのは、残りが型で決まるときだけ（docs/check.md「残りのケース」）
 namespace a {
   model M { id: string; }
   model N { id: string; }
@@ -17,6 +17,10 @@ namespace a {
   classify S of token { LoggedIn: token as string; LoggedOut: token as else; }
   classify P2 of Two { IsReady: Two as M; Rest: Two as else; }
   classify P3 of Three { Rest: Three as else; IsReady: Three as M; }
+  // 書ける: 残りが、ちょうど「値がない」（値の分類か op の分類で、対象の型が T?、ほかのケースが、どれも T? as T。
+  // ほかのケースが二つ以上で、述語で決まる分類でも）
+  classify Life of M? { Draft: M? as M; Placed: M? as M; Absent: M? as else; }
+  classify Session of find { Fresh: find as M; Stale: find as M; Missing: find as else; }
 
   // 述語のケースの隣には書けない
   classify NoAs of M? {
@@ -27,10 +31,21 @@ namespace a {
     Valid: string as Email;
     Invalid: string as else;           // ERROR: CLS-7
   }
-  classify SameType of find {
-    Fresh: find as M;
-    Stale: find as M;
-    Missing: find as else;             // ERROR: CLS-7
+  classify SameArm of Two {
+    Fresh: Two as M;
+    Stale: Two as M;
+    Other: Two as else;                // ERROR: CLS-7
+  }
+  classify SameTypeState of token {
+    Fresh: token as string;
+    Stale: token as string;
+    LoggedOut: token as else;          // ERROR: CLS-7
+  }
+  // as none のある分類には、残りがない
+  classify Both of M? {
+    Has: M? as M;
+    Gone: M? as none;
+    Rest: M? as else;                  // ERROR: CLS-7
   }
   // 対象が二つ以上の状態の分類には書けない
   classify Auth of token, profile {

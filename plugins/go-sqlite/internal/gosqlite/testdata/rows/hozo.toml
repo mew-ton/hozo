@@ -1,0 +1,6 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「効果の中身」の、行の遷移を持つ効果
+# （SQL は変わらず、行のケースを確かめない。コメントが、そう言う）と、デコレータを付けられない行の遷移の効果（人が書き足す）。
+[[emit]]
+namespace   = "shop"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/shop"

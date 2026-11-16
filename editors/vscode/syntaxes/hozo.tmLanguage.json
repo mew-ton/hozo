@@ -148,7 +148,7 @@
       "match": "(?\u003c![A-Za-z0-9_.])(?:-?[0-9]+\\.[0-9]+|[0-9]+(?:ms|s|m|h|d)|-?[0-9]+)\\b"
     },
     "arrow": {
-      "comment": "-\u003e は遷移（docs/grammar.md「exception / effect / read」の Transition）、=\u003e は match のアーム（同「配線」の MatchArm）",
+      "comment": "-\u003e は遷移と行の遷移（docs/grammar.md「exception / effect / read」の Transition と RowClause）、=\u003e は match のアーム（同「配線」の MatchArm）",
       "name": "keyword.operator.arrow.hozo",
       "match": "-\u003e|=\u003e"
     },
@@ -364,9 +364,9 @@
           ]
         },
         {
-          "comment": "ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping）。, で次の CaseTyping が続く",
+          "comment": "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、行の遷移のケース（同「exception / effect / read」の RowClause: as C.A, C.B -\u003e C.D。-\u003e は矢印、any と else は予約語）。; か { まで続く",
           "begin": "\\b(as)\\b",
-          "end": "(?=[;{,])",
+          "end": "(?=[;{])",
           "beginCaptures": {
             "1": {
               "name": "keyword.control.hozo"
@@ -374,7 +374,13 @@
           },
           "patterns": [
             {
+              "include": "#arrow"
+            },
+            {
               "include": "#type"
+            },
+            {
+              "include": "#keywords"
             }
           ]
         },

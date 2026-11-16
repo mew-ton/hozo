@@ -416,4 +416,42 @@ namespace api {
       Arrived => nameOf(user);
     };
   }
+
+  // ---- docs/ir.md「版」の 0.9 で足した形 ----
+
+  // docs/check.md「ない側のケース」: T? を対象にした分類の、値がない側。Fresh か Lapsed かは述語、Unknown は型で決まる
+  /** ユーザーの、登録の状態 */
+  classify Enrolment of User? {
+    Fresh: User? as User;
+    Lapsed: User? as User;
+    /** いない */
+    Unknown: User? as none;
+  }
+  // docs/check.md「行の遷移」: 効果が、受け取った行の状態をどう変えるか。書き込む状態と操作は、今までどおり on の後ろ
+  /** ユーザーを足す。Fresh で入る */
+  effect enrol(user: User) on users.post as Standing.Fresh;
+  /** ユーザーを休ませる */
+  effect rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;
+  /** ユーザーを閉じる。どの使われ方からでも */
+  effect closeUser(user: User) on users.put as any -> Standing.Closed;
+  /** ユーザーを書き換える。後の使われ方は、決まっていない */
+  effect amend(user: User) on users.put as Standing.Idle -> else;
+  /** ユーザーを消す。消せるのは、登録が切れたユーザーだけ */
+  effect forget(user: User) on users.delete as Enrolment.Lapsed -> Enrolment.Unknown;
+  // docs/check.md「行の遷移」の「呼ぶ側の検査」: 前のケースを並べた効果は、そのケースを受けるアームの中で呼ぶ
+  op restUser(user: User, now: Time)
+  {
+    match user by Standing {
+      Fresh, Active => rest(user, now);
+      else          => none;
+    };
+  }
+  op forgetUser(id: UserId)
+  {
+    const user = userById(id);
+    match user by Enrolment {
+      Lapsed         => forget(user);
+      Fresh, Unknown => none;
+    };
+  }
 }

@@ -1,0 +1,94 @@
+// plugins/go の単体テストの入力: 行の遷移（docs/check.md「行の遷移」）と、ない側のケース（同「ない側のケース」）。
+// 効果は、行の遷移を持っても、宛先の状態の単位のメソッドで、形は変わらない。変わるのは、コメントだけ。
+// ない側のケースは、述語を持たない: 型で決まる分類（Known）は何も出さず、述語で決まる分類（Life）は、判定関数が、値がないことで決める。
+namespace app {
+  model Order { id: string; note: string; }
+
+  state orders: list<Order>;
+
+  exception NoOrder;
+  exception NotAccepted;
+  exception NotOpen;
+
+  /** 注文の段階 */
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+
+  /** 注文が、あるか。あれば、開いているか */
+  classify Life of Order? {
+    Open: Order? as Order;
+    Closed: Order? as Order;
+    /** ない */
+    Absent: Order? as none;
+  }
+
+  /** 引いた注文があるか */
+  classify Known of Order? {
+    Found: Order? as Order;
+    Missing: Order? as none;
+  }
+
+  read orderById(id: string): Order? on orders;
+
+  /** 注文を受け付ける */
+  effect accept(order: Order) on orders.post as Stage.Accepted;
+  effect open(order: Order) on orders.post as Life.Absent -> Life.Open;
+  effect bring(order: Order) on orders.post as any;
+  /** 作り始める */
+  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  /**
+   * 取り消す。
+   * 取り消せるのは、作り始める前だけ
+   */
+  effect cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect forceShip(order: Order) on orders.put as any -> Stage.Shipped;
+  effect revise(order: Order, note: string) on orders.put as Stage.Accepted -> else;
+  effect patch(order: Order) on orders.put as any -> else;
+  effect rename(order: Order) on orders.put;
+  effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  effect purge(order: Order) on orders.delete as Life.Absent;
+
+  /** 作り始める。受け付けた注文だけ */
+  export op begin(id: string, at: Time)
+    throws NoOrder, NotAccepted
+  {
+    const found = orderById(id);
+    match found by Known {
+      Found   => beginFound(found, at);
+      Missing => throw NoOrder;
+    };
+  }
+
+  export op beginFound(order: Order, at: Time)
+    throws NotAccepted
+  {
+    match order by Stage {
+      Accepted => start(order, at);
+      else     => throw NotAccepted;
+    };
+  }
+
+  /** 型から Accepted と分かっている注文を、書き換える */
+  export op amend(order: Stage.Accepted<Order>, note: string) {
+    revise(order, note);
+  }
+
+  /** 捨てる。開いている注文だけ */
+  export op drop(id: string)
+    throws NoOrder, NotOpen
+  {
+    const found = orderById(id);
+    match found by Life {
+      Open   => discard(found);
+      Closed => throw NotOpen;
+      Absent => throw NoOrder;
+    };
+  }
+
+  /** いまの状態の呼び名 */
+  export op lifeName(found: Order?): string {
+    return match found by Life {
+      Open, Closed => found.note;
+      Absent       => "absent";
+    };
+  }
+}

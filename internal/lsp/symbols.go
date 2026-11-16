@@ -135,6 +135,10 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			switch {
 			case d.On != nil:
 				detail += " on " + d.On.State.String() + "." + d.On.Op.String()
+				if d.Row != nil {
+					// 行の遷移（as …）は、書いたまま
+					detail += " " + b.text(d.Row)
+				}
 			case d.Transition != nil:
 				detail += " on " + b.text(d.Transition)
 			}

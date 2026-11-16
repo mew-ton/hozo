@@ -129,6 +129,33 @@ func TestZero(t *testing.T) {
 }
 
 // docs/plugin-go.md「コメント」の「型の表示」。
+// TestRowDisplay は、コメントの中の行の遷移の書き方（docs/plugin-go.md「コメント」の「行の遷移の表示」）。
+func TestRowDisplay(t *testing.T) {
+	effect := func(op ir.Operation, row *ir.RowTransition) *ir.Effect {
+		return &ir.Effect{Target: ir.BuiltinTarget{State: "shop.orders", Operation: op}, Row: row}
+	}
+	for _, tt := range []struct {
+		e    *ir.Effect
+		want string
+	}{
+		{effect(ir.OpPost, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.AnyCase(), To: "Accepted"}), "as shop.Stage.Accepted"},
+		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.Cases("Accepted"), To: "InProduction"}), "as shop.Stage.Accepted -> shop.Stage.InProduction"},
+		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.Cases("Draft", "Accepted"), To: "Cancelled"}), "as shop.Stage.Draft, shop.Stage.Accepted -> shop.Stage.Cancelled"},
+		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.AnyCase(), To: "Shipped"}), "as any -> shop.Stage.Shipped"},
+		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.Cases("Accepted")}), "as shop.Stage.Accepted -> else"},
+		{effect(ir.OpPut, &ir.RowTransition{Param: "order", From: ir.AnyCase()}), "as any -> else"},
+		{effect(ir.OpDelete, &ir.RowTransition{Param: "order", Classify: "shop.Life", From: ir.AnyCase(), To: "Absent"}), "as shop.Life.Absent"},
+		{effect(ir.OpDelete, &ir.RowTransition{Param: "order", Classify: "shop.Life", From: ir.Cases("Draft"), To: "Absent"}), "as shop.Life.Draft -> shop.Life.Absent"},
+		// 行の遷移を持たない効果と、宛先が組み込みの効果でない効果は ""
+		{effect(ir.OpPut, nil), ""},
+		{&ir.Effect{Target: ir.TransitionTarget{Of: "shop.Checkout"}, Row: &ir.RowTransition{Param: "order", From: ir.AnyCase()}}, ""},
+	} {
+		if got := RowDisplay(tt.e); got != tt.want {
+			t.Errorf("RowDisplay(%+v) = %q, want %q", tt.e.Row, got, tt.want)
+		}
+	}
+}
+
 func TestTypeDisplay(t *testing.T) {
 	for _, tt := range []struct {
 		t    ir.Type

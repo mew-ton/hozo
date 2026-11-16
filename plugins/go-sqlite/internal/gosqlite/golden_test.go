@@ -23,6 +23,7 @@ var goldenFixtures = []struct {
 	{name: "effects", covers: "「効果の中身」の表の各行（@db.insert、@db.update、一つと二つ以上の列の @db.delete）、「状態ごとの型」の、形で決まる命令 Post", behavior: true},
 	{name: "transaction", covers: "「トランザクション」（継ぎ目のメソッドの二つの形、確定と取り消し、入れ子、同じ db の上の二つの名前空間、var _ Seams を出すとき）", behavior: true},
 	{name: "partial", covers: "「状態ごとの型」の、デコレータを付けていない read と効果があるとき（var _ を出さない、付けていないものの句、warning を出さない。人が埋め込んで書き足し、Conn を通す）と、型を出さない単位", behavior: true},
+	{name: "rows", covers: "「効果の中身」の、行の遷移を持つ効果（SQL は変わらない。コメントの「確かめない」の一文）と、デコレータを付けられない行の遷移の効果（人が書き足す）", behavior: true},
 	{name: "names", covers: "「補助」の、当たる名前（引数、同じ名前の model、局所の名前と同じ名前のパッケージ）と、内側のフォルダを持つ出力", behavior: true},
 	{name: "minimal", covers: "「補助」の、使うものだけを出すこと（read も効果も持たない表。出る補助と import が、いちばん少ない）"},
 }
@@ -232,6 +233,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gosql27", codeSQLLatest},      // @db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない
 	{"gosql28", codeSQLDeleteAll},   // @db.delete の効果が、引数を一つも持たない
 	{"gosql29", codeSQLTransaction}, // op に @db.transaction が付いているのに、N に表の状態が一つもない
+	{"gosql30", codeSQLRow},         // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない
 }
 
 // TestDiagnostics は docs/plugin-go-sqlite.md「診断」の表の各行: 診断のコード・位置・メッセージがゴールデンと同じで、

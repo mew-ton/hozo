@@ -105,9 +105,9 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "namespaces[web] は config だけ", v.Namespaces["web"], []ir.NamespaceConfig{v.Config})
 		// ops はすべての op について
 		expect(t, "ops のキー（export の有無によらず、すべての op）", keysOf(v.Ops), []string{
-			"api.arrivedName", "api.currentName", "api.findByName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.idle", "api.issue", "api.keep",
+			"api.arrivedName", "api.currentName", "api.findByName", "api.findUser", "api.forgetUser", "api.getUser", "api.greeting", "api.guard", "api.idle", "api.issue", "api.keep",
 			"api.login", "api.logout", "api.memberName", "api.mint", "api.nameOf", "api.onlyArrived",
-			"api.renew", "api.renewAgain", "api.renewAudited", "api.renewDeclared", "api.rotate", "api.sessionOf", "api.shownName", "api.signIn", "api.standingName", "api.standingNote", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.verify", "api.viaAlias", "api.whenLive",
+			"api.renew", "api.renewAgain", "api.renewAudited", "api.renewDeclared", "api.restUser", "api.rotate", "api.sessionOf", "api.shownName", "api.signIn", "api.standingName", "api.standingNote", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.verify", "api.viaAlias", "api.whenLive",
 			"web.adminPageVm", "web.clearToken", "web.fetchUser", "web.greet", "web.login", "web.openUser",
 			"web.reload", "web.signOut", "web.userPageVm", "web.welcome",
 		})
@@ -841,6 +841,22 @@ func TestViewFromEntry(t *testing.T) {
 			if _, ok := verified[key]; ok {
 				t.Errorf("classify の JSON に %s のキーがある", key)
 			}
+		}
+		// 版 0.9: 行の遷移（Effect.row）。書いていない効果は、row のキーを持たない。-> else は to を、分類を名指ししない形は classify を持たない
+		expect(t, "行の遷移の JSON（post）", jsonDecl(t, api, "api.enrol")["row"], map[string]any{"param": "user", "classify": "api.Standing", "from": "any", "to": "Fresh"})
+		expect(t, "行の遷移の JSON（put、前のケースの並び）", jsonDecl(t, api, "api.rest")["row"], map[string]any{"param": "user", "classify": "api.Standing", "from": []any{"Fresh", "Active"}, "to": "Idle"})
+		expect(t, "行の遷移の JSON（-> else）", jsonDecl(t, api, "api.amend")["row"], map[string]any{"param": "user", "classify": "api.Standing", "from": []any{"Idle"}})
+		expect(t, "行の遷移の JSON（delete）", jsonDecl(t, api, "api.forget")["row"], map[string]any{"param": "user", "classify": "api.Enrolment", "from": []any{"Lapsed"}, "to": "Unknown"})
+		if _, ok := jsonDecl(t, api, "api.createSession")["row"]; ok {
+			t.Error("行の遷移を書いていない効果に row のキーを出さない")
+		}
+		// 版 0.9: ない側のケース（Classify.absent、CaseTyping.by の none）。ない側のケースを持たない分類は、absent のキーを持たない
+		enrolment := jsonDecl(t, api, "api.Enrolment")
+		expect(t, "ない側のケースの JSON", []any{enrolment["absent"], enrolment["decidedBy"], enrolment["cases"].([]any)[2].(map[string]any)["as"].([]any)[0].(map[string]any)["by"]},
+			[]any{"Unknown", "predicate", "none"})
+		expect(t, "as else で書いた、ない側のケース", jsonDecl(t, api, "api.Membership")["absent"], "Stranger")
+		if _, ok := jsonDecl(t, api, "api.Standing")["absent"]; ok {
+			t.Error("ない側のケースを持たない分類に absent のキーを出さない")
 		}
 		expect(t, "ops のキーは FQN の辞書順", jsonKeysInOrder(t, marshalView(t, v), "ops"), keysOf(v.Ops))
 	})

@@ -145,6 +145,9 @@ func (e *emitter) genClassify() *fileGen {
 			f.print(casesComment(name, c.Name))
 			f.printf("type %sCases interface {\n", name)
 			for _, cs := range c.Cases {
+				if cs.Name == c.Absent {
+					continue // ない側のケースは、述語を持たない（docs/plugin-go.md「分類」）
+				}
 				f.printf("\t// %s はケース %s の述語。\n\t%s(ctx %s.Context, v %s) (bool, error)\n", golang.Capitalize(cs.Name), cs.Name, golang.Capitalize(cs.Name), ctx, f.goType(subject))
 			}
 			f.print("}\n\n")
@@ -153,6 +156,11 @@ func (e *emitter) genClassify() *fileGen {
 			f.printf("func Classify%s(ctx %s.Context, c %sCases, v %s) (%s, error) {\n\tvar hits []string\n\tvar kind %s\n\tvar first error\n",
 				name, ctx, name, f.goType(subject), name, name)
 			for _, cs := range c.Cases {
+				if cs.Name == c.Absent {
+					// ない側のケース: 述語を呼ぶ代わりに、値がなければ真とする
+					f.print("if v == nil {\nhits = append(hits, " + strconv.Quote(cs.Name) + ")\nkind = " + golang.CaseConst(name, cs.Name) + "\n}\n")
+					continue
+				}
 				call := classifyCase("c."+golang.Capitalize(cs.Name)+"(ctx, v)", cs.Name, golang.CaseConst(name, cs.Name))
 				// 型で決まる絞り込みの as を持つケースは、値がその型に当たらなければ、述語を呼ばずに偽とする
 				guard := ""

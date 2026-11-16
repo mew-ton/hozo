@@ -61,13 +61,15 @@ namespace staff {
   @db.find
   read sessionByToken(token: type.Token): Session? on sessions;
 
-  /** セッションを作る */
+  /** セッションを作る。ログインしていなかったトークンが、ログインしたことになる */
   @db.insert
-  effect createSession(session: Session) on sessions.post;
+  effect createSession(session: Session) on sessions.post as Login.LoggedOut -> Login.LoggedIn;
 
-  /** セッションを消す */
-  @db.delete
-  effect deleteSession(token: type.Token) on sessions.delete;
+  /**
+   * セッションを消す（人が書く）。消せるのは、あるセッションだけ。セッションは、なくなることが意味: ログアウトした後に、残す記録はない。
+   * db の語彙の @db.delete は、列の条件を引数に取り、行を受け取れないので、付けていない（README.md「分かったこと」の F54）。
+   */
+  effect deleteSession(session: Session) on sessions.delete as Login.LoggedIn -> Login.LoggedOut;
 
   // ---- 分類 ----
 
@@ -83,10 +85,10 @@ namespace staff {
     Absent: type.Token? as else;
   }
 
-  /** そのトークンでログインしているか */
+  /** そのトークンでログインしているか。セッションの行がないことが、「ログインしていない」という状態 */
   classify Login of Session? {
     LoggedIn: Session? as Session;
-    LoggedOut: Session? as else;
+    LoggedOut: Session? as none;
   }
 
   // 仕事ごとに、分類を一つ。一人が複数の仕事を持てる（maker と packer の両方が真の担当者がいる）ので、
@@ -160,8 +162,17 @@ namespace staff {
   /** ログアウトする。トークンがなければ、何もしない */
   export op logout(token: type.Token?) {
     match token by Credential {
-      Presented => deleteSession(token);
+      Presented => endSession(token);
       Absent    => none;
+    };
+  }
+
+  /** そのトークンのセッションがあれば、消す。もうなければ、何もしない */
+  op endSession(token: type.Token) {
+    const session = sessionByToken(token);
+    match session by Login {
+      LoggedIn  => deleteSession(session);
+      LoggedOut => none;
     };
   }
 

@@ -90,6 +90,18 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 - 期待する出力（`gen/**`）と、人が書いたもの（`app/**`）も、変えていない: `docs/plugin-go.md`「match」「分類」で変わったのは、述語で決まる分類の列挙と判定関数、型の `switch`、残りのケースを書かない分類の `match` で、このサンプルは、どれも持たない。その形の期待する出力は、基底 `go` の単体テストの入力（`plugins/go/internal/gobase/testdata/` の `matchswitch`、`matchclosed`）が持つ。
 - `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc emit` の出力と、バイト単位で同じ。
 
+### 行の遷移で変えたこと
+
+行の遷移（`docs/decisions.md`「決めたこと」163〜173。効果の宛先の後ろの `as` の節と、ケースの `as none`）で、このサンプルが変えたのは、版だけ。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `plugins/go-ratelimit/hozo-plugin.toml`、`plugins/go-ratelimit/testdata/**/views.json`、`testdata/seams/plugins/tracer/hozo-plugin.toml` | `protocol` と `View` の版が `"0.9"`（`Effect.row`、`Classify.absent`、`CaseTyping.by` の `none` が足された） | `docs/ir.md`「版」 |
+
+- 仕様（`.hozo`）は、変えていない: このサンプルには、表の一行が進む段階（注文や支払いの状態）がなく、効果は、どれも `as` を書かない `post` / `put` / `delete`。
+- 期待する出力（`gen/**`）と、人が書いたもの（`app/**`）も、変えていない: `docs/plugin-go.md` と `docs/plugin-go-sqlite.md` で変わったのは、行の遷移を持つ効果のコメントと、ない側のケースを持つ、述語で決まる分類の判定関数で、このサンプルは、どちらも持たない（四つの分類は、どれも型で決まり、基底は何も出さない。その値がない側の `as else` のケースは、IR では `absent` に入るが、出力は変わらない）。
+- `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc emit` の出力と、バイト単位で同じ。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。

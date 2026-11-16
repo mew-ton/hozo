@@ -30,19 +30,19 @@ editors/vscode/
 |---|---|---|
 | 予約語（宣言の頭） | `keyword.declaration.hozo` | `token.Keywords` から生成 |
 | 予約語（修飾: `export`、`override`） | `storage.modifier.hozo` | 同上 |
-| 予約語（節の頭、文の頭。`reads`、`as`、`throw`、`as` の後ろと `match` のアームの頭の `else` を含む） | `keyword.control.hozo` | 同上。どの生成規則も使わない予約語 `default`（`docs/grammar.md`「予約語」）は除く: 予約語として塗らず、フィールド名とデコレータ名の位置の規則（下の行）だけが拾う |
+| 予約語（節の頭、文の頭。`reads`、`as`、`throw`、`as` の後ろと `match` のアームの頭の `else`、行の遷移（`docs/grammar.md`「exception / effect / read」の `RowClause`）の `any` と `else` を含む） | `keyword.control.hozo` | 同上。どの生成規則も使わない予約語 `default`（`docs/grammar.md`「予約語」）は除く: 予約語として塗らず、フィールド名とデコレータ名の位置の規則（下の行）だけが拾う |
 | 核の型と形（`never`、`list` / `nullable` / `single` を含む） | `support.type.primitive.hozo` | 同上 |
 | `true` / `false` / `none` | `constant.language.hozo` | 同上 |
 | フィールド名の位置の予約語（`op: string;`、`{ op: x }`、`res.op`） | `variable.other.property.hozo` | `:` の前か `.` の後ろの予約語。予約語のパターンより先に拾い、予約語として塗らない（`docs/grammar.md`「識別子」の `FieldName`）。`override: string;` の `override` もここに当たる（`:` の前） |
 | `override` の後ろの予約語（`override op;`、`override to: never;`） | `variable.other.property.hozo` | `\boverride\s+` の直後の一語。フィールド名の位置（`docs/grammar.md`「model」の `Override`）なので、予約語として塗らない。`override` そのものは修飾の予約語（`storage.modifier.hozo`）。予約語でないフィールド名には scope を付けない |
 | 文脈キーワード `field` / `variant` | `keyword.other.hozo` | `\bfor\s+` の後と `\bany\s+` の後に限る（`docs/grammar.md`「予約語」）。`for` の対象の `effect` と `read` は予約語（宣言の頭）で、ほかの対象（`op`、`state` など）と同じ scope。`for` の対象の並びは、節の頭（`throws` / `catches` / `reads` / `effects`）で終わる |
 | 文脈キーワード `post` / `put` / `delete` | `keyword.other.hozo` | `\bon\s+[\w.]+\.` の後と、`effects` の節の要素の最後の `.` の後（直に書いた `状態.操作`。`docs/grammar.md`「op」の `EffectElem`）と、`.` の後で直後が `(` のとき（配線で直に呼ぶ `状態.操作(…)`。同「配線」の `Call`）に限る。`effects` の節は、`;` か `{` か次の節の頭で終わる。名前の解決をしないので、名前空間で修飾した `post` という名前の効果や op（`ns.post`、`ns.post(…)`）にも同じ scope が付く |
-| `->`（遷移）と `=>`（`match` のアーム） | `keyword.operator.arrow.hozo` | 記号そのもの。`->` は `on X:` の後ろに来るので、`:` の後ろの型の位置でも拾う。遷移のケースと `match` のアームのケース（`Empty` / `HasItems` を含む）は予約語ではないので、専用の scope は付けない（`:` の後ろでは「型の位置の名前」の規則が当たる） |
+| `->`（遷移、行の遷移）と `=>`（`match` のアーム） | `keyword.operator.arrow.hozo` | 記号そのもの。`->` は `on X:` の後ろに来るので、`:` の後ろの型の位置でも拾う。行の遷移の `->` は `as` の後ろに来るので、`as` の後ろの型の位置でも拾う。遷移のケースと `match` のアームのケース（`Empty` / `HasItems` を含む）は予約語ではないので、専用の scope は付けない（`:` の後ろでは「型の位置の名前」の規則が当たる） |
 | デコレータ | `entity.name.function.decorator.hozo` | `@` から `DecoratorRef` まで（`docs/grammar.md`「識別子」）。最後の要素が予約語でも（`@db.list`、`@db.int`、`@effects`）、一つの字句のまま、予約語としては塗らない。名前付きのデコレータの `=` の後ろの `DecoratorRef`（`decorator all = db.list(orders);`）も同じ scope |
 | `...`（残りの引数） | `keyword.operator.rest.hozo` | 記号そのもの（`docs/grammar.md`「decorator の宣言」の `RestParam`） |
 | `@external`、`@repeatable` | `storage.modifier.hozo` | 核の印でデコレータではない（`docs/grammar.md`「予約語」）ので、デコレータより先に拾う |
 | 宣言の名前 | `entity.name.type.hozo`（model / scalar / union / exception / classify）、`entity.name.function.hozo`（op / effect / read / decorator）、`variable.other.hozo`（state） | 宣言の頭の予約語の直後の `Ident`（`exception`、`effect`、`read` は、その後ろに引数の括弧が続いてもよい）。`decorator` の直後は `DecoratorName` で、予約語でも（`decorator list(…)`、`decorator effects(…)`）宣言の名前として塗る |
-| 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`extends` / `of` / `as` の後、`<` の中、`throws` / `catches` / `throw` の後、`by` の後（`match x by store.Registration`）の `QualifiedName` のうち、最後の要素が大文字で始まるもの（§3.3 の命名規則。`:` は値の位置（名前で渡す引数、レコードリテラル）にも現れるので、小文字で始まる名前は型にしない。`of` の後ろの op や状態の名前、`as` の前の op や状態の名前、`reads` の後ろの `read` や状態の名前は小文字で始まるので、scope を付けない。`throws` / `catches` の並びの `,` は記号で、scope を付けない。`throw` の後ろの型の位置は、引数の `(` の手前で終わり、引数（`throw Invalid("weak")`）は値の位置として塗る） |
+| 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`extends` / `of` / `as` の後、`<` の中、`throws` / `catches` / `throw` の後、`by` の後（`match x by store.Registration`）の `QualifiedName` のうち、最後の要素が大文字で始まるもの（`as` の後ろの型の位置は、`;` か `{` まで続く: 行の遷移のケース（`as Stage.Draft, Stage.Accepted -> Stage.Cancelled` の三つ）は、どれも、この規則で、型の位置の名前として塗る。状態の分類のケースの、`,` で続く次の `対象 as T` も、同じ位置の中で読む。§3.3 の命名規則。`:` は値の位置（名前で渡す引数、レコードリテラル）にも現れるので、小文字で始まる名前は型にしない。`of` の後ろの op や状態の名前、`as` の前の op や状態の名前、`reads` の後ろの `read` や状態の名前は小文字で始まるので、scope を付けない。`throws` / `catches` の並びの `,` は記号で、scope を付けない。`throw` の後ろの型の位置は、引数の `(` の手前で終わり、引数（`throw Invalid("weak")`）は値の位置として塗る） |
 | 文字列 | `string.quoted.double.hozo` | エスケープは `constant.character.escape.hozo` |
 | 数値 | `constant.numeric.hozo` | `Int` / `Float` / `Duration`（単位も含む） |
 | コメント | `comment.line.double-slash.hozo`、`comment.block.hozo` | |

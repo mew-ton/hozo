@@ -253,6 +253,25 @@ func TestRoundTripEffectTargets(t *testing.T) {
 	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[],"target":{"kind":"transition","of":"C","from":["A"],"to":"any"},"writes":["s1","s2"]}`; string(b) != want {
 		t.Errorf("effect\nwant %s\ngot  %s", want, b)
 	}
+	// 行の遷移（版 0.9。docs/ir.md「state / exception / effect」の RowTransition）: 書いていなければ row のキーごと省く（上の二つ）。
+	// 分類を名指ししない形は classify を、後のケースが決まっていない形は to を、キーごと省く。from は CaseSet（"any" か列）
+	b = roundTrip(t, Effect{
+		DeclBase: DeclBase{Name: "e", Span: sp()},
+		Params:   []OpParam{{Name: "order", Type: Ref("s.Order"), Span: sp()}},
+		Target:   BuiltinTarget{State: "s", Operation: OpPut},
+		Writes:   []string{"s"},
+		Row:      &RowTransition{Param: "order", Classify: "s.Stage", From: Cases("Draft", "Accepted"), To: "Shipped"},
+	})
+	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[{"name":"order","type":{"kind":"ref","target":"s.Order"},` + spJSON +
+		`}],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":["s"],"row":{"param":"order","classify":"s.Stage","from":["Draft","Accepted"],"to":"Shipped"}}`; string(b) != want {
+		t.Errorf("effect with row\nwant %s\ngot  %s", want, b)
+	}
+	if b := roundTrip(t, RowTransition{Param: "order", From: AnyCase()}); string(b) != `{"param":"order","from":"any"}` {
+		t.Errorf("row without classify and to: %s", b)
+	}
+	if b := roundTrip(t, RowTransition{Param: "order", Classify: "s.Stage", From: Cases("Accepted")}); string(b) != `{"param":"order","classify":"s.Stage","from":["Accepted"]}` {
+		t.Errorf("row to else: %s", b)
+	}
 
 	var c CaseSet
 	if err := json.Unmarshal([]byte(`"any"`), &c); err != nil || !c.Any || c.Cases != nil {
@@ -309,6 +328,21 @@ func TestRoundTripClassifySubjects(t *testing.T) {
 	rest := ClassifyCase{Name: "Unregistered", As: []CaseTyping{{Type: Optional(Ref("type.User")), By: NarrowByElse, Span: sp()}}, Span: sp()}
 	if b := roundTrip(t, rest); string(b) != `{"name":"Unregistered","as":[{"type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}},"by":"else",`+spJSON+`}],`+spJSON+`}` {
 		t.Errorf("else case: %s", b)
+	}
+	// ない側のケース `対象 as none`（版 0.9）: by は none、type は対象の型のまま。分類は、その名前を absent に持つ（なければ、キーごと省く）
+	gone := ClassifyCase{Name: "Absent", As: []CaseTyping{{Type: Optional(Ref("type.User")), By: NarrowByNone, Span: sp()}}, Span: sp()}
+	if b := roundTrip(t, gone); string(b) != `{"name":"Absent","as":[{"type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}},"by":"none",`+spJSON+`}],`+spJSON+`}` {
+		t.Errorf("none case: %s", b)
+	}
+	if gone.IsElse() {
+		t.Error("IsElse: as none のケースは、残りのケースではない")
+	}
+	withAbsent := roundTrip(t, Classify{DeclBase: DeclBase{Name: "c", Span: sp()}, Subject: TypeSubject{Type: Optional(Ref("type.User"))}, Cases: []ClassifyCase{gone}, DecidedBy: DecidedByPredicate, Absent: "Absent"})
+	if !strings.HasSuffix(string(withAbsent), `"decidedBy":"predicate","absent":"Absent"}`) {
+		t.Errorf("classify with absent: %s", withAbsent)
+	}
+	if b := roundTrip(t, Classify{DeclBase: DeclBase{Name: "c", Span: sp()}, Subject: TypeSubject{Type: Int()}, DecidedBy: DecidedByPredicate}); strings.Contains(string(b), "absent") {
+		t.Errorf("classify without absent: %s", b)
 	}
 	if !rest.IsElse() || cs.IsElse() {
 		t.Errorf("IsElse: 残りのケース = %v、型を書いたケース = %v", rest.IsElse(), cs.IsElse())
@@ -440,7 +474,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.8","namespaces":[],"binds":[]}`
+	want := `{"version":"0.9","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -448,7 +482,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.8","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.8","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.9","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.9","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

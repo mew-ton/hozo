@@ -298,7 +298,7 @@ func (r *renderer) head(d ir.Decl) string {
 		}
 		return "exception " + name + r.params(d.Params)
 	case *ir.Effect:
-		return "effect " + name + r.params(d.Params) + r.effectTarget(d.Target)
+		return "effect " + name + r.params(d.Params) + r.effectTarget(d.Target) + r.rowTransition(d)
 	case *ir.Read:
 		s := "read " + name + r.params(d.Params)
 		if d.Returns != nil {
@@ -501,9 +501,9 @@ func (r *renderer) caseLine(c *ir.Classify, cs ir.ClassifyCase) string {
 		case ir.StatesSubject:
 			subject = r.rel(as.State)
 		}
-		if as.By == ir.NarrowByElse {
-			// 残りのケースは、型を書いていない（as.Type は、そのケースでの対象の型）
-			parts = append(parts, subject+" as else")
+		if as.By == ir.NarrowByElse || as.By == ir.NarrowByNone {
+			// 残りのケースと、ない側のケースは、型を書いていない（as.Type は、そのケースでの対象の型）
+			parts = append(parts, subject+" as "+string(as.By))
 			continue
 		}
 		parts = append(parts, subject+" as "+r.typ(as.Type))
@@ -547,6 +547,40 @@ func (r *renderer) effectTarget(t ir.EffectTarget) string {
 		return " on " + r.rel(t.Of) + ": " + caseSet(t.From) + " -> " + caseSet(t.To)
 	}
 	return ""
+}
+
+// rowTransition は行の遷移を Hozo の構文で書く（docs/lsp.md「ホバー」: `… on orders.put as Stage.Accepted -> Stage.InProduction` の
+// as から後ろ。頭に空白を一つ置く）。形は docs/plugin-go.md「コメント」の「行の遷移の表示」と同じで、IR から組み立てる
+// （post は `as <後>`。put は `as <前> -> <後>`。delete は、前が any なら `as <後>`）。
+// 分類の名前は、見ている名前空間から見た修飾。行の遷移を持たない効果は空。
+func (r *renderer) rowTransition(e *ir.Effect) string {
+	target, ok := e.Target.(ir.BuiltinTarget)
+	if !ok || e.Row == nil {
+		return ""
+	}
+	row := e.Row
+	name := func(c string) string { return r.rel(row.Classify) + "." + c }
+	after := "else"
+	if row.To != "" {
+		after = name(row.To)
+	}
+	before := "any"
+	if !row.From.Any {
+		names := make([]string, len(row.From.Cases))
+		for i, c := range row.From.Cases {
+			names[i] = name(c)
+		}
+		before = strings.Join(names, ", ")
+	}
+	switch target.Operation {
+	case ir.OpPost:
+		return " as " + after
+	case ir.OpDelete:
+		if row.From.Any {
+			return " as " + after
+		}
+	}
+	return " as " + before + " -> " + after
 }
 
 func caseSet(c ir.CaseSet) string {

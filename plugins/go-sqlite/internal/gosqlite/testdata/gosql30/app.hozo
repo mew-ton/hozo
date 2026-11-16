@@ -1,0 +1,36 @@
+// GOSQL-30（docs/plugin-go-sqlite.md「効果の中身」）: @db.update を付けた効果の行の遷移の、前がケースの並びで、後のケースが、
+// その並びにない。渡る行は前のケースにあり（STATE-9）、@db.update は、その行を、そのまま書くので、後のケースにならない。位置は効果。
+
+namespace app {
+  model Order { @db.key @db.text id: string; @db.text note: string; }
+  @db.table state orders: list<Order>;
+
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; }
+
+  @db.update
+  effect start(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction;
+  /** 配線が呼んでいない効果も、同じに確かめる。前のケースが二つでも、後のケースが、その並びになければ同じ */
+  @db.update
+  effect ship(order: Order) on orders.put as Stage.Accepted, Stage.InProduction -> Stage.Shipped;
+  // 配線が呼んでも、効果ごとに一度だけ
+  export op begin(order: Stage.Accepted<Order>) {
+    start(order);
+  }
+
+  // 通るもの: 前が any、後ろが else、後のケースが前の並びにある、行の遷移を書かない
+  @db.update
+  effect forceShip(order: Order) on orders.put as any -> Stage.Shipped;
+  @db.update
+  effect revise(order: Order) on orders.put as Stage.Accepted -> else;
+  @db.update
+  effect touch(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
+  @db.update
+  effect hold(order: Order) on orders.put as Stage.Accepted, Stage.InProduction -> Stage.Accepted;
+  @db.update
+  effect patch(order: Order) on orders.put as any -> else;
+  @db.update
+  effect rename(order: Order) on orders.put;
+  // @db.insert は、入る行を、そのまま足す
+  @db.insert
+  effect accept(order: Order) on orders.post as Stage.Accepted;
+}

@@ -427,7 +427,7 @@
     },
     "CaseTyping": {
       "additionalProperties": false,
-      "description": "ケースの `対象 as T` と `対象 as else`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。",
+      "description": "ケースの `対象 as T`、`対象 as else`、`対象 as none`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。",
       "properties": {
         "by": {
           "$ref": "#/$defs/NarrowBy"
@@ -517,7 +517,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.8"
+          "const": "0.9"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -548,8 +548,11 @@
     },
     "Classify": {
       "additionalProperties": false,
-      "description": "classify 宣言（docs/ir.md「classify」）。cases は、宣言したケースのすべて。",
+      "description": "classify 宣言（docs/ir.md「classify」）。cases は、宣言したケースのすべて。absent は、ない側のケースの名前（あるときだけ持つ）。",
       "properties": {
+        "absent": {
+          "type": "string"
+        },
         "cases": {
           "items": {
             "$ref": "#/$defs/ClassifyCase"
@@ -1012,7 +1015,7 @@
     },
     "Effect": {
       "additionalProperties": false,
-      "description": "effect 宣言（docs/ir.md「state / exception / effect」）。宛先（target）は一つだけ。writes は書き込む基底の状態の FQN。",
+      "description": "effect 宣言（docs/ir.md「state / exception / effect」）。宛先（target）は一つだけ。writes は書き込む基底の状態の FQN。row は行の遷移（書いたときだけ持つ）。",
       "properties": {
         "decorators": {
           "items": {
@@ -1034,6 +1037,9 @@
             "$ref": "#/$defs/OpParam"
           },
           "type": "array"
+        },
+        "row": {
+          "$ref": "#/$defs/RowTransition"
         },
         "span": {
           "$ref": "#/$defs/Span"
@@ -1129,7 +1135,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.8"
+          "const": "0.9"
         },
         "transpiler": {
           "type": "string"
@@ -1308,7 +1314,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.8"
+          "const": "0.9"
         }
       },
       "required": [
@@ -1741,12 +1747,13 @@
       "type": "object"
     },
     "NarrowBy": {
-      "description": "絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`。",
+      "description": "絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`、none はない側のケース `対象 as none`。",
       "enum": [
         "presence",
         "variant",
         "predicate",
-        "else"
+        "else",
+        "none"
       ],
       "type": "string"
     },
@@ -2084,7 +2091,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.8"
+          "const": "0.9"
         }
       },
       "required": [
@@ -2314,6 +2321,29 @@
         "kind",
         "expr",
         "span"
+      ],
+      "type": "object"
+    },
+    "RowTransition": {
+      "additionalProperties": false,
+      "description": "行の遷移（docs/ir.md「state / exception / effect」の RowTransition、docs/check.md「行の遷移」）。param は行の引数の名前。classify は行の分類の FQN（名指ししない形では持たない）。from は効果の前のケース（\"any\" かケース名の列）。to は効果の後のケース（決まっていなければ持たない）。",
+      "properties": {
+        "classify": {
+          "type": "string"
+        },
+        "from": {
+          "$ref": "#/$defs/CaseSet"
+        },
+        "param": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "param",
+        "from"
       ],
       "type": "object"
     },
@@ -2900,7 +2930,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.8"
+          "const": "0.9"
         },
         "viewer": {
           "type": "string"

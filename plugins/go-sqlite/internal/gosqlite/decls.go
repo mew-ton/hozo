@@ -381,8 +381,24 @@ func (e *emitter) collectEffects() {
 				e.errorf(codeSQLUpdate, fqn, "効果 %s の @db.update の表 %s の model %s が、キーでない列を一つも持たない（書き換えるものがない）", fqn, x.table.state.Name, m.decl.Name)
 			}
 		}
+		// GOSQL-30: @db.update は、渡った行を、そのまま書く。渡る行は、前のケースにある（STATE-9）ので、後のケースが
+		// 前のケースの並びになければ、書いた後の行は、宣言した後のケースにならない
+		if row := decl.Row; x.kind == decoratorUpdate && row != nil && !row.From.Any && row.To != "" && !containsCase(row.From.Cases, row.To) {
+			e.errorf(codeSQLRow, fqn, "効果 %s の @db.update が、行の遷移（%s）と合わない: 渡る行は、前のケースにあり、@db.update は、その行を、そのまま書くので、書いた後の行は %s.%s にならない（行をそのケースにする書き方は、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）",
+				fqn, golang.RowDisplay(decl), row.Classify, row.To)
+		}
 		x.ok = len(e.errs) == before
 	}
+}
+
+// containsCase は、ケースの名前の列 cases に name があるか。
+func containsCase(cases []string, name string) bool {
+	for _, c := range cases {
+		if c == name {
+			return true
+		}
+	}
+	return false
 }
 
 // paramsDisplay は、引数の並びの、メッセージ用の書き方（`a: T, b: U`。なければ「なし」）。

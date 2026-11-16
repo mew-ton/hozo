@@ -56,8 +56,9 @@ namespace inventory {
   @db.find
   read reservationOf(orderId: type.OrderId, line: type.LineId): Reservation? on reservations;
 
-  /** いくつかの注文の取り置き（人が書く: 集合に入っているか） */
-  read reservationsOfOrders(orderIds: type.OrderId[]): Reservation[] on reservations;
+  /** その注文の取り置き */
+  @db.list
+  read reservationsOfOrder(orderId: type.OrderId): Reservation[] on reservations;
 
   /** 棚から出してよくなった取り置きのうち、まだ出していないもの（人が書く: 値があること、ないこと） */
   read toPick(): Reservation[] on reservations;
@@ -68,15 +69,15 @@ namespace inventory {
   /** 取り置きを、まとめて足す */
   effect addReservations(added: Reservation[]) on reservations.post;
 
-  /** 取り置きを書き換える */
-  @db.update
-  effect saveReservation(reservation: Reservation) on reservations.put;
+  /** 棚から出した: 出した時刻を入れる（人が書く） */
+  effect markPicked(reservation: Reservation, at: Time) on reservations.put as Picking.OnShelf -> Picking.Picked;
 
-  /** その注文の取り置きに、棚から出してよくなった時刻を入れる */
+  /** その注文の取り置きに、棚から出してよくなった時刻を入れる。棚にあるか出したか（Picking）は、変えない: as を書かない put */
   effect confirmReservations(orderId: type.OrderId, at: Time) on reservations.put;
 
-  /** いくつかの注文の取り置きを消す */
-  effect dropReservations(orderIds: type.OrderId[]) on reservations.delete;
+  /** その注文の取り置きを消す。戻した取り置きは、残さない（取り置きは、なくなることが意味） */
+  @db.delete
+  effect dropReservations(orderId: type.OrderId) on reservations.delete;
 
   // ---- 取り置く ----
 
@@ -107,20 +108,16 @@ namespace inventory {
 
   // ---- 戻す ----
 
-  /** 期限切れになった注文の取り置きを、まとめて戻す */
+  /** 期限切れになった注文の取り置きを戻す */
   @db.transaction
-  export op release(orders: ordering.Order[]) {
-    const orderIds = idsOf(orders);
-    const held = reservationsOfOrders(orderIds);
+  export op release(orderId: type.OrderId) {
+    const held = reservationsOfOrder(orderId);
     const skus = skusOfHeld(held);
     const current = levelsOf(skus);
     const restored = restore(held, current);
     saveLevels(restored);
-    dropReservations(orderIds);
+    dropReservations(orderId);
   }
-
-  /** 注文の識別子（人が書く） */
-  op idsOf(orders: ordering.Order[]): type.OrderId[];
 
   /** 取り置きの商品の識別子（人が書く） */
   op skusOfHeld(held: Reservation[]): type.Sku[];
@@ -185,22 +182,18 @@ namespace inventory {
     };
   }
 
-  /** 在庫の数を減らし、取り置きに、出した時刻を入れる */
+  /** 在庫の数を減らし、取り置きを、棚から出したことにする */
   op takeFromShelf(reservation: Picking.OnShelf<Reservation>)
     throws NotReserved
   {
     const level = levelOf(reservation.sku);
     const now = clock.now();
-    const picked = pickedAt(reservation, now);
     match level by Stocked {
-      Counted   => shipOut(level, picked);
+      Counted   => shipOut(level, reservation);
       Uncounted => throw NotReserved;
     };
-    saveReservation(picked);
+    markPicked(reservation, now);
   }
-
-  /** 出した時刻を入れる（人が書く） */
-  op pickedAt(reservation: Picking.OnShelf<Reservation>, now: Time): Reservation;
 
   /** 出した分を、棚の数と取り置きの数から引く */
   op shipOut(level: Level, picked: Reservation) {

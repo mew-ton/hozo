@@ -1007,6 +1007,166 @@ namespace store {
 	c.shutdown()
 }
 
+// TestRowTransitionAndAbsentCase は、版 0.9 の構文（行の遷移 `effect … on s.op as …`、ない側のケース `対象 as none`）について、
+// ホバーの見出し（docs/lsp.md「ホバー」）、定義へジャンプ（同「定義へジャンプ」の表）、ドキュメントのシンボル、診断（STATE-9）を確かめる。
+func TestRowTransitionAndAbsentCase(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace kind {
+  /** 注文の段階 */
+  classify Stage of shop.Order {
+    Draft;
+    /** 受け付けた */
+    Accepted;
+    Shipped;
+  }
+}
+namespace shop {
+  model Order { id: string; }
+  state orders: list<Order>;
+  classify Life of Order? {
+    Open: Order? as Order;
+    Closed: Order? as Order;
+    /** ない */
+    Absent: Order? as none;
+  }
+  effect accept(order: Order) on orders.post as kind.Stage.Accepted;
+  effect open(order: Order) on orders.post as Life.Absent -> Life.Open;
+  effect bring(order: Order) on orders.post as any;
+  effect ship(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped;
+  effect revise(order: Order) on orders.put as kind.Stage.Accepted -> else;
+  effect patch(order: Order) on orders.put as any -> else;
+  effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  effect purge(order: Order) on orders.delete as any -> Life.Absent;
+  op send(order: Order, at: Time) {
+    match order by kind.Stage {
+      Accepted => ship(order, at);
+      else     => none;
+    };
+  }
+  op wrong(order: Order, at: Time) {
+    ship(order, at);
+  }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	// 診断は、分かっていない行で呼んだ STATE-9 が一つ（位置は、渡した値）
+	var state9 []protocol.Diagnostic
+	for _, d := range byURI[uri] {
+		switch d.Code {
+		case codeNoConfig:
+		case "STATE-9":
+			state9 = append(state9, d)
+		default:
+			t.Fatalf("診断が出た: %+v", d)
+		}
+	}
+	if want := shift(positionOf(t, enc, text, "ship(order, at);\n  }\n}", 0), len("ship(")); len(state9) != 1 || state9[0].Range.Start != want {
+		t.Errorf("STATE-9 = %+v, want 一つ（位置 %+v）", state9, want)
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	hover := func(needle string, shiftBy int) string {
+		t.Helper()
+		var h *protocol.Hover
+		c.result(protocol.MethodHover, at(needle, shiftBy), &h)
+		if h == nil {
+			t.Fatalf("hover(%q) が null", needle)
+		}
+		return h.Contents.Value
+	}
+	// ホバーの見出し: 行の遷移は、IR から、仕様の書き方で組み立てる（同じ意味の二つの書き方は、一つの形）。分類の名前は、
+	// 見ている名前空間から見た修飾
+	for _, tt := range []struct {
+		needle  string
+		shiftBy int
+		want    string
+	}{
+		{"effect accept(", len("effect "), "```hozo\neffect accept(order: Order) on orders.post as kind.Stage.Accepted\n```"},
+		{"effect open(", len("effect "), "```hozo\neffect open(order: Order) on orders.post as Life.Open\n```"},
+		// post の as any は、as を書かないのと同じ形（IR に row がない）
+		{"effect bring(", len("effect "), "```hozo\neffect bring(order: Order) on orders.post\n```"},
+		{"effect ship(", len("effect "), "```hozo\neffect ship(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
+		{"effect revise(", len("effect "), "```hozo\neffect revise(order: Order) on orders.put as kind.Stage.Accepted -> else\n```"},
+		{"effect patch(", len("effect "), "```hozo\neffect patch(order: Order) on orders.put as any -> else\n```"},
+		{"effect discard(", len("effect "), "```hozo\neffect discard(order: Order) on orders.delete as Life.Open -> Life.Absent\n```"},
+		{"effect purge(", len("effect "), "```hozo\neffect purge(order: Order) on orders.delete as Life.Absent\n```"},
+		// 配線の呼び出しの名前は、呼び出し先の効果の見出し
+		{"Accepted => ship(order, at);", len("Accepted => "), "```hozo\neffect ship(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
+		// 行の遷移のケース: 分類のセグメントは分類、ケースのセグメントは、そのケース
+		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind."), "```hozo\nclassify kind.Stage of Order\n```"},
+		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage."), "classify kind.Stage of Order\n  Accepted"},
+		{"as Life.Open -> Life.Absent;", len("as Life.Open -> Life."), "classify Life of Order?\n  Absent: Order? as none"},
+		// ない側のケース（as none）: 見出しは、書いたとおり `対象 as none`
+		{"Absent: Order? as none;", 0, "classify Life of Order?\n  Absent: Order? as none"},
+	} {
+		if got := hover(tt.needle, tt.shiftBy); !strings.Contains(got, tt.want) {
+			t.Errorf("hover(%q) に %q がない:\n%s", tt.needle, tt.want, got)
+		}
+	}
+	if got := hover("orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage.")); !strings.Contains(got, "受け付けた") {
+		t.Errorf("行の遷移のケースのホバーに、ケースの説明がない:\n%s", got)
+	}
+
+	// 定義へジャンプ
+	for _, tt := range []struct {
+		what, needle string
+		shiftBy      int
+		target       string
+	}{
+		{"行の遷移のケースの分類（別の名前空間）", "orders.post as kind.Stage.Accepted;", len("orders.post as kind."), "Stage of shop.Order"},
+		{"行の遷移のケース（矢印のない形）", "orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage."), "Accepted;\n    Shipped;"},
+		{"行の遷移の前のケース（二つ目）", "kind.Stage.Draft, kind.Stage.Accepted -> ", len("kind.Stage.Draft, kind.Stage."), "Accepted;\n    Shipped;"},
+		{"行の遷移の後のケース", "-> kind.Stage.Shipped;", len("-> kind.Stage."), "Shipped;\n  }"},
+		{"行の遷移のケースの分類（同じ名前空間）", "as Life.Open -> Life.Absent;", len("as "), "Life of Order?"},
+		{"行の遷移の、ない側のケース", "as Life.Open -> Life.Absent;", len("as Life.Open -> Life."), "Absent: Order? as none;"},
+		{"ケースの X as none の X", "Absent: Order? as none;", len("Absent: "), "Order { id: string; }"},
+	} {
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, at(tt.needle, tt.shiftBy), &loc)
+		if want := positionOf(t, enc, text, tt.target, 0); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %q の位置 %+v", tt.what, loc, tt.target, want)
+		}
+	}
+	// 行の遷移の any と else、ケースの as none の none は、宣言を持たないので null
+	for _, tt := range []struct {
+		needle  string
+		shiftBy int
+	}{{"orders.post as any;", len("orders.post as ")}, {"as any -> else;", len("as ")}, {"as any -> else;", len("as any -> ")},
+		{"Absent: Order? as none;", len("Absent: Order? as ")}} {
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, at(tt.needle, tt.shiftBy), &loc)
+		if loc != nil {
+			t.Errorf("definition(%q) = %+v, want nil", tt.needle, loc)
+		}
+	}
+
+	// ドキュメントのシンボル: 効果の detail は、引数と、宛先と、書いたままの行の遷移
+	var syms []protocol.DocumentSymbol
+	c.result(protocol.MethodDocumentSymbol, protocol.DocumentSymbolParams{TextDocument: textDoc(uri)}, &syms)
+	details := map[string]string{}
+	for i := range syms {
+		for j := range syms[i].Children {
+			details[syms[i].Children[j].Name] = syms[i].Children[j].Detail
+		}
+	}
+	for name, want := range map[string]string{
+		"accept": "(order: Order) on orders.post as kind.Stage.Accepted",
+		"open":   "(order: Order) on orders.post as Life.Absent -> Life.Open",
+		"ship":   "(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped",
+		"patch":  "(order: Order) on orders.put as any -> else",
+	} {
+		if details[name] != want {
+			t.Errorf("symbol %s の detail = %q, want %q", name, details[name], want)
+		}
+	}
+	c.shutdown()
+}
+
 // TestCarryingDecorators は、版 0.5 の構文（予約語のデコレータ名、reads / effects の節、残りの引数、対象 effect）について、
 // 定義へジャンプ（docs/lsp.md「定義へジャンプ」の表）、ホバーの見出し（同「ホバー」）、ドキュメントのシンボル、診断を確かめる。
 // 運ぶ節を持つデコレータは、配線の op にも付けられる（docs/check.md「デコレータが運ぶ reads と effects」）: 付けただけでは診断は出ず、

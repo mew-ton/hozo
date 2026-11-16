@@ -124,7 +124,7 @@ namespace shipping {
 
   // ---- 分類: 出荷の進み具合は、足された事実で決まる ----
 
-  /** 出荷する品目が、すべてそろったか。箱を決められるのは、Complete のときだけ */
+  /** 出荷する品目が、すべてそろったか。箱を決められるのは、Complete のときだけ。Awaiting の出荷に品目を置く効果（recordPlacement）だけが、これを変える */
   classify Gathered of Shipment {
     /** すべての品目が、そろえ場所にある */
     Complete;
@@ -132,16 +132,16 @@ namespace shipping {
     Awaiting;
   }
 
-  /** 梱包したか（荷物の行があるか） */
+  /** 梱包したか（荷物の行があるか）。行がないことが、「まだ梱包していない」という状態。荷物は、作るだけで、消さない */
   classify Packing of Parcel? {
     Packed: Parcel? as Parcel;
-    Unpacked: Parcel? as else;
+    Unpacked: Parcel? as none;
   }
 
-  /** 送り状を買ったか（送り状の行があるか） */
+  /** 送り状を買ったか（送り状の行があるか）。行がないことが、「まだ買っていない」という状態。送り状は、作るだけで、消さない */
   classify Labelling of Label? {
     Labelled: Label? as Label;
-    Unlabelled: Label? as else;
+    Unlabelled: Label? as none;
   }
 
   /** 引いた出荷があるか */
@@ -156,7 +156,10 @@ namespace shipping {
     Unlisted: Box? as else;
   }
 
-  /** 出荷を、配送業者に渡したか */
+  /**
+   * 出荷を、配送業者に渡したか。進め方は、効果の行の遷移だけ:
+   * createShipment で InHouse に入り、recordHandOver で WithCarrier に、recordDelivery で Delivered になる。
+   */
   classify Custody of Shipment {
     /** まだ店にある */
     InHouse;
@@ -245,21 +248,26 @@ namespace shipping {
   @db.find
   read boxByCode(code: BoxCode): Box? on boxes;
 
-  /** 出荷を作る */
+  /** 出荷を作る。店にある出荷として入る（そろったかどうか: Gathered は、一つの as では一緒に言えない。README.md「分かったこと」の F52） */
   @db.insert
-  effect createShipment(shipment: Shipment) on shipments.post;
+  effect createShipment(shipment: Shipment) on shipments.post as Custody.InHouse;
 
-  /** 出荷を書き換える */
-  @db.update
-  effect saveShipment(shipment: Shipment) on shipments.put;
+  /** 品目を一つ、そろえ場所に置いた: 置いた時刻と、量った大きさを入れる（人が書く）。それで、そろうか、まだ待つかは、残りの品目による */
+  effect recordPlacement(shipment: Shipment, placement: Placement) on shipments.put as Gathered.Awaiting -> else;
 
-  /** 荷物を作る。箱と送料が、ここで決まる */
+  /** 配送業者に渡した: 渡した時刻を入れる（人が書く） */
+  effect recordHandOver(shipment: Shipment, at: Time) on shipments.put as Custody.InHouse -> Custody.WithCarrier;
+
+  /** 届いた: 届いた時刻を入れる（人が書く） */
+  effect recordDelivery(shipment: Shipment, at: Time) on shipments.put as Custody.WithCarrier -> Custody.Delivered;
+
+  /** 荷物を作る。箱と送料が、ここで決まる。梱包は一度だけ: 荷物のない出荷にだけ、作る */
   @db.insert
-  effect createParcel(parcel: Parcel) on parcels.post;
+  effect createParcel(parcel: Parcel) on parcels.post as Packing.Unpacked -> Packing.Packed;
 
-  /** 送り状を記録する */
+  /** 送り状を記録する。送り状は一つだけ: 送り状のない出荷にだけ、作る */
   @db.insert
-  effect createLabel(label: Label) on labels.post;
+  effect createLabel(label: Label) on labels.post as Labelling.Unlabelled -> Labelling.Labelled;
 
   // ---- 注文のとき: 送料の見積もりと上限 ----
 
@@ -348,25 +356,50 @@ namespace shipping {
 
   // ---- そろえる ----
 
+  /** 品目を一つ、そろえ場所に置いた、という事実 */
+  model Placement {
+    line: type.LineId;
+    /** 受注製作の品目の、出来上がりを量った大きさと重さ。在庫の品目は、もう分かっているので、ない */
+    measured: type.Measurement?;
+    at: Time;
+  }
+
   /**
    * 品目を一つ、そろえ場所に置いた。受注製作の品目は、出来上がりを量った大きさと重さ（measured）を持ってくる。
-   * 在庫の品目は、もう分かっているので、持ってこない。
+   * 在庫の品目は、もう分かっているので、持ってこない。置いた後の出荷を返す。
    */
   export op gather(orderId: type.OrderId, line: type.LineId, measured: type.Measurement?): Shipment
     throws NoShipment, UnknownItem
   {
     const found = shipmentOfOrder(orderId);
-    const now = clock.now();
-    const gathered = match found by Known {
-      Found   => place(found, line, measured, now);
+    return match found by Known {
+      Found   => placeOn(found, line, measured);
       Missing => throw NoShipment;
     };
-    saveShipment(gathered);
-    return gathered;
   }
 
-  /** 品目に、置いた時刻と、量った大きさを入れる（人が書く）。その行が品目になければ UnknownItem */
-  op place(shipment: Shipment, line: type.LineId, measured: type.Measurement?, now: Time): Shipment
+  /** 品目を置けるのは、まだ待っている品目のある出荷だけ。もうそろっている出荷には、何もしない */
+  op placeOn(shipment: Shipment, line: type.LineId, measured: type.Measurement?): Shipment
+    throws NoShipment, UnknownItem
+  {
+    match shipment by Gathered {
+      Awaiting => putDown(shipment, line, measured);
+      Complete => none;
+    };
+    return find(shipment.id);
+  }
+
+  /** 品目を確かめて、置く */
+  op putDown(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?)
+    throws UnknownItem
+  {
+    const now = clock.now();
+    const placement = place(shipment, line, measured, now);
+    recordPlacement(shipment, placement);
+  }
+
+  /** その行が、出荷の、まだ置いていない品目であることを確かめて、置いた事実にする（人が書く）。品目になければ UnknownItem */
+  op place(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?, now: Time): Placement
     throws UnknownItem;
 
   // ---- 梱包する: 箱と重さを決める。送料が、ここで決まる ----
@@ -505,19 +538,16 @@ namespace shipping {
 
   /** まだ店にある出荷だけを、渡せる */
   op release(packed: Sealed, label: Label): Dispatched
-    throws AlreadyHandedOver
+    throws NoShipment, AlreadyHandedOver
   {
     const now = clock.now();
-    const released = match packed.shipment by Custody {
-      InHouse                 => handedOverAt(packed.shipment, now);
-      WithCarrier, Delivered  => throw AlreadyHandedOver;
+    match packed.shipment by Custody {
+      InHouse                => recordHandOver(packed.shipment, now);
+      WithCarrier, Delivered => throw AlreadyHandedOver;
     };
-    saveShipment(released);
+    const released = find(packed.shipment.id);
     return { shipment: released, parcel: packed.parcel, label: label };
   }
-
-  /** 渡した時刻を入れる（人が書く） */
-  op handedOverAt(shipment: Custody.InHouse<Shipment>, now: Time): Shipment;
 
   /** 配送業者が、届けたと知らせてきた。知らない追跡番号と、もう届いている出荷は、何もしない */
   export op delivered(trackingNumber: TrackingNumber, at: Time) {
@@ -540,17 +570,8 @@ namespace shipping {
   /** 配送業者に渡してある出荷だけが、届く */
   op markDelivered(shipment: Shipment, at: Time) {
     match shipment by Custody {
-      WithCarrier         => saveArrival(shipment, at);
-      InHouse, Delivered  => none;
+      WithCarrier        => recordDelivery(shipment, at);
+      InHouse, Delivered => none;
     };
   }
-
-  /** 届いた時刻を記録する */
-  op saveArrival(shipment: Custody.WithCarrier<Shipment>, at: Time) {
-    const arrived = deliveredAt(shipment, at);
-    saveShipment(arrived);
-  }
-
-  /** 届いた時刻を入れる（人が書く） */
-  op deliveredAt(shipment: Custody.WithCarrier<Shipment>, at: Time): Shipment;
 }

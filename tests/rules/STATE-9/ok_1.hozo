@@ -1,0 +1,83 @@
+// STATE-9（docs/check.md「行の遷移」の「呼ぶ側の検査」、docs/types.md「ケースが分かっている値」）: 矢印の前にケースを並べた
+// 効果は、そのケースにあると分かっている行で呼ぶ。分かるのは、match のアームの中の対象（名前で並べたアームも、else のアームも）と、
+// 型が C.K<T> の値。前が any の形、as を書かない効果、post は、どの行でも受け取る
+namespace a {
+  model Order { id: string; note: string; }
+  model Box { order: Order; }
+  state orders: list<Order>;
+  exception NotAccepted;
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+  classify Urgency of Order { Rush; Normal; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  classify Review of Order { Passed: Order as Stage.Accepted<Order>; Failed; }
+  read byId(id: string): Order? on orders;
+  effect accept(order: Order) on orders.post as Stage.Accepted;
+  effect open(order: Order) on orders.post as Life.Absent -> Life.Open;
+  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect forceShip(order: Order) on orders.put as any -> Stage.Shipped;
+  effect patch(order: Order) on orders.put as any -> else;
+  effect rename(order: Order) on orders.put;
+  effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  effect purge(order: Order) on orders.delete as Life.Absent;
+  // アームから: 名前で並べたアーム（一つのケース、前の並びに入る二つのケース）
+  op byArm(order: Order, at: Time) throws NotAccepted {
+    match order by Stage {
+      Accepted => start(order, at);
+      else     => throw NotAccepted;
+    };
+    match order by Stage {
+      Draft, Accepted => cancel(order);
+      InProduction, Shipped, Cancelled => none;
+    };
+  }
+  // アームから: else のアームが受けるケースが、前の並びに入る
+  op byElseArm(order: Order) {
+    match order by Stage {
+      InProduction, Shipped, Cancelled => none;
+      else => cancel(order);
+    };
+  }
+  // アームから: 対象がパスでも、同じ Atom なら分かる。ケースが型を書いていて、対象の型が case にならないアームでも分かる
+  op byPath(box: Box, found: Order?) {
+    match box.order by Stage {
+      Draft => cancel(box.order);
+      else  => none;
+    };
+    match found by Life {
+      Open   => discard(found);
+      Closed => none;
+      Absent => none;
+    };
+  }
+  // 型から: 引数の型、束縛の型、別の分類のケースが as に書いた型
+  op byType(order: Stage.Accepted<Order>, at: Time) {
+    start(order, at);
+    cancel(order);
+  }
+  op pick(order: Order): Stage.Draft<Order>;
+  op byBinding(order: Order, reviewed: Order) {
+    const draft = pick(order);
+    cancel(draft);
+    match reviewed by Review {
+      Passed => cancel(reviewed);
+      Failed => none;
+    };
+  }
+  // 型から分かっていれば、別の分類のアームの中でも分かる
+  op inOtherArm(order: Stage.Accepted<Order>, at: Time) {
+    match order by Urgency {
+      Rush   => start(order, at);
+      Normal => none;
+    };
+  }
+  // どの行でも受け取る効果
+  op free(order: Order) {
+    accept(order);
+    open(order);
+    forceShip(order);
+    patch(order);
+    rename(order);
+    purge(order);
+  }
+}

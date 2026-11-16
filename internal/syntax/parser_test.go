@@ -552,6 +552,90 @@ func TestEffectTransition(t *testing.T) {
 	}
 }
 
+// 行の遷移（docs/grammar.md「exception / effect / read」の RowClause）。
+func TestEffectRowClause(t *testing.T) {
+	rowString := func(r *ast.RowClause) string {
+		after := "?"
+		switch {
+		case r.After.Any:
+			after = "any"
+		case r.After.Else:
+			after = "else"
+		case r.After.Case != nil:
+			after = r.After.Case.String()
+		}
+		if !r.Arrow {
+			if r.Before != nil {
+				return "矢印のない形に Before がある"
+			}
+			return after
+		}
+		before := "any"
+		if !r.Before.Any {
+			before = names(r.Before.Cases)
+		} else if len(r.Before.Cases) != 0 {
+			return "any なのに Cases がある"
+		}
+		return before + " -> " + after
+	}
+	for _, tt := range []struct{ src, on, row string }{
+		{"effect accept(order: Order) on orders.post as Stage.Accepted;", "orders.post", "Stage.Accepted"},
+		{"effect imp(order: Order) on orders.post as any;", "orders.post", "any"},
+		{"effect start(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction;", "orders.put", "Stage.Accepted -> Stage.InProduction"},
+		{"effect cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;", "orders.put", "Stage.Draft|Stage.Accepted -> Stage.Cancelled"},
+		{"effect force(order: Order) on orders.put as any -> Stage.Shipped;", "orders.put", "any -> Stage.Shipped"},
+		{"effect revise(order: Order) on orders.put as Stage.Accepted -> else;", "orders.put", "Stage.Accepted -> else"},
+		{"effect patch(order: Order) on orders.put as any -> else;", "orders.put", "any -> else"},
+		{"effect drop(order: Order) on shop.orders.delete as ordering.Life.Draft->ordering.Life.Absent;", "shop.orders.delete", "ordering.Life.Draft -> ordering.Life.Absent"},
+	} {
+		e := firstDecl[*ast.EffectDecl](t, tt.src)
+		if e.On == nil || e.Transition != nil || e.Row == nil {
+			t.Fatalf("%s: On = %+v, Transition = %+v, Row = %+v", tt.src, e.On, e.Transition, e.Row)
+		}
+		if got := e.On.State.String() + "." + e.On.Op.String(); got != tt.on {
+			t.Errorf("%s: On = %s", tt.src, got)
+		}
+		if got := rowString(e.Row); got != tt.row {
+			t.Errorf("%s: Row = %s, want %s", tt.src, got, tt.row)
+		}
+		// RowClause の Span は as から後の終わりまで（";" は含まない）。AsSpan は as の語
+		r := e.Row
+		if r.Span.Start != r.AsSpan.Start || r.AsSpan.End-r.AsSpan.Start != 2 || r.Span.End != r.After.Span.End || r.Span.End+1 != e.Span.End {
+			t.Errorf("%s: Span = %+v（as %+v、後 %+v、effect %+v）", tt.src, r.Span, r.AsSpan, r.After.Span, e.Span)
+		}
+	}
+	// as を書かない効果は Row が nil
+	if e := firstDecl[*ast.EffectDecl](t, "effect rename(order: Order) on orders.put;"); e.Row != nil {
+		t.Errorf("Row = %+v", e.Row)
+	}
+	for _, tt := range []struct{ name, src, want string }{
+		{"two cases without arrow", "effect a(o: O) on s.post as C.A, C.B;", "矢印のない行の遷移（as <後>）に書けるケースは、一つだけ"},
+		{"else without arrow", "effect a(o: O) on s.put as else;", "行の遷移の else を書けるのは、矢印の後ろだけ"},
+		{"any after arrow", "effect a(o: O) on s.put as C.A -> any;", "行の遷移の矢印の後ろに any は書けない"},
+		{"two cases after arrow", "effect a(o: O) on s.put as C.A -> C.B, C.D;", "「;」が必要"},
+		{"else in the before list", "effect a(o: O) on s.put as C.A, else -> C.B;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"any in the before list", "effect a(o: O) on s.put as C.A, any -> C.B;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"bare case", "effect a(o: O) on s.put as Accepted -> C.B;", "行の遷移のケースは、分類の名前から書く（<分類>.Accepted"},
+		{"bare case after arrow", "effect a(o: O) on s.put as C.A -> Shipped;", "行の遷移のケースは、分類の名前から書く（<分類>.Shipped"},
+		{"missing after", "effect a(o: O) on s.put as C.A -> ;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"missing everything", "effect a(o: O) on s.put as ;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"two arrows", "effect a(o: O) on s.put as C.A -> C.B -> C.D;", "「;」が必要"},
+		{"pipe in the before list", "effect a(o: O) on s.put as C.A | C.B -> C.D;", "行の遷移のケースの並びの区切りは「,」で、「|」ではない（as C.A, C.B -> C.D と書く"},
+		{"after a transition", "effect a() on Checkout: A -> B as C.A;", "行の遷移（as …）は、組み込みの効果（on 状態.操作）の後ろにだけ書ける"},
+		{"reserved word as a case", "effect a(o: O) on s.put as C.A -> C.else;", "else は予約語で、名前には使えない"},
+	} {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
+	// なくした区切り "|" は、"," として読み進める
+	file, diags := parseSrc(t, "effect a(o: O) on s.put as C.A | C.B -> C.D;")
+	if len(diags) != 1 || len(file.Decls) != 1 {
+		t.Fatalf("diags = %d, Decls = %d", len(diags), len(file.Decls))
+	}
+	if r := file.Decls[0].(*ast.EffectDecl).Row; r == nil || names(r.Before.Cases) != "C.A|C.B" {
+		t.Errorf("Row = %+v", r)
+	}
+}
+
 // --- classify ---
 
 func TestClassify(t *testing.T) {
@@ -597,6 +681,18 @@ func TestClassify(t *testing.T) {
 	if as := c.Cases[0].As; len(as) != 1 || as[0].Else || as[0].Type == nil {
 		t.Errorf("Case 0 = %+v", c.Cases[0])
 	}
+	// ない側のケース（CaseTyping = Type "as" ( Type | "else" | "none" )）。none は型ではなく、Type は nil
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Life of Order? { Draft: Order? as Order; Placed: Order? as Order; /** ない */ Absent: Order? as none; }")
+	if as := c.Cases[2].As; len(as) != 1 || !as[0].None || as[0].Else || as[0].Type != nil || typeString(as[0].Subject) != "Order?" ||
+		as[0].NoneSpan.End-as[0].NoneSpan.Start != 4 || c.Cases[2].Doc == nil {
+		t.Errorf("Case 2 = %+v", c.Cases[2])
+	}
+	if as := c.Cases[0].As; len(as) != 1 || as[0].None || as[0].Type == nil {
+		t.Errorf("Case 0 = %+v", c.Cases[0])
+	}
+	// none は予約語: as の後ろの none の後ろに、型の続きは書けない
+	mustFail(t, "classify A of T? { X: T? as none?; }", "「;」が必要")
+	mustFail(t, "classify A of T? { none: T? as T; }", "none は予約語で、識別子には使えない")
 	// else は予約語（docs/grammar.md「予約語」）: 書けるのは as の後ろと、アームの頭と、フィールド名の位置だけ
 	mustFail(t, "classify A of T { X: T as else?; }", "「;」が必要")
 	mustFail(t, "classify A of T { X: else; }", "型が必要")

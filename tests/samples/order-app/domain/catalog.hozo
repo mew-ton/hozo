@@ -86,7 +86,7 @@ namespace catalog {
     OnSale: Product? as Product;
     /** あるが、並べていない */
     Withdrawn: Product? as Product;
-    /** ない */
-    Absent;
+    /** ない（値がない側は、型で決まる。OnSale か Withdrawn かは、述語） */
+    Absent: Product? as none;
   }
 }

@@ -36,6 +36,7 @@ const (
 	codeSQLLatest      = "GOSQL-27" // @db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない
 	codeSQLDeleteAll   = "GOSQL-28" // @db.delete の効果が、引数を一つも持たない
 	codeSQLTransaction = "GOSQL-29" // op に @db.transaction が付いているのに、N に表の状態が一つもない
+	codeSQLRow         = "GOSQL-30" // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない
 )
 
 // 読む語彙（docs/vocab.md「`db` の語彙」）のデコレータの FQN。しまい方のデコレータは storages（tables.go）。

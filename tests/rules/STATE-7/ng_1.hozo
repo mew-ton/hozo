@@ -1,0 +1,21 @@
+// STATE-7（docs/check.md「行の遷移」の「結びつき」）: 分類が、書き込む状態の行の分類でない。ケースが、その分類のケースでない。
+// 一つの as に、二つの分類のケースがある。前のケースの並びに、同じケースが二度ある
+namespace a {
+  model Order { id: string; }
+  model Job { id: string; }
+  state orders: list<Order>;
+  state jobs: list<Job>;
+  op find(): Order?;
+  classify Stage of Order { Draft; Accepted; Shipped; }
+  classify Paid of Order { Yes; No; }
+  classify Progress of Job { Queued; Done; }
+  classify Hit of find { Found: find as Order; Missing: find as else; }
+  classify Filled of orders { Some; None; }
+  effect a1(order: Order) on orders.put as Progress.Queued -> Progress.Done;   // ERROR: STATE-7
+  effect a2(order: Order) on orders.post as Hit.Found;                         // ERROR: STATE-7
+  effect a3(order: Order) on orders.post as Filled.Some;                       // ERROR: STATE-7
+  effect a4(order: Order) on orders.put as Stage.Draft -> Stage.Packed;        // ERROR: STATE-7
+  effect a5(order: Order) on orders.put as Stage.Draft -> Paid.Yes;            // ERROR: STATE-7
+  effect a6(order: Order) on orders.put as Stage.Draft, Paid.No -> Stage.Shipped;   // ERROR: STATE-7
+  effect a7(order: Order) on orders.put as Stage.Draft, Stage.Draft -> Stage.Shipped;   // ERROR: STATE-7
+}

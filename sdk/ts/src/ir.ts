@@ -31,18 +31,18 @@ export type UnionVariant = "arms" | "set";
  */
 export type StateShape = "list" | "nullable" | "single";
 /**
+ * 遷移の前か後のケースの集合。"any" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。
+ */
+export type CaseSet = "any" | string[];
+/**
  * 効果の宛先（docs/ir.md「state / exception / effect」の EffectTarget）。kind で分ける。
  */
 export type EffectTarget = BuiltinTarget | TransitionTarget;
 export type Operation = "post" | "put" | "delete";
 /**
- * 遷移の前か後のケースの集合。"any" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。
+ * 絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`、none はない側のケース `対象 as none`。
  */
-export type CaseSet = "any" | string[];
-/**
- * 絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`。
- */
-export type NarrowBy = "presence" | "variant" | "predicate" | "else";
+export type NarrowBy = "presence" | "variant" | "predicate" | "else" | "none";
 /**
  * 分類のケースが何で決まるか（docs/ir.md「classify」の decidedBy、docs/check.md「ケースの判定」）。type なら述語を持たない。
  */
@@ -91,7 +91,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.8";
+  version: "0.9";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -369,7 +369,7 @@ export interface OpParam {
   type: Type;
 }
 /**
- * effect 宣言（docs/ir.md「state / exception / effect」）。宛先（target）は一つだけ。writes は書き込む基底の状態の FQN。
+ * effect 宣言（docs/ir.md「state / exception / effect」）。宛先（target）は一つだけ。writes は書き込む基底の状態の FQN。row は行の遷移（書いたときだけ持つ）。
  */
 export interface Effect {
   decorators: Application[];
@@ -377,9 +377,19 @@ export interface Effect {
   kind: "effect";
   name: string;
   params: OpParam[];
+  row?: RowTransition;
   span: Span;
   target: EffectTarget;
   writes: string[];
+}
+/**
+ * 行の遷移（docs/ir.md「state / exception / effect」の RowTransition、docs/check.md「行の遷移」）。param は行の引数の名前。classify は行の分類の FQN（名指ししない形では持たない）。from は効果の前のケース（"any" かケース名の列）。to は効果の後のケース（決まっていなければ持たない）。
+ */
+export interface RowTransition {
+  classify?: string;
+  from: CaseSet;
+  param: string;
+  to?: string;
 }
 /**
  * 基底の状態の組み込みの効果（docs/ir.md「state / exception / effect」の EffectTarget kind "builtin"）。
@@ -409,9 +419,10 @@ export interface Read {
   state: string;
 }
 /**
- * classify 宣言（docs/ir.md「classify」）。cases は、宣言したケースのすべて。
+ * classify 宣言（docs/ir.md「classify」）。cases は、宣言したケースのすべて。absent は、ない側のケースの名前（あるときだけ持つ）。
  */
 export interface Classify {
+  absent?: string;
   cases: ClassifyCase[];
   decidedBy: DecidedBy;
   decorators: Application[];
@@ -431,7 +442,7 @@ export interface ClassifyCase {
   span: Span;
 }
 /**
- * ケースの `対象 as T` と `対象 as else`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。
+ * ケースの `対象 as T`、`対象 as else`、`対象 as none`（docs/ir.md「classify」の CaseTyping）。state は状態の分類のときだけ持つ。
  */
 export interface CaseTyping {
   by: NarrowBy;
@@ -778,7 +789,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.8";
+  version: "0.9";
   viewer: string;
 }
 /**

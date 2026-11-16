@@ -1,0 +1,65 @@
+// docs/plugin-go-sqlite.md「効果の中身」の「行の遷移を持つ効果」: db のデコレータを付けても、SQL は、行の遷移のない効果と同じ。
+// 行のケースは、述語で決まる分類のもので、列とは限らないので、SQL は、前のケースも後のケースも確かめない。
+// 後のケースが前の並びにない put と、行を受け取る delete は、デコレータを付けられず、人が書き足す。
+
+/** 店 */
+namespace shop {
+  model Order {
+    @db.key @db.text id: string;
+    @db.text note: string;
+    /** 作り始めた時刻。受け付けただけの注文には、ない */
+    @db.time startedAt: Time?;
+  }
+
+  @db.table state orders: list<Order>;
+
+  /** 注文の段階。startedAt があるかどうかで決まる（述語は、人が書く） */
+  classify Stage of Order { Accepted; InProduction; }
+
+  /** 注文が、あるか */
+  classify Life of Order? {
+    Kept: Order? as Order;
+    Gone: Order? as none;
+  }
+
+  @db.find
+  read orderById(id: string): Order? on orders;
+
+  /** @db.insert: 入る行を、そのまま足す。Accepted にあることは、確かめない */
+  @db.insert
+  effect accept(order: Order) on orders.post as Stage.Accepted;
+
+  /** @db.insert: 前が、ない側のケース */
+  @db.insert
+  effect keep(order: Order) on orders.post as Life.Gone -> Life.Kept;
+
+  /** @db.update: 前が any。渡した行を、そのまま書く */
+  @db.update
+  effect overwrite(order: Order) on orders.put as any -> Stage.InProduction;
+
+  /** @db.update: ケースを変えない書き換え */
+  @db.update
+  effect annotate(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
+
+  /** @db.update: 後のケースを約束しない */
+  @db.update
+  effect revise(order: Order) on orders.put as Stage.InProduction -> else;
+
+  /** 行の遷移を書かない @db.update は、今までどおり */
+  @db.update
+  effect rename(order: Order) on orders.put;
+
+  /** 作り始める: 始めた時刻を入れる（人が書く。後のケースが前の並びにないので、@db.update は付けられない） */
+  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+
+  /** 捨てる（人が書く。行を受け取る効果に、@db.delete は付けられない） */
+  effect discard(order: Order) on orders.delete as Life.Kept -> Life.Gone;
+
+  /** 受け付けた注文だけを、作り始める */
+  export op begin(order: Order, at: Time) {
+    match order by Stage {
+      Accepted     => start(order, at);
+      InProduction => none;
+    };
+  }
+}

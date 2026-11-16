@@ -1,5 +1,5 @@
 {
-  "version": "0.8",
+  "version": "0.9",
   "namespaces": [
     {
       "name": "",
@@ -2852,7 +2852,8 @@
               }
             }
           ],
-          "decidedBy": "type"
+          "decidedBy": "type",
+          "absent": "Miss"
         },
         {
           "kind": "classify",
@@ -2950,7 +2951,8 @@
               }
             }
           ],
-          "decidedBy": "type"
+          "decidedBy": "type",
+          "absent": "Out"
         },
         {
           "kind": "op",
@@ -8469,6 +8471,1753 @@
                   "end": {
                     "line": 51,
                     "col": 7
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "row",
+      "decls": [
+        {
+          "kind": "model",
+          "name": "row.Order",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 3,
+              "col": 3
+            },
+            "end": {
+              "line": 3,
+              "col": 30
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 3,
+                  "col": 17
+                },
+                "end": {
+                  "line": 3,
+                  "col": 28
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "state",
+          "name": "row.orders",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 4,
+              "col": 3
+            },
+            "end": {
+              "line": 4,
+              "col": 29
+            }
+          },
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "row.Order"
+            }
+          },
+          "shape": "list",
+          "element": {
+            "kind": "ref",
+            "target": "row.Order"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "row.token",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 5,
+              "col": 3
+            },
+            "end": {
+              "line": 5,
+              "col": 33
+            }
+          },
+          "type": {
+            "kind": "optional",
+            "of": {
+              "kind": "core",
+              "name": "string"
+            }
+          },
+          "shape": "nullable",
+          "element": {
+            "kind": "core",
+            "name": "string"
+          }
+        },
+        {
+          "kind": "op",
+          "name": "row.find",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 6,
+              "col": 3
+            },
+            "end": {
+              "line": 6,
+              "col": 21
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "row.Order"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "row.f",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 7,
+              "col": 3
+            },
+            "end": {
+              "line": 7,
+              "col": 10
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "classify",
+          "name": "row.Stage",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 9,
+              "col": 3
+            },
+            "end": {
+              "line": 9,
+              "col": 56
+            }
+          },
+          "subject": {
+            "kind": "type",
+            "type": {
+              "kind": "ref",
+              "target": "row.Order"
+            }
+          },
+          "cases": [
+            {
+              "name": "Draft",
+              "as": [],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 9,
+                  "col": 29
+                },
+                "end": {
+                  "line": 9,
+                  "col": 35
+                }
+              }
+            },
+            {
+              "name": "Accepted",
+              "as": [],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 9,
+                  "col": 36
+                },
+                "end": {
+                  "line": 9,
+                  "col": 45
+                }
+              }
+            },
+            {
+              "name": "Shipped",
+              "as": [],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 9,
+                  "col": 46
+                },
+                "end": {
+                  "line": 9,
+                  "col": 54
+                }
+              }
+            }
+          ],
+          "decidedBy": "predicate"
+        },
+        {
+          "kind": "classify",
+          "name": "row.Life",
+          "description": {
+            "summary": "ない側のケースを持つ、述語で決まる分類",
+            "body": "ない側のケースを持つ、述語で決まる分類",
+            "params": [],
+            "throws": [],
+            "see": []
+          },
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 11,
+              "col": 3
+            },
+            "end": {
+              "line": 11,
+              "col": 112
+            }
+          },
+          "subject": {
+            "kind": "type",
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "row.Order"
+              }
+            }
+          },
+          "cases": [
+            {
+              "name": "Open",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "row.Order"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 11,
+                      "col": 35
+                    },
+                    "end": {
+                      "line": 11,
+                      "col": 50
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 11,
+                  "col": 29
+                },
+                "end": {
+                  "line": 11,
+                  "col": 51
+                }
+              }
+            },
+            {
+              "name": "Closed",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "row.Order"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 11,
+                      "col": 60
+                    },
+                    "end": {
+                      "line": 11,
+                      "col": 75
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 11,
+                  "col": 52
+                },
+                "end": {
+                  "line": 11,
+                  "col": 76
+                }
+              }
+            },
+            {
+              "name": "Absent",
+              "description": {
+                "summary": "ない",
+                "body": "ない",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "as": [
+                {
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "ref",
+                      "target": "row.Order"
+                    }
+                  },
+                  "by": "none",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 11,
+                      "col": 95
+                    },
+                    "end": {
+                      "line": 11,
+                      "col": 109
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 11,
+                  "col": 87
+                },
+                "end": {
+                  "line": 11,
+                  "col": 110
+                }
+              }
+            }
+          ],
+          "decidedBy": "predicate",
+          "absent": "Absent"
+        },
+        {
+          "kind": "classify",
+          "name": "row.LifeElse",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 12,
+              "col": 3
+            },
+            "end": {
+              "line": 12,
+              "col": 96
+            }
+          },
+          "subject": {
+            "kind": "op",
+            "op": "row.find",
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "row.Order"
+              }
+            }
+          },
+          "cases": [
+            {
+              "name": "Open",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "row.Order"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 12,
+                      "col": 37
+                    },
+                    "end": {
+                      "line": 12,
+                      "col": 50
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 12,
+                  "col": 31
+                },
+                "end": {
+                  "line": 12,
+                  "col": 51
+                }
+              }
+            },
+            {
+              "name": "Closed",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "row.Order"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 12,
+                      "col": 60
+                    },
+                    "end": {
+                      "line": 12,
+                      "col": 73
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 12,
+                  "col": 52
+                },
+                "end": {
+                  "line": 12,
+                  "col": 74
+                }
+              }
+            },
+            {
+              "name": "Gone",
+              "as": [
+                {
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "ref",
+                      "target": "row.Order"
+                    }
+                  },
+                  "by": "else",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 12,
+                      "col": 81
+                    },
+                    "end": {
+                      "line": 12,
+                      "col": 93
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 12,
+                  "col": 75
+                },
+                "end": {
+                  "line": 12,
+                  "col": 94
+                }
+              }
+            }
+          ],
+          "decidedBy": "predicate",
+          "absent": "Gone"
+        },
+        {
+          "kind": "classify",
+          "name": "row.Known",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 13,
+              "col": 3
+            },
+            "end": {
+              "line": 13,
+              "col": 80
+            }
+          },
+          "subject": {
+            "kind": "type",
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "row.Order"
+              }
+            }
+          },
+          "cases": [
+            {
+              "name": "Found",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "row.Order"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 13,
+                      "col": 37
+                    },
+                    "end": {
+                      "line": 13,
+                      "col": 52
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 13,
+                  "col": 30
+                },
+                "end": {
+                  "line": 13,
+                  "col": 53
+                }
+              }
+            },
+            {
+              "name": "Missing",
+              "as": [
+                {
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "ref",
+                      "target": "row.Order"
+                    }
+                  },
+                  "by": "none",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 13,
+                      "col": 63
+                    },
+                    "end": {
+                      "line": 13,
+                      "col": 77
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 13,
+                  "col": 54
+                },
+                "end": {
+                  "line": 13,
+                  "col": 78
+                }
+              }
+            }
+          ],
+          "decidedBy": "type",
+          "absent": "Missing"
+        },
+        {
+          "kind": "classify",
+          "name": "row.KnownElse",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 14,
+              "col": 3
+            },
+            "end": {
+              "line": 14,
+              "col": 84
+            }
+          },
+          "subject": {
+            "kind": "type",
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "row.Order"
+              }
+            }
+          },
+          "cases": [
+            {
+              "name": "Found",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "row.Order"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 14,
+                      "col": 41
+                    },
+                    "end": {
+                      "line": 14,
+                      "col": 56
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 14,
+                  "col": 34
+                },
+                "end": {
+                  "line": 14,
+                  "col": 57
+                }
+              }
+            },
+            {
+              "name": "Missing",
+              "as": [
+                {
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "ref",
+                      "target": "row.Order"
+                    }
+                  },
+                  "by": "else",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 14,
+                      "col": 67
+                    },
+                    "end": {
+                      "line": 14,
+                      "col": 81
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 14,
+                  "col": 58
+                },
+                "end": {
+                  "line": 14,
+                  "col": 82
+                }
+              }
+            }
+          ],
+          "decidedBy": "type",
+          "absent": "Missing"
+        },
+        {
+          "kind": "classify",
+          "name": "row.Session",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 15,
+              "col": 3
+            },
+            "end": {
+              "line": 15,
+              "col": 73
+            }
+          },
+          "subject": {
+            "kind": "states",
+            "states": [
+              "row.token"
+            ]
+          },
+          "cases": [
+            {
+              "name": "In",
+              "as": [
+                {
+                  "state": "row.token",
+                  "type": {
+                    "kind": "core",
+                    "name": "string"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 15,
+                      "col": 35
+                    },
+                    "end": {
+                      "line": 15,
+                      "col": 50
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 15,
+                  "col": 31
+                },
+                "end": {
+                  "line": 15,
+                  "col": 51
+                }
+              }
+            },
+            {
+              "name": "Out",
+              "as": [
+                {
+                  "state": "row.token",
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  },
+                  "by": "else",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 15,
+                      "col": 57
+                    },
+                    "end": {
+                      "line": 15,
+                      "col": 70
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 15,
+                  "col": 52
+                },
+                "end": {
+                  "line": 15,
+                  "col": 71
+                }
+              }
+            }
+          ],
+          "decidedBy": "type",
+          "absent": "Out"
+        },
+        {
+          "kind": "classify",
+          "name": "row.Present",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 16,
+              "col": 3
+            },
+            "end": {
+              "line": 16,
+              "col": 56
+            }
+          },
+          "subject": {
+            "kind": "type",
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "row.Order"
+              }
+            }
+          },
+          "cases": [
+            {
+              "name": "Here",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "row.Order"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 16,
+                      "col": 38
+                    },
+                    "end": {
+                      "line": 16,
+                      "col": 53
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 16,
+                  "col": 32
+                },
+                "end": {
+                  "line": 16,
+                  "col": 54
+                }
+              }
+            }
+          ],
+          "decidedBy": "type"
+        },
+        {
+          "kind": "effect",
+          "name": "row.enter",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 18,
+              "col": 3
+            },
+            "end": {
+              "line": 18,
+              "col": 60
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 18,
+                  "col": 16
+                },
+                "end": {
+                  "line": 18,
+                  "col": 28
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "post"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Stage",
+            "from": "any",
+            "to": "Draft"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.enterFromAbsent",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 19,
+              "col": 3
+            },
+            "end": {
+              "line": 19,
+              "col": 83
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 19,
+                  "col": 26
+                },
+                "end": {
+                  "line": 19,
+                  "col": 38
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "post"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Life",
+            "from": "any",
+            "to": "Open"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.enterAny",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 20,
+              "col": 3
+            },
+            "end": {
+              "line": 20,
+              "col": 55
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 19
+                },
+                "end": {
+                  "line": 20,
+                  "col": 31
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "post"
+          },
+          "writes": [
+            "row.orders"
+          ]
+        },
+        {
+          "kind": "effect",
+          "name": "row.plain",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 21,
+              "col": 3
+            },
+            "end": {
+              "line": 21,
+              "col": 45
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 21,
+                  "col": 16
+                },
+                "end": {
+                  "line": 21,
+                  "col": 28
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "post"
+          },
+          "writes": [
+            "row.orders"
+          ]
+        },
+        {
+          "kind": "effect",
+          "name": "row.advance",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 22,
+              "col": 3
+            },
+            "end": {
+              "line": 22,
+              "col": 104
+            }
+          },
+          "params": [
+            {
+              "name": "at",
+              "type": {
+                "kind": "core",
+                "name": "Time"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 22,
+                  "col": 18
+                },
+                "end": {
+                  "line": 22,
+                  "col": 26
+                }
+              }
+            },
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 22,
+                  "col": 28
+                },
+                "end": {
+                  "line": 22,
+                  "col": 40
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "put"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Stage",
+            "from": [
+              "Draft",
+              "Accepted"
+            ],
+            "to": "Shipped"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.force",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 23,
+              "col": 3
+            },
+            "end": {
+              "line": 23,
+              "col": 72
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 23,
+                  "col": 16
+                },
+                "end": {
+                  "line": 23,
+                  "col": 28
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "put"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Stage",
+            "from": "any",
+            "to": "Shipped"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.revise",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 24,
+              "col": 3
+            },
+            "end": {
+              "line": 24,
+              "col": 71
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 24,
+                  "col": 17
+                },
+                "end": {
+                  "line": 24,
+                  "col": 29
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "put"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Stage",
+            "from": [
+              "Accepted"
+            ]
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.patch",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 25,
+              "col": 3
+            },
+            "end": {
+              "line": 25,
+              "col": 59
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 16
+                },
+                "end": {
+                  "line": 25,
+                  "col": 28
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "put"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "from": "any"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.rename",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 26,
+              "col": 3
+            },
+            "end": {
+              "line": 26,
+              "col": 45
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 26,
+                  "col": 17
+                },
+                "end": {
+                  "line": 26,
+                  "col": 29
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "put"
+          },
+          "writes": [
+            "row.orders"
+          ]
+        },
+        {
+          "kind": "effect",
+          "name": "row.discard",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 27,
+              "col": 3
+            },
+            "end": {
+              "line": 27,
+              "col": 77
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 27,
+                  "col": 18
+                },
+                "end": {
+                  "line": 27,
+                  "col": 30
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "delete"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Life",
+            "from": [
+              "Open"
+            ],
+            "to": "Absent"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.purge",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 28,
+              "col": 3
+            },
+            "end": {
+              "line": 28,
+              "col": 62
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 16
+                },
+                "end": {
+                  "line": 28,
+                  "col": 28
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "delete"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Life",
+            "from": "any",
+            "to": "Absent"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "row.purgeAny",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 29,
+              "col": 3
+            },
+            "end": {
+              "line": 29,
+              "col": 72
+            }
+          },
+          "params": [
+            {
+              "name": "order",
+              "type": {
+                "kind": "ref",
+                "target": "row.Order"
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 29,
+                  "col": 19
+                },
+                "end": {
+                  "line": 29,
+                  "col": 31
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "row.orders",
+            "operation": "delete"
+          },
+          "writes": [
+            "row.orders"
+          ],
+          "row": {
+            "param": "order",
+            "classify": "row.Life",
+            "from": "any",
+            "to": "Absent"
+          }
+        },
+        {
+          "kind": "op",
+          "name": "row.wire",
+          "decorators": [],
+          "span": {
+            "file": "row.hozo",
+            "start": {
+              "line": 31,
+              "col": 3
+            },
+            "end": {
+              "line": 33,
+              "col": 4
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "found",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "ref",
+                  "target": "row.Order"
+                }
+              },
+              "span": {
+                "file": "row.hozo",
+                "start": {
+                  "line": 31,
+                  "col": 11
+                },
+                "end": {
+                  "line": 31,
+                  "col": 24
+                }
+              }
+            }
+          ],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": {
+            "statements": [
+              {
+                "kind": "match",
+                "match": {
+                  "subject": {
+                    "kind": "value",
+                    "atom": {
+                      "kind": "name",
+                      "path": [
+                        "found"
+                      ],
+                      "span": {
+                        "file": "row.hozo",
+                        "start": {
+                          "line": 32,
+                          "col": 11
+                        },
+                        "end": {
+                          "line": 32,
+                          "col": 16
+                        }
+                      }
+                    }
+                  },
+                  "classify": "row.Life",
+                  "arms": [
+                    {
+                      "cases": [
+                        "Open"
+                      ],
+                      "else": false,
+                      "body": {
+                        "kind": "call",
+                        "call": {
+                          "callee": {
+                            "kind": "effect",
+                            "effect": {
+                              "kind": "named",
+                              "effect": "row.discard"
+                            }
+                          },
+                          "args": [
+                            {
+                              "param": "order",
+                              "value": {
+                                "kind": "name",
+                                "path": [
+                                  "found"
+                                ],
+                                "span": {
+                                  "file": "row.hozo",
+                                  "start": {
+                                    "line": 32,
+                                    "col": 43
+                                  },
+                                  "end": {
+                                    "line": 32,
+                                    "col": 48
+                                  }
+                                }
+                              }
+                            }
+                          ],
+                          "bound": [],
+                          "span": {
+                            "file": "row.hozo",
+                            "start": {
+                              "line": 32,
+                              "col": 35
+                            },
+                            "end": {
+                              "line": 32,
+                              "col": 49
+                            }
+                          }
+                        }
+                      },
+                      "narrowed": [
+                        {
+                          "type": {
+                            "kind": "ref",
+                            "target": "row.Order"
+                          }
+                        }
+                      ],
+                      "span": {
+                        "file": "row.hozo",
+                        "start": {
+                          "line": 32,
+                          "col": 27
+                        },
+                        "end": {
+                          "line": 32,
+                          "col": 50
+                        }
+                      }
+                    },
+                    {
+                      "cases": [
+                        "Closed"
+                      ],
+                      "else": false,
+                      "body": {
+                        "kind": "call",
+                        "call": {
+                          "callee": {
+                            "kind": "op",
+                            "op": "row.f"
+                          },
+                          "args": [],
+                          "bound": [],
+                          "span": {
+                            "file": "row.hozo",
+                            "start": {
+                              "line": 32,
+                              "col": 61
+                            },
+                            "end": {
+                              "line": 32,
+                              "col": 64
+                            }
+                          }
+                        }
+                      },
+                      "narrowed": [
+                        {
+                          "type": {
+                            "kind": "ref",
+                            "target": "row.Order"
+                          }
+                        }
+                      ],
+                      "span": {
+                        "file": "row.hozo",
+                        "start": {
+                          "line": 32,
+                          "col": 51
+                        },
+                        "end": {
+                          "line": 32,
+                          "col": 65
+                        }
+                      }
+                    },
+                    {
+                      "cases": [
+                        "Absent"
+                      ],
+                      "else": false,
+                      "body": {
+                        "kind": "none"
+                      },
+                      "narrowed": [],
+                      "span": {
+                        "file": "row.hozo",
+                        "start": {
+                          "line": 32,
+                          "col": 66
+                        },
+                        "end": {
+                          "line": 32,
+                          "col": 81
+                        }
+                      }
+                    }
+                  ],
+                  "span": {
+                    "file": "row.hozo",
+                    "start": {
+                      "line": 32,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 32,
+                      "col": 83
+                    }
+                  }
+                },
+                "span": {
+                  "file": "row.hozo",
+                  "start": {
+                    "line": 32,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 32,
+                    "col": 84
                   }
                 }
               }

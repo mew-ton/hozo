@@ -1,5 +1,5 @@
 {
-  "version": "0.8",
+  "version": "0.9",
   "viewer": "page",
   "config": {
     "index": 3,
@@ -70,7 +70,7 @@
     ]
   },
   "program": {
-    "version": "0.8",
+    "version": "0.9",
     "namespaces": [
       {
         "name": "",
@@ -3480,7 +3480,8 @@
                 }
               }
             ],
-            "decidedBy": "type"
+            "decidedBy": "type",
+            "absent": "Missing"
           },
           {
             "kind": "classify",
@@ -3578,7 +3579,8 @@
                 }
               }
             ],
-            "decidedBy": "type"
+            "decidedBy": "type",
+            "absent": "No"
           },
           {
             "kind": "op",
@@ -7917,7 +7919,8 @@
                 }
               }
             ],
-            "decidedBy": "type"
+            "decidedBy": "type",
+            "absent": "Stranger"
           },
           {
             "kind": "union",
@@ -9799,6 +9802,1016 @@
               "reads": [
                 "api.users",
                 "api.sessions"
+              ],
+              "pure": false
+            }
+          },
+          {
+            "kind": "classify",
+            "name": "api.Enrolment",
+            "description": {
+              "summary": "ユーザーの、登録の状態",
+              "body": "ユーザーの、登録の状態",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 424,
+                "col": 3
+              },
+              "end": {
+                "line": 429,
+                "col": 4
+              }
+            },
+            "subject": {
+              "kind": "type",
+              "type": {
+                "kind": "optional",
+                "of": {
+                  "kind": "ref",
+                  "target": "api.User"
+                }
+              }
+            },
+            "cases": [
+              {
+                "name": "Fresh",
+                "as": [
+                  {
+                    "type": {
+                      "kind": "ref",
+                      "target": "api.User"
+                    },
+                    "by": "presence",
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 425,
+                        "col": 12
+                      },
+                      "end": {
+                        "line": 425,
+                        "col": 25
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 425,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 425,
+                    "col": 26
+                  }
+                }
+              },
+              {
+                "name": "Lapsed",
+                "as": [
+                  {
+                    "type": {
+                      "kind": "ref",
+                      "target": "api.User"
+                    },
+                    "by": "presence",
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 426,
+                        "col": 13
+                      },
+                      "end": {
+                        "line": 426,
+                        "col": 26
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 426,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 426,
+                    "col": 27
+                  }
+                }
+              },
+              {
+                "name": "Unknown",
+                "description": {
+                  "summary": "いない",
+                  "body": "いない",
+                  "params": [],
+                  "throws": [],
+                  "see": []
+                },
+                "as": [
+                  {
+                    "type": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "ref",
+                        "target": "api.User"
+                      }
+                    },
+                    "by": "none",
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 428,
+                        "col": 14
+                      },
+                      "end": {
+                        "line": 428,
+                        "col": 27
+                      }
+                    }
+                  }
+                ],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 428,
+                    "col": 5
+                  },
+                  "end": {
+                    "line": 428,
+                    "col": 28
+                  }
+                }
+              }
+            ],
+            "decidedBy": "predicate",
+            "absent": "Unknown"
+          },
+          {
+            "kind": "effect",
+            "name": "api.enrol",
+            "description": {
+              "summary": "ユーザーを足す。Fresh で入る",
+              "body": "ユーザーを足す。Fresh で入る",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 432,
+                "col": 3
+              },
+              "end": {
+                "line": 432,
+                "col": 60
+              }
+            },
+            "params": [
+              {
+                "name": "user",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.User"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 432,
+                    "col": 16
+                  },
+                  "end": {
+                    "line": 432,
+                    "col": 26
+                  }
+                }
+              }
+            ],
+            "target": {
+              "kind": "builtin",
+              "state": "api.users",
+              "operation": "post"
+            },
+            "writes": [
+              "api.users"
+            ],
+            "row": {
+              "param": "user",
+              "classify": "api.Standing",
+              "from": "any",
+              "to": "Fresh"
+            }
+          },
+          {
+            "kind": "effect",
+            "name": "api.rest",
+            "description": {
+              "summary": "ユーザーを休ませる",
+              "body": "ユーザーを休ませる",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 434,
+                "col": 3
+              },
+              "end": {
+                "line": 434,
+                "col": 105
+              }
+            },
+            "params": [
+              {
+                "name": "user",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.User"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 434,
+                    "col": 15
+                  },
+                  "end": {
+                    "line": 434,
+                    "col": 25
+                  }
+                }
+              },
+              {
+                "name": "since",
+                "type": {
+                  "kind": "core",
+                  "name": "Time"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 434,
+                    "col": 27
+                  },
+                  "end": {
+                    "line": 434,
+                    "col": 38
+                  }
+                }
+              }
+            ],
+            "target": {
+              "kind": "builtin",
+              "state": "api.users",
+              "operation": "put"
+            },
+            "writes": [
+              "api.users"
+            ],
+            "row": {
+              "param": "user",
+              "classify": "api.Standing",
+              "from": [
+                "Fresh",
+                "Active"
+              ],
+              "to": "Idle"
+            }
+          },
+          {
+            "kind": "effect",
+            "name": "api.closeUser",
+            "description": {
+              "summary": "ユーザーを閉じる。どの使われ方からでも",
+              "body": "ユーザーを閉じる。どの使われ方からでも",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 436,
+                "col": 3
+              },
+              "end": {
+                "line": 436,
+                "col": 71
+              }
+            },
+            "params": [
+              {
+                "name": "user",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.User"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 436,
+                    "col": 20
+                  },
+                  "end": {
+                    "line": 436,
+                    "col": 30
+                  }
+                }
+              }
+            ],
+            "target": {
+              "kind": "builtin",
+              "state": "api.users",
+              "operation": "put"
+            },
+            "writes": [
+              "api.users"
+            ],
+            "row": {
+              "param": "user",
+              "classify": "api.Standing",
+              "from": "any",
+              "to": "Closed"
+            }
+          },
+          {
+            "kind": "effect",
+            "name": "api.amend",
+            "description": {
+              "summary": "ユーザーを書き換える。後の使われ方は、決まっていない",
+              "body": "ユーザーを書き換える。後の使われ方は、決まっていない",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 438,
+                "col": 3
+              },
+              "end": {
+                "line": 438,
+                "col": 66
+              }
+            },
+            "params": [
+              {
+                "name": "user",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.User"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 438,
+                    "col": 16
+                  },
+                  "end": {
+                    "line": 438,
+                    "col": 26
+                  }
+                }
+              }
+            ],
+            "target": {
+              "kind": "builtin",
+              "state": "api.users",
+              "operation": "put"
+            },
+            "writes": [
+              "api.users"
+            ],
+            "row": {
+              "param": "user",
+              "classify": "api.Standing",
+              "from": [
+                "Idle"
+              ]
+            }
+          },
+          {
+            "kind": "effect",
+            "name": "api.forget",
+            "description": {
+              "summary": "ユーザーを消す。消せるのは、登録が切れたユーザーだけ",
+              "body": "ユーザーを消す。消せるのは、登録が切れたユーザーだけ",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 440,
+                "col": 3
+              },
+              "end": {
+                "line": 440,
+                "col": 86
+              }
+            },
+            "params": [
+              {
+                "name": "user",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.User"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 440,
+                    "col": 17
+                  },
+                  "end": {
+                    "line": 440,
+                    "col": 27
+                  }
+                }
+              }
+            ],
+            "target": {
+              "kind": "builtin",
+              "state": "api.users",
+              "operation": "delete"
+            },
+            "writes": [
+              "api.users"
+            ],
+            "row": {
+              "param": "user",
+              "classify": "api.Enrolment",
+              "from": [
+                "Lapsed"
+              ],
+              "to": "Unknown"
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.restUser",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 442,
+                "col": 3
+              },
+              "end": {
+                "line": 448,
+                "col": 4
+              }
+            },
+            "exported": false,
+            "params": [
+              {
+                "name": "user",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.User"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 442,
+                    "col": 15
+                  },
+                  "end": {
+                    "line": 442,
+                    "col": 25
+                  }
+                }
+              },
+              {
+                "name": "now",
+                "type": {
+                  "kind": "core",
+                  "name": "Time"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 442,
+                    "col": 27
+                  },
+                  "end": {
+                    "line": 442,
+                    "col": 36
+                  }
+                }
+              }
+            ],
+            "returns": null,
+            "effects": [],
+            "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
+            "throws": [],
+            "body": {
+              "statements": [
+                {
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "value",
+                      "atom": {
+                        "kind": "name",
+                        "path": [
+                          "user"
+                        ],
+                        "span": {
+                          "file": "api.hozo",
+                          "start": {
+                            "line": 444,
+                            "col": 11
+                          },
+                          "end": {
+                            "line": 444,
+                            "col": 15
+                          }
+                        }
+                      }
+                    },
+                    "classify": "api.Standing",
+                    "arms": [
+                      {
+                        "cases": [
+                          "Fresh",
+                          "Active"
+                        ],
+                        "else": false,
+                        "body": {
+                          "kind": "call",
+                          "call": {
+                            "callee": {
+                              "kind": "effect",
+                              "effect": {
+                                "kind": "named",
+                                "effect": "api.rest"
+                              }
+                            },
+                            "args": [
+                              {
+                                "param": "user",
+                                "value": {
+                                  "kind": "name",
+                                  "path": [
+                                    "user"
+                                  ],
+                                  "span": {
+                                    "file": "api.hozo",
+                                    "start": {
+                                      "line": 445,
+                                      "col": 29
+                                    },
+                                    "end": {
+                                      "line": 445,
+                                      "col": 33
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "param": "since",
+                                "value": {
+                                  "kind": "name",
+                                  "path": [
+                                    "now"
+                                  ],
+                                  "span": {
+                                    "file": "api.hozo",
+                                    "start": {
+                                      "line": 445,
+                                      "col": 35
+                                    },
+                                    "end": {
+                                      "line": 445,
+                                      "col": 38
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "bound": [],
+                            "span": {
+                              "file": "api.hozo",
+                              "start": {
+                                "line": 445,
+                                "col": 24
+                              },
+                              "end": {
+                                "line": 445,
+                                "col": 39
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "api.Standing",
+                              "cases": [
+                                "Fresh",
+                                "Active"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "api.User"
+                              }
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "api.hozo",
+                          "start": {
+                            "line": 445,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 445,
+                            "col": 40
+                          }
+                        }
+                      },
+                      {
+                        "cases": [
+                          "Idle",
+                          "Dormant",
+                          "Closed"
+                        ],
+                        "else": true,
+                        "body": {
+                          "kind": "none"
+                        },
+                        "narrowed": [],
+                        "span": {
+                          "file": "api.hozo",
+                          "start": {
+                            "line": 446,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 446,
+                            "col": 29
+                          }
+                        }
+                      }
+                    ],
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 444,
+                        "col": 5
+                      },
+                      "end": {
+                        "line": 447,
+                        "col": 6
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 444,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 447,
+                      "col": 7
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [],
+              "effects": [
+                {
+                  "kind": "named",
+                  "effect": "api.rest"
+                }
+              ],
+              "relations": [],
+              "successEffects": [
+                {
+                  "effect": {
+                    "kind": "named",
+                    "effect": "api.rest"
+                  },
+                  "state": "unknown"
+                }
+              ],
+              "reads": [],
+              "pure": false
+            }
+          },
+          {
+            "kind": "op",
+            "name": "api.forgetUser",
+            "decorators": [],
+            "span": {
+              "file": "api.hozo",
+              "start": {
+                "line": 449,
+                "col": 3
+              },
+              "end": {
+                "line": 456,
+                "col": 4
+              }
+            },
+            "exported": false,
+            "params": [
+              {
+                "name": "id",
+                "type": {
+                  "kind": "ref",
+                  "target": "api.UserId"
+                },
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 449,
+                    "col": 17
+                  },
+                  "end": {
+                    "line": 449,
+                    "col": 27
+                  }
+                }
+              }
+            ],
+            "returns": null,
+            "effects": [],
+            "reads": [],
+            "carried": {
+              "reads": [],
+              "effects": []
+            },
+            "throws": [],
+            "body": {
+              "statements": [
+                {
+                  "kind": "const",
+                  "name": "user",
+                  "expr": {
+                    "kind": "call",
+                    "call": {
+                      "callee": {
+                        "kind": "read",
+                        "read": "api.userById"
+                      },
+                      "args": [
+                        {
+                          "param": "id",
+                          "value": {
+                            "kind": "name",
+                            "path": [
+                              "id"
+                            ],
+                            "span": {
+                              "file": "api.hozo",
+                              "start": {
+                                "line": 451,
+                                "col": 27
+                              },
+                              "end": {
+                                "line": 451,
+                                "col": 29
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      "bound": [],
+                      "span": {
+                        "file": "api.hozo",
+                        "start": {
+                          "line": 451,
+                          "col": 18
+                        },
+                        "end": {
+                          "line": 451,
+                          "col": 30
+                        }
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 451,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 451,
+                      "col": 31
+                    }
+                  }
+                },
+                {
+                  "kind": "match",
+                  "match": {
+                    "subject": {
+                      "kind": "value",
+                      "atom": {
+                        "kind": "name",
+                        "path": [
+                          "user"
+                        ],
+                        "span": {
+                          "file": "api.hozo",
+                          "start": {
+                            "line": 452,
+                            "col": 11
+                          },
+                          "end": {
+                            "line": 452,
+                            "col": 15
+                          }
+                        }
+                      }
+                    },
+                    "classify": "api.Enrolment",
+                    "arms": [
+                      {
+                        "cases": [
+                          "Lapsed"
+                        ],
+                        "else": false,
+                        "body": {
+                          "kind": "call",
+                          "call": {
+                            "callee": {
+                              "kind": "effect",
+                              "effect": {
+                                "kind": "named",
+                                "effect": "api.forget"
+                              }
+                            },
+                            "args": [
+                              {
+                                "param": "user",
+                                "value": {
+                                  "kind": "name",
+                                  "path": [
+                                    "user"
+                                  ],
+                                  "span": {
+                                    "file": "api.hozo",
+                                    "start": {
+                                      "line": 453,
+                                      "col": 32
+                                    },
+                                    "end": {
+                                      "line": 453,
+                                      "col": 36
+                                    }
+                                  }
+                                }
+                              }
+                            ],
+                            "bound": [],
+                            "span": {
+                              "file": "api.hozo",
+                              "start": {
+                                "line": 453,
+                                "col": 25
+                              },
+                              "end": {
+                                "line": 453,
+                                "col": 37
+                              }
+                            }
+                          }
+                        },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "ref",
+                              "target": "api.User"
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "api.hozo",
+                          "start": {
+                            "line": 453,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 453,
+                            "col": 38
+                          }
+                        }
+                      },
+                      {
+                        "cases": [
+                          "Fresh",
+                          "Unknown"
+                        ],
+                        "else": false,
+                        "body": {
+                          "kind": "none"
+                        },
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "api.Enrolment",
+                              "cases": [
+                                "Fresh",
+                                "Unknown"
+                              ],
+                              "of": {
+                                "kind": "optional",
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "api.hozo",
+                          "start": {
+                            "line": 454,
+                            "col": 7
+                          },
+                          "end": {
+                            "line": 454,
+                            "col": 30
+                          }
+                        }
+                      }
+                    ],
+                    "span": {
+                      "file": "api.hozo",
+                      "start": {
+                        "line": 452,
+                        "col": 5
+                      },
+                      "end": {
+                        "line": 455,
+                        "col": 6
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "api.hozo",
+                    "start": {
+                      "line": 452,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 455,
+                      "col": 7
+                    }
+                  }
+                }
+              ]
+            },
+            "signature": {
+              "exceptions": [],
+              "effects": [
+                {
+                  "kind": "named",
+                  "effect": "api.forget"
+                }
+              ],
+              "relations": [],
+              "successEffects": [
+                {
+                  "effect": {
+                    "kind": "named",
+                    "effect": "api.forget"
+                  },
+                  "state": "unknown"
+                }
+              ],
+              "reads": [
+                "api.users"
               ],
               "pure": false
             }
@@ -15016,6 +16029,50 @@
       ],
       "bound": []
     },
+    "api.forgetUser": {
+      "exceptions": [],
+      "effects": [
+        {
+          "kind": "named",
+          "effect": "api.forget"
+        }
+      ],
+      "relations": [],
+      "successEffects": [
+        {
+          "effect": {
+            "kind": "named",
+            "effect": "api.forget"
+          },
+          "state": "unknown"
+        }
+      ],
+      "reads": [
+        "api.users"
+      ],
+      "pure": false,
+      "params": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "ref",
+            "target": "api.UserId"
+          },
+          "span": {
+            "file": "api.hozo",
+            "start": {
+              "line": 449,
+              "col": 17
+            },
+            "end": {
+              "line": 449,
+              "col": 27
+            }
+          }
+        }
+      ],
+      "bound": []
+    },
     "api.getUser": {
       "exceptions": [
         "api.NotFound",
@@ -15906,6 +16963,66 @@
             "end": {
               "line": 287,
               "col": 44
+            }
+          }
+        }
+      ],
+      "bound": []
+    },
+    "api.restUser": {
+      "exceptions": [],
+      "effects": [
+        {
+          "kind": "named",
+          "effect": "api.rest"
+        }
+      ],
+      "relations": [],
+      "successEffects": [
+        {
+          "effect": {
+            "kind": "named",
+            "effect": "api.rest"
+          },
+          "state": "unknown"
+        }
+      ],
+      "reads": [],
+      "pure": false,
+      "params": [
+        {
+          "name": "user",
+          "type": {
+            "kind": "ref",
+            "target": "api.User"
+          },
+          "span": {
+            "file": "api.hozo",
+            "start": {
+              "line": 442,
+              "col": 15
+            },
+            "end": {
+              "line": 442,
+              "col": 25
+            }
+          }
+        },
+        {
+          "name": "now",
+          "type": {
+            "kind": "core",
+            "name": "Time"
+          },
+          "span": {
+            "file": "api.hozo",
+            "start": {
+              "line": 442,
+              "col": 27
+            },
+            "end": {
+              "line": 442,
+              "col": 36
             }
           }
         }

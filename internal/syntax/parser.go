@@ -678,9 +678,10 @@ func (p *parser) parseException(start source.Offset, doc *ast.DocComment, decora
 	return e
 }
 
-// parseEffect は EffectDecl = "effect" Ident OpParams "on" ( BuiltinEffect | Transition ) ";" を読む
+// parseEffect は EffectDecl = "effect" Ident OpParams "on" ( BuiltinEffect [ RowClause ] | Transition ) ";" を読む
 // （docs/grammar.md「exception / effect / read」）。引数がなくても括弧を書く。
 // QualifiedName の直後が ":" なら Transition、そうでなければ最後の要素が StateOp の BuiltinEffect。
+// 行の遷移（RowClause）は BuiltinEffect の後ろにだけ書ける。
 // なくした書き方 `effect e on s.post;`（括弧なし）は、括弧が要ることをメッセージで示して SYNTAX にする。
 func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.EffectDecl {
 	p.expect(token.Effect)
@@ -692,13 +693,89 @@ func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorator
 	p.expect(token.On)
 	if p.atName() && p.peek(1).Kind == token.Colon {
 		e.Transition = p.parseTransition()
+		if p.at(token.As) {
+			p.fail(p.tok().Span, "行の遷移（as …）は、組み込みの効果（on 状態.操作）の後ろにだけ書ける。分類の遷移（on C: A -> B）の後ろには書けない（docs/grammar.md「exception / effect / read」）")
+		}
 	} else {
 		ref := p.parseStateOpRef()
 		e.On = &ref
+		if p.at(token.As) {
+			e.Row = p.parseRowClause()
+		}
 	}
 	p.expect(token.Semicolon)
 	e.Span = p.spanFrom(start)
 	return e
+}
+
+// parseRowClause は行の遷移を読む（docs/grammar.md「exception / effect / read」）。
+//
+//	RowClause = "as" ( "any" | RowCase )
+//	          | "as" RowBefore "->" ( RowCase | "else" ) ;
+//	RowBefore = "any" | RowCase { "," RowCase } ;
+//	RowCase   = QualifiedName ;      (* 分類の名前 "." ケースの名前 *)
+//
+// 矢印のない形のケースは一つだけ。else を書けるのは矢印の後ろだけで、矢印の後ろに any は書けない。
+func (p *parser) parseRowClause() *ast.RowClause {
+	start := p.tok().Span.Start
+	r := &ast.RowClause{AsSpan: p.expect(token.As).Span}
+	if p.at(token.Else) {
+		p.fail(p.tok().Span, "行の遷移の else を書けるのは、矢印の後ろだけ（as <前> -> else。docs/grammar.md「exception / effect / read」）")
+	}
+	before := &ast.RowBefore{}
+	beforeStart := p.tok().Span.Start
+	if p.got(token.Any) {
+		before.Any = true
+	} else {
+		before.Cases = []ast.QualifiedName{p.parseRowCase()}
+		for {
+			if p.at(token.Pipe) {
+				p.errorAt(p.tok().Span, "行の遷移のケースの並びの区切りは「,」で、「|」ではない（as C.A, C.B -> C.D と書く。docs/grammar.md「exception / effect / read」）")
+				p.advance()
+			} else if !p.got(token.Comma) {
+				break
+			}
+			before.Cases = append(before.Cases, p.parseRowCase())
+		}
+	}
+	before.Span = p.spanFrom(beforeStart)
+	if !p.got(token.ThinArrow) {
+		// 矢印のない形: 書いたものが、効果の後
+		if len(before.Cases) > 1 {
+			p.fail(before.Cases[1].Span, "矢印のない行の遷移（as <後>）に書けるケースは、一つだけ。前のケースを並べるなら、矢印を書く（as C.A, C.B -> C.D。docs/grammar.md「exception / effect / read」）")
+		}
+		r.After = ast.RowAfter{Span: before.Span, Any: before.Any}
+		if !before.Any {
+			r.After.Case = &before.Cases[0]
+		}
+		r.Span = p.spanFrom(start)
+		return r
+	}
+	r.Arrow, r.Before = true, before
+	afterStart := p.tok().Span.Start
+	switch {
+	case p.at(token.Any):
+		p.fail(p.tok().Span, "行の遷移の矢印の後ろに any は書けない。後のケースが決まっていないなら else と書く（as <前> -> else。docs/grammar.md「exception / effect / read」）")
+	case p.got(token.Else):
+		r.After.Else = true
+	default:
+		c := p.parseRowCase()
+		r.After.Case = &c
+	}
+	r.After.Span = p.spanFrom(afterStart)
+	r.Span = p.spanFrom(start)
+	return r
+}
+
+// parseRowCase は RowCase（分類の名前とケースの名前を "." でつないだ QualifiedName）を読む。要素が一つだけの名前は誤り。
+func (p *parser) parseRowCase() ast.QualifiedName {
+	if p.atIdent() {
+		p.fail(p.tok().Span, fmt.Sprintf("行の遷移のケースは、分類の名前から書く（<分類>.%s。docs/grammar.md「exception / effect / read」）", p.tok().Text))
+	}
+	if !p.at(token.QualifiedName) {
+		p.failExpected("行の遷移のケース（any か、<分類>.<ケース>）")
+	}
+	return p.parseQualifiedName()
 }
 
 // parseRead は ReadDecl = "read" Ident OpParams ":" Type "on" QualifiedName ";" を読む
@@ -817,7 +894,7 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 // parseClassifyCase は ClassifyCase を読む。
 //
 //	ClassifyCase = [ DocComment ] Ident [ ":" CaseTyping { "," CaseTyping } ] ";" ;
-//	CaseTyping   = Type "as" ( Type | "else" ) ;
+//	CaseTyping   = Type "as" ( Type | "else" | "none" ) ;
 //
 // 名前のないケース `default;` はなくした書き方で、ケースの位置の default は、今の書き方を示して誤りにする。
 func (p *parser) parseClassifyCase() *ast.ClassifyCase {
@@ -841,15 +918,18 @@ func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	return c
 }
 
-// parseCaseTyping は CaseTyping = Type "as" ( Type | "else" ) を読む。as の前は対象（宣言の of の後ろと同じに書く）。
-// as の後ろの else は、型の代わりに「残り」を言う（docs/check.md「残りのケース」）。
+// parseCaseTyping は CaseTyping = Type "as" ( Type | "else" | "none" ) を読む。as の前は対象（宣言の of の後ろと同じに書く）。
+// as の後ろの else は、型の代わりに「残り」を言い（docs/check.md「残りのケース」）、none は「値がない」を言う（同「ない側のケース」）。
 func (p *parser) parseCaseTyping() *ast.CaseTyping {
 	start := p.tok().Span.Start
 	t := &ast.CaseTyping{Subject: p.parseType()}
 	p.expect(token.As)
-	if p.at(token.Else) {
+	switch {
+	case p.at(token.Else):
 		t.Else, t.ElseSpan = true, p.advance().Span
-	} else {
+	case p.at(token.None):
+		t.None, t.NoneSpan = true, p.advance().Span
+	default:
 		t.Type = p.parseType()
 	}
 	t.Span = p.spanFrom(start)

@@ -245,6 +245,8 @@ namespace lib {
   }
 }
 `
+	// 版 0.9 の行（docs/ir.md「正規化」）: ケースの `X as none`、行の遷移（`effect … on s.op as …`）。入力は row_test.go
+	normalizeSource["row.hozo"] = rowSource
 }
 
 // TestNormalizeRefs は、版 0.6 の行（docs/ir.md「正規化」）を、手で組んだ期待と比べる: 引数を持つ exception / effect / read、

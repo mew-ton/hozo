@@ -1,6 +1,6 @@
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.8"
+protocol = "0.9"
 
 vocabulary = ["cli.hozo"]       # cli の語彙はこのプラグインが提供する（docs/vocab.md「同梱しない語彙」）
 

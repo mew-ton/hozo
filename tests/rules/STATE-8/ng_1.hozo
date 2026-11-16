@@ -1,0 +1,19 @@
+// STATE-8（docs/check.md「行の遷移」の「操作ごとに書ける形」）: post と put の、書けない形
+namespace a {
+  model Order { id: string; }
+  state orders: list<Order>;
+  classify Stage of Order { Draft; Accepted; Shipped; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  // post: 前が、ない側のケースでない矢印。後ろが、ない側のケースか else
+  effect p1(order: Order) on orders.post as any -> Stage.Draft;           // ERROR: STATE-8
+  effect p2(order: Order) on orders.post as Stage.Draft -> Stage.Accepted;   // ERROR: STATE-8
+  effect p3(order: Order) on orders.post as Life.Open -> Life.Closed;     // ERROR: STATE-8
+  effect p4(order: Order) on orders.post as Life.Absent;                  // ERROR: STATE-8
+  effect p5(order: Order) on orders.post as Life.Absent -> else;          // ERROR: STATE-8
+  effect p6(order: Order) on orders.post as Life.Absent, Life.Open -> Life.Closed;   // ERROR: STATE-8
+  // put: 矢印のない形。前か後ろに、ない側のケース
+  effect u1(order: Order) on orders.put as Stage.Shipped;                 // ERROR: STATE-8
+  effect u2(order: Order) on orders.put as any;                           // ERROR: STATE-8
+  effect u3(order: Order) on orders.put as Life.Absent -> Life.Open;      // ERROR: STATE-8
+  effect u4(order: Order) on orders.put as Life.Open -> Life.Absent;      // ERROR: STATE-8
+}

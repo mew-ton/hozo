@@ -165,7 +165,27 @@ type Effect struct {
 	Target EffectTarget `json:"target"`
 	// Writes はこの効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）。
 	Writes []string `json:"writes"`
+	// Row は行の遷移（`as` の節。docs/check.md「行の遷移」）。書いていなければ nil（JSON ではキーごと省く）。
+	// 持つのは、Target が [BuiltinTarget] の効果だけ。
+	Row *RowTransition `json:"row,omitempty"`
 }
+
+// RowTransition は行の遷移（docs/ir.md「state / exception / effect」の RowTransition）: 効果が、受け取った行の状態を
+// どう変えるか。書き込む状態と操作は、[Effect] の Target にある。
+type RowTransition struct {
+	// Param は行の引数の名前（Effect.Params のうち、型が状態の要素の型と等しい、ただ一つのもの）。
+	Param string `json:"param"`
+	// Classify は行の分類の FQN（値の分類）。分類を名指ししない形（`as any -> else`）では空（JSON ではキーごと省く）。
+	Classify string `json:"classify,omitempty"`
+	// From は効果の前のケース。any は、どのケースの行でも。ケースの列なら、呼ぶ側が、そのどれかにあると分かっている行を
+	// 渡す（STATE-9）。post では、いつも any。
+	From CaseSet `json:"from"`
+	// To は効果の後のケースの名前。空なら、決まっていない（put の `-> else`。JSON ではキーごと省く）。post では、いつも持つ。
+	To string `json:"to,omitempty"`
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (x *RowTransition) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
 
 // Read は read 宣言（docs/ir.md「read」）。状態を読むことに付けた名前。
 type Read struct {
@@ -294,6 +314,9 @@ type Classify struct {
 	Cases []ClassifyCase `json:"cases"`
 	// DecidedBy はケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない。
 	DecidedBy DecidedBy `json:"decidedBy"`
+	// Absent は、ない側のケース（docs/check.md「ない側のケース」）の名前。なければ空（JSON ではキーごと省く）。
+	// DecidedBy が predicate でも、このケースだけは述語を持たず、値がないことで決まる。
+	Absent string `json:"absent,omitempty"`
 }
 
 // DecidedBy は分類のケースが何で決まるか（docs/ir.md「classify」の decidedBy）。
@@ -309,19 +332,22 @@ const (
 type NarrowBy string
 
 // 絞り込みの種類。presence と variant は型で決まる絞り込み、predicate は述語の要る絞り込み。else は、型を書かない
-// `対象 as else`（残りのケース。docs/check.md「残りのケース」）。
+// `対象 as else`（残りのケース。docs/check.md「残りのケース」）、none は、型を書かない `対象 as none`（ない側のケース。
+// 同「ない側のケース」）。
 const (
 	NarrowByPresence  NarrowBy = "presence"
 	NarrowByVariant   NarrowBy = "variant"
 	NarrowByPredicate NarrowBy = "predicate"
 	NarrowByElse      NarrowBy = "else"
+	NarrowByNone      NarrowBy = "none"
 )
 
-// CaseTyping はケースの `対象 as T` と `対象 as else`（docs/ir.md「classify」の CaseTyping。docs/check.md「ケースの型」「残りのケース」）。
+// CaseTyping はケースの `対象 as T`、`対象 as else`、`対象 as none`（docs/ir.md「classify」の CaseTyping。
+// docs/check.md「ケースの型」「残りのケース」「ない側のケース」）。
 type CaseTyping struct {
 	// State は状態の分類のとき、その対象の状態の FQN。値の分類と op の分類では持たない（対象は一つ）。
 	State string `json:"state,omitempty"`
-	// Type はそのケースでの対象の型。By が else なら、書いた型がないので、docs/types.md「残りのケースでの対象の型」。
+	// Type はそのケースでの対象の型。By が else か none なら、書いた型がないので、docs/types.md「残りのケースでの対象の型」。
 	Type Type `json:"type"`
 	// By は絞り込みの種類。
 	By   NarrowBy `json:"by"`

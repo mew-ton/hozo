@@ -363,10 +363,236 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 	switch {
 	case d.On != nil:
 		a.lowerBuiltinTarget(s, e, d.On, sc)
+		if d.Row != nil {
+			a.lowerRow(s, e, d.Row, sc)
+		}
 	case d.Transition != nil:
 		a.lowerTransition(s, e, d.Transition, sc)
 	}
 	return e
+}
+
+// rowCase は、行の遷移に書いたケース一つ（`C.K`）を解決したもの。
+type rowCase struct {
+	classify *ir.Classify
+	name     string
+	span     source.Span // K の位置
+}
+
+// lowerRow は行の遷移（`on s.op as …`。docs/check.md「行の遷移」）。確かめて、誤りがなければ e.Row に置く
+// （post の `as any` は、確かめるだけで、置かない: as を書かないのと同じ意味）。
+// STATE-7（結びつき）: ケース `C.K` の C が、書き込む状態の行の分類（値の分類で、対象の型が、状態の要素の型 T か T?）でない。
+// K が C のケースでない。一つの as に二つ以上の分類のケースがある。前のケースの並びに同じケースが二度ある。効果の引数に、
+// 型が T のものが、ちょうど一つでない。STATE-8（形）: 形が、操作に合わない（同「操作ごとに書ける形」）。
+// 宛先が決まらなかった効果（RES-5、STATE-1 で報告済み）には、名前の解決だけを行う。
+func (a *analyzer) lowerRow(s *symbol, e *ir.Effect, r *ast.RowClause, sc *scope) {
+	var element ir.Type
+	var op ir.Operation
+	if target, ok := e.Target.(ir.BuiltinTarget); ok {
+		op = target.Operation
+		if sym := a.syms[target.State]; sym != nil {
+			if st, ok := a.lower(sym).(*ir.State); ok {
+				element = st.Element
+			}
+		}
+	}
+	ok := true
+	var classify *ir.Classify
+	// 解決: 分類は、最後の要素（ケースの名前）を除いた名前
+	resolveCase := func(qn *ast.QualifiedName) *rowCase {
+		n := len(qn.Segments)
+		if n < 2 {
+			ok = false
+			return nil
+		}
+		last := qn.Segments[n-1]
+		prefix := ast.QualifiedName{
+			Span:     source.Span{File: qn.Span.File, Start: qn.Span.Start, End: qn.Segments[n-2].Span.End},
+			Segments: qn.Segments[:n-1],
+		}
+		res, found := a.resolve(prefix, &scope{ns: sc.ns}, acClassify)
+		if !found {
+			ok = false
+			return nil
+		}
+		c, isClassify := a.lower(res.sym).(*ir.Classify)
+		if !isClassify || c.Subject == nil {
+			ok = false
+			return nil // 対象が決まっていない分類（CLS-3 などで報告済み）には重ねて報告しない
+		}
+		if element != nil {
+			subj, isType := c.Subject.(ir.TypeSubject)
+			if !isType {
+				a.errorf("STATE-7", qn.Span, "effect %s の行の遷移: %s は%sで、行の分類（値の分類）ではない（docs/check.md「行の遷移」の「結びつき」）", s.fqn, c.Name, classifyKindName(c))
+				ok = false
+				return nil
+			}
+			if !ir.TypeEqual(subj.Type, element) && !ir.TypeEqual(subj.Type, ir.Optional(element)) {
+				a.errorf("STATE-7", qn.Span, "effect %s の行の遷移: classify %s の対象の型は %s で、書き込む状態の要素の型 %s でも %s でもない（docs/check.md「行の遷移」の「結びつき」）",
+					s.fqn, c.Name, typeName(subj.Type), typeName(element), typeName(ir.Optional(element)))
+				ok = false
+				return nil
+			}
+		}
+		span, isCase := classifyCaseSpan(res.sym, last.Name)
+		if !isCase || c.Case(last.Name) == nil {
+			a.errorf("STATE-7", last.Span, "effect %s の行の遷移: %s は classify %s のケースではない（%s）", s.fqn, last.Name, c.Name, strings.Join(caseNames(c), " / "))
+			ok = false
+			return nil
+		}
+		a.addRef(last.Span, Target{Kind: TargetCase, Decl: c.Name, Name: last.Name, Span: span})
+		if classify == nil {
+			classify = c
+		} else if classify.Name != c.Name {
+			a.errorf("STATE-7", qn.Span, "effect %s の行の遷移に、二つの分類（%s と %s）のケースがある。一つの as が言うのは、一つの分類のこと（docs/check.md「行の遷移」の「書き方と意味」）", s.fqn, classify.Name, c.Name)
+			ok = false
+			return nil
+		}
+		return &rowCase{classify: c, name: last.Name, span: last.Span}
+	}
+	var before []*rowCase
+	if r.Before != nil {
+		seen := map[string]bool{}
+		for i := range r.Before.Cases {
+			rc := resolveCase(&r.Before.Cases[i])
+			if rc == nil {
+				continue
+			}
+			if seen[rc.name] {
+				a.errorf("STATE-7", rc.span, "effect %s の行の遷移の、前のケースに %s が二度ある", s.fqn, rc.name)
+				ok = false
+				continue
+			}
+			seen[rc.name] = true
+			before = append(before, rc)
+		}
+	}
+	var after *rowCase
+	if r.After.Case != nil {
+		after = resolveCase(r.After.Case)
+	}
+	if element == nil || !ok {
+		return
+	}
+	// 行の引数: 型が、状態の要素の型と等しい引数が、ちょうど一つ
+	var rows []string
+	for _, p := range e.Params {
+		if p.Type != nil && ir.TypeEqual(p.Type, element) {
+			rows = append(rows, p.Name)
+		}
+	}
+	if len(rows) != 1 {
+		found := "一つもない"
+		if len(rows) > 1 {
+			found = "二つ以上ある（" + strings.Join(rows, "、") + "）"
+		}
+		a.errorf("STATE-7", r.AsSpan, "effect %s の行の遷移: 型が %s（書き込む状態の要素の型）の引数が、%s。行の遷移を書く効果は、行を受け取る引数を、ちょうど一つ持つ（行の引数を持たない効果は as を書けない。docs/check.md「行の遷移」の「結びつき」）",
+			s.fqn, typeName(element), found)
+		return
+	}
+	absent := ""
+	if classify != nil {
+		absent = classify.Absent
+	}
+	if !a.checkSTATE8(s, op, r, before, after, absent) {
+		return
+	}
+	if op == ir.OpPost && after == nil {
+		// post の `as any` は、as を書かないのと同じ意味で、IR では同じ形（row を持たない。docs/ir.md「正規化」）
+		return
+	}
+	row := &ir.RowTransition{Param: rows[0], From: ir.AnyCase()}
+	if classify != nil {
+		row.Classify = classify.Name
+	}
+	if after != nil {
+		row.To = after.name
+	}
+	// post の前は、IR に残さない（入る前の行は、ない。docs/ir.md「正規化」）
+	if op != ir.OpPost && r.Before != nil && !r.Before.Any {
+		names := make([]string, len(before))
+		for i, rc := range before {
+			names[i] = rc.name
+		}
+		row.From = ir.Cases(names...)
+	}
+	e.Row = row
+}
+
+// caseNames は分類のケースの名前（宣言順）。
+func caseNames(c *ir.Classify) []string {
+	out := make([]string, len(c.Cases))
+	for i, cs := range c.Cases {
+		out[i] = cs.Name
+	}
+	return out
+}
+
+// checkSTATE8 は STATE-8（docs/check.md「行の遷移」の「操作ごとに書ける形」）: 行の遷移の形が、操作に合わない。
+// absent は、分類のない側のケースの名前（なければ空）。一つの効果に、一つだけ報告する。合っていれば true。
+func (a *analyzer) checkSTATE8(s *symbol, op ir.Operation, r *ast.RowClause, before []*rowCase, after *rowCase, absent string) bool {
+	fail := func(span source.Span, format string, args ...any) bool {
+		a.errorf("STATE-8", span, "effect %s の行の遷移: %s（docs/check.md「行の遷移」の「操作ごとに書ける形」）", s.fqn, fmt.Sprintf(format, args...))
+		return false
+	}
+	isAbsent := func(rc *rowCase) bool { return rc != nil && absent != "" && rc.name == absent }
+	switch op {
+	case ir.OpPost:
+		const forms = "post に書けるのは、as <ケース>（そのケースで入る）、as any、as <ない側のケース> -> <ケース>"
+		if !r.Arrow {
+			if isAbsent(after) {
+				return fail(after.span, "%s は、ない側のケースで、post の後のケースには書けない（入った行は、ある）。%s", after.name, forms)
+			}
+			return true
+		}
+		if r.Before.Any {
+			return fail(r.Before.Span, "post の矢印の前に any は書けない（入る前の行は、ない）。%s", forms)
+		}
+		for _, rc := range before {
+			if !isAbsent(rc) {
+				return fail(rc.span, "post の矢印の前に書けるのは、ない側のケース一つだけで、%s は、そうではない（入る前の行は、ない）。%s", rc.name, forms)
+			}
+		}
+		if r.After.Else {
+			return fail(r.After.Span, "post の矢印の後ろに else は書けない（入るケースが決まっていないなら、as を書かない）。%s", forms)
+		}
+		if isAbsent(after) {
+			return fail(after.span, "%s は、ない側のケースで、post の後のケースには書けない（入った行は、ある）。%s", after.name, forms)
+		}
+	case ir.OpPut:
+		const forms = "put に書けるのは、as <前> -> <後>（前は any か、ケースの並び。後は、ケース一つか else）"
+		if !r.Arrow {
+			return fail(r.AsSpan, "put は、矢印で書く（どのケースからでもよければ as any -> <後>）。%s", forms)
+		}
+		for _, rc := range before {
+			if isAbsent(rc) {
+				return fail(rc.span, "%s は、ない側のケースで、put の前のケースには書けない（put は、ある行を書き換える）。%s", rc.name, forms)
+			}
+		}
+		if isAbsent(after) {
+			return fail(after.span, "%s は、ない側のケースで、put の後のケースには書けない（行をなくすのは delete）。%s", after.name, forms)
+		}
+	case ir.OpDelete:
+		const forms = "delete に書けるのは、as <ない側のケース>、as <前> -> <ない側のケース>（前は any か、ない側でないケースの並び）。ない側のケースは、T? を対象にした分類に <名前>: T? as none; と書く"
+		if !r.Arrow && r.After.Any {
+			return fail(r.After.Span, "delete の後は、ない側のケース（消した後の行は、ない）。%s", forms)
+		}
+		if r.After.Else {
+			return fail(r.After.Span, "delete の矢印の後ろに else は書けない（消した後の行は、ない）。%s", forms)
+		}
+		if after != nil && !isAbsent(after) {
+			if absent == "" {
+				return fail(after.span, "classify %s は、ない側のケースを持たないので、delete の効果の as には書けない（「行がない」を言うケースがない）。%s", after.classify.Name, forms)
+			}
+			return fail(after.span, "delete の後のケースは、ない側のケース %s で、%s ではない（消した後の行は、ない）。%s", absent, after.name, forms)
+		}
+		for _, rc := range before {
+			if isAbsent(rc) {
+				return fail(rc.span, "%s は、ない側のケースで、delete の前のケースには書けない（消すのは、ある行）。%s", rc.name, forms)
+			}
+		}
+	}
+	return true
 }
 
 // lowerRead は read（docs/ir.md「read」）。宛先は現在の名前空間の基底の状態一つ（docs/check.md「read の宛先」）。
@@ -528,9 +754,9 @@ func operationOf(op ast.StateOp) ir.Operation {
 
 // --- classify ---
 
-// lowerClassify は classify。CLS-1（ケース名の重複、残りのケース `対象 as else` が二つ以上）、CLS-2（ケースがない）、
-// ケースの `対象 as T`（CLS-5 / CLS-6）、残りのケース（CLS-7）、ケースの判定（decidedBy。docs/check.md「ケースの判定」
-// 「残りのケース」）。
+// lowerClassify は classify。CLS-1（ケース名の重複、残りのケース `対象 as else` が二つ以上、`as none` が二つ以上）、
+// CLS-2（ケースがない）、ケースの `対象 as T`（CLS-5 / CLS-6）、残りのケース（CLS-7）、ない側のケース（CLS-8）、
+// ケースの判定（decidedBy。docs/check.md「ケースの判定」「残りのケース」「ない側のケース」）。
 func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
@@ -557,6 +783,7 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 	if len(c.Cases) == 0 {
 		a.errorf("CLS-2", s.nameSpan, "classify %s にケースが一つもない", s.fqn)
 	}
+	a.lowerNoneCase(s, c, &rest)
 	a.lowerElseCase(s, c, &rest)
 	c.DecidedBy = a.decidedBy(c)
 	return c
@@ -570,8 +797,57 @@ type restCases struct {
 	wrote map[string]bool
 	// first は、最初に書かれた as else（対象が分類の対象で、残りを言うものの二つ目でないもの）。なければ nil。
 	first *elseTyping
-	// broken は、どれかのケースの as に誤り（CLS-5 / CLS-6）があったか。あれば、CLS-7 を重ねて報告しない。
+	// broken は、どれかのケースの as に誤り（CLS-5 / CLS-6）があったか。あれば、CLS-7 と CLS-8 を重ねて報告しない。
 	broken bool
+	// none は、最初に書かれた as none（ない側のケース。docs/check.md「ない側のケース」）。なければ nil。二つ目からは CLS-1。
+	// elseSpan は none の位置。
+	none *elseTyping
+}
+
+// presenceOnly は、分類 c（値の分類か op の分類で、対象の型 subjectType が T?）の、skip にないケースが、一つ以上あり、
+// どれも、対象を T に絞る as（presence）を持つか（docs/check.md「残りのケース」の 2、「ない側のケース」）。
+// 満たさなければ、理由を返す。
+func presenceOnly(c *ir.Classify, subjectType ir.Type, skip map[string]bool) (ok bool, reason string) {
+	if _, isStates := c.SubjectStates(); isStates {
+		return false, "状態の分類"
+	}
+	if _, isOptional := subjectType.(ir.OptionalType); !isOptional {
+		return false, fmt.Sprintf("対象の型 %s は、値がないことのある型（T?）ではない", typeName(subjectType))
+	}
+	n := 0
+	for _, cs := range c.Cases {
+		if skip[cs.Name] {
+			continue
+		}
+		n++
+		if len(cs.As) != 1 || cs.As[0].By != ir.NarrowByPresence {
+			return false, fmt.Sprintf("ケース %s が、対象を、値のある型に絞る as（T? as T）を持たない", cs.Name)
+		}
+	}
+	if n == 0 {
+		return false, "ほかに、ケースが一つもない"
+	}
+	return true, ""
+}
+
+// lowerNoneCase は、ない側のケース `対象 as none`（rest.none）を確かめて、そのケースの as に足す（docs/check.md「ない側のケース」）。
+// CLS-8: 値の分類でも op の分類でもない。対象の型が T? でない。ほかのケースが、一つもないか、T? as T を持たないものがある。
+// ほかのケースの as に誤りがあれば、重ねて報告しない。
+func (a *analyzer) lowerNoneCase(s *symbol, c *ir.Classify, rest *restCases) {
+	e := rest.none
+	if e == nil || rest.broken || e.subjectType == nil {
+		return
+	}
+	if ok, reason := presenceOnly(c, e.subjectType, rest.wrote); !ok {
+		a.errorf("CLS-8", e.elseSpan, "classify %s のケース %s: ない側のケース（as none）を書けるのは、値の分類か op の分類で、対象の型が T?、ほかのケースが、どれも T? as T のとき。%s（docs/check.md「ない側のケース」）",
+			s.fqn, e.name, reason)
+		rest.none = nil
+		return
+	}
+	if cc := c.Case(e.name); cc != nil {
+		cc.As = append(cc.As, ir.CaseTyping{State: e.state, Type: e.subjectType, By: ir.NarrowByNone, Span: a.irSpan(e.span)})
+		c.Absent = e.name
+	}
 }
 
 // elseTyping は、ケース name の `対象 as else`。state は対象の状態の FQN（状態の分類のとき）、subjectType は対象の型。
@@ -592,8 +868,21 @@ func (a *analyzer) lowerElseCase(s *symbol, c *ir.Classify, rest *restCases) {
 		return
 	}
 	fail := func(format string, args ...any) {
-		a.errorf("CLS-7", e.elseSpan, "classify %s のケース %s: 残りのケース（as else）を書けるのは、型で決まる分類だけ。%s（docs/check.md「残りのケース」）",
+		a.errorf("CLS-7", e.elseSpan, "classify %s のケース %s: 残りのケース（as else）を書けるのは、残りが型で決まるときだけ。%s（docs/check.md「残りのケース」）",
 			s.fqn, e.name, fmt.Sprintf(format, args...))
+	}
+	if rest.none != nil {
+		fail("ない側のケース %s（as none）があるので、残りがない", rest.none.name)
+		return
+	}
+	// 残りが、ちょうど「値がない」（docs/check.md「残りのケース」の 2）: 値の分類か op の分類で、対象の型が T?、ほかのケースが、
+	// どれも T? as T。ほかのケースが二つ以上で同じ型を書いていても（述語で決まる分類でも）、書ける。この残りは、ない側のケース
+	if ok, _ := presenceOnly(c, e.subjectType, rest.wrote); ok {
+		if cc := c.Case(e.name); cc != nil {
+			cc.As = append(cc.As, ir.CaseTyping{State: e.state, Type: e.subjectType, By: ir.NarrowByElse, Span: a.irSpan(e.span)})
+			c.Absent = e.name
+		}
+		return
 	}
 	// 1. 対象が一つ
 	if states, isStates := c.SubjectStates(); isStates && len(states) != 1 {
@@ -648,6 +937,10 @@ func (a *analyzer) lowerElseCase(s *symbol, c *ir.Classify, rest *restCases) {
 	}
 	if cc := c.Case(e.name); cc != nil {
 		cc.As = append(cc.As, ir.CaseTyping{State: e.state, Type: typ, By: ir.NarrowByElse, Span: a.irSpan(e.span)})
+		if by == ir.NarrowByPresence {
+			// 対象の状態が一つの状態の分類の、値がない側（docs/check.md「ない側のケース」の表の二行目）
+			c.Absent = e.name
+		}
 	}
 }
 
@@ -686,8 +979,8 @@ func classifyKindName(c *ir.Classify) string {
 // lowerCaseTypings はケースの `対象 as T` の並び（docs/check.md「ケースの型」）。CLS-5: as の前がその分類の対象でない、
 // 一つのケースに同じ対象の as が二度ある。CLS-6: as の後ろの型が、対象の型から絞り込める型でない。
 // 対象が決まっていない分類（CLS-3 などで報告済み）では、型の解決だけを行う。
-// `対象 as else`（残りのケース）は、ここでは rest に覚えるだけで、as には足さない（確かめて足すのは lowerElseCase）。
-// CLS-1: 残りのケースが、もうある（別の as else）。
+// `対象 as else`（残りのケース）と `対象 as none`（ない側のケース）は、ここでは rest に覚えるだけで、as には足さない
+// （確かめて足すのは lowerElseCase と lowerNoneCase）。CLS-1: 残りのケースが、もうある（別の as else）。as none が、もうある。
 func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope, rest *restCases) []ir.CaseTyping {
 	var out []ir.CaseTyping
 	seen := map[string]bool{}
@@ -695,12 +988,12 @@ func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyC
 		if ct == nil {
 			continue
 		}
-		if ct.Else {
+		if ct.Else || ct.None {
 			rest.wrote[cs.Name.Name] = true
 		}
 		var t ir.Type
 		tok := true
-		if !ct.Else {
+		if !ct.Else && !ct.None {
 			t, tok = a.lowerType(ct.Type, sc)
 		}
 		if c.Subject == nil {
@@ -724,6 +1017,14 @@ func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyC
 			}
 			rest.said = true
 			rest.first = &elseTyping{name: cs.Name.Name, state: state, subjectType: subjectType, span: ct.Span, elseSpan: ct.ElseSpan}
+			continue
+		}
+		if ct.None {
+			if rest.none != nil {
+				a.errorf("CLS-1", ct.NoneSpan, "classify %s に、ない側のケース（as none）が二つ以上ある（ない側は一つ。docs/check.md「ない側のケース」）", s.fqn)
+				continue
+			}
+			rest.none = &elseTyping{name: cs.Name.Name, state: state, subjectType: subjectType, span: ct.Span, elseSpan: ct.NoneSpan}
 			continue
 		}
 		if !tok || subjectType == nil {
@@ -900,7 +1201,7 @@ func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 		if as == nil || as.By == ir.NarrowByPredicate {
 			return ir.DecidedByPredicate
 		}
-		if as.By == ir.NarrowByElse {
+		if as.By == ir.NarrowByElse || as.By == ir.NarrowByNone {
 			continue
 		}
 		for _, t := range types {

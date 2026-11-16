@@ -1,5 +1,5 @@
 {
-  "version": "0.8",
+  "version": "0.9",
   "namespaces": [
     {
       "name": "",
@@ -822,6 +822,106 @@
           ]
         },
         {
+          "kind": "effect",
+          "name": "server.promote",
+          "decorators": [],
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 25,
+              "col": 1
+            },
+            "end": {
+              "line": 25,
+              "col": 90
+            }
+          },
+          "params": [
+            {
+              "name": "user",
+              "type": {
+                "kind": "ref",
+                "target": "server.User"
+              },
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 16
+                },
+                "end": {
+                  "line": 25,
+                  "col": 26
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "db",
+            "operation": "put"
+          },
+          "writes": [
+            "db"
+          ],
+          "row": {
+            "param": "user",
+            "classify": "server.IsAdmin",
+            "from": [
+              "NotAdmin"
+            ],
+            "to": "IsAdmin"
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "server.patch",
+          "decorators": [],
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 26,
+              "col": 1
+            },
+            "end": {
+              "line": 26,
+              "col": 60
+            }
+          },
+          "params": [
+            {
+              "name": "user",
+              "type": {
+                "kind": "ref",
+                "target": "server.User"
+              },
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 26,
+                  "col": 14
+                },
+                "end": {
+                  "line": 26,
+                  "col": 24
+                }
+              }
+            }
+          ],
+          "target": {
+            "kind": "builtin",
+            "state": "db",
+            "operation": "put"
+          },
+          "writes": [
+            "db"
+          ],
+          "row": {
+            "param": "user",
+            "from": "any"
+          }
+        },
+        {
           "kind": "read",
           "name": "server.userById",
           "decorators": [
@@ -1128,7 +1228,143 @@
               }
             }
           ],
-          "decidedBy": "type"
+          "decidedBy": "type",
+          "absent": "Unregistered"
+        },
+        {
+          "kind": "classify",
+          "name": "server.Freshness",
+          "decorators": [],
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 36,
+              "col": 1
+            },
+            "end": {
+              "line": 36,
+              "col": 110
+            }
+          },
+          "subject": {
+            "kind": "type",
+            "type": {
+              "kind": "optional",
+              "of": {
+                "kind": "ref",
+                "target": "server.User"
+              }
+            }
+          },
+          "cases": [
+            {
+              "name": "Fresh",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "server.User"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 36,
+                      "col": 40
+                    },
+                    "end": {
+                      "line": 36,
+                      "col": 60
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 36,
+                  "col": 33
+                },
+                "end": {
+                  "line": 36,
+                  "col": 61
+                }
+              }
+            },
+            {
+              "name": "Stale",
+              "as": [
+                {
+                  "type": {
+                    "kind": "ref",
+                    "target": "server.User"
+                  },
+                  "by": "presence",
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 36,
+                      "col": 69
+                    },
+                    "end": {
+                      "line": 36,
+                      "col": 89
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 36,
+                  "col": 62
+                },
+                "end": {
+                  "line": 36,
+                  "col": 90
+                }
+              }
+            },
+            {
+              "name": "Gone",
+              "as": [
+                {
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "ref",
+                      "target": "server.User"
+                    }
+                  },
+                  "by": "none",
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 36,
+                      "col": 97
+                    },
+                    "end": {
+                      "line": 36,
+                      "col": 107
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 36,
+                  "col": 91
+                },
+                "end": {
+                  "line": 36,
+                  "col": 108
+                }
+              }
+            }
+          ],
+          "decidedBy": "predicate",
+          "absent": "Gone"
         },
         {
           "kind": "classify",

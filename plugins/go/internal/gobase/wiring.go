@@ -1619,7 +1619,8 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 		// もう一方は、どのケースでもない（分類の誤りの枝）
 		valueCase, otherCase = "", ""
 		for _, cs := range p.classify.Cases {
-			if cs.IsElse() {
+			// もう一方は、ない側のケース（対象 as else か、対象 as none。Classify.absent）
+			if cs.IsElse() || cs.Name == p.classify.Absent {
 				otherCase = cs.Name
 			} else {
 				valueCase = cs.Name

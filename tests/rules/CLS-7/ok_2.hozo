@@ -1,0 +1,20 @@
+// CLS-7（docs/check.md「残りのケース」の 2）: 値の分類か op の分類で、対象の型が T?、ほかのケースが、どれも T? as T なら、
+// ほかのケースが二つ以上でも（述語で決まる分類でも）、残りのケースを書ける: 残りは、ちょうど「値がない」
+namespace a {
+  model M { id: string; }
+  op find(): M?;
+  op f();
+  classify Life of M? {
+    Draft: M? as M;
+    Placed: M? as M;
+    Absent: M? as else;
+  }
+  classify Session of find {
+    Fresh: find as M;
+    Stale: find as M;
+    Missing: find as else;
+  }
+  op use(m: M?) {
+    match m by Life { Draft, Placed => f(); Absent => none; };
+  }
+}

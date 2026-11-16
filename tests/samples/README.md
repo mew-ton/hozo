@@ -138,6 +138,8 @@ tests/samples/<名前>/
 
 **分類を閉じる決定（同 154〜162）は、文書と仕様を先に直し、実装を後に入れた。** 版は 0.8 になり（`Classify.hasDefault` などをなくし、`MatchArm` に `else`）、hozoc と、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）を、一緒に上げた。サンプル `shop-server` は、仕様も、期待する出力も、変わらない（`shop-server/README.md`「分類を閉じたときに変えたこと」）。サンプル `order-app` は、仕様を直した（`order-app/README.md` の F44〜F49）。`TestSamples` は、すべてのサブテストが、飛ばしも、代役もなく通る。
 
+**行の遷移（同 163〜173）は、文書と、仕様だけのサンプル `order-app` を先に直し、実装を後に入れた。** 版は 0.9 になり（`Effect.row`、`Classify.absent`、`CaseTyping.by` の `none`）、hozoc と、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）を、一緒に上げた。サンプル `order-app` は、実装が入るまでの間、`check` が落ちた（行の遷移の `as` と、ケースの `as none` が SYNTAX。そこから、効果が見つからない RES-1 と、ケースが合わない MATCH-2 が続いて、60 の error）。実装が入った後は、`0 errors, 0 warnings`。サンプル `shop-server` は、仕様も、期待する出力も、変わらない（`shop-server/README.md`「行の遷移で変えたこと」）。
+
 ## サンプルの一覧
 
 | サンプル | 中身 |

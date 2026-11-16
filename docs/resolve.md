@@ -52,7 +52,7 @@
 |---|---|
 | `classify C of ...` の対象 | 一つで型を指せば値の分類（下の「型」と同じ）。一つで `op` を指せば op の分類（どの名前空間の op でも。`export` は要らない。値を返さない op は CLS-4）。すべてが現在の名前空間の `state`（基底の状態）なら状態の分類。型や op と状態の混在、状態でないものを含む並びなどは CLS-3（`docs/check.md`「classify / match」）。対象が一つで、型でも op でも状態でもなければ RES-4。対象が形の語か `?` / `[]` を持つ型（`nullable<User>`、`User?`）なら、型として読む |
 | ケースの `X as T` の `X` | その分類の対象と同じもの: 値の分類なら型（`subject` の型と等しいこと）、op の分類ならその `op`、状態の分類なら対象の `state` のどれか。解決は対象と同じ規則で行い、対象でなければ CLS-5（`docs/check.md`「classify / match」） |
-| ケースの `X as T` の `T` | 下の「型」と同じ。絞り込める型かどうかは CLS-6。残りのケースの `X as else` の `else` は予約語で、解決しない（`X` は上の行と同じ） |
+| ケースの `X as T` の `T` | 下の「型」と同じ。絞り込める型かどうかは CLS-6。残りのケースの `X as else` の `else` と、ない側のケースの `X as none` の `none` は予約語で、解決しない（`X` は上の行と同じ） |
 | 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）、`classify` のケース（`C.Case<T>` の形でだけ。`C` は値の分類か op の分類で、どの名前空間のものでもよい。状態の分類なら RES-4）。核の型と形の語は予約語なので解決しない |
 | ユニオンのメンバー `X;` | `exception`、`effect`、`union`（`set`） |
 | `exception`、`effect`、`read` の引数の型、`read` の結果の型 | 上の「型」と同じ |
@@ -60,6 +60,7 @@
 | `read r(…): T on s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
 | `effect e(…) on X: A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
 | 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら `Empty` / `HasItems` |
+| 行の遷移のケース `C.K`（`effect e(…) on s.op as C.K -> …`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
 | `catches` の要素 | `throws` と同じ |

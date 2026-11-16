@@ -73,7 +73,10 @@ namespace ordering {
     NothingToShip: PhysicalPart? as else;
   }
 
-  /** 注文の受け付けの状態 */
+  /**
+   * 注文の受け付けの状態。進め方は、三つの効果の行の遷移だけ:
+   * createOrder で AwaitingPayment に入り、acceptOrder で Accepted に、expireOrder で Expired になる。
+   */
   classify Standing of Order {
     /** 支払いを待っている。在庫は取り置いてある */
     AwaitingPayment;
@@ -179,19 +182,18 @@ namespace ordering {
   @db.find
   read orderByRequest(requestId: type.RequestId): Order? on orders;
 
-  /** deadline より前に申し込まれて、まだ支払いを待っている注文（比較は db の語彙で言えないので、人が書く） */
-  read unpaidBefore(deadline: Time): Order[] on orders;
+  /** deadline より前に申し込まれて、まだ支払いを待っている注文のうち、いちばん古いもの（比較と並べ方は db の語彙で言えないので、人が書く） */
+  read oldestUnpaidBefore(deadline: Time): Order? on orders;
 
-  /** 注文を作る */
+  /** 注文を作る。支払いを待つ注文として入る */
   @db.insert
-  effect createOrder(order: Order) on orders.post;
+  effect createOrder(order: Order) on orders.post as Standing.AwaitingPayment;
 
-  /** 注文を書き換える */
-  @db.update
-  effect saveOrder(order: Order) on orders.put;
+  /** 受け付けた: 受け付けた時刻を入れる（人が書く） */
+  effect acceptOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Accepted;
 
-  /** いくつかの注文を、まとめて書き換える */
-  effect saveOrders(changed: Order[]) on orders.put;
+  /** 期限切れにした: 期限が過ぎた時刻を入れる（人が書く） */
+  effect expireOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Expired;
 
   // ---- 値段を付ける ----
 
@@ -325,35 +327,48 @@ namespace ordering {
 
   // ---- 受け付けと、期限切れ ----
 
-  /** 注文を受け付ける（支払いの枠を確保できた） */
-  export op accept(order: Standing.AwaitingPayment<Order>): Order {
+  /** 注文を受け付ける（支払いの枠を確保できた）。受け付けた後の注文を返す */
+  export op accept(order: Standing.AwaitingPayment<Order>): Order
+    throws NoOrder
+  {
     const now = clock.now();
-    const accepted = acceptedAt(order, now);
-    saveOrder(accepted);
-    return accepted;
+    acceptOrder(order, now);
+    return byId(order.id);
   }
-
-  /** 受け付けた時刻を入れる（人が書く） */
-  op acceptedAt(order: Standing.AwaitingPayment<Order>, now: Time): Order;
 
   /** 支払いを待つ長さ。これを過ぎた注文は、期限切れにする */
   state paymentWindow: single<Duration>;
 
-  /** 支払いがないまま期限が過ぎた注文を、期限切れにして、取り置きを戻す。誰にも呼ばれずに動く */
-  @clock.tick(every: 5m)
+  /**
+   * 支払いがないまま期限が過ぎた注文を一つ、期限切れにして、取り置きを戻す。誰にも呼ばれずに動く。
+   * 一度に扱うのは、いちばん古い一つだけ: 行のケースを変える効果は、行を一つずつ受け取る（README.md「分かったこと」の F50）。
+   */
+  @clock.tick(every: 1m)
   @db.transaction
   op expireUnpaid() {
     const now = clock.now();
     const deadline = before(now, paymentWindow);
-    const stale = unpaidBefore(deadline);
-    const expired = expiredAt(stale, now);
-    saveOrders(expired);
-    inventory.release(expired);
+    const stale = oldestUnpaidBefore(deadline);
+    match stale by Known {
+      Found   => expireIfUnpaid(stale, now);
+      Missing => none;
+    };
+  }
+
+  /** 期限切れにできるのは、支払いを待っている注文だけ */
+  op expireIfUnpaid(order: Order, now: Time) {
+    match order by Standing {
+      AwaitingPayment   => expire(order, now);
+      Accepted, Expired => none;
+    };
+  }
+
+  /** 期限切れにして、取り置きを戻す */
+  op expire(order: Standing.AwaitingPayment<Order>, now: Time) {
+    expireOrder(order, now);
+    inventory.release(order.id);
   }
 
   /** now から window だけ前の時刻（人が書く） */
   op before(now: Time, window: Duration): Time;
-
-  /** 期限切れの時刻を入れる（人が書く） */
-  op expiredAt(stale: Order[], now: Time): Order[];
 }

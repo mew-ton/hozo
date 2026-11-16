@@ -1,0 +1,59 @@
+// STATE-9（docs/check.md「行の遷移」の「呼ぶ側の検査」）: 分かっていない行で呼んだ。分かっているケースに、前の並びにないものがある
+namespace a {
+  model Order { id: string; }
+  model Box { order: Order; other: Order; }
+  state orders: list<Order>;
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+  classify Urgency of Order { Rush; Normal; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  op edit(order: Stage.Accepted<Order>): Order;
+  // 分かっていない行
+  op unchecked(order: Order, at: Time) {
+    start(order, at);                  // ERROR: STATE-9
+    cancel(order);                     // ERROR: STATE-9
+    discard(order);                    // ERROR: STATE-9
+  }
+  // 別のケースのアーム、前の並びにないケースを含むアーム
+  op wrongArm(order: Order, at: Time) {
+    match order by Stage {
+      Draft => start(order, at);       // ERROR: STATE-9
+      else  => none;
+    };
+    match order by Stage {
+      Accepted, Shipped => cancel(order);   // ERROR: STATE-9
+      else => none;
+    };
+    match order by Stage {
+      Cancelled => none;
+      else => cancel(order);           // ERROR: STATE-9
+    };
+  }
+  // 別の分類のアーム、別の値、対象より長いパス、対象から作った別の値
+  op wrongValue(order: Order, other: Order, box: Box, known: Stage.Accepted<Order>, at: Time) {
+    match order by Urgency {
+      Rush   => start(order, at);      // ERROR: STATE-9
+      Normal => none;
+    };
+    match order by Stage {
+      Accepted => start(other, at);    // ERROR: STATE-9
+      else     => none;
+    };
+    match box.order by Stage {
+      Accepted => start(box.other, at);   // ERROR: STATE-9
+      else     => none;
+    };
+    const edited = edit(known);
+    start(edited, at);                 // ERROR: STATE-9
+  }
+  // 型から分かっているケースが、前の並びにない
+  op wrongType(order: Stage.Shipped<Order>, mixed: Order) {
+    cancel(order);                     // ERROR: STATE-9
+    match mixed by Life {
+      Closed => discard(mixed);        // ERROR: STATE-9
+      else   => none;
+    };
+  }
+}

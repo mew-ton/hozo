@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.8"
+protocol = "0.9"
 
 [[transpiler]]
 name     = "go-sqlite"
@@ -189,6 +189,18 @@ effect deleteSession(token: type.Token) on sessions.delete;
 - `@db.delete` の条件の値の渡し方は、`read` と同じ（「read の中身」）。
 - **未決: 引数のない `@db.delete`**。「引数がなければ、すべての行」は、`@db.list` では決めたが、消す方では決めていない（書き忘れた引数が、表を空にする）。決まるまで GOSQL-28。
 - この語彙で言えないもの（一意の違反を例外に写すこと、条件に合う行だけの書き換え）は、その効果にデコレータを付けず、人が書く。
+
+**行の遷移を持つ効果**（`Effect.row`。`docs/check.md`「行の遷移」）に `db` のデコレータを付けても、SQL は、上の表のまま変わらない。行のケースは、述語で決まる分類のもので、列とは限らない（どの列がどの値ならどのケースかは、仕様のどこにも書いていない）ので、このトランスパイラは、ケースを SQL にできない。
+
+| デコレータ | SQL がすること | SQL が確かめないこと |
+|---|---|---|
+| `@db.insert`（`post`） | 引数の行を、そのまま足す | 足した行が、`as` の後のケースにあること。行を作る側（配線と、葉の op）が担う |
+| `@db.update`（`put`） | 引数の行のすべての列を、キーが同じ行に書く | 保存してある行が、前のケースにあること（`WHERE` に足すものがない）。書いた後の行が、後のケースにあること |
+| `@db.delete`（`delete`） | 付けられない（下） | — |
+
+- **`@db.update` は、後のケースが、前のケースの並びにないとき、付けられない**（GOSQL-30）: `as Stage.Accepted -> Stage.InProduction` の効果に渡る行は、`Accepted` にあると分かっている行（STATE-9）。`@db.update` は、その行を、そのまま書く。書いた後の行も `Accepted` のままで、宣言した `InProduction` にならない。行を `InProduction` にする書き方（どの列を、何に変えるか）は、宣言から決まらないので、その効果は、人が書く（遷移を宛先にする効果と同じ扱い: GOSQL-11）。付けられるのは、前が `any` の形（`as any -> Stage.Shipped`: 渡した行を、そのまま書く。その行が `Shipped` にあることは、行を作る側が担う）、後ろが `else` の形、後のケースが前の並びにある形（`as Stage.Accepted -> Stage.Accepted`: ケースを変えない書き換え）。
+- **`@db.delete` は、行の遷移を持つ効果に、付けられない**: 行の遷移を持つ効果は、行を引数に取る（STATE-7）。`@db.delete` の引数は、列の条件で、行の引数の名前の列は、ない（GOSQL-8）。その効果は、人が書く。**未決: 行を受け取る `@db.delete`**（キーが、引数の行と同じ行を消す）。決まるまで、今の規則のまま。
+- 生成するメソッドのコメントは、行の遷移を確かめないことを言う（「メソッドの形とコメント」の「効果の句」）。
 
 ### 列と引数の型
 
@@ -443,6 +455,12 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 | `@db.update` | `表 "<表>" の、キーが引数 <引数名> と同じ行を書き換える。行がなければ何もしない。` |
 | `@db.delete` | `表 "<表>" から、<条件>行を消す。行がなければ何もしない。` |
 
+行の遷移を持つ効果（`Effect.row`）は、効果の句の後ろに、空白なしで一文を足す: `行の遷移（<行の遷移の表示>）は、確かめない。`（表示の形は `docs/plugin-go.md`「コメント」の「行の遷移の表示」）。
+
+```go
+// AcceptOrder は効果 shop.acceptOrder（@db.insert）: 表 "orders" に、引数 order の行を足す。行の遷移（as shop.Stage.Accepted）は、確かめない。
+```
+
 補助のコメントは、サンプルの通り。
 
 ## 診断
@@ -474,6 +492,7 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 | GOSQL-27 | error | `@db.latest` の列のしまい方が、`@db.time` / `@db.int` / `@db.float` のどれでもない。位置は `read` |
 | GOSQL-28 | error | `@db.delete` の効果が、引数を一つも持たない。まだ決めていない形（「効果の中身」の未決）。位置は効果 |
 | GOSQL-29 | error | N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。「出力」）。位置は op |
+| GOSQL-30 | error | `@db.update` を付けた効果の行の遷移（`Effect.row`）の、前がケースの並びで、後のケースが、その並びにない（「効果の中身」: 渡る行は前のケースにあり、そのまま書いても、後のケースにならない）。位置は効果 |
 
 - 欠番（番号は別の意味に使い回さない。欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）:
 

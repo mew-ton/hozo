@@ -75,9 +75,11 @@ namespace carrier {
   @db.insert
   effect addCarrier(carrier: Carrier) on carriers.post;
 
-  /** 配送業者を書き換える */
-  @db.update
-  effect saveCarrier(carrier: Carrier) on carriers.put;
+  /**
+   * 配送業者を、使う、使わないに切り替える（人が書く）。後のケース（Use）は、引数 enabled の値で決まるので、宣言では約束できない:
+   * 何も約束しない形（as any -> else）で書く（README.md「分かったこと」の F53）。
+   */
+  effect switchCarrier(carrier: Carrier, enabled: boolean) on carriers.put as any -> else;
 
   // ---- 分類 ----
 
@@ -122,16 +124,23 @@ namespace carrier {
     throws UnknownCarrier
   {
     const found = carrierByCode(code);
-    const changed = match found by Registered {
-      Known   => switched(found, enabled);
+    match found by Registered {
+      Known   => switchCarrier(found, enabled);
       Unknown => throw UnknownCarrier;
     };
-    saveCarrier(changed);
-    return changed;
+    return known(code);
   }
 
-  /** 使う、使わないを入れる（人が書く） */
-  op switched(carrier: Carrier, enabled: boolean): Carrier;
+  /** 登録してある配送業者を引く */
+  op known(code: CarrierCode): Carrier
+    throws UnknownCarrier
+  {
+    const found = carrierByCode(code);
+    return match found by Registered {
+      Known   => found;
+      Unknown => throw UnknownCarrier;
+    };
+  }
 
   // ---- 使う ----
 
