@@ -31,14 +31,14 @@ func (a *analyzer) checkCase(name string, span source.Span, upper bool, what str
 		return
 	}
 	if strings.HasPrefix(name, "_") {
-		a.warnf("NAME-1", span, "%s の名前 %s は _ で始めない（設計書 §3.3）", what, name)
+		a.warnf("NAME-1", span, "%s の名前 %s は _ で始めない", what, name)
 		return
 	}
 	first := rune(name[0])
 	switch {
 	case upper && !unicode.IsUpper(first):
-		a.warnf("NAME-1", span, "%s の名前 %s は UpperCamelCase で書く（設計書 §3.3）", what, name)
+		a.warnf("NAME-1", span, "%s の名前 %s は UpperCamelCase で書く", what, name)
 	case !upper && !unicode.IsLower(first):
-		a.warnf("NAME-1", span, "%s の名前 %s は lowerCamelCase で書く（設計書 §3.3）", what, name)
+		a.warnf("NAME-1", span, "%s の名前 %s は lowerCamelCase で書く", what, name)
 	}
 }

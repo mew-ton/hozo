@@ -258,7 +258,7 @@ func contains(list []string, x string) bool {
 // failMessage は TYPE-4 / TYPE-1 の文言。
 func failMessage(fail assignFailure, what string, got exprType, want ir.Type) string {
 	if fail == failScalar {
-		return fmt.Sprintf("%s: 核の型の値 %s を scalar %s の位置に渡せない（検証を通していない。設計書 §6.5）", what, exprName(got), typeName(want))
+		return fmt.Sprintf("%s: 核の型の値 %s を scalar %s の位置に渡せない（検証を通していない）", what, exprName(got), typeName(want))
 	}
 	return fmt.Sprintf("%s: %s に %s は渡せない", what, typeName(want), exprName(got))
 }

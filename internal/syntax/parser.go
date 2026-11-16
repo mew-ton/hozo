@@ -239,7 +239,7 @@ func (p *parser) parseDecl() ast.Decl {
 	start := p.tok().Span.Start
 	decorators, marks := p.parseDecorators()
 	if p.at(token.DocComment) {
-		p.fail(p.tok().Span, "ドキュメンテーションコメントはデコレータの前に置く（設計書 §3.4）")
+		p.fail(p.tok().Span, "ドキュメンテーションコメントはデコレータの前に置く")
 	}
 	if p.at(token.Export) {
 		export := p.advance().Span
@@ -1362,7 +1362,7 @@ func (p *parser) parseCallArgs() []ast.Atom {
 	p.expect(token.LParen)
 	for !p.at(token.RParen) {
 		if p.atName() && p.peek(1).Kind == token.LParen {
-			p.fail(p.tok().Span, "呼び出しの引数に呼び出しは書けない。中間結果に const で名前を付ける（設計書 §9）")
+			p.fail(p.tok().Span, "呼び出しの引数に呼び出しは書けない。中間結果に const で名前を付ける")
 		}
 		args = append(args, p.parseAtom())
 		if !p.got(token.Comma) {

@@ -30,7 +30,7 @@ editors/vscode/
 |---|---|---|
 | 予約語（宣言の頭） | `keyword.declaration.hozo` | `token.Keywords` から生成 |
 | 予約語（修飾: `export`、`override`） | `storage.modifier.hozo` | 同上 |
-| 予約語（節の頭、文の頭。`reads`、`as`、`throw` を含む） | `keyword.control.hozo` | 同上 |
+| 予約語（節の頭、文の頭。`reads`、`as`、`throw`、`as` の後ろの `else` を含む） | `keyword.control.hozo` | 同上 |
 | 核の型と形（`never`、`list` / `nullable` / `single` を含む） | `support.type.primitive.hozo` | 同上 |
 | `true` / `false` / `none` | `constant.language.hozo` | 同上 |
 | フィールド名の位置の予約語（`op: string;`、`{ op: x }`、`res.op`） | `variable.other.property.hozo` | `:` の前か `.` の後ろの予約語。予約語のパターンより先に拾い、予約語として塗らない（`docs/grammar.md`「識別子」の `FieldName`）。`override: string;` の `override` もここに当たる（`:` の前） |

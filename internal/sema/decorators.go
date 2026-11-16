@@ -851,7 +851,7 @@ func (a *analyzer) lowerAlias(s *symbol, al *ast.DecoratorAlias, sc *scope) *ir.
 	}
 	target, ok := a.lower(r.sym).(*ir.Decorator)
 	if !ok || target.Alias != nil {
-		a.errorf("DEC-12", al.Name.Span, "名前付きデコレータ %s の元 %s も名前付きデコレータ（別名の別名は作れない。設計書 §8.1）", s.fqn, r.sym.fqn)
+		a.errorf("DEC-12", al.Name.Span, "名前付きデコレータ %s の元 %s も名前付きデコレータ（別名の別名は作れない）", s.fqn, r.sym.fqn)
 		return nil
 	}
 	return &ir.DecoratorAlias{Target: target.Name, Args: a.lowerArgs(al.Args, target, sc, al.Span, "DEC-12")}

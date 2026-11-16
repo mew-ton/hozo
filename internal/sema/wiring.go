@@ -148,7 +148,7 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		}
 		t, call, ok := a.evalCall(w, s.Call, nil)
 		if ok && hasValue(t) {
-			a.errorf("WIRE-2", s.Call.Span, "呼び出し %s は値を返すので、束縛せずに書けない（設計書 §9）", call.Callee)
+			a.errorf("WIRE-2", s.Call.Span, "呼び出し %s は値を返すので、束縛せずに書けない", call.Callee)
 		}
 		a.checkWIRE9(t, s.Span, last)
 		if !ok {
@@ -161,7 +161,7 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		}
 		t, m := a.evalMatch(w, s.Match, nil)
 		if hasValue(t) {
-			a.errorf("WIRE-2", s.Match.Span, "match は値を持つので、束縛せずに書けない（設計書 §9）")
+			a.errorf("WIRE-2", s.Match.Span, "match は値を持つので、束縛せずに書けない")
 		}
 		a.checkWIRE9(t, s.Span, last)
 		return ir.MatchStmt{Match: m, Span: a.irSpan(s.Span)}, true
@@ -188,7 +188,7 @@ func (a *analyzer) lowerConst(w *wiring, s *ast.ConstStmt) (ir.Statement, bool) 
 	name := s.Name.Name
 	switch t.kind {
 	case etNoValue:
-		a.errorf("WIRE-2", s.Value.NodeSpan(), "const %s に束縛する式は値を持たない（設計書 §9）", name)
+		a.errorf("WIRE-2", s.Value.NodeSpan(), "const %s に束縛する式は値を持たない", name)
 		t = unknownType()
 	case etNever:
 		a.errorf("WIRE-2", s.Value.NodeSpan(), "const %s に束縛する式は決して返らない（束縛できない）", name)
@@ -202,7 +202,7 @@ func (a *analyzer) lowerConst(w *wiring, s *ast.ConstStmt) (ir.Statement, bool) 
 		if prev.isParam {
 			what = "引数"
 		}
-		a.errorf("WIRE-4", s.Name.Span, "%s は既に%sの名前（束縛は一度だけ。設計書 §9）", name, what).Related = []diag.Related{related(prev.span, "最初の定義")}
+		a.errorf("WIRE-4", s.Name.Span, "%s は既に%sの名前（束縛は一度だけ）", name, what).Related = []diag.Related{related(prev.span, "最初の定義")}
 	} else {
 		b := &binding{name: name, typ: t, span: s.Name.Span, target: Target{Kind: TargetBinding, Decl: w.job.sym.fqn, Name: name, Span: s.Name.Span}}
 		w.scope.bindings[name] = b
@@ -219,7 +219,7 @@ func (a *analyzer) lowerConst(w *wiring, s *ast.ConstStmt) (ir.Statement, bool) 
 func (a *analyzer) lowerReturn(w *wiring, s *ast.ReturnStmt, last bool) (ir.Statement, bool) {
 	op := w.job.op
 	if op.Returns == nil {
-		a.errorf("WIRE-3", s.Span, "op %s は値を返さないので return を書けない（設計書 §9）", op.Name)
+		a.errorf("WIRE-3", s.Span, "op %s は値を返さないので return を書けない", op.Name)
 	} else if !last {
 		a.errorf("WIRE-3", s.Span, "return は本体の最後の文にだけ書ける（下の行が評価されないため）")
 	}
@@ -228,7 +228,7 @@ func (a *analyzer) lowerReturn(w *wiring, s *ast.ReturnStmt, last bool) (ir.Stat
 		return nil, false
 	}
 	if t.kind == etNoValue {
-		a.errorf("WIRE-2", s.Value.NodeSpan(), "return の式は値を持たない（設計書 §9）")
+		a.errorf("WIRE-2", s.Value.NodeSpan(), "return の式は値を持たない")
 	} else if op.Returns != nil && a.assign(t, op.Returns) != assignOK {
 		a.errorf("TYPE-3", s.Value.NodeSpan(), "return の値の型 %s は op %s の戻り値の型 %s に渡せない", exprName(t), op.Name, typeName(op.Returns))
 	}
@@ -1031,7 +1031,7 @@ func (a *analyzer) matchType(arms []armResult, m *ast.Match, ret *returnContext)
 		switch a.assign(arm.typ, t) {
 		case assignOK:
 		case failScalar:
-			a.errorf("TYPE-1", arm.span, "アームの値 %s を scalar %s の位置に渡せない（検証を通していない。設計書 §6.5）", exprName(arm.typ), typeName(t))
+			a.errorf("TYPE-1", arm.span, "アームの値 %s を scalar %s の位置に渡せない（検証を通していない）", exprName(arm.typ), typeName(t))
 		default:
 			a.errorf("TYPE-8", arm.span, "アームの値 %s は、match の型 %s に渡せない", exprName(arm.typ), typeName(t))
 		}

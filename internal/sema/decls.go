@@ -403,7 +403,7 @@ func (a *analyzer) lowerBuiltinTarget(s *symbol, e *ir.Effect, on *ast.StateOpRe
 		return
 	}
 	if r.sym.ns != s.ns {
-		a.errorf("RES-5", on.State.Span, "effect %s の on は別の名前空間の状態 %s を指している（効果は状態の持ち主の名前空間に宣言する。設計書 §6.2）", s.fqn, r.sym.fqn)
+		a.errorf("RES-5", on.State.Span, "effect %s の on は別の名前空間の状態 %s を指している（効果は状態の持ち主の名前空間に宣言する）", s.fqn, r.sym.fqn)
 		return
 	}
 	e.Target = ir.BuiltinTarget{State: r.sym.fqn, Operation: operationOf(on.Op)}
@@ -453,7 +453,7 @@ func (a *analyzer) lowerTransition(s *symbol, e *ir.Effect, t *ast.Transition, s
 		if r.sym.kind == kindClassify {
 			what = "分類"
 		}
-		a.errorf("RES-5", t.Of.Span, "effect %s の on は別の名前空間の%s %s を指している（効果は状態の持ち主の名前空間に宣言する。設計書 §6.2）", s.fqn, what, r.sym.fqn)
+		a.errorf("RES-5", t.Of.Span, "effect %s の on は別の名前空間の%s %s を指している（効果は状態の持ち主の名前空間に宣言する）", s.fqn, what, r.sym.fqn)
 		return
 	}
 	var cases []string
