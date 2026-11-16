@@ -117,7 +117,7 @@ tests/samples/<名前>/
 
 - サンプルの中のプラグイン `go-ratelimit` の単体テストの入力（`shop-server/plugins/go-ratelimit/testdata/`）は、仕様（`.hozo`）だけを先に直してあり、`views.json` は前の版のままだった（`shop-server/README.md`「R4 で、まだないもの」）。hozoc が R4 の言語を読めるようになってから、`go test ./tests -run TestPluginViewFixtures -update` で置き直した。その後、`go-ratelimit` の、生成したコードを動かすテスト（`testdata/seams/behavior_test.go`）は、状態の単位の見立てが前の版のメソッドの名前のままで落ちていて、それを、基底 `go` の R4 の形（`read` と効果のメソッド）に直した。
 
-**その段階の実装も、サンプルが使う分は入り**（hozoc と、すべてのプラグインのマニフェストが版 0.6。基底 `go`、`go-valid`、`go-sqlite`、`go-http`、サンプルの中の `go-ratelimit`。`go-sqlite` の、サンプルが使わない場合は、これを書いたとき、まだ直している途中）、サンプル `shop-server` の `TestSamples` は、すべてのサブテストが、飛ばしも、代役もなく通る。R4 の段階の全体（サンプルの外の条件を含む）が済んだかどうかの持ち主は、`docs/requirements.md`「作り直しの段階」の R4 の行。ここから、サブテストが飛ぶか、代役が置かれるなら、それは後戻り。
+**その段階の実装も、サンプルが使う分は入り**（hozoc と、すべてのプラグインのマニフェストが版 0.6。基底 `go`、`go-valid`、`go-sqlite`、`go-http`、サンプルの中の `go-ratelimit`）、サンプル `shop-server` の `TestSamples` は、すべてのサブテストが、飛ばしも、代役もなく通る。R4 の段階の全体（サンプルの外の条件を含む）が済んだかどうかの持ち主は、`docs/requirements.md`「作り直しの段階」の R4 の行。ここから、サブテストが飛ぶか、代役が置かれるなら、それは後戻り。
 
 ## サンプルの一覧
 

@@ -87,8 +87,8 @@ func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
 	if marked == 0 {
 		// 表の状態が一つもない。継ぎ目の実装を出せないので、@db.transaction の付いた op があれば GOSQL-29
 		for _, s := range e.seams {
-			e.errorf(codeSQLTransaction, s.Op, "op %s に @db.transaction が付いているが、名前空間 %s に @db.table の付いた状態が一つもない（継ぎ目の実装を出す %s がない）",
-				s.Op, view.Viewer, FileName)
+			e.errorf(codeSQLTransaction, s.Op, "op %s に @%s が付いているが、名前空間 %s に @db.table の付いた状態が一つもない（継ぎ目の実装を出す %s がない）",
+				s.Op, s.Decorator, view.Viewer, FileName)
 		}
 		if len(e.errs) == 0 {
 			// ファイルを出さず、warning を一つ（docs/plugin-go-sqlite.md「出力」）
@@ -169,10 +169,11 @@ func (e *emitter) prepare() {
 }
 
 // collectSeams は、このトランスパイラが中身を出す継ぎ目（docs/plugin-go-sqlite.md「トランザクション」の「対象」）: 基底の Seams の
-// メソッド（golang.ShapeOf(view).Seams）のうち、宣言したトランスパイラが go-sqlite のもの。並びは、基底のまま。
+// メソッド（golang.ShapeOf(view).Seams）のうち、宣言したトランスパイラが go-sqlite のもの（マニフェストが宣言する継ぎ目は
+// @db.transaction だけ）。並びは、基底のまま。
 func (e *emitter) collectSeams() {
 	for _, s := range e.shape.Seams {
-		if s.Transpiler == TranspilerName {
+		if s.Transpiler == TranspilerName && s.Decorator == decoratorTransaction {
 			e.seams = append(e.seams, s)
 		}
 	}
