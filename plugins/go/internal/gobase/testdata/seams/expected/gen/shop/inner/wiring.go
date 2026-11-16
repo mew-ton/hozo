@@ -29,5 +29,5 @@ func (o *ops) restockBody(ctx context.Context, item Item) (int64, error) {
 
 // findBody は op shop.find の中身（配線の本体）。外側の Find が、継ぎ目を通して呼ぶ。
 func (o *ops) findBody(ctx context.Context, id string) (Item, error) {
-	return o.Lookup(id), nil
+	return o.Lookup(ctx, id)
 }

@@ -19,7 +19,7 @@ type Mailer struct {
 var _ server.MailerOps = (*Mailer)(nil)
 
 // Send は mailer.send の本体。届けられなければ、仕様の例外 type.NotificationFailed。
-// ctx を取るのは、mailer.send が純粋でない（送る仕組みの語彙のデコレータ @smtp.sendMail が付いている）から。
+// ctx は、届ける関数（Deliver）に、そのまま渡す（中断と期限を伝える）。
 func (m *Mailer) Send(ctx context.Context, notice pkgtype.Notification) error {
 	if err := m.Deliver(ctx, notice); err != nil {
 		return pkgtype.NotificationFailed{}

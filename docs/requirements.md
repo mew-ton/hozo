@@ -67,7 +67,7 @@ UML に足しているのは、つながりの整合（例外と効果の伝播�
 | DB の状態は、それを使う名前空間とは別の名前空間に切り出す | 状態を名前で読めるのは持ち主の名前空間の中だけ（`docs/check.md`「状態の参照」）なので、切り出せば、ほかの名前空間はその op を通すしかなくなる |
 | 分岐には標準の分類（`by nullable`、`by list`）を使えるが、場合に業務の名前を付けた分類を、その都度宣言する方がよい（`classify Registration of findUser { Registered: findUser as User; default; }`） | 「値がある」ではなく「登録済み」と読める。判定は同じ（`docs/check.md`「ケースの判定」） |
 | 語彙のデコレータ（`@db.key` など）は、複数の担い手が共有する型のフィールドに書いてよい。どこに何を書くかは設計する人が決める。別の名前空間でだけ注釈を足したいときは、型を継承して足す（`docs/types.md`「継承した model」） | 言語は注釈の置き場を縛らない |
-| 別のプロセスや外部の仕組みを使う op には、その仕組みの語彙のデコレータを付ける（外部のサービスならそのサービスの語彙、SMTP なら `@smtp.sendMail` のように） | デコレータの付いた op は純粋でなくなり（`docs/check.md`「純粋」）、その op が外部に触れることが仕様から読める。付け忘れは実装を書く時点で分かるので、そこで仕様を直す |
+| 別のプロセスや外部の仕組みを使う op には、その仕組みの語彙のデコレータを付ける（外部のサービスならそのサービスの語彙、SMTP なら `@smtp.sendMail` のように） | デコレータの付いた op は純粋でなくなり（`docs/check.md`「純粋」）、その op が外部に触れることが仕様から読める |
 | デコレータは、原則として、op の入力と出力の値を変えない。デコレータが足すのは、op の前後の処理（確かめる、数える、記録する、待つ、やり直す）と、宣言した例外。値を変えたいなら、その変換を op として書き、配線で呼ぶ | op の引数と戻り値の型は、op の宣言に書いたもので、デコレータを読んでも変わらない。値が途中で変わると、配線を読んでも流れる値が分からなくなる。デコレータを読むトランスパイラ（継ぎ目の中身を出すもの。`docs/config.md`「継ぎ目」）を書く人への勧めでもある。継ぎ目の中で何をするかは、そのトランスパイラが決め、hozoc も基底も確かめない |
 
 ## 作るもの
@@ -132,6 +132,17 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 
 当てはめたプラグイン: op を包む側は `go-http`（`docs/plugin-go-http.md`「出力」）、`go-cli`（`docs/plugin-go-cli.md`「コマンドごとの関数」）、`go-sqlite` の `@db.transaction`（`docs/plugin-go-sqlite.md`「トランザクション」）と、継ぎ目の中身を出す相乗り。宣言から作る側は `go-sqlite` の表と `read` と効果（同「表」「read の中身」「効果の中身」）、`go-valid`（`docs/plugin-go-valid.md`「Validate を持つ型」: `Validate` を持つ型を、型の構造から決める）、基底 `go`（`docs/plugin-go.md`）。
 
+### op の中身に立ち入らない
+
+基底のトランスパイラが従う原則（`docs/decisions.md`「決めたこと」145）。
+
+**Hozo は、プログラミング言語として書いた仕様で、同時に、ハーネスでもある。仕様が守られている限り、op の中身には立ち入らない。** 中身は AI が書いてもよく、壊れたら作り直せばよい。Hozo が守るのは、仕様に書いたこと: op の名前、引数、戻り値、例外・読む状態・効果と、それらのつながり。
+
+そこから、基底は、op の中身に何が要るかを判定しない。出力する言語の作法で関数に付くもの（Go なら `context.Context` と `error`）は、仕様ではない。基底は、それが「この op には要る、この op には要らない」を、仕様から当てず、**仕様の宣言を写した関数のすべてに、同じ形で与える**。中身を書き直した結果、中断を見るようになった、失敗を返すようになった、というだけで、関数の形と、それを呼ぶコードが変わらないようにするため。
+
+- 当てはめた基底: `go`（`docs/plugin-go.md`「op の形」: どの関数も、最初の引数に `ctx context.Context` を取り、最後の戻り値に `error` を返す）。
+- op が純粋かどうか（`docs/check.md`「純粋」）は、言語が仕様から割り出す事実として残る。基底が、それで関数の形を分けないだけ。
+
 ## リポジトリの構成
 
 一つの Go モジュール `github.com/mew-ton/hozo` に、役割ごとのパッケージとディレクトリを置く。一覧と依存の向きは `docs/packages.md`「ディレクトリ」「依存の向き」。
@@ -156,7 +167,7 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 
 ### 作り直しの段階
 
-段階 4 までを作った後で、サンプル（`tests/samples/README.md`）を書きながら決めたこと（`docs/decisions.md`「P の番号との対応」）を、二つの段階（R1、R2）に分けて入れた。R3 は、その後に決めたこと（デコレータで言う読み書きと、型に依らない出力）を入れる段階。R4 は、さらにその後に決めたこと（例外、効果、`read` を同じ書き方にし、状態に触れるのをその二つだけにする。op のデコレータは包むだけ）を入れる段階。どれも、上の表の段階 5 より前に置く（TS の基底は、ここで決めた基底と相乗りの形の上に作る）。済んだ段階の行は、その段階が終わったときの記録: R3 の行にある、op に付ける `db` のデコレータ、`db.nullable`、`SharedState` と、見出し `docs/vocab.md`「`db` の読み書きのデコレータ」、`docs/plugin-go-sqlite.md`「op の中身」は、R4 が置き換えた（今の形と見出しは、R4 の行）。
+段階 4 までを作った後で、サンプル（`tests/samples/README.md`）を書きながら決めたこと（`docs/decisions.md`「P の番号との対応」）を、二つの段階（R1、R2）に分けて入れた。R3 は、その後に決めたこと（デコレータで言う読み書きと、型に依らない出力）を入れる段階。R4 は、さらにその後に決めたこと（例外、効果、`read` を同じ書き方にし、状態に触れるのをその二つだけにする。op のデコレータは包むだけ）を入れる段階。R5 は、その後に決めた原則（「op の中身に立ち入らない」）を、基底 `go` の関数の形に入れる段階。どれも、上の表の段階 5 より前に置く（TS の基底は、ここで決めた基底と相乗りの形の上に作る）。済んだ段階の行は、その段階が終わったときの記録: R3 の行にある、op に付ける `db` のデコレータ、`db.nullable`、`SharedState` と、見出し `docs/vocab.md`「`db` の読み書きのデコレータ」、`docs/plugin-go-sqlite.md`「op の中身」は、R4 が置き換えた（今の形と見出しは、R4 の行）。
 
 | 段階 | 入口 | 終わったと言える条件 |
 |---|---|---|
@@ -164,6 +175,7 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 | R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜88） | 済み。hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としもなく、すべて通る（サンプルの中のプラグイン `go-ratelimit` の分を含む）。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
 | R3 | デコレータで言う読み書きと、型に依らない出力（同「決めたこと」91〜123、「設計書を変える決定」S24） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 言語（デコレータの対象 `effect`、`reads` / `effects` の節、残りの引数、予約語のデコレータ名、DEC-17、`Op.carried`、版 0.5。フィールドの既定値がないこと）を、解析・検査・IR・スキーマ・SDK が持つ。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の読み書きのデコレータ」の全文）、`vocab/http.hozo`（同「`http` の語彙」）、`plugins/go-cli/cli.hozo`（`docs/plugin-go-cli.md`「語彙」）。三つとも、値がないときの扱いのデコレータ（`db.nullable`、`http.required` / `http.default`、`cli.required` / `cli.default`）を持つ。今の語彙で書いてある仕様を、それに合わせて直す: リポジトリ直下の `cli.hozo` と、その写し（`docs/cli.md`「cli.hozo」の `@cli.arg(1)`）、コーパスと規則ごとのテストとプラグインの単体テストの入力のうち、`@db state …`、引数のない `@cli.arg`、一つの `@http.body` を「本文そのもの」と読ませているもの、フィールドの既定値（`= 1`）、`@db.nullable` のない省略可能な列、`@http.required` / `@cli.required` を書かずに「なければ誤り」を当てにしているもの。基底 `go` が op の置き場を直に持つ効果と読む状態で決め（`SharedState` の命令）、`New<Model>` を出さず、`go-sqlite`、`go-http`、`go-cli` が、それぞれの文書の通りに出す（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」、`docs/plugin-go-http.md`「出力」「入力の読み方」「通信の形」、`docs/plugin-go-cli.md`「引数の解釈」「コマンドごとの関数」）。`go-valid` が GOVALID-2 を返さない。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が 0.5 になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」）。残っていた二点は決めた（`docs/decisions.md`「決めたこと」123） |
 | R4 | 例外、効果、`read` を同じ書き方にする（同「決めたこと」124、127 の（a）、132〜144、「設計書を変える決定」S25〜S28） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 言語（節の区切りの `,`、引数を持つ `exception` / `effect` / `read` の宣言、配線からの `read` と効果の呼び出しと、直に呼ぶ組み込みの効果、引数を持つ `throw`、葉の op が `reads` / `effects` を書けないこと、核の印 `@repeatable`、版）を、解析・検査・IR・スキーマ・SDK が持つ（`docs/grammar.md`「exception / effect / read」「decorator の宣言」「配線」、`docs/check.md`「状態に触れるもの」、`docs/ir.md`「版」）。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の語彙」の全文）、`vocab/http.hozo`（同「同梱する語彙」の `BadRequest`）。今の語彙と言語で書いてある、サンプル `shop-server` の外の、すべての仕様（リポジトリ直下の `cli.hozo` と、その写し `docs/cli.md`「cli.hozo」、コーパス、規則ごとのテスト、プラグインの単体テストの入力と、その `views.json`。サンプルの中の `go-ratelimit` の `views.json` と、それに合わせる `testdata/seams/behavior_test.go` を含む）を、新しい書き方と版に直す。基底 `go` が、`read` と効果を状態の単位のメソッドにし、配線からそれを呼び、`SharedState` を出さず、例外を引数ごとのフィールドで出す（`docs/plugin-go.md`「op の置き場」「状態の単位」「呼び出し」「exception」）。`go-sqlite` が、`read` と効果の中身を宣言から作り、`@db.transaction` の継ぎ目を宣言して、その実装を出す（`docs/plugin-go-sqlite.md`「マニフェスト」「read の中身」「効果の中身」「トランザクション」「診断」）。`go-http` と `go-cli` が、例外の値を、引数の名前をキーにしたオブジェクトで返す（`docs/plugin-go-http.md`「失敗の応答」、`docs/plugin-go-cli.md`「実行と表示」）。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が、`docs/ir.md`「版」の今の版になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」） |
+| R5 | op の中身に立ち入らない: 基底 `go` の関数の形を一通りにする（同「決めたこと」145〜148） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 基底 `go` が、仕様の宣言を写した関数（op、`read` と効果のメソッド、分類の述語と判定関数、継ぎ目のメソッドと `body`）のすべてに、最初の引数 `ctx context.Context` と、最後の戻り値 `error` を出し、純粋さで形を分けない。判定の誤りを `panic` にするコードを出さない（`docs/plugin-go.md`「op の形」「呼び出し」「分類」）。`plugin/golang` が、その形を写す（`docs/packages.md`「`plugin/golang`（公開）」）。相乗り（`go-valid`、`go-sqlite`、`go-http`、`go-cli`、サンプルの中の `go-ratelimit`）の出力と入力が、その形に合う。hozoc 自身の骨組み（`internal/gen/`）を生成し直し、`internal/app` の葉が `ctx` を取る（`docs/cli.md`「手で書くもの」）。`hozoc` の外から見える振る舞い（コマンド、フラグ、環境変数、終了コード、出力）は変わらない。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る |
 
 R2 の成果物:
 

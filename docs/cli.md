@@ -349,7 +349,7 @@ out         = "internal/gen/proc"
 
 | 口 | メソッド | 実装（`internal/app`） |
 |---|---|---|
-| `hozoc.Leaves` | `Check`、`CollectOutputs`、`Lsp`、`RunEmit`（葉の op。状態に触れない。`Check`、`Lsp`、`RunEmit` はデコレータを持つので `ctx` を取り、`error` を返す。`CollectOutputs` はデコレータを持たない葉で、純粋な op の形になり、`ctx` を取らずに `error` を返す。`docs/plugin-go.md`「op の形」） | `*app.App` |
+| `hozoc.Leaves` | `Check`、`CollectOutputs`、`Lsp`、`RunEmit`（葉の op。状態に触れない。四つとも、最初の引数に `ctx` を取り、最後の戻り値に `error` を返す: `docs/plugin-go.md`「op の形」） | `*app.App` |
 | `hozoc.SourcesState`（`sources: list<SourceFile>`） | `IsEmpty`、`Get` | `app.App` の `Sources()` が返す値: `sources` の glob に合うファイル |
 | `hozoc.ConfigState`（`config: nullable<SourceFile>`） | `IsEmpty`、`Get` | 同 `Config()`: `hozo.toml`（設定なしなら、ない） |
 | `hozoc.OutputsState`（`outputs: list<OutputFile>`） | `IsEmpty`、`Get`、`OutputChanges`（`read outputChanges` の宛先が、この状態） | 同 `Outputs()`: 出力先ごとの記録（`.hozoc-outputs.json`）に載っているファイル。`OutputChanges` は、書き出す予定を、その記録とディスクと比べる |
@@ -359,7 +359,7 @@ out         = "internal/gen/proc"
 
 - `cmd/hozoc/main.go`: `internal/app` の `App` から上の五つを取り出して `hozoc.New` に渡し（`app.App` の `Ops()`）、その戻り値を、`Presenter` と一緒に `cli.Main`（`docs/plugin-go-cli.md`「出力」）に渡す。最初の引数の `ctx` は `context.Background()`。プロセスの環境を読むのはここだけ: 環境変数は `os.Getenv` を `cli.Main` に渡し（`cli.hozo` の `@cli.env` のフィールドに入る）、ホームディレクトリ（`os.UserHomeDir()`。プラグインの探索の `<ホーム>/.hozo/plugins`）は `app.App` の `Home` に入れる。それだけ。
 - `internal/app`: 葉の op と、状態の単位の実装。`Check` は `internal/project.LoadWith`、`CollectOutputs` は「emit」の手順の 1〜3（プラグインの起動は `internal/plugin.Runner`。ファイルには触れない）、`RunEmit` は下の項目、`Lsp` は `internal/lsp.Serve`（`docs/packages.md`）。状態に触れるのは、状態の単位のメソッドだけ: `Outputs()` の `OutputChanges` は、同 4〜7 の、書くファイルと消すファイルを決めるところ（読むだけで、何も変えない。`written` は書く予定のすべて、`removed` は、記録にあって今回は書かないパスのうち、ディスクにあるもの。`dryRun` の予定では `removed` を決めない）、`OutputsSync()` の `SyncOutputs` は、書き出すところ（消す、書く、記録を書く。`dryRun` の予定では何もしない）。`OutputsSync` の述語 `UpToDate` は、生成し直した内容とディスクの内容を比べて実装する。状態の単位の、形で決まる問い合わせ（`IsEmpty`、`Get`）は、作業ディレクトリから探した設定で読む（配線は呼ばない。テストが、効果の結果の判定に使う）。
-- `CollectOutputs` は `ctx` を取らない（上の表）ので、トランスパイラの起動の間に、中断を見ない。`cmd/hozoc` が渡す `ctx` は `context.Background()` で、中断されることはない。
+- `CollectOutputs` は、受け取った `ctx` で、トランスパイラを起動する: `ctx` が中断されていれば、次のトランスパイラを起動せずに、その `error` を返す。`cmd/hozoc` が渡す `ctx` は `context.Background()` で、中断されることはない。
 - `runEmit` は、どの配線からも呼ばれない内部の op だが、基底は単位の対象の op をすべて出す（`docs/plugin-go.md`「出力の対象」）ので、`hozoc.Leaves` のメソッド `RunEmit` になり、実装が要る。実装は、`plugin` を起動し、`req` を JSON にして送り、応答を `hozoc.EmitResponse` に読んで返す。`hozoc.View` は中身のない model なので、この入口から送る要求の `view` は空のオブジェクトになる（プラグインとの境界の記述としての op で、hozoc 自身はこの入口を呼ばない）。`CollectOutputs` は、同じ起動を、本物の `View`（`ir.View`）を持つ要求で、`internal/plugin.Runner` を直に使って行う。
 - 境界の型は生成したもの（`hozoc.CheckInput`、`hozoc.Diagnostic`。中の `internal/diag.Diagnostic` は行と列に直して写す）で、例外は生成した exception の型を**値で**返す。`proc.Crashed` / `proc.MalformedOutput` は、`proc` の単位の出力 `internal/gen/proc` の型（`proc.Crashed{}`）。`hozoc` のパッケージには複製されない。`cli.hozo` の model は境界だけ（`docs/requirements.md`「自己展開」）なので、op をまたいで要る中身は `internal/app` の中に持つ: `check` が解析した `Project`、プラグインに渡す IR と、書き出す予定の置き場（ルートと、出力ごとの Dir(U, N)。境界の `EmitPlan` は、warning と、ファイルと、`dryRun` だけ）。`OutputChanges` と `SyncOutputs` に渡す予定が、直前の `CollectOutputs` の返したものでなければ、誤り（宣言にない誤り。70）。
 - **診断を運ぶ四つの例外**（`CheckFailed`、`ConfigInvalid`、`LanguageMismatch`、`OutputConflict`。生成した構造体は、引数 `diagnostics` のフィールドを一つ持つ。`docs/plugin-go.md`「exception」）を作るのと、その診断を取り出すのは、`internal/app/exceptions.go` の関数だけ。引数の名前を書くのは、そのファイルの一か所（四つの構造体と同じ形の型 `carried` と、そのフィールドを読む一行）で、`cli.hozo` の引数の名前を変えたら、そこを合わせる（合っていなければ、コンパイルできない）。ほかのコードとテストは、名前を書かない。

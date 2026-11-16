@@ -172,30 +172,44 @@ func (l leaves) Peek(context.Context) (*app.Token, error) {
 	return l.w.token, nil
 }
 
-// Audit は、運ぶ節のないデコレータだけを持つ葉: 純粋でない（ctx を取り、error を返す）
+// Audit は、運ぶ節のないデコレータだけを持つ葉
 func (l leaves) Audit(_ context.Context, note string) error {
 	l.w.note("audit " + note)
 	return nil
 }
-func (l leaves) Show(title string) { l.w.note("show " + title) }
-func (l leaves) ShowCount(n int64) { l.w.note("count " + string(rune('0'+n))) }
-func (l leaves) ShowOwner(name *string) {
+
+// デコレータも throws もない葉（仕様の上で純粋）も、同じ形: ctx を取り、error を返す（docs/plugin-go.md「op の形」）
+func (l leaves) Show(_ context.Context, title string) error {
+	l.w.note("show " + title)
+	return nil
+}
+func (l leaves) ShowCount(_ context.Context, n int64) error {
+	l.w.note("count " + string(rune('0'+n)))
+	return nil
+}
+func (l leaves) ShowOwner(_ context.Context, name *string) error {
 	if name == nil {
 		l.w.note("owner none")
 	} else {
 		l.w.note("owner " + *name)
 	}
+	return nil
 }
-func (l leaves) ShowToken(token *app.Token) {
+func (l leaves) ShowToken(_ context.Context, token *app.Token) error {
 	if token == nil {
 		l.w.note("token none")
 	} else {
 		l.w.note("token " + string(*token))
 	}
+	return nil
 }
-func (l leaves) ShowBoth(a, b *app.Token) { l.w.note("both") }
-func (l leaves) ShowLines(lines []app.Line) {
+func (l leaves) ShowBoth(_ context.Context, a, b *app.Token) error {
+	l.w.note("both")
+	return nil
+}
+func (l leaves) ShowLines(_ context.Context, lines []app.Line) error {
 	l.w.note("lines")
+	return nil
 }
 
 func newOps(w *world) app.Ops {

@@ -23,8 +23,8 @@ func main() {
 
 	leaves := &app.Leaves{
 		Now:        time.Now,
-		NewToken:   func() pkgtype.Token { return pkgtype.Token(randomHex()) },
-		NewOrderID: func() pkgtype.OrderId { return pkgtype.OrderId(randomHex()) },
+		NewToken:   func() (pkgtype.Token, error) { s, err := randomHex(); return pkgtype.Token(s), err },
+		NewOrderID: func() (pkgtype.OrderId, error) { s, err := randomHex(); return pkgtype.OrderId(s), err },
 		SessionTTL: 24 * time.Hour,
 		PageSize:   20,
 	}
@@ -47,11 +47,11 @@ func main() {
 	log.Fatal(http.ListenAndServe(*addr, handler))
 }
 
-// randomHex は推測できない 32 桁の 16 進の文字列。
-func randomHex() string {
+// randomHex は推測できない 32 桁の 16 進の文字列。乱数を読めなければ、その error（葉の op が、そのまま返す）。
+func randomHex() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic(err)
+		return "", err
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }

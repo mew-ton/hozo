@@ -15,24 +15,16 @@ import (
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
 	// Keep は op bodies.keep。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Keep(thing o2.Thing, info *ctx2.Info, fault err2.Fault)
+	Keep(ctx context.Context, thing o2.Thing, info *ctx2.Info, fault err2.Fault) error
 
 	// TakeName は op bodies.takeName。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeName(name *string)
+	TakeName(ctx context.Context, name *string) error
 
 	// TakeZero は op bodies.takeZero。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeZero(zero v0.Zero)
+	TakeZero(ctx context.Context, zero v0.Zero) error
 
 	// TakeKey は op bodies.takeKey。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeKey(key k0.Key)
+	TakeKey(ctx context.Context, key k0.Key) error
 
 	// Load は op bodies.load。
 	Load(ctx context.Context) (ctx2.Info, error)
@@ -41,45 +33,33 @@ type Ops interface {
 	Go(ctx context.Context, thing o2.Thing) (ctx2.Info, error)
 
 	// Temps は op bodies.temps。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Temps(outer Outer)
+	Temps(ctx context.Context, outer Outer) error
 
 	// Kinds は op bodies.kinds。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Kinds(text string)
+	Kinds(ctx context.Context, text string) error
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// Keep は op bodies.keep。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Keep(thing o2.Thing, info *ctx2.Info, fault err2.Fault)
+	Keep(ctx context.Context, thing o2.Thing, info *ctx2.Info, fault err2.Fault) error
 
 	// TakeName は op bodies.takeName。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeName(name *string)
+	TakeName(ctx context.Context, name *string) error
 
 	// TakeZero は op bodies.takeZero。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeZero(zero v0.Zero)
+	TakeZero(ctx context.Context, zero v0.Zero) error
 
 	// TakeKey は op bodies.takeKey。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeKey(key k0.Key)
+	TakeKey(ctx context.Context, key k0.Key) error
 
 	// Load は op bodies.load。
 	Load(ctx context.Context) (ctx2.Info, error)
 }
 
 // OOps は名前空間 o の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 o に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、o の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、o の出力の Ops は、そのまま渡せる。
 type OOps interface {
 	// Make は op o.make。
 	Make(ctx context.Context) (o2.Thing, error)
@@ -98,20 +78,20 @@ type ops struct {
 	o      OOps
 }
 
-func (o *ops) Keep(thing o2.Thing, info *ctx2.Info, fault err2.Fault) {
-	o.leaves.Keep(thing, info, fault)
+func (o *ops) Keep(ctx context.Context, thing o2.Thing, info *ctx2.Info, fault err2.Fault) error {
+	return o.leaves.Keep(ctx, thing, info, fault)
 }
 
-func (o *ops) TakeName(name *string) {
-	o.leaves.TakeName(name)
+func (o *ops) TakeName(ctx context.Context, name *string) error {
+	return o.leaves.TakeName(ctx, name)
 }
 
-func (o *ops) TakeZero(zero v0.Zero) {
-	o.leaves.TakeZero(zero)
+func (o *ops) TakeZero(ctx context.Context, zero v0.Zero) error {
+	return o.leaves.TakeZero(ctx, zero)
 }
 
-func (o *ops) TakeKey(key k0.Key) {
-	o.leaves.TakeKey(key)
+func (o *ops) TakeKey(ctx context.Context, key k0.Key) error {
+	return o.leaves.TakeKey(ctx, key)
 }
 
 func (o *ops) Load(ctx context.Context) (ctx2.Info, error) {

@@ -32,7 +32,7 @@ func (e *emitter) seamsComment() string {
 // depTypeComment は、別の名前空間の口 `<M>Ops` のコメント。
 func depTypeComment(d golang.Dep) string {
 	return comment(d.TypeName + " は名前空間 " + d.Namespace + " の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 " + d.Param + " に渡す。\n" +
-		"メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、" + d.Namespace + " の出力の Ops は、そのまま渡せる。")
+		"メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、" + d.Namespace + " の出力の Ops は、そのまま渡せる。")
 }
 
 // newComment は New のコメント: 一行目は、ある引数の種類を、この順に「、」でつないだ句。引数が一つもなければ一行だけ。
@@ -74,11 +74,9 @@ func method(name, params, results string) string {
 }
 
 // args は、op o を呼ぶときの引数の並び（ctx と、局所の名前）。メソッドの引数を、そのまま実装に渡すのに使う。
+// どの op も、最初の引数に ctx を取る（docs/plugin-go.md「op の形」）。
 func (e *emitter) args(o *ir.Op) string {
-	var as []string
-	if !o.Signature.Pure {
-		as = append(as, "ctx")
-	}
+	as := []string{"ctx"}
 	for _, p := range o.Params {
 		as = append(as, golang.LocalName(p.Name, e.reserved))
 	}
@@ -226,12 +224,8 @@ func (e *emitter) genOps() *fileGen {
 		case golang.Never:
 			f.printf("func (o *ops) %s {\n\treturn %s\n}\n\n", f.signature(o), e.neverValue(f, o))
 		default:
-			call := e.implExpr(os) + "(" + e.args(o) + ")"
-			params, results := golang.Signature(o, f.im, e.reserved)
-			if results != "" {
-				call = "return " + call // 戻り値のないメソッド（値も error もない）は、return を書かずに呼ぶだけ
-			}
-			f.printf("func (o *ops) %s {\n\t%s\n}\n\n", method(os.Method, params, results), call)
+			// 葉: 実装を呼んで、そのまま返す（どの op も error を返すので、いつも return）
+			f.printf("func (o *ops) %s {\n\treturn %s(%s)\n}\n\n", f.signature(o), e.implExpr(os), e.args(o))
 		}
 	}
 	return f
@@ -280,14 +274,8 @@ func (e *emitter) genOuter(f *fileGen, os golang.OpShape, o *ir.Op) {
 	impl := e.implExpr(os)
 	f.print(comment(os.Method + " は、継ぎ目（" + joinJa(decorators) + "）を通して、中身（" + impl + "）を呼ぶ。"))
 	params, results := golang.Signature(o, f.im, e.reserved)
-	args := e.args(o)
-	if args != "" {
-		args += ", "
-	}
-	fn := "func(" + params + ")"
-	if results != "" {
-		fn += " " + results
-	}
+	args := e.args(o) + ", "
+	fn := "func(" + params + ") " + results
 	// 内側から外へ組み立てる
 	inner := impl
 	for i := len(os.Seams) - 1; i >= 0; i-- {

@@ -19,26 +19,26 @@ import (
 
 // 生成されたメソッドの形。インターフェースのメソッド式（最初の引数がそのインターフェース）を、関数の型に代入できることで確かめる。
 //
-//   - ctx: 純粋な op（仕様から割り出したもの: デコレータ、reads、effects がなく、状態に依らない。配線なら、呼び出し先も
-//     すべて純粋）は取らず、そうでない op は最初の引数に取る。別の名前空間の op（MailerOps、StoreOps）も相手の op の判定に従う:
-//     mailer.send はデコレータ @smtp.sendMail を持ち、store.findSession は read（状態 sessions を読む）を呼ぶ配線なので、
-//     純粋でなく、ctx を取る。
-//   - error: 純粋で、throws のない op は返さない。それ以外は返す（純粋でも、throws があれば返す）。
+//   - ctx: どの op も、最初の引数に取る。
+//   - error: どの op も、最後の戻り値に返す。
+//
+// 形は一通り（docs/plugin-go.md「op の形」）: 純粋かどうか（デコレータ、reads、effects の有無）でも、throws の有無でも、
+// 葉か配線かでも、自分の名前空間の op か別の名前空間の op（MailerOps、StoreOps）かでも、変わらない。
 //
 // 入口のパッケージ（gen/server）から形を書けるのは、export を付けた op（server.Ops）、人が実装する葉（server.Leaves）、
 // 別の名前空間の op（server.MailerOps、server.StoreOps）、継ぎ目（server.Seams）。内部の配線（issueSession、authenticate、
 // sessionOf）は、内側のパッケージ（gen/server/inner）の Ops の公開のメソッドで、テストはそこから名指しできる。
 var (
-	// 純粋で、throws がない: ctx も error もない
-	_ func(server.Leaves, pkgtype.User) pkgtype.Session                       = server.Leaves.NewSession
-	_ func(server.Leaves, pkgtype.User) pkgtype.PublicUser                    = server.Leaves.ToPublicUser
-	_ func(server.Leaves, []pkgtype.Order, int64) []pkgtype.Order             = server.Leaves.PageOf
-	_ func(server.Leaves, pkgtype.Session, []pkgtype.OrderLine) pkgtype.Order = server.Leaves.NewOrder
-	_ func(server.Leaves, pkgtype.Order) pkgtype.Notification                 = server.Leaves.ComposeNotice
-	// 純粋で、throws がある: ctx はなく、error はある
-	_ func(server.Leaves, pkgtype.User, pkgtype.Password) error     = server.Leaves.CheckPassword
-	_ func(server.Leaves, pkgtype.Session) (pkgtype.Session, error) = server.Leaves.RequireFresh
-	// 純粋でない: ctx も error もある
+	// 仕様の上で純粋で、throws がない葉: それでも、ctx も error もある
+	_ func(server.Leaves, context.Context, pkgtype.User) (pkgtype.Session, error)                       = server.Leaves.NewSession
+	_ func(server.Leaves, context.Context, pkgtype.User) (pkgtype.PublicUser, error)                    = server.Leaves.ToPublicUser
+	_ func(server.Leaves, context.Context, []pkgtype.Order, int64) ([]pkgtype.Order, error)             = server.Leaves.PageOf
+	_ func(server.Leaves, context.Context, pkgtype.Session, []pkgtype.OrderLine) (pkgtype.Order, error) = server.Leaves.NewOrder
+	_ func(server.Leaves, context.Context, pkgtype.Order) (pkgtype.Notification, error)                 = server.Leaves.ComposeNotice
+	// 仕様の上で純粋で、throws がある葉: 同じ
+	_ func(server.Leaves, context.Context, pkgtype.User, pkgtype.Password) error     = server.Leaves.CheckPassword
+	_ func(server.Leaves, context.Context, pkgtype.Session) (pkgtype.Session, error) = server.Leaves.RequireFresh
+	// 仕様の上で純粋でない op（デコレータを持つ、状態に触れる op を呼ぶ）: 同じ
 	_ func(server.Ops, context.Context, server.LoginInput) (server.LoginOk, error)      = server.Ops.Login
 	_ func(server.Ops, context.Context, server.AuthInput) error                         = server.Ops.Logout
 	_ func(server.Ops, context.Context, server.AuthInput) (pkgtype.PublicUser, error)   = server.Ops.GetMe
@@ -49,12 +49,12 @@ var (
 	_ func(server.StoreOps, context.Context, pkgtype.Token) (*pkgtype.Session, error)   = server.StoreOps.FindSession
 	// 二つの効果を呼ぶ配線（store.placeOrder）も、引数の並びは op の宣言のまま
 	_ func(server.StoreOps, context.Context, pkgtype.Order, pkgtype.Notification) error = server.StoreOps.PlaceOrder
-	// 内部の配線も同じ判定: 純粋でない op を呼ぶので、ctx も error もある
+	// 内部の配線も同じ形
 	_ func(inner.Ops, context.Context, pkgtype.User, pkgtype.Password) (server.LoginOk, error) = inner.Ops.IssueSession
 	_ func(inner.Ops, context.Context, *pkgtype.Token) (pkgtype.Session, error)                = inner.Ops.Authenticate
 	_ func(inner.Ops, context.Context, pkgtype.Token) (pkgtype.Session, error)                 = inner.Ops.SessionOf
 	// 継ぎ目: op の引数（ctx と in）の後ろに、op と同じ形の body を取り、op と同じものを返す。
-	// デコレータの付いた op は純粋でないので、継ぎ目も body も、いつも ctx を取り、error を返す
+	// 継ぎ目も body も、op と同じに、いつも ctx を取り、error を返す
 	_ func(server.Seams, context.Context, server.LoginInput, func(context.Context, server.LoginInput) (server.LoginOk, error)) (server.LoginOk, error) = server.Seams.LoginRateLimited
 )
 
@@ -132,8 +132,8 @@ func TestRequestContextReachesStore(t *testing.T) {
 // fixedSession は、葉の op を一つだけ差し替えた server.Leaves: 埋め込んだ実装のうち、NewSession を置き換える。
 type fixedSession struct{ server.Leaves }
 
-func (fixedSession) NewSession(user pkgtype.User) pkgtype.Session {
-	return pkgtype.Session{Token: "差し替えたトークン", UserId: user.Id, ExpiresAt: handlertest.Now.Add(time.Minute)}
+func (fixedSession) NewSession(_ context.Context, user pkgtype.User) (pkgtype.Session, error) {
+	return pkgtype.Session{Token: "差し替えたトークン", UserId: user.Id, ExpiresAt: handlertest.Now.Add(time.Minute)}, nil
 }
 
 // sessionLog は、内部の配線 issueSession が呼ぶ別の名前空間の op を書いたもの: store.addSession。
@@ -168,8 +168,35 @@ func TestReplaceOneLeaf(t *testing.T) {
 		t.Errorf("IssueSession のトークンが %q、store.addSession に %v（期待は、%v が一つ）", ok.Token, log.added, want)
 	}
 	// 差し替えていない葉は、埋め込んだ実装のまま。葉も、内側の Ops から直に呼べる
-	if order := ops.NewOrder(pkgtype.Session{UserId: "u1"}, nil); order.Id != "order-1" || order.UserId != "u1" {
-		t.Errorf("NewOrder = %+v", order)
+	if order, err := ops.NewOrder(context.Background(), pkgtype.Session{UserId: "u1"}, nil); err != nil || order.Id != "order-1" || order.UserId != "u1" {
+		t.Errorf("NewOrder = %+v, %v", order, err)
+	}
+}
+
+// noToken は、葉 newSession が、仕様の例外でない error を返す server.Leaves（乱数を読めなかった、など）。
+type noToken struct {
+	server.Leaves
+	err error
+}
+
+func (l noToken) NewSession(context.Context, pkgtype.User) (pkgtype.Session, error) {
+	return pkgtype.Session{}, l.err
+}
+
+// TestLeafErrorIsReturned は、throws を持たない葉（newSession）が返した error が、配線 issueSession を通って、包まれずに
+// 呼び出し元に届くこと。その後ろの行（store.addSession）は呼ばれない。葉は、仕様の上で純粋でも、error を返す形を持つ
+// （docs/plugin-go.md「op の形」）ので、失敗を panic にしなくてよい。
+func TestLeafErrorIsReturned(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	log := &sessionLog{}
+	failed := errors.New("トークンを作れない")
+	ops := inner.New(noToken{f.Leaves(), failed}, nil, log, nil)
+	if _, err := ops.IssueSession(context.Background(), handlertest.Alice(), handlertest.AlicePassword); err != failed {
+		t.Errorf("IssueSession = %v（期待は、葉が返した error そのもの）", err)
+	}
+	if len(log.added) != 0 {
+		t.Errorf("葉が失敗したのに、store.addSession が呼ばれた: %v", log.added)
 	}
 }
 
@@ -400,7 +427,7 @@ func TestNilIsNotChecked(t *testing.T) {
 	}
 	f := &handlertest.Fixture{}
 	// 葉: nil の leaves（内側の Ops から、葉を直に呼ぶ）
-	panics("leaves", func() { inner.New(nil, nil, nil, nil).ToPublicUser(pkgtype.User{}) })
+	panics("leaves", func() { _, _ = inner.New(nil, nil, nil, nil).ToPublicUser(context.Background(), pkgtype.User{}) })
 	// 継ぎ目: nil の seams。継ぎ目を持つ op（login）は、中身に進む前に、継ぎ目を呼ぶ
 	panics("seams", func() {
 		_, _ = server.New(f.Leaves(), f.Mailer(), registered{}, nil).Login(context.Background(), server.LoginInput{})

@@ -21,28 +21,44 @@ const (
 // SizeCases は分類 app.Size のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type SizeCases interface {
 	// Big はケース Big の述語。
-	Big(v Item) bool
+	Big(ctx context.Context, v Item) (bool, error)
 	// Small はケース Small の述語。
-	Small(v Item) bool
+	Small(ctx context.Context, v Item) (bool, error)
 	// Tiny はケース Tiny の述語。
-	Tiny(v Item) bool
+	Tiny(ctx context.Context, v Item) (bool, error)
 }
 
 // ClassifySize は v を app.Size で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifySize(c SizeCases, v Item) (Size, error) {
+func ClassifySize(ctx context.Context, c SizeCases, v Item) (Size, error) {
 	var hits []string
 	var kind Size
-	if c.Big(v) {
+	var first error
+	if ok, err := c.Big(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Big")
 		kind = SizeBig
 	}
-	if c.Small(v) {
+	if ok, err := c.Small(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Small")
 		kind = SizeSmall
 	}
-	if c.Tiny(v) {
+	if ok, err := c.Tiny(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Tiny")
 		kind = SizeTiny
+	}
+	if first != nil {
+		return kind, first
 	}
 	switch len(hits) {
 	case 1:
@@ -62,16 +78,24 @@ const (
 // AddressCases は分類 app.Address のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type AddressCases interface {
 	// Valid はケース Valid の述語。
-	Valid(v string) bool
+	Valid(ctx context.Context, v string) (bool, error)
 }
 
 // ClassifyAddress は v を app.Address で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyAddress(c AddressCases, v string) (Address, error) {
+func ClassifyAddress(ctx context.Context, c AddressCases, v string) (Address, error) {
 	var hits []string
 	var kind Address
-	if c.Valid(v) {
+	var first error
+	if ok, err := c.Valid(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Valid")
 		kind = AddressValid
+	}
+	if first != nil {
+		return kind, first
 	}
 	switch len(hits) {
 	case 1:
@@ -94,22 +118,36 @@ const (
 // ContactCases は分類 app.Contact のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type ContactCases interface {
 	// Mail はケース Mail の述語。
-	Mail(v *string) bool
+	Mail(ctx context.Context, v *string) (bool, error)
 	// Text はケース Text の述語。
-	Text(v *string) bool
+	Text(ctx context.Context, v *string) (bool, error)
 }
 
 // ClassifyContact は v を app.Contact で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyContact(c ContactCases, v *string) (Contact, error) {
+func ClassifyContact(ctx context.Context, c ContactCases, v *string) (Contact, error) {
 	var hits []string
 	var kind Contact
-	if c.Mail(v) {
+	var first error
+	if ok, err := c.Mail(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Mail")
 		kind = ContactMail
 	}
-	if v != nil && c.Text(v) {
-		hits = append(hits, "Text")
-		kind = ContactText
+	if v != nil {
+		if ok, err := c.Text(ctx, v); err != nil {
+			if first == nil {
+				first = err
+			}
+		} else if ok {
+			hits = append(hits, "Text")
+			kind = ContactText
+		}
+	}
+	if first != nil {
+		return kind, first
 	}
 	switch len(hits) {
 	case 1:
@@ -132,22 +170,38 @@ const (
 // StockCases は分類 app.Stock のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type StockCases interface {
 	// InStock はケース InStock の述語。
-	InStock(v *Item) bool
+	InStock(ctx context.Context, v *Item) (bool, error)
 	// SoldOut はケース SoldOut の述語。
-	SoldOut(v *Item) bool
+	SoldOut(ctx context.Context, v *Item) (bool, error)
 }
 
 // ClassifyStock は v を app.Stock で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyStock(c StockCases, v *Item) (Stock, error) {
+func ClassifyStock(ctx context.Context, c StockCases, v *Item) (Stock, error) {
 	var hits []string
 	var kind Stock
-	if v != nil && c.InStock(v) {
-		hits = append(hits, "InStock")
-		kind = StockInStock
+	var first error
+	if v != nil {
+		if ok, err := c.InStock(ctx, v); err != nil {
+			if first == nil {
+				first = err
+			}
+		} else if ok {
+			hits = append(hits, "InStock")
+			kind = StockInStock
+		}
 	}
-	if v != nil && c.SoldOut(v) {
-		hits = append(hits, "SoldOut")
-		kind = StockSoldOut
+	if v != nil {
+		if ok, err := c.SoldOut(ctx, v); err != nil {
+			if first == nil {
+				first = err
+			}
+		} else if ok {
+			hits = append(hits, "SoldOut")
+			kind = StockSoldOut
+		}
+	}
+	if first != nil {
+		return kind, first
 	}
 	switch len(hits) {
 	case 1:

@@ -13,7 +13,10 @@ func (o *ops) Consts(ctx context.Context, id Id) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
-	b := o.Make(id)
+	b, err := o.Make(ctx, id)
+	if err != nil {
+		return Item{}, err
+	}
 	unused, err := o.Load(ctx, id)
 	if err != nil {
 		return Item{}, err
@@ -22,7 +25,9 @@ func (o *ops) Consts(ctx context.Context, id Id) (Item, error) {
 	c := b
 	n := int64(3)
 	_ = n
-	o.Note(a)
+	if err := o.Note(ctx, a); err != nil {
+		return Item{}, err
+	}
 	if err := o.Save(ctx, c); err != nil {
 		return Item{}, err
 	}
@@ -36,14 +41,12 @@ func (o *ops) SameShape(ctx context.Context, id Id) (Item, error) {
 
 // CalleeOnlyPure は op app.calleeOnlyPure。
 func (o *ops) CalleeOnlyPure(ctx context.Context, id Id) (Item, error) {
-	return o.Make(id), nil
+	return o.Make(ctx, id)
 }
 
 // BothPure は op app.bothPure。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) BothPure(id Id) Item {
-	return o.Make(id)
+func (o *ops) BothPure(ctx context.Context, id Id) (Item, error) {
+	return o.Make(ctx, id)
 }
 
 // Widen は op app.widen。
@@ -61,28 +64,29 @@ func (o *ops) ValueWithError(ctx context.Context, item Item) (Item, error) {
 }
 
 // ValueOnly は op app.valueOnly。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) ValueOnly(item Item) Item {
-	return item
+func (o *ops) ValueOnly(ctx context.Context, item Item) (Item, error) {
+	return item, nil
 }
 
 // Stop は op app.stop。
 //
 // Throws: app.Gone
-// 純粋（ctx を取らない）
-func (o *ops) Stop(id Id) (Item, error) {
-	a := o.Make(id)
-	o.Note(a)
-	return Item{}, o.Fail()
+func (o *ops) Stop(ctx context.Context, id Id) (Item, error) {
+	a, err := o.Make(ctx, id)
+	if err != nil {
+		return Item{}, err
+	}
+	if err := o.Note(ctx, a); err != nil {
+		return Item{}, err
+	}
+	return Item{}, o.Fail(ctx)
 }
 
 // StopStatement は op app.stopStatement。
 //
 // Throws: app.Gone
-// 純粋（ctx を取らない）
-func (o *ops) StopStatement() error {
-	return o.Fail()
+func (o *ops) StopStatement(ctx context.Context) error {
+	return o.Fail(ctx)
 }
 
 // EndWithError は op app.endWithError。
@@ -94,17 +98,18 @@ func (o *ops) EndWithError(ctx context.Context, item Item) error {
 }
 
 // EndQuiet は op app.endQuiet。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) EndQuiet(item Item) {
-	o.Note(item)
+func (o *ops) EndQuiet(ctx context.Context, item Item) error {
+	if err := o.Note(ctx, item); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Calls は op app.calls。
 //
 // Throws: app.Broken
 func (o *ops) Calls(ctx context.Context, text string) (*Item, error) {
-	id, err := o.Parse(text)
+	id, err := o.Parse(ctx, text)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +121,9 @@ func (o *ops) Calls(ctx context.Context, text string) (*Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	o.Note(fetched)
+	if err := o.Note(ctx, fetched); err != nil {
+		return nil, err
+	}
 	return found, nil
 }
 
@@ -125,7 +132,7 @@ func (o *ops) ZeroTime(ctx context.Context) (time.Time, error) {
 	if err := o.Touch(ctx); err != nil {
 		return time.Time{}, err
 	}
-	return o.AsTime(), nil
+	return o.AsTime(ctx)
 }
 
 // ZeroDuration は op app.zeroDuration。
@@ -133,7 +140,7 @@ func (o *ops) ZeroDuration(ctx context.Context) (time.Duration, error) {
 	if err := o.Touch(ctx); err != nil {
 		return 0, err
 	}
-	return o.AsDuration(), nil
+	return o.AsDuration(ctx)
 }
 
 // ZeroId は op app.zeroId。
@@ -141,7 +148,7 @@ func (o *ops) ZeroId(ctx context.Context) (Id, error) {
 	if err := o.Touch(ctx); err != nil {
 		return "", err
 	}
-	return o.AsId(), nil
+	return o.AsId(ctx)
 }
 
 // ZeroCount は op app.zeroCount。
@@ -149,7 +156,7 @@ func (o *ops) ZeroCount(ctx context.Context) (Count, error) {
 	if err := o.Touch(ctx); err != nil {
 		return 0, err
 	}
-	return o.AsCount(), nil
+	return o.AsCount(ctx)
 }
 
 // ZeroFloat は op app.zeroFloat。
@@ -157,7 +164,7 @@ func (o *ops) ZeroFloat(ctx context.Context) (float64, error) {
 	if err := o.Touch(ctx); err != nil {
 		return 0, err
 	}
-	return o.AsFloat(), nil
+	return o.AsFloat(ctx)
 }
 
 // ZeroBool は op app.zeroBool。
@@ -165,7 +172,7 @@ func (o *ops) ZeroBool(ctx context.Context) (bool, error) {
 	if err := o.Touch(ctx); err != nil {
 		return false, err
 	}
-	return o.AsBool(), nil
+	return o.AsBool(ctx)
 }
 
 // ZeroItems は op app.zeroItems。
@@ -173,7 +180,7 @@ func (o *ops) ZeroItems(ctx context.Context) ([]Item, error) {
 	if err := o.Touch(ctx); err != nil {
 		return nil, err
 	}
-	return o.AsItems(), nil
+	return o.AsItems(ctx)
 }
 
 // ZeroTable は op app.zeroTable。
@@ -181,7 +188,7 @@ func (o *ops) ZeroTable(ctx context.Context) (map[string]int64, error) {
 	if err := o.Touch(ctx); err != nil {
 		return nil, err
 	}
-	return o.AsTable(), nil
+	return o.AsTable(ctx)
 }
 
 // ZeroOptional は op app.zeroOptional。
@@ -189,7 +196,7 @@ func (o *ops) ZeroOptional(ctx context.Context) (*Item, error) {
 	if err := o.Touch(ctx); err != nil {
 		return nil, err
 	}
-	return o.AsOptional(), nil
+	return o.AsOptional(ctx)
 }
 
 // ZeroShape は op app.zeroShape。
@@ -197,7 +204,7 @@ func (o *ops) ZeroShape(ctx context.Context) (Shape, error) {
 	if err := o.Touch(ctx); err != nil {
 		return nil, err
 	}
-	return o.AsShape(), nil
+	return o.AsShape(ctx)
 }
 
 // ZeroItem は op app.zeroItem。
@@ -205,7 +212,7 @@ func (o *ops) ZeroItem(ctx context.Context, id Id) (Item, error) {
 	if err := o.Touch(ctx); err != nil {
 		return Item{}, err
 	}
-	return o.Make(id), nil
+	return o.Make(ctx, id)
 }
 
 func ptr[T any](v T) *T { return &v }

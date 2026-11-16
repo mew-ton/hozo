@@ -14,7 +14,7 @@ namespace app {
     Small;
   }
 
-  // 値を受け取る葉（純粋で失敗しない）
+  // 値を受け取る葉（純粋で throws がない）
   export op takeString(v: string);
   export op takeInt(v: int);
   export op takeFloat(v: float);

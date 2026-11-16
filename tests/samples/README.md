@@ -119,6 +119,8 @@ tests/samples/<名前>/
 
 **その段階の実装も、サンプルが使う分は入り**（hozoc と、すべてのプラグインのマニフェストが版 0.6。基底 `go`、`go-valid`、`go-sqlite`、`go-http`、サンプルの中の `go-ratelimit`）、サンプル `shop-server` の `TestSamples` は、すべてのサブテストが、飛ばしも、代役もなく通る。R4 の段階の全体（サンプルの外の条件を含む）が済んだかどうかの持ち主は、`docs/requirements.md`「作り直しの段階」の R4 の行。ここから、サブテストが飛ぶか、代役が置かれるなら、それは後戻り。
 
+**その次の段階（同 R5: 基底は op の中身に立ち入らず、どの関数も `ctx` を取り、`error` を返す）も、文書とサンプルを、実装より先に書いた。** 言語も、文書の版も、変わらないので、飛ばすサブテストはない: 実装が入るまでの間は、`files` と `go`（手で書いた期待する出力と、人が書いたコード）が通り、`transpilers/go` と `transpilers/all` が、`gen/server/inner/ops.go`、`gen/server/inner/wiring.go`、`gen/server/ops.go` の違いで落ちる。実装が入った後は、すべてのサブテストが通る（`shop-server/README.md`「R5 で変えたこと」）。
+
 ## サンプルの一覧
 
 | サンプル | 中身 |

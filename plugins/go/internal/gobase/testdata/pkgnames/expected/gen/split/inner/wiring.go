@@ -11,7 +11,9 @@ import (
 
 // Go は op split.go。
 func (o *ops) Go(ctx context.Context, job ops2.Job, target ptr2.Target) (ops2.Job, error) {
-	o.Keep(ptr(target))
+	if err := o.Keep(ctx, ptr(target)); err != nil {
+		return ops2.Job{}, err
+	}
 	return o.ops_.Run(ctx, job)
 }
 

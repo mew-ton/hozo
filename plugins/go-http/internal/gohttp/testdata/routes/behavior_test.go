@@ -104,9 +104,9 @@ func (l *apiLeaves) Count(ctx context.Context) (int64, error) {
 	l.called(ctx, "count")
 	return 0, l.err
 }
-func (l *apiLeaves) Version() string                           { return "1" }
-func (l *apiLeaves) Flaky(ctx context.Context) (string, error) { return "", nil }
-func (l *apiLeaves) Helper(n int64) int64                      { return n }
+func (l *apiLeaves) Version(context.Context) (string, error)          { return "1", nil }
+func (l *apiLeaves) Flaky(ctx context.Context) (string, error)        { return "", nil }
+func (l *apiLeaves) Helper(_ context.Context, n int64) (int64, error) { return n, nil }
 
 // response は、応答の、比べるところ。
 type response struct {

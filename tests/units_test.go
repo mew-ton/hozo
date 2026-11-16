@@ -68,9 +68,10 @@ func TestUnitsCorpus(t *testing.T) {
 		// nightly は、本体を出さず、人が実装する葉（Leaves の口）として出す。nightly が呼ぶ sweep と、呼ばれていない report は出ない
 		want(t, "gen/api/inner/ops.go", []string{"\tNightly(ctx context.Context, item Item) error", "return o.leaves.Nightly(ctx, item)"}, []string{"Sweep", "Report"})
 		want(t, "gen/api/inner/wiring.go", []string{"func (o *ops) Open(ctx context.Context, item Item) (Receipt, error) {", "o.Nightly(ctx, item)"}, []string{"func (o *ops) Nightly("})
-		// 単位 3 は in を省いているので、同じ nightly の本体を出し、sweep（純粋で失敗しない葉: ctx も error もない）と report も出す
-		want(t, "gen/batch/inner/wiring.go", []string{"func (o *ops) Nightly(ctx context.Context, item Item) error {", "o.Sweep(item)"}, nil)
-		want(t, "gen/batch/inner/ops.go", []string{"\tSweep(item Item)\n", "\tReport(ctx context.Context) (Report, error)"}, nil)
+		// 単位 3 は in を省いているので、同じ nightly の本体を出し、sweep（純粋で throws のない葉。それでも、ctx を取り、error を返す:
+		// docs/plugin-go.md「op の形」）と report も出す
+		want(t, "gen/batch/inner/wiring.go", []string{"func (o *ops) Nightly(ctx context.Context, item Item) error {", "o.Sweep(ctx, item)"}, nil)
+		want(t, "gen/batch/inner/ops.go", []string{"\tSweep(ctx context.Context, item Item) error\n", "\tReport(ctx context.Context) (Report, error)"}, nil)
 	})
 	t.Run("config.md 単位の対象/別の単位が名指しした子孫は外れる", func(t *testing.T) {
 		want(t, "gen/admin/inner/ops.go", []string{"package inner", "\tBan(ctx context.Context, item shop.Item) error"}, nil)

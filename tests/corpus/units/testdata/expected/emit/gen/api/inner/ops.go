@@ -22,9 +22,7 @@ type Ops interface {
 	Save(ctx context.Context, item Item) error
 
 	// Issue は領収書を出す
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Issue(item Item) Receipt
+	Issue(ctx context.Context, item Item) (Receipt, error)
 
 	// Nightly は夜間の片付け
 	Nightly(ctx context.Context, item Item) error
@@ -34,16 +32,14 @@ type Ops interface {
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// Issue は領収書を出す
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Issue(item Item) Receipt
+	Issue(ctx context.Context, item Item) (Receipt, error)
 
 	// Nightly は夜間の片付け
 	Nightly(ctx context.Context, item Item) error
 }
 
 // StockOps は名前空間 stock の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 stock に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、stock の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、stock の出力の Ops は、そのまま渡せる。
 type StockOps interface {
 	// Reserve は op stock.reserve: 在庫を引き当てる
 	//
@@ -64,8 +60,8 @@ type ops struct {
 	stock  StockOps
 }
 
-func (o *ops) Issue(item Item) Receipt {
-	return o.leaves.Issue(item)
+func (o *ops) Issue(ctx context.Context, item Item) (Receipt, error) {
+	return o.leaves.Issue(ctx, item)
 }
 
 func (o *ops) Nightly(ctx context.Context, item Item) error {

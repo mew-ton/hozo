@@ -6,6 +6,7 @@
 package app
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"time"
@@ -17,15 +18,16 @@ import (
 // Leaves は、server の葉の op 七つの本体（メソッド）と、それが外から受け取るもの（フィールド）。
 // *Leaves を server.New の引数 leaves にそのまま渡す。テストが差し替えられるように、時計と識別子の作り方を持つ。
 //
-// 七つとも仕様の上で純粋な op で、メソッドは ctx を取らない。throws のない五つは error も返さない
-// （生成された server.Leaves のメソッドの形がそう決めている）。
+// メソッドは、七つとも、最初の引数に ctx を取り、最後の戻り値に error を返す（生成された server.Leaves のメソッドの形。
+// docs/plugin-go.md「op の形」: 基底は、どの op にそれが要るかを判定しない）。ここの本体は、どれも待たないので ctx を見ない。
+// error を返すのは、仕様の例外（checkPassword、requireFresh）と、トークンと識別子を作れなかったとき（newSession、newOrder）。
 type Leaves struct {
 	// Now は今の時刻。
 	Now func() time.Time
-	// NewToken は新しいセッションのトークンを作る。
-	NewToken func() pkgtype.Token
-	// NewOrderID は新しい注文の識別子を作る。
-	NewOrderID func() pkgtype.OrderId
+	// NewToken は新しいセッションのトークンを作る。作れなければ、その error（仕様の例外ではない）。
+	NewToken func() (pkgtype.Token, error)
+	// NewOrderID は新しい注文の識別子を作る。作れなければ、その error（仕様の例外ではない）。
+	NewOrderID func() (pkgtype.OrderId, error)
 	// SessionTTL はセッションの有効期間。
 	SessionTTL time.Duration
 	// PageSize は注文一覧の 1 ページの件数。
@@ -36,7 +38,7 @@ type Leaves struct {
 var _ server.Leaves = (*Leaves)(nil)
 
 // CheckPassword は server.checkPassword の本体。パスワードが合わなければ InvalidCredentials。
-func (l *Leaves) CheckPassword(user pkgtype.User, password pkgtype.Password) error {
+func (l *Leaves) CheckPassword(_ context.Context, user pkgtype.User, password pkgtype.Password) error {
 	if user.Hash != HashPassword(password) {
 		return pkgtype.InvalidCredentials{}
 	}
@@ -44,22 +46,27 @@ func (l *Leaves) CheckPassword(user pkgtype.User, password pkgtype.Password) err
 }
 
 // NewSession は server.newSession の本体。トークンを作り、期限を今から SessionTTL の後にする。
-func (l *Leaves) NewSession(user pkgtype.User) pkgtype.Session {
+// トークンを作れなければ、その error を、そのまま返す。
+func (l *Leaves) NewSession(_ context.Context, user pkgtype.User) (pkgtype.Session, error) {
+	token, err := l.NewToken()
+	if err != nil {
+		return pkgtype.Session{}, err
+	}
 	return pkgtype.Session{
-		Token:     l.NewToken(),
+		Token:     token,
 		UserId:    user.Id,
 		ExpiresAt: l.Now().UTC().Add(l.SessionTTL),
-	}
+	}, nil
 }
 
 // ToPublicUser は server.toPublicUser の本体。type.User を type.PublicUser に写す（hash を落とす）。
-func (l *Leaves) ToPublicUser(user pkgtype.User) pkgtype.PublicUser {
-	return pkgtype.PublicUser{Id: user.Id, Email: user.Email, Name: user.Name}
+func (l *Leaves) ToPublicUser(_ context.Context, user pkgtype.User) (pkgtype.PublicUser, error) {
+	return pkgtype.PublicUser{Id: user.Id, Email: user.Email, Name: user.Name}, nil
 }
 
 // RequireFresh は server.requireFresh の本体。今が期限（ExpiresAt）より前なら、セッションをそのまま返す。
 // 期限ちょうどか、それより後なら Unauthorized。
-func (l *Leaves) RequireFresh(session pkgtype.Session) (pkgtype.Session, error) {
+func (l *Leaves) RequireFresh(_ context.Context, session pkgtype.Session) (pkgtype.Session, error) {
 	if !l.Now().Before(session.ExpiresAt) {
 		return pkgtype.Session{}, pkgtype.Unauthorized{}
 	}
@@ -67,26 +74,31 @@ func (l *Leaves) RequireFresh(session pkgtype.Session) (pkgtype.Session, error) 
 }
 
 // PageOf は server.pageOf の本体。1 から数える page の分（PageSize 件）を取り出す。範囲の外なら空。
-func (l *Leaves) PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
+func (l *Leaves) PageOf(_ context.Context, orders []pkgtype.Order, page int64) ([]pkgtype.Order, error) {
 	n, size := int64(len(orders)), int64(l.PageSize)
 	start := min((max(page, 1)-1)*size, n)
 	end := min(start+size, n)
-	return orders[start:end]
+	return orders[start:end], nil
 }
 
 // NewOrder は server.newOrder の本体。識別子を作り、注文した時刻を今にする。
-func (l *Leaves) NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {
+// 識別子を作れなければ、その error を、そのまま返す。
+func (l *Leaves) NewOrder(_ context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error) {
+	id, err := l.NewOrderID()
+	if err != nil {
+		return pkgtype.Order{}, err
+	}
 	return pkgtype.Order{
-		Id:       l.NewOrderID(),
+		Id:       id,
 		UserId:   session.UserId,
 		Lines:    append([]pkgtype.OrderLine{}, lines...),
 		PlacedAt: l.Now().UTC(),
-	}
+	}, nil
 }
 
 // ComposeNotice は server.composeNotice の本体。
-func (l *Leaves) ComposeNotice(order pkgtype.Order) pkgtype.Notification {
-	return pkgtype.Notification{UserId: order.UserId, Message: "注文 " + string(order.Id) + " を受け付けました"}
+func (l *Leaves) ComposeNotice(_ context.Context, order pkgtype.Order) (pkgtype.Notification, error) {
+	return pkgtype.Notification{UserId: order.UserId, Message: "注文 " + string(order.Id) + " を受け付けました"}, nil
 }
 
 // HashPassword はパスワードのハッシュ。サンプルなので SHA-256 一回（本物は bcrypt などにする）。

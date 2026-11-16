@@ -9,20 +9,41 @@ import (
 )
 
 // Locals は op app.locals。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Locals(o_ string, ctx_ string, err_ string, ptr_ string, func_ string, len_ string, error_ string, util_ string, context_ string, pkgtype_ string, runtime string) {
-	o.Show(o_)
-	o.Show(ctx_)
-	o.Show(err_)
-	o.Show(ptr_)
-	o.Show(func_)
-	o.Show(len_)
-	o.Show(error_)
-	o.Show(util_)
-	o.Show(context_)
-	o.Show(pkgtype_)
-	o.Show(runtime)
+func (o *ops) Locals(ctx context.Context, o_ string, ctx_ string, err_ string, ptr_ string, func_ string, len_ string, error_ string, util_ string, context_ string, pkgtype_ string, runtime string) error {
+	if err := o.Show(ctx, o_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, ctx_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, err_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, ptr_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, func_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, len_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, error_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, util_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, context_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, pkgtype_); err != nil {
+		return err
+	}
+	if err := o.Show(ctx, runtime); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Touch は op app.touch。
@@ -66,17 +87,23 @@ func (o *ops) Bindings(ctx context.Context) (pkgtype.Token, error) {
 	if err != nil {
 		return "", err
 	}
-	o.Show(func_)
-	o.ShowToken(v0)
+	if err := o.Show(ctx, func_); err != nil {
+		return "", err
+	}
+	if err := o.ShowToken(ctx, v0); err != nil {
+		return "", err
+	}
 	var v1 string = "x"
 	// match "x" by app.Extra
-	k0, err := ClassifyExtra(o.extra_, v1)
+	k0, err := ClassifyExtra(ctx, o.extra_, v1)
 	if err != nil {
 		return "", err
 	}
 	switch k0 {
 	case ExtraYes:
-		o.Show("yes")
+		if err := o.Show(ctx, "yes"); err != nil {
+			return "", err
+		}
 	case ExtraNo:
 	}
 	return o.type_.Issue(ctx)

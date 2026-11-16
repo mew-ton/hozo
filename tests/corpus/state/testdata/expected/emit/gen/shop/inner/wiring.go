@@ -19,7 +19,7 @@ func (o *ops) AddToCart(ctx context.Context, line Line) error {
 // Throws: shop.EmptyCart
 // Effects: shop.placeOrder
 func (o *ops) SubmitOrder(ctx context.Context) (Order, error) {
-	order, err := o.NewOrder()
+	order, err := o.NewOrder(ctx)
 	if err != nil {
 		return Order{}, err
 	}
@@ -103,10 +103,14 @@ func (o *ops) OpenTop(ctx context.Context) error {
 	// match token by nullable
 	if token != nil {
 		// HasItems: token は shop.Token
-		o.ShowCart()
+		if err := o.ShowCart(ctx); err != nil {
+			return err
+		}
 	} else {
 		// Empty
-		o.ShowLogin()
+		if err := o.ShowLogin(ctx); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -128,7 +132,9 @@ func (o *ops) OpenCart(ctx context.Context) error {
 		}
 	} else {
 		// Empty
-		o.ShowEmpty()
+		if err := o.ShowEmpty(ctx); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -164,15 +170,23 @@ func (o *ops) Checkout(ctx context.Context) (*Order, error) {
 func (o *ops) Add(ctx context.Context, line Line) error {
 	// match line by shop.LineKind
 	var normalized Line
-	k0, err := ClassifyLineKind(o.lineKind, line)
+	k0, err := ClassifyLineKind(ctx, o.lineKind, line)
 	if err != nil {
 		return err
 	}
 	switch k0 {
 	case LineKindSingle:
-		normalized = o.PackSingle(line)
+		v0, err := o.PackSingle(ctx, line)
+		if err != nil {
+			return err
+		}
+		normalized = v0
 	case LineKindBulk:
-		normalized = o.PackBulk(line)
+		v1, err := o.PackBulk(ctx, line)
+		if err != nil {
+			return err
+		}
+		normalized = v1
 	}
 	// match by shop.LoggedIn
 	k1, err := ClassifyLoggedIn(ctx, o.loggedIn)
@@ -185,7 +199,9 @@ func (o *ops) Add(ctx context.Context, line Line) error {
 			return err
 		}
 	case LoggedInDefault:
-		o.ShowLogin()
+		if err := o.ShowLogin(ctx); err != nil {
+			return err
+		}
 	}
 	return nil
 }

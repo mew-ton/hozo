@@ -44,7 +44,7 @@ namespace app {
     default;
   }
 
-  // return match: 呼び出し（error を返す）と throw。アームを書いた順によらず、値のある場合が if の枝。else を書かない
+  // return match: 呼び出し（純粋でない op）と throw。アームを書いた順によらず、値のある場合が if の枝。else を書かない
   @mark export op nameById(id: string): string
     throws Missing
   {
@@ -64,7 +64,7 @@ namespace app {
     };
   }
 
-  // return match: 呼び出し（error を返さない。絞り込んだ値は *<対象>）と「返らない」呼び出し
+  // return match: 呼び出し（純粋な配線が、純粋な op を呼ぶ。絞り込んだ値は *<対象>）と「返らない」呼び出し
   export op pureName(user: User?): string
     throws Denied
   {
@@ -108,7 +108,7 @@ namespace app {
     };
   }
 
-  // const x = match: var x <match の型> を先に置く。呼び出し（error を返す / 返さない）、値、none（何も書かない）、
+  // const x = match: var x <match の型> を先に置く。呼び出し（純粋でない op / 純粋な op。どちらも失敗の扱いを置く）、値、none（何も書かない）、
   // throw、使っていない束縛（match の後ろに _ = x）
   @mark export op constForms(id: string, lines: Line[]): string
     throws Missing
@@ -135,7 +135,7 @@ namespace app {
     return strict;
   }
 
-  // 文の match: 呼び出し（error を返す / 返さない）、none のアーム（枝を書かない。if の枝がなければ条件を逆にする）、
+  // 文の match: 呼び出し（純粋でない op / 純粋な op）、none のアーム（枝を書かない。if の枝がなければ条件を逆にする）、
   // 「返らない」呼び出し、throw、一つのアームが両方のケース（分けない）、絞り込んだ値を省略可能な位置へ
   @mark export op statementForms(user: User?, lines: Line[])
     throws Denied

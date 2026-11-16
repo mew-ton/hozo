@@ -18,7 +18,10 @@ func (o *ops) Open(ctx context.Context, item Item) (Receipt, error) {
 	if err := o.Nightly(ctx, item); err != nil {
 		return Receipt{}, err
 	}
-	receipt := o.Issue(item)
+	receipt, err := o.Issue(ctx, item)
+	if err != nil {
+		return Receipt{}, err
+	}
 	return receipt, nil
 }
 

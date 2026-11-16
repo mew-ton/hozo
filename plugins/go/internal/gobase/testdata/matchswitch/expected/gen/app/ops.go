@@ -13,55 +13,36 @@ type Ops interface {
 	Load(ctx context.Context, name string) (string, error)
 
 	// TitleOf は op app.titleOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TitleOf(ready Title) string
+	TitleOf(ctx context.Context, ready Title) (string, error)
 
 	// CodeText は op app.codeText。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	CodeText(code int64) string
+	CodeText(ctx context.Context, code int64) (string, error)
 
 	// ReceiptText は op app.receiptText。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ReceiptText(receipt Receipt) string
+	ReceiptText(ctx context.Context, receipt Receipt) (string, error)
 
 	// Send は op app.send。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Send(addr Email) string
+	Send(ctx context.Context, addr Email) (string, error)
 
 	// PriceOf は op app.priceOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PriceOf(item Item) int64
+	PriceOf(ctx context.Context, item Item) (int64, error)
 
 	// BigOnly は op app.bigOnly。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	BigOnly(item Item) string
+	BigOnly(ctx context.Context, item Item) (string, error)
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 
 	// Fail は op app.fail。
 	//
 	// Throws: app.Bad
-	// 純粋（ctx を取らない）
-	Fail() error
+	Fail(ctx context.Context) error
 
 	// Describe は op app.describe。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Describe(page Page) string
+	Describe(ctx context.Context, page Page) (string, error)
 
 	// Outcome は op app.outcome。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Outcome(result Result) string
+	Outcome(ctx context.Context, result Result) (string, error)
 
 	// Variants は op app.variants。
 	Variants(ctx context.Context, page Page) (string, error)
@@ -75,15 +56,12 @@ type Ops interface {
 	SizeLabel(ctx context.Context, item Item) (string, error)
 
 	// PureLabel は op app.pureLabel。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PureLabel(item Item) string
+	PureLabel(ctx context.Context, item Item) (string, error)
 
 	// Mail は op app.mail。
 	//
 	// Throws: app.Bad
-	// 純粋（ctx を取らない）
-	Mail(addr string, contact *string) (string, error)
+	Mail(ctx context.Context, addr string, contact *string) (string, error)
 
 	// Price は op app.price。
 	//
@@ -93,8 +71,7 @@ type Ops interface {
 	// LiteralSubjects は op app.literalSubjects。
 	//
 	// Throws: app.Bad
-	// 純粋（ctx を取らない）
-	LiteralSubjects() (string, error)
+	LiteralSubjects(ctx context.Context) (string, error)
 
 	// CheckoutNote は op app.checkoutNote。
 	//
@@ -112,39 +89,25 @@ type Leaves interface {
 	Load(ctx context.Context, name string) (string, error)
 
 	// TitleOf は op app.titleOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TitleOf(ready Title) string
+	TitleOf(ctx context.Context, ready Title) (string, error)
 
 	// CodeText は op app.codeText。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	CodeText(code int64) string
+	CodeText(ctx context.Context, code int64) (string, error)
 
 	// ReceiptText は op app.receiptText。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ReceiptText(receipt Receipt) string
+	ReceiptText(ctx context.Context, receipt Receipt) (string, error)
 
 	// Send は op app.send。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Send(addr Email) string
+	Send(ctx context.Context, addr Email) (string, error)
 
 	// PriceOf は op app.priceOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PriceOf(item Item) int64
+	PriceOf(ctx context.Context, item Item) (int64, error)
 
 	// BigOnly は op app.bigOnly。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	BigOnly(item Item) string
+	BigOnly(ctx context.Context, item Item) (string, error)
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、分類の述語（FQN の辞書順）。
@@ -174,34 +137,34 @@ func (o *ops) Load(ctx context.Context, name string) (string, error) {
 	return o.leaves.Load(ctx, name)
 }
 
-func (o *ops) TitleOf(ready Title) string {
-	return o.leaves.TitleOf(ready)
+func (o *ops) TitleOf(ctx context.Context, ready Title) (string, error) {
+	return o.leaves.TitleOf(ctx, ready)
 }
 
-func (o *ops) CodeText(code int64) string {
-	return o.leaves.CodeText(code)
+func (o *ops) CodeText(ctx context.Context, code int64) (string, error) {
+	return o.leaves.CodeText(ctx, code)
 }
 
-func (o *ops) ReceiptText(receipt Receipt) string {
-	return o.leaves.ReceiptText(receipt)
+func (o *ops) ReceiptText(ctx context.Context, receipt Receipt) (string, error) {
+	return o.leaves.ReceiptText(ctx, receipt)
 }
 
-func (o *ops) Send(addr Email) string {
-	return o.leaves.Send(addr)
+func (o *ops) Send(ctx context.Context, addr Email) (string, error) {
+	return o.leaves.Send(ctx, addr)
 }
 
-func (o *ops) PriceOf(item Item) int64 {
-	return o.leaves.PriceOf(item)
+func (o *ops) PriceOf(ctx context.Context, item Item) (int64, error) {
+	return o.leaves.PriceOf(ctx, item)
 }
 
-func (o *ops) BigOnly(item Item) string {
-	return o.leaves.BigOnly(item)
+func (o *ops) BigOnly(ctx context.Context, item Item) (string, error) {
+	return o.leaves.BigOnly(ctx, item)
 }
 
-func (o *ops) Show(text string) {
-	o.leaves.Show(text)
+func (o *ops) Show(ctx context.Context, text string) error {
+	return o.leaves.Show(ctx, text)
 }
 
-func (o *ops) Fail() error {
+func (o *ops) Fail(ctx context.Context) error {
 	return Bad{}
 }

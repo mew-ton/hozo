@@ -12,7 +12,7 @@ type Ops interface{}
 type Leaves = inner.Leaves
 
 // StockOps は名前空間 stock の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 stock に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、stock の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、stock の出力の Ops は、そのまま渡せる。
 type StockOps = inner.StockOps
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、別の名前空間（名前の辞書順）。

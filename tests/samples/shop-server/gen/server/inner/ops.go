@@ -26,18 +26,13 @@ type Ops interface {
 	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
 	//
 	// Throws: type.InvalidCredentials
-	// 純粋（ctx を取らない）
-	CheckPassword(user pkgtype.User, password pkgtype.Password) error
+	CheckPassword(ctx context.Context, user pkgtype.User, password pkgtype.Password) error
 
 	// NewSession はトークンと期限を決める（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewSession(user pkgtype.User) pkgtype.Session
+	NewSession(ctx context.Context, user pkgtype.User) (pkgtype.Session, error)
 
 	// ToPublicUser はユーザーを、外に見せる形に写す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ToPublicUser(user pkgtype.User) pkgtype.PublicUser
+	ToPublicUser(ctx context.Context, user pkgtype.User) (pkgtype.PublicUser, error)
 
 	// Authenticate は呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
 	//
@@ -54,8 +49,7 @@ type Ops interface {
 	// RequireFresh は期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く）
 	//
 	// Throws: type.Unauthorized
-	// 純粋（ctx を取らない）
-	RequireFresh(session pkgtype.Session) (pkgtype.Session, error)
+	RequireFresh(ctx context.Context, session pkgtype.Session) (pkgtype.Session, error)
 
 	// Logout はログアウトする
 	//
@@ -77,9 +71,7 @@ type Ops interface {
 	GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order, error)
 
 	// PageOf は一覧から、そのページの分を取り出す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
+	PageOf(ctx context.Context, orders []pkgtype.Order, page int64) ([]pkgtype.Order, error)
 
 	// GetLatestOrder は自分のいちばん新しい注文を返す。まだ注文がなければ、値がない
 	//
@@ -95,14 +87,10 @@ type Ops interface {
 	PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error)
 
 	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order
+	NewOrder(ctx context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error)
 
 	// ComposeNotice は通知の文面を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ComposeNotice(order pkgtype.Order) pkgtype.Notification
+	ComposeNotice(ctx context.Context, order pkgtype.Order) (pkgtype.Notification, error)
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
@@ -111,43 +99,31 @@ type Leaves interface {
 	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
 	//
 	// Throws: type.InvalidCredentials
-	// 純粋（ctx を取らない）
-	CheckPassword(user pkgtype.User, password pkgtype.Password) error
+	CheckPassword(ctx context.Context, user pkgtype.User, password pkgtype.Password) error
 
 	// NewSession はトークンと期限を決める（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewSession(user pkgtype.User) pkgtype.Session
+	NewSession(ctx context.Context, user pkgtype.User) (pkgtype.Session, error)
 
 	// ToPublicUser はユーザーを、外に見せる形に写す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ToPublicUser(user pkgtype.User) pkgtype.PublicUser
+	ToPublicUser(ctx context.Context, user pkgtype.User) (pkgtype.PublicUser, error)
 
 	// RequireFresh は期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く）
 	//
 	// Throws: type.Unauthorized
-	// 純粋（ctx を取らない）
-	RequireFresh(session pkgtype.Session) (pkgtype.Session, error)
+	RequireFresh(ctx context.Context, session pkgtype.Session) (pkgtype.Session, error)
 
 	// PageOf は一覧から、そのページの分を取り出す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
+	PageOf(ctx context.Context, orders []pkgtype.Order, page int64) ([]pkgtype.Order, error)
 
 	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order
+	NewOrder(ctx context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error)
 
 	// ComposeNotice は通知の文面を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ComposeNotice(order pkgtype.Order) pkgtype.Notification
+	ComposeNotice(ctx context.Context, order pkgtype.Order) (pkgtype.Notification, error)
 }
 
 // MailerOps は名前空間 mailer の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 mailer に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、mailer の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、mailer の出力の Ops は、そのまま渡せる。
 type MailerOps interface {
 	// Send は op mailer.send: 通知を外へ送る。送れなければ NotificationFailed
 	//
@@ -156,7 +132,7 @@ type MailerOps interface {
 }
 
 // StoreOps は名前空間 store の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 store に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
 type StoreOps interface {
 	// FindUser は op store.findUser: email からユーザーを引く
 	//
@@ -225,30 +201,30 @@ func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
 	return o.seams.LoginRateLimited(ctx, in, o.loginBody)
 }
 
-func (o *ops) CheckPassword(user pkgtype.User, password pkgtype.Password) error {
-	return o.leaves.CheckPassword(user, password)
+func (o *ops) CheckPassword(ctx context.Context, user pkgtype.User, password pkgtype.Password) error {
+	return o.leaves.CheckPassword(ctx, user, password)
 }
 
-func (o *ops) NewSession(user pkgtype.User) pkgtype.Session {
-	return o.leaves.NewSession(user)
+func (o *ops) NewSession(ctx context.Context, user pkgtype.User) (pkgtype.Session, error) {
+	return o.leaves.NewSession(ctx, user)
 }
 
-func (o *ops) ToPublicUser(user pkgtype.User) pkgtype.PublicUser {
-	return o.leaves.ToPublicUser(user)
+func (o *ops) ToPublicUser(ctx context.Context, user pkgtype.User) (pkgtype.PublicUser, error) {
+	return o.leaves.ToPublicUser(ctx, user)
 }
 
-func (o *ops) RequireFresh(session pkgtype.Session) (pkgtype.Session, error) {
-	return o.leaves.RequireFresh(session)
+func (o *ops) RequireFresh(ctx context.Context, session pkgtype.Session) (pkgtype.Session, error) {
+	return o.leaves.RequireFresh(ctx, session)
 }
 
-func (o *ops) PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
-	return o.leaves.PageOf(orders, page)
+func (o *ops) PageOf(ctx context.Context, orders []pkgtype.Order, page int64) ([]pkgtype.Order, error) {
+	return o.leaves.PageOf(ctx, orders, page)
 }
 
-func (o *ops) NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {
-	return o.leaves.NewOrder(session, lines)
+func (o *ops) NewOrder(ctx context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error) {
+	return o.leaves.NewOrder(ctx, session, lines)
 }
 
-func (o *ops) ComposeNotice(order pkgtype.Order) pkgtype.Notification {
-	return o.leaves.ComposeNotice(order)
+func (o *ops) ComposeNotice(ctx context.Context, order pkgtype.Order) (pkgtype.Notification, error) {
+	return o.leaves.ComposeNotice(ctx, order)
 }

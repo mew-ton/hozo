@@ -51,9 +51,7 @@ type Ops interface {
 	Find(ctx context.Context, id string) (Item, error)
 
 	// Lookup は op shop.lookup。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Lookup(id string) Item
+	Lookup(ctx context.Context, id string) (Item, error)
 
 	// Post は op shop.post。
 	Post(ctx context.Context, body string, body_ string) (string, error)

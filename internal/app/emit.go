@@ -51,9 +51,8 @@ type output struct {
 // 1〜3 は [App.collect]。返す予定（hozoc.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun。置き場を含む形は
 // a.planned に置く（[App.plannedFor]）。
 //
-// 仕様の collectOutputs は純粋な op（デコレータを持たない葉）なので、このメソッドは ctx を取らない（docs/plugin-go.md
-// 「op の形」）。トランスパイラの起動の間に、中断を見ることはできない。
-func (a *App) CollectOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
+// ctx は、トランスパイラの起動に使う: 中断されていれば、次のトランスパイラを起動せずに、その error を返す（[App.collect]）。
+func (a *App) CollectOutputs(ctx context.Context, in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
 	a.planned = nil
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
@@ -63,7 +62,7 @@ func (a *App) CollectOutputs(in hozoc.EmitInput, checked hozoc.CheckResult) (hoz
 	if p.NoConfig {
 		return hozoc.EmitPlan{}, noConfig(p)
 	}
-	pl, err := a.collect(context.Background(), p, in.Namespaces)
+	pl, err := a.collect(ctx, p, in.Namespaces)
 	if err != nil {
 		return hozoc.EmitPlan{}, err
 	}

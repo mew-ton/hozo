@@ -103,7 +103,7 @@ namespace app {
     };
   }
 
-  // variant の return match で、default の節がない（純粋で失敗しない配線）
+  // variant の return match で、default の節がない（純粋な配線。switch の後ろは return <零値>, &runtime.ClassificationError{…}）
   export op outcome(result: Result): string
   {
     return match result by Outcome {
@@ -149,7 +149,7 @@ namespace app {
     };
   }
 
-  // 述語で決まる分類を、純粋で失敗しない配線が使う（判定の誤りを返す先がない）
+  // 述語で決まる分類を、純粋で throws のない配線が使う（判定の誤りは、error として返す。panic にしない）
   export op pureLabel(item: Item): string
   {
     return match item by Size {

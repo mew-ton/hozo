@@ -43,7 +43,8 @@ type Shape struct {
 	New []Param
 }
 
-// OpShape は N の op 一つの形（docs/plugin-go.md「op の形」「op の置き場」「継ぎ目」）。
+// OpShape は N の op 一つの形（docs/plugin-go.md「op の形」「op の置き場」「継ぎ目」）。メソッドは、どの op も、最初の引数に
+// ctx context.Context を取り、最後の戻り値に error を返す（同「op の形」）ので、それを言うフィールドは持たない。
 type OpShape struct {
 	// FQN は op の FQN。Method はメソッドの名前（op 名を先頭大文字にしたもの）。
 	FQN, Method string
@@ -51,9 +52,6 @@ type OpShape struct {
 	Exported bool
 	// Place は置き場。
 	Place Place
-	// Ctx は最初の引数に ctx context.Context を取るか（純粋でない）。Err は最後の戻り値に error を返すか
-	// （純粋で、かつ例外が空の op だけが返さない）。
-	Ctx, Err bool
 	// Seams は、この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない。
 	Seams []string
 	// Body は、継ぎ目を持ち、基底が中身を出す op（Wiring と Never）の、中身のメソッドの名前（`loginBody`）。それ以外は ""。
@@ -224,8 +222,7 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		if !target && !called[o.Name] {
 			continue
 		}
-		os := OpShape{FQN: o.Name, Method: MethodName(o.Name), Exported: o.Exported, Place: place(o, target),
-			Ctx: !o.Signature.Pure, Err: !(o.Signature.Pure && len(o.Signature.Exceptions) == 0)}
+		os := OpShape{FQN: o.Name, Method: MethodName(o.Name), Exported: o.Exported, Place: place(o, target)}
 		if target {
 			for _, app := range o.Decorators {
 				if _, has := seams[app.Decorator]; has && !contains(os.Seams, app.Decorator) {
@@ -344,36 +341,23 @@ func effectUnit(p *ir.Program, e *ir.Effect) string {
 }
 
 // Signature は、op のメソッドの引数と戻り値のテキスト（docs/plugin-go.md「op の形」）。形は op の宣言だけで決まり、
-// どのインターフェースに現れても、どの名前空間から見ても同じ。
+// どのインターフェースに現れても、どの名前空間から見ても同じ。純粋かどうか（Op.signature.pure）と、throws の有無は、見ない。
 //
-//   - 引数: 純粋でない op は、最初に `ctx context.Context`。続けて Op.params の並びのまま `<局所の名前> <型>`。
-//   - 戻り値: returns が型なら、その型（void と never は、値はない）。純粋で、かつ例外が空の op を除いて、最後に error。
-//     二つなら `(T, error)`、何もなければ ""。
+//   - 引数: いつも、最初に `ctx context.Context`。続けて Op.params の並びのまま `<局所の名前> <型>`。
+//   - 戻り値: returns が型なら、その型（void と never は、値はない）。いつも、最後に error。値があれば `(T, error)`、
+//     なければ `error`。
 //
 // 必要な import（context、型のパッケージ）を imports に足す。reserved は、局所の名前が避ける名前（LocalName）。
 func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string) {
-	var ps []string
-	if !op.Signature.Pure {
-		ps = append(ps, "ctx "+qualify(imports, "context", "context")+".Context")
-	}
-	for _, p := range op.Params {
-		ps = append(ps, LocalName(p.Name, reserved)+" "+GoType(p.Type, imports))
-	}
-	ret := GoType(op.Returns, imports)
-	hasErr := !(op.Signature.Pure && len(op.Signature.Exceptions) == 0)
-	switch {
-	case ret != "" && hasErr:
+	results = "error"
+	if ret := GoType(op.Returns, imports); ret != "" {
 		results = "(" + ret + ", error)"
-	case ret != "":
-		results = ret
-	case hasErr:
-		results = "error"
 	}
-	return strings.Join(ps, ", "), results
+	return unitParams(op.Params, imports, reserved), results
 }
 
 // ReadSignature は、read のメソッド（状態の単位の問い合わせ）の引数と戻り値のテキスト（docs/plugin-go.md「状態の単位」）:
-// `ctx context.Context` と、Read.params の並びのまま `<局所の名前> <型>`、戻り値は `(<結果の型>, error)`。状態に触れるので、
+// `ctx context.Context` と、Read.params の並びのまま `<局所の名前> <型>`、戻り値は `(<結果の型>, error)`。op と同じに、
 // いつも ctx を取り、error を返す。reserved は、局所の名前が避ける名前（LocalName）。
 func ReadSignature(r *ir.Read, imports *Imports, reserved map[string]bool) (params, results string) {
 	return unitParams(r.Params, imports, reserved), "(" + GoType(r.Returns, imports) + ", error)"
@@ -400,7 +384,7 @@ func BuiltinSignature(s *ir.State, operation string, imports *Imports) (params, 
 // 「直に呼ぶ組み込みの効果」の表）: post と put は取り、delete は取らない。
 func BuiltinTakesValue(operation string) bool { return ir.Operation(operation) != ir.OpDelete }
 
-// unitParams は、状態の単位のメソッド（read と効果）の引数のテキスト: ctx と、宣言の引数の並び。
+// unitParams は、op のメソッドと、状態の単位のメソッド（read と効果）の引数のテキスト: ctx と、宣言の引数の並び。
 func unitParams(ps []ir.OpParam, imports *Imports, reserved map[string]bool) string {
 	out := []string{"ctx " + qualify(imports, "context", "context") + ".Context"}
 	for _, p := range ps {

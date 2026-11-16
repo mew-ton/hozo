@@ -48,6 +48,6 @@ const (
 type LineKindCases = inner.LineKindCases
 
 // ClassifyLineKind は v を shop.LineKind で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyLineKind(c LineKindCases, v Line) (LineKind, error) {
-	return inner.ClassifyLineKind(c, v)
+func ClassifyLineKind(ctx context.Context, c LineKindCases, v Line) (LineKind, error) {
+	return inner.ClassifyLineKind(ctx, c, v)
 }

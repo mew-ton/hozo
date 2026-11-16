@@ -14,8 +14,7 @@ type Ops interface {
 	// NewOrder は op shop.newOrder。
 	//
 	// Throws: shop.EmptyCart
-	// 純粋（ctx を取らない）
-	NewOrder() (Order, error)
+	NewOrder(ctx context.Context) (Order, error)
 
 	// SubmitOrder は op shop.submitOrder。
 	//
@@ -49,34 +48,22 @@ type Ops interface {
 	Logout(ctx context.Context) error
 
 	// ShowLogin は op shop.showLogin。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowLogin()
+	ShowLogin(ctx context.Context) error
 
 	// ShowCart は op shop.showCart。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowCart()
+	ShowCart(ctx context.Context) error
 
 	// ShowEmpty は op shop.showEmpty。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowEmpty()
+	ShowEmpty(ctx context.Context) error
 
 	// ShowOrders は op shop.showOrders。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowOrders()
+	ShowOrders(ctx context.Context) error
 
 	// PackSingle は op shop.packSingle。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PackSingle(line Line) Line
+	PackSingle(ctx context.Context, line Line) (Line, error)
 
 	// PackBulk は op shop.packBulk。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PackBulk(line Line) Line
+	PackBulk(ctx context.Context, line Line) (Line, error)
 
 	// Login は op shop.login。
 	//
@@ -114,38 +101,25 @@ type Leaves interface {
 	// NewOrder は op shop.newOrder。
 	//
 	// Throws: shop.EmptyCart
-	// 純粋（ctx を取らない）
-	NewOrder() (Order, error)
+	NewOrder(ctx context.Context) (Order, error)
 
 	// ShowLogin は op shop.showLogin。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowLogin()
+	ShowLogin(ctx context.Context) error
 
 	// ShowCart は op shop.showCart。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowCart()
+	ShowCart(ctx context.Context) error
 
 	// ShowEmpty は op shop.showEmpty。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowEmpty()
+	ShowEmpty(ctx context.Context) error
 
 	// ShowOrders は op shop.showOrders。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowOrders()
+	ShowOrders(ctx context.Context) error
 
 	// PackSingle は op shop.packSingle。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PackSingle(line Line) Line
+	PackSingle(ctx context.Context, line Line) (Line, error)
 
 	// PackBulk は op shop.packBulk。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PackBulk(line Line) Line
+	PackBulk(ctx context.Context, line Line) (Line, error)
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、分類の述語（FQN の辞書順）。
@@ -166,30 +140,30 @@ type ops struct {
 	lineKind LineKindCases
 }
 
-func (o *ops) NewOrder() (Order, error) {
-	return o.leaves.NewOrder()
+func (o *ops) NewOrder(ctx context.Context) (Order, error) {
+	return o.leaves.NewOrder(ctx)
 }
 
-func (o *ops) ShowLogin() {
-	o.leaves.ShowLogin()
+func (o *ops) ShowLogin(ctx context.Context) error {
+	return o.leaves.ShowLogin(ctx)
 }
 
-func (o *ops) ShowCart() {
-	o.leaves.ShowCart()
+func (o *ops) ShowCart(ctx context.Context) error {
+	return o.leaves.ShowCart(ctx)
 }
 
-func (o *ops) ShowEmpty() {
-	o.leaves.ShowEmpty()
+func (o *ops) ShowEmpty(ctx context.Context) error {
+	return o.leaves.ShowEmpty(ctx)
 }
 
-func (o *ops) ShowOrders() {
-	o.leaves.ShowOrders()
+func (o *ops) ShowOrders(ctx context.Context) error {
+	return o.leaves.ShowOrders(ctx)
 }
 
-func (o *ops) PackSingle(line Line) Line {
-	return o.leaves.PackSingle(line)
+func (o *ops) PackSingle(ctx context.Context, line Line) (Line, error) {
+	return o.leaves.PackSingle(ctx, line)
 }
 
-func (o *ops) PackBulk(line Line) Line {
-	return o.leaves.PackBulk(line)
+func (o *ops) PackBulk(ctx context.Context, line Line) (Line, error) {
+	return o.leaves.PackBulk(ctx, line)
 }

@@ -90,7 +90,7 @@ func (o *ops) Hello(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return o.Greet(name, locale), nil
+	return o.Greet(ctx, name, locale)
 }
 
 func ptr[T any](v T) *T { return &v }

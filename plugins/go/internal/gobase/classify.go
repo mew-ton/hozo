@@ -9,6 +9,7 @@ import (
 
 // このファイルは classify.go（docs/plugin-go.md「分類」）: 述語で決まる分類の、列挙の型と定数、述語のインターフェース、判定関数
 // （宣言順）。型で決まる分類は、何も出さない。定義のパッケージのもの（genClassify）と、分けた出力の入口の再公開（genEntryClassify）。
+// 述語も判定関数も、op と同じに、最初の引数に ctx を取り、最後の戻り値に error を返す（同「op の形」）。
 
 // predicateClassifies は、N の述語で決まる分類（宣言順）。
 func (e *emitter) predicateClassifies() []*ir.Classify {
@@ -117,56 +118,69 @@ func (e *emitter) genClassify() *fileGen {
 			}
 		}
 		f.print(")\n\n")
+		ctx := f.im.Add("context", "context")
 		_, isState := c.SubjectStates()
 		if !isState {
-			// 述語のインターフェース。引数は、分類の対象の型
+			// 述語のインターフェース。引数は、ctx と、分類の対象の型の値
 			subject := c.SubjectType()
 			f.print(casesComment(name, c.Name))
 			f.printf("type %sCases interface {\n", name)
 			for _, cs := range c.Cases {
-				f.printf("\t// %s はケース %s の述語。\n\t%s(v %s) bool\n", golang.Capitalize(cs.Name), cs.Name, golang.Capitalize(cs.Name), f.goType(subject))
+				f.printf("\t// %s はケース %s の述語。\n\t%s(ctx %s.Context, v %s) (bool, error)\n", golang.Capitalize(cs.Name), cs.Name, golang.Capitalize(cs.Name), ctx, f.goType(subject))
 			}
 			f.print("}\n\n")
 			// 判定関数: すべての述語を宣言順に呼び、真の数を数える
 			f.print(classifyFuncComment(name, c.Name, false))
-			f.printf("func Classify%s(c %sCases, v %s) (%s, error) {\n\tvar hits []string\n\tvar kind %s\n", name, name, f.goType(subject), name, name)
+			f.printf("func Classify%s(ctx %s.Context, c %sCases, v %s) (%s, error) {\n\tvar hits []string\n\tvar kind %s\n\tvar first error\n",
+				name, ctx, name, f.goType(subject), name, name)
 			for _, cs := range c.Cases {
-				cond := "c." + golang.Capitalize(cs.Name) + "(v)"
+				call := classifyCase("c."+golang.Capitalize(cs.Name)+"(ctx, v)", cs.Name, golang.CaseConst(name, cs.Name))
 				// 型で決まる絞り込みの as を持つケースは、値がその型に当たらなければ、述語を呼ばずに偽とする
+				guard := ""
 				if len(cs.As) > 0 {
 					switch cs.As[0].By {
 					case ir.NarrowByPresence:
-						cond = "v != nil && " + cond
+						guard = "v != nil"
 					case ir.NarrowByVariant:
 						if u := e.unionOf(subject); u != nil {
 							if a, ok := e.variantArm(u, cs.As[0].Type, c.Name); ok {
-								cond = "_, ok := v.(" + e.armGoType(f, u, a) + "); ok && " + cond
+								guard = "_, is := v.(" + e.armGoType(f, u, a) + "); is"
 							}
 						}
 					}
 				}
-				f.printf("\tif %s {\n\t\thits = append(hits, %s)\n\t\tkind = %s\n\t}\n", cond, strconv.Quote(cs.Name), golang.CaseConst(name, cs.Name))
+				if guard != "" {
+					call = "if " + guard + " {\n" + call + "}\n"
+				}
+				f.print(call)
 			}
 			e.classifyTail(f, c, name, rt())
 			continue
 		}
-		// 状態の分類: 述語は状態の単位 <C>State のメソッド。述語がエラーを返したら、残りも呼んだうえで最初のエラーを返す
+		// 状態の分類: 述語は状態の単位 <C>State のメソッド
 		f.print(classifyFuncComment(name, c.Name, true))
 		f.printf("func Classify%s(ctx %s.Context, s %s) (%s, error) {\n\tvar hits []string\n\tvar kind %s\n\tvar first error\n",
-			name, f.im.Add("context", "context"), golang.StateUnitName(c.Name), name, name)
+			name, ctx, golang.StateUnitName(c.Name), name, name)
 		for _, cs := range c.Cases {
-			f.printf("\tif ok, err := s.%s(ctx); err != nil {\n\t\tif first == nil {\n\t\t\tfirst = err\n\t\t}\n\t} else if ok {\n\t\thits = append(hits, %s)\n\t\tkind = %s\n\t}\n",
-				golang.Capitalize(cs.Name), strconv.Quote(cs.Name), golang.CaseConst(name, cs.Name))
+			f.print(classifyCase("s."+golang.Capitalize(cs.Name)+"(ctx)", cs.Name, golang.CaseConst(name, cs.Name)))
 		}
-		f.print("\tif first != nil {\n\t\treturn kind, first\n\t}\n")
 		e.classifyTail(f, c, name, rt())
 	}
 	return f
 }
 
-// classifyTail は、判定関数の終わり: 真が一つならそのケース、0 で hasDefault なら <C>Default。hasDefault が false なら、真が
-// ちょうど一つでなければ、true なら、真が二つ以上なら、*runtime.ClassificationError。
+// classifyCase は、判定関数の中の、ケース一つの述語の呼び出し（call は `c.<ケース>(ctx, v)` か `s.<ケース>(ctx)`）: 真なら、
+// ケース名を hits に足す。述語が error を返したら、最初のものを first に覚えて、残りの述語も呼ぶ。
+func classifyCase(call, caseName, caseConst string) string {
+	return "if ok, err := " + call + "; err != nil {\nif first == nil {\nfirst = err\n}\n} else if ok {\n" +
+		"hits = append(hits, " + strconv.Quote(caseName) + ")\nkind = " + caseConst + "\n}\n"
+}
+
+// classifyTail は、判定関数の終わり: 述語が error を返していれば、最初のもの。そうでなければ、真が一つならそのケース、0 で
+// hasDefault なら <C>Default。hasDefault が false なら、真がちょうど一つでなければ、true なら、真が二つ以上なら、
+// *runtime.ClassificationError。
 func (e *emitter) classifyTail(f *fileGen, c *ir.Classify, name, rt string) {
+	f.print("\tif first != nil {\n\t\treturn kind, first\n\t}\n")
 	f.print("\tswitch len(hits) {\n\tcase 1:\n\t\treturn kind, nil\n")
 	if c.HasDefault {
 		f.printf("\tcase 0:\n\t\treturn %s, nil\n", golang.CaseConst(name, "default"))
@@ -202,8 +216,8 @@ func (e *emitter) genEntryClassify() *fileGen {
 		f.print(casesComment(name, c.Name))
 		f.printf("type %sCases = %s.%sCases\n\n", name, inner, name)
 		f.print(classifyFuncComment(name, c.Name, false))
-		f.printf("func Classify%s(c %sCases, v %s) (%s, error) {\n\treturn %s.Classify%s(c, v)\n}\n\n",
-			name, name, f.goType(c.SubjectType()), name, inner, name)
+		f.printf("func Classify%s(ctx %s.Context, c %sCases, v %s) (%s, error) {\n\treturn %s.Classify%s(ctx, c, v)\n}\n\n",
+			name, f.im.Add("context", "context"), name, f.goType(c.SubjectType()), name, inner, name)
 	}
 	return f
 }

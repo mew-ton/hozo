@@ -2,213 +2,136 @@
 
 package app
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
 	// TakeString は op app.takeString。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeString(v string)
+	TakeString(ctx context.Context, v string) error
 
 	// TakeInt は op app.takeInt。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeInt(v int64)
+	TakeInt(ctx context.Context, v int64) error
 
 	// TakeFloat は op app.takeFloat。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeFloat(v float64)
+	TakeFloat(ctx context.Context, v float64) error
 
 	// TakeBool は op app.takeBool。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeBool(v bool)
+	TakeBool(ctx context.Context, v bool) error
 
 	// TakeDuration は op app.takeDuration。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeDuration(v time.Duration)
+	TakeDuration(ctx context.Context, v time.Duration) error
 
 	// TakeAccount は op app.takeAccount。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeAccount(v Account)
+	TakeAccount(ctx context.Context, v Account) error
 
 	// TakeProfile は op app.takeProfile。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeProfile(v Profile)
+	TakeProfile(ctx context.Context, v Profile) error
 
 	// TakeAddress は op app.takeAddress。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeAddress(v Address)
+	TakeAddress(ctx context.Context, v Address) error
 
 	// TakeOptions は op app.takeOptions。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptions(v Options)
+	TakeOptions(ctx context.Context, v Options) error
 
 	// TakeOptionalString は op app.takeOptionalString。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalString(v *string)
+	TakeOptionalString(ctx context.Context, v *string) error
 
 	// TakeOptionalInt は op app.takeOptionalInt。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalInt(v *int64)
+	TakeOptionalInt(ctx context.Context, v *int64) error
 
 	// TakeOptionalProfile は op app.takeOptionalProfile。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalProfile(v *Profile)
+	TakeOptionalProfile(ctx context.Context, v *Profile) error
 
 	// TakeOptionalTags は op app.takeOptionalTags。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalTags(v []string)
+	TakeOptionalTags(ctx context.Context, v []string) error
 
 	// TakeStrings は op app.takeStrings。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeStrings(v []string)
+	TakeStrings(ctx context.Context, v []string) error
 
 	// TakeOptionalStrings は op app.takeOptionalStrings。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalStrings(v []*string)
+	TakeOptionalStrings(ctx context.Context, v []*string) error
 
 	// TakeTable は op app.takeTable。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeTable(v map[string]string)
+	TakeTable(ctx context.Context, v map[string]string) error
 
 	// Names は op app.names。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Names(account Account)
+	Names(ctx context.Context, account Account) error
 
 	// Literals は op app.literals。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Literals()
+	Literals(ctx context.Context) error
 
 	// Records は op app.records。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Records(name string, email Email)
+	Records(ctx context.Context, name string, email Email) error
 
 	// ToOptional は op app.toOptional。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ToOptional(name string, tags []string)
+	ToOptional(ctx context.Context, name string, tags []string) error
 
 	// ToBase は op app.toBase。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ToBase(email Email)
+	ToBase(ctx context.Context, email Email) error
 
 	// Elements は op app.elements。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Elements(emails []Email, names []string, byName map[string]Email)
+	Elements(ctx context.Context, emails []Email, names []string, byName map[string]Email) error
 
 	// FromCase は op app.fromCase。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	FromCase(big Address)
+	FromCase(ctx context.Context, big Address) error
 
 	// OptionalPaths は op app.optionalPaths。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	OptionalPaths(account Account) *string
+	OptionalPaths(ctx context.Context, account Account) (*string, error)
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// TakeString は op app.takeString。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeString(v string)
+	TakeString(ctx context.Context, v string) error
 
 	// TakeInt は op app.takeInt。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeInt(v int64)
+	TakeInt(ctx context.Context, v int64) error
 
 	// TakeFloat は op app.takeFloat。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeFloat(v float64)
+	TakeFloat(ctx context.Context, v float64) error
 
 	// TakeBool は op app.takeBool。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeBool(v bool)
+	TakeBool(ctx context.Context, v bool) error
 
 	// TakeDuration は op app.takeDuration。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeDuration(v time.Duration)
+	TakeDuration(ctx context.Context, v time.Duration) error
 
 	// TakeAccount は op app.takeAccount。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeAccount(v Account)
+	TakeAccount(ctx context.Context, v Account) error
 
 	// TakeProfile は op app.takeProfile。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeProfile(v Profile)
+	TakeProfile(ctx context.Context, v Profile) error
 
 	// TakeAddress は op app.takeAddress。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeAddress(v Address)
+	TakeAddress(ctx context.Context, v Address) error
 
 	// TakeOptions は op app.takeOptions。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptions(v Options)
+	TakeOptions(ctx context.Context, v Options) error
 
 	// TakeOptionalString は op app.takeOptionalString。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalString(v *string)
+	TakeOptionalString(ctx context.Context, v *string) error
 
 	// TakeOptionalInt は op app.takeOptionalInt。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalInt(v *int64)
+	TakeOptionalInt(ctx context.Context, v *int64) error
 
 	// TakeOptionalProfile は op app.takeOptionalProfile。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalProfile(v *Profile)
+	TakeOptionalProfile(ctx context.Context, v *Profile) error
 
 	// TakeOptionalTags は op app.takeOptionalTags。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalTags(v []string)
+	TakeOptionalTags(ctx context.Context, v []string) error
 
 	// TakeStrings は op app.takeStrings。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeStrings(v []string)
+	TakeStrings(ctx context.Context, v []string) error
 
 	// TakeOptionalStrings は op app.takeOptionalStrings。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalStrings(v []*string)
+	TakeOptionalStrings(ctx context.Context, v []*string) error
 
 	// TakeTable は op app.takeTable。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeTable(v map[string]string)
+	TakeTable(ctx context.Context, v map[string]string) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves。
@@ -222,66 +145,66 @@ type ops struct {
 	leaves Leaves
 }
 
-func (o *ops) TakeString(v string) {
-	o.leaves.TakeString(v)
+func (o *ops) TakeString(ctx context.Context, v string) error {
+	return o.leaves.TakeString(ctx, v)
 }
 
-func (o *ops) TakeInt(v int64) {
-	o.leaves.TakeInt(v)
+func (o *ops) TakeInt(ctx context.Context, v int64) error {
+	return o.leaves.TakeInt(ctx, v)
 }
 
-func (o *ops) TakeFloat(v float64) {
-	o.leaves.TakeFloat(v)
+func (o *ops) TakeFloat(ctx context.Context, v float64) error {
+	return o.leaves.TakeFloat(ctx, v)
 }
 
-func (o *ops) TakeBool(v bool) {
-	o.leaves.TakeBool(v)
+func (o *ops) TakeBool(ctx context.Context, v bool) error {
+	return o.leaves.TakeBool(ctx, v)
 }
 
-func (o *ops) TakeDuration(v time.Duration) {
-	o.leaves.TakeDuration(v)
+func (o *ops) TakeDuration(ctx context.Context, v time.Duration) error {
+	return o.leaves.TakeDuration(ctx, v)
 }
 
-func (o *ops) TakeAccount(v Account) {
-	o.leaves.TakeAccount(v)
+func (o *ops) TakeAccount(ctx context.Context, v Account) error {
+	return o.leaves.TakeAccount(ctx, v)
 }
 
-func (o *ops) TakeProfile(v Profile) {
-	o.leaves.TakeProfile(v)
+func (o *ops) TakeProfile(ctx context.Context, v Profile) error {
+	return o.leaves.TakeProfile(ctx, v)
 }
 
-func (o *ops) TakeAddress(v Address) {
-	o.leaves.TakeAddress(v)
+func (o *ops) TakeAddress(ctx context.Context, v Address) error {
+	return o.leaves.TakeAddress(ctx, v)
 }
 
-func (o *ops) TakeOptions(v Options) {
-	o.leaves.TakeOptions(v)
+func (o *ops) TakeOptions(ctx context.Context, v Options) error {
+	return o.leaves.TakeOptions(ctx, v)
 }
 
-func (o *ops) TakeOptionalString(v *string) {
-	o.leaves.TakeOptionalString(v)
+func (o *ops) TakeOptionalString(ctx context.Context, v *string) error {
+	return o.leaves.TakeOptionalString(ctx, v)
 }
 
-func (o *ops) TakeOptionalInt(v *int64) {
-	o.leaves.TakeOptionalInt(v)
+func (o *ops) TakeOptionalInt(ctx context.Context, v *int64) error {
+	return o.leaves.TakeOptionalInt(ctx, v)
 }
 
-func (o *ops) TakeOptionalProfile(v *Profile) {
-	o.leaves.TakeOptionalProfile(v)
+func (o *ops) TakeOptionalProfile(ctx context.Context, v *Profile) error {
+	return o.leaves.TakeOptionalProfile(ctx, v)
 }
 
-func (o *ops) TakeOptionalTags(v []string) {
-	o.leaves.TakeOptionalTags(v)
+func (o *ops) TakeOptionalTags(ctx context.Context, v []string) error {
+	return o.leaves.TakeOptionalTags(ctx, v)
 }
 
-func (o *ops) TakeStrings(v []string) {
-	o.leaves.TakeStrings(v)
+func (o *ops) TakeStrings(ctx context.Context, v []string) error {
+	return o.leaves.TakeStrings(ctx, v)
 }
 
-func (o *ops) TakeOptionalStrings(v []*string) {
-	o.leaves.TakeOptionalStrings(v)
+func (o *ops) TakeOptionalStrings(ctx context.Context, v []*string) error {
+	return o.leaves.TakeOptionalStrings(ctx, v)
 }
 
-func (o *ops) TakeTable(v map[string]string) {
-	o.leaves.TakeTable(v)
+func (o *ops) TakeTable(ctx context.Context, v map[string]string) error {
+	return o.leaves.TakeTable(ctx, v)
 }

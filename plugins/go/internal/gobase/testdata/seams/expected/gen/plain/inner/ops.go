@@ -47,9 +47,7 @@ type Ops interface {
 	Find(ctx context.Context, id string) (Item, error)
 
 	// Lookup は op shop.lookup。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Lookup(id string) Item
+	Lookup(ctx context.Context, id string) (Item, error)
 
 	// Audit は op shop.audit。
 	Audit(ctx context.Context, item Item) error
@@ -83,9 +81,7 @@ type Leaves interface {
 	Notify(ctx context.Context, item Item) error
 
 	// Lookup は op shop.lookup。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Lookup(id string) Item
+	Lookup(ctx context.Context, id string) (Item, error)
 
 	// Audit は op shop.audit。
 	Audit(ctx context.Context, item Item) error
@@ -130,8 +126,8 @@ func (o *ops) Notify(ctx context.Context, item Item) error {
 	return o.leaves.Notify(ctx, item)
 }
 
-func (o *ops) Lookup(id string) Item {
-	return o.leaves.Lookup(id)
+func (o *ops) Lookup(ctx context.Context, id string) (Item, error) {
+	return o.leaves.Lookup(ctx, id)
 }
 
 func (o *ops) Audit(ctx context.Context, item Item) error {

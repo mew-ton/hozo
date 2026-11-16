@@ -7,33 +7,27 @@ import "context"
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 
 	// Need は op app.need。
 	//
 	// Throws: app.Missing, app.Plain
-	// 純粋（ctx を取らない）
-	Need(id *string, known *bool) (string, error)
+	Need(ctx context.Context, id *string, known *bool) (string, error)
 
 	// NeedId は op app.needId。
 	//
 	// Throws: app.Missing
-	// 純粋（ctx を取らない）
-	NeedId(id *string) (string, error)
+	NeedId(ctx context.Context, id *string) (string, error)
 
 	// Check は op app.check。
 	//
 	// Throws: app.Invalid
-	// 純粋（ctx を取らない）
-	Check(in Input, tags []string, text *string) (string, error)
+	Check(ctx context.Context, in Input, tags []string, text *string) (string, error)
 
 	// Guard は op app.guard。
 	//
 	// Throws: app.Missing, limits.LimitExceeded
-	// 純粋（ctx を取らない）
-	Guard(code *Code, wait *bool) error
+	Guard(ctx context.Context, code *Code, wait *bool) error
 
 	// Retry は op app.retry。
 	//
@@ -44,17 +38,14 @@ type Ops interface {
 	// Count は op app.count。
 	//
 	// Throws: app.TooMany
-	// 純粋（ctx を取らない）
-	Count(text *string) (string, error)
+	Count(ctx context.Context, text *string) (string, error)
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）。
@@ -69,6 +60,6 @@ type ops struct {
 	attempts AttemptsState
 }
 
-func (o *ops) Show(text string) {
-	o.leaves.Show(text)
+func (o *ops) Show(ctx context.Context, text string) error {
+	return o.leaves.Show(ctx, text)
 }

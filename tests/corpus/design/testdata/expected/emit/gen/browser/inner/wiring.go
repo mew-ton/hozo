@@ -73,13 +73,16 @@ func (o *ops) OnAddToCart(ctx context.Context, item server.Item) error {
 	}
 	// match item by browser.WarrantyKind
 	var warranty *server.WarrantyLine
-	k0, err := ClassifyWarrantyKind(o.warrantyKind, item)
+	k0, err := ClassifyWarrantyKind(ctx, o.warrantyKind, item)
 	if err != nil {
 		return err
 	}
 	switch k0 {
 	case WarrantyKindStandard:
-		v0 := o.ChooseStandardWarranty(item, line)
+		v0, err := o.ChooseStandardWarranty(ctx, item, line)
+		if err != nil {
+			return err
+		}
 		warranty = ptr(v0)
 	case WarrantyKindYamada:
 		v1, err := o.ChooseYamadaWarranty(ctx, item, line)
@@ -118,7 +121,7 @@ func (o *ops) ChooseYamadaWarranty(ctx context.Context, item server.Item, line s
 func (o *ops) ChooseWarrantyPlan(ctx context.Context, item server.Item) (*server.PlanId, error) {
 	// match item by browser.WarrantyAvailable
 	var plan *server.PlanId
-	k0, err := ClassifyWarrantyAvailable(o.warrantyAvailable, item)
+	k0, err := ClassifyWarrantyAvailable(ctx, o.warrantyAvailable, item)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +173,7 @@ func (o *ops) OpenOrders(ctx context.Context, query OrdersQuery) (OrderPage, err
 	if err != nil {
 		return nil, err
 	}
-	return o.OrderPageVm(me, orders), nil
+	return o.OrderPageVm(ctx, me, orders)
 }
 
 // OpenProfile は op browser.openProfile。
@@ -181,7 +184,7 @@ func (o *ops) OpenProfile(ctx context.Context) (ProfilePage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return o.ProfilePageVm(me), nil
+	return o.ProfilePageVm(ctx, me)
 }
 
 // FetchItem は op browser.fetchItem。
@@ -197,7 +200,7 @@ func (o *ops) OpenProduct(ctx context.Context, query ProductQuery) (ProductPage,
 	if err != nil {
 		return nil, err
 	}
-	return o.ProductPageVm(item), nil
+	return o.ProductPageVm(ctx, item)
 }
 
 func ptr[T any](v T) *T { return &v }

@@ -19,7 +19,9 @@ func (o *ops) Total(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	o.ShowCount(n)
+	if err := o.ShowCount(ctx, n); err != nil {
+		return 0, err
+	}
 	return n, nil
 }
 
@@ -173,7 +175,9 @@ func (o *ops) Header(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	o.Show(settings.Title)
+	if err := o.Show(ctx, settings.Title); err != nil {
+		return err
+	}
 	settings, err = o.settings.Get(ctx)
 	if err != nil {
 		return err
@@ -182,7 +186,9 @@ func (o *ops) Header(ctx context.Context) error {
 	if settings.Owner != nil {
 		v0 = ptr(settings.Owner.Name)
 	}
-	o.ShowOwner(v0)
+	if err := o.ShowOwner(ctx, v0); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -195,7 +201,9 @@ func (o *ops) Once(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	o.ShowBoth(token, token)
+	if err := o.ShowBoth(ctx, token, token); err != nil {
+		return err
+	}
 	settings, err := o.settings.Get(ctx)
 	if err != nil {
 		return err
@@ -207,7 +215,9 @@ func (o *ops) Once(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	o.ShowToken(token)
+	if err := o.ShowToken(ctx, token); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -220,7 +230,9 @@ func (o *ops) Current(ctx context.Context) (*Token, error) {
 		return nil, err
 	}
 	t := token
-	o.ShowToken(t)
+	if err := o.ShowToken(ctx, t); err != nil {
+		return nil, err
+	}
 	token, err = o.token.Get(ctx)
 	if err != nil {
 		return nil, err
@@ -232,12 +244,16 @@ func (o *ops) Current(ctx context.Context) (*Token, error) {
 //
 // Reads: app.token
 func (o *ops) Shadowed(ctx context.Context, token *Token, lines []Line) error {
-	o.ShowLines(lines)
+	if err := o.ShowLines(ctx, lines); err != nil {
+		return err
+	}
 	token_, err := o.token.Get(ctx)
 	if err != nil {
 		return err
 	}
-	o.ShowBoth(token, token_)
+	if err := o.ShowBoth(ctx, token, token_); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -253,14 +269,18 @@ func (o *ops) Branches(ctx context.Context) error {
 	// match lines by list
 	if len(lines) != 0 {
 		// HasItems
-		o.ShowLines(lines)
+		if err := o.ShowLines(ctx, lines); err != nil {
+			return err
+		}
 	} else {
 		// Empty
 		settings, err := o.settings.Get(ctx)
 		if err != nil {
 			return err
 		}
-		o.Show(settings.Title)
+		if err := o.Show(ctx, settings.Title); err != nil {
+			return err
+		}
 	}
 	token, err := o.token.Get(ctx)
 	if err != nil {
@@ -274,7 +294,9 @@ func (o *ops) Branches(ctx context.Context) error {
 		}
 	} else {
 		// Empty
-		o.ShowToken(token)
+		if err := o.ShowToken(ctx, token); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -303,7 +325,9 @@ func (o *ops) Finish(ctx context.Context, line Line) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	o.ShowCount(n)
+	if err := o.ShowCount(ctx, n); err != nil {
+		return "", err
+	}
 	return o.Summary(ctx)
 }
 

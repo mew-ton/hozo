@@ -30,34 +30,22 @@ type Ops interface {
 	Audit(ctx context.Context, note string) error
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(title string)
+	Show(ctx context.Context, title string) error
 
 	// ShowCount は op app.showCount。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowCount(n int64)
+	ShowCount(ctx context.Context, n int64) error
 
 	// ShowOwner は op app.showOwner。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowOwner(name *string)
+	ShowOwner(ctx context.Context, name *string) error
 
 	// ShowToken は op app.showToken。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowToken(token *Token)
+	ShowToken(ctx context.Context, token *Token) error
 
 	// ShowBoth は op app.showBoth。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowBoth(a *Token, b *Token)
+	ShowBoth(ctx context.Context, a *Token, b *Token) error
 
 	// ShowLines は op app.showLines。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowLines(lines []Line)
+	ShowLines(ctx context.Context, lines []Line) error
 
 	// Find は op app.find。
 	//
@@ -176,34 +164,22 @@ type Leaves interface {
 	Audit(ctx context.Context, note string) error
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(title string)
+	Show(ctx context.Context, title string) error
 
 	// ShowCount は op app.showCount。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowCount(n int64)
+	ShowCount(ctx context.Context, n int64) error
 
 	// ShowOwner は op app.showOwner。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowOwner(name *string)
+	ShowOwner(ctx context.Context, name *string) error
 
 	// ShowToken は op app.showToken。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowToken(token *Token)
+	ShowToken(ctx context.Context, token *Token) error
 
 	// ShowBoth は op app.showBoth。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowBoth(a *Token, b *Token)
+	ShowBoth(ctx context.Context, a *Token, b *Token) error
 
 	// ShowLines は op app.showLines。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowLines(lines []Line)
+	ShowLines(ctx context.Context, lines []Line) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）。
@@ -242,26 +218,26 @@ func (o *ops) Audit(ctx context.Context, note string) error {
 	return o.leaves.Audit(ctx, note)
 }
 
-func (o *ops) Show(title string) {
-	o.leaves.Show(title)
+func (o *ops) Show(ctx context.Context, title string) error {
+	return o.leaves.Show(ctx, title)
 }
 
-func (o *ops) ShowCount(n int64) {
-	o.leaves.ShowCount(n)
+func (o *ops) ShowCount(ctx context.Context, n int64) error {
+	return o.leaves.ShowCount(ctx, n)
 }
 
-func (o *ops) ShowOwner(name *string) {
-	o.leaves.ShowOwner(name)
+func (o *ops) ShowOwner(ctx context.Context, name *string) error {
+	return o.leaves.ShowOwner(ctx, name)
 }
 
-func (o *ops) ShowToken(token *Token) {
-	o.leaves.ShowToken(token)
+func (o *ops) ShowToken(ctx context.Context, token *Token) error {
+	return o.leaves.ShowToken(ctx, token)
 }
 
-func (o *ops) ShowBoth(a *Token, b *Token) {
-	o.leaves.ShowBoth(a, b)
+func (o *ops) ShowBoth(ctx context.Context, a *Token, b *Token) error {
+	return o.leaves.ShowBoth(ctx, a, b)
 }
 
-func (o *ops) ShowLines(lines []Line) {
-	o.leaves.ShowLines(lines)
+func (o *ops) ShowLines(ctx context.Context, lines []Line) error {
+	return o.leaves.ShowLines(ctx, lines)
 }

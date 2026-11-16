@@ -60,7 +60,8 @@ func describe(name string, d *ir.Doc, fallback string) string {
 }
 
 // opFacts は、op のコメントの、説明の後ろの段（docs/plugin-go.md「コメント」の「op のコメント」）: `引数:` の段と、
-// Throws / Reads / Effects と「純粋」の行。sig は、その op の計算した結果（Op.signature か、見る側から見た View.ops の値）。
+// Throws / Reads / Effects の行。純粋かどうか（Signature.pure）は、書かない。sig は、その op の計算した結果（Op.signature か、
+// 見る側から見た View.ops の値）。
 func opFacts(o *ir.Op, sig *ir.Signature) []string {
 	var sections []string
 	if o.Description != nil && len(o.Description.Params) > 0 {
@@ -83,13 +84,6 @@ func opFacts(o *ir.Op, sig *ir.Signature) []string {
 			effects[i] = fx.String() // 宣言は FQN、直に書いた効果は <状態の FQN>.<操作>
 		}
 		facts = append(facts, "Effects: "+strings.Join(effects, ", "))
-	}
-	if o.Signature.Pure {
-		if len(o.Signature.Exceptions) == 0 {
-			facts = append(facts, "純粋（ctx を取らない）。失敗しない（error を返さない）")
-		} else {
-			facts = append(facts, "純粋（ctx を取らない）")
-		}
 	}
 	if len(facts) > 0 {
 		sections = append(sections, strings.Join(facts, "\n"))

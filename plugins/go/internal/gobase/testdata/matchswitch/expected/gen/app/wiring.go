@@ -9,34 +9,30 @@ import (
 )
 
 // Describe は op app.describe。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Describe(page Page) string {
+func (o *ops) Describe(ctx context.Context, page Page) (string, error) {
 	// match page by app.PageKind
 	switch page.(type) {
 	case Title:
-		return o.TitleOf(page.(Title))
+		return o.TitleOf(ctx, page.(Title))
 	case Problem:
-		return page.(Problem).Reason
+		return page.(Problem).Reason, nil
 	case PageCode:
-		return o.CodeText(page.(PageCode).Value)
+		return o.CodeText(ctx, page.(PageCode).Value)
 	default:
-		return "other"
+		return "other", nil
 	}
 }
 
 // Outcome は op app.outcome。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Outcome(result Result) string {
+func (o *ops) Outcome(ctx context.Context, result Result) (string, error) {
 	// match result by app.Outcome
 	switch result.(type) {
 	case Receipt:
-		return o.ReceiptText(result.(Receipt))
+		return o.ReceiptText(ctx, result.(Receipt))
 	case Problem:
-		return result.(Problem).Reason
+		return result.(Problem).Reason, nil
 	}
-	panic(&runtime.ClassificationError{Classify: "app.Outcome"})
+	return "", &runtime.ClassificationError{Classify: "app.Outcome"}
 }
 
 // Variants は op app.variants。
@@ -51,7 +47,10 @@ func (o *ops) Variants(ctx context.Context, page Page) (string, error) {
 		}
 		text = ptr(v0)
 	case PageCode:
-		v1 := o.CodeText(page.(PageCode).Value)
+		v1, err := o.CodeText(ctx, page.(PageCode).Value)
+		if err != nil {
+			return "", err
+		}
 		text = ptr(v1)
 	default:
 	}
@@ -59,7 +58,9 @@ func (o *ops) Variants(ctx context.Context, page Page) (string, error) {
 	// match page by app.PageKind
 	switch page.(type) {
 	case Title:
-		o.Show("ready")
+		if err := o.Show(ctx, "ready"); err != nil {
+			return "", err
+		}
 	case Problem, PageCode:
 	default:
 	}
@@ -77,7 +78,7 @@ func (o *ops) StageText(ctx context.Context) (string, error) {
 	// match by app.Stage
 	switch stage.(type) {
 	case Title:
-		return o.TitleOf(stage.(Title)), nil
+		return o.TitleOf(ctx, stage.(Title))
 	case Problem:
 		return stage.(Problem).Reason, nil
 	default:
@@ -88,13 +89,13 @@ func (o *ops) StageText(ctx context.Context) (string, error) {
 // SizeLabel は op app.sizeLabel。
 func (o *ops) SizeLabel(ctx context.Context, item Item) (string, error) {
 	// match item by app.Size
-	k0, err := ClassifySize(o.size, item)
+	k0, err := ClassifySize(ctx, o.size, item)
 	if err != nil {
 		return "", err
 	}
 	switch k0 {
 	case SizeBig:
-		return o.BigOnly(item), nil
+		return o.BigOnly(ctx, item)
 	case SizeSmall:
 		return "small", nil
 	case SizeTiny:
@@ -104,53 +105,56 @@ func (o *ops) SizeLabel(ctx context.Context, item Item) (string, error) {
 }
 
 // PureLabel は op app.pureLabel。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) PureLabel(item Item) string {
+func (o *ops) PureLabel(ctx context.Context, item Item) (string, error) {
 	// match item by app.Size
-	k0, err := ClassifySize(o.size, item)
+	k0, err := ClassifySize(ctx, o.size, item)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	switch k0 {
 	case SizeBig, SizeSmall:
-		return "normal"
+		return "normal", nil
 	case SizeTiny:
-		return "tiny"
+		return "tiny", nil
 	}
-	panic(&runtime.ClassificationError{Classify: "app.Size"})
+	return "", &runtime.ClassificationError{Classify: "app.Size"}
 }
 
 // Mail は op app.mail。
 //
 // Throws: app.Bad
-// 純粋（ctx を取らない）
-func (o *ops) Mail(addr string, contact *string) (string, error) {
+func (o *ops) Mail(ctx context.Context, addr string, contact *string) (string, error) {
 	// match addr by app.Address
 	var first string
-	k0, err := ClassifyAddress(o.address, addr)
+	k0, err := ClassifyAddress(ctx, o.address, addr)
 	if err != nil {
 		return "", err
 	}
 	switch k0 {
 	case AddressValid:
-		first = o.Send(Email(addr))
+		v0, err := o.Send(ctx, Email(addr))
+		if err != nil {
+			return "", err
+		}
+		first = v0
 	case AddressDefault:
 		first = "invalid"
 	}
-	o.Show(first)
+	if err := o.Show(ctx, first); err != nil {
+		return "", err
+	}
 	// match contact by app.Contact
-	k1, err := ClassifyContact(o.contact, contact)
+	k1, err := ClassifyContact(ctx, o.contact, contact)
 	if err != nil {
 		return "", err
 	}
 	switch k1 {
 	case ContactMail:
-		return o.Send(Email(*contact)), nil
+		return o.Send(ctx, Email(*contact))
 	case ContactText:
 		return *contact, nil
 	case ContactDefault:
-		return "", o.Fail()
+		return "", o.Fail(ctx)
 	}
 	return "", &runtime.ClassificationError{Classify: "app.Contact"}
 }
@@ -165,17 +169,21 @@ func (o *ops) Price(ctx context.Context, name string) (int64, error) {
 	}
 	// match item by app.Stock
 	var value int64
-	k0, err := ClassifyStock(o.stock, item)
+	k0, err := ClassifyStock(ctx, o.stock, item)
 	if err != nil {
 		return 0, err
 	}
 	switch k0 {
 	case StockInStock:
-		value = o.PriceOf(*item)
+		v0, err := o.PriceOf(ctx, *item)
+		if err != nil {
+			return 0, err
+		}
+		value = v0
 	case StockSoldOut:
 		return 0, Bad{}
 	case StockDefault:
-		return 0, o.Fail()
+		return 0, o.Fail(ctx)
 	}
 	return value, nil
 }
@@ -183,12 +191,11 @@ func (o *ops) Price(ctx context.Context, name string) (int64, error) {
 // LiteralSubjects は op app.literalSubjects。
 //
 // Throws: app.Bad
-// 純粋（ctx を取らない）
-func (o *ops) LiteralSubjects() (string, error) {
+func (o *ops) LiteralSubjects(ctx context.Context) (string, error) {
 	var v0 string = "x@example.com"
 	// match "x@example.com" by app.Address
 	var a string
-	k0, err := ClassifyAddress(o.address, v0)
+	k0, err := ClassifyAddress(ctx, o.address, v0)
 	if err != nil {
 		return "", err
 	}
@@ -198,10 +205,12 @@ func (o *ops) LiteralSubjects() (string, error) {
 	case AddressDefault:
 		a = "ng"
 	}
-	o.Show(a)
+	if err := o.Show(ctx, a); err != nil {
+		return "", err
+	}
 	v1 := Item{Name: "box", Price: 3}
 	// match {…} by app.Size
-	k1, err := ClassifySize(o.size, v1)
+	k1, err := ClassifySize(ctx, o.size, v1)
 	if err != nil {
 		return "", err
 	}
@@ -227,7 +236,9 @@ func (o *ops) CheckoutNote(ctx context.Context) error {
 	}
 	switch k0 {
 	case CheckoutShopping:
-		o.Show("shopping")
+		if err := o.Show(ctx, "shopping"); err != nil {
+			return err
+		}
 	case CheckoutOrdered:
 	}
 	return nil

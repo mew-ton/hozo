@@ -231,7 +231,6 @@ type OpShape struct {
     FQN, Method string
     Exported   bool
     Place      Place                              // Wiring / Never / Leaf（同「op の置き場」の 1〜3）
-    Ctx, Err   bool                               // ctx を取るか、error を返すか
     Seams      []string                           // この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない
     Body       string                             // 継ぎ目を持ち、基底が中身を出す op（Wiring / Never）の、中身のメソッドの名前。それ以外は ""
 }
@@ -247,7 +246,7 @@ type Dep struct { Namespace, TypeName, Param string; Ops []string }
 type Seam struct { Op, Decorator, Transpiler, Method string }   // 継ぎ目一つ: op の FQN、デコレータの FQN、宣言したトランスパイラ（View.config.seams の値）、Seams のメソッドの名前
 type Param struct { Name, Type string }
 func ShapeOf(view *ir.View) *Shape
-func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // op のメソッドの引数と戻り値のテキスト（ctx と error を含む）
+func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // op のメソッドの引数と戻り値のテキスト（いつも、最初に ctx、最後に error）
 func ReadSignature(r *ir.Read, imports *Imports, reserved map[string]bool) (params, results string)       // read のメソッド（いつも ctx を取り、結果と error を返す）
 func EffectSignature(e *ir.Effect, imports *Imports, reserved map[string]bool) (params, results string)   // 効果のメソッド（いつも ctx を取り、error を返す）
 func BuiltinSignature(s *ir.State, operation string, imports *Imports) (params, results string)           // 形で決まる命令のメソッド（値を取る操作は value <要素の型>）
@@ -271,6 +270,7 @@ func PublicNames(view *ir.View) []PublicName      // 出力 (U, N) の定義の�
 - `Param.Type` は、定義のパッケージの中での書き方。別の名前空間の分類の述語（`<C>Cases`）は修飾なしの名前で、書く側が `Imports.Qualifier` で修飾する。
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
 - 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。メソッドの名前は、`read` と効果が `MethodName(<FQN>)`、形で決まる命令が `BuiltinMethod(<操作>)`。N の `read` と効果は、どれも、ちょうど一つの単位の `Reads` / `Effects` にある（`read` は `Read.state` の単位、効果は宛先の単位。`docs/plugin-go.md`「状態の単位」の「効果の宛先の単位」）ので、ある `read` か効果がどの単位のメソッドかは、`States` を走査して求める。`Reads` と `Effects` は、単位の対象（`in`）によらず、配線が呼んでいるかにもよらない。`Builtins` だけが、単位の対象の配線が直に呼ぶ操作で決まる。
+- op のメソッドは、どれも、最初に `ctx` を取り、最後に `error` を返す（`docs/plugin-go.md`「op の形」）。op を呼ぶ相乗りは、op ごとに確かめずに、`ctx` を渡し、`error` を受ける。これまでの `OpShape.Ctx` / `OpShape.Err`（op ごとに、取るか、返すか）は、いつも真なので、なくした。
 - op の置き場（`OpShape.Place`）は三つだけで、状態の単位に op のメソッドはない: `Shape.Leaves` は、置き場が `Leaf` の op のすべて。これまでの、状態の単位の `Queries` / `Commands`、`Shape.Shared`（`SharedState`）、`OpShape.Unit`、置き場 `StateCommand` / `SharedCommand` / `StateQuery` / `SharedQuery`、`PublicShared` は、なくした（`docs/decisions.md`「決めたこと」139）。
 - 例外の値を作るか読む相乗り（`go-http`、`go-cli`、サンプルの `go-ratelimit`）は、例外の構造体のフィールドを、`Exception.params` の順に、`FieldName(<引数名>)` で求める（型は `GoType(<引数の型>)`、タグは `json:"<引数名>"`、省略可能なら `,omitempty`）。引数のない例外は `struct{}`。値を一つに包むフィールド `Value` は、もうない。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。

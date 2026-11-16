@@ -11,6 +11,8 @@ import (
 
 // このファイルは wiring.go（docs/plugin-go.md「配線の本体」）: 単位の対象の配線ごとに、ops のメソッドを一つ。
 // 実行の順序は行の順で、並列にはしない。継ぎ目を持つ配線は、メソッドの名前が中身の名前（`loginBody`）になる。
+// 配線も、配線が呼ぶもの（op、read、効果、分類の判定関数）も、最初の引数に ctx を取り、最後の戻り値に error を返す
+// （同「op の形」）: 呼び出しには、いつも ctx を渡し、失敗は、いつも error で返す。panic は出さない。
 
 // ptrHelper は、値をポインタにする補助（docs/plugin-go.md「値」）。wiring.go が使っていれば、その末尾に一つだけ出す。
 const ptrHelper = "func ptr[T any](v T) *T { return &v }\n"
@@ -83,15 +85,14 @@ type bodyGen struct {
 	overrides []override
 	vn, kn    int
 
-	ret    ir.Type // 配線の戻り値の型（void なら nil）
-	hasErr bool    // 配線が error を返すか
-	// terminated は、直前に書いた文が、関数を抜ける文（return / panic）か。
+	ret ir.Type // 配線の戻り値の型（void なら nil）
+	// terminated は、直前に書いた文が、関数を抜ける文（return）か。
 	terminated bool
 }
 
 func newBody(e *emitter, f *fileGen, os golang.OpShape) *bodyGen {
 	o := e.op(os.FQN)
-	b := &bodyGen{e: e, f: f, op: o, os: os, buf: &strings.Builder{}, depth: 1, taken: map[string]bool{}, hasErr: os.Err}
+	b := &bodyGen{e: e, f: f, op: o, os: os, buf: &strings.Builder{}, depth: 1, taken: map[string]bool{}}
 	if o.Returns != nil && !ir.IsNever(o.Returns) {
 		b.ret = o.Returns
 	}
@@ -181,13 +182,9 @@ func (b *bodyGen) zeroPrefix() string {
 	return b.f.zero(b.ret) + ", "
 }
 
-// ret1 は `return <零値>, <errExpr>`。error を返さない配線（純粋で、例外のない配線）では、返す先がないので panic にする。
+// returnErr は `return <零値>, <errExpr>`。どの配線も error を返すので、返す先は、いつもある。
 func (b *bodyGen) returnErr(errExpr string) {
-	if !b.hasErr {
-		b.line("panic(" + errExpr + ")")
-	} else {
-		b.line("return " + b.zeroPrefix() + errExpr)
-	}
+	b.line("return " + b.zeroPrefix() + errExpr)
 	b.terminated = true
 }
 
@@ -207,7 +204,7 @@ func (b *bodyGen) gen() {
 	for i, s := range stmts {
 		b.stmt(s, stmts[i+1:])
 	}
-	if !b.terminated && b.ret == nil && b.hasErr {
+	if !b.terminated && b.ret == nil {
 		b.line("return nil") // 本体の終わり（戻り値のない配線）
 	}
 	name := b.os.Method
@@ -791,23 +788,20 @@ func (b *bodyGen) read(states []string, skip map[string]bool) {
 
 // ---- 呼び出し ----
 
-// callInfo は、呼び出し一つを Go にしたもの。
+// callInfo は、呼び出し一つを Go にしたもの。呼ぶ先は、どれも、最後の戻り値に error を返す。
 type callInfo struct {
-	expr   string
-	ret    ir.Type // 呼ぶ先の戻り値の型（void と never の op と、効果は nil）
-	hasErr bool    // 呼ぶ先が error を返すか（read と効果は、いつも）
-	never  bool    // 「返らない」呼び出し（never を返す op）
+	expr  string
+	ret   ir.Type // 呼ぶ先の戻り値の型（void と never の op と、効果は nil）
+	never bool    // 「返らない」呼び出し（never を返す op）
 }
 
 // target は、呼び出しの先（docs/plugin-go.md「呼び出し」の表の行）を、同じ形のメソッドの呼び出しとして見たもの:
-// op か、read か、効果（宣言したものと、直に呼ぶ組み込みの効果）。
+// op か、read か、効果（宣言したものと、直に呼ぶ組み込みの効果）。どれも、最初の引数に ctx を取り、最後の戻り値に error を返す。
 type target struct {
 	recv   string       // メソッドの前: `o.`（同じ名前空間の op）、`o.<名前空間の引数名>.`、`o.<状態の単位の引数名>.`
 	method string       // メソッドの名前
-	params []ir.OpParam // 引数の並び（Op.params、Read.params、Effect.params。直に呼ぶ組み込みの効果は、value 一つか、なし）
-	ctx    bool         // 最初の引数に ctx を渡すか（read と効果は、いつも）
+	params []ir.OpParam // ctx の後ろの引数の並び（Op.params、Read.params、Effect.params。直に呼ぶ組み込みの効果は、value 一つか、なし）
 	ret    ir.Type      // 戻り値の型（void と never の op と、効果は nil）
-	hasErr bool         // error を返すか（read と効果は、いつも）
 	never  bool         // never を返す op か
 	isOp   bool         // op か（bind で埋まる位置を持つのは、op の呼び出しだけ）
 }
@@ -829,8 +823,7 @@ func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
 		if o == nil {
 			break
 		}
-		t := target{recv: "o.", method: golang.MethodName(o.Name), params: o.Params, ctx: !o.Signature.Pure, isOp: true,
-			hasErr: !(o.Signature.Pure && len(o.Signature.Exceptions) == 0), never: ir.IsNever(o.Returns)}
+		t := target{recv: "o.", method: golang.MethodName(o.Name), params: o.Params, isOp: true, never: ir.IsNever(o.Returns)}
 		if ns := e.declNS[o.Name]; ns != e.view.Viewer {
 			t.recv = "o." + e.fields.deps[ns] + "."
 		}
@@ -845,7 +838,7 @@ func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
 		if r == nil || !placed {
 			break
 		}
-		return target{recv: "o." + u.Param + ".", method: golang.MethodName(r.Name), params: r.Params, ctx: true, ret: r.Returns, hasErr: true}, true
+		return target{recv: "o." + u.Param + ".", method: golang.MethodName(r.Name), params: r.Params, ret: r.Returns}, true
 	case ir.EffectCallee:
 		switch fx := callee.Effect.(type) {
 		case ir.NamedEffect:
@@ -855,7 +848,7 @@ func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
 			if x == nil || !placed {
 				break
 			}
-			return target{recv: "o." + u.Param + ".", method: golang.MethodName(x.Name), params: x.Params, ctx: true, hasErr: true}, true
+			return target{recv: "o." + u.Param + ".", method: golang.MethodName(x.Name), params: x.Params}, true
 		case ir.DirectEffect:
 			// 直に呼ぶ組み込みの効果は、その状態の単位の、形で決まる命令。値を取る操作の引数は、状態の要素の型の value 一つ
 			st, ok := e.lookup(fx.State).(*ir.State)
@@ -866,7 +859,7 @@ func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
 			if !ok {
 				return target{}, false
 			}
-			t := target{recv: recv, method: golang.BuiltinMethod(string(fx.Operation)), ctx: true, hasErr: true}
+			t := target{recv: recv, method: golang.BuiltinMethod(string(fx.Operation))}
 			if golang.BuiltinTakesValue(string(fx.Operation)) {
 				t.params = []ir.OpParam{{Name: ir.DirectEffectParam, Type: st.Element}}
 			}
@@ -896,10 +889,7 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 			bounds = append(bounds, boundValue{path: bp.Path, expr: v, typ: st.Type})
 		}
 	}
-	var args []string
-	if t.ctx {
-		args = append(args, "ctx")
-	}
+	args := []string{"ctx"}
 	for _, p := range t.params {
 		var written ir.Atom
 		for i := range c.Args {
@@ -936,7 +926,7 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 		}
 		args = append(args, arg)
 	}
-	return callInfo{expr: t.recv + t.method + "(" + strings.Join(args, ", ") + ")", ret: t.ret, hasErr: t.hasErr, never: t.never}
+	return callInfo{expr: t.recv + t.method + "(" + strings.Join(args, ", ") + ")", ret: t.ret, never: t.never}
 }
 
 // throwValue は、アームの本体の `throw E`、`throw E(<値>, …)` が作る例外の値（docs/plugin-go.md「match」の「アームの本体」）:
@@ -1065,12 +1055,8 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 			b.read(states, nil)
 			ci := b.call(&ex.Call)
 			name := b.bind(x.Name, ci.ret)
-			if ci.hasErr {
-				b.line(name + ", err := " + ci.expr)
-				b.fail()
-			} else {
-				b.line(name + " := " + ci.expr)
-			}
+			b.line(name + ", err := " + ci.expr)
+			b.fail()
 			b.markUnused(name, x.Name, rest)
 		case ir.AtomExpr:
 			var states []string
@@ -1116,13 +1102,9 @@ func (b *bodyGen) markUnused(goName, hozoName string, rest []ir.Statement) {
 	}
 }
 
-// returnValue は `return <値>, nil`（error を返さない配線なら `return <値>`）。
+// returnValue は `return <値>, nil`。
 func (b *bodyGen) returnValue(expr string) {
-	if b.hasErr {
-		b.line("return " + expr + ", nil")
-	} else {
-		b.line("return " + expr)
-	}
+	b.line("return " + expr + ", nil")
 	b.terminated = true
 }
 
@@ -1131,62 +1113,45 @@ func (b *bodyGen) returnNever(ci callInfo) {
 	b.returnErr(ci.expr)
 }
 
-// returnCall は `return 呼び出し`（docs/plugin-go.md「文」）: 呼ぶ op の戻り値の並びが、この配線と同じで、型をそろえる必要が
-// なければ `return <呼び出し>`。呼ぶ op だけが error を返さないなら `return <呼び出し>, nil`。型をそろえる必要があれば、
-// v<n> に束縛してから `return <そろえた値>, nil`。
+// returnCall は `return 呼び出し`（docs/plugin-go.md「文」）: 型をそろえる必要がなければ `return <呼び出し>`（戻り値の並びは、
+// 呼ぶ先も、この配線も `(T, error)`）。型をそろえる必要があれば、v<n> に束縛して失敗の扱いを置いてから
+// `return <そろえた値>, nil`。
 func (b *bodyGen) returnCall(ci callInfo) {
 	switch {
 	case ci.never:
 		b.returnNever(ci)
-		return
 	case ci.ret == nil || b.ret == nil:
 		// 値のない呼び出し（検査を通った IR では、return には来ない）
 		b.callStmt(ci)
-		if b.hasErr {
-			b.line("return nil")
-		} else {
-			b.line("return")
-		}
+		b.line("return nil")
 		b.terminated = true
-		return
-	}
-	same := b.sameGo(ci.ret, b.ret)
-	switch {
-	case same && ci.hasErr == b.hasErr:
+	case b.sameGo(ci.ret, b.ret):
 		b.line("return " + ci.expr)
 		b.terminated = true
-	case same && !ci.hasErr:
-		b.returnValue(ci.expr)
 	default:
 		v := b.temp()
-		if ci.hasErr {
-			b.line(v + ", err := " + ci.expr)
-			b.fail()
-		} else {
-			b.line(v + " := " + ci.expr)
-		}
+		b.line(v + ", err := " + ci.expr)
+		b.fail()
 		b.returnValue(b.convert(v, ci.ret, b.ret))
 	}
 }
 
-// callStmt は `呼び出し;`: `if err := <呼び出し>; err != nil { return <零値>, err }`。error を返さない op なら、呼ぶだけ。
+// callStmt は `呼び出し;`: `if err := <呼び出し>; err != nil { return <零値>, err }`。値を返す op なら、値を捨てる
+// （`if _, err := …`）。
 func (b *bodyGen) callStmt(ci callInfo) {
-	switch {
-	case ci.never:
+	if ci.never {
 		b.returnNever(ci)
-	case ci.hasErr:
-		lhs := "err"
-		if ci.ret != nil {
-			lhs = "_, err"
-		}
-		b.line("if " + lhs + " := " + ci.expr + "; err != nil {")
-		b.depth++
-		b.returnErr("err")
-		b.depth--
-		b.line("}")
-	default:
-		b.line(ci.expr)
+		return
 	}
+	lhs := "err"
+	if ci.ret != nil {
+		lhs = "_, err"
+	}
+	b.line("if " + lhs + " := " + ci.expr + "; err != nil {")
+	b.depth++
+	b.returnErr("err")
+	b.depth--
+	b.line("}")
 }
 
 // ---- match ----
@@ -1527,18 +1492,10 @@ func (b *bodyGen) armBody(p *matchPlan, a *ir.MatchArm, mode matchMode, x string
 				b.callStmt(ci)
 				return
 			}
-			if ci.hasErr {
-				v := b.temp()
-				b.line(v + ", err := " + ci.expr)
-				b.fail()
-				b.line(x + " = " + b.convert(v, ci.ret, t))
-			} else {
-				expr := ci.expr
-				if !b.sameGo(ci.ret, t) {
-					expr = b.convert(b.simple(expr), ci.ret, t)
-				}
-				b.line(x + " = " + expr)
-			}
+			v := b.temp()
+			b.line(v + ", err := " + ci.expr)
+			b.fail()
+			b.line(x + " = " + b.convert(v, ci.ret, t))
 		default:
 			b.callStmt(ci)
 		}
@@ -1737,7 +1694,7 @@ func (b *bodyGen) matchSwitch(p *matchPlan, mode matchMode, x string, t ir.Type)
 		b.line("switch " + p.subject + ".(type) {")
 	case "value":
 		k := b.kind()
-		b.line(k + ", err := " + qualifier + "Classify" + name + "(o." + e.fields.classify[c.Name] + ", " + p.subject + ")")
+		b.line(k + ", err := " + qualifier + "Classify" + name + "(ctx, o." + e.fields.classify[c.Name] + ", " + p.subject + ")")
 		b.fail()
 		b.line("switch " + k + " {")
 	case "state":

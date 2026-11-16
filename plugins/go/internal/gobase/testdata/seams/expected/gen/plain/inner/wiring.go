@@ -37,5 +37,5 @@ func (o *ops) Restock(ctx context.Context, item Item) (int64, error) {
 
 // Find は op shop.find。
 func (o *ops) Find(ctx context.Context, id string) (Item, error) {
-	return o.Lookup(id), nil
+	return o.Lookup(ctx, id)
 }

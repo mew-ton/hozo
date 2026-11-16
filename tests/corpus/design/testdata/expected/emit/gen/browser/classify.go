@@ -3,6 +3,8 @@
 package browser
 
 import (
+	"context"
+
 	"github.com/mew-ton/hozo/gen/browser/inner"
 	"github.com/mew-ton/hozo/gen/server"
 )
@@ -24,8 +26,8 @@ const (
 type WarrantyKindCases = inner.WarrantyKindCases
 
 // ClassifyWarrantyKind は v を browser.WarrantyKind で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyWarrantyKind(c WarrantyKindCases, v server.Item) (WarrantyKind, error) {
-	return inner.ClassifyWarrantyKind(c, v)
+func ClassifyWarrantyKind(ctx context.Context, c WarrantyKindCases, v server.Item) (WarrantyKind, error) {
+	return inner.ClassifyWarrantyKind(ctx, c, v)
 }
 
 // CampaignKind は商品が対象のキャンペーン
@@ -42,8 +44,8 @@ const (
 type CampaignKindCases = inner.CampaignKindCases
 
 // ClassifyCampaignKind は v を browser.CampaignKind で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyCampaignKind(c CampaignKindCases, v server.Item) (CampaignKind, error) {
-	return inner.ClassifyCampaignKind(c, v)
+func ClassifyCampaignKind(ctx context.Context, c CampaignKindCases, v server.Item) (CampaignKind, error) {
+	return inner.ClassifyCampaignKind(ctx, c, v)
 }
 
 // WarrantyAvailable は二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; default; } と同じ
@@ -58,6 +60,6 @@ const (
 type WarrantyAvailableCases = inner.WarrantyAvailableCases
 
 // ClassifyWarrantyAvailable は v を browser.WarrantyAvailable で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyWarrantyAvailable(c WarrantyAvailableCases, v server.Item) (WarrantyAvailable, error) {
-	return inner.ClassifyWarrantyAvailable(c, v)
+func ClassifyWarrantyAvailable(ctx context.Context, c WarrantyAvailableCases, v server.Item) (WarrantyAvailable, error) {
+	return inner.ClassifyWarrantyAvailable(ctx, c, v)
 }

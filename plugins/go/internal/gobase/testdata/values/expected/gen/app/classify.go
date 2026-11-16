@@ -2,7 +2,11 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import (
+	"context"
+
+	"github.com/mew-ton/hozo/runtime"
+)
 
 // Size は大きさ（述語で決まる分類。ケースで絞り込んだ型 Size.Big<Address> を作るため）
 type Size int
@@ -15,22 +19,34 @@ const (
 // SizeCases は分類 app.Size のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type SizeCases interface {
 	// Big はケース Big の述語。
-	Big(v Address) bool
+	Big(ctx context.Context, v Address) (bool, error)
 	// Small はケース Small の述語。
-	Small(v Address) bool
+	Small(ctx context.Context, v Address) (bool, error)
 }
 
 // ClassifySize は v を app.Size で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifySize(c SizeCases, v Address) (Size, error) {
+func ClassifySize(ctx context.Context, c SizeCases, v Address) (Size, error) {
 	var hits []string
 	var kind Size
-	if c.Big(v) {
+	var first error
+	if ok, err := c.Big(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Big")
 		kind = SizeBig
 	}
-	if c.Small(v) {
+	if ok, err := c.Small(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Small")
 		kind = SizeSmall
+	}
+	if first != nil {
+		return kind, first
 	}
 	switch len(hits) {
 	case 1:

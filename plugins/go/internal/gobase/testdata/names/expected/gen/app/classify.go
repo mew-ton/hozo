@@ -2,7 +2,11 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import (
+	"context"
+
+	"github.com/mew-ton/hozo/runtime"
+)
 
 // Extra は classify app.Extra。
 type Extra int
@@ -15,22 +19,34 @@ const (
 // ExtraCases は分類 app.Extra のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type ExtraCases interface {
 	// Yes はケース Yes の述語。
-	Yes(v string) bool
+	Yes(ctx context.Context, v string) (bool, error)
 	// No はケース No の述語。
-	No(v string) bool
+	No(ctx context.Context, v string) (bool, error)
 }
 
 // ClassifyExtra は v を app.Extra で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyExtra(c ExtraCases, v string) (Extra, error) {
+func ClassifyExtra(ctx context.Context, c ExtraCases, v string) (Extra, error) {
 	var hits []string
 	var kind Extra
-	if c.Yes(v) {
+	var first error
+	if ok, err := c.Yes(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Yes")
 		kind = ExtraYes
 	}
-	if c.No(v) {
+	if ok, err := c.No(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "No")
 		kind = ExtraNo
+	}
+	if first != nil {
+		return kind, first
 	}
 	switch len(hits) {
 	case 1:

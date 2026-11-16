@@ -142,7 +142,7 @@ func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args 
 
 ## 実行と表示
 
-1. `ops.<Op>(ctx, input)` を呼ぶ（引数が 0 個なら `ops.<Op>(ctx)`）。`@cli.command` の付いた op はデコレータを持つので、いつも `ctx` を取り、`error` を返す（`docs/plugin-go.md`「op の形」）。
+1. `ops.<Op>(ctx, input)` を呼ぶ（引数が 0 個なら `ops.<Op>(ctx)`）。op のメソッドは、どれも `ctx` を取り、`error` を返す（`docs/plugin-go.md`「op の形」）。
 2. 成功なら `p.Present(stdout, command, input, result)` を呼び（void なら `result` は `nil`）、0。
 3. 例外なら、`Signature.exceptions` の順に `errors.As` で例外の値の型を見分けて `Failure` を作り（例外は値で返る。`docs/plugin-go.md`「exception」。形は「コマンドごとの関数」）、終了コードを決めてから `p.PresentError(stderr, command, input, failure)` を呼ぶ。終了コードは、見分けた例外に `@cli.exitCode(code)` があればその `code`、なければ 70。見分けられなければ `Failure{Err: err}` で 70。
 4. `Present` / `PresentError` 自体が失敗したら、そのエラーを標準エラーに出して 70。

@@ -18,7 +18,7 @@ import (
 
 type leaves struct{}
 
-func (leaves) Show(string) {}
+func (leaves) Show(context.Context, string) error { return nil }
 
 // attempts は、状態 app.attempts の単位。
 type attempts struct {
@@ -34,11 +34,12 @@ func ptr[T any](v T) *T { return &v }
 
 // 引数が一つの例外と、引数のない例外: errors.As の先は、例外の値の型（ポインタではない）
 func TestThrowOneArgument(t *testing.T) {
+	ctx := context.Background()
 	o := newOps(attempts{})
-	if got, err := o.Need(ptr("u1"), ptr(true)); err != nil || got != "u1" {
+	if got, err := o.Need(ctx, ptr("u1"), ptr(true)); err != nil || got != "u1" {
 		t.Fatalf("Need = %q, %v", got, err)
 	}
-	_, err := o.Need(nil, ptr(true))
+	_, err := o.Need(ctx, nil, ptr(true))
 	var missing app.Missing
 	if !errors.As(err, &missing) || missing.Id != "unknown" {
 		t.Fatalf("Need の err = %#v, want Missing{Id: unknown}", err)
@@ -54,7 +55,7 @@ func TestThrowOneArgument(t *testing.T) {
 	if errors.As(err, &asPointer) {
 		t.Error("例外が、ポインタで返っている")
 	}
-	_, err = o.Need(ptr("u1"), nil)
+	_, err = o.Need(ctx, ptr("u1"), nil)
 	var plain app.Plain
 	if !errors.As(err, &plain) || errors.As(err, &missing) {
 		t.Fatalf("Need の err = %#v, want Plain", err)
@@ -68,15 +69,16 @@ func TestThrowOneArgument(t *testing.T) {
 
 // 引数が二つ以上の例外: フィールドは引数ごとに一つ。レコードリテラル、array、省略可能な引数（値、省略可能を通るパス）
 func TestThrowSeveralArguments(t *testing.T) {
+	ctx := context.Background()
 	o := newOps(attempts{})
 	in := app.Input{Code: "c1", Sub: &app.Sub{At: 9}}
 	tags := []string{"a", "b"}
 
-	if got, err := o.Check(in, tags, ptr("ok")); err != nil || got != "ok" {
+	if got, err := o.Check(ctx, in, tags, ptr("ok")); err != nil || got != "ok" {
 		t.Fatalf("Check = %q, %v", got, err)
 	}
 
-	_, err := o.Check(in, tags, nil)
+	_, err := o.Check(ctx, in, tags, nil)
 	var invalid app.Invalid
 	if !errors.As(err, &invalid) {
 		t.Fatalf("Check の err = %#v, want Invalid", err)
@@ -86,7 +88,7 @@ func TestThrowSeveralArguments(t *testing.T) {
 		t.Errorf("Invalid = %+v, want %+v", invalid, want)
 	}
 
-	_, err = o.Check(in, nil, ptr("first"))
+	_, err = o.Check(ctx, in, nil, ptr("first"))
 	if !errors.As(err, &invalid) {
 		t.Fatalf("Check の err = %#v, want Invalid", err)
 	}
@@ -95,7 +97,7 @@ func TestThrowSeveralArguments(t *testing.T) {
 		t.Errorf("Invalid = %+v, want %+v", invalid, want)
 	}
 	// 省略可能を通るパスの途中に値がなければ、その引数は nil
-	_, err = o.Check(app.Input{Code: "c2"}, nil, ptr("first"))
+	_, err = o.Check(ctx, app.Input{Code: "c2"}, nil, ptr("first"))
 	if !errors.As(err, &invalid) || invalid.At != nil || invalid.Code != "c2" {
 		t.Errorf("Invalid = %+v, want At が nil", invalid)
 	}
@@ -113,13 +115,14 @@ func TestThrowSeveralArguments(t *testing.T) {
 
 // 文の match の throw: 戻り値のない配線は、例外だけを返す。別の名前空間の例外、渡されていない省略可能な引数
 func TestThrowInStatement(t *testing.T) {
+	ctx := context.Background()
 	o := newOps(attempts{})
-	err := o.Guard(ptr(app.Code("c9")), nil)
+	err := o.Guard(ctx, ptr(app.Code("c9")), nil)
 	var missing app.Missing
 	if !errors.As(err, &missing) || missing.Id != "c9" {
 		t.Fatalf("Guard の err = %#v, want Missing{Id: c9}", err)
 	}
-	err = o.Guard(nil, ptr(true))
+	err = o.Guard(ctx, nil, ptr(true))
 	var limit limits.LimitExceeded
 	if !errors.As(err, &limit) || limit.RetryAfter != 5*time.Minute || limit.Scope == nil || *limit.Scope != "guard" {
 		t.Fatalf("Guard の err = %#v, want LimitExceeded{5m, guard}", err)
@@ -127,7 +130,7 @@ func TestThrowInStatement(t *testing.T) {
 	if limit.HozoException() != "limits.LimitExceeded" {
 		t.Errorf("HozoException = %q", limit.HozoException())
 	}
-	err = o.Guard(nil, nil)
+	err = o.Guard(ctx, nil, nil)
 	if !errors.As(err, &limit) || limit.RetryAfter != time.Second || limit.Scope != nil {
 		t.Fatalf("Guard の err = %#v, want LimitExceeded{1s, nil}", err)
 	}
@@ -149,7 +152,7 @@ func TestThrowReadsState(t *testing.T) {
 		t.Fatalf("Retry の err = %v, want boom", err)
 	}
 	// 束縛を、throw の引数に使う
-	_, err = newOps(attempts{}).Count(nil)
+	_, err = newOps(attempts{}).Count(ctx, nil)
 	if !errors.As(err, &tooMany) || tooMany.Attempts != 3 {
 		t.Fatalf("Count の err = %#v, want TooMany{Attempts: 3}", err)
 	}

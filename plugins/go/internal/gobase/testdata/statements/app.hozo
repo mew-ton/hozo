@@ -9,23 +9,23 @@ namespace app {
   union Shape { Thing: Item; Key: Id; }
   exception Broken;
   exception Gone;
-  /** 印。読むトランスパイラはない。付いた op は純粋でなくなる（ctx を取り、error を返す） */
+  /** 印。読むトランスパイラはない。付いた op は純粋でなくなる（メソッドの形は変わらない） */
   decorator mark;
 
-  // 葉: error を返す
+  // 葉: デコレータを持つ（仕様の上で、純粋でない）
   @mark export op load(id: Id): Item;
   @mark export op save(item: Item);
   @mark export op touch();
   @mark export op find(id: Id, limit: int?, tag: string?): Item?;
-  // 葉: 純粋で失敗しない（ctx を取らず、error を返さない）
+  // 葉: 純粋で throws がない（それでも、メソッドは ctx を取り、error を返す。docs/plugin-go.md「op の形」）
   export op make(id: Id): Item;
   export op note(item: Item);
-  // 葉: 純粋だが失敗する（ctx を取らず、error を返す）
+  // 葉: 純粋で throws がある（同じ形）
   export op parse(text: string): Id throws Broken;
   // never を返す op
   export op fail(): never throws Gone;
 
-  // 「文」const x = 呼び出し（error を返す op、返さない op）、使っていない束縛（WIRE-8）、const x = 値、呼び出しの文
+  // 「文」const x = 呼び出し（純粋でない op と、純粋な op。どちらも失敗の扱いを置く）、使っていない束縛（WIRE-8）、const x = 値、呼び出しの文
   @mark export op consts(id: Id): Item
   {
     const a = load(id);
@@ -38,19 +38,19 @@ namespace app {
     return c;
   }
 
-  // 「文」return 呼び出し: 戻り値の並びが同じ
+  // 「文」return 呼び出し: 型をそろえる必要がない（純粋でない配線が、純粋でない op を返す）
   @mark export op sameShape(id: Id): Item
   {
     return load(id);
   }
 
-  // 「文」return 呼び出し: 呼ぶ op だけが error を返さない
+  // 「文」return 呼び出し: 純粋でない配線が、純粋な op を返す（同じ形: return <呼び出し>）
   @mark export op calleeOnlyPure(id: Id): Item
   {
     return make(id);
   }
 
-  // 「文」return 呼び出し: どちらも error を返さない
+  // 「文」return 呼び出し: 純粋な配線が、純粋な op を返す（同じ形。配線も ctx を取り、error を返す）
   export op bothPure(id: Id): Item
   {
     return make(id);
@@ -62,7 +62,7 @@ namespace app {
     return load(id);
   }
 
-  // 「文」return 値: error を返す配線と、返さない配線
+  // 「文」return 値: 純粋でない配線と、純粋な配線（どちらも return <値>, nil）
   @mark export op valueWithError(item: Item): Item
   {
     return item;
@@ -86,7 +86,7 @@ namespace app {
     fail();
   }
 
-  // 「文」本体の終わり: error を返す配線は return nil、返さない配線は何も足さない
+  // 「文」本体の終わり: 純粋でない配線も、純粋な配線も、最後に return nil
   @mark export op endWithError(item: Item)
   {
     save(item);
@@ -96,7 +96,7 @@ namespace app {
     note(item);
   }
 
-  // 「呼び出し」純粋だが失敗する op（ctx を渡さず、失敗の扱いを置く）、渡されていない省略可能な引数は nil、別の名前空間の op
+  // 「呼び出し」純粋で throws がある op（ctx を渡し、失敗の扱いを置く）、渡されていない省略可能な引数は nil、別の名前空間の op
   @mark export op calls(text: string): Item?
     throws Broken
   {

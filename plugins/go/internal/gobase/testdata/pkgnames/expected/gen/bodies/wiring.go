@@ -18,37 +18,45 @@ func (o *ops) Go(ctx context.Context, thing o2.Thing) (ctx2.Info, error) {
 	if err != nil {
 		return ctx2.Info{}, err
 	}
-	o.Keep(made, nil, err2.Fault{Z: 1})
+	if err := o.Keep(ctx, made, nil, err2.Fault{Z: 1}); err != nil {
+		return ctx2.Info{}, err
+	}
 	return o.Load(ctx)
 }
 
 // Temps は op bodies.temps。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Temps(outer Outer) {
+func (o *ops) Temps(ctx context.Context, outer Outer) error {
 	var v1 *string
 	if outer.Inner != nil {
 		v1 = ptr(outer.Inner.Name)
 	}
-	o.TakeName(v1)
-	o.TakeZero(v0.Zero{N: 1})
+	if err := o.TakeName(ctx, v1); err != nil {
+		return err
+	}
+	if err := o.TakeZero(ctx, v0.Zero{N: 1}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Kinds は op bodies.kinds。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Kinds(text string) {
+func (o *ops) Kinds(ctx context.Context, text string) error {
 	// match text by bodies.Size
-	k1, err := ClassifySize(o.size, text)
+	k1, err := ClassifySize(ctx, o.size, text)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	switch k1 {
 	case SizeBig:
-		o.TakeKey(k0.Key{N: 1})
+		if err := o.TakeKey(ctx, k0.Key{N: 1}); err != nil {
+			return err
+		}
 	case SizeSmall:
-		o.TakeKey(k0.Key{N: 2})
+		if err := o.TakeKey(ctx, k0.Key{N: 2}); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func ptr[T any](v T) *T { return &v }

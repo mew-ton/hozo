@@ -10,14 +10,10 @@ type Ops interface {
 	FindUser(ctx context.Context, id string) (*User, error)
 
 	// Lookup は op app.lookup。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Lookup(id string) *User
+	Lookup(ctx context.Context, id string) (*User, error)
 
 	// NameOf は op app.nameOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NameOf(user User) string
+	NameOf(ctx context.Context, user User) (string, error)
 
 	// LoadName は op app.loadName。
 	LoadName(ctx context.Context, user User) (string, error)
@@ -25,36 +21,25 @@ type Ops interface {
 	// Deny は op app.deny。
 	//
 	// Throws: app.Denied
-	// 純粋（ctx を取らない）
-	Deny() error
+	Deny(ctx context.Context) error
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 
 	// Record は op app.record。
 	Record(ctx context.Context, text string) error
 
 	// CountOf は op app.countOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	CountOf(lines []Line) int64
+	CountOf(ctx context.Context, lines []Line) (int64, error)
 
 	// CountTags は op app.countTags。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	CountTags(tags []string) int64
+	CountTags(ctx context.Context, tags []string) (int64, error)
 
 	// UseToken は op app.useToken。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	UseToken(token Token) string
+	UseToken(ctx context.Context, token Token) (string, error)
 
 	// TakeOptionalUser は op app.takeOptionalUser。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalUser(user *User)
+	TakeOptionalUser(ctx context.Context, user *User) error
 
 	// NameById は op app.nameById。
 	//
@@ -62,23 +47,18 @@ type Ops interface {
 	NameById(ctx context.Context, id string) (string, error)
 
 	// NickOf は op app.nickOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NickOf(user *User) *string
+	NickOf(ctx context.Context, user *User) (*string, error)
 
 	// PureName は op app.pureName。
 	//
 	// Throws: app.Denied
-	// 純粋（ctx を取らない）
-	PureName(user *User) (string, error)
+	PureName(ctx context.Context, user *User) (string, error)
 
 	// Widened は op app.widened。
 	Widened(ctx context.Context, in Input) (*string, error)
 
 	// TagCount は op app.tagCount。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TagCount(tags []string) int64
+	TagCount(ctx context.Context, tags []string) (int64, error)
 
 	// TokenText は op app.tokenText。
 	//
@@ -108,45 +88,31 @@ type Leaves interface {
 	FindUser(ctx context.Context, id string) (*User, error)
 
 	// Lookup は op app.lookup。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Lookup(id string) *User
+	Lookup(ctx context.Context, id string) (*User, error)
 
 	// NameOf は op app.nameOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NameOf(user User) string
+	NameOf(ctx context.Context, user User) (string, error)
 
 	// LoadName は op app.loadName。
 	LoadName(ctx context.Context, user User) (string, error)
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 
 	// Record は op app.record。
 	Record(ctx context.Context, text string) error
 
 	// CountOf は op app.countOf。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	CountOf(lines []Line) int64
+	CountOf(ctx context.Context, lines []Line) (int64, error)
 
 	// CountTags は op app.countTags。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	CountTags(tags []string) int64
+	CountTags(ctx context.Context, tags []string) (int64, error)
 
 	// UseToken は op app.useToken。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	UseToken(token Token) string
+	UseToken(ctx context.Context, token Token) (string, error)
 
 	// TakeOptionalUser は op app.takeOptionalUser。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	TakeOptionalUser(user *User)
+	TakeOptionalUser(ctx context.Context, user *User) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）。
@@ -165,42 +131,42 @@ func (o *ops) FindUser(ctx context.Context, id string) (*User, error) {
 	return o.leaves.FindUser(ctx, id)
 }
 
-func (o *ops) Lookup(id string) *User {
-	return o.leaves.Lookup(id)
+func (o *ops) Lookup(ctx context.Context, id string) (*User, error) {
+	return o.leaves.Lookup(ctx, id)
 }
 
-func (o *ops) NameOf(user User) string {
-	return o.leaves.NameOf(user)
+func (o *ops) NameOf(ctx context.Context, user User) (string, error) {
+	return o.leaves.NameOf(ctx, user)
 }
 
 func (o *ops) LoadName(ctx context.Context, user User) (string, error) {
 	return o.leaves.LoadName(ctx, user)
 }
 
-func (o *ops) Deny() error {
+func (o *ops) Deny(ctx context.Context) error {
 	return Denied{}
 }
 
-func (o *ops) Show(text string) {
-	o.leaves.Show(text)
+func (o *ops) Show(ctx context.Context, text string) error {
+	return o.leaves.Show(ctx, text)
 }
 
 func (o *ops) Record(ctx context.Context, text string) error {
 	return o.leaves.Record(ctx, text)
 }
 
-func (o *ops) CountOf(lines []Line) int64 {
-	return o.leaves.CountOf(lines)
+func (o *ops) CountOf(ctx context.Context, lines []Line) (int64, error) {
+	return o.leaves.CountOf(ctx, lines)
 }
 
-func (o *ops) CountTags(tags []string) int64 {
-	return o.leaves.CountTags(tags)
+func (o *ops) CountTags(ctx context.Context, tags []string) (int64, error) {
+	return o.leaves.CountTags(ctx, tags)
 }
 
-func (o *ops) UseToken(token Token) string {
-	return o.leaves.UseToken(token)
+func (o *ops) UseToken(ctx context.Context, token Token) (string, error) {
+	return o.leaves.UseToken(ctx, token)
 }
 
-func (o *ops) TakeOptionalUser(user *User) {
-	o.leaves.TakeOptionalUser(user)
+func (o *ops) TakeOptionalUser(ctx context.Context, user *User) error {
+	return o.leaves.TakeOptionalUser(ctx, user)
 }

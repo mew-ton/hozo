@@ -80,7 +80,7 @@ func (l *toolLeaves) Check(ctx context.Context, in tool.CheckInput) (tool.CheckR
 	return tool.CheckResult{Warnings: []tool.Note{{Code: "W", Message: msg}}}, nil
 }
 
-func (l *toolLeaves) Write(in tool.EmitInput, checked tool.CheckResult) (tool.EmitResult, error) {
+func (l *toolLeaves) Write(_ context.Context, in tool.EmitInput, checked tool.CheckResult) (tool.EmitResult, error) {
 	l.calls = append(l.calls, "write")
 	if str(in.Config) == "x4" {
 		return tool.EmitResult{}, tool.UnknownName{}

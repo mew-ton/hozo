@@ -56,11 +56,11 @@ type Ops interface {
 type Leaves = inner.Leaves
 
 // MailerOps は名前空間 mailer の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 mailer に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、mailer の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、mailer の出力の Ops は、そのまま渡せる。
 type MailerOps = inner.MailerOps
 
 // StoreOps は名前空間 store の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 store に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
 type StoreOps = inner.StoreOps
 
 // Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。

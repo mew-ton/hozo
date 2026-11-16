@@ -18,7 +18,10 @@ func (o *ops) Open(ctx context.Context, item Item) (Receipt, error) {
 	if err := o.Nightly(ctx, item); err != nil {
 		return Receipt{}, err
 	}
-	receipt := o.Issue(item)
+	receipt, err := o.Issue(ctx, item)
+	if err != nil {
+		return Receipt{}, err
+	}
 	return receipt, nil
 }
 
@@ -34,6 +37,8 @@ func (o *ops) Save(ctx context.Context, item Item) error {
 
 // Nightly は夜間の片付け
 func (o *ops) Nightly(ctx context.Context, item Item) error {
-	o.Sweep(item)
+	if err := o.Sweep(ctx, item); err != nil {
+		return err
+	}
 	return nil
 }

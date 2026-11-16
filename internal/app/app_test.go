@@ -288,7 +288,7 @@ func TestCheckWithoutConfig(t *testing.T) {
 	}
 	_, err = innerOps(l).WriteOutputs(ctx, hozoc.EmitInput{}, res)
 	cfg7("WriteOutputs", err)
-	_, err = l.CollectOutputs(hozoc.EmitInput{}, res)
+	_, err = l.CollectOutputs(ctx, hozoc.EmitInput{}, res)
 	cfg7("CollectOutputs", err)
 	_, err = l.OutputsSync().UpToDate(ctx)
 	cfg7("UpToDate", err)
@@ -911,7 +911,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 	paths := []hozoc.Path{"gen/browser/out.txt", "gen/http/out.txt", "gen/page/out.txt", "gen/server/out.txt"}
 
 	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning にトランスパイラの warning を足したもの
-	plan, err := ops.CollectOutputs(hozoc.EmitInput{}, checked)
+	plan, err := ops.CollectOutputs(ctx, hozoc.EmitInput{}, checked)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -940,7 +940,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 
 	// dryRun の予定: 書くファイルだけを返し（消すファイルは決めない）、syncOutputs は何もしない
 	yes := true
-	dry, err := ops.CollectOutputs(hozoc.EmitInput{DryRun: &yes}, checked)
+	dry, err := ops.CollectOutputs(ctx, hozoc.EmitInput{DryRun: &yes}, checked)
 	if err != nil || dry.DryRun == nil || !*dry.DryRun {
 		t.Fatalf("dryRun の plan = %+v, %v", dry, err)
 	}
@@ -963,8 +963,20 @@ func TestWriteOutputsSteps(t *testing.T) {
 	}
 	unchanged("誤った予定の SyncOutputs")
 
+	// collectOutputs は、受け取った ctx で、トランスパイラを起動する: 中断された ctx では、集めずに、その error を返す。
+	// 配線 writeOutputs も、その error を、そのまま返し、何も書かない
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := ops.CollectOutputs(cancelled, hozoc.EmitInput{}, checked); !errors.Is(err, context.Canceled) {
+		t.Errorf("中断された ctx の CollectOutputs: err = %v, want context.Canceled", err)
+	}
+	if _, err := ops.WriteOutputs(cancelled, hozoc.EmitInput{}, checked); !errors.Is(err, context.Canceled) {
+		t.Errorf("中断された ctx の WriteOutputs: err = %v, want context.Canceled", err)
+	}
+	unchanged("中断された ctx の WriteOutputs")
+
 	// syncOutputs: 余分なファイルを消し、古いファイルを書き換え、記録を書く。その後は UpToDate で、消すファイルはない
-	if plan, err = ops.CollectOutputs(hozoc.EmitInput{}, checked); err != nil {
+	if plan, err = ops.CollectOutputs(ctx, hozoc.EmitInput{}, checked); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.OutputsSync().SyncOutputs(ctx, plan); err != nil {

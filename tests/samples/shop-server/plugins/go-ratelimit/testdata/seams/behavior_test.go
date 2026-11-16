@@ -38,9 +38,9 @@ func (l leaves) Audit(_ context.Context, note string) error {
 	*l.log = append(*l.log, "audit "+note)
 	return nil
 }
-func (l leaves) Find(id pkgtype.ItemId) pkgtype.Item {
+func (l leaves) Find(_ context.Context, id pkgtype.ItemId) (pkgtype.Item, error) {
 	*l.log = append(*l.log, "find "+string(id))
-	return pkgtype.Item{Id: id, Name: "apple"}
+	return pkgtype.Item{Id: id, Name: "apple"}, nil
 }
 func (l leaves) Names(context.Context) ([]string, error)         { return []string{"a"}, nil }
 func (l leaves) Title(context.Context) (string, error)           { return "title", nil }

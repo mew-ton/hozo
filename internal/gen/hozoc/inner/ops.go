@@ -21,8 +21,7 @@ type Ops interface {
 	//   - checked: 検査の結果
 	//
 	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
-	// 純粋（ctx を取らない）
-	CollectOutputs(in EmitInput, checked CheckResult) (EmitPlan, error)
+	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
 
 	// WriteOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
 	// 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
@@ -80,8 +79,7 @@ type Leaves interface {
 	//   - checked: 検査の結果
 	//
 	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
-	// 純粋（ctx を取らない）
-	CollectOutputs(in EmitInput, checked CheckResult) (EmitPlan, error)
+	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
@@ -118,8 +116,8 @@ func (o *ops) Check(ctx context.Context, in CheckInput) (CheckResult, error) {
 	return o.leaves.Check(ctx, in)
 }
 
-func (o *ops) CollectOutputs(in EmitInput, checked CheckResult) (EmitPlan, error) {
-	return o.leaves.CollectOutputs(in, checked)
+func (o *ops) CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error) {
+	return o.leaves.CollectOutputs(ctx, in, checked)
 }
 
 func (o *ops) Lsp(ctx context.Context, in LspInput) error {

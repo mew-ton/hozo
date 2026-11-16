@@ -15,7 +15,7 @@ import "context"
 // Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
 func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error) {
-	plan, err := o.CollectOutputs(in, checked)
+	plan, err := o.CollectOutputs(ctx, in, checked)
 	if err != nil {
 		return EmitResult{}, err
 	}

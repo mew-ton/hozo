@@ -19,19 +19,13 @@ type Ops interface {
 	Both(ctx context.Context) (string, error)
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 
 	// ShowToken は op app.showToken。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowToken(token pkgtype.Token)
+	ShowToken(ctx context.Context, token pkgtype.Token) error
 
 	// Locals は op app.locals。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Locals(o_ string, ctx_ string, err_ string, ptr_ string, func_ string, len_ string, error_ string, util_ string, context_ string, pkgtype_ string, runtime string)
+	Locals(ctx context.Context, o_ string, ctx_ string, err_ string, ptr_ string, func_ string, len_ string, error_ string, util_ string, context_ string, pkgtype_ string, runtime string) error
 
 	// Touch は op app.touch。
 	//
@@ -54,39 +48,35 @@ type Leaves interface {
 	Both(ctx context.Context) (string, error)
 
 	// Show は op app.show。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Show(text string)
+	Show(ctx context.Context, text string) error
 
 	// ShowToken は op app.showToken。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ShowToken(token pkgtype.Token)
+	ShowToken(ctx context.Context, token pkgtype.Token) error
 }
 
 // AUtilOps は名前空間 a.util の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 aUtil に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、a.util の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、a.util の出力の Ops は、そのまま渡せる。
 type AUtilOps interface {
 	// Make は op a.util.make。
 	Make(ctx context.Context) (util.Box, error)
 }
 
 // BUtilOps は名前空間 b.util の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 bUtil に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、b.util の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、b.util の出力の Ops は、そのまま渡せる。
 type BUtilOps interface {
 	// Make は op b.util.make。
 	Make(ctx context.Context) (util2.Box, error)
 }
 
 // ContextOps は名前空間 context の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 context に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、context の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、context の出力の Ops は、そのまま渡せる。
 type ContextOps interface {
 	// Info は op context.info。
 	Info(ctx context.Context) (context2.Info, error)
 }
 
 // TypeOps は名前空間 type の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 type_ に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、type の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、type の出力の Ops は、そのまま渡せる。
 type TypeOps interface {
 	// Issue は op type.issue。
 	Issue(ctx context.Context) (pkgtype.Token, error)
@@ -115,10 +105,10 @@ func (o *ops) Both(ctx context.Context) (string, error) {
 	return o.leaves.Both(ctx)
 }
 
-func (o *ops) Show(text string) {
-	o.leaves.Show(text)
+func (o *ops) Show(ctx context.Context, text string) error {
+	return o.leaves.Show(ctx, text)
 }
 
-func (o *ops) ShowToken(token pkgtype.Token) {
-	o.leaves.ShowToken(token)
+func (o *ops) ShowToken(ctx context.Context, token pkgtype.Token) error {
+	return o.leaves.ShowToken(ctx, token)
 }

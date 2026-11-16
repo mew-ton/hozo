@@ -62,9 +62,15 @@ type Fixture struct {
 // 時計は Now で止まっていて、Advance で進む。
 func (f *Fixture) Leaves() server.Leaves {
 	return &app.Leaves{
-		Now:        func() time.Time { return Now.Add(f.elapsed) },
-		NewToken:   func() pkgtype.Token { f.tokens++; return pkgtype.Token(fmt.Sprintf("token-%d", f.tokens)) },
-		NewOrderID: func() pkgtype.OrderId { f.orders++; return pkgtype.OrderId(fmt.Sprintf("order-%d", f.orders)) },
+		Now: func() time.Time { return Now.Add(f.elapsed) },
+		NewToken: func() (pkgtype.Token, error) {
+			f.tokens++
+			return pkgtype.Token(fmt.Sprintf("token-%d", f.tokens)), nil
+		},
+		NewOrderID: func() (pkgtype.OrderId, error) {
+			f.orders++
+			return pkgtype.OrderId(fmt.Sprintf("order-%d", f.orders)), nil
+		},
 		SessionTTL: SessionTTL,
 		PageSize:   PageSize,
 	}

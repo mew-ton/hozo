@@ -35,8 +35,11 @@ func (x leaves) Add(context.Context, shop.Item) error    { x.l.note("leaf Add");
 func (x leaves) Count(context.Context) (int64, error)    { x.l.note("leaf Count"); return 3, nil }
 func (x leaves) Summary(context.Context) (string, error) { x.l.note("leaf Summary"); return "s", nil }
 func (x leaves) Notify(context.Context, shop.Item) error { x.l.note("leaf Notify"); return nil }
-func (x leaves) Lookup(id string) shop.Item              { x.l.note("leaf Lookup"); return shop.Item{Id: id} }
-func (x leaves) Audit(context.Context, shop.Item) error  { x.l.note("leaf Audit"); return nil }
+func (x leaves) Lookup(_ context.Context, id string) (shop.Item, error) {
+	x.l.note("leaf Lookup")
+	return shop.Item{Id: id}, nil
+}
+func (x leaves) Audit(context.Context, shop.Item) error { x.l.note("leaf Audit"); return nil }
 func (x leaves) Post(_ context.Context, body string, body_ string) (string, error) {
 	x.l.note("leaf Post")
 	return body + body_, nil
@@ -252,9 +255,9 @@ func (x plainLeaves) Add(context.Context, plain.Item) error    { return nil }
 func (x plainLeaves) Count(context.Context) (int64, error)     { return 0, nil }
 func (x plainLeaves) Summary(context.Context) (string, error)  { return "", nil }
 func (x plainLeaves) Notify(context.Context, plain.Item) error { return nil }
-func (x plainLeaves) Lookup(id string) plain.Item {
+func (x plainLeaves) Lookup(_ context.Context, id string) (plain.Item, error) {
 	x.l.note("plain Lookup")
-	return plain.Item{Id: id}
+	return plain.Item{Id: id}, nil
 }
 func (x plainLeaves) Audit(context.Context, plain.Item) error { return nil }
 func (x plainLeaves) Post(context.Context, string, string) (string, error) {

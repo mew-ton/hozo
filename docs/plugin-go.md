@@ -22,7 +22,7 @@ language = "go"
 
 - 提供するトランスパイラは `go` の一つ。`requires` を持たない（基底）。言語 `go` を定める。
 - オプションはない。`[emit.options.go]` にキーが一つでもあれば GO-5。
-- 語彙は提供せず、どの語彙も読まない。`seams` も持たない。デコレータの適用が基底の出力に効く道は「デコレータ」の三つで、どれも hozoc が計算して IR と `View` に置いたもの（`Signature`、`View.config.seams`）を通る。
+- 語彙は提供せず、どの語彙も読まない。`seams` も持たない。デコレータの適用が基底の出力に効く道は「デコレータ」の二つで、どちらも hozoc が計算して IR と `View` に置いたもの（`Signature`、`View.config.seams`）を通る。
 - `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため。配布するときはビルドした実行ファイル `hozoc-plugin-go` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go/` に置く（`docs/plugin-protocol.md`「探索」）。このリポジトリのほかの Go のプラグインも同じ。
 
 ## 出力の対象
@@ -128,7 +128,7 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 
 - 相乗りは、置き場と名前を `plugin/golang`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。この文書の規則を自分で書き写さない（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
 - 表にないトランスパイラ（プロジェクトの中のプラグインのものなど）も、同じ決まりに従う: 表のファイル名、前置き、公開の名前を避け、自分のものを自分の文書に書く。
-- 関数の引数の並び（`ctx` の有無を含む）を決めるのは基底だけで、相乗りは変えられない。相乗りが基底の出力に足せるのは、自分のファイルと、宣言した継ぎ目（「継ぎ目」）だけ。
+- 関数の引数の並び（最初の `ctx` を含む。「op の形」）を決めるのは基底だけで、相乗りは変えられない。相乗りが基底の出力に足せるのは、自分のファイルと、宣言した継ぎ目（「継ぎ目」）だけ。
 - 基底の名前と、相乗りの公開の名前、利用者の宣言の名前が当たること（model `Schema` と `go-sqlite` の `Schema` など）は、当たった名前を足すトランスパイラが、自分の診断で報告する（基底は GO-2）。当たる相手（定義のパッケージの公開の名前）の一覧は、`golang.PublicNames`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。
 
 ## 名前
@@ -250,22 +250,22 @@ const EffectCreateUser runtime.Effect = "store.createUser"
 
 ## op の形
 
-op のメソッドの形は、その op の宣言だけで決まり、どのインターフェースに現れても、どの名前空間から見ても同じ。`export` の有無にもよらない。
+op のメソッドの形は、その op の宣言だけで決まり、どのインターフェースに現れても、どの名前空間から見ても同じ。`export` の有無にも、純粋かどうか（`Op.signature.pure`）にも、`throws` の有無にもよらない。
 
 | 部分 | 規則 |
 |---|---|
 | 名前 | op 名を先頭大文字にしたもの |
-| `ctx` | 最初の引数に `ctx context.Context` を取る。**純粋な op（`Op.signature.pure` が真。`docs/check.md`「純粋」）は取らない** |
+| `ctx` | 最初の引数に、**いつも** `ctx context.Context` を取る |
 | 引数 | `Op.params` の並びのまま、`<局所の名前> <型>` |
 | 戻り値 | `returns` が型なら、その型。`null`（void）と `never` なら、値はない |
-| `error` | 最後の戻り値に `error` を返す。**純粋で、かつ `Op.signature.exceptions` が空の op は返さない**（失敗しえない）。戻り値が二つなら `(T, error)` |
+| `error` | 最後の戻り値に、**いつも** `error` を返す。値があれば `(T, error)`、なければ `error` だけ |
 
+- **基底は、どの関数に `ctx` と `error` が要るかを判定しない**（原則の持ち主は `docs/requirements.md`「op の中身に立ち入らない」）。基底が出す関数のうち、仕様の宣言を写したものは、どれも同じ形: 最初の引数が `ctx context.Context`、最後の戻り値が `error`。op（配線でも葉でも）のほかに、`read` と効果のメソッド（「状態の単位」）、分類の述語と判定関数（「分類」）、継ぎ目のメソッドとその `body`（「Seams」）。
+- 仕様の宣言を写したものでない関数は、Go がその形を決めているので、この形にしない: `New`（「New」）、補助 `ptr`（「値」）、union のマーカーメソッド（「union」）、例外の `Error()` と `HozoException()`（「exception」）。
 - `ctx` は、中断と期限を伝えるための、標準の `context.Context`（Go の作法）。自前のコンテキスト型は作らず、基底は、値を載せて引数の代わりにすることには使わない。生成したコードは、受け取った `ctx` を、呼ぶ先にそのまま渡す（継ぎ目の実装が、`body` に渡す `ctx` に、呼び出しの間だけのものを載せることはある: `docs/plugin-go-sqlite.md`「トランザクション」）。
-- 純粋さと `Signature.exceptions` は、op 自身の名前空間から見たもの（`View.program` の `Op.signature`）を使う。純粋な op はデコレータを持たないので、どの名前空間から見ても同じ値になる。
-- 形は三通り: 純粋でない（`ctx` を取り、`error` を返す）、純粋で `throws` がある（`ctx` を取らず、`error` を返す）、純粋で `throws` がない（どちらもない）。関数の形を見れば、その op が状態や外部に触れるかが分かる。仕様の一語（デコレータ、`throws`）と、配線が呼ぶもので形が変わり、人が書いた実装は、コンパイルエラーで気づく。
-- **`read` と効果のメソッドの形**は、op とは別に決まる（「状態の単位」）: 状態に触れるので、いつも `ctx` を取り、`error` を返す。
-- 戻り値がなく、純粋で、`throws` もない op は、引数を受け取って何も返さないメソッドになる。
-- **`never` を返す op** は、値を返さず `error` だけを返す（`Unauthorized() error`。デコレータが付いていれば `ctx` も取る）。中身は基底が出す（「op の置き場」）。
+- 純粋さ（`docs/check.md`「純粋」）は、言語が仕様から割り出す事実として IR に残る。基底は、それを読まない: 関数の形にも、コメントにも使わない。
+- `throws` を持たない op の実装も、`error` を返せる。仕様の例外でない `error`（中断、入出力の失敗）は、配線がそのまま呼び出し元へ返す（「呼び出し」の「失敗の扱い」）。
+- **`never` を返す op** は、値を返さず `error` だけを返す（`Unauthorized(ctx context.Context) error`）。中身は基底が出す（「op の置き場」）。
 
 ## 実装を受け取る口
 
@@ -318,8 +318,7 @@ type Leaves interface {
 	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
 	//
 	// Throws: type.InvalidCredentials
-	// 純粋（ctx を取らない）
-	CheckPassword(user pkgtype.User, password pkgtype.Password) error
+	CheckPassword(ctx context.Context, user pkgtype.User, password pkgtype.Password) error
 	…
 }
 ```
@@ -345,7 +344,7 @@ type UsersState interface {
 }
 ```
 
-メソッドは、この順: 形で決まる問い合わせ、形で決まる命令（配線が直に呼ぶものだけ）、`read`（宣言順）、効果（宣言順）。どれも状態に触れるので、`ctx` を取り、`error` を返す。
+メソッドは、この順: 形で決まる問い合わせ、形で決まる命令（配線が直に呼ぶものだけ）、`read`（宣言順）、効果（宣言順）。どれも、op と同じに、`ctx` を取り、`error` を返す（「op の形」）。
 
 | メソッド | 出すとき | 形 |
 |---|---|---|
@@ -376,7 +375,7 @@ type UsersState interface {
 
 ```go
 // StoreOps は名前空間 store の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 store に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
 type StoreOps interface {
 	// FindUser は op store.findUser: email からユーザーを引く
 	//
@@ -429,10 +428,10 @@ type ops struct {
 
 | 置き場 | メソッドの中身 |
 |---|---|
-| `Leaves` | `return o.leaves.<Op>(<引数>)`（op が `ctx` を取るなら、最初に `ctx`） |
+| `Leaves` | `return o.leaves.<Op>(ctx, <引数>)` |
 | `never` を返す op | `return <例外の型>{}` |
 
-戻り値のないメソッド（値も `error` もない）は、`return` を書かずに呼ぶだけ。`ops` の、配線でないメソッドには、コメントを書かない（継ぎ目を持つ op の外側と中身は、一行のコメントを持つ。「コメント」）。
+`ops` の、配線でないメソッドには、コメントを書かない（継ぎ目を持つ op の外側と中身は、一行のコメントを持つ。「コメント」）。
 
 ## 配線の本体
 
@@ -447,7 +446,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 	// match session by store.Login
 	if session != nil {
 		// LoggedIn: session は type.Session
-		return o.RequireFresh(*session)
+		return o.RequireFresh(ctx, *session)
 	}
 	// default
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
@@ -460,16 +459,16 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 
 | 呼ぶもの（`Call.callee`） | Go |
 |---|---|
-| 同じ名前空間の op（葉でも配線でも、`export` の有無によらず） | `o.<Op>(<引数>)`。実装がどの口にあるか、継ぎ目を持つかは、書き方を変えない（継ぎ目を持つ op は、同じ名前空間の配線から呼んでも継ぎ目を通る） |
-| 別の名前空間の op | `o.<名前空間の引数名>.<Op>(<引数>)` |
+| 同じ名前空間の op（葉でも配線でも、`export` の有無によらず） | `o.<Op>(ctx, <引数>)`。実装がどの口にあるか、継ぎ目を持つかは、書き方を変えない（継ぎ目を持つ op は、同じ名前空間の配線から呼んでも継ぎ目を通る） |
+| 別の名前空間の op | `o.<名前空間の引数名>.<Op>(ctx, <引数>)` |
 | `read`（`userByEmail(email)`） | `o.<読む状態の引数名>.<Read>(ctx, <引数>)`（`o.users.UserByEmail(ctx, email)`） |
 | 効果（`createOrder(order);`） | `o.<宛先の単位の引数名>.<Effect>(ctx, <引数>)`（`o.orders.CreateOrder(ctx, order)`） |
 | 直に呼ぶ組み込みの効果（`users.post(user);`） | `o.<状態の引数名>.<操作>(ctx[, <値>])`（`o.users.Post(ctx, user)`、`o.token.Delete(ctx)`） |
 
-- 呼ぶ op が `ctx` を取るなら、最初の引数に `ctx` を渡す。`read` と効果は、いつも `ctx` を取る。引数は、呼ぶ先の引数（`Op.params`、`Read.params`、`Effect.params`）の順に、`Call.args` の値（「値」）。渡されていない省略可能な引数は `nil`。`bind` で埋まる位置は「bind で埋まる位置」（op の呼び出しだけ）。
+- 最初の引数は、いつも、受け取った `ctx`（「op の形」）。続く引数は、呼ぶ先の引数（`Op.params`、`Read.params`、`Effect.params`）の順に、`Call.args` の値（「値」）。渡されていない省略可能な引数は `nil`。`bind` で埋まる位置は「bind で埋まる位置」（op の呼び出しだけ）。
 - `read` と効果を呼べるのは、宣言した名前空間の配線だけ（NS-6。`docs/check.md`「配線からの呼び出し」）なので、呼ぶ先は、いつも N の状態の単位。単位は「状態の単位」の表のとおり。
 - 状態を名前で読むこと（名前を付けない `read`）は、呼び出しではなく、値（「状態の参照」）。
-- **失敗の扱い**: `error` を返すものの呼び出し（`read` と効果は、いつも）は、すぐ後に `if err != nil { return <零値>, err }` を置く（`<零値>` は、この配線の戻り値の型の零値。戻り値がなければ `return err`）。`error` を返さない op の呼び出しには置かない。
+- **失敗の扱い**: 呼び出しは、どれも `error` を返す（「op の形」）。その結果を束縛か文で受ける呼び出しは、すぐ後に `if err != nil { return <零値>, err }` を置く（`<零値>` は、この配線の戻り値の型の零値。戻り値がなければ `return err`）。配線も、いつも `error` を返すので、返す先は、いつもある。受け取った `error` は、包まず、そのまま返す。
 - **零値**: ポインタ・インターフェース・スライス・マップは `nil`、構造体は `<型>{}`、`time.Time` は `time.Time{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
 
 ### 値
@@ -512,14 +511,14 @@ if <x> != nil {
 
 | 文 | Go |
 |---|---|
-| `const x = 呼び出し`（op か `read`） | `x, err := <呼び出し>` と失敗の扱い。`error` を返さない op なら `x := <呼び出し>`。下の行で使っていない束縛（WIRE-8）は、直後に `_ = x` を足す |
+| `const x = 呼び出し`（op か `read`） | `x, err := <呼び出し>` と失敗の扱い。下の行で使っていない束縛（WIRE-8）は、直後に `_ = x` を足す |
 | `const x = 値` | `x := <値>`（当てはめる型は、値の型） |
-| `呼び出し;`（op か効果） | `if err := <呼び出し>; err != nil { return <零値>, err }`。`error` を返さない op なら `<呼び出し>` だけ |
-| `return 呼び出し`（op か `read`） | 呼ぶ先の戻り値の並びが、この配線と同じで、型をそろえる必要がなければ `return <呼び出し>`（`return o.users.UserByEmail(ctx, email)`）。呼ぶ op だけが `error` を返さないなら `return <呼び出し>, nil`。型をそろえる必要があれば、`v<n>` に束縛してから `return <そろえた値>, nil` |
-| `return 値` | `return <値>, nil`（`error` を返さない配線なら `return <値>`） |
+| `呼び出し;`（op か効果） | `if err := <呼び出し>; err != nil { return <零値>, err }`。値を返す op なら、値を捨てる: `if _, err := <呼び出し>; …` |
+| `return 呼び出し`（op か `read`） | 型をそろえる必要がなければ `return <呼び出し>`（`return o.users.UserByEmail(ctx, email)`。戻り値の並びは、どちらも `(T, error)`）。型をそろえる必要があれば、`v<n>` に束縛して失敗の扱いを置いてから `return <そろえた値>, nil` |
+| `return 値` | `return <値>, nil` |
 | `const x = match …` / `return match …` / `match …;` | 「match」 |
 | 「返らない」呼び出し（`never` を返す op）の文と `return` | `return <零値>, <呼び出し>`（戻り値がなければ `return <呼び出し>`） |
-| 本体の終わり（戻り値のない配線） | `error` を返す配線なら、最後に `return nil`。最後の文が「返らない」なら足さない |
+| 本体の終わり（戻り値のない配線） | 最後に `return nil`。最後の文が「返らない」なら足さない |
 
 束縛を二度目以降に作るときも `:=` を使う（`err` は同じ変数が使い回される）。
 
@@ -561,7 +560,7 @@ if err != nil {
 | 標準の分類 `nullable`、型で決まる分類のうち絞り込みが `presence` のもの | `if <対象> != nil`。この枝が、値のある場合（`HasItems`、名前の付いたケース）。もう一方が `Empty` / `default` |
 | 標準の分類 `list` | `if len(<対象>) != 0`。この枝が `HasItems`、もう一方が `Empty` |
 | 型で決まる分類のうち絞り込みが `variant` のもの | `switch <対象>.(type)`。ケースごとに `case <アームの Go の型>:`（アームを包む型なら、その包む型）。`default` のアームは `default:` |
-| 述語で決まる値の分類・op の分類 | `k<n>, err := <パッケージ>.Classify<C>(o.<分類の引数名>, <対象>)` と失敗の扱いの後、`switch k<n>`。ケースごとに `case <C><ケース名>:`、`default` のアームは `case <C>Default:` |
+| 述語で決まる値の分類・op の分類 | `k<n>, err := <パッケージ>.Classify<C>(ctx, o.<分類の引数名>, <対象>)` と失敗の扱いの後、`switch k<n>`。ケースごとに `case <C><ケース名>:`、`default` のアームは `case <C>Default:` |
 | 述語で決まる状態の分類 | `k<n>, err := Classify<C>(ctx, o.<分類の引数名>)` と失敗の扱いの後、`switch k<n>`。上と同じ |
 | 型で決まる状態の分類 | 対象の状態を「状態の参照」で読んでから、その値を対象にして、上の `presence` か `variant` の分け方 |
 
@@ -585,8 +584,7 @@ if err != nil {
 
 | 本体 | `return match` | `const x = match` | 文の `match` |
 |---|---|---|---|
-| 呼び出し（`error` を返す） | `return <呼び出し>`。型をそろえる必要があれば、束縛してから `return <そろえた値>, nil` | `v<n>, err := <呼び出し>` と失敗の扱い、`x = <そろえた値>` | `if err := <呼び出し>; err != nil { return <零値>, err }` |
-| 呼び出し（`error` を返さない） | `return <呼び出し>, nil`（配線も返さないなら `return <呼び出し>`） | `x = <呼び出し>` | `<呼び出し>` |
+| 呼び出し | `return <呼び出し>`。型をそろえる必要があれば、束縛してから `return <そろえた値>, nil` | `v<n>, err := <呼び出し>` と失敗の扱い、`x = <そろえた値>` | `if err := <呼び出し>; err != nil { return <零値>, err }` |
 | 「返らない」呼び出し | `return <零値>, <呼び出し>` | 同じ | 同じ |
 | 値 | `return <値>, nil` | `x = <値>` | —（書けない。WIRE-2） |
 | `none` | `return nil, nil` | 何も書かない（`x` は零値の `nil` のまま） | 何も書かない |
@@ -616,24 +614,25 @@ const (
 // WarrantyKindCases は分類 shop.WarrantyKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type WarrantyKindCases interface {
 	// Standard はケース Standard の述語。
-	Standard(v Item) bool
-	Yamada(v Item) bool
+	Standard(ctx context.Context, v Item) (bool, error)
+	// Yamada はケース Yamada の述語。
+	Yamada(ctx context.Context, v Item) (bool, error)
 }
 
 // ClassifyWarrantyKind は v を shop.WarrantyKind で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyWarrantyKind(c WarrantyKindCases, v Item) (WarrantyKind, error)
+func ClassifyWarrantyKind(ctx context.Context, c WarrantyKindCases, v Item) (WarrantyKind, error)
 ```
 
-- 述語の引数は、分類の対象の型（値の分類は `subject` の型、op の分類はその op の `returns`）。値だけを見るので、`ctx` を取らず、`error` を返さない。
-- 判定関数は、すべての述語を宣言順に呼び、真の数を数える。`hasDefault` が false なら、真がちょうど一つでなければ、true なら、真が二つ以上なら、`*runtime.ClassificationError{Classify: "<FQN>", Hits: <真になったケース名>}` を返す。真が一つならそのケース、0 で `hasDefault` なら `<C>Default`。
+- 述語は、`ctx` と、分類の対象の値（値の分類は `subject` の型、op の分類はその op の `returns`）を取り、`(bool, error)` を返す。判定関数は、`ctx`、述語、対象の値を、この順に取る。どちらも、op と同じ形（「op の形」）。
+- 判定関数は、すべての述語を宣言順に呼び、真の数を数える。述語が `error` を返したら、残りも呼んだうえで、最初の `error` を返す。どの述語も `error` を返さなければ、真の数を確かめる: `hasDefault` が false なら、真がちょうど一つでなければ、true なら、真が二つ以上なら、`*runtime.ClassificationError{Classify: "<FQN>", Hits: <真になったケース名>}` を返す。真が一つならそのケース、0 で `hasDefault` なら `<C>Default`。
 - 型で決まる絞り込み（`presence` / `variant`）の `as` を持つケースは、値がその型に当たらなければ、述語を呼ばずに偽とする（`docs/check.md`「ケースの判定」）。
-- **判定の誤りを返す先がない配線**（純粋で、例外を持たない配線は `error` を返さない。「op の形」）が、述語で決まる分類で `match` するときは、判定関数の誤りで `panic` する: `if err != nil { panic(err) }`。`return match` で `default` の節を持たない `switch` の後ろ（「match」）も、`panic(&runtime.ClassificationError{Classify: "<分類の FQN>"})`。述語が排他でない・全集合でないのは実装の誤りで、仕様はこの配線に失敗を許していない。
+- **判定の誤りは、配線が返す。** 判定関数が返した `error`（述語の `error` か、`*runtime.ClassificationError`）は、ほかの呼び出しの失敗と同じに、配線がそのまま返す（「呼び出し」の「失敗の扱い」）。どの配線も `error` を返す（「op の形」）ので、返す先は、いつもある。基底は、`panic` を呼ぶコードを出さない。述語が排他でない・全集合でないのは実装の誤りで（ケースが排他で全体を覆うことは、述語を書く人が担保する）、その誤りは、仕様の例外（`throws`）ではない `error` として、呼び出し元に届く。
 - 述語の実装は、その分類を `match` に使う名前空間の `New` が、引数で受け取る（「New」の 3）。分類を宣言した名前空間の `New` が受け取るのは、その名前空間の配線が使うときだけ。
-- **述語で決まる状態の分類** C は、`classify.go` に列挙の型と定数と、判定関数 `func Classify<C>(ctx context.Context, s <C>State) (<C>, error)` を出す。述語は状態の単位 `<C>State` のメソッド（「状態の単位」）。判定関数は、すべての述語を呼び（述語がエラーを返したら、残りも呼んだうえで最初のエラーを返す）、真の数を上と同じ規則で確かめる。配線が `match by C` に使っていなくても出す（テストが、効果の結果の判定に使う）。
+- **述語で決まる状態の分類** C は、`classify.go` に列挙の型と定数と、判定関数 `func Classify<C>(ctx context.Context, s <C>State) (<C>, error)` を出す。述語は状態の単位 `<C>State` のメソッド（「状態の単位」）。判定関数は、値の分類と同じ規則で、すべての述語を呼び、真の数を確かめる。配線が `match by C` に使っていなくても出す（テストが、効果の結果の判定に使う）。
 
 ## デコレータ
 
-**デコレータの適用が何を出力するかは、そのデコレータを読むトランスパイラが決める。** 基底は語彙を知らないので、デコレータの名前からも、宣言の節（`throws`、`catches … recovers` / `halts` / `ignores`）からも、何も生成しない。デコレータが基底の出力に効くのは、op の純粋さ（付いていれば純粋でなく、`ctx` を取り、`error` を返す）、検査が計算した `Throws:` などのコメント、単位のトランスパイラが宣言した継ぎ目（「継ぎ目」）の三つだけ。
+**デコレータの適用が何を出力するかは、そのデコレータを読むトランスパイラが決める。** 基底は語彙を知らないので、デコレータの名前からも、宣言の節（`throws`、`catches … recovers` / `halts` / `ignores`）からも、何も生成しない。デコレータが基底の出力に効くのは、検査が計算した `Throws:` などのコメントと、単位のトランスパイラが宣言した継ぎ目（「継ぎ目」）の二つだけ。op のメソッドの形は、デコレータの有無で変わらない（「op の形」）。
 
 **付ける先で、デコレータのできることが分かれる**（原則の持ち主は `docs/requirements.md`「出力を推論しない」）。
 
@@ -719,7 +718,7 @@ func (o *ops) loginBody(ctx context.Context, in LoginInput) (LoginOk, error) {
 | 引数 | op の形の引数（`ctx context.Context` と、`Op.params`）の後ろに、`body func(<op の形の引数>) <op の形の戻り値>` |
 | 戻り値 | op の形の戻り値 |
 
-- デコレータの付いた op は純粋でない（`docs/check.md`「純粋」）ので、継ぎ目のメソッドも `body` も、いつも `ctx` を取り、`error` を返す。
+- 継ぎ目のメソッドも `body` も、op と同じに、いつも `ctx` を取り、`error` を返す（「op の形」）。
 - `body` の関数の型には、引数の名前も書く（op の引数の局所の名前）。`body` という名前が op の引数の局所の名前と当たれば、当たらなくなるまで、`body` の方の末尾に `_` を足す（「名前」の、生成したコードが作る名前の規則）。
 - 基底は、デコレータの引数（`Application.args`）を継ぎ目に渡さない。中身を出すトランスパイラが `View` から読んで、自分のコードに書く。
 
@@ -793,14 +792,14 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 // Throws: <例外の FQN を「, 」で>
 // Reads: <状態の FQN を「, 」で>
 // Effects: <効果を「, 」で>
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
 ```
 
 - 説明がなければ、一行目は `// <メソッド名> は op <FQN>。`。
 - `引数:` の段は、`@param` があるときだけ。`Throws:` / `Reads:` / `Effects:` の行は、それぞれ `Op.signature` の `exceptions` / `reads` / `effects` が空でないときだけで、並びは、その列の順。区切りは、仕様の節と同じ `,`（と空白一つ）。
 - **`Reads:` に並ぶのは、読む基底の状態**（`Signature.reads`）: 名前を付けた `read` を呼んでも、状態を名前で読んでも、その状態の FQN（`Reads: store.users`。どの `read` かは書かない。読む状態は、書き方によらない: `docs/check.md`「節に書く要素」）。
-- **`Effects:` に並ぶのは、効果**（`Signature.effects` の `EffectRef`）: 宣言した効果は、その FQN（`store.createOrder`）。直に呼んだ組み込みの効果は、`<状態の FQN>.<操作>`（`store.users.post`）。最後の行は、純粋な op だけで、`error` を返すなら `// 純粋（ctx を取らない）`。
+- **`Effects:` に並ぶのは、効果**（`Signature.effects` の `EffectRef`）: 宣言した効果は、その FQN（`store.createOrder`）。直に呼んだ組み込みの効果は、`<状態の FQN>.<操作>`（`store.users.post`）。
 - 説明の段と次の段の間は `//` の一行で空ける。`Throws:` から最後の行までは、空けずに続ける。説明のほかに何もなければ、説明だけ。
+- op が純粋かどうかは、コメントに書かない（「op の形」）。
 - op が内部かどうかは、コメントに書かない。
 
 **状態の単位のメソッド**:
@@ -881,7 +880,8 @@ type ClassificationError struct { Classify string; Hits []string }   // 述語�
 | hozoc 本体が出す。トランスパイラが選んだ宣言だけ | 基底のプラグインが出す。型と状態はすべて、op は単位の対象のすべて | 68、69 |
 | 別の言語の型と、どの出力にもない型は、使う側に複製する | 複製しない。置き場がなければ CFG-22 | 67 |
 | `Validate` を基底が出す | `go-valid` が出す | 71 |
-| 生成するコードは `context` を取らない | 純粋でない op は `ctx context.Context` を取る。純粋で例外のない op は `error` を返さない | 72 |
+| 生成するコードは `context` を取らない。その後の形では、純粋でない op だけが `ctx context.Context` を取り、純粋で例外のない op は `error` を返さない | 仕様の宣言を写した関数は、どれも、最初の引数に `ctx context.Context` を取り、最後の戻り値に `error` を返す。純粋かどうかは見ない | 145、146（72 の、純粋さで形を分ける部分を置き換えた） |
+| 分類の述語は、値だけを取って `bool` を返す。判定の誤りを返す先がない配線は、`panic` する | 述語も判定関数も、`ctx` を取り、`error` を返す。判定の誤りは、配線が返す。基底は `panic` を出さない | 146、147（90 の帰結を置き換えた） |
 | 実装は、関数のフィールドを持つ構造体（`Leaves`、`Deps`、`Wrappers`、`Classifiers`）と、パッケージの変数 `States` | インターフェースと、`New` の位置引数。未設定の `*runtime.MissingError` はない | 73 |
 | `Ops` はすべての op | 入口の `Ops` は `export` の op だけ。内部の op は内側のフォルダから | 74 |
 | 別の名前空間への呼び出しの `bind` の位置は、`Deps` を埋める者が埋める | 配線が埋める | 79 |

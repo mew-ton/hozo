@@ -93,22 +93,34 @@ const (
 // LineKindCases は分類 shop.LineKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type LineKindCases interface {
 	// Single はケース Single の述語。
-	Single(v Line) bool
+	Single(ctx context.Context, v Line) (bool, error)
 	// Bulk はケース Bulk の述語。
-	Bulk(v Line) bool
+	Bulk(ctx context.Context, v Line) (bool, error)
 }
 
 // ClassifyLineKind は v を shop.LineKind で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyLineKind(c LineKindCases, v Line) (LineKind, error) {
+func ClassifyLineKind(ctx context.Context, c LineKindCases, v Line) (LineKind, error) {
 	var hits []string
 	var kind LineKind
-	if c.Single(v) {
+	var first error
+	if ok, err := c.Single(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Single")
 		kind = LineKindSingle
 	}
-	if c.Bulk(v) {
+	if ok, err := c.Bulk(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
 		hits = append(hits, "Bulk")
 		kind = LineKindBulk
+	}
+	if first != nil {
+		return kind, first
 	}
 	switch len(hits) {
 	case 1:

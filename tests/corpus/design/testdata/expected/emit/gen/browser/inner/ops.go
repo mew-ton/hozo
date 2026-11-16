@@ -52,9 +52,7 @@ type Ops interface {
 	AskYamadaWarranty(ctx context.Context, item server.Item) (server.PlanId, error)
 
 	// ChooseStandardWarranty はメーカー保証の明細を作る
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ChooseStandardWarranty(item server.Item, line server.CartLine) server.WarrantyLine
+	ChooseStandardWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error)
 
 	// ChooseWarrantyPlan は保証プランを選ぶ。保証が付かない商品なら none
 	//
@@ -79,9 +77,7 @@ type Ops interface {
 	FetchOrders(ctx context.Context, query OrdersQuery) ([]server.OrderSummary, error)
 
 	// OrderPageVm は op browser.orderPageVm。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	OrderPageVm(me server.PublicUser, orders []server.OrderSummary) OrderPage
+	OrderPageVm(ctx context.Context, me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
 
 	// OpenOrders は op browser.openOrders。
 	//
@@ -89,9 +85,7 @@ type Ops interface {
 	OpenOrders(ctx context.Context, query OrdersQuery) (OrderPage, error)
 
 	// ProfilePageVm は op browser.profilePageVm。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ProfilePageVm(me server.PublicUser) ProfilePage
+	ProfilePageVm(ctx context.Context, me server.PublicUser) (ProfilePage, error)
 
 	// OpenProfile は op browser.openProfile。
 	//
@@ -99,9 +93,7 @@ type Ops interface {
 	OpenProfile(ctx context.Context) (ProfilePage, error)
 
 	// ProductPageVm は op browser.productPageVm。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ProductPageVm(item server.Item) ProductPage
+	ProductPageVm(ctx context.Context, item server.Item) (ProductPage, error)
 
 	// FetchItem は op browser.fetchItem。
 	//
@@ -121,9 +113,7 @@ type Leaves interface {
 	AskYamadaWarranty(ctx context.Context, item server.Item) (server.PlanId, error)
 
 	// ChooseStandardWarranty はメーカー保証の明細を作る
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ChooseStandardWarranty(item server.Item, line server.CartLine) server.WarrantyLine
+	ChooseStandardWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error)
 
 	// AskWarrantyPlan は op browser.askWarrantyPlan。
 	//
@@ -131,23 +121,17 @@ type Leaves interface {
 	AskWarrantyPlan(ctx context.Context, item server.Item) (server.PlanId, error)
 
 	// OrderPageVm は op browser.orderPageVm。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	OrderPageVm(me server.PublicUser, orders []server.OrderSummary) OrderPage
+	OrderPageVm(ctx context.Context, me server.PublicUser, orders []server.OrderSummary) (OrderPage, error)
 
 	// ProfilePageVm は op browser.profilePageVm。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ProfilePageVm(me server.PublicUser) ProfilePage
+	ProfilePageVm(ctx context.Context, me server.PublicUser) (ProfilePage, error)
 
 	// ProductPageVm は op browser.productPageVm。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ProductPageVm(item server.Item) ProductPage
+	ProductPageVm(ctx context.Context, item server.Item) (ProductPage, error)
 }
 
 // ServerOps は名前空間 server の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 server に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、server の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、server の出力の Ops は、そのまま渡せる。
 type ServerOps interface {
 	// Logout は op server.logout。
 	//
@@ -204,22 +188,22 @@ func (o *ops) AskYamadaWarranty(ctx context.Context, item server.Item) (server.P
 	return o.leaves.AskYamadaWarranty(ctx, item)
 }
 
-func (o *ops) ChooseStandardWarranty(item server.Item, line server.CartLine) server.WarrantyLine {
-	return o.leaves.ChooseStandardWarranty(item, line)
+func (o *ops) ChooseStandardWarranty(ctx context.Context, item server.Item, line server.CartLine) (server.WarrantyLine, error) {
+	return o.leaves.ChooseStandardWarranty(ctx, item, line)
 }
 
 func (o *ops) AskWarrantyPlan(ctx context.Context, item server.Item) (server.PlanId, error) {
 	return o.leaves.AskWarrantyPlan(ctx, item)
 }
 
-func (o *ops) OrderPageVm(me server.PublicUser, orders []server.OrderSummary) OrderPage {
-	return o.leaves.OrderPageVm(me, orders)
+func (o *ops) OrderPageVm(ctx context.Context, me server.PublicUser, orders []server.OrderSummary) (OrderPage, error) {
+	return o.leaves.OrderPageVm(ctx, me, orders)
 }
 
-func (o *ops) ProfilePageVm(me server.PublicUser) ProfilePage {
-	return o.leaves.ProfilePageVm(me)
+func (o *ops) ProfilePageVm(ctx context.Context, me server.PublicUser) (ProfilePage, error) {
+	return o.leaves.ProfilePageVm(ctx, me)
 }
 
-func (o *ops) ProductPageVm(item server.Item) ProductPage {
-	return o.leaves.ProductPageVm(item)
+func (o *ops) ProductPageVm(ctx context.Context, item server.Item) (ProductPage, error) {
+	return o.leaves.ProductPageVm(ctx, item)
 }

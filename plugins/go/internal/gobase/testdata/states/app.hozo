@@ -83,7 +83,7 @@ namespace app {
   @mark
   export op audit(note: string);
 
-  // 値を受け取る葉（純粋で失敗しない）
+  // 値を受け取る葉（純粋で throws がない）
   export op show(title: string);
   export op showCount(n: int);
   export op showOwner(name: string?);

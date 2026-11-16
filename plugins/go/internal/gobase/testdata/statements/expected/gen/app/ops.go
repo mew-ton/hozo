@@ -22,26 +22,20 @@ type Ops interface {
 	Find(ctx context.Context, id Id, limit *int64, tag *string) (*Item, error)
 
 	// Make は op app.make。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Make(id Id) Item
+	Make(ctx context.Context, id Id) (Item, error)
 
 	// Note は op app.note。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Note(item Item)
+	Note(ctx context.Context, item Item) error
 
 	// Parse は op app.parse。
 	//
 	// Throws: app.Broken
-	// 純粋（ctx を取らない）
-	Parse(text string) (Id, error)
+	Parse(ctx context.Context, text string) (Id, error)
 
 	// Fail は op app.fail。
 	//
 	// Throws: app.Gone
-	// 純粋（ctx を取らない）
-	Fail() error
+	Fail(ctx context.Context) error
 
 	// Consts は op app.consts。
 	Consts(ctx context.Context, id Id) (Item, error)
@@ -53,9 +47,7 @@ type Ops interface {
 	CalleeOnlyPure(ctx context.Context, id Id) (Item, error)
 
 	// BothPure は op app.bothPure。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	BothPure(id Id) Item
+	BothPure(ctx context.Context, id Id) (Item, error)
 
 	// Widen は op app.widen。
 	Widen(ctx context.Context, id Id) (*Item, error)
@@ -64,29 +56,23 @@ type Ops interface {
 	ValueWithError(ctx context.Context, item Item) (Item, error)
 
 	// ValueOnly は op app.valueOnly。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ValueOnly(item Item) Item
+	ValueOnly(ctx context.Context, item Item) (Item, error)
 
 	// Stop は op app.stop。
 	//
 	// Throws: app.Gone
-	// 純粋（ctx を取らない）
-	Stop(id Id) (Item, error)
+	Stop(ctx context.Context, id Id) (Item, error)
 
 	// StopStatement は op app.stopStatement。
 	//
 	// Throws: app.Gone
-	// 純粋（ctx を取らない）
-	StopStatement() error
+	StopStatement(ctx context.Context) error
 
 	// EndWithError は op app.endWithError。
 	EndWithError(ctx context.Context, item Item) error
 
 	// EndQuiet は op app.endQuiet。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	EndQuiet(item Item)
+	EndQuiet(ctx context.Context, item Item) error
 
 	// Calls は op app.calls。
 	//
@@ -94,54 +80,34 @@ type Ops interface {
 	Calls(ctx context.Context, text string) (*Item, error)
 
 	// AsTime は op app.asTime。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsTime() time.Time
+	AsTime(ctx context.Context) (time.Time, error)
 
 	// AsDuration は op app.asDuration。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsDuration() time.Duration
+	AsDuration(ctx context.Context) (time.Duration, error)
 
 	// AsId は op app.asId。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsId() Id
+	AsId(ctx context.Context) (Id, error)
 
 	// AsCount は op app.asCount。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsCount() Count
+	AsCount(ctx context.Context) (Count, error)
 
 	// AsFloat は op app.asFloat。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsFloat() float64
+	AsFloat(ctx context.Context) (float64, error)
 
 	// AsBool は op app.asBool。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsBool() bool
+	AsBool(ctx context.Context) (bool, error)
 
 	// AsItems は op app.asItems。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsItems() []Item
+	AsItems(ctx context.Context) ([]Item, error)
 
 	// AsTable は op app.asTable。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsTable() map[string]int64
+	AsTable(ctx context.Context) (map[string]int64, error)
 
 	// AsOptional は op app.asOptional。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsOptional() *Item
+	AsOptional(ctx context.Context) (*Item, error)
 
 	// AsShape は op app.asShape。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsShape() Shape
+	AsShape(ctx context.Context) (Shape, error)
 
 	// ZeroTime は op app.zeroTime。
 	ZeroTime(ctx context.Context) (time.Time, error)
@@ -193,74 +159,49 @@ type Leaves interface {
 	Find(ctx context.Context, id Id, limit *int64, tag *string) (*Item, error)
 
 	// Make は op app.make。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Make(id Id) Item
+	Make(ctx context.Context, id Id) (Item, error)
 
 	// Note は op app.note。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Note(item Item)
+	Note(ctx context.Context, item Item) error
 
 	// Parse は op app.parse。
 	//
 	// Throws: app.Broken
-	// 純粋（ctx を取らない）
-	Parse(text string) (Id, error)
+	Parse(ctx context.Context, text string) (Id, error)
 
 	// AsTime は op app.asTime。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsTime() time.Time
+	AsTime(ctx context.Context) (time.Time, error)
 
 	// AsDuration は op app.asDuration。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsDuration() time.Duration
+	AsDuration(ctx context.Context) (time.Duration, error)
 
 	// AsId は op app.asId。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsId() Id
+	AsId(ctx context.Context) (Id, error)
 
 	// AsCount は op app.asCount。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsCount() Count
+	AsCount(ctx context.Context) (Count, error)
 
 	// AsFloat は op app.asFloat。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsFloat() float64
+	AsFloat(ctx context.Context) (float64, error)
 
 	// AsBool は op app.asBool。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsBool() bool
+	AsBool(ctx context.Context) (bool, error)
 
 	// AsItems は op app.asItems。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsItems() []Item
+	AsItems(ctx context.Context) ([]Item, error)
 
 	// AsTable は op app.asTable。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsTable() map[string]int64
+	AsTable(ctx context.Context) (map[string]int64, error)
 
 	// AsOptional は op app.asOptional。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsOptional() *Item
+	AsOptional(ctx context.Context) (*Item, error)
 
 	// AsShape は op app.asShape。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	AsShape() Shape
+	AsShape(ctx context.Context) (Shape, error)
 }
 
 // DepOps は名前空間 dep の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 dep に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、dep の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、dep の出力の Ops は、そのまま渡せる。
 type DepOps interface {
 	// Fetch は op dep.fetch。
 	Fetch(ctx context.Context, id Id) (Item, error)
@@ -294,58 +235,58 @@ func (o *ops) Find(ctx context.Context, id Id, limit *int64, tag *string) (*Item
 	return o.leaves.Find(ctx, id, limit, tag)
 }
 
-func (o *ops) Make(id Id) Item {
-	return o.leaves.Make(id)
+func (o *ops) Make(ctx context.Context, id Id) (Item, error) {
+	return o.leaves.Make(ctx, id)
 }
 
-func (o *ops) Note(item Item) {
-	o.leaves.Note(item)
+func (o *ops) Note(ctx context.Context, item Item) error {
+	return o.leaves.Note(ctx, item)
 }
 
-func (o *ops) Parse(text string) (Id, error) {
-	return o.leaves.Parse(text)
+func (o *ops) Parse(ctx context.Context, text string) (Id, error) {
+	return o.leaves.Parse(ctx, text)
 }
 
-func (o *ops) Fail() error {
+func (o *ops) Fail(ctx context.Context) error {
 	return Gone{}
 }
 
-func (o *ops) AsTime() time.Time {
-	return o.leaves.AsTime()
+func (o *ops) AsTime(ctx context.Context) (time.Time, error) {
+	return o.leaves.AsTime(ctx)
 }
 
-func (o *ops) AsDuration() time.Duration {
-	return o.leaves.AsDuration()
+func (o *ops) AsDuration(ctx context.Context) (time.Duration, error) {
+	return o.leaves.AsDuration(ctx)
 }
 
-func (o *ops) AsId() Id {
-	return o.leaves.AsId()
+func (o *ops) AsId(ctx context.Context) (Id, error) {
+	return o.leaves.AsId(ctx)
 }
 
-func (o *ops) AsCount() Count {
-	return o.leaves.AsCount()
+func (o *ops) AsCount(ctx context.Context) (Count, error) {
+	return o.leaves.AsCount(ctx)
 }
 
-func (o *ops) AsFloat() float64 {
-	return o.leaves.AsFloat()
+func (o *ops) AsFloat(ctx context.Context) (float64, error) {
+	return o.leaves.AsFloat(ctx)
 }
 
-func (o *ops) AsBool() bool {
-	return o.leaves.AsBool()
+func (o *ops) AsBool(ctx context.Context) (bool, error) {
+	return o.leaves.AsBool(ctx)
 }
 
-func (o *ops) AsItems() []Item {
-	return o.leaves.AsItems()
+func (o *ops) AsItems(ctx context.Context) ([]Item, error) {
+	return o.leaves.AsItems(ctx)
 }
 
-func (o *ops) AsTable() map[string]int64 {
-	return o.leaves.AsTable()
+func (o *ops) AsTable(ctx context.Context) (map[string]int64, error) {
+	return o.leaves.AsTable(ctx)
 }
 
-func (o *ops) AsOptional() *Item {
-	return o.leaves.AsOptional()
+func (o *ops) AsOptional(ctx context.Context) (*Item, error) {
+	return o.leaves.AsOptional(ctx)
 }
 
-func (o *ops) AsShape() Shape {
-	return o.leaves.AsShape()
+func (o *ops) AsShape(ctx context.Context) (Shape, error) {
+	return o.leaves.AsShape(ctx)
 }

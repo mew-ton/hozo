@@ -9,7 +9,7 @@ import "context"
 // Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn, server.ClientError
 // Effects: server.createSession
 func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
-	ok, err := o.Authenticate(in)
+	ok, err := o.Authenticate(ctx, in)
 	if err != nil {
 		return LoginOk{}, err
 	}
@@ -27,14 +27,17 @@ func (o *ops) CancelOrder(ctx context.Context, in CancelInput) (Order, error) {
 	if err := o.orders.Refund(ctx, in.OrderId); err != nil {
 		return Order{}, err
 	}
-	return o.ConfirmRefund(in)
+	return o.ConfirmRefund(ctx, in)
 }
 
 // SaveOrder は注文を保存する
 //
 // Effects: server.createOrder
 func (o *ops) SaveOrder(ctx context.Context, in OrderInput) (Order, error) {
-	order := o.NewOrder(in)
+	order, err := o.NewOrder(ctx, in)
+	if err != nil {
+		return Order{}, err
+	}
 	if err := o.orders.CreateOrder(ctx, order); err != nil {
 		return Order{}, err
 	}
@@ -46,7 +49,7 @@ func (o *ops) SaveOrder(ctx context.Context, in OrderInput) (Order, error) {
 // Throws: server.NotificationFailed
 // Effects: server.notifyUser
 func (o *ops) SendOrderNotice(ctx context.Context, order Order) error {
-	notice, err := o.ComposeNotice(order)
+	notice, err := o.ComposeNotice(ctx, order)
 	if err != nil {
 		return err
 	}
@@ -79,7 +82,7 @@ func (o *ops) PlaceOrder(ctx context.Context, in OrderInput) (Order, error) {
 // Throws: server.RateLimited
 // Effects: server.sendResetMail
 func (o *ops) RequestPasswordReset(ctx context.Context, email Email) error {
-	reset, err := o.NewPasswordReset(email)
+	reset, err := o.NewPasswordReset(ctx, email)
 	if err != nil {
 		return err
 	}
@@ -103,7 +106,10 @@ func (o *ops) Logout(ctx context.Context, in LogoutInput) error {
 //
 // Effects: server.addCartLine
 func (o *ops) AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error) {
-	line := o.NewCartLine(in)
+	line, err := o.NewCartLine(ctx, in)
+	if err != nil {
+		return CartLine{}, err
+	}
 	if err := o.carts.AddCartLine(ctx, line); err != nil {
 		return CartLine{}, err
 	}
@@ -114,7 +120,10 @@ func (o *ops) AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error
 //
 // Effects: server.attachWarrantyToLine
 func (o *ops) AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error) {
-	line := o.WithWarranty(in)
+	line, err := o.WithWarranty(ctx, in)
+	if err != nil {
+		return WarrantyLine{}, err
+	}
 	if err := o.carts.AttachWarrantyToLine(ctx, line); err != nil {
 		return WarrantyLine{}, err
 	}

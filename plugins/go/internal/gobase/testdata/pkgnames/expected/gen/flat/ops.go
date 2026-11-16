@@ -13,14 +13,10 @@ import (
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
 	// Pick は op flat.pick。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Pick(job ops3.Job) ptr2.Ref
+	Pick(ctx context.Context, job ops3.Job) (ptr2.Ref, error)
 
 	// Keep は op flat.keep。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Keep(target *ptr2.Target, step ops2.Step)
+	Keep(ctx context.Context, target *ptr2.Target, step ops2.Step) error
 
 	// Go は op flat.go。
 	Go(ctx context.Context, job ops3.Job, target ptr2.Target) (ops3.Job, error)
@@ -30,18 +26,14 @@ type Ops interface {
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// Pick は op flat.pick。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Pick(job ops3.Job) ptr2.Ref
+	Pick(ctx context.Context, job ops3.Job) (ptr2.Ref, error)
 
 	// Keep は op flat.keep。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Keep(target *ptr2.Target, step ops2.Step)
+	Keep(ctx context.Context, target *ptr2.Target, step ops2.Step) error
 }
 
 // OpsOps は名前空間 ops の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 ops_ に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、ops の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、ops の出力の Ops は、そのまま渡せる。
 type OpsOps interface {
 	// Run は op ops.run。
 	Run(ctx context.Context, job ops3.Job) (ops3.Job, error)
@@ -60,10 +52,10 @@ type ops struct {
 	ops_   OpsOps
 }
 
-func (o *ops) Pick(job ops3.Job) ptr2.Ref {
-	return o.leaves.Pick(job)
+func (o *ops) Pick(ctx context.Context, job ops3.Job) (ptr2.Ref, error) {
+	return o.leaves.Pick(ctx, job)
 }
 
-func (o *ops) Keep(target *ptr2.Target, step ops2.Step) {
-	o.leaves.Keep(target, step)
+func (o *ops) Keep(ctx context.Context, target *ptr2.Target, step ops2.Step) error {
+	return o.leaves.Keep(ctx, target, step)
 }

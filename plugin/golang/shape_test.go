@@ -194,8 +194,8 @@ func TestUnitSignatures(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「op の形」: 純粋でない op は ctx を取り error を返す。純粋で throws がある op は ctx を取らず error を返す。
-// 純粋で throws がない op は、どちらもない。
+// docs/plugin-go.md「op の形」: どの op も、最初の引数に ctx を取り、最後の戻り値に error を返す。純粋かどうか
+// （Op.signature.pure）でも、throws の有無でも、形は変わらない。
 func TestSignature(t *testing.T) {
 	root := projectRoot(t)
 	v := typesView()
@@ -205,23 +205,23 @@ func TestSignature(t *testing.T) {
 		name            string
 		op              *ir.Op
 		params, results string
-		ctx, err        bool
 	}{
 		{"純粋でない、値を返す", with(op("server.find", ir.Optional(user), param("email", email)), impure()),
-			"ctx context.Context, email Email", "(*User, error)", true, true},
+			"ctx context.Context, email Email", "(*User, error)"},
 		{"純粋でない、値を返さない", with(op("server.add", nil, param("user", user)), impure()),
-			"ctx context.Context, user User", "error", true, true},
+			"ctx context.Context, user User", "error"},
 		{"純粋で throws がある", with(op("server.check", user, param("user", user)), throwing("server.Bad")),
-			"user User", "(User, error)", false, true},
-		{"純粋で throws があり、値を返さない", with(op("server.check2", nil), throwing("server.Bad")), "", "error", false, true},
+			"ctx context.Context, user User", "(User, error)"},
+		{"純粋で throws があり、値を返さない", with(op("server.check2", nil), throwing("server.Bad")), "ctx context.Context", "error"},
 		{"純粋で throws がない", op("server.page", ir.Array(user), param("users", ir.Array(user)), param("page", ir.Int())),
-			"users []User, page int64", "[]User", false, false},
-		{"戻り値がなく、純粋で、throws もない", op("server.noop", nil, param("x", ir.String())), "x string", "", false, false},
-		{"never を返す op は、値を返さず error だけを返す", with(op("server.unauthorized", ir.Never()), throwing("server.Bad")), "", "error", false, true},
-		{"never を返す op にデコレータが付いていれば ctx も取る", with(op("server.un2", ir.Never()), throwing("server.Bad"), impure()),
-			"ctx context.Context", "error", true, true},
+			"ctx context.Context, users []User, page int64", "([]User, error)"},
+		{"戻り値がなく、純粋で、throws もない", op("server.noop", nil, param("x", ir.String())), "ctx context.Context, x string", "error"},
+		{"never を返す op は、値を返さず error だけを返す", with(op("server.unauthorized", ir.Never()), throwing("server.Bad")),
+			"ctx context.Context", "error"},
+		{"never を返す op にデコレータが付いていても同じ", with(op("server.un2", ir.Never()), throwing("server.Bad"), impure()),
+			"ctx context.Context", "error"},
 		{"別の名前空間の型と、局所の名前", op("server.x", ir.Ref("type.Session"), param("type", ir.Ref("type.Token")), param("ctx", ir.String()), param("o", ir.Int())),
-			"type_ pkgtype.Token, ctx_ string, o_ int64", "pkgtype.Session", false, false},
+			"ctx context.Context, type_ pkgtype.Token, ctx_ string, o_ int64", "(pkgtype.Session, error)"},
 	}
 	reserved := map[string]bool{"o": true, "ctx": true, "err": true, "ptr": true}
 	for _, tt := range tests {
@@ -231,14 +231,41 @@ func TestSignature(t *testing.T) {
 			if params != tt.params || results != tt.results {
 				t.Errorf("Signature = (%q, %q), want (%q, %q)", params, results, tt.params, tt.results)
 			}
-			if hasCtx := im.Name("context") != ""; hasCtx != tt.ctx {
-				t.Errorf("context の import = %v, want %v", hasCtx, tt.ctx)
+			if im.Name("context") == "" {
+				t.Errorf("context を import していない")
 			}
-			s := shapeOf(&ir.Program{Namespaces: []ir.Namespace{namespace("server", tt.op)}}, "server", func(*ir.Op) bool { return true }, nil)
-			if s.Ops[0].Ctx != tt.ctx || s.Ops[0].Err != tt.err {
-				t.Errorf("OpShape: Ctx = %v, Err = %v, want %v, %v", s.Ops[0].Ctx, s.Ops[0].Err, tt.ctx, tt.err)
+			// 継ぎ目のメソッドと body も、同じ形（同「Seams」）
+			seamParams, seamResults := SeamSignature(tt.op, im, reserved)
+			if want := tt.params + ", body func(" + tt.params + ") " + tt.results; seamParams != want || seamResults != tt.results {
+				t.Errorf("SeamSignature = (%q, %q), want (%q, %q)", seamParams, seamResults, want, tt.results)
 			}
 		})
+	}
+}
+
+// docs/plugin-go.md「op の形」: 形は op の宣言だけで決まる。純粋さ（Signature.pure）と、計算した例外（Signature.exceptions）を
+// 変えても、メソッドのテキストは一バイトも変わらない。
+func TestSignatureIgnoresPurity(t *testing.T) {
+	root := projectRoot(t)
+	v := typesView()
+	l, _ := LayoutOf(v, root)
+	user := ir.Ref("server.User")
+	text := func(o *ir.Op) string {
+		params, results := Signature(o, NewImports(v, l, root, true), nil)
+		return "(" + params + ") " + results
+	}
+	for _, returns := range []ir.Type{nil, user, ir.Never()} {
+		pure := text(op("server.f", returns, param("user", user)))
+		for name, o := range map[string]*ir.Op{
+			"純粋でない":        with(op("server.f", returns, param("user", user)), impure()),
+			"throws がある":   with(op("server.f", returns, param("user", user)), throwing("server.Bad")),
+			"デコレータが付いている":  with(op("server.f", returns, param("user", user)), decorated("rate.limited")),
+			"純粋でなく、throws": with(op("server.f", returns, param("user", user)), impure(), throwing("server.Bad")),
+		} {
+			if got := text(o); got != pure {
+				t.Errorf("%s（戻り値 %v）: %s、純粋で throws のない op は %s（同じでなければならない）", name, returns, got, pure)
+			}
+		}
 	}
 }
 

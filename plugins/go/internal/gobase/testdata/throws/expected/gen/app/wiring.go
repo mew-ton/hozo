@@ -12,12 +12,11 @@ import (
 // Need は op app.need。
 //
 // Throws: app.Missing, app.Plain
-// 純粋（ctx を取らない）
-func (o *ops) Need(id *string, known *bool) (string, error) {
+func (o *ops) Need(ctx context.Context, id *string, known *bool) (string, error) {
 	// match known by nullable
 	if known != nil {
 		// HasItems: known は boolean
-		return o.NeedId(id)
+		return o.NeedId(ctx, id)
 	}
 	// Empty
 	return "", Plain{}
@@ -26,8 +25,7 @@ func (o *ops) Need(id *string, known *bool) (string, error) {
 // NeedId は op app.needId。
 //
 // Throws: app.Missing
-// 純粋（ctx を取らない）
-func (o *ops) NeedId(id *string) (string, error) {
+func (o *ops) NeedId(ctx context.Context, id *string) (string, error) {
 	// match id by nullable
 	if id != nil {
 		// HasItems: id は string
@@ -40,8 +38,7 @@ func (o *ops) NeedId(id *string) (string, error) {
 // Check は op app.check。
 //
 // Throws: app.Invalid
-// 純粋（ctx を取らない）
-func (o *ops) Check(in Input, tags []string, text *string) (string, error) {
+func (o *ops) Check(ctx context.Context, in Input, tags []string, text *string) (string, error) {
 	// match text by nullable
 	var first string
 	if text != nil {
@@ -70,8 +67,7 @@ func (o *ops) Check(in Input, tags []string, text *string) (string, error) {
 // Guard は op app.guard。
 //
 // Throws: app.Missing, limits.LimitExceeded
-// 純粋（ctx を取らない）
-func (o *ops) Guard(code *Code, wait *bool) error {
+func (o *ops) Guard(ctx context.Context, code *Code, wait *bool) error {
 	// match code by nullable
 	if code != nil {
 		// HasItems: code は app.Code
@@ -108,8 +104,7 @@ func (o *ops) Retry(ctx context.Context, text *string) (string, error) {
 // Count は op app.count。
 //
 // Throws: app.TooMany
-// 純粋（ctx を取らない）
-func (o *ops) Count(text *string) (string, error) {
+func (o *ops) Count(ctx context.Context, text *string) (string, error) {
 	n := int64(3)
 	// match text by nullable
 	if text != nil {

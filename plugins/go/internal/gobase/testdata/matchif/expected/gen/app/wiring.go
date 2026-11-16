@@ -22,30 +22,27 @@ func (o *ops) NameById(ctx context.Context, id string) (string, error) {
 }
 
 // NickOf は op app.nickOf。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) NickOf(user *User) *string {
+func (o *ops) NickOf(ctx context.Context, user *User) (*string, error) {
 	// match user by nullable
 	if user != nil {
 		// HasItems: user は app.User
-		return user.Nick
+		return user.Nick, nil
 	}
 	// Empty
-	return nil
+	return nil, nil
 }
 
 // PureName は op app.pureName。
 //
 // Throws: app.Denied
-// 純粋（ctx を取らない）
-func (o *ops) PureName(user *User) (string, error) {
+func (o *ops) PureName(ctx context.Context, user *User) (string, error) {
 	// match user by app.Present
 	if user != nil {
 		// Some: user は app.User
-		return o.NameOf(*user), nil
+		return o.NameOf(ctx, *user)
 	}
 	// default
-	return "", o.Deny()
+	return "", o.Deny(ctx)
 }
 
 // Widened は op app.widened。
@@ -64,16 +61,14 @@ func (o *ops) Widened(ctx context.Context, in Input) (*string, error) {
 }
 
 // TagCount は op app.tagCount。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) TagCount(tags []string) int64 {
+func (o *ops) TagCount(ctx context.Context, tags []string) (int64, error) {
 	// match tags by nullable
 	if tags != nil {
 		// HasItems: tags は string[]
-		return o.CountTags(tags)
+		return o.CountTags(ctx, tags)
 	}
 	// Empty
-	return 0
+	return 0, nil
 }
 
 // TokenText は op app.tokenText。
@@ -87,7 +82,7 @@ func (o *ops) TokenText(ctx context.Context) (string, error) {
 	// match token by nullable
 	if token != nil {
 		// HasItems: token は app.Token
-		return o.UseToken(*token), nil
+		return o.UseToken(ctx, *token)
 	}
 	// Empty
 	return "none", nil
@@ -104,7 +99,7 @@ func (o *ops) SignedInText(ctx context.Context) (string, error) {
 	// match by app.SignedIn
 	if token != nil {
 		// Yes: token は app.Token
-		return o.UseToken(*token), nil
+		return o.UseToken(ctx, *token)
 	}
 	// default
 	return "anonymous", nil
@@ -114,7 +109,10 @@ func (o *ops) SignedInText(ctx context.Context) (string, error) {
 //
 // Throws: app.Missing
 func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, error) {
-	user := o.Lookup(id)
+	user, err := o.Lookup(ctx, id)
+	if err != nil {
+		return "", err
+	}
 	// match user by nullable
 	var name string
 	if user != nil {
@@ -132,7 +130,11 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 	var count int64
 	if len(lines) != 0 {
 		// HasItems
-		count = o.CountOf(lines)
+		v1, err := o.CountOf(ctx, lines)
+		if err != nil {
+			return "", err
+		}
+		count = v1
 	} else {
 		// Empty
 		count = 0
@@ -142,8 +144,11 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 	var maybe *string
 	if user != nil {
 		// HasItems: user は app.User
-		v1 := o.NameOf(*user)
-		maybe = ptr(v1)
+		v2, err := o.NameOf(ctx, *user)
+		if err != nil {
+			return "", err
+		}
+		maybe = ptr(v2)
 	}
 	_ = maybe
 	// match user by nullable
@@ -155,8 +160,12 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 		// Empty
 		return "", Missing{}
 	}
-	o.Show(name)
-	o.TakeOptionalUser(user)
+	if err := o.Show(ctx, name); err != nil {
+		return "", err
+	}
+	if err := o.TakeOptionalUser(ctx, user); err != nil {
+		return "", err
+	}
 	return strict, nil
 }
 
@@ -172,24 +181,32 @@ func (o *ops) StatementForms(ctx context.Context, user *User, lines []Line) erro
 		}
 	} else {
 		// Empty
-		o.Show("none")
+		if err := o.Show(ctx, "none"); err != nil {
+			return err
+		}
 	}
 	// match lines by list
 	if len(lines) != 0 {
 		// HasItems
-		o.Show("some")
+		if err := o.Show(ctx, "some"); err != nil {
+			return err
+		}
 	}
 	// match user by nullable
 	if user == nil {
 		// Empty
-		return o.Deny()
+		return o.Deny(ctx)
 	}
 	// match lines by list
-	o.Show("any")
+	if err := o.Show(ctx, "any"); err != nil {
+		return err
+	}
 	// match user by nullable
 	if user != nil {
 		// HasItems: user は app.User
-		o.TakeOptionalUser(ptr(*user))
+		if err := o.TakeOptionalUser(ctx, ptr(*user)); err != nil {
+			return err
+		}
 	} else {
 		// Empty
 		return Denied{}

@@ -28,14 +28,20 @@ func (o *ops) loginBody(ctx context.Context, in LoginInput) (LoginOk, error) {
 // Throws: type.InvalidCredentials
 // Effects: store.createSession
 func (o *ops) IssueSession(ctx context.Context, user pkgtype.User, password pkgtype.Password) (LoginOk, error) {
-	if err := o.CheckPassword(user, password); err != nil {
+	if err := o.CheckPassword(ctx, user, password); err != nil {
 		return LoginOk{}, err
 	}
-	session := o.NewSession(user)
+	session, err := o.NewSession(ctx, user)
+	if err != nil {
+		return LoginOk{}, err
+	}
 	if err := o.store.AddSession(ctx, session); err != nil {
 		return LoginOk{}, err
 	}
-	publicUser := o.ToPublicUser(user)
+	publicUser, err := o.ToPublicUser(ctx, user)
+	if err != nil {
+		return LoginOk{}, err
+	}
 	return LoginOk{User: publicUser, Token: session.Token}, nil
 }
 
@@ -65,7 +71,7 @@ func (o *ops) SessionOf(ctx context.Context, token pkgtype.Token) (pkgtype.Sessi
 	// match session by store.Login
 	if session != nil {
 		// LoggedIn: session は type.Session
-		return o.RequireFresh(*session)
+		return o.RequireFresh(ctx, *session)
 	}
 	// default
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
@@ -103,7 +109,7 @@ func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, erro
 	// match user by store.Account
 	if user != nil {
 		// Found: user は type.User
-		return o.ToPublicUser(*user), nil
+		return o.ToPublicUser(ctx, *user)
 	}
 	// default
 	return pkgtype.PublicUser{}, pkgtype.Unauthorized{}
@@ -122,7 +128,7 @@ func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order
 	if err != nil {
 		return nil, err
 	}
-	return o.PageOf(orders, in.Page), nil
+	return o.PageOf(ctx, orders, in.Page)
 }
 
 // GetLatestOrder は自分のいちばん新しい注文を返す。まだ注文がなければ、値がない
@@ -147,8 +153,14 @@ func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order
 	if err != nil {
 		return pkgtype.Order{}, err
 	}
-	order := o.NewOrder(session, in.Lines)
-	notice := o.ComposeNotice(order)
+	order, err := o.NewOrder(ctx, session, in.Lines)
+	if err != nil {
+		return pkgtype.Order{}, err
+	}
+	notice, err := o.ComposeNotice(ctx, order)
+	if err != nil {
+		return pkgtype.Order{}, err
+	}
 	if err := o.store.PlaceOrder(ctx, order, notice); err != nil {
 		return pkgtype.Order{}, err
 	}

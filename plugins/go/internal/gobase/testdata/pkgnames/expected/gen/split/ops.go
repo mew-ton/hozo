@@ -13,9 +13,7 @@ import (
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
 	// Pick は op split.pick。
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	Pick(job ops2.Job) ptr2.Ref
+	Pick(ctx context.Context, job ops2.Job) (ptr2.Ref, error)
 
 	// Go は op split.go。
 	Go(ctx context.Context, job ops2.Job, target ptr2.Target) (ops2.Job, error)
@@ -26,7 +24,7 @@ type Ops interface {
 type Leaves = inner.Leaves
 
 // OpsOps は名前空間 ops の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 ops_ に渡す。
-// メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、ops の出力の Ops は、そのまま渡せる。
+// メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、ops の出力の Ops は、そのまま渡せる。
 type OpsOps = inner.OpsOps
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、別の名前空間（名前の辞書順）。

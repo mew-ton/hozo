@@ -12,7 +12,9 @@ import (
 
 // Go は op flat.go。
 func (o *ops) Go(ctx context.Context, job ops3.Job, target ptr2.Target) (ops3.Job, error) {
-	o.Keep(ptr(target), ops2.Step{N: 1})
+	if err := o.Keep(ctx, ptr(target), ops2.Step{N: 1}); err != nil {
+		return ops3.Job{}, err
+	}
 	return o.ops_.Run(ctx, job)
 }
 

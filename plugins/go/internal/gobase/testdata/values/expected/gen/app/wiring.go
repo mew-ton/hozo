@@ -2,65 +2,107 @@
 
 package app
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Names は op app.names。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Names(account Account) {
-	o.TakeAccount(account)
-	o.TakeString(account.Id)
-	o.TakeOptionalString(nil)
+func (o *ops) Names(ctx context.Context, account Account) error {
+	if err := o.TakeAccount(ctx, account); err != nil {
+		return err
+	}
+	if err := o.TakeString(ctx, account.Id); err != nil {
+		return err
+	}
+	if err := o.TakeOptionalString(ctx, nil); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Literals は op app.literals。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Literals() {
-	o.TakeString("a\"b\n")
-	o.TakeInt(42)
-	o.TakeInt(-7)
-	o.TakeFloat(1.5)
-	o.TakeFloat(2.0)
-	o.TakeFloat(1e+21)
-	o.TakeBool(true)
-	o.TakeBool(false)
-	o.TakeDuration(time.Duration(300000000000))
+func (o *ops) Literals(ctx context.Context) error {
+	if err := o.TakeString(ctx, "a\"b\n"); err != nil {
+		return err
+	}
+	if err := o.TakeInt(ctx, 42); err != nil {
+		return err
+	}
+	if err := o.TakeInt(ctx, -7); err != nil {
+		return err
+	}
+	if err := o.TakeFloat(ctx, 1.5); err != nil {
+		return err
+	}
+	if err := o.TakeFloat(ctx, 2.0); err != nil {
+		return err
+	}
+	if err := o.TakeFloat(ctx, 1e+21); err != nil {
+		return err
+	}
+	if err := o.TakeBool(ctx, true); err != nil {
+		return err
+	}
+	if err := o.TakeBool(ctx, false); err != nil {
+		return err
+	}
+	if err := o.TakeDuration(ctx, time.Duration(300000000000)); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Records は op app.records。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Records(name string, email Email) {
-	o.TakeProfile(Profile{Name: name, Active: ptr(bool(false))})
-	o.TakeOptions(Options{})
-	o.TakeOptions(Options{Limit: ptr(int64(3)), Note: ptr(string("n"))})
-	o.TakeAccount(Account{Id: "1", Profile: &Profile{Name: "inner"}, Email: email})
-	o.TakeOptionalProfile(&Profile{Name: "p"})
+func (o *ops) Records(ctx context.Context, name string, email Email) error {
+	if err := o.TakeProfile(ctx, Profile{Name: name, Active: ptr(bool(false))}); err != nil {
+		return err
+	}
+	if err := o.TakeOptions(ctx, Options{}); err != nil {
+		return err
+	}
+	if err := o.TakeOptions(ctx, Options{Limit: ptr(int64(3)), Note: ptr(string("n"))}); err != nil {
+		return err
+	}
+	if err := o.TakeAccount(ctx, Account{Id: "1", Profile: &Profile{Name: "inner"}, Email: email}); err != nil {
+		return err
+	}
+	if err := o.TakeOptionalProfile(ctx, &Profile{Name: "p"}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ToOptional は op app.toOptional。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) ToOptional(name string, tags []string) {
-	o.TakeOptionalString(ptr(name))
-	o.TakeOptionalString(ptr(string("lit")))
-	o.TakeOptionalInt(ptr(int64(3)))
-	o.TakeOptionalTags(tags)
+func (o *ops) ToOptional(ctx context.Context, name string, tags []string) error {
+	if err := o.TakeOptionalString(ctx, ptr(name)); err != nil {
+		return err
+	}
+	if err := o.TakeOptionalString(ctx, ptr(string("lit"))); err != nil {
+		return err
+	}
+	if err := o.TakeOptionalInt(ctx, ptr(int64(3))); err != nil {
+		return err
+	}
+	if err := o.TakeOptionalTags(ctx, tags); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ToBase は op app.toBase。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) ToBase(email Email) {
-	o.TakeString(string(email))
-	o.TakeOptionalString(ptr(string(email)))
+func (o *ops) ToBase(ctx context.Context, email Email) error {
+	if err := o.TakeString(ctx, string(email)); err != nil {
+		return err
+	}
+	if err := o.TakeOptionalString(ctx, ptr(string(email))); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Elements は op app.elements。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) Elements(emails []Email, names []string, byName map[string]Email) {
+func (o *ops) Elements(ctx context.Context, emails []Email, names []string, byName map[string]Email) error {
 	var v0 []string
 	if emails != nil {
 		v0 = make([]string, len(emails))
@@ -68,7 +110,9 @@ func (o *ops) Elements(emails []Email, names []string, byName map[string]Email) 
 			v0[i] = string(e)
 		}
 	}
-	o.TakeStrings(v0)
+	if err := o.TakeStrings(ctx, v0); err != nil {
+		return err
+	}
 	var v1 []*string
 	if names != nil {
 		v1 = make([]*string, len(names))
@@ -76,7 +120,9 @@ func (o *ops) Elements(emails []Email, names []string, byName map[string]Email) 
 			v1[i] = ptr(e)
 		}
 	}
-	o.TakeOptionalStrings(v1)
+	if err := o.TakeOptionalStrings(ctx, v1); err != nil {
+		return err
+	}
 	var v2 map[string]string
 	if byName != nil {
 		v2 = make(map[string]string, len(byName))
@@ -84,37 +130,45 @@ func (o *ops) Elements(emails []Email, names []string, byName map[string]Email) 
 			v2[key] = string(e)
 		}
 	}
-	o.TakeTable(v2)
+	if err := o.TakeTable(ctx, v2); err != nil {
+		return err
+	}
+	return nil
 }
 
 // FromCase は op app.fromCase。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) FromCase(big Address) {
-	o.TakeAddress(big)
+func (o *ops) FromCase(ctx context.Context, big Address) error {
+	if err := o.TakeAddress(ctx, big); err != nil {
+		return err
+	}
+	return nil
 }
 
 // OptionalPaths は op app.optionalPaths。
-//
-// 純粋（ctx を取らない）。失敗しない（error を返さない）
-func (o *ops) OptionalPaths(account Account) *string {
+func (o *ops) OptionalPaths(ctx context.Context, account Account) (*string, error) {
 	var v0 *string
 	if account.Profile != nil {
 		v0 = ptr(account.Profile.Name)
 	}
-	o.TakeOptionalString(v0)
+	if err := o.TakeOptionalString(ctx, v0); err != nil {
+		return nil, err
+	}
 	var v1 *string
 	if account.Profile != nil {
 		v1 = account.Profile.Nick
 	}
-	o.TakeOptionalString(v1)
+	if err := o.TakeOptionalString(ctx, v1); err != nil {
+		return nil, err
+	}
 	var v2 []string
 	if account.Profile != nil {
 		if account.Profile.Address != nil {
 			v2 = account.Profile.Address.Tags
 		}
 	}
-	o.TakeOptionalTags(v2)
+	if err := o.TakeOptionalTags(ctx, v2); err != nil {
+		return nil, err
+	}
 	var v3 *string
 	if account.Profile != nil {
 		if account.Profile.Address != nil {
@@ -122,14 +176,16 @@ func (o *ops) OptionalPaths(account Account) *string {
 		}
 	}
 	city := v3
-	o.TakeOptionalString(city)
+	if err := o.TakeOptionalString(ctx, city); err != nil {
+		return nil, err
+	}
 	var v4 *string
 	if account.Profile != nil {
 		if account.Profile.Address != nil {
 			v4 = account.Profile.Address.Zip
 		}
 	}
-	return v4
+	return v4, nil
 }
 
 func ptr[T any](v T) *T { return &v }
