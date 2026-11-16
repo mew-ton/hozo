@@ -171,18 +171,18 @@ namespace fulfilment {
     return dispatched.shipment;
   }
 
-  /** 配送業者の通知が、届いたことを言っているか */
+  /**
+   * 配送業者の通知が言っている、届いた時刻。
+   * この仕様が使うのは、届いたという通知だけ: 届いた時刻のない通知（運んでいる途中、不在、返送など）は、どのケースでもなく、分類の誤りになる。
+   */
   classify Arrival of Time? {
     Arrived: Time? as Time;
-    /** ほかの動きの通知（運んでいる途中、不在、返送など）。この仕様は使わない */
-    default;
   }
 
-  /** 配送業者から、荷物の動きの通知が届いた。届いたという通知だけを使う */
+  /** 配送業者から、届いたという通知が届いた。ほかの動きの通知は受けない（分類の誤りで失敗する） */
   export op tracked(event: carriergw.TrackingEvent) {
     match event.deliveredAt by Arrival {
       Arrived => shipping.delivered(event.trackingNumber, event.deliveredAt);
-      default => none;
     };
   }
 }

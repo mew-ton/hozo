@@ -57,8 +57,6 @@ func (a *analyzer) lower(s *symbol) ir.Decl {
 		s.decl = a.lowerRead(s, d, sc)
 	case *ast.ClassifyDecl:
 		s.decl = a.lowerClassify(s, d, sc)
-	case *ast.ConditionDecl:
-		s.decl = a.lowerCondition(s, d, sc)
 	case *ast.DecoratorDecl:
 		s.decl = a.lowerDecoratorDecl(s, d, sc)
 	case *ast.OpDecl:
@@ -528,11 +526,11 @@ func operationOf(op ast.StateOp) ir.Operation {
 	return ir.OpDelete
 }
 
-// --- classify / condition ---
+// --- classify ---
 
-// lowerClassify は classify。CLS-1（残りを言うもの — default と、残りのケース `対象 as else` — が合わせて二つ以上、ケース名の
-// 重複）、CLS-2（名前の付いたケースがない）、ケースの `対象 as T`（CLS-5 / CLS-6）、残りのケース（CLS-7）、ケースの判定
-// （decidedBy。docs/check.md「ケースの判定」「残りのケース」）。
+// lowerClassify は classify。CLS-1（ケース名の重複、残りのケース `対象 as else` が二つ以上）、CLS-2（ケースがない）、
+// ケースの `対象 as T`（CLS-5 / CLS-6）、残りのケース（CLS-7）、ケースの判定（decidedBy。docs/check.md「ケースの判定」
+// 「残りのケース」）。
 func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
@@ -543,19 +541,12 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 		if cs == nil {
 			continue
 		}
-		if cs.Default {
-			a.lowerDefaultCase(s, c, cs, sc, &rest)
-			continue
-		}
-		if cs.Name == nil {
-			continue
-		}
 		if seen[cs.Name.Name] {
 			a.errorf("CLS-1", cs.Name.Span, "classify %s にケース %s が二度ある", s.fqn, cs.Name.Name)
 			continue
 		}
 		seen[cs.Name.Name] = true
-		a.checkCaseName(s, *cs.Name)
+		a.checkCaseName(s, cs.Name)
 		cc := ir.ClassifyCase{Name: cs.Name.Name, Span: a.irSpan(cs.Span)}
 		if cs.Doc != nil {
 			cc.Description = a.lowerDoc(cs.Doc, docContext{ns: sc.ns, span: cs.Name.Span})
@@ -564,17 +555,16 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 		c.Cases = append(c.Cases, cc)
 	}
 	if len(c.Cases) == 0 {
-		a.errorf("CLS-2", s.nameSpan, "classify %s に名前の付いたケースが一つもない", s.fqn)
+		a.errorf("CLS-2", s.nameSpan, "classify %s にケースが一つもない", s.fqn)
 	}
 	a.lowerElseCase(s, c, &rest)
 	c.DecidedBy = a.decidedBy(c)
 	return c
 }
 
-// restCases は、一つの classify の中で「残り」を言うもの（default と、残りのケース `対象 as else`）の覚え書き
-// （docs/check.md「残りのケース」）。
+// restCases は、一つの classify の中の、残りのケース（`対象 as else`）の覚え書き（docs/check.md「残りのケース」）。
 type restCases struct {
-	// said は、残りを言うものを、もう見たか（default か、as else）。二つ目からは CLS-1。
+	// said は、as else を、もう見たか。二つ目からは CLS-1。
 	said bool
 	// wrote は、as else を書いたケースの名前（誤りのものを含む）。CLS-7 の「ほかのケース」から除く。
 	wrote map[string]bool
@@ -593,24 +583,8 @@ type elseTyping struct {
 	elseSpan    source.Span // else
 }
 
-func (a *analyzer) lowerDefaultCase(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope, rest *restCases) {
-	if c.HasDefault {
-		a.errorf("CLS-1", cs.Span, "classify %s に default が二つ以上ある", s.fqn)
-		return
-	}
-	if rest.said {
-		a.errorf("CLS-1", cs.Span, "classify %s に、残りのケース（as else）と default の両方がある（どちらも残りを言う。docs/check.md「残りのケース」）", s.fqn)
-		return
-	}
-	rest.said = true
-	c.HasDefault = true
-	if cs.Doc != nil {
-		c.DefaultDescription = a.lowerDoc(cs.Doc, docContext{ns: sc.ns, span: cs.Span})
-	}
-}
-
 // lowerElseCase は、残りのケース（rest.first）を確かめて、そのケースの as に足す（docs/check.md「残りのケース」）。
-// CLS-7: 残りのケースを除いた名前の付いたケースが、一つもないか、「ケースの判定」の条件 1〜3 を満たさない。または、
+// CLS-7: 残りのケースを除いたケースが、一つもないか、「ケースの判定」の条件 1〜3 を満たさない。または、
 // variant の絞り込みで残りのアームがない。ほかのケースの as に誤りがあれば、重ねて報告しない。
 func (a *analyzer) lowerElseCase(s *symbol, c *ir.Classify, rest *restCases) {
 	e := rest.first
@@ -713,7 +687,7 @@ func classifyKindName(c *ir.Classify) string {
 // 一つのケースに同じ対象の as が二度ある。CLS-6: as の後ろの型が、対象の型から絞り込める型でない。
 // 対象が決まっていない分類（CLS-3 などで報告済み）では、型の解決だけを行う。
 // `対象 as else`（残りのケース）は、ここでは rest に覚えるだけで、as には足さない（確かめて足すのは lowerElseCase）。
-// CLS-1: 残りを言うものが、もうある（default か、別の as else）。
+// CLS-1: 残りのケースが、もうある（別の as else）。
 func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope, rest *restCases) []ir.CaseTyping {
 	var out []ir.CaseTyping
 	seen := map[string]bool{}
@@ -745,7 +719,7 @@ func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyC
 		seen[state] = true
 		if ct.Else {
 			if rest.said {
-				a.errorf("CLS-1", ct.ElseSpan, "classify %s に、残りを言うものが二つ以上ある（残りのケース as else は高々一つで、default とは一緒に書けない。docs/check.md「残りのケース」）", s.fqn)
+				a.errorf("CLS-1", ct.ElseSpan, "classify %s に、残りのケース（as else）が二つ以上ある（残りは一つ。docs/check.md「残りのケース」）", s.fqn)
 				continue
 			}
 			rest.said = true
@@ -885,7 +859,8 @@ func (a *analyzer) narrowBy(s, t ir.Type) ir.NarrowBy {
 	return ir.NarrowByPredicate
 }
 
-// decidedBy は docs/check.md「ケースの判定」: 型で決まる分類の四つの条件をすべて満たせば type、そうでなければ predicate。
+// decidedBy は docs/check.md「ケースの判定」: 型で決まる分類の条件 1〜3 をすべて満たせば type、そうでなければ predicate。
+// 残りを受けるケースがなくても、型で決まる（どのケースの型にも当たらない値は、分類の誤り。同「当たらない値」）。
 // c.Cases の as は、確かめた後のもの（lowerCaseTypings、lowerElseCase）。
 func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 	// 1. 対象が一つ
@@ -915,8 +890,6 @@ func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 	// 2. すべてのケースがその対象の as を持ち、型を書いた as は、どれも型で決まる絞り込み。3. as に書いた型がケースの間で
 	// すべて違う。残りのケース（as else）は、型を書かないので比べない（確かめてあるのは lowerElseCase）
 	var types []ir.Type
-	by := ir.NarrowBy("")
-	hasElse := false
 	for _, cs := range c.Cases {
 		var as *ir.CaseTyping
 		for i := range cs.As {
@@ -928,7 +901,6 @@ func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 			return ir.DecidedByPredicate
 		}
 		if as.By == ir.NarrowByElse {
-			hasElse = true
 			continue
 		}
 		for _, t := range types {
@@ -937,52 +909,8 @@ func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 			}
 		}
 		types = append(types, as.Type)
-		by = as.By
 	}
-	// 4. 残りを受けるものがある: presence なら、残りのケースか default。variant なら、残りのケースか default があるか、
-	// 書いた型が union のすべてのアームの型を覆う。
-	if c.HasDefault || hasElse {
-		return ir.DecidedByType
-	}
-	if by == ir.NarrowByVariant && a.coversArms(subjectType, types) {
-		return ir.DecidedByType
-	}
-	return ir.DecidedByPredicate
-}
-
-// coversArms は types が union u のすべてのアームの型を覆うか。
-func (a *analyzer) coversArms(u ir.Type, types []ir.Type) bool {
-	un := a.unionArms(u)
-	if un == nil {
-		return false
-	}
-	for _, arm := range un.Arms {
-		covered := false
-		for _, t := range types {
-			if arm.Type != nil && ir.TypeEqual(arm.Type, t) {
-				covered = true
-			}
-		}
-		if !covered {
-			return false
-		}
-	}
-	return true
-}
-
-// lowerCondition は condition → Classify（cases は一つ、hasDefault は true、fromCondition は true。docs/ir.md「正規化」）。
-// as を書けないので、述語で決まる分類。
-func (a *analyzer) lowerCondition(s *symbol, d *ast.ConditionDecl, sc *scope) ir.Decl {
-	c := &ir.Classify{
-		DeclBase:      a.base(s, d.Doc, d.Span, docContext{}),
-		Cases:         []ir.ClassifyCase{{Name: d.Name.Name, Span: a.irSpan(d.Name.Span)}},
-		HasDefault:    true,
-		FromCondition: true,
-		DecidedBy:     ir.DecidedByPredicate,
-	}
-	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
-	c.Subject = a.lowerClassifySubject(s, d.Of, sc)
-	return c
+	return ir.DecidedByType
 }
 
 // subjectKind は classify の対象の一つが何を指しているか。

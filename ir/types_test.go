@@ -60,7 +60,7 @@ func TestTypeString(t *testing.T) {
 		{Record(String(), Ref("server.Item")), "Record<string, server.Item>"},
 		{Record(String(), Array(Optional(Int()))), "Record<string, int?[]>"},
 		{Case("server.WarrantyKind", []string{"Yamada"}, Ref("server.Item")), "server.WarrantyKind.Yamada<server.Item>"},
-		{Case("C", []string{"A", "B"}, Int()), "C.(A | B)<int>"},
+		{Case("C", []string{"A", "B"}, Int()), "C.(A, B)<int>"},
 		{Case("C", nil, Int()), "C.()<int>"},
 		{Optional(Case("C", []string{"A"}, Ref("T"))), "C.A<T>?"},
 		{OptionalType{}, "void?"},

@@ -208,14 +208,12 @@ func sampleProgram() *Program {
 							{Name: "Active", Span: span(f, 31, 3, 31, 10)},
 							{Name: "Banned", Description: &Doc{Summary: "Banned.", Body: "Banned."}, Span: span(f, 32, 3, 32, 10)},
 						},
-						HasDefault:         true,
-						DefaultDescription: &Doc{Summary: "Others.", Body: "Others."},
-						DecidedBy:          DecidedByPredicate,
+						DecidedBy: DecidedByPredicate,
 					},
 					&Classify{
 						DeclBase: DeclBase{Name: "server.Registration", Span: span(f, 34, 1, 34, 105)},
 						Subject:  OpSubject{Op: "server.findUser", Type: Optional(Ref("server.User"))},
-						// 残りのケース（`対象 as else`）は cases に入り、hasDefault には数えない（docs/ir.md「classify」）
+						// 残りのケース（`対象 as else`）も、ほかのケースと同じに cases に入る（docs/ir.md「classify」）
 						Cases: []ClassifyCase{{
 							Name: "Registered",
 							As:   []CaseTyping{{Type: Ref("server.User"), By: NarrowByPresence, Span: span(f, 34, 50, 34, 70)}},
@@ -228,12 +226,13 @@ func sampleProgram() *Program {
 						DecidedBy: DecidedByType,
 					},
 					&Classify{
-						DeclBase:      DeclBase{Name: "server.IsAdmin", Span: span(f, 35, 1, 35, 30)},
-						Subject:       TypeSubject{Type: Ref("server.User")},
-						Cases:         []ClassifyCase{{Name: "IsAdmin", Span: span(f, 35, 11, 35, 18)}},
-						HasDefault:    true,
-						FromCondition: true,
-						DecidedBy:     DecidedByPredicate,
+						DeclBase: DeclBase{Name: "server.IsAdmin", Span: span(f, 35, 1, 35, 51)},
+						Subject:  TypeSubject{Type: Ref("server.User")},
+						Cases: []ClassifyCase{
+							{Name: "IsAdmin", Span: span(f, 35, 29, 35, 37)},
+							{Name: "NotAdmin", Span: span(f, 35, 38, 35, 47)},
+						},
+						DecidedBy: DecidedByPredicate,
 					},
 					&Decorator{
 						DeclBase: DeclBase{Name: "server.retry", Span: span(f, 37, 1, 41, 2)},
@@ -425,8 +424,9 @@ func sampleProgram() *Program {
 									Subject:  ValueSubject{Atom: NameAtom{Path: []string{"user"}, Span: span(f, 54, 9, 54, 13)}},
 									Classify: "server.IsAdmin",
 									Arms: []MatchArm{
-										{Cases: ArmCases{Cases: []string{"IsAdmin"}}, Body: CallExpr{Call: Call{Callee: OpCallee{Op: "server.notify"}, Args: []CallArg{{Param: "in", Value: NameAtom{Path: []string{"user"}, Span: span(f, 55, 30, 55, 34)}}}, Span: span(f, 55, 16, 55, 35)}}, Span: span(f, 55, 5, 55, 36)},
-										{Cases: DefaultArm(), Body: NoneBody{}, Span: span(f, 56, 5, 56, 20)},
+										{Cases: []string{"IsAdmin"}, Body: CallExpr{Call: Call{Callee: OpCallee{Op: "server.notify"}, Args: []CallArg{{Param: "in", Value: NameAtom{Path: []string{"user"}, Span: span(f, 55, 30, 55, 34)}}}, Span: span(f, 55, 16, 55, 35)}}, Span: span(f, 55, 5, 55, 36)},
+										// else のアーム: cases は、それが受けるケース（docs/ir.md「配線」）
+										{Cases: []string{"NotAdmin"}, Else: true, Body: NoneBody{}, Span: span(f, 56, 5, 56, 17)},
 									},
 									Span: span(f, 54, 3, 57, 4),
 								},
@@ -437,7 +437,7 @@ func sampleProgram() *Program {
 									Subject:  ValueSubject{Atom: NameAtom{Path: []string{"user"}, Span: span(f, 58, 16, 58, 20)}},
 									Classify: "server.Status",
 									Arms: []MatchArm{
-										{Cases: ArmCases{Cases: []string{"Active", "Banned"}}, Body: CallExpr{Call: Call{Callee: OpCallee{Op: "server.findUser"}, Args: []CallArg{{Param: "id", Value: LiteralAtom{Literal: StringLiteral{Value: "x"}, Span: span(f, 59, 40, 59, 43)}}}, Span: span(f, 59, 24, 59, 44)}}, Span: span(f, 59, 5, 59, 45)},
+										{Cases: []string{"Active", "Banned"}, Body: CallExpr{Call: Call{Callee: OpCallee{Op: "server.findUser"}, Args: []CallArg{{Param: "id", Value: LiteralAtom{Literal: StringLiteral{Value: "x"}, Span: span(f, 59, 40, 59, 43)}}}, Span: span(f, 59, 24, 59, 44)}}, Span: span(f, 59, 5, 59, 45)},
 									},
 									Span: span(f, 58, 10, 60, 4),
 								}},
@@ -452,9 +452,9 @@ func sampleProgram() *Program {
 									Subject:  ValueSubject{Atom: StateAtom{State: "session", Span: span(f, 62, 9, 62, 16)}},
 									Classify: ClassifyNullable,
 									Arms: []MatchArm{
-										{Cases: ArmCases{Cases: []string{CaseEmpty}}, Body: NoneBody{}, Span: span(f, 63, 5, 63, 19)},
+										{Cases: []string{CaseEmpty}, Body: NoneBody{}, Span: span(f, 63, 5, 63, 19)},
 										{
-											Cases:    ArmCases{Cases: []string{CaseHasItems}},
+											Cases:    []string{CaseHasItems},
 											Body:     CallExpr{Call: Call{Callee: OpCallee{Op: "server.notify"}, Span: span(f, 64, 17, 64, 32)}},
 											Narrowed: []Narrowing{{Type: Ref("server.Token")}},
 											Span:     span(f, 64, 5, 64, 33),
@@ -495,13 +495,13 @@ func sampleProgram() *Program {
 									Classify: "Login",
 									Arms: []MatchArm{
 										// 引数を持つ throw（docs/ir.md「配線」の MatchArm の body の throw の args）
-										{Cases: ArmCases{Cases: []string{"Anonymous"}}, Body: ThrowBody{
+										{Cases: []string{"Anonymous"}, Body: ThrowBody{
 											Exception: "server.Unavailable",
 											Args:      []CallArg{{Param: "reason", Value: LiteralAtom{Literal: StringLiteral{Value: "anonymous"}, Span: span(f, 67, 37, 67, 48)}}},
 											Span:      span(f, 67, 18, 67, 49),
 										}, Span: span(f, 67, 5, 67, 50)},
 										{
-											Cases:    ArmCases{Cases: []string{"LoggedIn"}},
+											Cases:    []string{"LoggedIn"},
 											Body:     AtomExpr{Atom: StateAtom{State: "session", Path: []string{"value"}, Span: span(f, 67, 58, 67, 71)}},
 											Narrowed: []Narrowing{{State: "session", Type: Ref("server.Token")}, {State: "db", Type: Array(Ref("server.User"))}},
 											Span:     span(f, 67, 46, 67, 72),

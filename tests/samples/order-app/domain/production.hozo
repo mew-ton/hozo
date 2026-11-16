@@ -120,7 +120,7 @@ namespace production {
     const now = clock.now();
     const started = match job by Progress {
       Queued                  => startedAt(job, now);
-      InProduction | Finished => throw NotQueued;
+      InProduction, Finished => throw NotQueued;
     };
     saveJob(started);
     return started;
@@ -134,7 +134,7 @@ namespace production {
     const now = clock.now();
     const finished = match job by Progress {
       InProduction      => finishedAt(job, measured, now);
-      Queued | Finished => throw NotInProduction;
+      Queued, Finished  => throw NotInProduction;
     };
     saveJob(finished);
     return finished;

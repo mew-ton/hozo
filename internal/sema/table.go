@@ -230,8 +230,6 @@ func declInfo(d ast.Decl) (declKind, ast.Ident, bool) {
 		return kindRead, d.Name, true
 	case *ast.ClassifyDecl:
 		return kindClassify, d.Name, true
-	case *ast.ConditionDecl:
-		return kindClassify, d.Name, true
 	case *ast.DecoratorDecl:
 		return kindDecorator, d.Name, true
 	case *ast.OpDecl:

@@ -502,13 +502,13 @@ func TestEffectTransition(t *testing.T) {
 	for _, tt := range []struct {
 		src      string
 		of       string
-		from, to string // "any" か、"|" でつないだケース名
+		from, to string // "any" か、ケース名を "|" でつないだもの（idents の書き方）
 	}{
 		{"effect placeOrder() on Checkout: Shopping -> Ordered;", "Checkout", "Shopping", "Ordered"},
 		{"effect clearCart() on carts: HasItems -> Empty;", "carts", "HasItems", "Empty"},
 		{"effect reset() on Checkout: any -> Shopping;", "Checkout", "any", "Shopping"},
-		{"effect touch() on Checkout: Shopping | Ordered -> any;", "Checkout", "Shopping|Ordered", "any"},
-		{"effect a() on server.Checkout:A|B->C|D;", "server.Checkout", "A|B", "C|D"},
+		{"effect touch() on Checkout: Shopping, Ordered -> any;", "Checkout", "Shopping|Ordered", "any"},
+		{"effect a() on server.Checkout:A,B->C,D;", "server.Checkout", "A|B", "C|D"},
 	} {
 		e := firstDecl[*ast.EffectDecl](t, tt.src)
 		if e.On != nil || e.Transition == nil {
@@ -543,7 +543,7 @@ func TestEffectTransition(t *testing.T) {
 		{"missing to", "effect a() on C: A -> ;", "遷移のケース（any かケース名）が必要"},
 		{"missing from", "effect a() on C: -> B;", "遷移のケース（any かケース名）が必要"},
 		{"qualified case", "effect a() on C: x.A -> B;", "遷移のケース（any かケース名）が必要"},
-		{"any in a set", "effect a() on C: A | any -> B;", "any は予約語"},
+		{"any in a set", "effect a() on C: A, any -> B;", "any は予約語"},
 		{"two transitions", "effect a() on C: A -> B, D: E -> F;", "「;」が必要"},
 		{"no target", "effect a() on : A -> B;", "「状態.操作」"},
 	}
@@ -552,56 +552,55 @@ func TestEffectTransition(t *testing.T) {
 	}
 }
 
-// --- classify / condition ---
+// --- classify ---
 
 func TestClassify(t *testing.T) {
-	c := firstDecl[*ast.ClassifyDecl](t, "classify CampaignKind of server.Item {\n /** s */ Spring;\n Summer;\n /** d */ default;\n}")
+	c := firstDecl[*ast.ClassifyDecl](t, "classify CampaignKind of server.Item {\n /** s */ Spring;\n Summer;\n /** d */ Other;\n}")
 	if c.Name.Name != "CampaignKind" || len(c.Of) != 1 || typeString(c.Of[0]) != "server.Item" || len(c.Cases) != 3 {
 		t.Fatalf("Classify = %+v", c)
 	}
-	if c.Cases[0].Doc == nil || c.Cases[0].Name == nil || c.Cases[0].Name.Name != "Spring" || c.Cases[0].Default {
+	if c.Cases[0].Doc == nil || c.Cases[0].Name.Name != "Spring" {
 		t.Errorf("Case 0 = %+v", c.Cases[0])
 	}
-	if !c.Cases[2].Default || c.Cases[2].Name != nil || c.Cases[2].Doc == nil || c.Cases[2].Doc.Body != "d" {
+	if c.Cases[2].Name.Name != "Other" || c.Cases[2].Doc == nil || c.Cases[2].Doc.Body != "d" {
 		t.Errorf("Case 2 = %+v", c.Cases[2])
 	}
 	// ケースの型（CaseTyping = Type "as" ( Type | "else" )）。
 	c = firstDecl[*ast.ClassifyDecl](t, `classify Registration of findUser {
   /** 登録済み */
   Registered: findUser as type.User;
-  default;
+  Unknown;
 }`)
 	if as := c.Cases[0].As; len(as) != 1 || typeString(as[0].Subject) != "findUser" || typeString(as[0].Type) != "type.User" || c.Cases[0].Doc == nil {
 		t.Errorf("Case 0 = %+v", c.Cases[0])
 	}
-	if len(c.Cases[1].As) != 0 || !c.Cases[1].Default {
+	if len(c.Cases[1].As) != 0 || c.Cases[1].Name.Name != "Unknown" {
 		t.Errorf("Case 1 = %+v", c.Cases[1])
 	}
-	c = firstDecl[*ast.ClassifyDecl](t, "classify Ready of token, profile { Ready: token as Token, profile as Profile; Half: token as nullable<Token>; default; }")
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Ready of token, profile { Ready: token as Token, profile as Profile; Half: token as nullable<Token>; Neither; }")
 	if as := c.Cases[0].As; len(as) != 2 || typeString(as[1].Subject) != "profile" || typeString(as[1].Type) != "Profile" {
 		t.Errorf("Case 0 = %+v", c.Cases[0])
 	}
 	if as := c.Cases[1].As; len(as) != 1 || typeString(as[0].Type) != "nullable<Token>" {
 		t.Errorf("Case 1 = %+v", c.Cases[1])
 	}
-	c = firstDecl[*ast.ClassifyDecl](t, "classify Presence of nullable<User> { Present: nullable<User> as User; default; }")
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Presence of nullable<User> { Present: nullable<User> as User; }")
 	if typeString(c.Of[0]) != "nullable<User>" || typeString(c.Cases[0].As[0].Subject) != "nullable<User>" {
 		t.Errorf("Classify = %+v", c)
 	}
 	// 残りのケース（CaseTyping = Type "as" ( Type | "else" )）。else は型ではなく、Type は nil
 	c = firstDecl[*ast.ClassifyDecl](t, "classify Registration of findUser { Registered: findUser as type.User; /** 未登録 */ Unregistered: findUser as else; }")
 	if as := c.Cases[1].As; len(as) != 1 || !as[0].Else || as[0].Type != nil || typeString(as[0].Subject) != "findUser" ||
-		as[0].ElseSpan.End-as[0].ElseSpan.Start != 4 || c.Cases[1].Default || c.Cases[1].Doc == nil {
+		as[0].ElseSpan.End-as[0].ElseSpan.Start != 4 || c.Cases[1].Doc == nil {
 		t.Errorf("Case 1 = %+v", c.Cases[1])
 	}
 	if as := c.Cases[0].As; len(as) != 1 || as[0].Else || as[0].Type == nil {
 		t.Errorf("Case 0 = %+v", c.Cases[0])
 	}
-	// else は予約語（docs/grammar.md「予約語」）: 書けるのは as の後ろと、フィールド名の位置だけ
+	// else は予約語（docs/grammar.md「予約語」）: 書けるのは as の後ろと、アームの頭と、フィールド名の位置だけ
 	mustFail(t, "classify A of T { X: T as else?; }", "「;」が必要")
 	mustFail(t, "classify A of T { X: else; }", "型が必要")
-	mustFail(t, "classify A of T { default: T as else; }", "default には as を書けない")
-	mustFail(t, "condition A of T as else;", "condition には as を書けない")
+	mustFail(t, "classify A of T { else; }", "else は予約語で、識別子には使えない")
 	mustFail(t, "model else { id: string; }", "else は予約語で、識別子には使えない")
 	mustFail(t, "op f(m: else);", "型が必要")
 	firstDecl[*ast.ModelDecl](t, "model M { else: string; }")
@@ -609,8 +608,6 @@ func TestClassify(t *testing.T) {
 	mustFail(t, "classify A of T { X: as U; }", "型が必要")
 	mustFail(t, "classify A of T { X: T as; }", "型が必要")
 	mustFail(t, "classify A of T { X: T as U,; }", "型が必要")
-	mustFail(t, "classify A of T { default: T as U; }", "default には as を書けない")
-	mustFail(t, "condition A of T: T as U;", "condition には as を書けない")
 	mustFail(t, "classify A of T { x }", "「;」が必要")
 	mustFail(t, "classify A T { }", "「of」が必要")
 	mustFail(t, "classify A of T { /** x */ }", "付く先のない")
@@ -624,13 +621,13 @@ func typeStrings(ts []ast.Type) string {
 	return strings.Join(s, ",")
 }
 
-// 対象が二つ以上（docs/grammar.md「classify / condition」の ClassifySubject）。型か op か状態かは名前の解決が決める。
+// 対象が二つ以上（docs/grammar.md「classify」の ClassifySubject）。型か op か状態かは名前の解決が決める。
 func TestClassifySubject(t *testing.T) {
 	c := firstDecl[*ast.ClassifyDecl](t, "classify Checkout of carts, orders {\n Shopping;\n Ordered;\n}")
 	if typeStrings(c.Of) != "carts,orders" || len(c.Cases) != 2 {
 		t.Errorf("Classify = %+v（Of = %s）", c, typeStrings(c.Of))
 	}
-	c = firstDecl[*ast.ClassifyDecl](t, "classify Session of token { LoggedIn; default; }")
+	c = firstDecl[*ast.ClassifyDecl](t, "classify Session of token { LoggedIn; LoggedOut; }")
 	if typeStrings(c.Of) != "token" {
 		t.Errorf("Of = %s", typeStrings(c.Of))
 	}
@@ -638,10 +635,6 @@ func TestClassifySubject(t *testing.T) {
 	c = firstDecl[*ast.ClassifyDecl](t, "classify X of server.Item[], carts { A; }")
 	if typeStrings(c.Of) != "server.Item[],carts" {
 		t.Errorf("Of = %s", typeStrings(c.Of))
-	}
-	cond := firstDecl[*ast.ConditionDecl](t, "condition CartFilled of carts, orders;")
-	if cond.Name.Name != "CartFilled" || typeStrings(cond.Of) != "carts,orders" {
-		t.Errorf("Condition = %+v（Of = %s）", cond, typeStrings(cond.Of))
 	}
 	mustFail(t, "classify A of { X; }", "分類の対象（型か op か状態の名前）が必要")
 	mustFail(t, "classify A of carts, { X; }", "分類の対象（型か op か状態の名前）が必要")
@@ -651,16 +644,59 @@ func TestClassifySubject(t *testing.T) {
 	if typeStrings(c.Of) != "list<T>" {
 		t.Errorf("Of = %s", typeStrings(c.Of))
 	}
-	mustFail(t, "condition A of carts,;", "分類の対象（型か op か状態の名前）が必要")
-	mustFail(t, "condition A of;", "分類の対象（型か op か状態の名前）が必要")
 }
 
-func TestCondition(t *testing.T) {
-	c := firstDecl[*ast.ConditionDecl](t, "condition WarrantyAvailable of server.Item;")
-	if c.Name.Name != "WarrantyAvailable" || len(c.Of) != 1 || typeString(c.Of[0]) != "server.Item" {
-		t.Errorf("Condition = %+v", c)
+// 分類を閉じたときになくした書き方（docs/grammar.md「classify」「exception / effect / read」「配線」）: 新しい書き方を
+// メッセージで示して SYNTAX にする。
+func TestRemovedClassifyForms(t *testing.T) {
+	for _, tt := range []struct{ name, src, want string }{
+		{"default case", "classify A of T { X; default; }", "名前のないケース default は書けない。ケースには名前を付ける"},
+		{"default case points to as else", "classify A of T { X: T as U; default; }", "<名前>: <対象> as else;"},
+		{"default case with doc", "classify A of T { X; /** d */ default; }", "名前のないケース default は書けない"},
+		{"default case with as", "classify A of T { X; default: T as U; }", "名前のないケース default は書けない"},
+		{"condition", "condition A of T;", "condition の宣言は書けない。両側に名前を付けた classify で書く"},
+		{"condition shows the form", "/** d */ condition A of carts, orders;", "classify C of T { <成り立つ側>; <成り立たない側>; }"},
+		{"default arm", "op a() { match x by K { A => f(); default => none; }; }", "default のアームは書けない。受けるケースを名前で並べるか、最後のアームを else => … と書く"},
+		{"pipe in arm", "op a() { match x by K { A | B => f(); }; }", "アームのケースの並びの区切りは「,」で、「|」ではない（A, B => … と書く"},
+		{"pipe in transition, from", "effect e() on C: A | B -> any;", "遷移のケースの並びの区切りは「,」で、「|」ではない（on C: A, B -> any と書く"},
+		{"pipe in transition, to", "effect e() on C: any -> A | B;", "遷移のケースの並びの区切りは「,」で、「|」ではない"},
+		{"else arm, then an arm", "op a() { match x by K { A => f(); else => none; B => g(); }; }", "else のアームの後ろに、アームは書けない"},
+		{"two else arms", "op a() { match x by K { A => f(); else => none; else => g(); }; }", "else のアームの後ろに、アームは書けない"},
+		{"else arm only", "op a() { match x by K { else => f(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
+		{"else arm first", "op a() { match x by K { else => f(); A => g(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
+		{"else in a case list", "op a() { match x by K { A, else => f(); }; }", "else は予約語で、識別子には使えない"},
+	} {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
-	mustFail(t, "condition A of T { }", "「;」が必要")
+	// condition は予約語ではない（docs/grammar.md「予約語」）: 名前に使える。宣言の頭でだけ、なくした書き方として見分ける
+	o := firstDecl[*ast.OpDecl](t, "op check(condition: string): string { const condition2 = f(condition); return condition2; }")
+	if o.Params[0].Name.Name != "condition" {
+		t.Errorf("Params = %+v", o.Params)
+	}
+	// default は予約語のまま（書ける位置は FieldName と DecoratorName だけ）
+	mustFail(t, "op f(default: string);", "default は予約語で、識別子には使えない")
+	// なくした区切り "|" は、"," として読み進める: 宣言は残り、ケースは二つとも読める
+	file, diags := parseSrc(t, "effect e() on C: A | B -> any;\nop a() { match x by K { A | B => f(); }; }")
+	if len(diags) != 2 || len(file.Decls) != 2 {
+		t.Fatalf("diags = %d, Decls = %d", len(diags), len(file.Decls))
+	}
+	if from := file.Decls[0].(*ast.EffectDecl).Transition.From; idents(from.Cases) != "A|B" {
+		t.Errorf("From = %s", idents(from.Cases))
+	}
+	if arm := file.Decls[1].(*ast.OpDecl).Body.Stmts[0].(*ast.MatchStmt).Match.Arms[0]; idents(arm.Cases) != "A|B" {
+		t.Errorf("Arm = %s", idents(arm.Cases))
+	}
+	// default のアームは、else のアームとして読み進める。else の後ろのアームは捨てる
+	file, diags = parseSrc(t, "op a() { match x by K { A => f(); default => none; }; }\nop b() { match x by K { A => f(); else => none; B => g(); }; }")
+	if len(diags) != 2 || len(file.Decls) != 2 {
+		t.Fatalf("diags = %d, Decls = %d", len(diags), len(file.Decls))
+	}
+	if arms := file.Decls[0].(*ast.OpDecl).Body.Stmts[0].(*ast.MatchStmt).Match.Arms; len(arms) != 2 || !arms[1].Else {
+		t.Errorf("default のアーム: Arms = %+v", arms)
+	}
+	if arms := file.Decls[1].(*ast.OpDecl).Body.Stmts[0].(*ast.MatchStmt).Match.Arms; len(arms) != 2 || !arms[1].Else {
+		t.Errorf("else の後ろのアーム: Arms = %+v", arms)
+	}
 }
 
 // --- decorator の宣言 ---
@@ -1369,9 +1405,9 @@ func TestReturnAtom(t *testing.T) {
 func TestMatch(t *testing.T) {
 	o := firstDecl[*ast.OpDecl](t, `op a(item: I) {
   const warranty = match item by WarrantyKind {
-    Standard | NoWarranty => chooseStandardWarranty(item, line);
+    Standard, NoWarranty => chooseStandardWarranty(item, line);
     Yamada     => server.chooseYamada(item);
-    default => none;
+    else => none;
   };
   match item by Available { A => f(); };
 }`)
@@ -1380,7 +1416,7 @@ func TestMatch(t *testing.T) {
 		t.Fatalf("Match = %+v", m)
 	}
 	a0 := m.Arms[0]
-	if len(a0.Cases) != 2 || a0.Cases[1].Name != "NoWarranty" || a0.Default {
+	if len(a0.Cases) != 2 || a0.Cases[1].Name != "NoWarranty" || a0.Else {
 		t.Errorf("Arm 0 = %+v", a0)
 	}
 	if c, ok := a0.Body.(*ast.Call); !ok || c.Callee.String() != "chooseStandardWarranty" || len(c.Args) != 2 {
@@ -1389,8 +1425,9 @@ func TestMatch(t *testing.T) {
 	if c, ok := m.Arms[1].Body.(*ast.Call); !ok || c.Callee.String() != "server.chooseYamada" {
 		t.Errorf("Arm 1 body = %+v", m.Arms[1].Body)
 	}
+	// ElseArm = "else" "=>" ArmBody ";"。ケースの並びは空で、ElseSpan が else の位置
 	a2 := m.Arms[2]
-	if !a2.Default || len(a2.Cases) != 0 {
+	if !a2.Else || len(a2.Cases) != 0 || a2.ElseSpan.Start != a2.Span.Start || a2.ElseSpan.End-a2.ElseSpan.Start != 4 {
 		t.Errorf("Arm 2 = %+v", a2)
 	}
 	if _, ok := a2.Body.(*ast.NoneAtom); !ok {
@@ -1413,7 +1450,7 @@ func TestMatchArmBody(t *testing.T) {
     Standard => 1;
     Named => "x";
     Rec => { a: 1, b };
-    default => throw type.Unauthorized;
+    else => throw type.Unauthorized;
   };
 }`)
 	m := o.Body.Stmts[0].(*ast.ReturnStmt).Value.(*ast.Match)
@@ -1442,7 +1479,7 @@ func TestMatchArmBody(t *testing.T) {
 		t.Errorf("Arm 6 body = %+v", m.Arms[6].Body)
 	}
 	th, ok := m.Arms[7].Body.(*ast.Throw)
-	if !ok || th.Exception.String() != "type.Unauthorized" || !m.Arms[7].Default {
+	if !ok || th.Exception.String() != "type.Unauthorized" || !m.Arms[7].Else {
 		t.Fatalf("Arm 7 body = %+v", m.Arms[7].Body)
 	}
 	// Throw の Span は throw から例外の名前まで。
@@ -1450,7 +1487,7 @@ func TestMatchArmBody(t *testing.T) {
 		t.Errorf("Throw Span = %+v, Exception = %+v", th.Span, th.Exception.Span)
 	}
 	// 引数を持つ throw（docs/grammar.md「配線」の Throw）。引数は Atom で、Span は閉じ括弧まで。
-	tsrc := "op a() { match x by K { A => throw rate.LimitExceeded(wait, 5, { a: b }); default => throw X; }; }"
+	tsrc := "op a() { match x by K { A => throw rate.LimitExceeded(wait, 5, { a: b }); else => throw X; }; }"
 	ta := firstDecl[*ast.OpDecl](t, tsrc).Body.Stmts[0].(*ast.MatchStmt).Match.Arms[0].Body.(*ast.Throw)
 	if ta.Exception.String() != "rate.LimitExceeded" || len(ta.Args) != 3 {
 		t.Fatalf("Throw = %+v", ta)
@@ -1481,9 +1518,9 @@ func TestMatchOnState(t *testing.T) {
   };
   match by Checkout {
     Shopping => f();
-    Ordered | Shipped => g();
+    Ordered, Shipped => g();
   };
-  return match by Session { LoggedIn => h(); default => none; };
+  return match by Session { LoggedIn => h(); else => none; };
 }`)
 	byList := o.Body.Stmts[0].(*ast.MatchStmt).Match
 	if byList.Subject.(*ast.NameAtom).Name.String() != "carts" || !byList.Builtin || byList.Classifier.String() != "list" || len(byList.Arms) != 2 {
@@ -1501,7 +1538,7 @@ func TestMatchOnState(t *testing.T) {
 		t.Errorf("by Checkout = %+v", byClassify)
 	}
 	ret := o.Body.Stmts[3].(*ast.ReturnStmt).Value.(*ast.Match)
-	if ret.Subject != nil || ret.Classifier.String() != "Session" || !ret.Arms[1].Default {
+	if ret.Subject != nil || ret.Classifier.String() != "Session" || !ret.Arms[1].Else {
 		t.Errorf("return match = %+v", ret)
 	}
 	// by の後ろの予約語の Span は Classifier が持つ。
@@ -1528,13 +1565,13 @@ func TestStateConstructSpans(t *testing.T) {
     Shopping;
     Ordered;
   }
-  condition LoggedIn of token;
-  effect placeOrder() on Checkout: Shopping | Ordered -> any;
+  classify LoggedIn of token { Yes; No; }
+  effect placeOrder() on Checkout: Shopping, Ordered -> any;
   effect clearCart() on shop.carts: any -> Empty;
   op view(): Order? {
     match token by nullable { Empty => f(); HasItems => none; };
     const placed = match by Checkout { Shopping => submit(); Ordered => none; };
-    return match carts by list { Empty | HasItems => g(); };
+    return match carts by list { Empty, HasItems => g(); };
   }
 }`
 	fs := source.NewFileSet()
@@ -1718,7 +1755,7 @@ func TestFieldName(t *testing.T) {
 	// レコードリテラルのキーと、値のパス（Path = Ident { "." FieldName }）。
 	o := firstDecl[*ast.OpDecl](t, `op f(res: Wrap): Wrap {
   const a = g({ op: res.op, state: res.state.model, match: "m", namespace: none, item });
-  const b = match res.match by Kind { A => h(res.by); default => none; };
+  const b = match res.match by Kind { A => h(res.by); else => none; };
   return res.decorator;
 }`)
 	call := o.Body.Stmts[0].(*ast.ConstStmt).Value.(*ast.Call)

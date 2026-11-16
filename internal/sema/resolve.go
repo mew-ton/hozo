@@ -469,18 +469,13 @@ func declTarget(s *symbol) Target {
 	return Target{Kind: TargetDecl, Decl: s.fqn, Span: s.nameSpan}
 }
 
-// classifyCaseSpan は classify（condition を含む）のケース名の位置。default は指せない。
+// classifyCaseSpan は classify のケース名の位置。
 func classifyCaseSpan(s *symbol, name string) (source.Span, bool) {
-	switch d := s.node.(type) {
-	case *ast.ClassifyDecl:
+	if d, ok := s.node.(*ast.ClassifyDecl); ok {
 		for _, c := range d.Cases {
-			if c.Name != nil && c.Name.Name == name {
+			if c != nil && c.Name.Name == name {
 				return c.Name.Span, true
 			}
-		}
-	case *ast.ConditionDecl:
-		if d.Name.Name == name {
-			return d.Name.Span, true
 		}
 	}
 	return source.Span{}, false

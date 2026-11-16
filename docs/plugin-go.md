@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.7"
+protocol = "0.8"
 
 [[transpiler]]
 name     = "go"
@@ -145,7 +145,7 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | 直に呼ぶ組み込みの効果の操作 | 先頭を大文字に（状態の単位のメソッド名: `post` → `Post`、`put` → `Put`、`delete` → `Delete`） |
 | 状態の単位 | 状態（か状態の分類）の名前を先頭大文字にして `State` を付ける（`UsersState`、`OutputsSyncState`） |
 | 別の名前空間の口 | 名前空間の FQN のセグメントをそれぞれ先頭大文字にして連結し、`Ops` を付ける（`store` → `StoreOps`、`shop.admin` → `ShopAdminOps`） |
-| 分類 C の列挙と述語 | 型 `<C>`、定数 `<C><ケース名>`（`default` は `<C>Default`）、述語のインターフェース `<C>Cases`、判定関数 `Classify<C>` |
+| 分類 C の列挙と述語 | 型 `<C>`、定数 `<C><ケース名>`、述語のインターフェース `<C>Cases`、判定関数 `Classify<C>` |
 | 継ぎ目のメソッド（`Seams`） | op 名を先頭大文字にしたものに、デコレータの FQN のセグメントをそれぞれ先頭大文字にして連結したものを付ける（`server.login` の `@rate.limited` → `LoginRateLimited`） |
 | 継ぎ目を持つ op の、中身のメソッド | op 名の先頭を小文字にして `Body` を付ける（`login` → `loginBody`）。非公開の名前 |
 | `New` の引数と、構造体 `ops` のフィールド | 「New」 |
@@ -246,7 +246,7 @@ type LimitExceeded struct {
 const EffectCreateUser runtime.Effect = "store.createUser"
 ```
 
-効果ごとに、この定数一つ。効果を行うメソッドは、定数とは別に、宛先の単位に出す（「状態の単位」）。宛先が分類の遷移（`Effect.target` が `transition`）の効果は、コメントの末尾に一行足す: `// on <宛先の FQN>: <前> -> <後>`（ケースの集合は `any` か `A | B`）。
+効果ごとに、この定数一つ。効果を行うメソッドは、定数とは別に、宛先の単位に出す（「状態の単位」）。宛先が分類の遷移（`Effect.target` が `transition`）の効果は、コメントの末尾に一行足す: `// on <宛先の FQN>: <前> -> <後>`（ケースの集合は `any` か `A, B`）。
 
 ## op の形
 
@@ -367,7 +367,7 @@ type UsersState interface {
 - 生成した配線が呼ぶ形で決まる問い合わせは `Get` だけ（「状態の参照」）。`IsEmpty` は、テストと人のコードのためのもの。
 - **形で決まる命令を、呼ばれているものだけにする**のは、実装する者に、誰も呼ばない操作を書かせないため（別の名前空間の口 `<M>Ops` と同じ決め方）。問い合わせと違って、テストが効果の結果を見るのには要らない。配線の本体を書き換えて、直に呼ぶ操作が増えれば、単位のメソッドが増え、実装は、渡すところでコンパイルできなくなる。
 - **`read` と効果を、呼ばれていなくても出す**のは、宣言が、その状態にできることの約束だから（`docs/check.md`「read と効果」）。`read` の引数と結果の型、効果の引数は、宣言に書かれたままで、基底は、宛先の状態の型と照らさない（照らすのは、デコレータを読む相乗り）。
-- **述語で決まる状態の分類** C も、同じ形の単位 `<C>State` を持つ。メソッドは、ケースごとの述語（宣言順。`default` は持たない。`<ケース名>(ctx context.Context) (bool, error)`）、命令（その分類の遷移を宛先にする効果。宣言順）。型で決まる状態の分類は、単位を持たない。
+- **述語で決まる状態の分類** C も、同じ形の単位 `<C>State` を持つ。メソッドは、ケースごとの述語（宣言順。どのケースも持つ: 「分類」。`<ケース名>(ctx context.Context) (bool, error)`）、命令（その分類の遷移を宛先にする効果。宣言順）。型で決まる状態の分類は、単位を持たない。
 - 二つの基底の状態にまたがるものは、ない: `read` の宛先は基底の状態一つ（`docs/check.md`「read の宛先」）、効果の宛先は一つの状態の一つの変化（同「効果の宛先」）。二つの状態を一緒に変える処理は、二つの効果を呼ぶ配線で書く。
 - 単位のメソッドの実装は、その `read` か効果のデコレータを読む相乗りが出すか（`docs/plugin-go-sqlite.md`「状態ごとの型」）、人が書く。デコレータのない `read` と効果、形で決まる命令のうち、相乗りが出さなかったものは、人が、相乗りの型を埋め込んで書き足す。
 
@@ -557,17 +557,21 @@ if err != nil {
 
 | 分類 | 条件 |
 |---|---|
-| 標準の分類 `nullable`、型で決まる分類のうち絞り込みが `presence` のもの | `if <対象> != nil`。この枝が、値のある場合（`HasItems`、型を書いたケース）。もう一方が `Empty` / 残りのケース（`対象 as else`。`docs/check.md`「残りのケース」）/ `default` |
+| 標準の分類 `nullable`、型で決まる分類のうち絞り込みが `presence` のもの | `if <対象> != nil`。この枝が、値のある場合（`HasItems`、型を書いたケース）。もう一方が `Empty` / 残りのケース（`対象 as else`。`docs/check.md`「残りのケース」）。残りのケースを持たない分類では、もう一方は、分類の誤りの枝（下） |
 | 標準の分類 `list` | `if len(<対象>) != 0`。この枝が `HasItems`、もう一方が `Empty` |
-| 型で決まる分類のうち絞り込みが `variant` のもの | `switch <対象>.(type)`。型を書いたケースごとに `case <アームの Go の型>:`（アームを包む型なら、その包む型）。残りのケースは、残りのアーム（`docs/check.md`「残りのケース」）の Go の型を、union の宣言の順に並べた `case <型>, <型>:`（同じ Go の型は一度だけ）。`default` のアームは `default:` |
-| 述語で決まる値の分類・op の分類 | `k<n>, err := <パッケージ>.Classify<C>(ctx, o.<分類の引数名>, <対象>)` と失敗の扱いの後、`switch k<n>`。ケースごとに `case <C><ケース名>:`、`default` のアームは `case <C>Default:` |
+| 型で決まる分類のうち絞り込みが `variant` のもの | `switch <対象>.(type)`。型を書いたケースごとに `case <アームの Go の型>:`（アームを包む型なら、その包む型）。残りのケースは、残りのアーム（`docs/check.md`「残りのケース」）の Go の型を、union の宣言の順に並べた `case <型>, <型>:`（同じ Go の型は一度だけ）。最後の節は、いつも `default:` で、分類の誤りの枝（下） |
+| 述語で決まる値の分類・op の分類 | `k<n>, err := <パッケージ>.Classify<C>(ctx, o.<分類の引数名>, <対象>)` と失敗の扱いの後、`switch k<n>`。ケースごとに `case <C><ケース名>:` |
 | 述語で決まる状態の分類 | `k<n>, err := Classify<C>(ctx, o.<分類の引数名>)` と失敗の扱いの後、`switch k<n>`。上と同じ |
 | 型で決まる状態の分類 | 対象の状態を「状態の参照」で読んでから、その値を対象にして、上の `presence` か `variant` の分け方 |
 
 - 対象が状態なら、先に「状態の参照」で読む。対象が名前でない `Atom`（リテラル、レコードリテラル、`none`）なら、`v<n>` に束縛してから分ける。
-- **二つに分ける形**（`if`）は、アームを書いた順によらず、値のある場合を `if` の枝にする。`return match` では、`else` を書かず、もう一方をそのまま後ろに続ける（どの枝も `return` で終わる）。それ以外では `if … { … } else { … }`。枝の中身がないとき（文の `match` の `none` のアーム）は、その枝を書かない（`if` の枝がなければ、条件を逆にして `if <対象> == nil` / `if len(<対象>) == 0` にする）。一つのアームが両方のケースを並べていれば（`Empty | HasItems => f();`）、分けずに、そのアームの本体だけを書く。
-- **`switch` の形**は、アームごとに `case` を一つ。並びは、アームの最初のケースの、分類の宣言での順。`default` のアームは最後。複数のケースを並べたアームは `case A, B:`。`return match` で、`default` の節を持たない `switch` の後ろには、`return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` を置く（判定関数が先に同じ誤りを返すので、ここには来ない。Go が、関数の終わりの `return` を求めるため）。残りのケースの節は `default:` ではないので、`variant` の `switch` は、残りのケースがあっても `default` の節を持たない: union の値がない（`nil`）のは、どのアームでもなく、残りのケースにも当たらずに、この `return` に来る。
-- それぞれの枝（`if` の枝、後ろに続く部分、`else` の枝）の頭に、ケースの名前をコメントで書く: `// <ケース名>`（複数なら ` | ` でつなぐ。`default` は `default`。残りのケースは、ほかのケースと同じく、その名前）。対象が絞り込まれるアームは `// <ケース名>: <対象> は <型>`（型の書き方は「コメント」の「型の表示」）。`switch` の節には書かない（`case` が名前を持つ）。
+- **`else` のアームは、受けるケース（`MatchArm.cases`）を名前で並べたアームと、同じコードになる**: `if` の枝も、`case <C>A, <C>B:` も、`case <型>, <型>:` も、枝の頭のコメントも。基底は `MatchArm.else` を読まない。Go の `default:` の節は、`else` のアームには使わない: `else` が受けるのは宣言したケースだけで（`docs/check.md`「アームが受けるケース」）、型の `switch` の `default:` は、宣言したケースの外の値が来る節だから。
+- **分類の誤りの枝**: 型で決まる分類は判定関数を持たないので、どのケースにも当たらない値（`docs/check.md`「ケースの判定」の「当たらない値」）は、`match` のコードが受ける。枝の中身は、`match` の使われ方（`return` / `const` / 文）によらず、`return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` の一行。枝の頭のコメントは書かない。置くのは、次の二つの形だけ。標準の分類の `match`（どの値も、どちらかのケースに当たる）と、述語で決まる分類の `match`（判定関数が、先に同じ誤りを返す。「分類」）には、ない:
+  - `if` の形で、分類が残りのケースを持たないとき、値のない側の枝。
+  - `switch <対象>.(type)` の、最後の `default:` の節。来るのは、どのケースも `as` に書かなかった型のアームの値と、union の値がない（`nil`）とき。書いた型が union のすべてのアームを覆っていても、`nil` のために、いつも置く。
+- **二つに分ける形**（`if`）は、アームを書いた順によらず、値のある場合を `if` の枝にする。`return match` では、`else` を書かず、もう一方をそのまま後ろに続ける（どの枝も `return` で終わる）。それ以外では `if … { … } else { … }`。枝の中身がないとき（文の `match` の `none` のアーム）は、その枝を書かない（`if` の枝がなければ、条件を逆にして `if <対象> == nil` / `if len(<対象>) == 0` にする）。分類の誤りの枝も、もう一方の枝として、同じに置く（`return match` なら後ろに続け、それ以外なら `else` の枝。中身がなくなることはない）。一つのアームが両方のケースを受けていれば（`Empty, HasItems => f();`）、分けずに、そのアームの本体だけを書く。
+- **`switch` の形**は、アームごとに `case` を一つ。並びは、アームが受ける最初のケース（`MatchArm.cases` の先頭）の、分類の宣言での順。複数のケースを受けるアームは `case A, B:`。述語で決まる分類の `switch k<n>` は `default:` の節を持たず、どの節も関数を抜けるとき（`return match` と、すべてのアームが `throw` か「返らない」呼び出しの `match`）は、後ろに `return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` を置く（判定関数が先に同じ誤りを返すので、ここには来ない。Go が、関数の終わりの `return` を求めるため）。型の `switch` は、`default:` の節（分類の誤りの枝）が関数を抜けるので、後ろには何も置かない。
+- それぞれの枝（`if` の枝、後ろに続く部分、`else` の枝）の頭に、ケースの名前をコメントで書く: `// <ケース名>`（複数なら `, ` でつなぐ。残りのケースは、ほかのケースと同じく、その名前。`else` のアームは、受けるケースの名前）。対象が絞り込まれるアームは `// <ケース名>: <対象> は <型>`（型の書き方は「コメント」の「型の表示」）。`switch` の節には書かない（`case` が名前を持つ）。
 
 **絞り込んだ値**（アームの中で、対象と同じ `Atom` を値として使う位置の式。フィールドを読むだけなら、Go がポインタを辿るので、元の式のまま）:
 
@@ -598,7 +602,7 @@ if err != nil {
 
 ### 分類
 
-- **型で決まる分類**（`Classify.decidedBy` が `type`。標準の分類を含む）について、基底は何も出さない: 列挙の型も、判定関数も、`New` の引数もない。どのケースに当たるかは、値から決まる（「match」の `presence` と `variant`）。分類の名前とケースの名前は、それを使う配線のコメントにだけ残る。残りのケース（`対象 as else`）を持つ分類も同じで、残りのケースのための定数も出さない。
+- **型で決まる分類**（`Classify.decidedBy` が `type`。標準の分類を含む）について、基底は何も出さない: 列挙の型も、判定関数も、`New` の引数もない。どのケースに当たるかは、値から決まる（「match」の `presence` と `variant`）。分類の名前とケースの名前は、それを使う配線のコメントにだけ残る。残りのケース（`対象 as else`）を持つ分類も同じで、残りのケースのための定数も出さない。どのケースにも当たらない値は、`match` のコードが分類の誤りにする（「match」の「分類の誤りの枝」）。
 - **述語で決まる値の分類・op の分類** C は、宣言した名前空間の定義のパッケージの `classify.go` に、次を出す。述語は、人が実装する（排他になるように、一人がまとめて書く）。
 
 ```go
@@ -609,7 +613,6 @@ const (
 	// 標準の保証
 	WarrantyKindStandard WarrantyKind = iota
 	WarrantyKindYamada
-	// hasDefault なら、最後に WarrantyKindDefault
 )
 
 // WarrantyKindCases は分類 shop.WarrantyKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
@@ -624,10 +627,11 @@ type WarrantyKindCases interface {
 func ClassifyWarrantyKind(ctx context.Context, c WarrantyKindCases, v Item) (WarrantyKind, error)
 ```
 
+- **述語は、ケースの数だけある。** 人が実装するのは、宣言したケースのすべての述語で、基底は、「ほかのどれでもない」ケースを導かない（`docs/check.md`「ケースの判定」）。二つに分かれる分類（`classify Role of Member { Admin; Regular; }`）は、二つの述語を持ち、一方をもう一方の否定として書くのは、人。
 - 述語は、`ctx` と、分類の対象の値（値の分類は `subject` の型、op の分類はその op の `returns`）を取り、`(bool, error)` を返す。判定関数は、`ctx`、述語、対象の値を、この順に取る。どちらも、op と同じ形（「op の形」）。
-- 判定関数は、すべての述語を宣言順に呼び、真の数を数える。述語が `error` を返したら、残りも呼んだうえで、最初の `error` を返す。どの述語も `error` を返さなければ、真の数を確かめる: `hasDefault` が false なら、真がちょうど一つでなければ、true なら、真が二つ以上なら、`*runtime.ClassificationError{Classify: "<FQN>", Hits: <真になったケース名>}` を返す。真が一つならそのケース、0 で `hasDefault` なら `<C>Default`。
+- 判定関数は、すべての述語を宣言順に呼び、真の数を数える。述語が `error` を返したら、残りも呼んだうえで、最初の `error` を返す。どの述語も `error` を返さなければ、真の数を確かめる: 真がちょうど一つなら、そのケース。0 か、二つ以上なら、`*runtime.ClassificationError{Classify: "<FQN>", Hits: <真になったケース名>}` を返す。
 - 型で決まる絞り込み（`presence` / `variant`）の `as` を持つケースは、値がその型に当たらなければ、述語を呼ばずに偽とする（`docs/check.md`「ケースの判定」）。
-- **判定の誤りは、配線が返す。** 判定関数が返した `error`（述語の `error` か、`*runtime.ClassificationError`）は、ほかの呼び出しの失敗と同じに、配線がそのまま返す（「呼び出し」の「失敗の扱い」）。どの配線も `error` を返す（「op の形」）ので、返す先は、いつもある。基底は、`panic` を呼ぶコードを出さない。述語が排他でない・全集合でないのは実装の誤りで（ケースが排他で全体を覆うことは、述語を書く人が担保する）、その誤りは、仕様の例外（`throws`）ではない `error` として、呼び出し元に届く。
+- **判定の誤りは、配線が返す。** 判定関数が返した `error`（述語の `error` か、`*runtime.ClassificationError`）は、ほかの呼び出しの失敗と同じに、配線がそのまま返す（「呼び出し」の「失敗の扱い」）。どの配線も `error` を返す（「op の形」）ので、返す先は、いつもある。基底は、`panic` を呼ぶコードを出さない。どの述語も真でないのは、値が、宣言したケースの外にあるということ（`docs/check.md`「閉じた分類」）。二つ以上が真なのは、述語の実装の誤り（排他であることは、述語を書く人が担保する）。どちらも、仕様の例外（`throws`）ではない `error` として、呼び出し元に届く。
 - 述語の実装は、その分類を `match` に使う名前空間の `New` が、引数で受け取る（「New」の 3）。分類を宣言した名前空間の `New` が受け取るのは、その名前空間の配線が使うときだけ。
 - **述語で決まる状態の分類** C は、`classify.go` に列挙の型と定数と、判定関数 `func Classify<C>(ctx context.Context, s <C>State) (<C>, error)` を出す。述語は状態の単位 `<C>State` のメソッド（「状態の単位」）。判定関数は、値の分類と同じ規則で、すべての述語を呼び、真の数を確かめる。配線が `match by C` に使っていなくても出す（テストが、効果の結果の判定に使う）。
 
@@ -830,7 +834,7 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 ```go
 type Effect string
 type Exception interface { error; HozoException() string }
-type ClassificationError struct { Classify string; Hits []string }   // 述語で決まる分類の判定の誤り。Error() を持つ
+type ClassificationError struct { Classify string; Hits []string }   // 分類の誤り（判定関数と、型で決まる分類の match が返す）。Error() を持つ
 ```
 
 - `Effect` と `Exception` は `types.go`、`ClassificationError` は `classify.go` と `wiring.go` が使う。`ops.go` と `states.go` は `runtime` を import しない。
@@ -882,6 +886,7 @@ type ClassificationError struct { Classify string; Hits []string }   // 述語�
 | 別の言語の型と、どの出力にもない型は、使う側に複製する | 複製しない。置き場がなければ CFG-22 | 67 |
 | `Validate` を基底が出す | `go-valid` が出す | 71 |
 | 生成するコードは `context` を取らない。その後の形では、純粋でない op だけが `ctx context.Context` を取り、純粋で例外のない op は `error` を返さない | 仕様の宣言を写した関数は、どれも、最初の引数に `ctx context.Context` を取り、最後の戻り値に `error` を返す。純粋かどうかは見ない | 145、146（72 の、純粋さで形を分ける部分を置き換えた） |
+| 分類の列挙は、`default` のための定数 `<C>Default` を持ち、判定関数は、真が一つもなければ `<C>Default` を返す。`default` のアームは `case <C>Default:` か、型の `switch` の `default:` | `<C>Default` はない。どのケースも述語を持ち、真がちょうど一つでなければ `*runtime.ClassificationError`。型で決まる分類の `match` は、どのケースにも当たらない値を、分類の誤りの枝で返す。`else` のアームは、受けるケースを並べたアームと同じコード | 154、156、160 |
 | 分類の述語は、値だけを取って `bool` を返す。判定の誤りを返す先がない配線は、`panic` する | 述語も判定関数も、`ctx` を取り、`error` を返す。判定の誤りは、配線が返す。基底は `panic` を出さない | 146、147（90 の帰結を置き換えた） |
 | 実装は、関数のフィールドを持つ構造体（`Leaves`、`Deps`、`Wrappers`、`Classifiers`）と、パッケージの変数 `States` | インターフェースと、`New` の位置引数。未設定の `*runtime.MissingError` はない | 73 |
 | `Ops` はすべての op | 入口の `Ops` は `export` の op だけ。内部の op は内側のフォルダから | 74 |

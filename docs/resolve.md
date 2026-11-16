@@ -37,7 +37,7 @@
    |---|---|
    | 名前空間 | 子の名前空間、またはその名前空間の宣言。両方あれば `RES-2`。どちらもなければ `RES-1` |
    | 値の参照（束縛・引数。配線の値の位置では、現在の名前空間の `state` も） | その値の型のフィールド（型が model、または model の `optional`）。それ以外の型なら `RES-3`。`match` のアームの中では、絞り込まれた型から辿る（`docs/types.md`「アームの中の対象の型」） |
-   | `classify` | ケース名 → 絞り込まれた型の元（`Type.case`）。`default` は指せない |
+   | `classify` | ケース名 → 絞り込まれた型の元（`Type.case`） |
    | `union`（`arms`） | アーム名 → `ArgValue.variant` |
    | `state`（値の位置でないとき） | `post` / `put` / `delete` → 状態への操作（`effect ... on`、`any effect on`、`effects` の要素、配線の呼び出しの位置でだけ） |
    | それ以外 | `RES-3` |

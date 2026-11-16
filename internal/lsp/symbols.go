@@ -37,7 +37,7 @@ type symbolBuilder struct {
 }
 
 // text は節の元の文字列（detail に使う）。
-// subject は classify / condition の対象（一つ以上。docs/grammar.md「classify / condition」の ClassifySubject）。
+// subject は classify の対象（一つ以上。docs/grammar.md「classify」の ClassifySubject）。
 func (b *symbolBuilder) subject(of []ast.Type) string {
 	parts := make([]string, 0, len(of))
 	for _, t := range of {
@@ -148,14 +148,8 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 		case *ast.ClassifyDecl:
 			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.subject(d.Of))
 			for _, c := range d.Cases {
-				if c.Name != nil {
-					sym.Children = append(sym.Children, b.sym(c.Name.Name, protocol.SymbolEnumMember, c.Span, c.Name.Span, ""))
-				}
+				sym.Children = append(sym.Children, b.sym(c.Name.Name, protocol.SymbolEnumMember, c.Span, c.Name.Span, ""))
 			}
-			out = append(out, sym)
-		case *ast.ConditionDecl:
-			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.subject(d.Of))
-			sym.Children = []protocol.DocumentSymbol{b.sym(d.Name.Name, protocol.SymbolEnumMember, d.Name.Span, d.Name.Span, "")}
 			out = append(out, sym)
 		case *ast.DecoratorDecl:
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolInterface, d.Span, d.Name.Span, b.declTail(d.Span, d.Name.Span)))

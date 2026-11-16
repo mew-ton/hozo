@@ -71,7 +71,7 @@ func TestNodeSpan(t *testing.T) {
 		&NamespaceDecl{Span: s}, &BindDecl{Span: s}, &ModelDecl{Span: s}, &ModelBody{Span: s}, &Field{Span: s},
 		&ScalarDecl{Span: s}, &UnionDecl{Span: s}, &UnionMember{Span: s}, &ArmType{Span: s}, &StateDecl{Span: s},
 		&ExceptionDecl{Span: s}, &StateOpRef{Span: s}, &EffectDecl{Span: s}, &ClassifyDecl{Span: s}, &ClassifyCase{Span: s},
-		&ConditionDecl{Span: s}, &DecoratorDecl{Span: s}, &DecoratorAlias{Span: s}, &Param{Span: s}, &ParamType{Span: s},
+		&DecoratorDecl{Span: s}, &DecoratorAlias{Span: s}, &Param{Span: s}, &ParamType{Span: s},
 		&AnyType{Span: s}, &Target{Span: s}, &ThrowsClause{Span: s}, &Relation{Span: s},
 		&CatchesClause{Span: s}, &EffectsClause{Span: s}, &OpDecl{Span: s}, &OpParam{Span: s}, &ReturnType{Span: s},
 		&CoreType{Span: s}, &RecordType{Span: s}, &NamedType{Span: s}, &ArrayType{Span: s}, &OptionalType{Span: s},

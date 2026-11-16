@@ -1,5 +1,5 @@
 {
-  "version": "0.7",
+  "version": "0.8",
   "namespaces": [
     {
       "name": "",
@@ -181,8 +181,6 @@
               }
             }
           ],
-          "hasDefault": false,
-          "fromCondition": false,
           "decidedBy": "predicate"
         },
         {
@@ -1029,15 +1027,6 @@
               }
             }
           ],
-          "hasDefault": true,
-          "defaultDescription": {
-            "summary": "Others.",
-            "body": "Others.",
-            "params": [],
-            "throws": [],
-            "see": []
-          },
-          "fromCondition": false,
           "decidedBy": "predicate"
         },
         {
@@ -1139,8 +1128,6 @@
               }
             }
           ],
-          "hasDefault": false,
-          "fromCondition": false,
           "decidedBy": "type"
         },
         {
@@ -1155,7 +1142,7 @@
             },
             "end": {
               "line": 35,
-              "col": 30
+              "col": 51
             }
           },
           "subject": {
@@ -1173,17 +1160,30 @@
                 "file": "server.hozo",
                 "start": {
                   "line": 35,
-                  "col": 11
+                  "col": 29
                 },
                 "end": {
                   "line": 35,
-                  "col": 18
+                  "col": 37
+                }
+              }
+            },
+            {
+              "name": "NotAdmin",
+              "as": [],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 35,
+                  "col": 38
+                },
+                "end": {
+                  "line": 35,
+                  "col": 47
                 }
               }
             }
           ],
-          "hasDefault": true,
-          "fromCondition": true,
           "decidedBy": "predicate"
         },
         {
@@ -2279,6 +2279,7 @@
                       "cases": [
                         "IsAdmin"
                       ],
+                      "else": false,
                       "body": {
                         "kind": "call",
                         "call": {
@@ -2336,7 +2337,10 @@
                       }
                     },
                     {
-                      "cases": "default",
+                      "cases": [
+                        "NotAdmin"
+                      ],
+                      "else": true,
                       "body": {
                         "kind": "none"
                       },
@@ -2349,7 +2353,7 @@
                         },
                         "end": {
                           "line": 56,
-                          "col": 20
+                          "col": 17
                         }
                       }
                     }
@@ -2410,6 +2414,7 @@
                           "Active",
                           "Banned"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "call",
                           "call": {
@@ -2556,6 +2561,7 @@
                       "cases": [
                         "Empty"
                       ],
+                      "else": false,
                       "body": {
                         "kind": "none"
                       },
@@ -2576,6 +2582,7 @@
                       "cases": [
                         "HasItems"
                       ],
+                      "else": false,
                       "body": {
                         "kind": "call",
                         "call": {
@@ -2807,6 +2814,7 @@
                       "cases": [
                         "Anonymous"
                       ],
+                      "else": false,
                       "body": {
                         "kind": "throw",
                         "exception": "server.Unavailable",
@@ -2862,6 +2870,7 @@
                       "cases": [
                         "LoggedIn"
                       ],
+                      "else": false,
                       "body": {
                         "kind": "atom",
                         "atom": {

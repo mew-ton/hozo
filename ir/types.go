@@ -134,7 +134,7 @@ func (t RecordType) String() string {
 	return "Record<" + typeString(t.Key) + ", " + typeString(t.Value) + ">"
 }
 
-// String は "C.Case<T>"。ケースが複数なら "C.(A | B)<T>"（表面の構文にはない形）。
+// String は "C.Case<T>"。ケースが複数なら "C.(A, B)<T>"（表面の構文にはない形。ケースの並びの区切りは、アームと同じ ","）。
 func (t CaseType) String() string {
 	cases := ""
 	switch len(t.Cases) {
@@ -143,7 +143,7 @@ func (t CaseType) String() string {
 	case 1:
 		cases = t.Cases[0]
 	default:
-		cases = "(" + strings.Join(t.Cases, " | ") + ")"
+		cases = "(" + strings.Join(t.Cases, ", ") + ")"
 	}
 	return t.Classify + "." + cases + "<" + typeString(t.Of) + ">"
 }

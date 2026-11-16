@@ -164,7 +164,7 @@ namespace storefront {
   {
     const line = match product.fulfilment by catalog.Kind {
       Made              => askRequest(product, quantity);
-      Digital | Stocked => lineOf(product, quantity);
+      Digital, Stocked  => lineOf(product, quantity);
     };
     addLine(line);
     forgetOffer();

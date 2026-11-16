@@ -89,14 +89,32 @@ namespace staff {
     LoggedOut: Session? as else;
   }
 
+  // 仕事ごとに、分類を一つ。一人が複数の仕事を持てる（maker と packer の両方が真の担当者がいる）ので、
+  // 三つの仕事を一つの分類のケースにはしない（ケースは排他）。
+
   /** 製作の担当か */
-  condition Maker of Member;
+  classify MakerDuty of Member {
+    /** 製作の仕事をしてよい */
+    Maker;
+    /** 製作の仕事は、してはいけない */
+    NotMaker;
+  }
 
   /** 梱包の担当か */
-  condition Packer of Member;
+  classify PackerDuty of Member {
+    /** そろえる、梱包する、渡す仕事をしてよい */
+    Packer;
+    /** 梱包の仕事は、してはいけない */
+    NotPacker;
+  }
 
   /** 管理の担当か */
-  condition Admin of Member;
+  classify AdminDuty of Member {
+    /** 配送業者を管理してよい */
+    Admin;
+    /** 管理の仕事は、してはいけない */
+    NotAdmin;
+  }
 
   // ---- ログイン ----
 
@@ -192,9 +210,9 @@ namespace staff {
     throws type.Unauthorized, type.Forbidden
   {
     const member = whoIs(token);
-    match member by Maker {
-      Maker   => none;
-      default => throw type.Forbidden;
+    match member by MakerDuty {
+      Maker    => none;
+      NotMaker => throw type.Forbidden;
     };
   }
 
@@ -203,9 +221,9 @@ namespace staff {
     throws type.Unauthorized, type.Forbidden
   {
     const member = whoIs(token);
-    match member by Packer {
-      Packer  => none;
-      default => throw type.Forbidden;
+    match member by PackerDuty {
+      Packer    => none;
+      NotPacker => throw type.Forbidden;
     };
   }
 
@@ -214,9 +232,9 @@ namespace staff {
     throws type.Unauthorized, type.Forbidden
   {
     const member = whoIs(token);
-    match member by Admin {
-      Admin   => none;
-      default => throw type.Forbidden;
+    match member by AdminDuty {
+      Admin    => none;
+      NotAdmin => throw type.Forbidden;
     };
   }
 }

@@ -132,7 +132,7 @@ namespace hozoc {
     /** 一致している */
     UpToDate;
     /** 足りない、古い、または余分なファイルがある */
-    default;
+    OutOfDate;
   }
 
   /** 書き出す予定: 単位ごとにトランスパイラを呼んで集めたファイルと、そこまでの warning */

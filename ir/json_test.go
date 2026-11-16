@@ -122,14 +122,14 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 		Subject:  ValueSubject{Atom: NameAtom{Path: []string{"u"}, Span: sp()}},
 		Classify: "s.C",
 		Arms: []MatchArm{
-			{Cases: ArmCases{Cases: []string{"A", "B"}}, Body: CallExpr{Call: call}, Span: sp()},
-			{Cases: DefaultArm(), Body: NoneBody{}, Span: sp()},
+			{Cases: []string{"A", "B"}, Body: CallExpr{Call: call}, Span: sp()},
+			{Cases: []string{"C"}, Else: true, Body: NoneBody{}, Span: sp()},
 		},
 		Span: sp(),
 	}
 	matchJSON := `{"subject":{"kind":"value","atom":{"kind":"name","path":["u"],` + spJSON + `}},"classify":"s.C","arms":[` +
-		`{"cases":["A","B"],"body":{"kind":"call","call":` + callJSON + `},"narrowed":[],` + spJSON + `},` +
-		`{"cases":"default","body":{"kind":"none"},"narrowed":[],` + spJSON + `}],` + spJSON + `}`
+		`{"cases":["A","B"],"else":false,"body":{"kind":"call","call":` + callJSON + `},"narrowed":[],` + spJSON + `},` +
+		`{"cases":["C"],"else":true,"body":{"kind":"none"},"narrowed":[],` + spJSON + `}],` + spJSON + `}`
 
 	unionRoundTrip(t, Expr(CallExpr{Call: call}), UnmarshalExpr, `{"kind":"call","call":`+callJSON+`}`)
 	unionRoundTrip(t, Expr(MatchExpr{Match: match}), UnmarshalExpr, `{"kind":"match","match":`+matchJSON+`}`)
@@ -162,8 +162,8 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 		t.Errorf("CalledOp: %q %q", call.CalledOp(), direct.CalledOp())
 	}
 	// アームの中で絞り込まれた型（docs/ir.md「配線」の Narrowing）。状態の分類での match だけが state を持つ。
-	narrowed := MatchArm{Cases: ArmCases{Cases: []string{"A"}}, Body: NoneBody{}, Narrowed: []Narrowing{{Type: Ref("s.T")}, {State: "s.token", Type: Int()}}, Span: sp()}
-	if b := roundTrip(t, narrowed); string(b) != `{"cases":["A"],"body":{"kind":"none"},"narrowed":[{"type":{"kind":"ref","target":"s.T"}},{"state":"s.token","type":{"kind":"core","name":"int"}}],`+spJSON+`}` {
+	narrowed := MatchArm{Cases: []string{"A"}, Body: NoneBody{}, Narrowed: []Narrowing{{Type: Ref("s.T")}, {State: "s.token", Type: Int()}}, Span: sp()}
+	if b := roundTrip(t, narrowed); string(b) != `{"cases":["A"],"else":false,"body":{"kind":"none"},"narrowed":[{"type":{"kind":"ref","target":"s.T"}},{"state":"s.token","type":{"kind":"core","name":"int"}}],`+spJSON+`}` {
 		t.Errorf("narrowed arm: %s", b)
 	}
 
@@ -192,8 +192,8 @@ func TestRoundTripMatchSubjects(t *testing.T) {
 	}
 	unionRoundTrip(t, MatchSubject(ClassifyOwnedSubject{}), UnmarshalMatchSubject, `{"kind":"classify"}`)
 
-	arm := MatchArm{Cases: ArmCases{Cases: []string{CaseEmpty, CaseHasItems}}, Body: NoneBody{}, Span: sp()}
-	armJSON := `{"cases":["Empty","HasItems"],"body":{"kind":"none"},"narrowed":[],` + spJSON + `}`
+	arm := MatchArm{Cases: []string{CaseEmpty, CaseHasItems}, Body: NoneBody{}, Span: sp()}
+	armJSON := `{"cases":["Empty","HasItems"],"else":false,"body":{"kind":"none"},"narrowed":[],` + spJSON + `}`
 	// 標準の分類なら classify は "list" か "nullable"。
 	b := roundTrip(t, Match{Subject: ValueSubject{Atom: StateAtom{State: "browser.token", Span: sp()}}, Classify: "nullable", Arms: []MatchArm{arm}, Span: sp()})
 	if want := `{"subject":{"kind":"value","atom":` + stateAtomJSON + `},"classify":"nullable","arms":[` + armJSON + `],` + spJSON + `}`; string(b) != want {
@@ -440,7 +440,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.7","namespaces":[],"binds":[]}`
+	want := `{"version":"0.8","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -448,7 +448,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.7","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.7","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.8","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.8","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -582,6 +582,18 @@ func TestNamespacesKeysSorted(t *testing.T) {
 }
 
 func TestRelationAndArmCases(t *testing.T) {
+	// アームのケースは、いつもケース名の列（docs/ir.md「配線」の MatchArm）。なくても []。0.7 までの "default" は読めない
+	b0, _ := json.Marshal(MatchArm{Else: true, Body: NoneBody{}, Span: sp()})
+	if want := `{"cases":[],"else":true,"body":{"kind":"none"},"narrowed":[],` + spJSON + `}`; string(b0) != want {
+		t.Errorf("受けるケースのない else のアーム\nwant %s\ngot  %s", want, b0)
+	}
+	var arm MatchArm
+	if err := json.Unmarshal([]byte(`{"cases":"default","body":{"kind":"none"},"narrowed":[],`+spJSON+`}`), &arm); err == nil {
+		t.Error(`want error: cases の "default" は 0.8 でなくなった`)
+	}
+	if err := json.Unmarshal([]byte(`{"cases":["A"],"else":true,"body":{"kind":"none"},"narrowed":[],`+spJSON+`}`), &arm); err != nil || !arm.Else || !reflect.DeepEqual(arm.Cases, []string{"A"}) {
+		t.Errorf("else のアーム: %v %+v", err, arm)
+	}
 	// Relation は kind だけ（docs/ir.md「decorator」）。目的語は常にその op のすべての効果。
 	b, _ := json.Marshal(Relation{Kind: Keeps})
 	if string(b) != `{"kind":"keeps"}` {
@@ -590,16 +602,6 @@ func TestRelationAndArmCases(t *testing.T) {
 	var r Relation
 	if err := json.Unmarshal([]byte(`{"kind":"prevents"}`), &r); err != nil || r.Kind != Prevents {
 		t.Errorf("prevents: %v %+v", err, r)
-	}
-	var c ArmCases
-	if err := json.Unmarshal([]byte(`"default"`), &c); err != nil || !c.Default {
-		t.Errorf("default: %v %+v", err, c)
-	}
-	if err := json.Unmarshal([]byte(`"other"`), &c); err == nil {
-		t.Error("want error for unknown cases string")
-	}
-	if err := json.Unmarshal([]byte(`["A"]`), &c); err != nil || c.Default || !reflect.DeepEqual(c.Cases, []string{"A"}) {
-		t.Errorf("cases: %v %+v", err, c)
 	}
 }
 

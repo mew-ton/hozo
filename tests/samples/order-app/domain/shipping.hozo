@@ -510,7 +510,7 @@ namespace shipping {
     const now = clock.now();
     const released = match packed.shipment by Custody {
       InHouse                 => handedOverAt(packed.shipment, now);
-      WithCarrier | Delivered => throw AlreadyHandedOver;
+      WithCarrier, Delivered  => throw AlreadyHandedOver;
     };
     saveShipment(released);
     return { shipment: released, parcel: packed.parcel, label: label };
@@ -541,7 +541,7 @@ namespace shipping {
   op markDelivered(shipment: Shipment, at: Time) {
     match shipment by Custody {
       WithCarrier         => saveArrival(shipment, at);
-      InHouse | Delivered => none;
+      InHouse, Delivered  => none;
     };
   }
 

@@ -309,9 +309,6 @@ func (r *renderer) head(d ir.Decl) string {
 		}
 		return s
 	case *ir.Classify:
-		if d.FromCondition {
-			return "condition " + name + " of " + r.classifySubject(d.Subject)
-		}
 		return "classify " + name + " of " + r.classifySubject(d.Subject)
 	case *ir.Decorator:
 		return r.decoratorHead(name, d)
@@ -475,7 +472,7 @@ func (r *renderer) typ(t ir.Type) string {
 	case ir.RecordType:
 		return "Record<" + r.typ(t.Key) + ", " + r.typ(t.Value) + ">"
 	case ir.CaseType:
-		cases := strings.Join(t.Cases, " | ")
+		cases := strings.Join(t.Cases, ", ")
 		if len(t.Cases) != 1 {
 			cases = "(" + cases + ")"
 		}
@@ -556,7 +553,7 @@ func caseSet(c ir.CaseSet) string {
 	if c.Any {
 		return "any"
 	}
-	return strings.Join(c.Cases, " | ")
+	return strings.Join(c.Cases, ", ")
 }
 
 // classifySubject は分類の対象を Hozo の構文で書く（`classify WarrantyKind of server.Item`、

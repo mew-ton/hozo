@@ -260,7 +260,7 @@ type PublicName struct {
     Kind   PublicKind                             // PublicType / PublicArm / PublicEffect / PublicClassify / PublicCase / PublicClassifyFunc / PublicCases /
                                                   // PublicStateUnit / PublicOps / PublicNew / PublicLeaves / PublicSeams / PublicDep
     Decl   string                                 // その名前を生んだ宣言の FQN（状態の単位なら、状態か状態の分類）。診断の位置に使う。Ops、New、Leaves、Seams と、別の名前空間の口なら ""
-    Detail string                                 // PublicArm ならアーム名、PublicCase ならケース名（default は "default"）、PublicDep なら名前空間の FQN
+    Detail string                                 // PublicArm ならアーム名、PublicCase ならケース名、PublicDep なら名前空間の FQN
     What   string                                 // その名前を生んだものの、診断のメッセージ用の言い方（`model store.Schema`、`インターフェース Ops`）
 }
 func PublicNames(view *ir.View) []PublicName      // 出力 (U, N) の定義のパッケージの公開の名前のすべて。当たる名前も、そのまま二つ返す

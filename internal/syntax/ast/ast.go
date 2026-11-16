@@ -458,7 +458,7 @@ type CaseSet struct {
 // NodeSpan は Node の実装。
 func (n *CaseSet) NodeSpan() source.Span { return n.Span }
 
-// ClassifyDecl は classify（docs/grammar.md「classify / condition」）。
+// ClassifyDecl は classify（docs/grammar.md「classify」）。
 type ClassifyDecl struct {
 	Span       source.Span
 	Doc        *DocComment
@@ -473,20 +473,19 @@ type ClassifyDecl struct {
 func (n *ClassifyDecl) NodeSpan() source.Span { return n.Span }
 func (n *ClassifyDecl) declNode()             {}
 
-// ClassifyCase は分類のケース。Default なら Name は nil。
+// ClassifyCase は分類のケース。どのケースも名前を持つ（docs/check.md「閉じた分類」）。
 type ClassifyCase struct {
-	Span    source.Span
-	Doc     *DocComment
-	Name    *Ident
-	Default bool
-	// As は "対象 as 型" と "対象 as else" の並び（CaseTyping）。なければ空。default には書けない。
+	Span source.Span
+	Doc  *DocComment
+	Name Ident
+	// As は "対象 as 型" と "対象 as else" の並び（CaseTyping）。なければ空。
 	As []*CaseTyping
 }
 
 // NodeSpan は Node の実装。
 func (n *ClassifyCase) NodeSpan() source.Span { return n.Span }
 
-// CaseTyping はケースの "対象 as 型" と "対象 as else"（docs/grammar.md「classify / condition」）。
+// CaseTyping はケースの "対象 as 型" と "対象 as else"（docs/grammar.md「classify」）。
 // Subject は宣言の of の後ろと同じに書いた対象（型か op か状態の名前。名前の解決が決める）。
 type CaseTyping struct {
 	Span    source.Span
@@ -500,20 +499,6 @@ type CaseTyping struct {
 
 // NodeSpan は Node の実装。
 func (n *CaseTyping) NodeSpan() source.Span { return n.Span }
-
-// ConditionDecl は condition。
-type ConditionDecl struct {
-	Span       source.Span
-	Doc        *DocComment
-	Decorators []*Decorator
-	Name       Ident
-	// Of は対象（ClassifySubject）。一つ以上。
-	Of []Type
-}
-
-// NodeSpan は Node の実装。
-func (n *ConditionDecl) NodeSpan() source.Span { return n.Span }
-func (n *ConditionDecl) declNode()             {}
 
 // DecoratorDecl はデコレータの宣言（docs/grammar.md「decorator の宣言」）。
 // Alias が nil でなければ二つ目の形（名前付きのデコレータ）で、Params / For / Clauses は空。
@@ -1068,12 +1053,16 @@ type Throw struct {
 func (n *Throw) NodeSpan() source.Span { return n.Span }
 func (n *Throw) armBodyNode()          {}
 
-// MatchArm は "A | B => ArmBody;"。Body は *Call か Atom か *Throw。
+// MatchArm は "A, B => ArmBody;"（MatchArm）か "else => ArmBody;"（ElseArm）。Body は *Call か Atom か *Throw。
 type MatchArm struct {
-	Span    source.Span
-	Cases   []Ident
-	Default bool
-	Body    ArmBody
+	Span source.Span
+	// Cases は名前で並べたケース。else のアームなら空。
+	Cases []Ident
+	// Else は else のアーム（ほかのアームが並べなかったケースのすべてを受ける。docs/check.md「アームが受けるケース」）。
+	// ElseSpan は、その else の位置。
+	Else     bool
+	ElseSpan source.Span
+	Body     ArmBody
 }
 
 // NodeSpan は Node の実装。

@@ -76,7 +76,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | フィールドの参照 `x.f` | フィールドの宣言 |
 | 束縛名 | `const` の名前 |
 | 引数名 | 引数 |
-| `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）の `Empty` / `HasItems` と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null` |
+| `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）の `Empty` / `HasItems` と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null`。アームの頭の `else` も、一つのケースを指さないので `null` |
 | デコレータの引数名（`name:`） | デコレータの宣言の `Param` |
 | ドキュメンテーションコメントの `@param` / `@throws` / `@see` の名前 | 同上（`internal/sema` の `Refs` にはないので、言語サーバーが構文木から解決する） |
 | 語彙の宣言 | `hozo:` の URI の位置 |
@@ -110,7 +110,7 @@ Markdown の `MarkupContent`。順に:
 | `exception` | `Class` |
 | `effect` | `Event` |
 | `read` | `Key` |
-| `classify` / `condition` | `Enum`。ケースは子の `EnumMember` |
+| `classify` | `Enum`。ケースは子の `EnumMember` |
 | `decorator` | `Interface` |
 | `bind` | `Property` |
 

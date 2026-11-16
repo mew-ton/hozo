@@ -39,7 +39,6 @@ const (
 	Effect
 	Read
 	Classify
-	Condition
 	Decorator
 	Bind
 
@@ -130,7 +129,6 @@ var Keywords = map[string]Kind{
 	"effect":    Effect,
 	"read":      Read,
 	"classify":  Classify,
-	"condition": Condition,
 	"decorator": Decorator,
 	"bind":      Bind,
 

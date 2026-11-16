@@ -130,14 +130,8 @@ func (s *server) declIndex(id source.FileID) []declEntry {
 				fqn := joinNS(ns, d.Name.Name)
 				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: fqn})
 				for _, c := range d.Cases {
-					if c.Name != nil {
-						add(c.Name.Span, sema.Target{Kind: sema.TargetCase, Decl: fqn, Name: c.Name.Name})
-					}
+					add(c.Name.Span, sema.Target{Kind: sema.TargetCase, Decl: fqn, Name: c.Name.Name})
 				}
-			case *ast.ConditionDecl:
-				docTags(d.Doc, ns, "", nil, sema.TargetDecl)
-				fqn := joinNS(ns, d.Name.Name)
-				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: fqn})
 			case *ast.DecoratorDecl:
 				fqn := joinNS(ns, d.Name.Name)
 				add(d.Name.Span, sema.Target{Kind: sema.TargetDecl, Decl: fqn})

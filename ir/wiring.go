@@ -1,10 +1,6 @@
 package ir
 
-import (
-	"encoding/json"
-	"fmt"
-	"time"
-)
+import "time"
 
 // Wiring は op の本体（docs/ir.md「配線」の Wiring）。
 type Wiring struct {
@@ -559,8 +555,13 @@ func (m Match) SubjectState() (state string, ok bool) {
 
 // MatchArm は match のアーム（docs/ir.md「配線」の MatchArm）。
 type MatchArm struct {
-	Cases ArmCases `json:"cases"`
-	Body  ArmBody  `json:"body"`
+	// Cases はこのアームが受けるケース（docs/check.md「アームが受けるケース」）。名前で並べたアームなら、書かれた順。
+	// else のアームなら、ほかのアームが並べなかったケースを、分類の宣言の順に（標準の分類は Empty、HasItems の順）。
+	// JSON では、なくても []。
+	Cases []string `json:"cases"`
+	// Else は `else => …` と書いたアームか。プラグインは、Cases だけを読めば足りる。
+	Else bool    `json:"else"`
+	Body ArmBody `json:"body"`
 	// Narrowed はこのアームの中で、外と型が違う対象（docs/types.md「アームの中の対象の型」）。なければ空（JSON では []）。
 	Narrowed []Narrowing `json:"narrowed"`
 	Span     Span        `json:"span"`
@@ -580,48 +581,6 @@ func (n *Narrowing) UnmarshalJSON(data []byte) error { return unmarshalStruct(da
 
 // MarshalJSON は docs/ir.md「JSON」の形で書く。
 func (a MatchArm) MarshalJSON() ([]byte, error) { type alias MatchArm; return marshalStruct(alias(a)) }
-
-// ArmCases はアームが受けるケース: ケース名の列か default（docs/ir.md「配線」の Match の cases）。
-// Default が true なら JSON は "default"、そうでなければ列。
-type ArmCases struct {
-	Default bool
-	Cases   []string
-}
-
-// DefaultArm は default のアームを表す ArmCases。
-func DefaultArm() ArmCases { return ArmCases{Default: true} }
-
-// MarshalJSON は "default" かケース名の列を書く。
-func (c ArmCases) MarshalJSON() ([]byte, error) {
-	if c.Default {
-		return []byte(`"default"`), nil
-	}
-	if c.Cases == nil {
-		return []byte(`[]`), nil
-	}
-	return json.Marshal(c.Cases)
-}
-
-// UnmarshalJSON は "default" かケース名の列を読む。
-func (c *ArmCases) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err == nil {
-		if s != "default" {
-			return fmt.Errorf("ir: arm cases: unknown value %q", s)
-		}
-		*c = ArmCases{Default: true}
-		return nil
-	}
-	var list []string
-	if err := json.Unmarshal(data, &list); err != nil {
-		return fmt.Errorf("ir: arm cases: want \"default\" or array: %w", err)
-	}
-	if len(list) == 0 {
-		list = nil
-	}
-	*c = ArmCases{Cases: list}
-	return nil
-}
 
 // ArmBody は match のアームの本体（docs/ir.md「配線」の MatchArm の body）。
 // 具体型は値型の [CallExpr]（kind "call"）、[AtomExpr]（kind "atom"）、[NoneBody]（kind "none"）、[ThrowBody]（kind "throw"）。

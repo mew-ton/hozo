@@ -155,8 +155,8 @@ namespace payment {
     throws AlreadySecured, ProviderUnavailable
   {
     return match payment by Standing {
-      Pending                             => replaceSession(order, payment, returnTo);
-      Held | Prepaid | Settled | Released => throw AlreadySecured;
+      Pending => replaceSession(order, payment, returnTo);
+      else    => throw AlreadySecured;
     };
   }
 
@@ -227,13 +227,12 @@ namespace payment {
     };
   }
 
-  /** はじめて届いた通知 */
+  /** はじめて届いた通知。客の同意（Secured）の通知だけを受ける: ほかの通知は、分類の誤りで失敗する */
   op recordNew(event: psp.Event): type.OrderId? {
     const now = clock.now();
     remember({ id: event.id, at: now });
     return match event by psp.Meaning {
       Secured => secure(event, now);
-      default => none;
     };
   }
 
@@ -249,8 +248,8 @@ namespace payment {
   /** まだ同意していなかった支払いだけが、新しく確保される */
   op secureFound(payment: Payment, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
     return match payment by Standing {
-      Pending                             => markSecured(payment, event, now);
-      Held | Prepaid | Settled | Released => none;
+      Pending => markSecured(payment, event, now);
+      else    => none;
     };
   }
 
@@ -302,7 +301,7 @@ namespace payment {
       Held               => capture(payment, fee);
       Prepaid            => refundDifference(payment, fee);
       Settled            => none;
-      Pending | Released => throw NotSecured;
+      Pending, Released => throw NotSecured;
     };
   }
 
@@ -369,8 +368,8 @@ namespace payment {
     throws psp.HoldExpired, http.NetworkError, http.ServerError
   {
     match payment by Standing {
-      Held                                   => prepay(payment, now);
-      Pending | Prepaid | Settled | Released => none;
+      Held => prepay(payment, now);
+      else => none;
     };
   }
 
@@ -395,8 +394,8 @@ namespace payment {
   {
     const payment = require(orderId);
     match payment by Standing {
-      Held                                   => letGo(payment);
-      Pending | Prepaid | Settled | Released => none;
+      Held => letGo(payment);
+      else => none;
     };
   }
 

@@ -290,13 +290,8 @@ type Classify struct {
 	// Subject は対象。値の分類なら型（[TypeSubject]）、op の分類なら op（[OpSubject]）、
 	// 状態の分類なら基底の状態（[StatesSubject]）。
 	Subject ClassifySubject `json:"subject"`
-	// Cases はケース。default は含まない。
-	Cases      []ClassifyCase `json:"cases"`
-	HasDefault bool           `json:"hasDefault"`
-	// DefaultDescription は default に付いた DocComment。
-	DefaultDescription *Doc `json:"defaultDescription,omitempty"`
-	// FromCondition は condition の糖衣から来たか（Cases は一つ、HasDefault は true）。
-	FromCondition bool `json:"fromCondition"`
+	// Cases は宣言したケースのすべて（宣言順）。分類は閉じていて、名前のないケースはない（docs/check.md「閉じた分類」）。
+	Cases []ClassifyCase `json:"cases"`
 	// DecidedBy はケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない。
 	DecidedBy DecidedBy `json:"decidedBy"`
 }

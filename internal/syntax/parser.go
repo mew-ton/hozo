@@ -282,10 +282,13 @@ func (p *parser) parseDecl() ast.Decl {
 		return p.parseRead(start, doc, decorators)
 	case token.Classify:
 		return p.parseClassify(start, doc, decorators)
-	case token.Condition:
-		return p.parseCondition(start, doc, decorators)
 	case token.Decorator:
 		return p.parseDecoratorDecl(start, doc, decorators, marks)
+	}
+	// `condition C of T;` はなくした書き方で、宣言の頭の識別子 condition は、今の書き方を示して誤りにする
+	// （condition は予約語ではない。docs/grammar.md「classify」「決めたこと」）。
+	if p.atContextual("condition") {
+		p.fail(p.tok().Span, "condition の宣言は書けない。両側に名前を付けた classify で書く（classify C of T { <成り立つ側>; <成り立たない側>; }。docs/grammar.md「classify」）")
 	}
 	if doc != nil && len(decorators) == 0 {
 		p.fail(doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
@@ -738,7 +741,7 @@ func (p *parser) parseTransition() *ast.Transition {
 	return t
 }
 
-// parseCaseSet は CaseSet = "any" | Ident { "|" Ident } を読む。
+// parseCaseSet は CaseSet = "any" | Ident { "," Ident } を読む。
 func (p *parser) parseCaseSet() *ast.CaseSet {
 	start := p.tok().Span.Start
 	c := &ast.CaseSet{}
@@ -748,13 +751,26 @@ func (p *parser) parseCaseSet() *ast.CaseSet {
 		if !p.atIdent() {
 			p.failExpected("遷移のケース（any かケース名）")
 		}
-		c.Cases = append(c.Cases, p.parseIdent())
-		for p.got(token.Pipe) {
-			c.Cases = append(c.Cases, p.parseIdent())
-		}
+		c.Cases = p.parseCaseList("遷移のケース", "on C: A, B -> any", "exception / effect / read")
 	}
 	c.Span = p.spanFrom(start)
 	return c
+}
+
+// parseCaseList はケースの並び Ident { "," Ident } を読む（アームの頭と、遷移の CaseSet）。what は並びの呼び名、
+// example は今の書き方の例、section は docs/grammar.md の見出し。ケースの後ろに "|" が来たら（なくした書き方）、
+// 区切りが "," であることをメッセージで示して SYNTAX にし、"," として読み進める。
+func (p *parser) parseCaseList(what, example, section string) []ast.Ident {
+	cases := []ast.Ident{p.parseIdent()}
+	for {
+		if p.at(token.Pipe) {
+			p.errorAt(p.tok().Span, fmt.Sprintf("%sの並びの区切りは「,」で、「|」ではない（%s と書く。docs/grammar.md「%s」）", what, example, section))
+			p.advance()
+		} else if !p.got(token.Comma) {
+			return cases
+		}
+		cases = append(cases, p.parseIdent())
+	}
 }
 
 // parseStateOpRef は "状態.操作" を読む。字句では一つの QualifiedName なので、最後の要素を StateOp として切り出す
@@ -783,7 +799,7 @@ func (p *parser) parseStateOpRef() ast.StateOpRef {
 	return ref
 }
 
-// parseClassify は ClassifyDecl = "classify" Ident "of" ClassifySubject "{" { ClassifyCase } "}" を読む（docs/grammar.md「classify / condition」）。
+// parseClassify は ClassifyDecl = "classify" Ident "of" ClassifySubject "{" { ClassifyCase } "}" を読む（docs/grammar.md「classify」）。
 func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ClassifyDecl {
 	p.expect(token.Classify)
 	c := &ast.ClassifyDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent(), Cases: []*ast.ClassifyCase{}}
@@ -800,27 +816,24 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 
 // parseClassifyCase は ClassifyCase を読む。
 //
-//	ClassifyCase = [ DocComment ] ( Ident [ ":" CaseTyping { "," CaseTyping } ] | "default" ) ";" ;
+//	ClassifyCase = [ DocComment ] Ident [ ":" CaseTyping { "," CaseTyping } ] ";" ;
 //	CaseTyping   = Type "as" ( Type | "else" ) ;
+//
+// 名前のないケース `default;` はなくした書き方で、ケースの位置の default は、今の書き方を示して誤りにする。
 func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	c := &ast.ClassifyCase{Doc: p.parseLeadingDoc()}
 	start := p.tok().Span.Start
 	if c.Doc != nil && p.at(token.RBrace) {
 		p.fail(c.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	}
-	if p.got(token.Default) {
-		c.Default = true
-		if p.at(token.Colon) {
-			p.fail(p.tok().Span, "default には as を書けない（docs/grammar.md「classify / condition」）")
-		}
-	} else {
-		name := p.parseIdent()
-		c.Name = &name
-		if p.got(token.Colon) {
+	if p.at(token.Default) {
+		p.fail(p.tok().Span, "名前のないケース default は書けない。ケースには名前を付ける（値がない側や、union の残りのアームなら <名前>: <対象> as else;。仕様が使わない場合は、宣言しない。docs/grammar.md「classify」）")
+	}
+	c.Name = p.parseIdent()
+	if p.got(token.Colon) {
+		c.As = append(c.As, p.parseCaseTyping())
+		for p.got(token.Comma) {
 			c.As = append(c.As, p.parseCaseTyping())
-			for p.got(token.Comma) {
-				c.As = append(c.As, p.parseCaseTyping())
-			}
 		}
 	}
 	p.expect(token.Semicolon)
@@ -855,20 +868,6 @@ func (p *parser) parseClassifySubject() []ast.Type {
 			return subject
 		}
 	}
-}
-
-// parseCondition は ConditionDecl = "condition" Ident "of" ClassifySubject ";" を読む。
-func (p *parser) parseCondition(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ConditionDecl {
-	p.expect(token.Condition)
-	c := &ast.ConditionDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
-	p.expect(token.Of)
-	c.Of = p.parseClassifySubject()
-	if p.at(token.Colon) || p.at(token.As) {
-		p.fail(p.tok().Span, "condition には as を書けない（docs/grammar.md「classify / condition」）")
-	}
-	p.expect(token.Semicolon)
-	c.Span = p.spanFrom(start)
-	return c
 }
 
 // parseDecoratorDecl は DecoratorDecl を読む（docs/grammar.md「decorator の宣言」）。
@@ -1426,9 +1425,11 @@ func (p *parser) parseRecordLit() *ast.RecordLit {
 	return r
 }
 
-// parseMatch は Match = "match" [ Atom ] "by" ( QualifiedName | "list" | "nullable" ) "{" MatchArm { MatchArm } "}" を読む。
+// parseMatch は Match = "match" [ Atom ] "by" ( QualifiedName | "list" | "nullable" ) "{" MatchArm { MatchArm } [ ElseArm ] "}" を読む。
 // 対象を書かない形（match by C）は状態の分類、by list / by nullable は標準の分類。
 // どの形がどの分類に合うかは検査（MATCH-7）が決める。
+// ElseArm は、MatchArm を一つ以上書いた後ろに、最後に一つだけ（文法で閉じる）: else のアームの後ろのアームは、誤りにして捨てる。
+// MatchArm より前の else のアームは、誤りにして残す（ほかのアームがないので、すべてのケースを受ける）。
 func (p *parser) parseMatch() *ast.Match {
 	start := p.expect(token.Match).Span.Start
 	m := &ast.Match{}
@@ -1447,8 +1448,20 @@ func (p *parser) parseMatch() *ast.Match {
 		m.Classifier = p.parseQualifiedName()
 	}
 	p.expect(token.LBrace)
+	sawElse := false
 	p.parseMembers(func() {
-		m.Arms = append(m.Arms, p.parseMatchArm())
+		arm := p.parseMatchArm()
+		head := source.Span{File: arm.Span.File, Start: arm.Span.Start, End: arm.Span.Start}
+		switch {
+		case sawElse:
+			head.End = p.armHeadEnd(arm)
+			p.errorAt(head, "else のアームの後ろに、アームは書けない（else は、最後に一つだけ。docs/grammar.md「配線」）")
+			return
+		case arm.Else && len(m.Arms) == 0:
+			p.errorAt(arm.ElseSpan, "else のアームは、ケースを名前で並べたアームの後ろに書く（else は「ほかのケースのすべて」。docs/grammar.md「配線」）")
+		}
+		sawElse = sawElse || arm.Else
+		m.Arms = append(m.Arms, arm)
 	})
 	closing := p.expect(token.RBrace)
 	if len(m.Arms) == 0 {
@@ -1458,22 +1471,37 @@ func (p *parser) parseMatch() *ast.Match {
 	return m
 }
 
-// parseMatchArm は MatchArm = ( Ident { "|" Ident } | "default" ) "=>" ArmBody ";" を読む。
+// armHeadEnd はアームの頭（ケースの並びか else）の終わり。診断の位置に使う。
+func (p *parser) armHeadEnd(a *ast.MatchArm) source.Offset {
+	if a.Else {
+		return a.ElseSpan.End
+	}
+	if n := len(a.Cases); n > 0 {
+		return a.Cases[n-1].Span.End
+	}
+	return a.Span.End
+}
+
+// parseMatchArm は MatchArm と ElseArm を読む。
 //
-//	ArmBody = Call | Atom | Throw ;
-//	Throw   = "throw" QualifiedName ;
+//	MatchArm = Ident { "," Ident } "=>" ArmBody ";" ;
+//	ElseArm  = "else" "=>" ArmBody ";" ;
+//	ArmBody  = Call | Atom | Throw ;
+//	Throw    = "throw" QualifiedName ;
 //
-// Path の直後が "(" なら Call、そうでなければ Atom。
+// Path の直後が "(" なら Call、そうでなければ Atom。`default => …` はなくした書き方で、今の書き方を示して SYNTAX にし、
+// else のアームとして読み進める。ケースの後ろの "|" も、なくした書き方（parseCaseList）。
 func (p *parser) parseMatchArm() *ast.MatchArm {
 	start := p.tok().Span.Start
 	a := &ast.MatchArm{}
-	if p.got(token.Default) {
-		a.Default = true
-	} else {
-		a.Cases = append(a.Cases, p.parseIdent())
-		for p.got(token.Pipe) {
-			a.Cases = append(a.Cases, p.parseIdent())
-		}
+	switch {
+	case p.at(token.Default):
+		p.errorAt(p.tok().Span, "default のアームは書けない。受けるケースを名前で並べるか、最後のアームを else => … と書く（else は、並べなかったケースのすべてを受ける。docs/grammar.md「配線」）")
+		a.Else, a.ElseSpan = true, p.advance().Span
+	case p.at(token.Else):
+		a.Else, a.ElseSpan = true, p.advance().Span
+	default:
+		a.Cases = p.parseCaseList("アームのケース", "A, B => …", "配線")
 	}
 	p.expect(token.Arrow)
 	switch {
