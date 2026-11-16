@@ -92,8 +92,9 @@ func (o *ops) Method(ctx context.Context, payment Payment) (string, error) {
 		return o.CardText(ctx, payment.(Card))
 	case Bank, PaymentByCode:
 		return o.Describe(ctx, payment)
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Method"}
 	}
-	return "", &runtime.ClassificationError{Classify: "app.Method"}
 }
 
 // Outcome は op app.outcome。
@@ -104,8 +105,9 @@ func (o *ops) Outcome(ctx context.Context, result Result) (string, error) {
 		return o.NameOf(ctx, result.(User))
 	case ResultFail:
 		return o.Shout(ctx, result.(ResultFail).Value)
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Outcome"}
 	}
-	return "", &runtime.ClassificationError{Classify: "app.Outcome"}
 }
 
 // Failure は op app.failure。
@@ -116,8 +118,9 @@ func (o *ops) Failure(ctx context.Context, result Result) (string, error) {
 		return result.(ResultFail).Value, nil
 	case User:
 		return result.(User).Name, nil
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Failure"}
 	}
-	return "", &runtime.ClassificationError{Classify: "app.Failure"}
 }
 
 // Variants は op app.variants。
@@ -132,6 +135,8 @@ func (o *ops) Variants(ctx context.Context, payment Payment, result Result) (*st
 		}
 		text = ptr(v0)
 	case Bank, PaymentByCode:
+	default:
+		return nil, &runtime.ClassificationError{Classify: "app.Method"}
 	}
 	// match result by app.Outcome
 	switch result.(type) {
@@ -139,6 +144,8 @@ func (o *ops) Variants(ctx context.Context, payment Payment, result Result) (*st
 		if err := o.Show(ctx, "done"); err != nil {
 			return nil, err
 		}
+	default:
+		return nil, &runtime.ClassificationError{Classify: "app.Outcome"}
 	}
 	// match payment by app.Method
 	switch payment.(type) {
@@ -147,6 +154,8 @@ func (o *ops) Variants(ctx context.Context, payment Payment, result Result) (*st
 		if err := o.Show(ctx, "other"); err != nil {
 			return nil, err
 		}
+	default:
+		return nil, &runtime.ClassificationError{Classify: "app.Method"}
 	}
 	return text, nil
 }
@@ -165,8 +174,9 @@ func (o *ops) StageText(ctx context.Context) (string, error) {
 		return o.NameOf(ctx, stage.(User))
 	case ResultFail:
 		return o.Shout(ctx, stage.(ResultFail).Value)
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Stage"}
 	}
-	return "", &runtime.ClassificationError{Classify: "app.Stage"}
 }
 
 func ptr[T any](v T) *T { return &v }

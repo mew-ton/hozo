@@ -175,23 +175,23 @@ namespace api {
   // docs/check.md「ケースの判定」: 型で決まる分類（presence）
   classify Lookup of findUser {
     Found: findUser as User;
-    Other: findUser as else;
+    Missing: findUser as else;
   }
   // docs/ir.md「正規化」: ケースの `X as T` の X が状態なら、state にその FQN
   classify SignedIn of current {
     Yes: current as Token;
-    Other: current as else;
+    No: current as else;
   }
 
-  // docs/ir.md「配線」: アームの narrowed（as のケースでは書いた型）、本体の throw
+  // docs/ir.md「配線」: アームの narrowed（as のケースでは書いた型）、本体の throw。else のアームの cases は、それが受けるケース
   // docs/check.md「計算」手順 0: アームの throw は、例外がそれだけの呼び出し。docs/check.md「reads」: 呼び出し先の R が伝わる
   op currentName(id: UserId): string
     throws NotFound
   {
     const user = findUser(id);
     return match user by Lookup {
-      Found   => nameOf(user);
-      else    => throw NotFound;
+      Found => nameOf(user);
+      else  => throw NotFound;
     };
   }
 
@@ -216,8 +216,8 @@ namespace api {
     throws Unauthorized
   {
     return match by SignedIn {
-      Yes     => current;
-      else    => unauthorized();
+      Yes => current;
+      No  => unauthorized();
     };
   }
 
@@ -304,7 +304,7 @@ namespace api {
   // docs/ir.md「正規化」: 配線の呼び出しの callee（read、効果の宣言、直に呼ぶ組み込みの効果）、`throw E(a, b)` の args
   // docs/check.md「直に呼ぶ組み込みの効果」: nullable の post / put は要素の型の値一つ、delete は引数なし。list の post も値一つ
   // docs/check.md「節に書く要素」: 直に呼んだ効果は direct で、同じ宛先の宣言（createSession）とは別の効果
-  classify Strength of Credentials { Weak; Other; }
+  classify Strength of Credentials { Weak; Strong; }
   op mint(user: User): Token;
   op sessionOf(user: User, token: Token): Session;
   export op signIn(id: UserId, creds: Credentials): Token?
@@ -315,18 +315,18 @@ namespace api {
     const user = userById(id);
     const token = match user by Lookup {
       Found   => mint(user);
-      else    => throw NotFound;
+      Missing => throw NotFound;
     };
     const session = match user by Lookup {
       Found   => sessionOf(user, token);
-      else    => throw NotFound;
+      Missing => throw NotFound;
     };
     sessions.post(session);
     current.post(token);
     api.current.put(token);
     return match creds by Strength {
-      Weak    => throw Invalid("weak password");
-      else    => keep(token);
+      Weak   => throw Invalid("weak password");
+      Strong => keep(token);
     };
   }
   op keep(token: Token): Token? {
@@ -336,7 +336,7 @@ namespace api {
 
   // ---- docs/ir.md「版」の 0.7 で足した形 ----
 
-  // docs/ir.md「classify」: 残りのケース（`対象 as else`）は cases に入り、as の by は else。hasDefault は false
+  // docs/ir.md「classify」: 残りのケース（`対象 as else`）は、ほかのケースと同じに cases に入り、as の by は else
   // docs/check.md「残りのケース」: presence の残りは、値がないとき。docs/types.md「残りのケースでの対象の型」: 対象の型のまま
   classify Membership of findUser {
     Member: findUser as User;
@@ -353,7 +353,7 @@ namespace api {
     Short: Shown as string;
     Full: Shown as else;
   }
-  // docs/ir.md「配線」: 残りのケースのアームは、名前で書く（default のアームではない）。narrowed は、対象の型が外と違うアームにだけ出る
+  // docs/ir.md「配線」: 残りのケースのアームも、名前で書ける。narrowed は、対象の型が外と違うアームにだけ出る
   op memberName(id: UserId): string
     throws NotFound
   {
@@ -368,6 +368,52 @@ namespace api {
     return match shown by Detail {
       Short => shown;
       Full  => nameOf(shown);
+    };
+  }
+
+  // ---- docs/ir.md「版」の 0.8 で足した形 ----
+
+  // docs/check.md「閉じた分類」「ケースの判定」: 残りのケースを書かない分類も、型で決まる。値がない側は、どのケースでもない
+  classify Arrival of findUser {
+    Arrived: findUser as User;
+  }
+  /** ユーザーの、いまの使われ方 */
+  classify Standing of User { Fresh; Active; Idle; Dormant; Closed; }
+  // docs/ir.md「配線」: else のアームの cases は、ほかのアームが並べなかったケース（分類の宣言の順）で、else は true。
+  // docs/types.md「アームの中の対象の型」の 1: 受けるケースが二つ以上の else のアームでは、対象は絞り込まれない
+  op standingName(user: User): string
+    throws NotFound
+  {
+    return match user by Standing {
+      Closed => throw NotFound;
+      else   => nameOf(user);
+    };
+  }
+  // 名前で並べたアーム（区切りは ","）は、cases が書かれた順で、else は false
+  op standingNote(user: User): string
+  {
+    return match user by Standing {
+      Idle, Fresh => "new or idle";
+      Active      => nameOf(user);
+      else        => "gone";
+    };
+  }
+  // 受けるケースがちょうど一つの else のアームは、そのケースを名前で書いたアームと同じに絞り込まれる
+  op arrivedName(id: UserId): string
+    throws NotFound
+  {
+    const user = findUser(id);
+    return match user by Membership {
+      Stranger => throw NotFound;
+      else     => nameOf(user);
+    };
+  }
+  // ケースが一つの分類での match。値がないことは、分類の誤り（docs/check.md「閉じた分類」）で、throws には現れない
+  op onlyArrived(id: UserId): string
+  {
+    const user = findUser(id);
+    return match user by Arrival {
+      Arrived => nameOf(user);
     };
   }
 }

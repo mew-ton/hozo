@@ -23,12 +23,12 @@ func ClassifyCheckout(ctx context.Context, s CheckoutState) (Checkout, error) {
 	return inner.ClassifyCheckout(ctx, s)
 }
 
-// LoggedIn はログインしている
+// LoggedIn はログインしているか
 type LoggedIn = inner.LoggedIn
 
 const (
-	LoggedInLoggedIn = inner.LoggedInLoggedIn
-	LoggedInDefault  = inner.LoggedInDefault
+	LoggedInLoggedIn  = inner.LoggedInLoggedIn
+	LoggedInLoggedOut = inner.LoggedInLoggedOut
 )
 
 // ClassifyLoggedIn は、状態の分類 shop.LoggedIn の今のケースを返す。すべての述語を呼び、真になった数を数える。

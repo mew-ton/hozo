@@ -136,6 +136,8 @@ tests/samples/<名前>/
 
 **残りのケース（`docs/decisions.md`「決めたこと」152、153）は、文書とサンプルと実装を、一緒に入れた。** 版は 0.7 になり（`CaseTyping.by` に `else`）、hozoc と、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）を、一緒に上げた。サンプル `shop-server` の期待する出力は、生成器より先に手で直し（`shop-server/README.md`「残りのケースで変えたこと」）、`TestSamples` は、すべてのサブテストが、飛ばしも、代役もなく通る。
 
+**分類を閉じる決定（同 154〜162）は、文書と仕様を先に直し、実装を後に入れた。** 版は 0.8 になり（`Classify.hasDefault` などをなくし、`MatchArm` に `else`）、hozoc と、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）を、一緒に上げた。サンプル `shop-server` は、仕様も、期待する出力も、変わらない（`shop-server/README.md`「分類を閉じたときに変えたこと」）。サンプル `order-app` は、仕様を直した（`order-app/README.md` の F44〜F49）。`TestSamples` は、すべてのサブテストが、飛ばしも、代役もなく通る。
+
 ## サンプルの一覧
 
 | サンプル | 中身 |

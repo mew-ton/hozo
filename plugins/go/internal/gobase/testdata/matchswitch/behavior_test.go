@@ -1,6 +1,6 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 述語で決まる分類の判定
-// （docs/plugin-go.md「分類」）と、それで分ける配線。plugins/go の TestBehavior が、生成したコードのモジュールのルートに
-// 置いて走らせる。
+// （docs/plugin-go.md「分類」）と、それで分ける配線、型で決まる分類の「分類の誤りの枝」（同「match」）。
+// plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 
 import (
@@ -40,9 +40,14 @@ func (c *failingSizes) Tiny(ctx context.Context, _ app.Item) (bool, error) {
 	return false, nil
 }
 
+// addresses は AddressCases の実装。二つに分かれる分類も、どちらのケースも述語を持つ。空の文字列は、どちらでもない
+// （宣言したケースの外の値）
 type addresses struct{}
 
 func (addresses) Valid(_ context.Context, v string) (bool, error) { return v == "a@example.com", nil }
+func (addresses) Invalid(_ context.Context, v string) (bool, error) {
+	return v != "" && v != "a@example.com", nil
+}
 
 // contacts は ContactCases の実装。呼ばれた述語を覚える。
 type contacts struct{ called []string }
@@ -57,10 +62,17 @@ func (c *contacts) Text(_ context.Context, v *string) (bool, error) {
 	return *v == "plain", nil // v が nil なら、ここで落ちる（判定関数は、nil のときにこの述語を呼ばない）
 }
 
+func (c *contacts) Silent(_ context.Context, v *string) (bool, error) {
+	c.called = append(c.called, "Silent")
+	return v == nil, nil
+}
+
+// stocks は StockCases の実装。InStock と SoldOut は、値がないときには呼ばれない（型で決まる絞り込みの as を持つ）
 type stocks struct{}
 
 func (stocks) InStock(_ context.Context, v *app.Item) (bool, error) { return v.Price > 0, nil }
 func (stocks) SoldOut(_ context.Context, v *app.Item) (bool, error) { return v.Price == 0, nil }
+func (stocks) Unknown(_ context.Context, v *app.Item) (bool, error) { return v == nil, nil }
 
 // checkout は CheckoutState の実装。
 type checkout struct {
@@ -123,8 +135,8 @@ func classificationError(t *testing.T, err error, classify string, hits []string
 	}
 }
 
-// 判定関数: 真がちょうど一つならそのケース。hasDefault が false なら、0 でも 2 以上でも ClassificationError
-func TestClassifyWithoutDefault(t *testing.T) {
+// 判定関数: 真がちょうど一つならそのケース。0 でも 2 以上でも ClassificationError
+func TestClassifyExactlyOne(t *testing.T) {
 	ctx := context.Background()
 	for price, want := range map[int64]app.Size{1: app.SizeBig, 2: app.SizeSmall, 4: app.SizeTiny} {
 		got, err := app.ClassifySize(ctx, sizes{}, app.Item{Price: price})
@@ -158,24 +170,27 @@ func TestClassifyPredicateError(t *testing.T) {
 	}
 }
 
-// 判定関数: hasDefault が true なら、真が 0 で <C>Default
-func TestClassifyWithDefault(t *testing.T) {
+// 二つに分かれる分類の判定関数: どちらのケースも、その述語が真のとき。基底は「ほかのどれでもない」ケースを導かないので、
+// どの述語も真でない値は、ClassificationError（宣言したケースの外の値。docs/plugin-go.md「分類」）
+func TestClassifyTwoSided(t *testing.T) {
 	if got, err := app.ClassifyAddress(context.Background(), addresses{}, "a@example.com"); err != nil || got != app.AddressValid {
 		t.Errorf("Valid: %v, %v", got, err)
 	}
-	if got, err := app.ClassifyAddress(context.Background(), addresses{}, "x"); err != nil || got != app.AddressDefault {
-		t.Errorf("default: %v, %v", got, err)
+	if got, err := app.ClassifyAddress(context.Background(), addresses{}, "x"); err != nil || got != app.AddressInvalid {
+		t.Errorf("Invalid: %v, %v", got, err)
 	}
+	_, err := app.ClassifyAddress(context.Background(), addresses{}, "")
+	classificationError(t, err, "app.Address", nil)
 }
 
 // 型で決まる絞り込み（presence）の as を持つケースは、値がその型に当たらなければ、述語を呼ばずに偽とする
 func TestClassifyPresenceGuard(t *testing.T) {
 	cs := &contacts{}
 	got, err := app.ClassifyContact(context.Background(), cs, nil)
-	if err != nil || got != app.ContactDefault {
+	if err != nil || got != app.ContactSilent {
 		t.Errorf("nil: %v, %v", got, err)
 	}
-	if !reflect.DeepEqual(cs.called, []string{"Mail"}) {
+	if !reflect.DeepEqual(cs.called, []string{"Mail", "Silent"}) {
 		t.Errorf("呼ばれた述語 = %v（Text は、値がないので呼ばない）", cs.called)
 	}
 	plain := "plain"
@@ -230,6 +245,9 @@ func TestWiring(t *testing.T) {
 	if !reflect.DeepEqual(l.shown, []string{"sent a@example.com", "invalid", "invalid"}) {
 		t.Errorf("shown = %v", l.shown)
 	}
+	// const の match で、どの述語も真でない値: 通り抜けずに、判定関数の ClassificationError が返る
+	_, err = o.Mail(ctx, "", &plain)
+	classificationError(t, err, "app.Address", nil)
 
 	// op の分類: const、throw、「返らない」呼び出し
 	if got, err := o.Price(ctx, "box"); err != nil || got != 7 {
@@ -255,6 +273,34 @@ func TestWiring(t *testing.T) {
 	if got, err := o.StageText(ctx); err != nil || got != "top" {
 		t.Errorf("StageText = %q, %v", got, err)
 	}
+	// else のアームは、受けるケースを名前で並べたアームと同じに動く（describeElse の else は Rest を受ける）
+	for _, page := range []app.Page{app.PageCode{Value: 3}, app.Title{Title: "t"}, app.Problem{Reason: "r"}, app.PageNote{}, app.PageBlank{}} {
+		want, wantErr := o.Describe(ctx, page)
+		got, err := o.DescribeElse(ctx, page)
+		if got != want || err != wantErr {
+			t.Errorf("DescribeElse(%T) = %q, %v。Describe は %q, %v", page, got, err, want, wantErr)
+		}
+	}
+	// 述語で決まる分類の else のアーム（pureLabel の else は Big と Small を受ける）
+	if got, err := o.PureLabel(ctx, app.Item{Price: 1}); err != nil || got != "normal" {
+		t.Errorf("PureLabel(Big) = %q, %v", got, err)
+	}
+	if got, err := o.PureLabel(ctx, app.Item{Price: 2}); err != nil || got != "normal" {
+		t.Errorf("PureLabel(Small) = %q, %v", got, err)
+	}
+	// 型の switch の else のアーム（variants の三つの match）
+	l.shown = nil
+	if got, err := o.Variants(ctx, app.Title{Title: "t"}); err != nil || got != "done" || !reflect.DeepEqual(l.shown, []string{"ready", "not code"}) {
+		t.Errorf("Variants(Ready) = %q, %v, shown = %v", got, err, l.shown)
+	}
+	l.shown = nil
+	if got, err := o.Variants(ctx, app.PageCode{Value: 1}); err != nil || got != "done" || len(l.shown) != 0 {
+		t.Errorf("Variants(Code) = %q, %v, shown = %v", got, err, l.shown)
+	}
+	l.shown = nil
+	if got, err := o.Variants(ctx, app.PageNote{}); err != nil || got != "done" || !reflect.DeepEqual(l.shown, []string{"not code"}) {
+		t.Errorf("Variants(Note) = %q, %v, shown = %v", got, err, l.shown)
+	}
 
 	// 状態の分類: 文の match
 	l.shown = nil
@@ -279,7 +325,7 @@ func TestPureWiringReturnsClassificationError(t *testing.T) {
 		}
 		classificationError(t, err, "app.Size", hits)
 	}
-	// 判定関数を持たない分類（variant）で、default の節のない switch の後ろ: どのアームの型でもない値（nil）
+	// 判定関数を持たない分類（variant）の switch の default: の節: どのアームの型でもない値（nil）
 	got, err := returned(t, func() (string, error) { return o.Outcome(ctx, nil) })
 	if got != "" {
 		t.Errorf("Outcome(nil) = %q（期待は零値）", got)
@@ -288,6 +334,65 @@ func TestPureWiringReturnsClassificationError(t *testing.T) {
 	if got, err := o.Outcome(ctx, app.Problem{Reason: "r"}); err != nil || got != "r" {
 		t.Errorf("Outcome(Err) = %q, %v", got, err)
 	}
+}
+
+// 型で決まる分類は判定関数を持たないので、宣言したケースの外の値は、match のコードが分類の誤りにする（docs/plugin-go.md
+// 「match」の「分類の誤りの枝」）: 型の switch の default: の節。return / const / 文のどの match でも、通り抜けない
+func TestTypeSwitchClassificationError(t *testing.T) {
+	ctx := context.Background()
+	l := &leaves{}
+	o := newOps(l, stage{page: app.PageBlank{}}, &checkout{}, &contacts{})
+	// 残りのケースのない分類 Shown: Title と int のアームだけがケース
+	if got, err := o.Shown(ctx, app.Title{Title: "t"}); err != nil || got != "t" {
+		t.Errorf("Shown(Ready) = %q, %v", got, err)
+	}
+	if got, err := o.Shown(ctx, app.PageCode{Value: 1}); err != nil || got != "code" {
+		t.Errorf("Shown(Code) = %q, %v", got, err)
+	}
+	for _, page := range []app.Page{app.PageBlank{}, app.Problem{}, app.PageNote{}, nil} {
+		got, err := returned(t, func() (string, error) { return o.Shown(ctx, page) })
+		if got != "" {
+			t.Errorf("Shown(%T) = %q（期待は零値）", page, got)
+		}
+		classificationError(t, err, "app.Shown", nil)
+		// const の match でも、文の match でも、同じ
+		l.shown = nil
+		got, err = returned(t, func() (string, error) { return o.ShownNote(ctx, page) })
+		if got != "" || len(l.shown) != 0 {
+			t.Errorf("ShownNote(%T) = %q, shown = %v（期待は、零値と、何も呼ばないこと）", page, got, l.shown)
+		}
+		classificationError(t, err, "app.Shown", nil)
+	}
+	l.shown = nil
+	if got, err := o.ShownNote(ctx, app.Title{Title: "t"}); err != nil || got != "noted" || !reflect.DeepEqual(l.shown, []string{"title"}) {
+		t.Errorf("ShownNote(Ready) = %q, %v, shown = %v", got, err, l.shown)
+	}
+	// 残りのケースを持つ分類 PageKind: 残りのアーム（Blank、Note）は Rest。union の値がない（nil）のは、Rest でもなく、分類の誤り。
+	// else のアームも、nil を受けない
+	if got, err := o.Describe(ctx, app.PageBlank{}); err != nil || got != "other" {
+		t.Errorf("Describe(Blank) = %q, %v", got, err)
+	}
+	for name, call := range map[string]func() (string, error){
+		"Describe":     func() (string, error) { return o.Describe(ctx, nil) },
+		"DescribeElse": func() (string, error) { return o.DescribeElse(ctx, nil) },
+		"Variants":     func() (string, error) { return o.Variants(ctx, nil) },
+	} {
+		got, err := returned(t, call)
+		if got != "" {
+			t.Errorf("%s(nil) = %q（期待は零値）", name, got)
+		}
+		classificationError(t, err, "app.PageKind", nil)
+	}
+	// 型で決まる状態の分類: 残りのケース Hidden が残りのアームを受け、値がない（nil）のは分類の誤り
+	if got, err := o.StageText(ctx); err != nil || got != "none" {
+		t.Errorf("StageText(Blank) = %q, %v", got, err)
+	}
+	empty := newOps(l, stage{}, &checkout{}, &contacts{})
+	got, err := returned(t, func() (string, error) { return empty.StageText(ctx) })
+	if got != "" {
+		t.Errorf("StageText(nil) = %q（期待は零値）", got)
+	}
+	classificationError(t, err, "app.Stage", nil)
 }
 
 // 述語が返した error も、純粋な配線から、包まれずに返る

@@ -78,7 +78,7 @@ const (
 	CampaignKindSpring CampaignKind = iota
 	CampaignKindSummer
 	// キャンペーンの対象外
-	CampaignKindDefault
+	CampaignKindNoCampaign
 )
 
 // CampaignKindCases は分類 browser.CampaignKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
@@ -87,6 +87,8 @@ type CampaignKindCases interface {
 	Spring(ctx context.Context, v server.Item) (bool, error)
 	// Summer はケース Summer の述語。
 	Summer(ctx context.Context, v server.Item) (bool, error)
+	// NoCampaign はケース NoCampaign の述語。
+	NoCampaign(ctx context.Context, v server.Item) (bool, error)
 }
 
 // ClassifyCampaignKind は v を browser.CampaignKind で分類する。すべての述語を呼び、真になった数を数える。
@@ -110,30 +112,38 @@ func ClassifyCampaignKind(ctx context.Context, c CampaignKindCases, v server.Ite
 		hits = append(hits, "Summer")
 		kind = CampaignKindSummer
 	}
+	if ok, err := c.NoCampaign(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
+		hits = append(hits, "NoCampaign")
+		kind = CampaignKindNoCampaign
+	}
 	if first != nil {
 		return kind, first
 	}
 	switch len(hits) {
 	case 1:
 		return kind, nil
-	case 0:
-		return CampaignKindDefault, nil
 	}
 	return kind, &runtime.ClassificationError{Classify: "browser.CampaignKind", Hits: hits}
 }
 
-// WarrantyAvailable は二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; default; } と同じ
+// WarrantyAvailable は保証プランを選べるか。二値の場合も、両側に名前を付ける（§10.1 の `condition WarrantyAvailable of server.Item;` は、なくした書き方）
 type WarrantyAvailable int
 
 const (
-	WarrantyAvailableWarrantyAvailable WarrantyAvailable = iota
-	WarrantyAvailableDefault
+	WarrantyAvailableAvailable WarrantyAvailable = iota
+	WarrantyAvailableUnavailable
 )
 
 // WarrantyAvailableCases は分類 browser.WarrantyAvailable のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type WarrantyAvailableCases interface {
-	// WarrantyAvailable はケース WarrantyAvailable の述語。
-	WarrantyAvailable(ctx context.Context, v server.Item) (bool, error)
+	// Available はケース Available の述語。
+	Available(ctx context.Context, v server.Item) (bool, error)
+	// Unavailable はケース Unavailable の述語。
+	Unavailable(ctx context.Context, v server.Item) (bool, error)
 }
 
 // ClassifyWarrantyAvailable は v を browser.WarrantyAvailable で分類する。すべての述語を呼び、真になった数を数える。
@@ -141,13 +151,21 @@ func ClassifyWarrantyAvailable(ctx context.Context, c WarrantyAvailableCases, v 
 	var hits []string
 	var kind WarrantyAvailable
 	var first error
-	if ok, err := c.WarrantyAvailable(ctx, v); err != nil {
+	if ok, err := c.Available(ctx, v); err != nil {
 		if first == nil {
 			first = err
 		}
 	} else if ok {
-		hits = append(hits, "WarrantyAvailable")
-		kind = WarrantyAvailableWarrantyAvailable
+		hits = append(hits, "Available")
+		kind = WarrantyAvailableAvailable
+	}
+	if ok, err := c.Unavailable(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
+		hits = append(hits, "Unavailable")
+		kind = WarrantyAvailableUnavailable
 	}
 	if first != nil {
 		return kind, first
@@ -155,8 +173,6 @@ func ClassifyWarrantyAvailable(ctx context.Context, c WarrantyAvailableCases, v 
 	switch len(hits) {
 	case 1:
 		return kind, nil
-	case 0:
-		return WarrantyAvailableDefault, nil
 	}
 	return kind, &runtime.ClassificationError{Classify: "browser.WarrantyAvailable", Hits: hits}
 }

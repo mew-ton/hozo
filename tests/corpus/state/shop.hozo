@@ -28,9 +28,9 @@ namespace shop {
     /** 注文を出した */
     Ordered;
   }
-  // docs/grammar.md「classify / condition」: condition も状態を対象にできる（ClassifySubject）
-  /** ログインしている */
-  classify LoggedIn of token { LoggedIn; NotLoggedIn; }
+  // docs/grammar.md「classify」: 二つに分かれる状態の分類も、両側に名前を付ける（docs/check.md「閉じた分類」）
+  /** ログインしているか */
+  classify LoggedIn of token { LoggedIn; LoggedOut; }
   // 値の分類（§10.1）は今まで通り。subject は { kind: "type", type }
   /** 行の種類 */
   classify LineKind of Line {
@@ -57,7 +57,7 @@ namespace shop {
   effect startOver() on Checkout: any -> Shopping;
   /** 進み具合を記録し直す */
   effect touchCheckout() on Checkout: Shopping, Ordered -> any;
-  // condition の遷移（ケースは condition の名前）
+  // 二つに分かれる状態の分類の遷移
   /** ログインする */
   effect signIn() on LoggedIn: any -> LoggedIn;
 
@@ -110,7 +110,7 @@ namespace shop {
     };
   }
 
-  // 同じく by list。ケースは Empty / HasItems で、default はない（MATCH-2）
+  // 同じく by list。ケースは Empty / HasItems（MATCH-2）
   // docs/check.md「計算」手順 0（配線）: 一部のアームにしかない効果（clearCart）は succ が unknown
   op openCart()
   {
@@ -133,7 +133,7 @@ namespace shop {
     return placed;
   }
 
-  // condition での match（default のアーム）と、値の分類での match（subject は { kind: "value", atom }）が並ぶ
+  // 状態の分類での match（else のアーム: 受けるケースは LoggedOut）と、値の分類での match（subject は { kind: "value", atom }）が並ぶ
   op add(line: Line)
   {
     const normalized = match line by LineKind {

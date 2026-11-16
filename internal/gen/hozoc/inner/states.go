@@ -38,6 +38,8 @@ type OutputsState interface {
 type OutputsSyncState interface {
 	// UpToDate は問い合わせ: ケース UpToDate の述語。
 	UpToDate(ctx context.Context) (bool, error)
+	// OutOfDate は問い合わせ: ケース OutOfDate の述語。
+	OutOfDate(ctx context.Context) (bool, error)
 	// SyncOutputs は命令（効果 hozoc.syncOutputs、on hozoc.OutputsSync: any -> UpToDate）: 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
 	SyncOutputs(ctx context.Context, plan EmitPlan) error
 }

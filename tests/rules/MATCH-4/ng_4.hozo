@@ -1,37 +1,24 @@
-// MATCH-4（docs/types.md「アームの中の対象の型」の 1）: else のアームが二つ以上のケースを受けるなら、対象は絞り込まれない
-// （外の型のまま）。受けるケースのすべてが同じ型の as を持っていても、型を書かないケースの和にも、ならない
+// MATCH-4（docs/types.md「残りのケースでの対象の型」）: 残りのケース（as else）のアームで、presence は外のまま（値のある型には
+// ならない）。variant で残りのアームが二つ以上なら、union のまま（アームの型にはならない）
 namespace a {
   model M { id: string; }
   model N { id: string; }
   model O { id: string; }
   union Three { Ready: M; Missing: N; Broken: O; }
-  classify K of M { A; B; C; D; E; }
-  classify Whole of Three { IsReady: Three as M; IsMissing: Three as N; IsBroken: Three as O; }
   op find(): M?;
-  classify Stale of find { Fresh: find as M; Old: find as M; Gone; }
-  op onBToE(m: K.B<M>): void;
+  classify Hit of find { Found: find as M; NotFound: find as else; }
+  classify K3 of Three { IsReady: Three as M; Rest: Three as else; }
   op takeM(m: M): void;
   op takeN(n: N): void;
-  op f(m: M, three: Three): void {
-    // else は B、C、D、E を受ける: m は M のまま（case(K, [B, C, D, E], M) ではない）
-    match m by K {
-      A    => none;
-      else => onBToE(m);               // ERROR: MATCH-4
+  op f(three: Three): void {
+    const m = find();
+    match m by Hit {
+      Found    => takeM(m);
+      NotFound => takeM(m);            // ERROR: MATCH-4
     };
-    // else は IsMissing と IsBroken を受ける: three は Three のまま
-    match three by Whole {
+    match three by K3 {
       IsReady => takeM(three);
-      else    => takeN(three);         // ERROR: MATCH-4
-    };
-    // else は Fresh と Old を受ける。どちらも M の as を持つが、x は M? のまま（名前で並べれば M）
-    const x = find();
-    match x by Stale {
-      Gone => none;
-      else => takeM(x);                // ERROR: MATCH-4
-    };
-    match x by Stale {
-      Gone       => none;
-      Fresh, Old => takeM(x);
+      Rest    => takeN(three);         // ERROR: MATCH-4
     };
   }
 }

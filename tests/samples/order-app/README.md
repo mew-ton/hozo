@@ -317,7 +317,7 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 - **F5 例外を、別の名前に言い換える書き方がない。** `catches A recovers throws B` と書くと、A を「吸収した」ことになり、効果を持つ op では DEC-5（成功のアームでも効果が不明）。金が動く三つの呼び出しに付けたら、warning が六つ出た。→ 言い換えたのは、金が動かない呼び出しだけ（`payment.openHold`、`payment.openCharge`、`download.fetchLink` の `@outside.failsAs`）。請求の確定、返金、枠を手放す、送り状を買う、の失敗は、`http.NetworkError` / `http.ServerError` のまま `staffApi.buyLabel` まで伝わる。ブラウザから見ると、自分の通信の失敗と、サーバーの先の失敗が、同じ名前になる。
 - **F6 外部の仕組みの中で起きること（金が動く）は、効果ではない。** → 相手の状態を、相手の名前空間に置いた（`psp.ledger`、`psp.holds`、`carriergw.labels`）。相手の op に `@outside.does(…)` で効果を運ばせる。得たもの: `fulfilment.dispatch` の効果に `psp.takeMoney` と `carriergw.issueLabel` が並び、`payment.capture` の `throws psp.HoldExpired prevents effects` を、検査器が本体から確かめる（REL-4）。払ったもの: 相手の内側の状態を、こちらが作った。
 - **F7 分類の述語は、対象の値しか見られない。** 時刻で変わる場合分け（期限が過ぎたか）は、分類にできない。→ 「受け取った値を、そのまま返すか、投げる葉」（`staff.requireFresh`、`download.stillValid`）。`ordering.Standing.Expired` は、時計で動く `ordering.expireUnpaid` が `expiredAt` を入れた後でだけ、当たる。
-- **F8 値の集合を言う型（列挙）がない。** リテラルを scalar の引数に渡せない（TYPE-1）ので、`authorize(token, "packer")` は書けない。→ 仕事は、三つの真偽値と、三つの `condition` と、三つの op（`staff.asMaker`、`asPacker`、`asAdmin`）。商品の種類は、union と、型で決まる分類で書けた（`catalog.Fulfilment`、`catalog.Kind`）。`psp.Event.kind`、`shipping.SizeClass`、`shipping.Zone`、`Problem.reason` は文字列で、値の集合はコメント。
+- **F8 値の集合を言う型（列挙）がない。** リテラルを scalar の引数に渡せない（TYPE-1）ので、`authorize(token, "packer")` は書けない。→ 仕事は、三つの真偽値と、仕事ごとの分類三つ（`staff.MakerDuty`、`PackerDuty`、`AdminDuty`）と、三つの op（`staff.asMaker`、`asPacker`、`asAdmin`）。商品の種類は、union と、型で決まる分類で書けた（`catalog.Fulfilment`、`catalog.Kind`）。`psp.Event.kind`、`shipping.SizeClass`、`shipping.Zone`、`Problem.reason` は文字列で、値の集合はコメント。
 - **F9 「この段階では、この値がある」を、一つの model では言えない。** `model Packed extends Shipment { override parcel: Parcel; }` は TYPE-15。model を別の model に絞るケースは CLS-6。→ 事実を別の表にして（`parcels`、`labels`）、存在の分類（`Packing`、`Labelling`）で絞り、そろった組を model にした（`Sealed`、`Dispatched`）。
 - **F10 `C.Case<T>` の引数は、別の名前空間からも効いた。作り方は縛れない。** `shipping.boxOptions(shipment: Gathered.Complete<Shipment>)` を `fulfilment.optionsIfGathered` が呼ぶ。そろっていない出荷を渡すと MATCH-4（`Awaiting` のアームから `boxOptions(shipment)` を呼んで確かめた）。ただし、効果 `createParcel(parcel: Parcel)` は、どの `Parcel` でも受け取る。「荷物は、そろった出荷からしか作れない」は、`Parcel` を返す葉が `weighed` だけであることに依り、検査されない。
 - **F11 不変条件を書けない。** 「請求は上限を超えない」「請求する送料 = min(送料, 上限)」「`limit` = `itemsTotal` + `shippingCeiling`」「見積もり ≤ 上限」は、葉（`payment.charged`、`shipping.foresee`）のコメント。→ 印 `@prd.promise` を、約束を守る op に付けた。約束と op が結ばれるだけで、中身は確かめない。この仕様でいちばん大事な客への約束が、検査の外にある。
@@ -370,9 +370,15 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 - **F41 「外部の仕組みの op には、その仕組みの語彙のデコレータ」。** `@http.post` を付けると、相手の口の宣言になり、通信の形（パス、本文）まで仕様に入る（`psp`、`carriergw`、`assets`）。印だけにすると（`mailer.send` の `@smtp.sendMail`）、入らない。どちらにするかの基準は、指針にない。
 - **F42 入口の名前空間を、呼ぶ相手ごとに分けた（`shopApi`、`staffApi`、`hooks`）。指針にない。** `staffApi` の 15 の op のうち 13 は、担当を確かめて、一つ呼ぶだけ（残りは、ログインとログアウト）。概念の op に `@http.*` を直に付ければ消えるが、要求のどこから読むか（`@http.header` のトークン）と認証が、概念に入る。
 - **F43 状態を持たない、流れの名前空間 `fulfilment` を作った。指針にない。** 概念どうしが直に呼び合う（`production` が `shipping` を呼ぶ）代わりに、順番を一か所に置いた。`ordering` は `inventory` と `shipping` を直に呼んでいて、そろっていない。
-- **F44 「意味のある状態には名前を。`default` は、意味のない残りにだけ」を当てると、`default` は 24 から 2 になった。** 名前を付けた 22 のうち、19 は型で決まる分類の残りのケース（`Missing: Order? as else;`。`docs/check.md`「残りのケース」）、3 は述語のケース（`shipping.Gathered` の `Awaiting`、`carrier.Fleet` の `Unavailable`、`catalog.Offer` の `Absent`）。残した二つは、この仕様が使わない残り: `psp.Meaning` の `default`（客の同意のほかの通知）と、`fulfilment.Arrival` の `default`（「届いた」のほかの、荷物の動きの通知。運んでいる途中、不在、返送などが混ざり、一つの状態ではない）。「ない」側の名前は、分類ごとにばらついた（`Missing` が四つ、`Unknown` が二つ、`Absent`、`Unlisted`、`Unreserved`、`Uncounted`、`Ungranted`、`LoggedOut`）: 同じ意味の分類が並ぶこと（F12、F40）が、名前の数だけ目立つ。例外と同じことを二度言うアームもできた（`Ungranted => throw NotGranted;`、`Unknown => throw UnknownCarrier;`）。`condition`（`staff.Maker`、`Packer`、`Admin`）は、名前一つと `default` の糖衣（`docs/ir.md`「正規化」）のままで、その `match` のアームは `default` と書く: 数えた 24 に入れていない。
-- **F45 述語で決まる分類の残りに名前を付けると、人が書く述語が一つ増える。** `default` のときは、「どの述語も真でない」が残りで、人が書くのは `Complete` の述語だけだった。`classify Gathered of Shipment { Complete; Awaiting; }` は、`Awaiting` の述語も人が書き、二つが排他で全体を覆うことは、書く人が担保する（`docs/plugin-go.md`「分類」: 真がちょうど一つでなければ、判定の誤り）。`Awaiting` が `Complete` の否定であることは、仕様のどこにも書けない。`carrier.Fleet` の `Unavailable` も同じ。
+- **F44 分類を閉じると（`docs/check.md`「閉じた分類」）、名前のないケースは、なくなった。** はじめに 24 あった `default` のうち、22 は意味のある状態で、名前を付けた: 19 は型で決まる分類の残りのケース（`Missing: Order? as else;`。同「残りのケース」）、3 は述語のケース（`shipping.Gathered` の `Awaiting`、`carrier.Fleet` の `Unavailable`、`catalog.Offer` の `Absent`）。残りの 2 は、この仕様が使わない場合で、ケースごと消した: `psp.Meaning`（客の同意のほかの通知）と、`fulfilment.Arrival`（「届いた」のほかの、荷物の動きの通知）。振る舞いが変わったのは、この 2 だけ（F47）。「ない」側の名前は、分類ごとにばらついた（`Missing` が四つ、`Unknown` が二つ、`Absent`、`Unlisted`、`Unreserved`、`Uncounted`、`Ungranted`、`LoggedOut`）: 同じ意味の分類が並ぶこと（F12、F40）が、名前の数だけ目立つ。例外と同じことを二度言うアームもできた（`Ungranted => throw NotGranted;`、`Unknown => throw UnknownCarrier;`）。
+- **F45 述語で決まる分類は、ケースの数だけ、人が述語を書く。** `classify Gathered of Shipment { Complete; Awaiting; }` は、`Awaiting` の述語も人が書き、二つが排他で、どの出荷もどちらかに当たることは、書く人が担保する（`docs/plugin-go.md`「分類」: 真がちょうど一つでなければ、分類の誤り）。`Awaiting` が `Complete` の否定であることは、仕様のどこにも書けない。`carrier.Fleet` の `Unavailable` も同じ。三つの `condition`（`staff.Maker`、`Packer`、`Admin`）を、両側に名前のある分類に直したので、否定の側の述語が、さらに三つ増えた（`NotMaker`、`NotPacker`、`NotAdmin`）: 35 の分類のうち、述語で決まるものは 14 で、人が書く述語は、31 から 34 になった。
 - **F46 型で決まる側が、述語のケースになった。** `catalog.Offer`（`OnSale` と `Withdrawn` が、どちらも `Product? as Product`）の「ない」は、値がないことで、型から決まる。それでも、残りのケースは述語のケースの隣に書けない（CLS-7）ので、名前を付けるには、`as` のないケース `Absent;` にするしかなく、「値がない」という述語を人が書く。「あるか」（型で決まる）と「並べているか」（述語）の二つの分類に分ければ避けられるが、アームの本体は呼び出し一つなので、配線が一段増える（F3）。
+- **F47 使わない通知を宣言しないと、通知の入口が、その通知で失敗する。** 分類を閉じる前は、`payment.recordNew` は、客の同意のほかの通知を「覚えて、何もしない」、`fulfilment.tracked` は、「届いた」のほかの通知を「何もしない」だった。いまは、どちらも、分類の誤りで失敗する（`psp.Meaning` のケースは `Secured` だけ、`fulfilment.Arrival` のケースは `Arrived` だけ）。
+  - `hooks.paymentEvent` は `@db.transaction` なので、失敗すれば、`payment.remember` も取り消される。通知を「扱った」と記録しないので、相手は同じ通知を送り直し、そのたびに同じ失敗になる。
+  - `hooks.trackingEvent` は、運んでいる途中、不在、返送の通知のたびに失敗する。配送業者は、荷物一つにつき、そういう通知をいくつも送る。
+  - 分類の誤りは、仕様の例外ではない（`docs/check.md`「閉じた分類」）ので、`throws` に書けず、`@http.status` で応答を決められず、デコレータの `catches` でも受けられない。「使わない通知は、受け取ったとだけ答える」を、仕様に書く場所がない（Q11）。
+- **F48 仕事の分類は、一つの `Role` にしなかった。** 担当者は、三つの仕事を、いくつでも持てる（`Member.maker`、`packer`、`admin` は、別々の真偽値）。`classify Role of Member { Maker; Packer; Admin; }` は、製作と梱包の両方をする担当者で、二つの述語が真になり、分類の誤りになる（ケースは排他）。仕事ごとに、「してよい / してはいけない」の分類を一つずつ持った。「してはいけない」側の名前（`NotMaker`）は、業務の言葉になかった。
+- **F49 `match` の `else` のアームが合ったのは、`payment.Standing` だけ。** 五つのケースから一つを取り出して、残りの四つを同じに扱う `match` が四つあり（`reopen`、`secureFound`、`prepayHeld`、`release`）、`else` にした（`docs/requirements.md`「書き方の指針」の「1 : 4」）。`payment.settle` は「1 : 1 : 1 : 2」なので、どのアームも名前で並べた。三つのケースの「1 : 2」（`production.start` と `finish`、`shipping.release` と `markDelivered`、`storefront.onAddToCart`）も、名前で並べた: 並べる名前が二つなら、`else` にしても短くならず、ケースを足したときに MATCH-2 が尋ねる方がよい。
 
 ## 粒度: 仕様は、どこまで書くか
 
@@ -586,6 +592,20 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
   ```
 
 勧め: **(a)** から始める。(b) は、式の言語が要る。印の文を、テストの名前にするところまでなら、言語を変えずにできる。
+
+### Q11 宣言したケースの外の値を、仕様の上で受けられるようにするか
+
+通知の入口は、この仕様が使わない種類の通知で、分類の誤りになって失敗する（F47）。相手は、失敗した通知を送り直す。
+
+- **(a) 今のまま。** 使わない通知は誤りにし、相手の側（通知の設定）で、送る種類を絞ってもらう。仕様は、相手がそうしていることを、コメントで当てにする。
+- **(b) 分類の誤りを、言語の例外にする**（核の例外を一つ。`throws` に書け、デコレータが `catches` で受けられる）。
+  ```ts
+  @webhook.acknowledgeUnknown   // catches ClassificationFailed ignores
+  export op trackingEvent(in: TrackingInput) { … }
+  ```
+- **(c) 使わない場合にも、ケースを宣言する**（`Ignored;`）。「仕様が使う場合だけを宣言する」（`docs/requirements.md`「書き方の指針」）から外れる。
+
+勧め: **(a)** のまま、(b) を検討する。(c) は、なくした `default` を、名前を変えて戻すことになる。
 
 ## 近づけたもの
 

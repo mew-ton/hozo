@@ -80,10 +80,6 @@ export type Callee = OpCallee | ReadCallee | EffectCallee;
  */
 export type ArmBody = CallExpr | AtomExpr | NoneBody | ThrowBody;
 /**
- * match のアームが受けるケース。"default" か、ケース名の列（docs/ir.md「配線」の Match）。
- */
-export type ArmCases = "default" | string[];
-/**
  * match の対象（docs/ir.md「配線」の Match の subject）。kind で分ける。
  */
 export type MatchSubject = ValueSubject | ClassifyOwnedSubject;
@@ -413,16 +409,13 @@ export interface Read {
   state: string;
 }
 /**
- * classify 宣言（docs/ir.md「classify」）。cases に default は含まない。
+ * classify 宣言（docs/ir.md「classify」）。cases は、宣言したケースのすべて。
  */
 export interface Classify {
   cases: ClassifyCase[];
   decidedBy: DecidedBy;
   decorators: Application[];
-  defaultDescription?: Doc;
   description?: Doc;
-  fromCondition: boolean;
-  hasDefault: boolean;
   kind: "classify";
   name: string;
   span: Span;
@@ -679,11 +672,12 @@ export interface Match {
   subject: MatchSubject;
 }
 /**
- * match のアーム（docs/ir.md「配線」）。narrowed は、アームの中で外と型が違う対象（なければ []）。
+ * match のアーム（docs/ir.md「配線」）。cases は、このアームが受けるケース（else のアームなら、ほかのアームが並べなかったケース）。narrowed は、アームの中で外と型が違う対象（なければ []）。
  */
 export interface MatchArm {
   body: ArmBody;
-  cases: ArmCases;
+  cases: string[];
+  else: boolean;
   narrowed: Narrowing[];
   span: Span;
 }

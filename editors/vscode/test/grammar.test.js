@@ -16,9 +16,9 @@ const files = {
   page: path.join(root, 'vocab', 'page.hozo'),
   valid: path.join(root, 'vocab', 'valid.hozo'),
   cli: path.join(root, 'cli.hozo'),
-  // 状態の分類・遷移の効果・状態での match（docs/grammar.md「exception / effect / read」「classify / condition」「配線」）
+  // 状態の分類・遷移の効果・状態での match（docs/grammar.md「exception / effect / read」「classify」「配線」）
   state: path.join(root, 'tests', 'corpus', 'state', 'shop.hozo'),
-  // export、reads、extends / override、op の分類とケースの as、throw、read の宣言、直に呼ぶ組み込みの効果（docs/grammar.md「model」「exception / effect / read」「classify / condition」「op」「配線」）と、
+  // export、reads、extends / override、op の分類とケースの as、throw、read の宣言、直に呼ぶ組み込みの効果（docs/grammar.md「model」「exception / effect / read」「classify」「op」「配線」）と、
   // 版 0.5 の構文（効果の宣言に付けたデコレータ、reads / effects の節、残りの引数、予約語のデコレータ名）
   api: path.join(root, 'tests', 'corpus', 'view', 'api.hozo'),
   // 予約語のデコレータ名の宣言（decorator list / int / delete）と、対象 effect / read、核の印 @repeatable
@@ -86,7 +86,7 @@ test('予約語（宣言の頭、節の頭、核の型、リテラル）', () =>
   assertScope(b, 'const warranty = match item by WarrantyKind {', 'match', 'keyword.control.hozo');
   assertScope(b, 'const warranty = match item by WarrantyKind {', 'by', 'keyword.control.hozo');
   assertScope(b, 'NoWarranty => none;', 'none', 'constant.language.hozo');
-  assertScope(b, 'default           => none;', 'default', 'keyword.control.hozo');
+  assertScope(b, 'Unavailable => none;', 'none', 'constant.language.hozo');
   assertScope(b, 'return plan;', 'return', 'keyword.control.hozo');
   const t = tokensOf('@flags(true, off: false) model X { a: boolean; }');
   assertScope(t, 'model X', 'true', 'constant.language.hozo');
@@ -198,7 +198,10 @@ test('宣言の名前', () => {
   const b = linesOf(files.browser);
   assertScope(b, 'union ApiError {', 'ApiError', 'entity.name.type.hozo');
   assertScope(b, 'classify WarrantyKind of server.Item {', 'WarrantyKind', 'entity.name.type.hozo');
-  assertScope(b, 'condition WarrantyAvailable of server.Item;', 'WarrantyAvailable', 'entity.name.type.hozo');
+  assertScope(b, 'classify WarrantyAvailable of server.Item { Available; Unavailable; }', 'WarrantyAvailable', 'entity.name.type.hozo');
+  // condition は予約語ではない（docs/grammar.md「予約語」）: 宣言の頭としても、名前としても、塗らない
+  const cond = tokensOf('op check(condition: string): string;');
+  assert.ok(!cond[0].tokens.some((tk) => tk.text.includes('condition') && tk.scopes.some((sc) => sc.startsWith('keyword'))), 'condition が予約語として塗られている');
 });
 
 test('型の位置の名前', () => {
@@ -258,13 +261,15 @@ test('修飾（export、override）と、reads / as / throw / never', () => {
     assert.ok(!l.tokens.some((tk) => tk.text.includes('findUser') && tk.scopes.length > 1), `${line} の findUser に scope が付いている`);
   }
   // 状態の分類の、対象ごとの as（, で続く）
-  const as = tokensOf('classify Ready of token, profile { Ready: token as Token, profile as Profile; default; }');
+  const as = tokensOf('classify Ready of token, profile { Ready: token as Token, profile as Profile; Neither; }');
   assertScope(as, 'classify Ready', 'as', 'keyword.control.hozo', 0);
   assertScope(as, 'classify Ready', 'as', 'keyword.control.hozo', 1);
   assertScope(as, 'classify Ready', 'Token', 'entity.name.type.hozo');
   assertScope(as, 'classify Ready', 'Profile', 'entity.name.type.hozo');
-  assertScope(as, 'classify Ready', 'default', 'keyword.control.hozo');
-  // 残りのケース: as の後ろの else は予約語で、型の名前としては塗らない（docs/grammar.md「予約語」「classify / condition」）
+  // default は、どの生成規則も使わない予約語で、予約語として塗らない（docs/editors.md「TextMate の文法」）
+  const old = tokensOf('classify Old of T { A; default; }');
+  assert.ok(!old[0].tokens.some((tk) => tk.text.includes('default') && tk.scopes.some((sc) => sc.startsWith('keyword'))), 'default が予約語として塗られている');
+  // 残りのケース: as の後ろの else は予約語で、型の名前としては塗らない（docs/grammar.md「予約語」「classify」）
   assertScope(api, 'Stranger: findUser as else;', 'as', 'keyword.control.hozo');
   assertScope(api, 'Stranger: findUser as else;', 'else', 'keyword.control.hozo');
   const rest = api.find((x) => x.text.includes('Stranger: findUser as else;'));
@@ -277,13 +282,24 @@ test('修飾（export、override）と、reads / as / throw / never', () => {
   assertScope(by, 'return match', 'by', 'keyword.control.hozo');
   assertScope(by, 'return match', 'store.Registration', 'entity.name.type.hozo');
   // アームの throw と、その例外
-  const th = tokensOf('      default    => throw type.InvalidCredentials;');
-  assertScope(th, 'default', 'throw', 'keyword.control.hozo');
-  assertScope(th, 'default', 'type.InvalidCredentials', 'entity.name.type.hozo');
-  assertScope(th, 'default', '=>', 'keyword.operator.arrow.hozo');
-  // 実物: コーパスのアームの throw
-  assertScope(api, 'default => throw NotFound;', 'throw', 'keyword.control.hozo');
-  assertScope(api, 'default => throw NotFound;', 'NotFound', 'entity.name.type.hozo');
+  const th = tokensOf('      Unknown    => throw type.InvalidCredentials;');
+  assertScope(th, 'Unknown', 'throw', 'keyword.control.hozo');
+  assertScope(th, 'Unknown', 'type.InvalidCredentials', 'entity.name.type.hozo');
+  assertScope(th, 'Unknown', '=>', 'keyword.operator.arrow.hozo');
+  // else のアーム: アームの頭の else は予約語（docs/grammar.md「配線」の ElseArm）。本体は、ほかのアームと同じ
+  const el = tokensOf('      else    => throw type.InvalidCredentials;');
+  assertScope(el, 'else', 'else', 'keyword.control.hozo');
+  assertScope(el, 'else', 'throw', 'keyword.control.hozo');
+  assertScope(el, 'else', 'type.InvalidCredentials', 'entity.name.type.hozo');
+  assertScope(el, 'else', '=>', 'keyword.operator.arrow.hozo');
+  // 実物: コーパスの else のアームと、ケースを , で並べたアーム（ケースの名前は予約語ではなく、専用の scope を付けない）
+  assertScope(api, 'else  => throw NotFound;', 'else', 'keyword.control.hozo');
+  assertScope(api, 'else  => throw NotFound;', 'throw', 'keyword.control.hozo');
+  assertScope(api, 'else  => throw NotFound;', 'NotFound', 'entity.name.type.hozo');
+  assertScope(api, 'Idle, Fresh => "new or idle";', '=>', 'keyword.operator.arrow.hozo');
+  assertScope(api, 'Idle, Fresh => "new or idle";', 'new or idle', 'string.quoted.double.hozo');
+  const listed = api.find((x) => x.text.includes('Idle, Fresh => "new or idle";'));
+  assert.ok(!listed.tokens.some((tk) => /Idle|Fresh/.test(tk.text) && tk.scopes.length > 1), 'アームのケースの名前に scope が付いている');
   // never は核の型と同じ scope
   const nv = tokensOf('op unauthorized(): never throws Unauthorized;');
   assertScope(nv, 'op unauthorized', 'never', 'support.type.primitive.hozo');
@@ -302,12 +318,15 @@ test('矢印（遷移の -> と match のアームの =>）', () => {
   // 遷移は `on X:` の後ろ（: の後ろの型の位置）に来る
   assertScope(st, 'effect placeOrder() on Checkout: Shopping -> Ordered;', '->', 'keyword.operator.arrow.hozo');
   assertScope(st, 'effect startOver() on Checkout: any -> Shopping;', '->', 'keyword.operator.arrow.hozo');
-  assertScope(st, 'effect touchCheckout() on Checkout: Shopping | Ordered -> any;', '->', 'keyword.operator.arrow.hozo');
+  // 遷移のケースの並びの区切りは ,（docs/grammar.md「exception / effect / read」の CaseSet）
+  assertScope(st, 'effect touchCheckout() on Checkout: Shopping, Ordered -> any;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'effect touchCheckout() on Checkout: Shopping, Ordered -> any;', 'any', 'keyword.control.hozo');
   assertScope(st, 'effect clearCart() on carts: HasItems -> Empty;', '->', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Empty    => showLogin();', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Shopping => submitOrder();', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Ordered  => none;', '=>', 'keyword.operator.arrow.hozo');
-  assertScope(st, 'default  => showLogin();', '=>', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'else     => showLogin();', '=>', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'else     => showLogin();', 'else', 'keyword.control.hozo');
   const b = linesOf(files.browser);
   assertScope(b, 'NoWarranty => none;', '=>', 'keyword.operator.arrow.hozo');
   // 矢印の両側は今まで通り
@@ -465,7 +484,7 @@ test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み�
   assertScope(ex, 'exception LimitExceeded', 'LimitExceeded', 'entity.name.type.hozo');
   assertScope(ex, 'exception LimitExceeded', 'Duration', 'support.type.primitive.hozo');
   assertScope(ex, 'exception LimitExceeded', 'string', 'support.type.primitive.hozo');
-  const weak = 'Weak    => throw Invalid("weak password");';
+  const weak = 'Weak   => throw Invalid("weak password");';
   assertScope(api, weak, 'throw', 'keyword.control.hozo');
   assertScope(api, weak, 'Invalid', 'entity.name.type.hozo');
   assertScope(api, weak, 'weak password', 'string.quoted.double.hozo');

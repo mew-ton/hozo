@@ -73,7 +73,7 @@ namespace app {
   export op show(text: string);
 
   // presence の return match: アームを書いた順によらず、値のある場合が if の枝。残りのケースは、else を書かずに後ろに続け、
-  // 頭のコメントは、default ではなく、ケースの名前
+  // 頭のコメントは、ケースの名前
   @mark export op login(name: string): string
     throws Unknown
   {
@@ -107,7 +107,7 @@ namespace app {
   export op both(title: string?): string
   {
     return match title by Given {
-      Filled, Blank  => "any";
+      Filled, Blank => "any";
     };
   }
 
@@ -121,7 +121,7 @@ namespace app {
   }
 
   // variant の return match: 残りのケースは、残りのアームの Go の型を、union の宣言の順に並べた case。対象の型は変わらない。
-  // default の節がないので、switch の後ろに return <零値>, &runtime.ClassificationError{…}
+  // 最後の default: の節は、分類の誤りの枝（union の値がない nil が、ここに来る）
   export op method(payment: Payment): string
   {
     return match payment by Method {
@@ -156,7 +156,7 @@ namespace app {
       Other   => none;
     };
     match result by Outcome {
-      Ok, Failed  => show("done");
+      Ok, Failed => show("done");
     };
     match payment by Method {
       Plastic => none;

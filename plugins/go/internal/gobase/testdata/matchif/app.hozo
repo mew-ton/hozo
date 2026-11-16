@@ -31,17 +31,17 @@ namespace app {
   /** 型で決まる op の分類（絞り込みは presence） */
   classify Lookup of findUser {
     Found: findUser as User;
-    Other: findUser as else;
+    NotFound: findUser as else;
   }
   /** 型で決まる値の分類（絞り込みは presence） */
   classify Present of nullable<User> {
     Some: nullable<User> as User;
-    Other: nullable<User> as else;
+    Nothing: nullable<User> as else;
   }
   /** 型で決まる状態の分類（絞り込みは presence） */
   classify SignedIn of token {
     Yes: token as Token;
-    Other: token as else;
+    No: token as else;
   }
 
   // return match: 呼び出し（純粋でない op）と throw。アームを書いた順によらず、値のある場合が if の枝。else を書かない
@@ -50,8 +50,8 @@ namespace app {
   {
     const user = findUser(id);
     return match user by Lookup {
-      else    => throw Missing;
-      Found   => loadName(user);
+      NotFound => throw Missing;
+      Found    => loadName(user);
     };
   }
 
@@ -64,13 +64,14 @@ namespace app {
     };
   }
 
-  // return match: 呼び出し（純粋な配線が、純粋な op を呼ぶ。絞り込んだ値は *<対象>）と「返らない」呼び出し
+  // return match: 呼び出し（純粋な配線が、純粋な op を呼ぶ。絞り込んだ値は *<対象>）と「返らない」呼び出し。
+  // else のアーム（Nothing を受ける）は、そのケースを名前で書いたアームと同じコード（枝の頭のコメントも、ケースの名前）
   export op pureName(user: User?): string
     throws Denied
   {
     return match user by Present {
-      Some    => nameOf(user);
-      else    => deny();
+      Some => nameOf(user);
+      else => deny();
     };
   }
 
@@ -103,8 +104,8 @@ namespace app {
   export op signedInText(): string
   {
     return match by SignedIn {
-      Yes     => useToken(token);
-      else    => "anonymous";
+      Yes => useToken(token);
+      No  => "anonymous";
     };
   }
 
@@ -153,7 +154,7 @@ namespace app {
       Empty    => deny();
     };
     match lines by list {
-      Empty, HasItems  => show("any");
+      Empty, HasItems => show("any");
     };
     match user by nullable {
       HasItems => takeOptionalUser(user);

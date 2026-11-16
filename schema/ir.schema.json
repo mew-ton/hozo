@@ -112,20 +112,6 @@
         }
       ]
     },
-    "ArmCases": {
-      "description": "match のアームが受けるケース。\"default\" か、ケース名の列（docs/ir.md「配線」の Match）。",
-      "oneOf": [
-        {
-          "const": "default"
-        },
-        {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      ]
-    },
     "ArrayType": {
       "additionalProperties": false,
       "description": "T[]（docs/ir.md「型」の array）。",
@@ -562,7 +548,7 @@
     },
     "Classify": {
       "additionalProperties": false,
-      "description": "classify 宣言（docs/ir.md「classify」）。cases に default は含まない。",
+      "description": "classify 宣言（docs/ir.md「classify」）。cases は、宣言したケースのすべて。",
       "properties": {
         "cases": {
           "items": {
@@ -579,17 +565,8 @@
           },
           "type": "array"
         },
-        "defaultDescription": {
-          "$ref": "#/$defs/Doc"
-        },
         "description": {
           "$ref": "#/$defs/Doc"
-        },
-        "fromCondition": {
-          "type": "boolean"
-        },
-        "hasDefault": {
-          "type": "boolean"
         },
         "kind": {
           "const": "classify"
@@ -611,8 +588,6 @@
         "span",
         "subject",
         "cases",
-        "hasDefault",
-        "fromCondition",
         "decidedBy"
       ],
       "type": "object"
@@ -1485,13 +1460,19 @@
     },
     "MatchArm": {
       "additionalProperties": false,
-      "description": "match のアーム（docs/ir.md「配線」）。narrowed は、アームの中で外と型が違う対象（なければ []）。",
+      "description": "match のアーム（docs/ir.md「配線」）。cases は、このアームが受けるケース（else のアームなら、ほかのアームが並べなかったケース）。narrowed は、アームの中で外と型が違う対象（なければ []）。",
       "properties": {
         "body": {
           "$ref": "#/$defs/ArmBody"
         },
         "cases": {
-          "$ref": "#/$defs/ArmCases"
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "else": {
+          "type": "boolean"
         },
         "narrowed": {
           "items": {
@@ -1505,6 +1486,7 @@
       },
       "required": [
         "cases",
+        "else",
         "body",
         "narrowed",
         "span"

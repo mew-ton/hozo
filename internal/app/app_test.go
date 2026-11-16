@@ -275,7 +275,7 @@ func TestCheckWithoutConfig(t *testing.T) {
 		t.Fatalf("Check = %+v, %v", res, err)
 	}
 	// その後の WriteOutputs（内部の op。内側のパッケージの Ops から呼ぶ）は ConfigInvalid（CFG-7）: 配線の最初の collectOutputs
-	// （葉の op）が投げる。述語 UpToDate も、生成し直せないので同じ例外
+	// （葉の op）が投げる。述語 UpToDate と OutOfDate も、生成し直せないので同じ例外
 	cfg7 := func(what string, err error) {
 		t.Helper()
 		var ci hozoc.ConfigInvalid
@@ -292,6 +292,8 @@ func TestCheckWithoutConfig(t *testing.T) {
 	cfg7("CollectOutputs", err)
 	_, err = l.OutputsSync().UpToDate(ctx)
 	cfg7("UpToDate", err)
+	_, err = l.OutputsSync().OutOfDate(ctx)
+	cfg7("OutOfDate", err)
 }
 
 func TestCheckInvalidConfig(t *testing.T) {
@@ -797,9 +799,9 @@ func TestEmitNothing(t *testing.T) {
 	}
 }
 
-// TestUpToDate は cli.hozo の分類 OutputsSync の述語 UpToDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した内容と
-// ディスクの内容を比べる。生成したコードの判定関数 hozoc.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
-// 述語を呼ぶ。
+// TestUpToDate は cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した
+// 内容とディスクの内容を比べる。生成したコードの判定関数 hozoc.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
+// 二つの述語を呼び、真がちょうど一つのケースを返す（OutOfDate は UpToDate の否定なので、いつも、どちらか一つ）。
 func TestUpToDate(t *testing.T) {
 	dir := copyCorpus(t)
 	wd, err := os.Getwd()
@@ -822,9 +824,25 @@ func TestUpToDate(t *testing.T) {
 		}
 		return got
 	}
+	// predicates は、二つの述語の値（UpToDate、OutOfDate）
+	predicates := func() [2]bool {
+		t.Helper()
+		up, err := unit.UpToDate(ctx)
+		if err != nil {
+			t.Fatalf("UpToDate: %v", err)
+		}
+		out, err := unit.OutOfDate(ctx)
+		if err != nil {
+			t.Fatalf("OutOfDate: %v", err)
+		}
+		return [2]bool{up, out}
+	}
 	// まだ書き出していない: 足りない
-	if got := sync(); got != hozoc.OutputsSyncDefault {
+	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
 		t.Fatalf("emit の前: %v", got)
+	}
+	if got := predicates(); got != [2]bool{false, true} {
+		t.Errorf("emit の前の述語（UpToDate、OutOfDate）= %v", got)
 	}
 	// 配線の emit（check → writeOutputs → collectOutputs、outputChanges、syncOutputs）。効果 syncOutputs は、状態の分類
 	// OutputsSync の単位の命令で、どの場合からも UpToDate に移す
@@ -835,6 +853,9 @@ func TestUpToDate(t *testing.T) {
 	if got := sync(); got != hozoc.OutputsSyncUpToDate {
 		t.Fatalf("emit の後: %v", got)
 	}
+	if got := predicates(); got != [2]bool{true, false} {
+		t.Errorf("emit の後の述語（UpToDate、OutOfDate）= %v", got)
+	}
 	// 古い（内容が違う）
 	types := filepath.Join(dir, "gen", "server", "out.txt")
 	orig, err := os.ReadFile(types)
@@ -842,7 +863,7 @@ func TestUpToDate(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, types, string(orig)+"\n手で足した行\n")
-	if got := sync(); got != hozoc.OutputsSyncDefault {
+	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
 		t.Errorf("書き換えた後: %v", got)
 	}
 	write(t, types, string(orig))
@@ -853,7 +874,7 @@ func TestUpToDate(t *testing.T) {
 	if err := os.Remove(types); err != nil {
 		t.Fatal(err)
 	}
-	if got := sync(); got != hozoc.OutputsSyncDefault {
+	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
 		t.Errorf("消した後: %v", got)
 	}
 	write(t, types, string(orig))
@@ -861,7 +882,7 @@ func TestUpToDate(t *testing.T) {
 	fakePlugin(t, dir, "base", "go", "", `{"files":[],"warnings":[]}`, 0)
 	b := &App{Stderr: &bytes.Buffer{}} // 設定を読み直すために新しい App（直前の Check の結果を持たない）
 	ops, unit = b.Ops(), b.OutputsSync()
-	if got := sync(); got != hozoc.OutputsSyncDefault {
+	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
 		t.Errorf("基底がファイルを返さなくなった後: %v", got)
 	}
 	if _, err := ops.Emit(ctx, hozoc.EmitInput{}); err != nil {

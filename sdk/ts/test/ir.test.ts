@@ -273,7 +273,11 @@ function walkEffectRef(e: EffectRef): void {
 function walkMatch(m: Match): void {
   walkMatchSubject(m.subject, m.classify);
   for (const arm of m.arms) {
-    if (arm.cases !== "default") assert.ok(Array.isArray(arm.cases));
+    // 版 0.8: cases は、いつもケース名の列。else のアームは else: true で、cases は、それが受けるケース
+    assert.ok(Array.isArray(arm.cases));
+    for (const name of arm.cases) assert.equal(typeof name, "string");
+    assert.equal(typeof arm.else, "boolean");
+    if (arm.else) seen.add("arm:else");
     const body: ArmBody = arm.body;
     seen.add(`armBody:${body.kind}`);
     switch (body.kind) {
@@ -397,6 +401,10 @@ function walkDecl(d: Decl, program: Program): void {
     case "classify":
       walkClassifySubject(d.subject);
       seen.add(`decidedBy:${d.decidedBy}`);
+      // 版 0.8: 分類は閉じていて、hasDefault / defaultDescription / fromCondition はない
+      for (const key of ["hasDefault", "defaultDescription", "fromCondition"]) {
+        assert.ok(!(key in d), `Classify.${key} は 0.8 でなくなった`);
+      }
       for (const c of d.cases) {
         assert.ok(Array.isArray(c.as));
         for (const as of c.as) {
@@ -548,6 +556,8 @@ test("goldens cover every kind of every union", () => {
     "decorator:repeatable",
     // 版 0.7 で足した形（同上）: 残りのケース `対象 as else`
     "narrowBy:else",
+    // 版 0.8 で足した形（同上）: match の else のアーム
+    "arm:else",
   ];
   for (const k of want) assert.ok(seen.has(k), `goldens contain no ${k}`);
 });

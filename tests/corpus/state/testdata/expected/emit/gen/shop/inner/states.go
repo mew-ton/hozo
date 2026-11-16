@@ -59,7 +59,7 @@ type CheckoutState interface {
 	PlaceOrder(ctx context.Context) error
 	// StartOver は命令（効果 shop.startOver、on shop.Checkout: any -> Shopping）: 買い物をやり直す
 	StartOver(ctx context.Context) error
-	// TouchCheckout は命令（効果 shop.touchCheckout、on shop.Checkout: Shopping | Ordered -> any）: 進み具合を記録し直す
+	// TouchCheckout は命令（効果 shop.touchCheckout、on shop.Checkout: Shopping, Ordered -> any）: 進み具合を記録し直す
 	TouchCheckout(ctx context.Context) error
 }
 
@@ -68,6 +68,8 @@ type CheckoutState interface {
 type LoggedInState interface {
 	// LoggedIn は問い合わせ: ケース LoggedIn の述語。
 	LoggedIn(ctx context.Context) (bool, error)
+	// LoggedOut は問い合わせ: ケース LoggedOut の述語。
+	LoggedOut(ctx context.Context) (bool, error)
 	// SignIn は命令（効果 shop.signIn、on shop.LoggedIn: any -> LoggedIn）: ログインする
 	SignIn(ctx context.Context) error
 }

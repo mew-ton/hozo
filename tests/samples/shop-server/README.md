@@ -78,6 +78,18 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 - `gen/` のほかのファイルは、変わらない: 型で決まる分類について、基底は何も出さず（残りのケースを持っていても同じ）、分類とケースの名前は、配線のコメントにだけ残る。動きも変わらないので、`app/` のテストは、コメントのほかは変えていない。
 - **実装も入った**（言語、IR の版 0.7、基底 `go`）。`TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/server/inner/wiring.go` は、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。
 
+### 分類を閉じたときに変えたこと
+
+分類を閉じる決定（`docs/decisions.md`「決めたこと」154〜162。名前のないケース `default`、`condition`、`default =>` のアーム、ケースの並びの `|` をなくし、`match` に `else` のアームを足す）で、このサンプルが変えたのは、版だけ。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `plugins/go-ratelimit/hozo-plugin.toml`、`plugins/go-ratelimit/testdata/**/views.json`、`testdata/seams/plugins/tracer/hozo-plugin.toml` | `protocol` と `View` の版が `"0.8"`（`Classify.hasDefault` などがなくなり、`MatchArm` に `else` が足された） | `docs/ir.md`「版」 |
+
+- 仕様（`.hozo`）は、変えていない: 四つの分類は、どれも、残りのケースを持つ、型で決まる分類で、なくした書き方（`default;`、`condition`、`default =>`、アームの `|`）を使っていなかった。
+- 期待する出力（`gen/**`）と、人が書いたもの（`app/**`）も、変えていない: `docs/plugin-go.md`「match」「分類」で変わったのは、述語で決まる分類の列挙と判定関数、型の `switch`、残りのケースを書かない分類の `match` で、このサンプルは、どれも持たない。その形の期待する出力は、基底 `go` の単体テストの入力（`plugins/go/internal/gobase/testdata/` の `matchswitch`、`matchclosed`）が持つ。
+- `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc emit` の出力と、バイト単位で同じ。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。

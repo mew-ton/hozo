@@ -20,7 +20,7 @@ func storeProgram(serverOps ...ir.Decl) *ir.Program {
 		reads(leaf("store.findUser", ir.Optional(user), param("email", ir.String())), "store.users"),
 		reads(leaf("store.findSession", ir.Optional(ir.Ref("type.Session"))), "store.sessions", "store.users", "store.sessions"),
 		&ir.Classify{DeclBase: ir.DeclBase{Name: "store.Login", Span: sp("store.Login")},
-			Subject: ir.StatesSubject{States: []string{"store.token", "store.sessions"}}, Cases: []ir.ClassifyCase{{Name: "In"}}, HasDefault: true},
+			Subject: ir.StatesSubject{States: []string{"store.token", "store.sessions"}}, Cases: []ir.ClassifyCase{{Name: "In"}, {Name: "Out"}}},
 	}
 	add := leaf("store.addUser", nil, param("user", user))
 	add.Effects = ir.NamedEffects("store.createUser")

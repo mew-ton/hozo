@@ -30,7 +30,7 @@ editors/vscode/
 |---|---|---|
 | 予約語（宣言の頭） | `keyword.declaration.hozo` | `token.Keywords` から生成 |
 | 予約語（修飾: `export`、`override`） | `storage.modifier.hozo` | 同上 |
-| 予約語（節の頭、文の頭。`reads`、`as`、`throw`、`as` の後ろの `else` を含む） | `keyword.control.hozo` | 同上 |
+| 予約語（節の頭、文の頭。`reads`、`as`、`throw`、`as` の後ろと `match` のアームの頭の `else` を含む） | `keyword.control.hozo` | 同上。どの生成規則も使わない予約語 `default`（`docs/grammar.md`「予約語」）は除く: 予約語として塗らず、フィールド名とデコレータ名の位置の規則（下の行）だけが拾う |
 | 核の型と形（`never`、`list` / `nullable` / `single` を含む） | `support.type.primitive.hozo` | 同上 |
 | `true` / `false` / `none` | `constant.language.hozo` | 同上 |
 | フィールド名の位置の予約語（`op: string;`、`{ op: x }`、`res.op`） | `variable.other.property.hozo` | `:` の前か `.` の後ろの予約語。予約語のパターンより先に拾い、予約語として塗らない（`docs/grammar.md`「識別子」の `FieldName`）。`override: string;` の `override` もここに当たる（`:` の前） |
@@ -49,7 +49,7 @@ editors/vscode/
 | ドキュメンテーションコメント | `comment.block.documentation.hozo` | 中の `@param` / `@throws` / `@see` は `storage.type.class.jsdoc`、続く名前は `variable.other.jsdoc` |
 
 - 予約語の部分は `internal/tools/tmgrammar` が `token.Keywords` から生成する（`docs/packages.md`「生成するもの」）。それ以外のパターンも同じ道具の中（`grammar.go`）に手で書き、ファイル全体を `go generate ./editors/...`（`syntaxes/generate.go`）で決定的に生成する。生成物とのずれは `internal/tools/tmgrammar` のテストと CI が見る（`docs/testing.md`「生成物の一致」）。
-- `is` と `omit` は予約語ではなくなった（`docs/grammar.md`「予約語」）ので、`omit` の並びのパターンは持たない。
+- `is`、`omit`、`condition` は予約語ではない（`docs/grammar.md`「予約語」）ので、どのパターンにも現れない。
 - 文法のテストは `editors/vscode/test/`。`vscode-textmate` + `vscode-oniguruma` で、コーパス・標準の語彙・`cli.hozo` を字句に分け、選んだ字句の scope がこの表の通りであることを `npm test` で確かめる。
 - 型の位置と値の位置の区別は TextMate では位置の規則でしか付けられない。残りは命名規則（§3.3）に頼り、正確な区別は段階 4 の後の semantic tokens に任せる（`docs/lsp.md`）。
 

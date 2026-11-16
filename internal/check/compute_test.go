@@ -159,7 +159,7 @@ func TestSigMatchArms(t *testing.T) {
 	d.Effects = ir.NamedEffects("server.e3")
 	ca, cb := call("server.a"), call("server.b")
 	cls := &ir.Classify{DeclBase: ir.DeclBase{Name: "server.C", Span: sp("server.C")}, Subject: ir.TypeSubject{Type: ir.String()},
-		Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}, HasDefault: true}
+		Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}, {Name: "C"}}}
 	w := wire("server.w", nil, []ir.OpParam{param("x", ir.String())},
 		matchConst("r", "server.C", arm(&ca, "A"), arm(&cb, "B"), arm(nil)),
 		cs(call("server.d")),
@@ -749,9 +749,9 @@ func TestSigCarriedSucc(t *testing.T) {
 	write := leaf("server.write", nil)
 	write.Effects = ir.NamedEffects("server.e1")
 	k := &ir.Classify{DeclBase: ir.DeclBase{Name: "server.K", Span: sp("server.K")}, Subject: ir.TypeSubject{Type: ir.String()},
-		Cases: []ir.ClassifyCase{{Name: "A"}}, HasDefault: true, DecidedBy: ir.DecidedByPredicate}
+		Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}, DecidedBy: ir.DecidedByPredicate}
 	c := call("server.write")
-	w := wire("server.w", nil, nil, matchStmt("server.K", arm(&c, "A"), arm(nil, "default")))
+	w := wire("server.w", nil, nil, matchStmt("server.K", arm(&c, "A"), arm(nil, "B")))
 	w.Decorators = []ir.Application{app("server.doing")}
 	w.Carried = ir.Carried{Effects: ir.NamedEffects("server.e1", "server.e2")}
 	doing := decorator("server.doing")

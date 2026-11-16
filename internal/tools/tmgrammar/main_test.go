@@ -48,8 +48,9 @@ func TestDeterministic(t *testing.T) {
 	}
 }
 
-// TestKeywordsCovered は token.Keywords のすべての予約語が、生成した予約語のパターン
-// （repository の keywords.*）のちょうど一つに現れ、予約語でない語が混ざらないことを確かめる。
+// TestKeywordsCovered は token.Keywords の予約語が、生成した予約語のパターン（repository の keywords.*）のちょうど一つに
+// 現れ、予約語でない語が混ざらないことを確かめる。どの生成規則も使わない予約語 default（docs/grammar.md「予約語」）だけは、
+// どのパターンにも現れない（予約語として塗らない。docs/editors.md「TextMate の文法」）。
 func TestKeywordsCovered(t *testing.T) {
 	data, err := Generate()
 	if err != nil {
@@ -89,9 +90,16 @@ func TestKeywordsCovered(t *testing.T) {
 		t.Errorf("予約語のパターンは docs/editors.md の表の 5 行のはずが %d", groups)
 	}
 	for w := range token.Keywords {
-		if count[w] != 1 {
-			t.Errorf("予約語 %q が予約語のパターンに %d 回現れる（1 回のはず）", w, count[w])
+		want := 1
+		if w == "default" {
+			want = 0
 		}
+		if count[w] != want {
+			t.Errorf("予約語 %q が予約語のパターンに %d 回現れる（%d 回のはず）", w, count[w], want)
+		}
+	}
+	if _, reserved := token.Keywords["condition"]; reserved || count["condition"] != 0 {
+		t.Errorf("condition は予約語ではない（docs/grammar.md「予約語」）のに、予約語の表かパターンにある")
 	}
 	for w := range count {
 		if _, ok := token.Keywords[w]; !ok {
@@ -110,7 +118,6 @@ func TestKeywordsCovered(t *testing.T) {
 		"reads":     "keyword.control.hozo",
 		"any":       "keyword.control.hozo",
 		"const":     "keyword.control.hozo",
-		"default":   "keyword.control.hozo",
 		"else":      "keyword.control.hozo",
 		"throw":     "keyword.control.hozo",
 		"string":    "support.type.primitive.hozo",

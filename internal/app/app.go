@@ -8,7 +8,7 @@
 //   - 状態に触れるのは、状態の単位のメソッドだけ（docs/plugin-go.md「状態の単位」）。read outputChanges は、その状態 outputs の単位
 //     （hozoc.OutputsState）の問い合わせで、形で決まる問い合わせ（IsEmpty と Get）と一緒に、[App.Outputs] が返す値が持つ。
 //     効果 syncOutputs は、その宛先の状態の分類 OutputsSync の単位（hozoc.OutputsSyncState）の命令で、同じ単位の問い合わせ
-//     （述語 UpToDate）と一緒に、[App.OutputsSync] が返す値が持つ。
+//     （述語 UpToDate と OutOfDate）と一緒に、[App.OutputsSync] が返す値が持つ。
 //   - 状態 sources、config の単位（形で決まる問い合わせ IsEmpty と Get だけ）は、[App.Sources]、[App.Config] が返す値。
 //   - 配線の writeOutputs（collectOutputs、outputChanges、syncOutputs を、この順に呼ぶ）と emit は、生成した本体が持つ。
 //

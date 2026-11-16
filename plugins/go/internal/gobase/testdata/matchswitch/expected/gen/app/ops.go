@@ -41,8 +41,17 @@ type Ops interface {
 	// Describe は op app.describe。
 	Describe(ctx context.Context, page Page) (string, error)
 
+	// DescribeElse は op app.describeElse。
+	DescribeElse(ctx context.Context, page Page) (string, error)
+
 	// Outcome は op app.outcome。
 	Outcome(ctx context.Context, result Result) (string, error)
+
+	// Shown は op app.shown。
+	Shown(ctx context.Context, page Page) (string, error)
+
+	// ShownNote は op app.shownNote。
+	ShownNote(ctx context.Context, page Page) (string, error)
 
 	// Variants は op app.variants。
 	Variants(ctx context.Context, page Page) (string, error)

@@ -59,17 +59,17 @@
       "patterns": [
         {
           "name": "variable.other.property.hozo",
-          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b(?=\\s*:)"
+          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default)\\b(?=\\s*:)"
         },
         {
           "name": "variable.other.property.hozo",
-          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b"
+          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default)\\b"
         }
       ]
     },
     "override-name": {
       "comment": "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
-      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false))\\b",
+      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default))\\b",
       "captures": {
         "1": {
           "name": "storage.modifier.hozo"
@@ -170,7 +170,7 @@
     "declarations": {
       "patterns": [
         {
-          "match": "\\b(model|scalar|union|exception|classify|condition)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "match": "\\b(model|scalar|union|exception|classify)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
               "name": "keyword.declaration.hozo"
@@ -364,7 +364,7 @@
           ]
         },
         {
-          "comment": "ケースの as の後ろの型（docs/grammar.md「classify / condition」の CaseTyping）。, で次の CaseTyping が続く",
+          "comment": "ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping）。, で次の CaseTyping が続く",
           "begin": "\\b(as)\\b",
           "end": "(?=[;{,])",
           "beginCaptures": {
@@ -432,7 +432,7 @@
     },
     "keywords.declaration": {
       "name": "keyword.declaration.hozo",
-      "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind)\\b"
+      "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind)\\b"
     },
     "keywords.modifier": {
       "name": "storage.modifier.hozo",
@@ -440,7 +440,7 @@
     },
     "keywords.control": {
       "name": "keyword.control.hozo",
-      "match": "\\b(?:extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|else|throw)\\b"
+      "match": "\\b(?:extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|else|throw)\\b"
     },
     "keywords.type": {
       "name": "support.type.primitive.hozo",

@@ -85,7 +85,11 @@ type KeywordGroup struct {
 	Words []string // token.Keywords から集めた語。Kind の順（docs/grammar.md「予約語」の表の順）
 }
 
-// KeywordGroups は token.Keywords を docs/editors.md の scope ごとに分ける。
+// unwritable は、どの生成規則も使わない予約語（docs/grammar.md「予約語」: 書ける位置は FieldName と DecoratorName だけ）。
+// 予約語としては塗らない: 正しい仕様では、フィールド名かデコレータ名としてしか現れない。
+var unwritable = map[token.Kind]bool{token.Default: true}
+
+// KeywordGroups は token.Keywords を docs/editors.md の scope ごとに分ける。unwritable の語は、どの組にも入れない。
 func KeywordGroups() []KeywordGroup {
 	groups := []KeywordGroup{
 		{Key: "declaration", Scope: "keyword.declaration.hozo"},
@@ -100,6 +104,9 @@ func KeywordGroups() []KeywordGroup {
 	}
 	var all []kw
 	for w, k := range token.Keywords {
+		if unwritable[k] {
+			continue
+		}
 		all = append(all, kw{w, k})
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].kind < all[j].kind })
@@ -158,9 +165,15 @@ func Build() Grammar {
 		keywordIncludes = append(keywordIncludes, Rule{Include: "#" + key})
 	}
 
+	// フィールド名の位置の予約語のパターンは、塗らない予約語（unwritable）も含めた、すべての予約語から作る
 	var allWords []string
 	for _, g := range groups {
 		allWords = append(allWords, g.Words...)
+	}
+	for w, k := range token.Keywords {
+		if unwritable[k] {
+			allWords = append(allWords, w)
+		}
 	}
 	// 予約語の語の選択（\b なし）。フィールド名の位置の予約語（docs/grammar.md「識別子」の FieldName）に使う。
 	anyKeyword := `(?:` + strings.Join(allWords, "|") + `)`
@@ -266,7 +279,7 @@ func Build() Grammar {
 		// ---- 宣言の名前 ----
 		{Key: "declarations", Rule: Rule{Patterns: []Rule{
 			{
-				Match: `\b(model|scalar|union|exception|classify|condition)\s+(` + ident + `)`,
+				Match: `\b(model|scalar|union|exception|classify)\s+(` + ident + `)`,
 				Captures: Captures{
 					"1": {Name: "keyword.declaration.hozo"},
 					"2": {Name: "entity.name.type.hozo"},
@@ -387,7 +400,7 @@ func Build() Grammar {
 				Patterns: []Rule{{Include: "#type"}},
 			},
 			{
-				Comment: "ケースの as の後ろの型（docs/grammar.md「classify / condition」の CaseTyping）。, で次の CaseTyping が続く",
+				Comment: "ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping）。, で次の CaseTyping が続く",
 				Begin:   `\b(as)\b`,
 				End:     `(?=[;{,])`,
 				BeginCaptures: Captures{

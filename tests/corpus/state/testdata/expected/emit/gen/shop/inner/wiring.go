@@ -198,7 +198,7 @@ func (o *ops) Add(ctx context.Context, line Line) error {
 		if err := o.AddToCart(ctx, normalized); err != nil {
 			return err
 		}
-	case LoggedInDefault:
+	case LoggedInLoggedOut:
 		if err := o.ShowLogin(ctx); err != nil {
 			return err
 		}

@@ -18,8 +18,27 @@ func (o *ops) Describe(ctx context.Context, page Page) (string, error) {
 		return page.(Problem).Reason, nil
 	case PageCode:
 		return o.CodeText(ctx, page.(PageCode).Value)
-	default:
+	case PageBlank, PageNote:
 		return "other", nil
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.PageKind"}
+	}
+}
+
+// DescribeElse は op app.describeElse。
+func (o *ops) DescribeElse(ctx context.Context, page Page) (string, error) {
+	// match page by app.PageKind
+	switch page.(type) {
+	case Title:
+		return o.TitleOf(ctx, page.(Title))
+	case Problem:
+		return page.(Problem).Reason, nil
+	case PageCode:
+		return o.CodeText(ctx, page.(PageCode).Value)
+	case PageBlank, PageNote:
+		return "other", nil
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.PageKind"}
 	}
 }
 
@@ -31,8 +50,51 @@ func (o *ops) Outcome(ctx context.Context, result Result) (string, error) {
 		return o.ReceiptText(ctx, result.(Receipt))
 	case Problem:
 		return result.(Problem).Reason, nil
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Outcome"}
 	}
-	return "", &runtime.ClassificationError{Classify: "app.Outcome"}
+}
+
+// Shown は op app.shown。
+func (o *ops) Shown(ctx context.Context, page Page) (string, error) {
+	// match page by app.Shown
+	switch page.(type) {
+	case Title:
+		return o.TitleOf(ctx, page.(Title))
+	case PageCode:
+		return o.CodeText(ctx, page.(PageCode).Value)
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Shown"}
+	}
+}
+
+// ShownNote は op app.shownNote。
+func (o *ops) ShownNote(ctx context.Context, page Page) (string, error) {
+	// match page by app.Shown
+	var text *string
+	switch page.(type) {
+	case Title:
+		v0, err := o.TitleOf(ctx, page.(Title))
+		if err != nil {
+			return "", err
+		}
+		text = ptr(v0)
+	case PageCode:
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Shown"}
+	}
+	_ = text
+	// match page by app.Shown
+	switch page.(type) {
+	case Title:
+		if err := o.Show(ctx, "title"); err != nil {
+			return "", err
+		}
+	case PageCode:
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Shown"}
+	}
+	return "noted", nil
 }
 
 // Variants は op app.variants。
@@ -52,7 +114,9 @@ func (o *ops) Variants(ctx context.Context, page Page) (string, error) {
 			return "", err
 		}
 		text = ptr(v1)
+	case PageBlank, PageNote:
 	default:
+		return "", &runtime.ClassificationError{Classify: "app.PageKind"}
 	}
 	_ = text
 	// match page by app.PageKind
@@ -61,8 +125,19 @@ func (o *ops) Variants(ctx context.Context, page Page) (string, error) {
 		if err := o.Show(ctx, "ready"); err != nil {
 			return "", err
 		}
-	case Problem, PageCode:
+	case Problem, PageCode, PageBlank, PageNote:
 	default:
+		return "", &runtime.ClassificationError{Classify: "app.PageKind"}
+	}
+	// match page by app.PageKind
+	switch page.(type) {
+	case Title, Problem, PageBlank, PageNote:
+		if err := o.Show(ctx, "not code"); err != nil {
+			return "", err
+		}
+	case PageCode:
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.PageKind"}
 	}
 	return "done", nil
 }
@@ -81,8 +156,10 @@ func (o *ops) StageText(ctx context.Context) (string, error) {
 		return o.TitleOf(ctx, stage.(Title))
 	case Problem:
 		return stage.(Problem).Reason, nil
-	default:
+	case PageBlank, PageCode, PageNote:
 		return "none", nil
+	default:
+		return "", &runtime.ClassificationError{Classify: "app.Stage"}
 	}
 }
 
@@ -137,7 +214,7 @@ func (o *ops) Mail(ctx context.Context, addr string, contact *string) (string, e
 			return "", err
 		}
 		first = v0
-	case AddressDefault:
+	case AddressInvalid:
 		first = "invalid"
 	}
 	if err := o.Show(ctx, first); err != nil {
@@ -153,7 +230,7 @@ func (o *ops) Mail(ctx context.Context, addr string, contact *string) (string, e
 		return o.Send(ctx, Email(*contact))
 	case ContactText:
 		return *contact, nil
-	case ContactDefault:
+	case ContactSilent:
 		return "", o.Fail(ctx)
 	}
 	return "", &runtime.ClassificationError{Classify: "app.Contact"}
@@ -182,7 +259,7 @@ func (o *ops) Price(ctx context.Context, name string) (int64, error) {
 		value = v0
 	case StockSoldOut:
 		return 0, Bad{}
-	case StockDefault:
+	case StockUnknown:
 		return 0, o.Fail(ctx)
 	}
 	return value, nil
@@ -202,7 +279,7 @@ func (o *ops) LiteralSubjects(ctx context.Context) (string, error) {
 	switch k0 {
 	case AddressValid:
 		a = "ok"
-	case AddressDefault:
+	case AddressInvalid:
 		a = "ng"
 	}
 	if err := o.Show(ctx, a); err != nil {

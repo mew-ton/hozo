@@ -26,8 +26,9 @@ var goldenFixtures = []struct {
 	{name: "states", covers: "「op の置き場」（デコレータが reads と effects を運ぶ葉も Leaves）、「コメント」の Reads / Effects（配線に運ばれたものを含む）、「状態の単位」（read、効果、形で決まる命令）、「呼び出し」の read・効果・直に呼ぶ組み込みの効果、「状態の参照」", behavior: true},
 	{name: "bind", covers: "「bind で埋まる位置」の 1〜4、「別の名前空間の op」"},
 	{name: "matchif", covers: "「match」の二つに分ける形（nullable、list、presence）と、アームの本体の組"},
-	{name: "matchswitch", covers: "「match」の switch の形（variant、述語で決まる分類）、「絞り込んだ値」、「分類」", behavior: true},
+	{name: "matchswitch", covers: "「match」の switch の形（variant、述語で決まる分類）と、その「分類の誤りの枝」（型の switch の default:）、else のアーム、「絞り込んだ値」、「分類」", behavior: true},
 	{name: "matchelse", covers: "「match」の、残りのケース（対象 as else）を持つ型で決まる分類: 二つに分ける形のもう一方の枝（presence）、残りのアームを並べた case と絞り込んだ値（variant）。「分類」（何も出さない）", behavior: true},
+	{name: "matchclosed", covers: "「match」の、二つに分ける形の「分類の誤りの枝」（残りのケースを書かない presence の分類）と、else のアーム（受けるケースを名前で並べたアームと同じコード）", behavior: true},
 	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
 }

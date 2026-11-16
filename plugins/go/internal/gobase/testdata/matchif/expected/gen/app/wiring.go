@@ -17,7 +17,7 @@ func (o *ops) NameById(ctx context.Context, id string) (string, error) {
 		// Found: user は app.User
 		return o.LoadName(ctx, *user)
 	}
-	// default
+	// NotFound
 	return "", Missing{}
 }
 
@@ -41,7 +41,7 @@ func (o *ops) PureName(ctx context.Context, user *User) (string, error) {
 		// Some: user は app.User
 		return o.NameOf(ctx, *user)
 	}
-	// default
+	// Nothing
 	return "", o.Deny(ctx)
 }
 
@@ -101,7 +101,7 @@ func (o *ops) SignedInText(ctx context.Context) (string, error) {
 		// Yes: token は app.Token
 		return o.UseToken(ctx, *token)
 	}
-	// default
+	// No
 	return "anonymous", nil
 }
 

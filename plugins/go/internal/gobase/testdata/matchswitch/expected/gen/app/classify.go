@@ -8,7 +8,7 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// Size は述語で決まる値の分類（default がない）
+// Size は述語で決まる値の分類
 type Size int
 
 const (
@@ -67,18 +67,21 @@ func ClassifySize(ctx context.Context, c SizeCases, v Item) (Size, error) {
 	return kind, &runtime.ClassificationError{Classify: "app.Size", Hits: hits}
 }
 
-// Address は述語で決まる値の分類（default がある）。絞り込みは predicate（string を Email に）
+// Address は述語で決まる値の分類。二つに分かれ、どちらのケースも述語を持つ。絞り込みは predicate（string を Email に）
 type Address int
 
 const (
 	AddressValid Address = iota
-	AddressDefault
+	// メールアドレスでない
+	AddressInvalid
 )
 
 // AddressCases は分類 app.Address のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
 type AddressCases interface {
 	// Valid はケース Valid の述語。
 	Valid(ctx context.Context, v string) (bool, error)
+	// Invalid はケース Invalid の述語。
+	Invalid(ctx context.Context, v string) (bool, error)
 }
 
 // ClassifyAddress は v を app.Address で分類する。すべての述語を呼び、真になった数を数える。
@@ -94,25 +97,31 @@ func ClassifyAddress(ctx context.Context, c AddressCases, v string) (Address, er
 		hits = append(hits, "Valid")
 		kind = AddressValid
 	}
+	if ok, err := c.Invalid(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
+		hits = append(hits, "Invalid")
+		kind = AddressInvalid
+	}
 	if first != nil {
 		return kind, first
 	}
 	switch len(hits) {
 	case 1:
 		return kind, nil
-	case 0:
-		return AddressDefault, nil
 	}
 	return kind, &runtime.ClassificationError{Classify: "app.Address", Hits: hits}
 }
 
-// Contact は述語で決まる値の分類。型で決まる絞り込み（presence）の as を持つケースと、predicate の as を持つケース
+// Contact は述語で決まる値の分類。型で決まる絞り込み（presence）の as を持つケースと、predicate の as を持つケースと、as のないケース
 type Contact int
 
 const (
 	ContactMail Contact = iota
 	ContactText
-	ContactDefault
+	ContactSilent
 )
 
 // ContactCases は分類 app.Contact のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
@@ -121,6 +130,8 @@ type ContactCases interface {
 	Mail(ctx context.Context, v *string) (bool, error)
 	// Text はケース Text の述語。
 	Text(ctx context.Context, v *string) (bool, error)
+	// Silent はケース Silent の述語。
+	Silent(ctx context.Context, v *string) (bool, error)
 }
 
 // ClassifyContact は v を app.Contact で分類する。すべての述語を呼び、真になった数を数える。
@@ -146,14 +157,20 @@ func ClassifyContact(ctx context.Context, c ContactCases, v *string) (Contact, e
 			kind = ContactText
 		}
 	}
+	if ok, err := c.Silent(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
+		hits = append(hits, "Silent")
+		kind = ContactSilent
+	}
 	if first != nil {
 		return kind, first
 	}
 	switch len(hits) {
 	case 1:
 		return kind, nil
-	case 0:
-		return ContactDefault, nil
 	}
 	return kind, &runtime.ClassificationError{Classify: "app.Contact", Hits: hits}
 }
@@ -164,7 +181,7 @@ type Stock int
 const (
 	StockInStock Stock = iota
 	StockSoldOut
-	StockDefault
+	StockUnknown
 )
 
 // StockCases は分類 app.Stock のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
@@ -173,6 +190,8 @@ type StockCases interface {
 	InStock(ctx context.Context, v *Item) (bool, error)
 	// SoldOut はケース SoldOut の述語。
 	SoldOut(ctx context.Context, v *Item) (bool, error)
+	// Unknown はケース Unknown の述語。
+	Unknown(ctx context.Context, v *Item) (bool, error)
 }
 
 // ClassifyStock は v を app.Stock で分類する。すべての述語を呼び、真になった数を数える。
@@ -200,14 +219,20 @@ func ClassifyStock(ctx context.Context, c StockCases, v *Item) (Stock, error) {
 			kind = StockSoldOut
 		}
 	}
+	if ok, err := c.Unknown(ctx, v); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
+		hits = append(hits, "Unknown")
+		kind = StockUnknown
+	}
 	if first != nil {
 		return kind, first
 	}
 	switch len(hits) {
 	case 1:
 		return kind, nil
-	case 0:
-		return StockDefault, nil
 	}
 	return kind, &runtime.ClassificationError{Classify: "app.Stock", Hits: hits}
 }

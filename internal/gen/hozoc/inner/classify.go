@@ -15,7 +15,7 @@ const (
 	// 一致している
 	OutputsSyncUpToDate OutputsSync = iota
 	// 足りない、古い、または余分なファイルがある
-	OutputsSyncDefault
+	OutputsSyncOutOfDate
 )
 
 // ClassifyOutputsSync は、状態の分類 hozoc.OutputsSync の今のケースを返す。すべての述語を呼び、真になった数を数える。
@@ -31,14 +31,20 @@ func ClassifyOutputsSync(ctx context.Context, s OutputsSyncState) (OutputsSync, 
 		hits = append(hits, "UpToDate")
 		kind = OutputsSyncUpToDate
 	}
+	if ok, err := s.OutOfDate(ctx); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
+		hits = append(hits, "OutOfDate")
+		kind = OutputsSyncOutOfDate
+	}
 	if first != nil {
 		return kind, first
 	}
 	switch len(hits) {
 	case 1:
 		return kind, nil
-	case 0:
-		return OutputsSyncDefault, nil
 	}
 	return kind, &runtime.ClassificationError{Classify: "hozoc.OutputsSync", Hits: hits}
 }

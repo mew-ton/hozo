@@ -43,7 +43,7 @@ func callsProgram(ops ...ir.Decl) *ir.Program {
 		state("store.title", ir.StateSingle, ir.String()),
 		create, byEmail, limit, exc("store.Plain"),
 		&ir.Classify{DeclBase: ir.DeclBase{Name: "store.K", Span: sp("store.K")}, Subject: ir.TypeSubject{Type: ir.String()},
-			Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}, HasDefault: true, DecidedBy: ir.DecidedByPredicate},
+			Cases: []ir.ClassifyCase{{Name: "A"}, {Name: "B"}}, DecidedBy: ir.DecidedByPredicate},
 		check,
 	}
 	return program(nil, namespace("store", append(decls, ops...)...))

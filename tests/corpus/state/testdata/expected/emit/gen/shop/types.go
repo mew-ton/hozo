@@ -31,7 +31,7 @@ const EffectPlaceOrder = inner.EffectPlaceOrder
 const EffectStartOver = inner.EffectStartOver
 
 // EffectTouchCheckout は進み具合を記録し直す
-// on shop.Checkout: Shopping | Ordered -> any
+// on shop.Checkout: Shopping, Ordered -> any
 const EffectTouchCheckout = inner.EffectTouchCheckout
 
 // EffectSignIn はログインする

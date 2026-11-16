@@ -1283,7 +1283,7 @@
             },
             "end": {
               "line": 52,
-              "col": 30
+              "col": 50
             }
           },
           "subject": {
@@ -1295,23 +1295,36 @@
           },
           "cases": [
             {
-              "name": "IsActive",
+              "name": "Active",
               "as": [],
               "span": {
                 "file": "a.hozo",
                 "start": {
                   "line": 52,
-                  "col": 13
+                  "col": 31
                 },
                 "end": {
                   "line": 52,
-                  "col": 21
+                  "col": 38
+                }
+              }
+            },
+            {
+              "name": "Inactive",
+              "as": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 52,
+                  "col": 39
+                },
+                "end": {
+                  "line": 52,
+                  "col": 48
                 }
               }
             }
           ],
-          "hasDefault": true,
-          "fromCondition": true,
           "decidedBy": "predicate"
         },
         {
@@ -1326,7 +1339,7 @@
             },
             "end": {
               "line": 53,
-              "col": 68
+              "col": 62
             }
           },
           "subject": {
@@ -1373,17 +1386,30 @@
                   "col": 45
                 }
               }
+            },
+            {
+              "name": "C",
+              "description": {
+                "summary": "それ以外",
+                "body": "それ以外",
+                "params": [],
+                "throws": [],
+                "see": []
+              },
+              "as": [],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 53,
+                  "col": 58
+                },
+                "end": {
+                  "line": 53,
+                  "col": 60
+                }
+              }
             }
           ],
-          "hasDefault": true,
-          "defaultDescription": {
-            "summary": "それ以外",
-            "body": "それ以外",
-            "params": [],
-            "throws": [],
-            "see": []
-          },
-          "fromCondition": false,
           "decidedBy": "predicate"
         },
         {
@@ -2504,6 +2530,7 @@
                         "cases": [
                           "HasItems"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "call",
                           "call": {
@@ -2571,6 +2598,7 @@
                         "cases": [
                           "Empty"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "none"
                         },
@@ -2737,7 +2765,7 @@
             },
             "end": {
               "line": 91,
-              "col": 59
+              "col": 71
             }
           },
           "subject": {
@@ -2785,10 +2813,45 @@
                   "col": 48
                 }
               }
+            },
+            {
+              "name": "Miss",
+              "as": [
+                {
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "ref",
+                      "target": "a.User"
+                    }
+                  },
+                  "by": "else",
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 91,
+                      "col": 55
+                    },
+                    "end": {
+                      "line": 91,
+                      "col": 68
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 91,
+                  "col": 49
+                },
+                "end": {
+                  "line": 91,
+                  "col": 69
+                }
+              }
             }
           ],
-          "hasDefault": true,
-          "fromCondition": false,
           "decidedBy": "type"
         },
         {
@@ -2803,7 +2866,7 @@
             },
             "end": {
               "line": 92,
-              "col": 62
+              "col": 73
             }
           },
           "subject": {
@@ -2847,10 +2910,46 @@
                   "col": 51
                 }
               }
+            },
+            {
+              "name": "Out",
+              "as": [
+                {
+                  "state": "a.token",
+                  "type": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  },
+                  "by": "else",
+                  "span": {
+                    "file": "a.hozo",
+                    "start": {
+                      "line": 92,
+                      "col": 57
+                    },
+                    "end": {
+                      "line": 92,
+                      "col": 70
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "a.hozo",
+                "start": {
+                  "line": 92,
+                  "col": 52
+                },
+                "end": {
+                  "line": 92,
+                  "col": 71
+                }
+              }
             }
           ],
-          "hasDefault": true,
-          "fromCondition": false,
           "decidedBy": "type"
         },
         {
@@ -2998,6 +3097,7 @@
                         "cases": [
                           "Hit"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "call",
                           "call": {
@@ -3062,7 +3162,10 @@
                         }
                       },
                       {
-                        "cases": "default",
+                        "cases": [
+                          "Miss"
+                        ],
+                        "else": true,
                         "body": {
                           "kind": "throw",
                           "exception": "a.Unauthorized",
@@ -3071,11 +3174,11 @@
                             "file": "a.hozo",
                             "start": {
                               "line": 97,
-                              "col": 18
+                              "col": 15
                             },
                             "end": {
                               "line": 97,
-                              "col": 36
+                              "col": 33
                             }
                           }
                         },
@@ -3088,7 +3191,7 @@
                           },
                           "end": {
                             "line": 97,
-                            "col": 37
+                            "col": 34
                           }
                         }
                       }
@@ -3192,6 +3295,7 @@
                         "cases": [
                           "HasItems"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "atom",
                           "atom": {
@@ -3235,6 +3339,7 @@
                         "cases": [
                           "Empty"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "none"
                         },
@@ -3406,6 +3511,7 @@
                         "cases": [
                           "In"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "atom",
                           "atom": {
@@ -3447,7 +3553,10 @@
                         }
                       },
                       {
-                        "cases": "default",
+                        "cases": [
+                          "Out"
+                        ],
+                        "else": false,
                         "body": {
                           "kind": "call",
                           "call": {
@@ -3461,11 +3570,11 @@
                               "file": "a.hozo",
                               "start": {
                                 "line": 105,
-                                "col": 55
+                                "col": 51
                               },
                               "end": {
                                 "line": 105,
-                                "col": 61
+                                "col": 57
                               }
                             }
                           }
@@ -3479,7 +3588,7 @@
                           },
                           "end": {
                             "line": 105,
-                            "col": 62
+                            "col": 58
                           }
                         }
                       }
@@ -3492,7 +3601,7 @@
                       },
                       "end": {
                         "line": 105,
-                        "col": 64
+                        "col": 60
                       }
                     }
                   }
@@ -3505,7 +3614,7 @@
                   },
                   "end": {
                     "line": 105,
-                    "col": 65
+                    "col": 61
                   }
                 }
               }
@@ -3856,6 +3965,7 @@
                           "A",
                           "B"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "call",
                           "call": {
@@ -3875,11 +3985,11 @@
                                     "file": "a.hozo",
                                     "start": {
                                       "line": 114,
-                                      "col": 23
+                                      "col": 22
                                     },
                                     "end": {
                                       "line": 114,
-                                      "col": 24
+                                      "col": 23
                                     }
                                   }
                                 }
@@ -3890,11 +4000,11 @@
                               "file": "a.hozo",
                               "start": {
                                 "line": 114,
-                                "col": 16
+                                "col": 15
                               },
                               "end": {
                                 "line": 114,
-                                "col": 25
+                                "col": 24
                               }
                             }
                           }
@@ -3923,16 +4033,33 @@
                           },
                           "end": {
                             "line": 114,
-                            "col": 26
+                            "col": 25
                           }
                         }
                       },
                       {
-                        "cases": "default",
+                        "cases": [
+                          "C"
+                        ],
+                        "else": true,
                         "body": {
                           "kind": "none"
                         },
-                        "narrowed": [],
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "a.Kind",
+                              "cases": [
+                                "C"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "a.User"
+                              }
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "a.hozo",
                           "start": {
@@ -3941,7 +4068,7 @@
                           },
                           "end": {
                             "line": 115,
-                            "col": 23
+                            "col": 20
                           }
                         }
                       }
@@ -7839,7 +7966,7 @@
             },
             "end": {
               "line": 43,
-              "col": 43
+              "col": 41
             }
           },
           "subject": {
@@ -7864,10 +7991,23 @@
                   "col": 32
                 }
               }
+            },
+            {
+              "name": "Light",
+              "as": [],
+              "span": {
+                "file": "d.hozo",
+                "start": {
+                  "line": 43,
+                  "col": 33
+                },
+                "end": {
+                  "line": 43,
+                  "col": 39
+                }
+              }
             }
           ],
-          "hasDefault": true,
-          "fromCondition": false,
           "decidedBy": "predicate"
         },
         {
@@ -8143,6 +8283,7 @@
                         "cases": [
                           "Heavy"
                         ],
+                        "else": false,
                         "body": {
                           "kind": "throw",
                           "exception": "lib.Busy",
@@ -8230,7 +8371,10 @@
                         }
                       },
                       {
-                        "cases": "default",
+                        "cases": [
+                          "Light"
+                        ],
+                        "else": false,
                         "body": {
                           "kind": "call",
                           "call": {
@@ -8251,11 +8395,11 @@
                                     "file": "d.hozo",
                                     "start": {
                                       "line": 50,
-                                      "col": 24
+                                      "col": 22
                                     },
                                     "end": {
                                       "line": 50,
-                                      "col": 28
+                                      "col": 26
                                     }
                                   }
                                 }
@@ -8266,16 +8410,30 @@
                               "file": "d.hozo",
                               "start": {
                                 "line": 50,
-                                "col": 18
+                                "col": 16
                               },
                               "end": {
                                 "line": 50,
-                                "col": 29
+                                "col": 27
                               }
                             }
                           }
                         },
-                        "narrowed": [],
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "lib.Load",
+                              "cases": [
+                                "Light"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "lib.Row"
+                              }
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "d.hozo",
                           "start": {
@@ -8284,7 +8442,7 @@
                           },
                           "end": {
                             "line": 50,
-                            "col": 30
+                            "col": 28
                           }
                         }
                       }

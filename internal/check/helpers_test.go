@@ -162,12 +162,9 @@ func ret(c ir.Call) ir.Statement { return ir.ReturnStmt{Expr: ir.CallExpr{Call: 
 
 func retAtom(a ir.Atom) ir.Statement { return ir.ReturnStmt{Expr: ir.AtomExpr{Atom: a}} }
 
-// arm は match のアーム。body が nil なら none。
+// arm は match のアーム。body が nil なら none。cases がなければ else のアーム（受けるケースは、ここの計算が読まないので、置かない）。
 func arm(body *ir.Call, cases ...string) ir.MatchArm {
-	a := ir.MatchArm{Cases: ir.ArmCases{Cases: cases}}
-	if len(cases) == 0 {
-		a.Cases = ir.DefaultArm()
-	}
+	a := ir.MatchArm{Cases: cases, Else: len(cases) == 0}
 	if body == nil {
 		a.Body = ir.NoneBody{}
 	} else {
@@ -192,20 +189,12 @@ func matchState(state string, shape ir.StateShape, arms ...ir.MatchArm) ir.State
 
 // throwArm はアームの本体が `throw E` のアーム。
 func throwArm(exception string, cases ...string) ir.MatchArm {
-	a := ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.ThrowBody{Exception: exception, Span: sp("call." + parentOf(exception) + ".throw")}}
-	if len(cases) == 0 {
-		a.Cases = ir.DefaultArm()
-	}
-	return a
+	return ir.MatchArm{Cases: cases, Else: len(cases) == 0, Body: ir.ThrowBody{Exception: exception, Span: sp("call." + parentOf(exception) + ".throw")}}
 }
 
 // atomArm はアームの本体が値のアーム。
 func atomArm(v ir.Atom, cases ...string) ir.MatchArm {
-	a := ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.AtomExpr{Atom: v}}
-	if len(cases) == 0 {
-		a.Cases = ir.DefaultArm()
-	}
-	return a
+	return ir.MatchArm{Cases: cases, Else: len(cases) == 0, Body: ir.AtomExpr{Atom: v}}
 }
 
 // matchByClassify は状態の分類での match の文（`match by C { ... };`）。

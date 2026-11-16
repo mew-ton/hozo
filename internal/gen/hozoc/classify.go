@@ -15,7 +15,7 @@ const (
 	// 一致している
 	OutputsSyncUpToDate = inner.OutputsSyncUpToDate
 	// 足りない、古い、または余分なファイルがある
-	OutputsSyncDefault = inner.OutputsSyncDefault
+	OutputsSyncOutOfDate = inner.OutputsSyncOutOfDate
 )
 
 // ClassifyOutputsSync は、状態の分類 hozoc.OutputsSync の今のケースを返す。すべての述語を呼び、真になった数を数える。

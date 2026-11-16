@@ -581,7 +581,7 @@ func TestNamespacesKeysSorted(t *testing.T) {
 	}
 }
 
-func TestRelationAndArmCases(t *testing.T) {
+func TestRelationAndMatchArm(t *testing.T) {
 	// アームのケースは、いつもケース名の列（docs/ir.md「配線」の MatchArm）。なくても []。0.7 までの "default" は読めない
 	b0, _ := json.Marshal(MatchArm{Else: true, Body: NoneBody{}, Span: sp()})
 	if want := `{"cases":[],"else":true,"body":{"kind":"none"},"narrowed":[],` + spJSON + `}`; string(b0) != want {

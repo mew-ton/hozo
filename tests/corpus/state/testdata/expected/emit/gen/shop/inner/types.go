@@ -36,7 +36,7 @@ const EffectPlaceOrder runtime.Effect = "shop.placeOrder"
 const EffectStartOver runtime.Effect = "shop.startOver"
 
 // EffectTouchCheckout は進み具合を記録し直す
-// on shop.Checkout: Shopping | Ordered -> any
+// on shop.Checkout: Shopping, Ordered -> any
 const EffectTouchCheckout runtime.Effect = "shop.touchCheckout"
 
 // EffectSignIn はログインする

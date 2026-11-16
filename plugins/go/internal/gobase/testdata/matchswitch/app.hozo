@@ -33,47 +33,53 @@ namespace app {
   /** 注文 */
   state orders: list<Item>;
 
-  /** 型で決まる値の分類（variant。default がある） */
+  /** 型で決まる値の分類（variant。残りのケースが、残りのアーム Blank と Note を受ける） */
   classify PageKind of Page {
     IsReady: Page as Title;
     IsFailed: Page as Problem;
     IsCode: Page as int;
-    Other: Page as else;
+    Rest: Page as else;
   }
-  /** 型で決まる値の分類（variant。すべてのアームを覆うので default がない） */
+  /** 型で決まる値の分類（variant。すべてのアームを覆う） */
   classify Outcome of Result {
     Ok: Result as Receipt;
     Err: Result as Problem;
+  }
+  /** 型で決まる値の分類（variant。残りのケースがなく、アーム Blank、Failed、Note の値は、どのケースでもない） */
+  classify Shown of Page {
+    ShowsTitle: Page as Title;
+    ShowsCode: Page as int;
   }
   /** 型で決まる状態の分類（variant） */
   classify Stage of stage {
     Showing: stage as Title;
     Broken: stage as Problem;
-    Other: stage as else;
+    Hidden: stage as else;
   }
-  /** 述語で決まる値の分類（default がない） */
+  /** 述語で決まる値の分類 */
   classify Size of Item {
     /** 大きい */
     Big;
     Small;
     Tiny;
   }
-  /** 述語で決まる値の分類（default がある）。絞り込みは predicate（string を Email に） */
+  /** 述語で決まる値の分類。二つに分かれ、どちらのケースも述語を持つ。絞り込みは predicate（string を Email に） */
   classify Address of string {
     Valid: string as Email;
-    Other: string as else;
+    /** メールアドレスでない */
+    Invalid;
   }
-  /** 述語で決まる値の分類。型で決まる絞り込み（presence）の as を持つケースと、predicate の as を持つケース */
+  /** 述語で決まる値の分類。型で決まる絞り込み（presence）の as を持つケースと、predicate の as を持つケースと、as のないケース */
   classify Contact of string? {
     Mail: string? as Email;
     Text: string? as string;
-    Other: string? as else;
+    Silent;
   }
   /** 述語で決まる op の分類（同じ型に絞り込むケースが二つ） */
   classify Stock of findItem {
     InStock: findItem as Item;
     SoldOut: findItem as Item;
-    Other: findItem as else;
+    Unknown;
   }
   /** 述語で決まる状態の分類 */
   classify Checkout of carts, orders {
@@ -92,8 +98,20 @@ namespace app {
   export op show(text: string);
   export op fail(): never throws Bad;
 
-  // variant の return match: switch <対象>.(type)。絞り込んだ値（アームの型、包む型の .Value）、フィールドを読む、default
+  // variant の return match: switch <対象>.(type)。絞り込んだ値（アームの型、包む型の .Value）、フィールドを読む、残りのケースの節。
+  // 最後の節は、いつも default:（分類の誤りの枝）
   export op describe(page: Page): string
+  {
+    return match page by PageKind {
+      IsCode   => codeText(page);
+      IsReady  => titleOf(page);
+      IsFailed => page.reason;
+      Rest     => "other";
+    };
+  }
+
+  // else のアームは、受けるケースを名前で並べたアームと、同じコードになる: describe と、本体が同じ（else は Rest を受ける）
+  export op describeElse(page: Page): string
   {
     return match page by PageKind {
       IsCode   => codeText(page);
@@ -103,7 +121,7 @@ namespace app {
     };
   }
 
-  // variant の return match で、default の節がない（純粋な配線。switch の後ろは return <零値>, &runtime.ClassificationError{…}）
+  // variant の return match で、書いた型が union のすべてのアームを覆う（純粋な配線）。union の値がない（nil）ために、default: の節は置く
   export op outcome(result: Result): string
   {
     return match result by Outcome {
@@ -112,18 +130,45 @@ namespace app {
     };
   }
 
-  // variant の const と文。複数のケースを並べたアーム（対象の型は変わらない）
+  // 残りのケースのない variant の return match: 書かなかった型のアームの値は、default: の節で、分類の誤り
+  export op shown(page: Page): string
+  {
+    return match page by Shown {
+      ShowsTitle => titleOf(page);
+      ShowsCode  => codeText(page);
+    };
+  }
+
+  // 同じ分類の const と文の match: どの節にも入らない値は、通り抜けずに、default: の節で、分類の誤り
+  export op shownNote(page: Page): string
+  {
+    const text = match page by Shown {
+      ShowsTitle => titleOf(page);
+      ShowsCode  => none;
+    };
+    match page by Shown {
+      ShowsTitle => show("title");
+      ShowsCode  => none;
+    };
+    return "noted";
+  }
+
+  // variant の const と文。複数のケースを受けるアーム（対象の型は変わらない）。else のアームは、型を書いたケースと残りのケースを
+  // 受ける（case は、それぞれの Go の型を並べる）
   @mark export op variants(page: Page): string
   {
     const text = match page by PageKind {
-      IsReady, IsFailed  => load("page");
-      IsCode             => codeText(page);
-      else               => none;
+      IsReady, IsFailed => load("page");
+      IsCode            => codeText(page);
+      else              => none;
     };
     match page by PageKind {
-      IsReady           => show("ready");
-      IsFailed, IsCode  => none;
-      else              => none;
+      IsReady => show("ready");
+      else    => none;
+    };
+    match page by PageKind {
+      IsCode => none;
+      else   => show("not code");
     };
     return "done";
   }
@@ -138,7 +183,7 @@ namespace app {
     };
   }
 
-  // 述語で決まる値の分類の return match: 判定関数と失敗の扱い、switch k<n>。default の節がないので、後ろに return を置く。
+  // 述語で決まる値の分類の return match: 判定関数と失敗の扱い、switch k<n>。default: の節がないので、後ろに return を置く。
   // ケースで絞り込んだ型（Size.Big<Item>）は、Go では同じ型
   @mark export op sizeLabel(item: Item): string
   {
@@ -149,12 +194,13 @@ namespace app {
     };
   }
 
-  // 述語で決まる分類を、純粋で throws のない配線が使う（判定の誤りは、error として返す。panic にしない）
+  // 述語で決まる分類を、純粋で throws のない配線が使う（判定の誤りは、error として返す。panic にしない）。
+  // else のアームは、受けるケースの定数を並べた case（Go の default: ではない）
   export op pureLabel(item: Item): string
   {
     return match item by Size {
-      Big, Small  => "normal";
-      Tiny        => "tiny";
+      Tiny => "tiny";
+      else => "normal";
     };
   }
 
@@ -164,13 +210,13 @@ namespace app {
   {
     const first = match addr by Address {
       Valid   => send(addr);
-      else    => "invalid";
+      Invalid => "invalid";
     };
     show(first);
     return match contact by Contact {
-      Mail    => send(contact);
-      Text    => contact;
-      else    => fail();
+      Mail   => send(contact);
+      Text   => contact;
+      Silent => fail();
     };
   }
 
@@ -182,7 +228,7 @@ namespace app {
     const value = match item by Stock {
       InStock => priceOf(item);
       SoldOut => throw Bad;
-      else    => fail();
+      Unknown => fail();
     };
     return value;
   }
@@ -192,14 +238,14 @@ namespace app {
     throws Bad
   {
     const a = match "x@example.com" by Address {
-      Valid   => "ok";
-      else    => "ng";
+      Valid => "ok";
+      else  => "ng";
     };
     show(a);
     return match { name: "box", price: 3 } by Size {
-      Big     => "big";
-      Small   => "small";
-      Tiny    => throw Bad;
+      Big   => "big";
+      Small => "small";
+      Tiny  => throw Bad;
     };
   }
 

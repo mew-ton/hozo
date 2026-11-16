@@ -37,7 +37,7 @@ const (
 	CampaignKindSpring = inner.CampaignKindSpring
 	CampaignKindSummer = inner.CampaignKindSummer
 	// キャンペーンの対象外
-	CampaignKindDefault = inner.CampaignKindDefault
+	CampaignKindNoCampaign = inner.CampaignKindNoCampaign
 )
 
 // CampaignKindCases は分類 browser.CampaignKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
@@ -48,12 +48,12 @@ func ClassifyCampaignKind(ctx context.Context, c CampaignKindCases, v server.Ite
 	return inner.ClassifyCampaignKind(ctx, c, v)
 }
 
-// WarrantyAvailable は二値の場合の糖衣: classify WarrantyAvailable of server.Item { WarrantyAvailable; default; } と同じ
+// WarrantyAvailable は保証プランを選べるか。二値の場合も、両側に名前を付ける（§10.1 の `condition WarrantyAvailable of server.Item;` は、なくした書き方）
 type WarrantyAvailable = inner.WarrantyAvailable
 
 const (
-	WarrantyAvailableWarrantyAvailable = inner.WarrantyAvailableWarrantyAvailable
-	WarrantyAvailableDefault           = inner.WarrantyAvailableDefault
+	WarrantyAvailableAvailable   = inner.WarrantyAvailableAvailable
+	WarrantyAvailableUnavailable = inner.WarrantyAvailableUnavailable
 )
 
 // WarrantyAvailableCases は分類 browser.WarrantyAvailable のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。

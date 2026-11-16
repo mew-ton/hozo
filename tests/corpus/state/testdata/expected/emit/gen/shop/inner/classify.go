@@ -49,12 +49,12 @@ func ClassifyCheckout(ctx context.Context, s CheckoutState) (Checkout, error) {
 	return kind, &runtime.ClassificationError{Classify: "shop.Checkout", Hits: hits}
 }
 
-// LoggedIn はログインしている
+// LoggedIn はログインしているか
 type LoggedIn int
 
 const (
 	LoggedInLoggedIn LoggedIn = iota
-	LoggedInDefault
+	LoggedInLoggedOut
 )
 
 // ClassifyLoggedIn は、状態の分類 shop.LoggedIn の今のケースを返す。すべての述語を呼び、真になった数を数える。
@@ -70,14 +70,20 @@ func ClassifyLoggedIn(ctx context.Context, s LoggedInState) (LoggedIn, error) {
 		hits = append(hits, "LoggedIn")
 		kind = LoggedInLoggedIn
 	}
+	if ok, err := s.LoggedOut(ctx); err != nil {
+		if first == nil {
+			first = err
+		}
+	} else if ok {
+		hits = append(hits, "LoggedOut")
+		kind = LoggedInLoggedOut
+	}
 	if first != nil {
 		return kind, first
 	}
 	switch len(hits) {
 	case 1:
 		return kind, nil
-	case 0:
-		return LoggedInDefault, nil
 	}
 	return kind, &runtime.ClassificationError{Classify: "shop.LoggedIn", Hits: hits}
 }

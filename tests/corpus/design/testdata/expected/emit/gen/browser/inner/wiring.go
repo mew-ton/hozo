@@ -126,13 +126,13 @@ func (o *ops) ChooseWarrantyPlan(ctx context.Context, item server.Item) (*server
 		return nil, err
 	}
 	switch k0 {
-	case WarrantyAvailableWarrantyAvailable:
+	case WarrantyAvailableAvailable:
 		v0, err := o.AskWarrantyPlan(ctx, item)
 		if err != nil {
 			return nil, err
 		}
 		plan = ptr(v0)
-	case WarrantyAvailableDefault:
+	case WarrantyAvailableUnavailable:
 	}
 	return plan, nil
 }

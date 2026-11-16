@@ -30,7 +30,7 @@ namespace app {
   /** 型で決まる状態の分類（単位を持たない。遷移の宛先の単位は、ただ一つの対象の状態） */
   classify SignedIn of token {
     Yes: token as Token;
-    Other: token as else;
+    No: token as else;
   }
 
   // 「状態の単位」read: 読む状態の単位の問い合わせ（宣言順）。説明は、メソッドのコメントに写す

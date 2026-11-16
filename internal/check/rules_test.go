@@ -249,10 +249,10 @@ func TestCfg22(t *testing.T) {
 	ref := ir.Ref(T)
 	types := func() ir.Namespace {
 		return namespace("types", model(T), exc("types.E"), &ir.Classify{DeclBase: ir.DeclBase{Name: "types.K", Span: sp("types.K")},
-			Subject: ir.TypeSubject{Type: ir.String()}, DecidedBy: ir.DecidedByPredicate, HasDefault: true})
+			Subject: ir.TypeSubject{Type: ir.String()}, DecidedBy: ir.DecidedByPredicate, Cases: []ir.ClassifyCase{{Name: "A"}}})
 	}
 	classifyOf := func(fqn string, subject ir.ClassifySubject, as ...ir.CaseTyping) *ir.Classify {
-		return &ir.Classify{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Subject: subject, HasDefault: true,
+		return &ir.Classify{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Subject: subject,
 			Cases: []ir.ClassifyCase{{Name: "A", As: as}}, DecidedBy: ir.DecidedByPredicate}
 	}
 	withThrows := func(o *ir.Op, x string) *ir.Op {
@@ -293,7 +293,7 @@ func TestCfg22(t *testing.T) {
 		// 5: 単位の対象の配線の match
 		{"述語で決まる、別の名前空間の分類", []ir.Decl{wire("server.w", nil, []ir.OpParam{param("v", ir.String())},
 			ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("v")}, Classify: "types.K",
-				Arms: []ir.MatchArm{{Cases: ir.DefaultArm(), Body: ir.NoneBody{}}}}})}, true},
+				Arms: []ir.MatchArm{{Cases: []string{"A"}, Body: ir.NoneBody{}}}}})}, true},
 		// 数えないもの
 		{"デコレータの適用とその引数", []ir.Decl{func() ir.Decl {
 			o := leaf("server.o", nil)

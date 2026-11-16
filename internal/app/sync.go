@@ -20,7 +20,7 @@ import (
 // JSON の文字列の配列で、パスはルートからの相対パス（"/" 区切り）、辞書順。
 const OutputsFile = ".hozoc-outputs.json"
 
-// OutputsSync は、状態の分類 OutputsSync の単位の実装: 述語 UpToDate（問い合わせ）と、効果 syncOutputs（命令）。
+// OutputsSync は、状態の分類 OutputsSync の単位の実装: 述語 UpToDate と OutOfDate（問い合わせ）と、効果 syncOutputs（命令）。
 // hozoc.New の引数 outputsSync に渡す（[App.Ops]）。
 func (a *App) OutputsSync() hozoc.OutputsSyncState { return outputsSync{a} }
 
@@ -136,6 +136,17 @@ func (s outputsSync) UpToDate(ctx context.Context) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// OutOfDate は cli.hozo の分類 OutputsSync の述語（docs/cli.md「cli.hozo」「手で書くもの」）: 生成したファイルに、足りない、
+// 古い、または余分なものがあるか。UpToDate の否定で、同じ比べ方を使う（分類のケースは、どれも述語を持つ: docs/check.md
+// 「ケースの判定」）。生成し直せなければ、UpToDate と同じ例外を返す。
+func (s outputsSync) OutOfDate(ctx context.Context) (bool, error) {
+	upToDate, err := s.UpToDate(ctx)
+	if err != nil {
+		return false, err
+	}
+	return !upToDate, nil
 }
 
 // staleFile は、前回書いて、今回は書かないファイル一つ。

@@ -360,7 +360,7 @@ func TestSession(t *testing.T) {
 		"fallbackToCache":      protocol.SymbolInterface, // decorator
 		"clearToken":           protocol.SymbolFunction,  // op
 		"WarrantyKind":         protocol.SymbolEnum,      // classify
-		"WarrantyAvailable":    protocol.SymbolEnum,      // condition
+		"WarrantyAvailable":    protocol.SymbolEnum,      // classify（二つに分かれる分類も、両側がケース）
 		"OrdersQuery":          protocol.SymbolStruct,    // model
 		"unavailableOnFailure": protocol.SymbolInterface,
 	}
@@ -380,8 +380,11 @@ func TestSession(t *testing.T) {
 			t.Errorf("case %s kind = %d", ch.Name, ch.Kind)
 		}
 	}
-	if got := names(children["CampaignKind"]); strings.Join(got, ",") != "Spring,Summer" {
-		t.Errorf("CampaignKind の子（default を含まない）= %v", got)
+	if got := names(children["CampaignKind"]); strings.Join(got, ",") != "Spring,Summer,NoCampaign" {
+		t.Errorf("CampaignKind の子 = %v", got)
+	}
+	if got := names(children["WarrantyAvailable"]); strings.Join(got, ",") != "Available,Unavailable" {
+		t.Errorf("WarrantyAvailable の子 = %v", got)
 	}
 	if got := names(children["OrdersQuery"]); strings.Join(got, ",") != "page,status" || children["OrdersQuery"][0].Kind != protocol.SymbolField || children["OrdersQuery"][0].Detail != "PosInt" {
 		t.Errorf("OrdersQuery の子 = %+v", summarize(children["OrdersQuery"]))
@@ -646,11 +649,11 @@ func TestStateClassification(t *testing.T) {
 		{"effects placeOrder throws", len("effects "), "```hozo\neffect placeOrder() on Checkout: Shopping -> Ordered\n```"},
 		{"effects startOver {", len("effects "), "```hozo\neffect startOver() on Checkout: any -> Shopping\n```"},
 		{"effects clearCart {", len("effects "), "```hozo\neffect clearCart() on carts: HasItems -> Empty\n```"},
-		{"touchCheckout() on", 0, "```hozo\neffect touchCheckout() on Checkout: Shopping | Ordered -> any\n```"},
+		{"touchCheckout() on", 0, "```hozo\neffect touchCheckout() on Checkout: Shopping, Ordered -> any\n```"},
 		{"saveToken(token); }", 0, "```hozo\neffect saveToken(token: Token) on token: Empty -> HasItems\n```"},
 		// 分類の対象: 状態の分類は状態の名前の並び、値の分類は型
 		{"match by Checkout", len("match by "), "```hozo\nclassify Checkout of carts, orders\n```"},
-		{"match by LoggedIn", len("match by "), "```hozo\ncondition LoggedIn of token\n```"},
+		{"match by LoggedIn", len("match by "), "```hozo\nclassify LoggedIn of token\n```"},
 		{"match line by LineKind", len("match line by "), "```hozo\nclassify LineKind of Line\n```"},
 		// 状態の形
 		{"match token by nullable", len("match "), "```hozo\nstate token: nullable<Token>\n```"},
@@ -708,7 +711,7 @@ func TestStateClassification(t *testing.T) {
 		"token":         "nullable<Token>",
 		"addLine":       "(line: Line) on carts.post",
 		"placeOrder":    "() on Checkout: Shopping -> Ordered",
-		"touchCheckout": "() on Checkout: Shopping | Ordered -> any",
+		"touchCheckout": "() on Checkout: Shopping, Ordered -> any",
 		"clearCart":     "() on carts: HasItems -> Empty",
 		"Checkout":      "of carts, orders",
 		"LoggedIn":      "of token",
@@ -807,11 +810,11 @@ namespace store {
   op nameOf(user: type.User): string;
   classify Registration of findUser {
     Registered: findUser as type.User;
-    default;
+    Unregistered: findUser as else;
   }
   classify Session of current {
     LoggedIn: current as type.User;
-    default;
+    LoggedOut: current as else;
   }
   classify Account of findUser {
     Known: findUser as type.User;
@@ -834,7 +837,7 @@ namespace server {
     const user = store.findUser(id);
     return match user by store.Registration {
       Registered => store.nameOf2(user);
-      default    => throw type.Unauthorized;
+      else       => throw type.Unauthorized;
     };
   }
   export op lookup(id: string): string
@@ -969,7 +972,9 @@ namespace store {
 		shiftBy int
 	}{{"by nullable {", len("by ")}, {"HasItems => current;", 0}, {"Empty    => none;", 0},
 		// 残りのケースの `X as else` の else も、宣言を持たない（docs/lsp.md「定義へジャンプ」）
-		{"Unknown: findUser as else", len("Unknown: findUser as ")}} {
+		{"Unknown: findUser as else", len("Unknown: findUser as ")},
+		// アームの頭の else も、一つのケースを指さない
+		{"else       => throw type.Unauthorized;", 0}} {
 		var loc *protocol.Location
 		c.result(protocol.MethodDefinition, at(tt.needle, tt.shiftBy), &loc)
 		if loc != nil {
@@ -1037,13 +1042,13 @@ func TestCarryingDecorators(t *testing.T) {
    */
   @db.find @db.where("id", "x") @db.where("id", "y")
   read byId(id: string): Row? on rows;
-  classify Size of Row { Big; default; }
+  classify Size of Row { Big; Small; }
   op save(row: Row): Row? throws Busy {
     add(row);
     rows.post(row);
     return match row by Size {
       Big     => throw Busy(5m, "big");
-      default => byId(row.id);
+      else    => byId(row.id);
     };
   }
   /**
@@ -1126,7 +1131,7 @@ func TestCarryingDecorators(t *testing.T) {
 		// 版 0.6: 引数を持つ exception / effect / read、配線からの呼び出し、引数を持つ throw
 		{"効果の呼び出し", at("    add(row);", len("    ")), "add(row: Row) on rows.post;", 0, []string{"effect add(row: Row) on rows.post"}},
 		{"直に呼ぶ「状態.操作」の状態", at("    rows.post(row);", len("    ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
-		{"read の呼び出し", at("default => byId(row.id);", len("default => ")), "byId(id: string): Row?", 0, []string{"read byId(id: string): Row? on rows", "id で引く"}},
+		{"read の呼び出し", at("else    => byId(row.id);", len("else    => ")), "byId(id: string): Row?", 0, []string{"read byId(id: string): Row? on rows", "id で引く"}},
 		{"throw E(…) の E", at("throw Busy(5m", len("throw ")), "Busy(wait: Duration", 0, []string{"exception Busy(wait: Duration, note: string?)", "忙しい"}},
 		{"read の引数", at("byId(id: string): Row?", len("byId(")), "id: string): Row? on", 0, []string{"read byId(id: string): Row? on rows", "  id: string", "引く行の識別子"}},
 		{"例外の @param", at("@param wait", len("@param ")), "wait: Duration, note", 0, []string{"exception Busy(wait: Duration, note: string?)", "  wait: Duration", "待つ時間"}},
