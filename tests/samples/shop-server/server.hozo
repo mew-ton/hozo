@@ -1,6 +1,6 @@
 // サンプル shop-server の仕様（README.md）。HTTP の入口と業務の流れを持つ名前空間 server。
 // 保存先には触れない: 読み書きは store の op を、外への配送は mailer の op を呼ぶ。
-// 人が書く op（本体のない op）は七つで、どれも状態を読まず、効果を持たない。export を付けたのは HTTP の入口の五つだけで、ほかの十は内部の op（P33）。
+// 人が書く op（本体のない op）は七つで、どれも状態を読まず、効果を持たない。export を付けたのは HTTP の入口の五つだけで、ほかの十は内部の op（P33）。login には、サンプルの中のプラグインの語彙のデコレータ @rate.limited を付けた（継ぎ目。P38）。
 
 /** サーバー。HTTP の入口と、業務の流れ */
 namespace server {
@@ -39,6 +39,7 @@ namespace server {
 
   /** ログインする */
   @http.post("/login")
+  @rate.limited
   export op login(in: LoginInput): LoginOk
     throws type.InvalidCredentials
   {

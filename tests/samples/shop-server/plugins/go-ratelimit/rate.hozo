@@ -1,0 +1,12 @@
+// サンプル shop-server の中のプラグイン go-ratelimit が提供する語彙 rate（hozo-plugin.toml の vocabulary。../../README.md「サンプルの中のプラグイン」）。
+// デコレータ limited は、go-ratelimit が継ぎ目を宣言している（マニフェストの seams）。付いた op は、Go の基底 go が二層で出す。
+
+/** 呼び出しの頻度を制限する仕組みの語彙 */
+namespace rate {
+  /** 呼び出しの頻度の制限を超えた（op の中身は呼ばれていない） */
+  @http.status(429)
+  exception LimitExceeded;
+
+  /** この op を呼べる頻度を制限する。制限を超えた呼び出しは、op の中身を呼ばずに LimitExceeded */
+  decorator limited for op throws LimitExceeded prevents effects;
+}

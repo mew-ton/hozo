@@ -2,46 +2,25 @@
 
 package server
 
-import pkgtype "example.com/shop-server/gen/type"
+import "example.com/shop-server/gen/server/inner"
 
 // Credentials はログインの本文
-type Credentials struct {
-	Email    pkgtype.Email    `json:"email"`
-	Password pkgtype.Password `json:"password"`
-}
+type Credentials = inner.Credentials
 
 // LoginInput はログインの入力
-type LoginInput struct {
-	Body Credentials `json:"body"`
-}
+type LoginInput = inner.LoginInput
 
 // LoginOk はログインの結果
-type LoginOk struct {
-	User  pkgtype.PublicUser `json:"user"`
-	Token pkgtype.Token      `json:"token"`
-}
+type LoginOk = inner.LoginOk
 
 // AuthInput はトークンだけを運ぶ入力
-type AuthInput struct {
-	Token *pkgtype.Token `json:"token,omitempty"`
-}
+type AuthInput = inner.AuthInput
 
 // GetOrdersInput は注文一覧の入力
-type GetOrdersInput struct {
-	Token *pkgtype.Token `json:"token,omitempty"`
-	// 1 から数えるページ番号
-	Page int64 `json:"page"`
-}
+type GetOrdersInput = inner.GetOrdersInput
 
 // NewGetOrdersInput は既定値を入れた GetOrdersInput を返す。
-func NewGetOrdersInput() GetOrdersInput {
-	m := GetOrdersInput{}
-	m.Page = 1
-	return m
-}
+func NewGetOrdersInput() GetOrdersInput { return inner.NewGetOrdersInput() }
 
 // PlaceOrderInput は注文の入力
-type PlaceOrderInput struct {
-	Token *pkgtype.Token      `json:"token,omitempty"`
-	Lines []pkgtype.OrderLine `json:"lines"`
-}
+type PlaceOrderInput = inner.PlaceOrderInput

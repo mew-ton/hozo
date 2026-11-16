@@ -32,7 +32,9 @@ func main() {
 		log.Printf("通知 → %s: %s", notice.UserId, notice.Message)
 		return nil
 	}}
-	handler, store := onmem.New(memstore.New(), leaves, mailer)
+	// ログイン（@rate.limited の付いた op）は、1 分に 5 回まで
+	limiter := &app.Limiter{Now: time.Now, Max: 5, Window: time.Minute}
+	handler, store := onmem.New(memstore.New(), leaves, mailer, limiter)
 
 	// 試すためのユーザーを一人入れる（store の op で）
 	demo := pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: app.HashPassword("password123")}

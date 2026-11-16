@@ -1,12 +1,11 @@
 {
-  "pending": {
-    "shared": "期待する出力はすべて、P7〜P11、P29〜P33 の後の形を人が書いたもの。基底の go も、まだないトランスパイラの一つ（P9）で、今の hozoc の既定の出力はこの形を出さない"
-  },
   "transpilers": {
     "go": {
       "files": [
         "gen/type/doc.go",
         "gen/type/types.go",
+        "gen/rate/doc.go",
+        "gen/rate/types.go",
         "gen/store/doc.go",
         "gen/store/types.go",
         "gen/store/ops.go",
@@ -18,17 +17,23 @@
         "gen/server/doc.go",
         "gen/server/types.go",
         "gen/server/ops.go",
-        "gen/server/wiring.go"
+        "gen/server/inner/doc.go",
+        "gen/server/inner/types.go",
+        "gen/server/inner/ops.go",
+        "gen/server/inner/wiring.go"
       ]
     },
     "go-valid": {
-      "files": ["gen/type/validate.go", "gen/server/validate.go"]
+      "files": ["gen/type/validate.go", "gen/server/inner/validate.go"]
     },
     "go-sqlite": {
       "files": ["gen/store/db.go"]
     },
     "go-http": {
       "files": ["gen/server/http.go"]
+    },
+    "go-ratelimit": {
+      "files": ["gen/server/ratelimit.go"]
     }
   }
 }

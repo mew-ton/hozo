@@ -56,15 +56,13 @@ type Ops interface {
 	AddNotification(ctx context.Context, notification pkgtype.Notification) error
 }
 
-// New はこの名前空間の Ops を組み立てる。状態を読む葉と、効果を持つ葉は、状態の単位（states.go）の実装
-// users、sessions、orders、notifications の問い合わせと命令に委ねる。引数の並びは、状態の宣言順。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）。
 // 引数が nil かどうかは確かめない。
 func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState) Ops {
 	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications}
 }
 
-// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて:
-// export を付けた op は公開の名前（Ops のメソッド）、付けていない op は非公開の名前（op の名前そのまま）。
+// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
 type ops struct {
 	users         UsersState
 	sessions      SessionsState

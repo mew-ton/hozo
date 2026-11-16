@@ -4,7 +4,7 @@
 
 Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相乗り」）が、どんな仕様に対しても何を出すか。プラグインは `plugins/go/`、形の規則を写した公開の SDK は `plugin/golang`（`docs/packages.md`）、生成したコードが import するのは `runtime`。入力は `docs/ir.md` の `View`（出力ごとに一つ。見る側は出力する名前空間）、出力は `View.config.dir` の下のファイル（パスはルートからの相対）。
 
-基底が出すのは、**語彙を知らなくても、仕様と設定だけから一通りに決まるもの**: 型、op の関数の形、実装を受け取る口（インターフェース）、配線の本体、それらを組み立てる `New`。語彙に固有のもの（制約を確かめる関数、HTTP のハンドラ、表と SQL、CLI）は出さない。それは、この形の上に相乗りするトランスパイラが足す（`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md`）。型を写す op の中身も、機械的に決まる場合を含めて出さない（写すのは人が書く葉の op。写し忘れは、このツールでは確かめない）。
+基底が出すのは、**語彙を知らなくても、仕様と設定だけから一通りに決まるもの**: 型、op の関数の形、実装を受け取る口（インターフェース）、配線の本体、単位のトランスパイラが宣言した継ぎ目（「継ぎ目」）、それらを組み立てる `New`。「設定」は、`hozo.toml` と、単位のトランスパイラのマニフェスト（`View.config`）。語彙に固有のもの（制約を確かめる関数、HTTP のハンドラ、表と SQL、CLI）は出さない。それは、この形の上に相乗りするトランスパイラが足す（`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md`）。型を写す op の中身も、機械的に決まる場合を含めて出さない（写すのは人が書く葉の op。写し忘れは、このツールでは確かめない）。
 
 この文書の「N」は出力する名前空間（`View.viewer`）、「U」はその単位。「単位」は設定の単位（`docs/config.md`「単位」）で、「状態の単位」はこの文書の中の別の言葉（「状態の単位」）。期待する出力の実物は、サンプル `tests/samples/shop-server/` の `gen/`（`docs/testing.md`「トランスパイラのテスト」）。
 
@@ -22,7 +22,7 @@ language = "go"
 
 - 提供するトランスパイラは `go` の一つ。`requires` を持たない（基底）。言語 `go` を定める。
 - オプションはない。`[emit.options.go]` にキーが一つでもあれば GO-5。
-- 語彙は提供せず、どの語彙も読まない。デコレータの適用は、op の純粋さ（`Signature.pure`。hozoc が計算する）を通してだけ、出力に効く。
+- 語彙は提供せず、どの語彙も読まない。`seams` も持たない。デコレータの適用が基底の出力に効くのは、op の純粋さ（`Signature.pure`。hozoc が計算する）と、単位のほかのトランスパイラが宣言した継ぎ目（`View.config.seams`。「継ぎ目」）を通してだけ。
 - `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため。配布するときはビルドした実行ファイル `hozoc-plugin-go` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go/` に置く（`docs/plugin-protocol.md`「探索」）。このリポジトリのほかの Go のプラグインも同じ。
 
 ## 出力の対象
@@ -38,7 +38,8 @@ language = "go"
 | N の op | **単位の対象の op のすべて**（`View.InUnit`。`docs/config.md`「in」）。起点から辿れるものだけに絞らない。`export` の有無は、出すかどうかを変えない |
 | N の op のうち、単位の対象でないもの | 単位の対象の配線が呼んでいるものだけを、**本体のない op として**出す（配線でも本体を出さず、人が実装する葉として扱う。「op の置き場」） |
 | 別の名前空間の op | 単位の対象の配線が呼んでいるものを、実装を受け取る口のメソッドとして出す（「別の名前空間の op」） |
-| decorator、`set` の union、`bind` | 何も出さない |
+| decorator（宣言）、`set` の union、`bind` | 何も出さない |
+| デコレータの適用 | 単位の継ぎ目（`docs/config.md`「継ぎ目」）にあるデコレータが、単位の対象の op に付いているものだけ、継ぎ目を出す（「継ぎ目」）。それ以外の適用には、何も出さない（「デコレータ」） |
 
 - 型と状態を `in` によらず出すのは、ほかの出力がこの出力の型を import でき（`docs/config.md`「型の置き場」）、残った op の置き場（状態の単位）が欠けないようにするため。`in` が絞るのは op だけ。
 - 以降、この文書が「N の op」と言えば、上の表で出す op（単位の対象の op と、本体のない op として出すもの）。
@@ -65,7 +66,7 @@ N の op に内部の op が**一つでもある**出力は、二つのパッケ
 
 | パッケージ | ディレクトリ | パッケージ名 | 中身 |
 |---|---|---|---|
-| **内側** | `<Dir(U, N)>/inner/` | `inner` | すべての定義: 型、実装を受け取る口、**すべての op** を並べた `Ops`、配線の本体、`New` |
+| **内側** | `<Dir(U, N)>/inner/` | `inner` | すべての定義: 型、実装を受け取る口、**すべての op** を並べた `Ops`、配線の本体、継ぎ目の二層と `Seams`、`New` |
 | **入口** | `<Dir(U, N)>/` | N のパッケージ名 | 内側の再公開: 型と口の別名、**`export` の op だけ**を並べた `Ops`、内側の `New` を呼ぶ `New` |
 
 N の op に内部の op が一つもない出力（op を持たない、型だけの名前空間を含む）は、分けない。`<Dir(U, N)>/` の一つのパッケージがすべての定義を持ち、それが入口でもある。
@@ -85,7 +86,7 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | model、scalar、union、exception の型（union のアームを包む型を含む） | `type <名前> = inner.<名前>`（型の別名。メソッドもそのまま付いてくる） |
 | effect の定数、分類の列挙の定数 | `const <名前> = inner.<名前>` |
 | `New<Model>()`（既定値） | `func New<Model>() <Model> { return inner.New<Model>() }` |
-| `Leaves`、状態の単位（`<状態>State`、`SharedState`）、`<Ns>Ops`、分類の型と述語（`<C>`、`<C>Cases`） | `type <名前> = inner.<名前>` |
+| `Leaves`、状態の単位（`<状態>State`、`SharedState`）、`<Ns>Ops`、`Seams`、分類の型と述語（`<C>`、`<C>Cases`） | `type <名前> = inner.<名前>` |
 | 分類の判定関数 `Classify<C>` | 同じ引数と戻り値で、`inner.Classify<C>(…)` を呼んで返す関数 |
 | `Ops` | **別名にしない。** `export` の op だけを、宣言順に並べたインターフェースを、入口で宣言する |
 | `New` | 同じ引数で、`return inner.New(…)`。戻り値は入口の `Ops`（内側の `Ops` の値は、メソッドが多いだけなので、そのまま返せる） |
@@ -103,12 +104,12 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 |---|---|
 | `doc.go` | パッケージのコメント（「コメント」） |
 | `types.go` | model、scalar、union、exception、effect を、宣言の順に一つずつ（「型」） |
-| `ops.go` | `Ops`、`Leaves`、`<Ns>Ops`（名前空間の FQN の辞書順）、`New`、構造体 `ops`、`ops` のメソッドのうち配線でないもの（宣言順）。N の op が一つもなければ作らない |
+| `ops.go` | `Ops`、`Leaves`、`<Ns>Ops`（名前空間の FQN の辞書順）、`Seams`、`New`、構造体 `ops`、`ops` のメソッドのうち配線の本体でないもの（op の宣言順。継ぎ目を持つ op の外側のメソッドと、`never` を返す op の中身のメソッドを含む。「継ぎ目」）。N の op が一つもなければ作らない |
 | `states.go` | 状態の単位（基底の状態と、述語で決まる状態の分類を、宣言順に）、`SharedState` |
 | `classify.go` | 述語で決まる分類の、列挙の型と定数、述語のインターフェース、判定関数（宣言順） |
-| `wiring.go` | 配線の op の本体（宣言順）。値をポインタにする補助 `ptr` を使っていれば、末尾に一つ |
+| `wiring.go` | 配線の op の本体（宣言順。継ぎ目を持つ配線は、中身の名前のメソッド）。値をポインタにする補助 `ptr` を使っていれば、末尾に一つ |
 
-分けた出力の入口のファイルは、内側の同じ名前のファイルの再公開: `doc.go`（N のパッケージのコメント）、`types.go`、`ops.go`（入口の `Ops`、`Leaves` と `<Ns>Ops` の別名、`New`）、`states.go`、`classify.go`。`wiring.go` はない。内側のファイルに再公開するものがなければ、入口のファイルも作らない。
+分けた出力の入口のファイルは、内側の同じ名前のファイルの再公開: `doc.go`（N のパッケージのコメント）、`types.go`、`ops.go`（入口の `Ops`、`Leaves` と `<Ns>Ops` と `Seams` の別名、`New`）、`states.go`、`classify.go`。`wiring.go` はない。内側のファイルに再公開するものがなければ、入口のファイルも作らない。
 
 ### 相乗りのファイル
 
@@ -126,7 +127,8 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | `go-cli` | `cli/cli.go`（パッケージ `cli`） | 自分のパッケージ | — | `docs/plugin-go-cli.md` |
 
 - 相乗りは、置き場と名前を `plugin/golang`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。この文書の規則を自分で書き写さない（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
-- 関数の引数の並び（`ctx` の有無を含む）を決めるのは基底だけで、相乗りは変えられない。
+- 表にないトランスパイラ（プロジェクトの中のプラグインのものなど）も、同じ決まりに従う: 表のファイル名、前置き、公開の名前を避け、自分のものを自分の文書に書く。
+- 関数の引数の並び（`ctx` の有無を含む）を決めるのは基底だけで、相乗りは変えられない。相乗りが基底の出力に足せるのは、自分のファイルと、宣言した継ぎ目（「継ぎ目」）だけ。
 - 基底の名前と、相乗りの公開の名前、利用者の宣言の名前が当たること（model `Schema` と `go-sqlite` の `Schema` など）は、当たった名前を足すトランスパイラが、自分の診断で報告する（基底は GO-2）。
 
 ## 名前
@@ -141,13 +143,15 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | 状態の単位 | 状態（か状態の分類）の名前を先頭大文字にして `State` を付ける（`UsersState`、`OutputsSyncState`） |
 | 別の名前空間の口 | 名前空間の FQN のセグメントをそれぞれ先頭大文字にして連結し、`Ops` を付ける（`store` → `StoreOps`、`shop.admin` → `ShopAdminOps`） |
 | 分類 C の列挙と述語 | 型 `<C>`、定数 `<C><ケース名>`（`default` は `<C>Default`）、述語のインターフェース `<C>Cases`、判定関数 `Classify<C>` |
+| 継ぎ目のメソッド（`Seams`） | op 名を先頭大文字にしたものに、デコレータの FQN のセグメントをそれぞれ先頭大文字にして連結したものを付ける（`server.login` の `@rate.limited` → `LoginRateLimited`） |
+| 継ぎ目を持つ op の、中身のメソッド | op 名の先頭を小文字にして `Body` を付ける（`login` → `loginBody`）。非公開の名前 |
 | `New` の引数と、構造体 `ops` のフィールド | 「New」 |
 | op の引数名、配線の束縛名 | そのまま。下の「局所の名前」で当たれば末尾に `_` |
 
 - 先頭だけを大文字にする（`Id`、`Url`）のは、Go の慣習（`ID`）より決定性と予測しやすさを取るため。
 - **局所の名前**: メソッドの中で、次の名前は生成したコードが使う。op の引数名と束縛名がこれと同じなら、末尾に `_` を付ける: Go の予約語、事前宣言の識別子（`error`、`string`、`nil`、`len` など）、`o`、`ctx`、`err`、`ptr`、定義のパッケージの `ops.go` と `wiring.go` が import するパッケージの名前（`context`、`time`、`runtime`、名前空間のパッケージ）。
 - 生成したコードが作る局所の変数（状態を読んだ値、途中の値）の名前は「配線の本体」。引数名、束縛名、先に作った変数と当たれば、当たらなくなるまで末尾に `_` を足す。
-- **名前が当たれば GO-2**: 定義のパッケージの公開の名前どうし（型、`New<Model>`、`Effect…`、`Ops`、`Leaves`、`SharedState`、`<状態>State`、`<Ns>Ops`、分類の名前、`New`、`Classify<C>`。大文字化で同じになる `id` と `Id`、合成した名前と宣言の名前を含む）、一つの構造体のフィールドどうし、一つのインターフェースのメソッドどうし（状態の単位の `IsEmpty` / `Get` / ケースの述語と、op 名を先頭大文字にしたもの。`Ops` の中の `foo` と `Foo`）。直すのは仕様の名前。
+- **名前が当たれば GO-2**: 定義のパッケージの公開の名前どうし（型、`New<Model>`、`Effect…`、`Ops`、`Leaves`、`SharedState`、`<状態>State`、`<Ns>Ops`、`Seams`、分類の名前、`New`、`Classify<C>`。大文字化で同じになる `id` と `Id`、合成した名前と宣言の名前を含む）、一つの構造体のフィールドどうし、一つのインターフェースのメソッドどうし（状態の単位の `IsEmpty` / `Get` / ケースの述語と、op 名を先頭大文字にしたもの。`Ops` の中の `foo` と `Foo`。`Seams` の中の、op `loginRate` の `@limited` と op `login` の `@rate.limited`）、構造体 `ops` のフィールドと中身のメソッド（状態 `loginBody` と、継ぎ目を持つ op `login`）。直すのは仕様の名前。
 
 ## 型
 
@@ -290,7 +294,7 @@ N の op は、上から順に、最初に当たる行の置き場を持つ。
 type Ops interface {
 	// Login はログインする
 	//
-	// Throws: type.InvalidCredentials
+	// Throws: type.InvalidCredentials, rate.LimitExceeded
 	// Reads: store.users
 	// Effects: store.createSession
 	Login(ctx context.Context, in LoginInput) (LoginOk, error)
@@ -302,6 +306,7 @@ type Ops interface {
 - **内側の `Ops`**（分けた出力だけ）は、N の op のすべて。宣言順。コメントは `// Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。`
 - 分けない出力では、N の op はすべて `export` なので、一つの `Ops` がどちらでもある。
 - メソッドの間は一行空ける。
+- op が継ぎ目を持つかどうかは、`Ops` を変えない。`Ops` のメソッドを呼べば、継ぎ目を通る（「継ぎ目」）。
 
 ### Leaves
 
@@ -377,10 +382,10 @@ type StoreOps interface {
 ### New
 
 ```go
-// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、別の名前空間（名前の辞書順）。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、別の名前空間（名前の辞書順）、seams。
 // 引数が nil かどうかは確かめない。
-func New(leaves Leaves, mailer MailerOps, store StoreOps) Ops {
-	return &ops{leaves: leaves, mailer: mailer, store: store}
+func New(leaves Leaves, mailer MailerOps, store StoreOps, seams Seams) Ops {
+	return &ops{leaves: leaves, mailer: mailer, store: store, seams: seams}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
@@ -388,6 +393,7 @@ type ops struct {
 	leaves Leaves
 	mailer MailerOps
 	store  StoreOps
+	seams  Seams
 }
 ```
 
@@ -400,13 +406,15 @@ type ops struct {
 | 3 | 複数の状態を読む葉（`SharedState` があるとき） | `shared` | `SharedState` |
 | 4 | 単位の対象の配線が `match` に使う、述語で決まる値の分類と op の分類（別の名前空間のものを含む）。分類の FQN の辞書順 | 分類の名前 | `<C>Cases`（別の名前空間のものは修飾する） |
 | 5 | 単位の対象の配線が呼ぶ別の名前空間。FQN の辞書順 | 名前空間の FQN のセグメントをつないだもの（`store`、`shopAdmin`） | `<M>Ops` |
+| 6 | 継ぎ目（`Seams` があるとき。「継ぎ目」） | `seams` | `Seams` |
 
 - 引数の名前は、先頭を小文字にする（名前空間のセグメントは、二つ目から先頭大文字にしてつなぐ）。Go の予約語か事前宣言の識別子なら末尾に `_`（名前空間 `type` は `type_`）。先に並んだ引数の名前と当たれば、当たらなくなるまで末尾に `_` を足す。構造体 `ops` のフィールドは、引数と同じ名前、同じ順。
 - 別の名前空間を辞書順にするのは、配線の本体を書き換えただけで並びが変わらないようにするため。状態は宣言順なので、仕様で宣言を入れ替えると、`New` を呼ぶ行が変わる。
+- 継ぎ目を最後に置くのは、継ぎ目を宣言するトランスパイラを単位に足し引きしても、ほかの引数の位置が動かないようにするため。
 - 引数の型が同じ二つの状態（同じ形、同じ要素の型で、どちらにも op がない）は、入れ替えて渡してもコンパイルが通る。位置引数と引き換えに受け入れた弱さ。
-- `New` のコメントの一行目は `// New はこの名前空間の Ops を組み立てる。引数の並びは、<句>。` で、句は、ある引数の種類を、この順に「、」でつないだもの: `leaves`、`状態の単位（宣言順）`、`shared`、`分類の述語（FQN の辞書順）`、`別の名前空間（名前の辞書順）`。二行目は `// 引数が nil かどうかは確かめない。`。引数が一つもなければ、`// New はこの名前空間の Ops を組み立てる。` の一行だけ。
+- `New` のコメントの一行目は `// New はこの名前空間の Ops を組み立てる。引数の並びは、<句>。` で、句は、ある引数の種類を、この順に「、」でつないだもの: `leaves`、`状態の単位（宣言順）`、`shared`、`分類の述語（FQN の辞書順）`、`別の名前空間（名前の辞書順）`、`seams`。二行目は `// 引数が nil かどうかは確かめない。`。引数が一つもなければ、`// New はこの名前空間の Ops を組み立てる。` の一行だけ。
 
-**構造体 `ops`** は、N の op のすべてをメソッドに持つ（公開の名前）。配線のメソッドは `wiring.go`、それ以外は `ops.go` に、宣言順で置く。配線でないメソッドは、実装を呼ぶだけ。
+**構造体 `ops`** は、N の op のすべてをメソッドに持つ（公開の名前）。配線のメソッドは `wiring.go`、それ以外は `ops.go` に、宣言順で置く。配線でないメソッドは、実装を呼ぶだけ。継ぎ目を持つ op は、公開の名前のメソッドが外側になり、下の表の中身は、その内側に入る（「継ぎ目」）。
 
 | 置き場 | メソッドの中身 |
 |---|---|
@@ -415,25 +423,25 @@ type ops struct {
 | `SharedState` | `return o.shared.<Op>(ctx, <引数>)` |
 | `never` を返す op | `return <例外の型>{}` |
 
-戻り値のないメソッド（値も `error` もない）は、`return` を書かずに呼ぶだけ。`ops` の、配線でないメソッドには、コメントを書かない。
+戻り値のないメソッド（値も `error` もない）は、`return` を書かずに呼ぶだけ。`ops` の、配線でないメソッドには、コメントを書かない（継ぎ目を持つ op の外側と中身は、一行のコメントを持つ。「コメント」）。
 
 ## 配線の本体
 
-単位の対象の配線ごとに、`wiring.go` に `ops` のメソッドを一つ出す。コメントは `Ops` のメソッドと同じ（「コメント」）。実行の順序は行の順で、並列にはしない。
+単位の対象の配線ごとに、`wiring.go` に `ops` のメソッドを一つ出す。コメントは `Ops` のメソッドと同じ（「コメント」）。実行の順序は行の順で、並列にはしない。継ぎ目を持つ配線は、このメソッドの名前が中身の名前（`loginBody`）になり、コメントが一行になる。本体の規則は変わらない（「継ぎ目」）。
 
 ```go
-func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
-	user, err := o.store.FindUser(ctx, in.Body.Email)
+func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error) {
+	session, err := o.store.FindSession(ctx, token)
 	if err != nil {
-		return LoginOk{}, err
+		return pkgtype.Session{}, err
 	}
-	// match user by store.Registration
-	if user != nil {
-		// Registered: user は type.User
-		return o.IssueSession(ctx, *user, in.Body.Password)
+	// match session by store.Login
+	if session != nil {
+		// LoggedIn: session は type.Session
+		return o.RequireFresh(*session)
 	}
 	// default
-	return LoginOk{}, pkgtype.InvalidCredentials{}
+	return pkgtype.Session{}, pkgtype.Unauthorized{}
 }
 ```
 
@@ -441,7 +449,7 @@ func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
 
 | 呼ぶ op | Go |
 |---|---|
-| 同じ名前空間の op（葉でも配線でも、`export` の有無によらず） | `o.<Op>(<引数>)`。実装がどの口にあるかは、書き方を変えない |
+| 同じ名前空間の op（葉でも配線でも、`export` の有無によらず） | `o.<Op>(<引数>)`。実装がどの口にあるか、継ぎ目を持つかは、書き方を変えない（継ぎ目を持つ op は、同じ名前空間の配線から呼んでも継ぎ目を通る） |
 | 別の名前空間の op | `o.<名前空間の引数名>.<Op>(<引数>)` |
 
 - 呼ぶ op が `ctx` を取るなら、最初の引数に `ctx` を渡す。引数は、呼ぶ op の `Op.params` の順に、`Call.args` の値（「値」）。渡されていない省略可能な引数は `nil`。`bind` で埋まる位置は「bind で埋まる位置」。
@@ -606,21 +614,127 @@ func ClassifyWarrantyKind(c WarrantyKindCases, v Item) (WarrantyKind, error)
 
 ## デコレータ
 
-**基底は、デコレータについて何も生成しない。** 包む関数も、それを受け取る口も出さない。デコレータが出力に効くのは、op の純粋さ（付いていれば純粋でなく、`ctx` を取り、`error` を返す）と、検査が計算した `Throws:` などのコメントだけ。
+**デコレータの適用が何を出力するかは、そのデコレータを読むトランスパイラが決める。** 基底は語彙を知らないので、デコレータの名前からも、宣言の節（`throws`、`catches … recovers` / `halts` / `ignores`）からも、何も生成しない。デコレータが基底の出力に効くのは、op の純粋さ（付いていれば純粋でなく、`ctx` を取り、`error` を返す）、検査が計算した `Throws:` などのコメント、単位のトランスパイラが宣言した継ぎ目（「継ぎ目」）の三つだけ。
 
-デコレータの意味を形にするのは、その語彙を読む相乗りで、自分のファイルの中（自分の層）で行う。形は三つ。
+読むトランスパイラが、デコレータを形にする仕方は四つ。上の三つは、相乗りが自分のファイルの中だけで行い、基底は関わらない。
 
-| 形 | 例 |
+| 形 | すること | 例 |
+|---|---|---|
+| 入口を作る | 外からの呼び出しを、入口の `Ops` のメソッドに届ける | `go-http` のハンドラ（`@http.get`）、`go-cli` の `Main`（`@cli.command`） |
+| 実装を出す | 口（状態の単位、`Leaves`）を満たす型を出す | `go-sqlite` の `<状態>Table`（`@db`） |
+| 材料にする | 自分が出すコードの中身を決めるために読む | `@http.header`、`@db.key`、`@valid.*` |
+| 継ぎ目を要る | op の中身の前後に処理を置く。口は基底が出し、中身はそのトランスパイラが出す（「継ぎ目」） | サンプルの `go-ratelimit`（`@rate.limited`） |
+
+- **読む者がなければ、何も出ない**（規則の持ち主は `docs/config.md`「継ぎ目」）。単位のどのトランスパイラも読まないデコレータの適用には、基底は何も出さない: 継ぎ目も、呼び出しも、warning も。何も生成しないデコレータは、この言語のために用意されたものではないデコレータ（要求やドメインの印、ほかの道具や別の言語の出力のための注記）と区別がつかないので、同じに扱う。
+- プロジェクトが自分で宣言したデコレータも同じで、読むトランスパイラがなければ印。処理をさせたいなら、配線の中の op の呼び出しとして書くか、そのデコレータを読むプラグインをプロジェクトの中に置く（`docs/config.md`「継ぎ目」）。
+- デコレータが宣言した `throws` / `catches` は、読む者がいてもいなくても、検査の計算（`docs/check.md`「計算」）に効き、`Signature.exceptions` とコメントの `Throws:` に現れる。それを実際に起こすのは、読むトランスパイラが出したコードか、葉を実装する者で、基底ではない。
+- **帰結**: `catches` を持つデコレータが付いた op で、それを読むトランスパイラが単位にいなければ、生成した本体は例外を吸収しないので、その op のメソッドは、コメントの `Throws:` にない例外を返しうる。基底は、これを warning にもしない（節を見ない）。
+
+これまでの二つの形は、やめた: 単位のトランスパイラが `wraps` で引き受けたデコレータの適用に、包む関数の型と、それを束ねる構造体を生成する形（引き受ける者を集める仕組み `select` がなくなった）と、基底は何も生成せず、相乗りが入口の `Ops` を外から包む形（同じ名前空間の配線からの呼び出しに掛からない）。
+
+## 継ぎ目
+
+継ぎ目とは何か、どのデコレータが継ぎ目を持つか（単位の継ぎ目）、宣言のしかたの持ち主は `docs/config.md`「継ぎ目」。この節が決めるのは、Go での形。期待する出力の実物は、サンプルの `gen/server/inner/ops.go`、`gen/server/inner/wiring.go`（基底）と、`gen/server/ratelimit.go`（継ぎ目を宣言したトランスパイラ）。
+
+**継ぎ目を持つ op** は、N の単位の対象の op のうち、単位の継ぎ目（`View.config.seams` のキー）にあるデコレータが付いたもの。付いているかは `Op.decorators` の `Application.decorator` で見る（名前付きデコレータは展開済み）。葉か配線か、`export` の有無にはよらない。単位の対象でない op（本体のない op として出すもの。「出力の対象」）と、op 以外の宣言への適用は、継ぎ目を持たない。
+
+継ぎ目を持つ op は、**二層**で出す: op の**中身**と、継ぎ目に制御を渡す**外側**。継ぎ目は、インターフェース `Seams` のメソッドで、実装は `New` の位置引数で受け取る（「実装を受け取る口」と同じ作法）。
+
+```go
+// ops.go
+
+// Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type Seams interface {
+	// LoginRateLimited は op server.login に付いた @rate.limited の継ぎ目（go-ratelimit）。body が op の中身で、その前後に置くものを、実装が決める。
+	LoginRateLimited(ctx context.Context, in LoginInput, body func(ctx context.Context, in LoginInput) (LoginOk, error)) (LoginOk, error)
+}
+
+// Login は、継ぎ目（@rate.limited）を通して、中身（o.loginBody）を呼ぶ。
+func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
+	return o.seams.LoginRateLimited(ctx, in, o.loginBody)
+}
+```
+
+```go
+// wiring.go
+
+// loginBody は op server.login の中身（配線の本体）。外側の Login が、継ぎ目を通して呼ぶ。
+func (o *ops) loginBody(ctx context.Context, in LoginInput) (LoginOk, error) {
+	user, err := o.store.FindUser(ctx, in.Body.Email)
+	…
+}
+```
+
+### 中身
+
+中身は、「op の置き場」が決めた実装そのもの。置き場は、継ぎ目の有無で変わらない。
+
+| op の置き場 | 中身 | 外側が渡す式 |
+|---|---|---|
+| 1（配線） | `wiring.go` の、`ops` のメソッド `<op>Body`。本体は「配線の本体」の規則のまま | `o.<op>Body` |
+| 2（`never` を返す op） | `ops.go` の、外側のすぐ後ろの、`ops` のメソッド `<op>Body`: `return <例外の型>{}` | `o.<op>Body` |
+| 3〜6（葉） | 実装を受け取る口のメソッド。**名前は op 名のまま** | `o.<口のフィールド>.<Op>`（メソッドの値。`o.leaves.<Op>`、`o.<状態>.<Op>`、`o.shared.<Op>`） |
+
+- **中身の名前**（`<op>Body`: op 名の先頭を小文字にして `Body` を付けた、非公開の名前）を持つのは、基底が中身を出す op（配線と、`never` を返す op）だけ。形（引数と戻り値）は op の形のまま。どのインターフェースにも現れない。当たる名前は「名前」の GO-2。
+- **葉の実装のメソッドに、中身の名前を付けない**のは、口（`Leaves`、状態の単位、`SharedState`）の形を、継ぎ目の有無で変えないため。継ぎ目は、単位にどのトランスパイラを並べたかで決まり、同じ名前空間でも単位ごとに違いうる。口の名前がそれで変われば、人の実装と、口を満たす相乗りの型（`go-sqlite` の `<状態>Table`）が、関係のないトランスパイラの宣言で壊れる。口のメソッドを直に呼べば継ぎ目を通らないが、それは実装を呼ぶことで、op を呼ぶことではない。op を呼ぶのは、`Ops` のメソッド（外側）。
+- 継ぎ目を持つ配線の中から、別の op を呼ぶ書き方は変わらない（「呼び出し」）。継ぎ目を持つ op を、同じ名前空間の配線から呼ぶと（`o.<Op>(…)`）、外側を通る。
+
+### Seams
+
+- 定義のパッケージの `ops.go` に、インターフェース `Seams` を一つ出す。継ぎ目を持つ op が一つもなければ出さず、`New` の引数 `seams` もない（単位の継ぎ目にあるデコレータが、単位の対象のどの op にも付いていないときを含む）。
+- メソッドは、継ぎ目を持つ op と、それに付いた、単位の継ぎ目にあるデコレータの組ごとに一つ。並びは op の宣言順、その中は `Op.decorators` の順（書かれた順）。同じデコレータは一つの op に一度しか付かない（DEC-13）ので、組は重ならない。メソッドの間は一行空ける。
+- メソッドの形:
+
+| 部分 | 規則 |
 |---|---|
-| 入口を作る: 外からの呼び出しを、入口の `Ops` のメソッドに届ける | `go-http` のハンドラ（`@http.get`）、`go-cli` の `Main`（`@cli.command`） |
-| 葉の中身を出す: 口（`Leaves`、状態の単位）を満たす型を出す | `go-sqlite` の `<状態>Table`（`@db`） |
-| `Ops` を包む: 入口の `Ops` を受け取り、付いた op のメソッドだけを差し替えた `Ops` を返す関数を出す | 今はない（キャッシュ、再試行など） |
+| 名前 | `<Op><Decorator>`（「名前」: `LoginRateLimited`） |
+| 引数 | op の形の引数（`ctx context.Context` と、`Op.params`）の後ろに、`body func(<op の形の引数>) <op の形の戻り値>` |
+| 戻り値 | op の形の戻り値 |
 
-- どの相乗りも読まないデコレータは印で、何も起きない（要求やドメインの印、ほかの道具のための注記）。
-- デコレータが宣言した `throws` / `catches` は、検査の計算（`docs/check.md`「計算」）には効く。それを実際に起こすのは、葉の op なら、その葉を実装する者。配線の op なら、その `Ops` を包む者か、入口を作る者。
-- **帰結**: 相乗りが `Ops` の外側で形にしたデコレータは、同じ名前空間の配線からの呼び出し（`o.<Op>(…)`）には掛からない。配線の op に、`catches` を持つデコレータが付いているとき、生成した本体は例外を吸収しないので、その op のメソッドは、コメントの `Throws:` にない例外を返しうる。基底は、そういう op ごとに warning を一つ返す（`<op の FQN>: catches を持つデコレータ <FQN> が付いているが、生成した本体は吸収しない`）。
+- デコレータの付いた op は純粋でない（`docs/check.md`「純粋」）ので、継ぎ目のメソッドも `body` も、いつも `ctx` を取り、`error` を返す。
+- `body` の関数の型には、引数の名前も書く（op の引数の局所の名前）。`body` という名前が op の引数の局所の名前と当たれば、当たらなくなるまで、`body` の方の末尾に `_` を足す（「名前」の、生成したコードが作る名前の規則）。
+- 基底は、デコレータの引数（`Application.args`）を継ぎ目に渡さない。中身を出すトランスパイラが `View` から読んで、自分のコードに書く。
 
-これまでの形（単位のトランスパイラが `wraps` で引き受けたデコレータの適用に、包む関数の型と、それを束ねる構造体を生成する）はやめた。引き受ける者を集める仕組み（`select`）がなくなり、基底が語彙を知らないため。
+### 外側
+
+継ぎ目を持つ op の、`ops` の公開のメソッド `<Op>`（`Ops` を満たすメソッド）。`ops.go` の、配線でないメソッドの並びの、その op の位置に置く。形は op の形のまま。
+
+- 継ぎ目が一つなら `return o.seams.<Op><Decorator>(ctx, <引数>, <中身の式>)`。
+- **継ぎ目が二つ以上なら、入れ子にする。順序は、言語のデコレータの適用順（DEC-9: op に近いものから）**: `Op.decorators` の最後（op に最も近い）のものが最も内側で、中身を直に受け取る。先に書かれたものほど外側。内側は、同じ形の関数リテラルにして、外側の継ぎ目の `body` に渡す。継ぎ目を持たないデコレータは、間にあっても層にならない。
+
+```go
+// @trace.span
+// @rate.limited
+// export op foo(in: FooInput): FooOk { … }
+
+// Foo は、継ぎ目（@trace.span、@rate.limited）を通して、中身（o.fooBody）を呼ぶ。
+func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
+	return o.seams.FooTraceSpan(ctx, in, func(ctx context.Context, in FooInput) (FooOk, error) {
+		return o.seams.FooRateLimited(ctx, in, o.fooBody)
+	})
+}
+```
+
+### 内側のフォルダと、別の名前空間
+
+- **分けた出力**（「内側のフォルダと入口」）では、二層と `Seams` は内側のパッケージにある。入口は `type Seams = inner.Seams` と、同じ引数の `New` を出す。内側の `Ops` のメソッドも外側なので、テストが内側の `New` の戻り値から内部の op を呼んでも、継ぎ目を通る。中身だけを試すテストは、`body` をそのまま呼ぶ `Seams` を自分で書いて、`inner.New` に渡す。
+- **継ぎ目が掛かるのは、op の持ち主の名前空間の出力。** 別の名前空間 M の op を `<M>Ops` で呼ぶ側（N）は、M の op の継ぎ目について何も出さない（N の `Seams` に、M の op のメソッドはない。N の単位の継ぎ目に、そのデコレータがあっても）。M の出力の `Ops` のメソッドは外側なので、それを N の `New` に渡せば、N からの呼び出しは M の継ぎ目を通る。
+- M が**単位を持たない名前空間**なら、基底の出力がないので、継ぎ目もない。`<M>Ops` を満たす型を書く人が、そのデコレータの意味をどう実装するかを決める。
+- 同じ名前空間を二つの単位が出力していて、継ぎ目を宣言したトランスパイラが一方にしか並んでいなければ、継ぎ目を持つのは、その出力だけ（単位は互いに独立。`docs/config.md`「単位の対象」）。
+
+### 継ぎ目の実装
+
+- `Seams` のメソッドの実装は、**その継ぎ目を宣言したトランスパイラが出す**: 自分が宣言したデコレータの分のメソッドを持つ具体的な型を、自分のファイル（「相乗りのファイル」。入口のパッケージ）に、op ごとに、型の付いたコードで出す。型の名前、作り方、実行のときに要るもの（数え方、保存先）をどう受け取るかは、そのトランスパイラが決め、自分の文書に書く。メソッドの名前と形は、`plugin/golang` で求める（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
+- 単位で継ぎ目を宣言したトランスパイラが一つなら、その型が `Seams` を満たし、そのまま `New` に渡せる。二つ以上なら、`Seams` のメソッドがそれぞれの型に分かれるので、人が、それらを埋め込んだ構造体を一つ書いて渡す（`struct{ server.RateSeams; server.TraceSeams }`）。どれかが足りなければ、渡すところでコンパイルできない。
+- 宣言したトランスパイラがメソッドを出さなくても、hozoc は確かめない（起動は互いに独立）。`New` に渡すところでコンパイルできなくなる。
+- 人が書いた型を渡してもよい（テストで継ぎ目を素通しにする、一つのメソッドだけを埋め込みで差し替える）。
+- 継ぎ目の中身は、原則として、op の入力と出力の値を変えない（`docs/requirements.md`「書き方の指針」）。基底は確かめない: `body` に何を渡し、何を返すかは、継ぎ目の実装が決める。
+
+### 継ぎ目で変わるもの、変わらないもの
+
+- 変わらない: op のメソッドの形（「op の形」。`ctx`、引数、戻り値、`error`）、`Ops`、`Leaves`、状態の単位、`<Ns>Ops`、コメントの `Throws:` など（どれも仕様だけで決まる）。継ぎ目を宣言するトランスパイラを単位に足しても、`Ops` を使うコードと、口を実装するコードは、そのまま通る。
+- 変わる: `Seams` と `New` の最後の引数、継ぎ目を持つ op の `ops.go` と `wiring.go` の中（外側と、中身の名前）。`New` を呼ぶ行は、引数が一つ増える。
 
 ## コメント
 
@@ -635,6 +749,10 @@ func ClassifyWarrantyKind(c WarrantyKindCases, v Item) (WarrantyKind, error)
 | effect | `// <定数名> は<説明>`。説明がなければ `// <定数名> は effect <FQN>。` |
 | `New<Model>` | `// New<Model> は既定値を入れた <Model> を返す。` |
 | op（`Ops`、`Leaves` のメソッド、配線の本体） | 下の「op のコメント」 |
+| `Seams` | `// Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。` と `// メソッドが一つでも足りない値は、渡すところでコンパイルできない。` の二行 |
+| `Seams` のメソッド | `// <メソッド名> は op <FQN> に付いた @<デコレータの FQN> の継ぎ目（<宣言したトランスパイラの名前>）。body が op の中身で、その前後に置くものを、実装が決める。` |
+| 継ぎ目を持つ op の外側（`ops.go`） | `// <Op> は、継ぎ目（<@デコレータの FQN を、書かれた順に「、」で>）を通して、中身（<外側が渡す式>）を呼ぶ。` |
+| 継ぎ目を持つ op の中身（`<op>Body`） | 配線なら `// <op>Body は op <FQN> の中身（配線の本体）。外側の <Op> が、継ぎ目を通して呼ぶ。`、`never` を返す op なら `// <op>Body は op <FQN> の中身（<例外の FQN> を投げる）。外側の <Op> が、継ぎ目を通して呼ぶ。`。op のコメント（説明、`Throws:` など）は、`Ops` のメソッドにだけ書く（`Throws:` は継ぎ目を通した後のもので、中身だけのものではない） |
 | `<M>Ops` のメソッド | 「op のコメント」の一行目を `// <メソッド名> は op <FQN>: <説明>` に替えたもの。`Throws:` などは、見る側から見た `View.ops[<FQN>]` の値 |
 | 状態の単位のメソッド | 一行ずつ（下） |
 
@@ -695,7 +813,7 @@ type ClassificationError struct { Classify string; Hits []string }   // 述語�
 - 同じ `View` から、同じバイト列を返す（`docs/plugin-protocol.md`「emit」）。読むのは `View` と、import パスを求めるための `go.mod` だけ。時刻、乱数、環境（`HOZO_PROJECT_ROOT` を除く）、マップの走査の順に依らない。
 - 並びは、この文書に書いた順（宣言順、FQN の辞書順）だけで決まる。
 - 応答の `files` は、パスの辞書順。
-- 同じ名前空間の二つの単位の基底のファイルは、`in` が同じなら、import パスに現れる自分のディレクトリを除いて、バイト単位で同じ。単位に並べたほかのトランスパイラと、そのオプションは、基底の出力を変えない。
+- 同じ名前空間の二つの単位の基底のファイルは、`in` と単位の継ぎ目が同じなら、import パスに現れる自分のディレクトリを除いて、バイト単位で同じ。単位に並べたほかのトランスパイラが基底の出力を変えるのは、マニフェストで宣言した継ぎ目（`View.config.seams`）を通してだけで、そのオプションは変えない。
 
 ## 診断
 
@@ -711,7 +829,7 @@ type ClassificationError struct { Classify string; Hits []string }   // 述語�
 | GO-6 | error | `variant` の絞り込みの `as` の型と等しい型のアームが、union に二つ以上ある（「match」）。位置は分類 |
 | GO-INTERNAL | error | 生成器の不具合（利用者の仕様の誤りではない）: 生成したコードを `go/format` で整形できない、検査を通った IR には来ないはずの形、`View` が欠けている、型の置き場がない（CFG-22 が通したはずのもの） |
 
-- warning（コードは `PLUGIN`）は、「デコレータ」の一つだけ。
+- warning は返さない。`catches` を持つデコレータが配線の op に付いているときの warning は、やめた（基底はデコレータの節を見ない。「デコレータ」）。
 - GOEMIT-1〜GOEMIT-6 と GOEMIT-INTERNAL は欠番。本体に組み込んだ Go の出力（「既定の出力」）の規則で、出力を基底のプラグインに移したときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。行き先:
 
 | なくなった ID | 規則 | 行き先 |
@@ -737,6 +855,6 @@ type ClassificationError struct { Classify string; Hits []string }   // 述語�
 | 実装は、関数のフィールドを持つ構造体（`Leaves`、`Deps`、`Wrappers`、`Classifiers`）と、パッケージの変数 `States` | インターフェースと、`New` の位置引数。未設定の `*runtime.MissingError` はない | 73 |
 | `Ops` はすべての op | 入口の `Ops` は `export` の op だけ。内部の op は内側のフォルダから | 74 |
 | 別の名前空間への呼び出しの `bind` の位置は、`Deps` を埋める者が埋める | 配線が埋める | 79 |
-| `wraps` で引き受けたデコレータに、包む関数を生成する | 何も生成しない | 78 |
+| `wraps` で引き受けたデコレータに、包む関数を生成する | デコレータの出力は、読むトランスパイラが決める。基底が出すのは、単位のトランスパイラがマニフェストで宣言した継ぎ目（二層と `Seams`）だけ。読む者がなければ何も出さない | 84、85、86（78 を置き換えた） |
 | `match s by list` / `by nullable` は `IsEmpty` を呼ぶ | 状態は `Get` で読み、値として分ける | 72（状態は名前で書いた値。S21） |
 | union を `optional` にすると `*<Union>` | インターフェースのまま（`nil` が「なし」） | 69 |

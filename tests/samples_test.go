@@ -15,13 +15,18 @@ import (
 
 	"github.com/mew-ton/hozo/internal/app"
 	"github.com/mew-ton/hozo/internal/config"
+	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 )
 
 // このファイルは、サンプル（tests/samples/<名前>/。持ち主は tests/samples/README.md）を確かめる。サンプルは
-// 「仕様（.hozo と hozo.toml）と、手で書いた完成したコード」の組で、まだないトランスパイラのブラックボックスのテストの
+// 「仕様（.hozo と hozo.toml）と、手で書いた完成したコード」の組で、トランスパイラのブラックボックスのテストの
 // 仕様になる（docs/testing.md「トランスパイラのテスト」）。
+//
+// テストは最後の形で書いてある。サンプルは、まだないトランスパイラと、今の hozoc がまだ読めない設定で書かれて
+// いてよい。そのサンプルで通せないサブテストは、足りないもの（sampleProject.missing）を名指しして飛ばし、
+// 足りないものがそろえば、このファイルを変えずに走る（tests/samples/README.md「テスト」）。
 
 // samplesDir はサンプルの置き場（tests/ からの相対パス）。
 const samplesDir = "samples"
@@ -29,154 +34,206 @@ const samplesDir = "samples"
 // sampleManifestFile は、サンプルのトランスパイラごとの事実を書いたファイル（tests/samples/README.md「sample.json」）。
 const sampleManifestFile = "sample.json"
 
-// sampleProjectTranspiler は sample.json のトランスパイラ一つ分。
-type sampleProjectTranspiler struct {
-	// Select は、このトランスパイラが出力の対象に選ぶ宣言。tests/plugins/pick の規則の形（デコレータの FQN）で書く。
-	// トランスパイラがまだない間、pick がこの規則でそのトランスパイラの代役をする。代役を使うサブテスト（check、shared）が
-	// どちらも保留のサンプルでは、書かなくてよい。
-	Select json.RawMessage `json:"select"`
-	// Files は、期待する出力のうちこのトランスパイラが出すファイル（サンプルのルートからの相対パス）。
-	// 単位の out の下の、ここにないファイルは、共有する形（hozoc の既定の出力）。
-	Files []string `json:"files"`
-}
+// repoPluginsDir は、リポジトリのプラグインの置き場（tests/ からの相対パス）。hozoc には HOZO_PLUGIN_PATH として渡す。
+var repoPluginsDir = filepath.Join("..", "plugins")
 
-// サンプルごとに保留にできるサブテスト（sample.json の pending のキー。tests/samples/README.md「保留」）。
-// 今の hozoc を動かすサブテストだけ。go（サンプルが動くこと）は保留にできない。
-const (
-	pendingCheck  = "check"
-	pendingShared = "shared"
-)
+// transpilersAll は、hozoc emit の出力の全体を比べるサブテストの名前（transpilers/all）。トランスパイラの名前には使えない。
+const transpilersAll = "all"
 
 // sampleProject はサンプル一つ。
 type sampleProject struct {
-	name        string
-	dir         string                             // サンプルのルート（tests/ からの相対パス）
-	transpilers map[string]sampleProjectTranspiler // sample.json
-	pending     map[string]string                  // sample.json の pending: 保留にするサブテスト → 理由
-	outs        []string                           // hozo.toml の単位の out（設定の順）
-	owner       map[string]string                  // トランスパイラのファイル → トランスパイラの名前
+	name string
+	dir  string // サンプルのルート（tests/ からの相対パス）
+
+	// files は sample.json: トランスパイラの名前 → 期待する出力のうち、そのトランスパイラが出すファイル
+	// （サンプルのルートからの相対パス）。
+	files map[string][]string
+	// owner は、期待する出力のファイル → それを出すトランスパイラの名前（files の逆）。
+	owner map[string]string
+
+	// cfg は、今の hozoc（internal/config）が読んだ、サンプルの本物の hozo.toml。
+	cfg *config.Config
+	// unreadable は、cfg を読んだときの診断。空でなければ、今の hozoc はこの hozo.toml をまだ読めず、cfg の単位は欠けている。
+	unreadable []string
+	// missing は、このサンプルに hozoc check / emit を掛けるのに足りないもの: unreadable と、まだないトランスパイラ、
+	// 今の hozoc が読めないマニフェスト。空なら、hozoc を本物の hozo.toml で走らせるサブテストが走る。
+	missing []string
 }
 
-// loadSample は、サンプルの sample.json と hozo.toml を読み、二つが合っていることを確かめる:
-// 単位に書いたトランスパイラはどれも sample.json にあり、sample.json のファイルはどれも単位の out の下にある。
+// loadSample は、サンプルの sample.json と hozo.toml を読み、足りないもの（missing）を調べる。
 func loadSample(t *testing.T, name string) *sampleProject {
 	t.Helper()
-	s := &sampleProject{name: name, dir: filepath.Join(samplesDir, name), owner: map[string]string{}}
+	s := &sampleProject{name: name, dir: filepath.Join(samplesDir, name), files: map[string][]string{}, owner: map[string]string{}}
 	data, err := os.ReadFile(filepath.Join(s.dir, sampleManifestFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var m struct {
-		Pending     map[string]string                  `json:"pending"`
-		Transpilers map[string]sampleProjectTranspiler `json:"transpilers"`
+		Transpilers map[string]struct {
+			Files []string `json:"files"`
+		} `json:"transpilers"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
+	dec.DisallowUnknownFields() // ほかのキー（これまでの pending、select）は書けない
 	if err := dec.Decode(&m); err != nil {
 		t.Fatalf("%s/%s を読めない: %v", s.dir, sampleManifestFile, err)
 	}
-	s.transpilers = m.Transpilers
-	s.pending = m.Pending
-	for sub, reason := range s.pending {
-		if sub != pendingCheck && sub != pendingShared {
-			t.Errorf("%s: pending に書けるのは %s と %s だけ（%s）", sampleManifestFile, pendingCheck, pendingShared, sub)
-		}
-		if strings.TrimSpace(reason) == "" {
-			t.Errorf("%s: pending の %s に理由がない", sampleManifestFile, sub)
-		}
+	if len(m.Transpilers) == 0 {
+		t.Fatalf("%s/%s に transpilers がない", s.dir, sampleManifestFile)
 	}
-	if s.pending[pendingShared] == "" {
-		// 代役のトランスパイラ（standIn）を使うサブテストが走るなら、代役の規則が要る。shared が保留のサンプルの
-		// check は、仕様の検査だけで、代役を使わない（testCheck）
-		for _, name := range s.names() {
-			if len(s.transpilers[name].Select) == 0 {
-				t.Errorf("%s: トランスパイラ %s に select がない（check と shared の代役が使う）", sampleManifestFile, name)
-			}
+	for name, tr := range m.Transpilers {
+		if name == transpilersAll {
+			t.Errorf("%s: トランスパイラの名前 %q は、サブテスト transpilers/%s と当たる", sampleManifestFile, name, transpilersAll)
 		}
-	}
-
-	// 本物の hozo.toml。トランスパイラがあるかどうかは見ない（見るのは internal/project の CFG-14）
-	cfg, diags := config.Load(s.configPath(t))
-	if len(diags) > 0 {
-		t.Fatalf("%s/%s: %+v", s.dir, config.FileName, diags)
-	}
-	used := map[string]bool{}
-	for _, u := range cfg.Units {
-		s.outs = append(s.outs, config.CleanRel(u.Out))
-		for _, name := range u.Transpilers {
-			used[name] = true
-			if _, ok := s.transpilers[name]; !ok {
-				t.Errorf("%s が単位に書いたトランスパイラ %s が、%s にない", config.FileName, name, sampleManifestFile)
-			}
-		}
-	}
-	for name, tr := range s.transpilers {
-		if !used[name] {
-			t.Errorf("%s のトランスパイラ %s を、%s のどの単位も使っていない", sampleManifestFile, name, config.FileName)
-		}
+		s.files[name] = tr.Files
 		for _, f := range tr.Files {
 			if prev, dup := s.owner[f]; dup {
 				t.Errorf("%s: %s が %s と %s の両方のファイルになっている", sampleManifestFile, f, prev, name)
 			}
 			s.owner[f] = name
-			if !s.underOut(f) {
-				t.Errorf("%s: %s のファイル %s が、どの単位の out の下にもない", sampleManifestFile, name, f)
-			}
 		}
 	}
 	if t.Failed() {
 		t.FailNow()
 	}
+
+	// 本物の hozo.toml を、今の hozoc が読む。読めない書き方（まだ実装のない設定）があれば、診断が返る
+	cfg, diags := config.Load(filepath.Join(s.dir, config.FileName))
+	s.cfg = cfg
+	for _, d := range diags {
+		s.unreadable = append(s.unreadable, fmt.Sprintf("今の hozoc（internal/config）が、%s/%s を読めない: %s", s.dir, config.FileName, diagText(d)))
+	}
+	s.missing = append(s.missing, s.unreadable...)
+	s.missing = append(s.missing, s.missingTranspilers(t)...)
 	return s
 }
 
-// configPath は、loadSample が単位（out と transpilers）を読む hozo.toml のパス。ふつうはサンプルの本物の hozo.toml。
-//
-// check か shared が保留のサンプルの hozo.toml は、今の hozoc が読めない書き方で書かれていてよい: 単位ごとのオプションの
-// テーブル `[emit.options.<トランスパイラ>]`（docs/decisions.md の P16。今の internal/config は知らないキーとして CFG-7 にし、
-// その単位を読まない）がそれに当たる。そのテーブルだけを行の単位で除いた写しを一時ディレクトリに作り、それを読む
-// （ほかの検査は、そのまま internal/config が行う）。P16 を実装したら、この分岐は要らなくなる。
-func (s *sampleProject) configPath(t *testing.T) string {
-	t.Helper()
-	real := filepath.Join(s.dir, config.FileName)
-	if len(s.pending) == 0 {
-		return real
+// diagText は診断一つを、理由として読める一行にする。
+func diagText(d diag.Diagnostic) string {
+	return d.Code + ": " + strings.Join(strings.Fields(d.Message), " ")
+}
+
+// pluginDirs は、hozoc がこのサンプルのプラグインを探す場所（docs/plugin-protocol.md「探索」の順）: サンプルの
+// hozo.toml の plugin_dirs（サンプルの中のプラグイン）と、リポジトリの plugins/（HOZO_PLUGIN_PATH として渡す）。
+// tests/ からの相対パス。
+func (s *sampleProject) pluginDirs() []string {
+	var dirs []string
+	for _, d := range s.cfg.Hozo.PluginDirs {
+		dirs = append(dirs, filepath.Join(s.dir, filepath.FromSlash(d)))
 	}
-	data, err := os.ReadFile(real)
+	return append(dirs, repoPluginsDir)
+}
+
+// missingTranspilers は、サンプルのトランスパイラ（sample.json の名前）のうち、今は動かせないものと、その理由。
+// 動かせるのは、pluginDirs のどれかのプラグインのマニフェストを今の hozoc が読め、そのマニフェストがその名前の
+// トランスパイラを提供し、プラグインに実装があるとき。
+func (s *sampleProject) missingTranspilers(t *testing.T) []string {
+	t.Helper()
+	var reasons []string
+	var unreadable []string       // リポジトリのプラグインのうち、マニフェストを読めなかったもの
+	provided := map[string]bool{} // 動かせるトランスパイラ
+	seen := map[string]bool{}     // プラグインの名前。近い場所のものを優先する（docs/plugin-protocol.md「探索」）
+	for _, dir := range s.pluginDirs() {
+		manifests, err := filepath.Glob(filepath.Join(dir, "*", hostplugin.ManifestFileName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sort.Strings(manifests)
+		for _, p := range manifests {
+			pluginDir := filepath.Dir(p)
+			plugin := filepath.Base(pluginDir)
+			if seen[plugin] {
+				continue
+			}
+			seen[plugin] = true
+			m, diags := hostplugin.LoadManifest(p)
+			if len(diags) > 0 {
+				// 読めない（MAN-4）か、protocol が合わない（MAN-2）。どちらも、今の hozoc はこのプラグインを使えない。
+				// サンプルの中のプラグインは、サンプルが使うものなので、いつも理由に挙げる。リポジトリのプラグインは、
+				// サンプルが使うものかどうかが、読めなければ分からないので、足りないトランスパイラがあるときにだけ添える
+				for _, d := range diags {
+					text := fmt.Sprintf("今の hozoc（internal/plugin）が、マニフェスト %s を読めない: %s", filepath.ToSlash(filepath.Clean(p)), diagText(d))
+					if dir == repoPluginsDir {
+						unreadable = append(unreadable, text)
+					} else {
+						reasons = append(reasons, text)
+					}
+				}
+				continue
+			}
+			if m == nil {
+				continue
+			}
+			if !pluginImplemented(t, m, pluginDir) {
+				reasons = append(reasons, fmt.Sprintf("プラグイン %s の実装がまだない（%s に、マニフェストの command が go run で動かす Go のファイルがない）",
+					plugin, filepath.ToSlash(pluginDir)))
+				continue
+			}
+			for _, tr := range m.Transpilers {
+				provided[tr.Name] = true
+			}
+		}
+	}
+	var absent []string
+	for _, name := range s.names() {
+		if !provided[name] {
+			absent = append(absent, name)
+		}
+	}
+	if len(absent) > 0 {
+		var dirs []string
+		for _, d := range s.pluginDirs() {
+			dirs = append(dirs, filepath.ToSlash(filepath.Clean(d)))
+		}
+		reasons = append(reasons, fmt.Sprintf("トランスパイラ %s がまだない（%s の、今の hozoc が動かせるどのプラグインも提供していない）",
+			strings.Join(absent, "、"), strings.Join(dirs, " と ")))
+		reasons = append(reasons, unreadable...)
+	}
+	return reasons
+}
+
+// pluginImplemented は、マニフェスト m のプラグインに、動かすものがあるか。サンプルは、マニフェストと語彙と期待する出力を、
+// プラグインの実装より先に書く（docs/testing.md「サンプル」）。command が `go run …` のプラグインは、マニフェストの
+// ディレクトリ（main パッケージの置き場。docs/packages.md「plugins/<名前>」）に、テストでない Go のファイルがあれば、
+// 実装があるとする。それ以外の command（ビルド済みの実行ファイルなど）は、あるものとして起動に任せる。
+func pluginImplemented(t *testing.T, m *hostplugin.Manifest, dir string) bool {
+	t.Helper()
+	if len(m.Command) < 2 || m.Command[0] != "go" || m.Command[1] != "run" {
+		return true
+	}
+	sources, err := filepath.Glob(filepath.Join(dir, "*.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var kept []string
-	inOptions := false
-	for _, line := range strings.Split(string(data), "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "[") {
-			inOptions = strings.HasPrefix(trimmed, "[emit.options.")
-		}
-		if !inOptions {
-			kept = append(kept, line)
-		}
-	}
-	stripped := filepath.Join(t.TempDir(), config.FileName)
-	if err := os.WriteFile(stripped, []byte(strings.Join(kept, "\n")), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return stripped
-}
-
-// underOut は、サンプルのルートからの相対パス p が、どれかの単位の out の下にあるか。
-func (s *sampleProject) underOut(p string) bool {
-	for _, out := range s.outs {
-		if config.Under(p, out) {
+	for _, f := range sources {
+		if !strings.HasSuffix(f, "_test.go") {
 			return true
 		}
 	}
 	return false
 }
 
+// skipIfMissing は、hozoc を本物の hozo.toml で走らせるサブテストを、足りないものがあれば、それを名指しして飛ばす。
+func (s *sampleProject) skipIfMissing(t *testing.T, what string) {
+	t.Helper()
+	if len(s.missing) > 0 {
+		t.Skipf("飛ばす（%s）。足りないもの:\n  - %s\nそろえば、何も変えずに走る", what, strings.Join(s.missing, "\n  - "))
+	}
+}
+
+// outs は、hozo.toml の単位の out（設定の順。ルートからの相対パス）。
+func (s *sampleProject) outs() []string {
+	var outs []string
+	for _, u := range s.cfg.Units {
+		outs = append(outs, config.CleanRel(u.Out))
+	}
+	return outs
+}
+
 // names はサンプルのトランスパイラの名前（辞書順）。
 func (s *sampleProject) names() []string {
 	var names []string
-	for name := range s.transpilers {
+	for name := range s.files {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -187,7 +244,7 @@ func (s *sampleProject) names() []string {
 func (s *sampleProject) expected(t *testing.T) map[string][]byte {
 	t.Helper()
 	want := map[string][]byte{}
-	for _, out := range s.outs {
+	for _, out := range s.outs() {
 		for p, content := range readTree(t, filepath.Join(s.dir, filepath.FromSlash(out))) {
 			want[path.Join(out, p)] = content
 		}
@@ -195,32 +252,54 @@ func (s *sampleProject) expected(t *testing.T) map[string][]byte {
 	return want
 }
 
-// copyInputs は、サンプルの入力（hozo.toml、.hozo、go.mod、go.sum）を root に写す。期待する出力と人の手のコードは写さない。
-// go.mod は、既定の出力が import パスを決めるのに要る（docs/emit-go.md「配置」。なければ GOEMIT-1）。その replace は
-// リポジトリへの相対パスなので、絶対パスに書き換える（root から `go run` でプラグインを動かせるように）。
+// copyInputs は、サンプルの入力を root に写す: hozo.toml、.hozo、go.mod、go.sum と、サンプルの中のプラグイン（hozo.toml の
+// plugin_dirs の下のすべて）。期待する出力（単位の out の下）と、人が書いたコードは写さない。
+// go.mod は、基底が import パスを決めるのに要る（docs/plugin-go.md「パッケージと import パス」。なければ GO-1）。その replace は
+// リポジトリへの相対パスなので、絶対パスに書き換える（root から、サンプルの中のプラグインを `go run` で動かせるように）。
 func (s *sampleProject) copyInputs(t *testing.T, root string) {
 	t.Helper()
 	repo, err := filepath.Abs("..")
 	if err != nil {
 		t.Fatal(err)
 	}
+	var pluginDirs, outs []string
+	for _, d := range s.cfg.Hozo.PluginDirs {
+		pluginDirs = append(pluginDirs, config.CleanRel(d))
+	}
+	outs = s.outs()
+	under := func(rel string, dirs []string) bool {
+		for _, d := range dirs {
+			if rel == d || config.Under(rel, d) {
+				return true
+			}
+		}
+		return false
+	}
 	err = filepath.WalkDir(s.dir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
 			return err
 		}
 		rel, err := filepath.Rel(s.dir, p)
 		if err != nil {
 			return err
 		}
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() {
+			if under(rel, outs) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		name := d.Name()
-		if name != config.FileName && name != "go.mod" && name != "go.sum" && !strings.HasSuffix(name, ".hozo") {
+		isInput := name == config.FileName || name == "go.mod" || name == "go.sum" || strings.HasSuffix(name, ".hozo")
+		if !isInput && !under(rel, pluginDirs) {
 			return nil
 		}
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return err
 		}
-		if name == "go.mod" {
+		if rel == "go.mod" {
 			lines := strings.Split(string(data), "\n")
 			for i, l := range lines {
 				if strings.HasPrefix(l, "replace "+modulePath+" => ") {
@@ -229,7 +308,7 @@ func (s *sampleProject) copyInputs(t *testing.T, root string) {
 			}
 			data = []byte(strings.Join(lines, "\n"))
 		}
-		dst := filepath.Join(root, rel)
+		dst := filepath.Join(root, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
 		}
@@ -240,64 +319,37 @@ func (s *sampleProject) copyInputs(t *testing.T, root string) {
 	}
 }
 
-// copySpecs は、サンプルの仕様（.hozo）だけを root に写す。hozo.toml は写さない（testCheck の、言語の検査だけの形）。
+// copySpecs は、サンプルのすべての .hozo（サンプルの中のプラグインの語彙を含む）を、同じ相対パスで root に写す。
+// hozo.toml は写さない（testCheck の、言語の検査だけの形）。設定がなければ、hozoc はルートの下のすべての .hozo を
+// 仕様として読むので、プラグインの語彙も、宣言として読まれる。
 func (s *sampleProject) copySpecs(t *testing.T, root string) {
 	t.Helper()
-	specs, err := filepath.Glob(filepath.Join(s.dir, "*.hozo"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(specs) == 0 {
-		t.Fatalf("%s に .hozo がない", s.dir)
-	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, p := range specs {
+	n := 0
+	err := filepath.WalkDir(s.dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(d.Name(), ".hozo") {
+			return err
+		}
+		rel, err := filepath.Rel(s.dir, p)
+		if err != nil {
+			return err
+		}
 		data, err := os.ReadFile(p)
 		if err != nil {
-			t.Fatal(err)
+			return err
 		}
-		if err := os.WriteFile(filepath.Join(root, filepath.Base(p)), data, 0o644); err != nil {
-			t.Fatal(err)
+		dst := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
 		}
-	}
-}
-
-// standIn は、サンプルの入力を一時ディレクトリに写し、トランスパイラの代役を入れたプラグインのディレクトリを作る。
-// 戻り値はプロジェクトのルートと、hozoc に渡す環境（HOZO_PLUGIN_PATH だけを持つ。docs/plugin-protocol.md「探索」の 2）。
-//
-// サンプルの本物の hozo.toml は、まだないトランスパイラの名前を書いている。それを書き換えずに使うために、
-// 同じ名前のトランスパイラを提供するプラグイン pick（tests/plugins/pick。ファイルは出さず、sample.json の select の
-// 規則で選ぶだけ）を、プロジェクトの外に置く。pick は pickExe（go build したもの）で動かす: 一時ディレクトリは
-// リポジトリのモジュールの外なので、コーパスのマニフェストの `go run` は使えない。
-func (s *sampleProject) standIn(t *testing.T, pickExe string) (string, func(string) string) {
-	t.Helper()
-	tmp := t.TempDir()
-	root := filepath.Join(tmp, "project")
-	s.copyInputs(t, root)
-
-	plugins := filepath.Join(tmp, "plugins")
-	pick := filepath.Join(plugins, "pick")
-	if err := os.MkdirAll(pick, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	manifest := fmt.Sprintf("name     = \"pick\"\ncommand  = [%q]\nprotocol = %q\n", pickExe, hostplugin.Protocol)
-	rules := map[string]json.RawMessage{}
-	for _, name := range s.names() {
-		manifest += fmt.Sprintf("\n[[transpiler]]\nname     = %q\nlanguage = \"go\"\n", name)
-		rules[name] = s.transpilers[name].Select
-	}
-	pickJSON, err := json.Marshal(map[string]any{"transpilers": rules})
+		n++
+		return os.WriteFile(dst, data, 0o644)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, content := range map[string][]byte{hostplugin.ManifestFileName: []byte(manifest), "pick.json": pickJSON} {
-		if err := os.WriteFile(filepath.Join(pick, name), content, 0o644); err != nil {
-			t.Fatal(err)
-		}
+	if n == 0 {
+		t.Fatalf("%s に .hozo がない", s.dir)
 	}
-	return root, pluginPathEnv(plugins)
 }
 
 // pluginPathEnv は、HOZO_PLUGIN_PATH だけが dir である環境。
@@ -316,28 +368,29 @@ func hozocMainEnv(dir string, env func(string) string, args []string, stdout, st
 	return cli.Main(a.Ops(), app.Presenter{}, args, env, stdout, stderr)
 }
 
-// buildPick は tests/plugins/pick を go build し、実行ファイルのパスを返す。
-func buildPick(t *testing.T) string {
+// project は、サンプルの入力を一時ディレクトリに写し、そのルートと、hozoc に渡す環境（リポジトリの plugins/ を
+// HOZO_PLUGIN_PATH に持つ。docs/plugin-protocol.md「探索」の 2）を返す。hozo.toml は本物のまま。
+func (s *sampleProject) project(t *testing.T) (string, func(string) string) {
 	t.Helper()
-	exe := filepath.Join(t.TempDir(), "pick")
-	build := exec.Command("go", "build", "-o", exe, "./plugins/pick")
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("tests/plugins/pick を go build できない: %v\n%s", err, out)
+	root := filepath.Join(t.TempDir(), "project")
+	s.copyInputs(t, root)
+	plugins, err := filepath.Abs(repoPluginsDir)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return exe
+	return root, pluginPathEnv(plugins)
 }
 
-// TestSamples は tests/samples/ の各サンプルについて、四つを確かめる（tests/samples/README.md「テスト」）。
+// TestSamples は tests/samples/ の各サンプルについて、次を確かめる（tests/samples/README.md「テスト」）。
 //
-//   - check: サンプルの仕様が hozoc check を error なしで通る。
-//   - shared: 期待する出力のうち共有する形（既定の出力）のファイルが、今の hozoc emit の出力とバイト単位で同じ。
-//   - go: 期待する出力と人の手のコードが、サンプルのモジュールで go vet と go test を通る。
-//   - transpilers: 本物のトランスパイラで emit した出力の全体が、期待する出力とバイト単位で同じ。
-//     トランスパイラがまだなければ飛ばす。
+//   - check: サンプルの仕様と設定が、本物の hozo.toml とプラグインで、hozoc check を error なしで通る。
+//   - files: 期待する出力のファイル、sample.json、hozo.toml、出力先ごとの記録が合っている（hozoc を動かさない）。
+//   - go: 期待する出力と人が書いたコードが、サンプルのモジュールで go vet と go test を通る。
+//   - transpilers/<名前>: hozoc emit の出力のうち、そのトランスパイラのファイルが、期待する出力とバイト単位で同じ。
+//   - transpilers/all: hozoc emit の出力の全体が、期待する出力と同じ（余分なファイルがなく、記録が同じ）。
 //
-// check と shared は、サンプルが sample.json の pending に理由を書いていれば、その理由を示して飛ばす（今の hozoc が
-// まだ読めない書き方、まだ出さない形で書いたサンプル。tests/samples/README.md「保留」）。書いていないサンプルでは、
-// 今までどおり走る。shared を飛ばす前に、hozoc を動かさずに確かめられること（testFiles）は確かめる。
+// go は飛ばさない。ほかは、足りないものがあれば、それを名指しして飛ばす。check だけは、飛ばす代わりに、
+// 設定を使わない言語の検査に落として通す（testCheck）。
 func TestSamples(t *testing.T) {
 	requireGo(t)
 	manifests, err := filepath.Glob(filepath.Join(samplesDir, "*", sampleManifestFile))
@@ -347,44 +400,34 @@ func TestSamples(t *testing.T) {
 	if len(manifests) == 0 {
 		t.Fatalf("%s にサンプルがない", samplesDir)
 	}
-	pickExe := buildPick(t)
 	for _, m := range manifests {
 		name := filepath.Base(filepath.Dir(m))
 		t.Run(name, func(t *testing.T) {
 			s := loadSample(t, name)
-			t.Run("check", func(t *testing.T) {
-				if reason := s.pending[pendingCheck]; reason != "" {
-					t.Skipf("保留（%s/%s）: %s", s.dir, sampleManifestFile, reason)
-				}
-				s.testCheck(t, pickExe)
-			})
-			t.Run("shared", func(t *testing.T) {
-				if reason := s.pending[pendingShared]; reason != "" {
-					s.testFiles(t)
-					t.Skipf("保留（%s/%s）: %s", s.dir, sampleManifestFile, reason)
-				}
-				s.testShared(t, pickExe)
-			})
+			t.Run("check", s.testCheck)
+			t.Run("files", s.testFiles)
 			t.Run("go", s.testGo)
-			t.Run("transpilers", func(t *testing.T) { s.testTranspilers(t, filepath.Join("..", "plugins")) })
+			t.Run("transpilers", s.testTranspilers)
 		})
 	}
 }
 
-// testCheck は、サンプルの仕様が hozoc check を error なしで通ること。本物の hozo.toml のまま、代役のトランスパイラで
-// 確かめる（代役がなければ、単位のトランスパイラが見つからない CFG-14 になる）。warning は許し、表示する。
+// testCheck は、サンプルの仕様と設定が hozoc check を error なしで通ること。サンプルの入力を一時ディレクトリに写し、
+// 本物の hozo.toml のまま、サンプルの中のプラグインと、リポジトリの plugins/ のプラグインで確かめる。warning は許し、表示する。
 //
-// shared が保留のサンプルは、設定（hozo.toml）も、まだない形で書かれている: まだないトランスパイラと、単位ごとの
-// オプション（P16）のほかに、型だけの名前空間の単位（docs/decisions.md の P7。今の検査では CFG-8）を持ちうる。
-// そういうサンプルでは、仕様（.hozo）だけを写して、言語の検査だけを行う: hozo.toml がなければ、hozoc は設定の検査
-// （CFG-*）をしない（docs/config.md「置き場と探し方」）。設定は、shared の保留を外したときに、代役の emit が確かめる。
-func (s *sampleProject) testCheck(t *testing.T, pickExe string) {
+// 足りないもの（missing）がある間は、本物の hozo.toml では走らせられない（まだないトランスパイラは CFG-14、まだ読めない
+// 設定は CFG-7 になる）。その間は、**言語の検査だけ**に落とす: すべての .hozo（サンプルの中のプラグインの語彙を含む）
+// だけを写し、設定なしで hozoc check を通す（hozo.toml がなければ、hozoc は設定の検査 CFG-* をしない。docs/config.md
+// 「置き場と探し方」）。落としたことと、足りないものは、ログに書く。足りないものがそろえば、本物の設定での検査に戻る。
+func (s *sampleProject) testCheck(t *testing.T) {
 	root, env := "", func(string) string { return "" }
-	if s.pending[pendingShared] != "" {
+	if len(s.missing) > 0 {
+		t.Logf("言語の検査だけに落とした（設定 %s と、プラグインの検査は、まだ確かめていない）。足りないもの:\n  - %s\nそろえば、本物の hozo.toml で走る",
+			config.FileName, strings.Join(s.missing, "\n  - "))
 		root = filepath.Join(t.TempDir(), "project")
 		s.copySpecs(t, root)
 	} else {
-		root, env = s.standIn(t, pickExe)
+		root, env = s.project(t)
 	}
 	var stdout, stderr bytes.Buffer
 	if code := hozocMainEnv(root, env, []string{"check"}, &stdout, &stderr); code != 0 {
@@ -393,108 +436,46 @@ func (s *sampleProject) testCheck(t *testing.T, pickExe string) {
 	t.Logf("hozoc check:\n%s", stdout.String())
 }
 
-// testShared は、期待する出力のうち共有する形のファイルが古くなっていないこと。代役のトランスパイラ（sample.json の
-// select の通りに選ぶだけの pick）で emit し、書き出されたファイルを、サンプルの同じパスのファイルとバイト単位で比べる。
-// 単位の out の下のファイルは、既定の出力が書くか、sample.json がトランスパイラのファイルとして挙げるかのどちらか。
-// 出力先ごとの記録（.hozoc-outputs.json）は、代役の記録にトランスパイラのファイルを足したものと比べる。
-// -update なら、共有する形のファイルと記録をサンプルに書き直す（トランスパイラのファイルは人が書くので、触らない）。
-func (s *sampleProject) testShared(t *testing.T, pickExe string) {
-	root, env := s.standIn(t, pickExe)
-	before := readTree(t, root)
-	var stdout, stderr bytes.Buffer
-	if code := hozocMainEnv(root, env, []string{"emit"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
-	}
-	got := readTree(t, root)
-	for p := range before {
-		delete(got, p)
-	}
-
-	// 記録は、その出力のトランスパイラのファイルを足してから比べる。ファイルの持ち主の出力は、記録のあるディレクトリのうち
-	// そのファイルを下に持つ最も深いもの（Dir(U, N)。docs/config.md「単位の対象」）
-	records := map[string][]string{}
-	for p, content := range got {
-		if path.Base(p) != app.OutputsFile {
-			continue
-		}
-		var paths []string
-		if err := json.Unmarshal(content, &paths); err != nil {
-			t.Fatalf("%s を読めない: %v", p, err)
-		}
-		records[path.Dir(p)] = paths
-	}
-	for f, name := range s.owner {
-		if _, written := got[f]; written {
-			t.Errorf("%s は %s のファイルのはずだが、既定の出力が書いた", f, name)
-		}
-		dir := ""
-		for d := range records {
-			if config.Under(f, d) && len(d) > len(dir) {
-				dir = d
-			}
-		}
-		if dir == "" {
-			t.Errorf("%s のファイル %s を下に持つ出力がない（その単位は何も出力しなかった）", name, f)
-			continue
-		}
-		records[dir] = append(records[dir], f)
-	}
-	for dir, paths := range records {
-		sort.Strings(paths)
-		data, err := json.MarshalIndent(paths, "", "  ") // docs/cli.md「emit」の 6: 辞書順の JSON の配列
-		if err != nil {
-			t.Fatal(err)
-		}
-		got[path.Join(dir, app.OutputsFile)] = append(data, '\n')
-	}
-
-	if *update {
-		for p, content := range got {
-			abs := filepath.Join(s.dir, filepath.FromSlash(p))
-			if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(abs, content, 0o644); err != nil {
-				t.Fatal(err)
-			}
-		}
-		for p := range s.expected(t) {
-			if _, ok := got[p]; !ok && s.owner[p] == "" {
-				if err := os.Remove(filepath.Join(s.dir, filepath.FromSlash(p))); err != nil {
-					t.Fatal(err)
-				}
-			}
-		}
-	}
-
-	want := s.expected(t)
-	for _, p := range sortedKeys(want, got) {
-		w, inWant := want[p]
-		g, inGot := got[p]
-		switch name := s.owner[p]; {
-		case name != "" && !inWant:
-			t.Errorf("%s/%s: %s が出すはずのファイルがない（%s）", s.dir, p, name, sampleManifestFile)
-		case name != "":
-			// トランスパイラのファイル。中身を確かめるのは testGo と testTranspilers
-		case !inGot:
-			t.Errorf("%s/%s は既定の出力が書かず、%s のトランスパイラのファイルにもない（-update で消える）", s.dir, p, sampleManifestFile)
-		case !inWant:
-			t.Errorf("%s/%s は既定の出力が書くが、サンプルにない（-update で作る）", s.dir, p)
-		case !bytes.Equal(w, g):
-			t.Errorf("%s/%s が今の既定の出力と違う（-update で更新）:\n%s", s.dir, p, firstDiff(string(w), string(g)))
-		}
-	}
-}
-
-// testFiles は、shared が保留のサンプルについて、hozoc を動かさずに確かめられること: 期待する出力のファイルと、
-// sample.json と、出力先ごとの記録（.hozoc-outputs.json）が合っている。
+// testFiles は、hozoc を動かさずに確かめられること: 期待する出力のファイルと、sample.json と、hozo.toml と、
+// 出力先ごとの記録（.hozoc-outputs.json）が合っている。
 //
+//   - 単位に書いたトランスパイラは、どれも sample.json にあり、sample.json のトランスパイラは、どれかの単位が使っている。
+//   - sample.json のファイルは、どれもあり、どれかの単位の out の下にある。
 //   - 単位の out の下のファイルは、記録を除いて、どれも sample.json のどれかのトランスパイラのファイル
-//     （共有する形のファイルを今の hozoc emit と比べられないので、出どころのないファイルを置かせない）。
-//   - sample.json のファイルは、どれもある。
+//     （hozoc 本体はコードを出力しない。出どころのないファイルを置かせない）。
 //   - 記録は、そのディレクトリの下のファイル（もっと深い記録のあるディレクトリの下のものを除く）のパスを、
 //     辞書順に並べた JSON の配列（docs/cli.md「emit」の 6）。記録の下にないファイルはない。
+//
+// 単位（out と transpilers）は、今の hozoc が読んだ hozo.toml から取る。読めなければ、単位が欠けるので、理由を示して飛ばす。
 func (s *sampleProject) testFiles(t *testing.T) {
+	if len(s.unreadable) > 0 {
+		t.Skipf("飛ばす（単位の out と transpilers が分からない）。足りないもの:\n  - %s\nそろえば、何も変えずに走る", strings.Join(s.unreadable, "\n  - "))
+	}
+	used := map[string]bool{}
+	outs := s.outs()
+	for _, u := range s.cfg.Units {
+		for _, name := range u.Transpilers {
+			used[name] = true
+			if _, ok := s.files[name]; !ok {
+				t.Errorf("%s が単位に書いたトランスパイラ %s が、%s にない", config.FileName, name, sampleManifestFile)
+			}
+		}
+	}
+	for _, name := range s.names() {
+		if !used[name] {
+			t.Errorf("%s のトランスパイラ %s を、%s のどの単位も使っていない", sampleManifestFile, name, config.FileName)
+		}
+		for _, f := range s.files[name] {
+			underOut := false
+			for _, out := range outs {
+				underOut = underOut || config.Under(f, out)
+			}
+			if !underOut {
+				t.Errorf("%s: %s のファイル %s が、どの単位の out の下にもない", sampleManifestFile, name, f)
+			}
+		}
+	}
+
 	want := s.expected(t)
 	listed := map[string][]string{} // 記録のあるディレクトリ → その記録が挙げるはずのファイル
 	for p := range want {
@@ -540,7 +521,8 @@ func (s *sampleProject) testFiles(t *testing.T) {
 }
 
 // testGo は、サンプルが動くこと: サンプルのモジュール（リポジトリのモジュールとは別。自分の go.mod を持つ）で
-// `go vet ./...` と `go test ./...` を通す。期待する出力がコンパイルでき、人の手のコードと合わせて仕様の通りに動く。
+// `go vet ./...` と `go test ./...` を通す。期待する出力がコンパイルでき、人が書いたコードと合わせて仕様の通りに動く。
+// 飛ばさない: 動くと確かめていないサンプルを、仕様として通さない。
 //
 // 依存はサンプルの go.sum の通りのもの（-mod=readonly）を、モジュールキャッシュから使う。キャッシュにあれば
 // ネットワークは要らない。なければ go が GOPROXY から取りに行き、取れなければ（オフラインなど）このテストは失敗する。
@@ -565,70 +547,73 @@ func (s *sampleProject) testGo(t *testing.T) {
 }
 
 // testTranspilers は、トランスパイラのブラックボックスのテスト（docs/testing.md「トランスパイラのテスト」）:
-// サンプルの入力を一時ディレクトリに写し、本物の hozo.toml のまま、pluginDir のプラグインのトランスパイラで emit して、
-// 書き出されたファイルの木の全体（共有する形、トランスパイラのファイル、記録）が、サンプルの期待する出力と
-// バイト単位で同じであることを確かめる。
+// サンプルの入力を一時ディレクトリに写し、本物の hozo.toml のまま、サンプルの中のプラグインと、リポジトリの plugins/ の
+// プラグインのトランスパイラで、hozoc emit を一度だけ走らせる。書き出されたファイルを、サブテストが分けて、
+// サンプルの期待する出力とバイト単位で比べる。
 //
-// サンプルのトランスパイラのうち、pluginDir のどのプラグインも提供していないものがあれば飛ばす。
-// そのトランスパイラを提供するプラグインを plugins/ に足せば、何も変えずに走るようになる。
-// 期待する出力が仕様なので、-update では書き直さない。
-func (s *sampleProject) testTranspilers(t *testing.T, pluginDir string) {
-	provided := map[string]bool{}
-	manifests, err := filepath.Glob(filepath.Join(pluginDir, "*", hostplugin.ManifestFileName))
-	if err != nil {
-		t.Fatal(err)
+//   - transpilers/<名前>: sample.json の、そのトランスパイラの files が、どれも書き出され、期待する出力と同じ。
+//     失敗が、どのトランスパイラのものかが分かり、一つ実装するごとに、その分が通る。
+//   - transpilers/all: 出力の全体が同じ。どのトランスパイラの files にもないファイルが書かれていない。期待する出力の
+//     ファイルが、すべて書かれている。出力先ごとの記録が同じ。
+//
+// 足りないもの（missing）があれば、hozoc emit は何も書き出さない（一つの単位の誤りで、全体が止まる）ので、
+// どのサブテストも、足りないものを名指しして飛ばす。期待する出力が仕様なので、-update では書き直さない。
+func (s *sampleProject) testTranspilers(t *testing.T) {
+	var got, want map[string][]byte
+	if len(s.missing) == 0 {
+		got, want = s.emit(t), s.expected(t)
 	}
-	for _, p := range manifests {
-		m, _ := hostplugin.LoadManifest(p)
-		if m == nil {
-			continue
-		}
-		for _, tr := range m.Transpilers {
-			provided[tr.Name] = true
-		}
-	}
-	var missing []string
 	for _, name := range s.names() {
-		if !provided[name] {
-			missing = append(missing, name)
+		t.Run(name, func(t *testing.T) {
+			s.skipIfMissing(t, "hozoc emit を、このサンプルに掛けられない")
+			for _, p := range s.files[name] {
+				w, inWant := want[p]
+				g, inGot := got[p]
+				switch {
+				case !inWant:
+					t.Errorf("%s/%s: %s が出すはずのファイルが、期待する出力にない（%s）", s.dir, p, name, sampleManifestFile)
+				case !inGot:
+					t.Errorf("%s/%s は期待する出力にあるが、emit は書かない（%s のファイル）", s.dir, p, name)
+				case !bytes.Equal(w, g):
+					t.Errorf("%s/%s が期待する出力と違う（%s のファイル）:\n%s", s.dir, p, name, firstDiff(string(w), string(g)))
+				}
+			}
+		})
+	}
+	t.Run(transpilersAll, func(t *testing.T) {
+		s.skipIfMissing(t, "hozoc emit を、このサンプルに掛けられない")
+		for _, p := range sortedKeys(want, got) {
+			w, inWant := want[p]
+			g, inGot := got[p]
+			isRecord := path.Base(p) == app.OutputsFile
+			switch {
+			case !inWant && s.owner[p] == "":
+				t.Errorf("%s/%s は emit が書くが、%s のどのトランスパイラのファイルでもない", s.dir, p, sampleManifestFile)
+			case !inWant:
+				t.Errorf("%s/%s は emit が書くが、期待する出力にない", s.dir, p)
+			case !inGot:
+				t.Errorf("%s/%s は期待する出力にあるが、emit は書かない", s.dir, p)
+			case isRecord && !bytes.Equal(w, g):
+				t.Errorf("%s/%s（出力先ごとの記録）が期待する出力と違う:\n%s", s.dir, p, firstDiff(string(w), string(g)))
+			}
+			// 記録でないファイルの内容の違いは、transpilers/<名前> が、持ち主のトランスパイラの名前で報告する
 		}
-	}
-	if len(missing) > 0 {
-		t.Skipf("保留: トランスパイラ %s がまだない（%s のどのプラグインも提供していない）。"+
-			"できたら、hozoc emit の出力の全体を %s の期待する出力とバイト単位で比べる",
-			strings.Join(missing, "、"), filepath.ToSlash(filepath.Clean(pluginDir)), s.dir)
-	}
+	})
+}
 
-	absPlugins, err := filepath.Abs(pluginDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.Join(t.TempDir(), "project")
-	s.copyInputs(t, root)
+// emit は、サンプルの入力を一時ディレクトリに写して hozoc emit を走らせ、書き出されたファイル（入力になかったもの）を、
+// サンプルのルートからの相対パス → 内容で返す。
+func (s *sampleProject) emit(t *testing.T) map[string][]byte {
+	t.Helper()
+	root, env := s.project(t)
 	before := readTree(t, root)
 	var stdout, stderr bytes.Buffer
-	if code := hozocMainEnv(root, pluginPathEnv(absPlugins), []string{"emit"}, &stdout, &stderr); code != 0 {
+	if code := hozocMainEnv(root, env, []string{"emit"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 	got := readTree(t, root)
 	for p := range before {
 		delete(got, p)
 	}
-	want := s.expected(t)
-	for _, p := range sortedKeys(want, got) {
-		w, inWant := want[p]
-		g, inGot := got[p]
-		from := s.owner[p]
-		if from == "" {
-			from = "既定の出力"
-		}
-		switch {
-		case !inGot:
-			t.Errorf("%s/%s は期待する出力にあるが、emit は書かない（%s）", s.dir, p, from)
-		case !inWant:
-			t.Errorf("%s/%s は emit が書くが、期待する出力にない", s.dir, p)
-		case !bytes.Equal(w, g):
-			t.Errorf("%s/%s が期待する出力と違う（%s）:\n%s", s.dir, p, from, firstDiff(string(w), string(g)))
-		}
-	}
+	return got
 }

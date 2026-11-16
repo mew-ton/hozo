@@ -28,7 +28,7 @@ func openDB(t *testing.T) *sql.DB {
 // newServer は、新しいデータベースの上に組み立てたサーバー。
 func newServer(t *testing.T, f *handlertest.Fixture) handlertest.Server {
 	db := openDB(t)
-	handler, s, err := New(context.Background(), db, f.Leaves(), f.Mailer())
+	handler, s, err := New(context.Background(), db, f.Leaves(), f.Mailer(), f.Limiter())
 	if err != nil {
 		t.Fatal(err)
 	}

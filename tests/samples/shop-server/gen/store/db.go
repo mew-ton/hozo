@@ -42,8 +42,8 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
-// UsersTable は状態 store.users の単位（UsersState）の、表 "users" の上の実装。メソッドは、形で決まる問い合わせ
-// （IsEmpty、Get）と、store.users を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+// UsersTable は状態 store.users の単位（UsersState）の、表 "users" の上の実装。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.users を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
 type UsersTable struct{ db *sql.DB }
 
 // NewUsersTable は db の表 "users" の上の UsersTable を返す。表は CreateTables が作る。
@@ -84,8 +84,8 @@ func (t UsersTable) AddUser(ctx context.Context, user pkgtype.User) error {
 		`INSERT INTO "users" ("id", "email", "name", "hash") VALUES (?1, ?2, ?3, ?4)`, args...)
 }
 
-// SessionsTable は状態 store.sessions の単位（SessionsState）の、表 "sessions" の上の実装。メソッドは、形で決まる問い合わせ
-// （IsEmpty、Get）と、store.sessions を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+// SessionsTable は状態 store.sessions の単位（SessionsState）の、表 "sessions" の上の実装。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.sessions を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
 type SessionsTable struct{ db *sql.DB }
 
 // NewSessionsTable は db の表 "sessions" の上の SessionsTable を返す。表は CreateTables が作る。
@@ -104,8 +104,8 @@ func (t SessionsTable) Get(ctx context.Context) ([]pkgtype.Session, error) {
 		`SELECT "token", "userId", "expiresAt" FROM "sessions" ORDER BY rowid`)
 }
 
-// FindSession は op store.findSession: 表 "sessions" から、"token"（引数 token と型が合う列。@db.key）が同じ行を引く。
-// なければ nil。token は省略可能で、なければ問い合わせずに nil。
+// FindSession は op store.findSession: 表 "sessions" から、"token"（引数 token と型が合う列。@db.key）が同じ行を引く。なければ nil。
+// token は省略可能で、なければ問い合わせずに nil。
 func (t SessionsTable) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
 	if token == nil {
 		return nil, nil
@@ -124,14 +124,13 @@ func (t SessionsTable) AddSession(ctx context.Context, session pkgtype.Session) 
 		`INSERT INTO "sessions" ("token", "userId", "expiresAt") VALUES (?1, ?2, ?3)`, args...)
 }
 
-// RemoveSession は op store.removeSession（効果 store.deleteSession は sessions.delete）: 表 "sessions" から、
-// "token"（引数 token と型が合う列）が同じ行を消す。行がなければ何もしない。
+// RemoveSession は op store.removeSession（効果 store.deleteSession は sessions.delete）: 表 "sessions" から、"token"（引数 token と型が合う列）が同じ行を消す。行がなければ何もしない。
 func (t SessionsTable) RemoveSession(ctx context.Context, token pkgtype.Token) error {
 	return dbExec(ctx, t.db, `DELETE FROM "sessions" WHERE "token" = ?1`, string(token))
 }
 
-// OrdersTable は状態 store.orders の単位（OrdersState）の、表 "orders" の上の実装。メソッドは、形で決まる問い合わせ
-// （IsEmpty、Get）と、store.orders を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+// OrdersTable は状態 store.orders の単位（OrdersState）の、表 "orders" の上の実装。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.orders を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
 type OrdersTable struct{ db *sql.DB }
 
 // NewOrdersTable は db の表 "orders" の上の OrdersTable を返す。表は CreateTables が作る。
@@ -167,8 +166,7 @@ func (t OrdersTable) AddOrder(ctx context.Context, order pkgtype.Order) error {
 }
 
 // NotificationsTable は状態 store.notifications の単位（NotificationsState）の、表 "notifications" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.notifications を読み書きする葉の op のうち、
-// 中身が仕様から決まるもの（この状態では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.notifications を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
 type NotificationsTable struct{ db *sql.DB }
 
 // NewNotificationsTable は db の表 "notifications" の上の NotificationsTable を返す。表は CreateTables が作る。

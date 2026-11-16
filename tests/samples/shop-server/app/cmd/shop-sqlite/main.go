@@ -41,8 +41,10 @@ func main() {
 		log.Printf("通知 → %s: %s", notice.UserId, notice.Message)
 		return nil
 	}}
+	// ログイン（@rate.limited の付いた op）は、1 分に 5 回まで
+	limiter := &app.Limiter{Now: time.Now, Max: 5, Window: time.Minute}
 	ctx := context.Background()
-	handler, store, err := onsqlite.New(ctx, db, leaves, mailer)
+	handler, store, err := onsqlite.New(ctx, db, leaves, mailer, limiter)
 	if err != nil {
 		log.Fatal(err)
 	}

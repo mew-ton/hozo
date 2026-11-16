@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"example.com/shop-server/gen/rate"
 	pkgtype "example.com/shop-server/gen/type"
 	"github.com/mew-ton/hozo/runtime"
 )
@@ -211,12 +212,15 @@ func httpWriteInvalid(w http.ResponseWriter, err error, places ...httpPlace) {
 func httpWriteError(w http.ResponseWriter, err error) {
 	var (
 		e0 pkgtype.InvalidCredentials
-		e1 pkgtype.Unauthorized
+		e1 rate.LimitExceeded
+		e2 pkgtype.Unauthorized
 	)
 	switch {
 	case errors.As(err, &e0):
 		httpWriteJSON(w, 401, httpErrorBody{Error: "type.InvalidCredentials"})
 	case errors.As(err, &e1):
+		httpWriteJSON(w, 429, httpErrorBody{Error: "rate.LimitExceeded"})
+	case errors.As(err, &e2):
 		httpWriteJSON(w, 401, httpErrorBody{Error: "type.Unauthorized"})
 	default:
 		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})

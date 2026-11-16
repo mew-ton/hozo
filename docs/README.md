@@ -12,10 +12,10 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | [`resolve.md`](resolve.md) | 名前の解決 | `internal/sema` |
 | [`types.md`](types.md) | 型の互換、形の書き方、継承した model、絞り込み、式の型 | `internal/sema` |
 | [`check.md`](check.md) | 状態の形、分類、`export` などの op の規則、例外・効果・読む状態・純粋さ・`bind` の計算と、規則ごとの検査 | `internal/check` |
-| [`config.md`](config.md) | `hozo.toml`: 単位、基底と相乗り、オプション、型の置き場 | `internal/config`、`internal/project`、`internal/check` |
+| [`config.md`](config.md) | `hozo.toml`: 単位、基底と相乗り、オプション、継ぎ目、型の置き場 | `internal/config`、`internal/project`、`internal/check` |
 | [`vocab.md`](vocab.md) | 標準の語彙 | `vocab/`、`internal/vocab` |
-| [`plugin-protocol.md`](plugin-protocol.md) | マニフェスト（基底と相乗りの `requires`）、探索、JSON のやり取り、相乗りが基底の形を知る方法 | `internal/plugin`、`plugin`、`sdk/ts` |
-| [`plugin-go.md`](plugin-go.md) | Go の基底のトランスパイラ `go`: 語彙によらずに決まる Go の出力のすべて（置き場、名前、型、op の形、実装を受け取る口、配線の本体） | `plugins/go`、`plugin/golang`、`runtime` |
+| [`plugin-protocol.md`](plugin-protocol.md) | マニフェスト（基底と相乗りの `requires`、継ぎ目の `seams`）、探索、JSON のやり取り、相乗りが基底の形を知る方法 | `internal/plugin`、`plugin`、`sdk/ts` |
+| [`plugin-go.md`](plugin-go.md) | Go の基底のトランスパイラ `go`: 語彙によらずに決まる Go の出力のすべて（置き場、名前、型、op の形、実装を受け取る口、配線の本体、継ぎ目） | `plugins/go`、`plugin/golang`、`runtime` |
 | [`plugin-go-valid.md`](plugin-go-valid.md) | `valid` の制約を確かめる関数を出す相乗り `go-valid` | `plugins/go-valid`、`plugin/govalid`、`runtime` |
 | [`plugin-go-sqlite.md`](plugin-go-sqlite.md) | `db` の状態を SQLite の表と読み書きにする相乗り `go-sqlite` | `plugins/go-sqlite` |
 | [`plugin-go-http.md`](plugin-go-http.md) | `http` の op を `net/http` のハンドラにする相乗り `go-http` と、HTTP の通信の上の形 | `plugins/go-http` |
@@ -38,6 +38,7 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | 入っているプラグイン、使うプラグイン | `plugin-protocol.md`「探索」 |
 | 単位 | `config.md`「単位」 |
 | 基底、相乗り、単位の基底、単位の言語 | `config.md`「基底と相乗り」 |
+| 継ぎ目、単位の継ぎ目（op の「中身」と「外側」） | `config.md`「継ぎ目」。Go での形（`Seams`、中身の名前）は `plugin-go.md`「継ぎ目」 |
 | 型の置き場、「名前空間が基底の出力を持つ」 | `config.md`「型の置き場」 |
 | 単位の対象（単位が対象にする名前空間）、Dir(U, N) | `config.md`「単位の対象」 |
 | 単位の対象の宣言、出力（単位と、その単位が出力する名前空間の組） | `config.md`「in」 |

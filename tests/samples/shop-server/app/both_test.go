@@ -18,6 +18,7 @@ import (
 	"example.com/shop-server/app/onsqlite"
 	"example.com/shop-server/app/storetest"
 	"example.com/shop-server/gen/server"
+	"example.com/shop-server/gen/server/inner"
 	"example.com/shop-server/gen/store"
 	storemem "example.com/shop-server/gen/storemem" // このパッケージの名前も store なので、別の名前で import する
 	pkgtype "example.com/shop-server/gen/type"
@@ -47,25 +48,35 @@ func methodNames(typ reflect.Type) []string {
 	return names
 }
 
-// TestOpsHoldExportedOpsOnly は、Ops に並ぶのが、仕様で export を付けた op だけであること。
-//   - server: 十五の op のうち、HTTP の入口の五つ。内部の op（配線 issueSession、authenticate、notify と、七つの葉）はない。
-//   - store: 九つとも export。server が呼ぶ八つ（server.StoreOps）は、その中にある。
+// TestOpsHoldExportedOpsOnly は、入口の Ops に並ぶのが、仕様で export を付けた op だけであること。
+//   - server: 十五の op のうち、HTTP の入口の五つ。内部の op（配線 issueSession、authenticate、notify と、七つの葉）は、
+//     入口の Ops にはなく、内側のパッケージ（gen/server/inner）の Ops にある（十五のすべて）。
+//   - store: 九つとも export。内部の op がないので、出力を分けない（内側のパッケージがない）。server が呼ぶ八つ
+//     （server.StoreOps）は、その中にある。
+//
+// 確かめるのは、インターフェースのメソッド。内部の op を、入口の New が返す値から取り出せないことは、約束していない
+// （守るのは Hozo の検査 NS-5。生成したコードは、置き方で分けるだけ）。
 func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	t.Parallel()
 	entries := []string{"GetMe", "GetOrders", "Login", "Logout", "PlaceOrder"}
 	if got := methodNames(reflect.TypeFor[server.Ops]()); !slices.Equal(got, entries) {
 		t.Errorf("server.Ops のメソッド = %v（期待は %v）", got, entries)
 	}
-	// New が返す値も、公開のメソッドは同じ五つ。内部の op は非公開のメソッドなので、別のパッケージが宣言した
-	// インターフェースへの型アサーションでも取り出せない
-	ops := server.New(nil, nil, nil)
-	if got := methodNames(reflect.TypeOf(ops)); !slices.Equal(got, entries) {
-		t.Errorf("server.New が返す値の公開のメソッド = %v（期待は %v）", got, entries)
+	everything := []string{
+		"Authenticate", "CheckPassword", "ComposeNotice", "GetMe", "GetOrders", "IssueSession", "Login", "Logout",
+		"NewOrder", "NewSession", "Notify", "PageOf", "PlaceOrder", "RequireFresh", "ToPublicUser",
 	}
-	if _, ok := ops.(interface {
-		Authenticate(context.Context, *pkgtype.Token) (pkgtype.Session, error)
-	}); ok {
-		t.Error("内部の op authenticate を、server.New が返す値から呼べる")
+	if got := methodNames(reflect.TypeFor[inner.Ops]()); !slices.Equal(got, everything) {
+		t.Errorf("inner.Ops のメソッド = %v（期待は %v）", got, everything)
+	}
+	// 内側の Ops は、入口の Ops を満たす（入口の New は、内側の New の戻り値を、そのまま返す）
+	if !reflect.TypeFor[inner.Ops]().Implements(reflect.TypeFor[server.Ops]()) {
+		t.Error("inner.Ops が server.Ops を満たさない")
+	}
+	// 継ぎ目のメソッドは、継ぎ目を持つ op と、継ぎ目を宣言されたデコレータの組ごとに一つ: login の @rate.limited だけ。
+	// @http.post などの、継ぎ目を宣言されていないデコレータの分はない
+	if got := methodNames(reflect.TypeFor[server.Seams]()); !slices.Equal(got, []string{"LoginRateLimited"}) {
+		t.Errorf("server.Seams のメソッド = %v（期待は LoginRateLimited だけ）", got)
 	}
 
 	all := []string{
@@ -87,6 +98,12 @@ func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	if got := methodNames(storeOps); !slices.Equal(got, called) {
 		t.Errorf("server.StoreOps のメソッド = %v（期待は %v）", got, called)
 	}
+	// 内部の op を持たない出力（store、型だけの type と rate）には、内側のフォルダがない
+	for _, dir := range []string{"store", "storemem", "type", "rate"} {
+		if _, err := os.Stat(filepath.Join("..", "gen", dir, "inner")); !os.IsNotExist(err) {
+			t.Errorf("gen/%s/inner がある（内部の op を持たない出力は、分けない）: %v", dir, err)
+		}
+	}
 }
 
 // TestTwoStoresInOneProcess は、同じ server（gen/server と人が書いた葉。どちらも一つしかない）を、一つのプロセスで
@@ -97,11 +114,11 @@ func TestTwoStoresInOneProcess(t *testing.T) {
 	db := openDB(t)
 	ctx := context.Background()
 	onDB, onMem := &handlertest.Fixture{}, &handlertest.Fixture{}
-	_, sqliteStore, err := onsqlite.New(ctx, db, onDB.Leaves(), onDB.Mailer())
+	_, sqliteStore, err := onsqlite.New(ctx, db, onDB.Leaves(), onDB.Mailer(), onDB.Limiter())
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, memStore := onmem.New(memstore.New(), onMem.Leaves(), onMem.Mailer())
+	_, memStore := onmem.New(memstore.New(), onMem.Leaves(), onMem.Mailer(), onMem.Limiter())
 
 	// SQLite の方にだけユーザーと注文を足す
 	if err := sqliteStore.AddUser(ctx, handlertest.Alice()); err != nil {

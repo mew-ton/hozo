@@ -12,7 +12,7 @@ import (
 // newServer は、新しい memstore.Store の上に組み立てたサーバー。
 func newServer(t *testing.T, f *handlertest.Fixture) handlertest.Server {
 	m := memstore.New()
-	handler, s := New(m, f.Leaves(), f.Mailer())
+	handler, s := New(m, f.Leaves(), f.Mailer(), f.Limiter())
 	return handlertest.Server{
 		Handler: handler,
 		Store:   s,

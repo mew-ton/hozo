@@ -1,0 +1,14 @@
+# サンプル shop-server の中のプラグイン（プロジェクトの plugin_dirs に置く、プロジェクトの中のプラグイン。docs/config.md「継ぎ目」）。
+# 語彙 rate と、そのデコレータ @rate.limited の継ぎ目の中身を出すトランスパイラ go-ratelimit を提供する（../../README.md「サンプルの中のプラグイン」）。
+# 実装（このディレクトリの main パッケージ）は、まだない。期待する出力（../../gen/server/ratelimit.go）を先に書いてある。
+name     = "go-ratelimit"
+command  = ["go", "run", "example.com/shop-server/plugins/go-ratelimit"]
+protocol = "0.4"
+
+vocabulary = ["rate.hozo"]      # 語彙 rate: 例外 LimitExceeded と、デコレータ limited
+
+[[transpiler]]
+name     = "go-ratelimit"
+language = "go"
+requires = ["go"]               # Go の基底に相乗りする（docs/plugin-go.md「相乗りのファイル」）
+seams    = ["rate.limited"]     # @rate.limited は継ぎ目を要る: 基底 go が口（Seams のメソッド）を出し、中身はこのトランスパイラが出す

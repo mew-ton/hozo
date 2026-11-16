@@ -34,6 +34,10 @@ const (
 	PageSize = 2
 	// セッションの有効期間。
 	SessionTTL = time.Hour
+	// ログイン（@rate.limited の付いた op）を、LoginWindow の間に呼べる回数。
+	LoginLimit = 5
+	// ログインの回数を数える時間の幅。
+	LoginWindow = time.Minute
 )
 
 // Now は止まった時計の時刻。
@@ -44,8 +48,9 @@ func Alice() pkgtype.User {
 	return pkgtype.User{Id: AliceID, Email: AliceEmail, Name: AliceName, Hash: app.HashPassword(AlicePassword)}
 }
 
-// Fixture は、試すサーバーの材料のうち保存先によらないもの: テストが進める時計と連番の識別子で動く server の葉と、
-// 失敗させられる配送。トークンは "token-1"、"token-2"…、注文の識別子は "order-1"、"order-2"… の順に作る。
+// Fixture は、試すサーバーの材料のうち保存先によらないもの: テストが進める時計と連番の識別子で動く server の葉、
+// 失敗させられる配送、同じ時計で数える @rate.limited の数え方。トークンは "token-1"、"token-2"…、注文の識別子は
+// "order-1"、"order-2"… の順に作る。
 // サーバーごとに一つ作る。並行には使えない（一つのサーバーへの要求は、一つの goroutine から順に送る）。
 type Fixture struct {
 	tokens, orders int
@@ -75,10 +80,16 @@ func (f *Fixture) Mailer() server.MailerOps {
 	}}
 }
 
+// Limiter は、人が書いた数え方（app.Limiter）を、葉と同じ時計で動かしたもの: ログインは LoginWindow の間に LoginLimit 回まで。
+// go-ratelimit の出力 server.NewRateSeams に渡す。呼ぶたびに、何も数えていない新しい値を返す（サーバーごとに一度呼ぶ）。
+func (f *Fixture) Limiter() server.RateLimiter {
+	return &app.Limiter{Now: func() time.Time { return Now.Add(f.elapsed) }, Max: LoginLimit, Window: LoginWindow}
+}
+
 // FailDelivery は、以降の通知を届けられなくする（true）か、元に戻す（false）。
 func (f *Fixture) FailDelivery(fail bool) { f.failDelivery = fail }
 
-// Advance は、葉の op が見る時計を d だけ進める。
+// Advance は、葉の op と Limiter が見る時計を d だけ進める。
 func (f *Fixture) Advance(d time.Duration) { f.elapsed += d }
 
 // Store は、Run が状態を用意し、確かめるのに使う store の op。gen/store と gen/storemem の Ops のどちらも満たす。
@@ -89,7 +100,7 @@ type Store interface {
 
 // Server は試す相手。
 type Server struct {
-	// Handler は、Fixture の Leaves と Mailer で組み立てたサーバー。
+	// Handler は、Fixture の Leaves と Mailer と Limiter で組み立てたサーバー。
 	Handler http.Handler
 	// Store は、そのサーバーの store。
 	Store Store
@@ -144,6 +155,38 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		// 成功: ユーザー（hash を持たない type.PublicUser）とトークン
 		s.post(t, "/login", "", `{"email":"alice@example.com","password":"password123"}`).
 			want(t, 200, `{"user":{"id":"u1","email":"alice@example.com","name":"Alice"},"token":"token-1"}`)
+	})
+
+	t.Run("login/LimitExceeded", func(t *testing.T) {
+		t.Parallel()
+		s := start(t)
+		// login には @rate.limited が付いている。op を呼んだ回数を数えるので、パスワード違いの失敗も一回
+		for range LoginLimit {
+			s.post(t, "/login", "", `{"email":"alice@example.com","password":"wrong-password"}`).
+				want(t, 401, `{"error":"type.InvalidCredentials"}`)
+		}
+		// 制限を超えた呼び出しは、正しいパスワードでも 429 rate.LimitExceeded（語彙 rate の例外。@http.status(429)）。
+		// op の中身は呼ばれていない: トークンは作られていない（下で、次に作るトークンが "token-1" であることで確かめる）
+		s.post(t, "/login", "", `{"email":"alice@example.com","password":"password123"}`).
+			want(t, 429, `{"error":"rate.LimitExceeded"}`)
+		s.post(t, "/login", "", `{"email":"bob@example.com","password":"password123"}`).
+			want(t, 429, `{"error":"rate.LimitExceeded"}`)
+		// 制約の検査は op を呼ぶ前（go-http）なので、制限を超えていても 400 が先になる。op を呼ばないので、数えない
+		s.post(t, "/login", "", `{"email":"alice@example.com","password":"short"}`).
+			want(t, 400, `{"error":"http.BadRequest","value":{"message":"invalid input","violations":[`+
+				`{"path":"body.password","constraint":"length"}]}}`)
+		// 幅の終わりの直前までは、超えたまま
+		s.fixture.Advance(LoginWindow - time.Nanosecond)
+		s.post(t, "/login", "", `{"email":"alice@example.com","password":"password123"}`).
+			want(t, 429, `{"error":"rate.LimitExceeded"}`)
+		// 幅が過ぎれば、また呼べる。はじめてのトークンなので "token-1"
+		s.fixture.Advance(time.Nanosecond)
+		s.post(t, "/login", "", `{"email":"alice@example.com","password":"password123"}`).
+			want(t, 200, `{"user":{"id":"u1","email":"alice@example.com","name":"Alice"},"token":"token-1"}`)
+		// @rate.limited の付いていない op は、何度呼んでも制限されない
+		for range LoginLimit * 2 {
+			s.get(t, "/me", "token-1").want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
+		}
 	})
 
 	t.Run("me", func(t *testing.T) {

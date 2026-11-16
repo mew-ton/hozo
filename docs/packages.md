@@ -44,6 +44,7 @@ tests/                 リポジトリをまたぐテスト（パッケージ te
 tests/rules/, tests/corpus/   テストの入力（docs/testing.md）
 tests/corpus/view/plugins/view-dump/   テスト用のプラグイン（main パッケージ。docs/testing.md「コーパス」）
 tests/samples/<名前>/  サンプル（仕様と、手で書いた完成したコードの組。tests/samples/README.md）。自分の go.mod を持つ別のモジュールで、このモジュールのパッケージではない
+                       サンプルが自分で持つプラグイン（tests/samples/<名前>/plugins/<name>/。マニフェスト、語彙、main）も、サンプルのモジュールの中
 docs/                  設計文書
 ```
 
@@ -105,7 +106,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 - `internal/sema` は設定（`internal/config`）に依存しない。設定に関わる検査は `internal/config`、`internal/check`、`internal/project` が行う（「`internal/config`」）。
 - `internal/tools/selfgen` はこのモジュールのどのパッケージも import しない（生成物が壊れていても動くため。「自己生成の手順」）。
 - 外部のモジュールは `github.com/BurntSushi/toml` だけ（`internal/config` と `internal/plugin` が使う）。依存を最小にするため、言語サーバーの JSON-RPC も自前で書く。
-- `tests/samples/` のサンプルは別のモジュール（自分の `go.mod`）なので、この表にも上の規則にも入らない。サンプルだけが使う依存は、サンプルの `go.mod` に置く（`tests/samples/README.md`「置き方」）。
+- `tests/samples/` のサンプルは別のモジュール（自分の `go.mod`）なので、この表にも上の規則にも入らない。サンプルだけが使う依存は、サンプルの `go.mod` に置く（`tests/samples/README.md`「置き方」）。サンプルが自分で持つプラグインも、プラグインの規則（使えるのは `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`runtime`）に従う。
 
 ## パッケージ
 
@@ -165,6 +166,8 @@ func EffectConst(name string) string
 func CaseConst(classify, caseName string) string
 func StateUnitName(stateOrClassify string) string // <状態>State
 func DepName(namespace string) (typeName, param string)   // 別の名前空間の口: StoreOps と store
+func SeamMethod(opName, decorator string) string  // 継ぎ目のメソッド: login と rate.limited から LoginRateLimited（同「名前」「継ぎ目」）
+func BodyName(opName string) string               // 基底が出す中身のメソッド: loginBody
 func Capitalize(s string) string                  // 先頭の一文字を大文字に
 func IsKeyword(name string) bool                  // Go の予約語か
 func IsPredeclared(name string) bool              // Go の事前宣言の識別子（error、string、nil、len など）か
@@ -199,6 +202,7 @@ type Shape struct {                               // 一つの出力の、op と
     Shared   []string                             // SharedState のメソッドになる op の FQN
     Classify []string                             // New が述語を受け取る、値の分類と op の分類の FQN（辞書順）
     Deps     []Dep                                // 別の名前空間の口（FQN の辞書順）
+    Seams    []Seam                               // Seams のメソッド（op の宣言順、その中はデコレータの書かれた順）。空なら Seams も New の引数 seams もない（同「継ぎ目」）
     New      []Param                              // New の引数（名前と Go の型）。ops のフィールドも同じ
 }
 type OpShape struct {
@@ -207,14 +211,19 @@ type OpShape struct {
     Place      Place                              // Wiring / Never / StateCommand / StateQuery / SharedQuery / Leaf（同「op の置き場」の 1〜6）
     Unit       string                             // Place が状態の単位なら、その状態（か分類）の FQN
     Ctx, Err   bool                               // ctx を取るか、error を返すか
+    Seams      []string                           // この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない
+    Body       string                             // 継ぎ目を持ち、基底が中身を出す op（Wiring / Never）の、中身のメソッドの名前。それ以外は ""
 }
 type StateUnit struct { FQN, TypeName, Param string; Shape string; Queries, Commands []string; Predicates []string }
 type Dep struct { Namespace, TypeName, Param string; Ops []string }
+type Seam struct { Op, Decorator, Transpiler, Method string }   // 継ぎ目一つ: op の FQN、デコレータの FQN、宣言したトランスパイラ（View.config.seams の値）、Seams のメソッドの名前
 type Param struct { Name, Type string }
 func ShapeOf(view *ir.View) *Shape
 func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // メソッドの引数と戻り値のテキスト（ctx と error を含む）
+func SeamSignature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // 継ぎ目のメソッドの引数（op の引数の後ろに body）と戻り値のテキスト
 ```
 
+- 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
 
@@ -348,7 +357,7 @@ func Under(a, dir string) bool                              // 相対パス a �
 | CFG-10 | `internal/check`（`Check`） | プログラム（名前空間） |
 | CFG-6 | `internal/check`（`CheckUnsupported`。呼ぶのは `internal/project`） | プログラムと、マニフェストの `unsupported` |
 | CFG-22 | `internal/check`（`CheckHomes`。呼ぶのは `internal/project`） | プログラムと、単位ごとの基底と `in` に合ったファイル |
-| CFG-14〜CFG-16、CFG-18〜CFG-20 | `internal/project` | マニフェストと、読んだファイル |
+| CFG-14〜CFG-16、CFG-18〜CFG-20、CFG-23 | `internal/project` | マニフェストと、読んだファイル |
 | CFG-5 と、設定なしで `emit` したときの CFG-7 | `internal/app` | 書き出すファイルの一覧 |
 
 設定なし（`Project.NoConfig`）のときは、`internal/project` が CFG-* をまとめて除く。
@@ -363,7 +372,7 @@ func Under(a, dir string) bool                              // 相対パス a �
 
 ```go
 type Manifest struct{ ...; Transpilers []Transpiler }
-type Transpiler struct { Name, Language string; Requires, Unsupported []string }         // [[transpiler]] 一つ。Requires が空なら基底
+type Transpiler struct { Name, Language string; Requires, Unsupported, Seams []string }  // [[transpiler]] 一つ。Requires が空なら基底。Seams は継ぎ目を要るデコレータの FQN
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-2 / MAN-4
 type Plugin struct { Name, Dir string; Manifest *Manifest; Mismatch []diag.Diagnostic } // 入っているプラグイン一つ。Dir は絶対パス。Mismatch は MAN-2（使うときにだけ報告する）
 type SearchEnv struct { PluginPath, Home string }                                       // 探索が見るプロジェクトの外の場所（HOZO_PLUGIN_PATH の値、ホーム）。呼ぶ側が渡す。零値なら plugin_dirs だけ
@@ -387,7 +396,7 @@ type Project struct {
     Units   []Unit                   // 解決した単位（Config.Units と同じ順）
     Diags   []diag.Diagnostic        // 解析・解決・検査・設定・プラグインの check のすべて。並べ替え済み
 }
-type Unit struct { *config.Unit; Language, Base string; Transpilers []Transpiler; Files []string }   // 言語、基底の名前（CFG-20 なら空）、解決できたトランスパイラ、in に合ったファイル（語彙のファイルを含む）
+type Unit struct { *config.Unit; Language, Base string; Transpilers []Transpiler; Seams map[string]string; Files []string }   // 言語、基底の名前（CFG-20 なら空）、解決できたトランスパイラ、単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ。CFG-23 なら、設定の順で最初のもの）、in に合ったファイル（語彙のファイルを含む）
 type Transpiler struct { Name string; Plugin *plugin.Plugin; Decl *plugin.Transpiler }
 type Options struct {
     Root, ConfigPath string          // hozo.toml を探し始めるディレクトリと、--config / HOZO_CONFIG

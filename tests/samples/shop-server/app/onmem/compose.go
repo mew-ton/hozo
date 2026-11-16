@@ -11,11 +11,12 @@ import (
 	store "example.com/shop-server/gen/storemem"
 )
 
-// New は m の上の store と、その上の server のハンドラを返す。
+// New は m の上の store と、その上の server のハンドラを返す。limiter は、@rate.limited の数え方。
 // 何度呼んでもよい: 返す値は互いに独立で、同じ m なら同じ状態を、別の m なら別の状態を読み書きする。
-func New(m *memstore.Store, leaves server.Leaves, mailer server.MailerOps) (http.Handler, store.Ops) {
+func New(m *memstore.Store, leaves server.Leaves, mailer server.MailerOps, limiter server.RateLimiter) (http.Handler, store.Ops) {
 	// 状態の単位の実装は、人が状態ごとに書いた型。一つでも渡し忘れれば、コンパイルできない
 	s := store.New(m.Users(), m.Sessions(), m.Orders(), m.Notifications())
-	// store.Ops は、server が呼ぶ store の op（server.StoreOps）をそのまま満たす
-	return server.NewHandler(server.New(leaves, mailer, s)), s
+	// store.Ops は、server が呼ぶ store の op（server.StoreOps）をそのまま満たす。
+	// 継ぎ目（server.Seams）の実装は、go-ratelimit が出した型。この単位で継ぎ目を宣言したトランスパイラは一つなので、そのまま渡せる
+	return server.NewHandler(server.New(leaves, mailer, s, server.NewRateSeams(limiter))), s
 }

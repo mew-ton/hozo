@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 
+	"example.com/shop-server/gen/server/inner"
 	pkgtype "example.com/shop-server/gen/type"
 )
 
@@ -12,7 +13,7 @@ import (
 type Ops interface {
 	// Login はログインする
 	//
-	// Throws: type.InvalidCredentials
+	// Throws: type.InvalidCredentials, rate.LimitExceeded
 	// Reads: store.users
 	// Effects: store.createSession
 	Login(ctx context.Context, in LoginInput) (LoginOk, error)
@@ -46,136 +47,22 @@ type Ops interface {
 
 // Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
-type Leaves interface {
-	// CheckPassword はパスワードが合わなければ InvalidCredentials（人が書く）
-	//
-	// Throws: type.InvalidCredentials
-	// 純粋（ctx を取らない）
-	CheckPassword(user pkgtype.User, password pkgtype.Password) error
-
-	// NewSession はトークンと期限を決める（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewSession(user pkgtype.User) pkgtype.Session
-
-	// ToPublicUser はユーザーを、外に見せる形に写す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ToPublicUser(user pkgtype.User) pkgtype.PublicUser
-
-	// RequireFresh は期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く）
-	//
-	// Throws: type.Unauthorized
-	// 純粋（ctx を取らない）
-	RequireFresh(session pkgtype.Session) (pkgtype.Session, error)
-
-	// PageOf は一覧から、そのページの分を取り出す（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
-
-	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order
-
-	// ComposeNotice は通知の文面を作る（人が書く）
-	//
-	// 純粋（ctx を取らない）。失敗しない（error を返さない）
-	ComposeNotice(order pkgtype.Order) pkgtype.Notification
-}
+type Leaves = inner.Leaves
 
 // MailerOps は名前空間 mailer の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 mailer に渡す。
 // メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、mailer の出力の Ops は、そのまま渡せる。
-type MailerOps interface {
-	// Send は op mailer.send: 通知を外へ送る。送れなければ NotificationFailed
-	//
-	// Throws: type.NotificationFailed
-	Send(ctx context.Context, notice pkgtype.Notification) error
-}
+type MailerOps = inner.MailerOps
 
 // StoreOps は名前空間 store の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 store に渡す。
 // メソッドの形は相手の op の判定に従う（どの名前空間から見ても同じ）ので、store の出力の Ops は、そのまま渡せる。
-type StoreOps interface {
-	// FindUser は op store.findUser: email からユーザーを引く
-	//
-	// Reads: store.users
-	FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
+type StoreOps = inner.StoreOps
 
-	// FindUserById は op store.findUserById: 識別子からユーザーを引く
-	//
-	// Reads: store.users
-	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
+// Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type Seams = inner.Seams
 
-	// FindSession は op store.findSession: トークンからセッションを引く。トークンがなければ、ない
-	//
-	// Reads: store.sessions
-	FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
-
-	// ListOrders は op store.listOrders: ユーザーの注文を、足した順に返す
-	//
-	// Reads: store.orders
-	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
-
-	// AddSession は op store.addSession: セッションを足す
-	//
-	// Effects: store.createSession
-	AddSession(ctx context.Context, session pkgtype.Session) error
-
-	// RemoveSession は op store.removeSession: そのトークンのセッションを消す
-	//
-	// Effects: store.deleteSession
-	RemoveSession(ctx context.Context, token pkgtype.Token) error
-
-	// AddOrder は op store.addOrder: 注文を足す
-	//
-	// Effects: store.createOrder
-	AddOrder(ctx context.Context, order pkgtype.Order) error
-
-	// AddNotification は op store.addNotification: 通知を足す
-	//
-	// Effects: store.notifyUser
-	AddNotification(ctx context.Context, notification pkgtype.Notification) error
-}
-
-// New はこの名前空間の Ops を組み立てる。人が実装する葉は leaves に、別の名前空間の op は mailer と store に、
-// 配線は生成した本体に委ねる。引数の並びは、leaves、別の名前空間（名前の辞書順）。引数が nil かどうかは確かめない。
-func New(leaves Leaves, mailer MailerOps, store StoreOps) Ops {
-	return &ops{leaves: leaves, mailer: mailer, store: store}
-}
-
-// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて:
-// export を付けた op は公開の名前（Ops のメソッド）、付けていない op は非公開の名前（op の名前そのまま）。
-type ops struct {
-	leaves Leaves
-	mailer MailerOps
-	store  StoreOps
-}
-
-func (o *ops) checkPassword(user pkgtype.User, password pkgtype.Password) error {
-	return o.leaves.CheckPassword(user, password)
-}
-
-func (o *ops) newSession(user pkgtype.User) pkgtype.Session {
-	return o.leaves.NewSession(user)
-}
-
-func (o *ops) toPublicUser(user pkgtype.User) pkgtype.PublicUser {
-	return o.leaves.ToPublicUser(user)
-}
-
-func (o *ops) requireFresh(session pkgtype.Session) (pkgtype.Session, error) {
-	return o.leaves.RequireFresh(session)
-}
-
-func (o *ops) pageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
-	return o.leaves.PageOf(orders, page)
-}
-
-func (o *ops) newOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {
-	return o.leaves.NewOrder(session, lines)
-}
-
-func (o *ops) composeNotice(order pkgtype.Order) pkgtype.Notification {
-	return o.leaves.ComposeNotice(order)
+// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、別の名前空間（名前の辞書順）、seams。
+// 引数が nil かどうかは確かめない。
+func New(leaves Leaves, mailer MailerOps, store StoreOps, seams Seams) Ops {
+	return inner.New(leaves, mailer, store, seams)
 }

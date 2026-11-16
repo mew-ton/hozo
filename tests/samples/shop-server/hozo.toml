@@ -1,6 +1,10 @@
-# サンプル shop-server（tests/samples/README.md）: docs/decisions.md の P1〜P33 の後の形。
-# 名前空間は四つ（type、store、server、mailer）で、単位は四つ。mailer には単位を置かない（コードを出さない）。
+# サンプル shop-server（tests/samples/README.md）: docs/decisions.md の P1〜P39 の後の形。
+# 名前空間は、仕様の四つ（type、store、server、mailer）と、サンプルの中のプラグインの語彙 rate。単位は五つ。
+# mailer には単位を置かない（コードを出さない）。
 # 単位の transpilers には、依存しているものもすべて書く（P18）。期待する出力は、それぞれの out のディレクトリ（README.md）。
+
+[hozo]
+plugin_dirs = ["plugins"]       # サンプルの中のプラグイン go-ratelimit（語彙 rate と、その継ぎ目の中身。P38）
 
 # 1: 共有の型。言語ごとに一度だけ出し、ほかの単位は import する（P7）
 [[emit]]
@@ -8,22 +12,28 @@ namespace   = "type"
 transpilers = ["go", "go-valid"]
 out         = "gen/type"
 
-# 2: DB の状態と、それを読み書きする op。op の中身は go-sqlite が出す
+# 2: 語彙 rate の型（例外 rate.LimitExceeded）。server が使うので、同じ基底の単位が要る（語彙の名前空間の単位。P7）
+[[emit]]
+namespace   = "rate"
+transpilers = ["go"]
+out         = "gen/rate"
+
+# 3: DB の状態と、それを読み書きする op。op の中身は go-sqlite が出す
 [[emit]]
 namespace   = "store"
 transpilers = ["go", "go-sqlite"]
 out         = "gen/store"
 
-# 3: 同じ store を、DB なしで。op の中身は、人がメモリの上に書く
+# 4: 同じ store を、DB なしで。op の中身は、人がメモリの上に書く
 [[emit]]
 namespace   = "store"
 transpilers = ["go"]
 out         = "gen/storemem"
 
-# 4: HTTP の入口と業務の流れ
+# 5: HTTP の入口と業務の流れ。go-ratelimit が @rate.limited の継ぎ目を宣言しているので、login は二層になる
 [[emit]]
 namespace   = "server"
-transpilers = ["go", "go-valid", "go-http"]
+transpilers = ["go", "go-valid", "go-http", "go-ratelimit"]
 out         = "gen/server"
 
 [emit.options.go-http]

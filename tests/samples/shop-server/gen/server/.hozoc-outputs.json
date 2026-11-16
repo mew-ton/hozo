@@ -1,8 +1,12 @@
 [
   "gen/server/doc.go",
   "gen/server/http.go",
+  "gen/server/inner/doc.go",
+  "gen/server/inner/ops.go",
+  "gen/server/inner/types.go",
+  "gen/server/inner/validate.go",
+  "gen/server/inner/wiring.go",
   "gen/server/ops.go",
-  "gen/server/types.go",
-  "gen/server/validate.go",
-  "gen/server/wiring.go"
+  "gen/server/ratelimit.go",
+  "gen/server/types.go"
 ]

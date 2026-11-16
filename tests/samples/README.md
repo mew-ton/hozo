@@ -25,11 +25,14 @@ tests/samples/<名前>/
   sample.json    トランスパイラごとの、出すファイル（下）
   go.mod, go.sum サンプル自身の Go のモジュール（Go のサンプルのとき）
   <out>/         単位の out。期待する出力（各トランスパイラのファイルと、記録 .hozoc-outputs.json）
+  <plugin_dirs>/ サンプルの中のプラグイン（あれば）。hozo.toml の plugin_dirs に書いたディレクトリの下に、プラグインごとに
+                 マニフェスト、語彙、実装（下の「サンプルの中のプラグイン」）
   それ以外       人が書くコード（葉の op の本体、準備、main、テスト）
 ```
 
 - 期待する出力は、`hozo.toml` の単位の `out` のディレクトリそのものに置く。`hozoc emit` が書き出す場所と同じで、置いたままコンパイルできる。
 - 期待する出力のファイルは、どれも、どれかのトランスパイラのもの（hozoc 本体はコードを出力しない。`docs/plugin-protocol.md`「この文書が決めること」）。どのトランスパイラのものかは `sample.json` が決める。どれも人が書き、`hozoc emit` の出力で書き直さない。
+- **サンプルの中のプラグイン**: サンプルは、自分のプラグインを持てる（プロジェクトの中のプラグイン。`docs/config.md`「継ぎ目」）。サンプルの `hozo.toml` の `plugin_dirs` のディレクトリに、ふつうのプラグインと同じ形で置く（`docs/plugin-protocol.md`「マニフェスト」）。期待する出力と同じく、マニフェストと語彙と、そのトランスパイラの期待する出力を、実装より先に書く。実装は、サンプルのモジュールの中の `main` パッケージ（マニフェストのディレクトリ）で、マニフェストの `command` は `go run <そのパッケージの import パス>`。プラグインの規則（何を出すか）は、サンプルの `README.md` が持つ。
 - サンプルは自分の `go.mod` を持つ、リポジトリのモジュールとは別のモジュールにする。リポジトリの `go build ./...` / `go vet ./...` / `go test ./...` はサンプルの Go を見ない（サンプルだけが使う依存を、リポジトリのモジュールに入れないため）。生成したコードが import する `runtime` は、`replace github.com/mew-ton/hozo => ../../..` で解決する。`gofmt -l .` はモジュールを見ないので、サンプルの Go も整形しておく。
 
 ## sample.json
@@ -37,15 +40,16 @@ tests/samples/<名前>/
 ```json
 {
   "transpilers": {
-    "go":      { "files": ["gen/server/doc.go", "gen/server/ops.go"] },
-    "go-http": { "files": ["gen/server/http.go"] }
+    "go":           { "files": ["gen/server/doc.go", "gen/server/ops.go"] },
+    "go-http":      { "files": ["gen/server/http.go"] },
+    "go-ratelimit": { "files": ["gen/server/ratelimit.go"] }
   }
 }
 ```
 
-- `transpilers` のキーは、`hozo.toml` の単位に書いたトランスパイラの名前。単位に書いた名前はすべてここに要り、ここに書いた名前はどれかの単位が使っていなければならない。
+- `transpilers` のキーは、`hozo.toml` の単位に書いたトランスパイラの名前（リポジトリのプラグインのものも、サンプルの中のプラグインのものも）。単位に書いた名前はすべてここに要り、ここに書いた名前はどれかの単位が使っていなければならない。`all` という名前は使えない（サブテスト `transpilers/all` と当たる）。
 - `files` は、期待する出力のうち、そのトランスパイラが出すファイル（サンプルのルートからの相対パス）。単位の `out` の下のファイルは、出力先ごとの記録を除いて、どれかのトランスパイラの `files` になければならない。
-- ほかのキーはない。選ぶ宣言を代役に伝える `select` と、保留にするサブテストを書く `pending` は、なくした（`docs/testing.md`「サンプル」）。
+- ほかのキーはない（書けば、読むところで失敗する）。選ぶ宣言を代役に伝える `select` と、保留にするサブテストを書く `pending` は、なくした（`docs/testing.md`「サンプル」）。まだ通せないサブテストは、サンプルが申告するのではなく、テストが、足りないものを自分で調べて飛ばす（下の「飛ばす条件」）。
 
 ## テスト
 
@@ -53,27 +57,43 @@ tests/samples/<名前>/
 
 | サブテスト | 確かめること |
 |---|---|
-| `check` | サンプルの仕様と設定が、本物の `hozo.toml` と、リポジトリの `plugins/` のプラグインで、`hozoc check` を error なしで通る |
-| `files` | hozoc を動かさずに確かめられること: 単位の `out` の下のファイルは、記録を除いてどれも `sample.json` のどれかのトランスパイラの `files` にあり、`files` のファイルはどれもあり、記録 `.hozoc-outputs.json` は、その出力先の下のファイルのパスを辞書順に並べたものと同じ |
+| `check` | サンプルの仕様と設定が、本物の `hozo.toml` と、サンプルの中のプラグインと、リポジトリの `plugins/` のプラグインで、`hozoc check` を error なしで通る |
+| `files` | hozoc を動かさずに確かめられること: 単位に書いたトランスパイラと `sample.json` のトランスパイラが同じ集合で、単位の `out` の下のファイルは、記録を除いてどれも `sample.json` のどれかのトランスパイラの `files` にあり、`files` のファイルはどれもあり、記録 `.hozoc-outputs.json` は、その出力先の下のファイルのパスを辞書順に並べたものと同じ |
 | `go` | **サンプルが動く**: サンプルのモジュールで `go vet ./...` と `go test ./...` が通る（期待する出力がコンパイルでき、人が書いたコードと合わせて仕様の通りに動く） |
-| `transpilers/<名前>` | **トランスパイラごとのブラックボックスのテスト**: `hozoc emit` の出力のうち、`sample.json` のそのトランスパイラの `files` が、期待する出力とバイト単位で同じ（足りないファイル、内容の違いを、ファイルごとに示す） |
-| `transpilers/all` | `hozoc emit` の出力の全体が、期待する出力と同じ: どのトランスパイラの `files` にもないファイルが書かれていない。記録が同じ |
+| `transpilers/<名前>` | **トランスパイラごとのブラックボックスのテスト**: `hozoc emit` の出力のうち、`sample.json` のそのトランスパイラの `files` が、期待する出力とバイト単位で同じ（足りないファイル、内容の違いを、ファイルごとに示す）。サンプルの中のプラグインのトランスパイラも、同じに一つ持つ |
+| `transpilers/all` | `hozoc emit` の出力の全体が、期待する出力と同じ: どのトランスパイラの `files` にもないファイルが書かれていない。期待する出力のファイルが、すべて書かれている。記録が同じ |
 
-- `check` と `transpilers/*` は、サンプルの入力（`hozo.toml`、`.hozo`、`go.mod`）を一時ディレクトリに写して走らせる。プラグインは、リポジトリの `plugins/` を `HOZO_PLUGIN_PATH` として hozoc に渡す（`docs/plugin-protocol.md`「探索」の 2）。`hozoc emit` は一度だけ走らせ、出力を `transpilers/*` が分けて比べる。
-- サンプルのトランスパイラのうち、`plugins/` のどのプラグインも提供していないものがあれば、`check` と `transpilers/*` を、足りない名前を示して飛ばす。提供するプラグインを足せば、何も変えずに走る。`files` と `go` は飛ばさない。
+- `check` と `transpilers/*` は、サンプルの入力（`hozo.toml`、`.hozo`、`go.mod`、`go.sum` と、`plugin_dirs` の下のすべて）を一時ディレクトリに写して走らせる。期待する出力（単位の `out` の下）と、人が書いたコードは写さない。リポジトリのプラグインは、`plugins/` を `HOZO_PLUGIN_PATH` として hozoc に渡す（`docs/plugin-protocol.md`「探索」の 2）。サンプルの中のプラグインは、写した `hozo.toml` の `plugin_dirs` から見つかる（同 1）。`hozoc emit` は一度だけ走らせ、出力を `transpilers/*` が分けて比べる。
 - 期待する出力は仕様なので、`-update` では書き直さない。
-- `go` は、サンプルの `go.sum` の通りの依存をモジュールキャッシュから使う（`GOFLAGS=-mod=readonly`、`GOTOOLCHAIN=local`、`GOWORK=off`）。キャッシュにあればネットワークは要らない。なければ `go` が `GOPROXY` から取りに行き、取れなければ（オフラインなど）失敗する。飛ばさないのは、動くと確かめていないサンプルを仕様として通さないため。先に取っておくには、サンプルのディレクトリで `GOTOOLCHAIN=local go mod download`。
+- `go` は、サンプルの `go.sum` の通りの依存をモジュールキャッシュから使う（`GOFLAGS=-mod=readonly`、`GOTOOLCHAIN=local`、`GOWORK=off`）。キャッシュにあればネットワークは要らない。なければ `go` が `GOPROXY` から取りに行き、取れなければ（オフラインなど）失敗する。先に取っておくには、サンプルのディレクトリで `GOTOOLCHAIN=local go mod download`。
 - サンプルだけを手で確かめるには、サンプルのディレクトリで `GOTOOLCHAIN=local go vet ./... && GOTOOLCHAIN=local go test ./...`。
+
+### 飛ばす条件
+
+テストは、最後の形で書いてある。サンプルは、まだないトランスパイラと、今の hozoc がまだ読めない書き方（設定、マニフェスト）で書かれていてよく、その間は、通せないサブテストを、**足りないものを名指しして**飛ばす。足りないものがそろえば、テストもサンプルも変えずに走る。足りないものは、テストがサンプルごとに調べる。
+
+| 足りないもの | 調べ方 |
+|---|---|
+| 今の hozoc が、サンプルの `hozo.toml` を読めない | `internal/config` で読んで、診断（CFG-7 など）が返る。理由には、その診断を書く |
+| 今の hozoc が、サンプルの中のプラグインのマニフェストを読めない | `internal/plugin` で読んで、診断（MAN-4、MAN-2）が返る |
+| トランスパイラがまだない | `sample.json` の名前のトランスパイラを、サンプルの `plugin_dirs` と、リポジトリの `plugins/` の、今の hozoc が読めるどのマニフェストも提供していない |
+| プラグインの実装がまだない | マニフェストはあるが、`command` が `go run …` で、マニフェストのディレクトリに、テストでない Go のファイルがない（マニフェストと語彙だけを先に書いた、サンプルの中のプラグイン） |
+
+| サブテスト | 足りないものがあるとき |
+|---|---|
+| `go` | **飛ばさない**（hozoc を使わない）。動くと確かめていないサンプルを、仕様として通さない |
+| `files` | `hozo.toml` を読めないときだけ、飛ばす（単位の `out` と `transpilers` が分からない）。トランスパイラがないだけなら、走る |
+| `transpilers/<名前>`、`transpilers/all` | 一つでも足りなければ、どれも飛ばす（`hozoc emit` は、一つの単位の誤りで、何も書き出さない） |
+| `check` | 飛ばさずに、**言語の検査だけに落として通す**: すべての `.hozo`（サンプルの中のプラグインの語彙を含む）だけを写し、設定なしで `hozoc check` を通す（設定がなければ、hozoc は設定の検査をしない。`docs/config.md`「置き場と探し方」）。落としたことと、足りないものは、ログに書く。足りないものがそろえば、本物の `hozo.toml` での検査になる |
+
+`check` だけを落とすのは、仕様（`.hozo`）が今の言語で読めることを、設定が読めるようになる前から確かめ続けるため。
 
 ## 移行の間
 
-この文書は、トランスパイラを作る段階（`docs/requirements.md`「作り直しの段階」の R2）の後の形を書いている。その段階の実装が済むまで、次は前の形のまま。
-
-- `tests/samples_test.go` は、前のサブテスト（`check` / `shared` / `go` / `transpilers`）と、`sample.json` の `pending` を読む。
-- サンプル `shop-server` の `sample.json` は `pending` を持ち、`gen/` は、文書の形と少し違う（`shop-server/README.md`「文書の形との違い」）。
+この文書と `tests/samples_test.go` は、トランスパイラを作る段階（`docs/requirements.md`「作り直しの段階」の R2）の後の形で書いてある。その段階の実装が済むまで、サンプル `shop-server` では、`check` が言語の検査だけに落ち、`files` と `transpilers/*` が飛ぶ（足りないものは、`shop-server/README.md`「まだないもの」）。R2 が済んだと言える条件の一つは、`TestSamples` が、飛ばしも、落としもなく、すべて通ること。
 
 ## サンプルの一覧
 
 | サンプル | 中身 |
 |---|---|
-| [`shop-server`](shop-server/README.md) | 共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go`（`docs/plugin-go.md`）と、それに相乗りする `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`。`database/sql` の上の表と、`store` の op の中身）、`go-http`（`docs/plugin-go-http.md`。`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる |
+| [`shop-server`](shop-server/README.md) | 共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go`（`docs/plugin-go.md`）と、それに相乗りする `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`。`database/sql` の上の表と、`store` の op の中身）、`go-http`（`docs/plugin-go-http.md`。`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。サンプルの中のプラグイン `go-ratelimit` が、語彙 `rate` と、デコレータ `@rate.limited` の継ぎ目（`docs/plugin-go.md`「継ぎ目」）の中身を出す |

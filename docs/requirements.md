@@ -68,6 +68,7 @@ UML に足しているのは、つながりの整合（例外と効果の伝播�
 | 分岐には標準の分類（`by nullable`、`by list`）を使えるが、場合に業務の名前を付けた分類を、その都度宣言する方がよい（`classify Registration of findUser { Registered: findUser as User; default; }`） | 「値がある」ではなく「登録済み」と読める。判定は同じ（`docs/check.md`「ケースの判定」） |
 | 語彙のデコレータ（`@db.key` など）は、複数の担い手が共有する型のフィールドに書いてよい。どこに何を書くかは設計する人が決める。別の名前空間でだけ注釈を足したいときは、型を継承して足す（`docs/types.md`「継承した model」） | 言語は注釈の置き場を縛らない |
 | 別のプロセスや外部の仕組みを使う op には、その仕組みの語彙のデコレータを付ける（外部のサービスならそのサービスの語彙、SMTP なら `@smtp.sendMail` のように） | デコレータの付いた op は純粋でなくなり（`docs/check.md`「純粋」）、その op が外部に触れることが仕様から読める。付け忘れは実装を書く時点で分かるので、そこで仕様を直す |
+| デコレータは、原則として、op の入力と出力の値を変えない。デコレータが足すのは、op の前後の処理（確かめる、数える、記録する、待つ、やり直す）と、宣言した例外。値を変えたいなら、その変換を op として書き、配線で呼ぶ | op の引数と戻り値の型は、op の宣言に書いたもので、デコレータを読んでも変わらない。値が途中で変わると、配線を読んでも流れる値が分からなくなる。デコレータを読むトランスパイラ（継ぎ目の中身を出すもの。`docs/config.md`「継ぎ目」）を書く人への勧めでもある。継ぎ目の中で何をするかは、そのトランスパイラが決め、hozoc も基底も確かめない |
 
 ## 作るもの
 
@@ -133,19 +134,20 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 | 段階 | 入口 | 終わったと言える条件 |
 |---|---|---|
 | R1 | 言語の変更（`docs/decisions.md`「設計書を変える決定」S15〜S23） | 済み。`reads`、純粋さ、op の分類、ケースの型、`throw`、`never`、状態の参照、形の型、model の継承、`export` を、解析・検査・IR が持つ |
-| R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜83） | hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、保留も飛ばしもなく、すべて通る。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
+| R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜88） | hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としもなく、すべて通る（サンプルの中のプラグイン `go-ratelimit` の分を含む）。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
 
 R2 の成果物:
 
 | 成果物 | 文書 |
 |---|---|
-| 設定: `[emit.options]`、基底と相乗り（CFG-19〜CFG-21）、型の置き場（CFG-22）、語彙の名前空間の単位 | `docs/config.md` |
-| プロトコル: 版 0.4（`requires`、`View.config` の `index` / `base` / `options`、`select` の廃止） | `docs/plugin-protocol.md`、`docs/ir.md`「その名前空間から見た IR」 |
+| 設定: `[emit.options]`、基底と相乗り（CFG-19〜CFG-21）、型の置き場（CFG-22）、継ぎ目（CFG-23）、語彙の名前空間の単位 | `docs/config.md` |
+| プロトコル: 版 0.4（`requires`、`seams`、`View.config` の `index` / `base` / `options` / `seams`、`select` の廃止） | `docs/plugin-protocol.md`、`docs/ir.md`「その名前空間から見た IR」 |
 | 公開の SDK: `plugin`（`Options`）、`plugin/golang`（形の規則）、`plugin/govalid`、`sdk/ts`（同じ変更） | `docs/packages.md` |
 | プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md` |
 | `emit` の手順（本体は出力を作らない）、`cli.hozo` と `hozo.toml`、`internal/app` | `docs/cli.md` |
 | 語彙: `http.BadRequest` | `docs/vocab.md`「同梱する語彙」 |
 | テスト: サンプルのサブテスト、コーパスのゴールデンの作り直し、`select` のコーパスと `pick` の削除 | `docs/testing.md`、`tests/samples/README.md` |
+| サンプルの中のプラグイン `go-ratelimit`（継ぎ目の中身を出す、プロジェクトの中のプラグインの例）の実装 | `tests/samples/shop-server/README.md`「サンプルの中のプラグイン」 |
 
 ## 最初に決めること
 

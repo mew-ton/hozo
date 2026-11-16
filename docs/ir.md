@@ -402,6 +402,8 @@ interface NamespaceConfig {       // 単位 U での名前空間 N の設定
   options: Record<string, Record<string, unknown>>;   // U の options（docs/config.md「オプション」）。キーはトランスパイラの名前、
                                   // 値は hozo.toml のテーブルを JSON に写したもの（整数と小数は number）。オプションを書いていないトランスパイラのキーはない。
                                   // 順序は、キーの辞書順（入れ子のテーブルも）
+  seams: Record<string, string>;  // U の継ぎ目（docs/config.md「継ぎ目」）。キーは、継ぎ目を持つデコレータの FQN、値は、それをマニフェストの seams で
+                                  // 宣言した U のトランスパイラの名前（一つに決まる。CFG-23）。順序は、キーの辞書順。なければ {}
 }
 
 interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
@@ -414,6 +416,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 ```
 
 - `Program` 全体を渡すのは、トランスパイラが参照先（別の名前空間の型、語彙の宣言、`in` の外の宣言）を自分で探さなくて済むようにするため。何を出力するかは、基底が `View` だけから決める（Go なら `docs/plugin-go.md`「出力の対象」）。`View` のうち、相乗りが基底の形を知るのに使う項目は `docs/plugin-protocol.md`「相乗りが基底の形を知る方法」。
+- `config.seams` は、仕様（`Program`）からではなく、単位のトランスパイラのマニフェストから作る。同じ名前空間でも、単位ごとに違いうる（`namespaces[N]` の要素ごとに、その単位のものを持つ）。
 - `files` は、トランスパイラが単位の対象の宣言を見分けるための最小の情報。宣言ごとの印を `Program` に足さないのは、`Program` を単位によらず同じにするため。合成した model（`<viewer>.<op 名>$<引数名>`）の `span` は元の引数のもので、op と同じファイルになる。
 - `namespaces` に入るのは、どれかの単位が出力する名前空間（`docs/config.md`「単位の対象」「in」）。同じ名前空間を複数の単位が出力していれば、値は複数の要素を持つ。`namespaces[viewer]` のうち `index` が `config.index` と同じ要素が、この View の単位のもの。別の名前空間の型の置き場（`docs/config.md`「型の置き場」）は、`namespaces[M]` の要素のうち、`index` が `config.index` と同じもの、なければ `base` が `config.base` と同じ最初のもの。
 - `ViewedSignature.params` と、それが合成する model（`<viewer>.<op 名>$<引数名>`）は、`bind` で埋まる位置を呼ぶ側の引数から消した形が要るトランスパイラ（別のプロセスの op を呼ぶ口を作るもの）のためのもの。Go の基底は使わない（`docs/plugin-go.md`「出力の対象」）。
@@ -436,5 +439,5 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 | 版 | 変わったこと |
 |---|---|
-| 0.4 | `NamespaceConfig` に `index`、`base`、`options`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
+| 0.4 | `NamespaceConfig` に `index`、`base`、`options`、`seams`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
 | 0.3 | `Type` に `never`。`Model.derivedFrom` をやめて `Model.extends`。`State.type`。`Classify.subject` に `op`、`cases[].as`、`decidedBy`。`Op.exported`、`Op.reads`。`Signature.reads`、`Signature.pure`。`Atom` に `state`。`Match.subject` の `state` をやめる（`value` の `atom` が `state`）。`Match.arms[].body` に `atom` と `throw`、`Match.arms[].narrowed` |

@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"example.com/shop-server/app/handlertest"
+	"example.com/shop-server/gen/rate"
 	"example.com/shop-server/gen/server"
+	"example.com/shop-server/gen/server/inner"
 	pkgtype "example.com/shop-server/gen/type"
 )
 
@@ -21,9 +23,9 @@ import (
 //     mailer.send はデコレータ @smtp.sendMail を、store.findSession は reads を持つので、純粋でなく、ctx を取る。
 //   - error: 純粋で、throws のない op は返さない。それ以外は返す（純粋でも、throws があれば返す）。
 //
-// 外から形を書けるのは、公開のメソッドだけ: export を付けた op（server.Ops）、人が実装する葉（server.Leaves）、別の名前空間の
-// op（server.MailerOps、server.StoreOps）。内部の配線（issueSession、authenticate、notify）は、非公開の構造体の非公開の
-// メソッドなので、このパッケージからは名指しできない。その形を確かめるのは、生成されたコードがコンパイルできることだけ。
+// 入口のパッケージ（gen/server）から形を書けるのは、export を付けた op（server.Ops）、人が実装する葉（server.Leaves）、
+// 別の名前空間の op（server.MailerOps、server.StoreOps）、継ぎ目（server.Seams）。内部の配線（issueSession、authenticate、
+// notify）は、内側のパッケージ（gen/server/inner）の Ops の公開のメソッドで、テストはそこから名指しできる。
 var (
 	// 純粋で、throws がない: ctx も error もない
 	_ func(server.Leaves, pkgtype.User) pkgtype.Session                       = server.Leaves.NewSession
@@ -42,6 +44,22 @@ var (
 	_ func(server.Ops, context.Context, server.PlaceOrderInput) (pkgtype.Order, error)  = server.Ops.PlaceOrder
 	_ func(server.MailerOps, context.Context, pkgtype.Notification) error               = server.MailerOps.Send
 	_ func(server.StoreOps, context.Context, *pkgtype.Token) (*pkgtype.Session, error)  = server.StoreOps.FindSession
+	// 内部の配線も同じ判定: 純粋でない op を呼ぶので、ctx も error もある
+	_ func(inner.Ops, context.Context, pkgtype.User, pkgtype.Password) (server.LoginOk, error) = inner.Ops.IssueSession
+	_ func(inner.Ops, context.Context, *pkgtype.Token) (pkgtype.Session, error)                = inner.Ops.Authenticate
+	_ func(inner.Ops, context.Context, pkgtype.Order) error                                    = inner.Ops.Notify
+	// 継ぎ目: op の引数（ctx と in）の後ろに、op と同じ形の body を取り、op と同じものを返す。
+	// デコレータの付いた op は純粋でないので、継ぎ目も body も、いつも ctx を取り、error を返す
+	_ func(server.Seams, context.Context, server.LoginInput, func(context.Context, server.LoginInput) (server.LoginOk, error)) (server.LoginOk, error) = server.Seams.LoginRateLimited
+)
+
+// 入口の型は、内側の型の別名（同じ型）。入口の New が受け取る口は、内側の New にも、そのまま渡せる。
+var (
+	_ inner.Leaves    = server.Leaves(nil)
+	_ inner.MailerOps = server.MailerOps(nil)
+	_ inner.StoreOps  = server.StoreOps(nil)
+	_ inner.Seams     = server.Seams(nil)
+	_ inner.Seams     = server.RateSeams{} // go-ratelimit が入口のパッケージに出した型は、内側の Seams も満たす
 )
 
 // ctxKey は、要求の context を見分けるために、テストが値を載せる鍵（生成されたコードは context に値を載せない）。
@@ -74,7 +92,7 @@ func TestRequestContextReachesStore(t *testing.T) {
 	t.Parallel()
 	f := &handlertest.Fixture{}
 	st := &seenStore{}
-	handler := server.NewHandler(server.New(f.Leaves(), f.Mailer(), st))
+	handler := server.NewHandler(server.New(f.Leaves(), f.Mailer(), st, server.NewRateSeams(f.Limiter())))
 
 	get := func(ctx context.Context) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodGet, "/me", nil).WithContext(ctx)
@@ -113,30 +131,19 @@ func (fixedNotice) ComposeNotice(order pkgtype.Order) pkgtype.Notification {
 	return pkgtype.Notification{UserId: order.UserId, Message: "差し替えた文面"}
 }
 
-// orderLog は、入口 placeOrder が通る別の名前空間の op を書いたもの: store.findSession（いつもログインしている）、
-// store.addOrder、mailer.send、store.addNotification。server.MailerOps と、server.StoreOps（ほかの op は、埋め込んだ nil の
-// インターフェースのまま）の両方として渡す。
-type orderLog struct {
+// noticeLog は、内部の配線 notify が呼ぶ別の名前空間の op を書いたもの: mailer.send と store.addNotification。
+// server.MailerOps と、server.StoreOps（ほかの op は、埋め込んだ nil のインターフェースのまま）の両方として渡す。
+type noticeLog struct {
 	server.StoreOps
-	orders      []pkgtype.Order
 	sent, added []pkgtype.Notification
 }
 
-func (l *orderLog) FindSession(_ context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
-	return &pkgtype.Session{Token: *token, UserId: "u1", ExpiresAt: handlertest.Now.Add(time.Hour)}, nil
-}
-
-func (l *orderLog) AddOrder(_ context.Context, order pkgtype.Order) error {
-	l.orders = append(l.orders, order)
-	return nil
-}
-
-func (l *orderLog) Send(_ context.Context, notice pkgtype.Notification) error {
+func (l *noticeLog) Send(_ context.Context, notice pkgtype.Notification) error {
 	l.sent = append(l.sent, notice)
 	return nil
 }
 
-func (l *orderLog) AddNotification(_ context.Context, notification pkgtype.Notification) error {
+func (l *noticeLog) AddNotification(_ context.Context, notification pkgtype.Notification) error {
 	l.added = append(l.added, notification)
 	return nil
 }
@@ -144,25 +151,24 @@ func (l *orderLog) AddNotification(_ context.Context, notification pkgtype.Notif
 // TestReplaceOneLeaf は、テストが葉の op を一つだけ差し替える形: 実装を埋め込んだ型に、そのメソッドだけを書く。
 // 内部の配線 notify は、差し替えた composeNotice の結果を、mailer.send と store.addNotification に渡す。
 //
-// notify は export のない op なので、server.Ops にはなく、テストは直に呼べない。notify に届く、export を付けた op
-// （placeOrder）を呼び、そこまでの道が通る op（store.findSession、葉 requireFresh と newOrder、store.addOrder）も用意する。
+// notify は export のない op なので、入口の server.Ops にはない。内側のパッケージの New が返す Ops（すべての op）から、
+// 直に呼ぶ。notify が通らない op（store.findSession、葉 newOrder など）は、用意しなくてよい。
 func TestReplaceOneLeaf(t *testing.T) {
 	t.Parallel()
 	f := &handlertest.Fixture{}
-	log := &orderLog{}
-	ops := server.New(fixedNotice{f.Leaves()}, log, log)
-	token := pkgtype.Token("token-1")
-	order, err := ops.PlaceOrder(context.Background(), server.PlaceOrderInput{Token: &token})
-	if err != nil {
+	log := &noticeLog{}
+	// 継ぎ目を持つ op（login）を通らないので、seams は渡さない（nil。使われないものは、確かめられない）
+	ops := inner.New(fixedNotice{f.Leaves()}, log, log, nil)
+	if err := ops.Notify(context.Background(), pkgtype.Order{Id: "order-1", UserId: "u1"}); err != nil {
 		t.Fatal(err)
 	}
 	want := pkgtype.Notification{UserId: "u1", Message: "差し替えた文面"}
 	if len(log.sent) != 1 || log.sent[0] != want || len(log.added) != 1 || log.added[0] != want {
 		t.Errorf("mailer.send に %v、store.addNotification に %v（期待は、どちらも %v が一つ）", log.sent, log.added, want)
 	}
-	// 差し替えていない葉は、埋め込んだ実装のまま（newOrder が、識別子と、セッションのユーザーを入れる）
-	if order.Id != "order-1" || order.UserId != "u1" || len(log.orders) != 1 || log.orders[0].Id != order.Id {
-		t.Errorf("PlaceOrder = %+v、store.addOrder に %v", order, log.orders)
+	// 差し替えていない葉は、埋め込んだ実装のまま。葉も、内側の Ops から直に呼べる
+	if order := ops.NewOrder(pkgtype.Session{UserId: "u1"}, nil); order.Id != "order-1" || order.UserId != "u1" {
+		t.Errorf("NewOrder = %+v", order)
 	}
 }
 
@@ -224,21 +230,83 @@ func TestValidationPrecedesOp(t *testing.T) {
 
 // TestNilIsNotChecked は、New が引数を確かめないこと。渡し忘れ（引数が足りない、メソッドが足りない）はコンパイルできないが、
 // nil を書いて渡すことはできる。そのときは *runtime.MissingError ではなく、その実装を使う op を呼んだところで panic になる。
-// 葉の op は server.Ops にないので、葉に届く入口（login）を、nil の leaves で呼ぶ。
+// 使わない op は呼べる（上の TestReplaceOneLeaf は、seams が nil のまま notify を呼んでいる）。
 func TestNilIsNotChecked(t *testing.T) {
 	t.Parallel()
-	ops := server.New(nil, nil, registered{})
-	defer func() {
-		if recover() == nil {
-			t.Error("nil の leaves に届く op を呼んでも panic にならない")
-		}
-	}()
-	_, _ = ops.Login(context.Background(), server.LoginInput{})
+	panics := func(name string, call func()) {
+		t.Helper()
+		defer func() {
+			if recover() == nil {
+				t.Errorf("%s: nil の実装に届く op を呼んでも panic にならない", name)
+			}
+		}()
+		call()
+	}
+	f := &handlertest.Fixture{}
+	// 葉: nil の leaves（内側の Ops から、葉を直に呼ぶ）
+	panics("leaves", func() { inner.New(nil, nil, nil, nil).ToPublicUser(pkgtype.User{}) })
+	// 継ぎ目: nil の seams。継ぎ目を持つ op（login）は、中身に進む前に、継ぎ目を呼ぶ
+	panics("seams", func() {
+		_, _ = server.New(f.Leaves(), f.Mailer(), registered{}, nil).Login(context.Background(), server.LoginInput{})
+	})
 }
 
-// registered は、どの email にもユーザーがいる server.StoreOps。login が、葉 checkPassword（leaves）まで進む。
-type registered struct{ server.StoreOps }
+// registered は、どの email にも、パスワードが handlertest.AlicePassword のユーザーがいる server.StoreOps。
+// login が通る store の op（findUser と addSession）だけを書き、呼ばれた回数を数える。
+type registered struct {
+	server.StoreOps
+	found, added *int
+}
 
-func (registered) FindUser(_ context.Context, email pkgtype.Email) (*pkgtype.User, error) {
-	return &pkgtype.User{Id: "u1", Email: email}, nil
+func (r registered) FindUser(_ context.Context, email pkgtype.Email) (*pkgtype.User, error) {
+	if r.found != nil {
+		*r.found++
+	}
+	user := handlertest.Alice()
+	user.Email = email
+	return &user, nil
+}
+
+func (r registered) AddSession(context.Context, pkgtype.Session) error {
+	if r.added != nil {
+		*r.added++
+	}
+	return nil
+}
+
+// TestLoginIsLimitedThroughOps は、@rate.limited が、HTTP のハンドラではなく op そのものに掛かること:
+// server.New が返す Ops の Login を直に呼んでも、制限を超えれば rate.LimitExceeded が返り、中身（配線の本体）は呼ばれない。
+// 継ぎ目は、基底が op の外側に出した口（server.Seams）で、go-http の出力とは関係がない。
+func TestLoginIsLimitedThroughOps(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	var found, added int
+	ops := server.New(f.Leaves(), f.Mailer(), registered{found: &found, added: &added}, server.NewRateSeams(f.Limiter()))
+	ctx := context.Background()
+	in := server.LoginInput{Body: server.Credentials{Email: handlertest.AliceEmail, Password: handlertest.AlicePassword}}
+
+	// 制限まで: 中身が動き、セッションができる
+	for i := range handlertest.LoginLimit {
+		if _, err := ops.Login(ctx, in); err != nil {
+			t.Fatalf("%d 回目の Login: %v", i+1, err)
+		}
+	}
+	if found != handlertest.LoginLimit || added != handlertest.LoginLimit {
+		t.Fatalf("store.findUser が %d 回、store.addSession が %d 回（期待は、どちらも %d 回）", found, added, handlertest.LoginLimit)
+	}
+	// 制限を超えた呼び出し: 仕様の例外 rate.LimitExceeded が値で返る。中身は呼ばれない（store のどの op も呼ばれない。
+	// 仕様の `throws LimitExceeded prevents effects` を、継ぎ目の中身が守っている）
+	out, err := ops.Login(ctx, in)
+	var exceeded rate.LimitExceeded
+	if !errors.As(err, &exceeded) {
+		t.Fatalf("制限を超えた Login = %+v, %v（期待は rate.LimitExceeded）", out, err)
+	}
+	if out != (server.LoginOk{}) || found != handlertest.LoginLimit || added != handlertest.LoginLimit {
+		t.Errorf("制限を超えた Login が中身を呼んだ: 戻り値 %+v、store.findUser %d 回、store.addSession %d 回", out, found, added)
+	}
+	// 時間の幅が過ぎれば、また呼べる
+	f.Advance(handlertest.LoginWindow)
+	if _, err := ops.Login(ctx, in); err != nil {
+		t.Errorf("幅が過ぎた後の Login: %v", err)
+	}
 }
