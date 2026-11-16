@@ -149,7 +149,7 @@ namespace db {
 - `default` は予約語だが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
 - 出典（§4.2）から変えたところ: `header` の `name` を省けるようにし、`query` と `body` に、同じ `name` を足した。「`@http.body` が一つなら、本文がその値。二つ以上なら、フィールドの名前をキーにしたオブジェクト」という、数で形が変わる読み方は、やめた: 本文そのものを一つの model で受け取るなら `@http.bodyObj`、キー一つなら `@http.body`。
 - 通信の上の形と、書いたものの整合の検査は、語彙を読むトランスパイラが決める（`docs/plugin-go-http.md`「対象」「通信の形」「診断」）。
-- **`vocab/http.hozo` のファイルは、この部分を、そのまま含む**（同じテストが確かめる）。語彙を読む `go-http` の出力は、まだこの語彙になっていない（`docs/requirements.md`「作り直しの段階」の R3）。
+- **`vocab/http.hozo` のファイルは、この部分を、そのまま含む**（同じテストが確かめる）。読むのは `go-http`（`docs/plugin-go-http.md`「対象」）。
 
 ## 同梱しない語彙
 
