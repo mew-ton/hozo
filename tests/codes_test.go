@@ -401,3 +401,47 @@ func TestDiagnosticCodesAreDocumented(t *testing.T) {
 		t.Errorf("docs/%s の %s（%s）を、コードのどこも出していない", d.doc, code, d.sev)
 	}
 }
+
+// TestMessagesDoNotCiteDraft は、Go のコードの文字列リテラル（診断のメッセージを含む、利用者に見える文言）が「設計書」を
+// 引いていないことを確かめる。「設計書」は、出発点のアイデア集の呼び名で、仕様の持ち主ではない（docs/README.md
+// 「設計書という呼び名」）ので、利用者に見せる根拠にならない。コメントは、考えの出どころを指すために「§n」を書いてよい
+// （コメントは構文木の文字列リテラルではないので、ここでは見ない）。読むソースは collectCodeUses と同じ。
+func TestMessagesDoNotCiteDraft(t *testing.T) {
+	fset := token.NewFileSet()
+	for _, top := range scanDirs {
+		root := filepath.Join("..", top)
+		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			rel := filepath.ToSlash(strings.TrimPrefix(p, ".."+string(filepath.Separator)))
+			if d.IsDir() {
+				if skipDirs[d.Name()] || skipPaths[rel] {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+				return nil
+			}
+			f, err := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
+			if err != nil {
+				return err
+			}
+			ast.Inspect(f, func(n ast.Node) bool {
+				lit, ok := n.(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					return true
+				}
+				if s, err := strconv.Unquote(lit.Value); err == nil && strings.Contains(s, "設計書") {
+					t.Errorf("%s: 文字列 %q が「設計書」を引いている（docs/README.md「設計書という呼び名」）", fset.Position(lit.Pos()), s)
+				}
+				return true
+			})
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}

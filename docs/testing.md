@@ -60,6 +60,7 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 
 - 規則ごとのテストがそろっていること（`tests/rules_test.go` の `TestRulesCoverDocs`。「規則ごとのテスト」）。
 - 診断のコード: Go のコードが出しうる診断のコード（規則の ID と、`SYNTAX` / `IO` / `PLUGIN` / `GO-INTERNAL`。プラグインが `errors` で返すコードを含む）がどれも設計文書の「診断」の表にあり、表の重さ（error / warning。診断にならない ID は「—」）がコードと合っていること（`tests/codes_test.go` の `TestDiagnosticCodesAreDocumented`。コードの側はソースを構文木で読んで集める）。
+- 診断のメッセージ: Go のコードの文字列が「設計書」を引いていないこと（`docs/diagnostics.md`「構造」。`tests/codes_test.go` の `TestMessagesDoNotCiteDraft`。コメントは見ない）。
 - 依存の向き: `docs/packages.md`「依存の向き」の表が Go のパッケージの実際の import と同じで、箇条書きの規則がテストのファイルの import を含めて守られていること（`tests/deps_test.go`）。
 - 予約語（下の「予約語の一致」）。
 

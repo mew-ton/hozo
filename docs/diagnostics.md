@@ -27,6 +27,7 @@ type Related struct {
 
 - `Code` は `docs/requirements.md`「検査の規則の一覧」と、各設計文書の「診断」の表のもの。トランスパイラが `emit` の応答の `errors` で返したコード（`docs/plugin-protocol.md`「emit」）は、そのまま `Code` になる。規則の ID でないコードは下の「規則の ID でないコード」。コードが出しうる `Code` がどれかの表にあり、表の重さがコードと合っていることは `tests/codes_test.go` が確かめる。
 - `Message` は、`docs/` の文書の言葉で書く。例: THROWS-1 → `openOrders は http.NetworkError を投げうるが throws に書かれていない（出どころ: fetchMe の呼び出し）`。
+- `Message` は、設計書（`docs/README.md`「設計書という呼び名」）と、その節番号（「§n」）を引かない。設計書は仕様の持ち主ではなく、利用者が読んで確かめる先にならない。文書を引くなら、`docs/` の文書と見出しを引く（`docs/check.md`「残りのケース」）。
 - `Data` の中身は `docs/check.md`「Data」。
 
 ### 規則の ID でないコード

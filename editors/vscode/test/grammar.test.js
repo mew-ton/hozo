@@ -264,6 +264,14 @@ test('修飾（export、override）と、reads / as / throw / never', () => {
   assertScope(as, 'classify Ready', 'Token', 'entity.name.type.hozo');
   assertScope(as, 'classify Ready', 'Profile', 'entity.name.type.hozo');
   assertScope(as, 'classify Ready', 'default', 'keyword.control.hozo');
+  // 残りのケース: as の後ろの else は予約語で、型の名前としては塗らない（docs/grammar.md「予約語」「classify / condition」）
+  assertScope(api, 'Stranger: findUser as else;', 'as', 'keyword.control.hozo');
+  assertScope(api, 'Stranger: findUser as else;', 'else', 'keyword.control.hozo');
+  const rest = api.find((x) => x.text.includes('Stranger: findUser as else;'));
+  assert.ok(!rest.tokens.some((tk) => tk.text.includes('findUser') && tk.scopes.length > 1), '残りのケースの findUser に scope が付いている');
+  // フィールド名の位置の else は、予約語として塗らない
+  const field = tokensOf('model M { else: string; }');
+  assertScope(field, 'model M', 'else', 'variable.other.property.hozo');
   // match の by の後ろの、修飾した分類の名前
   const by = tokensOf('    return match user by store.Registration {');
   assertScope(by, 'return match', 'by', 'keyword.control.hozo');

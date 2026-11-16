@@ -398,6 +398,7 @@ interface Bind {
 | `export op f()` | `exported: true` |
 | `reads a, b`、複数の `reads` | `ReadRef` の列一つ（重複は最初の出現に寄せる）。`read` の宣言の名前は `named`、状態の名前は `direct` |
 | ケースの `X as T` | `as` の `CaseTyping`。`X` が状態なら `state` にその FQN、型か op なら `state` を持たない |
+| ケースの `X as else`（残りのケース） | `as` の `CaseTyping`。`by` は `else`、`type` は、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。`state` は上の行と同じ。そのケースは `cases` に入り、`hasDefault` は変えない |
 | 配線の値の位置の、状態の名前（`f(token)`、`token.value`、`match token by nullable`） | `Atom` の `state`。修飾して書いても同じ |
 | アームの本体の `none` | `body` の `none`（`atom` にはしない） |
 | ユニオンのアームのその場の model `Ready: { ... }` | `<ユニオンの FQN>.Ready` という FQN の `Model`（`synthesizedFrom` にユニオンの FQN）を同じ名前空間に足し、アームの型を `ref` にする。宣言の位置はユニオンの直後 |

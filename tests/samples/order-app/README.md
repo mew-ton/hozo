@@ -204,7 +204,7 @@ shipments（何を待っているか）──[すべてそろった: Gathered.Co
 ```ts
 classify Gathered of Shipment {
   Complete;      // すべての品目が、そろえ場所にある
-  default;       // まだ待っている品目がある
+  Awaiting;      // まだ待っている品目がある
 }
 
 // そろっていない出荷は、引数に渡せない
@@ -221,8 +221,8 @@ export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
   const shipment = find(id);
   const existing = parcelOf(id);
   return match existing by Packing {
-    Packed  => throw AlreadyPacked;
-    default => packGathered(shipment, box, weight);
+    Packed   => throw AlreadyPacked;
+    Unpacked => packGathered(shipment, box, weight);
   };
 }
 
@@ -231,7 +231,7 @@ op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
 {
   return match shipment by Gathered {
     Complete => packInto(shipment, box, weight);   // ここでだけ Gathered.Complete<Shipment> になる
-    default  => throw NotGathered;
+    Awaiting => throw NotGathered;
   };
 }
 ```
@@ -319,10 +319,10 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 - **F7 分類の述語は、対象の値しか見られない。** 時刻で変わる場合分け（期限が過ぎたか）は、分類にできない。→ 「受け取った値を、そのまま返すか、投げる葉」（`staff.requireFresh`、`download.stillValid`）。`ordering.Standing.Expired` は、時計で動く `ordering.expireUnpaid` が `expiredAt` を入れた後でだけ、当たる。
 - **F8 値の集合を言う型（列挙）がない。** リテラルを scalar の引数に渡せない（TYPE-1）ので、`authorize(token, "packer")` は書けない。→ 仕事は、三つの真偽値と、三つの `condition` と、三つの op（`staff.asMaker`、`asPacker`、`asAdmin`）。商品の種類は、union と、型で決まる分類で書けた（`catalog.Fulfilment`、`catalog.Kind`）。`psp.Event.kind`、`shipping.SizeClass`、`shipping.Zone`、`Problem.reason` は文字列で、値の集合はコメント。
 - **F9 「この段階では、この値がある」を、一つの model では言えない。** `model Packed extends Shipment { override parcel: Parcel; }` は TYPE-15。model を別の model に絞るケースは CLS-6。→ 事実を別の表にして（`parcels`、`labels`）、存在の分類（`Packing`、`Labelling`）で絞り、そろった組を model にした（`Sealed`、`Dispatched`）。
-- **F10 `C.Case<T>` の引数は、別の名前空間からも効いた。作り方は縛れない。** `shipping.boxOptions(shipment: Gathered.Complete<Shipment>)` を `fulfilment.optionsIfGathered` が呼ぶ。そろっていない出荷を渡すと MATCH-4（`default` のアームから `boxOptions(shipment)` を呼んで確かめた）。ただし、効果 `createParcel(parcel: Parcel)` は、どの `Parcel` でも受け取る。「荷物は、そろった出荷からしか作れない」は、`Parcel` を返す葉が `weighed` だけであることに依り、検査されない。
+- **F10 `C.Case<T>` の引数は、別の名前空間からも効いた。作り方は縛れない。** `shipping.boxOptions(shipment: Gathered.Complete<Shipment>)` を `fulfilment.optionsIfGathered` が呼ぶ。そろっていない出荷を渡すと MATCH-4（`Awaiting` のアームから `boxOptions(shipment)` を呼んで確かめた）。ただし、効果 `createParcel(parcel: Parcel)` は、どの `Parcel` でも受け取る。「荷物は、そろった出荷からしか作れない」は、`Parcel` を返す葉が `weighed` だけであることに依り、検査されない。
 - **F11 不変条件を書けない。** 「請求は上限を超えない」「請求する送料 = min(送料, 上限)」「`limit` = `itemsTotal` + `shippingCeiling`」「見積もり ≤ 上限」は、葉（`payment.charged`、`shipping.foresee`）のコメント。→ 印 `@prd.promise` を、約束を守る op に付けた。約束と op が結ばれるだけで、中身は確かめない。この仕様でいちばん大事な客への約束が、検査の外にある。
-- **F12 分類の対象に `read` を書けない**（RES-4）。op の分類にするには、`read` をそのまま呼ぶ op が要る（`shop-server/README.md` の N119）。→ 型の分類にした（`classify Known of Order?`）。「引いたものがあるか」の分類が、名前空間ごとに並ぶ（`Known` が四つ、`Held`、`Stocked`、`Registered`、`Account`、`Entitlement`、`Login`）。どれも同じ意味（同 N4）。
-- **F13 空でない一覧の型がない。** `carrier.Fleet`（使っている配送業者があるか）は、述語で決まる分類になり、「空でない」を人が書く。`by list` なら書かずに済むが、場合に業務の名前が付かない。
+- **F12 分類の対象に `read` を書けない**（RES-4）。op の分類にするには、`read` をそのまま呼ぶ op が要る（`shop-server/README.md` の N119）。→ 型の分類にした（`classify Known of Order?`）。「引いたものがあるか」の分類が、名前空間ごとに並ぶ（`Known` が四つ、`Held`、`Stocked`、`Registered`、`Account`、`Entitlement`、`Login`）。どれも同じ意味（同 N4）。「ない」側の名前も、分類ごとに付けた（F44）。
+- **F13 空でない一覧の型がない。** `carrier.Fleet`（使っている配送業者があるか）は、述語で決まる分類になり、「空でない」（`Available`）と「空」（`Unavailable`）を、人が二つとも書く（F45）。`by list` なら書かずに済むが、場合に業務の名前が付かない。
 - **F14 設定の値を言う宣言がない。** → `single` の状態にした（`ordering.paymentWindow`、`payment.holdMargin`、`download.grantLifetime`、`shopApi.site`、`shipping.origin`）。誰が書き込むのかは、仕様にない。時計の間隔だけは、デコレータの引数に数字で書いた（`@clock.tick(every: 5m)`）。PRD の数字を、どちらに書くかの基準がない。
 - **F15 識別子と鍵を作る葉は、仕様の上では、乱数を使っていない。** 時刻は `clock.now()` で配線に出したが、識別子（`ordering.draft`、`storefront.newRequestId`）は出していない（`shop-server/README.md` の N9 と同じ）。
 - **F16 予約語が、業務の言葉と当たる。** `signed(by: …)` は SYNTAX（`by`）。→ `sender`。相手の「取り消す」は `void` と書けない → `psp.release`。
@@ -370,6 +370,9 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 - **F41 「外部の仕組みの op には、その仕組みの語彙のデコレータ」。** `@http.post` を付けると、相手の口の宣言になり、通信の形（パス、本文）まで仕様に入る（`psp`、`carriergw`、`assets`）。印だけにすると（`mailer.send` の `@smtp.sendMail`）、入らない。どちらにするかの基準は、指針にない。
 - **F42 入口の名前空間を、呼ぶ相手ごとに分けた（`shopApi`、`staffApi`、`hooks`）。指針にない。** `staffApi` の 15 の op のうち 13 は、担当を確かめて、一つ呼ぶだけ（残りは、ログインとログアウト）。概念の op に `@http.*` を直に付ければ消えるが、要求のどこから読むか（`@http.header` のトークン）と認証が、概念に入る。
 - **F43 状態を持たない、流れの名前空間 `fulfilment` を作った。指針にない。** 概念どうしが直に呼び合う（`production` が `shipping` を呼ぶ）代わりに、順番を一か所に置いた。`ordering` は `inventory` と `shipping` を直に呼んでいて、そろっていない。
+- **F44 「意味のある状態には名前を。`default` は、意味のない残りにだけ」を当てると、`default` は 24 から 2 になった。** 名前を付けた 22 のうち、19 は型で決まる分類の残りのケース（`Missing: Order? as else;`。`docs/check.md`「残りのケース」）、3 は述語のケース（`shipping.Gathered` の `Awaiting`、`carrier.Fleet` の `Unavailable`、`catalog.Offer` の `Absent`）。残した二つは、この仕様が使わない残り: `psp.Meaning` の `default`（客の同意のほかの通知）と、`fulfilment.Arrival` の `default`（「届いた」のほかの、荷物の動きの通知。運んでいる途中、不在、返送などが混ざり、一つの状態ではない）。「ない」側の名前は、分類ごとにばらついた（`Missing` が四つ、`Unknown` が二つ、`Absent`、`Unlisted`、`Unreserved`、`Uncounted`、`Ungranted`、`LoggedOut`）: 同じ意味の分類が並ぶこと（F12、F40）が、名前の数だけ目立つ。例外と同じことを二度言うアームもできた（`Ungranted => throw NotGranted;`、`Unknown => throw UnknownCarrier;`）。`condition`（`staff.Maker`、`Packer`、`Admin`）は、名前一つと `default` の糖衣（`docs/ir.md`「正規化」）のままで、その `match` のアームは `default` と書く: 数えた 24 に入れていない。
+- **F45 述語で決まる分類の残りに名前を付けると、人が書く述語が一つ増える。** `default` のときは、「どの述語も真でない」が残りで、人が書くのは `Complete` の述語だけだった。`classify Gathered of Shipment { Complete; Awaiting; }` は、`Awaiting` の述語も人が書き、二つが排他で全体を覆うことは、書く人が担保する（`docs/plugin-go.md`「分類」: 真がちょうど一つでなければ、判定の誤り）。`Awaiting` が `Complete` の否定であることは、仕様のどこにも書けない。`carrier.Fleet` の `Unavailable` も同じ。
+- **F46 型で決まる側が、述語のケースになった。** `catalog.Offer`（`OnSale` と `Withdrawn` が、どちらも `Product? as Product`）の「ない」は、値がないことで、型から決まる。それでも、残りのケースは述語のケースの隣に書けない（CLS-7）ので、名前を付けるには、`as` のないケース `Absent;` にするしかなく、「値がない」という述語を人が書く。「あるか」（型で決まる）と「並べているか」（述語）の二つの分類に分ければ避けられるが、アームの本体は呼び出し一つなので、配線が一段増える（F3）。
 
 ## 粒度: 仕様は、どこまで書くか
 
