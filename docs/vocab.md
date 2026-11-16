@@ -97,7 +97,7 @@ namespace db {
 - 列を渡す引数の名前を `by` にしないのは、`by` が予約語で、引数の名前（`Ident`）に書けないため（`docs/grammar.md`「予約語」）。
 - `int`、`float`、`list`、`nullable`、`effects` は予約語、`delete` は文脈キーワードだが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
 - 何を生成するかと、書いたものの整合の検査（表は `@db.table` の状態か、列はあるか、引数と戻り値の型は合うか）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「op の中身」「診断」）。hozoc は、デコレータの引数の種類（`docs/types.md`「デコレータの引数」）だけを確かめる。
-- **`vocab/db.hozo` のファイルは、言語の実装（デコレータの `reads` / `effects` の節、残りの引数、対象 `effect`、予約語のデコレータ名）と一緒に、この全文に置き換える。** それまでは、今のパーサーが読める今の中身（グローバルの `db` と、`key`、`unique`、`ref`）のまま（`docs/requirements.md`「作り直しの段階」の R3）。
+- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（デコレータの `reads` / `effects` の節、残りの引数、対象 `effect`、予約語のデコレータ名）は hozoc が読む。語彙を読む `go-sqlite` の出力は、まだこの語彙になっていない（`docs/requirements.md`「作り直しの段階」の R3）。
 
 ### `db` の表と、しまい方
 
@@ -149,7 +149,7 @@ namespace db {
 - `default` は予約語だが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
 - 出典（§4.2）から変えたところ: `header` の `name` を省けるようにし、`query` と `body` に、同じ `name` を足した。「`@http.body` が一つなら、本文がその値。二つ以上なら、フィールドの名前をキーにしたオブジェクト」という、数で形が変わる読み方は、やめた: 本文そのものを一つの model で受け取るなら `@http.bodyObj`、キー一つなら `@http.body`。
 - 通信の上の形と、書いたものの整合の検査は、語彙を読むトランスパイラが決める（`docs/plugin-go-http.md`「対象」「通信の形」「診断」）。
-- **`vocab/http.hozo` のファイルは、`go-http` の実装と一緒に、この形に置き換える。** それまでは、今の中身（`header(name: string)`、引数のない `body` と `query`。`required` と `default` はない）のまま（`docs/requirements.md`「作り直しの段階」の R3）。
+- **`vocab/http.hozo` のファイルは、この部分を、そのまま含む**（同じテストが確かめる）。語彙を読む `go-http` の出力は、まだこの語彙になっていない（`docs/requirements.md`「作り直しの段階」の R3）。
 
 ## 同梱しない語彙
 

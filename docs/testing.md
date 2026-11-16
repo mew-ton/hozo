@@ -11,7 +11,7 @@
 - 落ちる例は、診断が出る行の末尾に `// ERROR: <ID>` か `// WARN: <ID>` のコメントを書く。同じ行に複数なら `// ERROR: A, B`。
 - テストはディレクトリごとに `hozo.toml`（なければ `tests/rules/hozo.toml` を使う）で `Project` を作り、診断の集合を「ファイル、行、重さ、ID」の組で比べる。期待にない診断、出なかった期待はどちらも失敗。
 - `hozo.toml` の単位はトランスパイラを要る（`docs/config.md`「単位」）ので、起動しないプラグインの fixture を置く: 既定のもの `tests/rules/plugins/std`（基底 `go` / `go-b` / `ts` と、`go` に相乗りする `go-x`、`go` と `go-x` に相乗りする `go-y`）と、規則のディレクトリの `plugins/`（その規則のためのもの）。どちらも各例のプロジェクトの `plugins/` に写す。既定の `tests/rules/hozo.toml` は、名前空間 `a` をトランスパイラ `go` で出力する単位一つ。規則のテストは `check` だけで、プラグインを起動しない。
-- 欠番にした規則（CFG-8、CFG-11）のディレクトリは消す。足した規則（CFG-19〜CFG-23）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
+- 欠番にした規則（CFG-8、CFG-11、TYPE-13）のディレクトリは消す。足した規則（CFG-19〜CFG-23、DEC-17）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
 - メッセージの文言は比べない（変えやすくするため）。文言はゴールデン（下）で確かめる。
 - 文法で閉じている規則（`—` のもの）は、構文エラーになる例を `ng_*.hozo` に置き、`// ERROR: SYNTAX` で確かめる。
 
@@ -39,7 +39,7 @@
 
 テスト用のプラグイン `tests/plugins/pick`（選択だけを返す代役）は消す。コーパスの `plugins/pick/` も消す。
 
-`tests/parse_test.go` は、コーパス・標準の語彙・プラグインの語彙のすべての `.hozo` が構文エラーなしに解析できることと、`docs/cli.md`「cli.hozo」に埋め込んだ `cli.hozo` と `hozo.toml` のブロックがリポジトリ直下のファイルとバイト単位で同じであること（`TestDocsEmbedRootFiles`）を確かめる。
+`tests/parse_test.go` は、コーパス・標準の語彙・プラグインの語彙のすべての `.hozo` が構文エラーなしに解析できることと、`docs/cli.md`「cli.hozo」に埋め込んだ `cli.hozo` と `hozo.toml` のブロックがリポジトリ直下のファイルとバイト単位で同じであること（`TestDocsEmbedRootFiles`）を確かめる。語彙のファイルが文書の写しであることも、同じファイルが確かめる（`TestDocsEmbedVocabulary`）: `vocab/db.hozo` は `docs/vocab.md`「`db` の読み書きのデコレータ」の全文とバイト単位で同じ、`vocab/http.hozo` は同「`http` の語彙」のブロックをそのまま含み、`plugins/go-cli/cli.hozo` は `docs/plugin-go-cli.md`「語彙」のブロックの宣言を、同じ順に、過不足なく持つ。
 
 hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコーパスには入れない。`hozoc check` が error なしで通ることを `tests/selfcheck_test.go` で確かめ、`emit` の結果は「生成物の一致」で確かめる。
 

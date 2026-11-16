@@ -119,9 +119,11 @@ func (p *Program) Lookup(fqn string) Decl          // 宣言を引く。なけ�
 func (p *Program) Namespace(fqn string) *Namespace
 func (v *View) Signature(op string) *ViewedSignature
 func (v *View) InUnit(fqn string) bool             // viewer の名前空間の宣言で、単位の対象か（span.file が View.files にある。docs/config.md「in」）
+func (o *Op) DirectReads() []string                // op が直に読む状態: Reads の後ろに Carried.Reads（重複は最初の出現に寄せる。docs/check.md「デコレータが運ぶ reads と effects」）
+func (o *Op) DirectEffects() []string              // op が直に持つ効果: Effects の後ろに Carried.Effects（同上）
 ```
 
-TS の SDK（`sdk/ts`）は同じ引き方を関数で持つ: `lookup(program, fqn)`、`namespace(program, fqn)`、`signature(view, op)`、`inUnit(view, fqn)`（なければ `undefined`）。
+TS の SDK（`sdk/ts`）は同じ引き方を関数で持つ: `lookup(program, fqn)`、`namespace(program, fqn)`、`signature(view, op)`、`inUnit(view, fqn)`（なければ `undefined`）、`directReads(op)`、`directEffects(op)`。
 
 ### `plugin`（公開）
 

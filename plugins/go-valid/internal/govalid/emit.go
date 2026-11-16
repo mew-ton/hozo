@@ -14,7 +14,6 @@ import (
 // 診断のコード（docs/plugin-go-valid.md「診断」）。
 const (
 	codeValidConstraint = "GOVALID-1" // 制約が元の型に合わない、など（「制約」の表）
-	codeValidDefault    = "GOVALID-2" // フィールドの既定値が、その型かフィールドの制約に合わない
 	codeValidHome       = "GOVALID-3" // Validate を持つ別の名前空間の型の置き場の単位が、go-valid を並べていない
 	codeValidUnion      = "GOVALID-4" // フィールドの型が union で、そのアームに Validate を持つ型がある
 	codeValidCustom     = "GOVALID-5" // 標準でない valid の制約が付いている
@@ -280,7 +279,6 @@ func (g *generator) checkModel(m *ir.Model) {
 				g.checkHome(t.Target, m.Name, fmt.Sprintf("%s の型 %s", subject, t.Target))
 			}
 		}
-		g.checkDefault(m, f)
 	}
 	if !g.validated(m.Name) {
 		return
@@ -418,10 +416,4 @@ func (g *generator) scalarConstraints(t ir.Type) []constraint {
 		}
 	}
 	return cons
-}
-
-// checkDefault は GOVALID-2: フィールド f の既定値を、その型（scalar の制約）と、フィールドに付いた制約で確かめる。
-// IR にフィールドの既定値はなくなった（版 0.5。docs/ir.md「版」）ので、確かめる既定値がない（GOVALID-2 の扱いは、go-valid を
-// 作り直す段で決める）。
-func (g *generator) checkDefault(m *ir.Model, f *ir.Field) {
 }

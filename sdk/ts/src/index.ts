@@ -14,7 +14,7 @@ import {
   type ImportResponse,
   type PluginError,
 } from "./protocol.js";
-import type { Decl, Namespace, Program, View, ViewedSignature } from "./ir.js";
+import type { Decl, Namespace, Op, Program, View, ViewedSignature } from "./ir.js";
 
 export * from "./ir.js";
 export * from "./protocol.js";
@@ -138,6 +138,22 @@ export function namespace(program: Program, fqn: string): Namespace | undefined 
  */
 export function signature(view: View, op: string): ViewedSignature | undefined {
   return Object.hasOwn(view.ops, op) ? view.ops[op] : undefined;
+}
+
+/**
+ * op が直に読む状態: 書いた reads の後ろに、デコレータが運ぶ carried.reads を並べ、重複を最初の出現に寄せたもの
+ * （docs/check.md「デコレータが運ぶ reads と effects」。Go の ir.Op.DirectReads と同じ）。呼び出し先から伝わるものは含まない。
+ */
+export function directReads(op: Op): string[] {
+  return [...new Set([...op.reads, ...op.carried.reads])];
+}
+
+/**
+ * op が直に持つ効果: 書いた effects の後ろに、デコレータが運ぶ carried.effects を並べ、重複を最初の出現に寄せたもの
+ * （同上。Go の ir.Op.DirectEffects と同じ）。呼び出し先から伝わるものと、デコレータの halts の効果は含まない。
+ */
+export function directEffects(op: Op): string[] {
+  return [...new Set([...op.effects, ...op.carried.effects])];
 }
 
 /**

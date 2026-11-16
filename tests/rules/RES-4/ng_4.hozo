@@ -1,0 +1,33 @@
+// RES-4（docs/resolve.md「位置ごとに受け付ける種類」）: デコレータの宣言の reads / effects の要素: reads は state（基底の状態。どの
+// 名前空間のものでも）か any state の引数、effects は effect、効果の union、any effect の引数（どちらも残りの引数でよい）。
+// それ以外は RES-4（状態の分類も書けない）
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  state cur: nullable<M>;
+  effect add on rows.post;
+  effect set on cur.post;
+  exception E;
+  union Writes { add; set; }
+  union Errors { E; }
+  classify Both of rows, cur { Ready; default; }
+  decorator ok(t: any state, u: any state?, e: any effect, ...es: any effect on rows.post)
+    reads t, u, rows, b.other
+    effects e | es | add | Writes;
+  decorator okRest(...ts: any state) reads ts;
+  decorator r1(m: any model) reads m;            // ERROR: RES-4
+  decorator r2(s: string) reads s;               // ERROR: RES-4
+  decorator r3(e: any effect) reads e;           // ERROR: RES-4
+  decorator r4 reads Both;                       // ERROR: RES-4
+  decorator r5 reads add;                        // ERROR: RES-4
+  decorator r7 reads rows.post;                  // ERROR: RES-4
+  decorator e1(t: any state) effects t;          // ERROR: RES-4
+  decorator e2 effects rows;                     // ERROR: RES-4
+  decorator e3 effects Errors;                   // ERROR: RES-4
+  decorator e4 effects E;                        // ERROR: RES-4
+  decorator e5(x: any exception) effects x;      // ERROR: RES-4
+  decorator e6(...xs: string) effects xs;        // ERROR: RES-4
+}
+namespace b {
+  state other: list<string>;
+}

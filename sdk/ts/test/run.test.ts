@@ -8,6 +8,8 @@ import { test } from "node:test";
 import {
   PROTOCOL,
   UnsupportedDirectionError,
+  directEffects,
+  directReads,
   inUnit,
   lookup,
   namespace,
@@ -327,4 +329,23 @@ test("lookup / namespace / signature: same lookups as the Go ir package", () => 
   }
   assert.equal(signature(view, "no.such.op"), undefined);
   assert.equal(signature(view, "toString"), undefined); // Object.prototype の名前を拾わない
+});
+
+// Go の ir.Op.DirectReads / DirectEffects と同じ（docs/packages.md「`ir`（公開）」、docs/check.md「デコレータが運ぶ reads と effects」）。
+test("directReads / directEffects: written first, then carried, duplicates folded to the first", () => {
+  const record = lookup(view.program, "server.record");
+  assert.equal(record?.kind, "op");
+  if (record?.kind !== "op") return;
+  assert.deepEqual(directReads(record), ["db", "session"]);
+  assert.deepEqual(directEffects(record), ["server.UserCreated", "login", "logout"]);
+  const both = { ...record, reads: ["session", "x"], effects: ["logout"] };
+  assert.deepEqual(directReads(both), ["session", "x", "db"]);
+  assert.deepEqual(directEffects(both), ["logout", "server.UserCreated", "login"]);
+  // 元の op は変えない
+  assert.deepEqual(record.reads, []);
+  // デコレータが何も運ばない op は、書いたものだけ
+  const findUser = lookup(view.program, "server.findUser");
+  if (findUser?.kind !== "op") return assert.fail("server.findUser is not an op");
+  assert.deepEqual(directReads(findUser), findUser.reads);
+  assert.deepEqual(directEffects(findUser), findUser.effects);
 });

@@ -137,7 +137,7 @@ func (r *renderer) hover(t sema.Target) (string, bool) {
 		}
 		for _, p := range d.Params {
 			if p.Name == t.Name {
-				code(r.head(d), "  "+p.Name+": "+r.paramType(p))
+				code(r.head(d), "  "+r.param(p))
 				r.paramDoc(&b, d.Description, p.Name)
 				return b.String(), true
 			}
@@ -328,7 +328,7 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 	if len(d.Params) > 0 {
 		var ps []string
 		for _, p := range d.Params {
-			ps = append(ps, p.Name+": "+r.paramType(p))
+			ps = append(ps, r.param(p))
 		}
 		b.WriteString("(" + strings.Join(ps, ", ") + ")")
 	}
@@ -348,7 +348,27 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 			b.WriteString(" " + r.rel(c.Halts))
 		}
 	}
+	// デコレータが op に運ぶ reads / effects の節（docs/grammar.md「decorator の宣言」）。区切りは op の節と同じ
+	if len(d.Reads) > 0 {
+		var states []string
+		for _, st := range d.Reads {
+			states = append(states, r.rel(st))
+		}
+		b.WriteString(" reads " + strings.Join(states, ", "))
+	}
+	if len(d.Effects) > 0 {
+		b.WriteString(" effects " + r.rels(d.Effects))
+	}
 	return b.String()
+}
+
+// param はデコレータの引数の宣言。残りの引数は `...名前: 型`（docs/grammar.md「decorator の宣言」の RestParam）。
+func (r *renderer) param(p ir.Param) string {
+	s := p.Name + ": " + r.paramType(p)
+	if p.Rest {
+		return "..." + s
+	}
+	return s
 }
 
 // throwsClause は `throws A | B prevents effects` の形。

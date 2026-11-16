@@ -105,8 +105,8 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "namespaces[web] は config だけ", v.Namespaces["web"], []ir.NamespaceConfig{v.Config})
 		// ops はすべての op について
 		expect(t, "ops のキー（export の有無によらず、すべての op）", keysOf(v.Ops), []string{
-			"api.currentName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.login", "api.logout", "api.nameOf",
-			"api.tokenOrNone", "api.touch", "api.unauthorized",
+			"api.currentName", "api.findByName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.idle", "api.login", "api.logout", "api.nameOf",
+			"api.renew", "api.rotate", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.viaAlias",
 			"web.adminPageVm", "web.clearToken", "web.fetchUser", "web.greet", "web.login", "web.openUser",
 			"web.reload", "web.signOut", "web.userPageVm", "web.welcome",
 		})
@@ -206,7 +206,7 @@ func TestViewFromEntry(t *testing.T) {
 		// override で型を変える・デコレータを足す・なくす、フィールドを足す
 		a := declOf(t, prog, "api.Admin").(*ir.Model)
 		expect(t, "Admin の fields（override は元の位置のまま、足したフィールドは末尾）", renderFields(a), []string{
-			"id: api.AdminId", "name: string", "secret: string", "nick: string?", "tags: string[]", "attrs: Record<string, string[]>", "level: int = 1",
+			"id: api.AdminId", "name: string", "secret: string", "nick: string?", "tags: string[]", "attrs: Record<string, string[]>", "level: int",
 		})
 		expect(t, "Admin の extends（書かれた順）", a.Extends, &ir.ModelExtends{Base: "api.User", Removed: []string{"hash"}, Overridden: []string{"id", "name", "secret"}})
 		expect(t, "override に付けたデコレータは、受け継いだものの後ろ", [][]string{renderApplications(a.Fields[0].Decorators), renderApplications(a.Fields[1].Decorators)}, [][]string{{"@db.key"}, {"@db.unique"}})
@@ -378,10 +378,77 @@ func TestViewFromEntry(t *testing.T) {
 	})
 
 	t.Run("ir.md 正規化/リテラル", func(t *testing.T) {
-		expect(t, "Query の既定値（int、Duration はナノ秒、boolean）", renderFields(declOf(t, prog, "web.Query").(*ir.Model)), []string{
-			"id: api.UserId", "page: int = 1", "timeout: Duration = 30000000000ns", "strict: boolean = false",
+		// フィールドの既定値は書けない（docs/grammar.md「model」）ので、リテラルはデコレータの引数で確かめる
+		expect(t, "Query に付けたデコレータの引数（int、Duration はナノ秒、boolean）", renderApplications(declOf(t, prog, "web.Query").Common().Decorators), []string{
+			"@web.limits(page: 1, timeout: 30000000000ns, strict: false)",
 		})
-		expect(t, "LoginInput の既定値", renderFields(declOf(t, prog, "api.LoginInput").(*ir.Model)), []string{"creds: api.Credentials", "remember: boolean = false"})
+		expect(t, "Query の fields（既定値を持たない）", renderFields(declOf(t, prog, "web.Query").(*ir.Model)), []string{
+			"id: api.UserId", "page: int?", "timeout: Duration?", "strict: boolean?",
+		})
+	})
+
+	t.Run("ir.md decorator/reads と effects の節、残りの引数、対象 effect", func(t *testing.T) {
+		find := declOf(t, prog, "api.find").(*ir.Decorator)
+		expect(t, "find の reads（引数名は $param:名前）", find.Reads, []string{"$param:table"})
+		expect(t, "find の effects", find.Effects, []string(nil))
+		expect(t, "find の params の rest", []bool{find.Params[0].Rest, find.Params[1].Rest}, []bool{false, false})
+		effects := declOf(t, prog, "api.effects").(*ir.Decorator)
+		expect(t, "予約語の名前のデコレータ effects の params（残りの引数は rest、optional ではない）", effects.Params,
+			[]ir.Param{{Name: "targets", Type: ir.AnyParam{Of: ir.AnyEffect}, Rest: true}})
+		expect(t, "effects の effects / reads（節は書かれた順に連結）", [][]string{effects.Effects, effects.Reads}, [][]string{{"$param:targets"}, {"api.sessions"}})
+		into := declOf(t, prog, "api.into").(*ir.Decorator)
+		expect(t, "into の targets", into.Targets, []ir.DecoratorTarget{ir.TargetEffect})
+		expect(t, "効果の宣言の decorators", renderApplications(declOf(t, prog, "api.renameUser").Common().Decorators), []string{"@api.into(table: api.users)"})
+		// 標準の語彙の db も同じ形
+		expect(t, "db.effects の params", declOf(t, prog, "db.effects").(*ir.Decorator).Params, []ir.Param{{Name: "targets", Type: ir.AnyParam{Of: ir.AnyEffect}, Rest: true}})
+		expect(t, "db.list の reads", declOf(t, prog, "db.list").(*ir.Decorator).Reads, []string{"$param:table"})
+		expect(t, "db.insert の targets", declOf(t, prog, "db.insert").(*ir.Decorator).Targets, []ir.DecoratorTarget{ir.TargetEffect})
+		expect(t, "状態に付けた @db.table", renderApplications(declOf(t, prog, "api.users").Common().Decorators), []string{"@db.table(element: api.User)"})
+	})
+
+	t.Run("ir.md 正規化/残りの引数と Op.carried", func(t *testing.T) {
+		rotate := opOf(t, prog, "api.rotate")
+		expect(t, "残りの引数に渡した値は list の Arg 一つ（一つずつ ref か refs）", renderApplications(rotate.Decorators), []string{
+			"@api.effects(targets: [api.createSession, api.deleteSession | api.renameUser])",
+		})
+		expect(t, "rotate の Op.effects は書いたものだけ", rotate.Effects, []string{"api.touchUser"})
+		expect(t, "rotate の Op.carried（decorators の順、節の順、引数に書いた順）", rotate.Carried,
+			ir.Carried{Reads: []string{"api.sessions"}, Effects: []string{"api.createSession", "api.deleteSession", "api.renameUser"}})
+		idle := opOf(t, prog, "api.idle")
+		expect(t, "何も渡さない残りの引数は items が []", renderApplications(idle.Decorators), []string{"@api.effects(targets: [])"})
+		expect(t, "idle の Op.carried", idle.Carried, ir.Carried{Reads: []string{"api.sessions"}})
+		via := opOf(t, prog, "api.viaAlias")
+		expect(t, "名前付きデコレータの固定した引数（ユニオンは展開）", renderApplications(via.Decorators), []string{
+			"@api.effects(targets: [api.createSession, api.deleteSession | api.renameUser]) via api.both",
+		})
+		expect(t, "viaAlias の Op.carried", via.Carried, ir.Carried{Reads: []string{"api.sessions"}, Effects: []string{"api.createSession", "api.deleteSession", "api.renameUser"}})
+		find := opOf(t, prog, "api.findByName")
+		expect(t, "findByName の Op.reads は書いたものだけ", find.Reads, []string{"api.sessions"})
+		expect(t, "findByName の Op.carried", find.Carried, ir.Carried{Reads: []string{"api.users"}})
+		expect(t, "@see は予約語のデコレータ名も指せる", find.Description.See, []string{"api.find", "api.effects"})
+		// デコレータの付いていない op の carried は空（JSON では {reads: [], effects: []}）
+		expect(t, "findUser の Op.carried", opOf(t, prog, "api.findUser").Carried, ir.Carried{})
+	})
+
+	t.Run("check.md 計算/デコレータが運ぶ reads と effects", func(t *testing.T) {
+		// 直に持つ効果は Op.effects の後ろに Op.carried.effects、直に読む状態は Op.reads の後ろに Op.carried.reads
+		expect(t, "api.rotate（op の throws の relations は、運ばれた効果にも掛かる）", sigOf(opOf(t, prog, "api.rotate").Signature), sig{
+			E: []string{"api.Invalid"}, F: []string{"api.touchUser", "api.createSession", "api.deleteSession", "api.renameUser"},
+			Rel: []string{"api.Invalid / api.touchUser = prevented", "api.Invalid / api.createSession = prevented",
+				"api.Invalid / api.deleteSession = prevented", "api.Invalid / api.renameUser = prevented"},
+			Succ: []string{"api.touchUser = kept", "api.createSession = kept", "api.deleteSession = kept", "api.renameUser = kept"},
+		})
+		expect(t, "api.rotate の R", opOf(t, prog, "api.rotate").Signature.Reads, []string{"api.sessions"})
+		expect(t, "api.findByName の R（書いたもの、運ばれたもの）", opOf(t, prog, "api.findByName").Signature.Reads, []string{"api.sessions", "api.users"})
+		expect(t, "api.idle の F は空、R は運ばれた状態", [][]string{opOf(t, prog, "api.idle").Signature.Effects, opOf(t, prog, "api.idle").Signature.Reads}, [][]string{{}, {"api.sessions"}})
+		// 呼び出し元へは、op が書いたものと同じに伝わる
+		renew := opOf(t, prog, "api.renew")
+		expect(t, "api.renew の F（伝播）", renew.Signature.Effects, []string{"api.touchUser", "api.createSession", "api.deleteSession", "api.renameUser"})
+		expect(t, "api.renew の R（伝播）", renew.Signature.Reads, []string{"api.sessions", "api.users"})
+		expect(t, "api.renew の Op.carried は空（配線には運ばない）", renew.Carried, ir.Carried{})
+		// 見る側によらない
+		expect(t, "web から見た api.rotate の effects", v.Ops["api.rotate"].Effects, opOf(t, prog, "api.rotate").Signature.Effects)
+		expect(t, "デコレータの付いた op は純粋でない", opOf(t, prog, "api.idle").Signature.Pure, false)
 	})
 
 	t.Run("ir.md 配線", func(t *testing.T) {

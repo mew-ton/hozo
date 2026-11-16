@@ -1,0 +1,30 @@
+// TYPE-4（docs/types.md「デコレータの引数」）: 残りの引数に渡した値は、一つずつ、残りの引数の ParamType で受ける。
+// 型で受ける値の型が合わない、any の引数にリスト・リテラル・`|` の集合（例外と効果のほか）は渡せない
+namespace a {
+  state rows: list<string>;
+  state cur: nullable<string>;
+  effect add on rows.post;
+  effect add2 on rows.post;
+  effect set on cur.post;
+  effect drop on rows.delete;
+  union Posts { add; add2; }
+  decorator posts(...es: any effect on rows.post) for op effects es;
+  decorator tags(first: string, ...more: string | int);
+  decorator states(...ts: any state) for op reads ts;
+  @posts(add, add2, Posts)
+  op ok(x: string, y: string);
+  @tags("a", "b", 1)
+  op okTags();
+  @tags("a", true)                               // ERROR: TYPE-4
+  op badTag();
+  @tags("a", 1.5, "c")                           // ERROR: TYPE-4
+  op badTag2();
+  @posts([add, add2])                            // ERROR: TYPE-4
+  op listToAny(x: string);
+  @posts("add")                                  // ERROR: TYPE-4
+  op literalToAny(x: string);
+  @states(rows, cur)
+  op okStates(): string[];
+  @states(rows | cur)                            // ERROR: TYPE-4
+  op setToState(): string[];
+}

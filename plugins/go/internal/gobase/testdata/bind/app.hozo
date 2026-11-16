@@ -5,9 +5,9 @@
 namespace api {
   scalar Token extends string;
   model GetInput { token: Token?; id: string; }
-  model Auth { token: Token?; locale: string; }
+  model Auth { token: Token?; locale: string?; }
   model NestedInput { auth: Auth; id: string; }
-  model Guest { token: Token; id: string; }
+  model Guest { token: Token?; id: string; }
   /** 印。付いた op は純粋でなくなる */
   decorator remote;
 
@@ -46,13 +46,14 @@ namespace web {
     return api.nested({ auth: {}, id: a });
   }
 
-  // 4: 位置が、渡されていない引数の中のフィールド（その引数の型の構造体リテラルを作る。既定値も書く）
+  // 4: 位置が、渡されていない引数の中のフィールド（その引数の型の構造体リテラルを作る）
   export op check(): string
   {
     return api.ping();
   }
 
-  // 5: 状態の形が nullable で、位置の型が省略可能でない（既定値を持つ位置）: 値があるときだけ埋める
+  // 5 は、フィールドの既定値と一緒になくなった（nullable の状態を、既定値を持つ省略可能でない位置に、値があるときだけ
+  // 埋める形。docs/decisions.md「決めたこと」116）。同じ op を、省略可能な位置を埋める例として残す
   export op enter(id: string): string
   {
     return api.enter({ id });

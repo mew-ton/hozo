@@ -7,13 +7,13 @@ namespace a {
   state own: list<M>;
   decorator fromRows for op reads b.rows;
   @db.find(b.rows, "id")               // ERROR: READS-1
-  op k(id: string): b.Row?;
+  op k(id: string): string?;
   @db.list(shared)                     // ERROR: READS-1
   op l(): string[];
   @fromRows                            // ERROR: READS-1
-  op m(): b.Row[];
+  op m(): string[];
   @db.list(b.rows)                     // ERROR: READS-1
-  op n(): b.Row[]
+  op n(): string[]
     reads b.rows;                      // ERROR: READS-1
   @db.find(own, "id")
   op ok(id: string): M?;

@@ -48,6 +48,9 @@
     },
     {
       "include": "#arrow"
+    },
+    {
+      "include": "#rest"
     }
   ],
   "repository": {
@@ -149,12 +152,18 @@
       "name": "keyword.operator.arrow.hozo",
       "match": "-\u003e|=\u003e"
     },
+    "rest": {
+      "comment": "... はデコレータの宣言の残りの引数（docs/grammar.md「decorator の宣言」の RestParam）",
+      "name": "keyword.operator.rest.hozo",
+      "match": "\\.\\.\\."
+    },
     "external": {
       "comment": "@external は核の印でデコレータではない（docs/grammar.md「予約語」）",
       "name": "storage.modifier.hozo",
       "match": "@external\\b"
     },
     "decorator": {
+      "comment": "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
       "name": "entity.name.function.decorator.hozo",
       "match": "@[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"
     },
@@ -172,7 +181,22 @@
           }
         },
         {
-          "match": "\\b(op|effect|decorator)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "comment": "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator list(…)。docs/grammar.md「識別子」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
+          "match": "\\b(decorator)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*))?",
+          "captures": {
+            "1": {
+              "name": "keyword.declaration.hozo"
+            },
+            "2": {
+              "name": "entity.name.function.hozo"
+            },
+            "3": {
+              "name": "entity.name.function.decorator.hozo"
+            }
+          }
+        },
+        {
+          "match": "\\b(op|effect)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
               "name": "keyword.declaration.hozo"
@@ -198,9 +222,9 @@
     "contextual": {
       "patterns": [
         {
-          "comment": "for の対象: field は for の後ろ（| で続く位置を含む）でだけ文脈キーワード",
+          "comment": "for の対象: field は for の後ろ（| で続く位置を含む）でだけ文脈キーワード。対象の並びは、節の頭（throws / catches / reads / effects）か記号で終わる",
           "begin": "\\b(for)\\b",
-          "end": "(?=[^\\s|A-Za-z0-9_])|(?=\\b(?:throws|catches)\\b)",
+          "end": "(?=[^\\s|A-Za-z0-9_])|(?=\\b(?:throws|catches|reads|effects)\\b)",
           "beginCaptures": {
             "1": {
               "name": "keyword.control.hozo"

@@ -63,6 +63,8 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `classify C of op` の `op`、ケースの `op as T` の `op` | その op の名前 |
 | ケースの `X as T` の `X`（状態、型）と `T` | 状態なら `state` の名前、型ならその宣言 |
 | `reads` の状態の名前 | `state` の名前 |
+| デコレータの宣言の `reads` / `effects` の節の名前 | 状態か効果の宣言。デコレータの引数の名前（残りの引数を含む）なら、その `Param` |
+| 予約語のデコレータ名（`@db.list`、`@effects`、別名の `=` の後ろ） | ほかのデコレータ名と同じく、その `decorator` の名前 |
 | 配線の値の位置の、状態の名前（`f(token)`、`match token by nullable`） | `state` の名前。同じ名前の束縛か引数があれば、そちら（`docs/resolve.md`「手続き」） |
 | `match x by ns.C` の `C` | `classify` の名前 |
 | アームの `throw E` の `E` | `exception` の名前 |
@@ -81,7 +83,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 Markdown の `MarkupContent`。順に:
 
-1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `op login(in: LoginInput): LoginOk`、`export op login(in: LoginInput): LoginOk`（`Op.exported`）、`op unauthorized(): never`、`model User`、`model PublicUser extends User`（`Model.extends.base`）、`scalar Email extends string`、`exception InvalidCredentials: Violations`、`effect createSession on sessions.post`、`effect placeOrder on Checkout: Shopping -> Ordered`、`decorator validated throws ClientError prevents effects`、`state users: list<User>`、`classify WarrantyKind of server.Item`、`classify Registration of findUser`（op の分類）、`classify Checkout of carts, orders`、フィールドなら `token: Token?`、`as` を持つケースなら `Registered: findUser as type.User`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
+1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `op login(in: LoginInput): LoginOk`、`export op login(in: LoginInput): LoginOk`（`Op.exported`）、`op unauthorized(): never`、`model User`、`model PublicUser extends User`（`Model.extends.base`）、`scalar Email extends string`、`exception InvalidCredentials: Violations`、`effect createSession on sessions.post`、`effect placeOrder on Checkout: Shopping -> Ordered`、`decorator validated throws ClientError prevents effects`、`decorator find(table: any state, column: string) reads table`、`decorator effects(...targets: any effect) effects targets`（残りの引数は `...名前: 型`。節は `throws`、`catches`、`reads`、`effects` の順にまとめて書く）、`decorator insert(table: any state) for effect`、`state users: list<User>`、`classify WarrantyKind of server.Item`、`classify Registration of findUser`（op の分類）、`classify Checkout of carts, orders`、フィールドなら `token: Token?`、`as` を持つケースなら `Registered: findUser as type.User`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
    - 型は `T?` と `T[]` で書く。状態の見出しだけは、形の語で書く（`State.shape` と `State.element` から `list<T>` / `nullable<T>` / `single<T>`）。
    - 配線の値の位置の状態の名前は、ほかの宣言への参照と同じく、その状態の見出し。アームの中で絞り込まれていても、見出しは宣言のまま。
    - 継承した model のフィールドは、受け継いだものも `fields` にあるので、同じ形で出る。

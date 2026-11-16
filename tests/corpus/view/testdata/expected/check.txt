@@ -1,2 +1,2 @@
-web.hozo:139:3: warning[DEC-5]: @offlineFallback は api.Timeout を recovers で吸収するが、api.Timeout のとき効果 api.createSession は不明なので、web.login の成功のアームでも不明になる
+web.hozo:141:3: warning[DEC-5]: @offlineFallback は api.Timeout を recovers で吸収するが、api.Timeout のとき効果 api.createSession は不明なので、web.login の成功のアームでも不明になる
 0 errors, 1 warning

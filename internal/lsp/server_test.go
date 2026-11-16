@@ -967,3 +967,152 @@ namespace store {
 	}
 	c.shutdown()
 }
+
+// TestCarryingDecorators は、版 0.5 の構文（予約語のデコレータ名、reads / effects の節、残りの引数、対象 effect）について、
+// 定義へジャンプ（docs/lsp.md「定義へジャンプ」の表）、ホバーの見出し（同「ホバー」）、ドキュメントのシンボル、診断（DEC-17）を確かめる。
+func TestCarryingDecorators(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace store {
+  model Row { @db.text id: string; }
+  @db.table(Row)
+  state rows: list<Row>;
+  /** 表から引く */
+  decorator list(table: any state, column: string?) for op reads table;
+  /**
+   * 並べた効果を行う。
+   *
+   * @param targets 行う効果
+   */
+  decorator effects(...targets: any effect) for op effects targets reads rows;
+  decorator into(table: any state) for effect;
+  decorator everything = list(rows);
+  @into(rows)
+  effect add on rows.post;
+  /**
+   * 全部を引く。
+   *
+   * @see list
+   * @see store.effects
+   */
+  @list(rows)
+  op all(): Row[];
+  @effects(add)
+  op insert(row: Row);
+  @store.effects
+  op idle();
+  @db.effects(add)
+  op viaVocab(row: Row);
+  @everything
+  op viaAlias(): Row[];
+  @list(rows)
+  op wired(): Row[] {
+    return all();
+  }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	// 診断: 運ぶ節を持つデコレータを配線に付けた DEC-17 だけ（位置はその適用）
+	var codes []string
+	for _, d := range byURI[uri] {
+		if d.Code == codeNoConfig {
+			continue
+		}
+		codes = append(codes, d.Code)
+		if want := positionOf(t, enc, text, "@list(rows)\n  op wired", 0); d.Code == "DEC-17" && d.Range.Start != want {
+			t.Errorf("DEC-17 の位置 = %+v, want %+v", d.Range.Start, want)
+		}
+	}
+	if strings.Join(codes, ",") != "DEC-17" {
+		t.Fatalf("診断 = %v, want [DEC-17]", codes)
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	const (
+		listHead    = "decorator list(table: any state, column: string?) reads table"
+		effectsHead = "decorator effects(...targets: any effect) reads rows effects targets"
+	)
+	for _, tt := range []struct {
+		what   string
+		pos    protocol.TextDocumentPositionParams
+		target string // 定義の位置（この文字列の先頭から skip 文字目）
+		skip   int
+		hover  []string
+	}{
+		{"予約語のデコレータ名の宣言", at("decorator list(", len("decorator ")), "decorator list(", len("decorator "), []string{listHead, "表から引く"}},
+		{"予約語のデコレータ名の適用", at("@list(rows)\n  op all", 1), "decorator list(", len("decorator "), []string{listHead, "表から引く"}},
+		{"修飾しない予約語の適用（@effects）", at("@effects(add)", 1), "decorator effects(", len("decorator "), []string{effectsHead, "並べた効果を行う。"}},
+		{"修飾した予約語の適用（@store.effects）", at("@store.effects\n", len("@store.")), "decorator effects(", len("decorator "), []string{effectsHead}},
+		{"reads の節の引数名", at("for op reads table;", len("for op reads ")), "table: any state, column", 0, []string{listHead, "  table: any state"}},
+		{"effects の節の、残りの引数の名前", at("for op effects targets", len("for op effects ")), "targets: any effect) for op", 0, []string{effectsHead, "  ...targets: any effect", "行う効果"}},
+		{"節に書いた状態の名前", at("effects targets reads rows;", len("effects targets reads ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
+		{"残りの引数の宣言", at("...targets: any effect", len("...")), "targets: any effect) for op", 0, []string{"  ...targets: any effect"}},
+		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add on rows.post;", 0, []string{"effect add on rows.post"}},
+		{"効果の宣言に付けたデコレータ", at("@into(rows)", 1), "decorator into(", len("decorator "), []string{"decorator into(table: any state) for effect"}},
+		{"別名の先の予約語", at("= list(rows);", len("= ")), "decorator list(", len("decorator "), []string{listHead}},
+		{"@see の予約語のデコレータ名", at("@see list", len("@see ")), "decorator list(", len("decorator "), []string{listHead}},
+		{"@see の修飾した予約語のデコレータ名", at("@see store.effects", len("@see store.")), "decorator effects(", len("decorator "), []string{effectsHead}},
+		{"@param の残りの引数", at("@param targets", len("@param ")), "targets: any effect) for op", 0, []string{"  ...targets: any effect"}},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, tt.pos, &hov)
+		if hov == nil {
+			t.Errorf("hover(%s) = nil", tt.what)
+		} else {
+			for _, want := range tt.hover {
+				if !strings.Contains(hov.Contents.Value, want) {
+					t.Errorf("hover(%s) に %q がない:\n%s", tt.what, want, hov.Contents.Value)
+				}
+			}
+		}
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, tt.pos, &loc)
+		if want := shift(positionOf(t, enc, text, tt.target, 0), tt.skip); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
+		}
+	}
+	// 語彙の予約語のデコレータ名（@db.effects）は、語彙のファイルへ飛ぶ
+	var loc *protocol.Location
+	c.result(protocol.MethodDefinition, at("@db.effects(add)", len("@db.")), &loc)
+	if loc == nil || loc.URI != "hozo:vocab/db.hozo" {
+		t.Errorf("definition(@db.effects) = %+v", loc)
+	}
+	var hov *protocol.Hover
+	c.result(protocol.MethodHover, at("@db.effects(add)", len("@db.")), &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "decorator db.effects(...targets: any effect) effects targets") {
+		t.Errorf("hover(@db.effects) = %+v", hov)
+	}
+	// 名前付きデコレータの適用は、宣言と、固定した引数
+	c.result(protocol.MethodHover, at("@everything", 1), &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "decorator everything = list(table: rows)") || !strings.Contains(hov.Contents.Value, listHead) {
+		t.Errorf("hover(@everything) = %+v", hov)
+	}
+	// op のホバー: 運ばれた状態と効果は、Signature の一覧に出る
+	c.result(protocol.MethodHover, at("op insert(", len("op ")), &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "effects:\n- `add`") || !strings.Contains(hov.Contents.Value, "reads:\n- `rows`") {
+		t.Errorf("hover(op insert) = %+v", hov)
+	}
+	// ドキュメントのシンボル: 予約語の名前のデコレータも Interface、効果は Event
+	var syms []protocol.DocumentSymbol
+	c.result(protocol.MethodDocumentSymbol, protocol.DocumentSymbolParams{TextDocument: textDoc(uri)}, &syms)
+	if len(syms) != 1 {
+		t.Fatalf("documentSymbol = %+v", summarize(syms))
+	}
+	kinds := map[string]protocol.SymbolKind{}
+	for _, s := range syms[0].Children {
+		kinds[s.Name] = s.Kind
+	}
+	for _, name := range []string{"list", "effects", "into", "everything"} {
+		if kinds[name] != protocol.SymbolInterface {
+			t.Errorf("symbol %s の種類 = %v, want Interface", name, kinds[name])
+		}
+	}
+	if kinds["add"] != protocol.SymbolEvent {
+		t.Errorf("symbol add の種類 = %v, want Event", kinds["add"])
+	}
+	c.shutdown()
+}

@@ -115,12 +115,14 @@ func TestNone(t *testing.T) {
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
 var diagnosticFixtures = []struct{ name, code string }{
 	{"govalid1", codeValidConstraint}, // 制約が元の型に合わない、length に min も max もない、pattern が RE2 でない、format の名前を知らない、配列か record そのもの
-	{"govalid2", codeValidDefault},    // フィールドの既定値が、その型かフィールドの制約に合わない
-	{"govalid3", codeValidHome},       // Validate を持つ別の名前空間の型の置き場の単位が、go-valid を並べていない
-	{"govalid4", codeValidUnion},      // フィールドの型が union で、そのアームに Validate を持つ型がある
-	{"govalid5", codeValidCustom},     // 標準でない valid の制約が付いている
-	{"govalid6", codeValidField},      // Validate を持つ model が、validate という名前のフィールドを持つ
-	{"govalid7", codeValidOption},     // [emit.options.go-valid] に、知らないキーがある
+	// GOVALID-2（フィールドの既定値が、その型かフィールドの制約に合わない）は欠番になった: フィールドの既定値を言語からなくした
+	// （docs/plugin-go-valid.md「診断」）。この入力と期待（testdata/govalid2）は、go-valid を作り直す段で消す。
+	{"govalid2", "GOVALID-2"},
+	{"govalid3", codeValidHome},   // Validate を持つ別の名前空間の型の置き場の単位が、go-valid を並べていない
+	{"govalid4", codeValidUnion},  // フィールドの型が union で、そのアームに Validate を持つ型がある
+	{"govalid5", codeValidCustom}, // 標準でない valid の制約が付いている
+	{"govalid6", codeValidField},  // Validate を持つ model が、validate という名前のフィールドを持つ
+	{"govalid7", codeValidOption}, // [emit.options.go-valid] に、知らないキーがある
 }
 
 // TestDiagnostics は docs/plugin-go-valid.md「診断」の GOVALID-1〜GOVALID-7: 診断のコード・位置・メッセージがゴールデンと同じで、

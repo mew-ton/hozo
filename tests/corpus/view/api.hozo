@@ -210,7 +210,7 @@ namespace api {
   // docs/ir.md「正規化」: 残りの引数に渡した値は list の Arg 一つ（一つずつ ref か refs）
   // docs/check.md EFF-3: 運ばれる効果は数えない（自分で書いた効果は一つまで）
   @effects(createSession, deleteSession | renameUser)
-  export op rotate(old: Token, id: UserId)
+  export op rotate(id: UserId, name: string)
     effects touchUser
     throws Invalid prevents effects;
   // 残りの引数に何も渡さない（items は []）。reads の節の sessions だけが運ばれる
@@ -220,10 +220,10 @@ namespace api {
   op viaAlias(session: Session);
 
   // docs/check.md「計算」手順 0（配線）と「reads」: 運ばれた効果と状態は、op が書いたものと同じに呼び出し元へ伝わる
-  op renew(old: Token, id: UserId): User?
+  op renew(id: UserId, name: string): User?
     throws Invalid
   {
-    rotate(old, id);
-    return findByName("x");
+    rotate(id, name);
+    return findByName(name);
   }
 }

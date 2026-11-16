@@ -245,6 +245,12 @@ func Build() Grammar {
 			Match:   `->|=>`,
 		}},
 
+		{Key: "rest", Rule: Rule{
+			Comment: "... はデコレータの宣言の残りの引数（docs/grammar.md「decorator の宣言」の RestParam）",
+			Name:    "keyword.operator.rest.hozo",
+			Match:   `\.\.\.`,
+		}},
+
 		// ---- デコレータ ----
 		{Key: "external", Rule: Rule{
 			Comment: "@external は核の印でデコレータではない（docs/grammar.md「予約語」）",
@@ -252,8 +258,9 @@ func Build() Grammar {
 			Match:   `@external\b`,
 		}},
 		{Key: "decorator", Rule: Rule{
-			Name:  "entity.name.function.decorator.hozo",
-			Match: `@` + qualifiedName,
+			Comment: "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
+			Name:    "entity.name.function.decorator.hozo",
+			Match:   `@` + qualifiedName,
 		}},
 
 		// ---- 宣言の名前 ----
@@ -266,7 +273,16 @@ func Build() Grammar {
 				},
 			},
 			{
-				Match: `\b(op|effect|decorator)\s+(` + ident + `)`,
+				Comment: "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator list(…)。docs/grammar.md「識別子」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
+				Match:   `\b(decorator)\s+(` + ident + `)(?:\s*=\s*(` + qualifiedName + `))?`,
+				Captures: Captures{
+					"1": {Name: "keyword.declaration.hozo"},
+					"2": {Name: "entity.name.function.hozo"},
+					"3": {Name: "entity.name.function.decorator.hozo"},
+				},
+			},
+			{
+				Match: `\b(op|effect)\s+(` + ident + `)`,
 				Captures: Captures{
 					"1": {Name: "keyword.declaration.hozo"},
 					"2": {Name: "entity.name.function.hozo"},
@@ -284,9 +300,9 @@ func Build() Grammar {
 		// ---- 文脈キーワード ----
 		{Key: "contextual", Rule: Rule{Patterns: []Rule{
 			{
-				Comment: "for の対象: field は for の後ろ（| で続く位置を含む）でだけ文脈キーワード",
+				Comment: "for の対象: field は for の後ろ（| で続く位置を含む）でだけ文脈キーワード。対象の並びは、節の頭（throws / catches / reads / effects）か記号で終わる",
 				Begin:   `\b(for)\b`,
-				End:     `(?=[^\s|A-Za-z0-9_])|(?=\b(?:throws|catches)\b)`,
+				End:     `(?=[^\s|A-Za-z0-9_])|(?=\b(?:throws|catches|reads|effects)\b)`,
 				BeginCaptures: Captures{
 					"1": {Name: "keyword.control.hozo"},
 				},
@@ -412,6 +428,7 @@ func Build() Grammar {
 			{Include: "#keywords"},
 			{Include: "#number"},
 			{Include: "#arrow"},
+			{Include: "#rest"},
 		},
 		Repository: repo,
 	}
