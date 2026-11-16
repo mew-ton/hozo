@@ -15,8 +15,20 @@ namespace http {
   decorator post(path: string) throws ServerError | NetworkError;
 
   decorator status(code: int) for exception;
-  decorator header(name: string) for field;
-  decorator body for field;
-  decorator query for field;
+
+  /** このフィールドを、要求のヘッダ一つから読む。name を省けば、フィールドの名前 */
+  decorator header(name: string?) for field;
+  /** このフィールドを、クエリの項目一つから読む。name を省けば、フィールドの名前 */
+  decorator query(name: string?) for field;
+  /** このフィールドを、本文（JSON のオブジェクト）のキー一つから読む。name を省けば、フィールドの名前 */
+  decorator body(name: string?) for field;
+
+  /** このフィールド（model）で、ヘッダの全体を受け取る。項目の名前は、その model のフィールドの名前 */
+  decorator headerObj for field;
+  /** このフィールド（model）で、クエリの全体を受け取る。項目の名前は、その model のフィールドの名前 */
+  decorator queryObj for field;
+  /** このフィールド（model）で、本文の全体を受け取る。本文が、その model の JSON */
+  decorator bodyObj for field;
+
   decorator retry(times: int);
 }

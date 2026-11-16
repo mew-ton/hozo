@@ -92,7 +92,7 @@ type scope struct {
 	ns *namespace
 	// wiring は配線の中なら、その束縛と op の引数（手続き 1.1）。
 	wiring *wiringScope
-	// decoParams はデコレータの宣言の throws / catches の中なら、その引数（手続き 1.2）。
+	// decoParams はデコレータの宣言の throws / catches / reads / effects の中なら、その引数（手続き 1.2）。
 	decoParams *decoParamScope
 	// opParams は op に付いたデコレータの引数の値で、Param.type が type のとき（手続き 1.3）。
 	opParams *opParamScope

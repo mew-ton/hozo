@@ -1,9 +1,37 @@
-/** この状態を DB が持つ */
-decorator db for state;
-
 namespace db {
+  /** この状態を、element の行の表として、DB が持つ。列は、element のフィールド */
+  decorator table(element: any model) for state;
+
+  /** このフィールドを、文字列の列にしまう */
+  decorator text for field;
+  /** このフィールドを、整数の列にしまう */
+  decorator int for field;
+  /** このフィールドを、小数の列にしまう */
+  decorator float for field;
+  /** このフィールドを、真偽値の列にしまう */
+  decorator bool for field;
+  /** このフィールドを、時刻の列にしまう */
+  decorator time for field;
+  /** このフィールドを、JSON にして一つの列にしまう */
+  decorator json for field;
+
   decorator key for field;
   decorator unique for field;
   /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
   decorator ref(target: any model) for field;
+
+  /** この op は、表 table から、列 column が引数の値と同じ一行を引く。なければ、ない */
+  decorator find(table: any state, column: string) for op reads table;
+  /** この op は、表 table の行をすべて引く。column を書けば、その列が引数の値と同じ行だけ */
+  decorator list(table: any state, column: string?) for op reads table;
+
+  /** この効果は、表 table に行を一つ足す */
+  decorator insert(table: any state) for effect;
+  /** この効果は、表 table の、キー（@db.key）が同じ行を書き換える */
+  decorator update(table: any state) for effect;
+  /** この効果は、表 table から、列 column が引数の値と同じ行を消す */
+  decorator delete(table: any state, column: string) for effect;
+
+  /** この op は、並べた効果を、書いた順に、一つのトランザクションで行う。n 番目の効果が、op の n 番目の引数を受け取る */
+  decorator effects(...targets: any effect) for op effects targets;
 }

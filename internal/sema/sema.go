@@ -119,12 +119,14 @@ type analyzer struct {
 	models  map[string]*ir.Model  // すべての model（合成したものを含む）
 	fields  map[string]map[string]source.Span
 
-	pendingBinds     []pendingBind
-	binds            []ir.Bind
-	sites            []*appSite
-	wirings          []*wiringJob
-	bodies           []*modelJob
-	neverOps         []*neverOp
+	pendingBinds []pendingBind
+	binds        []ir.Bind
+	sites        []*appSite
+	wirings      []*wiringJob
+	bodies       []*modelJob
+	neverOps     []*neverOp
+	// carriers は、op ごとの、reads か effects を運んだデコレータの適用（書かれた順）。
+	carriers         map[*ir.Op][]carrier
 	pendingCaseTypes []pendingCaseType
 
 	diags []diag.Diagnostic
@@ -139,6 +141,7 @@ func newAnalyzer(fs *source.FileSet, files []*ast.File) *analyzer {
 		syms:      map[string]*symbol{},
 		models:    map[string]*ir.Model{},
 		fields:    map[string]map[string]source.Span{},
+		carriers:  map[*ir.Op][]carrier{},
 	}
 	a.files = sortFiles(fs, files)
 	for i, f := range a.files {

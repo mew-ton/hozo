@@ -1,5 +1,5 @@
 {
-  "version": "0.4",
+  "version": "0.5",
   "namespaces": [
     {
       "name": "",
@@ -245,7 +245,9 @@
           ],
           "external": false,
           "throws": [],
-          "catches": []
+          "catches": [],
+          "reads": [],
+          "effects": []
         },
         {
           "kind": "model",
@@ -1358,7 +1360,8 @@
                   }
                 ]
               },
-              "optional": false
+              "optional": false,
+              "rest": false
             }
           ],
           "targets": [
@@ -1373,7 +1376,9 @@
               "relations": []
             }
           ],
-          "catches": []
+          "catches": [],
+          "reads": [],
+          "effects": []
         },
         {
           "kind": "decorator",
@@ -1397,7 +1402,8 @@
                 "kind": "any",
                 "of": "exception"
               },
-              "optional": false
+              "optional": false,
+              "rest": false
             },
             {
               "name": "view",
@@ -1405,7 +1411,8 @@
                 "kind": "any",
                 "of": "model"
               },
-              "optional": false
+              "optional": false,
+              "rest": false
             }
           ],
           "targets": [
@@ -1421,7 +1428,9 @@
               ],
               "mode": "recovers"
             }
-          ]
+          ],
+          "reads": [],
+          "effects": []
         },
         {
           "kind": "decorator",
@@ -1443,6 +1452,8 @@
           "external": false,
           "throws": [],
           "catches": [],
+          "reads": [],
+          "effects": [],
           "alias": {
             "target": "a.fallback",
             "args": [
@@ -1497,7 +1508,8 @@
                   }
                 ]
               },
-              "optional": false
+              "optional": false,
+              "rest": false
             },
             {
               "name": "stale",
@@ -1510,7 +1522,8 @@
                   }
                 ]
               },
-              "optional": true
+              "optional": true,
+              "rest": false
             }
           ],
           "targets": [
@@ -1518,7 +1531,9 @@
           ],
           "external": false,
           "throws": [],
-          "catches": []
+          "catches": [],
+          "reads": [],
+          "effects": []
         },
         {
           "kind": "decorator",
@@ -1551,7 +1566,8 @@
                   }
                 ]
               },
-              "optional": false
+              "optional": false,
+              "rest": false
             }
           ],
           "targets": [
@@ -1559,7 +1575,9 @@
           ],
           "external": false,
           "throws": [],
-          "catches": []
+          "catches": [],
+          "reads": [],
+          "effects": []
         },
         {
           "kind": "op",
@@ -1649,6 +1667,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [
             {
               "exceptions": [
@@ -1697,6 +1719,10 @@
           "returns": null,
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": null,
           "signature": {
@@ -1728,6 +1754,10 @@
           "returns": null,
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": null,
           "signature": {
@@ -1783,6 +1813,10 @@
             "a.add"
           ],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [
             {
               "exceptions": [
@@ -1829,6 +1863,10 @@
             "a.set"
           ],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": null,
           "signature": {
@@ -1885,6 +1923,10 @@
             "a.set"
           ],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [
             {
               "exceptions": [
@@ -2031,6 +2073,10 @@
           "returns": null,
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": null,
           "signature": {
@@ -2084,6 +2130,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": null,
           "signature": {
@@ -2143,6 +2193,10 @@
             "a.users",
             "a.token"
           ],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": null,
           "signature": {
@@ -2196,6 +2250,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": null,
           "signature": {
@@ -2229,6 +2287,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [
             {
               "exceptions": [
@@ -2417,6 +2479,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [
             {
               "exceptions": [
@@ -2666,6 +2732,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": {
             "statements": [
@@ -2818,6 +2888,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": {
             "statements": [
@@ -2888,6 +2962,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": {
             "statements": [
@@ -3139,6 +3217,10 @@
           },
           "effects": [],
           "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
           "throws": [],
           "body": {
             "statements": [
@@ -3614,6 +3696,1466 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "store",
+      "decls": [
+        {
+          "kind": "model",
+          "name": "store.Row",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 3,
+              "col": 3
+            },
+            "end": {
+              "line": 3,
+              "col": 34
+            }
+          },
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "decorators": [
+                {
+                  "decorator": "store.text",
+                  "args": [],
+                  "span": {
+                    "file": "c.hozo",
+                    "start": {
+                      "line": 3,
+                      "col": 15
+                    },
+                    "end": {
+                      "line": 3,
+                      "col": 20
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 3,
+                  "col": 15
+                },
+                "end": {
+                  "line": 3,
+                  "col": 32
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "state",
+          "name": "store.rows",
+          "decorators": [
+            {
+              "decorator": "store.table",
+              "args": [
+                {
+                  "param": "element",
+                  "value": {
+                    "kind": "ref",
+                    "target": "store.Row"
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 4,
+                  "col": 3
+                },
+                "end": {
+                  "line": 4,
+                  "col": 14
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 4,
+              "col": 3
+            },
+            "end": {
+              "line": 4,
+              "col": 37
+            }
+          },
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "store.Row"
+            }
+          },
+          "shape": "list",
+          "element": {
+            "kind": "ref",
+            "target": "store.Row"
+          }
+        },
+        {
+          "kind": "state",
+          "name": "store.logs",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 5,
+              "col": 3
+            },
+            "end": {
+              "line": 5,
+              "col": 25
+            }
+          },
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "store.Row"
+            }
+          },
+          "shape": "list",
+          "element": {
+            "kind": "ref",
+            "target": "store.Row"
+          }
+        },
+        {
+          "kind": "decorator",
+          "name": "store.table",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 7,
+              "col": 3
+            },
+            "end": {
+              "line": 7,
+              "col": 49
+            }
+          },
+          "params": [
+            {
+              "name": "element",
+              "type": {
+                "kind": "any",
+                "of": "model"
+              },
+              "optional": false,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "state"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "store.text",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 8,
+              "col": 3
+            },
+            "end": {
+              "line": 8,
+              "col": 28
+            }
+          },
+          "params": [],
+          "targets": [
+            "field"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "store.find",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 9,
+              "col": 3
+            },
+            "end": {
+              "line": 9,
+              "col": 71
+            }
+          },
+          "params": [
+            {
+              "name": "table",
+              "type": {
+                "kind": "any",
+                "of": "state"
+              },
+              "optional": false,
+              "rest": false
+            },
+            {
+              "name": "column",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                ]
+              },
+              "optional": false,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [
+            "$param:table"
+          ],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "store.list",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 10,
+              "col": 3
+            },
+            "end": {
+              "line": 10,
+              "col": 72
+            }
+          },
+          "params": [
+            {
+              "name": "table",
+              "type": {
+                "kind": "any",
+                "of": "state"
+              },
+              "optional": false,
+              "rest": false
+            },
+            {
+              "name": "column",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                ]
+              },
+              "optional": true,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [
+            "$param:table"
+          ],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "store.insert",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 11,
+              "col": 3
+            },
+            "end": {
+              "line": 11,
+              "col": 49
+            }
+          },
+          "params": [
+            {
+              "name": "table",
+              "type": {
+                "kind": "any",
+                "of": "state"
+              },
+              "optional": false,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "effect"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "store.effects",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 12,
+              "col": 3
+            },
+            "end": {
+              "line": 12,
+              "col": 68
+            }
+          },
+          "params": [
+            {
+              "name": "targets",
+              "type": {
+                "kind": "any",
+                "of": "effect"
+              },
+              "optional": false,
+              "rest": true
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": [
+            "$param:targets"
+          ]
+        },
+        {
+          "kind": "decorator",
+          "name": "store.audited",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 13,
+              "col": 3
+            },
+            "end": {
+              "line": 13,
+              "col": 97
+            }
+          },
+          "params": [
+            {
+              "name": "extra",
+              "type": {
+                "kind": "any",
+                "of": "state"
+              },
+              "optional": true,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "op"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [
+            "store.logs",
+            "$param:extra",
+            "store.rows"
+          ],
+          "effects": [
+            "store.addRow",
+            "store.touch",
+            "store.log"
+          ]
+        },
+        {
+          "kind": "decorator",
+          "name": "store.tags",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 14,
+              "col": 3
+            },
+            "end": {
+              "line": 14,
+              "col": 72
+            }
+          },
+          "params": [
+            {
+              "name": "first",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                ]
+              },
+              "optional": false,
+              "rest": false
+            },
+            {
+              "name": "more",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  },
+                  {
+                    "kind": "core",
+                    "name": "int"
+                  }
+                ]
+              },
+              "optional": false,
+              "rest": true
+            }
+          ],
+          "targets": [
+            "op",
+            "effect"
+          ],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "store.both",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 15,
+              "col": 3
+            },
+            "end": {
+              "line": 15,
+              "col": 44
+            }
+          },
+          "params": [],
+          "targets": [],
+          "external": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": [],
+          "alias": {
+            "target": "store.effects",
+            "args": [
+              {
+                "param": "targets",
+                "value": {
+                  "kind": "list",
+                  "items": [
+                    {
+                      "kind": "ref",
+                      "target": "store.addRow"
+                    },
+                    {
+                      "kind": "refs",
+                      "targets": [
+                        "store.addRow",
+                        "store.touch"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "effect",
+          "name": "store.addRow",
+          "decorators": [
+            {
+              "decorator": "store.insert",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "store.rows"
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 17,
+                  "col": 3
+                },
+                "end": {
+                  "line": 17,
+                  "col": 16
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 17,
+              "col": 3
+            },
+            "end": {
+              "line": 17,
+              "col": 44
+            }
+          },
+          "target": {
+            "kind": "builtin",
+            "state": "store.rows",
+            "operation": "post"
+          },
+          "writes": [
+            "store.rows"
+          ]
+        },
+        {
+          "kind": "effect",
+          "name": "store.log",
+          "decorators": [
+            {
+              "decorator": "store.insert",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "store.logs"
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 18,
+                  "col": 3
+                },
+                "end": {
+                  "line": 18,
+                  "col": 16
+                }
+              }
+            },
+            {
+              "decorator": "store.tags",
+              "args": [
+                {
+                  "param": "first",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "a"
+                    }
+                  }
+                },
+                {
+                  "param": "more",
+                  "value": {
+                    "kind": "list",
+                    "items": []
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 18,
+                  "col": 17
+                },
+                "end": {
+                  "line": 18,
+                  "col": 27
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 18,
+              "col": 3
+            },
+            "end": {
+              "line": 18,
+              "col": 52
+            }
+          },
+          "target": {
+            "kind": "builtin",
+            "state": "store.logs",
+            "operation": "post"
+          },
+          "writes": [
+            "store.logs"
+          ]
+        },
+        {
+          "kind": "effect",
+          "name": "store.touch",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 19,
+              "col": 3
+            },
+            "end": {
+              "line": 19,
+              "col": 28
+            }
+          },
+          "target": {
+            "kind": "builtin",
+            "state": "store.rows",
+            "operation": "put"
+          },
+          "writes": [
+            "store.rows"
+          ]
+        },
+        {
+          "kind": "union",
+          "name": "store.Writes",
+          "decorators": [],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 20,
+              "col": 3
+            },
+            "end": {
+              "line": 20,
+              "col": 34
+            }
+          },
+          "variant": "set",
+          "arms": [],
+          "members": [
+            {
+              "target": "store.addRow",
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 18
+                },
+                "end": {
+                  "line": 20,
+                  "col": 25
+                }
+              }
+            },
+            {
+              "target": "store.touch",
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 20,
+                  "col": 26
+                },
+                "end": {
+                  "line": 20,
+                  "col": 32
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "op",
+          "name": "store.findRow",
+          "description": {
+            "summary": "一行を引く。",
+            "body": "一行を引く。",
+            "params": [],
+            "throws": [],
+            "see": [
+              "store.list",
+              "store.effects"
+            ]
+          },
+          "decorators": [
+            {
+              "decorator": "store.find",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "store.rows"
+                  }
+                },
+                {
+                  "param": "column",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "id"
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 3
+                },
+                "end": {
+                  "line": 28,
+                  "col": 20
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 28,
+              "col": 3
+            },
+            "end": {
+              "line": 28,
+              "col": 50
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 28,
+                  "col": 32
+                },
+                "end": {
+                  "line": 28,
+                  "col": 42
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "store.Row"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [
+              "store.rows"
+            ],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "store.allRows",
+          "decorators": [
+            {
+              "decorator": "store.list",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "store.rows"
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 29,
+                  "col": 3
+                },
+                "end": {
+                  "line": 29,
+                  "col": 14
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 29,
+              "col": 3
+            },
+            "end": {
+              "line": 29,
+              "col": 35
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": {
+            "kind": "array",
+            "of": {
+              "kind": "ref",
+              "target": "store.Row"
+            }
+          },
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [
+              "store.rows"
+            ],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "store.place",
+          "decorators": [
+            {
+              "decorator": "store.effects",
+              "args": [
+                {
+                  "param": "targets",
+                  "value": {
+                    "kind": "list",
+                    "items": [
+                      {
+                        "kind": "ref",
+                        "target": "store.addRow"
+                      },
+                      {
+                        "kind": "refs",
+                        "targets": [
+                          "store.touch",
+                          "store.log"
+                        ]
+                      },
+                      {
+                        "kind": "refs",
+                        "targets": [
+                          "store.addRow",
+                          "store.touch"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 30,
+                  "col": 3
+                },
+                "end": {
+                  "line": 30,
+                  "col": 40
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 30,
+              "col": 3
+            },
+            "end": {
+              "line": 30,
+              "col": 66
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "store.Row"
+              },
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 30,
+                  "col": 50
+                },
+                "end": {
+                  "line": 30,
+                  "col": 56
+                }
+              }
+            },
+            {
+              "name": "l",
+              "type": {
+                "kind": "ref",
+                "target": "store.Row"
+              },
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 30,
+                  "col": 58
+                },
+                "end": {
+                  "line": 30,
+                  "col": 64
+                }
+              }
+            }
+          ],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": [
+              "store.addRow",
+              "store.touch",
+              "store.log"
+            ]
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "store.nothing",
+          "decorators": [
+            {
+              "decorator": "store.effects",
+              "args": [
+                {
+                  "param": "targets",
+                  "value": {
+                    "kind": "list",
+                    "items": []
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 31,
+                  "col": 3
+                },
+                "end": {
+                  "line": 31,
+                  "col": 11
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 31,
+              "col": 3
+            },
+            "end": {
+              "line": 31,
+              "col": 25
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "store.nothingEither",
+          "decorators": [
+            {
+              "decorator": "store.effects",
+              "args": [
+                {
+                  "param": "targets",
+                  "value": {
+                    "kind": "list",
+                    "items": []
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 32,
+                  "col": 3
+                },
+                "end": {
+                  "line": 32,
+                  "col": 13
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 32,
+              "col": 3
+            },
+            "end": {
+              "line": 32,
+              "col": 33
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": []
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "store.viaAlias",
+          "decorators": [
+            {
+              "decorator": "store.effects",
+              "via": "store.both",
+              "args": [
+                {
+                  "param": "targets",
+                  "value": {
+                    "kind": "list",
+                    "items": [
+                      {
+                        "kind": "ref",
+                        "target": "store.addRow"
+                      },
+                      {
+                        "kind": "refs",
+                        "targets": [
+                          "store.addRow",
+                          "store.touch"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 33,
+                  "col": 3
+                },
+                "end": {
+                  "line": 33,
+                  "col": 8
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 33,
+              "col": 3
+            },
+            "end": {
+              "line": 33,
+              "col": 29
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "r",
+              "type": {
+                "kind": "ref",
+                "target": "store.Row"
+              },
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 33,
+                  "col": 21
+                },
+                "end": {
+                  "line": 33,
+                  "col": 27
+                }
+              }
+            }
+          ],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [],
+            "effects": [
+              "store.addRow",
+              "store.touch"
+            ]
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "store.mixed",
+          "decorators": [
+            {
+              "decorator": "store.audited",
+              "args": [],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 34,
+                  "col": 3
+                },
+                "end": {
+                  "line": 34,
+                  "col": 11
+                }
+              }
+            },
+            {
+              "decorator": "store.find",
+              "args": [
+                {
+                  "param": "table",
+                  "value": {
+                    "kind": "ref",
+                    "target": "store.logs"
+                  }
+                },
+                {
+                  "param": "column",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "id"
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 34,
+                  "col": 12
+                },
+                "end": {
+                  "line": 34,
+                  "col": 29
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 34,
+              "col": 3
+            },
+            "end": {
+              "line": 34,
+              "col": 80
+            }
+          },
+          "exported": false,
+          "params": [
+            {
+              "name": "id",
+              "type": {
+                "kind": "core",
+                "name": "string"
+              },
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 34,
+                  "col": 39
+                },
+                "end": {
+                  "line": 34,
+                  "col": 49
+                }
+              }
+            }
+          ],
+          "returns": {
+            "kind": "optional",
+            "of": {
+              "kind": "ref",
+              "target": "store.Row"
+            }
+          },
+          "effects": [
+            "store.log"
+          ],
+          "reads": [
+            "store.rows"
+          ],
+          "carried": {
+            "reads": [
+              "store.logs",
+              "store.rows"
+            ],
+            "effects": [
+              "store.addRow",
+              "store.touch",
+              "store.log"
+            ]
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
+        },
+        {
+          "kind": "op",
+          "name": "store.audit",
+          "decorators": [
+            {
+              "decorator": "store.audited",
+              "args": [
+                {
+                  "param": "extra",
+                  "value": {
+                    "kind": "ref",
+                    "target": "store.logs"
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 35,
+                  "col": 3
+                },
+                "end": {
+                  "line": 35,
+                  "col": 17
+                }
+              }
+            },
+            {
+              "decorator": "store.tags",
+              "args": [
+                {
+                  "param": "first",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "x"
+                    }
+                  }
+                },
+                {
+                  "param": "more",
+                  "value": {
+                    "kind": "list",
+                    "items": [
+                      {
+                        "kind": "literal",
+                        "literal": {
+                          "kind": "int",
+                          "value": 1
+                        }
+                      },
+                      {
+                        "kind": "literal",
+                        "literal": {
+                          "kind": "string",
+                          "value": "y"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
+              "span": {
+                "file": "c.hozo",
+                "start": {
+                  "line": 35,
+                  "col": 18
+                },
+                "end": {
+                  "line": 35,
+                  "col": 36
+                }
+              }
+            }
+          ],
+          "span": {
+            "file": "c.hozo",
+            "start": {
+              "line": 35,
+              "col": 3
+            },
+            "end": {
+              "line": 35,
+              "col": 48
+            }
+          },
+          "exported": false,
+          "params": [],
+          "returns": null,
+          "effects": [],
+          "reads": [],
+          "carried": {
+            "reads": [
+              "store.logs",
+              "store.rows"
+            ],
+            "effects": [
+              "store.addRow",
+              "store.touch",
+              "store.log"
+            ]
+          },
+          "throws": [],
+          "body": null,
+          "signature": {
+            "exceptions": [],
+            "effects": [],
+            "relations": [],
+            "successEffects": [],
+            "reads": [],
+            "pure": false
+          }
         }
       ]
     }

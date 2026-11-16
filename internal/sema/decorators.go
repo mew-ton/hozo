@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"strings"
+
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/source"
 	"github.com/mew-ton/hozo/internal/syntax/ast"
@@ -43,6 +45,8 @@ func (k siteKind) target() (ir.DecoratorTarget, bool) {
 		return ir.TargetScalar, true
 	case siteModel:
 		return ir.TargetModel, true
+	case siteEffect:
+		return ir.TargetEffect, true
 	}
 	return "", false
 }
@@ -53,16 +57,28 @@ type appSite struct {
 	kind  siteKind
 	sc    *scope
 	out   *[]ir.Application
+	// op は付けた先が op のとき、その op。デコレータが運ぶ reads / effects（Op.carried）を、適用を下ろしながら集める。
+	op *opSite
 }
 
-func (a *analyzer) addSite(decos []*ast.Decorator, kind siteKind, sc *scope, out *[]ir.Application) {
+// opSite はデコレータを付けた先の op。
+type opSite struct {
+	sym  *symbol
+	decl *ast.OpDecl
+	op   *ir.Op
+}
+
+func (a *analyzer) addSite(decos []*ast.Decorator, kind siteKind, sc *scope, out *[]ir.Application) *appSite {
 	if len(decos) == 0 {
-		return
+		return nil
 	}
-	a.sites = append(a.sites, &appSite{decos: decos, kind: kind, sc: sc, out: out})
+	site := &appSite{decos: decos, kind: kind, sc: sc, out: out}
+	a.sites = append(a.sites, site)
+	return site
 }
 
 // lowerApplications はすべての適用を下ろす（docs/ir.md「デコレータの適用」）。並びは書かれた順。
+// op に付けた適用は、そのデコレータの reads / effects の節が運ぶものを Op.carried に足す。
 func (a *analyzer) lowerApplications() {
 	for _, site := range a.sites {
 		seen := map[string]source.Span{}
@@ -73,8 +89,110 @@ func (a *analyzer) lowerApplications() {
 			}
 			a.checkDEC13(app, d, seen)
 			*site.out = append(*site.out, app)
+			if site.op != nil {
+				a.carry(site.op, app, d)
+			}
 		}
 	}
+}
+
+// carrier は、reads か effects を運んだ適用の位置（THROWS-3 の条件 5 の位置に使う）。
+type carrier struct {
+	span source.Span
+}
+
+// carry は docs/check.md「デコレータが運ぶ reads と effects」: 適用 app のデコレータの reads / effects の節の要素を、
+// `$param:` を適用の引数の値で置き換えて（残りの引数なら渡した値を書いた順にすべて、省いた省略可能な引数なら何も足さない）、
+// Op.carried に足す。重複は最初の出現に寄せる。Op.reads / Op.effects には足さない（docs/ir.md「正規化」）。
+//
+// 運ばれたものも、op が書いたものと同じに確かめる（どれも Signature を要しない）。位置はその適用。
+//   - DEC-17: 節を持つデコレータが、配線の op（本体を持つ op）に付いている。
+//   - READS-1: 葉の op に運ばれた状態が、別の名前空間のもの。
+//   - STATE-2: 葉の op に運ばれた効果が、別の名前空間のもの。
+func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
+	sym := a.syms[app.Decorator]
+	if sym == nil {
+		return
+	}
+	dec, ok := a.lower(sym).(*ir.Decorator)
+	if !ok || (len(dec.Reads) == 0 && len(dec.Effects) == 0) {
+		return
+	}
+	op, name := site.op, site.sym.fqn
+	leaf := site.decl.Body == nil
+	if !leaf {
+		a.errorf("DEC-17", d.Span, "デコレータ %s は reads / effects の節を持つので、配線の op %s には付けられない（配線が読む状態と効果は、本体の呼び出しから決まる。付けられるのは葉の op だけ）", dec.Name, name)
+	}
+	carried := false
+	for _, raw := range dec.Reads {
+		for _, state := range carriedTargets(raw, app.Args) {
+			carried = true
+			if contains(op.Carried.Reads, state) {
+				continue
+			}
+			op.Carried.Reads = append(op.Carried.Reads, state)
+			if st := a.syms[state]; leaf && st != nil && st.ns != site.sym.ns {
+				a.errorf("READS-1", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の状態 %s を reads として運んでいる（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", name, dec.Name, state, nsName(site.sym.ns))
+			}
+		}
+	}
+	for _, raw := range dec.Effects {
+		for _, effect := range carriedTargets(raw, app.Args) {
+			carried = true
+			if contains(op.Carried.Effects, effect) {
+				continue
+			}
+			op.Carried.Effects = append(op.Carried.Effects, effect)
+			if ef := a.syms[effect]; leaf && ef != nil && ef.ns != site.sym.ns {
+				a.errorf("STATE-2", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の効果 %s を運んでいる（%s は名前空間 %s の持ち主ではない）", name, dec.Name, effect, name, nsName(ef.ns))
+			}
+		}
+	}
+	if carried {
+		a.carriers[op] = append(a.carriers[op], carrier{span: d.Span})
+	}
+}
+
+// carriedTargets はデコレータの reads / effects の節の要素一つが、適用の引数 args のもとで指す宣言の FQN の列。
+// `$param:名前` でなければその FQN 一つ。`$param:名前` なら、その引数の値: ref は一つ、refs と list（残りの引数）は
+// 書かれた順にすべて。渡されていない引数（省いた省略可能な引数）は空。
+func carriedTargets(element string, args []ir.Arg) []string {
+	param, isParam := strings.CutPrefix(element, "$param:")
+	if !isParam {
+		return []string{element}
+	}
+	for _, arg := range args {
+		if arg.Param == param {
+			return argTargets(arg.Value)
+		}
+	}
+	return nil
+}
+
+// argTargets は引数の値が指す宣言の FQN の列（書かれた順）。op の引数（"$param:"）、リテラル、バリアントは含めない。
+func argTargets(v ir.ArgValue) []string {
+	switch x := v.(type) {
+	case ir.RefValue:
+		if strings.HasPrefix(x.Target, "$param:") {
+			return nil
+		}
+		return []string{x.Target}
+	case ir.RefsValue:
+		var out []string
+		for _, t := range x.Targets {
+			if !strings.HasPrefix(t, "$param:") {
+				out = append(out, t)
+			}
+		}
+		return out
+	case ir.ListValue:
+		var out []string
+		for _, item := range x.Items {
+			out = append(out, argTargets(item)...)
+		}
+		return out
+	}
+	return nil
 }
 
 // checkDEC13 は DEC-13（docs/check.md「デコレータ」）: 同じデコレータが同じ宣言に二度付いている（引数が違っても）。
@@ -130,7 +248,7 @@ func (a *analyzer) aliasTarget(dec *ir.Decorator) (*ir.Decorator, bool) {
 }
 
 // checkDEC1 は DEC-1（docs/check.md「デコレータ」）: 付けた先の種類が targets にない。
-// union / effect / classify / decorator に付けたら常に DEC-1（namespace / bind は文法で閉じる）。
+// union / classify / decorator に付けたら常に DEC-1（namespace / bind は文法で閉じる）。
 func (a *analyzer) checkDEC1(dec *ir.Decorator, kind siteKind, d *ast.Decorator) {
 	t, ok := kind.target()
 	if ok {
@@ -154,15 +272,33 @@ func targetsString(ts []ir.DecoratorTarget) string {
 // --- 引数（docs/types.md「デコレータの引数」） ---
 
 // lowerArgs は適用の引数を Param に対応付ける。数と名前の違反は code（適用なら DEC-11、別名なら DEC-12）。
+//
+// 宣言が残りの引数（Param.rest）を持てば、ほかの Param の数を超えて位置で渡した値は、書いた順に、残りの引数の値になる。
+// 残りの引数は、いつも一つの Arg で、value は list（0 個なら items が空。docs/ir.md「デコレータの適用」）。値は一つずつ、
+// 残りの引数の ParamType で受ける。Arg の並びは書かれた順で、残りの引数の Arg は最初の値の位置（値がなければ末尾）。
 func (a *analyzer) lowerArgs(args []*ast.Arg, dec *ir.Decorator, sc *scope, span source.Span, code string) []ir.Arg {
 	var out []ir.Arg
 	given := map[string]bool{}
+	rest, hasRest := restParam(dec)
+	restAt := -1
+	var restItems []ir.ArgValue
 	for i, arg := range args {
 		if arg == nil || arg.Value == nil {
 			continue
 		}
 		p, ok := a.paramFor(arg, i, dec, code)
 		if !ok {
+			continue
+		}
+		if p.Rest {
+			if restAt < 0 {
+				restAt = len(out)
+				out = append(out, ir.Arg{Param: p.Name})
+			}
+			// 値一つの型で受ける（残りの引数そのものではない）
+			if v, ok := a.lowerArgValue(arg.Value, ir.Param{Name: p.Name, Type: p.Type}, sc); ok {
+				restItems = append(restItems, v)
+			}
 			continue
 		}
 		if given[p.Name] {
@@ -175,26 +311,54 @@ func (a *analyzer) lowerArgs(args []*ast.Arg, dec *ir.Decorator, sc *scope, span
 		}
 	}
 	for _, p := range dec.Params {
-		if !p.Optional && !given[p.Name] {
+		if !p.Optional && !p.Rest && !given[p.Name] {
 			a.errorf(code, span, "デコレータ %s の必須の引数 %s が渡されていない", dec.Name, p.Name)
 		}
+	}
+	if hasRest {
+		if restAt < 0 {
+			restAt = len(out)
+			out = append(out, ir.Arg{Param: rest.Name})
+		}
+		out[restAt].Value = ir.ListValue{Items: restItems}
 	}
 	return out
 }
 
-// paramFor は位置か名前で Param を引く。
+// restParam は宣言の残りの引数（Param.rest）。Params の最後の一つだけがなりうる。
+func restParam(dec *ir.Decorator) (ir.Param, bool) {
+	if n := len(dec.Params); n > 0 && dec.Params[n-1].Rest {
+		return dec.Params[n-1], true
+	}
+	return ir.Param{}, false
+}
+
+// paramFor は位置か名前で Param を引く。位置で渡した引数が、残りの引数のほかの Param の数を超えていれば、残りの引数。
+// 残りの引数には名前では渡せない（DEC-11。docs/types.md「デコレータの引数」）。
 func (a *analyzer) paramFor(arg *ast.Arg, index int, dec *ir.Decorator, code string) (ir.Param, bool) {
+	rest, hasRest := restParam(dec)
+	fixed := dec.Params
+	if hasRest {
+		fixed = fixed[:len(fixed)-1]
+	}
 	if arg.Name != nil {
-		for _, p := range dec.Params {
+		for _, p := range fixed {
 			if p.Name == arg.Name.Name {
 				return p, true
 			}
 		}
+		if hasRest && rest.Name == arg.Name.Name {
+			a.errorf(code, arg.Name.Span, "デコレータ %s の残りの引数 %s には、名前では渡せない（ほかの引数の後ろに、位置で並べる）", dec.Name, rest.Name)
+			return ir.Param{}, false
+		}
 		a.errorf(code, arg.Name.Span, "デコレータ %s に引数 %s はない", dec.Name, arg.Name.Name)
 		return ir.Param{}, false
 	}
-	if index < len(dec.Params) {
-		return dec.Params[index], true
+	if index < len(fixed) {
+		return fixed[index], true
+	}
+	if hasRest {
+		return rest, true
 	}
 	a.errorf(code, arg.Span, "デコレータ %s の引数は %d 個で、位置で渡した引数が多い", dec.Name, len(dec.Params))
 	return ir.Param{}, false
@@ -495,6 +659,10 @@ func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope
 			dec.Throws = append(dec.Throws, a.lowerThrows(c, csc))
 		case *ast.CatchesClause:
 			dec.Catches = append(dec.Catches, a.lowerCatches(c, csc))
+		case *ast.ReadsClause:
+			dec.Reads = append(dec.Reads, a.lowerDecoReads(c, csc)...)
+		case *ast.EffectsClause:
+			dec.Effects = append(dec.Effects, a.lowerDecoEffects(c, csc)...)
 		}
 	}
 	a.checkREL1(s.fqn, dec.Throws, d.Span)
@@ -510,18 +678,59 @@ func setOf(m map[string]*ast.Param) map[string]bool {
 	return out
 }
 
+// lowerDecoReads はデコレータの宣言の reads の一節（docs/ir.md「decorator」の reads）。要素は state（基底の状態。
+// どの名前空間のものでも解決する）か、any state の引数（残りの引数でもよい。`$param:名前`）。どちらでもなければ RES-4。
+func (a *analyzer) lowerDecoReads(c *ast.ReadsClause, sc *scope) []string {
+	var out []string
+	for _, n := range c.States {
+		r, ok := a.resolve(n, sc, acState|acDecoParam)
+		if !ok {
+			continue
+		}
+		if r.kind == rDecoParam {
+			if a.checkAnyParam(sc, r.name, ir.AnyState, n.Span) {
+				out = append(out, "$param:"+r.name)
+			}
+			continue
+		}
+		out = append(out, r.sym.fqn)
+	}
+	return out
+}
+
+// lowerDecoEffects はデコレータの宣言の effects の一節（docs/ir.md「decorator」の effects）。要素は effect、効果の union
+// （展開）、any effect の引数（残りの引数でもよい。`$param:名前`）。
+func (a *analyzer) lowerDecoEffects(c *ast.EffectsClause, sc *scope) []string {
+	var out []string
+	for _, n := range c.Effects {
+		r, ok := a.resolve(n, sc, acEffectsPos|acDecoParam)
+		if !ok {
+			continue
+		}
+		if r.kind == rDecoParam {
+			if a.checkAnyParam(sc, r.name, ir.AnyEffect, n.Span) {
+				out = append(out, "$param:"+r.name)
+			}
+			continue
+		}
+		out = append(out, a.expandSet(r, kindEffect, n.Span)...)
+	}
+	return out
+}
+
 // lowerParam は Param。`int?` は Types を int にして Optional を true にする。`any state?` も Optional。
+// 残りの引数（`...名前: 型`）は Rest で、Optional にはならない（構文解析が閉じている）。
 func (a *analyzer) lowerParam(p *ast.Param, sc *scope) ir.Param {
-	param := ir.Param{Name: p.Name.Name}
+	param := ir.Param{Name: p.Name.Name, Rest: p.Rest}
 	if p.Type.Any != nil {
 		param.Type = a.lowerAnyType(p.Type.Any, sc)
-		param.Optional = p.Type.Optional
+		param.Optional = p.Type.Optional && !p.Rest
 		return param
 	}
 	tp := ir.TypeParam{}
 	for _, t := range p.Type.Types {
 		if o, ok := t.(*ast.OptionalType); ok {
-			param.Optional = true
+			param.Optional = !p.Rest
 			t = o.Elem
 		}
 		if lt, ok := a.lowerParamType(t, sc); ok {
@@ -592,7 +801,8 @@ func (a *analyzer) lowerCatches(c *ast.CatchesClause, sc *scope) ir.CatchesClaus
 	return cc
 }
 
-// checkDEC2 は DEC-2（docs/check.md「デコレータ」）: targets に op を含まない宣言が throws か catches を持つ。
+// checkDEC2 は DEC-2（docs/check.md「デコレータ」）: targets に op を含まない宣言が throws、catches、reads、effects の
+// どれかの節を持つ。
 func (a *analyzer) checkDEC2(s *symbol, dec *ir.Decorator, d *ast.DecoratorDecl) {
 	if len(d.Clauses) == 0 {
 		return
@@ -602,7 +812,7 @@ func (a *analyzer) checkDEC2(s *symbol, dec *ir.Decorator, d *ast.DecoratorDecl)
 			return
 		}
 	}
-	a.errorf("DEC-2", d.Clauses[0].NodeSpan(), "デコレータ %s は op に付けないので throws / catches を宣言できない（for: %s）", s.fqn, targetsString(dec.Targets))
+	a.errorf("DEC-2", d.Clauses[0].NodeSpan(), "デコレータ %s は op に付けないので throws / catches / reads / effects を宣言できない（for: %s）", s.fqn, targetsString(dec.Targets))
 }
 
 // lowerAlias は名前付きデコレータ `decorator X = Y(args);`。DEC-12: Y が別名、または args が Y の Param に合わない。

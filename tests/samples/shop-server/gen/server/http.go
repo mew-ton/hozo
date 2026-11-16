@@ -31,7 +31,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.login
 	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
-		in := NewLoginInput()
+		var in LoginInput
 		req := httpRequest{r: r}
 		req.bodyObj(&in.Body)
 		if !req.ok(w) {
@@ -50,7 +50,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.logout
 	mux.HandleFunc("POST /logout", func(w http.ResponseWriter, r *http.Request) {
-		in := NewAuthInput()
+		var in AuthInput
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
 		if !req.ok(w) {
@@ -68,7 +68,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.getMe
 	mux.HandleFunc("GET /me", func(w http.ResponseWriter, r *http.Request) {
-		in := NewAuthInput()
+		var in AuthInput
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
 		if !req.ok(w) {
@@ -107,7 +107,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.getLatestOrder
 	mux.HandleFunc("GET /orders/latest", func(w http.ResponseWriter, r *http.Request) {
-		in := NewAuthInput()
+		var in AuthInput
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
 		if !req.ok(w) {
@@ -126,7 +126,7 @@ func NewHandler(ops Ops) http.Handler {
 
 	// server.placeOrder
 	mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
-		in := NewPlaceOrderInput()
+		var in PlaceOrderInput
 		req := httpRequest{r: r}
 		req.header("Authorization", &in.Token)
 		req.body("lines", &in.Lines, httpRequired)
@@ -240,7 +240,7 @@ func (q *httpRequest) bodyObj(dst any) {
 	}
 }
 
-// missing は、項目がなかったときの扱い。読む先は、初めの値のまま。
+// missing は、項目がなかったときの扱い。読む先には、何も書かない。
 // @http.required（httpRequired）の項目なら、読めない要求。型は見ない。
 func (q *httpRequest) missing(place, name string, opts []httpOption) {
 	if slices.Contains(opts, httpRequired) {

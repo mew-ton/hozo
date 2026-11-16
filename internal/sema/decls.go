@@ -1022,7 +1022,7 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 	for _, c := range d.Clauses {
 		switch c := c.(type) {
 		case *ast.EffectsClause:
-			op.Effects = append(op.Effects, a.lowerEffectRefs(c.Effects, sc)...)
+			op.Effects = append(op.Effects, a.lowerOpEffects(s, d, c, sc)...)
 		case *ast.ReadsClause:
 			op.Reads = a.lowerReads(s, d, c, op.Reads, sc)
 		case *ast.ThrowsClause:
@@ -1031,11 +1031,33 @@ func (a *analyzer) lowerOp(s *symbol, d *ast.OpDecl, sc *scope) ir.Decl {
 	}
 	a.checkREL1(s.fqn, op.Throws, d.Span)
 	a.checkEFF3(s, d, op.Effects)
-	a.addSite(d.Decorators, siteOp, &scope{ns: s.ns, opParams: &opParamScope{decl: s.fqn, params: params}}, &op.DeclBase.Decorators)
+	if site := a.addSite(d.Decorators, siteOp, &scope{ns: s.ns, opParams: &opParamScope{decl: s.fqn, params: params}}, &op.DeclBase.Decorators); site != nil {
+		site.op = &opSite{sym: s, decl: d, op: op}
+	}
 	if d.Body != nil {
 		a.wirings = append(a.wirings, &wiringJob{sym: s, decl: d, op: op})
 	}
 	return op
+}
+
+// lowerOpEffects は op の effects の一節（docs/ir.md「op」の effects）。要素は effect か、効果の union（展開）。
+// STATE-2（docs/check.md「状態と効果」）のうち、葉の op が自分で書いた効果の分: 効果の名前空間が op の名前空間と違う。
+// 位置はその効果の名前。デコレータが運ぶ効果の分は carry、halts の効果の分は internal/check が出す。
+func (a *analyzer) lowerOpEffects(s *symbol, d *ast.OpDecl, c *ast.EffectsClause, sc *scope) []string {
+	var out []string
+	for _, n := range c.Effects {
+		r, ok := a.resolve(n, sc, acEffectsPos)
+		if !ok {
+			continue
+		}
+		for _, e := range a.expandSet(r, kindEffect, n.Span) {
+			out = append(out, e)
+			if ef := a.syms[e]; d.Body == nil && ef != nil && ef.ns != s.ns {
+				a.errorf("STATE-2", n.Span, "%s は名前空間 %s の持ち主ではないので、効果 %s を effects に宣言できない", s.fqn, nsName(ef.ns), e)
+			}
+		}
+	}
+	return out
 }
 
 // lowerReads は reads の一節を、ここまでの並び reads に足す（docs/ir.md「正規化」: 重複は最初の出現に寄せる）。
@@ -1066,7 +1088,7 @@ type neverOp struct {
 
 // checkNeverOps は THROWS-3（docs/check.md「throws」）: never を返す op が、docs/check.md「never を返す op」の条件 1〜6 の
 // どれかを満たさない。満たさない条件ごとに一つ。位置は、1 は op の名前、2 と 3 は throws（なければ op の名前）、
-// 4 は最初の引数、5 はその節、6 はそのデコレータ。
+// 4 は最初の引数、5 はその節（デコレータが運ぶものなら、そのデコレータ）、6 はそのデコレータ。
 func (a *analyzer) checkNeverOps() {
 	for _, n := range a.neverOps {
 		a.checkTHROWS3(n)
@@ -1117,15 +1139,20 @@ func (a *analyzer) checkTHROWS3(n *neverOp) {
 	if len(d.Params) > 0 && d.Params[0] != nil {
 		a.errorf("THROWS-3", d.Params[0].Span, "never を返す op %s は引数を持てない", name)
 	}
-	// 5. effects も reads も持たない
+	// 5. effects も reads も持たない（デコレータが運ぶものを含めて）
+	written := false
 	for _, c := range d.Clauses {
 		switch c.(type) {
 		case *ast.EffectsClause, *ast.ReadsClause:
 			a.errorf("THROWS-3", c.NodeSpan(), "never を返す op %s は effects も reads も持てない", name)
+			written = true
 		default:
 			continue
 		}
 		break
+	}
+	if carriers := a.carriers[op]; !written && len(carriers) > 0 {
+		a.errorf("THROWS-3", carriers[0].span, "never を返す op %s は effects も reads も持てない（デコレータが運ぶものを含めて）", name)
 	}
 	// 6. catches を持つデコレータが付いていない
 	for _, app := range op.Decorators {
@@ -1156,21 +1183,11 @@ func paramNames(params []*ast.OpParam) map[string]bool {
 	return m
 }
 
-// lowerEffectRefs は effects の要素: effect か、効果の union（展開）。
-func (a *analyzer) lowerEffectRefs(names []ast.QualifiedName, sc *scope) []string {
-	var out []string
-	for _, n := range names {
-		if r, ok := a.resolve(n, sc, acEffectsPos); ok {
-			out = append(out, a.expandSet(r, kindEffect, n.Span)...)
-		}
-	}
-	return out
-}
-
-// checkEFF3 は EFF-3（docs/check.md「状態と効果」）: 葉の op の Op.effects（ユニオンを展開した後）が二つ以上。
+// checkEFF3 は EFF-3（docs/check.md「状態と効果」）: 葉の op が自分で書いた Op.effects（ユニオンを展開した後）が二つ以上。
 // 葉かどうか（本体がない）と展開後の効果の列だけで決まり、Signature を要しないので、REL-1 / REL-5 と同じく
-// internal/sema が出す。同じ効果を二度書いたものは一つと数える。配線の op（本体を持つ）は伝播した効果を
-// いくつ書いてもよい（EFF-2 が照合する）。位置は op の宣言。
+// internal/sema が出す。同じ効果を二度書いたものは一つと数える。デコレータが運ぶ効果（Op.carried.effects）は数えない
+// （順序はデコレータの引数に書いてある）。配線の op（本体を持つ）は伝播した効果をいくつ書いてもよい（EFF-2 が照合する）。
+// 位置は op の宣言。
 func (a *analyzer) checkEFF3(s *symbol, d *ast.OpDecl, effects []string) {
 	if d.Body != nil {
 		return
@@ -1184,7 +1201,7 @@ func (a *analyzer) checkEFF3(s *symbol, d *ast.OpDecl, effects []string) {
 	if len(distinct) < 2 {
 		return
 	}
-	a.errorf("EFF-3", d.Span, "葉の op %s が効果を二つ以上持っている（%s）。葉の op が直に持てる効果は一つまで。効果ごとの葉の op を配線でつなぐか、まとめて変える状態を対象にした分類の遷移一つにする", s.fqn, join(distinct))
+	a.errorf("EFF-3", d.Span, "葉の op %s が効果を二つ以上書いている（%s）。葉の op が自分で書ける効果は一つまで。効果ごとの葉の op を配線でつなぐか、まとめて変える状態を対象にした分類の遷移一つにするか、効果を並べて一体に行うと言うデコレータを付ける", s.fqn, join(distinct))
 }
 
 // lowerThrows は throws の一節（docs/ir.md「decorator」の ThrowsClause）。REL-5 もここで確かめる。

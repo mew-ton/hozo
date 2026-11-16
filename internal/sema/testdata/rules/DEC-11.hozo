@@ -18,4 +18,36 @@ namespace a {
   op aliasArgs(): void;
   @alias
   op ok3(): void;
+  // 残りの引数（docs/types.md「デコレータの引数」）: ほかの Param の数を超えて位置で渡した値は、書いた順に残りの引数に入る。
+  // 0 個でもよい。名前では渡せない
+  state s: list<string>;
+  effect e1 on s.post;
+  effect e2 on s.put;
+  decorator all(...targets: any effect) for op effects targets;
+  decorator some(first: int, second: string?, ...more: string);
+  @all
+  op rest0(): void;
+  @all()
+  op rest0b(): void;
+  @all(e1)
+  op rest1(): void;
+  @all(e1, e2)
+  op rest2(): void;
+  @all(targets: e1)                    // ERROR: DEC-11
+  op restNamed(): void;
+  @some(1, "s", "a", "b", "c")
+  op restAfterFixed(): void;
+  @some(1)
+  op restAfterFixed0(): void;
+  @some                                // ERROR: DEC-11
+  op restMissingFixed(): void;
+  @some(1, "s", more: "a")             // ERROR: DEC-11
+  op restNamed2(): void;
+  @some(1, "s", "a", second: "t")      // ERROR: DEC-11
+  op restTwice(): void;
+  @some(second: "t", first: 1)
+  op restNone(): void;
+  decorator fixed = some(1, "s", "a", "b");
+  @fixed
+  op restAlias(): void;
 }

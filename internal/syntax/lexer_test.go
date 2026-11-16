@@ -90,6 +90,13 @@ func TestLexTokens(t *testing.T) {
 		{"thin arrow", "A -> B A->B", []token.Kind{token.Ident, token.ThinArrow, token.Ident, token.Ident, token.ThinArrow, token.Ident, token.EOF}},
 		{"thin arrow and negative int", "-> -1 ->", []token.Kind{token.ThinArrow, token.Int, token.ThinArrow, token.EOF}},
 		{"at ident", "@db @http.status", []token.Kind{token.At, token.Ident, token.At, token.QualifiedName, token.EOF}},
+		// デコレータの名前の予約語（docs/grammar.md「識別子」の DecoratorRef）: 修飾していれば一つの QualifiedName、
+		// していなければ予約語の字句そのもの
+		{"at keyword", "@db.list @db.effects @effects @int", []token.Kind{token.At, token.QualifiedName, token.At, token.QualifiedName, token.At, token.Effects, token.At, token.IntType, token.EOF}},
+		// "..." は残りの引数の記号（docs/grammar.md「記号」）。二つの "." は一つずつ
+		{"ellipsis", "(...targets: any effect) ...x .. . a.b", []token.Kind{token.LParen, token.Ellipsis, token.Ident, token.Colon, token.Any, token.Effect, token.RParen,
+			token.Ellipsis, token.Ident, token.Dot, token.Dot, token.Dot, token.QualifiedName, token.EOF}},
+		{"four dots", "....", []token.Kind{token.Ellipsis, token.Dot, token.EOF}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

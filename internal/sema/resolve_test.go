@@ -120,6 +120,8 @@ namespace a {
 }
 
 // TestResolveStep1_4 は 1.4: セグメントが二つ以上なら先頭はルートの名前空間。一つだけなら名前空間は候補にならない（@db）。
+// 名前空間の名前と、グローバルの宣言の名前は別の空間（docs/resolve.md「名前空間の併合と重複」）: グローバルのデコレータ db と、
+// 語彙の名前空間 db の db.ref は共存する。
 func TestResolveStep1_4(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace server {
@@ -127,7 +129,8 @@ namespace server {
   @db
   state users: list<User>;
   model Order { @db.ref(User) userId: string; }
-}`}, true)
+}
+decorator db for state;`}, true)
 	noErrors(t, res, fs)
 	st := res.Program.Lookup("server.users").(*ir.State)
 	if st.Decorators[0].Decorator != "db" {
@@ -263,7 +266,7 @@ func TestDuplicatePosition(t *testing.T) {
 	res, fs := analyzeProject(t, project{
 		"b.hozo":                   "namespace a { model X { id: string; } }\nnamespace http { exception NetworkError; }\n",
 		"a.hozo":                   "namespace a { model X { id: string; } }\n",
-		"hozo:plugin/p/vocab.hozo": "decorator db for state;\n",
+		"hozo:plugin/p/vocab.hozo": "decorator localStorage for state;\n",
 	}, true)
 	got := map[string]string{}
 	for _, d := range res.Diags {
@@ -275,7 +278,7 @@ func TestDuplicatePosition(t *testing.T) {
 	if got["RES-6"] == "" {
 		t.Fatalf("RES-6 がない: %v", codes(res))
 	}
-	if got["NS-3"] != "hozo:vocab/db.hozo:2" { // 語彙どうしは順で後の方（hozo:vocab は hozo:plugin の後）
+	if got["NS-3"] != "hozo:vocab/localstorage.hozo:2" { // 語彙どうしは順で後の方（hozo:vocab は hozo:plugin の後）
 		t.Errorf("NS-3 の位置 = %s", got["NS-3"])
 	}
 	// b.hozo の二つ: a.X（a.hozo が先なので b.hozo 側）と http.NetworkError（ユーザーの側）

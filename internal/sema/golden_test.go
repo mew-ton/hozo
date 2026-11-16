@@ -141,6 +141,48 @@ namespace a {
 `,
 }
 
+// normalizeSource に足す、版 0.5 の行（docs/ir.md「正規化」の「残りの引数に渡した値」「デコレータの宣言の reads / effects」
+// 「op に付いたデコレータの reads / effects の節」）と、対象 effect、予約語のデコレータ名。
+func init() {
+	normalizeSource["c.hozo"] = `
+namespace store {
+  model Row { @text id: string; }
+  @table(Row) state rows: list<Row>;
+  state logs: list<Row>;
+
+  decorator table(element: any model) for state;
+  decorator text for field;
+  decorator find(table: any state, column: string) for op reads table;
+  decorator list(table: any state, column: string?) for op reads table;
+  decorator insert(table: any state) for effect;
+  decorator effects(...targets: any effect) for op effects targets;
+  decorator audited(extra: any state?) for op reads logs, extra reads rows effects Writes | log;
+  decorator tags(first: string, ...more: string | int) for op | effect;
+  decorator both = effects(addRow, Writes);
+
+  @insert(rows) effect addRow on rows.post;
+  @insert(logs) @tags("a") effect log on logs.post;
+  effect touch on rows.put;
+  union Writes { addRow; touch; }
+
+  /**
+   * 一行を引く。
+   *
+   * @see list
+   * @see store.effects
+   */
+  @find(rows, "id") op findRow(id: string): Row?;
+  @list(rows) op allRows(): Row[];
+  @effects(addRow, touch | log, Writes) op place(r: Row, l: Row);
+  @effects op nothing();
+  @effects() op nothingEither();
+  @both op viaAlias(r: Row);
+  @audited @find(logs, "id") op mixed(id: string): Row? reads rows effects log;
+  @audited(logs) @tags("x", 1, "y") op audit();
+}
+`
+}
+
 // TestNormalizeGolden は正規化の結果を testdata/normalize.golden.json と比べる。更新は go test ./internal/sema -update。
 func TestNormalizeGolden(t *testing.T) {
 	res, fs := analyzeProject(t, normalizeSource, false)

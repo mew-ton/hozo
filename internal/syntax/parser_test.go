@@ -933,8 +933,8 @@ func TestDecoratorDeclReject(t *testing.T) {
 		{"array rest type", "decorator a(...xs: string[]);", "渡す値一つの型を書く"},
 		{"rest without name", "decorator a(...: string);", "「識別子」が必要"},
 		{"rest with keyword name", "decorator a(...to: string);", "to は予約語で、識別子には使えない"},
-		{"two dots", "decorator a(..xs: string);", "「)」が必要だが「.」がある"},
-		{"rest in op params", "op f(...xs: string);", "「)」が必要だが「...」がある"},
+		{"two dots", "decorator a(..xs: string);", "「識別子」が必要だが「.」がある"},
+		{"rest in op params", "op f(...xs: string);", "「識別子」が必要だが「...」がある"},
 		{"alias target keyword in the middle", "decorator a = b.op.c();", "op は予約語で、名前には使えない"},
 	}
 	for _, tt := range tests {

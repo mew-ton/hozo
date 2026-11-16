@@ -302,14 +302,40 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		// クエリ: @http.query page。名前を省いたので、フィールドの名前で読む。ほかの名前（p）は読まず、既定値の 1 のまま
 		s.get(t, "/orders?page=2", token).want(t, 200, `[`+order("3", "plum")+`]`)
 		s.get(t, "/orders?p=2", token).want(t, 200, `[`+order("1", "apple")+`,`+order("2", "pear")+`]`)
-		// 本文の項目: @http.body lines。本文はオブジェクトで、フィールドの名前がキー。ほかのキー（items）は読まず、
-		// lines は初めの値（空）のまま
+		// 本文の項目: @http.body lines。本文はオブジェクトで、フィールドの名前がキー。ほかのキー（items）は読まないので、
+		// lines はないことになる（@http.required が付いているので 400。サブテスト required）
 		s.post(t, "/orders", token, `{"items":[{"item":"fig","quantity":1}]}`).
-			want(t, 200, `{"id":"order-4","userId":"u1","lines":[],"placedAt":"2026-01-02T03:04:05Z"}`)
+			want(t, 400, `{"error":"http.BadRequest","value":{"message":"body lines: missing","violations":[]}}`)
+		s.post(t, "/orders", token, `{"lines":[{"item":"fig","quantity":1}]}`).
+			want(t, 200, order("4", "fig"))
 		// 本文の全体: @http.bodyObj body。本文そのものが model（server.Credentials）で、フィールドの名前（body）のキーで包まない
 		s.post(t, "/login", "", `{"body":{"email":"alice@example.com","password":"password123"}}`).
 			want(t, 400, `{"error":"http.BadRequest","value":{"message":"invalid input","violations":[`+
 				`{"path":"body.email","constraint":"format"},{"path":"body.password","constraint":"length"}]}}`)
+	})
+
+	// 項目がないことが誤りかどうかは、@http.required が付いているかどうかだけで決まる（フィールドの型では決まらない）
+	t.Run("required", func(t *testing.T) {
+		t.Parallel()
+		s := start(t)
+		token := s.login(t)
+		// @http.required @http.body lines: キー lines がなければ、読めない要求の 400 http.BadRequest。op は呼ばれない
+		missing := `{"error":"http.BadRequest","value":{"message":"body lines: missing","violations":[]}}`
+		s.post(t, "/orders", token, `{}`).want(t, 400, missing)
+		s.post(t, "/orders", token, `{"items":[{"item":"apple","quantity":1}]}`).want(t, 400, missing)
+		// 読めない要求は op より先なので、トークンがなくても 401 より先に 400 になる
+		s.post(t, "/orders", "", `{}`).want(t, 400, missing)
+		s.count(t, 0, 0)
+		// キーがあれば、空の配列でも、ある: op が呼ばれる
+		s.post(t, "/orders", token, `{"lines":[]}`).
+			want(t, 200, `{"id":"order-1","userId":"u1","lines":[],"placedAt":"2026-01-02T03:04:05Z"}`)
+		s.count(t, 1, 1)
+		// @http.required のない項目（ヘッダ Authorization、クエリ page）は、なくても読めない要求にならない: op が呼ばれ、
+		// トークンがないことは op が決める（401）。page のない一覧も、op まで届く
+		s.get(t, "/me", "").want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.get(t, "/orders", "").want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.get(t, "/orders", token).
+			want(t, 200, `[{"id":"order-1","userId":"u1","lines":[],"placedAt":"2026-01-02T03:04:05Z"}]`)
 	})
 
 	t.Run("logout", func(t *testing.T) {

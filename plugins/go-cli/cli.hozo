@@ -7,22 +7,26 @@ namespace cli {
    */
   decorator command(name: string);
 
-  /** 位置引数として受け取る */
-  decorator arg for field;
+  /**
+   * 位置引数として受け取る。position は、1 から数える位置
+   *
+   * @param position 1 から数える位置
+   */
+  decorator arg(position: int) for field;
 
   /**
-   * フラグとして受け取る。
+   * フラグとして受け取る。name（`--` を除く）を省けば、フィールドの名前
    *
-   * @param name フラグの名前（`--` を除く）
+   * @param name フラグの名前（`--` を除く）。省けば、フィールドの名前
    */
-  decorator flag(name: string) for field;
+  decorator flag(name: string?) for field;
 
   /**
-   * 環境変数から受け取る。フラグと両方付けたときの優先順位は cli のプラグインが決める。
+   * 環境変数から受け取る。name を省けば、フィールドの名前。フラグと両方付けたときの優先順位は cli のプラグインが決める。
    *
-   * @param name 環境変数の名前
+   * @param name 環境変数の名前。省けば、フィールドの名前
    */
-  decorator env(name: string) for field;
+  decorator env(name: string?) for field;
 
   /**
    * この例外で終了するときの終了コード。

@@ -287,6 +287,77 @@ func TestValidationPrecedesOp(t *testing.T) {
 	}
 }
 
+// seenInputs は、渡された入力を覚えるだけの server.Ops。書いていない op は、埋め込んだ nil のインターフェースのまま。
+type seenInputs struct {
+	server.Ops
+	logouts     []server.AuthInput
+	placeOrders []server.PlaceOrderInput
+}
+
+func (s *seenInputs) Logout(_ context.Context, in server.AuthInput) error {
+	s.logouts = append(s.logouts, in)
+	return nil
+}
+
+func (s *seenInputs) PlaceOrder(_ context.Context, in server.PlaceOrderInput) (pkgtype.Order, error) {
+	s.placeOrders = append(s.placeOrders, in)
+	return pkgtype.Order{}, nil
+}
+
+// TestRequiredDecidesMissing は、項目がないことの扱いが、@http.required だけで決まること（go-http）。
+// 付いた項目（PlaceOrderInput の lines）がなければ、op を呼ばずに 400。付いていない項目（どの入力でも token）は、
+// なくても op を呼び、そのフィールドには何も書かれていない。
+func TestRequiredDecidesMissing(t *testing.T) {
+	t.Parallel()
+	seen := &seenInputs{}
+	handler := server.NewHandler(seen)
+	post := func(path, token, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		if token != "" {
+			req.Header.Set("Authorization", token)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// @http.required の項目がない: 400 で、op は呼ばれない。トークンの有無によらない
+	for _, token := range []string{"", "token-1"} {
+		rec := post("/orders", token, `{}`)
+		want := `{"error":"http.BadRequest","value":{"message":"body lines: missing","violations":[]}}`
+		if rec.Code != 400 || rec.Body.String() != want {
+			t.Errorf("lines のない POST /orders（トークン %q）: %d %s", token, rec.Code, rec.Body)
+		}
+	}
+	if len(seen.placeOrders) != 0 {
+		t.Fatalf("lines のない要求で op が呼ばれた: %+v", seen.placeOrders)
+	}
+
+	// @http.required のない項目（token）がない: op は呼ばれ、フィールドは nil のまま。あれば、その値
+	if rec := post("/logout", "", ""); rec.Code != 204 {
+		t.Errorf("トークンのない POST /logout: %d %s", rec.Code, rec.Body)
+	}
+	if rec := post("/orders", "", `{"lines":[]}`); rec.Code != 200 {
+		t.Errorf("トークンのない POST /orders: %d %s", rec.Code, rec.Body)
+	}
+	if rec := post("/orders", "token-1", `{"lines":[{"item":"apple","quantity":1}]}`); rec.Code != 200 {
+		t.Errorf("POST /orders: %d %s", rec.Code, rec.Body)
+	}
+	if len(seen.logouts) != 1 || seen.logouts[0].Token != nil {
+		t.Errorf("Logout に渡った入力: %+v（期待は、Token が nil のものが一つ）", seen.logouts)
+	}
+	if len(seen.placeOrders) != 2 {
+		t.Fatalf("PlaceOrder に渡った入力: %+v（期待は二つ）", seen.placeOrders)
+	}
+	// キーがあれば、空の配列でも、ある（nil ではなく、空のスライスが渡る）
+	if in := seen.placeOrders[0]; in.Token != nil || in.Lines == nil || len(in.Lines) != 0 {
+		t.Errorf("トークンがなく、lines が空の入力: %+v", in)
+	}
+	if in := seen.placeOrders[1]; in.Token == nil || *in.Token != "token-1" || len(in.Lines) != 1 || in.Lines[0].Item != "apple" {
+		t.Errorf("トークンと lines のある入力: %+v", in)
+	}
+}
+
 // TestNilIsNotChecked は、New が引数を確かめないこと。渡し忘れ（引数が足りない、メソッドが足りない）はコンパイルできないが、
 // nil を書いて渡すことはできる。そのときは、その実装を使う op を呼んだところで panic になる。
 // 使わない op は呼べる（上の TestReplaceOneLeaf は、mailer と seams が nil のまま issueSession を呼んでいる）。

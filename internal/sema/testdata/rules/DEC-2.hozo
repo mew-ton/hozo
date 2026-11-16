@@ -1,8 +1,18 @@
-// DEC-2: throws / catches を宣言できるのは op に付けるデコレータだけ（docs/check.md「デコレータ」）
+// DEC-2: throws / catches / reads / effects の節を宣言できるのは op に付けるデコレータだけ（docs/check.md「デコレータ」）
 namespace a {
   exception E;
+  state s: list<string>;
+  effect e on s.post;
   decorator d for field throws E;                  // ERROR: DEC-2
   decorator c for state | scalar catches E ignores; // ERROR: DEC-2
+  decorator r(table: any state) for effect reads table;        // ERROR: DEC-2
+  decorator w(...targets: any effect) for state effects targets;   // ERROR: DEC-2
+  decorator r2 for field | effect reads s;         // ERROR: DEC-2
+  decorator w2 for model effects e;                // ERROR: DEC-2
   decorator ok for op | field throws E;
   decorator ok2 throws E;
+  decorator ok3(table: any state) for op reads table;
+  decorator ok4(...targets: any effect) effects targets;
+  decorator ok5 for effect | op reads s effects e;
+  decorator ok6 for effect;
 }
