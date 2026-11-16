@@ -480,6 +480,9 @@ func (g *generator) checkName() {
 	}
 	typeName := func(fqn string) string { return golang.TypeName(fqn, g.declNS[fqn]) }
 	for _, d := range g.ns.Decls {
+		if d == nil {
+			continue
+		}
 		name := d.Common().Name
 		switch x := d.(type) {
 		case *ir.Model:

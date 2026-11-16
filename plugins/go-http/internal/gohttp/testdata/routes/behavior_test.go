@@ -409,11 +409,16 @@ type bareLeaves struct{}
 
 func (bareLeaves) Root(ctx context.Context) (string, error) { return "root", nil }
 func (bareLeaves) Touch(ctx context.Context) error          { return bare.Unknown{} }
+func (bareLeaves) ViaAlias(ctx context.Context) (string, error) {
+	return "pong", nil
+}
 
 // @http.status を持つ例外が一つもない名前空間: どのエラーも 500。
 func TestNoStatus(t *testing.T) {
 	h := bare.NewHandler(bare.New(bareLeaves{}))
 	expectJSON(t, call(t, h, "POST", "/touch", ""), 500, `{"error":"internal"}`)
+	// 名前付きデコレータを通して付けた @http.get の経路
+	expectJSON(t, call(t, h, "GET", "/pong", ""), 200, `"pong"`)
 }
 
 // NewHandler が受け取るのは、入口の Ops（New の戻り値を、そのまま渡す）。http.Handler を返す。

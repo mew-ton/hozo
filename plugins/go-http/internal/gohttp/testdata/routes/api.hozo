@@ -154,4 +154,9 @@ namespace bare {
   @http.post("/touch")
   export op touch()
     throws Unknown;
+
+  // 名前付きデコレータを通して付けた @http.get も、展開した適用として経路になる
+  decorator pong = http.get("/pong");
+  @pong
+  export op viaAlias(): string;
 }

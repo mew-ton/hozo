@@ -271,8 +271,7 @@ func (g *generator) checkModel(m *ir.Model) {
 		for _, problem := range g.fieldProblems(f, subject, m.Name) {
 			g.errorf(codeValidConstraint, m.Name, "%s", problem)
 		}
-		switch t := through(f.Type).(type) {
-		case ir.RefType:
+		if t, isRef := through(f.Type).(ir.RefType); isRef {
 			if u, ok := g.p.Lookup(t.Target).(*ir.Union); ok && u.Variant == ir.UnionArms {
 				if arm, found := g.validatedArm(u, map[string]bool{}); found {
 					g.errorf(codeValidUnion, m.Name, "%s の型が union %s で、そのアームに %s を持つ型 %s がある（union の値の制約を確かめる形は、まだない）",

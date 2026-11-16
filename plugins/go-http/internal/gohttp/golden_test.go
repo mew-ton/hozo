@@ -164,6 +164,28 @@ func TestNoRoutes(t *testing.T) {
 	}
 }
 
+// TestUnitTargets は「対象」: 経路の op は、単位の対象の op（View.files にあるファイルの op。docs/config.md「in」）だけ。
+// 単位の対象でない op は、@http.get が付いていても、経路にならない。
+func TestUnitTargets(t *testing.T) {
+	var bare *ir.View
+	for _, v := range loadViews(t, "routes") {
+		if v.Viewer == "bare" {
+			bare = v
+		}
+	}
+	root := newRoot(t)
+	files, diags, warnings := emitViews(t, root, []*ir.View{bare})
+	if len(files) != 1 || len(diags) != 0 || len(warnings) != 0 {
+		t.Fatalf("files=%v 診断=%+v warnings=%+v, want ファイルが一つ", sortedPaths(files), diags, warnings)
+	}
+	outside := *bare
+	outside.Files = []string{"elsewhere.hozo"}
+	files, diags, warnings = emitViews(t, root, []*ir.View{&outside})
+	if len(files) != 0 || len(diags) != 0 || len(warnings) != 1 {
+		t.Errorf("単位の対象でない op だけ: files=%v 診断=%+v warnings=%+v, want warning が一つだけ", sortedPaths(files), diags, warnings)
+	}
+}
+
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
 var diagnosticFixtures = []struct{ name, code string }{

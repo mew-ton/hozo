@@ -12,6 +12,7 @@ import (
 //
 //	GET /        bare.root
 //	POST /touch  bare.touch
+//	GET /pong    bare.viaAlias
 func NewHandler(ops Ops) http.Handler {
 	mux := http.NewServeMux()
 
@@ -32,6 +33,16 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// bare.viaAlias
+	mux.HandleFunc("GET /pong", func(w http.ResponseWriter, r *http.Request) {
+		out, err := ops.ViaAlias(r.Context())
+		if err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteJSON(w, http.StatusOK, out)
 	})
 
 	return mux
