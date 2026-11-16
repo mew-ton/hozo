@@ -24,7 +24,7 @@ func newStore(t *testing.T) storetest.Store {
 	users, sessions, orders, notifications :=
 		store.NewUsersTable(db), store.NewSessionsTable(db), store.NewOrdersTable(db), store.NewNotificationsTable(db)
 	return storetest.Store{
-		Ops: store.New(users, sessions, orders, notifications),
+		Ops: store.New(users, sessions, orders, notifications, store.NewSharedTable(db)),
 		// 形で決まる問い合わせは、store.New に渡したのと同じ値で読む
 		States: storetest.States{Users: users, Sessions: sessions, Orders: orders, Notifications: notifications},
 	}
@@ -78,8 +78,9 @@ func TestCreateTables(t *testing.T) {
 	}
 }
 
-// 以下の三つの型は、「プラグインが、ある op の中身を出せなかった」ときに人がすること（../../README.md「go-sqlite が従う規則」）を、
-// この仕様で形にしたもの。この仕様では go-sqlite は九つの op すべての中身を出すので、出せなかった型は見立てで作る。
+// 以下の三つの型は、「ある op に db の語彙のデコレータを付けなかった（go-sqlite は、その op のメソッドを出さない）」ときに
+// 人がすること（../../README.md「go-sqlite が従う規則」）を、この仕様で形にしたもの。この仕様では八つの op のすべてに
+// デコレータが付いていて、go-sqlite はすべてのメソッドを出すので、メソッドの足りない型は見立てで作る。
 
 // usersReads は、store.UsersTable のメソッドのうち、AddUser を除いたもの。
 type usersReads interface {
@@ -89,7 +90,7 @@ type usersReads interface {
 	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
 }
 
-// partialUsers は、addUser の中身を出せなかった go-sqlite の型の見立て: メソッド AddUser を持たない。
+// partialUsers は、addUser に @db.effects を付けなかったときの go-sqlite の型の見立て: メソッド AddUser を持たない。
 // store.UsersState を満たさないので、store.New の引数 users に渡すと、コンパイルできない。
 type partialUsers struct{ usersReads }
 
@@ -130,7 +131,7 @@ func TestHumanCompletesPluginType(t *testing.T) {
 	}
 	added := 0
 	users := humanUsers{partialUsers{store.NewUsersTable(db)}, db, &added}
-	s := store.New(users, store.NewSessionsTable(db), store.NewOrdersTable(db), store.NewNotificationsTable(db))
+	s := store.New(users, store.NewSessionsTable(db), store.NewOrdersTable(db), store.NewNotificationsTable(db), store.NewSharedTable(db))
 	// addUser は人が書いたメソッドへ、findUser はプラグインのメソッドへ届く
 	if err := s.AddUser(ctx, pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: "h"}); err != nil {
 		t.Fatal(err)
@@ -155,7 +156,7 @@ func TestColumns(t *testing.T) {
 	}
 	placedAt := time.Date(2026, 1, 2, 12, 4, 5, 120000000, time.FixedZone("JST", 9*60*60))
 	order := pkgtype.Order{Id: "o1", UserId: "u1", Lines: []pkgtype.OrderLine{{Item: "apple", Quantity: 2}}, PlacedAt: placedAt}
-	if err := store.NewOrdersTable(db).AddOrder(ctx, order); err != nil {
+	if err := store.NewSharedTable(db).PlaceOrder(ctx, order, pkgtype.Notification{UserId: "u1", Message: "x"}); err != nil {
 		t.Fatal(err)
 	}
 	var lines, at string
@@ -179,5 +180,42 @@ func TestRef(t *testing.T) {
 	// どの制約の違反かは、ドライバのエラーの文言でしか分からない（gen/store はドライバを import しない）
 	if !strings.Contains(err.Error(), "FOREIGN KEY") {
 		t.Errorf("エラーが %v", err)
+	}
+}
+
+// TestPlaceOrderIsOneTransaction は、二つの効果を持つ op（@db.effects(createOrder, notifyUser)）が、SQLite の上で
+// 一つのトランザクションであること: 二つ目の文（通知の行）が失敗すれば、一つ目の文（注文の行）も残らない。
+// 一つ目の文が失敗する場合（同じ id の注文）は、二つの実装が共に走らせる storetest の placeOrder が確かめる。
+// ここでは、二つ目だけを失敗させる: 外部キーを有効にした接続で、通知の userId（@db.ref）を、いないユーザーにする。
+func TestPlaceOrderIsOneTransaction(t *testing.T) {
+	t.Parallel()
+	s, ctx := newStore(t), context.Background()
+	if err := s.AddUser(ctx, pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: "h"}); err != nil {
+		t.Fatal(err)
+	}
+	order := pkgtype.Order{Id: "o1", UserId: "u1", PlacedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}
+	err := s.PlaceOrder(ctx, order, pkgtype.Notification{UserId: "nobody", Message: "残らない"})
+	if err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
+		t.Fatalf("いないユーザーへの通知を持つ placeOrder のエラーが %v（期待は、外部キーの違反）", err)
+	}
+	// 注文の行は、取り消されている（状態 orders も notifications も空のまま）
+	if empty, err := s.States.Orders.IsEmpty(ctx); err != nil || !empty {
+		t.Errorf("失敗した placeOrder の後の orders の IsEmpty = %v, %v（期待は true: 注文も残らない）", empty, err)
+	}
+	if empty, err := s.States.Notifications.IsEmpty(ctx); err != nil || !empty {
+		t.Errorf("失敗した placeOrder の後の notifications の IsEmpty = %v, %v（期待は true）", empty, err)
+	}
+	// トランザクションは閉じている: 接続は一つだけ（openDB）なので、開いたままなら、次の op は戻ってこない。
+	// 同じ注文を、いるユーザーへの通知と一緒に足せる（失敗したときの注文の行が残っていれば、キーの違反になる）
+	if err := s.PlaceOrder(ctx, order, pkgtype.Notification{UserId: "u1", Message: "残る"}); err != nil {
+		t.Fatalf("失敗の後の placeOrder: %v", err)
+	}
+	orders, err := s.ListOrders(ctx, "u1")
+	if err != nil || len(orders) != 1 || orders[0].Id != "o1" {
+		t.Errorf("listOrders(u1) = %+v, %v（期待は o1 が一つ）", orders, err)
+	}
+	notices, err := s.States.Notifications.Get(ctx)
+	if err != nil || len(notices) != 1 || notices[0].Message != "残る" {
+		t.Errorf("notifications の Get = %+v, %v（期待は「残る」が一つ）", notices, err)
 	}
 }
