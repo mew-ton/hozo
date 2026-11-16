@@ -30,6 +30,10 @@ import (
 // いてよい。まだないトランスパイラは、ファイルを返さない代役（sampleProject.standIns）に置き換えて、あるトランスパイラの分だけを
 // 走らせる。それでも通せないサブテストは、足りないもの（sampleProject.blocked、sampleProject.absent）を名指しして飛ばし、
 // 足りないものがそろえば、このファイルを変えずに走る（tests/samples/README.md「テスト」）。
+//
+// サンプルは、設計文書の版の言語と出力で書く。文書の版（docs/ir.md「版」）が、今の hozoc の版より先にある間
+// （sampleProject.ahead）は、今の hozoc はサンプルの仕様を読めず、文書の通りの出力も作れないので、hozoc を走らせる
+// サブテスト（check と transpilers/*）を、二つの版を名指しして飛ばす（tests/samples/README.md「飛ばす条件」）。
 
 // samplesDir はサンプルの置き場（tests/ からの相対パス）。
 const samplesDir = "samples"
@@ -67,6 +71,44 @@ type sampleProject struct {
 	// blocked は、このサンプルに、本物の hozo.toml で hozoc check / emit を掛けられない理由: unreadable と、代役を置けない
 	// トランスパイラ（その単位に、動かせる基底がない）。空なら、hozoc を本物の hozo.toml で走らせるサブテストが走る。
 	blocked []string
+	// ahead は、設計文書の版が、今の hozoc の版より先にあるときの、その理由（docsAhead）。空でなければ、hozoc を走らせる
+	// サブテスト（check と transpilers/*）は、言語の検査にも落とさず、飛ばす: 仕様そのものが、今の hozoc の読めない書き方で
+	// 書かれていてよい。
+	ahead string
+}
+
+// irDoc は、IR の版の持ち主の文書（tests/ からの相対パス）。
+var irDoc = filepath.Join("..", "docs", "ir.md")
+
+// docVersion は、docs/ir.md「版」の「今の版は `"<版>"`」。
+var docVersion = regexp.MustCompile("今の版は `\"([^\"]+)\"`")
+
+// docsAhead は、設計文書の版（docs/ir.md「版」）が、今の hozoc の版（internal/plugin の Protocol）と違えば、その理由を返す。
+// 文書とサンプルは、実装より先に書く（docs/testing.md「トランスパイラのテスト」）。言語や IR を変える決定では、文書の版が
+// 先に上がり、サンプルは、その版の言語と出力で書かれる。同じなら ""。
+func docsAhead(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(irDoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := docVersion.FindSubmatch(data)
+	if m == nil {
+		t.Fatalf("%s に「今の版は `\"<版>\"`」がない", irDoc)
+	}
+	if doc := string(m[1]); doc != hostplugin.Protocol {
+		return fmt.Sprintf("設計文書の版（docs/ir.md「版」）は %s、今の hozoc の版（internal/plugin の Protocol）は %s: 文書とサンプルが、実装より先にある。"+
+			"サンプルは文書の版の言語と出力で書いてあるので、今の hozoc では、仕様を読めず、文書の通りの出力も作れない", doc, hostplugin.Protocol)
+	}
+	return ""
+}
+
+// skipIfAhead は、hozoc を走らせるサブテストを、設計文書の版が今の hozoc より先にある間、二つの版を名指しして飛ばす。
+func (s *sampleProject) skipIfAhead(t *testing.T, what string) {
+	t.Helper()
+	if s.ahead != "" {
+		t.Skipf("飛ばす（%s）。足りないもの:\n  - %s\nhozoc がその版になれば、何も変えずに走る", what, s.ahead)
+	}
 }
 
 // standIn は、まだ動かせないトランスパイラ一つを、ファイルを返さない代役に置き換える手順。
@@ -128,6 +170,7 @@ func loadSample(t *testing.T, name string) *sampleProject {
 	}
 	s.blocked = append(s.blocked, s.unreadable...)
 	s.findTranspilers(t)
+	s.ahead = docsAhead(t)
 	return s
 }
 
@@ -506,7 +549,8 @@ func (s *sampleProject) project(t *testing.T) (string, func(string) string) {
 //   - transpilers/<名前>: hozoc emit の出力のうち、そのトランスパイラのファイルが、期待する出力とバイト単位で同じ。
 //   - transpilers/all: hozoc emit の出力の全体が、期待する出力と同じ（余分なファイルがなく、記録が同じ）。
 //
-// go は飛ばさない。まだないトランスパイラは、ファイルを返さない代役に置き換えて、check と、あるトランスパイラの
+// go は飛ばさない。設計文書の版が今の hozoc より先にある間は、check と transpilers/* を、版を名指しして飛ばす（docsAhead）。
+// まだないトランスパイラは、ファイルを返さない代役に置き換えて、check と、あるトランスパイラの
 // transpilers/<名前> を走らせる。まだないトランスパイラの transpilers/<名前> と transpilers/all は、足りないものを名指しして
 // 飛ばす。本物の hozo.toml を読めないときは、どれも飛ばし、check だけは、設定を使わない言語の検査に落として通す（testCheck）。
 func TestSamples(t *testing.T) {
@@ -539,6 +583,7 @@ func TestSamples(t *testing.T) {
 // しない。docs/config.md「置き場と探し方」）。落としたことと、足りないものは、ログに書く。足りないものがそろえば、本物の設定での
 // 検査に戻る。
 func (s *sampleProject) testCheck(t *testing.T) {
+	s.skipIfAhead(t, "hozoc check を、このサンプルに掛けられない")
 	root, env := "", func(string) string { return "" }
 	if len(s.blocked) > 0 {
 		t.Logf("言語の検査だけに落とした（設定 %s と、プラグインの検査は、まだ確かめていない）。足りないもの:\n  - %s\nそろえば、本物の hozo.toml で走る",
@@ -684,12 +729,13 @@ func (s *sampleProject) testGo(t *testing.T) {
 // 動かせるトランスパイラが一つもなければ、どのサブテストも飛ばす。期待する出力が仕様なので、-update では書き直さない。
 func (s *sampleProject) testTranspilers(t *testing.T) {
 	var got, want map[string][]byte
-	runnable := len(s.blocked) == 0 && len(s.absent) < len(s.files)
+	runnable := s.ahead == "" && len(s.blocked) == 0 && len(s.absent) < len(s.files)
 	if runnable {
 		got, want = s.emit(t), s.expected(t)
 	}
 	for _, name := range s.names() {
 		t.Run(name, func(t *testing.T) {
+			s.skipIfAhead(t, "hozoc emit を、このサンプルに掛けられない")
 			s.skipIfBlocked(t, "hozoc emit を、このサンプルに掛けられない")
 			if why, absent := s.absent[name]; absent {
 				t.Skipf("飛ばす（トランスパイラ %s を動かせない）。足りないもの:\n  - %s\nそろえば、何も変えずに走る", name, why)
@@ -721,6 +767,7 @@ func (s *sampleProject) testTranspilers(t *testing.T) {
 		})
 	}
 	t.Run(transpilersAll, func(t *testing.T) {
+		s.skipIfAhead(t, "hozoc emit を、このサンプルに掛けられない")
 		s.skipIfBlocked(t, "hozoc emit を、このサンプルに掛けられない")
 		if len(s.absent) > 0 {
 			t.Skipf("飛ばす（出力の全体は、すべてのトランスパイラがそろってから比べる）。足りないもの:\n  - %s\nそろえば、何も変えずに走る",

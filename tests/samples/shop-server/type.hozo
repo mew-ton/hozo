@@ -1,6 +1,6 @@
 // サンプル shop-server の仕様（README.md）。共有の型の名前空間 type。
 // 保存（store.hozo）、サーバー（server.hozo）、配送（mailer.hozo）が同じ型を使う。
-// 書き方は docs/decisions.md の P1〜P39 の後の形。仕様（.hozo）は今の hozoc が読む。設定（hozo.toml）とプラグインのマニフェストは、まだ実装のない書き方を含む（README.md「まだないもの」）。
+// 書き方は docs/decisions.md の P1〜P39 と、決定 91〜102 の後の形。store.hozo は、まだ実装のない書き方（db の語彙のデコレータで言う読み書き）を含む（README.md「まだないもの」）。
 
 /** 共有の型。どの担い手にも属さない */
 namespace type {
