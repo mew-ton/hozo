@@ -59,17 +59,17 @@
       "patterns": [
         {
           "name": "variable.other.property.hozo",
-          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b(?=\\s*:)"
+          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b(?=\\s*:)"
         },
         {
           "name": "variable.other.property.hozo",
-          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b"
+          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false)\\b"
         }
       ]
     },
     "override-name": {
       "comment": "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
-      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false))\\b",
+      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|const|return|match|default|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false))\\b",
       "captures": {
         "1": {
           "name": "storage.modifier.hozo"
@@ -148,7 +148,7 @@
       "match": "(?\u003c![A-Za-z0-9_.])(?:-?[0-9]+\\.[0-9]+|[0-9]+(?:ms|s|m|h|d)|-?[0-9]+)\\b"
     },
     "arrow": {
-      "comment": "-\u003e は遷移（docs/grammar.md「exception / effect」の Transition）、=\u003e は match のアーム（同「配線」の MatchArm）",
+      "comment": "-\u003e は遷移（docs/grammar.md「exception / effect / read」の Transition）、=\u003e は match のアーム（同「配線」の MatchArm）",
       "name": "keyword.operator.arrow.hozo",
       "match": "-\u003e|=\u003e"
     },
@@ -158,9 +158,9 @@
       "match": "\\.\\.\\."
     },
     "external": {
-      "comment": "@external は核の印でデコレータではない（docs/grammar.md「予約語」）",
+      "comment": "@external と @repeatable は核の印でデコレータではない（docs/grammar.md「予約語」）",
       "name": "storage.modifier.hozo",
-      "match": "@external\\b"
+      "match": "@(?:external|repeatable)\\b"
     },
     "decorator": {
       "comment": "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
@@ -196,7 +196,8 @@
           }
         },
         {
-          "match": "\\b(op|effect)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "comment": "op、effect、read は、実行・適用されるものの名前。effect と read は、名前の後ろに引数の括弧が続く",
+          "match": "\\b(op|effect|read)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
               "name": "keyword.declaration.hozo"
@@ -263,6 +264,30 @@
               "name": "keyword.other.hozo"
             }
           }
+        },
+        {
+          "comment": "effects の節の要素に直に書いた「状態.操作」（docs/grammar.md「op」の EffectElem）: 要素の最後の . の後ろの post / put / delete。節は ; か { か次の節の頭で終わる",
+          "begin": "\\b(effects)\\b",
+          "end": "(?=[;{])|(?=\\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\\b)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#comments"
+            },
+            {
+              "name": "keyword.other.hozo",
+              "match": "(?\u003c=\\.)(?:post|put|delete)\\b(?!\\s*\\.)"
+            }
+          ]
+        },
+        {
+          "comment": "配線で直に呼ぶ「状態.操作(…)」（docs/grammar.md「配線」の Call）: . の後ろで、直後が ( の post / put / delete",
+          "name": "keyword.other.hozo",
+          "match": "(?\u003c=\\.)(?:post|put|delete)(?=\\s*\\()"
         }
       ]
     },
@@ -369,9 +394,9 @@
           ]
         },
         {
-          "comment": "throws / catches / throw の後ろの例外の名前",
+          "comment": "throws / catches / throw の後ろの例外の名前。throw の引数の括弧（docs/grammar.md「配線」の Throw）の手前で終わり、引数は値の位置として塗る",
           "begin": "\\b(throws|catches|throw)\\b",
-          "end": "(?=[;{])|(?=\\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\\b)",
+          "end": "(?=[;{(])|(?=\\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\\b)",
           "beginCaptures": {
             "1": {
               "name": "keyword.control.hozo"
@@ -407,7 +432,7 @@
     },
     "keywords.declaration": {
       "name": "keyword.declaration.hozo",
-      "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|classify|condition|decorator|bind)\\b"
+      "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|condition|decorator|bind)\\b"
     },
     "keywords.modifier": {
       "name": "storage.modifier.hozo",

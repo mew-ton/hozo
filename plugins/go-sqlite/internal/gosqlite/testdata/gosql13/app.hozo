@@ -7,28 +7,49 @@ namespace app {
   model Pair { @db.key @db.text left: string; @db.key @db.text right: string; @db.unique @db.key @db.text both: string; }
   /** キーがない */
   model Log { @db.text line: string; }
-  @db.table(Row) state rows: list<Row>;
-  @db.table(Pair) state pairs: list<Pair>;
-  @db.table(Log) state logs: list<Log>;
+  @db.table state rows: list<Row>;
+  @db.table state pairs: list<Pair>;
+  @db.table state logs: list<Log>;
 
   // キーでも一意でもない列
-  @db.find(rows, "note")
-  export op findByNote(note: string): Row?;
+  @db.find
+  read findByNoteRow(note: string): Row? on rows;
+  export op findByNote(note: string): Row? {
+    return findByNoteRow(note);
+  }
   // 複数の @db.key の一つ
-  @db.find(pairs, "left")
-  export op findByLeft(left: string): Pair?;
+  @db.find
+  read findByLeftRow(left: string): Pair? on pairs;
+  export op findByLeft(left: string): Pair? {
+    return findByLeftRow(left);
+  }
   // キーのない model
-  @db.find(logs, "line")
-  export op findLine(line: string): Log?;
+  @db.find
+  read findLineRow(line: string): Log? on logs;
+  export op findLine(line: string): Log? {
+    return findLineRow(line);
+  }
 
   // 通るもの: ただ一つの @db.key、@db.unique、複数の @db.key の一つでも @db.unique を持つ列
-  @db.find(rows, "id")
-  export op findRow(id: string): Row?;
-  @db.find(rows, "code")
-  export op findByCode(code: string): Row?;
-  @db.find(pairs, "both")
-  export op findByBoth(both: string): Pair?;
+  @db.find
+  read findRowRow(id: string): Row? on rows;
+  export op findRow(id: string): Row? {
+    return findRowRow(id);
+  }
+  @db.find
+  read findByCodeRow(code: string): Row? on rows;
+  export op findByCode(code: string): Row? {
+    return findByCodeRow(code);
+  }
+  @db.find
+  read findByBothRow(both: string): Pair? on pairs;
+  export op findByBoth(both: string): Pair? {
+    return findByBothRow(both);
+  }
   // @db.list なら、どの列でもよい
-  @db.list(rows, "note")
-  export op listByNote(note: string): Row[];
+  @db.list
+  read listByNoteRows(note: string): Row[] on rows;
+  export op listByNote(note: string): Row[] {
+    return listByNoteRows(note);
+  }
 }

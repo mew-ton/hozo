@@ -556,7 +556,7 @@ func TestEmitErrors(t *testing.T) {
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/extra.txt","content":"hi"}],"warnings":[{"message":"w"}],"errors":[{"code":"FAKE-1","at":"server.placeOrder","message":"nope"}]}`, 0)
 	fakeRider(t, dir, "fake2", "go", `"base"`, `{"files":[],"warnings":[],"errors":[{"code":"FAKE-2","message":"again"}]}`, 0)
 	code, stdout, stderr := run(t, dir, nil, "emit")
-	if code != exitCheckFailed || stdout != "" || !strings.Contains(stderr, "server.hozo:246:3: error[FAKE-1]: nope") ||
+	if code != exitCheckFailed || stdout != "" || !strings.Contains(stderr, "server.hozo:281:3: error[FAKE-1]: nope") ||
 		!strings.Contains(stderr, "error[FAKE-2]: again") || !strings.Contains(stderr, "warning[PLUGIN]: fake: w") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -1104,7 +1104,7 @@ namespace shop {
   model Receipt { item: Item; }
   /** 品物 */
   state items: list<Item>;
-  effect addItem() on items.post;
+  effect addItem(item: Item) on items.post;
 
   /** 入口。nightly は batch.hozo で宣言した配線 */
   op open(item: Item): Receipt {
@@ -1113,7 +1113,7 @@ namespace shop {
     const r = issue(item);
     return r;
   }
-  op save(item: Item) effects addItem;
+  op save(item: Item) effects addItem { addItem(item); }
   op issue(item: Item): Receipt;
 }
 `

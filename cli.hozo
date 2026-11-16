@@ -34,9 +34,6 @@ namespace hozoc {
   /** 指摘に関連する位置 */
   model RelatedInfo { file: Path; start: Position; end: Position; message: string; }
 
-  /** 指摘の一覧 */
-  model Diagnostics { items: Diagnostic[]; }
-
   /** 仕様のファイル */
   @fs.files("**/*.hozo")
   state sources: list<SourceFile>;
@@ -48,21 +45,37 @@ namespace hozoc {
   /** 生成したファイル。置き場は hozo.toml の各単位の out（docs/config.md「単位の対象」） */
   state outputs: list<OutputFile>;
 
-  /** 仕様に構文か型の誤りがある */
+  /**
+   * 仕様に構文か型の誤りがある
+   *
+   * @param diagnostics error と warning のすべて
+   */
   @cli.exitCode(1)
-  exception CheckFailed: Diagnostics;
+  exception CheckFailed(diagnostics: Diagnostic[]);
 
-  /** hozo.toml がない、または設定が誤っている（docs/config.md の CFG-*） */
+  /**
+   * hozo.toml がない、または設定が誤っている（docs/config.md の CFG-*）
+   *
+   * @param diagnostics error と warning のすべて
+   */
   @cli.exitCode(2)
-  exception ConfigInvalid: Diagnostics;
+  exception ConfigInvalid(diagnostics: Diagnostic[]);
 
-  /** 一つの単位のトランスパイラの language がそろっていない */
+  /**
+   * 一つの単位のトランスパイラの language がそろっていない
+   *
+   * @param diagnostics error と warning のすべて
+   */
   @cli.exitCode(2)
-  exception LanguageMismatch: Diagnostics;
+  exception LanguageMismatch(diagnostics: Diagnostic[]);
 
-  /** 複数の出どころが同じファイルに書こうとした */
+  /**
+   * 複数の出どころが同じファイルに書こうとした
+   *
+   * @param diagnostics error と warning のすべて
+   */
   @cli.exitCode(3)
-  exception OutputConflict: Diagnostics;
+  exception OutputConflict(diagnostics: Diagnostic[]);
 
   /** emit の引数の名前空間も、その子孫も、どの単位の対象でもない */
   @cli.exitCode(64)
@@ -122,8 +135,27 @@ namespace hozoc {
     default;
   }
 
-  /** 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す） */
-  effect syncOutputs on OutputsSync: any -> UpToDate;
+  /** 書き出す予定: 単位ごとにトランスパイラを呼んで集めたファイルと、そこまでの warning */
+  model EmitPlan {
+    warnings: Diagnostic[];
+    files: OutputFile[];
+    /** 書き出さずに、書き出す予定だけを返す */
+    dryRun: boolean?;
+  }
+
+  /**
+   * 書き出す予定を、今の生成したファイルと比べて、書くファイルと消すファイルを決める。
+   *
+   * @param plan 書き出す予定
+   */
+  read outputChanges(plan: EmitPlan): EmitResult on outputs;
+
+  /**
+   * 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
+   *
+   * @param plan 書き出す予定
+   */
+  effect syncOutputs(plan: EmitPlan) on OutputsSync: any -> UpToDate;
 
   /**
    * 仕様を検査する。ファイルは書き出さない。
@@ -139,19 +171,36 @@ namespace hozoc {
     throws proc.Crashed, proc.MalformedOutput;
 
   /**
-   * 検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+   * 検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを集める。ファイルには触れない。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
-   * @throws CheckFailed トランスパイラが errors を返した。ファイルは書き出さない
-   * @throws OutputConflict 同じファイルに二つの出どころが書こうとした。ファイルは書き出さない
-   * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない。ファイルは書き出さない
-   * @throws proc.Crashed プラグインが異常終了した。書き出しは始めていない
+   * @throws CheckFailed トランスパイラが errors を返した
+   * @throws OutputConflict 同じファイルに二つの出どころが書こうとした
+   * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない
+   * @throws proc.Crashed プラグインが異常終了した
+   */
+  op collectOutputs(in: EmitInput, checked: CheckResult): EmitPlan
+    throws CheckFailed, OutputConflict, UnknownNamespace
+    throws proc.Crashed, proc.MalformedOutput;
+
+  /**
+   * 検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+   * 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+   *
+   * @param in コマンドの入力
+   * @param checked 検査の結果
    */
   op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
     effects syncOutputs
     throws CheckFailed, OutputConflict, UnknownNamespace prevents effects
-    throws proc.Crashed, proc.MalformedOutput prevents effects;
+    throws proc.Crashed, proc.MalformedOutput prevents effects
+  {
+    const plan = collectOutputs(in, checked);
+    const result = outputChanges(plan);
+    syncOutputs(plan);
+    return result;
+  }
 
   /**
    * 仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。

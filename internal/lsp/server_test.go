@@ -640,11 +640,14 @@ func TestStateClassification(t *testing.T) {
 		want    string
 	}{
 		// 効果の宛先: 組み込みの効果と、分類の遷移
-		{"effects addLine;", len("effects "), "```hozo\neffect addLine on carts.post\n```"},
-		{"effects placeOrder throws", len("effects "), "```hozo\neffect placeOrder on Checkout: Shopping -> Ordered\n```"},
-		{"effects startOver;", len("effects "), "```hozo\neffect startOver on Checkout: any -> Shopping\n```"},
-		{"effects clearCart;", len("effects "), "```hozo\neffect clearCart on carts: HasItems -> Empty\n```"},
-		{"touchCheckout on", 0, "```hozo\neffect touchCheckout on Checkout: Shopping | Ordered -> any\n```"},
+		// 引数を持つ効果（節の要素と、配線の呼び出しの名前のどちらからも）
+		{"effects addLine {", len("effects "), "```hozo\neffect addLine(line: Line) on carts.post\n```"},
+		{"{ addLine(line); }", len("{ "), "```hozo\neffect addLine(line: Line) on carts.post\n```"},
+		{"effects placeOrder throws", len("effects "), "```hozo\neffect placeOrder() on Checkout: Shopping -> Ordered\n```"},
+		{"effects startOver {", len("effects "), "```hozo\neffect startOver() on Checkout: any -> Shopping\n```"},
+		{"effects clearCart {", len("effects "), "```hozo\neffect clearCart() on carts: HasItems -> Empty\n```"},
+		{"touchCheckout() on", 0, "```hozo\neffect touchCheckout() on Checkout: Shopping | Ordered -> any\n```"},
+		{"saveToken(token); }", 0, "```hozo\neffect saveToken(token: Token) on token: Empty -> HasItems\n```"},
 		// 分類の対象: 状態の分類は状態の名前の並び、値の分類は型
 		{"match by Checkout", len("match by "), "```hozo\nclassify Checkout of carts, orders\n```"},
 		{"match by LoggedIn", len("match by "), "```hozo\ncondition LoggedIn of token\n```"},
@@ -671,9 +674,11 @@ func TestStateClassification(t *testing.T) {
 		shiftBy      int
 		target       string // 定義の位置（この文字列の先頭）
 	}{
-		{"遷移の宛先の分類", "placeOrder on Checkout", len("placeOrder on "), "Checkout of carts, orders"},
+		{"遷移の宛先の分類", "placeOrder() on Checkout", len("placeOrder() on "), "Checkout of carts, orders"},
 		{"遷移の後のケース", "Shopping -> Ordered;", len("Shopping -> "), "Ordered;\n  }"},
-		{"遷移の宛先の基底の状態", "clearCart on carts", len("clearCart on "), "carts: list<Line>"},
+		{"遷移の宛先の基底の状態", "clearCart() on carts", len("clearCart() on "), "carts: list<Line>"},
+		{"効果の呼び出しの名前", "{ clearCart(); }", len("{ "), "clearCart() on carts"},
+		{"効果の引数の型", "addLine(line: Line) on", len("addLine(line: "), "Line { item"},
 		{"分類の対象の状態", "Checkout of carts, orders", len("Checkout of carts, "), "orders: list<Order>"},
 		{"match の対象の状態", "match token by nullable", len("match "), "token: nullable<Token>"},
 		{"match by の分類", "match by Checkout", len("match by "), "Checkout of carts, orders"},
@@ -701,10 +706,10 @@ func TestStateClassification(t *testing.T) {
 	}
 	for name, want := range map[string]string{
 		"token":         "nullable<Token>",
-		"addLine":       "on carts.post",
-		"placeOrder":    "on Checkout: Shopping -> Ordered",
-		"touchCheckout": "on Checkout: Shopping | Ordered -> any",
-		"clearCart":     "on carts: HasItems -> Empty",
+		"addLine":       "(line: Line) on carts.post",
+		"placeOrder":    "() on Checkout: Shopping -> Ordered",
+		"touchCheckout": "() on Checkout: Shopping | Ordered -> any",
+		"clearCart":     "() on carts: HasItems -> Empty",
 		"Checkout":      "of carts, orders",
 		"LoggedIn":      "of token",
 		"LineKind":      "of Line",
@@ -796,7 +801,8 @@ namespace store {
   state users: list<type.User>;
   state current: type.User?;
   state title: string;
-  export op findUser(id: string): type.User? reads users;
+  read userById(id: string): type.User? on users;
+  export op findUser(id: string): type.User? reads users { return userById(id); }
   op unauthorized(): never throws type.Unauthorized;
   op nameOf(user: type.User): string;
   classify Registration of findUser {
@@ -882,7 +888,11 @@ namespace store {
 		{"match current by nullable", len("match "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
 		{"HasItems => current;", len("HasItems => "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
 		{"return title;", len("return "), []string{"```hozo\nstate title: single<string>\n```"}, nil},
-		{"reads users;", len("reads "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
+		{"reads users {", len("reads "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
+		// read の宣言と、配線からの read の呼び出し
+		{"read userById(", len("read "), []string{"```hozo\nread userById(id: string): type.User? on users\n```"}, nil},
+		{"return userById(id); }", len("return "), []string{"```hozo\nread userById(id: string): type.User? on users\n```"}, nil},
+		{"type.User? on users;", len("type.User? on "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
 		// throw の例外
 		{"throw type.Unauthorized", len("throw type."), []string{"```hozo\nexception type.Unauthorized\n```"}, nil},
 	} {
@@ -917,7 +927,10 @@ namespace store {
 		{"ケースの op as T の op", "Registered: findUser as", len("Registered: "), "findUser(id: string)"},
 		{"ケースの X as T の T", "findUser as type.User;", len("findUser as type."), "User {\n    /** 識別子 */"},
 		{"ケースの X as T の X（状態）", "LoggedIn: current as", len("LoggedIn: "), "current: type.User?;"},
-		{"reads の状態", "reads users;", len("reads "), "users: list<type.User>;"},
+		{"reads の状態", "reads users {", len("reads "), "users: list<type.User>;"},
+		{"read r(…): T on s の s", "type.User? on users;", len("type.User? on "), "users: list<type.User>;"},
+		{"read の呼び出し", "return userById(id); }", len("return "), "userById(id: string): type.User? on"},
+		{"read の結果の型", "userById(id: string): type.User? on", len("userById(id: string): type."), "User {\n    /** 識別子 */"},
 		{"配線の値の位置の状態（match の対象）", "match current by nullable", len("match "), "current: type.User?;"},
 		{"配線の値の位置の状態（アームの値）", "HasItems => current;", len("HasItems => "), "current: type.User?;"},
 		{"配線の値の位置の状態（return）", "return title;", len("return "), "title: string;"},
@@ -974,7 +987,7 @@ func TestCarryingDecorators(t *testing.T) {
 	root := t.TempDir()
 	text := `namespace store {
   model Row { @db.text id: string; }
-  @db.table(Row)
+  @db.table
   state rows: list<Row>;
   /** 表から引く */
   decorator list(table: any state, column: string?) for op reads table;
@@ -987,7 +1000,29 @@ func TestCarryingDecorators(t *testing.T) {
   decorator into(table: any state) for effect;
   decorator everything = list(rows);
   @into(rows)
-  effect add() on rows.post;
+  effect add(row: Row) on rows.post;
+  /**
+   * 忙しい
+   *
+   * @param wait 待つ時間
+   */
+  exception Busy(wait: Duration, note: string?);
+  /**
+   * id で引く
+   *
+   * @param id 引く行の識別子
+   */
+  @db.find @db.where("id", "x") @db.where("id", "y")
+  read byId(id: string): Row? on rows;
+  classify Size of Row { Big; default; }
+  op save(row: Row): Row? throws Busy {
+    add(row);
+    rows.post(row);
+    return match row by Size {
+      Big     => throw Busy(5m, "big");
+      default => byId(row.id);
+    };
+  }
   /**
    * 全部を引く。
    *
@@ -1000,8 +1035,6 @@ func TestCarryingDecorators(t *testing.T) {
   op insert(row: Row);
   @store.effects
   op idle();
-  @db.effects(add)
-  op viaVocab(row: Row);
   @everything
   op viaAlias(): Row[];
   @list(rows)
@@ -1051,7 +1084,15 @@ func TestCarryingDecorators(t *testing.T) {
 		{"effects の節の、残りの引数の名前", at("for op effects targets", len("for op effects ")), "targets: any effect) for op", 0, []string{effectsHead, "  ...targets: any effect", "行う効果"}},
 		{"節に書いた状態の名前", at("effects targets reads rows;", len("effects targets reads ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
 		{"残りの引数の宣言", at("...targets: any effect", len("...")), "targets: any effect) for op", 0, []string{"  ...targets: any effect"}},
-		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add on rows.post;", 0, []string{"effect add() on rows.post"}},
+		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add(row: Row) on rows.post;", 0, []string{"effect add(row: Row) on rows.post"}},
+		// 版 0.6: 引数を持つ exception / effect / read、配線からの呼び出し、引数を持つ throw
+		{"効果の呼び出し", at("    add(row);", len("    ")), "add(row: Row) on rows.post;", 0, []string{"effect add(row: Row) on rows.post"}},
+		{"直に呼ぶ「状態.操作」の状態", at("    rows.post(row);", len("    ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
+		{"read の呼び出し", at("default => byId(row.id);", len("default => ")), "byId(id: string): Row?", 0, []string{"read byId(id: string): Row? on rows", "id で引く"}},
+		{"throw E(…) の E", at("throw Busy(5m", len("throw ")), "Busy(wait: Duration", 0, []string{"exception Busy(wait: Duration, note: string?)", "忙しい"}},
+		{"read の引数", at("byId(id: string): Row?", len("byId(")), "id: string): Row? on", 0, []string{"read byId(id: string): Row? on rows", "  id: string", "引く行の識別子"}},
+		{"例外の @param", at("@param wait", len("@param ")), "wait: Duration, note", 0, []string{"exception Busy(wait: Duration, note: string?)", "  wait: Duration", "待つ時間"}},
+		{"read に付けた、何度も付けられるデコレータ", at("@db.where(\"id\", \"y\")", len("@db.")), "", -1, []string{"@repeatable decorator db.where(column: string, value: string | int | float | boolean) for read"}},
 		{"効果の宣言に付けたデコレータ", at("@into(rows)", 1), "decorator into(", len("decorator "), []string{"decorator into(table: any state) for effect"}},
 		{"別名の先の予約語", at("= list(rows);", len("= ")), "decorator list(", len("decorator "), []string{listHead}},
 		{"@see の予約語のデコレータ名", at("@see list", len("@see ")), "decorator list(", len("decorator "), []string{listHead}},
@@ -1069,22 +1110,31 @@ func TestCarryingDecorators(t *testing.T) {
 				}
 			}
 		}
+		if tt.skip < 0 {
+			continue // 語彙の宣言（飛び先は下で確かめる）
+		}
 		var loc *protocol.Location
 		c.result(protocol.MethodDefinition, tt.pos, &loc)
 		if want := shift(positionOf(t, enc, text, tt.target, 0), tt.skip); loc == nil || loc.URI != uri || loc.Range.Start != want {
 			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
 		}
 	}
-	// 語彙の予約語のデコレータ名（@db.effects）は、語彙のファイルへ飛ぶ
+	// 直に呼ぶ「状態.操作」の操作の語は宣言を持たないので null（docs/lsp.md「定義へジャンプ」）
+	var none *protocol.Location
+	c.result(protocol.MethodDefinition, at("    rows.post(row);", len("    rows.")), &none)
+	if none != nil {
+		t.Errorf("definition(直に呼ぶ操作の語 post) = %+v, want nil", none)
+	}
+	// 語彙の予約語のデコレータ名（@db.find）は、語彙のファイルへ飛ぶ
 	var loc *protocol.Location
-	c.result(protocol.MethodDefinition, at("@db.effects(add)", len("@db.")), &loc)
+	c.result(protocol.MethodDefinition, at("@db.find @db.where", len("@db.")), &loc)
 	if loc == nil || loc.URI != "hozo:vocab/db.hozo" {
-		t.Errorf("definition(@db.effects) = %+v", loc)
+		t.Errorf("definition(@db.find) = %+v", loc)
 	}
 	var hov *protocol.Hover
-	c.result(protocol.MethodHover, at("@db.effects(add)", len("@db.")), &hov)
-	if hov == nil || !strings.Contains(hov.Contents.Value, "decorator db.effects(...targets: any effect) effects targets") {
-		t.Errorf("hover(@db.effects) = %+v", hov)
+	c.result(protocol.MethodHover, at("@db.find @db.where", len("@db.")), &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "decorator db.find for read") {
+		t.Errorf("hover(@db.find) = %+v", hov)
 	}
 	// 名前付きデコレータの適用は、宣言と、固定した引数
 	c.result(protocol.MethodHover, at("@everything", 1), &hov)
@@ -1113,6 +1163,23 @@ func TestCarryingDecorators(t *testing.T) {
 	}
 	if kinds["add"] != protocol.SymbolEvent {
 		t.Errorf("symbol add の種類 = %v, want Event", kinds["add"])
+	}
+	// read は Key、exception は Class。detail は、引数の並び（と、read の結果の型、宛先）
+	if kinds["byId"] != protocol.SymbolKey || kinds["Busy"] != protocol.SymbolClass {
+		t.Errorf("symbol byId / Busy の種類 = %v / %v, want Key / Class", kinds["byId"], kinds["Busy"])
+	}
+	details := map[string]string{}
+	for _, s := range syms[0].Children {
+		details[s.Name] = s.Detail
+	}
+	for name, want := range map[string]string{
+		"byId": "(id: string): Row? on rows",
+		"add":  "(row: Row) on rows.post",
+		"Busy": "(wait: Duration, note: string?)",
+	} {
+		if details[name] != want {
+			t.Errorf("symbol %s の detail = %q, want %q", name, details[name], want)
+		}
 	}
 	c.shutdown()
 }

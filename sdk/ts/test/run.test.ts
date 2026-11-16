@@ -8,17 +8,26 @@ import { test } from "node:test";
 import {
   PROTOCOL,
   UnsupportedDirectionError,
+  calledOp,
   directEffects,
   directReads,
+  effectWrites,
   inUnit,
   lookup,
   namespace,
   options,
   opsWith,
+  readState,
+  readStates,
   run,
+  sameRef,
   signature,
+  type Callee,
+  type EffectRef,
   type EmitRequest,
   type Handler,
+  type Op,
+  type ReadRef,
   type View,
 } from "../src/index.js";
 
@@ -137,7 +146,7 @@ test("protocol mismatch: {error:{code:protocol}} on stdout and exit 2", async ()
   const out = JSON.parse(r.stdout);
   assert.equal(out.error.code, "protocol");
   assert.match(out.error.message, /0\.1/);
-  assert.match(out.error.message, /0\.5/);
+  assert.match(out.error.message, /0\.6/);
 });
 
 test("protocol missing: exit 2 with code protocol (checked before direction)", async () => {
@@ -336,11 +345,13 @@ test("directReads / directEffects: written first, then carried, duplicates folde
   const record = lookup(view.program, "server.record");
   assert.equal(record?.kind, "op");
   if (record?.kind !== "op") return;
-  assert.deepEqual(directReads(record), ["db", "session"]);
-  assert.deepEqual(directEffects(record), ["server.UserCreated", "login", "logout"]);
-  const both = { ...record, reads: ["session", "x"], effects: ["logout"] };
-  assert.deepEqual(directReads(both), ["session", "x", "db"]);
-  assert.deepEqual(directEffects(both), ["logout", "server.UserCreated", "login"]);
+  const state = (s: string): ReadRef => ({ kind: "direct", state: s });
+  const named = (e: string): EffectRef => ({ effect: e, kind: "named" });
+  assert.deepEqual(directReads(record), [state("db"), state("session")]);
+  assert.deepEqual(directEffects(record), [named("server.UserCreated"), named("login"), named("logout")]);
+  const both: Op = { ...record, reads: [state("session"), state("x")], effects: [named("logout")] };
+  assert.deepEqual(directReads(both), [state("session"), state("x"), state("db")]);
+  assert.deepEqual(directEffects(both), [named("logout"), named("server.UserCreated"), named("login")]);
   // 元の op は変えない
   assert.deepEqual(record.reads, []);
   // デコレータが何も運ばない op は、書いたものだけ
@@ -348,4 +359,58 @@ test("directReads / directEffects: written first, then carried, duplicates folde
   if (findUser?.kind !== "op") return assert.fail("server.findUser is not an op");
   assert.deepEqual(directReads(findUser), findUser.reads);
   assert.deepEqual(directEffects(findUser), findUser.effects);
+});
+
+// 要素は値として比べられないので sameRef で見る（docs/packages.md「`ir`（公開）」）。
+test("sameRef: named and direct elements are different even for the same name", () => {
+  const namedRead: ReadRef = { kind: "named", read: "s.x" };
+  const directRead: ReadRef = { kind: "direct", state: "s.x" };
+  const namedEffect: EffectRef = { effect: "s.x", kind: "named" };
+  const post: EffectRef = { kind: "direct", operation: "post", state: "s.x" };
+  const put: EffectRef = { kind: "direct", operation: "put", state: "s.x" };
+  const all = [namedRead, directRead, namedEffect, post, put];
+  all.forEach((a, i) => all.forEach((b, j) => assert.equal(sameRef(a, b), i === j, `${i} / ${j}`)));
+  assert.ok(sameRef(post, { ...post }));
+  // 同じ要素は、directEffects で一つに寄る（参照が違っても）
+  const record = lookup(view.program, "server.record");
+  if (record?.kind !== "op") return assert.fail("server.record is not an op");
+  assert.deepEqual(directEffects({ ...record, effects: [post, { ...post }], carried: { reads: [], effects: [{ ...post }] } }), [post]);
+});
+
+// Go の ir.Program.ReadState / ReadStates / EffectWrites と同じ（docs/packages.md「`ir`（公開）」）。
+test("readState / readStates / effectWrites: named elements follow the declaration, direct ones carry the state", () => {
+  const p = view.program;
+  assert.equal(readState(p, { kind: "named", read: "server.userById" }), "db");
+  assert.equal(readState(p, { kind: "direct", state: "session" }), "session");
+  assert.equal(readState(p, { kind: "named", read: "no.such" }), undefined);
+  assert.equal(readState(p, { kind: "named", read: "server.findUser" }), undefined); // read の宣言でない
+  const findUser = lookup(p, "server.findUser");
+  if (findUser?.kind !== "op") return assert.fail("server.findUser is not an op");
+  assert.deepEqual(readStates(p, findUser.reads), ["db", "session"]);
+  // 重複は最初の出現に寄せ、宣言のない要素は飛ばす
+  assert.deepEqual(
+    readStates(p, [{ kind: "direct", state: "session" }, { kind: "named", read: "no.such" }, ...findUser.reads]),
+    ["session", "db"],
+  );
+  assert.deepEqual(effectWrites(p, { effect: "server.UserCreated", kind: "named" }), ["db"]);
+  assert.deepEqual(effectWrites(p, { kind: "direct", operation: "delete", state: "session" }), ["session"]);
+  assert.equal(effectWrites(p, { effect: "no.such", kind: "named" }), undefined);
+});
+
+// Go の ir.Call.CalledOp に当たる（docs/ir.md「配線」の Callee）。
+test("calledOp: only an op callee has a name", () => {
+  const callees: Callee[] = [];
+  for (const ns of view.program.namespaces) {
+    for (const d of ns.decls) {
+      if (d.kind !== "op" || d.body === null) continue;
+      for (const s of d.body.statements) {
+        const call = s.kind === "call" ? s.call : (s.kind === "const" || s.kind === "return") && s.expr.kind === "call" ? s.expr.call : undefined;
+        if (call === undefined) continue;
+        callees.push(call.callee);
+        assert.equal(calledOp(call), call.callee.kind === "op" ? call.callee.op : undefined);
+      }
+    }
+  }
+  // ゴールデンには、三つの呼び出し先がすべてある
+  assert.deepEqual([...new Set(callees.map((c) => c.kind))].sort(), ["effect", "op", "read"]);
 });

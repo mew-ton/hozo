@@ -106,8 +106,8 @@ func TestExampleLogout(t *testing.T) {
 
 // TestExamplePlaceOrder は §7.3 の placeOrder。設計書の原文は葉の op に
 // `effects createOrder | notifyUser throws NotificationFailed keeps createOrder prevents notifyUser` と書くが、
-// 葉の op が直に持つ効果は一つまで（EFF-3。docs/decisions.md S8）で、prevents / keeps の目的語は effects だけ（S9）なので、
-// 効果ごとの葉の op を配線でつなぐ。例外ごとの効果の状態は本体から計算され、原文が書いていた関係と同じになる。
+// 葉の op は effects の節を書けず（STATE-5。docs/check.md「葉の op」）、prevents / keeps の目的語は effects だけ（docs/decisions.md S9）
+// なので、効果ごとの葉の op を配線でつなぐ。例外ごとの効果の状態は本体から計算され、原文が書いていた関係と同じになる。
 func TestExamplePlaceOrder(t *testing.T) {
 	base := func() []ir.Decl {
 		return []ir.Decl{

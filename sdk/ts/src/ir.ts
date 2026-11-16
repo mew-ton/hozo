@@ -9,7 +9,8 @@ export type HozoIR = Program | View;
 /**
  * 宣言（docs/ir.md「Program」の Decl）。kind で分ける。
  */
-export type Decl = Model | Scalar | Union | State | Exception | Effect | Classify | Decorator | Op;
+export type Decl =
+  Model | Scalar | Union | State | Exception | Effect | Read | Classify | Decorator | Op;
 /**
  * デコレータの引数の値の種類（docs/ir.md「デコレータの適用」）。kind で分ける。
  */
@@ -51,13 +52,15 @@ export type DecidedBy = "type" | "predicate";
  */
 export type ClassifySubject = TypeSubject | OpSubject | StatesSubject;
 export type CatchMode = "recovers" | "halts" | "ignores";
+export type EffectRef = NamedEffect | DirectEffect;
 /**
  * デコレータの引数の型（docs/ir.md「decorator」の ParamType）。
  */
 export type ParamType = TypeParam | AnyParam;
 export type AnyOf = "exception" | "effect" | "state" | "op" | "model" | "variant";
+export type ReadRef = NamedRead | DirectRead;
 export type DecoratorTarget =
-  "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect";
+  "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read";
 export type RelationKind = "prevents" | "keeps";
 /**
  * 配線の文（docs/ir.md「配線」）。kind で分ける。
@@ -71,6 +74,7 @@ export type Expr = CallExpr | MatchExpr | AtomExpr;
  * 式の葉（docs/ir.md「配線」）。kind で分ける。
  */
 export type Atom = NameAtom | StateAtom | LiteralAtom | NoneAtom | RecordAtom;
+export type Callee = OpCallee | ReadCallee | EffectCallee;
 /**
  * match のアームの本体（docs/ir.md「配線」）。call、atom、none、throw のどれか。
  */
@@ -91,7 +95,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.5";
+  version: "0.6";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -357,8 +361,16 @@ export interface Exception {
   description?: Doc;
   kind: "exception";
   name: string;
+  params: OpParam[];
   span: Span;
-  value?: Type;
+}
+/**
+ * op の引数（docs/ir.md「op」）。
+ */
+export interface OpParam {
+  name: string;
+  span: Span;
+  type: Type;
 }
 /**
  * effect 宣言（docs/ir.md「state / exception / effect」）。宛先（target）は一つだけ。writes は書き込む基底の状態の FQN。
@@ -368,6 +380,7 @@ export interface Effect {
   description?: Doc;
   kind: "effect";
   name: string;
+  params: OpParam[];
   span: Span;
   target: EffectTarget;
   writes: string[];
@@ -388,6 +401,16 @@ export interface TransitionTarget {
   kind: "transition";
   of: string;
   to: CaseSet;
+}
+export interface Read {
+  decorators: Application[];
+  description?: Doc;
+  kind: "read";
+  name: string;
+  params: OpParam[];
+  returns: Type;
+  span: Span;
+  state: string;
 }
 /**
  * classify 宣言（docs/ir.md「classify」）。cases に default は含まない。
@@ -453,12 +476,13 @@ export interface Decorator {
   catches: CatchesClause[];
   decorators: Application[];
   description?: Doc;
-  effects: string[];
+  effects: EffectRef[];
   external: boolean;
   kind: "decorator";
   name: string;
   params: Param[];
-  reads: string[];
+  reads: ReadRef[];
+  repeatable: boolean;
   span: Span;
   targets: DecoratorTarget[];
   throws: ThrowsClause[];
@@ -477,6 +501,15 @@ export interface CatchesClause {
   exceptions: string[];
   halts?: string;
   mode: CatchMode;
+}
+export interface NamedEffect {
+  effect: string;
+  kind: "named";
+}
+export interface DirectEffect {
+  kind: "direct";
+  operation: Operation;
+  state: string;
 }
 /**
  * デコレータの引数（docs/ir.md「decorator」の Param）。
@@ -509,6 +542,14 @@ export interface EffectOn {
   operation: Operation;
   state: string;
 }
+export interface NamedRead {
+  kind: "named";
+  read: string;
+}
+export interface DirectRead {
+  kind: "direct";
+  state: string;
+}
 /**
  * throws の一節（docs/ir.md「decorator」）。exceptions はデコレータの引数名なら "$param:名前"。
  */
@@ -530,12 +571,12 @@ export interface Op {
   carried: Carried;
   decorators: Application[];
   description?: Doc;
-  effects: string[];
+  effects: EffectRef[];
   exported: boolean;
   kind: "op";
   name: string;
   params: OpParam[];
-  reads: string[];
+  reads: ReadRef[];
   returns: Type | null;
   signature: Signature;
   span: Span;
@@ -563,7 +604,7 @@ export interface CallExpr {
 export interface Call {
   args: CallArg[];
   bound: BoundPosition[];
-  op: string;
+  callee: Callee;
   span: Span;
 }
 /**
@@ -612,6 +653,18 @@ export interface BoundPosition {
   path: string[];
   state: string;
 }
+export interface OpCallee {
+  kind: "op";
+  op: string;
+}
+export interface ReadCallee {
+  kind: "read";
+  read: string;
+}
+export interface EffectCallee {
+  effect: EffectRef;
+  kind: "effect";
+}
 export interface MatchExpr {
   kind: "match";
   match: Match;
@@ -648,6 +701,7 @@ export interface NoneBody {
  * アームの本体の throw（docs/ir.md「配線」）。exception は FQN。
  */
 export interface ThrowBody {
+  args: CallArg[];
   exception: string;
   kind: "throw";
   span: Span;
@@ -688,22 +742,14 @@ export interface MatchStmt {
   span: Span;
 }
 export interface Carried {
-  effects: string[];
-  reads: string[];
-}
-/**
- * op の引数（docs/ir.md「op」）。
- */
-export interface OpParam {
-  name: string;
-  span: Span;
-  type: Type;
+  effects: EffectRef[];
+  reads: ReadRef[];
 }
 /**
  * 計算結果の関数の型 Sig(O, v)（docs/ir.md「op」、docs/check.md「計算」）。
  */
 export interface Signature {
-  effects: string[];
+  effects: EffectRef[];
   exceptions: string[];
   pure: boolean;
   reads: string[];
@@ -714,7 +760,7 @@ export interface Signature {
  * 例外が起きたときの効果の状態（docs/ir.md「op」の Signature.relations）。
  */
 export interface SignatureRelation {
-  effect: string;
+  effect: EffectRef;
   exception: string;
   state: EffectState;
 }
@@ -722,7 +768,7 @@ export interface SignatureRelation {
  * 成功のアームでの効果の状態（docs/ir.md「op」の Signature.successEffects）。
  */
 export interface SuccessEffect {
-  effect: string;
+  effect: EffectRef;
   state: EffectState;
 }
 /**
@@ -738,7 +784,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.5";
+  version: "0.6";
   viewer: string;
 }
 /**
@@ -765,7 +811,7 @@ export interface NamespaceConfig {
  */
 export interface ViewedSignature {
   bound: BoundPosition[];
-  effects: string[];
+  effects: EffectRef[];
   exceptions: string[];
   params: OpParam[];
   pure: boolean;

@@ -826,7 +826,60 @@
         {
           "kind": "read",
           "name": "server.userById",
-          "decorators": [],
+          "decorators": [
+            {
+              "decorator": "server.only",
+              "args": [
+                {
+                  "param": "column",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "active"
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 1
+                },
+                "end": {
+                  "line": 25,
+                  "col": 16
+                }
+              }
+            },
+            {
+              "decorator": "server.only",
+              "args": [
+                {
+                  "param": "column",
+                  "value": {
+                    "kind": "literal",
+                    "literal": {
+                      "kind": "string",
+                      "value": "verified"
+                    }
+                  }
+                }
+              ],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 25,
+                  "col": 18
+                },
+                "end": {
+                  "line": 25,
+                  "col": 35
+                }
+              }
+            }
+          ],
           "span": {
             "file": "server.hozo",
             "start": {
@@ -835,7 +888,7 @@
             },
             "end": {
               "line": 25,
-              "col": 50
+              "col": 90
             }
           },
           "params": [
@@ -1285,6 +1338,47 @@
           ],
           "external": false,
           "repeatable": false,
+          "throws": [],
+          "catches": [],
+          "reads": [],
+          "effects": []
+        },
+        {
+          "kind": "decorator",
+          "name": "server.only",
+          "decorators": [],
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 44,
+              "col": 51
+            },
+            "end": {
+              "line": 44,
+              "col": 51
+            }
+          },
+          "params": [
+            {
+              "name": "column",
+              "type": {
+                "kind": "type",
+                "types": [
+                  {
+                    "kind": "core",
+                    "name": "string"
+                  }
+                ]
+              },
+              "optional": false,
+              "rest": false
+            }
+          ],
+          "targets": [
+            "read"
+          ],
+          "external": false,
+          "repeatable": true,
           "throws": [],
           "catches": [],
           "reads": [],

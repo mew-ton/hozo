@@ -1,8 +1,13 @@
 // docs/plugin-go-sqlite.md「出力」: @db.table の付いた状態が一つもなければ、ファイルを出さず warning を一つ。
 
+// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
+// （docs/check.md「デコレータが運ぶ reads と effects」）
+decorator reading(...tables: any state) for op reads tables;
+decorator doing(...targets: any effect) for op effects targets;
+
 namespace app {
   model Row { @db.key @db.text id: string; }
   /** @db.table のない状態は、表の状態ではない */
   state rows: list<Row>;
-  export op findRow(id: string): Row? reads rows;
+  @reading(rows) export op findRow(id: string): Row?;
 }

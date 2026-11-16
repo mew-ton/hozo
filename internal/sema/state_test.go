@@ -45,7 +45,8 @@ namespace shop {
   op me(): Token;
   op gift(line: LineKind.Gift<Line>): Line;
   op normal(line: Line): Line;
-  op order(): Order effects placeOrder;
+  op newOrder(): Order;
+  op order(): Order effects placeOrder { placeOrder(); return newOrder(); }
 
   op view(line: Line): Order {
     match carts by list {
@@ -233,12 +234,12 @@ namespace a {
   effect drain() on s: HasItems -> Empty;
 }`}, false)
 	noErrors(t, res, fs)
-	hasRef(t, res, fs, "a.hozo:5:19 decl a.Phase")
-	hasRef(t, res, fs, "a.hozo:5:26 case a.Phase.Idle")
-	hasRef(t, res, fs, "a.hozo:5:34 case a.Phase.Busy")
-	hasRef(t, res, fs, "a.hozo:6:19 decl a.s")
+	hasRef(t, res, fs, "a.hozo:5:21 decl a.Phase")
+	hasRef(t, res, fs, "a.hozo:5:28 case a.Phase.Idle")
+	hasRef(t, res, fs, "a.hozo:5:36 case a.Phase.Busy")
+	hasRef(t, res, fs, "a.hozo:6:21 decl a.s")
 	for _, s := range refStrings(res, fs) {
-		if s == "a.hozo:6:22 case a.s.HasItems" || s == "a.hozo:6:34 case a.s.Empty" {
+		if s == "a.hozo:6:24 case a.s.HasItems" || s == "a.hozo:6:36 case a.s.Empty" {
 			t.Errorf("組み込みのケースに参照がある: %s", s)
 		}
 	}

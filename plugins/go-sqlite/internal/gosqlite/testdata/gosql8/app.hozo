@@ -3,26 +3,39 @@
 
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 
   // @db.find、@db.list
-  @db.find(rows, "ID")
-  export op findRow(id: string): Row?;
-  @db.list(rows, "notes")
-  export op listRows(note: string): Row[];
+  @db.find
+  read findRowRow(ID: string): Row? on rows;
+  export op findRow(id: string): Row? {
+    return findRowRow(id);
+  }
+  @db.list
+  read listRowsRows(notes: string): Row[] on rows;
+  export op listRows(note: string): Row[] {
+    return listRowsRows(note);
+  }
   // 空の名前
-  @db.list(rows, "")
-  export op listAll(note: string): Row[];
+  @db.list
+  read listAllRows(): Row[] on rows;
+  export op listAll(note: string): Row[] {
+    return listAllRows();
+  }
 
   // @db.delete（op に並べられていない効果のデコレータも、同じに確かめる）
-  @db.delete(rows, "key")
-  effect deleteRow() on rows.delete;
-  @db.delete(rows, "rowid")
-  effect deleteByRowid() on rows.delete;
-  @db.effects(deleteRow)
-  export op removeRow(id: string);
+  @db.delete
+  effect deleteRow(key: string) on rows.delete;
+  @db.delete
+  effect deleteByRowid(rowid: string) on rows.delete;
+  export op removeRow(id: string) {
+    deleteRow(id);
+  }
 
   // 通るもの
-  @db.list(rows, "note")
-  export op listByNote(note: string): Row[];
+  @db.list
+  read listByNoteRows(note: string): Row[] on rows;
+  export op listByNote(note: string): Row[] {
+    return listByNoteRows(note);
+  }
 }

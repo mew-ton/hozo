@@ -3,10 +3,15 @@
 // 位置は当たった宣言（このトランスパイラの名前どうしなら、後ろの宣言）。
 
 // Schema と CreateTables が、型の名前と当たる
+// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
+// （docs/check.md「デコレータが運ぶ reads と effects」）
+decorator reading(...tables: any state) for op reads tables;
+decorator doing(...targets: any effect) for op effects targets;
+
 namespace fixed {
   model Schema { @db.key @db.text id: string; }
   exception CreateTables;
-  @db.table(Schema) state rows: list<Schema>;
+  @db.table state rows: list<Schema>;
 }
 
 // <状態>Table が scalar と、New<状態>Table が model と当たる
@@ -14,33 +19,33 @@ namespace table {
   model Row { @db.key @db.text id: string; }
   scalar UsersTable extends string;
   model NewUsersTable { n: int; }
-  @db.table(Row) state users: list<Row>;
+  @db.table state users: list<Row>;
 }
 
 // <状態>Table が、effect の定数、述語で決まる分類のケースの定数、判定関数、union のアームを包む型と当たる
 namespace consts {
   model Row { @db.key @db.text id: string; }
-  @db.table(Row) state effectLog: list<Row>;
+  @db.table state effectLog: list<Row>;
   effect logTable() on effectLog.post;
-  @db.table(Row) state kind: list<Row>;
+  @db.table state kind: list<Row>;
   classify Kind of string {
     Table;
     Other;
   }
-  @db.table(Row) state classifyKinds: list<Row>;
+  @db.table state classifyKinds: list<Row>;
   classify KindsTable of int {
     Small;
     Large;
   }
-  @db.table(Row) state shape: list<Row>;
+  @db.table state shape: list<Row>;
   union Shape { Table: string; Circle: int; }
 }
 
 // このトランスパイラの公開の名前どうし: 状態 users の New<状態>Table と、状態 newUsers の <状態>Table
 namespace own {
   model Row { @db.key @db.text id: string; }
-  @db.table(Row) state users: list<Row>;
-  @db.table(Row) state newUsers: list<Row>;
+  @db.table state users: list<Row>;
+  @db.table state newUsers: list<Row>;
 }
 
 // SharedTable と NewSharedTable: 出すとき（SharedState の op に @db.effects がある）だけ、当たる。
@@ -48,14 +53,17 @@ namespace own {
 namespace across {
   model Row { @db.key @db.text id: string; }
   model NewSharedTable { n: int; }
-  @db.table(Row) state shared: list<Row>;
-  @db.table(Row) state other: list<Row>;
-  @db.insert(shared)
-  effect createShared() on shared.post;
-  @db.insert(other)
-  effect createOther() on other.post;
-  @db.effects(createShared, createOther)
-  export op addBoth(first: Row, second: Row);
+  @db.table state shared: list<Row>;
+  @db.table state other: list<Row>;
+  @db.insert
+  effect createShared(row: Row) on shared.post;
+  @db.insert
+  effect createOther(row: Row) on other.post;
+  @db.transaction
+  export op addBoth(first: Row, second: Row) {
+    createShared(first);
+    createOther(second);
+  }
 }
 
 // <C>Table と New<C>Table: 出すとき（述語で決まる状態の分類の命令に @db.effects がある）だけ、当たる
@@ -65,7 +73,7 @@ namespace sorted {
   exception NewOrderTable;
   /** 命令に @db.effects のない分類の <C>Table は出さないので、当たらない */
   model QuietTable { n: int; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
   classify Order of rows {
     Sorted;
     Mixed;
@@ -74,17 +82,18 @@ namespace sorted {
     Still;
     Moving;
   }
-  @db.insert(rows)
-  effect sortRows() on Order: Mixed -> Sorted;
+  @db.insert
+  effect sortRows(row: Row) on Order: Mixed -> Sorted;
   effect settle() on Quiet: Moving -> Still;
-  @db.effects(sortRows)
-  export op insertSorted(row: Row);
-  export op calm() effects settle;
+  export op insertSorted(row: Row) {
+    sortRows(row);
+  }
+  @doing(settle) export op calm();
 }
 
 // 当たらない名前空間には、出ない。SharedTable を出さないなら、model SharedTable とも当たらない
 namespace clean {
   model Row { @db.key @db.text id: string; }
   model SharedTable { n: int; }
-  @db.table(Row) state users: list<Row>;
+  @db.table state users: list<Row>;
 }

@@ -3,19 +3,19 @@
 namespace app {
   scalar Name extends string;
   /** 表の model でない model のフィールドは、見ない */
-  model Tag { @db.nullable name: string; }
+  model Tag { name: string; }
 
   model Row {
     @db.key @db.text id: string;
-    @db.nullable @db.text note: string;
-    @db.nullable @db.text name: Name;
+    @db.text note: string;
+    @db.text name: Name;
     // 配列と record も、? がなければ、省略可能でない
-    @db.nullable @db.json tags: string[];
-    @db.nullable @db.json tag: Tag;
+    @db.json tags: string[];
+    @db.json tag: Tag;
     // 通るもの
-    @db.nullable @db.int rank: int?;
-    @db.nullable @db.json more: string[]?;
+    @db.int rank: int?;
+    @db.json more: string[]?;
   }
 
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 }

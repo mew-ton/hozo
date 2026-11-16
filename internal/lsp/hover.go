@@ -534,8 +534,8 @@ func (r *renderer) argValue(v ir.ArgValue) string {
 	return "?"
 }
 
-// effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect createSession on sessions.post`、
-// `effect placeOrder on Checkout: Shopping -> Ordered`）。宛先が決まっていなければ空。
+// effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect createSession(session: Session) on sessions.post`、
+// `effect placeOrder() on Checkout: Shopping -> Ordered` の on から後ろ）。宛先が決まっていなければ空。
 func (r *renderer) effectTarget(t ir.EffectTarget) string {
 	switch t := t.(type) {
 	case ir.BuiltinTarget:

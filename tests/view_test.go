@@ -105,8 +105,9 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "namespaces[web] は config だけ", v.Namespaces["web"], []ir.NamespaceConfig{v.Config})
 		// ops はすべての op について
 		expect(t, "ops のキー（export の有無によらず、すべての op）", keysOf(v.Ops), []string{
-			"api.currentName", "api.findByName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.idle", "api.login", "api.logout", "api.nameOf",
-			"api.renew", "api.rotate", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.viaAlias",
+			"api.currentName", "api.findByName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.idle", "api.issue", "api.keep",
+			"api.login", "api.logout", "api.mint", "api.nameOf",
+			"api.renew", "api.rotate", "api.sessionOf", "api.signIn", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.verify", "api.viaAlias", "api.whenLive",
 			"web.adminPageVm", "web.clearToken", "web.fetchUser", "web.greet", "web.login", "web.openUser",
 			"web.reload", "web.signOut", "web.userPageVm", "web.welcome",
 		})
@@ -530,7 +531,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "binds", renderBinds(prog.Binds), []string{"web: bind web.token to api.*"})
 	})
 
-	t.Run("check.md 計算/Sig 葉", func(t *testing.T) {
+	t.Run("check.md 計算/Sig 効果を呼ぶ配線", func(t *testing.T) {
 		expect(t, "api.login（prevents effects）", sigOf(opOf(t, prog, "api.login").Signature), sig{
 			E: []string{"api.Invalid"}, F: []string{"api.createSession"},
 			Rel: []string{"api.Invalid / api.createSession = prevented"}, Succ: []string{"api.createSession = kept"},
@@ -586,14 +587,14 @@ func TestViewFromEntry(t *testing.T) {
 
 	t.Run("check.md 計算/reads", func(t *testing.T) {
 		reads := func(name string) []string { return orEmptyStrings(opOf(t, prog, name).Signature.Reads) }
-		expect(t, "葉の op の R は Op.reads", reads("api.findUser"), []string{"api.users", "api.sessions"})
+		expect(t, "配線の R: 呼んだ read の宛先の状態（行の順）", reads("api.findUser"), []string{"api.users", "api.sessions"})
 		expect(t, "配線の R: 呼び出し先の R が伝わる", reads("api.currentName"), []string{"api.users", "api.sessions"})
 		expect(t, "配線の R: match の対象と、アームの値が参照する状態", reads("api.tokenOrNone"), []string{"api.current"})
 		expect(t, "配線の R: return の値が参照する状態", reads("api.greeting"), []string{"api.motd"})
 		expect(t, "配線の R: match by C は C の対象の状態", reads("api.guard"), []string{"api.current"})
 		// bind で埋まる位置の状態も読む（Call.bound）。別の名前空間の呼び出し先の R は、そのまま伝わる
 		expect(t, "配線の R: Call.bound の状態", reads("web.fetchUser"), []string{"web.token"})
-		expect(t, "reads を書いていない葉の R は []", reads("api.getUser"), []string{})
+		expect(t, "葉の R は、運ばれたものだけ（なければ []）", reads("api.getUser"), []string{})
 		// R は見る側によらない
 		expect(t, "web から見た api.findUser の reads", v.Ops["api.findUser"].Reads, []string{"api.users", "api.sessions"})
 	})
@@ -657,8 +658,8 @@ func TestViewFromEntry(t *testing.T) {
 	t.Run("check.md 計算/配線 効果の伝播", func(t *testing.T) {
 		// F は各呼び出しの effects を行の順に連結したもの（書いていない effects は Op.effects が [] でも Signature にある）
 		expect(t, "signOut の Op.effects", effectStrings(opOf(t, prog, "web.signOut").Effects), []string{})
-		expect(t, "signOut の Signature.effects", opOf(t, prog, "web.signOut").Signature.Effects, []string{"api.deleteSession", "web.removeToken"})
-		expect(t, "reload の Signature.effects", opOf(t, prog, "web.reload").Signature.Effects, []string{"api.touchUser"})
+		expect(t, "signOut の Signature.effects", effectStrings(opOf(t, prog, "web.signOut").Signature.Effects), []string{"api.deleteSession", "web.removeToken"})
+		expect(t, "reload の Signature.effects", effectStrings(opOf(t, prog, "web.reload").Signature.Effects), []string{"api.touchUser"})
 	})
 
 	t.Run("check.md bind/Pos", func(t *testing.T) {
@@ -708,7 +709,7 @@ func TestViewFromEntry(t *testing.T) {
 		if r, ok := signOut["returns"]; !ok || r != nil {
 			t.Errorf("void の op の returns は null で出す: %v", signOut["returns"])
 		}
-		greet := jsonDecl(t, web, "web.greet")
+		greet := jsonDecl(t, web, "web.userPageVm")
 		if b, ok := greet["body"]; !ok || b != nil {
 			t.Errorf("葉の op の body は null で出す: %v", greet["body"])
 		}
@@ -919,17 +920,18 @@ func TestStateCorpusIR(t *testing.T) {
 		})
 	})
 
-	t.Run("check.md 状態と効果/EFF-3、計算/手順 0（配線）", func(t *testing.T) {
-		// 葉の op が直に持つ効果は一つ。二つの効果を持つ login は、効果ごとの葉の op を順に呼ぶ配線（docs/decisions.md S8）
+	t.Run("check.md 状態と効果/STATE-5、計算/手順 0（配線）", func(t *testing.T) {
+		// 葉の op は状態に触れない（reads / effects の節を書けない）。効果を持つのは、効果を呼ぶ配線
 		for _, ns := range prog.Namespaces {
 			for _, d := range ns.Decls {
-				if o, ok := d.(*ir.Op); ok && o.Body == nil && len(o.Effects) > 1 {
-					t.Errorf("葉の op %s が効果を二つ以上持っている: %v", o.Name, o.Effects)
+				if o, ok := d.(*ir.Op); ok && o.Body == nil && len(o.Effects)+len(o.Reads) > 0 {
+					t.Errorf("葉の op %s が reads / effects の節を持っている: %v %v", o.Name, o.Reads, o.Effects)
 				}
 			}
 		}
-		expect(t, "storeToken の effects", opOf(t, prog, "shop.storeToken").Effects, []string{"shop.saveToken"})
-		expect(t, "markLoggedIn の effects", opOf(t, prog, "shop.markLoggedIn").Effects, []string{"shop.signIn"})
+		expect(t, "storeToken の effects（節に書いたもの）", effectStrings(opOf(t, prog, "shop.storeToken").Effects), []string{"shop.saveToken"})
+		expect(t, "storeToken の本体（効果の呼び出し）", renderBody(opOf(t, prog, "shop.storeToken").Body), []string{"shop.saveToken(token: token)"})
+		expect(t, "markLoggedIn の effects", effectStrings(opOf(t, prog, "shop.markLoggedIn").Effects), []string{"shop.signIn"})
 		login := opOf(t, prog, "shop.login")
 		expect(t, "login の本体", renderBody(login.Body), []string{"shop.storeToken(token: token)", "shop.markLoggedIn()"})
 		expect(t, "login の effects（宣言）", effectStrings(login.Effects), []string{})

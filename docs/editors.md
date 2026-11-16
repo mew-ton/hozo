@@ -42,7 +42,7 @@ editors/vscode/
 | `...`（残りの引数） | `keyword.operator.rest.hozo` | 記号そのもの（`docs/grammar.md`「decorator の宣言」の `RestParam`） |
 | `@external`、`@repeatable` | `storage.modifier.hozo` | 核の印でデコレータではない（`docs/grammar.md`「予約語」）ので、デコレータより先に拾う |
 | 宣言の名前 | `entity.name.type.hozo`（model / scalar / union / exception / classify / condition）、`entity.name.function.hozo`（op / effect / read / decorator）、`variable.other.hozo`（state） | 宣言の頭の予約語の直後の `Ident`（`exception`、`effect`、`read` は、その後ろに引数の括弧が続いてもよい）。`decorator` の直後は `DecoratorName` で、予約語でも（`decorator list(…)`、`decorator effects(…)`）宣言の名前として塗る |
-| 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`extends` / `of` / `as` の後、`<` の中、`throws` / `catches` / `throw` の後、`by` の後（`match x by store.Registration`）の `QualifiedName` のうち、最後の要素が大文字で始まるもの（§3.3 の命名規則。`:` は値の位置（名前で渡す引数、レコードリテラル）にも現れるので、小文字で始まる名前は型にしない。`of` の後ろの op や状態の名前、`as` の前の op や状態の名前、`reads` の後ろの `read` や状態の名前は小文字で始まるので、scope を付けない。`throws` / `catches` の並びの `,` は記号で、scope を付けない） |
+| 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`extends` / `of` / `as` の後、`<` の中、`throws` / `catches` / `throw` の後、`by` の後（`match x by store.Registration`）の `QualifiedName` のうち、最後の要素が大文字で始まるもの（§3.3 の命名規則。`:` は値の位置（名前で渡す引数、レコードリテラル）にも現れるので、小文字で始まる名前は型にしない。`of` の後ろの op や状態の名前、`as` の前の op や状態の名前、`reads` の後ろの `read` や状態の名前は小文字で始まるので、scope を付けない。`throws` / `catches` の並びの `,` は記号で、scope を付けない。`throw` の後ろの型の位置は、引数の `(` の手前で終わり、引数（`throw Invalid("weak")`）は値の位置として塗る） |
 | 文字列 | `string.quoted.double.hozo` | エスケープは `constant.character.escape.hozo` |
 | 数値 | `constant.numeric.hozo` | `Int` / `Float` / `Duration`（単位も含む） |
 | コメント | `comment.line.double-slash.hozo`、`comment.block.hozo` | |

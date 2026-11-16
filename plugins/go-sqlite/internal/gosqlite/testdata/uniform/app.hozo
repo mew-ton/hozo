@@ -16,38 +16,65 @@ namespace plain {
     @db.json j: string[];
   }
 
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 
-  @db.find(rows, "s")
-  export op find(s: string): Row?;
-  @db.list(rows, "i")
-  export op byI(i: int): Row[];
-  @db.list(rows, "d")
-  export op byD(d: Duration): Row[];
-  @db.list(rows, "f")
-  export op byF(f: float): Row[];
-  @db.list(rows, "b")
-  export op byB(b: boolean): Row[];
-  @db.list(rows, "at")
-  export op byAt(at: Time): Row[];
-  @db.list(rows, "j")
-  export op byJ(j: string[]): Row[];
+  @db.find
+  read findRow(s: string): Row? on rows;
+  export op find(s: string): Row? {
+    return findRow(s);
+  }
+  @db.list
+  read byIRows(i: int): Row[] on rows;
+  export op byI(i: int): Row[] {
+    return byIRows(i);
+  }
+  @db.list
+  read byDRows(d: Duration): Row[] on rows;
+  export op byD(d: Duration): Row[] {
+    return byDRows(d);
+  }
+  @db.list
+  read byFRows(f: float): Row[] on rows;
+  export op byF(f: float): Row[] {
+    return byFRows(f);
+  }
+  @db.list
+  read byBRows(b: boolean): Row[] on rows;
+  export op byB(b: boolean): Row[] {
+    return byBRows(b);
+  }
+  @db.list
+  read byAtRows(at: Time): Row[] on rows;
+  export op byAt(at: Time): Row[] {
+    return byAtRows(at);
+  }
+  @db.list
+  read byJRows(j: string[]): Row[] on rows;
+  export op byJ(j: string[]): Row[] {
+    return byJRows(j);
+  }
 
-  @db.insert(rows)
-  effect create() on rows.post;
-  @db.update(rows)
-  effect change() on rows.put;
-  @db.delete(rows, "at")
-  effect drop() on rows.delete;
+  @db.insert
+  effect create(row: Row) on rows.post;
+  @db.update
+  effect change(row: Row) on rows.put;
+  @db.delete
+  effect drop(at: Time) on rows.delete;
 
-  @db.effects(create)
-  export op add(row: Row);
-  @db.effects(change)
-  export op save(row: Row);
-  @db.effects(drop)
-  export op remove(at: Time);
-  @db.effects(drop, create)
-  export op swap(at: Time, row: Row);
+  export op add(row: Row) {
+    create(row);
+  }
+  export op save(row: Row) {
+    change(row);
+  }
+  export op remove(at: Time) {
+    drop(at);
+  }
+  @db.transaction
+  export op swap(at: Time, row: Row) {
+    drop(at);
+    create(row);
+  }
 }
 
 /** scalar */
@@ -70,38 +97,65 @@ namespace named {
     @db.json j: Record<string, Tag>;
   }
 
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 
-  @db.find(rows, "s")
-  export op find(s: S): Row?;
-  @db.list(rows, "i")
-  export op byI(i: I): Row[];
-  @db.list(rows, "d")
-  export op byD(d: D): Row[];
-  @db.list(rows, "f")
-  export op byF(f: F): Row[];
-  @db.list(rows, "b")
-  export op byB(b: B): Row[];
-  @db.list(rows, "at")
-  export op byAt(at: At): Row[];
-  @db.list(rows, "j")
-  export op byJ(j: Record<string, Tag>): Row[];
+  @db.find
+  read findRow(s: S): Row? on rows;
+  export op find(s: S): Row? {
+    return findRow(s);
+  }
+  @db.list
+  read byIRows(i: I): Row[] on rows;
+  export op byI(i: I): Row[] {
+    return byIRows(i);
+  }
+  @db.list
+  read byDRows(d: D): Row[] on rows;
+  export op byD(d: D): Row[] {
+    return byDRows(d);
+  }
+  @db.list
+  read byFRows(f: F): Row[] on rows;
+  export op byF(f: F): Row[] {
+    return byFRows(f);
+  }
+  @db.list
+  read byBRows(b: B): Row[] on rows;
+  export op byB(b: B): Row[] {
+    return byBRows(b);
+  }
+  @db.list
+  read byAtRows(at: At): Row[] on rows;
+  export op byAt(at: At): Row[] {
+    return byAtRows(at);
+  }
+  @db.list
+  read byJRows(j: Record<string, Tag>): Row[] on rows;
+  export op byJ(j: Record<string, Tag>): Row[] {
+    return byJRows(j);
+  }
 
-  @db.insert(rows)
-  effect create() on rows.post;
-  @db.update(rows)
-  effect change() on rows.put;
-  @db.delete(rows, "at")
-  effect drop() on rows.delete;
+  @db.insert
+  effect create(row: Row) on rows.post;
+  @db.update
+  effect change(row: Row) on rows.put;
+  @db.delete
+  effect drop(at: At) on rows.delete;
 
-  @db.effects(create)
-  export op add(row: Row);
-  @db.effects(change)
-  export op save(row: Row);
-  @db.effects(drop)
-  export op remove(at: At);
-  @db.effects(drop, create)
-  export op swap(at: At, row: Row);
+  export op add(row: Row) {
+    create(row);
+  }
+  export op save(row: Row) {
+    change(row);
+  }
+  export op remove(at: At) {
+    drop(at);
+  }
+  @db.transaction
+  export op swap(at: At, row: Row) {
+    drop(at);
+    create(row);
+  }
 }
 
 /** 省略可能（@db.nullable） */
@@ -109,45 +163,72 @@ namespace sparse {
   model Tag { name: string; }
 
   model Row {
-    @db.nullable @db.key @db.text s: string?;
-    @db.nullable @db.int i: int?;
-    @db.nullable @db.int d: Duration?;
-    @db.nullable @db.float f: float?;
-    @db.nullable @db.bool b: boolean?;
-    @db.nullable @db.time at: Time?;
-    @db.nullable @db.json j: Tag?;
+    @db.key @db.text s: string?;
+    @db.int i: int?;
+    @db.int d: Duration?;
+    @db.float f: float?;
+    @db.bool b: boolean?;
+    @db.time at: Time?;
+    @db.json j: Tag?;
   }
 
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 
-  @db.find(rows, "s")
-  export op find(s: string?): Row?;
-  @db.list(rows, "i")
-  export op byI(i: int?): Row[];
-  @db.list(rows, "d")
-  export op byD(d: Duration?): Row[];
-  @db.list(rows, "f")
-  export op byF(f: float?): Row[];
-  @db.list(rows, "b")
-  export op byB(b: boolean?): Row[];
-  @db.list(rows, "at")
-  export op byAt(at: Time?): Row[];
-  @db.list(rows, "j")
-  export op byJ(j: Tag?): Row[];
+  @db.find
+  read findRow(s: string?): Row? on rows;
+  export op find(s: string?): Row? {
+    return findRow(s);
+  }
+  @db.list
+  read byIRows(i: int?): Row[] on rows;
+  export op byI(i: int?): Row[] {
+    return byIRows(i);
+  }
+  @db.list
+  read byDRows(d: Duration?): Row[] on rows;
+  export op byD(d: Duration?): Row[] {
+    return byDRows(d);
+  }
+  @db.list
+  read byFRows(f: float?): Row[] on rows;
+  export op byF(f: float?): Row[] {
+    return byFRows(f);
+  }
+  @db.list
+  read byBRows(b: boolean?): Row[] on rows;
+  export op byB(b: boolean?): Row[] {
+    return byBRows(b);
+  }
+  @db.list
+  read byAtRows(at: Time?): Row[] on rows;
+  export op byAt(at: Time?): Row[] {
+    return byAtRows(at);
+  }
+  @db.list
+  read byJRows(j: Tag?): Row[] on rows;
+  export op byJ(j: Tag?): Row[] {
+    return byJRows(j);
+  }
 
-  @db.insert(rows)
-  effect create() on rows.post;
-  @db.update(rows)
-  effect change() on rows.put;
-  @db.delete(rows, "at")
-  effect drop() on rows.delete;
+  @db.insert
+  effect create(row: Row) on rows.post;
+  @db.update
+  effect change(row: Row) on rows.put;
+  @db.delete
+  effect drop(at: Time?) on rows.delete;
 
-  @db.effects(create)
-  export op add(row: Row);
-  @db.effects(change)
-  export op save(row: Row);
-  @db.effects(drop)
-  export op remove(at: Time?);
-  @db.effects(drop, create)
-  export op swap(at: Time?, row: Row);
+  export op add(row: Row) {
+    create(row);
+  }
+  export op save(row: Row) {
+    change(row);
+  }
+  export op remove(at: Time?) {
+    drop(at);
+  }
+  @db.transaction
+  export op swap(at: Time?, row: Row) {
+    drop(at);
+    create(row);
+  }
 }

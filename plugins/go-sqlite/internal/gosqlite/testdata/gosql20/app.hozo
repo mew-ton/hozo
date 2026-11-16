@@ -4,7 +4,7 @@
 /** 別の名前空間の表 */
 namespace far {
   model Row { @db.key @db.text id: string; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 }
 
 namespace app {
@@ -28,13 +28,13 @@ namespace app {
     @db.ref(far.Row) @db.text far: string;
     // 通るもの（自分の表も指せる）
     @db.ref(User) @db.text user: string;
-    @db.nullable @db.ref(Link) @db.text parent: string?;
+    @db.ref(Link) @db.text parent: string?;
   }
 
-  @db.table(Twin) state twinsA: list<Twin>;
-  @db.table(Twin) state twinsB: list<Twin>;
-  @db.table(Pair) state pairs: list<Pair>;
-  @db.table(Log) state logs: list<Log>;
-  @db.table(User) state users: list<User>;
-  @db.table(Link) state links: list<Link>;
+  @db.table state twinsA: list<Twin>;
+  @db.table state twinsB: list<Twin>;
+  @db.table state pairs: list<Pair>;
+  @db.table state logs: list<Log>;
+  @db.table state users: list<User>;
+  @db.table state links: list<Link>;
 }

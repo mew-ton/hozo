@@ -16,7 +16,7 @@ namespace shop {
     @db.time addedAt: Time;
     @db.json tags: string[];
     /** 値がなくてよい列 */
-    @db.nullable @db.text note: string?;
+    @db.text note: string?;
   }
 
   /** キーが二つ */
@@ -32,101 +32,157 @@ namespace shop {
     @db.time at: Time;
   }
 
-  @db.table(Item) state items: list<Item>;
-  @db.table(Stock) state stock: list<Stock>;
-  @db.table(Audit) state audits: list<Audit>;
+  @db.table state items: list<Item>;
+  @db.table state stock: list<Stock>;
+  @db.table state audits: list<Audit>;
 
   // ---- 読む op ----
 
   // @db.find: 列が、ただ一つの @db.key
-  @db.find(items, "id")
-  export op findItem(id: ItemId): Item?;
+  @db.find
+  read findItemRow(id: ItemId): Item? on items;
+  export op findItem(id: ItemId): Item? {
+    return findItemRow(id);
+  }
   // @db.find: 列が @db.unique
-  @db.find(items, "sku")
-  export op findBySku(sku: Sku): Item?;
+  @db.find
+  read findBySkuRow(sku: Sku): Item? on items;
+  export op findBySku(sku: Sku): Item? {
+    return findBySkuRow(sku);
+  }
   // @db.list: 列を渡さない（引数はない）
-  @db.list(items)
-  export op listItems(): Item[];
+  @db.list
+  read listItemsRows(): Item[] on items;
+  export op listItems(): Item[] {
+    return listItemsRows();
+  }
   // @db.list: @db.int の列
-  @db.list(items, "shelf")
-  export op listOnShelf(shelf: Shelf): Item[];
+  @db.list
+  read listOnShelfRows(shelf: Shelf): Item[] on items;
+  export op listOnShelf(shelf: Shelf): Item[] {
+    return listOnShelfRows(shelf);
+  }
   // @db.list: @db.bool の列
-  @db.list(items, "active")
-  export op listActive(active: boolean): Item[];
+  @db.list
+  read listActiveRows(active: boolean): Item[] on items;
+  export op listActive(active: boolean): Item[] {
+    return listActiveRows(active);
+  }
   // @db.list: @db.time の列。引数の名前は、列の名前と違ってよい
-  @db.list(items, "addedAt")
-  export op listAddedAt(at: Time): Item[];
+  @db.list
+  read listAddedAtRows(addedAt: Time): Item[] on items;
+  export op listAddedAt(at: Time): Item[] {
+    return listAddedAtRows(at);
+  }
   // @db.list: @db.json の列
-  @db.list(items, "tags")
-  export op listTagged(tags: string[]): Item[];
+  @db.list
+  read listTaggedRows(tags: string[]): Item[] on items;
+  export op listTagged(tags: string[]): Item[] {
+    return listTaggedRows(tags);
+  }
   // @db.list: 複数の @db.key の一つ（@db.find にはできない列でも、@db.list ならよい）
-  @db.list(stock, "item")
-  export op listStock(item: ItemId): Stock[];
+  @db.list
+  read listStockRows(item: ItemId): Stock[] on stock;
+  export op listStock(item: ItemId): Stock[] {
+    return listStockRows(item);
+  }
   // 列と引数の型: T? の列に、T の引数（値のない行は、どの値にも合わない）
-  @db.list(items, "note")
-  export op listNoted(note: string): Item[];
+  @db.list
+  read listNotedRows(note: string): Item[] on items;
+  export op listNoted(note: string): Item[] {
+    return listNotedRows(note);
+  }
   // 列と引数の型: T? の列に、T? の引数（値がなければ、値のない行）
-  @db.list(items, "note")
-  export op listByNote(note: string?): Item[];
+  @db.list
+  read listByNoteRows(note: string?): Item[] on items;
+  export op listByNote(note: string?): Item[] {
+    return listByNoteRows(note);
+  }
 
   // ---- 効果: 表に何をするか ----
 
-  @db.insert(items)
-  effect createItem() on items.post;
-  @db.update(items)
-  effect updateItem() on items.put;
-  @db.delete(items, "id")
-  effect deleteItem() on items.delete;
-  @db.delete(items, "note")
-  effect deleteNoted() on items.delete;
-  @db.insert(stock)
-  effect createStock() on stock.post;
-  @db.update(stock)
-  effect updateStock() on stock.put;
-  @db.delete(stock, "item")
-  effect deleteStock() on stock.delete;
-  @db.insert(audits)
-  effect createAudit() on audits.post;
+  @db.insert
+  effect createItem(row: Item) on items.post;
+  @db.update
+  effect updateItem(row: Item) on items.put;
+  @db.delete
+  effect deleteItem(id: ItemId) on items.delete;
+  @db.delete
+  effect deleteNoted(note: string?) on items.delete;
+  @db.insert
+  effect createStock(row: Stock) on stock.post;
+  @db.update
+  effect updateStock(row: Stock) on stock.put;
+  @db.delete
+  effect deleteStock(item: ItemId) on stock.delete;
+  @db.insert
+  effect createAudit(row: Audit) on audits.post;
   /** op に並べられていない効果のデコレータも、同じに確かめる（何も出さない） */
-  @db.delete(audits, "item")
-  effect deleteAudit() on audits.delete;
+  @db.delete
+  effect deleteAudit(item: ItemId) on audits.delete;
 
   // ---- 書く op: 効果が一つ ----
 
   // @db.insert
-  @db.effects(createItem)
-  export op addItem(item: Item);
-  @db.effects(createStock)
-  export op addStock(stock: Stock);
+  export op addItem(item: Item) {
+    createItem(item);
+  }
+  export op addStock(stock: Stock) {
+    createStock(stock);
+  }
   // @db.update: キーが一つ
-  @db.effects(updateItem)
-  export op saveItem(item: Item);
+  export op saveItem(item: Item) {
+    updateItem(item);
+  }
   // @db.update: キーが二つ
-  @db.effects(updateStock)
-  export op saveStock(stock: Stock);
+  export op saveStock(stock: Stock) {
+    updateStock(stock);
+  }
   // @db.delete
-  @db.effects(deleteItem)
-  export op removeItem(id: ItemId);
+  export op removeItem(id: ItemId) {
+    deleteItem(id);
+  }
   // @db.delete: @db.nullable の列と、T? の引数（値がなければ、値のない行を消す）
-  @db.effects(deleteNoted)
-  export op removeNoted(note: string?);
+  export op removeNoted(note: string?) {
+    deleteNoted(note);
+  }
 
   // ---- 書く op: 効果が二つ以上（一つのトランザクション） ----
 
   // 宛先の単位が同じ: <状態>Table のメソッド。同じ効果を二度並べてもよい
-  @db.effects(createItem, createItem)
-  export op addTwo(first: Item, second: Item);
+  @db.transaction
+  export op addTwo(first: Item, second: Item) {
+    createItem(first);
+    createItem(second);
+  }
   // 三つの効果のデコレータを、一つの状態に（@db.delete は、行の値を作らない）
-  @db.effects(deleteItem, createItem, updateItem)
-  export op replaceItem(old: ItemId, item: Item, other: Item);
+  @db.transaction
+  export op replaceItem(old: ItemId, item: Item, other: Item) {
+    deleteItem(old);
+    createItem(item);
+    updateItem(other);
+  }
   // @db.delete だけ
-  @db.effects(deleteItem, deleteNoted)
-  export op purge(id: ItemId, note: string?);
+  @db.transaction
+  export op purge(id: ItemId, note: string?) {
+    deleteItem(id);
+    deleteNoted(note);
+  }
   // 宛先の単位が分かれる: SharedTable のメソッド
-  @db.effects(createItem, createStock, createAudit)
-  export op receive(item: Item, stock: Stock, audit: Audit);
-  @db.effects(deleteItem, deleteStock)
-  export op discontinue(id: ItemId, item: ItemId);
-  @db.effects(updateStock, createAudit)
-  export op recount(stock: Stock, audit: Audit);
+  @db.transaction
+  export op receive(item: Item, stock: Stock, audit: Audit) {
+    createItem(item);
+    createStock(stock);
+    createAudit(audit);
+  }
+  @db.transaction
+  export op discontinue(id: ItemId, item: ItemId) {
+    deleteItem(id);
+    deleteStock(item);
+  }
+  @db.transaction
+  export op recount(stock: Stock, audit: Audit) {
+    updateStock(stock);
+    createAudit(audit);
+  }
 }

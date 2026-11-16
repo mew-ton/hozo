@@ -1,5 +1,10 @@
 // docs/plugin-go.md「継ぎ目」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 
+// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
+// （docs/check.md「デコレータが運ぶ reads と effects」）
+decorator reading(...tables: any state) for op reads tables;
+decorator doing(...targets: any effect) for op effects targets;
+
 /** テストの語彙 */
 namespace t {
   /** 継ぎ目を要る（go-rate） */
@@ -43,11 +48,11 @@ namespace shop {
 
   // 「中身」置き場 3〜6（葉）: 口のメソッドの値（状態の命令、状態の問い合わせ、SharedState、Leaves）
   @t.limited
-  export op add(item: Item) effects addItem;
+  @doing(addItem) export op add(item: Item);
   @t.limited
-  export op count(): int reads items;
+  @reading(items) export op count(): int;
   @t.limited
-  export op summary(): string reads items, title;
+  @reading(items, title) export op summary(): string;
   @t.limited
   export op notify(item: Item);
 

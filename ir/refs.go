@@ -1,7 +1,7 @@
 package ir
 
 // ReadRef は reads の要素（docs/ir.md「op」の ReadRef）。名前で書いたか、直に書いたかを要素ごとに持つ
-// （docs/check.md「直に書く要素」）。具体型は値型の [NamedRead]（kind "named"）と [DirectRead]（kind "direct"）で、
+// （docs/check.md「節に書く要素」）。具体型は値型の [NamedRead]（kind "named"）と [DirectRead]（kind "direct"）で、
 // == で比べられ、写像のキーにできる。
 type ReadRef interface {
 	// Kind は JSON の判別子（"named" か "direct"）。
@@ -66,7 +66,7 @@ func UnmarshalReadRef(data []byte) (ReadRef, error) {
 }
 
 // EffectRef は effects の要素（docs/ir.md「op」の EffectRef）。名前で書いたか、直に書いたかを要素ごとに持つ
-// （docs/check.md「直に書く要素」: 直に書いた効果と、同じ宛先の宣言は、別の効果）。具体型は値型の [NamedEffect]
+// （docs/check.md「節に書く要素」: 直に書いた効果と、同じ宛先の宣言は、別の効果）。具体型は値型の [NamedEffect]
 // （kind "named"）と [DirectEffect]（kind "direct"）で、== で比べられ、写像のキーにできる。
 type EffectRef interface {
 	// Kind は JSON の判別子（"named" か "direct"）。
@@ -159,7 +159,7 @@ func NamedEffects(fqns ...string) []EffectRef {
 }
 
 // ReadState は reads の要素 r が読む基底の状態の FQN: 名前で書いた要素なら read の宣言の State、直に書いた要素なら
-// その State（docs/check.md「直に書く要素」）。宣言がなければ ""。
+// その State（docs/check.md「節に書く要素」）。宣言がなければ ""。
 func (p *Program) ReadState(r ReadRef) string {
 	switch x := r.(type) {
 	case DirectRead:
@@ -187,7 +187,7 @@ func (p *Program) ReadStates(rs []ReadRef) []string {
 }
 
 // EffectWrites は効果 e が書き込む基底の状態の FQN: 名前で書いた要素なら effect の宣言の Writes、直に書いた要素なら
-// その State（docs/check.md「直に書く要素」）。宣言がなければ nil。
+// その State（docs/check.md「節に書く要素」）。宣言がなければ nil。
 func (p *Program) EffectWrites(e EffectRef) []string {
 	switch x := e.(type) {
 	case DirectEffect:

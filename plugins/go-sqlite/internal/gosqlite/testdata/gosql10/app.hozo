@@ -4,47 +4,78 @@
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
   model Other { @db.key @db.text id: string; @db.text note: string; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 
   // ---- @db.find は M? ----
 
-  @db.find(rows, "id")
-  export op findSure(id: string): Row;
-  @db.find(rows, "id")
-  export op findMany(id: string): Row[];
-  @db.find(rows, "id")
-  export op findOther(id: string): Other?;
-  @db.find(rows, "id")
-  export op findNote(id: string): string?;
-  @db.find(rows, "id")
-  export op findNothing(id: string);
+  @db.find
+  read findSureRow(id: string): Row on rows;
+  export op findSure(id: string): Row {
+    return findSureRow(id);
+  }
+  @db.find
+  read findManyRow(id: string): Row[] on rows;
+  export op findMany(id: string): Row[] {
+    return findManyRow(id);
+  }
+  @db.find
+  read findOtherRow(id: string): Other? on rows;
+  export op findOther(id: string): Other? {
+    return findOtherRow(id);
+  }
+  @db.find
+  read findNoteRow(id: string): string? on rows;
+  export op findNote(id: string): string? {
+    return findNoteRow(id);
+  }
+  // 値を返さない op は、read を呼べない（read の呼び出しは値を持つ。WIRE-2）ので、この形は書けなくなった
 
   // ---- @db.list は M[] ----
 
-  @db.list(rows)
-  export op listOne(): Row?;
-  @db.list(rows, "note")
-  export op listMaybe(note: string): Row[]?;
-  @db.list(rows)
-  export op listOthers(): Other[];
-  @db.list(rows)
-  export op listNothing();
+  @db.list
+  read listOneRows(): Row? on rows;
+  export op listOne(): Row? {
+    return listOneRows();
+  }
+  @db.list
+  read listMaybeRows(note: string): Row[]? on rows;
+  export op listMaybe(note: string): Row[]? {
+    return listMaybeRows(note);
+  }
+  @db.list
+  read listOthersRows(): Other[] on rows;
+  export op listOthers(): Other[] {
+    return listOthersRows();
+  }
+  // 同上（値を返さない op は、read を呼べない）
 
   // ---- @db.effects は戻り値なし ----
 
-  @db.insert(rows)
-  effect createRow() on rows.post;
-  @db.effects(createRow)
-  export op addAndReturn(row: Row): Row;
-  @db.effects(createRow)
-  export op addAndCount(row: Row): int;
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+  export op addAndReturn(row: Row): Row {
+    createRow(row);
+    return row;
+  }
+  op one(): int;
+  export op addAndCount(row: Row): int {
+    createRow(row);
+    return one();
+  }
 
   // ---- 通るもの ----
 
-  @db.find(rows, "id")
-  export op findRow(id: string): Row?;
-  @db.list(rows)
-  export op listRows(): Row[];
-  @db.effects(createRow)
-  export op addRow(row: Row);
+  @db.find
+  read findRowRow(id: string): Row? on rows;
+  export op findRow(id: string): Row? {
+    return findRowRow(id);
+  }
+  @db.list
+  read listRowsRows(): Row[] on rows;
+  export op listRows(): Row[] {
+    return listRowsRows();
+  }
+  export op addRow(row: Row) {
+    createRow(row);
+  }
 }

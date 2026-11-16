@@ -2,6 +2,11 @@
 // その op のメソッドを持たず、var _ を出さない。warning も出さない。述語で決まる状態の分類の単位の命令は <C>Table、
 // 宛先の単位が分かれる op は SharedTable。
 
+// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
+// （docs/check.md「デコレータが運ぶ reads と effects」）
+decorator reading(...tables: any state) for op reads tables;
+decorator doing(...targets: any effect) for op effects targets;
+
 /** 図書館 */
 namespace lib {
   scalar BookId extends string;
@@ -23,57 +28,65 @@ namespace lib {
     @db.text member: string;
   }
 
-  @db.table(Book) state books: list<Book>;
-  @db.table(Note) state notes: list<Note>;
-  @db.table(Loan) state loans: list<Loan>;
+  @db.table state books: list<Book>;
+  @db.table state notes: list<Note>;
+  @db.table state loans: list<Loan>;
   /** op を一つも持たない表の状態（句は「この単位では、すべて」。var _ を出す）。命令は、分類 Shelving の単位に置かれる */
-  @db.table(Archived) state archive: list<Archived>;
+  @db.table state archive: list<Archived>;
   /** 行を受け取る op（@db.insert、@db.update）を持たない表: dbScan<Model> だけが出て、dbArgs<Model> は出ない（使う補助だけを出す） */
-  @db.table(Stamp) state stamps: list<Stamp>;
+  @db.table state stamps: list<Stamp>;
   /** @db.table のない状態は、表にならない（単位は、人が書く） */
   state drafts: list<Note>;
 
   // ---- books: デコレータを付けた op と、付けていない op ----
 
-  @db.find(books, "id")
-  export op findBook(id: BookId): Book?;
+  @db.find
+  read findBookRow(id: BookId): Book? on books;
+  export op findBook(id: BookId): Book? {
+    return findBookRow(id);
+  }
   // 付けていない: 順序と件数は、デコレータで言えない
-  export op newestBooks(limit: int): Book[] reads books;
+  @reading(books) export op newestBooks(limit: int): Book[];
   // 付けていない
-  export op countBooks(): int reads books;
+  @reading(books) export op countBooks(): int;
 
-  @db.insert(books)
-  effect createBook() on books.post;
+  @db.insert
+  effect createBook(row: Book) on books.post;
   /** デコレータを付けていない効果 */
   effect deleteBook() on books.delete;
 
-  @db.effects(createBook)
-  export op addBook(book: Book);
+  export op addBook(book: Book) {
+    createBook(book);
+  }
   // 付けていない
-  export op clearBooks() effects deleteBook;
+  @doing(deleteBook) export op clearBooks();
 
-  // ---- notes: 基底の状態の遷移を宛先にする効果。操作の名前との照合はなく、表が、効果の書き込む状態にあればよい ----
+  // ---- notes: 基底の状態の遷移を宛先にする効果には、db のデコレータを付けない（docs/plugin-go-sqlite.md「効果の中身」: 宛先は、
+  // 組み込みの効果でなければならない）。人が書く ----
 
-  @db.insert(notes)
-  effect firstNote() on notes: Empty -> HasItems;
-  @db.delete(notes, "text")
-  effect lastNote() on notes: HasItems -> Empty;
+  effect firstNote(note: Note) on notes: Empty -> HasItems;
+  effect lastNote(text: string) on notes: HasItems -> Empty;
 
-  @db.effects(firstNote)
-  export op startNotes(note: Note);
-  @db.effects(lastNote, firstNote)
-  export op swapNote(text: string, note: Note);
+  export op startNotes(note: Note) {
+    firstNote(note);
+  }
+  @db.transaction
+  export op swapNote(text: string, note: Note) {
+    lastNote(text);
+    firstNote(note);
+  }
 
   // ---- stamps: 消すだけ ----
 
-  @db.delete(stamps, "at")
-  effect dropStamp() on stamps.delete;
-  @db.effects(dropStamp)
-  export op unstamp(at: Time);
+  @db.delete
+  effect dropStamp(at: Time) on stamps.delete;
+  export op unstamp(at: Time) {
+    dropStamp(at);
+  }
 
   // ---- drafts: 表でない状態の op は、どの型にも出ない ----
 
-  export op listDrafts(): Note[] reads drafts;
+  @reading(drafts) export op listDrafts(): Note[];
 
   // ---- 述語で決まる状態の分類の単位: <C>Table ----
 
@@ -85,39 +98,47 @@ namespace lib {
     Lent;
   }
 
-  /** 状態の分類の遷移を宛先にする効果: 表（loans）は、効果の書き込む状態（books、loans）の一つ */
-  @db.insert(loans)
-  effect lend() on Lending: Free -> Lent;
-  @db.update(books)
-  effect retitle() on Lending: any -> any;
+  /** 状態の分類の遷移を宛先にする効果: 書き込む状態は books と loans。db のデコレータは付けない */
+  effect lend(loan: Loan) on Lending: Free -> Lent;
+  effect retitle(book: Book) on Lending: any -> any;
   effect giveBack() on Lending: Lent -> Free;
 
-  @db.effects(lend)
-  export op lendBook(loan: Loan);
-  // 二つの効果の宛先の単位が、どちらも Lending: <C>Table のメソッドで、一つのトランザクション
-  @db.effects(retitle, lend)
-  export op lendRenamed(book: Book, loan: Loan);
+  export op lendBook(loan: Loan) {
+    lend(loan);
+  }
+  // 二つの効果の宛先の単位が、どちらも Lending で、一つのトランザクション
+  @db.transaction
+  export op lendRenamed(book: Book, loan: Loan) {
+    retitle(book);
+    lend(loan);
+  }
   // 付けていない
-  export op returnBook(book: BookId) effects giveBack;
+  @doing(giveBack) export op returnBook(book: BookId);
 
-  /** 命令のすべてにデコレータの付いた、述語で決まる状態の分類（句は「この単位では、すべて」。それでも var _ は出さない） */
+  /** 一つの状態だけにまたがる、述語で決まる状態の分類 */
   classify Shelving of archive {
     Open;
     Closed;
   }
-  @db.insert(archive)
-  effect shelve() on Shelving: Open -> Closed;
-  @db.effects(shelve)
-  export op shelveBook(book: Archived);
+  effect shelve(book: Archived) on Shelving: Open -> Closed;
+  export op shelveBook(book: Archived) {
+    shelve(book);
+  }
 
   // ---- SharedState: 宛先の単位が分かれる op と、複数の状態を読む op ----
 
   // 宛先の単位が books と notes: SharedTable のメソッド
-  @db.effects(createBook, firstNote)
-  export op addWithNote(book: Book, note: Note);
+  @db.transaction
+  export op addWithNote(book: Book, note: Note) {
+    createBook(book);
+    firstNote(note);
+  }
   // 宛先の単位が books と Lending（Lending は books にもまたがるが、単位は別）
-  @db.effects(createBook, lend)
-  export op addAndLend(book: Book, loan: Loan);
+  @db.transaction
+  export op addAndLend(book: Book, loan: Loan) {
+    createBook(book);
+    lend(loan);
+  }
   // 付けていない: 複数の状態を読む葉は、SharedState の op（読む op のデコレータは、表一つしか読めない）
-  export op overdue(): Book[] reads books, loans;
+  @reading(books, loans) export op overdue(): Book[];
 }

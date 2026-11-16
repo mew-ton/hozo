@@ -77,10 +77,10 @@ func TestHasValidate(t *testing.T) {
 			// union と exception は Validate を持たない。union をフィールドに持つ model も、それだけでは持たない
 			&ir.Union{DeclBase: decl("app.Contact"), Variant: ir.UnionArms, Arms: []ir.UnionArm{{Name: "Mail", Type: ir.Ref("type.Email")}}},
 			model("app.Holder", field("contact", ir.Ref("app.Contact"))),
-			&ir.Exception{DeclBase: decl("app.Bad"), Value: ir.Ref("app.Named")},
-			// その場で書いた model（合成した model）は、普通の model
-			&ir.Model{DeclBase: decl("app.Bad2.Value"), SynthesizedFrom: "app.Bad2", Fields: []ir.Field{field("n", ir.Int(), "valid.max")}},
-			&ir.Exception{DeclBase: decl("app.Bad2"), Value: ir.Ref("app.Bad2.Value")},
+			&ir.Exception{DeclBase: decl("app.Bad"), Params: []ir.OpParam{{Name: "value", Type: ir.Ref("app.Named")}}},
+			// その場で書いた model（合成した model。ユニオンのアーム）は、普通の model
+			&ir.Model{DeclBase: decl("app.Page.Ready"), SynthesizedFrom: "app.Page", Fields: []ir.Field{field("n", ir.Int(), "valid.max")}},
+			&ir.Exception{DeclBase: decl("app.Bad2"), Params: []ir.OpParam{{Name: "n", Type: ir.Int()}}},
 			// View が見る側のために合成した model（synthesizedFrom が op の FQN）は、Go の型にならないので持たない
 			&ir.Op{DeclBase: decl("app.send")},
 			&ir.Model{DeclBase: decl("app.send$in"), SynthesizedFrom: "app.send", Fields: []ir.Field{field("email", ir.Ref("type.Email"))}},
@@ -95,7 +95,7 @@ func TestHasValidate(t *testing.T) {
 		"app.Keyed": false, "app.NoCheck": false,
 		"app.Outer": true, "app.Mid": true, "app.Ping": true, "app.Pong": true, "app.Loop": false,
 		"app.Contact": false, "app.Holder": false, "app.Bad": false,
-		"app.Bad2.Value": true, "app.Bad2": false,
+		"app.Page.Ready": true, "app.Bad2": false,
 		"app.send": false, "app.send$in": false,
 		"app.Nowhere": false, "": false,
 	}

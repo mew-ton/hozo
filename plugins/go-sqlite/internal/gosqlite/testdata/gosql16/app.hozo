@@ -11,7 +11,7 @@ namespace app {
     note: string;
     // ほかの db の語彙のデコレータは、しまい方ではない
     @db.unique code: string;
-    @db.nullable rank: int?;
+    rank: int?;
     // 二つ以上
     @db.text @db.json doc: Tag;
     // 三つ（同じものを二度付けるのは、hozoc の DEC-13）
@@ -20,6 +20,6 @@ namespace app {
     @db.json tag: Tag;
   }
 
-  @db.table(Row) state rows: list<Row>;
-  @db.table(Row) state more: list<Row>;
+  @db.table state rows: list<Row>;
+  @db.table state more: list<Row>;
 }

@@ -253,9 +253,9 @@ func Build() Grammar {
 
 		// ---- デコレータ ----
 		{Key: "external", Rule: Rule{
-			Comment: "@external は核の印でデコレータではない（docs/grammar.md「予約語」）",
+			Comment: "@external と @repeatable は核の印でデコレータではない（docs/grammar.md「予約語」）",
 			Name:    "storage.modifier.hozo",
-			Match:   `@external\b`,
+			Match:   `@(?:external|repeatable)\b`,
 		}},
 		{Key: "decorator", Rule: Rule{
 			Comment: "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
@@ -282,7 +282,8 @@ func Build() Grammar {
 				},
 			},
 			{
-				Match: `\b(op|effect)\s+(` + ident + `)`,
+				Comment: "op、effect、read は、実行・適用されるものの名前。effect と read は、名前の後ろに引数の括弧が続く",
+				Match:   `\b(op|effect|read)\s+(` + ident + `)`,
 				Captures: Captures{
 					"1": {Name: "keyword.declaration.hozo"},
 					"2": {Name: "entity.name.function.hozo"},
@@ -326,6 +327,23 @@ func Build() Grammar {
 					"1": {Name: "keyword.control.hozo"},
 					"3": {Name: "keyword.other.hozo"},
 				},
+			},
+			{
+				Comment: "effects の節の要素に直に書いた「状態.操作」（docs/grammar.md「op」の EffectElem）: 要素の最後の . の後ろの post / put / delete。節は ; か { か次の節の頭で終わる",
+				Begin:   `\b(effects)\b`,
+				End:     `(?=[;{])|(?=\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\b)`,
+				BeginCaptures: Captures{
+					"1": {Name: "keyword.control.hozo"},
+				},
+				Patterns: []Rule{
+					{Include: "#comments"},
+					{Name: "keyword.other.hozo", Match: `(?<=\.)(?:post|put|delete)\b(?!\s*\.)`},
+				},
+			},
+			{
+				Comment: "配線で直に呼ぶ「状態.操作(…)」（docs/grammar.md「配線」の Call）: . の後ろで、直後が ( の post / put / delete",
+				Name:    "keyword.other.hozo",
+				Match:   `(?<=\.)(?:post|put|delete)(?=\s*\()`,
 			},
 		}}},
 
@@ -387,9 +405,9 @@ func Build() Grammar {
 				Patterns: []Rule{{Include: "#type"}},
 			},
 			{
-				Comment: "throws / catches / throw の後ろの例外の名前",
+				Comment: "throws / catches / throw の後ろの例外の名前。throw の引数の括弧（docs/grammar.md「配線」の Throw）の手前で終わり、引数は値の位置として塗る",
 				Begin:   `\b(throws|catches|throw)\b`,
-				End:     `(?=[;{])|(?=\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\b)`,
+				End:     `(?=[;{(])|(?=\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\b)`,
 				BeginCaptures: Captures{
 					"1": {Name: "keyword.control.hozo"},
 				},

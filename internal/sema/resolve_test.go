@@ -427,7 +427,7 @@ namespace a {
   scalar Id extends string;
   state users: list<t.User>;
   state current: t.User?;
-  export op find(id: string): t.User? reads users, a.current;
+  export op find(id: string): t.User? reads users, a.current { return first(users, current); } op first(us: t.User[], c: t.User?): t.User?;
   classify Found of find { Hit: find as t.User; default; }
   classify Session of current { In: current as t.User; default; }
 }
@@ -469,5 +469,79 @@ namespace b {
 				t.Errorf("override id の飛び先 = %d:%d, want 3:16（t.User の id）", def.Line, def.Col)
 			}
 		}
+	}
+}
+
+// TestCallResolution は docs/resolve.md「呼び出しの読み分け」の表の各行と、その参照（定義へのジャンプ）: 行き着いたものの
+// 種類で、op、read、効果（宣言）、直に呼ぶ組み込みの効果のどれを呼ぶかが決まる。
+func TestCallResolution(t *testing.T) {
+	res, fs := analyzeProject(t, project{"a.hozo": `
+namespace a {
+  model M { id: string; }
+  exception Busy(wait: Duration);
+  state rows: list<M>;
+  read byId(id: string): M? on rows;
+  effect add(m: M) on rows.post;
+  op keep(m: M?): M?;
+  classify K of M { A; default; }
+  op f(m: M): M? throws Busy {
+    add(m);
+    rows.post(m);
+    a.rows.post(m);
+    const found = a.byId(m.id);
+    return match m by K {
+      A => throw Busy(5m);
+      default => keep(found);
+    };
+  }
+}`}, false)
+	noErrors(t, res, fs)
+	for _, want := range []string{
+		"a.hozo:6:32 decl a.rows",  // read r(…): T on s の s
+		"a.hozo:6:26 decl a.M",     // read の結果の型
+		"a.hozo:7:17 decl a.M",     // effect の引数の型
+		"a.hozo:11:5 decl a.add",   // 効果の呼び出し
+		"a.hozo:12:5 decl a.rows",  // 直に呼ぶ「状態.操作」の状態
+		"a.hozo:13:7 decl a.rows",  // 修飾して書いた状態
+		"a.hozo:14:21 decl a.byId", // read の呼び出し（修飾）
+		"a.hozo:16:18 decl a.Busy", // throw E(…) の E
+		"a.hozo:17:18 decl a.keep", // op の呼び出し
+	} {
+		hasRef(t, res, fs, want)
+	}
+	f := res.Program.Lookup("a.f").(*ir.Op)
+	var kinds []string
+	for _, st := range f.Body.Statements {
+		switch x := st.(type) {
+		case ir.CallStmt:
+			kinds = append(kinds, x.Call.Callee.Kind()+" "+x.Call.Callee.String())
+		case ir.ConstStmt:
+			kinds = append(kinds, x.Expr.(ir.CallExpr).Call.Callee.Kind()+" "+x.Expr.(ir.CallExpr).Call.Callee.String())
+		}
+	}
+	want := []string{"effect a.add", "effect a.rows.post", "effect a.rows.post", "read a.byId"}
+	if strings.Join(kinds, "; ") != strings.Join(want, "; ") {
+		t.Errorf("callee = %v, want %v", kinds, want)
+	}
+}
+
+// TestCallShadowedByBinding は、呼び出しの名前の先頭が束縛か引数の名前と同じなら、手続き 1.1 が先で、値を指すこと
+// （docs/resolve.md「呼び出しの読み分け」）。状態の操作を呼ぶには、修飾して書く。
+func TestCallShadowedByBinding(t *testing.T) {
+	res, _ := analyzeProject(t, project{"a.hozo": `
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  op f(rows: M[], m: M) {
+    rows.post(m);
+    a.rows.post(m);
+  }
+}`}, false)
+	var got []string
+	for _, d := range res.Diags {
+		got = append(got, d.Code)
+	}
+	if strings.Join(got, ",") != "RES-3" {
+		t.Errorf("診断 = %v, want [RES-3]（引数 rows のフィールド post は辿れない）", got)
 	}
 }

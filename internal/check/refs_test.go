@@ -6,7 +6,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// reads と effects の要素の、二つの書き方（docs/check.md「直に書く要素」）: 読む状態は書き方によらず、効果は書き方ごとに別。
+// reads と effects の要素の、二つの書き方（docs/check.md「節に書く要素」）: 読む状態は書き方によらず、効果は書き方ごとに別。
 
 // readDecl は read の宣言。
 func readDecl(fqn, state string) *ir.Read {

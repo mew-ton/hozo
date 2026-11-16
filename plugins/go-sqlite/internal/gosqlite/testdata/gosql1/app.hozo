@@ -10,24 +10,28 @@ namespace app {
   model Wide extends Row { @db.text note: string; }
 
   // 核の型
-  @db.table(Row) state names: list<string>;
+  @db.table state names: list<string>;
   // scalar
-  @db.table(Row) state ids: list<Id>;
+  @db.table state ids: list<Id>;
   // array
-  @db.table(Row) state groups: list<Row[]>;
+  @db.table state groups: list<Row[]>;
   // 別の model
-  @db.table(Row) state others: list<Other>;
+  @db.table state others: list<Other>;
   // 継承した model
-  @db.table(Row) state wides: list<Wide>;
+  @db.table state wides: list<Wide>;
   // 等しければ通る
-  @db.table(Row) state rows: list<Row>;
-  @db.table(Wide) state all: list<Wide>;
+  @db.table state rows: list<Row>;
+  @db.table state all: list<Wide>;
 
   // 表にならなかった状態を名指しするデコレータは、重ねて報告しない
-  @db.find(names, "id")
-  export op findName(id: Id): Row?;
-  @db.insert(others)
-  effect createOther() on others.post;
-  @db.effects(createOther)
-  export op addOther(other: Other);
+  @db.find
+  read findNameRow(id: Id): Row? on names;
+  export op findName(id: Id): Row? {
+    return findNameRow(id);
+  }
+  @db.insert
+  effect createOther(row: Other) on others.post;
+  export op addOther(other: Other) {
+    createOther(other);
+  }
 }

@@ -580,7 +580,7 @@ func TestViewConfig(t *testing.T) {
 func TestHomes(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "type.hozo"), "namespace type {\n  model User { id: string; }\n}\n")
-	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  @http.status(404)\n  exception Gone;\n  export op get(): type.User throws Gone | http.BadRequest;\n}\n")
+	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  @http.status(404)\n  exception Gone;\n  export op get(): type.User throws Gone, http.BadRequest;\n}\n")
 	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-b", ""})
 	load := func(units string) *Project {
 		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)

@@ -174,7 +174,7 @@ type Read struct {
 	Params []OpParam `json:"params"`
 	// Returns は結果の型。nil にも [NeverType] にもならない。
 	Returns Type `json:"returns"`
-	// State は読む基底の状態の FQN。宛先は一つだけ（docs/check.md「読むことの宛先」）。
+	// State は読む基底の状態の FQN。宛先は一つだけ（docs/check.md「read の宛先」）。
 	State string `json:"state"`
 }
 
@@ -500,7 +500,7 @@ type Decorator struct {
 	Throws     []ThrowsClause  `json:"throws"`
 	Catches    []CatchesClause `json:"catches"`
 	// Reads は `reads` の節の要素（書かれた順。節が複数なら連結）。FQN の位置に、デコレータの引数名 "$param:名前" も来る:
-	// any read の引数は [NamedRead] の Read に、any state の引数は [DirectRead] の State に。
+	// any state の引数は [DirectRead] の State に。
 	// 付いた op に何が運ばれるかは Op.Carried（docs/check.md「デコレータが運ぶ reads と effects」）。
 	Reads []ReadRef `json:"reads"`
 	// Effects は `effects` の節の要素（同じ。ユニオンは展開済み）。any effect の引数は [NamedEffect] の Effect に "$param:名前"。

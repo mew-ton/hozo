@@ -11,9 +11,11 @@ import type {
   ArgValue,
   ArmBody,
   Atom,
+  Call,
   CaseSet,
   ClassifySubject,
   Decl,
+  EffectRef,
   EffectTarget,
   Expr,
   Literal,
@@ -21,10 +23,12 @@ import type {
   MatchSubject,
   ParamType,
   Program,
+  ReadRef,
   Statement,
   Type,
   View,
 } from "../src/index.js";
+import { readStates, sameRef } from "../src/index.js";
 
 // build/test/ir.test.js から見たリポジトリのルート。
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
@@ -215,6 +219,57 @@ function walkClassifySubject(s: ClassifySubject): void {
   }
 }
 
+// 呼び出し先は op、read、効果のどれか（docs/ir.md「配線」の Callee。版 0.6）
+function walkCall(c: Call): void {
+  const callee = c.callee;
+  seen.add(`callee:${callee.kind}`);
+  switch (callee.kind) {
+    case "op":
+      assert.equal(typeof callee.op, "string");
+      break;
+    case "read":
+      assert.equal(typeof callee.read, "string");
+      break;
+    case "effect":
+      walkEffectRef(callee.effect);
+      // 直に呼ぶ組み込みの効果の、値を取る操作の引数名は value
+      if (callee.effect.kind === "direct") for (const a of c.args) assert.equal(a.param, "value");
+      break;
+    default:
+      unreachable(callee);
+  }
+  c.args.forEach((x) => walkAtom(x.value));
+}
+
+function walkReadRef(r: ReadRef): void {
+  seen.add(`readRef:${r.kind}`);
+  switch (r.kind) {
+    case "named":
+      assert.equal(typeof r.read, "string");
+      return;
+    case "direct":
+      assert.equal(typeof r.state, "string");
+      return;
+    default:
+      unreachable(r);
+  }
+}
+
+function walkEffectRef(e: EffectRef): void {
+  seen.add(`effectRef:${e.kind}`);
+  switch (e.kind) {
+    case "named":
+      assert.equal(typeof e.effect, "string");
+      return;
+    case "direct":
+      assert.equal(typeof e.state, "string");
+      assert.ok(["post", "put", "delete"].includes(e.operation));
+      return;
+    default:
+      unreachable(e);
+  }
+}
+
 function walkMatch(m: Match): void {
   walkMatchSubject(m.subject, m.classify);
   for (const arm of m.arms) {
@@ -223,7 +278,7 @@ function walkMatch(m: Match): void {
     seen.add(`armBody:${body.kind}`);
     switch (body.kind) {
       case "call":
-        body.call.args.forEach((x) => walkAtom(x.value));
+        walkCall(body.call);
         break;
       case "atom":
         walkAtom(body.atom);
@@ -232,6 +287,9 @@ function walkMatch(m: Match): void {
         break;
       case "throw":
         assert.equal(typeof body.exception, "string");
+        // throw の引数（版 0.6）。引数のない例外なら []
+        if (body.args.length > 0) seen.add("throw:args");
+        body.args.forEach((x) => walkAtom(x.value));
         break;
       default:
         unreachable(body);
@@ -249,7 +307,7 @@ function walkExpr(e: Expr): void {
   seen.add(`expr:${e.kind}`);
   switch (e.kind) {
     case "call":
-      e.call.args.forEach((x) => walkAtom(x.value));
+      walkCall(e.call);
       return;
     case "match":
       walkMatch(e.match);
@@ -272,7 +330,7 @@ function walkStatement(s: Statement): void {
       walkExpr(s.expr);
       return;
     case "call":
-      s.call.args.forEach((x) => walkAtom(x.value));
+      walkCall(s.call);
       return;
     case "match":
       walkMatch(s.match);
@@ -282,7 +340,7 @@ function walkStatement(s: Statement): void {
   }
 }
 
-function walkDecl(d: Decl): void {
+function walkDecl(d: Decl, program: Program): void {
   seen.add(`decl:${d.kind}`);
   assert.equal(typeof d.name, "string");
   for (const app of d.decorators) app.args.forEach((a) => walkArgValue(a.value));
@@ -315,14 +373,26 @@ function walkDecl(d: Decl): void {
       assert.equal(d.shape, d.type.kind === "array" ? "list" : d.type.kind === "optional" ? "nullable" : "single");
       return;
     case "exception":
-      if (d.value) walkType(d.value);
+      // 例外の持つ値は、引数（版 0.6）。なければ []
+      assert.ok(!("value" in d), "Exception.value は 0.6 でなくなった");
+      if (d.params.length > 0) seen.add("exception:params");
+      d.params.forEach((p) => walkType(p.type));
       return;
     case "effect":
       // 効果の宣言にも、デコレータが付く（Decorator.targets の effect。版 0.5）
       if (d.decorators.length > 0) seen.add("effect:decorated");
       walkEffectTarget(d.target);
+      // 効果の引数（版 0.6）。なければ []
+      if (d.params.length > 0) seen.add("effect:params");
+      d.params.forEach((p) => walkType(p.type));
       assert.ok(d.writes.length > 0);
       for (const st of d.writes) assert.equal(typeof st, "string");
+      return;
+    case "read":
+      // read の宣言（版 0.6）: 引数、結果の型、読む基底の状態
+      d.params.forEach((p) => walkType(p.type));
+      walkType(d.returns);
+      assert.equal(typeof d.state, "string");
       return;
     case "classify":
       walkClassifySubject(d.subject);
@@ -346,6 +416,9 @@ function walkDecl(d: Decl): void {
           assert.equal(p.optional, false);
         }
       });
+      // 何度でも書ける印（@repeatable。版 0.6）
+      assert.equal(typeof d.repeatable, "boolean");
+      if (d.repeatable) seen.add("decorator:repeatable");
       // reads / effects の節（版 0.5）。なければ []
       assert.ok(Array.isArray(d.reads) && Array.isArray(d.effects));
       if (d.reads.length > 0) seen.add("decorator:reads");
@@ -358,7 +431,7 @@ function walkDecl(d: Decl): void {
         }
       }
       for (const target of d.targets) {
-        assert.ok(["op", "field", "state", "exception", "scalar", "model", "effect"].includes(target));
+        assert.ok(["op", "field", "state", "exception", "scalar", "model", "effect", "read"].includes(target));
         seen.add(`target:${target}`);
       }
       if (d.alias) d.alias.args.forEach((a) => walkArgValue(a.value));
@@ -370,6 +443,14 @@ function walkDecl(d: Decl): void {
       assert.equal(typeof d.exported, "boolean");
       if (d.exported) seen.add("op:exported");
       assert.ok(Array.isArray(d.reads) && Array.isArray(d.signature.reads));
+      // 節の要素は、名前で書いたものか、直に書いたもの（docs/check.md「節に書く要素」。版 0.6）
+      d.reads.forEach(walkReadRef);
+      d.effects.forEach(walkEffectRef);
+      d.carried.reads.forEach(walkReadRef);
+      d.carried.effects.forEach(walkEffectRef);
+      d.signature.effects.forEach(walkEffectRef);
+      // Signature.reads は、基底の状態の FQN の列
+      for (const st of d.signature.reads) assert.equal(typeof st, "string");
       // デコレータが運ぶもの（版 0.5）。書いたもの（reads / effects）とは分けて持つ
       assert.ok(Array.isArray(d.carried.reads) && Array.isArray(d.carried.effects));
       if (d.carried.reads.length > 0 || d.carried.effects.length > 0) {
@@ -379,8 +460,8 @@ function walkDecl(d: Decl): void {
           for (const a of app.args) if (a.value.kind === "list") seen.add("arg:list");
         }
         // 運ばれたものは、Signature に入る
-        for (const st of d.carried.reads) assert.ok(d.signature.reads.includes(st));
-        for (const e of d.carried.effects) assert.ok(d.signature.effects.includes(e));
+        for (const st of readStates(program, d.carried.reads)) assert.ok(d.signature.reads.includes(st));
+        for (const e of d.carried.effects) assert.ok(d.signature.effects.some((x) => sameRef(x, e)));
       }
       assert.equal(typeof d.signature.pure, "boolean");
       return;
@@ -390,12 +471,12 @@ function walkDecl(d: Decl): void {
 }
 
 function walkProgram(p: Program): void {
-  assert.equal(p.version, "0.5");
+  assert.equal(p.version, "0.6");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
     // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
     assert.ok(!("decorators" in ns));
-    ns.decls.forEach(walkDecl);
+    ns.decls.forEach((d) => walkDecl(d, p));
   }
   for (const b of p.binds) assert.equal(typeof b.target.deep, "boolean");
 }
@@ -410,7 +491,7 @@ test("program.golden.json reads as Program and round-trips", () => {
 test("view.golden.json reads as View and round-trips", () => {
   const text = golden("view.golden.json");
   const view: View = JSON.parse(text);
-  assert.equal(view.version, "0.5");
+  assert.equal(view.version, "0.6");
   assert.equal(typeof view.viewer, "string");
   // files は単位の in に合ったファイル。namespaces の値は、その名前空間を出力する単位ごとの設定（設定の順）
   assert.ok(view.files.every((f) => typeof f === "string"));
@@ -428,7 +509,7 @@ test("view.golden.json reads as View and round-trips", () => {
 test("goldens cover every kind of every union", () => {
   const want = [
     ...["core", "ref", "optional", "array", "record", "case", "never"].map((k) => `type:${k}`),
-    ...["model", "scalar", "union", "state", "exception", "effect", "classify", "decorator", "op"].map((k) => `decl:${k}`),
+    ...["model", "scalar", "union", "state", "exception", "effect", "read", "classify", "decorator", "op"].map((k) => `decl:${k}`),
     ...["string", "int", "float", "boolean", "duration"].map((k) => `literal:${k}`),
     ...["literal", "ref", "refs", "variant", "list"].map((k) => `argValue:${k}`),
     ...["type", "any"].map((k) => `paramType:${k}`),
@@ -456,6 +537,15 @@ test("goldens cover every kind of every union", () => {
     "decorator:effects",
     "op:carried",
     "arg:list",
+    // 版 0.6 で足した形（同上）
+    ...["op", "read", "effect"].map((k) => `callee:${k}`),
+    ...["named", "direct"].map((k) => `readRef:${k}`),
+    ...["named", "direct"].map((k) => `effectRef:${k}`),
+    "target:read",
+    "exception:params",
+    "effect:params",
+    "throw:args",
+    "decorator:repeatable",
   ];
   for (const k of want) assert.ok(seen.has(k), `goldens contain no ${k}`);
 });

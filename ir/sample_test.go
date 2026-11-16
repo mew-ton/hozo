@@ -172,10 +172,26 @@ func sampleProgram() *Program {
 					},
 					// read の宣言（docs/ir.md「read」）
 					&Read{
-						DeclBase: DeclBase{Name: "server.userById", Span: span(f, 25, 1, 25, 50)},
-						Params:   []OpParam{{Name: "id", Type: String(), Span: span(f, 25, 15, 25, 25)}},
-						Returns:  Optional(Ref("server.User")),
-						State:    "db",
+						DeclBase: DeclBase{
+							Name: "server.userById",
+							// 何度でも書けるデコレータ（Decorator.repeatable）を、二度付けた read（Decorator.targets の read）
+							Decorators: []Application{
+								{
+									Decorator: "server.only",
+									Args:      []Arg{{Param: "column", Value: LiteralValue{Literal: StringLiteral{Value: "active"}}}},
+									Span:      span(f, 25, 1, 25, 16),
+								},
+								{
+									Decorator: "server.only",
+									Args:      []Arg{{Param: "column", Value: LiteralValue{Literal: StringLiteral{Value: "verified"}}}},
+									Span:      span(f, 25, 18, 25, 35),
+								},
+							},
+							Span: span(f, 25, 1, 25, 90),
+						},
+						Params:  []OpParam{{Name: "id", Type: String(), Span: span(f, 25, 15, 25, 25)}},
+						Returns: Optional(Ref("server.User")),
+						State:   "db",
 					},
 					&Union{
 						DeclBase: DeclBase{Name: "server.ApiError", Span: span(f, 26, 1, 28, 2)},
@@ -247,6 +263,13 @@ func sampleProgram() *Program {
 						DeclBase: DeclBase{Name: "server.inserts", Span: span(f, 44, 1, 44, 50)},
 						Params:   []Param{{Name: "table", Type: AnyParam{Of: AnyState}}},
 						Targets:  []DecoratorTarget{TargetEffect},
+					},
+					// 何度でも書けるデコレータ（docs/ir.md「decorator」の repeatable）
+					&Decorator{
+						DeclBase:   DeclBase{Name: "server.only", Span: span(f, 44, 51, 44, 51)},
+						Params:     []Param{{Name: "column", Type: TypeParam{Types: []Type{String()}}}},
+						Targets:    []DecoratorTarget{TargetRead},
+						Repeatable: true,
 					},
 					// reads / effects の節と、残りの引数を持つデコレータ
 					&Decorator{

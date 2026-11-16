@@ -4,5 +4,5 @@
 
 namespace app {
   model Tick { @db.int n: int; }
-  @db.table(Tick) state ticks: list<Tick>;
+  @db.table state ticks: list<Tick>;
 }

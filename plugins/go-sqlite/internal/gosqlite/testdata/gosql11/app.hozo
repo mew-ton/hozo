@@ -4,31 +4,31 @@
 
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
-  @db.table(Row) state rows: list<Row>;
-  @db.table(Row) state copies: list<Row>;
-  @db.table(Row) state logs: list<Row>;
+  @db.table state rows: list<Row>;
+  @db.table state copies: list<Row>;
+  @db.table state logs: list<Row>;
 
   // ---- 組み込みの効果: 操作が合わない ----
 
-  @db.insert(rows)
-  effect insertOnPut() on rows.put;
-  @db.insert(rows)
-  effect insertOnDelete() on rows.delete;
-  @db.update(rows)
-  effect updateOnPost() on rows.post;
-  @db.update(rows)
-  effect updateOnDelete() on rows.delete;
-  @db.delete(rows, "id")
-  effect deleteOnPost() on rows.post;
-  @db.delete(rows, "id")
-  effect deleteOnPut() on rows.put;
+  @db.insert
+  effect insertOnPut(row: Row) on rows.put;
+  @db.insert
+  effect insertOnDelete(row: Row) on rows.delete;
+  @db.update
+  effect updateOnPost(row: Row) on rows.post;
+  @db.update
+  effect updateOnDelete(row: Row) on rows.delete;
+  @db.delete
+  effect deleteOnPost(id: string) on rows.post;
+  @db.delete
+  effect deleteOnPut(id: string) on rows.put;
 
   // ---- 組み込みの効果: 状態が、デコレータの表でない ----
 
-  @db.insert(copies)
-  effect insertElsewhere() on rows.post;
-  @db.delete(copies, "id")
-  effect deleteElsewhere() on rows.delete;
+  @db.insert
+  effect insertElsewhere(row: Row) on rows.post;
+  @db.delete
+  effect deleteElsewhere(id: string) on rows.delete;
 
   // ---- 遷移: デコレータの表が、効果の書き込む状態にない ----
 
@@ -36,26 +36,27 @@ namespace app {
     Same;
     Differ;
   }
-  @db.insert(logs)
-  effect logSync() on Sync: Differ -> Same;
-  @db.update(copies)
-  effect fillRows() on rows: Empty -> HasItems;
+  @db.insert
+  effect logSync(row: Row) on Sync: Differ -> Same;
+  @db.update
+  effect fillRows(row: Row) on rows: Empty -> HasItems;
 
   // op に並べても、効果ごとに一度だけ
-  @db.effects(insertOnPut)
-  export op addWrong(row: Row);
+  export op addWrong(row: Row) {
+    insertOnPut(row);
+  }
 
   // ---- 通るもの ----
 
-  @db.insert(rows)
-  effect createRow() on rows.post;
-  @db.update(rows)
-  effect updateRow() on rows.put;
-  @db.delete(rows, "id")
-  effect deleteRow() on rows.delete;
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+  @db.update
+  effect updateRow(row: Row) on rows.put;
+  @db.delete
+  effect deleteRow(id: string) on rows.delete;
   // 遷移なら、操作の名前との照合はない
-  @db.delete(copies, "id")
-  effect copyOver() on Sync: Differ -> Same;
-  @db.update(rows)
-  effect touchRows() on rows: HasItems -> HasItems;
+  @db.delete
+  effect copyOver(id: string) on Sync: Differ -> Same;
+  @db.update
+  effect touchRows(row: Row) on rows: HasItems -> HasItems;
 }

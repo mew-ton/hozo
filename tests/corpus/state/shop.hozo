@@ -48,7 +48,7 @@ namespace shop {
   /** 手元のトークンを消す */
   effect removeToken() on token.delete;
 
-  // docs/grammar.md「exception / effect」Transition: 状態の分類の遷移。書き込むのは分類の対象のすべての基底の状態
+  // docs/grammar.md「exception / effect / read」Transition: 状態の分類の遷移。書き込むのは分類の対象のすべての基底の状態
   // docs/ir.md「state / exception / effect」: target は { kind: "transition", of, from, to }
   /** 注文を確定する */
   effect placeOrder() on Checkout: Shopping -> Ordered;
@@ -61,7 +61,7 @@ namespace shop {
   /** ログインする */
   effect signIn() on LoggedIn: any -> LoggedIn;
 
-  // docs/grammar.md「exception / effect」Transition: 基底の状態の組み込みの分類の遷移（ケースは Empty / HasItems）。
+  // docs/grammar.md「exception / effect / read」Transition: 基底の状態の組み込みの分類の遷移（ケースは Empty / HasItems）。
   // 書き込むのはその状態
   /** カートを空にする */
   effect clearCart() on carts: HasItems -> Empty;

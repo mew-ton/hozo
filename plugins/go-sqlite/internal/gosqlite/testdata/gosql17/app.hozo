@@ -33,8 +33,8 @@ namespace app {
     @db.text textOnCount: Count;
     @db.int intOnStamp: Stamp;
     // 省略可能でも同じ
-    @db.nullable @db.int intOnMaybeString: string?;
-    @db.nullable @db.text textOnMaybeTag: Tag?;
+    @db.int intOnMaybeString: string?;
+    @db.text textOnMaybeTag: Tag?;
 
     // 通るもの
     @db.text name: Name;
@@ -44,8 +44,8 @@ namespace app {
     @db.json tag: Tag;
     @db.json tags: Name[];
     @db.json byName: Record<string, Count>;
-    @db.nullable @db.float ratio: float?;
+    @db.float ratio: float?;
   }
 
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 }

@@ -2,5 +2,5 @@
 
 namespace app {
   model Row { @db.key @db.text id: string; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 }

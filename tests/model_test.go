@@ -251,7 +251,7 @@ func TestModelCorpus(t *testing.T) {
 			t.Fatalf("NoConfig=%v diags=%v", q.NoConfig, q.Diags)
 		}
 		expect(t, "View を持つ名前空間", keysOf(viewsOf(q)), []string{})
-		expect(t, "buy の Signature.effects", q.Sema.Program.Lookup("customer.buy").(*ir.Op).Signature.Effects,
+		expect(t, "buy の Signature.effects", effectStrings(q.Sema.Program.Lookup("customer.buy").(*ir.Op).Signature.Effects),
 			[]string{"customer.forget", "shop.addLine", "shop.createOrder", "carrier.accept"})
 		var stdout, stderr bytes.Buffer
 		if code := hozocMainIn(dir, []string{"check"}, &stdout, &stderr); code != 0 || stdout.String() != "0 errors, 0 warnings\n" {

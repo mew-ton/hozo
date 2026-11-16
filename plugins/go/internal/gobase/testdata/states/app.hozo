@@ -1,6 +1,11 @@
 // docs/plugin-go.md「op の置き場」「状態の単位」（問い合わせ、命令、SharedState）と「状態の参照」を、一か所ずつ使う。
 // 各 op の上のコメントが、その op が確かめる行。op はどれも export（出力は一つのパッケージ）。
 
+// 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
+// （docs/check.md「デコレータが運ぶ reads と effects」）
+decorator reading(...tables: any state) for op reads tables;
+decorator doing(...targets: any effect) for op effects targets;
+
 /** 状態を読む配線 */
 namespace app {
   scalar Token extends string;
@@ -42,17 +47,17 @@ namespace app {
   decorator mark for op;
 
   // 「状態の単位」命令（効果を持つ葉）、op の問い合わせ（reads が一つの葉）、SharedState（reads が二つ以上の葉）
-  export op add(line: Line) effects addLine;
-  export op logout() effects dropToken;
-  export op countLines(): int reads lines;
-  export op summary(): string reads lines, settings;
+  @doing(addLine) export op add(line: Line);
+  @doing(dropToken) export op logout();
+  @reading(lines) export op countLines(): int;
+  @reading(lines, settings) export op summary(): string;
 
   // 「op の置き場」の 3: 効果の宛先の単位。基底の状態の遷移はその状態、述語で決まる状態の分類の遷移はその分類の単位、
   // 型で決まる状態の分類の遷移は、ただ一つの対象の状態。効果と読む状態の両方を持つ葉は、効果だけで決める
-  export op clear() effects clearLines;
-  export op sync() effects refresh;
-  export op enter(token: Token) effects signIn;
-  export op addCounted(line: Line): int effects addLine reads settings;
+  @doing(clearLines) export op clear();
+  @doing(refresh) export op sync();
+  @doing(signIn) export op enter(token: Token);
+  @doing(addLine) @reading(settings) export op addCounted(line: Line): int;
 
   // 「op の置き場」の 3: デコレータが運ぶ効果。一つならその単位。二つ以上でも、宛先の単位がすべて同じなら、その単位の命令
   // （コメントは、効果を「、」でつなぐ）。分かれるなら SharedState の命令
@@ -64,7 +69,7 @@ namespace app {
   export op checkout(line: Line);
   // op が書いた効果と、運ばれた効果を合わせて数える（書いたものが先）
   @does(dropToken)
-  export op syncOut() effects refresh;
+  @doing(refresh) export op syncOut();
 
   // 「op の置き場」の 4 と 5: デコレータが運ぶ reads。一つならその単位の問い合わせ、op が書いたものと合わせて二つ以上なら SharedState
   @looks(token)
@@ -72,7 +77,7 @@ namespace app {
   @joins(token, lines)
   export op status(): string;
   @looks(token)
-  export op lineFor(item: string): Line? reads lines;
+  @reading(lines) export op lineFor(item: string): Line?;
 
   // 「op の置き場」の 6: 運ぶ節のないデコレータだけを持つ葉は Leaves
   @mark

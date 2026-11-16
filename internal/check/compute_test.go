@@ -26,9 +26,9 @@ func serverWith(decls ...ir.Decl) *ir.Program {
 }
 
 // TestSigLeaf は手順 0（葉の op）の表の各行: E = Declared、F = effects、rel は relations から、succ は kept。
-// relations の目的語は常にすべての効果なので、rel は効果によらない。.hozo の葉の op が持てる効果は一つまで（EFF-3 は
-// internal/sema が出す）だが、手順 0 は循環に含まれる配線の op（本体を無視して葉として計算する）にも使うので、
-// 効果が複数の IR で確かめる。
+// relations の目的語は常にすべての効果なので、rel は効果によらない。.hozo の葉の op は effects の節を書けない（STATE-5 は
+// internal/sema が出す）が、手順 0 はデコレータが運ぶ効果を持つ葉と、循環に含まれる配線の op（本体を無視して葉として計算する）にも
+// 使うので、効果が複数の IR で確かめる。
 func TestSigLeaf(t *testing.T) {
 	o := leaf("server.op", nil)
 	o.Effects = ir.NamedEffects("server.e1", "server.e2", "server.e3")

@@ -33,7 +33,7 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 
 - 英字と数字は ASCII に限る（「決めたこと」）。予約語は `Ident` にならない。
 - `FieldName` はフィールド名を書く位置の名前で、予約語も書ける（`op: string;`、`{ op: x }`、`res.op`）。使う位置は、model のフィールド（「model」の `Field`。その場で書く model も同じ）、`override` の後ろの名前（「model」の `Override`）、レコードリテラルのキー、値のパスの二つ目以降の要素（「配線」）。理由は「決めたこと」。
-- `DecoratorName` はデコレータの名前を書く位置の名前で、予約語も書ける（`decorator effects(…)`、`decorator list(…)`）。`DecoratorRef` はデコレータを指す位置の名前で、最後の要素にだけ予約語を書ける（`@db.effects(…)`、`@db.list(orders)`。同じ名前空間の中なら `@effects(…)`）。使う位置は、デコレータの宣言の名前、適用の `@` の後ろ、別名の `=` の後ろ（「decorator の宣言」）、ドキュメンテーションコメントの `@see` の後ろ。理由は「決めたこと」。
+- `DecoratorName` はデコレータの名前を書く位置の名前で、予約語も書ける（`decorator effects(…)`、`decorator list(…)`）。`DecoratorRef` はデコレータを指す位置の名前で、最後の要素にだけ予約語を書ける（`@db.list`、`@db.delete`。同じ名前空間の中なら `@effects(…)`）。使う位置は、デコレータの宣言の名前、適用の `@` の後ろ、別名の `=` の後ろ（「decorator の宣言」）、ドキュメンテーションコメントの `@see` の後ろ。理由は「決めたこと」。
 - `Path` は値を書く位置の名前。先頭は束縛か引数か状態の名前（`Ident`）、残りはその値のフィールド名。構文木の形は `QualifiedName` と同じ。何を指すかは `docs/resolve.md`「手続き」。
 - 字句解析は、先頭が予約語でなければ `.` で続く要素を予約語も含めて一つの字句にまとめ、`QualifiedName` か `Path` かは構文解析が位置で決める。`QualifiedName` の位置で二つ目以降の要素が予約語なら構文エラー。`DecoratorRef` の位置では、最後の要素だけが予約語でよく、要素が一つで予約語のとき（`@effects`）は、その予約語の字句をそのまま名前として読む。
 
@@ -117,7 +117,7 @@ ArgTerm   = Literal | QualifiedName ;
 - 位置で渡す引数（`@http.status(401)`）と名前で渡す引数（`@http.header(name: "Authorization")`）を混ぜられる（`@page.route("/orders", from: query, onInvalid: transitionToOrders)`）。名前で渡す引数の後ろに位置で渡す引数は書けない（「決めたこと」）。
 - `ArgTerm` の `|` は、一つの引数に渡す宣言の集合（`http.NetworkError | http.ServerError`。§11.2）。引数の並びの `,` は引数を区切るので、一つの引数の中の集合は `|` のまま（節の並びの区切りは `,`。「op」）。`[ ]` はリスト（`["orders", query]`。§11.1）。
 - `QualifiedName` が何を指すか（宣言、op の引数、デコレータの引数）は名前の解決が決める。
-- 宣言が残りの引数（「decorator の宣言」の `RestParam`）を持つデコレータには、ほかの引数の数を超えて位置で渡した値が、書いた順に、残りの引数に入る（`@db.effects(createOrder, notifyUser)`）。0 個でもよい。残りの引数には、名前では渡せない（DEC-11。`docs/types.md`「デコレータの引数」）。
+- 宣言が残りの引数（「decorator の宣言」の `RestParam`）を持つデコレータには、ほかの引数の数を超えて位置で渡した値が、書いた順に、残りの引数に入る（`decorator effects(...targets: any effect)` に `@effects(createOrder, notifyUser)`）。0 個でもよい。残りの引数には、名前では渡せない（DEC-11。`docs/types.md`「デコレータの引数」）。
 
 ### model
 
@@ -249,7 +249,7 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 - `ExcRef` は例外、例外のユニオン、またはデコレータの引数の名前（`catches error recovers`。§4.2）。
 - `int | float`（§4.2 `valid.min`）のように、デコレータの引数の型にだけ `|` を書ける。model のフィールドや op の引数の型には書けない。`for` の対象の並びも `|`（`for scalar | field`）。節の並び（`throws`、`catches`、`reads`、`effects`）の区切りは `,` で、`|` ではない（「op」）。
 - `ThrowsClause` と `CatchesClause` の順序と回数は文法では縛らない（`catches X recovers throws Y`。§8.1）。差し引きは検査が計算する（DEC-6）。
-- `Target` の `effect` は、効果の宣言に付けるデコレータ（`@db.insert(orders) effect createOrder(order: Order) on orders.post;`）。`read` は、`read` の宣言に付けるデコレータ（`decorator find(table: any state) for read;`）。`exception` は、例外の宣言に付けるデコレータ（`@http.status(401) exception Unauthorized;`）。
+- `Target` の `effect` は、効果の宣言に付けるデコレータ（`@db.insert effect createOrder(order: Order) on orders.post;`）。`read` は、`read` の宣言に付けるデコレータ（`@db.find read userByEmail(email: Email): User? on users;`）。`exception` は、例外の宣言に付けるデコレータ（`@http.status(401) exception Unauthorized;`）。
 - `DecoReadsClause` と `DecoEffectsClause` は、そのデコレータの処理が読むものと、持つ効果を言う節（`decorator limit(counter: any state, by: any effect) for op reads counter effects by;`）。要素は op の節と同じもの（`ReadElem`、`EffectElem`）か、デコレータの引数の名前（`any state` の引数は読む状態、`any effect` の引数は効果）。何度でも書ける。意味は `docs/check.md`「デコレータが運ぶ reads と effects」。
 - `Relation` の `effects` は、直前の `prevents` / `keeps` の目的語。`DecoEffectsClause` の頭の `effects` と字句は同じだが、`prevents` / `keeps` の直後かどうかで分かれる（`throws X prevents effects effects e` は、`Relation` の後ろに `DecoEffectsClause`）。
 - `RestParam` は**残りの引数**: 適用が、ほかの引数の後ろに位置で渡した 0 個以上の値を、まとめて受け取る（`decorator effects(...targets: any effect) for op effects targets;`）。型は、渡す値一つの型を書く。引数の並びの最後に一つだけ書け、省略可能にはできない（文法で閉じる）。節の中で名前を書けば、渡した値のすべてを指す。
@@ -384,10 +384,10 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 形の語（`list<T>` / `nullable<T>` / `single<T>`）は型の別の書き方で、型を書けるどの位置にも書ける。状態の宣言は `state 名前: Type;` | 形と型を揃えた（`docs/decisions.md`「設計書を変える決定」S21）。状態を名前で参照したときの型が、宣言に書いた型そのものになる。位置ごとに書ける綴りを分けると、同じ型なのに位置で書き方が変わる規則が要る。以前の「空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない」はなくした: `single<T>` は `T` なので、`single<T?>` は `T?`、つまり `nullable<T>` と同じ型で、「空」は型の一か所にしか現れない |
 | 状態の分類での `match` は対象を書かない（`match by C`） | 対象は分類の宣言が持っていて、書かせると二か所になる |
 | `prevents` / `keeps` の目的語は `effects` だけ | 効果を名前で書き分ける場面がない: 葉の op は自分では効果を持たず（STATE-5）、配線の op の、例外ごとの効果の状態は、検査器が計算する（REL-4）。デコレータが運ぶ複数の効果（`docs/check.md`「デコレータが運ぶ reads と effects」）も、名前では書き分けない: 目的語の `effects` は、その op のすべての効果 |
-| 予約語をデコレータの名前に書ける（`DecoratorName`） | 語彙のデコレータは、することの名前で呼ぶ（`@db.list`、`@db.effects`）。その語が言語の節の頭や形の語と同じでも、語彙の側の名前を曲げさせない。デコレータの名前の位置は、`decorator` の直後か `@` の後ろ（修飾していれば最後の要素）で、予約語が来ても構文があいまいにならない。フィールド名（`FieldName`）と同じ扱い |
+| 予約語をデコレータの名前に書ける（`DecoratorName`） | 語彙のデコレータは、することの名前で呼ぶ（`@db.list`、`@db.delete`）。その語が言語の節の頭や形の語と同じでも、語彙の側の名前を曲げさせない。デコレータの名前の位置は、`decorator` の直後か `@` の後ろ（修飾していれば最後の要素）で、予約語が来ても構文があいまいにならない。フィールド名（`FieldName`）と同じ扱い |
 | デコレータの宣言に `reads` / `effects` の節を書ける。要素と区切りは op の節と同じ | デコレータの処理（op の前後に足すもの）が状態に触れることを、デコレータの引数から決められるようにする（`docs/decisions.md`「決めたこと」98）。`throws` と同じく、付いた op の関数の型に加わる。書き方を op の節とそろえて、同じ意味の節の綴りを二つ持たない |
 | 残りの引数は `...名前: 型` と書き、型は値一つの型。最後に一つだけ、省略可能にできない | 並べる数が決まらない引数（op が行う効果の並び）を、リスト（`[a, b]`）で囲ませない。TS の書き方に寄せるが、型は配列でなく値一つの型で書く: デコレータの引数の型には `any effect` のような、配列にできない種類がある |
-| デコレータの対象は、op が使う三つの単位のどれも（`exception`、`effect`、`read`） | 宣言が、それを使う op の実装の材料を言えるようにする（`@http.status(401)`、`@db.insert(orders)`、`@db.find(users)`）。`union` や `classify` と違い、op が投げる、行う、読む「こと」の名前で、語彙が意味を足す相手になる |
+| デコレータの対象は、op が使う三つの単位のどれも（`exception`、`effect`、`read`） | 宣言が、それを使う op の実装の材料を言えるようにする（`@http.status(401)`、`@db.insert`、`@db.find`）。`union` や `classify` と違い、op が投げる、行う、読む「こと」の名前で、語彙が意味を足す相手になる |
 | デコレータは `namespace` に付けられない。`for namespace` という対象もない | 名前空間は、複数のファイルの複数のブロックに分けて宣言できる（TypeScript の `interface` と同じく、同じ名前のブロックは一つにまとまる）。名前空間に付けたデコレータは、ファイルをまたいで一つにまとめて管理することになり、どのブロックに何が付いているかが直感的でない。印は中の宣言（op、model など）に付ける |
 | `@external` と `@repeatable` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
 | 同じデコレータを一つの宣言に重ねられるのは、宣言が `@repeatable` を持つときだけ | 条件を一つずつ足す語彙（`@db.where(…)` を二つ）のように、重ねることに意味があるデコレータと、重ねれば書き間違いであるデコレータ（`@http.status` を二つ）を、宣言の側で分ける。既定は今までどおり一度だけ（DEC-13） |
@@ -404,7 +404,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `reads` `read` `as` `never` `throw` `override` `export` は予約語。綴りは仮で、後で別の語に変えうる | どれも構文の骨（宣言の頭、節の頭、文の頭、核の型、修飾）で、識別子が来る位置の名詞ではないので、文脈キーワードの基準（下の行）に当たらない。`never` は `void` と同じく型の位置に来るので、予約しないと同じ名前の型と区別できない。`override` と `read` は予約してもフィールド名には書け（`FieldName`）、`read` はデコレータの名前にも書ける（`DecoratorName`）。綴りを変えるときは、この表と「予約語」の表を変える |
 | `export` と `override` は、予約語の表の「修飾」の行に置く | 宣言やフィールドの頭の語の前に置いて性質を足す語で、宣言の頭でも節の頭でもない。色分けも分ける（`docs/editors.md`「TextMate の文法」） |
 | `export` を書けるのは `op` の前だけ | 別の名前空間から隠せるのは op だけ（`docs/check.md`「export」）。ほかの宣言に書ける形にしておくと、意味のない `export` が検査まで残る |
-| `throws`、`catches`、`effects`、`reads` の並びの区切りは、op の節でもデコレータの宣言の節でも `,`。`throws A \| B`、`effects a \| b` はなくした（`docs/decisions.md`「設計書を変える決定」S25） | 三つの節（`throws`、`effects`、`reads`）は、どれも「その op を呼んだときに起きうること」の集合を言うので、同じ書き方にする。記法は「どれか」と「すべて」を書き分けない: 例外は呼び出しを終わらせるので、起きるのは高々一つ。効果と読むことは「このうちのいくつか」。「すべてを行う」と言うのは、デコレータの引数だけ（`@db.effects(a, b)`）。`,` は `throws` の出どころ（Java）の書き方に近い。`\|` は、型の選択（`int \| float`）、`for` の対象の並び、一つの引数に渡す宣言の集合、ケースの並び（遷移と `match` のアーム）に残る |
+| `throws`、`catches`、`effects`、`reads` の並びの区切りは、op の節でもデコレータの宣言の節でも `,`。`throws A \| B`、`effects a \| b` はなくした（`docs/decisions.md`「設計書を変える決定」S25） | 三つの節（`throws`、`effects`、`reads`）は、どれも「その op を呼んだときに起きうること」の集合を言うので、同じ書き方にする。記法は「どれか」と「すべて」を書き分けない: 例外は呼び出しを終わらせるので、起きるのは高々一つ。効果と読むことは「このうちのいくつか」。「すべてを行う」と言うのは、デコレータの引数だけ（残りの引数に並べた `@effects(a, b)`）。`,` は `throws` の出どころ（Java）の書き方に近い。`\|` は、型の選択（`int \| float`）、`for` の対象の並び、一つの引数に渡す宣言の集合、ケースの並び（遷移と `match` のアーム）に残る |
 | `exception`、`effect`、`read` は、同じ形で書く: 名前、引数、（`read` は結果の型、）宛先。`exception X: T` と、引数のない `effect e on …` はなくした | 三つは、op が使う最小の単位で、op はそれを組み合わせる。配線から op と同じに使えるように（`userByEmail(email)`、`createOrder(order)`、`throw LimitExceeded(wait)`）、op と同じ引数の並びを持たせる。例外の値を一つの model に包ませない: 運ぶ値は引数として並べる |
 | `effect` と `read` は引数がなくても `()` を書き、`exception` は引数がなければ括弧を書かない | `effect` と `read` は呼び出すもので、呼び出しはいつも括弧を持つ（op と同じ）。例外は名前で並べ（`throws A, B`）、名前で投げる（`throw A`）もので、値を運ばない例外が普通。どちらも、同じ意味の書き方を二つ持たない |
 | `read` の結果の型は省略できない。`on` の後ろに操作は書かない | 読むことは、値を得ること。何を得るかを宣言に書かせ、配線の式の型を宣言だけから決める。操作を書かないのは、状態を読むことが一種類だから |

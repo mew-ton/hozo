@@ -4,40 +4,51 @@
 /** 別の名前空間の表 */
 namespace far {
   model Row { @db.key @db.text id: string; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 }
 
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
   /** @db.table が付いていない状態 */
   state plain: list<Row>;
 
   // @db.find、@db.list
-  @db.find(plain, "id")
-  export op findPlain(id: string): Row?;
-  @db.list(plain)
-  export op listPlain(): Row[];
+  @db.find
+  read findPlainRow(id: string): Row? on plain;
+  export op findPlain(id: string): Row? {
+    return findPlainRow(id);
+  }
+  @db.list
+  read listPlainRows(): Row[] on plain;
+  export op listPlain(): Row[] {
+    return listPlainRows();
+  }
 
   // @db.insert、@db.update、@db.delete（op に並べられていない効果のデコレータも、同じに確かめる）
-  @db.insert(plain)
-  effect createPlain() on plain.post;
-  @db.update(plain)
-  effect updatePlain() on plain.put;
-  @db.delete(plain, "id")
-  effect deletePlain() on plain.delete;
-  @db.effects(createPlain)
-  export op addPlain(row: Row);
+  @db.insert
+  effect createPlain(row: Row) on plain.post;
+  @db.update
+  effect updatePlain(row: Row) on plain.put;
+  @db.delete
+  effect deletePlain(id: string) on plain.delete;
+  export op addPlain(row: Row) {
+    createPlain(row);
+  }
 
   // 別の名前空間の状態
-  @db.insert(far.rows)
-  effect createFar() on rows.post;
+  @db.insert
+  effect createFar(row: Row) on rows.post;
 
   // 通るもの
-  @db.find(rows, "id")
-  export op findRow(id: string): Row?;
-  @db.insert(rows)
-  effect createRow() on rows.post;
-  @db.effects(createRow)
-  export op addRow(row: Row);
+  @db.find
+  read findRowRow(id: string): Row? on rows;
+  export op findRow(id: string): Row? {
+    return findRowRow(id);
+  }
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+  export op addRow(row: Row) {
+    createRow(row);
+  }
 }

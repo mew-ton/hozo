@@ -50,21 +50,21 @@ namespace app {
 
   /** @db.nullable の列: しまい方ごと（核の型と scalar）。NOT NULL が付かない */
   model Sparse {
-    @db.nullable @db.text s: string?;
-    @db.nullable @db.int i: int?;
-    @db.nullable @db.int d: Duration?;
-    @db.nullable @db.float f: float?;
-    @db.nullable @db.bool b: boolean?;
-    @db.nullable @db.time t: Time?;
-    @db.nullable @db.text name: kinds.Name?;
-    @db.nullable @db.int count: kinds.Count?;
-    @db.nullable @db.int span: kinds.Span?;
-    @db.nullable @db.float ratio: kinds.Ratio?;
-    @db.nullable @db.bool flag: kinds.Flag?;
-    @db.nullable @db.time stamp: kinds.Stamp?;
-    @db.nullable @db.json tags: string[]?;
-    @db.nullable @db.json attrs: Record<string, int>?;
-    @db.nullable @db.json tag: kinds.Tag?;
+    @db.text s: string?;
+    @db.int i: int?;
+    @db.int d: Duration?;
+    @db.float f: float?;
+    @db.bool b: boolean?;
+    @db.time t: Time?;
+    @db.text name: kinds.Name?;
+    @db.int count: kinds.Count?;
+    @db.int span: kinds.Span?;
+    @db.float ratio: kinds.Ratio?;
+    @db.bool flag: kinds.Flag?;
+    @db.time stamp: kinds.Stamp?;
+    @db.json tags: string[]?;
+    @db.json attrs: Record<string, int>?;
+    @db.json tag: kinds.Tag?;
   }
 
   /** 複数の @db.key（表の末尾の PRIMARY KEY）と @db.unique */
@@ -81,33 +81,47 @@ namespace app {
   model Link {
     @db.key @db.text id: string;
     @db.ref(Core) @db.text core: string;
-    @db.nullable @db.unique @db.ref(Link) @db.text parent: string?;
+    @db.unique @db.ref(Link) @db.text parent: string?;
   }
 
-  @db.table(Core) state cores: list<Core>;
-  @db.table(Named) state nameds: list<Named>;
-  @db.table(Doc) state docs: list<Doc>;
-  @db.table(Sparse) state sparses: list<Sparse>;
-  @db.table(Pair) state pairs: list<Pair>;
-  @db.table(Shared) state sharedA: list<Shared>;
-  @db.table(Shared) state sharedB: list<Shared>;
-  @db.table(Link) state links: list<Link>;
+  @db.table state cores: list<Core>;
+  @db.table state nameds: list<Named>;
+  @db.table state docs: list<Doc>;
+  @db.table state sparses: list<Sparse>;
+  @db.table state pairs: list<Pair>;
+  @db.table state sharedA: list<Shared>;
+  @db.table state sharedB: list<Shared>;
+  @db.table state links: list<Link>;
   /** @db.table のない状態は、表にならない */
   state plain: list<Core>;
 
-  @db.insert(cores) effect createCore() on cores.post;
-  @db.insert(nameds) effect createNamed() on nameds.post;
-  @db.insert(docs) effect createDoc() on docs.post;
-  @db.insert(sparses) effect createSparse() on sparses.post;
-  @db.insert(pairs) effect createPair() on pairs.post;
-  @db.insert(sharedA) effect createSharedA() on sharedA.post;
-  @db.insert(links) effect createLink() on links.post;
+  @db.insert effect createCore(row: Core) on cores.post;
+  @db.insert effect createNamed(row: Named) on nameds.post;
+  @db.insert effect createDoc(row: Doc) on docs.post;
+  @db.insert effect createSparse(row: Sparse) on sparses.post;
+  @db.insert effect createPair(row: Pair) on pairs.post;
+  @db.insert effect createSharedA(row: Shared) on sharedA.post;
+  @db.insert effect createLink(row: Link) on links.post;
 
-  @db.effects(createCore) export op addCore(core: Core);
-  @db.effects(createNamed) export op addNamed(named: Named);
-  @db.effects(createDoc) export op addDoc(doc: Doc);
-  @db.effects(createSparse) export op addSparse(sparse: Sparse);
-  @db.effects(createPair) export op addPair(pair: Pair);
-  @db.effects(createSharedA) export op addSharedA(shared: Shared);
-  @db.effects(createLink) export op addLink(link: Link);
+  export op addCore(core: Core) {
+    createCore(core);
+  }
+  export op addNamed(named: Named) {
+    createNamed(named);
+  }
+  export op addDoc(doc: Doc) {
+    createDoc(doc);
+  }
+  export op addSparse(sparse: Sparse) {
+    createSparse(sparse);
+  }
+  export op addPair(pair: Pair) {
+    createPair(pair);
+  }
+  export op addSharedA(shared: Shared) {
+    createSharedA(shared);
+  }
+  export op addLink(link: Link) {
+    createLink(link);
+  }
 }

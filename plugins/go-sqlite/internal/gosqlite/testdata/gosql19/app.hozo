@@ -12,9 +12,9 @@ namespace app {
     @db.json tags: string[]?;
     @db.json tag: Tag?;
     // 通るもの
-    @db.nullable @db.int rank: int?;
+    @db.int rank: int?;
     @db.int count: int;
   }
 
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 }

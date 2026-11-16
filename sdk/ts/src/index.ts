@@ -14,7 +14,7 @@ import {
   type ImportResponse,
   type PluginError,
 } from "./protocol.js";
-import type { Decl, Namespace, Op, Program, View, ViewedSignature } from "./ir.js";
+import type { Call, Decl, EffectRef, Namespace, Op, Program, ReadRef, View, ViewedSignature } from "./ir.js";
 
 export * from "./ir.js";
 export * from "./protocol.js";
@@ -141,19 +141,84 @@ export function signature(view: View, op: string): ViewedSignature | undefined {
 }
 
 /**
- * op が直に読む状態: 書いた reads の後ろに、デコレータが運ぶ carried.reads を並べ、重複を最初の出現に寄せたもの
- * （docs/check.md「デコレータが運ぶ reads と effects」。Go の ir.Op.DirectReads と同じ）。呼び出し先から伝わるものは含まない。
+ * 二つの要素（reads か effects の要素。docs/ir.md「op」の ReadRef / EffectRef）が同じか。TS の値は === で比べられないので、
+ * これで見る（Go では == で比べる。docs/packages.md「`ir`（公開）」）。
  */
-export function directReads(op: Op): string[] {
-  return [...new Set([...op.reads, ...op.carried.reads])];
+export function sameRef(a: ReadRef | EffectRef, b: ReadRef | EffectRef): boolean {
+  return refKey(a) === refKey(b);
+}
+
+function refKey(r: ReadRef | EffectRef): string {
+  if (r.kind === "named") return "read" in r ? `named read ${r.read}` : `named effect ${r.effect}`;
+  return "operation" in r ? `direct effect ${r.state} ${r.operation}` : `direct read ${r.state}`;
+}
+
+function mergeUnique<T extends ReadRef | EffectRef>(a: T[], b: T[]): T[] {
+  const out: T[] = [];
+  const keys = new Set<string>();
+  for (const r of [...a, ...b]) {
+    const key = refKey(r);
+    if (keys.has(key)) continue;
+    keys.add(key);
+    out.push(r);
+  }
+  return out;
 }
 
 /**
- * op が直に持つ効果: 書いた effects の後ろに、デコレータが運ぶ carried.effects を並べ、重複を最初の出現に寄せたもの
+ * 葉の op が直に読むもの: 書いた reads の後ろに、デコレータが運ぶ carried.reads を並べ、重複を最初の出現に寄せたもの
+ * （docs/check.md「デコレータが運ぶ reads と effects」。Go の ir.Op.DirectReads と同じ）。呼び出し先から伝わるものは含まない。
+ */
+export function directReads(op: Op): ReadRef[] {
+  return mergeUnique(op.reads, op.carried.reads);
+}
+
+/**
+ * 葉の op が直に持つ効果: 書いた effects の後ろに、デコレータが運ぶ carried.effects を並べ、重複を最初の出現に寄せたもの
  * （同上。Go の ir.Op.DirectEffects と同じ）。呼び出し先から伝わるものと、デコレータの halts の効果は含まない。
  */
-export function directEffects(op: Op): string[] {
-  return [...new Set([...op.effects, ...op.carried.effects])];
+export function directEffects(op: Op): EffectRef[] {
+  return mergeUnique(op.effects, op.carried.effects);
+}
+
+/**
+ * 呼び出し先が op なら、その FQN。read か効果の呼び出しなら undefined（docs/ir.md「配線」の Callee。Go の ir.Call.CalledOp に当たる）。
+ */
+export function calledOp(call: Call): string | undefined {
+  return call.callee.kind === "op" ? call.callee.op : undefined;
+}
+
+/**
+ * reads の要素が読む基底の状態の FQN: named なら read の宣言の state、direct ならその state。宣言がなければ undefined
+ * （Go の ir.Program.ReadState に当たる）。
+ */
+export function readState(program: Program, ref: ReadRef): string | undefined {
+  if (ref.kind === "direct") return ref.state;
+  const decl = lookup(program, ref.read);
+  return decl?.kind === "read" ? decl.state : undefined;
+}
+
+/**
+ * 要素ごとの readState を同じ順に並べ、重複を最初の出現に寄せたもの（宣言のない要素は飛ばす）。op が直に読む状態は
+ * readStates(program, directReads(op))（Go の ir.Program.ReadStates と同じ）。
+ */
+export function readStates(program: Program, refs: ReadRef[]): string[] {
+  const out = new Set<string>();
+  for (const ref of refs) {
+    const state = readState(program, ref);
+    if (state !== undefined) out.add(state);
+  }
+  return [...out];
+}
+
+/**
+ * 効果が書き込む基底の状態の FQN: named なら effect の宣言の writes、direct ならその state。宣言がなければ undefined
+ * （Go の ir.Program.EffectWrites に当たる）。
+ */
+export function effectWrites(program: Program, ref: EffectRef): string[] | undefined {
+  if (ref.kind === "direct") return [ref.state];
+  const decl = lookup(program, ref.effect);
+  return decl?.kind === "effect" ? decl.writes : undefined;
 }
 
 /**

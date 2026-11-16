@@ -22,7 +22,7 @@ type sigKey struct{ op, viewer string }
 // R と pure は見る側によらないので、computer が op ごとに持つ（computer.reads、computer.pure）。
 type sigState struct {
 	E    []string                                   // 例外の列
-	F    []ir.EffectRef                             // 効果の列（効果の数え方は docs/check.md「直に書く要素」）
+	F    []ir.EffectRef                             // 効果の列（効果の数え方は docs/check.md「節に書く要素」）
 	rel  map[string]map[ir.EffectRef]ir.EffectState // rel[X][e]。ないものは unknown
 	succ map[ir.EffectRef]ir.EffectState            // succ[e]。ないものは kept
 }

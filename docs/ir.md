@@ -410,7 +410,7 @@ interface Bind {
 | `effects a, b`、複数の `effects` | `EffectRef` の列一つ（書かれた順に連結）。`effect` の宣言の名前は `named`（ユニオンは展開）、`状態.操作` は `direct` |
 | `@redirectToLogin`（名前付き） | `decorator: "browser.redirectOn"`、`via: "browser.redirectToLogin"`、`args` は固定した引数 |
 | デコレータの位置で書いた引数 | `param` に対応付け |
-| 残りの引数に渡した値（`@db.effects(a, b)`） | 残りの引数の名前の `Arg` 一つ。`value` は `list` で、`items` は渡した値を書いた順に（一つずつ `ref` か `refs`） |
+| 残りの引数に渡した値（`decorator effects(...targets: any effect)` に `@effects(a, b)`） | 残りの引数の名前の `Arg` 一つ。`value` は `list` で、`items` は渡した値を書いた順に（一つずつ `ref` か `refs`） |
 | デコレータの宣言の `reads a, b`、`effects a, b`、複数の節 | `Decorator.reads` / `Decorator.effects` の列一つずつ（書かれた順に連結。効果のユニオンは展開。引数名は `$param:名前`） |
 | op に付いたデコレータの `reads` / `effects` の節 | `Op.carried`（`$param:` を適用の引数で置き換えたもの）。`Op.reads` / `Op.effects` には足さない |
 | `{ item }` | `{ item: item }` |

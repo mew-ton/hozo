@@ -6,7 +6,7 @@ namespace app {
     @http.body item: string;
   }
   @http.get("/item")
-  export op read(in: In): string;
+  export op fetch(in: In): string;
 
   // 一つの op の @http.get と @http.post のうち、当たるのは GET の経路
   @http.get("/both")

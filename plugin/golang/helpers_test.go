@@ -76,25 +76,33 @@ func throwing(exceptions ...string) opOption {
 	return func(o *ir.Op) { o.Signature.Exceptions = exceptions }
 }
 func reading(states ...string) opOption {
-	return func(o *ir.Op) { o.Reads = states; o.Signature.Reads = states; o.Signature.Pure = false }
+	return func(o *ir.Op) {
+		o.Reads = ir.StateReads(states...)
+		o.Signature.Reads = states
+		o.Signature.Pure = false
+	}
 }
 func effecting(effects ...string) opOption {
-	return func(o *ir.Op) { o.Effects = effects; o.Signature.Effects = effects; o.Signature.Pure = false }
+	return func(o *ir.Op) {
+		o.Effects = ir.NamedEffects(effects...)
+		o.Signature.Effects = ir.NamedEffects(effects...)
+		o.Signature.Pure = false
+	}
 }
 
 // carryingReads と carryingEffects は、デコレータが運ぶ reads / effects（Op.carried。docs/check.md「デコレータが運ぶ reads と effects」）。
 // op が書いたもの（Op.reads / Op.effects）とは分けて置かれ、Signature には合わせたものが入る。
 func carryingReads(states ...string) opOption {
 	return func(o *ir.Op) {
-		o.Carried.Reads = append(o.Carried.Reads, states...)
+		o.Carried.Reads = append(o.Carried.Reads, ir.StateReads(states...)...)
 		o.Signature.Reads = append(o.Signature.Reads, states...)
 		o.Signature.Pure = false
 	}
 }
 func carryingEffects(effects ...string) opOption {
 	return func(o *ir.Op) {
-		o.Carried.Effects = append(o.Carried.Effects, effects...)
-		o.Signature.Effects = append(o.Signature.Effects, effects...)
+		o.Carried.Effects = append(o.Carried.Effects, ir.NamedEffects(effects...)...)
+		o.Signature.Effects = append(o.Signature.Effects, ir.NamedEffects(effects...)...)
 		o.Signature.Pure = false
 	}
 }
@@ -111,14 +119,16 @@ func wired(stmts ...ir.Statement) opOption {
 	return func(o *ir.Op) { o.Body = &ir.Wiring{Statements: stmts}; o.Signature.Pure = false }
 }
 
-func call(opFQN string) ir.Statement { return ir.CallStmt{Call: ir.Call{Op: opFQN}} }
+func call(opFQN string) ir.Statement {
+	return ir.CallStmt{Call: ir.Call{Callee: ir.OpCallee{Op: opFQN}}}
+}
 
 func matchBy(classifyFQN string, arms ...ir.MatchArm) ir.Statement {
 	return ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: ir.NameAtom{Path: []string{"v"}}}, Classify: classifyFQN, Arms: arms}}
 }
 
 func armCall(opFQN string, cases ...string) ir.MatchArm {
-	return ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.CallExpr{Call: ir.Call{Op: opFQN}}}
+	return ir.MatchArm{Cases: ir.ArmCases{Cases: cases}, Body: ir.CallExpr{Call: ir.Call{Callee: ir.OpCallee{Op: opFQN}}}}
 }
 
 func namespace(name string, decls ...ir.Decl) ir.Namespace {

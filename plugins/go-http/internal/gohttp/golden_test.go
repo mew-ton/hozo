@@ -419,7 +419,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		// 全体の形で受け取る model のフィールドの型は、その model の位置
 		"gohttp4":  {"app.HeaderIn", "app.QueryIn", "app.Meta", "app.Paging"},
 		"gohttp5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.clash"},
-		"gohttp6":  {"app.read", "app.both", "app.whole"},
+		"gohttp6":  {"app.fetch", "app.both", "app.whole"},
 		"gohttp7":  {"app.relative", "app.empty", "app.absolute", "app.byId", "app.brace"},
 		"gohttp8":  {"app.second", "app.third", "app.again"},
 		"gohttp9":  {""},

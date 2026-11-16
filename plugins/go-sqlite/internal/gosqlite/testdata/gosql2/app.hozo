@@ -4,17 +4,18 @@ namespace app {
   model Row { @db.key @db.text id: string; }
 
   // nullable
-  @db.table(Row) state current: nullable<Row>;
+  @db.table state current: nullable<Row>;
   // single
-  @db.table(Row) state config: single<Row>;
+  @db.table state config: single<Row>;
   // list は通る
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
   // @db.table がなければ、見ない
   state other: single<Row>;
 
   // 表にならなかった状態を名指しするデコレータは、重ねて報告しない
-  @db.update(config)
-  effect saveConfig() on config.put;
-  @db.effects(saveConfig)
-  export op setConfig(row: Row);
+  @db.update
+  effect saveConfig(row: Row) on config.put;
+  export op setConfig(row: Row) {
+    saveConfig(row);
+  }
 }

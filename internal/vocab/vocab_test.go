@@ -11,19 +11,20 @@ import (
 // docs/vocab.md「同梱する語彙」の表。
 var expected = map[string][]string{
 	"hozo:vocab/valid.hozo": {"namespace valid {", "decorator min(", "decorator max(", "decorator length(min: int?, max: int?)", "decorator pattern(", "decorator format("},
-	"hozo:vocab/http.hozo": {"namespace http {", "exception ServerError;", "exception NetworkError;", "model Violation {", "exception BadRequest:", "@external\n  decorator get(", "@external\n  decorator post(", "decorator status(",
+	"hozo:vocab/http.hozo": {"namespace http {", "exception ServerError;", "exception NetworkError;", "model Violation {", "exception BadRequest(message: string, violations: Violation[]);", "@external\n  decorator get(", "@external\n  decorator post(", "decorator status(",
 		"decorator header(name: string?) for field;", "decorator query(name: string?) for field;", "decorator body(name: string?) for field;",
 		"decorator headerObj for field;", "decorator queryObj for field;", "decorator bodyObj for field;", "decorator required for field;", "decorator default(value:", "decorator retry("},
-	"hozo:vocab/db.hozo": {"namespace db {", "decorator table(element: any model) for state;",
-		"decorator text for field;", "decorator int for field;", "decorator float for field;", "decorator bool for field;", "decorator time for field;", "decorator json for field;", "decorator nullable for field;",
+	"hozo:vocab/db.hozo": {"namespace db {", "decorator table for state;",
+		"decorator text for field;", "decorator int for field;", "decorator float for field;", "decorator bool for field;", "decorator time for field;", "decorator json for field;",
 		"decorator key for field;", "decorator unique for field;", "decorator ref(target: any model) for field;",
-		"decorator find(table: any state, column: string) for op reads table;", "decorator list(table: any state, column: string?) for op reads table;",
-		"decorator insert(table: any state) for effect;", "decorator update(table: any state) for effect;", "decorator delete(table: any state, column: string) for effect;",
-		"decorator effects(...targets: any effect) for op effects targets;"},
+		"decorator find for read;", "decorator list for read;",
+		"@repeatable\n  decorator where(column: string, value: string | int | float | boolean) for read;", "decorator latest(column: string) for read;",
+		"decorator insert for effect;", "decorator update for effect;", "decorator delete for effect;",
+		"decorator transaction for op;"},
 	"hozo:vocab/localstorage.hozo": {"decorator localStorage for state;"},
 	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator route(path: string, from: any state?, onInvalid: any effect?);", "decorator dialog(", "decorator fallback(", "decorator interaction("},
 	"hozo:vocab/fs.hozo":           {"namespace fs {", "decorator files(glob: string) for state;"},
-	"hozo:vocab/proc.hozo":         {"namespace proc {", "exception Crashed;", "exception MalformedOutput;", "decorator stdio throws Crashed | MalformedOutput;"},
+	"hozo:vocab/proc.hozo":         {"namespace proc {", "exception Crashed;", "exception MalformedOutput;", "decorator stdio throws Crashed, MalformedOutput;"},
 }
 
 func TestFiles(t *testing.T) {

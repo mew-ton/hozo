@@ -220,7 +220,7 @@ func (ix *index) effect(fqn string) *ir.Effect {
 	return e
 }
 
-// readStates は reads の要素ごとの状態（read の宣言ならその宛先、直に書いた状態ならその状態。docs/check.md「直に書く要素」）を
+// readStates は reads の要素ごとの状態（read の宣言ならその宛先、直に書いた状態ならその状態。docs/check.md「節に書く要素」）を
 // 同じ順に並べ、重複を最初の出現に寄せたもの。宛先の決まらない read は飛ばす。
 func (ix *index) readStates(refs []ir.ReadRef) []string {
 	var out []string

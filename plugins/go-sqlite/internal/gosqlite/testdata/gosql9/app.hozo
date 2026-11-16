@@ -1,93 +1,104 @@
-// GOSQL-9（docs/plugin-go-sqlite.md「op の中身」「列と引数の型」）: op の引数が、デコレータの言うものと合わない。位置は op。
+// GOSQL-9 の入力だったもの。op の引数と、read / 効果の引数の食い違い（数、型）は、今は hozoc が確かめる（docs/types.md「呼び出しの
+// 引数」の TYPE-4、BIND-4）ので、検査を通る仕様には書けない。ここに残すのは、read と効果の引数の型が、表の列の型と合わない宣言と、
+// それを、引数の型どおりに呼ぶ op。
 
 namespace app {
   scalar Id extends string;
   model Row {
     @db.key @db.text id: Id;
     @db.text note: string;
-    @db.nullable @db.int rank: int?;
+    @db.int rank: int?;
   }
   model Other { @db.key @db.text id: Id; }
-  @db.table(Row) state rows: list<Row>;
+  @db.table state rows: list<Row>;
 
   // ---- @db.find: 引数は一つで、型が列に合う ----
 
-  // 引数がない
-  @db.find(rows, "id")
-  export op findNone(): Row?;
   // 引数が二つ
-  @db.find(rows, "id")
-  export op findTwo(id: Id, note: string): Row?;
+  @db.find
+  read findTwoRow(id: Id): Row? on rows;
+  export op findTwo(id: Id, note: string): Row? {
+    return findTwoRow(id);
+  }
   // scalar は名前で比べる（Id の列に string）
-  @db.find(rows, "id")
-  export op findByString(id: string): Row?;
+  @db.find
+  read findByStringRow(id: string): Row? on rows;
+  export op findByString(id: string): Row? {
+    return findByStringRow(id);
+  }
   // 列より広い引数（T の列に T?）
-  @db.find(rows, "id")
-  export op findMaybe(id: Id?): Row?;
+  @db.find
+  read findMaybeRow(id: Id?): Row? on rows;
+  export op findMaybe(id: Id?): Row? {
+    return findMaybeRow(id);
+  }
 
   // ---- @db.list ----
 
-  // 列を渡したのに、引数がない
-  @db.list(rows, "note")
-  export op listNone(): Row[];
   // 型が違う
-  @db.list(rows, "note")
-  export op listByInt(note: int): Row[];
+  @db.list
+  read listByIntRows(note: int): Row[] on rows;
+  export op listByInt(note: int): Row[] {
+    return listByIntRows(note);
+  }
   // T? の列に、別の型
-  @db.list(rows, "rank")
-  export op listByRank(rank: string?): Row[];
+  @db.list
+  read listByRankRows(rank: string?): Row[] on rows;
+  export op listByRank(rank: string?): Row[] {
+    return listByRankRows(rank);
+  }
   // 列を渡さないのに、引数がある
-  @db.list(rows)
-  export op listWith(note: string): Row[];
+  @db.list
+  read listWithRows(): Row[] on rows;
+  export op listWith(note: string): Row[] {
+    return listWithRows();
+  }
 
   // ---- @db.effects: 引数の数は効果の数と同じで、n 番目の型が、n 番目の効果の受け取るもの ----
 
-  @db.insert(rows)
-  effect createRow() on rows.post;
-  @db.update(rows)
-  effect updateRow() on rows.put;
-  @db.delete(rows, "id")
-  effect deleteRow() on rows.delete;
-  @db.delete(rows, "rank")
-  effect deleteRank() on rows.delete;
+  @db.insert
+  effect createRow(row: Row) on rows.post;
+  @db.update
+  effect updateRow(row: Row) on rows.put;
+  @db.delete
+  effect deleteRow(id: Id) on rows.delete;
+  @db.delete
+  effect deleteRank(rank: int?) on rows.delete;
 
-  // 引数が足りない
-  @db.effects(createRow)
-  export op addNone();
-  @db.effects(createRow, deleteRow)
-  export op addAndRemove(row: Row);
-  // 引数が多い
-  @db.effects(createRow)
-  export op addTwo(row: Row, other: Row);
-  // @db.insert は表の model そのもの（別の model、省略可能、配列は合わない）
-  @db.effects(createRow)
-  export op addOther(other: Other);
-  @db.effects(createRow)
-  export op addMaybe(row: Row?);
-  @db.effects(createRow)
-  export op addMany(rows: Row[]);
-  // @db.update も同じ
-  @db.effects(updateRow)
-  export op saveId(id: Id);
-  // @db.delete は列に合う型
-  @db.effects(deleteRow)
-  export op removeByString(id: string);
-  @db.effects(deleteRow)
-  export op removeRow(row: Row);
-  // 二つ目だけが合わない（順が逆）
-  @db.effects(createRow, deleteRow)
-  export op swapped(id: Id, row: Row);
+  // 引数が多い op は、効果に渡すものを選ぶ
+  export op addTwo(row: Row, other: Row) {
+    createRow(row);
+  }
+  // 二つの効果を、一つのトランザクションで
+  @db.transaction
+  export op swapped(id: Id, row: Row) {
+    createRow(row);
+    deleteRow(id);
+  }
 
   // ---- 通るもの ----
 
-  @db.find(rows, "id")
-  export op findRow(id: Id): Row?;
-  @db.list(rows, "rank")
-  export op listRank(rank: int): Row[];
-  @db.list(rows, "rank")
-  export op listRankOrNone(rank: int?): Row[];
-  @db.effects(deleteRank)
-  export op removeRank(rank: int?);
-  @db.effects(deleteRow, createRow)
-  export op replace(id: Id, row: Row);
+  @db.find
+  read findRowRow(id: Id): Row? on rows;
+  export op findRow(id: Id): Row? {
+    return findRowRow(id);
+  }
+  @db.list
+  read listRankRows(rank: int): Row[] on rows;
+  export op listRank(rank: int): Row[] {
+    return listRankRows(rank);
+  }
+  @db.list
+  read listRankOrNoneRows(rank: int?): Row[] on rows;
+  export op listRankOrNone(rank: int?): Row[] {
+    return listRankOrNoneRows(rank);
+  }
+  export op removeRank(rank: int?) {
+    deleteRank(rank);
+  }
+  @db.transaction
+  export op replace(id: Id, row: Row) {
+    deleteRow(id);
+    createRow(row);
+  }
 }
