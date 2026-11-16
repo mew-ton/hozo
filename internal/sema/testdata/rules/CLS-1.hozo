@@ -1,4 +1,4 @@
-// CLS-1: default は高々一つ、ケース名の重複（docs/check.md「classify / match」）
+// CLS-1: 残りを言うもの（default と、残りのケース as else）は合わせて高々一つ、ケース名の重複（docs/check.md「classify / match」「残りのケース」）
 namespace a {
   model M { id: string; }
   classify C of M {
@@ -11,4 +11,21 @@ namespace a {
     A;                                 // ERROR: CLS-1
   }
   classify Ok of M { A; B; default; }
+  op find(): M?;
+  classify TwoElse of find {
+    Found: find as M;
+    Missing: find as else;
+    Gone: find as else;                // ERROR: CLS-1
+  }
+  classify ElseThenDefault of find {
+    Found: find as M;
+    Missing: find as else;
+    default;                           // ERROR: CLS-1
+  }
+  classify DefaultThenElse of find {
+    Found: find as M;
+    default;
+    Missing: find as else;             // ERROR: CLS-1
+  }
+  classify OkElse of find { Found: find as M; Missing: find as else; }
 }

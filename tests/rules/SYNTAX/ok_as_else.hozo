@@ -1,0 +1,20 @@
+// SYNTAX（docs/grammar.md「classify / condition」「予約語」）: as の後ろの else（残りのケース）。else は予約語だが、
+// フィールド名の位置には書ける
+namespace a {
+  model M { id: string; else: string; }
+  op find(): M?;
+  op take(s: string);
+  classify Hit of find {
+    /** 見つかった */
+    Found: find as M;
+    /** 見つからなかった */
+    Missing: find as else;
+  }
+  op f() {
+    const m = find();
+    match m by Hit {
+      Found   => take(m.else);
+      Missing => none;
+    };
+  }
+}

@@ -1,0 +1,9 @@
+// CLS-7（docs/check.md「残りのケース」）: 対象が二つ以上の状態の分類には、残りのケースを書けない
+namespace a {
+  state token: nullable<string>;
+  state profile: nullable<string>;
+  classify Auth of token, profile {
+    Ready: token as string, profile as string;
+    NoToken: token as else;            // ERROR: CLS-7
+  }
+}

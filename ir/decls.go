@@ -313,18 +313,20 @@ const (
 // NarrowBy は絞り込みの種類（docs/ir.md「classify」の CaseTyping の by。docs/types.md「型で決まる絞り込み」）。
 type NarrowBy string
 
-// 絞り込みの種類。presence と variant は型で決まる絞り込み、predicate は述語の要る絞り込み。
+// 絞り込みの種類。presence と variant は型で決まる絞り込み、predicate は述語の要る絞り込み。else は、型を書かない
+// `対象 as else`（残りのケース。docs/check.md「残りのケース」）。
 const (
 	NarrowByPresence  NarrowBy = "presence"
 	NarrowByVariant   NarrowBy = "variant"
 	NarrowByPredicate NarrowBy = "predicate"
+	NarrowByElse      NarrowBy = "else"
 )
 
-// CaseTyping はケースの `対象 as T`（docs/ir.md「classify」の CaseTyping。docs/check.md「ケースの型」）。
+// CaseTyping はケースの `対象 as T` と `対象 as else`（docs/ir.md「classify」の CaseTyping。docs/check.md「ケースの型」「残りのケース」）。
 type CaseTyping struct {
 	// State は状態の分類のとき、その対象の状態の FQN。値の分類と op の分類では持たない（対象は一つ）。
 	State string `json:"state,omitempty"`
-	// Type はそのケースでの対象の型。
+	// Type はそのケースでの対象の型。By が else なら、書いた型がないので、docs/types.md「残りのケースでの対象の型」。
 	Type Type `json:"type"`
 	// By は絞り込みの種類。
 	By   NarrowBy `json:"by"`
@@ -447,6 +449,16 @@ func (c *Classify) Case(name string) *ClassifyCase {
 	return nil
 }
 
+// ElseCase は残りのケース（`対象 as else`。docs/check.md「残りのケース」）。なければ nil。
+func (c *Classify) ElseCase() *ClassifyCase {
+	for i := range c.Cases {
+		if c.Cases[i].IsElse() {
+			return &c.Cases[i]
+		}
+	}
+	return nil
+}
+
 // SubjectStates は状態の分類の対象の基底の状態の FQN。値の分類か op の分類なら ok が false。
 func (c *Classify) SubjectStates() (states []string, ok bool) {
 	s, ok := c.Subject.(StatesSubject)
@@ -457,9 +469,19 @@ func (c *Classify) SubjectStates() (states []string, ok bool) {
 type ClassifyCase struct {
 	Name        string `json:"name"`
 	Description *Doc   `json:"description,omitempty"`
-	// As は `対象 as T` の並び（書かれた順）。なければ空（JSON では []）。
+	// As は `対象 as T` と `対象 as else` の並び（書かれた順）。なければ空（JSON では []）。
 	As   []CaseTyping `json:"as"`
 	Span Span         `json:"span"`
+}
+
+// IsElse は、残りのケース（`対象 as else`。docs/check.md「残りのケース」）か。
+func (c ClassifyCase) IsElse() bool {
+	for _, as := range c.As {
+		if as.By == NarrowByElse {
+			return true
+		}
+	}
+	return false
 }
 
 // MarshalJSON は docs/ir.md「JSON」の形で書く。

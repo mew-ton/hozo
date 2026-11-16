@@ -1,0 +1,11 @@
+// CLS-7（docs/check.md「残りのケース」）: variant で、ほかのケースの型が union のすべてのアームの型を覆っていて、残りのアームがない
+namespace a {
+  model M { id: string; }
+  model N { id: string; }
+  union Page { Ready: M; Missing: N; }
+  classify Kind of Page {
+    IsReady: Page as M;
+    IsMissing: Page as N;
+    Other: Page as else;               // ERROR: CLS-7
+  }
+}

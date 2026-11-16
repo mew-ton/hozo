@@ -530,19 +530,21 @@ func operationOf(op ast.StateOp) ir.Operation {
 
 // --- classify / condition ---
 
-// lowerClassify は classify。CLS-1（default が二つ以上、ケース名の重複）、CLS-2（名前の付いたケースがない）、
-// ケースの `対象 as T`（CLS-5 / CLS-6）、ケースの判定（decidedBy。docs/check.md「ケースの判定」）。
+// lowerClassify は classify。CLS-1（残りを言うもの — default と、残りのケース `対象 as else` — が合わせて二つ以上、ケース名の
+// 重複）、CLS-2（名前の付いたケースがない）、ケースの `対象 as T`（CLS-5 / CLS-6）、残りのケース（CLS-7）、ケースの判定
+// （decidedBy。docs/check.md「ケースの判定」「残りのケース」）。
 func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
 	c.Subject = a.lowerClassifySubject(s, d.Of, sc)
 	seen := map[string]bool{}
+	rest := restCases{wrote: map[string]bool{}}
 	for _, cs := range d.Cases {
 		if cs == nil {
 			continue
 		}
 		if cs.Default {
-			a.lowerDefaultCase(s, c, cs, sc)
+			a.lowerDefaultCase(s, c, cs, sc, &rest)
 			continue
 		}
 		if cs.Name == nil {
@@ -558,25 +560,142 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 		if cs.Doc != nil {
 			cc.Description = a.lowerDoc(cs.Doc, docContext{ns: sc.ns, span: cs.Name.Span})
 		}
-		cc.As = a.lowerCaseTypings(s, c, cs, sc)
+		cc.As = a.lowerCaseTypings(s, c, cs, sc, &rest)
 		c.Cases = append(c.Cases, cc)
 	}
 	if len(c.Cases) == 0 {
 		a.errorf("CLS-2", s.nameSpan, "classify %s に名前の付いたケースが一つもない", s.fqn)
 	}
+	a.lowerElseCase(s, c, &rest)
 	c.DecidedBy = a.decidedBy(c)
 	return c
 }
 
-func (a *analyzer) lowerDefaultCase(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope) {
+// restCases は、一つの classify の中で「残り」を言うもの（default と、残りのケース `対象 as else`）の覚え書き
+// （docs/check.md「残りのケース」）。
+type restCases struct {
+	// said は、残りを言うものを、もう見たか（default か、as else）。二つ目からは CLS-1。
+	said bool
+	// wrote は、as else を書いたケースの名前（誤りのものを含む）。CLS-7 の「ほかのケース」から除く。
+	wrote map[string]bool
+	// first は、最初に書かれた as else（対象が分類の対象で、残りを言うものの二つ目でないもの）。なければ nil。
+	first *elseTyping
+	// broken は、どれかのケースの as に誤り（CLS-5 / CLS-6）があったか。あれば、CLS-7 を重ねて報告しない。
+	broken bool
+}
+
+// elseTyping は、ケース name の `対象 as else`。state は対象の状態の FQN（状態の分類のとき）、subjectType は対象の型。
+type elseTyping struct {
+	name        string
+	state       string
+	subjectType ir.Type
+	span        source.Span // as else の全体
+	elseSpan    source.Span // else
+}
+
+func (a *analyzer) lowerDefaultCase(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope, rest *restCases) {
 	if c.HasDefault {
 		a.errorf("CLS-1", cs.Span, "classify %s に default が二つ以上ある", s.fqn)
 		return
 	}
+	if rest.said {
+		a.errorf("CLS-1", cs.Span, "classify %s に、残りのケース（as else）と default の両方がある（どちらも残りを言う。docs/check.md「残りのケース」）", s.fqn)
+		return
+	}
+	rest.said = true
 	c.HasDefault = true
 	if cs.Doc != nil {
 		c.DefaultDescription = a.lowerDoc(cs.Doc, docContext{ns: sc.ns, span: cs.Span})
 	}
+}
+
+// lowerElseCase は、残りのケース（rest.first）を確かめて、そのケースの as に足す（docs/check.md「残りのケース」）。
+// CLS-7: 残りのケースを除いた名前の付いたケースが、一つもないか、「ケースの判定」の条件 1〜3 を満たさない。または、
+// variant の絞り込みで残りのアームがない。ほかのケースの as に誤りがあれば、重ねて報告しない。
+func (a *analyzer) lowerElseCase(s *symbol, c *ir.Classify, rest *restCases) {
+	e := rest.first
+	if e == nil || rest.broken || e.subjectType == nil {
+		return
+	}
+	fail := func(format string, args ...any) {
+		a.errorf("CLS-7", e.elseSpan, "classify %s のケース %s: 残りのケース（as else）を書けるのは、型で決まる分類だけ。%s（docs/check.md「残りのケース」）",
+			s.fqn, e.name, fmt.Sprintf(format, args...))
+	}
+	// 1. 対象が一つ
+	if states, isStates := c.SubjectStates(); isStates && len(states) != 1 {
+		fail("対象が二つ以上の状態の分類には書けない")
+		return
+	}
+	// 2. ほかのケースのすべてが、その対象の、型で決まる絞り込みの as を持つ。3. その型が、ケースの間ですべて違う
+	var types []ir.Type
+	var names []string
+	by := ir.NarrowBy("")
+	for _, cs := range c.Cases {
+		if rest.wrote[cs.Name] {
+			continue
+		}
+		var as *ir.CaseTyping
+		for i := range cs.As {
+			if cs.As[i].State == e.state {
+				as = &cs.As[i]
+			}
+		}
+		if as == nil {
+			fail("ケース %s は as を持たない（述語のケース）", cs.Name)
+			return
+		}
+		if as.By == ir.NarrowByPredicate {
+			fail("ケース %s の as は、述語の要る絞り込み（型からは決まらない）", cs.Name)
+			return
+		}
+		for i, t := range types {
+			if ir.TypeEqual(t, as.Type) {
+				fail("ケース %s と %s が同じ型 %s を書いている（述語のケース）", names[i], cs.Name, typeName(as.Type))
+				return
+			}
+		}
+		types, names, by = append(types, as.Type), append(names, cs.Name), as.By
+	}
+	if len(types) == 0 {
+		fail("ほかに、型を書いたケースが一つもない")
+		return
+	}
+	// 残りのケースでの対象の型（docs/types.md「残りのケースでの対象の型」）
+	typ := e.subjectType
+	if by == ir.NarrowByVariant {
+		remaining := a.remainingArms(e.subjectType, types)
+		if len(remaining) == 0 {
+			fail("ほかのケースが union のすべてのアームの型を覆っていて、残りのアームがない")
+			return
+		}
+		if len(remaining) == 1 && remaining[0].Type != nil {
+			typ = remaining[0].Type
+		}
+	}
+	if cc := c.Case(e.name); cc != nil {
+		cc.As = append(cc.As, ir.CaseTyping{State: e.state, Type: typ, By: ir.NarrowByElse, Span: a.irSpan(e.span)})
+	}
+}
+
+// remainingArms は、union u のアームのうち、型が types のどれとも等しくないもの（残りのアーム。docs/check.md「残りのケース」）。
+func (a *analyzer) remainingArms(u ir.Type, types []ir.Type) []ir.UnionArm {
+	un := a.unionArms(u)
+	if un == nil {
+		return nil
+	}
+	var out []ir.UnionArm
+	for _, arm := range un.Arms {
+		named := false
+		for _, t := range types {
+			if arm.Type != nil && ir.TypeEqual(arm.Type, t) {
+				named = true
+			}
+		}
+		if !named {
+			out = append(out, arm)
+		}
+	}
+	return out
 }
 
 // classifyKindName は分類の種類の呼び名（診断用）。
@@ -593,31 +712,53 @@ func classifyKindName(c *ir.Classify) string {
 // lowerCaseTypings はケースの `対象 as T` の並び（docs/check.md「ケースの型」）。CLS-5: as の前がその分類の対象でない、
 // 一つのケースに同じ対象の as が二度ある。CLS-6: as の後ろの型が、対象の型から絞り込める型でない。
 // 対象が決まっていない分類（CLS-3 などで報告済み）では、型の解決だけを行う。
-func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope) []ir.CaseTyping {
+// `対象 as else`（残りのケース）は、ここでは rest に覚えるだけで、as には足さない（確かめて足すのは lowerElseCase）。
+// CLS-1: 残りを言うものが、もうある（default か、別の as else）。
+func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyCase, sc *scope, rest *restCases) []ir.CaseTyping {
 	var out []ir.CaseTyping
 	seen := map[string]bool{}
 	for _, ct := range cs.As {
 		if ct == nil {
 			continue
 		}
-		t, tok := a.lowerType(ct.Type, sc)
+		if ct.Else {
+			rest.wrote[cs.Name.Name] = true
+		}
+		var t ir.Type
+		tok := true
+		if !ct.Else {
+			t, tok = a.lowerType(ct.Type, sc)
+		}
 		if c.Subject == nil {
 			continue
 		}
 		state, subjectType, ok := a.caseTypingSubject(s, c, ct, sc)
 		if !ok {
+			rest.broken = true
 			continue
 		}
 		if seen[state] {
 			a.errorf("CLS-5", ct.Subject.NodeSpan(), "classify %s のケース %s に、対象 %s の as が二度ある", s.fqn, cs.Name.Name, a.text(ct.Subject.NodeSpan()))
+			rest.broken = true
 			continue
 		}
 		seen[state] = true
+		if ct.Else {
+			if rest.said {
+				a.errorf("CLS-1", ct.ElseSpan, "classify %s に、残りを言うものが二つ以上ある（残りのケース as else は高々一つで、default とは一緒に書けない。docs/check.md「残りのケース」）", s.fqn)
+				continue
+			}
+			rest.said = true
+			rest.first = &elseTyping{name: cs.Name.Name, state: state, subjectType: subjectType, span: ct.Span, elseSpan: ct.ElseSpan}
+			continue
+		}
 		if !tok || subjectType == nil {
+			rest.broken = rest.broken || !tok
 			continue
 		}
 		if !a.narrowable(subjectType, t) {
 			a.errorf("CLS-6", ct.Type.NodeSpan(), "classify %s のケース %s: 対象の型 %s を %s には絞り込めない（絞り込めるのは、対象の型に渡せる型か、対象の union のアームの型。docs/types.md「絞り込める型」）", s.fqn, cs.Name.Name, typeName(subjectType), typeName(t))
+			rest.broken = true
 			continue
 		}
 		out = append(out, ir.CaseTyping{State: state, Type: t, By: a.narrowBy(subjectType, t), Span: a.irSpan(ct.Span)})
@@ -745,6 +886,7 @@ func (a *analyzer) narrowBy(s, t ir.Type) ir.NarrowBy {
 }
 
 // decidedBy は docs/check.md「ケースの判定」: 型で決まる分類の四つの条件をすべて満たせば type、そうでなければ predicate。
+// c.Cases の as は、確かめた後のもの（lowerCaseTypings、lowerElseCase）。
 func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 	// 1. 対象が一つ
 	state := ""
@@ -770,9 +912,11 @@ func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 	if len(c.Cases) == 0 || subjectType == nil {
 		return ir.DecidedByPredicate
 	}
-	// 2. すべてのケースがその対象の as を持ち、どれも型で決まる絞り込み。3. as の型がケースの間ですべて違う。
+	// 2. すべてのケースがその対象の as を持ち、型を書いた as は、どれも型で決まる絞り込み。3. as に書いた型がケースの間で
+	// すべて違う。残りのケース（as else）は、型を書かないので比べない（確かめてあるのは lowerElseCase）
 	var types []ir.Type
 	by := ir.NarrowBy("")
+	hasElse := false
 	for _, cs := range c.Cases {
 		var as *ir.CaseTyping
 		for i := range cs.As {
@@ -783,6 +927,10 @@ func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 		if as == nil || as.By == ir.NarrowByPredicate {
 			return ir.DecidedByPredicate
 		}
+		if as.By == ir.NarrowByElse {
+			hasElse = true
+			continue
+		}
 		for _, t := range types {
 			if ir.TypeEqual(t, as.Type) {
 				return ir.DecidedByPredicate
@@ -791,8 +939,9 @@ func (a *analyzer) decidedBy(c *ir.Classify) ir.DecidedBy {
 		types = append(types, as.Type)
 		by = as.By
 	}
-	// 4. presence なら default がある。variant なら、default があるか、書いた型が union のすべてのアームの型を覆う。
-	if c.HasDefault {
+	// 4. 残りを受けるものがある: presence なら、残りのケースか default。variant なら、残りのケースか default があるか、
+	// 書いた型が union のすべてのアームの型を覆う。
+	if c.HasDefault || hasElse {
 		return ir.DecidedByType
 	}
 	if by == ir.NarrowByVariant && a.coversArms(subjectType, types) {

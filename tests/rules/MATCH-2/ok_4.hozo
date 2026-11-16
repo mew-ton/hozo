@@ -1,0 +1,16 @@
+// MATCH-2（docs/check.md「classify / match」「残りのケース」）: 残りのケース（as else）は名前の付いたケース。アームに名前で並べる
+namespace a {
+  model M { id: string; }
+  state token: nullable<string>;
+  op find(): M?;
+  classify Hit of find { Found: find as M; Missing: find as else; }
+  classify Session of token { LoggedIn: token as string; LoggedOut: token as else; }
+  op use(m: M);
+  op f();
+  op ok() {
+    const m = find();
+    match m by Hit { Found => use(m); Missing => none; };
+    match m by Hit { Found | Missing => f(); };
+    match by Session { LoggedOut => f(); LoggedIn => none; };
+  }
+}

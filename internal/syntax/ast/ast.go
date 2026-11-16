@@ -479,19 +479,23 @@ type ClassifyCase struct {
 	Doc     *DocComment
 	Name    *Ident
 	Default bool
-	// As は "対象 as 型" の並び（CaseTyping）。なければ空。default には書けない。
+	// As は "対象 as 型" と "対象 as else" の並び（CaseTyping）。なければ空。default には書けない。
 	As []*CaseTyping
 }
 
 // NodeSpan は Node の実装。
 func (n *ClassifyCase) NodeSpan() source.Span { return n.Span }
 
-// CaseTyping はケースの "対象 as 型"（docs/grammar.md「classify / condition」）。
+// CaseTyping はケースの "対象 as 型" と "対象 as else"（docs/grammar.md「classify / condition」）。
 // Subject は宣言の of の後ろと同じに書いた対象（型か op か状態の名前。名前の解決が決める）。
 type CaseTyping struct {
 	Span    source.Span
 	Subject Type
-	Type    Type
+	// Type は as の後ろの型。Else なら nil。
+	Type Type
+	// Else は、as の後ろが型ではなく else（残りのケース。docs/check.md「残りのケース」）。ElseSpan は、その else の位置。
+	Else     bool
+	ElseSpan source.Span
 }
 
 // NodeSpan は Node の実装。

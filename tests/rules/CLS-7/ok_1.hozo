@@ -1,0 +1,19 @@
+// CLS-7（docs/check.md「残りのケース」）: 残りのケース（対象 as else）を書けるのは、型で決まる分類。
+// presence（値の分類、op の分類、対象の状態が一つの状態の分類）と、variant（残りのアームが一つ、二つ以上）
+namespace a {
+  model M { id: string; }
+  model N { id: string; }
+  model O { id: string; }
+  union Page { Ready: M; Missing: N; Broken: O; }
+  state token: nullable<string>;
+  op find(): M?;
+  op page(): Page;
+  classify V of M? { Has: M? as M; Lacks: M? as else; }
+  classify F of find { Found: find as M; NotFound: find as else; }
+  classify S of token { LoggedIn: token as string; LoggedOut: token as else; }
+  classify P1 of Page { IsReady: Page as M; IsMissing: Page as N; Other: Page as else; }
+  classify P2 of page { IsReady: page as M; Rest: page as else; }
+  /** 残りのケースは、どこに書いてもよい */
+  classify P3 of Page { Rest: Page as else; IsReady: Page as M; }
+  effect logout() on S: LoggedIn -> LoggedOut;
+}

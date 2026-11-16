@@ -1,0 +1,18 @@
+// MATCH-2（docs/check.md「classify / match」「残りのケース」）: 残りのケース（as else）は default のアームでは受けられない
+// （hasDefault は false）。名前で並べなければ、足りない
+namespace a {
+  model M { id: string; }
+  op find(): M?;
+  classify Hit of find { Found: find as M; Missing: find as else; }
+  op use(m: M);
+  op ng() {
+    const m = find();
+    match m by Hit {                   // ERROR: MATCH-2
+      Found   => use(m);
+      default => none;
+    };
+    match m by Hit {                   // ERROR: MATCH-2
+      Found => use(m);
+    };
+  }
+}

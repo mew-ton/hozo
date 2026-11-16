@@ -71,6 +71,7 @@ const (
 	Return
 	Match
 	Default
+	Else
 	None
 	Throw
 
@@ -158,6 +159,7 @@ var Keywords = map[string]Kind{
 	"return":  Return,
 	"match":   Match,
 	"default": Default,
+	"else":    Else,
 	"none":    None,
 	"throw":   Throw,
 

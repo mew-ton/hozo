@@ -1,0 +1,20 @@
+// CLS-7（docs/check.md「残りのケース」）: 述語のケースの隣には、残りのケースを書けない
+// （as を持たないケース、述語の要る絞り込みのケース、同じ型を書いた二つのケース）
+namespace a {
+  model M { id: string; }
+  scalar Email extends string;
+  op find(): M?;
+  classify NoAs of M? {
+    Has;
+    Lacks: M? as else;                 // ERROR: CLS-7
+  }
+  classify Predicate of string {
+    Valid: string as Email;
+    Invalid: string as else;           // ERROR: CLS-7
+  }
+  classify SameType of find {
+    Fresh: find as M;
+    Stale: find as M;
+    Missing: find as else;             // ERROR: CLS-7
+  }
+}

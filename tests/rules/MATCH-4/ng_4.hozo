@@ -1,0 +1,24 @@
+// MATCH-4（docs/types.md「残りのケースでの対象の型」）: 残りのケース（as else）のアームで、presence は外のまま（値のある型には
+// ならない）。variant で残りのアームが二つ以上なら、union のまま（アームの型にはならない）
+namespace a {
+  model M { id: string; }
+  model N { id: string; }
+  model O { id: string; }
+  union Three { Ready: M; Missing: N; Broken: O; }
+  op find(): M?;
+  classify Hit of find { Found: find as M; NotFound: find as else; }
+  classify K3 of Three { IsReady: Three as M; Rest: Three as else; }
+  op takeM(m: M): void;
+  op takeN(n: N): void;
+  op f(three: Three): void {
+    const m = find();
+    match m by Hit {
+      Found    => takeM(m);
+      NotFound => takeM(m);            // ERROR: MATCH-4
+    };
+    match three by K3 {
+      IsReady => takeM(three);
+      Rest    => takeN(three);         // ERROR: MATCH-4
+    };
+  }
+}

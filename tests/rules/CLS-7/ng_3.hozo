@@ -1,0 +1,7 @@
+// CLS-7（docs/check.md「残りのケース」）: 残りのケースのほかに、名前の付いたケースが一つもない（default だけでも同じ）
+namespace a {
+  model M { id: string; }
+  classify Only of M? {
+    Lacks: M? as else;                 // ERROR: CLS-7
+  }
+}

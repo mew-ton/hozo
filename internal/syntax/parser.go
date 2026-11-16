@@ -801,7 +801,7 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 // parseClassifyCase は ClassifyCase を読む。
 //
 //	ClassifyCase = [ DocComment ] ( Ident [ ":" CaseTyping { "," CaseTyping } ] | "default" ) ";" ;
-//	CaseTyping   = Type "as" Type ;
+//	CaseTyping   = Type "as" ( Type | "else" ) ;
 func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	c := &ast.ClassifyCase{Doc: p.parseLeadingDoc()}
 	start := p.tok().Span.Start
@@ -828,12 +828,17 @@ func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	return c
 }
 
-// parseCaseTyping は CaseTyping = Type "as" Type を読む。as の前は対象（宣言の of の後ろと同じに書く）。
+// parseCaseTyping は CaseTyping = Type "as" ( Type | "else" ) を読む。as の前は対象（宣言の of の後ろと同じに書く）。
+// as の後ろの else は、型の代わりに「残り」を言う（docs/check.md「残りのケース」）。
 func (p *parser) parseCaseTyping() *ast.CaseTyping {
 	start := p.tok().Span.Start
 	t := &ast.CaseTyping{Subject: p.parseType()}
 	p.expect(token.As)
-	t.Type = p.parseType()
+	if p.at(token.Else) {
+		t.Else, t.ElseSpan = true, p.advance().Span
+	} else {
+		t.Type = p.parseType()
+	}
 	t.Span = p.spanFrom(start)
 	return t
 }
