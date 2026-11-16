@@ -46,7 +46,7 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 | 宣言の頭 | `namespace` `model` `scalar` `union` `state` `op` `exception` `effect` `read` `classify` `condition` `decorator` `bind` |
 | 修飾 | `export` `override` |
 | 節の頭 | `extends` `of` `on` `to` `by` `for` `as` `effects` `reads` `throws` `prevents` `keeps` `catches` `recovers` `halts` `ignores` `any` |
-| 文の頭と値 | `const` `return` `match` `default` `none` `throw` |
+| 文の頭と値 | `const` `return` `match` `default` `else` `none` `throw` |
 | 核の型と形 | `string` `boolean` `int` `float` `Time` `Duration` `void` `never` `Record` `list` `nullable` `single` |
 | リテラル | `true` `false` |
 
@@ -200,7 +200,7 @@ CaseSet       = "any" | Ident { "|" Ident } ;
 ```
 ClassifyDecl    = "classify" Ident "of" ClassifySubject "{" { ClassifyCase } "}" ;
 ClassifyCase    = [ DocComment ] ( Ident [ ":" CaseTyping { "," CaseTyping } ] | "default" ) ";" ;
-CaseTyping      = Type "as" Type ;
+CaseTyping      = Type "as" ( Type | "else" ) ;
 ConditionDecl   = "condition" Ident "of" ClassifySubject ";" ;
 ClassifySubject = Type { "," Type } ;
 ```
@@ -214,6 +214,7 @@ ClassifySubject = Type { "," Type } ;
 | すべてが今の名前空間の状態の名前 | `classify Checkout of carts, orders { ... }` | 状態の分類 |
 
 - `CaseTyping` は、そのケースのときに対象が何の型になるかを書く（`Registered: findUser as type.User;`）。`as` の前は対象の一つで、宣言の `of` の後ろと同じに書く（値の分類なら同じ型、op の分類ならその op、状態の分類なら対象の状態の一つ）。`as` の後ろはそのケースでの型。意味と、書ける型は `docs/check.md`「分類」と `docs/types.md`「絞り込み」。
+- `as` の後ろの `else` は、型の代わりに「残り」を言う（`Unregistered: findUser as else;`）: 対象が、ほかのケースが `as` に書いた型のどれにも当たらないとき。`else` は予約語で、書けるのはこの位置だけ。書ける分類と意味は `docs/check.md`「分類」の「残りのケース」。
 - 状態の分類は、一つのケースに複数の対象の型を `,` で並べられる（`Ready: token as Token, profile as Profile;`）。
 - `default` と `condition` には `as` を書けない（文法で閉じる）。
 
@@ -410,6 +411,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `read` の結果の型は省略できない。`on` の後ろに操作は書かない | 読むことは、値を得ること。何を得るかを宣言に書かせ、配線の式の型を宣言だけから決める。操作を書かないのは、状態を読むことが一種類だから |
 | 名前を付けない形は、配線にある: 状態を名前で読むこと（`f(users)`）と、組み込みの効果を直に呼ぶこと（`users.post(user);`）。配線の op の `reads` と `effects` の要素も、名前でも、直にでも書ける（`reads userByEmail` と `reads users`、`effects addUser` と `effects users.post`） | 名前を付けるかどうかを、書く人が選べるようにする。説明もデコレータも要らない読み書きに、宣言を一つ足させない。分類の遷移だけは直に書けない: 前後のケースを節や呼び出しの中に書くと、並びが読めなくなる |
 | `as` の前には対象を、宣言の `of` の後ろと同じに書く。対象が一つでも省略できない | どの対象が何の型になるかを、対象が複数ある状態の分類と同じ形で読めるようにする。`default` と `condition` には書けない（`default` は「どれでもない」で、型を言えない。`condition` は名前と対象だけの糖衣） |
+| `as` の後ろの `else` は予約語（`docs/decisions.md`「決めたこと」152） | 型の位置に来るので、予約しないと同じ名前の型と区別できない（`never` と同じ理由）。フィールド名には書ける（`FieldName`）。予約語の表では、同じく分類の残りを言う `default` の隣に置く |
 | `throw` はアームの本体にだけ書ける | 「この場合は失敗」を書くためのもの。本体のどこにでも書ける文にすると、下の行が評価されない配線を書ける |
 | `throw` は、例外の引数に値を渡せる（`throw E(a, b)`）。値は `Atom` | 値を運ぶ例外も、配線から投げられるようにする（以前は、値を運ぶ例外を投げられるのは葉の op だけだった）。引数は呼び出しと同じ形（位置で渡す `Atom`）にして、書ける値を位置ごとに分けない |
 | アームの本体の値は `Atom` のすべて（名前、リテラル、`none`、レコードリテラル） | 呼び出しの引数と同じ集合にして、位置ごとに書ける値を分けない |
