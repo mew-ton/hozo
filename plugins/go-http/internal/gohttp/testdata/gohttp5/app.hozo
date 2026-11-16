@@ -5,13 +5,18 @@ namespace app {
   model Drawing { title: string; shape: Shape; }
   model Album { drawings: Drawing[]; }
 
-  // 本文: union そのもの、union を中に持つ model
+  // 本文の項目: union そのもの、union を中に持つ model
   model ShapeIn { @http.body shape: Shape; }
   @http.post("/shape")
   export op putShape(in: ShapeIn);
-  model AlbumIn { @http.query id: string?; @http.body album: Album?; @http.body byName: Record<string, Shape[]>; }
+  model AlbumIn { @http.query id: string?; @http.body album: Album?; @http.body("names") byName: Record<string, Shape[]>; }
   @http.post("/album")
   export op putAlbum(in: AlbumIn);
+
+  // 本文の全体
+  model DrawingIn { @http.bodyObj drawing: Drawing; }
+  @http.post("/drawing")
+  export op putDrawing(in: DrawingIn);
 
   // 結果
   @http.get("/drawing")

@@ -1,6 +1,6 @@
 # plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「パッケージと import パス」の「import の名前」のうち、
 # 名前空間のパッケージ名が、基底が決まった名前で使う識別子と同じとき: 定義のパッケージに宣言する非公開の名前（構造体 ops、補助 ptr）と、
-# 関数の本体の中の名前（レシーバ o、ctx、err、New<Model> の m、途中の値 v0、判定の結果 k0）。
+# 関数の本体の中の名前（レシーバ o、ctx、err、途中の値 v0、判定の結果 k0）。
 
 # 1: flat。内部の op を持たない（定義のパッケージが入口でもある）。ops と ptr の型を使い、ops の op を呼ぶ
 [[emit]]
@@ -50,11 +50,6 @@ out         = "gen/ctx"
 namespace   = "err"
 transpilers = ["go"]
 out         = "gen/err"
-
-[[emit]]
-namespace   = "m"
-transpilers = ["go"]
-out         = "gen/m"
 
 [[emit]]
 namespace   = "v0"

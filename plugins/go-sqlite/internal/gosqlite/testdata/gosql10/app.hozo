@@ -1,0 +1,50 @@
+// GOSQL-10（docs/plugin-go-sqlite.md「op の中身」）: op の戻り値が、デコレータの言うものと合わない: @db.find は M?、
+// @db.list は M[]（M は表の model）、@db.effects は戻り値なし。位置は op。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; }
+  model Other { @db.key @db.text id: string; @db.text note: string; }
+  @db.table(Row) state rows: list<Row>;
+
+  // ---- @db.find は M? ----
+
+  @db.find(rows, "id")
+  export op findSure(id: string): Row;
+  @db.find(rows, "id")
+  export op findMany(id: string): Row[];
+  @db.find(rows, "id")
+  export op findOther(id: string): Other?;
+  @db.find(rows, "id")
+  export op findNote(id: string): string?;
+  @db.find(rows, "id")
+  export op findNothing(id: string);
+
+  // ---- @db.list は M[] ----
+
+  @db.list(rows)
+  export op listOne(): Row?;
+  @db.list(rows, "note")
+  export op listMaybe(note: string): Row[]?;
+  @db.list(rows)
+  export op listOthers(): Other[];
+  @db.list(rows)
+  export op listNothing();
+
+  // ---- @db.effects は戻り値なし ----
+
+  @db.insert(rows)
+  effect createRow on rows.post;
+  @db.effects(createRow)
+  export op addAndReturn(row: Row): Row;
+  @db.effects(createRow)
+  export op addAndCount(row: Row): int;
+
+  // ---- 通るもの ----
+
+  @db.find(rows, "id")
+  export op findRow(id: string): Row?;
+  @db.list(rows)
+  export op listRows(): Row[];
+  @db.effects(createRow)
+  export op addRow(row: Row);
+}

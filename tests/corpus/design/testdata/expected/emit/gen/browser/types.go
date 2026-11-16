@@ -25,9 +25,6 @@ const EffectTransitionToPayment = inner.EffectTransitionToPayment
 // OrdersQuery は model browser.OrdersQuery。
 type OrdersQuery = inner.OrdersQuery
 
-// NewOrdersQuery は既定値を入れた OrdersQuery を返す。
-func NewOrdersQuery() OrdersQuery { return inner.NewOrdersQuery() }
-
 // Unavailable は一時的に表示できない
 type Unavailable = inner.Unavailable
 

@@ -1,0 +1,10 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-7（db の語彙のデコレータの引数の状態が、N の表の状態でない）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/app"
+
+[[emit]]
+namespace   = "far"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/far"

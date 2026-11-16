@@ -13,15 +13,8 @@ type GetInput struct {
 
 // Auth は model api.Auth。
 type Auth struct {
-	Token  *Token `json:"token,omitempty"`
-	Locale string `json:"locale"`
-}
-
-// NewAuth は既定値を入れた Auth を返す。
-func NewAuth() Auth {
-	m := Auth{}
-	m.Locale = "ja"
-	return m
+	Token  *Token  `json:"token,omitempty"`
+	Locale *string `json:"locale,omitempty"`
 }
 
 // NestedInput は model api.NestedInput。
@@ -32,14 +25,6 @@ type NestedInput struct {
 
 // Guest は model api.Guest。
 type Guest struct {
-	Token Token  `json:"token"`
+	Token *Token `json:"token,omitempty"`
 	Id    string `json:"id"`
-}
-
-// NewGuest は既定値を入れた Guest を返す。
-func NewGuest() Guest {
-	m := Guest{}
-	m.Token = "guest"
-	m.Id = "0"
-	return m
 }

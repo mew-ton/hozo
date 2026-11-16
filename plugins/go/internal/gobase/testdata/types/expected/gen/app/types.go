@@ -60,18 +60,6 @@ type Options struct {
 	Note  *string       `json:"note,omitempty"`
 }
 
-// NewOptions は既定値を入れた Options を返す。
-func NewOptions() Options {
-	m := Options{}
-	m.Limit = 10
-	m.Label = "none"
-	m.Ratio = 1.5
-	m.Wait = time.Duration(5000000000)
-	m.On = true
-	m.Id = "x"
-	return m
-}
-
 // Public は model app.Public。
 // app.User を継承し（extends）、nick をなくした、id を変えた、extra を足したもの。app.User とは別の型で、暗黙には渡せない。
 type Public struct {

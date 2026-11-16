@@ -1,5 +1,5 @@
-// GOSQL-3（docs/plugin-go-sqlite.md「表」）: 列にできない型のフィールドがある（union と、union を中に持つ array / record / model）。
-// 位置は model。フィールドごとに一つ。同じ model を要素に持つ表の状態が二つあっても、一度だけ。
+// GOSQL-3（docs/plugin-go-sqlite.md「しまい方」）: 表の model に、どのしまい方でも列にできない型のフィールドがある
+// （union と、union を中に持つ array / record / model）。位置は model。フィールドごとに一つ。同じ model の表の状態が二つあっても、一度だけ。
 
 namespace app {
   model Circle { r: float; }
@@ -12,15 +12,18 @@ namespace app {
   model Tree { children: Tree[]; }
 
   model Bad {
-    @db.key id: string;
-    shape: Shape;
-    maybe: Shape?;
-    shapes: Shape[];
-    byName: Record<string, Shape>;
-    frame: Frame;
-    albums: Album[]?;
-    tree: Tree;
-    circle: Circle;
+    @db.key @db.text id: string;
+    @db.json shape: Shape;
+    @db.nullable @db.json maybe: Shape?;
+    @db.json shapes: Shape[];
+    @db.json byName: Record<string, Shape>;
+    @db.json frame: Frame;
+    @db.nullable @db.json albums: Album[]?;
+    // しまい方が @db.json でなくても、同じ（合わないしまい方 GOSQL-17 とは、重ねて報告しない）
+    @db.text text: Shape;
+    // 通るもの
+    @db.json tree: Tree;
+    @db.json circle: Circle;
   }
 
   @db.table(Bad) state bads: list<Bad>;

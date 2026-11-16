@@ -6,6 +6,3 @@ import "example.com/app/gen/split/inner"
 
 // Plan は model split.Plan。
 type Plan = inner.Plan
-
-// NewPlan は既定値を入れた Plan を返す。
-func NewPlan() Plan { return inner.NewPlan() }

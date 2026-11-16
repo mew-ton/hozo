@@ -1,0 +1,37 @@
+// GOSQL-12（docs/plugin-go-sqlite.md「op の中身」）: @db.effects に並べた効果が、@db.insert / @db.update / @db.delete のどれも
+// 持たない（位置は op）。または、一つの効果が、その三つのうち二つ以上を持つ（位置は効果）。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; }
+  @db.table(Row) state rows: list<Row>;
+
+  /** デコレータを持たない効果 */
+  effect bare on rows.post;
+  /** 二つ持つ効果 */
+  @db.insert(rows)
+  @db.update(rows)
+  effect both on rows.post;
+  /** 三つとも持つ効果（op に並べられていなくても、確かめる。同じデコレータを二度付けるのは、hozoc の DEC-13） */
+  @db.insert(rows)
+  @db.update(rows)
+  @db.delete(rows, "id")
+  effect all on rows.delete;
+  @db.insert(rows)
+  effect createRow on rows.post;
+
+  // 並べた効果が、どれも持たない
+  @db.effects(bare)
+  export op addBare(row: Row);
+  // 二つ目だけが持たない
+  @db.effects(createRow, bare)
+  export op addThenBare(row: Row, other: Row);
+  // 二つ持つ効果を並べた op には、重ねて報告しない（報告は効果に）
+  @db.effects(both)
+  export op addBoth(row: Row);
+
+  // 通るもの
+  @db.effects(createRow)
+  export op addRow(row: Row);
+  /** デコレータを持たない効果を、デコレータのない op が持つのは、かまわない */
+  export op addByHand(row: Row) effects bare;
+}

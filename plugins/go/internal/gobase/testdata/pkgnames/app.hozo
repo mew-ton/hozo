@@ -20,7 +20,7 @@ namespace more.ops {
 
 /** 分けない出力 */
 namespace flat {
-  // types.go が ops と ptr を import し、補助 ptr を使う（省略可能なフィールドの既定値）
+  // types.go が ops と ptr を import する
   model Plan { job: ops.Job; target: ptr.Target?; step: more.ops.Step; label: string?; }
   // states.go が ptr を import する
   state target: nullable<ptr.Target>;
@@ -49,7 +49,7 @@ namespace split {
 }
 
 // 関数の本体の中で、基底が決まった名前で使う識別子と同じ名前のパッケージ。本体がそのパッケージの型を書くと、局所の名前に隠れて
-// コンパイルできないので、基底のファイルでは、名前空間のパッケージの方を o2、ctx2、err2、m2 で import する。
+// コンパイルできないので、基底のファイルでは、名前空間のパッケージの方を o2、ctx2、err2 で import する。
 // 途中の値 v0 と、判定の結果 k0 は、import の名前を飛ばして v1、k1 から振る。
 namespace o {
   model Thing { x: int; }
@@ -59,14 +59,10 @@ namespace o {
 }
 namespace ctx { model Info { y: int; } }
 namespace err { model Fault { z: int; } }
-namespace m { scalar Level extends int; }
 namespace v0 { model Zero { n: int; } }
 namespace k0 { model Key { n: int; } }
 
 namespace bodies {
-  // New<Model> の m: 既定値の式が、パッケージ m の型を書く
-  model Plan { level: m.Level?; }
-
   model Inner { name: string; }
   model Outer { inner: Inner?; }
   classify Size of string { Big; Small; }

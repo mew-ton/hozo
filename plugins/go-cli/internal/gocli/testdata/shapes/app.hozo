@@ -1,0 +1,56 @@
+// 型に依らない形の確かめ（docs/testing.md「単体テスト」の「型に依らない形の確かめ」、docs/requirements.md「出力を推論しない」）。
+// 二つの名前空間は、宣言の名前と、cli のデコレータが同じで、違うのは型だけ: フィールドの型（核の型と scalar、省略可能と
+// そうでないもの、文字列と真偽値、一つの値と array）、例外が値を運ぶか、戻り値が省略可能か、入力が制約を持つか。
+// 出る cli.go は、名前空間の名前のほかは、同じテキスト（TestSameShape）。違いは、実行時に出る（behavior_test.go）。
+
+namespace shapea {
+  model Note { text: string; }
+
+  /** 値を運ばない */
+  @cli.exitCode(3)
+  exception Broken;
+  exception Lost;
+
+  model RunInput {
+    /** 名前 */
+    @cli.flag("name") name: string;
+    @cli.flag("level") @cli.default(1) level: int;
+    @cli.flag("on") on: string?;
+    @cli.arg(1) @cli.required first: string;
+    @cli.arg(2) rest: string;
+    @cli.env("SHAPE_HOME") @cli.required home: string;
+    @cli.flag @cli.env size: int?;
+  }
+
+  /** 走らせる */
+  @cli.command("run")
+  export op run(in: RunInput): Note throws Broken | Lost;
+}
+
+namespace shapeb {
+  model Note { text: string; }
+
+  /** 値を運ぶ */
+  @cli.exitCode(3)
+  exception Broken: Note;
+  exception Lost;
+
+  @valid.length(min: 2)
+  scalar Name extends string;
+  scalar Level extends float;
+
+  model RunInput {
+    /** 名前 */
+    @cli.flag("name") name: Name?;
+    @cli.flag("level") @cli.default(1) level: Level;
+    @cli.flag("on") on: boolean;
+    @cli.arg(1) @cli.required first: int;
+    @cli.arg(2) rest: Name[];
+    @cli.env("SHAPE_HOME") @cli.required home: Name;
+    @cli.flag @cli.env size: float;
+  }
+
+  /** 走らせる */
+  @cli.command("run")
+  export op run(in: RunInput): Note? throws Broken | Lost;
+}

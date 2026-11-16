@@ -1,5 +1,5 @@
-// docs/plugin-go-sqlite.md「表」: 列の型の表の各行（核の型と scalar）、省略可能な列、制約。
-// どの表にも「足す」op を置く（dbArgs<Model> が出る）。読むのは、形で決まる問い合わせ Get。
+// docs/plugin-go-sqlite.md「表」「しまい方」: 六つのしまい方（表の各行。核の型と scalar）、@db.nullable の列（しまい方ごと）、制約。
+// どの表にも、行を足す op を置く（dbArgs<Model> が出る）。読むのは、形で決まる問い合わせ Get。
 
 namespace kinds {
   scalar Name extends string;
@@ -11,78 +11,77 @@ namespace kinds {
   /** scalar の元が scalar（元の核の型は string） */
   scalar Label extends Name;
 
-  model Tag { key: string; value: string; }
+  /** 表の model でない model: フィールドの db の語彙のデコレータは、読まない（合わないしまい方も、@db.nullable のない省略可能も） */
+  model Tag { @db.int key: string; value: string; note: string?; }
 }
 
-/** 列の型 */
+/** 列のしまい方 */
 namespace app {
-  /** 核の型の列 */
+  /** 核の型の列: しまい方の表の各行 */
   model Core {
-    @db.key s: string;
-    i: int;
-    f: float;
-    b: boolean;
-    d: Duration;
-    t: Time;
+    @db.key @db.text s: string;
+    @db.int i: int;
+    @db.int d: Duration;
+    @db.float f: float;
+    @db.bool b: boolean;
+    @db.time t: Time;
   }
 
-  /** scalar の列（元の核の型で見る） */
+  /** scalar の列（しまい方に合うかは、元の核の型で見る） */
   model Named {
-    @db.key name: kinds.Name;
-    count: kinds.Count;
-    ratio: kinds.Ratio;
-    flag: kinds.Flag;
-    span: kinds.Span;
-    stamp: kinds.Stamp;
-    label: kinds.Label;
+    @db.key @db.text name: kinds.Name;
+    @db.int count: kinds.Count;
+    @db.int span: kinds.Span;
+    @db.float ratio: kinds.Ratio;
+    @db.bool flag: kinds.Flag;
+    @db.time stamp: kinds.Stamp;
+    @db.text label: kinds.Label;
   }
 
-  /** JSON の列（array、record、model）。自分を指す model も JSON */
+  /** @db.json の列（array、record、model）。自分を指す model も JSON */
   model Doc {
-    tags: string[];
-    attrs: Record<string, int>;
-    tag: kinds.Tag;
-    nested: kinds.Tag[];
-    tree: Tree;
+    @db.json tags: string[];
+    @db.json attrs: Record<string, int>;
+    @db.json tag: kinds.Tag;
+    @db.json nested: kinds.Tag[];
+    @db.json tree: Tree;
   }
   model Tree { label: string; children: Tree[]; }
 
-  /** 省略可能な列: 核の型、scalar、Time、JSON の型 */
+  /** @db.nullable の列: しまい方ごと（核の型と scalar）。NOT NULL が付かない */
   model Sparse {
-    s: string?;
-    i: int?;
-    f: float?;
-    b: boolean?;
-    d: Duration?;
-    t: Time?;
-    name: kinds.Name?;
-    count: kinds.Count?;
-    ratio: kinds.Ratio?;
-    flag: kinds.Flag?;
-    span: kinds.Span?;
-    stamp: kinds.Stamp?;
-    tags: string[]?;
-    attrs: Record<string, int>?;
-    tag: kinds.Tag?;
+    @db.nullable @db.text s: string?;
+    @db.nullable @db.int i: int?;
+    @db.nullable @db.int d: Duration?;
+    @db.nullable @db.float f: float?;
+    @db.nullable @db.bool b: boolean?;
+    @db.nullable @db.time t: Time?;
+    @db.nullable @db.text name: kinds.Name?;
+    @db.nullable @db.int count: kinds.Count?;
+    @db.nullable @db.int span: kinds.Span?;
+    @db.nullable @db.float ratio: kinds.Ratio?;
+    @db.nullable @db.bool flag: kinds.Flag?;
+    @db.nullable @db.time stamp: kinds.Stamp?;
+    @db.nullable @db.json tags: string[]?;
+    @db.nullable @db.json attrs: Record<string, int>?;
+    @db.nullable @db.json tag: kinds.Tag?;
   }
 
   /** 複数の @db.key（表の末尾の PRIMARY KEY）と @db.unique */
   model Pair {
-    @db.key left: kinds.Name;
-    @db.key right: kinds.Count;
-    @db.unique note: string;
+    @db.key @db.text left: kinds.Name;
+    @db.key @db.int right: kinds.Count;
+    @db.unique @db.text note: string;
   }
 
-  /** 二つの表の要素（@db.ref の先にならない） */
-  model Shared { @db.key id: string; }
+  /** 二つの表の model（補助は一度だけ出る） */
+  model Shared { @db.key @db.text id: string; }
 
-  /** @db.ref: 先の表がちょうど一つで、キーがちょうど一つのときだけ REFERENCES */
+  /** @db.ref: 先の表と、そのただ一つのキーへの REFERENCES。自分の表も指せる。@db.nullable と @db.unique と一緒にも書ける */
   model Link {
-    @db.ref(Core) core: string;
-    @db.ref(Pair) pair: kinds.Name;
-    @db.ref(kinds.Tag) tag: string;
-    @db.ref(Shared) shared: string;
-    @db.key @db.ref(Link) self: string?;
+    @db.key @db.text id: string;
+    @db.ref(Core) @db.text core: string;
+    @db.nullable @db.unique @db.ref(Link) @db.text parent: string?;
   }
 
   @db.table(Core) state cores: list<Core>;
@@ -93,22 +92,22 @@ namespace app {
   @db.table(Shared) state sharedA: list<Shared>;
   @db.table(Shared) state sharedB: list<Shared>;
   @db.table(Link) state links: list<Link>;
-  /** @db のない状態は、表にならない */
+  /** @db.table のない状態は、表にならない */
   state plain: list<Core>;
 
-  effect createCore on cores.post;
-  effect createNamed on nameds.post;
-  effect createDoc on docs.post;
-  effect createSparse on sparses.post;
-  effect createPair on pairs.post;
-  effect createSharedA on sharedA.post;
-  effect createLink on links.post;
+  @db.insert(cores) effect createCore on cores.post;
+  @db.insert(nameds) effect createNamed on nameds.post;
+  @db.insert(docs) effect createDoc on docs.post;
+  @db.insert(sparses) effect createSparse on sparses.post;
+  @db.insert(pairs) effect createPair on pairs.post;
+  @db.insert(sharedA) effect createSharedA on sharedA.post;
+  @db.insert(links) effect createLink on links.post;
 
-  export op addCore(core: Core) effects createCore;
-  export op addNamed(named: Named) effects createNamed;
-  export op addDoc(doc: Doc) effects createDoc;
-  export op addSparse(sparse: Sparse) effects createSparse;
-  export op addPair(pair: Pair) effects createPair;
-  export op addSharedA(shared: Shared) effects createSharedA;
-  export op addLink(link: Link) effects createLink;
+  @db.effects(createCore) export op addCore(core: Core);
+  @db.effects(createNamed) export op addNamed(named: Named);
+  @db.effects(createDoc) export op addDoc(doc: Doc);
+  @db.effects(createSparse) export op addSparse(sparse: Sparse);
+  @db.effects(createPair) export op addPair(pair: Pair);
+  @db.effects(createSharedA) export op addSharedA(shared: Shared);
+  @db.effects(createLink) export op addLink(link: Link);
 }

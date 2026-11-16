@@ -1,0 +1,10 @@
+# plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）: 型だけが違う二つの名前空間。
+[[emit]]
+namespace   = "shapea"
+transpilers = ["go", "go-valid", "go-cli"]
+out         = "gen/shapea"
+
+[[emit]]
+namespace   = "shapeb"
+transpilers = ["go", "go-valid", "go-cli"]
+out         = "gen/shapeb"

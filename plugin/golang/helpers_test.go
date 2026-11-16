@@ -81,6 +81,23 @@ func reading(states ...string) opOption {
 func effecting(effects ...string) opOption {
 	return func(o *ir.Op) { o.Effects = effects; o.Signature.Effects = effects; o.Signature.Pure = false }
 }
+
+// carryingReads と carryingEffects は、デコレータが運ぶ reads / effects（Op.carried。docs/check.md「デコレータが運ぶ reads と effects」）。
+// op が書いたもの（Op.reads / Op.effects）とは分けて置かれ、Signature には合わせたものが入る。
+func carryingReads(states ...string) opOption {
+	return func(o *ir.Op) {
+		o.Carried.Reads = append(o.Carried.Reads, states...)
+		o.Signature.Reads = append(o.Signature.Reads, states...)
+		o.Signature.Pure = false
+	}
+}
+func carryingEffects(effects ...string) opOption {
+	return func(o *ir.Op) {
+		o.Carried.Effects = append(o.Carried.Effects, effects...)
+		o.Signature.Effects = append(o.Signature.Effects, effects...)
+		o.Signature.Pure = false
+	}
+}
 func decorated(decorators ...string) opOption {
 	return func(o *ir.Op) {
 		for _, d := range decorators {

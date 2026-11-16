@@ -29,3 +29,15 @@ const EffectAddLine runtime.Effect = "app.addLine"
 
 // EffectDropToken は effect app.dropToken。
 const EffectDropToken runtime.Effect = "app.dropToken"
+
+// EffectClearLines はカートを空にする
+// on app.lines: HasItems -> Empty
+const EffectClearLines runtime.Effect = "app.clearLines"
+
+// EffectRefresh は effect app.refresh。
+// on app.Sync: Stale -> Fresh
+const EffectRefresh runtime.Effect = "app.refresh"
+
+// EffectSignIn は effect app.signIn。
+// on app.SignedIn: any -> Yes
+const EffectSignIn runtime.Effect = "app.signIn"

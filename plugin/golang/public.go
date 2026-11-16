@@ -13,8 +13,6 @@ type PublicKind int
 const (
 	// PublicType は model、scalar、union、exception の型。
 	PublicType PublicKind = iota
-	// PublicNewModel は、既定値を持つ model の `New<Model>`。
-	PublicNewModel
 	// PublicArm は union のアームを包む型 `<Union><アーム名>`。
 	PublicArm
 	// PublicEffect は effect の定数 `Effect<名前>`。
@@ -56,7 +54,7 @@ type PublicName struct {
 }
 
 // PublicNames は、view の出力 (U, N) の定義のパッケージの公開の名前のすべて（docs/plugin-go.md「名前」の「名前が当たれば GO-2」）。
-// 並びは、N の宣言順（宣言ごとに、型、`New<Model>`、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語の
+// 並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語の
 // インターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`SharedState`、`Seams`、別の名前空間の口（FQN の辞書順）。
 // 当たる名前も、そのまま二つ返す（当たっているかを見るのは呼ぶ側）。View が見る側のために合成した model、`set` の union、
 // 型で決まる分類は、Go の名前にならないので、入らない。
@@ -97,7 +95,7 @@ func PublicNames(view *ir.View) []PublicName {
 					continue // View が見る側のために合成した model は、基底が出さない（docs/plugin-go.md「出力の対象」）
 				}
 			}
-			// IR にフィールドの既定値はなくなった（版 0.5。docs/ir.md「版」）ので、New<Model>（PublicNewModel）は並べない
+			// model から出す名前は、構造体の型だけ（docs/plugin-go.md「model」: 値を作る関数は出さない）
 			add(typeName(name), PublicType, name, "", "model "+name)
 		case *ir.Scalar, *ir.Exception:
 			add(typeName(name), PublicType, name, "", d.Kind()+" "+name)

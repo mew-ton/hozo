@@ -1,0 +1,34 @@
+// GOHTTP-18: 位置は model。
+namespace app {
+  scalar Token extends string;
+  scalar Page extends int;
+  model Item { name: string; }
+
+  model In {
+    // 核の型と、リテラルの型が合わない
+    @http.query @http.default("one") page: int;
+    @http.query @http.default(1) q: string;
+    @http.query @http.default(1.5) size: int;
+    @http.query @http.default(1) exact: boolean;
+    @http.header("X-Trace") @http.default(true) trace: string;
+    // scalar は、元の核の型で見る
+    @http.query @http.default("x") limit: Page;
+    @http.query @http.default(30s) owner: Token;
+    // 本文の項目: リテラルで書けない型（model、配列、record、Time）
+    @http.body @http.default("x") item: Item;
+    @http.body @http.default(1) tags: int[];
+    @http.body @http.default("x") attrs: Record<string, string>;
+    @http.body @http.default("2024-01-02T03:04:05Z") at: Time;
+    @http.body @http.default(5) wait: Duration;
+    // 渡せるリテラルは、当たらない: 同じ核の型、整数のリテラルを float に、scalar の元の核の型、期間
+    @http.query @http.default(1) ok: int;
+    @http.query @http.default(2) ratio: float;
+    @http.query @http.default(0.5) scale: float;
+    @http.query @http.default("me") who: Token;
+    @http.query @http.default(3) per: Page;
+    @http.query @http.default(false) deep: boolean;
+    @http.body @http.default(5s) pause: Duration;
+  }
+  @http.post("/in")
+  export op take(in: In);
+}

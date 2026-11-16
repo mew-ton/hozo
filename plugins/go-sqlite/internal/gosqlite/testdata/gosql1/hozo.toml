@@ -1,4 +1,4 @@
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-1（@db の状態の要素が model でない）。
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-1（@db.table(M) の付いた状態の要素の型が、M と等しくない）。
 [[emit]]
 namespace   = "app"
 transpilers = ["go", "go-sqlite"]

@@ -15,15 +15,21 @@ const (
 	Wiring Place = iota + 1
 	// Never は、never を返す op。実装は、生成した本体（ops.go）: `return <例外の型>{}`。
 	Never
-	// StateCommand は、効果を持つ葉。実装は、効果の宛先の状態の単位の命令。
+	// StateCommand は、効果を持つ葉で、効果の宛先の単位が、すべての効果で同じもの。実装は、その状態の単位の命令。
 	StateCommand
-	// StateQuery は、効果を持たず、Op.reads が一つの葉。実装は、その状態の単位の問い合わせ。
+	// SharedCommand は、効果を持つ葉で、効果の宛先の単位が、二つ以上に分かれるもの。実装は、SharedState。
+	SharedCommand
+	// StateQuery は、効果を持たず、読む状態が一つの葉。実装は、その状態の単位の問い合わせ。
 	StateQuery
-	// SharedQuery は、効果を持たず、Op.reads が二つ以上の葉。実装は、SharedState。
+	// SharedQuery は、効果を持たず、読む状態が二つ以上の葉。実装は、SharedState。
 	SharedQuery
-	// Leaf は、それ以外の葉（デコレータだけを持つ葉を含む）と、単位の対象でない配線。実装は、Leaves。
+	// Leaf は、それ以外の葉（運ぶ節のないデコレータだけを持つ葉を含む）と、単位の対象でない配線。実装は、Leaves。
 	Leaf
 )
+
+// 葉の「効果」と「読む状態」は、op が直に持つ効果と、直に読む状態: op が自分で書いたもの（Op.effects、Op.reads）と、付いたデコレータが
+// 運ぶもの（Op.carried）を合わせたもの（ir.Op.DirectEffects、ir.Op.DirectReads）。どちらで書かれたかは、置き場を変えない。
+// デコレータの名前は見ない: 運ぶものは、hozoc が IR に置いている。
 
 // Shape は、一つの出力 (U, N) の、op と、実装を受け取る口のすべて（docs/plugin-go.md「出力の対象」「実装を受け取る口」「継ぎ目」）。
 // 基底も相乗りも、ShapeOf の同じ値から名前と並びを求める。
@@ -34,7 +40,8 @@ type Shape struct {
 	Leaves []string
 	// States は状態の単位: 基底の状態と、述語で決まる状態の分類。宣言順。
 	States []StateUnit
-	// Shared は、インターフェース SharedState のメソッドになる op の FQN（宣言順）。空なら SharedState も New の引数 shared もない。
+	// Shared は、インターフェース SharedState のメソッドになる op の FQN: 効果の宛先の単位が分かれた葉（SharedCommand）と、
+	// 複数の状態を読む葉（SharedQuery）。種類で分けずに、宣言順。空なら SharedState も New の引数 shared もない。
 	Shared []string
 	// Classify は、New が述語を受け取る、値の分類と op の分類の FQN: 単位の対象の配線が match に使う、述語で決まるもの
 	// （別の名前空間のものを含む）。FQN の辞書順。
@@ -211,7 +218,7 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		case StateQuery:
 			u := &s.States[units[os.Unit]]
 			u.Queries = append(u.Queries, o.Name)
-		case SharedQuery:
+		case SharedCommand, SharedQuery:
 			s.Shared = append(s.Shared, o.Name)
 		case Leaf:
 			s.Leaves = append(s.Leaves, o.Name)
@@ -294,21 +301,27 @@ func place(p *ir.Program, o *ir.Op, target bool, units map[string]int) (Place, s
 	case ir.IsNever(o.Returns):
 		return Never, "" // 2
 	}
-	if len(o.Effects) > 0 { // 3: 効果の宛先の単位
-		if unit := effectUnit(p, o.Effects[0]); unit != "" {
-			if _, ok := units[unit]; ok {
-				return StateCommand, unit
+	if effects := o.DirectEffects(); len(effects) > 0 { // 3: 効果の宛先の単位が、すべての効果で同じか
+		unit := ""
+		for _, fx := range effects {
+			u := effectUnit(p, fx)
+			if _, ok := units[u]; !ok {
+				return Leaf, "" // 宛先の単位が N にない（検査を通った IR には来ない。STATE-2）
 			}
+			if unit != "" && u != unit {
+				return SharedCommand, ""
+			}
+			unit = u
 		}
-		return Leaf, ""
+		return StateCommand, unit
 	}
-	switch {
-	case len(o.Reads) == 1: // 4
-		if _, ok := units[o.Reads[0]]; ok {
-			return StateQuery, o.Reads[0]
+	switch reads := o.DirectReads(); {
+	case len(reads) == 1: // 4
+		if _, ok := units[reads[0]]; ok {
+			return StateQuery, reads[0]
 		}
 		return Leaf, ""
-	case len(o.Reads) >= 2: // 5
+	case len(reads) >= 2: // 5
 		return SharedQuery, ""
 	}
 	return Leaf, "" // 6

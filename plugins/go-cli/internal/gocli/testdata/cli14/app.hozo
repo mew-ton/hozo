@@ -1,0 +1,37 @@
+// CLI-14: 位置は model。@cli.default の値が、フィールドの制約（@valid.*。フィールドに付いたものと、型の scalar に付いたもの）に
+// 合わない（docs/plugin-go-cli.md「補う値と制約」）。
+namespace app {
+  @valid.pattern("^(text|json)$")
+  scalar Format extends string;
+  @valid.min(1)
+  scalar Count extends int;
+  /** 元の scalar の制約も受け継ぐ */
+  @valid.max(10)
+  scalar Small extends Count;
+
+  model In {
+    // 型の scalar に付いた制約
+    @cli.flag("format") @cli.default("xml") format: Format;
+    @cli.flag("count") @cli.default(0) count: Count;
+    // 元の scalar の制約と、自分の制約
+    @cli.flag("low") @cli.default(0) low: Small;
+    @cli.flag("high") @cli.default(11) high: Small;
+    // フィールドに付いた制約
+    @valid.length(min: 2) @cli.flag("name") @cli.default("x") name: string;
+    @valid.max(0.5) @cli.env("RATIO") @cli.default(1) ratio: float;
+    // 型の制約と、フィールドの制約の両方に合わない
+    @valid.min(5) @cli.flag("both") @cli.default(0) both: Count;
+  }
+  @cli.command("run")
+  export op run(in: In);
+
+  // 制約に合う値と、制約のないフィールドは、当たらない
+  model Fine {
+    @cli.flag("format") @cli.default("text") format: Format;
+    @cli.flag("count") @cli.default(1) count: Small;
+    @valid.length(min: 2) @cli.flag("name") @cli.default("xy") name: string;
+    @cli.flag("free") @cli.default("") free: string;
+  }
+  @cli.command("fine")
+  export op fine(in: Fine);
+}

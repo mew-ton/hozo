@@ -1,4 +1,0 @@
-GOSQL-1	app.names	@db の状態 app.names の要素 string が model でない（表の列は、要素の model のフィールドから作る）
-GOSQL-1	app.ids	@db の状態 app.ids の要素 app.Id が model でない（表の列は、要素の model のフィールドから作る）
-GOSQL-1	app.shapes	@db の状態 app.shapes の要素 app.Shape が model でない（表の列は、要素の model のフィールドから作る）
-GOSQL-1	app.groups	@db の状態 app.groups の要素 app.Row[] が model でない（表の列は、要素の model のフィールドから作る）

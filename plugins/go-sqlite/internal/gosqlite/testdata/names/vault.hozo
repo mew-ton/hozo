@@ -1,13 +1,14 @@
-// docs/plugin-go-sqlite.md「補助」: メソッドの引数の名前が、このファイルが使う名前（レシーバの t、ctx、args、err、import する
-// パッケージの名前、このファイルの非公開の名前）と当たれば、末尾に _。読み書きの途中の変数（フィールドの名前から作る）も同じ。
+// docs/plugin-go-sqlite.md「補助」: メソッドの引数の名前が、このファイルが使う名前（レシーバの t、ctx、args、args<数>、tx、err、
+// import するパッケージの名前、このファイルの非公開の名前）と当たれば、末尾に _。
 // vault は内部の op（touch）を持つので、出力は内側のフォルダと入口に分かれる。db.go は入口のパッケージで、型は入口の別名で書く。
 
-namespace a {
-  model Entry { @db.key id: string; at: Time; }
+// パッケージの名前が、dbArgs<Model> / dbScan<Model> の中の局所の名前（row、r）と同じ名前空間
+namespace row {
+  model Entry { @db.key @db.text id: string; @db.time at: Time; }
 }
 
-namespace b {
-  model Entry { @db.key code: int; tags: string[]; }
+namespace r {
+  model Entry { @db.key @db.int code: int; @db.json tags: string[]; }
 }
 
 /** 当たる名前を持つ名前空間 */
@@ -19,47 +20,86 @@ namespace vault {
 
   model Tag { name: string; }
 
-  /** フィールドの名前が、dbArgs / dbScan の中の名前（row、r、err、data）、Go の予約語、事前宣言の識別子、import と当たる */
+  /** フィールドの名前が、Go の予約語、事前宣言の識別子、import するパッケージの名前、このファイルの局所の名前と同じ */
   model Secret {
-    @db.key row: Key;
-    r: Num;
-    err: Ratio;
-    data: Flag;
-    type: Time;
-    string: Tag[];
-    json: Record<string, string>;
-    any: Tag?;
-    time: Time?;
-    sql: Duration;
+    @db.key @db.text row: Key;
+    @db.int r: Num;
+    @db.float err: Ratio;
+    @db.bool data: Flag;
+    @db.time type: Time;
+    @db.json string: Tag[];
+    @db.json json: Record<string, string>;
+    @db.nullable @db.json any: Tag?;
+    @db.nullable @db.time time: Time?;
+    @db.int sql: Duration;
   }
 
   @db.table(Secret) state secrets: list<Secret>;
-  /** 同じ名前の model（a.Entry と b.Entry）: 補助の名前は、後の方に 2 を付ける */
-  @db.table(a.Entry) state entriesA: list<a.Entry>;
-  @db.table(b.Entry) state entriesB: list<b.Entry>;
+  /** 同じ名前の model（row.Entry と r.Entry）: 補助の名前は、後の方に 2 を付ける */
+  @db.table(row.Entry) state entriesA: list<row.Entry>;
+  @db.table(r.Entry) state entriesB: list<r.Entry>;
 
   // 引数の名前がレシーバの t と当たる
-  export op find(t: Key): Secret? reads secrets;
-  // 引数の名前が ctx、args、err と当たる
-  export op scan(ctx: Num, args: Ratio, err: Flag): Secret[] reads secrets;
-  // 引数の名前が import するパッケージの名前と当たる。JSON の列の途中の変数（json_JSON）
-  export op listAt(time: Time, json: Record<string, string>, sql: Duration): Secret[] reads secrets;
+  @db.find(secrets, "row")
+  export op find(t: Key): Secret?;
+  // 引数の名前が ctx と当たる
+  @db.list(secrets, "r")
+  export op scan(ctx: Num): Secret[];
+  // 引数の名前が err と当たる
+  @db.list(secrets, "err")
+  export op near(err: Ratio): Secret[];
+  // 引数の名前が import するパッケージの名前と当たる
+  @db.list(secrets, "type")
+  export op listAt(time: Time): Secret[];
+  @db.list(secrets, "json")
+  export op listJson(json: Record<string, string>): Secret[];
+  @db.list(secrets, "sql")
+  export op listSql(sql: Duration): Secret[];
+  @db.list(secrets, "data")
+  export op listData(reflect: Flag): Secret[];
   // 引数の名前が、このファイルの非公開の名前と当たる
-  export op open(dbGet: Key, dbScanSecret: Num): Secret? reads secrets;
+  @db.find(secrets, "row")
+  export op open(dbGet: Key): Secret?;
+  @db.list(secrets, "r")
+  export op count(dbScanSecret: Num): Secret[];
   // 内部の op（export がない）: 状態の単位のメソッドは、export の有無によらず公開
-  op touch(row: Key): Secret? reads secrets;
+  @db.find(secrets, "row")
+  op touch(row: Key): Secret?;
 
+  @db.insert(secrets)
   effect createSecret on secrets.post;
+  @db.update(secrets)
   effect updateSecret on secrets.put;
+  @db.delete(secrets, "row")
   effect deleteSecret on secrets.delete;
-  // 引数の名前が、足す op と書き換える op の中の args、err と当たる
-  export op add(args: Secret) effects createSecret;
-  export op save(err: Secret) effects updateSecret;
-  // 引数の名前が、このファイルの非公開の名前と当たる
-  export op drop(dbExec: Key, context: Num) effects deleteSecret;
+  @db.delete(secrets, "r")
+  effect deleteByNum on secrets.delete;
 
+  // 引数の名前が、行の値の変数 args、err と当たる
+  @db.effects(createSecret)
+  export op add(args: Secret);
+  @db.effects(updateSecret)
+  export op save(err: Secret);
+  // 引数の名前が、このファイルの非公開の名前、import するパッケージの名前と当たる
+  @db.effects(deleteSecret)
+  export op drop(dbExec: Key);
+  @db.effects(deleteByNum)
+  export op dropNum(context: Num);
+  // トランザクションの中の名前（args<数>、tx、err、t、ctx）と当たる
+  @db.effects(createSecret, updateSecret, deleteSecret, deleteByNum)
+  export op mix(args1: Secret, tx: Secret, args2: Key, args: Num);
+  @db.effects(deleteSecret, deleteByNum, createSecret)
+  export op mix2(t: Key, ctx: Num, err: Secret);
+
+  @db.insert(entriesA)
   effect createA on entriesA.post;
+  @db.insert(entriesB)
   effect createB on entriesB.post;
-  export op addA(entry: a.Entry) effects createA;
-  export op addB(entry: b.Entry) effects createB;
+  @db.effects(createA)
+  export op addA(entry: row.Entry);
+  @db.effects(createB)
+  export op addB(entry: r.Entry);
+  // 宛先の単位が分かれる: SharedTable
+  @db.effects(createA, createB)
+  export op addBoth(row: row.Entry, r: r.Entry);
 }

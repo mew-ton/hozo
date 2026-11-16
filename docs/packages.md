@@ -14,7 +14,7 @@ cmd/hozoc/             CLI の main。app.App の Ops()（実装を hozoc.New �
 ir/                    IR の型（公開）
 plugin/                Go 向けプラグイン SDK（公開）。testdata/ に、二つの SDK のテストが読む表
 plugin/golang/         Go の基底の形の規則: 置き場、名前、型、op の形（公開）
-plugin/govalid/        go-valid の形の規則: どの型が Validate を持つか（公開）
+plugin/govalid/        go-valid の形の規則: どの型が Validate を持つか、値一つが制約に合うか（公開）
 runtime/               生成した Go のコードが import する型（公開）
 vocab/                 標準の語彙の .hozo と、それを embed する公開パッケージ vocab（go:embed はパッケージのディレクトリの外を参照できないため）
 internal/source/       ファイルと位置
@@ -80,7 +80,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `ir` | — |
 | `plugin` | `ir` |
 | `plugin/golang` | `ir` |
-| `plugin/govalid` | `ir` |
+| `plugin/govalid` | `ir`、`runtime` |
 | `runtime` | — |
 | `vocab` | — |
 | `plugins/go` | `plugin`、`plugins/go/internal/gobase` |
@@ -264,9 +264,13 @@ func Standard(decorator string) bool                   // valid の標準の制�
 const Transpiler = "go-valid"                          // Validate を出すトランスパイラの名前
 func Unlisted(view *ir.View, namespace string) (unit int, ok bool)   // view の単位から見た namespace の型の置き場の単位が、transpilers に go-valid を並べていなければ、
                                                        // その単位が何番目の [[emit]] かと true。並べていれば、または置き場がなければ、0 と false
+type Mismatch struct { Decorator, Text, Scalar string } // 値が合わなかった制約一つ: デコレータの FQN（valid.min）、書き方（@valid.min(1)）、
+                                                       // scalar に付いた制約なら、その scalar の FQN（フィールドに付いたものなら ""）
+func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch   // リテラル lit が、フィールド field の制約に合うか。合わなかった制約を返す
 ```
 
 - `Unlisted` は、別の名前空間の型の `Validate` を呼べるかを見る、ただ一つの写し（`docs/plugin-go-valid.md`「出力」）: `Validate` は型の定義のパッケージにしか書けないので、呼ぶコードは、その型の置き場（`docs/config.md`「型の置き場」）の単位が `go-valid` を並べているときにだけコンパイルできる。`go-valid` の GOVALID-3、`go-http` の GOHTTP-11、`go-cli` の CLI-9 が、これで確かめる。置き場は `View.namespaces` と `View.config` だけから求まる。
+- `CheckLiteral` は、値一つを制約で確かめる、ただ一つの写し。境界のデコレータが補う値（`@http.default`、`@cli.default`）を、相乗りが、生成するときに確かめる（`go-http` の GOHTTP-19、`go-cli` の CLI-14。`docs/plugin-go-http.md`「補う値と制約」、`docs/plugin-go-cli.md`「補う値と制約」）。確かめる制約は、`valid` の標準の制約（`Standard`）のうち、フィールドの型の scalar（と、その元の scalar）に付いたものと、フィールドに付いたもの。意味は、`go-valid` が出す `Validate` と同じ（`docs/plugin-go-valid.md`「制約」の表。`format` は `runtime.CheckFormat` を、そのまま呼ぶ）で、返す順も、`Validate` が確かめる順（元の scalar から自分の scalar へ、その後にフィールド。それぞれ、書かれた順）。省略可能なフィールドは、中の型で見る。リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（GOHTTP-18、CLI-13）。確かめられないものは、合わないとは言わない: リテラルの型に当たらない制約と、解釈できない正規表現（`go-valid` の GOVALID-1）、利用者が `valid` に足した制約（同 GOVALID-5）。
 
 ### `runtime`（公開）
 

@@ -20,6 +20,16 @@ transpilers = ["go", "go-sqlite"]
 out         = "gen/own"
 
 [[emit]]
+namespace   = "across"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/across"
+
+[[emit]]
+namespace   = "sorted"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/sorted"
+
+[[emit]]
 namespace   = "clean"
 transpilers = ["go", "go-sqlite"]
 out         = "gen/clean"

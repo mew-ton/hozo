@@ -1,0 +1,45 @@
+// 型に依らない形の確かめ（docs/requirements.md「出力を推論しない」）の一つ目: 核の型、省略可能でないフィールド、
+// 値を運ばない例外、戻り値のある op。uniformb/app.hozo と、型だけが違う。
+namespace app {
+  model Paging { page: int; q: string; }
+  model Meta { tenant: string; }
+  model Item { name: string; }
+
+  @http.status(404)
+  exception Missing;
+  @http.status(409)
+  exception Clash;
+
+  model FindInput {
+    @http.header("Authorization") token: string;
+    @http.header trace: string;
+    @http.query page: int;
+    @http.query("q") keyword: string;
+    @http.query ratio: float;
+    @http.query exact: boolean;
+    @http.query @http.default(10) size: int;
+    @http.query @http.required owner: string;
+  }
+  @http.get("/items")
+  export op find(in: FindInput): Item
+    throws Missing;
+
+  model PutInput {
+    @http.header @http.default("en") lang: string;
+    @http.body item: Item;
+    @http.body("memo") note: string;
+    @http.body @http.required count: int;
+    @http.body @http.default(1) copies: int;
+  }
+  @http.post("/items")
+  export op put(in: PutInput): string
+    throws Clash;
+
+  model AllInput {
+    @http.headerObj meta: Meta;
+    @http.queryObj paging: Paging;
+    @http.bodyObj item: Item;
+  }
+  @http.post("/all")
+  export op all(in: AllInput): Item[];
+}

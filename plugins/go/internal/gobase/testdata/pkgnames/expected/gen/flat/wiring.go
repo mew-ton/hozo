@@ -15,3 +15,5 @@ func (o *ops) Go(ctx context.Context, job ops3.Job, target ptr2.Target) (ops3.Jo
 	o.Keep(ptr(target), ops2.Step{N: 1})
 	return o.ops_.Run(ctx, job)
 }
+
+func ptr[T any](v T) *T { return &v }

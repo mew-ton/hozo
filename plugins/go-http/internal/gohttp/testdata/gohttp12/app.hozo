@@ -1,0 +1,30 @@
+// GOHTTP-12: 位置は model。
+namespace app {
+  scalar Name extends string;
+  model Item { name: string; }
+  union Shape { Dot: Item; Label: string; }
+
+  model In {
+    // 省略可能な model、配列、record、核の型、scalar、union は、model ではない
+    @http.headerObj meta: Item?;
+    @http.queryObj paging: Item[];
+    @http.bodyObj attrs: Record<string, Item>;
+  }
+  @http.post("/in")
+  export op take(in: In);
+
+  model More {
+    @http.headerObj text: string;
+    @http.queryObj name: Name;
+    @http.bodyObj shape: Shape;
+  }
+  @http.post("/more")
+  export op more(in: More);
+
+  // model なら、当たらない
+  model Fine {
+    @http.bodyObj item: Item;
+  }
+  @http.post("/fine")
+  export op fine(in: Fine);
+}

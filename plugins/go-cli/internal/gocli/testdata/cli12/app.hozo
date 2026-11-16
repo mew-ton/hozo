@@ -1,0 +1,13 @@
+// CLI-12: 位置は model。
+namespace app {
+  model In {
+    // 一つのフィールドに、@cli.required と @cli.default の両方
+    @cli.flag("a") @cli.required @cli.default("x") a: string;
+    @cli.arg(1) @cli.default(1) @cli.required b: int;
+    // どちらか一つなら、付けられる
+    @cli.flag("c") @cli.required c: string;
+    @cli.flag("d") @cli.default("x") d: string;
+  }
+  @cli.command("run")
+  export op run(in: In);
+}

@@ -1,0 +1,28 @@
+// GOSQL-8（docs/plugin-go-sqlite.md「診断」）: デコレータの引数の列の名前が、その表の model のフィールドにない。
+// 位置はデコレータを付けた宣言。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; }
+  @db.table(Row) state rows: list<Row>;
+
+  // @db.find、@db.list
+  @db.find(rows, "ID")
+  export op findRow(id: string): Row?;
+  @db.list(rows, "notes")
+  export op listRows(note: string): Row[];
+  // 空の名前
+  @db.list(rows, "")
+  export op listAll(note: string): Row[];
+
+  // @db.delete（op に並べられていない効果のデコレータも、同じに確かめる）
+  @db.delete(rows, "key")
+  effect deleteRow on rows.delete;
+  @db.delete(rows, "rowid")
+  effect deleteByRowid on rows.delete;
+  @db.effects(deleteRow)
+  export op removeRow(id: string);
+
+  // 通るもの
+  @db.list(rows, "note")
+  export op listByNote(note: string): Row[];
+}

@@ -19,16 +19,8 @@ type Profile struct {
 	Name    string   `json:"name"`
 	Address *Address `json:"address,omitempty"`
 	Nick    *string  `json:"nick,omitempty"`
-	Age     int64    `json:"age"`
-	Active  bool     `json:"active"`
-}
-
-// NewProfile は既定値を入れた Profile を返す。
-func NewProfile() Profile {
-	m := Profile{}
-	m.Age = 20
-	m.Active = true
-	return m
+	Age     *int64   `json:"age,omitempty"`
+	Active  *bool    `json:"active,omitempty"`
 }
 
 // Account は model app.Account。
@@ -40,19 +32,9 @@ type Account struct {
 
 // Options は model app.Options。
 type Options struct {
-	Limit int64         `json:"limit"`
-	Label string        `json:"label"`
-	Ratio float64       `json:"ratio"`
-	Wait  time.Duration `json:"wait"`
-	Note  *string       `json:"note,omitempty"`
-}
-
-// NewOptions は既定値を入れた Options を返す。
-func NewOptions() Options {
-	m := Options{}
-	m.Limit = 10
-	m.Label = "none"
-	m.Ratio = 1.5
-	m.Wait = time.Duration(5000000000)
-	return m
+	Limit *int64         `json:"limit,omitempty"`
+	Label *string        `json:"label,omitempty"`
+	Ratio *float64       `json:"ratio,omitempty"`
+	Wait  *time.Duration `json:"wait,omitempty"`
+	Note  *string        `json:"note,omitempty"`
 }

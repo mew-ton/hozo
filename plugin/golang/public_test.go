@@ -10,8 +10,8 @@ import (
 // docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前を、種類ごとに一つずつ。
 // 並びは、宣言順（宣言ごとの名前）、状態の単位、Ops、New、Leaves、SharedState、Seams、別の名前空間の口。
 func TestPublicNames(t *testing.T) {
-	// フィールドの既定値は IR にない（版 0.5）ので、New<Model> は公開の名前に並ばない
-	withDefault := model("shop.Page", field("size", ir.Int()))
+	// model から出す名前は、構造体の型だけ（値を作る関数 New<Model> は出さない。docs/plugin-go.md「model」）
+	page := model("shop.Page", field("size", ir.Int()))
 	synthesized := model("shop.leaf$in")
 	synthesized.SynthesizedFrom = "shop.leaf"
 	arm := model("shop.Shape.Circle") // その場で書いたアームの model（op からの合成ではない）
@@ -24,7 +24,7 @@ func TestPublicNames(t *testing.T) {
 	sync.HasDefault = false
 	v := viewOf("shop",
 		namespace("shop",
-			model("shop.Item"), withDefault, synthesized, arm,
+			model("shop.Item"), page, synthesized, arm,
 			scalar("shop.Sku", ir.String()),
 			exception("shop.Missing"),
 			union("shop.Shape", ir.UnionArm{Name: "Circle", Type: ir.Ref("shop.Shape.Circle")}, ir.UnionArm{Name: "text", Type: ir.String()},

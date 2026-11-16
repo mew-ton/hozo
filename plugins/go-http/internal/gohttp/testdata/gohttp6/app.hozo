@@ -1,5 +1,6 @@
 // GOHTTP-6: 位置は op。
 namespace app {
+  model Item { name: string; }
   model In {
     @http.query id: string?;
     @http.body item: string;
@@ -12,7 +13,16 @@ namespace app {
   @http.post("/both")
   export op both(in: In): string;
 
+  // 本文の全体（@http.bodyObj）も同じ
+  model WholeIn {
+    @http.bodyObj item: Item;
+  }
+  @http.get("/whole")
+  export op whole(in: WholeIn): string;
+
   // @http.post なら、当たらない
   @http.post("/item")
   export op write(in: In): string;
+  @http.post("/whole")
+  export op writeWhole(in: WholeIn): string;
 }

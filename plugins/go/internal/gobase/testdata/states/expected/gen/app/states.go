@@ -11,8 +11,12 @@ type TokenState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 nullable で決まる）: app.token の値。なければ nil。
 	Get(ctx context.Context) (*Token, error)
+	// Peek は問い合わせ: app.token を読む（reads）葉の op app.peek。
+	Peek(ctx context.Context) (*Token, error)
 	// Logout は命令: 効果 app.dropToken（on app.token.delete）を持つ葉の op app.logout。
 	Logout(ctx context.Context) error
+	// Enter は命令: 効果 app.signIn（on app.SignedIn: any -> Yes）を持つ葉の op app.enter。
+	Enter(ctx context.Context, token Token) error
 }
 
 // LinesState は状態 app.lines（list<app.Line>）の単位。実装は New の引数 lines に渡す。
@@ -26,6 +30,14 @@ type LinesState interface {
 	CountLines(ctx context.Context) (int64, error)
 	// Add は命令: 効果 app.addLine（on app.lines.post）を持つ葉の op app.add。
 	Add(ctx context.Context, line Line) error
+	// Clear は命令: 効果 app.clearLines（on app.lines: HasItems -> Empty）を持つ葉の op app.clear。
+	Clear(ctx context.Context) error
+	// AddCounted は命令: 効果 app.addLine（on app.lines.post）を持つ葉の op app.addCounted。
+	AddCounted(ctx context.Context, line Line) (int64, error)
+	// Push は命令: 効果 app.addLine（on app.lines.post）を持つ葉の op app.push。
+	Push(ctx context.Context, line Line) error
+	// Replace は命令: 効果 app.clearLines（on app.lines: HasItems -> Empty）、app.addLine（on app.lines.post）を持つ葉の op app.replace。
+	Replace(ctx context.Context, line Line) error
 }
 
 // SettingsState は状態 app.settings（single<app.Settings>）の単位。実装は New の引数 settings に渡す。
@@ -35,9 +47,28 @@ type SettingsState interface {
 	Get(ctx context.Context) (Settings, error)
 }
 
-// SharedState は、複数の状態を読む葉の op。実装は New の引数 shared に渡す。
+// SyncState は状態の分類 app.Sync（app.token、app.lines を対象にした classify）の単位。実装は New の引数 sync に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type SyncState interface {
+	// Fresh は問い合わせ: ケース Fresh の述語。
+	Fresh(ctx context.Context) (bool, error)
+	// Stale は問い合わせ: ケース Stale の述語。
+	Stale(ctx context.Context) (bool, error)
+	// Sync は命令: 効果 app.refresh（on app.Sync: Stale -> Fresh）を持つ葉の op app.sync。
+	Sync(ctx context.Context) error
+}
+
+// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type SharedState interface {
 	// Summary は問い合わせ: app.lines、app.settings を読む（reads）葉の op app.summary。
 	Summary(ctx context.Context) (string, error)
+	// Checkout は命令: 効果 app.addLine（on app.lines.post）、app.dropToken（on app.token.delete）を持つ葉の op app.checkout。
+	Checkout(ctx context.Context, line Line) error
+	// SyncOut は命令: 効果 app.refresh（on app.Sync: Stale -> Fresh）、app.dropToken（on app.token.delete）を持つ葉の op app.syncOut。
+	SyncOut(ctx context.Context) error
+	// Status は問い合わせ: app.token、app.lines を読む（reads）葉の op app.status。
+	Status(ctx context.Context) (string, error)
+	// LineFor は問い合わせ: app.lines、app.token を読む（reads）葉の op app.lineFor。
+	LineFor(ctx context.Context, item string) (*Line, error)
 }

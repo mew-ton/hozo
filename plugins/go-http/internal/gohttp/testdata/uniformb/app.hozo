@@ -1,0 +1,53 @@
+// 型に依らない形の確かめ（docs/requirements.md「出力を推論しない」）の二つ目: scalar、省略可能なフィールド、
+// 値を運ぶ例外、省略可能な戻り値の op。uniforma/app.hozo と、型だけが違う。
+namespace app {
+  scalar Token extends string;
+  @valid.min(1)
+  scalar Page extends int;
+  scalar Ratio extends float;
+  scalar Flag extends boolean;
+  @valid.length(min: 1)
+  scalar Name extends string;
+
+  model Paging { page: Page?; q: Name?; }
+  model Meta { tenant: Token?; }
+  model Item { @valid.length(min: 1) name: Name; tags: string[]; at: Time?; }
+
+  @http.status(404)
+  exception Missing: Item;
+  @http.status(409)
+  exception Clash: { existing: string; };
+
+  model FindInput {
+    @http.header("Authorization") token: Token?;
+    @http.header trace: Name;
+    @http.query page: Page?;
+    @http.query("q") keyword: Name?;
+    @http.query ratio: Ratio?;
+    @http.query exact: Flag?;
+    @http.query @http.default(10) size: Page;
+    @http.query @http.required owner: Token;
+  }
+  @http.get("/items")
+  export op find(in: FindInput): Item?
+    throws Missing;
+
+  model PutInput {
+    @http.header @http.default("en") lang: Name;
+    @http.body item: Item?;
+    @http.body("memo") note: Record<string, Item[]>;
+    @http.body @http.required count: float;
+    @http.body @http.default(1) copies: Page;
+  }
+  @http.post("/items")
+  export op put(in: PutInput): Token?
+    throws Clash;
+
+  model AllInput {
+    @http.headerObj meta: Meta;
+    @http.queryObj paging: Paging;
+    @http.bodyObj item: Item;
+  }
+  @http.post("/all")
+  export op all(in: AllInput): Record<string, Item>;
+}

@@ -1,7 +1,7 @@
-// GOSQL-2（docs/plugin-go-sqlite.md「表」）: @db の状態の形が list でない（nullable、single）。位置は状態。
+// GOSQL-2（docs/plugin-go-sqlite.md「表」）: @db.table の付いた状態の形が list でない（nullable、single）。位置は状態。
 
 namespace app {
-  model Row { @db.key id: string; }
+  model Row { @db.key @db.text id: string; }
 
   // nullable
   @db.table(Row) state current: nullable<Row>;
@@ -9,6 +9,12 @@ namespace app {
   @db.table(Row) state config: single<Row>;
   // list は通る
   @db.table(Row) state rows: list<Row>;
-  // @db がなければ、見ない
+  // @db.table がなければ、見ない
   state other: single<Row>;
+
+  // 表にならなかった状態を名指しするデコレータは、重ねて報告しない
+  @db.update(config)
+  effect saveConfig on config.put;
+  @db.effects(saveConfig)
+  export op setConfig(row: Row);
 }

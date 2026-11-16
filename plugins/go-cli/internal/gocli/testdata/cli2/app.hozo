@@ -1,14 +1,17 @@
 // CLI-2: 位置は model。
 namespace app {
   model In {
-    // どれもない
+    // 値の出どころが、どれもない
     bare: string;
-    // @cli.arg(1) と @cli.flag の両方
-    @cli.arg(2) @cli.flag("both") both: string;
-    // @cli.env だけ、@cli.env と @cli.flag、@cli.env と @cli.arg(3) は受け付ける
+    // @cli.required か @cli.default だけでは、値の出どころにならない
+    @cli.required needed: string;
+    @cli.default("x") filled: string;
+    // @cli.arg と @cli.flag の両方
+    @cli.arg(1) @cli.flag("both") both: string;
+    // @cli.env だけ、@cli.env と @cli.flag、@cli.env と @cli.arg は受け付ける
     @cli.env("ONLY") only: string?;
     @cli.flag("named") @cli.env("NAMED") named: string?;
-    @cli.arg(4) @cli.env("PLACED") placed: string?;
+    @cli.arg(2) @cli.env("PLACED") placed: string?;
   }
   @cli.command("run")
   export op run(in: In);

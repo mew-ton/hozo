@@ -145,4 +145,24 @@ func (o *ops) Report(ctx context.Context, line Line) (string, error) {
 	return o.Summary(ctx)
 }
 
+// Finish は op app.finish。
+//
+// Reads: app.token, app.lines
+// Effects: app.clearLines, app.addLine, app.dropToken, app.refresh
+func (o *ops) Finish(ctx context.Context, line Line) (string, error) {
+	if err := o.Replace(ctx, line); err != nil {
+		return "", err
+	}
+	if err := o.Checkout(ctx, line); err != nil {
+		return "", err
+	}
+	if err := o.Sync(ctx); err != nil {
+		return "", err
+	}
+	if err := o.Audit(ctx, "finished"); err != nil {
+		return "", err
+	}
+	return o.Status(ctx)
+}
+
 func ptr[T any](v T) *T { return &v }

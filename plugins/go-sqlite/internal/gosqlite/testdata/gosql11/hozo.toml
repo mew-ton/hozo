@@ -1,0 +1,5 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-11（効果のデコレータが、効果の宛先と合わない）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/app"

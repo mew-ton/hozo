@@ -15,17 +15,25 @@ import (
 
 // 診断のコード（docs/plugin-go-http.md「診断」）。
 const (
-	codeHTTPExport    = "GOHTTP-1"  // @http.get / @http.post の付いた op に export がない
-	codeHTTPParams    = "GOHTTP-2"  // 経路の op の引数が、0 個でも model 一つでもない
-	codeHTTPPlace     = "GOHTTP-3"  // 入力の model のフィールドが、@http.header / @http.query / @http.body のどれも持たない、または二つ以上持つ
-	codeHTTPFieldType = "GOHTTP-4"  // @http.header か @http.query のフィールドの型が受け付けられない
-	codeHTTPJSON      = "GOHTTP-5"  // 本文、結果、@http.status を持つ例外の値に、JSON にできない型がある
-	codeHTTPGetBody   = "GOHTTP-6"  // @http.get の op の入力が @http.body のフィールドを持つ
-	codeHTTPPath      = "GOHTTP-7"  // パスが / で始まらない、または { か } を含む
-	codeHTTPDuplicate = "GOHTTP-8"  // 同じメソッドとパスの経路が二つある
-	codeHTTPOption    = "GOHTTP-9"  // [emit.options.go-http] に、知らないキーか、型の違う値がある
-	codeHTTPName      = "GOHTTP-10" // NewHandler が、N の定義のパッケージの名前と当たる
-	codeHTTPValidate  = "GOHTTP-11" // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
+	codeHTTPExport     = "GOHTTP-1"  // @http.get / @http.post の付いた op に export がない
+	codeHTTPParams     = "GOHTTP-2"  // 経路の op の引数が、0 個でも model 一つでもない
+	codeHTTPPlace      = "GOHTTP-3"  // 入力の model のフィールドが、場所の六つのデコレータのどれも持たない、または二つ以上持つ
+	codeHTTPFieldType  = "GOHTTP-4"  // ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない
+	codeHTTPJSON       = "GOHTTP-5"  // 本文、結果、@http.status を持つ例外の値に、JSON にできない型がある
+	codeHTTPGetBody    = "GOHTTP-6"  // @http.get の op の入力が、本文のデコレータ（@http.body、@http.bodyObj）のフィールドを持つ
+	codeHTTPPath       = "GOHTTP-7"  // パスが / で始まらない、または { か } を含む
+	codeHTTPDuplicate  = "GOHTTP-8"  // 同じメソッドとパスの経路が二つある
+	codeHTTPOption     = "GOHTTP-9"  // [emit.options.go-http] に、知らないキーか、型の違う値がある
+	codeHTTPName       = "GOHTTP-10" // NewHandler が、N の定義のパッケージの名前と当たる
+	codeHTTPValidate   = "GOHTTP-11" // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
+	codeHTTPWholeType  = "GOHTTP-12" // 全体の形を付けたフィールドの型が、model でない
+	codeHTTPWholeMix   = "GOHTTP-13" // 一つの場所に、全体の形が二つ以上ある、または、全体の形と項目の形の両方がある
+	codeHTTPNoItem     = "GOHTTP-14" // @http.required か @http.default の付いたフィールドが、項目の形を持たない
+	codeHTTPOptional   = "GOHTTP-15" // @http.required か @http.default の付いたフィールドの型が、省略可能
+	codeHTTPResult     = "GOHTTP-16" // 経路の op の結果の型が、省略可能な配列か、省略可能な record
+	codeHTTPBoth       = "GOHTTP-17" // 一つのフィールドに、@http.required と @http.default の両方がある
+	codeHTTPDefault    = "GOHTTP-18" // @http.default のリテラルが、フィールドの型に渡せない
+	codeHTTPConstraint = "GOHTTP-19" // @http.default の値が、フィールドの制約（@valid.*）に合わない
 )
 
 // FileName は、このトランスパイラが出すただ一つのファイルの名前（docs/plugin-go.md「相乗りのファイル」）。入口のパッケージに置く。
@@ -36,12 +44,17 @@ const handlerName = "NewHandler"
 
 // 読む語彙（標準の http。docs/plugin-go-http.md「マニフェスト」）。@http.retry は読まない（印）。
 const (
-	httpGet    = "http.get"
-	httpPost   = "http.post"
-	httpHeader = "http.header"
-	httpQuery  = "http.query"
-	httpBody   = "http.body"
-	httpStatus = "http.status"
+	httpGet       = "http.get"
+	httpPost      = "http.post"
+	httpHeader    = "http.header"
+	httpQuery     = "http.query"
+	httpBody      = "http.body"
+	httpHeaderObj = "http.headerObj"
+	httpQueryObj  = "http.queryObj"
+	httpBodyObj   = "http.bodyObj"
+	httpRequired  = "http.required"
+	httpDefault   = "http.default"
+	httpStatus    = "http.status"
 )
 
 // options は [emit.options.go-http]（docs/plugin-go-http.md「オプション」）。
@@ -119,6 +132,8 @@ type generator struct {
 
 	declNS map[string]string // 宣言の FQN → 宣言した名前空間
 	files  map[string]bool   // 単位の対象のファイル（View.files）
+	// read は、入力の model の FQN → そのフィールドの読み方（一度だけ調べる。診断も、model ごとに一度）。
+	read map[string][]input
 
 	errs []plugin.Diagnostic
 	seen map[string]bool
@@ -139,7 +154,7 @@ func (g *generator) errorf(code, at, format string, args ...any) {
 
 // prepare は、View から、検査と生成の間ずっと使う表を作る。
 func (g *generator) prepare() {
-	g.declNS, g.files = map[string]string{}, map[string]bool{}
+	g.declNS, g.files, g.read = map[string]string{}, map[string]bool{}, map[string][]input{}
 	for i := range g.p.Namespaces {
 		for _, d := range g.p.Namespaces[i].Decls {
 			if d == nil {
@@ -155,28 +170,6 @@ func (g *generator) prepare() {
 	}
 }
 
-// place は、入力の model のフィールドを読む、通信の上の場所の種類。
-type place int
-
-const (
-	inHeader place = iota + 1
-	inQuery
-	inBody
-)
-
-// input は、入力の model のフィールド一つの読み方（docs/plugin-go-http.md「入力の読み方」）。
-type input struct {
-	field *ir.Field
-	place place
-	// header は @http.header の name。
-	header string
-	// optional は、フィールドの型が省略可能か。value は、省略可能を外した型。
-	optional bool
-	value    ir.Type
-	// core は、ヘッダとクエリの値の、元の核の型（scalar は辿る）。
-	core ir.CoreName
-}
-
 // route は経路一つ: 経路の op と、メソッドとパス。
 type route struct {
 	op           *ir.Op
@@ -184,33 +177,16 @@ type route struct {
 	// model は入力の model。引数のない op なら nil。inputs は、そのフィールドの読み方（フィールドの順）。
 	model  *ir.Model
 	inputs []input
-	// validate は、op を呼ぶ前に、入力の制約を確かめるか（単位のオプション validate = true で、入力の model が Validate を持つ）。
-	validate bool
 }
 
-// bodies は、@http.body のフィールドの数。
-func (r *route) bodies() int {
-	n := 0
-	for _, in := range r.inputs {
-		if in.place == inBody {
-			n++
+// hasBody は、入力が、本文のデコレータ（@http.body、@http.bodyObj）のフィールドを持つか。
+func (r *route) hasBody() bool {
+	for i := range r.inputs {
+		if r.inputs[i].place == inBody {
+			return true
 		}
 	}
-	return n
-}
-
-// location は、フィールド in の、通信の上の場所（docs/plugin-go-http.md「入力の読み方」: httpPlace の二つ目と、違反の path の先頭）。
-func (r *route) location(in *input) string {
-	switch in.place {
-	case inHeader:
-		return "header." + in.header
-	case inQuery:
-		return "query." + in.field.Name
-	}
-	if r.bodies() == 1 {
-		return "body"
-	}
-	return "body." + in.field.Name
+	return false
 }
 
 // status は、@http.status を持つ例外一つ。
@@ -219,7 +195,7 @@ type status struct {
 	code      int64
 }
 
-// check は、N の単位の対象の op を宣言順に見て、診断（GOHTTP-1〜GOHTTP-8、GOHTTP-10、GOHTTP-11）を集め、経路を返す
+// check は、N の単位の対象の op を宣言順に見て、診断（GOHTTP-1〜GOHTTP-8、GOHTTP-10〜GOHTTP-19）を集め、経路を返す
 // （docs/plugin-go-http.md「対象」）。
 func (g *generator) check() []route {
 	var routes []route
@@ -258,26 +234,27 @@ func (g *generator) check() []route {
 		default:
 			g.errorf(codeHTTPParams, op.Name, "経路の op %s の引数が %d 個ある（引数は、0 個か、入力の model 一つ）", op.Name, len(op.Params))
 		}
-		var inputs []input
+		r := route{op: op, model: model}
 		if model != nil {
-			inputs = g.inputs(model)
-		}
-		r := route{op: op, model: model, inputs: inputs}
-		r.validate = g.opts.Validate && model != nil && govalid.HasValidate(g.p, model.Name)
-		// GOHTTP-11
-		if r.validate {
-			g.checkValidateHome(op, model)
+			// GOHTTP-3、GOHTTP-4、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19（位置は model）
+			r.inputs = g.inputs(model)
+			// GOHTTP-11
+			if g.opts.Validate {
+				g.checkValidateHome(op, model)
+			}
 		}
 		// GOHTTP-5: 本文、結果、@http.status を持つ例外の値
-		for i := range inputs {
-			if inputs[i].place == inBody {
-				g.checkJSON(op, inputs[i].field.Type, fmt.Sprintf("本文（model %s のフィールド %s）", model.Name, inputs[i].field.Name))
+		for i := range r.inputs {
+			if in := &r.inputs[i]; in.place == inBody {
+				g.checkJSON(op, in.field.Type, fmt.Sprintf("本文（model %s のフィールド %s）", model.Name, in.field.Name))
 			}
 		}
 		g.checkJSON(op, op.Returns, "結果")
 		for _, s := range g.statuses([]route{r}) {
 			g.checkJSON(op, s.exception.Value, fmt.Sprintf("例外 %s の値", s.exception.Name))
 		}
+		// GOHTTP-16
+		g.checkResult(op)
 		for _, app := range apps {
 			r.method = "GET"
 			if app.Decorator == httpPost {
@@ -285,8 +262,9 @@ func (g *generator) check() []route {
 			}
 			r.path, _ = stringArg(app, "path")
 			// GOHTTP-6
-			if r.method == "GET" && r.bodies() > 0 {
-				g.errorf(codeHTTPGetBody, op.Name, "@%s の op %s の入力 %s が、@%s のフィールドを持つ（GET の要求は、本文を持たない）", httpGet, op.Name, model.Name, httpBody)
+			if r.method == "GET" && r.hasBody() {
+				g.errorf(codeHTTPGetBody, op.Name, "@%s の op %s の入力 %s が、本文のデコレータ（@%s、@%s）のフィールドを持つ（GET の要求は、本文を持たない）",
+					httpGet, op.Name, model.Name, httpBody, httpBodyObj)
 			}
 			// GOHTTP-7
 			switch {
@@ -311,75 +289,49 @@ func (g *generator) check() []route {
 	return routes
 }
 
-// checkValidateHome は GOHTTP-11: 制約を確かめる経路の op の入力の model m（Validate を持つ）が、別の名前空間 M のものなら、M の型の
-// 置き場（docs/config.md「型の置き場」）の単位が、transpilers に go-valid を並べていなければならない（Validate は、型の定義の
-// パッケージにしか書けない。並べていなければ、ハンドラの in.Validate() がコンパイルできない）。N の model は、自分の単位が go-valid を
-// 並べている（CFG-19）。置き場は、View だけから求まる（govalid.Unlisted）。
+// checkValidateHome は GOHTTP-11: validate = true の単位で、経路の op の入力の model m が、別の名前空間 M のもので、Validate を持つ
+// なら、M の型の置き場（docs/config.md「型の置き場」）の単位が、transpilers に go-valid を並べていなければならない（Validate は、
+// 型の定義のパッケージにしか書けない）。並べていなくても、生成したコードはコンパイルできる（補助 httpValidate は、入力が Validate を
+// 持つかを実行時に見る）が、確かめると書いた入力が、確かめられないまま op に渡る。書いたものの食い違いなので、error にする
+// （docs/plugin-go-http.md「制約の検査」）。型（Validate を持つか）を使うのは、この整合の検査だけで、出力は変えない。
+// N の model は、自分の単位が go-valid を並べている（CFG-19）。置き場は、View だけから求まる（govalid.Unlisted）。
 func (g *generator) checkValidateHome(op *ir.Op, m *ir.Model) {
 	ns := g.declNS[m.Name]
-	if ns == g.view.Viewer {
+	if ns == g.view.Viewer || !govalid.HasValidate(g.p, m.Name) {
 		return
 	}
 	if unit, unlisted := govalid.Unlisted(g.view, ns); unlisted {
-		g.errorf(codeHTTPValidate, op.Name, "経路の op %s の入力 %s は Validate を持つが、名前空間 %s の型の置き場の単位（%d 番目の [[emit]]）が、transpilers に %s を並べていない（validate = true のハンドラは、入力の Validate を呼ぶ。メソッドは、型の定義のパッケージにしか書けない）",
+		g.errorf(codeHTTPValidate, op.Name, "経路の op %s の入力 %s は Validate を持つが、名前空間 %s の型の置き場の単位（%d 番目の [[emit]]）が、transpilers に %s を並べていない（validate = true と書いたのに、この入力は、確かめられないまま op に渡る。メソッドは、型の定義のパッケージにしか書けない）",
 			op.Name, m.Name, ns, unit, govalid.Transpiler)
 	}
 }
 
-// inputs は、入力の model m のフィールドの読み方（フィールドの順）。GOHTTP-3 と GOHTTP-4 を報告する（位置は model）。
-func (g *generator) inputs(m *ir.Model) []input {
-	var out []input
-	for i := range m.Fields {
-		f := &m.Fields[i]
-		in := input{field: f, value: f.Type}
-		if o, ok := f.Type.(ir.OptionalType); ok {
-			in.optional, in.value = true, o.Of
-		}
-		var found []string
-		for j := range f.Decorators {
-			app := &f.Decorators[j]
-			switch app.Decorator {
-			case httpHeader:
-				in.place = inHeader
-				in.header, _ = stringArg(app, "name")
-			case httpQuery:
-				in.place = inQuery
-			case httpBody:
-				in.place = inBody
-			default:
-				continue
-			}
-			found = append(found, "@"+app.Decorator)
-		}
-		// GOHTTP-3
-		if len(found) != 1 {
-			if len(found) == 0 {
-				g.errorf(codeHTTPPlace, m.Name, "入力の model %s のフィールド %s が、@%s、@%s、@%s のどれも持たない（ちょうど一つ要る）", m.Name, f.Name, httpHeader, httpQuery, httpBody)
-			} else {
-				g.errorf(codeHTTPPlace, m.Name, "入力の model %s のフィールド %s が、%s を持つ（ちょうど一つ要る）", m.Name, f.Name, strings.Join(found, " と "))
-			}
-			continue
-		}
-		// GOHTTP-4
-		core, isCore := g.coreOf(in.value)
-		in.core = core
-		switch in.place {
-		case inHeader:
-			if !isCore || core != ir.CoreString {
-				g.errorf(codeHTTPFieldType, m.Name, "入力の model %s の @%s のフィールド %s の型 %s は受け付けられない（string か、その省略可能）",
-					m.Name, httpHeader, f.Name, golang.TypeDisplay(f.Type))
-				continue
-			}
-		case inQuery:
-			if !isCore || core != ir.CoreString && core != ir.CoreInt && core != ir.CoreFloat && core != ir.CoreBoolean {
-				g.errorf(codeHTTPFieldType, m.Name, "入力の model %s の @%s のフィールド %s の型 %s は受け付けられない（string / int / float / boolean か、その省略可能）",
-					m.Name, httpQuery, f.Name, golang.TypeDisplay(f.Type))
-				continue
-			}
-		}
-		out = append(out, in)
+// checkResult は GOHTTP-16: 経路の op の結果の型が、省略可能な配列か、省略可能な record。Go では、どちらも nil が「値がない」を
+// 表すので、補助 httpWriteResult は、実行時に、値がない（204）ことと、空である（200）ことを見分けられない。
+func (g *generator) checkResult(op *ir.Op) {
+	t := op.Returns
+	if c, ok := t.(ir.CaseType); ok {
+		t = c.Of
 	}
-	return out
+	o, ok := t.(ir.OptionalType)
+	if !ok {
+		return
+	}
+	of := o.Of
+	if c, ok := of.(ir.CaseType); ok {
+		of = c.Of
+	}
+	var what string
+	switch of.(type) {
+	case ir.ArrayType:
+		what = "省略可能な配列"
+	case ir.RecordType:
+		what = "省略可能な record"
+	default:
+		return
+	}
+	g.errorf(codeHTTPResult, op.Name, "経路の op %s の結果の型 %s が、%s（Go では、値がないことと、空であることを見分けられないので、204 か 200 かを決められない。省略可能にしないか、model で包む）",
+		op.Name, golang.TypeDisplay(op.Returns), what)
 }
 
 // coreOf は、型 t の元の核の型（scalar は、その継承を辿る）。核の型を元に持たなければ false。
@@ -401,18 +353,22 @@ func (g *generator) coreOf(t ir.Type) (ir.CoreName, bool) {
 	return "", false
 }
 
-// stringArg は、適用 app の引数 param の文字列のリテラル。
-func stringArg(app *ir.Application, param string) (string, bool) {
+// argLiteral は、適用 app の引数 param のリテラル。書かれていない（省いた）か、リテラルでなければ false。
+func argLiteral(app *ir.Application, param string) (ir.Literal, bool) {
 	for _, a := range app.Args {
 		if a.Param == param {
-			if l, ok := a.Value.(ir.LiteralValue); ok {
-				if s, ok := l.Literal.(ir.StringLiteral); ok {
-					return s.Value, true
-				}
-			}
+			l, ok := a.Value.(ir.LiteralValue)
+			return l.Literal, ok && l.Literal != nil
 		}
 	}
-	return "", false
+	return nil, false
+}
+
+// stringArg は、適用 app の引数 param の文字列のリテラル。
+func stringArg(app *ir.Application, param string) (string, bool) {
+	l, _ := argLiteral(app, param)
+	s, ok := l.(ir.StringLiteral)
+	return s.Value, ok
 }
 
 // statuses は、経路 routes の op のどれかが投げうる例外（Op.signature.exceptions）のうち、@http.status を持つもの。
@@ -435,11 +391,9 @@ func (g *generator) statuses(routes []route) []status {
 				if app.Decorator != httpStatus {
 					continue
 				}
-				for _, a := range app.Args {
-					if l, ok := a.Value.(ir.LiteralValue); ok && a.Param == "code" {
-						if n, ok := l.Literal.(ir.IntLiteral); ok {
-							out = append(out, status{exception: x, code: n.Value})
-						}
+				if l, ok := argLiteral(app, "code"); ok {
+					if n, ok := l.(ir.IntLiteral); ok {
+						out = append(out, status{exception: x, code: n.Value})
 					}
 				}
 			}
@@ -501,8 +455,6 @@ func (g *generator) checkName() {
 		switch n.Kind {
 		case golang.PublicType:
 			what = g.p.Lookup(n.Decl).Kind() + " " + n.Decl + " の型"
-		case golang.PublicNewModel:
-			what = "既定値を持つ model " + n.Decl + " の関数"
 		case golang.PublicArm:
 			what = "union " + n.Decl + " のアーム " + n.Detail + " を包む型"
 		case golang.PublicEffect:

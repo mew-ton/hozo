@@ -271,13 +271,6 @@ type GetOrdersInput struct {
 	Status *OrderStatus `json:"status,omitempty"`
 }
 
-// NewGetOrdersInput は既定値を入れた GetOrdersInput を返す。
-func NewGetOrdersInput() GetOrdersInput {
-	m := GetOrdersInput{}
-	m.Page = 1
-	return m
-}
-
 // GetItemInput は商品を取る入力
 type GetItemInput struct {
 	Id ItemId `json:"id"`

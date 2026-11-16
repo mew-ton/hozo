@@ -1,0 +1,153 @@
+// docs/requirements.md「出力を推論しない」: フィールドごと、op ごとに出すコードは、型によらず同じ形。
+// 三つの名前空間は、フィールドと引数の型だけが違う（plain は核の型、named は scalar、sparse は省略可能で @db.nullable を持つ）。
+// plugins/go-sqlite の TestUniform が、三つの db.go が、名前と型（と、@db.nullable の足すもの）のほかは同じテキストであることを確かめる。
+
+/** 核の型 */
+namespace plain {
+  model Tag { name: string; }
+
+  model Row {
+    @db.key @db.text s: string;
+    @db.int i: int;
+    @db.int d: Duration;
+    @db.float f: float;
+    @db.bool b: boolean;
+    @db.time at: Time;
+    @db.json j: string[];
+  }
+
+  @db.table(Row) state rows: list<Row>;
+
+  @db.find(rows, "s")
+  export op find(s: string): Row?;
+  @db.list(rows, "i")
+  export op byI(i: int): Row[];
+  @db.list(rows, "d")
+  export op byD(d: Duration): Row[];
+  @db.list(rows, "f")
+  export op byF(f: float): Row[];
+  @db.list(rows, "b")
+  export op byB(b: boolean): Row[];
+  @db.list(rows, "at")
+  export op byAt(at: Time): Row[];
+  @db.list(rows, "j")
+  export op byJ(j: string[]): Row[];
+
+  @db.insert(rows)
+  effect create on rows.post;
+  @db.update(rows)
+  effect change on rows.put;
+  @db.delete(rows, "at")
+  effect drop on rows.delete;
+
+  @db.effects(create)
+  export op add(row: Row);
+  @db.effects(change)
+  export op save(row: Row);
+  @db.effects(drop)
+  export op remove(at: Time);
+  @db.effects(drop, create)
+  export op swap(at: Time, row: Row);
+}
+
+/** scalar */
+namespace named {
+  scalar S extends string;
+  scalar I extends int;
+  scalar D extends Duration;
+  scalar F extends float;
+  scalar B extends boolean;
+  scalar At extends Time;
+  model Tag { name: string; }
+
+  model Row {
+    @db.key @db.text s: S;
+    @db.int i: I;
+    @db.int d: D;
+    @db.float f: F;
+    @db.bool b: B;
+    @db.time at: At;
+    @db.json j: Record<string, Tag>;
+  }
+
+  @db.table(Row) state rows: list<Row>;
+
+  @db.find(rows, "s")
+  export op find(s: S): Row?;
+  @db.list(rows, "i")
+  export op byI(i: I): Row[];
+  @db.list(rows, "d")
+  export op byD(d: D): Row[];
+  @db.list(rows, "f")
+  export op byF(f: F): Row[];
+  @db.list(rows, "b")
+  export op byB(b: B): Row[];
+  @db.list(rows, "at")
+  export op byAt(at: At): Row[];
+  @db.list(rows, "j")
+  export op byJ(j: Record<string, Tag>): Row[];
+
+  @db.insert(rows)
+  effect create on rows.post;
+  @db.update(rows)
+  effect change on rows.put;
+  @db.delete(rows, "at")
+  effect drop on rows.delete;
+
+  @db.effects(create)
+  export op add(row: Row);
+  @db.effects(change)
+  export op save(row: Row);
+  @db.effects(drop)
+  export op remove(at: At);
+  @db.effects(drop, create)
+  export op swap(at: At, row: Row);
+}
+
+/** 省略可能（@db.nullable） */
+namespace sparse {
+  model Tag { name: string; }
+
+  model Row {
+    @db.nullable @db.key @db.text s: string?;
+    @db.nullable @db.int i: int?;
+    @db.nullable @db.int d: Duration?;
+    @db.nullable @db.float f: float?;
+    @db.nullable @db.bool b: boolean?;
+    @db.nullable @db.time at: Time?;
+    @db.nullable @db.json j: Tag?;
+  }
+
+  @db.table(Row) state rows: list<Row>;
+
+  @db.find(rows, "s")
+  export op find(s: string?): Row?;
+  @db.list(rows, "i")
+  export op byI(i: int?): Row[];
+  @db.list(rows, "d")
+  export op byD(d: Duration?): Row[];
+  @db.list(rows, "f")
+  export op byF(f: float?): Row[];
+  @db.list(rows, "b")
+  export op byB(b: boolean?): Row[];
+  @db.list(rows, "at")
+  export op byAt(at: Time?): Row[];
+  @db.list(rows, "j")
+  export op byJ(j: Tag?): Row[];
+
+  @db.insert(rows)
+  effect create on rows.post;
+  @db.update(rows)
+  effect change on rows.put;
+  @db.delete(rows, "at")
+  effect drop on rows.delete;
+
+  @db.effects(create)
+  export op add(row: Row);
+  @db.effects(change)
+  export op save(row: Row);
+  @db.effects(drop)
+  export op remove(at: Time?);
+  @db.effects(drop, create)
+  export op swap(at: Time?, row: Row);
+}

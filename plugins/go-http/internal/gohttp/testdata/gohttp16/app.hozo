@@ -1,0 +1,24 @@
+// GOHTTP-16: 位置は op。
+namespace app {
+  model Item { name: string; }
+
+  @http.get("/list")
+  export op items(): Item[]?;
+  @http.get("/byName")
+  export op byName(): Record<string, Item>?;
+  // 形の語で書いても同じ型
+  @http.get("/names")
+  export op names(): nullable<list<string>>;
+
+  // 省略可能な model と scalar、省略可能でない配列と record、省略可能な要素の配列は、結果にできる
+  @http.get("/one")
+  export op one(): Item?;
+  @http.get("/text")
+  export op text(): string?;
+  @http.get("/all")
+  export op all(): Item[];
+  @http.get("/map")
+  export op map(): Record<string, Item>;
+  @http.get("/holes")
+  export op holes(): Item?[];
+}

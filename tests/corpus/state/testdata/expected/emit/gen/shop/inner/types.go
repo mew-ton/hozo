@@ -13,13 +13,6 @@ type Line struct {
 	Count int64  `json:"count"`
 }
 
-// NewLine は既定値を入れた Line を返す。
-func NewLine() Line {
-	m := Line{}
-	m.Count = 1
-	return m
-}
-
 // Order は model shop.Order。
 type Order struct {
 	Id string `json:"id"`

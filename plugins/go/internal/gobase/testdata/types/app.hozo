@@ -34,7 +34,7 @@ namespace app {
     homes: type.Address[]?;
   }
 
-  // 「model」既定値を持つ model（New<Model>）: 核の型ごとの既定値と、scalar の既定値
+  // 「model」model から出すのは、構造体だけ（値を作る関数 New<Model> は出さない）。使う側は、零値から始める
   model Options {
     limit: int;
     label: string;

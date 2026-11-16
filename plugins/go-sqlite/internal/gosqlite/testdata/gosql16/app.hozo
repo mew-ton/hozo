@@ -1,0 +1,25 @@
+// GOSQL-16（docs/plugin-go-sqlite.md「しまい方」）: 表の model のフィールドが、しまい方のデコレータ（@db.text / @db.int /
+// @db.float / @db.bool / @db.time / @db.json）を一つも持たないか、二つ以上持つ。位置は model。フィールドごとに一つ。
+
+namespace app {
+  /** 表の model でない model のフィールドは、見ない */
+  model Tag { name: string; @db.text @db.json twice: string; }
+
+  model Row {
+    @db.key @db.text id: string;
+    // 一つもない
+    note: string;
+    // ほかの db の語彙のデコレータは、しまい方ではない
+    @db.unique code: string;
+    @db.nullable rank: int?;
+    // 二つ以上
+    @db.text @db.json doc: Tag;
+    // 三つ（同じものを二度付けるのは、hozoc の DEC-13）
+    @db.int @db.float @db.bool count: int;
+    // 通るもの
+    @db.json tag: Tag;
+  }
+
+  @db.table(Row) state rows: list<Row>;
+  @db.table(Row) state more: list<Row>;
+}

@@ -51,10 +51,20 @@ func TestShapePlaces(t *testing.T) {
 		with(op("shop.write", nil), effecting("shop.sync")),                          // 述語で決まる状態の分類の遷移 → その分類の単位
 		with(op("shop.signIn", nil), effecting("shop.login")),                        // 型で決まる状態の分類の遷移 → ただ一つの対象の状態
 		with(op("shop.both", nil), effecting("shop.addItem"), reading("shop.token")), // 効果と reads の両方 → 効果の宛先の単位
+		// 3: 直に持つ効果は、op が書いたものと、デコレータが運ぶもの（Op.carried）を合わせたもの。どちらで書かれたかは、置き場を変えない
+		with(op("shop.carried", nil), decorated("x.fx"), carryingEffects("shop.addItem")),                                        // 運ばれた効果が一つ → その単位
+		with(op("shop.pair", nil), decorated("x.fx"), carryingEffects("shop.addItem", "shop.clear")),                             // 二つの効果の宛先の単位が同じ → その単位
+		with(op("shop.split", nil), decorated("x.fx"), carryingEffects("shop.addItem", "shop.login")),                            // 宛先の単位が二つに分かれる → SharedState
+		with(op("shop.mixed", nil), effecting("shop.sync"), decorated("x.fx"), carryingEffects("shop.addItem")),                  // 書いた効果と運ばれた効果で分かれる → SharedState
+		with(op("shop.splitReads", nil), decorated("x.fx"), carryingEffects("shop.addItem", "shop.sync"), reading("shop.title")), // 効果と reads の両方 → 効果だけで決める
 		// 4: 効果を持たず、reads が一つの葉 → その状態の単位の問い合わせ
 		with(op("shop.find", ir.Optional(ir.String())), reading("shop.items")),
 		// 5: 効果を持たず、reads が二つ以上の葉 → SharedState
 		with(op("shop.report", ir.String()), reading("shop.items", "shop.title")),
+		// 4、5: 直に読む状態も、op が書いたものと、デコレータが運ぶものを合わせたもの
+		with(op("shop.lookup", ir.Optional(ir.String())), decorated("x.rd"), carryingReads("shop.token")),                      // 運ばれた reads が一つ → その単位の問い合わせ
+		with(op("shop.same", ir.Optional(ir.String())), reading("shop.token"), decorated("x.rd"), carryingReads("shop.token")), // 書いた reads と同じ状態 → 一つと数える
+		with(op("shop.join", ir.String()), reading("shop.items"), decorated("x.rd"), carryingReads("shop.token")),              // 合わせて二つ → SharedState
 		// 6: それ以外の葉（デコレータだけを持つ葉を含む）
 		op("shop.leaf", nil),
 		with(op("shop.marked", nil), decorated("x.mark")),
@@ -69,14 +79,18 @@ func TestShapePlaces(t *testing.T) {
 	want := map[string]Place{
 		"shop.wire": Wiring, "shop.gone": Never,
 		"shop.add": StateCommand, "shop.empty": StateCommand, "shop.write": StateCommand, "shop.signIn": StateCommand, "shop.both": StateCommand,
+		"shop.carried": StateCommand, "shop.pair": StateCommand, "shop.split": SharedCommand, "shop.mixed": SharedCommand, "shop.splitReads": SharedCommand,
 		"shop.find": StateQuery, "shop.report": SharedQuery,
+		"shop.lookup": StateQuery, "shop.same": StateQuery, "shop.join": SharedQuery,
 		"shop.leaf": Leaf, "shop.marked": Leaf, "shop.outside": Leaf, "shop.outsideWire": Leaf,
 	}
 	if got := placesOf(s); !reflect.DeepEqual(got, want) {
 		t.Errorf("places = %v\nwant %v", got, want)
 	}
 	for fqn, unit := range map[string]string{"shop.add": "shop.items", "shop.empty": "shop.items", "shop.write": "shop.Sync",
-		"shop.signIn": "shop.token", "shop.both": "shop.items", "shop.find": "shop.items", "shop.wire": "", "shop.report": ""} {
+		"shop.signIn": "shop.token", "shop.both": "shop.items", "shop.find": "shop.items", "shop.wire": "", "shop.report": "",
+		"shop.carried": "shop.items", "shop.pair": "shop.items", "shop.split": "", "shop.mixed": "", "shop.splitReads": "",
+		"shop.lookup": "shop.token", "shop.same": "shop.token", "shop.join": ""} {
 		if got := opShape(s, fqn).Unit; got != unit {
 			t.Errorf("%s の単位 = %q, want %q", fqn, got, unit)
 		}
@@ -86,19 +100,21 @@ func TestShapePlaces(t *testing.T) {
 	for _, o := range s.Ops {
 		order = append(order, strings.TrimPrefix(o.FQN, "shop."))
 	}
-	if got := strings.Join(order, ","); got != "wire,gone,add,empty,write,signIn,both,find,report,leaf,marked,outside,outsideWire" {
+	if got := strings.Join(order, ","); got != "wire,gone,add,empty,write,signIn,both,carried,pair,split,mixed,splitReads,find,report,lookup,same,join,leaf,marked,outside,outsideWire" {
 		t.Errorf("Ops の順 = %s", got)
 	}
 	if got := strings.Join(s.Leaves, ","); got != "shop.leaf,shop.marked,shop.outside,shop.outsideWire" {
 		t.Errorf("Leaves = %s", got)
 	}
-	if got := strings.Join(s.Shared, ","); got != "shop.report" {
+	// SharedState は、宛先の単位が分かれた命令と、複数の状態を読む問い合わせを、宣言順に（種類で分けない）
+	if got := strings.Join(s.Shared, ","); got != "shop.split,shop.mixed,shop.splitReads,shop.report,shop.join" {
 		t.Errorf("Shared = %s", got)
 	}
 	// 状態の単位: 基底の状態と、述語で決まる状態の分類を、宣言順に。型で決まる状態の分類は、単位を持たない
 	wantUnits := []StateUnit{
-		{FQN: "shop.items", TypeName: "ItemsState", Param: "items", Shape: "list", Queries: []string{"shop.find"}, Commands: []string{"shop.add", "shop.empty", "shop.both"}},
-		{FQN: "shop.token", TypeName: "TokenState", Param: "token", Shape: "nullable", Commands: []string{"shop.signIn"}},
+		{FQN: "shop.items", TypeName: "ItemsState", Param: "items", Shape: "list", Queries: []string{"shop.find"},
+			Commands: []string{"shop.add", "shop.empty", "shop.both", "shop.carried", "shop.pair"}},
+		{FQN: "shop.token", TypeName: "TokenState", Param: "token", Shape: "nullable", Queries: []string{"shop.lookup", "shop.same"}, Commands: []string{"shop.signIn"}},
 		{FQN: "shop.title", TypeName: "TitleState", Param: "title", Shape: "single"},
 		{FQN: "shop.Sync", TypeName: "SyncState", Param: "sync", Commands: []string{"shop.write"}, Predicates: []string{"UpToDate"}},
 	}

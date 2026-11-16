@@ -7,9 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode"
 
-	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
 	"github.com/mew-ton/hozo/plugin/golang"
 )
@@ -20,6 +18,9 @@ import (
 // cli.go は自分のパッケージ（cli）なので、非公開の名前に前置きの決まりはない（docs/plugin-go.md「相乗りのファイル」）。ただし、
 // import する名前空間のパッケージの名前（小文字と数字だけ）と当たらないように、パッケージの非公開の名前は、どれも大文字を含む形に
 // する: コマンドごとの run<Op> / fail<Op> / usage<Op> と、補助の cli<名前>（コマンドごとの名前と当たらないように、前置きを分ける）。
+//
+// コマンドごと、フィールドごと、例外ごとに出すテキストは、名前と、デコレータの引数と、説明だけから作る（どの型でも同じ形）。型で変わる
+// 振る舞いは、補助（helpers）の中にあり、実行時に決める（docs/requirements.md「出力を推論しない」）。
 
 // runtimePath は、生成したコードが import する runtime パッケージ（*runtime.ValidationError。docs/plugin-go-valid.md「runtime」）。
 const runtimePath = "github.com/mew-ton/hozo/runtime"
@@ -35,12 +36,15 @@ type file struct {
 	// std は、使った標準ライブラリと runtime の import パス。spaces は、型を書いた別の名前空間。
 	std    map[string]bool
 	spaces map[string]bool
-	// 補助のうち、コマンドが使ったもの（使うものだけを出す）。
-	usesLookup, usesLookupArg, usesPtr, usesValidation bool
+	// 補助のうち、コマンドが使ったもの（使うものだけを出す）: cliLine の行のメソッド（デコレータごと）、入力の制約の検査（入力を持つ
+	// コマンドがある）、例外の見分け（例外を持つコマンドがある）。どれも、デコレータと op の宣言の有無で決まり、型では決まらない。
+	usesLine                 map[string]bool
+	usesValidate, usesThrown bool
 }
 
 func (g *generator) newFile() *file {
-	return &file{g: g, im: golang.NewImports(g.view, g.layout, g.root, false), reserved: map[string]bool{}, std: map[string]bool{}, spaces: map[string]bool{}}
+	return &file{g: g, im: golang.NewImports(g.view, g.layout, g.root, false), reserved: map[string]bool{}, std: map[string]bool{}, spaces: map[string]bool{},
+		usesLine: map[string]bool{}}
 }
 
 // local は、関数の中の局所の名前。このファイルが import するパッケージの名前と当たれば、当たらなくなるまで末尾に _ を足す
@@ -247,84 +251,50 @@ func (f *file) main(commands []command) string {
 	return b.String()
 }
 
-// command は、サブコマンド一つの run<Op>、fail<Op>、usage<Op>（docs/plugin-go-cli.md「引数の解釈」「実行と表示」）。
+// command は、サブコマンド一つの run<Op>、fail<Op>、usage<Op>（docs/plugin-go-cli.md「コマンドごとの関数」「実行と表示」）。
+// 中は、フィールドの型と、例外が値を運ぶかどうかによらず、同じ形: 出すテキストは、名前と、デコレータの引数と、説明だけから作る。
 func (f *file) command(c *command) string {
 	s := f.signature()
 	context, io, fmt_ := f.pkg("context"), f.pkg("io"), f.pkg("fmt")
 	m := c.input
-	usage := "usage" + c.method + "(" + s.prog + ")"
-	flags, pos, help, err, in := f.local("flags"), f.local("pos"), f.local("help"), f.local("err"), f.local("in")
-	usageError := func(message string) string {
-		return fmt.Sprintf("return cliUsageError(%s, %s, %s, %s)\n", s.stderr, s.prog, usage, message)
-	}
+	line, err, in, code, done := f.local("line"), f.local("err"), f.local("in"), f.local("code"), f.local("done")
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "// run%s はサブコマンド %s（op %s）。\n", c.method, c.name, c.op.Name)
 	fmt.Fprintf(&b, "func run%s(%s %s.Context, %s %s.Ops, %s Presenter, %s string, %s []string, %s func(string) string, %s, %s %s.Writer) int {\n",
 		c.method, s.ctx, context, s.ops, f.ns(), s.p, s.prog, s.args, s.env, s.stdout, s.stderr, io)
 
-	// フラグと位置引数に分ける。フラグの表は、フラグ名 → boolean か
-	var specs []string
-	usesFlags, fixed, hasArray := false, 0, false
-	if m != nil {
-		for _, fd := range m.fields {
-			if fd.flag != "" {
-				specs = append(specs, fmt.Sprintf("%s: %v", strconv.Quote(fd.flag), fd.kind == kindBoolean))
-			}
-			switch {
-			case fd.array:
-				hasArray = true
-			case fd.arg:
-				fixed++
-			default:
-				usesFlags = true
-			}
-		}
-	}
-	table := "nil"
-	if len(specs) > 0 {
-		table = "map[string]bool{" + strings.Join(specs, ", ") + "}"
-	}
-	if !usesFlags {
-		flags = "_"
-	}
-	fmt.Fprintf(&b, "%s, %s, %s, %s := cliParseArgs(%s, %s)\n", flags, pos, help, err, s.args, table)
-	fmt.Fprintf(&b, "if %s != nil {\n%s}\n", err, usageError(err+".Error()"))
-	fmt.Fprintf(&b, "if %s {\n%s.Fprint(%s, %s)\nreturn 0\n}\n", help, fmt_, s.stdout, usage)
-	if !hasArray {
-		fmt.Fprintf(&b, "if len(%s) > %d {\n%s}\n", pos, fixed,
-			usageError(fmt.Sprintf("%s.Sprintf(\"too many arguments: %%d given, at most %d expected\", len(%s))", fmt_, fixed, pos)))
-	}
-
-	// 入力の初めの値と、フィールドごとの値
+	// 入力を置き、フィールドに付いた cli のデコレータごとに一行を並べてから、引数の並びを一度に解釈する
 	input := "nil"
 	if m != nil {
 		input = in
-		if m.hasDefault {
-			space := f.g.declNS[m.decl.Name]
-			name := "New" + golang.TypeName(m.decl.Name, space)
-			if space == f.g.view.Viewer {
-				fmt.Fprintf(&b, "%s := %s.%s()\n", in, f.ns(), name)
-			} else {
-				f.spaces[space] = true
-				fmt.Fprintf(&b, "%s := %s%s()\n", in, f.im.Qualifier(space), name)
-			}
-		} else {
-			fmt.Fprintf(&b, "var %s %s\n", in, f.decl(m.decl.Name))
-		}
-		index := 0
+		fmt.Fprintf(&b, "var %s %s\n", in, f.decl(m.decl.Name))
+	}
+	fmt.Fprintf(&b, "%s := cliLine{args: %s, getenv: %s}\n", line, s.args, s.env)
+	if m != nil {
 		for _, fd := range m.fields {
-			b.WriteString(f.field(fd, s, flags, pos, in, usageError, &index))
-		}
-		// 制約の検査
-		if m.validate {
-			f.usesValidation = true
-			fmt.Fprintf(&b, "if %s := %s.Validate(); %s != nil {\nreturn cliUsageError(%s, %s, \"\", \"invalid input: \"+cliValidationMessage(%s))\n}\n",
-				err, in, err, s.stderr, s.prog, err)
+			target := "&" + in + "." + golang.FieldName(fd.name)
+			for _, l := range fd.lines {
+				f.usesLine[l.method] = true
+				switch l.method {
+				case lineRequired:
+					fmt.Fprintf(&b, "%s.%s(%s)\n", line, l.method, target)
+				case lineDefault:
+					fmt.Fprintf(&b, "%s.%s(%s, %s)\n", line, l.method, target, l.arg)
+				default:
+					fmt.Fprintf(&b, "%s.%s(%s, %s)\n", line, l.method, l.arg, target)
+				}
+			}
 		}
 	}
+	fmt.Fprintf(&b, "if %s, %s := %s.read(%s, usage%s(), %s, %s); %s {\nreturn %s\n}\n", code, done, line, s.prog, c.method, s.stdout, s.stderr, done, code)
+	// 制約の検査: 入力を持つどのコマンドにも、同じ補助の呼び出し一つ（入力が Validate を持つかは、補助が実行時に見る）
+	if m != nil {
+		f.usesValidate = true
+		fmt.Fprintf(&b, "if !cliValidate(%s, %s, %s) {\nreturn 64\n}\n", s.stderr, s.prog, in)
+	}
 
-	// op を呼んで、結果を表示する
+	// op を呼んで、結果を表示する。行の形が二つあるのは、呼ぶ相手の、基底のメソッドの形（結果の値を持つか）を写しているから
 	call := fmt.Sprintf("%s.%s(%s", s.ops, c.method, s.ctx)
 	if m != nil {
 		call += ", " + in
@@ -342,92 +312,13 @@ func (f *file) command(c *command) string {
 		err, s.p, s.stdout, strconv.Quote(c.name), input, result, err, fmt_, s.stderr, s.prog, err, defaultExitCode)
 
 	b.WriteString(f.fail(c, s))
-
-	fmt.Fprintf(&b, "// usage%s は %s の使い方。\n", c.method, c.name)
-	fmt.Fprintf(&b, "func usage%s(prog string) string {\nreturn \"usage: \" + prog + %s\n}\n\n", c.method, strconv.Quote(commandUsage(c)))
+	b.WriteString(f.usage(c))
 	return b.String()
 }
 
-// field は、フィールド一つの値の取り出しと変換（docs/plugin-go-cli.md「引数の解釈」）。index は、次の位置引数の番号。
-func (f *file) field(fd *field, s signature, flags, pos, in string, usageError func(string) string, index *int) string {
-	target := in + "." + golang.FieldName(fd.name)
-	var b strings.Builder
-	// 値の型にする式: 核の型ならそのまま、scalar なら、元の型で読んだ値を scalar の型にする
-	convert := func(expr string) string {
-		if r, isRef := fd.value.(ir.RefType); isRef {
-			return f.decl(r.Target) + "(" + expr + ")"
-		}
-		return expr
-	}
-	if fd.array {
-		rest := pos
-		if *index > 0 {
-			rest = fmt.Sprintf("%s[%d:]", pos, *index)
-		}
-		fmt.Fprintf(&b, "if len(%s) > %d {\n", pos, *index)
-		if convert("v") == "v" {
-			fmt.Fprintf(&b, "%s = %s\n", target, rest)
-		} else {
-			v := f.local("v")
-			fmt.Fprintf(&b, "for _, %s := range %s {\n%s = append(%s, %s)\n}\n", v, rest, target, target, convert(v))
-		}
-		b.WriteString("}\n")
-		return b.String()
-	}
-
-	// 誤りのメッセージで、値の出どころを指す言葉
-	var label, what string
-	switch {
-	case fd.arg:
-		label = argLabel(fd.name)
-		what = "argument " + label
-	case fd.flag != "":
-		label = "--" + fd.flag
-		what = "flag " + label
-	default:
-		label = fd.env
-		what = "environment variable " + label
-	}
-	v, ok := f.local("v"), f.local("ok")
-	if fd.arg {
-		f.usesLookupArg = true
-		fmt.Fprintf(&b, "if %s, %s := cliLookupArg(%s, %d, %s, %s); %s {\n", v, ok, pos, *index, s.env, strconv.Quote(fd.env), ok)
-		*index++
-	} else {
-		f.usesLookup = true
-		fmt.Fprintf(&b, "if %s, %s := cliLookup(%s, %s, %s, %s); %s {\n", v, ok, flags, strconv.Quote(fd.flag), s.env, strconv.Quote(fd.env), ok)
-	}
-	value := v
-	if fd.kind != kindString {
-		var parse string
-		switch fd.kind {
-		case kindBoolean:
-			parse = fmt.Sprintf("%s.ParseBool(%s)", f.pkg("strconv"), v)
-		case kindInt:
-			parse = fmt.Sprintf("%s.ParseInt(%s, 10, 64)", f.pkg("strconv"), v)
-		default:
-			parse = fmt.Sprintf("%s.ParseFloat(%s, 64)", f.pkg("strconv"), v)
-		}
-		x, err := f.local("x"), f.local("err")
-		fmt.Fprintf(&b, "%s, %s := %s\nif %s != nil {\n%s}\n", x, err, parse, err,
-			usageError(fmt.Sprintf("%s.Sprintf(%s, %s)", f.pkg("fmt"), strconv.Quote("invalid value %q for "+label+": want "+fd.kind.label()), v)))
-		value = x
-	}
-	if fd.optional {
-		f.usesPtr = true
-		fmt.Fprintf(&b, "%s = cliPtr(%s)\n", target, convert(value))
-	} else {
-		fmt.Fprintf(&b, "%s = %s\n", target, convert(value))
-	}
-	if fd.required {
-		b.WriteString("} else {\n" + usageError(strconv.Quote("missing required "+what)))
-	}
-	b.WriteString("}\n")
-	return b.String()
-}
-
-// fail は fail<Op>（docs/plugin-go-cli.md「実行と表示」の 3 と 4）: 例外を、Signature.exceptions の順に、errors.As で値の型を
-// 見分けて Failure を作り、終了コードを決めてから、p.PresentError を呼ぶ。
+// fail は fail<Op>（docs/plugin-go-cli.md「実行と表示」の 3 と 4）: 例外を、Signature.exceptions の順に、例外ごとに一行の同じ形
+// （型引数に例外の型を、引数に終了コードを渡す cliThrown）で見分けて Failure を作り、終了コードを決めてから、p.PresentError を呼ぶ。
+// 値を運ぶ例外かどうかは、書かない（補助が、実行時に見る）。
 func (f *file) fail(c *command, s signature) string {
 	io, fmt_ := f.pkg("io"), f.pkg("fmt")
 	input, err, fl, code := f.local("input"), f.local("err"), f.local("f"), f.local("code")
@@ -436,20 +327,10 @@ func (f *file) fail(c *command, s signature) string {
 	fmt.Fprintf(&b, "func fail%s(%s Presenter, %s string, %s any, %s error, %s %s.Writer) int {\n", c.method, s.p, s.prog, input, err, s.stderr, io)
 	fmt.Fprintf(&b, "%s, %s := Failure{Err: %s}, %d\n", fl, code, err, defaultExitCode)
 	if len(c.exceptions) > 0 {
-		errors := f.pkg("errors")
-		b.WriteString("var (\n")
-		for i, e := range c.exceptions {
-			fmt.Fprintf(&b, "%s %s\n", f.local("e"+strconv.Itoa(i)), f.decl(e.decl.Name))
-		}
-		b.WriteString(")\nswitch {\n")
-		for i, e := range c.exceptions {
-			v := f.local("e" + strconv.Itoa(i))
-			fmt.Fprintf(&b, "case %s.As(%s, &%s):\n", errors, err, v)
-			if e.decl.Value != nil {
-				fmt.Fprintf(&b, "%s, %s = Failure{Name: %s, Value: %s.Value, Err: %s}, %d\n", fl, code, strconv.Quote(e.decl.Name), v, err, e.exitCode)
-			} else {
-				fmt.Fprintf(&b, "%s, %s = Failure{Name: %s, Err: %s}, %d\n", fl, code, strconv.Quote(e.decl.Name), err, e.exitCode)
-			}
+		f.usesThrown = true
+		b.WriteString("switch {\n")
+		for _, e := range c.exceptions {
+			fmt.Fprintf(&b, "case cliThrown[%s](%s, %d, &%s, &%s):\n", f.decl(e.decl.Name), err, e.exitCode, fl, code)
 		}
 		b.WriteString("}\n")
 	}
@@ -458,214 +339,464 @@ func (f *file) fail(c *command, s signature) string {
 	return b.String()
 }
 
-// helpers は、コマンドごとの関数の後ろの補助。cliProgramName、cliParseArgs、cliUsageError はいつも、ほかは使うものだけを出す。
+// usage は usage<Op>（docs/plugin-go-cli.md「使い方の表示」）: 使い方に出す説明だけを返す。コマンドの名前と一行の説明と、
+// 入力のフィールドの順に、フィールドの名前と一行の説明。フラグ、位置引数、環境変数の並びは、補助 cliLine が、並べた行から
+// 実行時に作る（値を取らないフラグか、残りの位置引数かは、読む先の型で決まるので、ここには書かない）。
+func (f *file) usage(c *command) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "// usage%s は %s の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。\n", c.method, c.name)
+	fmt.Fprintf(&b, "func usage%s() cliHelp {\nreturn cliHelp{command: %s, summary: %s", c.method, strconv.Quote(c.name), strconv.Quote(c.summary))
+	if c.input != nil && len(c.input.fields) > 0 {
+		b.WriteString(", fields: [][2]string{\n")
+		for _, fd := range c.input.fields {
+			fmt.Fprintf(&b, "{%s, %s},\n", strconv.Quote(fd.name), strconv.Quote(fd.summary))
+		}
+		b.WriteString("}")
+	}
+	b.WriteString("}\n}\n\n")
+	return b.String()
+}
+
+// lineMethods は、cliLine の行のメソッド（デコレータごとに一つ）。出す順。使うものだけを出す。
+var lineMethods = []struct{ name, text string }{
+	{lineFlag, `// flag は @cli.flag の行: フラグ --name の値を dst に読む。
+func (l *cliLine) flag(name string, dst any) { l.field(dst).flag = name }
+
+`},
+	{lineEnv, `// env は @cli.env の行: フラグも位置引数も与えられなければ、環境変数 name の値（空でなければ）を dst に読む。
+func (l *cliLine) env(name string, dst any) { l.field(dst).env = name }
+
+`},
+	{lineArg, `// arg は @cli.arg の行: position 番目（1 から数える）の位置引数を dst に読む。
+func (l *cliLine) arg(position int, dst any) { l.field(dst).position = position }
+
+`},
+	{lineRequired, `// required は @cli.required の行: dst に値が与えられなければ、誤り。
+func (l *cliLine) required(dst any) { l.field(dst).required = true }
+
+`},
+	{lineDefault, `// orDefault は @cli.default の行: dst に値が与えられなければ、value にする。
+func (l *cliLine) orDefault(dst any, value any) { l.field(dst).fallback = value }
+
+`},
+}
+
+// helpers は、コマンドごとの関数の後ろの補助。cliProgramName、cliUsageError、cliHelp、cliField、cliLine（と read、parse、usage）は
+// いつも、ほかは使うものだけを出す。型で変わる振る舞い（値を取らないフラグか、残りの位置引数か、省略可能か、文字列の読み方、
+// 入力が Validate を持つか、例外が値を運ぶか）は、どれもここにあり、実行時に決める（docs/plugin-go-cli.md「コマンドごとの関数」）。
 func (f *file) helpers() string {
-	os, filepath, strings_, fmt_, io := f.pkg("os"), f.pkg("path/filepath"), f.pkg("strings"), f.pkg("fmt"), f.pkg("io")
+	// 補助のテキストは、標準ライブラリと runtime のパッケージを、その名前のまま書く: 最後に描くとき（render の二度目）は、それらを
+	// 先に import に足すので、名前は変わらない（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
+	for _, p := range []string{"os", "path/filepath", "strings", "fmt", "io", "reflect", "strconv", "sort"} {
+		f.pkg(p)
+	}
 	var b strings.Builder
 	b.WriteString(`// cliProgramName は、使い方に出すプログラム名（filepath.Base(os.Args[0])）。
 func cliProgramName() string {
-	if len(` + os + `.Args) > 0 && ` + os + `.Args[0] != "" {
-		return ` + filepath + `.Base(` + os + `.Args[0])
+	if len(os.Args) > 0 && os.Args[0] != "" {
+		return filepath.Base(os.Args[0])
 	}
 	return ` + strconv.Quote(golang.PackageName(f.g.view.Viewer)) + `
 }
 
-// cliParseArgs は args をフラグと位置引数に分ける。specs は、フラグ名 → boolean か。フラグは --name value か --name=value で、
-// boolean は --name だけで true（値は取らない。--name=false は取れる）。同じフラグが二度あれば、後のものが勝つ。-x の形は
-// フラグではなく位置引数（負の数を渡せるように）。-- 以降は、すべて位置引数。--help か -h があれば help が true。
-// 知らないフラグと、値のないフラグは誤り。
-func cliParseArgs(args []string, specs map[string]bool) (flags map[string]string, pos []string, help bool, err error) {
-	flags = map[string]string{}
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--" {
-			pos = append(pos, args[i+1:]...)
-			break
-		}
-		if a == "--help" || a == "-h" {
-			return nil, nil, true, nil
-		}
-		if !` + strings_ + `.HasPrefix(a, "--") {
-			pos = append(pos, a)
-			continue
-		}
-		name, value, hasValue := ` + strings_ + `.Cut(a[2:], "=")
-		boolean, known := specs[name]
-		if !known {
-			return nil, nil, false, ` + fmt_ + `.Errorf("unknown flag --%s", name)
-		}
-		if !hasValue {
-			if boolean {
-				value = "true"
-			} else {
-				if i+1 >= len(args) {
-					return nil, nil, false, ` + fmt_ + `.Errorf("flag --%s needs a value", name)
-				}
-				i++
-				value = args[i]
-			}
-		}
-		flags[name] = value
-	}
-	return flags, pos, false, nil
-}
-
-`)
-	if f.usesLookup || f.usesLookupArg {
-		b.WriteString(`// cliLookup は、フラグ flag の値、なければ環境変数 name の値（空でなければ）を返す。フラグが優先。
-func cliLookup(flags map[string]string, flag string, env func(string) string, name string) (string, bool) {
-	if flag != "" {
-		if v, ok := flags[flag]; ok {
-			return v, true
-		}
-	}
-	if name != "" && env != nil {
-		if v := env(name); v != "" {
-			return v, true
-		}
-	}
-	return "", false
-}
-
-`)
-	}
-	if f.usesLookupArg {
-		b.WriteString(`// cliLookupArg は、i 番目の位置引数、なければ環境変数 name の値（空でなければ）を返す。
-func cliLookupArg(pos []string, i int, env func(string) string, name string) (string, bool) {
-	if i < len(pos) {
-		return pos[i], true
-	}
-	return cliLookup(nil, "", env, name)
-}
-
-`)
-	}
-	b.WriteString(`// cliUsageError は、使い方の誤りを w（標準エラー）に出して 64 を返す。usage が空なら、使い方は出さない。
-func cliUsageError(w ` + io + `.Writer, prog, usage, message string) int {
-	` + fmt_ + `.Fprintf(w, "%s: %s\n", prog, message)
+// cliUsageError は、使い方の誤りを w（標準エラー）に出して 64 を返す。usage が空なら、使い方は出さない。
+func cliUsageError(w io.Writer, prog, usage, message string) int {
+	fmt.Fprintf(w, "%s: %s\n", prog, message)
 	if usage != "" {
-		` + fmt_ + `.Fprint(w, "\n"+usage)
+		fmt.Fprint(w, "\n"+usage)
 	}
 	return 64
 }
 
-`)
-	if f.usesValidation {
-		errors, runtime := f.pkg("errors"), f.pkg(runtimePath)
-		b.WriteString(`// cliValidationMessage は、Validate の誤りを「path: constraint; …」にする。
-func cliValidationMessage(err error) string {
-	var invalid *` + runtime + `.ValidationError
-	if !` + errors + `.As(err, &invalid) {
-		return err.Error()
-	}
-	parts := make([]string, len(invalid.Violations))
-	for i, v := range invalid.Violations {
-		parts[i] = v.String()
-	}
-	return ` + strings_ + `.Join(parts, "; ")
+// cliHelp は、コマンドの使い方に出す説明（usage<Op> が返す）: コマンドの名前と一行の説明と、入力のフィールドの順に、
+// フィールドの名前と一行の説明。
+type cliHelp struct {
+	command, summary string
+	fields           [][2]string
 }
 
-`)
-	}
-	if f.usesPtr {
-		b.WriteString(`// cliPtr は v を指すポインタ（省略可能なフィールドの値）。
-func cliPtr[T any](v T) *T { return &v }
-`)
+// cliField は、読む先一つ（入力のフィールド）と、それに並べた行。
+type cliField struct {
+	ptr      any           // 行に渡された、読む先へのポインタ
+	dst      reflect.Value // 読む先
+	name     string        // フィールドの名前（位置引数の表示名にする）
+	summary  string        // 一行の説明
+	flag     string        // @cli.flag の名前。行がなければ ""
+	env      string        // @cli.env の名前。行がなければ ""
+	position int           // @cli.arg の位置。行がなければ 0
+	required bool          // @cli.required の行がある
+	fallback any           // @cli.default の値。行がなければ nil
+}
+
+// kind は、読む先の値の Go の型の種類。省略可能（ポインタ）と、残りの位置引数（スライス）は、中の型で見る。
+func (f *cliField) kind() reflect.Kind { return cliValueType(f.dst.Type()).Kind() }
+
+// rest は、読む先が、残りの位置引数をすべて受け取るか（スライスか）。
+func (f *cliField) rest() bool { return f.dst.Kind() == reflect.Slice }
+
+// label は、位置引数の表示名: フィールドの名前を、大文字と _ にしたもの（dryRun は DRY_RUN）。
+func (f *cliField) label() string {
+	var b strings.Builder
+	for i, r := range f.name {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			b.WriteByte('_')
+		}
+		b.WriteString(strings.ToUpper(string(r)))
 	}
 	return b.String()
 }
 
-// commandUsage は、コマンドの使い方の、"usage: <prog>" に続く部分（docs/plugin-go-cli.md「使い方の表示」）: 一行目、
-// コマンドの説明、位置引数、フラグ、環境変数だけのフィールドの順。
-func commandUsage(c *command) string {
-	var b strings.Builder
-	b.WriteString(" " + c.name)
-	var flags, envs, args []*field
-	if c.input != nil {
-		for _, f := range c.input.fields {
-			switch {
-			case f.arg:
-				args = append(args, f)
-			case f.flag != "":
-				flags = append(flags, f)
-			default:
-				envs = append(envs, f)
-			}
+// source は、誤りの文言で、このフィールドの値の出どころを指す言葉。
+func (f *cliField) source() string {
+	switch {
+	case f.position > 0:
+		return "argument " + f.label()
+	case f.flag != "":
+		return "flag --" + f.flag
+	}
+	return "environment variable " + f.env
+}
+
+// cliValueType は、読む先の型 t の、値一つの型: 省略可能（ポインタ）と、残りの位置引数（スライス）の、中の型。
+func cliValueType(t reflect.Type) reflect.Type {
+	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice {
+		t = t.Elem()
+	}
+	return t
+}
+
+// cliTypeName は、使い方と誤りの文言に出す、値の型の名前: 名前付きの型（scalar）ならその名前、そうでなければ、種類の名前。
+func cliTypeName(t reflect.Type, named bool) string {
+	if named && t.PkgPath() != "" {
+		return t.Name()
+	}
+	switch t.Kind() {
+	case reflect.Bool:
+		return "boolean"
+	case reflect.Int64:
+		return "int"
+	case reflect.Float64:
+		return "float"
+	}
+	return "string"
+}
+
+// cliLine は、コマンドライン一つを、入力のフィールドに読む。フィールドに付いた cli のデコレータごとの行（flag、env、arg、
+// required、orDefault）を並べてから、read で、引数の並びを一度に解釈する。読む先の Go の型は、実行時に見る: 真偽値なら値を
+// 取らないフラグ、スライスなら残りの位置引数、ポインタなら省略可能。値が与えられなかった読む先の扱いは、並べた行（required、
+// orDefault）だけで決め、型では決めない。
+type cliLine struct {
+	args   []string
+	getenv func(string) string
+	fields []*cliField // 読む先ごと。初めて行を並べた順（入力のフィールドの順）
+}
+
+// field は、読む先 dst（入力のフィールドへのポインタ）に並べた行の集まり。初めての読む先なら、足す。
+func (l *cliLine) field(dst any) *cliField {
+	for _, f := range l.fields {
+		if f.ptr == dst {
+			return f
 		}
 	}
+	f := &cliField{ptr: dst, dst: reflect.ValueOf(dst).Elem()}
+	l.fields = append(l.fields, f)
+	return f
+}
+
+`)
+	for _, m := range lineMethods {
+		if f.usesLine[m.name] {
+			b.WriteString(m.text)
+		}
+	}
+	b.WriteString(`// read は、並べた行に従って、引数の並びを解釈し、読む先に値を入れる。終わりなら、終了コードと true を返す: --help か -h が
+// あれば、使い方を stdout に出して 0。使い方の誤りは、文言と使い方を stderr に出して 64。読めたら、false。
+func (l *cliLine) read(prog string, help cliHelp, stdout, stderr io.Writer) (int, bool) {
+	for i, f := range l.fields {
+		if i < len(help.fields) {
+			f.name, f.summary = help.fields[i][0], help.fields[i][1]
+		}
+	}
+	asked, err := l.parse()
+	if err != nil {
+		return cliUsageError(stderr, prog, l.usage(prog, help), err.Error()), true
+	}
+	if asked {
+		fmt.Fprint(stdout, l.usage(prog, help))
+		return 0, true
+	}
+	return 0, false
+}
+
+// parse は、引数の並びを一度に解釈する。フラグは --name value か --name=value で、読む先が真偽値なら --name だけで true
+// （値は取らない。--name=false は取れる）。同じフラグが二度あれば、後のものが勝つ。-x の形はフラグではなく位置引数（負の数を
+// 渡せるように）。-- 以降は、すべて位置引数。--help か -h があれば asked が true。読む先ごとの値は、フラグ、位置引数、環境変数
+// （空でなければ）の順に探す。どこからも与えられなければ、required の行があれば誤り、orDefault の行があればその値、どちらも
+// なければ、読む先に何も書かない。
+func (l *cliLine) parse() (asked bool, err error) {
+	flags := map[string]*cliField{}
+	most, rest := 0, false
+	for _, f := range l.fields {
+		if f.flag != "" {
+			flags[f.flag] = f
+		}
+		if f.position > most {
+			most = f.position
+		}
+		rest = rest || f.position > 0 && f.rest()
+	}
+	given := map[*cliField]string{}
+	var pos []string
+	for i := 0; i < len(l.args); i++ {
+		a := l.args[i]
+		if a == "--" {
+			pos = append(pos, l.args[i+1:]...)
+			break
+		}
+		if a == "--help" || a == "-h" {
+			return true, nil
+		}
+		if !strings.HasPrefix(a, "--") {
+			pos = append(pos, a)
+			continue
+		}
+		name, value, hasValue := strings.Cut(a[2:], "=")
+		f := flags[name]
+		if f == nil {
+			return false, fmt.Errorf("unknown flag --%s", name)
+		}
+		if !hasValue {
+			if f.kind() == reflect.Bool {
+				value = "true"
+			} else {
+				if i+1 >= len(l.args) {
+					return false, fmt.Errorf("flag --%s needs a value", name)
+				}
+				i++
+				value = l.args[i]
+			}
+		}
+		given[f] = value
+	}
+	if !rest && len(pos) > most {
+		return false, fmt.Errorf("too many arguments: %d given, at most %d expected", len(pos), most)
+	}
+	for _, f := range l.fields {
+		var values []string
+		var from string
+		if v, ok := given[f]; ok {
+			values, from = []string{v}, "--"+f.flag
+		} else if f.position > 0 && len(pos) >= f.position {
+			values, from = pos[f.position-1:f.position], f.label()
+			if f.rest() {
+				values = pos[f.position-1:]
+			}
+		} else if v := l.lookup(f.env); v != "" {
+			values, from = []string{v}, f.env
+		} else if f.required {
+			return false, fmt.Errorf("missing required %s", f.source())
+		} else if f.fallback != nil {
+			f.dst.Set(reflect.ValueOf(f.fallback).Convert(f.dst.Type()))
+			continue
+		} else {
+			continue
+		}
+		if err := cliStore(f.dst, values, from); err != nil {
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+// lookup は、環境変数 name の値。name が空か、環境変数を見ない（getenv が nil）なら ""。
+func (l *cliLine) lookup(name string) string {
+	if name == "" || l.getenv == nil {
+		return ""
+	}
+	return l.getenv(name)
+}
+
+// cliStore は、与えられた文字列 values を、読む先 dst に読む。読み方は、dst の型で決める: ポインタ（省略可能）なら、値を置く先を
+// 作ってから読む。スライス（残りの位置引数）なら、一つずつ読む。文字列はそのまま、整数は strconv.ParseInt(v, 10, 64)、小数は
+// strconv.ParseFloat(v, 64)、真偽値は strconv.ParseBool(v)。名前付きの型（scalar）は、元の型で読んでから、その型にする。
+// from は、誤りの文言に出す、値の出どころ。
+func cliStore(dst reflect.Value, values []string, from string) error {
+	switch dst.Kind() {
+	case reflect.Pointer:
+		p := reflect.New(dst.Type().Elem())
+		if err := cliStore(p.Elem(), values, from); err != nil {
+			return err
+		}
+		dst.Set(p)
+		return nil
+	case reflect.Slice:
+		s := reflect.MakeSlice(dst.Type(), len(values), len(values))
+		for i := range values {
+			if err := cliStore(s.Index(i), values[i:i+1], from); err != nil {
+				return err
+			}
+		}
+		dst.Set(s)
+		return nil
+	}
+	v := values[0]
+	switch dst.Kind() {
+	case reflect.Bool:
+		if x, err := strconv.ParseBool(v); err == nil {
+			dst.SetBool(x)
+			return nil
+		}
+	case reflect.Int64:
+		if x, err := strconv.ParseInt(v, 10, 64); err == nil {
+			dst.SetInt(x)
+			return nil
+		}
+	case reflect.Float64:
+		if x, err := strconv.ParseFloat(v, 64); err == nil {
+			dst.SetFloat(x)
+			return nil
+		}
+	default:
+		dst.SetString(v)
+		return nil
+	}
+	return fmt.Errorf("invalid value %q for %s: want %s", v, from, cliTypeName(dst.Type(), false))
+}
+
+// usage は、コマンドの使い方: 一行目、コマンドの説明、位置引数（位置の順）、フラグ、環境変数だけのフィールド。並べた行から作る。
+func (l *cliLine) usage(prog string, help cliHelp) string {
+	var args, flags, envs []*cliField
+	for _, f := range l.fields {
+		switch {
+		case f.position > 0:
+			args = append(args, f)
+		case f.flag != "":
+			flags = append(flags, f)
+		default:
+			envs = append(envs, f)
+		}
+	}
+	sort.SliceStable(args, func(i, j int) bool { return args[i].position < args[j].position })
+	var b strings.Builder
+	b.WriteString("usage: " + prog + " " + help.command)
 	if len(flags) > 0 {
 		b.WriteString(" [flags]")
 	}
+	shown := func(f *cliField) string {
+		if f.rest() {
+			return f.label() + "..."
+		}
+		return f.label()
+	}
 	for _, f := range args {
-		label := argLabel(f.name)
-		switch {
-		case f.array:
-			b.WriteString(" [" + label + "...]")
-		case f.required:
-			b.WriteString(" " + label)
-		default:
-			b.WriteString(" [" + label + "]")
+		if f.required {
+			b.WriteString(" " + shown(f))
+		} else {
+			b.WriteString(" [" + shown(f) + "]")
 		}
 	}
 	b.WriteString("\n")
-	if c.summary != "" {
-		b.WriteString("\n" + c.summary + "\n")
+	if help.summary != "" {
+		b.WriteString("\n" + help.summary + "\n")
 	}
-	section := func(title string, fields []*field, label func(*field) string) {
+	section := func(title string, fields []*cliField, left func(*cliField) string) {
 		if len(fields) == 0 {
 			return
 		}
 		b.WriteString("\n" + title + ":\n")
-		rows := make([][2]string, len(fields))
-		for i, f := range fields {
-			rows[i] = [2]string{label(f), fieldHelp(f)}
+		width := 0
+		for _, f := range fields {
+			if n := len(left(f)); n > width {
+				width = n
+			}
 		}
-		writeRows(&b, rows)
+		for _, f := range fields {
+			var notes []string
+			if f.required {
+				notes = append(notes, "required")
+			}
+			if f.fallback != nil {
+				notes = append(notes, fmt.Sprintf("default: %v", f.fallback))
+			}
+			if f.env != "" && (f.flag != "" || f.position > 0) {
+				notes = append(notes, "env: "+f.env)
+			}
+			right := f.summary
+			if len(notes) > 0 {
+				if right != "" {
+					right += " "
+				}
+				right += "(" + strings.Join(notes, ", ") + ")"
+			}
+			if right == "" {
+				b.WriteString("  " + left(f) + "\n")
+				continue
+			}
+			b.WriteString("  " + left(f) + strings.Repeat(" ", width+3-len(left(f))) + right + "\n")
+		}
 	}
-	section("arguments", args, func(f *field) string {
-		if f.array {
-			return argLabel(f.name) + "..."
-		}
-		return argLabel(f.name)
-	})
-	section("flags", flags, func(f *field) string {
-		if f.kind == kindBoolean {
+	section("arguments", args, shown)
+	section("flags", flags, func(f *cliField) string {
+		if f.kind() == reflect.Bool {
 			return "--" + f.flag
 		}
-		return "--" + f.flag + " <" + typeLabel(f) + ">"
+		return "--" + f.flag + " <" + cliTypeName(cliValueType(f.dst.Type()), true) + ">"
 	})
-	section("environment", envs, func(f *field) string { return f.env })
+	section("environment", envs, func(f *cliField) string { return f.env })
 	return b.String()
 }
 
-// typeLabel は、使い方に出す値の型: scalar ならその名前、核の型ならその名前。
-func typeLabel(f *field) string {
-	if r, ok := f.value.(ir.RefType); ok {
-		return r.Target[strings.LastIndexByte(r.Target, '.')+1:]
+`)
+	if f.usesValidate {
+		f.pkg("errors")
+		f.pkg(runtimePath)
+		b.WriteString(`// cliValidate は、解釈した入力 in の制約を確かめる。in が Validate() error を持つかどうかは、実行時に見る（持たなければ、
+// 確かめるものがない）。違反があれば、「path: constraint; …」を w（標準エラー）に出して false（使い方は出さない）。
+func cliValidate(w io.Writer, prog string, in any) bool {
+	v, ok := in.(interface{ Validate() error })
+	if !ok {
+		return true
 	}
-	return f.kind.label()
+	err := v.Validate()
+	if err == nil {
+		return true
+	}
+	message := err.Error()
+	var invalid *runtime.ValidationError
+	if errors.As(err, &invalid) {
+		parts := make([]string, len(invalid.Violations))
+		for i, v := range invalid.Violations {
+			parts[i] = v.String()
+		}
+		message = strings.Join(parts, "; ")
+	}
+	cliUsageError(w, prog, "", "invalid input: "+message)
+	return false
 }
 
-// fieldHelp は、フィールドの一行の説明: summary に、必須・既定値・代わりの環境変数の注記を足したもの。
-func fieldHelp(f *field) string {
-	s := f.summary
-	var notes []string
-	if f.required {
-		notes = append(notes, "required")
+`)
 	}
-	if f.def != "" {
-		notes = append(notes, "default: "+f.def)
+	if f.usesThrown {
+		f.pkg("errors")
+		f.pkg(runtimePath)
+		b.WriteString(`// cliThrown は、err が例外 E（値）なら、f に Failure（Name は例外の FQN、Value は運ぶ値）を、code に終了コード exit を入れて
+// true。値を運ぶ例外かどうか（フィールド Value を持つか）は、実行時に見る。
+func cliThrown[E runtime.Exception](err error, exit int, f *Failure, code *int) bool {
+	var e E
+	if !errors.As(err, &e) {
+		return false
 	}
-	if f.env != "" && (f.flag != "" || f.arg) {
-		notes = append(notes, "env: "+f.env)
-	}
-	if len(notes) > 0 {
-		if s != "" {
-			s += " "
+	*f, *code = Failure{Name: e.HozoException(), Err: err}, exit
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
+		if value := v.FieldByName("Value"); value.IsValid() {
+			f.Value = value.Interface()
 		}
-		s += "(" + strings.Join(notes, ", ") + ")"
 	}
-	return s
+	return true
+}
+`)
+	}
+	return b.String()
 }
 
 // writeRows は「  <左>   <右>」の表を書く。左の幅をそろえる。右が空の行は、左だけ（行末に空白を残さない）。
@@ -683,16 +814,4 @@ func writeRows(b *strings.Builder, rows [][2]string) {
 		}
 		b.WriteString("  " + r[0] + strings.Repeat(" ", width+3-len(r[0])) + r[1] + "\n")
 	}
-}
-
-// argLabel は、位置引数の表示名（lowerCamelCase → UPPER_SNAKE。names → NAMES、dryRun → DRY_RUN）。
-func argLabel(name string) string {
-	var b strings.Builder
-	for i, r := range name {
-		if i > 0 && unicode.IsUpper(r) {
-			b.WriteByte('_')
-		}
-		b.WriteRune(unicode.ToUpper(r))
-	}
-	return b.String()
 }

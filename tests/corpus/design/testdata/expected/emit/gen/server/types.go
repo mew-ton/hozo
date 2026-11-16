@@ -143,9 +143,6 @@ type MeInput = inner.MeInput
 // GetOrdersInput は注文一覧の入力
 type GetOrdersInput = inner.GetOrdersInput
 
-// NewGetOrdersInput は既定値を入れた GetOrdersInput を返す。
-func NewGetOrdersInput() GetOrdersInput { return inner.NewGetOrdersInput() }
-
 // GetItemInput は商品を取る入力
 type GetItemInput = inner.GetItemInput
 

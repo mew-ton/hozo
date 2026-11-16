@@ -32,11 +32,11 @@ func (o *ops) Literals() {
 //
 // 純粋（ctx を取らない）。失敗しない（error を返さない）
 func (o *ops) Records(name string, email Email) {
-	o.TakeProfile(Profile{Name: name, Age: 20, Active: false})
-	o.TakeOptions(Options{Limit: 10, Label: "none", Ratio: 1.5, Wait: time.Duration(5000000000)})
-	o.TakeOptions(Options{Limit: 3, Label: "none", Ratio: 1.5, Wait: time.Duration(5000000000), Note: ptr(string("n"))})
-	o.TakeAccount(Account{Id: "1", Profile: &Profile{Name: "inner", Age: 20, Active: true}, Email: email})
-	o.TakeOptionalProfile(&Profile{Name: "p", Age: 20, Active: true})
+	o.TakeProfile(Profile{Name: name, Active: ptr(bool(false))})
+	o.TakeOptions(Options{})
+	o.TakeOptions(Options{Limit: ptr(int64(3)), Note: ptr(string("n"))})
+	o.TakeAccount(Account{Id: "1", Profile: &Profile{Name: "inner"}, Email: email})
+	o.TakeOptionalProfile(&Profile{Name: "p"})
 }
 
 // ToOptional は op app.toOptional。

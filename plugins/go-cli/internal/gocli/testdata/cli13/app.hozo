@@ -1,0 +1,39 @@
+// CLI-13: 位置は model。リテラルが、フィールドの型（scalar は元の核の型）に渡せない（docs/types.md「互換」の 10）。
+namespace app {
+  scalar Name extends string;
+  scalar Count extends int;
+  scalar Ratio extends float;
+  scalar Flag extends boolean;
+
+  model In {
+    @cli.flag("a") @cli.default(1) a: string;
+    @cli.flag("b") @cli.default("x") b: int;
+    @cli.flag("c") @cli.default(0.5) c: int;
+    @cli.flag("d") @cli.default(true) d: float;
+    @cli.flag("e") @cli.default("true") e: boolean;
+    // scalar は、元の核の型で見る
+    @cli.flag("f") @cli.default(1) f: Name;
+    @cli.flag("g") @cli.default(1.5) g: Count;
+    @cli.flag("h") @cli.default("x") h: Ratio;
+    @cli.flag("i") @cli.default(0) i: Flag;
+    // array のフィールドに渡せるリテラルはない
+    @cli.arg(1) @cli.default("x") rest: string[];
+  }
+  @cli.command("run")
+  export op run(in: In);
+
+  // 渡せるリテラル: string に文字列、int に整数、float に整数と小数、boolean に真偽値。scalar は、元の核の型で
+  model Fine {
+    @cli.flag("a") @cli.default("x") a: string;
+    @cli.flag("b") @cli.default(-1) b: int;
+    @cli.flag("c") @cli.default(1) c: float;
+    @cli.flag("d") @cli.default(1.5) d: float;
+    @cli.flag("e") @cli.default(false) e: boolean;
+    @cli.flag("f") @cli.default("x") f: Name;
+    @cli.flag("g") @cli.default(1) g: Count;
+    @cli.flag("h") @cli.default(1) h: Ratio;
+    @cli.flag("i") @cli.default(true) i: Flag;
+  }
+  @cli.command("fine")
+  export op fine(in: Fine);
+}

@@ -1,0 +1,21 @@
+// GOSQL-18（docs/plugin-go-sqlite.md「表」）: 表の model の、@db.nullable の付いたフィールドの型が、省略可能でない。位置は model。
+
+namespace app {
+  scalar Name extends string;
+  /** 表の model でない model のフィールドは、見ない */
+  model Tag { @db.nullable name: string; }
+
+  model Row {
+    @db.key @db.text id: string;
+    @db.nullable @db.text note: string;
+    @db.nullable @db.text name: Name;
+    // 配列と record も、? がなければ、省略可能でない
+    @db.nullable @db.json tags: string[];
+    @db.nullable @db.json tag: Tag;
+    // 通るもの
+    @db.nullable @db.int rank: int?;
+    @db.nullable @db.json more: string[]?;
+  }
+
+  @db.table(Row) state rows: list<Row>;
+}

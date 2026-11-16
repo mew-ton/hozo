@@ -38,7 +38,7 @@ func (o *ops) Fetch(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	b, err := o.api.Nested(ctx, api.NestedInput{Auth: api.Auth{Token: token, Locale: "en"}, Id: id})
+	b, err := o.api.Nested(ctx, api.NestedInput{Auth: api.Auth{Token: token, Locale: ptr(string("en"))}, Id: id})
 	if err != nil {
 		return "", err
 	}
@@ -47,7 +47,7 @@ func (o *ops) Fetch(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return o.api.Nested(ctx, api.NestedInput{Auth: api.Auth{Token: token, Locale: "ja"}, Id: a})
+	return o.api.Nested(ctx, api.NestedInput{Auth: api.Auth{Token: token}, Id: a})
 }
 
 // Check は op web.check。
@@ -58,7 +58,7 @@ func (o *ops) Check(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return o.api.Ping(ctx, &api.Auth{Token: token, Locale: "ja"})
+	return o.api.Ping(ctx, &api.Auth{Token: token})
 }
 
 // Enter は op web.enter。
@@ -69,11 +69,7 @@ func (o *ops) Enter(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	v0 := api.Guest{Token: "guest", Id: id}
-	if token != nil {
-		v0.Token = *token
-	}
-	return o.api.Enter(ctx, v0)
+	return o.api.Enter(ctx, api.Guest{Token: token, Id: id})
 }
 
 // Explicit は op web.explicit。
@@ -96,3 +92,5 @@ func (o *ops) Hello(ctx context.Context, name string) (string, error) {
 	}
 	return o.Greet(name, locale), nil
 }
+
+func ptr[T any](v T) *T { return &v }

@@ -1,0 +1,44 @@
+// CLI-10: 位置は model。
+namespace app {
+  // 1 より小さい位置
+  model Zero {
+    @cli.arg(0) a: string;
+    @cli.arg(1) b: string;
+  }
+  @cli.command("zero")
+  export op zero(in: Zero);
+
+  // 同じ位置が二つ
+  model Twice {
+    @cli.arg(1) a: string;
+    @cli.arg(1) b: string;
+    @cli.arg(2) c: string;
+  }
+  @cli.command("twice")
+  export op twice(in: Twice);
+
+  // 抜けた位置（2 と 3 がない）
+  model Gap {
+    @cli.arg(1) a: string;
+    @cli.arg(4) b: string;
+  }
+  @cli.command("gap")
+  export op gap(in: Gap);
+
+  // 一つだけなら、位置は 1
+  model Late {
+    @cli.arg(2) only: string;
+  }
+  @cli.command("late")
+  export op late(in: Late);
+
+  // 1 から続いていれば、フィールドの宣言の順と違っていてよい
+  model Fine {
+    @cli.arg(3) c: string;
+    @cli.arg(1) a: string;
+    @cli.flag("x") x: string?;
+    @cli.arg(2) b: string;
+  }
+  @cli.command("fine")
+  export op fine(in: Fine);
+}

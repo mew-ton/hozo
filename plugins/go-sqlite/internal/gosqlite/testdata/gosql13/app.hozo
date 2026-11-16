@@ -1,0 +1,34 @@
+// GOSQL-13（docs/plugin-go-sqlite.md「op の中身」）: @db.find の列が、一行に決まる列でない（表の model のただ一つの @db.key でも、
+// @db.unique でもない）。位置は op。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.unique @db.text code: string; @db.text note: string; }
+  /** キーが二つ */
+  model Pair { @db.key @db.text left: string; @db.key @db.text right: string; @db.unique @db.key @db.text both: string; }
+  /** キーがない */
+  model Log { @db.text line: string; }
+  @db.table(Row) state rows: list<Row>;
+  @db.table(Pair) state pairs: list<Pair>;
+  @db.table(Log) state logs: list<Log>;
+
+  // キーでも一意でもない列
+  @db.find(rows, "note")
+  export op findByNote(note: string): Row?;
+  // 複数の @db.key の一つ
+  @db.find(pairs, "left")
+  export op findByLeft(left: string): Pair?;
+  // キーのない model
+  @db.find(logs, "line")
+  export op findLine(line: string): Log?;
+
+  // 通るもの: ただ一つの @db.key、@db.unique、複数の @db.key の一つでも @db.unique を持つ列
+  @db.find(rows, "id")
+  export op findRow(id: string): Row?;
+  @db.find(rows, "code")
+  export op findByCode(code: string): Row?;
+  @db.find(pairs, "both")
+  export op findByBoth(both: string): Pair?;
+  // @db.list なら、どの列でもよい
+  @db.list(rows, "note")
+  export op listByNote(note: string): Row[];
+}

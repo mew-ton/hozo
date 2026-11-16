@@ -1,5 +1,6 @@
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: 名前空間のパッケージの名前が、生成したコードの局所の名前
-# （w、in、out、err、v、x など）と同じとき。局所の名前の方の末尾に _ を足す。
+# （ops、mux、w、r、in、req、out、err）や、標準ライブラリのパッケージの名前と同じとき。局所の名前の方の末尾に _ を足す。
+# 標準ライブラリと同じ名前の名前空間のパッケージ（strconv、reflect）と、基底の非公開の名前と同じもの（ops）は、名前空間の方に 2 が付く。
 [[emit]]
 namespace   = "api"
 transpilers = ["go", "go-valid", "go-http"]
@@ -9,24 +10,14 @@ out         = "gen/api"
 validate = true
 
 [[emit]]
-namespace   = "v"
-transpilers = ["go", "go-valid"]
-out         = "gen/v"
-
-[[emit]]
 namespace   = "w"
 transpilers = ["go", "go-valid"]
 out         = "gen/w"
 
 [[emit]]
-namespace   = "out"
+namespace   = "err"
 transpilers = ["go", "go-valid"]
-out         = "gen/out"
-
-[[emit]]
-namespace   = "x"
-transpilers = ["go", "go-valid"]
-out         = "gen/x"
+out         = "gen/err"
 
 [[emit]]
 namespace   = "in"
@@ -34,20 +25,19 @@ transpilers = ["go", "go-valid"]
 out         = "gen/in"
 
 [[emit]]
-namespace   = "err"
+namespace   = "out"
 transpilers = ["go", "go-valid"]
-out         = "gen/err"
-
-# パッケージの名前が、標準ライブラリのパッケージと同じ名前空間: 名前空間の方に 2 が付く
-[[emit]]
-namespace   = "strconv"
-transpilers = ["go", "go-valid"]
-out         = "gen/strconv"
+out         = "gen/out"
 
 [[emit]]
-namespace   = "body"
+namespace   = "r"
 transpilers = ["go", "go-valid"]
-out         = "gen/body"
+out         = "gen/r"
+
+[[emit]]
+namespace   = "req"
+transpilers = ["go", "go-valid"]
+out         = "gen/req"
 
 [[emit]]
 namespace   = "mux"
@@ -55,11 +45,16 @@ transpilers = ["go", "go-valid"]
 out         = "gen/mux"
 
 [[emit]]
-namespace   = "q"
+namespace   = "ops"
 transpilers = ["go", "go-valid"]
-out         = "gen/q"
+out         = "gen/ops"
 
 [[emit]]
-namespace   = "r"
+namespace   = "strconv"
 transpilers = ["go", "go-valid"]
-out         = "gen/r"
+out         = "gen/strconv"
+
+[[emit]]
+namespace   = "reflect"
+transpilers = ["go", "go-valid"]
+out         = "gen/reflect"

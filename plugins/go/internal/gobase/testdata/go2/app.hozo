@@ -24,8 +24,8 @@ namespace c.synth {
   model PageReady { title: string; }
 }
 
-// 公開の名前どうし: New<Model> と型
-namespace c.defaults {
+// model から出す名前は、構造体の型だけ（New<Model> は出さない）ので、New… という名前の型は、何とも当たらない
+namespace c.models {
   model Options { limit: int; }
   model NewOptions { x: int; }
 }

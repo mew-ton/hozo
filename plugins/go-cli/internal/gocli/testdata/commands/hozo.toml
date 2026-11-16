@@ -7,7 +7,8 @@ namespace   = "tool"
 transpilers = ["go", "go-valid", "go-cli"]
 out         = "gen/tool"
 
-# 2: demo。内部の op を持たない。値の変換（int / float / boolean / scalar）、必須、既定値、位置引数、引数のない op、never を返す op
+# 2: demo。内部の op を持たない。値の変換（int / float / boolean / scalar）、値が与えられなかったときの三つの扱い（@cli.required、
+# @cli.default、どちらもない）、位置を書いた @cli.arg、名前を省いた @cli.flag / @cli.env、引数のない op、never を返す op
 [[emit]]
 namespace   = "demo"
 transpilers = ["go", "go-valid", "go-cli"]

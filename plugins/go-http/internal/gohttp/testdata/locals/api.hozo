@@ -1,54 +1,58 @@
-// 名前空間のパッケージの名前が、ハンドラの中の局所の名前（w、r、in、out、err、v、x、q、body、mux）と当たる入力。
-namespace v {
-  scalar Token extends string;
-}
+// 名前空間のパッケージの名前が、NewHandler とハンドラの中の局所の名前（ops、mux、w、r、in、req、out、err）や、
+// http.go が import する標準ライブラリのパッケージの名前（strconv、reflect）と当たる入力。
 namespace w {
   @http.status(404)
   exception NotFound;
 }
-namespace out {
-  model Item { @valid.length(min: 1) name: string; }
-}
-namespace x {
-  scalar Page extends int;
+namespace err {
+  model Note { text: string; }
+  @http.status(409)
+  exception Conflict: Note;
 }
 namespace in {
-  model Note { text: string; }
+  model Note { @http.required @http.body text: string; }
 }
-namespace err {
-  @http.status(409)
-  exception Conflict: in.Note;
-}
-namespace body {
-  scalar Label extends string;
-}
-namespace mux {
-  scalar Trace extends string;
-}
-namespace q {
-  scalar Flag extends boolean;
+namespace out {
+  model Find { @valid.length(min: 1) @http.query @http.default("x") q: string; }
 }
 namespace r {
-  scalar Ratio extends float;
+  model Head { @http.header("X-Trace") trace: string?; }
+}
+namespace req {
+  model Page { @http.query page: int?; }
+}
+namespace mux {
+  model Paging { page: int?; }
+  model Query { @http.queryObj paging: Paging; }
+}
+namespace ops {
+  model Meta { trace: string?; }
+  model Head { @http.headerObj meta: Meta; }
 }
 namespace strconv {
-  scalar Size extends int;
+  model Flag { @http.query on: boolean?; }
+}
+namespace reflect {
+  model Body { text: string; }
+  model Put { @http.bodyObj body: Body; }
 }
 
 namespace api {
-  model In {
-    @http.header(name: "Authorization") token: v.Token?;
-    @http.header(name: "X-Trace") trace: mux.Trace;
-    @http.query page: x.Page?;
-    @http.query @http.default(10) size: strconv.Size;
-    @http.query flag: q.Flag?;
-    @http.query ratio: r.Ratio;
-    @http.body item: out.Item;
-    @http.body note: in.Note?;
-    @http.body label: body.Label?;
-  }
-
-  @http.post("/items")
-  export op create(in: In): out.Item[]
+  @http.post("/in")
+  export op viaIn(in: in.Note): string
     throws w.NotFound | err.Conflict;
+  @http.get("/out")
+  export op viaOut(in: out.Find): string[];
+  @http.get("/r")
+  export op viaR(in: r.Head): string?;
+  @http.get("/req")
+  export op viaReq(in: req.Page);
+  @http.get("/mux")
+  export op viaMux(in: mux.Query): int;
+  @http.get("/ops")
+  export op viaOps(in: ops.Head): int;
+  @http.get("/strconv")
+  export op viaStrconv(in: strconv.Flag): boolean;
+  @http.post("/reflect")
+  export op viaReflect(in: reflect.Put): Record<string, string>;
 }

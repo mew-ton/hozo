@@ -54,7 +54,8 @@ namespace app {
     takeDuration(5m);
   }
 
-  // 「値」record: 並びは model のフィールドの順、書かれていない既定値、値を省いたフィールド、入れ子、省略可能なら &
+  // 「値」record: 並びは model のフィールドの順、書かれていないフィールド（省略可能なフィールドだけ）は書かず零値のまま、
+  // 値を省いたフィールド、入れ子、省略可能なら &
   export op records(name: string, email: Email)
   {
     takeProfile({ active: false, name });

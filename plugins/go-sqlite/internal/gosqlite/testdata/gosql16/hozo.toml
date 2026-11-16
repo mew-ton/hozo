@@ -1,0 +1,5 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-16（表の model のフィールドが、しまい方のデコレータを一つも持たないか、二つ以上持つ）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/app"

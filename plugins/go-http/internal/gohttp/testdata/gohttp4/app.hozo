@@ -1,4 +1,4 @@
-// GOHTTP-4: 位置は model。
+// GOHTTP-4: 位置は、そのフィールドを持つ model。
 namespace app {
   scalar Count extends int;
   scalar When extends Time;
@@ -6,13 +6,13 @@ namespace app {
 
   model HeaderIn {
     // @http.header は、string と、その省略可能だけ
-    @http.header(name: "X-Count") count: int;
-    @http.header(name: "X-Scalar") scalarCount: Count?;
-    @http.header(name: "X-Flag") flag: boolean?;
-    @http.header(name: "X-At") at: Time;
-    @http.header(name: "X-List") list: string[];
-    @http.header(name: "X-Inner") inner: Inner?;
-    @http.header(name: "X-Ok") ok: string?;
+    @http.header("X-Count") count: int;
+    @http.header("X-Scalar") scalarCount: Count?;
+    @http.header flag: boolean?;
+    @http.header("X-At") at: Time;
+    @http.header("X-List") list: string[];
+    @http.header("X-Inner") inner: Inner?;
+    @http.header("X-Ok") ok: string?;
   }
   @http.get("/header")
   export op header(in: HeaderIn);
@@ -21,7 +21,7 @@ namespace app {
     // @http.query は、string / int / float / boolean と、その省略可能だけ
     @http.query at: Time?;
     @http.query when: When;
-    @http.query wait: Duration?;
+    @http.query("w") wait: Duration?;
     @http.query list: string[];
     @http.query later: int[]?;
     @http.query attrs: Record<string, string>?;
@@ -30,4 +30,23 @@ namespace app {
   }
   @http.get("/query")
   export op query(in: QueryIn);
+
+  // 全体の形では、その model のフィールドの一つずつを、同じ場所の項目として見る
+  model Meta {
+    tenant: string;
+    retries: int;
+    trace: string?;
+  }
+  model Paging {
+    page: Count?;
+    tags: string[];
+    inner: Inner;
+    q: string;
+  }
+  model ObjIn {
+    @http.headerObj meta: Meta;
+    @http.queryObj paging: Paging;
+  }
+  @http.get("/obj")
+  export op obj(in: ObjIn);
 }

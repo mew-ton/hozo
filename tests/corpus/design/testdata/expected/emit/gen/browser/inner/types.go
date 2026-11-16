@@ -38,13 +38,6 @@ type OrdersQuery struct {
 	Status *server.OrderStatus `json:"status,omitempty"`
 }
 
-// NewOrdersQuery は既定値を入れた OrdersQuery を返す。
-func NewOrdersQuery() OrdersQuery {
-	m := OrdersQuery{}
-	m.Page = 1
-	return m
-}
-
 // Unavailable は一時的に表示できない
 type Unavailable struct{}
 

@@ -1,0 +1,5 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-12（@db.effects に並べた効果が、@db.insert / @db.update / @db.delete のどれも持たない。または、一つの効果が二つ以上持つ）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/app"

@@ -2,20 +2,6 @@
 
 package bodies
 
-import m2 "example.com/app/gen/m"
-
-// Plan は model bodies.Plan。
-type Plan struct {
-	Level *m2.Level `json:"level,omitempty"`
-}
-
-// NewPlan は既定値を入れた Plan を返す。
-func NewPlan() Plan {
-	m := Plan{}
-	m.Level = ptr(m2.Level(3))
-	return m
-}
-
 // Inner は model bodies.Inner。
 type Inner struct {
 	Name string `json:"name"`
@@ -25,5 +11,3 @@ type Inner struct {
 type Outer struct {
 	Inner *Inner `json:"inner,omitempty"`
 }
-
-func ptr[T any](v T) *T { return &v }

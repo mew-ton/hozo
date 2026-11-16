@@ -2,10 +2,13 @@
 // 置いて走らせる）。確かめること（docs/plugin-go-cli.md）:
 //
 //   - 「出力」: Main は、基底の New の戻り値（入口の Ops）をそのまま受け取り、ctx を op にそのまま渡す。
-//   - 「引数の解釈」の各規則: コマンドがない・知らない、help / --help / -h、--name value と --name=value、boolean のフラグ、
-//     同じフラグが二度、-x は位置引数、-- 以降は位置引数、知らないフラグ・値のないフラグ・変換できない値・必須のフラグがない・
-//     位置引数が足りない・多い（どれも 64）、@cli.env（フラグが優先、空文字列は「ない」）、@cli.arg（宣言順、array は残りすべて）、
-//     値の変換（int / float / boolean / scalar）、Validate の違反（64）、入力の初めの値（既定値を持つ model は New<Model>()）。
+//   - 「引数の解釈」の各規則: コマンドがない・知らない、help / --help / -h、--name value と --name=value、値を取らない boolean の
+//     フラグ（読む先の型で、実行時に決まる）、同じフラグが二度、-x は位置引数、-- 以降は位置引数、知らないフラグ・値のないフラグ・
+//     変換できない値・位置引数が多い（どれも 64）、@cli.env（フラグと位置引数が優先、空文字列は「ない」）、@cli.arg（位置は引数で
+//     決まり、宣言の順ではない。array は残りすべて）、名前を省いた @cli.flag / @cli.env（フィールドの名前）、値の変換
+//     （int / float / boolean / scalar）、Validate の違反（64）。
+//   - 値が与えられなかったときの三つの扱い: @cli.required（誤り。64）、@cli.default（その値）、どちらもない（零値のまま）。
+//     フラグ、位置引数、環境変数だけのフィールド、残りを受け取る array で。
 //   - 「実行と表示」: 成功は Present を呼んで 0。例外は Signature の順に値の型で見分けて Failure を作り、@cli.exitCode か 70。
 //     見分けられなければ 70。Present / PresentError の失敗は 70。JSONPresenter の形。
 //   - 「使い方の表示」: 全体とコマンドごと。プログラム名は filepath.Base(os.Args[0])。
@@ -97,15 +100,17 @@ func (l *toolLeaves) Serve(ctx context.Context, in tool.ServeInput) error {
 	return nil
 }
 
-// demoLeaves は demo の葉の op。
+// demoLeaves は demo の葉の op。受け取った入力を覚える。
 type demoLeaves struct {
 	calls []string
+	add   demo.AddInput
 	copy  demo.CopyInput
+	move  demo.MoveInput
 }
 
-// Add は入力のすべてを一つの数に畳む: a + b + count*100 + (verbose ? 0.5 : 0) + len(label) + scale*1000。
+// Add は入力の数を一つに畳む: a + b + count*100 + (verbose ? 0.5 : 0) + len(label) + scale*1000。
 func (l *demoLeaves) Add(ctx context.Context, in demo.AddInput) (demo.Sum, error) {
-	l.calls = append(l.calls, "add")
+	l.calls, l.add = append(l.calls, "add"), in
 	switch in.A {
 	case 99:
 		return demo.Sum{}, demo.Overflow{}
@@ -131,6 +136,11 @@ func (l *demoLeaves) Add(ctx context.Context, in demo.AddInput) (demo.Sum, error
 func (l *demoLeaves) Copy(ctx context.Context, in demo.CopyInput) (string, error) {
 	l.calls, l.copy = append(l.calls, "copy"), in
 	return "copied", nil
+}
+
+func (l *demoLeaves) Move(ctx context.Context, in demo.MoveInput) (string, error) {
+	l.calls, l.move = append(l.calls, "move"), in
+	return "moved", nil
 }
 
 func (l *demoLeaves) Ping(ctx context.Context) error {
@@ -243,6 +253,7 @@ func TestTool(t *testing.T) {
 		{name: "環境変数だけのフィールドの使い方", args: []string{"check", "-h"}, code: 0, stdout: []string{"\nenvironment:\n  TOOL_PATH   探す場所\n", "--format <Format>   表示の形式"}},
 		{name: "引数の後ろの -h", args: []string{"emit", "a", "-h"}, code: 0, stdout: []string{"usage: " + prog + " emit"}, calls: "-"},
 		{name: "位置引数と boolean のフラグ", args: []string{"emit", "a", "b", "--dry-run"}, code: 0, stdout: []string{`"a"`, `"b"`, `"dry"`}, calls: "check write"},
+		{name: "boolean のフラグは値を取らない（後ろは位置引数）", args: []string{"emit", "--dry-run", "false"}, code: 0, stdout: []string{`"false"`, `"dry"`}},
 		{name: "-- 以降は位置引数", args: []string{"emit", "--", "--dry-run", "-h"}, code: 0, stdout: []string{`"--dry-run"`, `"-h"`}, notStdout: []string{`"dry"`}},
 		{name: "-x は位置引数", args: []string{"emit", "-x", "-1"}, code: 0, stdout: []string{`"-x"`, `"-1"`}},
 		{name: "boolean の =false", args: []string{"emit", "--dry-run=false", "x"}, code: 0, stdout: []string{`"x"`}, notStdout: []string{`"dry"`}},
@@ -264,35 +275,40 @@ func TestTool(t *testing.T) {
 
 func TestDemo(t *testing.T) {
 	scenarios := []scenario{
-		{name: "int と float と既定値", args: []string{"add", "1", "2.5", "--verbose"}, code: 0, stdout: []string{`"total": 104`}},
-		{name: "scalar のフラグと =false", args: []string{"add", "1", "--verbose=false", "--count", "3"}, code: 0, stdout: []string{`"total": 301`}},
-		{name: "負の数の位置引数", args: []string{"add", "-5", "--verbose"}, code: 0, stdout: []string{`"total": 95.5`}},
-		{name: "scalar の Validate", args: []string{"add", "1", "--verbose", "--count", "-1"}, code: 64, stderr: []string{"invalid input: count: min"}, calls: "-"},
-		{name: "int に変換できない位置引数", args: []string{"add", "x", "--verbose"}, code: 64, stderr: []string{`invalid value "x" for A: want int`, "usage: " + prog + " add"}, calls: "-"},
-		{name: "int に変換できないフラグ", args: []string{"add", "1", "--verbose", "--count", "1.5"}, code: 64, stderr: []string{`invalid value "1.5" for --count: want int`}, calls: "-"},
-		{name: "float に変換できない位置引数", args: []string{"add", "1", "y", "--verbose"}, code: 64, stderr: []string{`invalid value "y" for B: want float`}, calls: "-"},
-		{name: "位置引数が足りない", args: []string{"add", "--verbose"}, code: 64, stderr: []string{"missing required argument A", "usage: " + prog + " add"}, calls: "-"},
-		{name: "必須のフラグがない", args: []string{"add", "1"}, code: 64, stderr: []string{"missing required flag --verbose"}, calls: "-"},
-		{name: "位置引数が多い", args: []string{"add", "1", "2", "3", "--verbose"}, code: 64, stderr: []string{"too many arguments: 3 given, at most 2 expected"}, calls: "-"},
-		{name: "環境変数だけの float", args: []string{"add", "1", "--verbose"}, env: map[string]string{"DEMO_SCALE": "2"}, code: 0, stdout: []string{`"total": 2101.5`}},
-		{name: "環境変数を変換できない", args: []string{"add", "1", "--verbose"}, env: map[string]string{"DEMO_SCALE": "z"}, code: 64, stderr: []string{`invalid value "z" for DEMO_SCALE: want float`}, calls: "-"},
-		{name: "フラグの代わりの環境変数", args: []string{"add", "1", "--verbose"}, env: map[string]string{"DEMO_LABEL": "abc"}, code: 0, stdout: []string{`"total": 104.5`}},
-		{name: "フラグが環境変数より優先", args: []string{"add", "1", "--verbose", "--label", "a"}, env: map[string]string{"DEMO_LABEL": "abc"}, code: 0, stdout: []string{`"total": 102.5`}},
-		{name: "@cli.exitCode の終了コード", args: []string{"add", "99", "--verbose"}, code: 5, stdoutEmpty: true, stderr: []string{`"error": "demo.Overflow"`}},
-		{name: "終了コードのない例外", args: []string{"add", "98", "--verbose"}, code: 70, stderr: []string{`"error": "demo.Tired"`}},
+		{name: "int と float と補う値", args: []string{"add", "1", "2.5", "--verbose", "--mode", "m"}, code: 0, stdout: []string{`"total": 104`}},
+		{name: "scalar のフラグと =false", args: []string{"add", "1", "--verbose=false", "--count", "3", "--mode", "m"}, code: 0, stdout: []string{`"total": 301`}},
+		{name: "負の数の位置引数", args: []string{"add", "-5", "--verbose", "--mode", "m"}, code: 0, stdout: []string{`"total": 95.5`}},
+		{name: "値を取らないフラグの後ろは位置引数", args: []string{"add", "--verbose", "7", "--mode", "m"}, code: 0, stdout: []string{`"total": 107.5`}},
+		{name: "どちらもないフラグは零値のまま", args: []string{"add", "1", "--mode", "m"}, code: 0, stdout: []string{`"total": 101`}, stderrEmpty: true},
+		{name: "scalar の Validate", args: []string{"add", "1", "--mode", "m", "--count", "-1"}, code: 64, stderr: []string{"invalid input: count: min"}, calls: "-"},
+		{name: "int に変換できない位置引数", args: []string{"add", "x", "--mode", "m"}, code: 64, stderr: []string{`invalid value "x" for A: want int`, "usage: " + prog + " add"}, calls: "-"},
+		{name: "int に変換できないフラグ", args: []string{"add", "1", "--mode", "m", "--count", "1.5"}, code: 64, stderr: []string{`invalid value "1.5" for --count: want int`}, calls: "-"},
+		{name: "float に変換できない位置引数", args: []string{"add", "1", "y", "--mode", "m"}, code: 64, stderr: []string{`invalid value "y" for B: want float`}, calls: "-"},
+		{name: "必須の位置引数がない", args: []string{"add", "--mode", "m"}, code: 64, stdoutEmpty: true, stderr: []string{prog + ": missing required argument A", "usage: " + prog + " add"}, calls: "-"},
+		{name: "必須のフラグがない", args: []string{"add", "1"}, code: 64, stderr: []string{"missing required flag --mode", "usage: " + prog + " add"}, calls: "-"},
+		{name: "位置引数が多い", args: []string{"add", "1", "2", "3", "--mode", "m"}, code: 64, stderr: []string{"too many arguments: 3 given, at most 2 expected"}, calls: "-"},
+		{name: "環境変数だけの float", args: []string{"add", "1", "--verbose", "--mode", "m"}, env: map[string]string{"DEMO_SCALE": "2"}, code: 0, stdout: []string{`"total": 2101.5`}},
+		{name: "環境変数を変換できない", args: []string{"add", "1", "--mode", "m"}, env: map[string]string{"DEMO_SCALE": "z"}, code: 64, stderr: []string{`invalid value "z" for DEMO_SCALE: want float`}, calls: "-"},
+		{name: "フラグの代わりの環境変数", args: []string{"add", "1", "--verbose", "--mode", "m"}, env: map[string]string{"DEMO_LABEL": "abc"}, code: 0, stdout: []string{`"total": 104.5`}},
+		{name: "フラグが環境変数より優先", args: []string{"add", "1", "--verbose", "--mode", "m", "--label", "a"}, env: map[string]string{"DEMO_LABEL": "abc"}, code: 0, stdout: []string{`"total": 102.5`}},
+		{name: "@cli.exitCode の終了コード", args: []string{"add", "99", "--mode", "m"}, code: 5, stdoutEmpty: true, stderr: []string{`"error": "demo.Overflow"`}},
+		{name: "終了コードのない例外", args: []string{"add", "98", "--mode", "m"}, code: 70, stderr: []string{`"error": "demo.Tired"`}},
 		{name: "コマンドの使い方", args: []string{"add", "--help"}, code: 0, stderrEmpty: true, calls: "-",
-			stdout: []string{"usage: " + prog + " add [flags] A [B]\n\n足す\n\narguments:\n  A   左 (required)\n  B   右\n\nflags:\n  --count <Count>    回数 (default: 1)\n  --verbose          詳しく (required)\n  --label <string>   名札 (env: DEMO_LABEL)\n\nenvironment:\n  DEMO_SCALE   倍率\n"}},
+			stdout: []string{"usage: " + prog + " add [flags] A [B]\n\n足す\n\narguments:\n  A   左 (required)\n  B   右\n\nflags:\n  --count <Count>    回数 (default: 1)\n  --verbose          詳しく\n  --label <string>   名札 (env: DEMO_LABEL)\n  --mode <string>    動かし方 (required)\n\nenvironment:\n  DEMO_SCALE   倍率\n  tag          札（環境変数 tag） (default: none)\n"}},
 		{name: "引数のない void", args: []string{"ping"}, code: 0, stdoutEmpty: true, stderrEmpty: true, calls: "ping"},
 		{name: "引数のないコマンドに位置引数", args: []string{"ping", "x"}, code: 64, stderr: []string{"too many arguments: 1 given, at most 0 expected"}, calls: "-"},
 		{name: "引数のないコマンドにフラグ", args: []string{"ping", "--x"}, code: 64, stderr: []string{"unknown flag --x"}, calls: "-"},
 		{name: "引数のないコマンドの使い方", args: []string{"ping", "--help"}, code: 0, stdout: []string{"usage: " + prog + " ping\n\n何もしない\n"}},
 		{name: "never を返す op", args: []string{"quit"}, code: 5, stdoutEmpty: true, stderr: []string{`"error": "demo.Overflow"`}},
-		{name: "全体の使い方（説明のないコマンド）", args: []string{"help"}, code: 0, stdout: []string{"commands:\n  add    足す\n  copy\n  ping   何もしない\n  quit   いつも失敗する\n"}},
-		{name: "環境変数を代わりに持つ位置引数がない", args: []string{"copy"}, code: 64, stderr: []string{"missing required argument FROM"}, calls: "-"},
+		{name: "全体の使い方（説明のないコマンド）", args: []string{"help"}, code: 0, stdout: []string{"commands:\n  add    足す\n  copy\n  move   動かす\n  ping   何もしない\n  quit   いつも失敗する\n"}},
+		{name: "環境変数を代わりに持つ必須の位置引数がない", args: []string{"copy"}, code: 64, stderr: []string{"missing required argument FROM"}, calls: "-"},
 		{name: "scalar を元にした scalar の Validate", args: []string{"copy", "a", "--steps", "-2"}, code: 64, stderr: []string{"invalid input: steps: min"}, calls: "-"},
-		{name: "環境変数の boolean を変換できない", args: []string{"copy", "a"}, env: map[string]string{"DEMO_FORCE": "perhaps"}, code: 64, stderr: []string{`invalid value "perhaps" for --force: want boolean`}, calls: "-"},
+		{name: "環境変数の boolean を変換できない", args: []string{"copy", "a"}, env: map[string]string{"DEMO_FORCE": "perhaps"}, code: 64, stderr: []string{`invalid value "perhaps" for DEMO_FORCE: want boolean`}, calls: "-"},
 		{name: "copy の使い方", args: []string{"copy", "-h"}, code: 0,
 			stdout: []string{"usage: " + prog + " copy [flags] FROM [TO...]\n\narguments:\n  FROM    元 (required, env: DEMO_FROM)\n  TO...   先\n\nflags:\n  --steps <Steps>   (env: DEMO_STEPS)\n  --ratio <Ratio>   (default: 0.5)\n  --force           (env: DEMO_FORCE)\n  --offset <int>    (default: -1)\n"}},
+		{name: "必須の、残りを受け取る位置引数がない", args: []string{"move", "a", "b"}, code: 64, stderr: []string{"missing required argument REST", "usage: " + prog + " move"}, calls: "-"},
+		{name: "move の使い方（位置の順）", args: []string{"move", "-h"}, code: 0,
+			stdout: []string{"usage: " + prog + " move [flags] [FROM] [TO] REST...\n\n動かす\n\narguments:\n  FROM      元\n  TO        先\n  REST...   残り (required, env: DEMO_REST)\n\nflags:\n  --keep              (default: true)\n  --suffix <Name>     (default: ~)\n  --weight <float>    (default: 2)\n"}},
 	}
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
@@ -302,8 +318,41 @@ func TestDemo(t *testing.T) {
 	}
 }
 
+// TestAddInput は、値が与えられなかったときの三つの扱いと、名前を省いたフラグと環境変数: @cli.default のフィールドはその値、
+// どちらもないフィールドは零値のまま（省略可能なら nil）。名前を省いた @cli.flag は --<フィールドの名前>、@cli.env は
+// フィールドの名前の環境変数。
+func TestAddInput(t *testing.T) {
+	two, label := 2.0, "l"
+	for name, c := range map[string]struct {
+		args []string
+		env  map[string]string
+		want demo.AddInput
+	}{
+		"与えられなかったフィールド": {
+			args: []string{"add", "1", "--mode", "m"},
+			want: demo.AddInput{A: 1, Count: 1, Mode: "m", Tag: "none"},
+		},
+		"すべて与える": {
+			args: []string{"add", "1", "2", "--count=7", "--verbose", "--label", "l", "--mode", "m"}, env: map[string]string{"DEMO_SCALE": "2", "tag": "t"},
+			want: demo.AddInput{A: 1, B: &two, Count: 7, Verbose: true, Label: &label, Scale: &two, Mode: "m", Tag: "t"},
+		},
+		"空の環境変数は、ない（補う値になる）": {
+			args: []string{"add", "1", "--mode", "m"}, env: map[string]string{"tag": "", "DEMO_SCALE": ""},
+			want: demo.AddInput{A: 1, Count: 1, Mode: "m", Tag: "none"},
+		},
+	} {
+		l := &demoLeaves{}
+		if r := runDemo(l, c.env, c.args...); r.code != 0 || r.stderr != "" {
+			t.Errorf("%s: %+v", name, r)
+		}
+		if !reflect.DeepEqual(l.add, c.want) {
+			t.Errorf("%s: 入力 = %+v, want %+v", name, l.add, c.want)
+		}
+	}
+}
+
 // TestCopyInput は、値の変換と、位置引数の当て方: scalar は元の型で変換してから scalar の型にし、array は残りすべて。
-// 与えられなかったフィールドは、初めの値（既定値を持つ model は New<Model>()）のまま。
+// 与えられなかったフィールドは、@cli.default の値か、零値のまま。
 func TestCopyInput(t *testing.T) {
 	ptr := func(v demo.Steps) *demo.Steps { return &v }
 	yes, no := demo.Flag(true), demo.Flag(false)
@@ -316,7 +365,7 @@ func TestCopyInput(t *testing.T) {
 			args: []string{"copy", "a", "b", "c", "--steps", "3", "--ratio=2", "--force", "--offset", "-4"},
 			want: demo.CopyInput{From: "a", Steps: ptr(3), Ratio: 2, Force: &yes, Offset: -4, To: []demo.Name{"b", "c"}},
 		},
-		"既定値と、0 個の array": {
+		"補う値と、0 個の array": {
 			args: []string{"copy", "a"},
 			want: demo.CopyInput{From: "a", Ratio: 0.5, Offset: -1},
 		},
@@ -335,6 +384,46 @@ func TestCopyInput(t *testing.T) {
 		}
 		if !reflect.DeepEqual(l.copy, c.want) {
 			t.Errorf("%s: 入力 = %+v, want %+v", name, l.copy, c.want)
+		}
+	}
+}
+
+// TestMoveInput は、位置（@cli.arg の引数で決まり、フィールドの宣言の順ではない）と、残りを受け取る array の @cli.required
+// （位置引数が一つは要る。環境変数が代わりなら、その一つだけが要素）と、型の違う補う値（真偽値、scalar の文字列、int の
+// リテラルを float に）。
+func TestMoveInput(t *testing.T) {
+	for name, c := range map[string]struct {
+		args []string
+		env  map[string]string
+		want demo.MoveInput
+	}{
+		"位置の順と、補う値": {
+			args: []string{"move", "a", "b", "c", "d"},
+			want: demo.MoveInput{From: "a", To: "b", Rest: []string{"c", "d"}, Keep: true, Suffix: "~", Weight: 2},
+		},
+		"フラグが補う値より優先": {
+			args: []string{"move", "a", "b", "c", "--keep=false", "--suffix", ".bak", "--weight", "1.5"},
+			want: demo.MoveInput{From: "a", To: "b", Rest: []string{"c"}, Suffix: ".bak", Weight: 1.5},
+		},
+		"残りの代わりの環境変数": {
+			args: []string{"move", "a", "b"}, env: map[string]string{"DEMO_REST": "r"},
+			want: demo.MoveInput{From: "a", To: "b", Rest: []string{"r"}, Keep: true, Suffix: "~", Weight: 2},
+		},
+		"足りない位置引数は零値のまま": {
+			args: []string{"move", "a"}, env: map[string]string{"DEMO_REST": "r"},
+			want: demo.MoveInput{From: "a", Rest: []string{"r"}, Keep: true, Suffix: "~", Weight: 2},
+		},
+		"位置引数が環境変数より優先": {
+			args: []string{"move", "a", "b", "c"}, env: map[string]string{"DEMO_REST": "r"},
+			want: demo.MoveInput{From: "a", To: "b", Rest: []string{"c"}, Keep: true, Suffix: "~", Weight: 2},
+		},
+	} {
+		l := &demoLeaves{}
+		if r := runDemo(l, c.env, c.args...); r.code != 0 || r.stdout != "\"moved\"\n" || r.stderr != "" {
+			t.Errorf("%s: %+v", name, r)
+		}
+		if !reflect.DeepEqual(l.move, c.want) {
+			t.Errorf("%s: 入力 = %+v, want %+v", name, l.move, c.want)
 		}
 	}
 }

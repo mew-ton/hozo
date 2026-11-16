@@ -1,0 +1,33 @@
+// GOSQL-15（docs/plugin-go-sqlite.md「op の中身」）: @db.update の表の model が、@db.key を一つも持たないか、キーでない列を
+// 一つも持たない。位置は効果。
+
+namespace app {
+  /** キーのない model */
+  model Note { @db.text text: string; @db.unique @db.int stars: int; }
+  /** キーだけの model */
+  model Mark { @db.key @db.text book: string; @db.key @db.int page: int; }
+  model Row { @db.key @db.text id: string; @db.text note: string; }
+  @db.table(Note) state notes: list<Note>;
+  @db.table(Mark) state marks: list<Mark>;
+  @db.table(Row) state rows: list<Row>;
+
+  @db.update(notes)
+  effect updateNote on notes.put;
+  /** op に並べられていない効果のデコレータも、同じに確かめる */
+  @db.update(marks)
+  effect updateMark on marks.put;
+  // op に並べても、効果ごとに一度だけ
+  @db.effects(updateNote)
+  export op saveNote(note: Note);
+
+  // 通るもの
+  @db.update(rows)
+  effect updateRow on rows.put;
+  @db.effects(updateRow)
+  export op saveRow(row: Row);
+  // @db.insert と @db.delete は、キーを要らない
+  @db.insert(notes)
+  effect createNote on notes.post;
+  @db.delete(marks, "book")
+  effect deleteMark on marks.delete;
+}

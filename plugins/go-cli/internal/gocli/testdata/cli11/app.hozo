@@ -1,0 +1,20 @@
+// CLI-11: 位置は model。
+namespace app {
+  scalar Name extends string;
+
+  model In {
+    // 省略可能なフィールドの @cli.required
+    @cli.flag("a") @cli.required a: string?;
+    // 省略可能なフィールドの @cli.default
+    @cli.flag("b") @cli.default(1) b: int?;
+    // scalar の省略可能、位置引数、環境変数だけのフィールドも同じ
+    @cli.arg(1) @cli.required c: Name?;
+    @cli.env("D") @cli.default("d") d: Name?;
+    // 省略可能でなければ、付けられる。どちらも付けない省略可能なフィールドも、当たらない
+    @cli.flag("e") @cli.required e: string;
+    @cli.flag("f") @cli.default(1) f: int;
+    @cli.flag("g") g: string?;
+  }
+  @cli.command("run")
+  export op run(in: In);
+}

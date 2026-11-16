@@ -12,9 +12,11 @@ import (
 // このファイルは wiring.go（docs/plugin-go.md「配線の本体」）: 単位の対象の配線ごとに、ops のメソッドを一つ。
 // 実行の順序は行の順で、並列にはしない。継ぎ目を持つ配線は、メソッドの名前が中身の名前（`loginBody`）になる。
 
-// genWiring は定義のパッケージの wiring.go。単位の対象の配線がなければ nil。typesHasPtr は、types.go が補助 ptr を
-// 出しているか（出していれば、wiring.go には出さない）。
-func (e *emitter) genWiring(typesHasPtr bool) *fileGen {
+// ptrHelper は、値をポインタにする補助（docs/plugin-go.md「値」）。wiring.go が使っていれば、その末尾に一つだけ出す。
+const ptrHelper = "func ptr[T any](v T) *T { return &v }\n"
+
+// genWiring は定義のパッケージの wiring.go。単位の対象の配線がなければ nil。
+func (e *emitter) genWiring() *fileGen {
 	var wirings []golang.OpShape
 	for _, os := range e.shape.Ops {
 		if os.Place == golang.Wiring {
@@ -29,7 +31,7 @@ func (e *emitter) genWiring(typesHasPtr bool) *fileGen {
 		b := newBody(e, f, os)
 		b.gen()
 	}
-	if e.usesPtr[f.key] && !typesHasPtr {
+	if f.usesPtr {
 		f.print(ptrHelper)
 	}
 	return f
@@ -465,6 +467,50 @@ func (b *bodyGen) optionalPath(x string, inner ir.Type, rest []string, emit bool
 	return v, result
 }
 
+// literal は、リテラル lit を、型 target の位置に書く Go の式（docs/plugin-go.md「値」の literal の行と「型をそろえる」）。
+// target が省略可能で、Go の型がポインタなら `ptr(<型>(<リテラル>))`。target が nil（位置の型が決まらない）なら、リテラルの型の値。
+func (f *fileGen) literal(lit ir.Literal, target ir.Type) string {
+	if opt, ok := target.(ir.OptionalType); ok {
+		inner := f.literal(lit, opt.Of)
+		if golang.IsNillable(opt.Of, f.e.p) {
+			return inner
+		}
+		if _, isDuration := lit.(ir.DurationLiteral); isDuration {
+			return f.ptr(inner) // すでに型の付いた式
+		}
+		return f.ptr(f.goType(opt.Of) + "(" + inner + ")")
+	}
+	if c, ok := target.(ir.CaseType); ok {
+		return f.literal(lit, c.Of)
+	}
+	switch x := lit.(type) {
+	case ir.StringLiteral:
+		return strconv.Quote(x.Value)
+	case ir.IntLiteral:
+		if target == nil {
+			return "int64(" + strconv.FormatInt(x.Value, 10) + ")"
+		}
+		return strconv.FormatInt(x.Value, 10)
+	case ir.FloatLiteral:
+		s := strconv.FormatFloat(x.Value, 'g', -1, 64)
+		if !strings.ContainsAny(s, ".e") {
+			s += ".0"
+		}
+		return s
+	case ir.BooleanLiteral:
+		return strconv.FormatBool(x.Value)
+	case ir.DurationLiteral:
+		typ := ""
+		if _, isRef := target.(ir.RefType); isRef {
+			typ = f.goType(target) // Duration が元の scalar
+		} else {
+			typ = f.goType(ir.Duration())
+		}
+		return typ + "(" + strconv.FormatInt(int64(x.Value), 10) + ")"
+	}
+	return "nil"
+}
+
 // literalType は、リテラルの型（対応する核の型）。
 func literalType(l ir.Literal) ir.Type {
 	switch l.(type) {
@@ -518,7 +564,7 @@ func (b *bodyGen) atom(a ir.Atom, target ir.Type) (string, ir.Type) {
 	case ir.NoneAtom:
 		return "nil", target
 	case ir.RecordAtom:
-		return b.record(&x, target, nil, nil, nil), target
+		return b.record(&x, target, nil, nil), target
 	}
 	return "nil", nil
 }
@@ -613,13 +659,6 @@ type boundValue struct {
 	typ  ir.Type // 状態の型
 }
 
-// postAssign は、値があるときだけ埋める位置（状態の形が nullable で、位置の型が省略可能でない。BIND-2）。
-type postAssign struct {
-	path  []string // 引数の中のフィールドのパス
-	bound boundValue
-	typ   ir.Type // 位置の型
-}
-
 func hasPrefix(path, prefix []string) bool {
 	if len(prefix) > len(path) {
 		return false
@@ -634,9 +673,9 @@ func hasPrefix(path, prefix []string) bool {
 
 // record は、レコードリテラル rec（書かれていない引数なら nil）を、当てはめる model の構造体リテラルにする
 // （docs/plugin-go.md「値」の record の行、「bind で埋まる位置」の 3 と 4）。並びは model のフィールドの順。書かれていない
-// フィールドのうち、既定値を持つものは、その既定値を書く。当てはめる型が省略可能なら `&<型>{…}`。
-// path は、引数名からこの値までのパス、bounds は bind で埋まる位置。値があるときだけ埋める位置は post に足す。
-func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, bounds []boundValue, post *[]postAssign) string {
+// フィールド（省略可能なフィールドだけ）は書かず、零値のまま。当てはめる型が省略可能なら `&<型>{…}`。
+// path は、引数名からこの値までのパス、bounds は bind で埋まる位置。
+func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, bounds []boundValue) string {
 	m := b.e.modelOf(target)
 	inner := strip(target)
 	optional := false
@@ -669,19 +708,16 @@ func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, boun
 		}
 		value := ""
 		switch {
-		case exact != nil && b.e.isPointer(exact.typ) && !b.e.nilable(fd.Type) && post != nil:
-			// 値があるときだけ埋める。なければ既定値のまま
-			*post = append(*post, postAssign{path: fpath[1:], bound: *exact, typ: fd.Type})
-		case exact != nil:
+		case exact != nil: // bind で埋まる位置: 読んだ値を書く
 			value = b.convert(exact.expr, exact.typ, fd.Type)
 		case written[fd.Name] != nil:
 			if r, ok := written[fd.Name].(ir.RecordAtom); ok {
-				value = b.record(&r, fd.Type, fpath, bounds, post)
+				value = b.record(&r, fd.Type, fpath, bounds)
 			} else {
 				value, _ = b.atom(written[fd.Name], fd.Type)
 			}
-		case below:
-			value = b.record(nil, fd.Type, fpath, bounds, post)
+		case below: // 書かれていないフィールドの中に、bind で埋まる位置がある
+			value = b.record(nil, fd.Type, fpath, bounds)
 		}
 		if value != "" {
 			fields = append(fields, golang.FieldName(fd.Name)+": "+value)
@@ -764,7 +800,7 @@ type callInfo struct {
 }
 
 // call は、呼び出しの式を作る（docs/plugin-go.md「呼び出し」「bind で埋まる位置」）。bind で埋まる位置の状態は、先に read で
-// 読んであること。引数を束縛する文（値があるときだけ埋める位置）は、ここで書く。
+// 読んであること。
 func (b *bodyGen) call(c *ir.Call) callInfo {
 	e := b.e
 	callee := e.op(c.Op)
@@ -808,41 +844,20 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 				below = true
 			}
 		}
-		var post []postAssign
 		arg := ""
 		switch {
 		case whole != nil: // 位置が引数そのもの
 			arg = b.convert(whole.expr, whole.typ, p.Type)
 		case written != nil:
 			if r, ok := written.(ir.RecordAtom); ok {
-				arg = b.record(&r, p.Type, []string{p.Name}, bounds, &post)
+				arg = b.record(&r, p.Type, []string{p.Name}, bounds)
 			} else {
 				arg, _ = b.atom(written, p.Type)
 			}
 		case below: // 渡されていない引数の中のフィールド
-			arg = b.record(nil, p.Type, []string{p.Name}, bounds, &post)
+			arg = b.record(nil, p.Type, []string{p.Name}, bounds)
 		default: // 渡されていない省略可能な引数
 			arg = "nil"
-		}
-		if len(post) > 0 {
-			v := b.temp()
-			b.line(v + " := " + arg)
-			for _, pa := range post {
-				field := v
-				for _, seg := range pa.path {
-					field += "." + golang.FieldName(seg)
-				}
-				inner := pa.bound.typ
-				if o, ok := strip(inner).(ir.OptionalType); ok {
-					inner = o.Of
-				}
-				b.line("if " + pa.bound.expr + " != nil {")
-				b.depth++
-				b.line(field + " = " + b.convert("*"+pa.bound.expr, inner, pa.typ))
-				b.depth--
-				b.line("}")
-			}
-			arg = v
 		}
 		args = append(args, arg)
 	}

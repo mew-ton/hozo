@@ -1,4 +1,4 @@
-// docs/plugin-go-http.md「出力」「入力の読み方」「補助」の各行を、一か所ずつ使う。
+// docs/plugin-go-http.md「出力」「入力の読み方」「補助」「通信の形」の各行を、一か所ずつ使う。
 
 /** 共有の型と例外 */
 namespace type {
@@ -9,6 +9,7 @@ namespace type {
   scalar Flag extends boolean;
   @valid.length(min: 1)
   scalar Name extends string;
+  scalar Wait extends Duration;
 
   /** 品物 */
   model Item {
@@ -32,8 +33,23 @@ namespace type {
 
   /** 別の名前空間の入力の model */
   model Lookup {
-    @http.query id: string;
-    @http.header(name: "X-Trace") trace: string?;
+    @http.query @http.required id: string;
+    @http.header("X-Trace") trace: string?;
+  }
+
+  /** ヘッダの全体で受け取る model: 項目の名前は、フィールドの名前 */
+  model Meta {
+    tenant: string;
+    trace: Token?;
+  }
+
+  /** クエリの全体で受け取る model */
+  model Paging {
+    page: int?;
+    size: Page;
+    q: string;
+    exact: Flag?;
+    ratio: float;
   }
 }
 
@@ -43,17 +59,25 @@ namespace api {
   @http.get("/health")
   export op health(): string;
 
-  // ヘッダ（必須の string、必須の scalar、省略可能な string、既定値持ち）、二つ以上の @http.body（省略可能、既定値持ちを含む）、必須の boolean のクエリ
+  // ヘッダと本文の項目: 名前を書いたものと省いたもの、@http.required、@http.default、どちらもない（省略可能と、そうでないもの）。
+  // 本文の項目は、いくつあっても、JSON のオブジェクトのキー。@http.default のリテラルは、文字列、整数、小数、真偽値、期間
   model CreateInput {
-    @http.header(name: "X-Tenant") tenant: string;
-    @http.header(name: "Authorization") token: type.Token;
-    @http.header(name: "X-Request-Id") requestId: string?;
-    @http.header(name: "Accept-Language") @http.default("en") lang: string;
+    @http.header("X-Tenant") @http.required tenant: string;
+    @http.header("Authorization") token: type.Token;
+    @http.header("X-Request-Id") requestId: string?;
+    @http.header("Accept-Language") @http.default("en") lang: string;
+    @http.header trace: string?;
     @http.body item: type.Item;
-    @http.query dryRun: boolean;
-    @http.body note: string?;
+    @http.query @http.required dryRun: boolean;
+    @http.body("memo") note: string?;
     @http.body @http.default(1) copies: int;
-    @http.body labels: Record<string, type.Name>;
+    @http.required @http.body labels: Record<string, type.Name>;
+    @http.body @http.default(2) weight: float;
+    @http.body @http.default(1.5) scale: type.Ratio;
+    @http.body @http.default(true) active: boolean;
+    @http.body @http.default(30s) timeout: Duration;
+    @http.body @http.default(5m) wait: type.Wait;
+    @http.body @http.default("anon") owner: type.Token;
   }
 
   /** 品物を作る */
@@ -61,23 +85,24 @@ namespace api {
   export op create(in: CreateInput): type.Item
     throws type.Conflict | type.Rejected;
 
-  // クエリ: string / int / float / boolean と、その scalar。必須、省略可能、既定値持ち
+  // クエリの項目: string / int / float / boolean と、その scalar。@http.required、@http.default、どちらもない
   model SearchInput {
-    @http.query q: string;
-    @http.query name: type.Name?;
+    @http.query @http.required q: string;
+    @http.query("n") name: type.Name?;
     @http.query tag: string?;
     @http.query @http.default("nobody") owner: type.Token;
     @http.query @http.default(1) page: type.Page;
     @http.query limit: int?;
     @http.query size: type.Page?;
     @http.query offset: int;
-    @http.query min: float;
+    @http.query @http.required min: float;
     @http.query @http.default(0.5) ratio: type.Ratio;
     @http.query max: float?;
     @http.query scale: type.Ratio?;
-    @http.query @http.default(false) exact: boolean;
+    @http.query @http.default(true) exact: boolean;
     @http.query deep: boolean?;
     @http.query flag: type.Flag?;
+    @http.query @http.default(3) factor: float;
   }
 
   /** 品物を探す。結果は配列（空でも [] を返す） */
@@ -85,18 +110,34 @@ namespace api {
   export op search(in: SearchInput): type.Item[]
     throws type.Broken;
 
-  /** 最初の品物。省略可能な戻り値（なければ null）。入力は、別の名前空間の model */
+  /** 最初の品物。省略可能な戻り値（なければ 204）。入力は、別の名前空間の model */
   @http.get("/items/first")
   export op first(in: type.Lookup): type.Item?
     throws type.NotFound;
 
-  // 本文が一つ（配列）。戻り値がない（204）
+  // 本文の項目が一つでも、本文は、キーを持つオブジェクト。戻り値がない（204）
   model ReplaceInput {
     @http.body items: type.Item[];
   }
   @http.post("/items/replace")
   export op replace(in: ReplaceInput)
     throws type.NotFound;
+
+  // 全体の形: ヘッダとクエリを、一つずつの model で。結果は record（値がなくても {} を返す）
+  model ListInput {
+    @http.headerObj meta: type.Meta;
+    @http.queryObj paging: type.Paging;
+  }
+  @http.get("/list")
+  export op listAll(in: ListInput): Record<string, int>;
+
+  // 全体の形: 本文が、その model の JSON。ほかの場所の項目の形とは、一緒に書ける。結果は、省略可能な scalar
+  model PutInput {
+    @http.bodyObj item: type.Item;
+    @http.header("X-Tenant") tenant: string?;
+  }
+  @http.post("/put")
+  export op put(in: PutInput): type.Token?;
 
   // 引数も戻り値もない。/ で終わるパスは、そのパスだけに合う
   @http.post("/reset/")
@@ -106,6 +147,10 @@ namespace api {
   @http.get("/ping")
   @http.post("/ping")
   export op ping(): boolean;
+
+  // 零値の結果も、値（200）
+  @http.get("/count")
+  export op count(): int;
 
   // @http.* のない export の op は、経路にならない。@http.retry は読まない（印）
   export op version(): string;
@@ -118,30 +163,42 @@ namespace api {
 
 /** 制約の検査（validate = true） */
 namespace strict {
-  // 本文が一つ: 違反の path は body と、その中のパス
+  // 項目の形: 違反の path は、場所と名前と、その中のパス（body.lines[1].name）
   model OrderInput {
-    @http.header(name: "Authorization") token: type.Token?;
-    @http.body lines: type.Item[];
+    @http.header("Authorization") token: type.Token?;
+    @http.required @http.body lines: type.Item[];
   }
   @http.post("/orders")
   export op order(in: OrderInput): int;
 
-  // 本文が二つ以上: body.<フィールド名>。クエリとヘッダの値の制約も確かめる
+  // 名前を書いた項目は、その名前で（body.more）。クエリとヘッダの値の制約も確かめる
   model EditInput {
     @http.query @http.default(1) page: type.Page;
-    @http.header(name: "X-Name") name: type.Name?;
+    @http.header("X-Name") name: type.Name?;
     @http.body item: type.Item;
-    @http.body extra: type.Item?;
+    @http.body("more") extra: type.Item?;
   }
   @http.post("/edit")
   export op edit(in: EditInput);
 
-  // Validate を持たない入力は、validate = true でも確かめない
+  // 全体の形: 場所は body、query（フィールドの名前 payload、paging は、通信に現れない）
+  model BulkInput {
+    @http.bodyObj payload: type.Item;
+    @http.queryObj paging: type.Paging;
+  }
+  @http.post("/bulk")
+  export op bulk(in: BulkInput);
+
+  // Validate を持たない入力にも、同じ httpValidate を出す（補助が、実行時に見る）
   model PlainInput {
     @http.query id: string?;
   }
   @http.get("/plain")
   export op plain(in: PlainInput): string;
+
+  // 入力のない経路は、確かめるものがない
+  @http.get("/now")
+  export op now(): string;
 }
 
 /** 入力も、@http.status を持つ例外もない */

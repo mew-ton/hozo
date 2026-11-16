@@ -1,0 +1,20 @@
+// GOSQL-19（docs/plugin-go-sqlite.md「表」）: 表の model の、省略可能なフィールド（T?）に、@db.nullable がない。位置は model。
+
+namespace app {
+  scalar Name extends string;
+  /** 表の model でない model のフィールドは、見ない */
+  model Tag { name: string?; }
+
+  model Row {
+    @db.key @db.text id: string;
+    @db.text note: string?;
+    @db.text name: Name?;
+    @db.json tags: string[]?;
+    @db.json tag: Tag?;
+    // 通るもの
+    @db.nullable @db.int rank: int?;
+    @db.int count: int;
+  }
+
+  @db.table(Row) state rows: list<Row>;
+}

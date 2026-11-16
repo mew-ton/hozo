@@ -102,20 +102,27 @@ namespace demo {
   exception Overflow;
   exception Tired;
 
-  /** add の入力。既定値を持つ（初めの値は NewAddInput()） */
+  /**
+   * add の入力。値が与えられなかったときの三つの扱い（@cli.required、@cli.default、どちらもない）と、
+   * 名前を省いた @cli.flag / @cli.env（フィールドの名前になる）
+   */
   model AddInput {
     /** 左 */
-    @cli.arg(1) a: int;
+    @cli.required @cli.arg(1) a: int;
     /** 右 */
     @cli.arg(2) b: float?;
     /** 回数 */
     @cli.flag("count") @cli.default(1) count: Count;
     /** 詳しく */
-    @cli.flag("verbose") verbose: boolean;
+    @cli.flag verbose: boolean;
     /** 名札 */
     @cli.flag("label") @cli.env("DEMO_LABEL") label: string?;
     /** 倍率 */
     @cli.env("DEMO_SCALE") scale: float?;
+    /** 動かし方 */
+    @cli.flag("mode") @cli.required mode: string;
+    /** 札（環境変数 tag） */
+    @cli.env @cli.default("none") tag: string;
   }
 
   /** 足す */
@@ -125,7 +132,7 @@ namespace demo {
   /** copy の入力。scalar の値と、環境変数を代わりに持つ位置引数、string の scalar の array */
   model CopyInput {
     /** 元 */
-    @cli.arg(1) @cli.env("DEMO_FROM") from: Name;
+    @cli.arg(1) @cli.env("DEMO_FROM") @cli.required from: Name;
     @cli.flag("steps") @cli.env("DEMO_STEPS") steps: Steps?;
     @cli.flag("ratio") @cli.default(0.5) ratio: Ratio;
     @cli.flag("force") @cli.env("DEMO_FORCE") force: Flag?;
@@ -136,6 +143,26 @@ namespace demo {
 
   @cli.command("copy")
   export op copy(in: CopyInput): string;
+
+  /**
+   * move の入力。位置は、フィールドの宣言の順からは読まない（@cli.arg の引数で決まる）。残りを受け取る array の
+   * @cli.required（位置引数が一つは要る）と、その代わりの環境変数。型の違う補う値（真偽値、文字列、int のリテラルを float に）
+   */
+  model MoveInput {
+    /** 残り */
+    @cli.arg(3) @cli.env("DEMO_REST") @cli.required rest: string[];
+    /** 先 */
+    @cli.arg(2) to: Name;
+    /** 元 */
+    @cli.arg(1) from: Name;
+    @cli.flag @cli.default(true) keep: boolean;
+    @cli.flag("suffix") @cli.default("~") suffix: Name;
+    @cli.flag("weight") @cli.default(2) weight: float;
+  }
+
+  /** 動かす */
+  @cli.command("move")
+  export op move(in: MoveInput): string;
 
   /** 何もしない */
   @cli.command("ping")

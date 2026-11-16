@@ -1,4 +1,4 @@
-// docs/plugin-go.md「bind で埋まる位置」の 1〜5 を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// docs/plugin-go.md「bind で埋まる位置」の 1〜4 を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は、名前空間ごとに一つのパッケージ）。
 
 /** 呼ばれる側。bind の位置を持つ op */
@@ -52,8 +52,8 @@ namespace web {
     return api.ping();
   }
 
-  // 5 は、フィールドの既定値と一緒になくなった（nullable の状態を、既定値を持つ省略可能でない位置に、値があるときだけ
-  // 埋める形。docs/decisions.md「決めたこと」116）。同じ op を、省略可能な位置を埋める例として残す
+  // 3: 形が nullable の状態が埋まるのは、省略可能な位置だけ（省略可能でない位置に埋めることは、ない。BIND-2）。
+  // 読んだ値を、そのまま、構造体リテラルのフィールドに書く
   export op enter(id: string): string
   {
     return api.enter({ id });

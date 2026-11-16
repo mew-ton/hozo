@@ -1,0 +1,5 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-15（@db.update の表の model が、@db.key を一つも持たないか、キーでない列を一つも持たない）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/app"

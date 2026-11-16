@@ -50,3 +50,5 @@ func (o *ops) Kinds(text string) {
 		o.TakeKey(k0.Key{N: 2})
 	}
 }
+
+func ptr[T any](v T) *T { return &v }

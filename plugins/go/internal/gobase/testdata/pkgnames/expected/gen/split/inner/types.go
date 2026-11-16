@@ -13,12 +13,3 @@ type Plan struct {
 	Target *ptr2.Target `json:"target,omitempty"`
 	Label  *string      `json:"label,omitempty"`
 }
-
-// NewPlan は既定値を入れた Plan を返す。
-func NewPlan() Plan {
-	m := Plan{}
-	m.Label = ptr(string("x"))
-	return m
-}
-
-func ptr[T any](v T) *T { return &v }

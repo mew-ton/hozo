@@ -251,10 +251,13 @@ func (e *emitter) implExpr(os golang.OpShape) string {
 		return "o." + os.Body
 	case golang.StateCommand, golang.StateQuery:
 		return "o." + e.units[os.Unit].Param + "." + os.Method
-	case golang.SharedQuery:
+	case golang.SharedCommand, golang.SharedQuery:
 		return "o." + e.fields.shared + "." + os.Method
+	case golang.Leaf:
+		return "o." + e.fields.leaves + "." + os.Method
 	}
-	return "o." + e.fields.leaves + "." + os.Method
+	e.errorf(codeInternal, os.FQN, "op %s の置き場（%d）を知らない（生成器の不具合）", os.FQN, os.Place)
+	return "nil"
 }
 
 // neverException は、never を返す op が投げる例外の FQN（throws の例外は、ちょうど一つ。THROWS-3）。

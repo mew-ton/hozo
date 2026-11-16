@@ -10,9 +10,6 @@ type Token = inner.Token
 // Line は model shop.Line。
 type Line = inner.Line
 
-// NewLine は既定値を入れた Line を返す。
-func NewLine() Line { return inner.NewLine() }
-
 // Order は model shop.Order。
 type Order = inner.Order
 

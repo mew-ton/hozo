@@ -102,8 +102,6 @@ type emitter struct {
 	reserved map[string]bool
 	// imports は、ファイル（"def/ops.go"、"entry/ops.go" の形のキー）ごとの、名前を決めた import（一度目の生成の後で作る）。
 	imports map[string]*golang.Imports
-	// usesPtr は、そのファイルが補助 ptr を使ったか（キーは imports と同じ）。
-	usesPtr map[string]bool
 
 	errs []plugin.Diagnostic
 	seen map[string]bool // 同じ診断を二度出さない（生成を二度走らせるため）
@@ -175,7 +173,6 @@ func (e *emitter) prepare() {
 	}
 	e.reserved = baseReserved()
 	e.imports = map[string]*golang.Imports{}
-	e.usesPtr = map[string]bool{}
 }
 
 // baseReserved は、生成したコードがメソッドの中で使う名前（docs/plugin-go.md「名前」の「局所の名前」）。
@@ -273,13 +270,12 @@ func (e *emitter) build() []plugin.File {
 		files = append(files, plugin.File{Path: path.Join(dir, f.name), Content: content})
 	}
 	def := e.layout.DefDir
-	types := e.genTypes()
 	add(def, e.genDoc(true))
-	add(def, types)
+	add(def, e.genTypes())
 	add(def, e.genOps())
 	add(def, e.genStates())
 	add(def, e.genClassify())
-	add(def, e.genWiring(types != nil && e.usesPtr[types.key]))
+	add(def, e.genWiring())
 	if e.layout.HasInner {
 		entry := e.layout.Dir
 		add(entry, e.genDoc(false))
@@ -301,6 +297,8 @@ type fileGen struct {
 	doc   string // パッケージのコメント（doc.go だけ）
 	im    *golang.Imports
 	body  strings.Builder
+	// usesPtr は、このファイルが補助 ptr を使ったか（wiring.go だけが使う。docs/plugin-go.md「値」）。
+	usesPtr bool
 }
 
 // newFile は、定義のパッケージ（inDef）か、入口のパッケージのファイル name を作り始める。import は、一度目なら空から集め、
@@ -320,10 +318,10 @@ func (e *emitter) newFile(name string, inDef bool) *fileGen {
 }
 
 // bodyNames は、基底が、関数の本体の中で決まった名前で使う識別子のうち、本体が名前空間のパッケージの型を書きうるもの: メソッドの
-// レシーバ o、ctx、err と、New<Model> の m。その名前の局所の変数が、同じ名前のパッケージを隠すので、基底のファイルでは、import の
-// 名前に使わない（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。パッケージに宣言する ops と ptr は、
-// plugin/golang が、どのファイルでも避ける。
-var bodyNames = []string{"o", "ctx", "err", "m"}
+// レシーバ o と、ctx、err。その名前の局所の変数が、同じ名前のパッケージを隠すので、基底のファイルでは、import の名前に使わない
+// （docs/plugin-go.md「パッケージと import パス」の「import の名前」）。パッケージに宣言する ops と ptr は、plugin/golang が、
+// どのファイルでも避ける。
+var bodyNames = []string{"o", "ctx", "err"}
 
 func (f *fileGen) printf(format string, args ...any) { fmt.Fprintf(&f.body, format, args...) }
 func (f *fileGen) print(s string)                    { f.body.WriteString(s) }
@@ -334,9 +332,9 @@ func (f *fileGen) goType(t ir.Type) string { return golang.GoType(t, f.im) }
 // zero は型 t の零値の式。
 func (f *fileGen) zero(t ir.Type) string { return golang.Zero(t, f.im) }
 
-// ptr は補助 ptr を使ったことを覚える（docs/plugin-go.md「値」: 使ったファイルの属するパッケージに一つだけ出す）。
+// ptr は、式 expr を補助 ptr で包み、このファイルが ptr を使ったことを覚える（docs/plugin-go.md「値」）。
 func (f *fileGen) ptr(expr string) string {
-	f.e.usesPtr[f.key] = true
+	f.usesPtr = true
 	return "ptr(" + expr + ")"
 }
 

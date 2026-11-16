@@ -1,79 +1,112 @@
-// docs/plugin-go-sqlite.md「状態ごとの型」: 規則に当たらない op があるとき、その型は、その op のメソッドを持たず、
-// var _ を出さない。当たらなかった op ごとに warning。各 op の上のコメントが、当たらない理由。
+// docs/plugin-go-sqlite.md「状態ごとの型」「状態をまたぐ単位の型」: db の語彙のデコレータを付けていない op があるとき、その型は、
+// その op のメソッドを持たず、var _ を出さない。warning も出さない。述語で決まる状態の分類の単位の命令は <C>Table、
+// 宛先の単位が分かれる op は SharedTable。
 
 /** 図書館 */
 namespace lib {
   scalar BookId extends string;
 
   model Book {
-    @db.key id: BookId;
-    title: string;
-    author: string;
-    pages: int;
-    lentAt: Time?;
+    @db.key @db.text id: BookId;
+    @db.text title: string;
+    @db.int pages: int;
   }
 
-  /** キーのない model */
-  model Note { text: string; stars: int; }
+  model Note { @db.text text: string; @db.int stars: int; }
 
-  /** キーだけの model */
-  model Mark { @db.key book: BookId; @db.key page: int; }
+  model Archived { @db.key @db.text id: BookId; }
+
+  model Loan {
+    @db.key @db.ref(Book) @db.text book: BookId;
+    @db.text member: string;
+  }
 
   @db.table(Book) state books: list<Book>;
   @db.table(Note) state notes: list<Note>;
-  @db.table(Mark) state marks: list<Mark>;
-  /** op がどれも規則に当たる状態（var _ を出す） */
-  @db.table(Book) state archive: list<Book>;
+  @db.table(Loan) state loans: list<Loan>;
+  /** op を一つも持たない表の状態（句は「この単位では、すべて」。var _ を出す）。命令は、分類 Shelving の単位に置かれる */
+  @db.table(Archived) state archive: list<Archived>;
+  /** @db.table のない状態は、表にならない（単位は、人が書く） */
+  state drafts: list<Note>;
 
-  // ---- books ----
+  // ---- books: デコレータを付けた op と、付けていない op ----
 
-  // 当たる（一行を引く）
-  export op findBook(id: BookId): Book? reads books;
-  // 当たらない: 引数の型 string と等しい型のフィールドが二つ（title、author）
-  export op findByTitle(title: string): Book? reads books;
-  // 当たらない: 対応した列（pages）が @db.key でも @db.unique でもない（戻り値が Book[] なら当たる）
-  export op findByPages(pages: int): Book? reads books;
-  // 当たらない: 戻り値が Book? でも Book[] でもない
+  @db.find(books, "id")
+  export op findBook(id: BookId): Book?;
+  // 付けていない: 順序と件数は、デコレータで言えない
+  export op newestBooks(limit: int): Book[] reads books;
+  // 付けていない
   export op countBooks(): int reads books;
-  // 当たらない: 引数の型 Time と等しい型のフィールドがない（lentAt は Time?）
-  export op lentAt(at: Time): Book[] reads books;
-  // 当たらない: 引数の一つ（newest）が列に対応しない
-  export op recent(id: BookId, newest: boolean): Book[] reads books;
 
+  @db.insert(books)
   effect createBook on books.post;
+  /** デコレータを付けていない効果 */
   effect deleteBook on books.delete;
-  effect refill on books: Empty -> HasItems;
 
-  // 当たる（足す）
-  export op addBook(book: Book) effects createBook;
-  // 当たらない: 引数が M の一つだけでない
-  export op addBookAt(book: Book, at: Time) effects createBook;
-  // 当たらない: 戻り値がある
-  export op addAndCount(book: Book): int effects createBook;
-  // 当たらない: 引数が M でない
-  export op addById(id: BookId) effects createBook;
-  // 当たらない: 引数がない（消す op は、引数が一つ以上）
+  @db.effects(createBook)
+  export op addBook(book: Book);
+  // 付けていない
   export op clearBooks() effects deleteBook;
-  // 当たらない: reads と効果の両方を持つ
-  export op takeBook(id: BookId): Book? reads books effects deleteBook;
-  // 当たらない: 遷移を宛先にする効果
-  export op restock(book: Book) effects refill;
 
-  // ---- notes ----
+  // ---- notes: 基底の状態の遷移を宛先にする効果。操作の名前との照合はなく、表が、効果の書き込む状態にあればよい ----
 
-  effect updateNote on notes.put;
-  // 当たらない: M が @db.key を持たない
-  export op saveNote(note: Note) effects updateNote;
+  @db.insert(notes)
+  effect firstNote on notes: Empty -> HasItems;
+  @db.delete(notes, "text")
+  effect lastNote on notes: HasItems -> Empty;
 
-  // ---- marks ----
+  @db.effects(firstNote)
+  export op startNotes(note: Note);
+  @db.effects(lastNote, firstNote)
+  export op swapNote(text: string, note: Note);
 
-  effect updateMark on marks.put;
-  // 当たらない: M に、キーでない列がない（書き換えるものがない）
-  export op saveMark(mark: Mark) effects updateMark;
+  // ---- drafts: 表でない状態の op は、どの型にも出ない ----
 
-  // ---- archive ----
+  export op listDrafts(): Note[] reads drafts;
 
-  effect archiveBook on archive.post;
-  // 当たる
-  export op archiveOne(book: Book) effects archiveBook;
+  // ---- 述語で決まる状態の分類の単位: <C>Table ----
+
+  /** 貸し出しの進み具合（books と loans にまたがる） */
+  classify Lending of books, loans {
+    /** 貸し出していない */
+    Free;
+    /** 貸し出している */
+    Lent;
+  }
+
+  /** 状態の分類の遷移を宛先にする効果: 表（loans）は、効果の書き込む状態（books、loans）の一つ */
+  @db.insert(loans)
+  effect lend on Lending: Free -> Lent;
+  @db.update(books)
+  effect retitle on Lending: any -> any;
+  effect giveBack on Lending: Lent -> Free;
+
+  @db.effects(lend)
+  export op lendBook(loan: Loan);
+  // 二つの効果の宛先の単位が、どちらも Lending: <C>Table のメソッドで、一つのトランザクション
+  @db.effects(retitle, lend)
+  export op lendRenamed(book: Book, loan: Loan);
+  // 付けていない
+  export op returnBook(book: BookId) effects giveBack;
+
+  /** 命令のすべてにデコレータの付いた、述語で決まる状態の分類（句は「この単位では、すべて」。それでも var _ は出さない） */
+  classify Shelving of archive {
+    Open;
+    Closed;
+  }
+  @db.insert(archive)
+  effect shelve on Shelving: Open -> Closed;
+  @db.effects(shelve)
+  export op shelveBook(book: Archived);
+
+  // ---- SharedState: 宛先の単位が分かれる op と、複数の状態を読む op ----
+
+  // 宛先の単位が books と notes: SharedTable のメソッド
+  @db.effects(createBook, firstNote)
+  export op addWithNote(book: Book, note: Note);
+  // 宛先の単位が books と Lending（Lending は books にもまたがるが、単位は別）
+  @db.effects(createBook, lend)
+  export op addAndLend(book: Book, loan: Loan);
+  // 付けていない: 複数の状態を読む葉は、SharedState の op（読む op のデコレータは、表一つしか読めない）
+  export op overdue(): Book[] reads books, loans;
 }

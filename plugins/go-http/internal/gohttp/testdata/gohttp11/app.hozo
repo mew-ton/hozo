@@ -17,7 +17,7 @@ namespace checked {
 }
 
 namespace app {
-  // 入力の model が plain のもの: Validate のメソッドがない
+  // 入力の model が plain のもの: Validate のメソッドがないので、確かめられないまま op に渡る
   @http.get("/a")
   export op a(in: plain.In): string;
 
@@ -25,7 +25,7 @@ namespace app {
   @http.post("/b")
   export op b(in: plain.In);
 
-  // Validate を持たない入力は、確かめないので、当たらない
+  // Validate を持たない入力は、確かめるものがないので、当たらない
   @http.get("/c")
   export op c(in: plain.Free): string;
 

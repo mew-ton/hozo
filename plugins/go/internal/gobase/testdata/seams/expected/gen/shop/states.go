@@ -12,6 +12,6 @@ type ItemsState = inner.ItemsState
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type TitleState = inner.TitleState
 
-// SharedState は、複数の状態を読む葉の op。実装は New の引数 shared に渡す。
+// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type SharedState = inner.SharedState

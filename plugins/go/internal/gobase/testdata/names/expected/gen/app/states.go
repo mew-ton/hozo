@@ -25,7 +25,7 @@ type FuncState interface {
 	Get(ctx context.Context) (string, error)
 }
 
-// SharedState は、複数の状態を読む葉の op。実装は New の引数 shared に渡す。
+// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type SharedState interface {
 	// Both は問い合わせ: app.leaves、app.extra を読む（reads）葉の op app.both。

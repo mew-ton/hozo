@@ -1,4 +1,4 @@
-# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-3（入力の model のフィールドが、@http.header / @http.query / @http.body のどれも持たない、または二つ以上持つ）。
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-3（入力の model のフィールドが、要求のどこから読むかを言う六つのデコレータのどれも持たない、または二つ以上持つ）。
 [[emit]]
 namespace   = "app"
 transpilers = ["go", "go-valid", "go-http"]

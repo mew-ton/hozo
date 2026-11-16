@@ -1,5 +1,5 @@
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「表」の、列の型の表の各行
-# （核の型と scalar）、省略可能な列、制約（複数の @db.key、@db.unique、@db.ref）。
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「しまい方」の表の各行
+# （六つのしまい方。核の型と scalar）、@db.nullable の列（しまい方ごと）、制約（複数の @db.key、@db.unique、@db.ref）。
 [[emit]]
 namespace   = "app"
 transpilers = ["go", "go-sqlite"]

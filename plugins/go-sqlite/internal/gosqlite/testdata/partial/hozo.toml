@@ -1,5 +1,5 @@
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「状態ごとの型」の
-# 「規則に当たらない op があるとき」と、「op の中身」の条件の、当たらない側。
+# 「デコレータを付けていない op があるとき」と、「状態をまたぐ単位の型」（SharedTable と <C>Table。足りないメソッドのあるものと、ないもの）。
 [[emit]]
 namespace   = "lib"
 transpilers = ["go", "go-sqlite"]
