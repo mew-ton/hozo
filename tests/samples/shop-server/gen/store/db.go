@@ -5,14 +5,17 @@ package store
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"reflect"
 	"time"
 
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Schema は @db の状態の表を作る SQL（SQLite）。状態ごとに表一つ、要素の model のフィールドごとに列一つ。
+// Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。
 const Schema = `CREATE TABLE IF NOT EXISTS "users" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "email" TEXT NOT NULL UNIQUE,
@@ -36,7 +39,7 @@ CREATE TABLE IF NOT EXISTS "notifications" (
 );
 `
 
-// CreateTables は db に、@db の状態の表を作る（Schema を実行する）。すでにある表には触れない。
+// CreateTables は db に、@db.table の状態の表を作る（Schema を実行する）。すでにある表には触れない。
 func CreateTables(ctx context.Context, db *sql.DB) error {
 	_, err := db.ExecContext(ctx, Schema)
 	return err
@@ -65,13 +68,13 @@ func (t UsersTable) Get(ctx context.Context) ([]pkgtype.User, error) {
 // FindUser は op store.findUser（@db.find）: 表 "users" から、"email"（@db.unique）が引数 email と同じ行を引く。なければ nil。
 func (t UsersTable) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
 	return dbGet(ctx, t.db, dbScanUser,
-		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "email" = ?1`, string(email))
+		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "email" IS ?1`, dbText(email))
 }
 
 // FindUserById は op store.findUserById（@db.find）: 表 "users" から、"id"（@db.key）が引数 id と同じ行を引く。なければ nil。
 func (t UsersTable) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
 	return dbGet(ctx, t.db, dbScanUser,
-		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "id" = ?1`, string(id))
+		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "id" IS ?1`, dbText(id))
 }
 
 // AddUser は op store.addUser（@db.effects）: 効果 store.createUser（@db.insert）で、表 "users" に、引数 user の行を足す。
@@ -107,7 +110,7 @@ func (t SessionsTable) Get(ctx context.Context) ([]pkgtype.Session, error) {
 // FindSession は op store.findSession（@db.find）: 表 "sessions" から、"token"（@db.key）が引数 token と同じ行を引く。なければ nil。
 func (t SessionsTable) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
 	return dbGet(ctx, t.db, dbScanSession,
-		`SELECT "token", "userId", "expiresAt" FROM "sessions" WHERE "token" = ?1`, string(token))
+		`SELECT "token", "userId", "expiresAt" FROM "sessions" WHERE "token" IS ?1`, dbText(token))
 }
 
 // AddSession は op store.addSession（@db.effects）: 効果 store.createSession（@db.insert）で、表 "sessions" に、引数 session の行を足す。
@@ -122,7 +125,7 @@ func (t SessionsTable) AddSession(ctx context.Context, session pkgtype.Session) 
 
 // RemoveSession は op store.removeSession（@db.effects）: 効果 store.deleteSession（@db.delete）で、表 "sessions" から、"token" が引数 token と同じ行を消す。行がなければ何もしない。
 func (t SessionsTable) RemoveSession(ctx context.Context, token pkgtype.Token) error {
-	return dbExec(ctx, t.db, `DELETE FROM "sessions" WHERE "token" = ?1`, string(token))
+	return dbExec(ctx, t.db, `DELETE FROM "sessions" WHERE "token" IS ?1`, dbText(token))
 }
 
 // OrdersTable は状態 store.orders の単位（OrdersState）の、表 "orders" の上の実装。
@@ -148,7 +151,7 @@ func (t OrdersTable) Get(ctx context.Context) ([]pkgtype.Order, error) {
 // ListOrders は op store.listOrders（@db.list）: 表 "orders" から、"userId" が引数 userId と同じ行を、足した順にすべて引く。
 func (t OrdersTable) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
 	return dbList(ctx, t.db, dbScanOrder,
-		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" WHERE "userId" = ?1 ORDER BY rowid`, string(userId))
+		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" WHERE "userId" IS ?1 ORDER BY rowid`, dbText(userId))
 }
 
 // NotificationsTable は状態 store.notifications の単位（NotificationsState）の、表 "notifications" の上の実装。
@@ -208,13 +211,13 @@ func (t SharedTable) PlaceOrder(ctx context.Context, order pkgtype.Order, notifi
 
 // dbArgsUser は type.User を、表 "users" の列の順の値にする。
 func dbArgsUser(row pkgtype.User) ([]any, error) {
-	return []any{string(row.Id), string(row.Email), row.Name, row.Hash}, nil
+	return dbArgs(dbText(row.Id), dbText(row.Email), dbText(row.Name), dbText(row.Hash))
 }
 
 // dbScanUser は、表 "users" の列の順の値を type.User に読む。
 func dbScanUser(r dbRow) (pkgtype.User, error) {
 	var row pkgtype.User
-	if err := r.Scan(&row.Id, &row.Email, &row.Name, &row.Hash); err != nil {
+	if err := r.Scan(dbText(&row.Id), dbText(&row.Email), dbText(&row.Name), dbText(&row.Hash)); err != nil {
 		return pkgtype.User{}, err
 	}
 	return row, nil
@@ -222,18 +225,13 @@ func dbScanUser(r dbRow) (pkgtype.User, error) {
 
 // dbArgsSession は type.Session を、表 "sessions" の列の順の値にする。
 func dbArgsSession(row pkgtype.Session) ([]any, error) {
-	return []any{string(row.Token), string(row.UserId), dbTime(row.ExpiresAt)}, nil
+	return dbArgs(dbText(row.Token), dbText(row.UserId), dbTime(row.ExpiresAt))
 }
 
 // dbScanSession は、表 "sessions" の列の順の値を type.Session に読む。
 func dbScanSession(r dbRow) (pkgtype.Session, error) {
 	var row pkgtype.Session
-	var expiresAt string
-	if err := r.Scan(&row.Token, &row.UserId, &expiresAt); err != nil {
-		return pkgtype.Session{}, err
-	}
-	var err error
-	if row.ExpiresAt, err = dbParseTime(expiresAt); err != nil {
+	if err := r.Scan(dbText(&row.Token), dbText(&row.UserId), dbTime(&row.ExpiresAt)); err != nil {
 		return pkgtype.Session{}, err
 	}
 	return row, nil
@@ -241,26 +239,13 @@ func dbScanSession(r dbRow) (pkgtype.Session, error) {
 
 // dbArgsOrder は type.Order を、表 "orders" の列の順の値にする。
 func dbArgsOrder(row pkgtype.Order) ([]any, error) {
-	lines, err := json.Marshal(row.Lines)
-	if err != nil {
-		return nil, err
-	}
-	return []any{string(row.Id), string(row.UserId), string(lines), dbTime(row.PlacedAt)}, nil
+	return dbArgs(dbText(row.Id), dbText(row.UserId), dbJSON(row.Lines), dbTime(row.PlacedAt))
 }
 
 // dbScanOrder は、表 "orders" の列の順の値を type.Order に読む。
 func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 	var row pkgtype.Order
-	var lines string
-	var placedAt string
-	if err := r.Scan(&row.Id, &row.UserId, &lines, &placedAt); err != nil {
-		return pkgtype.Order{}, err
-	}
-	var err error
-	if err = json.Unmarshal([]byte(lines), &row.Lines); err != nil {
-		return pkgtype.Order{}, err
-	}
-	if row.PlacedAt, err = dbParseTime(placedAt); err != nil {
+	if err := r.Scan(dbText(&row.Id), dbText(&row.UserId), dbJSON(&row.Lines), dbTime(&row.PlacedAt)); err != nil {
 		return pkgtype.Order{}, err
 	}
 	return row, nil
@@ -268,13 +253,13 @@ func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 
 // dbArgsNotification は type.Notification を、表 "notifications" の列の順の値にする。
 func dbArgsNotification(row pkgtype.Notification) ([]any, error) {
-	return []any{string(row.UserId), row.Message}, nil
+	return dbArgs(dbText(row.UserId), dbText(row.Message))
 }
 
 // dbScanNotification は、表 "notifications" の列の順の値を type.Notification に読む。
 func dbScanNotification(r dbRow) (pkgtype.Notification, error) {
 	var row pkgtype.Notification
-	if err := r.Scan(&row.UserId, &row.Message); err != nil {
+	if err := r.Scan(dbText(&row.UserId), dbText(&row.Message)); err != nil {
 		return pkgtype.Notification{}, err
 	}
 	return row, nil
@@ -285,14 +270,115 @@ type dbRow interface {
 	Scan(dest ...any) error
 }
 
-// dbTimeLayout は Time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+// dbCol は列一つ: しまい方（@db.text など。write と read）と、Go の値 v。
+// v は、書くときはフィールドの値（か、列と比べる引数）、読むときはフィールドへのポインタ。
+// database/sql が、書くときに Value を、読むときに Scan を呼ぶ。
+type dbCol struct {
+	v     any
+	write func(v reflect.Value) (driver.Value, error) // 値のある Go の値を、列の値にする
+	read  func(src any, dst reflect.Value) error      // NULL でない列の値を、Go の値に読む
+}
+
+// Value は、列に書く値。値があるかどうかは、実行時に見る: 値のないポインタ（省略可能で、ない）は NULL。
+func (c dbCol) Value() (driver.Value, error) {
+	v := reflect.ValueOf(c.v)
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil, nil
+		}
+		v = v.Elem()
+	}
+	return c.write(v)
+}
+
+// Scan は、列の値 src を、読む先に読む。読む先がポインタ（省略可能）かどうかは、実行時に見る: NULL は、値がない。
+// 値がないことを表せない読む先に NULL を読めば、エラー。
+func (c dbCol) Scan(src any) error {
+	dst := reflect.ValueOf(c.v).Elem()
+	if src == nil {
+		switch dst.Kind() {
+		case reflect.Pointer, reflect.Slice, reflect.Map:
+			dst.SetZero()
+			return nil
+		}
+		return fmt.Errorf("db: NULL in a column read into %s", dst.Type())
+	}
+	if dst.Kind() == reflect.Pointer {
+		dst.Set(reflect.New(dst.Type().Elem()))
+		dst = dst.Elem()
+	}
+	return c.read(src, dst)
+}
+
+// dbArgs は、列の並びを、文に渡す値の並びにする。
+func dbArgs(cols ...dbCol) ([]any, error) {
+	args := make([]any, len(cols))
+	for i, c := range cols {
+		v, err := c.Value()
+		if err != nil {
+			return nil, err
+		}
+		args[i] = v
+	}
+	return args, nil
+}
+
+// dbString は、列の値 src を文字列として読む。
+func dbString(src any) (string, error) {
+	var s sql.NullString
+	err := s.Scan(src)
+	return s.String, err
+}
+
+// dbText は @db.text の列: 文字列を、そのまま。
+func dbText(v any) dbCol {
+	return dbCol{v, func(v reflect.Value) (driver.Value, error) {
+		return v.String(), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		dst.SetString(s)
+		return nil
+	}}
+}
+
+// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
 const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は t を Time の列の値にする。
-func dbTime(t time.Time) string { return t.UTC().Format(dbTimeLayout) }
+// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
+func dbTime(v any) dbCol {
+	return dbCol{v, func(v reflect.Value) (driver.Value, error) {
+		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
+		return t.UTC().Format(dbTimeLayout), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(t).Convert(dst.Type()))
+		return nil
+	}}
+}
 
-// dbParseTime は Time の列の値を読む。
-func dbParseTime(s string) (time.Time, error) { return time.Parse(time.RFC3339Nano, s) }
+// dbJSON は @db.json の列: 値を、encoding/json の JSON の文字列で。
+func dbJSON(v any) dbCol {
+	return dbCol{v, func(v reflect.Value) (driver.Value, error) {
+		data, err := json.Marshal(v.Interface())
+		return string(data), err
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(s), dst.Addr().Interface())
+	}}
+}
 
 // dbExec は行を返さない文を実行する。
 func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {

@@ -203,19 +203,22 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		t.Parallel()
 		s := start(t)
 		token := s.login(t)
-		s.post(t, "/orders", "", `[{"item":"apple","quantity":2}]`).want(t, 401, `{"error":"type.Unauthorized"}`)
-		s.post(t, "/orders", token, `[{"item":"apple","quantity":2},{"item":"pear","quantity":0}]`).
+		s.post(t, "/orders", "", `{"lines":[{"item":"apple","quantity":2}]}`).want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.post(t, "/orders", token, `{"lines":[{"item":"apple","quantity":2},{"item":"pear","quantity":0}]}`).
 			want(t, 400, `{"error":"http.BadRequest","value":{"message":"invalid input","violations":[`+
-				`{"path":"body[1].quantity","constraint":"min"}]}}`)
+				`{"path":"body.lines[1].quantity","constraint":"min"}]}}`)
 		// 制約を確かめるのは op を呼ぶ前なので、トークンがなくても 401 より先に 400 になる
-		s.post(t, "/orders", "", `[{"item":"apple","quantity":0}]`).
+		s.post(t, "/orders", "", `{"lines":[{"item":"apple","quantity":0}]}`).
 			want(t, 400, `{"error":"http.BadRequest","value":{"message":"invalid input","violations":[`+
-				`{"path":"body[0].quantity","constraint":"min"}]}}`)
-		s.post(t, "/orders", token, `{"item":"apple"}`).
+				`{"path":"body.lines[0].quantity","constraint":"min"}]}}`)
+		// 本文がオブジェクトでない、lines の型が違う: 読めない要求の 400 http.BadRequest
+		s.post(t, "/orders", token, `[{"item":"apple","quantity":2}]`).
+			want(t, 400, `{"error":"http.BadRequest","value":{"message":"body: invalid JSON","violations":[]}}`)
+		s.post(t, "/orders", token, `{"lines":{"item":"apple"}}`).
 			want(t, 400, `{"error":"http.BadRequest","value":{"message":"body: invalid JSON","violations":[]}}`)
 		s.count(t, 0, 0)
 		// 成功: 注文が一つでき、通知が一つ残る
-		s.post(t, "/orders", token, `[{"item":"apple","quantity":2},{"item":"pear","quantity":1}]`).
+		s.post(t, "/orders", token, `{"lines":[{"item":"apple","quantity":2},{"item":"pear","quantity":1}]}`).
 			want(t, 200, `{"id":"order-1","userId":"u1","lines":[{"item":"apple","quantity":2},{"item":"pear","quantity":1}],`+
 				`"placedAt":"2026-01-02T03:04:05Z"}`)
 		s.count(t, 1, 1)
@@ -228,7 +231,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		s.fixture.FailDelivery(true)
 		// mailer.send が失敗すると type.NotificationFailed。@http.status を持たないので 500 で、中身は出ない。
 		// 仕様では、注文と通知の記録（createOrder、notifyUser）は配送の前に一緒に起きているので、どちらも残る
-		s.post(t, "/orders", token, `[{"item":"apple","quantity":2}]`).want(t, 500, `{"error":"internal"}`)
+		s.post(t, "/orders", token, `{"lines":[{"item":"apple","quantity":2}]}`).want(t, 500, `{"error":"internal"}`)
 		s.count(t, 1, 1)
 		s.get(t, "/orders", token).
 			want(t, 200, `[{"id":"order-1","userId":"u1","lines":[{"item":"apple","quantity":2}],"placedAt":"2026-01-02T03:04:05Z"}]`)
@@ -242,7 +245,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		// 注文がなければ空の配列（null ではない）
 		s.get(t, "/orders", token).want(t, 200, `[]`)
 		for _, item := range []string{"apple", "pear", "plum"} {
-			if r := s.post(t, "/orders", token, `[{"item":"`+item+`","quantity":1}]`); r.status != 200 {
+			if r := s.post(t, "/orders", token, `{"lines":[{"item":"`+item+`","quantity":1}]}`); r.status != 200 {
 				t.Fatalf("POST /orders: %d %s", r.status, r.body)
 			}
 		}
@@ -261,12 +264,60 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 			want(t, 400, `{"error":"http.BadRequest","value":{"message":"query page: invalid int","violations":[]}}`)
 	})
 
+	t.Run("getLatestOrder", func(t *testing.T) {
+		t.Parallel()
+		s := start(t)
+		token := s.login(t)
+		s.get(t, "/orders/latest", "").want(t, 401, `{"error":"type.Unauthorized"}`)
+		// 省略可能な戻り値で、値がない: 204 で、本文はない（null を返さない）。何を返すかは、実行時に、戻り値で決まる
+		s.get(t, "/orders/latest", token).want(t, 204, "")
+		for _, item := range []string{"apple", "pear"} {
+			if r := s.post(t, "/orders", token, `{"lines":[{"item":"`+item+`","quantity":1}]}`); r.status != 200 {
+				t.Fatalf("POST /orders: %d %s", r.status, r.body)
+			}
+		}
+		// 値があれば、同じ op が 200 と、その JSON
+		s.get(t, "/orders/latest", token).
+			want(t, 200, `{"id":"order-2","userId":"u1","lines":[{"item":"pear","quantity":1}],"placedAt":"2026-01-02T03:04:05Z"}`)
+	})
+
+	// 入力のフィールドを、要求のどの名前から読むか: デコレータに名前を書けばその名前、省けばフィールドの名前
+	t.Run("names", func(t *testing.T) {
+		t.Parallel()
+		s := start(t)
+		token := s.login(t)
+		for _, item := range []string{"apple", "pear", "plum"} {
+			if r := s.post(t, "/orders", token, `{"lines":[{"item":"`+item+`","quantity":1}]}`); r.status != 200 {
+				t.Fatalf("POST /orders: %d %s", r.status, r.body)
+			}
+		}
+		order := func(n, item string) string {
+			return `{"id":"order-` + n + `","userId":"u1","lines":[{"item":"` + item + `","quantity":1}],"placedAt":"2026-01-02T03:04:05Z"}`
+		}
+		// ヘッダ: @http.header("Authorization") token。書いた名前で読む。フィールドの名前（token）のヘッダは読まない
+		s.do(t, context.Background(), http.MethodGet, "/me", "", "", "token", token).
+			want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.do(t, context.Background(), http.MethodGet, "/me", "", "", "Authorization", token).
+			want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
+		// クエリ: @http.query page。名前を省いたので、フィールドの名前で読む。ほかの名前（p）は読まず、既定値の 1 のまま
+		s.get(t, "/orders?page=2", token).want(t, 200, `[`+order("3", "plum")+`]`)
+		s.get(t, "/orders?p=2", token).want(t, 200, `[`+order("1", "apple")+`,`+order("2", "pear")+`]`)
+		// 本文の項目: @http.body lines。本文はオブジェクトで、フィールドの名前がキー。ほかのキー（items）は読まず、
+		// lines は初めの値（空）のまま
+		s.post(t, "/orders", token, `{"items":[{"item":"fig","quantity":1}]}`).
+			want(t, 200, `{"id":"order-4","userId":"u1","lines":[],"placedAt":"2026-01-02T03:04:05Z"}`)
+		// 本文の全体: @http.bodyObj body。本文そのものが model（server.Credentials）で、フィールドの名前（body）のキーで包まない
+		s.post(t, "/login", "", `{"body":{"email":"alice@example.com","password":"password123"}}`).
+			want(t, 400, `{"error":"http.BadRequest","value":{"message":"invalid input","violations":[`+
+				`{"path":"body.email","constraint":"format"},{"path":"body.password","constraint":"length"}]}}`)
+	})
+
 	t.Run("logout", func(t *testing.T) {
 		t.Parallel()
 		s := start(t)
 		token := s.login(t)
 		s.get(t, "/me", token).want(t, 200, `{"id":"u1","email":"alice@example.com","name":"Alice"}`)
-		// 戻り値のない op は 204 で、本文はない
+		// 戻り値のない op は、返す値がないので 204 で、本文はない
 		s.post(t, "/logout", token, "").want(t, 204, "")
 		s.get(t, "/me", token).want(t, 401, `{"error":"type.Unauthorized"}`)
 		// トークンがない、もう無効: 401（仕様: logout は authenticate を通る）
@@ -282,11 +333,11 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		// （SQLite は database/sql が、メモリは memstore が ctx を見る）、状態は変わらない。応答は 500
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		s.do(t, ctx, http.MethodPost, "/orders", token, `[{"item":"apple","quantity":2}]`).want(t, 500, `{"error":"internal"}`)
+		s.do(t, ctx, http.MethodPost, "/orders", token, `{"lines":[{"item":"apple","quantity":2}]}`).want(t, 500, `{"error":"internal"}`)
 		s.do(t, ctx, http.MethodGet, "/me", token, "").want(t, 500, `{"error":"internal"}`)
 		s.count(t, 0, 0)
 		// 同じ要求は、生きている ctx なら通る
-		s.post(t, "/orders", token, `[{"item":"apple","quantity":2}]`).
+		s.post(t, "/orders", token, `{"lines":[{"item":"apple","quantity":2}]}`).
 			want(t, 200, `{"id":"order-1","userId":"u1","lines":[{"item":"apple","quantity":2}],"placedAt":"2026-01-02T03:04:05Z"}`)
 		s.count(t, 1, 1)
 	})
@@ -303,7 +354,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		s.fixture.Advance(time.Nanosecond)
 		s.get(t, "/me", token).want(t, 401, `{"error":"type.Unauthorized"}`)
 		s.get(t, "/orders", token).want(t, 401, `{"error":"type.Unauthorized"}`)
-		s.post(t, "/orders", token, `[{"item":"apple","quantity":2}]`).want(t, 401, `{"error":"type.Unauthorized"}`)
+		s.post(t, "/orders", token, `{"lines":[{"item":"apple","quantity":2}]}`).want(t, 401, `{"error":"type.Unauthorized"}`)
 		s.post(t, "/logout", token, "").want(t, 401, `{"error":"type.Unauthorized"}`)
 		s.count(t, 0, 0)
 		// 入り直せば、新しいセッションで通る
@@ -330,7 +381,7 @@ func RunTwo(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 			defer wg.Done()
 			token := c.s.login(t)
 			for range c.orders {
-				if r := c.s.post(t, "/orders", token, `[{"item":"apple","quantity":1}]`); r.status != 200 {
+				if r := c.s.post(t, "/orders", token, `{"lines":[{"item":"apple","quantity":1}]}`); r.status != 200 {
 					t.Errorf("POST /orders: %d %s", r.status, r.body)
 				}
 			}
@@ -375,11 +426,15 @@ func (s Server) post(t *testing.T, path, token, body string) response {
 }
 
 // do は要求を一つ、ctx を要求の context にして送る。token が空でなければ、そのまま Authorization ヘッダの値にする。
-func (s Server) do(t *testing.T, ctx context.Context, method, path, token, body string) response {
+// headers は、ほかに付けるヘッダ（名前、値、名前、値、…）。
+func (s Server) do(t *testing.T, ctx context.Context, method, path, token, body string, headers ...string) response {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body)).WithContext(ctx)
 	if token != "" {
 		req.Header.Set("Authorization", token)
+	}
+	for i := 0; i+1 < len(headers); i += 2 {
+		req.Header.Set(headers[i], headers[i+1])
 	}
 	rec := httptest.NewRecorder()
 	s.Handler.ServeHTTP(rec, req)

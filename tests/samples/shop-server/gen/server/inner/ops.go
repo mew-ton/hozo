@@ -81,6 +81,17 @@ type Ops interface {
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
 
+	// GetLatestOrder は自分のいちばん新しい注文を返す。まだ注文がなければ、値がない
+	//
+	// Throws: type.Unauthorized
+	// Reads: store.sessions, store.orders
+	GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order, error)
+
+	// LatestOf は一覧の最後の一つ。一覧が空なら、ない（人が書く）
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	LatestOf(orders []pkgtype.Order) *pkgtype.Order
+
 	// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
@@ -128,6 +139,11 @@ type Leaves interface {
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
+
+	// LatestOf は一覧の最後の一つ。一覧が空なら、ない（人が書く）
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	LatestOf(orders []pkgtype.Order) *pkgtype.Order
 
 	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
 	//
@@ -232,6 +248,10 @@ func (o *ops) RequireFresh(session pkgtype.Session) (pkgtype.Session, error) {
 
 func (o *ops) PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order {
 	return o.leaves.PageOf(orders, page)
+}
+
+func (o *ops) LatestOf(orders []pkgtype.Order) *pkgtype.Order {
+	return o.leaves.LatestOf(orders)
 }
 
 func (o *ops) NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order {

@@ -37,6 +37,12 @@ type Ops interface {
 	// Reads: store.sessions, store.orders
 	GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order, error)
 
+	// GetLatestOrder は自分のいちばん新しい注文を返す。まだ注文がなければ、値がない
+	//
+	// Throws: type.Unauthorized
+	// Reads: store.sessions, store.orders
+	GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order, error)
+
 	// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed

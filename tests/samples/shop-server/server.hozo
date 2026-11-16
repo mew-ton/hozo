@@ -1,6 +1,7 @@
 // サンプル shop-server の仕様（README.md）。HTTP の入口と業務の流れを持つ名前空間 server。
 // 保存先には触れない: 読み書きは store の op を、外への配送は mailer の op を呼ぶ。
-// 人が書く op（本体のない op）は七つで、どれも状態を読まず、効果を持たない。export を付けたのは HTTP の入口の五つだけで、ほかの十は内部の op（P33）。
+// 人が書く op（本体のない op）は八つで、どれも状態を読まず、効果を持たない。export を付けたのは HTTP の入口の六つだけで、ほかの十一は内部の op（P33）。
+// 入力の model のフィールドは、要求のどこから読むかを http の語彙のデコレータで言う（docs/plugin-go-http.md「対象」）: 一つの項目は @http.header / @http.query / @http.body（名前を省けば、フィールドの名前）、本文の全体を一つの model で受け取るなら @http.bodyObj。
 // トークンのない要求は、store を呼ぶ前に、ここで断る（分類 Credential）: store.findSession は、列と同じ型のトークンだけを受け取る。login には、サンプルの中のプラグインの語彙のデコレータ @rate.limited を付けた（継ぎ目。P38）。
 
 /** サーバー。HTTP の入口と、業務の流れ */
@@ -12,7 +13,7 @@ namespace server {
 
   /** ログインの入力 */
   model LoginInput {
-    @http.body body: Credentials;
+    @http.bodyObj body: Credentials;
   }
 
   /** ログインの結果 */
@@ -20,19 +21,19 @@ namespace server {
 
   /** トークンだけを運ぶ入力 */
   model AuthInput {
-    @http.header(name: "Authorization") token: type.Token?;
+    @http.header("Authorization") token: type.Token?;
   }
 
   /** 注文一覧の入力 */
   model GetOrdersInput {
-    @http.header(name: "Authorization") token: type.Token?;
+    @http.header("Authorization") token: type.Token?;
     /** 1 から数えるページ番号 */
     @http.query page: int = 1;
   }
 
   /** 注文の入力 */
   model PlaceOrderInput {
-    @http.header(name: "Authorization") token: type.Token?;
+    @http.header("Authorization") token: type.Token?;
     @http.body lines: type.OrderLine[];
   }
 
@@ -141,6 +142,19 @@ namespace server {
 
   /** 一覧から、そのページの分を取り出す（人が書く） */
   op pageOf(orders: type.Order[], page: int): type.Order[];
+
+  /** 自分のいちばん新しい注文を返す。まだ注文がなければ、値がない */
+  @http.get("/orders/latest")
+  export op getLatestOrder(in: AuthInput): type.Order?
+    throws type.Unauthorized
+  {
+    const session = authenticate(in.token);
+    const orders = store.listOrders(session.userId);
+    return latestOf(orders);
+  }
+
+  /** 一覧の最後の一つ。一覧が空なら、ない（人が書く） */
+  op latestOf(orders: type.Order[]): type.Order?;
 
   /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")

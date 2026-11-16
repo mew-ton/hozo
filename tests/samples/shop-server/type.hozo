@@ -1,6 +1,7 @@
 // サンプル shop-server の仕様（README.md）。共有の型の名前空間 type。
 // 保存（store.hozo）、サーバー（server.hozo）、配送（mailer.hozo）が同じ型を使う。
-// 書き方は docs/decisions.md の P1〜P39 と、決定 91〜102 の後の形。store.hozo は、まだ実装のない書き方（db の語彙のデコレータで言う読み書き）を含む（README.md「まだないもの」）。
+// 書き方は docs/decisions.md の P1〜P39 と、決定 91〜113 の後の形。まだ実装のない書き方（db の語彙のデコレータで言う読み書きと、列のしまい方）を含む（README.md「まだないもの」）。
+// 表の model（User、Session、Order、Notification）のフィールドは、しまい方のデコレータ（@db.text、@db.time、@db.json）をちょうど一つ持つ（docs/plugin-go-sqlite.md「しまい方」）。
 
 /** 共有の型。どの担い手にも属さない */
 namespace type {
@@ -30,11 +31,11 @@ namespace type {
 
   /** ユーザー */
   model User {
-    @db.key    id: UserId;
-    @db.unique email: Email;
-    @valid.length(min: 1, max: 100) name: string;
+    @db.key    @db.text id: UserId;
+    @db.unique @db.text email: Email;
+    @db.text @valid.length(min: 1, max: 100) name: string;
     /** パスワードのハッシュ */
-    hash: string;
+    @db.text hash: string;
   }
 
   /** 外に見せるユーザー（ハッシュを持たない） */
@@ -44,9 +45,9 @@ namespace type {
 
   /** ログインセッション */
   model Session {
-    @db.key       token: Token;
-    @db.ref(User) userId: UserId;
-    expiresAt: Time;
+    @db.key       @db.text token: Token;
+    @db.ref(User) @db.text userId: UserId;
+    @db.time expiresAt: Time;
   }
 
   /** 注文の一行 */
@@ -57,16 +58,16 @@ namespace type {
 
   /** 注文 */
   model Order {
-    @db.key       id: OrderId;
-    @db.ref(User) userId: UserId;
-    lines: OrderLine[];
-    placedAt: Time;
+    @db.key       @db.text id: OrderId;
+    @db.ref(User) @db.text userId: UserId;
+    @db.json lines: OrderLine[];
+    @db.time placedAt: Time;
   }
 
   /** ユーザーへの通知 */
   model Notification {
-    @db.ref(User) userId: UserId;
-    message: string;
+    @db.ref(User) @db.text userId: UserId;
+    @db.text message: string;
   }
 
   // ---- 例外 ----

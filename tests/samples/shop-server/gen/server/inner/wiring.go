@@ -125,6 +125,22 @@ func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order
 	return o.PageOf(orders, in.Page), nil
 }
 
+// GetLatestOrder は自分のいちばん新しい注文を返す。まだ注文がなければ、値がない
+//
+// Throws: type.Unauthorized
+// Reads: store.sessions, store.orders
+func (o *ops) GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order, error) {
+	session, err := o.Authenticate(ctx, in.Token)
+	if err != nil {
+		return nil, err
+	}
+	orders, err := o.store.ListOrders(ctx, session.UserId)
+	if err != nil {
+		return nil, err
+	}
+	return o.LatestOf(orders), nil
+}
+
 // PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 //
 // Throws: type.Unauthorized, type.NotificationFailed

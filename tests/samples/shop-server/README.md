@@ -2,7 +2,7 @@
 
 小さな店のサーバー（ログイン、自分の情報、注文）を、サンプルを書きながら決めたこと（`docs/decisions.md`「サンプルを書きながら決めたこと（P の番号との対応）」の P1〜P39）を**当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜102: プラグインは出力を推論せず、`store` の読み書きは `db` の語彙のデコレータで言う）は、このサンプルと設計文書だけが先にあり、実装はまだない**（「まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
+P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜113: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかは `http` の語彙のデコレータで言う）は、このサンプルと設計文書だけが先にあり、実装はまだない**（「まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
 
 **生成するコードの規則の持ち主は、トランスパイラごとの設計文書**（「各トランスパイラの規則」）。この文書が持つのは、ファイルの出どころ、この仕様に固有の事実、サンプルの中のプラグイン `go-ratelimit` の規則、書いて分かったこと。期待する出力（`gen/`）は、設計文書の形のとおりに書いてある（文書と違うところは、残していない）。
 
@@ -16,13 +16,16 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 |---|---|---|
 | 言語: 効果の宣言に付けるデコレータ、予約語の名前のデコレータ、デコレータが運ぶ `reads` / `effects`、残りの引数 | `store.hozo` の `@db.insert(users) effect createUser …`、`@db.list(orders, "userId")`、`@db.effects(createOrder, notifyUser)` | `docs/grammar.md`「decorator の宣言」、`docs/check.md`「デコレータが運ぶ reads と effects」 |
 | 語彙 `db` の `find` / `list` / `insert` / `update` / `delete` / `effects` | `store.hozo` の八つの op と五つの効果 | `docs/vocab.md`「`db` の読み書きのデコレータ」 |
+| 語彙 `db` の `table` と、しまい方（`text` / `time` / `json` など） | `store.hozo` の四つの状態の `@db.table(type.<Model>)`、`type.hozo` の四つの表の model のフィールド | `docs/vocab.md`「`db` の表と、しまい方」 |
+| 語彙 `http` の、名前を省ける `header` / `query` / `body` と、`headerObj` / `queryObj` / `bodyObj` | `server.hozo` の `@http.bodyObj body`、`@http.query page`、`@http.body lines` | `docs/vocab.md`「`http` の語彙」 |
 | 基底 `go`: 効果の宛先の単位が分かれた葉を `SharedState` に置く | `gen/store/states.go` の `SharedState`、`gen/store/ops.go` の `New` の引数 `shared` | `docs/plugin-go.md`「op の置き場」 |
-| `go-sqlite`: デコレータの引数だけから中身を出す。複数の効果は一つのトランザクション。`SharedTable` | `gen/store/db.go` | `docs/plugin-go-sqlite.md`「op の中身」「トランザクション」「状態をまたぐ単位の型」 |
+| `go-sqlite`: デコレータの引数だけから中身を出す。複数の効果は一つのトランザクション。`SharedTable`。列ごとのコードは、型に依らず、しまい方の補助の呼び出し | `gen/store/db.go` | `docs/plugin-go-sqlite.md`「op の中身」「トランザクション」「状態をまたぐ単位の型」「しまい方」「補助」 |
+| `go-http`: フィールドごと・経路ごとのコードは、型に依らず、同じ補助の呼び出し。成功の応答は、実行時に、返す値で決める | `gen/server/http.go` | `docs/plugin-go-http.md`「出力」「入力の読み方」「補助」 |
 | 版 0.5 | `plugins/go-ratelimit/hozo-plugin.toml` の `protocol` は、今の hozoc が読める `"0.4"` のまま。hozoc とリポジトリのプラグインが 0.5 になるときに、一緒に上げる（今これだけを上げると、今の hozoc が MAN-2 で断る） | `docs/ir.md`「版」 |
 
 `TestSamples` のサブテストは、最後の形で書いてあり、足りないものを名指しして飛ばす（`../README.md`「飛ばす条件」「移行の間」）。今は、`files` と `go`（このモジュールの `go vet` と `go test`）が通り、`check` と、六つの `transpilers/*` が、文書の版（0.5）と今の hozoc の版（0.4）の違いを名指しして飛ぶ。`sample.json` に、保留を書くところはない。
 
-`server` の出力（`gen/server`）は、今の hozoc でも確かめてある: `store.hozo` を、同じ op を今の書き方（`reads` と `effects` を op に書く。`placeOrder` の効果は一つだけ）で書いた写しに置き換えて `hozoc emit` を掛けると、`gen/server` は、`placeOrder` の `Effects:` のコメント（効果が一つになる）のほかは、期待する出力とバイト単位で同じ。`gen/store` と `gen/storemem` は、そこから、`SharedState` と、デコレータで決まる `db.go` を、文書のとおりに手で書いた。
+`gen/type`、`gen/rate` と、`gen/server` の基底と `go-valid` と `go-ratelimit` のファイル（`http.go` のほかのすべて）は、今の hozoc でも確かめてある: 仕様の写しを、今の hozoc が読める書き方に直して（`store.hozo` は、同じ op を、`reads` と `effects` を op に書く形で。`placeOrder` の効果は一つだけ。しまい方のデコレータを外し、`@db.table(…)` を `@db` に、`@http.bodyObj` を `@http.body` に）`hozoc emit` を掛けると、それらのファイルは、`placeOrder` の `Effects:` のコメント（効果が一つになる）のほかは、期待する出力とバイト単位で同じ。`gen/server/http.go`、`gen/store` と `gen/storemem` の `SharedState`、デコレータで決まる `db.go` は、文書のとおりに手で書いた。
 
 ## 入力
 
@@ -30,9 +33,9 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 | ファイル | 名前空間 | 中身 |
 |---|---|---|
-| `type.hozo` | `type` | 共有の型（P6）: scalar、model、例外。`model PublicUser extends User { override hash: never; }`（P24〜P26） |
-| `store.hozo` | `store` | DB の状態四つ（P5）、それを読む op と書く op（八つとも `export`）、読んだ結果の分類（`classify C of <op>`、`Case: <op> as T;`）。読み書きは `db` の語彙のデコレータで言う: 読む op に `@db.find` / `@db.list`、効果に `@db.insert` / `@db.delete`、書く op に `@db.effects`。op は `reads` も `effects` も書かない |
-| `server.hozo` | `server` | HTTP の入口（`export` を付けた五つ）と、業務の流れ（配線）。人が書く op は七つ。`login` に `@rate.limited`（継ぎ目。P38）。トークンのない要求を断る分類 `Credential` |
+| `type.hozo` | `type` | 共有の型（P6）: scalar、model、例外。`model PublicUser extends User { override hash: never; }`（P24〜P26）。表の model（`User`、`Session`、`Order`、`Notification`）のフィールドは、しまい方のデコレータ（`@db.text`、`@db.time`、`@db.json`）を一つずつ持つ |
+| `store.hozo` | `store` | DB の状態四つ（P5。どれも `@db.table(type.<Model>)`）、それを読む op と書く op（八つとも `export`）、読んだ結果の分類（`classify C of <op>`、`Case: <op> as T;`）。読み書きは `db` の語彙のデコレータで言う: 読む op に `@db.find` / `@db.list`、効果に `@db.insert` / `@db.delete`、書く op に `@db.effects`。op は `reads` も `effects` も書かない |
+| `server.hozo` | `server` | HTTP の入口（`export` を付けた六つ）と、業務の流れ（配線）。人が書く op は八つ。入力の model のフィールドは、要求のどこから読むかを `@http.header("Authorization")` / `@http.query` / `@http.body` / `@http.bodyObj` で言う。`login` に `@rate.limited`（継ぎ目。P38）。トークンのない要求を断る分類 `Credential` |
 | `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。`@smtp.sendMail` を付けた op `send`（`export`） |
 | `smtp.hozo` | `smtp` | メールを SMTP で送る仕組みの語彙。デコレータ `sendMail`。読むトランスパイラがないので、印（何も出ない。P37） |
 | `plugins/go-ratelimit/rate.hozo` | `rate` | サンプルの中のプラグイン `go-ratelimit` が提供する語彙: 例外 `LimitExceeded` と、デコレータ `limited`（「サンプルの中のプラグイン」） |
@@ -45,7 +48,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | 2 | `gen/rate` | `rate` | `go` | —（語彙 `rate` の例外の型だけ） |
 | 3 | `gen/store` | `store` | `go`、`go-sqlite` | `go-sqlite`: 四つの状態の単位と `SharedState` の実装（八つの op と、状態の形で決まる問い合わせのすべて） |
 | 4 | `gen/storemem` | `store` | `go` | 人: `app/memstore`（四つの状態の単位と `SharedState` の実装。メモリの上） |
-| 5 | `gen/server` | `server` | `go`、`go-valid`、`go-http`、`go-ratelimit` | 人: `app/leaves.go`（葉の op 七つ）、`app/mailer.go`（`mailer.send`）、`app/limiter.go`（`@rate.limited` の数え方）。`go-ratelimit`: 継ぎ目の中身 |
+| 5 | `gen/server` | `server` | `go`、`go-valid`、`go-http`、`go-ratelimit` | 人: `app/leaves.go`（葉の op 八つ）、`app/mailer.go`（`mailer.send`）、`app/limiter.go`（`@rate.limited` の数え方）。`go-ratelimit`: 継ぎ目の中身 |
 
 - 五つの単位は、どれも基底 `go` を一つ持ち、相乗りの依存（`go-http` は `go` と `go-valid`、`go-ratelimit` は `go`）をすべて並べている（`docs/config.md`「基底と相乗り」）。
 - 使う型の名前空間は、どれも `go` の単位を持つ（同「型の置き場」）: `type` は単位 1、`rate` は単位 2。**`rate` は語彙の名前空間**で、その例外 `rate.LimitExceeded` を `server` の出力が使う（`login` の `Op.signature.exceptions` にある。同「型の置き場」の表の 3）ので、単位が要る。単位 2 がなければ CFG-22。
@@ -54,13 +57,13 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 ### `export` を付けた op
 
-別の名前空間から呼べる op には `export` を付ける（P33）。書く位置は、説明のコメントとデコレータの後ろ、`op` のすぐ前（`server.hozo:42-44` の `@http.post("/login")`、`@rate.limited`、`export op login(…)`）。付けていない op は内部で、別の名前空間から呼べばエラー。対象は op だけで、型、例外、分類、効果、デコレータは、今までどおりどこからでも参照できる（`server` は `store.Registration` や `type.Unauthorized` を、そのまま書く）。
+別の名前空間から呼べる op には `export` を付ける（P33）。書く位置は、説明のコメントとデコレータの後ろ、`op` のすぐ前（`server.hozo:43-45` の `@http.post("/login")`、`@rate.limited`、`export op login(…)`）。付けていない op は内部で、別の名前空間から呼べばエラー。対象は op だけで、型、例外、分類、効果、デコレータは、今までどおりどこからでも参照できる（`server` は `store.Registration` や `type.Unauthorized` を、そのまま書く）。
 
-この仕様の二十四の op のうち、`export` を付けたのは十四。付けたのは、**その名前空間の外に、呼ぶ者がいる op だけ**。
+この仕様の二十六の op のうち、`export` を付けたのは十五。付けたのは、**その名前空間の外に、呼ぶ者がいる op だけ**。
 
 | 名前空間 | `export` を付けた op | 外の呼び手 | 内部の op |
 |---|---|---|---|
-| `server` | `login`、`logout`、`getMe`、`getOrders`、`placeOrder`（五つ） | `go-http` のハンドラ（`@http.*` の入口）。仕様の中に、呼ぶ名前空間はない | 配線 `issueSession`、`authenticate`、`sessionOf` と、人が書く葉 `checkPassword`、`newSession`、`toPublicUser`、`requireFresh`、`pageOf`、`newOrder`、`composeNotice`（十） |
+| `server` | `login`、`logout`、`getMe`、`getOrders`、`getLatestOrder`、`placeOrder`（六つ） | `go-http` のハンドラ（`@http.*` の入口）。仕様の中に、呼ぶ名前空間はない | 配線 `issueSession`、`authenticate`、`sessionOf` と、人が書く葉 `checkPassword`、`newSession`、`toPublicUser`、`requireFresh`、`pageOf`、`latestOf`、`newOrder`、`composeNotice`（十一） |
 | `store` | `findUser`、`findUserById`、`findSession`、`listOrders`、`addSession`、`removeSession`、`placeOrder`（七つ） | `server` の配線 | なし |
 | `store` | `addUser` | 人が書くコード（二つの main と、テスト）。仕様の中に、呼ぶ名前空間はない | |
 | `mailer` | `send` | `server` の配線 `placeOrder` | なし |
@@ -69,19 +72,24 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 ### 下書きから変えたこと
 
-仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の十一。9〜11 は、`docs/decisions.md`「決めたこと」91〜102 を当てはめたもの。
+仕様の元は、`ac57788` までこのディレクトリにあった下書き `NEXT.md`（P1〜P19 を当てはめたもの）。そこから変えたのは次の十五。9〜11 は、`docs/decisions.md`「決めたこと」91〜102 を、12〜15 は、同 103〜113 を当てはめたもの。
 
-1. **継承**（P24〜P27）: `model PublicUser is User omit hash;` を `model PublicUser extends User { override hash: never; }` にした（`type.hozo:41-43`）。`type.User` を `type.PublicUser` に写す葉の op `toPublicUser` を `server` に足し（`server.hozo:73`）、下書きが `User` をそのまま渡していた二か所で呼ぶ（`server.hozo:61`、`:125`）。
-2. **外部の入出力**（P30）: `server` の葉 `deliver` をやめ、名前空間 `mailer` の `op send` にし、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`smtp.hozo:7`、`mailer.hozo:6-9`、`server.hozo:154`）。外部の入出力をする op は、その仕組みの語彙のデコレータを持つ形に書くのが望ましい（外部のサービスなら、そのサービスの語彙。規則ではなく書き方の指針で、検査はしない）。デコレータを持つ op は純粋でない。
-3. **`store.addUser` と効果 `createUser` を足した**（`store.hozo:61-62`、`:83-84`）。下書きにない変更。ユーザーを足す op がなければ、起動のときとテストが、保存先を直に書き換えるしかない（v1 の「分かったこと」26）。
-4. **`getMe` の `Found` のアームは、呼び出しをそのまま書いた**（`server.hozo:125` の `Found => toPublicUser(user);`）。写した値を先に束縛する形にはできない: `user` が `type.User` になるのはアームの中だけ。
-5. **セッションの期限を確かめる**: 下書きは `expiresAt` を書くだけで、誰も読まなかった（期限の切れたトークンで入れた。「分かったこと」N3）。人が書く葉の op `requireFresh` を `server` に足し（`server.hozo:105-106`）、`LoggedIn` のアームを `LoggedIn => requireFresh(session);` にした（`server.hozo:99`。今は配線 `sessionOf` の中。下の 11）。期限が過ぎていれば `type.Unauthorized`。下書きのアームは値のアーム（P14 の `LoggedIn => session;`）だったので、この仕様に値のアームはなくなった。
+1. **継承**（P24〜P27）: `model PublicUser is User omit hash;` を `model PublicUser extends User { override hash: never; }` にした（`type.hozo:42-44`）。`type.User` を `type.PublicUser` に写す葉の op `toPublicUser` を `server` に足し（`server.hozo:74`）、下書きが `User` をそのまま渡していた二か所で呼ぶ（`server.hozo:62`、`:126`）。
+2. **外部の入出力**（P30）: `server` の葉 `deliver` をやめ、名前空間 `mailer` の `op send` にし、送る仕組みの語彙のデコレータ `@smtp.sendMail` を付けた（`smtp.hozo:7`、`mailer.hozo:6-9`、`server.hozo:168`）。外部の入出力をする op は、その仕組みの語彙のデコレータを持つ形に書くのが望ましい（外部のサービスなら、そのサービスの語彙。規則ではなく書き方の指針で、検査はしない）。デコレータを持つ op は純粋でない。
+3. **`store.addUser` と効果 `createUser` を足した**（`store.hozo:62-63`、`:84-85`）。下書きにない変更。ユーザーを足す op がなければ、起動のときとテストが、保存先を直に書き換えるしかない（v1 の「分かったこと」26）。
+4. **`getMe` の `Found` のアームは、呼び出しをそのまま書いた**（`server.hozo:126` の `Found => toPublicUser(user);`）。写した値を先に束縛する形にはできない: `user` が `type.User` になるのはアームの中だけ。
+5. **セッションの期限を確かめる**: 下書きは `expiresAt` を書くだけで、誰も読まなかった（期限の切れたトークンで入れた。「分かったこと」N3）。人が書く葉の op `requireFresh` を `server` に足し（`server.hozo:106-107`）、`LoggedIn` のアームを `LoggedIn => requireFresh(session);` にした（`server.hozo:100`。今は配線 `sessionOf` の中。下の 11）。期限が過ぎていれば `type.Unauthorized`。下書きのアームは値のアーム（P14 の `LoggedIn => session;`）だったので、この仕様に値のアームはなくなった。
 6. 説明のコメントを足した。
-7. **`export`**（P33）: 外に呼び手のいる十五の op に `export` を付けた（上の「`export` を付けた op」）。下書きには、op を内部にする書き方がなかった。
-8. **継ぎ目**（P36〜P38）: `login` に `@rate.limited` を付けた（`server.hozo:43`）。語彙 `rate` と、その継ぎ目を宣言するトランスパイラは、サンプルの中のプラグイン `go-ratelimit` が提供する（下の「サンプルの中のプラグイン」）。`login` の `throws` には `rate.LimitExceeded` を書いていない: デコレータの `throws` が足す例外は、op が書かなくても `Signature.exceptions` に入る（`docs/check.md`「計算」の手順 i）。`login` を呼ぶ仕様の名前空間があれば、そこは書くことになる（THROWS-1）。
+7. **`export`**（P33）: 外に呼び手のいる op に `export` を付けた（上の「`export` を付けた op」）。下書きには、op を内部にする書き方がなかった。
+8. **継ぎ目**（P36〜P38）: `login` に `@rate.limited` を付けた（`server.hozo:44`）。語彙 `rate` と、その継ぎ目を宣言するトランスパイラは、サンプルの中のプラグイン `go-ratelimit` が提供する（下の「サンプルの中のプラグイン」）。`login` の `throws` には `rate.LimitExceeded` を書いていない: デコレータの `throws` が足す例外は、op が書かなくても `Signature.exceptions` に入る（`docs/check.md`「計算」の手順 i）。`login` を呼ぶ仕様の名前空間があれば、そこは書くことになる（THROWS-1）。
 9. **読み書きを、`db` の語彙のデコレータで言う**（決定 92〜95）: `store` の読む op の `reads <状態>` を `@db.find(<状態>, "<列>")` / `@db.list(<状態>, "<列>")` に、書く op の `effects <効果>` を `@db.effects(<効果>)` に置き換え、五つの効果に `@db.insert(<状態>)` / `@db.delete(<状態>, "<列>")` を付けた（`store.hozo`）。op は `reads` も `effects` も書かない（デコレータが運ぶ）。引数と列を、型が合うかどうかで結ぶ規則（N39）は、なくなった: 列は、仕様が名指しする。
-10. **二つの効果を、一つのトランザクションで**（決定 94）: `store.placeOrder(order, notification)` を足した（`@db.effects(createOrder, notifyUser)`。`store.hozo:95-96`）。`server.placeOrder` は、注文と通知の文面を作ってから、`store.placeOrder` で二つを一緒に記録し、その後で `mailer.send` で配送する（`server.hozo:152-154`）。前は、`store.addOrder`、`mailer.send`、`store.addNotification` を順に呼んでいて、配送に失敗すると、注文だけが残り、通知の記録は残らなかった。今は、配送に失敗しても、注文と通知の記録の両方が残る（HTTP の応答は、前と同じ 500）。**なくした op**: `store.addOrder`、`store.addNotification`（呼ぶ者が、仕様にも、人が書くコードにも、いなくなった。テストは、注文と通知を `placeOrder` で足す。`export` を付けるのは外に呼ぶ者がいる op だけ、という上の「`export` を付けた op」の決まりのとおり）と、`server.notify`（中身が `mailer.send` の呼び出し一つになった）。効果 `createOrder` と `notifyUser` は残る。
-11. **トークンのない要求は、`server` が断る**（決定 96）: `store.findSession` の引数を `type.Token?` から `type.Token` にした（列 `token` の型と等しい。列より広い引数は GOSQL-9）。「トークンがなければ、問い合わせずに『ない』」は、`go-sqlite` の規則ではなくなったので、仕様に書く: `server` に、値の分類 `classify Credential of type.Token? { Presented: type.Token? as type.Token; default; }` を足し（型で決まる分類。`server.hozo:78-81`）、配線 `authenticate(token: type.Token?)` は `match token by Credential` で分け、`Presented` のアームで、新しい内部の配線 `sessionOf(token: type.Token)` を呼び、`default` のアームで `throw type.Unauthorized`（`server.hozo:84-91`）。`sessionOf` が、前の `authenticate` の中身（`store.findSession` と、`store.Login` での分岐）を持つ（`server.hozo:94-102`）。HTTP から見た振る舞いは変わらない（トークンのない要求は 401 `type.Unauthorized`）。変わったのは、そのとき `store` が呼ばれないこと。
+10. **二つの効果を、一つのトランザクションで**（決定 94）: `store.placeOrder(order, notification)` を足した（`@db.effects(createOrder, notifyUser)`。`store.hozo:96-97`）。`server.placeOrder` は、注文と通知の文面を作ってから、`store.placeOrder` で二つを一緒に記録し、その後で `mailer.send` で配送する（`server.hozo:166-168`）。前は、`store.addOrder`、`mailer.send`、`store.addNotification` を順に呼んでいて、配送に失敗すると、注文だけが残り、通知の記録は残らなかった。今は、配送に失敗しても、注文と通知の記録の両方が残る（HTTP の応答は、前と同じ 500）。**なくした op**: `store.addOrder`、`store.addNotification`（呼ぶ者が、仕様にも、人が書くコードにも、いなくなった。テストは、注文と通知を `placeOrder` で足す。`export` を付けるのは外に呼ぶ者がいる op だけ、という上の「`export` を付けた op」の決まりのとおり）と、`server.notify`（中身が `mailer.send` の呼び出し一つになった）。効果 `createOrder` と `notifyUser` は残る。
+11. **トークンのない要求は、`server` が断る**（決定 96）: `store.findSession` の引数を `type.Token?` から `type.Token` にした（列 `token` の型と等しい。列より広い引数は GOSQL-9）。「トークンがなければ、問い合わせずに『ない』」は、`go-sqlite` の規則ではなくなったので、仕様に書く: `server` に、値の分類 `classify Credential of type.Token? { Presented: type.Token? as type.Token; default; }` を足し（型で決まる分類。`server.hozo:79-82`）、配線 `authenticate(token: type.Token?)` は `match token by Credential` で分け、`Presented` のアームで、新しい内部の配線 `sessionOf(token: type.Token)` を呼び、`default` のアームで `throw type.Unauthorized`（`server.hozo:85-92`）。`sessionOf` が、前の `authenticate` の中身（`store.findSession` と、`store.Login` での分岐）を持つ（`server.hozo:95-103`）。HTTP から見た振る舞いは変わらない（トークンのない要求は 401 `type.Unauthorized`）。変わったのは、そのとき `store` が呼ばれないこと。
+
+12. **表は `@db.table` で言う**（決定 104）: 四つの状態の `@db` を `@db.table(type.<要素の model>)` にした（`store.hozo:9-19`）。状態の型に書いてある model を、デコレータの引数でもう一度書く: 表の列を決めるのは、デコレータの引数だけ。
+13. **列のしまい方を、フィールドに書く**（決定 105）: 四つの表の model の十三のフィールドに、`@db.text`（十）、`@db.time`（二: `expiresAt`、`placedAt`）、`@db.json`（一: `lines`）を付けた（`type.hozo:33-71`）。`@db.key` / `@db.unique` / `@db.ref` は、そのまま並べて書く。表にならない `OrderLine` には付けない（`lines` の列の中の JSON）。
+14. **要求のどこから読むか**（決定 107）: `LoginInput` の `@http.body body: Credentials` を `@http.bodyObj` にした（本文が、その model そのもの。通信の形は変わらない）。`PlaceOrderInput` の `@http.body lines: type.OrderLine[]` は、書き方はそのままで、意味が変わった: 項目の形なので、**本文は、配列そのものから、`{"lines":[…]}` に変わった**（違反の場所は `body[1].quantity` から `body.lines[1].quantity` に）。配列そのものを本文にする書き方は、なくなった（全体の形は、model だけ）。`@http.header(name: "Authorization")` は、名前を位置で渡す `@http.header("Authorization")` に書き直した（意味は同じ）。`@http.query page` は、名前を省いた項目の形（名前は、フィールドの名前 `page`）で、書き方も意味も変わらない（`server.hozo:15-38`）。
+15. **省略可能な戻り値の経路を足した**（決定 108）: `@http.get("/orders/latest") export op getLatestOrder(in: AuthInput): type.Order?` と、人が書く葉 `latestOf(orders: type.Order[]): type.Order?`（`server.hozo:146-157`）。注文がなければ 204 で本文なし、あれば 200 と、その注文。成功の応答を、op の型でなく、実行時の値で決めること（`docs/plugin-go-http.md`「通信の形」の「成功の応答」）を、期待する出力とテストで確かめるためだけに足した。
 
 ## サンプルの中のプラグイン `go-ratelimit`
 
@@ -159,7 +167,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/server/http.go` | `go-http`（入口のパッケージ） |
 | `gen/server/ratelimit.go` | `go-ratelimit`（入口のパッケージ） |
 | `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
-| `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 七つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
+| `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 八つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/memstore/memstore.go` | 人が書く: `store` の四つの状態の単位と `SharedState` の、メモリの上の実装（`gen/storemem` の `New` に渡す型） |
 | `app/onsqlite/compose.go`、`app/onmem/compose.go` | 人が書く: 二つの組み立て（`server` を `gen/store` の上に、`gen/storemem` の上に） |
 | `app/cmd/shop-sqlite/main.go`、`app/cmd/shop-mem/main.go` | 人が書く: それぞれの組み立てで待ち受ける main |
@@ -208,10 +216,10 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 | op（`server`） | 種類 | `export` | 純粋か | `throws` | メソッドの形 | Go で現れるところ |
 |---|---|---|---|---|---|---|
 | `login` | 配線 | ある | いいえ（デコレータ `@http.post` と `@rate.limited` があり、純粋でない op も呼ぶ） | ある（自分の `type.InvalidCredentials` と、`@rate.limited` が足す `rate.LimitExceeded`） | `ctx` を取り、`error` を返す | 入口と内側の `Ops` の `Login`。**継ぎ目を持つ**ので二層: 外側は `inner/ops.go` の `ops.Login`（`o.seams.LoginRateLimited(ctx, in, o.loginBody)`）、中身は `inner/wiring.go` の非公開のメソッド `loginBody`。継ぎ目の口は `Seams` の `LoginRateLimited`、その実装は `go-ratelimit` の `RateSeams` |
-| `logout`、`getMe`、`getOrders`、`placeOrder` | 配線 | ある | いいえ（デコレータ `@http.*` があり、純粋でない op も呼ぶ） | ある | `ctx` を取り、`error` を返す | 入口と内側の `Ops` のメソッド（`Logout`）。本体は `inner/wiring.go` の、`ops` の公開のメソッド。`go-http` のハンドラが、入口の `Ops` を通して呼ぶ |
+| `logout`、`getMe`、`getOrders`、`getLatestOrder`、`placeOrder` | 配線 | ある | いいえ（デコレータ `@http.*` があり、純粋でない op も呼ぶ） | ある | `ctx` を取り、`error` を返す | 入口と内側の `Ops` のメソッド（`Logout`）。本体は `inner/wiring.go` の、`ops` の公開のメソッド。`go-http` のハンドラが、入口の `Ops` を通して呼ぶ |
 | `issueSession`、`authenticate`、`sessionOf` | 配線 | ない | いいえ（純粋でない op を呼ぶ: 順に `store.addSession`、`sessionOf`、`store.findSession`） | ある | `ctx` を取り、`error` を返す | 内側の `Ops` のメソッド（`Authenticate`）だけ。入口の `Ops` にはない。本体は `inner/wiring.go` の、`ops` の公開のメソッド |
 | `checkPassword`、`requireFresh` | 葉 | ない | はい（デコレータも `reads` も効果もない） | ある | `ctx` を取らず、`error` を返す | `Leaves` のメソッド（`CheckPassword`。人が実装する）と、内側の `Ops` のメソッド。`ops` のメソッドは、`o.leaves.CheckPassword(…)` を呼ぶだけ（`inner/ops.go`） |
-| `newSession`、`toPublicUser`、`pageOf`、`newOrder`、`composeNotice` | 葉 | ない | はい（同じ） | ない | `ctx` を取らず、`error` も返さない（戻り値だけ） | 同じ（`Leaves` の `NewSession` と、内側の `Ops` の `NewSession`） |
+| `newSession`、`toPublicUser`、`pageOf`、`latestOf`、`newOrder`、`composeNotice` | 葉 | ない | はい（同じ） | ない | `ctx` を取らず、`error` も返さない（戻り値だけ） | 同じ（`Leaves` の `NewSession` と、内側の `Ops` の `NewSession`） |
 
 `store` の八つの op は、どれも `export` を付けた葉で、読む状態か効果を、`db` の語彙のデコレータが運ぶ（op は `reads` も `effects` も書かない。`docs/check.md`「デコレータが運ぶ reads と effects」）。`store.Ops` と、実装を受け取る口の両方に、公開のメソッドとして現れる（`gen/store/ops.go:69-99`）: 七つは、読む状態か効果の宛先の、状態の単位（`<状態>State`）に、二つの効果の宛先が `orders` と `notifications` に分かれる `placeOrder` は、`SharedState` に置かれる（`docs/plugin-go.md`「op の置き場」の 3。`gen/store/states.go` の末尾）。どれも純粋でなく、`ctx` を取り、`error` を返す（`throws` は、どれにもない）。`mailer.send` は、デコレータ `@smtp.sendMail` を持つ葉なので純粋でない（`mailer.hozo:6-9`）。`server.MailerOps` と `server.StoreOps` のメソッド（`mailer.send` と、`store` の七つ）は、相手がどれも純粋でないので、`ctx` を取り、`error` を返す。`mailer` に Go の単位を置けば、そこに出る `Ops` の `Send` も同じ判定で同じ形になり、その `Ops` は `server.MailerOps` をそのまま満たす。
 
@@ -220,9 +228,9 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 | デコレータ | 読むトランスパイラ | 形 | 基底の出力への効き方 |
 |---|---|---|---|
 | `@http.post` / `@http.get`（op） | `go-http` | 入口を作る（ハンドラ） | 純粋さだけ |
-| `@http.header` / `@http.query` / `@http.body`（フィールド）、`@http.status`（例外） | `go-http` | 材料にする | なし |
-| `@db`（状態） | `go-sqlite`（単位 3 だけ） | 実装を出す（`<状態>Table`） | なし |
-| `@db.key` / `@db.unique` / `@db.ref`（フィールド） | `go-sqlite`（単位 3 だけ） | 材料にする | なし |
+| `@http.header` / `@http.query` / `@http.body` / `@http.bodyObj`（フィールド）、`@http.status`（例外） | `go-http` | 材料にする | なし |
+| `@db.table`（状態） | `go-sqlite`（単位 3 だけ） | 実装を出す（`<状態>Table`） | なし |
+| `@db.text` / `@db.time` / `@db.json`、`@db.key` / `@db.unique` / `@db.ref`（フィールド） | `go-sqlite`（単位 3 だけ） | 材料にする（`type` の単位 1 では、どのトランスパイラも読まない: 印） | なし |
 | `@db.find` / `@db.list` / `@db.effects`（op） | `go-sqlite`（単位 3 だけ） | 実装を出す（単位の型のメソッド） | 純粋さと、op の置き場（デコレータが運ぶ読む状態と効果。hozoc が `Op.carried` に置く。単位 4 でも同じ） |
 | `@db.insert` / `@db.delete`（効果） | `go-sqlite`（単位 3 だけ） | 材料にする | なし |
 | `@valid.*`（scalar、フィールド） | `go-valid` | 材料にする（`Validate`） | なし |
@@ -235,44 +243,49 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 
 - この仕様で `Validate` を持つ型（同「Validate を持つ型」）: `type` の `Email`、`Password`、`User`、`PublicUser`、`OrderLine`、`Order`。`server` の `Credentials`、`LoginInput`、`LoginOk`、`PlaceOrderInput`（`AuthInput` と `GetOrdersInput` にはない）。
 - `server` の `Validate` は `type` の型のメソッドを呼ぶので、`type` の単位も `go-valid` を並べている（同「出力」の GOVALID-3）。
-- `server` のメソッドは内側のパッケージの型に付く。入口の型は別名なので、`go-http` は、入口の名前（`LoginInput`）のまま `in.Validate()` を呼べる。
+- `server` のメソッドは内側のパッケージの型に付く。入口の型は別名なので、入口の名前（`LoginInput`）の値も、同じメソッドを持つ。`go-http` は、型ごとに `in.Validate()` を書かず、補助 `httpValidate` が、実行時に、値が `Validate` を持つかを見る。
 
 ## `go-sqlite` が従う規則
 
 持ち主は `docs/plugin-go-sqlite.md`。出すファイルは `db.go` 一つ（入口のパッケージ）。
 
-- この仕様の八つの op は、どれも `db` の語彙の op のデコレータを持つ（同「op の中身」）: `findUser`、`findUserById`、`findSession` は `@db.find`、`listOrders` は `@db.list`、`addUser`、`addSession`、`removeSession`、`placeOrder` は `@db.effects`。五つの効果は、`@db.insert`（四つ）か `@db.delete`（`deleteSession`）を持つ。形で決まる問い合わせは、四つの状態に `IsEmpty` と `Get` で八つ。五つの型（`UsersTable`、`SessionsTable`、`OrdersTable`、`NotificationsTable`、`SharedTable`）は、合わせて十六のメソッドを持ち、どれも基底の口（四つの状態の単位と `SharedState`）を満たす（`gen/store/db.go:45-207`）。組み立ては、五つの型を `store.New` に渡す一行（`app/onsqlite/compose.go:23-24`）。
-- **`placeOrder` は、二つの効果を一つのトランザクションで行う**（同「トランザクション」。`gen/store/db.go:183-207`）: `orders` と `notifications` への二つの `INSERT` を、書いた順に実行し、どちらかが失敗すれば、どちらも残らない。効果が一つの op（`addUser` など）は、文一つ。
-- 列と引数の型（同「列と引数の型」）は、どの op でも等しい（`findUser` は `email: type.Email`、`findSession` と `removeSession` は `token: type.Token`、`listOrders` は `userId: type.UserId`）。
+- この仕様の八つの op は、どれも `db` の語彙の op のデコレータを持つ（同「op の中身」）: `findUser`、`findUserById`、`findSession` は `@db.find`、`listOrders` は `@db.list`、`addUser`、`addSession`、`removeSession`、`placeOrder` は `@db.effects`。五つの効果は、`@db.insert`（四つ）か `@db.delete`（`deleteSession`）を持つ。形で決まる問い合わせは、四つの状態に `IsEmpty` と `Get` で八つ。五つの型（`UsersTable`、`SessionsTable`、`OrdersTable`、`NotificationsTable`、`SharedTable`）は、合わせて十六のメソッドを持ち、どれも基底の口（四つの状態の単位と `SharedState`）を満たす（`gen/store/db.go:48-210`）。組み立ては、五つの型を `store.New` に渡す一行（`app/onsqlite/compose.go:23-24`）。
+- **`placeOrder` は、二つの効果を一つのトランザクションで行う**（同「トランザクション」。`gen/store/db.go:186-210`）: `orders` と `notifications` への二つの `INSERT` を、書いた順に実行し、どちらかが失敗すれば、どちらも残らない。効果が一つの op（`addUser` など）は、文一つ。
+- 列と引数の型（同「列と引数の型」）は、どの op でも等しい（`findUser` は `email: type.Email`、`findSession` と `removeSession` は `token: type.Token`、`listOrders` は `userId: type.UserId`）。条件は、どれも `"<列>" IS ?1` で、引数は、その列のしまい方の補助で包む（五つとも `@db.text` の列なので `dbText(…)`）。
+- **しまい方**（同「しまい方」）: 四つの表の十三の列は、`@db.text` が十、`@db.time` が二、`@db.json` が一。`dbArgs<Model>` と `dbScan<Model>` は、フィールドごとに、しまい方の補助の呼び出し一つ（`gen/store/db.go:212-266`）。scalar（`type.UserId` など）と核の型（`string`）を、書き分けていない。
 - デコレータを付けていない op があるときの形（人が、プラグインの型を埋め込んで書き足す）は、この仕様では起きないので、見立ての型で確かめている（`app/onsqlite/store_test.go` の `partialUsers` と `humanUsers`）。
-- この仕様が使っていない規則: 省略可能な列（と、`T?` の列と比べる引数）、`Duration` / `boolean` / `float` の列、`@db.update`、列のない `@db.list`、複数の `@db.key`、遷移を宛先にする効果のデコレータ、述語で決まる状態の分類の単位の型（`<C>Table`）、効果の宛先の単位が一つの、複数の効果。
+- この仕様が使っていない規則: 省略可能な列（と、`T?` の列と比べる引数。同「未決」の 1）、`@db.int` / `@db.float` / `@db.bool` の列、`@db.update`、列のない `@db.list`、複数の `@db.key`、遷移を宛先にする効果のデコレータ、述語で決まる状態の分類の単位の型（`<C>Table`）、効果の宛先の単位が一つの、複数の効果。
 
 ## `go-http` が従う規則
 
 持ち主は `docs/plugin-go-http.md`。出すファイルは `http.go` 一つ（入口のパッケージ）。**通信の上の形（要求と応答の JSON）の持ち主も、その文書の「通信の形」**で、`app/handlertest` が文字列のまま比べている JSON は、その実物。
 
-- この仕様では、`@http.*` の付いた op と、`server` の `export` を付けた op が、同じ五つ。`NewHandler` が受け取る `Ops` は、ハンドラが呼ぶ op ちょうど。
-- `gen/server` の単位だけが `validate = true` を渡す（同「オプション」）。`Validate` を呼ぶのは `LoginInput` と `PlaceOrderInput`（`gen/server/http.go:36,114`）。
+- この仕様では、`@http.*` の付いた op と、`server` の `export` を付けた op が、同じ六つ。`NewHandler` が受け取る `Ops` は、ハンドラが呼ぶ op ちょうど。
+- **六つのハンドラは、同じ形**（同「出力」）: 入力の初めの値、`req := httpRequest{r: r}`、フィールドごとの一行、`req.ok`、`httpValidate`、op の呼び出し、`httpWriteResult`（`gen/server/http.go:31-144`）。フィールドの読み方は四通りで、どれもデコレータとその引数だけで決まる: `req.bodyObj(&in.Body)`（`@http.bodyObj`）、`req.header("Authorization", &in.Token)`（`@http.header("Authorization")`）、`req.query("page", &in.Page)`（名前を省いた `@http.query`）、`req.body("lines", &in.Lines)`（名前を省いた `@http.body`）。
+- `gen/server` の単位だけが `validate = true` を渡す（同「オプション」）。`httpValidate` は、六つのハンドラのすべてにある。入力が `Validate` を持つ（`LoginInput`、`PlaceOrderInput`）か、持たない（`AuthInput`、`GetOrdersInput`）かは、実行時に見る。
+- **成功の応答は、実行時に決まる**（同「通信の形」の「成功の応答」）: `logout`（戻り値がない）は、いつも 204。`getLatestOrder`（`type.Order?`）は、注文がなければ 204、あれば 200。`getOrders`（`type.Order[]`）は、注文がなくても 200 と `[]`。どのハンドラも、同じ `httpWriteResult` を呼ぶだけで、ステータスを書かない。
 - **`@http.status` を持つ例外は三つ**: `type.InvalidCredentials`（401）、`rate.LimitExceeded`（429）、`type.Unauthorized`（401）。並びは、経路の op の宣言順と、その `exceptions` の順（`login` の二つが先）。`rate.LimitExceeded` は、語彙 `rate` の例外で、`login` の `throws` には書かれていないが、`@rate.limited` が足すので `login` の `Op.signature.exceptions` にあり、`go-http` は、ほかの例外と同じに扱う（`gen/rate` を import する）。`go-http` は、`go-ratelimit` も、継ぎ目も知らない。
-- この仕様が使っていない規則: 二つ以上の `@http.body`、必須のヘッダとクエリ、`int` 以外のクエリ、値を運ぶ例外、省略可能な戻り値。
+- この仕様が使っていない規則: 名前を書いた `@http.query` と `@http.body`、名前を省いた `@http.header`、ヘッダとクエリの全体の形（`@http.headerObj`、`@http.queryObj`）、二つ以上の本文の項目、要るヘッダとクエリ（省略可能でも、既定値持ちでもないフィールド。同「未決」の 1）、`int` 以外のクエリ、値を運ぶ例外、省略可能な配列の戻り値（同「未決」の 3）。
 
-v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制約の検査（P15、P16）、op を呼ぶ前の失敗の本文（v1 は `{"error":"http.BadRequest","message":"…"}`。「分かったこと」N44）。P33 で足したのは、`export` のない op についての規則一つ。
+v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制約の検査（P15、P16）、op を呼ぶ前の失敗の本文（v1 は `{"error":"http.BadRequest","message":"…"}`。「分かったこと」N44）。P33 で足したのは、`export` のない op についての規則一つ。決定 103〜110 で変えたのは、上の、同じ形のハンドラと、実行時に決まる成功の応答と、要求のどこから読むかの六つのデコレータ。
 
 ## 人が書いたもの
 
-- **`app/leaves.go`**: `server` の葉の op 七つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:36`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも `ctx` を取らず、`throws` のない五つは `error` も返さない**: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go:104-141`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:62-67`）。
+- **`app/leaves.go`**: `server` の葉の op 八つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:36`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも `ctx` を取らず、`throws` のない六つは `error` も返さない**: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go:115-157`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。八つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:62-67`）。
 - **`app/mailer.go`**: `mailer.send` の実装。`*app.Mailer` が `server.MailerOps` を満たし、`server.New` の引数 `mailer` に、そのまま渡す。`ctx` を取る（`mailer.send` は `@smtp.sendMail` を持ち、純粋でない）。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。`@smtp.sendMail` は、読むトランスパイラがなく、`mailer` には単位もないので、基底は何も出さない: デコレータの意味（SMTP で送る）を実装するのは、`server.MailerOps` を満たす型を書く人。
 - **`app/limiter.go`**: `@rate.limited` の数え方。`*app.Limiter` が、`go-ratelimit` の出力の `server.RateLimiter` を満たす（`app/limiter.go:34`）。op ごとに、`Window` の間に `Max` 回まで。時計（`Now`）は、テストが差し替える。`server.NewRateSeams(limiter)` に渡し、その戻り値を `server.New` の最後の引数 `seams` に渡す。数え方のテストは `app/limiter_test.go`。
 - `app` パッケージは保存先を知らない: import するのは `gen/server` と `gen/type` だけ（`app/leaves_test.go` の `TestNoStorageImport`）。
 - **`app/memstore/memstore.go`**: `store` の四つの状態の単位と `SharedState` の、メモリの上の実装。`memstore.New()` が空の `Store` を返し、`Users()`、`Sessions()`、`Orders()`、`Notifications()` が、その上の状態ごとの型を、`Shared()` が、二つの状態にまたがる op（`placeOrder`）の型を返す（`app/memstore/memstore.go:44-74`）。五つの型は、`gen/storemem` の `UsersState`、`SharedState` などを満たす（`app/memstore/memstore.go:36-42`）。メソッドは合わせて十六（形で決まる問い合わせ `IsEmpty`、`Get` が八つ、op が八つ）で、どれも、はじめに `ctx.Err()` を見る。**`placeOrder` の「どちらも足すか、どちらも足さない」は、人が守る**: 一度の lock の中で、失敗しうること（同じ id の注文）を先に確かめてから、二つの状態を書く（`gen/storemem` の単位には、`@db.effects` を読むトランスパイラがいない。「一つのトランザクション」の意味は、仕様のデコレータの説明と、`go-sqlite` の文書にある）。`Store` はいくつ作ってもよく、互いに混ざらない。テストのためだけの読む口は持たない。
 - **二つの組み立て**: `app/onsqlite/compose.go`（表を作る `store.CreateTables(ctx, db)` と、`go-sqlite` の五つの型を渡す `store.New`。`app/onsqlite/compose.go:17-28`）と `app/onmem/compose.go`（`memstore` の五つの型を渡す `store.New`。`app/onmem/compose.go:16-23`）。どちらも、`store.New(…)` の戻り値を `server.New(leaves, mailer, s, server.NewRateSeams(limiter))` の三つ目に渡し、その戻り値を `server.NewHandler` に渡す。**二つが使う `gen/server` と `app` の葉は同じ一つのもの**で、違うのは `store` の import と、状態の単位の実装だけ。組み立ては何度呼んでもよい（パッケージの変数がない）。
-- **`app/handlertest`**: HTTP から見た振る舞い。二つの組み立て（`app/onsqlite/compose_test.go`、`app/onmem/compose_test.go` の `TestHandler`）が同じものを走らせる。サブテストは、それぞれ新しいサーバーを作り、並列に走る（`t.Parallel()`）。応答の本文を文字列のまま比べるので、そこに書いた JSON が、クライアントが合わせる形になる。確かめること: パスワード違いとユーザーなしは 401 `type.InvalidCredentials`、制約に合わない入力は 400 `http.BadRequest` と違反の一覧、ログインでトークン、`GET /me`（トークンあり・なし・知らないトークン）、`POST /orders` で注文と通知が一つずつ（通知は、状態 `store.notifications` の `Get` で数える。`Server.count`）、`mailer.send` を失敗させると 500 で**注文も、通知の記録も残る**（二つは、配送の前に、一つの op で一緒に記録してある）、`GET /orders?page=…`、読めない `page` は 400、ログアウトの後の `GET /me` は 401、中断された要求は 500 で状態が変わらない、**期限の切れたセッションは、どの入口でも 401 `type.Unauthorized`**（時計を進めて確かめる。サブテスト `expired`）。
+- **`app/handlertest`**: HTTP から見た振る舞い。二つの組み立て（`app/onsqlite/compose_test.go`、`app/onmem/compose_test.go` の `TestHandler`）が同じものを走らせる。サブテストは、それぞれ新しいサーバーを作り、並列に走る（`t.Parallel()`）。応答の本文を文字列のまま比べるので、そこに書いた JSON が、クライアントが合わせる形になる。確かめること: パスワード違いとユーザーなしは 401 `type.InvalidCredentials`、制約に合わない入力は 400 `http.BadRequest` と違反の一覧、ログインでトークン、`GET /me`（トークンあり・なし・知らないトークン）、`POST /orders`（本文は `{"lines":[…]}`）で注文と通知が一つずつ（通知は、状態 `store.notifications` の `Get` で数える。`Server.count`）、`mailer.send` を失敗させると 500 で**注文も、通知の記録も残る**（二つは、配送の前に、一つの op で一緒に記録してある）、`GET /orders?page=…`、読めない `page` は 400、ログアウトの後の `GET /me` は 401、中断された要求は 500 で状態が変わらない、**期限の切れたセッションは、どの入口でも 401 `type.Unauthorized`**（時計を進めて確かめる。サブテスト `expired`）。
   - **`login/LimitExceeded`**（`app/handlertest/handlertest.go:160-190`）: **`/login` を、制限（`LoginLimit` 回。パスワード違いの失敗も一回と数える）を超えて呼ぶと、429 `{"error":"rate.LimitExceeded"}`**。op の中身は呼ばれない（トークンが作られない）。制約に合わない入力は、制限を超えていても 400 が先（`go-http` の検査は op を呼ぶ前で、op を呼ばないので、数えない）。時間の幅が過ぎれば、また呼べる。`@rate.limited` の付いていない op（`GET /me`）は、何度呼んでも制限されない。
-  - `handlertest.RunTwo`（二つの組み立ての `TestTwoServers`）: **同じ出力の上の二つのサーバーが、一つのプロセスで同時に動き、混ざらない**。SQLite ならデータベースが二つ、メモリなら `memstore.Store` が二つで、`store.New` と `server.New` を二度呼ぶ。二つに並行に要求を送り、注文と通知の数、ログアウトが、もう一方に及ばないことを確かめる（`app/handlertest/handlertest.go:320-346`）。数え方（`app.Limiter`）も、サーバーごとに別の値。
+  - **`getLatestOrder`**: **省略可能な戻り値で、値がなければ 204 で本文なし**（`null` を返さない）。注文を足した後は、同じ経路が 200 と、その注文の JSON。空の配列（`GET /orders`）は値なので 200 と `[]`、戻り値のない `POST /logout` は 204（サブテスト `getOrders`、`logout`）。
+  - **`names`**: 入力のフィールドを、要求のどの名前から読むか。ヘッダは、書いた名前（`@http.header("Authorization") token`: `Authorization` で読み、フィールドの名前 `token` のヘッダは読まない）。クエリは、名前を省いたので、フィールドの名前（`@http.query page`: `page` で読み、`p` は読まない）。本文の項目も同じ（`@http.body lines`: 本文のオブジェクトのキー `lines`。ほかのキー `items` は読まず、`lines` は空のまま）。本文の全体（`@http.bodyObj body`）は、本文そのものが `server.Credentials` で、フィールドの名前 `body` では包まない。
+  - `handlertest.RunTwo`（二つの組み立ての `TestTwoServers`）: **同じ出力の上の二つのサーバーが、一つのプロセスで同時に動き、混ざらない**。SQLite ならデータベースが二つ、メモリなら `memstore.Store` が二つで、`store.New` と `server.New` を二度呼ぶ。二つに並行に要求を送り、注文と通知の数、ログアウトが、もう一方に及ばないことを確かめる（`app/handlertest/handlertest.go:371-397`）。数え方（`app.Limiter`）も、サーバーごとに別の値。
 - **`app/storetest`**: `store` の op と、状態の形で決まる問い合わせの振る舞い。**`placeOrder` は、注文と通知を一緒に足し、同じ id の注文があって失敗するときは、通知も足さない**（サブテスト `placeOrder`。二つの実装に共通の「どちらも足すか、どちらも足さない」）。二つの実装（`app/onsqlite/store_test.go`、`app/onmem/compose_test.go` の `TestStore`）が同じものを走らせる。`server` は組み立てない。サブテストは並列に走る。効果の結果は、`store.New` に渡したのと同じ、状態の単位の実装の `Get` と `IsEmpty` で確かめる（読む op のない `notifications` も読める。どちらの実装の型も、`storetest.List[T]` をそのまま満たす）。中断された `ctx` で呼ばれた op と問い合わせが `context.Canceled` を返し、四つの状態が変わらないことも確かめる。
 - **`app/onsqlite/store_test.go`**: `go-sqlite` だけの事実。**`placeOrder` は一つのトランザクション**（`TestPlaceOrderIsOneTransaction`）: 二つ目の文（通知の行。`userId` が、いないユーザーで、外部キーの違反）が失敗すれば、一つ目の文（注文の行）も取り消され、その後も続けて足せる。`CreateTables` は中断された `ctx` では表を作らず、二度呼んでも足した行が残る。プラグインの型に足りないメソッドを、人が埋め込みで書き足せる（`TestHumanCompletesPluginType`。足りないままの型が `store.UsersState` を満たさないことは、リフレクションで確かめる）。`Time` と配列の列の形、`REFERENCES`。
 - **`app/server_test.go`**: `server` だけ（`store` のどの出力も使わず、`server.StoreOps` を満たす型をテストが書く）。
-  - メソッドの形（`ctx` と `error` の有無）を、メソッド式の代入で確かめる: 入口の `server.Ops` の五つ、`server.Leaves`、`server.MailerOps`、`server.StoreOps`、**内側の `inner.Ops` の内部の配線**（`IssueSession`、`Authenticate`、`SessionOf`）、**継ぎ目 `server.Seams.LoginRateLimited`**（op の引数の後ろに、op と同じ形の `body`）。入口の型が内側の型の別名であること、`go-ratelimit` の `server.RateSeams` が `inner.Seams` も満たすことも、代入で確かめる。
+  - メソッドの形（`ctx` と `error` の有無）を、メソッド式の代入で確かめる: 入口の `server.Ops` の六つ、`server.Leaves`、`server.MailerOps`、`server.StoreOps`、**内側の `inner.Ops` の内部の配線**（`IssueSession`、`Authenticate`、`SessionOf`）、**継ぎ目 `server.Seams.LoginRateLimited`**（op の引数の後ろに、op と同じ形の `body`）。入口の型が内側の型の別名であること、`go-ratelimit` の `server.RateSeams` が `inner.Seams` も満たすことも、代入で確かめる。
   - 要求の `context` が `server.StoreOps` のメソッドにそのまま届く、`go-http` が読めない要求と制約に合わない入力では op を呼ばない、`New` は `nil` を確かめない（`TestNilIsNotChecked`: `nil` の `leaves` と、`nil` の `seams`）。
   - **`TestReplaceOneLeaf`**: 葉の op を一つだけ差し替え（`newSession`）、内部の配線 `issueSession` を、**内側の `Ops` から直に呼ぶ**（`inner.New(…).IssueSession(ctx, user, password)`）。`issueSession` が通る別の名前空間の op（`store.addSession`）だけを書けばよい。
   - **`TestPlaceOrderRecordsThenSends`**: 配線 `placeOrder` は、注文と通知を、一つの op（`store.placeOrder`）に一緒に渡してから、配送する（`mailer.send`）。配送に失敗しても、`store.placeOrder` は済んでいる。
@@ -281,11 +294,11 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
   - `TestInternalWirings`: 内部の配線 `issueSession`、`authenticate`、`sessionOf` を、`inner.New(…)` の戻り値から直に呼ぶ（パスワード違い、トークンなし、知らないトークン、期限切れ）。**トークンのない `authenticate` は、`store.findSession` を呼ばずに `type.Unauthorized`**（分類 `server.Credential` の `default` のアーム）。継ぎ目を持つ op を呼ばないので、`seams` は `nil` のまま。
   - `TestBodyBehindSeam`: 継ぎ目を持つ op の**中身だけ**を試す。継ぎ目を素通しにする `inner.Seams`（テストが書いた型 `through`）を渡すと、制限なしに、配線の本体の結果がそのまま返る。外側は、呼ばれるたびに継ぎ目を一度通る。
   - `TestSeamOwnsBeforeAndAfter`: 継ぎ目は、中身の前と後の両方を持つ（中身に渡す値と、返す値を、継ぎ目の実装が決める。基底の外側は、何も足さない）。
-- **`app/both_test.go`**: 一つのプロセスで、同じ `server` を二つの保存先の上に組み立てられ、二つが混ざらない。`store` の二つの出力の `Ops` が、どちらも `server.StoreOps` をそのまま満たす（`app/both_test.go:35-36`）。**入口の `Ops` に並ぶのは `export` を付けた op だけ**（`TestOpsHoldExportedOpsOnly`。インターフェースの型のリフレクションで確かめる）: `server.Ops` のメソッドはちょうど五つ、内側の `inner.Ops` は十五のすべて、`server.Seams` は `LoginRateLimited` の一つ。`store.Ops` は八つとも持ち、`server.StoreOps`（そのうちの七つ）を満たす。内部の op を持たない出力（`store`、`storemem`、`type`、`rate`）に、内側のフォルダはない。内部の op を、入口の `New` が返す値から取り出せないことは、確かめない（約束していない。`docs/plugin-go.md`「内側のフォルダと入口」）。一つの `store` の状態の単位を、状態ごとに別の実装（SQLite とメモリ）から取れる（`TestStatesFromTwoImplementations`。二つの状態にまたがる `placeOrder` の実装は、その二つの状態と同じ保存先のものを渡す）。`gen/store` と `gen/storemem` の基底のファイルが、バイト単位で同じ。
+- **`app/both_test.go`**: 一つのプロセスで、同じ `server` を二つの保存先の上に組み立てられ、二つが混ざらない。`store` の二つの出力の `Ops` が、どちらも `server.StoreOps` をそのまま満たす（`app/both_test.go:35-36`）。**入口の `Ops` に並ぶのは `export` を付けた op だけ**（`TestOpsHoldExportedOpsOnly`。インターフェースの型のリフレクションで確かめる）: `server.Ops` のメソッドはちょうど六つ、内側の `inner.Ops` は十七のすべて、`server.Seams` は `LoginRateLimited` の一つ。`store.Ops` は八つとも持ち、`server.StoreOps`（そのうちの七つ）を満たす。内部の op を持たない出力（`store`、`storemem`、`type`、`rate`）に、内側のフォルダはない。内部の op を、入口の `New` が返す値から取り出せないことは、確かめない（約束していない。`docs/plugin-go.md`「内側のフォルダと入口」）。一つの `store` の状態の単位を、状態ごとに別の実装（SQLite とメモリ）から取れる（`TestStatesFromTwoImplementations`。二つの状態にまたがる `placeOrder` の実装は、その二つの状態と同じ保存先のものを渡す）。`gen/store` と `gen/storemem` の基底のファイルが、バイト単位で同じ。
 
 ## 分かったこと
 
-サンプルを書いたときの記録。**N1〜N86 が引く行番号と、op の数え方（`store` の九つの op、`notify`、`addOrder` など）は、その項目を書いたときのもの**で、決定 91〜102 を当てはめた書き直し（「下書きから変えたこと」の 9〜11）で、`store.hozo`、`server.hozo`、`gen/store`、`gen/server/inner`、`app/` の行はずれている。今の形を引いているのは、この節より上と、N87 から後ろ。規則を引いている `docs/emit-go.md` は、そのときの文書（本体に組み込んでいた Go の出力）で、今は `docs/plugin-go.md` が置き換えた。「基底 `go` が従う規則」などの節の名前で引いている規則は、上の「各トランスパイラの規則」が指す文書にある。設計文書を書くときに決まったもの（N23 の、人が書く述語の置き場。N29 の `runtime` の持ち主。N30 の、単位をまたぐ依存。N32 の、オプションと依存。N44 の `http.BadRequest`。N55 の名前の衝突）は、項目を書き直さず、ここに挙げるだけにする: 決まった中身は、文書の方にある。期待する出力を文書の形にそろえたとき（P35 の内側のフォルダ、P36〜P39 の継ぎ目）に形が変わった項目（N26、N51、N52、N54、N56、N65、N68、N70、N71、N72）は、番号と元の記録を残して、「その後」を書き足した。ファイルと行の参照は、今の `gen/` と `app/` のもの。
+サンプルを書いたときの記録。**N1〜N86 が引く行番号と、op の数え方（`store` の九つの op、`notify`、`addOrder`、`server` の十五の op など）、`gen/server/http.go` と `gen/store/db.go` の形（`httpReadBody`、`in.Validate()`、`dbOpt` など）は、その項目を書いたときのもの**で、決定 91〜113 を当てはめた書き直し（「下書きから変えたこと」の 9〜15）で、`type.hozo`、`store.hozo`、`server.hozo`、`gen/store`、`gen/server`、`app/` は変わっている。今の形を引いているのは、この節より上と、N87 から後ろ。規則を引いている `docs/emit-go.md` は、そのときの文書（本体に組み込んでいた Go の出力）で、今は `docs/plugin-go.md` が置き換えた。「基底 `go` が従う規則」などの節の名前で引いている規則は、上の「各トランスパイラの規則」が指す文書にある。設計文書を書くときに決まったもの（N23 の、人が書く述語の置き場。N29 の `runtime` の持ち主。N30 の、単位をまたぐ依存。N32 の、オプションと依存。N44 の `http.BadRequest`。N55 の名前の衝突）は、項目を書き直さず、ここに挙げるだけにする: 決まった中身は、文書の方にある。期待する出力を文書の形にそろえたとき（P35 の内側のフォルダ、P36〜P39 の継ぎ目）に形が変わった項目（N26、N51、N52、N54、N56、N65、N68、N70、N71、N72）は、番号と元の記録を残して、「その後」を書き足した。ファイルと行の参照は、今の `gen/` と `app/` のもの。
 
 ### v1 の「分かったこと」の、その後
 
@@ -363,7 +376,7 @@ v1 の 63 項目（`git show ac57788:tests/samples/shop-server/README.md` の「
 
 決定が決めていなかったので書きながら決めたこと、二つの決定が引っ張り合ったところ、理想のコードに決定が与えてくれなかったもの、v1 より悪くなったところ。それぞれ「何が起きたか → サンプルではどうしたか」。パスはこのディレクトリから。
 
-N1〜N53 は、P1〜P30 を当てはめた形を書いたときのもの。その後の決定（直した P30、P31、P32）と仕様の直しで片づいたものは、番号を残して、見出しに「解決」と、何で解決したかを書く。N54〜N65 は、P31 と P32 を当てはめた形（実装をインターフェースで受け取る）を書いて分かったこと。N66〜N75 は、P33 を当てはめた形（`export` を付けた op だけが `Ops` に並ぶ）を書いて分かったこと。N76〜N86 は、期待する出力を文書の形にそろえ（P35 の、内側のフォルダと入口）、継ぎ目（P36〜P39）を入れて分かったこと。N87〜N96 は、決定 91〜102（プラグインは出力を推論しない。読み書きを `db` の語彙のデコレータで言う）を当てはめて分かったこと。
+N1〜N53 は、P1〜P30 を当てはめた形を書いたときのもの。その後の決定（直した P30、P31、P32）と仕様の直しで片づいたものは、番号を残して、見出しに「解決」と、何で解決したかを書く。N54〜N65 は、P31 と P32 を当てはめた形（実装をインターフェースで受け取る）を書いて分かったこと。N66〜N75 は、P33 を当てはめた形（`export` を付けた op だけが `Ops` に並ぶ）を書いて分かったこと。N76〜N86 は、期待する出力を文書の形にそろえ（P35 の、内側のフォルダと入口）、継ぎ目（P36〜P39）を入れて分かったこと。N87〜N96 は、決定 91〜102（プラグインは出力を推論しない。読み書きを `db` の語彙のデコレータで言う）を当てはめて分かったこと。N97〜N106 は、決定 103〜113（デコレータが出すコードは型に依らない。表、しまい方、要求のどこから読むか、実行時に決まる応答）を当てはめて分かったこと。
 
 N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30）、N22（先にあった決定に合わせた）、N27 と N28（P31）、N10、N14、N17、N18、N53（P32）、N26（P33）、N71 と N72（P35）、N5 と N38（決定 96）、N39（決定 92）。ほかに、N36 は規則そのものがなくなり、N37 は「複数の op を一つのトランザクションにする」だけが、形を変えて解決した（どちらも見出しに書く。数には入れていない）。ほかに、N61 は前半だけが P33 で解決した（見出しに書く。数には入れていない）。N68 と N70 は、P35 で形が変わった（見出しに書く）。
 
@@ -545,10 +558,23 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
 - **N87 列を渡す引数の名前を `by` にできなかった**。決定の書き方は `find(table: any state, by: string)` だったが、`by` は予約語（`match … by`）で、デコレータの引数の名前（`Ident`）に書けない。→ `column` にした（`docs/vocab.md`「`db` の読み書きのデコレータ」）。位置で渡すので、仕様の書き方（`@db.find(users, "email")`）は変わらない。
 - **N88 `@db.find` の列は、一行に決まる列でなければならない**（GOSQL-13）。決定が並べた整合の検査にはなかった。足さなければ、一意でない列を名指しした `find` が、合う行のうちのどれか一つを黙って返す。前の規則の「対応した列のどれかが `@db.key` か `@db.unique`」を、検査として残した形。
 - **N89 `T?` の列と `T?` の引数で、値がないときの意味**。決定 96 は「型が等しければよい」までで、値のない引数が何に合うかは言っていない。→ 等しい型どうしの比較として、値のない行に合う、と決めた（`"c" IS ?n`。`docs/plugin-go-sqlite.md`「列と引数の型」）。この仕様には、省略可能な列がないので、期待する出力には現れない。
-- **N90 配送に失敗したときに、通知の記録が残るようになった**。前は、`mailer.send` の後で `store.addNotification` を呼んでいたので、配送に失敗すれば記録は残らなかった。二つの書き込みを一つの op にまとめるには、記録を配送の前に置くしかない（配送は別の名前空間の op で、トランザクションに入らない）。記録が「送った通知」ではなく「送るべき通知」になり、送れたかどうかは、どこにも残らない（`app/handlertest/handlertest.go:224-235`）。配送の前に注文だけを書き、配送の後で通知を書く形に戻すなら、二つの効果を一つの op にする理由がなくなる。
+- **N90 配送に失敗したときに、通知の記録が残るようになった**。前は、`mailer.send` の後で `store.addNotification` を呼んでいたので、配送に失敗すれば記録は残らなかった。二つの書き込みを一つの op にまとめるには、記録を配送の前に置くしかない（配送は別の名前空間の op で、トランザクションに入らない）。記録が「送った通知」ではなく「送るべき通知」になり、送れたかどうかは、どこにも残らない（`app/handlertest/handlertest.go:227-238`）。配送の前に注文だけを書き、配送の後で通知を書く形に戻すなら、二つの効果を一つの op にする理由がなくなる。
 - **N91 メモリの上の実装では、「一体」を人が守る**（`app/memstore/memstore.go` の `Shared.PlaceOrder`）。`gen/storemem` の単位には `@db.effects` を読むトランスパイラがいないので、「一つのトランザクション」は、デコレータの説明のコメントにしかない。二つ目の効果だけが失敗する場合（SQLite では外部キーの違反で起こせる。`TestPlaceOrderIsOneTransaction`）は、メモリの上では起こせないので、二つの実装が共に走らせるテスト（`storetest` の `placeOrder`）は、一つ目が失敗する場合だけを確かめる。N42 と同じ: 状態の単位のインターフェースが保証するのは、メソッドの形まで。
-- **N92 トークンがない場合を仕様に書くと、配線が一つ増える**。アームに書けるのは呼び出し一つ（N1）なので、「トークンがあれば、セッションを引いて、分ける」は、`authenticate` のアームから呼ぶ別の配線 `sessionOf` になった（`server.hozo:94-102`）。分類 `Credential` は、`by nullable` と同じ判定で、場合に名前を付けただけ（N4 と同じ）。
+- **N92 トークンがない場合を仕様に書くと、配線が一つ増える**。アームに書けるのは呼び出し一つ（N1）なので、「トークンがあれば、セッションを引いて、分ける」は、`authenticate` のアームから呼ぶ別の配線 `sessionOf` になった（`server.hozo:95-103`）。分類 `Credential` は、`by nullable` と同じ判定で、場合に名前を付けただけ（N4 と同じ）。
 - **N93 `SharedState` の実装は、またがる状態と同じ保存先のものでなければ意味がないが、型はそれを言わない**。`store.New(users, sessions, orders, notifications, shared)` に、`orders` はメモリ、`shared` は SQLite、と渡しても、コンパイルは通る（`placeOrder` は SQLite の表に書き、`listOrders` はメモリを読む）。`app/both_test.go` の `TestStatesFromTwoImplementations` は、そろえて渡している。N42 の、状態ごとの実装を混ぜられることの、裏側。
 - **N94 サンプルの中のプラグインのマニフェストの `protocol` を、先に上げられない**。文書の版は 0.5 だが、`plugins/go-ratelimit/hozo-plugin.toml` を 0.5 にすると、今の hozoc が MAN-2 で断り、プラグインの単体テストの入力（`testdata/*/views.json`。今の hozoc が作る）とも食い違う。マニフェストの版は、仕様ではなく、読む hozoc と対のものなので、実装と一緒に上げる（「まだないもの」）。
 - **N95 文書にあって、この仕様が使っていない形**: 述語で決まる状態の分類の単位の型（`<C>Table`）、遷移を宛先にする効果のデコレータ、`@db.update`、列のない `@db.list`、`T?` の列。どれも、期待する出力による確かめがない（`go-sqlite` の単体テストが、小さな入力で確かめることになる。`docs/testing.md`「単体テスト」）。
-- **N96 期待する出力を、実装のない間に、どこまで道具で確かめられたか**。`gen/server` は、今の hozoc で確かめられた（「まだないもの」の末尾）。`gen/store` の基底のファイル（`SharedState`、`New` の引数 `shared`）と `db.go` は、文書から手で書いたもので、確かめたのは、コンパイルできることと、テストが通ること（一つのトランザクションであることを含む）まで。空白やコメントの文言が文書の型どおりかは、実装ができて `transpilers/go` と `transpilers/go-sqlite` が走るまで、機械では確かめられていない。
+- **N96 期待する出力を、実装のない間に、どこまで道具で確かめられたか**。`gen/server` は、今の hozoc で確かめられた（「まだないもの」の末尾。その後、`gen/server/http.go` は、手で書いたものに変わった: N105）。`gen/store` の基底のファイル（`SharedState`、`New` の引数 `shared`）と `db.go` は、文書から手で書いたもので、確かめたのは、コンパイルできることと、テストが通ること（一つのトランザクションであることを含む）まで。空白やコメントの文言が文書の型どおりかは、実装ができて `transpilers/go` と `transpilers/go-sqlite` が走るまで、機械では確かめられていない。
+
+#### 型に依らない出力（決定 103〜113）
+
+- **N97 表の model を言う引数の名前を `model` にできなかった**。`model` は予約語で、デコレータの引数の名前（`Ident`）に書けない（N87 と同じ）。→ `element` にした（`docs/vocab.md`「`db` の表と、しまい方」）。位置で渡すので、仕様の書き方（`@db.table(type.Order)`）は変わらない。
+- **N98 しまい方の名前のうち、`int` と `float` は予約語**。デコレータの名前には書ける（決定 98 の、予約語のデコレータ名）が、今の hozoc は、まだ読めない（「まだないもの」）。この仕様は `@db.text`、`@db.time`、`@db.json` しか使わないので、予約語の名前のしまい方は、期待する出力に現れない。
+- **N99 配列そのものを、本文にできなくなった**。全体の形（`@http.bodyObj`）は model だけなので、`@http.body lines: type.OrderLine[]` は、キー `lines` のオブジェクトになる（「下書きから変えたこと」の 14）。配列や文字列一つを本文そのものにする API は、今の語彙では書けない。
+- **N100 省略可能なものと、そうでないものを、一つの型引数の関数では受け取れない**。`*pkgtype.Token`（省略可能）と `pkgtype.Token` を同じ補助に渡す形を、Go の型引数と制約では書けなかった（`P interface{ *T | **T }` という制約は書けるが、呼び出しから T を推論できず、行ごとに型を書くことになる。その型は、フィールドの型）。→ 読む先を `any` で受け取り、実行時に `reflect` で見る形にした（`gen/server/http.go` の `httpRequest.text`、`gen/store/db.go` の `dbCol`）。受け付けない型を渡すことが、コンパイルエラーにならない。防ぐのは、トランスパイラの整合の検査（GOHTTP-4、GOSQL-17）。例外（`httpThrown[E]`）は、型引数で書けた。
+- **N101 実行時には、「既定値が零値」と「既定値がない」を見分けられない**。要るヘッダやクエリがないことを、補助は、読む先がポインタでなく零値のままかどうかで見る。`page: int = 1` は、初めの値が 1 なので足りないことにならないが、`= 0` と書けば、既定値なしと同じになる。この仕様には、その形がない（`docs/plugin-go-http.md`「未決」の 1）。
+- **N102 省略可能な配列は、実行時には、空の配列と見分けられない**。Go で、どちらも `nil` のスライス。`httpWriteResult` は、`nil` の配列を、いつも `[]` で 200 にする。この仕様の `getOrders` は `type.Order[]` なので、それで正しい（同「未決」の 3）。
+- **N103 入力の初めの値だけは、ハンドラの形が二つある**（`in := NewGetOrdersInput()` と `var in AuthInput`）。既定値を持つ model だけが `New<Model>` を持つという、基底の形に合わせている（同「未決」の 2）。
+- **N104 条件を `IS` にそろえても、この仕様の振る舞いは変わらない**。五つの条件の列は、どれも省略可能でなく、引数も同じ型なので、`=` と同じ行に合う。変わったのは SQL の文字だけ（`gen/store/db.go` の `FindUser` など）。
+- **N105 `gen/server/http.go` は、今の hozoc では確かめられない**。今の `go-http` は、型で形を変える前の出力を出す。新しい `http.go` は、文書から手で書き、確かめたのは、コンパイルできることと、`app/handlertest` が通ること（204 と、項目の名前を含む）まで。`gen/server` のほかのファイルは、今の hozoc の出力と比べてある（「まだないもの」の末尾）。
+- **N106 `httpValidate` が、確かめるもののない入力にも出る**。`AuthInput` と `GetOrdersInput` は `Validate` を持たないが、四つのハンドラが `httpValidate` を呼ぶ（実行時に、何もしないで `true`）。型を見て行を省かないことの、目に見える帰結。

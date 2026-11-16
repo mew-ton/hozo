@@ -48,7 +48,7 @@ func TestNoStorageImport(t *testing.T) {
 }
 
 // TestLeaves は、葉の op の本体。どれも引数だけで決まる（ctx を取らず、保存先に触れない）。
-// throws のない五つは、値だけを返す（error を確かめる行がない）。
+// throws のない六つは、値だけを返す（error を確かめる行がない）。
 func TestLeaves(t *testing.T) {
 	now := time.Date(2026, 1, 2, 12, 4, 5, 0, time.FixedZone("JST", 9*60*60))
 	clock := now
@@ -115,6 +115,14 @@ func TestLeaves(t *testing.T) {
 		if strings.Join(ids, ",") != want {
 			t.Errorf("pageOf(%d) = %s（期待は %s）", page, strings.Join(ids, ","), want)
 		}
+	}
+
+	// latestOf: 最後の一つ。空なら、ない
+	if latest := leaves.LatestOf(orders); latest == nil || latest.Id != "o3" {
+		t.Errorf("latestOf = %+v（期待は o3）", latest)
+	}
+	if latest := leaves.LatestOf(nil); latest != nil {
+		t.Errorf("latestOf(空) = %+v（期待は、ない）", latest)
 	}
 
 	// composeNotice

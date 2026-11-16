@@ -34,6 +34,7 @@ var (
 	_ func(server.Leaves, pkgtype.User) pkgtype.PublicUser                    = server.Leaves.ToPublicUser
 	_ func(server.Leaves, []pkgtype.Order, int64) []pkgtype.Order             = server.Leaves.PageOf
 	_ func(server.Leaves, pkgtype.Session, []pkgtype.OrderLine) pkgtype.Order = server.Leaves.NewOrder
+	_ func(server.Leaves, []pkgtype.Order) *pkgtype.Order                     = server.Leaves.LatestOf
 	_ func(server.Leaves, pkgtype.Order) pkgtype.Notification                 = server.Leaves.ComposeNotice
 	// 純粋で、throws がある: ctx はなく、error はある
 	_ func(server.Leaves, pkgtype.User, pkgtype.Password) error     = server.Leaves.CheckPassword
@@ -43,6 +44,7 @@ var (
 	_ func(server.Ops, context.Context, server.AuthInput) error                         = server.Ops.Logout
 	_ func(server.Ops, context.Context, server.AuthInput) (pkgtype.PublicUser, error)   = server.Ops.GetMe
 	_ func(server.Ops, context.Context, server.GetOrdersInput) ([]pkgtype.Order, error) = server.Ops.GetOrders
+	_ func(server.Ops, context.Context, server.AuthInput) (*pkgtype.Order, error)       = server.Ops.GetLatestOrder
 	_ func(server.Ops, context.Context, server.PlaceOrderInput) (pkgtype.Order, error)  = server.Ops.PlaceOrder
 	_ func(server.MailerOps, context.Context, pkgtype.Notification) error               = server.MailerOps.Send
 	_ func(server.StoreOps, context.Context, pkgtype.Token) (*pkgtype.Session, error)   = server.StoreOps.FindSession
@@ -228,8 +230,8 @@ func TestPlaceOrderRecordsThenSends(t *testing.T) {
 	}
 }
 
-// spyOps は、呼ばれた回数を数えるだけの server.Ops（go-http が受け取る、export を付けた五つの op）。
-// 数えない三つは、埋め込んだ nil のインターフェースのまま（呼べば panic）。
+// spyOps は、呼ばれた回数を数えるだけの server.Ops（go-http が受け取る、export を付けた六つの op）。
+// 数えない四つは、埋め込んだ nil のインターフェースのまま（呼べば panic）。
 type spyOps struct {
 	server.Ops
 	logins, placeOrders int
@@ -262,8 +264,9 @@ func TestValidationPrecedesOp(t *testing.T) {
 		{"/login", `{"email":"not-an-email","password":"password123"}`, 400},
 		{"/login", `{"email":"alice@example.com","password":"short"}`, 400},
 		{"/login", `{"email":`, 400},
-		{"/orders", `[{"item":"apple","quantity":0}]`, 400},
-		{"/orders", `{}`, 400},
+		{"/orders", `{"lines":[{"item":"apple","quantity":0}]}`, 400},
+		{"/orders", `{"lines":{}}`, 400},
+		{"/orders", `[{"item":"apple","quantity":1}]`, 400},
 	} {
 		if got := post(c.path, c.body); got != c.status {
 			t.Errorf("POST %s %s: %d（期待は %d）", c.path, c.body, got, c.status)
@@ -276,7 +279,7 @@ func TestValidationPrecedesOp(t *testing.T) {
 	if got := post("/login", `{"email":"alice@example.com","password":"password123"}`); got != 200 {
 		t.Errorf("POST /login: %d", got)
 	}
-	if got := post("/orders", `[{"item":"apple","quantity":1}]`); got != 200 {
+	if got := post("/orders", `{"lines":[{"item":"apple","quantity":1}]}`); got != 200 {
 		t.Errorf("POST /orders: %d", got)
 	}
 	if spy.logins != 1 || spy.placeOrders != 1 {

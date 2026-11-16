@@ -52,8 +52,8 @@ func methodNames(typ reflect.Type) []string {
 }
 
 // TestOpsHoldExportedOpsOnly は、入口の Ops に並ぶのが、仕様で export を付けた op だけであること。
-//   - server: 十五の op のうち、HTTP の入口の五つ。内部の op（配線 issueSession、authenticate、sessionOf と、七つの葉）は、
-//     入口の Ops にはなく、内側のパッケージ（gen/server/inner）の Ops にある（十五のすべて）。
+//   - server: 十七の op のうち、HTTP の入口の六つ。内部の op（配線 issueSession、authenticate、sessionOf と、八つの葉）は、
+//     入口の Ops にはなく、内側のパッケージ（gen/server/inner）の Ops にある（十七のすべて）。
 //   - store: 八つとも export。内部の op がないので、出力を分けない（内側のパッケージがない）。server が呼ぶ七つ
 //     （server.StoreOps）は、その中にある。
 //
@@ -61,13 +61,13 @@ func methodNames(typ reflect.Type) []string {
 // （守るのは Hozo の検査 NS-5。生成したコードは、置き方で分けるだけ）。
 func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	t.Parallel()
-	entries := []string{"GetMe", "GetOrders", "Login", "Logout", "PlaceOrder"}
+	entries := []string{"GetLatestOrder", "GetMe", "GetOrders", "Login", "Logout", "PlaceOrder"}
 	if got := methodNames(reflect.TypeFor[server.Ops]()); !slices.Equal(got, entries) {
 		t.Errorf("server.Ops のメソッド = %v（期待は %v）", got, entries)
 	}
 	everything := []string{
-		"Authenticate", "CheckPassword", "ComposeNotice", "GetMe", "GetOrders", "IssueSession", "Login", "Logout",
-		"NewOrder", "NewSession", "PageOf", "PlaceOrder", "RequireFresh", "SessionOf", "ToPublicUser",
+		"Authenticate", "CheckPassword", "ComposeNotice", "GetLatestOrder", "GetMe", "GetOrders", "IssueSession", "LatestOf",
+		"Login", "Logout", "NewOrder", "NewSession", "PageOf", "PlaceOrder", "RequireFresh", "SessionOf", "ToPublicUser",
 	}
 	if got := methodNames(reflect.TypeFor[inner.Ops]()); !slices.Equal(got, everything) {
 		t.Errorf("inner.Ops のメソッド = %v（期待は %v）", got, everything)

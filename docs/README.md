@@ -51,7 +51,9 @@ Hozo の実装（このリポジトリ）の設計。言語の意味の持ち主
 | op の分類、標準の分類、型で決まる分類、述語で決まる分類 | `check.md`「分類」 |
 | 読む op、内部の op、純粋 | `check.md`「reads」「export」「純粋」 |
 | 直に読む状態、直に持つ効果、デコレータが運ぶもの（`Op.carried`） | `check.md`「デコレータが運ぶ reads と effects」 |
-| 出力を推論しない（プラグインの規則） | `requirements.md`「出力を推論しない」 |
+| 出力を推論しない（プラグインの原則: デコレータが出すコードは型に依らない） | `requirements.md`「出力を推論しない」。当てはめて決められなかったところは、`plugin-go-sqlite.md`、`plugin-go-http.md`、`plugin-go-cli.md` の「未決」 |
+| 表の状態、表の model、しまい方 | `plugin-go-sqlite.md`「出力」「表」「しまい方」（語彙は `vocab.md`「`db` の表と、しまい方」） |
+| 項目の形、全体の形（要求のどこから読むか） | `plugin-go-http.md`「対象」（語彙は `vocab.md`「`http` の語彙」） |
 | 形の語、状態の型 | `types.md`「形の書き方」 |
 | 継承した model、元の model、継承している | `types.md`「継承した model」 |
 | 絞り込み、型で決まる絞り込み、述語の要る絞り込み | `types.md`「絞り込み」 |

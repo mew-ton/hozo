@@ -1,20 +1,21 @@
 // サンプル shop-server の仕様（README.md）。DB の状態を持つ名前空間 store。
 // 状態を名前で読めるのはこの名前空間の中だけなので、ほかの名前空間は、ここの op を通して読み書きする。八つの op はどれも export（P33）: 七つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
+// 表は、状態に付けた @db.table(<要素の model>) が言う（docs/plugin-go-sqlite.md「表」）。
 // op の中身は、db の語彙のデコレータが言う（docs/plugin-go-sqlite.md「op の中身」）: 読む op は @db.find / @db.list で表と列を、書く op は @db.effects で効果を並べ、効果は @db.insert / @db.delete で表への操作を言う。op は reads も effects も書かない（デコレータが運ぶ）。
 // 単位 gen/store では go-sqlite がその通りに出し、単位 gen/storemem では人が書く。
 
 /** 保存。DB の状態の持ち主 */
 namespace store {
-  @db
+  @db.table(type.User)
   state users: list<type.User>;
 
-  @db
+  @db.table(type.Session)
   state sessions: list<type.Session>;
 
-  @db
+  @db.table(type.Order)
   state orders: list<type.Order>;
 
-  @db
+  @db.table(type.Notification)
   state notifications: list<type.Notification>;
 
   // ---- 読む（効果を持たない op） ----
