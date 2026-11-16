@@ -21,6 +21,7 @@ type sessions struct {
 	server.StoreOps
 	users map[pkgtype.Email]pkgtype.User
 	byKey map[pkgtype.Token]pkgtype.Session
+	finds int // store.findSession が呼ばれた回数
 }
 
 func (s *sessions) FindUser(_ context.Context, email pkgtype.Email) (*pkgtype.User, error) {
@@ -30,11 +31,9 @@ func (s *sessions) FindUser(_ context.Context, email pkgtype.Email) (*pkgtype.Us
 	return nil, nil
 }
 
-func (s *sessions) FindSession(_ context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
-	if token == nil {
-		return nil, nil
-	}
-	if session, ok := s.byKey[*token]; ok {
+func (s *sessions) FindSession(_ context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
+	s.finds++
+	if session, ok := s.byKey[token]; ok {
 		return &session, nil
 	}
 	return nil, nil
@@ -48,7 +47,7 @@ func (s *sessions) AddSession(_ context.Context, session pkgtype.Session) error 
 	return nil
 }
 
-// TestInternalWirings は、内部の配線を、内側の Ops から直に呼ぶ: authenticate と issueSession。
+// TestInternalWirings は、内部の配線を、内側の Ops から直に呼ぶ: issueSession、authenticate、sessionOf。
 // 入口（login、getMe など）を通さないので、そこまでの道の op を用意しなくてよく、戻り値（セッション）もそのまま見られる。
 func TestInternalWirings(t *testing.T) {
 	t.Parallel()
@@ -83,13 +82,24 @@ func TestInternalWirings(t *testing.T) {
 	if session, err := ops.Authenticate(ctx, &token); err != nil || session != added {
 		t.Errorf("Authenticate = %+v, %v（期待は %+v）", session, err, added)
 	}
-	// トークンがない、知らないトークン、期限が過ぎたセッション: どれも type.Unauthorized
+	// sessionOf は、トークンのある呼び出しの先: authenticate が、分類 server.Credential の Presented のアームで呼ぶ
+	if session, err := ops.SessionOf(ctx, token); err != nil || session != added {
+		t.Errorf("SessionOf = %+v, %v（期待は %+v）", session, err, added)
+	}
+	// トークンがない: type.Unauthorized。store は呼ばれない（store.findSession が受け取るのは、列と同じ型のトークンだけ。
+	// ないときにどうするかは、server の配線が決める）
 	var unauthorized pkgtype.Unauthorized
+	finds := st.finds
+	if _, err := ops.Authenticate(ctx, nil); !errors.As(err, &unauthorized) {
+		t.Errorf("Authenticate（トークンなし）= %v（期待は type.Unauthorized）", err)
+	}
+	if st.finds != finds {
+		t.Errorf("トークンのない Authenticate が、store.findSession を %d 回呼んだ", st.finds-finds)
+	}
+	// 知らないトークン、期限が過ぎたセッション: どちらも type.Unauthorized
 	unknown := pkgtype.Token("no-such-token")
-	for name, tok := range map[string]*pkgtype.Token{"トークンなし": nil, "知らないトークン": &unknown} {
-		if _, err := ops.Authenticate(ctx, tok); !errors.As(err, &unauthorized) {
-			t.Errorf("Authenticate（%s）= %v（期待は type.Unauthorized）", name, err)
-		}
+	if _, err := ops.Authenticate(ctx, &unknown); !errors.As(err, &unauthorized) {
+		t.Errorf("Authenticate（知らないトークン）= %v（期待は type.Unauthorized）", err)
 	}
 	f.Advance(handlertest.SessionTTL)
 	if _, err := ops.Authenticate(ctx, &token); !errors.As(err, &unauthorized) {

@@ -227,9 +227,9 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		token := s.login(t)
 		s.fixture.FailDelivery(true)
 		// mailer.send が失敗すると type.NotificationFailed。@http.status を持たないので 500 で、中身は出ない。
-		// 仕様では createOrder は起きたままなので、注文は残り、通知は残らない
+		// 仕様では、注文と通知の記録（createOrder、notifyUser）は配送の前に一緒に起きているので、どちらも残る
 		s.post(t, "/orders", token, `[{"item":"apple","quantity":2}]`).want(t, 500, `{"error":"internal"}`)
-		s.count(t, 1, 0)
+		s.count(t, 1, 1)
 		s.get(t, "/orders", token).
 			want(t, 200, `[{"id":"order-1","userId":"u1","lines":[{"item":"apple","quantity":2}],"placedAt":"2026-01-02T03:04:05Z"}]`)
 	})

@@ -30,13 +30,16 @@ var (
 	_ storetest.Ops = store.Ops(nil)
 	_ storetest.Ops = storemem.Ops(nil)
 	// server が呼ぶ store の op のインターフェース（server.StoreOps）も、どちらの Ops もそのまま満たす。
-	// server.StoreOps は store の九つの op のうち、配線が呼ぶ八つ（addUser がない）。別の名前空間から呼べるのは export を
+	// server.StoreOps は store の八つの op のうち、配線が呼ぶ七つ（addUser がない）。別の名前空間から呼べるのは export を
 	// 付けた op だけで、Ops にはそれがすべて並ぶので、<Ns>Ops のメソッドは、いつも相手の Ops にある
 	_ server.StoreOps = store.Ops(nil)
 	_ server.StoreOps = storemem.Ops(nil)
 	// 状態の単位のインターフェースも、二つの出力で中身が同じ。一方のための実装は、もう一方の New にも渡せる
 	_ storemem.UsersState = store.UsersTable{}
 	_ store.UsersState    = memstore.Users{}
+	// 複数の状態にまたがる op の口（SharedState）も同じ
+	_ storemem.SharedState = store.SharedTable{}
+	_ store.SharedState    = memstore.Shared{}
 )
 
 // methodNames は、型 T の公開のメソッドの名前（名前順）。T がインターフェースなら、そのメソッドのすべて。
@@ -49,9 +52,9 @@ func methodNames(typ reflect.Type) []string {
 }
 
 // TestOpsHoldExportedOpsOnly は、入口の Ops に並ぶのが、仕様で export を付けた op だけであること。
-//   - server: 十五の op のうち、HTTP の入口の五つ。内部の op（配線 issueSession、authenticate、notify と、七つの葉）は、
+//   - server: 十五の op のうち、HTTP の入口の五つ。内部の op（配線 issueSession、authenticate、sessionOf と、七つの葉）は、
 //     入口の Ops にはなく、内側のパッケージ（gen/server/inner）の Ops にある（十五のすべて）。
-//   - store: 九つとも export。内部の op がないので、出力を分けない（内側のパッケージがない）。server が呼ぶ八つ
+//   - store: 八つとも export。内部の op がないので、出力を分けない（内側のパッケージがない）。server が呼ぶ七つ
 //     （server.StoreOps）は、その中にある。
 //
 // 確かめるのは、インターフェースのメソッド。内部の op を、入口の New が返す値から取り出せないことは、約束していない
@@ -64,7 +67,7 @@ func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	}
 	everything := []string{
 		"Authenticate", "CheckPassword", "ComposeNotice", "GetMe", "GetOrders", "IssueSession", "Login", "Logout",
-		"NewOrder", "NewSession", "Notify", "PageOf", "PlaceOrder", "RequireFresh", "ToPublicUser",
+		"NewOrder", "NewSession", "PageOf", "PlaceOrder", "RequireFresh", "SessionOf", "ToPublicUser",
 	}
 	if got := methodNames(reflect.TypeFor[inner.Ops]()); !slices.Equal(got, everything) {
 		t.Errorf("inner.Ops のメソッド = %v（期待は %v）", got, everything)
@@ -80,7 +83,7 @@ func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	}
 
 	all := []string{
-		"AddNotification", "AddOrder", "AddSession", "AddUser", "FindSession", "FindUser", "FindUserById", "ListOrders", "RemoveSession",
+		"AddSession", "AddUser", "FindSession", "FindUser", "FindUserById", "ListOrders", "PlaceOrder", "RemoveSession",
 	}
 	storeOps := reflect.TypeFor[server.StoreOps]()
 	for name, typ := range map[string]reflect.Type{
@@ -124,7 +127,8 @@ func TestTwoStoresInOneProcess(t *testing.T) {
 	if err := sqliteStore.AddUser(ctx, handlertest.Alice()); err != nil {
 		t.Fatal(err)
 	}
-	if err := sqliteStore.AddOrder(ctx, pkgtype.Order{Id: "o1", UserId: handlertest.AliceID, PlacedAt: handlertest.Now}); err != nil {
+	order := pkgtype.Order{Id: "o1", UserId: handlertest.AliceID, PlacedAt: handlertest.Now}
+	if err := sqliteStore.PlaceOrder(ctx, order, pkgtype.Notification{UserId: handlertest.AliceID, Message: "x"}); err != nil {
 		t.Fatal(err)
 	}
 	if user, err := sqliteStore.FindUser(ctx, handlertest.AliceEmail); err != nil || user == nil {
@@ -140,7 +144,8 @@ func TestTwoStoresInOneProcess(t *testing.T) {
 
 // TestStatesFromTwoImplementations は、一つの store の状態の単位を、状態ごとに別の実装から取れること:
 // users は SQLite（go-sqlite の型）、ほかの三つはメモリ（memstore の型）。store.New は、状態ごとのインターフェースを
-// 満たす値を受け取るだけで、どの実装かを知らない。
+// 満たす値を受け取るだけで、どの実装かを知らない。二つの状態（orders と notifications）にまたがる op（placeOrder）の
+// 実装は、その二つの状態と同じ保存先のもの（memstore の Shared）を渡す。
 func TestStatesFromTwoImplementations(t *testing.T) {
 	t.Parallel()
 	db, m := openDB(t), memstore.New()
@@ -149,11 +154,12 @@ func TestStatesFromTwoImplementations(t *testing.T) {
 		t.Fatal(err)
 	}
 	users := store.NewUsersTable(db)
-	s := store.New(users, m.Sessions(), m.Orders(), m.Notifications())
+	s := store.New(users, m.Sessions(), m.Orders(), m.Notifications(), m.Shared())
 	if err := s.AddUser(ctx, handlertest.Alice()); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddOrder(ctx, pkgtype.Order{Id: "o1", UserId: handlertest.AliceID, PlacedAt: handlertest.Now}); err != nil {
+	order := pkgtype.Order{Id: "o1", UserId: handlertest.AliceID, PlacedAt: handlertest.Now}
+	if err := s.PlaceOrder(ctx, order, pkgtype.Notification{UserId: handlertest.AliceID, Message: "x"}); err != nil {
 		t.Fatal(err)
 	}
 	// ユーザーは SQLite の表に、注文はメモリにある
