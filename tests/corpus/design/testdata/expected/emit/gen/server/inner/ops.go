@@ -6,11 +6,34 @@ import "context"
 
 // Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。
 type Ops interface {
+	// Authenticate は op server.authenticate。
+	//
+	// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn
+	// 純粋（ctx を取らない）
+	Authenticate(in LoginInput) (LoginOk, error)
+
 	// Login は op server.login。
 	//
 	// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn, server.ClientError
 	// Effects: server.createSession
 	Login(ctx context.Context, in LoginInput) (LoginOk, error)
+
+	// ConfirmRefund は返金の完了を確かめ、取り消した注文を返す
+	//
+	// Throws: server.RefundPending
+	// 純粋（ctx を取らない）
+	ConfirmRefund(in CancelInput) (Order, error)
+
+	// NewOrder は入力から注文を作る
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewOrder(in OrderInput) Order
+
+	// ComposeNotice は注文の通知を作る
+	//
+	// Throws: server.NotificationFailed
+	// 純粋（ctx を取らない）
+	ComposeNotice(order Order) (Notification, error)
 
 	// CancelOrder は op server.cancelOrder。
 	//
@@ -35,6 +58,12 @@ type Ops interface {
 	// Effects: server.createOrder, server.notifyUser
 	PlaceOrder(ctx context.Context, in OrderInput) (Order, error)
 
+	// NewPasswordReset は op server.newPasswordReset。
+	//
+	// Throws: server.RateLimited
+	// 純粋（ctx を取らない）
+	NewPasswordReset(email Email) (PasswordReset, error)
+
 	// RequestPasswordReset はパスワードの再設定メールを送る。
 	//
 	// 引数:
@@ -58,10 +87,20 @@ type Ops interface {
 	// GetItem は商品を一つ返す（認証は要らない）
 	GetItem(ctx context.Context, in GetItemInput) (Item, error)
 
+	// NewCartLine は op server.newCartLine。
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewCartLine(in AddToCartInput) CartLine
+
 	// AddToCart は商品をカートに入れる
 	//
 	// Effects: server.addCartLine
 	AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error)
+
+	// WithWarranty は op server.withWarranty。
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	WithWarranty(in AttachWarrantyInput) WarrantyLine
 
 	// AttachWarranty はカートの一行に保証プランを付ける
 	//
@@ -69,9 +108,38 @@ type Ops interface {
 	AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
+	// Authenticate は op server.authenticate。
+	//
+	// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn
+	// 純粋（ctx を取らない）
+	Authenticate(in LoginInput) (LoginOk, error)
+
+	// ConfirmRefund は返金の完了を確かめ、取り消した注文を返す
+	//
+	// Throws: server.RefundPending
+	// 純粋（ctx を取らない）
+	ConfirmRefund(in CancelInput) (Order, error)
+
+	// NewOrder は入力から注文を作る
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewOrder(in OrderInput) Order
+
+	// ComposeNotice は注文の通知を作る
+	//
+	// Throws: server.NotificationFailed
+	// 純粋（ctx を取らない）
+	ComposeNotice(order Order) (Notification, error)
+
+	// NewPasswordReset は op server.newPasswordReset。
+	//
+	// Throws: server.RateLimited
+	// 純粋（ctx を取らない）
+	NewPasswordReset(email Email) (PasswordReset, error)
+
 	// GetMe はログインしているユーザー自身を返す
 	GetMe(ctx context.Context, in MeInput) (PublicUser, error)
 
@@ -80,6 +148,16 @@ type Leaves interface {
 
 	// GetItem は商品を一つ返す（認証は要らない）
 	GetItem(ctx context.Context, in GetItemInput) (Item, error)
+
+	// NewCartLine は op server.newCartLine。
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	NewCartLine(in AddToCartInput) CartLine
+
+	// WithWarranty は op server.withWarranty。
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	WithWarranty(in AttachWarrantyInput) WarrantyLine
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）。
@@ -100,28 +178,24 @@ type ops struct {
 	passwordResets PasswordResetsState
 }
 
-func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
-	return o.sessions.Login(ctx, in)
+func (o *ops) Authenticate(in LoginInput) (LoginOk, error) {
+	return o.leaves.Authenticate(in)
 }
 
-func (o *ops) CancelOrder(ctx context.Context, in CancelInput) (Order, error) {
-	return o.orders.CancelOrder(ctx, in)
+func (o *ops) ConfirmRefund(in CancelInput) (Order, error) {
+	return o.leaves.ConfirmRefund(in)
 }
 
-func (o *ops) SaveOrder(ctx context.Context, in OrderInput) (Order, error) {
-	return o.orders.SaveOrder(ctx, in)
+func (o *ops) NewOrder(in OrderInput) Order {
+	return o.leaves.NewOrder(in)
 }
 
-func (o *ops) SendOrderNotice(ctx context.Context, order Order) error {
-	return o.notifications.SendOrderNotice(ctx, order)
+func (o *ops) ComposeNotice(order Order) (Notification, error) {
+	return o.leaves.ComposeNotice(order)
 }
 
-func (o *ops) RequestPasswordReset(ctx context.Context, email Email) error {
-	return o.passwordResets.RequestPasswordReset(ctx, email)
-}
-
-func (o *ops) Logout(ctx context.Context, in LogoutInput) error {
-	return o.sessions.Logout(ctx, in)
+func (o *ops) NewPasswordReset(email Email) (PasswordReset, error) {
+	return o.leaves.NewPasswordReset(email)
 }
 
 func (o *ops) GetMe(ctx context.Context, in MeInput) (PublicUser, error) {
@@ -136,10 +210,10 @@ func (o *ops) GetItem(ctx context.Context, in GetItemInput) (Item, error) {
 	return o.leaves.GetItem(ctx, in)
 }
 
-func (o *ops) AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error) {
-	return o.carts.AddToCart(ctx, in)
+func (o *ops) NewCartLine(in AddToCartInput) CartLine {
+	return o.leaves.NewCartLine(in)
 }
 
-func (o *ops) AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error) {
-	return o.carts.AttachWarranty(ctx, in)
+func (o *ops) WithWarranty(in AttachWarrantyInput) WarrantyLine {
+	return o.leaves.WithWarranty(in)
 }

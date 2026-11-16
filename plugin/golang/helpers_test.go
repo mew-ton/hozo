@@ -41,8 +41,13 @@ func state(fqn string, t ir.Type) *ir.State {
 	return &ir.State{DeclBase: base(fqn, fileOf(fqn)), Type: t, Shape: shape, Element: elem}
 }
 
-func effect(fqn string, target ir.EffectTarget) *ir.Effect {
-	return &ir.Effect{DeclBase: base(fqn, fileOf(fqn)), Target: target}
+func effect(fqn string, target ir.EffectTarget, params ...ir.OpParam) *ir.Effect {
+	return &ir.Effect{DeclBase: base(fqn, fileOf(fqn)), Params: params, Target: target}
+}
+
+// read は read の宣言: 基底の状態 stateFQN を読んで、returns を得る。
+func read(fqn, stateFQN string, returns ir.Type, params ...ir.OpParam) *ir.Read {
+	return &ir.Read{DeclBase: base(fqn, fileOf(fqn)), Params: params, Returns: returns, State: stateFQN}
 }
 
 // classify は分類。subject は ir.TypeSubject / ir.OpSubject / ir.StatesSubject。
@@ -75,23 +80,9 @@ func impure() opOption   { return func(o *ir.Op) { o.Signature.Pure = false } }
 func throwing(exceptions ...string) opOption {
 	return func(o *ir.Op) { o.Signature.Exceptions = exceptions }
 }
-func reading(states ...string) opOption {
-	return func(o *ir.Op) {
-		o.Reads = ir.StateReads(states...)
-		o.Signature.Reads = states
-		o.Signature.Pure = false
-	}
-}
-func effecting(effects ...string) opOption {
-	return func(o *ir.Op) {
-		o.Effects = ir.NamedEffects(effects...)
-		o.Signature.Effects = ir.NamedEffects(effects...)
-		o.Signature.Pure = false
-	}
-}
 
 // carryingReads と carryingEffects は、デコレータが運ぶ reads / effects（Op.carried。docs/check.md「デコレータが運ぶ reads と effects」）。
-// op が書いたもの（Op.reads / Op.effects）とは分けて置かれ、Signature には合わせたものが入る。
+// 葉の op が状態に触れるのは、この分だけ（葉は reads / effects の節を書けない）。Signature にも入る。
 func carryingReads(states ...string) opOption {
 	return func(o *ir.Op) {
 		o.Carried.Reads = append(o.Carried.Reads, ir.StateReads(states...)...)
@@ -123,8 +114,27 @@ func call(opFQN string) ir.Statement {
 	return ir.CallStmt{Call: ir.Call{Callee: ir.OpCallee{Op: opFQN}}}
 }
 
+// callRead、callEffect、callDirect は、read の宣言、effect の宣言、直に呼ぶ組み込みの効果の呼び出し（docs/ir.md「配線」の Callee）。
+func callRead(readFQN string) ir.Statement {
+	return ir.ConstStmt{Name: "x", Expr: ir.CallExpr{Call: ir.Call{Callee: ir.ReadCallee{Read: readFQN}}}}
+}
+
+func callEffect(effectFQN string) ir.Statement {
+	return ir.CallStmt{Call: ir.Call{Callee: ir.EffectCallee{Effect: ir.NamedEffect{Effect: effectFQN}}}}
+}
+
+func callDirect(stateFQN string, operation ir.Operation) ir.Statement {
+	return ir.CallStmt{Call: ir.Call{Callee: ir.EffectCallee{Effect: ir.DirectEffect{State: stateFQN, Operation: operation}}}}
+}
+
 func matchBy(classifyFQN string, arms ...ir.MatchArm) ir.Statement {
 	return ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: ir.NameAtom{Path: []string{"v"}}}, Classify: classifyFQN, Arms: arms}}
+}
+
+// armDirect は、直に呼ぶ組み込みの効果を本体にしたアーム。
+func armDirect(stateFQN string, operation ir.Operation, cases ...string) ir.MatchArm {
+	return ir.MatchArm{Cases: ir.ArmCases{Cases: cases},
+		Body: ir.CallExpr{Call: ir.Call{Callee: ir.EffectCallee{Effect: ir.DirectEffect{State: stateFQN, Operation: operation}}}}}
 }
 
 func armCall(opFQN string, cases ...string) ir.MatchArm {

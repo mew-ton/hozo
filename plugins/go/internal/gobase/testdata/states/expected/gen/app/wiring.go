@@ -4,6 +4,167 @@ package app
 
 import "context"
 
+// Find は op app.find。
+//
+// Reads: app.lines
+func (o *ops) Find(ctx context.Context, item string) (*Line, error) {
+	return o.lines.LineFor(ctx, item)
+}
+
+// Total は op app.total。
+//
+// Reads: app.lines
+func (o *ops) Total(ctx context.Context) (int64, error) {
+	n, err := o.lines.CountLines(ctx)
+	if err != nil {
+		return 0, err
+	}
+	o.ShowCount(n)
+	return n, nil
+}
+
+// MaybeTotal は op app.maybeTotal。
+//
+// Reads: app.lines
+func (o *ops) MaybeTotal(ctx context.Context) (*int64, error) {
+	v0, err := o.lines.CountLines(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return ptr(v0), nil
+}
+
+// Title は op app.title。
+//
+// Reads: app.settings
+func (o *ops) Title(ctx context.Context) (string, error) {
+	return o.settings.ShopTitle(ctx)
+}
+
+// Add は op app.add。
+//
+// Effects: app.addLine
+func (o *ops) Add(ctx context.Context, line Line) error {
+	if err := o.lines.AddLine(ctx, line); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Reset は op app.reset。
+//
+// Effects: app.clearLines, app.refresh, app.signIn, app.dropToken
+func (o *ops) Reset(ctx context.Context, t Token) error {
+	if err := o.lines.ClearLines(ctx); err != nil {
+		return err
+	}
+	if err := o.sync.Refresh(ctx); err != nil {
+		return err
+	}
+	if err := o.token.SignIn(ctx, t); err != nil {
+		return err
+	}
+	if err := o.token.DropToken(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Retitle は op app.retitle。
+//
+// Effects: app.rename, app.addLine
+func (o *ops) Retitle(ctx context.Context, t Token, owner Owner) error {
+	if err := o.settings.Rename(ctx, string(t), ptr(owner)); err != nil {
+		return err
+	}
+	if err := o.settings.Rename(ctx, string(t), nil); err != nil {
+		return err
+	}
+	if err := o.lines.AddLine(ctx, Line{Item: "gift", Count: 1}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Direct は op app.direct。
+//
+// Effects: app.lines.post, app.token.put, app.token.delete, app.token.post, app.settings.put
+func (o *ops) Direct(ctx context.Context, line Line, t Token) error {
+	if err := o.lines.Post(ctx, line); err != nil {
+		return err
+	}
+	if err := o.token.Put(ctx, t); err != nil {
+		return err
+	}
+	if err := o.token.Delete(ctx); err != nil {
+		return err
+	}
+	if err := o.token.Post(ctx, t); err != nil {
+		return err
+	}
+	if err := o.settings.Put(ctx, Settings{Title: "direct"}); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FindOrNone は op app.findOrNone。
+//
+// Reads: app.lines
+func (o *ops) FindOrNone(ctx context.Context, item *string) (*Line, error) {
+	// match item by nullable
+	if item != nil {
+		// HasItems: item は string
+		return o.lines.LineFor(ctx, *item)
+	}
+	// Empty
+	return nil, nil
+}
+
+// CountOrZero は op app.countOrZero。
+//
+// Reads: app.lines
+func (o *ops) CountOrZero(ctx context.Context, item *string) (int64, error) {
+	// match item by nullable
+	var n int64
+	if item != nil {
+		// HasItems: item は string
+		v0, err := o.lines.CountLines(ctx)
+		if err != nil {
+			return 0, err
+		}
+		n = v0
+	} else {
+		// Empty
+		n = 0
+	}
+	return n, nil
+}
+
+// Toggle は op app.toggle。
+//
+// Reads: app.token
+// Effects: app.dropToken, app.token.post
+func (o *ops) Toggle(ctx context.Context, t Token) error {
+	token, err := o.token.Get(ctx)
+	if err != nil {
+		return err
+	}
+	// match token by nullable
+	if token != nil {
+		// HasItems: token は app.Token
+		if err := o.token.DropToken(ctx); err != nil {
+			return err
+		}
+	} else {
+		// Empty
+		if err := o.token.Post(ctx, t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Header は op app.header。
 //
 // Reads: app.settings
@@ -39,7 +200,7 @@ func (o *ops) Once(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := o.Add(ctx, Line{Item: settings.Title, Count: 1}); err != nil {
+	if err := o.lines.AddLine(ctx, Line{Item: settings.Title, Count: 1}); err != nil {
 		return err
 	}
 	token, err = o.token.Get(ctx)
@@ -65,17 +226,6 @@ func (o *ops) Current(ctx context.Context) (*Token, error) {
 		return nil, err
 	}
 	return token, nil
-}
-
-// Title は op app.title。
-//
-// Reads: app.settings
-func (o *ops) Title(ctx context.Context) (string, error) {
-	settings, err := o.settings.Get(ctx)
-	if err != nil {
-		return "", err
-	}
-	return settings.Title, nil
 }
 
 // Shadowed は op app.shadowed。
@@ -119,7 +269,7 @@ func (o *ops) Branches(ctx context.Context) error {
 	// match token by nullable
 	if token != nil {
 		// HasItems: token は app.Token
-		if err := o.Logout(ctx); err != nil {
+		if err := o.token.DropToken(ctx); err != nil {
 			return err
 		}
 	} else {
@@ -129,40 +279,32 @@ func (o *ops) Branches(ctx context.Context) error {
 	return nil
 }
 
-// Report は op app.report。
-//
-// Reads: app.lines, app.settings
-// Effects: app.addLine
-func (o *ops) Report(ctx context.Context, line Line) (string, error) {
-	if err := o.Add(ctx, line); err != nil {
-		return "", err
-	}
-	n, err := o.CountLines(ctx)
-	if err != nil {
-		return "", err
-	}
-	_ = n
-	return o.Summary(ctx)
-}
-
 // Finish は op app.finish。
 //
-// Reads: app.token, app.lines
-// Effects: app.clearLines, app.addLine, app.dropToken, app.refresh
+// Reads: app.lines, app.settings
+// Effects: app.addLine, app.dropToken, app.lines.post, app.refresh
 func (o *ops) Finish(ctx context.Context, line Line) (string, error) {
-	if err := o.Replace(ctx, line); err != nil {
+	if err := o.Push(ctx, line); err != nil {
 		return "", err
 	}
 	if err := o.Checkout(ctx, line); err != nil {
 		return "", err
 	}
-	if err := o.Sync(ctx); err != nil {
+	if err := o.lines.Post(ctx, line); err != nil {
+		return "", err
+	}
+	if err := o.sync.Refresh(ctx); err != nil {
 		return "", err
 	}
 	if err := o.Audit(ctx, "finished"); err != nil {
 		return "", err
 	}
-	return o.Status(ctx)
+	n, err := o.lines.CountLines(ctx)
+	if err != nil {
+		return "", err
+	}
+	o.ShowCount(n)
+	return o.Summary(ctx)
 }
 
 func ptr[T any](v T) *T { return &v }

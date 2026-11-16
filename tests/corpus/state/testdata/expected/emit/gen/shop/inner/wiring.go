@@ -4,6 +4,81 @@ package inner
 
 import "context"
 
+// AddToCart は op shop.addToCart。
+//
+// Effects: shop.addLine
+func (o *ops) AddToCart(ctx context.Context, line Line) error {
+	if err := o.carts.AddLine(ctx, line); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SubmitOrder は op shop.submitOrder。
+//
+// Throws: shop.EmptyCart
+// Effects: shop.placeOrder
+func (o *ops) SubmitOrder(ctx context.Context) (Order, error) {
+	order, err := o.NewOrder()
+	if err != nil {
+		return Order{}, err
+	}
+	if err := o.checkout.PlaceOrder(ctx); err != nil {
+		return Order{}, err
+	}
+	return order, nil
+}
+
+// EmptyCart は op shop.emptyCart。
+//
+// Effects: shop.clearCart
+func (o *ops) EmptyCart(ctx context.Context) error {
+	if err := o.carts.ClearCart(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Restart は op shop.restart。
+//
+// Effects: shop.startOver
+func (o *ops) Restart(ctx context.Context) error {
+	if err := o.checkout.StartOver(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// StoreToken は op shop.storeToken。
+//
+// Effects: shop.saveToken
+func (o *ops) StoreToken(ctx context.Context, token Token) error {
+	if err := o.token.SaveToken(ctx, token); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarkLoggedIn は op shop.markLoggedIn。
+//
+// Effects: shop.signIn
+func (o *ops) MarkLoggedIn(ctx context.Context) error {
+	if err := o.loggedIn.SignIn(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Logout は op shop.logout。
+//
+// Effects: shop.removeToken
+func (o *ops) Logout(ctx context.Context) error {
+	if err := o.token.RemoveToken(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Login は op shop.login。
 //
 // Effects: shop.saveToken, shop.signIn

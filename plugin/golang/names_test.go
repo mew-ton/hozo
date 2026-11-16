@@ -39,11 +39,22 @@ func TestFieldName(t *testing.T) {
 	}
 }
 
+// docs/plugin-go.md「名前」の「op 名」「read 名」「effect 名」: どれも、先頭を大文字にしたメソッド名。
 func TestMethodName(t *testing.T) {
-	tests := []struct{ in, want string }{{"login", "Login"}, {"openOrders", "OpenOrders"}, {"go", "Go"}, {"Login", "Login"}, {"server.login", "Login"}}
+	tests := []struct{ in, want string }{{"login", "Login"}, {"openOrders", "OpenOrders"}, {"go", "Go"}, {"Login", "Login"}, {"server.login", "Login"},
+		{"store.userByEmail", "UserByEmail"}, {"store.createSession", "CreateSession"}}
 	for _, tt := range tests {
 		if got := MethodName(tt.in); got != tt.want {
 			t.Errorf("MethodName(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// docs/plugin-go.md「名前」の「直に呼ぶ組み込みの効果の操作」: 状態の単位のメソッド名は、先頭を大文字に。
+func TestBuiltinMethod(t *testing.T) {
+	for in, want := range map[string]string{"post": "Post", "put": "Put", "delete": "Delete"} {
+		if got := BuiltinMethod(in); got != want {
+			t.Errorf("BuiltinMethod(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

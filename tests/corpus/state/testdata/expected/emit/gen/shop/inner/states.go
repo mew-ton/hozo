@@ -11,10 +11,10 @@ type CartsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: shop.carts の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Line, error)
-	// AddToCart は命令: 効果 shop.addLine（on shop.carts.post）を持つ葉の op shop.addToCart。
-	AddToCart(ctx context.Context, line Line) error
-	// EmptyCart は命令: 効果 shop.clearCart（on shop.carts: HasItems -> Empty）を持つ葉の op shop.emptyCart。
-	EmptyCart(ctx context.Context) error
+	// AddLine は命令（効果 shop.addLine、on shop.carts.post）: カートに行を足す
+	AddLine(ctx context.Context, line Line) error
+	// ClearCart は命令（効果 shop.clearCart、on shop.carts: HasItems -> Empty）: カートを空にする
+	ClearCart(ctx context.Context) error
 }
 
 // OrdersState は状態 shop.orders（list<shop.Order>）の単位。実装は New の引数 orders に渡す。
@@ -33,10 +33,10 @@ type TokenState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 nullable で決まる）: shop.token の値。なければ nil。
 	Get(ctx context.Context) (*Token, error)
-	// StoreToken は命令: 効果 shop.saveToken（on shop.token: Empty -> HasItems）を持つ葉の op shop.storeToken。
-	StoreToken(ctx context.Context, token Token) error
-	// Logout は命令: 効果 shop.removeToken（on shop.token.delete）を持つ葉の op shop.logout。
-	Logout(ctx context.Context) error
+	// RemoveToken は命令（効果 shop.removeToken、on shop.token.delete）: 手元のトークンを消す
+	RemoveToken(ctx context.Context) error
+	// SaveToken は命令（効果 shop.saveToken、on shop.token: Empty -> HasItems）: トークンを保存する
+	SaveToken(ctx context.Context, token Token) error
 }
 
 // TitleState は状態 shop.title（single<string>）の単位。実装は New の引数 title に渡す。
@@ -44,6 +44,8 @@ type TokenState interface {
 type TitleState interface {
 	// Get は問い合わせ（形 single で決まる）: shop.title の値。
 	Get(ctx context.Context) (string, error)
+	// Rename は命令（効果 shop.rename、on shop.title.put）: 店の名前を変える
+	Rename(ctx context.Context) error
 }
 
 // CheckoutState は状態の分類 shop.Checkout（shop.carts、shop.orders を対象にした classify）の単位。実装は New の引数 checkout に渡す。
@@ -53,10 +55,12 @@ type CheckoutState interface {
 	Shopping(ctx context.Context) (bool, error)
 	// Ordered は問い合わせ: ケース Ordered の述語。
 	Ordered(ctx context.Context) (bool, error)
-	// SubmitOrder は命令: 効果 shop.placeOrder（on shop.Checkout: Shopping -> Ordered）を持つ葉の op shop.submitOrder。
-	SubmitOrder(ctx context.Context) (Order, error)
-	// Restart は命令: 効果 shop.startOver（on shop.Checkout: any -> Shopping）を持つ葉の op shop.restart。
-	Restart(ctx context.Context) error
+	// PlaceOrder は命令（効果 shop.placeOrder、on shop.Checkout: Shopping -> Ordered）: 注文を確定する
+	PlaceOrder(ctx context.Context) error
+	// StartOver は命令（効果 shop.startOver、on shop.Checkout: any -> Shopping）: 買い物をやり直す
+	StartOver(ctx context.Context) error
+	// TouchCheckout は命令（効果 shop.touchCheckout、on shop.Checkout: Shopping | Ordered -> any）: 進み具合を記録し直す
+	TouchCheckout(ctx context.Context) error
 }
 
 // LoggedInState は状態の分類 shop.LoggedIn（shop.token を対象にした classify）の単位。実装は New の引数 loggedIn に渡す。
@@ -64,6 +68,6 @@ type CheckoutState interface {
 type LoggedInState interface {
 	// LoggedIn は問い合わせ: ケース LoggedIn の述語。
 	LoggedIn(ctx context.Context) (bool, error)
-	// MarkLoggedIn は命令: 効果 shop.signIn（on shop.LoggedIn: any -> LoggedIn）を持つ葉の op shop.markLoggedIn。
-	MarkLoggedIn(ctx context.Context) error
+	// SignIn は命令（効果 shop.signIn、on shop.LoggedIn: any -> LoggedIn）: ログインする
+	SignIn(ctx context.Context) error
 }

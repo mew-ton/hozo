@@ -75,11 +75,17 @@ namespace app {
     Counted: Count;
   }
 
-  // 「exception」値のない例外、その場の model の値、宣言した model の値
+  // 「exception」引数のない例外（struct{}）と、引数を持つ例外（引数ごとにフィールド一つ。並びは引数の順、名前とタグは model の
+  // フィールドと同じ）: 核の型と省略可能（omitempty）、宣言した model、Duration と別の名前空間の型と array
   exception Plain;
   /** 入力が不正 */
   exception Invalid(reason: string, at: int?);
   exception Wrapped(value: Problem);
+  /**
+   * 呼び出しの頻度の制限を超えた。
+   * 二行目の説明。
+   */
+  exception LimitExceeded(retryAfter: Duration, home: type.Address, userIds: Id[]);
   // variant が set の union は、Go の型にしない
   union Errors { Plain; Invalid; }
 
@@ -87,8 +93,11 @@ namespace app {
   /** 利用者 */
   state users: list<User>;
   /** 利用者を足す */
-  effect addUser() on users.post;
+  effect addUser(user: User) on users.post;
   effect clearUsers() on users: HasItems -> Empty;
+  // read は、型を出さない（状態の単位のメソッド。op のない名前空間でも、states.go に出る）
+  /** 識別子が同じ利用者 */
+  read userById(id: Id): User? on users;
 
   // 型で決まる分類と decorator の宣言は、何も出さない
   classify Known of User? {

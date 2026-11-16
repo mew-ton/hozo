@@ -24,7 +24,7 @@ type Settings struct {
 	Owner *Owner `json:"owner,omitempty"`
 }
 
-// EffectAddLine は effect app.addLine。
+// EffectAddLine は行を足す
 const EffectAddLine runtime.Effect = "app.addLine"
 
 // EffectDropToken は effect app.dropToken。
@@ -38,6 +38,13 @@ const EffectClearLines runtime.Effect = "app.clearLines"
 // on app.Sync: Stale -> Fresh
 const EffectRefresh runtime.Effect = "app.refresh"
 
-// EffectSignIn は effect app.signIn。
+// EffectSignIn はログインする。
+// 二行目の説明。
 // on app.SignedIn: any -> Yes
 const EffectSignIn runtime.Effect = "app.signIn"
+
+// EffectRename は effect app.rename。
+const EffectRename runtime.Effect = "app.rename"
+
+// EffectRemoveLine は effect app.removeLine。
+const EffectRemoveLine runtime.Effect = "app.removeLine"

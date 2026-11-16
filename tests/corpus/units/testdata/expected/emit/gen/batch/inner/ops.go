@@ -38,7 +38,7 @@ type Ops interface {
 	Report(ctx context.Context) (Report, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// Issue は領収書を出す
@@ -75,10 +75,6 @@ type ops struct {
 	leaves Leaves
 	items  ItemsState
 	stock  StockOps
-}
-
-func (o *ops) Save(ctx context.Context, item Item) error {
-	return o.items.Save(ctx, item)
 }
 
 func (o *ops) Issue(item Item) Receipt {

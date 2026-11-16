@@ -50,12 +50,21 @@ func (e *emitter) checkNames() {
 		pkg.add(n.Name, n.What, n.Decl)
 	}
 
-	// 一つの構造体のフィールドどうし
+	// 一つの構造体のフィールドどうし（例外の引数を含む）
 	for _, d := range e.ns.Decls {
-		if m, ok := d.(*ir.Model); ok && e.typeDecl(d) {
-			fields := e.names("model " + m.Name + " の構造体")
-			for _, fd := range m.Fields {
-				fields.add(golang.FieldName(fd.Name), "フィールド "+fd.Name, m.Name)
+		switch x := d.(type) {
+		case *ir.Model:
+			if !e.typeDecl(d) {
+				continue
+			}
+			fields := e.names("model " + x.Name + " の構造体")
+			for _, fd := range x.Fields {
+				fields.add(golang.FieldName(fd.Name), "フィールド "+fd.Name, x.Name)
+			}
+		case *ir.Exception:
+			fields := e.names("exception " + x.Name + " の構造体")
+			for _, p := range x.Params {
+				fields.add(golang.FieldName(p.Name), "引数 "+p.Name, x.Name)
 			}
 		}
 	}
@@ -65,7 +74,8 @@ func (e *emitter) checkNames() {
 	for _, o := range s.Ops {
 		ops.add(o.Method, "op "+o.FQN, o.FQN)
 	}
-	// 状態の単位: IsEmpty / Get / ケースの述語と、op 名を先頭大文字にしたもの
+	// 状態の単位: 形で決まるメソッド（IsEmpty / Get と、出す Post / Put / Delete）、ケースの述語と、その単位の read と効果の名前を
+	// 先頭大文字にしたもの
 	for _, u := range s.States {
 		methods := e.names("状態の単位 " + u.TypeName)
 		switch u.Shape {
@@ -75,11 +85,17 @@ func (e *emitter) checkNames() {
 		case string(ir.StateSingle):
 			methods.add("Get", "形で決まる問い合わせ Get", u.FQN)
 		}
+		for _, operation := range u.Builtins {
+			methods.add(golang.BuiltinMethod(operation), "形で決まる命令 "+golang.BuiltinMethod(operation)+"（配線が直に呼ぶ "+u.FQN+"."+operation+"）", u.FQN)
+		}
 		for _, c := range u.Predicates {
 			methods.add(golang.Capitalize(c), "ケース "+c+" の述語", u.FQN)
 		}
-		for _, fqn := range append(append([]string{}, u.Queries...), u.Commands...) {
-			methods.add(golang.MethodName(fqn), "op "+fqn, fqn)
+		for _, fqn := range u.Reads {
+			methods.add(golang.MethodName(fqn), "read "+fqn, fqn)
+		}
+		for _, fqn := range u.Effects {
+			methods.add(golang.MethodName(fqn), "effect "+fqn, fqn)
 		}
 	}
 	// Seams（op loginRate の @limited と、op login の @rate.limited）

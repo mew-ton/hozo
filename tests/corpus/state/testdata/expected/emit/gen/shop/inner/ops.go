@@ -11,6 +11,12 @@ type Ops interface {
 	// Effects: shop.addLine
 	AddToCart(ctx context.Context, line Line) error
 
+	// NewOrder は op shop.newOrder。
+	//
+	// Throws: shop.EmptyCart
+	// 純粋（ctx を取らない）
+	NewOrder() (Order, error)
+
 	// SubmitOrder は op shop.submitOrder。
 	//
 	// Throws: shop.EmptyCart
@@ -102,9 +108,15 @@ type Ops interface {
 	Add(ctx context.Context, line Line) error
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
+	// NewOrder は op shop.newOrder。
+	//
+	// Throws: shop.EmptyCart
+	// 純粋（ctx を取らない）
+	NewOrder() (Order, error)
+
 	// ShowLogin は op shop.showLogin。
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
@@ -154,32 +166,8 @@ type ops struct {
 	lineKind LineKindCases
 }
 
-func (o *ops) AddToCart(ctx context.Context, line Line) error {
-	return o.carts.AddToCart(ctx, line)
-}
-
-func (o *ops) SubmitOrder(ctx context.Context) (Order, error) {
-	return o.checkout.SubmitOrder(ctx)
-}
-
-func (o *ops) EmptyCart(ctx context.Context) error {
-	return o.carts.EmptyCart(ctx)
-}
-
-func (o *ops) Restart(ctx context.Context) error {
-	return o.checkout.Restart(ctx)
-}
-
-func (o *ops) StoreToken(ctx context.Context, token Token) error {
-	return o.token.StoreToken(ctx, token)
-}
-
-func (o *ops) MarkLoggedIn(ctx context.Context) error {
-	return o.loggedIn.MarkLoggedIn(ctx)
-}
-
-func (o *ops) Logout(ctx context.Context) error {
-	return o.token.Logout(ctx)
+func (o *ops) NewOrder() (Order, error) {
+	return o.leaves.NewOrder()
 }
 
 func (o *ops) ShowLogin() {

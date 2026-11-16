@@ -112,7 +112,7 @@ type Ops interface {
 	OpenProduct(ctx context.Context, query ProductQuery) (ProductPage, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
 	// AskYamadaWarranty は op browser.askYamadaWarranty。
@@ -198,14 +198,6 @@ type ops struct {
 	warrantyAvailable WarrantyAvailableCases
 	warrantyKind      WarrantyKindCases
 	server            ServerOps
-}
-
-func (o *ops) ClearToken(ctx context.Context) error {
-	return o.token.ClearToken(ctx)
-}
-
-func (o *ops) GoPayment(ctx context.Context, line server.CartLine, warranty *server.WarrantyLine) error {
-	return o.location.GoPayment(ctx, line, warranty)
 }
 
 func (o *ops) AskYamadaWarranty(ctx context.Context, item server.Item) (server.PlanId, error) {

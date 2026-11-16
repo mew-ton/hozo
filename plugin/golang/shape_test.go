@@ -25,8 +25,65 @@ func opShape(s *Shape, fqn string) OpShape {
 	return OpShape{}
 }
 
-// docs/plugin-go.md「op の置き場」の表の行に一つずつ（上から順に、最初に当たる行）と、「効果の宛先の単位」。
+// docs/plugin-go.md「op の置き場」の表の三つの行（上から順に、最初に当たる行）: 配線、never を返す op、Leaves。
+// 葉に付いたデコレータが reads / effects を運んでいても（Op.carried）、置き場は Leaves のまま。
 func TestShapePlaces(t *testing.T) {
+	v := viewOf("shop", namespace("shop",
+		state("shop.items", ir.Array(ir.String())),
+		state("shop.token", ir.Optional(ir.String())),
+		effect("shop.addItem", ir.BuiltinTarget{State: "shop.items", Operation: ir.OpPost}),
+		read("shop.itemByName", "shop.items", ir.Optional(ir.String())),
+		exception("shop.Gone"),
+		// 1: 単位の対象の配線（read と効果を呼ぶものも、op を呼ぶものも）
+		with(op("shop.wire", nil), wired(call("shop.leaf"), call("shop.outside"), call("shop.outsideWire"))),
+		with(op("shop.touch", nil), wired(callRead("shop.itemByName"), callEffect("shop.addItem"), callDirect("shop.token", ir.OpDelete))),
+		// 2: never を返す op
+		with(op("shop.gone", ir.Never()), throwing("shop.Gone")),
+		// 3: 葉。デコレータだけを持つ葉も、デコレータが reads / effects を運ぶ葉も
+		op("shop.leaf", nil),
+		with(op("shop.marked", nil), decorated("x.mark")),
+		with(op("shop.carriedFx", nil), decorated("x.fx"), carryingEffects("shop.addItem")),
+		with(op("shop.carriedRd", ir.Optional(ir.String())), decorated("x.rd"), carryingReads("shop.token")),
+		with(op("shop.carriedBoth", nil), decorated("x.fx"), carryingEffects("shop.addItem"), carryingReads("shop.items", "shop.token")),
+		// 3: 単位の対象でない op は、単位の対象の配線が呼んでいるものだけを、本体のない op として出す
+		with(op("shop.outside", nil), inFile("batch.hozo")),
+		with(op("shop.outsideWire", nil), inFile("batch.hozo"), wired(call("shop.deep"))), // 配線でも、葉として扱う
+		with(op("shop.deep", nil), inFile("batch.hozo")),                                  // 単位の対象でない配線の先は辿らない
+		with(op("shop.unused", nil), inFile("batch.hozo")),
+	))
+	v.Files = []string{"shop.hozo"}
+	s := ShapeOf(v)
+	want := map[string]Place{
+		"shop.wire": Wiring, "shop.touch": Wiring, "shop.gone": Never,
+		"shop.leaf": Leaf, "shop.marked": Leaf, "shop.carriedFx": Leaf, "shop.carriedRd": Leaf, "shop.carriedBoth": Leaf,
+		"shop.outside": Leaf, "shop.outsideWire": Leaf,
+	}
+	if got := placesOf(s); !reflect.DeepEqual(got, want) {
+		t.Errorf("places = %v\nwant %v", got, want)
+	}
+	// Ops は宣言順
+	var order []string
+	for _, o := range s.Ops {
+		order = append(order, strings.TrimPrefix(o.FQN, "shop."))
+	}
+	if got := strings.Join(order, ","); got != "wire,touch,gone,leaf,marked,carriedFx,carriedRd,carriedBoth,outside,outsideWire" {
+		t.Errorf("Ops の順 = %s", got)
+	}
+	// Leaves は、置き場が Leaf の op のすべて（宣言順）
+	if got := strings.Join(s.Leaves, ","); got != "shop.leaf,shop.marked,shop.carriedFx,shop.carriedRd,shop.carriedBoth,shop.outside,shop.outsideWire" {
+		t.Errorf("Leaves = %s", got)
+	}
+	// New の引数: leaves、状態の単位（宣言順）。複数の状態にまたがる口（SharedState）はない
+	wantNew := []Param{{"leaves", "Leaves"}, {"items", "ItemsState"}, {"token", "TokenState"}}
+	if !reflect.DeepEqual(s.New, wantNew) {
+		t.Errorf("New = %+v\nwant %+v", s.New, wantNew)
+	}
+}
+
+// docs/plugin-go.md「状態の単位」: N の read と効果は、配線が呼んでいるかによらず、すべて、読む状態の単位と、宛先の単位の
+// メソッド（宣言順）。形で決まる命令は、単位の対象の配線が直に呼んでいる操作だけ（post、put、delete の順）。
+// 「効果の宛先の単位」の四つの行。
+func TestShapeStateUnits(t *testing.T) {
 	tr := func(of string) ir.EffectTarget {
 		return ir.TransitionTarget{Of: of, From: ir.AnyCase(), To: ir.Cases("A")}
 	}
@@ -36,95 +93,104 @@ func TestShapePlaces(t *testing.T) {
 		state("shop.title", ir.String()),
 		classify("shop.Sync", ir.StatesSubject{States: []string{"shop.items", "shop.token"}}, ir.DecidedByPredicate, "UpToDate"),
 		classify("shop.Logged", ir.StatesSubject{States: []string{"shop.token"}}, ir.DecidedByType, "In"),
-		effect("shop.addItem", ir.BuiltinTarget{State: "shop.items", Operation: ir.OpPost}),
+		// 効果: 組み込みの効果 → その基底の状態、基底の状態の遷移 → その基底の状態、述語で決まる状態の分類の遷移 → その分類の単位、
+		// 型で決まる状態の分類の遷移 → ただ一つの対象の状態
+		effect("shop.login", tr("shop.Logged")),
+		effect("shop.addItem", ir.BuiltinTarget{State: "shop.items", Operation: ir.OpPost}, param("item", ir.String())),
 		effect("shop.clear", tr("shop.items")),
 		effect("shop.sync", tr("shop.Sync")),
-		effect("shop.login", tr("shop.Logged")),
-		exception("shop.Gone"),
-		// 1: 単位の対象の配線
-		with(op("shop.wire", nil), wired(call("shop.leaf"), call("shop.outside"), call("shop.outsideWire"))),
-		// 2: never を返す op
-		with(op("shop.gone", ir.Never()), throwing("shop.Gone")),
-		// 3: 効果を持つ葉 → 効果の宛先の単位の命令
-		with(op("shop.add", nil), effecting("shop.addItem")),                         // 組み込みの効果 → その基底の状態
-		with(op("shop.empty", nil), effecting("shop.clear")),                         // 基底の状態の遷移 → その基底の状態
-		with(op("shop.write", nil), effecting("shop.sync")),                          // 述語で決まる状態の分類の遷移 → その分類の単位
-		with(op("shop.signIn", nil), effecting("shop.login")),                        // 型で決まる状態の分類の遷移 → ただ一つの対象の状態
-		with(op("shop.both", nil), effecting("shop.addItem"), reading("shop.token")), // 効果と reads の両方 → 効果の宛先の単位
-		// 3: 直に持つ効果は、op が書いたものと、デコレータが運ぶもの（Op.carried）を合わせたもの。どちらで書かれたかは、置き場を変えない
-		with(op("shop.carried", nil), decorated("x.fx"), carryingEffects("shop.addItem")),                                        // 運ばれた効果が一つ → その単位
-		with(op("shop.pair", nil), decorated("x.fx"), carryingEffects("shop.addItem", "shop.clear")),                             // 二つの効果の宛先の単位が同じ → その単位
-		with(op("shop.split", nil), decorated("x.fx"), carryingEffects("shop.addItem", "shop.login")),                            // 宛先の単位が二つに分かれる → SharedState
-		with(op("shop.mixed", nil), effecting("shop.sync"), decorated("x.fx"), carryingEffects("shop.addItem")),                  // 書いた効果と運ばれた効果で分かれる → SharedState
-		with(op("shop.splitReads", nil), decorated("x.fx"), carryingEffects("shop.addItem", "shop.sync"), reading("shop.title")), // 効果と reads の両方 → 効果だけで決める
-		// 4: 効果を持たず、reads が一つの葉 → その状態の単位の問い合わせ
-		with(op("shop.find", ir.Optional(ir.String())), reading("shop.items")),
-		// 5: 効果を持たず、reads が二つ以上の葉 → SharedState
-		with(op("shop.report", ir.String()), reading("shop.items", "shop.title")),
-		// 4、5: 直に読む状態も、op が書いたものと、デコレータが運ぶものを合わせたもの
-		with(op("shop.lookup", ir.Optional(ir.String())), decorated("x.rd"), carryingReads("shop.token")),                      // 運ばれた reads が一つ → その単位の問い合わせ
-		with(op("shop.same", ir.Optional(ir.String())), reading("shop.token"), decorated("x.rd"), carryingReads("shop.token")), // 書いた reads と同じ状態 → 一つと数える
-		with(op("shop.join", ir.String()), reading("shop.items"), decorated("x.rd"), carryingReads("shop.token")),              // 合わせて二つ → SharedState
-		// 6: それ以外の葉（デコレータだけを持つ葉を含む）
-		op("shop.leaf", nil),
-		with(op("shop.marked", nil), decorated("x.mark")),
-		// 単位の対象でない op: 単位の対象の配線が呼んでいるものだけを、本体のない op として出す
-		with(op("shop.outside", nil), inFile("batch.hozo")),
-		with(op("shop.outsideWire", nil), inFile("batch.hozo"), wired(call("shop.deep"))), // 配線でも、葉として扱う（6）
-		with(op("shop.deep", nil), inFile("batch.hozo")),                                  // 単位の対象でない配線の先は辿らない
-		with(op("shop.unused", nil), inFile("batch.hozo")),
+		effect("shop.unused", ir.BuiltinTarget{State: "shop.token", Operation: ir.OpDelete}), // どの配線も呼ばない効果も出す
+		// read: Read.state の単位（宣言順）。どの配線も呼ばない read も出す
+		read("shop.second", "shop.items", ir.Array(ir.String())),
+		read("shop.itemByName", "shop.items", ir.Optional(ir.String()), param("name", ir.String())),
+		read("shop.heading", "shop.title", ir.Int()),
+		// 直に呼ぶ組み込みの効果: 呼んだ順によらず post、put、delete の順。同じ操作を二度呼んでも一つ
+		with(op("shop.wire", nil), wired(callDirect("shop.token", ir.OpDelete), callDirect("shop.token", ir.OpPost),
+			callDirect("shop.token", ir.OpDelete), callDirect("shop.title", ir.OpPut), callRead("shop.itemByName"), callEffect("shop.addItem"),
+			matchBy("nullable", armDirect("shop.token", ir.OpPut, ir.CaseHasItems)))),
+		// 単位の対象でない配線が直に呼ぶものは、数えない
+		with(op("shop.outside", nil), inFile("batch.hozo"), wired(callDirect("shop.items", ir.OpPost))),
 	))
 	v.Files = []string{"shop.hozo"}
 	s := ShapeOf(v)
-	want := map[string]Place{
-		"shop.wire": Wiring, "shop.gone": Never,
-		"shop.add": StateCommand, "shop.empty": StateCommand, "shop.write": StateCommand, "shop.signIn": StateCommand, "shop.both": StateCommand,
-		"shop.carried": StateCommand, "shop.pair": StateCommand, "shop.split": SharedCommand, "shop.mixed": SharedCommand, "shop.splitReads": SharedCommand,
-		"shop.find": StateQuery, "shop.report": SharedQuery,
-		"shop.lookup": StateQuery, "shop.same": StateQuery, "shop.join": SharedQuery,
-		"shop.leaf": Leaf, "shop.marked": Leaf, "shop.outside": Leaf, "shop.outsideWire": Leaf,
-	}
-	if got := placesOf(s); !reflect.DeepEqual(got, want) {
-		t.Errorf("places = %v\nwant %v", got, want)
-	}
-	for fqn, unit := range map[string]string{"shop.add": "shop.items", "shop.empty": "shop.items", "shop.write": "shop.Sync",
-		"shop.signIn": "shop.token", "shop.both": "shop.items", "shop.find": "shop.items", "shop.wire": "", "shop.report": "",
-		"shop.carried": "shop.items", "shop.pair": "shop.items", "shop.split": "", "shop.mixed": "", "shop.splitReads": "",
-		"shop.lookup": "shop.token", "shop.same": "shop.token", "shop.join": ""} {
-		if got := opShape(s, fqn).Unit; got != unit {
-			t.Errorf("%s の単位 = %q, want %q", fqn, got, unit)
-		}
-	}
-	// Ops は宣言順
-	var order []string
-	for _, o := range s.Ops {
-		order = append(order, strings.TrimPrefix(o.FQN, "shop."))
-	}
-	if got := strings.Join(order, ","); got != "wire,gone,add,empty,write,signIn,both,carried,pair,split,mixed,splitReads,find,report,lookup,same,join,leaf,marked,outside,outsideWire" {
-		t.Errorf("Ops の順 = %s", got)
-	}
-	if got := strings.Join(s.Leaves, ","); got != "shop.leaf,shop.marked,shop.outside,shop.outsideWire" {
-		t.Errorf("Leaves = %s", got)
-	}
-	// SharedState は、宛先の単位が分かれた命令と、複数の状態を読む問い合わせを、宣言順に（種類で分けない）
-	if got := strings.Join(s.Shared, ","); got != "shop.split,shop.mixed,shop.splitReads,shop.report,shop.join" {
-		t.Errorf("Shared = %s", got)
-	}
 	// 状態の単位: 基底の状態と、述語で決まる状態の分類を、宣言順に。型で決まる状態の分類は、単位を持たない
-	wantUnits := []StateUnit{
-		{FQN: "shop.items", TypeName: "ItemsState", Param: "items", Shape: "list", Queries: []string{"shop.find"},
-			Commands: []string{"shop.add", "shop.empty", "shop.both", "shop.carried", "shop.pair"}},
-		{FQN: "shop.token", TypeName: "TokenState", Param: "token", Shape: "nullable", Queries: []string{"shop.lookup", "shop.same"}, Commands: []string{"shop.signIn"}},
-		{FQN: "shop.title", TypeName: "TitleState", Param: "title", Shape: "single"},
-		{FQN: "shop.Sync", TypeName: "SyncState", Param: "sync", Commands: []string{"shop.write"}, Predicates: []string{"UpToDate"}},
+	want := []StateUnit{
+		{FQN: "shop.items", TypeName: "ItemsState", Param: "items", Shape: "list",
+			Reads: []string{"shop.second", "shop.itemByName"}, Effects: []string{"shop.addItem", "shop.clear"}},
+		{FQN: "shop.token", TypeName: "TokenState", Param: "token", Shape: "nullable", Builtins: []string{"post", "put", "delete"},
+			Effects: []string{"shop.login", "shop.unused"}},
+		{FQN: "shop.title", TypeName: "TitleState", Param: "title", Shape: "single", Builtins: []string{"put"}, Reads: []string{"shop.heading"}},
+		{FQN: "shop.Sync", TypeName: "SyncState", Param: "sync", Effects: []string{"shop.sync"}, Predicates: []string{"UpToDate"}},
 	}
-	if !reflect.DeepEqual(s.States, wantUnits) {
-		t.Errorf("States = %+v\nwant %+v", s.States, wantUnits)
+	if !reflect.DeepEqual(s.States, want) {
+		t.Errorf("States = %+v\nwant %+v", s.States, want)
 	}
-	// New の引数: leaves、状態の単位（宣言順）、shared
-	wantNew := []Param{{"leaves", "Leaves"}, {"items", "ItemsState"}, {"token", "TokenState"}, {"title", "TitleState"}, {"sync", "SyncState"}, {"shared", "SharedState"}}
-	if !reflect.DeepEqual(s.New, wantNew) {
-		t.Errorf("New = %+v\nwant %+v", s.New, wantNew)
+	// read と効果の呼び出しは、op の置き場にも、別の名前空間の口にも入らない
+	if len(s.Ops) != 1 || s.Ops[0].Place != Wiring || len(s.Leaves) != 0 || len(s.Deps) != 0 {
+		t.Errorf("Ops = %+v, Leaves = %v, Deps = %+v", s.Ops, s.Leaves, s.Deps)
+	}
+	// 単位の対象を変えても、read と効果は変わらない（変わるのは、形で決まる命令だけ）
+	v.Files = []string{"batch.hozo"}
+	other := ShapeOf(v)
+	for i := range want {
+		want[i].Builtins = nil
+	}
+	want[0].Builtins = []string{"post"}
+	if !reflect.DeepEqual(other.States, want) {
+		t.Errorf("単位の対象を変えた States = %+v\nwant %+v", other.States, want)
+	}
+}
+
+// docs/plugin-go.md「状態の単位」のメソッドの形: read は (<結果の型>, error)、効果は error、形で決まる命令は value 一つか、なし。
+// どれも ctx を取る。
+func TestUnitSignatures(t *testing.T) {
+	root := projectRoot(t)
+	v := typesView()
+	l, _ := LayoutOf(v, root)
+	user, email := ir.Ref("server.User"), ir.Ref("server.Email")
+	reserved := map[string]bool{"o": true, "ctx": true, "err": true, "ptr": true}
+	sig := func(f func(im *Imports) (string, string)) string {
+		im := NewImports(v, l, root, true)
+		params, results := f(im)
+		if im.Name("context") == "" {
+			t.Errorf("(%s) %s: context を import していない", params, results)
+		}
+		return "(" + params + ") " + results
+	}
+	byEmail := read("server.userByEmail", "server.users", ir.Optional(user), param("email", email), param("ctx", ir.String()))
+	if got := sig(func(im *Imports) (string, string) { return ReadSignature(byEmail, im, reserved) }); got != "(ctx context.Context, email Email, ctx_ string) (*User, error)" {
+		t.Errorf("ReadSignature = %s", got)
+	}
+	count := read("server.count", "server.users", ir.Int())
+	if got := sig(func(im *Imports) (string, string) { return ReadSignature(count, im, reserved) }); got != "(ctx context.Context) (int64, error)" {
+		t.Errorf("引数のない read: %s", got)
+	}
+	create := effect("server.createUser", ir.BuiltinTarget{State: "server.users", Operation: ir.OpPost}, param("user", user), param("type", ir.Ref("type.Token")))
+	if got := sig(func(im *Imports) (string, string) { return EffectSignature(create, im, reserved) }); got != "(ctx context.Context, user User, type_ pkgtype.Token) error" {
+		t.Errorf("EffectSignature = %s", got)
+	}
+	clear := effect("server.clear", ir.BuiltinTarget{State: "server.users", Operation: ir.OpDelete})
+	if got := sig(func(im *Imports) (string, string) { return EffectSignature(clear, im, reserved) }); got != "(ctx context.Context) error" {
+		t.Errorf("引数のない効果: %s", got)
+	}
+	users, token := state("server.users", ir.Array(user)), state("server.token", ir.Optional(ir.Ref("type.Token")))
+	for _, tt := range []struct {
+		state     *ir.State
+		operation string
+		want      string
+		value     bool
+	}{
+		{users, "post", "(ctx context.Context, value User) error", true},
+		{token, "post", "(ctx context.Context, value pkgtype.Token) error", true}, // 要素の型（optional を外したもの）
+		{token, "put", "(ctx context.Context, value pkgtype.Token) error", true},
+		{token, "delete", "(ctx context.Context) error", false},
+	} {
+		if got := sig(func(im *Imports) (string, string) { return BuiltinSignature(tt.state, tt.operation, im) }); got != tt.want {
+			t.Errorf("BuiltinSignature(%s, %s) = %s, want %s", tt.state.Name, tt.operation, got, tt.want)
+		}
+		if got := BuiltinTakesValue(tt.operation); got != tt.value {
+			t.Errorf("BuiltinTakesValue(%s) = %v", tt.operation, got)
+		}
 	}
 }
 
@@ -177,7 +243,7 @@ func TestSignature(t *testing.T) {
 }
 
 // docs/plugin-go.md「別の名前空間の op」「New」: 単位の対象の配線が呼ぶ別の名前空間ごとに口が一つ。メソッドは、呼ぶものだけを
-// 相手の宣言順に。New の引数は、leaves、状態の単位、shared、分類の述語（FQN の辞書順）、別の名前空間（FQN の辞書順）、seams。
+// 相手の宣言順に。New の引数は、leaves、状態の単位、分類の述語（FQN の辞書順）、別の名前空間（FQN の辞書順）、seams。
 func TestShapeDepsAndNew(t *testing.T) {
 	kind := classify("type.Kind", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "A")
 	byType := classify("type.Present", ir.TypeSubject{Type: ir.Optional(ir.String())}, ir.DecidedByType, "Some")
@@ -259,8 +325,8 @@ func TestShapeSeams(t *testing.T) {
 			with(op("server.leaf", nil), decorated("rate.limited"), internal()),
 			// never を返す op
 			with(op("server.gone", ir.Never()), decorated("rate.limited"), throwing("server.Gone")),
-			// 状態の単位に置かれる葉
-			with(op("server.find", nil), decorated("trace.span"), reading("server.items")),
+			// デコレータが reads を運ぶ葉（置き場は Leaves のまま）
+			with(op("server.find", nil), decorated("trace.span"), carryingReads("server.items")),
 			state("server.items", ir.Array(ir.String())),
 			// 単位の継ぎ目にないデコレータだけ
 			with(op("server.plain", nil), decorated("x.mark")),

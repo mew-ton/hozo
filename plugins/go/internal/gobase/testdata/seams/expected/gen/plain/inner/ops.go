@@ -14,6 +14,12 @@ type Ops interface {
 	// Effects: shop.addItem
 	Buy(ctx context.Context, id string) (Item, error)
 
+	// Restock は op shop.restock。
+	//
+	// Reads: shop.items
+	// Effects: shop.addItem, shop.title.put
+	Restock(ctx context.Context, item Item) (int64, error)
+
 	// Closed は op shop.closed。
 	//
 	// Throws: shop.Closed
@@ -55,9 +61,24 @@ type Ops interface {
 	Plain(ctx context.Context, id string) (Item, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
+	// Add は op shop.add。
+	//
+	// Effects: shop.addItem
+	Add(ctx context.Context, item Item) error
+
+	// Count は op shop.count。
+	//
+	// Reads: shop.items
+	Count(ctx context.Context) (int64, error)
+
+	// Summary は op shop.summary。
+	//
+	// Reads: shop.items, shop.title
+	Summary(ctx context.Context) (string, error)
+
 	// Notify は op shop.notify。
 	Notify(ctx context.Context, item Item) error
 
@@ -76,10 +97,10 @@ type Leaves interface {
 	Plain(ctx context.Context, id string) (Item, error)
 }
 
-// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、shared。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）。
 // 引数が nil かどうかは確かめない。
-func New(leaves Leaves, items ItemsState, title TitleState, shared SharedState) Ops {
-	return &ops{leaves: leaves, items: items, title: title, shared: shared}
+func New(leaves Leaves, items ItemsState, title TitleState) Ops {
+	return &ops{leaves: leaves, items: items, title: title}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
@@ -87,7 +108,6 @@ type ops struct {
 	leaves Leaves
 	items  ItemsState
 	title  TitleState
-	shared SharedState
 }
 
 func (o *ops) Closed(ctx context.Context) error {
@@ -95,15 +115,15 @@ func (o *ops) Closed(ctx context.Context) error {
 }
 
 func (o *ops) Add(ctx context.Context, item Item) error {
-	return o.items.Add(ctx, item)
+	return o.leaves.Add(ctx, item)
 }
 
 func (o *ops) Count(ctx context.Context) (int64, error) {
-	return o.items.Count(ctx)
+	return o.leaves.Count(ctx)
 }
 
 func (o *ops) Summary(ctx context.Context) (string, error) {
-	return o.shared.Summary(ctx)
+	return o.leaves.Summary(ctx)
 }
 
 func (o *ops) Notify(ctx context.Context, item Item) error {

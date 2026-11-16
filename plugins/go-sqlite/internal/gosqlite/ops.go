@@ -387,8 +387,9 @@ func (e *emitter) collectUnits() {
 	for _, su := range e.shape.States {
 		if t := e.byState[su.FQN]; t != nil {
 			u := &unit{kind: unitTable, goName: golang.Capitalize(short(su.FQN)) + "Table", fqn: su.FQN, iface: su.TypeName, table: t, at: su.FQN}
-			// 基底の状態の単位のメソッドの順: op の問い合わせ、命令（docs/plugin-go.md「状態の単位」）
-			e.fill(u, append(append([]string(nil), su.Queries...), su.Commands...), false)
+			// R4 の途中: 基底は、op を状態の単位に置かなくなった（単位のメソッドは read と効果。golang.StateUnit の Reads / Effects / Builtins）。
+			// この型のメソッドの組み立ては、read と効果から作り直す（docs/plugin-go-sqlite.md「状態ごとの型」）。それまで、op は一つも持たない
+			e.fill(u, nil, false)
 			e.units = append(e.units, u)
 			continue
 		}
@@ -396,14 +397,11 @@ func (e *emitter) collectUnits() {
 			continue // @db.table のない状態の単位は、人が書く
 		}
 		u := &unit{kind: unitClassify, goName: golang.Capitalize(short(su.FQN)) + "Table", fqn: su.FQN, iface: su.TypeName, at: su.FQN}
-		if e.fill(u, su.Commands, true) {
+		if e.fill(u, nil, true) { // R4 の途中: 上と同じ（<C>Table は、なくなる）
 			e.units = append(e.units, u)
 		}
 	}
-	u := &unit{kind: unitShared, goName: "SharedTable", iface: "SharedState"}
-	if e.fill(u, e.shape.Shared, true) {
-		e.units = append(e.units, u)
-	}
+	// R4 の途中: 基底の SharedState は、なくなった（golang.Shape.Shared はない）。SharedTable は、もう出ない
 	for _, u := range e.units {
 		for _, m := range u.methods {
 			for _, s := range m.steps {

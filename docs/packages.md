@@ -171,7 +171,7 @@ var ErrUnsupported error
 ```go
 // 名前（docs/plugin-go.md「名前」）
 func TypeName(fqn, namespace string) string       // namespace は宣言した名前空間。合成 model（`.`）の連結を含む
-func FieldName(name string) string
+func FieldName(name string) string                // model のフィールドと、例外の引数（例外の構造体のフィールド。同「exception」）の名前
 func MethodName(name string) string               // op、read、効果の名前から、メソッドの名前。export の有無によらず、先頭を大文字に
 func BuiltinMethod(operation string) string       // 直に呼ぶ組み込みの効果の、状態の単位のメソッド: post から Post（同「状態の単位」）
 func LocalName(name string, reserved map[string]bool) string   // op・read・効果の引数名と、束縛名。Go の予約語か事前宣言の識別子か reserved にあれば末尾に _
@@ -251,6 +251,7 @@ func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, r
 func ReadSignature(r *ir.Read, imports *Imports, reserved map[string]bool) (params, results string)       // read のメソッド（いつも ctx を取り、結果と error を返す）
 func EffectSignature(e *ir.Effect, imports *Imports, reserved map[string]bool) (params, results string)   // 効果のメソッド（いつも ctx を取り、error を返す）
 func BuiltinSignature(s *ir.State, operation string, imports *Imports) (params, results string)           // 形で決まる命令のメソッド（値を取る操作は value <要素の型>）
+func BuiltinTakesValue(operation string) bool    // 形で決まる命令が、値（value 一つ）を取るか: post と put は取り、delete は取らない（docs/check.md「直に呼ぶ組み込みの効果」の表）
 func SeamSignature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, results string)   // 継ぎ目のメソッドの引数（op の引数の後ろに body）と戻り値のテキスト
 func SeamBodyParam(op *ir.Op, reserved map[string]bool) string   // 継ぎ目のメソッドの最後の引数の名前: body。op の引数の局所の名前と当たれば、末尾に _ を足したもの
 
@@ -269,7 +270,9 @@ func PublicNames(view *ir.View) []PublicName      // 出力 (U, N) の定義の�
 - `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは入口のパッケージなので、import には効かない。
 - `Param.Type` は、定義のパッケージの中での書き方。別の名前空間の分類の述語（`<C>Cases`）は修飾なしの名前で、書く側が `Imports.Qualifier` で修飾する。
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
-- 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。
+- 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。メソッドの名前は、`read` と効果が `MethodName(<FQN>)`、形で決まる命令が `BuiltinMethod(<操作>)`。N の `read` と効果は、どれも、ちょうど一つの単位の `Reads` / `Effects` にある（`read` は `Read.state` の単位、効果は宛先の単位。`docs/plugin-go.md`「状態の単位」の「効果の宛先の単位」）ので、ある `read` か効果がどの単位のメソッドかは、`States` を走査して求める。`Reads` と `Effects` は、単位の対象（`in`）によらず、配線が呼んでいるかにもよらない。`Builtins` だけが、単位の対象の配線が直に呼ぶ操作で決まる。
+- op の置き場（`OpShape.Place`）は三つだけで、状態の単位に op のメソッドはない: `Shape.Leaves` は、置き場が `Leaf` の op のすべて。これまでの、状態の単位の `Queries` / `Commands`、`Shape.Shared`（`SharedState`）、`OpShape.Unit`、置き場 `StateCommand` / `SharedCommand` / `StateQuery` / `SharedQuery`、`PublicShared` は、なくした（`docs/decisions.md`「決めたこと」139）。
+- 例外の値を作るか読む相乗り（`go-http`、`go-cli`、サンプルの `go-ratelimit`）は、例外の構造体のフィールドを、`Exception.params` の順に、`FieldName(<引数名>)` で求める（型は `GoType(<引数の型>)`、タグは `json:"<引数名>"`、省略可能なら `,omitempty`）。引数のない例外は `struct{}`。値を一つに包むフィールド `Value` は、もうない。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
 - `PublicNames` は、`docs/plugin-go.md`「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。

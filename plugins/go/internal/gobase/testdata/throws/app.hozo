@@ -1,0 +1,99 @@
+// docs/plugin-go.md「exception」（引数ごとにフィールド一つの構造体）と、「match」の「アームの本体」の `throw E`、`throw E(<値>, …)` の
+// 行を、使われ方（return / const / 文）ごとに、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** 別の名前空間の例外 */
+namespace limits {
+  /** 呼び出しの頻度の制限を超えた */
+  exception LimitExceeded(retryAfter: Duration, scope: string?);
+}
+
+/** 引数を持つ例外を投げる配線 */
+namespace app {
+  scalar Code extends string;
+  model Detail { field: string; hint: string?; }
+  model Sub { at: int; }
+  model Input { code: Code; sub: Sub?; }
+
+  /** 入力が不正 */
+  exception Invalid(code: Code, detail: Detail, tags: string[], at: int?);
+  /** 見つからない */
+  exception Missing(id: string);
+  exception TooMany(attempts: int, last: Detail?);
+  exception Plain;
+
+  /** 試した回数 */
+  state attempts: single<int>;
+
+  export op show(text: string);
+
+  // return match の throw E(<値>): 絞り込んだ対象を値に使う（*<対象>）。もう一方は、引数のない throw E
+  export op need(id: string?, known: boolean?): string
+    throws Missing, Plain
+  {
+    return match known by nullable {
+      HasItems => needId(id);
+      Empty    => throw Plain;
+    };
+  }
+  export op needId(id: string?): string
+    throws Missing
+  {
+    return match id by nullable {
+      HasItems => id;
+      Empty    => throw Missing("unknown");
+    };
+  }
+
+  // const x = match の throw E(<値>, …): 名前の値、レコードリテラル（当てはめる型は引数の model）、array、
+  // 省略可能な引数に、省略可能でない値（ptr）と、省略可能を通るパス（文の前に置く途中の値は、その枝の中）
+  export op check(in: Input, tags: string[], text: string?): string
+    throws Invalid
+  {
+    const first = match text by nullable {
+      HasItems => text;
+      Empty    => throw Invalid(in.code, { field: "text" }, tags, 7);
+    };
+    const second = match tags by list {
+      HasItems => first;
+      Empty    => throw Invalid(in.code, { field: "tags", hint: first }, tags, in.sub.at);
+    };
+    return second;
+  }
+
+  // 文の match の throw E(<値>, …): 戻り値のない配線は `return <例外>`。引数の型をそろえる（scalar → 元の型）、
+  // 渡されていない省略可能な引数は nil、別の名前空間の例外（Duration のリテラルと、省略可能な引数に文字列のリテラル）
+  export op guard(code: Code?, wait: boolean?)
+    throws Missing, limits.LimitExceeded
+  {
+    match code by nullable {
+      HasItems => throw Missing(code);
+      Empty    => none;
+    };
+    match wait by nullable {
+      HasItems => throw limits.LimitExceeded(5m, "guard");
+      Empty    => throw limits.LimitExceeded(1s);
+    };
+  }
+
+  // throw の引数に書いた状態は、その枝の中で読む。省略可能な引数を渡さない
+  export op retry(text: string?): string
+    throws TooMany
+  {
+    return match text by nullable {
+      HasItems => text;
+      Empty    => throw TooMany(attempts);
+    };
+  }
+
+  // throw の引数だけが使う束縛は、使われている（_ = x を足さない）
+  export op count(text: string?): string
+    throws TooMany
+  {
+    const n = 3;
+    return match text by nullable {
+      HasItems => text;
+      Empty    => throw TooMany(n);
+    };
+  }
+}

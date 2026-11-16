@@ -154,7 +154,7 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 - 先頭だけを大文字にする（`Id`、`Url`）のは、Go の慣習（`ID`）より決定性と予測しやすさを取るため。
 - **局所の名前**: メソッドの中で、次の名前は生成したコードが使う。op・read・effect の引数名と束縛名がこれと同じなら、末尾に `_` を付ける: Go の予約語、事前宣言の識別子（`error`、`string`、`nil`、`len` など）、`o`、`ctx`、`err`、`ptr`、定義のパッケージの `ops.go` と `wiring.go` が import するパッケージの名前（`context`、`time`、`runtime`、名前空間のパッケージ）。
 - 生成したコードが作る局所の変数（状態を読んだ値、途中の値）の名前は「配線の本体」。引数名、束縛名、先に作った変数と当たれば、当たらなくなるまで末尾に `_` を足す。
-- **名前が当たれば GO-2**: 定義のパッケージの公開の名前どうし（型、`Effect…`、`Ops`、`Leaves`、`<状態>State`、`<Ns>Ops`、`Seams`、分類の名前、`New`、`Classify<C>`。大文字化で同じになる `id` と `Id`、合成した名前と宣言の名前を含む）、一つの構造体のフィールドどうし（例外の引数を含む）、一つのインターフェースのメソッドどうし（状態の単位の、形で決まるメソッド `IsEmpty` / `Get` / `Post` / `Put` / `Delete` と、ケースの述語と、その単位の read と効果の名前を先頭大文字にしたもの: 状態 `users` の read `get`、同じ状態の read `findUser` と効果 `FindUser`。`Ops` の中の `foo` と `Foo`。`Seams` の中の、op `loginRate` の `@limited` と op `login` の `@rate.limited`、`@repeatable` のデコレータを一つの op に二度付けたもの）、構造体 `ops` のフィールドと中身のメソッド（状態 `loginBody` と、継ぎ目を持つ op `login`）。直すのは仕様の名前。
+- **名前が当たれば GO-2**: 定義のパッケージの公開の名前どうし（型、`Effect…`、`Ops`、`Leaves`、`<状態>State`、`<Ns>Ops`、`Seams`、分類の名前、`New`、`Classify<C>`。大文字化で同じになる `id` と `Id`、合成した名前と宣言の名前を含む）、一つの構造体のフィールドどうし（例外の引数を含む）、一つのインターフェースのメソッドどうし（状態の単位の、形で決まるメソッド `IsEmpty` / `Get` / `Post` / `Put` / `Delete` と、ケースの述語と、その単位の read と効果の名前を先頭大文字にしたもの: 状態 `users` の read `get`、同じ状態の read `findUser` と効果 `FindUser`。形で決まるメソッドは、その単位に出すものだけを数える: 配線が `users.post(…)` を直に呼んでいなければ、`Post` は単位になく、効果 `post` は当たらない。`Ops` の中の `foo` と `Foo`。`Seams` の中の、op `loginRate` の `@limited` と op `login` の `@rate.limited`、`@repeatable` のデコレータを一つの op に二度付けたもの）、構造体 `ops` のフィールドと中身のメソッド（状態 `loginBody` と、継ぎ目を持つ op `login`）。直すのは仕様の名前。
 
 ## 型
 

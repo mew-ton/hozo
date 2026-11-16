@@ -11,4 +11,10 @@ type UsersState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: app.users の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]User, error)
+	// UserById は問い合わせ（read app.userById）: 識別子が同じ利用者
+	UserById(ctx context.Context, id Id) (*User, error)
+	// AddUser は命令（効果 app.addUser、on app.users.post）: 利用者を足す
+	AddUser(ctx context.Context, user User) error
+	// ClearUsers は命令（効果 app.clearUsers、on app.users: HasItems -> Empty）。
+	ClearUsers(ctx context.Context) error
 }

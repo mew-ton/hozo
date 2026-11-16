@@ -18,15 +18,16 @@ var goldenFixtures = []struct {
 	covers   string
 	behavior bool
 }{
-	{name: "types", covers: "「型」（model、scalar、union、exception、effect）と「コメント」、予約語の名前空間のパッケージ名"},
+	{name: "types", covers: "「型」（model、scalar、union、exception、effect）と「コメント」、予約語の名前空間のパッケージ名、op のない名前空間の状態の単位"},
 	{name: "names", covers: "「名前」の局所の名前、「パッケージと import パス」の import の名前、「New」の引数の名前、「別の名前空間の op」"},
 	{name: "pkgnames", covers: "「パッケージと import パス」の import の名前のうち、名前空間のパッケージ名が、基底が決まった名前で使う識別子（ops、ptr、o、ctx、err）や、途中の値（v0、k0）と同じとき。「New」の引数の名前 ops"},
 	{name: "statements", covers: "「呼び出し」「文」の表の各行、失敗の扱いの零値"},
 	{name: "values", covers: "「値」の表の各行、「型をそろえる」、「省略可能を通るパス」"},
-	{name: "states", covers: "「op の置き場」（デコレータが運ぶ reads と effects、宛先の単位が分かれた葉の SharedState を含む）、「状態の単位」「状態の参照」", behavior: true},
+	{name: "states", covers: "「op の置き場」（デコレータが reads と effects を運ぶ葉も Leaves）、「状態の単位」（read、効果、形で決まる命令）、「呼び出し」の read・効果・直に呼ぶ組み込みの効果、「状態の参照」", behavior: true},
 	{name: "bind", covers: "「bind で埋まる位置」の 1〜4、「別の名前空間の op」"},
 	{name: "matchif", covers: "「match」の二つに分ける形（nullable、list、presence）と、アームの本体の組"},
 	{name: "matchswitch", covers: "「match」の switch の形（variant、述語で決まる分類）、「絞り込んだ値」、「分類」", behavior: true},
+	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
 }
 

@@ -8,6 +8,16 @@ import (
 	"github.com/mew-ton/hozo/gen/server"
 )
 
+// ClearToken は op browser.clearToken。
+//
+// Effects: browser.removeToken
+func (o *ops) ClearToken(ctx context.Context) error {
+	if err := o.token.RemoveToken(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
 // RequestLogout はサーバーのセッションの削除を依頼する。結果は見ない
 //
 // Reads: browser.token
@@ -32,6 +42,16 @@ func (o *ops) Logout(ctx context.Context) error {
 		return err
 	}
 	if err := o.ClearToken(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GoPayment は op browser.goPayment。
+//
+// Effects: browser.transitionToPayment
+func (o *ops) GoPayment(ctx context.Context, line server.CartLine, warranty *server.WarrantyLine) error {
+	if err := o.location.TransitionToPayment(ctx); err != nil {
 		return err
 	}
 	return nil

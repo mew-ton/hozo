@@ -16,6 +16,17 @@ func (o *ops) buyBody(ctx context.Context, id string) (Item, error) {
 	return item, nil
 }
 
+// restockBody は op shop.restock の中身（配線の本体）。外側の Restock が、継ぎ目を通して呼ぶ。
+func (o *ops) restockBody(ctx context.Context, item Item) (int64, error) {
+	if err := o.items.AddItem(ctx, item); err != nil {
+		return 0, err
+	}
+	if err := o.title.Put(ctx, "restocked"); err != nil {
+		return 0, err
+	}
+	return o.items.CountById(ctx, item.Id)
+}
+
 // findBody は op shop.find の中身（配線の本体）。外側の Find が、継ぎ目を通して呼ぶ。
 func (o *ops) findBody(ctx context.Context, id string) (Item, error) {
 	return o.Lookup(id), nil

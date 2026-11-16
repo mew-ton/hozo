@@ -26,7 +26,10 @@ namespace shop {
   state items: list<Item>;
   /** 店の名前 */
   state title: single<string>;
-  effect addItem() on items.post;
+  /** 品物を足す */
+  effect addItem(item: Item) on items.post;
+  /** 識別子が同じ品物の数 */
+  read countById(id: string): int on items;
 
   // 「中身」置き場 1（配線）: wiring.go の buyBody。継ぎ目を持つ op を同じ名前空間の配線から呼ぶと、外側を通る
   /**
@@ -42,11 +45,21 @@ namespace shop {
     return item;
   }
 
+  // 「中身」継ぎ目が掛かるのは op だけ: 継ぎ目を持つ配線の中身が呼ぶ read と効果と、直に呼ぶ組み込みの効果は、
+  // 状態の単位のメソッドを、そのまま呼ぶ
+  @t.limited
+  export op restock(item: Item): int
+  {
+    addItem(item);
+    title.put("restocked");
+    return countById(item.id);
+  }
+
   // 「中身」置き場 2（never を返す op）: ops.go の、外側のすぐ後ろの closedBody
   @t.limited
   export op closed(): never throws Closed;
 
-  // 「中身」置き場 3〜6（葉）: 口のメソッドの値（状態の命令、状態の問い合わせ、SharedState、Leaves）
+  // 「中身」置き場 3（葉）: Leaves のメソッドの値（名前は op 名のまま）。デコレータが reads / effects を運ぶ葉も、Leaves
   @t.limited
   @doing(addItem) export op add(item: Item);
   @t.limited

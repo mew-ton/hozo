@@ -1,10 +1,10 @@
 GO-2	c.caps.Id	定義のパッケージ（gen/c/caps）の名前 Id が当たる: scalar c.caps.id と scalar c.caps.Id（直すのは仕様の名前）
 GO-2	c.fields.Row	model c.fields.Row の構造体の名前 Id が当たる: フィールド id と フィールド Id（直すのは仕様の名前）
+GO-2	c.fields.Bad	exception c.fields.Bad の構造体の名前 Code が当たる: 引数 code と 引数 Code（直すのは仕様の名前）
 GO-2	c.kinds.SizeBig	定義のパッケージ（gen/c/kinds）の名前 SizeBig が当たる: classify c.kinds.Size のケースの定数 SizeBig と model c.kinds.SizeBig（直すのは仕様の名前）
 GO-2	c.kinds.SizeCases	定義のパッケージ（gen/c/kinds）の名前 SizeCases が当たる: classify c.kinds.Size の述語のインターフェース と model c.kinds.SizeCases（直すのは仕様の名前）
 GO-2	c.kinds.ClassifySize	定義のパッケージ（gen/c/kinds）の名前 ClassifySize が当たる: classify c.kinds.Size の判定関数 と model c.kinds.ClassifySize（直すのは仕様の名前）
 GO-2	c.methods.Foo	インターフェース Ops の名前 Foo が当たる: op c.methods.foo と op c.methods.Foo（直すのは仕様の名前）
-GO-2	c.methods.get	状態の単位 RowsState の名前 Get が当たる: 形で決まる問い合わせ Get と op c.methods.get（直すのは仕様の名前）
 GO-2	c.ops.Ops	定義のパッケージ（gen/c/ops）の名前 Ops が当たる: model c.ops.Ops と インターフェース Ops（直すのは仕様の名前）
 GO-2	c.ops.Leaves	定義のパッケージ（gen/c/ops）の名前 Leaves が当たる: model c.ops.Leaves と インターフェース Leaves（直すのは仕様の名前）
 GO-2	c.ops.CDepOps	定義のパッケージ（gen/c/ops）の名前 CDepOps が当たる: model c.ops.CDepOps と 別の名前空間 c.dep の口（直すのは仕様の名前）
@@ -13,3 +13,7 @@ GO-2	c.seams.login	構造体 ops の名前 loginBody が当たる: New の 2 番
 GO-2	c.states.EffectAddRow	定義のパッケージ（gen/c/states）の名前 EffectAddRow が当たる: effect c.states.addRow と model c.states.EffectAddRow（直すのは仕様の名前）
 GO-2	c.states.rows	定義のパッケージ（gen/c/states）の名前 RowsState が当たる: model c.states.RowsState と 状態の単位 c.states.rows（直すのは仕様の名前）
 GO-2	c.synth.PageReady	定義のパッケージ（gen/c/synth）の名前 PageReady が当たる: model c.synth.Page.Ready と model c.synth.PageReady（直すのは仕様の名前）
+GO-2	c.units.get	状態の単位 RowsState の名前 Get が当たる: 形で決まる問い合わせ Get と read c.units.get（直すのは仕様の名前）
+GO-2	c.units.FindRow	状態の単位 RowsState の名前 FindRow が当たる: read c.units.findRow と effect c.units.FindRow（直すのは仕様の名前）
+GO-2	c.units.post	状態の単位 RowsState の名前 Post が当たる: 形で決まる命令 Post（配線が直に呼ぶ c.units.rows.post） と effect c.units.post（直すのは仕様の名前）
+GO-2	c.units.full	状態の単位 LoadState の名前 Full が当たる: ケース Full の述語 と effect c.units.full（直すのは仕様の名前）

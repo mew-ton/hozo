@@ -71,18 +71,42 @@ namespace c.kinds {
   model ClassifySize { x: int; }
 }
 
-// 一つの構造体のフィールドどうし
+// 一つの構造体のフィールドどうし（例外の引数を含む）
 namespace c.fields {
   model Row { id: string; Id: string; }
+  exception Bad(code: int, Code: string);
 }
 
-// 一つのインターフェースのメソッドどうし: Ops の中の foo と Foo、状態の単位の Get と op
+// 一つのインターフェースのメソッドどうし: Ops の中の foo と Foo
 namespace c.methods {
-  model Row { id: string; }
-  state rows: list<Row>;
   export op foo(): int;
   export op Foo(): int;
-  @reading(rows) export op get(): int;
+}
+
+// 一つのインターフェースのメソッドどうし: 状態の単位の、形で決まるメソッド（Get と、配線が直に呼ぶ Post）と、ケースの述語と、
+// その単位の read と効果の名前を先頭大文字にしたもの
+namespace c.units {
+  model Row { id: string; }
+  state rows: list<Row>;
+  // 形で決まる問い合わせ Get と read get
+  read get(): int on rows;
+  // 同じ状態の read findRow と効果 FindRow
+  read findRow(id: string): Row? on rows;
+  effect FindRow(id: string) on rows.delete;
+  // 形で決まる命令 Post（配線が直に呼ぶ）と効果 post
+  effect post(row: Row) on rows.post;
+  export op add(row: Row)
+  {
+    rows.post(row);
+  }
+  // 直に呼ばれていない操作（rows は put を直に呼べない）は、単位のメソッドにならないので、効果 put は当たらない
+  effect put(row: Row) on rows.put;
+  // 状態の分類の単位: ケースの述語 Full と効果 full
+  classify Load of rows {
+    Full;
+    Spare;
+  }
+  effect full() on Load: Spare -> Full;
 }
 
 // Seams の中のメソッドどうし（op loginRate の @x.limited と、op login の @rate.x.limited。どちらも LoginRateXLimited）と、

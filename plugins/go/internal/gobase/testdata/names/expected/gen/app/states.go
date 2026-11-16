@@ -2,7 +2,11 @@
 
 package app
 
-import "context"
+import (
+	"context"
+
+	pkgtype "example.com/app/gen/type"
+)
 
 // LeavesState は状態 app.leaves（single<string>）の単位。実装は New の引数 leaves_ に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
@@ -16,6 +20,10 @@ type LeavesState interface {
 type ExtraState interface {
 	// Get は問い合わせ（形 single で決まる）: app.extra の値。
 	Get(ctx context.Context) (string, error)
+	// Pick は問い合わせ（read app.pick）。
+	Pick(ctx context.Context, ctx_ string, type_ string, err_ *int64) (string, error)
+	// Store は命令（効果 app.store、on app.extra.put）。
+	Store(ctx context.Context, o_ string, range_ *pkgtype.Token, context_ string) error
 }
 
 // FuncState は状態 app.func（single<string>）の単位。実装は New の引数 func_ に渡す。
@@ -23,11 +31,6 @@ type ExtraState interface {
 type FuncState interface {
 	// Get は問い合わせ（形 single で決まる）: app.func の値。
 	Get(ctx context.Context) (string, error)
-}
-
-// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
-// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
-type SharedState interface {
-	// Both は問い合わせ: app.leaves、app.extra を読む（reads）葉の op app.both。
-	Both(ctx context.Context) (string, error)
+	// Put は命令（形 single で決まる）: app.func の組み込みの効果 put。
+	Put(ctx context.Context, value string) error
 }

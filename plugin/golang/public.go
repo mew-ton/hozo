@@ -27,12 +27,10 @@ const (
 	PublicCases
 	// PublicStateUnit は状態の単位 `<状態>State`。
 	PublicStateUnit
-	// PublicOps、PublicNew、PublicLeaves、PublicShared、PublicSeams は、生成したコードが決めた名前
-	// `Ops`、`New`、`Leaves`、`SharedState`、`Seams`。
+	// PublicOps、PublicNew、PublicLeaves、PublicSeams は、生成したコードが決めた名前 `Ops`、`New`、`Leaves`、`Seams`。
 	PublicOps
 	PublicNew
 	PublicLeaves
-	PublicShared
 	PublicSeams
 	// PublicDep は別の名前空間の口 `<Ns>Ops`。
 	PublicDep
@@ -45,7 +43,7 @@ type PublicName struct {
 	// Kind は名前の種類。
 	Kind PublicKind
 	// Decl は、その名前を生んだ宣言の FQN（状態の単位なら、状態か状態の分類）。診断の位置に使う。生成したコードが決めた名前
-	// （Ops、New、Leaves、SharedState、Seams）と、別の名前空間の口なら ""。
+	// （Ops、New、Leaves、Seams）と、別の名前空間の口なら ""。
 	Decl string
 	// Detail は、PublicArm ならアーム名、PublicCase ならケース名（default は "default"）、PublicDep なら名前空間の FQN。ほかは ""。
 	Detail string
@@ -55,7 +53,7 @@ type PublicName struct {
 
 // PublicNames は、view の出力 (U, N) の定義のパッケージの公開の名前のすべて（docs/plugin-go.md「名前」の「名前が当たれば GO-2」）。
 // 並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語の
-// インターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`SharedState`、`Seams`、別の名前空間の口（FQN の辞書順）。
+// インターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。
 // 当たる名前も、そのまま二つ返す（当たっているかを見るのは呼ぶ側）。View が見る側のために合成した model、`set` の union、
 // 型で決まる分類は、Go の名前にならないので、入らない。
 func PublicNames(view *ir.View) []PublicName {
@@ -145,9 +143,6 @@ func PublicNames(view *ir.View) []PublicName {
 	}
 	if len(s.Leaves) > 0 {
 		add("Leaves", PublicLeaves, "", "", "インターフェース Leaves")
-	}
-	if len(s.Shared) > 0 {
-		add("SharedState", PublicShared, "", "", "インターフェース SharedState")
 	}
 	if len(s.Seams) > 0 {
 		add("Seams", PublicSeams, "", "", "インターフェース Seams")

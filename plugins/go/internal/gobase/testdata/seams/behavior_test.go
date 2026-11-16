@@ -28,8 +28,12 @@ func (l *log) expect(t *testing.T, want ...string) {
 	l.lines = nil
 }
 
+// leaves は、人が書く葉。デコレータが reads / effects を運ぶ葉（Add、Count、Summary）も、ここ。
 type leaves struct{ l *log }
 
+func (x leaves) Add(context.Context, shop.Item) error    { x.l.note("leaf Add"); return nil }
+func (x leaves) Count(context.Context) (int64, error)    { x.l.note("leaf Count"); return 3, nil }
+func (x leaves) Summary(context.Context) (string, error) { x.l.note("leaf Summary"); return "s", nil }
 func (x leaves) Notify(context.Context, shop.Item) error { x.l.note("leaf Notify"); return nil }
 func (x leaves) Lookup(id string) shop.Item              { x.l.note("leaf Lookup"); return shop.Item{Id: id} }
 func (x leaves) Audit(context.Context, shop.Item) error  { x.l.note("leaf Audit"); return nil }
@@ -42,20 +46,30 @@ func (x leaves) Plain(_ context.Context, id string) (shop.Item, error) {
 	return shop.Item{Id: id}, nil
 }
 
+// items は、状態 shop.items の単位: 形で決まる問い合わせ、read countById、効果 addItem。
 type items struct{ l *log }
 
 func (x items) IsEmpty(context.Context) (bool, error)    { return true, nil }
 func (x items) Get(context.Context) ([]shop.Item, error) { return nil, nil }
-func (x items) Add(context.Context, shop.Item) error     { x.l.note("state Add"); return nil }
-func (x items) Count(context.Context) (int64, error)     { x.l.note("state Count"); return 3, nil }
+func (x items) CountById(_ context.Context, id string) (int64, error) {
+	x.l.note("state CountById " + id)
+	return 2, nil
+}
+func (x items) AddItem(_ context.Context, item shop.Item) error {
+	x.l.note("state AddItem " + item.Id)
+	return nil
+}
 
-type title struct{}
+// title は、状態 shop.title の単位: 形で決まる問い合わせと、配線が直に呼ぶ、形で決まる命令 Put。
+type title struct{ l *log }
 
 func (title) Get(context.Context) (string, error) { return "shop", nil }
-
-type shared struct{ l *log }
-
-func (x shared) Summary(context.Context) (string, error) { x.l.note("shared Summary"); return "s", nil }
+func (x title) Put(_ context.Context, value string) error {
+	if x.l != nil {
+		x.l.note("state title.Put " + value)
+	}
+	return nil
+}
 
 // seams は、継ぎ目の実装: 前後を log に残して、body をそのまま呼ぶ。deny に名前があれば、body を呼ばずにエラーを返す。
 type seams struct {
@@ -85,6 +99,9 @@ func around0(s seams, name string, body func() error) error {
 func (s seams) BuyTLimited(ctx context.Context, id string, body func(ctx context.Context, id string) (shop.Item, error)) (shop.Item, error) {
 	return around(s, "BuyTLimited", func() (shop.Item, error) { return body(ctx, id) })
 }
+func (s seams) RestockTLimited(ctx context.Context, item shop.Item, body func(ctx context.Context, item shop.Item) (int64, error)) (int64, error) {
+	return around(s, "RestockTLimited", func() (int64, error) { return body(ctx, item) })
+}
 func (s seams) ClosedTLimited(ctx context.Context, body func(ctx context.Context) error) error {
 	return around0(s, "ClosedTLimited", func() error { return body(ctx) })
 }
@@ -113,11 +130,11 @@ func (s seams) PostTLimited(ctx context.Context, body string, body_ string, body
 	return around(s, "PostTLimited", func() (string, error) { return body__(ctx, body, body_) })
 }
 
-// 継ぎ目を持つ op は、継ぎ目を通して中身を呼ぶ。中身は、配線の本体・never を返す op・葉の実装（口のメソッド）
+// 継ぎ目を持つ op は、継ぎ目を通して中身を呼ぶ。中身は、配線の本体・never を返す op・葉の実装（Leaves のメソッド）
 func TestSeamsPassThrough(t *testing.T) {
 	ctx := context.Background()
 	l := &log{}
-	o := shop.New(leaves{l}, items{l}, title{}, shared{l}, seams{l: l})
+	o := shop.New(leaves{l}, items{l}, title{l}, seams{l: l})
 
 	if err := o.Closed(ctx); !errors.Is(err, shop.Closed{}) {
 		t.Errorf("Closed の err = %v", err)
@@ -126,15 +143,15 @@ func TestSeamsPassThrough(t *testing.T) {
 	if err := o.Add(ctx, shop.Item{}); err != nil {
 		t.Error(err)
 	}
-	l.expect(t, "AddTLimited before", "state Add", "AddTLimited after")
+	l.expect(t, "AddTLimited before", "leaf Add", "AddTLimited after")
 	if n, err := o.Count(ctx); err != nil || n != 3 {
 		t.Errorf("Count = %d, %v", n, err)
 	}
-	l.expect(t, "CountTLimited before", "state Count", "CountTLimited after")
+	l.expect(t, "CountTLimited before", "leaf Count", "CountTLimited after")
 	if _, err := o.Summary(ctx); err != nil {
 		t.Error(err)
 	}
-	l.expect(t, "SummaryTLimited before", "shared Summary", "SummaryTLimited after")
+	l.expect(t, "SummaryTLimited before", "leaf Summary", "SummaryTLimited after")
 	if err := o.Notify(ctx, shop.Item{}); err != nil {
 		t.Error(err)
 	}
@@ -143,6 +160,12 @@ func TestSeamsPassThrough(t *testing.T) {
 		t.Errorf("Post = %q, %v", got, err)
 	}
 	l.expect(t, "PostTLimited before", "leaf Post", "PostTLimited after")
+	// 継ぎ目が掛かるのは op だけ: 継ぎ目を持つ配線の中身が呼ぶ read と効果と、直に呼ぶ組み込みの効果は、状態の単位のメソッドを、
+	// そのまま呼ぶ（継ぎ目は、op の外側の一度だけ）
+	if n, err := o.Restock(ctx, shop.Item{Id: "i1"}); err != nil || n != 2 {
+		t.Errorf("Restock = %d, %v", n, err)
+	}
+	l.expect(t, "RestockTLimited before", "state AddItem i1", "state title.Put restocked", "state CountById i1", "RestockTLimited after")
 	// 継ぎ目にないデコレータだけの op は、継ぎ目を通らない
 	if _, err := o.Plain(ctx, "p"); err != nil {
 		t.Error(err)
@@ -155,7 +178,7 @@ func TestSeamsPassThrough(t *testing.T) {
 func TestSeamsNesting(t *testing.T) {
 	ctx := context.Background()
 	l := &log{}
-	o := shop.New(leaves{l}, items{l}, title{}, shared{l}, seams{l: l})
+	o := shop.New(leaves{l}, items{l}, title{l}, seams{l: l})
 	if got, err := o.Find(ctx, "x"); err != nil || got.Id != "x" {
 		t.Errorf("Find = %v, %v", got, err)
 	}
@@ -167,11 +190,11 @@ func TestSeamsNesting(t *testing.T) {
 	l.expect(t,
 		"BuyTLimited before",
 		"FindTTraced before", "FindTLimited before", "leaf Lookup", "FindTLimited after", "FindTTraced after",
-		"AddTLimited before", "state Add", "AddTLimited after",
+		"AddTLimited before", "leaf Add", "AddTLimited after",
 		"BuyTLimited after")
 
 	// 継ぎ目が body を呼ばなければ、中身は走らない
-	denied := shop.New(leaves{l}, items{l}, title{}, shared{l}, seams{l: l, deny: "FindTLimited"})
+	denied := shop.New(leaves{l}, items{l}, title{l}, seams{l: l, deny: "FindTLimited"})
 	if _, err := denied.Buy(ctx, "x"); err != errDenied {
 		t.Errorf("Buy の err = %v, want denied", err)
 	}
@@ -182,7 +205,7 @@ func TestSeamsNesting(t *testing.T) {
 func TestInnerAndEntry(t *testing.T) {
 	ctx := context.Background()
 	l := &log{}
-	in := inner.New(leaves{l}, items{l}, title{}, shared{l}, seams{l: l})
+	in := inner.New(leaves{l}, items{l}, title{l}, seams{l: l})
 	if err := in.Audit(ctx, shop.Item{}); err != nil {
 		t.Error(err)
 	}
@@ -209,13 +232,13 @@ func TestInnerAndEntry(t *testing.T) {
 func TestOtherOutputs(t *testing.T) {
 	ctx := context.Background()
 	l := &log{}
-	p := plain.New(plainLeaves{l}, plainItems{l}, title{}, plainShared{})
+	p := plain.New(plainLeaves{l}, plainItems{l}, title{})
 	if _, err := p.Find(ctx, "x"); err != nil {
 		t.Error(err)
 	}
 	l.expect(t, "plain Lookup")
 
-	s := shop.New(leaves{l}, items{l}, title{}, shared{l}, seams{l: l, deny: "BuyTLimited"})
+	s := shop.New(leaves{l}, items{l}, title{l}, seams{l: l, deny: "BuyTLimited"})
 	f := front.New(s)
 	if _, err := f.Order(ctx, "x"); err != errDenied {
 		t.Errorf("Order の err = %v, want denied", err)
@@ -225,6 +248,9 @@ func TestOtherOutputs(t *testing.T) {
 
 type plainLeaves struct{ l *log }
 
+func (x plainLeaves) Add(context.Context, plain.Item) error    { return nil }
+func (x plainLeaves) Count(context.Context) (int64, error)     { return 0, nil }
+func (x plainLeaves) Summary(context.Context) (string, error)  { return "", nil }
 func (x plainLeaves) Notify(context.Context, plain.Item) error { return nil }
 func (x plainLeaves) Lookup(id string) plain.Item {
 	x.l.note("plain Lookup")
@@ -238,11 +264,7 @@ func (x plainLeaves) Plain(context.Context, string) (plain.Item, error) { return
 
 type plainItems struct{ l *log }
 
-func (x plainItems) IsEmpty(context.Context) (bool, error)     { return true, nil }
-func (x plainItems) Get(context.Context) ([]plain.Item, error) { return nil, nil }
-func (x plainItems) Add(context.Context, plain.Item) error     { return nil }
-func (x plainItems) Count(context.Context) (int64, error)      { return 0, nil }
-
-type plainShared struct{}
-
-func (plainShared) Summary(context.Context) (string, error) { return "", nil }
+func (x plainItems) IsEmpty(context.Context) (bool, error)            { return true, nil }
+func (x plainItems) Get(context.Context) ([]plain.Item, error)        { return nil, nil }
+func (x plainItems) CountById(context.Context, string) (int64, error) { return 0, nil }
+func (x plainItems) AddItem(context.Context, plain.Item) error        { return nil }

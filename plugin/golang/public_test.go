@@ -8,7 +8,7 @@ import (
 )
 
 // docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前を、種類ごとに一つずつ。
-// 並びは、宣言順（宣言ごとの名前）、状態の単位、Ops、New、Leaves、SharedState、Seams、別の名前空間の口。
+// 並びは、宣言順（宣言ごとの名前）、状態の単位、Ops、New、Leaves、Seams、別の名前空間の口。
 func TestPublicNames(t *testing.T) {
 	// model から出す名前は、構造体の型だけ（値を作る関数 New<Model> は出さない。docs/plugin-go.md「model」）
 	page := model("shop.Page", field("size", ir.Int()))
@@ -35,7 +35,8 @@ func TestPublicNames(t *testing.T) {
 			classify("shop.Present", ir.TypeSubject{Type: ir.Optional(ir.String())}, ir.DecidedByType, "Some"),
 			state("shop.items", ir.Array(ir.Ref("shop.Item"))), state("shop.token", ir.Optional(ir.String())),
 			op("shop.leaf", nil),
-			with(op("shop.both", nil), reading("shop.items", "shop.token")),
+			with(op("shop.both", nil), decorated("x.rd"), carryingReads("shop.items", "shop.token")), // 二つの状態を読む葉も Leaves（SharedState はない）
+			read("shop.itemBySku", "shop.items", ir.Optional(ir.Ref("shop.Item"))),                   // read は、状態の単位のメソッド。公開の名前を足さない
 			with(op("shop.wire", nil), wired(call("other.run")), decorated("rate.limited")),
 		),
 		namespace("other", model("other.Far"), with(op("other.run", nil), decorated("t.mark"))),
@@ -71,7 +72,6 @@ func TestPublicNames(t *testing.T) {
 		{"Ops", PublicOps, "", "", "インターフェース Ops"},
 		{"New", PublicNew, "", "", "関数 New"},
 		{"Leaves", PublicLeaves, "", "", "インターフェース Leaves"},
-		{"SharedState", PublicShared, "", "", "インターフェース SharedState"},
 		{"Seams", PublicSeams, "", "", "インターフェース Seams"},
 		{"OtherOps", PublicDep, "", "other", "別の名前空間 other の口"},
 	}

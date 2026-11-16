@@ -17,5 +17,5 @@ func (Closed) HozoException() string { return "shop.Closed" }
 
 var _ runtime.Exception = Closed{}
 
-// EffectAddItem は effect shop.addItem。
+// EffectAddItem は品物を足す
 const EffectAddItem runtime.Effect = "shop.addItem"

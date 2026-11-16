@@ -11,10 +11,10 @@ type ItemsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: shop.items の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Item, error)
-	// Count は問い合わせ: shop.items を読む（reads）葉の op shop.count。
-	Count(ctx context.Context) (int64, error)
-	// Add は命令: 効果 shop.addItem（on shop.items.post）を持つ葉の op shop.add。
-	Add(ctx context.Context, item Item) error
+	// CountById は問い合わせ（read shop.countById）: 識別子が同じ品物の数
+	CountById(ctx context.Context, id string) (int64, error)
+	// AddItem は命令（効果 shop.addItem、on shop.items.post）: 品物を足す
+	AddItem(ctx context.Context, item Item) error
 }
 
 // TitleState は状態 shop.title（single<string>）の単位。実装は New の引数 title に渡す。
@@ -22,11 +22,6 @@ type ItemsState interface {
 type TitleState interface {
 	// Get は問い合わせ（形 single で決まる）: shop.title の値。
 	Get(ctx context.Context) (string, error)
-}
-
-// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
-// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
-type SharedState interface {
-	// Summary は問い合わせ: shop.items、shop.title を読む（reads）葉の op shop.summary。
-	Summary(ctx context.Context) (string, error)
+	// Put は命令（形 single で決まる）: shop.title の組み込みの効果 put。
+	Put(ctx context.Context, value string) error
 }

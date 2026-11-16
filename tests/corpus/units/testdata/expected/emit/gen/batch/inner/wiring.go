@@ -22,6 +22,16 @@ func (o *ops) Open(ctx context.Context, item Item) (Receipt, error) {
 	return receipt, nil
 }
 
+// Save は品物を記録する
+//
+// Effects: shop.addItem
+func (o *ops) Save(ctx context.Context, item Item) error {
+	if err := o.items.AddItem(ctx, item); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Nightly は夜間の片付け
 func (o *ops) Nightly(ctx context.Context, item Item) error {
 	o.Sweep(item)

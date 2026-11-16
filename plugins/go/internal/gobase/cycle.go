@@ -73,6 +73,15 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 			}
 		case *ir.State: // 2
 			typ(x.Type)
+		case *ir.Read:
+			for _, p := range x.Params {
+				typ(p.Type)
+			}
+			typ(x.Returns)
+		case *ir.Effect:
+			for _, p := range x.Params {
+				typ(p.Type)
+			}
 		case *ir.Classify:
 			typ(x.SubjectType())
 			for _, cs := range x.Cases {

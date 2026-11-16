@@ -2,7 +2,10 @@
 
 package app
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // TokenState は状態 app.token（nullable<app.Token>）の単位。実装は New の引数 token に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
@@ -11,12 +14,19 @@ type TokenState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 nullable で決まる）: app.token の値。なければ nil。
 	Get(ctx context.Context) (*Token, error)
-	// Peek は問い合わせ: app.token を読む（reads）葉の op app.peek。
-	Peek(ctx context.Context) (*Token, error)
-	// Logout は命令: 効果 app.dropToken（on app.token.delete）を持つ葉の op app.logout。
-	Logout(ctx context.Context) error
-	// Enter は命令: 効果 app.signIn（on app.SignedIn: any -> Yes）を持つ葉の op app.enter。
-	Enter(ctx context.Context, token Token) error
+	// Post は命令（形 nullable で決まる）: app.token の組み込みの効果 post。
+	Post(ctx context.Context, value Token) error
+	// Put は命令（形 nullable で決まる）: app.token の組み込みの効果 put。
+	Put(ctx context.Context, value Token) error
+	// Delete は命令（形 nullable で決まる）: app.token の組み込みの効果 delete。
+	Delete(ctx context.Context) error
+	// TokenCopy は問い合わせ（read app.tokenCopy）: 手元のトークンの写し
+	TokenCopy(ctx context.Context) (*Token, error)
+	// DropToken は命令（効果 app.dropToken、on app.token.delete）。
+	DropToken(ctx context.Context) error
+	// SignIn は命令（効果 app.signIn、on app.SignedIn: any -> Yes）: ログインする。
+	// 二行目の説明。
+	SignIn(ctx context.Context, token Token) error
 }
 
 // LinesState は状態 app.lines（list<app.Line>）の単位。実装は New の引数 lines に渡す。
@@ -26,18 +36,20 @@ type LinesState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: app.lines の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Line, error)
-	// CountLines は問い合わせ: app.lines を読む（reads）葉の op app.countLines。
+	// Post は命令（形 list で決まる）: app.lines の組み込みの効果 post。
+	Post(ctx context.Context, value Line) error
+	// LineFor は問い合わせ（read app.lineFor）: 品目が同じ行
+	LineFor(ctx context.Context, item string) (*Line, error)
+	// CountLines は問い合わせ（read app.countLines）。
 	CountLines(ctx context.Context) (int64, error)
-	// Add は命令: 効果 app.addLine（on app.lines.post）を持つ葉の op app.add。
-	Add(ctx context.Context, line Line) error
-	// Clear は命令: 効果 app.clearLines（on app.lines: HasItems -> Empty）を持つ葉の op app.clear。
-	Clear(ctx context.Context) error
-	// AddCounted は命令: 効果 app.addLine（on app.lines.post）を持つ葉の op app.addCounted。
-	AddCounted(ctx context.Context, line Line) (int64, error)
-	// Push は命令: 効果 app.addLine（on app.lines.post）を持つ葉の op app.push。
-	Push(ctx context.Context, line Line) error
-	// Replace は命令: 効果 app.clearLines（on app.lines: HasItems -> Empty）、app.addLine（on app.lines.post）を持つ葉の op app.replace。
-	Replace(ctx context.Context, line Line) error
+	// LinesSince は問い合わせ（read app.linesSince）。
+	LinesSince(ctx context.Context, since time.Time, limit *int64) ([]Line, error)
+	// AddLine は命令（効果 app.addLine、on app.lines.post）: 行を足す
+	AddLine(ctx context.Context, line Line) error
+	// ClearLines は命令（効果 app.clearLines、on app.lines: HasItems -> Empty）: カートを空にする
+	ClearLines(ctx context.Context) error
+	// RemoveLine は命令（効果 app.removeLine、on app.lines.delete）。
+	RemoveLine(ctx context.Context, item string) error
 }
 
 // SettingsState は状態 app.settings（single<app.Settings>）の単位。実装は New の引数 settings に渡す。
@@ -45,6 +57,22 @@ type LinesState interface {
 type SettingsState interface {
 	// Get は問い合わせ（形 single で決まる）: app.settings の値。
 	Get(ctx context.Context) (Settings, error)
+	// Put は命令（形 single で決まる）: app.settings の組み込みの効果 put。
+	Put(ctx context.Context, value Settings) error
+	// ShopTitle は問い合わせ（read app.shopTitle）: 店の名前。
+	// 設定の title を、そのまま返す。
+	ShopTitle(ctx context.Context) (string, error)
+	// Rename は命令（効果 app.rename、on app.settings.put）。
+	Rename(ctx context.Context, title string, owner *Owner) error
+}
+
+// JournalState は状態 app.journal（list<string>）の単位。実装は New の引数 journal に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type JournalState interface {
+	// IsEmpty は問い合わせ（形 list で決まる）: app.journal に要素が一つもなければ true。
+	IsEmpty(ctx context.Context) (bool, error)
+	// Get は問い合わせ（形 list で決まる）: app.journal の値。すべての要素を、足した順に。
+	Get(ctx context.Context) ([]string, error)
 }
 
 // SyncState は状態の分類 app.Sync（app.token、app.lines を対象にした classify）の単位。実装は New の引数 sync に渡す。
@@ -54,21 +82,6 @@ type SyncState interface {
 	Fresh(ctx context.Context) (bool, error)
 	// Stale は問い合わせ: ケース Stale の述語。
 	Stale(ctx context.Context) (bool, error)
-	// Sync は命令: 効果 app.refresh（on app.Sync: Stale -> Fresh）を持つ葉の op app.sync。
-	Sync(ctx context.Context) error
-}
-
-// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
-// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
-type SharedState interface {
-	// Summary は問い合わせ: app.lines、app.settings を読む（reads）葉の op app.summary。
-	Summary(ctx context.Context) (string, error)
-	// Checkout は命令: 効果 app.addLine（on app.lines.post）、app.dropToken（on app.token.delete）を持つ葉の op app.checkout。
-	Checkout(ctx context.Context, line Line) error
-	// SyncOut は命令: 効果 app.refresh（on app.Sync: Stale -> Fresh）、app.dropToken（on app.token.delete）を持つ葉の op app.syncOut。
-	SyncOut(ctx context.Context) error
-	// Status は問い合わせ: app.token、app.lines を読む（reads）葉の op app.status。
-	Status(ctx context.Context) (string, error)
-	// LineFor は問い合わせ: app.lines、app.token を読む（reads）葉の op app.lineFor。
-	LineFor(ctx context.Context, item string) (*Line, error)
+	// Refresh は命令（効果 app.refresh、on app.Sync: Stale -> Fresh）。
+	Refresh(ctx context.Context) error
 }

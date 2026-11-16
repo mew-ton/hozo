@@ -108,16 +108,22 @@ func TypeName(fqn, namespace string) string {
 	return escapeKeyword(b.String())
 }
 
-// FieldName はフィールド名を Go の公開フィールドの名前にする（docs/plugin-go.md「名前」の「フィールド名」）。
+// FieldName はフィールド名を Go の公開フィールドの名前にする（docs/plugin-go.md「名前」の「フィールド名」「例外の引数名」）。
 // 先頭だけを大文字にする（`id` → `Id`、`userId` → `UserId`）。JSON のタグは元の名前のまま呼ぶ側が付ける。
+// 例外の構造体のフィールド（引数ごとに一つ。同「exception」）も、引数名から、これで作る（`retryAfter` → `RetryAfter`）。
 // 大文字化で当たる二つの名前（`id` と `Id`）を見つける（GO-2）のは、基底のプラグイン。
 func FieldName(name string) string { return escapeKeyword(Capitalize(name)) }
 
-// MethodName は op 名を Go のメソッド名にする（docs/plugin-go.md「名前」の「op 名」）: 先頭を大文字に。export の有無によらない。
-// op の FQN を渡してもよい（最後のセグメントを使う）。
-func MethodName(opName string) string { return escapeKeyword(Capitalize(short(opName))) }
+// MethodName は op、read、効果の名前を Go のメソッド名にする（docs/plugin-go.md「名前」の「op 名」「read 名」「effect 名」）:
+// 先頭を大文字に（`login` → `Login`、`userByEmail` → `UserByEmail`、`createSession` → `CreateSession`）。op の export の有無に
+// よらない。FQN を渡してもよい（最後のセグメントを使う）。
+func MethodName(name string) string { return escapeKeyword(Capitalize(short(name))) }
 
-// LocalName は op の引数名や配線の束縛名を Go の局所の名前にする（docs/plugin-go.md「名前」の「局所の名前」）。
+// BuiltinMethod は、直に呼ぶ組み込みの効果の操作を、状態の単位のメソッド名にする（docs/plugin-go.md「名前」の
+// 「直に呼ぶ組み込みの効果の操作」）: 先頭を大文字に（`post` → `Post`、`put` → `Put`、`delete` → `Delete`）。
+func BuiltinMethod(operation string) string { return Capitalize(operation) }
+
+// LocalName は op・read・効果の引数名や配線の束縛名を Go の局所の名前にする（docs/plugin-go.md「名前」の「局所の名前」）。
 // 元の名前のままで、Go の予約語か、事前宣言の識別子か、reserved にあれば、末尾に `_`（`type` → `type_`、`error` → `error_`）。
 // reserved は、生成したコードがそのメソッドの中で使う名前（`o`、`ctx`、`err`、`ptr`、そのファイルが import するパッケージの名前）で、
 // 呼ぶ側が渡す。nil でもよい。

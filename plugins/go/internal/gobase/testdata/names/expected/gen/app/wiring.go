@@ -25,6 +25,20 @@ func (o *ops) Locals(o_ string, ctx_ string, err_ string, ptr_ string, func_ str
 	o.Show(runtime)
 }
 
+// Touch は op app.touch。
+//
+// Reads: app.extra
+// Effects: app.store, app.func.put
+func (o *ops) Touch(ctx context.Context, ctx_ string, type_ string, value string) (string, error) {
+	if err := o.extra.Store(ctx, ctx_, nil, type_); err != nil {
+		return "", err
+	}
+	if err := o.func_.Put(ctx, value); err != nil {
+		return "", err
+	}
+	return o.extra.Pick(ctx, ctx_, type_, nil)
+}
+
 // Bindings は op app.bindings。
 //
 // Reads: app.func
@@ -55,15 +69,15 @@ func (o *ops) Bindings(ctx context.Context) (pkgtype.Token, error) {
 	o.Show(func_)
 	o.ShowToken(v0)
 	var v1 string = "x"
-	// match "x" by app.Shared
-	k0, err := ClassifyShared(o.shared_, v1)
+	// match "x" by app.Extra
+	k0, err := ClassifyExtra(o.extra_, v1)
 	if err != nil {
 		return "", err
 	}
 	switch k0 {
-	case SharedYes:
+	case ExtraYes:
 		o.Show("yes")
-	case SharedNo:
+	case ExtraNo:
 	}
 	return o.type_.Issue(ctx)
 }

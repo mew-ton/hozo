@@ -4,6 +4,58 @@ package inner
 
 import "context"
 
+// Login は op server.login。
+//
+// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn, server.ClientError
+// Effects: server.createSession
+func (o *ops) Login(ctx context.Context, in LoginInput) (LoginOk, error) {
+	ok, err := o.Authenticate(in)
+	if err != nil {
+		return LoginOk{}, err
+	}
+	if err := o.sessions.CreateSession(ctx, ok); err != nil {
+		return LoginOk{}, err
+	}
+	return ok, nil
+}
+
+// CancelOrder は op server.cancelOrder。
+//
+// Throws: server.RefundPending
+// Effects: server.refund
+func (o *ops) CancelOrder(ctx context.Context, in CancelInput) (Order, error) {
+	if err := o.orders.Refund(ctx, in.OrderId); err != nil {
+		return Order{}, err
+	}
+	return o.ConfirmRefund(in)
+}
+
+// SaveOrder は注文を保存する
+//
+// Effects: server.createOrder
+func (o *ops) SaveOrder(ctx context.Context, in OrderInput) (Order, error) {
+	order := o.NewOrder(in)
+	if err := o.orders.CreateOrder(ctx, order); err != nil {
+		return Order{}, err
+	}
+	return order, nil
+}
+
+// SendOrderNotice は注文したユーザーに通知する
+//
+// Throws: server.NotificationFailed
+// Effects: server.notifyUser
+func (o *ops) SendOrderNotice(ctx context.Context, order Order) error {
+	notice, err := o.ComposeNotice(order)
+	if err != nil {
+		return err
+	}
+	if err := o.notifications.NotifyUser(ctx, notice); err != nil {
+		return err
+	}
+	return nil
+}
+
 // PlaceOrder は op server.placeOrder。
 //
 // Throws: server.NotificationFailed
@@ -17,4 +69,54 @@ func (o *ops) PlaceOrder(ctx context.Context, in OrderInput) (Order, error) {
 		return Order{}, err
 	}
 	return order, nil
+}
+
+// RequestPasswordReset はパスワードの再設定メールを送る。
+//
+// 引数:
+//   - email: 再設定するアカウントのメールアドレス
+//
+// Throws: server.RateLimited
+// Effects: server.sendResetMail
+func (o *ops) RequestPasswordReset(ctx context.Context, email Email) error {
+	reset, err := o.NewPasswordReset(email)
+	if err != nil {
+		return err
+	}
+	if err := o.passwordResets.SendResetMail(ctx, reset); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Logout は op server.logout。
+//
+// Effects: server.deleteSession
+func (o *ops) Logout(ctx context.Context, in LogoutInput) error {
+	if err := o.sessions.DeleteSession(ctx, in.Token); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AddToCart は商品をカートに入れる
+//
+// Effects: server.addCartLine
+func (o *ops) AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error) {
+	line := o.NewCartLine(in)
+	if err := o.carts.AddCartLine(ctx, line); err != nil {
+		return CartLine{}, err
+	}
+	return line, nil
+}
+
+// AttachWarranty はカートの一行に保証プランを付ける
+//
+// Effects: server.attachWarrantyToLine
+func (o *ops) AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error) {
+	line := o.WithWarranty(in)
+	if err := o.carts.AttachWarrantyToLine(ctx, line); err != nil {
+		return WarrantyLine{}, err
+	}
+	return line, nil
 }

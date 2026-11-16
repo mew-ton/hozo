@@ -27,15 +27,12 @@ type Violation struct {
 }
 
 // BadRequest: 要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない）
-type BadRequest struct{ Value BadRequestValue }
+type BadRequest struct {
+	Message    string      `json:"message"`
+	Violations []Violation `json:"violations"`
+}
 
 func (BadRequest) Error() string         { return "http.BadRequest" }
 func (BadRequest) HozoException() string { return "http.BadRequest" }
 
 var _ runtime.Exception = BadRequest{}
-
-// BadRequestValue は model http.BadRequest.Value。
-type BadRequestValue struct {
-	Message    string      `json:"message"`
-	Violations []Violation `json:"violations"`
-}

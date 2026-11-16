@@ -21,6 +21,20 @@ func (o *ops) Buy(ctx context.Context, id string) (Item, error) {
 	return item, nil
 }
 
+// Restock は op shop.restock。
+//
+// Reads: shop.items
+// Effects: shop.addItem, shop.title.put
+func (o *ops) Restock(ctx context.Context, item Item) (int64, error) {
+	if err := o.items.AddItem(ctx, item); err != nil {
+		return 0, err
+	}
+	if err := o.title.Put(ctx, "restocked"); err != nil {
+		return 0, err
+	}
+	return o.items.CountById(ctx, item.Id)
+}
+
 // Find は op shop.find。
 func (o *ops) Find(ctx context.Context, id string) (Item, error) {
 	return o.Lookup(id), nil

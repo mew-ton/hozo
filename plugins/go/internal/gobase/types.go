@@ -68,19 +68,6 @@ func (e *emitter) unionComment(u *ir.Union) string {
 	return comment(describe(e.typeName(u.Name), u.Description, "union "+u.Name+"。"))
 }
 
-// exceptionValue は、例外の構造体の Value の型。IR 0.6 で例外は引数の並び（Exception.Params）を持つようになったが、
-// 引数ごとのフィールドの形は、まだ決めていない: 引数が一つの例外だけを、今までの形（Value 一つ）で出し、二つ以上は誤りにする。
-func (e *emitter) exceptionValue(x *ir.Exception) ir.Type {
-	switch len(x.Params) {
-	case 0:
-		return nil
-	case 1:
-		return x.Params[0].Type
-	}
-	e.errorf(codeInternal, x.Name, "例外 %s は引数を %d 個持つ（引数を二つ以上持つ例外の出力は、まだない）", x.Name, len(x.Params))
-	return nil
-}
-
 // exceptionComment は「<型名>: <説明>」。説明がなければ「<型名> は exception <FQN>。」。
 func (e *emitter) exceptionComment(x *ir.Exception) string {
 	if b := body(x.Description); b != "" {
@@ -146,10 +133,15 @@ func (e *emitter) genTypes() *fileGen {
 		case *ir.Exception:
 			name := e.typeName(x.Name)
 			f.print(e.exceptionComment(x))
-			if value := e.exceptionValue(x); value != nil {
-				f.printf("type %s struct{ Value %s }\n\n", name, f.goType(value))
-			} else {
+			// 引数ごとにフィールド一つ（Exception.params の順）。名前とタグは model のフィールドと同じ。引数のない例外は struct{}
+			if len(x.Params) == 0 {
 				f.printf("type %s struct{}\n\n", name)
+			} else {
+				f.printf("type %s struct {\n", name)
+				for _, p := range x.Params {
+					f.printf("\t%s\n", f.structField(p.Name, p.Type))
+				}
+				f.print("}\n\n")
 			}
 			f.printf("func (%s) Error() string { return %s }\n", name, strconv.Quote(x.Name))
 			f.printf("func (%s) HozoException() string { return %s }\n\n", name, strconv.Quote(x.Name))
@@ -175,14 +167,20 @@ func (e *emitter) genModel(f *fileGen, m *ir.Model) {
 		f.printf("type %s struct {\n", name)
 		for _, fd := range m.Fields {
 			f.print(indent(comment(body(fd.Description))))
-			tag := fd.Name
-			if _, optional := fd.Type.(ir.OptionalType); optional {
-				tag += ",omitempty"
-			}
-			f.printf("\t%s %s `json:%s`\n", golang.FieldName(fd.Name), f.goType(fd.Type), strconv.Quote(tag))
+			f.printf("\t%s\n", f.structField(fd.Name, fd.Type))
 		}
 		f.print("}\n\n")
 	}
+}
+
+// structField は、構造体のフィールド一つ（model のフィールドと、例外の引数。docs/plugin-go.md「名前」）: 名前は先頭を大文字に、
+// タグは `json:"<元の名前>"`。型が省略可能なら `,omitempty`。
+func (f *fileGen) structField(name string, t ir.Type) string {
+	tag := name
+	if _, optional := t.(ir.OptionalType); optional {
+		tag += ",omitempty"
+	}
+	return golang.FieldName(name) + " " + f.goType(t) + " `json:" + strconv.Quote(tag) + "`"
 }
 
 // genUnion は union（arms）一つ: インターフェース、マーカーメソッド（アームの順）、包む型（アームの順）。

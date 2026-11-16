@@ -18,6 +18,12 @@ type Ops interface {
 	// Effects: shop.addItem
 	Buy(ctx context.Context, id string) (Item, error)
 
+	// Restock は op shop.restock。
+	//
+	// Reads: shop.items
+	// Effects: shop.addItem, shop.title.put
+	Restock(ctx context.Context, item Item) (int64, error)
+
 	// Closed は op shop.closed。
 	//
 	// Throws: shop.Closed
@@ -56,7 +62,7 @@ type Ops interface {
 	Plain(ctx context.Context, id string) (Item, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves = inner.Leaves
 
@@ -64,8 +70,8 @@ type Leaves = inner.Leaves
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Seams = inner.Seams
 
-// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、shared、seams。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、seams。
 // 引数が nil かどうかは確かめない。
-func New(leaves Leaves, items ItemsState, title TitleState, shared SharedState, seams Seams) Ops {
-	return inner.New(leaves, items, title, shared, seams)
+func New(leaves Leaves, items ItemsState, title TitleState, seams Seams) Ops {
+	return inner.New(leaves, items, title, seams)
 }

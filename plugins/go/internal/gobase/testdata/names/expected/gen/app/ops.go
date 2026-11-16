@@ -33,15 +33,26 @@ type Ops interface {
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	Locals(o_ string, ctx_ string, err_ string, ptr_ string, func_ string, len_ string, error_ string, util_ string, context_ string, pkgtype_ string, runtime string)
 
+	// Touch は op app.touch。
+	//
+	// Reads: app.extra
+	// Effects: app.store, app.func.put
+	Touch(ctx context.Context, ctx_ string, type_ string, value string) (string, error)
+
 	// Bindings は op app.bindings。
 	//
 	// Reads: app.func
 	Bindings(ctx context.Context) (pkgtype.Token, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
+	// Both は op app.both。
+	//
+	// Reads: app.leaves, app.extra
+	Both(ctx context.Context) (string, error)
+
 	// Show は op app.show。
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
@@ -81,10 +92,10 @@ type TypeOps interface {
 	Issue(ctx context.Context) (pkgtype.Token, error)
 }
 
-// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、shared、分類の述語（FQN の辞書順）、別の名前空間（名前の辞書順）。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、分類の述語（FQN の辞書順）、別の名前空間（名前の辞書順）。
 // 引数が nil かどうかは確かめない。
-func New(leaves Leaves, leaves_ LeavesState, extra ExtraState, func_ FuncState, shared SharedState, shared_ SharedCases, aUtil AUtilOps, bUtil BUtilOps, context ContextOps, type_ TypeOps) Ops {
-	return &ops{leaves: leaves, leaves_: leaves_, extra: extra, func_: func_, shared: shared, shared_: shared_, aUtil: aUtil, bUtil: bUtil, context: context, type_: type_}
+func New(leaves Leaves, leaves_ LeavesState, extra ExtraState, func_ FuncState, extra_ ExtraCases, aUtil AUtilOps, bUtil BUtilOps, context ContextOps, type_ TypeOps) Ops {
+	return &ops{leaves: leaves, leaves_: leaves_, extra: extra, func_: func_, extra_: extra_, aUtil: aUtil, bUtil: bUtil, context: context, type_: type_}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
@@ -93,8 +104,7 @@ type ops struct {
 	leaves_ LeavesState
 	extra   ExtraState
 	func_   FuncState
-	shared  SharedState
-	shared_ SharedCases
+	extra_  ExtraCases
 	aUtil   AUtilOps
 	bUtil   BUtilOps
 	context ContextOps
@@ -102,7 +112,7 @@ type ops struct {
 }
 
 func (o *ops) Both(ctx context.Context) (string, error) {
-	return o.shared.Both(ctx)
+	return o.leaves.Both(ctx)
 }
 
 func (o *ops) Show(text string) {

@@ -30,13 +30,13 @@ namespace context {
 
 /** 当たる名前を持つ名前空間 */
 namespace app {
-  // 「New」状態の名前（leaves、Go の予約語 func）と、分類の名前（shared）が、ほかの引数の名前と当たる。
+  // 「New」状態の名前（leaves、Go の予約語 func）と、分類の名前（extra）が、ほかの引数の名前と当たる。
   // 先に並んだ引数と当たれば、後ろの方に _ を足す
   state leaves: single<string>;
   state extra: single<string>;
   state func: single<string>;
   @reading(leaves, extra) export op both(): string;
-  classify Shared of string {
+  classify Extra of string {
     Yes;
     No;
   }
@@ -60,6 +60,17 @@ namespace app {
     show(runtime);
   }
 
+  // 「局所の名前」read と効果の引数名も、同じ規則（状態の単位のメソッドの引数）。それを呼ぶ配線の引数名と、直に呼ぶ組み込みの
+  // 効果の値
+  read pick(ctx: string, type: string, err: int?): string on extra;
+  effect store(o: string, range: type.Token?, context: string) on extra.put;
+  export op touch(ctx: string, type: string, value: string): string
+  {
+    store(ctx, none, type);
+    func.put(value);
+    return pick(ctx, type);
+  }
+
   // 「局所の名前」束縛名と、状態を読んだ値の変数の名前（状態 func は予約語なので func_）。
   // 「import の名前」同じパッケージ名の二つの名前空間（util と util2）、標準ライブラリと同じ名前（context2）、予約語（pkgtype）
   export op bindings(): type.Token
@@ -70,7 +81,7 @@ namespace app {
     const v0 = type.issue();
     show(func);
     showToken(v0);
-    match "x" by Shared {
+    match "x" by Extra {
       Yes => show("yes");
       No  => none;
     };

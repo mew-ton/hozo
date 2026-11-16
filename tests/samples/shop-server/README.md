@@ -43,6 +43,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | 文書の版（`docs/ir.md`「版」） | `plugins/go-ratelimit/hozo-plugin.toml` の `protocol`。hozoc と、リポジトリのプラグインのマニフェストと、一緒に上げる | `docs/ir.md`「版」 |
 
 - その間に `TestSamples` のどのサブテストが通らないかの持ち主は、`../README.md`「移行の間」。
+- **表のうち、基底 `go` の行は、実装が入った。** 基底のファイル（`sample.json` の `go` の 21 個）は、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。確かめたのは、相乗りを代役（ファイルを返さないトランスパイラ。`../README.md`「飛ばす条件」）に置き換えた形で、`go-sqlite` の代役のマニフェストには、文書のとおり `seams = ["db.transaction"]` を足した。本物の `go-sqlite` のマニフェストが `seams` を宣言するまで、`gen/store` の `ops.go` と `wiring.go` は、継ぎ目のない形（`gen/storemem` と同じ形）で出る。
 - **`plugins/go-ratelimit/testdata/` は、入力の仕様だけを直した**（`seams/app.hozo` の、状態に触れる二つの op を、`read` と効果を呼ぶ配線に）。`views.json`（hozoc が置く `View`）と、それに合わせてある `seams/behavior_test.go`（状態の単位の見立て）は、前の版のまま: `go-ratelimit` の出力（継ぎ目のメソッド）は、op の形が同じなので変わらない。二つは、R4 の実装と一緒に直す（「サンプルの中のプラグイン」の「実装」）。
 - この段階の期待する出力は、どの hozoc でも確かめていない（「分かったこと」N121）。`files` と `go`（このモジュールの `go vet` と `go test`）は、hozoc を使わないので、今も通る。
 

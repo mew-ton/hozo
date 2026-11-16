@@ -134,7 +134,9 @@ type Violations struct {
 }
 
 // ClientError: 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ）
-type ClientError struct{ Value Violations }
+type ClientError struct {
+	Value Violations `json:"value"`
+}
 
 func (ClientError) Error() string         { return "server.ClientError" }
 func (ClientError) HozoException() string { return "server.ClientError" }

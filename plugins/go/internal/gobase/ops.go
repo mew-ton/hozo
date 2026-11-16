@@ -14,7 +14,7 @@ import (
 const (
 	commentOpsEntry = "Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。"
 	commentOpsInner = "Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。"
-	commentLeaves   = "Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。\n" +
+	commentLeaves   = "Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。\n" +
 		"実装は New の引数 %s に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。"
 	commentMissing = "メソッドが一つでも足りない値は、渡すところでコンパイルできない。"
 	commentSeams   = "Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 %s に渡す。\n" + commentMissing
@@ -43,9 +43,6 @@ func (e *emitter) newComment() string {
 	}
 	if len(e.shape.States) > 0 {
 		kinds = append(kinds, "状態の単位（宣言順）")
-	}
-	if len(e.shape.Shared) > 0 {
-		kinds = append(kinds, e.fields.shared)
 	}
 	if len(e.shape.Classify) > 0 {
 		kinds = append(kinds, "分類の述語（FQN の辞書順）")
@@ -96,9 +93,6 @@ func (e *emitter) newParams(f *fileGen) (params, names []string) {
 		i++
 	}
 	i += len(e.shape.States)
-	if len(e.shape.Shared) > 0 {
-		i++
-	}
 	for _, fqn := range e.shape.Classify {
 		foreign[i] = fqn
 		i++
@@ -244,15 +238,11 @@ func (e *emitter) genOps() *fileGen {
 }
 
 // implExpr は、op の実装（中身）を指す式（docs/plugin-go.md「継ぎ目」の「中身」の表の「外側が渡す式」）: 配線と never を返す op は
-// `o.<op>Body`（継ぎ目を持つときだけ使う）、葉は、実装を受け取る口のメソッドの値。
+// `o.<op>Body`（継ぎ目を持つときだけ使う）、葉は、Leaves のメソッドの値（名前は op 名のまま）。
 func (e *emitter) implExpr(os golang.OpShape) string {
 	switch os.Place {
 	case golang.Wiring, golang.Never:
 		return "o." + os.Body
-	case golang.StateCommand, golang.StateQuery:
-		return "o." + e.units[os.Unit].Param + "." + os.Method
-	case golang.SharedCommand, golang.SharedQuery:
-		return "o." + e.fields.shared + "." + os.Method
 	case golang.Leaf:
 		return "o." + e.fields.leaves + "." + os.Method
 	}

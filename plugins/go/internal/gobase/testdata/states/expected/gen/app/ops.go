@@ -6,81 +6,25 @@ import "context"
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
-	// Add は op app.add。
+	// Push は op app.push。
 	//
 	// Effects: app.addLine
-	Add(ctx context.Context, line Line) error
-
-	// Logout は op app.logout。
-	//
-	// Effects: app.dropToken
-	Logout(ctx context.Context) error
-
-	// CountLines は op app.countLines。
-	//
-	// Reads: app.lines
-	CountLines(ctx context.Context) (int64, error)
+	Push(ctx context.Context, line Line) error
 
 	// Summary は op app.summary。
 	//
 	// Reads: app.lines, app.settings
 	Summary(ctx context.Context) (string, error)
 
-	// Clear は op app.clear。
-	//
-	// Effects: app.clearLines
-	Clear(ctx context.Context) error
-
-	// Sync は op app.sync。
-	//
-	// Effects: app.refresh
-	Sync(ctx context.Context) error
-
-	// Enter は op app.enter。
-	//
-	// Effects: app.signIn
-	Enter(ctx context.Context, token Token) error
-
-	// AddCounted は op app.addCounted。
-	//
-	// Reads: app.settings
-	// Effects: app.addLine
-	AddCounted(ctx context.Context, line Line) (int64, error)
-
-	// Push は op app.push。
-	//
-	// Effects: app.addLine
-	Push(ctx context.Context, line Line) error
-
-	// Replace は op app.replace。
-	//
-	// Effects: app.clearLines, app.addLine
-	Replace(ctx context.Context, line Line) error
-
 	// Checkout は op app.checkout。
 	//
 	// Effects: app.addLine, app.dropToken
 	Checkout(ctx context.Context, line Line) error
 
-	// SyncOut は op app.syncOut。
-	//
-	// Effects: app.refresh, app.dropToken
-	SyncOut(ctx context.Context) error
-
 	// Peek は op app.peek。
 	//
 	// Reads: app.token
 	Peek(ctx context.Context) (*Token, error)
-
-	// Status は op app.status。
-	//
-	// Reads: app.token, app.lines
-	Status(ctx context.Context) (string, error)
-
-	// LineFor は op app.lineFor。
-	//
-	// Reads: app.lines, app.token
-	LineFor(ctx context.Context, item string) (*Line, error)
 
 	// Audit は op app.audit。
 	Audit(ctx context.Context, note string) error
@@ -89,6 +33,11 @@ type Ops interface {
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	Show(title string)
+
+	// ShowCount は op app.showCount。
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	ShowCount(n int64)
 
 	// ShowOwner は op app.showOwner。
 	//
@@ -109,6 +58,62 @@ type Ops interface {
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	ShowLines(lines []Line)
+
+	// Find は op app.find。
+	//
+	// Reads: app.lines
+	Find(ctx context.Context, item string) (*Line, error)
+
+	// Total は op app.total。
+	//
+	// Reads: app.lines
+	Total(ctx context.Context) (int64, error)
+
+	// MaybeTotal は op app.maybeTotal。
+	//
+	// Reads: app.lines
+	MaybeTotal(ctx context.Context) (*int64, error)
+
+	// Title は op app.title。
+	//
+	// Reads: app.settings
+	Title(ctx context.Context) (string, error)
+
+	// Add は op app.add。
+	//
+	// Effects: app.addLine
+	Add(ctx context.Context, line Line) error
+
+	// Reset は op app.reset。
+	//
+	// Effects: app.clearLines, app.refresh, app.signIn, app.dropToken
+	Reset(ctx context.Context, t Token) error
+
+	// Retitle は op app.retitle。
+	//
+	// Effects: app.rename, app.addLine
+	Retitle(ctx context.Context, t Token, owner Owner) error
+
+	// Direct は op app.direct。
+	//
+	// Effects: app.lines.post, app.token.put, app.token.delete, app.token.post, app.settings.put
+	Direct(ctx context.Context, line Line, t Token) error
+
+	// FindOrNone は op app.findOrNone。
+	//
+	// Reads: app.lines
+	FindOrNone(ctx context.Context, item *string) (*Line, error)
+
+	// CountOrZero は op app.countOrZero。
+	//
+	// Reads: app.lines
+	CountOrZero(ctx context.Context, item *string) (int64, error)
+
+	// Toggle は op app.toggle。
+	//
+	// Reads: app.token
+	// Effects: app.dropToken, app.token.post
+	Toggle(ctx context.Context, t Token) error
 
 	// Header は op app.header。
 	//
@@ -126,11 +131,6 @@ type Ops interface {
 	// Reads: app.token
 	Current(ctx context.Context) (*Token, error)
 
-	// Title は op app.title。
-	//
-	// Reads: app.settings
-	Title(ctx context.Context) (string, error)
-
 	// Shadowed は op app.shadowed。
 	//
 	// Reads: app.token
@@ -142,22 +142,36 @@ type Ops interface {
 	// Effects: app.dropToken
 	Branches(ctx context.Context) error
 
-	// Report は op app.report。
-	//
-	// Reads: app.lines, app.settings
-	// Effects: app.addLine
-	Report(ctx context.Context, line Line) (string, error)
-
 	// Finish は op app.finish。
 	//
-	// Reads: app.token, app.lines
-	// Effects: app.clearLines, app.addLine, app.dropToken, app.refresh
+	// Reads: app.lines, app.settings
+	// Effects: app.addLine, app.dropToken, app.lines.post, app.refresh
 	Finish(ctx context.Context, line Line) (string, error)
 }
 
-// Leaves は、人が実装する葉の op: 本体がなく、状態を読まず（reads がない）、効果も持たない op。export の有無によらない。
+// Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
+	// Push は op app.push。
+	//
+	// Effects: app.addLine
+	Push(ctx context.Context, line Line) error
+
+	// Summary は op app.summary。
+	//
+	// Reads: app.lines, app.settings
+	Summary(ctx context.Context) (string, error)
+
+	// Checkout は op app.checkout。
+	//
+	// Effects: app.addLine, app.dropToken
+	Checkout(ctx context.Context, line Line) error
+
+	// Peek は op app.peek。
+	//
+	// Reads: app.token
+	Peek(ctx context.Context) (*Token, error)
+
 	// Audit は op app.audit。
 	Audit(ctx context.Context, note string) error
 
@@ -165,6 +179,11 @@ type Leaves interface {
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	Show(title string)
+
+	// ShowCount は op app.showCount。
+	//
+	// 純粋（ctx を取らない）。失敗しない（error を返さない）
+	ShowCount(n int64)
 
 	// ShowOwner は op app.showOwner。
 	//
@@ -187,10 +206,10 @@ type Leaves interface {
 	ShowLines(lines []Line)
 }
 
-// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）、shared。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、状態の単位（宣言順）。
 // 引数が nil かどうかは確かめない。
-func New(leaves Leaves, token TokenState, lines LinesState, settings SettingsState, sync SyncState, shared SharedState) Ops {
-	return &ops{leaves: leaves, token: token, lines: lines, settings: settings, sync: sync, shared: shared}
+func New(leaves Leaves, token TokenState, lines LinesState, settings SettingsState, journal JournalState, sync SyncState) Ops {
+	return &ops{leaves: leaves, token: token, lines: lines, settings: settings, journal: journal, sync: sync}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
@@ -199,68 +218,24 @@ type ops struct {
 	token    TokenState
 	lines    LinesState
 	settings SettingsState
+	journal  JournalState
 	sync     SyncState
-	shared   SharedState
-}
-
-func (o *ops) Add(ctx context.Context, line Line) error {
-	return o.lines.Add(ctx, line)
-}
-
-func (o *ops) Logout(ctx context.Context) error {
-	return o.token.Logout(ctx)
-}
-
-func (o *ops) CountLines(ctx context.Context) (int64, error) {
-	return o.lines.CountLines(ctx)
-}
-
-func (o *ops) Summary(ctx context.Context) (string, error) {
-	return o.shared.Summary(ctx)
-}
-
-func (o *ops) Clear(ctx context.Context) error {
-	return o.lines.Clear(ctx)
-}
-
-func (o *ops) Sync(ctx context.Context) error {
-	return o.sync.Sync(ctx)
-}
-
-func (o *ops) Enter(ctx context.Context, token Token) error {
-	return o.token.Enter(ctx, token)
-}
-
-func (o *ops) AddCounted(ctx context.Context, line Line) (int64, error) {
-	return o.lines.AddCounted(ctx, line)
 }
 
 func (o *ops) Push(ctx context.Context, line Line) error {
-	return o.lines.Push(ctx, line)
+	return o.leaves.Push(ctx, line)
 }
 
-func (o *ops) Replace(ctx context.Context, line Line) error {
-	return o.lines.Replace(ctx, line)
+func (o *ops) Summary(ctx context.Context) (string, error) {
+	return o.leaves.Summary(ctx)
 }
 
 func (o *ops) Checkout(ctx context.Context, line Line) error {
-	return o.shared.Checkout(ctx, line)
-}
-
-func (o *ops) SyncOut(ctx context.Context) error {
-	return o.shared.SyncOut(ctx)
+	return o.leaves.Checkout(ctx, line)
 }
 
 func (o *ops) Peek(ctx context.Context) (*Token, error) {
-	return o.token.Peek(ctx)
-}
-
-func (o *ops) Status(ctx context.Context) (string, error) {
-	return o.shared.Status(ctx)
-}
-
-func (o *ops) LineFor(ctx context.Context, item string) (*Line, error) {
-	return o.shared.LineFor(ctx, item)
+	return o.leaves.Peek(ctx)
 }
 
 func (o *ops) Audit(ctx context.Context, note string) error {
@@ -269,6 +244,10 @@ func (o *ops) Audit(ctx context.Context, note string) error {
 
 func (o *ops) Show(title string) {
 	o.leaves.Show(title)
+}
+
+func (o *ops) ShowCount(n int64) {
+	o.leaves.ShowCount(n)
 }
 
 func (o *ops) ShowOwner(name *string) {

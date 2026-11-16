@@ -147,26 +147,38 @@ func (Plain) HozoException() string { return "app.Plain" }
 var _ runtime.Exception = Plain{}
 
 // Invalid: 入力が不正
-type Invalid struct{ Value InvalidValue }
+type Invalid struct {
+	Reason string `json:"reason"`
+	At     *int64 `json:"at,omitempty"`
+}
 
 func (Invalid) Error() string         { return "app.Invalid" }
 func (Invalid) HozoException() string { return "app.Invalid" }
 
 var _ runtime.Exception = Invalid{}
 
-// InvalidValue は model app.Invalid.Value。
-type InvalidValue struct {
-	Reason string `json:"reason"`
-	At     *int64 `json:"at,omitempty"`
-}
-
 // Wrapped は exception app.Wrapped。
-type Wrapped struct{ Value Problem }
+type Wrapped struct {
+	Value Problem `json:"value"`
+}
 
 func (Wrapped) Error() string         { return "app.Wrapped" }
 func (Wrapped) HozoException() string { return "app.Wrapped" }
 
 var _ runtime.Exception = Wrapped{}
+
+// LimitExceeded: 呼び出しの頻度の制限を超えた。
+// 二行目の説明。
+type LimitExceeded struct {
+	RetryAfter time.Duration   `json:"retryAfter"`
+	Home       pkgtype.Address `json:"home"`
+	UserIds    []Id            `json:"userIds"`
+}
+
+func (LimitExceeded) Error() string         { return "app.LimitExceeded" }
+func (LimitExceeded) HozoException() string { return "app.LimitExceeded" }
+
+var _ runtime.Exception = LimitExceeded{}
 
 // EffectAddUser は利用者を足す
 const EffectAddUser runtime.Effect = "app.addUser"

@@ -7,7 +7,8 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Place は op の置き場（docs/plugin-go.md「op の置き場」の表の 1〜6）: N の op の実装が、どこにあるか。
+// Place は op の置き場（docs/plugin-go.md「op の置き場」の表の 1〜3）: N の op の実装が、どこにあるか。
+// op は、関数の枠だけを作る。状態に触れるのは read と効果（どちらも状態の単位のメソッド）で、op ではないので、置き場は三つだけ。
 type Place int
 
 const (
@@ -15,34 +16,20 @@ const (
 	Wiring Place = iota + 1
 	// Never は、never を返す op。実装は、生成した本体（ops.go）: `return <例外の型>{}`。
 	Never
-	// StateCommand は、効果を持つ葉で、効果の宛先の単位が、すべての効果で同じもの。実装は、その状態の単位の命令。
-	StateCommand
-	// SharedCommand は、効果を持つ葉で、効果の宛先の単位が、二つ以上に分かれるもの。実装は、SharedState。
-	SharedCommand
-	// StateQuery は、効果を持たず、読む状態が一つの葉。実装は、その状態の単位の問い合わせ。
-	StateQuery
-	// SharedQuery は、効果を持たず、読む状態が二つ以上の葉。実装は、SharedState。
-	SharedQuery
-	// Leaf は、それ以外の葉（運ぶ節のないデコレータだけを持つ葉を含む）と、単位の対象でない配線。実装は、Leaves。
+	// Leaf は、葉（本体を持たない op）と、単位の対象でない配線。実装は、Leaves。葉に付いたデコレータが reads / effects を
+	// 運んでいても（Op.carried）、置き場は変わらない。
 	Leaf
 )
-
-// 葉の「効果」と「読む状態」は、op が直に持つ効果と、直に読む状態: op が自分で書いたもの（Op.effects、Op.reads）と、付いたデコレータが
-// 運ぶもの（Op.carried）を合わせたもの（ir.Op.DirectEffects、ir.Op.DirectReads）。どちらで書かれたかは、置き場を変えない。
-// デコレータの名前は見ない: 運ぶものは、hozoc が IR に置いている。
 
 // Shape は、一つの出力 (U, N) の、op と、実装を受け取る口のすべて（docs/plugin-go.md「出力の対象」「実装を受け取る口」「継ぎ目」）。
 // 基底も相乗りも、ShapeOf の同じ値から名前と並びを求める。
 type Shape struct {
 	// Ops は N の op: 単位の対象の op と、単位の対象の配線が呼ぶ、単位の対象でない N の op（本体のない op として出すもの）。宣言順。
 	Ops []OpShape
-	// Leaves は、インターフェース Leaves のメソッドになる op の FQN（宣言順）。空なら Leaves も New の引数 leaves もない。
+	// Leaves は、インターフェース Leaves のメソッドになる op の FQN（宣言順）: 置き場が Leaf の op。空なら Leaves も New の引数 leaves もない。
 	Leaves []string
-	// States は状態の単位: 基底の状態と、述語で決まる状態の分類。宣言順。
+	// States は状態の単位: 基底の状態と、述語で決まる状態の分類。宣言順。N の read と効果は、どれも、このどれか一つのメソッド。
 	States []StateUnit
-	// Shared は、インターフェース SharedState のメソッドになる op の FQN: 効果の宛先の単位が分かれた葉（SharedCommand）と、
-	// 複数の状態を読む葉（SharedQuery）。種類で分けずに、宣言順。空なら SharedState も New の引数 shared もない。
-	Shared []string
 	// Classify は、New が述語を受け取る、値の分類と op の分類の FQN: 単位の対象の配線が match に使う、述語で決まるもの
 	// （別の名前空間のものを含む）。FQN の辞書順。
 	Classify []string
@@ -51,7 +38,7 @@ type Shape struct {
 	// Seams は、インターフェース Seams のメソッド: 継ぎ目を持つ op と、それに付いた、単位の継ぎ目にあるデコレータの組ごとに一つ。
 	// op の宣言順、その中はデコレータの書かれた順。空なら Seams も New の引数 seams もない。
 	Seams []Seam
-	// New は New の引数（名前と Go の型）。この順: leaves、状態の単位、shared、分類の述語、別の名前空間、seams。
+	// New は New の引数（名前と Go の型）。この順: leaves、状態の単位、分類の述語、別の名前空間、seams。
 	// 構造体 ops のフィールドも、同じ名前、同じ順。
 	New []Param
 }
@@ -64,8 +51,6 @@ type OpShape struct {
 	Exported bool
 	// Place は置き場。
 	Place Place
-	// Unit は、Place が状態の単位（StateCommand、StateQuery）なら、その状態（か、述語で決まる状態の分類）の FQN。それ以外は ""。
-	Unit string
 	// Ctx は最初の引数に ctx context.Context を取るか（純粋でない）。Err は最後の戻り値に error を返すか
 	// （純粋で、かつ例外が空の op だけが返さない）。
 	Ctx, Err bool
@@ -75,14 +60,23 @@ type OpShape struct {
 	Body string
 }
 
-// StateUnit は状態の単位一つ（docs/plugin-go.md「状態の単位」）: インターフェース `<状態>State`。
+// StateUnit は状態の単位一つ（docs/plugin-go.md「状態の単位」）: インターフェース `<状態>State`。その状態に触れるもののすべて。
+// メソッドの並びは、形で決まる問い合わせ（基底の状態。Shape から決まる IsEmpty / Get）か、ケースごとの述語（状態の分類。Predicates）、
+// 形で決まる命令（Builtins）、read（Reads）、効果（Effects）。どれも ctx を取り、error を返す。
 type StateUnit struct {
 	// FQN は基底の状態か、述語で決まる状態の分類の FQN。TypeName はインターフェースの名前、Param は New の引数の名前。
 	FQN, TypeName, Param string
 	// Shape は基底の状態の形（"list"、"nullable"、"single"）。状態の分類なら ""。
 	Shape string
-	// Queries は op の問い合わせ（StateQuery）の op の FQN、Commands は命令（StateCommand）の op の FQN。どちらも宣言順。
-	Queries, Commands []string
+	// Builtins は、形で決まる命令の操作（"post"、"put"、"delete" の順）: 単位の対象の配線が、この状態の組み込みの効果を直に
+	// 呼んでいるものだけ。メソッドの名前は BuiltinMethod、形は BuiltinSignature。状態の分類なら空。
+	Builtins []string
+	// Reads は、この状態を読む read（Read.state が、この状態）の FQN。N の read のすべてを、配線が呼んでいるかによらず、宣言順に。
+	// メソッドの名前は MethodName、形は ReadSignature。状態の分類なら空（read の宛先は、基底の状態）。
+	Reads []string
+	// Effects は、この単位を宛先にする効果の FQN（同「状態の単位」の「効果の宛先の単位」）。N の効果のすべてを、配線が呼んでいるかに
+	// よらず、宣言順に。メソッドの名前は MethodName、形は EffectSignature。
+	Effects []string
 	// Predicates は、状態の分類のケースごとの述語のケース名（宣言順。default は持たない）。基底の状態なら空。
 	Predicates []string
 }
@@ -137,9 +131,10 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		}
 	}
 
-	// 単位の対象の配線が呼ぶ op と、match に使う分類
+	// 単位の対象の配線が呼ぶ op と、直に呼ぶ組み込みの効果と、match に使う分類
 	called := map[string]bool{}
-	depOps := map[string]map[string]bool{} // 別の名前空間 → 呼ぶ op
+	depOps := map[string]map[string]bool{}         // 別の名前空間 → 呼ぶ op
+	builtins := map[string]map[ir.Operation]bool{} // 基底の状態 → 直に呼ぶ操作
 	classifies := map[string]bool{}
 	for _, d := range ns.Decls {
 		o, ok := d.(*ir.Op)
@@ -147,17 +142,25 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 			continue
 		}
 		eachCall(o.Body, func(c *ir.Call) {
-			// read と効果の呼び出し（IR 0.6 の Callee）は、まだ形を決めていない: op の呼び出しだけを数える
-			name := c.CalledOp()
-			if name == "" {
-				return
-			}
-			called[name] = true
-			if m, known := declNS[name]; known && m != viewer {
-				if depOps[m] == nil {
-					depOps[m] = map[string]bool{}
+			switch callee := c.Callee.(type) {
+			case ir.OpCallee:
+				name := callee.Op
+				called[name] = true
+				if m, known := declNS[name]; known && m != viewer {
+					if depOps[m] == nil {
+						depOps[m] = map[string]bool{}
+					}
+					depOps[m][name] = true
 				}
-				depOps[m][name] = true
+			case ir.EffectCallee:
+				// 直に呼ぶ組み込みの効果は、その状態の単位の、形で決まる命令になる。read と、宣言した効果の呼び出しは、
+				// 単位の形を変えない（N の read と効果は、呼ばれていなくても、すべて単位のメソッド）
+				if direct, ok := callee.Effect.(ir.DirectEffect); ok {
+					if builtins[direct.State] == nil {
+						builtins[direct.State] = map[ir.Operation]bool{}
+					}
+					builtins[direct.State][direct.Operation] = true
+				}
 			}
 		})
 		eachMatch(o.Body, func(m *ir.Match) {
@@ -176,8 +179,14 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 	for _, d := range ns.Decls {
 		switch x := d.(type) {
 		case *ir.State:
+			u := StateUnit{FQN: x.Name, TypeName: StateUnitName(x.Name), Shape: string(x.Shape)}
+			for _, operation := range builtinOrder {
+				if builtins[x.Name][operation] {
+					u.Builtins = append(u.Builtins, string(operation))
+				}
+			}
 			units[x.Name] = len(s.States)
-			s.States = append(s.States, StateUnit{FQN: x.Name, TypeName: StateUnitName(x.Name), Shape: string(x.Shape)})
+			s.States = append(s.States, u)
 		case *ir.Classify:
 			if _, isState := x.SubjectStates(); !isState || x.DecidedBy != ir.DecidedByPredicate {
 				continue
@@ -188,6 +197,20 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 			}
 			units[x.Name] = len(s.States)
 			s.States = append(s.States, u)
+		}
+	}
+	// N の read と効果: それぞれ、読む状態の単位の問い合わせと、宛先の単位の命令（宣言順。配線が呼んでいるかによらない）。
+	// 単位が N にないもの（検査を通った IR には来ない）は、どの単位にも置かない（基底が GO-INTERNAL で報告する）
+	for _, d := range ns.Decls {
+		switch x := d.(type) {
+		case *ir.Read:
+			if i, ok := units[x.State]; ok {
+				s.States[i].Reads = append(s.States[i].Reads, x.Name)
+			}
+		case *ir.Effect:
+			if i, ok := units[effectUnit(p, x)]; ok {
+				s.States[i].Effects = append(s.States[i].Effects, x.Name)
+			}
 		}
 	}
 
@@ -201,9 +224,8 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		if !target && !called[o.Name] {
 			continue
 		}
-		os := OpShape{FQN: o.Name, Method: MethodName(o.Name), Exported: o.Exported,
+		os := OpShape{FQN: o.Name, Method: MethodName(o.Name), Exported: o.Exported, Place: place(o, target),
 			Ctx: !o.Signature.Pure, Err: !(o.Signature.Pure && len(o.Signature.Exceptions) == 0)}
-		os.Place, os.Unit = place(p, o, target, units)
 		if target {
 			for _, app := range o.Decorators {
 				if _, has := seams[app.Decorator]; has && !contains(os.Seams, app.Decorator) {
@@ -216,16 +238,7 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 				os.Body = BodyName(o.Name)
 			}
 		}
-		switch os.Place {
-		case StateCommand:
-			u := &s.States[units[os.Unit]]
-			u.Commands = append(u.Commands, o.Name)
-		case StateQuery:
-			u := &s.States[units[os.Unit]]
-			u.Queries = append(u.Queries, o.Name)
-		case SharedCommand, SharedQuery:
-			s.Shared = append(s.Shared, o.Name)
-		case Leaf:
+		if os.Place == Leaf {
 			s.Leaves = append(s.Leaves, o.Name)
 		}
 		s.Ops = append(s.Ops, os)
@@ -280,9 +293,6 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 	for i := range s.States {
 		s.States[i].Param = param(short(s.States[i].FQN), s.States[i].TypeName)
 	}
-	if len(s.Shared) > 0 {
-		param("shared", "SharedState")
-	}
 	for _, fqn := range s.Classify {
 		param(short(fqn), TypeName(fqn, declNS[fqn])+"Cases")
 	}
@@ -295,58 +305,25 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 	return s
 }
 
-// place は op o の置き場と、状態の単位の FQN（docs/plugin-go.md「op の置き場」: 上から順に、最初に当たる行）。
-// target は o が単位の対象か。units は、N の状態の単位（基底の状態と、述語で決まる状態の分類）。
-func place(p *ir.Program, o *ir.Op, target bool, units map[string]int) (Place, string) {
+// builtinOrder は、形で決まる命令の並び（docs/plugin-go.md「状態の単位」: Post、Put、Delete の順）。
+var builtinOrder = []ir.Operation{ir.OpPost, ir.OpPut, ir.OpDelete}
+
+// place は op o の置き場（docs/plugin-go.md「op の置き場」: 上から順に、最初に当たる行）。target は o が単位の対象か。
+// 読む状態と効果（デコレータが運ぶ Op.carried を含む）は、置き場を変えない: 状態に触れるのは read と効果で、op ではない。
+func place(o *ir.Op, target bool) Place {
 	switch {
 	case o.Body != nil && target:
-		return Wiring, "" // 1
-	case o.Body != nil:
-		return Leaf, "" // 6: 単位の対象でない配線は、本体を出さず、人が実装する葉として扱う
-	case ir.IsNever(o.Returns):
-		return Never, "" // 2
+		return Wiring // 1
+	case o.Body == nil && ir.IsNever(o.Returns):
+		return Never // 2
 	}
-	if effects := o.DirectEffects(); len(effects) > 0 { // 3: 効果の宛先の単位が、すべての効果で同じか
-		unit := ""
-		for _, fx := range effects {
-			u := effectUnit(p, fx)
-			if _, ok := units[u]; !ok {
-				return Leaf, "" // 宛先の単位が N にない（検査を通った IR には来ない。STATE-2）
-			}
-			if unit != "" && u != unit {
-				return SharedCommand, ""
-			}
-			unit = u
-		}
-		return StateCommand, unit
-	}
-	switch reads := p.ReadStates(o.DirectReads()); { // 直に読む状態（read の宣言は、その宛先の状態として数える）
-	case len(reads) == 1: // 4
-		if _, ok := units[reads[0]]; ok {
-			return StateQuery, reads[0]
-		}
-		return Leaf, ""
-	case len(reads) >= 2: // 5
-		return SharedQuery, ""
-	}
-	return Leaf, "" // 6
+	return Leaf // 3: 葉と、単位の対象でない配線（本体を出さず、人が実装する葉として扱う）
 }
 
-// effectUnit は、効果 fx の宛先の単位（docs/plugin-go.md「op の置き場」の「効果の宛先の単位」）: 組み込みの効果か、基底の状態の
+// effectUnit は、効果 e の宛先の単位（docs/plugin-go.md「状態の単位」の「効果の宛先の単位」）: 組み込みの効果か、基底の状態の
 // 遷移なら、その基底の状態。状態の分類の遷移なら、その分類が述語で決まるならその分類、型で決まるなら、その分類のただ一つの
-// 対象の状態。直に書いた効果（docs/ir.md「op」の EffectRef の direct）は、組み込みの効果なので、その状態。分からなければ ""。
-func effectUnit(p *ir.Program, fx ir.EffectRef) string {
-	named, ok := fx.(ir.NamedEffect)
-	if !ok {
-		if direct, ok := fx.(ir.DirectEffect); ok {
-			return direct.State
-		}
-		return ""
-	}
-	e, ok := p.Lookup(named.Effect).(*ir.Effect)
-	if !ok {
-		return ""
-	}
+// 対象の状態。分からなければ ""。
+func effectUnit(p *ir.Program, e *ir.Effect) string {
 	switch t := e.Target.(type) {
 	case ir.BuiltinTarget:
 		return t.State
@@ -393,6 +370,43 @@ func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, r
 		results = "error"
 	}
 	return strings.Join(ps, ", "), results
+}
+
+// ReadSignature は、read のメソッド（状態の単位の問い合わせ）の引数と戻り値のテキスト（docs/plugin-go.md「状態の単位」）:
+// `ctx context.Context` と、Read.params の並びのまま `<局所の名前> <型>`、戻り値は `(<結果の型>, error)`。状態に触れるので、
+// いつも ctx を取り、error を返す。reserved は、局所の名前が避ける名前（LocalName）。
+func ReadSignature(r *ir.Read, imports *Imports, reserved map[string]bool) (params, results string) {
+	return unitParams(r.Params, imports, reserved), "(" + GoType(r.Returns, imports) + ", error)"
+}
+
+// EffectSignature は、効果のメソッド（状態の単位の命令）の引数と戻り値のテキスト（docs/plugin-go.md「状態の単位」）:
+// `ctx context.Context` と、Effect.params の並びのまま `<局所の名前> <型>`、戻り値は `error`。
+func EffectSignature(e *ir.Effect, imports *Imports, reserved map[string]bool) (params, results string) {
+	return unitParams(e.Params, imports, reserved), "error"
+}
+
+// BuiltinSignature は、形で決まる命令（直に呼ぶ組み込みの効果。状態 s の単位の Post / Put / Delete）の引数と戻り値のテキスト
+// （docs/plugin-go.md「状態の単位」）: `ctx context.Context[, value <状態の要素の型>]` と `error`。値を取るかどうかは、
+// docs/check.md「直に呼ぶ組み込みの効果」の表のとおり: 取らないのは delete だけ。引数の名前は、いつも value（ir.DirectEffectParam）。
+func BuiltinSignature(s *ir.State, operation string, imports *Imports) (params, results string) {
+	params = "ctx " + qualify(imports, "context", "context") + ".Context"
+	if BuiltinTakesValue(operation) {
+		params += ", " + ir.DirectEffectParam + " " + GoType(s.Element, imports)
+	}
+	return params, "error"
+}
+
+// BuiltinTakesValue は、直に呼ぶ組み込みの効果の操作が、値（状態の要素の型の value 一つ）を取るか（docs/check.md
+// 「直に呼ぶ組み込みの効果」の表）: post と put は取り、delete は取らない。
+func BuiltinTakesValue(operation string) bool { return ir.Operation(operation) != ir.OpDelete }
+
+// unitParams は、状態の単位のメソッド（read と効果）の引数のテキスト: ctx と、宣言の引数の並び。
+func unitParams(ps []ir.OpParam, imports *Imports, reserved map[string]bool) string {
+	out := []string{"ctx " + qualify(imports, "context", "context") + ".Context"}
+	for _, p := range ps {
+		out = append(out, LocalName(p.Name, reserved)+" "+GoType(p.Type, imports))
+	}
+	return strings.Join(out, ", ")
 }
 
 // SeamSignature は、継ぎ目のメソッド（インターフェース Seams のメソッド）の引数と戻り値のテキスト（docs/plugin-go.md「Seams」）:

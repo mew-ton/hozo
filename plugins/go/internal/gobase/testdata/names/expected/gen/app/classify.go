@@ -4,37 +4,37 @@ package app
 
 import "github.com/mew-ton/hozo/runtime"
 
-// Shared は classify app.Shared。
-type Shared int
+// Extra は classify app.Extra。
+type Extra int
 
 const (
-	SharedYes Shared = iota
-	SharedNo
+	ExtraYes Extra = iota
+	ExtraNo
 )
 
-// SharedCases は分類 app.Shared のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type SharedCases interface {
+// ExtraCases は分類 app.Extra のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
+type ExtraCases interface {
 	// Yes はケース Yes の述語。
 	Yes(v string) bool
 	// No はケース No の述語。
 	No(v string) bool
 }
 
-// ClassifyShared は v を app.Shared で分類する。すべての述語を呼び、真になった数を数える。
-func ClassifyShared(c SharedCases, v string) (Shared, error) {
+// ClassifyExtra は v を app.Extra で分類する。すべての述語を呼び、真になった数を数える。
+func ClassifyExtra(c ExtraCases, v string) (Extra, error) {
 	var hits []string
-	var kind Shared
+	var kind Extra
 	if c.Yes(v) {
 		hits = append(hits, "Yes")
-		kind = SharedYes
+		kind = ExtraYes
 	}
 	if c.No(v) {
 		hits = append(hits, "No")
-		kind = SharedNo
+		kind = ExtraNo
 	}
 	switch len(hits) {
 	case 1:
 		return kind, nil
 	}
-	return kind, &runtime.ClassificationError{Classify: "app.Shared", Hits: hits}
+	return kind, &runtime.ClassificationError{Classify: "app.Extra", Hits: hits}
 }

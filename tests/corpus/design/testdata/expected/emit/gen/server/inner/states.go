@@ -20,10 +20,10 @@ type SessionsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.sessions の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Session, error)
-	// Login は命令: 効果 server.createSession（on server.sessions.post）を持つ葉の op server.login。
-	Login(ctx context.Context, in LoginInput) (LoginOk, error)
-	// Logout は命令: 効果 server.deleteSession（on server.sessions.delete）を持つ葉の op server.logout。
-	Logout(ctx context.Context, in LogoutInput) error
+	// CreateSession は命令（効果 server.createSession、on server.sessions.post）: ログインセッションを作成する
+	CreateSession(ctx context.Context, login LoginOk) error
+	// DeleteSession は命令（効果 server.deleteSession、on server.sessions.delete）: ログインセッションを削除する
+	DeleteSession(ctx context.Context, token *Token) error
 }
 
 // ItemsState は状態 server.items（list<server.Item>）の単位。実装は New の引数 items に渡す。
@@ -42,10 +42,10 @@ type CartsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.carts の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]CartLine, error)
-	// AddToCart は命令: 効果 server.addCartLine（on server.carts.post）を持つ葉の op server.addToCart。
-	AddToCart(ctx context.Context, in AddToCartInput) (CartLine, error)
-	// AttachWarranty は命令: 効果 server.attachWarrantyToLine（on server.carts.put）を持つ葉の op server.attachWarranty。
-	AttachWarranty(ctx context.Context, in AttachWarrantyInput) (WarrantyLine, error)
+	// AddCartLine は命令（効果 server.addCartLine、on server.carts.post）: カートに一行足す
+	AddCartLine(ctx context.Context, line CartLine) error
+	// AttachWarrantyToLine は命令（効果 server.attachWarrantyToLine、on server.carts.put）: カートの一行に保証を付ける
+	AttachWarrantyToLine(ctx context.Context, line WarrantyLine) error
 }
 
 // OrdersState は状態 server.orders（list<server.Order>）の単位。実装は New の引数 orders に渡す。
@@ -55,10 +55,10 @@ type OrdersState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.orders の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Order, error)
-	// CancelOrder は命令: 効果 server.refund（on server.orders.put）を持つ葉の op server.cancelOrder。
-	CancelOrder(ctx context.Context, in CancelInput) (Order, error)
-	// SaveOrder は命令: 効果 server.createOrder（on server.orders.post）を持つ葉の op server.saveOrder。
-	SaveOrder(ctx context.Context, in OrderInput) (Order, error)
+	// Refund は命令（効果 server.refund、on server.orders.put）: 返金する（注文の状態を返金済みにする）
+	Refund(ctx context.Context, orderId OrderId) error
+	// CreateOrder は命令（効果 server.createOrder、on server.orders.post）: 注文を作成する
+	CreateOrder(ctx context.Context, order Order) error
 }
 
 // NotificationsState は状態 server.notifications（list<server.Notification>）の単位。実装は New の引数 notifications に渡す。
@@ -68,8 +68,8 @@ type NotificationsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.notifications の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Notification, error)
-	// SendOrderNotice は命令: 効果 server.notifyUser（on server.notifications.post）を持つ葉の op server.sendOrderNotice。
-	SendOrderNotice(ctx context.Context, order Order) error
+	// NotifyUser は命令（効果 server.notifyUser、on server.notifications.post）: ユーザーに通知する
+	NotifyUser(ctx context.Context, notice Notification) error
 }
 
 // PasswordResetsState は状態 server.passwordResets（list<server.PasswordReset>）の単位。実装は New の引数 passwordResets に渡す。
@@ -79,6 +79,6 @@ type PasswordResetsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.passwordResets の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]PasswordReset, error)
-	// RequestPasswordReset は命令: 効果 server.sendResetMail（on server.passwordResets.post）を持つ葉の op server.requestPasswordReset。
-	RequestPasswordReset(ctx context.Context, email Email) error
+	// SendResetMail は命令（効果 server.sendResetMail、on server.passwordResets.post）: 再設定メールを送る
+	SendResetMail(ctx context.Context, reset PasswordReset) error
 }

@@ -95,7 +95,9 @@ type emitter struct {
 	declNS map[string]string           // 宣言の FQN → 宣言した名前空間
 	ops    map[string]golang.OpShape   // N の op（Shape.Ops）を FQN で引く
 	units  map[string]golang.StateUnit // 状態の単位を FQN で引く
-	fields fieldNames                  // New の引数（= 構造体 ops のフィールド）の名前
+	// unitOf は、N の read と効果の FQN → それをメソッドに持つ状態の単位（read は読む状態の単位、効果は宛先の単位）。
+	unitOf map[string]golang.StateUnit
+	fields fieldNames // New の引数（= 構造体 ops のフィールド）の名前
 
 	// reserved は、局所の名前が避ける名前（docs/plugin-go.md「名前」の「局所の名前」）: o、ctx、err、ptr と、定義のパッケージの
 	// ops.go と wiring.go が import するパッケージの名前。
@@ -109,9 +111,9 @@ type emitter struct {
 
 // fieldNames は、New の引数のうち、種類ごとに一つのものの名前と、分類の述語の引数の名前。
 type fieldNames struct {
-	leaves, shared, seams string
-	classify              map[string]string // 分類の FQN → 引数の名前
-	deps                  map[string]string // 別の名前空間の FQN → 引数の名前
+	leaves, seams string
+	classify      map[string]string // 分類の FQN → 引数の名前
+	deps          map[string]string // 別の名前空間の FQN → 引数の名前
 }
 
 func (e *emitter) errorf(code, at, format string, args ...any) {
@@ -148,10 +150,27 @@ func (e *emitter) prepare() {
 		e.ops[o.FQN] = o
 	}
 	e.units = map[string]golang.StateUnit{}
+	e.unitOf = map[string]golang.StateUnit{}
 	for _, u := range e.shape.States {
 		e.units[u.FQN] = u
+		for _, fqn := range u.Reads {
+			e.unitOf[fqn] = u
+		}
+		for _, fqn := range u.Effects {
+			e.unitOf[fqn] = u
+		}
 	}
-	// New の引数の名前を、Shape.New の並び（leaves、状態の単位、shared、分類の述語、別の名前空間、seams）から引く
+	// N の read と効果は、どれも、N の状態の単位のメソッド（docs/plugin-go.md「状態の単位」）。単位が決まらないものは、検査を通った
+	// IR には来ない（read の宛先も、効果の宛先も、宣言した名前空間の状態）
+	for _, d := range e.ns.Decls {
+		switch d.(type) {
+		case *ir.Read, *ir.Effect:
+			if _, placed := e.unitOf[d.Common().Name]; !placed {
+				e.errorf(codeInternal, d.Common().Name, "%s %s の宛先の状態の単位が、名前空間 %s にない（検査を通った IR には来ないはずの形）", d.Kind(), d.Common().Name, e.view.Viewer)
+			}
+		}
+	}
+	// New の引数の名前を、Shape.New の並び（leaves、状態の単位、分類の述語、別の名前空間、seams）から引く
 	e.fields = fieldNames{classify: map[string]string{}, deps: map[string]string{}}
 	i := 0
 	next := func() string { name := e.shape.New[i].Name; i++; return name }
@@ -159,9 +178,6 @@ func (e *emitter) prepare() {
 		e.fields.leaves = next()
 	}
 	i += len(e.shape.States)
-	if len(e.shape.Shared) > 0 {
-		e.fields.shared = next()
-	}
 	for _, fqn := range e.shape.Classify {
 		e.fields.classify[fqn] = next()
 	}
@@ -187,6 +203,18 @@ func (e *emitter) lookup(fqn string) ir.Decl { return e.p.Lookup(fqn) }
 func (e *emitter) op(fqn string) *ir.Op {
 	o, _ := e.lookup(fqn).(*ir.Op)
 	return o
+}
+
+// read は FQN の read。read でなければ nil。
+func (e *emitter) read(fqn string) *ir.Read {
+	r, _ := e.lookup(fqn).(*ir.Read)
+	return r
+}
+
+// effect は FQN の効果。効果でなければ nil。
+func (e *emitter) effect(fqn string) *ir.Effect {
+	x, _ := e.lookup(fqn).(*ir.Effect)
+	return x
 }
 
 // inUnit は、N の op o が単位の対象か（docs/config.md「in」）。

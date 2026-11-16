@@ -1,12 +1,12 @@
-// docs/plugin-go.md「op の置き場」「状態の単位」（問い合わせ、命令、SharedState）と「状態の参照」を、一か所ずつ使う。
-// 各 op の上のコメントが、その op が確かめる行。op はどれも export（出力は一つのパッケージ）。
+// docs/plugin-go.md「op の置き場」「状態の単位」「状態の参照」と、「呼び出し」「文」の read・効果・直に呼ぶ組み込みの効果の行を、
+// 一か所ずつ使う。各宣言の上のコメントが、それが確かめる行。op はどれも export（出力は一つのパッケージ）。
 
 // 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
 // （docs/check.md「デコレータが運ぶ reads と effects」）
 decorator reading(...tables: any state) for op reads tables;
 decorator doing(...targets: any effect) for op effects targets;
 
-/** 状態を読む配線 */
+/** 状態に触れる read と効果と、それを呼ぶ配線 */
 namespace app {
   scalar Token extends string;
   model Line { item: string; count: int; }
@@ -19,6 +19,8 @@ namespace app {
   state lines: list<Line>;
   /** 店の設定 */
   state settings: single<Settings>;
+  // 「状態の単位」read も効果もなく、どの配線も直に呼ばない状態: 形で決まる問い合わせだけを持つ
+  state journal: list<string>;
 
   /** 述語で決まる状態の分類（単位 SyncState を持つ） */
   classify Sync of token, lines {
@@ -31,64 +33,141 @@ namespace app {
     default;
   }
 
-  effect addLine() on lines.post;
+  // 「状態の単位」read: 読む状態の単位の問い合わせ（宣言順）。説明は、メソッドのコメントに写す
+  /** 品目が同じ行 */
+  read lineFor(item: string): Line? on lines;
+  // 説明がなく、引数もない read。結果の型は、宣言に書かれたまま（宛先の状態の型と照らさない）
+  read countLines(): int on lines;
+  /**
+   * 店の名前。
+   * 設定の title を、そのまま返す。
+   */
+  read shopTitle(): string on settings;
+  // どの配線も呼ばない read も出す。省略可能な引数と、Time の引数
+  read linesSince(since: Time, limit: int?): Line[] on lines;
+  /** 手元のトークンの写し */
+  read tokenCopy(): Token? on token;
+
+  // 「状態の単位」効果: 宛先の単位の命令（宣言順）。宛先の単位は、組み込みの効果と基底の状態の遷移なら、その基底の状態。
+  // 述語で決まる状態の分類の遷移は、その分類の単位。型で決まる状態の分類の遷移は、ただ一つの対象の状態
+  /** 行を足す */
+  effect addLine(line: Line) on lines.post;
   effect dropToken() on token.delete;
   /** カートを空にする */
   effect clearLines() on lines: HasItems -> Empty;
   effect refresh() on Sync: Stale -> Fresh;
-  effect signIn() on SignedIn: any -> Yes;
+  /**
+   * ログインする。
+   * 二行目の説明。
+   */
+  effect signIn(token: Token) on SignedIn: any -> Yes;
+  // 引数が二つの効果（省略可能な引数を持つ）
+  effect rename(title: string, owner: Owner?) on settings.put;
+  // どの配線も呼ばない効果も出す
+  effect removeLine(item: string) on lines.delete;
 
-  // 読む状態と効果を運ぶデコレータ（docs/check.md「デコレータが運ぶ reads と effects」）。基底は、デコレータの名前を見ずに、
-  // hozoc が IR に置いた Op.carried で、op の置き場を決める
+  // 読む状態と効果を運ぶデコレータ（docs/check.md「デコレータが運ぶ reads と effects」）
   decorator looks(table: any state) for op reads table;
-  decorator joins(a: any state, b: any state) for op reads a, b;
   decorator does(...targets: any effect) for op effects targets;
   /** 運ぶ節のないデコレータ。付いた op は純粋でなくなるだけ */
   decorator mark for op;
 
-  // 「状態の単位」命令（効果を持つ葉）、op の問い合わせ（reads が一つの葉）、SharedState（reads が二つ以上の葉）
-  @doing(addLine) export op add(line: Line);
-  @doing(dropToken) export op logout();
-  @reading(lines) export op countLines(): int;
+  // 「op の置き場」の 3: 葉は、いつも Leaves。デコレータが reads / effects を運んでいても（一つの状態でも、二つの状態でも）、
+  // 置き場は変わらない
+  @doing(addLine) export op push(line: Line);
   @reading(lines, settings) export op summary(): string;
-
-  // 「op の置き場」の 3: 効果の宛先の単位。基底の状態の遷移はその状態、述語で決まる状態の分類の遷移はその分類の単位、
-  // 型で決まる状態の分類の遷移は、ただ一つの対象の状態。効果と読む状態の両方を持つ葉は、効果だけで決める
-  @doing(clearLines) export op clear();
-  @doing(refresh) export op sync();
-  @doing(signIn) export op enter(token: Token);
-  @doing(addLine) @reading(settings) export op addCounted(line: Line): int;
-
-  // 「op の置き場」の 3: デコレータが運ぶ効果。一つならその単位。二つ以上でも、宛先の単位がすべて同じなら、その単位の命令
-  // （コメントは、効果を「、」でつなぐ）。分かれるなら SharedState の命令
-  @does(addLine)
-  export op push(line: Line);
-  @does(clearLines, addLine)
-  export op replace(line: Line);
   @does(addLine, dropToken)
   export op checkout(line: Line);
-  // op が書いた効果と、運ばれた効果を合わせて数える（書いたものが先）
-  @does(dropToken)
-  @doing(refresh) export op syncOut();
-
-  // 「op の置き場」の 4 と 5: デコレータが運ぶ reads。一つならその単位の問い合わせ、op が書いたものと合わせて二つ以上なら SharedState
   @looks(token)
   export op peek(): Token?;
-  @joins(token, lines)
-  export op status(): string;
-  @looks(token)
-  @reading(lines) export op lineFor(item: string): Line?;
-
-  // 「op の置き場」の 6: 運ぶ節のないデコレータだけを持つ葉は Leaves
   @mark
   export op audit(note: string);
 
   // 値を受け取る葉（純粋で失敗しない）
   export op show(title: string);
+  export op showCount(n: int);
   export op showOwner(name: string?);
   export op showToken(token: Token?);
   export op showBoth(a: Token?, b: Token?);
   export op showLines(lines: Line[]);
+
+  // 「呼び出し」read: return 呼び出し（戻り値の並びが同じ）、const、型をそろえる return（int → int?）
+  export op find(item: string): Line?
+  {
+    return lineFor(item);
+  }
+  export op total(): int
+  {
+    const n = countLines();
+    showCount(n);
+    return n;
+  }
+  export op maybeTotal(): int?
+  {
+    return countLines();
+  }
+  export op title(): string
+  {
+    return shopTitle();
+  }
+
+  // 「呼び出し」効果: 文（失敗の扱いを置く）。宛先の単位の引数名で呼ぶ: 基底の状態、述語で決まる状態の分類、
+  // 型で決まる状態の分類の、ただ一つの対象の状態
+  export op add(line: Line)
+  {
+    addLine(line);
+  }
+  export op reset(t: Token)
+  {
+    clearLines();
+    refresh();
+    signIn(t);
+    dropToken();
+  }
+
+  // 「呼び出し」引数の型をそろえる（scalar → 元の型、T → T?）、渡されていない省略可能な引数は nil、レコードリテラルの引数
+  export op retitle(t: Token, owner: Owner)
+  {
+    rename(t, owner);
+    rename(t);
+    addLine({ item: "gift", count: 1 });
+  }
+
+  // 「呼び出し」直に呼ぶ組み込みの効果: 状態の単位の、形で決まる命令。値を取る操作は value 一つ（状態の要素の型）、
+  // nullable の delete は、なし。呼んでいる操作だけが、単位のメソッドになる（lines は Post、token は Post と Put と Delete、
+  // settings は Put。journal は、どれも持たない）
+  export op direct(line: Line, t: Token)
+  {
+    lines.post(line);
+    token.put(t);
+    token.delete();
+    token.post(t);
+    settings.put({ title: "direct" });
+  }
+
+  // 「match」アームの本体の read（return match、const）と、効果と直に呼ぶ組み込みの効果（文の match）
+  export op findOrNone(item: string?): Line?
+  {
+    return match item by nullable {
+      HasItems => lineFor(item);
+      Empty    => none;
+    };
+  }
+  export op countOrZero(item: string?): int
+  {
+    const n = match item by nullable {
+      HasItems => countLines();
+      Empty    => 0;
+    };
+    return n;
+  }
+  export op toggle(t: Token)
+  {
+    match token by nullable {
+      HasItems => dropToken();
+      Empty    => token.post(t);
+    };
+  }
 
   // 「状態の参照」Atom の state とパス（省略可能を通るパスも）。別の文なら、もう一度読む（同じ変数に = で代入する）
   export op header()
@@ -97,11 +176,12 @@ namespace app {
     showOwner(settings.owner.name);
   }
 
-  // 「状態の参照」一つの文の中の同じ状態は、一度だけ読む。二つの状態を使う文は、書かれた順に読む
+  // 「状態の参照」一つの文の中の同じ状態は、一度だけ読む。二つの状態を使う文は、書かれた順に読む。
+  // read と効果の引数に書いた状態も、その文の前に読む
   export op once()
   {
     showBoth(token, token);
-    add({ item: settings.title, count: 1 });
+    addLine({ item: settings.title, count: 1 });
     showToken(token);
   }
 
@@ -111,10 +191,6 @@ namespace app {
     const t = token;
     showToken(t);
     return token;
-  }
-  export op title(): string
-  {
-    return settings.title;
   }
 
   // 「状態の参照」読んだ値の変数の名前が、引数と当たる（末尾に _）。同じ名前の引数があれば、名前はそちらを指す
@@ -133,27 +209,22 @@ namespace app {
       Empty    => show(settings.title);
     };
     match token by nullable {
-      HasItems => logout();
+      HasItems => dropToken();
       Empty    => showToken(token);
     };
   }
 
-  // 状態を読む葉と、効果を持つ葉を呼ぶ配線（Reads と Effects のコメント）
-  export op report(line: Line): string
-  {
-    add(line);
-    const n = countLines();
-    return summary();
-  }
-
-  // 複数の状態にまたがる葉（SharedState の命令と問い合わせ）と、分類の単位の命令を呼ぶ配線。運ばれた reads と effects も、
-  // 呼び出し元へ伝わる（Reads と Effects のコメント）
+  // 葉（デコレータが reads と effects を運ぶもの）と、read と、効果を呼ぶ配線。運ばれた reads と effects も、呼び出し元へ伝わる
+  // （Reads と Effects のコメント: Reads は読む状態、Effects は効果。直に呼んだ組み込みの効果は <状態>.<操作>）
   export op finish(line: Line): string
   {
-    replace(line);
+    push(line);
     checkout(line);
-    sync();
+    lines.post(line);
+    refresh();
     audit("finished");
-    return status();
+    const n = countLines();
+    showCount(n);
+    return summary();
   }
 }

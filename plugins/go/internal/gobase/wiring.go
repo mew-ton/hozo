@@ -794,40 +794,113 @@ func (b *bodyGen) read(states []string, skip map[string]bool) {
 // callInfo は、呼び出し一つを Go にしたもの。
 type callInfo struct {
 	expr   string
-	ret    ir.Type // 呼ぶ op の戻り値の型（void と never は nil）
-	hasErr bool    // 呼ぶ op が error を返すか
+	ret    ir.Type // 呼ぶ先の戻り値の型（void と never の op と、効果は nil）
+	hasErr bool    // 呼ぶ先が error を返すか（read と効果は、いつも）
 	never  bool    // 「返らない」呼び出し（never を返す op）
 }
 
-// call は、呼び出しの式を作る（docs/plugin-go.md「呼び出し」「bind で埋まる位置」）。bind で埋まる位置の状態は、先に read で
-// 読んであること。
+// target は、呼び出しの先（docs/plugin-go.md「呼び出し」の表の行）を、同じ形のメソッドの呼び出しとして見たもの:
+// op か、read か、効果（宣言したものと、直に呼ぶ組み込みの効果）。
+type target struct {
+	recv   string       // メソッドの前: `o.`（同じ名前空間の op）、`o.<名前空間の引数名>.`、`o.<状態の単位の引数名>.`
+	method string       // メソッドの名前
+	params []ir.OpParam // 引数の並び（Op.params、Read.params、Effect.params。直に呼ぶ組み込みの効果は、value 一つか、なし）
+	ctx    bool         // 最初の引数に ctx を渡すか（read と効果は、いつも）
+	ret    ir.Type      // 戻り値の型（void と never の op と、効果は nil）
+	hasErr bool         // error を返すか（read と効果は、いつも）
+	never  bool         // never を返す op か
+	isOp   bool         // op か（bind で埋まる位置を持つのは、op の呼び出しだけ）
+}
+
+// targetOf は、呼び出し c の先。Program にないもの、状態の単位が N にないもの（検査を通った IR には来ない）は、GO-INTERNAL で false。
+func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
+	e := b.e
+	unit := func(fqn string) (string, bool) {
+		u, ok := e.units[fqn]
+		if !ok {
+			e.errorf(codeInternal, b.op.Name, "op %s の配線が呼ぶ %s の宛先の状態 %s が、名前空間 %s の状態の単位でない（検査を通った IR には来ないはずの形）", b.op.Name, c.Callee, fqn, e.view.Viewer)
+			return "", false
+		}
+		return "o." + u.Param + ".", true
+	}
+	switch callee := c.Callee.(type) {
+	case ir.OpCallee:
+		o := e.op(callee.Op)
+		if o == nil {
+			break
+		}
+		t := target{recv: "o.", method: golang.MethodName(o.Name), params: o.Params, ctx: !o.Signature.Pure, isOp: true,
+			hasErr: !(o.Signature.Pure && len(o.Signature.Exceptions) == 0), never: ir.IsNever(o.Returns)}
+		if ns := e.declNS[o.Name]; ns != e.view.Viewer {
+			t.recv = "o." + e.fields.deps[ns] + "."
+		}
+		if o.Returns != nil && !t.never {
+			t.ret = o.Returns
+		}
+		return t, true
+	case ir.ReadCallee:
+		// read は、読む状態の単位の問い合わせ（read を呼べるのは、宣言した名前空間の配線だけ。NS-6）
+		r := e.read(callee.Read)
+		u, placed := e.unitOf[callee.Read]
+		if r == nil || !placed {
+			break
+		}
+		return target{recv: "o." + u.Param + ".", method: golang.MethodName(r.Name), params: r.Params, ctx: true, ret: r.Returns, hasErr: true}, true
+	case ir.EffectCallee:
+		switch fx := callee.Effect.(type) {
+		case ir.NamedEffect:
+			// 効果は、宛先の単位の命令
+			x := e.effect(fx.Effect)
+			u, placed := e.unitOf[fx.Effect]
+			if x == nil || !placed {
+				break
+			}
+			return target{recv: "o." + u.Param + ".", method: golang.MethodName(x.Name), params: x.Params, ctx: true, hasErr: true}, true
+		case ir.DirectEffect:
+			// 直に呼ぶ組み込みの効果は、その状態の単位の、形で決まる命令。値を取る操作の引数は、状態の要素の型の value 一つ
+			st, ok := e.lookup(fx.State).(*ir.State)
+			if !ok {
+				break
+			}
+			recv, ok := unit(fx.State)
+			if !ok {
+				return target{}, false
+			}
+			t := target{recv: recv, method: golang.BuiltinMethod(string(fx.Operation)), ctx: true, hasErr: true}
+			if golang.BuiltinTakesValue(string(fx.Operation)) {
+				t.params = []ir.OpParam{{Name: ir.DirectEffectParam, Type: st.Element}}
+			}
+			return t, true
+		}
+	}
+	e.errorf(codeInternal, b.op.Name, "op %s の配線が呼ぶ %v が Program にないか、その状態の単位が名前空間 %s にない（検査を通った IR には来ないはずの形）", b.op.Name, c.Callee, e.view.Viewer)
+	return target{}, false
+}
+
+// call は、呼び出しの式を作る（docs/plugin-go.md「呼び出し」「bind で埋まる位置」）。呼ぶ先が op でも、read でも、効果でも、
+// 同じ形のメソッドの呼び出しになる。bind で埋まる位置の状態は、先に read で読んであること。
 func (b *bodyGen) call(c *ir.Call) callInfo {
 	e := b.e
-	// read と効果の呼び出し（IR 0.6 の Callee）の形は、まだ決めていない。来たら、op がないのと同じに誤りにする
-	name := c.CalledOp()
-	callee := e.op(name)
-	if callee == nil {
-		e.errorf(codeInternal, b.op.Name, "op %s の配線が呼ぶ %s は op ではないか、Program にない（read と効果の呼び出しの出力は、まだない）", b.op.Name, c.Callee)
+	t, ok := b.targetOf(c)
+	if !ok {
 		return callInfo{expr: "nil"}
 	}
-	recv := "o."
-	if ns := e.declNS[name]; ns != e.view.Viewer {
-		recv = "o." + e.fields.deps[ns] + "."
-	}
 	var bounds []boundValue
-	for _, bp := range c.Bound {
-		st, ok := e.lookup(bp.State).(*ir.State)
-		v, read := b.stateVar(bp.State)
-		if !ok || !read || len(bp.Path) == 0 {
-			continue
+	if t.isOp { // bind は、read と効果の引数を埋めない
+		for _, bp := range c.Bound {
+			st, ok := e.lookup(bp.State).(*ir.State)
+			v, read := b.stateVar(bp.State)
+			if !ok || !read || len(bp.Path) == 0 {
+				continue
+			}
+			bounds = append(bounds, boundValue{path: bp.Path, expr: v, typ: st.Type})
 		}
-		bounds = append(bounds, boundValue{path: bp.Path, expr: v, typ: st.Type})
 	}
 	var args []string
-	if !callee.Signature.Pure {
+	if t.ctx {
 		args = append(args, "ctx")
 	}
-	for _, p := range callee.Params {
+	for _, p := range t.params {
 		var written ir.Atom
 		for i := range c.Args {
 			if c.Args[i].Param == p.Name {
@@ -863,12 +936,30 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 		}
 		args = append(args, arg)
 	}
-	ci := callInfo{expr: recv + golang.MethodName(name) + "(" + strings.Join(args, ", ") + ")",
-		hasErr: !(callee.Signature.Pure && len(callee.Signature.Exceptions) == 0), never: ir.IsNever(callee.Returns)}
-	if callee.Returns != nil && !ci.never {
-		ci.ret = callee.Returns
+	return callInfo{expr: t.recv + t.method + "(" + strings.Join(args, ", ") + ")", ret: t.ret, hasErr: t.hasErr, never: t.never}
+}
+
+// throwValue は、アームの本体の `throw E`、`throw E(<値>, …)` が作る例外の値（docs/plugin-go.md「match」の「アームの本体」）:
+// 例外の構造体のリテラル。フィールドは例外の引数（Exception.params の順）で、いつもすべて書く。値は、引数の型を当てはめる型にして
+// 「値」の規則で書く。渡されていない省略可能な引数は nil。
+func (b *bodyGen) throwValue(t *ir.ThrowBody) string {
+	typ := b.f.goType(ir.Ref(t.Exception))
+	x, ok := b.e.lookup(t.Exception).(*ir.Exception)
+	if !ok {
+		b.e.errorf(codeInternal, b.op.Name, "op %s の配線が投げる %s が Program にない（検査を通った IR には来ないはずの形）", b.op.Name, t.Exception)
+		return "nil"
 	}
-	return ci
+	var fields []string
+	for _, p := range x.Params {
+		value := "nil"
+		for i := range t.Args {
+			if t.Args[i].Param == p.Name {
+				value, _ = b.atom(t.Args[i].Value, p.Type)
+			}
+		}
+		fields = append(fields, golang.FieldName(p.Name)+": "+value)
+	}
+	return typ + "{" + strings.Join(fields, ", ") + "}"
 }
 
 // ---- 文 ----
@@ -910,6 +1001,12 @@ func usesName(stmts []ir.Statement, name string) bool {
 			case ir.AtomExpr:
 				if inAtom(body.Atom) {
 					return true
+				}
+			case ir.ThrowBody:
+				for _, a := range body.Args {
+					if inAtom(a.Value) {
+						return true
+					}
 				}
 			}
 		}
@@ -1326,17 +1423,28 @@ func armStates(a *ir.MatchArm) []string {
 		statesOfCall(&body.Call, &states)
 	case ir.AtomExpr:
 		statesOfAtom(body.Atom, &states)
+	case ir.ThrowBody:
+		for _, arg := range body.Args {
+			statesOfAtom(arg.Value, &states)
+		}
 	}
 	return states
 }
 
-// armType は、アームの本体の型（docs/types.md「match の型」の 1）: 値のある呼び出しはその戻り値、名前の Atom はその型
-// （そのアームの絞り込みを掛けた後）、リテラルはその型。それ以外（返らない、値がない、none、レコードリテラル）は nil。
+// armType は、アームの本体の型（docs/types.md「match の型」の 1）: 値のある呼び出し（op か read）はその戻り値、名前の Atom は
+// その型（そのアームの絞り込みを掛けた後）、リテラルはその型。それ以外（返らない、値がない、none、レコードリテラル）は nil。
 func (b *bodyGen) armType(p *matchPlan, a *ir.MatchArm) ir.Type {
 	switch body := a.Body.(type) {
 	case ir.CallExpr:
-		if callee := b.e.op(body.Call.CalledOp()); callee != nil && callee.Returns != nil && !ir.IsNever(callee.Returns) {
-			return callee.Returns
+		switch callee := body.Call.Callee.(type) {
+		case ir.OpCallee:
+			if o := b.e.op(callee.Op); o != nil && o.Returns != nil && !ir.IsNever(o.Returns) {
+				return o.Returns
+			}
+		case ir.ReadCallee:
+			if r := b.e.read(callee.Read); r != nil {
+				return r.Returns
+			}
 		}
 	case ir.AtomExpr:
 		saved := b.overrides
@@ -1451,7 +1559,7 @@ func (b *bodyGen) armBody(p *matchPlan, a *ir.MatchArm, mode matchMode, x string
 			b.returnValue("nil")
 		}
 	case ir.ThrowBody:
-		b.returnErr(b.f.goType(ir.Ref(body.Exception)) + "{}")
+		b.returnErr(b.throwValue(&body))
 	}
 }
 

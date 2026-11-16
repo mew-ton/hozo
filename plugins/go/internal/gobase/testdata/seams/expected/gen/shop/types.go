@@ -10,5 +10,5 @@ type Item = inner.Item
 // Closed: 閉店している
 type Closed = inner.Closed
 
-// EffectAddItem は effect shop.addItem。
+// EffectAddItem は品物を足す
 const EffectAddItem = inner.EffectAddItem

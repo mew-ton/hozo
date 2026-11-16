@@ -21,3 +21,13 @@ func (o *ops) Open(ctx context.Context, item Item) (Receipt, error) {
 	receipt := o.Issue(item)
 	return receipt, nil
 }
+
+// Save は品物を記録する
+//
+// Effects: shop.addItem
+func (o *ops) Save(ctx context.Context, item Item) error {
+	if err := o.items.AddItem(ctx, item); err != nil {
+		return err
+	}
+	return nil
+}
