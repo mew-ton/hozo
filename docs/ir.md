@@ -241,7 +241,7 @@ interface Op extends DeclBase {
   carried: {                      // デコレータの reads / effects の節が、この op に運ぶもの（docs/check.md「デコレータが運ぶ reads と effects」）。
     reads: ReadRef[];             // decorators の順、節の順、引数に書いた順。重複は最初の出現に寄せる。なければ []
     effects: EffectRef[];         // ユニオンは展開済み。同じ順。なければ []
-  };                              // 葉の op が状態に触れるのは、この分だけ（docs/check.md「葉の op」）。配線の op では空（DEC-17）
+  };                              // 葉の op が状態に触れるのは、この分だけ（docs/check.md「葉の op」）。配線の op にも運ばれ、どちらも signature に入る
   throws: ThrowsClause[];         // 書かれた throws
   body: Wiring | null;            // null は葉
   signature: Signature;           // 計算結果。自分の名前空間から見た関数の型（docs/check.md「計算」）
@@ -487,7 +487,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.6"`。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.6"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|

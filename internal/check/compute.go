@@ -397,16 +397,12 @@ func (c *computer) sig(o *ir.Op, viewer string) *sigState {
 // leafStep0 は手順 0（葉の op）。E = Declared(O)、F = O が直に持つ効果（デコレータが運ぶ Op.carried.effects。
 // STATE-5 に当たった葉は、節に書いた Op.effects を前に並べる。docs/check.md「デコレータが運ぶ reads と effects」）、
 // rel は Op.throws の relations、succ は kept。
-// 呼び出しが循環している op（WIRE-7）は配線なので、運ばれるものを使わず、F = Op.effects（節に書いたもの）。
+// 呼び出しが循環している op（WIRE-7）も、節を書いた葉と同じ: F = Op.effects（節に書いたもの）の後ろに、運ばれたもの。
 func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 	for _, x := range declared(o) {
 		s.addE(x)
 	}
-	effects := o.Effects
-	if o.Body == nil {
-		effects = o.DirectEffects()
-	}
-	for _, e := range effects {
+	for _, e := range o.DirectEffects() {
 		s.addF(e)
 	}
 	for _, x := range s.E {
@@ -419,7 +415,8 @@ func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 	}
 }
 
-// wiringStep0 は手順 0（配線の op）。本体の行を順に見て E / F / rel / succ を計算する。
+// wiringStep0 は手順 0（配線の op）。本体の行を順に見て E / F / rel / succ を計算し、その後ろに、運ばれた効果を足す
+// （addCarried）。
 func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 	info := &bodyInfo{rows: rowsOf(o.Body), sources: map[string][]exSource{}}
 	info.sigs = make([][]*sigState, len(info.rows))
@@ -529,10 +526,34 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 			s.succ[e] = ir.Unknown
 		}
 	}
+	c.addCarried(o, s)
 	c.bodies[o.Name] = info
 	if emit {
 		checkRel4(o, s, c.r)
 		checkThrows1(c, o, info)
+	}
+}
+
+// addCarried は手順 0（配線の op）の「運ばれた効果」（docs/check.md「Sig(O, v)」）: Op.carried.effects の効果 e を、
+// 本体から決めた F / rel / succ に足す。e のデコレータの分は、葉の op と同じ値（rel は Op.throws の relations から、
+// succ は kept）: デコレータの処理が、本体のどの行の前後で起きるかを、言語は決めない。本体が行き着かない e は F の末尾に
+// 足して、デコレータの分をそのまま持つ。本体も行き着く e は、位置を変えず、本体から決めた状態とデコレータの分が違えば unknown。
+func (c *computer) addCarried(o *ir.Op, s *sigState) {
+	for _, e := range o.Carried.Effects {
+		inBody := s.hasF(e)
+		s.addF(e)
+		for _, x := range s.E {
+			st := relationState(o.Throws, x, identity)
+			if inBody && s.relOf(x, e) != st {
+				st = ir.Unknown
+			}
+			s.setRel(x, e, st)
+		}
+		if inBody && s.succOf(e) != ir.Kept {
+			s.succ[e] = ir.Unknown
+		} else {
+			s.succ[e] = ir.Kept
+		}
 	}
 }
 
@@ -757,10 +778,10 @@ func (c *computer) returningArms(r row) int {
 
 // readsOf は op が読む状態 R（docs/check.md「reads」）。基底の状態の FQN の列で、デコレータが R に足すのは、reads の節が
 // 運ぶものだけ（throws / catches の節は R を変えない）。葉の op は直に読む状態（デコレータが運ぶ Op.carried.reads の、
-// 要素ごとの状態。read の宣言は、その宛先の状態として数える。STATE-5 に当たった葉は、節に書いた Op.reads を前に並べる）、
-// 呼び出しが循環している op は Op.reads の要素の状態。
-// 配線の op は、本体を行の順に見て集める（運ばれるものは使わない）: 名前で書いた状態、bind で埋まる位置の状態、
-// 呼んだ read の宛先の状態、呼んだ op の R。
+// 要素ごとの状態。read の宣言は、その宛先の状態として数える。STATE-5 に当たった葉は、節に書いた Op.reads を前に並べる）。
+// 呼び出しが循環している op も、葉として同じ（Op.reads の要素の状態の後ろに、運ばれた状態）。
+// 配線の op は、本体を行の順に見て集め（名前で書いた状態、bind で埋まる位置の状態、呼んだ read の宛先の状態、
+// 呼んだ op の R）、その後ろに、運ばれた状態を並べる。
 func (c *computer) readsOf(o *ir.Op) []string {
 	if r, ok := c.reads[o.Name]; ok {
 		return r
@@ -774,13 +795,8 @@ func (c *computer) readsOf(o *ir.Op) []string {
 			}
 		}
 	}
-	if o.Body == nil {
+	if o.Body == nil || c.cyclic[o.Name] {
 		add(c.ix.readStates(o.DirectReads())...)
-		c.reads[o.Name] = out
-		return out
-	}
-	if c.cyclic[o.Name] {
-		add(c.ix.readStates(o.Reads)...)
 		c.reads[o.Name] = out
 		return out
 	}
@@ -847,6 +863,7 @@ func (c *computer) readsOf(o *ir.Op) []string {
 			expr(ir.MatchExpr{Match: s.Match})
 		}
 	}
+	add(c.ix.readStates(o.Carried.Reads)...)
 	c.reads[o.Name] = out
 	return out
 }

@@ -1,0 +1,19 @@
+// STATE-5（docs/check.md「葉の op」「デコレータが運ぶ reads と effects」）: 運ぶ節を持つデコレータは、葉にも配線にも付けられるが、
+// 葉の op が、自分で reads / effects の節を書けないことは、変わらない。デコレータが運ぶものと同じものを書いても、同じ
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  effect add(m: M) on rows.post;
+  decorator counting(table: any state) for op reads table;
+  decorator doing(...targets: any effect) for op effects targets;
+  @counting(rows)
+  op count(): int reads rows;                          // ERROR: STATE-5
+  @doing(add)
+  op insert(m: M) effects add;                         // ERROR: STATE-5
+  // 配線は、節を書ける
+  @counting(rows) @doing(add)
+  op wired(m: M): int reads rows effects add {
+    insert(m);
+    return count();
+  }
+}

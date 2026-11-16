@@ -107,7 +107,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "ops のキー（export の有無によらず、すべての op）", keysOf(v.Ops), []string{
 			"api.currentName", "api.findByName", "api.findUser", "api.getUser", "api.greeting", "api.guard", "api.idle", "api.issue", "api.keep",
 			"api.login", "api.logout", "api.mint", "api.nameOf",
-			"api.renew", "api.rotate", "api.sessionOf", "api.signIn", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.verify", "api.viaAlias", "api.whenLive",
+			"api.renew", "api.renewAgain", "api.renewAudited", "api.renewDeclared", "api.rotate", "api.sessionOf", "api.signIn", "api.tokenOrNone", "api.touch", "api.unauthorized", "api.verify", "api.viaAlias", "api.whenLive",
 			"web.adminPageVm", "web.clearToken", "web.fetchUser", "web.greet", "web.login", "web.openUser",
 			"web.reload", "web.signOut", "web.userPageVm", "web.welcome",
 		})
@@ -503,7 +503,36 @@ func TestViewFromEntry(t *testing.T) {
 		renew := opOf(t, prog, "api.renew")
 		expect(t, "api.renew の F（伝播）", effectStrings(renew.Signature.Effects), []string{"api.createSession", "api.deleteSession", "api.renameUser"})
 		expect(t, "api.renew の R（伝播）", renew.Signature.Reads, []string{"api.sessions", "api.users"})
-		expect(t, "api.renew の Op.carried は空（配線には運ばない）", renew.Carried, ir.Carried{})
+		expect(t, "api.renew の Op.carried は空（デコレータが付いていない）", renew.Carried, ir.Carried{})
+		// 運ぶ節を持つデコレータの付いた配線: 運ばれたものは Op.carried に載り、本体が行き着くものの後ろに並ぶ
+		audited := opOf(t, prog, "api.renewAudited")
+		carried := ir.Carried{Reads: ir.StateReads("api.motd", "api.sessions"), Effects: ir.NamedEffects("api.touchUser", "api.renameUser")}
+		expect(t, "api.renewAudited の Op.carried（decorators の順、節の順、引数に書いた順）", audited.Carried, carried)
+		expect(t, "api.renewAudited の Op.reads / Op.effects は書いたもののまま（空）", []any{audited.Reads, audited.Effects}, []any{[]ir.ReadRef(nil), []ir.EffectRef(nil)})
+		expect(t, "api.renewAudited（本体も行き着く renameUser は位置を変えず、本体とデコレータの分が違うので unknown。運ばれただけの touchUser は、関係を書いていないので unknown）",
+			sigOf(audited.Signature), sig{
+				E: []string{"api.Invalid"}, F: []string{"api.createSession", "api.deleteSession", "api.renameUser", "api.touchUser"},
+				Rel: []string{"api.Invalid / api.createSession = prevented", "api.Invalid / api.deleteSession = prevented",
+					"api.Invalid / api.renameUser = unknown", "api.Invalid / api.touchUser = unknown"},
+				Succ: []string{"api.createSession = kept", "api.deleteSession = kept", "api.renameUser = kept", "api.touchUser = kept"},
+			})
+		expect(t, "api.renewAudited の R（本体、運ばれたもの）", audited.Signature.Reads, []string{"api.sessions", "api.users", "api.motd"})
+		expect(t, "運ばれたものを持つ配線は純粋でない", audited.Signature.Pure, false)
+		// 節を書いた配線: 書いた節は、運ばれたものを含む Sig と等しい（READS-2 / EFF-2 は出ない: check.txt）。運ばれた効果の rel は、書いた prevents
+		declared := opOf(t, prog, "api.renewDeclared")
+		expect(t, "api.renewDeclared の Op.carried", declared.Carried, carried)
+		expect(t, "api.renewDeclared（書いた prevents が、運ばれた効果にも掛かる）", sigOf(declared.Signature), sig{
+			E: []string{"api.Invalid"}, F: []string{"api.createSession", "api.deleteSession", "api.renameUser", "api.touchUser"},
+			Rel: []string{"api.Invalid / api.createSession = prevented", "api.Invalid / api.deleteSession = prevented",
+				"api.Invalid / api.renameUser = prevented", "api.Invalid / api.touchUser = prevented"},
+			Succ: []string{"api.createSession = kept", "api.deleteSession = kept", "api.renameUser = kept", "api.touchUser = kept"},
+		})
+		// 配線に運ばれたものも、呼び出し元へ伝わる（見る側にもよらない）
+		again := opOf(t, prog, "api.renewAgain")
+		expect(t, "api.renewAgain の F（配線に運ばれた touchUser を含む）", effectStrings(again.Signature.Effects), []string{"api.createSession", "api.deleteSession", "api.renameUser", "api.touchUser"})
+		expect(t, "api.renewAgain の R（配線に運ばれた motd を含む）", again.Signature.Reads, []string{"api.sessions", "api.users", "api.motd"})
+		expect(t, "web から見た api.renewAgain", []any{effectStrings(v.Ops["api.renewAgain"].Effects), v.Ops["api.renewAgain"].Reads},
+			[]any{effectStrings(again.Signature.Effects), again.Signature.Reads})
 		// 見る側によらない
 		expect(t, "web から見た api.rotate の effects", v.Ops["api.rotate"].Effects, opOf(t, prog, "api.rotate").Signature.Effects)
 		expect(t, "デコレータの付いた op は純粋でない", opOf(t, prog, "api.idle").Signature.Pure, false)

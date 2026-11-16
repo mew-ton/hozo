@@ -1,0 +1,23 @@
+// STATE-2（docs/check.md「状態と効果」「デコレータが運ぶ reads と effects」）: 配線の op に運ばれた効果の名前空間（直に書いた
+// 効果なら、その状態の名前空間）も、op の名前空間と違えば error。配線が別の名前空間の op を呼んで行き着く効果（EFF-1）とは
+// 違い、デコレータの処理は、状態に直に触れる。位置はそのデコレータの適用
+namespace a {
+  state s: list<string>;
+  effect e(x: string) on s.post;
+  decorator doing(...targets: any effect) for op effects targets;
+  decorator posting for op effects s.post;
+  export op own(x: string) { e(x); }
+  // 自分の名前空間の配線に付ければ通る
+  @doing(e) @posting
+  op wired(x: string) { own(x); }
+}
+namespace b {
+  state u: list<string>;
+  effect g(x: string) on u.post;
+  @a.doing(g)
+  op ok(x: string) { a.own(x); }
+  @a.doing(a.e)                                  // ERROR: STATE-2
+  op carried(x: string) { a.own(x); }
+  @a.posting                                     // ERROR: STATE-2
+  op carriedDirect(x: string) { g(x); }
+}

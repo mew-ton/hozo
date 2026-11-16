@@ -269,6 +269,36 @@ namespace api {
     return findByName(name);
   }
 
+  // docs/check.md「デコレータが運ぶ reads と effects」と「計算」手順 0（配線）の「運ばれた効果」: 運ぶ節を持つデコレータは、
+  // 配線の op にも付けられる。運ばれたもの（Op.carried）は、本体が行き着くものの後ろに並ぶ。本体も行き着く効果（renameUser）は
+  // 位置を変えず、rel は、本体から決めた状態（prevented）と、デコレータの分（関係を書いていないので unknown）が違うので unknown
+  @find(motd)
+  @effects(touchUser, renameUser)
+  op renewAudited(id: UserId, name: string): User?
+    throws Invalid
+  {
+    rotate(id, name);
+    return findByName(name);
+  }
+  // 節を書いた配線は、運ばれたものも書く（READS-2、EFF-2）。運ばれた効果の rel は、葉と同じに、書いた prevents から決まる（REL-4 は
+  // 食い違わない）
+  @find(motd)
+  @effects(touchUser, renameUser)
+  op renewDeclared(id: UserId, name: string): User?
+    effects createSession, deleteSession, renameUser, touchUser
+    reads sessions, users, motd
+    throws Invalid prevents effects
+  {
+    rotate(id, name);
+    return findByName(name);
+  }
+  // 配線に運ばれたものも、呼び出し元へ伝わる
+  export op renewAgain(id: UserId, name: string): User?
+    throws Invalid
+  {
+    return renewDeclared(id, name);
+  }
+
   // ---- docs/ir.md「版」の 0.6 で足した形 ----
 
   // docs/ir.md「正規化」: 配線の呼び出しの callee（read、効果の宣言、直に呼ぶ組み込みの効果）、`throw E(a, b)` の args

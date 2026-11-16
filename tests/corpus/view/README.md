@@ -50,7 +50,7 @@
 | `docs/ir.md`「JSON」 | 同 | `returns: null`、`body: null`、省略可能のキーは省く、空の列は `[]`、`ops` のキーは辞書順、読み戻して書いても同じバイト列 |
 | `docs/check.md`「計算」手順 0（配線）: 効果の呼び出し | `api.login`（`issue(in)` の後ろで `createSession(session);`。`prevents effects`）、`api.touch`（`touchUser(id);` の後ろで `verify(id)`。`keeps effects`）、`web.greet` | E / F / rel / succ。書いた `effects` と関係の節は、本体から計算したものと照合される（EFF-2、REL-4） |
 | 同「reads」 | `api.findUser`（`read` を二つ呼ぶ配線）、`api.currentName` / `tokenOrNone` / `greeting` / `guard`、`web.fetchUser`（`Call.bound`） | R: 配線は、呼んだ `read` の宛先の状態、match の対象、`Atom` が参照する状態、`Call.bound` の状態、呼び出し先の R。葉は、運ばれたものだけ。見る側によらない |
-| 同「デコレータが運ぶ reads と effects」 | `api.rotate`（運ばれた効果）、`api.findByName`（運ばれた状態）、`api.idle`、配線 `api.renew` | 葉の F は `Op.carried.effects`、R は `Op.carried.reads` の要素の状態（葉の `Op.effects` / `Op.reads` は空）。op の `throws` の relations は、運ばれた効果に掛かる。呼び出し元へは、配線が呼んだ効果と `read` と同じに伝わる。配線の `Op.carried` は空 |
+| 同「デコレータが運ぶ reads と effects」 | `api.rotate`（運ばれた効果）、`api.findByName`（運ばれた状態）、`api.idle`、配線 `api.renew`、運ぶ節を持つデコレータの付いた配線 `api.renewAudited`（節を書かない）と `api.renewDeclared`（節を書く）、それを呼ぶ配線 `api.renewTwice` | 葉の F は `Op.carried.effects`、R は `Op.carried.reads` の要素の状態（葉の `Op.effects` / `Op.reads` は空）。op の `throws` の relations は、運ばれた効果に掛かる。呼び出し元へは、配線が呼んだ効果と `read` と同じに伝わる。デコレータの付いていない配線の `Op.carried` は空。配線に運ばれたものは、本体が行き着くものの後ろに並び（本体も行き着く効果は、位置を変えず、rel と succ は、本体とデコレータの分が違えば `unknown`）、書いた節はそれを含み（READS-2、EFF-2）、呼び出し元へ伝わる |
 | 同「純粋」 | `api.nameOf`、`api.unauthorized`、`web.userPageVm` と、そうでない op | `Signature.pure`。見る側によらない |
 | 同 手順 0（配線）: アームの `throw` と「返らない」アーム | `api.currentName`（`default => throw NotFound`）、`api.guard`（`default => unauthorized()`） | `throw` は例外がそれだけの呼び出しとして数える |
 | 同 手順 0（配線）: 効果の伝播 | `signOut`、`reload` | F は呼び出しの effects を行の順に連結。`Op.effects` は `[]` のまま |

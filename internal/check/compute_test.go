@@ -1,6 +1,7 @@
 package check
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/diag"
@@ -571,7 +572,8 @@ func TestComputeIdempotent(t *testing.T) {
 // TestSigCarried は docs/check.md「デコレータが運ぶ reads と effects」: 葉の op の F は直に持つ効果（Op.effects の後ろに
 // Op.carried.effects。重複は最初の出現）、R は直に読む状態（Op.reads の後ろに Op.carried.reads）。呼び出し元へは、op が
 // 書いたものと同じに伝わる（EFF-1）。手順 i（catches / throws）は、運ばれた効果を op の中身の分として扱う。
-// 配線の計算は、運ばれるものを使わない（循環していて葉として計算する op も、配線なので使わない）。
+// 配線の op も、運ばれたものを持つ（本体が行き着くものの後ろ。細かい場合は TestSigCarriedWiring）。循環していて葉として
+// 計算する op は、節を書いた葉と同じ: 書いたものの後ろに、運ばれたもの。
 func TestSigCarried(t *testing.T) {
 	doing := decorator("server.doing")
 	doing.Reads = ir.StateReads("$param:table")
@@ -588,12 +590,12 @@ func TestSigCarried(t *testing.T) {
 	caller := wire("server.caller", nil, nil, cs(call("server.carried")))
 	caller.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y"})}
 
-	// 配線に運ばれたもの（DEC-17 の誤りの形）は、計算に入らない
+	// 配線に運ばれたものも、その配線の F と R に入る
 	wired := wire("server.wired", nil, nil, cs(call("server.plain")))
 	wired.Carried = ir.Carried{Reads: ir.StateReads("server.sA"), Effects: ir.NamedEffects("server.e4")}
 	plain := leaf("server.plain", nil)
 
-	// 循環上の op は葉として計算するが、配線なので運ばれるものは使わない
+	// 循環上の op は葉として計算する: 書いたものの後ろに、運ばれたもの
 	loop := wire("server.loop", nil, nil, cs(call("server.loop")))
 	loop.Effects = ir.NamedEffects("server.e1")
 	loop.Reads = ir.StateReads("server.sA")
@@ -629,12 +631,141 @@ func TestSigCarried(t *testing.T) {
 	wantStrings(t, "呼び出し元の R", up.Reads, []string{"server.sB", "server.sA"})
 
 	w := sigOf(t, p, "server.wired")
-	wantStrings(t, "配線の F は本体から", effectNames(w.Effects), nil)
-	wantStrings(t, "配線の R は本体から", w.Reads, nil)
+	wantStrings(t, "配線の F（運ばれたもの）", effectNames(w.Effects), []string{"server.e4"})
+	wantStrings(t, "配線の R（運ばれたもの）", w.Reads, []string{"server.sA"})
+	if w.Pure {
+		t.Error("運ばれたものを持つ配線は純粋でない")
+	}
 
 	l := sigOf(t, p, "server.loop")
-	wantStrings(t, "循環上の op の F は Op.effects", effectNames(l.Effects), []string{"server.e1"})
-	wantStrings(t, "循環上の op の R は Op.reads", l.Reads, []string{"server.sA"})
+	wantStrings(t, "循環上の op の F は Op.effects の後ろに Op.carried.effects", effectNames(l.Effects), []string{"server.e1", "server.e2"})
+	wantStrings(t, "循環上の op の R は Op.reads の後ろに Op.carried.reads", l.Reads, []string{"server.sA", "server.sB"})
+}
+
+// TestSigCarriedWiring は docs/check.md「デコレータが運ぶ reads と effects」と、手順 0（配線の op）の「運ばれた効果」:
+// 配線の op の F と R は、本体が行き着くものの後ろに、運ばれたもの（重複は最初の出現）。運ばれた効果のデコレータの分は、
+// 葉と同じ（rel は op の throws の relations から、succ は kept）で、本体も行き着く効果は、本体から決めた状態と違えば unknown。
+// 呼び出し元へ伝わり、書いた節は、運ばれたものを含む Sig と照合する（READS-2 / EFF-2）。
+func TestSigCarriedWiring(t *testing.T) {
+	doing := decorator("server.doing")
+	doing.Reads = ir.StateReads("$param:table")
+	doing.Effects = ir.NamedEffects("$param:targets")
+	fail := leaf("server.fail", nil)
+	fail.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	write := leaf("server.write", nil)
+	write.Effects = ir.NamedEffects("server.e1")
+	look := reads(leaf("server.look", nil), "server.sA")
+	body := func(name string) *ir.Op {
+		o := wire(name, nil, nil, cs(call("server.fail")), cs(call("server.write")), cs(call("server.look")))
+		o.Decorators = []ir.Application{app("server.doing")}
+		// e1 は本体も行き着く（X のとき prevented）。e2 は運ばれただけ。sA は本体も読む、sB は運ばれただけ
+		o.Carried = ir.Carried{Reads: ir.StateReads("server.sB", "server.sA"), Effects: ir.NamedEffects("server.e2", "server.e1")}
+		return o
+	}
+	// 関係を書かない: 運ばれた効果のデコレータの分は unknown
+	plain := body("server.plain")
+	plain.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	// prevents: 本体から決めた e1（prevented）と同じ。運ばれただけの e2 は、書いたとおり
+	prevented := body("server.prevented")
+	prevented.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
+	// keeps: 本体から決めた e1（prevented）と違うので unknown になり、REL-4
+	kept := body("server.kept")
+	kept.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
+	// 節を書く: 運ばれたものを含めば通り、落とせば READS-2 / EFF-2
+	written := body("server.written")
+	written.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	written.Reads = ir.StateReads("server.sA", "server.sB")
+	written.Effects = ir.NamedEffects("server.e1", "server.e2")
+	dropped := body("server.dropped")
+	dropped.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	dropped.Reads = ir.StateReads("server.sA")
+	dropped.Effects = ir.NamedEffects("server.e1")
+	// 呼び出し元: 運ばれたものも伝わる。節が落とせば READS-2 / EFF-2
+	caller := wire("server.caller", nil, nil, cs(call("server.prevented")))
+	caller.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	callerDropped := wire("server.callerDropped", nil, nil, cs(call("server.prevented")))
+	callerDropped.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	callerDropped.Reads = ir.StateReads("server.sA")
+	callerDropped.Effects = ir.NamedEffects("server.e1")
+
+	p := serverWith(doing, fail, write, look, plain, prevented, kept, written, dropped, caller, callerDropped)
+	diags := Check(p, cfgFor("server"))
+
+	for _, name := range []string{"server.plain", "server.prevented", "server.kept", "server.written", "server.dropped", "server.caller", "server.callerDropped"} {
+		sig := sigOf(t, p, name)
+		wantStrings(t, name+" の F（本体、運ばれたもの）", effectNames(sig.Effects), []string{"server.e1", "server.e2"})
+		wantStrings(t, name+" の R（本体、運ばれたもの）", sig.Reads, []string{"server.sA", "server.sB"})
+		if sig.Pure {
+			t.Errorf("%s は純粋でない", name)
+		}
+	}
+	rel := func(op string, e string, want ir.EffectState, why string) {
+		t.Helper()
+		if got := relOf(t, sigOf(t, p, op), "server.X", e); got != want {
+			t.Errorf("%s: rel(X, %s) = %s, want %s（%s）", op, e, got, want, why)
+		}
+	}
+	rel("server.plain", "server.e1", ir.Unknown, "本体は prevented、デコレータの分は unknown")
+	rel("server.plain", "server.e2", ir.Unknown, "運ばれただけ。関係を書いていない")
+	rel("server.prevented", "server.e1", ir.Prevented, "本体もデコレータの分も prevented")
+	rel("server.prevented", "server.e2", ir.Prevented, "運ばれただけ。書いた prevents")
+	rel("server.kept", "server.e1", ir.Unknown, "本体は prevented、デコレータの分は kept")
+	rel("server.kept", "server.e2", ir.Kept, "運ばれただけ。書いた keeps")
+	rel("server.caller", "server.e1", ir.Prevented, "呼び出し先の Sig のまま")
+	rel("server.caller", "server.e2", ir.Prevented, "呼び出し先に運ばれた効果も、呼び出し先の Sig のまま")
+	for _, name := range []string{"server.plain", "server.prevented", "server.kept"} {
+		for _, e := range []string{"server.e1", "server.e2"} {
+			if got := succOf(t, sigOf(t, p, name), e); got != ir.Kept {
+				t.Errorf("%s: succ(%s) = %s, want kept", name, e, got)
+			}
+		}
+	}
+	// Op.reads / Op.effects / Op.carried は書き換えない
+	wantStrings(t, "Op.effects", effectNames(plain.Effects), nil)
+	wantStrings(t, "Op.carried.effects", effectNames(plain.Carried.Effects), []string{"server.e2", "server.e1"})
+
+	byOp := func(code string) []string {
+		var out []string
+		for _, d := range withCode(diags, code) {
+			out = append(out, strings.Fields(d.Message)[0]) // メッセージは op の FQN で始まる
+		}
+		return out
+	}
+	wantStrings(t, "REL-4（keeps と書いたが、本体も行き着く e1 は unknown）", byOp("REL-4"), []string{"server.kept"})
+	wantStrings(t, "READS-2（運ばれた sB を落とした節）", byOp("READS-2"), []string{"server.dropped", "server.callerDropped"})
+	wantStrings(t, "EFF-2（運ばれた e2 を落とした節）", byOp("EFF-2"), []string{"server.dropped", "server.callerDropped"})
+	for _, d := range append(withCode(diags, "READS-2"), withCode(diags, "EFF-2")...) {
+		missing, _ := d.Data["missing"].([]string)
+		if len(missing) != 1 || (missing[0] != "server.sB" && missing[0] != "server.e2") {
+			t.Errorf("%s の Data.missing = %v, want 運ばれたもの一つ", d.Code, d.Data["missing"])
+		}
+	}
+	wantNoCode(t, diags, "THROWS-1")
+}
+
+// TestSigCarriedSucc は手順 0（配線の op）の「運ばれた効果」の succ: 本体も行き着く効果は、本体から決めた状態（一部のアームに
+// しかなければ unknown）とデコレータの分（kept）が違えば unknown。
+func TestSigCarriedSucc(t *testing.T) {
+	write := leaf("server.write", nil)
+	write.Effects = ir.NamedEffects("server.e1")
+	k := &ir.Classify{DeclBase: ir.DeclBase{Name: "server.K", Span: sp("server.K")}, Subject: ir.TypeSubject{Type: ir.String()},
+		Cases: []ir.ClassifyCase{{Name: "A"}}, HasDefault: true, DecidedBy: ir.DecidedByPredicate}
+	c := call("server.write")
+	w := wire("server.w", nil, nil, matchStmt("server.K", arm(&c, "A"), arm(nil, "default")))
+	w.Decorators = []ir.Application{app("server.doing")}
+	w.Carried = ir.Carried{Effects: ir.NamedEffects("server.e1", "server.e2")}
+	doing := decorator("server.doing")
+	doing.Effects = ir.NamedEffects("$param:targets")
+	p := serverWith(doing, k, write, w)
+	Compute(p)
+	sig := sigOf(t, p, "server.w")
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.e2"})
+	if got := succOf(t, sig, "server.e1"); got != ir.Unknown {
+		t.Errorf("succ(e1) = %s, want unknown（本体は一部のアームだけ、デコレータの分は kept）", got)
+	}
+	if got := succOf(t, sig, "server.e2"); got != ir.Kept {
+		t.Errorf("succ(e2) = %s, want kept（運ばれただけ）", got)
+	}
 }
 
 // TestCarriedReadsOnly はデコレータが運ぶ状態だけを読む op（読む op）: R が空でなく、効果を持たない。

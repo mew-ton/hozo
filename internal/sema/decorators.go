@@ -110,10 +110,10 @@ type carrier struct {
 // 重複は最初の出現に寄せる。同じデコレータを何度も付けていれば（@repeatable）、適用ごとに足す。
 // Op.reads / Op.effects には足さない（docs/ir.md「正規化」）。
 //
-// 運ばれたものは、付いた op の名前空間のものでなければならない（どれも Signature を要しない）。位置はその適用。
-//   - DEC-17: 節を持つデコレータが、配線の op（本体を持つ op）に付いている。
-//   - READS-1: 葉の op に運ばれた状態（か、その read）が、別の名前空間のもの。
-//   - STATE-2: 葉の op に運ばれた効果が、別の名前空間のもの。
+// 付いた op は、葉でも配線でもよい。運ばれたものは、付いた op の名前空間のものでなければならない（どれも Signature を
+// 要しない）。位置はその適用。
+//   - READS-1: op に運ばれた状態（か、その read）が、別の名前空間のもの。
+//   - STATE-2: op に運ばれた効果が、別の名前空間のもの。
 func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
 	sym := a.syms[app.Decorator]
 	if sym == nil {
@@ -124,10 +124,6 @@ func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
 		return
 	}
 	op, name := site.op, site.sym.fqn
-	leaf := site.decl.Body == nil
-	if !leaf {
-		a.errorf("DEC-17", d.Span, "デコレータ %s は reads / effects の節を持つので、配線の op %s には付けられない（配線が読む状態と効果は、本体の呼び出しから決まる。付けられるのは葉の op だけ）", dec.Name, name)
-	}
 	carried := false
 	for _, raw := range dec.Reads {
 		for _, read := range carriedReads(raw, app.Args) {
@@ -136,8 +132,8 @@ func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
 				continue
 			}
 			op.Carried.Reads = append(op.Carried.Reads, read)
-			if rs := a.syms[read.String()]; leaf && rs != nil && rs.ns != site.sym.ns {
-				a.errorf("READS-1", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の%sを reads として運んでいる（葉の op が読めるのは自分の名前空間 %s の状態だけ。その名前空間の op を通して読む）", name, dec.Name, readRefText(read), nsName(site.sym.ns))
+			if rs := a.syms[read.String()]; rs != nil && rs.ns != site.sym.ns {
+				a.errorf("READS-1", d.Span, "op %s に、デコレータ %s が別の名前空間の%sを reads として運んでいる（デコレータの処理が読めるのは、付いた op の名前空間 %s の状態だけ。別の名前空間の状態は、その名前空間の op を通して読む）", name, dec.Name, readRefText(read), nsName(site.sym.ns))
 			}
 		}
 	}
@@ -148,8 +144,8 @@ func (a *analyzer) carry(site *opSite, app ir.Application, d *ast.Decorator) {
 				continue
 			}
 			op.Carried.Effects = append(op.Carried.Effects, effect)
-			if owner := a.effectOwner(effect); leaf && owner != nil && owner != site.sym.ns {
-				a.errorf("STATE-2", d.Span, "葉の op %s に、デコレータ %s が別の名前空間の効果 %s を運んでいる（%s は名前空間 %s の持ち主ではない）", name, dec.Name, effect, name, nsName(owner))
+			if owner := a.effectOwner(effect); owner != nil && owner != site.sym.ns {
+				a.errorf("STATE-2", d.Span, "op %s に、デコレータ %s が別の名前空間の効果 %s を運んでいる（%s は名前空間 %s の持ち主ではない）", name, dec.Name, effect, name, nsName(owner))
 			}
 		}
 	}

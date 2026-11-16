@@ -50,7 +50,7 @@ func checkRel4(o *ir.Op, s *sigState, r *reporter) {
 				for _, e := range s.F {
 					if got := s.relOf(x, e); got != want {
 						r.errorAt("REL-4", o.Span,
-							sprintf("%s の throws は %s が %s を %s と書いているが、本体から計算した状態は %s", o.Name, x, e, rel.Kind, got))
+							sprintf("%s の throws は %s が %s を %s と書いているが、計算した状態は %s", o.Name, x, e, rel.Kind, got))
 					}
 				}
 			}

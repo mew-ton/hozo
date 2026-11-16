@@ -14,12 +14,12 @@
 //     （docs/check.md「状態の形」。どれも Signature を要しない）。
 //  3. デコレータの適用を下ろす（decorators.go）。DEC-1 / DEC-7 / DEC-11 / DEC-12 / DEC-13。op に付けた適用は、
 //     そのデコレータの reads / effects の節が運ぶものを Op.carried に集める（docs/check.md「デコレータが運ぶ reads と
-//     effects」。DEC-17 と、運ばれたものの READS-1 / STATE-2）。
+//     effects」。付く先は葉でも配線でもよく、運ばれたものの READS-1 / STATE-2 を出す）。
 //  4. 配線の本体を下ろし、式の型を決める（wiring.go、compat.go）。WIRE-* / MATCH-* / TYPE-*。match の三つの形
 //     （値、基底の状態の組み込みの分類、状態の分類。MATCH-7）を見分け、絞り込み（MATCH-4 / MATCH-6）は値の match にだけ掛ける。
 //
 // docs/check.md「計算」が埋める Op.Signature と Call.Bound は零値のまま残す。Signature を要する規則
 // （THROWS-1、EFF-2、REL-2/4、DEC-4/5/6/14/16、WIRE-6/7、BIND-*、DOC-1 の @throws の所属、CFG-*）は internal/check が行う。
-// STATE-2 は、op が直に持つ効果（書いたものと、デコレータが運ぶもの）の分をここで、デコレータの halts の効果の分を
+// STATE-2 は、op にデコレータが運ぶ効果の分をここで、デコレータの halts の効果の分を
 // internal/check が出す。
 package sema

@@ -1,0 +1,33 @@
+// REL-4（docs/check.md「計算」の手順 0、「デコレータが運ぶ reads と effects」）: 配線の op に運ばれた効果の、例外ごとの状態は、
+// 葉と同じに、その op の throws の prevents / keeps から決める（デコレータの処理が、本体のどの行の前後で起きるかを、言語は
+// 決めない）。運ばれた効果だけなら、書いた関係と食い違わない
+namespace a {
+  state s: list<string>;
+  state log: list<string>;
+  effect e() on s.post;
+  effect note() on log.post;
+  exception E;
+  decorator doing(...targets: any effect) for op effects targets;
+  op fail() throws E;
+  // 本体は効果を持たない。運ばれた note だけ
+  @doing(note)
+  op carriedOnly() throws E prevents effects {
+    fail();
+  }
+  @doing(note)
+  op carriedKept() throws E keeps effects {
+    fail();
+  }
+  // 本体の e は、例外の後ろなので prevented。運ばれた note は、書いた prevents のとおり
+  @doing(note)
+  op both() throws E prevents effects {
+    fail();
+    e();
+  }
+  // 本体も行き着く効果を運ぶ: 本体から決めた状態（prevented）と、書いた関係が同じ
+  @doing(e)
+  op same() throws E prevents effects {
+    fail();
+    e();
+  }
+}

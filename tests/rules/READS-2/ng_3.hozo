@@ -1,0 +1,27 @@
+// READS-2（docs/check.md「reads」「デコレータが運ぶ reads と effects」）: 配線の op に書いた reads が、デコレータが運ぶ状態を
+// 落としている。書いた節は、その op が読む状態の全体を言うので、運ばれた状態も書く。呼び出し元の節も同じ。位置は op
+namespace a {
+  state rows: list<string>;
+  state log: list<string>;
+  read first(): string? on rows;
+  decorator counting(table: any state) for op reads table;
+  op g();
+  // 運ばれた log が足りない
+  @counting(log)                             // ERROR: READS-2
+  op missing(): string? reads rows {
+    return first();
+  }
+  // 本体は読まないが、運ばれた状態がある。別の状態を書いた
+  @counting(log)                             // ERROR: READS-2
+  op wrong() reads rows {
+    g();
+  }
+  @counting(log)
+  op carrying(): string? {
+    return first();
+  }
+  // 呼び出し先の配線に運ばれた log が、呼ぶ側の節に足りない
+  op caller(): string? reads rows {              // ERROR: READS-2
+    return carrying();
+  }
+}

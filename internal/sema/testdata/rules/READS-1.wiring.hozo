@@ -1,0 +1,59 @@
+// READS-1 / STATE-2（docs/check.md「デコレータが運ぶ reads と effects」）: reads か effects の節を持つデコレータは、配線の op
+// （本体を持つ op）にも付けられる（DEC-17 は欠番）。運ばれたものが、付いた op の名前空間のものでなければならないことは、
+// 葉と同じ。位置はそのデコレータの適用
+namespace a {
+  model M { id: string; }
+  state s: list<M>;
+  effect add() on s.post;
+  decorator reading(table: any state) for op reads table;
+  decorator writing(...targets: any effect) for op effects targets;
+  decorator fixed for op reads s effects add;
+  decorator plain for op;
+
+  @reading(s) op leafRead(): M[];
+  @writing(add) export op leafWrite(m: M);
+
+  // 配線に付けられる。節を持つデコレータが二つでも、残りの引数に何も渡していなくても
+  @reading(s)
+  op wireRead(): M[] {
+    return leafRead();
+  }
+  @plain
+  @writing(add)
+  op wireWrite(m: M) {
+    leafWrite(m);
+  }
+  @fixed
+  @reading(s)
+  op wireBoth(m: M): M[] {
+    leafWrite(m);
+    return leafRead();
+  }
+  @writing
+  op wireNothing() {
+    leafWrite({ id: "x" });
+  }
+}
+namespace b {
+  state t: list<a.M>;
+  effect put() on t.post;
+  // 自分の名前空間のものを運ぶ
+  @a.reading(t)
+  @a.writing(put)
+  op own(m: a.M) {
+    a.leafWrite(m);
+  }
+  // 別の名前空間のものを運べば、配線でも error
+  @a.reading(a.s)                      // ERROR: READS-1
+  op otherRead(m: a.M) {
+    a.leafWrite(m);
+  }
+  @a.writing(put, a.add)               // ERROR: STATE-2
+  op otherWrite(m: a.M) {
+    a.leafWrite(m);
+  }
+  @a.fixed                             // ERROR: READS-1, STATE-2
+  op otherBoth(m: a.M) {
+    a.leafWrite(m);
+  }
+}

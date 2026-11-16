@@ -1,0 +1,50 @@
+// EFF-2（docs/check.md「状態と効果」「デコレータが運ぶ reads と effects」）: effects の節を持つデコレータは、配線の op にも
+// 付けられる。運ばれた効果は、本体が行き着く効果と合わせて、その配線の効果になり、呼び出し元へ伝わる。配線は effects を
+// 書かなくてよく、書くなら、運ばれた効果も書く
+namespace a {
+  state s: list<string>;
+  state log: list<string>;
+  effect e() on s.post;
+  effect note() on log.post;
+  decorator doing(...targets: any effect) for op effects targets;
+  decorator posting for op effects log.post;
+  op g();
+  // 節を書かない配線
+  @doing(note)
+  op omitted() {
+    e();
+  }
+  // 節を書いた配線: 本体の e と、運ばれた note の両方を書く（順序は問わない）
+  @doing(note)
+  op written() effects note, e {
+    e();
+  }
+  // 本体が効果を持たない配線: 効果は、運ばれたものだけ。直に書いた効果を運ぶデコレータなら、直に書く
+  @posting
+  op carriedOnly() effects log.post {
+    g();
+  }
+  // 本体も行う効果を運んでも、同じ効果一つ
+  @doing(e)
+  op same() effects e {
+    e();
+  }
+  // 残りの引数に何も渡さなければ、何も運ばれない
+  @doing
+  op nothing() effects e {
+    e();
+  }
+  // 呼び出し元へ伝わる
+  export op caller() effects e, note {
+    omitted();
+  }
+  op callerOmitted() {
+    omitted();
+  }
+}
+namespace b {
+  // 別の名前空間の配線にも伝わる
+  op across() effects a.e, a.note {
+    a.caller();
+  }
+}
