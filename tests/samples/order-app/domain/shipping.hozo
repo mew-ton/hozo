@@ -1,7 +1,7 @@
 // サンプル order-app の仕様（README.md「難しい問題」）。出荷の名前空間 shipping。
 // 箱は、送る品目がすべてそろうまで決められない。送料は、箱の大きさで決まる。だから、送料も、そろうまで決まらない。
 // この名前空間は、その順を、事実が足されていく形で持つ: 出荷（shipments。何を待っているか）→ 荷物（parcels。箱と重さと送料が決まった）
-// → 送り状（labels。配送業者が決まった）。荷物の行は、そろった出荷（Gathered.Complete）からしか作れない。
+// → 送り状（labels。配送業者が決まった）。荷物を作る葉（weighed）は、そろった出荷（Gathered.Complete）しか受け取らない。
 
 /** 出荷。箱で送る部分を、そろえて、梱包して、渡す */
 namespace shipping {
@@ -395,6 +395,8 @@ namespace shipping {
    * 梱包した: 箱の種類と、量った重さを記録する。送料は、箱の大きさの区分と届け先の地帯から、料金表で決まる。
    * そろっていない出荷は、梱包できない。梱包は一度だけ。
    */
+  @prd.promise("店", "箱は、送る品目がすべてそろうまで決めない")
+  @prd.promise("客", "送料は、梱包した箱の大きさと届け先だけで決まる")
   @db.transaction
   export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
     throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable

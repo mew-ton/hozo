@@ -1,0 +1,14 @@
+// サンプル order-app の語彙（README.md「語彙」）。要求（PRD）の約束を、それを守る op に結ぶ印。
+// 読むトランスパイラはない（docs/requirements.md「モデルが先」の「何も生成しないデコレータ」）。検査器は、約束の中身を確かめない。
+
+/** 要求（PRD）の語彙 */
+namespace prd {
+  /**
+   * この op は、whom への約束 what を守る場所。約束が変わったら、この op を見直す。
+   *
+   * @param whom 約束の相手（客、担当者、店）
+   * @param what 約束の文
+   */
+  @repeatable
+  decorator promise(whom: string, what: string) for op;
+}

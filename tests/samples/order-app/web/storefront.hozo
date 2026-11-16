@@ -107,6 +107,12 @@ namespace storefront {
   /** サーバーに届かないときは、ページの代わりに Unavailable を描く */
   decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);
 
+  /** カートに、もう売っていない商品がある。どの商品かは、ここまで届かない（例外の値は、表示の型に渡せない） */
+  model Outdated {}
+
+  /** カートの商品が売られていないときは、ページの代わりに Outdated を描く */
+  decorator outdatedOnFailure = page.fallback(ordering.UnknownProduct | ordering.NotForSale, Outdated);
+
   // ---- 商品の一覧 ----
 
   /** 商品の一覧のページ */
@@ -179,6 +185,8 @@ namespace storefront {
     /** 商品の代金まで見せる。送料は「届け先を入れると、見積もりと上限が出る。決まるのは梱包の後」とだけ */
     Filled: { sorted: ordering.Sorted; problem: Problem?; };
     Empty: {};
+    /** もう売っていない商品が入っている。できるのは、カートを空にすることだけ */
+    Outdated: Outdated;
     Unavailable: Unavailable;
   }
 
@@ -187,18 +195,17 @@ namespace storefront {
 
   @unavailableOnFailure
   @page.route("/cart")
-  op openCart(): CartPage
-    throws ordering.UnknownProduct, ordering.NotForSale
-  {
+  op openCart(): CartPage {
     return match cart by list {
       Empty    => emptyCartVm();
       HasItems => filledCart();
     };
   }
 
-  /** カートの中身に、いまの値段を付けてもらう */
+  /** カートの中身に、いまの値段を付けてもらう。ページの op に fallback を二つは付けられないので、二つ目は、この op が持つ */
+  @outdatedOnFailure
   op filledCart(): CartPage
-    throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
+    throws http.NetworkError, http.ServerError
   {
     const sorted = shopApi.itemise({ lines: cart });
     return filledCartVm(sorted, problem);
@@ -227,6 +234,14 @@ namespace storefront {
     goToCheckout();
   }
 
+  /** カートを空にして、やり直す */
+  @page.interaction(page: openCart, when: CartPage.Outdated)
+  op onStartOver() {
+    emptyCart();
+    forgetOffer();
+    reload();
+  }
+
   // ---- 注文 ----
 
   /** 注文のページ。客が同意するのは、Quoted に見えている額 */
@@ -240,6 +255,8 @@ namespace storefront {
      */
     Quoted: { offer: Offer; problem: Problem?; };
     EmptyCart: {};
+    /** もう売っていない商品が入っている。カートのページで、やり直す */
+    Outdated: Outdated;
     Unavailable: Unavailable;
   }
 
@@ -249,9 +266,7 @@ namespace storefront {
 
   @unavailableOnFailure
   @page.route("/checkout")
-  op openCheckout(): CheckoutPage
-    throws ordering.UnknownProduct, ordering.NotForSale
-  {
+  op openCheckout(): CheckoutPage {
     return match cart by list {
       Empty    => emptyCheckoutVm();
       HasItems => checkout();
@@ -259,8 +274,9 @@ namespace storefront {
   }
 
   /** 値段を見せているか、まだか */
+  @outdatedOnFailure
   op checkout(): CheckoutPage
-    throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
+    throws http.NetworkError, http.ServerError
   {
     return match offer by nullable {
       HasItems => quotedVm(offer, problem);

@@ -1,0 +1,606 @@
+# サンプル `order-app`
+
+注文を受けて、作って、そろえて、送る店のアプリ（サーバーと、客の画面と、担当者の画面）を、**仕様だけ**で書いたもの。生成するコードも、期待する出力も、人が書くコードも持たない。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)（仕様だけのサンプルは、同「仕様だけのサンプル」）。
+
+このサンプルが答えようとしている問いは一つ: **仕様は、どこまで書くのか**。「PRD の概念と、その境界だけを最低限で決めて、必要になったら足す」という立場の、「必要」の線を、本物の大きさのアプリを書いて探す。この文書が持つのは、作るもの（PRD）、名前空間の地図、難しい問題のモデル、書いて分かったこと、粒度についての事例と規則の候補、利用者への問い。**規則は、どれも決めていない**（決めるのは利用者。「利用者への問い」）。
+
+名前を `order-app` にしたのは、`shop-server`（出すものの名前）と違い、出すものがなく、サーバーと二つの画面を一つの仕様に持つから。
+
+## 作るもの
+
+### 何をする店か
+
+手作りの品と、その材料や道具と、作り方の教材（ファイル）を売る店。客はアカウントを作らず、注文ごとの鍵（`type.OrderKey`）で、自分の注文を見る。
+
+### 商品の三つの種類
+
+一つの注文に、三つの種類が混ざる。種類の持ち主は `domain/catalog.hozo` の `Fulfilment`。
+
+| 種類 | 渡し方 | 大きさと重さが決まるとき |
+|---|---|---|
+| ダウンロード（`DigitalGoods`） | 注文を受け付けたときに、取る権利を足す。箱は要らない | — |
+| 受注製作（`MadeGoods`） | 注文を受け付けてから作る。出来上がったら量って、そろえ場所に置く | 作り終えたとき。注文のときに分かるのは、いちばん大きく出来た場合（`largest`）だけ |
+| 在庫（`StockedGoods`） | 注文のときに取り置き、受け付けたら棚から出して、そろえ場所に置く | 商品に登録してある（`unit`） |
+
+### 担い手
+
+| 担い手 | すること | 仕様の中の場所 |
+|---|---|---|
+| 客 | 商品を選ぶ、値段を見る、上限の額に同意する、注文のいまを見る、ファイルを取る | `web/storefront.hozo` |
+| 製作の担当 | 仕事を始める、作り終えて量る | `web/backoffice.hozo` の「製作」 |
+| 梱包の担当 | 棚から出す、箱を選んで量る、配送業者を選ぶ、渡す | `web/backoffice.hozo` の「そろえる」「梱包の台」 |
+| 管理の担当 | 配送業者を登録する、使う・使わないを切り替える | `web/backoffice.hozo` の「配送業者の管理」 |
+| 支払いを引き受ける仕組み | 支払いの画面、枠の確保、請求の確定、返金、通知 | `external/psp.hozo` |
+| 配送業者の API をまとめる仕組み | 見積もり、送り状、荷物の動きの通知 | `external/carriergw.hozo` |
+| ファイルの置き場、メールの配送 | 期限付きの URL、メール | `external/assets.hozo`、`external/mailer.hozo` |
+| 時計 | 支払いのない注文の期限切れ、枠の期限の見張り | `vocab/clock.hozo` の `tick` を付けた op |
+
+### 流れ
+
+1. 客が、カートの値段を見る。箱で送るものがあれば、届け先を入れると、送料の**見積もり**と**上限**が出る（`ordering.price`）。
+2. 客が、見えている上限に同意して注文する。在庫の行を取り置く（`ordering.place`）。
+3. 客が、支払いの画面（外部）で、**商品の代金 + 送料の上限**の額に同意する。箱で送るものがあれば、その額の枠を確保するだけで、金は動かない（`payment.begin`）。
+4. 同意の通知が届いたら、注文を受け付けて、種類ごとに分ける（`fulfilment.secured`、`fulfilment.begin`）: ダウンロードは渡し終える。受注製作は仕事にする。在庫は棚から出してよくする。箱で送る二つは、一つの出荷にまとめる。
+5. 担当が、作り終えた品目と、棚から出した品目を、そろえ場所に置く（`fulfilment.made`、`fulfilment.picked`）。
+6. すべてそろったら、梱包の担当が箱を選んで量る。**送料が、ここで決まる**（`shipping.pack`）。
+7. 梱包の担当が配送業者を選ぶ。客への請求を確定してから、送り状を買う（`fulfilment.dispatch`）。
+8. 渡したら、客に、決まった送料と、確定した請求と、追跡番号を知らせる（`fulfilment.handedOver`）。
+
+### 作らないもの
+
+受け付けた後のキャンセルと返品、分けて送ること、商品・箱・料金表・在庫の数・担当者を登録する画面、客のアカウント。分けて送らない理由は「難しい問題」の「分けて送ること」。
+
+## 入力
+
+`hozo.toml` は `sources` だけを持ち、出力の単位（`[[emit]]`）を置かない。置き場は、担い手の種類ごとのディレクトリ。
+
+| ディレクトリ | 中身 |
+|---|---|
+| `type.hozo` | 共有の値の型（名前空間 `type`） |
+| `domain/` | サーバーの概念。名前空間ごとに一つのファイル |
+| `api/` | サーバーの HTTP の入口。呼ぶ相手ごとに一つの名前空間 |
+| `external/` | 外部の仕組み。相手の口を、こちらが呼ぶ op として書いたもの |
+| `web/` | ブラウザの画面 |
+| `vocab/` | このサンプルの語彙（「語彙」） |
+| `sample.json` | `{ "specOnly": true }`（`../README.md`「sample.json」） |
+
+## 名前空間の地図
+
+27 の名前空間、約 4,200 行。op は 269（別の名前空間から呼べる `export` が 96、配線が 179、人が書く葉が 90）、状態は 35、`read` は 34、効果は 56。数は、この文書を書いたときのもの。
+
+「op」の列は「全部（`export` / 配線 / 葉）」。「read」と「効果」の括弧は、`db` の語彙のデコレータで中身を言えた数。
+
+| 名前空間 | 概念 | 状態 | read | 効果 | op | 担い手 |
+|---|---|---|---|---|---|---|
+| `type` | 共有の値（識別子、金額、住所、寸法）と、認証の例外 | — | — | — | — | — |
+| `catalog` | 商品と、その種類 | `products` | 3（2） | 0 | 3（3 / 3 / 0） | サーバー |
+| `ordering` | 注文: 何を頼み、何を約束されたか | `orders`、`paymentWindow` | 4（3） | 3（2） | 20（7 / 12 / 8） | サーバー |
+| `inventory` | 在庫の数と、取り置き | `levels`、`reservations` | 5（2） | 5（1） | 15（5 / 8 / 7） | サーバー |
+| `payment` | 支払い: 何に同意し、いくら請求したか | `payments`、`seen`、`holdMargin` | 4（3） | 3（3） | 34（5 / 22 / 12） | サーバー |
+| `production` | 受注製作の仕事 | `jobs` | 3（2） | 2（1） | 9（5 / 6 / 3） | サーバー |
+| `download` | ダウンロードの権利 | `grants`、`grantLifetime`、`linkLifetime` | 2（2） | 1（0） | 7（3 / 5 / 2） | サーバー |
+| `shipping` | 出荷: そろえる、梱包する、渡す。箱と料金表 | `shipments`、`parcels`、`labels`、`boxes`、`tariffs`、`origin` | 7（6） | 4（4） | 31（14 / 23 / 8） | サーバー |
+| `carrier` | 契約している配送業者と、その使い分け | `carriers` | 3（3） | 2（2） | 12（5 / 8 / 4） | サーバー |
+| `staff` | 担当者と、してよい仕事 | `members`、`sessions` | 3（3） | 2（2） | 13（5 / 9 / 4） | サーバー |
+| `notice` | 客への知らせ | — | — | — | 4（2 / 2 / 2） | サーバー |
+| `fulfilment` | 受け付けた後の流れ。概念をまたぐ順番だけ | — | — | — | 15（7 / 15 / 0） | サーバー |
+| `shopApi` | 客の画面のための入口 | `site` | — | — | 13（8 / 11 / 2） | サーバー（HTTP） |
+| `staffApi` | 担当者の画面のための入口 | — | — | — | 15（15 / 15 / 0） | サーバー（HTTP） |
+| `hooks` | 外部の仕組みからの通知の入口 | — | — | — | 2（2 / 2 / 0） | サーバー（HTTP） |
+| `psp` | 支払いを引き受ける仕組み | `ledger`、`holds`（相手のもの） | — | 3 | 5（5 / 0 / 5） | 外部 |
+| `carriergw` | 配送業者の API をまとめる仕組み | `labels`（相手のもの） | — | 1 | 2（2 / 0 / 2） | 外部 |
+| `assets`、`mailer` | ファイルの置き場、メールの配送 | — | — | — | 1 ずつ | 外部 |
+| `storefront` | **客の画面** | `cart`、`lastOrder`、`offer`、`problem`、`location`、`query` | — | 17 | 33（0 / 20 / 13） | ブラウザ |
+| `backoffice` | **担当者の画面** | `token`、`problem`、`location`、`query` | — | 13 | 33（0 / 18 / 15） | ブラウザ |
+| `clock`、`nav`、`outside`、`prd`、`smtp`、`webhook` | このサンプルの語彙 | — | — | — | `clock.now` だけ | — |
+
+名前空間どうしの呼び出しの向き:
+
+```
+storefront ──▶ shopApi ─┐                       ┌─▶ catalog
+backoffice ──▶ staffApi ├─▶ fulfilment ─────────┼─▶ ordering ──▶ catalog, inventory, shipping
+psp, carriergw ─▶ hooks ┘     │                 ├─▶ payment  ──▶ psp
+                              │                 ├─▶ production
+                              │                 ├─▶ download ──▶ assets
+                              │                 ├─▶ shipping
+                              │                 ├─▶ carrier  ──▶ carriergw
+                              │                 └─▶ notice   ──▶ mailer
+                              └─（入口は、流れを通さずに、概念の op を直に呼ぶこともある）
+```
+
+## 画面
+
+画面は、ページの op（`@page.route`。返す union のアームが、画面の状態）と、操作の op（`@page.interaction`。どのページの、どのアームでできるか）で書いた。描き方（部品、文言、見た目、入力の途中の状態）は書いていない。
+
+### 客の画面（`web/storefront.hozo`）
+
+| ページ | アーム（画面の状態） | 操作 |
+|---|---|---|
+| `/` `openCatalog` | `Ready`、`Empty`、`Unavailable` | — |
+| `/product` `openProduct` | `Ready`、`Missing`、`Unavailable` | `Ready`: `onAddToCart`（受注製作なら、希望を聞くダイアログ） |
+| `/cart` `openCart` | `Filled`、`Empty`、`Outdated`、`Unavailable` | `Filled`: `onChangeQuantity`、`onRemoveLine`、`onProceed`。`Outdated`: `onStartOver` |
+| `/checkout` `openCheckout` | `Entering`、`Quoted`、`EmptyCart`、`Outdated`、`Unavailable` | `Entering`: `onAskQuote`。`Quoted`: `onEditContact`、`onPlaceOrder` |
+| `/order` `openOrder` | `AwaitingPayment`、`Accepted`、`Expired`、`Missing`、`Unavailable` | `AwaitingPayment`: `onPay`、`onRefresh`。`Accepted`: `onDownload` |
+
+### 担当者の画面（`web/backoffice.hozo`）
+
+| ページ | アーム | 操作 |
+|---|---|---|
+| `/login` `openLogin` | `Form` | `onLogin` |
+| `/production` `openProduction` | `Ready`、`Empty`、`Unavailable` | `Ready`: `onStartJob`、`onFinishJob`（量った大きさを聞くダイアログ） |
+| `/picking` `openPicking` | `Ready`、`Empty`、`Unavailable` | `Ready`: `onPicked` |
+| `/shipments` `openShipments` | `Ready`、`Empty`、`Unavailable` | `Ready`: `onOpenStation` |
+| `/station` `openStation` | `Waiting`、`ChooseBox`、`ChooseCarrier`、`HandOver`、`Gone`、`Unavailable` | `ChooseBox`: `onPack`。`ChooseCarrier`: `onBuyLabel`。`HandOver`: `onHandOver` |
+| `/carriers` `openCarriers` | `Ready`、`Empty`、`Unavailable` | `Ready`: `onSwitchCarrier`。どのアームでも: `onRegisterCarrier` |
+
+## 語彙
+
+このサンプルが宣言した語彙。どれも読むトランスパイラがない。プラグインのディレクトリではなく、プロジェクトの仕様（`vocab/*.hozo`）として置いた理由は、「分かったこと」の F22。
+
+| 語彙 | 宣言 | 何を言うか | 検査に効くか |
+|---|---|---|---|
+| `outside` | `does(...targets)` | 外部の仕組みが、その中で行う効果 | 効く。付いた op の効果に加わる（`docs/check.md`「デコレータが運ぶ reads と effects」） |
+| `outside` | `failsAs(error)` | 相手に届かない失敗（`http.NetworkError`、`http.ServerError`）を、別の例外に言い換える | 効く（`catches … recovers`、`throws`）。金が動く呼び出しには使えなかった（F5） |
+| `clock` | `system`、`tick(every)`、op `now()` | 時計を読む op、誰にも呼ばれずに動く op | 印。`now()` は、時刻を配線に出すための葉 |
+| `webhook` | `signed(sender)`、例外 `BadSignature` | 外部の仕組みが呼ぶ入口で、署名を確かめる | 効く（`throws BadSignature prevents effects`） |
+| `prd` | `promise(whom, what)` | その op が守る、PRD の約束 | 印。約束の中身は確かめない（F11） |
+| `smtp` | `sendMail` | SMTP でメールを送る op | 印 |
+| `nav` | `leave`、`save` | ブラウザを、アプリの外へ移す。ファイルを保存させる | 印 |
+
+画面の名前空間は、それぞれ、失敗を画面の状態にするデコレータ `recover(error, then)`（`catches error halts then`）を持つ。
+
+## 難しい問題
+
+### 何が難しいか
+
+三つの事実が、順番を決める。
+
+1. 箱は、送る品目がすべてそろうまで決められない（受注製作の品目は、在庫の品目より後に出来上がり、大きさは作り終えるまで決まらない）。
+2. 送料は、箱の大きさで決まる。
+3. だから、注文のときには、請求する額が決まらない。決まるのは、梱包した後。
+
+客は、額が決まる前に注文する。店は、額が決まる前に、作り始める。
+
+### 選んだ形: 上限に同意して、後で確定する
+
+| いつ | 客に見せるもの | 金 | 仕様の場所 |
+|---|---|---|---|
+| 注文の前 | 商品の代金、送料の**見積もり**（ふつうに出来て、いちばん小さく詰めたとき）と**上限**（いちばん大きく出来たとき）、「送料は梱包の後に決まり、請求は、商品の代金 + 上限を超えない」 | — | `shipping.estimate`、`shipping.FeeQuote`、`storefront.CheckoutPage` の `Quoted` |
+| 注文 | 客が同意した上限（`Checkout.agreedCeiling`）が、サーバーがいま出す上限と違えば、注文しない（`ordering.TermsChanged`） | — | `ordering.draft` |
+| 支払いの画面 | 商品の代金 + 送料の上限 | **枠の確保**だけ。金は動かない。ダウンロードだけの注文は、送料がないので、その場で請求が確定する | `payment.openSession`、`psp.openHold`、`psp.openCharge` |
+| 梱包の前 | 「見積もり ○ 円（上限 ○ 円）。梱包の後に決まります」 | — | `shopApi.ShippingView` |
+| 梱包 | — | 送料が決まる: 箱の大きさの区分 × 届け先の地帯（店の料金表） | `shipping.pack`、`shipping.Parcel.fee` |
+| 送り状を買う直前 | — | **請求の確定**: 商品の代金 + min(送料, 上限)。残りの枠は、相手が手放す | `fulfilment.dispatch`、`payment.settle` |
+| 渡した後 | 決まった送料、確定した請求、追跡番号 | — | `notice.shipped` |
+
+支払いを引き受ける仕組みに当てにしている振る舞い（枠の確保、枠ごとに一度だけの確定、確保した額以下、一部の返金、二度届く通知）の持ち主は、`external/psp.hozo` の冒頭のコメント。
+
+客に請求する送料（`Parcel.fee`。店の料金表）と、店が配送業者に払う額（`Label.cost`）は、別のもの。配送業者を選ぶのは店の都合で、客の額を変えない。
+
+### 送料が、見せた額と違ったとき
+
+| 決まった送料 | すること | 客の同意 |
+|---|---|---|
+| 見積もりより低い | 決まった額を請求する | 要らない |
+| 見積もりより高く、上限以下 | 決まった額を請求する。発送の知らせに、理由を書く | 要らない（上限に同意している） |
+| 上限を超える | 上限までを請求する。超えた分は店が持つ（`Payment.absorbed`）。梱包の担当には、箱を選ぶ前に、超える額を見せて確かめる（`shipping.BoxOption.overCeiling`、`backoffice.onPack` の `confirmAbsorb`） | 要らない |
+
+### 枠の期限と、納期
+
+枠には期限がある。受注製作が長引くと、送料が決まる前に、枠が切れる。時計で動く `payment.prepayExpiring` が、期限の近い支払いを、**上限の額で先に確定**する（`Standing.Prepaid`）。送料が決まったら、`payment.settle` が、差額を返す。商品の納期（`catalog.MadeGoods.leadTime`）が枠の期限より短いことは、コメントにしかない（F26）。
+
+### モデル: 事実が、足されていく
+
+出荷の進み具合は、状態の列ではなく、**足された事実**で持つ。前の事実がなければ、次の事実を作る op に渡せる値が、手に入らない。
+
+```
+shipments（何を待っているか）──[すべてそろった: Gathered.Complete]──▶ parcels（箱、重さ、送料）
+        ──[荷物がある: Packing.Packed]──▶ 請求の確定 ──▶ labels（配送業者、追跡番号）
+        ──[送り状がある: Labelling.Labelled]──▶ handedOverAt ──▶ deliveredAt
+```
+
+`domain/shipping.hozo` から（説明のコメントを省いた抜粋）:
+
+```ts
+classify Gathered of Shipment {
+  Complete;      // すべての品目が、そろえ場所にある
+  default;       // まだ待っている品目がある
+}
+
+// そろっていない出荷は、引数に渡せない
+export op boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
+  return fitting(shipment, boxes, tariffs);
+}
+
+@prd.promise("店", "箱は、送る品目がすべてそろうまで決めない")
+@prd.promise("客", "送料は、梱包した箱の大きさと届け先だけで決まる")
+@db.transaction
+export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
+  throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable
+{
+  const shipment = find(id);
+  const existing = parcelOf(id);
+  return match existing by Packing {
+    Packed  => throw AlreadyPacked;
+    default => packGathered(shipment, box, weight);
+  };
+}
+
+op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
+  throws NotGathered, UnknownBox, OverWeight, Undeliverable
+{
+  return match shipment by Gathered {
+    Complete => packInto(shipment, box, weight);   // ここでだけ Gathered.Complete<Shipment> になる
+    default  => throw NotGathered;
+  };
+}
+```
+
+`domain/fulfilment.hozo` から。請求の確定が、送り状より先:
+
+```ts
+@prd.promise("店", "請求を確定できない荷物には、送り状を買わない")
+export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
+  throws …
+{
+  const sealed = shipping.sealed(id);                               // 荷物があり、送り状がまだない
+  payment.settle(sealed.shipment.orderId, sealed.parcel.fee);       // 客: 商品の代金 + min(送料, 上限)
+  const origin = shipping.shipFrom();
+  const label = carrier.book(choice, sealed.parcel, origin, sealed.shipment.destination);   // 店の金が動く
+  shipping.attachLabel(label);
+  return label;
+}
+```
+
+混ざった注文そのものは、型が持つ。`ordering.Order` は、ダウンロードの行（`digital`）と、箱で送る部分（`physical: PhysicalPart?`）に分かれ、届け先と送料の約束は、箱で送る部分の中にある（ダウンロードだけの注文には、届け先がない）。
+
+### 誰が、いつ、何を決めるか
+
+| 決めること | 誰が | いつ | 仕様の場所 |
+|---|---|---|---|
+| 行の種類 | 商品（`catalog.Kind`） | 注文のとき | `ordering.sort`（葉） |
+| 送料の見積もりと上限 | サーバー（料金表と、行の大きさ） | 注文の前 | `shipping.foresee`（葉） |
+| 上限への同意 | 客 | 注文のとき | `storefront.onPlaceOrder` |
+| 出来上がりの大きさ | 製作の担当（量る） | 作り終えたとき | `backoffice.onFinishJob` → `fulfilment.made` |
+| そろったか | 品目の事実（`shipping.Gathered` の述語） | 品目を置くたび | `shipping.gather` |
+| 箱と重さ | 梱包の担当 | そろった後 | `backoffice.onPack` → `shipping.pack` |
+| 客に請求する送料 | 料金表（箱の大きさの区分 × 地帯） | 梱包したとき | `shipping.weighed`（葉） |
+| 請求する額 | サーバー（min(送料, 上限)） | 送り状を買う直前 | `payment.charged`（葉） |
+| 配送業者 | 梱包の担当（見積もりを見て） | 梱包の後 | `backoffice.onBuyLabel` → `carrier.book` |
+
+「そろったか」「箱と重さ」「客に請求する送料」「請求する額」「配送業者」は、この順でしか決められない: どれも、一つ前の事実が要る。「行の種類」から「出来上がりの大きさ」までの四つは、箱を知らずに決める。
+
+### 分けて送ること
+
+**許していない**（一つの注文に、出荷は一つ: `shipping.Shipment.orderId` は `@db.unique`）。在庫の品目を先に送れば、客は早く受け取れるが、送料の決め方と当たる。
+
+- 二つの箱の送料の合計は、たいてい、一つの箱より高い。上限を、分けた場合の額で出すと、分けない注文の客にも高い上限を見せることになる。
+- 枠からの請求の確定は一度だけ（`external/psp.hozo` の 3）。一つ目の箱を送るときに確定すると、二つ目の箱の送料は、まだ決まっていない。分けて送るなら、上限の額で先に確定して後で返す形（`payment.Standing.Prepaid` の形）を、いつも使うことになる。
+- 誰の都合で分けるか（客が頼んだか、店が棚を空けたいか）で、増えた送料を誰が持つかが変わる。
+
+### 考えた別の形
+
+| 形 | 取らなかった理由 |
+|---|---|
+| 送料を、地帯だけで決める（箱によらない定額） | 「送料は荷物の大きさで決まる」という要件に反する。請求する額が注文のときに決まるので、「何が難しいか」の 3 がなくなる |
+| 注文のときに、見積もりの額で請求を確定し、差額を、後から請求するか返す | 後からの請求には、支払いの手段を預かることと、二度目の同意が要る。請求が通らないと、梱包した箱が止まる |
+| 注文のときに、上限の額で請求を確定し、差額を、いつも返す | 納期が枠の期限を超える注文でも成り立つが、ほとんどの注文で返金が起きる。枠の期限が近いときだけ、この形にした（「枠の期限と、納期」） |
+| 送料が見積もりを超えたら、客の同意を取り直す | 梱包した箱が、同意を待つ状態になる。上限に、はじめに同意してもらう形にした |
+| 出荷の進み具合を、一つの値（`stage`）の列で持つ | 値の集合を言う型がなく（F8）、「この段階では荷物がある」を型で言えない（F9）。事実ごとの表にすると、存在の分類が、型で決まる |
+| 出荷の進み具合を、状態の分類と、効果の遷移で書く | 遷移の宛先にできるのは、状態の全体を対象にした分類だけで、表の一行の場合は書けない（F1） |
+| 梱包を、荷物を返す葉一つにして、中で確かめる | 葉は状態に触れないので、そろったことと、まだ梱包していないことを、配線が読んで渡すことになる。確かめる場所が、仕様から見えなくなる |
+
+### 言語が言えなかったこと
+
+この問題の中心で、仕様に書けなかったもの。それぞれの持ち主は「分かったこと」。
+
+| 言えなかったこと | 代わりにしたこと | 項目 |
+|---|---|---|
+| 請求は上限を超えない、請求する送料 = min(送料, 上限) | 葉のコメントと、印 `@prd.promise` | F11 |
+| 出荷の一行が、どのケースからどのケースへ進むか | 値の分類と、`put` の効果と、時刻を入れる葉 | F1 |
+| 荷物は、そろった出荷からしか作れない | 荷物を返す葉 `weighed` の引数の型。効果 `createParcel` は、どの荷物でも受け取る | F10 |
+| 混ざった注文の行を、種類ごとに分ける | 葉 `ordering.sort`。分けた結果の形（`Sorted`）だけが仕様 | F2 |
+| 上限が変わっていたときの、新しい上限を、画面に出す | 例外は値を運ぶ（`TermsChanged(terms)`）が、画面は、見せている値段を捨てるだけ | F4 |
+| 金が動いたかどうか分からない失敗 | `http.NetworkError` / `http.ServerError` を、言い換えずに、画面まで伝える | F5 |
+| 納期は、枠の期限より短い | コメント | F26 |
+
+## 分かったこと
+
+書けなかったもの、書きにくかったもの、規則がないまま決めたもの。それぞれ「何が起きたか → サンプルではどうしたか」。確かめた診断は、このサンプルの外の小さな仕様に `hozoc check` を掛けたもの。
+
+### 言語
+
+- **F1 表の一行の進み具合を、遷移で書けない。** `effect … on C: A -> B` の宛先は、状態を対象にした分類だけ（値の分類を書くと RES-4「遷移の宛先にできるのは状態を対象にした classify だけ」）。注文、支払い、仕事、出荷は、どれも表の一行の話。→ 値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉になった。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からない。遷移を書けたのは、ブラウザの状態だけ（`storefront.emptyCart`、`storefront.showOffer`、`backoffice.saveToken`）。
+- **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`、`ordering.saveOrders`、`inventory.release`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものは、時計で一件ずつ（`payment.prepayExpiring`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。
+- **F3 判断一つにつき、op が一つ要る。** アームの本体は呼び出し一つで、呼び出しの引数に呼び出しを書けない。→ `shipping.pack` は `packGathered`、`packInto`、`seal` の四段。`payment` の 34 の op のうち 22 が配線。PRD に名前のない op（`packInto`、`secureFound`、`offersIfPacked`）に、名前を付けることになる。
+- **F4 例外を、配線で受けられない。受けられるのはデコレータだけで、例外の値は使えない。** → 値を運ぶ例外（`ordering.TermsChanged(terms)`、`inventory.OutOfStock(sku)`、`ordering.UnknownProduct(sku)`）の値は、画面に届かない: `storefront.sayTermsChanged` は見せている値段を捨てるだけで、`storefront.Outdated` は、どの商品かを持たない。画面を分けたい結果は、例外ではなく値で返す形に寄った（`shopApi.product` と `shopApi.status` は `T?`）。
+- **F5 例外を、別の名前に言い換える書き方がない。** `catches A recovers throws B` と書くと、A を「吸収した」ことになり、効果を持つ op では DEC-5（成功のアームでも効果が不明）。金が動く三つの呼び出しに付けたら、warning が六つ出た。→ 言い換えたのは、金が動かない呼び出しだけ（`payment.openHold`、`payment.openCharge`、`download.fetchLink` の `@outside.failsAs`）。請求の確定、返金、枠を手放す、送り状を買う、の失敗は、`http.NetworkError` / `http.ServerError` のまま `staffApi.buyLabel` まで伝わる。ブラウザから見ると、自分の通信の失敗と、サーバーの先の失敗が、同じ名前になる。
+- **F6 外部の仕組みの中で起きること（金が動く）は、効果ではない。** → 相手の状態を、相手の名前空間に置いた（`psp.ledger`、`psp.holds`、`carriergw.labels`）。相手の op に `@outside.does(…)` で効果を運ばせる。得たもの: `fulfilment.dispatch` の効果に `psp.takeMoney` と `carriergw.issueLabel` が並び、`payment.capture` の `throws psp.HoldExpired prevents effects` を、検査器が本体から確かめる（REL-4）。払ったもの: 相手の内側の状態を、こちらが作った。
+- **F7 分類の述語は、対象の値しか見られない。** 時刻で変わる場合分け（期限が過ぎたか）は、分類にできない。→ 「受け取った値を、そのまま返すか、投げる葉」（`staff.requireFresh`、`download.stillValid`）。`ordering.Standing.Expired` は、時計で動く `ordering.expireUnpaid` が `expiredAt` を入れた後でだけ、当たる。
+- **F8 値の集合を言う型（列挙）がない。** リテラルを scalar の引数に渡せない（TYPE-1）ので、`authorize(token, "packer")` は書けない。→ 仕事は、三つの真偽値と、三つの `condition` と、三つの op（`staff.asMaker`、`asPacker`、`asAdmin`）。商品の種類は、union と、型で決まる分類で書けた（`catalog.Fulfilment`、`catalog.Kind`）。`psp.Event.kind`、`shipping.SizeClass`、`shipping.Zone`、`Problem.reason` は文字列で、値の集合はコメント。
+- **F9 「この段階では、この値がある」を、一つの model では言えない。** `model Packed extends Shipment { override parcel: Parcel; }` は TYPE-15。model を別の model に絞るケースは CLS-6。→ 事実を別の表にして（`parcels`、`labels`）、存在の分類（`Packing`、`Labelling`）で絞り、そろった組を model にした（`Sealed`、`Dispatched`）。
+- **F10 `C.Case<T>` の引数は、別の名前空間からも効いた。作り方は縛れない。** `shipping.boxOptions(shipment: Gathered.Complete<Shipment>)` を `fulfilment.optionsIfGathered` が呼ぶ。そろっていない出荷を渡すと MATCH-4（`default` のアームから `boxOptions(shipment)` を呼んで確かめた）。ただし、効果 `createParcel(parcel: Parcel)` は、どの `Parcel` でも受け取る。「荷物は、そろった出荷からしか作れない」は、`Parcel` を返す葉が `weighed` だけであることに依り、検査されない。
+- **F11 不変条件を書けない。** 「請求は上限を超えない」「請求する送料 = min(送料, 上限)」「`limit` = `itemsTotal` + `shippingCeiling`」「見積もり ≤ 上限」は、葉（`payment.charged`、`shipping.foresee`）のコメント。→ 印 `@prd.promise` を、約束を守る op に付けた。約束と op が結ばれるだけで、中身は確かめない。この仕様でいちばん大事な客への約束が、検査の外にある。
+- **F12 分類の対象に `read` を書けない**（RES-4）。op の分類にするには、`read` をそのまま呼ぶ op が要る（`shop-server/README.md` の N119）。→ 型の分類にした（`classify Known of Order?`）。「引いたものがあるか」の分類が、名前空間ごとに並ぶ（`Known` が四つ、`Held`、`Stocked`、`Registered`、`Account`、`Entitlement`、`Login`）。どれも同じ意味（同 N4）。
+- **F13 空でない一覧の型がない。** `carrier.Fleet`（使っている配送業者があるか）は、述語で決まる分類になり、「空でない」を人が書く。`by list` なら書かずに済むが、場合に業務の名前が付かない。
+- **F14 設定の値を言う宣言がない。** → `single` の状態にした（`ordering.paymentWindow`、`payment.holdMargin`、`download.grantLifetime`、`shopApi.site`、`shipping.origin`）。誰が書き込むのかは、仕様にない。時計の間隔だけは、デコレータの引数に数字で書いた（`@clock.tick(every: 5m)`）。PRD の数字を、どちらに書くかの基準がない。
+- **F15 識別子と鍵を作る葉は、仕様の上では、乱数を使っていない。** 時刻は `clock.now()` で配線に出したが、識別子（`ordering.draft`、`storefront.newRequestId`）は出していない（`shop-server/README.md` の N9 と同じ）。
+- **F16 予約語が、業務の言葉と当たる。** `signed(by: …)` は SYNTAX（`by`）。→ `sender`。相手の「取り消す」は `void` と書けない → `psp.release`。
+- **F17 「あれば置き換え、なければ入れる」効果がない。** `nullable` の `put` は、形の表では「あるものを置き換える」。→ `storefront.rememberOrder` と、理由を出す効果（`sayTryLater` など）は、空のときにも呼ぶ `put` として宣言した。検査器は、配線の行をまたいで状態の場合を追わないので、何も言わない。
+- **F18 配線が、二つの値を一度に運べない。** → 運ぶためだけの model（`shipping.Sealed`、`shipping.Dispatched`、`shipping.Progress`、`inventory.Allocation`）。
+- **F19 トランザクションの範囲を、仕様は言えない。** `hooks.paymentEvent` の `@db.transaction` は、六つの名前空間の表と、外部の呼び出し（`payment.release`）と、メールを含む。どの状態が同じ DB にあるかを言う宣言はない。入れ子（`fulfilment.acceptAndBegin`、`ordering.place`）の意味は、語彙を読むトランスパイラが決める（`docs/vocab.md`「`db` の read と効果」）。
+- **F20 誰にも呼ばれない op の例外には、受け手がない。** `payment.prepayExpiring` は `throws psp.HoldExpired, http.NetworkError, http.ServerError`。検査器は何も言わない。
+- **F21 「外から呼ばれる入口」と `export` は、別のもの。** 時計で動く op（`ordering.expireUnpaid`）と、画面の操作の op は、`export` を持たない内部の op。入口であることは、デコレータ（`@clock.tick`、`@page.interaction`）にしかない。操作の op のうち、ページのどのアームでもできるもの（`backoffice.onLogout`、`onRegisterCarrier`）は、印もない。
+
+### 語彙
+
+- **F22 プラグインの語彙は、設計だけの段階では使えない。** 読まれるのは、単位の `transpilers` に書いたトランスパイラのプラグインの語彙だけ（`docs/vocab.md`「読み込み」）。単位のないプロジェクトで、`plugin_dirs` のプラグインの語彙を使うと RES-1。→ 語彙を、プロジェクトの仕様（`vocab/*.hozo`）として書いた。マニフェスト（継ぎ目の宣言など）は書いていない: 読む者がいないものは、確かめられない。
+- **F23 `http` の語彙に足りなかったもの。** パスの中の引数（`/orders/:key`）→ クエリにした。POST と GET のほかのメソッド → POST にした。外へ呼ぶときの、相手の場所、鍵、やり直しても二度起きないための識別子のヘッダ、待つ長さ → 書いていない。`@http.retry` は、金が動く呼び出しに、その識別子なしでは付けられないので、使っていない。
+- **F24 外へ呼ぶ HTTP は、相手の名前空間の op に `@http.post` を付けて書けた。こちらの入口と、相手の口が、同じ書き方になる。** `@external` が、呼ぶ側に `http.NetworkError` と `http.ServerError` を足す（`external/psp.hozo`、`external/carriergw.hozo`）。違いは、`hozo.toml` に単位があるかだけ。このサンプルには単位がないので、どれがこちらのサーバーかは、ディレクトリの名前と、この文書にしかない。
+- **F25 二度届く通知は、配線で書けた。届く順は、書けない。** `payment.seen` と分類 `Redelivery`、`payment.Securing`。「もう扱った」と記録する行と、扱う行が、一つのトランザクションに入ることは、F19 のとおり、仕様の外。
+- **F26 時刻。** `clock.now()` と `@clock.tick` を作った。「期限の N 日前」は、時刻を作る葉（`ordering.before`、`payment.ahead`）と、比較を人が書く `read`（`unpaidBefore`、`nextExpiringHold`）。`Duration` の上限は、`valid` で言えない（`@valid.max(45d)` は TYPE-4）。
+- **F27 `db` の語彙で言えなかった読み書き。** サーバーの 34 の `read` のうち 8、22 の効果のうち 7 に、デコレータを付けられなかった: 集合に入っているか（`productsBySkus`、`levelsOf`）、比較（`unpaidBefore`）、値がないこと（`toPick`、`shipmentsInHouse`、`openJobs`）、まとめて書く（`saveLevels`、`addJobs`）、キーでない列で書き換える（`confirmReservations`）。列のしまい方（`@db.text` など）は、一つも書いていない（G1）。
+- **F28 「後で、必ず」がない。** 通知の入口は、受け付けて、分けて、メールを送るまでを、その場で行う（`hooks.paymentEvent`）。失敗したら、相手がもう一度送ることに頼る。
+- **F29 金額。** `type.Yen` は整数の scalar。足し算も比較も配線にないので、合計と差額は、どれも葉（`payment.limitOf`、`payment.charged`、`payment.refundOf`）。
+- **F30 `page` の語彙。**
+  - `@page.fallback` は、一つの op に一つ（DEC-13）。→ 二つ目は、内側の op に付けた（`storefront.filledCart` の `@outdatedOnFailure`）。
+  - `@page.interaction` も一つの op に一つで、`when` はアーム一つ。→ **ページの union のアームを、できる操作で切ることになった**（`storefront.OrderPage.Accepted` は、進み具合を、アームではなく中の値に畳んだ）。
+  - 状態が変わったとき、ページを描き直すかを言えない。→ 効果 `reload()`（`location.put`）を、操作の最後に呼ぶ。
+  - 待つ、定期的に見直す、がない。→ 同意の通知を待つ間は、客が `onRefresh` を押す。
+  - 操作の op が投げた例外が、画面でどうなるかを言う語彙がない。→ `recover(error, then)` を、画面の名前空間ごとに作った。
+  - 操作の結果を画面に出すには、それを受け取る葉が要る（`backoffice.seen`、`placedIn`、`sealed`）: 値を返す呼び出しは束縛しなければならず（WIRE-2）、使わない束縛は WIRE-8。
+- **F31 認証を、入口ごとに一行書いた**（`staffApi` の 13 の op の一行目が、`staff.asMaker`、`asPacker`、`asAdmin` のどれか）。デコレータにすれば一語で書ける（`decorator packerOnly for op throws type.Unauthorized, type.Forbidden prevents effects;`）。そうしなかったのは、確かめるために `staff` のセッションを読むことが、仕様から消えるから: 別の名前空間の状態を読むことは、デコレータの `reads` に書けない（READS-1。`docs/check.md`「デコレータが運ぶ reads と effects」）。配線なら、`staff.sessions` が、入口の op の読む状態に現れる。
+- **F32 一つの述語を、二つの担い手が要る。** `shipping.Gathered` をブラウザでも使うと、述語の実装が、二つの言語に要る。分類の結果を、値として運ぶ型はない。→ サーバーが、結果を、値の形で運ぶ（`fulfilment.Station.options` があるか）。
+
+### 検査器
+
+- **F33 検査器が error にしたのは、言語の限りを確かめた実験だけ。** F1、F8、F9、F12、F16、F22、F26、F30 の書き方は、このサンプルの外で確かめた。サンプルの約 4,200 行は、まだ書いていない名前空間を引いたとき（RES-1）のほかは、書いたまま通った。順番の誤り（請求の確定より先に、送り状を買う）は、通る。
+- **F34 書く量をいちばん増やしたのは THROWS-1。** `staffApi.buyLabel` の `throws` は 13、`storefront.placeOrder` は 12。同じ並びを、`fulfilment.dispatch`、`staffApi.buyLabel`、`backoffice.onBuyLabel` の `@recover` で、三度書く。例外のユニオンでまとめることは、していない（G8）。
+- **F35 DEC-16 は、画面で役に立った。** `@recover` の相手を、その op が投げない例外にすると warning。
+- **F36 op が値を返すかどうかが、呼ぶ側の都合で決まった。** 確かめるためだけに呼ぶ op は、値を返せない（WIRE-2 と WIRE-8）。→ `staff.asPacker`、`inventory.pick`、`payment.settle` を、値を返さない op に直した。
+- **F37 `hozoc check` は、親のディレクトリの `hozo.toml` を拾う。** サンプルに `hozo.toml` を置く前は、リポジトリ直下の設定で検査され、「0 errors」と出た（`docs/config.md`「置き場と探し方」のとおりの振る舞い）。
+
+### 指針が引っ張り合ったところ
+
+指針は `docs/requirements.md`「書き方の指針」。
+
+- **F38 「DB の状態は、使う名前空間とは別の名前空間に」には、従わなかった。** 概念の名前空間が、状態と規則の両方を持つ。`store` に切り出すと、八つの概念の表が一つの名前空間に集まり、`read` と効果を呼ぶだけの op が、その数だけ要る（`shop-server/README.md` の N119）。引き換えに、概念の中の配線は、同じ概念の状態に、どこからでも触れられる。
+- **F39 「共有の型は、中立の名前空間に」は、値の型にだけ当てた。** `type` に置いたのは、識別子、金額、住所、寸法。行の model は、状態の持ち主に置いた。すると、`ordering.MadeLine` を、`production`、`shipping`、`inventory` が引く。画面まで入れると、ほとんどの model が「共有」になるので、「共有なら `type`」では、`type` が全部を持つ。
+- **F40 「分類には、業務の名前を」と、同じ意味の分類が増えること**（F12）。
+- **F41 「外部の仕組みの op には、その仕組みの語彙のデコレータ」。** `@http.post` を付けると、相手の口の宣言になり、通信の形（パス、本文）まで仕様に入る（`psp`、`carriergw`、`assets`）。印だけにすると（`mailer.send` の `@smtp.sendMail`）、入らない。どちらにするかの基準は、指針にない。
+- **F42 入口の名前空間を、呼ぶ相手ごとに分けた（`shopApi`、`staffApi`、`hooks`）。指針にない。** `staffApi` の 15 の op のうち 13 は、担当を確かめて、一つ呼ぶだけ（残りは、ログインとログアウト）。概念の op に `@http.*` を直に付ければ消えるが、要求のどこから読むか（`@http.header` のトークン）と認証が、概念に入る。
+- **F43 状態を持たない、流れの名前空間 `fulfilment` を作った。指針にない。** 概念どうしが直に呼び合う（`production` が `shipping` を呼ぶ）代わりに、順番を一か所に置いた。`ordering` は `inventory` と `shipping` を直に呼んでいて、そろっていない。
+
+## 粒度: 仕様は、どこまで書くか
+
+### 言語が決めている下限
+
+**状態に触れる順は、配線に書くしかない。** 葉は状態に触れない（STATE-5）ので、読むことと書くことは、どれも配線の行になる。配線が呼べるのは、同じ名前空間の `read` と効果と、`export` された op だけなので、概念の境界を越えるところも、配線の行になる。「最低限」は、ここより上には上げられない。この下限の持ち主は `docs/check.md`「状態に触れるもの」。
+
+### 名前空間ごとに、どこで止めたか
+
+| 名前空間 | 止めたところ | 理由 |
+|---|---|---|
+| `type` | 値の型と、その制約（`@valid`） | 二つ以上の概念と画面が使う |
+| `catalog` | 種類ごとに持つ事実と、引き方 | 商品の登録は PRD の外に置いた |
+| `ordering` | 種類に分けた結果の形、届け先が要る条件、同じ申し込みは一つ、取り置きと注文の順 | 分け方と、値段の付け方は、葉（`sort`、`toShip`、`draft`） |
+| `inventory` | 取り置く、戻す、出す、の順と、足りないときの例外 | 数の計算は、葉（`allocate`、`restore`、`minus`） |
+| `payment` | 支払いの五つの場合、場合ごとにしてよいこと、相手を呼ぶ順 | 額の計算は、葉（`charged`、`limitOf`）。この名前空間が、いちばん深い: 金が動く順を、葉に入れたくなかった |
+| `production` | 仕事の三つの場合と、進める二つの op | 納期の決め方は、葉（`plan`） |
+| `shipping` | 事実の足される順と、それぞれの前提。箱の選択肢と送料を、選ぶ前に見せること | 詰め方、地帯の決め方、送料の引き方は、葉（`foresee`、`fitting`、`weighed`） |
+| `carrier` | 登録と切り替え、使っている配送業者にだけ頼むこと | 依頼の組み立ては、葉 |
+| `staff` | 三つの仕事と、確かめる op | パスワードの確かめ方は、葉 |
+| `notice` | 何を知らせるか（op の説明）と、送れなくても流れを止めないこと | 文面は、葉 |
+| `fulfilment` | 概念をまたぐ順番のすべて | 葉がない。順番だけの名前空間 |
+| `shopApi`、`staffApi`、`hooks` | 経路、入力の読み方、誰が呼べるか、客に見せる形（`OrderView`） | 見せる形への写しは、葉（`view`） |
+| `psp`、`carriergw`、`assets`、`mailer` | こちらが使う口と、当てにしている振る舞い | 相手の内側は、金が動く効果だけ（F6） |
+| `storefront`、`backoffice` | ページ、アーム、操作、操作が変える状態、失敗の行き先 | 表示への写しは、葉（`…Vm`）。部品、文言、入力の途中は、書いていない |
+
+### 書けたが、書かなかったもの
+
+- **G1 列のしまい方**（`@db.text`、`@db.json`）。`go-sqlite` を選ぶまで、要らない。書いていないので、`go-sqlite` には、そのままでは通らない。
+- **G2 画面の部品、文言、入力の途中の状態、制約の違反の出し方。**
+- **G3 人の手の動き**（棚から出す、量る、貼る）を、担い手ごとの名前空間の op として。画面の操作の op の引数（量った重さ）に現れるだけ。
+- **G4 管理の画面**（商品、箱、料金表、在庫の数、担当者）。状態はあるが、書き込む op がない。
+- **G5 メールの中身の形**（`mailer.Mail` は、件名と本文）。
+- **G6 見積もりと箱の選び方の中**（`shipping.foresee`、`shipping.fitting`）: 詰め方、地帯の決め方。
+- **G7 請求する額の計算を、配線に。** 「送料が上限を超えるか」を分類にすれば、`payment.charged` の中の分岐を、配線に出せる（画面では、そうした: `backoffice.Overrun`）。足し算は、どのみち葉。
+- **G8 例外のユニオン**（F34 の並びに、名前を付ける）。
+- **G9 `effects` と `reads` の節**。一つも書いていない。`prevents effects` は、一か所だけ（`payment.capture`）。
+- **G10 通知の種類の値**（`psp.Event.kind`）と、荷物の動きの、届いた以外の通知。
+- **G11 受け付けた後のキャンセル。** 枠を手放す op（`payment.release`）は、期限切れの注文のためにだけある。
+
+### 実装に見えたが、書いたもの
+
+- **H1 「引いて、なければ投げる」op**（`ordering.byId`、`shipping.find`、`payment.require`、`production.require`）。
+- **H2 時刻を入れるだけの葉**（`startedAt`、`acceptedAt`、`handedOverAt`、`deliveredAt`、`pickedAt`）。効果が行の全体を受け取るので、変えた行を作る葉が要る。
+- **H3 相手の型に写す葉**（`payment.captureOf`、`refundOf`、`holdOf`、`carrier.rateRequest`、`labelRequest`、`toLabel`）。
+- **H4 一覧から項目を抜く葉**（`ordering.skusOf`、`inventory.idsOf`、`skusOfHeld`）。
+- **H5 判断の段ごとの配線**（F3）。
+- **H6 扱った通知の表**（`payment.seen`）。なくなれば、二度受け付ける。
+- **H7 表のキーと一意**（`@db.key`、`@db.unique`）。`Order.requestId` の一意は、「同じ申し込みは一つ」の根拠。ほかのキーは、引き方（`@db.find`）が一行に決まるため。
+- **H8 値を運ぶためだけの model**（F18）。
+- **H9 `clock.now()` を呼んで、葉に渡す行。**
+- **H10 画面を描き直す効果 `reload()`。**
+
+### 規則の候補
+
+どれも決めていない。それぞれ、説明できる事例と、外れる事例。
+
+**R1 境界だけ。** 名前空間の外から見えるもの（`export` の op と、その引数、戻り値、例外、効果）だけを書き、中は葉一つにする。
+- 説明できる: G1、G6、H1〜H5 が、仕様から消える。地図が、PRD の概念の一覧と同じ大きさになる。
+- 外れる: 今の言語では書けない（「言語が決めている下限」）。書けるようにしても、`shipping.pack` の中の「そろっていなければ梱包できない」は、境界の内側にあるのに、PRD の中心。
+
+**R2 状態に触れる順と、PRD に名前のある分かれ道まで。** `read` と効果を呼ぶ順、概念をまたぐ呼び出し、業務の名前が付く場合分け（分類）は、配線。値を作ることは、葉。このサンプルは、ほぼ、この形。
+- 説明できる: `fulfilment.begin` の分け方、`fulfilment.dispatch` の順、`payment.settle` の場合分け、H6。
+- 外れる: PRD に名前のない段（H5）と葉（H2〜H4）を、大量に書かせる（葉は 90）。PRD の中心の約束（F11）は、葉の中に残る。「PRD に名前があるか」を決める人が要る。
+
+**R3 約束したことだけ。** 誰か（客、担当者、外部の仕組み）への約束と、それを破りうる順番だけを書く。このサンプルでは、`@prd.promise` を付けた七つの op と、そこから辿れる配線。
+- 説明できる: 難しい問題の全部、同じ申し込みは一つ、`TermsChanged`、G2〜G5 を書かないこと。
+- 外れる: 何が約束かを決める規則がない。今の言語は、約束の中身（金額の不等式）を書けず、約束でない段（H1〜H5）を書かせるので、言語の形と合っていない。`staff` と `carrier` の管理のように、約束らしい約束のない概念が、何も書かれなくなる。
+
+**R4 作り直しても、変わってはいけないものだけ。** op の中身を AI が書き直したときに、変わったら困るものが、仕様。変わってよいものは、葉。
+- 説明できる: G6（詰め方は、変わってよい）、H2〜H4 は葉でよいこと、H6 と H7（表が変わると、動いているデータが壊れる）、`external/` の口（相手は、作り直せない）。
+- 外れる: G1（列のしまい方も、データがあれば変えられないので、書く側に倒れる）。画面の文言と部品（変わってよいのか、決める人が要る）。「困る」の相手が、利用者か、データか、外部かで、線が変わる。
+
+四つは、「必要になったら足す」の「必要」を、別のものに置いている: R1 は、別の概念が見るとき。R2 は、状態か、名前の付いた判断に触れるとき。R3 は、誰かに約束したとき。R4 は、作り直しで壊れるとき。
+
+## 利用者への問い
+
+残りを止めている順。それぞれ、一つで読める問いと、選択肢と、勧め。
+
+### Q1 表の一行の進み具合を、遷移として書けるようにするか
+
+出荷、支払い、注文、仕事は、どれも「一行が、いくつかの場合を進む」もので、このサンプルの中心。今は、効果の宛先に書けない（F1）。
+
+- **(a) 今のまま。** 値の分類と、`put` の効果と、`match`。
+  ```ts
+  @db.update effect saveShipment(shipment: Shipment) on shipments.put;
+  ```
+- **(b) 値の分類を、遷移の宛先に書ける。** 効果が、行をどの場合からどの場合へ進めるかを言う。
+  ```ts
+  effect handOver(shipment: Shipment) on shipments: Custody.InHouse -> Custody.WithCarrier;
+  ```
+- **(c) 事実ごとの表で持つ書き方を、指針にする**（このサンプルの `parcels`、`labels`）。言語は変えない。
+
+勧め: **(b)**。`docs/requirements.md`「価値と位置づけ」の表の「ステートマシン図」が、サーバーの側で、当たるものを持たない。(c) は、(b) があっても使える。
+
+### Q2 仕様に書く深さの規則を、どれにするか
+
+「規則の候補」の R1〜R4。今の言語は R2 を強いている。
+
+- **(a) R2 を指針にする。** 言語は変えない。
+- **(b) R1 に寄せる。** 葉が、読む状態と効果を宣言できる形に戻す（STATE-5 をやめる）。
+  ```ts
+  op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
+    reads shipments, boxes, tariffs effects createParcel
+    throws NotGathered, AlreadyPacked;
+  ```
+- **(c) R2 を下限、R3 を上限にする。** 配線は、約束（`@prd.promise` のような印）から辿れるところまで下ろし、その先は、葉にしてよい。
+
+勧め: **(c)**。(b) は、`docs/requirements.md`「出力を推論しない」の「人が書くコードを、できるだけ減らす」と当たる。(c) は、どこで止めるかに、理由を書かせる。
+
+### Q3 分けて送ることを、作るものに入れるか
+
+入れると、支払いのモデルが変わる（「難しい問題」の「分けて送ること」）。
+
+- **(a) 入れない。** 一つの注文に、出荷は一つ。
+- **(b) 店が決めて分ける。** 増えた送料は店が持つ。請求の確定は、最後の箱のとき。客の額は変わらない。
+- **(c) 客が頼んで分ける。** 上限を出し直して、同意を取り直す。請求は、上限の額で先に確定して、後で返す。
+
+勧め: **(a)** のまま、粒度の問い（Q2）を先に決める。入れるなら **(b)**: 客への約束を変えずに済む。
+
+### Q4 例外が運ぶ値を、受ける側で使えるようにするか
+
+今は、デコレータが例外を受けても、値を使えない（F4）。
+
+- **(a) 今のまま。** 画面で使う値は、例外ではなく、op の結果で返す。
+- **(b) `halts` の効果に、例外の引数を渡せる。**
+  ```ts
+  decorator recover(error: any exception, then: any effect) catches error halts then(error);
+  // @recover(ordering.TermsChanged, showNewTerms)  →  showNewTerms(terms)
+  ```
+- **(c) 配線で、例外を値にできる。**
+  ```ts
+  const placed = try shopApi.checkout(…);
+  match placed by Outcome { … }
+  ```
+
+勧め: **(b)**。(c) は、`docs/grammar.md`「決めたこと」の「`throw` はアームの本体にだけ」と同じ理由で、配線を、制御の言語にする。
+
+### Q5 配線に、一覧の要素ごとの呼び出しを入れるか
+
+今は、一覧を受け取る効果か、葉か、時計で一件ずつ（F2）。
+
+- **(a) 今のまま。**
+- **(b) 要素ごとに op を一つ呼ぶ行だけを足す。**
+  ```ts
+  each line of part.made => production.enqueueOne(orderId, line);
+  ```
+- **(c) 要素ごとの分類だけを足す**（混ざった注文を、配線で分けられる）。
+  ```ts
+  const sorted = partition lines by catalog.Kind;
+  ```
+
+勧め: **(a)**。一覧を受け取る op で、足りた。困ったのは、外部の仕組みを要素ごとに呼ぶ一か所（`payment.prepayExpiring`）だけ。
+
+### Q6 設計だけの段階で、プラグインの語彙を読めるようにするか
+
+今は、単位に書いたトランスパイラのプラグインの語彙しか、読まれない（F22）。
+
+- **(a) 今のまま。** 設計の段階の語彙は、プロジェクトの `.hozo` に書く。
+- **(b) `hozo.toml` で、語彙だけを読むと言える。**
+  ```toml
+  [hozo]
+  plugin_dirs  = ["plugins"]
+  vocabularies = ["pay"]        # このプラグインの語彙を、単位がなくても読む
+  ```
+- **(c) 出力のない単位を書ける**（`out` のない `[[emit]]`）。
+
+勧め: **(b)**。`docs/requirements.md`「モデルが先」の「設定なしの検査」と同じ向き。
+
+### Q7 概念の名前空間が、状態を持ってよいか
+
+指針は「DB の状態は、別の名前空間に切り出す」。このサンプルは、従っていない（F38）。
+
+- **(a) 指針のまま。** 概念ごとに、状態の名前空間を切り出す（`shipping` と `shipping.store`）。
+- **(b) 指針を、「状態は、それを守る規則と同じ名前空間に置き、ほかの概念は `export` の op を通す」に変える。**
+- **(c) 指針を、小さな仕様（`shop-server`）のためのものと書き足す。**
+
+勧め: **(b)**。切り出す目的（ほかの名前空間が op を通すしかなくなる）は、概念の境界で、もう満たされている。
+
+### Q8 上限を超えた送料を、店が持つ、でよいか
+
+作るものの問い。今は、上限までを請求し、超えた分を店が持つ（「送料が、見せた額と違ったとき」）。
+
+- **(a) 店が持つ。**
+- **(b) 客に、追加の同意を求める。** 梱包した箱が、同意を待つ。
+- **(c) 上限を超える箱は、選べない。** 梱包の担当が、管理の担当に渡す。
+
+勧め: **(a)**。客への約束が一つ（「上限を超えない」）で済む。
+
+### Q9 例外の言い換えを、吸収と別のものにするか
+
+`catches A recovers throws B` は、効果を持つ op で DEC-5 になる（F5）。
+
+- **(a) 今のまま。** 境界で、名前をそろえない。
+- **(b) 言い換えの節を足す。** 効果の状態は、元の例外のものを引き継ぐ。
+  ```ts
+  decorator failsAs(error: any exception) for op catches http.NetworkError, http.ServerError rethrows error;
+  ```
+
+勧め: **(b)**。入口の応答（`@http.status`）を、相手ごとに決められる。
+
+### Q10 不変条件を、検査できる形で書けるようにするか
+
+今は、葉のコメントと、印 `@prd.promise`（F11）。
+
+- **(a) 印のまま。** 約束と op を結ぶだけ。
+- **(b) 葉の op に、結果の条件を書ける。** アサーションの材料にする。
+  ```ts
+  op charged(payment: Payment, fee: type.Yen, now: Time): Payment
+    ensures result.captured <= payment.limit;
+  ```
+
+勧め: **(a)** から始める。(b) は、式の言語が要る。印の文を、テストの名前にするところまでなら、言語を変えずにできる。
+
+## 近づけたもの
+
+言語で言えず、近いもので書いたところ。
+
+| 言いたかったこと | 書いたもの |
+|---|---|
+| 表の一行の遷移 | 値の分類と `put` の効果（F1） |
+| 設定の値 | `single` の状態（F14） |
+| 「あれば置き換え、なければ入れる」 | `nullable` の `put`（F17） |
+| 相手の中で金が動くこと | 相手の名前空間の状態と、`@outside.does`（F6） |
+| プラグインが提供する語彙 | プロジェクトの `.hozo`（F22） |
+| パスの引数、PUT / DELETE | クエリ、POST（F23） |
+| 一覧の要素ごとの処理 | 一覧を受け取る効果、葉、時計で一件ずつ（F2） |
+| 一つのトランザクション | 入口の `@db.transaction`（F19） |
+| 値の集合 | 文字列の scalar とコメント、真偽値の組（F8） |
+
+## 確かめ方
+
+- このディレクトリで `go run ../../../cmd/hozoc check`。この文書を書いたときの結果は `0 errors, 0 warnings`。
+- リポジトリで `go test ./tests/ -run TestSamples/order-app -count=1 -v`。走るのは `check` だけ（`../README.md`「仕様だけのサンプル」）。

@@ -31,6 +31,10 @@ import (
 // 走らせる。それでも通せないサブテストは、足りないもの（sampleProject.blocked、sampleProject.absent）を名指しして飛ばし、
 // 足りないものがそろえば、このファイルを変えずに走る（tests/samples/README.md「テスト」）。
 //
+// 仕様だけのサンプル（sample.json の "specOnly": true。sampleProject.specOnly）は、期待する出力を持たないと申告したサンプルで、
+// 確かめるのは check だけ。出力についてのサブテスト（files、go、transpilers）は、当てはまらないので、作らない
+// （tests/samples/README.md「仕様だけのサンプル」）。
+//
 // サンプルは、設計文書の版の言語と出力で書く。文書の版（docs/ir.md「版」）が、今の hozoc の版より先にある間
 // （sampleProject.ahead）は、今の hozoc はサンプルの仕様を読めず、文書の通りの出力も作れないので、hozoc を走らせる
 // サブテスト（check と transpilers/*）を、二つの版を名指しして飛ばす（tests/samples/README.md「飛ばす条件」）。
@@ -51,6 +55,10 @@ const transpilersAll = "all"
 type sampleProject struct {
 	name string
 	dir  string // サンプルのルート（tests/ からの相対パス）
+
+	// specOnly は、sample.json の "specOnly": 仕様だけのサンプル（期待する出力を持たないと、サンプルが申告している）。
+	// 真なら、transpilers は書けず、hozo.toml に出力の単位（[[emit]]）を置けない。確かめるのは check だけ。
+	specOnly bool
 
 	// files は sample.json: トランスパイラの名前 → 期待する出力のうち、そのトランスパイラが出すファイル
 	// （サンプルのルートからの相対パス）。
@@ -134,6 +142,7 @@ func loadSample(t *testing.T, name string) *sampleProject {
 		t.Fatal(err)
 	}
 	var m struct {
+		SpecOnly    bool `json:"specOnly"`
 		Transpilers map[string]struct {
 			Files []string `json:"files"`
 		} `json:"transpilers"`
@@ -143,8 +152,12 @@ func loadSample(t *testing.T, name string) *sampleProject {
 	if err := dec.Decode(&m); err != nil {
 		t.Fatalf("%s/%s を読めない: %v", s.dir, sampleManifestFile, err)
 	}
-	if len(m.Transpilers) == 0 {
-		t.Fatalf("%s/%s に transpilers がない", s.dir, sampleManifestFile)
+	s.specOnly = m.SpecOnly
+	switch {
+	case s.specOnly && m.Transpilers != nil:
+		t.Fatalf("%s/%s: specOnly のサンプルは、期待する出力を持たないので、transpilers を書けない", s.dir, sampleManifestFile)
+	case !s.specOnly && len(m.Transpilers) == 0:
+		t.Fatalf("%s/%s に transpilers がない（期待する出力を持たないサンプルなら \"specOnly\": true と書く）", s.dir, sampleManifestFile)
 	}
 	for name, tr := range m.Transpilers {
 		if name == transpilersAll {
@@ -169,9 +182,33 @@ func loadSample(t *testing.T, name string) *sampleProject {
 		s.unreadable = append(s.unreadable, fmt.Sprintf("今の hozoc（internal/config）が、%s/%s を読めない: %s", s.dir, config.FileName, diagText(d)))
 	}
 	s.blocked = append(s.blocked, s.unreadable...)
+	if s.specOnly {
+		s.requireNoOutputs(t)
+	}
 	s.findTranspilers(t)
 	s.ahead = docsAhead(t)
 	return s
+}
+
+// requireNoOutputs は、仕様だけのサンプルが、出力を持たないことを確かめる: hozo.toml に出力の単位（[[emit]]）がなく、
+// Go のモジュール（go.mod）でもない。どちらかがあれば、確かめられない出力か、走らせないコードを持つサンプルが、check だけで
+// 通ってしまう。hozo.toml を読めないときは、単位が分からないので、それも失敗にする（仕様だけのサンプルは、今の hozoc が
+// 読める設定で書く。まだないトランスパイラを待つ理由がない）。
+func (s *sampleProject) requireNoOutputs(t *testing.T) {
+	t.Helper()
+	for _, why := range s.unreadable {
+		t.Errorf("specOnly のサンプルの %s を読めない: %s", config.FileName, why)
+	}
+	if n := len(s.cfg.Units); n > 0 {
+		t.Errorf("%s/%s: specOnly のサンプルなのに、出力の単位（[[emit]]）が %d つある。期待する出力を持つサンプルなら、%s に transpilers を書く",
+			s.dir, config.FileName, n, sampleManifestFile)
+	}
+	if _, err := os.Stat(filepath.Join(s.dir, "go.mod")); err == nil {
+		t.Errorf("%s: specOnly のサンプルなのに、go.mod がある（仕様だけのサンプルは、コードを持たない）", s.dir)
+	}
+	if t.Failed() {
+		t.FailNow()
+	}
 }
 
 // diagText は診断一つを、理由として読める一行にする。
@@ -553,6 +590,10 @@ func (s *sampleProject) project(t *testing.T) (string, func(string) string) {
 // まだないトランスパイラは、ファイルを返さない代役に置き換えて、check と、あるトランスパイラの
 // transpilers/<名前> を走らせる。まだないトランスパイラの transpilers/<名前> と transpilers/all は、足りないものを名指しして
 // 飛ばす。本物の hozo.toml を読めないときは、どれも飛ばし、check だけは、設定を使わない言語の検査に落として通す（testCheck）。
+//
+// 仕様だけのサンプル（sample.json の "specOnly": true）は、check だけを持つ: 期待する出力がないと申告しているので、
+// files、go、transpilers は、飛ばすのではなく、作らない。申告と食い違うもの（出力の単位、go.mod、transpilers）があれば、
+// そのサンプルは失敗する（loadSample）。
 func TestSamples(t *testing.T) {
 	requireGo(t)
 	manifests, err := filepath.Glob(filepath.Join(samplesDir, "*", sampleManifestFile))
@@ -567,6 +608,9 @@ func TestSamples(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s := loadSample(t, name)
 			t.Run("check", s.testCheck)
+			if s.specOnly {
+				return
+			}
 			t.Run("files", s.testFiles)
 			t.Run("go", s.testGo)
 			t.Run("transpilers", s.testTranspilers)

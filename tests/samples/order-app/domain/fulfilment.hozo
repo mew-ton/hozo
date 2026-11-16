@@ -31,6 +31,8 @@ namespace fulfilment {
   }
 
   /** 混ざった注文を、種類ごとの担い手に分ける。ダウンロードの行は、ここで渡し終える */
+  @prd.promise("客", "ダウンロードの商品は、箱で送るものを待たずに、受け付けたときに渡す")
+  @prd.promise("客", "箱で送るものは、一つの注文につき、一つの荷物で届く")
   op begin(order: ordering.Order) {
     download.grant(order.id, order.digital);
     match order.physical by ordering.Delivery {
@@ -141,6 +143,7 @@ namespace fulfilment {
    * 順番: 決まった送料で、客への請求を確定する → 配送業者から送り状を買う（店の金が動く）→ 記録する。
    * 請求できない荷物（枠の期限切れ）には、送り状を買わない。途中で失敗したら、もう一度呼べる: 請求の確定は、二度は起きない。
    */
+  @prd.promise("店", "請求を確定できない荷物には、送り状を買わない")
   export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
     throws shipping.NoShipment, shipping.NotPacked, shipping.AlreadyLabelled,
            payment.NoPayment, payment.NotSecured, psp.HoldExpired,
