@@ -39,11 +39,25 @@ func (o *ops) IssueSession(ctx context.Context, user pkgtype.User, password pkgt
 	return LoginOk{User: publicUser, Token: session.Token}, nil
 }
 
-// Authenticate は呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
+// Authenticate は呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
 //
 // Throws: type.Unauthorized
 // Reads: store.sessions
 func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error) {
+	// match token by server.Credential
+	if token != nil {
+		// Presented: token は type.Token
+		return o.SessionOf(ctx, *token)
+	}
+	// default
+	return pkgtype.Session{}, pkgtype.Unauthorized{}
+}
+
+// SessionOf はそのトークンのセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
+//
+// Throws: type.Unauthorized
+// Reads: store.sessions
+func (o *ops) SessionOf(ctx context.Context, token pkgtype.Token) (pkgtype.Session, error) {
 	session, err := o.store.FindSession(ctx, token)
 	if err != nil {
 		return pkgtype.Session{}, err
@@ -111,7 +125,7 @@ func (o *ops) GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order
 	return o.PageOf(orders, in.Page), nil
 }
 
-// PlaceOrder は注文する。通知に失敗しても、注文は残る
+// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 //
 // Throws: type.Unauthorized, type.NotificationFailed
 // Reads: store.sessions
@@ -122,26 +136,12 @@ func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order
 		return pkgtype.Order{}, err
 	}
 	order := o.NewOrder(session, in.Lines)
-	if err := o.store.AddOrder(ctx, order); err != nil {
+	notice := o.ComposeNotice(order)
+	if err := o.store.PlaceOrder(ctx, order, notice); err != nil {
 		return pkgtype.Order{}, err
 	}
-	if err := o.Notify(ctx, order); err != nil {
+	if err := o.mailer.Send(ctx, notice); err != nil {
 		return pkgtype.Order{}, err
 	}
 	return order, nil
-}
-
-// Notify は注文したユーザーに通知する
-//
-// Throws: type.NotificationFailed
-// Effects: store.notifyUser
-func (o *ops) Notify(ctx context.Context, order pkgtype.Order) error {
-	notice := o.ComposeNotice(order)
-	if err := o.mailer.Send(ctx, notice); err != nil {
-		return err
-	}
-	if err := o.store.AddNotification(ctx, notice); err != nil {
-		return err
-	}
-	return nil
 }

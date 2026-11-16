@@ -39,11 +39,17 @@ type Ops interface {
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	ToPublicUser(user pkgtype.User) pkgtype.PublicUser
 
-	// Authenticate は呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
+	// Authenticate は呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
 	//
 	// Throws: type.Unauthorized
 	// Reads: store.sessions
 	Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error)
+
+	// SessionOf はそのトークンのセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized
+	//
+	// Throws: type.Unauthorized
+	// Reads: store.sessions
+	SessionOf(ctx context.Context, token pkgtype.Token) (pkgtype.Session, error)
 
 	// RequireFresh は期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く）
 	//
@@ -75,7 +81,7 @@ type Ops interface {
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	PageOf(orders []pkgtype.Order, page int64) []pkgtype.Order
 
-	// PlaceOrder は注文する。通知に失敗しても、注文は残る
+	// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
 	// Reads: store.sessions
@@ -86,12 +92,6 @@ type Ops interface {
 	//
 	// 純粋（ctx を取らない）。失敗しない（error を返さない）
 	NewOrder(session pkgtype.Session, lines []pkgtype.OrderLine) pkgtype.Order
-
-	// Notify は注文したユーザーに通知する
-	//
-	// Throws: type.NotificationFailed
-	// Effects: store.notifyUser
-	Notify(ctx context.Context, order pkgtype.Order) error
 
 	// ComposeNotice は通知の文面を作る（人が書く）
 	//
@@ -162,10 +162,10 @@ type StoreOps interface {
 	// Reads: store.users
 	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
 
-	// FindSession は op store.findSession: トークンからセッションを引く。トークンがなければ、ない
+	// FindSession は op store.findSession: トークンからセッションを引く
 	//
 	// Reads: store.sessions
-	FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
+	FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error)
 
 	// ListOrders は op store.listOrders: ユーザーの注文を、足した順に返す
 	//
@@ -182,15 +182,10 @@ type StoreOps interface {
 	// Effects: store.deleteSession
 	RemoveSession(ctx context.Context, token pkgtype.Token) error
 
-	// AddOrder は op store.addOrder: 注文を足す
+	// PlaceOrder は op store.placeOrder: 注文と、その通知の記録を、一緒に足す。一つのトランザクションで、どちらも足すか、どちらも足さない
 	//
-	// Effects: store.createOrder
-	AddOrder(ctx context.Context, order pkgtype.Order) error
-
-	// AddNotification は op store.addNotification: 通知を足す
-	//
-	// Effects: store.notifyUser
-	AddNotification(ctx context.Context, notification pkgtype.Notification) error
+	// Effects: store.createOrder, store.notifyUser
+	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
 }
 
 // Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。

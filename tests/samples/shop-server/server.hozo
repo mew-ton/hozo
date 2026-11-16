@@ -1,6 +1,7 @@
 // サンプル shop-server の仕様（README.md）。HTTP の入口と業務の流れを持つ名前空間 server。
 // 保存先には触れない: 読み書きは store の op を、外への配送は mailer の op を呼ぶ。
-// 人が書く op（本体のない op）は七つで、どれも状態を読まず、効果を持たない。export を付けたのは HTTP の入口の五つだけで、ほかの十は内部の op（P33）。login には、サンプルの中のプラグインの語彙のデコレータ @rate.limited を付けた（継ぎ目。P38）。
+// 人が書く op（本体のない op）は七つで、どれも状態を読まず、効果を持たない。export を付けたのは HTTP の入口の五つだけで、ほかの十は内部の op（P33）。
+// トークンのない要求は、store を呼ぶ前に、ここで断る（分類 Credential）: store.findSession は、列と同じ型のトークンだけを受け取る。login には、サンプルの中のプラグインの語彙のデコレータ @rate.limited を付けた（継ぎ目。P38）。
 
 /** サーバー。HTTP の入口と、業務の流れ */
 namespace server {
@@ -73,8 +74,24 @@ namespace server {
 
   // ---- 誰が呼んだか ----
 
-  /** 呼んだ人のセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
+  /** 要求がトークンを持ってきたか */
+  classify Credential of type.Token? {
+    Presented: type.Token? as type.Token;
+    default;
+  }
+
+  /** 呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
   op authenticate(token: type.Token?): type.Session
+    throws type.Unauthorized
+  {
+    return match token by Credential {
+      Presented => sessionOf(token);
+      default   => throw type.Unauthorized;
+    };
+  }
+
+  /** そのトークンのセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
+  op sessionOf(token: type.Token): type.Session
     throws type.Unauthorized
   {
     const session = store.findSession(token);
@@ -125,29 +142,21 @@ namespace server {
   /** 一覧から、そのページの分を取り出す（人が書く） */
   op pageOf(orders: type.Order[], page: int): type.Order[];
 
-  /** 注文する。通知に失敗しても、注文は残る */
+  /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")
   export op placeOrder(in: PlaceOrderInput): type.Order
     throws type.Unauthorized | type.NotificationFailed
   {
     const session = authenticate(in.token);
     const order = newOrder(session, in.lines);
-    store.addOrder(order);
-    notify(order);
+    const notice = composeNotice(order);
+    store.placeOrder(order, notice);
+    mailer.send(notice);
     return order;
   }
 
   /** 識別子と時刻を決めて、注文を作る（人が書く） */
   op newOrder(session: type.Session, lines: type.OrderLine[]): type.Order;
-
-  /** 注文したユーザーに通知する */
-  op notify(order: type.Order)
-    throws type.NotificationFailed
-  {
-    const notice = composeNotice(order);
-    mailer.send(notice);
-    store.addNotification(notice);
-  }
 
   /** 通知の文面を作る（人が書く） */
   op composeNotice(order: type.Order): type.Notification;

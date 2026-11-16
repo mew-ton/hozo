@@ -31,7 +31,7 @@ type SessionsState interface {
 	// Get は問い合わせ（形 list で決まる）: store.sessions の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]pkgtype.Session, error)
 	// FindSession は問い合わせ: store.sessions を読む（reads）葉の op store.findSession。
-	FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
+	FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error)
 	// AddSession は命令: 効果 store.createSession（on store.sessions.post）を持つ葉の op store.addSession。
 	AddSession(ctx context.Context, session pkgtype.Session) error
 	// RemoveSession は命令: 効果 store.deleteSession（on store.sessions.delete）を持つ葉の op store.removeSession。
@@ -47,8 +47,6 @@ type OrdersState interface {
 	Get(ctx context.Context) ([]pkgtype.Order, error)
 	// ListOrders は問い合わせ: store.orders を読む（reads）葉の op store.listOrders。
 	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
-	// AddOrder は命令: 効果 store.createOrder（on store.orders.post）を持つ葉の op store.addOrder。
-	AddOrder(ctx context.Context, order pkgtype.Order) error
 }
 
 // NotificationsState は状態 store.notifications（list<type.Notification>）の単位。実装は New の引数 notifications に渡す。
@@ -58,6 +56,11 @@ type NotificationsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: store.notifications の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]pkgtype.Notification, error)
-	// AddNotification は命令: 効果 store.notifyUser（on store.notifications.post）を持つ葉の op store.addNotification。
-	AddNotification(ctx context.Context, notification pkgtype.Notification) error
+}
+
+// SharedState は、複数の状態にまたがる葉の op: 複数の状態を読む op と、効果の宛先が一つの状態の単位に収まらない op。実装は New の引数 shared に渡す。
+// メソッドが一つでも足りない値は、渡すところでコンパイルできない。
+type SharedState interface {
+	// PlaceOrder は命令: 効果 store.createOrder（on store.orders.post）、store.notifyUser（on store.notifications.post）を持つ葉の op store.placeOrder。
+	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
 }

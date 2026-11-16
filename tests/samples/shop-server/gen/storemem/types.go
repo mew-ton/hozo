@@ -16,5 +16,5 @@ const EffectDeleteSession runtime.Effect = "store.deleteSession"
 // EffectCreateOrder は注文を作る
 const EffectCreateOrder runtime.Effect = "store.createOrder"
 
-// EffectNotifyUser はユーザーに通知する
+// EffectNotifyUser はユーザーへの通知を記録する
 const EffectNotifyUser runtime.Effect = "store.notifyUser"

@@ -43,7 +43,7 @@ func TestStore(t *testing.T) {
 		m := memstore.New()
 		users, sessions, orders, notifications := m.Users(), m.Sessions(), m.Orders(), m.Notifications()
 		return storetest.Store{
-			Ops: store.New(users, sessions, orders, notifications),
+			Ops: store.New(users, sessions, orders, notifications, m.Shared()),
 			// 形で決まる問い合わせは、store.New に渡したのと同じ値で読む
 			States: storetest.States{Users: users, Sessions: sessions, Orders: orders, Notifications: notifications},
 		}

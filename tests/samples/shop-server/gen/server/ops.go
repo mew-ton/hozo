@@ -37,7 +37,7 @@ type Ops interface {
 	// Reads: store.sessions, store.orders
 	GetOrders(ctx context.Context, in GetOrdersInput) ([]pkgtype.Order, error)
 
-	// PlaceOrder は注文する。通知に失敗しても、注文は残る
+	// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
 	// Reads: store.sessions

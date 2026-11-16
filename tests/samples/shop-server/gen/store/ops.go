@@ -20,10 +20,10 @@ type Ops interface {
 	// Reads: store.users
 	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
 
-	// FindSession はトークンからセッションを引く。トークンがなければ、ない
+	// FindSession はトークンからセッションを引く
 	//
 	// Reads: store.sessions
-	FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error)
+	FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error)
 
 	// ListOrders はユーザーの注文を、足した順に返す
 	//
@@ -45,21 +45,16 @@ type Ops interface {
 	// Effects: store.deleteSession
 	RemoveSession(ctx context.Context, token pkgtype.Token) error
 
-	// AddOrder は注文を足す
+	// PlaceOrder は注文と、その通知の記録を、一緒に足す。一つのトランザクションで、どちらも足すか、どちらも足さない
 	//
-	// Effects: store.createOrder
-	AddOrder(ctx context.Context, order pkgtype.Order) error
-
-	// AddNotification は通知を足す
-	//
-	// Effects: store.notifyUser
-	AddNotification(ctx context.Context, notification pkgtype.Notification) error
+	// Effects: store.createOrder, store.notifyUser
+	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
 }
 
-// New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）、shared。
 // 引数が nil かどうかは確かめない。
-func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState) Ops {
-	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications}
+func New(users UsersState, sessions SessionsState, orders OrdersState, notifications NotificationsState, shared SharedState) Ops {
+	return &ops{users: users, sessions: sessions, orders: orders, notifications: notifications, shared: shared}
 }
 
 // ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
@@ -68,6 +63,7 @@ type ops struct {
 	sessions      SessionsState
 	orders        OrdersState
 	notifications NotificationsState
+	shared        SharedState
 }
 
 func (o *ops) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
@@ -78,7 +74,7 @@ func (o *ops) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.Use
 	return o.users.FindUserById(ctx, id)
 }
 
-func (o *ops) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
+func (o *ops) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
 	return o.sessions.FindSession(ctx, token)
 }
 
@@ -98,10 +94,6 @@ func (o *ops) RemoveSession(ctx context.Context, token pkgtype.Token) error {
 	return o.sessions.RemoveSession(ctx, token)
 }
 
-func (o *ops) AddOrder(ctx context.Context, order pkgtype.Order) error {
-	return o.orders.AddOrder(ctx, order)
-}
-
-func (o *ops) AddNotification(ctx context.Context, notification pkgtype.Notification) error {
-	return o.notifications.AddNotification(ctx, notification)
+func (o *ops) PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error {
+	return o.shared.PlaceOrder(ctx, order, notification)
 }

@@ -43,7 +43,7 @@ func CreateTables(ctx context.Context, db *sql.DB) error {
 }
 
 // UsersTable は状態 store.users の単位（UsersState）の、表 "users" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.users を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type UsersTable struct{ db *sql.DB }
 
 // NewUsersTable は db の表 "users" の上の UsersTable を返す。表は CreateTables が作る。
@@ -62,19 +62,19 @@ func (t UsersTable) Get(ctx context.Context) ([]pkgtype.User, error) {
 		`SELECT "id", "email", "name", "hash" FROM "users" ORDER BY rowid`)
 }
 
-// FindUser は op store.findUser: 表 "users" から、"email"（引数 email と型が合う列。@db.unique）が同じ行を引く。なければ nil。
+// FindUser は op store.findUser（@db.find）: 表 "users" から、"email"（@db.unique）が引数 email と同じ行を引く。なければ nil。
 func (t UsersTable) FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error) {
 	return dbGet(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "email" = ?1`, string(email))
 }
 
-// FindUserById は op store.findUserById: 表 "users" から、"id"（引数 id と型が合う列。@db.key）が同じ行を引く。なければ nil。
+// FindUserById は op store.findUserById（@db.find）: 表 "users" から、"id"（@db.key）が引数 id と同じ行を引く。なければ nil。
 func (t UsersTable) FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
 	return dbGet(ctx, t.db, dbScanUser,
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "id" = ?1`, string(id))
 }
 
-// AddUser は op store.addUser（効果 store.createUser は users.post）: 表 "users" に行を一つ足す。
+// AddUser は op store.addUser（@db.effects）: 効果 store.createUser（@db.insert）で、表 "users" に、引数 user の行を足す。
 func (t UsersTable) AddUser(ctx context.Context, user pkgtype.User) error {
 	args, err := dbArgsUser(user)
 	if err != nil {
@@ -85,7 +85,7 @@ func (t UsersTable) AddUser(ctx context.Context, user pkgtype.User) error {
 }
 
 // SessionsTable は状態 store.sessions の単位（SessionsState）の、表 "sessions" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.sessions を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type SessionsTable struct{ db *sql.DB }
 
 // NewSessionsTable は db の表 "sessions" の上の SessionsTable を返す。表は CreateTables が作る。
@@ -104,17 +104,13 @@ func (t SessionsTable) Get(ctx context.Context) ([]pkgtype.Session, error) {
 		`SELECT "token", "userId", "expiresAt" FROM "sessions" ORDER BY rowid`)
 }
 
-// FindSession は op store.findSession: 表 "sessions" から、"token"（引数 token と型が合う列。@db.key）が同じ行を引く。なければ nil。
-// token は省略可能で、なければ問い合わせずに nil。
-func (t SessionsTable) FindSession(ctx context.Context, token *pkgtype.Token) (*pkgtype.Session, error) {
-	if token == nil {
-		return nil, nil
-	}
+// FindSession は op store.findSession（@db.find）: 表 "sessions" から、"token"（@db.key）が引数 token と同じ行を引く。なければ nil。
+func (t SessionsTable) FindSession(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
 	return dbGet(ctx, t.db, dbScanSession,
-		`SELECT "token", "userId", "expiresAt" FROM "sessions" WHERE "token" = ?1`, string(*token))
+		`SELECT "token", "userId", "expiresAt" FROM "sessions" WHERE "token" = ?1`, string(token))
 }
 
-// AddSession は op store.addSession（効果 store.createSession は sessions.post）: 表 "sessions" に行を一つ足す。
+// AddSession は op store.addSession（@db.effects）: 効果 store.createSession（@db.insert）で、表 "sessions" に、引数 session の行を足す。
 func (t SessionsTable) AddSession(ctx context.Context, session pkgtype.Session) error {
 	args, err := dbArgsSession(session)
 	if err != nil {
@@ -124,13 +120,13 @@ func (t SessionsTable) AddSession(ctx context.Context, session pkgtype.Session) 
 		`INSERT INTO "sessions" ("token", "userId", "expiresAt") VALUES (?1, ?2, ?3)`, args...)
 }
 
-// RemoveSession は op store.removeSession（効果 store.deleteSession は sessions.delete）: 表 "sessions" から、"token"（引数 token と型が合う列）が同じ行を消す。行がなければ何もしない。
+// RemoveSession は op store.removeSession（@db.effects）: 効果 store.deleteSession（@db.delete）で、表 "sessions" から、"token" が引数 token と同じ行を消す。行がなければ何もしない。
 func (t SessionsTable) RemoveSession(ctx context.Context, token pkgtype.Token) error {
 	return dbExec(ctx, t.db, `DELETE FROM "sessions" WHERE "token" = ?1`, string(token))
 }
 
 // OrdersTable は状態 store.orders の単位（OrdersState）の、表 "orders" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.orders を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type OrdersTable struct{ db *sql.DB }
 
 // NewOrdersTable は db の表 "orders" の上の OrdersTable を返す。表は CreateTables が作る。
@@ -149,24 +145,14 @@ func (t OrdersTable) Get(ctx context.Context) ([]pkgtype.Order, error) {
 		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" ORDER BY rowid`)
 }
 
-// ListOrders は op store.listOrders: 表 "orders" から、"userId"（引数 userId と型が合う列）が同じ行を、足した順にすべて引く。
+// ListOrders は op store.listOrders（@db.list）: 表 "orders" から、"userId" が引数 userId と同じ行を、足した順にすべて引く。
 func (t OrdersTable) ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
 	return dbList(ctx, t.db, dbScanOrder,
 		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" WHERE "userId" = ?1 ORDER BY rowid`, string(userId))
 }
 
-// AddOrder は op store.addOrder（効果 store.createOrder は orders.post）: 表 "orders" に行を一つ足す。
-func (t OrdersTable) AddOrder(ctx context.Context, order pkgtype.Order) error {
-	args, err := dbArgsOrder(order)
-	if err != nil {
-		return err
-	}
-	return dbExec(ctx, t.db,
-		`INSERT INTO "orders" ("id", "userId", "lines", "placedAt") VALUES (?1, ?2, ?3, ?4)`, args...)
-}
-
 // NotificationsTable は状態 store.notifications の単位（NotificationsState）の、表 "notifications" の上の実装。
-// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、store.notifications を読み書きする葉の op のうち、中身が仕様から決まるもの（この状態では、すべて）。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の葉の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type NotificationsTable struct{ db *sql.DB }
 
 // NewNotificationsTable は db の表 "notifications" の上の NotificationsTable を返す。表は CreateTables が作る。
@@ -185,14 +171,39 @@ func (t NotificationsTable) Get(ctx context.Context) ([]pkgtype.Notification, er
 		`SELECT "userId", "message" FROM "notifications" ORDER BY rowid`)
 }
 
-// AddNotification は op store.addNotification（効果 store.notifyUser は notifications.post）: 表 "notifications" に行を一つ足す。
-func (t NotificationsTable) AddNotification(ctx context.Context, notification pkgtype.Notification) error {
-	args, err := dbArgsNotification(notification)
+// SharedTable は、複数の状態にまたがる葉の op（SharedState）の、db の上の実装。
+// メソッドは、SharedState の op のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+type SharedTable struct{ db *sql.DB }
+
+// NewSharedTable は db の上の SharedTable を返す。表は CreateTables が作る。
+func NewSharedTable(db *sql.DB) SharedTable { return SharedTable{db: db} }
+
+var _ SharedState = SharedTable{}
+
+// PlaceOrder は op store.placeOrder（@db.effects）: 一つのトランザクションで、書いた順に行う。効果 store.createOrder（@db.insert）で、表 "orders" に、引数 order の行を足す。効果 store.notifyUser（@db.insert）で、表 "notifications" に、引数 notification の行を足す。どれかが失敗すれば、どれも残らない。
+func (t SharedTable) PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error {
+	args1, err := dbArgsOrder(order)
 	if err != nil {
 		return err
 	}
-	return dbExec(ctx, t.db,
-		`INSERT INTO "notifications" ("userId", "message") VALUES (?1, ?2)`, args...)
+	args2, err := dbArgsNotification(notification)
+	if err != nil {
+		return err
+	}
+	tx, err := t.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO "orders" ("id", "userId", "lines", "placedAt") VALUES (?1, ?2, ?3, ?4)`, args1...); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO "notifications" ("userId", "message") VALUES (?1, ?2)`, args2...); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // dbArgsUser は type.User を、表 "users" の列の順の値にする。
