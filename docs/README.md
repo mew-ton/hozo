@@ -14,7 +14,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 
 | 文書 | 決めること | 写す場所 |
 |---|---|---|
-| [`requirements.md`](requirements.md) | 作るもの、段階、自己展開、品質の要件、検査の規則の ID | — |
+| [`requirements.md`](requirements.md) | 価値と、そこから導く要件、作るもの、段階、自己展開、品質の要件、検査の規則の ID | — |
 | [`grammar.md`](grammar.md) | 字句と構文（EBNF） | `internal/syntax` |
 | [`ir.md`](ir.md) | IR の構造、正規化、JSON、その名前空間から見た IR | `ir`、`internal/sema` |
 | [`resolve.md`](resolve.md) | 名前の解決 | `internal/sema` |
@@ -60,6 +60,8 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | op の分類、標準の分類、型で決まる分類、述語で決まる分類 | `check.md`「分類」 |
 | 読む op、内部の op、純粋 | `check.md`「reads」「export」「純粋」 |
 | 直に読む状態、直に持つ効果、デコレータが運ぶもの（`Op.carried`） | `check.md`「デコレータが運ぶ reads と effects」 |
+| ただ一つの正（SSOT。Hozo の価値: 設計を言うものは、仕様だけ） | `requirements.md`「価値と位置づけ」「ただ一つの正」 |
+| ハーネス（中身が仕様から外れないことを確かめる仕組みの全体） | `requirements.md`「ハーネス」 |
 | 出力を推論しない（プラグインの原則: op のデコレータは包むだけで、出すコードは型に依らない。op 以外は、宣言の全体から作る） | `requirements.md`「出力を推論しない」 |
 | op の中身に立ち入らない（基底の原則: op の中身に何が要るかを判定せず、言語の作法で関数に付くものを、どの関数にも同じ形で与える） | `requirements.md`「op の中身に立ち入らない」 |
 | 表の状態、表の model、しまい方 | `plugin-go-sqlite.md`「出力」「表」「しまい方」（語彙は `vocab.md`「`db` の表と、しまい方」） |
