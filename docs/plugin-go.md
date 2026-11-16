@@ -261,7 +261,7 @@ op のメソッドの形は、その op の宣言だけで決まり、どのイ�
 
 ### op の置き場
 
-N の op は、上から順に、最初に当たる行の置き場を持つ。葉の「効果」と「読む状態」は、op が**直に持つ効果**と**直に読む状態**: op が自分で書いたものと、付いたデコレータが運ぶものを合わせたもの（定義の持ち主は `docs/check.md`「デコレータが運ぶ reads と effects」。IR では `Op.effects` と `Op.carried.effects`、`Op.reads` と `Op.carried.reads`）。どちらで書かれたかは、置き場を変えない。
+N の op は、上から順に、最初に当たる行の置き場を持つ。葉の「効果」と「読む状態」は、op が**直に持つ効果**と**直に読む状態**: op が自分で書いたものと、付いたデコレータが運ぶものを合わせたもの（定義の持ち主は `docs/check.md`「デコレータが運ぶ reads と effects」。IR では `Op.effects` と `Op.carried.effects`、`Op.reads` と `Op.carried.reads`）。どちらで書かれたかは、置き場を変えない。op が、状態を直に書いて読むか（`reads users`）、名前を付けた読みで読むか（`reads userByEmail`。`read userByEmail on users;`）も、置き場を変えない: 読みで読む状態は、その読みの宣言の `on` の状態（`docs/check.md`「reads」）。
 
 | # | op | 実装のある場所 |
 |---|---|---|
@@ -612,8 +612,8 @@ func ClassifyWarrantyKind(c WarrantyKindCases, v Item) (WarrantyKind, error)
 | 形 | すること | 例 |
 |---|---|---|
 | 入口を作る | 外からの呼び出しを、入口の `Ops` のメソッドに届ける | `go-http` のハンドラ（`@http.get`）、`go-cli` の `Main`（`@cli.command`） |
-| 実装を出す | 口（状態の単位、`SharedState`、`Leaves`）を満たす型を出す | `go-sqlite` の `<状態>Table`（`@db.table`）と、そのメソッド（`@db.find`、`@db.effects`） |
-| 材料にする | 自分が出すコードの中身を決めるために読む | `@http.header`、`@db.text`、`@db.key`、`@db.insert`、`@valid.*` |
+| 実装を出す | 口（状態の単位、`SharedState`、`Leaves`）を満たす型を出す | `go-sqlite` の `<状態>Table`（`@db.table`）と、そのメソッド（`@db.reads`、`@db.effects`） |
+| 材料にする | 自分が出すコードの中身を決めるために読む | `@http.header`、`@db.text`、`@db.key`、`@db.find`、`@db.insert`、`@valid.*` |
 | 継ぎ目を要る | op の中身の前後に処理を置く。口は基底が出し、中身はそのトランスパイラが出す（「継ぎ目」） | サンプルの `go-ratelimit`（`@rate.limited`） |
 
 - **読む者がなければ、何も出ない**（規則の持ち主は `docs/config.md`「継ぎ目」）。単位のどのトランスパイラも読まないデコレータの適用には、基底は何も出さない: 継ぎ目も、呼び出しも、warning も。何も生成しないデコレータは、この言語のために用意されたものではないデコレータ（要求やドメインの印、ほかの道具や別の言語の出力のための注記）と区別がつかないので、同じに扱う。
