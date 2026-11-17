@@ -155,7 +155,7 @@ UI が変えるのは、文面と同じ IR（`docs/ir.md`「この文書が決�
 | `hozoc` | CLI。サブコマンドは `check` / `emit` / `import` / `extract` と、言語サーバーとして動く `lsp` | §17.1 |
 | 言語サーバー | `hozoc lsp`。文面のエディタに診断・定義へのジャンプ・ホバーなどを提供する（LSP） | この文書の「言語サーバー」 |
 | エディタの対応 | シンタックスハイライトの文法と、`hozoc lsp` に接続する薄いクライアント。最初は VS Code | この文書の「シンタックスハイライト」 |
-| IDE | エンジニアでない人が、プロジェクトを開いて、仕様を読み、直し、AI に頼み、ハーネスの状況を見る道具（`docs/decisions.md`「決めたこと」186）。**まだない** | `docs/tools.md`「道具」「作る順」 |
+| IDE | エンジニアでない人が、プロジェクトを開いて、仕様を読み、直し、AI に頼み、ハーネスの状況を見る道具（`docs/decisions.md`「決めたこと」186）。手元のアプリで、殻は Tauri 2、裏方は `hozoc`（同 187、188）。**まだない** | `docs/tools.md`「道具」「作る順」 |
 | MCP サーバー | `hozoc mcp`。AI が仕様を扱うための口（検査、宣言を引く、足りない宣言を足す、枠を出す、言語の手引き）。**まだない** | `docs/tools.md`「道具」「操作」 |
 | プラグイン | 展開・取り込みの実行ファイル。「標準入出力で JSON をやり取りする実行ファイル」（§4.6）。モノレポの中で一つずつ別の実行ファイルとして作る。プラグインはトランスパイラ（`hozo.toml` の単位が名前で選ぶ変換）を提供し、トランスパイラは自分のファイルを返す（`docs/plugin-protocol.md`）。トランスパイラは、言語ごとの基底と、それに相乗りするものに分かれる（`docs/config.md`「基底と相乗り」）。Go は、基底 `go`（`docs/plugin-go.md`）と、相乗りの `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`）、`go-http`（`docs/plugin-go-http.md`）、`go-cli`（`docs/plugin-go-cli.md`） | §4.3、§4.6 |
 | 標準の語彙 | `valid` などの語彙の `.hozo` | §4.2、§6.5 |
