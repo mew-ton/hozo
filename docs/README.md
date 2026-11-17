@@ -36,6 +36,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`editors.md`](editors.md) | VS Code 拡張と TextMate の文法 | `editors/vscode` |
 | [`decisions.md`](decisions.md) | 決定と、その持ち主の一覧 | — |
 | [`tools.md`](tools.md) | 誰が、何のために、どの道具（IDE、MCP サーバー、言語サーバー、VS Code 拡張、CLI）で、何をするか。道具の境目と、共有する操作、作る順（前提のほかは、案） | — |
+| [`ide.md`](ide.md) | IDE の画面の要件: 並び、画面ごとに見せるものと操作、どの画面にも掛かる要件、規模、枠組みを選ぶ規準（案） | — |
 | [`open.md`](open.md) | まだ決めていないことと、その持ち主の一覧。持ち主のない点の中身 | — |
 
 ## 言葉
