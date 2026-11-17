@@ -39,6 +39,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`ide-scenarios.md`](ide-scenarios.md) | IDE の設計の段 1: 設計する人のユースケースの、具体例の上の筋書き（案） | — |
 | [`ide-methods.md`](ide-methods.md) | IDE の設計の段 1: サンプル `order-app` を、設計の手法（UML など）に写した結果。調べの記録 | — |
 | [`ide-needs.md`](ide-needs.md) | IDE の設計の段 2: 筋書きが要る情報と操作。今、どこから得られるか（案） | — |
+| [`ide-screens.md`](ide-screens.md) | IDE の設計の段 3: 画面の一覧、画面ごとに見せるものと直せること、移り方、割り当ての確かめ（案） | — |
 | [`open.md`](open.md) | まだ決めていないことと、その持ち主の一覧。持ち主のない点の中身 | — |
 
 ## 言葉
