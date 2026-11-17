@@ -38,6 +38,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`tools.md`](tools.md) | 誰が、何のために、どの道具（IDE、MCP サーバー、言語サーバー、VS Code 拡張、CLI）で、何をするか。道具の境目と、共有する操作、作る順（前提のほかは、案） | — |
 | [`ide-scenarios.md`](ide-scenarios.md) | IDE の設計の段 1: 設計する人のユースケースの、具体例の上の筋書き（案） | — |
 | [`ide-methods.md`](ide-methods.md) | IDE の設計の段 1: サンプル `order-app` を、設計の手法（UML など）に写した結果。調べの記録 | — |
+| [`ide-needs.md`](ide-needs.md) | IDE の設計の段 2: 筋書きが要る情報と操作。今、どこから得られるか（案） | — |
 | [`open.md`](open.md) | まだ決めていないことと、その持ち主の一覧。持ち主のない点の中身 | — |
 
 ## 言葉
