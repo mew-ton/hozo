@@ -24,7 +24,7 @@ Hozo の実装（`hozoc`、言語サーバー、エディタの対応、プラ�
 
 ### もとの考えと、Hozo が守るもの
 
-`docs/decisions.md`「決めたこと」275〜277、282、283、287。
+`docs/decisions.md`「決めたこと」275〜277、282、283、287、289。
 
 もとの考え（仮説）:
 
@@ -38,23 +38,34 @@ Hozo が守るもの:
 - 段を示すことで、**設計の手法ごとに、どれだけ効果があるか**を、出せる。
 - **Hozo が守る品質と、人が持つ責任を、それぞれ、明言する。** 一つの言い方に、まとめない。
 
-op の配線は、概念的な流れ（`docs/decisions.md`「決めたこと」282、283、287）:
+op の配線は、概念的な流れ（`docs/decisions.md`「決めたこと」282、283、287、289）:
 
 - **op の中で、別の op を呼び、その結果を、別の op に渡し、分類で分かれる、という記述（配線）は、実体のコードではなく、おおまかな、呼ぶ順などの、設計。** 概念的な、処理の流れを示す。
 - **実際のコードは、流れは同じでも、細かいところで、手直しが出る。** 処理の順と、依存関係は、テストになる: 何を、どの順に呼び、何を渡して、何が返ったかを、テストから追える。
 - **条件は、流れではなく、中身。** 「どの場合に、何をするか」は、配線が言う。「どうやって、その場合だと分かるか」は、言わない。配線にも、言語の核にも、条件の式は、書かない。
 - **配線の op のコードは、既定では、仕様から、そのまま作る。op ごとに、手で書くことを、選べる。**
   - hozoc が作った範囲は、関数ごとに、対のコメントで囲む: `// <hozoc: generated>` から、`// </hozoc: generated>` まで。
-  - 人が手直しした範囲は、その中の、`// <hozoc: slot>` から、`// </hozoc: slot>` までの対で囲む。`slot` の中は、作り直しの対象にしない。`slot` の外は、作り直す。
+  - 人が、手で直したい範囲は、その中の、`// <hozoc: slot>` から、`// </hozoc: slot>` までの対で囲む。範囲は、関数の中身の、一部でよい。
+  - `slot` の中は、作り直しの対象にしない。`slot` の外は、作り直す。
   - 作ったままのコードに、`slot` の対は、ない。手で書いた op は、`slot` の対のある op。
   - 手で書いた op は、流れのテストで確かめる。
 
-  中身を手直しした、配線の本体の例（Go。`slot` の中の `…` は、人が書いたコード）:
+  中身の一部を、手で直した、配線の本体の例（Go。`slot` の中の `…` は、人が書いたコード）:
 
   ```go
   // <hozoc: generated>
   func (o *ops) loginBody(ctx context.Context, in LoginInput) (LoginOk, error) {
+  	user, err := o.store.FindUser(ctx, in.Body.Email)
+  	if err != nil {
+  		return LoginOk{}, err
+  	}
+  	// match user by store.Registration
+  	if user != nil {
+  		// Registered: user は type.User
+  		return o.IssueSession(ctx, *user, in.Body.Password)
+  	}
   	// <hozoc: slot>
+  	// Unregistered
   	…
   	// </hozoc: slot>
   }
