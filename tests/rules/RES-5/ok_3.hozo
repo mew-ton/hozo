@@ -14,13 +14,13 @@ namespace a {
     a.s.post(x);
   }
   op phase() {
-    match by a.Phase { Idle => g(); Busy => none; };
+    match (by a.Phase) { Idle => g(); Busy => none; };
   }
 }
 namespace b {
   op f(xs: string[]);
   op ok() {
-    const xs = a.all();
+    val xs = a.all();
     f(xs);
   }
 }

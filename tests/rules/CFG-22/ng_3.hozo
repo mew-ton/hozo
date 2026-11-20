@@ -1,7 +1,7 @@
 // CFG-22: 置き場になるのは、同じ基底の単位の出力だけ（ng_3.toml）。配線が呼ぶ op の型、述語で決まる別の名前空間の分類も数える
 namespace a {
   op f(x: string) {
-    match x by c.Kind {
+    match (x by c.Kind) {
       A => b.g();
       else    => none;
     };

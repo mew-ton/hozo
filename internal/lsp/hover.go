@@ -170,11 +170,39 @@ func (r *renderer) hover(t sema.Target) (string, bool) {
 		if !ok || op.Body == nil {
 			return "", false
 		}
-		for _, st := range op.Body.Statements {
-			if c, ok := st.(ir.ConstStmt); ok && c.Name == t.Name {
-				code(r.head(op), "  const "+c.Name+" = "+r.expr(c.Expr))
-				return b.String(), true
+		found := false
+		ir.WalkStatements(op.Body.Statements, func(st ir.Statement) {
+			if found {
+				return
 			}
+			switch c := st.(type) {
+			case ir.ValStmt:
+				if c.Name != t.Name {
+					return
+				}
+				found = true
+				line := "  val " + c.Name
+				if c.Type != nil {
+					line += ": " + r.typ(c.Type)
+				}
+				if c.Expr != nil {
+					line += " = " + r.expr(c.Expr)
+				}
+				code(r.head(op), line)
+			case ir.ForStmt:
+				if c.Var != t.Name {
+					return
+				}
+				found = true
+				line := "  for (val " + c.Var
+				if c.VarType != nil {
+					line += ": " + r.typ(c.VarType)
+				}
+				code(r.head(op), line+" of …)")
+			}
+		})
+		if found {
+			return b.String(), true
 		}
 	}
 	return "", false

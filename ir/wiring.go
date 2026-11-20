@@ -14,15 +14,35 @@ func (w Wiring) MarshalJSON() ([]byte, error) { type alias Wiring; return marsha
 func (w *Wiring) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, w) }
 
 // Statement は配線の文（docs/ir.md「配線」の Statement）。
-// 具体型は値型の [ConstStmt]、[ReturnStmt]、[CallStmt]、[MatchStmt]。
+// 具体型は値型の [ValStmt]、[AssignStmt]、[CollectStmt]、[ReturnStmt]、[CallStmt]、[MatchStmt]、[DisjointStmt]、[ForStmt]。
 type Statement interface {
-	// Kind は JSON の判別子（"const"、"return"、"call"、"match"）。
+	// Kind は JSON の判別子（"val"、"assign"、"collect"、"return"、"call"、"match"、"disjoint"、"for"）。
 	Kind() string
 	isStatement()
 }
 
-// ConstStmt は `const name = expr;`（docs/ir.md「配線」の Statement kind "const"）。
-type ConstStmt struct {
+// ValStmt は値の入れ物の宣言（docs/ir.md「配線」の Statement kind "val"）: `val name = expr;`、`val name;`。
+// 名前を並べた宣言（`val a, b;`）は、名前ごとの文に分けてある。
+type ValStmt struct {
+	Name string `json:"name"`
+	// Type は、解決した型（書いた型か、入れる式から導いた型。docs/types.md「val の型」）。
+	Type Type `json:"type"`
+	// Expr は、値と一緒に宣言したときの式。空の宣言なら nil。
+	Expr Expr `json:"expr,omitempty"`
+	// Collected は、集める文で値が入る val か（Expr があれば偽）。
+	Collected bool `json:"collected"`
+	Span      Span `json:"span"`
+}
+
+// AssignStmt は値を入れる文 `name = expr;`（docs/ir.md「配線」の Statement kind "assign"）。
+type AssignStmt struct {
+	Name string `json:"name"`
+	Expr Expr   `json:"expr"`
+	Span Span   `json:"span"`
+}
+
+// CollectStmt は集める文 `name collect expr;`（docs/ir.md「配線」の Statement kind "collect"）。
+type CollectStmt struct {
 	Name string `json:"name"`
 	Expr Expr   `json:"expr"`
 	Span Span   `json:"span"`
@@ -46,15 +66,55 @@ type MatchStmt struct {
 	Span  Span  `json:"span"`
 }
 
+// DisjointStmt は互いに触れないアームの並び（docs/ir.md「配線」の Statement kind "disjoint"）。アームは、書かれた順で、二つ以上。
+type DisjointStmt struct {
+	Arms []Arm `json:"arms"`
+	Span Span  `json:"span"`
+}
+
+// Arm は disjoint のアーム（docs/ir.md「配線」の Arm）。文の一つのアームは、Statements が一つ。
+type Arm struct {
+	Statements []Statement `json:"statements"`
+	Span       Span        `json:"span"`
+}
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く。
+func (a Arm) MarshalJSON() ([]byte, error) { type alias Arm; return marshalStruct(alias(a)) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (a *Arm) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, a) }
+
+// ForStmt は繰り返し（docs/ir.md「配線」の Statement kind "for"）: `for (val var of 並び) { … }`。
+type ForStmt struct {
+	Var string `json:"var"`
+	// VarType は変数の型（並びの要素の型）。
+	VarType Type        `json:"varType"`
+	Of      Atom        `json:"of"`
+	Body    []Statement `json:"body"`
+	// Disjoint は、前に disjoint を書いたか（回どうしが、互いに触れない）。
+	Disjoint bool `json:"disjoint"`
+	Span     Span `json:"span"`
+}
+
 var (
-	_ Statement = ConstStmt{}
+	_ Statement = ValStmt{}
+	_ Statement = AssignStmt{}
+	_ Statement = CollectStmt{}
 	_ Statement = ReturnStmt{}
 	_ Statement = CallStmt{}
 	_ Statement = MatchStmt{}
+	_ Statement = DisjointStmt{}
+	_ Statement = ForStmt{}
 )
 
-// Kind は "const"。
-func (ConstStmt) Kind() string { return "const" }
+// Kind は "val"。
+func (ValStmt) Kind() string { return "val" }
+
+// Kind は "assign"。
+func (AssignStmt) Kind() string { return "assign" }
+
+// Kind は "collect"。
+func (CollectStmt) Kind() string { return "collect" }
 
 // Kind は "return"。
 func (ReturnStmt) Kind() string { return "return" }
@@ -65,15 +125,37 @@ func (CallStmt) Kind() string { return "call" }
 // Kind は "match"。
 func (MatchStmt) Kind() string { return "match" }
 
-func (ConstStmt) isStatement()  {}
-func (ReturnStmt) isStatement() {}
-func (CallStmt) isStatement()   {}
-func (MatchStmt) isStatement()  {}
+// Kind は "disjoint"。
+func (DisjointStmt) Kind() string { return "disjoint" }
+
+// Kind は "for"。
+func (ForStmt) Kind() string { return "for" }
+
+func (ValStmt) isStatement()      {}
+func (AssignStmt) isStatement()   {}
+func (CollectStmt) isStatement()  {}
+func (ReturnStmt) isStatement()   {}
+func (CallStmt) isStatement()     {}
+func (MatchStmt) isStatement()    {}
+func (DisjointStmt) isStatement() {}
+func (ForStmt) isStatement()      {}
 
 // MarshalJSON は kind を付けて書く。
-func (s ConstStmt) MarshalJSON() ([]byte, error) {
-	type alias ConstStmt
-	return marshalKind("const", alias(s))
+func (s ValStmt) MarshalJSON() ([]byte, error) {
+	type alias ValStmt
+	return marshalKind("val", alias(s))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (s AssignStmt) MarshalJSON() ([]byte, error) {
+	type alias AssignStmt
+	return marshalKind("assign", alias(s))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (s CollectStmt) MarshalJSON() ([]byte, error) {
+	type alias CollectStmt
+	return marshalKind("collect", alias(s))
 }
 
 // MarshalJSON は kind を付けて書く。
@@ -94,17 +176,81 @@ func (s MatchStmt) MarshalJSON() ([]byte, error) {
 	return marshalKind("match", alias(s))
 }
 
+// MarshalJSON は kind を付けて書く。
+func (s DisjointStmt) MarshalJSON() ([]byte, error) {
+	type alias DisjointStmt
+	return marshalKind("disjoint", alias(s))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (s ForStmt) MarshalJSON() ([]byte, error) {
+	type alias ForStmt
+	return marshalKind("for", alias(s))
+}
+
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
-func (s *ConstStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+func (s *ValStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *AssignStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *CollectStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (s *ReturnStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
 
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *DisjointStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *ForStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
 var statementTable = map[string]func([]byte) (Statement, error){
-	"const":  asValue[Statement, ConstStmt],
-	"return": asValue[Statement, ReturnStmt],
-	"call":   asValue[Statement, CallStmt],
-	"match":  asValue[Statement, MatchStmt],
+	"val":      asValue[Statement, ValStmt],
+	"assign":   asValue[Statement, AssignStmt],
+	"collect":  asValue[Statement, CollectStmt],
+	"return":   asValue[Statement, ReturnStmt],
+	"call":     asValue[Statement, CallStmt],
+	"match":    asValue[Statement, MatchStmt],
+	"disjoint": asValue[Statement, DisjointStmt],
+	"for":      asValue[Statement, ForStmt],
+}
+
+// WalkStatements は、文を、辿る順に、fn に渡す（docs/check.md「Sig(O, v)」の手順 0）: 書いた順で、中のブロックにも入る。
+// for は、文そのものの後に、ブロックの文を上から。disjoint は、文そのものの後に、アームを書いた順に、アームの中の文を上から。
+func WalkStatements(stmts []Statement, fn func(st Statement)) {
+	for _, st := range stmts {
+		fn(st)
+		switch s := st.(type) {
+		case DisjointStmt:
+			for _, arm := range s.Arms {
+				WalkStatements(arm.Statements, fn)
+			}
+		case ForStmt:
+			WalkStatements(s.Body, fn)
+		}
+	}
+}
+
+// StatementExpr は、文の式。式を持たない文（空の val、disjoint、for）は ok が偽。
+// 呼び出しの文と match の文は、その呼び出しと match を、式にして返す。
+func StatementExpr(st Statement) (expr Expr, ok bool) {
+	switch s := st.(type) {
+	case ValStmt:
+		return s.Expr, s.Expr != nil
+	case AssignStmt:
+		return s.Expr, true
+	case CollectStmt:
+		return s.Expr, true
+	case ReturnStmt:
+		return s.Expr, true
+	case CallStmt:
+		return CallExpr{Call: s.Call}, true
+	case MatchStmt:
+		return MatchExpr{Match: s.Match}, true
+	}
+	return nil, false
 }
 
 // UnmarshalStatement は kind で分けて Statement を読む（docs/ir.md「JSON」）。

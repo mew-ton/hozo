@@ -14,7 +14,7 @@ namespace a {
   op nothing(): never throws Unauthorized;
   op keep(m: M): M;
   op f(m: M): M throws Unauthorized {
-    return match m by Kind {
+    return match (m by Kind) {
       A => keep(m);
       B => unauthorized();
     };

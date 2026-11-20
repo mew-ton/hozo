@@ -7,18 +7,18 @@ namespace a {
     value();                           // ERROR: WIRE-2
   }
   op g(): void {
-    const x = noValue();               // ERROR: WIRE-2 // WARN: WIRE-8
+    val x = noValue();               // ERROR: WIRE-2 // WARN: WIRE-8
   }
   op h(): M {
     return noValue();                  // ERROR: WIRE-2
   }
   classify C of M { A; }
   op i(m: M): void {
-    match m by C { A => value(); };    // ERROR: WIRE-2
+    match (m by C) { A => value(); };    // ERROR: WIRE-2
   }
   op ok(): M {
     noValue();
-    const m = value();
+    val m = value();
     return m;
   }
 }

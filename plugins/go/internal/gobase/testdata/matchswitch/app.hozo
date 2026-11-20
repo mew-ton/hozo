@@ -102,7 +102,7 @@ namespace app {
   // 最後の節は、いつも default:（分類の誤りの枝）
   export op describe(page: Page): string
   {
-    return match page by PageKind {
+    return match (page by PageKind) {
       IsCode   => codeText(page);
       IsReady  => titleOf(page);
       IsFailed => page.reason;
@@ -113,7 +113,7 @@ namespace app {
   // else のアームは、受けるケースを名前で並べたアームと、同じコードになる: describe と、本体が同じ（else は Rest を受ける）
   export op describeElse(page: Page): string
   {
-    return match page by PageKind {
+    return match (page by PageKind) {
       IsCode   => codeText(page);
       IsReady  => titleOf(page);
       IsFailed => page.reason;
@@ -124,7 +124,7 @@ namespace app {
   // variant の return match で、書いた型が union のすべてのアームを覆う（純粋な配線）。union の値がない（nil）ために、default: の節は置く
   export op outcome(result: Result): string
   {
-    return match result by Outcome {
+    return match (result by Outcome) {
       Ok  => receiptText(result);
       Err => result.reason;
     };
@@ -133,7 +133,7 @@ namespace app {
   // 残りのケースのない variant の return match: 書かなかった型のアームの値は、default: の節で、分類の誤り
   export op shown(page: Page): string
   {
-    return match page by Shown {
+    return match (page by Shown) {
       ShowsTitle => titleOf(page);
       ShowsCode  => codeText(page);
     };
@@ -142,11 +142,11 @@ namespace app {
   // 同じ分類の const と文の match: どの節にも入らない値は、通り抜けずに、default: の節で、分類の誤り
   export op shownNote(page: Page): string
   {
-    const text = match page by Shown {
+    val text = match (page by Shown) {
       ShowsTitle => titleOf(page);
       ShowsCode  => none;
     };
-    match page by Shown {
+    match (page by Shown) {
       ShowsTitle => show("title");
       ShowsCode  => none;
     };
@@ -157,16 +157,16 @@ namespace app {
   // 受ける（case は、それぞれの Go の型を並べる）
   @mark export op variants(page: Page): string
   {
-    const text = match page by PageKind {
+    val text = match (page by PageKind) {
       IsReady, IsFailed => load("page");
       IsCode            => codeText(page);
       else              => none;
     };
-    match page by PageKind {
+    match (page by PageKind) {
       IsReady => show("ready");
       else    => none;
     };
-    match page by PageKind {
+    match (page by PageKind) {
       IsCode => none;
       else   => show("not code");
     };
@@ -176,7 +176,7 @@ namespace app {
   // 型で決まる状態の分類（variant）: 対象の状態を読んでから分ける
   export op stageText(): string
   {
-    return match by Stage {
+    return match (by Stage) {
       Showing => titleOf(stage);
       Broken  => stage.reason;
       else    => "none";
@@ -187,7 +187,7 @@ namespace app {
   // ケースで絞り込んだ型（Size.Big<Item>）は、Go では同じ型
   @mark export op sizeLabel(item: Item): string
   {
-    return match item by Size {
+    return match (item by Size) {
       Small => "small";
       Big   => bigOnly(item);
       Tiny  => load(item.name);
@@ -198,7 +198,7 @@ namespace app {
   // else のアームは、受けるケースの定数を並べた case（Go の default: ではない）
   export op pureLabel(item: Item): string
   {
-    return match item by Size {
+    return match (item by Size) {
       Tiny => "tiny";
       else => "normal";
     };
@@ -208,12 +208,12 @@ namespace app {
   export op mail(addr: string, contact: string?): string
     throws Bad
   {
-    const first = match addr by Address {
+    val first = match (addr by Address) {
       Valid   => send(addr);
       Invalid => "invalid";
     };
     show(first);
-    return match contact by Contact {
+    return match (contact by Contact) {
       Mail   => send(contact);
       Text   => contact;
       Silent => fail();
@@ -224,8 +224,8 @@ namespace app {
   @mark export op price(name: string): int
     throws Bad
   {
-    const item = findItem(name);
-    const value = match item by Stock {
+    val item = findItem(name);
+    val value = match (item by Stock) {
       InStock => priceOf(item);
       SoldOut => throw Bad;
       Unknown => fail();
@@ -237,12 +237,12 @@ namespace app {
   export op literalSubjects(): string
     throws Bad
   {
-    const a = match "x@example.com" by Address {
+    val a = match ("x@example.com" by Address) {
       Valid => "ok";
       else  => "ng";
     };
     show(a);
-    return match { name: "box", price: 3 } by Size {
+    return match ({ name: "box", price: 3 } by Size) {
       Big   => "big";
       Small => "small";
       Tiny  => throw Bad;
@@ -252,7 +252,7 @@ namespace app {
   // 述語で決まる状態の分類: 文の match（error を返す呼び出しと、none のアーム）
   export op checkoutNote()
   {
-    match by Checkout {
+    match (by Checkout) {
       Shopping => show("shopping");
       Ordered  => none;
     };

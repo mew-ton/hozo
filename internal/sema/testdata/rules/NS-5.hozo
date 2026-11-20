@@ -6,11 +6,11 @@ namespace a {
     return b.internal();               // ERROR: NS-5
   }
   op g() {
-    const x = a.sub.inner();           // ERROR: NS-5
+    val x = a.sub.inner();           // ERROR: NS-5
     b.take(x);                         // ERROR: NS-5
   }
   op h(x: string): string {
-    return match x by b.Kind {
+    return match (x by b.Kind) {
       A => b.internal();               // ERROR: NS-5
       B => b.open();
     };

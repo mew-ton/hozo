@@ -14,7 +14,7 @@ namespace a {
     return user();                     // ERROR: TYPE-3
   }
   op mapped(): PublicUser {
-    const u = user();
+    val u = user();
     return toPublic(u);
   }
   op wrong(): PublicUser {
@@ -37,6 +37,6 @@ namespace a {
     return gone();
   }
   op never2(u: User): int throws Gone {
-    return match u by Kind { A => throw Gone; B => gone(); };
+    return match (u by Kind) { A => throw Gone; B => gone(); };
   }
 }

@@ -12,26 +12,26 @@ namespace a {
   state token: nullable<string>;
   classify Session of token { LoggedIn; LoggedOut; }
   op ng(): void {
-    const x = find();
-    match x by Hit {
+    val x = find();
+    match (x by Hit) {
       Found => use(x);
       Missing => none;
       else => none;                    // ERROR: MATCH-9
     };
-    match x by Arrival {
+    match (x by Arrival) {
       Arrived => use(x);
       else => none;                    // ERROR: MATCH-9
     };
-    match carts by list {
+    match (carts by list) {
       Empty, HasItems => f();
       else => none;                    // ERROR: MATCH-9
     };
-    match token by nullable {
+    match (token by nullable) {
       Empty => f();
       HasItems => none;
       else => none;                    // ERROR: MATCH-9
     };
-    match by Session {
+    match (by Session) {
       LoggedIn => f();
       LoggedOut => none;
       else => none;                    // ERROR: MATCH-9

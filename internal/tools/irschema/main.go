@@ -97,7 +97,8 @@ var unions = []struct {
 	{typeOf[ir.ClassifySubject](), []reflect.Type{typeOf[ir.TypeSubject](), typeOf[ir.OpSubject](), typeOf[ir.StatesSubject]()}},
 	{typeOf[ir.ParamType](), []reflect.Type{typeOf[ir.TypeParam](), typeOf[ir.AnyParam]()}},
 	{typeOf[ir.Statement](), []reflect.Type{
-		typeOf[ir.ConstStmt](), typeOf[ir.ReturnStmt](), typeOf[ir.CallStmt](), typeOf[ir.MatchStmt](),
+		typeOf[ir.ValStmt](), typeOf[ir.AssignStmt](), typeOf[ir.CollectStmt](), typeOf[ir.ReturnStmt](), typeOf[ir.CallStmt](),
+		typeOf[ir.MatchStmt](), typeOf[ir.DisjointStmt](), typeOf[ir.ForStmt](),
 	}},
 	{typeOf[ir.Expr](), []reflect.Type{typeOf[ir.CallExpr](), typeOf[ir.MatchExpr](), typeOf[ir.AtomExpr]()}},
 	{typeOf[ir.Atom](), []reflect.Type{

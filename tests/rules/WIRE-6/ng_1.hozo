@@ -3,9 +3,9 @@ namespace a {
   op v(): string;
   op use(x: string, y: string, z: string);
   op f() {                             // WARN: WIRE-6
-    const x = v();
-    const y = v();
-    const z = v();
+    val x = v();
+    val y = v();
+    val z = v();
     use(x, y, z);
   }
 }

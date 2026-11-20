@@ -100,7 +100,9 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 			if x.Body == nil {
 				continue
 			}
-			for _, st := range x.Body.Statements {
+			var all []ir.Statement
+			ir.WalkStatements(x.Body.Statements, func(st ir.Statement) { all = append(all, st) })
+			for _, st := range all {
 				eachCallIn(st, func(c *ir.Call) { // 4
 					if callee := e.op(c.CalledOp()); callee != nil {
 						signature(callee)
@@ -140,30 +142,16 @@ func eachCallIn(st ir.Statement, fn func(c *ir.Call)) {
 			}
 		}
 	}
-	switch x := st.(type) {
-	case ir.ConstStmt:
-		expr(x.Expr)
-	case ir.ReturnStmt:
-		expr(x.Expr)
-	case ir.CallStmt:
-		fn(&x.Call)
-	case ir.MatchStmt:
-		expr(ir.MatchExpr{Match: x.Match})
+	if x, ok := ir.StatementExpr(st); ok {
+		expr(x)
 	}
 }
 
 func eachMatchIn(st ir.Statement, fn func(m *ir.Match)) {
-	switch x := st.(type) {
-	case ir.ConstStmt:
-		if m, ok := x.Expr.(ir.MatchExpr); ok {
+	if x, ok := ir.StatementExpr(st); ok {
+		if m, isMatch := x.(ir.MatchExpr); isMatch {
 			fn(&m.Match)
 		}
-	case ir.ReturnStmt:
-		if m, ok := x.Expr.(ir.MatchExpr); ok {
-			fn(&m.Match)
-		}
-	case ir.MatchStmt:
-		fn(&x.Match)
 	}
 }
 

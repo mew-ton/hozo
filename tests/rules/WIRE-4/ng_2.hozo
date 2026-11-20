@@ -4,7 +4,7 @@ namespace a {
   op value(): M;
   op use(m: M): void;
   op param(m: M): void {
-    const m = value();                 // ERROR: WIRE-4
+    val m = value();                 // ERROR: WIRE-4
     use(m);
   }
 }

@@ -17,10 +17,10 @@ namespace a {
     rows.post(m, m);                     // ERROR: TYPE-4
     cur.put("x");                        // ERROR: TYPE-4
     cur.delete(m);                       // ERROR: TYPE-4
-    const a1 = byId(count);              // ERROR: TYPE-4
-    const a2 = byId("x", "y");           // ERROR: TYPE-4
+    val a1 = byId(count);              // ERROR: TYPE-4
+    val a2 = byId("x", "y");           // ERROR: TYPE-4
     use(a1, a2);
-    return match m by K {
+    return match (m by K) {
       A => throw Busy("soon");           // ERROR: TYPE-4
       B => throw Busy(5m, 1);            // ERROR: TYPE-4
       C => throw Busy(5m, "x", "y");     // ERROR: TYPE-4

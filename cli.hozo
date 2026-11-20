@@ -196,8 +196,8 @@ namespace hozoc {
     throws CheckFailed, OutputConflict, UnknownNamespace prevents effects
     throws proc.Crashed, proc.MalformedOutput prevents effects
   {
-    const plan = collectOutputs(in, checked);
-    const result = outputChanges(plan);
+    val plan = collectOutputs(in, checked);
+    val result = outputChanges(plan);
     syncOutputs(plan);
     return result;
   }
@@ -213,7 +213,7 @@ namespace hozoc {
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
     throws proc.Crashed, proc.MalformedOutput prevents effects
   {
-    const checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
+    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
     return writeOutputs(in, checked);
   }
 

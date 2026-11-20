@@ -127,8 +127,8 @@ namespace browser {
   op onAddToCart(item: server.Item)
     throws page.Aborted, http.NetworkError, http.ServerError
   {
-    const line = server.addToCart({ item });
-    const warranty = match item by WarrantyKind {
+    val line = server.addToCart({ item });
+    val warranty = match (item by WarrantyKind) {
       Standard   => chooseStandardWarranty(item, line);
       Yamada     => chooseYamadaWarranty(item, line);
       NoWarranty => none;
@@ -140,7 +140,7 @@ namespace browser {
     : server.WarrantyLine
     throws page.Aborted, http.NetworkError, http.ServerError
   {
-    const plan = askYamadaWarranty(item);
+    val plan = askYamadaWarranty(item);
     return server.attachWarranty({ line, plan });
   }
 
@@ -151,12 +151,12 @@ namespace browser {
   /** メーカー保証の明細を作る */
   op chooseStandardWarranty(item: WarrantyKind.Standard<server.Item>, line: server.CartLine): server.WarrantyLine;
 
-  // 追加: §10.2 の、二値の分類での match の例（const plan = match item by WarrantyAvailable { ... };）を包む op
+  // 追加: §10.2 の、二値の分類での match の例（val plan = match (item by WarrantyAvailable) { ... };）を包む op
   /** 保証プランを選ぶ。保証が付かない商品なら none */
   op chooseWarrantyPlan(item: server.Item): server.PlanId?
     throws page.Aborted
   {
-    const plan = match item by WarrantyAvailable {
+    val plan = match (item by WarrantyAvailable) {
       Available   => askWarrantyPlan(item);
       Unavailable => none;
     };
@@ -219,8 +219,8 @@ namespace browser {
   @page.route("/orders", from: query, onInvalid: transitionToOrders)
   op openOrders(query: OrdersQuery): OrderPage
   {
-    const me     = fetchMe();
-    const orders = fetchOrders(query);
+    val me     = fetchMe();
+    val orders = fetchOrders(query);
     return orderPageVm(me, orders);
   }
 
@@ -235,7 +235,7 @@ namespace browser {
   @page.route("/profile")
   op openProfile(): ProfilePage
   {
-    const me = fetchMe();
+    val me = fetchMe();
     return profilePageVm(me);
   }
 
@@ -261,7 +261,7 @@ namespace browser {
   @page.route("/product", from: query)
   op openProduct(query: ProductQuery): ProductPage
   {
-    const item = fetchItem(query);
+    val item = fetchItem(query);
     return productPageVm(item);
   }
 }

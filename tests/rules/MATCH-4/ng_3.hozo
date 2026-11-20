@@ -9,18 +9,18 @@ namespace a {
   op takeM(m: M): void;
   op takeOpt(m: M?): void;
   op f(): void {
-    const m = find();
-    match m by Found {
+    val m = find();
+    match (m by Found) {
       Hit     => takeM(m);
       Miss    => takeM(m);             // ERROR: MATCH-4
     };
     // 型を書かないケースは case(C, Ks, X) に絞り込むだけで、M? のまま
-    match m by Loose {
+    match (m by Loose) {
       Hit     => takeM(m);             // ERROR: MATCH-4
       Miss    => takeOpt(m);
     };
     // by nullable の Empty のアームは外のまま
-    match m by nullable {
+    match (m by nullable) {
       HasItems => takeM(m);
       Empty    => takeM(m);            // ERROR: MATCH-4
     };
@@ -28,7 +28,7 @@ namespace a {
   // 型を書いたケースと C.Case<T> は、どちらか一方で書く: 絞り込んだ型は T そのもので、C.K<…> の位置には渡せない
   op onHit(m: Found.Hit<M?>): void;
   op g(in: In): void {
-    match in.m by Found {
+    match (in.m by Found) {
       Hit     => onHit(in.m);          // ERROR: MATCH-4
       Miss    => none;
     };

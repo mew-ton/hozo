@@ -10,11 +10,11 @@ namespace a {
   classify Remote of b.lookup { Hit; Other; }
   classify Known of find { Known; NotKnown; }
   op f(id: string, given: M?) {
-    const m = find(id);
-    match m by Found { Hit => g(m); else => none; };
-    match given by Found { Hit => g(given); else => none; };
-    match given by Remote { Hit => g(given); else => none; };
-    match given by Known { Known => g(given); else => none; };
+    val m = find(id);
+    match (m by Found) { Hit => g(m); else => none; };
+    match (given by Found) { Hit => g(given); else => none; };
+    match (given by Remote) { Hit => g(given); else => none; };
+    match (given by Known) { Known => g(given); else => none; };
   }
 }
 namespace b {

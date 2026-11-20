@@ -8,21 +8,21 @@ namespace a {
   op v(x: M): void;
   op use(x: M?): void;
   op differ(x: M): void {
-    const r = match x by C {           // ERROR: TYPE-8
+    val r = match (x by C) {           // ERROR: TYPE-8
       A => m(x);
       B => n(x);
     };
     use(r);
   }
   op mixed(x: M): void {
-    const r = match x by C {           // ERROR: TYPE-8
+    val r = match (x by C) {           // ERROR: TYPE-8
       A => m(x);
       B => v(x);
     };
     use(r);
   }
   op ok(x: M): void {
-    const r = match x by C {
+    val r = match (x by C) {
       A => m(x);
       B => none;
     };

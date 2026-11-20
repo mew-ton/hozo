@@ -7,8 +7,8 @@ namespace a {
   op g();
   classify Found of find { Hit: find as M; Other: find as else; }
   op f(s: string) {
-    const n = other();
-    match n by Found { Hit => g(); else => none; };        // ERROR: MATCH-6
-    match s by Found { Hit => g(); else => none; };        // ERROR: MATCH-6
+    val n = other();
+    match (n by Found) { Hit => g(); else => none; };        // ERROR: MATCH-6
+    match (s by Found) { Hit => g(); else => none; };        // ERROR: MATCH-6
   }
 }

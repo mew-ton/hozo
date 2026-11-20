@@ -28,7 +28,7 @@ namespace a {
   condition CartFilled of carts, orders;         // ERROR: SYNTAX
   // default のアームは書けない: 受けるケースを名前で並べるか、最後のアームを else => … と書く
   op oldDefault(m: M) {
-    match m by K {
+    match (m by K) {
       A       => use(m);
       default => none;                           // ERROR: SYNTAX
     };
@@ -38,7 +38,7 @@ namespace a {
   effect touch() on Checkout: Shopping | Ordered -> any;                 // ERROR: SYNTAX
   effect move() on Checkout: any -> Ordered | Shipped;                   // ERROR: SYNTAX
   op oldPipe(m: M) effects touch, move {
-    match m by K {
+    match (m by K) {
       A | B => use(m);                           // ERROR: SYNTAX
     };
     touch();

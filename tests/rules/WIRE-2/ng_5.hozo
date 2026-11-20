@@ -7,8 +7,8 @@ namespace a {
   effect add(m: M) on rows.post;
   op f(m: M): M? {
     byId(m.id);                          // ERROR: WIRE-2
-    const done = add(m);                 // ERROR: WIRE-2 // WARN: WIRE-8
-    const done2 = rows.post(m);          // ERROR: WIRE-2 // WARN: WIRE-8
+    val done = add(m);                 // ERROR: WIRE-2 // WARN: WIRE-8
+    val done2 = rows.post(m);          // ERROR: WIRE-2 // WARN: WIRE-8
     return add(m);                       // ERROR: WIRE-2
   }
 }

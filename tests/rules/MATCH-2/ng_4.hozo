@@ -5,11 +5,11 @@ namespace a {
   classify D of M { A; B; C; D; E; }
   op use(m: M): void;
   op unknownWithElse(m: M): void {
-    match m by D {                     // ERROR: MATCH-2
+    match (m by D) {                     // ERROR: MATCH-2
       A, Z => use(m);
       else => none;
     };
-    match m by D {                     // ERROR: MATCH-2
+    match (m by D) {                     // ERROR: MATCH-2
       A => use(m);
       B, A => none;
       else => none;

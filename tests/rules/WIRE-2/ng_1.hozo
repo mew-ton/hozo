@@ -7,6 +7,6 @@ namespace a {
   }
   classify C of M { A; }
   op i(m: M): void {
-    match m by C { A => value(); };    // ERROR: WIRE-2
+    match (m by C) { A => value(); };    // ERROR: WIRE-2
   }
 }

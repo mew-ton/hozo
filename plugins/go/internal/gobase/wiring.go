@@ -47,8 +47,9 @@ type local struct {
 
 // scope は、Go のブロック一つで宣言した変数。
 type scope struct {
-	vars   map[string]local  // Hozo の名前（引数・束縛） → Go の変数
+	vars   map[string]local  // Hozo の名前（引数・val・for の変数） → Go の変数
 	states map[string]string // 状態の FQN → その値を読んだ Go の変数
+	err    bool              // このブロックで、err を作る文（…, err := …）を、もう書いたか
 }
 
 // override は、match のアームの中の、絞り込まれた対象（docs/plugin-go.md「match」の「絞り込んだ値」）。
@@ -66,8 +67,9 @@ type matchMode int
 
 const (
 	modeReturn matchMode = iota // return match …
-	modeConst                   // const x = match …
+	modeConst                   // val x = match …
 	modeStmt                    // match …;
+	modeAssign                  // x = match …（var x は、空の宣言の所に、もう、ある）
 )
 
 // bodyGen は配線の op 一つの本体を作る。
@@ -102,12 +104,15 @@ func newBody(e *emitter, f *fileGen, os golang.OpShape) *bodyGen {
 		b.scopes[0].vars[p.Name] = local{expr: name, typ: p.Type}
 		b.taken[name] = true
 	}
-	// 束縛名は、生成する変数（状態を読んだ値、途中の値）より先に押さえる
-	for _, s := range o.Body.Statements {
-		if c, ok := s.(ir.ConstStmt); ok {
+	// val と for の変数の名前は、生成する変数（状態を読んだ値、途中の値）より先に押さえる
+	ir.WalkStatements(o.Body.Statements, func(s ir.Statement) {
+		switch c := s.(type) {
+		case ir.ValStmt:
 			b.taken[golang.LocalName(c.Name, e.reserved)] = true
+		case ir.ForStmt:
+			b.taken[golang.LocalName(c.Var, e.reserved)] = true
 		}
-	}
+	})
 	return b
 }
 
@@ -116,10 +121,25 @@ func (b *bodyGen) push() {
 }
 func (b *bodyGen) pop() { b.scopes = b.scopes[:len(b.scopes)-1] }
 
-// line は、今の字下げで一行書く。
+// line は、今の字下げで一行書く。err を作る文（…, err := …）なら、今のブロックで、err が見えるようになる。
 func (b *bodyGen) line(s string) {
 	b.buf.WriteString(strings.Repeat("\t", b.depth) + s + "\n")
 	b.terminated = false
+	if strings.Contains(s, ", err := ") && !strings.HasPrefix(s, "if ") {
+		b.scopes[len(b.scopes)-1].err = true
+	}
+}
+
+// needErr は、`x, err = <呼び出し>` の前に呼ぶ: err が、まだ、見えていなければ、`var err error` を置く
+// （docs/plugin-go.md「文」）。
+func (b *bodyGen) needErr() {
+	for _, sc := range b.scopes {
+		if sc.err {
+			return
+		}
+	}
+	b.line("var err error")
+	b.scopes[len(b.scopes)-1].err = true
 }
 
 // fresh は base を元に、まだ使っていない Go の識別子を作る（当たれば、当たらなくなるまで末尾に _ を足す）。
@@ -200,10 +220,7 @@ func (b *bodyGen) fail() {
 // gen は、メソッド一つを書く。
 func (b *bodyGen) gen() {
 	e, o := b.e, b.op
-	stmts := o.Body.Statements
-	for i, s := range stmts {
-		b.stmt(s, stmts[i+1:])
-	}
+	b.block(o.Body.Statements)
 	if !b.terminated && b.ret == nil {
 		b.line("return nil") // 本体の終わり（戻り値のない配線）
 	}
@@ -1013,27 +1030,20 @@ func usesName(stmts []ir.Statement, name string) bool {
 		}
 		return false
 	}
-	for _, s := range stmts {
-		switch x := s.(type) {
-		case ir.ConstStmt:
-			if inExpr(x.Expr) {
-				return true
-			}
-		case ir.ReturnStmt:
-			if inExpr(x.Expr) {
-				return true
-			}
-		case ir.CallStmt:
-			if inCall(&x.Call) {
-				return true
-			}
-		case ir.MatchStmt:
-			if inMatch(&x.Match) {
-				return true
-			}
+	used := false
+	ir.WalkStatements(stmts, func(s ir.Statement) {
+		if used {
+			return
 		}
-	}
-	return false
+		if f, ok := s.(ir.ForStmt); ok {
+			used = inAtom(f.Of)
+			return
+		}
+		if x, ok := ir.StatementExpr(s); ok {
+			used = inExpr(x)
+		}
+	})
+	return used
 }
 
 // bind は、束縛名 name を、型 typ の Go の変数として、今のブロックに足す。
@@ -1044,16 +1054,33 @@ func (b *bodyGen) bind(name string, typ ir.Type) string {
 	return goName
 }
 
-// stmt は文一つ。rest は後ろの文（束縛が使われるかの判定）。
+// stmt は文一つ。rest は、同じブロックの、後ろの文（val が読まれるかの判定）。
 func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 	switch x := s.(type) {
-	case ir.ConstStmt:
+	case ir.ValStmt:
+		if x.Expr == nil {
+			// 空の宣言: var x T
+			name := b.bind(x.Name, x.Type)
+			b.line("var " + name + " " + b.f.goType(x.Type))
+			b.markUnused(name, x.Name, rest)
+			return
+		}
 		switch ex := x.Expr.(type) {
 		case ir.CallExpr:
 			var states []string
 			statesOfCall(&ex.Call, &states)
 			b.read(states, nil)
 			ci := b.call(&ex.Call)
+			if x.Type != nil && ci.ret != nil && !b.sameGo(ci.ret, x.Type) {
+				// 型を書いた val で、型をそろえる
+				v := b.temp()
+				b.line(v + ", err := " + ci.expr)
+				b.fail()
+				name := b.bind(x.Name, x.Type)
+				b.line(name + " := " + b.convert(v, ci.ret, x.Type))
+				b.markUnused(name, x.Name, rest)
+				return
+			}
 			name := b.bind(x.Name, ci.ret)
 			b.line(name + ", err := " + ci.expr)
 			b.fail()
@@ -1062,12 +1089,82 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 			var states []string
 			statesOfAtom(ex.Atom, &states)
 			b.read(states, nil)
-			expr, typ := b.atom(ex.Atom, nil)
+			expr, typ := b.atom(ex.Atom, x.Type)
+			if x.Type != nil {
+				typ = x.Type
+			}
 			name := b.bind(x.Name, typ)
 			b.line(name + " := " + expr)
 			b.markUnused(name, x.Name, rest)
 		case ir.MatchExpr:
-			b.match(&ex.Match, modeConst, x.Name, rest)
+			b.match(&ex.Match, modeConst, x.Name, x.Type, rest)
+		}
+	case ir.AssignStmt:
+		l, ok := b.lookupVar(x.Name)
+		if !ok {
+			b.e.errorf(codeInternal, b.op.Name, "op %s の配線が、宣言のない val %s に値を入れている（検査を通った IR には来ないはずの形）", b.op.Name, x.Name)
+			return
+		}
+		switch ex := x.Expr.(type) {
+		case ir.CallExpr:
+			var states []string
+			statesOfCall(&ex.Call, &states)
+			b.read(states, nil)
+			ci := b.call(&ex.Call)
+			if ci.ret != nil && l.typ != nil && !b.sameGo(ci.ret, l.typ) {
+				v := b.temp()
+				b.line(v + ", err := " + ci.expr)
+				b.fail()
+				b.line(l.expr + " = " + b.convert(v, ci.ret, l.typ))
+				return
+			}
+			b.needErr()
+			b.line(l.expr + ", err = " + ci.expr)
+			b.fail()
+		case ir.AtomExpr:
+			var states []string
+			statesOfAtom(ex.Atom, &states)
+			b.read(states, nil)
+			expr, _ := b.atom(ex.Atom, l.typ)
+			b.line(l.expr + " = " + expr)
+		case ir.MatchExpr:
+			b.match(&ex.Match, modeAssign, x.Name, l.typ, nil)
+		}
+	case ir.CollectStmt:
+		l, ok := b.lookupVar(x.Name)
+		if !ok {
+			b.e.errorf(codeInternal, b.op.Name, "op %s の配線が、宣言のない val %s に集めている（検査を通った IR には来ないはずの形）", b.op.Name, x.Name)
+			return
+		}
+		var elem ir.Type
+		if arr, isArray := strip(l.typ).(ir.ArrayType); isArray {
+			elem = arr.Of
+		}
+		switch ex := x.Expr.(type) {
+		case ir.CallExpr:
+			var states []string
+			statesOfCall(&ex.Call, &states)
+			b.read(states, nil)
+			ci := b.call(&ex.Call)
+			v := b.temp()
+			b.line(v + ", err := " + ci.expr)
+			b.fail()
+			value := v
+			if elem != nil && ci.ret != nil {
+				value = b.convert(v, ci.ret, elem)
+			}
+			b.line(l.expr + " = append(" + l.expr + ", " + value + ")")
+		case ir.AtomExpr:
+			var states []string
+			statesOfAtom(ex.Atom, &states)
+			b.read(states, nil)
+			expr, _ := b.atom(ex.Atom, elem)
+			b.line(l.expr + " = append(" + l.expr + ", " + expr + ")")
+		case ir.MatchExpr:
+			// v<n> に、val v<n> = match と同じに受けてから、集める
+			v := b.temp()
+			b.matchInto(&ex.Match, v, elem)
+			b.line(l.expr + " = append(" + l.expr + ", " + v + ")")
 		}
 	case ir.ReturnStmt:
 		switch ex := x.Expr.(type) {
@@ -1083,7 +1180,7 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 			expr, _ := b.atom(ex.Atom, b.ret)
 			b.returnValue(expr)
 		case ir.MatchExpr:
-			b.match(&ex.Match, modeReturn, "", nil)
+			b.match(&ex.Match, modeReturn, "", nil, nil)
 		}
 	case ir.CallStmt:
 		var states []string
@@ -1091,8 +1188,70 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 		b.read(states, nil)
 		b.callStmt(b.call(&x.Call))
 	case ir.MatchStmt:
-		b.match(&x.Match, modeStmt, "", nil)
+		b.match(&x.Match, modeStmt, "", nil, nil)
+	case ir.DisjointStmt:
+		// 直列に出す: // disjoint の一行と、一つの Go のブロック。ブロックのアームは、Go のブロック。文の一つのアームは、その文のまま
+		b.line("// disjoint")
+		b.line("{")
+		b.depth++
+		b.push()
+		for _, arm := range x.Arms {
+			if len(arm.Statements) == 1 && !isBlockArm(arm) {
+				b.stmt(arm.Statements[0], nil)
+				continue
+			}
+			b.line("{")
+			b.depth++
+			b.push()
+			b.block(arm.Statements)
+			b.pop()
+			b.depth--
+			b.line("}")
+		}
+		b.pop()
+		b.depth--
+		b.line("}")
+	case ir.ForStmt:
+		var states []string
+		statesOfAtom(x.Of, &states)
+		b.read(states, nil)
+		seq, _ := b.atom(x.Of, nil)
+		if x.Disjoint {
+			b.line("// disjoint")
+		}
+		if usesName(x.Body, x.Var) {
+			v := golang.LocalName(x.Var, b.e.reserved)
+			b.line("for _, " + v + " := range " + seq + " {")
+			b.depth++
+			b.push()
+			b.scopes[len(b.scopes)-1].vars[x.Var] = local{expr: v, typ: x.VarType}
+		} else {
+			b.line("for range " + seq + " {")
+			b.depth++
+			b.push()
+		}
+		b.block(x.Body)
+		b.pop()
+		b.depth--
+		b.line("}")
 	}
+}
+
+// block は、ブロック一つの文の並びを書く。
+func (b *bodyGen) block(stmts []ir.Statement) {
+	for i, s := range stmts {
+		b.stmt(s, stmts[i+1:])
+	}
+}
+
+// isBlockArm は、disjoint のアームが、ブロックで書かれたか: 文が一つでないか、その一つが val の宣言（文の一つのアームには、
+// val の宣言は書けないので、val で始まるアームは、ブロック）。
+func isBlockArm(arm ir.Arm) bool {
+	if len(arm.Statements) != 1 {
+		return true
+	}
+	_, isVal := arm.Statements[0].(ir.ValStmt)
+	return isVal
 }
 
 // markUnused は、束縛が下の行で使われていなければ `_ = x` を足す（WIRE-8 は warning。Go は、使わない変数をコンパイルしない）。
@@ -1573,40 +1732,82 @@ func (b *bodyGen) errorBranch(classify string) string {
 }
 
 // match は match を書く（docs/plugin-go.md「match」）: 分類の種類ごとの分け方と、使われ方ごとのアームの本体の組み合わせ。
-func (b *bodyGen) match(m *ir.Match, mode matchMode, bindName string, rest []ir.Statement) {
+//
+// mode が modeConst（val x = match）なら、分ける前に `var x <型>` を置く。modeAssign（x = match）なら、置かない
+// （空の宣言の所に、もう、ある）。typ は、val の型（書いた型か、解決した型）。nil なら、match の型。
+func (b *bodyGen) match(m *ir.Match, mode matchMode, bindName string, typ ir.Type, rest []ir.Statement) {
 	p := b.plan(m)
 	if p == nil {
 		return
 	}
-	// `const x = match` は、分ける前に `var x <match の型>` を置く
 	x := ""
-	var t ir.Type
-	if mode == modeConst {
-		t = b.matchType(p)
+	t := typ
+	if mode == modeConst || mode == modeAssign {
 		if t == nil {
-			b.e.errorf(codeInternal, b.op.Name, "op %s の配線の `const %s = match` の型が決まらない（検査を通った IR には来ないはずの形）", b.op.Name, bindName)
+			t = b.matchType(p)
+		}
+		if t == nil {
+			b.e.errorf(codeInternal, b.op.Name, "op %s の配線の `val %s = match` の型が決まらない（検査を通った IR には来ないはずの形）", b.op.Name, bindName)
 			return
 		}
-		x = golang.LocalName(bindName, b.e.reserved)
-		b.taken[x] = true
+		if mode == modeAssign {
+			l, _ := b.lookupVar(bindName)
+			x = l.expr
+		} else {
+			x = golang.LocalName(bindName, b.e.reserved)
+			b.taken[x] = true
+		}
 	}
-	if a := m.SubjectAtom(); a != nil {
-		b.line("// match " + subjectText(a) + " by " + m.Classify)
-	} else {
-		b.line("// match by " + m.Classify)
-	}
+	b.matchHead(m)
 	if mode == modeConst {
 		b.line("var " + x + " " + b.f.goType(t))
 	}
+	inner := mode
+	if mode == modeAssign {
+		inner = modeConst // アームの本体は、val x = match と同じ（x に入れる）
+	}
 	switch p.form {
 	case "nil", "len":
-		b.matchIf(p, mode, x, t)
+		b.matchIf(p, inner, x, t)
 	default:
-		b.matchSwitch(p, mode, x, t)
+		b.matchSwitch(p, inner, x, t)
 	}
 	if mode == modeConst {
 		b.scopes[len(b.scopes)-1].vars[bindName] = local{expr: x, typ: t}
 		b.markUnused(x, bindName, rest)
+	}
+}
+
+// matchHead は、分ける前の一行: `// match (<対象> by <分類>)`。
+func (b *bodyGen) matchHead(m *ir.Match) {
+	if a := m.SubjectAtom(); a != nil {
+		b.line("// match (" + subjectText(a) + " by " + m.Classify + ")")
+	} else {
+		b.line("// match (by " + m.Classify + ")")
+	}
+}
+
+// matchInto は、match の値を、新しい変数 v（型 typ。nil なら match の型）に受ける: `val v = match` と同じ形。
+func (b *bodyGen) matchInto(m *ir.Match, v string, typ ir.Type) {
+	p := b.plan(m)
+	if p == nil {
+		return
+	}
+	t := typ
+	if t == nil {
+		t = b.matchType(p)
+	}
+	if t == nil {
+		b.e.errorf(codeInternal, b.op.Name, "op %s の配線の、集める match の型が決まらない（検査を通った IR には来ないはずの形）", b.op.Name)
+		return
+	}
+	b.matchHead(m)
+	b.line("var " + v + " " + b.f.goType(t))
+	switch p.form {
+	case "nil", "len":
+		b.matchIf(p, modeConst, v, t)
+	default:
+		b.matchSwitch(p, modeConst, v, t)
 	}
 }
 

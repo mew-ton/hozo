@@ -101,7 +101,7 @@ namespace app {
     takeOptionalString(account.profile.name);
     takeOptionalString(account.profile.nick);
     takeOptionalTags(account.profile.address.tags);
-    const city = account.profile.address.city;
+    val city = account.profile.address.city;
     takeOptionalString(city);
     return account.profile.address.zip;
   }

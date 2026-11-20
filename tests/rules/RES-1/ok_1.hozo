@@ -3,7 +3,7 @@ namespace a {
   model User { id: string; }
   op ok(u: User): User;
   op use(u: User): User {
-    const v = ok(u);
+    val v = ok(u);
     return ok(v);
   }
 }

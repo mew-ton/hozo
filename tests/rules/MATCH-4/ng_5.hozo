@@ -14,22 +14,22 @@ namespace a {
   op takeN(n: N): void;
   op f(m: M, three: Three): void {
     // else は B、C、D、E を受ける: m は M のまま（case(K, [B, C, D, E], M) ではない）
-    match m by K {
+    match (m by K) {
       A    => none;
       else => onBToE(m);               // ERROR: MATCH-4
     };
     // else は IsMissing と IsBroken を受ける: three は Three のまま
-    match three by Whole {
+    match (three by Whole) {
       IsReady => takeM(three);
       else    => takeN(three);         // ERROR: MATCH-4
     };
     // else は Fresh と Old を受ける。どちらも M の as を持つが、x は M? のまま（名前で並べれば M）
-    const x = find();
-    match x by Stale {
+    val x = find();
+    match (x by Stale) {
       Gone => none;
       else => takeM(x);                // ERROR: MATCH-4
     };
-    match x by Stale {
+    match (x by Stale) {
       Gone       => none;
       Fresh, Old => takeM(x);
     };

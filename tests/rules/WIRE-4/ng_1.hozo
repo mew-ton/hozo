@@ -4,8 +4,8 @@ namespace a {
   op value(): M;
   op use(m: M): void;
   op twice(): void {
-    const x = value();
-    const x = value();                 // ERROR: WIRE-4
+    val x = value();
+    val x = value();                 // ERROR: WIRE-4
     use(x);
   }
 }

@@ -22,7 +22,7 @@ namespace shop {
     stock.reserve(item.id);
     save(item);
     nightly(item);
-    const receipt = issue(item);
+    val receipt = issue(item);
     return receipt;
   }
 

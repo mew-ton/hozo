@@ -11,7 +11,7 @@ namespace a {
     g();
   }
   op h(m: M) throws E {
-    match m by Kind { A => throw E; B => fail(); };    // ERROR: WIRE-9
+    match (m by Kind) { A => throw E; B => fail(); };    // ERROR: WIRE-9
     g();
   }
   op twice() throws E {

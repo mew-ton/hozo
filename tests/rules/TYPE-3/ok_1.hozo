@@ -10,7 +10,7 @@ namespace a {
   op toPublic(u: User): PublicUser;
   op gone(): never throws Gone;
   op mapped(): PublicUser {
-    const u = user();
+    val u = user();
     return toPublic(u);
   }
   op fromRecord(): Other {
@@ -23,6 +23,6 @@ namespace a {
     return gone();
   }
   op never2(u: User): int throws Gone {
-    return match u by Kind { A => throw Gone; B => gone(); };
+    return match (u by Kind) { A => throw Gone; B => gone(); };
   }
 }

@@ -98,7 +98,7 @@ namespace app {
   }
   export op total(): int
   {
-    const n = countLines();
+    val n = countLines();
     showCount(n);
     return n;
   }
@@ -148,14 +148,14 @@ namespace app {
   // 「match」アームの本体の read（return match、const）と、効果と直に呼ぶ組み込みの効果（文の match）
   export op findOrNone(item: string?): Line?
   {
-    return match item by nullable {
+    return match (item by nullable) {
       HasItems => lineFor(item);
       Empty    => none;
     };
   }
   export op countOrZero(item: string?): int
   {
-    const n = match item by nullable {
+    val n = match (item by nullable) {
       HasItems => countLines();
       Empty    => 0;
     };
@@ -163,7 +163,7 @@ namespace app {
   }
   export op toggle(t: Token)
   {
-    match token by nullable {
+    match (token by nullable) {
       HasItems => dropToken();
       Empty    => token.post(t);
     };
@@ -188,7 +188,7 @@ namespace app {
   // 「状態の参照」const と return。戻り値の型の零値で失敗を返す
   export op current(): Token?
   {
-    const t = token;
+    val t = token;
     showToken(t);
     return token;
   }
@@ -204,11 +204,11 @@ namespace app {
   // アームの本体だけが使う状態は、そのアームの枝の中で読む
   export op branches()
   {
-    match lines by list {
+    match (lines by list) {
       HasItems => showLines(lines);
       Empty    => show(settings.title);
     };
-    match token by nullable {
+    match (token by nullable) {
       HasItems => dropToken();
       Empty    => showToken(token);
     };
@@ -223,7 +223,7 @@ namespace app {
     lines.post(line);
     refresh();
     audit("finished");
-    const n = countLines();
+    val n = countLines();
     showCount(n);
     return summary();
   }

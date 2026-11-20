@@ -6,8 +6,8 @@ namespace a {
   classify Hit of find { Found: find as M; Missing: find as else; }
   op use(m: M);
   op ng() {
-    const m = find();
-    match m by Hit {                   // ERROR: MATCH-2
+    val m = find();
+    match (m by Hit) {                   // ERROR: MATCH-2
       Found => use(m);
     };
   }

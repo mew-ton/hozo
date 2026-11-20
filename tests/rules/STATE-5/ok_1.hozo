@@ -11,7 +11,7 @@ namespace a {
     return byId(id);
   }
   op insert(m: M) effects add throws Invalid {
-    const row = normalize(m);
+    val row = normalize(m);
     add(row);
   }
   // デコレータが運ぶ分は、葉の節ではない

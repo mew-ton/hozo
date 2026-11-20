@@ -5,7 +5,7 @@ namespace a {
   op noValue(): void;
   op ok(): M {
     noValue();
-    const m = value();
+    val m = value();
     return m;
   }
 }

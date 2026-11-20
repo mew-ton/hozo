@@ -5,6 +5,6 @@ namespace a {
   op use(m: M): void;
   op before(): void {
     use(y);                            // ERROR: RES-1
-    const y = value();                 // WARN: WIRE-8
+    val y = value();                 // WARN: WIRE-8
   }
 }

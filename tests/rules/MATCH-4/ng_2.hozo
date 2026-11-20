@@ -4,7 +4,7 @@ namespace a {
   classify C of M { A; B; }
   op onA(m: C.A<M>): void;
   op g(m: M): void {
-    match m by C {
+    match (m by C) {
       A, B => onA(m);                  // ERROR: MATCH-4
     };
   }

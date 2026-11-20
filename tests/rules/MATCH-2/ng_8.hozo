@@ -7,16 +7,16 @@ namespace a {
   classify Session of token { LoggedIn; LoggedOut; }
   op f();
   op ng() {
-    match by Checkout {                // ERROR: MATCH-2
+    match (by Checkout) {                // ERROR: MATCH-2
       Shopping => f();
     };
     // 状態の分類のケースに、標準の分類のケースは混ざらない
-    match by Checkout {                // ERROR: MATCH-2
+    match (by Checkout) {                // ERROR: MATCH-2
       Shopping => f();
       Ordered => none;
       Empty => none;
     };
-    match by Session {                 // ERROR: MATCH-2
+    match (by Session) {                 // ERROR: MATCH-2
       LoggedIn => f();
     };
   }

@@ -32,8 +32,8 @@ namespace browser {
   @page.route("/orders", from: query, onInvalid: transitionToOrders)
   op openOrders(query: OrdersQuery): OrderPage
   {
-    const me     = fetchMe();
-    const orders = fetchOrders(query);
+    val me     = fetchMe();
+    val orders = fetchOrders(query);
     return orderPageVm(me, orders);
   }
 
@@ -48,7 +48,7 @@ namespace browser {
   @page.route("/profile")
   op openProfile(): ProfilePage
   {
-    const me = fetchMe();
+    val me = fetchMe();
     return profilePageVm(me);
   }
 }

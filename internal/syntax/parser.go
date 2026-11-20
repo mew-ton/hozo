@@ -881,7 +881,14 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 	p.expect(token.Classify)
 	c := &ast.ClassifyDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent(), Cases: []*ast.ClassifyCase{}}
 	p.expect(token.Of)
-	c.Of = p.parseClassifySubject()
+	if p.at(token.Never) {
+		c.Never, c.NeverSpan = true, p.advance().Span
+		if p.at(token.Comma) {
+			p.fail(p.tok().Span, "never は、ほかの対象と並べられない（対象のない分類は of never だけ。docs/grammar.md「classify」）")
+		}
+	} else {
+		c.Of = p.parseClassifySubject()
+	}
 	p.expect(token.LBrace)
 	p.parseMembers(func() {
 		c.Cases = append(c.Cases, p.parseClassifyCase())
@@ -902,6 +909,10 @@ func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 	start := p.tok().Span.Start
 	if c.Doc != nil && p.at(token.RBrace) {
 		p.fail(c.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
+	}
+	c.Decorators, _ = p.parseDecorators()
+	if p.at(token.DocComment) {
+		p.fail(p.tok().Span, "ドキュメンテーションコメントは、デコレータより上に書く（docs/grammar.md「ファイルと宣言」）")
 	}
 	if p.at(token.Default) {
 		p.fail(p.tok().Span, "名前のないケース default は書けない。ケースには名前を付ける（値がない側や、union の残りのアームなら <名前>: <対象> as else;。仕様が使わない場合は、宣言しない。docs/grammar.md「classify」）")
@@ -1107,8 +1118,12 @@ func (p *parser) parseAnyType() *ast.AnyType {
 		a.Kind = ast.AnyModel
 	case p.atContextual("variant"):
 		a.Kind = ast.AnyVariant
+	case p.at(token.Classify):
+		a.Kind, a.Case = ast.AnyCase, p.parseCaseKind()
+		a.Span = p.spanFrom(start)
+		return a
 	default:
-		p.failExpected("any の種類（exception / effect / state / op / model / variant）")
+		p.failExpected("any の種類（exception / effect / state / op / model / variant / classify … case）")
 	}
 	p.advance()
 	if p.got(token.On) {
@@ -1139,11 +1154,39 @@ func (p *parser) parseTarget() *ast.Target {
 		t.Kind = ast.TargetEffect
 	case p.at(token.Read):
 		t.Kind = ast.TargetRead
+	case p.at(token.Classify):
+		t.Kind, t.Case = ast.TargetCase, p.parseCaseKind()
+		t.Span = t.Case.Span
+		return t
 	default:
-		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect / read）")
+		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect / read / classify … case）")
 	}
 	p.advance()
 	return t
+}
+
+// parseCaseKind は CaseKind = "classify" [ QualifiedName ] [ "of" "never" ] "case" を読む（分類のケース）。
+// case のない classify（分類そのもの）は、まだ、書けない。of の後ろに書けるのは never だけ。
+func (p *parser) parseCaseKind() *ast.CaseKind {
+	start := p.expect(token.Classify).Span.Start
+	k := &ast.CaseKind{}
+	if p.atName() {
+		n := p.parseQualifiedName()
+		k.Classify = &n
+	}
+	if p.got(token.Of) {
+		if !p.at(token.Never) {
+			p.fail(p.tok().Span, "デコレータの宣言の classify … case で、of の後ろに書けるのは never だけ（docs/grammar.md「decorator の宣言」）")
+		}
+		p.advance()
+		k.Never = true
+	}
+	if !p.at(token.Case) {
+		p.fail(p.tok().Span, "分類のケースは classify … case と書く（case のない classify は、まだ、書けない。docs/grammar.md「decorator の宣言」）")
+	}
+	p.advance()
+	k.Span = p.spanFrom(start)
+	return k
 }
 
 // parseThrowsClause は ThrowsClause = "throws" ExcRef { "," ExcRef } { Relation } を読む。
@@ -1373,48 +1416,186 @@ func (p *parser) parseBlock() *ast.Block {
 	start := p.expect(token.LBrace).Span.Start
 	b := &ast.Block{Stmts: []ast.Stmt{}}
 	p.parseMembers(func() {
-		b.Stmts = append(b.Stmts, p.parseStmt())
+		b.Stmts = append(b.Stmts, p.parseStmt(false)...)
 	})
 	p.expect(token.RBrace)
 	b.Span = p.spanFrom(start)
 	return b
 }
 
-// parseStmt は Stmt = "const" Ident "=" Expr ";" | "return" Expr ";" | Call ";" | Match ";" を読む。
-func (p *parser) parseStmt() ast.Stmt {
+// end は End = [ ";" ] を読む。";" を省けるのは、直前の字句が "}" のときだけ（docs/grammar.md「配線」）。
+func (p *parser) end() {
+	if p.got(token.Semicolon) {
+		return
+	}
+	if p.pos > 0 && p.toks[p.pos-1].Kind == token.RBrace {
+		return
+	}
+	p.expect(token.Semicolon)
+}
+
+// parseStmt は文を一つ読む（docs/grammar.md「配線」の Stmt）。名前を並べた空の val は、名前ごとの文になるので、並びを返す。
+// arm が真なら、disjoint の、文の一つのアーム（ArmStmt）: val の宣言と return は書けない。
+//
+//	Stmt = ValDecl | Assign | Collect | "return" Expr End | Call End | Match End | Disjoint End | [ "disjoint" ] For End ;
+func (p *parser) parseStmt(arm bool) []ast.Stmt {
 	start := p.tok().Span.Start
 	switch p.tok().Kind {
-	case token.Const:
-		p.advance()
-		s := &ast.ConstStmt{Name: p.parseIdent()}
-		p.expect(token.Assign)
-		s.Value = p.parseExpr()
-		p.expect(token.Semicolon)
-		s.Span = p.spanFrom(start)
-		return s
+	case token.Val:
+		if arm {
+			p.fail(p.tok().Span, "disjoint の、文の一つのアームに、val の宣言は書けない（宣言は、ブロックのアーム { … } の中に書く。docs/grammar.md「配線」）")
+		}
+		return p.parseVal()
 	case token.Return:
+		if arm {
+			p.fail(p.tok().Span, "disjoint のアームに、return は書けない（docs/grammar.md「配線」）")
+		}
 		p.advance()
 		s := &ast.ReturnStmt{Value: p.parseExpr()}
-		p.expect(token.Semicolon)
+		p.end()
 		s.Span = p.spanFrom(start)
-		return s
+		return []ast.Stmt{s}
 	case token.Match:
 		s := &ast.MatchStmt{Match: p.parseMatch()}
-		p.expect(token.Semicolon)
+		p.end()
 		s.Span = p.spanFrom(start)
-		return s
+		return []ast.Stmt{s}
+	case token.Disjoint:
+		if p.peek(1).Kind == token.For {
+			return []ast.Stmt{p.parseFor()}
+		}
+		return []ast.Stmt{p.parseDisjoint()}
+	case token.For:
+		return []ast.Stmt{p.parseFor()}
 	case token.Ident, token.QualifiedName:
+		if p.at(token.Ident) {
+			switch {
+			case p.tok().Text == "const" && p.peek(1).Kind == token.Ident:
+				p.fail(p.tok().Span, "const は、なくした書き方。val と書く: val 名前 = 式;（docs/grammar.md「配線」）")
+			case p.peek(1).Kind == token.Assign:
+				s := &ast.AssignStmt{Name: p.parseIdent()}
+				p.expect(token.Assign)
+				s.Value = p.parseExpr()
+				p.end()
+				s.Span = p.spanFrom(start)
+				return []ast.Stmt{s}
+			case p.peek(1).Kind == token.Collect:
+				s := &ast.CollectStmt{Name: p.parseIdent()}
+				p.expect(token.Collect)
+				s.Value = p.parseExpr()
+				p.end()
+				s.Span = p.spanFrom(start)
+				return []ast.Stmt{s}
+			}
+		}
 		s := &ast.CallStmt{Call: p.parseCall()}
-		p.expect(token.Semicolon)
+		p.end()
 		s.Span = p.spanFrom(start)
-		return s
+		return []ast.Stmt{s}
 	case token.DocComment:
 		p.fail(p.tok().Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	case token.Throw:
 		p.fail(p.tok().Span, "throw は match のアームの本体にだけ書ける（docs/grammar.md「配線」）")
+	case token.Semicolon:
+		p.fail(p.tok().Span, "「何もしない文」は、ない。; は、文の終わりに、一つだけ書く（docs/grammar.md「配線」）")
 	}
-	p.failExpected("文（const / return / 呼び出し / match）")
+	if arm {
+		p.failExpected("disjoint のアーム（ブロック { … } か、文の一つ: 値を入れる / 集める / 呼び出し / match / disjoint / for）")
+	}
+	p.failExpected("文（val / 値を入れる / 集める / return / 呼び出し / match / disjoint / for）")
 	return nil
+}
+
+// parseVal は ValDecl を読む。名前を並べた空の宣言は、名前ごとの ValStmt にする。
+//
+//	ValDecl = "val" ValName { "," ValName } End | "val" Ident [ ":" Type ] "=" Expr End ;
+//	ValName = Ident [ ":" Type ] ;
+func (p *parser) parseVal() []ast.Stmt {
+	start := p.expect(token.Val).Span.Start
+	var out []ast.Stmt
+	for {
+		nameStart := p.tok().Span.Start
+		if len(out) == 0 {
+			nameStart = start
+		}
+		s := &ast.ValStmt{Name: p.parseIdent()}
+		if p.got(token.Colon) {
+			s.Type = p.parseType()
+		}
+		if p.at(token.Assign) {
+			if len(out) > 0 {
+				p.fail(p.tok().Span, "値と一緒に宣言する val は、一つの文に、一つ（val a = …; val b = …; と分ける。名前を並べられるのは、空の宣言だけ。docs/grammar.md「配線」）")
+			}
+			p.advance()
+			s.Value = p.parseExpr()
+			if p.at(token.Comma) {
+				p.fail(p.tok().Span, "値と一緒に宣言する val は、一つの文に、一つ（val a = …; val b = …; と分ける。名前を並べられるのは、空の宣言だけ。docs/grammar.md「配線」）")
+			}
+			p.end()
+			s.Span = p.spanFrom(start)
+			return []ast.Stmt{s}
+		}
+		s.Span = p.spanFrom(nameStart)
+		out = append(out, s)
+		if !p.got(token.Comma) {
+			break
+		}
+	}
+	p.end()
+	return out
+}
+
+// parseDisjoint は Disjoint = "disjoint" "{" Arm Arm { Arm } "}" を読む。Arm = Block End | ArmStmt。
+func (p *parser) parseDisjoint() ast.Stmt {
+	kw := p.expect(token.Disjoint)
+	s := &ast.DisjointStmt{Keyword: kw.Span}
+	p.expect(token.LBrace)
+	p.parseMembers(func() {
+		armStart := p.tok().Span.Start
+		arm := &ast.Arm{}
+		if p.at(token.LBrace) {
+			b := p.parseBlock()
+			p.got(token.Semicolon)
+			arm.Block, arm.Stmts = true, b.Stmts
+		} else {
+			arm.Stmts = p.parseStmt(true)
+		}
+		arm.Span = p.spanFrom(armStart)
+		s.Arms = append(s.Arms, arm)
+	})
+	p.expect(token.RBrace)
+	if len(s.Arms) < 2 {
+		p.errorAt(kw.Span, "disjoint には、アームが二つ以上要る（docs/grammar.md「配線」）")
+	}
+	p.end()
+	s.Span = p.spanFrom(kw.Span.Start)
+	return s
+}
+
+// parseFor は [ "disjoint" ] For を読む。For = "for" "(" "val" Ident "of" Atom ")" Block。
+func (p *parser) parseFor() ast.Stmt {
+	start := p.tok().Span.Start
+	s := &ast.ForStmt{Keyword: p.tok().Span}
+	if p.got(token.Disjoint) {
+		s.Disjoint = true
+	}
+	p.expect(token.For)
+	p.expect(token.LParen)
+	if !p.at(token.Val) {
+		p.fail(p.tok().Span, "for の頭は (val 名前 of 並び) の形だけ（数を増やしながら回す形は、ない。docs/grammar.md「配線」）")
+	}
+	p.advance()
+	s.Var = p.parseIdent()
+	p.expect(token.Of)
+	if p.atName() && p.peek(1).Kind == token.LParen {
+		p.fail(p.tok().Span, "for の並びに、呼び出しは書けない（先に val に受ける: val xs = f(…); for (val x of xs) { … }。docs/grammar.md「配線」）")
+	}
+	s.Seq = p.parseAtom()
+	p.expect(token.RParen)
+	s.Body = p.parseBlock()
+	p.end()
+	s.Span = p.spanFrom(start)
+	return s
 }
 
 // parseExpr は Expr = Call | Match | Atom を読む。
@@ -1513,6 +1694,10 @@ func (p *parser) parseRecordLit() *ast.RecordLit {
 func (p *parser) parseMatch() *ast.Match {
 	start := p.expect(token.Match).Span.Start
 	m := &ast.Match{}
+	if !p.at(token.LParen) {
+		p.fail(p.tok().Span, "match の頭は、全体を、丸括弧で囲む: match (x by C) { … }（丸括弧のない頭は、なくした書き方。docs/grammar.md「配線」）")
+	}
+	p.advance()
 	if !p.at(token.By) {
 		m.Subject = p.parseAtom()
 	}
@@ -1527,6 +1712,7 @@ func (p *parser) parseMatch() *ast.Match {
 	default:
 		m.Classifier = p.parseQualifiedName()
 	}
+	p.expect(token.RParen)
 	p.expect(token.LBrace)
 	sawElse := false
 	p.parseMembers(func() {

@@ -111,7 +111,7 @@ namespace api {
     effects createSession
     throws Invalid prevents effects
   {
-    const session = issue(in);
+    val session = issue(in);
     createSession(session);
     return session;
   }
@@ -162,8 +162,8 @@ namespace api {
   op whenLive(user: User?, live: Session[]): User?;
   /** 識別子からユーザーを引く */
   export op findUser(id: UserId): User? reads users, sessionsOf reads users {
-    const user = userById(id);
-    const live = sessionsOf(id);
+    val user = userById(id);
+    val live = sessionsOf(id);
     return whenLive(user, live);
   }
   // docs/ir.md「型」: never は Op.returns にだけ現れる。docs/check.md「純粋」: throws は純粋さを変えない
@@ -188,8 +188,8 @@ namespace api {
   op currentName(id: UserId): string
     throws NotFound
   {
-    const user = findUser(id);
-    return match user by Lookup {
+    val user = findUser(id);
+    return match (user by Lookup) {
       Found => nameOf(user);
       else  => throw NotFound;
     };
@@ -199,7 +199,7 @@ namespace api {
   // docs/check.md「reads」: match の対象と Atom が参照する状態
   op tokenOrNone(): Token?
   {
-    return match current by nullable {
+    return match (current by nullable) {
       HasItems => current;
       Empty    => none;
     };
@@ -215,7 +215,7 @@ namespace api {
   op guard(): Token
     throws Unauthorized
   {
-    return match by SignedIn {
+    return match (by SignedIn) {
       Yes => current;
       No  => unauthorized();
     };
@@ -312,19 +312,19 @@ namespace api {
     reads userById
     throws Invalid, NotFound
   {
-    const user = userById(id);
-    const token = match user by Lookup {
+    val user = userById(id);
+    val token = match (user by Lookup) {
       Found   => mint(user);
       Missing => throw NotFound;
     };
-    const session = match user by Lookup {
+    val session = match (user by Lookup) {
       Found   => sessionOf(user, token);
       Missing => throw NotFound;
     };
     sessions.post(session);
     current.post(token);
     api.current.put(token);
-    return match creds by Strength {
+    return match (creds by Strength) {
       Weak   => throw Invalid("weak password");
       Strong => keep(token);
     };
@@ -357,15 +357,15 @@ namespace api {
   op memberName(id: UserId): string
     throws NotFound
   {
-    const user = findUser(id);
-    return match user by Membership {
+    val user = findUser(id);
+    return match (user by Membership) {
       Member   => nameOf(user);
       Stranger => throw NotFound;
     };
   }
   op shownName(shown: Shown): string
   {
-    return match shown by Detail {
+    return match (shown by Detail) {
       Short => shown;
       Full  => nameOf(shown);
     };
@@ -384,7 +384,7 @@ namespace api {
   op standingName(user: User): string
     throws NotFound
   {
-    return match user by Standing {
+    return match (user by Standing) {
       Closed => throw NotFound;
       else   => nameOf(user);
     };
@@ -392,7 +392,7 @@ namespace api {
   // 名前で並べたアーム（区切りは ","）は、cases が書かれた順で、else は false
   op standingNote(user: User): string
   {
-    return match user by Standing {
+    return match (user by Standing) {
       Idle, Fresh => "new or idle";
       Active      => nameOf(user);
       else        => "gone";
@@ -402,8 +402,8 @@ namespace api {
   op arrivedName(id: UserId): string
     throws NotFound
   {
-    const user = findUser(id);
-    return match user by Membership {
+    val user = findUser(id);
+    return match (user by Membership) {
       Stranger => throw NotFound;
       else     => nameOf(user);
     };
@@ -411,8 +411,8 @@ namespace api {
   // ケースが一つの分類での match。値がないことは、分類の誤り（docs/check.md「閉じた分類」）で、throws には現れない
   op onlyArrived(id: UserId): string
   {
-    const user = findUser(id);
-    return match user by Arrival {
+    val user = findUser(id);
+    return match (user by Arrival) {
       Arrived => nameOf(user);
     };
   }
@@ -441,15 +441,15 @@ namespace api {
   // docs/check.md「行の遷移」の「呼ぶ側の検査」: 前のケースを並べた効果は、そのケースを受けるアームの中で呼ぶ
   op restUser(user: User, now: Time)
   {
-    match user by Standing {
+    match (user by Standing) {
       Fresh, Active => rest(user, now);
       else          => none;
     };
   }
   op forgetUser(id: UserId)
   {
-    const user = userById(id);
-    match user by Enrolment {
+    val user = userById(id);
+    match (user by Enrolment) {
       Lapsed         => forget(user);
       Fresh, Unknown => none;
     };

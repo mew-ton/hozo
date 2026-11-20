@@ -7,13 +7,13 @@ namespace a {
   classify Kind of M { A; B; }
   op fail(): never throws F;
   op f(m: M): M {                      // ERROR: THROWS-1
-    return match m by Kind {
+    return match (m by Kind) {
       A => m;
       B => throw E;
     };
   }
   op g(m: M): M throws E {             // ERROR: THROWS-1
-    return match m by Kind {
+    return match (m by Kind) {
       A => throw E;
       B => fail();
     };

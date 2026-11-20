@@ -6,7 +6,7 @@ namespace a {
   classify Checkout of carts, orders { Shopping; Ordered; }
   op f();
   op ng(m: M) {
-    match m by Checkout { Shopping => f(); Ordered => none; };       // ERROR: MATCH-7
-    match carts by Checkout { Shopping => f(); Ordered => none; };   // ERROR: MATCH-7
+    match (m by Checkout) { Shopping => f(); Ordered => none; };       // ERROR: MATCH-7
+    match (carts by Checkout) { Shopping => f(); Ordered => none; };   // ERROR: MATCH-7
   }
 }

@@ -3,7 +3,7 @@ namespace a {
   model In { token: string?; lines: string[]; }
   op f();
   op ng(in: In) {
-    match in.token by nullable { HasItems => f(); };                 // ERROR: MATCH-2
-    match in.lines by list { Empty => f(); Some => none; };          // ERROR: MATCH-2
+    match (in.token by nullable) { HasItems => f(); };                 // ERROR: MATCH-2
+    match (in.lines by list) { Empty => f(); Some => none; };          // ERROR: MATCH-2
   }
 }

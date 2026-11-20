@@ -9,10 +9,10 @@ namespace a {
   op use(m: M);
   op f();
   op ok() {
-    const m = find();
-    match m by Hit { Found => use(m); Missing => none; };
-    match m by Hit { Found, Missing => f(); };
-    match m by Hit { Found => use(m); else => none; };
-    match by Session { LoggedOut => f(); LoggedIn => none; };
+    val m = find();
+    match (m by Hit) { Found => use(m); Missing => none; };
+    match (m by Hit) { Found, Missing => f(); };
+    match (m by Hit) { Found => use(m); else => none; };
+    match (by Session) { LoggedOut => f(); LoggedIn => none; };
   }
 }

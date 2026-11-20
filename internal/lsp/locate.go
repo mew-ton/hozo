@@ -151,11 +151,25 @@ func (s *server) declIndex(id source.FileID) []declEntry {
 				}
 				docTags(d.Doc, ns, fqn, params, sema.TargetOpParam)
 				if d.Body != nil {
-					for _, st := range d.Body.Stmts {
-						if c, ok := st.(*ast.ConstStmt); ok {
-							add(c.Name.Span, sema.Target{Kind: sema.TargetBinding, Decl: fqn, Name: c.Name.Name})
+					var stmts func(list []ast.Stmt)
+					stmts = func(list []ast.Stmt) {
+						for _, st := range list {
+							switch c := st.(type) {
+							case *ast.ValStmt:
+								add(c.Name.Span, sema.Target{Kind: sema.TargetBinding, Decl: fqn, Name: c.Name.Name})
+							case *ast.DisjointStmt:
+								for _, arm := range c.Arms {
+									stmts(arm.Stmts)
+								}
+							case *ast.ForStmt:
+								add(c.Var.Span, sema.Target{Kind: sema.TargetBinding, Decl: fqn, Name: c.Var.Name})
+								if c.Body != nil {
+									stmts(c.Body.Stmts)
+								}
+							}
 						}
 					}
+					stmts(d.Body.Stmts)
 				}
 			}
 		}

@@ -4,7 +4,7 @@ namespace a {
   op value(): M;
   op use(m: M): void;
   op ok(m: M): void {
-    const x = value();
+    val x = value();
     use(x);
     use(m);
   }

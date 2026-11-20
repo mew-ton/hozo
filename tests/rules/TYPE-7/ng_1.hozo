@@ -3,7 +3,7 @@ namespace a {
   model In { id: string; }
   op take(in: In): void;
   op f(): void {
-    const x = { id: "x" };             // ERROR: TYPE-7
+    val x = { id: "x" };             // ERROR: TYPE-7
     take(x);
   }
 }

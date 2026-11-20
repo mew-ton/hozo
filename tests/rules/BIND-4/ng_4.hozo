@@ -15,10 +15,10 @@ namespace a {
     add();                               // ERROR: BIND-4
     add({ id: "x" });                    // ERROR: BIND-4
     rows.post();                         // ERROR: BIND-4
-    const found = byToken();             // ERROR: BIND-4
-    const bound = viaOp();
+    val found = byToken();             // ERROR: BIND-4
+    val bound = viaOp();
     use(found, bound);
-    return match m by K {
+    return match (m by K) {
       A => throw Busy;                   // ERROR: BIND-4
       B => byToken(token, m.id);
     };

@@ -13,15 +13,15 @@ namespace a {
   state token: nullable<string>;
   classify Session of token { LoggedIn; LoggedOut; }
   op ok(m: M): void {
-    match m by C { A => use(m); else => none; };
-    match m by D { A => use(m); else => none; };
-    match m by D { A, B, C, D => use(m); else => none; };
-    const x = find();
-    match x by Hit { Found => use(x); else => none; };
-    match x by Hit { Missing => none; else => use(x); };
-    match x by Arrival { Arrived => use(x); };
-    match carts by list { HasItems => f(); else => none; };
-    match token by nullable { Empty => f(); else => none; };
-    match by Session { LoggedIn => f(); else => none; };
+    match (m by C) { A => use(m); else => none; };
+    match (m by D) { A => use(m); else => none; };
+    match (m by D) { A, B, C, D => use(m); else => none; };
+    val x = find();
+    match (x by Hit) { Found => use(x); else => none; };
+    match (x by Hit) { Missing => none; else => use(x); };
+    match (x by Arrival) { Arrived => use(x); };
+    match (carts by list) { HasItems => f(); else => none; };
+    match (token by nullable) { Empty => f(); else => none; };
+    match (by Session) { LoggedIn => f(); else => none; };
   }
 }

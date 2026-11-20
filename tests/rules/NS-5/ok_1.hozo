@@ -3,11 +3,11 @@
 namespace a {
   op local(): b.M;
   op f(): b.M throws b.E {
-    const m = local();
+    val m = local();
     return b.keep(m);
   }
   op g(m: b.M): b.M throws b.E {
-    return match m by b.Kind {
+    return match (m by b.Kind) {
       A => b.keep(m);
       B => throw b.E;
     };

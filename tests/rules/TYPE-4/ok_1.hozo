@@ -11,12 +11,12 @@ namespace a {
   op email(): Email;
   op toM(n: N): M;
   op i(): void {
-    const x = n();
-    const m = toM(x);
+    val x = n();
+    val m = toM(x);
     takeM(m);
     takeInt(1);
     takeOpt(none);
-    const e = email();
+    val e = email();
     takeString(e);
   }
   decorator l(xs: string[]);

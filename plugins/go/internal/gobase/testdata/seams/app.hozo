@@ -40,7 +40,7 @@ namespace shop {
   @t.limited
   export op buy(id: string): Item
   {
-    const item = find(id);
+    val item = find(id);
     add(item);
     return item;
   }

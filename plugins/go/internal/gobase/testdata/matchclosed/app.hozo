@@ -39,24 +39,24 @@ namespace app {
   // return match: 値のある場合が if の枝。もう一方は、分類の誤りの枝（else を書かずに後ろに続ける。頭のコメントは書かない）
   @mark export op arrivedName(name: string): string
   {
-    const user = findUser(name);
-    return match user by Arrival {
+    val user = findUser(name);
+    return match (user by Arrival) {
       Arrived => nameOf(user);
     };
   }
 
-  // const x = match と、文の match: 分類の誤りの枝は、else の枝。if の枝の中身がなければ（none のアーム）、条件を逆にして、
+  // val x = match と、文の match: 分類の誤りの枝は、else の枝。if の枝の中身がなければ（none のアーム）、条件を逆にして、
   // 分類の誤りの枝だけを書く。どの形でも、値がなければ、通り抜けずに、分類の誤りを返す
   @mark export op arrivedForms(name: string): string
   {
-    const user = findUser(name);
-    const text = match user by Arrival {
+    val user = findUser(name);
+    val text = match (user by Arrival) {
       Arrived => nameOf(user);
     };
-    match user by Arrival {
+    match (user by Arrival) {
       Arrived => show(text);
     };
-    match user by Arrival {
+    match (user by Arrival) {
       Arrived => none;
     };
     return text;
@@ -65,7 +65,7 @@ namespace app {
   // 型で決まる状態の分類（presence）で、残りのケースを書かない: 対象の状態を読んでから分ける
   export op heldText(): string
   {
-    return match by Held {
+    return match (by Held) {
       Holding => useToken(token);
     };
   }
@@ -74,7 +74,7 @@ namespace app {
   export op nameOrDeny(user: User?): string
     throws Denied
   {
-    return match user by Present {
+    return match (user by Present) {
       Some => nameOf(user);
       else => deny();
     };
@@ -83,7 +83,7 @@ namespace app {
   // else のアームが、値のある側のケース（Some）を受ける: 受けるケースが一つなので、対象は絞り込まれる（*<対象>）
   export op nameOrNobody(user: User?): string
   {
-    return match user by Present {
+    return match (user by Present) {
       Nothing => "nobody";
       else    => nameOf(user);
     };
@@ -92,11 +92,11 @@ namespace app {
   // 標準の分類の else のアーム（nullable の HasItems を受けて絞り込まれる。list の Empty を受ける）
   @mark export op standard(user: User?, lines: Line[]): string
   {
-    match lines by list {
+    match (lines by list) {
       HasItems => show("some");
       else     => show("none");
     };
-    return match user by nullable {
+    return match (user by nullable) {
       Empty => "nobody";
       else  => nameOf(user);
     };

@@ -6,7 +6,7 @@ namespace a {
     b.g();
   }
   op h(x: string?): string {
-    return match x by b.Present {
+    return match (x by b.Present) {
       Some => keep(x);
       else    => keep("none");
     };

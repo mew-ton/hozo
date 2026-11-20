@@ -6,7 +6,7 @@ namespace a {
   op wide(m: M): void;
   op onAorB(m: C.A<M>): void;
   op ok(m: M): void {
-    match m by C {
+    match (m by C) {
       A => onA(m);
       B => wide(m);
     };

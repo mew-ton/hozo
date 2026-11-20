@@ -64,11 +64,14 @@ const (
 	Halts
 	Ignores
 	Any
+	Case
 
 	// 文の頭と値。
-	Const
+	Val
 	Return
 	Match
+	Disjoint
+	Collect
 	Default
 	Else
 	None
@@ -152,14 +155,17 @@ var Keywords = map[string]Kind{
 	"halts":    Halts,
 	"ignores":  Ignores,
 	"any":      Any,
+	"case":     Case,
 
-	"const":   Const,
-	"return":  Return,
-	"match":   Match,
-	"default": Default,
-	"else":    Else,
-	"none":    None,
-	"throw":   Throw,
+	"val":      Val,
+	"return":   Return,
+	"match":    Match,
+	"disjoint": Disjoint,
+	"collect":  Collect,
+	"default":  Default,
+	"else":     Else,
+	"none":     None,
+	"throw":    Throw,
 
 	"string":   StringType,
 	"boolean":  BooleanType,

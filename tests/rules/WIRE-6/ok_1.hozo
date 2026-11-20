@@ -3,8 +3,8 @@ namespace a {
   op v(): string;
   op use(x: string, y: string);
   op f() {
-    const x = v();
-    const y = v();
+    val x = v();
+    val y = v();
     use(x, y);
   }
 }

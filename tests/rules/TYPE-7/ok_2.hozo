@@ -4,13 +4,13 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   op f(x: M): M {
-    return match x by C {
+    return match (x by C) {
       A => { id: "a" };
       B => { id: "b" };
     };
   }
   op g(x: M): M? {
-    return match x by C {
+    return match (x by C) {
       A => { id: "a" };
       B => none;
     };

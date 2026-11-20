@@ -5,9 +5,9 @@ namespace a {
   op v(): M;
   op use(m: M);
   op f(): M {
-    const x = v();
+    val x = v();
     use(x);
-    match x by C { A => use(x); };
+    match (x by C) { A => use(x); };
     return x;
   }
 }

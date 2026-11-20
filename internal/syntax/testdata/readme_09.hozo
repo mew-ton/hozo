@@ -3,8 +3,8 @@
 op loadOrderPage(query: OrdersQuery): OrderPage
   throws http.NetworkError, http.ServerError
 {
-  const me     = fetchMe();
-  const orders = fetchOrders(query);
+  val me     = fetchMe();
+  val orders = fetchOrders(query);
   return orderPageVm(me, orders);
 }
 

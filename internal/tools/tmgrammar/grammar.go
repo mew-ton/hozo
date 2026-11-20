@@ -124,11 +124,11 @@ func groupOf(k token.Kind) int {
 		return 0
 	case k >= token.Export && k <= token.Override: // 修飾
 		return 1
-	case k >= token.Extends && k <= token.Any: // 節の頭
+	case k >= token.Extends && k <= token.Case: // 節の頭
 		return 2
 	case k == token.None, k == token.True, k == token.False: // true / false / none
 		return 4
-	case k >= token.Const && k <= token.Throw: // 文の頭（none は上で拾っている）
+	case k >= token.Val && k <= token.Throw: // 文の頭（none は上で拾っている）
 		return 2
 	case k >= token.StringType && k <= token.Single: // 核の型と形
 		return 3

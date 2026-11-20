@@ -31,7 +31,7 @@ namespace app {
   export op need(id: string?, known: boolean?): string
     throws Missing, Plain
   {
-    return match known by nullable {
+    return match (known by nullable) {
       HasItems => needId(id);
       Empty    => throw Plain;
     };
@@ -39,22 +39,22 @@ namespace app {
   export op needId(id: string?): string
     throws Missing
   {
-    return match id by nullable {
+    return match (id by nullable) {
       HasItems => id;
       Empty    => throw Missing("unknown");
     };
   }
 
-  // const x = match の throw E(<値>, …): 名前の値、レコードリテラル（当てはめる型は引数の model）、array、
+  // val x = match の throw E(<値>, …): 名前の値、レコードリテラル（当てはめる型は引数の model）、array、
   // 省略可能な引数に、省略可能でない値（ptr）と、省略可能を通るパス（文の前に置く途中の値は、その枝の中）
   export op check(in: Input, tags: string[], text: string?): string
     throws Invalid
   {
-    const first = match text by nullable {
+    val first = match (text by nullable) {
       HasItems => text;
       Empty    => throw Invalid(in.code, { field: "text" }, tags, 7);
     };
-    const second = match tags by list {
+    val second = match (tags by list) {
       HasItems => first;
       Empty    => throw Invalid(in.code, { field: "tags", hint: first }, tags, in.sub.at);
     };
@@ -66,11 +66,11 @@ namespace app {
   export op guard(code: Code?, wait: boolean?)
     throws Missing, limits.LimitExceeded
   {
-    match code by nullable {
+    match (code by nullable) {
       HasItems => throw Missing(code);
       Empty    => none;
     };
-    match wait by nullable {
+    match (wait by nullable) {
       HasItems => throw limits.LimitExceeded(5m, "guard");
       Empty    => throw limits.LimitExceeded(1s);
     };
@@ -80,7 +80,7 @@ namespace app {
   export op retry(text: string?): string
     throws TooMany
   {
-    return match text by nullable {
+    return match (text by nullable) {
       HasItems => text;
       Empty    => throw TooMany(attempts);
     };
@@ -90,8 +90,8 @@ namespace app {
   export op count(text: string?): string
     throws TooMany
   {
-    const n = 3;
-    return match text by nullable {
+    val n = 3;
+    return match (text by nullable) {
       HasItems => text;
       Empty    => throw TooMany(n);
     };

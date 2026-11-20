@@ -25,14 +25,14 @@ namespace app {
   // never を返す op
   export op fail(): never throws Gone;
 
-  // 「文」const x = 呼び出し（純粋でない op と、純粋な op。どちらも失敗の扱いを置く）、使っていない束縛（WIRE-8）、const x = 値、呼び出しの文
+  // 「文」val x = 呼び出し（純粋でない op と、純粋な op。どちらも失敗の扱いを置く）、使っていない束縛（WIRE-8）、val x = 値、呼び出しの文
   @mark export op consts(id: Id): Item
   {
-    const a = load(id);
-    const b = make(id);
-    const unused = load(id);
-    const c = b;
-    const n = 3;
+    val a = load(id);
+    val b = make(id);
+    val unused = load(id);
+    val c = b;
+    val n = 3;
     note(a);
     save(c);
     return c;
@@ -76,7 +76,7 @@ namespace app {
   export op stop(id: Id): Item
     throws Gone
   {
-    const a = make(id);
+    val a = make(id);
     note(a);
     return fail();
   }
@@ -100,9 +100,9 @@ namespace app {
   @mark export op calls(text: string): Item?
     throws Broken
   {
-    const id = parse(text);
-    const found = find(id);
-    const fetched = dep.fetch(id);
+    val id = parse(text);
+    val found = find(id);
+    val fetched = dep.fetch(id);
     note(fetched);
     return found;
   }

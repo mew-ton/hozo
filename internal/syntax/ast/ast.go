@@ -504,9 +504,12 @@ type ClassifyDecl struct {
 	Doc        *DocComment
 	Decorators []*Decorator
 	Name       Ident
-	// Of は対象（ClassifySubject）。一つ以上。型か op か状態の名前かは名前の解決が決める。
-	Of    []Type
-	Cases []*ClassifyCase
+	// Of は対象（ClassifySubject）。一つ以上。型か op か状態の名前かは名前の解決が決める。Never なら空。
+	Of []Type
+	// Never は、対象のない分類（"of never"）か。NeverSpan は、その語の位置。
+	Never     bool
+	NeverSpan source.Span
+	Cases     []*ClassifyCase
 }
 
 // NodeSpan は Node の実装。
@@ -517,7 +520,9 @@ func (n *ClassifyDecl) declNode()             {}
 type ClassifyCase struct {
 	Span source.Span
 	Doc  *DocComment
-	Name Ident
+	// Decorators は、ケースの前に書いたデコレータ。なければ空。
+	Decorators []*Decorator
+	Name       Ident
 	// As は "対象 as 型"、"対象 as else"、"対象 as none" の並び（CaseTyping）。なければ空。
 	As []*CaseTyping
 }
@@ -626,6 +631,8 @@ const (
 	AnyModel
 	// AnyVariant は any variant。
 	AnyVariant
+	// AnyCase は any classify … case（分類のケース）。
+	AnyCase
 )
 
 // String は種類の語。
@@ -643,6 +650,8 @@ func (k AnyKind) String() string {
 		return "model"
 	case AnyVariant:
 		return "variant"
+	case AnyCase:
+		return "classify case"
 	}
 	return "?"
 }
@@ -653,7 +662,22 @@ type AnyType struct {
 	Kind AnyKind
 	// On は "on 状態.操作"。なければ nil。
 	On *StateOpRef
+	// Case は、Kind が AnyCase のときの、分類のケースの絞り。ほかは nil。
+	Case *CaseKind
 }
+
+// CaseKind は、デコレータの宣言で、分類のケースを言う書き方（docs/grammar.md「decorator の宣言」）:
+// "classify [名前] [of never] case"。
+type CaseKind struct {
+	Span source.Span
+	// Classify は、名前で絞ったときの、分類の名前。書いていなければ nil。
+	Classify *QualifiedName
+	// Never は、対象で絞ったか（"of never"）。
+	Never bool
+}
+
+// NodeSpan は Node の実装。
+func (n *CaseKind) NodeSpan() source.Span { return n.Span }
 
 // NodeSpan は Node の実装。
 func (n *AnyType) NodeSpan() source.Span { return n.Span }
@@ -678,6 +702,8 @@ const (
 	TargetEffect
 	// TargetRead は read。
 	TargetRead
+	// TargetCase は classify … case（分類のケース）。
+	TargetCase
 )
 
 // String は対象の語。
@@ -699,6 +725,8 @@ func (k TargetKind) String() string {
 		return "effect"
 	case TargetRead:
 		return "read"
+	case TargetCase:
+		return "classify case"
 	}
 	return "?"
 }
@@ -707,6 +735,8 @@ func (k TargetKind) String() string {
 type Target struct {
 	Span source.Span
 	Kind TargetKind
+	// Case は、Kind が TargetCase のときの、分類のケースの絞り。ほかは nil。
+	Case *CaseKind
 }
 
 // NodeSpan は Node の実装。
@@ -943,22 +973,86 @@ type Block struct {
 // NodeSpan は Node の実装。
 func (n *Block) NodeSpan() source.Span { return n.Span }
 
-// Stmt は文。*ConstStmt、*ReturnStmt、*CallStmt、*MatchStmt が実装する。
+// Stmt は文。*ValStmt、*AssignStmt、*CollectStmt、*ReturnStmt、*CallStmt、*MatchStmt、*DisjointStmt、*ForStmt が実装する。
 type Stmt interface {
 	Node
 	stmtNode()
 }
 
-// ConstStmt は "const x = Expr;"。
-type ConstStmt struct {
+// ValStmt は値の入れ物の宣言、一つ分（docs/grammar.md「配線」の ValDecl）: "val x = Expr;"、"val x;"、"val x: T;"。
+// 名前を並べた空の宣言（"val a, b;"）は、名前ごとの ValStmt に分ける。Span は、一つ目が "val" から、二つ目からは名前から。
+type ValStmt struct {
+	Span source.Span
+	Name Ident
+	// Type は、書いた型。書いていなければ nil。
+	Type Type
+	// Value は、一緒に宣言した値。空の宣言なら nil。
+	Value Expr
+}
+
+// NodeSpan は Node の実装。
+func (n *ValStmt) NodeSpan() source.Span { return n.Span }
+func (n *ValStmt) stmtNode()             {}
+
+// AssignStmt は値を入れる文 "x = Expr;"。
+type AssignStmt struct {
 	Span  source.Span
 	Name  Ident
 	Value Expr
 }
 
 // NodeSpan は Node の実装。
-func (n *ConstStmt) NodeSpan() source.Span { return n.Span }
-func (n *ConstStmt) stmtNode()             {}
+func (n *AssignStmt) NodeSpan() source.Span { return n.Span }
+func (n *AssignStmt) stmtNode()             {}
+
+// CollectStmt は集める文 "xs collect Expr;"。
+type CollectStmt struct {
+	Span  source.Span
+	Name  Ident
+	Value Expr
+}
+
+// NodeSpan は Node の実装。
+func (n *CollectStmt) NodeSpan() source.Span { return n.Span }
+func (n *CollectStmt) stmtNode()             {}
+
+// DisjointStmt は互いに触れないアームの並び "disjoint { Arm Arm … }"。アームは二つ以上。
+type DisjointStmt struct {
+	Span source.Span
+	// Keyword は disjoint の語の位置（診断の位置）。
+	Keyword source.Span
+	Arms    []*Arm
+}
+
+// NodeSpan は Node の実装。
+func (n *DisjointStmt) NodeSpan() source.Span { return n.Span }
+func (n *DisjointStmt) stmtNode()             {}
+
+// Arm は disjoint のアーム。ブロックか、文の一つ。
+type Arm struct {
+	Span source.Span
+	// Block は、ブロックで書いたアームか（その中の val は、アームの中だけで見える）。
+	Block bool
+	Stmts []Stmt
+}
+
+// NodeSpan は Node の実装。
+func (n *Arm) NodeSpan() source.Span { return n.Span }
+
+// ForStmt は繰り返し "[disjoint] for (val v of Atom) Block"。
+type ForStmt struct {
+	Span source.Span
+	// Disjoint は、前に disjoint を書いたか。Keyword は、その語（なければ for）の位置。
+	Disjoint bool
+	Keyword  source.Span
+	Var      Ident
+	Seq      Atom
+	Body     *Block
+}
+
+// NodeSpan は Node の実装。
+func (n *ForStmt) NodeSpan() source.Span { return n.Span }
+func (n *ForStmt) stmtNode()             {}
 
 // ReturnStmt は "return Expr;"。
 type ReturnStmt struct {

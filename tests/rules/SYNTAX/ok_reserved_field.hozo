@@ -48,13 +48,13 @@ namespace a {
 
   // 値のパス（res.op、res.state.model）、レコードリテラルのキー、match の対象
   op run(): Page throws Rejected {
-    const res = fetch();
-    const name = label(res.state, res.op);
-    const kind = match res.state by Kind {
+    val res = fetch();
+    val name = label(res.state, res.op);
+    val kind = match (res.state by Kind) {
       Core => describe(res.state);
       else    => none;
     };
-    const saved = store({
+    val saved = store({
       op: name,
       decorator: res.decorator,
       state: { model: res.state.model, namespace: kind },
@@ -64,7 +64,7 @@ namespace a {
       default: true,
       true: none,
     });
-    const slimmed = slim(saved);
+    val slimmed = slim(saved);
     return show(slimmed);
   }
 }

@@ -22,14 +22,14 @@ namespace a {
   classify K of M { A; B; }
   // 節の並びの区切りは ","（"|" は、なくした書き方）。"," として読み進めるので、op は残る
   op pipes(m: M): M throws E | F {               // ERROR: SYNTAX
-    return match m by K {
+    return match (m by K) {
       A => throw E;
       B => throw F;
     };
   }
   // 引数のない例外を投げるときも、括弧を書かない
   op parens(m: M): M throws E {
-    return match m by K {
+    return match (m by K) {
       A => throw E();                            // ERROR: SYNTAX
       B => m;
     };

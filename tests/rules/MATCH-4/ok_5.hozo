@@ -15,33 +15,33 @@ namespace a {
   op takeThree(t: Three): void;
   op f(m: M, three: Three): void {
     // else は A だけを受ける: m は K.A<M>
-    match m by K {
+    match (m by K) {
       B, C, D, E => none;
       else       => onA(m);
     };
     // else は B〜E を受ける: m は M のまま
-    match m by K {
+    match (m by K) {
       A    => onA(m);
       else => takeM(m);
     };
     // else は IsBroken だけを受ける: three は O
-    match three by Whole {
+    match (three by Whole) {
       IsReady, IsMissing => none;
       else               => takeO(three);
     };
     // else は IsMissing と IsBroken を受ける: three は Three のまま
-    match three by Whole {
+    match (three by Whole) {
       IsReady => takeM(three);
       else    => takeThree(three);
     };
     // else は Found だけを受ける: x は M
-    const x = find();
-    match x by Hit {
+    val x = find();
+    match (x by Hit) {
       Missing => none;
       else    => takeM(x);
     };
     // 標準の分類でも同じ: else は HasItems だけを受け、x は M
-    match x by nullable {
+    match (x by nullable) {
       Empty => none;
       else  => takeM(x);
     };

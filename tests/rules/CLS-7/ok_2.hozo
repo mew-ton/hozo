@@ -15,6 +15,6 @@ namespace a {
     Missing: find as else;
   }
   op use(m: M?) {
-    match m by Life { Draft, Placed => f(); Absent => none; };
+    match (m by Life) { Draft, Placed => f(); Absent => none; };
   }
 }

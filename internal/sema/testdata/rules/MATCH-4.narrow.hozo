@@ -13,46 +13,46 @@ namespace a {
   op takeString(s: string): void;
   op takeWrap(w: Wrap): void;
   op f(in: In): void {
-    const m = find();
-    match m by Found {
+    val m = find();
+    match (m by Found) {
       Hit     => takeM(m);
       else    => none;
     };
     // より長いパス（m.id、m.profile.nick）は、絞り込まれた型から辿る
-    match m by Found {
+    match (m by Found) {
       Hit     => takeString(m.profile.nick);
       else    => none;
     };
     // レコードリテラルの中の値
-    match m by Found {
+    match (m by Found) {
       Hit     => takeWrap({ m: m, note: m.id });
       else    => none;
     };
     // 対象がフィールドのパスでも同じ
-    match in.m by Found {
+    match (in.m by Found) {
       Hit     => takeM(in.m);
       else    => none;
     };
-    match in.m by nullable {
+    match (in.m by nullable) {
       HasItems => takeString(in.m.id);
       Empty    => none;
     };
   }
   // 状態を対象にした絞り込み: アームの中のその状態の名前は、match が読んだ値を指す
   op g(): void {
-    match current by nullable {
+    match (current by nullable) {
       HasItems => takeM(current);
       Empty    => none;
     };
-    match by Session {
+    match (by Session) {
       In      => takeString(current.id);
       else    => none;
     };
   }
   // アームの本体の値にも掛かる
   op h(): M? {
-    const m = find();
-    return match m by Found {
+    val m = find();
+    return match (m by Found) {
       Hit     => m;
       else    => none;
     };

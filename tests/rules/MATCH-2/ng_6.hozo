@@ -4,14 +4,14 @@ namespace a {
   state token: nullable<string>;
   op f();
   op ng() {
-    match carts by list {              // ERROR: MATCH-2
+    match (carts by list) {              // ERROR: MATCH-2
       Empty => f();
     };
-    match token by nullable {          // ERROR: MATCH-2
+    match (token by nullable) {          // ERROR: MATCH-2
       None => f();
       Some => none;
     };
-    match carts by list {              // ERROR: MATCH-2
+    match (carts by list) {              // ERROR: MATCH-2
       Empty => f();
       HasItems, Empty => none;
     };

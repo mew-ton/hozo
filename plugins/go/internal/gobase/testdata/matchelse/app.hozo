@@ -77,8 +77,8 @@ namespace app {
   @mark export op login(name: string): string
     throws Unknown
   {
-    const user = findUser(name);
-    return match user by Registration {
+    val user = findUser(name);
+    return match (user by Registration) {
       Unregistered => throw Unknown;
       Registered   => nameOf(user);
     };
@@ -87,16 +87,16 @@ namespace app {
   // presence の const（残りのケースのアームの値）と、文（none のアーム。if の枝がなければ、条件を逆にする）
   @mark export op greet(name: string, title: string?): string
   {
-    const user = findUser(name);
-    const who = match user by Registration {
+    val user = findUser(name);
+    val who = match (user by Registration) {
       Registered   => nameOf(user);
       Unregistered => "guest";
     };
-    match title by Given {
+    match (title by Given) {
       Filled => show(title);
       Blank  => none;
     };
-    match title by Given {
+    match (title by Given) {
       Filled => none;
       Blank  => show("no title");
     };
@@ -106,7 +106,7 @@ namespace app {
   // 一つのアームが、型を書いたケースと残りのケースを並べる: 分けずに、そのアームの本体だけを書く
   export op both(title: string?): string
   {
-    return match title by Given {
+    return match (title by Given) {
       Filled, Blank => "any";
     };
   }
@@ -114,7 +114,7 @@ namespace app {
   // 型で決まる状態の分類（presence）: 対象の状態を読んでから分ける
   export op current(): string
   {
-    return match by Login {
+    return match (by Login) {
       LoggedIn  => nameOf(session);
       LoggedOut => "nobody";
     };
@@ -124,7 +124,7 @@ namespace app {
   // 最後の default: の節は、分類の誤りの枝（union の値がない nil が、ここに来る）
   export op method(payment: Payment): string
   {
-    return match payment by Method {
+    return match (payment by Method) {
       Other   => describe(payment);
       Plastic => cardText(payment);
     };
@@ -133,7 +133,7 @@ namespace app {
   // variant で、残りのアームがちょうど一つ: 残りのケースのアームで、対象はそのアームの型（包む型は .Value）
   export op outcome(result: Result): string
   {
-    return match result by Outcome {
+    return match (result by Outcome) {
       Ok     => nameOf(result);
       Failed => shout(result);
     };
@@ -142,7 +142,7 @@ namespace app {
   // variant で、残りのアームがちょうど一つ（宣言した model）: フィールドを読む
   export op failure(result: Result): string
   {
-    return match result by Failure {
+    return match (result by Failure) {
       Message => result;
       Rest    => result.name;
     };
@@ -151,14 +151,14 @@ namespace app {
   // variant の const と文。型を書いたケースと残りのケースを並べたアーム（case に、すべての型を並べる）
   @mark export op variants(payment: Payment, result: Result): string?
   {
-    const text = match payment by Method {
+    val text = match (payment by Method) {
       Plastic => cardText(payment);
       Other   => none;
     };
-    match result by Outcome {
+    match (result by Outcome) {
       Ok, Failed => show("done");
     };
-    match payment by Method {
+    match (payment by Method) {
       Plastic => none;
       Other   => show("other");
     };
@@ -168,7 +168,7 @@ namespace app {
   // 型で決まる状態の分類（variant）: 対象の状態を読んでから分ける
   export op stageText(): string
   {
-    return match by Stage {
+    return match (by Stage) {
       Succeeded => nameOf(stage);
       NotYet    => shout(stage);
     };

@@ -11,10 +11,10 @@ namespace a {
   op fetch(): Wrap;
   op store(w: Wrap): Wrap;
   op run(): Wrap {
-    const res = fetch();
-    const model = fetch();                             // ERROR: SYNTAX
-    const called = res.op();                           // ERROR: SYNTAX
-    const short = store({ op, state: res.state });     // ERROR: SYNTAX
+    val res = fetch();
+    val model = fetch();                             // ERROR: SYNTAX
+    val called = res.op();                           // ERROR: SYNTAX
+    val short = store({ op, state: res.state });     // ERROR: SYNTAX
     return store({ op: res.op, state: res.state });
   }
 }

@@ -4,6 +4,6 @@ namespace a {
   classify C of M { A; }
   op use(m: M);
   op f(m: M) {
-    match m by C { A => use(m); };
+    match (m by C) { A => use(m); };
   }
 }

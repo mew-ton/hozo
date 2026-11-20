@@ -14,39 +14,39 @@ namespace a {
   classify Session of token { LoggedIn; LoggedOut; }
 
   op ng(m: M): void {
-    match m by C {
+    match (m by C) {
       A, B => use(m);
       else => none;                    // ERROR: MATCH-9
     };
-    match m by C {
+    match (m by C) {
       A => use(m);
       B => none;
       else => none;                    // ERROR: MATCH-9
     };
-    match m by One {
+    match (m by One) {
       Only => use(m);
       else => none;                    // ERROR: MATCH-9
     };
-    const x = find();
-    match x by Hit {
+    val x = find();
+    match (x by Hit) {
       Found => use(x);
       Missing => none;
       else => none;                    // ERROR: MATCH-9
     };
-    match x by Arrival {
+    match (x by Arrival) {
       Arrived => use(x);
       else => none;                    // ERROR: MATCH-9
     };
-    match carts by list {
+    match (carts by list) {
       Empty, HasItems => f();
       else => none;                    // ERROR: MATCH-9
     };
-    match token by nullable {
+    match (token by nullable) {
       Empty => f();
       HasItems => none;
       else => none;                    // ERROR: MATCH-9
     };
-    match by Session {
+    match (by Session) {
       LoggedIn => f();
       LoggedOut => none;
       else => none;                    // ERROR: MATCH-9
@@ -54,17 +54,17 @@ namespace a {
   }
   // 知らない名前のアーム（MATCH-2）があっても、else のアームが受けるケースが残っていれば、MATCH-9 は出ない
   op unknownButRest(m: M): void {
-    match m by C {                     // ERROR: MATCH-2
+    match (m by C) {                     // ERROR: MATCH-2
       A, Z => use(m);
       else => none;
     };
   }
   op ok(m: M): void {
-    match m by C { A => use(m); else => none; };
-    const x = find();
-    match x by Hit { Found => use(x); else => none; };
-    match x by Hit { Missing => none; else => use(x); };
-    match carts by list { HasItems => f(); else => none; };
-    match by Session { LoggedIn => f(); else => none; };
+    match (m by C) { A => use(m); else => none; };
+    val x = find();
+    match (x by Hit) { Found => use(x); else => none; };
+    match (x by Hit) { Missing => none; else => use(x); };
+    match (carts by list) { HasItems => f(); else => none; };
+    match (by Session) { LoggedIn => f(); else => none; };
   }
 }

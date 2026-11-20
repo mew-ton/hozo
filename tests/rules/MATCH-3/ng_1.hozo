@@ -5,7 +5,7 @@ namespace a {
   classify C of M { A; }
   op use(m: M);
   op f(m: M) {
-    match m by C {                     // ERROR: MATCH-2
+    match (m by C) {                     // ERROR: MATCH-2
       A => { use(m); use(m); };        // ERROR: SYNTAX
     };                                 // ERROR: SYNTAX
   }

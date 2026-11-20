@@ -200,34 +200,20 @@ func eachCall(w *ir.Wiring, fn func(c *ir.Call)) {
 			}
 		}
 	}
-	for _, st := range w.Statements {
-		switch s := st.(type) {
-		case ir.ConstStmt:
-			expr(s.Expr)
-		case ir.ReturnStmt:
-			expr(s.Expr)
-		case ir.CallStmt:
-			fn(&s.Call)
-		case ir.MatchStmt:
-			expr(ir.MatchExpr{Match: s.Match})
+	walkStmts(w.Statements, func(st ir.Statement, _ []int) {
+		if e, _, ok := stmtExpr(st); ok {
+			expr(e)
 		}
-	}
+	})
 }
 
 // eachMatch は配線のすべての match（文、束縛、return）に fn を呼ぶ。
 func eachMatch(w *ir.Wiring, fn func(m *ir.Match)) {
-	for _, st := range w.Statements {
-		switch s := st.(type) {
-		case ir.ConstStmt:
-			if m, ok := s.Expr.(ir.MatchExpr); ok {
+	walkStmts(w.Statements, func(st ir.Statement, _ []int) {
+		if e, _, ok := stmtExpr(st); ok {
+			if m, isMatch := e.(ir.MatchExpr); isMatch {
 				fn(&m.Match)
 			}
-		case ir.ReturnStmt:
-			if m, ok := s.Expr.(ir.MatchExpr); ok {
-				fn(&m.Match)
-			}
-		case ir.MatchStmt:
-			fn(&s.Match)
 		}
-	}
+	})
 }

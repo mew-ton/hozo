@@ -12,10 +12,10 @@ namespace a {
     return token;
   }
   op bySubject() reads token {                 // ERROR: READS-2
-    match rows by list { Empty => g(); HasItems => none; };
+    match (rows by list) { Empty => g(); HasItems => none; };
   }
   op byClassify() reads token {                // ERROR: READS-2
-    match by Phase { Idle => g(); Busy => none; };
+    match (by Phase) { Idle => g(); Busy => none; };
   }
   op byBind(): string reads rows {             // ERROR: READS-2
     return take();

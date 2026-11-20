@@ -11,12 +11,12 @@ namespace a {
   op takeM(m: M): void;
   op takeN(n: N): void;
   op f(three: Three): void {
-    const m = find();
-    match m by Hit {
+    val m = find();
+    match (m by Hit) {
       Found    => takeM(m);
       NotFound => takeM(m);            // ERROR: MATCH-4
     };
-    match three by K3 {
+    match (three by K3) {
       IsReady => takeM(three);
       Rest    => takeN(three);         // ERROR: MATCH-4
     };

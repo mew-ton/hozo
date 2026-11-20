@@ -18,40 +18,40 @@ namespace a {
   }
   // 別のケースのアーム、前の並びにないケースを含むアーム
   op wrongArm(order: Order, at: Time) {
-    match order by Stage {
+    match (order by Stage) {
       Draft => start(order, at);       // ERROR: STATE-9
       else  => none;
     };
-    match order by Stage {
+    match (order by Stage) {
       Accepted, Shipped => cancel(order);   // ERROR: STATE-9
       else => none;
     };
-    match order by Stage {
+    match (order by Stage) {
       Cancelled => none;
       else => cancel(order);           // ERROR: STATE-9
     };
   }
   // 別の分類のアーム、別の値、対象より長いパス、対象から作った別の値
   op wrongValue(order: Order, other: Order, box: Box, known: Stage.Accepted<Order>, at: Time) {
-    match order by Urgency {
+    match (order by Urgency) {
       Rush   => start(order, at);      // ERROR: STATE-9
       Normal => none;
     };
-    match order by Stage {
+    match (order by Stage) {
       Accepted => start(other, at);    // ERROR: STATE-9
       else     => none;
     };
-    match box.order by Stage {
+    match (box.order by Stage) {
       Accepted => start(box.other, at);   // ERROR: STATE-9
       else     => none;
     };
-    const edited = edit(known);
+    val edited = edit(known);
     start(edited, at);                 // ERROR: STATE-9
   }
   // 型から分かっているケースが、前の並びにない
   op wrongType(order: Stage.Shipped<Order>, mixed: Order) {
     cancel(order);                     // ERROR: STATE-9
-    match mixed by Life {
+    match (mixed by Life) {
       Closed => discard(mixed);        // ERROR: STATE-9
       else   => none;
     };

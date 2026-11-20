@@ -76,7 +76,7 @@ namespace bodies {
   // メソッドの o、ctx、err: 失敗の扱いの零値と、レコードリテラルが、パッケージの型を書く
   export op go(thing: o.Thing): ctx.Info
   {
-    const made = o.make();
+    val made = o.make();
     keep(made, none, { z: 1 });
     return load();
   }
@@ -91,7 +91,7 @@ namespace bodies {
   // 判定の結果（述語で決まる分類での match）の後ろで、パッケージ k0 の型を書く
   export op kinds(text: string)
   {
-    match text by Size {
+    match (text by Size) {
       Big   => takeKey({ n: 1 });
       Small => takeKey({ n: 2 });
     };

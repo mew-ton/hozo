@@ -6,14 +6,14 @@ namespace a {
   op fail(): never throws E;
   op use(m: M): void;
   op f(m: M): void throws E {
-    const x = fail();                  // ERROR: WIRE-2
+    val x = fail();                  // ERROR: WIRE-2
     use(x);
   }
   op g(m: M): void throws E {
-    const y = match m by C { A => throw E; B => fail(); };   // ERROR: WIRE-2
+    val y = match (m by C) { A => throw E; B => fail(); };   // ERROR: WIRE-2
     use(y);
   }
   op h(m: M): void {
-    match m by C { A => m; B => none; };                     // ERROR: WIRE-2
+    match (m by C) { A => m; B => none; };                     // ERROR: WIRE-2
   }
 }

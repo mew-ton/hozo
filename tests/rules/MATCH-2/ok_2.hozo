@@ -8,11 +8,11 @@ namespace a {
   classify Session of token { LoggedIn; LoggedOut; }
   op f();
   op ok() {
-    match carts by list { Empty => f(); HasItems => none; };
-    match token by nullable { HasItems => f(); Empty => none; };
-    match carts by list { Empty, HasItems => f(); };
-    match carts by list { HasItems => f(); else => none; };
-    match by Checkout { Shopping => f(); Ordered => none; };
-    match by Session { LoggedIn => f(); else => none; };
+    match (carts by list) { Empty => f(); HasItems => none; };
+    match (token by nullable) { HasItems => f(); Empty => none; };
+    match (carts by list) { Empty, HasItems => f(); };
+    match (carts by list) { HasItems => f(); else => none; };
+    match (by Checkout) { Shopping => f(); Ordered => none; };
+    match (by Session) { LoggedIn => f(); else => none; };
   }
 }

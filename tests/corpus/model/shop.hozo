@@ -39,7 +39,7 @@ namespace shop {
   op placeOrder(): Order
     effects createOrder
   {
-    const order = newOrder();
+    val order = newOrder();
     createOrder(order);
     return order;
   }
@@ -52,7 +52,7 @@ namespace shop {
   export op fulfill(): Order
     throws marks.NotApproved, carrier.Closed
   {
-    const order = placeOrder();
+    val order = placeOrder();
     carrier.pickup(order);
     return order;
   }

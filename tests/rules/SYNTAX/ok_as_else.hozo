@@ -11,8 +11,8 @@ namespace a {
     Missing: find as else;
   }
   op f() {
-    const m = find();
-    match m by Hit {
+    val m = find();
+    match (m by Hit) {
       Found   => take(m.else);
       Missing => none;
     };

@@ -84,7 +84,7 @@ namespace web {
   // docs/check.md「計算」手順 0（配線）: match の一部のアームにしかない効果は succ が unknown
   op welcome(user: api.PublicUser)
   {
-    match user by Verified {
+    match (user by Verified) {
       Verified   => greet(user);
       Unverified => none;
     };
@@ -96,7 +96,7 @@ namespace web {
     throws api.NotFound, api.Unauthorized
     throws Offline
   {
-    const user = fetchUser({ id });
+    val user = fetchUser({ id });
     api.touch(id);
     return user;
   }
@@ -117,8 +117,8 @@ namespace web {
   op openUser(id: api.UserId): UserPage
     throws Offline, api.NotFound
   {
-    const user = fetchUser({ id });
-    const page = match user by UserKind {
+    val user = fetchUser({ id });
+    val page = match (user by UserKind) {
       Admin  => adminPageVm(user);
       Member => userPageVm(user);
     };

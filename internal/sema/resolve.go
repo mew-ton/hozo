@@ -207,6 +207,9 @@ func (a *analyzer) resolveHead(qn ast.QualifiedName, sc *scope, acc accept, refs
 		if v, ok := sc.wiring.lookup(head.Name); ok {
 			*refs = append(*refs, Ref{Span: head.Span, Target: v.target})
 			v.markUsed()
+			if v.unassigned && sc.wiring.unassignedRead != nil {
+				sc.wiring.unassignedRead(v, head.Span)
+			}
 			root := "b:" + head.Name
 			return resolved{kind: rValue, value: &valueRef{path: []string{head.Name}, typ: sc.narrowed(root, nil, v.typ), root: root}}, rest, nil
 		}

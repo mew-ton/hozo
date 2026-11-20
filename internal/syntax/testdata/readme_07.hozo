@@ -41,7 +41,7 @@ op sendOrderNotice(order: Order)
 op placeOrder(in: OrderInput): Order
   throws NotificationFailed
 {
-  const order = saveOrder(in);
+  val order = saveOrder(in);
   sendOrderNotice(order);
   return order;
 }

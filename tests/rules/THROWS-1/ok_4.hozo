@@ -7,14 +7,14 @@ namespace a {
   decorator swallow catches E recovers;
   op fail(): never throws F;
   op f(m: M): M throws E, F {
-    return match m by Kind {
+    return match (m by Kind) {
       A => throw E;
       B => fail();
     };
   }
   @swallow
   op g(m: M): M {
-    return match m by Kind {
+    return match (m by Kind) {
       A => m;
       B => throw E;
     };

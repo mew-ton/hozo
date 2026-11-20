@@ -13,28 +13,28 @@ namespace a {
   op useString(s: string): void;
   op email(): Email;
   op valueAndNoValue(x: M): void {
-    const r = match x by C {           // ERROR: TYPE-8
+    val r = match (x by C) {           // ERROR: TYPE-8
       A => x;
       B => v(x);
     };
     use(r);
   }
   op literalKinds(x: M): void {
-    const r = match x by C {           // ERROR: TYPE-8
+    val r = match (x by C) {           // ERROR: TYPE-8
       A => 1;
       B => "one";
     };
     useInt(r);
   }
   op intAndFloat(x: M): void {
-    const r = match x by C {           // ERROR: TYPE-8
+    val r = match (x by C) {           // ERROR: TYPE-8
       A => 1;
       B => 1.5;
     };
     useFloat(r);
   }
   op literalToModel(x: M): void {
-    const r = match x by C {
+    val r = match (x by C) {
       A => m(x);
       B => 1;                          // ERROR: TYPE-8
     };
@@ -42,14 +42,14 @@ namespace a {
   }
   // scalar にそろえた match に、リテラルは渡せない（TYPE-1）
   op literalToScalar(x: M): void {
-    const r = match x by C {
+    val r = match (x by C) {
       A => email();
       B => "none";                     // ERROR: TYPE-1
     };
     useString(r);
   }
   op recordToOther(x: M, n: N): void {
-    const r = match x by C {
+    val r = match (x by C) {
       A => m(x);
       B => { name: n.name };           // ERROR: TYPE-5
     };

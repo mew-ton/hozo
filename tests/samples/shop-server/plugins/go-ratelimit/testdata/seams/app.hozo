@@ -23,7 +23,7 @@ namespace shop {
   @rate.limited
   export op buy(id: type.ItemId, count: int): Receipt
   {
-    const item = find(id);
+    val item = find(id);
     return { item: item, count: count };
   }
 

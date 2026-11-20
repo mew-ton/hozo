@@ -20,8 +20,8 @@ namespace a {
   op nameOf(u: User): string;
   classify Found of find { Hit: find as User; Other: find as else; }
   op name(is: string): string throws Gone {
-    const u = find(is);
-    return match u by a.Found {
+    val u = find(is);
+    return match (u by a.Found) {
       Hit     => nameOf(u);
       else    => throw Gone;
     };

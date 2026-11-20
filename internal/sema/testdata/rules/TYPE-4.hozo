@@ -9,7 +9,7 @@ namespace a {
   op n(): N;
   op o(): O;
   op f(): void {
-    const x = o();
+    val x = o();
     takeM(x);                          // ERROR: TYPE-4
   }
   op g(): void {
@@ -20,7 +20,7 @@ namespace a {
   }
   // model の値は、別の model の位置には渡せない（フィールドを含んでいても。暗黙の射影はない）
   op i(): void {
-    const x = n();
+    val x = n();
     takeM(x);                          // ERROR: TYPE-4
     takeList(x);                       // ERROR: TYPE-4
   }

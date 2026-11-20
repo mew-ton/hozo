@@ -19,19 +19,20 @@ func checkWiring(ix *index, cfg *config.Config, r *reporter) {
 	}
 }
 
-// checkWire6 は WIRE-6: 本体の const の数が [hozo].max_bindings を超える（op に切り出す候補）。
+// checkWire6 は WIRE-6: 本体の val の名前の数（for のブロックと、disjoint のアームの中も数える。for の変数は、数えない）が
+// [hozo].max_bindings を超える（op に切り出す候補）。
 func checkWire6(o *ir.Op, max int, r *reporter) {
 	if o.Body == nil {
 		return
 	}
 	n := 0
-	for _, st := range o.Body.Statements {
-		if _, ok := st.(ir.ConstStmt); ok {
+	walkStmts(o.Body.Statements, func(st ir.Statement, _ []int) {
+		if _, ok := st.(ir.ValStmt); ok {
 			n++
 		}
-	}
+	})
 	if n > max {
-		r.warnAt("WIRE-6", o.Span, sprintf("%s の束縛が %d 個あり、上限 %d を超えている。op に切り出す候補", o.Name, n, max))
+		r.warnAt("WIRE-6", o.Span, sprintf("%s の val が %d 個あり、上限 %d を超えている。op に切り出す候補", o.Name, n, max))
 	}
 }
 

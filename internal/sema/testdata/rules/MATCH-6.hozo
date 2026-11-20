@@ -5,12 +5,12 @@ namespace a {
   classify C of M { A; }
   op use(n: N): void;
   op f(n: N): void {
-    match n by C {                     // ERROR: MATCH-6
+    match (n by C) {                     // ERROR: MATCH-6
       A => use(n);
     };
   }
   op g(s: string): void {
-    match s by C {                     // ERROR: MATCH-6
+    match (s by C) {                     // ERROR: MATCH-6
       A => none;
     };
   }

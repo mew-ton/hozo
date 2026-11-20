@@ -6,9 +6,9 @@ namespace a {
   classify D of M { A; B; C; D; E; }
   op use(m: M): void;
   op ok(m: M): void {
-    match m by C { A => use(m); B => none; };
-    match m by D { A => use(m); else => none; };
-    match m by D { A, B => use(m); C => none; else => none; };
-    match m by D { A => use(m); B, C => none; D, E => none; };
+    match (m by C) { A => use(m); B => none; };
+    match (m by D) { A => use(m); else => none; };
+    match (m by D) { A, B => use(m); C => none; else => none; };
+    match (m by D) { A => use(m); B, C => none; D, E => none; };
   }
 }

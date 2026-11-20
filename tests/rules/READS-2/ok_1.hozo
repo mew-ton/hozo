@@ -20,10 +20,10 @@ namespace a {
     return token;
   }
   op bySubject() reads rows {
-    match rows by list { Empty => g(); HasItems => none; };
+    match (rows by list) { Empty => g(); HasItems => none; };
   }
   op byClassify() reads a.rows {
-    match by Phase { Idle => g(); Busy => none; };
+    match (by Phase) { Idle => g(); Busy => none; };
   }
   op byBind(): string reads token {
     return take();
@@ -37,7 +37,7 @@ namespace a {
     return rowByName(name);
   }
   op across(name: string): string[] reads b.items, rows {
-    const x = find(name);
+    val x = find(name);
     g2(x);
     return b.all();
   }

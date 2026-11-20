@@ -3,12 +3,12 @@ namespace a {
   op v(): string;
   op use(a: string, b: string, c: string, d: string, e: string, f: string);
   op g() {                             // WARN: WIRE-6
-    const a = v();
-    const b = v();
-    const c = v();
-    const d = v();
-    const e = v();
-    const f = v();
+    val a = v();
+    val b = v();
+    val c = v();
+    val d = v();
+    val e = v();
+    val f = v();
     use(a, b, c, d, e, f);
   }
 }

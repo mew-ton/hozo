@@ -77,7 +77,7 @@ namespace shop {
   // docs/check.md「葉の op」: 葉は状態に触れない（注文を作るだけ）。効果は、それを呼ぶ配線が行う
   op newOrder(): Order throws EmptyCart;
   op submitOrder(): Order effects placeOrder throws EmptyCart prevents effects {
-    const order = newOrder();
+    val order = newOrder();
     placeOrder();
     return order;
   }
@@ -104,7 +104,7 @@ namespace shop {
   // docs/ir.md「配線」: subject は { kind: "state", state }、classify は "nullable"
   op openTop()
   {
-    match token by nullable {
+    match (token by nullable) {
       Empty    => showLogin();
       HasItems => showCart();
     };
@@ -114,7 +114,7 @@ namespace shop {
   // docs/check.md「計算」手順 0（配線）: 一部のアームにしかない効果（clearCart）は succ が unknown
   op openCart()
   {
-    match carts by list {
+    match (carts by list) {
       Empty    => showEmpty();
       HasItems => emptyCart();
     };
@@ -126,7 +126,7 @@ namespace shop {
   op checkout(): Order?
     throws EmptyCart
   {
-    const placed = match by Checkout {
+    val placed = match (by Checkout) {
       Shopping => submitOrder();
       Ordered  => none;
     };
@@ -136,11 +136,11 @@ namespace shop {
   // 状態の分類での match（else のアーム: 受けるケースは LoggedOut）と、値の分類での match（subject は { kind: "value", atom }）が並ぶ
   op add(line: Line)
   {
-    const normalized = match line by LineKind {
+    val normalized = match (line by LineKind) {
       Single => packSingle(line);
       Bulk   => packBulk(line);
     };
-    match by LoggedIn {
+    match (by LoggedIn) {
       LoggedIn => addToCart(normalized);
       else     => showLogin();
     };

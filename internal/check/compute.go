@@ -155,30 +155,26 @@ type callRef struct {
 type row struct {
 	calls   []callRef
 	isMatch bool
+	// loops は、この文を囲んでいる for の番号（外から内へ）。
+	loops []int
 	// armBodies は match のアームごとの本体（アームの順）。呼び出しを持たないアーム（値、none）も含む。
 	armBodies []ir.ArmBody
 }
 
-// rowsOf は配線の本体を行ごとの呼び出しに分ける（docs/check.md「手順 0」の「行 i の呼び出し」）。
+// rowsOf は配線の本体を、式を持つ文ごとの呼び出しに分ける（docs/check.md「手順 0」の「文 i の呼び出し」）。
+// 並びは、文を辿る順（walkStmts）。空の val、disjoint、for は、行にならない（中の文が、行になる）。
 func rowsOf(w *ir.Wiring) []row {
 	if w == nil {
 		return nil
 	}
 	rows := make([]row, 0, len(w.Statements))
-	for i, st := range w.Statements {
-		var r row
-		var expr ir.Expr
-		var span ir.Span
-		switch s := st.(type) {
-		case ir.ConstStmt:
-			expr, span = s.Expr, s.Span
-		case ir.ReturnStmt:
-			expr, span = s.Expr, s.Span
-		case ir.CallStmt:
-			expr, span = ir.CallExpr{Call: s.Call}, s.Span
-		case ir.MatchStmt:
-			expr, span = ir.MatchExpr{Match: s.Match}, s.Span
+	walkStmts(w.Statements, func(st ir.Statement, loops []int) {
+		expr, span, ok := stmtExpr(st)
+		if !ok {
+			return
 		}
+		i := len(rows)
+		r := row{loops: loops}
 		switch e := expr.(type) {
 		case ir.CallExpr:
 			r.calls = append(r.calls, callRef{row: i, arm: -1, call: e.Call, stmt: span})
@@ -197,7 +193,7 @@ func rowsOf(w *ir.Wiring) []row {
 			}
 		}
 		rows = append(rows, r)
-	}
+	})
 	return rows
 }
 
@@ -224,23 +220,13 @@ func mapCalls(w *ir.Wiring, fn func(c *ir.Call)) {
 		}
 		return e
 	}
-	for i, st := range w.Statements {
-		switch s := st.(type) {
-		case ir.ConstStmt:
-			s.Expr = mapExpr(s.Expr)
-			w.Statements[i] = s
-		case ir.ReturnStmt:
-			s.Expr = mapExpr(s.Expr)
-			w.Statements[i] = s
-		case ir.CallStmt:
-			fn(&s.Call)
-			w.Statements[i] = s
-		case ir.MatchStmt:
-			m := mapExpr(ir.MatchExpr{Match: s.Match}).(ir.MatchExpr)
-			s.Match = m.Match
-			w.Statements[i] = s
+	mapStmts(w.Statements, func(st ir.Statement) ir.Statement {
+		expr, _, ok := stmtExpr(st)
+		if !ok {
+			return st
 		}
-	}
+		return withExpr(st, mapExpr(expr))
+	})
 }
 
 // source は例外の出どころ（行 i, 呼び出し c）。
@@ -452,13 +438,37 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 	for _, x := range declared(o) {
 		s.addE(x)
 	}
-	// 行 j < i の呼び出しの effects にあるか
+	// 文 j が、e を持つ呼び出しを持つか
+	rowHas := func(e ir.EffectRef, j int) bool {
+		for _, sc := range info.sigs[j] {
+			if sc != nil && sc.hasF(e) {
+				return true
+			}
+		}
+		return false
+	}
+	// 出どころ（文 i）での e の状態の、1・3・4（docs/check.md「Sig(O, v)」の手順 0）。
+	// 1: e を持つ呼び出しが、文 j < i にあり、それを囲む for が、どれも、文 i も囲んでいる → kept（必ず、先に動いている）
+	// 3: e を持つ呼び出しが、文 j < i にあり、それを囲む for に、文 i を囲まないものがある → unknown（0 回かもしれない）
+	// 4: e を持つ呼び出しと、文 i を、ともに囲む for がある → unknown（前の回で、起きたかもしれない）
 	before := func(e ir.EffectRef, i int) bool {
 		for j := 0; j < i; j++ {
-			for _, sc := range info.sigs[j] {
-				if sc != nil && sc.hasF(e) {
-					return true
-				}
+			if rowHas(e, j) && subset(info.rows[j].loops, info.rows[i].loops) {
+				return true
+			}
+		}
+		return false
+	}
+	maybe := func(e ir.EffectRef, i int) bool {
+		for j := range info.rows {
+			if !rowHas(e, j) {
+				continue
+			}
+			if j < i && !subset(info.rows[j].loops, info.rows[i].loops) {
+				return true
+			}
+			if shares(info.rows[j].loops, info.rows[i].loops) {
+				return true
 			}
 		}
 		return false
@@ -477,6 +487,10 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 				switch {
 				case before(e, src.ref.row):
 					st = ir.Kept
+				case src.sig.hasF(e) && src.sig.relOf(x, e) == ir.Kept:
+					st = ir.Kept
+				case maybe(e, src.ref.row):
+					st = ir.Unknown
 				case src.sig.hasF(e):
 					st = src.sig.relOf(x, e)
 				default:
@@ -502,6 +516,11 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 					continue
 				}
 				inArms++
+				if len(r.loops) > 0 {
+					// for の中の呼び出しは、0 回かもしれない
+					other++
+					continue
+				}
 				switch sc.succOf(e) {
 				case ir.Kept:
 					kept++
@@ -851,18 +870,16 @@ func (c *computer) readsOf(o *ir.Op) []string {
 			}
 		}
 	}
-	for _, st := range o.Body.Statements {
-		switch s := st.(type) {
-		case ir.ConstStmt:
-			expr(s.Expr)
-		case ir.ReturnStmt:
-			expr(s.Expr)
-		case ir.CallStmt:
-			call(s.Call)
-		case ir.MatchStmt:
-			expr(ir.MatchExpr{Match: s.Match})
+	walkStmts(o.Body.Statements, func(st ir.Statement, _ []int) {
+		if f, ok := st.(ir.ForStmt); ok {
+			// for の頭の並びが参照する状態
+			add(atomStates(f.Of)...)
+			return
 		}
-	}
+		if e, _, ok := stmtExpr(st); ok {
+			expr(e)
+		}
+	})
 	add(c.ix.readStates(o.Carried.Reads)...)
 	c.reads[o.Name] = out
 	return out

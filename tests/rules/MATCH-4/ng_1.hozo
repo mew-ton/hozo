@@ -6,13 +6,13 @@ namespace a {
   op onB(m: C.B<M>): void;
   op wide2(m: M): void;
   op f(m: M): void {
-    match m by C {
+    match (m by C) {
       A => onB(m);                     // ERROR: MATCH-4
       B => onB(m);
     };
   }
   op h(m: M, n: M): void {
-    match m by C {
+    match (m by C) {
       A => onA(n);                     // ERROR: TYPE-4
       B => wide2(m);
     };

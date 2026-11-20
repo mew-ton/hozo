@@ -17,7 +17,7 @@ type wiringJob struct {
 	op   *ir.Op
 }
 
-// binding は配線のスコープの名前: op の引数か const の束縛。
+// binding は配線のスコープの名前: op の引数、val、for の変数。
 type binding struct {
 	name    string
 	typ     exprType
@@ -25,25 +25,59 @@ type binding struct {
 	isParam bool
 	used    bool
 	target  Target
+
+	// isLoopVar は for の変数か。
+	isLoopVar bool
+	// empty は、空で宣言した val か（値を入れる文か、集める文で、値が入る）。
+	empty bool
+	// declType は、宣言に書いた型。書いていなければ nil。
+	declType ir.Type
+	// unassigned は、代入が、まだ済んでいないか（docs/check.md「値の入れ物」の「代入が済んでいるか」）。
+	unassigned bool
+	// filled は、値を入れる文か、集める文が、一つでもあったか（なければ WIRE-12）。
+	filled bool
+	// collected は、集める文で値が入る val か。collectTypes は、集めた式の型（型を書かない val の、型を導くため）。
+	collected    bool
+	collectTypes []collectedType
+	// loops は、宣言した所を囲んでいる for の数。
+	loops int
+	// irSpan は、IR の val の文の span（後から、型を入れるための鍵）。
+	irSpan ir.Span
+}
+
+type collectedType struct {
+	typ  exprType
+	span source.Span
 }
 
 func (b *binding) markUsed() { b.used = true }
 
-// wiringScope は配線のスコープ（docs/resolve.md「スコープ」）。束縛はその行より下で見える。
+// loopFrame は、今、中にいる for 一つ。completes は、この for を抜けたときに、集め終わる val。
+type loopFrame struct {
+	completes []*binding
+}
+
+// wiringScope は配線のスコープ（docs/resolve.md「スコープ」）。val は、宣言したブロックの、宣言より下で見える。
 type wiringScope struct {
-	op       string
-	params   map[string]*binding
-	bindings map[string]*binding
-	order    []*binding
+	op     string
+	params map[string]*binding
+	// frames は、ブロックごとの名前（外から内へ）。
+	frames []map[string]*binding
+	// order は、宣言した val のすべて（宣言の順。for の変数は入れない）。
+	order []*binding
 	// narrow は、今見ているアームの中で絞り込まれた型（docs/types.md「アームの中の対象の型」）。キーは narrowKey。
 	// アームの本体を評価する間だけ持つ。
 	narrow map[string]exprType
+	// unassignedRead は、代入の済んでいない val を読んだときに呼ぶ（WIRE-10）。
+	unassignedRead func(b *binding, at source.Span)
 }
 
-// lookup は束縛か引数。
+// lookup は、そこで見えている val、for の変数、引数。
 func (w *wiringScope) lookup(name string) (*binding, bool) {
-	if b, ok := w.bindings[name]; ok {
-		return b, true
+	for i := len(w.frames) - 1; i >= 0; i-- {
+		if b, ok := w.frames[i][name]; ok {
+			return b, true
+		}
 	}
 	b, ok := w.params[name]
 	return b, ok
@@ -64,11 +98,32 @@ type wiring struct {
 	// vsc は値の位置（Atom の Path）のスコープ。今の名前空間の状態を名前で読める。
 	vsc   *scope
 	scope *wiringScope
+	// loops は、今、中にいる for（外から内へ）。
+	loops []*loopFrame
+	// depth は、中のブロック（for のブロック、disjoint のアーム）の深さ。0 は、op の本体のいちばん外。
+	depth int
+	// arms は、今、中にいる disjoint（外から内へ）。アームごとに、代入の済んだ val を、数え直すため。
+	arms []*disjointFrame
+	// vals は、IR の val の文の span から、その束縛（後から、型を入れる）。
+	vals map[ir.Span]*binding
 }
 
-// lowerWiring は配線の本体（docs/ir.md「配線」）。WIRE-2 / WIRE-3 / WIRE-4 / WIRE-8 / WIRE-9 と式の型。
+// disjointFrame は、今、中にいる disjoint 一つ。
+type disjointFrame struct {
+	// arm は、今のアームの番号。
+	arm int
+	// assigned は、このアームで、代入が済んだ val。
+	assigned []*binding
+	// by は、val ごとの、値を入れたアームの番号（別のアームが入れる val に、入れたら WIRE-11）。
+	by map[*binding]int
+}
+
+// lowerWiring は配線の本体（docs/ir.md「配線」）。WIRE-2 / WIRE-3 / WIRE-4 / WIRE-8〜WIRE-14 と式の型。
 func (a *analyzer) lowerWiring(j *wiringJob) {
-	ws := &wiringScope{op: j.sym.fqn, params: map[string]*binding{}, bindings: map[string]*binding{}}
+	ws := &wiringScope{op: j.sym.fqn, params: map[string]*binding{}}
+	ws.unassignedRead = func(b *binding, at source.Span) {
+		a.errorf("WIRE-10", at, "val %s は、まだ、代入が済んでいないので、読めない", b.name).Related = []diag.Related{related(b.span, "宣言")}
+	}
 	for _, p := range j.op.Params {
 		var span source.Span
 		if ap := findAstParam(j.decl, p.Name); ap != nil {
@@ -80,17 +135,53 @@ func (a *analyzer) lowerWiring(j *wiringJob) {
 		}
 		ws.params[p.Name] = &binding{name: p.Name, typ: typ, span: span, isParam: true, target: Target{Kind: TargetOpParam, Decl: j.sym.fqn, Name: p.Name, Span: span}}
 	}
-	w := &wiring{job: j, scope: ws, sc: &scope{ns: j.sym.ns, wiring: ws}, vsc: &scope{ns: j.sym.ns, wiring: ws, values: true}}
+	w := &wiring{job: j, scope: ws, sc: &scope{ns: j.sym.ns, wiring: ws}, vsc: &scope{ns: j.sym.ns, wiring: ws, values: true}, vals: map[ir.Span]*binding{}}
 	body := &ir.Wiring{}
 	stmts := j.decl.Body.Stmts
-	for i, s := range stmts {
-		if st, ok := a.lowerStmt(w, s, i == len(stmts)-1); ok {
-			body.Statements = append(body.Statements, st)
-		}
-	}
+	body.Statements = a.lowerBlock(w, stmts)
 	a.checkWIRE3Last(j, stmts)
 	a.checkWIRE8(ws)
+	a.fillVals(w, body.Statements)
 	j.op.Body = body
+}
+
+// lowerBlock は、ブロック一つの文の並び。名前の枠を一つ足し、抜けるときに WIRE-12 を見る。
+func (a *analyzer) lowerBlock(w *wiring, stmts []ast.Stmt) []ir.Statement {
+	frame := map[string]*binding{}
+	w.scope.frames = append(w.scope.frames, frame)
+	var out []ir.Statement
+	for i, s := range stmts {
+		if st, ok := a.lowerStmt(w, s, i == len(stmts)-1); ok {
+			out = append(out, st)
+		}
+	}
+	w.scope.frames = w.scope.frames[:len(w.scope.frames)-1]
+	for _, b := range frame {
+		if b.empty && !b.filled {
+			a.errorf("WIRE-12", b.span, "空で宣言した val %s に、値を入れる文も、集める文も、ない", b.name)
+		}
+		a.finishCollect(b)
+	}
+	return out
+}
+
+// fillVals は、IR の val の文に、解決した型と、collected を入れる（docs/ir.md「配線」）。
+func (a *analyzer) fillVals(w *wiring, stmts []ir.Statement) {
+	for i, s := range stmts {
+		switch s := s.(type) {
+		case ir.ValStmt:
+			if b, ok := w.vals[s.Span]; ok {
+				s.Type, s.Collected = b.typ.typ, b.collected
+				stmts[i] = s
+			}
+		case ir.DisjointStmt:
+			for _, arm := range s.Arms {
+				a.fillVals(w, arm.Statements)
+			}
+		case ir.ForStmt:
+			a.fillVals(w, s.Body)
+		}
+	}
 }
 
 func findAstParam(d *ast.OpDecl, name string) *ast.OpParam {
@@ -126,21 +217,30 @@ func hasReturn(stmts []ast.Stmt) bool {
 	return false
 }
 
-// checkWIRE8 は WIRE-8（docs/check.md「配線」。warning）: 束縛した名前が下の行で使われていない。
+// checkWIRE8 は WIRE-8（docs/check.md「配線」。warning）: 代入の済んだ val が、どこからも読まれていない。
 func (a *analyzer) checkWIRE8(ws *wiringScope) {
 	for _, b := range ws.order {
-		if !b.used {
-			a.warnf("WIRE-8", b.span, "束縛 %s は使われていない", b.name)
+		if !b.used && (!b.empty || b.filled) {
+			a.warnf("WIRE-8", b.span, "val %s は使われていない", b.name)
 		}
 	}
 }
 
-// lowerStmt は一つの文。
+// lowerStmt は一つの文。last は、今のブロックの最後の文か。
 func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bool) {
 	switch s := s.(type) {
-	case *ast.ConstStmt:
-		return a.lowerConst(w, s)
+	case *ast.ValStmt:
+		return a.lowerVal(w, s)
+	case *ast.AssignStmt:
+		return a.lowerAssign(w, s)
+	case *ast.CollectStmt:
+		return a.lowerCollect(w, s)
 	case *ast.ReturnStmt:
+		if w.depth > 0 {
+			a.errorf("WIRE-13", s.Span, "for のブロックと、disjoint のアームの中に、return は書けない")
+			a.evalExpr(w, s.Value, nil)
+			return nil, false
+		}
 		return a.lowerReturn(w, s, last)
 	case *ast.CallStmt:
 		if s.Call == nil {
@@ -148,9 +248,9 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		}
 		t, call, ok := a.evalCall(w, s.Call, nil)
 		if ok && hasValue(t) {
-			a.errorf("WIRE-2", s.Call.Span, "呼び出し %s は値を返すので、束縛せずに書けない", call.Callee)
+			a.errorf("WIRE-2", s.Call.Span, "呼び出し %s は値を返すので、val に受けずに書けない", call.Callee)
 		}
-		a.checkWIRE9(t, s.Span, last)
+		a.checkWIRE9(w, t, s.Span, last)
 		if !ok {
 			return nil, false
 		}
@@ -161,10 +261,14 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		}
 		t, m := a.evalMatch(w, s.Match, nil)
 		if hasValue(t) {
-			a.errorf("WIRE-2", s.Match.Span, "match は値を持つので、束縛せずに書けない")
+			a.errorf("WIRE-2", s.Match.Span, "match は値を持つので、val に受けずに書けない")
 		}
-		a.checkWIRE9(t, s.Span, last)
+		a.checkWIRE9(w, t, s.Span, last)
 		return ir.MatchStmt{Match: m, Span: a.irSpan(s.Span)}, true
+	case *ast.DisjointStmt:
+		return a.lowerDisjoint(w, s), true
+	case *ast.ForStmt:
+		return a.lowerFor(w, s)
 	}
 	return nil, false
 }
@@ -175,43 +279,328 @@ func hasValue(t exprType) bool {
 }
 
 // checkWIRE9 は WIRE-9（docs/check.md「配線」）: 「返らない」式の文が、本体の最後以外にある（下の行が評価されない）。
-func (a *analyzer) checkWIRE9(t exprType, span source.Span, last bool) {
-	if t.kind == etNever && !last {
+// for のブロックと、disjoint のアームの中では、どこにあっても。
+func (a *analyzer) checkWIRE9(w *wiring, t exprType, span source.Span, last bool) {
+	if t.kind != etNever {
+		return
+	}
+	if w.depth > 0 {
+		a.errorf("WIRE-9", span, "この文は決して返らないので、for のブロックと、disjoint のアームの中には書けない")
+	} else if !last {
 		a.errorf("WIRE-9", span, "この文は決して返らないので、本体の最後にだけ書ける（下の行が評価されない）")
 	}
 }
 
-// lowerConst は `const x = 式;`。WIRE-4（同じ名前を二度束縛、引数と同じ名前）、WIRE-2（式が「値がない」か「返らない」）、
-// TYPE-7（レコードリテラルの当てはめる先が決まらない）。
-func (a *analyzer) lowerConst(w *wiring, s *ast.ConstStmt) (ir.Statement, bool) {
-	t, expr, ok := a.evalExpr(w, s.Value, nil)
-	name := s.Name.Name
+// declareVal は、val か、for の変数を、今のブロックに足す。見えている名前と同じなら WIRE-4。
+func (a *analyzer) declareVal(w *wiring, b *binding, what string) bool {
+	if prev, dup := w.scope.lookup(b.name); dup {
+		kind := "val"
+		switch {
+		case prev.isParam:
+			kind = "引数"
+		case prev.isLoopVar:
+			kind = "for の変数"
+		}
+		a.errorf("WIRE-4", b.span, "%s は既に%sの名前（見えている名前と同じ名前は、%sに使えない）", b.name, kind, what).Related = []diag.Related{related(prev.span, "最初の定義")}
+		return false
+	}
+	b.loops = len(w.loops)
+	w.scope.frames[len(w.scope.frames)-1][b.name] = b
+	if !b.isLoopVar {
+		w.scope.order = append(w.scope.order, b)
+	}
+	return true
+}
+
+// markAssigned は、val の代入が済んだことにする。disjoint のアームの中なら、そのアームの分として覚える。
+func (w *wiring) markAssigned(b *binding) {
+	b.unassigned = false
+	for _, f := range w.arms {
+		f.assigned = append(f.assigned, b)
+	}
+}
+
+// valueOf は、val に入れる式（値と一緒の宣言、値を入れる文）を評価する。b の型を書いていれば、そこへ渡せること（TYPE-17）。
+// 書いていなければ、式の型を、b の型にする（docs/types.md「val の型」）。
+func (a *analyzer) valueOf(w *wiring, b *binding, name string, value ast.Expr) (ir.Expr, bool) {
+	var ctx *returnContext
+	if b.declType != nil {
+		ctx = &returnContext{returns: b.declType}
+	}
+	t, expr, ok := a.evalExpr(w, value, ctx)
 	switch t.kind {
 	case etNoValue:
-		a.errorf("WIRE-2", s.Value.NodeSpan(), "const %s に束縛する式は値を持たない", name)
+		a.errorf("WIRE-2", value.NodeSpan(), "val %s に入れる式は値を持たない", name)
 		t = unknownType()
 	case etNever:
-		a.errorf("WIRE-2", s.Value.NodeSpan(), "const %s に束縛する式は決して返らない（束縛できない）", name)
+		a.errorf("WIRE-2", value.NodeSpan(), "val %s に入れる式は決して返らない（val に受けられない）", name)
 		t = unknownType()
 	case etRecord:
-		a.errorf("TYPE-7", s.Value.NodeSpan(), "レコードリテラルの当てはめる先が決まらない（const %s）。引数か return の位置に書く", name)
-		t = unknownType()
-	}
-	if prev, dup := w.scope.lookup(name); dup {
-		what := "束縛"
-		if prev.isParam {
-			what = "引数"
+		if b.declType == nil {
+			a.errorf("TYPE-7", value.NodeSpan(), "レコードリテラルの当てはめる先が決まらない（val %s）。val に型を書くか、引数か return の位置に書く", name)
+			t = unknownType()
 		}
-		a.errorf("WIRE-4", s.Name.Span, "%s は既に%sの名前（束縛は一度だけ）", name, what).Related = []diag.Related{related(prev.span, "最初の定義")}
+	}
+	if b.declType != nil {
+		if t.kind != etUnknown && a.assign(t, b.declType) != assignOK {
+			a.errorf("TYPE-17", value.NodeSpan(), "式の型 %s は、val %s の型 %s に渡せない", exprName(t), name, typeName(b.declType))
+		}
+		b.typ = valueType(b.declType)
 	} else {
-		b := &binding{name: name, typ: t, span: s.Name.Span, target: Target{Kind: TargetBinding, Decl: w.job.sym.fqn, Name: name, Span: s.Name.Span}}
-		w.scope.bindings[name] = b
-		w.scope.order = append(w.scope.order, b)
+		b.typ = t
+	}
+	return expr, ok
+}
+
+// lowerVal は val の宣言一つ（docs/check.md「値の入れ物」）。WIRE-4、WIRE-2、TYPE-7、TYPE-17。
+func (a *analyzer) lowerVal(w *wiring, s *ast.ValStmt) (ir.Statement, bool) {
+	name := s.Name.Name
+	b := &binding{name: name, typ: unknownType(), span: s.Name.Span, target: Target{Kind: TargetBinding, Decl: w.job.sym.fqn, Name: name, Span: s.Name.Span}}
+	if s.Type != nil {
+		if t, ok := a.lowerType(s.Type, w.sc); ok {
+			b.declType = t
+			b.typ = valueType(t)
+		}
+	}
+	span := a.irSpan(s.Span)
+	b.irSpan = span
+	if s.Value == nil {
+		b.empty, b.unassigned = true, true
+		if a.declareVal(w, b, "val の宣言") {
+			w.vals[span] = b
+		}
+		return ir.ValStmt{Name: name, Span: span}, true
+	}
+	// 式を先に読む: 式の中から、宣言している名前は、見えない
+	expr, ok := a.valueOf(w, b, name, s.Value)
+	if a.declareVal(w, b, "val の宣言") {
+		w.vals[span] = b
 	}
 	if !ok {
 		return nil, false
 	}
-	return ir.ConstStmt{Name: name, Expr: expr, Span: a.irSpan(s.Span)}, true
+	return ir.ValStmt{Name: name, Expr: expr, Span: span}, true
+}
+
+// lowerAssign は値を入れる文 `x = 式;`（docs/check.md「値の入れ物」の「値を入れる文」）。WIRE-11、WIRE-2、TYPE-17。
+func (a *analyzer) lowerAssign(w *wiring, s *ast.AssignStmt) (ir.Statement, bool) {
+	name := s.Name.Name
+	b, found := w.scope.lookup(name)
+	if !found {
+		a.errorf("RES-1", s.Name.Span, "名前 %s が見つからない（値を入れられるのは、空で宣言した val）", name)
+		a.evalExpr(w, s.Value, nil)
+		return nil, false
+	}
+	a.refs = append(a.refs, Ref{Span: s.Name.Span, Target: b.target})
+	bad := ""
+	switch {
+	case b.isParam:
+		bad = "引数には、値を入れられない"
+	case b.isLoopVar:
+		bad = "for の変数には、値を入れられない"
+	case !b.empty:
+		bad = "値と一緒に宣言した val には、もう、値を入れられない"
+	case !b.unassigned:
+		bad = "もう、代入が済んでいる（値が入るのは、一度だけ）"
+	case len(w.loops) != b.loops:
+		bad = "for の中から、その for の外の val には、値を入れられない（回ごとに入るため。外に出すには、collect で集める）"
+	}
+	if bad == "" {
+		for _, f := range w.arms {
+			if arm, ok := f.by[b]; ok && arm != f.arm {
+				bad = "同じ disjoint の、別のアームが、もう、値を入れている"
+				break
+			}
+		}
+	}
+	if bad != "" {
+		a.errorf("WIRE-11", s.Name.Span, "%s に値を入れられない: %s", name, bad).Related = []diag.Related{related(b.span, "宣言")}
+		a.evalExpr(w, s.Value, nil)
+		return nil, false
+	}
+	expr, ok := a.valueOf(w, b, name, s.Value)
+	b.filled = true
+	for _, f := range w.arms {
+		f.by[b] = f.arm
+	}
+	w.markAssigned(b)
+	if !ok {
+		return nil, false
+	}
+	return ir.AssignStmt{Name: name, Expr: expr, Span: a.irSpan(s.Span)}, true
+}
+
+// lowerCollect は集める文 `xs collect 式;`（docs/check.md「繰り返し」の「集める」）。WIRE-14、WIRE-2、TYPE-7、TYPE-17。
+func (a *analyzer) lowerCollect(w *wiring, s *ast.CollectStmt) (ir.Statement, bool) {
+	name := s.Name.Name
+	b, found := w.scope.lookup(name)
+	if !found {
+		a.errorf("RES-1", s.Name.Span, "名前 %s が見つからない（集められるのは、for の外で、空で宣言した val）", name)
+		a.evalExpr(w, s.Value, nil)
+		return nil, false
+	}
+	a.refs = append(a.refs, Ref{Span: s.Name.Span, Target: b.target})
+	bad := ""
+	switch {
+	case len(w.loops) == 0:
+		bad = "集める文は、for の中にだけ書ける"
+	case b.isParam, b.isLoopVar, !b.empty:
+		bad = "集められるのは、空で宣言した val だけ"
+	case !b.unassigned:
+		bad = "もう、代入が済んでいる（一つの val に集められるのは、一つの for の中からだけ）"
+	case len(w.loops) <= b.loops:
+		bad = "集める先の val は、for の外で宣言する"
+	}
+	if bad != "" {
+		a.errorf("WIRE-14", s.Name.Span, "%s に集められない: %s", name, bad).Related = []diag.Related{related(b.span, "宣言")}
+		a.evalExpr(w, s.Value, nil)
+		return nil, false
+	}
+	var elem ir.Type
+	if b.declType != nil {
+		arr, isArray := b.declType.(ir.ArrayType)
+		if !isArray {
+			a.errorf("TYPE-17", s.Name.Span, "集める先の val %s の型 %s は、並び（T[]）でない", name, typeName(b.declType))
+		} else {
+			elem = arr.Of
+		}
+	}
+	var ctx *returnContext
+	if elem != nil {
+		ctx = &returnContext{returns: elem}
+	}
+	t, expr, ok := a.evalExpr(w, s.Value, ctx)
+	switch t.kind {
+	case etNoValue:
+		a.errorf("WIRE-2", s.Value.NodeSpan(), "%s に集める式は値を持たない", name)
+		t = unknownType()
+	case etNever:
+		a.errorf("WIRE-2", s.Value.NodeSpan(), "%s に集める式は決して返らない", name)
+		t = unknownType()
+	case etRecord:
+		if elem == nil {
+			a.errorf("TYPE-7", s.Value.NodeSpan(), "レコードリテラルの当てはめる先が決まらない（%s に集める式）。集める先の val に型を書く", name)
+			t = unknownType()
+		}
+	}
+	if elem != nil {
+		if t.kind != etUnknown && a.assign(t, elem) != assignOK {
+			a.errorf("TYPE-17", s.Value.NodeSpan(), "式の型 %s は、%s の要素の型 %s に渡せない", exprName(t), name, typeName(elem))
+		}
+	} else if b.declType == nil {
+		b.collectTypes = append(b.collectTypes, collectedType{typ: t, span: s.Value.NodeSpan()})
+	}
+	if !b.collected {
+		b.collected, b.filled = true, true
+		loop := w.loops[b.loops]
+		loop.completes = append(loop.completes, b)
+	}
+	if !ok {
+		return nil, false
+	}
+	return ir.CollectStmt{Name: name, Expr: expr, Span: a.irSpan(s.Span)}, true
+}
+
+// finishCollect は、型を書かない、集める先の val の型を、集めた式の型から導く（docs/types.md「val の型」の 2）:
+// ほかのすべてが渡せる型 U の、並び。そういう型がなければ TYPE-17。
+func (a *analyzer) finishCollect(b *binding) {
+	if !b.collected || b.declType != nil || len(b.collectTypes) == 0 {
+		return
+	}
+	types := b.collectTypes
+	b.collectTypes = nil
+	var known []collectedType
+	for _, c := range types {
+		if c.typ.typ != nil && (c.typ.kind == etValue || c.typ.kind == etLiteral) {
+			known = append(known, c)
+		}
+	}
+	if len(known) == 0 {
+		return
+	}
+	for _, cand := range known {
+		ok := true
+		for _, other := range types {
+			if other.typ.kind != etUnknown && a.assign(other.typ, cand.typ.typ) != assignOK {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			b.typ = valueType(ir.ArrayType{Of: cand.typ.typ})
+			return
+		}
+	}
+	a.errorf("TYPE-17", known[0].span, "val %s に集める式の型が、そろわない（ほかのすべてが渡せる型が、ない）", b.name)
+}
+
+// lowerDisjoint は `disjoint { アーム … }`（docs/check.md「disjoint」）。どのアームも、disjoint の前の、代入の済んだ集まりから始める。
+// アームどうしの検査（DISJ-1〜DISJ-3）は、Signature が要るので、internal/check が行う。
+func (a *analyzer) lowerDisjoint(w *wiring, s *ast.DisjointStmt) ir.Statement {
+	f := &disjointFrame{by: map[*binding]int{}}
+	w.arms = append(w.arms, f)
+	w.depth++
+	out := ir.DisjointStmt{Span: a.irSpan(s.Span)}
+	var all []*binding
+	for i, arm := range s.Arms {
+		f.arm, f.assigned = i, nil
+		stmts := a.lowerBlock(w, arm.Stmts)
+		out.Arms = append(out.Arms, ir.Arm{Statements: stmts, Span: a.irSpan(arm.Span)})
+		// 次のアームからは、このアームが入れた val は、済んでいない
+		for _, b := range f.assigned {
+			b.unassigned = true
+		}
+		all = append(all, f.assigned...)
+	}
+	w.depth--
+	w.arms = w.arms[:len(w.arms)-1]
+	// 抜けたら、どのアームが入れた val も、済んでいる（外の disjoint のアームの分としても、覚える）
+	for _, b := range all {
+		w.markAssigned(b)
+	}
+	return out
+}
+
+// lowerFor は `[disjoint] for (val v of 並び) { … }`（docs/check.md「繰り返し」）。TYPE-17（並びでない）、WIRE-4（変数の名前）。
+func (a *analyzer) lowerFor(w *wiring, s *ast.ForStmt) (ir.Statement, bool) {
+	t, seq := a.evalAtom(w, s.Seq)
+	elem := unknownType()
+	var elemType ir.Type
+	switch {
+	case t.kind == etUnknown:
+	case t.kind == etValue && t.typ != nil:
+		if arr, ok := t.typ.(ir.ArrayType); ok {
+			elem, elemType = valueType(arr.Of), arr.Of
+		} else {
+			a.errorf("TYPE-17", s.Seq.NodeSpan(), "for の並びの型 %s は、並び（T[]）でない", typeName(t.typ))
+		}
+	default:
+		a.errorf("TYPE-17", s.Seq.NodeSpan(), "for の並びは、型が並び（T[]）の値でなければならない")
+	}
+	loop := &loopFrame{}
+	w.loops = append(w.loops, loop)
+	w.depth++
+	// 変数は、ブロックの中だけで見える: 変数だけの枠を、ブロックの枠の外に、一つ足す
+	w.scope.frames = append(w.scope.frames, map[string]*binding{})
+	v := &binding{name: s.Var.Name, typ: elem, span: s.Var.Span, isLoopVar: true, used: true, target: Target{Kind: TargetBinding, Decl: w.job.sym.fqn, Name: s.Var.Name, Span: s.Var.Span}}
+	a.declareVal(w, v, "for の変数")
+	v.used = false
+	var body []ir.Statement
+	if s.Body != nil {
+		body = a.lowerBlock(w, s.Body.Stmts)
+	}
+	w.scope.frames = w.scope.frames[:len(w.scope.frames)-1]
+	w.depth--
+	w.loops = w.loops[:len(w.loops)-1]
+	// この for を抜けて、集め終わる val
+	for _, b := range loop.completes {
+		a.finishCollect(b)
+		w.markAssigned(b)
+	}
+	if seq == nil {
+		return nil, false
+	}
+	return ir.ForStmt{Var: s.Var.Name, VarType: elemType, Of: seq, Body: body, Disjoint: s.Disjoint, Span: a.irSpan(s.Span)}, true
 }
 
 // lowerReturn は `return 式;`。WIRE-3（void の op に return、最後以外の行の return）、WIRE-2（値がない）、TYPE-3（returns に渡せない）。

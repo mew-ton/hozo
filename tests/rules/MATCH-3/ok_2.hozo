@@ -7,20 +7,20 @@ namespace a {
   classify K of M { A; B; }
   op use(m: M): M;
   op call1(m: M): M? throws E {
-    return match m by C {
+    return match (m by C) {
       A => use(m);
       B => none;
       D => throw E;
     };
   }
   op atom(m: M): M {
-    return match m by K {
+    return match (m by K) {
       A => use(m);
       B => { id: m.id };
     };
   }
   op literal(m: M): int {
-    return match m by K {
+    return match (m by K) {
       A => 1;
       B => 2;
     };

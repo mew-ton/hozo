@@ -14,7 +14,7 @@ namespace a {
   }
   classify Hit of find { Absent: find as none; Found: find as M; }
   op use(m: M?) {
-    match m by Known { Found => take(m); Missing => none; };
-    match m by Life { Draft => take(m); Placed => f(); Absent => none; };
+    match (m by Known) { Found => take(m); Missing => none; };
+    match (m by Life) { Draft => take(m); Placed => f(); Absent => none; };
   }
 }

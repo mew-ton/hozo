@@ -79,7 +79,7 @@ namespace tool {
     throws CheckFailed, ConfigInvalid, Busy, UnknownName
     throws fail.Crashed
   {
-    const checked = check({ config: in.config });
+    val checked = check({ config: in.config });
     return write(in, checked);
   }
 

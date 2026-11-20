@@ -6,16 +6,16 @@ namespace a {
   classify One of M { Only; }
   op use(m: M): void;
   op ng(m: M): void {
-    match m by C {
+    match (m by C) {
       A, B => use(m);
       else => none;                    // ERROR: MATCH-9
     };
-    match m by C {
+    match (m by C) {
       A => use(m);
       B => none;
       else => none;                    // ERROR: MATCH-9
     };
-    match m by One {
+    match (m by One) {
       Only => use(m);
       else => none;                    // ERROR: MATCH-9
     };

@@ -75,13 +75,13 @@ namespace app {
   // 「import の名前」同じパッケージ名の二つの名前空間（util と util2）、標準ライブラリと同じ名前（context2）、予約語（pkgtype）
   export op bindings(): type.Token
   {
-    const var = a.util.make();
-    const range = b.util.make();
-    const nil = context.info();
-    const v0 = type.issue();
+    val var = a.util.make();
+    val range = b.util.make();
+    val nil = context.info();
+    val v0 = type.issue();
     show(func);
     showToken(v0);
-    match "x" by Extra {
+    match ("x" by Extra) {
       Yes => show("yes");
       No  => none;
     };

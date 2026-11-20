@@ -13,7 +13,7 @@ namespace customer {
   op pick(): shop.Line
     effects forget
   {
-    const line = choose();
+    val line = choose();
     forget();
     return line;
   }
@@ -27,9 +27,9 @@ namespace customer {
   op buy(): shop.Order
     throws shop.OutOfStock, marks.NotApproved, carrier.Closed
   {
-    const line = pick();
+    val line = pick();
     shop.addToCart(line);
-    const order = shop.fulfill();
+    val order = shop.fulfill();
     return order;
   }
 }

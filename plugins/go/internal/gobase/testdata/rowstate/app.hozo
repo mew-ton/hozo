@@ -51,8 +51,8 @@ namespace app {
   export op begin(id: string, at: Time)
     throws NoOrder, NotAccepted
   {
-    const found = orderById(id);
-    match found by Known {
+    val found = orderById(id);
+    match (found by Known) {
       Found   => beginFound(found, at);
       Missing => throw NoOrder;
     };
@@ -61,7 +61,7 @@ namespace app {
   export op beginFound(order: Order, at: Time)
     throws NotAccepted
   {
-    match order by Stage {
+    match (order by Stage) {
       Accepted => start(order, at);
       else     => throw NotAccepted;
     };
@@ -76,8 +76,8 @@ namespace app {
   export op drop(id: string)
     throws NoOrder, NotOpen
   {
-    const found = orderById(id);
-    match found by Life {
+    val found = orderById(id);
+    match (found by Life) {
       Open   => discard(found);
       Closed => throw NotOpen;
       Absent => throw NoOrder;
@@ -86,7 +86,7 @@ namespace app {
 
   /** いまの状態の呼び名 */
   export op lifeName(found: Order?): string {
-    return match found by Life {
+    return match (found by Life) {
       Open, Closed => found.note;
       Absent       => "absent";
     };

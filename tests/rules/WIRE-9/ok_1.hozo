@@ -11,10 +11,10 @@ namespace a {
   }
   op h(m: M) throws E {
     g();
-    match m by Kind { A => throw E; B => fail(); };
+    match (m by Kind) { A => throw E; B => fail(); };
   }
   op some(m: M) throws E {
-    match m by Kind { A => throw E; B => g(); };
+    match (m by Kind) { A => throw E; B => g(); };
     g();
   }
 }

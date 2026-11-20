@@ -48,8 +48,8 @@ namespace app {
   @mark export op nameById(id: string): string
     throws Missing
   {
-    const user = findUser(id);
-    return match user by Lookup {
+    val user = findUser(id);
+    return match (user by Lookup) {
       NotFound => throw Missing;
       Found    => loadName(user);
     };
@@ -58,7 +58,7 @@ namespace app {
   // return match: 値（絞り込んだ対象のフィールドを読むだけなら、元の式のまま）と none
   export op nickOf(user: User?): string?
   {
-    return match user by nullable {
+    return match (user by nullable) {
       HasItems => user.nick;
       Empty    => none;
     };
@@ -69,7 +69,7 @@ namespace app {
   export op pureName(user: User?): string
     throws Denied
   {
-    return match user by Present {
+    return match (user by Present) {
       Some => nameOf(user);
       else => deny();
     };
@@ -78,7 +78,7 @@ namespace app {
   // return match: 呼び出しの結果の型をそろえる（string → string?）。対象がパス
   @mark export op widened(in: Input): string?
   {
-    return match in.user by nullable {
+    return match (in.user by nullable) {
       HasItems => loadName(in.user);
       Empty    => none;
     };
@@ -87,7 +87,7 @@ namespace app {
   // return match: 絞り込みで Go の型が変わらない対象（array）
   export op tagCount(tags: string[]?): int
   {
-    return match tags by nullable {
+    return match (tags by nullable) {
       HasItems => countTags(tags);
       Empty    => 0;
     };
@@ -96,38 +96,38 @@ namespace app {
   // return match: 対象が状態（先に読む）。型で決まる状態の分類は、対象の状態を読んでから分ける
   export op tokenText(): string
   {
-    return match token by nullable {
+    return match (token by nullable) {
       HasItems => useToken(token);
       Empty    => "none";
     };
   }
   export op signedInText(): string
   {
-    return match by SignedIn {
+    return match (by SignedIn) {
       Yes => useToken(token);
       No  => "anonymous";
     };
   }
 
-  // const x = match: var x <match の型> を先に置く。呼び出し（純粋でない op / 純粋な op。どちらも失敗の扱いを置く）、値、none（何も書かない）、
+  // val x = match: var x <match の型> を先に置く。呼び出し（純粋でない op / 純粋な op。どちらも失敗の扱いを置く）、値、none（何も書かない）、
   // throw、使っていない束縛（match の後ろに _ = x）
   @mark export op constForms(id: string, lines: Line[]): string
     throws Missing
   {
-    const user = lookup(id);
-    const name = match user by nullable {
+    val user = lookup(id);
+    val name = match (user by nullable) {
       HasItems => loadName(user);
       Empty    => "nobody";
     };
-    const count = match lines by list {
+    val count = match (lines by list) {
       HasItems => countOf(lines);
       Empty    => 0;
     };
-    const maybe = match user by nullable {
+    val maybe = match (user by nullable) {
       HasItems => nameOf(user);
       Empty    => none;
     };
-    const strict = match user by nullable {
+    val strict = match (user by nullable) {
       HasItems => user.name;
       Empty    => throw Missing;
     };
@@ -141,22 +141,22 @@ namespace app {
   @mark export op statementForms(user: User?, lines: Line[])
     throws Denied
   {
-    match user by nullable {
+    match (user by nullable) {
       HasItems => record(user.name);
       Empty    => show("none");
     };
-    match lines by list {
+    match (lines by list) {
       HasItems => show("some");
       Empty    => none;
     };
-    match user by nullable {
+    match (user by nullable) {
       HasItems => none;
       Empty    => deny();
     };
-    match lines by list {
+    match (lines by list) {
       Empty, HasItems => show("any");
     };
-    match user by nullable {
+    match (user by nullable) {
       HasItems => takeOptionalUser(user);
       Empty    => throw Denied;
     };

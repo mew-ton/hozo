@@ -6,11 +6,11 @@ namespace a {
   classify Stock of items { None; Some; }
   op wide(m: M): void;
   op ok(m: M): void {
-    match items by list {
+    match (items by list) {
       Empty => wide(m);
       HasItems => wide(m);
     };
-    match by Stock {
+    match (by Stock) {
       None => wide(m);
       Some => wide(m);
     };

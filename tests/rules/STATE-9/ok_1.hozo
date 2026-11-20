@@ -22,29 +22,29 @@ namespace a {
   effect purge(order: Order) on orders.delete as Life.Absent;
   // アームから: 名前で並べたアーム（一つのケース、前の並びに入る二つのケース）
   op byArm(order: Order, at: Time) throws NotAccepted {
-    match order by Stage {
+    match (order by Stage) {
       Accepted => start(order, at);
       else     => throw NotAccepted;
     };
-    match order by Stage {
+    match (order by Stage) {
       Draft, Accepted => cancel(order);
       InProduction, Shipped, Cancelled => none;
     };
   }
   // アームから: else のアームが受けるケースが、前の並びに入る
   op byElseArm(order: Order) {
-    match order by Stage {
+    match (order by Stage) {
       InProduction, Shipped, Cancelled => none;
       else => cancel(order);
     };
   }
   // アームから: 対象がパスでも、同じ Atom なら分かる。ケースが型を書いていて、対象の型が case にならないアームでも分かる
   op byPath(box: Box, found: Order?) {
-    match box.order by Stage {
+    match (box.order by Stage) {
       Draft => cancel(box.order);
       else  => none;
     };
-    match found by Life {
+    match (found by Life) {
       Open   => discard(found);
       Closed => none;
       Absent => none;
@@ -57,16 +57,16 @@ namespace a {
   }
   op pick(order: Order): Stage.Draft<Order>;
   op byBinding(order: Order, reviewed: Order) {
-    const draft = pick(order);
+    val draft = pick(order);
     cancel(draft);
-    match reviewed by Review {
+    match (reviewed by Review) {
       Passed => cancel(reviewed);
       Failed => none;
     };
   }
   // 型から分かっていれば、別の分類のアームの中でも分かる
   op inOtherArm(order: Stage.Accepted<Order>, at: Time) {
-    match order by Urgency {
+    match (order by Urgency) {
       Rush   => start(order, at);
       Normal => none;
     };

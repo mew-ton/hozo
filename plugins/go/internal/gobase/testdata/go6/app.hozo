@@ -17,7 +17,7 @@ namespace a {
   export op pick(item: Item): int;
   export op choose(pair: Pair): int
   {
-    return match pair by Kind {
+    return match (pair by Kind) {
       IsItem => pick(pair);
       else   => 0;
     };

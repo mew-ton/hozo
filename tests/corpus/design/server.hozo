@@ -202,7 +202,7 @@ namespace server {
     effects createSession
     throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn prevents effects
   {
-    const ok = authenticate(in);
+    val ok = authenticate(in);
     createSession(ok);
     return ok;
   }
@@ -260,7 +260,7 @@ namespace server {
   op saveOrder(in: OrderInput): Order
     effects createOrder
   {
-    const order = newOrder(in);
+    val order = newOrder(in);
     createOrder(order);
     return order;
   }
@@ -270,7 +270,7 @@ namespace server {
     effects notifyUser
     throws NotificationFailed prevents effects
   {
-    const notice = composeNotice(order);
+    val notice = composeNotice(order);
     notifyUser(notice);
   }
 
@@ -281,7 +281,7 @@ namespace server {
   op placeOrder(in: OrderInput): Order
     throws NotificationFailed
   {
-    const order = saveOrder(in);
+    val order = saveOrder(in);
     sendOrderNotice(order);
     return order;
   }
@@ -312,7 +312,7 @@ namespace server {
     effects sendResetMail
     throws RateLimited prevents effects
   {
-    const reset = newPasswordReset(email);
+    val reset = newPasswordReset(email);
     sendResetMail(reset);
   }
 
@@ -387,7 +387,7 @@ namespace server {
   export op addToCart(in: AddToCartInput): CartLine
     effects addCartLine
   {
-    const line = newCartLine(in);
+    val line = newCartLine(in);
     addCartLine(line);
     return line;
   }
@@ -410,7 +410,7 @@ namespace server {
   export op attachWarranty(in: AttachWarrantyInput): WarrantyLine
     effects attachWarrantyToLine
   {
-    const line = withWarranty(in);
+    val line = withWarranty(in);
     attachWarrantyToLine(line);
     return line;
   }

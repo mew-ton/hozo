@@ -12,19 +12,19 @@ namespace a {
   op f();
   op check(condition: string): string;
   op g(m: M): string effects touch, move {
-    match m by K {
+    match (m by K) {
       A    => use(m);
       else => none;
     };
-    match m by K {
+    match (m by K) {
       A, B => use(m);
       C    => f();
       else => none;
     };
-    match m by K { A, B, C => f(); D, E => none; };
-    match carts by list { HasItems => f(); else => none; };
-    match by Checkout { Shopping => touch(); else => move(); };
-    const condition = check(m.condition);
+    match (m by K) { A, B, C => f(); D, E => none; };
+    match (carts by list) { HasItems => f(); else => none; };
+    match (by Checkout) { Shopping => touch(); else => move(); };
+    val condition = check(m.condition);
     return condition;
   }
 }

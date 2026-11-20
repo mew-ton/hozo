@@ -41,8 +41,8 @@ namespace web {
   // 3: 位置が、レコードリテラルで渡した引数の中のフィールド（入れ子のレコードリテラルも）
   export op fetch(id: string): string
   {
-    const a = api.get({ id });
-    const b = api.nested({ auth: { locale: "en" }, id });
+    val a = api.get({ id });
+    val b = api.nested({ auth: { locale: "en" }, id });
     return api.nested({ auth: {}, id: a });
   }
 
@@ -62,7 +62,7 @@ namespace web {
   // 名前で渡した引数の中の位置は、明示した位置（埋めない）。位置のない op はそのまま
   export op explicit(in: api.GetInput, id: string): string
   {
-    const a = api.get(in);
+    val a = api.get(in);
     return api.plain(id);
   }
 

@@ -5,7 +5,7 @@ namespace a {
   op m(x: M): M;
   op use(x: M?): void;
   op ok(x: M): void {
-    const r = match x by C {
+    val r = match (x by C) {
       A => m(x);
       B => none;
     };

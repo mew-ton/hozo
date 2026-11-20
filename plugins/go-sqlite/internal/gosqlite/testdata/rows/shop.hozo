@@ -57,7 +57,7 @@ namespace shop {
 
   /** 受け付けた注文だけを、作り始める */
   export op begin(order: Order, at: Time) {
-    match order by Stage {
+    match (order by Stage) {
       Accepted     => start(order, at);
       InProduction => none;
     };
