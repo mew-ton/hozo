@@ -12,7 +12,7 @@ R6（`requirements.md`「作り直しの段階」）で入れる、配線の綴�
 
 | 綴り | 決めた所（`decisions.md`「決めたこと」） |
 |---|---|
-| `val x = …;`、`val x;`、`val x: T;`、`x = …;` | 309、310、312 |
+| `val x = …;`、`val x;`、`val x: T;`、`val x, y;`、`x = …;` | 309、310、312、336 |
 | `parallelizable { … }` | 294〜299、302、311 |
 | `for (val x of xs) { … }`、`parallelizable for (…) { … }` | 307、308、314、319 |
 | `xs collect x;` | 317、318 |
@@ -36,8 +36,9 @@ Stmt  = ValDecl
       | Parallelizable End
       | [ "parallelizable" ] For End ;
 
-ValDecl = "val" Ident [ ":" Type ] End          (* 空で宣言する *)
+ValDecl = "val" ValName { "," ValName } End    (* 空で宣言する。名前を並べられる（336） *)
         | "val" Ident "=" Expr End ;            (* 値と一緒に宣言する *)
+ValName = Ident [ ":" Type ] ;
 Assign  = Ident "=" Expr End ;
 Collect = Ident "collect" Expr End ;
 End     = [ ";" ] ;                             (* 省けるのは、直前の字句が "}" のときだけ *)
@@ -69,7 +70,7 @@ For = "for" "(" "val" Ident "of" Atom ")" Block ;
 
 ## 書き直し
 
-サンプル `order-app` の、四つの op。「今」は、サンプルの文面のまま。
+サンプル `order-app` の、五つの op。「今」は、サンプルの文面のまま。五つ目（`shopApi.statusOf`）は、335 と 336 を決めるときに、足した。
 
 ### 期限切れの注文を、引く（`ordering.expireUnpaid`）
 
@@ -222,6 +223,37 @@ export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
 }
 ```
 
+### 注文のいまを、客に見せる（`shopApi.statusOf`）
+
+四つの概念から、事実を、一つずつ読み、画面に見せる形に、まとめる。本当に、並列にしたい形。
+
+今:
+
+```
+op statusOf(order: ordering.Order): OrderView {
+  const charge = payment.ofOrder(order.id);
+  const progress = shipping.progressOfOrder(order.id);
+  const jobs = production.ofOrder(order.id);
+  const grants = download.granted(order.id);
+  return view(order, charge, progress, jobs, grants);
+}
+```
+
+書き直し:
+
+```
+op statusOf(order: ordering.Order): OrderView {
+  val charge, progress, jobs, grants;
+  parallelizable {
+    charge = payment.ofOrder(order.id);
+    progress = shipping.progressOfOrder(order.id);
+    jobs = production.ofOrder(order.id);
+    grants = download.granted(order.id);
+  }
+  return view(order, charge, progress, jobs, grants);
+}
+```
+
 ## 分かったこと
 
 ### 書けるようになったこと
@@ -234,9 +266,9 @@ export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
 ### 書けないこと、合わないこと
 
 - **W5 失敗しうる呼び出しを繰り返すと、一つの失敗が、後ろの回を、止める。** `prepayExpiring` の書き直しでは、一つの支払いで、外の仕組みが失敗すると、残りの支払いは、その回では、扱われない。今の、時計で一件ずつ、の形は、失敗を、回ごとに分けていた。回ごとに、例外を受けて、次へ進む書き方は、配線に、ない。 → 決めた: 止める。失敗を分けたいものは、時計で一件ずつ、のままにする（`decisions.md`「決めたこと」323）。
-- **W6 繰り返しの中の、例外と効果の組は、多くが、`unknown` になる。** 検査の計算（`check.md`「計算」）は、例外と効果の組ごとに、`kept`（起きている）、`prevented`（起きていない）、`unknown`（決まらない）を出す。`prepayExpiring` の書き直しでは、途中の回で例外が出たとき、前の回の効果（`recordPrepaid`）は、起きていて、今の回の効果は、起きていない。答えは、`unknown`。計算に、繰り返しの決まりは、まだない。「例外のとき、効果は起きていない」（`prevents effects`）と書いた約束は、繰り返しの中では、守れない。
+- **W6 繰り返しの中の、例外と効果の組は、多くが、`unknown` になる。** 検査の計算（`check.md`「計算」）は、例外と効果の組ごとに、`kept`（起きている）、`prevented`（起きていない）、`unknown`（決まらない）を出す。`prepayExpiring` の書き直しでは、途中の回で例外が出たとき、前の回の効果（`recordPrepaid`）は、起きていて、今の回の効果は、起きていない。答えは、`unknown`。計算に、繰り返しの決まりは、まだない。「例外のとき、効果は起きていない」（`prevents effects`）と書いた約束は、繰り返しの中では、守れない。 → 決めた: 直列に動いたとして、計算する。本体は、0 回以上、動き、前の回の効果は、起きている（`decisions.md`「決めたこと」335）。
 - **W7 `collect` は、回が、互いに依存しないときにだけ、合う。** 在庫の取り置き（`inventory.reserve` の `allocate`）は、前の行までの取り置きを見て、残りを決めうる。集める先は、`for` の中で読めない（320）ので、`collect` では、書けない。葉の op のまま。
-- **W8 `parallelizable` は、軽いアームでは、行が増えるだけ。** `placeNew` は、6 行が、10 行になった。二つの読みを並べるだけなら、得は、小さい。
+- **W8 `parallelizable` は、軽いアームでは、行が増えるだけ。** `placeNew` は、6 行が、10 行になった。二つの読みを並べるだけなら、得は、小さい。 → 空の `val` は、名前を並べて、一つの文で、宣言できる、と決めた（同 336）。
 
 ### 図の部品との対応
 
@@ -257,3 +289,4 @@ export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
 - **W10 `for` の頭に、呼び出しを書けないと、行が一つ増える。** 案では、並びを、いったん `val` に受ける（`val stale = unpaidBefore(deadline);`）。名前が付くので、読みやすさは、落ちなかった。
 - **W11 `collect` の右に、呼び出しを、じかに書くと、短い。** `planned collect planJob(orderId, line, now);`。`val` に受けてから集める形と、どちらも書ける。
 - **W12 四つの op で、`;` を省いたのは、`for` と `parallelizable` の後ろだけ。** 式で終わる文（`val`、`=`、`collect`、呼び出し、`return`）は、どれも、`;` で終わった。
+- **W13 読みをいくつか集める形には、例外と効果の組が、ない。** `statusOf` の四つのアームは、読むだけで、効果を持たず、仕様の例外も、出さない。検査の計算が答えるものが、なく、アームについての検査（295）にも、掛からない。読みが、仕様の例外を出す形でも、どのアームも、効果を持たないので、直列でも、並列でも、答えは同じ。`parallelizable` に、例外のときの扱いを明示する書き方に、出番は、なかった（同 335）。確かめたのは、この一つの op。
