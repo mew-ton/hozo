@@ -355,7 +355,7 @@ func TestDiscoverBadManifest(t *testing.T) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
 	}
 	// protocol の不一致（MAN-2）はプラグインを返し、診断は Mismatch に置く（使うプラグインにだけ報告する）
-	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.10\"\n")
+	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.1\"\n")
 	plugins, diags = Discover(cfg, env)
 	if len(plugins) != 1 || len(diags) != 0 || !reflect.DeepEqual(codes(plugins[0].Mismatch), []string{"MAN-2"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)

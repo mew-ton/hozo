@@ -551,6 +551,39 @@ func sampleProgram() *Program {
 								},
 								Span: span(f, 66, 3, 68, 5),
 							},
+							// 値の入れ物、値を入れる文、disjoint、for、集める文（docs/ir.md「配線」の Statement。版 0.10）
+							ValStmt{Name: "first", Type: Optional(Ref("server.User")), Span: span(f, 69, 3, 69, 12)},
+							ValStmt{Name: "names", Type: Array(String()), Collected: true, Span: span(f, 70, 3, 70, 23)},
+							DisjointStmt{
+								Arms: []Arm{
+									{Statements: []Statement{AssignStmt{
+										Name: "first",
+										Expr: CallExpr{Call: Call{
+											Callee: ReadCallee{Read: "server.userById"},
+											Args:   []CallArg{{Param: "id", Value: NameAtom{Path: []string{"id"}, Span: span(f, 72, 26, 72, 28)}}},
+											Span:   span(f, 72, 13, 72, 29),
+										}},
+										Span: span(f, 72, 5, 72, 30),
+									}}, Span: span(f, 72, 5, 72, 30)},
+									{Statements: []Statement{CallStmt{
+										Call: Call{Callee: EffectCallee{Effect: DirectEffect{State: "session", Operation: OpDelete}}, Span: span(f, 73, 5, 73, 21)},
+										Span: span(f, 73, 5, 73, 22),
+									}}, Span: span(f, 73, 5, 73, 22)},
+								},
+								Span: span(f, 71, 3, 74, 4),
+							},
+							ForStmt{
+								Var:     "u",
+								VarType: Ref("server.User"),
+								Of:      StateAtom{State: "db", Span: span(f, 75, 17, 75, 19)},
+								Body: []Statement{CollectStmt{
+									Name: "names",
+									Expr: AtomExpr{Atom: NameAtom{Path: []string{"u", "name"}, Span: span(f, 76, 19, 76, 25)}},
+									Span: span(f, 76, 5, 76, 26),
+								}},
+								Disjoint: true,
+								Span:     span(f, 75, 3, 77, 4),
+							},
 						}},
 						Signature: Signature{},
 					},

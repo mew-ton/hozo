@@ -91,7 +91,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.9";
+  version: "0.10";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -789,7 +789,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.9";
+  version: "0.10";
   viewer: string;
 }
 /**

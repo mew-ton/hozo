@@ -418,7 +418,7 @@ func TestSchemaMatchesGo(t *testing.T) {
 		}
 		sort.Strings(want)
 		// Program / View は空の version を ir.Version に補うので、const と一致する。
-		if !reflect.DeepEqual(gotKeys, want) {
+		if (len(gotKeys) != 0 || len(want) != 0) && !reflect.DeepEqual(gotKeys, want) {
 			t.Errorf("%s: zero value marshals keys %v, schema requires %v", name, gotKeys, want)
 		}
 		if kind, ok := g.kinds[rt]; ok {

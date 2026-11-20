@@ -124,7 +124,7 @@ func (c *computer) checkArmPair(a, b *armInfo, first bool, at ir.Span, loopVar s
 		}
 		r.report(diag.Error, "DISJ-1", at, msg, []related{
 			{span: x.ref.call.Span, msg: sprintf("例外を出しうる: %s", strings.Join(x.sig.E, ", "))},
-			{span: e.ref.call.Span, msg: sprintf("効果を持つ: %s", effectNames(e.sig.F))},
+			{span: e.ref.call.Span, msg: sprintf("効果を持つ: %s", joinEffects(e.sig.F))},
 		}, nil)
 	}
 	// DISJ-2: W(a) と R(b) に、同じ状態がある
@@ -158,7 +158,7 @@ func (c *computer) checkArmPair(a, b *armInfo, first bool, at ir.Span, loopVar s
 	}
 }
 
-func effectNames(es []ir.EffectRef) string {
+func joinEffects(es []ir.EffectRef) string {
 	names := make([]string, len(es))
 	for i, e := range es {
 		names[i] = e.String()

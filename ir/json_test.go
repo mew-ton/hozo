@@ -325,10 +325,10 @@ func TestRoundTripClassifySubjects(t *testing.T) {
 	}
 	// ケースの `対象 as T`（docs/ir.md「classify」の CaseTyping）。as は空でも [] で出す。
 	cs := ClassifyCase{Name: "Registered", As: []CaseTyping{{Type: Ref("type.User"), By: NarrowByPresence, Span: sp()}}, Span: sp()}
-	if b := roundTrip(t, cs); string(b) != `{"name":"Registered","as":[{"type":{"kind":"ref","target":"type.User"},"by":"presence",`+spJSON+`}],`+spJSON+`}` {
+	if b := roundTrip(t, cs); string(b) != `{"name":"Registered","decorators":[],"as":[{"type":{"kind":"ref","target":"type.User"},"by":"presence",`+spJSON+`}],`+spJSON+`}` {
 		t.Errorf("case with as: %s", b)
 	}
-	if b := roundTrip(t, ClassifyCase{Name: "A", Span: sp()}); string(b) != `{"name":"A","as":[],`+spJSON+`}` {
+	if b := roundTrip(t, ClassifyCase{Name: "A", Span: sp()}); string(b) != `{"name":"A","decorators":[],"as":[],`+spJSON+`}` {
 		t.Errorf("case without as: %s", b)
 	}
 	if b := roundTrip(t, CaseTyping{State: "s.token", Type: Int(), By: NarrowByPredicate, Span: sp()}); string(b) != `{"state":"s.token","type":{"kind":"core","name":"int"},"by":"predicate",`+spJSON+`}` {
@@ -336,12 +336,12 @@ func TestRoundTripClassifySubjects(t *testing.T) {
 	}
 	// 残りのケース `対象 as else`（版 0.7）: by は else、type は、そのケースでの対象の型。IsElse / ElseCase で引ける
 	rest := ClassifyCase{Name: "Unregistered", As: []CaseTyping{{Type: Optional(Ref("type.User")), By: NarrowByElse, Span: sp()}}, Span: sp()}
-	if b := roundTrip(t, rest); string(b) != `{"name":"Unregistered","as":[{"type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}},"by":"else",`+spJSON+`}],`+spJSON+`}` {
+	if b := roundTrip(t, rest); string(b) != `{"name":"Unregistered","decorators":[],"as":[{"type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}},"by":"else",`+spJSON+`}],`+spJSON+`}` {
 		t.Errorf("else case: %s", b)
 	}
 	// ない側のケース `対象 as none`（版 0.9）: by は none、type は対象の型のまま。分類は、その名前を absent に持つ（なければ、キーごと省く）
 	gone := ClassifyCase{Name: "Absent", As: []CaseTyping{{Type: Optional(Ref("type.User")), By: NarrowByNone, Span: sp()}}, Span: sp()}
-	if b := roundTrip(t, gone); string(b) != `{"name":"Absent","as":[{"type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}},"by":"none",`+spJSON+`}],`+spJSON+`}` {
+	if b := roundTrip(t, gone); string(b) != `{"name":"Absent","decorators":[],"as":[{"type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}},"by":"none",`+spJSON+`}],`+spJSON+`}` {
 		t.Errorf("none case: %s", b)
 	}
 	if gone.IsElse() {
@@ -431,6 +431,7 @@ func TestRoundTripArgValues(t *testing.T) {
 	unionRoundTrip(t, ArgValue(LiteralValue{Literal: BooleanLiteral{Value: true}}), UnmarshalArgValue, `{"kind":"literal","literal":{"kind":"boolean","value":true}}`)
 	unionRoundTrip(t, ArgValue(RefValue{Target: "$param:to"}), UnmarshalArgValue, `{"kind":"ref","target":"$param:to"}`)
 	unionRoundTrip(t, ArgValue(RefsValue{Targets: []string{"a.X", "a.Y"}}), UnmarshalArgValue, `{"kind":"refs","targets":["a.X","a.Y"]}`)
+	unionRoundTrip(t, ArgValue(CaseValue{Classify: "a.Actor", Case: "Customer"}), UnmarshalArgValue, `{"kind":"case","classify":"a.Actor","case":"Customer"}`)
 	unionRoundTrip(t, ArgValue(VariantValue{Union: "s.Page", Arm: "Ready"}), UnmarshalArgValue, `{"kind":"variant","union":"s.Page","arm":"Ready"}`)
 	unionRoundTrip(t, ArgValue(ListValue{}), UnmarshalArgValue, `{"kind":"list","items":[]}`)
 	unionRoundTrip(t, ArgValue(ListValue{Items: []ArgValue{RefValue{Target: "a"}, ListValue{Items: []ArgValue{LiteralValue{Literal: IntLiteral{Value: 1}}}}}}), UnmarshalArgValue,
