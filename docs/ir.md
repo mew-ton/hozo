@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.9";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.10";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -70,11 +70,12 @@ type Type =
   | { kind: "array"; of: Type }
   | { kind: "record"; key: Type; value: Type }
   | { kind: "case"; classify: string; cases: string[]; of: Type }    // 絞り込まれた型。cases は昇順ではなく match のアームに書かれた順
-  | { kind: "never" };                                               // 決して値を返さない。Op.returns にだけ現れる
+  | { kind: "never" };                                               // 当たる値がない。Op.returns（決して値を返さない）と、
+                                                                     // 対象のない分類の Classify.subject.type にだけ現れる
 ```
 
 - `void` は型ではなく、`Op.returns` が `null` であること。
-- `never` は値の型ではない。`Op.returns` 以外の位置（フィールド、引数、`of`、`as` など）には現れない。`override f: never;` の `never` は型ではなく、IR では `Model.extends.removed` になる。
+- `never` は値の型ではない。`Op.returns` と、対象のない分類の対象（`classify C of never`。`docs/check.md`「分類」の「対象のない分類」）のほかの位置（フィールド、引数、`as` など）には現れない。`override f: never;` の `never` は型ではなく、IR では `Model.extends.removed` になる。
 - 形の語（`list<T>` / `nullable<T>` / `single<T>`）は IR にない。`array(T)` / `optional(T)` / T になる（「正規化」）。
 - その場で書いた model（`{ ... }`）は IR にはない（「正規化」）。
 
@@ -177,11 +178,15 @@ interface Read extends DeclBase {
 ```ts
 interface Classify extends DeclBase {
   kind: "classify";
-  subject: { kind: "type"; type: Type }             // 値の分類
+  subject: { kind: "type"; type: Type }             // 値の分類。対象のない分類（`of never`）は、type が never
          | { kind: "op"; op: string; type: Type }   // op の分類。op は FQN、type はその op の returns（対象の型）
          | { kind: "states"; states: string[] };    // 状態の分類。基底の状態の FQN（書かれた順）
-  cases: { name: string; description?: Doc; as: CaseTyping[]; span: Span }[];   // 宣言したケースのすべて（docs/check.md「閉じた分類」）。宣言順。as は書かれた順（なければ []）
-  decidedBy: "type" | "predicate";   // ケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない
+  cases: { name: string; description?: Doc; decorators: Application[]; as: CaseTyping[]; span: Span }[];
+                                  // 宣言したケースのすべて（docs/check.md「閉じた分類」）。宣言順。as は書かれた順（なければ []）。
+                                  // decorators は、ケースの前に書いたデコレータ（書かれた順。なければ []）。付けられるのは、
+                                  // Decorator.targets に、そのケースを含む CaseKind を持つデコレータ（DEC-1）
+  decidedBy: "type" | "predicate" | "none";   // ケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない。
+                                  // none は、対象のない分類: 判定するものがなく、述語も持たない（docs/check.md「対象のない分類」）
   absent?: string;                // ない側のケース（docs/check.md「ない側のケース」）の名前。なければ持たない。
                                   // decidedBy が predicate でも、このケースだけは述語を持たず、値がないことで決まる
 }
@@ -200,7 +205,7 @@ interface CaseTyping {            // ケースの `対象 as T`、`対象 as els
 interface Decorator extends DeclBase {
   kind: "decorator";
   params: Param[];
-  targets: ("op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read")[];   // 省略時は ["op"]
+  targets: Target[];              // 省略時は ["op"]
   external: boolean;              // @external が付いているか（DEC-10）
   repeatable: boolean;            // @repeatable が付いているか。偽なら、一つの宣言に一度だけ付けられる（DEC-13）
   throws: ThrowsClause[];
@@ -215,6 +220,14 @@ interface Decorator extends DeclBase {
                                              // external と repeatable は false で、どれも target のものを使う
 }
 
+type Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | CaseKind;
+
+interface CaseKind {              // 分類のケース（docs/grammar.md「decorator の宣言」の CaseKind）。絞らない所は、持たない
+  kind: "case";
+  classify?: string;              // 名前で絞ったとき（`classify Actor case`）、その分類の FQN
+  subject?: "never";              // 対象で絞ったとき（`classify of never case`）
+}
+
 interface Param {
   name: string;
   type: ParamType;
@@ -225,7 +238,8 @@ interface Param {
 
 type ParamType =
   | { kind: "type"; types: Type[] }                   // `int | float` は types が二つ。普通は一つ
-  | { kind: "any"; of: "exception" | "effect" | "state" | "op" | "model" | "variant"; on?: { state: string; operation: "post" | "put" | "delete" } };
+  | { kind: "any"; of: "exception" | "effect" | "state" | "op" | "model" | "variant"; on?: { state: string; operation: "post" | "put" | "delete" } }
+  | { kind: "any"; of: CaseKind };                   // `any classify … case`。分類のケースを受け取る
 
 interface ThrowsClause {
   exceptions: string[];           // FQN。ユニオンは展開済み。デコレータの引数名なら "$param:名前"
@@ -290,10 +304,24 @@ interface Signature {                   // docs/check.md「計算」の Sig(O, v
 interface Wiring { statements: Statement[]; }
 
 type Statement =
-  | { kind: "const"; name: string; expr: Expr; span: Span }
+  | { kind: "val"; name: string; type: Type; expr?: Expr; collected: boolean; span: Span }
+                                  // 値の入れ物の宣言（docs/check.md「値の入れ物」）。名前を並べた宣言（`val a, b;`）は、名前ごとの文に分ける。
+                                  // type は、解決した型（書いた型か、入れる式から導いた型。docs/types.md「val の型」）。プラグインは、型を導かない。
+                                  // expr は、値と一緒に宣言したときだけ。collected は、集める文で値が入る val か（expr があれば false）
+  | { kind: "assign"; name: string; expr: Expr; span: Span }      // 値を入れる文 `x = 式;`
+  | { kind: "collect"; name: string; expr: Expr; span: Span }     // 集める文 `xs collect 式;`（docs/check.md「繰り返し」の「集める」）
   | { kind: "return"; expr: Expr; span: Span }
   | { kind: "call"; call: Call; span: Span }
-  | { kind: "match"; match: Match; span: Span };
+  | { kind: "match"; match: Match; span: Span }
+  | { kind: "disjoint"; arms: Arm[]; span: Span }                 // 互いに触れないアームの並び（docs/check.md「disjoint」）。書かれた順。二つ以上
+  | { kind: "for"; var: string; varType: Type; of: Atom; body: Statement[]; disjoint: boolean; span: Span };
+                                  // 繰り返し（docs/check.md「繰り返し」）。var は変数の名前、varType はその型（並びの要素の型）、of は並び。
+                                  // disjoint は、前に `disjoint` を書いたか（回どうしが、互いに触れない）
+
+interface Arm {                   // disjoint のアーム。ブロックでも、文の一つでも、文の並びにする（文の一つなら、要素が一つ）
+  statements: Statement[];
+  span: Span;
+}
 
 type Expr = { kind: "call"; call: Call } | { kind: "match"; match: Match } | { kind: "atom"; atom: Atom };
 
@@ -316,7 +344,7 @@ interface BoundPosition {
 }
 
 type Atom =
-  | { kind: "name"; path: string[]; span: Span }      // ["query", "page"]。先頭は束縛名か引数名
+  | { kind: "name"; path: string[]; span: Span }      // ["query", "page"]。先頭は val の名前か、for の変数か、引数名
   | { kind: "state"; state: string; path: string[]; span: Span }   // 状態の参照（docs/check.md「状態の参照」）。state は FQN、
                                                                     // path はその値のフィールドのパス（状態そのものなら []）
   | { kind: "literal"; literal: Literal; span: Span }
@@ -381,6 +409,7 @@ type ArgValue =
   | { kind: "ref"; target: string }                 // 宣言の FQN、または op の引数名（"$param:名前"）
   | { kind: "refs"; targets: string[] }             // `A | B`。ユニオンは展開済み
   | { kind: "variant"; union: string; arm: string } // `ProductPage.Ready`
+  | { kind: "case"; classify: string; case: string } // 分類のケース `Actor.Customer`。classify は FQN
   | { kind: "list"; items: ArgValue[] };
 ```
 
@@ -414,7 +443,9 @@ interface Bind {
 | `reads a, b`、複数の `reads` | `ReadRef` の列一つ（重複は最初の出現に寄せる）。`read` の宣言の名前は `named`、状態の名前は `direct` |
 | ケースの `X as T` | `as` の `CaseTyping`。`X` が状態なら `state` にその FQN、型か op なら `state` を持たない |
 | ケースの `X as else`（残りのケース） | `as` の `CaseTyping`。`by` は `else`、`type` は、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。`state` は上の行と同じ。そのケースは、ほかのケースと同じに `cases` に入る |
-| 配線の値の位置の、状態の名前（`f(token)`、`token.value`、`match token by nullable`） | `Atom` の `state`。修飾して書いても同じ |
+| 配線の値の位置の、状態の名前（`f(token)`、`token.value`、`match (token by nullable)`） | `Atom` の `state`。修飾して書いても同じ |
+| `val a, b: T;`（名前を並べた、空の宣言） | 名前ごとの `val` の文（書かれた順）。`span` は、それぞれの名前（と、書いた型） |
+| `disjoint` の、文の一つのアーム（`a = f(x);`） | `statements` が一つの `Arm` |
 | ケースの `X as none`（ない側のケース） | `as` の `CaseTyping`。`by` は `none`、`type` は対象の型のまま。`Classify.absent` に、そのケースの名前。ない側のケースを `X as else` で書いた分類（`docs/check.md`「ない側のケース」の表の二行目）も、`absent` を持つ（`by` は `else` のまま） |
 | `effect e(o: T) on s.put as C.A, C.B -> C.D` | `row` に `{ param: "o", classify: C の FQN, from: ["A", "B"], to: "D" }`。前の `any` は `from: "any"`、後ろの `else` は `to` なし |
 | `effect e(o: T) on s.post as C.X`、`… as C.N -> C.X`（N は、ない側のケース） | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "X" }`。`post` の前は、IR に残さない（入る前の行は、ない） |
@@ -453,7 +484,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.9";
+  version: "0.10";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -511,10 +542,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.9"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.10"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.10 | 配線の文（`Statement`）: `const` をやめて `val`（`type`、`collected`。`expr` は省ける）。`assign`、`collect`、`disjoint`（`Arm`）、`for`。`Classify.cases[].decorators`。`Classify.decidedBy` に `none`（対象のない分類。`subject` の `type` が `never`）。`Decorator.targets` に `CaseKind`。`ParamType` の `any` に `CaseKind`。`ArgValue` に `case`。`View` とやり取りの形は 0.9 と同じ |
 | 0.9 | `Effect.row`（`RowTransition`: 行の遷移。`docs/check.md`「行の遷移」）。`CaseTyping.by` に `none`（ない側のケース `対象 as none`。同「ない側のケース」）。`Classify.absent`。述語で決まる分類（`decidedBy` が `predicate`）が、述語を持たないケース（`absent` のケース）を持ちうる。`View` とやり取りの形は 0.8 と同じ |
 | 0.8 | `Classify.hasDefault`、`Classify.defaultDescription`、`Classify.fromCondition` をなくした（分類を閉じた。`docs/check.md`「閉じた分類」）。`MatchArm.cases` は、いつもケース名の列（`"default"` をなくした）。`MatchArm.else`（`else` のアーム。`cases` は、それが受けるケース）。`View` とやり取りの形は 0.7 と同じ |
 | 0.7 | `CaseTyping.by` に `else`（残りのケース `対象 as else`。`docs/check.md`「残りのケース」）。そのときの `CaseTyping.type` は、書いた型ではなく、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。残りのケースは `Classify.cases` に入り、`hasDefault` には数えない。`View` とやり取りの形は 0.6 と同じ |
