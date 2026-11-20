@@ -121,6 +121,7 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 
 - `plugins/go-ratelimit` の、マニフェストと、テストの入力（`testdata/**`）は、変えていない: 版と、`.hozo` の書き換えは、実装と一緒に入れる（`views.json` が、実装の出す IR と、組になっているため）。
 - 期待する出力は、手で書いた。`go vet ./...` と `go test ./...` が、このモジュールで通る（サブテスト `go`）。
+- **`getMyPage` は、`val` を、六つ持つ**（`session`、`user`、`latest`、`orders`、`found`、`summaries`）。`disjoint` のアームから、外に値を出すには、アームの数だけ、空の `val` が要るので、数が増える。既定の上限（5）を超えて、WIRE-6 の warning になるので、`hozo.toml` の `max_bindings` を 6 にした。
 
 ## 入力
 
