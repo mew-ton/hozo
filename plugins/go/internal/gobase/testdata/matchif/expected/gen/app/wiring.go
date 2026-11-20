@@ -12,7 +12,7 @@ func (o *ops) NameById(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match user by app.Lookup
+	// match (user by app.Lookup)
 	if user != nil {
 		// Found: user は app.User
 		return o.LoadName(ctx, *user)
@@ -23,7 +23,7 @@ func (o *ops) NameById(ctx context.Context, id string) (string, error) {
 
 // NickOf は op app.nickOf。
 func (o *ops) NickOf(ctx context.Context, user *User) (*string, error) {
-	// match user by nullable
+	// match (user by nullable)
 	if user != nil {
 		// HasItems: user は app.User
 		return user.Nick, nil
@@ -36,7 +36,7 @@ func (o *ops) NickOf(ctx context.Context, user *User) (*string, error) {
 //
 // Throws: app.Denied
 func (o *ops) PureName(ctx context.Context, user *User) (string, error) {
-	// match user by app.Present
+	// match (user by app.Present)
 	if user != nil {
 		// Some: user は app.User
 		return o.NameOf(ctx, *user)
@@ -47,7 +47,7 @@ func (o *ops) PureName(ctx context.Context, user *User) (string, error) {
 
 // Widened は op app.widened。
 func (o *ops) Widened(ctx context.Context, in Input) (*string, error) {
-	// match in.user by nullable
+	// match (in.user by nullable)
 	if in.User != nil {
 		// HasItems: in.user は app.User
 		v0, err := o.LoadName(ctx, *in.User)
@@ -62,7 +62,7 @@ func (o *ops) Widened(ctx context.Context, in Input) (*string, error) {
 
 // TagCount は op app.tagCount。
 func (o *ops) TagCount(ctx context.Context, tags []string) (int64, error) {
-	// match tags by nullable
+	// match (tags by nullable)
 	if tags != nil {
 		// HasItems: tags は string[]
 		return o.CountTags(ctx, tags)
@@ -79,7 +79,7 @@ func (o *ops) TokenText(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match token by nullable
+	// match (token by nullable)
 	if token != nil {
 		// HasItems: token は app.Token
 		return o.UseToken(ctx, *token)
@@ -96,7 +96,7 @@ func (o *ops) SignedInText(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match by app.SignedIn
+	// match (by app.SignedIn)
 	if token != nil {
 		// Yes: token は app.Token
 		return o.UseToken(ctx, *token)
@@ -113,7 +113,7 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 	if err != nil {
 		return "", err
 	}
-	// match user by nullable
+	// match (user by nullable)
 	var name string
 	if user != nil {
 		// HasItems: user は app.User
@@ -126,7 +126,7 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 		// Empty
 		name = "nobody"
 	}
-	// match lines by list
+	// match (lines by list)
 	var count int64
 	if len(lines) != 0 {
 		// HasItems
@@ -140,7 +140,7 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 		count = 0
 	}
 	_ = count
-	// match user by nullable
+	// match (user by nullable)
 	var maybe *string
 	if user != nil {
 		// HasItems: user は app.User
@@ -151,7 +151,7 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 		maybe = ptr(v2)
 	}
 	_ = maybe
-	// match user by nullable
+	// match (user by nullable)
 	var strict string
 	if user != nil {
 		// HasItems: user は app.User
@@ -173,7 +173,7 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 //
 // Throws: app.Denied
 func (o *ops) StatementForms(ctx context.Context, user *User, lines []Line) error {
-	// match user by nullable
+	// match (user by nullable)
 	if user != nil {
 		// HasItems: user は app.User
 		if err := o.Record(ctx, user.Name); err != nil {
@@ -185,23 +185,23 @@ func (o *ops) StatementForms(ctx context.Context, user *User, lines []Line) erro
 			return err
 		}
 	}
-	// match lines by list
+	// match (lines by list)
 	if len(lines) != 0 {
 		// HasItems
 		if err := o.Show(ctx, "some"); err != nil {
 			return err
 		}
 	}
-	// match user by nullable
+	// match (user by nullable)
 	if user == nil {
 		// Empty
 		return o.Deny(ctx)
 	}
-	// match lines by list
+	// match (lines by list)
 	if err := o.Show(ctx, "any"); err != nil {
 		return err
 	}
-	// match user by nullable
+	// match (user by nullable)
 	if user != nil {
 		// HasItems: user は app.User
 		if err := o.TakeOptionalUser(ctx, ptr(*user)); err != nil {

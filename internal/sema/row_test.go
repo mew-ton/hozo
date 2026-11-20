@@ -42,7 +42,7 @@ namespace row {
   effect purgeAny(order: Order) on orders.delete as any -> Life.Absent;
 
   op wire(found: Order?) {
-    match found by Life { Open => discard(found); Closed => f(); Absent => none; };
+    match (found by Life) { Open => discard(found); Closed => f(); Absent => none; };
   }
 }
 `

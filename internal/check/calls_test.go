@@ -158,7 +158,7 @@ func TestBind4Callees(t *testing.T) {
 	}
 	// op でない呼び出し先の Call.bound は、いつも空
 	for _, st := range p.Lookup("store.w").(*ir.Op).Body.Statements {
-		if c, ok := st.(ir.ConstStmt); ok {
+		if c, ok := st.(ir.ValStmt); ok {
 			if b := c.Expr.(ir.CallExpr).Call.Bound; len(b) != 0 {
 				t.Errorf("read の呼び出しの bound = %v", b)
 			}

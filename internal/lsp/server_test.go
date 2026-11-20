@@ -661,7 +661,7 @@ func TestStateClassification(t *testing.T) {
 		// 遷移のケース名は分類のケース
 		{"Checkout: Shopping -> Ordered", len("Checkout: "), "classify Checkout of carts, orders\n  Shopping"},
 		// 束縛のホバーは式を短く書く: 状態の分類での match
-		{"return placed;", len("return "), "match by Checkout { ... }"},
+		{"return placed;", len("return "), "match (by Checkout) { ... }"},
 	} {
 		if got := hover(tt.needle, 0, tt.shiftBy); !strings.Contains(got, tt.want) {
 			t.Errorf("hover(%q) に %q がない:\n%s", tt.needle, tt.want, got)
@@ -737,7 +737,7 @@ func TestReservedWordFields(t *testing.T) {
   op fetch(): Wrap;
   op store(w: Wrap): Wrap;
   op run(): Wrap {
-    const res = fetch();
+    val res = fetch();
     return store({ op: res.op, state: res.state });
   }
 }
@@ -821,7 +821,7 @@ namespace store {
     Unknown: findUser as else;
   }
   op whoAmI(): type.User? {
-    return match current by nullable {
+    return match (current by nullable) {
       HasItems => current;
       Empty    => none;
     };
@@ -834,8 +834,8 @@ namespace server {
   export op login(id: string): string
     throws type.Unauthorized
   {
-    const user = store.findUser(id);
-    return match user by store.Registration {
+    val user = store.findUser(id);
+    return match (user by store.Registration) {
       Registered => store.nameOf2(user);
       else       => throw type.Unauthorized;
     };
@@ -843,8 +843,8 @@ namespace server {
   export op lookup(id: string): string
     throws type.Unauthorized
   {
-    const user = store.findUser(id);
-    return match user by store.Account {
+    val user = store.findUser(id);
+    return match (user by store.Account) {
       Known   => store.nameOf2(user);
       Unknown => throw type.Unauthorized;
     };
@@ -1038,7 +1038,7 @@ namespace shop {
   effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
   effect purge(order: Order) on orders.delete as any -> Life.Absent;
   op send(order: Order, at: Time) {
-    match order by kind.Stage {
+    match (order by kind.Stage) {
       Accepted => ship(order, at);
       else     => none;
     };
@@ -1206,7 +1206,7 @@ func TestCarryingDecorators(t *testing.T) {
   op save(row: Row): Row? throws Busy {
     add(row);
     rows.post(row);
-    return match row by Size {
+    return match (row by Size) {
       Big     => throw Busy(5m, "big");
       else    => byId(row.id);
     };

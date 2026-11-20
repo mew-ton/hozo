@@ -1257,7 +1257,7 @@ namespace shop {
   op open(item: Item): Receipt {
     save(item);
     nightly(item);
-    const r = issue(item);
+    val r = issue(item);
     return r;
   }
   op save(item: Item) effects addItem { addItem(item); }

@@ -41,7 +41,7 @@ func (o *ops) Temps(ctx context.Context, outer Outer) error {
 
 // Kinds は op bodies.kinds。
 func (o *ops) Kinds(ctx context.Context, text string) error {
-	// match text by bodies.Size
+	// match (text by bodies.Size)
 	k1, err := ClassifySize(ctx, o.size, text)
 	if err != nil {
 		return err

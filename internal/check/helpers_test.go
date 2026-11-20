@@ -153,7 +153,7 @@ func rec(fields ...ir.RecordField) ir.Atom { return ir.RecordAtom{Fields: fields
 func rf(name string, v ir.Atom) ir.RecordField { return ir.RecordField{Name: name, Value: v} }
 
 func cst(name string, c ir.Call) ir.Statement {
-	return ir.ConstStmt{Name: name, Expr: ir.CallExpr{Call: c}, Span: c.Span}
+	return ir.ValStmt{Name: name, Expr: ir.CallExpr{Call: c}, Span: c.Span}
 }
 
 func cs(c ir.Call) ir.Statement { return ir.CallStmt{Call: c, Span: c.Span} }
@@ -173,16 +173,16 @@ func arm(body *ir.Call, cases ...string) ir.MatchArm {
 	return a
 }
 
-// matchStmt は値の分類での match の文（`match x by C { ... };`）。
+// matchStmt は値の分類での match の文（`match (x by C) { ... };`）。
 func matchStmt(classify string, arms ...ir.MatchArm) ir.Statement {
 	return ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("x")}, Classify: classify, Arms: arms}}
 }
 
 func matchConst(name, classify string, arms ...ir.MatchArm) ir.Statement {
-	return ir.ConstStmt{Name: name, Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("x")}, Classify: classify, Arms: arms}}}
+	return ir.ValStmt{Name: name, Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("x")}, Classify: classify, Arms: arms}}}
 }
 
-// matchState は状態を名前で書いた、標準の分類での match の文（`match s by list { ... };`）。
+// matchState は状態を名前で書いた、標準の分類での match の文（`match (s by list) { ... };`）。
 func matchState(state string, shape ir.StateShape, arms ...ir.MatchArm) ir.Statement {
 	return ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: stateAtom(state)}, Classify: string(shape), Arms: arms}}
 }
@@ -197,7 +197,7 @@ func atomArm(v ir.Atom, cases ...string) ir.MatchArm {
 	return ir.MatchArm{Cases: cases, Else: len(cases) == 0, Body: ir.AtomExpr{Atom: v}}
 }
 
-// matchByClassify は状態の分類での match の文（`match by C { ... };`）。
+// matchByClassify は状態の分類での match の文（`match (by C) { ... };`）。
 func matchByClassify(classify string, arms ...ir.MatchArm) ir.Statement {
 	return ir.MatchStmt{Match: ir.Match{Subject: ir.ClassifyOwnedSubject{}, Classify: classify, Arms: arms}}
 }

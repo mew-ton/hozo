@@ -100,7 +100,7 @@ func (o *ops) OpenTop(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// match token by nullable
+	// match (token by nullable)
 	if token != nil {
 		// HasItems: token は shop.Token
 		if err := o.ShowCart(ctx); err != nil {
@@ -124,7 +124,7 @@ func (o *ops) OpenCart(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// match carts by list
+	// match (carts by list)
 	if len(carts) != 0 {
 		// HasItems
 		if err := o.EmptyCart(ctx); err != nil {
@@ -145,7 +145,7 @@ func (o *ops) OpenCart(ctx context.Context) error {
 // Reads: shop.carts, shop.orders
 // Effects: shop.placeOrder
 func (o *ops) Checkout(ctx context.Context) (*Order, error) {
-	// match by shop.Checkout
+	// match (by shop.Checkout)
 	var placed *Order
 	k0, err := ClassifyCheckout(ctx, o.checkout)
 	if err != nil {
@@ -168,7 +168,7 @@ func (o *ops) Checkout(ctx context.Context) (*Order, error) {
 // Reads: shop.token
 // Effects: shop.addLine
 func (o *ops) Add(ctx context.Context, line Line) error {
-	// match line by shop.LineKind
+	// match (line by shop.LineKind)
 	var normalized Line
 	k0, err := ClassifyLineKind(ctx, o.lineKind, line)
 	if err != nil {
@@ -188,7 +188,7 @@ func (o *ops) Add(ctx context.Context, line Line) error {
 		}
 		normalized = v1
 	}
-	// match by shop.LoggedIn
+	// match (by shop.LoggedIn)
 	k1, err := ClassifyLoggedIn(ctx, o.loggedIn)
 	if err != nil {
 		return err

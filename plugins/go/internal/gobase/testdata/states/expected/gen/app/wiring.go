@@ -114,7 +114,7 @@ func (o *ops) Direct(ctx context.Context, line Line, t Token) error {
 //
 // Reads: app.lines
 func (o *ops) FindOrNone(ctx context.Context, item *string) (*Line, error) {
-	// match item by nullable
+	// match (item by nullable)
 	if item != nil {
 		// HasItems: item は string
 		return o.lines.LineFor(ctx, *item)
@@ -127,7 +127,7 @@ func (o *ops) FindOrNone(ctx context.Context, item *string) (*Line, error) {
 //
 // Reads: app.lines
 func (o *ops) CountOrZero(ctx context.Context, item *string) (int64, error) {
-	// match item by nullable
+	// match (item by nullable)
 	var n int64
 	if item != nil {
 		// HasItems: item は string
@@ -152,7 +152,7 @@ func (o *ops) Toggle(ctx context.Context, t Token) error {
 	if err != nil {
 		return err
 	}
-	// match token by nullable
+	// match (token by nullable)
 	if token != nil {
 		// HasItems: token は app.Token
 		if err := o.token.DropToken(ctx); err != nil {
@@ -266,7 +266,7 @@ func (o *ops) Branches(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// match lines by list
+	// match (lines by list)
 	if len(lines) != 0 {
 		// HasItems
 		if err := o.ShowLines(ctx, lines); err != nil {
@@ -286,7 +286,7 @@ func (o *ops) Branches(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// match token by nullable
+	// match (token by nullable)
 	if token != nil {
 		// HasItems: token は app.Token
 		if err := o.token.DropToken(ctx); err != nil {

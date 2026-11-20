@@ -10,7 +10,7 @@ import (
 
 // Describe は op app.describe。
 func (o *ops) Describe(ctx context.Context, page Page) (string, error) {
-	// match page by app.PageKind
+	// match (page by app.PageKind)
 	switch page.(type) {
 	case Title:
 		return o.TitleOf(ctx, page.(Title))
@@ -27,7 +27,7 @@ func (o *ops) Describe(ctx context.Context, page Page) (string, error) {
 
 // DescribeElse は op app.describeElse。
 func (o *ops) DescribeElse(ctx context.Context, page Page) (string, error) {
-	// match page by app.PageKind
+	// match (page by app.PageKind)
 	switch page.(type) {
 	case Title:
 		return o.TitleOf(ctx, page.(Title))
@@ -44,7 +44,7 @@ func (o *ops) DescribeElse(ctx context.Context, page Page) (string, error) {
 
 // Outcome は op app.outcome。
 func (o *ops) Outcome(ctx context.Context, result Result) (string, error) {
-	// match result by app.Outcome
+	// match (result by app.Outcome)
 	switch result.(type) {
 	case Receipt:
 		return o.ReceiptText(ctx, result.(Receipt))
@@ -57,7 +57,7 @@ func (o *ops) Outcome(ctx context.Context, result Result) (string, error) {
 
 // Shown は op app.shown。
 func (o *ops) Shown(ctx context.Context, page Page) (string, error) {
-	// match page by app.Shown
+	// match (page by app.Shown)
 	switch page.(type) {
 	case Title:
 		return o.TitleOf(ctx, page.(Title))
@@ -70,7 +70,7 @@ func (o *ops) Shown(ctx context.Context, page Page) (string, error) {
 
 // ShownNote は op app.shownNote。
 func (o *ops) ShownNote(ctx context.Context, page Page) (string, error) {
-	// match page by app.Shown
+	// match (page by app.Shown)
 	var text *string
 	switch page.(type) {
 	case Title:
@@ -84,7 +84,7 @@ func (o *ops) ShownNote(ctx context.Context, page Page) (string, error) {
 		return "", &runtime.ClassificationError{Classify: "app.Shown"}
 	}
 	_ = text
-	// match page by app.Shown
+	// match (page by app.Shown)
 	switch page.(type) {
 	case Title:
 		if err := o.Show(ctx, "title"); err != nil {
@@ -99,7 +99,7 @@ func (o *ops) ShownNote(ctx context.Context, page Page) (string, error) {
 
 // Variants は op app.variants。
 func (o *ops) Variants(ctx context.Context, page Page) (string, error) {
-	// match page by app.PageKind
+	// match (page by app.PageKind)
 	var text *string
 	switch page.(type) {
 	case Title, Problem:
@@ -119,7 +119,7 @@ func (o *ops) Variants(ctx context.Context, page Page) (string, error) {
 		return "", &runtime.ClassificationError{Classify: "app.PageKind"}
 	}
 	_ = text
-	// match page by app.PageKind
+	// match (page by app.PageKind)
 	switch page.(type) {
 	case Title:
 		if err := o.Show(ctx, "ready"); err != nil {
@@ -129,7 +129,7 @@ func (o *ops) Variants(ctx context.Context, page Page) (string, error) {
 	default:
 		return "", &runtime.ClassificationError{Classify: "app.PageKind"}
 	}
-	// match page by app.PageKind
+	// match (page by app.PageKind)
 	switch page.(type) {
 	case Title, Problem, PageBlank, PageNote:
 		if err := o.Show(ctx, "not code"); err != nil {
@@ -150,7 +150,7 @@ func (o *ops) StageText(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match by app.Stage
+	// match (by app.Stage)
 	switch stage.(type) {
 	case Title:
 		return o.TitleOf(ctx, stage.(Title))
@@ -165,7 +165,7 @@ func (o *ops) StageText(ctx context.Context) (string, error) {
 
 // SizeLabel は op app.sizeLabel。
 func (o *ops) SizeLabel(ctx context.Context, item Item) (string, error) {
-	// match item by app.Size
+	// match (item by app.Size)
 	k0, err := ClassifySize(ctx, o.size, item)
 	if err != nil {
 		return "", err
@@ -183,7 +183,7 @@ func (o *ops) SizeLabel(ctx context.Context, item Item) (string, error) {
 
 // PureLabel は op app.pureLabel。
 func (o *ops) PureLabel(ctx context.Context, item Item) (string, error) {
-	// match item by app.Size
+	// match (item by app.Size)
 	k0, err := ClassifySize(ctx, o.size, item)
 	if err != nil {
 		return "", err
@@ -201,7 +201,7 @@ func (o *ops) PureLabel(ctx context.Context, item Item) (string, error) {
 //
 // Throws: app.Bad
 func (o *ops) Mail(ctx context.Context, addr string, contact *string) (string, error) {
-	// match addr by app.Address
+	// match (addr by app.Address)
 	var first string
 	k0, err := ClassifyAddress(ctx, o.address, addr)
 	if err != nil {
@@ -220,7 +220,7 @@ func (o *ops) Mail(ctx context.Context, addr string, contact *string) (string, e
 	if err := o.Show(ctx, first); err != nil {
 		return "", err
 	}
-	// match contact by app.Contact
+	// match (contact by app.Contact)
 	k1, err := ClassifyContact(ctx, o.contact, contact)
 	if err != nil {
 		return "", err
@@ -244,7 +244,7 @@ func (o *ops) Price(ctx context.Context, name string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	// match item by app.Stock
+	// match (item by app.Stock)
 	var value int64
 	k0, err := ClassifyStock(ctx, o.stock, item)
 	if err != nil {
@@ -270,7 +270,7 @@ func (o *ops) Price(ctx context.Context, name string) (int64, error) {
 // Throws: app.Bad
 func (o *ops) LiteralSubjects(ctx context.Context) (string, error) {
 	var v0 string = "x@example.com"
-	// match "x@example.com" by app.Address
+	// match ("x@example.com" by app.Address)
 	var a string
 	k0, err := ClassifyAddress(ctx, o.address, v0)
 	if err != nil {
@@ -286,7 +286,7 @@ func (o *ops) LiteralSubjects(ctx context.Context) (string, error) {
 		return "", err
 	}
 	v1 := Item{Name: "box", Price: 3}
-	// match {…} by app.Size
+	// match ({…} by app.Size)
 	k1, err := ClassifySize(ctx, o.size, v1)
 	if err != nil {
 		return "", err
@@ -306,7 +306,7 @@ func (o *ops) LiteralSubjects(ctx context.Context) (string, error) {
 //
 // Reads: app.carts, app.orders
 func (o *ops) CheckoutNote(ctx context.Context) error {
-	// match by app.Checkout
+	// match (by app.Checkout)
 	k0, err := ClassifyCheckout(ctx, o.checkout)
 	if err != nil {
 		return err

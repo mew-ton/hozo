@@ -13,7 +13,7 @@ import (
 //
 // Throws: app.Missing, app.Plain
 func (o *ops) Need(ctx context.Context, id *string, known *bool) (string, error) {
-	// match known by nullable
+	// match (known by nullable)
 	if known != nil {
 		// HasItems: known は boolean
 		return o.NeedId(ctx, id)
@@ -26,7 +26,7 @@ func (o *ops) Need(ctx context.Context, id *string, known *bool) (string, error)
 //
 // Throws: app.Missing
 func (o *ops) NeedId(ctx context.Context, id *string) (string, error) {
-	// match id by nullable
+	// match (id by nullable)
 	if id != nil {
 		// HasItems: id は string
 		return *id, nil
@@ -39,7 +39,7 @@ func (o *ops) NeedId(ctx context.Context, id *string) (string, error) {
 //
 // Throws: app.Invalid
 func (o *ops) Check(ctx context.Context, in Input, tags []string, text *string) (string, error) {
-	// match text by nullable
+	// match (text by nullable)
 	var first string
 	if text != nil {
 		// HasItems: text は string
@@ -48,7 +48,7 @@ func (o *ops) Check(ctx context.Context, in Input, tags []string, text *string) 
 		// Empty
 		return "", Invalid{Code: in.Code, Detail: Detail{Field: "text"}, Tags: tags, At: ptr(int64(7))}
 	}
-	// match tags by list
+	// match (tags by list)
 	var second string
 	if len(tags) != 0 {
 		// HasItems
@@ -68,12 +68,12 @@ func (o *ops) Check(ctx context.Context, in Input, tags []string, text *string) 
 //
 // Throws: app.Missing, limits.LimitExceeded
 func (o *ops) Guard(ctx context.Context, code *Code, wait *bool) error {
-	// match code by nullable
+	// match (code by nullable)
 	if code != nil {
 		// HasItems: code は app.Code
 		return Missing{Id: string(*code)}
 	}
-	// match wait by nullable
+	// match (wait by nullable)
 	if wait != nil {
 		// HasItems: wait は boolean
 		return limits.LimitExceeded{RetryAfter: time.Duration(300000000000), Scope: ptr(string("guard"))}
@@ -88,7 +88,7 @@ func (o *ops) Guard(ctx context.Context, code *Code, wait *bool) error {
 // Throws: app.TooMany
 // Reads: app.attempts
 func (o *ops) Retry(ctx context.Context, text *string) (string, error) {
-	// match text by nullable
+	// match (text by nullable)
 	if text != nil {
 		// HasItems: text は string
 		return *text, nil
@@ -106,7 +106,7 @@ func (o *ops) Retry(ctx context.Context, text *string) (string, error) {
 // Throws: app.TooMany
 func (o *ops) Count(ctx context.Context, text *string) (string, error) {
 	n := int64(3)
-	// match text by nullable
+	// match (text by nullable)
 	if text != nil {
 		// HasItems: text は string
 		return *text, nil

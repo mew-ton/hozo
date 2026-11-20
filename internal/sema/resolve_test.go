@@ -61,7 +61,7 @@ namespace a {
   op value(): M;
   op use(m: M, n: M): void;
   op f(m: M): void {
-    const x = value();
+    val x = value();
     use(m, x);
   }
 }`}, false)
@@ -327,7 +327,7 @@ namespace a {
   model M { id: string; bad: Nope; }
   op f(m: M): Nope throws Missing;
   op g(): M {
-    const x = nope();
+    val x = nope();
     return other(x);
   }
 }`}, false)
@@ -434,8 +434,8 @@ namespace a {
 namespace b {
   op keep(u: t.User): t.User;
   op f(id: string): t.User throws t.Gone {
-    const u = a.find(id);
-    return match u by a.Found {
+    val u = a.find(id);
+    return match (u by a.Found) {
       Hit     => keep(u);
       Miss    => throw t.Gone;
     };
@@ -488,8 +488,8 @@ namespace a {
     add(m);
     rows.post(m);
     a.rows.post(m);
-    const found = a.byId(m.id);
-    return match m by K {
+    val found = a.byId(m.id);
+    return match (m by K) {
       A => throw Busy(5m);
       else    => keep(found);
     };
@@ -515,7 +515,7 @@ namespace a {
 		switch x := st.(type) {
 		case ir.CallStmt:
 			kinds = append(kinds, x.Call.Callee.Kind()+" "+x.Call.Callee.String())
-		case ir.ConstStmt:
+		case ir.ValStmt:
 			kinds = append(kinds, x.Expr.(ir.CallExpr).Call.Callee.Kind()+" "+x.Expr.(ir.CallExpr).Call.Callee.String())
 		}
 	}

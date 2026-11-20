@@ -167,7 +167,7 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 		t.Errorf("narrowed arm: %s", b)
 	}
 
-	unionRoundTrip(t, Statement(ConstStmt{Name: "x", Expr: AtomExpr{Atom: NoneAtom{Span: sp()}}, Span: sp()}), UnmarshalStatement,
+	unionRoundTrip(t, Statement(ValStmt{Name: "x", Expr: AtomExpr{Atom: NoneAtom{Span: sp()}}, Span: sp()}), UnmarshalStatement,
 		`{"kind":"const","name":"x","expr":{"kind":"atom","atom":{"kind":"none",`+spJSON+`}},`+spJSON+`}`)
 	unionRoundTrip(t, Statement(ReturnStmt{Expr: CallExpr{Call: call}, Span: sp()}), UnmarshalStatement,
 		`{"kind":"return","expr":{"kind":"call","call":`+callJSON+`},`+spJSON+`}`)
@@ -677,7 +677,7 @@ func TestKinds(t *testing.T) {
 		"core": CoreType{}, "ref": RefType{}, "optional": OptionalType{}, "array": ArrayType{}, "record": RecordType{}, "case": CaseType{}, "never": NeverType{},
 		"throw": ThrowBody{},
 		"type":  TypeParam{}, "any": AnyParam{},
-		"const": ConstStmt{}, "return": ReturnStmt{},
+		"const": ValStmt{}, "return": ReturnStmt{},
 		"atom": AtomExpr{},
 		"name": NameAtom{}, "literal": LiteralAtom{}, "none": NoneAtom{},
 		"string": StringLiteral{}, "int": IntLiteral{}, "float": FloatLiteral{}, "boolean": BooleanLiteral{}, "duration": DurationLiteral{},

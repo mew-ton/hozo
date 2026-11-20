@@ -71,7 +71,7 @@ func (o *ops) OnAddToCart(ctx context.Context, item server.Item) error {
 	if err != nil {
 		return err
 	}
-	// match item by browser.WarrantyKind
+	// match (item by browser.WarrantyKind)
 	var warranty *server.WarrantyLine
 	k0, err := ClassifyWarrantyKind(ctx, o.warrantyKind, item)
 	if err != nil {
@@ -119,7 +119,7 @@ func (o *ops) ChooseYamadaWarranty(ctx context.Context, item server.Item, line s
 //
 // Throws: page.Aborted
 func (o *ops) ChooseWarrantyPlan(ctx context.Context, item server.Item) (*server.PlanId, error) {
-	// match item by browser.WarrantyAvailable
+	// match (item by browser.WarrantyAvailable)
 	var plan *server.PlanId
 	k0, err := ClassifyWarrantyAvailable(ctx, o.warrantyAvailable, item)
 	if err != nil {

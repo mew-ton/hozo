@@ -432,7 +432,7 @@ func sampleProgram() *Program {
 						},
 						Returns: Ref("server.OrderPage"),
 						Body: &Wiring{Statements: []Statement{
-							ConstStmt{
+							ValStmt{
 								Name: "user",
 								Expr: CallExpr{Call: Call{
 									Callee: OpCallee{Op: "server.findUser"},
@@ -503,7 +503,7 @@ func sampleProgram() *Program {
 								Span: span(f, 62, 3, 65, 5),
 							},
 							// read と効果の呼び出し（docs/ir.md「配線」の Callee）: read、効果の宣言、直に呼ぶ組み込みの効果
-							ConstStmt{
+							ValStmt{
 								Name: "found",
 								Expr: CallExpr{Call: Call{
 									Callee: ReadCallee{Read: "server.userById"},

@@ -14,7 +14,7 @@ func (o *ops) ArrivedName(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match user by app.Arrival
+	// match (user by app.Arrival)
 	if user != nil {
 		// Arrived: user は app.User
 		return o.NameOf(ctx, *user)
@@ -28,7 +28,7 @@ func (o *ops) ArrivedForms(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match user by app.Arrival
+	// match (user by app.Arrival)
 	var text string
 	if user != nil {
 		// Arrived: user は app.User
@@ -40,7 +40,7 @@ func (o *ops) ArrivedForms(ctx context.Context, name string) (string, error) {
 	} else {
 		return "", &runtime.ClassificationError{Classify: "app.Arrival"}
 	}
-	// match user by app.Arrival
+	// match (user by app.Arrival)
 	if user != nil {
 		// Arrived: user は app.User
 		if err := o.Show(ctx, text); err != nil {
@@ -49,7 +49,7 @@ func (o *ops) ArrivedForms(ctx context.Context, name string) (string, error) {
 	} else {
 		return "", &runtime.ClassificationError{Classify: "app.Arrival"}
 	}
-	// match user by app.Arrival
+	// match (user by app.Arrival)
 	if user == nil {
 		return "", &runtime.ClassificationError{Classify: "app.Arrival"}
 	}
@@ -64,7 +64,7 @@ func (o *ops) HeldText(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match by app.Held
+	// match (by app.Held)
 	if token != nil {
 		// Holding: token は app.Token
 		return o.UseToken(ctx, *token)
@@ -76,7 +76,7 @@ func (o *ops) HeldText(ctx context.Context) (string, error) {
 //
 // Throws: app.Denied
 func (o *ops) NameOrDeny(ctx context.Context, user *User) (string, error) {
-	// match user by app.Present
+	// match (user by app.Present)
 	if user != nil {
 		// Some: user は app.User
 		return o.NameOf(ctx, *user)
@@ -87,7 +87,7 @@ func (o *ops) NameOrDeny(ctx context.Context, user *User) (string, error) {
 
 // NameOrNobody は op app.nameOrNobody。
 func (o *ops) NameOrNobody(ctx context.Context, user *User) (string, error) {
-	// match user by app.Present
+	// match (user by app.Present)
 	if user != nil {
 		// Some: user は app.User
 		return o.NameOf(ctx, *user)
@@ -98,7 +98,7 @@ func (o *ops) NameOrNobody(ctx context.Context, user *User) (string, error) {
 
 // Standard は op app.standard。
 func (o *ops) Standard(ctx context.Context, user *User, lines []Line) (string, error) {
-	// match lines by list
+	// match (lines by list)
 	if len(lines) != 0 {
 		// HasItems
 		if err := o.Show(ctx, "some"); err != nil {
@@ -110,7 +110,7 @@ func (o *ops) Standard(ctx context.Context, user *User, lines []Line) (string, e
 			return "", err
 		}
 	}
-	// match user by nullable
+	// match (user by nullable)
 	if user != nil {
 		// HasItems: user は app.User
 		return o.NameOf(ctx, *user)

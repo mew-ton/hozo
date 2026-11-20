@@ -16,7 +16,7 @@ func (o *ops) Login(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match user by app.Registration
+	// match (user by app.Registration)
 	if user != nil {
 		// Registered: user は app.User
 		return o.NameOf(ctx, *user)
@@ -31,7 +31,7 @@ func (o *ops) Greet(ctx context.Context, name string, title *string) (string, er
 	if err != nil {
 		return "", err
 	}
-	// match user by app.Registration
+	// match (user by app.Registration)
 	var who string
 	if user != nil {
 		// Registered: user は app.User
@@ -44,14 +44,14 @@ func (o *ops) Greet(ctx context.Context, name string, title *string) (string, er
 		// Unregistered
 		who = "guest"
 	}
-	// match title by app.Given
+	// match (title by app.Given)
 	if title != nil {
 		// Filled: title は string
 		if err := o.Show(ctx, *title); err != nil {
 			return "", err
 		}
 	}
-	// match title by app.Given
+	// match (title by app.Given)
 	if title == nil {
 		// Blank
 		if err := o.Show(ctx, "no title"); err != nil {
@@ -63,7 +63,7 @@ func (o *ops) Greet(ctx context.Context, name string, title *string) (string, er
 
 // Both は op app.both。
 func (o *ops) Both(ctx context.Context, title *string) (string, error) {
-	// match title by app.Given
+	// match (title by app.Given)
 	return "any", nil
 }
 
@@ -75,7 +75,7 @@ func (o *ops) Current(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match by app.Login
+	// match (by app.Login)
 	if session != nil {
 		// LoggedIn: session は app.User
 		return o.NameOf(ctx, *session)
@@ -86,7 +86,7 @@ func (o *ops) Current(ctx context.Context) (string, error) {
 
 // Method は op app.method。
 func (o *ops) Method(ctx context.Context, payment Payment) (string, error) {
-	// match payment by app.Method
+	// match (payment by app.Method)
 	switch payment.(type) {
 	case Card:
 		return o.CardText(ctx, payment.(Card))
@@ -99,7 +99,7 @@ func (o *ops) Method(ctx context.Context, payment Payment) (string, error) {
 
 // Outcome は op app.outcome。
 func (o *ops) Outcome(ctx context.Context, result Result) (string, error) {
-	// match result by app.Outcome
+	// match (result by app.Outcome)
 	switch result.(type) {
 	case User:
 		return o.NameOf(ctx, result.(User))
@@ -112,7 +112,7 @@ func (o *ops) Outcome(ctx context.Context, result Result) (string, error) {
 
 // Failure は op app.failure。
 func (o *ops) Failure(ctx context.Context, result Result) (string, error) {
-	// match result by app.Failure
+	// match (result by app.Failure)
 	switch result.(type) {
 	case ResultFail:
 		return result.(ResultFail).Value, nil
@@ -125,7 +125,7 @@ func (o *ops) Failure(ctx context.Context, result Result) (string, error) {
 
 // Variants は op app.variants。
 func (o *ops) Variants(ctx context.Context, payment Payment, result Result) (*string, error) {
-	// match payment by app.Method
+	// match (payment by app.Method)
 	var text *string
 	switch payment.(type) {
 	case Card:
@@ -138,7 +138,7 @@ func (o *ops) Variants(ctx context.Context, payment Payment, result Result) (*st
 	default:
 		return nil, &runtime.ClassificationError{Classify: "app.Method"}
 	}
-	// match result by app.Outcome
+	// match (result by app.Outcome)
 	switch result.(type) {
 	case User, ResultFail:
 		if err := o.Show(ctx, "done"); err != nil {
@@ -147,7 +147,7 @@ func (o *ops) Variants(ctx context.Context, payment Payment, result Result) (*st
 	default:
 		return nil, &runtime.ClassificationError{Classify: "app.Outcome"}
 	}
-	// match payment by app.Method
+	// match (payment by app.Method)
 	switch payment.(type) {
 	case Card:
 	case Bank, PaymentByCode:
@@ -168,7 +168,7 @@ func (o *ops) StageText(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// match by app.Stage
+	// match (by app.Stage)
 	switch stage.(type) {
 	case User:
 		return o.NameOf(ctx, stage.(User))

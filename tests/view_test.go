@@ -262,14 +262,14 @@ func TestViewFromEntry(t *testing.T) {
 	t.Run("ir.md 配線/状態の参照とアームの本体", func(t *testing.T) {
 		expect(t, "currentName の本体（アームの throw）", renderBody(opOf(t, prog, "api.currentName").Body), []string{
 			"const user = api.findUser(id: id)",
-			"return match user by api.Lookup { Found => api.nameOf(user: user); else(Missing) => throw api.NotFound }",
+			"return match (user by api.Lookup) { Found => api.nameOf(user: user); else(Missing) => throw api.NotFound }",
 		})
 		expect(t, "tokenOrNone の本体（状態の名前は Atom の state、アームの値と none）", renderBody(opOf(t, prog, "api.tokenOrNone").Body), []string{
 			"return match state api.current by nullable { HasItems => state api.current; Empty => none }",
 		})
 		expect(t, "greeting の本体（修飾して書いた状態の名前も同じ）", renderBody(opOf(t, prog, "api.greeting").Body), []string{"return state api.motd"})
 		expect(t, "guard の本体（状態の分類での match、never を返す op の呼び出し）", renderBody(opOf(t, prog, "api.guard").Body), []string{
-			"return match by api.SignedIn { Yes => state api.current; No => api.unauthorized() }",
+			"return match (by api.SignedIn) { Yes => state api.current; No => api.unauthorized() }",
 		})
 		arms := func(op string) []ir.MatchArm {
 			return opOf(t, prog, op).Body.Statements[len(opOf(t, prog, op).Body.Statements)-1].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match.Arms
@@ -287,7 +287,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "Empty のアームは外のまま", narrowed(arms("api.tokenOrNone")[1].Narrowed), []string{})
 		expect(t, "状態の分類での match の narrowed は state を持つ", narrowed(arms("api.guard")[0].Narrowed), []string{"api.current: api.Token"})
 		// 型を書かないケースの絞り込みは case(C, Ks, X)
-		open := opOf(t, prog, "web.openUser").Body.Statements[1].(ir.ConstStmt).Expr.(ir.MatchExpr).Match
+		open := opOf(t, prog, "web.openUser").Body.Statements[1].(ir.ValStmt).Expr.(ir.MatchExpr).Match
 		expect(t, "型を書かないケースの narrowed", narrowed(open.Arms[0].Narrowed), []string{"web.UserKind.Admin<api.PublicUser>"})
 	})
 
@@ -312,7 +312,7 @@ func TestViewFromEntry(t *testing.T) {
 		// 配線: 残りのケースのアームは、名前で書く。narrowed は、対象の型が外と違うアームにだけ出る
 		expect(t, "memberName の本体", renderBody(opOf(t, prog, "api.memberName").Body), []string{
 			"const user = api.findUser(id: id)",
-			"return match user by api.Membership { Member => api.nameOf(user: user); Stranger => throw api.NotFound }",
+			"return match (user by api.Membership) { Member => api.nameOf(user: user); Stranger => throw api.NotFound }",
 		})
 		arms := func(op string) []ir.MatchArm {
 			return opOf(t, prog, op).Body.Statements[len(opOf(t, prog, op).Body.Statements)-1].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match.Arms
@@ -355,15 +355,15 @@ func TestViewFromEntry(t *testing.T) {
 		// callee は、行き着いた宣言の種類で決まる: read、効果の宣言（named）、直に呼ぶ組み込みの効果（direct）、op
 		expect(t, "signIn の本体", renderBody(opOf(t, prog, "api.signIn").Body), []string{
 			"const user = api.userById(id: id)",
-			"const token = match user by api.Lookup { Found => api.mint(user: user); Missing => throw api.NotFound }",
-			"const session = match user by api.Lookup { Found => api.sessionOf(user: user, token: token); Missing => throw api.NotFound }",
+			"val token = match (user by api.Lookup) { Found => api.mint(user: user); Missing => throw api.NotFound }",
+			"val session = match (user by api.Lookup) { Found => api.sessionOf(user: user, token: token); Missing => throw api.NotFound }",
 			"api.sessions.post(value: session)",
 			"api.current.post(value: token)",
 			"api.current.put(value: token)",
-			"return match creds by api.Strength { Weak => throw api.Invalid(reason: \"weak password\"); Strong => api.keep(token: token) }",
+			"return match (creds by api.Strength) { Weak => throw api.Invalid(reason: \"weak password\"); Strong => api.keep(token: token) }",
 		})
 		stmts := opOf(t, prog, "api.signIn").Body.Statements
-		expect(t, "read の呼び出しの callee", stmts[0].(ir.ConstStmt).Expr.(ir.CallExpr).Call.Callee, ir.Callee(ir.ReadCallee{Read: "api.userById"}))
+		expect(t, "read の呼び出しの callee", stmts[0].(ir.ValStmt).Expr.(ir.CallExpr).Call.Callee, ir.Callee(ir.ReadCallee{Read: "api.userById"}))
 		expect(t, "直に呼ぶ組み込みの効果の callee（list の post）", stmts[3].(ir.CallStmt).Call.Callee,
 			ir.Callee(ir.EffectCallee{Effect: ir.DirectEffect{State: "api.sessions", Operation: ir.OpPost}}))
 		expect(t, "修飾して書いた状態の put", stmts[5].(ir.CallStmt).Call.Callee,
@@ -371,9 +371,9 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "nullable の delete は引数なし", renderBody(opOf(t, prog, "api.keep").Body), []string{"api.current.delete()", "return token"})
 		login := opOf(t, prog, "api.login").Body.Statements
 		expect(t, "効果の宣言の呼び出しの callee", login[1].(ir.CallStmt).Call.Callee, ir.Callee(ir.EffectCallee{Effect: ir.NamedEffect{Effect: "api.createSession"}}))
-		expect(t, "op の呼び出しの callee", login[0].(ir.ConstStmt).Expr.(ir.CallExpr).Call.Callee, ir.Callee(ir.OpCallee{Op: "api.issue"}))
+		expect(t, "op の呼び出しの callee", login[0].(ir.ValStmt).Expr.(ir.CallExpr).Call.Callee, ir.Callee(ir.OpCallee{Op: "api.issue"}))
 		// read と効果の呼び出しの bound は、いつも空
-		expect(t, "read の呼び出しの bound", len(stmts[0].(ir.ConstStmt).Expr.(ir.CallExpr).Call.Bound), 0)
+		expect(t, "read の呼び出しの bound", len(stmts[0].(ir.ValStmt).Expr.(ir.CallExpr).Call.Bound), 0)
 	})
 
 	t.Run("check.md 状態に触れるもの/配線からの呼び出しと節に書く要素", func(t *testing.T) {
@@ -452,7 +452,7 @@ func TestViewFromEntry(t *testing.T) {
 		// 受けるケースが二つ以上の else のアームは、絞り込まれない（docs/types.md「アームの中の対象の型」の 1）
 		expect(t, "standingName の else のアームの narrowed", narrowed(s[1]), []string{})
 		expect(t, "standingName の本体", renderBody(opOf(t, prog, "api.standingName").Body), []string{
-			"return match user by api.Standing { Closed => throw api.NotFound; else(Fresh, Active, Idle, Dormant) => api.nameOf(user: user) }",
+			"return match (user by api.Standing) { Closed => throw api.NotFound; else(Fresh, Active, Idle, Dormant) => api.nameOf(user: user) }",
 		})
 		// 名前で並べたアームの cases は、書かれた順
 		n := armsOf("api.standingNote")
@@ -611,11 +611,11 @@ func TestViewFromEntry(t *testing.T) {
 	t.Run("ir.md 配線", func(t *testing.T) {
 		expect(t, "openUser の本体（{ id } は { id: id }、cases は書かれた順、return に束縛名）", renderBody(opOf(t, prog, "web.openUser").Body), []string{
 			"const user = web.fetchUser(q: {id: id})",
-			"const page = match user by web.UserKind { Admin => web.adminPageVm(user: user); Member => web.userPageVm(user: user) }",
+			"val page = match (user by web.UserKind) { Admin => web.adminPageVm(user: user); Member => web.userPageVm(user: user) }",
 			"return page",
 		})
 		expect(t, "welcome の本体（match の文、アームの none）", renderBody(opOf(t, prog, "web.welcome").Body), []string{
-			"match user by web.Verified { Verified => web.greet(user: user); Unverified => none }",
+			"match (user by web.Verified) { Verified => web.greet(user: user); Unverified => none }",
 		})
 		expect(t, "login の本体（入れ子のレコードリテラルとフィールド参照）", renderBody(opOf(t, prog, "web.login").Body), []string{
 			"return api.login(in: {creds: {name: form.name, password: form.password}})",
@@ -886,7 +886,7 @@ func TestStateCorpusIR(t *testing.T) {
 			switch x := st.(type) {
 			case ir.MatchStmt:
 				out = append(out, x.Match)
-			case ir.ConstStmt:
+			case ir.ValStmt:
 				if m, ok := x.Expr.(ir.MatchExpr); ok {
 					out = append(out, m.Match)
 				}
@@ -978,8 +978,8 @@ func TestStateCorpusIR(t *testing.T) {
 		expect(t, "match by LoggedIn の subject", add[1].Subject, ir.MatchSubject(ir.ClassifyOwnedSubject{}))
 		expect(t, "match by LoggedIn の classify", add[1].Classify, "shop.LoggedIn")
 		expect(t, "add の本体", renderBody(opOf(t, prog, "shop.add").Body), []string{
-			"const normalized = match line by shop.LineKind { Single => shop.packSingle(line: line); Bulk => shop.packBulk(line: line) }",
-			"match by shop.LoggedIn { LoggedIn => shop.addToCart(line: normalized); else(LoggedOut) => shop.showLogin() }",
+			"val normalized = match (line by shop.LineKind) { Single => shop.packSingle(line: line); Bulk => shop.packBulk(line: line) }",
+			"match (by shop.LoggedIn) { LoggedIn => shop.addToCart(line: normalized); else(LoggedOut) => shop.showLogin() }",
 		})
 	})
 
@@ -1024,7 +1024,7 @@ func TestStateCorpusIR(t *testing.T) {
 		// 状態の match の型も値の match と同じ決め方: none のアームがあれば optional(T)。`return placed;` が Order? に渡せる
 		expect(t, "checkout の戻り値", typeStr(opOf(t, prog, "shop.checkout").Returns), "shop.Order?")
 		expect(t, "checkout の本体", renderBody(opOf(t, prog, "shop.checkout").Body), []string{
-			"const placed = match by shop.Checkout { Shopping => shop.submitOrder(); Ordered => none }",
+			"val placed = match (by shop.Checkout) { Shopping => shop.submitOrder(); Ordered => none }",
 			"return placed",
 		})
 	})
@@ -1627,7 +1627,7 @@ func renderBody(w *ir.Wiring) []string {
 	out := []string{}
 	for _, st := range w.Statements {
 		switch s := st.(type) {
-		case ir.ConstStmt:
+		case ir.ValStmt:
 			out = append(out, "const "+s.Name+" = "+renderExpr(s.Expr))
 		case ir.ReturnStmt:
 			out = append(out, "return "+renderExpr(s.Expr))

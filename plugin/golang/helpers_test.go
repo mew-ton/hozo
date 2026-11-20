@@ -116,7 +116,7 @@ func call(opFQN string) ir.Statement {
 
 // callRead、callEffect、callDirect は、read の宣言、effect の宣言、直に呼ぶ組み込みの効果の呼び出し（docs/ir.md「配線」の Callee）。
 func callRead(readFQN string) ir.Statement {
-	return ir.ConstStmt{Name: "x", Expr: ir.CallExpr{Call: ir.Call{Callee: ir.ReadCallee{Read: readFQN}}}}
+	return ir.ValStmt{Name: "x", Expr: ir.CallExpr{Call: ir.Call{Callee: ir.ReadCallee{Read: readFQN}}}}
 }
 
 func callEffect(effectFQN string) ir.Statement {

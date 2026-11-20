@@ -94,7 +94,7 @@ func (o *ops) Bindings(ctx context.Context) (pkgtype.Token, error) {
 		return "", err
 	}
 	var v1 string = "x"
-	// match "x" by app.Extra
+	// match ("x" by app.Extra)
 	k0, err := ClassifyExtra(ctx, o.extra_, v1)
 	if err != nil {
 		return "", err

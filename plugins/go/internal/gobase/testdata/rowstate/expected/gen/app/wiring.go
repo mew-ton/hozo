@@ -19,7 +19,7 @@ func (o *ops) Begin(ctx context.Context, id string, at time.Time) error {
 	if err != nil {
 		return err
 	}
-	// match found by app.Known
+	// match (found by app.Known)
 	if found != nil {
 		// Found: found は app.Order
 		if err := o.BeginFound(ctx, *found, at); err != nil {
@@ -37,7 +37,7 @@ func (o *ops) Begin(ctx context.Context, id string, at time.Time) error {
 // Throws: app.NotAccepted
 // Effects: app.start
 func (o *ops) BeginFound(ctx context.Context, order Order, at time.Time) error {
-	// match order by app.Stage
+	// match (order by app.Stage)
 	k0, err := ClassifyStage(ctx, o.stage, order)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (o *ops) Drop(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	// match found by app.Life
+	// match (found by app.Life)
 	k0, err := ClassifyLife(ctx, o.life, found)
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func (o *ops) Drop(ctx context.Context, id string) error {
 
 // LifeName はいまの状態の呼び名
 func (o *ops) LifeName(ctx context.Context, found *Order) (string, error) {
-	// match found by app.Life
+	// match (found by app.Life)
 	k0, err := ClassifyLife(ctx, o.life, found)
 	if err != nil {
 		return "", err
