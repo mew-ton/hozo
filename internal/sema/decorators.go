@@ -24,11 +24,12 @@ const (
 	siteRead
 	siteClassify
 	siteDecorator
+	siteCase
 )
 
 // String は設計書の語。
 func (k siteKind) String() string {
-	return [...]string{"op", "field", "state", "exception", "scalar", "model", "union", "effect", "read", "classify", "decorator"}[k]
+	return [...]string{"op", "field", "state", "exception", "scalar", "model", "union", "effect", "read", "classify", "decorator", "分類のケース"}[k]
 }
 
 // target は対応する Decorator.targets の値。付けられない種類なら ok が false。
@@ -50,6 +51,8 @@ func (k siteKind) target() (ir.DecoratorTarget, bool) {
 		return ir.TargetEffect, true
 	case siteRead:
 		return ir.TargetRead, true
+	case siteCase:
+		return ir.TargetCase, true
 	}
 	return "", false
 }
@@ -62,6 +65,8 @@ type appSite struct {
 	out   *[]ir.Application
 	// op は付けた先が op のとき、その op。デコレータが運ぶ reads / effects（Op.carried）を、適用を下ろしながら集める。
 	op *opSite
+	// caseOf は付けた先が分類のケースのとき、その分類。
+	caseOf *ir.Classify
 }
 
 // opSite はデコレータを付けた先の op。
@@ -257,7 +262,7 @@ func (a *analyzer) lowerApplication(d *ast.Decorator, site *appSite) (ir.Applica
 	} else {
 		app.Args = a.lowerArgs(d.Args, dec, site.sc, d.Span, "DEC-11")
 	}
-	a.checkDEC1(generic, site.kind, d)
+	a.checkDEC1(generic, site, d)
 	return app, true
 }
 
@@ -276,24 +281,46 @@ func (a *analyzer) aliasTarget(dec *ir.Decorator) (*ir.Decorator, bool) {
 
 // checkDEC1 は DEC-1（docs/check.md「デコレータ」）: 付けた先の種類が targets にない。
 // union / classify / decorator に付けたら常に DEC-1（namespace / bind は文法で閉じる）。
-func (a *analyzer) checkDEC1(dec *ir.Decorator, kind siteKind, d *ast.Decorator) {
+// 分類のケースに付けたときは、targets に、そのケースを含む、分類のケース（CaseKind）がなければ DEC-1。
+func (a *analyzer) checkDEC1(dec *ir.Decorator, site *appSite, d *ast.Decorator) {
+	kind := site.kind
 	t, ok := kind.target()
-	if ok {
+	if ok && kind == siteCase {
+		for _, k := range dec.CaseTargets {
+			if k.Matches(site.caseOf) {
+				return
+			}
+		}
+	} else if ok {
 		for _, want := range dec.Targets {
 			if want == t {
 				return
 			}
 		}
 	}
-	a.errorf("DEC-1", d.Name.Span, "デコレータ %s は %s に付けられない（for: %s）", dec.Name, kind, targetsString(dec.Targets))
+	a.errorf("DEC-1", d.Name.Span, "デコレータ %s は %s に付けられない（for: %s）", dec.Name, kind, targetsString(dec))
 }
 
-func targetsString(ts []ir.DecoratorTarget) string {
-	names := make([]string, len(ts))
-	for i, t := range ts {
-		names[i] = string(t)
+func targetsString(dec *ir.Decorator) string {
+	names := make([]string, 0, len(dec.Targets))
+	cases := 0
+	for _, t := range dec.Targets {
+		if t != ir.TargetCase || cases >= len(dec.CaseTargets) {
+			names = append(names, string(t))
+			continue
+		}
+		k := dec.CaseTargets[cases]
+		cases++
+		name := "classify"
+		if k.Classify != "" {
+			name += " " + k.Classify
+		}
+		if k.Subject != "" {
+			name += " of " + k.Subject
+		}
+		names = append(names, name+" case")
 	}
-	return join(names)
+	return strings.Join(names, " | ")
 }
 
 // --- 引数（docs/types.md「デコレータの引数」） ---
@@ -449,6 +476,19 @@ func (a *analyzer) lowerAnyArg(v *ast.ArgValue, p ir.Param, pt ir.AnyParam, sc *
 		if pt.Of == ir.AnyVariant {
 			return ir.VariantValue{Union: r.sym.fqn, Arm: r.name}, true
 		}
+		if pt.Of == ir.AnyClassifyCase {
+			// 分類のケース。絞り（分類の名前、対象のない分類）に合わなければ DEC-7（docs/types.md「デコレータの引数」）
+			if pt.Case != nil {
+				d, _ := r.sym.node.(*ast.ClassifyDecl)
+				switch {
+				case pt.Case.Classify != "" && pt.Case.Classify != r.sym.fqn:
+					a.errorf("DEC-7", term.Span, "引数 %s は、分類 %s のケースを受け取るが、%s.%s は、別の分類のケース", p.Name, pt.Case.Classify, r.sym.fqn, r.name)
+				case pt.Case.Subject == "never" && d != nil && !d.Never:
+					a.errorf("DEC-7", term.Span, "引数 %s は、対象のない分類（of never）のケースを受け取るが、%s は、対象のある分類", p.Name, r.sym.fqn)
+				}
+			}
+			return ir.CaseValue{Classify: r.sym.fqn, Case: r.name}, true
+		}
 		if r.kind == rDecl && r.sym.kind == kindUnion {
 			// set のユニオンは展開して refs にする（docs/types.md「デコレータの引数」）
 			sawUnion = true
@@ -489,6 +529,8 @@ func anyAccept(of ir.AnyOf) accept {
 		return acModel
 	case ir.AnyVariant:
 		return acVariant
+	case ir.AnyClassifyCase:
+		return acCase
 	}
 	return 0
 }
@@ -679,6 +721,11 @@ func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope
 	dec.DeclBase = a.base(s, d.Doc, d.Span, docContext{params: setOf(params.params), hasParams: true})
 	a.addSite(d.Decorators, siteDecorator, sc, &dec.DeclBase.Decorators)
 	dec.Targets = lowerTargets(d.For)
+	for _, t := range d.For {
+		if t != nil && t.Case != nil {
+			dec.CaseTargets = append(dec.CaseTargets, a.lowerCaseKind(t.Case, sc))
+		}
+	}
 	csc := &scope{ns: s.ns, decoParams: params}
 	for _, c := range d.Clauses {
 		switch c := c.(type) {
@@ -787,8 +834,37 @@ func (a *analyzer) lowerParamType(t ast.Type, sc *scope) (ir.Type, bool) {
 	return ir.Ref(r.sym.fqn), true
 }
 
+// lowerCaseKind は、デコレータの宣言の、分類のケース（`classify [名前] [of never] case`。docs/grammar.md「decorator の宣言」）。
+// 名前は、classify（どの名前空間のものでも）。分類でなければ RES-4。名前と of never の両方を書いたのに、
+// その分類が、対象のない分類でなければ DEC-18。
+func (a *analyzer) lowerCaseKind(k *ast.CaseKind, sc *scope) ir.CaseKind {
+	out := ir.CaseKind{}
+	if k.Never {
+		out.Subject = "never"
+	}
+	if k.Classify == nil {
+		return out
+	}
+	r, ok := a.resolve(*k.Classify, sc, acClassify)
+	if !ok || r.sym == nil {
+		return out
+	}
+	out.Classify = r.sym.fqn
+	if d, isClassify := r.sym.node.(*ast.ClassifyDecl); k.Never && isClassify && !d.Never {
+		a.errorf("DEC-18", k.Classify.Span, "classify %s は、対象のない分類（of never）ではないので、classify %s of never case とは書けない", r.sym.fqn, k.Classify.String())
+	}
+	return out
+}
+
 // lowerAnyType は `any 種類 [on 状態.操作]`。on の状態はどの名前空間のものでもよい。
 func (a *analyzer) lowerAnyType(t *ast.AnyType, sc *scope) ir.ParamType {
+	if t.Kind == ast.AnyCase {
+		k := ir.CaseKind{}
+		if t.Case != nil {
+			k = a.lowerCaseKind(t.Case, sc)
+		}
+		return ir.AnyParam{Of: ir.AnyClassifyCase, Case: &k}
+	}
 	ap := ir.AnyParam{Of: ir.AnyOf(t.Kind.String())}
 	if t.On != nil {
 		if r, ok := a.resolve(t.On.State, sc, acState); ok {
@@ -806,6 +882,10 @@ func lowerTargets(for_ []*ast.Target) []ir.DecoratorTarget {
 	out := make([]ir.DecoratorTarget, 0, len(for_))
 	for _, t := range for_ {
 		if t != nil {
+			if t.Kind == ast.TargetCase {
+				out = append(out, ir.TargetCase)
+				continue
+			}
 			out = append(out, ir.DecoratorTarget(t.Kind.String()))
 		}
 	}
@@ -840,7 +920,7 @@ func (a *analyzer) checkDEC2(s *symbol, dec *ir.Decorator, d *ast.DecoratorDecl)
 			return
 		}
 	}
-	a.errorf("DEC-2", d.Clauses[0].NodeSpan(), "デコレータ %s は op に付けないので throws / catches / reads / effects を宣言できない（for: %s）", s.fqn, targetsString(dec.Targets))
+	a.errorf("DEC-2", d.Clauses[0].NodeSpan(), "デコレータ %s は op に付けないので throws / catches / reads / effects を宣言できない（for: %s）", s.fqn, targetsString(dec))
 }
 
 // lowerAlias は名前付きデコレータ `decorator X = Y(args);`。DEC-12: Y が別名、または args が Y の Param に合わない。

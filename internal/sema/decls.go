@@ -760,9 +760,15 @@ func operationOf(op ast.StateOp) ir.Operation {
 func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
-	c.Subject = a.lowerClassifySubject(s, d.Of, sc)
+	if d.Never {
+		// 対象のない分類（docs/check.md「分類」の「対象のない分類」）: 値の分類で、対象の型が never
+		c.Subject = ir.TypeSubject{Type: ir.Never()}
+	} else {
+		c.Subject = a.lowerClassifySubject(s, d.Of, sc)
+	}
 	seen := map[string]bool{}
 	rest := restCases{wrote: map[string]bool{}}
+	var decorated []*ast.ClassifyCase
 	for _, cs := range d.Cases {
 		if cs == nil {
 			continue
@@ -777,15 +783,32 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 		if cs.Doc != nil {
 			cc.Description = a.lowerDoc(cs.Doc, docContext{ns: sc.ns, span: cs.Name.Span})
 		}
-		cc.As = a.lowerCaseTypings(s, c, cs, sc, &rest)
+		if d.Never {
+			if len(cs.As) > 0 && cs.As[0] != nil {
+				a.errorf("CLS-9", cs.As[0].Span, "classify %s は、対象のない分類（of never）なので、ケース %s に as は書けない（ケースは、名前だけ）", s.fqn, cs.Name.Name)
+			}
+		} else {
+			cc.As = a.lowerCaseTypings(s, c, cs, sc, &rest)
+		}
 		c.Cases = append(c.Cases, cc)
+		decorated = append(decorated, cs)
 	}
 	if len(c.Cases) == 0 {
 		a.errorf("CLS-2", s.nameSpan, "classify %s にケースが一つもない", s.fqn)
 	}
-	a.lowerNoneCase(s, c, &rest)
-	a.lowerElseCase(s, c, &rest)
-	c.DecidedBy = a.decidedBy(c)
+	if d.Never {
+		c.DecidedBy = ir.DecidedByNone
+	} else {
+		a.lowerNoneCase(s, c, &rest)
+		a.lowerElseCase(s, c, &rest)
+		c.DecidedBy = a.decidedBy(c)
+	}
+	// ケースの前のデコレータ。c.Cases は、もう伸びないので、要素を指せる
+	for i, cs := range decorated {
+		if site := a.addSite(cs.Decorators, siteCase, sc, &c.Cases[i].Decorators); site != nil {
+			site.caseOf = c
+		}
+	}
 	return c
 }
 

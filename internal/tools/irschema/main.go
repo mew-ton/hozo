@@ -116,7 +116,7 @@ var unions = []struct {
 	}},
 	{typeOf[ir.ArgValue](), []reflect.Type{
 		typeOf[ir.LiteralValue](), typeOf[ir.RefValue](), typeOf[ir.RefsValue](),
-		typeOf[ir.VariantValue](), typeOf[ir.ListValue](),
+		typeOf[ir.VariantValue](), typeOf[ir.CaseValue](), typeOf[ir.ListValue](),
 	}},
 }
 

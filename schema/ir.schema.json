@@ -15,6 +15,9 @@
       "additionalProperties": false,
       "description": "`any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind \"any\"）。",
       "properties": {
+        "case": {
+          "$ref": "#/$defs/CaseKind"
+        },
         "kind": {
           "const": "any"
         },
@@ -89,6 +92,9 @@
         },
         {
           "$ref": "#/$defs/VariantValue"
+        },
+        {
+          "$ref": "#/$defs/CaseValue"
         },
         {
           "$ref": "#/$defs/ListValue"
@@ -426,6 +432,18 @@
       ],
       "type": "object"
     },
+    "CaseKind": {
+      "additionalProperties": false,
+      "properties": {
+        "classify": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "CaseSet": {
       "description": "遷移の前か後のケースの集合。\"any\" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。",
       "oneOf": [
@@ -489,6 +507,26 @@
         "type",
         "by",
         "span"
+      ],
+      "type": "object"
+    },
+    "CaseValue": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "type": "string"
+        },
+        "classify": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "case"
+        }
+      },
+      "required": [
+        "kind",
+        "classify",
+        "case"
       ],
       "type": "object"
     },
@@ -648,6 +686,12 @@
           },
           "type": "array"
         },
+        "decorators": {
+          "items": {
+            "$ref": "#/$defs/Application"
+          },
+          "type": "array"
+        },
         "description": {
           "$ref": "#/$defs/Doc"
         },
@@ -660,6 +704,7 @@
       },
       "required": [
         "name",
+        "decorators",
         "as",
         "span"
       ],
@@ -794,6 +839,12 @@
         "alias": {
           "$ref": "#/$defs/DecoratorAlias"
         },
+        "caseTargets": {
+          "items": {
+            "$ref": "#/$defs/CaseKind"
+          },
+          "type": "array"
+        },
         "catches": {
           "items": {
             "$ref": "#/$defs/CatchesClause"
@@ -862,6 +913,7 @@
         "span",
         "params",
         "targets",
+        "caseTargets",
         "external",
         "repeatable",
         "throws",

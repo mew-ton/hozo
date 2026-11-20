@@ -222,6 +222,10 @@ func (a *analyzer) lowerCaseType(t *ast.NamedType, r resolved, sc *scope) (ir.Ty
 		a.errorf("RES-4", t.Name.Span, "型引数を付けられるのは classify のケースだけで、%s ではない", describe(r))
 		return nil, false
 	}
+	if d, isClassify := r.sym.node.(*ast.ClassifyDecl); isClassify && d.Never {
+		a.errorf("RES-4", t.Name.Span, "classify %s は、対象のない分類（of never）なので、型には書けない（当たる値がない）", r.sym.fqn)
+		return nil, false
+	}
 	of, ok := a.lowerType(t.Arg, sc)
 	if !ok {
 		return nil, false

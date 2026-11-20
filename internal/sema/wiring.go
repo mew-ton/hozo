@@ -1055,6 +1055,13 @@ type matchValue struct {
 // matchSubject は `match [x] by C` の対象（C は classify。解決できていなければ nil）。MATCH-7 の
 // 「値の分類・op の分類なのに対象がない」「状態の分類なのに対象がある」と、値を対象にした match の MATCH-6。
 func (a *analyzer) matchSubject(w *wiring, m *ast.Match, c *ir.Classify) (ir.MatchSubject, *matchValue) {
+	if c != nil && c.IsSubjectless() {
+		a.errorf("MATCH-7", m.Classifier.Span, "classify %s は、対象のない分類（of never）なので、match の by には書けない（当たる値がない）", c.Name)
+		if m.Subject != nil {
+			a.evalAtom(w, m.Subject)
+		}
+		return nil, nil
+	}
 	if c != nil {
 		if _, isStates := c.SubjectStates(); isStates {
 			if m.Subject != nil {

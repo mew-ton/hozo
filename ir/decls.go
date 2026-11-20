@@ -326,7 +326,13 @@ type DecidedBy string
 const (
 	DecidedByType      DecidedBy = "type"
 	DecidedByPredicate DecidedBy = "predicate"
+	// DecidedByNone は、対象のない分類（`classify C of never`）: 判定するものがなく、述語も持たない
+	// （docs/check.md「分類」の「対象のない分類」）。
+	DecidedByNone DecidedBy = "none"
 )
+
+// IsSubjectless は、対象のない分類（`classify C of never`）か。
+func (c *Classify) IsSubjectless() bool { return c.DecidedBy == DecidedByNone }
 
 // NarrowBy は絞り込みの種類（docs/ir.md「classify」の CaseTyping の by。docs/types.md「型で決まる絞り込み」）。
 type NarrowBy string
@@ -490,6 +496,8 @@ func (c *Classify) SubjectStates() (states []string, ok bool) {
 type ClassifyCase struct {
 	Name        string `json:"name"`
 	Description *Doc   `json:"description,omitempty"`
+	// Decorators は、ケースの前に書いたデコレータ（書かれた順）。なければ空（JSON では []）。
+	Decorators []Application `json:"decorators"`
 	// As は `対象 as T` と `対象 as else` の並び（書かれた順）。なければ空（JSON では []）。
 	As   []CaseTyping `json:"as"`
 	Span Span         `json:"span"`
@@ -527,6 +535,8 @@ const (
 	TargetModel     DecoratorTarget = "model"
 	TargetEffect    DecoratorTarget = "effect"
 	TargetRead      DecoratorTarget = "read"
+	// TargetCase は、分類のケース（`classify … case`）。絞りは Decorator.CaseTargets。
+	TargetCase DecoratorTarget = "case"
 )
 
 // Decorator は decorator 宣言（docs/ir.md「decorator」）。
@@ -536,6 +546,8 @@ type Decorator struct {
 	Params []Param `json:"params"`
 	// Targets は対象。表面で省略されていれば ["op"]（正規化の側が埋める）。
 	Targets []DecoratorTarget `json:"targets"`
+	// CaseTargets は、Targets の "case" ごとの絞り（書かれた順）。なければ空（JSON では []）。
+	CaseTargets []CaseKind `json:"caseTargets"`
 	// External は @external が付いているか（DEC-10）。
 	External bool `json:"external"`
 	// Repeatable は @repeatable が付いているか。偽なら、一つの宣言に一度だけ付けられる（DEC-13）。
@@ -594,6 +606,8 @@ const (
 	AnyOp        AnyOf = "op"
 	AnyModel     AnyOf = "model"
 	AnyVariant   AnyOf = "variant"
+	// AnyClassifyCase は、分類のケース（`any classify … case`）。絞りは AnyParam.Case。
+	AnyClassifyCase AnyOf = "case"
 )
 
 // AnyParam は `any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind "any"）。
@@ -601,6 +615,30 @@ type AnyParam struct {
 	Of AnyOf `json:"of"`
 	// On は `any effect on s.op` の制約。
 	On *EffectOn `json:"on,omitempty"`
+	// Case は、Of が case のときの、分類のケースの絞り。ほかは nil。
+	Case *CaseKind `json:"case,omitempty"`
+}
+
+// CaseKind は、デコレータの宣言で言う、分類のケースの絞り（docs/ir.md「decorator」の CaseKind）。絞らない所は、空。
+type CaseKind struct {
+	// Classify は、名前で絞ったとき（`classify Actor case`）の、分類の FQN。
+	Classify string `json:"classify,omitempty"`
+	// Subject は、対象で絞ったとき（`classify of never case`）の "never"。
+	Subject string `json:"subject,omitempty"`
+}
+
+// Matches は、分類 c のケースが、この絞りに合うか。
+func (k CaseKind) Matches(c *Classify) bool {
+	if c == nil {
+		return false
+	}
+	if k.Classify != "" && k.Classify != c.Name {
+		return false
+	}
+	if k.Subject == "never" && !c.IsSubjectless() {
+		return false
+	}
+	return true
 }
 
 // EffectOn は `any effect on <state>.<operation>` の制約（docs/ir.md「decorator」の on）。

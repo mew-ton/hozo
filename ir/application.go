@@ -18,7 +18,7 @@ type Arg struct {
 }
 
 // ArgValue はデコレータの引数の値（docs/ir.md「デコレータの適用」の ArgValue）。
-// 具体型は値型の [LiteralValue]、[RefValue]、[RefsValue]、[VariantValue]、[ListValue]。
+// 具体型は値型の [LiteralValue]、[RefValue]、[RefsValue]、[VariantValue]、[CaseValue]、[ListValue]。
 type ArgValue interface {
 	// Kind は JSON の判別子（"literal"、"ref"、"refs"、"variant"、"list"）。
 	Kind() string
@@ -48,6 +48,13 @@ type VariantValue struct {
 	Arm   string `json:"arm"`
 }
 
+// CaseValue は `Actor.Customer` のような、分類のケースの引数（docs/ir.md「デコレータの適用」の ArgValue kind "case"）。
+type CaseValue struct {
+	// Classify は分類の FQN。
+	Classify string `json:"classify"`
+	Case     string `json:"case"`
+}
+
 // ListValue は列の引数（docs/ir.md「デコレータの適用」の ArgValue kind "list"）。
 type ListValue struct {
 	Items []ArgValue `json:"items"`
@@ -58,6 +65,7 @@ var (
 	_ ArgValue = RefValue{}
 	_ ArgValue = RefsValue{}
 	_ ArgValue = VariantValue{}
+	_ ArgValue = CaseValue{}
 	_ ArgValue = ListValue{}
 )
 
@@ -73,6 +81,9 @@ func (RefsValue) Kind() string { return "refs" }
 // Kind は "variant"。
 func (VariantValue) Kind() string { return "variant" }
 
+// Kind は "case"。
+func (CaseValue) Kind() string { return "case" }
+
 // Kind は "list"。
 func (ListValue) Kind() string { return "list" }
 
@@ -80,6 +91,7 @@ func (LiteralValue) isArgValue() {}
 func (RefValue) isArgValue()     {}
 func (RefsValue) isArgValue()    {}
 func (VariantValue) isArgValue() {}
+func (CaseValue) isArgValue()    {}
 func (ListValue) isArgValue()    {}
 
 // MarshalJSON は kind を付けて書く。
@@ -98,6 +110,12 @@ func (v RefValue) MarshalJSON() ([]byte, error) {
 func (v RefsValue) MarshalJSON() ([]byte, error) {
 	type alias RefsValue
 	return marshalKind("refs", alias(v))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (v CaseValue) MarshalJSON() ([]byte, error) {
+	type alias CaseValue
+	return marshalKind("case", alias(v))
 }
 
 // MarshalJSON は kind を付けて書く。
@@ -126,6 +144,7 @@ var argValueTable = map[string]func([]byte) (ArgValue, error){
 	"ref":     asValue[ArgValue, RefValue],
 	"refs":    asValue[ArgValue, RefsValue],
 	"variant": asValue[ArgValue, VariantValue],
+	"case":    asValue[ArgValue, CaseValue],
 	"list":    asValue[ArgValue, ListValue],
 }
 
