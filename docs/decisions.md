@@ -349,6 +349,7 @@
 | 339 | `parallelizable` を、どう出すかは、基底が、出力する言語に合わせて、決める（295 の、「出力する言語の決まりと、そのオプションに従う」の中身）。並列に動かす形にするか、直列にするか、オプションにするか、オプションにしたときの既定を、どちらにするかは、どう設計してもよい。大事なのは、その言語として、自然な書き方であること | `docs/ide-chain.md`「アクティビティ図」 |
 | 340 | R6 の、言語の部分の、新しい文（`val`、`=`、`parallelizable`、`for`、`collect`）の Go は、サンプル `shop-server` の、手で書いた、期待する出力で、確かめる: 新しい文を使う op を、仕様に足す。仕様だけのサンプル `order-app` は、`docs/wiring-trial.md`「書き直し」の五つの op を、その形に、書き直す。足す op は、文書とサンプルを書く段で、案を見せる。採らなかった案: サンプルは、書き換えるだけにして、新しい文の Go は、基底の単体テストの入力で確かめる。新しいサンプルを作る | `docs/requirements.md`「R6 の、言語の部分」 |
 | 341 | R6 の、言語の部分で、決定が言っていなかった、細かい点を、案のとおりに、決める: `docs/requirements.md`「R6 の、言語の部分」の「案で埋めた所」の表の、すべての行と、`docs/wiring-trial.md`「案で埋めた所」の四つ（`for` の頭の並びは、値だけ。文の一つのアームに書ける文。`collect` の右は、式。`return` は、検査で弾く）。この案で、言語の文書と、サンプルに進む | `docs/requirements.md`「R6 の、言語の部分」 |
+| 342 | サンプル `shop-server` に足す op（340）は、二つ。`server.getMyPage`（`GET /me/page`）: 自分の情報と、いちばん新しい注文と、注文ごとの要約を、まとめて返す。`parallelizable`（ブロックのアームを含む）、名前を並べた空の `val`、`parallelizable for` と `collect` を使う。`server.resendNotices`（`POST /orders/notices`）: 自分の注文の通知を、もう一度、送る。直列の `for`、その中の例外と効果、`collect` を使う。`store` に、通知を一つ記録する op（`recordNotice`）を足す。今ある op は、`const` を `val` に、`match` の頭を丸括弧に、書き換えるだけ | `docs/requirements.md`「R6 の、言語の部分」 |
 
 ## 設計書から離れた決定
 
