@@ -7,14 +7,15 @@ R6（`requirements.md`「作り直しの段階」）で入れる、配線の綴�
 - 綴りの決まりは、決めない。持ち主は、`ide-chain.md`「アクティビティ図」（R6 を作るときに、`grammar.md`「配線」へ移す）。
 - この文書が持つのは、三つ: 文法の全体の案、サンプル `order-app` の op の書き直し、そこから分かったこと。
 - 書き直しは、記録。サンプルの `.hozo` は、変えていない。今の `hozoc` は、この綴りを、読めない。
+- 確かめたときのキーワードは、`parallelizable`。後で、`disjoint` に替えた（`decisions.md`「決めたこと」343）ので、この文書の綴りも、`disjoint` に、書き換えてある。
 
 ## 確かめた綴り
 
 | 綴り | 決めた所（`decisions.md`「決めたこと」） |
 |---|---|
 | `val x = …;`、`val x;`、`val x: T;`、`val x, y;`、`x = …;` | 309、310、312、336 |
-| `parallelizable { … }` | 294〜299、302、311 |
-| `for (val x of xs) { … }`、`parallelizable for (…) { … }` | 307、308、314、319 |
+| `disjoint { … }` | 294〜299、302、311、343 |
+| `for (val x of xs) { … }`、`disjoint for (…) { … }` | 307、308、314、319 |
 | `xs collect x;` | 317、318 |
 | `match (x by C) { … }` | 315、316 |
 | `;` は、文の終わりの印。文が `}` で終われば、省ける | 313 |
@@ -33,8 +34,8 @@ Stmt  = ValDecl
       | "return" Expr End
       | Call End
       | Match End
-      | Parallelizable End
-      | [ "parallelizable" ] For End ;
+      | Disjoint End
+      | [ "disjoint" ] For End ;
 
 ValDecl = "val" ValName { "," ValName } End    (* 空で宣言する。名前を並べられる（336） *)
         | "val" Ident "=" Expr End ;            (* 値と一緒に宣言する *)
@@ -47,10 +48,10 @@ Expr  = Call | Match | Atom ;
 Match = "match" "(" [ Atom ] "by" ( QualifiedName | "list" | "nullable" ) ")"
         "{" MatchArm { MatchArm } [ ElseArm ] "}" ;
 
-Parallelizable = "parallelizable" "{" Arm Arm { Arm } "}" ;
+Disjoint = "disjoint" "{" Arm Arm { Arm } "}" ;
 Arm     = Block | ArmStmt ;
 ArmStmt = Assign | Collect | Call End | Match End
-        | Parallelizable End | [ "parallelizable" ] For End ;
+        | Disjoint End | [ "disjoint" ] For End ;
 
 For = "for" "(" "val" Ident "of" Atom ")" Block ;
 ```
@@ -64,7 +65,7 @@ For = "for" "(" "val" Ident "of" Atom ")" Block ;
 | 所 | 仮の決め | 別の案 |
 |---|---|---|
 | `for` の頭の、並び | `Atom`。呼び出しは、書けない（引数に呼び出しを書かない決まりに、合わせた） | 呼び出しも書ける |
-| 文の一つのアームに、書ける文 | `=`、`collect`、呼び出し、`match`、`parallelizable`、`for`。`val` と `return` は、書けない | ブロックだけにする |
+| 文の一つのアームに、書ける文 | `=`、`collect`、呼び出し、`match`、`disjoint`、`for`。`val` と `return` は、書けない | ブロックだけにする |
 | `collect` の右 | 式（呼び出しを、じかに書ける）。`=` と同じ | 値だけ |
 | `return` を書けない所（321） | 文法ではなく、検査で弾く | `for` とアームの中のブロックを、別の生成規則にする |
 
@@ -165,7 +166,7 @@ op prepayExpiring()
 {
   val priced;
   val now;
-  parallelizable {
+  disjoint {
     priced = price(checkout.lines, checkout.destination);
     now = clock.now();
   }
@@ -244,7 +245,7 @@ op statusOf(order: ordering.Order): OrderView {
 ```
 op statusOf(order: ordering.Order): OrderView {
   val charge, progress, jobs, grants;
-  parallelizable {
+  disjoint {
     charge = payment.ofOrder(order.id);
     progress = shipping.progressOfOrder(order.id);
     jobs = production.ofOrder(order.id);
@@ -268,7 +269,7 @@ op statusOf(order: ordering.Order): OrderView {
 - **W5 失敗しうる呼び出しを繰り返すと、一つの失敗が、後ろの回を、止める。** `prepayExpiring` の書き直しでは、一つの支払いで、外の仕組みが失敗すると、残りの支払いは、その回では、扱われない。今の、時計で一件ずつ、の形は、失敗を、回ごとに分けていた。回ごとに、例外を受けて、次へ進む書き方は、配線に、ない。 → 決めた: 止める。失敗を分けたいものは、時計で一件ずつ、のままにする（`decisions.md`「決めたこと」323）。
 - **W6 繰り返しの中の、例外と効果の組は、多くが、`unknown` になる。** 検査の計算（`check.md`「計算」）は、例外と効果の組ごとに、`kept`（起きている）、`prevented`（起きていない）、`unknown`（決まらない）を出す。`prepayExpiring` の書き直しでは、途中の回で例外が出たとき、前の回の効果（`recordPrepaid`）は、起きていて、今の回の効果は、起きていない。答えは、`unknown`。計算に、繰り返しの決まりは、まだない。「例外のとき、効果は起きていない」（`prevents effects`）と書いた約束は、繰り返しの中では、守れない。 → 決めた: 直列に動いたとして、計算する。本体は、0 回以上、動き、前の回の効果は、起きている（`decisions.md`「決めたこと」335）。
 - **W7 `collect` は、回が、互いに依存しないときにだけ、合う。** 在庫の取り置き（`inventory.reserve` の `allocate`）は、前の行までの取り置きを見て、残りを決めうる。集める先は、`for` の中で読めない（320）ので、`collect` では、書けない。葉の op のまま。
-- **W8 `parallelizable` は、軽いアームでは、行が増えるだけ。** `placeNew` は、6 行が、10 行になった。二つの読みを並べるだけなら、得は、小さい。 → 空の `val` は、名前を並べて、一つの文で、宣言できる、と決めた（同 336）。
+- **W8 `disjoint` は、軽いアームでは、行が増えるだけ。** `placeNew` は、6 行が、10 行になった。二つの読みを並べるだけなら、得は、小さい。 → 空の `val` は、名前を並べて、一つの文で、宣言できる、と決めた（同 336）。
 
 ### 図の部品との対応
 
@@ -278,7 +279,7 @@ op statusOf(order: ordering.Order): OrderView {
 | 文の順 | 作業の順 |
 | `match` | 分かれ道 |
 | アームの `throw` | 分かれ道の先の、終わり（例外） |
-| `parallelizable` | 並行 |
+| `disjoint` | 並行 |
 | `for` | 繰り返し |
 | `val x;`（空の宣言）、`x = …;`、`xs collect x;` | **確かめたときは、当たる部品が、なかった** |
 
@@ -288,5 +289,5 @@ op statusOf(order: ordering.Order): OrderView {
 
 - **W10 `for` の頭に、呼び出しを書けないと、行が一つ増える。** 案では、並びを、いったん `val` に受ける（`val stale = unpaidBefore(deadline);`）。名前が付くので、読みやすさは、落ちなかった。
 - **W11 `collect` の右に、呼び出しを、じかに書くと、短い。** `planned collect planJob(orderId, line, now);`。`val` に受けてから集める形と、どちらも書ける。
-- **W12 四つの op で、`;` を省いたのは、`for` と `parallelizable` の後ろだけ。** 式で終わる文（`val`、`=`、`collect`、呼び出し、`return`）は、どれも、`;` で終わった。
-- **W13 読みをいくつか集める形には、例外と効果の組が、ない。** `statusOf` の四つのアームは、読むだけで、効果を持たず、仕様の例外も、出さない。検査の計算が答えるものが、なく、アームについての検査（295）にも、掛からない。読みが、仕様の例外を出す形でも、どのアームも、効果を持たないので、直列でも、並列でも、答えは同じ。`parallelizable` に、例外のときの扱いを明示する書き方に、出番は、なかった（同 335）。確かめたのは、この一つの op。
+- **W12 四つの op で、`;` を省いたのは、`for` と `disjoint` の後ろだけ。** 式で終わる文（`val`、`=`、`collect`、呼び出し、`return`）は、どれも、`;` で終わった。
+- **W13 読みをいくつか集める形には、例外と効果の組が、ない。** `statusOf` の四つのアームは、読むだけで、効果を持たず、仕様の例外も、出さない。検査の計算が答えるものが、なく、アームについての検査（295）にも、掛からない。読みが、仕様の例外を出す形でも、どのアームも、効果を持たないので、直列でも、並列でも、答えは同じ。`disjoint` に、例外のときの扱いを明示する書き方に、出番は、なかった（同 335）。確かめたのは、この一つの op。
