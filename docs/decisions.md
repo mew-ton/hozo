@@ -325,6 +325,7 @@
 | 315 | `match` の頭にも、丸括弧を付ける。括弧の中に、何を入れるかは、まだ、決めていない | `docs/ide-chain.md`「アクティビティ図」 |
 | 316 | `match` の丸括弧（315）には、頭の全体を、入れる: `match (user by store.Registration) { … }`、`match (carts by list) { … }`、`match (by Checkout) { … }`。`for (val 名前 of 並び) { … }` と、同じ並び（キーワード、括弧に入った頭、ブロック）にする。値を書かない形でも、空の括弧が、残らない。採らなかった案: 値だけを、括弧に入れる（`match (user) by store.Registration { … }`） | `docs/ide-chain.md`「アクティビティ図」 |
 | 317 | 繰り返しの、一回ずつの結果は、集められる。`for` の外で、並びの型の `val` を、空で宣言し（`val foos: Foo[];`）、`for` の中から、そこへ、値を集める。集める文の綴り（語か、演算子か）は、まだ、決めていない。採らなかった案: 集めない（`for` は、効果と、確かめだけ）。`for` を、並びを返す式にする（`val foos = for (…) { … };`） | `docs/ide-chain.md`「アクティビティ図」 |
+| 318 | 集める文（317）は、`並びの val collect 値;`（`foos collect foo;`）。入れる先を、先に書く: `=`（`held = holdStock(stock);`）と、同じ順。語で書くので、読めば分かり、`=`（一度だけ入れる）と、見間違えない。予約語 `collect` を、足す。採らなかった案: `collect foo into foos;`（入れる値が、先）。`foos <- foo;`（矢印が、三つ目になる）。`foos <= foo;`（比較に読める）。二つの書き方を、両方持つ | `docs/ide-chain.md`「アクティビティ図」 |
 
 ## 設計書から離れた決定
 
