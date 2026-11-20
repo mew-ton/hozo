@@ -80,6 +80,7 @@ func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic {
 	checkThrows(ix, comp, r)
 	checkDecorators(ix, comp, r)
 	checkWiring(ix, cfg, r)
+	checkDisjoint(ix, comp, r)
 	checkBinds(ix, comp, r)
 	return r.diags
 }

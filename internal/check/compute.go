@@ -819,6 +819,23 @@ func (c *computer) readsOf(o *ir.Op) []string {
 		c.reads[o.Name] = out
 		return out
 	}
+	add(c.stmtReads(o.Body.Statements)...)
+	add(c.ix.readStates(o.Carried.Reads)...)
+	c.reads[o.Name] = out
+	return out
+}
+
+// stmtReads は、文の並びが読む状態（docs/check.md「reads」の 1、2。出現順。重複は最初の出現に寄せる）。
+// 配線の本体の全体にも、disjoint のアームや、for のブロックにも、使う。
+func (c *computer) stmtReads(stmts []ir.Statement) []string {
+	var out []string
+	add := func(states ...string) {
+		for _, s := range states {
+			if s != "" {
+				out = appendUnique(out, s)
+			}
+		}
+	}
 	call := func(call ir.Call) {
 		// 2.1 引数の Atom が参照する状態、2.2 Call.bound の状態、2.3 呼び出し先が op ならその R、read ならその宛先の状態
 		// （効果は何も足さない）
@@ -870,7 +887,7 @@ func (c *computer) readsOf(o *ir.Op) []string {
 			}
 		}
 	}
-	walkStmts(o.Body.Statements, func(st ir.Statement, _ []int) {
+	walkStmts(stmts, func(st ir.Statement, _ []int) {
 		if f, ok := st.(ir.ForStmt); ok {
 			// for の頭の並びが参照する状態
 			add(atomStates(f.Of)...)
@@ -880,8 +897,6 @@ func (c *computer) readsOf(o *ir.Op) []string {
 			expr(e)
 		}
 	})
-	add(c.ix.readStates(o.Carried.Reads)...)
-	c.reads[o.Name] = out
 	return out
 }
 
