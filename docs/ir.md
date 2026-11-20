@@ -184,7 +184,7 @@ interface Classify extends DeclBase {
   cases: { name: string; description?: Doc; decorators: Application[]; as: CaseTyping[]; span: Span }[];
                                   // 宣言したケースのすべて（docs/check.md「閉じた分類」）。宣言順。as は書かれた順（なければ []）。
                                   // decorators は、ケースの前に書いたデコレータ（書かれた順。なければ []）。付けられるのは、
-                                  // Decorator.targets に、そのケースを含む CaseKind を持つデコレータ（DEC-1）
+                                  // Decorator.caseTargets に、そのケースを含む CaseKind を持つデコレータ（DEC-1）
   decidedBy: "type" | "predicate" | "none";   // ケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない。
                                   // none は、対象のない分類: 判定するものがなく、述語も持たない（docs/check.md「対象のない分類」）
   absent?: string;                // ない側のケース（docs/check.md「ない側のケース」）の名前。なければ持たない。
@@ -205,7 +205,8 @@ interface CaseTyping {            // ケースの `対象 as T`、`対象 as els
 interface Decorator extends DeclBase {
   kind: "decorator";
   params: Param[];
-  targets: Target[];              // 省略時は ["op"]
+  targets: ("op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | "case")[];   // 省略時は ["op"]。case は、分類のケース
+  caseTargets: CaseKind[];        // targets の "case" ごとの、絞り（書かれた順）。なければ []
   external: boolean;              // @external が付いているか（DEC-10）
   repeatable: boolean;            // @repeatable が付いているか。偽なら、一つの宣言に一度だけ付けられる（DEC-13）
   throws: ThrowsClause[];
@@ -220,10 +221,7 @@ interface Decorator extends DeclBase {
                                              // external と repeatable は false で、どれも target のものを使う
 }
 
-type Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | CaseKind;
-
-interface CaseKind {              // 分類のケース（docs/grammar.md「decorator の宣言」の CaseKind）。絞らない所は、持たない
-  kind: "case";
+interface CaseKind {              // 分類のケースの絞り（docs/grammar.md「decorator の宣言」の CaseKind）。絞らない所は、持たない
   classify?: string;              // 名前で絞ったとき（`classify Actor case`）、その分類の FQN
   subject?: "never";              // 対象で絞ったとき（`classify of never case`）
 }
@@ -239,7 +237,7 @@ interface Param {
 type ParamType =
   | { kind: "type"; types: Type[] }                   // `int | float` は types が二つ。普通は一つ
   | { kind: "any"; of: "exception" | "effect" | "state" | "op" | "model" | "variant"; on?: { state: string; operation: "post" | "put" | "delete" } }
-  | { kind: "any"; of: CaseKind };                   // `any classify … case`。分類のケースを受け取る
+  | { kind: "any"; of: "case"; case: CaseKind };     // `any classify … case`。分類のケースを受け取る
 
 interface ThrowsClause {
   exceptions: string[];           // FQN。ユニオンは展開済み。デコレータの引数名なら "$param:名前"
@@ -547,7 +545,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 | 版 | 変わったこと |
 |---|---|
-| 0.10 | 配線の文（`Statement`）: `const` をやめて `val`（`type`、`collected`。`expr` は省ける）。`assign`、`collect`、`disjoint`（`Arm`）、`for`。`Classify.cases[].decorators`。`Classify.decidedBy` に `none`（対象のない分類。`subject` の `type` が `never`）。`Decorator.targets` に `CaseKind`。`ParamType` の `any` に `CaseKind`。`ArgValue` に `case`。`View` とやり取りの形は 0.9 と同じ |
+| 0.10 | 配線の文（`Statement`）: `const` をやめて `val`（`type`、`collected`。`expr` は省ける）。`assign`、`collect`、`disjoint`（`Arm`）、`for`。`Classify.cases[].decorators`。`Classify.decidedBy` に `none`（対象のない分類。`subject` の `type` が `never`）。`Decorator.targets` に `case` と、`Decorator.caseTargets`（`CaseKind`）。`ParamType` の `any` の `of` に `case` と、`case`（`CaseKind`）。`ArgValue` に `case`。`View` とやり取りの形は 0.9 と同じ |
 | 0.9 | `Effect.row`（`RowTransition`: 行の遷移。`docs/check.md`「行の遷移」）。`CaseTyping.by` に `none`（ない側のケース `対象 as none`。同「ない側のケース」）。`Classify.absent`。述語で決まる分類（`decidedBy` が `predicate`）が、述語を持たないケース（`absent` のケース）を持ちうる。`View` とやり取りの形は 0.8 と同じ |
 | 0.8 | `Classify.hasDefault`、`Classify.defaultDescription`、`Classify.fromCondition` をなくした（分類を閉じた。`docs/check.md`「閉じた分類」）。`MatchArm.cases` は、いつもケース名の列（`"default"` をなくした）。`MatchArm.else`（`else` のアーム。`cases` は、それが受けるケース）。`View` とやり取りの形は 0.7 と同じ |
 | 0.7 | `CaseTyping.by` に `else`（残りのケース `対象 as else`。`docs/check.md`「残りのケース」）。そのときの `CaseTyping.type` は、書いた型ではなく、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。残りのケースは `Classify.cases` に入り、`hasDefault` には数えない。`View` とやり取りの形は 0.6 と同じ |
