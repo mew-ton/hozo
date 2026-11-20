@@ -43,12 +43,25 @@ type Ops interface {
 	// Reads: store.sessions, store.orders
 	GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order, error)
 
+	// GetMyPage は自分のページ: 自分の情報と、いちばん新しい注文と、注文ごとの要約を、まとめて返す
+	//
+	// Throws: type.Unauthorized
+	// Reads: store.sessions, store.users, store.orders
+	GetMyPage(ctx context.Context, in AuthInput) (MyPage, error)
+
 	// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
 	// Reads: store.sessions
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error)
+
+	// ResendNotices は自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る
+	//
+	// Throws: type.Unauthorized, type.NotificationFailed
+	// Reads: store.sessions, store.orders
+	// Effects: store.notifyUser
+	ResendNotices(ctx context.Context, in AuthInput) ([]pkgtype.Notification, error)
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。

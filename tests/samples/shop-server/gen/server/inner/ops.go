@@ -79,6 +79,18 @@ type Ops interface {
 	// Reads: store.sessions, store.orders
 	GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order, error)
 
+	// GetMyPage は自分のページ: 自分の情報と、いちばん新しい注文と、注文ごとの要約を、まとめて返す
+	//
+	// Throws: type.Unauthorized
+	// Reads: store.sessions, store.users, store.orders
+	GetMyPage(ctx context.Context, in AuthInput) (MyPage, error)
+
+	// Summarize は注文を、一行の要約にする（人が書く）
+	Summarize(ctx context.Context, order pkgtype.Order) (OrderSummary, error)
+
+	// MyPage は見せる形にまとめる（人が書く）
+	MyPage(ctx context.Context, user pkgtype.PublicUser, latest *pkgtype.Order, summaries []OrderSummary) (MyPage, error)
+
 	// PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
@@ -91,6 +103,13 @@ type Ops interface {
 
 	// ComposeNotice は通知の文面を作る（人が書く）
 	ComposeNotice(ctx context.Context, order pkgtype.Order) (pkgtype.Notification, error)
+
+	// ResendNotices は自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る
+	//
+	// Throws: type.Unauthorized, type.NotificationFailed
+	// Reads: store.sessions, store.orders
+	// Effects: store.notifyUser
+	ResendNotices(ctx context.Context, in AuthInput) ([]pkgtype.Notification, error)
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
@@ -114,6 +133,12 @@ type Leaves interface {
 
 	// PageOf は一覧から、そのページの分を取り出す（人が書く）
 	PageOf(ctx context.Context, orders []pkgtype.Order, page int64) ([]pkgtype.Order, error)
+
+	// Summarize は注文を、一行の要約にする（人が書く）
+	Summarize(ctx context.Context, order pkgtype.Order) (OrderSummary, error)
+
+	// MyPage は見せる形にまとめる（人が書く）
+	MyPage(ctx context.Context, user pkgtype.PublicUser, latest *pkgtype.Order, summaries []OrderSummary) (MyPage, error)
 
 	// NewOrder は識別子と時刻を決めて、注文を作る（人が書く）
 	NewOrder(ctx context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error)
@@ -173,6 +198,11 @@ type StoreOps interface {
 	//
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
+
+	// RecordNotice は op store.recordNotice: 通知の記録を、一つ足す
+	//
+	// Effects: store.notifyUser
+	RecordNotice(ctx context.Context, notification pkgtype.Notification) error
 }
 
 // Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。
@@ -219,6 +249,14 @@ func (o *ops) RequireFresh(ctx context.Context, session pkgtype.Session) (pkgtyp
 
 func (o *ops) PageOf(ctx context.Context, orders []pkgtype.Order, page int64) ([]pkgtype.Order, error) {
 	return o.leaves.PageOf(ctx, orders, page)
+}
+
+func (o *ops) Summarize(ctx context.Context, order pkgtype.Order) (OrderSummary, error) {
+	return o.leaves.Summarize(ctx, order)
+}
+
+func (o *ops) MyPage(ctx context.Context, user pkgtype.PublicUser, latest *pkgtype.Order, summaries []OrderSummary) (MyPage, error) {
+	return o.leaves.MyPage(ctx, user, latest, summaries)
 }
 
 func (o *ops) NewOrder(ctx context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error) {

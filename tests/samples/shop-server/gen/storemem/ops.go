@@ -54,6 +54,11 @@ type Ops interface {
 	//
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
+
+	// RecordNotice は通知の記録を、一つ足す
+	//
+	// Effects: store.notifyUser
+	RecordNotice(ctx context.Context, notification pkgtype.Notification) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）。

@@ -14,7 +14,7 @@ func (o *ops) loginBody(ctx context.Context, in LoginInput) (LoginOk, error) {
 	if err != nil {
 		return LoginOk{}, err
 	}
-	// match user by store.Registration
+	// match (user by store.Registration)
 	if user != nil {
 		// Registered: user は type.User
 		return o.IssueSession(ctx, *user, in.Body.Password)
@@ -50,7 +50,7 @@ func (o *ops) IssueSession(ctx context.Context, user pkgtype.User, password pkgt
 // Throws: type.Unauthorized
 // Reads: store.sessions
 func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error) {
-	// match token by server.Credential
+	// match (token by server.Credential)
 	if token != nil {
 		// Presented: token は type.Token
 		return o.SessionOf(ctx, *token)
@@ -68,7 +68,7 @@ func (o *ops) SessionOf(ctx context.Context, token pkgtype.Token) (pkgtype.Sessi
 	if err != nil {
 		return pkgtype.Session{}, err
 	}
-	// match session by store.Login
+	// match (session by store.Login)
 	if session != nil {
 		// LoggedIn: session は type.Session
 		return o.RequireFresh(ctx, *session)
@@ -106,7 +106,7 @@ func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, erro
 	if err != nil {
 		return pkgtype.PublicUser{}, err
 	}
-	// match user by store.Account
+	// match (user by store.Account)
 	if user != nil {
 		// Found: user は type.User
 		return o.ToPublicUser(ctx, *user)
@@ -143,6 +143,59 @@ func (o *ops) GetLatestOrder(ctx context.Context, in AuthInput) (*pkgtype.Order,
 	return o.store.LatestOrder(ctx, session.UserId)
 }
 
+// GetMyPage は自分のページ: 自分の情報と、いちばん新しい注文と、注文ごとの要約を、まとめて返す
+//
+// Throws: type.Unauthorized
+// Reads: store.sessions, store.users, store.orders
+func (o *ops) GetMyPage(ctx context.Context, in AuthInput) (MyPage, error) {
+	session, err := o.Authenticate(ctx, in.Token)
+	if err != nil {
+		return MyPage{}, err
+	}
+	var user pkgtype.PublicUser
+	var latest *pkgtype.Order
+	var orders []pkgtype.Order
+	// disjoint
+	{
+		{
+			found, err := o.store.FindUserById(ctx, session.UserId)
+			if err != nil {
+				return MyPage{}, err
+			}
+			// match (found by store.Account)
+			if found != nil {
+				// Found: found は type.User
+				v0, err := o.ToPublicUser(ctx, *found)
+				if err != nil {
+					return MyPage{}, err
+				}
+				user = v0
+			} else {
+				// Missing
+				return MyPage{}, pkgtype.Unauthorized{}
+			}
+		}
+		latest, err = o.store.LatestOrder(ctx, session.UserId)
+		if err != nil {
+			return MyPage{}, err
+		}
+		orders, err = o.store.ListOrders(ctx, session.UserId)
+		if err != nil {
+			return MyPage{}, err
+		}
+	}
+	var summaries []OrderSummary
+	// disjoint
+	for _, order := range orders {
+		v1, err := o.Summarize(ctx, order)
+		if err != nil {
+			return MyPage{}, err
+		}
+		summaries = append(summaries, v1)
+	}
+	return o.MyPage(ctx, user, latest, summaries)
+}
+
 // PlaceOrder は注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る
 //
 // Throws: type.Unauthorized, type.NotificationFailed
@@ -168,4 +221,35 @@ func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order
 		return pkgtype.Order{}, err
 	}
 	return order, nil
+}
+
+// ResendNotices は自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る
+//
+// Throws: type.Unauthorized, type.NotificationFailed
+// Reads: store.sessions, store.orders
+// Effects: store.notifyUser
+func (o *ops) ResendNotices(ctx context.Context, in AuthInput) ([]pkgtype.Notification, error) {
+	session, err := o.Authenticate(ctx, in.Token)
+	if err != nil {
+		return nil, err
+	}
+	orders, err := o.store.ListOrders(ctx, session.UserId)
+	if err != nil {
+		return nil, err
+	}
+	var sent []pkgtype.Notification
+	for _, order := range orders {
+		notice, err := o.ComposeNotice(ctx, order)
+		if err != nil {
+			return nil, err
+		}
+		if err := o.mailer.Send(ctx, notice); err != nil {
+			return nil, err
+		}
+		if err := o.store.RecordNotice(ctx, notice); err != nil {
+			return nil, err
+		}
+		sent = append(sent, notice)
+	}
+	return sent, nil
 }

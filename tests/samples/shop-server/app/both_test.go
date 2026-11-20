@@ -61,13 +61,14 @@ func methodNames(typ reflect.Type) []string {
 // （守るのは Hozo の検査 NS-5。生成したコードは、置き方で分けるだけ）。
 func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	t.Parallel()
-	entries := []string{"GetLatestOrder", "GetMe", "GetOrders", "Login", "Logout", "PlaceOrder"}
+	entries := []string{"GetLatestOrder", "GetMe", "GetMyPage", "GetOrders", "Login", "Logout", "PlaceOrder", "ResendNotices"}
 	if got := methodNames(reflect.TypeFor[server.Ops]()); !slices.Equal(got, entries) {
 		t.Errorf("server.Ops のメソッド = %v（期待は %v）", got, entries)
 	}
 	everything := []string{
-		"Authenticate", "CheckPassword", "ComposeNotice", "GetLatestOrder", "GetMe", "GetOrders", "IssueSession",
-		"Login", "Logout", "NewOrder", "NewSession", "PageOf", "PlaceOrder", "RequireFresh", "SessionOf", "ToPublicUser",
+		"Authenticate", "CheckPassword", "ComposeNotice", "GetLatestOrder", "GetMe", "GetMyPage", "GetOrders", "IssueSession",
+		"Login", "Logout", "MyPage", "NewOrder", "NewSession", "PageOf", "PlaceOrder", "RequireFresh", "ResendNotices", "SessionOf",
+		"Summarize", "ToPublicUser",
 	}
 	if got := methodNames(reflect.TypeFor[inner.Ops]()); !slices.Equal(got, everything) {
 		t.Errorf("inner.Ops のメソッド = %v（期待は %v）", got, everything)
@@ -88,7 +89,7 @@ func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	}
 
 	all := []string{
-		"AddSession", "AddUser", "FindSession", "FindUser", "FindUserById", "LatestOrder", "ListOrders", "PlaceOrder", "RemoveSession",
+		"AddSession", "AddUser", "FindSession", "FindUser", "FindUserById", "LatestOrder", "ListOrders", "PlaceOrder", "RecordNotice", "RemoveSession",
 	}
 	storeOps := reflect.TypeFor[server.StoreOps]()
 	for name, typ := range map[string]reflect.Type{

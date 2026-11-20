@@ -83,3 +83,13 @@ func (o *ops) placeOrderBody(ctx context.Context, order pkgtype.Order, notificat
 	}
 	return nil
 }
+
+// RecordNotice は通知の記録を、一つ足す
+//
+// Effects: store.notifyUser
+func (o *ops) RecordNotice(ctx context.Context, notification pkgtype.Notification) error {
+	if err := o.notifications.NotifyUser(ctx, notification); err != nil {
+		return err
+	}
+	return nil
+}

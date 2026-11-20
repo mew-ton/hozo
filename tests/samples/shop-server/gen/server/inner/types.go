@@ -38,3 +38,16 @@ type PlaceOrderInput struct {
 	Token *pkgtype.Token      `json:"token,omitempty"`
 	Lines []pkgtype.OrderLine `json:"lines"`
 }
+
+// OrderSummary は注文の、一行の要約
+type OrderSummary struct {
+	Id    pkgtype.OrderId `json:"id"`
+	Lines int64           `json:"lines"`
+}
+
+// MyPage は自分のページ
+type MyPage struct {
+	User      pkgtype.PublicUser `json:"user"`
+	Latest    *pkgtype.Order     `json:"latest,omitempty"`
+	Summaries []OrderSummary     `json:"summaries"`
+}

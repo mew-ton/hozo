@@ -54,6 +54,11 @@ type Ops interface {
 	//
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, order pkgtype.Order, notification pkgtype.Notification) error
+
+	// RecordNotice は通知の記録を、一つ足す
+	//
+	// Effects: store.notifyUser
+	RecordNotice(ctx context.Context, notification pkgtype.Notification) error
 }
 
 // Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。

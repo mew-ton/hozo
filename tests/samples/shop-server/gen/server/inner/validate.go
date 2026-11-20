@@ -52,6 +52,19 @@ func (m PlaceOrderInput) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
+// Validate は server.MyPage の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m MyPage) Validate() error {
+	var violations []runtime.Violation
+	violations = validAppend(violations, "user", m.User.Validate())
+	if m.Latest != nil {
+		violations = validAppend(violations, "latest", (*m.Latest).Validate())
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+
 // validAppend は err が *runtime.ValidationError なら、その違反の Path に path を前置して dst に足す。
 func validAppend(dst []runtime.Violation, path string, err error) []runtime.Violation {
 	if err == nil {

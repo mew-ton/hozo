@@ -1,6 +1,6 @@
 // サンプル shop-server の仕様（README.md）。HTTP の入口と業務の流れを持つ名前空間 server。
 // 保存先には触れない: 読み書きは store の op を、外への配送は mailer の op を呼ぶ。
-// 人が書く op（本体のない op）は七つで、どれも状態に触れない。export を付けたのは HTTP の入口の六つだけで、ほかの十は内部の op（P33）。
+// 人が書く op（本体のない op）は九つで、どれも状態に触れない。export を付けたのは HTTP の入口の八つだけで、ほかの十二は内部の op（P33）。
 // 入力の model のフィールドは、要求のどこから読むかを http の語彙のデコレータで言う（docs/plugin-go-http.md「対象」）: 一つの項目は @http.header / @http.query / @http.body（名前を省けば、フィールドの名前）、本文の全体を一つの model で受け取るなら @http.bodyObj。項目がないときの扱いも、デコレータで言う: @http.required なら 400（PlaceOrderInput の lines）、@http.default(v) なら v（GetOrdersInput の page は 1）、どちらもなければ、零値のまま（省略可能な token は、値がない）。
 // トークンのない要求は、store を呼ぶ前に、ここで断る（分類 Credential）: store.findSession は、列と同じ型のトークンだけを受け取る。login には、サンプルの中のプラグインの語彙のデコレータ @rate.limited を付けた（継ぎ目。P38）。
 
@@ -37,6 +37,12 @@ namespace server {
     @http.required @http.body lines: type.OrderLine[];
   }
 
+  /** 注文の、一行の要約 */
+  model OrderSummary { id: type.OrderId; lines: int; }
+
+  /** 自分のページ */
+  model MyPage { user: type.PublicUser; latest: type.Order?; summaries: OrderSummary[]; }
+
   // ---- ログイン ----
 
   /** ログインする */
@@ -45,11 +51,11 @@ namespace server {
   export op login(in: LoginInput): LoginOk
     throws type.InvalidCredentials
   {
-    const user = store.findUser(in.body.email);
-    return match user by store.Registration {
+    val user = store.findUser(in.body.email);
+    return match (user by store.Registration) {
       Registered   => issueSession(user, in.body.password);
       Unregistered => throw type.InvalidCredentials;
-    };
+    }
   }
 
   /** パスワードを確かめて、セッションを作る */
@@ -57,9 +63,9 @@ namespace server {
     throws type.InvalidCredentials
   {
     checkPassword(user, password);
-    const session = newSession(user);
+    val session = newSession(user);
     store.addSession(session);
-    const publicUser = toPublicUser(user);
+    val publicUser = toPublicUser(user);
     return { user: publicUser, token: session.token };
   }
 
@@ -85,21 +91,21 @@ namespace server {
   op authenticate(token: type.Token?): type.Session
     throws type.Unauthorized
   {
-    return match token by Credential {
+    return match (token by Credential) {
       Presented => sessionOf(token);
       Absent    => throw type.Unauthorized;
-    };
+    }
   }
 
   /** そのトークンのセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
   op sessionOf(token: type.Token): type.Session
     throws type.Unauthorized
   {
-    const session = store.findSession(token);
-    return match session by store.Login {
+    val session = store.findSession(token);
+    return match (session by store.Login) {
       LoggedIn  => requireFresh(session);
       LoggedOut => throw type.Unauthorized;
-    };
+    }
   }
 
   /** 期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く） */
@@ -111,7 +117,7 @@ namespace server {
   export op logout(in: AuthInput)
     throws type.Unauthorized
   {
-    const session = authenticate(in.token);
+    val session = authenticate(in.token);
     store.removeSession(session.token);
   }
 
@@ -120,12 +126,12 @@ namespace server {
   export op getMe(in: AuthInput): type.PublicUser
     throws type.Unauthorized
   {
-    const session = authenticate(in.token);
-    const user = store.findUserById(session.userId);
-    return match user by store.Account {
+    val session = authenticate(in.token);
+    val user = store.findUserById(session.userId);
+    return match (user by store.Account) {
       Found   => toPublicUser(user);
       Missing => throw type.Unauthorized;
-    };
+    }
   }
 
   // ---- 注文 ----
@@ -135,8 +141,8 @@ namespace server {
   export op getOrders(in: GetOrdersInput): type.Order[]
     throws type.Unauthorized
   {
-    const session = authenticate(in.token);
-    const orders = store.listOrders(session.userId);
+    val session = authenticate(in.token);
+    val orders = store.listOrders(session.userId);
     return pageOf(orders, in.page);
   }
 
@@ -148,18 +154,49 @@ namespace server {
   export op getLatestOrder(in: AuthInput): type.Order?
     throws type.Unauthorized
   {
-    const session = authenticate(in.token);
+    val session = authenticate(in.token);
     return store.latestOrder(session.userId);
   }
+
+  /** 自分のページ: 自分の情報と、いちばん新しい注文と、注文ごとの要約を、まとめて返す */
+  @http.get("/me/page")
+  export op getMyPage(in: AuthInput): MyPage
+    throws type.Unauthorized
+  {
+    val session = authenticate(in.token);
+    val user, latest, orders;
+    disjoint {
+      {
+        val found = store.findUserById(session.userId);
+        user = match (found by store.Account) {
+          Found   => toPublicUser(found);
+          Missing => throw type.Unauthorized;
+        }
+      }
+      latest = store.latestOrder(session.userId);
+      orders = store.listOrders(session.userId);
+    }
+    val summaries: OrderSummary[];
+    disjoint for (val order of orders) {
+      summaries collect summarize(order);
+    }
+    return myPage(user, latest, summaries);
+  }
+
+  /** 注文を、一行の要約にする（人が書く） */
+  op summarize(order: type.Order): OrderSummary;
+
+  /** 見せる形にまとめる（人が書く） */
+  op myPage(user: type.PublicUser, latest: type.Order?, summaries: OrderSummary[]): MyPage;
 
   /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")
   export op placeOrder(in: PlaceOrderInput): type.Order
     throws type.Unauthorized, type.NotificationFailed
   {
-    const session = authenticate(in.token);
-    const order = newOrder(session, in.lines);
-    const notice = composeNotice(order);
+    val session = authenticate(in.token);
+    val order = newOrder(session, in.lines);
+    val notice = composeNotice(order);
     store.placeOrder(order, notice);
     mailer.send(notice);
     return order;
@@ -170,4 +207,21 @@ namespace server {
 
   /** 通知の文面を作る（人が書く） */
   op composeNotice(order: type.Order): type.Notification;
+
+  /** 自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る */
+  @http.post("/orders/notices")
+  export op resendNotices(in: AuthInput): type.Notification[]
+    throws type.Unauthorized, type.NotificationFailed
+  {
+    val session = authenticate(in.token);
+    val orders = store.listOrders(session.userId);
+    val sent: type.Notification[];
+    for (val order of orders) {
+      val notice = composeNotice(order);
+      mailer.send(notice);
+      store.recordNotice(notice);
+      sent collect notice;
+    }
+    return sent;
+  }
 }

@@ -15,10 +15,10 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Leaves は、server の葉の op 七つの本体（メソッド）と、それが外から受け取るもの（フィールド）。
+// Leaves は、server の葉の op 九つの本体（メソッド）と、それが外から受け取るもの（フィールド）。
 // *Leaves を server.New の引数 leaves にそのまま渡す。テストが差し替えられるように、時計と識別子の作り方を持つ。
 //
-// メソッドは、七つとも、最初の引数に ctx を取り、最後の戻り値に error を返す（生成された server.Leaves のメソッドの形。
+// メソッドは、九つとも、最初の引数に ctx を取り、最後の戻り値に error を返す（生成された server.Leaves のメソッドの形。
 // docs/plugin-go.md「op の形」: 基底は、どの op にそれが要るかを判定しない）。ここの本体は、どれも待たないので ctx を見ない。
 // error を返すのは、仕様の例外（checkPassword、requireFresh）と、トークンと識別子を作れなかったとき（newSession、newOrder）。
 type Leaves struct {
@@ -79,6 +79,16 @@ func (l *Leaves) PageOf(_ context.Context, orders []pkgtype.Order, page int64) (
 	start := min((max(page, 1)-1)*size, n)
 	end := min(start+size, n)
 	return orders[start:end], nil
+}
+
+// Summarize は server.summarize の本体。注文の識別子と、行の数。
+func (l *Leaves) Summarize(_ context.Context, order pkgtype.Order) (server.OrderSummary, error) {
+	return server.OrderSummary{Id: order.Id, Lines: int64(len(order.Lines))}, nil
+}
+
+// MyPage は server.myPage の本体。受け取ったものを、そのまま並べる。要約は、受け取った順のまま。
+func (l *Leaves) MyPage(_ context.Context, user pkgtype.PublicUser, latest *pkgtype.Order, summaries []server.OrderSummary) (server.MyPage, error) {
+	return server.MyPage{User: user, Latest: latest, Summaries: summaries}, nil
 }
 
 // NewOrder は server.newOrder の本体。識別子を作り、注文した時刻を今にする。

@@ -39,14 +39,16 @@ var (
 	_ func(server.Leaves, context.Context, pkgtype.User, pkgtype.Password) error     = server.Leaves.CheckPassword
 	_ func(server.Leaves, context.Context, pkgtype.Session) (pkgtype.Session, error) = server.Leaves.RequireFresh
 	// 仕様の上で純粋でない op（デコレータを持つ、状態に触れる op を呼ぶ）: 同じ
-	_ func(server.Ops, context.Context, server.LoginInput) (server.LoginOk, error)      = server.Ops.Login
-	_ func(server.Ops, context.Context, server.AuthInput) error                         = server.Ops.Logout
-	_ func(server.Ops, context.Context, server.AuthInput) (pkgtype.PublicUser, error)   = server.Ops.GetMe
-	_ func(server.Ops, context.Context, server.GetOrdersInput) ([]pkgtype.Order, error) = server.Ops.GetOrders
-	_ func(server.Ops, context.Context, server.AuthInput) (*pkgtype.Order, error)       = server.Ops.GetLatestOrder
-	_ func(server.Ops, context.Context, server.PlaceOrderInput) (pkgtype.Order, error)  = server.Ops.PlaceOrder
-	_ func(server.MailerOps, context.Context, pkgtype.Notification) error               = server.MailerOps.Send
-	_ func(server.StoreOps, context.Context, pkgtype.Token) (*pkgtype.Session, error)   = server.StoreOps.FindSession
+	_ func(server.Ops, context.Context, server.LoginInput) (server.LoginOk, error)        = server.Ops.Login
+	_ func(server.Ops, context.Context, server.AuthInput) error                           = server.Ops.Logout
+	_ func(server.Ops, context.Context, server.AuthInput) (pkgtype.PublicUser, error)     = server.Ops.GetMe
+	_ func(server.Ops, context.Context, server.GetOrdersInput) ([]pkgtype.Order, error)   = server.Ops.GetOrders
+	_ func(server.Ops, context.Context, server.AuthInput) (*pkgtype.Order, error)         = server.Ops.GetLatestOrder
+	_ func(server.Ops, context.Context, server.PlaceOrderInput) (pkgtype.Order, error)    = server.Ops.PlaceOrder
+	_ func(server.Ops, context.Context, server.AuthInput) (server.MyPage, error)          = server.Ops.GetMyPage
+	_ func(server.Ops, context.Context, server.AuthInput) ([]pkgtype.Notification, error) = server.Ops.ResendNotices
+	_ func(server.MailerOps, context.Context, pkgtype.Notification) error                 = server.MailerOps.Send
+	_ func(server.StoreOps, context.Context, pkgtype.Token) (*pkgtype.Session, error)     = server.StoreOps.FindSession
 	// 二つの効果を呼ぶ配線（store.placeOrder）も、引数の並びは op の宣言のまま
 	_ func(server.StoreOps, context.Context, pkgtype.Order, pkgtype.Notification) error = server.StoreOps.PlaceOrder
 	// 内部の配線も同じ形
@@ -256,8 +258,169 @@ func TestPlaceOrderRecordsThenSends(t *testing.T) {
 	}
 }
 
-// spyOps は、呼ばれた回数を数えるだけの server.Ops（go-http が受け取る、export を付けた六つの op）。
-// 数えない四つは、埋め込んだ nil のインターフェースのまま（呼べば panic）。
+// pageStore は、配線 getMyPage と resendNotices が呼ぶ別の名前空間の op。呼ばれた順と、記録した通知を覚える。
+// server.MailerOps と、server.StoreOps（ほかの op は、埋め込んだ nil のインターフェースのまま）の両方として渡す。
+type pageStore struct {
+	server.StoreOps
+	orders   []pkgtype.Order
+	noUser   bool
+	failSend pkgtype.OrderId // この注文の通知は、送れない
+	calls    []string
+	recorded []pkgtype.Notification
+}
+
+func (p *pageStore) FindSession(_ context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
+	p.calls = append(p.calls, "store.findSession")
+	return &pkgtype.Session{Token: token, UserId: "u1", ExpiresAt: handlertest.Now.Add(time.Hour)}, nil
+}
+
+func (p *pageStore) FindUserById(_ context.Context, id pkgtype.UserId) (*pkgtype.User, error) {
+	p.calls = append(p.calls, "store.findUserById")
+	if p.noUser {
+		return nil, nil
+	}
+	return &pkgtype.User{Id: id, Email: "alice@example.com", Name: "Alice", Hash: "h"}, nil
+}
+
+func (p *pageStore) LatestOrder(context.Context, pkgtype.UserId) (*pkgtype.Order, error) {
+	p.calls = append(p.calls, "store.latestOrder")
+	if len(p.orders) == 0 {
+		return nil, nil
+	}
+	return &p.orders[len(p.orders)-1], nil
+}
+
+func (p *pageStore) ListOrders(context.Context, pkgtype.UserId) ([]pkgtype.Order, error) {
+	p.calls = append(p.calls, "store.listOrders")
+	return p.orders, nil
+}
+
+func (p *pageStore) RecordNotice(_ context.Context, notification pkgtype.Notification) error {
+	p.calls = append(p.calls, "store.recordNotice")
+	p.recorded = append(p.recorded, notification)
+	return nil
+}
+
+func (p *pageStore) Send(_ context.Context, notice pkgtype.Notification) error {
+	p.calls = append(p.calls, "mailer.send")
+	if p.failSend != "" && strings.Contains(notice.Message, string(p.failSend)) {
+		return pkgtype.NotificationFailed{}
+	}
+	return nil
+}
+
+// threeOrders は、行の数が 1、2、3 の、三つの注文。
+func threeOrders() []pkgtype.Order {
+	line := pkgtype.OrderLine{Item: "apple", Quantity: 1}
+	return []pkgtype.Order{
+		{Id: "order-a", UserId: "u1", Lines: []pkgtype.OrderLine{line}},
+		{Id: "order-b", UserId: "u1", Lines: []pkgtype.OrderLine{line, line}},
+		{Id: "order-c", UserId: "u1", Lines: []pkgtype.OrderLine{line, line, line}},
+	}
+}
+
+// TestGetMyPageGathers は、配線 getMyPage（disjoint と、disjoint for）: 三つの読みの結果が、葉 myPage に渡り、
+// 注文ごとの要約は、注文の並びの順に、集まる。基底 go は、disjoint を、書いた順に、直列に出す（docs/plugin-go.md「文」）ので、
+// 呼ばれる順も、仕様に書いた順。
+func TestGetMyPageGathers(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	store := &pageStore{orders: threeOrders()}
+	ops := server.New(f.Leaves(), store, store, nil)
+	token := pkgtype.Token("token-1")
+	page, err := ops.GetMyPage(context.Background(), server.AuthInput{Token: &token})
+	if err != nil {
+		t.Fatalf("GetMyPage = %v", err)
+	}
+	if page.User.Id != "u1" || page.Latest == nil || page.Latest.Id != "order-c" {
+		t.Errorf("GetMyPage の user と latest が %+v、%+v", page.User, page.Latest)
+	}
+	want := []server.OrderSummary{{Id: "order-a", Lines: 1}, {Id: "order-b", Lines: 2}, {Id: "order-c", Lines: 3}}
+	if !slices.Equal(page.Summaries, want) {
+		t.Errorf("要約が %+v（期待は、注文の順の %+v）", page.Summaries, want)
+	}
+	if want := []string{"store.findSession", "store.findUserById", "store.latestOrder", "store.listOrders"}; !slices.Equal(store.calls, want) {
+		t.Errorf("呼ばれた順が %v（期待は %v）", store.calls, want)
+	}
+}
+
+// TestGetMyPageWithoutOrders は、注文がなければ、いちばん新しい注文は、値がなく、要約は、空の並び（繰り返しは、一回も回らない）。
+func TestGetMyPageWithoutOrders(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	store := &pageStore{}
+	ops := server.New(f.Leaves(), store, store, nil)
+	token := pkgtype.Token("token-1")
+	page, err := ops.GetMyPage(context.Background(), server.AuthInput{Token: &token})
+	if err != nil || page.Latest != nil || len(page.Summaries) != 0 {
+		t.Errorf("GetMyPage = %+v, %v（期待は、latest がなく、要約が空）", page, err)
+	}
+}
+
+// TestGetMyPageStopsAtException は、disjoint のアームの中の例外（ユーザーがいない: Unauthorized）で、op が終わること。
+// 後ろのアーム（二つの読み）は、動かない。
+func TestGetMyPageStopsAtException(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	store := &pageStore{orders: threeOrders(), noUser: true}
+	ops := server.New(f.Leaves(), store, store, nil)
+	token := pkgtype.Token("token-1")
+	_, err := ops.GetMyPage(context.Background(), server.AuthInput{Token: &token})
+	var unauthorized pkgtype.Unauthorized
+	if !errors.As(err, &unauthorized) {
+		t.Fatalf("GetMyPage = %v（期待は Unauthorized）", err)
+	}
+	if want := []string{"store.findSession", "store.findUserById"}; !slices.Equal(store.calls, want) {
+		t.Errorf("呼ばれた順が %v（期待は %v）", store.calls, want)
+	}
+}
+
+// TestResendNoticesInOrder は、配線 resendNotices（直列の for）: 注文の順に、送って、記録して、集める。
+func TestResendNoticesInOrder(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	store := &pageStore{orders: threeOrders()}
+	ops := server.New(f.Leaves(), store, store, nil)
+	token := pkgtype.Token("token-1")
+	sent, err := ops.ResendNotices(context.Background(), server.AuthInput{Token: &token})
+	if err != nil || len(sent) != 3 || !slices.Equal(sent, store.recorded) {
+		t.Fatalf("ResendNotices = %+v, %v（記録は %+v）", sent, err, store.recorded)
+	}
+	for i, id := range []string{"order-a", "order-b", "order-c"} {
+		if !strings.Contains(sent[i].Message, id) {
+			t.Errorf("%d 番目の通知が %q（期待は、注文 %s のもの）", i, sent[i].Message, id)
+		}
+	}
+	want := []string{"store.findSession", "store.listOrders", "mailer.send", "store.recordNotice", "mailer.send", "store.recordNotice", "mailer.send", "store.recordNotice"}
+	if !slices.Equal(store.calls, want) {
+		t.Errorf("呼ばれた順が %v（期待は %v）", store.calls, want)
+	}
+}
+
+// TestResendNoticesStopsAtFailure は、一つの回が失敗したら、繰り返しが、そこで止まること（docs/check.md「繰り返し」）:
+// 二つ目の注文の通知を送れないと、三つ目は、送らない。一つ目の記録は、残る（言語は、起きた効果を、取り消さない）。
+func TestResendNoticesStopsAtFailure(t *testing.T) {
+	t.Parallel()
+	f := &handlertest.Fixture{}
+	store := &pageStore{orders: threeOrders(), failSend: "order-b"}
+	ops := server.New(f.Leaves(), store, store, nil)
+	token := pkgtype.Token("token-1")
+	sent, err := ops.ResendNotices(context.Background(), server.AuthInput{Token: &token})
+	var failed pkgtype.NotificationFailed
+	if !errors.As(err, &failed) || sent != nil {
+		t.Fatalf("ResendNotices = %+v, %v（期待は NotificationFailed）", sent, err)
+	}
+	if len(store.recorded) != 1 || !strings.Contains(store.recorded[0].Message, "order-a") {
+		t.Errorf("記録が %+v（期待は、一つ目の注文の通知だけ）", store.recorded)
+	}
+	want := []string{"store.findSession", "store.listOrders", "mailer.send", "store.recordNotice", "mailer.send"}
+	if !slices.Equal(store.calls, want) {
+		t.Errorf("呼ばれた順が %v（期待は %v）", store.calls, want)
+	}
+}
+
+// spyOps は、呼ばれた回数を数えるだけの server.Ops（go-http が受け取る、export を付けた八つの op）。
+// 数えない六つは、埋め込んだ nil のインターフェースのまま（呼べば panic）。
 type spyOps struct {
 	server.Ops
 	logins, placeOrders int

@@ -2,7 +2,7 @@
 // 状態に触れるのは、read（読む）と効果（書く）だけ。どちらも本体を持たず、中身は、付けた db の語彙のデコレータから go-sqlite が出す
 // （docs/plugin-go-sqlite.md「read の中身」「効果の中身」）。表は、宣言の on の状態で、列は、引数の名前。
 // read と効果を呼べるのは、この名前空間の中だけ。ほかの名前空間は、ここの op（どれも、read か効果を呼ぶだけの配線）を通して読み書きする。
-// 九つの op はどれも export（P33）: 八つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
+// 十の op はどれも export（P33）: 九つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
 // 単位 gen/store では go-sqlite が read と効果の中身を出し、単位 gen/storemem では人が書く。
 
 /** 保存。DB の状態の持ち主 */
@@ -110,6 +110,11 @@ namespace store {
   @db.transaction
   export op placeOrder(order: type.Order, notification: type.Notification) {
     createOrder(order);
+    notifyUser(notification);
+  }
+
+  /** 通知の記録を、一つ足す */
+  export op recordNotice(notification: type.Notification) {
     notifyUser(notification);
   }
 

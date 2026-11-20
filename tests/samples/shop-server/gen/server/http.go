@@ -19,12 +19,14 @@ import (
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 // 入力を読んだ後、op を呼ぶ前に、入力の制約を確かめる（単位のオプション validate = true）。
 //
-//	POST /login         server.login
-//	POST /logout        server.logout
-//	GET /me             server.getMe
-//	GET /orders         server.getOrders
-//	GET /orders/latest  server.getLatestOrder
-//	POST /orders        server.placeOrder
+//	POST /login           server.login
+//	POST /logout          server.logout
+//	GET /me               server.getMe
+//	GET /orders           server.getOrders
+//	GET /orders/latest    server.getLatestOrder
+//	GET /me/page          server.getMyPage
+//	POST /orders          server.placeOrder
+//	POST /orders/notices  server.resendNotices
 func NewHandler(ops Ops) http.Handler {
 	mux := http.NewServeMux()
 
@@ -123,6 +125,25 @@ func NewHandler(ops Ops) http.Handler {
 		httpWriteResult(w, out)
 	})
 
+	// server.getMyPage
+	mux.HandleFunc("GET /me/page", func(w http.ResponseWriter, r *http.Request) {
+		var in AuthInput
+		req := httpRequest{r: r}
+		req.header("Authorization", &in.Token)
+		if !req.ok(w) {
+			return
+		}
+		if !httpValidate(w, in, httpPlace{"token", "header.Authorization"}) {
+			return
+		}
+		out, err := ops.GetMyPage(r.Context(), in)
+		if err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, out)
+	})
+
 	// server.placeOrder
 	mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
 		var in PlaceOrderInput
@@ -136,6 +157,25 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		out, err := ops.PlaceOrder(r.Context(), in)
+		if err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, out)
+	})
+
+	// server.resendNotices
+	mux.HandleFunc("POST /orders/notices", func(w http.ResponseWriter, r *http.Request) {
+		var in AuthInput
+		req := httpRequest{r: r}
+		req.header("Authorization", &in.Token)
+		if !req.ok(w) {
+			return
+		}
+		if !httpValidate(w, in, httpPlace{"token", "header.Authorization"}) {
+			return
+		}
+		out, err := ops.ResendNotices(r.Context(), in)
 		if err != nil {
 			httpWriteError(w, err)
 			return

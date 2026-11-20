@@ -102,6 +102,26 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 - 期待する出力（`gen/**`）と、人が書いたもの（`app/**`）も、変えていない: `docs/plugin-go.md` と `docs/plugin-go-sqlite.md` で変わったのは、行の遷移を持つ効果のコメントと、ない側のケースを持つ、述語で決まる分類の判定関数で、このサンプルは、どちらも持たない（四つの分類は、どれも型で決まり、基底は何も出さない。その値がない側の `as else` のケースは、IR では `absent` に入るが、出力は変わらない）。
 - `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc emit` の出力と、バイト単位で同じ。
 
+### R6 で変えたこと
+
+R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」。`docs/decisions.md`「決めたこと」294〜344）を、文書とサンプルに、実装より先に入れた。**実装は、まだ、ない。** 文書の版（0.10）が、今の hozoc の版より先にあるので、`TestSamples` の `check` と `transpilers/*` は、飛ぶ（`../README.md`「飛ばす条件」）。`files` と `go` は、通る。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `server.hozo`、`store.hozo` | `const` を `val` に。`match` の頭を、丸括弧で囲み、`}` の後ろの `;` を、省く | `docs/grammar.md`「配線」 |
+| `server.hozo` | `getMyPage`（`GET /me/page`）: 名前を並べた、空の `val`。`disjoint`（ブロックのアームが一つ、文のアームが二つ。ブロックのアームの中で、`match` の値を、外の `val` に入れ、もう一方のアームは `throw`）。`disjoint for` と `collect`。葉 `summarize`、`myPage`。model `OrderSummary`、`MyPage` | `docs/check.md`「値の入れ物」「繰り返し」「disjoint」。`docs/decisions.md`「決めたこと」342 |
+| `server.hozo` | `resendNotices`（`POST /orders/notices`）: 直列の `for`。中に、例外を出しうる呼び出し（`mailer.send`）と、効果を持つ呼び出し（`store.recordNotice`）と、`collect` | 同上 |
+| `store.hozo` | `recordNotice`: 通知の記録を、一つ足す op（効果 `notifyUser` を呼ぶだけの配線） | — |
+| `gen/server/inner/wiring.go` | `// match (<対象> by <分類>)` の一行に、丸括弧。`GetMyPage` と `ResendNotices` の本体: 空の `val` は `var` の一行ずつ。`disjoint` は、`// disjoint` の一行と、一つの Go のブロックで、直列。`disjoint for` は、`// disjoint` の一行と `for`。集める文は `append` | `docs/plugin-go.md`「文」「match」 |
+| `gen/server/inner/ops.go`、`gen/server/ops.go`、`gen/server/inner/types.go`、`gen/server/types.go` | 足した op と model の分（`Ops`、`Leaves`、`StoreOps`、葉を呼ぶメソッド、型と、その別名） | `docs/plugin-go.md`「実装を受け取る口」「型」 |
+| `gen/server/inner/validate.go` | `MyPage` の `Validate`（`user` と、省略可能な `latest`） | `docs/plugin-go-valid.md`「Validate を持つ型」「model」 |
+| `gen/server/http.go` | 二つの経路（`GET /me/page`、`POST /orders/notices`） | `docs/plugin-go-http.md` |
+| `gen/store/ops.go`、`gen/store/wiring.go`、`gen/storemem/ops.go`、`gen/storemem/wiring.go` | `RecordNotice` | `docs/plugin-go.md`「配線の本体」 |
+| `app/leaves.go`、`app/server_test.go`、`app/both_test.go` | 葉 `Summarize`、`MyPage` の本体。`getMyPage` と `resendNotices` のテスト（集まる順、注文がないとき、アームの中の例外で止まること、繰り返しが、失敗した回で止まり、前の回の記録が残ること）。メソッドの一覧 | 「人が書いたもの」 |
+
+- `plugins/go-ratelimit` の、マニフェストと、テストの入力（`testdata/**`）は、変えていない: 版と、`.hozo` の書き換えは、実装と一緒に入れる（`views.json` が、実装の出す IR と、組になっているため）。
+- 期待する出力は、手で書いた。`go vet ./...` と `go test ./...` が、このモジュールで通る（サブテスト `go`）。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。
@@ -109,8 +129,8 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | ファイル | 名前空間 | 中身 |
 |---|---|---|
 | `type.hozo` | `type` | 共有の型（P6）: scalar、model、例外。`model PublicUser extends User { override hash: never; }`（P24〜P26）。表の model（`User`、`Session`、`Order`、`Notification`）のフィールドは、しまい方のデコレータ（`@db.text`、`@db.time`、`@db.json`）を一つずつ持つ |
-| `store.hozo` | `store` | DB の状態四つ（P5。どれも `@db.table`）と、それに触れる五つの `read`（`@db.find` が四つ、うち一つは `@db.latest("placedAt")` 付き。`@db.list` が一つ）と五つの効果（`@db.insert` が四つ、`@db.delete` が一つ）。九つの op（どれも `export`）は、`read` か効果を呼ぶだけの配線で、`placeOrder` は、二つの効果を呼ぶ配線に `@db.transaction`。読んだ結果の分類（`classify C of <op>`、`Case: <op> as T;`） |
-| `server.hozo` | `server` | HTTP の入口（`export` を付けた六つ）と、業務の流れ（配線）。人が書く op は七つ。入力の model のフィールドは、要求のどこから読むかを `@http.header("Authorization")` / `@http.query` / `@http.body` / `@http.bodyObj` で、項目がないときの扱いを `@http.required`（`lines`）/ `@http.default(1)`（`page`）で言う。`login` に `@rate.limited`（継ぎ目。P38）。トークンのない要求を断る分類 `Credential` |
+| `store.hozo` | `store` | DB の状態四つ（P5。どれも `@db.table`）と、それに触れる五つの `read`（`@db.find` が四つ、うち一つは `@db.latest("placedAt")` 付き。`@db.list` が一つ）と五つの効果（`@db.insert` が四つ、`@db.delete` が一つ）。十の op（どれも `export`）は、`read` か効果を呼ぶだけの配線で、`placeOrder` は、二つの効果を呼ぶ配線に `@db.transaction`。読んだ結果の分類（`classify C of <op>`、`Case: <op> as T;`） |
+| `server.hozo` | `server` | HTTP の入口（`export` を付けた八つ）と、業務の流れ（配線）。人が書く op は九つ。`getMyPage` は、`disjoint` と `disjoint for`、`resendNotices` は、直列の `for` と `collect` を使う。入力の model のフィールドは、要求のどこから読むかを `@http.header("Authorization")` / `@http.query` / `@http.body` / `@http.bodyObj` で、項目がないときの扱いを `@http.required`（`lines`）/ `@http.default(1)`（`page`）で言う。`login` に `@rate.limited`（継ぎ目。P38）。トークンのない要求を断る分類 `Credential` |
 | `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。`@smtp.sendMail` を付けた op `send`（`export`） |
 | `smtp.hozo` | `smtp` | メールを SMTP で送る仕組みの語彙。デコレータ `sendMail`。読むトランスパイラがないので、印（何も出ない。P37） |
 | `plugins/go-ratelimit/rate.hozo` | `rate` | サンプルの中のプラグイン `go-ratelimit` が提供する語彙: 例外 `LimitExceeded` と、デコレータ `limited`（「サンプルの中のプラグイン」） |
@@ -123,7 +143,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | 2 | `gen/rate` | `rate` | `go` | —（語彙 `rate` の例外の型だけ） |
 | 3 | `gen/store` | `store` | `go`、`go-sqlite` | `go-sqlite`: 四つの状態の単位の実装（五つの `read`、五つの効果、状態の形で決まる問い合わせのすべて）と、`@db.transaction` の継ぎ目の実装。op の中身（配線）は、基底 |
 | 4 | `gen/storemem` | `store` | `go` | 人: `app/memstore`（四つの状態の単位の実装。メモリの上）。op の中身（配線）は、基底 |
-| 5 | `gen/server` | `server` | `go`、`go-valid`、`go-http`、`go-ratelimit` | 人: `app/leaves.go`（葉の op 七つ）、`app/mailer.go`（`mailer.send`）、`app/limiter.go`（`@rate.limited` の数え方）。`go-ratelimit`: 継ぎ目の中身 |
+| 5 | `gen/server` | `server` | `go`、`go-valid`、`go-http`、`go-ratelimit` | 人: `app/leaves.go`（葉の op 九つ）、`app/mailer.go`（`mailer.send`）、`app/limiter.go`（`@rate.limited` の数え方）。`go-ratelimit`: 継ぎ目の中身 |
 
 - 五つの単位は、どれも基底 `go` を一つ持ち、相乗りの依存（`go-http` は `go` と `go-valid`、`go-ratelimit` は `go`）をすべて並べている（`docs/config.md`「基底と相乗り」）。
 - 使う型の名前空間は、どれも `go` の単位を持つ（同「型の置き場」）: `type` は単位 1、`rate` は単位 2。**`rate` は語彙の名前空間**で、その例外 `rate.LimitExceeded` を `server` の出力が使う（`login` の `Op.signature.exceptions` にある。同「型の置き場」の表の 3）ので、単位が要る。単位 2 がなければ CFG-22。
@@ -134,12 +154,12 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 別の名前空間から呼べる op には `export` を付ける（P33）。書く位置は、説明のコメントとデコレータの後ろ、`op` のすぐ前（`server.hozo:43-45` の `@http.post("/login")`、`@rate.limited`、`export op login(…)`）。付けていない op は内部で、別の名前空間から呼べばエラー。対象は op だけで、型、例外、分類、効果、デコレータは、今までどおりどこからでも参照できる（`server` は `store.Registration` や `type.Unauthorized` を、そのまま書く）。
 
-この仕様の二十六の op のうち、`export` を付けたのは十六。付けたのは、**その名前空間の外に、呼ぶ者がいる op だけ**。
+この仕様の三十一の op のうち、`export` を付けたのは十九。付けたのは、**その名前空間の外に、呼ぶ者がいる op だけ**。
 
 | 名前空間 | `export` を付けた op | 外の呼び手 | 内部の op |
 |---|---|---|---|
-| `server` | `login`、`logout`、`getMe`、`getOrders`、`getLatestOrder`、`placeOrder`（六つ） | `go-http` のハンドラ（`@http.*` の入口）。仕様の中に、呼ぶ名前空間はない | 配線 `issueSession`、`authenticate`、`sessionOf` と、人が書く葉 `checkPassword`、`newSession`、`toPublicUser`、`requireFresh`、`pageOf`、`newOrder`、`composeNotice`（十） |
-| `store` | `findUser`、`findUserById`、`findSession`、`listOrders`、`latestOrder`、`addSession`、`removeSession`、`placeOrder`（八つ） | `server` の配線 | なし（`read` と効果は op ではなく、`export` を付けられない。使えるのは `store` の配線だけ） |
+| `server` | `login`、`logout`、`getMe`、`getOrders`、`getLatestOrder`、`getMyPage`、`placeOrder`、`resendNotices`（八つ） | `go-http` のハンドラ（`@http.*` の入口）。仕様の中に、呼ぶ名前空間はない | 配線 `issueSession`、`authenticate`、`sessionOf` と、人が書く葉 `checkPassword`、`newSession`、`toPublicUser`、`requireFresh`、`pageOf`、`summarize`、`myPage`、`newOrder`、`composeNotice`（十二） |
+| `store` | `findUser`、`findUserById`、`findSession`、`listOrders`、`latestOrder`、`addSession`、`removeSession`、`placeOrder`、`recordNotice`（九つ） | `server` の配線 | なし（`read` と効果は op ではなく、`export` を付けられない。使えるのは `store` の配線だけ） |
 | `store` | `addUser` | 人が書くコード（二つの main と、テスト）。仕様の中に、呼ぶ名前空間はない | |
 | `mailer` | `send` | `server` の配線 `placeOrder` | なし |
 

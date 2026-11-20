@@ -21,3 +21,9 @@ type GetOrdersInput = inner.GetOrdersInput
 
 // PlaceOrderInput は注文の入力
 type PlaceOrderInput = inner.PlaceOrderInput
+
+// OrderSummary は注文の、一行の要約
+type OrderSummary = inner.OrderSummary
+
+// MyPage は自分のページ
+type MyPage = inner.MyPage
