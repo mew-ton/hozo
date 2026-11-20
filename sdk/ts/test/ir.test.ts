@@ -107,6 +107,10 @@ function walkArgValue(v: ArgValue): void {
       assert.equal(typeof v.union, "string");
       assert.equal(typeof v.arm, "string");
       return;
+    case "case":
+      assert.equal(typeof v.classify, "string");
+      assert.equal(typeof v.case, "string");
+      return;
     case "list":
       v.items.forEach(walkArgValue);
       return;
@@ -327,8 +331,19 @@ function walkExpr(e: Expr): void {
 function walkStatement(s: Statement): void {
   seen.add(`statement:${s.kind}`);
   switch (s.kind) {
-    case "const":
+    case "val":
+      if (s.expr !== undefined) walkExpr(s.expr);
+      return;
+    case "assign":
+    case "collect":
       walkExpr(s.expr);
+      return;
+    case "disjoint":
+      s.arms.forEach((arm) => arm.statements.forEach(walkStatement));
+      return;
+    case "for":
+      walkAtom(s.of);
+      s.body.forEach(walkStatement);
       return;
     case "return":
       walkExpr(s.expr);
@@ -545,7 +560,7 @@ test("goldens cover every kind of every union", () => {
     ...["call", "atom", "none", "throw"].map((k) => `armBody:${k}`),
     ...["value", "state"].map((k) => `narrowing:${k}`),
     ...["call", "match", "atom"].map((k) => `expr:${k}`),
-    ...["const", "return", "call", "match"].map((k) => `statement:${k}`),
+    ...["val", "assign", "collect", "return", "call", "match", "disjoint", "for"].map((k) => `statement:${k}`),
     ...["list", "nullable", "single"].map((k) => `stateShape:${k}`),
     ...["builtin", "transition"].map((k) => `effectTarget:${k}`),
     ...["any", "list"].map((k) => `caseSet:${k}`),

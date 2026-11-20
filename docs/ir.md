@@ -318,6 +318,7 @@ type Statement =
                                   // disjoint は、前に `disjoint` を書いたか（回どうしが、互いに触れない）
 
 interface Arm {                   // disjoint のアーム。ブロックでも、文の一つでも、文の並びにする（文の一つなら、要素が一つ）
+  block: boolean;                 // ブロック `{ … }` で書いたか（中の文が一つでも true。出力の形に効く: docs/plugin-go.md「文」）
   statements: Statement[];
   span: Span;
 }
@@ -444,7 +445,7 @@ interface Bind {
 | ケースの `X as else`（残りのケース） | `as` の `CaseTyping`。`by` は `else`、`type` は、そのケースでの対象の型（`docs/types.md`「残りのケースでの対象の型」）。`state` は上の行と同じ。そのケースは、ほかのケースと同じに `cases` に入る |
 | 配線の値の位置の、状態の名前（`f(token)`、`token.value`、`match (token by nullable)`） | `Atom` の `state`。修飾して書いても同じ |
 | `val a, b: T;`（名前を並べた、空の宣言） | 名前ごとの `val` の文（書かれた順）。`span` は、それぞれの名前（と、書いた型） |
-| `disjoint` の、文の一つのアーム（`a = f(x);`） | `statements` が一つの `Arm` |
+| `disjoint` の、文の一つのアーム（`a = f(x);`） | `statements` が一つで、`block` が `false` の `Arm`。ブロックで書いた、文が一つのアーム（`{ a = f(x); }`）は、`block` が `true` |
 | ケースの `X as none`（ない側のケース） | `as` の `CaseTyping`。`by` は `none`、`type` は対象の型のまま。`Classify.absent` に、そのケースの名前。ない側のケースを `X as else` で書いた分類（`docs/check.md`「ない側のケース」の表の二行目）も、`absent` を持つ（`by` は `else` のまま） |
 | `effect e(o: T) on s.put as C.A, C.B -> C.D` | `row` に `{ param: "o", classify: C の FQN, from: ["A", "B"], to: "D" }`。前の `any` は `from: "any"`、後ろの `else` は `to` なし |
 | `effect e(o: T) on s.post as C.X`、`… as C.N -> C.X`（N は、ない側のケース） | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "X" }`。`post` の前は、IR に残さない（入る前の行は、ない） |

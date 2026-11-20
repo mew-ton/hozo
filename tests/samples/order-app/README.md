@@ -695,7 +695,7 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
 
 ## R6 で変えたこと
 
-R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」）を、実装より先に、このサンプルに入れた。**実装は、まだ、ない**: 今の hozoc は、この書き方を読めず、`TestSamples` の `check` は、文書の版が先にあることを理由に、飛ぶ（`../README.md`「飛ばす条件」）。新しい書き方の仕様は、hozoc では、まだ、確かめていない。
+R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」）を、実装より先に、このサンプルに入れた。実装は、その後に入り、新しい書き方の仕様は、`check` を通る（「確かめ方」）。
 
 | 変えたもの | 変えたこと |
 |---|---|
@@ -711,5 +711,5 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 
 ## 確かめ方
 
-- このディレクトリで `go run ../../../cmd/hozoc check`。R6 の書き方にする前の結果は `0 errors, 0 warnings`。R6 の実装が入るまで、今の hozoc は、この仕様を、読めない（「R6 で変えたこと」）。
+- このディレクトリで `go run ../../../cmd/hozoc check`。結果は `0 errors, 0 warnings`。
 - リポジトリで `go test ./tests/ -run TestSamples/order-app -count=1 -v`。走るのは `check` だけ（`../README.md`「仕様だけのサンプル」）。

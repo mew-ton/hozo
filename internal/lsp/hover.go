@@ -387,7 +387,14 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 	}
 	if !(len(d.Targets) == 1 && d.Targets[0] == ir.TargetOp) && len(d.Targets) > 0 {
 		var ts []string
+		cases := 0
 		for _, t := range d.Targets {
+			// 分類のケースは、絞り（Decorator.caseTargets。Targets の "case" と、同じ順）ごとに書く
+			if t == ir.TargetCase && cases < len(d.CaseTargets) {
+				ts = append(ts, r.caseKind(d.CaseTargets[cases]))
+				cases++
+				continue
+			}
 			ts = append(ts, string(t))
 		}
 		b.WriteString(" for " + strings.Join(ts, " | "))
@@ -446,6 +453,18 @@ func (r *renderer) throwsClause(c ir.ThrowsClause) string {
 	return s
 }
 
+// caseKind は、デコレータの宣言の、分類のケース（docs/grammar.md「decorator の宣言」の CaseKind）。
+func (r *renderer) caseKind(k ir.CaseKind) string {
+	s := "classify"
+	if k.Classify != "" {
+		s += " " + r.rel(k.Classify)
+	}
+	if k.Subject != "" {
+		s += " of " + k.Subject
+	}
+	return s + " case"
+}
+
 // rels は節の並び（throws / catches の例外）を Hozo の構文で書く。区切りは `,`（docs/grammar.md「op」）。
 func (r *renderer) rels(fqns []string) string {
 	var out []string
@@ -472,6 +491,9 @@ func (r *renderer) paramType(p ir.Param) string {
 		s = strings.Join(ts, " | ")
 	case ir.AnyParam:
 		s = "any " + string(t.Of)
+		if t.Case != nil {
+			s = "any " + r.caseKind(*t.Case)
+		}
 		if t.On != nil {
 			s += " on " + r.rel(t.On.State) + "." + string(t.On.Operation)
 		}
@@ -546,6 +568,8 @@ func (r *renderer) argValue(v ir.ArgValue) string {
 		return literal(v.Literal)
 	case ir.RefValue:
 		return r.rel(v.Target)
+	case ir.CaseValue:
+		return r.rel(v.Classify) + "." + v.Case
 	case ir.RefsValue:
 		// 一つの引数に渡した宣言の集合の区切りは `|`（docs/grammar.md「デコレータの適用」）
 		names := make([]string, len(v.Targets))

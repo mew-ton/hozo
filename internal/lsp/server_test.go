@@ -1398,3 +1398,101 @@ func TestCarryingDecorators(t *testing.T) {
 	}
 	c.shutdown()
 }
+
+// TestValAndCaseTargets は、R6 の言語の部分の、飛び先とホバー（docs/lsp.md「定義へ移動」の表）: val と for の変数（値を入れる文と、
+// 集める文の左を含む）、デコレータの引数の分類のケース、デコレータの宣言の分類のケース。
+func TestValAndCaseTargets(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace a {
+  classify Actor of never {
+    @human Customer;
+    Clerk;
+  }
+  decorator human for classify Actor of never case;
+  decorator of(who: any classify of never case) for op;
+  model Order { id: string; }
+  model Note { id: string; }
+  state orders: list<Order>;
+  read all(): Order[] on orders;
+  op note(order: Order): Note;
+  op count(notes: Note[], first: Order[]): int;
+  @of(Actor.Clerk)
+  op run(): int {
+    val found, again;
+    disjoint {
+      found = all();
+      again = all();
+    }
+    val notes: Note[];
+    disjoint for (val each of found) {
+      notes collect note(each);
+    }
+    return count(notes, again);
+  }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Errorf("診断 %s: %s", d.Code, d.Message)
+		}
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	for _, tt := range []struct {
+		what   string
+		pos    protocol.TextDocumentPositionParams
+		target string // 定義の位置（この文字列の先頭から skip 文字目）
+		skip   int
+		hover  []string
+	}{
+		{"名前を並べた val の、二つめの名前", at("val found, again;", len("val found, ")), "again;\n    disjoint", 0, []string{"val again: Order[]"}},
+		{"値を入れる文の左", at("found = all();", 0), "found, again;", 0, []string{"val found: Order[]"}},
+		{"for の頭の、並び", at("of found) {", len("of ")), "found, again;", 0, []string{"val found: Order[]"}},
+		{"for の変数の宣言", at("val each of", len("val ")), "each of found", 0, []string{"val each: Order"}},
+		{"for の変数を読む所", at("note(each);", len("note(")), "each of found", 0, []string{"val each: Order"}},
+		{"集める文の左", at("notes collect", 0), "notes: Note[];", 0, []string{"val notes: Note[]"}},
+		{"集めた val を読む所", at("count(notes, again);", len("count(")), "notes: Note[];", 0, []string{"val notes: Note[]"}},
+		{"デコレータの引数の、分類", at("@of(Actor.Clerk)", len("@of(")), "Actor of never {", 0, []string{"classify Actor of never"}},
+		{"デコレータの引数の、ケース", at("@of(Actor.Clerk)", len("@of(Actor.")), "Clerk;", 0, []string{"Clerk"}},
+		{"デコレータの宣言の、分類の名前", at("for classify Actor of never case;", len("for classify ")), "Actor of never {", 0, []string{"classify Actor of never"}},
+		{"ケースの前のデコレータ", at("@human Customer;", 1), "decorator human", len("decorator "), []string{"decorator human for classify Actor of never case"}},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, tt.pos, &hov)
+		if hov == nil {
+			t.Errorf("hover(%s) = nil", tt.what)
+		} else {
+			for _, want := range tt.hover {
+				if !strings.Contains(hov.Contents.Value, want) {
+					t.Errorf("hover(%s) に %q がない:\n%s", tt.what, want, hov.Contents.Value)
+				}
+			}
+		}
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, tt.pos, &loc)
+		if want := shift(positionOf(t, enc, text, tt.target, 0), tt.skip); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
+		}
+	}
+	// 宣言を持たない語は null（docs/lsp.md「定義へ移動」の表）
+	for _, tt := range []struct {
+		what string
+		pos  protocol.TextDocumentPositionParams
+	}{
+		{"デコレータの宣言の case", at("of never case;", len("of never "))},
+		{"デコレータの宣言の never", at("for classify Actor of never case;", len("for classify Actor of "))},
+		{"引数の種類の classify", at("any classify of never case", len("any "))},
+	} {
+		var none *protocol.Location
+		c.result(protocol.MethodDefinition, tt.pos, &none)
+		if none != nil {
+			t.Errorf("definition(%s) = %+v, want nil", tt.what, none)
+		}
+	}
+}

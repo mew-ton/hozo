@@ -105,6 +105,18 @@ namespace app {
     No: User? as else;
   }
   decorator mark for model | op;
+
+  // 「分類」対象のない分類と、そのケースに付けたデコレータ、ケースを引数に取るデコレータは、何も出さない
+  /** 担い手 */
+  classify Actor of never {
+    /** 客 */
+    @human Customer;
+    Clerk;
+  }
+  decorator human for classify Actor of never case;
+  decorator seenBy(who: any classify of never case) for model;
+  @seenBy(Actor.Clerk)
+  model Receipt { id: Id; }
 }
 
 // 説明のない名前空間

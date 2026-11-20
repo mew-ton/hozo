@@ -186,3 +186,8 @@ const EffectAddUser runtime.Effect = "app.addUser"
 // EffectClearUsers は effect app.clearUsers。
 // on app.users: HasItems -> Empty
 const EffectClearUsers runtime.Effect = "app.clearUsers"
+
+// Receipt は model app.Receipt。
+type Receipt struct {
+	Id Id `json:"id"`
+}

@@ -20,6 +20,8 @@ namespace app {
   // 葉: 純粋で throws がない（それでも、メソッドは ctx を取り、error を返す。docs/plugin-go.md「op の形」）
   export op make(id: Id): Item;
   export op note(item: Item);
+  export op pick(a: Item?, b: Item?): Item?;
+  export op keep(items: Item?[], ids: Id[]);
   // 葉: 純粋で throws がある（同じ形）
   export op parse(text: string): Id throws Broken;
   // never を返す op
@@ -94,6 +96,88 @@ namespace app {
   export op endQuiet(item: Item)
   {
     note(item);
+  }
+
+  // 「文」val x;（名前を並べた宣言は、名前ごとに一行）、x = 呼び出し（その位置で err が見えていないので、直前に var err error）、
+  // 型をそろえる x = 呼び出し（Item → Item?）、x = 値、読まれていない空の val（WIRE-8: 宣言の直後に _ = x）
+  @mark export op fill(id: Id): Item?
+  {
+    val a, b: Item?, unused: Item;
+    a = load(id);
+    b = make(id);
+    unused = a;
+    return b;
+  }
+
+  // 「文」x = 呼び出し: 上の行に、err を作る文がある（var err error を置かない）
+  @mark export op fillAfterCall(id: Id): Item
+  {
+    val a = load(id);
+    val b;
+    b = make(a.id);
+    return b;
+  }
+
+  // 「文」型を書いた val: 値の Go の型が同じ（x := 値）、違う（var x T = 値）、呼び出しの型をそろえる（v<n> に受ける）
+  @mark export op typed(id: Id): Item?
+  {
+    val a = make(id);
+    val same: Item = a;
+    val wide: Item? = a;
+    val called: Item? = load(id);
+    note(same);
+    return pick(wide, called);
+  }
+
+  // 「文」for（変数を読む: for _, v := range。読まない: for range）、xs collect 呼び出し、型をそろえる xs collect 呼び出し、
+  // xs collect 値
+  @mark export op each(ids: Id[]): Item[]
+  {
+    val items: Item[];
+    val wide: Item?[];
+    val seen: Id[];
+    for (val id of ids) {
+      items collect load(id);
+      wide collect make(id);
+      seen collect id;
+    }
+    for (val id of seen) {
+      touch();
+    }
+    keep(wide, seen);
+    return items;
+  }
+
+  // 「文」disjoint: 文の一つのアーム（そのまま）と、ブロックのアーム（Go のブロック。文が一つのブロックも）。disjoint for。
+  // 「match」x = match、xs collect match
+  @mark export op apart(id: Id, other: Id, ids: Id[]): Item[]
+  {
+    val a, b, c;
+    disjoint {
+      a = load(id);
+      {
+        c = make(id);
+      }
+      {
+        val found = find(other);
+        b = match (found by nullable) {
+          Empty    => make(other);
+          HasItems => found;
+        };
+      }
+    }
+    note(a);
+    note(b);
+    note(c);
+    val items: Item[];
+    disjoint for (val each of ids) {
+      val found = find(each);
+      items collect match (found by nullable) {
+        Empty    => make(each);
+        HasItems => found;
+      };
+    }
+    return items;
   }
 
   // 「呼び出し」純粋で throws がある op（ctx を渡し、失敗の扱いを置く）、渡されていない省略可能な引数は nil、別の名前空間の op

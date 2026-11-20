@@ -1201,7 +1201,7 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 		b.depth++
 		b.push()
 		for _, arm := range x.Arms {
-			if len(arm.Statements) == 1 && !isBlockArm(arm) {
+			if !arm.Block && len(arm.Statements) == 1 {
 				b.stmt(arm.Statements[0], nil)
 				continue
 			}
@@ -1247,16 +1247,6 @@ func (b *bodyGen) block(stmts []ir.Statement) {
 	for i, s := range stmts {
 		b.stmt(s, stmts[i+1:])
 	}
-}
-
-// isBlockArm は、disjoint のアームが、ブロックで書かれたか: 文が一つでないか、その一つが val の宣言（文の一つのアームには、
-// val の宣言は書けないので、val で始まるアームは、ブロック）。
-func isBlockArm(arm ir.Arm) bool {
-	if len(arm.Statements) != 1 {
-		return true
-	}
-	_, isVal := arm.Statements[0].(ir.ValStmt)
-	return isVal
 }
 
 // markUnused は、束縛が下の行で使われていなければ `_ = x` を足す（WIRE-8 は warning。Go は、使わない変数をコンパイルしない）。

@@ -27,6 +27,12 @@ type Ops interface {
 	// Note は op app.note。
 	Note(ctx context.Context, item Item) error
 
+	// Pick は op app.pick。
+	Pick(ctx context.Context, a *Item, b *Item) (*Item, error)
+
+	// Keep は op app.keep。
+	Keep(ctx context.Context, items []*Item, ids []Id) error
+
 	// Parse は op app.parse。
 	//
 	// Throws: app.Broken
@@ -73,6 +79,21 @@ type Ops interface {
 
 	// EndQuiet は op app.endQuiet。
 	EndQuiet(ctx context.Context, item Item) error
+
+	// Fill は op app.fill。
+	Fill(ctx context.Context, id Id) (*Item, error)
+
+	// FillAfterCall は op app.fillAfterCall。
+	FillAfterCall(ctx context.Context, id Id) (Item, error)
+
+	// Typed は op app.typed。
+	Typed(ctx context.Context, id Id) (*Item, error)
+
+	// Each は op app.each。
+	Each(ctx context.Context, ids []Id) ([]Item, error)
+
+	// Apart は op app.apart。
+	Apart(ctx context.Context, id Id, other Id, ids []Id) ([]Item, error)
 
 	// Calls は op app.calls。
 	//
@@ -164,6 +185,12 @@ type Leaves interface {
 	// Note は op app.note。
 	Note(ctx context.Context, item Item) error
 
+	// Pick は op app.pick。
+	Pick(ctx context.Context, a *Item, b *Item) (*Item, error)
+
+	// Keep は op app.keep。
+	Keep(ctx context.Context, items []*Item, ids []Id) error
+
 	// Parse は op app.parse。
 	//
 	// Throws: app.Broken
@@ -241,6 +268,14 @@ func (o *ops) Make(ctx context.Context, id Id) (Item, error) {
 
 func (o *ops) Note(ctx context.Context, item Item) error {
 	return o.leaves.Note(ctx, item)
+}
+
+func (o *ops) Pick(ctx context.Context, a *Item, b *Item) (*Item, error) {
+	return o.leaves.Pick(ctx, a, b)
+}
+
+func (o *ops) Keep(ctx context.Context, items []*Item, ids []Id) error {
+	return o.leaves.Keep(ctx, items, ids)
 }
 
 func (o *ops) Parse(ctx context.Context, text string) (Id, error) {

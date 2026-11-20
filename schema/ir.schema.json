@@ -104,6 +104,9 @@
     "Arm": {
       "additionalProperties": false,
       "properties": {
+        "block": {
+          "type": "boolean"
+        },
         "span": {
           "$ref": "#/$defs/Span"
         },
@@ -115,6 +118,7 @@
         }
       },
       "required": [
+        "block",
         "statements",
         "span"
       ],

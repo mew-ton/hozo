@@ -175,8 +175,8 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 		`{"kind":"assign","name":"x","expr":{"kind":"atom","atom":{"kind":"none",`+spJSON+`}},`+spJSON+`}`)
 	unionRoundTrip(t, Statement(CollectStmt{Name: "xs", Expr: AtomExpr{Atom: NoneAtom{Span: sp()}}, Span: sp()}), UnmarshalStatement,
 		`{"kind":"collect","name":"xs","expr":{"kind":"atom","atom":{"kind":"none",`+spJSON+`}},`+spJSON+`}`)
-	unionRoundTrip(t, Statement(DisjointStmt{Arms: []Arm{{Statements: []Statement{CallStmt{Call: call, Span: sp()}}, Span: sp()}, {Statements: []Statement{CallStmt{Call: call, Span: sp()}}, Span: sp()}}, Span: sp()}), UnmarshalStatement,
-		`{"kind":"disjoint","arms":[{"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`},{"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`}],`+spJSON+`}`)
+	unionRoundTrip(t, Statement(DisjointStmt{Arms: []Arm{{Block: true, Statements: []Statement{CallStmt{Call: call, Span: sp()}}, Span: sp()}, {Statements: []Statement{CallStmt{Call: call, Span: sp()}}, Span: sp()}}, Span: sp()}), UnmarshalStatement,
+		`{"kind":"disjoint","arms":[{"block":true,"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`},{"block":false,"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`}],`+spJSON+`}`)
 	unionRoundTrip(t, Statement(ForStmt{Var: "x", VarType: String(), Of: NameAtom{Path: []string{"xs"}, Span: sp()}, Body: []Statement{CallStmt{Call: call, Span: sp()}}, Disjoint: true, Span: sp()}), UnmarshalStatement,
 		`{"kind":"for","var":"x","varType":{"kind":"core","name":"string"},"of":{"kind":"name","path":["xs"],`+spJSON+`},"body":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],"disjoint":true,`+spJSON+`}`)
 	unionRoundTrip(t, Statement(ReturnStmt{Expr: CallExpr{Call: call}, Span: sp()}), UnmarshalStatement,

@@ -83,6 +83,8 @@ var statementsLeaves = map[string]string{
 	"Find":       "func (leaves) Find(context.Context, app.Id, *int64, *string) (*app.Item, error) { return nil, nil }",
 	"Make":       "func (leaves) Make(context.Context, app.Id) (app.Item, error) { return app.Item{}, nil }",
 	"Note":       "func (leaves) Note(context.Context, app.Item) error { return nil }",
+	"Pick":       "func (leaves) Pick(context.Context, *app.Item, *app.Item) (*app.Item, error) { return nil, nil }",
+	"Keep":       "func (leaves) Keep(context.Context, []*app.Item, []app.Id) error { return nil }",
 	"Parse":      "func (leaves) Parse(context.Context, string) (app.Id, error) { return \"\", nil }",
 	"AsTime":     "func (leaves) AsTime(context.Context) (time.Time, error) { return time.Time{}, nil }",
 	"AsDuration": "func (leaves) AsDuration(context.Context) (time.Duration, error) { return 0, nil }",

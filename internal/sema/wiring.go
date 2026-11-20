@@ -545,7 +545,7 @@ func (a *analyzer) lowerDisjoint(w *wiring, s *ast.DisjointStmt) ir.Statement {
 	for i, arm := range s.Arms {
 		f.arm, f.assigned = i, nil
 		stmts := a.lowerBlock(w, arm.Stmts)
-		out.Arms = append(out.Arms, ir.Arm{Statements: stmts, Span: a.irSpan(arm.Span)})
+		out.Arms = append(out.Arms, ir.Arm{Block: arm.Block, Statements: stmts, Span: a.irSpan(arm.Span)})
 		// 次のアームからは、このアームが入れた val は、済んでいない
 		for _, b := range f.assigned {
 			b.unassigned = true

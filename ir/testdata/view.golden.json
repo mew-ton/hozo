@@ -3382,6 +3382,7 @@
                   "kind": "disjoint",
                   "arms": [
                     {
+                      "block": false,
                       "statements": [
                         {
                           "kind": "assign",
@@ -3455,6 +3456,7 @@
                       }
                     },
                     {
+                      "block": false,
                       "statements": [
                         {
                           "kind": "call",

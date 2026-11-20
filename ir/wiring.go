@@ -75,6 +75,8 @@ type DisjointStmt struct {
 
 // Arm は disjoint のアーム（docs/ir.md「配線」の Arm）。文の一つのアームは、Statements が一つ。
 type Arm struct {
+	// Block は、ブロック `{ … }` で書いたか（中の文が一つでも true）。
+	Block      bool        `json:"block"`
 	Statements []Statement `json:"statements"`
 	Span       Span        `json:"span"`
 }

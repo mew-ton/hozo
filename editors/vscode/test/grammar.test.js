@@ -82,10 +82,41 @@ test('予約語（宣言の頭、節の頭、核の型、リテラル）', () =>
   const b = linesOf(files.browser);
   assertScope(b, 'bind token to server.*;', 'bind', 'keyword.declaration.hozo');
   assertScope(b, 'bind token to server.*;', 'to', 'keyword.control.hozo');
-  assertScope(b, 'const line = server.addToCart', 'const', 'keyword.control.hozo');
-  assertScope(b, 'const warranty = match item by WarrantyKind {', 'match', 'keyword.control.hozo');
-  assertScope(b, 'const warranty = match item by WarrantyKind {', 'by', 'keyword.control.hozo');
+  assertScope(b, 'val line = server.addToCart', 'val', 'keyword.control.hozo');
+  assertScope(b, 'val warranty = match (item by WarrantyKind) {', 'match', 'keyword.control.hozo');
+  assertScope(b, 'val warranty = match (item by WarrantyKind) {', 'by', 'keyword.control.hozo');
   assertScope(b, 'NoWarranty => none;', 'none', 'constant.language.hozo');
+  // 値の入れ物、disjoint、繰り返し、集める文（docs/grammar.md「配線」）。なくした const は、予約語として塗らない
+  const w = tokensOf([
+    'val user, orders;',
+    'disjoint {',
+    '  orders = store.listOrders(session.userId);',
+    '}',
+    'val summaries: OrderSummary[];',
+    'disjoint for (val order of orders) {',
+    '  summaries collect summarize(order);',
+    '}',
+    'const gone = 1;',
+  ].join('\n'));
+  assertScope(w, 'val user, orders;', 'val', 'keyword.control.hozo');
+  assertScope(w, 'disjoint {', 'disjoint', 'keyword.control.hozo');
+  assertScope(w, 'val summaries', 'OrderSummary', 'entity.name.type.hozo');
+  for (const word of ['disjoint', 'for', 'val', 'of']) {
+    assertScope(w, 'disjoint for', word, 'keyword.control.hozo');
+  }
+  assertScope(w, 'summaries collect', 'collect', 'keyword.control.hozo');
+  const gone = w.find((l) => l.text.includes('const gone'));
+  assert.ok(!gone.tokens.some((tk) => tk.text.includes('const') && tk.scopes.length > 1), 'なくした const に scope が付いている');
+  // 対象のない分類と、ケースを対象にするデコレータ（docs/grammar.md「classify」「decorator の宣言」）
+  const c = tokensOf([
+    'classify Actor of never { @actor.human Customer; }',
+    'decorator human for classify Actor of never case;',
+    'decorator by(who: any classify of never case) for op;',
+  ].join('\n'));
+  assertScope(c, 'classify Actor', 'never', 'support.type.primitive.hozo');
+  assertScope(c, 'classify Actor', '@actor.human', 'entity.name.function.decorator.hozo');
+  assertScope(c, 'decorator human', 'case', 'keyword.control.hozo');
+  assertScope(c, 'decorator by', 'case', 'keyword.control.hozo');
   assertScope(b, 'Unavailable => none;', 'none', 'constant.language.hozo');
   assertScope(b, 'return plan;', 'return', 'keyword.control.hozo');
   const t = tokensOf('@flags(true, off: false) model X { a: boolean; }');
@@ -133,10 +164,10 @@ test('フィールド名の位置の予約語は予約語として塗らない',
   assertScope(f, 'string: string;', 'string', prop, 0);
   assertScope(f, 'string: string;', 'string', 'support.type.primitive.hozo', 1);
   // レコードリテラルのキーと値のパス
-  const r = tokensOf('const saved = store({ op: res.op, state: res.state, match: res.match });');
+  const r = tokensOf('val saved = store({ op: res.op, state: res.state, match: res.match });');
   for (const w of ['op', 'state', 'match']) {
-    assertScope(r, 'const saved', w, prop, 0);
-    assertScope(r, 'const saved', w, prop, 1);
+    assertScope(r, 'val saved', w, prop, 0);
+    assertScope(r, 'val saved', w, prop, 1);
   }
   const c = tokensOf('const name = label(res.state, res.op);');
   assertScope(c, 'const name', 'state', prop);
@@ -223,9 +254,9 @@ test('型の位置の名前', () => {
   assertScope(b, 'state token: nullable<server.Token>;', 'nullable', 'support.type.primitive.hozo');
   // match の by の後ろの標準の分類の名前も同じ予約語
   const st = linesOf(files.state);
-  assertScope(st, 'match token by nullable {', 'nullable', 'support.type.primitive.hozo');
-  assertScope(st, 'match carts by list {', 'list', 'support.type.primitive.hozo');
-  assertScope(st, 'match carts by list {', 'by', 'keyword.control.hozo');
+  assertScope(st, 'match (token by nullable) {', 'nullable', 'support.type.primitive.hozo');
+  assertScope(st, 'match (carts by list) {', 'list', 'support.type.primitive.hozo');
+  assertScope(st, 'match (carts by list) {', 'by', 'keyword.control.hozo');
   assertScope(b, 'state query: single<Record<string, string[]>>;', 'Record', 'support.type.primitive.hozo');
   assertScope(b, 'state query: single<Record<string, string[]>>;', 'string', 'support.type.primitive.hozo', 1);
   assertScope(b, 'op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>', 'WarrantyKind.Yamada', 'entity.name.type.hozo');
@@ -278,7 +309,7 @@ test('修飾（export、override）と、reads / as / throw / never', () => {
   const field = tokensOf('model M { else: string; }');
   assertScope(field, 'model M', 'else', 'variable.other.property.hozo');
   // match の by の後ろの、修飾した分類の名前
-  const by = tokensOf('    return match user by store.Registration {');
+  const by = tokensOf('    return match (user by store.Registration) {');
   assertScope(by, 'return match', 'by', 'keyword.control.hozo');
   assertScope(by, 'return match', 'store.Registration', 'entity.name.type.hozo');
   // アームの throw と、その例外
@@ -387,9 +418,9 @@ test('形の語と、標準の分類のケース', () => {
   const st = linesOf(files.state);
   assertScope(st, 'state token: nullable<Token>;', 'nullable', 'support.type.primitive.hozo');
   assertScope(st, 'state title: single<string>;', 'single', 'support.type.primitive.hozo');
-  assertScope(st, 'match token by nullable {', 'match', 'keyword.control.hozo');
-  assertScope(st, 'match token by nullable {', 'by', 'keyword.control.hozo');
-  assertScope(st, 'match by Checkout {', 'by', 'keyword.control.hozo');
+  assertScope(st, 'match (token by nullable) {', 'match', 'keyword.control.hozo');
+  assertScope(st, 'match (token by nullable) {', 'by', 'keyword.control.hozo');
+  assertScope(st, 'match (by Checkout) {', 'by', 'keyword.control.hozo');
   // 状態の分類の対象（of の後ろ）は小文字の名前なので型にしない
   assertScope(st, 'classify Checkout of carts, orders {', 'of', 'keyword.control.hozo');
   const of = st.find((l) => l.text.includes('classify Checkout of carts, orders {'));

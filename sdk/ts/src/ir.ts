@@ -14,7 +14,7 @@ export type Decl =
 /**
  * デコレータの引数の値の種類（docs/ir.md「デコレータの適用」）。kind で分ける。
  */
-export type ArgValue = LiteralValue | RefValue | RefsValue | VariantValue | ListValue;
+export type ArgValue = LiteralValue | RefValue | RefsValue | VariantValue | CaseValue | ListValue;
 /**
  * リテラル（docs/ir.md「配線」）。duration は整数のナノ秒。
  */
@@ -65,7 +65,8 @@ export type RelationKind = "prevents" | "keeps";
 /**
  * 配線の文（docs/ir.md「配線」）。kind で分ける。
  */
-export type Statement = ConstStmt | ReturnStmt | CallStmt | MatchStmt;
+export type Statement =
+  ValStmt | AssignStmt | CollectStmt | ReturnStmt | CallStmt | MatchStmt | DisjointStmt | ForStmt;
 /**
  * 式（docs/ir.md「配線」）。kind で分ける。
  */
@@ -197,6 +198,11 @@ export interface VariantValue {
   arm: string;
   kind: "variant";
   union: string;
+}
+export interface CaseValue {
+  case: string;
+  classify: string;
+  kind: "case";
 }
 export interface ListValue {
   items: ArgValue[];
@@ -437,6 +443,7 @@ export interface Classify {
  */
 export interface ClassifyCase {
   as: CaseTyping[];
+  decorators: Application[];
   description?: Doc;
   name: string;
   span: Span;
@@ -477,6 +484,7 @@ export interface StatesSubject {
  */
 export interface Decorator {
   alias?: DecoratorAlias;
+  caseTargets: CaseKind[];
   catches: CatchesClause[];
   decorators: Application[];
   description?: Doc;
@@ -497,6 +505,10 @@ export interface Decorator {
 export interface DecoratorAlias {
   args: Arg[];
   target: string;
+}
+export interface CaseKind {
+  classify?: string;
+  subject?: string;
 }
 /**
  * catches の一節（docs/ir.md「decorator」）。
@@ -535,6 +547,7 @@ export interface TypeParam {
  * `any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind "any"）。
  */
 export interface AnyParam {
+  case?: CaseKind;
   kind: "any";
   of: AnyOf;
   on?: EffectOn;
@@ -592,11 +605,13 @@ export interface Op {
 export interface Wiring {
   statements: Statement[];
 }
-export interface ConstStmt {
-  expr: Expr;
-  kind: "const";
+export interface ValStmt {
+  collected: boolean;
+  expr?: Expr;
+  kind: "val";
   name: string;
   span: Span;
+  type?: Type;
 }
 export interface CallExpr {
   call: Call;
@@ -731,6 +746,18 @@ export interface ValueSubject {
 export interface ClassifyOwnedSubject {
   kind: "classify";
 }
+export interface AssignStmt {
+  expr: Expr;
+  kind: "assign";
+  name: string;
+  span: Span;
+}
+export interface CollectStmt {
+  expr: Expr;
+  kind: "collect";
+  name: string;
+  span: Span;
+}
 export interface ReturnStmt {
   expr: Expr;
   kind: "return";
@@ -745,6 +772,25 @@ export interface MatchStmt {
   kind: "match";
   match: Match;
   span: Span;
+}
+export interface DisjointStmt {
+  arms: Arm[];
+  kind: "disjoint";
+  span: Span;
+}
+export interface Arm {
+  block: boolean;
+  span: Span;
+  statements: Statement[];
+}
+export interface ForStmt {
+  body: Statement[];
+  disjoint: boolean;
+  kind: "for";
+  of: Atom;
+  span: Span;
+  var: string;
+  varType: Type;
 }
 export interface Carried {
   effects: EffectRef[];

@@ -105,6 +105,159 @@ func (o *ops) EndQuiet(ctx context.Context, item Item) error {
 	return nil
 }
 
+// Fill は op app.fill。
+func (o *ops) Fill(ctx context.Context, id Id) (*Item, error) {
+	var a Item
+	var b *Item
+	var unused Item
+	_ = unused
+	var err error
+	a, err = o.Load(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	v0, err := o.Make(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	b = ptr(v0)
+	unused = a
+	return b, nil
+}
+
+// FillAfterCall は op app.fillAfterCall。
+func (o *ops) FillAfterCall(ctx context.Context, id Id) (Item, error) {
+	a, err := o.Load(ctx, id)
+	if err != nil {
+		return Item{}, err
+	}
+	var b Item
+	b, err = o.Make(ctx, a.Id)
+	if err != nil {
+		return Item{}, err
+	}
+	return b, nil
+}
+
+// Typed は op app.typed。
+func (o *ops) Typed(ctx context.Context, id Id) (*Item, error) {
+	a, err := o.Make(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	same := a
+	var wide *Item = ptr(a)
+	v0, err := o.Load(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	called := ptr(v0)
+	if err := o.Note(ctx, same); err != nil {
+		return nil, err
+	}
+	return o.Pick(ctx, wide, called)
+}
+
+// Each は op app.each。
+func (o *ops) Each(ctx context.Context, ids []Id) ([]Item, error) {
+	var items []Item
+	var wide []*Item
+	var seen []Id
+	for _, id := range ids {
+		v0, err := o.Load(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, v0)
+		v1, err := o.Make(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		wide = append(wide, ptr(v1))
+		seen = append(seen, id)
+	}
+	for range seen {
+		if err := o.Touch(ctx); err != nil {
+			return nil, err
+		}
+	}
+	if err := o.Keep(ctx, wide, seen); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// Apart は op app.apart。
+func (o *ops) Apart(ctx context.Context, id Id, other Id, ids []Id) ([]Item, error) {
+	var a Item
+	var b Item
+	var c Item
+	// disjoint
+	{
+		var err error
+		a, err = o.Load(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		{
+			c, err = o.Make(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+		}
+		{
+			found, err := o.Find(ctx, other, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+			// match (found by nullable)
+			if found != nil {
+				// HasItems: found は app.Item
+				b = *found
+			} else {
+				// Empty
+				v0, err := o.Make(ctx, other)
+				if err != nil {
+					return nil, err
+				}
+				b = v0
+			}
+		}
+	}
+	if err := o.Note(ctx, a); err != nil {
+		return nil, err
+	}
+	if err := o.Note(ctx, b); err != nil {
+		return nil, err
+	}
+	if err := o.Note(ctx, c); err != nil {
+		return nil, err
+	}
+	var items []Item
+	// disjoint
+	for _, each := range ids {
+		found, err := o.Find(ctx, each, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		// match (found by nullable)
+		var v1 Item
+		if found != nil {
+			// HasItems: found は app.Item
+			v1 = *found
+		} else {
+			// Empty
+			v2, err := o.Make(ctx, each)
+			if err != nil {
+				return nil, err
+			}
+			v1 = v2
+		}
+		items = append(items, v1)
+	}
+	return items, nil
+}
+
 // Calls は op app.calls。
 //
 // Throws: app.Broken

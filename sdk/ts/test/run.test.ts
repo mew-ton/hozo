@@ -146,7 +146,7 @@ test("protocol mismatch: {error:{code:protocol}} on stdout and exit 2", async ()
   const out = JSON.parse(r.stdout);
   assert.equal(out.error.code, "protocol");
   assert.match(out.error.message, /0\.1/);
-  assert.match(out.error.message, /0\.9/);
+  assert.match(out.error.message, /0\.10/);
 });
 
 test("protocol missing: exit 2 with code protocol (checked before direction)", async () => {
@@ -404,7 +404,7 @@ test("calledOp: only an op callee has a name", () => {
     for (const d of ns.decls) {
       if (d.kind !== "op" || d.body === null) continue;
       for (const s of d.body.statements) {
-        const call = s.kind === "call" ? s.call : (s.kind === "const" || s.kind === "return") && s.expr.kind === "call" ? s.expr.call : undefined;
+        const call = s.kind === "call" ? s.call : (s.kind === "val" || s.kind === "return") && s.expr !== undefined && s.expr.kind === "call" ? s.expr.call : undefined;
         if (call === undefined) continue;
         callees.push(call.callee);
         assert.equal(calledOp(call), call.callee.kind === "op" ? call.callee.op : undefined);
