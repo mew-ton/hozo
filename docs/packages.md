@@ -174,7 +174,7 @@ func TypeName(fqn, namespace string) string       // namespace は宣言した�
 func FieldName(name string) string                // model のフィールドと、例外の引数（例外の構造体のフィールド。同「exception」）の名前
 func MethodName(name string) string               // op、read、効果の名前から、メソッドの名前。export の有無によらず、先頭を大文字に
 func BuiltinMethod(operation string) string       // 直に呼ぶ組み込みの効果の、状態の単位のメソッド: post から Post（同「状態の単位」）
-func LocalName(name string, reserved map[string]bool) string   // op・read・効果の引数名と、束縛名。Go の予約語か事前宣言の識別子か reserved にあれば末尾に _
+func LocalName(name string, reserved map[string]bool) string   // op・read・効果の引数名と、val・for の変数の名前。Go の予約語か事前宣言の識別子か reserved にあれば末尾に _
 func EffectConst(name string) string
 func CaseConst(classify, caseName string) string
 func StateUnitName(stateOrClassify string) string // <状態>State
@@ -377,7 +377,7 @@ type Result struct {
 }
 type Ref struct { Span source.Span; Target Target }
 type Target struct { Kind TargetKind; Decl string; Name string; Span source.Span }
-// TargetKind: 宣言、フィールド、ユニオンのアーム、classify のケース、デコレータの Param、束縛、op の引数、名前空間
+// TargetKind: 宣言、フィールド、ユニオンのアーム、classify のケース、デコレータの Param、val、for の変数、op の引数、名前空間
 func Analyze(fs *source.FileSet, files []*ast.File) *Result   // Op.Signature と Call.Bound は空のまま（internal/check が埋める）。設定は見ない
 ```
 

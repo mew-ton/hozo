@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.9"
+protocol = "0.10"
 
 [[transpiler]]
 name     = "go"
@@ -149,11 +149,11 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | 継ぎ目のメソッド（`Seams`） | op 名を先頭大文字にしたものに、デコレータの FQN のセグメントをそれぞれ先頭大文字にして連結したものを付ける（`server.login` の `@rate.limited` → `LoginRateLimited`） |
 | 継ぎ目を持つ op の、中身のメソッド | op 名の先頭を小文字にして `Body` を付ける（`login` → `loginBody`）。非公開の名前 |
 | `New` の引数と、構造体 `ops` のフィールド | 「New」 |
-| op・read・effect の引数名、配線の束縛名 | そのまま。下の「局所の名前」で当たれば末尾に `_` |
+| op・read・effect の引数名、配線の `val` と `for` の変数の名前 | そのまま。下の「局所の名前」で当たれば末尾に `_` |
 
 - 先頭だけを大文字にする（`Id`、`Url`）のは、Go の慣習（`ID`）より決定性と予測しやすさを取るため。
-- **局所の名前**: メソッドの中で、次の名前は生成したコードが使う。op・read・effect の引数名と束縛名がこれと同じなら、末尾に `_` を付ける: Go の予約語、事前宣言の識別子（`error`、`string`、`nil`、`len` など）、`o`、`ctx`、`err`、`ptr`、定義のパッケージの `ops.go` と `wiring.go` が import するパッケージの名前（`context`、`time`、`runtime`、名前空間のパッケージ）。
-- 生成したコードが作る局所の変数（状態を読んだ値、途中の値）の名前は「配線の本体」。引数名、束縛名、先に作った変数と当たれば、当たらなくなるまで末尾に `_` を足す。
+- **局所の名前**: メソッドの中で、次の名前は生成したコードが使う。op・read・effect の引数名と、`val`・`for` の変数の名前がこれと同じなら、末尾に `_` を付ける: Go の予約語、事前宣言の識別子（`error`、`string`、`nil`、`len` など）、`o`、`ctx`、`err`、`ptr`、定義のパッケージの `ops.go` と `wiring.go` が import するパッケージの名前（`context`、`time`、`runtime`、名前空間のパッケージ）。
+- 生成したコードが作る局所の変数（状態を読んだ値、途中の値）の名前は「配線の本体」。引数名、`val`・`for` の変数の名前、先に作った変数と当たれば、当たらなくなるまで末尾に `_` を足す。
 - **名前が当たれば GO-2**: 定義のパッケージの公開の名前どうし（型、`Effect…`、`Ops`、`Leaves`、`<状態>State`、`<Ns>Ops`、`Seams`、分類の名前、`New`、`Classify<C>`。大文字化で同じになる `id` と `Id`、合成した名前と宣言の名前を含む）、一つの構造体のフィールドどうし（例外の引数を含む）、一つのインターフェースのメソッドどうし（状態の単位の、形で決まるメソッド `IsEmpty` / `Get` / `Post` / `Put` / `Delete` と、ケースの述語と、その単位の read と効果の名前を先頭大文字にしたもの: 状態 `users` の read `get`、同じ状態の read `findUser` と効果 `FindUser`。形で決まるメソッドは、その単位に出すものだけを数える: 配線が `users.post(…)` を直に呼んでいなければ、`Post` は単位になく、効果 `post` は当たらない。`Ops` の中の `foo` と `Foo`。`Seams` の中の、op `loginRate` の `@limited` と op `login` の `@rate.limited`、`@repeatable` のデコレータを一つの op に二度付けたもの）、構造体 `ops` のフィールドと中身のメソッド（状態 `loginBody` と、継ぎ目を持つ op `login`）。直すのは仕様の名前。
 
 ## 型
@@ -442,7 +442,7 @@ type ops struct {
 
 ## 配線の本体
 
-単位の対象の配線ごとに、`wiring.go` に `ops` のメソッドを一つ出す。コメントは `Ops` のメソッドと同じ（「コメント」）。実行の順序は行の順で、並列にはしない。継ぎ目を持つ配線は、このメソッドの名前が中身の名前（`loginBody`）になり、コメントが一行になる。本体の規則は変わらない（「継ぎ目」）。
+単位の対象の配線ごとに、`wiring.go` に `ops` のメソッドを一つ出す。コメントは `Ops` のメソッドと同じ（「コメント」）。実行の順序は、文を辿る順（`docs/check.md`「Sig(O, v)」）で、並列にはしない（`disjoint` も。「文」）。継ぎ目を持つ配線は、このメソッドの名前が中身の名前（`loginBody`）になり、コメントが一行になる。本体の規則は変わらない（「継ぎ目」）。
 
 ```go
 func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.Session, error) {
@@ -450,7 +450,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 	if err != nil {
 		return pkgtype.Session{}, err
 	}
-	// match session by store.Login
+	// match (session by store.Login)
 	if session != nil {
 		// LoggedIn: session は type.Session
 		return o.RequireFresh(ctx, *session)
@@ -475,7 +475,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 - 最初の引数は、いつも、受け取った `ctx`（「op の形」）。続く引数は、呼ぶ先の引数（`Op.params`、`Read.params`、`Effect.params`）の順に、`Call.args` の値（「値」）。渡されていない省略可能な引数は `nil`。`bind` で埋まる位置は「bind で埋まる位置」（op の呼び出しだけ）。
 - `read` と効果を呼べるのは、宣言した名前空間の配線だけ（NS-6。`docs/check.md`「配線からの呼び出し」）なので、呼ぶ先は、いつも N の状態の単位。単位は「状態の単位」の表のとおり。
 - 状態を名前で読むこと（名前を付けない `read`）は、呼び出しではなく、値（「状態の参照」）。
-- **失敗の扱い**: 呼び出しは、どれも `error` を返す（「op の形」）。その結果を束縛か文で受ける呼び出しは、すぐ後に `if err != nil { return <零値>, err }` を置く（`<零値>` は、この配線の戻り値の型の零値。戻り値がなければ `return err`）。配線も、いつも `error` を返すので、返す先は、いつもある。受け取った `error` は、包まず、そのまま返す。
+- **失敗の扱い**: 呼び出しは、どれも `error` を返す（「op の形」）。その結果を`val` か文で受ける呼び出しは、すぐ後に `if err != nil { return <零値>, err }` を置く（`<零値>` は、この配線の戻り値の型の零値。戻り値がなければ `return err`）。配線も、いつも `error` を返すので、返す先は、いつもある。受け取った `error` は、包まず、そのまま返す。
 - **零値**: ポインタ・インターフェース・スライス・マップは `nil`、構造体は `<型>{}`、`time.Time` は `time.Time{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
 
 ### 値
@@ -484,7 +484,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 
 | `Atom` | Go |
 |---|---|
-| `name`（束縛か引数。パスなし） | その局所の名前 |
+| `name`（`val`・`for` の変数・引数。パスなし） | その局所の名前 |
 | `name` のパス（`in.body.email`） | フィールドを先頭大文字にしてつなぐ（`in.Body.Email`）。途中に省略可能な model があるときは「省略可能を通るパス」 |
 | `state` | その文の前で読んだ値（「状態の参照」）と、パス |
 | `literal` | 文字列は Go の文字列リテラル（`strconv.Quote`）、整数は 10 進、小数は `strconv.FormatFloat(v, 'g', -1, 64)`（`.` も `e` も含まなければ `.0` を足す）、真偽値は `true` / `false`、`Duration` は `time.Duration(<ナノ秒>)` |
@@ -512,22 +512,60 @@ if <x> != nil {
 }
 ```
 
-- 途中の値の名前は `v0`、`v1`、…（メソッドの中の通し番号）。引数名、束縛名、import するパッケージの名前に当たる番号は、飛ばす（分類の判定の結果 `k0`、`k1`、… も同じ）。
+- 途中の値の名前は `v0`、`v1`、…（メソッドの中の通し番号）。引数名、`val`・`for` の変数の名前、import するパッケージの名前に当たる番号は、飛ばす（分類の判定の結果 `k0`、`k1`、… も同じ）。
 
 ### 文
 
 | 文 | Go |
 |---|---|
-| `const x = 呼び出し`（op か `read`） | `x, err := <呼び出し>` と失敗の扱い。下の行で使っていない束縛（WIRE-8）は、直後に `_ = x` を足す |
-| `const x = 値` | `x := <値>`（当てはめる型は、値の型） |
+| `val x = 呼び出し`（op か `read`） | `x, err := <呼び出し>` と失敗の扱い。型を書いた `val` で、型をそろえる必要があれば、`v<n>, err := <呼び出し>` と失敗の扱い、`x := <そろえた値>` |
+| `val x = 値` | `x := <値>`（当てはめる型は、`val` の型: `Statement` の `type`） |
+| `val x;`（空の宣言。名前を並べた宣言は、名前ごとに一行） | `var x <val の型の Go の型>`（型は、`Statement` の `type`） |
+| `x = 呼び出し`（op か `read`） | `x, err = <呼び出し>` と失敗の扱い。型をそろえる必要があれば、`v<n>, err := <呼び出し>` と失敗の扱い、`x = <そろえた値>` |
+| `x = 値` | `x = <値>` |
+| `xs collect 呼び出し`（op か `read`） | `v<n>, err := <呼び出し>` と失敗の扱い、`xs = append(xs, <そろえた値>)` |
+| `xs collect 値` | `xs = append(xs, <値>)` |
 | `呼び出し;`（op か効果） | `if err := <呼び出し>; err != nil { return <零値>, err }`。値を返す op なら、値を捨てる: `if _, err := <呼び出し>; …` |
-| `return 呼び出し`（op か `read`） | 型をそろえる必要がなければ `return <呼び出し>`（`return o.users.UserByEmail(ctx, email)`。戻り値の並びは、どちらも `(T, error)`）。型をそろえる必要があれば、`v<n>` に束縛して失敗の扱いを置いてから `return <そろえた値>, nil` |
+| `return 呼び出し`（op か `read`） | 型をそろえる必要がなければ `return <呼び出し>`（`return o.users.UserByEmail(ctx, email)`。戻り値の並びは、どちらも `(T, error)`）。型をそろえる必要があれば、`v<n>` に受けて失敗の扱いを置いてから `return <そろえた値>, nil` |
 | `return 値` | `return <値>, nil` |
-| `const x = match …` / `return match …` / `match …;` | 「match」 |
+| `val x = match …` / `x = match …` / `xs collect match …` / `return match …` / `match …` | 「match」 |
+| `for (val v of 並び) { … }` | `for _, v := range <並び> { … }`。ブロックが `v` を読んでいなければ `for range <並び> { … }`。並びは「値」の規則で書く（状態なら、先に読む: 「状態の参照」）。ブロックの中の文は、この表を、そのまま当てる |
+| `disjoint { アーム … }` | `// disjoint` の一行と、Go のブロック `{ … }`。中に、アームを、書いた順に並べる。ブロックのアームは、Go のブロック `{ … }`。文の一つのアームは、その文を、そのまま（この表を当てる） |
+| `disjoint for (…) { … }` | `// disjoint` の一行と、上の `for` |
 | 「返らない」呼び出し（`never` を返す op）の文と `return` | `return <零値>, <呼び出し>`（戻り値がなければ `return <呼び出し>`） |
 | 本体の終わり（戻り値のない配線） | 最後に `return nil`。最後の文が「返らない」なら足さない |
 
-束縛を二度目以降に作るときも `:=` を使う（`err` は同じ変数が使い回される）。
+- `val` を二度目以降に作るときも `:=` を使う（`err` は同じ変数が使い回される）。
+- **`disjoint` は、直列に出す。** 仕様が言うのは、アームどうしが、互いに触れないことで、動かし方ではない（`docs/check.md`「disjoint」）。Go で、いちばん素直に読める形にする。並列に動かす形と、それを選ぶオプションは、持たない（`docs/decisions.md`「決めたこと」339）。
+- **失敗の扱いは、どのブロックの中でも、同じ。** `for` のブロックと、`disjoint` のブロックの中の失敗も、メソッドから `return <零値>, err` で抜ける。繰り返しは、そこで止まる。
+- **`x, err = <呼び出し>` の `err`**: その位置で、`err` が、まだ、見えていなければ（そのメソッドの、囲んでいる Go のブロックの、上の行に、`err` を作る文 `…, err := …` が、ない）、その文の直前に `var err error` を置く。
+- **読まれていない `val`**（WIRE-8）: Go は、使っていない変数を、コンパイルエラーにするので、`val x = …` の文と、空の宣言 `var x …` の直後に、`_ = x` を足す。
+- 集める先の `val` は、`var xs []T` のまま、`append` で足す。一つも集めなければ、`nil` のスライス（長さ 0 の並び）。
+
+```go
+	var latest *pkgtype.Order
+	var orders []pkgtype.Order
+	// disjoint
+	{
+		latest, err = o.store.LatestOrder(ctx, session.UserId)
+		if err != nil {
+			return MyPage{}, err
+		}
+		orders, err = o.store.ListOrders(ctx, session.UserId)
+		if err != nil {
+			return MyPage{}, err
+		}
+	}
+	var summaries []OrderSummary
+	// disjoint
+	for _, order := range orders {
+		v0, err := o.Summarize(ctx, order)
+		if err != nil {
+			return MyPage{}, err
+		}
+		summaries = append(summaries, v0)
+	}
+```
 
 ### 状態の参照
 
@@ -558,7 +596,7 @@ if err != nil {
 
 ### match
 
-`match` は、分類の種類ごとの**分け方**と、使われ方（`return` / `const` / 文）ごとの**アームの本体**の組み合わせで書く。どの形でも、分ける前に `// match <対象> by <分類>` の一行を置く（`<対象>` は仕様に書いたままのパス、`<分類>` は FQN、標準の分類なら `list` / `nullable`。状態の分類での `match` は `// match by <分類>`）。
+`match` は、分類の種類ごとの**分け方**と、使われ方（`return` / `val` / 文）ごとの**アームの本体**の組み合わせで書く。どの形でも、分ける前に `// match (<対象> by <分類>)` の一行を置く（`<対象>` は仕様に書いたままのパス、`<分類>` は FQN、標準の分類なら `list` / `nullable`。状態の分類での `match` は `// match (by <分類>)`）。
 
 **分け方**:
 
@@ -571,9 +609,9 @@ if err != nil {
 | 述語で決まる状態の分類 | `k<n>, err := Classify<C>(ctx, o.<分類の引数名>)` と失敗の扱いの後、`switch k<n>`。上と同じ |
 | 型で決まる状態の分類 | 対象の状態を「状態の参照」で読んでから、その値を対象にして、上の `presence` か `variant` の分け方 |
 
-- 対象が状態なら、先に「状態の参照」で読む。対象が名前でない `Atom`（リテラル、レコードリテラル、`none`）なら、`v<n>` に束縛してから分ける。
+- 対象が状態なら、先に「状態の参照」で読む。対象が名前でない `Atom`（リテラル、レコードリテラル、`none`）なら、`v<n>` に受けてから分ける。
 - **`else` のアームは、受けるケース（`MatchArm.cases`）を名前で並べたアームと、同じコードになる**: `if` の枝も、`case <C>A, <C>B:` も、`case <型>, <型>:` も、枝の頭のコメントも。基底は `MatchArm.else` を読まない。Go の `default:` の節は、`else` のアームには使わない: `else` が受けるのは宣言したケースだけで（`docs/check.md`「アームが受けるケース」）、型の `switch` の `default:` は、宣言したケースの外の値が来る節だから。
-- **分類の誤りの枝**: 型で決まる分類は判定関数を持たないので、どのケースにも当たらない値（`docs/check.md`「ケースの判定」の「当たらない値」）は、`match` のコードが受ける。枝の中身は、`match` の使われ方（`return` / `const` / 文）によらず、`return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` の一行。枝の頭のコメントは書かない。置くのは、次の二つの形だけ。標準の分類の `match`（どの値も、どちらかのケースに当たる）と、述語で決まる分類の `match`（判定関数が、先に同じ誤りを返す。「分類」）には、ない:
+- **分類の誤りの枝**: 型で決まる分類は判定関数を持たないので、どのケースにも当たらない値（`docs/check.md`「ケースの判定」の「当たらない値」）は、`match` のコードが受ける。枝の中身は、`match` の使われ方（`return` / `val` / 文）によらず、`return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` の一行。枝の頭のコメントは書かない。置くのは、次の二つの形だけ。標準の分類の `match`（どの値も、どちらかのケースに当たる）と、述語で決まる分類の `match`（判定関数が、先に同じ誤りを返す。「分類」）には、ない:
   - `if` の形で、分類が、ない側のケース（`対象 as else` か `対象 as none`）を持たないとき、値のない側の枝。
   - `switch <対象>.(type)` の、最後の `default:` の節。来るのは、どのケースも `as` に書かなかった型のアームの値と、union の値がない（`nil`）とき。書いた型が union のすべてのアームを覆っていても、`nil` のために、いつも置く。
 - **二つに分ける形**（`if`）は、アームを書いた順によらず、値のある場合を `if` の枝にする。`return match` では、`else` を書かず、もう一方をそのまま後ろに続ける（どの枝も `return` で終わる）。それ以外では `if … { … } else { … }`。枝の中身がないとき（文の `match` の `none` のアーム）は、その枝を書かない（`if` の枝がなければ、条件を逆にして `if <対象> == nil` / `if len(<対象>) == 0` にする）。分類の誤りの枝も、もう一方の枝として、同じに置く（`return match` なら後ろに続け、それ以外なら `else` の枝。中身がなくなることはない）。一つのアームが両方のケースを受けていれば（`Empty, HasItems => f();`）、分けずに、そのアームの本体だけを書く。
@@ -595,21 +633,23 @@ if err != nil {
 
 **アームの本体**:
 
-| 本体 | `return match` | `const x = match` | 文の `match` |
+| 本体 | `return match` | `val x = match` | 文の `match` |
 |---|---|---|---|
-| 呼び出し | `return <呼び出し>`。型をそろえる必要があれば、束縛してから `return <そろえた値>, nil` | `v<n>, err := <呼び出し>` と失敗の扱い、`x = <そろえた値>` | `if err := <呼び出し>; err != nil { return <零値>, err }` |
+| 呼び出し | `return <呼び出し>`。型をそろえる必要があれば、`v<n>` に受けてから `return <そろえた値>, nil` | `v<n>, err := <呼び出し>` と失敗の扱い、`x = <そろえた値>` | `if err := <呼び出し>; err != nil { return <零値>, err }` |
 | 「返らない」呼び出し | `return <零値>, <呼び出し>` | 同じ | 同じ |
 | 値 | `return <値>, nil` | `x = <値>` | —（書けない。WIRE-2） |
 | `none` | `return nil, nil` | 何も書かない（`x` は零値の `nil` のまま） | 何も書かない |
 | `throw E` | `return <零値>, <E の型>{}` | 同じ | 同じ |
 | `throw E(<値>, …)` | `return <零値>, <E の型>{<F>: <値>, …}`。`<F>` は例外の引数のフィールド名（「exception」）で、並びは `Exception.params` の順。値は、引数の型を当てはめる型にして「値」の規則で書く | 同じ | 同じ |
 
-- `const x = match` は、分ける前に `var x <match の型>`（`docs/types.md`「match の型」）を置く。アームの値は、その型にそろえる。束縛が下の行で使われていなければ、`match` の後ろに `_ = x`。
+- `val x = match` は、分ける前に `var x <match の型>`（`docs/types.md`「match の型」。型を書いた `val` なら、その型）を置く。アームの値は、その型にそろえる。`val` が、どこからも読まれていなければ、`match` の後ろに `_ = x`。
+- `x = match` は、`val x = match` と同じで、`var x` の行を置かない（空の宣言の所に、もう、ある）。`xs collect match` は、`v<n>` に、`val v<n> = match` と同じに受けてから、`xs = append(xs, v<n>)`。
 - アームの呼び出しの `err` は、その枝の中の変数（`:=`）で、失敗の扱いも枝の中に置く。
 - 例外は値で作る（「exception」）。`throw` の引数（`MatchArm.body` の `args`）は、数も型も、検査が例外の宣言と照らしてある（`docs/check.md`「throw」）ので、フィールドは、いつもすべて書く。
 
 ### 分類
 
+- **対象のない分類**（`Classify.decidedBy` が `none`。`classify C of never`。`docs/check.md`「分類」の「対象のない分類」）について、基底は何も出さない: 列挙の型も、定数も、ない。ケースに付いたデコレータ（`Classify.cases[].decorators`）も、読まない。何を出すかは、その分類を読むプラグインが決める。
 - **型で決まる分類**（`Classify.decidedBy` が `type`。標準の分類を含む）について、基底は何も出さない: 列挙の型も、判定関数も、`New` の引数もない。どのケースに当たるかは、値から決まる（「match」の `presence` と `variant`）。分類の名前とケースの名前は、それを使う配線のコメントにだけ残る。残りのケース（`対象 as else`）や、ない側のケース（`対象 as none`）を持つ分類も同じで、そのケースのための定数も出さない。どのケースにも当たらない値は、`match` のコードが分類の誤りにする（「match」の「分類の誤りの枝」）。
 - **述語で決まる値の分類・op の分類** C は、宣言した名前空間の定義のパッケージの `classify.go` に、次を出す。述語は、人が実装する（排他になるように、一人がまとめて書く）。
 

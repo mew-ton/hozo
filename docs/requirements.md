@@ -71,7 +71,7 @@ op の配線は、概念的な流れ（`docs/decisions.md`「決めたこと」2
   	if err != nil {
   		return LoginOk{}, err
   	}
-  	// match user by store.Registration
+  	// match (user by store.Registration)
   	if user != nil {
   		// Registered: user は type.User
   		return o.IssueSession(ctx, *user, in.Body.Password)

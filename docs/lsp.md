@@ -70,12 +70,14 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `read r(…): T on s` の `s` | `state` の名前 |
 | デコレータの宣言の `reads` / `effects` の節の名前 | op の節と同じ。デコレータの引数の名前（残りの引数を含む）なら、その `Param` |
 | 予約語のデコレータ名（`@db.list`、`@effects`、別名の `=` の後ろ） | ほかのデコレータ名と同じく、その `decorator` の名前 |
-| 配線の値の位置の、状態の名前（`f(token)`、`match token by nullable`） | `state` の名前。同じ名前の束縛か引数があれば、そちら（`docs/resolve.md`「手続き」） |
-| `match x by ns.C` の `C` | `classify` の名前 |
+| 配線の値の位置の、状態の名前（`f(token)`、`match (token by nullable)`） | `state` の名前。同じ名前の `val`、`for` の変数、引数があれば、そちら（`docs/resolve.md`「手続き」） |
+| `match (x by ns.C)` の `C` | `classify` の名前 |
 | アームの `throw E`、`throw E(…)` の `E` | `exception` の名前。引数の値は、配線のほかの値と同じ |
 | `a.b.c` の途中のセグメント | そのセグメントまでで決まるもの（名前空間なら、その名前空間の最初のブロックの名前） |
 | フィールドの参照 `x.f` | フィールドの宣言 |
-| 束縛名 | `const` の名前 |
+| `val` の名前、`for` の変数（値の位置。値を入れる文の左 `x = …`、集める文の左 `xs collect …` も） | `val` の宣言の名前、`for` の頭の名前 |
+| デコレータの引数の、分類のケース（`@usecase.of(Actor.Customer)`） | `Actor` のセグメントは `classify` の名前、`Customer` のセグメントは、その `classify` のケース |
+| デコレータの宣言の、分類のケース（`classify Actor case`）の `Actor` | `classify` の名前。`classify`、`of`、`never`、`case` の語は、宣言を持たないので `null` |
 | 引数名 | 引数 |
 | `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）の `Empty` / `HasItems` と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null`。アームの頭の `else` も、一つのケースを指さないので `null` |
 | デコレータの引数名（`name:`） | デコレータの宣言の `Param` |
