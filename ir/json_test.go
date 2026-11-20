@@ -168,7 +168,17 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 	}
 
 	unionRoundTrip(t, Statement(ValStmt{Name: "x", Expr: AtomExpr{Atom: NoneAtom{Span: sp()}}, Span: sp()}), UnmarshalStatement,
-		`{"kind":"const","name":"x","expr":{"kind":"atom","atom":{"kind":"none",`+spJSON+`}},`+spJSON+`}`)
+		`{"kind":"val","name":"x","expr":{"kind":"atom","atom":{"kind":"none",`+spJSON+`}},"collected":false,`+spJSON+`}`)
+	unionRoundTrip(t, Statement(ValStmt{Name: "xs", Type: ArrayType{Of: String()}, Collected: true, Span: sp()}), UnmarshalStatement,
+		`{"kind":"val","name":"xs","type":{"kind":"array","of":{"kind":"core","name":"string"}},"collected":true,`+spJSON+`}`)
+	unionRoundTrip(t, Statement(AssignStmt{Name: "x", Expr: AtomExpr{Atom: NoneAtom{Span: sp()}}, Span: sp()}), UnmarshalStatement,
+		`{"kind":"assign","name":"x","expr":{"kind":"atom","atom":{"kind":"none",`+spJSON+`}},`+spJSON+`}`)
+	unionRoundTrip(t, Statement(CollectStmt{Name: "xs", Expr: AtomExpr{Atom: NoneAtom{Span: sp()}}, Span: sp()}), UnmarshalStatement,
+		`{"kind":"collect","name":"xs","expr":{"kind":"atom","atom":{"kind":"none",`+spJSON+`}},`+spJSON+`}`)
+	unionRoundTrip(t, Statement(DisjointStmt{Arms: []Arm{{Statements: []Statement{CallStmt{Call: call, Span: sp()}}, Span: sp()}, {Statements: []Statement{CallStmt{Call: call, Span: sp()}}, Span: sp()}}, Span: sp()}), UnmarshalStatement,
+		`{"kind":"disjoint","arms":[{"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`},{"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`}],`+spJSON+`}`)
+	unionRoundTrip(t, Statement(ForStmt{Var: "x", VarType: String(), Of: NameAtom{Path: []string{"xs"}, Span: sp()}, Body: []Statement{CallStmt{Call: call, Span: sp()}}, Disjoint: true, Span: sp()}), UnmarshalStatement,
+		`{"kind":"for","var":"x","varType":{"kind":"core","name":"string"},"of":{"kind":"name","path":["xs"],`+spJSON+`},"body":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],"disjoint":true,`+spJSON+`}`)
 	unionRoundTrip(t, Statement(ReturnStmt{Expr: CallExpr{Call: call}, Span: sp()}), UnmarshalStatement,
 		`{"kind":"return","expr":{"kind":"call","call":`+callJSON+`},`+spJSON+`}`)
 	unionRoundTrip(t, Statement(CallStmt{Call: call, Span: sp()}), UnmarshalStatement, `{"kind":"call","call":`+callJSON+`,`+spJSON+`}`)
@@ -474,7 +484,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.9","namespaces":[],"binds":[]}`
+	want := `{"version":"0.10","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -482,7 +492,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.9","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.9","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.10","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.10","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -677,7 +687,7 @@ func TestKinds(t *testing.T) {
 		"core": CoreType{}, "ref": RefType{}, "optional": OptionalType{}, "array": ArrayType{}, "record": RecordType{}, "case": CaseType{}, "never": NeverType{},
 		"throw": ThrowBody{},
 		"type":  TypeParam{}, "any": AnyParam{},
-		"const": ValStmt{}, "return": ReturnStmt{},
+		"val": ValStmt{}, "assign": AssignStmt{}, "collect": CollectStmt{}, "disjoint": DisjointStmt{}, "for": ForStmt{}, "return": ReturnStmt{},
 		"atom": AtomExpr{},
 		"name": NameAtom{}, "literal": LiteralAtom{}, "none": NoneAtom{},
 		"string": StringLiteral{}, "int": IntLiteral{}, "float": FloatLiteral{}, "boolean": BooleanLiteral{}, "duration": DurationLiteral{},

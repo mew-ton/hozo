@@ -26,7 +26,8 @@ type Statement interface {
 type ValStmt struct {
 	Name string `json:"name"`
 	// Type は、解決した型（書いた型か、入れる式から導いた型。docs/types.md「val の型」）。
-	Type Type `json:"type"`
+	// 型が決まらない val（`val x = none;`）は nil。
+	Type Type `json:"type,omitempty"`
 	// Expr は、値と一緒に宣言したときの式。空の宣言なら nil。
 	Expr Expr `json:"expr,omitempty"`
 	// Collected は、集める文で値が入る val か（Expr があれば偽）。

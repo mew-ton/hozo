@@ -434,6 +434,7 @@ func sampleProgram() *Program {
 						Body: &Wiring{Statements: []Statement{
 							ValStmt{
 								Name: "user",
+								Type: Optional(Ref("server.User")),
 								Expr: CallExpr{Call: Call{
 									Callee: OpCallee{Op: "server.findUser"},
 									Args:   []CallArg{{Param: "id", Value: NameAtom{Path: []string{"id"}, Span: span(f, 52, 32, 52, 34)}}},
@@ -505,6 +506,7 @@ func sampleProgram() *Program {
 							// read と効果の呼び出し（docs/ir.md「配線」の Callee）: read、効果の宣言、直に呼ぶ組み込みの効果
 							ValStmt{
 								Name: "found",
+								Type: Optional(Ref("server.User")),
 								Expr: CallExpr{Call: Call{
 									Callee: ReadCallee{Read: "server.userById"},
 									Args:   []CallArg{{Param: "id", Value: NameAtom{Path: []string{"id"}, Span: span(f, 65, 30, 65, 32)}}},

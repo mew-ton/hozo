@@ -95,6 +95,25 @@
         }
       ]
     },
+    "Arm": {
+      "additionalProperties": false,
+      "properties": {
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "statements": {
+          "items": {
+            "$ref": "#/$defs/Statement"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "statements",
+        "span"
+      ],
+      "type": "object"
+    },
     "ArmBody": {
       "description": "match のアームの本体（docs/ir.md「配線」）。call、atom、none、throw のどれか。",
       "oneOf": [
@@ -126,6 +145,30 @@
       "required": [
         "kind",
         "of"
+      ],
+      "type": "object"
+    },
+    "AssignStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "expr": {
+          "$ref": "#/$defs/Expr"
+        },
+        "kind": {
+          "const": "assign"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "expr",
+        "span"
       ],
       "type": "object"
     },
@@ -517,7 +560,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.9"
+          "const": "0.10"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -649,14 +692,14 @@
         }
       ]
     },
-    "ConstStmt": {
+    "CollectStmt": {
       "additionalProperties": false,
       "properties": {
         "expr": {
           "$ref": "#/$defs/Expr"
         },
         "kind": {
-          "const": "const"
+          "const": "collect"
         },
         "name": {
           "type": "string"
@@ -925,6 +968,29 @@
       ],
       "type": "object"
     },
+    "DisjointStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "arms": {
+          "items": {
+            "$ref": "#/$defs/Arm"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "const": "disjoint"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "arms",
+        "span"
+      ],
+      "type": "object"
+    },
     "Doc": {
       "additionalProperties": false,
       "description": "DocComment の内容（docs/ir.md「Doc」）。",
@@ -1135,7 +1201,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.9"
+          "const": "0.10"
         },
         "transpiler": {
           "type": "string"
@@ -1297,6 +1363,45 @@
       ],
       "type": "object"
     },
+    "ForStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "items": {
+            "$ref": "#/$defs/Statement"
+          },
+          "type": "array"
+        },
+        "disjoint": {
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "for"
+        },
+        "of": {
+          "$ref": "#/$defs/Atom"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "var": {
+          "type": "string"
+        },
+        "varType": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "var",
+        "varType",
+        "of",
+        "body",
+        "disjoint",
+        "span"
+      ],
+      "type": "object"
+    },
     "ImportRequest": {
       "additionalProperties": false,
       "description": "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",
@@ -1314,7 +1419,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.9"
+          "const": "0.10"
         }
       },
       "required": [
@@ -2091,7 +2196,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.9"
+          "const": "0.10"
         }
       },
       "required": [
@@ -2556,7 +2661,13 @@
       "description": "配線の文（docs/ir.md「配線」）。kind で分ける。",
       "oneOf": [
         {
-          "$ref": "#/$defs/ConstStmt"
+          "$ref": "#/$defs/ValStmt"
+        },
+        {
+          "$ref": "#/$defs/AssignStmt"
+        },
+        {
+          "$ref": "#/$defs/CollectStmt"
         },
         {
           "$ref": "#/$defs/ReturnStmt"
@@ -2566,6 +2677,12 @@
         },
         {
           "$ref": "#/$defs/MatchStmt"
+        },
+        {
+          "$ref": "#/$defs/DisjointStmt"
+        },
+        {
+          "$ref": "#/$defs/ForStmt"
         }
       ]
     },
@@ -2861,6 +2978,36 @@
       ],
       "type": "string"
     },
+    "ValStmt": {
+      "additionalProperties": false,
+      "properties": {
+        "collected": {
+          "type": "boolean"
+        },
+        "expr": {
+          "$ref": "#/$defs/Expr"
+        },
+        "kind": {
+          "const": "val"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "type": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "collected",
+        "span"
+      ],
+      "type": "object"
+    },
     "ValueSubject": {
       "additionalProperties": false,
       "description": "値を対象にした match の対象（docs/ir.md「配線」の subject kind \"value\"）。状態を名前で書いた対象は atom が state。",
@@ -2930,7 +3077,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.9"
+          "const": "0.10"
         },
         "viewer": {
           "type": "string"

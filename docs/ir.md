@@ -304,9 +304,10 @@ interface Signature {                   // docs/check.md「計算」の Sig(O, v
 interface Wiring { statements: Statement[]; }
 
 type Statement =
-  | { kind: "val"; name: string; type: Type; expr?: Expr; collected: boolean; span: Span }
+  | { kind: "val"; name: string; type?: Type; expr?: Expr; collected: boolean; span: Span }
                                   // 値の入れ物の宣言（docs/check.md「値の入れ物」）。名前を並べた宣言（`val a, b;`）は、名前ごとの文に分ける。
                                   // type は、解決した型（書いた型か、入れる式から導いた型。docs/types.md「val の型」）。プラグインは、型を導かない。
+                                  // 型が決まらない val（`val x = none;`）だけ、持たない。
                                   // expr は、値と一緒に宣言したときだけ。collected は、集める文で値が入る val か（expr があれば false）
   | { kind: "assign"; name: string; expr: Expr; span: Span }      // 値を入れる文 `x = 式;`
   | { kind: "collect"; name: string; expr: Expr; span: Span }     // 集める文 `xs collect 式;`（docs/check.md「繰り返し」の「集める」）

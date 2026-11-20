@@ -1,5 +1,5 @@
 {
-  "version": "0.9",
+  "version": "0.10",
   "namespaces": [
     {
       "name": "",
@@ -2309,8 +2309,15 @@
           "body": {
             "statements": [
               {
-                "kind": "const",
+                "kind": "val",
                 "name": "user",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "ref",
+                    "target": "server.User"
+                  }
+                },
                 "expr": {
                   "kind": "call",
                   "call": {
@@ -2354,6 +2361,7 @@
                     }
                   }
                 },
+                "collected": false,
                 "span": {
                   "file": "server.hozo",
                   "start": {
@@ -2887,8 +2895,15 @@
                 }
               },
               {
-                "kind": "const",
+                "kind": "val",
                 "name": "found",
+                "type": {
+                  "kind": "optional",
+                  "of": {
+                    "kind": "ref",
+                    "target": "server.User"
+                  }
+                },
                 "expr": {
                   "kind": "call",
                   "call": {
@@ -2932,6 +2947,7 @@
                     }
                   }
                 },
+                "collected": false,
                 "span": {
                   "file": "server.hozo",
                   "start": {
