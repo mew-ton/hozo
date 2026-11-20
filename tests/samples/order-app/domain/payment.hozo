@@ -33,6 +33,10 @@ namespace payment {
     settledAt: Time?;
     /** 枠を手放した時刻 */
     releasedAt: Time?;
+    /** 上限の額での、先の確定に、最後に失敗した時刻。失敗していなければ、ない */
+    prepayFailedAt: Time?;
+    /** その失敗の理由（デコレータの中身が、受けた例外から書く） */
+    prepayFailure: string?;
   }
 
   /** 送料が決まったときに決まる額（charged が数える） */
@@ -139,8 +143,8 @@ namespace payment {
   @db.find
   read paymentBySession(session: psp.SessionId): Payment? on payments;
 
-  /** 枠の期限が deadline より前の、まだ請求を確定していない支払いのうち、期限がいちばん近いもの（人が書く: 比較と並べ方） */
-  read nextExpiringHold(deadline: Time): Payment? on payments;
+  /** 枠の期限が deadline より前の、まだ請求を確定していない支払い。期限の近い順（人が書く: 比較と並べ方） */
+  read holdsExpiringBefore(deadline: Time): Payment[] on payments;
 
   /** その識別子の通知の記録 */
   @db.find
@@ -161,6 +165,9 @@ namespace payment {
 
   /** 上限の額で、先に請求を確定した: 確定した額（同意した額）を入れる（人が書く） */
   effect recordPrepaid(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Prepaid;
+
+  /** 先の確定に、失敗した: 時刻と理由を、支払いに残す。枠は、確保したまま（人が書く） */
+  effect notePrepayFailure(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Held;
 
   /** 請求する額が、最後まで決まった: 決まった額と、時刻を入れる（人が書く） */
   effect recordSettled(payment: Payment, charge: Charge, at: Time) on payments.put as Standing.Held, Standing.Prepaid -> Standing.Settled;
@@ -384,19 +391,29 @@ namespace payment {
   // ---- 枠の期限が近い: 上限の額で、先に確定する ----
 
   /**
-   * 枠の期限が近い支払いを一つ、上限の額で、先に請求を確定する。誰にも呼ばれずに動く。
-   * 一度に扱うのは、期限がいちばん近い一つだけ（配線は、一覧の一つずつに外部の仕組みを呼べない）。
+   * error が起きたら、op を終わらせて、then の効果を行う。呼ぶ人のいない op（時計で動く op）が、想定した失敗を、
+   * 返す相手がいないので、状態に残すために使う。どの行に、何を書くかは、デコレータの中身（継ぎ目）が決める:
+   * 仕様の上では、効果は、引数を受け取らない。
+   *
+   * @param error 受ける例外
+   * @param then  代わりに行う効果
+   */
+  @repeatable
+  decorator noteFailure(error: any exception, then: any effect)
+    catches error halts then;
+
+  /**
+   * 枠の期限が近い支払いを、期限の近い順に、一つずつ、上限の額で、先に請求を確定する。誰にも呼ばれずに動く。
+   * 一つの確定が失敗しても、残りは、続ける: 想定した失敗は、prepay が受けて、支払いに残す。
+   * ここまで届く失敗は、想定していないもので、繰り返しは、そこで止まる。
    */
   @clock.tick(every: 10m)
-  op prepayExpiring()
-    throws psp.HoldExpired, http.NetworkError, http.ServerError
-  {
+  op prepayExpiring() {
     val now = clock.now();
     val deadline = ahead(now, holdMargin);
-    val next = nextExpiringHold(deadline);
-    match (next by Known) {
-      Found   => prepayHeld(next, now);
-      Missing => none;
+    val expiring = holdsExpiringBefore(deadline);
+    for (val payment of expiring) {
+      prepayHeld(payment, now);
     }
   }
 
@@ -404,19 +421,21 @@ namespace payment {
   op ahead(now: Time, margin: Duration): Time;
 
   /** 枠を確保してある支払いだけを、先に確定する */
-  op prepayHeld(payment: Payment, now: Time)
-    throws psp.HoldExpired, http.NetworkError, http.ServerError
-  {
+  op prepayHeld(payment: Payment, now: Time) {
     match (payment by Standing) {
       Held => prepay(payment, now);
       else => none;
     }
   }
 
-  /** 上限の額で、請求を確定する */
-  op prepay(payment: Standing.Held<Payment>, now: Time)
-    throws psp.HoldExpired, http.NetworkError, http.ServerError
-  {
+  /**
+   * 上限の額で、請求を確定する。想定した失敗（枠が切れていた、相手に届かない）は、支払いに残して、終わる。
+   * 次に時計が動いたときに、もう一度、試される
+   */
+  @noteFailure(psp.HoldExpired, notePrepayFailure)
+  @noteFailure(http.NetworkError, notePrepayFailure)
+  @noteFailure(http.ServerError, notePrepayFailure)
+  op prepay(payment: Standing.Held<Payment>, now: Time) {
     val request = limitCaptureOf(payment);
     psp.capture(request);
     recordPrepaid(payment, now);

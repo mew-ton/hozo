@@ -384,7 +384,7 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
 ### 言語
 
 - **F1 表の一行の進み具合を、遷移で書けなかった。→ 行の遷移で、書けるようになった。** はじめは、`effect … on C: A -> B` の宛先が、状態を対象にした分類だけだった。注文、支払い、仕事、出荷は、どれも表の一行の話で、値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉で近づけていた。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からなかった。→ いまは、効果が、宛先の後ろの `as` で言う（`docs/check.md`「行の遷移」）。22 の効果が行の遷移を持ち、行の全体を書き換えていた七つの効果（`saveOrder`、`saveOrders`、`savePayment`、`saveJob`、`saveShipment`、`saveReservation`、`saveCarrier`）は、なくなった。一覧は「行の遷移で書いた進み具合」。分かったことは F50〜F57。
-- **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものと、行のケースを変えるもの（F50）は、時計で一件ずつ（`payment.prepayExpiring`、`ordering.expireUnpaid`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。 → **R6 で、配線に、繰り返し（`for`）が入った**（下の「R6 で変えたこと」）: `production.enqueue` と `ordering.expireUnpaid` は、繰り返しで書き直した。外部の仕組みを一つずつ呼ぶ `payment.prepayExpiring` は、時計で一件ずつ、のまま。
+- **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものと、行のケースを変えるもの（F50）は、時計で一件ずつ（`payment.prepayExpiring`、`ordering.expireUnpaid`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。 → **R6 で、配線に、繰り返し（`for`）が入った**（下の「R6 で変えたこと」）: `production.enqueue` と `ordering.expireUnpaid` は、繰り返しで書き直した。外部の仕組みを一つずつ呼ぶ `payment.prepayExpiring` も、失敗を、状態に残す形にして、繰り返しにした。
 - **F3 判断一つにつき、op が一つ要る。** アームの本体は呼び出し一つで、呼び出しの引数に呼び出しを書けない。→ `shipping.pack` は `packGathered`、`packInto`、`seal` の四段。`payment` の 31 の op のうち 22 が配線。PRD に名前のない op（`packInto`、`secureFound`、`offersIfPacked`）に、名前を付けることになる。
 - **F4 例外を、配線で受けられない。受けられるのはデコレータだけで、例外の値は使えない。** → 値を運ぶ例外（`ordering.TermsChanged(terms)`、`inventory.OutOfStock(sku)`、`ordering.UnknownProduct(sku)`）の値は、画面に届かない: `storefront.sayTermsChanged` は見せている値段を捨てるだけで、`storefront.Outdated` は、どの商品かを持たない。画面を分けたい結果は、例外ではなく値で返す形に寄った（`shopApi.product` と `shopApi.status` は `T?`）。
 - **F5 例外を、別の名前に言い換える書き方がない。** `catches A recovers throws B` と書くと、A を「吸収した」ことになり、効果を持つ op では DEC-5（成功のアームでも効果が不明）。金が動く三つの呼び出しに付けたら、warning が六つ出た。→ 言い換えたのは、金が動かない呼び出しだけ（`payment.openHold`、`payment.openCharge`、`download.fetchLink` の `@outside.failsAs`）。請求の確定、返金、枠を手放す、送り状を買う、の失敗は、`http.NetworkError` / `http.ServerError` のまま `staffApi.buyLabel` まで伝わる。ブラウザから見ると、自分の通信の失敗と、サーバーの先の失敗が、同じ名前になる。
@@ -703,9 +703,10 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 | `ordering.expireUnpaid` | 期限切れの注文を、一回の動きで、すべて扱う: read `oldestUnpaidBefore(…): Order?` を、並びを返す `unpaidBefore(…): Order[]` に替え、`for` で、一つずつ、`expireIfUnpaid` を呼ぶ |
 | `ordering.placeNew` | 値段を付けることと、時刻を読むことを、`disjoint` に並べる。取り置き（例外を出しうる）と、注文を足すこと（効果）は、並べられない（DISJ-1）ので、直列のまま |
 | `production.enqueue` | 行ごとに、仕事を作って、足す: 効果 `addJobs(added: Job[])` を、行を一つ受け取る `addJob(job: Job) … as Progress.Queued` に替え、葉 `plan`（並びを返す）を、`planJob`（一つを返す）に替えた。入るケースを、書けるようになった |
+| `payment.prepayExpiring` | 期限の近い支払いを、一回の動きで、すべて扱う: read `nextExpiringHold(…): Payment?` を、並びを返す `holdsExpiringBefore(…): Payment[]` に替え、`for` で、一つずつ、`prepayHeld` を呼ぶ。`prepay` は、想定した失敗を、受けて、支払いに残す（`@noteFailure`、効果 `notePrepayFailure`、項目 `prepayFailedAt`、`prepayFailure`）。`prepayExpiring`、`prepayHeld`、`prepay` の `throws` は、なくなった |
 | `shopApi.statusOf` | 四つの読みを、`disjoint` に並べる。名前を並べた、空の `val` |
 
-- **`payment.prepayExpiring` は、変えていない。** `docs/wiring-trial.md`「書き直し」は、これも、繰り返しに書き直したが、一つの支払いで、外の仕組みが失敗すると、残りの支払いが、その回では、扱われなくなる（同 W5）。失敗を、一件ずつ分けたいものは、時計で一件ずつ動く op のままにする（`docs/requirements.md`「書き方の指針」。`docs/decisions.md`「決めたこと」323）。
+- **`payment.prepayExpiring` は、失敗を、状態に残す形にしてから、繰り返しにした**（`docs/decisions.md`「決めたこと」345）。そのまま繰り返しにすると、一つの支払いで、外の仕組みが失敗したとき、残りの支払いが、その回では、扱われない（`docs/wiring-trial.md` の W5）。`prepay` に、想定した失敗を受けて、支払いに残すデコレータ（`payment.noteFailure`: `catches … halts …`）を付けた。繰り返しの中身は、例外を出さなくなり、一つが失敗しても、残りは、続く。残した失敗は、次に時計が動いたときに、もう一度、試される。想定していない失敗は、ここまで届き、繰り返しを、止める。
 - `ordering.expireUnpaid` は、外の仕組みを呼ばず、`@db.transaction` を持つ: 途中で失敗したら、それまでの分も、戻る。
 
 ## 確かめ方
