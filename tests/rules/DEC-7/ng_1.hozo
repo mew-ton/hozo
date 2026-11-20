@@ -2,11 +2,11 @@
 namespace a {
   state s: single<string>;
   state t: list<string>;
-  effect put() on s.put;
-  effect post() on t.post;
+  effect fn put() on s.put;
+  effect fn post() on t.post;
   decorator onPut(e: any effect on s.put);
   @onPut(put)
-  op ok1(): void;
+  fn ok1(): void;
   @onPut(post)                         // ERROR: DEC-7
-  op ng1(): void;
+  fn ng1(): void;
 }

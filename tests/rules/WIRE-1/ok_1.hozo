@@ -2,9 +2,9 @@
 namespace a {
   model M { id: string; }
   classify C of M { A; }
-  op v(): M;
-  op use(m: M);
-  op f(): M {
+  fn v(): M;
+  fn use(m: M);
+  fn f(): M {
     val x = v();
     use(x);
     match (x by C) { A => use(x); };

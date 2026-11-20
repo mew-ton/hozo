@@ -7,5 +7,5 @@ namespace a {
   decorator a4 = d("x");               // ERROR: TYPE-4
   decorator a5 = d(1, 2);              // ERROR: DEC-12
   @a1
-  op ok(): void;
+  fn ok(): void;
 }

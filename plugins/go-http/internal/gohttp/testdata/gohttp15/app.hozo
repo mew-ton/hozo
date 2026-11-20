@@ -11,5 +11,5 @@ namespace app {
     @http.query tag: string?;
   }
   @http.post("/in")
-  export op take(in: In);
+  export fn take(in: In);
 }

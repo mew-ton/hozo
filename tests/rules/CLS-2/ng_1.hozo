@@ -2,5 +2,5 @@
 namespace a {
   model M { id: string; }
   classify D of M { }                  // ERROR: CLS-2
-  op use(m: M);
+  fn use(m: M);
 }

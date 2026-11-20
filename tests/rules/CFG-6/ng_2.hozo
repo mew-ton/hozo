@@ -5,5 +5,5 @@ namespace a {
     @legacy                            // WARN: CFG-6
     id: string;
   }
-  op f(): M;
+  fn f(): M;
 }

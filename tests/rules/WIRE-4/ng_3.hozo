@@ -1,9 +1,9 @@
 // WIRE-4（docs/check.md「配線」）: 束縛より上の行で使っている（RES-1 として出る。束縛は下で使われないので WIRE-8 も）
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op use(m: M): void;
-  op before(): void {
+  fn value(): M;
+  fn use(m: M): void;
+  fn before(): void {
     use(y);                            // ERROR: RES-1
     val y = value();                 // WARN: WIRE-8
   }

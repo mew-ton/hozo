@@ -6,11 +6,11 @@ namespace a {
   exception E;
   state rows: list<M>;
   state cur: nullable<M>;
-  effect add(m: M) on rows.post;
-  effect set(m: M) on cur.post;
+  effect fn add(m: M) on rows.post;
+  effect fn set(m: M) on cur.post;
   union Writes { add; set; }
   classify Stock of rows { None; Some; }
-  op f(m: M, rows: M[]) {
+  fn f(m: M, rows: M[]) {
     Writes(m);                           // ERROR: RES-4
     cur(m);                              // ERROR: RES-4
     Stock(m);                            // ERROR: RES-4

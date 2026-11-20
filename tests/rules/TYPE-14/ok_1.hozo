@@ -8,5 +8,5 @@ namespace a {
   }
   model Q extends User { override hash: never; }
   model R extends Q { hash: int; }
-  op f(): R;
+  fn f(): R;
 }

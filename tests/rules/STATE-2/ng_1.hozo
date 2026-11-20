@@ -3,30 +3,30 @@
 namespace a {
   state s: list<string>;
   state t: nullable<string>;
-  effect e(x: string) on s.post;
-  effect f(x: string) on t.post;
+  effect fn e(x: string) on s.post;
+  effect fn f(x: string) on t.post;
   union Both { e; f; }
   decorator doing(...targets: any effect) for op effects targets;
   decorator doingE for op effects e;
   decorator posting for op effects s.post;
-  @doing(e, f) op ownCarried(x: string, y: string);
-  @doingE @posting export op own();
+  @doing(e, f) fn ownCarried(x: string, y: string);
+  @doingE @posting export fn own();
 }
 namespace b {
   state u: list<string>;
-  effect g(x: string) on u.post;
+  effect fn g(x: string) on u.post;
   @a.doing(g)
-  op carriedOwn(x: string);
+  fn carriedOwn(x: string);
   @a.doing(a.e)                                  // ERROR: STATE-2
-  op carried(x: string);
+  fn carried(x: string);
   @a.doing(g, a.Both)                            // ERROR: STATE-2
-  op carriedUnion(x: string, y: string, z: string);
+  fn carriedUnion(x: string, y: string, z: string);
   @a.doingE                                      // ERROR: STATE-2
-  op carriedFixed();
+  fn carriedFixed();
   @a.posting                                     // ERROR: STATE-2
-  op carriedDirect();
+  fn carriedDirect();
   // 配線の op の節には、別の名前空間の効果を書ける（呼び出し先から伝わった効果。EFF-2 が照合する）
-  op wire() effects a.e, a.s.post {
+  fn wire() effects a.e, a.s.post {
     a.own();
   }
 }

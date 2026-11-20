@@ -3,9 +3,9 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   exception E;
-  op risky(m: M) throws E;
-  op safe(m: M);
-  op wiring(m: M) {                    // ERROR: THROWS-1
+  fn risky(m: M) throws E;
+  fn safe(m: M);
+  fn wiring(m: M) {                    // ERROR: THROWS-1
     match (m by C) {
       A => risky(m);
       B => safe(m);

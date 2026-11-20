@@ -1,9 +1,9 @@
 // WIRE-7（docs/check.md「配線」）: 配線の呼び出しが循環している。位置は循環上で最初に現れる op
 namespace a {
-  op f() {                             // ERROR: WIRE-7
+  fn f() {                             // ERROR: WIRE-7
     g();
   }
-  op g() {
+  fn g() {
     f();
   }
 }

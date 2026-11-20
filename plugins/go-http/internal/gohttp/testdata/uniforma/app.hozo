@@ -21,7 +21,7 @@ namespace app {
     @http.query @http.required owner: string;
   }
   @http.get("/items")
-  export op find(in: FindInput): Item
+  export fn find(in: FindInput): Item
     throws Missing;
 
   model PutInput {
@@ -32,7 +32,7 @@ namespace app {
     @http.body @http.default(1) copies: int;
   }
   @http.post("/items")
-  export op put(in: PutInput): string
+  export fn put(in: PutInput): string
     throws Clash;
 
   model AllInput {
@@ -41,5 +41,5 @@ namespace app {
     @http.bodyObj item: Item;
   }
   @http.post("/all")
-  export op all(in: AllInput): Item[];
+  export fn all(in: AllInput): Item[];
 }

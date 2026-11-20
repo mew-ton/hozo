@@ -17,10 +17,10 @@ namespace a {
   union Two { Ready: M; Missing: N; }
   union Three { Ready: M; Missing: N; Broken: O; }
   state token: nullable<string>;
-  op find(): M?;
-  op takeN(n: N): void;
-  op takeM(m: M): void;
-  op f(): void;
+  fn find(): M?;
+  fn takeN(n: N): void;
+  fn takeM(m: M): void;
+  fn f(): void;
 
   classify V of M? { Has: M? as M; /** ない */ Lacks: M? as else; }
   classify F of find { NotFound: find as else; Found: find as M; }
@@ -29,9 +29,9 @@ namespace a {
   classify P3 of Three { IsReady: Three as M; Rest: Three as else; }
   classify D of find { Found: find as M; }
 
-  effect logout() on S: LoggedIn -> LoggedOut;
+  effect fn logout() on S: LoggedIn -> LoggedOut;
 
-  op wire(two: Two, three: Three): void {
+  fn wire(two: Two, three: Three): void {
     val   m = find();
     match(m by F){ Found => takeM(m); NotFound => none; };
     match(two by P2){ IsReady => takeM(two); Rest => takeN(two); };

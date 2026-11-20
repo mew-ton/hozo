@@ -9,28 +9,28 @@ namespace a {
   decorator onlyRead for read;
   decorator onlyException for exception;
   @onlyEffect                          // ERROR: DEC-1
-  op notEffect(): void;
+  fn notEffect(): void;
   @db.insert                           // ERROR: DEC-1
   state notEffect2: list<M>;
   @db.find                             // ERROR: DEC-1
-  effect notRead(id: string) on s.delete;
+  effect fn notRead(id: string) on s.delete;
   @db.find                             // ERROR: DEC-1
-  op notRead2(id: string): M?;
+  fn notRead2(id: string): M?;
   @db.list                             // ERROR: DEC-1
   state notRead3: list<M>;
   @onlyEffect                          // ERROR: DEC-1
   @onlyException                       // ERROR: DEC-1
-  read notOp(): M[] on s;
+  read fn notOp(): M[] on s;
   @db.insert                           // ERROR: DEC-1
-  read notEffect3(): M[] on s;
+  read fn notEffect3(): M[] on s;
   @db.find @onlyRead
-  read byId(id: string): M? on s;
+  read fn byId(id: string): M? on s;
   @db.text                             // ERROR: DEC-1
-  effect notField(m: M) on s.put;
+  effect fn notField(m: M) on s.put;
   @onlyRead                            // ERROR: DEC-1
   exception NotRead;
   @onlyException                       // ERROR: DEC-1
-  effect notException(m: M) on s.post;
+  effect fn notException(m: M) on s.post;
   @onlyEffect                          // ERROR: DEC-1
   union V { Ready: M; }
   @onlyEffect                          // ERROR: DEC-1
@@ -38,7 +38,7 @@ namespace a {
   @onlyEffect                          // ERROR: DEC-1
   decorator another;
   @onlyEffect
-  effect ok(m: M) on s.post;
+  effect fn ok(m: M) on s.post;
   @onlyException
   exception Ok(reason: string);
 }

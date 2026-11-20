@@ -1,5 +1,5 @@
 // CLI-8: 位置なし。オプションはないので、どのキーも知らないキー。
 namespace app {
   @cli.command("run")
-  export op run();
+  export fn run();
 }

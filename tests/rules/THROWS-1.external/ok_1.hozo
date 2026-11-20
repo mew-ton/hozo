@@ -3,9 +3,9 @@ namespace a {
   exception E;
   @external
   decorator boundary throws E;
-  op leaf();
+  fn leaf();
   @boundary
-  op wiring() {
+  fn wiring() {
     leaf();
   }
 }

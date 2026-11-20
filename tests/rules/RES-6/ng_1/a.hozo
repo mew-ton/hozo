@@ -3,8 +3,8 @@
 namespace a {
   model X { id: string; }
   model Y { id: string; }
-  op Y(): void;                        // ERROR: RES-6
-  op f(): X;
+  fn Y(): void;                        // ERROR: RES-6
+  fn f(): X;
 }
 namespace http {
   exception ServerError;               // ERROR: RES-6

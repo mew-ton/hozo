@@ -2,5 +2,5 @@
 namespace a {
   exception E;
   decorator d catches E;               // ERROR: SYNTAX
-  op f();
+  fn f();
 }

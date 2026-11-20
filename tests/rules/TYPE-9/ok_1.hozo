@@ -2,5 +2,5 @@
 namespace a {
   scalar Ok extends string;
   scalar Ok2 extends Ok;
-  op f(): Ok2;
+  fn f(): Ok2;
 }

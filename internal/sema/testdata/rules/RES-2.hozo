@@ -1,8 +1,8 @@
 // RES-2: 名前空間の子と宣言の両方に当たって曖昧（docs/resolve.md「診断」）
 namespace a {
-  op x(): void;
+  fn x(): void;
   namespace x { model Y { id: string; } }
 }
 namespace b {
-  op f(): a.x.Y;                       // ERROR: RES-2
+  fn f(): a.x.Y;                       // ERROR: RES-2
 }

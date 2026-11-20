@@ -117,6 +117,20 @@ func KeywordGroups() []KeywordGroup {
 	return groups
 }
 
+// caseOfRule は、デコレータの宣言の、分類のケースの絞り（docs/grammar.md「decorator の宣言」の CaseKind: case of …）。
+// of の後ろの any は節の語、never は核の型、大文字で始まる名前（型か、分類の名前）は型の位置の名前。for の対象の並びの中と、
+// any の後ろの、どちらにも置く（extends / of の後ろの規則は、; か { まで続くので、ここでは使わない）。
+var caseOfRule = Rule{
+	Match: `\b(case)\s+(of)\s+(?:(any)|(never)|(` + typeName + `))`,
+	Captures: Captures{
+		"1": {Name: "keyword.control.hozo"},
+		"2": {Name: "keyword.control.hozo"},
+		"3": {Name: "keyword.control.hozo"},
+		"4": {Name: "support.type.primitive.hozo"},
+		"5": {Name: "entity.name.type.hozo"},
+	},
+}
+
 // groupOf は予約語の Kind を KeywordGroups の添字に写す。
 func groupOf(k token.Kind) int {
 	switch {
@@ -295,8 +309,8 @@ func Build() Grammar {
 				},
 			},
 			{
-				Comment: "op、effect、read は、実行・適用されるものの名前。effect と read は、名前の後ろに引数の括弧が続く",
-				Match:   `\b(op|effect|read)\s+(` + ident + `)`,
+				Comment: "関数（op、read、効果）の名前は、fn の直後（docs/grammar.md「関数の宣言」）。fn の前の read と effect は、予約語のパターンが塗る",
+				Match:   `\b(fn)\s+(` + ident + `)`,
 				Captures: Captures{
 					"1": {Name: "keyword.declaration.hozo"},
 					"2": {Name: "entity.name.function.hozo"},
@@ -322,9 +336,11 @@ func Build() Grammar {
 				},
 				Patterns: []Rule{
 					{Name: "keyword.other.hozo", Match: `\bfield\b`},
+					caseOfRule,
 					{Include: "#keywords"},
 				},
 			},
+			caseOfRule,
 			{
 				Comment: "any の種類: variant は any の後ろでだけ文脈キーワード",
 				Match:   `\b(any)\s+(variant)\b`,

@@ -3,12 +3,12 @@
 namespace a {
   model M { id: string; }
   model In { m: M?; }
-  op find(): M?;
+  fn find(): M?;
   classify Found of find { Hit: find as M; Miss: find as else; }
   classify Loose of find { Hit; Miss; }
-  op takeM(m: M): void;
-  op takeOpt(m: M?): void;
-  op f(): void {
+  fn takeM(m: M): void;
+  fn takeOpt(m: M?): void;
+  fn f(): void {
     val m = find();
     match (m by Found) {
       Hit     => takeM(m);
@@ -26,8 +26,8 @@ namespace a {
     };
   }
   // 型を書いたケースと C.Case<T> は、どちらか一方で書く: 絞り込んだ型は T そのもので、C.K<…> の位置には渡せない
-  op onHit(m: Found.Hit<M?>): void;
-  op g(in: In): void {
+  fn onHit(m: Found.Hit<M?>): void;
+  fn g(in: In): void {
     match (in.m by Found) {
       Hit     => onHit(in.m);          // ERROR: MATCH-4
       Miss    => none;

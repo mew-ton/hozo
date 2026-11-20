@@ -1,9 +1,9 @@
 // WIRE-2（docs/check.md「配線」）: 値のある呼び出しは束縛するか返し、値のない呼び出しは一行で書く
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op noValue(): void;
-  op ok(): M {
+  fn value(): M;
+  fn noValue(): void;
+  fn ok(): M {
     noValue();
     val m = value();
     return m;

@@ -4,14 +4,14 @@ namespace a {
   model M { id: string; }
   exception E;
   classify C of M { A; B; }
-  op fail(): never throws E;
-  op log(m: M): void;
-  op f(m: M): void throws E {
+  fn fail(): never throws E;
+  fn log(m: M): void;
+  fn f(m: M): void throws E {
     match (m by C) { A => throw E; B => log(m); };
     match (m by C) { A => none; B => fail(); };
     fail();
   }
-  op g(): M throws E {
+  fn g(): M throws E {
     return fail();
   }
 }

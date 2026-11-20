@@ -20,12 +20,12 @@ namespace a {
   scalar Email extends string;
   state token: nullable<string>;
   state carts: list<M>;
-  op find(): M?;
-  op takeM(m: M): void;
-  op takeO(o: O): void;
-  op takeA(m: K.A<M>): void;
-  op takeString(s: string): void;
-  op f(): void;
+  fn find(): M?;
+  fn takeM(m: M): void;
+  fn takeO(o: O): void;
+  fn takeA(m: K.A<M>): void;
+  fn takeString(s: string): void;
+  fn f(): void;
 
   classify K of M { A; B; C; D; E; }
   classify Arrival of find { Arrived: find as M; }
@@ -36,7 +36,7 @@ namespace a {
   classify Valid of string { Ok: string as Email; }
   classify Session of token { LoggedIn: token as string; LoggedOut: token as else; }
 
-  op wire(m: M, three: Three): void {
+  fn wire(m: M, three: Three): void {
     match(m by K){ A => takeA(m); else => none; };
     match(m by K){ D, A => f(); C => f(); else => none; };
     match(m by K){ B, C, D, E => f(); else => takeA(m); };

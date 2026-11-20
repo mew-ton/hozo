@@ -3,11 +3,11 @@ namespace app {
   model In { @cli.flag("x") x: string?; }
 
   @cli.command("hidden")
-  op hidden(in: In);
+  fn hidden(in: In);
 
   @cli.command("also")
-  op also();
+  fn also();
 
   @cli.command("shown")
-  export op shown();
+  export fn shown();
 }

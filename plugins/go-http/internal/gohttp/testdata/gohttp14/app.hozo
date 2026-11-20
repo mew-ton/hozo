@@ -17,7 +17,7 @@ namespace app {
     @http.header @http.default("x") lang: string;
   }
   @http.post("/in")
-  export op take(in: In);
+  export fn take(in: In);
 
   // 入力の model でも、全体の形で受け取る model でもない model のフィールドは、見ない
   model Elsewhere { @http.required free: string; }

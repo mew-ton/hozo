@@ -10,18 +10,18 @@ namespace a {
   classify Urgency of Order { Rush; Normal; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
   classify Review of Order { Passed: Order as Stage.Accepted<Order>; Failed; }
-  read byId(id: string): Order? on orders;
-  effect accept(order: Order) on orders.post as Stage.Accepted;
-  effect open(order: Order) on orders.post as Life.Absent -> Life.Open;
-  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
-  effect cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-  effect forceShip(order: Order) on orders.put as any -> Stage.Shipped;
-  effect patch(order: Order) on orders.put as any -> else;
-  effect rename(order: Order) on orders.put;
-  effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
-  effect purge(order: Order) on orders.delete as Life.Absent;
+  read fn byId(id: string): Order? on orders;
+  effect fn accept(order: Order) on orders.post as Stage.Accepted;
+  effect fn open(order: Order) on orders.post as Life.Absent -> Life.Open;
+  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect fn forceShip(order: Order) on orders.put as any -> Stage.Shipped;
+  effect fn patch(order: Order) on orders.put as any -> else;
+  effect fn rename(order: Order) on orders.put;
+  effect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  effect fn purge(order: Order) on orders.delete as Life.Absent;
   // アームから: 名前で並べたアーム（一つのケース、前の並びに入る二つのケース）
-  op byArm(order: Order, at: Time) throws NotAccepted {
+  fn byArm(order: Order, at: Time) throws NotAccepted {
     match (order by Stage) {
       Accepted => start(order, at);
       else     => throw NotAccepted;
@@ -32,14 +32,14 @@ namespace a {
     };
   }
   // アームから: else のアームが受けるケースが、前の並びに入る
-  op byElseArm(order: Order) {
+  fn byElseArm(order: Order) {
     match (order by Stage) {
       InProduction, Shipped, Cancelled => none;
       else => cancel(order);
     };
   }
   // アームから: 対象がパスでも、同じ Atom なら分かる。ケースが型を書いていて、対象の型が case にならないアームでも分かる
-  op byPath(box: Box, found: Order?) {
+  fn byPath(box: Box, found: Order?) {
     match (box.order by Stage) {
       Draft => cancel(box.order);
       else  => none;
@@ -51,12 +51,12 @@ namespace a {
     };
   }
   // 型から: 引数の型、束縛の型、別の分類のケースが as に書いた型
-  op byType(order: Stage.Accepted<Order>, at: Time) {
+  fn byType(order: Stage.Accepted<Order>, at: Time) {
     start(order, at);
     cancel(order);
   }
-  op pick(order: Order): Stage.Draft<Order>;
-  op byBinding(order: Order, reviewed: Order) {
+  fn pick(order: Order): Stage.Draft<Order>;
+  fn byBinding(order: Order, reviewed: Order) {
     val draft = pick(order);
     cancel(draft);
     match (reviewed by Review) {
@@ -65,14 +65,14 @@ namespace a {
     };
   }
   // 型から分かっていれば、別の分類のアームの中でも分かる
-  op inOtherArm(order: Stage.Accepted<Order>, at: Time) {
+  fn inOtherArm(order: Stage.Accepted<Order>, at: Time) {
     match (order by Urgency) {
       Rush   => start(order, at);
       Normal => none;
     };
   }
   // どの行でも受け取る効果
-  op free(order: Order) {
+  fn free(order: Order) {
     accept(order);
     open(order);
     forceShip(order);

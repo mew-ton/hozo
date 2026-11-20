@@ -1,15 +1,15 @@
 // STATE-2（docs/check.md「状態と効果」）: halts の効果が、付けた op と同じ名前空間のもの
 namespace a {
   state s: single<string>;
-  effect e() on s.put;
+  effect fn e() on s.put;
   exception X;
   decorator haltOnX catches X halts e;
-  op leaf() throws X;
+  fn leaf() throws X;
   @haltOnX
-  op g() {
+  fn g() {
     leaf();
   }
 }
 namespace b {
-  op f();
+  fn f();
 }

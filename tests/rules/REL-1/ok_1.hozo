@@ -2,5 +2,5 @@
 namespace a {
   exception E;
   exception F;
-  op ok() throws E throws F;
+  fn ok() throws E throws F;
 }

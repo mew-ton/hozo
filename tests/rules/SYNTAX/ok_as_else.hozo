@@ -2,15 +2,15 @@
 // フィールド名の位置には書ける
 namespace a {
   model M { id: string; else: string; }
-  op find(): M?;
-  op take(s: string);
+  fn find(): M?;
+  fn take(s: string);
   classify Hit of find {
     /** 見つかった */
     Found: find as M;
     /** 見つからなかった */
     Missing: find as else;
   }
-  op f() {
+  fn f() {
     val m = find();
     match (m by Hit) {
       Found   => take(m.else);

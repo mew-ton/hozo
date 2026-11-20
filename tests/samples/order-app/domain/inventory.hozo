@@ -46,38 +46,38 @@ namespace inventory {
   // ---- 状態に触れるもの ----
 
   /** skus のどれかに当たる在庫の数（人が書く: 集合に入っているか） */
-  read levelsOf(skus: type.Sku[]): Level[] on levels;
+  read fn levelsOf(skus: type.Sku[]): Level[] on levels;
 
   /** その商品の在庫の数 */
   @db.find
-  read levelOf(sku: type.Sku): Level? on levels;
+  read fn levelOf(sku: type.Sku): Level? on levels;
 
   /** その行の取り置き */
   @db.find
-  read reservationOf(orderId: type.OrderId, line: type.LineId): Reservation? on reservations;
+  read fn reservationOf(orderId: type.OrderId, line: type.LineId): Reservation? on reservations;
 
   /** その注文の取り置き */
   @db.list
-  read reservationsOfOrder(orderId: type.OrderId): Reservation[] on reservations;
+  read fn reservationsOfOrder(orderId: type.OrderId): Reservation[] on reservations;
 
   /** 棚から出してよくなった取り置きのうち、まだ出していないもの（人が書く: 値があること、ないこと） */
-  read toPick(): Reservation[] on reservations;
+  read fn toPick(): Reservation[] on reservations;
 
   /** 在庫の数を、まとめて書き換える */
-  effect saveLevels(changed: Level[]) on levels.put;
+  effect fn saveLevels(changed: Level[]) on levels.put;
 
   /** 取り置きを、まとめて足す */
-  effect addReservations(added: Reservation[]) on reservations.post;
+  effect fn addReservations(added: Reservation[]) on reservations.post;
 
   /** 棚から出した: 出した時刻を入れる（人が書く） */
-  effect markPicked(reservation: Reservation, at: Time) on reservations.put as Picking.OnShelf -> Picking.Picked;
+  effect fn markPicked(reservation: Reservation, at: Time) on reservations.put as Picking.OnShelf -> Picking.Picked;
 
   /** その注文の取り置きに、棚から出してよくなった時刻を入れる。棚にあるか出したか（Picking）は、変えない: as を書かない put */
-  effect confirmReservations(orderId: type.OrderId, at: Time) on reservations.put;
+  effect fn confirmReservations(orderId: type.OrderId, at: Time) on reservations.put;
 
   /** その注文の取り置きを消す。戻した取り置きは、残さない（取り置きは、なくなることが意味） */
   @db.delete
-  effect dropReservations(orderId: type.OrderId) on reservations.delete;
+  effect fn dropReservations(orderId: type.OrderId) on reservations.delete;
 
   // ---- 取り置く ----
 
@@ -89,7 +89,7 @@ namespace inventory {
 
   /** 注文の在庫の行を取り置く。一つでも足りなければ、どれも取り置かない */
   @db.transaction
-  export op reserve(orderId: type.OrderId, lines: ordering.StockedLine[])
+  export fn reserve(orderId: type.OrderId, lines: ordering.StockedLine[])
     throws OutOfStock
   {
     val skus = skusOf(lines);
@@ -100,17 +100,17 @@ namespace inventory {
   }
 
   /** 行の商品の識別子（人が書く） */
-  op skusOf(lines: ordering.StockedLine[]): type.Sku[];
+  fn skusOf(lines: ordering.StockedLine[]): type.Sku[];
 
   /** 取り置く数を数える。足りない商品があれば OutOfStock（人が書く） */
-  op allocate(orderId: type.OrderId, lines: ordering.StockedLine[], current: Level[]): Allocation
+  fn allocate(orderId: type.OrderId, lines: ordering.StockedLine[], current: Level[]): Allocation
     throws OutOfStock;
 
   // ---- 戻す ----
 
   /** 期限切れになった注文の取り置きを戻す */
   @db.transaction
-  export op release(orderId: type.OrderId) {
+  export fn release(orderId: type.OrderId) {
     val held = reservationsOfOrder(orderId);
     val skus = skusOfHeld(held);
     val current = levelsOf(skus);
@@ -120,15 +120,15 @@ namespace inventory {
   }
 
   /** 取り置きの商品の識別子（人が書く） */
-  op skusOfHeld(held: Reservation[]): type.Sku[];
+  fn skusOfHeld(held: Reservation[]): type.Sku[];
 
   /** 取り置いた数を、在庫の数に戻す（人が書く） */
-  op restore(held: Reservation[], current: Level[]): Level[];
+  fn restore(held: Reservation[], current: Level[]): Level[];
 
   // ---- 受け付けたとき ----
 
   /** 注文を受け付けた。取り置いた行を、棚から出してよくする */
-  export op confirm(orderId: type.OrderId) {
+  export fn confirm(orderId: type.OrderId) {
     val now = clock.now();
     confirmReservations(orderId, now);
   }
@@ -136,7 +136,7 @@ namespace inventory {
   // ---- 棚から出す ----
 
   /** 棚から出すものの一覧 */
-  export op pickList(): Reservation[] {
+  export fn pickList(): Reservation[] {
     return toPick();
   }
 
@@ -162,7 +162,7 @@ namespace inventory {
 
   /** 取り置いた行を、棚から出した。在庫の数を減らす */
   @db.transaction
-  export op pick(orderId: type.OrderId, line: type.LineId)
+  export fn pick(orderId: type.OrderId, line: type.LineId)
     throws NotReserved, AlreadyPicked
   {
     val found = reservationOf(orderId, line);
@@ -173,7 +173,7 @@ namespace inventory {
   }
 
   /** まだ棚にある取り置きだけを、出せる */
-  op pickReserved(reservation: Reservation)
+  fn pickReserved(reservation: Reservation)
     throws NotReserved, AlreadyPicked
   {
     match (reservation by Picking) {
@@ -183,7 +183,7 @@ namespace inventory {
   }
 
   /** 在庫の数を減らし、取り置きを、棚から出したことにする */
-  op takeFromShelf(reservation: Picking.OnShelf<Reservation>)
+  fn takeFromShelf(reservation: Picking.OnShelf<Reservation>)
     throws NotReserved
   {
     val level = levelOf(reservation.sku);
@@ -196,11 +196,11 @@ namespace inventory {
   }
 
   /** 出した分を、棚の数と取り置きの数から引く */
-  op shipOut(level: Level, picked: Reservation) {
+  fn shipOut(level: Level, picked: Reservation) {
     val changed = minus(level, picked);
     saveLevels(changed);
   }
 
   /** 出した分を引いた在庫の数（人が書く） */
-  op minus(level: Level, picked: Reservation): Level[];
+  fn minus(level: Level, picked: Reservation): Level[];
 }

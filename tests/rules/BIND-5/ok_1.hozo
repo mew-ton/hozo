@@ -6,5 +6,5 @@ namespace a {
   state locale: single<Locale>;
   bind token to a.*;
   bind locale to a.*;
-  op g(t: Token, l: Locale);
+  fn g(t: Token, l: Locale);
 }

@@ -1,4 +1,4 @@
 // CFG-21: オプションは単位ごと。別の単位の transpilers にある名前でも、その単位になければ CFG-21（ng_2.toml）
 namespace a {
-  op f();
+  fn f();
 }

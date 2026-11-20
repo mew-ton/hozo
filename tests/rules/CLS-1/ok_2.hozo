@@ -2,7 +2,7 @@
 // （なければ、値がない側は、どのケースでもない。docs/check.md「ケースの判定」）
 namespace a {
   model M { id: string; }
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
   classify Hit2 of find { Found: find as M; }
 }

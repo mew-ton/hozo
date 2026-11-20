@@ -6,44 +6,44 @@ namespace a {
   state rows: list<string>;
   bind token to a.*;
   classify Phase of rows { Idle; Busy; }
-  op take(t: Token?): string;
-  read rowByName(name: string): string? on rows;
-  op find(name: string): string? reads rowByName { return rowByName(name); }
-  op g();
-  op omitted(name: string): string? {
+  fn take(t: Token?): string;
+  read fn rowByName(name: string): string? on rows;
+  fn find(name: string): string? reads rowByName { return rowByName(name); }
+  fn g();
+  fn omitted(name: string): string? {
     return find(name);
   }
-  op written(name: string): string? reads rows {
+  fn written(name: string): string? reads rows {
     return find(name);
   }
-  op byName(): Token? reads token {
+  fn byName(): Token? reads token {
     return token;
   }
-  op bySubject() reads rows {
+  fn bySubject() reads rows {
     match (rows by list) { Empty => g(); HasItems => none; };
   }
-  op byClassify() reads a.rows {
+  fn byClassify() reads a.rows {
     match (by Phase) { Idle => g(); Busy => none; };
   }
-  op byBind(): string reads token {
+  fn byBind(): string reads token {
     return take();
   }
   // 状態を名前で渡した位置は明示で、bind は埋めないが、読むことに変わりはない
-  op explicit(): string reads token {
+  fn explicit(): string reads token {
     return take(token);
   }
   // read の名前と、その状態の名前の両方を書いても、同じ状態一つ
-  op both(name: string): string? reads rowByName, rows {
+  fn both(name: string): string? reads rowByName, rows {
     return rowByName(name);
   }
-  op across(name: string): string[] reads b.items, rows {
+  fn across(name: string): string[] reads b.items, rows {
     val x = find(name);
     g2(x);
     return b.all();
   }
-  op g2(x: string?);
+  fn g2(x: string?);
 }
 namespace b {
   state items: list<string>;
-  export op all(): string[] reads items { return items; }
+  export fn all(): string[] reads items { return items; }
 }

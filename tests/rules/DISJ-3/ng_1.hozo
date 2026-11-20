@@ -6,14 +6,14 @@ namespace a {
   state lines: list<Line>;
   state counter: single<int>;
   exception Declined;
-  read all(): Order[] on orders;
-  effect touch(order: Order) on orders.put;
-  effect removeById(id: string) on orders.delete;
-  effect addLine(line: Line) on lines.post;
-  effect bump(n: int) on counter.put;
-  op charge(order: Order) throws Declined;
-  op count(x: Order[], y: Order[]): int;
-  op f(a: Order, items: Line[]) {
+  read fn all(): Order[] on orders;
+  effect fn touch(order: Order) on orders.put;
+  effect fn removeById(id: string) on orders.delete;
+  effect fn addLine(line: Line) on lines.post;
+  effect fn bump(n: int) on counter.put;
+  fn charge(order: Order) throws Declined;
+  fn count(x: Order[], y: Order[]): int;
+  fn f(a: Order, items: Line[]) {
     disjoint {                         // ERROR: DISJ-3
       touch(a);
       touch(a);

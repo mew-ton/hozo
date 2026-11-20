@@ -181,14 +181,14 @@ namespace hozoc {
    *
    * @param plan 書き出す予定
    */
-  read outputChanges(plan: EmitPlan): EmitResult on outputs;
+  read fn outputChanges(plan: EmitPlan): EmitResult on outputs;
 
   /**
    * 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
    *
    * @param plan 書き出す予定
    */
-  effect syncOutputs(plan: EmitPlan) on OutputsSync: any -> UpToDate;
+  effect fn syncOutputs(plan: EmitPlan) on OutputsSync: any -> UpToDate;
 
   /**
    * 仕様を検査する。ファイルは書き出さない。
@@ -199,7 +199,7 @@ namespace hozoc {
    * @see emit
    */
   @cli.command("check")
-  export op check(in: CheckInput): CheckResult
+  export fn check(in: CheckInput): CheckResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch
     throws proc.Crashed, proc.MalformedOutput;
 
@@ -213,7 +213,7 @@ namespace hozoc {
    * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない
    * @throws proc.Crashed プラグインが異常終了した
    */
-  op collectOutputs(in: EmitInput, checked: CheckResult): EmitPlan
+  fn collectOutputs(in: EmitInput, checked: CheckResult): EmitPlan
     throws CheckFailed, OutputConflict, UnknownNamespace
     throws proc.Crashed, proc.MalformedOutput;
 
@@ -224,7 +224,7 @@ namespace hozoc {
    * @param in コマンドの入力
    * @param checked 検査の結果
    */
-  op writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
+  fn writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
     effects syncOutputs
     throws CheckFailed, OutputConflict, UnknownNamespace prevents effects
     throws proc.Crashed, proc.MalformedOutput prevents effects
@@ -242,7 +242,7 @@ namespace hozoc {
    * @see check
    */
   @cli.command("emit")
-  export op emit(in: EmitInput): EmitResult
+  export fn emit(in: EmitInput): EmitResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
     throws proc.Crashed, proc.MalformedOutput prevents effects
   {
@@ -256,7 +256,7 @@ namespace hozoc {
    * @param in コマンドの入力
    */
   @cli.command("lsp")
-  export op lsp(in: LspInput);
+  export fn lsp(in: LspInput);
 
   /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ */
   model Plugin { name: string; command: string[]; dir: Path; root: Path; }
@@ -283,7 +283,7 @@ namespace hozoc {
    * @param req プラグインへの入力
    */
   @proc.stdio
-  op runEmit(plugin: Plugin, req: EmitRequest): EmitResponse;
+  fn runEmit(plugin: Plugin, req: EmitRequest): EmitResponse;
 }
 ```
 

@@ -2,9 +2,9 @@
 namespace a {
   exception E;
   decorator recoverE catches E recovers;
-  op leaf();
+  fn leaf();
   @recoverE                            // WARN: DEC-16
-  op wiring() {
+  fn wiring() {
     leaf();
   }
 }

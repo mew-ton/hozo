@@ -4,8 +4,8 @@ namespace a {
   model In { token: string?; lines: M[]; name: string; }
   state token: nullable<string>;
   state title: single<string>;
-  op f();
-  op ng(in: In) {
+  fn f();
+  fn ng(in: In) {
     match (in.token by list) { Empty => f(); HasItems => none; };      // ERROR: MATCH-7
     match (in.lines by nullable) { Empty => f(); HasItems => none; };  // ERROR: MATCH-7
     match (in.name by nullable) { Empty => f(); HasItems => none; };   // ERROR: MATCH-7

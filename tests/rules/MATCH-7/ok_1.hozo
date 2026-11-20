@@ -7,9 +7,9 @@ namespace a {
   classify Kind of M { A; B; }
   classify Checkout of carts, orders { Shopping; Ordered; }
   classify LoggedIn of token { LoggedIn; NotLoggedIn; }
-  op f();
-  op g(m: M);
-  op ok(m: M) {
+  fn f();
+  fn g(m: M);
+  fn ok(m: M) {
     // 値の分類: 対象は値
     match (m by Kind) { A => g(m); B => none; };
     // 組み込みの分類: 対象は今の名前空間の、その形の基底の状態

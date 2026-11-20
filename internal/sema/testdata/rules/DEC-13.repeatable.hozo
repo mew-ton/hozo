@@ -9,11 +9,11 @@ namespace a {
   decorator hot = tag("hot");
   decorator cold = once("cold");
   @tag("a") @tag("b") @hot @hot
-  read some(): M[] on rows;
+  read fn some(): M[] on rows;
   @once("a")
   @once("b")                           // ERROR: DEC-13
-  read twice(): M[] on rows;
+  read fn twice(): M[] on rows;
   @cold
   @once("x")                           // ERROR: DEC-13
-  op f(): M[];
+  fn f(): M[];
 }

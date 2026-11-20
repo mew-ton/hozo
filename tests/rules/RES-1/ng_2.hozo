@@ -1,10 +1,10 @@
 // RES-1（docs/resolve.md「診断」）: 別の名前空間の宣言は修飾しなければ見つからない（NS-1）。知らない名前空間
 namespace a {
   model User { id: string; }
-  op ok(u: User): User;
+  fn ok(u: User): User;
 }
 namespace b {
-  op j(u: User): a.User;               // ERROR: RES-1
-  op m(): a.Nothing;                   // ERROR: RES-1
-  op n(): c.User;                      // ERROR: RES-1
+  fn j(u: User): a.User;               // ERROR: RES-1
+  fn m(): a.Nothing;                   // ERROR: RES-1
+  fn n(): c.User;                      // ERROR: RES-1
 }

@@ -6,7 +6,7 @@ namespace a {
   union Errors { E; F; }
   decorator onError(error: Errors);
   @onError(G)                          // ERROR: DEC-7
-  op ng2(): void;
+  fn ng2(): void;
   @onError(E | G)                      // ERROR: DEC-7
-  op ng3(): void;
+  fn ng3(): void;
 }

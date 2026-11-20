@@ -3,31 +3,31 @@
 namespace a {
   state s: list<string>;
   state t: nullable<string>;
-  effect e1() on s.post;
-  effect e2() on t.put;
+  effect fn e1() on s.post;
+  effect fn e2() on t.put;
   union Both { e1; e2; }
   decorator all(...targets: any effect) for op effects targets;
   decorator some(first: int, second: string?, ...more: string | int);
   @all
-  op rest0();
+  fn rest0();
   @all()
-  op rest0b();
+  fn rest0b();
   @all(e1)
-  op rest1(x: string);
+  fn rest1(x: string);
   @all(e1, e2)
-  op rest2(x: string, y: string);
+  fn rest2(x: string, y: string);
   @all(e1 | e2, Both)
-  op restSets(x: string);
+  fn restSets(x: string);
   @some(1, "s", "a", 2, "c")
-  op restAfterFixed();
+  fn restAfterFixed();
   @some(1)
-  op restAfterFixed0();
+  fn restAfterFixed0();
   @some(second: "t", first: 1)
-  op restNone();
+  fn restNone();
   decorator fixed = some(1, "s", "a", "b");
   decorator fixedAll = all(e1, e2);
   @fixed
-  op restAlias();
+  fn restAlias();
   @fixedAll
-  op restAlias2(x: string, y: string);
+  fn restAlias2(x: string, y: string);
 }

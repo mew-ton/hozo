@@ -7,5 +7,5 @@ namespace a {
   model Again extends Q { hash: int; }
   // 本体が空でもよい（別の型で、別名ではない）
   model Admin extends User { }
-  op f(): Q;
+  fn f(): Q;
 }

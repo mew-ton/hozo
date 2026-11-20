@@ -6,24 +6,24 @@ namespace types {
   model RateLimiter { max: int; }
   exception RateSeams;
   @rate.limited
-  export op ping();
+  export fn ping();
 }
 
 // NewRateSeams が、型の名前と当たる
 namespace funcs {
   scalar NewRateSeams extends string;
   @rate.limited
-  export op ping();
+  export fn ping();
 }
 
 // @rate.limited の付いた op がなければ（ファイルを出さないので）、当たらない
 namespace quiet {
   model RateLimiter { max: int; }
-  export op ping();
+  export fn ping();
 }
 
 // 当たらない名前空間には、出ない
 namespace clean {
   @rate.limited
-  export op ping();
+  export fn ping();
 }

@@ -3,5 +3,5 @@
 
 namespace shop {
   @rate.limited
-  export op ping();
+  export fn ping();
 }

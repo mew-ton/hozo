@@ -1,15 +1,15 @@
 // STATE-2（docs/check.md「状態と効果」）: デコレータの halts の効果（any effect の引数で渡したもの）が、付けた op の名前空間と違う
 namespace a {
   state s: single<string>;
-  effect e() on s.put;
-  op f();
+  effect fn e() on s.put;
+  fn f();
 }
 namespace b {
   exception X;
   decorator haltWith(h: any effect) catches X halts h;
-  op leaf() throws X;
+  fn leaf() throws X;
   @haltWith(a.e)                       // ERROR: STATE-2
-  op g() {
+  fn g() {
     leaf();
   }
 }

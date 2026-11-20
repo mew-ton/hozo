@@ -16,12 +16,12 @@ namespace type {
 namespace shop {
   model Receipt { item: type.Item; count: int; }
   state items: list<type.Item>;
-  read itemById(id: type.ItemId): type.Item? on items;
-  effect addItem(item: type.Item) on items.post;
+  read fn itemById(id: type.ItemId): type.Item? on items;
+  effect fn addItem(item: type.Item) on items.post;
 
   // 配線: 戻り値は model（零値は構造体）。引数は、別の名前空間の型
   @rate.limited
-  export op buy(id: type.ItemId, count: int): Receipt
+  export fn buy(id: type.ItemId, count: int): Receipt
   {
     val item = find(id);
     return { item: item, count: count };
@@ -29,47 +29,47 @@ namespace shop {
 
   // 葉（Leaves）: 引数も戻り値もない
   @rate.limited
-  export op ping();
+  export fn ping();
 
   // 配線（効果を呼ぶ）: 戻り値がない
   @rate.limited
-  export op add(item: type.Item)
+  export fn add(item: type.Item)
   {
     addItem(item);
   }
 
   // 配線（read を呼ぶ）: 戻り値の零値が、ポインタ（nil）
   @rate.limited
-  export op lookup(id: type.ItemId): type.Item?
+  export fn lookup(id: type.ItemId): type.Item?
   {
     return itemById(id);
   }
 
   // 戻り値の零値: スライス（nil）、文字列（""）、数（0）、真偽値（false）、time.Time（time.Time{}）、scalar（""）
   @rate.limited
-  export op names(): string[];
+  export fn names(): string[];
   @rate.limited
-  export op title(): string;
+  export fn title(): string;
   @rate.limited
-  export op total(): int;
+  export fn total(): int;
   @rate.limited
-  export op open(): boolean;
+  export fn open(): boolean;
   @rate.limited
-  export op since(): Time;
+  export fn since(): Time;
   @rate.limited
-  export op firstId(): type.ItemId;
+  export fn firstId(): type.ItemId;
 
   // 引数の名前が、このファイルが使う名前（レシーバの s、ctx、import するパッケージの名前）と当たれば、末尾に _。
   // body という名前の引数があれば、op の中身の引数の方に _ を足す
   @rate.limited
-  export op clash(s: string, ctx: string, body: string, context: string, pkgtype: type.ItemId): string;
+  export fn clash(s: string, ctx: string, body: string, context: string, pkgtype: type.ItemId): string;
 
   // 内部の op（export がない）にも、継ぎ目は付く
   @rate.limited
-  op audit(note: string);
+  fn audit(note: string);
 
   // @rate.limited のない op は、対象でない
-  export op find(id: type.ItemId): type.Item;
+  export fn find(id: type.ItemId): type.Item;
 }
 
 /** 継ぎ目を宣言したトランスパイラが二つある単位の名前空間 */
@@ -77,14 +77,14 @@ namespace mixed {
   // 二つの継ぎ目: 自分の分（@rate.limited）だけを出す
   @t.traced
   @rate.limited
-  export op both(n: int): int;
+  export fn both(n: int): int;
 
   // ほかのトランスパイラの継ぎ目だけの op は、対象でない
   @t.traced
-  export op traced(n: int): int;
+  export fn traced(n: int): int;
 }
 
 /** @rate.limited の付いた op のない名前空間 */
 namespace plain {
-  export op hello(name: string): string;
+  export fn hello(name: string): string;
 }

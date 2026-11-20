@@ -6,5 +6,5 @@ namespace a {
     Ready: M;
     E;
   }
-  op f(): M;
+  fn f(): M;
 }

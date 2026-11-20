@@ -23,7 +23,7 @@ namespace app {
 
   // 表にならなかった状態を宛先にする read と効果は、重ねて報告しない
   @db.find
-  read nameById(id: Id): Row? on names;
+  read fn nameById(id: Id): Row? on names;
   @db.insert
-  effect createId(row: Row) on ids.post;
+  effect fn createId(row: Row) on ids.post;
 }

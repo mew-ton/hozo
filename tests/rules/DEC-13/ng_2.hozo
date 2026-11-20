@@ -4,5 +4,5 @@ namespace a {
   decorator alias = d(1);
   @d(1)
   @alias                               // ERROR: DEC-13
-  op viaAlias(): void;
+  fn viaAlias(): void;
 }

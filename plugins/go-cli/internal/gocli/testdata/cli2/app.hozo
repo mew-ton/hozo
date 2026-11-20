@@ -14,9 +14,9 @@ namespace app {
     @cli.arg(2) @cli.env("PLACED") placed: string?;
   }
   @cli.command("run")
-  export op run(in: In);
+  export fn run(in: In);
 
   // サブコマンドの入力でない model は見ない
   model Other { bare: string; }
-  export op other(in: Other);
+  export fn other(in: Other);
 }

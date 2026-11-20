@@ -80,7 +80,7 @@ For = "for" "(" "val" Ident "of" Atom ")" Block ;
 ```
 @clock.tick(every: 1m)
 @db.transaction
-op expireUnpaid() {
+fn expireUnpaid() {
   const now = clock.now();
   const deadline = before(now, paymentWindow);
   const stale = oldestUnpaidBefore(deadline);
@@ -96,7 +96,7 @@ op expireUnpaid() {
 ```
 @clock.tick(every: 1m)
 @db.transaction
-op expireUnpaid() {
+fn expireUnpaid() {
   val now = clock.now();
   val deadline = before(now, paymentWindow);
   val stale = unpaidBefore(deadline);
@@ -114,7 +114,7 @@ op expireUnpaid() {
 
 ```
 @clock.tick(every: 10m)
-op prepayExpiring()
+fn prepayExpiring()
   throws psp.HoldExpired, http.NetworkError, http.ServerError
 {
   const now = clock.now();
@@ -131,7 +131,7 @@ op prepayExpiring()
 
 ```
 @clock.tick(every: 10m)
-op prepayExpiring()
+fn prepayExpiring()
   throws psp.HoldExpired, http.NetworkError, http.ServerError
 {
   val now = clock.now();
@@ -184,23 +184,23 @@ op prepayExpiring()
 今は、行ごとに仕事を作ることが、葉の op（`plan`）の中身に、隠れている。効果は、仕事を、まとめて受け取る。
 
 ```
-effect addJobs(added: Job[]) on jobs.post;
+effect fn addJobs(added: Job[]) on jobs.post;
 
-export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
+export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   const now = clock.now();
   const planned = plan(orderId, lines, now);
   addJobs(planned);
 }
 
-op plan(orderId: type.OrderId, lines: ordering.MadeLine[], now: Time): Job[];
+fn plan(orderId: type.OrderId, lines: ordering.MadeLine[], now: Time): Job[];
 ```
 
 書き直しの一つ目。効果を、回ごとに呼ぶ。効果は、行を一つ受け取るので、入るケースを、書ける。
 
 ```
-effect addJob(job: Job) on jobs.post as Progress.Queued;
+effect fn addJob(job: Job) on jobs.post as Progress.Queued;
 
-export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
+export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   val now = clock.now();
   for (val line of lines) {
     val job = planJob(orderId, line, now);
@@ -208,13 +208,13 @@ export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   }
 }
 
-op planJob(orderId: type.OrderId, line: ordering.MadeLine, now: Time): Job;
+fn planJob(orderId: type.OrderId, line: ordering.MadeLine, now: Time): Job;
 ```
 
 書き直しの二つ目。効果は、まとめて受け取るまま。仕事を、`collect` で集める。
 
 ```
-export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
+export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   val now = clock.now();
   val planned: Job[];
   for (val line of lines) {
@@ -231,7 +231,7 @@ export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
 今:
 
 ```
-op statusOf(order: ordering.Order): OrderView {
+fn statusOf(order: ordering.Order): OrderView {
   const charge = payment.ofOrder(order.id);
   const progress = shipping.progressOfOrder(order.id);
   const jobs = production.ofOrder(order.id);
@@ -243,7 +243,7 @@ op statusOf(order: ordering.Order): OrderView {
 書き直し:
 
 ```
-op statusOf(order: ordering.Order): OrderView {
+fn statusOf(order: ordering.Order): OrderView {
   val charge, progress, jobs, grants;
   disjoint {
     charge = payment.ofOrder(order.id);

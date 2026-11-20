@@ -7,8 +7,8 @@ namespace a {
   scalar Email extends string;
   union Page { Ready: M; Missing: N; }
   state token: nullable<string>;
-  op find(): M?;
-  op page(): Page;
+  fn find(): M?;
+  fn page(): Page;
   classify V1 of M { Other: M as N; }                            // ERROR: CLS-6
   classify V2 of M { Wide: M as M?; }                            // ERROR: CLS-6
   classify V3 of Email { Raw: Email as string; }                 // ERROR: CLS-6
@@ -17,5 +17,5 @@ namespace a {
   classify O1 of find { Hit: find as N; }                        // ERROR: CLS-6
   classify O2 of page { Other: page as Email; }                  // ERROR: CLS-6
   classify S1 of token { In: token as int; }                     // ERROR: CLS-6
-  op f(): N;
+  fn f(): N;
 }

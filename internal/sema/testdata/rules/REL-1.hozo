@@ -3,8 +3,8 @@ namespace a {
   exception E;
   exception F;
   union Errors { E; F; }
-  op f() throws E, F throws E;        // ERROR: REL-1
-  op g() throws E, Errors;            // ERROR: REL-1
-  op ok() throws E throws F;
+  fn f() throws E, F throws E;        // ERROR: REL-1
+  fn g() throws E, Errors;            // ERROR: REL-1
+  fn ok() throws E throws F;
   decorator d throws E throws E;       // ERROR: REL-1
 }

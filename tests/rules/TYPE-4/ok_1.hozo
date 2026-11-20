@@ -3,14 +3,14 @@ namespace a {
   scalar Email extends string;
   model M { id: string; }
   model N { id: string; extra: int; }
-  op takeM(m: M): void;
-  op takeInt(n: int): void;
-  op takeOpt(n: int?): void;
-  op takeString(s: string): void;
-  op n(): N;
-  op email(): Email;
-  op toM(n: N): M;
-  op i(): void {
+  fn takeM(m: M): void;
+  fn takeInt(n: int): void;
+  fn takeOpt(n: int?): void;
+  fn takeString(s: string): void;
+  fn n(): N;
+  fn email(): Email;
+  fn toM(n: N): M;
+  fn i(): void {
     val x = n();
     val m = toM(x);
     takeM(m);
@@ -21,5 +21,5 @@ namespace a {
   }
   decorator l(xs: string[]);
   @l(["a", "b"])
-  op m(): void;
+  fn m(): void;
 }

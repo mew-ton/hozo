@@ -16,5 +16,5 @@ namespace app {
     @cli.flag("g") g: string?;
   }
   @cli.command("run")
-  export op run(in: In);
+  export fn run(in: In);
 }

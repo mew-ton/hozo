@@ -3,22 +3,22 @@
 namespace a {
   state rows: list<string>;
   state cur: nullable<string>;
-  effect add() on rows.post;
-  effect add2() on rows.post;
-  effect set() on cur.post;
-  effect drop() on rows.delete;
+  effect fn add() on rows.post;
+  effect fn add2() on rows.post;
+  effect fn set() on cur.post;
+  effect fn drop() on rows.delete;
   union Posts { add; add2; }
   decorator posts(...es: any effect on rows.post) for op effects es;
   decorator tags(first: string, ...more: string | int);
   decorator states(...ts: any state) for op reads ts;
   @posts(add, add2, Posts)
-  op ok(x: string, y: string);
+  fn ok(x: string, y: string);
   @posts(add, set)                               // ERROR: DEC-7
-  op otherState(x: string, y: string);
+  fn otherState(x: string, y: string);
   @posts(drop)                                   // ERROR: DEC-7
-  op otherOperation(x: string);
+  fn otherOperation(x: string);
   @tags("a", "b", 1)
-  op okTags();
+  fn okTags();
   @states(rows, cur)
-  op okStates(): string[];
+  fn okStates(): string[];
 }

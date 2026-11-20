@@ -2,8 +2,8 @@
 namespace a {
   model M { id: string; }
   state items: list<M>;
-  op find(): M?;
-  op find2(): M?;
+  fn find(): M?;
+  fn find2(): M?;
   classify A1 of find, find2 { X; Other; }       // ERROR: CLS-3, CLS-3
   classify A2 of find, items { X; Other; }       // ERROR: CLS-3
   classify A3 of items, find { X; Other; }       // ERROR: CLS-3

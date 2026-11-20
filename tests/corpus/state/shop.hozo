@@ -41,60 +41,60 @@ namespace shop {
   // docs/check.md「状態の形」効果の宛先: 基底の状態の組み込みの効果。書き込むのはその状態
   // docs/ir.md「state / exception / effect」: target は { kind: "builtin", state, operation }
   /** カートに行を足す */
-  effect addLine(line: Line) on carts.post;
+  effect fn addLine(line: Line) on carts.post;
   /** 店の名前を変える */
-  effect rename() on title.put;
+  effect fn rename() on title.put;
   // 空にするのは delete（docs/decisions.md S2）
   /** 手元のトークンを消す */
-  effect removeToken() on token.delete;
+  effect fn removeToken() on token.delete;
 
   // docs/grammar.md「exception / effect / read」Transition: 状態の分類の遷移。書き込むのは分類の対象のすべての基底の状態
   // docs/ir.md「state / exception / effect」: target は { kind: "transition", of, from, to }
   /** 注文を確定する */
-  effect placeOrder() on Checkout: Shopping -> Ordered;
+  effect fn placeOrder() on Checkout: Shopping -> Ordered;
   // CaseSet: any と、ケースの和
   /** 買い物をやり直す */
-  effect startOver() on Checkout: any -> Shopping;
+  effect fn startOver() on Checkout: any -> Shopping;
   /** 進み具合を記録し直す */
-  effect touchCheckout() on Checkout: Shopping, Ordered -> any;
+  effect fn touchCheckout() on Checkout: Shopping, Ordered -> any;
   // 二つに分かれる状態の分類の遷移
   /** ログインする */
-  effect signIn() on LoggedIn: any -> LoggedIn;
+  effect fn signIn() on LoggedIn: any -> LoggedIn;
 
   // docs/grammar.md「exception / effect / read」Transition: 基底の状態の組み込みの分類の遷移（ケースは Empty / HasItems）。
   // 書き込むのはその状態
   /** カートを空にする */
-  effect clearCart() on carts: HasItems -> Empty;
+  effect fn clearCart() on carts: HasItems -> Empty;
   /** トークンを保存する */
-  effect saveToken(token: Token) on token: Empty -> HasItems;
+  effect fn saveToken(token: Token) on token: Empty -> HasItems;
 
   /** カートが空 */
   exception EmptyCart;
 
   // docs/check.md「配線からの呼び出し」: 効果を呼ぶ配線。効果の宛先が組み込みの効果でも遷移でも、呼び方は同じ。
   // 書いた effects は、本体が行う効果と照合する（EFF-2）
-  op addToCart(line: Line) effects addLine { addLine(line); }
+  fn addToCart(line: Line) effects addLine { addLine(line); }
   // docs/check.md「葉の op」: 葉は状態に触れない（注文を作るだけ）。効果は、それを呼ぶ配線が行う
-  op newOrder(): Order throws EmptyCart;
-  op submitOrder(): Order effects placeOrder throws EmptyCart prevents effects {
+  fn newOrder(): Order throws EmptyCart;
+  fn submitOrder(): Order effects placeOrder throws EmptyCart prevents effects {
     val order = newOrder();
     placeOrder();
     return order;
   }
-  op emptyCart() effects clearCart { clearCart(); }
-  op restart() effects startOver { startOver(); }
-  op storeToken(token: Token) effects saveToken { saveToken(token); }
-  op markLoggedIn() effects signIn { signIn(); }
-  op logout() effects removeToken { removeToken(); }
-  op showLogin();
-  op showCart();
-  op showEmpty();
-  op showOrders();
-  op packSingle(line: LineKind.Single<Line>): Line;
-  op packBulk(line: Line): Line;
+  fn emptyCart() effects clearCart { clearCart(); }
+  fn restart() effects startOver { startOver(); }
+  fn storeToken(token: Token) effects saveToken { saveToken(token); }
+  fn markLoggedIn() effects signIn { signIn(); }
+  fn logout() effects removeToken { removeToken(); }
+  fn showLogin();
+  fn showCart();
+  fn showEmpty();
+  fn showOrders();
+  fn packSingle(line: LineKind.Single<Line>): Line;
+  fn packBulk(line: Line): Line;
 
   // docs/check.md「計算」手順 0（配線）: F は呼び出しの effects を行の順に連結したもの（saveToken、signIn）
-  op login(token: Token)
+  fn login(token: Token)
   {
     storeToken(token);
     markLoggedIn();
@@ -102,7 +102,7 @@ namespace shop {
 
   // docs/grammar.md「配線」の表: 基底の状態の、組み込みの分類での match（by nullable）
   // docs/ir.md「配線」: subject は { kind: "state", state }、classify は "nullable"
-  op openTop()
+  fn openTop()
   {
     match (token by nullable) {
       Empty    => showLogin();
@@ -112,7 +112,7 @@ namespace shop {
 
   // 同じく by list。ケースは Empty / HasItems（MATCH-2）
   // docs/check.md「計算」手順 0（配線）: 一部のアームにしかない効果（clearCart）は succ が unknown
-  op openCart()
+  fn openCart()
   {
     match (carts by list) {
       Empty    => showEmpty();
@@ -123,7 +123,7 @@ namespace shop {
   // docs/grammar.md「配線」の表: 状態の分類での match。対象は書かない（分類の宣言が持つ）
   // docs/ir.md「配線」: subject は { kind: "classify" }、classify は分類の FQN
   // docs/types.md「式の型」: 状態の match も値の match と同じ決め方（none のアームがあれば optional）
-  op checkout(): Order?
+  fn checkout(): Order?
     throws EmptyCart
   {
     val placed = match (by Checkout) {
@@ -134,7 +134,7 @@ namespace shop {
   }
 
   // 状態の分類での match（else のアーム: 受けるケースは LoggedOut）と、値の分類での match（subject は { kind: "value", atom }）が並ぶ
-  op add(line: Line)
+  fn add(line: Line)
   {
     val normalized = match (line by LineKind) {
       Single => packSingle(line);

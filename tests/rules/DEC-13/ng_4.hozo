@@ -7,10 +7,10 @@ namespace a {
   decorator alias = once("id");
   @once("a")
   @once("b")                           // ERROR: DEC-13
-  read twice(): M[] on rows;
+  read fn twice(): M[] on rows;
   @alias
   @alias                               // ERROR: DEC-13
-  effect twiceEffect(m: M) on rows.post;
+  effect fn twiceEffect(m: M) on rows.post;
   @once("a")
   @alias                               // ERROR: DEC-13
   exception Twice;

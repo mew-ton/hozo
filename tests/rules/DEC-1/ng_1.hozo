@@ -3,7 +3,7 @@ namespace a {
   model M { id: string; }
   state s: list<M>;
   @http.status(400)                    // ERROR: DEC-1
-  op f(): void;
+  fn f(): void;
   @db.table                            // ERROR: DEC-1
   union U { Ready: M; }
   @http.retry(3)                       // ERROR: DEC-1
@@ -12,11 +12,11 @@ namespace a {
   state okState: list<M>;
   decorator onlyOp;
   @onlyOp                              // ERROR: DEC-1
-  effect e() on s.post;
+  effect fn e() on s.post;
   @onlyOp                              // ERROR: DEC-1
   classify C of M { A; }
   @onlyOp                              // ERROR: DEC-1
   decorator other;
   @onlyOp
-  op ok(): void;
+  fn ok(): void;
 }

@@ -30,25 +30,25 @@ namespace shop {
   classify LoggedIn of token { LoggedIn; LoggedOut; }
   classify LineKind of Line { Gift; Normal; }
 
-  effect addLine() on carts.post;
-  effect tick() on clock.put;
-  effect logout() on token.delete;
-  effect placeOrder() on Checkout: Shopping -> Ordered;
-  effect reset() on Checkout: any -> Shopping;
-  effect touch() on Checkout: Ordered, Shopping -> any;
-  effect clearCart() on carts: HasItems -> Empty;
-  effect login() on token: Empty -> HasItems;
-  effect signIn() on LoggedIn: any -> LoggedIn;
+  effect fn addLine() on carts.post;
+  effect fn tick() on clock.put;
+  effect fn logout() on token.delete;
+  effect fn placeOrder() on Checkout: Shopping -> Ordered;
+  effect fn reset() on Checkout: any -> Shopping;
+  effect fn touch() on Checkout: Ordered, Shopping -> any;
+  effect fn clearCart() on carts: HasItems -> Empty;
+  effect fn login() on token: Empty -> HasItems;
+  effect fn signIn() on LoggedIn: any -> LoggedIn;
 
-  op showEmpty(): void;
-  op showCart(): void;
-  op me(): Token;
-  op gift(line: LineKind.Gift<Line>): Line;
-  op normal(line: Line): Line;
-  op newOrder(): Order;
-  op order(): Order effects placeOrder { placeOrder(); return newOrder(); }
+  fn showEmpty(): void;
+  fn showCart(): void;
+  fn me(): Token;
+  fn gift(line: LineKind.Gift<Line>): Line;
+  fn normal(line: Line): Line;
+  fn newOrder(): Order;
+  fn order(): Order effects placeOrder { placeOrder(); return newOrder(); }
 
-  op view(line: Line): Order {
+  fn view(line: Line): Order {
     match(carts by list){
       Empty => showEmpty();
       HasItems => showCart();
@@ -177,9 +177,9 @@ namespace a {
   state x: list<M>;
   classify Mixed of x, M { A; }        // ERROR: CLS-3
   classify Twice of x, x { A; }        // ERROR: CLS-3
-  op f(): void;
+  fn f(): void;
   // 対象が決まらなかった分類での match には、MATCH-7 を重ねない
-  op g(): void {
+  fn g(): void {
     match(by Mixed){ A => f(); };
     match(by Twice){ A => f(); };
   }
@@ -230,14 +230,14 @@ func TestEffectTargetRefs(t *testing.T) {
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  effect start() on Phase: Idle -> Busy;
-  effect drain() on s: HasItems -> Empty;
+  effect fn start() on Phase: Idle -> Busy;
+  effect fn drain() on s: HasItems -> Empty;
 }`}, false)
 	noErrors(t, res, fs)
-	hasRef(t, res, fs, "a.hozo:5:21 decl a.Phase")
-	hasRef(t, res, fs, "a.hozo:5:28 case a.Phase.Idle")
-	hasRef(t, res, fs, "a.hozo:5:36 case a.Phase.Busy")
-	hasRef(t, res, fs, "a.hozo:6:21 decl a.s")
+	hasRef(t, res, fs, "a.hozo:5:24 decl a.Phase")
+	hasRef(t, res, fs, "a.hozo:5:31 case a.Phase.Idle")
+	hasRef(t, res, fs, "a.hozo:5:39 case a.Phase.Busy")
+	hasRef(t, res, fs, "a.hozo:6:24 decl a.s")
 	for _, s := range refStrings(res, fs) {
 		if s == "a.hozo:6:24 case a.s.HasItems" || s == "a.hozo:6:36 case a.s.Empty" {
 			t.Errorf("組み込みのケースに参照がある: %s", s)
@@ -253,10 +253,10 @@ namespace a {
   state clock: single<string>;
   state items: list<M>;
   classify Kind of M { A; B; }
-  effect onSingle() on clock: Empty -> HasItems; // ERROR: STATE-4
-  effect value() on Kind: A -> B;                // ERROR: RES-4
-  effect unknown() on nothing: A -> B;           // ERROR: RES-1
-  effect badCase() on items: Empty -> Full;      // ERROR: STATE-4
+  effect fn onSingle() on clock: Empty -> HasItems; // ERROR: STATE-4
+  effect fn value() on Kind: A -> B;                // ERROR: RES-4
+  effect fn unknown() on nothing: A -> B;           // ERROR: RES-1
+  effect fn badCase() on items: Empty -> Full;      // ERROR: STATE-4
 }`}, false)
 	for _, name := range []string{"a.onSingle", "a.value", "a.unknown"} {
 		e := res.Program.Lookup(name).(*ir.Effect)
@@ -344,8 +344,8 @@ func TestMatchStateRefs(t *testing.T) {
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  op f(): void;
-  op g(): void {
+  fn f(): void;
+  fn g(): void {
     match(s by list){ Empty => f(); HasItems => none; };
     match(by Phase){ Idle => f(); Busy => none; };
   }
@@ -367,43 +367,43 @@ namespace a {
   state items: list<M>;
   state token: nullable<string>;
   classify Stock of items { None; Some; }
-  op m(): M;
-  op n(): N;
-  op nothing(): void;
-  op takeM(m: M): void;
-  op takeOptM(m: M?): void;
-  op takeN(n: N): void;
+  fn m(): M;
+  fn n(): N;
+  fn nothing(): void;
+  fn takeM(m: M): void;
+  fn takeOptM(m: M?): void;
+  fn takeN(n: N): void;
 
   // すべてのアームが同じ型 → その型。none のアームがあれば optional
-  op same(): M {
+  fn same(): M {
     return match(items by list){ Empty => m(); HasItems => m(); };
   }
-  op optional(): void {
+  fn optional(): void {
     val   x = match(token by nullable){ Empty => none; HasItems => m(); };
     takeOptM(x);
     takeM(x);                                                          // ERROR: TYPE-4
   }
-  op byClassify(): M {
+  fn byClassify(): M {
     return match(by Stock){ None => m(); Some => m(); };
   }
   // 値のある呼び出しがなければ「値がない」
-  op noValue(): void {
+  fn noValue(): void {
     match(items by list){ Empty => nothing(); HasItems => none; };
     val   y = match(by Stock){ None => nothing(); Some => none; };     // ERROR: WIRE-2 // WARN: WIRE-8
   }
   // 型がそろわない、値のある呼び出しと値のない呼び出しが混ざる
-  op mixed(): void {
+  fn mixed(): void {
     val   a = match(items by list){ Empty => m(); HasItems => n(); };          // ERROR: TYPE-8 // WARN: WIRE-8
     val   b = match(by Stock){ None => m(); Some => nothing(); };              // ERROR: TYPE-8 // WARN: WIRE-8
     val   c = match(token by nullable){ Empty => m(); HasItems => m(); };      // WARN: WIRE-8
   }
   // 対象でない引数は、アームの中でもそのままの型で照合する
-  op args(v: M): void {
+  fn args(v: M): void {
     match(items by list){ Empty => takeM(v); HasItems => takeN(v); };  // ERROR: TYPE-4
     match(by Stock){ None => takeM(v); Some => takeN(v); };            // ERROR: TYPE-4
   }
   // 値がある match を束縛せずに書けない
-  op unbound(): void {
+  fn unbound(): void {
     match(items by list){ Empty => m(); HasItems => m(); };            // ERROR: WIRE-2
   }
 }`}, false)
@@ -415,13 +415,13 @@ func TestEffectOnAcceptsOnlyBuiltin(t *testing.T) {
 	res := runAnnotated(t, project{"a.hozo": `
 namespace a {
   state location: list<string>;
-  effect go() on location.put;
-  effect leave() on location: HasItems -> Empty;
+  effect fn go() on location.put;
+  effect fn leave() on location: HasItems -> Empty;
   decorator nav(target: any effect on location.put);
   @nav(go)
-  op ok(): void;
+  fn ok(): void;
   @nav(leave)                          // ERROR: DEC-7
-  op ng(): void;
+  fn ng(): void;
 }`}, false)
 	nav := res.Program.Lookup("a.nav").(*ir.Decorator)
 	jsonEq(t, "on", nav.Params[0].Type, ir.AnyParam{Of: ir.AnyEffect, On: &ir.EffectOn{State: "a.location", Operation: ir.OpPut}})
@@ -436,9 +436,9 @@ namespace a {
   model M { id: string; }
   state items: list<M>;
   classify Stock of items { None; Some; }
-  op get(): M;
-  op f(): void;
-  op g(): void {
+  fn get(): M;
+  fn f(): void;
+  fn g(): void {
     val   m = get();
     match(m by Stock){ None => f(); Some => none; };   // ERROR: MATCH-7
   }

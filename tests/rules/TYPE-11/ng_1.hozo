@@ -5,5 +5,5 @@ namespace a {
     ng1: Record<int, int>;             // ERROR: TYPE-11
     ng2: Record<Num, int>;             // ERROR: TYPE-11
   }
-  op f(): M;
+  fn f(): M;
 }

@@ -1,4 +1,4 @@
 // CFG-19: 単位のトランスパイラの requires にある名前が、その単位の transpilers にない（ng_1.toml）
 namespace a {
-  op f();
+  fn f();
 }

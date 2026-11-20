@@ -1,22 +1,22 @@
 // GOHTTP-8: 位置は後ろの op。
 namespace app {
   @http.get("/items")
-  export op first(): string;
+  export fn first(): string;
   @http.get("/items")
-  export op second(): string;
+  export fn second(): string;
   @http.get("/items")
-  export op third(): string;
+  export fn third(): string;
 
   // メソッドが違えば、当たらない。パスが違っても、当たらない
   @http.post("/items")
-  export op create();
+  export fn create();
   @http.get("/items/")
-  export op slash(): string;
+  export fn slash(): string;
 
   // 一つの op の二つの経路どうしでも当たる
   @http.post("/twice")
-  export op twice();
+  export fn twice();
   @http.post("/twice")
   @http.get("/twice")
-  export op again();
+  export fn again();
 }

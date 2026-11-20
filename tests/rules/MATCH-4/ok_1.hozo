@@ -2,10 +2,10 @@
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
-  op onA(m: C.A<M>): void;
-  op wide(m: M): void;
-  op onAorB(m: C.A<M>): void;
-  op ok(m: M): void {
+  fn onA(m: C.A<M>): void;
+  fn wide(m: M): void;
+  fn onAorB(m: C.A<M>): void;
+  fn ok(m: M): void {
     match (m by C) {
       A => onA(m);
       B => wide(m);

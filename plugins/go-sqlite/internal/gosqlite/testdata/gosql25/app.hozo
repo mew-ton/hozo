@@ -8,22 +8,22 @@ namespace app {
   // 引数と @db.where
   @db.list
   @db.where("note", "x")
-  read rowsNoted(note: string): Row[] on rows;
+  read fn rowsNoted(note: string): Row[] on rows;
   // 二つの @db.where（値が同じでも）
   @db.list
   @db.where("rank", 1)
   @db.where("rank", 1)
-  read topRows(): Row[] on rows;
+  read fn topRows(): Row[] on rows;
   // 三度
   @db.find
   @db.where("id", "a")
   @db.where("id", "b")
-  read fixedRow(id: string): Row? on rows;
+  read fn fixedRow(id: string): Row? on rows;
 
   // 通るもの: 別の列。@db.latest の列は、条件ではない
   @db.list
   @db.where("note", "x")
   @db.where("rank", 1)
   @db.latest("at")
-  read rowsAt(at: Time): Row[] on rows;
+  read fn rowsAt(at: Time): Row[] on rows;
 }

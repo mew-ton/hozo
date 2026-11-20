@@ -1,10 +1,10 @@
 // REL-5（docs/check.md「throws」）: 一つの ThrowsClause に prevents と keeps の両方がある。internal/sema/testdata/rules/REL-5.hozo から
 namespace a {
   state s: list<string>;
-  effect e() on s.post;
+  effect fn e() on s.post;
   exception E;
   exception F;
   decorator doing(...targets: any effect) for op effects targets;
-  @doing(e) op a1() throws E prevents effects keeps effects;     // ERROR: REL-5
-  @doing(e) op a2() throws E, F keeps effects prevents effects;  // ERROR: REL-5
+  @doing(e) fn a1() throws E prevents effects keeps effects;     // ERROR: REL-5
+  @doing(e) fn a2() throws E, F keeps effects prevents effects;  // ERROR: REL-5
 }

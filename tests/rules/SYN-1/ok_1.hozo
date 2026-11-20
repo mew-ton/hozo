@@ -2,5 +2,5 @@
 namespace a {
   @localStorage
   state s: list<string>;
-  op f();
+  fn f();
 }

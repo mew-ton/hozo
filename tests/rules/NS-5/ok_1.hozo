@@ -1,12 +1,12 @@
 // NS-5（docs/check.md「export」）: export を付けた op は別の名前空間から呼べる。同じ名前空間の op は、付けなくても呼べる。
 // 対象は op だけで、型・例外・分類は修飾すればどこからでも参照できる
 namespace a {
-  op local(): b.M;
-  op f(): b.M throws b.E {
+  fn local(): b.M;
+  fn f(): b.M throws b.E {
     val m = local();
     return b.keep(m);
   }
-  op g(m: b.M): b.M throws b.E {
+  fn g(m: b.M): b.M throws b.E {
     return match (m by b.Kind) {
       A => b.keep(m);
       B => throw b.E;
@@ -17,5 +17,5 @@ namespace b {
   model M { id: string; }
   exception E;
   classify Kind of M { A; B; }
-  export op keep(m: M): M throws E;
+  export fn keep(m: M): M throws E;
 }

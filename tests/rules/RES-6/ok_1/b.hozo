@@ -1,4 +1,4 @@
 namespace a {
   model Y { id: string; }
-  op g(): Y;
+  fn g(): Y;
 }

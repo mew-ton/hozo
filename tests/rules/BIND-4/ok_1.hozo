@@ -3,14 +3,14 @@ namespace a {
   scalar Token extends string;
   state token: single<Token>;
   bind token to b.*;
-  op f() {
+  fn f() {
     b.take({ id: "x" });
   }
-  op g(t: Token) {
+  fn g(t: Token) {
     b.take({ id: "x", token: t });
   }
 }
 namespace b {
   model In { id: string; token: a.Token; }
-  export op take(in: In);
+  export fn take(in: In);
 }

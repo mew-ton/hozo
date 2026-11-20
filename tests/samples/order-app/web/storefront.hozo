@@ -44,50 +44,50 @@ namespace storefront {
   // ---- 効果 ----
 
   /** カートに一行足す。同じ商品で、希望も同じ行があれば、個数を足す */
-  effect addLine(line: ordering.CartLine) on cart.post;
+  effect fn addLine(line: ordering.CartLine) on cart.post;
 
   /** カートの行の個数を変える */
-  effect changeQuantity(sku: type.Sku, quantity: type.Quantity) on cart.put;
+  effect fn changeQuantity(sku: type.Sku, quantity: type.Quantity) on cart.put;
 
   /** カートから行を消す */
-  effect removeLine(sku: type.Sku) on cart.delete;
+  effect fn removeLine(sku: type.Sku) on cart.delete;
 
   /** カートを空にする */
-  effect emptyCart() on cart: HasItems -> Empty;
+  effect fn emptyCart() on cart: HasItems -> Empty;
 
   /** 見せる値段を置く */
-  effect showOffer(offer: Offer) on offer: Empty -> HasItems;
+  effect fn showOffer(offer: Offer) on offer: Empty -> HasItems;
 
   /** 見せている値段を捨てる。同意は、取り直しになる */
-  effect forgetOffer() on offer.delete;
+  effect fn forgetOffer() on offer.delete;
 
   /** 注文の鍵を覚える */
-  effect rememberOrder(key: type.OrderKey) on lastOrder.put;
+  effect fn rememberOrder(key: type.OrderKey) on lastOrder.put;
 
   /** 理由を消す */
-  effect clearProblem() on problem.delete;
+  effect fn clearProblem() on problem.delete;
 
   /** カートの商品が、もう売っていない */
-  effect sayCartOutdated() on problem.put;
+  effect fn sayCartOutdated() on problem.put;
 
   /** その届け先には送れない、または大きすぎる */
-  effect sayCannotDeliver() on problem.put;
+  effect fn sayCannotDeliver() on problem.put;
 
   /** 在庫が足りない */
-  effect saySoldOut() on problem.put;
+  effect fn saySoldOut() on problem.put;
 
   /** 見せた送料の上限が、変わっていた。見せている値段を捨てて、取り直させる */
-  effect sayTermsChanged() on offer.delete;
+  effect fn sayTermsChanged() on offer.delete;
 
   /** いまは注文できない（サーバーか、支払いの仕組みに届かない） */
-  effect sayTryLater() on problem.put;
+  effect fn sayTryLater() on problem.put;
 
   /** 画面を移す */
-  effect goToCart() on location.put;
-  effect goToCheckout() on location.put;
-  effect goToOrder(key: type.OrderKey) on location.put;
+  effect fn goToCart() on location.put;
+  effect fn goToCheckout() on location.put;
+  effect fn goToOrder(key: type.OrderKey) on location.put;
   /** 同じ画面を、開き直す */
-  effect reload() on location.put;
+  effect fn reload() on location.put;
 
   // ---- デコレータ ----
 
@@ -123,11 +123,11 @@ namespace storefront {
     Unavailable: Unavailable;
   }
 
-  op catalogVm(products: catalog.Product[]): CatalogPage;
+  fn catalogVm(products: catalog.Product[]): CatalogPage;
 
   @unavailableOnFailure
   @page.route("/")
-  op openCatalog(): CatalogPage {
+  fn openCatalog(): CatalogPage {
     val products = shopApi.products();
     return catalogVm(products);
   }
@@ -148,18 +148,18 @@ namespace storefront {
     Unavailable: Unavailable;
   }
 
-  op productVm(product: catalog.Product?): ProductPage;
+  fn productVm(product: catalog.Product?): ProductPage;
 
   @unavailableOnFailure
   @page.route("/product", from: query)
-  op openProduct(query: ProductQuery): ProductPage {
+  fn openProduct(query: ProductQuery): ProductPage {
     val product = shopApi.product({ sku: query.sku });
     return productVm(product);
   }
 
   /** カートに入れる。受注製作の商品は、作り方の希望を聞いてから入れる */
   @page.interaction(page: openProduct, when: ProductPage.Ready)
-  op onAddToCart(product: catalog.Product, quantity: type.Quantity)
+  fn onAddToCart(product: catalog.Product, quantity: type.Quantity)
     throws page.Aborted
   {
     val line = match (product.fulfilment by catalog.Kind) {
@@ -173,10 +173,10 @@ namespace storefront {
 
   /** 作り方の希望を聞く */
   @page.dialog("MadeToOrderRequestDialog")
-  op askRequest(product: catalog.Product, quantity: type.Quantity): ordering.CartLine;
+  fn askRequest(product: catalog.Product, quantity: type.Quantity): ordering.CartLine;
 
   /** 希望のない行を作る */
-  op lineOf(product: catalog.Product, quantity: type.Quantity): ordering.CartLine;
+  fn lineOf(product: catalog.Product, quantity: type.Quantity): ordering.CartLine;
 
   // ---- カート ----
 
@@ -190,12 +190,12 @@ namespace storefront {
     Unavailable: Unavailable;
   }
 
-  op filledCartVm(sorted: ordering.Sorted, problem: Problem?): CartPage;
-  op emptyCartVm(): CartPage;
+  fn filledCartVm(sorted: ordering.Sorted, problem: Problem?): CartPage;
+  fn emptyCartVm(): CartPage;
 
   @unavailableOnFailure
   @page.route("/cart")
-  op openCart(): CartPage {
+  fn openCart(): CartPage {
     return match (cart by list) {
       Empty    => emptyCartVm();
       HasItems => filledCart();
@@ -204,7 +204,7 @@ namespace storefront {
 
   /** カートの中身に、いまの値段を付けてもらう。ページの op に fallback を二つは付けられないので、二つ目は、この op が持つ */
   @outdatedOnFailure
-  op filledCart(): CartPage
+  fn filledCart(): CartPage
     throws http.NetworkError, http.ServerError
   {
     val sorted = shopApi.itemise({ lines: cart });
@@ -213,7 +213,7 @@ namespace storefront {
 
   /** 個数を変える */
   @page.interaction(page: openCart, when: CartPage.Filled)
-  op onChangeQuantity(sku: type.Sku, quantity: type.Quantity) {
+  fn onChangeQuantity(sku: type.Sku, quantity: type.Quantity) {
     changeQuantity(sku, quantity);
     forgetOffer();
     reload();
@@ -221,7 +221,7 @@ namespace storefront {
 
   /** 行を消す */
   @page.interaction(page: openCart, when: CartPage.Filled)
-  op onRemoveLine(sku: type.Sku) {
+  fn onRemoveLine(sku: type.Sku) {
     removeLine(sku);
     forgetOffer();
     reload();
@@ -229,14 +229,14 @@ namespace storefront {
 
   /** 注文へ進む */
   @page.interaction(page: openCart, when: CartPage.Filled)
-  op onProceed() {
+  fn onProceed() {
     clearProblem();
     goToCheckout();
   }
 
   /** カートを空にして、やり直す */
   @page.interaction(page: openCart, when: CartPage.Outdated)
-  op onStartOver() {
+  fn onStartOver() {
     emptyCart();
     forgetOffer();
     reload();
@@ -260,13 +260,13 @@ namespace storefront {
     Unavailable: Unavailable;
   }
 
-  op enteringVm(sorted: ordering.Sorted, problem: Problem?): CheckoutPage;
-  op quotedVm(offer: Offer, problem: Problem?): CheckoutPage;
-  op emptyCheckoutVm(): CheckoutPage;
+  fn enteringVm(sorted: ordering.Sorted, problem: Problem?): CheckoutPage;
+  fn quotedVm(offer: Offer, problem: Problem?): CheckoutPage;
+  fn emptyCheckoutVm(): CheckoutPage;
 
   @unavailableOnFailure
   @page.route("/checkout")
-  op openCheckout(): CheckoutPage {
+  fn openCheckout(): CheckoutPage {
     return match (cart by list) {
       Empty    => emptyCheckoutVm();
       HasItems => checkout();
@@ -275,7 +275,7 @@ namespace storefront {
 
   /** 値段を見せているか、まだか */
   @outdatedOnFailure
-  op checkout(): CheckoutPage
+  fn checkout(): CheckoutPage
     throws http.NetworkError, http.ServerError
   {
     return match (offer by nullable) {
@@ -285,7 +285,7 @@ namespace storefront {
   }
 
   /** 入力を待つ */
-  op entering(): CheckoutPage
+  fn entering(): CheckoutPage
     throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
   {
     val sorted = shopApi.itemise({ lines: cart });
@@ -303,7 +303,7 @@ namespace storefront {
   @recover(ordering.UnknownProduct | ordering.NotForSale, sayCartOutdated)
   @recover(ordering.DestinationRequired | shipping.Undeliverable | shipping.TooLarge, sayCannotDeliver)
   @recover(http.NetworkError | http.ServerError, sayTryLater)
-  op onAskQuote(contact: Contact) {
+  fn onAskQuote(contact: Contact) {
     val priced = shopApi.quote({ lines: cart, destination: contact.destination });
     val requestId = newRequestId();
     showOffer({ requestId: requestId, email: contact.email, destination: contact.destination, priced: priced });
@@ -311,11 +311,11 @@ namespace storefront {
   }
 
   /** 申し込みの識別子を作る */
-  op newRequestId(): type.RequestId;
+  fn newRequestId(): type.RequestId;
 
   /** 連絡先を直す。見せている値段は捨てる */
   @page.interaction(page: openCheckout, when: CheckoutPage.Quoted)
-  op onEditContact() {
+  fn onEditContact() {
     forgetOffer();
     reload();
   }
@@ -330,7 +330,7 @@ namespace storefront {
   @recover(inventory.OutOfStock, saySoldOut)
   @recover(ordering.TermsChanged, sayTermsChanged)
   @recover(ordering.OrderExpired | payment.AlreadySecured | payment.ProviderUnavailable | http.NetworkError | http.ServerError, sayTryLater)
-  op onPlaceOrder() {
+  fn onPlaceOrder() {
     match (offer by nullable) {
       HasItems => placeOrder(offer);
       Empty    => none;
@@ -338,7 +338,7 @@ namespace storefront {
   }
 
   /** 注文して、カートを空にして、支払いの画面へ出る */
-  op placeOrder(agreed: Offer)
+  fn placeOrder(agreed: Offer)
     throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired, ordering.TermsChanged,
            ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
            payment.AlreadySecured, payment.ProviderUnavailable, http.NetworkError, http.ServerError
@@ -358,7 +358,7 @@ namespace storefront {
 
   /** アプリの外の URL へ移る */
   @nav.leave
-  op leaveTo(url: type.Url);
+  fn leaveTo(url: type.Url);
 
   // ---- 注文のいま ----
 
@@ -383,11 +383,11 @@ namespace storefront {
     Unavailable: Unavailable;
   }
 
-  op orderVm(view: shopApi.OrderView?): OrderPage;
+  fn orderVm(view: shopApi.OrderView?): OrderPage;
 
   @unavailableOnFailure
   @page.route("/order", from: query)
-  op openOrder(query: OrderQuery): OrderPage {
+  fn openOrder(query: OrderQuery): OrderPage {
     val view = shopApi.status({ key: query.key });
     return orderVm(view);
   }
@@ -396,14 +396,14 @@ namespace storefront {
   @page.interaction(page: openOrder, when: OrderPage.AwaitingPayment)
   @recover(ordering.NoOrder | ordering.OrderExpired | payment.AlreadySecured, reload)
   @recover(payment.ProviderUnavailable | http.NetworkError | http.ServerError, sayTryLater)
-  op onPay(key: type.OrderKey) {
+  fn onPay(key: type.OrderKey) {
     val placed = shopApi.pay({ key });
     leaveTo(placed.payAt);
   }
 
   /** 開き直す（同意の通知が届いたかを見る） */
   @page.interaction(page: openOrder, when: OrderPage.AwaitingPayment)
-  op onRefresh() {
+  fn onRefresh() {
     reload();
   }
 
@@ -411,12 +411,12 @@ namespace storefront {
   @page.interaction(page: openOrder, when: OrderPage.Accepted)
   @recover(ordering.NoOrder | download.NotGranted | download.GrantExpired, reload)
   @recover(download.AssetsUnavailable | http.NetworkError | http.ServerError, sayTryLater)
-  op onDownload(key: type.OrderKey, line: type.LineId) {
+  fn onDownload(key: type.OrderKey, line: type.LineId) {
     val url = shopApi.download({ key, line });
     saveFrom(url);
   }
 
   /** URL のファイルを保存させる */
   @nav.save
-  op saveFrom(url: type.Url);
+  fn saveFrom(url: type.Url);
 }

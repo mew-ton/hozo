@@ -59,28 +59,28 @@ namespace production {
 
   /** その識別子の仕事 */
   @db.find
-  read jobById(id: JobId): Job? on jobs;
+  read fn jobById(id: JobId): Job? on jobs;
 
   /** その注文の仕事 */
   @db.list
-  read jobsOfOrder(orderId: type.OrderId): Job[] on jobs;
+  read fn jobsOfOrder(orderId: type.OrderId): Job[] on jobs;
 
   /** 作り終えていない仕事。納期の近い順（人が書く: 値がないことと、古い順の並べ方） */
-  read openJobs(): Job[] on jobs;
+  read fn openJobs(): Job[] on jobs;
 
   /** 仕事を、一つ足す。まだ手を付けていない仕事として入る */
-  effect addJob(job: Job) on jobs.post as Progress.Queued;
+  effect fn addJob(job: Job) on jobs.post as Progress.Queued;
 
   /** 作り始めた: 始めた時刻を入れる（人が書く） */
-  effect startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.InProduction;
+  effect fn startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.InProduction;
 
   /** 作り終えて、量った: 終えた時刻と、量った大きさを入れる（人が書く） */
-  effect finishJob(job: Job, measured: type.Measurement, at: Time) on jobs.put as Progress.InProduction -> Progress.Finished;
+  effect fn finishJob(job: Job, measured: type.Measurement, at: Time) on jobs.put as Progress.InProduction -> Progress.Finished;
 
   // ---- 受け付けたとき ----
 
   /** 受注製作の行を、一つずつ、仕事にする。行がなければ、何も足さない */
-  export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
+  export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
     val now = clock.now();
     for (val line of lines) {
       val job = planJob(orderId, line, now);
@@ -89,22 +89,22 @@ namespace production {
   }
 
   /** 行から仕事を作り、納期を決める（人が書く） */
-  op planJob(orderId: type.OrderId, line: ordering.MadeLine, now: Time): Job;
+  fn planJob(orderId: type.OrderId, line: ordering.MadeLine, now: Time): Job;
 
   // ---- 引く ----
 
   /** 作り終えていない仕事の一覧。納期の近い順 */
-  export op queue(): Job[] {
+  export fn queue(): Job[] {
     return openJobs();
   }
 
   /** 注文の仕事の一覧 */
-  export op ofOrder(orderId: type.OrderId): Job[] {
+  export fn ofOrder(orderId: type.OrderId): Job[] {
     return jobsOfOrder(orderId);
   }
 
   /** 仕事を引く */
-  op require(id: JobId): Job
+  fn require(id: JobId): Job
     throws NoJob
   {
     val found = jobById(id);
@@ -117,7 +117,7 @@ namespace production {
   // ---- 作る ----
 
   /** 作り始めた */
-  export op start(id: JobId): Job
+  export fn start(id: JobId): Job
     throws NoJob, NotQueued
   {
     val job = require(id);
@@ -130,7 +130,7 @@ namespace production {
   }
 
   /** 作り終えて、量った。出来上がりの大きさと重さが、ここで決まる */
-  export op finish(id: JobId, measured: type.Measurement): Job
+  export fn finish(id: JobId, measured: type.Measurement): Job
     throws NoJob, NotInProduction
   {
     val job = require(id);

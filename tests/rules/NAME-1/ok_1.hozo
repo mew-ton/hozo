@@ -6,8 +6,8 @@ namespace a {
   union Page { Ready: User; }
   classify Kind of User { Big; }
   state users: list<User>;
-  op find(): User;
-  effect added() on users.post;
-  read first(): User? on users;
+  fn find(): User;
+  effect fn added() on users.post;
+  read fn first(): User? on users;
   decorator tag;
 }

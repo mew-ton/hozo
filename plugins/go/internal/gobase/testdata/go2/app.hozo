@@ -39,7 +39,7 @@ namespace c.models {
 namespace c.states {
   model Row { id: string; }
   state rows: list<Row>;
-  effect addRow() on rows.post;
+  effect fn addRow() on rows.post;
   model EffectAddRow { x: int; }
   model RowsState { x: int; }
 }
@@ -49,14 +49,14 @@ namespace c.ops {
   model Ops { x: int; }
   model Leaves { x: int; }
   model CDepOps { x: int; }
-  export op run(): int;
-  export op call(): int
+  export fn run(): int;
+  export fn call(): int
   {
     return c.dep.work();
   }
 }
 namespace c.dep {
-  export op work(): int;
+  export fn work(): int;
 }
 
 // 公開の名前どうし: 分類の名前（列挙の定数、述語のインターフェース、判定関数）と型
@@ -79,8 +79,8 @@ namespace c.fields {
 
 // 一つのインターフェースのメソッドどうし: Ops の中の foo と Foo
 namespace c.methods {
-  export op foo(): int;
-  export op Foo(): int;
+  export fn foo(): int;
+  export fn Foo(): int;
 }
 
 // 一つのインターフェースのメソッドどうし: 状態の単位の、形で決まるメソッド（Get と、配線が直に呼ぶ Post）と、ケースの述語と、
@@ -89,24 +89,24 @@ namespace c.units {
   model Row { id: string; }
   state rows: list<Row>;
   // 形で決まる問い合わせ Get と read get
-  read get(): int on rows;
+  read fn get(): int on rows;
   // 同じ状態の read findRow と効果 FindRow
-  read findRow(id: string): Row? on rows;
-  effect FindRow(id: string) on rows.delete;
+  read fn findRow(id: string): Row? on rows;
+  effect fn FindRow(id: string) on rows.delete;
   // 形で決まる命令 Post（配線が直に呼ぶ）と効果 post
-  effect post(row: Row) on rows.post;
-  export op add(row: Row)
+  effect fn post(row: Row) on rows.post;
+  export fn add(row: Row)
   {
     rows.post(row);
   }
   // 直に呼ばれていない操作（rows は put を直に呼べない）は、単位のメソッドにならないので、効果 put は当たらない
-  effect put(row: Row) on rows.put;
+  effect fn put(row: Row) on rows.put;
   // 状態の分類の単位: ケースの述語 Full と効果 full
   classify Load of rows {
     Full;
     Spare;
   }
-  effect full() on Load: Spare -> Full;
+  effect fn full() on Load: Spare -> Full;
 }
 
 // Seams の中のメソッドどうし（op loginRate の @x.limited と、op login の @rate.x.limited。どちらも LoginRateXLimited）と、
@@ -114,9 +114,9 @@ namespace c.units {
 namespace c.seams {
   state loginBody: single<string>;
   @x.limited
-  export op loginRate(): int;
+  export fn loginRate(): int;
   @rate.x.limited
-  export op login(): int
+  export fn login(): int
   {
     return loginRate();
   }

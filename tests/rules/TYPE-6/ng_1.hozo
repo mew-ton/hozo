@@ -1,8 +1,8 @@
 // TYPE-6（docs/types.md「診断」）: レコードリテラルに同じフィールドが二度。internal/sema/testdata/rules/TYPE-6.hozo から
 namespace a {
   model In { id: string; }
-  op take(in: In): void;
-  op f(): void {
+  fn take(in: In): void;
+  fn f(): void {
     take({ id: "x", id: "y" });        // ERROR: TYPE-6
   }
 }

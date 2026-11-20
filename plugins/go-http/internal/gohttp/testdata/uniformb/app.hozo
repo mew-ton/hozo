@@ -29,7 +29,7 @@ namespace app {
     @http.query @http.required owner: Token;
   }
   @http.get("/items")
-  export op find(in: FindInput): Item?
+  export fn find(in: FindInput): Item?
     throws Missing;
 
   model PutInput {
@@ -40,7 +40,7 @@ namespace app {
     @http.body @http.default(1) copies: Page;
   }
   @http.post("/items")
-  export op put(in: PutInput): Token?
+  export fn put(in: PutInput): Token?
     throws Clash;
 
   model AllInput {
@@ -49,5 +49,5 @@ namespace app {
     @http.bodyObj item: Item;
   }
   @http.post("/all")
-  export op all(in: AllInput): Record<string, Item>;
+  export fn all(in: AllInput): Record<string, Item>;
 }

@@ -19,24 +19,24 @@ namespace checked {
 namespace app {
   // 入力の model が plain のもの: Validate のメソッドがない
   @cli.command("a")
-  export op a(in: plain.In);
+  export fn a(in: plain.In);
 
   // 同じ model を使う、もう一つのコマンド
   @cli.command("b")
-  export op b(in: plain.In): string;
+  export fn b(in: plain.In): string;
 
   // Validate を持たない入力は、確かめないので、当たらない
   @cli.command("c")
-  export op c(in: plain.Free);
+  export fn c(in: plain.Free);
 
   // 置き場の単位が go-valid を並べていれば、当たらない
   @cli.command("d")
-  export op d(in: checked.In);
+  export fn d(in: checked.In);
 
   // 自分の名前空間の model（自分の単位は go-valid を並べている。CFG-19）
   model Own {
     @valid.length(min: 1) @cli.flag("name") name: string;
   }
   @cli.command("e")
-  export op e(in: Own);
+  export fn e(in: Own);
 }

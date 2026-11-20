@@ -58,9 +58,9 @@ func TestResolveStep1_1(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op use(m: M, n: M): void;
-  op f(m: M): void {
+  fn value(): M;
+  fn use(m: M, n: M): void;
+  fn f(m: M): void {
     val   x = value();
     use(m, x);
   }
@@ -76,7 +76,7 @@ func TestResolveStep1_2(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {
   state s: single<string>;
-  effect e() on s.put;
+  effect fn e() on s.put;
   decorator d(error: any exception, target: any effect) catches error halts target throws error;
 }`}, false)
 	noErrors(t, res, fs)
@@ -104,7 +104,7 @@ namespace a {
   decorator route(path: string, from: any state?);
   @cache(["orders", query])
   @route("/orders", from: query)
-  op f(query: string): void;
+  fn f(query: string): void;
 }`}, false)
 	noErrors(t, res, fs)
 	op := res.Program.Lookup("a.f").(*ir.Op)
@@ -151,10 +151,10 @@ func TestResolveStep1_5_6(t *testing.T) {
 model M { g: string; }
 namespace a {
   model M { l: string; }
-  op f(): M;
+  fn f(): M;
 }
 namespace b {
-  op g(): M;
+  fn g(): M;
 }`}, false)
 	noErrors(t, res, fs)
 	if got := res.Program.Lookup("a.f").(*ir.Op).Returns; !ir.TypeEqual(got, ir.Ref("a.M")) {
@@ -171,12 +171,12 @@ func TestResolveStep1_7Candidates(t *testing.T) {
 namespace a {
   model User { id: string; }
   model Usr { id: string; }
-  op user(): User;
-  op f(): Usre;
+  fn user(): User;
+  fn f(): Usre;
 }
 namespace b {
   model User { id: string; }
-  op g(): Usr;
+  fn g(): Usr;
 }`}, false)
 	var found int
 	for _, d := range res.Diags {
@@ -212,18 +212,18 @@ namespace a {
   union U { Ready: Q; }
   state s: list<Q>;
   decorator when(v: any variant);
-  op takeInt(n: int): void;
-  op takeOpt(n: int?): void;
-  op f(q: Q): void {
+  fn takeInt(n: int): void;
+  fn takeOpt(n: int?): void;
+  fn f(q: Q): void {
     takeInt(q.page);
     takeOpt(q.inner.page);
   }
-  op g(q: C.A<Q>): void;
+  fn g(q: C.A<Q>): void;
   @when(U.Ready)
-  op h(): void;
+  fn h(): void;
   decorator d(e: any effect);
   @d(s.post)
-  op bad(): void;
+  fn bad(): void;
 }`}, false)
 	if got := strings.Join(codes(res), ","); got != "RES-4" {
 		var b strings.Builder
@@ -325,8 +325,8 @@ func TestErrorTolerance(t *testing.T) {
 	res, _ := analyzeProject(t, project{"a.hozo": `
 namespace a {
   model M { id: string; bad: Nope; }
-  op f(m: M): Nope throws Missing;
-  op g(): M {
+  fn f(m: M): Nope throws Missing;
+  fn g(): M {
     val   x = nope();
     return other(x);
   }
@@ -362,19 +362,19 @@ namespace a {
   state token: nullable<string>;
   state me: single<User>;
   state maybe: User?;
-  op takeToken(t: string?);
-  op takeString(s: string);
-  op takeOptString(s: string?);
-  op f(token: string) {
+  fn takeToken(t: string?);
+  fn takeString(s: string);
+  fn takeOptString(s: string?);
+  fn f(token: string) {
     takeString(token);
   }
-  op g() {
+  fn g() {
     takeToken(token);
     takeToken(a.token);
     takeString(me.profile.nick);
     takeOptString(maybe.id);
   }
-  op ng() {
+  fn ng() {
     takeToken(b.remote);                // ERROR: RES-5
     takeToken(shared);                  // ERROR: RES-5
     takeToken(Profile);                 // ERROR: RES-4
@@ -427,13 +427,13 @@ namespace a {
   scalar Id extends string;
   state users: list<t.User>;
   state current: t.User?;
-  export op find(id: string): t.User? reads users, a.current { return first(users, current); } op first(us: t.User[], c: t.User?): t.User?;
+  export fn find(id: string): t.User? reads users, a.current { return first(users, current); } fn first(us: t.User[], c: t.User?): t.User?;
   classify Found of find { Hit: find as t.User; Miss: find as else; }
   classify Session of current { In: current as t.User; Out: current as else; }
 }
 namespace b {
-  op keep(u: t.User): t.User;
-  op f(id: string): t.User throws t.Gone {
+  fn keep(u: t.User): t.User;
+  fn f(id: string): t.User throws t.Gone {
     val   u = a.find(id);
     return match(u by a.Found){
       Hit     => keep(u);
@@ -480,11 +480,11 @@ namespace a {
   model M { id: string; }
   exception Busy(wait: Duration);
   state rows: list<M>;
-  read byId(id: string): M? on rows;
-  effect add(m: M) on rows.post;
-  op keep(m: M?): M?;
+  read fn byId(id: string): M? on rows;
+  effect fn add(m: M) on rows.post;
+  fn keep(m: M?): M?;
   classify K of M { A; B; }
-  op f(m: M): M? throws Busy {
+  fn f(m: M): M? throws Busy {
     add(m);
     rows.post(m);
     a.rows.post(m);
@@ -497,9 +497,9 @@ namespace a {
 }`}, false)
 	noErrors(t, res, fs)
 	for _, want := range []string{
-		"a.hozo:6:32 decl a.rows",  // read r(…): T on s の s
-		"a.hozo:6:26 decl a.M",     // read の結果の型
-		"a.hozo:7:17 decl a.M",     // effect の引数の型
+		"a.hozo:6:35 decl a.rows",  // read fn r(…): T on s の s
+		"a.hozo:6:29 decl a.M",     // read の結果の型
+		"a.hozo:7:20 decl a.M",     // effect の引数の型
 		"a.hozo:11:5 decl a.add",   // 効果の呼び出し
 		"a.hozo:12:5 decl a.rows",  // 直に呼ぶ「状態.操作」の状態
 		"a.hozo:13:7 decl a.rows",  // 修飾して書いた状態
@@ -532,7 +532,7 @@ func TestCallShadowedByBinding(t *testing.T) {
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  op f(rows: M[], m: M) {
+  fn f(rows: M[], m: M) {
     rows.post(m);
     a.rows.post(m);
   }

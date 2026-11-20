@@ -3,5 +3,5 @@ namespace a {
   decorator d(code: int);
   decorator alias = d(1);
   @alias
-  op f();
+  fn f();
 }

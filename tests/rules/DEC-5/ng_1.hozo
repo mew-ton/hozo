@@ -2,13 +2,13 @@
 // 成功のアームでも e は不明になる（warning）
 namespace a {
   state s: list<string>;
-  effect e() on s.post;
+  effect fn e() on s.post;
   exception E;
   decorator recoverE catches E recovers;
-  op write() effects e { e(); }
-  op fail() throws E;
+  fn write() effects e { e(); }
+  fn fail() throws E;
   @recoverE                            // WARN: DEC-5
-  op wiring() {
+  fn wiring() {
     fail();
     write();
   }

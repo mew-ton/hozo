@@ -30,38 +30,38 @@ namespace backoffice {
   // ---- 効果 ----
 
   /** トークンを保存する */
-  effect saveToken(token: type.Token) on token: Empty -> HasItems;
+  effect fn saveToken(token: type.Token) on token: Empty -> HasItems;
 
   /** トークンを消す */
-  effect removeToken() on token.delete;
+  effect fn removeToken() on token.delete;
 
   /** 理由を消す */
-  effect clearProblem() on problem.delete;
+  effect fn clearProblem() on problem.delete;
 
   /** ログイン名かパスワードが違う */
-  effect sayWrongCredentials() on problem.put;
+  effect fn sayWrongCredentials() on problem.put;
 
   /** その操作は、もうできない（ほかの人が先に進めた）。開き直せば、いまの状態が出る */
-  effect sayStale() on problem.put;
+  effect fn sayStale() on problem.put;
 
   /** 入れた値が、受け付けられない（箱の種類がない、重すぎる、もう登録してある） */
-  effect sayRejected() on problem.put;
+  effect fn sayRejected() on problem.put;
 
   /** 客に請求できない: 支払いの枠の期限が過ぎている。送り状は買っていない。管理の担当に渡す */
-  effect sayCannotCharge() on problem.put;
+  effect fn sayCannotCharge() on problem.put;
 
   /** 配送業者が、その荷物を引き受けない。送り状は買っていない。請求は、確定している。ほかの見積もりを選ぶ */
-  effect sayCarrierRefused() on problem.put;
+  effect fn sayCarrierRefused() on problem.put;
 
   /** 外部の仕組みに届かなかった。請求と送り状が、どこまで進んだかは、分からない。開き直して、確かめる */
-  effect sayUnknownOutcome() on problem.put;
+  effect fn sayUnknownOutcome() on problem.put;
 
   /** 画面を移す */
-  effect goToLogin() on location.put;
-  effect goToShipments() on location.put;
-  effect goToStation(id: shipping.ShipmentId) on location.put;
+  effect fn goToLogin() on location.put;
+  effect fn goToShipments() on location.put;
+  effect fn goToStation(id: shipping.ShipmentId) on location.put;
   /** 同じ画面を、開き直す */
-  effect reload() on location.put;
+  effect fn reload() on location.put;
 
   // ---- デコレータ ----
 
@@ -91,10 +91,10 @@ namespace backoffice {
     Form: { problem: Problem?; };
   }
 
-  op loginVm(problem: Problem?): LoginPage;
+  fn loginVm(problem: Problem?): LoginPage;
 
   @page.route("/login")
-  op openLogin(): LoginPage {
+  fn openLogin(): LoginPage {
     return loginVm(problem);
   }
 
@@ -102,7 +102,7 @@ namespace backoffice {
   @page.interaction(page: openLogin, when: LoginPage.Form)
   @recover(staff.InvalidCredentials, sayWrongCredentials)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onLogin(loginName: string, password: staff.Password) {
+  fn onLogin(loginName: string, password: staff.Password) {
     val ok = staffApi.login({ body: { loginName, password } });
     saveToken(ok.token);
     clearProblem();
@@ -110,7 +110,7 @@ namespace backoffice {
   }
 
   /** ログアウトする。サーバーに届かなくても、手元のトークンは消す */
-  op onLogout() {
+  fn onLogout() {
     requestLogout();
     removeToken();
     goToLogin();
@@ -118,7 +118,7 @@ namespace backoffice {
 
   /** サーバーのセッションを消してもらう。結果は見ない */
   @ignoreFailure
-  op requestLogout() {
+  fn requestLogout() {
     staffApi.logout({});
   }
 
@@ -136,12 +136,12 @@ namespace backoffice {
     Unavailable: Unavailable;
   }
 
-  op productionVm(jobs: production.Job[], problem: Problem?): ProductionPage;
+  fn productionVm(jobs: production.Job[], problem: Problem?): ProductionPage;
 
   @staffOnly
   @unavailableOnFailure
   @page.route("/production")
-  op openProduction(): ProductionPage {
+  fn openProduction(): ProductionPage {
     val jobs = staffApi.jobs({});
     return productionVm(jobs, problem);
   }
@@ -151,7 +151,7 @@ namespace backoffice {
   @staffOnly
   @recover(production.NoJob | production.NotQueued, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onStartJob(id: production.JobId) {
+  fn onStartJob(id: production.JobId) {
     val started = staffApi.startJob({ id });
     seen(started);
     reload();
@@ -162,7 +162,7 @@ namespace backoffice {
   @staffOnly
   @recover(production.NoJob | production.NotInProduction | shipping.NoShipment | shipping.UnknownItem, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onFinishJob(job: production.Job)
+  fn onFinishJob(job: production.Job)
     throws page.Aborted
   {
     val measured = askMeasurement(job);
@@ -173,13 +173,13 @@ namespace backoffice {
 
   /** 出来上がりの大きさと重さを聞く */
   @page.dialog("MeasurementDialog")
-  op askMeasurement(job: production.Job): type.Measurement;
+  fn askMeasurement(job: production.Job): type.Measurement;
 
   /** 始めた仕事を、画面に出す（描き方は、ここでは決めない） */
-  op seen(job: production.Job);
+  fn seen(job: production.Job);
 
   /** 品目を置いた出荷を、画面に出す: どのそろえ場所に置くか、あと何を待っているか */
-  op placedIn(shipment: shipping.Shipment);
+  fn placedIn(shipment: shipping.Shipment);
 
   // ---- そろえる ----
 
@@ -190,12 +190,12 @@ namespace backoffice {
     Unavailable: Unavailable;
   }
 
-  op pickingVm(picks: inventory.Reservation[], problem: Problem?): PickingPage;
+  fn pickingVm(picks: inventory.Reservation[], problem: Problem?): PickingPage;
 
   @staffOnly
   @unavailableOnFailure
   @page.route("/picking")
-  op openPicking(): PickingPage {
+  fn openPicking(): PickingPage {
     val picks = staffApi.picks({});
     return pickingVm(picks, problem);
   }
@@ -205,7 +205,7 @@ namespace backoffice {
   @staffOnly
   @recover(inventory.NotReserved | inventory.AlreadyPicked | shipping.NoShipment | shipping.UnknownItem, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onPicked(pick: inventory.Reservation) {
+  fn onPicked(pick: inventory.Reservation) {
     val shipment = staffApi.picked({ orderId: pick.orderId, line: pick.line });
     placedIn(shipment);
     reload();
@@ -220,19 +220,19 @@ namespace backoffice {
     Unavailable: Unavailable;
   }
 
-  op shipmentsVm(all: shipping.Progress[]): ShipmentsPage;
+  fn shipmentsVm(all: shipping.Progress[]): ShipmentsPage;
 
   @staffOnly
   @unavailableOnFailure
   @page.route("/shipments")
-  op openShipments(): ShipmentsPage {
+  fn openShipments(): ShipmentsPage {
     val all = staffApi.shipments({});
     return shipmentsVm(all);
   }
 
   /** 出荷一つの、梱包の台を開く */
   @page.interaction(page: openShipments, when: ShipmentsPage.Ready)
-  op onOpenStation(id: shipping.ShipmentId) {
+  fn onOpenStation(id: shipping.ShipmentId) {
     clearProblem();
     goToStation(id);
   }
@@ -265,12 +265,12 @@ namespace backoffice {
     Unavailable: Unavailable;
   }
 
-  op stationVm(station: fulfilment.Station, problem: Problem?): StationPage;
+  fn stationVm(station: fulfilment.Station, problem: Problem?): StationPage;
 
   @staffOnly
   @page.fallback(shipping.NoShipment | carrier.NoCarrier | http.NetworkError | http.ServerError, Unavailable)
   @page.route("/station", from: query)
-  op openStation(query: StationQuery): StationPage {
+  fn openStation(query: StationQuery): StationPage {
     val station = staffApi.station({ id: query.id });
     return stationVm(station, problem);
   }
@@ -292,7 +292,7 @@ namespace backoffice {
   @recover(shipping.NoShipment | shipping.NotGathered | shipping.AlreadyPacked, sayStale)
   @recover(shipping.UnknownBox | shipping.OverWeight | shipping.Undeliverable, sayRejected)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onPack(id: shipping.ShipmentId, option: shipping.BoxOption, weight: type.Grams)
+  fn onPack(id: shipping.ShipmentId, option: shipping.BoxOption, weight: type.Grams)
     throws page.Aborted
   {
     match (option.overCeiling by Overrun) {
@@ -306,10 +306,10 @@ namespace backoffice {
 
   /** 店が持つ額を見せて、確かめる。やめれば、梱包は記録しない */
   @page.dialog("AbsorbOverCeilingDialog")
-  op confirmAbsorb(over: type.Yen);
+  fn confirmAbsorb(over: type.Yen);
 
   /** 決まった送料を、画面に出す */
-  op sealed(parcel: shipping.Parcel);
+  fn sealed(parcel: shipping.Parcel);
 
   /**
    * 配送業者を選んで、送り状を買う。先に、客への請求が確定する。
@@ -322,7 +322,7 @@ namespace backoffice {
   @recover(payment.NoPayment | payment.NotSecured | psp.HoldExpired, sayCannotCharge)
   @recover(carrier.UnknownCarrier | carrier.NotEnabled | carriergw.Refused, sayCarrierRefused)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onBuyLabel(id: shipping.ShipmentId, offer: carrier.Quote) {
+  fn onBuyLabel(id: shipping.ShipmentId, offer: carrier.Quote) {
     val label = staffApi.buyLabel({ id, carrier: offer.carrier, service: offer.service });
     printLabel(label.document);
     reload();
@@ -330,21 +330,21 @@ namespace backoffice {
 
   /** 送り状を印刷する */
   @nav.save
-  op printLabel(document: type.Url);
+  fn printLabel(document: type.Url);
 
   /** 配送業者に渡した */
   @page.interaction(page: openStation, when: StationPage.HandOver)
   @staffOnly
   @recover(shipping.NoShipment | shipping.NotPacked | shipping.NotLabelled | shipping.AlreadyHandedOver | ordering.NoOrder, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onHandOver(id: shipping.ShipmentId) {
+  fn onHandOver(id: shipping.ShipmentId) {
     val shipment = staffApi.handOver({ id });
     gone(shipment);
     goToShipments();
   }
 
   /** 渡した出荷を、画面に出す */
-  op gone(shipment: shipping.Shipment);
+  fn gone(shipment: shipping.Shipment);
 
   // ---- 配送業者の管理 ----
 
@@ -356,12 +356,12 @@ namespace backoffice {
     Unavailable: Unavailable;
   }
 
-  op carriersVm(carriers: carrier.Carrier[], problem: Problem?): CarriersPage;
+  fn carriersVm(carriers: carrier.Carrier[], problem: Problem?): CarriersPage;
 
   @staffOnly
   @unavailableOnFailure
   @page.route("/carriers")
-  op openCarriers(): CarriersPage {
+  fn openCarriers(): CarriersPage {
     val carriers = staffApi.carriers({});
     return carriersVm(carriers, problem);
   }
@@ -370,7 +370,7 @@ namespace backoffice {
   @staffOnly
   @recover(carrier.AlreadyRegistered, sayRejected)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onRegisterCarrier()
+  fn onRegisterCarrier()
     throws page.Aborted
   {
     val carrier = askCarrier();
@@ -380,19 +380,19 @@ namespace backoffice {
 
   /** 配送業者の名前と、契約の番号を聞く */
   @page.dialog("CarrierDialog")
-  op askCarrier(): carrier.Carrier;
+  fn askCarrier(): carrier.Carrier;
 
   /** 配送業者を使う、使わないを切り替える */
   @page.interaction(page: openCarriers, when: CarriersPage.Ready)
   @staffOnly
   @recover(carrier.UnknownCarrier, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  op onSwitchCarrier(code: carrier.CarrierCode, enabled: boolean) {
+  fn onSwitchCarrier(code: carrier.CarrierCode, enabled: boolean) {
     val changed = staffApi.setCarrierEnabled({ code, enabled });
     switched(changed);
     reload();
   }
 
   /** 切り替えた配送業者を、画面に出す */
-  op switched(changed: carrier.Carrier);
+  fn switched(changed: carrier.Carrier);
 }

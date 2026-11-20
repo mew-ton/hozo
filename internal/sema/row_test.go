@@ -16,8 +16,8 @@ namespace row {
   model Order { id: string; }
   state orders: list<Order>;
   state token: nullable<string>;
-  op find(): Order?;
-  op f();
+  fn find(): Order?;
+  fn f();
 
   classify Stage of Order { Draft; Accepted; Shipped; }
   /** ない側のケースを持つ、述語で決まる分類 */
@@ -28,20 +28,20 @@ namespace row {
   classify Session of token { In: token as string; Out: token as else; }
   classify Present of Order? { Here: Order? as Order; }
 
-  effect enter(order: Order) on orders.post as Stage.Draft;
-  effect enterFromAbsent(order: Order) on orders.post as Life.Absent -> Life.Open;
-  effect enterAny(order: Order) on orders.post as any;
-  effect plain(order: Order) on orders.post;
-  effect advance(at: Time, order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
-  effect force(order: Order) on orders.put as any -> row.Stage.Shipped;
-  effect revise(order: Order) on orders.put as Stage.Accepted -> else;
-  effect patch(order: Order) on orders.put as any -> else;
-  effect rename(order: Order) on orders.put;
-  effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
-  effect purge(order: Order) on orders.delete as Life.Absent;
-  effect purgeAny(order: Order) on orders.delete as any -> Life.Absent;
+  effect fn enter(order: Order) on orders.post as Stage.Draft;
+  effect fn enterFromAbsent(order: Order) on orders.post as Life.Absent -> Life.Open;
+  effect fn enterAny(order: Order) on orders.post as any;
+  effect fn plain(order: Order) on orders.post;
+  effect fn advance(at: Time, order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
+  effect fn force(order: Order) on orders.put as any -> row.Stage.Shipped;
+  effect fn revise(order: Order) on orders.put as Stage.Accepted -> else;
+  effect fn patch(order: Order) on orders.put as any -> else;
+  effect fn rename(order: Order) on orders.put;
+  effect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  effect fn purge(order: Order) on orders.delete as Life.Absent;
+  effect fn purgeAny(order: Order) on orders.delete as any -> Life.Absent;
 
-  op wire(found: Order?) {
+  fn wire(found: Order?) {
     match(found by Life){ Open => discard(found); Closed => f(); Absent => none; };
   }
 }

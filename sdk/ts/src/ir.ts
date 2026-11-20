@@ -92,7 +92,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.10";
+  version: "0.11";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -508,7 +508,7 @@ export interface DecoratorAlias {
 }
 export interface CaseKind {
   classify?: string;
-  subject?: string;
+  subject?: Type;
 }
 /**
  * catches の一節（docs/ir.md「decorator」）。
@@ -835,7 +835,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.10";
+  version: "0.11";
   viewer: string;
 }
 /**

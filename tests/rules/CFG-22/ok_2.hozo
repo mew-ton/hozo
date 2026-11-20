@@ -2,21 +2,21 @@
 // どの単位の対象でもない名前空間（b）は出力せず、エラーにもしない（既定の設定: 単位は a だけ）
 namespace a {
   @b.mark(b.E)
-  export op f() {
+  export fn f() {
     b.g();
   }
-  op h(x: string?): string {
+  fn h(x: string?): string {
     return match (x by b.Present) {
       Some => keep(x);
       else    => keep("none");
     };
   }
-  op keep(x: string): string;
+  fn keep(x: string): string;
 }
 namespace b {
   exception E;
   decorator mark(e: any exception);
-  export op g();
+  export fn g();
   classify Present of string? {
     Some: string? as string;
     Other: string? as else;

@@ -2,5 +2,5 @@
 namespace a {
   scalar A extends B;
   scalar B extends A;                  // ERROR: TYPE-9
-  op f(): A;
+  fn f(): A;
 }

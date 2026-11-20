@@ -6,8 +6,8 @@ namespace a {
   state token: nullable<string>;
   classify Checkout of carts, orders { Shopping; Ordered; }
   classify Session of token { LoggedIn; LoggedOut; }
-  op f();
-  op ok() {
+  fn f();
+  fn ok() {
     match (carts by list) { Empty => f(); HasItems => none; };
     match (token by nullable) { HasItems => f(); Empty => none; };
     match (carts by list) { Empty, HasItems => f(); };

@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.10"
+protocol = "0.11"
 
 [[transpiler]]
 name     = "go"
@@ -796,7 +796,7 @@ func (o *ops) loginBody(ctx context.Context, in LoginInput) (LoginOk, error) {
 ```go
 // @trace.span
 // @rate.limited
-// export op foo(in: FooInput): FooOk { … }
+// export fn foo(in: FooInput): FooOk { … }
 
 // Foo は、継ぎ目（@trace.span、@rate.limited）を通して、中身（o.fooBody）を呼ぶ。
 func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {

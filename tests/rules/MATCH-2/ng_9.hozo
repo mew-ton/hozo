@@ -1,8 +1,8 @@
 // MATCH-2（docs/check.md「標準の分類」）: 値を対象にした標準の分類でも、Empty / HasItems を尽くす
 namespace a {
   model In { token: string?; lines: string[]; }
-  op f();
-  op ng(in: In) {
+  fn f();
+  fn ng(in: In) {
     match (in.token by nullable) { HasItems => f(); };                 // ERROR: MATCH-2
     match (in.lines by list) { Empty => f(); Some => none; };          // ERROR: MATCH-2
   }

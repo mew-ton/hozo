@@ -2,10 +2,10 @@
 namespace a {
   model X { id: string; }
   model Y { id: string; }
-  op Y(): void;                        // ERROR: RES-6
+  fn Y(): void;                        // ERROR: RES-6
 }
 namespace http {
   exception ServerError;               // ERROR: RES-6
 }
 model g { id: string; }                // WARN: NAME-1
-op g(): void;                          // ERROR: RES-6
+fn g(): void;                          // ERROR: RES-6

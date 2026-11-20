@@ -7,21 +7,21 @@ namespace a {
   bind token to b.*;
   decorator fallback(target: any op);
   decorator toOpen = fallback(b.open);
-  op local();
+  fn local();
   // 対象にすることは呼び出しではない
   classify Found of b.find { Hit; Other; }
   /**
    * @see b.find
    */
   @fallback(local)
-  op f();
+  fn f();
   @toOpen
-  op g();
+  fn g();
   @fallback(b.open)
-  op h();
+  fn h();
 }
 namespace b {
   // 内部の op。二つの Token の位置を持つが、a から呼べないので、a の bind は位置を作らない（BIND-1 にならない）
-  op find(x: a.Token, y: a.Token): string?;
-  export op open();
+  fn find(x: a.Token, y: a.Token): string?;
+  export fn open();
 }

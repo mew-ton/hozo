@@ -5,7 +5,7 @@ namespace a {
   scalar Email extends string;
   state token: nullable<string>;
   state profile: nullable<M>;
-  op find(): M?;
+  fn find(): M?;
   classify V1 of M? { Has: M? as M; }
   classify V2 of nullable<M> { Has: M? as M; }
   classify V3 of string { Valid: string as Email; Invalid; }
@@ -17,8 +17,8 @@ namespace a {
     Neither;
   }
   classify S2 of token { In: a.token as string; }
-  op f(): M;
+  fn f(): M;
 }
 namespace b {
-  op find(): a.M?;
+  fn find(): a.M?;
 }

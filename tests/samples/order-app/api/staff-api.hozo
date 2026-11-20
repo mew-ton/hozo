@@ -18,7 +18,7 @@ namespace staffApi {
 
   /** ログインする */
   @http.post("/staff/login")
-  export op login(in: LoginInput): staff.LoggedIn
+  export fn login(in: LoginInput): staff.LoggedIn
     throws staff.InvalidCredentials
   {
     return staff.login(in.body.loginName, in.body.password);
@@ -31,7 +31,7 @@ namespace staffApi {
 
   /** ログアウトする */
   @http.post("/staff/logout")
-  export op logout(in: AuthInput) {
+  export fn logout(in: AuthInput) {
     staff.logout(in.token);
   }
 
@@ -39,7 +39,7 @@ namespace staffApi {
 
   /** 作り終えていない仕事の一覧。納期の近い順 */
   @http.get("/staff/jobs")
-  export op jobs(in: AuthInput): production.Job[]
+  export fn jobs(in: AuthInput): production.Job[]
     throws type.Unauthorized, type.Forbidden
   {
     staff.asMaker(in.token);
@@ -53,7 +53,7 @@ namespace staffApi {
 
   /** 作り始めた */
   @http.post("/staff/jobs/start")
-  export op startJob(in: JobInput): production.Job
+  export fn startJob(in: JobInput): production.Job
     throws type.Unauthorized, type.Forbidden, production.NoJob, production.NotQueued
   {
     staff.asMaker(in.token);
@@ -68,7 +68,7 @@ namespace staffApi {
 
   /** 作り終えて、量って、そろえ場所に置いた */
   @http.post("/staff/jobs/finish")
-  export op finishJob(in: FinishInput): shipping.Shipment
+  export fn finishJob(in: FinishInput): shipping.Shipment
     throws type.Unauthorized, type.Forbidden,
            production.NoJob, production.NotInProduction, shipping.NoShipment, shipping.UnknownItem
   {
@@ -80,7 +80,7 @@ namespace staffApi {
 
   /** 棚から出すものの一覧 */
   @http.get("/staff/picks")
-  export op picks(in: AuthInput): inventory.Reservation[]
+  export fn picks(in: AuthInput): inventory.Reservation[]
     throws type.Unauthorized, type.Forbidden
   {
     staff.asPacker(in.token);
@@ -95,7 +95,7 @@ namespace staffApi {
 
   /** 棚から出して、そろえ場所に置いた */
   @http.post("/staff/picks/done")
-  export op picked(in: PickInput): shipping.Shipment
+  export fn picked(in: PickInput): shipping.Shipment
     throws type.Unauthorized, type.Forbidden,
            inventory.NotReserved, inventory.AlreadyPicked, shipping.NoShipment, shipping.UnknownItem
   {
@@ -107,7 +107,7 @@ namespace staffApi {
 
   /** まだ店にある出荷の一覧。それぞれの進み具合が付く */
   @http.get("/staff/shipments")
-  export op shipments(in: AuthInput): shipping.Progress[]
+  export fn shipments(in: AuthInput): shipping.Progress[]
     throws type.Unauthorized, type.Forbidden
   {
     staff.asPacker(in.token);
@@ -121,7 +121,7 @@ namespace staffApi {
 
   /** 梱包の台に見せるもの: 出荷一つについて、いま何ができるか */
   @http.get("/staff/shipments/station")
-  export op station(in: ShipmentQuery): fulfilment.Station
+  export fn station(in: ShipmentQuery): fulfilment.Station
     throws type.Unauthorized, type.Forbidden, shipping.NoShipment, carrier.NoCarrier, http.NetworkError, http.ServerError
   {
     staff.asPacker(in.token);
@@ -137,7 +137,7 @@ namespace staffApi {
 
   /** 梱包した。送料が、ここで決まる */
   @http.post("/staff/shipments/pack")
-  export op pack(in: PackInput): shipping.Parcel
+  export fn pack(in: PackInput): shipping.Parcel
     throws type.Unauthorized, type.Forbidden,
            shipping.NoShipment, shipping.NotGathered, shipping.AlreadyPacked, shipping.UnknownBox, shipping.OverWeight, shipping.Undeliverable
   {
@@ -154,7 +154,7 @@ namespace staffApi {
 
   /** 客への請求を確定して、送り状を買う */
   @http.post("/staff/shipments/label")
-  export op buyLabel(in: LabelInput): shipping.Label
+  export fn buyLabel(in: LabelInput): shipping.Label
     throws type.Unauthorized, type.Forbidden,
            shipping.NoShipment, shipping.NotPacked, shipping.AlreadyLabelled,
            payment.NoPayment, payment.NotSecured, psp.HoldExpired,
@@ -172,7 +172,7 @@ namespace staffApi {
 
   /** 配送業者に渡した */
   @http.post("/staff/shipments/handover")
-  export op handOver(in: ShipmentInput): shipping.Shipment
+  export fn handOver(in: ShipmentInput): shipping.Shipment
     throws type.Unauthorized, type.Forbidden,
            shipping.NoShipment, shipping.NotPacked, shipping.NotLabelled, shipping.AlreadyHandedOver, ordering.NoOrder
   {
@@ -184,7 +184,7 @@ namespace staffApi {
 
   /** 登録してある配送業者の一覧 */
   @http.get("/staff/carriers")
-  export op carriers(in: AuthInput): carrier.Carrier[]
+  export fn carriers(in: AuthInput): carrier.Carrier[]
     throws type.Unauthorized, type.Forbidden
   {
     staff.asAdmin(in.token);
@@ -198,7 +198,7 @@ namespace staffApi {
 
   /** 配送業者を登録する */
   @http.post("/staff/carriers")
-  export op registerCarrier(in: RegisterInput)
+  export fn registerCarrier(in: RegisterInput)
     throws type.Unauthorized, type.Forbidden, carrier.AlreadyRegistered
   {
     staff.asAdmin(in.token);
@@ -213,7 +213,7 @@ namespace staffApi {
 
   /** 配送業者を使う、使わないを切り替える */
   @http.post("/staff/carriers/enabled")
-  export op setCarrierEnabled(in: SwitchInput): carrier.Carrier
+  export fn setCarrierEnabled(in: SwitchInput): carrier.Carrier
     throws type.Unauthorized, type.Forbidden, carrier.UnknownCarrier
   {
     staff.asAdmin(in.token);

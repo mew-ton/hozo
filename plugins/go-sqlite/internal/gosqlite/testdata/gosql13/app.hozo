@@ -13,49 +13,49 @@ namespace app {
 
   // キーでも一意でもない列
   @db.find
-  read rowByNote(note: string): Row? on rows;
+  read fn rowByNote(note: string): Row? on rows;
   // 条件がない
   @db.find
-  read anyRow(): Row? on rows;
+  read fn anyRow(): Row? on rows;
   // @db.where の条件だけで、キーでも一意でもない列
   @db.find
   @db.where("note", "x")
-  read notedRow(): Row? on rows;
+  read fn notedRow(): Row? on rows;
   // 二つの @db.key の一つ
   @db.find
-  read pairByLeft(left: string): Pair? on pairs;
+  read fn pairByLeft(left: string): Pair? on pairs;
   // 二つの @db.key の一つと、キーでない列
   @db.find
-  read pairByLeftAndNote(left: string, note: string): Pair? on pairs;
+  read fn pairByLeftAndNote(left: string, note: string): Pair? on pairs;
   // キーのない model（どの列を並べても、決まらない）
   @db.find
-  read logByLine(line: string, at: Time): Log? on logs;
+  read fn logByLine(line: string, at: Time): Log? on logs;
 
   // ---- 通るもの ----
 
   // 1: @db.key のすべて
   @db.find
-  read rowById(id: string): Row? on rows;
+  read fn rowById(id: string): Row? on rows;
   @db.find
-  read pairByBoth(left: string, right: string): Pair? on pairs;
+  read fn pairByBoth(left: string, right: string): Pair? on pairs;
   // 引数と @db.where を合わせて、@db.key のすべて
   @db.find
   @db.where("right", "r")
-  read pairOnRight(left: string): Pair? on pairs;
+  read fn pairOnRight(left: string): Pair? on pairs;
   // 2: @db.unique の列
   @db.find
-  read rowByCode(code: string): Row? on rows;
+  read fn rowByCode(code: string): Row? on rows;
   @db.find
   @db.where("code", "c")
-  read fixedRow(note: string): Row? on rows;
+  read fn fixedRow(note: string): Row? on rows;
   // 3: @db.latest（条件がなくてもよい）
   @db.find
   @db.latest("at")
-  read lastLog(): Log? on logs;
+  read fn lastLog(): Log? on logs;
   @db.find
   @db.latest("at")
-  read lastRowNoted(note: string): Row? on rows;
+  read fn lastRowNoted(note: string): Row? on rows;
   // @db.list なら、どの条件でもよい
   @db.list
-  read rowsByNote(note: string): Row[] on rows;
+  read fn rowsByNote(note: string): Row[] on rows;
 }

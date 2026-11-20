@@ -6,7 +6,7 @@ namespace app {
     @cli.arg(2) last: string;
   }
   @cli.command("early")
-  export op early(in: Early);
+  export fn early(in: Early);
 
   // array の @cli.arg が二つ（いちばん後ろの位置でない方が当たる）
   model Twice {
@@ -14,7 +14,7 @@ namespace app {
     @cli.arg(2) b: string[];
   }
   @cli.command("twice")
-  export op twice(in: Twice);
+  export fn twice(in: Twice);
 
   // いちばん後ろは、位置で決まる（フィールドの宣言の順ではない）: 後ろに宣言した array が、位置 1
   model Order {
@@ -22,7 +22,7 @@ namespace app {
     @cli.arg(1) rest: string[];
   }
   @cli.command("order")
-  export op order(in: Order);
+  export fn order(in: Order);
 
   // array の @cli.arg が、いちばん後ろの位置なら、先に宣言していても、後ろにフラグがあってもよい
   model Fine {
@@ -31,5 +31,5 @@ namespace app {
     @cli.flag("after") after: string?;
   }
   @cli.command("fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

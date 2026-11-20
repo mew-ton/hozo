@@ -19,24 +19,24 @@ namespace checked {
 namespace app {
   // 入力の model が plain のもの: Validate のメソッドがないので、確かめられないまま op に渡る
   @http.get("/a")
-  export op a(in: plain.In): string;
+  export fn a(in: plain.In): string;
 
   // 同じ model を使う、もう一つの経路
   @http.post("/b")
-  export op b(in: plain.In);
+  export fn b(in: plain.In);
 
   // Validate を持たない入力は、確かめるものがないので、当たらない
   @http.get("/c")
-  export op c(in: plain.Free): string;
+  export fn c(in: plain.Free): string;
 
   // 置き場の単位が go-valid を並べていれば、当たらない
   @http.get("/d")
-  export op d(in: checked.In): string;
+  export fn d(in: checked.In): string;
 
   // 自分の名前空間の model（自分の単位は go-valid を並べている。CFG-19）
   model Own {
     @valid.length(min: 1) @http.query name: string;
   }
   @http.get("/e")
-  export op e(in: Own): string;
+  export fn e(in: Own): string;
 }

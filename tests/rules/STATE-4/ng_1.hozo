@@ -3,10 +3,10 @@ namespace a {
   state carts: list<string>;
   state orders: list<string>;
   classify Checkout of carts, orders { Shopping; Ordered; }
-  effect before() on Checkout: Browsing -> Ordered;   // ERROR: STATE-4
-  effect after() on Checkout: Shopping -> Paid;       // ERROR: STATE-4
+  effect fn before() on Checkout: Browsing -> Ordered;   // ERROR: STATE-4
+  effect fn after() on Checkout: Shopping -> Paid;       // ERROR: STATE-4
   // 分類の遷移に、組み込みの分類のケースは書けない
-  effect builtin() on Checkout: Empty -> Ordered;     // ERROR: STATE-4
+  effect fn builtin() on Checkout: Empty -> Ordered;     // ERROR: STATE-4
   // 和の中の一つでも同じ
-  effect oneOf() on Checkout: Shopping, Paid -> any;  // ERROR: STATE-4
+  effect fn oneOf() on Checkout: Shopping, Paid -> any;  // ERROR: STATE-4
 }

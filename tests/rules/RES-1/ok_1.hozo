@@ -1,12 +1,12 @@
 // RES-1（docs/resolve.md「診断」）: 現在の名前空間の宣言、修飾した別の名前空間の宣言、束縛、引数
 namespace a {
   model User { id: string; }
-  op ok(u: User): User;
-  op use(u: User): User {
+  fn ok(u: User): User;
+  fn use(u: User): User {
     val v = ok(u);
     return ok(v);
   }
 }
 namespace b {
-  op j(u: a.User): a.User;
+  fn j(u: a.User): a.User;
 }

@@ -114,17 +114,17 @@ namespace db {
 ```ts
 /** email が同じユーザー */
 @db.find
-read userByEmail(email: type.Email): type.User? on users;
+read fn userByEmail(email: type.Email): type.User? on users;
 
 /** そのユーザーの、支払いの済んだ請求。新しい順 */
 @db.list
 @db.where("paid", true)
 @db.latest("issuedAt")
-read paidInvoicesOf(userId: type.UserId): Invoice[] on invoices;
+read fn paidInvoicesOf(userId: type.UserId): Invoice[] on invoices;
 
 /** そのトークンのセッションを消す */
 @db.delete
-effect deleteSession(token: type.Token) on sessions.delete;
+effect fn deleteSession(token: type.Token) on sessions.delete;
 ```
 
 - **デコレータは、宣言がすでに言っていることを、もう一度言わない**（`docs/requirements.md`「出力を推論しない」）: 表は、宣言の `on` の状態。列は、引数の名前（表の model の、同じ名前のフィールド）。引くものの型は、`read` の結果の型。表を引数でもう一度名指しする書き方（`@db.find(users, "email")`）は、なくした。

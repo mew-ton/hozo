@@ -2,20 +2,20 @@
 namespace app {
   // / で始まらない
   @http.get("items")
-  export op relative(): string;
+  export fn relative(): string;
   @http.post("")
-  export op empty();
+  export fn empty();
   @http.get("http://example.com/items")
-  export op absolute(): string;
+  export fn absolute(): string;
   // { か } を含む（パスの中の値）
   @http.get("/items/{id}")
-  export op byId(): string;
+  export fn byId(): string;
   @http.post("/items/}")
-  export op brace();
+  export fn brace();
 
   // / で始まる、決まった文字列なら、当たらない
   @http.get("/items")
-  export op all(): string;
+  export fn all(): string;
   @http.get("/")
-  export op root(): string;
+  export fn root(): string;
 }

@@ -3,25 +3,25 @@ namespace app {
   // model の名前そのもの
   model NewHandler { retries: int; }
   @http.get("/a")
-  export op a(): string;
+  export fn a(): string;
 }
 
 namespace typed {
   // scalar の名前そのもの
   scalar NewHandler extends string;
   @http.get("/b")
-  export op b(): string;
+  export fn b(): string;
 }
 
 namespace wrapped {
   // union New のアーム Handler を包む型 NewHandler
   union New { Handler: string; Other: int; }
   @http.get("/c")
-  export op c(): string;
+  export fn c(): string;
 }
 
 namespace quiet {
   // 経路の op がなければ、NewHandler を出さないので、当たらない
   model NewHandler { retries: int; }
-  export op d(): string;
+  export fn d(): string;
 }

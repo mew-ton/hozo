@@ -11,5 +11,5 @@ namespace assets {
 
   /** そのファイルを、期限の間だけ取れる URL を作る */
   @http.post("/links")
-  export op link(request: LinkRequest): type.Url;
+  export fn link(request: LinkRequest): type.Url;
 }

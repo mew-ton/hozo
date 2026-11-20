@@ -208,14 +208,14 @@ classify Gathered of Shipment {
 }
 
 // そろっていない出荷は、引数に渡せない
-export op boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
+export fn boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
   return fitting(shipment, boxes, tariffs);
 }
 
 @prd.promise("店", "箱は、送る品目がすべてそろうまで決めない")
 @prd.promise("客", "送料は、梱包した箱の大きさと届け先だけで決まる")
 @db.transaction
-export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
+export fn pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
   throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable
 {
   val shipment = find(id);
@@ -226,7 +226,7 @@ export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
   };
 }
 
-op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
+fn packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
   throws NotGathered, UnknownBox, OverWeight, Undeliverable
 {
   return match (shipment by Gathered) {
@@ -240,7 +240,7 @@ op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
 
 ```ts
 @prd.promise("店", "請求を確定できない荷物には、送り状を買わない")
-export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
+export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
   throws …
 {
   val sealed = shipping.sealed(id);                               // 荷物があり、送り状がまだない
@@ -292,7 +292,7 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 ### 行の遷移で書いた進み具合
 
-行の型の分類と、その分類のケースを進める効果。効果は、どれも、前の行と、足す事実を受け取る（`effect startJob(job: Job, at: Time) …`）。「前」にケースを並べた効果は、そのケースを受ける `match` のアームの中か、型が `C.K<T>` の値でしか呼べない（STATE-9）。
+行の型の分類と、その分類のケースを進める効果。効果は、どれも、前の行と、足す事実を受け取る（`effect fn startJob(job: Job, at: Time) …`）。「前」にケースを並べた効果は、そのケースを受ける `match` のアームの中か、型が `C.K<T>` の値でしか呼べない（STATE-9）。
 
 | 行 | 分類 | 効果 | 行の遷移 |
 |---|---|---|---|
@@ -328,9 +328,9 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 ```ts
 // 前: 値の分類と、行の全体を書き換える効果と、時刻を入れる葉
 @db.update
-effect saveJob(job: Job) on jobs.put;
+effect fn saveJob(job: Job) on jobs.put;
 
-export op start(id: JobId): Job throws NoJob, NotQueued {
+export fn start(id: JobId): Job throws NoJob, NotQueued {
   val job = require(id);
   val now = clock.now();
   val started = match (job by Progress) {
@@ -341,15 +341,15 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
   return started;
 }
 
-op startedAt(job: Progress.Queued<Job>, now: Time): Job;   // 人が書く
+fn startedAt(job: Progress.Queued<Job>, now: Time): Job;   // 人が書く
 ```
 
 ```ts
 // 後: 効果が、どのケースからどのケースへ進めるかを言う
-effect startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.InProduction;
-effect finishJob(job: Job, measured: type.Measurement, at: Time) on jobs.put as Progress.InProduction -> Progress.Finished;
+effect fn startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.InProduction;
+effect fn finishJob(job: Job, measured: type.Measurement, at: Time) on jobs.put as Progress.InProduction -> Progress.Finished;
 
-export op start(id: JobId): Job throws NoJob, NotQueued {
+export fn start(id: JobId): Job throws NoJob, NotQueued {
   val job = require(id);
   val now = clock.now();
   match (job by Progress) {
@@ -560,7 +560,7 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
 - **(a) R2 を指針にする。** 言語は変えない。
 - **(b) R1 に寄せる。** 葉が、読む状態と効果を宣言できる形に戻す（STATE-5 をやめる）。
   ```ts
-  op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
+  fn pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
     reads shipments, boxes, tariffs effects createParcel
     throws NotGathered, AlreadyPacked;
   ```
@@ -666,7 +666,7 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
 - **(a) 印のまま。** 約束と op を結ぶだけ。
 - **(b) 葉の op に、結果の条件を書ける。** アサーションの材料にする。
   ```ts
-  op charged(payment: Payment, fee: type.Yen, now: Time): Payment
+  fn charged(payment: Payment, fee: type.Yen, now: Time): Payment
     ensures result.captured <= payment.limit;
   ```
 

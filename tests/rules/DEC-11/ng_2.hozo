@@ -2,7 +2,7 @@
 namespace a {
   decorator d(code: int, name: string?);
   @d(1, "x", true)                     // ERROR: DEC-11
-  op tooMany(): void;
+  fn tooMany(): void;
   @d(code: 1, nope: "x")               // ERROR: DEC-11
-  op unknown(): void;
+  fn unknown(): void;
 }

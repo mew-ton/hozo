@@ -165,7 +165,7 @@ namespace server {
   // ---- §6.2 effect ----
 
   /** ログインセッションを作成する */
-  effect createSession(login: LoginOk) on sessions.post;
+  effect fn createSession(login: LoginOk) on sessions.post;
 
   // ---- §8.1 デコレータの宣言 ----
 
@@ -191,14 +191,14 @@ namespace server {
   exception AlreadyLoggedIn;
 
   // 追加: login の、状態に触れない部分（入力の照合）。葉の op は reads / effects を書けない（STATE-5。README.md の表の 20）
-  op authenticate(in: LoginInput): LoginOk
+  fn authenticate(in: LoginInput): LoginOk
     throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn;
 
   // §7.1 の原文は葉の op。効果を持つので、葉 authenticate と効果 createSession を呼ぶ配線にした。
   // 上の行の例外のとき、下の行の効果が起きていないこと（prevents effects）は、検査器が本体から確かめる（REL-4）
   @http.post("/login")
   @validated
-  op login(in: LoginInput): LoginOk
+  fn login(in: LoginInput): LoginOk
     effects createSession
     throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn prevents effects
   {
@@ -222,13 +222,13 @@ namespace server {
   }
 
   /** 返金する（注文の状態を返金済みにする） */
-  effect refund(orderId: OrderId) on orders.put;
+  effect fn refund(orderId: OrderId) on orders.put;
 
   /** 注文を作成する */
-  effect createOrder(order: Order) on orders.post;
+  effect fn createOrder(order: Order) on orders.post;
 
   /** ユーザーに通知する */
-  effect notifyUser(notice: Notification) on notifications.post;
+  effect fn notifyUser(notice: Notification) on notifications.post;
 
   /** 返金の処理は受け付けたが、完了の確認が取れない */
   exception RefundPending;
@@ -238,16 +238,16 @@ namespace server {
 
   // 追加: §7.3 の例の、状態に触れない部分（葉の op。README.md の表の 20）
   /** 返金の完了を確かめ、取り消した注文を返す */
-  op confirmRefund(in: CancelInput): Order
+  fn confirmRefund(in: CancelInput): Order
     throws RefundPending;
   /** 入力から注文を作る */
-  op newOrder(in: OrderInput): Order;
+  fn newOrder(in: OrderInput): Order;
   /** 注文の通知を作る */
-  op composeNotice(order: Order): Notification
+  fn composeNotice(order: Order): Notification
     throws NotificationFailed;
 
   // 効果 refund を呼んだ後の行が RefundPending を投げるので、そのとき refund は起きている（keeps effects）
-  op cancelOrder(in: CancelInput): Order
+  fn cancelOrder(in: CancelInput): Order
     effects refund
     throws RefundPending keeps effects   // 返金の処理は受け付けたが、完了の確認が取れない
   {
@@ -257,7 +257,7 @@ namespace server {
 
   // 追加: §7.3 の `placeOrder` の二つの効果を、効果ごとの op に分けたもの（README.md の表の 14）
   /** 注文を保存する */
-  op saveOrder(in: OrderInput): Order
+  fn saveOrder(in: OrderInput): Order
     effects createOrder
   {
     val order = newOrder(in);
@@ -266,7 +266,7 @@ namespace server {
   }
 
   /** 注文したユーザーに通知する */
-  op sendOrderNotice(order: Order)
+  fn sendOrderNotice(order: Order)
     effects notifyUser
     throws NotificationFailed prevents effects
   {
@@ -278,7 +278,7 @@ namespace server {
   // `throws NotificationFailed keeps createOrder prevents notifyUser` を書く。葉の op は効果を書けず、
   // prevents / keeps の目的語は effects だけなので、配線にした。NotificationFailed のとき createOrder は
   // 起きていて（kept）、notifyUser は起きていない（prevented）ことは、検査器が本体から計算する。
-  op placeOrder(in: OrderInput): Order
+  fn placeOrder(in: OrderInput): Order
     throws NotificationFailed
   {
     val order = saveOrder(in);
@@ -290,14 +290,14 @@ namespace server {
 
   // 追加: §3.4 の例が参照する効果と例外
   /** 再設定メールを送る */
-  effect sendResetMail(reset: PasswordReset) on passwordResets.post;
+  effect fn sendResetMail(reset: PasswordReset) on passwordResets.post;
 
   /** 同じアドレスに短時間で送りすぎた */
   @http.status(429)
   exception RateLimited;
 
   // 追加: requestPasswordReset の、状態に触れない部分（README.md の表の 20）
-  op newPasswordReset(email: Email): PasswordReset
+  fn newPasswordReset(email: Email): PasswordReset
     throws RateLimited;
 
   /**
@@ -308,7 +308,7 @@ namespace server {
    * @see login
    */
   @http.post("/password-reset")
-  op requestPasswordReset(email: Email)
+  fn requestPasswordReset(email: Email)
     effects sendResetMail
     throws RateLimited prevents effects
   {
@@ -321,7 +321,7 @@ namespace server {
   // ---- §9 配線（server 側） ----
 
   /** ログインセッションを削除する */
-  effect deleteSession(token: Token?) on sessions.delete;
+  effect fn deleteSession(token: Token?) on sessions.delete;
 
   model LogoutInput {
     @http.header(name: "Authorization") token: Token?;
@@ -329,7 +329,7 @@ namespace server {
 
   // トークンがない・無効な場合のログアウトは何もしない（401 にしない）
   @http.post("/logout")
-  export op logout(in: LogoutInput)
+  export fn logout(in: LogoutInput)
     effects deleteSession
   {
     deleteSession(in.token);
@@ -346,7 +346,7 @@ namespace server {
 
   /** ログインしているユーザー自身を返す */
   @http.get("/me")
-  export op getMe(in: MeInput): PublicUser;
+  export fn getMe(in: MeInput): PublicUser;
 
   /** 注文一覧の入力 */
   model GetOrdersInput {
@@ -359,7 +359,7 @@ namespace server {
 
   /** ログインしているユーザーの注文一覧を返す */
   @http.get("/orders")
-  export op getOrders(in: GetOrdersInput): OrderSummary[];
+  export fn getOrders(in: GetOrdersInput): OrderSummary[];
 
   /** 商品を取る入力 */
   model GetItemInput {
@@ -368,7 +368,7 @@ namespace server {
 
   /** 商品を一つ返す（認証は要らない） */
   @http.get("/item")
-  export op getItem(in: GetItemInput): Item;
+  export fn getItem(in: GetItemInput): Item;
 
   /** カートに入れる入力 */
   model AddToCartInput {
@@ -377,14 +377,14 @@ namespace server {
   }
 
   /** カートに一行足す */
-  effect addCartLine(line: CartLine) on carts.post;
+  effect fn addCartLine(line: CartLine) on carts.post;
 
   // 追加: addToCart の、状態に触れない部分（README.md の表の 20）
-  op newCartLine(in: AddToCartInput): CartLine;
+  fn newCartLine(in: AddToCartInput): CartLine;
 
   /** 商品をカートに入れる */
   @http.post("/cart")
-  export op addToCart(in: AddToCartInput): CartLine
+  export fn addToCart(in: AddToCartInput): CartLine
     effects addCartLine
   {
     val line = newCartLine(in);
@@ -400,14 +400,14 @@ namespace server {
   }
 
   /** カートの一行に保証を付ける */
-  effect attachWarrantyToLine(line: WarrantyLine) on carts.put;
+  effect fn attachWarrantyToLine(line: WarrantyLine) on carts.put;
 
   // 追加: attachWarranty の、状態に触れない部分（README.md の表の 20）
-  op withWarranty(in: AttachWarrantyInput): WarrantyLine;
+  fn withWarranty(in: AttachWarrantyInput): WarrantyLine;
 
   /** カートの一行に保証プランを付ける */
   @http.post("/cart/warranty")
-  export op attachWarranty(in: AttachWarrantyInput): WarrantyLine
+  export fn attachWarranty(in: AttachWarrantyInput): WarrantyLine
     effects attachWarrantyToLine
   {
     val line = withWarranty(in);

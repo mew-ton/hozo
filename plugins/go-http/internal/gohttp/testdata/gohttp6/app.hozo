@@ -6,23 +6,23 @@ namespace app {
     @http.body item: string;
   }
   @http.get("/item")
-  export op fetch(in: In): string;
+  export fn fetch(in: In): string;
 
   // 一つの op の @http.get と @http.post のうち、当たるのは GET の経路
   @http.get("/both")
   @http.post("/both")
-  export op both(in: In): string;
+  export fn both(in: In): string;
 
   // 本文の全体（@http.bodyObj）も同じ
   model WholeIn {
     @http.bodyObj item: Item;
   }
   @http.get("/whole")
-  export op whole(in: WholeIn): string;
+  export fn whole(in: WholeIn): string;
 
   // @http.post なら、当たらない
   @http.post("/item")
-  export op write(in: In): string;
+  export fn write(in: In): string;
   @http.post("/whole")
-  export op writeWhole(in: WholeIn): string;
+  export fn writeWhole(in: WholeIn): string;
 }

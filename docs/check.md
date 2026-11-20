@@ -63,11 +63,11 @@
 
 | 単位 | 名前を付けた形 | 名前を付けない形 | すること |
 |---|---|---|---|
-| `read` | `read userByEmail(email: Email): User? on users;` | 配線の値の位置に書いた状態の名前（「op の宣言と本体」の「状態の参照」） | 基底の状態一つを読んで、値を得る |
-| 効果 | `effect createOrder(order: Order) on orders.post;` | 配線で直に呼ぶ組み込みの効果（`orders.post(order);`。「直に呼ぶ組み込みの効果」） | 一つの状態の一つの変化（「状態の形」の「効果の宛先」） |
+| `read` | `read fn userByEmail(email: Email): User? on users;` | 配線の値の位置に書いた状態の名前（「op の宣言と本体」の「状態の参照」） | 基底の状態一つを読んで、値を得る |
+| 効果 | `effect fn createOrder(order: Order) on orders.post;` | 配線で直に呼ぶ組み込みの効果（`orders.post(order);`。「直に呼ぶ組み込みの効果」） | 一つの状態の一つの変化（「状態の形」の「効果の宛先」） |
 
 - `read` と `effect` の宣言は本体を持たない。中身は、デコレータを読むトランスパイラが出すか（`@db.find` など）、人が書く。どちらになるかは、言語は決めない。
-- 宣言の引数と、`read` の結果の型は、書かれたままの約束で、検査器は宛先の状態の型と照らさない（`read count(): int on orders;` も書ける）。照らすのは、デコレータを読むトランスパイラ（`docs/requirements.md`「出力を推論しない」）。
+- 宣言の引数と、`read` の結果の型は、書かれたままの約束で、検査器は宛先の状態の型と照らさない（`read fn count(): int on orders;` も書ける）。照らすのは、デコレータを読むトランスパイラ（`docs/requirements.md`「出力を推論しない」）。
 - `read` と効果を使えるのは、宣言した名前空間（状態の持ち主）の配線だけ。別の名前空間は、その名前空間の op を通す（「配線からの呼び出し」の NS-6）。`export` は op にだけ付けられる（「op の宣言と本体」の「export」）。
 - どの配線も呼んでいない `read` と効果は診断しない。
 
@@ -99,7 +99,7 @@
 | `single<T>` | `put` | `title.put(t);` | 置き換える値（T） |
 | `list<T>` | `put`、`delete` | — | 直には呼べない（STATE-6） |
 
-- `list` の `put` と `delete` を直に呼べないのは、どの列を変えるか、消すかを、引数から決める規則がないから（キーに当たるものを、言語は持たない）。名前を付けた `effect` を宣言して呼ぶ（`effect removeOrder(id: OrderId) on orders.delete;`）。どの列かは、その宣言の実装（デコレータか人）が決める。
+- `list` の `put` と `delete` を直に呼べないのは、どの列を変えるか、消すかを、引数から決める規則がないから（キーに当たるものを、言語は持たない）。名前を付けた `effect` を宣言して呼ぶ（`effect fn removeOrder(id: OrderId) on orders.delete;`）。どの列かは、その宣言の実装（デコレータか人）が決める。
 - 形にない操作（`single` の `post` / `delete`）は STATE-1。
 - 引数の数と型の誤りは、`read` や効果の宣言の呼び出しと同じ診断（`docs/types.md`「呼び出しの引数」）。
 - 分類の遷移は、直には呼べない（`Checkout(…)` は RES-4）。名前を付けた `effect` の宛先にだけ書ける。
@@ -122,8 +122,8 @@
 | `reads` | `read` の宣言の名前（`reads userByEmail`） | 基底の状態の名前（`reads users`） | その状態を読むこと |
 | `effects` | `effect` の宣言の名前か、効果のユニオンの名前（`effects addUser`） | `状態.操作`（`effects users.post`） | その状態の組み込みの効果（「状態の形」の「基底の状態」） |
 
-- **効果は、書き方ごとに別のもの**として数える。直に書いた `users.post` は、状態 `users` の組み込みの効果 `post` そのもので、同じ宛先を持つ宣言（`effect addUser(user: User) on users.post;`）とは別の効果。宣言した効果は、宛先が同じでも、宣言ごとに別。配線の本体が `users.post(user);` と呼べば直に書いた効果 `users.post` を、`addUser(user);` と呼べば宣言 `addUser` を持つ。効果を数えるところ（Sig の F と rel、EFF-2）は、どれもこの数え方に従う。
-- **読む状態は、書き方によらない。** 読む状態（「計算」の「reads」の R）は基底の状態の集合で、`read` の宣言は、その宛先の状態として数える。`reads userByEmail`（`read userByEmail(…): User? on users;`）と `reads users` は、同じ `users` を指す。本体が `userByEmail(email)` と呼んでも、`users` を名前で読んでも、R に入るのは `users`。
+- **効果は、書き方ごとに別のもの**として数える。直に書いた `users.post` は、状態 `users` の組み込みの効果 `post` そのもので、同じ宛先を持つ宣言（`effect fn addUser(user: User) on users.post;`）とは別の効果。宣言した効果は、宛先が同じでも、宣言ごとに別。配線の本体が `users.post(user);` と呼べば直に書いた効果 `users.post` を、`addUser(user);` と呼べば宣言 `addUser` を持つ。効果を数えるところ（Sig の F と rel、EFF-2）は、どれもこの数え方に従う。
+- **読む状態は、書き方によらない。** 読む状態（「計算」の「reads」の R）は基底の状態の集合で、`read` の宣言は、その宛先の状態として数える。`reads userByEmail`（`read fn userByEmail(…): User? on users;`）と `reads users` は、同じ `users` を指す。本体が `userByEmail(email)` と呼んでも、`users` を名前で読んでも、R に入るのは `users`。
 - 直に書いた効果の操作が、その状態の形になければ STATE-1。
 - 分類の遷移は、直には書けない（`effects Checkout` は RES-4）。
 - 節には、別の名前空間の効果、状態、`read` も書ける: 配線の効果と読む状態は、呼び出し先から名前空間をまたいで伝わる（EFF-1、「計算」の「reads」）。
@@ -193,7 +193,7 @@
 | `list` | `list<T>`（`T[]`） | `Empty` / `HasItems` | 要素が一つもなければ `Empty`、あれば `HasItems` | なし |
 
 - 対象は値。状態に限らない（`match (in.token by nullable) { ... }`、`match (order.lines by list) { ... }`）。状態は、名前で書けば値になる（`match (token by nullable) { ... }`）。
-- 基底の状態の「組み込みの分類」（「状態の形」）は、この分類をその状態に当てたもの。遷移の宛先（`effect clearCart() on carts: HasItems -> Empty;`）になるのは、基底の状態に当てたものだけ（「効果の宛先」）。
+- 基底の状態の「組み込みの分類」（「状態の形」）は、この分類をその状態に当てたもの。遷移の宛先（`effect fn clearCart() on carts: HasItems -> Empty;`）になるのは、基底の状態に当てたものだけ（「効果の宛先」）。
 - 自分で宣言する分類も、`nullable<T>` や `list<T>` を対象にできる（`classify Presence of nullable<User> { ... }`）。
 
 ### ケースの型
@@ -311,14 +311,14 @@ classify Life of Order? {
 ```ts
 classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
 
-effect accept(order: Order)          on orders.post as Stage.Accepted;                          // Accepted で入る
-effect startProduction(order: Order) on orders.put  as Stage.Accepted -> Stage.InProduction;    // Accepted の行が InProduction になる
-effect cancel(order: Order)          on orders.put  as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-effect forceShip(order: Order)       on orders.put  as any -> Stage.Shipped;                    // どのケースからでも
-effect revise(order: Order)          on orders.put  as Stage.Accepted -> else;                  // 後のケースは決まっていない
-effect patch(order: Order)           on orders.put  as any -> else;                             // 何も約束しない（抜け道）
-effect rename(order: Order)          on orders.put;                                             // as がない: ケースは変わらない
-effect import(order: Order)          on orders.post;                                            // as any と同じ: 入るケースは決まっていない
+effect fn accept(order: Order)          on orders.post as Stage.Accepted;                          // Accepted で入る
+effect fn startProduction(order: Order) on orders.put  as Stage.Accepted -> Stage.InProduction;    // Accepted の行が InProduction になる
+effect fn cancel(order: Order)          on orders.put  as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+effect fn forceShip(order: Order)       on orders.put  as any -> Stage.Shipped;                    // どのケースからでも
+effect fn revise(order: Order)          on orders.put  as Stage.Accepted -> else;                  // 後のケースは決まっていない
+effect fn patch(order: Order)           on orders.put  as any -> else;                             // 何も約束しない（抜け道）
+effect fn rename(order: Order)          on orders.put;                                             // as がない: ケースは変わらない
+effect fn import(order: Order)          on orders.post;                                            // as any と同じ: 入るケースは決まっていない
 ```
 
 ### 行と、行の分類
@@ -364,7 +364,7 @@ effect import(order: Order)          on orders.post;                            
 3. **行の引数**: 効果の引数（`Effect.params`）のうち、型が T と等しいものが、ちょうど一つ。それが、状態を変える行。一つもないか、二つ以上あれば STATE-7。`as any -> else` のように、分類を名指ししない `as` でも要る。型が `T[]`（行の並び）や `C.K<T>`（絞り込んだ型）の引数は、行の引数に数えない。
 4. 行の引数が運ぶ値: `put` と `delete` では、効果の前の行（どのケースにあるかを、呼ぶ側が示す。「呼ぶ側の検査」）。`post` では、入る行。
 
-行の引数を持たない効果（行の並びをまとめて書く `effect saveAll(changed: Order[]) on orders.put;`、識別子で消す `effect remove(id: OrderId) on orders.delete;`）は、`as` を書けない。意味は「書き方と意味」の「`as` を書かない」のとおりなので、行のケースを変える `put` は、行を一つずつ受け取る効果として宣言する。
+行の引数を持たない効果（行の並びをまとめて書く `effect fn saveAll(changed: Order[]) on orders.put;`、識別子で消す `effect fn remove(id: OrderId) on orders.delete;`）は、`as` を書けない。意味は「書き方と意味」の「`as` を書かない」のとおりなので、行のケースを変える `put` は、行を一つずつ受け取る効果として宣言する。
 
 ### 行がないこと
 
@@ -379,9 +379,9 @@ classify Life of Order? {
   Absent: Order? as none;
 }
 
-effect createDraft(order: Order)  on orders.post   as Life.Absent -> Life.Draft;    // as Life.Draft でも同じ
-effect place(order: Order)        on orders.put    as Life.Draft -> Life.Placed;
-effect discardDraft(order: Order) on orders.delete as Life.Draft -> Life.Absent;    // 消せるのは、下書きだけ
+effect fn createDraft(order: Order)  on orders.post   as Life.Absent -> Life.Draft;    // as Life.Draft でも同じ
+effect fn place(order: Order)        on orders.put    as Life.Draft -> Life.Placed;
+effect fn discardDraft(order: Order) on orders.delete as Life.Draft -> Life.Absent;    // 消せるのは、下書きだけ
 ```
 
 消すものと、消さずにケースで言うものの分け方の勧めは `docs/requirements.md`「書き方の指針」。
@@ -394,7 +394,7 @@ effect discardDraft(order: Order) on orders.delete as Life.Draft -> Life.Absent;
 - 前が `any` の形、`as` を書かない効果、`post` の効果（`as N -> X` を含む）は、どの行でも受け取る: 確かめない。`post` の前の N は、行がないことで、渡す行（入る行）が示せることではない。
 
 ```ts
-export op start(id: OrderId) throws NoOrder, NotAccepted {
+export fn start(id: OrderId) throws NoOrder, NotAccepted {
   val order = byId(id);
   match (order by Stage) {
     Accepted => startProduction(order);     // order は、ここで Accepted と分かっている
@@ -402,11 +402,11 @@ export op start(id: OrderId) throws NoOrder, NotAccepted {
   };
 }
 
-op restart(order: Stage.Accepted<Order>) {
+fn restart(order: Stage.Accepted<Order>) {
   startProduction(order);                   // 型から Accepted と分かっている
 }
 
-op bad(order: Order) {
+fn bad(order: Order) {
   startProduction(order);                   // STATE-9: order が Accepted にあると分かっていない
 }
 ```
@@ -819,13 +819,13 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。分類のケースに付けたときは、D の `targets` に、そのケースを含む、分類のケース（`docs/grammar.md`「decorator の宣言」の `CaseKind`: 分類の名前と、対象のない分類かどうかで、絞る）がなければ DEC-1。`union` / `classify`（分類そのもの）/ `decorator` に付けたら常に DEC-1（`namespace` と `bind` は文法で閉じる。`docs/grammar.md`「ファイルと宣言」） |
+| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。分類のケースに付けたときは、D の `targets` に、そのケースを含む、分類のケース（`docs/grammar.md`「decorator の宣言」の `CaseKind`: 分類の名前か、対象の型で、絞る）がなければ DEC-1。`union` / `classify`（分類そのもの）/ `decorator` に付けたら常に DEC-1（`namespace` と `bind` は文法で閉じる。`docs/grammar.md`「ファイルと宣言」） |
 | DEC-2 | error | `targets` に `op` を含まない宣言が `throws`、`catches`、`reads`、`effects` のどれかの節を持つ |
 | DEC-3 | — | 文法で閉じる |
 | DEC-4 | error | `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている |
 | DEC-5 | warning | 計算の手順 i で `recovers` が succ(e) を `unknown` にした（F が空なら起きない） |
 | DEC-6 | warning | 一つのデコレータの宣言で、`catches` の例外と `throws` の例外に同じものがある |
-| DEC-7 | error | `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーと、分類のケース（`any case of never`、`any Actor case` の、絞りに合わないケース）の照合 |
+| DEC-7 | error | `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーと、分類のケース（`any case of never`、`any case of Order`、`any case of Actor` の、絞りに合わないケース）の照合 |
 | DEC-8 | — | 文法で閉じる |
 | DEC-9 | — | 正規化（`docs/ir.md`「デコレータの適用」） |
 | DEC-10 | — | 計算（手順 i の `throws`） |

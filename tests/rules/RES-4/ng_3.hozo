@@ -8,22 +8,22 @@ namespace a {
   classify Stock of items { None; Some; }
   classify Kind of M { A; B; }
   // 状態の分類のケースで絞り込んだ型は書けない
-  op ng1(m: Stock.Some<M>): void;      // ERROR: RES-4
+  fn ng1(m: Stock.Some<M>): void;      // ERROR: RES-4
   // reads の要素は read か状態だけ（状態の分類も書けない）
-  op pick(): M?;
-  op ng2(): M? reads Stock {           // ERROR: RES-4
+  fn pick(): M?;
+  fn ng2(): M? reads Stock {           // ERROR: RES-4
     return pick();
   }
-  op ng3(): M? reads M {               // ERROR: RES-4
+  fn ng3(): M? reads M {               // ERROR: RES-4
     return pick();
   }
-  op f(m: M): void;
+  fn f(m: M): void;
   // 配線の値の位置に書けるのは、束縛、引数、今の名前空間の状態
-  op ng4(): void {
+  fn ng4(): void {
     f(Kind);                           // ERROR: RES-4
   }
   // throw に書けるのは例外一つ（例外のユニオンは書けない）
-  op ng5(m: M): M throws E, F {
+  fn ng5(m: M): M throws E, F {
     return match (m by Kind) {
       A => throw Errors;               // ERROR: RES-4
       B => throw E;

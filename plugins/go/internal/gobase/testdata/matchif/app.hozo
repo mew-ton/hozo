@@ -16,17 +16,17 @@ namespace app {
   /** 手元のトークン */
   state token: nullable<Token>;
 
-  @mark export op findUser(id: string): User?;
-  export op lookup(id: string): User?;
-  export op nameOf(user: User): string;
-  @mark export op loadName(user: User): string;
-  export op deny(): never throws Denied;
-  export op show(text: string);
-  @mark export op record(text: string);
-  export op countOf(lines: Line[]): int;
-  export op countTags(tags: string[]): int;
-  export op useToken(token: Token): string;
-  export op takeOptionalUser(user: User?);
+  @mark export fn findUser(id: string): User?;
+  export fn lookup(id: string): User?;
+  export fn nameOf(user: User): string;
+  @mark export fn loadName(user: User): string;
+  export fn deny(): never throws Denied;
+  export fn show(text: string);
+  @mark export fn record(text: string);
+  export fn countOf(lines: Line[]): int;
+  export fn countTags(tags: string[]): int;
+  export fn useToken(token: Token): string;
+  export fn takeOptionalUser(user: User?);
 
   /** 型で決まる op の分類（絞り込みは presence） */
   classify Lookup of findUser {
@@ -45,7 +45,7 @@ namespace app {
   }
 
   // return match: 呼び出し（純粋でない op）と throw。アームを書いた順によらず、値のある場合が if の枝。else を書かない
-  @mark export op nameById(id: string): string
+  @mark export fn nameById(id: string): string
     throws Missing
   {
     val user = findUser(id);
@@ -56,7 +56,7 @@ namespace app {
   }
 
   // return match: 値（絞り込んだ対象のフィールドを読むだけなら、元の式のまま）と none
-  export op nickOf(user: User?): string?
+  export fn nickOf(user: User?): string?
   {
     return match (user by nullable) {
       HasItems => user.nick;
@@ -66,7 +66,7 @@ namespace app {
 
   // return match: 呼び出し（純粋な配線が、純粋な op を呼ぶ。絞り込んだ値は *<対象>）と「返らない」呼び出し。
   // else のアーム（Nothing を受ける）は、そのケースを名前で書いたアームと同じコード（枝の頭のコメントも、ケースの名前）
-  export op pureName(user: User?): string
+  export fn pureName(user: User?): string
     throws Denied
   {
     return match (user by Present) {
@@ -76,7 +76,7 @@ namespace app {
   }
 
   // return match: 呼び出しの結果の型をそろえる（string → string?）。対象がパス
-  @mark export op widened(in: Input): string?
+  @mark export fn widened(in: Input): string?
   {
     return match (in.user by nullable) {
       HasItems => loadName(in.user);
@@ -85,7 +85,7 @@ namespace app {
   }
 
   // return match: 絞り込みで Go の型が変わらない対象（array）
-  export op tagCount(tags: string[]?): int
+  export fn tagCount(tags: string[]?): int
   {
     return match (tags by nullable) {
       HasItems => countTags(tags);
@@ -94,14 +94,14 @@ namespace app {
   }
 
   // return match: 対象が状態（先に読む）。型で決まる状態の分類は、対象の状態を読んでから分ける
-  export op tokenText(): string
+  export fn tokenText(): string
   {
     return match (token by nullable) {
       HasItems => useToken(token);
       Empty    => "none";
     };
   }
-  export op signedInText(): string
+  export fn signedInText(): string
   {
     return match (by SignedIn) {
       Yes => useToken(token);
@@ -111,7 +111,7 @@ namespace app {
 
   // val x = match: var x <match の型> を先に置く。呼び出し（純粋でない op / 純粋な op。どちらも失敗の扱いを置く）、値、none（何も書かない）、
   // throw、使っていない束縛（match の後ろに _ = x）
-  @mark export op constForms(id: string, lines: Line[]): string
+  @mark export fn constForms(id: string, lines: Line[]): string
     throws Missing
   {
     val user = lookup(id);
@@ -138,7 +138,7 @@ namespace app {
 
   // 文の match: 呼び出し（純粋でない op / 純粋な op）、none のアーム（枝を書かない。if の枝がなければ条件を逆にする）、
   // 「返らない」呼び出し、throw、一つのアームが両方のケース（分けない）、絞り込んだ値を省略可能な位置へ
-  @mark export op statementForms(user: User?, lines: Line[])
+  @mark export fn statementForms(user: User?, lines: Line[])
     throws Denied
   {
     match (user by nullable) {

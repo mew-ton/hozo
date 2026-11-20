@@ -2,9 +2,9 @@
 namespace a {
   exception E;
   decorator ignoreE catches E ignores;
-  op leaf() throws E;
+  fn leaf() throws E;
   @ignoreE
-  op f() {
+  fn f() {
     leaf();
   }
 }

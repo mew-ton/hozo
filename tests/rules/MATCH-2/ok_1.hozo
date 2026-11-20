@@ -4,8 +4,8 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   classify D of M { A; B; C; D; E; }
-  op use(m: M): void;
-  op ok(m: M): void {
+  fn use(m: M): void;
+  fn ok(m: M): void {
     match (m by C) { A => use(m); B => none; };
     match (m by D) { A => use(m); else => none; };
     match (m by D) { A, B => use(m); C => none; else => none; };

@@ -5,7 +5,7 @@
 import type { Program, View } from "./ir.js";
 
 /** プロトコルの版。docs/ir.md の version（view.version）と同じ値。 */
-export const PROTOCOL = "0.10" as const;
+export const PROTOCOL = "0.11" as const;
 
 export type Direction = "emit" | "check" | "import";
 

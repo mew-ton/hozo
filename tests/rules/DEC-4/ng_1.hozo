@@ -2,9 +2,9 @@
 namespace a {
   exception E;
   decorator ignoreE catches E ignores;
-  op leaf(): string throws E;
+  fn leaf(): string throws E;
   @ignoreE                             // ERROR: DEC-4
-  op f(): string {
+  fn f(): string {
     return leaf();
   }
 }

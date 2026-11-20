@@ -10,22 +10,22 @@ namespace type {
   scalar Token extends string;
   /** 印。付いた op は純粋でなくなる */
   decorator mark;
-  @mark export op issue(): Token;
+  @mark export fn issue(): Token;
 }
 
 namespace a.util {
   model Box { x: int; }
-  @type.mark export op make(): Box;
+  @type.mark export fn make(): Box;
 }
 
 namespace b.util {
   model Box { y: int; }
-  @type.mark export op make(): Box;
+  @type.mark export fn make(): Box;
 }
 
 namespace context {
   model Info { z: int; }
-  @type.mark export op info(): Info;
+  @type.mark export fn info(): Info;
 }
 
 /** 当たる名前を持つ名前空間 */
@@ -35,17 +35,17 @@ namespace app {
   state leaves: single<string>;
   state extra: single<string>;
   state func: single<string>;
-  @reading(leaves, extra) export op both(): string;
+  @reading(leaves, extra) export fn both(): string;
   classify Extra of string {
     Yes;
     No;
   }
 
-  export op show(text: string);
-  export op showToken(token: type.Token);
+  export fn show(text: string);
+  export fn showToken(token: type.Token);
 
   // 「局所の名前」引数名が、Go の予約語、事前宣言の識別子、o、ctx、err、ptr、import するパッケージの名前と当たる
-  export op locals(o: string, ctx: string, err: string, ptr: string, func: string, len: string, error: string, util: string, context: string, pkgtype: string, runtime: string)
+  export fn locals(o: string, ctx: string, err: string, ptr: string, func: string, len: string, error: string, util: string, context: string, pkgtype: string, runtime: string)
   {
     show(o);
     show(ctx);
@@ -62,9 +62,9 @@ namespace app {
 
   // 「局所の名前」read と効果の引数名も、同じ規則（状態の単位のメソッドの引数）。それを呼ぶ配線の引数名と、直に呼ぶ組み込みの
   // 効果の値
-  read pick(ctx: string, type: string, err: int?): string on extra;
-  effect store(o: string, range: type.Token?, context: string) on extra.put;
-  export op touch(ctx: string, type: string, value: string): string
+  read fn pick(ctx: string, type: string, err: int?): string on extra;
+  effect fn store(o: string, range: type.Token?, context: string) on extra.put;
+  export fn touch(ctx: string, type: string, value: string): string
   {
     store(ctx, none, type);
     func.put(value);
@@ -73,7 +73,7 @@ namespace app {
 
   // 「局所の名前」束縛名と、状態を読んだ値の変数の名前（状態 func は予約語なので func_）。
   // 「import の名前」同じパッケージ名の二つの名前空間（util と util2）、標準ライブラリと同じ名前（context2）、予約語（pkgtype）
-  export op bindings(): type.Token
+  export fn bindings(): type.Token
   {
     val var = a.util.make();
     val range = b.util.make();

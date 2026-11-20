@@ -2,5 +2,5 @@
 namespace a {
   model User { id: string; hash: string; }
   model PublicUser is User omit hash;  // ERROR: SYNTAX
-  op f(): User;
+  fn f(): User;
 }

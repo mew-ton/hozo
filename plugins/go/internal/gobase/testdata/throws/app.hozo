@@ -25,10 +25,10 @@ namespace app {
   /** 試した回数 */
   state attempts: single<int>;
 
-  export op show(text: string);
+  export fn show(text: string);
 
   // return match の throw E(<値>): 絞り込んだ対象を値に使う（*<対象>）。もう一方は、引数のない throw E
-  export op need(id: string?, known: boolean?): string
+  export fn need(id: string?, known: boolean?): string
     throws Missing, Plain
   {
     return match (known by nullable) {
@@ -36,7 +36,7 @@ namespace app {
       Empty    => throw Plain;
     };
   }
-  export op needId(id: string?): string
+  export fn needId(id: string?): string
     throws Missing
   {
     return match (id by nullable) {
@@ -47,7 +47,7 @@ namespace app {
 
   // val x = match の throw E(<値>, …): 名前の値、レコードリテラル（当てはめる型は引数の model）、array、
   // 省略可能な引数に、省略可能でない値（ptr）と、省略可能を通るパス（文の前に置く途中の値は、その枝の中）
-  export op check(in: Input, tags: string[], text: string?): string
+  export fn check(in: Input, tags: string[], text: string?): string
     throws Invalid
   {
     val first = match (text by nullable) {
@@ -63,7 +63,7 @@ namespace app {
 
   // 文の match の throw E(<値>, …): 戻り値のない配線は `return <例外>`。引数の型をそろえる（scalar → 元の型）、
   // 渡されていない省略可能な引数は nil、別の名前空間の例外（Duration のリテラルと、省略可能な引数に文字列のリテラル）
-  export op guard(code: Code?, wait: boolean?)
+  export fn guard(code: Code?, wait: boolean?)
     throws Missing, limits.LimitExceeded
   {
     match (code by nullable) {
@@ -77,7 +77,7 @@ namespace app {
   }
 
   // throw の引数に書いた状態は、その枝の中で読む。省略可能な引数を渡さない
-  export op retry(text: string?): string
+  export fn retry(text: string?): string
     throws TooMany
   {
     return match (text by nullable) {
@@ -87,7 +87,7 @@ namespace app {
   }
 
   // throw の引数だけが使う束縛は、使われている（_ = x を足さない）
-  export op count(text: string?): string
+  export fn count(text: string?): string
     throws TooMany
   {
     val n = 3;

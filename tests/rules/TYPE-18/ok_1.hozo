@@ -1,0 +1,23 @@
+// TYPE-18（docs/grammar.md「関数の宣言」）: 効果の戻り値は、省くか、void。read は、値を返す。op は、省いても、void でも、never でも、型でもよい
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  exception Gone;
+  effect fn add(m: M) on rows.post;
+  effect fn put(m: M): void on rows.post;
+  read fn all(): M[] on rows;
+  read fn first(): M? on rows;
+  fn note(m: M);
+  fn quiet(m: M): void;
+  fn fail(): never throws Gone;
+  fn f(m: M): M[] {
+    add(m);
+    put(m);
+    note(m);
+    quiet(m);
+    return all();
+  }
+  fn g(): M? {
+    return first();
+  }
+}

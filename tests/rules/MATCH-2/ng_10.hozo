@@ -2,10 +2,10 @@
 // 名前で並べず、else のアームもなければ、足りない
 namespace a {
   model M { id: string; }
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
-  op use(m: M);
-  op ng() {
+  fn use(m: M);
+  fn ng() {
     val m = find();
     match (m by Hit) {                   // ERROR: MATCH-2
       Found => use(m);

@@ -5,14 +5,14 @@ namespace a {
   exception E;
   exception F;
   classify Kind of M { A; B; }
-  op fail(): never throws F;
-  op f(m: M): M {                      // ERROR: THROWS-1
+  fn fail(): never throws F;
+  fn f(m: M): M {                      // ERROR: THROWS-1
     return match (m by Kind) {
       A => m;
       B => throw E;
     };
   }
-  op g(m: M): M throws E {             // ERROR: THROWS-1
+  fn g(m: M): M throws E {             // ERROR: THROWS-1
     return match (m by Kind) {
       A => throw E;
       B => fail();

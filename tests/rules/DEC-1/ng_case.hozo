@@ -1,8 +1,11 @@
 // DEC-1: 分類のケースに付けたデコレータの、絞りに、そのケースが合わない。ケースに付けられないデコレータを、ケースに付けた
 namespace a {
   model M { id: string; }
+  model N { id: string; }
+  state rows: list<M>;
   decorator bySubject for case of never;
-  decorator byName for Size case;
+  decorator byType for case of M;
+  decorator byName for case of Size;
   decorator forOp for op;
   classify Size of M { Small; Large; }
   classify Weight of M {
@@ -12,6 +15,20 @@ namespace a {
   classify Actor of never {
     @byName Customer;                  // ERROR: DEC-1
     @forOp Clerk;                      // ERROR: DEC-1
+    @byType Guest;                     // ERROR: DEC-1
   }
-  @bySubject op f();                   // ERROR: DEC-1
+  // 対象の型で絞る形に当たるのは、値の分類で、対象の型が、等しいもの: 別の型、省略可能な型、状態の分類は、当たらない
+  classify Other of N {
+    @byType A;                         // ERROR: DEC-1
+    B;
+  }
+  classify Maybe of M? {
+    @byType Here: M? as M;             // ERROR: DEC-1
+    Gone: M? as else;
+  }
+  classify Load of rows {
+    @byType Idle;                      // ERROR: DEC-1
+    Busy;
+  }
+  @bySubject fn f();                   // ERROR: DEC-1
 }

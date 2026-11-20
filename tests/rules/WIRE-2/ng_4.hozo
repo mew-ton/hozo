@@ -3,17 +3,17 @@ namespace a {
   model M { id: string; }
   exception E;
   classify C of M { A; B; }
-  op fail(): never throws E;
-  op use(m: M): void;
-  op f(m: M): void throws E {
+  fn fail(): never throws E;
+  fn use(m: M): void;
+  fn f(m: M): void throws E {
     val x = fail();                  // ERROR: WIRE-2
     use(x);
   }
-  op g(m: M): void throws E {
+  fn g(m: M): void throws E {
     val y = match (m by C) { A => throw E; B => fail(); };   // ERROR: WIRE-2
     use(y);
   }
-  op h(m: M): void {
+  fn h(m: M): void {
     match (m by C) { A => m; B => none; };                     // ERROR: WIRE-2
   }
 }

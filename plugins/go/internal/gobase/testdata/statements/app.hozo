@@ -13,22 +13,22 @@ namespace app {
   decorator mark;
 
   // 葉: デコレータを持つ（仕様の上で、純粋でない）
-  @mark export op load(id: Id): Item;
-  @mark export op save(item: Item);
-  @mark export op touch();
-  @mark export op find(id: Id, limit: int?, tag: string?): Item?;
+  @mark export fn load(id: Id): Item;
+  @mark export fn save(item: Item);
+  @mark export fn touch();
+  @mark export fn find(id: Id, limit: int?, tag: string?): Item?;
   // 葉: 純粋で throws がない（それでも、メソッドは ctx を取り、error を返す。docs/plugin-go.md「op の形」）
-  export op make(id: Id): Item;
-  export op note(item: Item);
-  export op pick(a: Item?, b: Item?): Item?;
-  export op keep(items: Item?[], ids: Id[]);
+  export fn make(id: Id): Item;
+  export fn note(item: Item);
+  export fn pick(a: Item?, b: Item?): Item?;
+  export fn keep(items: Item?[], ids: Id[]);
   // 葉: 純粋で throws がある（同じ形）
-  export op parse(text: string): Id throws Broken;
+  export fn parse(text: string): Id throws Broken;
   // never を返す op
-  export op fail(): never throws Gone;
+  export fn fail(): never throws Gone;
 
   // 「文」val x = 呼び出し（純粋でない op と、純粋な op。どちらも失敗の扱いを置く）、使っていない束縛（WIRE-8）、val x = 値、呼び出しの文
-  @mark export op consts(id: Id): Item
+  @mark export fn consts(id: Id): Item
   {
     val a = load(id);
     val b = make(id);
@@ -41,66 +41,66 @@ namespace app {
   }
 
   // 「文」return 呼び出し: 型をそろえる必要がない（純粋でない配線が、純粋でない op を返す）
-  @mark export op sameShape(id: Id): Item
+  @mark export fn sameShape(id: Id): Item
   {
     return load(id);
   }
 
   // 「文」return 呼び出し: 純粋でない配線が、純粋な op を返す（同じ形: return <呼び出し>）
-  @mark export op calleeOnlyPure(id: Id): Item
+  @mark export fn calleeOnlyPure(id: Id): Item
   {
     return make(id);
   }
 
   // 「文」return 呼び出し: 純粋な配線が、純粋な op を返す（同じ形。配線も ctx を取り、error を返す）
-  export op bothPure(id: Id): Item
+  export fn bothPure(id: Id): Item
   {
     return make(id);
   }
 
   // 「文」return 呼び出し: 型をそろえる必要がある（Item → Item?）
-  @mark export op widen(id: Id): Item?
+  @mark export fn widen(id: Id): Item?
   {
     return load(id);
   }
 
   // 「文」return 値: 純粋でない配線と、純粋な配線（どちらも return <値>, nil）
-  @mark export op valueWithError(item: Item): Item
+  @mark export fn valueWithError(item: Item): Item
   {
     return item;
   }
-  export op valueOnly(item: Item): Item
+  export fn valueOnly(item: Item): Item
   {
     return item;
   }
 
   // 「文」「返らない」呼び出しの return と、文（戻り値のない配線。最後に return nil を足さない）
-  export op stop(id: Id): Item
+  export fn stop(id: Id): Item
     throws Gone
   {
     val a = make(id);
     note(a);
     return fail();
   }
-  export op stopStatement()
+  export fn stopStatement()
     throws Gone
   {
     fail();
   }
 
   // 「文」本体の終わり: 純粋でない配線も、純粋な配線も、最後に return nil
-  @mark export op endWithError(item: Item)
+  @mark export fn endWithError(item: Item)
   {
     save(item);
   }
-  export op endQuiet(item: Item)
+  export fn endQuiet(item: Item)
   {
     note(item);
   }
 
   // 「文」val x;（名前を並べた宣言は、名前ごとに一行）、x = 呼び出し（その位置で err が見えていないので、直前に var err error）、
   // 型をそろえる x = 呼び出し（Item → Item?）、x = 値、読まれていない空の val（WIRE-8: 宣言の直後に _ = x）
-  @mark export op fill(id: Id): Item?
+  @mark export fn fill(id: Id): Item?
   {
     val a, b: Item?, unused: Item;
     a = load(id);
@@ -110,7 +110,7 @@ namespace app {
   }
 
   // 「文」x = 呼び出し: 上の行に、err を作る文がある（var err error を置かない）
-  @mark export op fillAfterCall(id: Id): Item
+  @mark export fn fillAfterCall(id: Id): Item
   {
     val a = load(id);
     val b;
@@ -119,7 +119,7 @@ namespace app {
   }
 
   // 「文」型を書いた val: 値の Go の型が同じ（x := 値）、違う（var x T = 値）、呼び出しの型をそろえる（v<n> に受ける）
-  @mark export op typed(id: Id): Item?
+  @mark export fn typed(id: Id): Item?
   {
     val a = make(id);
     val same: Item = a;
@@ -131,7 +131,7 @@ namespace app {
 
   // 「文」for（変数を読む: for _, v := range。読まない: for range）、xs collect 呼び出し、型をそろえる xs collect 呼び出し、
   // xs collect 値
-  @mark export op each(ids: Id[]): Item[]
+  @mark export fn each(ids: Id[]): Item[]
   {
     val items: Item[];
     val wide: Item?[];
@@ -150,7 +150,7 @@ namespace app {
 
   // 「文」disjoint: 文の一つのアーム（そのまま）と、ブロックのアーム（Go のブロック。文が一つのブロックも）。disjoint for。
   // 「match」x = match、xs collect match
-  @mark export op apart(id: Id, other: Id, ids: Id[]): Item[]
+  @mark export fn apart(id: Id, other: Id, ids: Id[]): Item[]
   {
     val a, b, c;
     disjoint {
@@ -181,7 +181,7 @@ namespace app {
   }
 
   // 「呼び出し」純粋で throws がある op（ctx を渡し、失敗の扱いを置く）、渡されていない省略可能な引数は nil、別の名前空間の op
-  @mark export op calls(text: string): Item?
+  @mark export fn calls(text: string): Item?
     throws Broken
   {
     val id = parse(text);
@@ -192,30 +192,30 @@ namespace app {
   }
 
   // 「呼び出し」零値: 失敗の扱いの return の、戻り値の型ごとの零値
-  export op asTime(): Time;
-  export op asDuration(): Duration;
-  export op asId(): Id;
-  export op asCount(): Count;
-  export op asFloat(): float;
-  export op asBool(): boolean;
-  export op asItems(): Item[];
-  export op asTable(): Record<string, int>;
-  export op asOptional(): Item?;
-  export op asShape(): Shape;
-  @mark export op zeroTime(): Time { touch(); return asTime(); }
-  @mark export op zeroDuration(): Duration { touch(); return asDuration(); }
-  @mark export op zeroId(): Id { touch(); return asId(); }
-  @mark export op zeroCount(): Count { touch(); return asCount(); }
-  @mark export op zeroFloat(): float { touch(); return asFloat(); }
-  @mark export op zeroBool(): boolean { touch(); return asBool(); }
-  @mark export op zeroItems(): Item[] { touch(); return asItems(); }
-  @mark export op zeroTable(): Record<string, int> { touch(); return asTable(); }
-  @mark export op zeroOptional(): Item? { touch(); return asOptional(); }
-  @mark export op zeroShape(): Shape { touch(); return asShape(); }
-  @mark export op zeroItem(id: Id): Item { touch(); return make(id); }
+  export fn asTime(): Time;
+  export fn asDuration(): Duration;
+  export fn asId(): Id;
+  export fn asCount(): Count;
+  export fn asFloat(): float;
+  export fn asBool(): boolean;
+  export fn asItems(): Item[];
+  export fn asTable(): Record<string, int>;
+  export fn asOptional(): Item?;
+  export fn asShape(): Shape;
+  @mark export fn zeroTime(): Time { touch(); return asTime(); }
+  @mark export fn zeroDuration(): Duration { touch(); return asDuration(); }
+  @mark export fn zeroId(): Id { touch(); return asId(); }
+  @mark export fn zeroCount(): Count { touch(); return asCount(); }
+  @mark export fn zeroFloat(): float { touch(); return asFloat(); }
+  @mark export fn zeroBool(): boolean { touch(); return asBool(); }
+  @mark export fn zeroItems(): Item[] { touch(); return asItems(); }
+  @mark export fn zeroTable(): Record<string, int> { touch(); return asTable(); }
+  @mark export fn zeroOptional(): Item? { touch(); return asOptional(); }
+  @mark export fn zeroShape(): Shape { touch(); return asShape(); }
+  @mark export fn zeroItem(id: Id): Item { touch(); return make(id); }
 }
 
 /** 別の名前空間。単位を持たない（app が、その op の口 DepOps を持つ） */
 namespace dep {
-  @app.mark export op fetch(id: app.Id): app.Item;
+  @app.mark export fn fetch(id: app.Id): app.Item;
 }

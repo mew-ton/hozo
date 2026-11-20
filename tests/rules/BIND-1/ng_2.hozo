@@ -4,5 +4,5 @@ namespace a {
   state token: single<Token>;
   bind token to a.*;                   // ERROR: BIND-1
   model In { token: Token; id: string; }
-  op g(in: In, extra: Token);
+  fn g(in: In, extra: Token);
 }

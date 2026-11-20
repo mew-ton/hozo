@@ -4,22 +4,22 @@
 namespace a {
   state users: list<string>;
   state token: nullable<string>;
-  read first(): string? on users;
+  read fn first(): string? on users;
   decorator counting(table: any state) for op reads table;
   decorator peeking for op reads first, token;
   @counting(users)
-  export op count(): int;
+  export fn count(): int;
   @peeking
-  op peek(): string?;
-  op viaStore(): string[] reads b.rows, b.firstRow {
+  fn peek(): string?;
+  fn viaStore(): string[] reads b.rows, b.firstRow {
     return b.all();
   }
 }
 namespace b {
   state rows: list<string>;
-  read firstRow(): string? on rows;
-  export op all(): string[] reads rows { return rows; }
-  op size(): int reads a.users {
+  read fn firstRow(): string? on rows;
+  export fn all(): string[] reads rows { return rows; }
+  fn size(): int reads a.users {
     return a.count();
   }
 }

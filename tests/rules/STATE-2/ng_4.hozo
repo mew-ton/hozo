@@ -3,21 +3,21 @@
 // 違い、デコレータの処理は、状態に直に触れる。位置はそのデコレータの適用
 namespace a {
   state s: list<string>;
-  effect e(x: string) on s.post;
+  effect fn e(x: string) on s.post;
   decorator doing(...targets: any effect) for op effects targets;
   decorator posting for op effects s.post;
-  export op own(x: string) { e(x); }
+  export fn own(x: string) { e(x); }
   // 自分の名前空間の配線に付ければ通る
   @doing(e) @posting
-  op wired(x: string) { own(x); }
+  fn wired(x: string) { own(x); }
 }
 namespace b {
   state u: list<string>;
-  effect g(x: string) on u.post;
+  effect fn g(x: string) on u.post;
   @a.doing(g)
-  op ok(x: string) { a.own(x); }
+  fn ok(x: string) { a.own(x); }
   @a.doing(a.e)                                  // ERROR: STATE-2
-  op carried(x: string) { a.own(x); }
+  fn carried(x: string) { a.own(x); }
   @a.posting                                     // ERROR: STATE-2
-  op carriedDirect(x: string) { g(x); }
+  fn carriedDirect(x: string) { g(x); }
 }

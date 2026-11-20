@@ -1,8 +1,8 @@
 // 構文エラーのないファイル
 namespace a {
   exception E;
-  op leaf() throws E;
-  op wiring() throws E {
+  fn leaf() throws E;
+  fn wiring() throws E {
     leaf();
   }
 }

@@ -1,11 +1,16 @@
 // DEC-7: 分類のケースを受け取る引数の、絞りに、渡したケースが合わない
 namespace a {
   model M { id: string; }
+  model N { id: string; }
   classify Actor of never { Customer; }
   classify Role of never { Admin; }
   classify Size of M { Small; Large; }
+  classify Other of N { A; B; }
   decorator subj(x: any case of never) for op;
-  decorator named(x: any Actor case) for op;
-  @subj(Size.Small) op f();            // ERROR: DEC-7
-  @named(Role.Admin) op g();           // ERROR: DEC-7
+  decorator typed(x: any case of M) for op;
+  decorator named(x: any case of Actor) for op;
+  @subj(Size.Small) fn f();            // ERROR: DEC-7
+  @named(Role.Admin) fn g();           // ERROR: DEC-7
+  @typed(Other.A) fn h();              // ERROR: DEC-7
+  @typed(Actor.Customer) fn i();       // ERROR: DEC-7
 }

@@ -6,5 +6,5 @@ namespace a {
   model Self extends Self { }                            // ERROR: TYPE-10
   // 循環に入っていない model は、循環に入った model を元にできる
   model Tail extends S { extra: string; }
-  op f(): Tail;
+  fn f(): Tail;
 }

@@ -3,5 +3,5 @@ namespace a {
   scalar Token extends string;
   state token: nullable<Token>;
   bind token to a.*;
-  op g(t: Token?);
+  fn g(t: Token?);
 }

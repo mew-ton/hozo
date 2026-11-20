@@ -243,8 +243,11 @@ func (p *parser) parseDecl() ast.Decl {
 	}
 	if p.at(token.Export) {
 		export := p.advance().Span
-		if !p.at(token.Op) {
-			p.fail(export, "export を付けられるのは op だけで、op の直前に書く（docs/grammar.md「op」）")
+		if p.at(token.Op) {
+			p.failOldFnHead()
+		}
+		if !p.at(token.Fn) {
+			p.fail(export, "export を付けられるのは、種類を書かない fn（op）だけで、fn の直前に書く（docs/grammar.md「op」）")
 		}
 		o := p.parseOp(start, doc, decorators)
 		o.Export, o.ExportSpan = true, export
@@ -272,8 +275,11 @@ func (p *parser) parseDecl() ast.Decl {
 		return p.parseUnion(start, doc, decorators)
 	case token.State:
 		return p.parseState(start, doc, decorators)
-	case token.Op:
+	case token.Fn:
 		return p.parseOp(start, doc, decorators)
+	case token.Op:
+		// なくした書き方: op f()、op fn f()（docs/grammar.md「関数の宣言」）
+		p.failOldFnHead()
 	case token.Exception:
 		return p.parseException(start, doc, decorators)
 	case token.Effect:
@@ -295,6 +301,34 @@ func (p *parser) parseDecl() ast.Decl {
 	}
 	p.failExpected("宣言")
 	return nil
+}
+
+// expectFn は、関数の種類の語（read、effect）の後ろの fn を読む。なくした書き方（read r()、effect e(): 種類の語の直後に名前）は、
+// 新しい書き方をメッセージで示して SYNTAX にする（docs/grammar.md「関数の宣言」）。
+func (p *parser) expectFn(kind string) {
+	if p.at(token.Fn) {
+		p.advance()
+		return
+	}
+	if p.atIdent() {
+		name := p.tok().Text
+		p.fail(p.tok().Span, fmt.Sprintf("%s %s(…) という書き方はなくなった。関数の宣言の頭は fn で、種類は、その前に書く（%s fn %s(…) と書く。docs/grammar.md「関数の宣言」）", kind, name, kind, name))
+	}
+	p.failExpected("fn（" + kind + " fn 名前(…) と書く）")
+}
+
+// failOldFnHead は、宣言の頭の op を、新しい書き方を示して誤りにする: op f() は fn f()、op fn f() も fn f()
+// （種類を書かない fn が op。docs/grammar.md「関数の宣言」）。
+func (p *parser) failOldFnHead() {
+	op := p.tok().Span
+	if p.peek(1).Kind == token.Fn {
+		p.fail(op, "op fn とは書かない。種類を書かない fn が op（fn 名前(…) と書く。docs/grammar.md「関数の宣言」）")
+	}
+	name := "名前"
+	if n := p.peek(1); n.Kind == token.Ident {
+		name = n.Text
+	}
+	p.fail(op, fmt.Sprintf("op %s(…) という書き方はなくなった。関数の宣言の頭は fn（fn %s(…) と書く。docs/grammar.md「関数の宣言」）", name, name))
 }
 
 // parseLeadingDoc は先頭の DocComment を読む。二つ以上続いたら、最後のもの以外は付く先がないので誤り。
@@ -678,18 +712,23 @@ func (p *parser) parseException(start source.Offset, doc *ast.DocComment, decora
 	return e
 }
 
-// parseEffect は EffectDecl = "effect" Ident OpParams "on" ( BuiltinEffect [ RowClause ] | Transition ) ";" を読む
-// （docs/grammar.md「exception / effect / read」）。引数がなくても括弧を書く。
+// parseEffect は EffectDecl = "effect" FnHead "on" ( BuiltinEffect [ RowClause ] | Transition ) ";" を読む
+// （docs/grammar.md「関数の宣言」「exception / effect / read」）。引数がなくても括弧を書く。戻り値は、書いたものを、そのまま持つ
+// （void のほかは TYPE-18。意味の解析が出す）。
 // QualifiedName の直後が ":" なら Transition、そうでなければ最後の要素が StateOp の BuiltinEffect。
 // 行の遷移（RowClause）は BuiltinEffect の後ろにだけ書ける。
-// なくした書き方 `effect e on s.post;`（括弧なし）は、括弧が要ることをメッセージで示して SYNTAX にする。
+// なくした書き方 `effect fn e on s.post;`（括弧なし）は、括弧が要ることをメッセージで示して SYNTAX にする。
 func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.EffectDecl {
 	p.expect(token.Effect)
+	p.expectFn("effect")
 	e := &ast.EffectDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	if p.at(token.On) {
-		p.fail(p.tok().Span, fmt.Sprintf("effect %s の名前の後ろに、引数の括弧が要る（引数がなくても effect %s() on … と書く。docs/grammar.md「exception / effect / read」）", e.Name.Name, e.Name.Name))
+		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の名前の後ろに、引数の括弧が要る（引数がなくても effect fn %s() on … と書く。docs/grammar.md「exception / effect / read」）", e.Name.Name, e.Name.Name))
 	}
 	e.Params = p.parseOpParams()
+	if p.got(token.Colon) {
+		e.Return = p.parseReturnType()
+	}
 	p.expect(token.On)
 	if p.atName() && p.peek(1).Kind == token.Colon {
 		e.Transition = p.parseTransition()
@@ -778,24 +817,21 @@ func (p *parser) parseRowCase() ast.QualifiedName {
 	return p.parseQualifiedName()
 }
 
-// parseRead は ReadDecl = "read" Ident OpParams ":" Type "on" QualifiedName ";" を読む
-// （docs/grammar.md「exception / effect / read」）。引数がなくても括弧を書き、結果の型は省略できない（void / never も書けない）。
-// on の後ろは状態の名前一つで、操作は書かない。
+// parseRead は ReadDecl = "read" FnHead "on" QualifiedName ";" を読む
+// （docs/grammar.md「関数の宣言」「exception / effect / read」）。引数がなくても括弧を書く。戻り値は、書いたものを、そのまま持つ
+// （省いた形、void、never は TYPE-18。意味の解析が出す）。on の後ろは状態の名前一つで、操作は書かない。
 func (p *parser) parseRead(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ReadDecl {
 	p.expect(token.Read)
+	p.expectFn("read")
 	r := &ast.ReadDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	if !p.at(token.LParen) {
-		p.fail(p.tok().Span, fmt.Sprintf("read %s の名前の後ろに、引数の括弧と結果の型が要る（read %s(…): T on 状態; と書く。docs/grammar.md「exception / effect / read」）", r.Name.Name, r.Name.Name))
+		p.fail(p.tok().Span, fmt.Sprintf("read fn %s の名前の後ろに、引数の括弧が要る（read fn %s(…): T on 状態; と書く。docs/grammar.md「exception / effect / read」）", r.Name.Name, r.Name.Name))
 	}
 	r.Params = p.parseOpParams()
-	if !p.at(token.Colon) {
-		p.fail(p.tok().Span, fmt.Sprintf("read %s は結果の型を省略できない（read %s(…): T on 状態; と書く。docs/grammar.md「exception / effect / read」）", r.Name.Name, r.Name.Name))
+	if p.got(token.Colon) {
+		r.Return = p.parseReturnType()
+		r.Result = r.Return.Type
 	}
-	p.advance()
-	if p.at(token.Void) || p.at(token.Never) {
-		p.fail(p.tok().Span, fmt.Sprintf("read %s の結果の型に %s は書けない（read は値を得るもの）", r.Name.Name, p.tok().Text))
-	}
-	r.Result = p.parseType()
 	p.expect(token.On)
 	if !p.atName() {
 		p.failExpected("読む状態の名前")
@@ -1117,7 +1153,6 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	case p.at(token.Model):
 		a.Kind = ast.AnyModel
 	case p.atCaseKind():
-		// 文脈キーワード variant より先に見る: すぐ後ろに case が続く名前は、名前で絞った、分類のケース
 		a.Kind, a.Case = ast.AnyCase, p.parseCaseKind()
 		a.Span = p.spanFrom(start)
 		return a
@@ -1145,7 +1180,6 @@ func (p *parser) parseTarget() *ast.Target {
 	case p.at(token.Op):
 		t.Kind = ast.TargetOp
 	case p.atCaseKind():
-		// 文脈キーワード field より先に見る: すぐ後ろに case が続く名前は、名前で絞った、分類のケース
 		t.Kind, t.Case = ast.TargetCase, p.parseCaseKind()
 		t.Span = t.Case.Span
 		return t
@@ -1172,33 +1206,23 @@ func (p *parser) parseTarget() *ast.Target {
 	return t
 }
 
-// atCaseKind は、tok が CaseKind（分類のケース）の頭か: `case`、または、すぐ後ろに `case` が続く名前。
-func (p *parser) atCaseKind() bool {
-	return p.at(token.Case) || (p.atName() && p.peek(1).Kind == token.Case)
-}
+// atCaseKind は、tok が CaseKind（分類のケース）の頭か。
+func (p *parser) atCaseKind() bool { return p.at(token.Case) }
 
-// parseCaseKind は CaseKind = "case" [ "of" "never" ] | QualifiedName "case" を読む（分類のケース）。
-// of の後ろに書けるのは never だけ。名前と of never の両方は、書けない。
+// parseCaseKind は CaseKind = "case" [ "of" ( "any" | "never" | Type ) ] を読む（分類のケース）。
+// case は case of any の省略。of の後ろの型は、? と [] を含めて、型として読む（分類の名前も、型の名前として読み、
+// 名前の解決が分ける。docs/grammar.md「decorator の宣言」）。
 func (p *parser) parseCaseKind() *ast.CaseKind {
-	start := p.tok().Span.Start
+	start := p.expect(token.Case).Span.Start
 	k := &ast.CaseKind{}
-	if p.atName() {
-		n := p.parseQualifiedName()
-		k.Classify = &n
-		p.expect(token.Case)
-		if p.at(token.Of) {
-			p.fail(p.tok().Span, "分類のケースに、名前と of never の両方は、書けない（名前が決まれば、対象も決まる。docs/grammar.md「decorator の宣言」）")
-		}
-		k.Span = p.spanFrom(start)
-		return k
-	}
-	p.expect(token.Case)
 	if p.got(token.Of) {
-		if !p.at(token.Never) {
-			p.fail(p.tok().Span, "分類のケース（case of …）で、of の後ろに書けるのは never だけ（docs/grammar.md「decorator の宣言」）")
+		switch {
+		case p.got(token.Any):
+		case p.got(token.Never):
+			k.Never = true
+		default:
+			k.Of = p.parseType()
 		}
-		p.advance()
-		k.Never = true
 	}
 	k.Span = p.spanFrom(start)
 	return k
@@ -1207,7 +1231,7 @@ func (p *parser) parseCaseKind() *ast.CaseKind {
 // failClassifyKind は、for か any の後ろの classify: 分類そのものは、まだ、書けない。なくした書き方（classify … case）の、
 // 新しい書き方も、示す（docs/grammar.md「decorator の宣言」）。
 func (p *parser) failClassifyKind() {
-	p.fail(p.tok().Span, "分類そのもの（classify）は、まだ、書けない。分類のケースは、case、case of never、名前 case と書く（classify … case は、なくした書き方。docs/grammar.md「decorator の宣言」）")
+	p.fail(p.tok().Span, "分類そのもの（classify）は、まだ、書けない。分類のケースは、case of any（省略して case）、case of never、case of 分類の名前 と書く（classify … case は、なくした書き方。docs/grammar.md「decorator の宣言」）")
 }
 
 // parseThrowsClause は ThrowsClause = "throws" ExcRef { "," ExcRef } { Relation } を読む。
@@ -1284,11 +1308,12 @@ func (p *parser) parseNameList(clause string) []ast.QualifiedName {
 
 // parseOp は OpDecl を読む（docs/grammar.md「op」）。
 //
-//	OpDecl = [ "export" ] "op" Ident OpParams [ ":" ReturnType ] { OpClause } ( ";" | Block ) ;
+//	OpDecl = [ "export" ] FnHead { OpClause } ( ";" | Block ) ;
+//	FnHead = "fn" Ident OpParams [ ":" ReturnType ] ;          （docs/grammar.md「関数の宣言」）
 //
 // export は parseDecl が読む。
 func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.OpDecl {
-	p.expect(token.Op)
+	p.expect(token.Fn)
 	o := &ast.OpDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	o.Params = p.parseOpParams()
 	if p.got(token.Colon) {
@@ -1648,7 +1673,7 @@ func (p *parser) parseCallArgs() []ast.Atom {
 	p.expect(token.LParen)
 	for !p.at(token.RParen) {
 		if p.atName() && p.peek(1).Kind == token.LParen {
-			p.fail(p.tok().Span, "呼び出しの引数に呼び出しは書けない。中間結果に const で名前を付ける")
+			p.fail(p.tok().Span, "呼び出しの引数に呼び出しは書けない。中間結果に val で名前を付ける")
 		}
 		args = append(args, p.parseAtom())
 		if !p.got(token.Comma) {

@@ -65,7 +65,7 @@ namespace type {
 namespace api {
   // 引数がなく、戻り値がある
   @http.get("/health")
-  export op health(): string;
+  export fn health(): string;
 
   // ヘッダと本文の項目: 名前を書いたものと省いたもの、@http.required、@http.default、どちらもない（省略可能と、そうでないもの）。
   // 本文の項目は、いくつあっても、JSON のオブジェクトのキー。@http.default のリテラルは、文字列、整数、小数、真偽値、期間
@@ -90,7 +90,7 @@ namespace api {
 
   /** 品物を作る */
   @http.post("/items")
-  export op create(in: CreateInput): type.Item
+  export fn create(in: CreateInput): type.Item
     throws type.Conflict, type.Rejected;
 
   // クエリの項目: string / int / float / boolean と、その scalar。@http.required、@http.default、どちらもない
@@ -115,12 +115,12 @@ namespace api {
 
   /** 品物を探す。結果は配列（空でも [] を返す） */
   @http.get("/items")
-  export op search(in: SearchInput): type.Item[]
+  export fn search(in: SearchInput): type.Item[]
     throws type.Broken, type.Leaky;
 
   /** 最初の品物。省略可能な戻り値（なければ 204）。入力は、別の名前空間の model */
   @http.get("/items/first")
-  export op first(in: type.Lookup): type.Item?
+  export fn first(in: type.Lookup): type.Item?
     throws type.NotFound, type.Limited, type.Gone;
 
   // 本文の項目が一つでも、本文は、キーを持つオブジェクト。戻り値がない（204）
@@ -128,7 +128,7 @@ namespace api {
     @http.body items: type.Item[];
   }
   @http.post("/items/replace")
-  export op replace(in: ReplaceInput)
+  export fn replace(in: ReplaceInput)
     throws type.NotFound;
 
   // 全体の形: ヘッダとクエリを、一つずつの model で。結果は record（値がなくても {} を返す）
@@ -137,7 +137,7 @@ namespace api {
     @http.queryObj paging: type.Paging;
   }
   @http.get("/list")
-  export op listAll(in: ListInput): Record<string, int>;
+  export fn listAll(in: ListInput): Record<string, int>;
 
   // 全体の形: 本文が、その model の JSON。ほかの場所の項目の形とは、一緒に書ける。結果は、省略可能な scalar
   model PutInput {
@@ -145,28 +145,28 @@ namespace api {
     @http.header("X-Tenant") tenant: string?;
   }
   @http.post("/put")
-  export op put(in: PutInput): type.Token?;
+  export fn put(in: PutInput): type.Token?;
 
   // 引数も戻り値もない。/ で終わるパスは、そのパスだけに合う
   @http.post("/reset/")
-  export op reset();
+  export fn reset();
 
   // 一つの op に、二つの経路
   @http.get("/ping")
   @http.post("/ping")
-  export op ping(): boolean;
+  export fn ping(): boolean;
 
   // 零値の結果も、値（200）
   @http.get("/count")
-  export op count(): int;
+  export fn count(): int;
 
   // @http.* のない export の op は、経路にならない。@http.retry は読まない（印）
-  export op version(): string;
+  export fn version(): string;
   @http.retry(3)
-  export op flaky(): string;
+  export fn flaky(): string;
 
   // 内部の op
-  op helper(n: int): int;
+  fn helper(n: int): int;
 }
 
 /** 制約の検査（validate = true） */
@@ -177,7 +177,7 @@ namespace strict {
     @http.required @http.body lines: type.Item[];
   }
   @http.post("/orders")
-  export op order(in: OrderInput): int;
+  export fn order(in: OrderInput): int;
 
   // 名前を書いた項目は、その名前で（body.more）。クエリとヘッダの値の制約も確かめる
   model EditInput {
@@ -187,7 +187,7 @@ namespace strict {
     @http.body("more") extra: type.Item?;
   }
   @http.post("/edit")
-  export op edit(in: EditInput);
+  export fn edit(in: EditInput);
 
   // 全体の形: 場所は body、query（フィールドの名前 payload、paging は、通信に現れない）
   model BulkInput {
@@ -195,18 +195,18 @@ namespace strict {
     @http.queryObj paging: type.Paging;
   }
   @http.post("/bulk")
-  export op bulk(in: BulkInput);
+  export fn bulk(in: BulkInput);
 
   // Validate を持たない入力にも、同じ httpValidate を出す（補助が、実行時に見る）
   model PlainInput {
     @http.query id: string?;
   }
   @http.get("/plain")
-  export op plain(in: PlainInput): string;
+  export fn plain(in: PlainInput): string;
 
   // 入力のない経路は、確かめるものがない
   @http.get("/now")
-  export op now(): string;
+  export fn now(): string;
 }
 
 /** 入力も、@http.status を持つ例外もない */
@@ -214,14 +214,14 @@ namespace bare {
   exception Unknown;
 
   @http.get("/")
-  export op root(): string;
+  export fn root(): string;
 
   @http.post("/touch")
-  export op touch()
+  export fn touch()
     throws Unknown;
 
   // 名前付きデコレータを通して付けた @http.get も、展開した適用として経路になる
   decorator pong = http.get("/pong");
   @pong
-  export op viaAlias(): string;
+  export fn viaAlias(): string;
 }

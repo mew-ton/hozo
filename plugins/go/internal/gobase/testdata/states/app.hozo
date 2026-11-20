@@ -35,36 +35,36 @@ namespace app {
 
   // 「状態の単位」read: 読む状態の単位の問い合わせ（宣言順）。説明は、メソッドのコメントに写す
   /** 品目が同じ行 */
-  read lineFor(item: string): Line? on lines;
+  read fn lineFor(item: string): Line? on lines;
   // 説明がなく、引数もない read。結果の型は、宣言に書かれたまま（宛先の状態の型と照らさない）
-  read countLines(): int on lines;
+  read fn countLines(): int on lines;
   /**
    * 店の名前。
    * 設定の title を、そのまま返す。
    */
-  read shopTitle(): string on settings;
+  read fn shopTitle(): string on settings;
   // どの配線も呼ばない read も出す。省略可能な引数と、Time の引数
-  read linesSince(since: Time, limit: int?): Line[] on lines;
+  read fn linesSince(since: Time, limit: int?): Line[] on lines;
   /** 手元のトークンの写し */
-  read tokenCopy(): Token? on token;
+  read fn tokenCopy(): Token? on token;
 
   // 「状態の単位」効果: 宛先の単位の命令（宣言順）。宛先の単位は、組み込みの効果と基底の状態の遷移なら、その基底の状態。
   // 述語で決まる状態の分類の遷移は、その分類の単位。型で決まる状態の分類の遷移は、ただ一つの対象の状態
   /** 行を足す */
-  effect addLine(line: Line) on lines.post;
-  effect dropToken() on token.delete;
+  effect fn addLine(line: Line) on lines.post;
+  effect fn dropToken() on token.delete;
   /** カートを空にする */
-  effect clearLines() on lines: HasItems -> Empty;
-  effect refresh() on Sync: Stale -> Fresh;
+  effect fn clearLines() on lines: HasItems -> Empty;
+  effect fn refresh() on Sync: Stale -> Fresh;
   /**
    * ログインする。
    * 二行目の説明。
    */
-  effect signIn(token: Token) on SignedIn: any -> Yes;
+  effect fn signIn(token: Token) on SignedIn: any -> Yes;
   // 引数が二つの効果（省略可能な引数を持つ）
-  effect rename(title: string, owner: Owner?) on settings.put;
+  effect fn rename(title: string, owner: Owner?) on settings.put;
   // どの配線も呼ばない効果も出す
-  effect removeLine(item: string) on lines.delete;
+  effect fn removeLine(item: string) on lines.delete;
 
   // 読む状態と効果を運ぶデコレータ（docs/check.md「デコレータが運ぶ reads と effects」）
   decorator looks(table: any state) for op reads table;
@@ -74,50 +74,50 @@ namespace app {
 
   // 「op の置き場」の 3: 葉は、いつも Leaves。デコレータが reads / effects を運んでいても（一つの状態でも、二つの状態でも）、
   // 置き場は変わらない
-  @doing(addLine) export op push(line: Line);
-  @reading(lines, settings) export op summary(): string;
+  @doing(addLine) export fn push(line: Line);
+  @reading(lines, settings) export fn summary(): string;
   @does(addLine, dropToken)
-  export op checkout(line: Line);
+  export fn checkout(line: Line);
   @looks(token)
-  export op peek(): Token?;
+  export fn peek(): Token?;
   @mark
-  export op audit(note: string);
+  export fn audit(note: string);
 
   // 値を受け取る葉（純粋で throws がない）
-  export op show(title: string);
-  export op showCount(n: int);
-  export op showOwner(name: string?);
-  export op showToken(token: Token?);
-  export op showBoth(a: Token?, b: Token?);
-  export op showLines(lines: Line[]);
+  export fn show(title: string);
+  export fn showCount(n: int);
+  export fn showOwner(name: string?);
+  export fn showToken(token: Token?);
+  export fn showBoth(a: Token?, b: Token?);
+  export fn showLines(lines: Line[]);
 
   // 「呼び出し」read: return 呼び出し（戻り値の並びが同じ）、const、型をそろえる return（int → int?）
-  export op find(item: string): Line?
+  export fn find(item: string): Line?
   {
     return lineFor(item);
   }
-  export op total(): int
+  export fn total(): int
   {
     val n = countLines();
     showCount(n);
     return n;
   }
-  export op maybeTotal(): int?
+  export fn maybeTotal(): int?
   {
     return countLines();
   }
-  export op title(): string
+  export fn title(): string
   {
     return shopTitle();
   }
 
   // 「呼び出し」効果: 文（失敗の扱いを置く）。宛先の単位の引数名で呼ぶ: 基底の状態、述語で決まる状態の分類、
   // 型で決まる状態の分類の、ただ一つの対象の状態
-  export op add(line: Line)
+  export fn add(line: Line)
   {
     addLine(line);
   }
-  export op reset(t: Token)
+  export fn reset(t: Token)
   {
     clearLines();
     refresh();
@@ -126,7 +126,7 @@ namespace app {
   }
 
   // 「呼び出し」引数の型をそろえる（scalar → 元の型、T → T?）、渡されていない省略可能な引数は nil、レコードリテラルの引数
-  export op retitle(t: Token, owner: Owner)
+  export fn retitle(t: Token, owner: Owner)
   {
     rename(t, owner);
     rename(t);
@@ -136,7 +136,7 @@ namespace app {
   // 「呼び出し」直に呼ぶ組み込みの効果: 状態の単位の、形で決まる命令。値を取る操作は value 一つ（状態の要素の型）、
   // nullable の delete は、なし。呼んでいる操作だけが、単位のメソッドになる（lines は Post、token は Post と Put と Delete、
   // settings は Put。journal は、どれも持たない）
-  export op direct(line: Line, t: Token)
+  export fn direct(line: Line, t: Token)
   {
     lines.post(line);
     token.put(t);
@@ -146,14 +146,14 @@ namespace app {
   }
 
   // 「match」アームの本体の read（return match、const）と、効果と直に呼ぶ組み込みの効果（文の match）
-  export op findOrNone(item: string?): Line?
+  export fn findOrNone(item: string?): Line?
   {
     return match (item by nullable) {
       HasItems => lineFor(item);
       Empty    => none;
     };
   }
-  export op countOrZero(item: string?): int
+  export fn countOrZero(item: string?): int
   {
     val n = match (item by nullable) {
       HasItems => countLines();
@@ -161,7 +161,7 @@ namespace app {
     };
     return n;
   }
-  export op toggle(t: Token)
+  export fn toggle(t: Token)
   {
     match (token by nullable) {
       HasItems => dropToken();
@@ -170,7 +170,7 @@ namespace app {
   }
 
   // 「状態の参照」Atom の state とパス（省略可能を通るパスも）。別の文なら、もう一度読む（同じ変数に = で代入する）
-  export op header()
+  export fn header()
   {
     show(settings.title);
     showOwner(settings.owner.name);
@@ -178,7 +178,7 @@ namespace app {
 
   // 「状態の参照」一つの文の中の同じ状態は、一度だけ読む。二つの状態を使う文は、書かれた順に読む。
   // read と効果の引数に書いた状態も、その文の前に読む
-  export op once()
+  export fn once()
   {
     showBoth(token, token);
     addLine({ item: settings.title, count: 1 });
@@ -186,7 +186,7 @@ namespace app {
   }
 
   // 「状態の参照」const と return。戻り値の型の零値で失敗を返す
-  export op current(): Token?
+  export fn current(): Token?
   {
     val t = token;
     showToken(t);
@@ -194,7 +194,7 @@ namespace app {
   }
 
   // 「状態の参照」読んだ値の変数の名前が、引数と当たる（末尾に _）。同じ名前の引数があれば、名前はそちらを指す
-  export op shadowed(token: Token?, lines: Line[])
+  export fn shadowed(token: Token?, lines: Line[])
   {
     showLines(lines);
     showBoth(token, app.token);
@@ -202,7 +202,7 @@ namespace app {
 
   // 「状態の参照」match の対象が状態なら、match の前に一度読み、アームの中の同じ状態はその値を使う。
   // アームの本体だけが使う状態は、そのアームの枝の中で読む
-  export op branches()
+  export fn branches()
   {
     match (lines by list) {
       HasItems => showLines(lines);
@@ -216,7 +216,7 @@ namespace app {
 
   // 葉（デコレータが reads と effects を運ぶもの）と、read と、効果を呼ぶ配線。運ばれた reads と effects も、呼び出し元へ伝わる
   // （Reads と Effects のコメント: Reads は読む状態、Effects は効果。直に呼んだ組み込みの効果は <状態>.<操作>）
-  export op finish(line: Line): string
+  export fn finish(line: Line): string
   {
     push(line);
     checkout(line);
@@ -233,12 +233,12 @@ namespace app {
   // 書かれた呼び出しだけで、運ばれたものを起こすのは、デコレータを読むトランスパイラ
   @looks(settings)
   @does(dropToken)
-  export op keep(line: Line)
+  export fn keep(line: Line)
   {
     addLine(line);
   }
   // それを呼ぶ配線にも伝わる
-  export op keepTwice(line: Line)
+  export fn keepTwice(line: Line)
   {
     keep(line);
     keep(line);

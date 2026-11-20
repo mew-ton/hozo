@@ -3,9 +3,9 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   classify One of M { Only; }
-  op use(m: M): void;
-  op f(): void;
-  op find(): M?;
+  fn use(m: M): void;
+  fn f(): void;
+  fn find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
   // 残りのケースを書かない分類: 値がない側は、どのケースでもなく、else のアームも受けない
   classify Arrival of find { Arrived: find as M; }
@@ -13,7 +13,7 @@ namespace a {
   state token: nullable<string>;
   classify Session of token { LoggedIn; LoggedOut; }
 
-  op ng(m: M): void {
+  fn ng(m: M): void {
     match (m by C) {
       A, B => use(m);
       else => none;                    // ERROR: MATCH-9
@@ -53,13 +53,13 @@ namespace a {
     };
   }
   // 知らない名前のアーム（MATCH-2）があっても、else のアームが受けるケースが残っていれば、MATCH-9 は出ない
-  op unknownButRest(m: M): void {
+  fn unknownButRest(m: M): void {
     match (m by C) {                     // ERROR: MATCH-2
       A, Z => use(m);
       else => none;
     };
   }
-  op ok(m: M): void {
+  fn ok(m: M): void {
     match (m by C) { A => use(m); else => none; };
     val x = find();
     match (x by Hit) { Found => use(x); else => none; };

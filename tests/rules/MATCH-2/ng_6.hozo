@@ -2,8 +2,8 @@
 namespace a {
   state carts: list<string>;
   state token: nullable<string>;
-  op f();
-  op ng() {
+  fn f();
+  fn ng() {
     match (carts by list) {              // ERROR: MATCH-2
       Empty => f();
     };

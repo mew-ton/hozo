@@ -7,10 +7,10 @@ namespace a {
   exception Plain;
   state rows: list<M>;
   state cur: nullable<M>;
-  read byId(id: string): M? on rows;
-  effect add(m: M) on rows.post;
+  read fn byId(id: string): M? on rows;
+  effect fn add(m: M) on rows.post;
   classify K of M { A; B; C; D; }
-  op f(m: M, n: N, count: int): M? throws Busy {
+  fn f(m: M, n: N, count: int): M? throws Busy {
     add(n);                              // ERROR: TYPE-4
     add(m, m);                           // ERROR: TYPE-4
     rows.post(n);                        // ERROR: TYPE-4
@@ -27,5 +27,5 @@ namespace a {
       D => throw Busy(5m);
     };
   }
-  op use(x: M?, y: M?);
+  fn use(x: M?, y: M?);
 }

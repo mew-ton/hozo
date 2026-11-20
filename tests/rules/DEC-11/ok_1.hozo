@@ -2,10 +2,10 @@
 namespace a {
   decorator d(code: int, name: string?);
   @d(1)
-  op ok1(): void;
+  fn ok1(): void;
   @d(name: "x", code: 1)
-  op ok2(): void;
+  fn ok2(): void;
   decorator alias = d(1);
   @alias
-  op ok3(): void;
+  fn ok3(): void;
 }

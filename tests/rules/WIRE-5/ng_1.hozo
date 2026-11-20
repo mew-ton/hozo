@@ -1,9 +1,9 @@
 // WIRE-5（docs/check.md「配線」。文法で閉じる）: 呼び出しの引数に呼び出しは書けない（A 正規形）
 namespace a {
   model M { id: string; }
-  op v(): M;
-  op use(m: M);
-  op f() {
+  fn v(): M;
+  fn use(m: M);
+  fn f() {
     use(v());                          // ERROR: SYNTAX
   }
 }

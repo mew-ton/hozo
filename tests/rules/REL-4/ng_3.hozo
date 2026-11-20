@@ -4,20 +4,20 @@
 namespace a {
   state s: list<string>;
   state log: list<string>;
-  effect e() on s.post;
-  effect note() on log.post;
+  effect fn e() on s.post;
+  effect fn note() on log.post;
   exception E;
   decorator doing(...targets: any effect) for op effects targets;
-  op fail() throws E;
+  fn fail() throws E;
   // 本体の e は、例外の前なので kept
   @doing(note)                               // ERROR: REL-4
-  op body() throws E prevents effects {
+  fn body() throws E prevents effects {
     e();
     fail();
   }
   // 運ばれた e を、本体も例外の前に行う
   @doing(e)                                  // ERROR: REL-4
-  op same() throws E prevents effects {
+  fn same() throws E prevents effects {
     e();
     fail();
   }

@@ -137,52 +137,52 @@ namespace payment {
 
   /** その注文の支払い */
   @db.find
-  read paymentOf(orderId: type.OrderId): Payment? on payments;
+  read fn paymentOf(orderId: type.OrderId): Payment? on payments;
 
   /** その支払いの画面の支払い */
   @db.find
-  read paymentBySession(session: psp.SessionId): Payment? on payments;
+  read fn paymentBySession(session: psp.SessionId): Payment? on payments;
 
   /** 枠の期限が deadline より前の、まだ請求を確定していない支払い。期限の近い順（人が書く: 比較と並べ方） */
-  read holdsExpiringBefore(deadline: Time): Payment[] on payments;
+  read fn holdsExpiringBefore(deadline: Time): Payment[] on payments;
 
   /** その識別子の通知の記録 */
   @db.find
-  read seenEvent(id: psp.EventId): Seen? on seen;
+  read fn seenEvent(id: psp.EventId): Seen? on seen;
 
   /** 支払いを作る。まだ同意していない支払いとして入る */
   @db.insert
-  effect createPayment(payment: Payment) on payments.post as Standing.Pending;
+  effect fn createPayment(payment: Payment) on payments.post as Standing.Pending;
 
   /** 支払いの画面を差し替える。まだ同意していない支払いにだけ、できる（人が書く） */
-  effect replaceSessionOf(payment: Payment, session: psp.SessionId) on payments.put as Standing.Pending -> Standing.Pending;
+  effect fn replaceSessionOf(payment: Payment, session: psp.SessionId) on payments.put as Standing.Pending -> Standing.Pending;
 
   /** 客が同意して、枠を確保した: 同意した時刻と、枠の期限を入れる（人が書く） */
-  effect holdSecured(payment: Payment, holdExpiresAt: Time?, at: Time) on payments.put as Standing.Pending -> Standing.Held;
+  effect fn holdSecured(payment: Payment, holdExpiresAt: Time?, at: Time) on payments.put as Standing.Pending -> Standing.Held;
 
   /** 客が同意して、その場で請求が確定した: 同意した時刻と、確定した額（同意した額）を入れる（人が書く） */
-  effect chargeSecured(payment: Payment, at: Time) on payments.put as Standing.Pending -> Standing.Settled;
+  effect fn chargeSecured(payment: Payment, at: Time) on payments.put as Standing.Pending -> Standing.Settled;
 
   /** 上限の額で、先に請求を確定した: 確定した額（同意した額）を入れる（人が書く） */
-  effect recordPrepaid(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Prepaid;
+  effect fn recordPrepaid(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Prepaid;
 
   /** 先の確定に、失敗した: 時刻と理由を、支払いに残す。枠は、確保したまま（人が書く） */
-  effect notePrepayFailure(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Held;
+  effect fn notePrepayFailure(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Held;
 
   /** 請求する額が、最後まで決まった: 決まった額と、時刻を入れる（人が書く） */
-  effect recordSettled(payment: Payment, charge: Charge, at: Time) on payments.put as Standing.Held, Standing.Prepaid -> Standing.Settled;
+  effect fn recordSettled(payment: Payment, charge: Charge, at: Time) on payments.put as Standing.Held, Standing.Prepaid -> Standing.Settled;
 
   /** 枠を手放した: 手放した時刻を入れる（人が書く） */
-  effect recordReleased(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Released;
+  effect fn recordReleased(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Released;
 
   /** 通知を、扱ったと記録する */
   @db.insert
-  effect remember(event: Seen) on seen.post;
+  effect fn remember(event: Seen) on seen.post;
 
   // ---- 注文のとき: 支払いの画面を開く ----
 
   /** 注文の支払いの画面を開く。まだ同意していない注文なら、何度でも開き直せる */
-  export op begin(order: ordering.Order, returnTo: type.Url): psp.Session
+  export fn begin(order: ordering.Order, returnTo: type.Url): psp.Session
     throws AlreadySecured, ProviderUnavailable
   {
     val existing = paymentOf(order.id);
@@ -193,7 +193,7 @@ namespace payment {
   }
 
   /** はじめて開く */
-  op openFirst(order: ordering.Order, returnTo: type.Url): psp.Session
+  fn openFirst(order: ordering.Order, returnTo: type.Url): psp.Session
     throws ProviderUnavailable
   {
     val session = openSession(order, returnTo);
@@ -203,7 +203,7 @@ namespace payment {
   }
 
   /** 開き直せるのは、まだ同意していない支払いだけ */
-  op reopen(order: ordering.Order, payment: Payment, returnTo: type.Url): psp.Session
+  fn reopen(order: ordering.Order, payment: Payment, returnTo: type.Url): psp.Session
     throws AlreadySecured, ProviderUnavailable
   {
     return match (payment by Standing) {
@@ -213,7 +213,7 @@ namespace payment {
   }
 
   /** 新しい支払いの画面に差し替える */
-  op replaceSession(order: ordering.Order, payment: Standing.Pending<Payment>, returnTo: type.Url): psp.Session
+  fn replaceSession(order: ordering.Order, payment: Standing.Pending<Payment>, returnTo: type.Url): psp.Session
     throws ProviderUnavailable
   {
     val session = openSession(order, returnTo);
@@ -222,7 +222,7 @@ namespace payment {
   }
 
   /** 箱で送るものがあれば、上限の額の枠を確保する画面。ダウンロードだけなら、その場で請求する画面 */
-  op openSession(order: ordering.Order, returnTo: type.Url): psp.Session
+  fn openSession(order: ordering.Order, returnTo: type.Url): psp.Session
     throws ProviderUnavailable
   {
     return match (order.physical by ordering.Delivery) {
@@ -233,26 +233,26 @@ namespace payment {
 
   /** 商品の代金 + 送料の上限の枠を確保する画面を開く */
   @outside.failsAs(ProviderUnavailable)
-  op openHold(order: ordering.Order, part: ordering.PhysicalPart, returnTo: type.Url): psp.Session {
+  fn openHold(order: ordering.Order, part: ordering.PhysicalPart, returnTo: type.Url): psp.Session {
     val request = limitOf(order, part, returnTo);
     return psp.openHold(request);
   }
 
   /** 商品の代金を、その場で請求する画面を開く */
   @outside.failsAs(ProviderUnavailable)
-  op openCharge(order: ordering.Order, returnTo: type.Url): psp.Session {
+  fn openCharge(order: ordering.Order, returnTo: type.Url): psp.Session {
     val request = totalOf(order, returnTo);
     return psp.openCharge(request);
   }
 
   /** 商品の代金 + 送料の上限を、同意する額にする（人が書く） */
-  op limitOf(order: ordering.Order, part: ordering.PhysicalPart, returnTo: type.Url): psp.SessionRequest;
+  fn limitOf(order: ordering.Order, part: ordering.PhysicalPart, returnTo: type.Url): psp.SessionRequest;
 
   /** 商品の代金を、同意する額にする（人が書く） */
-  op totalOf(order: ordering.Order, returnTo: type.Url): psp.SessionRequest;
+  fn totalOf(order: ordering.Order, returnTo: type.Url): psp.SessionRequest;
 
   /** まだ同意していない支払いを作る（人が書く） */
-  op pending(order: ordering.Order, session: psp.Session): Payment;
+  fn pending(order: ordering.Order, session: psp.Session): Payment;
 
   // ---- 相手からの通知: 客が同意した ----
 
@@ -267,7 +267,7 @@ namespace payment {
    * この通知で、新しく、客の同意が取れた注文があれば、その識別子を返す。なければ、ない。
    */
   @prd.promise("客", "同じ通知が二度届いても、注文を二度は受け付けない")
-  export op record(event: psp.Event): type.OrderId? {
+  export fn record(event: psp.Event): type.OrderId? {
     val delivered = seenEvent(event.id);
     return match (delivered by Redelivery) {
       Redelivered   => none;
@@ -276,7 +276,7 @@ namespace payment {
   }
 
   /** はじめて届いた通知。扱ったと記録する。することがあるのは、客の同意（Secured）の通知だけで、ほかの通知（Echo）は、受け取るだけ */
-  op recordNew(event: psp.Event): type.OrderId? {
+  fn recordNew(event: psp.Event): type.OrderId? {
     val now = clock.now();
     remember({ id: event.id, at: now });
     return match (event by psp.Meaning) {
@@ -286,7 +286,7 @@ namespace payment {
   }
 
   /** 客の同意の通知。知らない支払いの画面のものは、何もしない */
-  op secure(event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
+  fn secure(event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
     val payment = paymentBySession(event.session);
     return match (payment by Known) {
       Found   => secureFound(payment, event, now);
@@ -295,7 +295,7 @@ namespace payment {
   }
 
   /** まだ同意していなかった支払いだけが、新しく確保される */
-  op secureFound(payment: Payment, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
+  fn secureFound(payment: Payment, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
     return match (payment by Standing) {
       Pending => markSecured(payment, event, now);
       else    => none;
@@ -306,7 +306,7 @@ namespace payment {
    * 同意を記録する。箱で送るものがある支払いは、枠を確保した（Held）。
    * 送料がない支払い（ダウンロードだけ）は、その場で請求が確定している（Settled）。
    */
-  op markSecured(payment: Standing.Pending<Payment>, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId {
+  fn markSecured(payment: Standing.Pending<Payment>, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId {
     match (payment by Billing) {
       Deferred  => holdSecured(payment, event.holdExpiresAt, now);
       Immediate => chargeSecured(payment, now);
@@ -317,12 +317,12 @@ namespace payment {
   // ---- 引く ----
 
   /** 注文の支払い。支払いの画面をまだ開いていなければ、ない */
-  export op ofOrder(orderId: type.OrderId): Payment? {
+  export fn ofOrder(orderId: type.OrderId): Payment? {
     return paymentOf(orderId);
   }
 
   /** 注文の支払い。なければ NoPayment */
-  op require(orderId: type.OrderId): Payment
+  fn require(orderId: type.OrderId): Payment
     throws NoPayment
   {
     val found = paymentOf(orderId);
@@ -341,7 +341,7 @@ namespace payment {
    */
   @prd.promise("客", "請求は、同意した額（商品の代金 + 送料の上限）を超えない")
   @prd.promise("客", "請求の確定は、注文一つに一度だけ")
-  export op settle(orderId: type.OrderId, fee: type.Yen)
+  export fn settle(orderId: type.OrderId, fee: type.Yen)
     throws NoPayment, NotSecured, psp.HoldExpired, http.NetworkError, http.ServerError
   {
     val payment = require(orderId);
@@ -354,7 +354,7 @@ namespace payment {
   }
 
   /** 枠から、請求を確定する。枠の期限が過ぎていれば、金は動かず、記録も変わらない。相手に届かなければ、金が動いたかどうかは、分からない */
-  op capture(payment: Standing.Held<Payment>, fee: type.Yen)
+  fn capture(payment: Standing.Held<Payment>, fee: type.Yen)
     throws psp.HoldExpired prevents effects
     throws http.NetworkError, http.ServerError
   {
@@ -366,7 +366,7 @@ namespace payment {
   }
 
   /** 先に確定した上限の額と、決まった額の差を、返す */
-  op refundDifference(payment: Standing.Prepaid<Payment>, fee: type.Yen)
+  fn refundDifference(payment: Standing.Prepaid<Payment>, fee: type.Yen)
     throws http.NetworkError, http.ServerError
   {
     val now = clock.now();
@@ -380,13 +380,13 @@ namespace payment {
    * 請求する額を決める（人が書く）: 請求する送料 = fee と送料の上限の小さい方。店が持つ分 = fee が上限を超えた分。
    * 請求する額 = 商品の代金 + 請求する送料。先に上限の額で確定してあれば、返す額 = 上限の額 - 請求する額。
    */
-  op charged(payment: Payment, fee: type.Yen): Charge;
+  fn charged(payment: Payment, fee: type.Yen): Charge;
 
   /** 請求を確定する額の依頼（人が書く） */
-  op captureOf(payment: Payment, charge: Charge): psp.AmountRequest;
+  fn captureOf(payment: Payment, charge: Charge): psp.AmountRequest;
 
   /** 返す額の依頼（人が書く）。差が 0 でも、依頼は作る */
-  op refundOf(payment: Payment, charge: Charge): psp.AmountRequest;
+  fn refundOf(payment: Payment, charge: Charge): psp.AmountRequest;
 
   // ---- 枠の期限が近い: 上限の額で、先に確定する ----
 
@@ -408,7 +408,7 @@ namespace payment {
    * ここまで届く失敗は、想定していないもので、繰り返しは、そこで止まる。
    */
   @clock.tick(every: 10m)
-  op prepayExpiring() {
+  fn prepayExpiring() {
     val now = clock.now();
     val deadline = ahead(now, holdMargin);
     val expiring = holdsExpiringBefore(deadline);
@@ -418,10 +418,10 @@ namespace payment {
   }
 
   /** now から margin だけ先の時刻（人が書く） */
-  op ahead(now: Time, margin: Duration): Time;
+  fn ahead(now: Time, margin: Duration): Time;
 
   /** 枠を確保してある支払いだけを、先に確定する */
-  op prepayHeld(payment: Payment, now: Time) {
+  fn prepayHeld(payment: Payment, now: Time) {
     match (payment by Standing) {
       Held => prepay(payment, now);
       else => none;
@@ -435,19 +435,19 @@ namespace payment {
   @noteFailure(psp.HoldExpired, notePrepayFailure)
   @noteFailure(http.NetworkError, notePrepayFailure)
   @noteFailure(http.ServerError, notePrepayFailure)
-  op prepay(payment: Standing.Held<Payment>, now: Time) {
+  fn prepay(payment: Standing.Held<Payment>, now: Time) {
     val request = limitCaptureOf(payment);
     psp.capture(request);
     recordPrepaid(payment, now);
   }
 
   /** 上限の額（同意した額）で請求を確定する依頼（人が書く）。送料は、まだ決まっていない */
-  op limitCaptureOf(payment: Standing.Held<Payment>): psp.AmountRequest;
+  fn limitCaptureOf(payment: Standing.Held<Payment>): psp.AmountRequest;
 
   // ---- 枠を手放す ----
 
   /** 期限切れにした注文に、後から同意が届いたとき: 枠を手放す。請求しない */
-  export op release(orderId: type.OrderId)
+  export fn release(orderId: type.OrderId)
     throws NoPayment, http.NetworkError, http.ServerError
   {
     val payment = require(orderId);
@@ -458,7 +458,7 @@ namespace payment {
   }
 
   /** 枠を手放して、記録する */
-  op letGo(payment: Standing.Held<Payment>)
+  fn letGo(payment: Standing.Held<Payment>)
     throws http.NetworkError, http.ServerError
   {
     val request = holdOf(payment);
@@ -468,5 +468,5 @@ namespace payment {
   }
 
   /** 手放す枠の依頼（人が書く） */
-  op holdOf(payment: Standing.Held<Payment>): psp.SessionRef;
+  fn holdOf(payment: Standing.Held<Payment>): psp.SessionRef;
 }

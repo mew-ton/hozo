@@ -5,5 +5,5 @@ namespace a {
   decorator wait(d: Duration);
   @between(-9223372036854775808, 9223372036854775807)
   @wait(9223372036s)
-  op f(): M;
+  fn f(): M;
 }

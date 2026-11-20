@@ -5,7 +5,7 @@ namespace a {
   state rows: list<M>;
   state cur: nullable<M>;
   state title: single<string>;
-  op f(m: M) {
+  fn f(m: M) {
     rows.put(m);                         // ERROR: STATE-6
     rows.delete(m);                      // ERROR: STATE-6
     a.rows.delete();                     // ERROR: STATE-6

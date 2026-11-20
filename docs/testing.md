@@ -14,7 +14,7 @@
 - 欠番にした規則（CFG-8、CFG-11、TYPE-13、EFF-3、MATCH-8、DEC-17、DEC-18）のディレクトリは消す。足した規則（CFG-19〜CFG-23、NS-6、STATE-5〜STATE-9、MATCH-9、CLS-8）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
 - メッセージの文言は比べない（変えやすくするため）。文言はゴールデン（下）で確かめる。
 - 文法で閉じている規則（`—` のもの）は、構文エラーになる例を `ng_*.hozo` に置き、`// ERROR: SYNTAX` で確かめる。
-- なくした書き方（`docs/grammar.md` の、新しい書き方をメッセージで示して SYNTAX にするもの: `throws A | B`、`exception X: T`、引数の括弧のない `effect e on s.post`、`exception X()`、`throw X()`、`model A is B`、フィールドの既定値、分類の `default;`、`condition`、`default =>` のアーム、ケースの並びの `|`、配線の `const`、丸括弧のない `match` の頭、デコレータの宣言の `classify … case`）は、`tests/rules/SYNTAX/` に `ng_*.hozo` を一つずつ置く。メッセージの文言は、`internal/syntax` の単体テストが確かめる。
+- なくした書き方（`docs/grammar.md` の、新しい書き方をメッセージで示して SYNTAX にするもの: `throws A | B`、`exception X: T`、引数の括弧のない `effect fn e on s.post`、`exception X()`、`throw X()`、`model A is B`、フィールドの既定値、分類の `default;`、`condition`、`default =>` のアーム、ケースの並びの `|`、配線の `const`、丸括弧のない `match` の頭、デコレータの宣言の `classify … case`、頭に `fn` のない関数の宣言、`op fn`）は、`tests/rules/SYNTAX/` に `ng_*.hozo` を一つずつ置く。メッセージの文言は、`internal/syntax` の単体テストが確かめる。
 
 ## コーパス
 

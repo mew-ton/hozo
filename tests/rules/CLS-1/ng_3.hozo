@@ -1,7 +1,7 @@
 // CLS-1（docs/check.md「classify / match」「残りのケース」）: 残りのケース（as else）が二つ。位置は二つ目の else
 namespace a {
   model M { id: string; }
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find {
     Found: find as M;
     Missing: find as else;

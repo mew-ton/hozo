@@ -147,7 +147,7 @@ func TestConfigPath(t *testing.T) {
 // TestNoConfig は hozo.toml がないとき: 既定の設定で解析し、CFG-* を除く。プラグインも探さない。
 func TestNoConfig(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
 	p := Load(dir, "", nil)
 	if !p.NoConfig {
 		t.Fatal("NoConfig = false")
@@ -168,7 +168,7 @@ func TestNoConfig(t *testing.T) {
 		t.Fatalf("Views = %d, Units = %d, Plugins = %d, want 0", n, len(p.Units), len(p.Plugins))
 	}
 	// 設定なしでも検査は掛かる（CFG-* 以外の診断はそのまま）。名前空間の名前に使えない名前はない（out も language も書ける）
-	write(t, filepath.Join(dir, "b.hozo"), "namespace out {\n  op g(): Nope;\n}\nnamespace language { op h(); }\n")
+	write(t, filepath.Join(dir, "b.hozo"), "namespace out {\n  fn g(): Nope;\n}\nnamespace language { fn h(); }\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); !p.NoConfig || got != "RES-1" {
 		t.Fatalf("codes = %v, want [RES-1]（NoConfig=%v）\n%s", got, p.NoConfig, text(p))
@@ -204,8 +204,8 @@ func TestUncoveredNamespace(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("app", "gen/app"))
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
-	write(t, filepath.Join(dir, "app.hozo"), "namespace app {\n  exception Busy;\n  export op save(text: string) throws Busy;\n}\n")
-	write(t, filepath.Join(dir, "user.hozo"), "/** 利用者 */\nnamespace user {\n  state memo: nullable<string>;\n  op write(text: string) throws app.Busy {\n    app.save(text);\n  }\n}\nop globalOp();\n")
+	write(t, filepath.Join(dir, "app.hozo"), "namespace app {\n  exception Busy;\n  export fn save(text: string) throws Busy;\n}\n")
+	write(t, filepath.Join(dir, "user.hozo"), "/** 利用者 */\nnamespace user {\n  state memo: nullable<string>;\n  fn write(text: string) throws app.Busy {\n    app.save(text);\n  }\n}\nfn globalOp();\n")
 	p := Load(dir, "", nil)
 	if p.NoConfig || len(p.Diags) != 0 {
 		t.Fatalf("NoConfig=%v diags:\n%s", p.NoConfig, text(p))
@@ -221,7 +221,7 @@ func TestUncoveredNamespace(t *testing.T) {
 		t.Fatalf("View(app).ops[user.write] = %+v", vs)
 	}
 	// 単位の対象でない名前空間にも検査は同じに掛かる: throws を外せば THROWS-1
-	write(t, filepath.Join(dir, "user.hozo"), "namespace user {\n  op write(text: string) {\n    app.save(text);\n  }\n}\n")
+	write(t, filepath.Join(dir, "user.hozo"), "namespace user {\n  fn write(text: string) {\n    app.save(text);\n  }\n}\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "THROWS-1" {
 		t.Fatalf("codes = %v, want [THROWS-1]\n%s", got, text(p))
@@ -257,7 +257,7 @@ func TestExcludesOutAndPluginDirs(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a")+unit("a.b", "gen/b"))
 	fakePlugin(t, dir, "p", "go", "", `{}`, 0, "t")
-	write(t, filepath.Join(dir, "spec", "a.hozo"), "namespace a {\n  op f();\n  namespace b { op g(); }\n}\n")
+	write(t, filepath.Join(dir, "spec", "a.hozo"), "namespace a {\n  fn f();\n  namespace b { fn g(); }\n}\n")
 	write(t, filepath.Join(dir, "gen", "a", "x.hozo"), "garbage")
 	write(t, filepath.Join(dir, "gen", "b", "deep", "x.hozo"), "garbage")
 	write(t, filepath.Join(dir, "plugins", "p", "v.hozo"), "garbage")
@@ -319,7 +319,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int, t
 		transpilers = []string{name}
 	}
 	script := "cat >/dev/null; printf '%s' '" + stdout + "'; exit " + string(rune('0'+exit))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.10\"\n" + extra
+	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.11\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
@@ -329,8 +329,8 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int, t
 // TestPluginCheck はプラグインの探索、使うプラグインの語彙の読み込み、[check] enabled の起動と診断の変換。
 func TestPluginCheck(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  model M { id: string; }\n  /** 注文する */\n  op placeOrder(m: M);\n}\n")
-	write(t, filepath.Join(dir, "browser.hozo"), "namespace browser {\n  op open();\n}\n")
+	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  model M { id: string; }\n  /** 注文する */\n  fn placeOrder(m: M);\n}\n")
+	write(t, filepath.Join(dir, "browser.hozo"), "namespace browser {\n  fn open();\n}\n")
 	fakePlugin(t, dir, "pick", "go", "", `{}`, 0)
 	config := func(serverTranspilers ...string) string {
 		return pluginDirs + unit("server", "gen/server", serverTranspilers...) + unit("browser", "gen/browser", "pick")
@@ -407,7 +407,7 @@ func TestPluginCheck(t *testing.T) {
 // （name と language のほかの行: requires、seams など）を、トランスパイラの名前 → 行で。
 func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
 	t.Helper()
-	m := "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.10\"\n"
+	m := "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.11\"\n"
 	for _, tr := range transpilers {
 		lang := "go"
 		if strings.HasPrefix(tr[0], "ts") {
@@ -424,7 +424,7 @@ func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
 // CFG-20（基底がちょうど一つでない）。
 func TestResolveTranspilers(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
 	// kit は基底 go と、それに相乗りする go-x（requires = ["go"]）、go と go-x に相乗りする go-y を提供する。
 	// kit2 は、もう一つの基底 go-b。ts-kit は言語の違う基底 ts と、それに相乗りする ts-x、言語の違う基底に相乗りする ts-on-go
 	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-x", "requires = [\"go\"]\n"}, [2]string{"go-y", "requires = [\"go\", \"go-x\"]\n"})
@@ -508,7 +508,7 @@ func TestResolveTranspilers(t *testing.T) {
 // 重なってよい。解決できなかったトランスパイラの seams は見ない。View の config に、単位ごとの継ぎ目が載る。
 func TestSeams(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
 	manifest(t, dir, "kit", [2]string{"go", ""},
 		[2]string{"go-rate", "requires = [\"go\"]\nseams = [\"rate.limited\", \"rate.slow\"]\n"},
 		[2]string{"go-trace", "requires = [\"go\"]\nseams = [\"trace.span\", \"rate.limited\"]\n"},
@@ -559,7 +559,7 @@ func TestSeams(t *testing.T) {
 // オプションの値は hozo.toml のテーブルのままで、書いていないトランスパイラのキーはない。
 func TestViewConfig(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
 	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-x", "requires = [\"go\"]\nseams = [\"a.dec\"]\n"})
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/first")+
 		unit("a", "gen/a", "go-x", "go")+"\n[emit.options.go-x]\nvalidate = true\nmax = 3\n")
@@ -580,7 +580,7 @@ func TestViewConfig(t *testing.T) {
 func TestHomes(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "type.hozo"), "namespace type {\n  model User { id: string; }\n}\n")
-	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  @http.status(404)\n  exception Gone;\n  export op get(): type.User throws Gone, http.BadRequest;\n}\n")
+	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  @http.status(404)\n  exception Gone;\n  export fn get(): type.User throws Gone, http.BadRequest;\n}\n")
 	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-b", ""})
 	load := func(units string) *Project {
 		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)
@@ -618,7 +618,7 @@ func TestHomes(t *testing.T) {
 // （読めば、テストや検査の結果が実行する人の環境に入っているプラグインに左右される）。
 func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 
@@ -642,7 +642,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	envDir, home := t.TempDir(), t.TempDir()
 	// env-t と home-t は、基底 t に相乗りする（一つの単位は、基底をちょうど一つ持つ）
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.10\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
+		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.11\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -673,7 +673,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 // マニフェスト（MAN-3）は使っていなくても報告し、protocol の不一致（MAN-2）は使うプラグインにだけ報告する。
 func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
 	write(t, filepath.Join(dir, "plugins", "old", "hozo-plugin.toml"), "name = \"old\"\ncommand = \"old\"\nprotocol = \"0.1\"\n\n[[transpiler]]\nname = \"old\"\nlanguage = \"go\"\n")
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
@@ -691,7 +691,7 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.10\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.11\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
@@ -703,9 +703,9 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 func TestUnitIn(t *testing.T) {
 	dir := t.TempDir()
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
-	write(t, filepath.Join(dir, "shop", "api.hozo"), "namespace shop {\n  model Item { id: string; }\n  op open(item: Item);\n}\n")
+	write(t, filepath.Join(dir, "shop", "api.hozo"), "namespace shop {\n  model Item { id: string; }\n  fn open(item: Item);\n}\n")
 	// batch.hozo は同じ名前空間 shop の続きと、子の名前空間 shop.jobs。検査は in によらず全体に掛かる（Item を参照できる）
-	write(t, filepath.Join(dir, "shop", "batch.hozo"), "namespace shop {\n  op nightly(item: Item);\n}\nnamespace shop.jobs {\n  op sweep();\n}\n")
+	write(t, filepath.Join(dir, "shop", "batch.hozo"), "namespace shop {\n  fn nightly(item: Item);\n}\nnamespace shop.jobs {\n  fn sweep();\n}\n")
 	in := func(globs string) string {
 		return pluginDirs + "[[emit]]\nin = [" + globs + "]\nnamespace = \"shop\"\ntranspilers = [\"t\"]\nout = \"gen/api\"\n" + unit("shop", "gen/all")
 	}
@@ -773,9 +773,9 @@ func userFiles(files []string) string {
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.10\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator legacy;\n  @legacy op f();\n}\n")
-	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy op g();\n}\n")
+		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.11\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator legacy;\n  @legacy fn f();\n}\n")
+	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy fn g();\n}\n")
 	count := func(units string) int {
 		t.Helper()
 		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)

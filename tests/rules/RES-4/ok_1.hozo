@@ -4,9 +4,9 @@ namespace a {
   model M { x: string; }
   scalar S extends string;
   union V { Ready: M; }
-  op n(): V throws E;
-  op f(s: S): M;
+  fn n(): V throws E;
+  fn f(s: S): M;
   decorator d;
   @d
-  op j(): void;
+  fn j(): void;
 }

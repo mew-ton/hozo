@@ -6,13 +6,13 @@ namespace a {
   classify Stage of Order { Draft; Accepted; Shipped; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
   classify Present of Order? { Here: Order? as Order; }
-  effect d1(order: Order) on orders.delete as Stage.Draft -> Stage.Shipped;   // ERROR: STATE-8
-  effect d2(order: Order) on orders.delete as Stage.Shipped;              // ERROR: STATE-8
-  effect d3(order: Order) on orders.delete as Present.Here;               // ERROR: STATE-8
-  effect d4(order: Order) on orders.delete as Life.Open;                  // ERROR: STATE-8
-  effect d5(order: Order) on orders.delete as Life.Open -> Life.Closed;   // ERROR: STATE-8
-  effect d6(order: Order) on orders.delete as Life.Open -> else;          // ERROR: STATE-8
-  effect d7(order: Order) on orders.delete as any;                        // ERROR: STATE-8
-  effect d8(order: Order) on orders.delete as any -> else;                // ERROR: STATE-8
-  effect d9(order: Order) on orders.delete as Life.Absent -> Life.Absent; // ERROR: STATE-8
+  effect fn d1(order: Order) on orders.delete as Stage.Draft -> Stage.Shipped;   // ERROR: STATE-8
+  effect fn d2(order: Order) on orders.delete as Stage.Shipped;              // ERROR: STATE-8
+  effect fn d3(order: Order) on orders.delete as Present.Here;               // ERROR: STATE-8
+  effect fn d4(order: Order) on orders.delete as Life.Open;                  // ERROR: STATE-8
+  effect fn d5(order: Order) on orders.delete as Life.Open -> Life.Closed;   // ERROR: STATE-8
+  effect fn d6(order: Order) on orders.delete as Life.Open -> else;          // ERROR: STATE-8
+  effect fn d7(order: Order) on orders.delete as any;                        // ERROR: STATE-8
+  effect fn d8(order: Order) on orders.delete as any -> else;                // ERROR: STATE-8
+  effect fn d9(order: Order) on orders.delete as Life.Absent -> Life.Absent; // ERROR: STATE-8
 }

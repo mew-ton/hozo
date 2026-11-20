@@ -1,4 +1,4 @@
 namespace other {
   @cli.command("run")
-  export op run();
+  export fn run();
 }

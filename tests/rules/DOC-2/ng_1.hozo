@@ -8,5 +8,5 @@ namespace a {
    * @throws E 一度目
    * @throws a.E 二度目                  // ERROR: DOC-2
    */
-  op f(m: M): M throws E;
+  fn f(m: M): M throws E;
 }

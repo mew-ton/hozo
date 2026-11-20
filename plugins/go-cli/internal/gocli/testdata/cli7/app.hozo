@@ -1,7 +1,7 @@
 // CLI-7: 位置なし。
 namespace app {
   @cli.command("run")
-  export op run();
+  export fn run();
 }
 
 namespace app.cli {
@@ -9,7 +9,7 @@ namespace app.cli {
 }
 
 namespace quiet {
-  export op run();
+  export fn run();
 }
 
 namespace quiet.cli {

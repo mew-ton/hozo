@@ -62,12 +62,12 @@ namespace tool {
    * @param in コマンドの入力
    */
   @cli.command("check")
-  export op check(in: CheckInput): CheckResult
+  export fn check(in: CheckInput): CheckResult
     throws CheckFailed, ConfigInvalid, Busy
     throws fail.Crashed;
 
   /** 書き出す（内部の op。サブコマンドではない） */
-  op write(in: EmitInput, checked: CheckResult): EmitResult
+  fn write(in: EmitInput, checked: CheckResult): EmitResult
     throws UnknownName;
 
   /**
@@ -75,7 +75,7 @@ namespace tool {
    * 書き出す。
    */
   @cli.command("emit")
-  export op emit(in: EmitInput): EmitResult
+  export fn emit(in: EmitInput): EmitResult
     throws CheckFailed, ConfigInvalid, Busy, UnknownName
     throws fail.Crashed
   {
@@ -85,7 +85,7 @@ namespace tool {
 
   /** 標準入出力で動き続ける */
   @cli.command("serve")
-  export op serve(in: ServeInput);
+  export fn serve(in: ServeInput);
 }
 
 namespace demo {
@@ -128,7 +128,7 @@ namespace demo {
 
   /** 足す */
   @cli.command("add")
-  export op add(in: AddInput): Sum throws Overflow, Tired;
+  export fn add(in: AddInput): Sum throws Overflow, Tired;
 
   /** copy の入力。scalar の値と、環境変数を代わりに持つ位置引数、string の scalar の array */
   model CopyInput {
@@ -143,7 +143,7 @@ namespace demo {
   }
 
   @cli.command("copy")
-  export op copy(in: CopyInput): string;
+  export fn copy(in: CopyInput): string;
 
   /**
    * move の入力。位置は、フィールドの宣言の順からは読まない（@cli.arg の引数で決まる）。残りを受け取る array の
@@ -163,20 +163,20 @@ namespace demo {
 
   /** 動かす */
   @cli.command("move")
-  export op move(in: MoveInput): string;
+  export fn move(in: MoveInput): string;
 
   /** 何もしない */
   @cli.command("ping")
-  export op ping();
+  export fn ping();
 
   /** いつも失敗する */
   @cli.command("quit")
-  export op quit(): never throws Overflow;
+  export fn quit(): never throws Overflow;
 }
 
 /** 入力も例外も持たないコマンドだけの名前空間（使わない補助と import を出さない） */
 namespace bare {
   /** 何もしない */
   @cli.command("noop")
-  export op noop();
+  export fn noop();
 }

@@ -7,13 +7,13 @@ namespace a {
   union Three { Ready: M; Missing: N; Broken: O; }
   classify K of M { A; B; C; D; E; }
   classify Whole of Three { IsReady: Three as M; IsMissing: Three as N; IsBroken: Three as O; }
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
-  op onA(m: K.A<M>): void;
-  op takeM(m: M): void;
-  op takeO(o: O): void;
-  op takeThree(t: Three): void;
-  op f(m: M, three: Three): void {
+  fn onA(m: K.A<M>): void;
+  fn takeM(m: M): void;
+  fn takeO(o: O): void;
+  fn takeThree(t: Three): void;
+  fn f(m: M, three: Three): void {
     // else は A だけを受ける: m は K.A<M>
     match (m by K) {
       B, C, D, E => none;

@@ -1,7 +1,7 @@
 // CFG-17（docs/config.md「診断」）: 単位の out が別の単位の out の下にある（ng_2.toml）。子孫を名指しする単位でも同じ
 namespace a {
-  op f();
+  fn f();
 }
 namespace a.sub {
-  op g();
+  fn g();
 }

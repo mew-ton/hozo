@@ -6,14 +6,14 @@ namespace a {
   state s: list<string>;
   state t: nullable<string>;
   classify Phase of s { Idle; Busy; }
-  export op all(): string[] reads s { return s; }
-  effect add(x: string) on s.post;
-  read first(): string? on s;
+  export fn all(): string[] reads s { return s; }
+  effect fn add(x: string) on s.post;
+  read fn first(): string? on s;
 }
 namespace b {
-  op f(xs: string[]);
-  op g();
-  op ng() {
+  fn f(xs: string[]);
+  fn g();
+  fn ng() {
     f(a.s);                                                    // ERROR: RES-5
     f(shared);                                                 // ERROR: RES-5
     match (a.t by nullable) { Empty => g(); HasItems => none; }; // ERROR: RES-5

@@ -6,25 +6,25 @@ namespace a {
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
   classify Known of Order? { Found: Order? as Order; Missing: Order? as else; }
   // post: as X、as any、ない側のケースからの矢印
-  effect p1(order: Order) on orders.post;
-  effect p2(order: Order) on orders.post as any;
-  effect p3(order: Order) on orders.post as Stage.Draft;
-  effect p4(order: Order) on orders.post as Life.Open;
-  effect p5(order: Order) on orders.post as Life.Absent -> Life.Open;
-  effect p6(order: Order) on orders.post as Known.Missing -> Known.Found;
+  effect fn p1(order: Order) on orders.post;
+  effect fn p2(order: Order) on orders.post as any;
+  effect fn p3(order: Order) on orders.post as Stage.Draft;
+  effect fn p4(order: Order) on orders.post as Life.Open;
+  effect fn p5(order: Order) on orders.post as Life.Absent -> Life.Open;
+  effect fn p6(order: Order) on orders.post as Known.Missing -> Known.Found;
   // put: 矢印のある形
-  effect u1(order: Order) on orders.put;
-  effect u2(order: Order) on orders.put as Stage.Draft -> Stage.Accepted;
-  effect u3(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
-  effect u4(order: Order) on orders.put as any -> Stage.Shipped;
-  effect u5(order: Order) on orders.put as Stage.Accepted -> else;
-  effect u6(order: Order) on orders.put as any -> else;
-  effect u7(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
-  effect u8(order: Order) on orders.put as Life.Open -> Life.Closed;
+  effect fn u1(order: Order) on orders.put;
+  effect fn u2(order: Order) on orders.put as Stage.Draft -> Stage.Accepted;
+  effect fn u3(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
+  effect fn u4(order: Order) on orders.put as any -> Stage.Shipped;
+  effect fn u5(order: Order) on orders.put as Stage.Accepted -> else;
+  effect fn u6(order: Order) on orders.put as any -> else;
+  effect fn u7(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
+  effect fn u8(order: Order) on orders.put as Life.Open -> Life.Closed;
   // delete: 後は、ない側のケース
-  effect d1(order: Order) on orders.delete;
-  effect d2(order: Order) on orders.delete as Life.Absent;
-  effect d3(order: Order) on orders.delete as Life.Open -> Life.Absent;
-  effect d4(order: Order) on orders.delete as any -> Life.Absent;
-  effect d5(order: Order) on orders.delete as Known.Found -> Known.Missing;
+  effect fn d1(order: Order) on orders.delete;
+  effect fn d2(order: Order) on orders.delete as Life.Absent;
+  effect fn d3(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  effect fn d4(order: Order) on orders.delete as any -> Life.Absent;
+  effect fn d5(order: Order) on orders.delete as Known.Found -> Known.Missing;
 }

@@ -3,8 +3,8 @@ namespace a {
   model M { id: string; }
   classify Kind of M { A; B; }
   classify Fresh of M { Fresh; NotFresh; }
-  op f();
-  op ng() {
+  fn f();
+  fn ng() {
     match (by Kind) { A => f(); B => none; };            // ERROR: MATCH-7
     match (by Fresh) { Fresh => f(); else => none; };    // ERROR: MATCH-7
   }

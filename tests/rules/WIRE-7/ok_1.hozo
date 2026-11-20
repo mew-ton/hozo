@@ -1,10 +1,10 @@
 // WIRE-7（docs/check.md「配線」）: 呼び出しが一方向なら循環ではない
 namespace a {
-  op leaf();
-  op g() {
+  fn leaf();
+  fn g() {
     leaf();
   }
-  op f() {
+  fn f() {
     g();
     leaf();
   }

@@ -4,5 +4,5 @@ namespace app {
   model User { @db.key id: Id; name: string; tags: string[]; }
   union Page { Ready: { title: string; }; Empty: User; }
   exception Missing(id: Id);
-  export op find(id: Id): User? ;
+  export fn find(id: Id): User? ;
 }

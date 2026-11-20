@@ -87,20 +87,20 @@ namespace app {
     Ordered;
   }
 
-  @mark export op findItem(name: string): Item?;
-  @mark export op load(name: string): string;
-  export op titleOf(ready: Title): string;
-  export op codeText(code: int): string;
-  export op receiptText(receipt: Receipt): string;
-  export op send(addr: Email): string;
-  export op priceOf(item: Item): int;
-  export op bigOnly(item: Size.Big<Item>): string;
-  export op show(text: string);
-  export op fail(): never throws Bad;
+  @mark export fn findItem(name: string): Item?;
+  @mark export fn load(name: string): string;
+  export fn titleOf(ready: Title): string;
+  export fn codeText(code: int): string;
+  export fn receiptText(receipt: Receipt): string;
+  export fn send(addr: Email): string;
+  export fn priceOf(item: Item): int;
+  export fn bigOnly(item: Size.Big<Item>): string;
+  export fn show(text: string);
+  export fn fail(): never throws Bad;
 
   // variant の return match: switch <対象>.(type)。絞り込んだ値（アームの型、包む型の .Value）、フィールドを読む、残りのケースの節。
   // 最後の節は、いつも default:（分類の誤りの枝）
-  export op describe(page: Page): string
+  export fn describe(page: Page): string
   {
     return match (page by PageKind) {
       IsCode   => codeText(page);
@@ -111,7 +111,7 @@ namespace app {
   }
 
   // else のアームは、受けるケースを名前で並べたアームと、同じコードになる: describe と、本体が同じ（else は Rest を受ける）
-  export op describeElse(page: Page): string
+  export fn describeElse(page: Page): string
   {
     return match (page by PageKind) {
       IsCode   => codeText(page);
@@ -122,7 +122,7 @@ namespace app {
   }
 
   // variant の return match で、書いた型が union のすべてのアームを覆う（純粋な配線）。union の値がない（nil）ために、default: の節は置く
-  export op outcome(result: Result): string
+  export fn outcome(result: Result): string
   {
     return match (result by Outcome) {
       Ok  => receiptText(result);
@@ -131,7 +131,7 @@ namespace app {
   }
 
   // 残りのケースのない variant の return match: 書かなかった型のアームの値は、default: の節で、分類の誤り
-  export op shown(page: Page): string
+  export fn shown(page: Page): string
   {
     return match (page by Shown) {
       ShowsTitle => titleOf(page);
@@ -140,7 +140,7 @@ namespace app {
   }
 
   // 同じ分類の const と文の match: どの節にも入らない値は、通り抜けずに、default: の節で、分類の誤り
-  export op shownNote(page: Page): string
+  export fn shownNote(page: Page): string
   {
     val text = match (page by Shown) {
       ShowsTitle => titleOf(page);
@@ -155,7 +155,7 @@ namespace app {
 
   // variant の const と文。複数のケースを受けるアーム（対象の型は変わらない）。else のアームは、型を書いたケースと残りのケースを
   // 受ける（case は、それぞれの Go の型を並べる）
-  @mark export op variants(page: Page): string
+  @mark export fn variants(page: Page): string
   {
     val text = match (page by PageKind) {
       IsReady, IsFailed => load("page");
@@ -174,7 +174,7 @@ namespace app {
   }
 
   // 型で決まる状態の分類（variant）: 対象の状態を読んでから分ける
-  export op stageText(): string
+  export fn stageText(): string
   {
     return match (by Stage) {
       Showing => titleOf(stage);
@@ -185,7 +185,7 @@ namespace app {
 
   // 述語で決まる値の分類の return match: 判定関数と失敗の扱い、switch k<n>。default: の節がないので、後ろに return を置く。
   // ケースで絞り込んだ型（Size.Big<Item>）は、Go では同じ型
-  @mark export op sizeLabel(item: Item): string
+  @mark export fn sizeLabel(item: Item): string
   {
     return match (item by Size) {
       Small => "small";
@@ -196,7 +196,7 @@ namespace app {
 
   // 述語で決まる分類を、純粋で throws のない配線が使う（判定の誤りは、error として返す。panic にしない）。
   // else のアームは、受けるケースの定数を並べた case（Go の default: ではない）
-  export op pureLabel(item: Item): string
+  export fn pureLabel(item: Item): string
   {
     return match (item by Size) {
       Tiny => "tiny";
@@ -205,7 +205,7 @@ namespace app {
   }
 
   // 絞り込みが predicate: Go の型が違えば <絞り込んだ型>(<対象>)、省略可能を外すなら *<対象>
-  export op mail(addr: string, contact: string?): string
+  export fn mail(addr: string, contact: string?): string
     throws Bad
   {
     val first = match (addr by Address) {
@@ -221,7 +221,7 @@ namespace app {
   }
 
   // 述語で決まる op の分類: const と、「返らない」呼び出し・throw のアーム
-  @mark export op price(name: string): int
+  @mark export fn price(name: string): int
     throws Bad
   {
     val item = findItem(name);
@@ -234,7 +234,7 @@ namespace app {
   }
 
   // 対象が名前でない Atom（リテラル、レコードリテラル）: v<n> に束縛してから分ける
-  export op literalSubjects(): string
+  export fn literalSubjects(): string
     throws Bad
   {
     val a = match ("x@example.com" by Address) {
@@ -250,7 +250,7 @@ namespace app {
   }
 
   // 述語で決まる状態の分類: 文の match（error を返す呼び出しと、none のアーム）
-  export op checkoutNote()
+  export fn checkoutNote()
   {
     match (by Checkout) {
       Shopping => show("shopping");

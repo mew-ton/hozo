@@ -2,11 +2,11 @@
 // 別の名前空間は、その名前空間の op を通す
 namespace a {
   state s: list<string>;
-  effect e(x: string) on s.post;
-  export op write(x: string) effects e { e(x); }
+  effect fn e(x: string) on s.post;
+  export fn write(x: string) effects e { e(x); }
 }
 namespace b {
-  op wiring() effects a.e {
+  fn wiring() effects a.e {
     a.write("x");
   }
 }

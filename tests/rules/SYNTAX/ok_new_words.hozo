@@ -14,19 +14,19 @@ namespace a {
   exception Gone;
   state users: list<User>;
   state omit: string;
-  read byId(is: string): User? on users;
-  export op find(is: string): User? reads users { return byId(is); }
-  op gone(): never throws Gone;
-  op nameOf(u: User): string;
+  read fn byId(is: string): User? on users;
+  export fn find(is: string): User? reads users { return byId(is); }
+  fn gone(): never throws Gone;
+  fn nameOf(u: User): string;
   classify Found of find { Hit: find as User; Other: find as else; }
-  op name(is: string): string throws Gone {
+  fn name(is: string): string throws Gone {
     val u = find(is);
     return match (u by a.Found) {
       Hit     => nameOf(u);
       else    => throw Gone;
     };
   }
-  op title(): string {
+  fn title(): string {
     return omit;
   }
 }

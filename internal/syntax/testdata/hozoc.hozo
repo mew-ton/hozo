@@ -162,7 +162,7 @@ namespace hozoc {
   }
 
   /** 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す） */
-  effect syncOutputs() on OutputsSync: any -> UpToDate;
+  effect fn syncOutputs() on OutputsSync: any -> UpToDate;
 
   /**
    * 仕様を検査する。ファイルは書き出さない。
@@ -171,7 +171,7 @@ namespace hozoc {
    * @see emit
    */
   @cli.command("check")
-  op check(in: CheckInput): CheckResult
+  fn check(in: CheckInput): CheckResult
     throws CheckFailed, ConfigInvalid;
 
   // 書けなかったもの: 名前空間ごと・プラグインごとに runEmit を呼ぶ繰り返しは、配線（ループを持たない。../README.md §9）で書けないので、葉の op にする
@@ -185,7 +185,7 @@ namespace hozoc {
    * @see runEmit
    */
   @cli.command("emit")
-  op emit(in: EmitInput): CheckResult
+  fn emit(in: EmitInput): CheckResult
     effects syncOutputs
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict prevents effects
     throws proc.Crashed, proc.MalformedOutput;
@@ -227,7 +227,7 @@ namespace hozoc {
    * @param req プラグインへの入力
    */
   @proc.stdio("{plugin.command}")
-  op runEmit(req: EmitRequest): EmitResponse;
+  fn runEmit(req: EmitRequest): EmitResponse;
 
   // 書けなかったもの: runEmit と同じく、呼び先が実行時に決まる
   /**
@@ -236,5 +236,5 @@ namespace hozoc {
    * @param req プラグインへの入力
    */
   @proc.stdio("{plugin.command}")
-  op runImport(req: ImportRequest): ImportResponse;
+  fn runImport(req: ImportRequest): ImportResponse;
 }

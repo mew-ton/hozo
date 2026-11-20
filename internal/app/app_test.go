@@ -51,7 +51,7 @@ const warnFile = `// internal/app のテストが足すファイル: 意図し�
 namespace server {
   /** 手が空いている */
   exception Idle;
-  op ping() throws Idle prevents effects;
+  fn ping() throws Idle prevents effects;
 }
 `
 
@@ -222,7 +222,7 @@ func TestCheckFailed(t *testing.T) {
 // 指定したファイルが読めないのは設定なしではなく CFG-7。
 func TestCheckWithoutConfig(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a { op f(); }\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a { fn f(); }\n")
 	code, stdout, stderr := run(t, dir, nil, "check")
 	if code != 0 || stderr != "" || stdout != "0 errors, 0 warnings\n" {
 		t.Fatalf("check: code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -246,7 +246,7 @@ func TestCheckWithoutConfig(t *testing.T) {
 		t.Fatalf("emit がファイルを書いた: %v", files)
 	}
 	// error があれば CheckFailed（1）。設定の誤りではない
-	write(t, filepath.Join(dir, "bad.hozo"), "namespace a { op g(): Nope; }\n")
+	write(t, filepath.Join(dir, "bad.hozo"), "namespace a { fn g(): Nope; }\n")
 	code, _, stderr = run(t, dir, nil, "check")
 	if code != exitCheckFailed || !strings.Contains(stderr, "error[RES-1]") || strings.Contains(stderr, "CFG-") {
 		t.Fatalf("check: code=%d stderr=%q", code, stderr)
@@ -298,7 +298,7 @@ func TestCheckWithoutConfig(t *testing.T) {
 
 func TestCheckInvalidConfig(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a { op f(); }\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a { fn f(); }\n")
 	// 設定の誤り（CFG-12: 単位に out がない）は 2
 	write(t, filepath.Join(dir, "hozo.toml"), "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"t\"]\n")
 	code, _, stderr := run(t, dir, nil, "check")
@@ -594,7 +594,7 @@ func TestEmitErrors(t *testing.T) {
 // （docs/cli.md「emit」の 5）。
 func TestEmitNestedOutput(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\nnamespace a.child {\n  op g();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace a.child {\n  fn g();\n}\n")
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"base", "fake"`))
 	fakePlugin(t, dir, "base", "go", "", baseResponse, 0)
 	// fake は、どの出力でも、Dir(U, N) の下の inner/deep/x.txt を書く
@@ -1033,7 +1033,7 @@ func readAll(t *testing.T, dir string) map[string]string {
 // 渡した env から cli.hozo の入力の pluginPath に入り、ホームは App.Home。プロセスの環境変数とホームディレクトリは読まない。
 func TestPluginSearchEnvironment(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  op f();\n}\nnamespace b {\n  op g();\n}\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"from-env"`)+unit("b", "gen/b", `"from-home"`))
 	fakePlugin(t, dir, "from-env", "go", "", baseResponse, 0)
 	fakePlugin(t, dir, "from-home", "go", "", baseResponse, 0)
@@ -1177,7 +1177,7 @@ func fakeTranspiler(t *testing.T, dir, name, lang, extra, transpilerExtra, stdou
 	write(t, filepath.Join(pluginDir, "plugin.sh"), fakeScript)
 	write(t, filepath.Join(pluginDir, "response.json"), stdout)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \". \\\"$HOZO_PLUGIN_DIR/plugin.sh\\\"\"]\nprotocol = \"0.10\"\n" + extra +
+	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \". \\\"$HOZO_PLUGIN_DIR/plugin.sh\\\"\"]\nprotocol = \"0.11\"\n" + extra +
 		"\n[[transpiler]]\nname = \"" + name + "\"\nlanguage = \"" + lang + "\"\n" + transpilerExtra
 	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"), manifest)
 }
@@ -1251,33 +1251,33 @@ namespace shop {
   model Receipt { item: Item; }
   /** 品物 */
   state items: list<Item>;
-  effect addItem(item: Item) on items.post;
+  effect fn addItem(item: Item) on items.post;
 
   /** 入口。nightly は batch.hozo で宣言した配線 */
-  op open(item: Item): Receipt {
+  fn open(item: Item): Receipt {
     save(item);
     nightly(item);
     val   r = issue(item);
     return r;
   }
-  op save(item: Item) effects addItem { addItem(item); }
-  op issue(item: Item): Receipt;
+  fn save(item: Item) effects addItem { addItem(item); }
+  fn issue(item: Item): Receipt;
 }
 `
 	shopBatch = `/** 店（バッチの側） */
 namespace shop {
   model Report { count: int; }
   /** 夜間の片付け */
-  op nightly(item: Item) {
+  fn nightly(item: Item) {
     sweep(item);
   }
-  op sweep(item: Item);
-  op report(): Report;
+  fn sweep(item: Item);
+  fn report(): Report;
 }
 
 /** 管理 */
 namespace shop.admin {
-  op ban(item: shop.Item);
+  fn ban(item: shop.Item);
 }
 `
 )
@@ -1367,7 +1367,7 @@ func TestEmitUnits(t *testing.T) {
 			}
 			r := reqs[0]
 			cfg := r.View.Config
-			if r.Protocol != "0.10" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
+			if r.Protocol != "0.11" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
 				cfg.Index != c.index || cfg.Language != "go" || cfg.Base != c.base || strings.Join(cfg.Transpilers, ",") != c.transpilers ||
 				userFiles(r.View.Files) != c.files || !containsStr(r.View.Files, "hozo:vocab/http.hozo") {
 				t.Errorf("%s: 要求 = %+v", c.name, r)
@@ -1442,7 +1442,7 @@ func TestEmitUnitsTargets(t *testing.T) {
 	same(emitAll(t, dir, "shop"), "api/", "batch/", "admin/", "adminshop/")
 	// 引数は名前空間で、単位の namespace である必要はない: 単位 3 が名指しする shop.admin の子孫 shop.admin.audit は、
 	// 単位 3 の対象。その出力だけを書く（Dir(U, N) は gen/admin/audit）
-	write(t, filepath.Join(dir, "shop", "audit.hozo"), "namespace shop.admin.audit {\n  op review(id: string): boolean;\n}\n")
+	write(t, filepath.Join(dir, "shop", "audit.hozo"), "namespace shop.admin.audit {\n  fn review(id: string): boolean;\n}\n")
 	clear()
 	if got := emitAll(t, dir, "shop.admin.audit"); len(got) != 2 || got["admin/audit/admin.txt"] != "shop.admin.audit" {
 		t.Errorf("shop.admin.audit の出力 = %v", got)
@@ -1474,8 +1474,8 @@ func TestEmitUnitsTargets(t *testing.T) {
 // 引数もその子孫もどの単位の対象でもなければ UnknownNamespace。
 func TestEmitArgumentDescendantOnly(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, "shop.hozo"), "namespace shop {\n  op browse(): boolean;\n}\n"+
-		"namespace shop.admin {\n  op ban(id: string): boolean;\n}\nnamespace other {\n  op f();\n}\n")
+	write(t, filepath.Join(dir, "shop.hozo"), "namespace shop {\n  fn browse(): boolean;\n}\n"+
+		"namespace shop.admin {\n  fn ban(id: string): boolean;\n}\nnamespace other {\n  fn f();\n}\n")
 	// 単位は shop.admin だけ。shop と other は、どの単位の対象でもない
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("shop.admin", "gen/admin", `"admin"`))
 	fakePlugin(t, dir, "admin", "go", "", `{"files":[{"path":"@DIR@/admin.txt","content":"@NS@"}],"warnings":[]}`, 0)
@@ -1513,7 +1513,7 @@ func TestEmitIn(t *testing.T) {
 	requests(t, dir, "rider")
 	requests(t, dir, "admin")
 
-	write(t, filepath.Join(dir, "shop", "extra.hozo"), "namespace shop.extra {\n  op only(): string;\n}\n")
+	write(t, filepath.Join(dir, "shop", "extra.hozo"), "namespace shop.extra {\n  fn only(): string;\n}\n")
 	fakePlugin(t, dir, "extra", "go", "", `{"files":[{"path":"@DIR@/e.txt","content":"e"}],"warnings":[]}`, 0)
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("shop.extra", "gen/x/extra", `"extra"`))
 	if got := emitAll(t, dir); got["x/extra/e.txt"] != "e" {
@@ -1554,7 +1554,7 @@ exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
 	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/x.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
 	write(t, filepath.Join(dir, "exit"), "0")
 	plugin := hozoc.Plugin{Name: "echo", Command: []string{"sh", "-c", `. "$HOZO_PLUGIN_DIR/plugin.sh"`}, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
-	req := hozoc.EmitRequest{Protocol: "0.10", Direction: "emit", Transpiler: "echo"}
+	req := hozoc.EmitRequest{Protocol: "0.11", Direction: "emit", Transpiler: "echo"}
 	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
 	ops := innerOps(a)
@@ -1575,7 +1575,7 @@ exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.10","direction":"emit","transpiler":"echo","view":{}}` {
+	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.11","direction":"emit","transpiler":"echo","view":{}}` {
 		t.Errorf("送った要求 = %s", got)
 	}
 	absRoot, _ := filepath.EvalSymlinks(root)
@@ -1702,7 +1702,7 @@ func TestStateUnits(t *testing.T) {
 
 	// 設定なし: config は空（nil）、outputs も空。sources は既定の glob
 	bare := t.TempDir()
-	write(t, filepath.Join(bare, "a.hozo"), "namespace a { op f(); }\n")
+	write(t, filepath.Join(bare, "a.hozo"), "namespace a { fn f(); }\n")
 	b := &App{Dir: bare, Stderr: &bytes.Buffer{}}
 	if cfg, err := b.Config().Get(ctx); err != nil || cfg != nil {
 		t.Errorf("設定なしの config = %+v, %v", cfg, err)

@@ -20,7 +20,7 @@ model LoginInput {
  * @see login
  */
 @http.post("/password-reset")
-op requestPasswordReset(email: Email)
+fn requestPasswordReset(email: Email)
   effects sendResetMail
   throws RateLimited prevents effects;
 

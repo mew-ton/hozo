@@ -3,23 +3,23 @@
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  export op all(): string[] reads s { return s; }
-  op own(): string[] {
+  export fn all(): string[] reads s { return s; }
+  fn own(): string[] {
     return a.s;
   }
-  op g();
+  fn g();
   // 組み込みの効果を直に呼べるのも、持ち主の名前空間の配線（修飾して書いても同じ）
-  op push(x: string) {
+  fn push(x: string) {
     s.post(x);
     a.s.post(x);
   }
-  op phase() {
+  fn phase() {
     match (by a.Phase) { Idle => g(); Busy => none; };
   }
 }
 namespace b {
-  op f(xs: string[]);
-  op ok() {
+  fn f(xs: string[]);
+  fn ok() {
     val xs = a.all();
     f(xs);
   }

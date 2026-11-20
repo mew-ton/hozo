@@ -9,29 +9,29 @@ namespace app {
 
   // read: @db.find、@db.list
   @db.find
-  read plainById(id: string): Row? on plain;
+  read fn plainById(id: string): Row? on plain;
   @db.list
   @db.where("note", "x")
   @db.latest("note")
-  read plainRows(): Row[] on plain;
+  read fn plainRows(): Row[] on plain;
 
   // 効果: @db.insert、@db.update、@db.delete（配線が呼んでいない効果も、同じに確かめる）
   @db.insert
-  effect createPlain(row: Row) on plain.post;
+  effect fn createPlain(row: Row) on plain.post;
   @db.update
-  effect updatePlain(row: Row) on plain.put;
+  effect fn updatePlain(row: Row) on plain.put;
   @db.delete
-  effect deletePlain(id: string) on plain.delete;
-  export op addPlain(row: Row) {
+  effect fn deletePlain(id: string) on plain.delete;
+  export fn addPlain(row: Row) {
     createPlain(row);
   }
 
   // 通るもの
   @db.find
-  read rowById(id: string): Row? on rows;
+  read fn rowById(id: string): Row? on rows;
   @db.insert
-  effect createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row) on rows.post;
   /** デコレータを付けていない read と効果は、見ない */
-  read plainCount(): int on plain;
-  effect clearPlain() on plain.delete;
+  read fn plainCount(): int on plain;
+  effect fn clearPlain() on plain.delete;
 }

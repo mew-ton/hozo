@@ -21,16 +21,16 @@ namespace browser {
   // 共通のエラー表示: 汎用の page.fallback に引数を固定した別名
   decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);
 
-  op orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
+  fn orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
 
   /** 注文一覧の既定の URL に置き換える */
-  effect transitionToOrders() on location.put;
+  effect fn transitionToOrders() on location.put;
 
   // このページだけ別の表示にする。fallback が吸収するので throws は書かない
   // OrdersUnavailable は OrderPage のアームの型
   @page.fallback(http.NetworkError | http.ServerError, OrdersUnavailable)
   @page.route("/orders", from: query, onInvalid: transitionToOrders)
-  op openOrders(query: OrdersQuery): OrderPage
+  fn openOrders(query: OrdersQuery): OrderPage
   {
     val me     = fetchMe();
     val orders = fetchOrders(query);
@@ -41,12 +41,12 @@ namespace browser {
     Ready: { userName: string; };
     Unavailable: Unavailable;
   }
-  op profilePageVm(me: server.PublicUser): ProfilePage;
+  fn profilePageVm(me: server.PublicUser): ProfilePage;
 
   // 共通のエラー表示を使う。Unavailable は ProfilePage のアームの型
   @unavailableOnFailure
   @page.route("/profile")
-  op openProfile(): ProfilePage
+  fn openProfile(): ProfilePage
   {
     val me = fetchMe();
     return profilePageVm(me);

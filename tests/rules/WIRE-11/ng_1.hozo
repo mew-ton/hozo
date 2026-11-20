@@ -1,9 +1,9 @@
 // WIRE-11: 値を入れられないもの。引数、for の変数、値と一緒に宣言した val、二度目、別のアームが入れる val、for の外の val
 namespace a {
   model M { id: string; }
-  op one(m: M): M;
-  op use(m: M);
-  op f(m: M, ms: M[]) {
+  fn one(m: M): M;
+  fn use(m: M);
+  fn f(m: M, ms: M[]) {
     m = one(m);                        // ERROR: WIRE-11
     val a = one(m);
     a = one(m);                        // ERROR: WIRE-11

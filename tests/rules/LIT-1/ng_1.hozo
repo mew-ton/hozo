@@ -3,5 +3,5 @@ namespace a {
   model M { id: string; }
   decorator limit(max: int);
   @limit(9223372036854775808)          // ERROR: LIT-1
-  op f(): M;
+  fn f(): M;
 }

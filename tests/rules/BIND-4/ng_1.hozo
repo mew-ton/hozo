@@ -1,10 +1,10 @@
 // BIND-4（docs/check.md「必須の入力」）: 必須の引数が明示でも bind でも埋まっていない
 namespace a {
-  op g(x: string, y: string);
-  op f() {
+  fn g(x: string, y: string);
+  fn f() {
     g("x");                            // ERROR: BIND-4
   }
 }
 namespace b {
-  op h();
+  fn h();
 }

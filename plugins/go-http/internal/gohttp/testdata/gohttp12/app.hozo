@@ -11,7 +11,7 @@ namespace app {
     @http.bodyObj attrs: Record<string, Item>;
   }
   @http.post("/in")
-  export op take(in: In);
+  export fn take(in: In);
 
   model More {
     @http.headerObj text: string;
@@ -19,12 +19,12 @@ namespace app {
     @http.bodyObj shape: Shape;
   }
   @http.post("/more")
-  export op more(in: More);
+  export fn more(in: More);
 
   // model なら、当たらない
   model Fine {
     @http.bodyObj item: Item;
   }
   @http.post("/fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

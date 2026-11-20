@@ -5,5 +5,5 @@ namespace a {
   union Page { Ready: M; Empty: { x: int; }; }
   union Ok { E; }
   union Nested { Ok; }
-  op f(): Page throws Nested;
+  fn f(): Page throws Nested;
 }

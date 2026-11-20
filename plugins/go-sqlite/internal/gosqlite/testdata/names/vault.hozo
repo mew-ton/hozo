@@ -66,63 +66,63 @@ namespace vault {
 
   /** レシーバの t */
   @db.find
-  read byT(t: Key): Secret? on secrets;
+  read fn byT(t: Key): Secret? on secrets;
 
   /** ctx、err、args */
   @db.list
-  read byLocals(ctx: Num, err: Ratio, args: Flag): Secret[] on secrets;
+  read fn byLocals(ctx: Num, err: Ratio, args: Flag): Secret[] on secrets;
 
   /** Go の予約語と、事前宣言の識別子（仕様の予約語 string、any の列は、引数の名前に書けない） */
   @db.list
-  read byWords(type: Time): Secret[] on secrets;
+  read fn byWords(type: Time): Secret[] on secrets;
 
   /** import するパッケージの名前 */
   @db.list
-  read byImports(json: Record<string, string>, time: Time?, sql: Duration, runtime: string): Secret[] on secrets;
+  read fn byImports(json: Record<string, string>, time: Time?, sql: Duration, runtime: string): Secret[] on secrets;
 
   /** このファイルの非公開の名前と、継ぎ目のメソッドのレシーバ s */
   @db.list
-  read byPrivates(dbGet: string, dbScanSecret: string, s: string): Secret[] on secrets;
+  read fn byPrivates(dbGet: string, dbScanSecret: string, s: string): Secret[] on secrets;
 
   // ---- 効果 ----
 
   /** 行の引数の名前が、行の値の変数 args と当たる */
   @db.insert
-  effect createSecret(args: Secret) on secrets.post;
+  effect fn createSecret(args: Secret) on secrets.post;
 
   /** err と当たる */
   @db.update
-  effect updateSecret(err: Secret) on secrets.put;
+  effect fn updateSecret(err: Secret) on secrets.put;
 
   /** @db.delete の引数（= 列の名前） */
   @db.delete
-  effect deleteSecret(t: Key, ctx: Num, dbGet: string) on secrets.delete;
+  effect fn deleteSecret(t: Key, ctx: Num, dbGet: string) on secrets.delete;
 
   @db.insert
-  effect createA(row: row.Entry) on entriesA.post;
+  effect fn createA(row: row.Entry) on entriesA.post;
   @db.insert
-  effect createB(r: r.Entry) on entriesB.post;
+  effect fn createB(r: r.Entry) on entriesB.post;
 
   // ---- op ----
 
   /** 内部の op（export がない）: 出力は、内側のフォルダと入口に分かれる */
-  op touch(t: Key): Secret? {
+  fn touch(t: Key): Secret? {
     return byT(t);
   }
 
   /** 引く */
-  export op find(t: Key): Secret? {
+  export fn find(t: Key): Secret? {
     return touch(t);
   }
 
   /** 足す。形で決まる命令 Post（引数の名前は、いつも value） */
-  export op add(secret: Secret) {
+  export fn add(secret: Secret) {
     secrets.post(secret);
   }
 
   /** 継ぎ目のメソッドの引数の名前が、このファイルが使う名前と当たる */
   @db.transaction
-  export op mix(s: Secret, t: Secret, ctx: Key, err: Num, body: string, args: row.Entry, dbTransaction: r.Entry) {
+  export fn mix(s: Secret, t: Secret, ctx: Key, err: Num, body: string, args: row.Entry, dbTransaction: r.Entry) {
     createSecret(s);
     updateSecret(t);
     deleteSecret(ctx, err, body);
@@ -132,14 +132,14 @@ namespace vault {
 
   // 継ぎ目のメソッドの本体が書く戻り値の型のパッケージの名前が、その中の局所の名前（s、ctx、err、body）と当たる。葉の op
   @db.transaction
-  export op mark(t: Key): s.Mark;
+  export fn mark(t: Key): s.Mark;
   @db.transaction
-  export op info(t: Key): ctx.Info?;
+  export fn info(t: Key): ctx.Info?;
   @db.transaction
-  export op faults(t: Key): err.Fault[];
+  export fn faults(t: Key): err.Fault[];
   @db.transaction
-  export op part(s: Key, body: Key): body.Part;
+  export fn part(s: Key, body: Key): body.Part;
   /** 戻り値がない形の局所の変数 err も、パッケージ err と当たる */
   @db.transaction
-  export op report(fault: err.Fault);
+  export fn report(fault: err.Fault);
 }

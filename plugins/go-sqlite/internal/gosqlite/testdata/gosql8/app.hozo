@@ -7,37 +7,37 @@ namespace app {
 
   // read の引数の名前（大文字と小文字は、区別する）
   @db.find
-  read rowByID(ID: string): Row? on rows;
+  read fn rowByID(ID: string): Row? on rows;
   // 二つの引数の、一つだけがない（もう一つは、キー）
   @db.find
-  read rowByIdAndNotes(id: string, notes: string): Row? on rows;
+  read fn rowByIdAndNotes(id: string, notes: string): Row? on rows;
   // @db.where の column
   @db.list
   @db.where("kind", "x")
-  read rowsOfKind(): Row[] on rows;
+  read fn rowsOfKind(): Row[] on rows;
   // @db.latest の column
   @db.list
   @db.latest("addedAt")
-  read newestRows(): Row[] on rows;
+  read fn newestRows(): Row[] on rows;
   // SQLite の rowid は、フィールドではない
   @db.find
   @db.latest("rowid")
-  read lastRow(): Row? on rows;
+  read fn lastRow(): Row? on rows;
 
   // @db.delete の効果の引数の名前（配線が呼んでいない効果も、同じに確かめる）
   @db.delete
-  effect deleteRow(key: string) on rows.delete;
+  effect fn deleteRow(key: string) on rows.delete;
   @db.delete
-  effect deleteByRowid(id: string, rowid: string) on rows.delete;
+  effect fn deleteByRowid(id: string, rowid: string) on rows.delete;
 
   // 通るもの
   @db.list
   @db.where("note", "x")
   @db.latest("at")
-  read rowsNoted(id: string): Row[] on rows;
+  read fn rowsNoted(id: string): Row[] on rows;
   @db.delete
-  effect deleteNoted(note: string) on rows.delete;
+  effect fn deleteNoted(note: string) on rows.delete;
   /** @db.insert と @db.update の引数の名前は、列ではない */
   @db.insert
-  effect createRow(anything: Row) on rows.post;
+  effect fn createRow(anything: Row) on rows.post;
 }

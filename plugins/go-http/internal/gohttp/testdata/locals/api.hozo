@@ -39,20 +39,20 @@ namespace reflect {
 
 namespace api {
   @http.post("/in")
-  export op viaIn(in: in.Note): string
+  export fn viaIn(in: in.Note): string
     throws w.NotFound, err.Conflict;
   @http.get("/out")
-  export op viaOut(in: out.Find): string[];
+  export fn viaOut(in: out.Find): string[];
   @http.get("/r")
-  export op viaR(in: r.Head): string?;
+  export fn viaR(in: r.Head): string?;
   @http.get("/req")
-  export op viaReq(in: req.Page);
+  export fn viaReq(in: req.Page);
   @http.get("/mux")
-  export op viaMux(in: mux.Query): int;
+  export fn viaMux(in: mux.Query): int;
   @http.get("/ops")
-  export op viaOps(in: ops.Head): int;
+  export fn viaOps(in: ops.Head): int;
   @http.get("/strconv")
-  export op viaStrconv(in: strconv.Flag): boolean;
+  export fn viaStrconv(in: strconv.Flag): boolean;
   @http.post("/reflect")
-  export op viaReflect(in: reflect.Put): Record<string, string>;
+  export fn viaReflect(in: reflect.Put): Record<string, string>;
 }

@@ -2,7 +2,7 @@
 namespace a {
   model M { id: string; }
   model N { name: string; }
-  op find(): M?;
+  fn find(): M?;
   classify Found of find { Hit; Other; }
-  op ng(n: Found.Hit<N>): void;        // ERROR: TYPE-12
+  fn ng(n: Found.Hit<N>): void;        // ERROR: TYPE-12
 }

@@ -51,25 +51,25 @@ namespace staff {
 
   /** そのログイン名の担当者 */
   @db.find
-  read memberByLoginName(loginName: string): Member? on members;
+  read fn memberByLoginName(loginName: string): Member? on members;
 
   /** その識別子の担当者 */
   @db.find
-  read memberById(id: MemberId): Member? on members;
+  read fn memberById(id: MemberId): Member? on members;
 
   /** そのトークンのセッション */
   @db.find
-  read sessionByToken(token: type.Token): Session? on sessions;
+  read fn sessionByToken(token: type.Token): Session? on sessions;
 
   /** セッションを作る。ログインしていなかったトークンが、ログインしたことになる */
   @db.insert
-  effect createSession(session: Session) on sessions.post as Login.LoggedOut -> Login.LoggedIn;
+  effect fn createSession(session: Session) on sessions.post as Login.LoggedOut -> Login.LoggedIn;
 
   /**
    * セッションを消す（人が書く）。消せるのは、あるセッションだけ。セッションは、なくなることが意味: ログアウトした後に、残す記録はない。
    * db の語彙の @db.delete は、列の条件を引数に取り、行を受け取れないので、付けていない（README.md「分かったこと」の F54）。
    */
-  effect deleteSession(session: Session) on sessions.delete as Login.LoggedIn -> Login.LoggedOut;
+  effect fn deleteSession(session: Session) on sessions.delete as Login.LoggedIn -> Login.LoggedOut;
 
   // ---- 分類 ----
 
@@ -127,7 +127,7 @@ namespace staff {
   }
 
   /** ログインする */
-  export op login(loginName: string, password: Password): LoggedIn
+  export fn login(loginName: string, password: Password): LoggedIn
     throws InvalidCredentials
   {
     val member = memberByLoginName(loginName);
@@ -138,7 +138,7 @@ namespace staff {
   }
 
   /** パスワードを確かめて、セッションを作る */
-  op issueSession(member: Member, password: Password): LoggedIn
+  fn issueSession(member: Member, password: Password): LoggedIn
     throws InvalidCredentials
   {
     checkPassword(member, password);
@@ -150,17 +150,17 @@ namespace staff {
   }
 
   /** パスワードが合わなければ InvalidCredentials（人が書く） */
-  op checkPassword(member: Member, password: Password)
+  fn checkPassword(member: Member, password: Password)
     throws InvalidCredentials;
 
   /** トークンと期限を決める（人が書く） */
-  op newSession(member: Member, now: Time): Session;
+  fn newSession(member: Member, now: Time): Session;
 
   /** 外に見せる形に写す（人が書く） */
-  op toPublic(member: Member): PublicMember;
+  fn toPublic(member: Member): PublicMember;
 
   /** ログアウトする。トークンがなければ、何もしない */
-  export op logout(token: type.Token?) {
+  export fn logout(token: type.Token?) {
     match (token by Credential) {
       Presented => endSession(token);
       Absent    => none;
@@ -168,7 +168,7 @@ namespace staff {
   }
 
   /** そのトークンのセッションがあれば、消す。もうなければ、何もしない */
-  op endSession(token: type.Token) {
+  fn endSession(token: type.Token) {
     val session = sessionByToken(token);
     match (session by Login) {
       LoggedIn  => deleteSession(session);
@@ -179,7 +179,7 @@ namespace staff {
   // ---- 誰が呼んだか ----
 
   /** 呼んだ担当者。トークンがない、ログインしていない、期限が過ぎている、のどれでも Unauthorized */
-  op whoIs(token: type.Token?): Member
+  fn whoIs(token: type.Token?): Member
     throws type.Unauthorized
   {
     return match (token by Credential) {
@@ -189,7 +189,7 @@ namespace staff {
   }
 
   /** そのトークンの担当者 */
-  op memberOf(token: type.Token): Member
+  fn memberOf(token: type.Token): Member
     throws type.Unauthorized
   {
     val session = sessionByToken(token);
@@ -200,7 +200,7 @@ namespace staff {
   }
 
   /** 期限の内のセッションの担当者 */
-  op freshMember(session: Session): Member
+  fn freshMember(session: Session): Member
     throws type.Unauthorized
   {
     val now = clock.now();
@@ -213,11 +213,11 @@ namespace staff {
   }
 
   /** 期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized（人が書く） */
-  op requireFresh(session: Session, now: Time): Session
+  fn requireFresh(session: Session, now: Time): Session
     throws type.Unauthorized;
 
   /** 製作の担当として呼んでいることを確かめる */
-  export op asMaker(token: type.Token?)
+  export fn asMaker(token: type.Token?)
     throws type.Unauthorized, type.Forbidden
   {
     val member = whoIs(token);
@@ -228,7 +228,7 @@ namespace staff {
   }
 
   /** 梱包の担当として呼んでいることを確かめる */
-  export op asPacker(token: type.Token?)
+  export fn asPacker(token: type.Token?)
     throws type.Unauthorized, type.Forbidden
   {
     val member = whoIs(token);
@@ -239,7 +239,7 @@ namespace staff {
   }
 
   /** 管理の担当として呼んでいることを確かめる */
-  export op asAdmin(token: type.Token?)
+  export fn asAdmin(token: type.Token?)
     throws type.Unauthorized, type.Forbidden
   {
     val member = whoIs(token);

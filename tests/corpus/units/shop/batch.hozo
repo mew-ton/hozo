@@ -8,17 +8,17 @@ namespace shop {
   // 単位 3 では配線の本体が出る。単位 2 では in の外なので、open が呼ぶ分の口だけが出る
   /** 夜間の片付け */
   @t.batch
-  op nightly(item: Item)
+  fn nightly(item: Item)
   {
     sweep(item);
   }
 
   /** 掃除する */
-  op sweep(item: Item);
+  fn sweep(item: Item);
 
   /** 集計する */
   @t.batch
-  op report(): Report;
+  fn report(): Report;
 }
 
 // docs/config.md「単位の対象」: 単位 4 が名指しする子孫。shop の単位（2 と 3）の対象から外れる
@@ -26,5 +26,5 @@ namespace shop {
 namespace shop.admin {
   /** 品物を売り場から外す */
   @t.admin
-  op ban(item: shop.Item);
+  fn ban(item: shop.Item);
 }

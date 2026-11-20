@@ -3,9 +3,9 @@ namespace a {
   exception E;
   exception F;
   decorator recoverE catches E recovers;
-  op leaf() throws E, F;
+  fn leaf() throws E, F;
   @recoverE                            // ERROR: THROWS-1
-  op wiring() {
+  fn wiring() {
     leaf();
   }
 }

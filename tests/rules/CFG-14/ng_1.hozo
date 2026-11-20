@@ -1,4 +1,4 @@
 // CFG-14（docs/config.md「診断」）: transpilers の名前のトランスパイラを、入っているどのプラグインも提供していない（ng_1.toml）
 namespace a {
-  op f();
+  fn f();
 }

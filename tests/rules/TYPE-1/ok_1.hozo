@@ -1,9 +1,9 @@
 // TYPE-1（docs/types.md「診断」）: scalar の値は scalar の位置に渡せ、元の型の位置にも渡せる（規則 11）
 namespace a {
   scalar Email extends string;
-  op send(email: Email): void;
-  op log(s: string): void;
-  op i(e: Email): void {
+  fn send(email: Email): void;
+  fn log(s: string): void;
+  fn i(e: Email): void {
     send(e);
     log(e);
   }

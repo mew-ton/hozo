@@ -159,7 +159,7 @@ const (
 // Effect は effect 宣言（docs/ir.md「state / exception / effect」の Effect）。
 type Effect struct {
 	DeclBase
-	// Params は効果が受け取る値（`effect e(order: Order) on …;`）。なければ空（JSON では []）。
+	// Params は効果が受け取る値（`effect fn e(order: Order) on …;`）。なければ空（JSON では []）。
 	Params []OpParam `json:"params"`
 	// Target は宛先。一つだけ（docs/check.md「状態の形」の「効果の宛先」）。
 	Target EffectTarget `json:"target"`
@@ -535,7 +535,7 @@ const (
 	TargetModel     DecoratorTarget = "model"
 	TargetEffect    DecoratorTarget = "effect"
 	TargetRead      DecoratorTarget = "read"
-	// TargetCase は、分類のケース（`case`、`case of never`、`Actor case`）。絞りは Decorator.CaseTargets。
+	// TargetCase は、分類のケース（`case`、`case of never`、`case of Actor`）。絞りは Decorator.CaseTargets。
 	TargetCase DecoratorTarget = "case"
 )
 
@@ -606,7 +606,7 @@ const (
 	AnyOp        AnyOf = "op"
 	AnyModel     AnyOf = "model"
 	AnyVariant   AnyOf = "variant"
-	// AnyClassifyCase は、分類のケース（`any case`、`any case of never`、`any Actor case`）。絞りは AnyParam.Case。
+	// AnyClassifyCase は、分類のケース（`any case`、`any case of never`、`any case of Actor`）。絞りは AnyParam.Case。
 	AnyClassifyCase AnyOf = "case"
 )
 
@@ -619,24 +619,33 @@ type AnyParam struct {
 	Case *CaseKind `json:"case,omitempty"`
 }
 
-// CaseKind は、デコレータの宣言で言う、分類のケースの絞り（docs/ir.md「decorator」の CaseKind）。立つのは、どちらか一つか、なし。
+// CaseKind は、デコレータの宣言で言う、分類のケースの絞り（docs/ir.md「decorator」の CaseKind）。立つのは、どちらか一つか、
+// なし（`case of any` と、その省略の `case`）。
 type CaseKind struct {
-	// Classify は、名前で絞ったとき（`Actor case`）の、分類の FQN。
+	// Classify は、分類の名前で絞ったとき（`case of Actor`）の、分類の FQN。
 	Classify string `json:"classify,omitempty"`
-	// Subject は、対象で絞ったとき（`case of never`）の "never"。
-	Subject string `json:"subject,omitempty"`
+	// Subject は、対象の型で絞ったとき（`case of Order`、`case of never`）の、その型。`of never` は NeverType。
+	Subject Type `json:"subject,omitempty"`
 }
 
-// Matches は、分類 c のケースが、この絞りに合うか。
+// MarshalJSON は docs/ir.md「JSON」の形で書く。
+func (k CaseKind) MarshalJSON() ([]byte, error) { type alias CaseKind; return marshalStruct(alias(k)) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (k *CaseKind) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, k) }
+
+// Matches は、分類 c のケースが、この絞りに合うか（docs/types.md「デコレータの引数」）。分類の名前なら、その分類。
+// 対象の型なら、値の分類で、対象の型が、その型と等しいもの。絞りがなければ、どの分類でも。
 func (k CaseKind) Matches(c *Classify) bool {
 	if c == nil {
 		return false
 	}
-	if k.Classify != "" && k.Classify != c.Name {
-		return false
+	if k.Classify != "" {
+		return k.Classify == c.Name
 	}
-	if k.Subject == "never" && !c.IsSubjectless() {
-		return false
+	if k.Subject != nil {
+		s, ok := c.Subject.(TypeSubject)
+		return ok && TypeEqual(s.Type, k.Subject)
 	}
 	return true
 }

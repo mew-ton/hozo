@@ -58,8 +58,8 @@ namespace a {
   state plain: string;
   state maybe: single<string?>;
   state rows: User[];
-  effect add(u: User) on users.post;
-  effect set(t: string) on token.put;
+  effect fn add(u: User) on users.post;
+  effect fn set(t: string) on token.put;
 
   exception Unauthorized;
   exception Invalid(field: string);
@@ -94,45 +94,45 @@ namespace a {
    * @see User
    */
   @get("/users")
-  op find(id: string): User throws Unauthorized prevents effects throws Invalid;
-  op noop();
-  op void2(): void;
-  op leaf(u: User): PublicUser throws AllErrors keeps effects;
-  op setToken(t: string) { set(t); }
-  op both(u: User): PublicUser effects Effects throws AllErrors {
+  fn find(id: string): User throws Unauthorized prevents effects throws Invalid;
+  fn noop();
+  fn void2(): void;
+  fn leaf(u: User): PublicUser throws AllErrors keeps effects;
+  fn setToken(t: string) { set(t); }
+  fn both(u: User): PublicUser effects Effects throws AllErrors {
     add(u);
     setToken("x");
     return leaf(u);
   }
-  op take(in: User): void;
-  op fromIn(in: User): User;
+  fn take(in: User): void;
+  fn fromIn(in: User): User;
 
-  read userById(id: string): User? on users;
-  export op find2(id: string): User? reads users, token reads users {
+  read fn userById(id: string): User? on users;
+  export fn find2(id: string): User? reads users, token reads users {
     return match(token by nullable){ HasItems => userById(id); Empty => none; };
   }
-  op nameOf(u: User): string;
-  op gone(): never throws Unauthorized;
+  fn nameOf(u: User): string;
+  fn gone(): never throws Unauthorized;
   classify Found of find2 { Hit: find2 as User; Miss: find2 as else; }
   classify Session of token { In: token as string; Out: token as else; }
-  op wire2(id: string): string throws Unauthorized {
+  fn wire2(id: string): string throws Unauthorized {
     val   u = find2(id);
     return match(u by Found){
       Hit => nameOf(u);
       else => throw Unauthorized;
     };
   }
-  op wire3(): string? {
+  fn wire3(): string? {
     return match(token by nullable){ HasItems => token; Empty => none; };
   }
-  op wire4(): string { return a.title; }
-  op wire5(): string {
+  fn wire4(): string { return a.title; }
+  fn wire5(): string {
     return match(by Session){ In => token; Out => gone(); };
   }
 
   @unavailable
   @cache(["users", id], 5m)
-  op wire(id: string): User {
+  fn wire(id: string): User {
     val   u = find(id);
     take({ id, email: u.email, hash: "x" });
     val   w = match(u by Kind){
@@ -164,9 +164,9 @@ namespace store {
   decorator tags(first: string, ...more: string | int) for op | effect;
   decorator both = effects(addRow, Writes);
 
-  @insert(rows) effect addRow(r: Row) on rows.post;
-  @insert(logs) @tags("a") effect log(l: Row) on logs.post;
-  effect touch() on rows.put;
+  @insert(rows) effect fn addRow(r: Row) on rows.post;
+  @insert(logs) @tags("a") effect fn log(l: Row) on logs.post;
+  effect fn touch() on rows.put;
   union Writes { addRow; touch; }
 
   /**
@@ -175,14 +175,14 @@ namespace store {
    * @see list
    * @see store.effects
    */
-  @find(rows, "id") op findRow(id: string): Row?;
-  @list(rows) op allRows(): Row[];
-  @effects(addRow, touch | log, Writes) op place(r: Row, l: Row);
-  @effects op nothing();
-  @effects() op nothingEither();
-  @both op viaAlias(r: Row);
-  @audited @find(logs, "id") op mixed(id: string): Row?;
-  @audited(logs) @tags("x", 1, "y") op audit();
+  @find(rows, "id") fn findRow(id: string): Row?;
+  @list(rows) fn allRows(): Row[];
+  @effects(addRow, touch | log, Writes) fn place(r: Row, l: Row);
+  @effects fn nothing();
+  @effects() fn nothingEither();
+  @both fn viaAlias(r: Row);
+  @audited @find(logs, "id") fn mixed(id: string): Row?;
+  @audited(logs) @tags("x", 1, "y") fn audit();
 }
 `
 }
@@ -210,31 +210,31 @@ namespace lib {
    *
    * @param id 引く行の識別子
    */
-  @find(rows) @where("id", "x") @where("kind", 1) read rowById(id: string): Row? on rows;
-  read allLogs(): Row[] on logs;
+  @find(rows) @where("id", "x") @where("kind", 1) read fn rowById(id: string): Row? on rows;
+  read fn allLogs(): Row[] on logs;
   /** @param r 触る行 */
-  effect touch(r: Row) on rows.put;
+  effect fn touch(r: Row) on rows.put;
   /** @param wait 待つ時間 */
   exception Busy(wait: Duration, note: string?);
 
-  op named(id: string): Row? reads rowById { return rowById(id); }
-  op direct(): Row[] reads rows { return rows; }
-  op pick(row: Row?, a: Row[], b: Row[]): Row[];
-  op mixed(id: string): Row[] reads rowById, rows, lib.allLogs reads rows, rowById {
+  fn named(id: string): Row? reads rowById { return rowById(id); }
+  fn direct(): Row[] reads rows { return rows; }
+  fn pick(row: Row?, a: Row[], b: Row[]): Row[];
+  fn mixed(id: string): Row[] reads rowById, rows, lib.allLogs reads rows, rowById {
     val   row = rowById(id);
     val   logged = allLogs();
     return pick(row, logged, rows);
   }
-  op write(r: Row) effects rows.post { rows.post(r); }
-  op rename(t: string) effects title.put { title.put(t); }
-  op forget() { cursor.delete(); }
-  op remember(r: Row) { cursor.post(r); lib.cursor.put(r); }
-  op touchIt(r: Row) effects touch { touch(r); }
-  @scan(logs) op scanned(): Row[];
-  @scan(rows, logs) op scanned2(): Row[];
-  @scan(rows) op scannedWired(): Row[] { return rows; }
+  fn write(r: Row) effects rows.post { rows.post(r); }
+  fn rename(t: string) effects title.put { title.put(t); }
+  fn forget() { cursor.delete(); }
+  fn remember(r: Row) { cursor.post(r); lib.cursor.put(r); }
+  fn touchIt(r: Row) effects touch { touch(r); }
+  @scan(logs) fn scanned(): Row[];
+  @scan(rows, logs) fn scanned2(): Row[];
+  @scan(rows) fn scannedWired(): Row[] { return rows; }
   classify Load of Row { Heavy; Light; }
-  op wired(r: Row): Row? effects rows.post, touch, lib.title.put reads rowById throws Busy {
+  fn wired(r: Row): Row? effects rows.post, touch, lib.title.put reads rowById throws Busy {
     write(r);
     touchIt(r);
     rename("t");

@@ -2,11 +2,11 @@
 namespace a {
   model M { id: string; }
   model N { id: string; }
-  op find(): M?;
-  op other(): N?;
-  op g();
+  fn find(): M?;
+  fn other(): N?;
+  fn g();
   classify Found of find { Hit: find as M; Other: find as else; }
-  op f(s: string) {
+  fn f(s: string) {
     val n = other();
     match (n by Found) { Hit => g(); else => none; };        // ERROR: MATCH-6
     match (s by Found) { Hit => g(); else => none; };        // ERROR: MATCH-6

@@ -461,9 +461,9 @@ func TestEffect(t *testing.T) {
 		op   ast.StateOp
 		stat string
 	}{
-		{"effect createSession() on sessions.post;", ast.Post, "sessions"},
-		{"effect a() on location.put;", ast.Put, "location"},
-		{"effect b() on server.users.delete;", ast.Delete, "server.users"},
+		{"effect fn createSession() on sessions.post;", ast.Post, "sessions"},
+		{"effect fn a() on location.put;", ast.Put, "location"},
+		{"effect fn b() on server.users.delete;", ast.Delete, "server.users"},
 	} {
 		e := firstDecl[*ast.EffectDecl](t, tt.src)
 		if e.On == nil || e.Transition != nil {
@@ -476,17 +476,29 @@ func TestEffect(t *testing.T) {
 			t.Errorf("%s: Span = %+v", tt.src, e.On)
 		}
 	}
-	mustFail(t, "effect a() on sessions.get;", "状態の操作は post / put / delete のどれかで、get ではない")
-	mustFail(t, "effect a() on sessions;", "「状態.操作」")
-	mustFail(t, "effect a() sessions.post;", "「on」が必要")
+	mustFail(t, "effect fn a() on sessions.get;", "状態の操作は post / put / delete のどれかで、get ではない")
+	mustFail(t, "effect fn a() on sessions;", "「状態.操作」")
+	mustFail(t, "effect fn a() sessions.post;", "「on」が必要")
 	// 引数（効果が受け取る値）。括弧は引数がなくても書く
-	e := firstDecl[*ast.EffectDecl](t, "effect createOrder(order: Order, at: Time) on orders.post;")
+	e := firstDecl[*ast.EffectDecl](t, "effect fn createOrder(order: Order, at: Time) on orders.post;")
 	if len(e.Params) != 2 || e.Params[0].Name.Name != "order" || typeString(e.Params[1].Type) != "Time" {
 		t.Errorf("Params = %+v", e.Params)
 	}
 	// なくした書き方（括弧なし）は、今の書き方をメッセージで示す
-	mustFail(t, "effect a on sessions.post;", "effect a の名前の後ろに、引数の括弧が要る（引数がなくても effect a() on … と書く")
-	mustFail(t, "effect a: T on sessions.post;", "「(」が必要")
+	mustFail(t, "effect fn a on sessions.post;", "effect fn a の名前の後ろに、引数の括弧が要る（引数がなくても effect fn a() on … と書く")
+	// 戻り値（docs/grammar.md「関数の宣言」）: 書いたものを、そのまま持つ。void のほかを弾くのは、意味の解析（TYPE-18）
+	if e := firstDecl[*ast.EffectDecl](t, "effect fn a() on sessions.post;"); e.Return != nil {
+		t.Errorf("省いた戻り値: Return = %+v", e.Return)
+	}
+	if e := firstDecl[*ast.EffectDecl](t, "effect fn a(): void on sessions.post;"); e.Return == nil || !e.Return.Void {
+		t.Errorf("void の戻り値: Return = %+v", e.Return)
+	}
+	if e := firstDecl[*ast.EffectDecl](t, "effect fn a(): T on sessions.post;"); e.Return == nil || typeString(e.Return.Type) != "T" {
+		t.Errorf("型の戻り値: Return = %+v", e.Return)
+	}
+	// なくした書き方（頭に fn のない宣言）は、新しい書き方をメッセージで示す
+	mustFail(t, "effect a() on sessions.post;", "effect a(…) という書き方はなくなった。関数の宣言の頭は fn で、種類は、その前に書く（effect fn a(…) と書く")
+	mustFail(t, "effect on sessions.post;", "fn（effect fn 名前(…) と書く）が必要")
 }
 
 func idents(ids []ast.Ident) string {
@@ -504,11 +516,11 @@ func TestEffectTransition(t *testing.T) {
 		of       string
 		from, to string // "any" か、ケース名を "|" でつないだもの（idents の書き方）
 	}{
-		{"effect placeOrder() on Checkout: Shopping -> Ordered;", "Checkout", "Shopping", "Ordered"},
-		{"effect clearCart() on carts: HasItems -> Empty;", "carts", "HasItems", "Empty"},
-		{"effect reset() on Checkout: any -> Shopping;", "Checkout", "any", "Shopping"},
-		{"effect touch() on Checkout: Shopping, Ordered -> any;", "Checkout", "Shopping|Ordered", "any"},
-		{"effect a() on server.Checkout:A,B->C,D;", "server.Checkout", "A|B", "C|D"},
+		{"effect fn placeOrder() on Checkout: Shopping -> Ordered;", "Checkout", "Shopping", "Ordered"},
+		{"effect fn clearCart() on carts: HasItems -> Empty;", "carts", "HasItems", "Empty"},
+		{"effect fn reset() on Checkout: any -> Shopping;", "Checkout", "any", "Shopping"},
+		{"effect fn touch() on Checkout: Shopping, Ordered -> any;", "Checkout", "Shopping|Ordered", "any"},
+		{"effect fn a() on server.Checkout:A,B->C,D;", "server.Checkout", "A|B", "C|D"},
 	} {
 		e := firstDecl[*ast.EffectDecl](t, tt.src)
 		if e.On != nil || e.Transition == nil {
@@ -534,18 +546,18 @@ func TestEffectTransition(t *testing.T) {
 	}
 	// 「QualifiedName の直後が ":" なら Transition」なので、これは carts.post という名前の遷移として読める。
 	// 名前が指すものの誤りは名前の解決（RES-4）が出す。
-	if e := firstDecl[*ast.EffectDecl](t, "effect a() on carts.post: A -> B;"); e.Transition == nil || e.Transition.Of.String() != "carts.post" {
+	if e := firstDecl[*ast.EffectDecl](t, "effect fn a() on carts.post: A -> B;"); e.Transition == nil || e.Transition.Of.String() != "carts.post" {
 		t.Errorf("Transition = %+v", e.Transition)
 	}
 	tests := []struct{ name, src, want string }{
-		{"missing arrow", "effect a() on C: A;", "「->」が必要"},
-		{"fat arrow", "effect a() on C: A => B;", "「->」が必要"},
-		{"missing to", "effect a() on C: A -> ;", "遷移のケース（any かケース名）が必要"},
-		{"missing from", "effect a() on C: -> B;", "遷移のケース（any かケース名）が必要"},
-		{"qualified case", "effect a() on C: x.A -> B;", "遷移のケース（any かケース名）が必要"},
-		{"any in a set", "effect a() on C: A, any -> B;", "any は予約語"},
-		{"two transitions", "effect a() on C: A -> B, D: E -> F;", "「;」が必要"},
-		{"no target", "effect a() on : A -> B;", "「状態.操作」"},
+		{"missing arrow", "effect fn a() on C: A;", "「->」が必要"},
+		{"fat arrow", "effect fn a() on C: A => B;", "「->」が必要"},
+		{"missing to", "effect fn a() on C: A -> ;", "遷移のケース（any かケース名）が必要"},
+		{"missing from", "effect fn a() on C: -> B;", "遷移のケース（any かケース名）が必要"},
+		{"qualified case", "effect fn a() on C: x.A -> B;", "遷移のケース（any かケース名）が必要"},
+		{"any in a set", "effect fn a() on C: A, any -> B;", "any は予約語"},
+		{"two transitions", "effect fn a() on C: A -> B, D: E -> F;", "「;」が必要"},
+		{"no target", "effect fn a() on : A -> B;", "「状態.操作」"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -579,14 +591,14 @@ func TestEffectRowClause(t *testing.T) {
 		return before + " -> " + after
 	}
 	for _, tt := range []struct{ src, on, row string }{
-		{"effect accept(order: Order) on orders.post as Stage.Accepted;", "orders.post", "Stage.Accepted"},
-		{"effect imp(order: Order) on orders.post as any;", "orders.post", "any"},
-		{"effect start(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction;", "orders.put", "Stage.Accepted -> Stage.InProduction"},
-		{"effect cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;", "orders.put", "Stage.Draft|Stage.Accepted -> Stage.Cancelled"},
-		{"effect force(order: Order) on orders.put as any -> Stage.Shipped;", "orders.put", "any -> Stage.Shipped"},
-		{"effect revise(order: Order) on orders.put as Stage.Accepted -> else;", "orders.put", "Stage.Accepted -> else"},
-		{"effect patch(order: Order) on orders.put as any -> else;", "orders.put", "any -> else"},
-		{"effect drop(order: Order) on shop.orders.delete as ordering.Life.Draft->ordering.Life.Absent;", "shop.orders.delete", "ordering.Life.Draft -> ordering.Life.Absent"},
+		{"effect fn accept(order: Order) on orders.post as Stage.Accepted;", "orders.post", "Stage.Accepted"},
+		{"effect fn imp(order: Order) on orders.post as any;", "orders.post", "any"},
+		{"effect fn start(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction;", "orders.put", "Stage.Accepted -> Stage.InProduction"},
+		{"effect fn cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;", "orders.put", "Stage.Draft|Stage.Accepted -> Stage.Cancelled"},
+		{"effect fn force(order: Order) on orders.put as any -> Stage.Shipped;", "orders.put", "any -> Stage.Shipped"},
+		{"effect fn revise(order: Order) on orders.put as Stage.Accepted -> else;", "orders.put", "Stage.Accepted -> else"},
+		{"effect fn patch(order: Order) on orders.put as any -> else;", "orders.put", "any -> else"},
+		{"effect fn drop(order: Order) on shop.orders.delete as ordering.Life.Draft->ordering.Life.Absent;", "shop.orders.delete", "ordering.Life.Draft -> ordering.Life.Absent"},
 	} {
 		e := firstDecl[*ast.EffectDecl](t, tt.src)
 		if e.On == nil || e.Transition != nil || e.Row == nil {
@@ -605,29 +617,29 @@ func TestEffectRowClause(t *testing.T) {
 		}
 	}
 	// as を書かない効果は Row が nil
-	if e := firstDecl[*ast.EffectDecl](t, "effect rename(order: Order) on orders.put;"); e.Row != nil {
+	if e := firstDecl[*ast.EffectDecl](t, "effect fn rename(order: Order) on orders.put;"); e.Row != nil {
 		t.Errorf("Row = %+v", e.Row)
 	}
 	for _, tt := range []struct{ name, src, want string }{
-		{"two cases without arrow", "effect a(o: O) on s.post as C.A, C.B;", "矢印のない行の遷移（as <後>）に書けるケースは、一つだけ"},
-		{"else without arrow", "effect a(o: O) on s.put as else;", "行の遷移の else を書けるのは、矢印の後ろだけ"},
-		{"any after arrow", "effect a(o: O) on s.put as C.A -> any;", "行の遷移の矢印の後ろに any は書けない"},
-		{"two cases after arrow", "effect a(o: O) on s.put as C.A -> C.B, C.D;", "「;」が必要"},
-		{"else in the before list", "effect a(o: O) on s.put as C.A, else -> C.B;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
-		{"any in the before list", "effect a(o: O) on s.put as C.A, any -> C.B;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
-		{"bare case", "effect a(o: O) on s.put as Accepted -> C.B;", "行の遷移のケースは、分類の名前から書く（<分類>.Accepted"},
-		{"bare case after arrow", "effect a(o: O) on s.put as C.A -> Shipped;", "行の遷移のケースは、分類の名前から書く（<分類>.Shipped"},
-		{"missing after", "effect a(o: O) on s.put as C.A -> ;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
-		{"missing everything", "effect a(o: O) on s.put as ;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
-		{"two arrows", "effect a(o: O) on s.put as C.A -> C.B -> C.D;", "「;」が必要"},
-		{"pipe in the before list", "effect a(o: O) on s.put as C.A | C.B -> C.D;", "行の遷移のケースの並びの区切りは「,」で、「|」ではない（as C.A, C.B -> C.D と書く"},
-		{"after a transition", "effect a() on Checkout: A -> B as C.A;", "行の遷移（as …）は、組み込みの効果（on 状態.操作）の後ろにだけ書ける"},
-		{"reserved word as a case", "effect a(o: O) on s.put as C.A -> C.else;", "else は予約語で、名前には使えない"},
+		{"two cases without arrow", "effect fn a(o: O) on s.post as C.A, C.B;", "矢印のない行の遷移（as <後>）に書けるケースは、一つだけ"},
+		{"else without arrow", "effect fn a(o: O) on s.put as else;", "行の遷移の else を書けるのは、矢印の後ろだけ"},
+		{"any after arrow", "effect fn a(o: O) on s.put as C.A -> any;", "行の遷移の矢印の後ろに any は書けない"},
+		{"two cases after arrow", "effect fn a(o: O) on s.put as C.A -> C.B, C.D;", "「;」が必要"},
+		{"else in the before list", "effect fn a(o: O) on s.put as C.A, else -> C.B;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"any in the before list", "effect fn a(o: O) on s.put as C.A, any -> C.B;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"bare case", "effect fn a(o: O) on s.put as Accepted -> C.B;", "行の遷移のケースは、分類の名前から書く（<分類>.Accepted"},
+		{"bare case after arrow", "effect fn a(o: O) on s.put as C.A -> Shipped;", "行の遷移のケースは、分類の名前から書く（<分類>.Shipped"},
+		{"missing after", "effect fn a(o: O) on s.put as C.A -> ;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"missing everything", "effect fn a(o: O) on s.put as ;", "行の遷移のケース（any か、<分類>.<ケース>）が必要"},
+		{"two arrows", "effect fn a(o: O) on s.put as C.A -> C.B -> C.D;", "「;」が必要"},
+		{"pipe in the before list", "effect fn a(o: O) on s.put as C.A | C.B -> C.D;", "行の遷移のケースの並びの区切りは「,」で、「|」ではない（as C.A, C.B -> C.D と書く"},
+		{"after a transition", "effect fn a() on Checkout: A -> B as C.A;", "行の遷移（as …）は、組み込みの効果（on 状態.操作）の後ろにだけ書ける"},
+		{"reserved word as a case", "effect fn a(o: O) on s.put as C.A -> C.else;", "else は予約語で、名前には使えない"},
 	} {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
 	// なくした区切り "|" は、"," として読み進める
-	file, diags := parseSrc(t, "effect a(o: O) on s.put as C.A | C.B -> C.D;")
+	file, diags := parseSrc(t, "effect fn a(o: O) on s.put as C.A | C.B -> C.D;")
 	if len(diags) != 1 || len(file.Decls) != 1 {
 		t.Fatalf("diags = %d, Decls = %d", len(diags), len(file.Decls))
 	}
@@ -698,7 +710,7 @@ func TestClassify(t *testing.T) {
 	mustFail(t, "classify A of T { X: else; }", "型が必要")
 	mustFail(t, "classify A of T { else; }", "else は予約語で、識別子には使えない")
 	mustFail(t, "model else { id: string; }", "else は予約語で、識別子には使えない")
-	mustFail(t, "op f(m: else);", "型が必要")
+	mustFail(t, "fn f(m: else);", "型が必要")
 	firstDecl[*ast.ModelDecl](t, "model M { else: string; }")
 	mustFail(t, "classify A of T { X: T; }", "「as」が必要")
 	mustFail(t, "classify A of T { X: as U; }", "型が必要")
@@ -752,27 +764,27 @@ func TestRemovedClassifyForms(t *testing.T) {
 		{"default case with as", "classify A of T { X; default: T as U; }", "名前のないケース default は書けない"},
 		{"condition", "condition A of T;", "condition の宣言は書けない。両側に名前を付けた classify で書く"},
 		{"condition shows the form", "/** d */ condition A of carts, orders;", "classify C of T { <成り立つ側>; <成り立たない側>; }"},
-		{"default arm", "op a() { match (x by K) { A => f(); default => none; }; }", "default のアームは書けない。受けるケースを名前で並べるか、最後のアームを else => … と書く"},
-		{"pipe in arm", "op a() { match (x by K) { A | B => f(); }; }", "アームのケースの並びの区切りは「,」で、「|」ではない（A, B => … と書く"},
-		{"pipe in transition, from", "effect e() on C: A | B -> any;", "遷移のケースの並びの区切りは「,」で、「|」ではない（on C: A, B -> any と書く"},
-		{"pipe in transition, to", "effect e() on C: any -> A | B;", "遷移のケースの並びの区切りは「,」で、「|」ではない"},
-		{"else arm, then an arm", "op a() { match (x by K) { A => f(); else => none; B => g(); }; }", "else のアームの後ろに、アームは書けない"},
-		{"two else arms", "op a() { match (x by K) { A => f(); else => none; else => g(); }; }", "else のアームの後ろに、アームは書けない"},
-		{"else arm only", "op a() { match (x by K) { else => f(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
-		{"else arm first", "op a() { match (x by K) { else => f(); A => g(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
-		{"else in a case list", "op a() { match (x by K) { A, else => f(); }; }", "else は予約語で、識別子には使えない"},
+		{"default arm", "fn a() { match (x by K) { A => f(); default => none; }; }", "default のアームは書けない。受けるケースを名前で並べるか、最後のアームを else => … と書く"},
+		{"pipe in arm", "fn a() { match (x by K) { A | B => f(); }; }", "アームのケースの並びの区切りは「,」で、「|」ではない（A, B => … と書く"},
+		{"pipe in transition, from", "effect fn e() on C: A | B -> any;", "遷移のケースの並びの区切りは「,」で、「|」ではない（on C: A, B -> any と書く"},
+		{"pipe in transition, to", "effect fn e() on C: any -> A | B;", "遷移のケースの並びの区切りは「,」で、「|」ではない"},
+		{"else arm, then an arm", "fn a() { match (x by K) { A => f(); else => none; B => g(); }; }", "else のアームの後ろに、アームは書けない"},
+		{"two else arms", "fn a() { match (x by K) { A => f(); else => none; else => g(); }; }", "else のアームの後ろに、アームは書けない"},
+		{"else arm only", "fn a() { match (x by K) { else => f(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
+		{"else arm first", "fn a() { match (x by K) { else => f(); A => g(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
+		{"else in a case list", "fn a() { match (x by K) { A, else => f(); }; }", "else は予約語で、識別子には使えない"},
 	} {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
 	// condition は予約語ではない（docs/grammar.md「予約語」）: 名前に使える。宣言の頭でだけ、なくした書き方として見分ける
-	o := firstDecl[*ast.OpDecl](t, "op check(condition: string): string { val condition2 = f(condition); return condition2; }")
+	o := firstDecl[*ast.OpDecl](t, "fn check(condition: string): string { val condition2 = f(condition); return condition2; }")
 	if o.Params[0].Name.Name != "condition" {
 		t.Errorf("Params = %+v", o.Params)
 	}
 	// default は予約語のまま（書ける位置は FieldName と DecoratorName だけ）
-	mustFail(t, "op f(default: string);", "default は予約語で、識別子には使えない")
+	mustFail(t, "fn f(default: string);", "default は予約語で、識別子には使えない")
 	// なくした区切り "|" は、"," として読み進める: 宣言は残り、ケースは二つとも読める
-	file, diags := parseSrc(t, "effect e() on C: A | B -> any;\nop a() { match (x by K) { A | B => f(); }; }")
+	file, diags := parseSrc(t, "effect fn e() on C: A | B -> any;\nfn a() { match (x by K) { A | B => f(); }; }")
 	if len(diags) != 2 || len(file.Decls) != 2 {
 		t.Fatalf("diags = %d, Decls = %d", len(diags), len(file.Decls))
 	}
@@ -783,7 +795,7 @@ func TestRemovedClassifyForms(t *testing.T) {
 		t.Errorf("Arm = %s", idents(arm.Cases))
 	}
 	// default のアームは、else のアームとして読み進める。else の後ろのアームは捨てる
-	file, diags = parseSrc(t, "op a() { match (x by K) { A => f(); default => none; }; }\nop b() { match (x by K) { A => f(); else => none; B => g(); }; }")
+	file, diags = parseSrc(t, "fn a() { match (x by K) { A => f(); default => none; }; }\nfn b() { match (x by K) { A => f(); else => none; B => g(); }; }")
 	if len(diags) != 2 || len(file.Decls) != 2 {
 		t.Fatalf("diags = %d, Decls = %d", len(diags), len(file.Decls))
 	}
@@ -856,7 +868,7 @@ func TestCoreMarks(t *testing.T) {
 		{"on alias", "@repeatable decorator a = b();", "名前付きのデコレータに @repeatable は付けられない"},
 		{"on field", "model A { @repeatable x: int; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
 		{"on reserved field", "model A { @repeatable decorator: string; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
-		{"on op", "@repeatable op f();", "@repeatable はデコレータの宣言の直前にだけ書ける"},
+		{"on op", "@repeatable fn f();", "@repeatable はデコレータの宣言の直前にだけ書ける"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -917,7 +929,7 @@ func TestDecoratorName(t *testing.T) {
 		t.Errorf("Decorator = %+v", d)
 	}
 	// 適用: 修飾していれば最後の要素だけ、していなければその予約語の字句そのもの
-	o := firstDecl[*ast.OpDecl](t, `@db.list(orders) @db.effects(a, b) @effects(a) @list @a.b.int op f();`)
+	o := firstDecl[*ast.OpDecl](t, `@db.list(orders) @db.effects(a, b) @effects(a) @list @a.b.int fn f();`)
 	want := []string{"db.list", "db.effects", "effects", "list", "a.b.int"}
 	if len(o.Decorators) != len(want) {
 		t.Fatalf("Decorators = %d", len(o.Decorators))
@@ -941,7 +953,7 @@ func TestDecoratorName(t *testing.T) {
 	if got := m.Body.Fields[1].Decorators[0].Name.String(); got != "text" {
 		t.Errorf("field decorator = %s", got)
 	}
-	e := firstDecl[*ast.EffectDecl](t, "@db.delete(sessions, \"token\") effect deleteSession() on sessions.delete;")
+	e := firstDecl[*ast.EffectDecl](t, "@db.delete(sessions, \"token\") effect fn deleteSession() on sessions.delete;")
 	if len(e.Decorators) != 1 || e.Decorators[0].Name.String() != "db.delete" || len(e.Decorators[0].Args) != 2 {
 		t.Errorf("effect decorators = %+v", e.Decorators)
 	}
@@ -1050,7 +1062,7 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 // TestRestArguments は残りの引数への渡し方（docs/grammar.md「デコレータの適用」）: 適用の構文は変わらず、
 // ほかの引数の数を超えて位置で渡した値が、書いた順に並ぶ（対応付けは internal/sema）。
 func TestRestArguments(t *testing.T) {
-	o := firstDecl[*ast.OpDecl](t, "@db.effects(createOrder, notifyUser, a.b | c) @db.effects() @db.effects op f();")
+	o := firstDecl[*ast.OpDecl](t, "@db.effects(createOrder, notifyUser, a.b | c) @db.effects() @db.effects fn f();")
 	if len(o.Decorators) != 3 {
 		t.Fatalf("Decorators = %d", len(o.Decorators))
 	}
@@ -1067,11 +1079,11 @@ func TestRestArguments(t *testing.T) {
 // 目的語は `effects` だけで、効果の名前は書けない（docs/grammar.md「決めたこと」、docs/decisions.md S9）。
 func TestRelationObject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
-		{"named effect on op", "op f() effects a throws X keeps a;", "目的語は「effects」だけ"},
-		{"named effects on op", "op f() effects a throws X keeps a prevents b;", "keeps の目的語は「effects」だけ"},
-		{"qualified effect", "op f() throws X prevents server.a;", "prevents の目的語は「effects」だけ"},
+		{"named effect on op", "fn f() effects a throws X keeps a;", "目的語は「effects」だけ"},
+		{"named effects on op", "fn f() effects a throws X keeps a prevents b;", "keeps の目的語は「effects」だけ"},
+		{"qualified effect", "fn f() throws X prevents server.a;", "prevents の目的語は「effects」だけ"},
 		{"named effect on decorator", "decorator d throws X prevents a | b;", "prevents の目的語は「effects」だけ"},
-		{"missing object", "op f() throws X prevents;", "「effects」が必要だが「;」がある"},
+		{"missing object", "fn f() throws X prevents;", "「effects」が必要だが「;」がある"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -1139,7 +1151,7 @@ func TestDecoratorDeclReject(t *testing.T) {
 		{"rest without name", "decorator a(...: string);", "「識別子」が必要"},
 		{"rest with keyword name", "decorator a(...to: string);", "to は予約語で、識別子には使えない"},
 		{"two dots", "decorator a(..xs: string);", "「識別子」が必要だが「.」がある"},
-		{"rest in op params", "op f(...xs: string);", "「識別子」が必要だが「...」がある"},
+		{"rest in op params", "fn f(...xs: string);", "「識別子」が必要だが「...」がある"},
 		{"alias target keyword in the middle", "decorator a = b.op.c();", "op は予約語で、名前には使えない"},
 	}
 	for _, tt := range tests {
@@ -1151,7 +1163,7 @@ func TestDecoratorDeclReject(t *testing.T) {
 
 func TestOp(t *testing.T) {
 	o := firstDecl[*ast.OpDecl](t, `@http.post("/login") @validated
-op login(in: LoginInput, n: int): LoginOk
+fn login(in: LoginInput, n: int): LoginOk
   effects createSession, notify
   throws InvalidCredentials, NotVerified prevents effects
   throws Other keeps effects;`)
@@ -1176,15 +1188,15 @@ op login(in: LoginInput, n: int): LoginOk
 		t.Errorf("Throws 2 = %+v", o.Clauses[2])
 	}
 
-	o = firstDecl[*ast.OpDecl](t, "op clearToken() effects removeToken;")
+	o = firstDecl[*ast.OpDecl](t, "fn clearToken() effects removeToken;")
 	if o.Return != nil || len(o.Params) != 0 || len(o.Clauses) != 1 {
 		t.Errorf("Op = %+v", o)
 	}
-	o = firstDecl[*ast.OpDecl](t, "op a(): void;")
+	o = firstDecl[*ast.OpDecl](t, "fn a(): void;")
 	if o.Return == nil || !o.Return.Void || o.Return.Type != nil {
 		t.Errorf("Return = %+v", o.Return)
 	}
-	o = firstDecl[*ast.OpDecl](t, "op a(x: int)\n  : T\n{ return x; }")
+	o = firstDecl[*ast.OpDecl](t, "fn a(x: int)\n  : T\n{ return x; }")
 	if o.Body == nil || len(o.Body.Stmts) != 1 || typeString(o.Return.Type) != "T" {
 		t.Errorf("Op = %+v", o)
 	}
@@ -1193,7 +1205,7 @@ op login(in: LoginInput, n: int): LoginOk
 	}
 
 	// export、reads、never（docs/grammar.md「op」）。
-	o = firstDecl[*ast.OpDecl](t, "/** d */ @http.get(\"/x\") export op findUser(email: Email): User? reads users, sessions reads store.orders throws X;")
+	o = firstDecl[*ast.OpDecl](t, "/** d */ @http.get(\"/x\") export fn findUser(email: Email): User? reads users, sessions reads store.orders throws X;")
 	if !o.Export || o.ExportSpan.End-o.ExportSpan.Start != source.Offset(len("export")) || o.Doc == nil || len(o.Decorators) != 1 {
 		t.Errorf("Op = %+v", o)
 	}
@@ -1210,11 +1222,11 @@ op login(in: LoginInput, n: int): LoginOk
 	if o.Span.Start != o.Decorators[0].Span.Start {
 		t.Errorf("Span = %+v", o.Span)
 	}
-	o = firstDecl[*ast.OpDecl](t, "export op a();")
+	o = firstDecl[*ast.OpDecl](t, "export fn a();")
 	if !o.Export || o.Span.Start != o.ExportSpan.Start {
 		t.Errorf("Op = %+v", o)
 	}
-	o = firstDecl[*ast.OpDecl](t, "op unauthorized(): never throws Unauthorized;")
+	o = firstDecl[*ast.OpDecl](t, "fn unauthorized(): never throws Unauthorized;")
 	if o.Export || o.Return == nil || !o.Return.Never || o.Return.Void || o.Return.Type != nil {
 		t.Errorf("Op = %+v（Return = %+v）", o, o.Return)
 	}
@@ -1224,7 +1236,7 @@ op login(in: LoginInput, n: int): LoginOk
 // reads の要素には read の名前か状態の名前を書ける（どちらかは名前の解決が決めるので、構文木では名前のまま）。
 // なくした書き方 "|" は SYNTAX にするが、"," として読み進めるので、宣言は残る。
 func TestClauseSeparators(t *testing.T) {
-	o := firstDecl[*ast.OpDecl](t, "op f() effects addUser, users.post, store.users.delete reads userByEmail, users, store.sessions throws A, b.B;")
+	o := firstDecl[*ast.OpDecl](t, "fn f() effects addUser, users.post, store.users.delete reads userByEmail, users, store.sessions throws A, b.B;")
 	if len(o.Clauses) != 3 {
 		t.Fatalf("Clauses = %d", len(o.Clauses))
 	}
@@ -1238,7 +1250,7 @@ func TestClauseSeparators(t *testing.T) {
 		t.Errorf("throws = %+v", th)
 	}
 
-	file, diags := parseSrc(t, "op f() throws A | B effects e | users.post reads s | t;\nop g();")
+	file, diags := parseSrc(t, "fn f() throws A | B effects e | users.post reads s | t;\nfn g();")
 	if len(diags) != 3 {
 		t.Fatalf("診断 = %d 件, want 3（節ごとに一つ）: %v", len(diags), diags)
 	}
@@ -1261,7 +1273,7 @@ func TestClauseSeparators(t *testing.T) {
 
 // TestReadDecl は ReadDecl = "read" Ident OpParams ":" Type "on" QualifiedName ";"（docs/grammar.md「exception / effect / read」）。
 func TestReadDecl(t *testing.T) {
-	r := firstDecl[*ast.ReadDecl](t, "/** メールで引く */ @db.find(users) read userByEmail(email: Email): User? on users;")
+	r := firstDecl[*ast.ReadDecl](t, "/** メールで引く */ @db.find(users) read fn userByEmail(email: Email): User? on users;")
 	if r.Name.Name != "userByEmail" || r.On.String() != "users" || r.Doc == nil || len(r.Decorators) != 1 {
 		t.Fatalf("Read = %+v", r)
 	}
@@ -1271,7 +1283,7 @@ func TestReadDecl(t *testing.T) {
 	if r.Span.Start != r.Decorators[0].Span.Start {
 		t.Errorf("Span はデコレータから: %+v", r.Span)
 	}
-	r = firstDecl[*ast.ReadDecl](t, "read all(): User[] on store.users;")
+	r = firstDecl[*ast.ReadDecl](t, "read fn all(): User[] on store.users;")
 	if r.On.String() != "store.users" || r.Doc != nil || len(r.Decorators) != 0 || len(r.Params) != 0 || typeString(r.Result) != "User[]" {
 		t.Errorf("Read = %+v", r)
 	}
@@ -1290,46 +1302,57 @@ func TestReadDecl(t *testing.T) {
 	}
 
 	tests := []struct{ name, src, want string }{
-		{"no on", "read r(): T;", "「on」が必要"},
-		{"no state", "read r(): T on;", "読む状態の名前が必要"},
-		{"with body", "read r(): T on users {}", "「;」が必要"},
-		{"export", "export read r(): T on users;", "export を付けられるのは op だけ"},
-		{"qualified name", "read a.r(): T on users;", "修飾しない識別子"},
-		{"no parens", "read r on users;", "read r の名前の後ろに、引数の括弧と結果の型が要る"},
-		{"no result", "read r() on users;", "read r は結果の型を省略できない"},
-		{"void result", "read r(): void on users;", "read r の結果の型に void は書けない"},
-		{"never result", "read r(): never on users;", "read r の結果の型に never は書けない"},
+		{"no on", "read fn r(): T;", "「on」が必要"},
+		{"no state", "read fn r(): T on;", "読む状態の名前が必要"},
+		{"with body", "read fn r(): T on users {}", "「;」が必要"},
+		{"export", "export read fn r(): T on users;", "export を付けられるのは、種類を書かない fn（op）だけ"},
+		{"qualified name", "read fn a.r(): T on users;", "修飾しない識別子"},
+		{"no parens", "read fn r on users;", "read fn r の名前の後ろに、引数の括弧が要る"},
+		{"old head", "read r(): T on users;", "read r(…) という書き方はなくなった。関数の宣言の頭は fn で、種類は、その前に書く（read fn r(…) と書く"},
 		{"any read", "decorator d(x: any read);", "any の種類（exception / effect / state / op / model / variant / case）が必要"},
-		{"keyword as op name", "op read();", "read は予約語で、識別子には使えない"},
+		{"keyword as op name", "fn read();", "read は予約語で、識別子には使えない"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
+	// 戻り値（docs/grammar.md「関数の宣言」）: 書いたものを、そのまま持つ。省いた形、void、never を弾くのは、意味の解析（TYPE-18）
+	if r := firstDecl[*ast.ReadDecl](t, "read fn r() on users;"); r.Return != nil || r.Result != nil {
+		t.Errorf("省いた戻り値: Return = %+v, Result = %+v", r.Return, r.Result)
+	}
+	if r := firstDecl[*ast.ReadDecl](t, "read fn r(): void on users;"); r.Return == nil || !r.Return.Void || r.Result != nil {
+		t.Errorf("void の戻り値: Return = %+v", r.Return)
+	}
+	if r := firstDecl[*ast.ReadDecl](t, "read fn r(): never on users;"); r.Return == nil || !r.Return.Never || r.Result != nil {
+		t.Errorf("never の戻り値: Return = %+v", r.Return)
 	}
 }
 
 func TestOpReject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
-		{"catches on op", "op a() catches X recovers;", "catches はデコレータの宣言にだけ書ける"},
-		{"no terminator", "op a()", "「;」か配線の「{」が必要"},
-		{"no params", "op a;", "「(」が必要"},
-		{"param without type", "op a(x);", "「:」が必要"},
-		{"void param", "op a(x: void);", "void は op の戻り値の型にだけ書ける"},
-		{"pipe type in param", "op a(x: int | float);", "「,」か「)」"},
-		{"for on op", "op a() for op;", "「;」か配線の「{」が必要"},
-		{"qualified name", "op a.b();", "修飾しない識別子"},
-		{"export on model", "export model A {}", "export を付けられるのは op だけ"},
-		{"export on state", "export state s: int;", "export を付けられるのは op だけ"},
-		{"export on namespace", "export namespace a {}", "export を付けられるのは op だけ"},
-		{"export before decorator", "export @d op a();", "export を付けられるのは op だけ"},
-		{"export twice", "export export op a();", "export を付けられるのは op だけ"},
-		{"reads with pipe", "op a() reads s | t;", "reads の並びの区切りは「,」で、「|」ではない"},
-		{"effects with pipe", "op a() effects e | users.post;", "effects の並びの区切りは「,」で、「|」ではない"},
-		{"throws with pipe", "op a() throws X | Y;", "throws の並びの区切りは「,」で、「|」ではない"},
-		{"throws trailing comma", "op a() throws X,;", "名前が必要"},
-		{"reads without name", "op a() reads;", "名前が必要"},
-		{"reads trailing comma", "op a() reads s,;", "名前が必要"},
-		{"never param", "op a(x: never);", "never は op の戻り値の型と"},
-		{"never optional", "op a(): never?;", "「;」か配線の「{」が必要"},
+		{"catches on op", "fn a() catches X recovers;", "catches はデコレータの宣言にだけ書ける"},
+		{"no terminator", "fn a()", "「;」か配線の「{」が必要"},
+		{"no params", "fn a;", "「(」が必要"},
+		{"old head", "op a();", "op a(…) という書き方はなくなった。関数の宣言の頭は fn（fn a(…) と書く"},
+		{"old head with export", "export op a();", "op a(…) という書き方はなくなった"},
+		{"op fn", "op fn a();", "op fn とは書かない。種類を書かない fn が op"},
+		{"param without type", "fn a(x);", "「:」が必要"},
+		{"void param", "fn a(x: void);", "void は op の戻り値の型にだけ書ける"},
+		{"pipe type in param", "fn a(x: int | float);", "「,」か「)」"},
+		{"for on op", "fn a() for op;", "「;」か配線の「{」が必要"},
+		{"qualified name", "fn a.b();", "修飾しない識別子"},
+		{"export on model", "export model A {}", "export を付けられるのは、種類を書かない fn（op）だけ"},
+		{"export on state", "export state s: int;", "export を付けられるのは、種類を書かない fn（op）だけ"},
+		{"export on namespace", "export namespace a {}", "export を付けられるのは、種類を書かない fn（op）だけ"},
+		{"export before decorator", "export @d fn a();", "export を付けられるのは、種類を書かない fn（op）だけ"},
+		{"export twice", "export export fn a();", "export を付けられるのは、種類を書かない fn（op）だけ"},
+		{"reads with pipe", "fn a() reads s | t;", "reads の並びの区切りは「,」で、「|」ではない"},
+		{"effects with pipe", "fn a() effects e | users.post;", "effects の並びの区切りは「,」で、「|」ではない"},
+		{"throws with pipe", "fn a() throws X | Y;", "throws の並びの区切りは「,」で、「|」ではない"},
+		{"throws trailing comma", "fn a() throws X,;", "名前が必要"},
+		{"reads without name", "fn a() reads;", "名前が必要"},
+		{"reads trailing comma", "fn a() reads s,;", "名前が必要"},
+		{"never param", "fn a(x: never);", "never は op の戻り値の型と"},
+		{"never optional", "fn a(): never?;", "「;」か配線の「{」が必要"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1418,7 +1441,7 @@ func TestType(t *testing.T) {
 // --- 配線 ---
 
 func TestBlockStmts(t *testing.T) {
-	src := `op a(query: OrdersQuery): OrderPage {
+	src := `fn a(query: OrdersQuery): OrderPage {
   val me = fetchMe();
   val line = server.addToCart({ item });
   val v = query.page;
@@ -1492,14 +1515,14 @@ func TestBlockStmts(t *testing.T) {
 }
 
 func TestReturnAtom(t *testing.T) {
-	o := firstDecl[*ast.OpDecl](t, "op a(me: M): M { return me; }")
+	o := firstDecl[*ast.OpDecl](t, "fn a(me: M): M { return me; }")
 	if _, ok := o.Body.Stmts[0].(*ast.ReturnStmt).Value.(*ast.NameAtom); !ok {
 		t.Errorf("return = %+v", o.Body.Stmts[0])
 	}
 }
 
 func TestMatch(t *testing.T) {
-	o := firstDecl[*ast.OpDecl](t, `op a(item: I) {
+	o := firstDecl[*ast.OpDecl](t, `fn a(item: I) {
   val warranty = match (item by WarrantyKind) {
     Standard, NoWarranty => chooseStandardWarranty(item, line);
     Yamada     => server.chooseYamada(item);
@@ -1537,7 +1560,7 @@ func TestMatch(t *testing.T) {
 
 // アームの本体（docs/grammar.md「配線」の ArmBody = Call | Atom | Throw）と、修飾した分類の名前。
 func TestMatchArmBody(t *testing.T) {
-	o := firstDecl[*ast.OpDecl](t, `op a(user: User?): Session {
+	o := firstDecl[*ast.OpDecl](t, `fn a(user: User?): Session {
   return match (user by store.Registration) {
     Registered => issueSession(user, in.body.password);
     LoggedIn => session;
@@ -1583,7 +1606,7 @@ func TestMatchArmBody(t *testing.T) {
 		t.Errorf("Throw Span = %+v, Exception = %+v", th.Span, th.Exception.Span)
 	}
 	// 引数を持つ throw（docs/grammar.md「配線」の Throw）。引数は Atom で、Span は閉じ括弧まで。
-	tsrc := "op a() { match (x by K) { A => throw rate.LimitExceeded(wait, 5, { a: b }); else => throw X; }; }"
+	tsrc := "fn a() { match (x by K) { A => throw rate.LimitExceeded(wait, 5, { a: b }); else => throw X; }; }"
 	ta := firstDecl[*ast.OpDecl](t, tsrc).Body.Stmts[0].(*ast.MatchStmt).Match.Arms[0].Body.(*ast.Throw)
 	if ta.Exception.String() != "rate.LimitExceeded" || len(ta.Args) != 3 {
 		t.Fatalf("Throw = %+v", ta)
@@ -1595,7 +1618,7 @@ func TestMatchArmBody(t *testing.T) {
 		t.Errorf("Throw Span.End = %d", ta.Span.End)
 	}
 	// 値を対象にした標準の分類（対象は Atom のどれでも）。
-	o = firstDecl[*ast.OpDecl](t, "op b(in: In) { match (in.token by nullable) { Empty => f(); HasItems => g(in.token); }; }")
+	o = firstDecl[*ast.OpDecl](t, "fn b(in: In) { match (in.token by nullable) { Empty => f(); HasItems => g(in.token); }; }")
 	if mt := o.Body.Stmts[0].(*ast.MatchStmt).Match; mt.Subject.(*ast.NameAtom).Name.String() != "in.token" || !mt.Builtin {
 		t.Errorf("match = %+v", mt)
 	}
@@ -1603,7 +1626,7 @@ func TestMatchArmBody(t *testing.T) {
 
 // 状態での match（docs/grammar.md「配線」の表の二つ目と三つ目の形）。
 func TestMatchOnState(t *testing.T) {
-	o := firstDecl[*ast.OpDecl](t, `op a() {
+	o := firstDecl[*ast.OpDecl](t, `fn a() {
   match (carts by list) {
     Empty => showEmpty();
     HasItems => showCart();
@@ -1642,7 +1665,7 @@ func TestMatchOnState(t *testing.T) {
 		t.Errorf("Classifier Span = %+v", byList.Classifier.Span)
 	}
 	// 構文は対象の有無と by の後ろを別々に読む。組み合わせが合うかは検査 MATCH-7。
-	o = firstDecl[*ast.OpDecl](t, "op b() { match (by list) { Empty => f(); HasItems => g(); }; match (carts by Checkout) { A => f(); }; }")
+	o = firstDecl[*ast.OpDecl](t, "fn b() { match (by list) { Empty => f(); HasItems => g(); }; match (carts by Checkout) { A => f(); }; }")
 	if m := o.Body.Stmts[0].(*ast.MatchStmt).Match; m.Subject != nil || !m.Builtin {
 		t.Errorf("match by list = %+v", m)
 	}
@@ -1662,9 +1685,9 @@ func TestStateConstructSpans(t *testing.T) {
     Ordered;
   }
   classify LoggedIn of token { Yes; No; }
-  effect placeOrder() on Checkout: Shopping, Ordered -> any;
-  effect clearCart() on shop.carts: any -> Empty;
-  op view(): Order? {
+  effect fn placeOrder() on Checkout: Shopping, Ordered -> any;
+  effect fn clearCart() on shop.carts: any -> Empty;
+  fn view(): Order? {
     match (token by nullable) { Empty => f(); HasItems => none; };
     val placed = match (by Checkout) { Shopping => submit(); Ordered => none; };
     return match (carts by list) { Empty, HasItems => g(); };
@@ -1696,42 +1719,42 @@ func TestStateConstructSpans(t *testing.T) {
 
 func TestBlockReject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
-		{"nested call", "op a() { val x = f(g()); }", "呼び出しの引数に呼び出しは書けない"},
-		{"match without arms", "op a() { match (x by K) { }; }", "match にはアームが一つ以上要る"},
-		{"call without semicolon", "op a() { f() g(); }", "「;」が必要"},
-		{"arm body match", "op a() { match (x by K) { A => match (y by L) { B => none; }; }; }", "アームの本体に match は書けない"},
-		{"arm body missing", "op a() { match (x by K) { A => ; }; }", "アームの本体（呼び出しか値か throw）"},
-		{"arm throw without name", "op a() { match (x by K) { A => throw; }; }", "名前が必要"},
-		{"arm throw empty parens", "op a() { match (x by K) { A => throw f(); }; }", "引数のない例外は括弧を書かない（throw f と書く"},
-		{"arm throw call in args", "op a() { match (x by K) { A => throw f(g()); }; }", "呼び出しの引数に呼び出しは書けない"},
-		{"arm throw value", "op a() { match (x by K) { A => throw 5; }; }", "名前が必要"},
-		{"throw statement", "op a() { throw X; }", "throw は match のアームの本体にだけ書ける"},
-		{"return throw", "op a(): T { return throw X; }", "throw は match のアームの本体にだけ書ける"},
-		{"const throw", "op a() { val x = throw X; }", "throw は match のアームの本体にだけ書ける"},
-		{"arm without arrow", "op a() { match (x by K) { A f(); }; }", "「=>」が必要"},
-		{"if", "op a() { if (x) { } }", "「;」が必要だが「{」がある"},
-		{"literal statement", "op a() { 5; }", "文（val / 値を入れる / 集める / return / 呼び出し / match / disjoint / for）が必要"},
-		{"removed const", "op a() { const x = g(); }", "const は、なくした書き方。val と書く"},
-		{"removed match head", "op a(x: M) { match x by C { A => f(); }; }", "match の頭は、全体を、丸括弧で囲む"},
-		{"empty statement", "op a() { f();; }", "「何もしない文」は、ない"},
-		{"val with two values", "op a() { val x = f(), y = g(); }", "値と一緒に宣言する val は、一つの文に、一つ"},
-		{"disjoint with one arm", "op a() { disjoint { f(); } }", "disjoint には、アームが二つ以上要る"},
-		{"val as arm", "op a() { disjoint { val x = f(); g(); } }", "文の一つのアームに、val の宣言は書けない"},
-		{"return as arm", "op a() { disjoint { return f(); g(); } }", "disjoint のアームに、return は書けない"},
-		{"counting for", "op a() { for (x of xs) { f(); } }", "for の頭は (val 名前 of 並び) の形だけ"},
-		{"call in for head", "op a() { for (val x of g()) { f(); } }", "for の並びに、呼び出しは書けない"},
-		{"bare name statement", "op a() { x; }", "「(」が必要"},
-		{"record field value call", "op a() { f({ x: g() }); }", "「,」か「}」"},
-		{"record field qualified", "op a() { f({ a.b }); }", "修飾しない識別子"},
-		{"doc in block", "op a() { /** d */ return x; }", "付く先のない"},
-		{"return missing semicolon", "op a() { return x }", "「;」が必要だが「}」がある"},
-		{"match by single", "op a() { match (s by single) { A => f(); }; }", "single は標準の分類ではない"},
-		{"match by reserved segment", "op a() { match (x by a.op) { A => f(); }; }", "op は予約語で、名前には使えない"},
-		{"match by core type", "op a() { match (s by string) { A => f(); }; }", "string は予約語"},
-		{"match without by", "op a() { match (x) { A => f(); }; }", "「by」が必要"},
-		{"match two subjects", "op a() { match (x, y by K) { A => f(); }; }", "「by」が必要"},
-		{"match by nullable with type argument", "op a() { match (s by nullable<T>) { Empty => f(); }; }", "「)」が必要"},
-		{"match by without classifier", "op a() { match (by) { A => f(); }; }", "名前が必要"},
+		{"nested call", "fn a() { val x = f(g()); }", "呼び出しの引数に呼び出しは書けない"},
+		{"match without arms", "fn a() { match (x by K) { }; }", "match にはアームが一つ以上要る"},
+		{"call without semicolon", "fn a() { f() g(); }", "「;」が必要"},
+		{"arm body match", "fn a() { match (x by K) { A => match (y by L) { B => none; }; }; }", "アームの本体に match は書けない"},
+		{"arm body missing", "fn a() { match (x by K) { A => ; }; }", "アームの本体（呼び出しか値か throw）"},
+		{"arm throw without name", "fn a() { match (x by K) { A => throw; }; }", "名前が必要"},
+		{"arm throw empty parens", "fn a() { match (x by K) { A => throw f(); }; }", "引数のない例外は括弧を書かない（throw f と書く"},
+		{"arm throw call in args", "fn a() { match (x by K) { A => throw f(g()); }; }", "呼び出しの引数に呼び出しは書けない"},
+		{"arm throw value", "fn a() { match (x by K) { A => throw 5; }; }", "名前が必要"},
+		{"throw statement", "fn a() { throw X; }", "throw は match のアームの本体にだけ書ける"},
+		{"return throw", "fn a(): T { return throw X; }", "throw は match のアームの本体にだけ書ける"},
+		{"const throw", "fn a() { val x = throw X; }", "throw は match のアームの本体にだけ書ける"},
+		{"arm without arrow", "fn a() { match (x by K) { A f(); }; }", "「=>」が必要"},
+		{"if", "fn a() { if (x) { } }", "「;」が必要だが「{」がある"},
+		{"literal statement", "fn a() { 5; }", "文（val / 値を入れる / 集める / return / 呼び出し / match / disjoint / for）が必要"},
+		{"removed const", "fn a() { const x = g(); }", "const は、なくした書き方。val と書く"},
+		{"removed match head", "fn a(x: M) { match x by C { A => f(); }; }", "match の頭は、全体を、丸括弧で囲む"},
+		{"empty statement", "fn a() { f();; }", "「何もしない文」は、ない"},
+		{"val with two values", "fn a() { val x = f(), y = g(); }", "値と一緒に宣言する val は、一つの文に、一つ"},
+		{"disjoint with one arm", "fn a() { disjoint { f(); } }", "disjoint には、アームが二つ以上要る"},
+		{"val as arm", "fn a() { disjoint { val x = f(); g(); } }", "文の一つのアームに、val の宣言は書けない"},
+		{"return as arm", "fn a() { disjoint { return f(); g(); } }", "disjoint のアームに、return は書けない"},
+		{"counting for", "fn a() { for (x of xs) { f(); } }", "for の頭は (val 名前 of 並び) の形だけ"},
+		{"call in for head", "fn a() { for (val x of g()) { f(); } }", "for の並びに、呼び出しは書けない"},
+		{"bare name statement", "fn a() { x; }", "「(」が必要"},
+		{"record field value call", "fn a() { f({ x: g() }); }", "「,」か「}」"},
+		{"record field qualified", "fn a() { f({ a.b }); }", "修飾しない識別子"},
+		{"doc in block", "fn a() { /** d */ return x; }", "付く先のない"},
+		{"return missing semicolon", "fn a() { return x }", "「;」が必要だが「}」がある"},
+		{"match by single", "fn a() { match (s by single) { A => f(); }; }", "single は標準の分類ではない"},
+		{"match by reserved segment", "fn a() { match (x by a.op) { A => f(); }; }", "op は予約語で、名前には使えない"},
+		{"match by core type", "fn a() { match (s by string) { A => f(); }; }", "string は予約語"},
+		{"match without by", "fn a() { match (x) { A => f(); }; }", "「by」が必要"},
+		{"match two subjects", "fn a() { match (x, y by K) { A => f(); }; }", "「by」が必要"},
+		{"match by nullable with type argument", "fn a() { match (s by nullable<T>) { Empty => f(); }; }", "「)」が必要"},
+		{"match by without classifier", "fn a() { match (by) { A => f(); }; }", "名前が必要"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1780,7 +1803,7 @@ func TestLiteral(t *testing.T) {
 // --- 識別子 ---
 
 func TestIdentAndQualifiedName(t *testing.T) {
-	e := firstDecl[*ast.EffectDecl](t, "effect post() on a.b.put;")
+	e := firstDecl[*ast.EffectDecl](t, "effect fn post() on a.b.put;")
 	if e.Name.Name != "post" {
 		t.Errorf("文脈キーワードが識別子にならない: %+v", e.Name)
 	}
@@ -1788,7 +1811,7 @@ func TestIdentAndQualifiedName(t *testing.T) {
 	if len(segs) != 2 || segs[0].Name != "a" || segs[1].Name != "b" {
 		t.Fatalf("Segments = %+v", segs)
 	}
-	start := source.Offset(len("effect post() on "))
+	start := source.Offset(len("effect fn post() on "))
 	if segs[0].Span.Start != start || segs[0].Span.End != start+1 || segs[1].Span.Start != start+2 || segs[1].Span.End != start+3 {
 		t.Errorf("Segment Spans = %+v %+v", segs[0].Span, segs[1].Span)
 	}
@@ -1857,7 +1880,7 @@ func TestFieldName(t *testing.T) {
 	}
 
 	// レコードリテラルのキーと、値のパス（Path = Ident { "." FieldName }）。
-	o := firstDecl[*ast.OpDecl](t, `op f(res: Wrap): Wrap {
+	o := firstDecl[*ast.OpDecl](t, `fn f(res: Wrap): Wrap {
   val a = g({ op: res.op, state: res.state.model, match: "m", namespace: none, item });
   val b = match (res.match by Kind) { A => h(res.by); else => none; };
   return res.decorator;
@@ -1879,7 +1902,7 @@ func TestFieldName(t *testing.T) {
 		t.Fatalf("path = %+v", path)
 	}
 	// 各要素の Span は元の字句の中の位置。
-	src := "op f(res: Wrap): Wrap {\n  val a = g({ op: res.op, state: "
+	src := "fn f(res: Wrap): Wrap {\n  val a = g({ op: res.op, state: "
 	if s := path.Segments[1].Span; s.Start != source.Offset(len(src)+len("res.")) || s.End != source.Offset(len(src)+len("res.state")) {
 		t.Errorf("Segments[1].Span = %+v", s)
 	}
@@ -1898,7 +1921,7 @@ func TestFieldName(t *testing.T) {
 // is と omit は予約語ではなくなった（docs/grammar.md「予約語」）: 識別子として、どの位置にも書ける。
 func TestIsAndOmitAreIdents(t *testing.T) {
 	file := mustParse(t, `model is { omit: string; }
-op omit(is: is): is { val omit = f(is); return omit; }
+fn omit(is: is): is { val omit = f(is); return omit; }
 namespace is.omit { scalar Omit extends string; }`)
 	if got := strings.Join(declNames(file), ","); got != "model is,op omit,namespace is.omit" {
 		t.Errorf("decls = %s", got)
@@ -1910,35 +1933,35 @@ namespace is.omit { scalar Omit extends string; }`)
 func TestReservedWordReject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
 		{"declaration name", "model op {}", "op は予約語で、識別子には使えない"},
-		{"op name", "op state();", "state は予約語で、識別子には使えない"},
-		{"op parameter", "op f(op: string);", "op は予約語で、識別子には使えない"},
+		{"op name", "fn state();", "state は予約語で、識別子には使えない"},
+		{"op parameter", "fn f(op: string);", "op は予約語で、識別子には使えない"},
 		{"decorator parameter", "decorator d(to: string);", "to は予約語で、識別子には使えない"},
-		{"named argument", "@d(to: 1) op f();", "to は予約語で、識別子には使えない"},
-		{"const name", "op f() { val match = g(); }", "match は予約語で、識別子には使えない"},
+		{"named argument", "@d(to: 1) fn f();", "to は予約語で、識別子には使えない"},
+		{"const name", "fn f() { val match = g(); }", "match は予約語で、識別子には使えない"},
 		{"union arm", "union U { model: string; }", "ユニオンのメンバー"},
 		{"classify case", "classify C of T { state; }", "state は予約語で、識別子には使えない"},
-		{"match arm case", "op f() { match (x by C) { op => g(); }; }", "op は予約語で、識別子には使えない"},
+		{"match arm case", "fn f() { match (x by C) { op => g(); }; }", "op は予約語で、識別子には使えない"},
 		{"namespace segment", "namespace a.op {}", "op は予約語で、名前には使えない"},
 		{"namespace head", "namespace op {}", "op は予約語で、名前には使えない"},
 		{"type name", "model A { x: a.model; }", "model は予約語で、名前には使えない"},
 		{"decorator name, not the last segment", "@a.op.x model A {}", "op は予約語で、名前には使えない"},
-		{"callee", "op f() { res.op(); }", "op は予約語で、名前には使えない"},
-		{"callee in expr", "op f() { val x = res.match(1); }", "match は予約語で、名前には使えない"},
-		{"throws", "op f() throws a.none;", "none は予約語で、名前には使えない"},
-		{"effect state", "effect e() on s.default;", "default は予約語で、名前には使えない"},
+		{"callee", "fn f() { res.op(); }", "op は予約語で、名前には使えない"},
+		{"callee in expr", "fn f() { val x = res.match(1); }", "match は予約語で、名前には使えない"},
+		{"throws", "fn f() throws a.none;", "none は予約語で、名前には使えない"},
+		{"effect state", "effect fn e() on s.default;", "default は予約語で、名前には使えない"},
 		{"bind target", "bind s to a.model.*;", "model は予約語で、名前には使えない"},
-		{"decorator argument", "@d(a.op) op f();", "op は予約語で、名前には使えない"},
-		{"path head", "op f() { g(op.x); }", "値（名前・リテラル・none・レコード）が必要だが「op」がある"},
-		{"shorthand record key", "op f() { g({ op }); }", "op は予約語なので、値を省いた形（{ op }）では書けない"},
-		{"shorthand record key after field", "op f() { g({ a: 1, state, b }); }", "state は予約語なので、値を省いた形"},
-		{"qualified record key", "op f() { g({ a.op: 1 }); }", "修飾しない識別子"},
-		{"export as name", "op export();", "export は予約語で、識別子には使えない"},
-		{"reads as param", "op f(reads: string);", "reads は予約語で、識別子には使えない"},
-		{"as as const", "op f() { val as = g(); }", "as は予約語で、識別子には使えない"},
+		{"decorator argument", "@d(a.op) fn f();", "op は予約語で、名前には使えない"},
+		{"path head", "fn f() { g(op.x); }", "値（名前・リテラル・none・レコード）が必要だが「op」がある"},
+		{"shorthand record key", "fn f() { g({ op }); }", "op は予約語なので、値を省いた形（{ op }）では書けない"},
+		{"shorthand record key after field", "fn f() { g({ a: 1, state, b }); }", "state は予約語なので、値を省いた形"},
+		{"qualified record key", "fn f() { g({ a.op: 1 }); }", "修飾しない識別子"},
+		{"export as name", "fn export();", "export は予約語で、識別子には使えない"},
+		{"reads as param", "fn f(reads: string);", "reads は予約語で、識別子には使えない"},
+		{"as as const", "fn f() { val as = g(); }", "as は予約語で、識別子には使えない"},
 		{"never as type name", "model A { x: a.never; }", "never は予約語で、名前には使えない"},
-		{"throw as callee", "op f() { throw(); }", "throw は match のアームの本体にだけ書ける"},
+		{"throw as callee", "fn f() { throw(); }", "throw は match のアームの本体にだけ書ける"},
 		{"external on reserved field", "model A { @external decorator: string; }", "@external はデコレータの宣言の直前にだけ書ける"},
-		{"member not a field", "model A { op f(); }", "「:」が必要だが識別子 fがある"},
+		{"member not a field", "model A { fn f(); }", "「:」が必要だが識別子 fがある"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -1949,7 +1972,7 @@ func TestReservedWordReject(t *testing.T) {
 
 // TestDocTagShortName は、タグの語（@param）の中にも現れる短い名前（r、a、am）を、タグの語の後ろから探すこと。
 func TestDocTagShortName(t *testing.T) {
-	src := "/** @param r 触る行 */\nop f(r: T);"
+	src := "/** @param r 触る行 */\nfn f(r: T);"
 	o := firstDecl[*ast.OpDecl](t, src)
 	if len(o.Doc.Tags) != 1 {
 		t.Fatalf("Tags = %+v", o.Doc.Tags)
@@ -1973,7 +1996,7 @@ func TestDocComment(t *testing.T) {
  * @throws Other
  * @see login
  */
-op requestPasswordReset(email: Email);`
+fn requestPasswordReset(email: Email);`
 	o := firstDecl[*ast.OpDecl](t, src)
 	d := o.Doc
 	if d == nil {
@@ -2085,7 +2108,7 @@ func TestRecoverDecls(t *testing.T) {
 	src := `model A {}
 scalar B extends;
 model C {}
-op D(x int) { return x; }
+fn D(x int) { return x; }
 model E {}
 exception F
 model G {}
@@ -2156,7 +2179,7 @@ model N {}
 }
 
 func TestRecoverStmts(t *testing.T) {
-	src := `op a(x: X): Y {
+	src := `fn a(x: X): Y {
   val a = f();
   val = g();
   h(x;
@@ -2189,7 +2212,7 @@ model N {}
 // TestRecoverInsideRecord は、レコードリテラルの中の誤りからの回復: 読みかけのレコードリテラルを閉じてから
 // 次の ";" まで読み飛ばす。レコードの "}" をブロックの終わりと取り違えず、SYNTAX は一つで、後ろの文も宣言も残る。
 func TestRecoverInsideRecord(t *testing.T) {
-	src := `op a(x: X): Y {
+	src := `fn a(x: X): Y {
   val a = f({ op, state: x.state });
   val b = f({ in: { op: g() }, rest: x });
   val c = match (x by K) {
@@ -2285,7 +2308,7 @@ func TestDiagnosticSpan(t *testing.T) {
 // TestWiringBlocks は、配線の、R6 で足した文（docs/grammar.md「配線」）: 名前を並べた空の val、値を入れる文、集める文、
 // disjoint（ブロックのアームと、文の一つのアーム）、for、disjoint for。"}" で終わる文の ";" は、省ける。
 func TestWiringBlocks(t *testing.T) {
-	src := `op page(in: In): Page {
+	src := `fn page(in: In): Page {
   val session = authenticate(in.token);
   val user, latest: Order?, orders;
   disjoint {
@@ -2356,50 +2379,59 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 	if !c.Never || len(c.Of) != 0 || len(c.Cases) != 2 || len(c.Cases[0].Decorators) != 1 || c.Cases[0].Doc == nil || len(c.Cases[1].Decorators) != 0 {
 		t.Fatalf("classify = %+v", c)
 	}
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any case of never, other: any Actor case?, free: any case) for op | case | x.Actor case | case of never | field | field case;")
-	if len(d.Params) != 3 || len(d.For) != 6 {
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any case of never, other: any case of Actor, free: any case?, all: any case of any?, opt: any case of M?) for op | case | case of x.Actor | case of never | field | case of any | case of M[];")
+	if len(d.Params) != 5 || len(d.For) != 7 {
 		t.Fatalf("decorator = %+v", d)
 	}
+	named := func(k *ast.CaseKind) string {
+		if k == nil || k.Of == nil {
+			return ""
+		}
+		return typeString(k.Of)
+	}
 	p0 := d.Params[0].Type.Any
-	if p0 == nil || p0.Kind != ast.AnyCase || p0.Case == nil || !p0.Case.Never || p0.Case.Classify != nil {
+	if p0 == nil || p0.Kind != ast.AnyCase || p0.Case == nil || !p0.Case.Never || p0.Case.Of != nil {
 		t.Errorf("Param 0 = %+v", d.Params[0].Type)
 	}
 	p1 := d.Params[1].Type.Any
-	if p1 == nil || p1.Kind != ast.AnyCase || p1.Case == nil || p1.Case.Never || p1.Case.Classify == nil || p1.Case.Classify.String() != "Actor" || !d.Params[1].Type.Optional {
+	if p1 == nil || p1.Kind != ast.AnyCase || p1.Case == nil || p1.Case.Never || named(p1.Case) != "Actor" || d.Params[1].Type.Optional {
 		t.Errorf("Param 1 = %+v", d.Params[1].Type)
 	}
-	p2 := d.Params[2].Type.Any
-	if p2 == nil || p2.Kind != ast.AnyCase || p2.Case == nil || p2.Case.Never || p2.Case.Classify != nil {
-		t.Errorf("Param 2 = %+v", d.Params[2].Type)
+	// case は case of any の省略: どちらも、絞りを持たない。後ろの ? は、引数を省ける印
+	for _, i := range []int{2, 3} {
+		p := d.Params[i].Type.Any
+		if p == nil || p.Kind != ast.AnyCase || p.Case == nil || p.Case.Never || p.Case.Of != nil || !d.Params[i].Type.Optional {
+			t.Errorf("Param %d = %+v", i, d.Params[i].Type)
+		}
 	}
-	if k := d.For[1]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || k.Case.Classify != nil {
+	// of の後ろの型は、? を含めて読む: M? が対象の型で、引数は省けない
+	p4 := d.Params[4].Type.Any
+	if p4 == nil || p4.Kind != ast.AnyCase || named(p4.Case) != "M?" || d.Params[4].Type.Optional {
+		t.Errorf("Param 4 = %+v", d.Params[4].Type)
+	}
+	if k := d.For[1]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || k.Case.Of != nil {
 		t.Errorf("Target 1 = %+v", k)
 	}
-	if k := d.For[2]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || k.Case.Classify == nil || k.Case.Classify.String() != "x.Actor" {
+	if k := d.For[2]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || named(k.Case) != "x.Actor" {
 		t.Errorf("Target 2 = %+v", k)
 	}
-	if k := d.For[3]; k.Kind != ast.TargetCase || k.Case == nil || !k.Case.Never || k.Case.Classify != nil {
+	if k := d.For[3]; k.Kind != ast.TargetCase || k.Case == nil || !k.Case.Never || k.Case.Of != nil {
 		t.Errorf("Target 3 = %+v", k)
 	}
-	// 文脈キーワードと同じ名前の分類: すぐ後ろに case が続けば、名前で絞る形
 	if k := d.For[4]; k.Kind != ast.TargetField || k.Case != nil {
 		t.Errorf("Target 4 = %+v", k)
 	}
-	if k := d.For[5]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Classify == nil || k.Case.Classify.String() != "field" {
+	if k := d.For[5]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || k.Case.Of != nil {
 		t.Errorf("Target 5 = %+v", k)
 	}
-	v := firstDecl[*ast.DecoratorDecl](t, "decorator v(a: any variant, b: any variant case);")
-	if a := v.Params[0].Type.Any; a == nil || a.Kind != ast.AnyVariant {
-		t.Errorf("any variant = %+v", v.Params[0].Type)
-	}
-	if b := v.Params[1].Type.Any; b == nil || b.Kind != ast.AnyCase || b.Case.Classify == nil || b.Case.Classify.String() != "variant" {
-		t.Errorf("any variant case = %+v", v.Params[1].Type)
+	if k := d.For[6]; k.Kind != ast.TargetCase || named(k.Case) != "M[]" {
+		t.Errorf("Target 6 = %+v", k)
 	}
 
-	const removed = "分類のケースは、case、case of never、名前 case と書く"
+	const removed = "分類のケースは、case of any（省略して case）、case of never、case of 分類の名前 と書く"
 	tests := []struct{ name, src, want string }{
-		{"of something else", "decorator d for case of M;", "of の後ろに書けるのは never だけ"},
-		{"name and subject", "decorator d for Actor case of never;", "名前と of never の両方は、書けない"},
+		{"of without a type", "decorator d for case of;", "型"},
+		{"name before case", "decorator d for Actor case;", "for の対象"},
 		{"removed: classify case", "decorator d for classify case;", removed},
 		{"removed: classify of never case", "decorator d for classify of never case;", removed},
 		{"removed: any classify Actor case", "decorator d(x: any classify Actor case);", removed},

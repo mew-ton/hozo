@@ -1,18 +1,18 @@
 // WIRE-4: 束縛は一度だけ、引数と同じ名前は束縛できない（docs/check.md「配線」）
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op use(m: M): void;
-  op twice(): void {
+  fn value(): M;
+  fn use(m: M): void;
+  fn twice(): void {
     val x = value();
     val x = value();                 // ERROR: WIRE-4
     use(x);
   }
-  op param(m: M): void {
+  fn param(m: M): void {
     val m = value();                 // ERROR: WIRE-4
     use(m);
   }
-  op before(): void {
+  fn before(): void {
     use(y);                            // ERROR: RES-1
     val y = value();                 // WARN: WIRE-8
   }

@@ -4,13 +4,13 @@
 namespace a {
   model Wrap { op: string; state: string; }
   model match { id: string; }                          // ERROR: SYNTAX
-  op state(): Wrap;                                    // ERROR: SYNTAX
-  op byParam(op: string): Wrap;                        // ERROR: SYNTAX
-  op byType(w: a.model): Wrap;                         // ERROR: SYNTAX
+  fn state(): Wrap;                                    // ERROR: SYNTAX
+  fn byParam(op: string): Wrap;                        // ERROR: SYNTAX
+  fn byType(w: a.model): Wrap;                         // ERROR: SYNTAX
   decorator mark(to: string);                          // ERROR: SYNTAX
-  op fetch(): Wrap;
-  op store(w: Wrap): Wrap;
-  op run(): Wrap {
+  fn fetch(): Wrap;
+  fn store(w: Wrap): Wrap;
+  fn run(): Wrap {
     val res = fetch();
     val model = fetch();                             // ERROR: SYNTAX
     val called = res.op();                           // ERROR: SYNTAX
@@ -19,5 +19,5 @@ namespace a {
   }
 }
 namespace a.namespace {                                // ERROR: SYNTAX
-  op f();
+  fn f();
 }

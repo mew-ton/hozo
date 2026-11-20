@@ -404,7 +404,7 @@ func TestCfg6(t *testing.T) {
 // TestFileSetLocator は IR の Span（行・列はコードポイント）を FileSet のバイトのオフセットに戻すこと。
 func TestFileSetLocator(t *testing.T) {
 	fs := source.NewFileSet()
-	id := fs.Add("a.hozo", []byte("namespace a {\n  op 日本語(x: string);\n}\n"))
+	id := fs.Add("a.hozo", []byte("namespace a {\n  fn 日本語(x: string);\n}\n"))
 	loc := FileSetLocator(fs)
 	got, ok := loc(ir.Span{File: "a.hozo", Start: ir.Pos{Line: 2, Col: 6}, End: ir.Pos{Line: 2, Col: 9}})
 	if !ok {

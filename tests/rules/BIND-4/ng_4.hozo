@@ -7,11 +7,11 @@ namespace a {
   state token: single<Token>;
   state rows: list<M>;
   bind token to a.*;
-  read byToken(t: Token, id: string?): M? on rows;
-  effect add(m: M) on rows.post;
+  read fn byToken(t: Token, id: string?): M? on rows;
+  effect fn add(m: M) on rows.post;
   classify K of M { A; B; }
-  op viaOp(t: Token): M?;
-  op f(m: M): M? throws Busy {
+  fn viaOp(t: Token): M?;
+  fn f(m: M): M? throws Busy {
     add();                               // ERROR: BIND-4
     add({ id: "x" });                    // ERROR: BIND-4
     rows.post();                         // ERROR: BIND-4
@@ -23,8 +23,8 @@ namespace a {
       B => byToken(token, m.id);
     };
   }
-  op use(m: M?, n: M?);
+  fn use(m: M?, n: M?);
 }
 namespace b {
-  op noop();
+  fn noop();
 }

@@ -3,5 +3,5 @@ namespace a {
   exception E;
   exception F;
   decorator d catches E recovers throws F;
-  op f();
+  fn f();
 }

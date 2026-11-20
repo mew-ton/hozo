@@ -12,5 +12,5 @@ namespace a {
     extra: string;
     override extra: never;                               // ERROR: TYPE-10
   }
-  op f(): User;
+  fn f(): User;
 }

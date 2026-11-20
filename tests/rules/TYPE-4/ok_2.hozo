@@ -6,12 +6,12 @@ namespace a {
   exception NotFound(id: string);
   state rows: list<M>;
   state cur: nullable<M>;
-  read byId(id: string): M? on rows;
-  read all(): M[] on rows;
-  effect add(m: M) on rows.post;
-  effect touch(m: M, at: Time?) on rows.put;
+  read fn byId(id: string): M? on rows;
+  read fn all(): M[] on rows;
+  effect fn add(m: M) on rows.post;
+  effect fn touch(m: M, at: Time?) on rows.put;
   classify K of M { A; B; }
-  op f(m: M, id: string): M[] throws Busy, NotFound {
+  fn f(m: M, id: string): M[] throws Busy, NotFound {
     add(m);
     add({ id: "x" });
     touch(m);

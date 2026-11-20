@@ -31,40 +31,40 @@ namespace lib {
   // ---- books: デコレータを付けた read と効果と、付けていない read と効果 ----
 
   @db.find
-  read bookById(id: BookId): Book? on books;
+  read fn bookById(id: BookId): Book? on books;
 
   /** 付けていない: 件数と位置は、この語彙で言えない */
-  read newestBooks(limit: int): Book[] on books;
+  read fn newestBooks(limit: int): Book[] on books;
 
   /** 付けていない: 行でないものを引く */
-  read countBooks(): int on books;
+  read fn countBooks(): int on books;
 
   @db.insert
-  effect createBook(book: Book) on books.post;
+  effect fn createBook(book: Book) on books.post;
 
   /** 付けていない: 条件に合う行の、一つの列だけの書き換え */
-  effect retitle(id: BookId, title: string) on books.put;
+  effect fn retitle(id: BookId, title: string) on books.put;
 
   /** 付けていない: すべての行を消す */
-  effect clearBooks() on books.delete;
+  effect fn clearBooks() on books.delete;
 
   // ---- notes: read は付け、効果は付けていない ----
 
   @db.list
-  read notesWith(stars: int): Note[] on notes;
+  read fn notesWith(stars: int): Note[] on notes;
 
   /** 基底の状態の遷移を宛先にする効果には、db のデコレータを付けられない（付ければ GOSQL-11）。人が書く */
-  effect firstNote(note: Note) on notes: Empty -> HasItems;
+  effect fn firstNote(note: Note) on notes: Empty -> HasItems;
 
   // ---- stamps: すべてに付けた（消すだけ） ----
 
   @db.delete
-  effect dropStamp(at: Time) on stamps.delete;
+  effect fn dropStamp(at: Time) on stamps.delete;
 
   // ---- drafts: 表でない状態の read と効果は、どの型にも出ない ----
 
-  read draftsWith(stars: int): Note[] on drafts;
-  effect createDraft(note: Note) on drafts.post;
+  read fn draftsWith(stars: int): Note[] on drafts;
+  effect fn createDraft(note: Note) on drafts.post;
 
   // ---- 述語で決まる状態の分類の単位（LendingState）: 型は出さない ----
 
@@ -77,51 +77,51 @@ namespace lib {
   }
 
   /** 状態の分類の遷移を宛先にする効果。人が書く */
-  effect lend(book: Book) on Lending: Free -> Lent;
+  effect fn lend(book: Book) on Lending: Free -> Lent;
 
   // ---- op: read と効果を呼ぶ配線 ----
 
   /** 本を引く */
-  export op findBook(id: BookId): Book? {
+  export fn findBook(id: BookId): Book? {
     return bookById(id);
   }
 
   /** 新しい本 */
-  export op newest(limit: int): Book[] {
+  export fn newest(limit: int): Book[] {
     return newestBooks(limit);
   }
 
   /** 本を足す */
-  export op addBook(book: Book) {
+  export fn addBook(book: Book) {
     createBook(book);
   }
 
   /** 本の題を変える */
-  export op rename(id: BookId, title: string) {
+  export fn rename(id: BookId, title: string) {
     retitle(id, title);
   }
 
   /** 本を足して、題を変える。人が書いた効果（retitle）も、Conn を通せば、同じトランザクションに入る */
   @db.transaction
-  export op addRenamed(book: Book, title: string) {
+  export fn addRenamed(book: Book, title: string) {
     createBook(book);
     retitle(book.id, title);
   }
 
   /** 題を変えてから、本を足す。後の効果が失敗すれば、人が書いた効果のしたことも残らない */
   @db.transaction
-  export op renameThenAdd(id: BookId, title: string, book: Book) {
+  export fn renameThenAdd(id: BookId, title: string, book: Book) {
     retitle(id, title);
     createBook(book);
   }
 
   /** 下書きを足す */
-  export op draft(note: Note) {
+  export fn draft(note: Note) {
     createDraft(note);
   }
 
   /** 本を貸す */
-  export op lendBook(book: Book) {
+  export fn lendBook(book: Book) {
     lend(book);
   }
 }

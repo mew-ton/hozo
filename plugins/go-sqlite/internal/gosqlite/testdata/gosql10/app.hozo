@@ -10,34 +10,34 @@ namespace app {
   // ---- @db.find は M? ----
 
   @db.find
-  read sureRow(id: string): Row on rows;
+  read fn sureRow(id: string): Row on rows;
   @db.find
-  read manyRows(id: string): Row[] on rows;
+  read fn manyRows(id: string): Row[] on rows;
   @db.find
-  read otherRow(id: string): Other? on rows;
+  read fn otherRow(id: string): Other? on rows;
   @db.find
-  read noteOf(id: string): string? on rows;
+  read fn noteOf(id: string): string? on rows;
   @db.find
   @db.latest("at")
-  read lastNote(): string on rows;
+  read fn lastNote(): string on rows;
 
   // ---- @db.list は M[] ----
 
   @db.list
-  read oneRow(): Row? on rows;
+  read fn oneRow(): Row? on rows;
   @db.list
-  read maybeRows(note: string): Row[]? on rows;
+  read fn maybeRows(note: string): Row[]? on rows;
   @db.list
-  read otherRows(): Other[] on rows;
+  read fn otherRows(): Other[] on rows;
   @db.list
-  read rowCount(): int on rows;
+  read fn rowCount(): int on rows;
   @db.list
-  read rowsByNote(): Record<string, Row> on rows;
+  read fn rowsByNote(): Record<string, Row> on rows;
 
   // ---- 通るもの ----
 
   @db.find
-  read rowById(id: string): Row? on rows;
+  read fn rowById(id: string): Row? on rows;
   @db.list
-  read allRows(): Row[] on rows;
+  read fn allRows(): Row[] on rows;
 }

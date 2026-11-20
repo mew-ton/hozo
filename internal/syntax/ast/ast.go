@@ -407,6 +407,8 @@ type EffectDecl struct {
 	Name       Ident
 	// Params は効果が受け取る値。括弧は必ず書く（引数がなければ空）。
 	Params []*OpParam
+	// Return は書いた戻り値（docs/grammar.md「関数の宣言」）。省いていれば nil。効果が返せるのは void だけ（TYPE-18）。
+	Return *ReturnType
 	// On は基底の状態の組み込みの効果（"状態.操作"）。遷移なら nil。
 	On *StateOpRef
 	// Transition は分類の遷移（"X: A -> B"）。組み込みの効果なら nil。
@@ -428,7 +430,9 @@ type ReadDecl struct {
 	Name       Ident
 	// Params は読むときに受け取る値。括弧は必ず書く（引数がなければ空）。
 	Params []*OpParam
-	// Result は結果の型。省略できない（解析できなかったときだけ nil）。
+	// Return は書いた戻り値（docs/grammar.md「関数の宣言」）。省いていれば nil。read は値を返す（省いた形、void、never は TYPE-18）。
+	Return *ReturnType
+	// Result は結果の型（Return.Type）。省いた形、void、never なら nil。
 	Result Type
 	// On は読む基底の状態の名前。
 	On QualifiedName
@@ -631,7 +635,7 @@ const (
 	AnyModel
 	// AnyVariant は any variant。
 	AnyVariant
-	// AnyCase は、any の後ろの、分類のケース（any case、any case of never、any Actor case）。
+	// AnyCase は、any の後ろの、分類のケース（any case、any case of never、any case of Actor）。
 	AnyCase
 )
 
@@ -667,13 +671,13 @@ type AnyType struct {
 }
 
 // CaseKind は、デコレータの宣言で、分類のケースを言う書き方（docs/grammar.md「decorator の宣言」）:
-// "case"、"case of never"、"名前 case"。
+// "case" [ "of" ( "any" | "never" | Type ) ]。"case" は "case of any" の省略。
 type CaseKind struct {
 	Span source.Span
-	// Classify は、名前で絞ったとき（"Actor case"）の、分類の名前。書いていなければ nil。
-	Classify *QualifiedName
-	// Never は、対象で絞ったか（"case of never"）。Classify と、同時には、立たない。
+	// Never は、"case of never"（対象のない分類のケース）。Of と、同時には、立たない。
 	Never bool
+	// Of は、"case of <型か、分類の名前>" の、of の後ろ。"case"、"case of any"、"case of never" なら nil。
+	Of Type
 }
 
 // NodeSpan は Node の実装。
@@ -702,7 +706,7 @@ const (
 	TargetEffect
 	// TargetRead は read。
 	TargetRead
-	// TargetCase は、分類のケース（case、case of never、Actor case）。
+	// TargetCase は、分類のケース（case、case of never、case of Actor）。
 	TargetCase
 )
 

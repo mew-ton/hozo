@@ -2,52 +2,52 @@
 namespace a {
   decorator d(code: int, name: string?);
   @d                                   // ERROR: DEC-11
-  op missing(): void;
+  fn missing(): void;
   @d(1, "x", true)                     // ERROR: DEC-11
-  op tooMany(): void;
+  fn tooMany(): void;
   @d(code: 1, nope: "x")               // ERROR: DEC-11
-  op unknown(): void;
+  fn unknown(): void;
   @d(1, code: 2)                       // ERROR: DEC-11
-  op twice(): void;
+  fn twice(): void;
   @d(1)
-  op ok1(): void;
+  fn ok1(): void;
   @d(name: "x", code: 1)
-  op ok2(): void;
+  fn ok2(): void;
   decorator alias = d(1);
   @alias(2)                            // ERROR: DEC-11
-  op aliasArgs(): void;
+  fn aliasArgs(): void;
   @alias
-  op ok3(): void;
+  fn ok3(): void;
   // 残りの引数（docs/types.md「デコレータの引数」）: ほかの Param の数を超えて位置で渡した値は、書いた順に残りの引数に入る。
   // 0 個でもよい。名前では渡せない
   state s: list<string>;
-  effect e1() on s.post;
-  effect e2() on s.put;
+  effect fn e1() on s.post;
+  effect fn e2() on s.put;
   decorator all(...targets: any effect) for op effects targets;
   decorator some(first: int, second: string?, ...more: string);
   @all
-  op rest0(): void;
+  fn rest0(): void;
   @all()
-  op rest0b(): void;
+  fn rest0b(): void;
   @all(e1)
-  op rest1(): void;
+  fn rest1(): void;
   @all(e1, e2)
-  op rest2(): void;
+  fn rest2(): void;
   @all(targets: e1)                    // ERROR: DEC-11
-  op restNamed(): void;
+  fn restNamed(): void;
   @some(1, "s", "a", "b", "c")
-  op restAfterFixed(): void;
+  fn restAfterFixed(): void;
   @some(1)
-  op restAfterFixed0(): void;
+  fn restAfterFixed0(): void;
   @some                                // ERROR: DEC-11
-  op restMissingFixed(): void;
+  fn restMissingFixed(): void;
   @some(1, "s", more: "a")             // ERROR: DEC-11
-  op restNamed2(): void;
+  fn restNamed2(): void;
   @some(1, "s", "a", second: "t")      // ERROR: DEC-11
-  op restTwice(): void;
+  fn restTwice(): void;
   @some(second: "t", first: 1)
-  op restNone(): void;
+  fn restNone(): void;
   decorator fixed = some(1, "s", "a", "b");
   @fixed
-  op restAlias(): void;
+  fn restAlias(): void;
 }

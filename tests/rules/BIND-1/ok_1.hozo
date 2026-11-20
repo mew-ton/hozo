@@ -5,6 +5,6 @@ namespace a {
   state token: single<Token>;
   bind token to a.*;
   model In { token: Token; id: UserId; }
-  op g(in: In);
-  op h(id: UserId);
+  fn g(in: In);
+  fn h(id: UserId);
 }

@@ -3,18 +3,18 @@ namespace a {
   model M { id: string; }
   model N { name: string; }
   classify C of M { A; B; }
-  op m(x: M): M;
-  op n(x: M): N;
-  op v(x: M): void;
-  op use(x: M?): void;
-  op differ(x: M): void {
+  fn m(x: M): M;
+  fn n(x: M): N;
+  fn v(x: M): void;
+  fn use(x: M?): void;
+  fn differ(x: M): void {
     val r = match (x by C) {           // ERROR: TYPE-8
       A => m(x);
       B => n(x);
     };
     use(r);
   }
-  op mixed(x: M): void {
+  fn mixed(x: M): void {
     val r = match (x by C) {           // ERROR: TYPE-8
       A => m(x);
       B => v(x);

@@ -1,8 +1,8 @@
 // TYPE-7: レコードリテラルの当てはめる先が決まらない（docs/types.md「診断」）
 namespace a {
   model In { id: string; }
-  op take(in: In): void;
-  op f(): void {
+  fn take(in: In): void;
+  fn f(): void {
     val x = { id: "x" };             // ERROR: TYPE-7
     take(x);
   }

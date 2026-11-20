@@ -140,7 +140,7 @@ tests/samples/<名前>/
 
 **行の遷移（同 163〜173）は、文書と、仕様だけのサンプル `order-app` を先に直し、実装を後に入れた。** 版は 0.9 になり（`Effect.row`、`Classify.absent`、`CaseTyping.by` の `none`）、hozoc と、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）を、一緒に上げた。サンプル `order-app` は、実装が入るまでの間、`check` が落ちた（行の遷移の `as` と、ケースの `as none` が SYNTAX。そこから、効果が見つからない RES-1 と、ケースが合わない MATCH-2 が続いて、60 の error）。実装が入った後は、`0 errors, 0 warnings`。サンプル `shop-server` は、仕様も、期待する出力も、変わらない（`shop-server/README.md`「行の遷移で変えたこと」）。
 
-**R6 の、言語の部分（同 294〜344。`docs/requirements.md`「R6 の、言語の部分」）も、文書とサンプルを、実装より先に書いた。** 文書の版は 0.10（配線の `val`、`=`、`collect`、`disjoint`、`for`。対象のない分類。分類のケースのデコレータ）。サンプル `shop-server` は、仕様を新しい書き方にし、新しい文を使う op を二つ足して、期待する出力を、手で書いた（`shop-server/README.md`「R6 で変えたこと」）。仕様だけのサンプル `order-app` も、新しい書き方にした（`order-app/README.md`）。実装は、その後に入った: hozoc の版も 0.10 で、飛ぶサブテストは、ない。
+**R6 の、言語の部分（同 294〜344。`docs/requirements.md`「R6 の、言語の部分」）も、文書とサンプルを、実装より先に書いた。** 文書の版は 0.10（配線の `val`、`=`、`collect`、`disjoint`、`for`。対象のない分類。分類のケースのデコレータ）。サンプル `shop-server` は、仕様を新しい書き方にし、新しい文を使う op を二つ足して、期待する出力を、手で書いた（`shop-server/README.md`「R6 で変えたこと」）。仕様だけのサンプル `order-app` も、新しい書き方にした（`order-app/README.md`）。実装は、その後に入った: hozoc の版は、文書の版（`docs/ir.md`「版」の「今の版」）と同じで、飛ぶサブテストは、ない。
 
 ## サンプルの一覧
 

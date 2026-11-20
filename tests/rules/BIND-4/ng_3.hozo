@@ -4,11 +4,11 @@ namespace a {
   state token: single<Token>;
   bind token to b.*;
   model In { id: string; token: Token; }
-  op take(in: In);
-  op f() {
+  fn take(in: In);
+  fn f() {
     take({ id: "x" });                 // ERROR: BIND-4
   }
 }
 namespace b {
-  op h();
+  fn h();
 }

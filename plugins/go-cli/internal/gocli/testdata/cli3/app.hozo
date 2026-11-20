@@ -21,7 +21,7 @@ namespace app {
     @cli.arg(6) rest: string[]?;
   }
   @cli.command("run")
-  export op run(in: In);
+  export fn run(in: In);
 
   // 受け付ける型: string / boolean / int / float、その scalar、その省略可能、@cli.arg(7) の string（と string の scalar）の array
   model Fine {
@@ -39,5 +39,5 @@ namespace app {
     @cli.arg(2) rest: Path[];
   }
   @cli.command("fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

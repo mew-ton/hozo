@@ -16,15 +16,15 @@ namespace app {
   }
 
   @http.post("/in")
-  export op take(in: In);
+  export fn take(in: In);
 
   // 同じ model を二つの経路が使っても、診断は一度
   @http.post("/again")
-  export op again(in: In);
+  export fn again(in: In);
 
   // 経路の op の入力でない model は、見ない。全体の形で受け取る model のフィールドも、場所のデコレータは要らない（Paging）
   model Other { free: string; }
   model Fine { @http.queryObj paging: Paging; }
   @http.get("/fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

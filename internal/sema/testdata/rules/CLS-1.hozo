@@ -12,7 +12,7 @@ namespace a {
     A;                                 // ERROR: CLS-1
   }
   classify Ok of M { A; B; C; }
-  op find(): M?;
+  fn find(): M?;
   classify TwoElse of find {
     Found: find as M;
     Missing: find as else;

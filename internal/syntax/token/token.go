@@ -34,6 +34,7 @@ const (
 	Scalar
 	Union
 	State
+	Fn
 	Op
 	Exception
 	Effect
@@ -127,6 +128,7 @@ var Keywords = map[string]Kind{
 	"scalar":    Scalar,
 	"union":     Union,
 	"state":     State,
+	"fn":        Fn,
 	"op":        Op,
 	"exception": Exception,
 	"effect":    Effect,

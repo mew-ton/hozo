@@ -1,5 +1,5 @@
 // GOHTTP-9: 位置なし。
 namespace app {
   @http.get("/items")
-  export op all(): string;
+  export fn all(): string;
 }

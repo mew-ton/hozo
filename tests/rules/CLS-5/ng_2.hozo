@@ -1,8 +1,8 @@
 // CLS-5（docs/check.md「残りのケース」）: 残りのケース（as else）の as の前も、その分類の対象
 namespace a {
   model M { id: string; }
-  op find(): M?;
-  op other(): M?;
+  fn find(): M?;
+  fn other(): M?;
   classify Hit of find {
     Found: find as M;
     Missing: other as else;            // ERROR: CLS-5

@@ -2,8 +2,8 @@
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
-  op use(m: M);
-  op f(m: M) {
+  fn use(m: M);
+  fn f(m: M) {
     match (m by C) {
       A => use(m);
       B => none;

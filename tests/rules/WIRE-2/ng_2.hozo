@@ -1,7 +1,7 @@
 // WIRE-2（docs/check.md「配線」）: val x = 式 で式が「値がない」（束縛した x は使われないので WIRE-8 も）
 namespace a {
-  op noValue(): void;
-  op g(): void {
+  fn noValue(): void;
+  fn g(): void {
     val x = noValue();               // ERROR: WIRE-2 // WARN: WIRE-8
   }
 }

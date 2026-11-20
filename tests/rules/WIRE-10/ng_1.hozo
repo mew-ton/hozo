@@ -1,10 +1,10 @@
 // WIRE-10: 代入の済んでいない val を、読んでいる。別のアームが入れる val も、集めている途中の val も、読めない
 namespace a {
   model M { id: string; }
-  op one(m: M): M;
-  op use(m: M);
-  op many(ms: M[]);
-  op f(m: M, ms: M[]) {
+  fn one(m: M): M;
+  fn use(m: M);
+  fn many(ms: M[]);
+  fn f(m: M, ms: M[]) {
     val x;
     use(x);                            // ERROR: WIRE-10
     x = one(m);

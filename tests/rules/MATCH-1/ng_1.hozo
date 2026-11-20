@@ -2,8 +2,8 @@
 namespace a {
   model M { id: string; }
   classify C of M { A; }
-  op use(m: M);
-  op f(m: M, n: M) {
+  fn use(m: M);
+  fn f(m: M, n: M) {
     match m, n by C { A => use(m); };  // ERROR: SYNTAX
   }
 }

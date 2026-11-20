@@ -7,22 +7,22 @@ namespace app {
 
   // 引数が二つ
   @http.get("/two")
-  export op two(a: A, b: B): string;
+  export fn two(a: A, b: B): string;
   // 引数が model でない: 核の型、scalar、省略可能な model、model の配列、union
   @http.get("/core")
-  export op core(id: string): string;
+  export fn core(id: string): string;
   @http.get("/scalar")
-  export op byId(id: Id): string;
+  export fn byId(id: Id): string;
   @http.get("/optional")
-  export op optional(in: A?): string;
+  export fn optional(in: A?): string;
   @http.get("/list")
-  export op many(in: A[]): string;
+  export fn many(in: A[]): string;
   @http.get("/either")
-  export op either(in: Either): string;
+  export fn either(in: Either): string;
 
   // 0 個か、model 一つなら、当たらない
   @http.get("/none")
-  export op nothing(): string;
+  export fn nothing(): string;
   @http.get("/one")
-  export op one(in: A): string;
+  export fn one(in: A): string;
 }

@@ -4,8 +4,8 @@ namespace a {
   state items: list<M>;
   state token: nullable<string>;
   classify Stock of items { None; Some; }
-  op f(): void;
-  op ok(): void {
+  fn f(): void;
+  fn ok(): void {
     match (items by list) { Empty => f(); HasItems => none; };
     match (token by nullable) { Empty => f(); HasItems => none; };
     match (by Stock) { None => f(); Some => none; };

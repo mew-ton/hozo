@@ -5,35 +5,35 @@ namespace a {
   model M { id: string; }
   model N { name: string; }
   classify C of M { A; B; }
-  op m(x: M): M;
-  op v(x: M): void;
-  op use(x: M?): void;
-  op useInt(n: int): void;
-  op useFloat(n: float): void;
-  op useString(s: string): void;
-  op email(): Email;
-  op valueAndNoValue(x: M): void {
+  fn m(x: M): M;
+  fn v(x: M): void;
+  fn use(x: M?): void;
+  fn useInt(n: int): void;
+  fn useFloat(n: float): void;
+  fn useString(s: string): void;
+  fn email(): Email;
+  fn valueAndNoValue(x: M): void {
     val r = match (x by C) {           // ERROR: TYPE-8
       A => x;
       B => v(x);
     };
     use(r);
   }
-  op literalKinds(x: M): void {
+  fn literalKinds(x: M): void {
     val r = match (x by C) {           // ERROR: TYPE-8
       A => 1;
       B => "one";
     };
     useInt(r);
   }
-  op intAndFloat(x: M): void {
+  fn intAndFloat(x: M): void {
     val r = match (x by C) {           // ERROR: TYPE-8
       A => 1;
       B => 1.5;
     };
     useFloat(r);
   }
-  op literalToModel(x: M): void {
+  fn literalToModel(x: M): void {
     val r = match (x by C) {
       A => m(x);
       B => 1;                          // ERROR: TYPE-8
@@ -41,14 +41,14 @@ namespace a {
     use(r);
   }
   // scalar にそろえた match に、リテラルは渡せない（TYPE-1）
-  op literalToScalar(x: M): void {
+  fn literalToScalar(x: M): void {
     val r = match (x by C) {
       A => email();
       B => "none";                     // ERROR: TYPE-1
     };
     useString(r);
   }
-  op recordToOther(x: M, n: N): void {
+  fn recordToOther(x: M, n: N): void {
     val r = match (x by C) {
       A => m(x);
       B => { name: n.name };           // ERROR: TYPE-5

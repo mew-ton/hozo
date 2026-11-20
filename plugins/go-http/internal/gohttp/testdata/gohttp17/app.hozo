@@ -8,5 +8,5 @@ namespace app {
     @http.query @http.default(10) size: int;
   }
   @http.get("/in")
-  export op take(in: In);
+  export fn take(in: In);
 }

@@ -2,13 +2,13 @@
 namespace a {
   model M { id: string; }
   model N { n: int; }
-  op one(m: M): M;
-  op other(m: M): N;
-  op maybe(m: M): M?;
-  op use(m: M);
-  op useN(n: N);
-  op useNs(ns: N[]);
-  op f(m: M, ms: M[], opt: M[]?) {
+  fn one(m: M): M;
+  fn other(m: M): N;
+  fn maybe(m: M): M?;
+  fn use(m: M);
+  fn useN(n: N);
+  fn useNs(ns: N[]);
+  fn f(m: M, ms: M[], opt: M[]?) {
     val x: M = maybe(m);               // ERROR: TYPE-17
     val y: N;
     y = one(m);                        // ERROR: TYPE-17

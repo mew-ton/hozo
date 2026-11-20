@@ -6,7 +6,7 @@ namespace ops {
   model Job { id: int; }
   /** 印。付いた op は純粋でなくなる */
   decorator mark;
-  @mark export op run(job: Job): Job;
+  @mark export fn run(job: Job): Job;
 }
 
 namespace ptr {
@@ -25,10 +25,10 @@ namespace flat {
   // states.go が ptr を import する
   state target: nullable<ptr.Target>;
   // ops.go（Leaves）が ops と ptr を import する
-  export op pick(job: ops.Job): ptr.Ref;
-  export op keep(target: ptr.Target?, step: more.ops.Step);
+  export fn pick(job: ops.Job): ptr.Ref;
+  export fn keep(target: ptr.Target?, step: more.ops.Step);
   // wiring.go が ops と ptr を import し、補助 ptr を使う。New の引数 ops（別の名前空間の口）
-  export op go(job: ops.Job, target: ptr.Target): ops.Job
+  export fn go(job: ops.Job, target: ptr.Target): ops.Job
   {
     keep(target, { n: 1 });
     return ops.run(job);
@@ -39,9 +39,9 @@ namespace flat {
 namespace split {
   model Plan { job: ops.Job; target: ptr.Target?; label: string?; }
   state target: nullable<ptr.Target>;
-  export op pick(job: ops.Job): ptr.Ref;
-  op keep(target: ptr.Target?);
-  export op go(job: ops.Job, target: ptr.Target): ops.Job
+  export fn pick(job: ops.Job): ptr.Ref;
+  fn keep(target: ptr.Target?);
+  export fn go(job: ops.Job, target: ptr.Target): ops.Job
   {
     keep(target);
     return ops.run(job);
@@ -55,7 +55,7 @@ namespace o {
   model Thing { x: int; }
   /** 印。付いた op は純粋でなくなる */
   decorator mark;
-  @mark export op make(): Thing;
+  @mark export fn make(): Thing;
 }
 namespace ctx { model Info { y: int; } }
 namespace err { model Fault { z: int; } }
@@ -67,14 +67,14 @@ namespace bodies {
   model Outer { inner: Inner?; }
   classify Size of string { Big; Small; }
 
-  export op keep(thing: o.Thing, info: ctx.Info?, fault: err.Fault);
-  export op takeName(name: string?);
-  export op takeZero(zero: v0.Zero);
-  export op takeKey(key: k0.Key);
-  @o.mark export op load(): ctx.Info;
+  export fn keep(thing: o.Thing, info: ctx.Info?, fault: err.Fault);
+  export fn takeName(name: string?);
+  export fn takeZero(zero: v0.Zero);
+  export fn takeKey(key: k0.Key);
+  @o.mark export fn load(): ctx.Info;
 
   // メソッドの o、ctx、err: 失敗の扱いの零値と、レコードリテラルが、パッケージの型を書く
-  export op go(thing: o.Thing): ctx.Info
+  export fn go(thing: o.Thing): ctx.Info
   {
     val made = o.make();
     keep(made, none, { z: 1 });
@@ -82,14 +82,14 @@ namespace bodies {
   }
 
   // 途中の値（省略可能を通るパス）の後ろで、パッケージ v0 の型を書く
-  export op temps(outer: Outer)
+  export fn temps(outer: Outer)
   {
     takeName(outer.inner.name);
     takeZero({ n: 1 });
   }
 
   // 判定の結果（述語で決まる分類での match）の後ろで、パッケージ k0 の型を書く
-  export op kinds(text: string)
+  export fn kinds(text: string)
   {
     match (text by Size) {
       Big   => takeKey({ n: 1 });

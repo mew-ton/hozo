@@ -2,12 +2,12 @@
 namespace a {
   model User { id: string; }
   model Usr { id: string; }
-  op f(u: Usre): User;                 // ERROR: RES-1
-  op g(): Nope;                        // ERROR: RES-1
-  op h(u: User): User {
+  fn f(u: Usre): User;                 // ERROR: RES-1
+  fn g(): Nope;                        // ERROR: RES-1
+  fn h(u: User): User {
     return k(u);                       // ERROR: RES-1
   }
 }
 namespace b {
-  op j(): a.User;
+  fn j(): a.User;
 }

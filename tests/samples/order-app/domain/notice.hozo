@@ -9,21 +9,21 @@ namespace notice {
 
   /** 注文を受け付けた。見るための鍵、ダウンロード、送料の見積もりと上限と「梱包の後に決まる」こと、納期を伝える */
   @bestEffort
-  export op accepted(order: ordering.Order) {
+  export fn accepted(order: ordering.Order) {
     val mail = acceptedMail(order);
     mailer.send(mail);
   }
 
   /** 発送した。決まった送料と、請求を確定した額と、追跡番号を伝える。送料が見積もりと違うときは、その理由も */
   @bestEffort
-  export op shipped(order: ordering.Order, parcel: shipping.Parcel, label: shipping.Label, charge: payment.Payment?) {
+  export fn shipped(order: ordering.Order, parcel: shipping.Parcel, label: shipping.Label, charge: payment.Payment?) {
     val mail = shippedMail(order, parcel, label, charge);
     mailer.send(mail);
   }
 
   /** 受け付けの知らせを書く（人が書く） */
-  op acceptedMail(order: ordering.Order): mailer.Mail;
+  fn acceptedMail(order: ordering.Order): mailer.Mail;
 
   /** 発送の知らせを書く（人が書く） */
-  op shippedMail(order: ordering.Order, parcel: shipping.Parcel, label: shipping.Label, charge: payment.Payment?): mailer.Mail;
+  fn shippedMail(order: ordering.Order, parcel: shipping.Parcel, label: shipping.Label, charge: payment.Payment?): mailer.Mail;
 }

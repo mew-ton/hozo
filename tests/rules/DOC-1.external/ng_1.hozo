@@ -8,5 +8,5 @@ namespace a {
    * @throws Other どこからも出ない
    */
   @http.get("/m")                      // ERROR: DOC-1
-  op fetch(): M;
+  fn fetch(): M;
 }

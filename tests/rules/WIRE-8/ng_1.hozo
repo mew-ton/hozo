@@ -1,9 +1,9 @@
 // WIRE-8（docs/check.md「配線」。warning）: 束縛した名前が下の行で使われていない。internal/sema/testdata/rules/WIRE-8.hozo から
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op use(m: M): void;
-  op f(): void {
+  fn value(): M;
+  fn use(m: M): void;
+  fn f(): void {
     val x = value();                 // WARN: WIRE-8
     val y = value();
     use(y);

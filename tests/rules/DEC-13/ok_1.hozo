@@ -4,5 +4,5 @@ namespace a {
   decorator e;
   @d(1)
   @e
-  op f(): void;
+  fn f(): void;
 }

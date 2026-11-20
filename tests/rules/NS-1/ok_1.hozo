@@ -1,13 +1,13 @@
 // NS-1（docs/check.md「名前空間」）: 修飾すれば参照できる。グローバルの宣言は修飾なしで見える
 namespace a {
   model M { id: string; }
-  op f(): M;
+  fn f(): M;
 }
 model G { id: string; }
 namespace b {
-  op g(): a.M;
-  op h(): G;
+  fn g(): a.M;
+  fn h(): G;
 }
 namespace a.child {
-  op k(): a.M;
+  fn k(): a.M;
 }

@@ -32,13 +32,13 @@ namespace browser {
 
 namespace browser {
   /** 支払い画面へ遷移する */
-  effect transitionToPayment() on location.put;
+  effect fn transitionToPayment() on location.put;
 
-  op goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
+  fn goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
     effects transitionToPayment;
 
   @page.interaction(page: openProduct, when: ProductPage.Ready)
-  op onAddToCart(item: server.Item)
+  fn onAddToCart(item: server.Item)
     throws page.Aborted, http.NetworkError, http.ServerError
   {
     val line = server.addToCart({ item });
@@ -50,7 +50,7 @@ namespace browser {
     goPayment(line, warranty);
   }
 
-  op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
+  fn chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
     : server.WarrantyLine
     throws page.Aborted, http.NetworkError, http.ServerError
   {
@@ -59,9 +59,9 @@ namespace browser {
   }
 
   @page.dialog("YamadaWarrantyModal")
-  op askYamadaWarranty(item: WarrantyKind.Yamada<server.Item>): server.PlanId;
+  fn askYamadaWarranty(item: WarrantyKind.Yamada<server.Item>): server.PlanId;
 
-  op chooseWarrantyPlan(item: server.Item): server.PlanId?
+  fn chooseWarrantyPlan(item: server.Item): server.PlanId?
     throws page.Aborted
   {
     val plan = match (item by WarrantyAvailable) {

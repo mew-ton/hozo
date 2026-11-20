@@ -1,7 +1,7 @@
 // 経路の op が一つもない: @http.get / @http.post の付いた op がない（@http.retry は読まない）。
 namespace app {
   model In { @http.query id: string; }
-  export op find(in: In): string;
+  export fn find(in: In): string;
   @http.retry(2)
-  export op flaky(): string;
+  export fn flaky(): string;
 }

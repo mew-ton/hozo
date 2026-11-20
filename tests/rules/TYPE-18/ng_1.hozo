@@ -1,0 +1,10 @@
+// TYPE-18: 効果が、void のほかを返す。read が、戻り値を省く、void か never を返す
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  effect fn add(m: M): M on rows.post;           // ERROR: TYPE-18
+  effect fn drop(m: M): never on rows.post;      // ERROR: TYPE-18
+  read fn noResult() on rows;                    // ERROR: TYPE-18
+  read fn voidResult(): void on rows;            // ERROR: TYPE-18
+  read fn neverResult(): never on rows;          // ERROR: TYPE-18
+}

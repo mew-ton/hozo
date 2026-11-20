@@ -5,27 +5,27 @@ namespace app {
 
   // 引数が二つ
   @cli.command("two")
-  export op two(a: In, b: In);
+  export fn two(a: In, b: In);
 
   // 核の型
   @cli.command("core")
-  export op core(a: string);
+  export fn core(a: string);
 
   // scalar
   @cli.command("named")
-  export op named(a: Name);
+  export fn named(a: Name);
 
   // 省略可能な model
   @cli.command("optional")
-  export op optional(a: In?);
+  export fn optional(a: In?);
 
   // model の配列
   @cli.command("many")
-  export op many(a: In[]);
+  export fn many(a: In[]);
 
   // 0 個と、model 一つは受け付ける
   @cli.command("none")
-  export op none_();
+  export fn none_();
   @cli.command("one")
-  export op one(a: In);
+  export fn one(a: In);
 }

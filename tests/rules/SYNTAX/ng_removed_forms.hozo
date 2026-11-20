@@ -1,4 +1,4 @@
-// SYNTAX（docs/grammar.md「exception / effect / read」「op」「配線」）: なくした書き方は、新しい書き方をメッセージで示して
+// SYNTAX（docs/grammar.md「関数の宣言」「exception / effect / read」「op」「配線」）: なくした書き方は、新しい書き方をメッセージで示して
 // 構文エラーにする。誤りのある宣言は捨てられ、残りの宣言は検査される
 namespace a {
   model M { id: string; }
@@ -8,35 +8,31 @@ namespace a {
   exception OldInline: { reason: string; };      // ERROR: SYNTAX
   // 引数のない例外は括弧を書かない
   exception Empty();                             // ERROR: SYNTAX
-  // 効果は、引数がなくても括弧を書く
-  effect old on rows.post;                       // ERROR: SYNTAX
-  // read は、括弧と結果の型が要る。結果の型に void / never は書けない
-  read noParens on rows;                         // ERROR: SYNTAX
-  read noResult() on rows;                       // ERROR: SYNTAX
-  read voidResult(): void on rows;               // ERROR: SYNTAX
-  read neverResult(): never on rows;             // ERROR: SYNTAX
+  // 効果と read は、引数がなくても括弧を書く
+  effect fn old on rows.post;                    // ERROR: SYNTAX
+  read fn noParens on rows;                      // ERROR: SYNTAX
   // any read という引数の種類はない
   decorator anyRead(target: any read);           // ERROR: SYNTAX
   exception E;
   exception F;
   classify K of M { A; B; }
   // 節の並びの区切りは ","（"|" は、なくした書き方）。"," として読み進めるので、op は残る
-  op pipes(m: M): M throws E | F {               // ERROR: SYNTAX
+  fn pipes(m: M): M throws E | F {               // ERROR: SYNTAX
     return match (m by K) {
       A => throw E;
       B => throw F;
     };
   }
   // 引数のない例外を投げるときも、括弧を書かない
-  op parens(m: M): M throws E {
+  fn parens(m: M): M throws E {
     return match (m by K) {
       A => throw E();                            // ERROR: SYNTAX
       B => m;
     };
   }
-  effect add(m: M) on rows.post;
-  read all(): M[] on rows;
-  op ok(m: M): M[] {
+  effect fn add(m: M) on rows.post;
+  read fn all(): M[] on rows;
+  fn ok(m: M): M[] {
     add(m);
     return all();
   }
@@ -46,12 +42,12 @@ namespace a {
 namespace removedWiring {
   model M { id: string; }
   classify K of M { A; B; }
-  op g(): M;
-  op h(m: M);
-  op f() {
+  fn g(): M;
+  fn h(m: M);
+  fn f() {
     const x = g();                     // ERROR: SYNTAX
   }
-  op k(m: M) {
+  fn k(m: M) {
     match m by K { A => h(m); B => h(m); };   // ERROR: SYNTAX
   }
 }
@@ -62,4 +58,23 @@ namespace removedCaseKind {
   decorator b for classify of never case;            // ERROR: SYNTAX
   decorator c(x: any classify Actor case) for op;    // ERROR: SYNTAX
   decorator d for classify;                          // ERROR: SYNTAX
+}
+
+// 頭に fn のない関数の宣言と、op fn（docs/grammar.md「関数の宣言」）
+namespace removedFnHead {
+  model M { id: string; }
+  state rows: list<M>;
+  op oldOp(m: M): M;                             // ERROR: SYNTAX
+  export op oldExported(m: M): M;                // ERROR: SYNTAX
+  read oldRead(): M[] on rows;                   // ERROR: SYNTAX
+  effect oldEffect(m: M) on rows.post;           // ERROR: SYNTAX
+  op fn both(m: M): M;                           // ERROR: SYNTAX
+  fn leaf(m: M): M;
+  read fn all(): M[] on rows;
+  effect fn add(m: M) on rows.post;
+  fn ok(m: M): M[] {
+    val x = leaf(m);
+    add(x);
+    return all();
+  }
 }

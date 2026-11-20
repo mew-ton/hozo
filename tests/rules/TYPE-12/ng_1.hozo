@@ -3,5 +3,5 @@ namespace a {
   model M { id: string; }
   model N { name: string; }
   classify C of M { A; }
-  op ng(n: C.A<N>): void;              // ERROR: TYPE-12
+  fn ng(n: C.A<N>): void;              // ERROR: TYPE-12
 }

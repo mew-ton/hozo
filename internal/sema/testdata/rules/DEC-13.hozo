@@ -4,10 +4,10 @@ namespace a {
   decorator alias = d(1);
   @d(1)
   @d(2)                                // ERROR: DEC-13
-  op twice(): void;
+  fn twice(): void;
   @d(1)
   @alias                               // ERROR: DEC-13
-  op viaAlias(): void;
+  fn viaAlias(): void;
   model M {
     @db.key
     @db.key                            // ERROR: DEC-13

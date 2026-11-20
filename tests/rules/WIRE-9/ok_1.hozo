@@ -3,17 +3,17 @@ namespace a {
   model M { id: string; }
   exception E;
   classify Kind of M { A; B; }
-  op fail(): never throws E;
-  op g();
-  op f() throws E {
+  fn fail(): never throws E;
+  fn g();
+  fn f() throws E {
     g();
     fail();
   }
-  op h(m: M) throws E {
+  fn h(m: M) throws E {
     g();
     match (m by Kind) { A => throw E; B => fail(); };
   }
-  op some(m: M) throws E {
+  fn some(m: M) throws E {
     match (m by Kind) { A => throw E; B => g(); };
     g();
   }

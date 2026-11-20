@@ -6,7 +6,7 @@ namespace app {
     @cli.arg(1) b: string;
   }
   @cli.command("zero")
-  export op zero(in: Zero);
+  export fn zero(in: Zero);
 
   // 同じ位置が二つ
   model Twice {
@@ -15,7 +15,7 @@ namespace app {
     @cli.arg(2) c: string;
   }
   @cli.command("twice")
-  export op twice(in: Twice);
+  export fn twice(in: Twice);
 
   // 抜けた位置（2 と 3 がない）
   model Gap {
@@ -23,14 +23,14 @@ namespace app {
     @cli.arg(4) b: string;
   }
   @cli.command("gap")
-  export op gap(in: Gap);
+  export fn gap(in: Gap);
 
   // 一つだけなら、位置は 1
   model Late {
     @cli.arg(2) only: string;
   }
   @cli.command("late")
-  export op late(in: Late);
+  export fn late(in: Late);
 
   // 1 から続いていれば、フィールドの宣言の順と違っていてよい
   model Fine {
@@ -40,5 +40,5 @@ namespace app {
     @cli.arg(2) b: string;
   }
   @cli.command("fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

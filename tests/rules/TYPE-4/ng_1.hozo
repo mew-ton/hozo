@@ -3,28 +3,28 @@ namespace a {
   model M { id: string; }
   model N { id: string; extra: int; }
   model O { name: string; }
-  op takeM(m: M): void;
-  op takeInt(n: int): void;
-  op takeList(l: M[]): void;
-  op n(): N;
-  op o(): O;
-  op f(): void {
+  fn takeM(m: M): void;
+  fn takeInt(n: int): void;
+  fn takeList(l: M[]): void;
+  fn n(): N;
+  fn o(): O;
+  fn f(): void {
     val x = o();
     takeM(x);                          // ERROR: TYPE-4
   }
-  op g(): void {
+  fn g(): void {
     takeInt("x");                      // ERROR: TYPE-4
   }
-  op h(): void {
+  fn h(): void {
     takeInt(1, 2);                     // ERROR: TYPE-4
   }
   // model の値は、別の model の位置には渡せない（フィールドを含んでいても。暗黙の射影はない）
-  op i(): void {
+  fn i(): void {
     val x = n();
     takeM(x);                          // ERROR: TYPE-4
     takeList(x);                       // ERROR: TYPE-4
   }
-  op j(): void {
+  fn j(): void {
     takeInt(none);                     // ERROR: TYPE-4
   }
 }

@@ -2,9 +2,9 @@
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  effect start() on Phase: Idle -> Busy;
-  effect drain() on s: HasItems -> Empty;
+  effect fn start() on Phase: Idle -> Busy;
+  effect fn drain() on s: HasItems -> Empty;
 }
 namespace b {
-  op f();
+  fn f();
 }

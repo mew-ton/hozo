@@ -4,15 +4,15 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   classify D of M { A; B; C; D; E; }
-  op find(): M?;
-  op use(m: M): void;
-  op f(): void;
+  fn find(): M?;
+  fn use(m: M): void;
+  fn f(): void;
   classify Hit of find { Found: find as M; Missing: find as else; }
   classify Arrival of find { Arrived: find as M; }
   state carts: list<M>;
   state token: nullable<string>;
   classify Session of token { LoggedIn; LoggedOut; }
-  op ok(m: M): void {
+  fn ok(m: M): void {
     match (m by C) { A => use(m); else => none; };
     match (m by D) { A => use(m); else => none; };
     match (m by D) { A, B, C, D => use(m); else => none; };

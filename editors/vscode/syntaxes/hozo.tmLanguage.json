@@ -59,17 +59,17 @@
       "patterns": [
         {
           "name": "variable.other.property.hozo",
-          "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default)\\b(?=\\s*:)"
+          "match": "\\b(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default)\\b(?=\\s*:)"
         },
         {
           "name": "variable.other.property.hozo",
-          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default)\\b"
+          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default)\\b"
         }
       ]
     },
     "override-name": {
       "comment": "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
-      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default))\\b",
+      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|Time|Duration|void|never|Record|list|nullable|single|none|true|false|default))\\b",
       "captures": {
         "1": {
           "name": "storage.modifier.hozo"
@@ -196,8 +196,8 @@
           }
         },
         {
-          "comment": "op、effect、read は、実行・適用されるものの名前。effect と read は、名前の後ろに引数の括弧が続く",
-          "match": "\\b(op|effect|read)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "comment": "関数（op、read、効果）の名前は、fn の直後（docs/grammar.md「関数の宣言」）。fn の前の read と effect は、予約語のパターンが塗る",
+          "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
               "name": "keyword.declaration.hozo"
@@ -237,9 +237,49 @@
               "match": "\\bfield\\b"
             },
             {
+              "match": "\\b(case)\\s+(of)\\s+(?:(any)|(never)|((?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*))",
+              "captures": {
+                "1": {
+                  "name": "keyword.control.hozo"
+                },
+                "2": {
+                  "name": "keyword.control.hozo"
+                },
+                "3": {
+                  "name": "keyword.control.hozo"
+                },
+                "4": {
+                  "name": "support.type.primitive.hozo"
+                },
+                "5": {
+                  "name": "entity.name.type.hozo"
+                }
+              }
+            },
+            {
               "include": "#keywords"
             }
           ]
+        },
+        {
+          "match": "\\b(case)\\s+(of)\\s+(?:(any)|(never)|((?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*))",
+          "captures": {
+            "1": {
+              "name": "keyword.control.hozo"
+            },
+            "2": {
+              "name": "keyword.control.hozo"
+            },
+            "3": {
+              "name": "keyword.control.hozo"
+            },
+            "4": {
+              "name": "support.type.primitive.hozo"
+            },
+            "5": {
+              "name": "entity.name.type.hozo"
+            }
+          }
         },
         {
           "comment": "any の種類: variant は any の後ろでだけ文脈キーワード",
@@ -438,7 +478,7 @@
     },
     "keywords.declaration": {
       "name": "keyword.declaration.hozo",
-      "match": "\\b(?:namespace|model|scalar|union|state|op|exception|effect|read|classify|decorator|bind)\\b"
+      "match": "\\b(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind)\\b"
     },
     "keywords.modifier": {
       "name": "storage.modifier.hozo",

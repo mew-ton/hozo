@@ -6,29 +6,29 @@ namespace a {
   state rows: list<string>;
   bind token to a.*;
   classify Phase of rows { Idle; Busy; }
-  op take(t: Token?): string;
-  op g();
-  op byName(): Token? reads rows {             // ERROR: READS-2
+  fn take(t: Token?): string;
+  fn g();
+  fn byName(): Token? reads rows {             // ERROR: READS-2
     return token;
   }
-  op bySubject() reads token {                 // ERROR: READS-2
+  fn bySubject() reads token {                 // ERROR: READS-2
     match (rows by list) { Empty => g(); HasItems => none; };
   }
-  op byClassify() reads token {                // ERROR: READS-2
+  fn byClassify() reads token {                // ERROR: READS-2
     match (by Phase) { Idle => g(); Busy => none; };
   }
-  op byBind(): string reads rows {             // ERROR: READS-2
+  fn byBind(): string reads rows {             // ERROR: READS-2
     return take();
   }
-  op across(): string[] reads rows {           // ERROR: READS-2
+  fn across(): string[] reads rows {           // ERROR: READS-2
     return b.all();
   }
-  read first(): string? on rows;
-  op byRead(): string? reads token {           // ERROR: READS-2
+  read fn first(): string? on rows;
+  fn byRead(): string? reads token {           // ERROR: READS-2
     return first();
   }
 }
 namespace b {
   state items: list<string>;
-  export op all(): string[] reads items { return items; }
+  export fn all(): string[] reads items { return items; }
 }

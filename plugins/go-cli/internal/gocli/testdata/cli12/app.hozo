@@ -9,9 +9,9 @@ namespace app {
     @cli.flag("d") @cli.default("x") d: string;
   }
   @cli.command("run")
-  export op run(in: In);
+  export fn run(in: In);
 
   // 同じ model を使う、もう一つのコマンド（入力の model の診断は、一度だけ返す）
   @cli.command("again")
-  export op again(in: In): string;
+  export fn again(in: In): string;
 }

@@ -65,16 +65,16 @@ namespace app {
     NotYet: stage as else;
   }
 
-  @mark export op findUser(name: string): User?;
-  export op nameOf(user: User): string;
-  export op cardText(card: Card): string;
-  export op describe(payment: Payment): string;
-  export op shout(text: string): string;
-  export op show(text: string);
+  @mark export fn findUser(name: string): User?;
+  export fn nameOf(user: User): string;
+  export fn cardText(card: Card): string;
+  export fn describe(payment: Payment): string;
+  export fn shout(text: string): string;
+  export fn show(text: string);
 
   // presence の return match: アームを書いた順によらず、値のある場合が if の枝。残りのケースは、else を書かずに後ろに続け、
   // 頭のコメントは、ケースの名前
-  @mark export op login(name: string): string
+  @mark export fn login(name: string): string
     throws Unknown
   {
     val user = findUser(name);
@@ -85,7 +85,7 @@ namespace app {
   }
 
   // presence の const（残りのケースのアームの値）と、文（none のアーム。if の枝がなければ、条件を逆にする）
-  @mark export op greet(name: string, title: string?): string
+  @mark export fn greet(name: string, title: string?): string
   {
     val user = findUser(name);
     val who = match (user by Registration) {
@@ -104,7 +104,7 @@ namespace app {
   }
 
   // 一つのアームが、型を書いたケースと残りのケースを並べる: 分けずに、そのアームの本体だけを書く
-  export op both(title: string?): string
+  export fn both(title: string?): string
   {
     return match (title by Given) {
       Filled, Blank => "any";
@@ -112,7 +112,7 @@ namespace app {
   }
 
   // 型で決まる状態の分類（presence）: 対象の状態を読んでから分ける
-  export op current(): string
+  export fn current(): string
   {
     return match (by Login) {
       LoggedIn  => nameOf(session);
@@ -122,7 +122,7 @@ namespace app {
 
   // variant の return match: 残りのケースは、残りのアームの Go の型を、union の宣言の順に並べた case。対象の型は変わらない。
   // 最後の default: の節は、分類の誤りの枝（union の値がない nil が、ここに来る）
-  export op method(payment: Payment): string
+  export fn method(payment: Payment): string
   {
     return match (payment by Method) {
       Other   => describe(payment);
@@ -131,7 +131,7 @@ namespace app {
   }
 
   // variant で、残りのアームがちょうど一つ: 残りのケースのアームで、対象はそのアームの型（包む型は .Value）
-  export op outcome(result: Result): string
+  export fn outcome(result: Result): string
   {
     return match (result by Outcome) {
       Ok     => nameOf(result);
@@ -140,7 +140,7 @@ namespace app {
   }
 
   // variant で、残りのアームがちょうど一つ（宣言した model）: フィールドを読む
-  export op failure(result: Result): string
+  export fn failure(result: Result): string
   {
     return match (result by Failure) {
       Message => result;
@@ -149,7 +149,7 @@ namespace app {
   }
 
   // variant の const と文。型を書いたケースと残りのケースを並べたアーム（case に、すべての型を並べる）
-  @mark export op variants(payment: Payment, result: Result): string?
+  @mark export fn variants(payment: Payment, result: Result): string?
   {
     val text = match (payment by Method) {
       Plastic => cardText(payment);
@@ -166,7 +166,7 @@ namespace app {
   }
 
   // 型で決まる状態の分類（variant）: 対象の状態を読んでから分ける
-  export op stageText(): string
+  export fn stageText(): string
   {
     return match (by Stage) {
       Succeeded => nameOf(stage);

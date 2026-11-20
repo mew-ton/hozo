@@ -326,9 +326,9 @@ func (r *renderer) head(d ir.Decl) string {
 		}
 		return "exception " + name + r.params(d.Params)
 	case *ir.Effect:
-		return "effect " + name + r.params(d.Params) + r.effectTarget(d.Target) + r.rowTransition(d)
+		return "effect fn " + name + r.params(d.Params) + r.effectTarget(d.Target) + r.rowTransition(d)
 	case *ir.Read:
-		s := "read " + name + r.params(d.Params)
+		s := "read fn " + name + r.params(d.Params)
 		if d.Returns != nil {
 			s += ": " + r.typ(d.Returns)
 		}
@@ -341,7 +341,7 @@ func (r *renderer) head(d ir.Decl) string {
 	case *ir.Decorator:
 		return r.decoratorHead(name, d)
 	case *ir.Op:
-		s := "op " + name + r.params(d.Params)
+		s := "fn " + name + r.params(d.Params)
 		if d.Exported {
 			s = "export " + s
 		}
@@ -453,15 +453,15 @@ func (r *renderer) throwsClause(c ir.ThrowsClause) string {
 	return s
 }
 
-// caseKind は、デコレータの宣言の、分類のケース（docs/grammar.md「decorator の宣言」の CaseKind）。
+// caseKind は、デコレータの宣言の、分類のケース（docs/grammar.md「decorator の宣言」の CaseKind）。もとの形（case of …）で書く。
 func (r *renderer) caseKind(k ir.CaseKind) string {
-	if k.Classify != "" {
-		return r.rel(k.Classify) + " case"
+	switch {
+	case k.Classify != "":
+		return "case of " + r.rel(k.Classify)
+	case k.Subject != nil:
+		return "case of " + r.typ(k.Subject)
 	}
-	if k.Subject != "" {
-		return "case of " + k.Subject
-	}
-	return "case"
+	return "case of any"
 }
 
 // rels は節の並び（throws / catches の例外）を Hozo の構文で書く。区切りは `,`（docs/grammar.md「op」）。
@@ -588,8 +588,8 @@ func (r *renderer) argValue(v ir.ArgValue) string {
 	return "?"
 }
 
-// effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect createSession(session: Session) on sessions.post`、
-// `effect placeOrder() on Checkout: Shopping -> Ordered` の on から後ろ）。宛先が決まっていなければ空。
+// effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect fn createSession(session: Session) on sessions.post`、
+// `effect fn placeOrder() on Checkout: Shopping -> Ordered` の on から後ろ）。宛先が決まっていなければ空。
 func (r *renderer) effectTarget(t ir.EffectTarget) string {
 	switch t := t.(type) {
 	case ir.BuiltinTarget:

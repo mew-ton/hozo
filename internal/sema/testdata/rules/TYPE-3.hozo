@@ -4,39 +4,39 @@ namespace a {
   model PublicUser extends User { override hash: never; }
   model Other { name: string; }
   exception Gone;
-  op user(): User;
-  op other(): Other;
-  op toPublic(u: User): PublicUser;
-  op gone(): never throws Gone;
+  fn user(): User;
+  fn other(): Other;
+  fn toPublic(u: User): PublicUser;
+  fn gone(): never throws Gone;
   classify Kind of User { A; B; }
   // 継承した model は別の型で、どちらの向きにも渡せない。写す op を呼ぶ
-  op projected(): PublicUser {
+  fn projected(): PublicUser {
     return user();                     // ERROR: TYPE-3
   }
-  op mapped(): PublicUser {
+  fn mapped(): PublicUser {
     val u = user();
     return toPublic(u);
   }
-  op wrong(): PublicUser {
+  fn wrong(): PublicUser {
     return other();                    // ERROR: TYPE-3
   }
-  op core(): int {
+  fn core(): int {
     return other();                    // ERROR: TYPE-3
   }
-  op fromRecord(): Other {
+  fn fromRecord(): Other {
     return { name: "x" };
   }
-  op noneToRequired(): Other {
+  fn noneToRequired(): Other {
     return none;                       // ERROR: TYPE-3
   }
-  op noneToOptional(): Other? {
+  fn noneToOptional(): Other? {
     return none;
   }
   // 「返らない」式は、どの型の return にも書ける
-  op never1(): Other throws Gone {
+  fn never1(): Other throws Gone {
     return gone();
   }
-  op never2(u: User): int throws Gone {
+  fn never2(u: User): int throws Gone {
     return match (u by Kind) { A => throw Gone; B => gone(); };
   }
 }

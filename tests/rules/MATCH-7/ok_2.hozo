@@ -3,10 +3,10 @@ namespace a {
   model M { id: string; }
   model In { token: string?; lines: M[]; }
   state maybe: M?;
-  op f();
-  op find(): M?;
-  op all(): M[];
-  op ok(in: In) {
+  fn f();
+  fn find(): M?;
+  fn all(): M[];
+  fn ok(in: In) {
     match (in.token by nullable) { Empty => f(); HasItems => none; };
     match (in.lines by list) { Empty => f(); HasItems => none; };
     val m = find();

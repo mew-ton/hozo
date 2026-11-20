@@ -18,22 +18,22 @@ namespace a {
   decorator readOrEffect for read | effect;
   decorator forAll for exception | effect | read;
   @onlyOp @opOrEffect
-  op f(): void;
+  fn f(): void;
   model N { @forField id: string; }
   @forEffect @opOrEffect @db.insert
-  effect add(m: M) on s.post;
+  effect fn add(m: M) on s.post;
   @db.update
-  effect change(m: M) on s.put;
+  effect fn change(m: M) on s.put;
   @readOrEffect @db.delete @forAll
-  effect remove(id: string) on s.delete;
+  effect fn remove(id: string) on s.delete;
   @forRead @readOrEffect @db.find @forAll
-  read byId(id: string): M? on s;
+  read fn byId(id: string): M? on s;
   @db.list @db.where("name", "x") @db.where("id", "y") @db.latest("name")
-  read named(): M[] on s;
+  read fn named(): M[] on s;
   @forAll
   exception Marked;
   @db.transaction
-  op find(id: string): M? {
+  fn find(id: string): M? {
     return byId(id);
   }
 }

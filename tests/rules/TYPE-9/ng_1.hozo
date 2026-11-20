@@ -3,5 +3,5 @@ namespace a {
   model M { id: string; }
   scalar Bad extends M;                // ERROR: RES-4
   scalar Arr extends string[];         // ERROR: TYPE-9
-  op f(): M;
+  fn f(): M;
 }

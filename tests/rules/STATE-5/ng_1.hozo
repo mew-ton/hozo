@@ -3,16 +3,16 @@
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  effect add(m: M) on rows.post;
-  read byId(id: string): M? on rows;
-  op find(id: string): M? reads rows;                  // ERROR: STATE-5
-  op named(id: string): M? reads byId;                 // ERROR: STATE-5
-  op insert(m: M) effects add;                         // ERROR: STATE-5
-  op direct(m: M) effects rows.post;                   // ERROR: STATE-5
-  op upsert(m: M)
+  effect fn add(m: M) on rows.post;
+  read fn byId(id: string): M? on rows;
+  fn find(id: string): M? reads rows;                  // ERROR: STATE-5
+  fn named(id: string): M? reads byId;                 // ERROR: STATE-5
+  fn insert(m: M) effects add;                         // ERROR: STATE-5
+  fn direct(m: M) effects rows.post;                   // ERROR: STATE-5
+  fn upsert(m: M)
     reads rows                                         // ERROR: STATE-5
     effects add;                                       // ERROR: STATE-5
-  export op twice(): M[]
+  export fn twice(): M[]
     reads rows                                         // ERROR: STATE-5
     reads byId;                                        // ERROR: STATE-5
 }

@@ -1,11 +1,11 @@
 // BIND-4（docs/check.md「必須の入力」）: レコードリテラルの必須のフィールドが足りない（パスを示す）
 namespace a {
   model In { id: string; name: string; }
-  op take(in: In);
-  op f() {
+  fn take(in: In);
+  fn f() {
     take({ id: "x" });                 // ERROR: BIND-4
   }
 }
 namespace b {
-  op h();
+  fn h();
 }

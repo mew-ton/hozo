@@ -7,5 +7,5 @@ namespace a {
     A;                                 // ERROR: CLS-1
     A;                                 // ERROR: CLS-1
   }
-  op use(m: M);
+  fn use(m: M);
 }

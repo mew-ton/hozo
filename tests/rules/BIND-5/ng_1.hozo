@@ -5,5 +5,5 @@ namespace a {
   state t2: single<Token>;
   bind t1 to a.*;
   bind t2 to a.*;                      // ERROR: BIND-5
-  op g(t: Token);
+  fn g(t: Token);
 }

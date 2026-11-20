@@ -45,7 +45,7 @@ namespace carriergw {
   state labels: list<BoughtLabel>;
 
   /** 送り状を発行する（店への請求が立つ） */
-  effect issueLabel() on labels.post;
+  effect fn issueLabel() on labels.post;
 
   /** 配送業者が、その荷物を引き受けない（大きすぎる、届け先が対象の外、サービスがない） */
   @http.status(422)
@@ -53,11 +53,11 @@ namespace carriergw {
 
   /** いくつかの配送業者の見積もりを、まとめて取る */
   @http.post("/rates")
-  export op rates(request: RateRequest): carrier.Quote[];
+  export fn rates(request: RateRequest): carrier.Quote[];
 
   /** 送り状を買う */
   @outside.does(issueLabel)
   @http.post("/labels")
-  export op buyLabel(request: LabelRequest): BoughtLabel
+  export fn buyLabel(request: LabelRequest): BoughtLabel
     throws Refused;
 }

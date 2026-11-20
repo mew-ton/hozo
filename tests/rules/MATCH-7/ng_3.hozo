@@ -3,8 +3,8 @@ namespace a {
   state carts: list<string>;
   state token: nullable<string>;
   state title: single<string>;
-  op f();
-  op ng() {
+  fn f();
+  fn ng() {
     match (carts by nullable) { Empty => f(); HasItems => none; };     // ERROR: MATCH-7
     match (token by list) { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
     // single には組み込みの分類がない

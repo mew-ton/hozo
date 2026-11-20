@@ -34,7 +34,7 @@ namespace env {
   }
   /** 走らせる */
   @cli.command("run")
-  export op run(in: RunInput): string throws errors.Lost, fmt.Wide;
+  export fn run(in: RunInput): string throws errors.Lost, fmt.Wide;
 }
 
 /** 入力の変数 in と同じ名前のパッケージ */
@@ -44,5 +44,5 @@ namespace in {
     @cli.flag("deep") deep: boolean?;
   }
   @cli.command("go")
-  export op go(in: GoInput) throws errors.Lost, reflect.Bent, line.Cut;
+  export fn go(in: GoInput) throws errors.Lost, reflect.Bent, line.Cut;
 }

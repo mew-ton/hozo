@@ -3,9 +3,9 @@
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  read byId(id: string): M? on rows;
-  effect add(m: M) on rows.post;
-  op f(m: M): M? {
+  read fn byId(id: string): M? on rows;
+  effect fn add(m: M) on rows.post;
+  fn f(m: M): M? {
     byId(m.id);                          // ERROR: WIRE-2
     val done = add(m);                 // ERROR: WIRE-2 // WARN: WIRE-8
     val done2 = rows.post(m);          // ERROR: WIRE-2 // WARN: WIRE-8

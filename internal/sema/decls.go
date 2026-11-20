@@ -360,6 +360,10 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 	e := &ir.Effect{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
 	a.addSite(d.Decorators, siteEffect, sc, &e.DeclBase.Decorators)
 	e.Params = a.lowerDeclParams(d.Params, sc)
+	// TYPE-18: 効果が返せるのは void だけ。戻り値は、省くか、void と書く（docs/grammar.md「関数の宣言」）
+	if d.Return != nil && !d.Return.Void {
+		a.errorf("TYPE-18", d.Return.Span, "effect fn %s は、値を返せない（効果の戻り値は、省くか、void と書く）", s.fqn)
+	}
 	switch {
 	case d.On != nil:
 		a.lowerBuiltinTarget(s, e, d.On, sc)
@@ -602,6 +606,17 @@ func (a *analyzer) lowerRead(s *symbol, d *ast.ReadDecl, sc *scope) ir.Decl {
 	rd := &ir.Read{DeclBase: a.base(s, d.Doc, d.Span, docContext{params: paramNames(d.Params), hasParams: true})}
 	a.addSite(d.Decorators, siteRead, sc, &rd.DeclBase.Decorators)
 	rd.Params = a.lowerDeclParams(d.Params, sc)
+	// TYPE-18: read は値を返す。省いた形、void、never は書けない（docs/grammar.md「関数の宣言」）
+	switch {
+	case d.Return == nil:
+		a.errorf("TYPE-18", d.Name.Span, "read fn %s は、戻り値の型を省けない（read は値を返す。read fn %s(…): T on 状態; と書く）", s.fqn, d.Name.Name)
+	case d.Return.Void, d.Return.Never:
+		word := "void"
+		if d.Return.Never {
+			word = "never"
+		}
+		a.errorf("TYPE-18", d.Return.Span, "read fn %s の戻り値に %s は書けない（read は値を返す）", s.fqn, word)
+	}
 	if d.Result != nil {
 		if t, ok := a.lowerType(d.Result, sc); ok {
 			rd.Returns = t

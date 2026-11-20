@@ -5,5 +5,5 @@ namespace a {
     ok1: Record<string, int>;
     ok2: Record<Key, int>;
   }
-  op f(): M;
+  fn f(): M;
 }

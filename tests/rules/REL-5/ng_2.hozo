@@ -2,5 +2,5 @@
 namespace a {
   exception E;
   decorator d throws E keeps effects prevents effects;  // ERROR: REL-5
-  op f();
+  fn f();
 }

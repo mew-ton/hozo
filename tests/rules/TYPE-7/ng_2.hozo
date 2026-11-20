@@ -3,8 +3,8 @@
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
-  op use(x: M?): void;
-  op f(x: M): void {
+  fn use(x: M?): void;
+  fn f(x: M): void {
     val r = match (x by C) {           // ERROR: TYPE-7
       A => { id: "a" };
       B => none;

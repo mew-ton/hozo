@@ -9,13 +9,13 @@ namespace a {
    * @throws E 失敗
    * @see wiring
    */
-  op leaf(m: M): M throws E;
+  fn leaf(m: M): M throws E;
   /**
    * 配線。E は leaf から伝播する。
    *
    * @throws E leaf の失敗
    */
-  op wiring(m: M): M throws E {
+  fn wiring(m: M): M throws E {
     return leaf(m);
   }
 }

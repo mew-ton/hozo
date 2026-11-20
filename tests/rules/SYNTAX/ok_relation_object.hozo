@@ -1,12 +1,12 @@
 // prevents / keeps の目的語は `effects`（その op のすべての効果）。節ごとに一つ書ける
 namespace a {
   state s: list<string>;
-  effect e1() on s.post;
+  effect fn e1() on s.post;
   exception X;
   exception Y;
-  op check() throws X;
-  op prepare() throws Y;
-  op f() effects e1 throws X keeps effects throws Y prevents effects {
+  fn check() throws X;
+  fn prepare() throws Y;
+  fn f() effects e1 throws X keeps effects throws Y prevents effects {
     prepare();
     e1();
     check();

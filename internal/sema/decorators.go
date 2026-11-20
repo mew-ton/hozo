@@ -301,6 +301,17 @@ func (a *analyzer) checkDEC1(dec *ir.Decorator, site *appSite, d *ast.Decorator)
 	a.errorf("DEC-1", d.Name.Span, "デコレータ %s は %s に付けられない（for: %s）", dec.Name, kind, targetsString(dec))
 }
 
+// caseKindString は、分類のケースの絞りを、もとの形（case of …）で書く（docs/grammar.md「decorator の宣言」）。
+func caseKindString(k ir.CaseKind) string {
+	switch {
+	case k.Classify != "":
+		return "case of " + k.Classify
+	case k.Subject != nil:
+		return "case of " + typeName(k.Subject)
+	}
+	return "case of any"
+}
+
 func targetsString(dec *ir.Decorator) string {
 	names := make([]string, 0, len(dec.Targets))
 	cases := 0
@@ -312,13 +323,7 @@ func targetsString(dec *ir.Decorator) string {
 		// 宣言の書き方（docs/grammar.md「decorator の宣言」の CaseKind）
 		k := dec.CaseTargets[cases]
 		cases++
-		name := "case"
-		if k.Classify != "" {
-			name = k.Classify + " case"
-		} else if k.Subject != "" {
-			name += " of " + k.Subject
-		}
-		names = append(names, name)
+		names = append(names, caseKindString(k))
 	}
 	return strings.Join(names, " | ")
 }
@@ -477,14 +482,10 @@ func (a *analyzer) lowerAnyArg(v *ast.ArgValue, p ir.Param, pt ir.AnyParam, sc *
 			return ir.VariantValue{Union: r.sym.fqn, Arm: r.name}, true
 		}
 		if pt.Of == ir.AnyClassifyCase {
-			// 分類のケース。絞り（分類の名前、対象のない分類）に合わなければ DEC-7（docs/types.md「デコレータの引数」）
+			// 分類のケース。絞り（分類の名前、対象の型）に合わなければ DEC-7（docs/types.md「デコレータの引数」）
 			if pt.Case != nil {
-				d, _ := r.sym.node.(*ast.ClassifyDecl)
-				switch {
-				case pt.Case.Classify != "" && pt.Case.Classify != r.sym.fqn:
-					a.errorf("DEC-7", term.Span, "引数 %s は、分類 %s のケースを受け取るが、%s.%s は、別の分類のケース", p.Name, pt.Case.Classify, r.sym.fqn, r.name)
-				case pt.Case.Subject == "never" && d != nil && !d.Never:
-					a.errorf("DEC-7", term.Span, "引数 %s は、対象のない分類（of never）のケースを受け取るが、%s は、対象のある分類", p.Name, r.sym.fqn)
+				if c, _ := a.lower(r.sym).(*ir.Classify); c != nil && !pt.Case.Matches(c) {
+					a.errorf("DEC-7", term.Span, "引数 %s は、%s を受け取るが、%s.%s は、それに当たらない分類のケース", p.Name, caseKindString(*pt.Case), r.sym.fqn, r.name)
 				}
 			}
 			return ir.CaseValue{Classify: r.sym.fqn, Case: r.name}, true
@@ -834,21 +835,32 @@ func (a *analyzer) lowerParamType(t ast.Type, sc *scope) (ir.Type, bool) {
 	return ir.Ref(r.sym.fqn), true
 }
 
-// lowerCaseKind は、デコレータの宣言の、分類のケース（`case`、`case of never`、`名前 case`。docs/grammar.md「decorator の宣言」）。
-// 名前は、classify（どの名前空間のものでも）。分類でなければ RES-4。
+// lowerCaseKind は、デコレータの宣言の、分類のケース（`case of …`。docs/grammar.md「decorator の宣言」）。
+// of の後ろの名前が、classify（どの名前空間のものでも）なら、その分類で絞る。型なら、対象の型で絞る。
+// どちらでもなければ（op、状態など）RES-4。
 func (a *analyzer) lowerCaseKind(k *ast.CaseKind, sc *scope) ir.CaseKind {
 	out := ir.CaseKind{}
-	if k.Never {
-		out.Subject = "never"
+	switch {
+	case k.Never:
+		out.Subject = ir.Never()
+	case k.Of != nil:
+		if n, ok := k.Of.(*ast.NamedType); ok && n.Arg == nil {
+			// 型引数のない名前: 分類の名前か、型の名前かを、名前の解決で分ける
+			r, ok := a.resolve(n.Name, sc, acClassify|acModel|acScalar|acUnionArms)
+			if !ok || r.sym == nil {
+				return out
+			}
+			if r.sym.kind == kindClassify {
+				out.Classify = r.sym.fqn
+				return out
+			}
+			out.Subject = ir.Ref(r.sym.fqn)
+			return out
+		}
+		if t, ok := a.lowerType(k.Of, sc); ok {
+			out.Subject = t
+		}
 	}
-	if k.Classify == nil {
-		return out
-	}
-	r, ok := a.resolve(*k.Classify, sc, acClassify)
-	if !ok || r.sym == nil {
-		return out
-	}
-	out.Classify = r.sym.fqn
 	return out
 }
 

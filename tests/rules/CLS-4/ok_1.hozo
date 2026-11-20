@@ -2,14 +2,14 @@
 // op の分類は、その op が返した値の分類で、match の対象は、型が渡せる値ならよい（その op の呼び出しの結果でなくてもよい）
 namespace a {
   model M { id: string; }
-  op find(id: string): M?;
-  op list1(): M[];
-  op g(m: M?);
+  fn find(id: string): M?;
+  fn list1(): M[];
+  fn g(m: M?);
   classify Found of find { Hit; Other; }
   classify Any of list1 { Some; None; }
   classify Remote of b.lookup { Hit; Other; }
   classify Known of find { Known; NotKnown; }
-  op f(id: string, given: M?) {
+  fn f(id: string, given: M?) {
     val m = find(id);
     match (m by Found) { Hit => g(m); else => none; };
     match (given by Found) { Hit => g(given); else => none; };
@@ -18,5 +18,5 @@ namespace a {
   }
 }
 namespace b {
-  op lookup(): a.M?;
+  fn lookup(): a.M?;
 }

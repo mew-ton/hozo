@@ -3,9 +3,9 @@ namespace a {
   scalar Token extends string;
   state token: nullable<Token>;
   /** 手元のトークンを消す */
-  effect removeToken() on token.delete;
+  effect fn removeToken() on token.delete;
   /** トークンを保存する */
-  effect saveToken() on token.post;
+  effect fn saveToken() on token.post;
   /** トークンを入れ替える */
-  effect refreshToken() on token.put;
+  effect fn refreshToken() on token.put;
 }

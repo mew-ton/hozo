@@ -3,8 +3,8 @@
 namespace a {
   model M { id: string; }
   classify D of M { A; B; C; D; E; }
-  op use(m: M): void;
-  op unknownWithElse(m: M): void {
+  fn use(m: M): void;
+  fn unknownWithElse(m: M): void {
     match (m by D) {                     // ERROR: MATCH-2
       A, Z => use(m);
       else => none;

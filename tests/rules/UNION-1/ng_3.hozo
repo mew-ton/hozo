@@ -5,5 +5,5 @@ namespace a {
     Ready: M;
     Ready: { x: int; };                // ERROR: UNION-1
   }
-  op f(): Dup;
+  fn f(): Dup;
 }

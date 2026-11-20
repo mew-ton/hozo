@@ -34,5 +34,5 @@ namespace a {
     override email: string;                        // ERROR: TYPE-15
     override profile: Other;                       // ERROR: TYPE-15
   }
-  op f(): User;
+  fn f(): User;
 }

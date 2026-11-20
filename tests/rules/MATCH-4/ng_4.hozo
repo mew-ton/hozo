@@ -5,12 +5,12 @@ namespace a {
   model N { id: string; }
   model O { id: string; }
   union Three { Ready: M; Missing: N; Broken: O; }
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find { Found: find as M; NotFound: find as else; }
   classify K3 of Three { IsReady: Three as M; Rest: Three as else; }
-  op takeM(m: M): void;
-  op takeN(n: N): void;
-  op f(three: Three): void {
+  fn takeM(m: M): void;
+  fn takeN(n: N): void;
+  fn f(three: Three): void {
     val m = find();
     match (m by Hit) {
       Found    => takeM(m);

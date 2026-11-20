@@ -38,16 +38,16 @@ namespace a {
     Other;
   }
 
-  op fetch(): Wrap;
-  op store(w: Wrap): Wrap throws Rejected;
-  op label(target: Target, text: string): string;
-  op describe(target: Target): string;
-  op show(w: Slim): Page;
+  fn fetch(): Wrap;
+  fn store(w: Wrap): Wrap throws Rejected;
+  fn label(target: Target, text: string): string;
+  fn describe(target: Target): string;
+  fn show(w: Slim): Page;
   // 継承した model は別の型なので、写す op を通す
-  op slim(w: Wrap): Slim;
+  fn slim(w: Wrap): Slim;
 
   // 値のパス（res.op、res.state.model）、レコードリテラルのキー、match の対象
-  op run(): Page throws Rejected {
+  fn run(): Page throws Rejected {
     val res = fetch();
     val name = label(res.state, res.op);
     val kind = match (res.state by Kind) {

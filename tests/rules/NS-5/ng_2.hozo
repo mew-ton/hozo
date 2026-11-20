@@ -5,12 +5,12 @@ namespace a {
   // 別名の宣言は a にあるので、a の内部の op を固定できる。b の内部の op は固定できない
   decorator toLocal = fallback(local);
   decorator toHidden = fallback(b.hidden);       // ERROR: NS-5
-  op local();
+  fn local();
   @fallback(b.hidden)                            // ERROR: NS-5
-  op f();
+  fn f();
   @fallback(target: b.hidden)                        // ERROR: NS-5
-  op g();
+  fn g();
 }
 namespace b {
-  op hidden();
+  fn hidden();
 }

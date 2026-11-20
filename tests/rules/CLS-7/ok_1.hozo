@@ -6,8 +6,8 @@ namespace a {
   model O { id: string; }
   union Page { Ready: M; Missing: N; Broken: O; }
   state token: nullable<string>;
-  op find(): M?;
-  op page(): Page;
+  fn find(): M?;
+  fn page(): Page;
   classify V of M? { Has: M? as M; Lacks: M? as else; }
   classify F of find { Found: find as M; NotFound: find as else; }
   classify S of token { LoggedIn: token as string; LoggedOut: token as else; }
@@ -15,5 +15,5 @@ namespace a {
   classify P2 of page { IsReady: page as M; Rest: page as else; }
   /** 残りのケースは、どこに書いてもよい */
   classify P3 of Page { Rest: Page as else; IsReady: Page as M; }
-  effect logout() on S: LoggedIn -> LoggedOut;
+  effect fn logout() on S: LoggedIn -> LoggedOut;
 }

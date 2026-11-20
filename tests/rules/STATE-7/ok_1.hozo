@@ -7,16 +7,16 @@ namespace a {
   state current: single<Order>;
   classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
-  effect accept(order: Order) on orders.post as Stage.Accepted;
-  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
-  effect cancel(reason: string, order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-  effect patch(order: Order) on orders.put as any -> else;
-  effect close(order: Order) on orders.put as Life.Open -> Life.Closed;
-  effect keep(order: Order) on draft.post as b.Kind.Fresh;
-  effect touch(order: Order) on current.put as any -> a.Stage.Shipped;
+  effect fn accept(order: Order) on orders.post as Stage.Accepted;
+  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn cancel(reason: string, order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect fn patch(order: Order) on orders.put as any -> else;
+  effect fn close(order: Order) on orders.put as Life.Open -> Life.Closed;
+  effect fn keep(order: Order) on draft.post as b.Kind.Fresh;
+  effect fn touch(order: Order) on current.put as any -> a.Stage.Shipped;
   // as を書かない効果は、行の引数を持たなくてよい
-  effect saveAll(changed: Order[]) on orders.put;
-  effect remove(id: string) on orders.delete;
+  effect fn saveAll(changed: Order[]) on orders.put;
+  effect fn remove(id: string) on orders.delete;
 }
 namespace b {
   classify Kind of a.Order { Fresh; Old; }

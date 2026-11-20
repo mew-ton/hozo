@@ -1,22 +1,22 @@
 // WIRE-2: 値を返す呼び出しを束縛せずに書く、値を返さない呼び出しを束縛する（docs/check.md「配線」）
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op noValue(): void;
-  op f(): void {
+  fn value(): M;
+  fn noValue(): void;
+  fn f(): void {
     value();                           // ERROR: WIRE-2
   }
-  op g(): void {
+  fn g(): void {
     val x = noValue();               // ERROR: WIRE-2 // WARN: WIRE-8
   }
-  op h(): M {
+  fn h(): M {
     return noValue();                  // ERROR: WIRE-2
   }
   classify C of M { A; }
-  op i(m: M): void {
+  fn i(m: M): void {
     match (m by C) { A => value(); };    // ERROR: WIRE-2
   }
-  op ok(): M {
+  fn ok(): M {
     noValue();
     val m = value();
     return m;

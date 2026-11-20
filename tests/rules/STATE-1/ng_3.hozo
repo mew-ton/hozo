@@ -2,12 +2,12 @@
 // 直に書いた「状態.操作」にも掛かる。位置は操作の語
 namespace a {
   state title: single<string>;
-  op f() {
+  fn f() {
     title.post("t");                     // ERROR: STATE-1
     title.delete();                      // ERROR: STATE-1
     title.put("t");
   }
-  op g() effects title.put, title.post { // ERROR: STATE-1, EFF-2
+  fn g() effects title.put, title.post { // ERROR: STATE-1, EFF-2
     title.put("t");
   }
 }

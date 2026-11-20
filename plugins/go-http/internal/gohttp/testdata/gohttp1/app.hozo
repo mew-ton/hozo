@@ -1,12 +1,12 @@
 // GOHTTP-1: 位置は op。
 namespace app {
   @http.get("/hidden")
-  op hidden(): string;
+  fn hidden(): string;
 
   @http.post("/also")
-  op also();
+  fn also();
 
   // export があれば、当たらない
   @http.get("/open")
-  export op open(): string;
+  export fn open(): string;
 }

@@ -3,5 +3,5 @@ namespace a {
   /** 状態 */
   @localStorage
   state s: list<string>;
-  op f();
+  fn f();
 }

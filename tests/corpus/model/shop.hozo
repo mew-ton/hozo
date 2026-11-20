@@ -15,14 +15,14 @@ namespace shop {
   state orders: list<Order>;
 
   /** カートに行を足す */
-  effect addLine(line: Line) on carts.post;
+  effect fn addLine(line: Line) on carts.post;
   /** 注文を作る */
-  effect createOrder(order: Order) on orders.post;
+  effect fn createOrder(order: Order) on orders.post;
 
   /** 在庫がない */
   exception OutOfStock;
 
-  export op addToCart(line: Line)
+  export fn addToCart(line: Line)
     effects addLine
     throws OutOfStock prevents effects
   {
@@ -30,13 +30,13 @@ namespace shop {
     addLine(line);
   }
   /** 在庫を確かめる */
-  op checkStock(line: Line) throws OutOfStock;
+  fn checkStock(line: Line) throws OutOfStock;
 
   // docs/check.md「計算」手順 i の throws: @marks.requirement が marks.NotApproved を E に足す（prevents effects）。
   // op 自身の throws には書かない
   /** 注文を確定する */
   @marks.requirement("PRD-12")
-  op placeOrder(): Order
+  fn placeOrder(): Order
     effects createOrder
   {
     val order = newOrder();
@@ -44,12 +44,12 @@ namespace shop {
     return order;
   }
   /** カートから注文を作る */
-  op newOrder(): Order;
+  fn newOrder(): Order;
 
   // docs/config.md「単位の対象」: 単位の対象の名前空間の配線から、対象でない名前空間（外部のシステム）の op を呼ぶ。
   // 呼び先の例外は、どの名前空間のものでも宣言する（THROWS-1）
   /** 注文を確定して、配送業者に渡す */
-  export op fulfill(): Order
+  export fn fulfill(): Order
     throws marks.NotApproved, carrier.Closed
   {
     val order = placeOrder();

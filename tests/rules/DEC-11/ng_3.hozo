@@ -2,8 +2,8 @@
 namespace a {
   decorator d(code: int, name: string?);
   @d(1, code: 2)                       // ERROR: DEC-11
-  op twice(): void;
+  fn twice(): void;
   decorator alias = d(1);
   @alias(2)                            // ERROR: DEC-11
-  op aliasArgs(): void;
+  fn aliasArgs(): void;
 }

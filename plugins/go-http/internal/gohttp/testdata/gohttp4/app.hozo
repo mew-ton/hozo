@@ -15,7 +15,7 @@ namespace app {
     @http.header("X-Ok") ok: string?;
   }
   @http.get("/header")
-  export op header(in: HeaderIn);
+  export fn header(in: HeaderIn);
 
   model QueryIn {
     // @http.query は、string / int / float / boolean と、その省略可能だけ
@@ -29,7 +29,7 @@ namespace app {
     @http.query ok: Count?;
   }
   @http.get("/query")
-  export op query(in: QueryIn);
+  export fn query(in: QueryIn);
 
   // 全体の形では、その model のフィールドの一つずつを、同じ場所の項目として見る
   model Meta {
@@ -48,5 +48,5 @@ namespace app {
     @http.queryObj paging: Paging;
   }
   @http.get("/obj")
-  export op obj(in: ObjIn);
+  export fn obj(in: ObjIn);
 }

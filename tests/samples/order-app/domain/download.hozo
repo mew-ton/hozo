@@ -43,32 +43,32 @@ namespace download {
 
   /** その注文の権利 */
   @db.list
-  read grantsOfOrder(orderId: type.OrderId): Grant[] on grants;
+  read fn grantsOfOrder(orderId: type.OrderId): Grant[] on grants;
 
   /** その行の権利 */
   @db.find
-  read grantOf(orderId: type.OrderId, line: type.LineId): Grant? on grants;
+  read fn grantOf(orderId: type.OrderId, line: type.LineId): Grant? on grants;
 
   /** 権利を、まとめて足す */
-  effect addGrants(added: Grant[]) on grants.post;
+  effect fn addGrants(added: Grant[]) on grants.post;
 
   /** ダウンロードの行を、取れるようにする。行がなければ、何も足さない */
-  export op grant(orderId: type.OrderId, lines: ordering.DigitalLine[]) {
+  export fn grant(orderId: type.OrderId, lines: ordering.DigitalLine[]) {
     val now = clock.now();
     val entitled = entitle(orderId, lines, now, grantLifetime);
     addGrants(entitled);
   }
 
   /** 行ごとに権利を作り、期限を決める（人が書く） */
-  op entitle(orderId: type.OrderId, lines: ordering.DigitalLine[], now: Time, lifetime: Duration): Grant[];
+  fn entitle(orderId: type.OrderId, lines: ordering.DigitalLine[], now: Time, lifetime: Duration): Grant[];
 
   /** 注文の権利の一覧 */
-  export op granted(orderId: type.OrderId): Grant[] {
+  export fn granted(orderId: type.OrderId): Grant[] {
     return grantsOfOrder(orderId);
   }
 
   /** その行のファイルを取る URL を作る。URL は、短い間だけ使える */
-  export op link(orderId: type.OrderId, line: type.LineId): type.Url
+  export fn link(orderId: type.OrderId, line: type.LineId): type.Url
     throws NotGranted, GrantExpired, AssetsUnavailable
   {
     val found = grantOf(orderId, line);
@@ -79,7 +79,7 @@ namespace download {
   }
 
   /** 期限の内の権利だけが、URL になる */
-  op linkOf(grant: Grant): type.Url
+  fn linkOf(grant: Grant): type.Url
     throws GrantExpired, AssetsUnavailable
   {
     val now = clock.now();
@@ -88,12 +88,12 @@ namespace download {
   }
 
   /** 期限を確かめて、URL の依頼にする（人が書く）。期限が過ぎていれば GrantExpired */
-  op stillValid(grant: Grant, now: Time, lifetime: Duration): assets.LinkRequest
+  fn stillValid(grant: Grant, now: Time, lifetime: Duration): assets.LinkRequest
     throws GrantExpired;
 
   /** ファイルの置き場に、URL を頼む */
   @outside.failsAs(AssetsUnavailable)
-  op fetchLink(request: assets.LinkRequest): type.Url {
+  fn fetchLink(request: assets.LinkRequest): type.Url {
     return assets.link(request);
   }
 }

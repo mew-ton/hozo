@@ -3,25 +3,25 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   classify D of M { A; B; C; D; E; }
-  op use(m: M): void;
-  op missing(m: M): void {
+  fn use(m: M): void;
+  fn missing(m: M): void {
     match (m by C) {                     // ERROR: MATCH-2
       A => use(m);
     };
   }
-  op unknown(m: M): void {
+  fn unknown(m: M): void {
     match (m by C) {                     // ERROR: MATCH-2
       A, B, Z => use(m);
     };
   }
-  op dup(m: M): void {
+  fn dup(m: M): void {
     match (m by C) {                     // ERROR: MATCH-2
       A => use(m);
       B, A => use(m);
     };
   }
   // else のアームがあっても、名前で並べたケースは、その分類のケースで、一度だけ
-  op unknownWithElse(m: M): void {
+  fn unknownWithElse(m: M): void {
     match (m by D) {                     // ERROR: MATCH-2
       A, Z => use(m);
       else => none;
@@ -32,7 +32,7 @@ namespace a {
       else => none;
     };
   }
-  op ok(m: M): void {
+  fn ok(m: M): void {
     match (m by C) { A => use(m); B => none; };
     // else のアームがあれば、足りないケースはない: 並べなかったケースのすべてを受ける
     match (m by D) { A => use(m); else => none; };
@@ -43,14 +43,14 @@ namespace a {
   // 標準の分類のケースは Empty / HasItems
   state carts: list<M>;
   state token: nullable<string>;
-  op f(): void;
-  op builtinOk(): void {
+  fn f(): void;
+  fn builtinOk(): void {
     match (carts by list) { Empty => f(); HasItems => none; };
     match (token by nullable) { HasItems => f(); Empty => none; };
     match (carts by list) { Empty, HasItems => f(); };
     match (carts by list) { Empty => f(); else => none; };
   }
-  op builtinMissing(): void {
+  fn builtinMissing(): void {
     match (carts by list) {              // ERROR: MATCH-2
       Empty => f();
     };
@@ -58,7 +58,7 @@ namespace a {
       HasItems => f();
     };
   }
-  op builtinUnknown(): void {
+  fn builtinUnknown(): void {
     match (carts by list) {              // ERROR: MATCH-2
       Empty => f();
       HasItems => none;
@@ -69,7 +69,7 @@ namespace a {
       Some => none;
     };
   }
-  op builtinDup(): void {
+  fn builtinDup(): void {
     match (carts by list) {              // ERROR: MATCH-2
       Empty => f();
       HasItems, Empty => none;
@@ -80,11 +80,11 @@ namespace a {
   state orders: list<M>;
   classify Checkout of carts, orders { Shopping; Ordered; }
   classify Session of token { LoggedIn; LoggedOut; }
-  op stateOk(): void {
+  fn stateOk(): void {
     match (by Checkout) { Shopping => f(); Ordered => none; };
     match (by Session) { LoggedIn => f(); else => none; };
   }
-  op stateNg(): void {
+  fn stateNg(): void {
     match (by Checkout) {                // ERROR: MATCH-2
       Shopping => f();
     };
@@ -99,14 +99,14 @@ namespace a {
   }
 
   // 残りのケース（as else）も、ほかのケースと同じ: 名前で並べるか、else のアームが受ける
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
-  op restOk(): void {
+  fn restOk(): void {
     val m = find();
     match (m by Hit) { Found => use(m); Missing => none; };
     match (m by Hit) { Found => use(m); else => none; };
   }
-  op restNg(): void {
+  fn restNg(): void {
     val m = find();
     match (m by Hit) {                   // ERROR: MATCH-2
       Found => use(m);

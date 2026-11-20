@@ -2,9 +2,9 @@
 // 同じ単位が出力する子の名前空間 n.inner の出力先も gen/n/inner。位置は、名前空間の最初の内部の op。
 
 namespace n {
-  export op open(): int;
-  op hidden(): int;
-  op alsoHidden(): int;
+  export fn open(): int;
+  fn hidden(): int;
+  fn alsoHidden(): int;
 }
 
 namespace n.inner {

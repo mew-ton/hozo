@@ -6,18 +6,18 @@ namespace a {
   classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
   classify Urgency of Order { Rush; Normal; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
-  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
-  effect cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-  effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
-  op edit(order: Stage.Accepted<Order>): Order;
+  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  fn edit(order: Stage.Accepted<Order>): Order;
   // 分かっていない行
-  op unchecked(order: Order, at: Time) {
+  fn unchecked(order: Order, at: Time) {
     start(order, at);                  // ERROR: STATE-9
     cancel(order);                     // ERROR: STATE-9
     discard(order);                    // ERROR: STATE-9
   }
   // 別のケースのアーム、前の並びにないケースを含むアーム
-  op wrongArm(order: Order, at: Time) {
+  fn wrongArm(order: Order, at: Time) {
     match (order by Stage) {
       Draft => start(order, at);       // ERROR: STATE-9
       else  => none;
@@ -32,7 +32,7 @@ namespace a {
     };
   }
   // 別の分類のアーム、別の値、対象より長いパス、対象から作った別の値
-  op wrongValue(order: Order, other: Order, box: Box, known: Stage.Accepted<Order>, at: Time) {
+  fn wrongValue(order: Order, other: Order, box: Box, known: Stage.Accepted<Order>, at: Time) {
     match (order by Urgency) {
       Rush   => start(order, at);      // ERROR: STATE-9
       Normal => none;
@@ -49,7 +49,7 @@ namespace a {
     start(edited, at);                 // ERROR: STATE-9
   }
   // 型から分かっているケースが、前の並びにない
-  op wrongType(order: Stage.Shipped<Order>, mixed: Order) {
+  fn wrongType(order: Stage.Shipped<Order>, mixed: Order) {
     cancel(order);                     // ERROR: STATE-9
     match (mixed by Life) {
       Closed => discard(mixed);        // ERROR: STATE-9

@@ -2,5 +2,5 @@
 namespace a {
   @external                            // WARN: DEC-14
   decorator boundary;
-  op f();
+  fn f();
 }

@@ -8,5 +8,5 @@ namespace a {
    * @throws http.NetworkError 境界の外から見たときだけ起きる
    */
   @http.get("/m")
-  op fetch(): M;
+  fn fetch(): M;
 }

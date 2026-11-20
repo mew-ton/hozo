@@ -1,11 +1,11 @@
 // EFF-2（docs/check.md「状態と効果」）: 書いた effects が伝播した効果と集合として等しい（順序は問わない）
 namespace a {
   state s: list<string>;
-  effect e() on s.post;
-  effect f() on s.post;
-  op doE() effects e { e(); }
-  op doF() effects f { f(); }
-  op wiring() effects f, e {
+  effect fn e() on s.post;
+  effect fn f() on s.post;
+  fn doE() effects e { e(); }
+  fn doF() effects f { f(); }
+  fn wiring() effects f, e {
     doE();
     doF();
   }

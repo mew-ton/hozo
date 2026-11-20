@@ -1,9 +1,9 @@
 // WIRE-4（docs/check.md「配線」）: 同じ名前を二度束縛。internal/sema/testdata/rules/WIRE-4.hozo から
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op use(m: M): void;
-  op twice(): void {
+  fn value(): M;
+  fn use(m: M): void;
+  fn twice(): void {
     val x = value();
     val x = value();                 // ERROR: WIRE-4
     use(x);

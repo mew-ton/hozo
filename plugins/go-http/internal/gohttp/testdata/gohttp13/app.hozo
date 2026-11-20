@@ -8,7 +8,7 @@ namespace app {
     @http.bodyObj second: Item;
   }
   @http.post("/twice")
-  export op twice(in: Twice);
+  export fn twice(in: Twice);
 
   // 同じ場所の、全体の形と項目の形（三つの場所で）
   model Mixed {
@@ -21,7 +21,7 @@ namespace app {
     @http.body("memo") memo: string?;
   }
   @http.post("/mixed")
-  export op mixed(in: Mixed);
+  export fn mixed(in: Mixed);
 
   // 別の場所なら、一緒に書ける。項目の形は、一つの場所にいくつあってもよい
   model Fine {
@@ -31,5 +31,5 @@ namespace app {
     @http.body b: string?;
   }
   @http.post("/fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

@@ -1,4 +1,4 @@
 // CFG-18（docs/config.md「in」）: 単位の in が読み込んだファイル（この ok_1.hozo）に合う（ok_1.toml）
 namespace a {
-  op f();
+  fn f();
 }

@@ -3,7 +3,7 @@ namespace a {
   model M { id: string; }
   state s: list<M>;
   @http.status(400)                    // ERROR: DEC-1
-  op f(): void;
+  fn f(): void;
   @db.table                            // ERROR: DEC-1
   union U { Ready: M; }
   @http.retry(3)                       // ERROR: DEC-1
@@ -12,28 +12,28 @@ namespace a {
   state okState: list<M>;
   decorator onlyOp;
   @onlyOp                              // ERROR: DEC-1
-  effect e() on s.post;
+  effect fn e() on s.post;
   @onlyOp                              // ERROR: DEC-1
   classify C of M { A; }
   @onlyOp                              // ERROR: DEC-1
   decorator other;
   @onlyOp
-  op ok(): void;
+  fn ok(): void;
   // 対象 effect: 効果の宣言に付けられ、宣言にない対象（op、state）には付けられない
   decorator onlyEffect for effect;
   decorator opOrEffect for op | effect;
   @onlyEffect @opOrEffect @db.insert
-  effect okEffect() on s.post;
+  effect fn okEffect() on s.post;
   @db.update @db.delete
-  effect okEffect2() on s.put;
+  effect fn okEffect2() on s.put;
   @onlyEffect                          // ERROR: DEC-1
-  op notEffect(): void;
+  fn notEffect(): void;
   @db.insert                           // ERROR: DEC-1
   state notEffect2: list<M>;
   @opOrEffect
-  op ok2(): void;
+  fn ok2(): void;
   @db.find                             // ERROR: DEC-1
-  effect notOp() on s.delete;
+  effect fn notOp() on s.delete;
   @onlyEffect                          // ERROR: DEC-1
   union V { Ready: M; }
   @onlyEffect                          // ERROR: DEC-1

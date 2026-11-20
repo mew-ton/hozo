@@ -34,5 +34,5 @@ namespace a {
     override hash: never;
     override hash: never;              // ERROR: TYPE-16
   }
-  op f(): User;
+  fn f(): User;
 }

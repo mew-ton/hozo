@@ -3,5 +3,5 @@ namespace a {
   exception E;
   decorator requiresAuth throws E prevents effects;
   @requiresAuth
-  op f();
+  fn f();
 }

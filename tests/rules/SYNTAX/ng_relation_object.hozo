@@ -3,11 +3,11 @@
 // 効果を名前で書き分ける形は構文エラー。誤りのある op は捨てられ、残りの宣言は検査される
 namespace a {
   state s: list<string>;
-  effect e1() on s.post;
-  effect e2() on s.put;
+  effect fn e1() on s.post;
+  effect fn e2() on s.put;
   exception X;
-  op f() effects e1 throws X keeps e1 prevents e2 { e1(); }       // ERROR: SYNTAX
-  op g() effects e1 throws X prevents e1 { e1(); }                // ERROR: SYNTAX
+  fn f() effects e1 throws X keeps e1 prevents e2 { e1(); }       // ERROR: SYNTAX
+  fn g() effects e1 throws X prevents e1 { e1(); }                // ERROR: SYNTAX
   decorator d throws X keeps e1 | e2;                    // ERROR: SYNTAX
-  op ok() effects e1 throws X keeps effects { e1(); }
+  fn ok() effects e1 throws X keeps effects { e1(); }
 }

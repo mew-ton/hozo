@@ -2,5 +2,5 @@
 namespace a {
   state items: list<string>;
   bind items to a.*;                   // ERROR: BIND-6
-  op g();
+  fn g();
 }

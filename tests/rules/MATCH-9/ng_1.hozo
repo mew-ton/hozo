@@ -4,8 +4,8 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   classify One of M { Only; }
-  op use(m: M): void;
-  op ng(m: M): void {
+  fn use(m: M): void;
+  fn ng(m: M): void {
     match (m by C) {
       A, B => use(m);
       else => none;                    // ERROR: MATCH-9

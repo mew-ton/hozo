@@ -9,17 +9,17 @@ namespace app {
   // ---- 組み込みの効果: 操作が合わない ----
 
   @db.insert
-  effect insertOnPut(row: Row) on rows.put;
+  effect fn insertOnPut(row: Row) on rows.put;
   @db.insert
-  effect insertOnDelete(row: Row) on rows.delete;
+  effect fn insertOnDelete(row: Row) on rows.delete;
   @db.update
-  effect updateOnPost(row: Row) on rows.post;
+  effect fn updateOnPost(row: Row) on rows.post;
   @db.update
-  effect updateOnDelete(row: Row) on rows.delete;
+  effect fn updateOnDelete(row: Row) on rows.delete;
   @db.delete
-  effect deleteOnPost(id: string) on rows.post;
+  effect fn deleteOnPost(id: string) on rows.post;
   @db.delete
-  effect deleteOnPut(id: string) on rows.put;
+  effect fn deleteOnPut(id: string) on rows.put;
 
   // ---- 宛先が、分類の遷移（基底の状態の組み込みの分類と、状態の分類） ----
 
@@ -28,25 +28,25 @@ namespace app {
     Differ;
   }
   @db.insert
-  effect fillRows(row: Row) on rows: Empty -> HasItems;
+  effect fn fillRows(row: Row) on rows: Empty -> HasItems;
   @db.update
-  effect touchRows(row: Row) on rows: HasItems -> HasItems;
+  effect fn touchRows(row: Row) on rows: HasItems -> HasItems;
   @db.delete
-  effect copyOver(id: string) on Sync: Differ -> Same;
+  effect fn copyOver(id: string) on Sync: Differ -> Same;
 
   // 配線が呼んでも、効果ごとに一度だけ
-  export op addWrong(row: Row) {
+  export fn addWrong(row: Row) {
     insertOnPut(row);
   }
 
   // ---- 通るもの ----
 
   @db.insert
-  effect createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row) on rows.post;
   @db.update
-  effect updateRow(row: Row) on rows.put;
+  effect fn updateRow(row: Row) on rows.put;
   @db.delete
-  effect deleteRow(id: string) on rows.delete;
+  effect fn deleteRow(id: string) on rows.delete;
   /** デコレータを付けていない、遷移の効果は、見ない（人が書く） */
-  effect syncRows() on Sync: Differ -> Same;
+  effect fn syncRows() on Sync: Differ -> Same;
 }

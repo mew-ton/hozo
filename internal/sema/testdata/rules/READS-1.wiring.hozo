@@ -4,56 +4,56 @@
 namespace a {
   model M { id: string; }
   state s: list<M>;
-  effect add() on s.post;
+  effect fn add() on s.post;
   decorator reading(table: any state) for op reads table;
   decorator writing(...targets: any effect) for op effects targets;
   decorator fixed for op reads s effects add;
   decorator plain for op;
 
-  @reading(s) op leafRead(): M[];
-  @writing(add) export op leafWrite(m: M);
+  @reading(s) fn leafRead(): M[];
+  @writing(add) export fn leafWrite(m: M);
 
   // 配線に付けられる。節を持つデコレータが二つでも、残りの引数に何も渡していなくても
   @reading(s)
-  op wireRead(): M[] {
+  fn wireRead(): M[] {
     return leafRead();
   }
   @plain
   @writing(add)
-  op wireWrite(m: M) {
+  fn wireWrite(m: M) {
     leafWrite(m);
   }
   @fixed
   @reading(s)
-  op wireBoth(m: M): M[] {
+  fn wireBoth(m: M): M[] {
     leafWrite(m);
     return leafRead();
   }
   @writing
-  op wireNothing() {
+  fn wireNothing() {
     leafWrite({ id: "x" });
   }
 }
 namespace b {
   state t: list<a.M>;
-  effect put() on t.post;
+  effect fn put() on t.post;
   // 自分の名前空間のものを運ぶ
   @a.reading(t)
   @a.writing(put)
-  op own(m: a.M) {
+  fn own(m: a.M) {
     a.leafWrite(m);
   }
   // 別の名前空間のものを運べば、配線でも error
   @a.reading(a.s)                      // ERROR: READS-1
-  op otherRead(m: a.M) {
+  fn otherRead(m: a.M) {
     a.leafWrite(m);
   }
   @a.writing(put, a.add)               // ERROR: STATE-2
-  op otherWrite(m: a.M) {
+  fn otherWrite(m: a.M) {
     a.leafWrite(m);
   }
   @a.fixed                             // ERROR: READS-1, STATE-2
-  op otherBoth(m: a.M) {
+  fn otherBoth(m: a.M) {
     a.leafWrite(m);
   }
 }

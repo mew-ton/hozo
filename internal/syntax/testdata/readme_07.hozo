@@ -18,27 +18,27 @@ namespace server {
 
   @http.post("/login")
   @validated
-  op login(in: LoginInput): LoginOk
+  fn login(in: LoginInput): LoginOk
     effects createSession
     throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn prevents effects;
 }
 
-op cancelOrder(in: CancelInput): Order
+fn cancelOrder(in: CancelInput): Order
   effects refund
   throws RefundPending keeps effects;   // 返金の処理は受け付けたが、完了の確認が取れない
 
-// §7.3 の `op placeOrder(in: OrderInput): Order effects createOrder | notifyUser
+// §7.3 の `fn placeOrder(in: OrderInput): Order effects createOrder | notifyUser
 // throws NotificationFailed keeps createOrder prevents notifyUser;` は書けない: 葉の op が直に持てる効果は一つまで
 // （docs/decisions.md「設計書から離れた決定」S8）で、prevents / keeps の目的語は effects だけ（同 S9）。
 // 効果ごとの葉の op を配線でつなぐ。NotificationFailed のとき createOrder は kept、notifyUser は prevented と計算される。
-op saveOrder(in: OrderInput): Order
+fn saveOrder(in: OrderInput): Order
   effects createOrder;
 
-op sendOrderNotice(order: Order)
+fn sendOrderNotice(order: Order)
   effects notifyUser
   throws NotificationFailed prevents effects;
 
-op placeOrder(in: OrderInput): Order
+fn placeOrder(in: OrderInput): Order
   throws NotificationFailed
 {
   val order = saveOrder(in);

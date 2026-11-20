@@ -13,7 +13,7 @@ namespace hooks {
   @webhook.signed("psp")
   @http.post("/hooks/payment")
   @db.transaction
-  export op paymentEvent(in: PaymentInput)
+  export fn paymentEvent(in: PaymentInput)
     throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
   {
     val secured = payment.record(in.event);
@@ -31,7 +31,7 @@ namespace hooks {
   /** 配送業者の API をまとめる仕組みからの通知 */
   @webhook.signed("carriergw")
   @http.post("/hooks/tracking")
-  export op trackingEvent(in: TrackingInput) {
+  export fn trackingEvent(in: TrackingInput) {
     fulfilment.tracked(in.event);
   }
 }

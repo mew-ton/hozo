@@ -1,9 +1,9 @@
 // WIRE-5: 呼び出しの結果は束縛してから渡す
 namespace a {
   model M { id: string; }
-  op v(): M;
-  op use(m: M);
-  op f() {
+  fn v(): M;
+  fn use(m: M);
+  fn f() {
     val m = v();
     use(m);
   }

@@ -2,10 +2,10 @@
 // （とフィールド名の位置）だけ。宣言の名前、引数の名前、型の位置、ケースの名前には書けない。else の後ろに型の続きは書けない
 namespace a {
   model M { id: string; }
-  op find(): M?;
+  fn find(): M?;
   model else { id: string; }                           // ERROR: SYNTAX
-  op byParam(else: string);                            // ERROR: SYNTAX
-  op byType(m: else);                                  // ERROR: SYNTAX
+  fn byParam(else: string);                            // ERROR: SYNTAX
+  fn byType(m: else);                                  // ERROR: SYNTAX
   classify D of find {
     Found: find as M;
     else: find as else;                                // ERROR: SYNTAX

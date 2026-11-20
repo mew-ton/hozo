@@ -22,61 +22,61 @@ namespace app {
 
   // scalar は名前で比べる（Id の列に string、別の scalar）
   @db.find
-  read rowByString(id: string): Row? on rows;
+  read fn rowByString(id: string): Row? on rows;
   @db.find
-  read rowByCode(id: Code): Row? on rows;
+  read fn rowByCode(id: Code): Row? on rows;
   // 列より広い引数（T の列に T?）
   @db.find
-  read rowByMaybe(id: Id?): Row? on rows;
+  read fn rowByMaybe(id: Id?): Row? on rows;
   // 型が違う
   @db.list
-  read rowsByIntNote(note: int): Row[] on rows;
+  read fn rowsByIntNote(note: int): Row[] on rows;
   // T? の列に、別の型
   @db.list
-  read rowsByStringRank(rank: string?): Row[] on rows;
+  read fn rowsByStringRank(rank: string?): Row[] on rows;
   // 二つの引数の、一つだけが合わない
   @db.find
-  read rowByIdAndRank(id: Id, rank: float): Row? on rows;
+  read fn rowByIdAndRank(id: Id, rank: float): Row? on rows;
 
   // ---- @db.delete の効果の引数 ----
 
   @db.delete
-  effect deleteByString(id: string) on rows.delete;
+  effect fn deleteByString(id: string) on rows.delete;
   @db.delete
-  effect deleteByMaybeNote(note: string?) on rows.delete;
+  effect fn deleteByMaybeNote(note: string?) on rows.delete;
 
   // ---- @db.insert / @db.update の効果の引数: 表の model の行一つ ----
 
   // 引数がない
   @db.insert
-  effect createNothing() on rows.post;
+  effect fn createNothing() on rows.post;
   // 二つ
   @db.insert
-  effect createTwo(first: Row, second: Row) on rows.post;
+  effect fn createTwo(first: Row, second: Row) on rows.post;
   // 別の model
   @db.insert
-  effect createOther(row: Other) on rows.post;
+  effect fn createOther(row: Other) on rows.post;
   // 省略可能な行、行の並び
   @db.update
-  effect updateMaybe(row: Row?) on rows.put;
+  effect fn updateMaybe(row: Row?) on rows.put;
   @db.update
-  effect updateMany(rows: Row[]) on rows.put;
+  effect fn updateMany(rows: Row[]) on rows.put;
   // 行でなく、列の値
   @db.update
-  effect updateNote(id: Id, note: string) on rows.put;
+  effect fn updateNote(id: Id, note: string) on rows.put;
 
   // ---- 通るもの ----
 
   @db.find
-  read rowById(id: Id): Row? on rows;
+  read fn rowById(id: Id): Row? on rows;
   @db.list
-  read rowsByRank(rank: int): Row[] on rows;
+  read fn rowsByRank(rank: int): Row[] on rows;
   @db.list
-  read rowsByRankOrNone(rank: int?): Row[] on rows;
+  read fn rowsByRankOrNone(rank: int?): Row[] on rows;
   @db.delete
-  effect deleteByRank(id: Id, rank: int?) on rows.delete;
+  effect fn deleteByRank(id: Id, rank: int?) on rows.delete;
   @db.insert
-  effect createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row) on rows.post;
   @db.update
-  effect updateRow(row: Row) on rows.put;
+  effect fn updateRow(row: Row) on rows.put;
 }

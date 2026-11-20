@@ -6,20 +6,20 @@ namespace a {
   decorator from(table: any state) for op reads table;
   decorator fromRead for op reads b.firstUser;
   @from(own)
-  op ok(): string[] {
+  fn ok(): string[] {
     return b.all();
   }
   @from(b.users)                                 // ERROR: READS-1
-  op wired(): string[] {
+  fn wired(): string[] {
     return b.all();
   }
   @fromRead                                      // ERROR: READS-1
-  op wiredRead(): string[] {
+  fn wiredRead(): string[] {
     return own;
   }
 }
 namespace b {
   state users: list<string>;
-  read firstUser(): string? on users;
-  export op all(): string[] { return users; }
+  read fn firstUser(): string? on users;
+  export fn all(): string[] { return users; }
 }

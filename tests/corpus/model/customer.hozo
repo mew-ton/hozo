@@ -5,12 +5,12 @@ namespace customer {
   /** 利用者が覚えている、ほしいもの */
   state wishlist: list<shop.Line>;
   /** ほしいものを一つ選んで、覚えから消す */
-  effect forget() on wishlist.delete;
+  effect fn forget() on wishlist.delete;
 
   // docs/requirements.md「モデルが先」: op に印を付けて書く形
   /** ほしいものを一つ選ぶ */
   @marks.manual
-  op pick(): shop.Line
+  fn pick(): shop.Line
     effects forget
   {
     val line = choose();
@@ -19,12 +19,12 @@ namespace customer {
   }
   /** どれにするかを決める */
   @marks.manual
-  op choose(): shop.Line;
+  fn choose(): shop.Line;
 
   // docs/config.md「単位の対象」: 単位の対象でない名前空間の配線から、対象の名前空間の op を呼ぶ。
   // docs/check.md「計算」手順 0（配線）: 効果も例外も、名前空間をまたいで伝播する
   /** ほしいものをカートに入れて、注文する */
-  op buy(): shop.Order
+  fn buy(): shop.Order
     throws shop.OutOfStock, marks.NotApproved, carrier.Closed
   {
     val line = pick();
@@ -39,5 +39,5 @@ namespace customer {
 namespace customer {
   /** 店を出る */
   @marks.manual
-  op leave();
+  fn leave();
 }

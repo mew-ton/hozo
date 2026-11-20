@@ -6,12 +6,12 @@ namespace a {
   state orders: list<M>;
   classify K of M { A; B; C; D; E; }
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
-  effect touch() on Checkout: Shopping, Ordered -> any;
-  effect move() on Checkout: any -> Ordered, Shipped;
-  op use(m: M);
-  op f();
-  op check(condition: string): string;
-  op g(m: M): string effects touch, move {
+  effect fn touch() on Checkout: Shopping, Ordered -> any;
+  effect fn move() on Checkout: any -> Ordered, Shipped;
+  fn use(m: M);
+  fn f();
+  fn check(condition: string): string;
+  fn g(m: M): string effects touch, move {
     match (m by K) {
       A    => use(m);
       else => none;

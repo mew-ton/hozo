@@ -146,7 +146,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "page.Route の Span.file（標準の語彙）", declOf(t, prog, "page.Route").Common().Span.File, "hozo:vocab/page.hozo")
 		// 宣言の位置はデコレータから（docs/grammar.md「ファイルと宣言」の Decl = [DocComment] {Decorator} Declaration。DocComment は含まない）
 		expect(t, "web.openUser の Span の行は最初のデコレータの行", opOf(t, prog, "web.openUser").Span.Start.Line, lineOf(t, "web.hozo", "@t.entry"))
-		expect(t, "web.greet の Span の行は op の行", opOf(t, prog, "web.greet").Span.Start.Line, lineOf(t, "web.hozo", "op greet("))
+		expect(t, "web.greet の Span の行は op の行", opOf(t, prog, "web.greet").Span.Start.Line, lineOf(t, "web.hozo", "fn greet("))
 		expect(t, "位置は 1 始まり", opOf(t, prog, "web.openUser").Span.Start.Col, 3)
 	})
 

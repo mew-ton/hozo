@@ -20,7 +20,7 @@ namespace app {
     @cli.arg(1) @cli.default("x") rest: string[];
   }
   @cli.command("run")
-  export op run(in: In);
+  export fn run(in: In);
 
   // 渡せるリテラル: string に文字列、int に整数、float に整数と小数、boolean に真偽値。scalar は、元の核の型で
   model Fine {
@@ -35,5 +35,5 @@ namespace app {
     @cli.flag("i") @cli.default(true) i: Flag;
   }
   @cli.command("fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

@@ -4,14 +4,14 @@ namespace a {
   model M { id: string; }
   exception E;
   classify C of M { A; B; }
-  op use(m: M): M;
-  op f(m: M): M {
+  fn use(m: M): M;
+  fn f(m: M): M {
     return match (m by C) {              // ERROR: MATCH-2
       A => match (m by C) { A => m; B => m; };   // ERROR: SYNTAX
       B => m;
     };
   }
-  op g(m: M): M throws E {
+  fn g(m: M): M throws E {
     return match (m by C) {              // ERROR: MATCH-2
       A => throw E(use(m));            // ERROR: SYNTAX
       B => m;

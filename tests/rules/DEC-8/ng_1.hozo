@@ -3,5 +3,5 @@ namespace a {
   exception E;
   decorator d(code: int);
   decorator alias = d(1) throws E;     // ERROR: SYNTAX
-  op f();
+  fn f();
 }

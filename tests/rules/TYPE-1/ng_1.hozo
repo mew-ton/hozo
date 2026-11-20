@@ -2,21 +2,21 @@
 namespace a {
   scalar Email extends string;
   model In { email: Email; }
-  op send(email: Email): void;
-  op f(): void {
+  fn send(email: Email): void;
+  fn f(): void {
     send("a@b");                       // ERROR: TYPE-1
   }
-  op g(s: string): void {
+  fn g(s: string): void {
     send(s);                           // ERROR: TYPE-1
   }
-  op h(): void {
+  fn h(): void {
     send({ email: "a@b" });            // ERROR: TYPE-4
   }
   decorator d(e: Email);
   @d("x")                              // ERROR: TYPE-1
-  op j(): void;
-  op k(s: string): void {
+  fn j(): void;
+  fn k(s: string): void {
     take({ email: s });                // ERROR: TYPE-1
   }
-  op take(in: In): void;
+  fn take(in: In): void;
 }

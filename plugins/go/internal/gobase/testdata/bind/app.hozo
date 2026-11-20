@@ -11,12 +11,12 @@ namespace api {
   /** 印。付いた op は純粋でなくなる */
   decorator remote;
 
-  @remote export op logout(token: Token?);
-  @remote export op get(in: GetInput): string;
-  @remote export op nested(in: NestedInput): string;
-  @remote export op ping(auth: Auth?): string;
-  @remote export op enter(guest: Guest): string;
-  @remote export op plain(id: string): string;
+  @remote export fn logout(token: Token?);
+  @remote export fn get(in: GetInput): string;
+  @remote export fn nested(in: NestedInput): string;
+  @remote export fn ping(auth: Auth?): string;
+  @remote export fn enter(guest: Guest): string;
+  @remote export fn plain(id: string): string;
 }
 
 /** 呼ぶ側。状態を bind で埋める */
@@ -30,16 +30,16 @@ namespace web {
   bind token to api.*;
   bind locale to web.*;
 
-  export op greet(name: string, locale: Locale): string;
+  export fn greet(name: string, locale: Locale): string;
 
   // 2: 位置が引数そのもの
-  export op signOut()
+  export fn signOut()
   {
     api.logout();
   }
 
   // 3: 位置が、レコードリテラルで渡した引数の中のフィールド（入れ子のレコードリテラルも）
-  export op fetch(id: string): string
+  export fn fetch(id: string): string
   {
     val a = api.get({ id });
     val b = api.nested({ auth: { locale: "en" }, id });
@@ -47,27 +47,27 @@ namespace web {
   }
 
   // 4: 位置が、渡されていない引数の中のフィールド（その引数の型の構造体リテラルを作る）
-  export op check(): string
+  export fn check(): string
   {
     return api.ping();
   }
 
   // 3: 形が nullable の状態が埋まるのは、省略可能な位置だけ（省略可能でない位置に埋めることは、ない。BIND-2）。
   // 読んだ値を、そのまま、構造体リテラルのフィールドに書く
-  export op enter(id: string): string
+  export fn enter(id: string): string
   {
     return api.enter({ id });
   }
 
   // 名前で渡した引数の中の位置は、明示した位置（埋めない）。位置のない op はそのまま
-  export op explicit(in: api.GetInput, id: string): string
+  export fn explicit(in: api.GetInput, id: string): string
   {
     val a = api.get(in);
     return api.plain(id);
   }
 
   // 同じ名前空間の op への呼び出しも、配線が埋める（形が single の状態）
-  export op hello(name: string): string
+  export fn hello(name: string): string
   {
     return greet(name);
   }

@@ -16,5 +16,5 @@ namespace a {
   model Sub extends Query {
     override id = "x";                 // ERROR: SYNTAX
   }
-  op f(q: Query): Query;
+  fn f(q: Query): Query;
 }

@@ -8,32 +8,32 @@ namespace app {
   // 本文の項目: union そのもの、union を中に持つ model
   model ShapeIn { @http.body shape: Shape; }
   @http.post("/shape")
-  export op putShape(in: ShapeIn);
+  export fn putShape(in: ShapeIn);
   model AlbumIn { @http.query id: string?; @http.body album: Album?; @http.body("names") byName: Record<string, Shape[]>; }
   @http.post("/album")
-  export op putAlbum(in: AlbumIn);
+  export fn putAlbum(in: AlbumIn);
 
   // 本文の全体
   model DrawingIn { @http.bodyObj drawing: Drawing; }
   @http.post("/drawing")
-  export op putDrawing(in: DrawingIn);
+  export fn putDrawing(in: DrawingIn);
 
   // 結果
   @http.get("/drawing")
-  export op getDrawing(): Drawing?;
+  export fn getDrawing(): Drawing?;
   @http.get("/shapes")
-  export op getShapes(): Shape[];
+  export fn getShapes(): Shape[];
 
   // @http.status を持つ例外の引数の型: 引数ごとに見る（union を中に持つ引数だけが当たる）
   @http.status(409)
   exception Clash(value: Drawing);
   @http.get("/clash")
-  export op clash(): string
+  export fn clash(): string
     throws Clash;
   @http.status(422)
   exception Refused(card: Card, shapes: Shape[]?, reason: string, album: Album);
   @http.get("/refused")
-  export op refused(): string
+  export fn refused(): string
     throws Refused;
 
   // ステータスを持たない例外の引数は、通信に現れないので、当たらない。union を持たない型も、当たらない
@@ -41,6 +41,6 @@ namespace app {
   @http.status(404)
   exception Missing(card: Card, cards: Record<string, Card[]>?);
   @http.get("/quiet")
-  export op quiet(): Card
+  export fn quiet(): Card
     throws Quiet, Missing;
 }

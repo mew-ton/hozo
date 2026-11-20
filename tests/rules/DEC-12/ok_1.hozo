@@ -3,5 +3,5 @@ namespace a {
   decorator d(code: int);
   decorator a1 = d(1);
   @a1
-  op ok(): void;
+  fn ok(): void;
 }

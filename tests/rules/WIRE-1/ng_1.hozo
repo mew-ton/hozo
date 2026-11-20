@@ -1,7 +1,7 @@
 // WIRE-1（docs/check.md「配線」。文法で閉じる）: 書けるのは、val の宣言、値を入れる文、集める文、return、match、呼び出し、disjoint、for だけ
 namespace a {
-  op v(): string;
-  op f(x: string) {
+  fn v(): string;
+  fn f(x: string) {
     x;                                 // ERROR: SYNTAX
   }
 }

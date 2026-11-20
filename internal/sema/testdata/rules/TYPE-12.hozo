@@ -3,16 +3,16 @@ namespace a {
   model M { id: string; }
   model N { name: string; }
   classify C of M { A; }
-  op ok(m: C.A<M>): void;
-  op ng(n: C.A<N>): void;              // ERROR: TYPE-12
+  fn ok(m: C.A<M>): void;
+  fn ng(n: C.A<N>): void;              // ERROR: TYPE-12
   // op の分類の対象の型は、その op の returns
-  op find(): M?;
+  fn find(): M?;
   classify Found of find { Hit; Other; }
-  op ok2(m: Found.Hit<M?>): void;
-  op ok3(m: Found.Hit<M>): void;
-  op ng3(n: Found.Hit<N>): void;       // ERROR: TYPE-12
+  fn ok2(m: Found.Hit<M?>): void;
+  fn ok3(m: Found.Hit<M>): void;
+  fn ng3(n: Found.Hit<N>): void;       // ERROR: TYPE-12
   // 状態の分類のケースで絞り込んだ型は書けない（RES-4。docs/resolve.md「位置ごとに受け付ける種類」の「型」）
   state items: list<M>;
   classify Stock of items { None; Some; }
-  op ng2(m: Stock.Some<M>): void;      // ERROR: RES-4
+  fn ng2(m: Stock.Some<M>): void;      // ERROR: RES-4
 }

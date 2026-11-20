@@ -3,7 +3,7 @@ namespace a {
   decorator legacy;
   decorator wrap;
   @legacy                              // WARN: CFG-6
-  op f();
+  fn f();
   @wrap
-  op g();
+  fn g();
 }

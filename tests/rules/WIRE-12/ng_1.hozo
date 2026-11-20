@@ -1,8 +1,8 @@
 // WIRE-12: 空で宣言した val に、値を入れる文も、集める文も、ない
 namespace a {
   model M { id: string; }
-  op g();
-  op f(m: M) {
+  fn g();
+  fn f(m: M) {
     val x;                             // ERROR: WIRE-12
     val y: M, z;                       // ERROR: WIRE-12, WIRE-12
     g();

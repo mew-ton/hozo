@@ -3,12 +3,12 @@ namespace a {
   scalar Token extends string;
   state token: single<Token>;
   bind token to b.*;
-  op f() {
+  fn f() {
     b.open();
   }
 }
 namespace b {
   // 内部の op。Token の位置が二つあるが、a からは呼べない
-  op internal(x: a.Token, y: a.Token);
-  export op open(t: a.Token);
+  fn internal(x: a.Token, y: a.Token);
+  export fn open(t: a.Token);
 }

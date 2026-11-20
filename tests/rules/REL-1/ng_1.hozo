@@ -2,5 +2,5 @@
 namespace a {
   exception E;
   exception F;
-  op f() throws E, F throws E;        // ERROR: REL-1
+  fn f() throws E, F throws E;        // ERROR: REL-1
 }

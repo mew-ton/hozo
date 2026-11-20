@@ -4,5 +4,5 @@ namespace a {
   decorator a1 = d(1);
   decorator a2 = a1();                 // ERROR: DEC-12
   @a1
-  op ok(): void;
+  fn ok(): void;
 }

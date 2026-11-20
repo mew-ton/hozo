@@ -2,5 +2,5 @@
 namespace a {
   model M { id: string; }
   classify Ok of M { A; B; C; }
-  op use(m: M);
+  fn use(m: M);
 }

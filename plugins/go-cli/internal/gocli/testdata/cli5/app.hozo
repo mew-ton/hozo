@@ -6,18 +6,18 @@ namespace app {
     @cli.flag("other") other: string?;
   }
   @cli.command("run")
-  export op run(in: In);
+  export fn run(in: In);
 
   // 同じコマンド名
   @cli.command("run")
-  export op again();
+  export fn again();
   @cli.command("run")
-  export op third();
+  export fn third();
 
   // 別の model の同じフラグ名は、重複ではない
   model Else { @cli.flag("name") name: string?; }
   @cli.command("else")
-  export op else_(in: Else);
+  export fn else_(in: Else);
 
   // 名前を省いた @cli.flag は、フィールドの名前がフラグ名（書いた名前と当たる）
   model Implied {
@@ -27,5 +27,5 @@ namespace app {
     @cli.env("verbose") quiet: string?;
   }
   @cli.command("implied")
-  export op implied(in: Implied);
+  export fn implied(in: Implied);
 }

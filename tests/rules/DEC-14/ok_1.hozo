@@ -3,5 +3,5 @@ namespace a {
   exception E;
   @external
   decorator boundary throws E;
-  op f();
+  fn f();
 }

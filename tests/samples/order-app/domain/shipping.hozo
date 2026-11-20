@@ -223,51 +223,51 @@ namespace shipping {
 
   /** その識別子の出荷 */
   @db.find
-  read shipmentById(id: ShipmentId): Shipment? on shipments;
+  read fn shipmentById(id: ShipmentId): Shipment? on shipments;
 
   /** その注文の出荷 */
   @db.find
-  read shipmentOfOrder(orderId: type.OrderId): Shipment? on shipments;
+  read fn shipmentOfOrder(orderId: type.OrderId): Shipment? on shipments;
 
   /** まだ配送業者に渡していない出荷（人が書く: 値がないこと） */
-  read shipmentsInHouse(): Shipment[] on shipments;
+  read fn shipmentsInHouse(): Shipment[] on shipments;
 
   /** その出荷の荷物 */
   @db.find
-  read parcelOf(shipmentId: ShipmentId): Parcel? on parcels;
+  read fn parcelOf(shipmentId: ShipmentId): Parcel? on parcels;
 
   /** その出荷の送り状 */
   @db.find
-  read labelOf(shipmentId: ShipmentId): Label? on labels;
+  read fn labelOf(shipmentId: ShipmentId): Label? on labels;
 
   /** その追跡番号の送り状 */
   @db.find
-  read labelByTracking(trackingNumber: TrackingNumber): Label? on labels;
+  read fn labelByTracking(trackingNumber: TrackingNumber): Label? on labels;
 
   /** その箱の種類 */
   @db.find
-  read boxByCode(code: BoxCode): Box? on boxes;
+  read fn boxByCode(code: BoxCode): Box? on boxes;
 
   /** 出荷を作る。店にある出荷として入る（そろったかどうか: Gathered は、一つの as では一緒に言えない。README.md「分かったこと」の F52） */
   @db.insert
-  effect createShipment(shipment: Shipment) on shipments.post as Custody.InHouse;
+  effect fn createShipment(shipment: Shipment) on shipments.post as Custody.InHouse;
 
   /** 品目を一つ、そろえ場所に置いた: 置いた時刻と、量った大きさを入れる（人が書く）。それで、そろうか、まだ待つかは、残りの品目による */
-  effect recordPlacement(shipment: Shipment, placement: Placement) on shipments.put as Gathered.Awaiting -> else;
+  effect fn recordPlacement(shipment: Shipment, placement: Placement) on shipments.put as Gathered.Awaiting -> else;
 
   /** 配送業者に渡した: 渡した時刻を入れる（人が書く） */
-  effect recordHandOver(shipment: Shipment, at: Time) on shipments.put as Custody.InHouse -> Custody.WithCarrier;
+  effect fn recordHandOver(shipment: Shipment, at: Time) on shipments.put as Custody.InHouse -> Custody.WithCarrier;
 
   /** 届いた: 届いた時刻を入れる（人が書く） */
-  effect recordDelivery(shipment: Shipment, at: Time) on shipments.put as Custody.WithCarrier -> Custody.Delivered;
+  effect fn recordDelivery(shipment: Shipment, at: Time) on shipments.put as Custody.WithCarrier -> Custody.Delivered;
 
   /** 荷物を作る。箱と送料が、ここで決まる。梱包は一度だけ: 荷物のない出荷にだけ、作る */
   @db.insert
-  effect createParcel(parcel: Parcel) on parcels.post as Packing.Unpacked -> Packing.Packed;
+  effect fn createParcel(parcel: Parcel) on parcels.post as Packing.Unpacked -> Packing.Packed;
 
   /** 送り状を記録する。送り状は一つだけ: 送り状のない出荷にだけ、作る */
   @db.insert
-  effect createLabel(label: Label) on labels.post as Labelling.Unlabelled -> Labelling.Labelled;
+  effect fn createLabel(label: Label) on labels.post as Labelling.Unlabelled -> Labelling.Labelled;
 
   // ---- 注文のとき: 送料の見積もりと上限 ----
 
@@ -275,31 +275,31 @@ namespace shipping {
    * 箱で送る行と届け先から、送料の見積もりと上限を出す。箱はまだ決められないので、どちらも、行の大きさからの見込み。
    * 届け先の地帯が料金表になければ Undeliverable。いちばん大きく出来上がると、どの箱にも入らないなら TooLarge。
    */
-  export op estimate(made: ordering.MadeLine[], stocked: ordering.StockedLine[], destination: type.Address): FeeQuote
+  export fn estimate(made: ordering.MadeLine[], stocked: ordering.StockedLine[], destination: type.Address): FeeQuote
     throws Undeliverable, TooLarge
   {
     return foresee(made, stocked, destination, boxes, tariffs);
   }
 
   /** 見積もり（在庫の行の大きさと、受注製作の行のふつうの大きさ）と、上限（受注製作の行がいちばん大きく出来た場合）を数える（人が書く） */
-  op foresee(made: ordering.MadeLine[], stocked: ordering.StockedLine[], destination: type.Address, boxes: Box[], tariffs: Tariff[]): FeeQuote
+  fn foresee(made: ordering.MadeLine[], stocked: ordering.StockedLine[], destination: type.Address, boxes: Box[], tariffs: Tariff[]): FeeQuote
     throws Undeliverable, TooLarge;
 
   // ---- 受け付けたとき: 出荷を開く ----
 
   /** 注文の、箱で送る部分の出荷を開く。在庫の品目は大きさが分かっていて、受注製作の品目は、まだ分からない */
-  export op open(orderId: type.OrderId, part: ordering.PhysicalPart) {
+  export fn open(orderId: type.OrderId, part: ordering.PhysicalPart) {
     val shipment = toGather(orderId, part);
     createShipment(shipment);
   }
 
   /** 識別子を決めて、品目の一覧を作る（人が書く） */
-  op toGather(orderId: type.OrderId, part: ordering.PhysicalPart): Shipment;
+  fn toGather(orderId: type.OrderId, part: ordering.PhysicalPart): Shipment;
 
   // ---- 引く ----
 
   /** 出荷を引く */
-  export op find(id: ShipmentId): Shipment
+  export fn find(id: ShipmentId): Shipment
     throws NoShipment
   {
     val found = shipmentById(id);
@@ -317,7 +317,7 @@ namespace shipping {
   }
 
   /** 出荷の進み具合を引く */
-  export op progress(id: ShipmentId): Progress
+  export fn progress(id: ShipmentId): Progress
     throws NoShipment
   {
     val shipment = find(id);
@@ -325,7 +325,7 @@ namespace shipping {
   }
 
   /** 注文の出荷の進み具合を引く。ダウンロードだけの注文には、ない */
-  export op progressOfOrder(orderId: type.OrderId): Progress? {
+  export fn progressOfOrder(orderId: type.OrderId): Progress? {
     val found = shipmentOfOrder(orderId);
     return match (found by Known) {
       Found   => progressOf(found);
@@ -334,23 +334,23 @@ namespace shipping {
   }
 
   /** 出荷に、荷物と送り状を添える */
-  op progressOf(shipment: Shipment): Progress {
+  fn progressOf(shipment: Shipment): Progress {
     val packed = parcelOf(shipment.id);
     val bought = labelOf(shipment.id);
     return { shipment: shipment, parcel: packed, label: bought };
   }
 
   /** まだ店にある出荷の一覧（そろえている途中のものも、梱包を待っているものも）。それぞれの進み具合を添える */
-  export op inHouse(): Progress[] {
+  export fn inHouse(): Progress[] {
     val waiting = shipmentsInHouse();
     return together(waiting, parcels, labels);
   }
 
   /** 出荷ごとに、荷物と送り状を添える（人が書く） */
-  op together(waiting: Shipment[], parcels: Parcel[], labels: Label[]): Progress[];
+  fn together(waiting: Shipment[], parcels: Parcel[], labels: Label[]): Progress[];
 
   /** 出荷元の住所 */
-  export op shipFrom(): type.Address {
+  export fn shipFrom(): type.Address {
     return origin;
   }
 
@@ -368,7 +368,7 @@ namespace shipping {
    * 品目を一つ、そろえ場所に置いた。受注製作の品目は、出来上がりを量った大きさと重さ（measured）を持ってくる。
    * 在庫の品目は、もう分かっているので、持ってこない。置いた後の出荷を返す。
    */
-  export op gather(orderId: type.OrderId, line: type.LineId, measured: type.Measurement?): Shipment
+  export fn gather(orderId: type.OrderId, line: type.LineId, measured: type.Measurement?): Shipment
     throws NoShipment, UnknownItem
   {
     val found = shipmentOfOrder(orderId);
@@ -379,7 +379,7 @@ namespace shipping {
   }
 
   /** 品目を置けるのは、まだ待っている品目のある出荷だけ。もうそろっている出荷には、何もしない */
-  op placeOn(shipment: Shipment, line: type.LineId, measured: type.Measurement?): Shipment
+  fn placeOn(shipment: Shipment, line: type.LineId, measured: type.Measurement?): Shipment
     throws NoShipment, UnknownItem
   {
     match (shipment by Gathered) {
@@ -390,7 +390,7 @@ namespace shipping {
   }
 
   /** 品目を確かめて、置く */
-  op putDown(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?)
+  fn putDown(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?)
     throws UnknownItem
   {
     val now = clock.now();
@@ -399,7 +399,7 @@ namespace shipping {
   }
 
   /** その行が、出荷の、まだ置いていない品目であることを確かめて、置いた事実にする（人が書く）。品目になければ UnknownItem */
-  op place(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?, now: Time): Placement
+  fn place(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?, now: Time): Placement
     throws UnknownItem;
 
   // ---- 梱包する: 箱と重さを決める。送料が、ここで決まる ----
@@ -417,12 +417,12 @@ namespace shipping {
    * そろった出荷が入る箱の種類と、それぞれの送料。小さい順。梱包する人は、ここから選ぶ。
    * そろっていない出荷は、引数に渡せない（箱は、そろうまで決められない）。
    */
-  export op boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
+  export fn boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
     return fitting(shipment, boxes, tariffs);
   }
 
   /** 品目の大きさから、入る箱の種類を選び、料金表で送料を付ける（人が書く） */
-  op fitting(shipment: Gathered.Complete<Shipment>, boxes: Box[], tariffs: Tariff[]): BoxOption[];
+  fn fitting(shipment: Gathered.Complete<Shipment>, boxes: Box[], tariffs: Tariff[]): BoxOption[];
 
   /**
    * 梱包した: 箱の種類と、量った重さを記録する。送料は、箱の大きさの区分と届け先の地帯から、料金表で決まる。
@@ -431,7 +431,7 @@ namespace shipping {
   @prd.promise("店", "箱は、送る品目がすべてそろうまで決めない")
   @prd.promise("客", "送料は、梱包した箱の大きさと届け先だけで決まる")
   @db.transaction
-  export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
+  export fn pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
     throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable
   {
     val shipment = find(id);
@@ -443,7 +443,7 @@ namespace shipping {
   }
 
   /** そろった出荷だけを、梱包できる */
-  op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
+  fn packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
     throws NotGathered, UnknownBox, OverWeight, Undeliverable
   {
     return match (shipment by Gathered) {
@@ -453,7 +453,7 @@ namespace shipping {
   }
 
   /** 箱の種類を引く */
-  op packInto(shipment: Gathered.Complete<Shipment>, code: BoxCode, weight: type.Grams): Parcel
+  fn packInto(shipment: Gathered.Complete<Shipment>, code: BoxCode, weight: type.Grams): Parcel
     throws UnknownBox, OverWeight, Undeliverable
   {
     val box = boxByCode(code);
@@ -464,7 +464,7 @@ namespace shipping {
   }
 
   /** 荷物を作る */
-  op seal(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams): Parcel
+  fn seal(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams): Parcel
     throws OverWeight, Undeliverable
   {
     val now = clock.now();
@@ -474,7 +474,7 @@ namespace shipping {
   }
 
   /** 箱の大きさの区分と届け先の地帯から、料金表で送料を決めて、荷物にする（人が書く）。重さが箱の上限を超えていれば OverWeight */
-  op weighed(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams, tariffs: Tariff[], now: Time): Parcel
+  fn weighed(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams, tariffs: Tariff[], now: Time): Parcel
     throws OverWeight, Undeliverable;
 
   // ---- 送り状を買う前に: 梱包が済んでいて、まだ送り状がないこと ----
@@ -486,7 +486,7 @@ namespace shipping {
   }
 
   /** 梱包が済んで、まだ送り状を買っていない出荷を、荷物と一緒に引く */
-  export op sealed(id: ShipmentId): Sealed
+  export fn sealed(id: ShipmentId): Sealed
     throws NoShipment, NotPacked, AlreadyLabelled
   {
     val shipment = find(id);
@@ -498,7 +498,7 @@ namespace shipping {
   }
 
   /** 出荷に、荷物を添える */
-  op withParcel(shipment: Shipment): Sealed
+  fn withParcel(shipment: Shipment): Sealed
     throws NotPacked
   {
     val packed = parcelOf(shipment.id);
@@ -509,7 +509,7 @@ namespace shipping {
   }
 
   /** 買った送り状を記録する */
-  export op attachLabel(label: Label) {
+  export fn attachLabel(label: Label) {
     createLabel(label);
   }
 
@@ -524,7 +524,7 @@ namespace shipping {
 
   /** 配送業者に渡した */
   @db.transaction
-  export op handOver(id: ShipmentId): Dispatched
+  export fn handOver(id: ShipmentId): Dispatched
     throws NoShipment, NotPacked, NotLabelled, AlreadyHandedOver
   {
     val shipment = find(id);
@@ -537,7 +537,7 @@ namespace shipping {
   }
 
   /** まだ店にある出荷だけを、渡せる */
-  op release(packed: Sealed, label: Label): Dispatched
+  fn release(packed: Sealed, label: Label): Dispatched
     throws NoShipment, AlreadyHandedOver
   {
     val now = clock.now();
@@ -550,7 +550,7 @@ namespace shipping {
   }
 
   /** 配送業者が、届けたと知らせてきた。知らない追跡番号と、もう届いている出荷は、何もしない */
-  export op delivered(trackingNumber: TrackingNumber, at: Time) {
+  export fn delivered(trackingNumber: TrackingNumber, at: Time) {
     val bought = labelByTracking(trackingNumber);
     match (bought by Labelling) {
       Labelled   => arrive(bought.shipmentId, at);
@@ -559,7 +559,7 @@ namespace shipping {
   }
 
   /** 出荷に、届いた時刻を入れる */
-  op arrive(id: ShipmentId, at: Time) {
+  fn arrive(id: ShipmentId, at: Time) {
     val found = shipmentById(id);
     match (found by Known) {
       Found   => markDelivered(found, at);
@@ -568,7 +568,7 @@ namespace shipping {
   }
 
   /** 配送業者に渡してある出荷だけが、届く */
-  op markDelivered(shipment: Shipment, at: Time) {
+  fn markDelivered(shipment: Shipment, at: Time) {
     match (shipment by Custody) {
       WithCarrier        => recordDelivery(shipment, at);
       InHouse, Delivered => none;

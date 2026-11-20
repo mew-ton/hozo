@@ -10,14 +10,14 @@ namespace a {
    * @throws M                           // ERROR: DOC-1
    * @see Nothing
    */                                    // ERROR(-1): DOC-1
-  op f(m: M): M
+  fn f(m: M): M
     throws E;
   /**
    * @param m ある引数
    * @see f
    * @throws E
    */
-  op g(m: M): M throws E;
+  fn g(m: M): M throws E;
   /** @param x フィールドには引数がない */ // ERROR: DOC-1
   model N { x: string; }
   /** @param code ある */

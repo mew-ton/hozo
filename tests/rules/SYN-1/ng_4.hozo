@@ -7,7 +7,7 @@ namespace marks {
 namespace a {
   @marks.mark                          // ERROR: SYNTAX
   namespace sub {
-    op f();
+    fn f();
   }
-  op g();
+  fn g();
 }

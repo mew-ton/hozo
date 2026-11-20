@@ -5,15 +5,15 @@ namespace a {
   exception F;
   classify Kind of M { A; B; }
   decorator swallow catches E recovers;
-  op fail(): never throws F;
-  op f(m: M): M throws E, F {
+  fn fail(): never throws F;
+  fn f(m: M): M throws E, F {
     return match (m by Kind) {
       A => throw E;
       B => fail();
     };
   }
   @swallow
-  op g(m: M): M {
+  fn g(m: M): M {
     return match (m by Kind) {
       A => m;
       B => throw E;

@@ -12,11 +12,11 @@ namespace web {
   bind token to api.*;
 
   /** ログイン画面へ */
-  effect goLogin() on location.put;
+  effect fn goLogin() on location.put;
   /** ホームへ */
-  effect goHome() on location.put;
+  effect fn goHome() on location.put;
   /** 手元のトークンを消す */
-  effect removeToken() on token.delete;
+  effect fn removeToken() on token.delete;
 
   /** 一時的に表示できない */
   model Unavailable {}
@@ -58,12 +58,12 @@ namespace web {
   model Query { id: api.UserId; page: int?; timeout: Duration?; strict: boolean?; }
 
   // 葉の op
-  op userPageVm(user: api.PublicUser): UserPage;
+  fn userPageVm(user: api.PublicUser): UserPage;
   // docs/ir.md「型」: 絞り込まれた型 case
-  op adminPageVm(user: UserKind.Admin<api.PublicUser>): UserPage;
+  fn adminPageVm(user: UserKind.Admin<api.PublicUser>): UserPage;
   // docs/check.md「配線からの呼び出し」: 効果を呼ぶ配線。書いていない effects は、本体の呼び出しから決まる
-  op greet(user: api.PublicUser) { goHome(); }
-  op clearToken() { removeToken(); }
+  fn greet(user: api.PublicUser) { goHome(); }
+  fn clearToken() { removeToken(); }
 
   /**
    * ユーザーを取る。
@@ -75,14 +75,14 @@ namespace web {
    */
   // docs/check.md「bind」: 明示していない位置 in.token が Call.bound に入る（BIND-3）
   @offlineFallback
-  op fetchUser(q: Query): api.PublicUser
+  fn fetchUser(q: Query): api.PublicUser
     throws api.NotFound, api.Unauthorized
   {
     return api.getUser({ id: q.id });
   }
 
   // docs/check.md「計算」手順 0（配線）: match の一部のアームにしかない効果は succ が unknown
-  op welcome(user: api.PublicUser)
+  fn welcome(user: api.PublicUser)
   {
     match (user by Verified) {
       Verified   => greet(user);
@@ -92,7 +92,7 @@ namespace web {
 
   // docs/check.md「計算」手順 0（配線）: 出どころが二つ（行 1 では prevented、行 2 では kept）で rel が unknown
   // docs/ir.md「正規化」: 複数行の throws は ThrowsClause の列のまま（まとめない）
-  op reload(id: api.UserId): api.PublicUser
+  fn reload(id: api.UserId): api.PublicUser
     throws api.NotFound, api.Unauthorized
     throws Offline
   {
@@ -114,7 +114,7 @@ namespace web {
   @t.entry
   @redirectToLogin
   @traced(id, 5m)
-  op openUser(id: api.UserId): UserPage
+  fn openUser(id: api.UserId): UserPage
     throws Offline, api.NotFound
   {
     val user = fetchUser({ id });
@@ -128,7 +128,7 @@ namespace web {
   // docs/check.md「計算」手順 i の ignores: Timeout を吸収し、deleteSession の succ は unknown。docs/check.md「bind」: api.logout() の bound は ["token"]
   @t.entry
   @ignoreTimeout
-  op signOut()
+  fn signOut()
   {
     api.logout();
     clearToken();
@@ -140,7 +140,7 @@ namespace web {
   // docs/check.md「計算」手順 i の recovers: Timeout のとき createSession が不明なので succ(createSession) = unknown（DEC-5 の warning。README.md）
   model LoginForm { name: string; password: string; }
   @offlineFallback
-  op login(form: LoginForm): api.Session
+  fn login(form: LoginForm): api.Session
     throws api.Invalid
   {
     return api.login({ creds: { name: form.name, password: form.password } });

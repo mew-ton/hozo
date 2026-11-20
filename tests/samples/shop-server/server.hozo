@@ -48,7 +48,7 @@ namespace server {
   /** ログインする */
   @http.post("/login")
   @rate.limited
-  export op login(in: LoginInput): LoginOk
+  export fn login(in: LoginInput): LoginOk
     throws type.InvalidCredentials
   {
     val user = store.findUser(in.body.email);
@@ -59,7 +59,7 @@ namespace server {
   }
 
   /** パスワードを確かめて、セッションを作る */
-  op issueSession(user: type.User, password: type.Password): LoginOk
+  fn issueSession(user: type.User, password: type.Password): LoginOk
     throws type.InvalidCredentials
   {
     checkPassword(user, password);
@@ -70,14 +70,14 @@ namespace server {
   }
 
   /** パスワードが合わなければ InvalidCredentials（人が書く） */
-  op checkPassword(user: type.User, password: type.Password)
+  fn checkPassword(user: type.User, password: type.Password)
     throws type.InvalidCredentials;
 
   /** トークンと期限を決める（人が書く） */
-  op newSession(user: type.User): type.Session;
+  fn newSession(user: type.User): type.Session;
 
   /** ユーザーを、外に見せる形に写す（人が書く） */
-  op toPublicUser(user: type.User): type.PublicUser;
+  fn toPublicUser(user: type.User): type.PublicUser;
 
   // ---- 誰が呼んだか ----
 
@@ -88,7 +88,7 @@ namespace server {
   }
 
   /** 呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
-  op authenticate(token: type.Token?): type.Session
+  fn authenticate(token: type.Token?): type.Session
     throws type.Unauthorized
   {
     return match (token by Credential) {
@@ -98,7 +98,7 @@ namespace server {
   }
 
   /** そのトークンのセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
-  op sessionOf(token: type.Token): type.Session
+  fn sessionOf(token: type.Token): type.Session
     throws type.Unauthorized
   {
     val session = store.findSession(token);
@@ -109,12 +109,12 @@ namespace server {
   }
 
   /** 期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized。時計を使う（人が書く） */
-  op requireFresh(session: type.Session): type.Session
+  fn requireFresh(session: type.Session): type.Session
     throws type.Unauthorized;
 
   /** ログアウトする */
   @http.post("/logout")
-  export op logout(in: AuthInput)
+  export fn logout(in: AuthInput)
     throws type.Unauthorized
   {
     val session = authenticate(in.token);
@@ -123,7 +123,7 @@ namespace server {
 
   /** 自分の情報を返す */
   @http.get("/me")
-  export op getMe(in: AuthInput): type.PublicUser
+  export fn getMe(in: AuthInput): type.PublicUser
     throws type.Unauthorized
   {
     val session = authenticate(in.token);
@@ -138,7 +138,7 @@ namespace server {
 
   /** 自分の注文の一覧を返す */
   @http.get("/orders")
-  export op getOrders(in: GetOrdersInput): type.Order[]
+  export fn getOrders(in: GetOrdersInput): type.Order[]
     throws type.Unauthorized
   {
     val session = authenticate(in.token);
@@ -147,11 +147,11 @@ namespace server {
   }
 
   /** 一覧から、そのページの分を取り出す（人が書く） */
-  op pageOf(orders: type.Order[], page: int): type.Order[];
+  fn pageOf(orders: type.Order[], page: int): type.Order[];
 
   /** 自分のいちばん新しい注文を返す。まだ注文がなければ、値がない */
   @http.get("/orders/latest")
-  export op getLatestOrder(in: AuthInput): type.Order?
+  export fn getLatestOrder(in: AuthInput): type.Order?
     throws type.Unauthorized
   {
     val session = authenticate(in.token);
@@ -160,7 +160,7 @@ namespace server {
 
   /** 自分のページ: 自分の情報と、いちばん新しい注文と、注文ごとの要約を、まとめて返す */
   @http.get("/me/page")
-  export op getMyPage(in: AuthInput): MyPage
+  export fn getMyPage(in: AuthInput): MyPage
     throws type.Unauthorized
   {
     val session = authenticate(in.token);
@@ -184,14 +184,14 @@ namespace server {
   }
 
   /** 注文を、一行の要約にする（人が書く） */
-  op summarize(order: type.Order): OrderSummary;
+  fn summarize(order: type.Order): OrderSummary;
 
   /** 見せる形にまとめる（人が書く） */
-  op myPage(user: type.PublicUser, latest: type.Order?, summaries: OrderSummary[]): MyPage;
+  fn myPage(user: type.PublicUser, latest: type.Order?, summaries: OrderSummary[]): MyPage;
 
   /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")
-  export op placeOrder(in: PlaceOrderInput): type.Order
+  export fn placeOrder(in: PlaceOrderInput): type.Order
     throws type.Unauthorized, type.NotificationFailed
   {
     val session = authenticate(in.token);
@@ -203,14 +203,14 @@ namespace server {
   }
 
   /** 識別子と時刻を決めて、注文を作る（人が書く） */
-  op newOrder(session: type.Session, lines: type.OrderLine[]): type.Order;
+  fn newOrder(session: type.Session, lines: type.OrderLine[]): type.Order;
 
   /** 通知の文面を作る（人が書く） */
-  op composeNotice(order: type.Order): type.Notification;
+  fn composeNotice(order: type.Order): type.Notification;
 
   /** 自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る */
   @http.post("/orders/notices")
-  export op resendNotices(in: AuthInput): type.Notification[]
+  export fn resendNotices(in: AuthInput): type.Notification[]
     throws type.Unauthorized, type.NotificationFailed
   {
     val session = authenticate(in.token);

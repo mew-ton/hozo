@@ -56,11 +56,11 @@
 | 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）、`classify` のケース（`C.Case<T>` の形でだけ。`C` は値の分類か op の分類で、どの名前空間のものでもよい。状態の分類と、対象のない分類なら RES-4）。核の型と形の語は予約語なので解決しない |
 | ユニオンのメンバー `X;` | `exception`、`effect`、`union`（`set`） |
 | `exception`、`effect`、`read` の引数の型、`read` の結果の型 | 上の「型」と同じ |
-| `effect e(…) on s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
-| `read r(…): T on s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
-| `effect e(…) on X: A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
+| `effect fn e(…) on s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
+| `read fn r(…): T on s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
+| `effect fn e(…) on X: A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
 | 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら `Empty` / `HasItems` |
-| 行の遷移のケース `C.K`（`effect e(…) on s.op as C.K -> …`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
+| 行の遷移のケース `C.K`（`effect fn e(…) on s.op as C.K -> …`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
 | `catches` の要素 | `throws` と同じ |
@@ -68,8 +68,8 @@
 | `effects` の要素 | 名前で書いた要素: `effect`、`union`（`set` で要素が効果）。直に書いた要素: `state`（基底の状態。どの名前空間のものでも解決する）から辿った `post` / `put` / `delete`（下の「`effects` の要素の読み分け」）。デコレータの宣言の中なら `any effect` の引数（残りの引数でもよい）も。操作を付けない `state` と `classify` は RES-4（分類の遷移は直に書けない）。操作が状態の形になければ STATE-1、葉の op が節を書けば STATE-5、配線の op に書いたものが計算と食い違えば EFF-2（`docs/check.md`「状態と効果」） |
 | `reads` の要素 | 名前で書いた要素: `read`。直に書いた要素: `state`（基底の状態）。どちらも、どの名前空間のものでも解決する。デコレータの宣言の中なら `any state` の引数（残りの引数でもよい）も。どれでもなければ RES-4（状態の分類も書けない）。同じ名前空間に同じ名前の `read` と `state` は宣言できない（RES-6）ので、名前がどちらを指すかは一つに決まる。葉の op が節を書けば STATE-5、配線の op に書いたものが計算と食い違えば READS-2（`docs/check.md`「状態と効果」） |
 | `@name`（核の印 `@external` と `@repeatable` を除く。`docs/grammar.md`「予約語」） | `decorator`。名前の最後の要素は予約語でもよい（`@db.list`。`docs/grammar.md`「識別子」の `DecoratorRef`）。付ける先の種類との照合は DEC-1 |
-| デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」）。分類のケースを受け取る引数（`any case`、`any case of never`、`any Actor case`）には、分類のケース（`Actor.Customer`。どの名前空間の分類でもよく、別の名前空間のものは、修飾して書く）。`any op` の引数に渡した op が、デコレータを付けた宣言とは別の名前空間の、`export` のない op なら NS-5 |
-| デコレータの宣言の、分類のケース（`名前 case`。`docs/grammar.md`「decorator の宣言」の `CaseKind`）の名前 | `classify`（どの名前空間のものでもよく、別の名前空間のものは、修飾して書く）。分類でなければ RES-4 |
+| デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」）。分類のケースを受け取る引数（`any case`、`any case of never`、`any case of Actor`）には、分類のケース（`Actor.Customer`。どの名前空間の分類でもよく、別の名前空間のものは、修飾して書く）。`any op` の引数に渡した op が、デコレータを付けた宣言とは別の名前空間の、`export` のない op なら NS-5 |
+| デコレータの宣言の、分類のケース（`case of 名前`。`docs/grammar.md`「decorator の宣言」の `CaseKind`）の、`of` の後ろの名前 | 型（上の「型」と同じ）か、`classify`（どの名前空間のものでもよく、別の名前空間のものは、修飾して書く）。`classify` なら、その分類のケース。型なら、対象が、その型の分類のケース。どちらでもなければ（op、状態など）RES-4 |
 | `match (x by C)` の `C` | `classify`（値の分類、op の分類、状態の分類。対象のない分類なら MATCH-7）。どの名前空間のものでもよく、別の名前空間のものは修飾して書く。対象の有無と分類の種類の照合は MATCH-7 |
 | `match (by C)` の `C` | 同上。状態の分類が別の名前空間のものなら `RES-5` |
 | `match (x by list)` / `(x by nullable)` の `list` / `nullable` | 解決しない（標準の分類の名前。予約語） |

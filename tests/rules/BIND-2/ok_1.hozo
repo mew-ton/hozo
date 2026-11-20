@@ -4,6 +4,6 @@ namespace a {
   state token: nullable<Token>;
   bind token to a.*;
   model In { token: Token?; }
-  op g(in: In);
-  op h(t: Token?);
+  fn g(in: In);
+  fn h(t: Token?);
 }

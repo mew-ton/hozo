@@ -6,13 +6,13 @@ namespace a {
   model In { m: M?; }
   model Wrap { m: M; note: string?; }
   state current: M?;
-  op find(): M?;
+  fn find(): M?;
   classify Found of find { Hit: find as M; Miss: find as else; }
   classify Session of current { In: current as M; Out: current as else; }
-  op takeM(m: M): void;
-  op takeString(s: string): void;
-  op takeWrap(w: Wrap): void;
-  op f(in: In): void {
+  fn takeM(m: M): void;
+  fn takeString(s: string): void;
+  fn takeWrap(w: Wrap): void;
+  fn f(in: In): void {
     val m = find();
     match (m by Found) {
       Hit     => takeM(m);
@@ -39,7 +39,7 @@ namespace a {
     };
   }
   // 状態を対象にした絞り込み: アームの中のその状態の名前は、match が読んだ値を指す
-  op g(): void {
+  fn g(): void {
     match (current by nullable) {
       HasItems => takeM(current);
       Empty    => none;
@@ -50,7 +50,7 @@ namespace a {
     };
   }
   // アームの本体の値にも掛かる
-  op h(): M? {
+  fn h(): M? {
     val m = find();
     return match (m by Found) {
       Hit     => m;

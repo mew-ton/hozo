@@ -3,12 +3,12 @@
 namespace a {
   model M { id: string; }
   state token: nullable<string>;
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
   classify Session of token { LoggedIn: token as string; LoggedOut: token as else; }
-  op use(m: M);
-  op f();
-  op ok() {
+  fn use(m: M);
+  fn f();
+  fn ok() {
     val m = find();
     match (m by Hit) { Found => use(m); Missing => none; };
     match (m by Hit) { Found, Missing => f(); };

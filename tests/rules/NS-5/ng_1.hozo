@@ -1,15 +1,15 @@
 // NS-5（docs/check.md「名前空間」「export」）: 別の名前空間の、export のない op（内部の op）を配線から呼んだ。
 // 位置は呼び出しの op の名前。親と子の名前空間も、互いに別の名前空間
 namespace a {
-  op hidden(): string;
-  op f(): string {
+  fn hidden(): string;
+  fn f(): string {
     return b.internal();               // ERROR: NS-5
   }
-  op g() {
+  fn g() {
     val x = a.sub.inner();           // ERROR: NS-5
     b.take(x);                         // ERROR: NS-5
   }
-  op h(x: string): string {
+  fn h(x: string): string {
     return match (x by b.Kind) {
       A => b.internal();               // ERROR: NS-5
       B => b.open();
@@ -17,14 +17,14 @@ namespace a {
   }
 }
 namespace a.sub {
-  op inner(): string;
-  op up(): string {
+  fn inner(): string;
+  fn up(): string {
     return a.hidden();                 // ERROR: NS-5
   }
 }
 namespace b {
   classify Kind of string { A; B; }
-  op internal(): string;
-  op take(x: string);
-  export op open(): string;
+  fn internal(): string;
+  fn take(x: string);
+  export fn open(): string;
 }

@@ -2,14 +2,14 @@
 // 伝播する（EFF-1）
 namespace a {
   state s: list<string>;
-  effect e(x: string) on s.post;
-  effect f(id: string) on s.delete;
+  effect fn e(x: string) on s.post;
+  effect fn f(id: string) on s.delete;
   decorator doing(...targets: any effect) for op effects targets;
   @doing(f, e)
-  export op replace(id: string, x: string);
+  export fn replace(id: string, x: string);
 }
 namespace b {
-  op wiring(id: string, x: string) effects a.f, a.e {
+  fn wiring(id: string, x: string) effects a.f, a.e {
     a.replace(id, x);
   }
 }

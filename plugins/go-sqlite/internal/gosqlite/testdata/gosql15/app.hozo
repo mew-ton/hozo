@@ -12,21 +12,21 @@ namespace app {
   @db.table state rows: list<Row>;
 
   @db.update
-  effect updateNote(row: Note) on notes.put;
+  effect fn updateNote(row: Note) on notes.put;
   /** 配線が呼んでいない効果も、同じに確かめる */
   @db.update
-  effect updateMark(row: Mark) on marks.put;
+  effect fn updateMark(row: Mark) on marks.put;
   // 配線が呼んでも、効果ごとに一度だけ
-  export op saveNote(note: Note) {
+  export fn saveNote(note: Note) {
     updateNote(note);
   }
 
   // 通るもの
   @db.update
-  effect updateRow(row: Row) on rows.put;
+  effect fn updateRow(row: Row) on rows.put;
   // @db.insert と @db.delete は、キーを要らない
   @db.insert
-  effect createNote(row: Note) on notes.post;
+  effect fn createNote(row: Note) on notes.post;
   @db.delete
-  effect deleteMark(book: string) on marks.delete;
+  effect fn deleteMark(book: string) on marks.delete;
 }

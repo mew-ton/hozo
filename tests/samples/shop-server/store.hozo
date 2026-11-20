@@ -23,98 +23,98 @@ namespace store {
 
   /** email が同じユーザー */
   @db.find
-  read userByEmail(email: type.Email): type.User? on users;
+  read fn userByEmail(email: type.Email): type.User? on users;
 
   /** 識別子が同じユーザー */
   @db.find
-  read userById(id: type.UserId): type.User? on users;
+  read fn userById(id: type.UserId): type.User? on users;
 
   /** トークンが同じセッション */
   @db.find
-  read sessionByToken(token: type.Token): type.Session? on sessions;
+  read fn sessionByToken(token: type.Token): type.Session? on sessions;
 
   /** そのユーザーの注文。足した順 */
   @db.list
-  read ordersOfUser(userId: type.UserId): type.Order[] on orders;
+  read fn ordersOfUser(userId: type.UserId): type.Order[] on orders;
 
   /** そのユーザーの、いちばん新しい注文。まだ注文がなければ、ない */
   @db.find
   @db.latest("placedAt")
-  read latestOrderOf(userId: type.UserId): type.Order? on orders;
+  read fn latestOrderOf(userId: type.UserId): type.Order? on orders;
 
   // ---- 書く: 効果は、表に何をするかを言う ----
 
   /** ユーザーを登録する */
   @db.insert
-  effect createUser(user: type.User) on users.post;
+  effect fn createUser(user: type.User) on users.post;
 
   /** ログインセッションを作る */
   @db.insert
-  effect createSession(session: type.Session) on sessions.post;
+  effect fn createSession(session: type.Session) on sessions.post;
 
   /** ログインセッションを消す */
   @db.delete
-  effect deleteSession(token: type.Token) on sessions.delete;
+  effect fn deleteSession(token: type.Token) on sessions.delete;
 
   /** 注文を作る */
   @db.insert
-  effect createOrder(order: type.Order) on orders.post;
+  effect fn createOrder(order: type.Order) on orders.post;
 
   /** ユーザーへの通知を記録する */
   @db.insert
-  effect notifyUser(notification: type.Notification) on notifications.post;
+  effect fn notifyUser(notification: type.Notification) on notifications.post;
 
   // ---- ほかの名前空間が呼ぶ op: read か効果を呼ぶだけの配線 ----
 
   /** email からユーザーを引く */
-  export op findUser(email: type.Email): type.User? {
+  export fn findUser(email: type.Email): type.User? {
     return userByEmail(email);
   }
 
   /** 識別子からユーザーを引く */
-  export op findUserById(id: type.UserId): type.User? {
+  export fn findUserById(id: type.UserId): type.User? {
     return userById(id);
   }
 
   /** トークンからセッションを引く */
-  export op findSession(token: type.Token): type.Session? {
+  export fn findSession(token: type.Token): type.Session? {
     return sessionByToken(token);
   }
 
   /** ユーザーの注文を、足した順に返す */
-  export op listOrders(userId: type.UserId): type.Order[] {
+  export fn listOrders(userId: type.UserId): type.Order[] {
     return ordersOfUser(userId);
   }
 
   /** ユーザーの、いちばん新しい注文を返す。まだ注文がなければ、値がない */
-  export op latestOrder(userId: type.UserId): type.Order? {
+  export fn latestOrder(userId: type.UserId): type.Order? {
     return latestOrderOf(userId);
   }
 
   /** ユーザーを足す */
-  export op addUser(user: type.User) {
+  export fn addUser(user: type.User) {
     createUser(user);
   }
 
   /** セッションを足す */
-  export op addSession(session: type.Session) {
+  export fn addSession(session: type.Session) {
     createSession(session);
   }
 
   /** そのトークンのセッションを消す */
-  export op removeSession(token: type.Token) {
+  export fn removeSession(token: type.Token) {
     deleteSession(token);
   }
 
   /** 注文と、その通知の記録を、一緒に足す。どちらも足すか、どちらも足さない */
   @db.transaction
-  export op placeOrder(order: type.Order, notification: type.Notification) {
+  export fn placeOrder(order: type.Order, notification: type.Notification) {
     createOrder(order);
     notifyUser(notification);
   }
 
   /** 通知の記録を、一つ足す */
-  export op recordNotice(notification: type.Notification) {
+  export fn recordNotice(notification: type.Notification) {
     notifyUser(notification);
   }
 

@@ -23,7 +23,7 @@ namespace app {
     @valid.min(5) @cli.flag("both") @cli.default(0) both: Count;
   }
   @cli.command("run")
-  export op run(in: In);
+  export fn run(in: In);
 
   // 制約に合う値と、制約のないフィールドは、当たらない
   model Fine {
@@ -33,5 +33,5 @@ namespace app {
     @cli.flag("free") @cli.default("") free: string;
   }
   @cli.command("fine")
-  export op fine(in: Fine);
+  export fn fine(in: Fine);
 }

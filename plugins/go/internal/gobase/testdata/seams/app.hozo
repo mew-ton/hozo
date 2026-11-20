@@ -27,9 +27,9 @@ namespace shop {
   /** 店の名前 */
   state title: single<string>;
   /** 品物を足す */
-  effect addItem(item: Item) on items.post;
+  effect fn addItem(item: Item) on items.post;
   /** 識別子が同じ品物の数 */
-  read countById(id: string): int on items;
+  read fn countById(id: string): int on items;
 
   // 「中身」置き場 1（配線）: wiring.go の buyBody。継ぎ目を持つ op を同じ名前空間の配線から呼ぶと、外側を通る
   /**
@@ -38,7 +38,7 @@ namespace shop {
    * @param id 品物の識別子
    */
   @t.limited
-  export op buy(id: string): Item
+  export fn buy(id: string): Item
   {
     val item = find(id);
     add(item);
@@ -48,7 +48,7 @@ namespace shop {
   // 「中身」継ぎ目が掛かるのは op だけ: 継ぎ目を持つ配線の中身が呼ぶ read と効果と、直に呼ぶ組み込みの効果は、
   // 状態の単位のメソッドを、そのまま呼ぶ
   @t.limited
-  export op restock(item: Item): int
+  export fn restock(item: Item): int
   {
     addItem(item);
     title.put("restocked");
@@ -57,46 +57,46 @@ namespace shop {
 
   // 「中身」置き場 2（never を返す op）: ops.go の、外側のすぐ後ろの closedBody
   @t.limited
-  export op closed(): never throws Closed;
+  export fn closed(): never throws Closed;
 
   // 「中身」置き場 3（葉）: Leaves のメソッドの値（名前は op 名のまま）。デコレータが reads / effects を運ぶ葉も、Leaves
   @t.limited
-  @doing(addItem) export op add(item: Item);
+  @doing(addItem) export fn add(item: Item);
   @t.limited
-  @reading(items) export op count(): int;
+  @reading(items) export fn count(): int;
   @t.limited
-  @reading(items, title) export op summary(): string;
+  @reading(items, title) export fn summary(): string;
   @t.limited
-  export op notify(item: Item);
+  export fn notify(item: Item);
 
   // 「外側」二つの継ぎ目の入れ子（先に書かれたものほど外側）と、間の継ぎ目を持たないデコレータ
   @t.traced
   @t.plain
   @t.limited
-  export op find(id: string): Item
+  export fn find(id: string): Item
   {
     return lookup(id);
   }
-  export op lookup(id: string): Item;
+  export fn lookup(id: string): Item;
 
   // 「内側のフォルダと、別の名前空間」内部の op も継ぎ目を持つ（二層と Seams は内側のパッケージ）
   @t.traced
-  op audit(item: Item);
+  fn audit(item: Item);
 
   // 「Seams」body という名前が op の引数の局所の名前と当たる
   @t.limited
-  export op post(body: string, body_: string): string;
+  export fn post(body: string, body_: string): string;
 
   // 継ぎ目にないデコレータだけの op は、継ぎ目を持たない
   @t.plain
-  export op plain(id: string): Item;
+  export fn plain(id: string): Item;
 }
 
 /** shop の op を呼ぶ側 */
 namespace front {
   // 「内側のフォルダと、別の名前空間」別の名前空間の op の継ぎ目について、呼ぶ側は何も出さない
   @t.plain
-  export op order(id: string): shop.Item
+  export fn order(id: string): shop.Item
   {
     return shop.buy(id);
   }

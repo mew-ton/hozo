@@ -11,6 +11,6 @@ namespace stock {
 
   /** 在庫を引き当てる */
   @t.stock
-  export op reserve(id: ItemId)
+  export fn reserve(id: ItemId)
     throws Short;
 }

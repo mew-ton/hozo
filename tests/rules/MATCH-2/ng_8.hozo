@@ -5,8 +5,8 @@ namespace a {
   state token: nullable<string>;
   classify Checkout of carts, orders { Shopping; Ordered; }
   classify Session of token { LoggedIn; LoggedOut; }
-  op f();
-  op ng() {
+  fn f();
+  fn ng() {
     match (by Checkout) {                // ERROR: MATCH-2
       Shopping => f();
     };

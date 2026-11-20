@@ -8,8 +8,8 @@ namespace a {
   union Three { Ready: M; Missing: N; Broken: O; }
   state token: nullable<string>;
   state profile: nullable<string>;
-  op find(): M?;
-  op other(): M?;
+  fn find(): M?;
+  fn other(): M?;
 
   // 書ける: presence（値の分類、op の分類、対象の状態が一つの状態の分類）、variant（残りのアームが一つ、二つ以上）
   classify V of M? { Has: M? as M; Lacks: M? as else; }

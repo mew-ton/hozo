@@ -1,4 +1,4 @@
 // CFG-15（docs/config.md「診断」）: transpilers の名前 dup を、二つのプラグイン（plugins/one と plugins/two）が提供している（ng_1.toml）
 namespace a {
-  op f();
+  fn f();
 }

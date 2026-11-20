@@ -1,4 +1,4 @@
 // CFG-7（docs/config.md「形」「診断」）: 名前空間ごとのテーブルは知らないキー（ng_4.toml）
 namespace a {
-  op f();
+  fn f();
 }

@@ -4,17 +4,17 @@ namespace a {
   model M { id: string; }
   exception E;
   classify Kind of M { A; B; }
-  op fail(): never throws E;
-  op g();
-  op f() throws E {
+  fn fail(): never throws E;
+  fn g();
+  fn f() throws E {
     fail();                            // ERROR: WIRE-9
     g();
   }
-  op h(m: M) throws E {
+  fn h(m: M) throws E {
     match (m by Kind) { A => throw E; B => fail(); };    // ERROR: WIRE-9
     g();
   }
-  op twice() throws E {
+  fn twice() throws E {
     fail();                            // ERROR: WIRE-9
     fail();
   }

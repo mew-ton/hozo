@@ -23,52 +23,52 @@ namespace app {
   // 文字列の列に、整数、真偽値
   @db.list
   @db.where("id", 1)
-  read intToText(): Row[] on rows;
+  read fn intToText(): Row[] on rows;
   @db.list
   @db.where("name", true)
-  read boolToName(): Row[] on rows;
+  read fn boolToName(): Row[] on rows;
   // 整数の列に、文字列、小数
   @db.list
   @db.where("count", "1")
-  read textToInt(): Row[] on rows;
+  read fn textToInt(): Row[] on rows;
   @db.list
   @db.where("count", 1.5)
-  read floatToInt(): Row[] on rows;
+  read fn floatToInt(): Row[] on rows;
   // 小数の列に、文字列
   @db.list
   @db.where("ratio", "0.5")
-  read textToFloat(): Row[] on rows;
+  read fn textToFloat(): Row[] on rows;
   // 真偽値の列に、整数、文字列
   @db.list
   @db.where("flag", 1)
-  read intToBool(): Row[] on rows;
+  read fn intToBool(): Row[] on rows;
   @db.list
   @db.where("flag", "true")
-  read textToBool(): Row[] on rows;
+  read fn textToBool(): Row[] on rows;
   // Duration の列（@db.int）に、整数
   @db.list
   @db.where("span", 60)
-  read intToDuration(): Row[] on rows;
+  read fn intToDuration(): Row[] on rows;
   // @db.time の列には、渡せるリテラルがない
   @db.list
   @db.where("at", "2026-01-02T03:04:05Z")
-  read textToTime(): Row[] on rows;
+  read fn textToTime(): Row[] on rows;
   // @db.json の列には、渡せるリテラルがない
   @db.list
   @db.where("tags", "[]")
-  read textToJSON(): Row[] on rows;
+  read fn textToJSON(): Row[] on rows;
   @db.list
   @db.where("tag", "{}")
-  read textToModel(): Row[] on rows;
+  read fn textToModel(): Row[] on rows;
   // 省略可能は、外して見る
   @db.list
   @db.where("note", 0)
-  read intToMaybeText(): Row[] on rows;
+  read fn intToMaybeText(): Row[] on rows;
   // 二つの @db.where の、一つだけが渡せない
   @db.list
   @db.where("name", "n")
   @db.where("rank", "high")
-  read mixed(): Row[] on rows;
+  read fn mixed(): Row[] on rows;
 
   // ---- 通るもの ----
 
@@ -80,8 +80,8 @@ namespace app {
   @db.where("flag", false)
   @db.where("note", "x")
   @db.where("rank", -2)
-  read fits(): Row[] on rows;
+  read fn fits(): Row[] on rows;
   @db.list
   @db.where("ratio", 0.5)
-  read floatToFloat(): Row[] on rows;
+  read fn floatToFloat(): Row[] on rows;
 }

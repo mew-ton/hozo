@@ -5,16 +5,16 @@ namespace a {
   model M { id: string; }
   exception E;
   classify C of M { A; B; D; }
-  op m(x: M): M;
-  op opt(x: M): M?;
-  op fail(): never throws E;
-  op email(): Email;
-  op name(x: M): string;
-  op use(x: M?): void;
-  op useM(x: M): void;
-  op useInt(n: int): void;
-  op useString(s: string): void;
-  op f(x: M): void throws E {
+  fn m(x: M): M;
+  fn opt(x: M): M?;
+  fn fail(): never throws E;
+  fn email(): Email;
+  fn name(x: M): string;
+  fn use(x: M?): void;
+  fn useM(x: M): void;
+  fn useInt(n: int): void;
+  fn useString(s: string): void;
+  fn f(x: M): void throws E {
     // 返らないアームを除いて M
     val r1 = match (x by C) { A => m(x); B => throw E; D => fail(); };
     useM(r1);
@@ -25,7 +25,7 @@ namespace a {
     val r3 = match (x by C) { A => x; B, D => m(x); };
     useM(r3);
   }
-  op f2(x: M): void {
+  fn f2(x: M): void {
     // リテラルだけなら、その種類の核の型
     val r4 = match (x by C) { A => 1; B, D => 2; };
     useInt(r4);
@@ -37,7 +37,7 @@ namespace a {
     use(r6);
   }
   // すべてのアームが返らない match は「返らない」
-  op g(x: M): M throws E {
+  fn g(x: M): M throws E {
     return match (x by C) { A, B => throw E; D => fail(); };
   }
 }

@@ -172,33 +172,33 @@ namespace ordering {
 
   /** その鍵の注文 */
   @db.find
-  read orderByKey(key: type.OrderKey): Order? on orders;
+  read fn orderByKey(key: type.OrderKey): Order? on orders;
 
   /** その識別子の注文 */
   @db.find
-  read orderById(id: type.OrderId): Order? on orders;
+  read fn orderById(id: type.OrderId): Order? on orders;
 
   /** その送信で、もう作った注文 */
   @db.find
-  read orderByRequest(requestId: type.RequestId): Order? on orders;
+  read fn orderByRequest(requestId: type.RequestId): Order? on orders;
 
   /** deadline より前に申し込まれて、まだ支払いを待っている注文。古い順（比較と並べ方は db の語彙で言えないので、人が書く） */
-  read unpaidBefore(deadline: Time): Order[] on orders;
+  read fn unpaidBefore(deadline: Time): Order[] on orders;
 
   /** 注文を作る。支払いを待つ注文として入る */
   @db.insert
-  effect createOrder(order: Order) on orders.post as Standing.AwaitingPayment;
+  effect fn createOrder(order: Order) on orders.post as Standing.AwaitingPayment;
 
   /** 受け付けた: 受け付けた時刻を入れる（人が書く） */
-  effect acceptOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Accepted;
+  effect fn acceptOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Accepted;
 
   /** 期限切れにした: 期限が過ぎた時刻を入れる（人が書く） */
-  effect expireOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Expired;
+  effect fn expireOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Expired;
 
   // ---- 値段を付ける ----
 
   /** カートを、商品の種類ごとに分けて、商品の代金を出す。送料は、まだ出さない（届け先が要る） */
-  export op itemise(lines: CartLine[]): Sorted
+  export fn itemise(lines: CartLine[]): Sorted
     throws UnknownProduct, NotForSale
   {
     val skus = skusOf(lines);
@@ -207,7 +207,7 @@ namespace ordering {
   }
 
   /** カートに値段を付ける。箱で送るものがあれば、届け先から、送料の見積もりと上限を出す */
-  export op price(lines: CartLine[], destination: type.Address?): Priced
+  export fn price(lines: CartLine[], destination: type.Address?): Priced
     throws UnknownProduct, NotForSale, DestinationRequired, shipping.Undeliverable, shipping.TooLarge
   {
     val sorted = itemise(lines);
@@ -218,14 +218,14 @@ namespace ordering {
   }
 
   /** カートの商品の識別子（人が書く） */
-  op skusOf(lines: CartLine[]): type.Sku[];
+  fn skusOf(lines: CartLine[]): type.Sku[];
 
   /** カートの行を、商品の種類ごとに分け、注文したときの値段と、種類ごとの事実を写す（人が書く）。混ざった注文は、ここで三つに分かれる */
-  op sort(lines: CartLine[], products: catalog.Product[]): Sorted
+  fn sort(lines: CartLine[], products: catalog.Product[]): Sorted
     throws UnknownProduct, NotForSale;
 
   /** 箱で送るものがあるカートは、届け先が要る */
-  op priceToShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address?): Priced
+  fn priceToShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address?): Priced
     throws DestinationRequired, shipping.Undeliverable, shipping.TooLarge
   {
     return match (destination by Destination) {
@@ -235,7 +235,7 @@ namespace ordering {
   }
 
   /** 送料の見積もりと上限を、shipping に出してもらう */
-  op withShipping(sorted: Mix.NeedsBox<Sorted>, destination: type.Address): Priced
+  fn withShipping(sorted: Mix.NeedsBox<Sorted>, destination: type.Address): Priced
     throws shipping.Undeliverable, shipping.TooLarge
   {
     val terms = shipping.estimate(sorted.made, sorted.stocked, destination);
@@ -243,10 +243,10 @@ namespace ordering {
   }
 
   /** 箱で送る部分を組み立てる（人が書く） */
-  op toShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address, terms: shipping.FeeQuote): Priced;
+  fn toShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address, terms: shipping.FeeQuote): Priced;
 
   /** ダウンロードだけの中身にする（人が書く） */
-  op withoutShipping(sorted: Mix.DigitalOnly<Sorted>): Priced;
+  fn withoutShipping(sorted: Mix.DigitalOnly<Sorted>): Priced;
 
   // ---- 注文する ----
 
@@ -254,7 +254,7 @@ namespace ordering {
   @prd.promise("客", "同じ申し込みを二度送っても、注文は一つ")
   @prd.promise("客", "注文できたなら、在庫の品目は取り置いてある")
   @db.transaction
-  export op place(checkout: Checkout): Order
+  export fn place(checkout: Checkout): Order
     throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
            shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
   {
@@ -266,7 +266,7 @@ namespace ordering {
   }
 
   /** 新しい注文を作る。値段を付けることと、時刻を読むことは、互いに触れない。効果は、取り置きの後に、注文を足す */
-  op placeNew(checkout: Checkout): Order
+  fn placeNew(checkout: Checkout): Order
     throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
            shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
   {
@@ -286,11 +286,11 @@ namespace ordering {
    * 箱で送る部分があるのに、客が同意した上限（agreedCeiling）がいまの上限と違えば、いまの約束を運ぶ TermsChanged。
    */
   @prd.promise("客", "客が見て同意した送料の上限と、注文に記録する上限は、同じ額")
-  op draft(checkout: Checkout, priced: Priced, now: Time): Order
+  fn draft(checkout: Checkout, priced: Priced, now: Time): Order
     throws TermsChanged;
 
   /** 在庫の行を取り置く。箱で送る部分がなければ、何もしない */
-  op holdStock(order: Order)
+  fn holdStock(order: Order)
     throws inventory.OutOfStock
   {
     match (order.physical by Delivery) {
@@ -302,7 +302,7 @@ namespace ordering {
   // ---- 引く ----
 
   /** 鍵から注文を引く */
-  export op byKey(key: type.OrderKey): Order
+  export fn byKey(key: type.OrderKey): Order
     throws NoOrder
   {
     val found = orderByKey(key);
@@ -313,12 +313,12 @@ namespace ordering {
   }
 
   /** 鍵から注文を引く。なければ、値がない */
-  export op peek(key: type.OrderKey): Order? {
+  export fn peek(key: type.OrderKey): Order? {
     return orderByKey(key);
   }
 
   /** 識別子から注文を引く */
-  export op byId(id: type.OrderId): Order
+  export fn byId(id: type.OrderId): Order
     throws NoOrder
   {
     val found = orderById(id);
@@ -331,7 +331,7 @@ namespace ordering {
   // ---- 受け付けと、期限切れ ----
 
   /** 注文を受け付ける（支払いの枠を確保できた）。受け付けた後の注文を返す */
-  export op accept(order: Standing.AwaitingPayment<Order>): Order
+  export fn accept(order: Standing.AwaitingPayment<Order>): Order
     throws NoOrder
   {
     val now = clock.now();
@@ -349,7 +349,7 @@ namespace ordering {
    */
   @clock.tick(every: 1m)
   @db.transaction
-  op expireUnpaid() {
+  fn expireUnpaid() {
     val now = clock.now();
     val deadline = before(now, paymentWindow);
     val stale = unpaidBefore(deadline);
@@ -359,7 +359,7 @@ namespace ordering {
   }
 
   /** 期限切れにできるのは、支払いを待っている注文だけ */
-  op expireIfUnpaid(order: Order, now: Time) {
+  fn expireIfUnpaid(order: Order, now: Time) {
     match (order by Standing) {
       AwaitingPayment   => expire(order, now);
       Accepted, Expired => none;
@@ -367,11 +367,11 @@ namespace ordering {
   }
 
   /** 期限切れにして、取り置きを戻す */
-  op expire(order: Standing.AwaitingPayment<Order>, now: Time) {
+  fn expire(order: Standing.AwaitingPayment<Order>, now: Time) {
     expireOrder(order, now);
     inventory.release(order.id);
   }
 
   /** now から window だけ前の時刻（人が書く） */
-  op before(now: Time, window: Duration): Time;
+  fn before(now: Time, window: Duration): Time;
 }

@@ -1,10 +1,10 @@
 // REL-5（docs/check.md「throws」）: 節ごとに prevents か keeps のどちらか一つ。節が違えば例外ごとに書き分けられる
 namespace a {
   state s: list<string>;
-  effect e() on s.post;
+  effect fn e() on s.post;
   exception E;
   exception F;
   decorator doing(...targets: any effect) for op effects targets;
-  @doing(e) op ok() throws E keeps effects;
-  @doing(e) op split() throws E prevents effects throws F keeps effects;
+  @doing(e) fn ok() throws E keeps effects;
+  @doing(e) fn split() throws E prevents effects throws F keeps effects;
 }

@@ -4,18 +4,18 @@ namespace a {
   model M { id: string; }
   exception Invalid(reason: string);
   state rows: list<M>;
-  effect add(m: M) on rows.post;
-  read byId(id: string): M? on rows;
-  op normalize(m: M): M throws Invalid;
-  op find(id: string): M? reads rows {
+  effect fn add(m: M) on rows.post;
+  read fn byId(id: string): M? on rows;
+  fn normalize(m: M): M throws Invalid;
+  fn find(id: string): M? reads rows {
     return byId(id);
   }
-  op insert(m: M) effects add throws Invalid {
+  fn insert(m: M) effects add throws Invalid {
     val row = normalize(m);
     add(row);
   }
   // デコレータが運ぶ分は、葉の節ではない
   decorator counting(table: any state) for op reads table;
   @counting(rows)
-  op count(): int;
+  fn count(): int;
 }

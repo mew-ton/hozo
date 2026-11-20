@@ -6,11 +6,11 @@ namespace a {
   union page { Ready: user; }          // WARN: NAME-1
   classify kind of user { big; }       // WARN: NAME-1, NAME-1
   state Users: list<user>;             // WARN: NAME-1
-  op Find(): user;                     // WARN: NAME-1
-  effect Added() on Users.post;        // WARN: NAME-1
-  read First(): user? on Users;        // WARN: NAME-1
+  fn Find(): user;                     // WARN: NAME-1
+  effect fn Added() on Users.post;        // WARN: NAME-1
+  read fn First(): user? on Users;        // WARN: NAME-1
   decorator Tag;                       // WARN: NAME-1
   model _Hidden { id: string; }        // WARN: NAME-1
   model Ok { id: string; }
-  op ok(): Ok;
+  fn ok(): Ok;
 }

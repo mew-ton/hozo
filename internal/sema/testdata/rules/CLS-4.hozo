@@ -1,9 +1,9 @@
 // CLS-4（tests/rules/CLS-4/ng_1.hozo と同じ。docs/check.md「classify / match」「対象」）: 分類の対象の op が値を返さない（returns が null か never）。位置は対象の名前
 namespace a {
   exception E;
-  op run();
-  op run2(): void;
-  op fail(): never throws E;
+  fn run();
+  fn run2(): void;
+  fn fail(): never throws E;
   classify A1 of run { X; Other; }               // ERROR: CLS-4
   classify A2 of run2 { X; Other; }              // ERROR: CLS-4
   classify A3 of fail { X; Other; }              // ERROR: CLS-4
@@ -11,5 +11,5 @@ namespace a {
   classify C1 of run { C1; NotC1; }              // ERROR: CLS-4
 }
 namespace b {
-  op quiet();
+  fn quiet();
 }

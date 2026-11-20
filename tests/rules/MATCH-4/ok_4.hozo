@@ -6,15 +6,15 @@ namespace a {
   model O { id: string; }
   union Two { Ready: M; Missing: N; }
   union Three { Ready: M; Missing: N; Broken: O; }
-  op find(): M?;
+  fn find(): M?;
   classify Hit of find { Found: find as M; NotFound: find as else; }
   classify K2 of Two { IsReady: Two as M; Rest: Two as else; }
   classify K3 of Three { IsReady: Three as M; Rest: Three as else; }
-  op takeM(m: M): void;
-  op takeN(n: N): void;
-  op takeOpt(m: M?): void;
-  op takeThree(t: Three): void;
-  op f(two: Two, three: Three): void {
+  fn takeM(m: M): void;
+  fn takeN(n: N): void;
+  fn takeOpt(m: M?): void;
+  fn takeThree(t: Three): void;
+  fn f(two: Two, three: Three): void {
     val m = find();
     match (m by Hit) {
       Found    => takeM(m);

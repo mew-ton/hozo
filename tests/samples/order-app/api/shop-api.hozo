@@ -8,7 +8,7 @@ namespace shopApi {
 
   /** 店に並べている商品の一覧 */
   @http.get("/products")
-  export op products(): catalog.Product[] {
+  export fn products(): catalog.Product[] {
     return catalog.listed();
   }
 
@@ -19,7 +19,7 @@ namespace shopApi {
 
   /** 商品を一つ引く。並べていない商品は、ないものとして、値がない */
   @http.get("/products/item")
-  export op product(in: ProductInput): catalog.Product? {
+  export fn product(in: ProductInput): catalog.Product? {
     val found = catalog.find(in.sku);
     return match (found by catalog.Offer) {
       OnSale    => found;
@@ -37,7 +37,7 @@ namespace shopApi {
 
   /** カートを種類ごとに分けて、商品の代金を出す。送料は出さない */
   @http.post("/cart/items")
-  export op itemise(in: CartInput): ordering.Sorted
+  export fn itemise(in: CartInput): ordering.Sorted
     throws ordering.UnknownProduct, ordering.NotForSale
   {
     return ordering.itemise(in.lines);
@@ -54,7 +54,7 @@ namespace shopApi {
    * 請求する送料は、梱包の後に決まり、上限を超えない。
    */
   @http.post("/quote")
-  export op quote(in: QuoteInput): ordering.Priced
+  export fn quote(in: QuoteInput): ordering.Priced
     throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired,
            shipping.Undeliverable, shipping.TooLarge
   {
@@ -80,7 +80,7 @@ namespace shopApi {
 
   /** 注文して、支払いの画面を開く。同じ送信が二度届いても、注文は一つ */
   @http.post("/orders")
-  export op checkout(in: CheckoutInput): Placed
+  export fn checkout(in: CheckoutInput): Placed
     throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired, ordering.TermsChanged,
            ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
            payment.AlreadySecured, payment.ProviderUnavailable
@@ -96,7 +96,7 @@ namespace shopApi {
 
   /** 支払いの画面を、開き直す（客が、支払いの画面を閉じてしまったとき） */
   @http.post("/orders/pay")
-  export op pay(in: KeyInput): Placed
+  export fn pay(in: KeyInput): Placed
     throws ordering.NoOrder, ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
   {
     val order = ordering.byKey(in.key);
@@ -104,7 +104,7 @@ namespace shopApi {
   }
 
   /** 支払いを待っている注文にだけ、支払いの画面を開く */
-  op payFor(order: ordering.Order): Placed
+  fn payFor(order: ordering.Order): Placed
     throws ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
   {
     return match (order by ordering.Standing) {
@@ -115,7 +115,7 @@ namespace shopApi {
   }
 
   /** 支払いの画面を開く */
-  op openPayment(order: ordering.Standing.AwaitingPayment<ordering.Order>): Placed
+  fn openPayment(order: ordering.Standing.AwaitingPayment<ordering.Order>): Placed
     throws payment.AlreadySecured, payment.ProviderUnavailable
   {
     val returnTo = orderPage(site, order.key);
@@ -124,7 +124,7 @@ namespace shopApi {
   }
 
   /** 注文の画面の URL（人が書く） */
-  op orderPage(site: type.Url, key: type.OrderKey): type.Url;
+  fn orderPage(site: type.Url, key: type.OrderKey): type.Url;
 
   // ---- 注文のいま ----
 
@@ -208,7 +208,7 @@ namespace shopApi {
 
   /** 注文のいまを返す。その鍵の注文がなければ、値がない */
   @http.get("/orders/status")
-  export op status(in: KeyQuery): OrderView? {
+  export fn status(in: KeyQuery): OrderView? {
     val found = ordering.peek(in.key);
     return match (found by ordering.Known) {
       Found   => statusOf(found);
@@ -217,7 +217,7 @@ namespace shopApi {
   }
 
   /** 概念ごとの事実を集めて、客に見せる形にする。四つの読みは、互いに触れない */
-  op statusOf(order: ordering.Order): OrderView {
+  fn statusOf(order: ordering.Order): OrderView {
     val charge, progress, jobs, grants;
     disjoint {
       charge = payment.ofOrder(order.id);
@@ -229,7 +229,7 @@ namespace shopApi {
   }
 
   /** 客に見せる形に写す（人が書く） */
-  op view(order: ordering.Order, charge: payment.Payment?, progress: shipping.Progress?, jobs: production.Job[], grants: download.Grant[]): OrderView;
+  fn view(order: ordering.Order, charge: payment.Payment?, progress: shipping.Progress?, jobs: production.Job[], grants: download.Grant[]): OrderView;
 
   // ---- ダウンロード ----
 
@@ -241,7 +241,7 @@ namespace shopApi {
 
   /** ダウンロードの行のファイルを取る URL。短い間だけ使える */
   @http.get("/orders/download")
-  export op download(in: DownloadInput): type.Url
+  export fn download(in: DownloadInput): type.Url
     throws ordering.NoOrder, download.NotGranted, download.GrantExpired, download.AssetsUnavailable
   {
     val order = ordering.byKey(in.key);

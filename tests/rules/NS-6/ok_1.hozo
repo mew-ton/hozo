@@ -3,10 +3,10 @@
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  read byId(id: string): M? on rows;
-  effect add(m: M) on rows.post;
-  export op find(id: string): M? { return a.byId(id); }
-  export op insert(m: M) { add(m); }
+  read fn byId(id: string): M? on rows;
+  effect fn add(m: M) on rows.post;
+  export fn find(id: string): M? { return a.byId(id); }
+  export fn insert(m: M) { add(m); }
 }
 namespace b {
   /**
@@ -15,7 +15,7 @@ namespace b {
    * @see a.byId
    * @see a.add
    */
-  op upsert(m: a.M): a.M? reads a.byId effects a.add {
+  fn upsert(m: a.M): a.M? reads a.byId effects a.add {
     a.insert(m);
     return a.find(m.id);
   }

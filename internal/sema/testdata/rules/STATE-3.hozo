@@ -18,11 +18,11 @@ namespace a {
   state ng3: list<nullable<M>>;        // ERROR: STATE-3
   state ng4: single<list<M?>>;         // ERROR: STATE-3
   // single<T?> は nullable なので、post も delete もできる
-  effect fill() on ok6.post;
-  effect clear() on ok6.delete;
+  effect fn fill() on ok6.post;
+  effect fn clear() on ok6.delete;
   // STATE-3 の状態は、list<T> として残りの検査を続ける
-  effect add() on ng1.post;
-  op all(): M[] {
+  effect fn add() on ng1.post;
+  fn all(): M[] {
     return ng1;
   }
 }

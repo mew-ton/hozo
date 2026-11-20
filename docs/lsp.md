@@ -64,10 +64,10 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `override f` の `f` | 元の model の `fields` の、そのフィールドの位置（`Field.span`。`docs/ir.md`「model / scalar / union」。元の model が受け継いだままのフィールドなら、さらに元の宣言の位置になる） |
 | `classify C of op` の `op`、ケースの `op as T` の `op` | その op の名前 |
 | ケースの `X as T` の `X`（状態、型）と `T` | 状態なら `state` の名前、型ならその宣言。残りのケースの `X as else` の `else` と、ない側のケースの `X as none` の `none` は宣言を持たないので `null` |
-| 行の遷移のケース `C.K`（`effect e(…) on s.put as C.K -> …`） | `C` のセグメントは `classify` の名前、`K` のセグメントは、その `classify` のケース。`any` と `else` は宣言を持たないので `null` |
+| 行の遷移のケース `C.K`（`effect fn e(…) on s.put as C.K -> …`） | `C` のセグメントは `classify` の名前、`K` のセグメントは、その `classify` のケース。`any` と `else` は宣言を持たないので `null` |
 | `reads` の要素 | `read` の名前（名前で書いた要素）か、`state` の名前（直に書いた要素） |
 | `effects` の要素 | `effect` か効果の `union` の名前（名前で書いた要素）。直に書いた `状態.操作` は、状態の名前のセグメントが `state` の名前、操作の語（`post` / `put` / `delete`）は宣言を持たないので `null` |
-| `read r(…): T on s` の `s` | `state` の名前 |
+| `read fn r(…): T on s` の `s` | `state` の名前 |
 | デコレータの宣言の `reads` / `effects` の節の名前 | op の節と同じ。デコレータの引数の名前（残りの引数を含む）なら、その `Param` |
 | 予約語のデコレータ名（`@db.list`、`@effects`、別名の `=` の後ろ） | ほかのデコレータ名と同じく、その `decorator` の名前 |
 | 配線の値の位置の、状態の名前（`f(token)`、`match (token by nullable)`） | `state` の名前。同じ名前の `val`、`for` の変数、引数があれば、そちら（`docs/resolve.md`「手続き」） |
@@ -77,7 +77,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | フィールドの参照 `x.f` | フィールドの宣言 |
 | `val` の名前、`for` の変数（値の位置。値を入れる文の左 `x = …`、集める文の左 `xs collect …` も） | `val` の宣言の名前、`for` の頭の名前 |
 | デコレータの引数の、分類のケース（`@usecase.of(Actor.Customer)`） | `Actor` のセグメントは `classify` の名前、`Customer` のセグメントは、その `classify` のケース |
-| デコレータの宣言の、分類のケース（`Actor case`）の `Actor` | `classify` の名前。`case`、`of`、`never` の語は、宣言を持たないので `null` |
+| デコレータの宣言の、分類のケース（`case of Actor`、`case of Order`）の、`of` の後ろの名前 | `classify` の名前か、型の宣言。`case`、`of`、`any`、`never` の語は、宣言を持たないので `null` |
 | 引数名 | 引数 |
 | `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）の `Empty` / `HasItems` と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null`。アームの頭の `else` も、一つのケースを指さないので `null` |
 | デコレータの引数名（`name:`） | デコレータの宣言の `Param` |
@@ -90,7 +90,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 Markdown の `MarkupContent`。順に:
 
-1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `op login(in: LoginInput): LoginOk`、`export op login(in: LoginInput): LoginOk`（`Op.exported`）、`op unauthorized(): never`、`model User`、`model PublicUser extends User`（`Model.extends.base`）、`scalar Email extends string`、`exception InvalidCredentials`、`exception LimitExceeded(wait: Duration)`、`effect createSession(session: Session) on sessions.post`、`effect placeOrder() on Checkout: Shopping -> Ordered`、行の遷移を持つ効果なら `effect startProduction(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction`（`Effect.row` から、`docs/plugin-go.md`「コメント」の「行の遷移の表示」と同じ形で組み立てる。分類の名前は、見ている名前空間から見た修飾）、`read userByEmail(email: Email): User? on users`、`decorator validated throws ClientError prevents effects`、`decorator limit(counter: any state) reads counter`、`decorator effects(...targets: any effect) effects targets`（残りの引数は `...名前: 型`。節は `throws`、`catches`、`reads`、`effects` の順にまとめて書き、並びの区切りは `,`）、`decorator insert for effect`、`decorator find for read`、`decorator human for Actor case`、`decorator of(who: any case of never)`（分類のケースは、`Decorator.caseTargets` と、`ParamType` の `case` の絞りごとに、書く）、`@repeatable decorator where(column: string, value: string | int | float | boolean) for read`（核の印 `@external` / `@repeatable` は、`decorator` の前に、この順で）、`state users: list<User>`、`classify WarrantyKind of server.Item`、`classify Registration of findUser`（op の分類）、`classify Checkout of carts, orders`、フィールドなら `token: Token?`、`as` を持つケースなら `Registered: findUser as type.User`、残りのケース（`docs/check.md`「残りのケース」）なら `Unregistered: findUser as else`、`as none` のケース（同「ない側のケース」）なら `Absent: Order? as none`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
+1. Hozo の構文で書いた宣言の見出し（コードブロック、言語 `hozo`）。IR から組み立てる: `fn login(in: LoginInput): LoginOk`、`export fn login(in: LoginInput): LoginOk`（`Op.exported`）、`fn unauthorized(): never`、`model User`、`model PublicUser extends User`（`Model.extends.base`）、`scalar Email extends string`、`exception InvalidCredentials`、`exception LimitExceeded(wait: Duration)`、`effect fn createSession(session: Session) on sessions.post`、`effect fn placeOrder() on Checkout: Shopping -> Ordered`、行の遷移を持つ効果なら `effect fn startProduction(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction`（`Effect.row` から、`docs/plugin-go.md`「コメント」の「行の遷移の表示」と同じ形で組み立てる。分類の名前は、見ている名前空間から見た修飾）、`read fn userByEmail(email: Email): User? on users`、`decorator validated throws ClientError prevents effects`、`decorator limit(counter: any state) reads counter`、`decorator effects(...targets: any effect) effects targets`（残りの引数は `...名前: 型`。節は `throws`、`catches`、`reads`、`effects` の順にまとめて書き、並びの区切りは `,`）、`decorator insert for effect`、`decorator find for read`、`decorator human for case of Actor`、`decorator of(who: any case of never)`、`decorator note for case of any`（分類のケースは、`Decorator.caseTargets` と、`ParamType` の `case` の絞りごとに、もとの形 `case of …` で書く。絞りがなければ `case of any`）、`@repeatable decorator where(column: string, value: string | int | float | boolean) for read`（核の印 `@external` / `@repeatable` は、`decorator` の前に、この順で）、`state users: list<User>`、`classify WarrantyKind of server.Item`、`classify Registration of findUser`（op の分類）、`classify Checkout of carts, orders`、フィールドなら `token: Token?`、`as` を持つケースなら `Registered: findUser as type.User`、残りのケース（`docs/check.md`「残りのケース」）なら `Unregistered: findUser as else`、`as none` のケース（同「ない側のケース」）なら `Absent: Order? as none`。名前は見ている名前空間から見た修飾（同じなら修飾なし）。
    - 型は `T?` と `T[]` で書く。状態の見出しだけは、形の語で書く（`State.shape` と `State.element` から `list<T>` / `nullable<T>` / `single<T>`）。
    - 配線の呼び出しの名前は、呼び出し先の宣言（op、`read`、`effect`）の見出し。直に呼ぶ `状態.操作(…)` の状態のセグメントは、その状態の見出し。
    - 配線の値の位置の状態の名前は、ほかの宣言への参照と同じく、その状態の見出し。アームの中で絞り込まれていても、見出しは宣言のまま。

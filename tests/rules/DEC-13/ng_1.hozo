@@ -3,5 +3,5 @@ namespace a {
   decorator d(code: int);
   @d(1)
   @d(2)                                // ERROR: DEC-13
-  op twice(): void;
+  fn twice(): void;
 }

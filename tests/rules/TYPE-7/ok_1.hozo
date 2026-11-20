@@ -1,11 +1,11 @@
 // TYPE-7（docs/types.md「式の型」）: レコードリテラルは引数の位置か return の位置で型が決まる
 namespace a {
   model In { id: string; }
-  op take(in: In): void;
-  op f(): void {
+  fn take(in: In): void;
+  fn f(): void {
     take({ id: "x" });
   }
-  op g(): In {
+  fn g(): In {
     return { id: "x" };
   }
 }

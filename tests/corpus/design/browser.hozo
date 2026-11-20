@@ -24,10 +24,10 @@ namespace browser {
   // ---- §6.2 effect ----
 
   /** ログイン画面へ遷移する */
-  effect transitionToLogin() on location.put;
+  effect fn transitionToLogin() on location.put;
 
   /** 権限がないことを示す画面へ遷移する */
-  effect transitionToForbidden() on location.put;
+  effect fn transitionToForbidden() on location.put;
 
   // ---- §6.4 union ----
 
@@ -64,9 +64,9 @@ namespace browser {
   // ---- §9 配線（browser 側） ----
 
   /** 手元のトークンを消す */
-  effect removeToken() on token.delete;   // 空にする（設計書では token.put で none を入れる）
+  effect fn removeToken() on token.delete;   // 空にする（設計書では token.put で none を入れる）
 
-  op clearToken()
+  fn clearToken()
     effects removeToken
   {
     removeToken();
@@ -74,13 +74,13 @@ namespace browser {
 
   /** サーバーのセッションの削除を依頼する。結果は見ない */
   @ignoreFailure
-  op requestLogout()
+  fn requestLogout()
   {
     server.logout({});   // token は bind で埋まる（§5.3）
   }
 
   // 効果 server.deleteSession / removeToken は呼び出し先から伝播する（§7.2）
-  op logout()
+  fn logout()
   {
     requestLogout();
     clearToken();   // requestLogout の成功が前提。requestLogout は例外を投げない
@@ -115,16 +115,16 @@ namespace browser {
   // ---- §10.2 match ----
 
   /** 支払い画面へ遷移する */
-  effect transitionToPayment() on location.put;
+  effect fn transitionToPayment() on location.put;
 
-  op goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
+  fn goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
     effects transitionToPayment
   {
     transitionToPayment();
   }
 
   @page.interaction(page: openProduct, when: ProductPage.Ready)
-  op onAddToCart(item: server.Item)
+  fn onAddToCart(item: server.Item)
     throws page.Aborted, http.NetworkError, http.ServerError
   {
     val line = server.addToCart({ item });
@@ -136,7 +136,7 @@ namespace browser {
     goPayment(line, warranty);
   }
 
-  op chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
+  fn chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
     : server.WarrantyLine
     throws page.Aborted, http.NetworkError, http.ServerError
   {
@@ -145,15 +145,15 @@ namespace browser {
   }
 
   @page.dialog("YamadaWarrantyModal")
-  op askYamadaWarranty(item: WarrantyKind.Yamada<server.Item>): server.PlanId;
+  fn askYamadaWarranty(item: WarrantyKind.Yamada<server.Item>): server.PlanId;
 
   // 追加: §10.2 の match のアームが呼ぶ op。メーカー保証は選ばないので入力を待たない
   /** メーカー保証の明細を作る */
-  op chooseStandardWarranty(item: WarrantyKind.Standard<server.Item>, line: server.CartLine): server.WarrantyLine;
+  fn chooseStandardWarranty(item: WarrantyKind.Standard<server.Item>, line: server.CartLine): server.WarrantyLine;
 
   // 追加: §10.2 の、二値の分類での match の例（val plan = match (item by WarrantyAvailable) { ... };）を包む op
   /** 保証プランを選ぶ。保証が付かない商品なら none */
-  op chooseWarrantyPlan(item: server.Item): server.PlanId?
+  fn chooseWarrantyPlan(item: server.Item): server.PlanId?
     throws page.Aborted
   {
     val plan = match (item by WarrantyAvailable) {
@@ -165,18 +165,18 @@ namespace browser {
 
   // 追加: chooseWarrantyPlan が呼ぶダイアログ
   @page.dialog("WarrantyPlanModal")
-  op askWarrantyPlan(item: WarrantyAvailable.Available<server.Item>): server.PlanId;
+  fn askWarrantyPlan(item: WarrantyAvailable.Available<server.Item>): server.PlanId;
 
   // ---- §11.1 fetch の層 ----
   // @redirectToLogin と @cache はスコープ外（docs/decisions.md）なので外し、配線だけを残す
 
-  op fetchMe(): server.PublicUser
+  fn fetchMe(): server.PublicUser
     throws http.NetworkError, http.ServerError
   {
     return server.getMe({});
   }
 
-  op fetchOrders(query: OrdersQuery): server.OrderSummary[]
+  fn fetchOrders(query: OrdersQuery): server.OrderSummary[]
     throws http.NetworkError, http.ServerError
   {
     return server.getOrders({ page: query.page, status: query.status });
@@ -208,16 +208,16 @@ namespace browser {
   // 共通のエラー表示: 汎用の page.fallback に引数を固定した別名
   decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);
 
-  op orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
+  fn orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
 
   /** 注文一覧の既定の URL に置き換える */
-  effect transitionToOrders() on location.put;
+  effect fn transitionToOrders() on location.put;
 
   // このページだけ別の表示にする。fallback が吸収するので throws は書かない
   // OrdersUnavailable は OrderPage のアームの型
   @page.fallback(http.NetworkError | http.ServerError, OrdersUnavailable)
   @page.route("/orders", from: query, onInvalid: transitionToOrders)
-  op openOrders(query: OrdersQuery): OrderPage
+  fn openOrders(query: OrdersQuery): OrderPage
   {
     val me     = fetchMe();
     val orders = fetchOrders(query);
@@ -228,12 +228,12 @@ namespace browser {
     Ready: { userName: string; };
     Unavailable: Unavailable;
   }
-  op profilePageVm(me: server.PublicUser): ProfilePage;
+  fn profilePageVm(me: server.PublicUser): ProfilePage;
 
   // 共通のエラー表示を使う。Unavailable は ProfilePage のアームの型
   @unavailableOnFailure
   @page.route("/profile")
-  op openProfile(): ProfilePage
+  fn openProfile(): ProfilePage
   {
     val me = fetchMe();
     return profilePageVm(me);
@@ -249,9 +249,9 @@ namespace browser {
     Unavailable: Unavailable;
   }
 
-  op productPageVm(item: server.Item): ProductPage;
+  fn productPageVm(item: server.Item): ProductPage;
 
-  op fetchItem(query: ProductQuery): server.Item
+  fn fetchItem(query: ProductQuery): server.Item
     throws http.NetworkError, http.ServerError
   {
     return server.getItem({ id: query.id });
@@ -259,7 +259,7 @@ namespace browser {
 
   @unavailableOnFailure
   @page.route("/product", from: query)
-  op openProduct(query: ProductQuery): ProductPage
+  fn openProduct(query: ProductQuery): ProductPage
   {
     val item = fetchItem(query);
     return productPageVm(item);

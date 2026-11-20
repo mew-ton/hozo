@@ -4,8 +4,8 @@ namespace a {
   scalar Token extends string;
   state session: single<Token>;
   state token: nullable<Token>;
-  effect dropSession() on session.delete;   // ERROR: STATE-1
-  effect newSession() on session.post;      // ERROR: STATE-1
-  effect dropToken() on token.delete;
-  effect newToken() on token.post;
+  effect fn dropSession() on session.delete;   // ERROR: STATE-1
+  effect fn newSession() on session.post;      // ERROR: STATE-1
+  effect fn dropToken() on token.delete;
+  effect fn newToken() on token.post;
 }

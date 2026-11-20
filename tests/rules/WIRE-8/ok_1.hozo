@@ -1,9 +1,9 @@
 // WIRE-8（docs/check.md「配線」）: 束縛した名前は下の行で使う
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op use(m: M): void;
-  op f(): void {
+  fn value(): M;
+  fn use(m: M): void;
+  fn f(): void {
     val y = value();
     use(y);
   }

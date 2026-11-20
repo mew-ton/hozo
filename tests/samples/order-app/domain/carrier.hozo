@@ -60,26 +60,26 @@ namespace carrier {
 
   /** 登録してある配送業者のすべて */
   @db.list
-  read allCarriers(): Carrier[] on carriers;
+  read fn allCarriers(): Carrier[] on carriers;
 
   /** いま使っている配送業者 */
   @db.list
   @db.where("enabled", true)
-  read enabledCarriers(): Carrier[] on carriers;
+  read fn enabledCarriers(): Carrier[] on carriers;
 
   /** その識別子の配送業者 */
   @db.find
-  read carrierByCode(code: CarrierCode): Carrier? on carriers;
+  read fn carrierByCode(code: CarrierCode): Carrier? on carriers;
 
   /** 配送業者を登録する */
   @db.insert
-  effect addCarrier(carrier: Carrier) on carriers.post;
+  effect fn addCarrier(carrier: Carrier) on carriers.post;
 
   /**
    * 配送業者を、使う、使わないに切り替える（人が書く）。後のケース（Use）は、引数 enabled の値で決まるので、宣言では約束できない:
    * 何も約束しない形（as any -> else）で書く（README.md「分かったこと」の F53）。
    */
-  effect switchCarrier(carrier: Carrier, enabled: boolean) on carriers.put as any -> else;
+  effect fn switchCarrier(carrier: Carrier, enabled: boolean) on carriers.put as any -> else;
 
   // ---- 分類 ----
 
@@ -104,12 +104,12 @@ namespace carrier {
   // ---- 管理する ----
 
   /** 登録してある配送業者の一覧 */
-  export op all(): Carrier[] {
+  export fn all(): Carrier[] {
     return allCarriers();
   }
 
   /** 配送業者を登録する */
-  export op register(carrier: Carrier)
+  export fn register(carrier: Carrier)
     throws AlreadyRegistered
   {
     val existing = carrierByCode(carrier.code);
@@ -120,7 +120,7 @@ namespace carrier {
   }
 
   /** 配送業者を使う、使わないを切り替える */
-  export op setEnabled(code: CarrierCode, enabled: boolean): Carrier
+  export fn setEnabled(code: CarrierCode, enabled: boolean): Carrier
     throws UnknownCarrier
   {
     val found = carrierByCode(code);
@@ -132,7 +132,7 @@ namespace carrier {
   }
 
   /** 登録してある配送業者を引く */
-  op known(code: CarrierCode): Carrier
+  fn known(code: CarrierCode): Carrier
     throws UnknownCarrier
   {
     val found = carrierByCode(code);
@@ -145,7 +145,7 @@ namespace carrier {
   // ---- 使う ----
 
   /** いま使っている配送業者の、この荷物の見積もり */
-  export op quotes(parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
+  export fn quotes(parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
     throws NoCarrier, http.NetworkError, http.ServerError
   {
     val fleet = enabledCarriers();
@@ -156,7 +156,7 @@ namespace carrier {
   }
 
   /** 外部の仕組みに、見積もりを頼む */
-  op rate(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
+  fn rate(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
     throws http.NetworkError, http.ServerError
   {
     val request = rateRequest(fleet, parcel, origin, destination);
@@ -164,10 +164,10 @@ namespace carrier {
   }
 
   /** 見積もりの依頼を組み立てる（人が書く） */
-  op rateRequest(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.RateRequest;
+  fn rateRequest(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.RateRequest;
 
   /** 選んだ配送業者とサービスで、送り状を買う。店の金が動く */
-  export op book(choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
+  export fn book(choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
     throws UnknownCarrier, NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
   {
     val found = carrierByCode(choice.carrier);
@@ -178,7 +178,7 @@ namespace carrier {
   }
 
   /** いま使っている配送業者にだけ、頼める */
-  op bookWith(carrier: Carrier, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
+  fn bookWith(carrier: Carrier, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
     throws NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
   {
     return match (carrier by Use) {
@@ -188,7 +188,7 @@ namespace carrier {
   }
 
   /** 外部の仕組みから、送り状を買う */
-  op buy(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
+  fn buy(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
     throws carriergw.Refused, http.NetworkError, http.ServerError
   {
     val request = labelRequest(carrier, choice, parcel, origin, destination);
@@ -198,8 +198,8 @@ namespace carrier {
   }
 
   /** 送り状の依頼を組み立てる（人が書く） */
-  op labelRequest(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.LabelRequest;
+  fn labelRequest(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.LabelRequest;
 
   /** 買った送り状を、出荷の送り状の形に写す（人が書く） */
-  op toLabel(parcel: shipping.Parcel, bought: carriergw.BoughtLabel, now: Time): shipping.Label;
+  fn toLabel(parcel: shipping.Parcel, bought: carriergw.BoughtLabel, now: Time): shipping.Label;
 }

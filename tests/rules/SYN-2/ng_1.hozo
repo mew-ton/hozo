@@ -3,5 +3,5 @@ namespace a {
   @localStorage
   /** 状態 */                          // ERROR: SYNTAX
   state s: list<string>;
-  op f();
+  fn f();
 }

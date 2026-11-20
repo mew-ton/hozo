@@ -2,5 +2,5 @@
 namespace a {
   decorator d(code: int, name: string?);
   @d                                   // ERROR: DEC-11
-  op missing(): void;
+  fn missing(): void;
 }

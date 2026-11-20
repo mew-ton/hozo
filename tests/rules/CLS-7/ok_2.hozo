@@ -2,8 +2,8 @@
 // ほかのケースが二つ以上でも（述語で決まる分類でも）、残りのケースを書ける: 残りは、ちょうど「値がない」
 namespace a {
   model M { id: string; }
-  op find(): M?;
-  op f();
+  fn find(): M?;
+  fn f();
   classify Life of M? {
     Draft: M? as M;
     Placed: M? as M;
@@ -14,7 +14,7 @@ namespace a {
     Stale: find as M;
     Missing: find as else;
   }
-  op use(m: M?) {
+  fn use(m: M?) {
     match (m by Life) { Draft, Placed => f(); Absent => none; };
   }
 }

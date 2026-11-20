@@ -5,19 +5,19 @@ namespace app {
   model Row { @db.key @db.text id: string; }
   /** @db.table のない状態 */
   state rows: list<Row>;
-  effect createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row) on rows.post;
 
   // 配線
   @db.transaction
-  export op add(row: Row) {
+  export fn add(row: Row) {
     createRow(row);
   }
   // 葉
   @db.transaction
-  export op importRows(rows: Row[]): int;
+  export fn importRows(rows: Row[]): int;
 
   // @db.transaction のない op は、かまわない
-  export op addOne(row: Row) {
+  export fn addOne(row: Row) {
     createRow(row);
   }
 }
@@ -27,9 +27,9 @@ namespace ok {
   model Row { @db.key @db.text id: string; }
   @db.table state rows: list<Row>;
   @db.insert
-  effect createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row) on rows.post;
   @db.transaction
-  export op add(row: Row) {
+  export fn add(row: Row) {
     createRow(row);
   }
 }

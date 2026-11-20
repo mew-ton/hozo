@@ -55,11 +55,11 @@ namespace api {
 
   // docs/ir.md「state / exception / effect」: 効果の params（受け取る値）
   /** セッションを作る */
-  effect createSession(session: Session) on sessions.post;
+  effect fn createSession(session: Session) on sessions.post;
   /** セッションを消す */
-  effect deleteSession(token: Token?) on sessions.delete;
+  effect fn deleteSession(token: Token?) on sessions.delete;
   /** 最終アクセスを更新する */
-  effect touchUser(id: UserId) on users.put;
+  effect fn touchUser(id: UserId) on users.put;
 
   // docs/ir.md「read」: read の宣言（params、returns、state）。docs/grammar.md「decorator の宣言」: 対象 read と @repeatable
   /**
@@ -68,12 +68,12 @@ namespace api {
    * @param id 引くユーザーの識別子
    */
   @db.find
-  read userById(id: UserId): User? on users;
+  read fn userById(id: UserId): User? on users;
   /** そのユーザーの、生きているセッション */
   @db.list
   @db.where("revoked", false)
   @db.where("kind", "web")
-  read sessionsOf(userId: UserId): Session[] on sessions;
+  read fn sessionsOf(userId: UserId): Session[] on sessions;
 
   // docs/check.md「計算」手順 i の throws（DEC-10）: external の例外は、境界の外（web）から見たときだけ Sig に入る
   /** ネットワーク越しに呼ぶ */
@@ -94,20 +94,20 @@ namespace api {
    */
   @remote
   @requiresAuth
-  export op getUser(in: GetUserInput): PublicUser
+  export fn getUser(in: GetUserInput): PublicUser
     throws NotFound;
 
   model Credentials { name: string; password: string; }
   model LoginInput { creds: Credentials; remember: boolean?; }
 
   // docs/check.md「葉の op」: 葉は状態に触れない（reads / effects の節を書けない）。throws は書ける
-  op issue(in: LoginInput): Session throws Invalid;
-  op verify(id: UserId) throws ClientError;
+  fn issue(in: LoginInput): Session throws Invalid;
+  fn verify(id: UserId) throws ClientError;
 
   // docs/check.md「配線からの呼び出し」: 効果の呼び出し。docs/check.md「計算」手順 0（配線）: 上の行の issue が Invalid を
   // 投げるとき、下の行の createSession は prevented（書いた relations は計算と照合する。REL-4）
   @remote
-  export op login(in: LoginInput): Session
+  export fn login(in: LoginInput): Session
     effects createSession
     throws Invalid prevents effects
   {
@@ -118,7 +118,7 @@ namespace api {
 
   // docs/check.md「bind」4: 引数そのものが位置（path ["token"]）。web から見た params は空になる
   @remote
-  export op logout(token: Token?)
+  export fn logout(token: Token?)
     effects deleteSession
   {
     deleteSession(token);
@@ -126,7 +126,7 @@ namespace api {
 
   // docs/check.md「計算」手順 0（配線）: ユニオンを展開した E。上の行の touchUser は、下の行の verify の例外のとき kept。
   // docs/ir.md「正規化」の `throws A, B にユニオン`
-  export op touch(id: UserId)
+  export fn touch(id: UserId)
     effects touchUser
     throws ClientError keeps effects
   {
@@ -156,20 +156,20 @@ namespace api {
     level: int;
   }
 
-  // docs/ir.md「正規化」: `export op f()` は exported。`reads a, b`、複数の reads は ReadRef の列一つ（直に書いた状態は direct、
+  // docs/ir.md「正規化」: `export fn f()` は exported。`reads a, b`、複数の reads は ReadRef の列一つ（直に書いた状態は direct、
   // read の名前は named。重複は最初の出現に寄せる）
   // docs/check.md「reads」: 配線の R は、呼んだ read の宛先の状態（行の順）。書いた reads は、状態の集合で照合する（READS-2）
-  op whenLive(user: User?, live: Session[]): User?;
+  fn whenLive(user: User?, live: Session[]): User?;
   /** 識別子からユーザーを引く */
-  export op findUser(id: UserId): User? reads users, sessionsOf reads users {
+  export fn findUser(id: UserId): User? reads users, sessionsOf reads users {
     val user = userById(id);
     val live = sessionsOf(id);
     return whenLive(user, live);
   }
   // docs/ir.md「型」: never は Op.returns にだけ現れる。docs/check.md「純粋」: throws は純粋さを変えない
-  op unauthorized(): never throws Unauthorized;
+  fn unauthorized(): never throws Unauthorized;
   // docs/check.md「純粋」: デコレータがなく、状態を読まず、効果を持たない
-  op nameOf(user: User): string;
+  fn nameOf(user: User): string;
 
   // docs/ir.md「classify」: op の分類。docs/ir.md「正規化」: ケースの `X as T`（X が型か op なら state を持たない）
   // docs/check.md「ケースの判定」: 型で決まる分類（presence）
@@ -185,7 +185,7 @@ namespace api {
 
   // docs/ir.md「配線」: アームの narrowed（as のケースでは書いた型）、本体の throw。else のアームの cases は、それが受けるケース
   // docs/check.md「計算」手順 0: アームの throw は、例外がそれだけの呼び出し。docs/check.md「reads」: 呼び出し先の R が伝わる
-  op currentName(id: UserId): string
+  fn currentName(id: UserId): string
     throws NotFound
   {
     val user = findUser(id);
@@ -197,7 +197,7 @@ namespace api {
 
   // docs/ir.md「正規化」: 配線の値の位置の状態の名前は Atom の state（match の対象、アームの本体の値）。アームの none は body の none
   // docs/check.md「reads」: match の対象と Atom が参照する状態
-  op tokenOrNone(): Token?
+  fn tokenOrNone(): Token?
   {
     return match (current by nullable) {
       HasItems => current;
@@ -206,13 +206,13 @@ namespace api {
   }
 
   // docs/ir.md「正規化」: 修飾して書いた状態の名前も Atom の state
-  op greeting(): string
+  fn greeting(): string
   {
     return api.motd;
   }
 
   // docs/ir.md「配線」: 状態の分類での match の narrowed は state を持つ。「返らない」アーム（never を返す op の呼び出し）
-  op guard(): Token
+  fn guard(): Token
     throws Unauthorized
   {
     return match (by SignedIn) {
@@ -237,7 +237,7 @@ namespace api {
   // docs/ir.md「decorator」の targets の effect: 効果の宣言の decorators
   /** 名前を変える */
   @into(users)
-  effect renameUser(id: UserId, name: string) on users.put;
+  effect fn renameUser(id: UserId, name: string) on users.put;
   union Cleanup { deleteSession; renameUser; }
 
   // docs/ir.md「正規化」: op に付いたデコレータの reads / effects の節は Op.carried（Op.reads / Op.effects には足さない）
@@ -249,20 +249,20 @@ namespace api {
    * @see api.effects
    */
   @find(users, "name")
-  export op findByName(name: string): User?;
+  export fn findByName(name: string): User?;
   // docs/ir.md「正規化」: 残りの引数に渡した値は list の Arg 一つ（一つずつ ref か refs）
   // docs/check.md「計算」手順 0（葉）: F は運ばれた効果、rel は op の throws の relations
   @effects(createSession, deleteSession | renameUser)
-  export op rotate(id: UserId, name: string)
+  export fn rotate(id: UserId, name: string)
     throws Invalid prevents effects;
   // 残りの引数に何も渡さない（items は []）。reads の節の sessions だけが運ばれる
   @effects
-  op idle();
+  fn idle();
   @both
-  op viaAlias(session: Session);
+  fn viaAlias(session: Session);
 
   // docs/check.md「計算」手順 0（配線）と「reads」: 運ばれた効果と状態は、op が書いたものと同じに呼び出し元へ伝わる
-  op renew(id: UserId, name: string): User?
+  fn renew(id: UserId, name: string): User?
     throws Invalid
   {
     rotate(id, name);
@@ -274,7 +274,7 @@ namespace api {
   // 位置を変えず、rel は、本体から決めた状態（prevented）と、デコレータの分（関係を書いていないので unknown）が違うので unknown
   @find(motd)
   @effects(touchUser, renameUser)
-  op renewAudited(id: UserId, name: string): User?
+  fn renewAudited(id: UserId, name: string): User?
     throws Invalid
   {
     rotate(id, name);
@@ -284,7 +284,7 @@ namespace api {
   // 食い違わない）
   @find(motd)
   @effects(touchUser, renameUser)
-  op renewDeclared(id: UserId, name: string): User?
+  fn renewDeclared(id: UserId, name: string): User?
     effects createSession, deleteSession, renameUser, touchUser
     reads sessions, users, motd
     throws Invalid prevents effects
@@ -293,7 +293,7 @@ namespace api {
     return findByName(name);
   }
   // 配線に運ばれたものも、呼び出し元へ伝わる
-  export op renewAgain(id: UserId, name: string): User?
+  export fn renewAgain(id: UserId, name: string): User?
     throws Invalid
   {
     return renewDeclared(id, name);
@@ -305,9 +305,9 @@ namespace api {
   // docs/check.md「直に呼ぶ組み込みの効果」: nullable の post / put は要素の型の値一つ、delete は引数なし。list の post も値一つ
   // docs/check.md「節に書く要素」: 直に呼んだ効果は direct で、同じ宛先の宣言（createSession）とは別の効果
   classify Strength of Credentials { Weak; Strong; }
-  op mint(user: User): Token;
-  op sessionOf(user: User, token: Token): Session;
-  export op signIn(id: UserId, creds: Credentials): Token?
+  fn mint(user: User): Token;
+  fn sessionOf(user: User, token: Token): Session;
+  export fn signIn(id: UserId, creds: Credentials): Token?
     effects sessions.post, current.post, current.put, current.delete
     reads userById
     throws Invalid, NotFound
@@ -329,7 +329,7 @@ namespace api {
       Strong => keep(token);
     };
   }
-  op keep(token: Token): Token? {
+  fn keep(token: Token): Token? {
     current.delete();
     return token;
   }
@@ -354,7 +354,7 @@ namespace api {
     Full: Shown as else;
   }
   // docs/ir.md「配線」: 残りのケースのアームも、名前で書ける。narrowed は、対象の型が外と違うアームにだけ出る
-  op memberName(id: UserId): string
+  fn memberName(id: UserId): string
     throws NotFound
   {
     val user = findUser(id);
@@ -363,7 +363,7 @@ namespace api {
       Stranger => throw NotFound;
     };
   }
-  op shownName(shown: Shown): string
+  fn shownName(shown: Shown): string
   {
     return match (shown by Detail) {
       Short => shown;
@@ -381,7 +381,7 @@ namespace api {
   classify Standing of User { Fresh; Active; Idle; Dormant; Closed; }
   // docs/ir.md「配線」: else のアームの cases は、ほかのアームが並べなかったケース（分類の宣言の順）で、else は true。
   // docs/types.md「アームの中の対象の型」の 1: 受けるケースが二つ以上の else のアームでは、対象は絞り込まれない
-  op standingName(user: User): string
+  fn standingName(user: User): string
     throws NotFound
   {
     return match (user by Standing) {
@@ -390,7 +390,7 @@ namespace api {
     };
   }
   // 名前で並べたアーム（区切りは ","）は、cases が書かれた順で、else は false
-  op standingNote(user: User): string
+  fn standingNote(user: User): string
   {
     return match (user by Standing) {
       Idle, Fresh => "new or idle";
@@ -399,7 +399,7 @@ namespace api {
     };
   }
   // 受けるケースがちょうど一つの else のアームは、そのケースを名前で書いたアームと同じに絞り込まれる
-  op arrivedName(id: UserId): string
+  fn arrivedName(id: UserId): string
     throws NotFound
   {
     val user = findUser(id);
@@ -409,7 +409,7 @@ namespace api {
     };
   }
   // ケースが一つの分類での match。値がないことは、分類の誤り（docs/check.md「閉じた分類」）で、throws には現れない
-  op onlyArrived(id: UserId): string
+  fn onlyArrived(id: UserId): string
   {
     val user = findUser(id);
     return match (user by Arrival) {
@@ -429,24 +429,24 @@ namespace api {
   }
   // docs/check.md「行の遷移」: 効果が、受け取った行の状態をどう変えるか。書き込む状態と操作は、今までどおり on の後ろ
   /** ユーザーを足す。Fresh で入る */
-  effect enrol(user: User) on users.post as Standing.Fresh;
+  effect fn enrol(user: User) on users.post as Standing.Fresh;
   /** ユーザーを休ませる */
-  effect rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;
+  effect fn rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;
   /** ユーザーを閉じる。どの使われ方からでも */
-  effect closeUser(user: User) on users.put as any -> Standing.Closed;
+  effect fn closeUser(user: User) on users.put as any -> Standing.Closed;
   /** ユーザーを書き換える。後の使われ方は、決まっていない */
-  effect amend(user: User) on users.put as Standing.Idle -> else;
+  effect fn amend(user: User) on users.put as Standing.Idle -> else;
   /** ユーザーを消す。消せるのは、登録が切れたユーザーだけ */
-  effect forget(user: User) on users.delete as Enrolment.Lapsed -> Enrolment.Unknown;
+  effect fn forget(user: User) on users.delete as Enrolment.Lapsed -> Enrolment.Unknown;
   // docs/check.md「行の遷移」の「呼ぶ側の検査」: 前のケースを並べた効果は、そのケースを受けるアームの中で呼ぶ
-  op restUser(user: User, now: Time)
+  fn restUser(user: User, now: Time)
   {
     match (user by Standing) {
       Fresh, Active => rest(user, now);
       else          => none;
     };
   }
-  op forgetUser(id: UserId)
+  fn forgetUser(id: UserId)
   {
     val user = userById(id);
     match (user by Enrolment) {

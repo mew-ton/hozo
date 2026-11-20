@@ -1,4 +1,4 @@
 // CFG-14（docs/config.md「診断」）: transpilers に書くのはトランスパイラの名前。プラグインの名前（std）ではない（ng_2.toml）
 namespace a {
-  op f();
+  fn f();
 }

@@ -2,9 +2,9 @@
 namespace a {
   model M { id: string; }
   state carts: list<M>;
-  op f();
-  op g(m: M);
-  op ng(m: M) {
+  fn f();
+  fn g(m: M);
+  fn ng(m: M) {
     match (m by list) { Empty => f(); HasItems => none; };             // ERROR: MATCH-7
     match (1 by nullable) { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
     match (none by list) { Empty => f(); HasItems => none; };          // ERROR: MATCH-7
@@ -12,7 +12,7 @@ namespace a {
     match (by list) { Empty => f(); HasItems => none; };               // ERROR: MATCH-7
   }
   // 引数が状態と同じ名前なら、そちらを指す（docs/resolve.md「手続き」1.1）。その値の型で照合する
-  op shadow(carts: M) {
+  fn shadow(carts: M) {
     match (carts by list) { Empty => f(); HasItems => g(carts); };     // ERROR: MATCH-7
   }
 }

@@ -16,5 +16,5 @@ namespace a {
       override y: string;              // ERROR: TYPE-10
     };
   }
-  op f(): Plain;
+  fn f(): Plain;
 }

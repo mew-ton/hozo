@@ -2,7 +2,7 @@
 // 単位と、足りない名前空間の組ごとに一つ（b の型をいくつ使っても一つ）
 namespace a {
   model Input { owner: b.M; other: b.N[]; }
-  export op f(in: Input): b.M?;
+  export fn f(in: Input): b.M?;
 }
 namespace b {
   model M { id: string; }

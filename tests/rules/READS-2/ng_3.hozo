@@ -3,25 +3,25 @@
 namespace a {
   state rows: list<string>;
   state log: list<string>;
-  read first(): string? on rows;
+  read fn first(): string? on rows;
   decorator counting(table: any state) for op reads table;
-  op g();
+  fn g();
   // 運ばれた log が足りない
   @counting(log)                             // ERROR: READS-2
-  op missing(): string? reads rows {
+  fn missing(): string? reads rows {
     return first();
   }
   // 本体は読まないが、運ばれた状態がある。別の状態を書いた
   @counting(log)                             // ERROR: READS-2
-  op wrong() reads rows {
+  fn wrong() reads rows {
     g();
   }
   @counting(log)
-  op carrying(): string? {
+  fn carrying(): string? {
     return first();
   }
   // 呼び出し先の配線に運ばれた log が、呼ぶ側の節に足りない
-  op caller(): string? reads rows {              // ERROR: READS-2
+  fn caller(): string? reads rows {              // ERROR: READS-2
     return carrying();
   }
 }

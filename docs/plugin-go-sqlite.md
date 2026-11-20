@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.10"
+protocol = "0.11"
 
 [[transpiler]]
 name     = "go-sqlite"
@@ -123,7 +123,7 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 /** そのユーザーの、いちばん新しい注文。まだ注文がなければ、ない */
 @db.find
 @db.latest("placedAt")
-read latestOrderOf(userId: type.UserId): type.Order? on orders;
+read fn latestOrderOf(userId: type.UserId): type.Order? on orders;
 ```
 
 **宣言から読むもの**（デコレータは、これをもう一度言わない）:
@@ -171,11 +171,11 @@ read latestOrderOf(userId: type.UserId): type.Order? on orders;
 ```ts
 /** 注文を作る */
 @db.insert
-effect createOrder(order: type.Order) on orders.post;
+effect fn createOrder(order: type.Order) on orders.post;
 
 /** ログインセッションを消す */
 @db.delete
-effect deleteSession(token: type.Token) on sessions.delete;
+effect fn deleteSession(token: type.Token) on sessions.delete;
 ```
 
 | デコレータ | 効果の宛先（合わなければ GOSQL-11） | 引数（合わなければ GOSQL-9） | SQL |
@@ -184,7 +184,7 @@ effect deleteSession(token: type.Token) on sessions.delete;
 | `@db.update` | `T.put` | M の行一つ（同じ）。M は `@db.key` を一つ以上と、キーでない列を一つ以上持つ（GOSQL-15） | `UPDATE "<表>" SET <キーでない列> = ?… WHERE <キーの列> IS ?…`。書き換える行は、M の `@db.key` のフィールドが、引数の行と同じ行。行がなければ何もしない |
 | `@db.delete` | `T.delete` | **条件**: 引数ごとに、その名前の列が、引数の値と同じ（`read` と同じ決まり。名前のフィールドがなければ GOSQL-8、型は「列と引数の型」）。引数は一つ以上（GOSQL-28） | `DELETE FROM "<表>" WHERE <条件>`。どの条件も満たす行をすべて消す。行がなければ何もしない |
 
-- T は、N の表の状態（GOSQL-7）。**宛先は、組み込みの効果でなければならない**: 分類の遷移を宛先にする効果（`effect e() on Checkout: Shopping -> Ordered;`）に `db` のデコレータが付いていれば GOSQL-11（一つの遷移が、どの表に何をするかは、宣言からは決まらない）。その効果は、人が書く。
+- T は、N の表の状態（GOSQL-7）。**宛先は、組み込みの効果でなければならない**: 分類の遷移を宛先にする効果（`effect fn e() on Checkout: Shopping -> Ordered;`）に `db` のデコレータが付いていれば GOSQL-11（一つの遷移が、どの表に何をするかは、宣言からは決まらない）。その効果は、人が書く。
 - 効果は、三つのうち、高々一つを持つ（二つ以上なら GOSQL-12）。
 - `@db.delete` の条件の値の渡し方は、`read` と同じ（「read の中身」）。
 - **未決: 引数のない `@db.delete`**。「引数がなければ、すべての行」は、`@db.list` では決めたが、消す方では決めていない（書き忘れた引数が、表を空にする）。決まるまで GOSQL-28。
@@ -228,7 +228,7 @@ effect deleteSession(token: type.Token) on sessions.delete;
 ```ts
 /** 注文と、その通知の記録を、一緒に足す。どちらも足すか、どちらも足さない */
 @db.transaction
-export op placeOrder(order: type.Order, notification: type.Notification) {
+export fn placeOrder(order: type.Order, notification: type.Notification) {
   createOrder(order);
   notifyUser(notification);
 }

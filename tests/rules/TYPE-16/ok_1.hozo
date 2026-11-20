@@ -19,5 +19,5 @@ namespace a {
     @mark override name: string;
     override hash: never;
   }
-  op f(): D;
+  fn f(): D;
 }

@@ -23,40 +23,40 @@ namespace shop {
   }
 
   @db.find
-  read orderById(id: string): Order? on orders;
+  read fn orderById(id: string): Order? on orders;
 
   /** @db.insert: 入る行を、そのまま足す。Accepted にあることは、確かめない */
   @db.insert
-  effect accept(order: Order) on orders.post as Stage.Accepted;
+  effect fn accept(order: Order) on orders.post as Stage.Accepted;
 
   /** @db.insert: 前が、ない側のケース */
   @db.insert
-  effect keep(order: Order) on orders.post as Life.Gone -> Life.Kept;
+  effect fn keep(order: Order) on orders.post as Life.Gone -> Life.Kept;
 
   /** @db.update: 前が any。渡した行を、そのまま書く */
   @db.update
-  effect overwrite(order: Order) on orders.put as any -> Stage.InProduction;
+  effect fn overwrite(order: Order) on orders.put as any -> Stage.InProduction;
 
   /** @db.update: ケースを変えない書き換え */
   @db.update
-  effect annotate(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
+  effect fn annotate(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
 
   /** @db.update: 後のケースを約束しない */
   @db.update
-  effect revise(order: Order) on orders.put as Stage.InProduction -> else;
+  effect fn revise(order: Order) on orders.put as Stage.InProduction -> else;
 
   /** 行の遷移を書かない @db.update は、今までどおり */
   @db.update
-  effect rename(order: Order) on orders.put;
+  effect fn rename(order: Order) on orders.put;
 
   /** 作り始める: 始めた時刻を入れる（人が書く。後のケースが前の並びにないので、@db.update は付けられない） */
-  effect start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
 
   /** 捨てる（人が書く。行を受け取る効果に、@db.delete は付けられない） */
-  effect discard(order: Order) on orders.delete as Life.Kept -> Life.Gone;
+  effect fn discard(order: Order) on orders.delete as Life.Kept -> Life.Gone;
 
   /** 受け付けた注文だけを、作り始める */
-  export op begin(order: Order, at: Time) {
+  export fn begin(order: Order, at: Time) {
     match (order by Stage) {
       Accepted     => start(order, at);
       InProduction => none;

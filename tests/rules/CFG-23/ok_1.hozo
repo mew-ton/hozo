@@ -2,5 +2,5 @@
 // 宣言していてよい（ok_1.toml、plugins/seams）。宣言したデコレータが付いているか、宣言されているかは確かめない
 namespace a {
   decorator dec;
-  @dec op f();
+  @dec fn f();
 }

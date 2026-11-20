@@ -4,8 +4,8 @@ namespace a {
   model M { id: string; }
   state items: list<M>;
   classify Stock of items { None; Some; }
-  op wide(m: M): void;
-  op ok(m: M): void {
+  fn wide(m: M): void;
+  fn ok(m: M): void {
     match (items by list) {
       Empty => wide(m);
       HasItems => wide(m);

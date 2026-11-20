@@ -443,7 +443,7 @@
           "type": "string"
         },
         "subject": {
-          "type": "string"
+          "$ref": "#/$defs/Type"
         }
       },
       "type": "object"
@@ -602,7 +602,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.10"
+          "const": "0.11"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1257,7 +1257,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.10"
+          "const": "0.11"
         },
         "transpiler": {
           "type": "string"
@@ -1475,7 +1475,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.10"
+          "const": "0.11"
         }
       },
       "required": [
@@ -2252,7 +2252,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.10"
+          "const": "0.11"
         }
       },
       "required": [
@@ -3133,7 +3133,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.10"
+          "const": "0.11"
         },
         "viewer": {
           "type": "string"

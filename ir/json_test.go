@@ -87,6 +87,12 @@ func TestRoundTripParamTypes(t *testing.T) {
 	unionRoundTrip(t, ParamType(TypeParam{Types: []Type{Int(), Float()}}), UnmarshalParamType,
 		`{"kind":"type","types":[{"kind":"core","name":"int"},{"kind":"core","name":"float"}]}`)
 	unionRoundTrip(t, ParamType(AnyParam{Of: AnyState}), UnmarshalParamType, `{"kind":"any","of":"state"}`)
+	// 分類のケースの絞り（docs/ir.md「decorator」の CaseKind）: 絞りなし（case of any）、分類の名前、対象の型（never を含む）
+	unionRoundTrip(t, ParamType(AnyParam{Of: AnyClassifyCase, Case: &CaseKind{}}), UnmarshalParamType, `{"kind":"any","of":"case","case":{}}`)
+	unionRoundTrip(t, ParamType(AnyParam{Of: AnyClassifyCase, Case: &CaseKind{Classify: "a.Actor"}}), UnmarshalParamType, `{"kind":"any","of":"case","case":{"classify":"a.Actor"}}`)
+	unionRoundTrip(t, ParamType(AnyParam{Of: AnyClassifyCase, Case: &CaseKind{Subject: Never()}}), UnmarshalParamType, `{"kind":"any","of":"case","case":{"subject":{"kind":"never"}}}`)
+	unionRoundTrip(t, ParamType(AnyParam{Of: AnyClassifyCase, Case: &CaseKind{Subject: Optional(Ref("a.Order"))}}), UnmarshalParamType,
+		`{"kind":"any","of":"case","case":{"subject":{"kind":"optional","of":{"kind":"ref","target":"a.Order"}}}}`)
 	unionRoundTrip(t, ParamType(AnyParam{Of: AnyEffect, On: &EffectOn{State: "db", Operation: OpDelete}}), UnmarshalParamType,
 		`{"kind":"any","of":"effect","on":{"state":"db","operation":"delete"}}`)
 }
@@ -427,6 +433,41 @@ func TestStateShapes(t *testing.T) {
 	}
 }
 
+// TestCaseKindMatches は、分類のケースの絞りの当たり方（docs/types.md「デコレータの引数」）: 絞りなしは、どの分類でも。
+// 分類の名前は、その分類。対象の型は、値の分類で、対象の型が、等しいもの（op や状態の分類には、当たらない）。
+func TestCaseKindMatches(t *testing.T) {
+	value := &Classify{DeclBase: DeclBase{Name: "a.Size"}, Subject: TypeSubject{Type: Ref("a.Order")}}
+	optional := &Classify{DeclBase: DeclBase{Name: "a.Known"}, Subject: TypeSubject{Type: Optional(Ref("a.Order"))}}
+	never := &Classify{DeclBase: DeclBase{Name: "a.Actor"}, Subject: TypeSubject{Type: Never()}, DecidedBy: DecidedByNone}
+	ofOp := &Classify{DeclBase: DeclBase{Name: "a.Arrival"}, Subject: OpSubject{Op: "a.find", Type: Ref("a.Order")}}
+	ofState := &Classify{DeclBase: DeclBase{Name: "a.Load"}, Subject: StatesSubject{States: []string{"a.rows"}}}
+	all := []*Classify{value, optional, never, ofOp, ofState}
+	for _, tt := range []struct {
+		name string
+		kind CaseKind
+		want []*Classify
+	}{
+		{"case of any", CaseKind{}, all},
+		{"case of Size", CaseKind{Classify: "a.Size"}, []*Classify{value}},
+		{"case of Order", CaseKind{Subject: Ref("a.Order")}, []*Classify{value}},
+		{"case of Order?", CaseKind{Subject: Optional(Ref("a.Order"))}, []*Classify{optional}},
+		{"case of never", CaseKind{Subject: Never()}, []*Classify{never}},
+	} {
+		for _, c := range all {
+			want := false
+			for _, w := range tt.want {
+				want = want || w == c
+			}
+			if got := tt.kind.Matches(c); got != want {
+				t.Errorf("%s が %s に当たるか = %v, want %v", tt.name, c.Name, got, want)
+			}
+		}
+	}
+	if (CaseKind{}).Matches(nil) {
+		t.Error("分類のないケースに当たった")
+	}
+}
+
 func TestRoundTripArgValues(t *testing.T) {
 	unionRoundTrip(t, ArgValue(LiteralValue{Literal: BooleanLiteral{Value: true}}), UnmarshalArgValue, `{"kind":"literal","literal":{"kind":"boolean","value":true}}`)
 	unionRoundTrip(t, ArgValue(RefValue{Target: "$param:to"}), UnmarshalArgValue, `{"kind":"ref","target":"$param:to"}`)
@@ -485,7 +526,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.10","namespaces":[],"binds":[]}`
+	want := `{"version":"0.11","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -493,7 +534,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.10","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.10","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.11","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.11","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

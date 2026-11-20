@@ -4,10 +4,10 @@ namespace a {
   model Order { id: string; }
   state orders: list<Order>;
   classify Stage of Order { Draft; Accepted; Shipped; }
-  effect b1(id: string) on orders.put as Stage.Draft -> Stage.Accepted;                 // ERROR: STATE-7
-  effect b2(before: Order, after: Order) on orders.put as Stage.Draft -> Stage.Accepted;   // ERROR: STATE-7
-  effect b3(changed: Order[]) on orders.put as Stage.Draft -> Stage.Accepted;           // ERROR: STATE-7
-  effect b4(order: Stage.Draft<Order>) on orders.put as Stage.Draft -> Stage.Accepted;  // ERROR: STATE-7
-  effect b5() on orders.put as any -> else;                                             // ERROR: STATE-7
-  effect b6(order: Order?) on orders.post as Stage.Draft;                               // ERROR: STATE-7
+  effect fn b1(id: string) on orders.put as Stage.Draft -> Stage.Accepted;                 // ERROR: STATE-7
+  effect fn b2(before: Order, after: Order) on orders.put as Stage.Draft -> Stage.Accepted;   // ERROR: STATE-7
+  effect fn b3(changed: Order[]) on orders.put as Stage.Draft -> Stage.Accepted;           // ERROR: STATE-7
+  effect fn b4(order: Stage.Draft<Order>) on orders.put as Stage.Draft -> Stage.Accepted;  // ERROR: STATE-7
+  effect fn b5() on orders.put as any -> else;                                             // ERROR: STATE-7
+  effect fn b6(order: Order?) on orders.post as Stage.Draft;                               // ERROR: STATE-7
 }

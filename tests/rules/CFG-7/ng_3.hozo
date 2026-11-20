@@ -1,4 +1,4 @@
 // CFG-7（docs/config.md「診断」）: 値の型が違う（ng_3.toml の max_bindings）
 namespace a {
-  op f();
+  fn f();
 }

@@ -4,8 +4,8 @@ namespace a {
   state carts: list<M>;
   state orders: list<M>;
   classify Checkout of carts, orders { Shopping; Ordered; }
-  op f();
-  op ng(m: M) {
+  fn f();
+  fn ng(m: M) {
     match (m by Checkout) { Shopping => f(); Ordered => none; };       // ERROR: MATCH-7
     match (carts by Checkout) { Shopping => f(); Ordered => none; };   // ERROR: MATCH-7
   }

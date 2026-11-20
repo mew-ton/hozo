@@ -1,4 +1,4 @@
 // CFG-14（docs/config.md「診断」）: 入っているプラグイン std がトランスパイラ go と go-b を提供している（ok_1.toml）
 namespace a {
-  op f();
+  fn f();
 }

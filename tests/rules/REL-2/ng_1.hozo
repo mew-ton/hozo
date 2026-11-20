@@ -1,5 +1,5 @@
 // REL-2（docs/check.md「throws」）: 効果を持たない op の throws に prevents / keeps がある（warning）
 namespace a {
   exception E;
-  op f() throws E prevents effects;    // WARN: REL-2
+  fn f() throws E prevents effects;    // WARN: REL-2
 }

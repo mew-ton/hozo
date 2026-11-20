@@ -8,19 +8,19 @@ namespace a {
   export state s: string;              // ERROR: SYNTAX
   model N { f: never; }                // ERROR: SYNTAX
   model D extends M { override n: int = 2; }   // ERROR: SYNTAX
-  op p(x: never);                      // ERROR: SYNTAX
-  op f(m: M): M throws E {
+  fn p(x: never);                      // ERROR: SYNTAX
+  fn f(m: M): M throws E {
     throw E;                           // ERROR: SYNTAX
     return m;
   }
-  op g(m: M): M throws E {             // ERROR: WIRE-3
+  fn g(m: M): M throws E {             // ERROR: WIRE-3
     return throw E;                    // ERROR: SYNTAX
   }
   state s: list<M>;
   state t: list<M>;
-  op count(a: M[], b: M[]): int;
-  op h(): int reads s | t {            // ERROR: SYNTAX
+  fn count(a: M[], b: M[]): int;
+  fn h(): int reads s | t {            // ERROR: SYNTAX
     return count(s, t);
   }
-  op ok(m: M): M;
+  fn ok(m: M): M;
 }

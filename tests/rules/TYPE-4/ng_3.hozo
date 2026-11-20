@@ -3,28 +3,28 @@
 namespace a {
   state rows: list<string>;
   state cur: nullable<string>;
-  effect add() on rows.post;
-  effect add2() on rows.post;
-  effect set() on cur.post;
-  effect drop() on rows.delete;
+  effect fn add() on rows.post;
+  effect fn add2() on rows.post;
+  effect fn set() on cur.post;
+  effect fn drop() on rows.delete;
   union Posts { add; add2; }
   decorator posts(...es: any effect on rows.post) for op effects es;
   decorator tags(first: string, ...more: string | int);
   decorator states(...ts: any state) for op reads ts;
   @posts(add, add2, Posts)
-  op ok(x: string, y: string);
+  fn ok(x: string, y: string);
   @tags("a", "b", 1)
-  op okTags();
+  fn okTags();
   @tags("a", true)                               // ERROR: TYPE-4
-  op badTag();
+  fn badTag();
   @tags("a", 1.5, "c")                           // ERROR: TYPE-4
-  op badTag2();
+  fn badTag2();
   @posts([add, add2])                            // ERROR: TYPE-4
-  op listToAny(x: string);
+  fn listToAny(x: string);
   @posts("add")                                  // ERROR: TYPE-4
-  op literalToAny(x: string);
+  fn literalToAny(x: string);
   @states(rows, cur)
-  op okStates(): string[];
+  fn okStates(): string[];
   @states(rows | cur)                            // ERROR: TYPE-4
-  op setToState(): string[];
+  fn setToState(): string[];
 }

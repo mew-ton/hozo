@@ -4,9 +4,9 @@ namespace a {
   model M { id: string; }
   state carts: list<M>;
   state orders: list<M>;
-  op find(): M?;
-  op use(m: M);
-  op f();
+  fn find(): M?;
+  fn use(m: M);
+  fn f();
   // 名前のないケース default は書けない: ケースには名前を付ける。値がない側なら、残りのケース（<名前>: <対象> as else;）
   classify K of M {
     A;
@@ -27,7 +27,7 @@ namespace a {
   /** 説明 */
   condition CartFilled of carts, orders;         // ERROR: SYNTAX
   // default のアームは書けない: 受けるケースを名前で並べるか、最後のアームを else => … と書く
-  op oldDefault(m: M) {
+  fn oldDefault(m: M) {
     match (m by K) {
       A       => use(m);
       default => none;                           // ERROR: SYNTAX
@@ -35,9 +35,9 @@ namespace a {
   }
   // ケースの並びの区切りは ","（"|" は、なくした書き方）。"," として読み進めるので、op と効果は残る
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
-  effect touch() on Checkout: Shopping | Ordered -> any;                 // ERROR: SYNTAX
-  effect move() on Checkout: any -> Ordered | Shipped;                   // ERROR: SYNTAX
-  op oldPipe(m: M) effects touch, move {
+  effect fn touch() on Checkout: Shopping | Ordered -> any;                 // ERROR: SYNTAX
+  effect fn move() on Checkout: any -> Ordered | Shipped;                   // ERROR: SYNTAX
+  fn oldPipe(m: M) effects touch, move {
     match (m by K) {
       A | B => use(m);                           // ERROR: SYNTAX
     };

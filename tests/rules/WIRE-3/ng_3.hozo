@@ -1,9 +1,9 @@
 // WIRE-3（docs/check.md「配線」）: return が最後以外の文にある（下の行が評価されない）
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op noValue(): void;
-  op notLast(): M {
+  fn value(): M;
+  fn noValue(): void;
+  fn notLast(): M {
     return value();                    // ERROR: WIRE-3
     noValue();
   }

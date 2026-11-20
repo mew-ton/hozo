@@ -15,9 +15,9 @@ namespace a {
   @repeatable                                    // ERROR: SYNTAX
   decorator alias = plain("id");
   @repeatable                                    // ERROR: SYNTAX
-  read marked(): M[] on rows;
+  read fn marked(): M[] on rows;
   model F { @repeatable x: int; }                // ERROR: SYNTAX
   @repeatable decorator ok(column: string) for read;
   @ok("a") @ok("b")
-  read all(): M[] on rows;
+  read fn all(): M[] on rows;
 }

@@ -5,25 +5,25 @@ namespace a {
   model PublicUser extends User { override hash: never; }
   model Same { id: string; hash: string; }
   model Other { name: string; }
-  op user(): User;
-  op publicUser(): PublicUser;
-  op other(): Other;
-  op projected(): PublicUser {
+  fn user(): User;
+  fn publicUser(): PublicUser;
+  fn other(): Other;
+  fn projected(): PublicUser {
     return user();                     // ERROR: TYPE-3
   }
-  op back(): User {
+  fn back(): User {
     return publicUser();               // ERROR: TYPE-3
   }
-  op same(): Same {
+  fn same(): Same {
     return user();                     // ERROR: TYPE-3
   }
-  op wrong(): PublicUser {
+  fn wrong(): PublicUser {
     return other();                    // ERROR: TYPE-3
   }
-  op core(): int {
+  fn core(): int {
     return other();                    // ERROR: TYPE-3
   }
-  op noneToRequired(): Other {
+  fn noneToRequired(): Other {
     return none;                       // ERROR: TYPE-3
   }
 }

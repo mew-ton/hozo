@@ -34,7 +34,7 @@
 | `docs/config.md`「単位」 | 単位 2 と 3（どちらも `namespace = "shop"`） | 同じ名前空間を、別の `out` に、互いに独立に出力する。どちらも自分の型（`Item`、`Receipt`、`Report`）をすべて持ち、相手のパッケージは import しない。記録（`.hozoc-outputs.json`）は出力ごと |
 | `docs/config.md`「in」、`docs/plugin-go.md`「出力の対象」 | 単位 2 の `in = ["shop/api.hozo"]` と、`open` が呼ぶ `nightly`（`shop/batch.hozo` の配線） | `in` が絞るのは op だけ。`gen/api` では、型（`Report` は `shop/batch.hozo` の宣言）と状態はすべて出て、`nightly` は `Leaves` の口だけで、本体も、本体が呼ぶ `sweep` も、呼ばれていない `report` も出ない。`gen/batch` では同じ `nightly` の本体と、`sweep`、`report` が出る |
 | `docs/config.md`「単位の対象」 | 単位 4（`namespace = "shop.admin"`） | `shop.admin` は単位 4 だけが出力する（`gen/admin`）。`gen/api/admin` も `gen/batch/admin` もできない |
-| `docs/config.md`「型の置き場」 | `model Item { id: stock.ItemId; ... }`、`op ban(item: shop.Item)` | `gen/api` と `gen/batch` は `gen/stock` の `ItemId` を import する（単位をまたぐ一方向の import。複製しない）。`gen/admin` は、`shop` を出力する単位のうち設定の順で最初の単位 2 の、入口のパッケージ `gen/api` を import する（内側は import しない）。`gen/stock` は誰も import しない |
+| `docs/config.md`「型の置き場」 | `model Item { id: stock.ItemId; ... }`、`fn ban(item: shop.Item)` | `gen/api` と `gen/batch` は `gen/stock` の `ItemId` を import する（単位をまたぐ一方向の import。複製しない）。`gen/admin` は、`shop` を出力する単位のうち設定の順で最初の単位 2 の、入口のパッケージ `gen/api` を import する（内側は import しない）。`gen/stock` は誰も import しない |
 | `docs/plugin-go.md`「内側のフォルダと入口」 | `stock`（op は `export` の `reserve` だけ）と `shop`（op はどれも内部） | `gen/stock` は一つのパッケージで、`inner/` を持たない。`gen/api` は定義が `inner/` にあり、入口の `Ops` はメソッドを持たない |
 | `docs/cli.md`「emit」の 1 | `hozoc emit shop`、`hozoc emit t` | 引数は名前空間。`shop` とその子孫を出力する単位 2・3・4 の分を書き出し、内容はすべてを対象にしたときと同じ。どの単位の対象でもない `t` は `UnknownNamespace` |
 

@@ -14,5 +14,5 @@ namespace clock {
 
   /** 今の時刻 */
   @system
-  export op now(): Time;
+  export fn now(): Time;
 }

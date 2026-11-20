@@ -1,9 +1,9 @@
 // WIRE-8: 束縛した名前が使われていない（docs/check.md「配線」。warning）
 namespace a {
   model M { id: string; }
-  op value(): M;
-  op use(m: M): void;
-  op f(): void {
+  fn value(): M;
+  fn use(m: M): void;
+  fn f(): void {
     val x = value();                 // WARN: WIRE-8
     val y = value();
     use(y);

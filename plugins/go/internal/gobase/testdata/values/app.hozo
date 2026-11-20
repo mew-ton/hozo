@@ -15,25 +15,25 @@ namespace app {
   }
 
   // 値を受け取る葉（純粋で throws がない）
-  export op takeString(v: string);
-  export op takeInt(v: int);
-  export op takeFloat(v: float);
-  export op takeBool(v: boolean);
-  export op takeDuration(v: Duration);
-  export op takeAccount(v: Account);
-  export op takeProfile(v: Profile);
-  export op takeAddress(v: Address);
-  export op takeOptions(v: Options);
-  export op takeOptionalString(v: string?);
-  export op takeOptionalInt(v: int?);
-  export op takeOptionalProfile(v: Profile?);
-  export op takeOptionalTags(v: string[]?);
-  export op takeStrings(v: string[]);
-  export op takeOptionalStrings(v: string?[]);
-  export op takeTable(v: Record<string, string>);
+  export fn takeString(v: string);
+  export fn takeInt(v: int);
+  export fn takeFloat(v: float);
+  export fn takeBool(v: boolean);
+  export fn takeDuration(v: Duration);
+  export fn takeAccount(v: Account);
+  export fn takeProfile(v: Profile);
+  export fn takeAddress(v: Address);
+  export fn takeOptions(v: Options);
+  export fn takeOptionalString(v: string?);
+  export fn takeOptionalInt(v: int?);
+  export fn takeOptionalProfile(v: Profile?);
+  export fn takeOptionalTags(v: string[]?);
+  export fn takeStrings(v: string[]);
+  export fn takeOptionalStrings(v: string?[]);
+  export fn takeTable(v: Record<string, string>);
 
   // 「値」name（パスなし）、name のパス、none
-  export op names(account: Account)
+  export fn names(account: Account)
   {
     takeAccount(account);
     takeString(account.id);
@@ -41,7 +41,7 @@ namespace app {
   }
 
   // 「値」literal: 文字列（エスケープ）、整数、小数（. も e も含まなければ .0 を足す）、真偽値、Duration
-  export op literals()
+  export fn literals()
   {
     takeString("a\"b\n");
     takeInt(42);
@@ -56,7 +56,7 @@ namespace app {
 
   // 「値」record: 並びは model のフィールドの順、書かれていないフィールド（省略可能なフィールドだけ）は書かず零値のまま、
   // 値を省いたフィールド、入れ子、省略可能なら &
-  export op records(name: string, email: Email)
+  export fn records(name: string, email: Email)
   {
     takeProfile({ active: false, name });
     takeOptions({});
@@ -66,7 +66,7 @@ namespace app {
   }
 
   // 「型をそろえる」T → optional(T) で Go の型が *T（リテラルは型を付ける）、Go の型がそのままのもの（array）
-  export op toOptional(name: string, tags: string[])
+  export fn toOptional(name: string, tags: string[])
   {
     takeOptionalString(name);
     takeOptionalString("lit");
@@ -75,14 +75,14 @@ namespace app {
   }
 
   // 「型をそろえる」scalar → その元の型
-  export op toBase(email: Email)
+  export fn toBase(email: Email)
   {
     takeString(email);
     takeOptionalString(email);
   }
 
   // 「型をそろえる」array / record の要素をそろえる（その文の前のループ。nil は nil のまま）
-  export op elements(emails: Email[], names: string[], byName: Record<string, Email>)
+  export fn elements(emails: Email[], names: string[], byName: Record<string, Email>)
   {
     takeStrings(emails);
     takeOptionalStrings(names);
@@ -90,13 +90,13 @@ namespace app {
   }
 
   // 「型をそろえる」case(…) → of（Go では同じ型）
-  export op fromCase(big: Size.Big<Address>)
+  export fn fromCase(big: Size.Big<Address>)
   {
     takeAddress(big);
   }
 
   // 「省略可能を通るパス」ポインタにする型、既に nil を持てる型、入れ子、return と const
-  export op optionalPaths(account: Account): string?
+  export fn optionalPaths(account: Account): string?
   {
     takeOptionalString(account.profile.name);
     takeOptionalString(account.profile.nick);

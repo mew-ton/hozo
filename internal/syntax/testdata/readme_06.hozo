@@ -23,15 +23,15 @@ namespace server {
 
 namespace server {
   /** ログインセッションを作成する */
-  effect createSession() on sessions.post;
+  effect fn createSession() on sessions.post;
 }
 
 namespace browser {
   /** ログイン画面へ遷移する */
-  effect transitionToLogin() on location.put;
+  effect fn transitionToLogin() on location.put;
 
   /** 権限がないことを示す画面へ遷移する */
-  effect transitionToForbidden() on location.put;
+  effect fn transitionToForbidden() on location.put;
 }
 
 namespace browser {

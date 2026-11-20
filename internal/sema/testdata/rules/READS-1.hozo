@@ -3,34 +3,34 @@
 state shared: list<string>;
 namespace a {
   state own: list<string>;
-  read first(): string? on own;
+  read fn first(): string? on own;
   decorator from(table: any state) for op reads table;
   decorator fromUsers for op reads b.users;
   decorator fromRead for op reads b.firstUser;
   decorator fromOwnRead for op reads first;
   @from(own)
-  op j(): string[];
+  fn j(): string[];
   @fromOwnRead
-  op j2(): string?;
+  fn j2(): string?;
   @from(b.users)                                 // ERROR: READS-1
-  op k(): string[];
+  fn k(): string[];
   @from(shared)                                  // ERROR: READS-1
-  op l(): string[];
+  fn l(): string[];
   @fromUsers                                     // ERROR: READS-1
-  op m(): string[];
+  fn m(): string[];
   @fromRead                                      // ERROR: READS-1
-  op m2(): string?;
+  fn m2(): string?;
   @from(b.token)                                 // ERROR: READS-1
   @fromOwnRead
-  op n(): string[];
+  fn n(): string[];
 }
 namespace b {
   state users: list<string>;
   state token: nullable<string>;
-  read firstUser(): string? on users;
+  read fn firstUser(): string? on users;
   // 自分の名前空間の葉に付ければ通る
   @a.fromUsers
-  op own(): string[];
+  fn own(): string[];
   @a.fromRead
-  op own2(): string?;
+  fn own2(): string?;
 }
