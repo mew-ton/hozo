@@ -41,3 +41,17 @@ namespace a {
     return all();
   }
 }
+
+// 配線の const と、丸括弧のない match の頭（docs/grammar.md「配線」）
+namespace removedWiring {
+  model M { id: string; }
+  classify K of M { A; B; }
+  op g(): M;
+  op h(m: M);
+  op f() {
+    const x = g();                     // ERROR: SYNTAX
+  }
+  op k(m: M) {
+    match m by K { A => h(m); B => h(m); };   // ERROR: SYNTAX
+  }
+}

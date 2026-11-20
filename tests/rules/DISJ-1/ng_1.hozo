@@ -1,0 +1,26 @@
+// DISJ-1: 例外を出しうるアームと、効果を持つ、別のアーム。disjoint for のブロックが、例外を出しうるのに、効果を持つ
+namespace a {
+  model Order { id: string; }
+  model Line { id: string; }
+  state orders: list<Order>;
+  state lines: list<Line>;
+  state counter: single<int>;
+  exception Declined;
+  read all(): Order[] on orders;
+  effect touch(order: Order) on orders.put;
+  effect removeById(id: string) on orders.delete;
+  effect addLine(line: Line) on lines.post;
+  effect bump(n: int) on counter.put;
+  op charge(order: Order) throws Declined;
+  op count(x: Order[], y: Order[]): int;
+  op f(a: Order, l: Line, items: Order[]) throws Declined {
+    disjoint {                         // ERROR: DISJ-1
+      charge(a);
+      addLine(l);
+    }
+    disjoint for (val o of items) {    // ERROR: DISJ-1
+      charge(o);
+      touch(o);
+    }
+  }
+}

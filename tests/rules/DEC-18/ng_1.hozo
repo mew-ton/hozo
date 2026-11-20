@@ -1,0 +1,7 @@
+// DEC-18: 名前と of never の両方を書いたのに、その分類が、対象のない分類でない
+namespace a {
+  model M { id: string; }
+  classify Size of M { Small; Large; }
+  decorator d for classify Size of never case;                    // ERROR: DEC-18
+  decorator e(x: any classify Size of never case) for op;         // ERROR: DEC-18
+}

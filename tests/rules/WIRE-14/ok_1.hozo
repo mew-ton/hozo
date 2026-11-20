@@ -1,0 +1,19 @@
+// WIRE-14（docs/check.md「繰り返し」の「集める」）: for の外で、空で宣言した val に、for の中から、集める。入れ子でも、何度でも
+namespace a {
+  model M { id: string; subs: M[]; }
+  op one(m: M): M;
+  op many(ms: M[]);
+  op f(ms: M[]) {
+    val xs: M[];
+    val ys;
+    for (val i of ms) {
+      xs collect one(i);
+      xs collect i;
+      for (val j of i.subs) {
+        ys collect one(j);
+      }
+    }
+    many(xs);
+    many(ys);
+  }
+}

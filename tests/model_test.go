@@ -276,7 +276,7 @@ func TestDesignPlaceOrderRelations(t *testing.T) {
 	prog := p.Sema.Program
 	place := opOf(t, prog, "server.placeOrder")
 	expect(t, "placeOrder は配線", renderBody(place.Body), []string{
-		"const order = server.saveOrder(in: in)",
+		"val order = server.saveOrder(in: in)",
 		"server.sendOrderNotice(order: order)",
 		"return order",
 	})

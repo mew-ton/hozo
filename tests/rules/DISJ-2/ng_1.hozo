@@ -1,0 +1,30 @@
+// DISJ-2: あるアームが効果で書く状態を、別のアームが読む。disjoint for のブロックが、書く状態を、読む
+namespace a {
+  model Order { id: string; }
+  model Line { id: string; }
+  state orders: list<Order>;
+  state lines: list<Line>;
+  state counter: single<int>;
+  exception Declined;
+  read all(): Order[] on orders;
+  effect touch(order: Order) on orders.put;
+  effect removeById(id: string) on orders.delete;
+  effect addLine(line: Line) on lines.post;
+  effect bump(n: int) on counter.put;
+  op charge(order: Order) throws Declined;
+  op count(x: Order[], y: Order[]): int;
+  op use(x: Order[]);
+  op f(a: Order, items: Order[]): Order[] {
+    val x;
+    disjoint {                         // ERROR: DISJ-2
+      touch(a);
+      x = all();
+    }
+    disjoint for (val o of items) {    // ERROR: DISJ-2
+      val seen = all();
+      use(seen);
+      touch(o);
+    }
+    return x;
+  }
+}

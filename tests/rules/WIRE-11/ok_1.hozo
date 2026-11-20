@@ -1,0 +1,16 @@
+// WIRE-11（docs/check.md「値の入れ物」の「値を入れる文」）: 空で宣言した val に、一度だけ、値を入れる
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op use(m: M);
+  op f(m: M, ms: M[]) {
+    val x;
+    x = one(m);
+    use(x);
+    for (val i of ms) {
+      val y;
+      y = one(i);
+      use(y);
+    }
+  }
+}

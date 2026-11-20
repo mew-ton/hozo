@@ -1,0 +1,8 @@
+// CLS-9: 対象のない分類のケースに、as を書いた
+namespace a {
+  model M { id: string; }
+  classify Actor of never {
+    Customer: M as M;                  // ERROR: CLS-9
+    Staff;
+  }
+}

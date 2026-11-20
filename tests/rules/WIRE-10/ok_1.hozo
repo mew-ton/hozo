@@ -1,0 +1,27 @@
+// WIRE-10（docs/check.md「値の入れ物」の「代入が済んでいるか」）: 代入の済んだ val は、読める。集めた val は、for を抜けてから
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op use(m: M);
+  op many(ms: M[]);
+  op f(m: M, ms: M[]) {
+    val x;
+    x = one(m);
+    use(x);
+    val y, z;
+    disjoint {
+      {
+        y = one(m);
+        use(y);
+      }
+      z = one(m);
+    }
+    use(y);
+    use(z);
+    val xs: M[];
+    for (val i of ms) {
+      xs collect one(i);
+    }
+    many(xs);
+  }
+}

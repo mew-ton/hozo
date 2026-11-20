@@ -1,0 +1,26 @@
+// TYPE-17（docs/types.md「val の型」、「式の型」の for の変数）: 型を書いた val に、渡せる値。並びの for。型を書かない、集める先
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op maybe(m: M): M?;
+  op use(m: M?);
+  op many(ms: M[]);
+  op opts(ms: M?[]);
+  op f(m: M, ms: M[]) {
+    val x: M? = one(m);
+    val y: M?;
+    y = maybe(m);
+    val z: M = { id: "a" };
+    val xs: M?[];
+    val ys;
+    for (val i of ms) {
+      xs collect one(i);
+      ys collect one(i);
+    }
+    use(x);
+    use(y);
+    use(z);
+    many(ys);
+    opts(xs);
+  }
+}

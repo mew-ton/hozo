@@ -1,0 +1,24 @@
+// WIRE-14: 集められないもの。for の外。値と一緒に宣言した val。for の中で宣言した val。もう、集め終わった val
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op many(ms: M[]);
+  op f(m: M, ms: M[]) {
+    val xs: M[];
+    xs collect one(m);                 // ERROR: WIRE-14
+    val ys = ms;
+    for (val i of ms) {
+      ys collect one(i);               // ERROR: WIRE-14
+      val zs: M[];
+      zs collect one(i);               // ERROR: WIRE-14
+      xs collect one(i);
+      zs = ms;
+      many(zs);
+    }
+    for (val i of ms) {
+      xs collect one(i);               // ERROR: WIRE-14
+    }
+    many(xs);
+    many(ys);
+  }
+}

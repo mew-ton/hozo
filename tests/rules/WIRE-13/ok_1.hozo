@@ -1,0 +1,12 @@
+// WIRE-13（docs/check.md「繰り返し」「disjoint」）: return を書けるのは、op の本体の、いちばん外だけ
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op f(m: M, ms: M[]): M[] {
+    val xs: M[];
+    for (val i of ms) {
+      xs collect one(i);
+    }
+    return xs;
+  }
+}

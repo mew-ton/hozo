@@ -1,0 +1,17 @@
+// WIRE-12（docs/check.md「値の入れ物」）: 空で宣言した val には、値を入れる文か、集める文がある
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op use(m: M);
+  op many(ms: M[]);
+  op f(m: M, ms: M[]) {
+    val x;
+    x = one(m);
+    use(x);
+    val xs: M[];
+    for (val i of ms) {
+      xs collect one(i);
+    }
+    many(xs);
+  }
+}

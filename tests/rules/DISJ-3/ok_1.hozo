@@ -1,0 +1,25 @@
+// DISJ-3（docs/check.md「disjoint」の「検査」）: 同じ状態への効果は、行で見る。違う値を渡していれば、通る。回ごとに、違う行
+namespace a {
+  model Order { id: string; }
+  model Line { id: string; }
+  state orders: list<Order>;
+  state lines: list<Line>;
+  state counter: single<int>;
+  exception Declined;
+  read all(): Order[] on orders;
+  effect touch(order: Order) on orders.put;
+  effect removeById(id: string) on orders.delete;
+  effect addLine(line: Line) on lines.post;
+  effect bump(n: int) on counter.put;
+  op charge(order: Order) throws Declined;
+  op count(x: Order[], y: Order[]): int;
+  op f(a: Order, b: Order, items: Order[]) {
+    disjoint {
+      touch(a);
+      touch(b);
+    }
+    disjoint for (val o of items) {
+      touch(o);
+    }
+  }
+}

@@ -1,0 +1,32 @@
+// DISJ-2（docs/check.md「disjoint」の「検査」）: 読みと読みは、重なってよい。書く状態と、読む状態が、別なら、通る
+namespace a {
+  model Order { id: string; }
+  model Line { id: string; }
+  state orders: list<Order>;
+  state lines: list<Line>;
+  state counter: single<int>;
+  exception Declined;
+  read all(): Order[] on orders;
+  effect touch(order: Order) on orders.put;
+  effect removeById(id: string) on orders.delete;
+  effect addLine(line: Line) on lines.post;
+  effect bump(n: int) on counter.put;
+  op charge(order: Order) throws Declined;
+  op count(x: Order[], y: Order[]): int;
+  op both(a: int, b: int): int;
+  op f(l: Line): int {
+    val x, y;
+    disjoint {
+      x = all();
+      y = all();
+    }
+    val z;
+    disjoint {
+      addLine(l);
+      z = all();
+    }
+    val n = count(x, y);
+    val k = count(x, z);
+    return both(n, k);
+  }
+}

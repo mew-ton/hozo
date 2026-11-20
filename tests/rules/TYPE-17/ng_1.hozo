@@ -1,0 +1,36 @@
+// TYPE-17: 渡せない型。並びでない、集める先。並びでない、for の頭。そろわない、集める式
+namespace a {
+  model M { id: string; }
+  model N { n: int; }
+  op one(m: M): M;
+  op other(m: M): N;
+  op maybe(m: M): M?;
+  op use(m: M);
+  op useN(n: N);
+  op useNs(ns: N[]);
+  op f(m: M, ms: M[], opt: M[]?) {
+    val x: M = maybe(m);               // ERROR: TYPE-17
+    val y: N;
+    y = one(m);                        // ERROR: TYPE-17
+    val xs: M;
+    val ys: N[];
+    val zs;
+    for (val i of ms) {
+      xs collect one(i);               // ERROR: TYPE-17
+      ys collect one(i);               // ERROR: TYPE-17
+      zs collect one(i);               // ERROR: TYPE-17
+      zs collect other(i);
+    }
+    for (val i of m) {                 // ERROR: TYPE-17
+      use(i);
+    }
+    for (val i of opt) {               // ERROR: TYPE-17
+      use(i);
+    }
+    use(x);
+    useN(y);
+    useNs(ys);
+    use(xs);
+    useNs(zs);
+  }
+}

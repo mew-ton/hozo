@@ -1,0 +1,18 @@
+// WIRE-13: for のブロックと、disjoint のブロックのアームの中の return
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op use(m: M);
+  op f(m: M, ms: M[]): M {
+    for (val i of ms) {
+      return i;                        // ERROR: WIRE-13
+    }
+    disjoint {
+      {
+        return m;                      // ERROR: WIRE-13
+      }
+      use(m);
+    }
+    return one(m);
+  }
+}

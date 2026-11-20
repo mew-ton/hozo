@@ -1,0 +1,23 @@
+// WIRE-10: 代入の済んでいない val を、読んでいる。別のアームが入れる val も、集めている途中の val も、読めない
+namespace a {
+  model M { id: string; }
+  op one(m: M): M;
+  op use(m: M);
+  op many(ms: M[]);
+  op f(m: M, ms: M[]) {
+    val x;
+    use(x);                            // ERROR: WIRE-10
+    x = one(m);
+    val y;
+    disjoint {
+      y = one(m);
+      use(y);                          // ERROR: WIRE-10
+    }
+    val xs: M[];
+    for (val i of ms) {
+      xs collect one(i);
+      many(xs);                        // ERROR: WIRE-10
+    }
+    many(xs);
+  }
+}
