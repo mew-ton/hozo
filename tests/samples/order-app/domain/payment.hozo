@@ -178,19 +178,19 @@ namespace payment {
   export op begin(order: ordering.Order, returnTo: type.Url): psp.Session
     throws AlreadySecured, ProviderUnavailable
   {
-    const existing = paymentOf(order.id);
-    return match existing by Known {
+    val existing = paymentOf(order.id);
+    return match (existing by Known) {
       Found   => reopen(order, existing, returnTo);
       Missing => openFirst(order, returnTo);
-    };
+    }
   }
 
   /** はじめて開く */
   op openFirst(order: ordering.Order, returnTo: type.Url): psp.Session
     throws ProviderUnavailable
   {
-    const session = openSession(order, returnTo);
-    const payment = pending(order, session);
+    val session = openSession(order, returnTo);
+    val payment = pending(order, session);
     createPayment(payment);
     return session;
   }
@@ -199,17 +199,17 @@ namespace payment {
   op reopen(order: ordering.Order, payment: Payment, returnTo: type.Url): psp.Session
     throws AlreadySecured, ProviderUnavailable
   {
-    return match payment by Standing {
+    return match (payment by Standing) {
       Pending => replaceSession(order, payment, returnTo);
       else    => throw AlreadySecured;
-    };
+    }
   }
 
   /** 新しい支払いの画面に差し替える */
   op replaceSession(order: ordering.Order, payment: Standing.Pending<Payment>, returnTo: type.Url): psp.Session
     throws ProviderUnavailable
   {
-    const session = openSession(order, returnTo);
+    val session = openSession(order, returnTo);
     replaceSessionOf(payment, session.id);
     return session;
   }
@@ -218,23 +218,23 @@ namespace payment {
   op openSession(order: ordering.Order, returnTo: type.Url): psp.Session
     throws ProviderUnavailable
   {
-    return match order.physical by ordering.Delivery {
+    return match (order.physical by ordering.Delivery) {
       ToShip        => openHold(order, order.physical, returnTo);
       NothingToShip => openCharge(order, returnTo);
-    };
+    }
   }
 
   /** 商品の代金 + 送料の上限の枠を確保する画面を開く */
   @outside.failsAs(ProviderUnavailable)
   op openHold(order: ordering.Order, part: ordering.PhysicalPart, returnTo: type.Url): psp.Session {
-    const request = limitOf(order, part, returnTo);
+    val request = limitOf(order, part, returnTo);
     return psp.openHold(request);
   }
 
   /** 商品の代金を、その場で請求する画面を開く */
   @outside.failsAs(ProviderUnavailable)
   op openCharge(order: ordering.Order, returnTo: type.Url): psp.Session {
-    const request = totalOf(order, returnTo);
+    val request = totalOf(order, returnTo);
     return psp.openCharge(request);
   }
 
@@ -261,38 +261,38 @@ namespace payment {
    */
   @prd.promise("客", "同じ通知が二度届いても、注文を二度は受け付けない")
   export op record(event: psp.Event): type.OrderId? {
-    const delivered = seenEvent(event.id);
-    return match delivered by Redelivery {
+    val delivered = seenEvent(event.id);
+    return match (delivered by Redelivery) {
       Redelivered   => none;
       FirstDelivery => recordNew(event);
-    };
+    }
   }
 
   /** はじめて届いた通知。扱ったと記録する。することがあるのは、客の同意（Secured）の通知だけで、ほかの通知（Echo）は、受け取るだけ */
   op recordNew(event: psp.Event): type.OrderId? {
-    const now = clock.now();
+    val now = clock.now();
     remember({ id: event.id, at: now });
-    return match event by psp.Meaning {
+    return match (event by psp.Meaning) {
       Secured => secure(event, now);
       Echo    => none;
-    };
+    }
   }
 
   /** 客の同意の通知。知らない支払いの画面のものは、何もしない */
   op secure(event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
-    const payment = paymentBySession(event.session);
-    return match payment by Known {
+    val payment = paymentBySession(event.session);
+    return match (payment by Known) {
       Found   => secureFound(payment, event, now);
       Missing => none;
-    };
+    }
   }
 
   /** まだ同意していなかった支払いだけが、新しく確保される */
   op secureFound(payment: Payment, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
-    return match payment by Standing {
+    return match (payment by Standing) {
       Pending => markSecured(payment, event, now);
       else    => none;
-    };
+    }
   }
 
   /**
@@ -300,10 +300,10 @@ namespace payment {
    * 送料がない支払い（ダウンロードだけ）は、その場で請求が確定している（Settled）。
    */
   op markSecured(payment: Standing.Pending<Payment>, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId {
-    match payment by Billing {
+    match (payment by Billing) {
       Deferred  => holdSecured(payment, event.holdExpiresAt, now);
       Immediate => chargeSecured(payment, now);
-    };
+    }
     return payment.orderId;
   }
 
@@ -318,11 +318,11 @@ namespace payment {
   op require(orderId: type.OrderId): Payment
     throws NoPayment
   {
-    const found = paymentOf(orderId);
-    return match found by Known {
+    val found = paymentOf(orderId);
+    return match (found by Known) {
       Found   => found;
       Missing => throw NoPayment;
-    };
+    }
   }
 
   // ---- 送料が決まった: 請求する額を、最後まで決める ----
@@ -337,13 +337,13 @@ namespace payment {
   export op settle(orderId: type.OrderId, fee: type.Yen)
     throws NoPayment, NotSecured, psp.HoldExpired, http.NetworkError, http.ServerError
   {
-    const payment = require(orderId);
-    match payment by Standing {
+    val payment = require(orderId);
+    match (payment by Standing) {
       Held               => capture(payment, fee);
       Prepaid            => refundDifference(payment, fee);
       Settled            => none;
       Pending, Released => throw NotSecured;
-    };
+    }
   }
 
   /** 枠から、請求を確定する。枠の期限が過ぎていれば、金は動かず、記録も変わらない。相手に届かなければ、金が動いたかどうかは、分からない */
@@ -351,9 +351,9 @@ namespace payment {
     throws psp.HoldExpired prevents effects
     throws http.NetworkError, http.ServerError
   {
-    const now = clock.now();
-    const charge = charged(payment, fee);
-    const request = captureOf(payment, charge);
+    val now = clock.now();
+    val charge = charged(payment, fee);
+    val request = captureOf(payment, charge);
     psp.capture(request);
     recordSettled(payment, charge, now);
   }
@@ -362,9 +362,9 @@ namespace payment {
   op refundDifference(payment: Standing.Prepaid<Payment>, fee: type.Yen)
     throws http.NetworkError, http.ServerError
   {
-    const now = clock.now();
-    const charge = charged(payment, fee);
-    const request = refundOf(payment, charge);
+    val now = clock.now();
+    val charge = charged(payment, fee);
+    val request = refundOf(payment, charge);
     psp.refund(request);
     recordSettled(payment, charge, now);
   }
@@ -391,13 +391,13 @@ namespace payment {
   op prepayExpiring()
     throws psp.HoldExpired, http.NetworkError, http.ServerError
   {
-    const now = clock.now();
-    const deadline = ahead(now, holdMargin);
-    const next = nextExpiringHold(deadline);
-    match next by Known {
+    val now = clock.now();
+    val deadline = ahead(now, holdMargin);
+    val next = nextExpiringHold(deadline);
+    match (next by Known) {
       Found   => prepayHeld(next, now);
       Missing => none;
-    };
+    }
   }
 
   /** now から margin だけ先の時刻（人が書く） */
@@ -407,17 +407,17 @@ namespace payment {
   op prepayHeld(payment: Payment, now: Time)
     throws psp.HoldExpired, http.NetworkError, http.ServerError
   {
-    match payment by Standing {
+    match (payment by Standing) {
       Held => prepay(payment, now);
       else => none;
-    };
+    }
   }
 
   /** 上限の額で、請求を確定する */
   op prepay(payment: Standing.Held<Payment>, now: Time)
     throws psp.HoldExpired, http.NetworkError, http.ServerError
   {
-    const request = limitCaptureOf(payment);
+    val request = limitCaptureOf(payment);
     psp.capture(request);
     recordPrepaid(payment, now);
   }
@@ -431,20 +431,20 @@ namespace payment {
   export op release(orderId: type.OrderId)
     throws NoPayment, http.NetworkError, http.ServerError
   {
-    const payment = require(orderId);
-    match payment by Standing {
+    val payment = require(orderId);
+    match (payment by Standing) {
       Held => letGo(payment);
       else => none;
-    };
+    }
   }
 
   /** 枠を手放して、記録する */
   op letGo(payment: Standing.Held<Payment>)
     throws http.NetworkError, http.ServerError
   {
-    const request = holdOf(payment);
+    val request = holdOf(payment);
     psp.release(request);
-    const now = clock.now();
+    val now = clock.now();
     recordReleased(payment, now);
   }
 

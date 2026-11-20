@@ -289,7 +289,7 @@ namespace shipping {
 
   /** 注文の、箱で送る部分の出荷を開く。在庫の品目は大きさが分かっていて、受注製作の品目は、まだ分からない */
   export op open(orderId: type.OrderId, part: ordering.PhysicalPart) {
-    const shipment = toGather(orderId, part);
+    val shipment = toGather(orderId, part);
     createShipment(shipment);
   }
 
@@ -302,11 +302,11 @@ namespace shipping {
   export op find(id: ShipmentId): Shipment
     throws NoShipment
   {
-    const found = shipmentById(id);
-    return match found by Known {
+    val found = shipmentById(id);
+    return match (found by Known) {
       Found   => found;
       Missing => throw NoShipment;
-    };
+    }
   }
 
   /** 出荷と、そこまでに足された事実。荷物は梱包するまで、送り状は買うまで、ない */
@@ -320,29 +320,29 @@ namespace shipping {
   export op progress(id: ShipmentId): Progress
     throws NoShipment
   {
-    const shipment = find(id);
+    val shipment = find(id);
     return progressOf(shipment);
   }
 
   /** 注文の出荷の進み具合を引く。ダウンロードだけの注文には、ない */
   export op progressOfOrder(orderId: type.OrderId): Progress? {
-    const found = shipmentOfOrder(orderId);
-    return match found by Known {
+    val found = shipmentOfOrder(orderId);
+    return match (found by Known) {
       Found   => progressOf(found);
       Missing => none;
-    };
+    }
   }
 
   /** 出荷に、荷物と送り状を添える */
   op progressOf(shipment: Shipment): Progress {
-    const packed = parcelOf(shipment.id);
-    const bought = labelOf(shipment.id);
+    val packed = parcelOf(shipment.id);
+    val bought = labelOf(shipment.id);
     return { shipment: shipment, parcel: packed, label: bought };
   }
 
   /** まだ店にある出荷の一覧（そろえている途中のものも、梱包を待っているものも）。それぞれの進み具合を添える */
   export op inHouse(): Progress[] {
-    const waiting = shipmentsInHouse();
+    val waiting = shipmentsInHouse();
     return together(waiting, parcels, labels);
   }
 
@@ -371,21 +371,21 @@ namespace shipping {
   export op gather(orderId: type.OrderId, line: type.LineId, measured: type.Measurement?): Shipment
     throws NoShipment, UnknownItem
   {
-    const found = shipmentOfOrder(orderId);
-    return match found by Known {
+    val found = shipmentOfOrder(orderId);
+    return match (found by Known) {
       Found   => placeOn(found, line, measured);
       Missing => throw NoShipment;
-    };
+    }
   }
 
   /** 品目を置けるのは、まだ待っている品目のある出荷だけ。もうそろっている出荷には、何もしない */
   op placeOn(shipment: Shipment, line: type.LineId, measured: type.Measurement?): Shipment
     throws NoShipment, UnknownItem
   {
-    match shipment by Gathered {
+    match (shipment by Gathered) {
       Awaiting => putDown(shipment, line, measured);
       Complete => none;
-    };
+    }
     return find(shipment.id);
   }
 
@@ -393,8 +393,8 @@ namespace shipping {
   op putDown(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?)
     throws UnknownItem
   {
-    const now = clock.now();
-    const placement = place(shipment, line, measured, now);
+    val now = clock.now();
+    val placement = place(shipment, line, measured, now);
     recordPlacement(shipment, placement);
   }
 
@@ -434,41 +434,41 @@ namespace shipping {
   export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
     throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable
   {
-    const shipment = find(id);
-    const existing = parcelOf(id);
-    return match existing by Packing {
+    val shipment = find(id);
+    val existing = parcelOf(id);
+    return match (existing by Packing) {
       Packed   => throw AlreadyPacked;
       Unpacked => packGathered(shipment, box, weight);
-    };
+    }
   }
 
   /** そろった出荷だけを、梱包できる */
   op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
     throws NotGathered, UnknownBox, OverWeight, Undeliverable
   {
-    return match shipment by Gathered {
+    return match (shipment by Gathered) {
       Complete => packInto(shipment, box, weight);
       Awaiting => throw NotGathered;
-    };
+    }
   }
 
   /** 箱の種類を引く */
   op packInto(shipment: Gathered.Complete<Shipment>, code: BoxCode, weight: type.Grams): Parcel
     throws UnknownBox, OverWeight, Undeliverable
   {
-    const box = boxByCode(code);
-    return match box by Stocked {
+    val box = boxByCode(code);
+    return match (box by Stocked) {
       InUse    => seal(shipment, box, weight);
       Unlisted => throw UnknownBox;
-    };
+    }
   }
 
   /** 荷物を作る */
   op seal(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams): Parcel
     throws OverWeight, Undeliverable
   {
-    const now = clock.now();
-    const parcel = weighed(shipment, box, weight, tariffs, now);
+    val now = clock.now();
+    val parcel = weighed(shipment, box, weight, tariffs, now);
     createParcel(parcel);
     return parcel;
   }
@@ -489,23 +489,23 @@ namespace shipping {
   export op sealed(id: ShipmentId): Sealed
     throws NoShipment, NotPacked, AlreadyLabelled
   {
-    const shipment = find(id);
-    const bought = labelOf(id);
-    return match bought by Labelling {
+    val shipment = find(id);
+    val bought = labelOf(id);
+    return match (bought by Labelling) {
       Labelled   => throw AlreadyLabelled;
       Unlabelled => withParcel(shipment);
-    };
+    }
   }
 
   /** 出荷に、荷物を添える */
   op withParcel(shipment: Shipment): Sealed
     throws NotPacked
   {
-    const packed = parcelOf(shipment.id);
-    return match packed by Packing {
+    val packed = parcelOf(shipment.id);
+    return match (packed by Packing) {
       Packed   => { shipment: shipment, parcel: packed };
       Unpacked => throw NotPacked;
-    };
+    }
   }
 
   /** 買った送り状を記録する */
@@ -527,51 +527,51 @@ namespace shipping {
   export op handOver(id: ShipmentId): Dispatched
     throws NoShipment, NotPacked, NotLabelled, AlreadyHandedOver
   {
-    const shipment = find(id);
-    const packed = withParcel(shipment);
-    const bought = labelOf(id);
-    return match bought by Labelling {
+    val shipment = find(id);
+    val packed = withParcel(shipment);
+    val bought = labelOf(id);
+    return match (bought by Labelling) {
       Labelled   => release(packed, bought);
       Unlabelled => throw NotLabelled;
-    };
+    }
   }
 
   /** まだ店にある出荷だけを、渡せる */
   op release(packed: Sealed, label: Label): Dispatched
     throws NoShipment, AlreadyHandedOver
   {
-    const now = clock.now();
-    match packed.shipment by Custody {
+    val now = clock.now();
+    match (packed.shipment by Custody) {
       InHouse                => recordHandOver(packed.shipment, now);
       WithCarrier, Delivered => throw AlreadyHandedOver;
-    };
-    const released = find(packed.shipment.id);
+    }
+    val released = find(packed.shipment.id);
     return { shipment: released, parcel: packed.parcel, label: label };
   }
 
   /** 配送業者が、届けたと知らせてきた。知らない追跡番号と、もう届いている出荷は、何もしない */
   export op delivered(trackingNumber: TrackingNumber, at: Time) {
-    const bought = labelByTracking(trackingNumber);
-    match bought by Labelling {
+    val bought = labelByTracking(trackingNumber);
+    match (bought by Labelling) {
       Labelled   => arrive(bought.shipmentId, at);
       Unlabelled => none;
-    };
+    }
   }
 
   /** 出荷に、届いた時刻を入れる */
   op arrive(id: ShipmentId, at: Time) {
-    const found = shipmentById(id);
-    match found by Known {
+    val found = shipmentById(id);
+    match (found by Known) {
       Found   => markDelivered(found, at);
       Missing => none;
-    };
+    }
   }
 
   /** 配送業者に渡してある出荷だけが、届く */
   op markDelivered(shipment: Shipment, at: Time) {
-    match shipment by Custody {
+    match (shipment by Custody) {
       WithCarrier        => recordDelivery(shipment, at);
       InHouse, Delivered => none;
-    };
+    }
   }
 }

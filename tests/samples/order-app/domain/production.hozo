@@ -68,8 +68,8 @@ namespace production {
   /** 作り終えていない仕事。納期の近い順（人が書く: 値がないことと、古い順の並べ方） */
   read openJobs(): Job[] on jobs;
 
-  /** 仕事を、まとめて足す（行を一つずつ受け取らないので、入るケースは書けない。どれも、まだ手を付けていない仕事として作る: plan） */
-  effect addJobs(added: Job[]) on jobs.post;
+  /** 仕事を、一つ足す。まだ手を付けていない仕事として入る */
+  effect addJob(job: Job) on jobs.post as Progress.Queued;
 
   /** 作り始めた: 始めた時刻を入れる（人が書く） */
   effect startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.InProduction;
@@ -79,15 +79,17 @@ namespace production {
 
   // ---- 受け付けたとき ----
 
-  /** 受注製作の行を、仕事にする。行がなければ、何も足さない */
+  /** 受注製作の行を、一つずつ、仕事にする。行がなければ、何も足さない */
   export op enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
-    const now = clock.now();
-    const planned = plan(orderId, lines, now);
-    addJobs(planned);
+    val now = clock.now();
+    for (val line of lines) {
+      val job = planJob(orderId, line, now);
+      addJob(job);
+    }
   }
 
-  /** 行ごとに仕事を作り、納期を決める（人が書く） */
-  op plan(orderId: type.OrderId, lines: ordering.MadeLine[], now: Time): Job[];
+  /** 行から仕事を作り、納期を決める（人が書く） */
+  op planJob(orderId: type.OrderId, line: ordering.MadeLine, now: Time): Job;
 
   // ---- 引く ----
 
@@ -105,11 +107,11 @@ namespace production {
   op require(id: JobId): Job
     throws NoJob
   {
-    const found = jobById(id);
-    return match found by Known {
+    val found = jobById(id);
+    return match (found by Known) {
       Found   => found;
       Missing => throw NoJob;
-    };
+    }
   }
 
   // ---- 作る ----
@@ -118,12 +120,12 @@ namespace production {
   export op start(id: JobId): Job
     throws NoJob, NotQueued
   {
-    const job = require(id);
-    const now = clock.now();
-    match job by Progress {
+    val job = require(id);
+    val now = clock.now();
+    match (job by Progress) {
       Queued                 => startJob(job, now);
       InProduction, Finished => throw NotQueued;
-    };
+    }
     return require(id);
   }
 
@@ -131,12 +133,12 @@ namespace production {
   export op finish(id: JobId, measured: type.Measurement): Job
     throws NoJob, NotInProduction
   {
-    const job = require(id);
-    const now = clock.now();
-    match job by Progress {
+    val job = require(id);
+    val now = clock.now();
+    match (job by Progress) {
       InProduction     => finishJob(job, measured, now);
       Queued, Finished => throw NotInProduction;
-    };
+    }
     return require(id);
   }
 }

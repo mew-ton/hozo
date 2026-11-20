@@ -128,7 +128,7 @@ namespace storefront {
   @unavailableOnFailure
   @page.route("/")
   op openCatalog(): CatalogPage {
-    const products = shopApi.products();
+    val products = shopApi.products();
     return catalogVm(products);
   }
 
@@ -153,7 +153,7 @@ namespace storefront {
   @unavailableOnFailure
   @page.route("/product", from: query)
   op openProduct(query: ProductQuery): ProductPage {
-    const product = shopApi.product({ sku: query.sku });
+    val product = shopApi.product({ sku: query.sku });
     return productVm(product);
   }
 
@@ -162,10 +162,10 @@ namespace storefront {
   op onAddToCart(product: catalog.Product, quantity: type.Quantity)
     throws page.Aborted
   {
-    const line = match product.fulfilment by catalog.Kind {
+    val line = match (product.fulfilment by catalog.Kind) {
       Made              => askRequest(product, quantity);
       Digital, Stocked  => lineOf(product, quantity);
-    };
+    }
     addLine(line);
     forgetOffer();
     goToCart();
@@ -196,10 +196,10 @@ namespace storefront {
   @unavailableOnFailure
   @page.route("/cart")
   op openCart(): CartPage {
-    return match cart by list {
+    return match (cart by list) {
       Empty    => emptyCartVm();
       HasItems => filledCart();
-    };
+    }
   }
 
   /** カートの中身に、いまの値段を付けてもらう。ページの op に fallback を二つは付けられないので、二つ目は、この op が持つ */
@@ -207,7 +207,7 @@ namespace storefront {
   op filledCart(): CartPage
     throws http.NetworkError, http.ServerError
   {
-    const sorted = shopApi.itemise({ lines: cart });
+    val sorted = shopApi.itemise({ lines: cart });
     return filledCartVm(sorted, problem);
   }
 
@@ -267,10 +267,10 @@ namespace storefront {
   @unavailableOnFailure
   @page.route("/checkout")
   op openCheckout(): CheckoutPage {
-    return match cart by list {
+    return match (cart by list) {
       Empty    => emptyCheckoutVm();
       HasItems => checkout();
-    };
+    }
   }
 
   /** 値段を見せているか、まだか */
@@ -278,17 +278,17 @@ namespace storefront {
   op checkout(): CheckoutPage
     throws http.NetworkError, http.ServerError
   {
-    return match offer by nullable {
+    return match (offer by nullable) {
       HasItems => quotedVm(offer, problem);
       Empty    => entering();
-    };
+    }
   }
 
   /** 入力を待つ */
   op entering(): CheckoutPage
     throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
   {
-    const sorted = shopApi.itemise({ lines: cart });
+    val sorted = shopApi.itemise({ lines: cart });
     return enteringVm(sorted, problem);
   }
 
@@ -304,8 +304,8 @@ namespace storefront {
   @recover(ordering.DestinationRequired | shipping.Undeliverable | shipping.TooLarge, sayCannotDeliver)
   @recover(http.NetworkError | http.ServerError, sayTryLater)
   op onAskQuote(contact: Contact) {
-    const priced = shopApi.quote({ lines: cart, destination: contact.destination });
-    const requestId = newRequestId();
+    val priced = shopApi.quote({ lines: cart, destination: contact.destination });
+    val requestId = newRequestId();
     showOffer({ requestId: requestId, email: contact.email, destination: contact.destination, priced: priced });
     reload();
   }
@@ -331,10 +331,10 @@ namespace storefront {
   @recover(ordering.TermsChanged, sayTermsChanged)
   @recover(ordering.OrderExpired | payment.AlreadySecured | payment.ProviderUnavailable | http.NetworkError | http.ServerError, sayTryLater)
   op onPlaceOrder() {
-    match offer by nullable {
+    match (offer by nullable) {
       HasItems => placeOrder(offer);
       Empty    => none;
-    };
+    }
   }
 
   /** 注文して、カートを空にして、支払いの画面へ出る */
@@ -343,7 +343,7 @@ namespace storefront {
            ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
            payment.AlreadySecured, payment.ProviderUnavailable, http.NetworkError, http.ServerError
   {
-    const placed = shopApi.checkout({ checkout: {
+    val placed = shopApi.checkout({ checkout: {
       requestId: agreed.requestId,
       email: agreed.email,
       lines: cart,
@@ -388,7 +388,7 @@ namespace storefront {
   @unavailableOnFailure
   @page.route("/order", from: query)
   op openOrder(query: OrderQuery): OrderPage {
-    const view = shopApi.status({ key: query.key });
+    val view = shopApi.status({ key: query.key });
     return orderVm(view);
   }
 
@@ -397,7 +397,7 @@ namespace storefront {
   @recover(ordering.NoOrder | ordering.OrderExpired | payment.AlreadySecured, reload)
   @recover(payment.ProviderUnavailable | http.NetworkError | http.ServerError, sayTryLater)
   op onPay(key: type.OrderKey) {
-    const placed = shopApi.pay({ key });
+    val placed = shopApi.pay({ key });
     leaveTo(placed.payAt);
   }
 
@@ -412,7 +412,7 @@ namespace storefront {
   @recover(ordering.NoOrder | download.NotGranted | download.GrantExpired, reload)
   @recover(download.AssetsUnavailable | http.NetworkError | http.ServerError, sayTryLater)
   op onDownload(key: type.OrderKey, line: type.LineId) {
-    const url = shopApi.download({ key, line });
+    val url = shopApi.download({ key, line });
     saveFrom(url);
   }
 

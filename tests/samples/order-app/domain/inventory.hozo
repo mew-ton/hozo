@@ -92,9 +92,9 @@ namespace inventory {
   export op reserve(orderId: type.OrderId, lines: ordering.StockedLine[])
     throws OutOfStock
   {
-    const skus = skusOf(lines);
-    const current = levelsOf(skus);
-    const allocation = allocate(orderId, lines, current);
+    val skus = skusOf(lines);
+    val current = levelsOf(skus);
+    val allocation = allocate(orderId, lines, current);
     saveLevels(allocation.levels);
     addReservations(allocation.reservations);
   }
@@ -111,10 +111,10 @@ namespace inventory {
   /** 期限切れになった注文の取り置きを戻す */
   @db.transaction
   export op release(orderId: type.OrderId) {
-    const held = reservationsOfOrder(orderId);
-    const skus = skusOfHeld(held);
-    const current = levelsOf(skus);
-    const restored = restore(held, current);
+    val held = reservationsOfOrder(orderId);
+    val skus = skusOfHeld(held);
+    val current = levelsOf(skus);
+    val restored = restore(held, current);
     saveLevels(restored);
     dropReservations(orderId);
   }
@@ -129,7 +129,7 @@ namespace inventory {
 
   /** 注文を受け付けた。取り置いた行を、棚から出してよくする */
   export op confirm(orderId: type.OrderId) {
-    const now = clock.now();
+    val now = clock.now();
     confirmReservations(orderId, now);
   }
 
@@ -165,39 +165,39 @@ namespace inventory {
   export op pick(orderId: type.OrderId, line: type.LineId)
     throws NotReserved, AlreadyPicked
   {
-    const found = reservationOf(orderId, line);
-    match found by Held {
+    val found = reservationOf(orderId, line);
+    match (found by Held) {
       Reserved   => pickReserved(found);
       Unreserved => throw NotReserved;
-    };
+    }
   }
 
   /** まだ棚にある取り置きだけを、出せる */
   op pickReserved(reservation: Reservation)
     throws NotReserved, AlreadyPicked
   {
-    match reservation by Picking {
+    match (reservation by Picking) {
       OnShelf => takeFromShelf(reservation);
       Picked  => throw AlreadyPicked;
-    };
+    }
   }
 
   /** 在庫の数を減らし、取り置きを、棚から出したことにする */
   op takeFromShelf(reservation: Picking.OnShelf<Reservation>)
     throws NotReserved
   {
-    const level = levelOf(reservation.sku);
-    const now = clock.now();
-    match level by Stocked {
+    val level = levelOf(reservation.sku);
+    val now = clock.now();
+    match (level by Stocked) {
       Counted   => shipOut(level, reservation);
       Uncounted => throw NotReserved;
-    };
+    }
     markPicked(reservation, now);
   }
 
   /** 出した分を、棚の数と取り置きの数から引く */
   op shipOut(level: Level, picked: Reservation) {
-    const changed = minus(level, picked);
+    val changed = minus(level, picked);
     saveLevels(changed);
   }
 

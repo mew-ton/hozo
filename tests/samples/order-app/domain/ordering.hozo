@@ -182,8 +182,8 @@ namespace ordering {
   @db.find
   read orderByRequest(requestId: type.RequestId): Order? on orders;
 
-  /** deadline より前に申し込まれて、まだ支払いを待っている注文のうち、いちばん古いもの（比較と並べ方は db の語彙で言えないので、人が書く） */
-  read oldestUnpaidBefore(deadline: Time): Order? on orders;
+  /** deadline より前に申し込まれて、まだ支払いを待っている注文。古い順（比較と並べ方は db の語彙で言えないので、人が書く） */
+  read unpaidBefore(deadline: Time): Order[] on orders;
 
   /** 注文を作る。支払いを待つ注文として入る */
   @db.insert
@@ -201,8 +201,8 @@ namespace ordering {
   export op itemise(lines: CartLine[]): Sorted
     throws UnknownProduct, NotForSale
   {
-    const skus = skusOf(lines);
-    const products = catalog.lookup(skus);
+    val skus = skusOf(lines);
+    val products = catalog.lookup(skus);
     return sort(lines, products);
   }
 
@@ -210,11 +210,11 @@ namespace ordering {
   export op price(lines: CartLine[], destination: type.Address?): Priced
     throws UnknownProduct, NotForSale, DestinationRequired, shipping.Undeliverable, shipping.TooLarge
   {
-    const sorted = itemise(lines);
-    return match sorted by Mix {
+    val sorted = itemise(lines);
+    return match (sorted by Mix) {
       NeedsBox    => priceToShip(sorted, destination);
       DigitalOnly => withoutShipping(sorted);
-    };
+    }
   }
 
   /** カートの商品の識別子（人が書く） */
@@ -228,17 +228,17 @@ namespace ordering {
   op priceToShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address?): Priced
     throws DestinationRequired, shipping.Undeliverable, shipping.TooLarge
   {
-    return match destination by Destination {
+    return match (destination by Destination) {
       Given   => withShipping(sorted, destination);
       Omitted => throw DestinationRequired;
-    };
+    }
   }
 
   /** 送料の見積もりと上限を、shipping に出してもらう */
   op withShipping(sorted: Mix.NeedsBox<Sorted>, destination: type.Address): Priced
     throws shipping.Undeliverable, shipping.TooLarge
   {
-    const terms = shipping.estimate(sorted.made, sorted.stocked, destination);
+    val terms = shipping.estimate(sorted.made, sorted.stocked, destination);
     return toShip(sorted, destination, terms);
   }
 
@@ -258,21 +258,24 @@ namespace ordering {
     throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
            shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
   {
-    const sent = orderByRequest(checkout.requestId);
-    return match sent by Known {
+    val sent = orderByRequest(checkout.requestId);
+    return match (sent by Known) {
       Found   => sent;
       Missing => placeNew(checkout);
-    };
+    }
   }
 
-  /** 新しい注文を作る。効果は、取り置きの後に、注文を足す */
+  /** 新しい注文を作る。値段を付けることと、時刻を読むことは、互いに触れない。効果は、取り置きの後に、注文を足す */
   op placeNew(checkout: Checkout): Order
     throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
            shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
   {
-    const priced = price(checkout.lines, checkout.destination);
-    const now = clock.now();
-    const order = draft(checkout, priced, now);
+    val priced, now;
+    disjoint {
+      priced = price(checkout.lines, checkout.destination);
+      now = clock.now();
+    }
+    val order = draft(checkout, priced, now);
     holdStock(order);
     createOrder(order);
     return order;
@@ -290,10 +293,10 @@ namespace ordering {
   op holdStock(order: Order)
     throws inventory.OutOfStock
   {
-    match order.physical by Delivery {
+    match (order.physical by Delivery) {
       ToShip        => inventory.reserve(order.id, order.physical.stocked);
       NothingToShip => none;
-    };
+    }
   }
 
   // ---- 引く ----
@@ -302,11 +305,11 @@ namespace ordering {
   export op byKey(key: type.OrderKey): Order
     throws NoOrder
   {
-    const found = orderByKey(key);
-    return match found by Known {
+    val found = orderByKey(key);
+    return match (found by Known) {
       Found   => found;
       Missing => throw NoOrder;
-    };
+    }
   }
 
   /** 鍵から注文を引く。なければ、値がない */
@@ -318,11 +321,11 @@ namespace ordering {
   export op byId(id: type.OrderId): Order
     throws NoOrder
   {
-    const found = orderById(id);
-    return match found by Known {
+    val found = orderById(id);
+    return match (found by Known) {
       Found   => found;
       Missing => throw NoOrder;
-    };
+    }
   }
 
   // ---- 受け付けと、期限切れ ----
@@ -331,7 +334,7 @@ namespace ordering {
   export op accept(order: Standing.AwaitingPayment<Order>): Order
     throws NoOrder
   {
-    const now = clock.now();
+    val now = clock.now();
     acceptOrder(order, now);
     return byId(order.id);
   }
@@ -340,27 +343,27 @@ namespace ordering {
   state paymentWindow: single<Duration>;
 
   /**
-   * 支払いがないまま期限が過ぎた注文を一つ、期限切れにして、取り置きを戻す。誰にも呼ばれずに動く。
-   * 一度に扱うのは、いちばん古い一つだけ: 行のケースを変える効果は、行を一つずつ受け取る（README.md「分かったこと」の F50）。
+   * 支払いがないまま期限が過ぎた注文を、古い順に、一つずつ、期限切れにして、取り置きを戻す。誰にも呼ばれずに動く。
+   * 行のケースを変える効果は、行を一つずつ受け取る（README.md「分かったこと」の F50）ので、繰り返しの中で、一つずつ呼ぶ。
+   * 途中で失敗したら、そこで止まり、トランザクションが、それまでの分も、戻す。
    */
   @clock.tick(every: 1m)
   @db.transaction
   op expireUnpaid() {
-    const now = clock.now();
-    const deadline = before(now, paymentWindow);
-    const stale = oldestUnpaidBefore(deadline);
-    match stale by Known {
-      Found   => expireIfUnpaid(stale, now);
-      Missing => none;
-    };
+    val now = clock.now();
+    val deadline = before(now, paymentWindow);
+    val stale = unpaidBefore(deadline);
+    for (val order of stale) {
+      expireIfUnpaid(order, now);
+    }
   }
 
   /** 期限切れにできるのは、支払いを待っている注文だけ */
   op expireIfUnpaid(order: Order, now: Time) {
-    match order by Standing {
+    match (order by Standing) {
       AwaitingPayment   => expire(order, now);
       Accepted, Expired => none;
-    };
+    }
   }
 
   /** 期限切れにして、取り置きを戻す */

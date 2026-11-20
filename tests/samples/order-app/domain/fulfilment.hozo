@@ -14,12 +14,12 @@ namespace fulfilment {
   export op secured(orderId: type.OrderId)
     throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
   {
-    const order = ordering.byId(orderId);
-    match order by ordering.Standing {
+    val order = ordering.byId(orderId);
+    match (order by ordering.Standing) {
       AwaitingPayment => acceptAndBegin(order);
       Accepted        => none;
       Expired         => payment.release(order.id);
-    };
+    }
   }
 
   /** 受け付けて、始めて、知らせる */
@@ -27,7 +27,7 @@ namespace fulfilment {
   op acceptAndBegin(order: ordering.Standing.AwaitingPayment<ordering.Order>)
     throws ordering.NoOrder
   {
-    const accepted = ordering.accept(order);
+    val accepted = ordering.accept(order);
     begin(accepted);
     notice.accepted(accepted);
   }
@@ -37,10 +37,10 @@ namespace fulfilment {
   @prd.promise("客", "箱で送るものは、一つの注文につき、一つの荷物で届く")
   op begin(order: ordering.Order) {
     download.grant(order.id, order.digital);
-    match order.physical by ordering.Delivery {
+    match (order.physical by ordering.Delivery) {
       ToShip        => beginPhysical(order.id, order.physical);
       NothingToShip => none;
-    };
+    }
   }
 
   /** 箱で送る部分: 受注製作の行は仕事に、在庫の行は棚から出してよくし、両方をそろえる出荷を開く */
@@ -66,7 +66,7 @@ namespace fulfilment {
   export op made(id: production.JobId, measured: type.Measurement): shipping.Shipment
     throws production.NoJob, production.NotInProduction, shipping.NoShipment, shipping.UnknownItem
   {
-    const job = production.finish(id, measured);
+    val job = production.finish(id, measured);
     return shipping.gather(job.orderId, job.line, measured);
   }
 
@@ -87,54 +87,54 @@ namespace fulfilment {
   export op station(id: shipping.ShipmentId): Station
     throws shipping.NoShipment, carrier.NoCarrier, http.NetworkError, http.ServerError
   {
-    const progress = shipping.progress(id);
-    const options = optionsFor(progress);
-    const offers = offersFor(progress);
-    const charge = payment.ofOrder(progress.shipment.orderId);
+    val progress = shipping.progress(id);
+    val options = optionsFor(progress);
+    val offers = offersFor(progress);
+    val charge = payment.ofOrder(progress.shipment.orderId);
     return { progress: progress, options: options, offers: offers, charge: charge };
   }
 
   /** まだ梱包していない出荷には、箱の選択肢を出す */
   op optionsFor(progress: shipping.Progress): shipping.BoxOption[]? {
-    return match progress.parcel by shipping.Packing {
+    return match (progress.parcel by shipping.Packing) {
       Packed   => none;
       Unpacked => optionsIfGathered(progress.shipment);
-    };
+    }
   }
 
   /** 箱の選択肢を出せるのは、そろった出荷だけ */
   op optionsIfGathered(shipment: shipping.Shipment): shipping.BoxOption[]? {
-    return match shipment by shipping.Gathered {
+    return match (shipment by shipping.Gathered) {
       Complete => shipping.boxOptions(shipment);
       Awaiting => none;
-    };
+    }
   }
 
   /** まだ送り状を買っていない出荷には、見積もりを出す */
   op offersFor(progress: shipping.Progress): carrier.Quote[]?
     throws carrier.NoCarrier, http.NetworkError, http.ServerError
   {
-    return match progress.label by shipping.Labelling {
+    return match (progress.label by shipping.Labelling) {
       Labelled   => none;
       Unlabelled => offersIfPacked(progress);
-    };
+    }
   }
 
   /** 見積もりを取れるのは、荷物（箱と重さ）が決まった後だけ */
   op offersIfPacked(progress: shipping.Progress): carrier.Quote[]?
     throws carrier.NoCarrier, http.NetworkError, http.ServerError
   {
-    return match progress.parcel by shipping.Packing {
+    return match (progress.parcel by shipping.Packing) {
       Packed   => offers(progress.parcel, progress.shipment.destination);
       Unpacked => none;
-    };
+    }
   }
 
   /** 荷物の見積もりを、いま使っている配送業者から取る */
   op offers(parcel: shipping.Parcel, destination: type.Address): carrier.Quote[]
     throws carrier.NoCarrier, http.NetworkError, http.ServerError
   {
-    const origin = shipping.shipFrom();
+    val origin = shipping.shipFrom();
     return carrier.quotes(parcel, origin, destination);
   }
 
@@ -152,10 +152,10 @@ namespace fulfilment {
            carrier.UnknownCarrier, carrier.NotEnabled, carriergw.Refused,
            http.NetworkError, http.ServerError
   {
-    const sealed = shipping.sealed(id);
+    val sealed = shipping.sealed(id);
     payment.settle(sealed.shipment.orderId, sealed.parcel.fee);
-    const origin = shipping.shipFrom();
-    const label = carrier.book(choice, sealed.parcel, origin, sealed.shipment.destination);
+    val origin = shipping.shipFrom();
+    val label = carrier.book(choice, sealed.parcel, origin, sealed.shipment.destination);
     shipping.attachLabel(label);
     return label;
   }
@@ -166,9 +166,9 @@ namespace fulfilment {
   export op handedOver(id: shipping.ShipmentId): shipping.Shipment
     throws shipping.NoShipment, shipping.NotPacked, shipping.NotLabelled, shipping.AlreadyHandedOver, ordering.NoOrder
   {
-    const dispatched = shipping.handOver(id);
-    const order = ordering.byId(dispatched.shipment.orderId);
-    const charge = payment.ofOrder(order.id);
+    val dispatched = shipping.handOver(id);
+    val order = ordering.byId(dispatched.shipment.orderId);
+    val charge = payment.ofOrder(order.id);
     notice.shipped(order, dispatched.parcel, dispatched.label, charge);
     return dispatched.shipment;
   }
@@ -187,9 +187,9 @@ namespace fulfilment {
 
   /** 配送業者から、荷物の動きの通知が届いた。届いたという通知なら、出荷に記録する。ほかの動きの通知は、受け取るだけ */
   export op tracked(event: carriergw.TrackingEvent) {
-    match event.deliveredAt by Arrival {
+    match (event.deliveredAt by Arrival) {
       Arrived  => shipping.delivered(event.trackingNumber, event.deliveredAt);
       Underway => none;
-    };
+    }
   }
 }

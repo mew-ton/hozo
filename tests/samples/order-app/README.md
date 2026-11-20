@@ -218,9 +218,9 @@ export op boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
 export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
   throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable
 {
-  const shipment = find(id);
-  const existing = parcelOf(id);
-  return match existing by Packing {
+  val shipment = find(id);
+  val existing = parcelOf(id);
+  return match (existing by Packing) {
     Packed   => throw AlreadyPacked;
     Unpacked => packGathered(shipment, box, weight);
   };
@@ -229,7 +229,7 @@ export op pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
 op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
   throws NotGathered, UnknownBox, OverWeight, Undeliverable
 {
-  return match shipment by Gathered {
+  return match (shipment by Gathered) {
     Complete => packInto(shipment, box, weight);   // ここでだけ Gathered.Complete<Shipment> になる
     Awaiting => throw NotGathered;
   };
@@ -243,10 +243,10 @@ op packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
 export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
   throws …
 {
-  const sealed = shipping.sealed(id);                               // 荷物があり、送り状がまだない
+  val sealed = shipping.sealed(id);                               // 荷物があり、送り状がまだない
   payment.settle(sealed.shipment.orderId, sealed.parcel.fee);       // 客: 商品の代金 + min(送料, 上限)
-  const origin = shipping.shipFrom();
-  const label = carrier.book(choice, sealed.parcel, origin, sealed.shipment.destination);   // 店の金が動く
+  val origin = shipping.shipFrom();
+  val label = carrier.book(choice, sealed.parcel, origin, sealed.shipment.destination);   // 店の金が動く
   shipping.attachLabel(label);
   return label;
 }
@@ -331,9 +331,9 @@ export op dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 effect saveJob(job: Job) on jobs.put;
 
 export op start(id: JobId): Job throws NoJob, NotQueued {
-  const job = require(id);
-  const now = clock.now();
-  const started = match job by Progress {
+  val job = require(id);
+  val now = clock.now();
+  val started = match (job by Progress) {
     Queued                  => startedAt(job, now);
     InProduction, Finished => throw NotQueued;
   };
@@ -350,9 +350,9 @@ effect startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.I
 effect finishJob(job: Job, measured: type.Measurement, at: Time) on jobs.put as Progress.InProduction -> Progress.Finished;
 
 export op start(id: JobId): Job throws NoJob, NotQueued {
-  const job = require(id);
-  const now = clock.now();
-  match job by Progress {
+  val job = require(id);
+  val now = clock.now();
+  match (job by Progress) {
     Queued                 => startJob(job, now);      // Queued のアームの中でしか、呼べない
     InProduction, Finished => throw NotQueued;
   };
@@ -384,7 +384,7 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
 ### 言語
 
 - **F1 表の一行の進み具合を、遷移で書けなかった。→ 行の遷移で、書けるようになった。** はじめは、`effect … on C: A -> B` の宛先が、状態を対象にした分類だけだった。注文、支払い、仕事、出荷は、どれも表の一行の話で、値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉で近づけていた。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からなかった。→ いまは、効果が、宛先の後ろの `as` で言う（`docs/check.md`「行の遷移」）。22 の効果が行の遷移を持ち、行の全体を書き換えていた七つの効果（`saveOrder`、`saveOrders`、`savePayment`、`saveJob`、`saveShipment`、`saveReservation`、`saveCarrier`）は、なくなった。一覧は「行の遷移で書いた進み具合」。分かったことは F50〜F57。
-- **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものと、行のケースを変えるもの（F50）は、時計で一件ずつ（`payment.prepayExpiring`、`ordering.expireUnpaid`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。
+- **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものと、行のケースを変えるもの（F50）は、時計で一件ずつ（`payment.prepayExpiring`、`ordering.expireUnpaid`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。 → **R6 で、配線に、繰り返し（`for`）が入った**（下の「R6 で変えたこと」）: `production.enqueue` と `ordering.expireUnpaid` は、繰り返しで書き直した。外部の仕組みを一つずつ呼ぶ `payment.prepayExpiring` は、時計で一件ずつ、のまま。
 - **F3 判断一つにつき、op が一つ要る。** アームの本体は呼び出し一つで、呼び出しの引数に呼び出しを書けない。→ `shipping.pack` は `packGathered`、`packInto`、`seal` の四段。`payment` の 31 の op のうち 22 が配線。PRD に名前のない op（`packInto`、`secureFound`、`offersIfPacked`）に、名前を付けることになる。
 - **F4 例外を、配線で受けられない。受けられるのはデコレータだけで、例外の値は使えない。** → 値を運ぶ例外（`ordering.TermsChanged(terms)`、`inventory.OutOfStock(sku)`、`ordering.UnknownProduct(sku)`）の値は、画面に届かない: `storefront.sayTermsChanged` は見せている値段を捨てるだけで、`storefront.Outdated` は、どの商品かを持たない。画面を分けたい結果は、例外ではなく値で返す形に寄った（`shopApi.product` と `shopApi.status` は `T?`）。
 - **F5 例外を、別の名前に言い換える書き方がない。** `catches A recovers throws B` と書くと、A を「吸収した」ことになり、効果を持つ op では DEC-5（成功のアームでも効果が不明）。金が動く三つの呼び出しに付けたら、warning が六つ出た。→ 言い換えたのは、金が動かない呼び出しだけ（`payment.openHold`、`payment.openCharge`、`download.fetchLink` の `@outside.failsAs`）。請求の確定、返金、枠を手放す、送り状を買う、の失敗は、`http.NetworkError` / `http.ServerError` のまま `staffApi.buyLabel` まで伝わる。ブラウザから見ると、自分の通信の失敗と、サーバーの先の失敗が、同じ名前になる。
@@ -455,14 +455,14 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
   - 宣言しないままにしたものは、ない: この二つの入口のほかに、「来るはずのない値」を受けている分類は、このサンプルにない（ほかの分類の、ケースの外の値は、述語の実装の誤りで、仕様が何かをする場合ではない）。Q11 は、これで閉じた。
 - **F48 仕事の分類は、一つの `Role` にしなかった。** 担当者は、三つの仕事を、いくつでも持てる（`Member.maker`、`packer`、`admin` は、別々の真偽値）。`classify Role of Member { Maker; Packer; Admin; }` は、製作と梱包の両方をする担当者で、二つの述語が真になり、分類の誤りになる（ケースは排他）。仕事ごとに、「してよい / してはいけない」の分類を一つずつ持った。「してはいけない」側の名前（`NotMaker`）は、業務の言葉になかった。
 - **F49 `match` の `else` のアームが合ったのは、`payment.Standing` だけ。** 五つのケースから一つを取り出して、残りの四つを同じに扱う `match` が四つあり（`reopen`、`secureFound`、`prepayHeld`、`release`）、`else` にした（`docs/requirements.md`「書き方の指針」の「1 : 4」）。`payment.settle` は「1 : 1 : 1 : 2」なので、どのアームも名前で並べた。三つのケースの「1 : 2」（`production.start` と `finish`、`shipping.release` と `markDelivered`、`storefront.onAddToCart`）も、名前で並べた: 並べる名前が二つなら、`else` にしても短くならず、ケースを足したときに MATCH-2 が尋ねる方がよい。
-- **F50 行のケースを変える効果は、行を一つずつ受け取る。** 行の遷移を書く効果は、行の引数（型が、状態の要素の型の引数）を、ちょうど一つ持つ（STATE-7）。行の並びを受け取る効果（`saveOrders(changed: Order[])`）には `as` を書けず、`as` を書かない `put` は「行のケースを変えない」という意味になる。→ 期限切れは、時計で一件ずつにした（`ordering.expireUnpaid` は、いちばん古い一つを `expireOrder` に渡す。間隔を 5 分から 1 分にした）。`inventory.release` は、注文一つの取り置きを戻す形になり、葉 `idsOf` と、集合で引く `read` が要らなくなった。まとめて足す `post`（`production.addJobs`、`inventory.addReservations`、`download.addGrants`）は、入るケースを書けないまま（どれも、はじめのケースで作ることは、葉のコメント）。
+- **F50 行のケースを変える効果は、行を一つずつ受け取る。** 行の遷移を書く効果は、行の引数（型が、状態の要素の型の引数）を、ちょうど一つ持つ（STATE-7）。行の並びを受け取る効果（`saveOrders(changed: Order[])`）には `as` を書けず、`as` を書かない `put` は「行のケースを変えない」という意味になる。→ 期限切れは、時計で一件ずつにした（`ordering.expireUnpaid` は、いちばん古い一つを `expireOrder` に渡す。間隔を 5 分から 1 分にした）。`inventory.release` は、注文一つの取り置きを戻す形になり、葉 `idsOf` と、集合で引く `read` が要らなくなった。まとめて足す `post`（`production.addJobs`、`inventory.addReservations`、`download.addGrants`）は、入るケースを書けないまま（どれも、はじめのケースで作ることは、葉のコメント）。 → **R6 で、効果を、繰り返しの中で、一つずつ呼べるようになった**: `ordering.expireUnpaid` は、期限切れの注文を、一回の動きで、すべて扱う。
 - **F51 `@db.update` は、行のケースを変える効果の、どれにも合わなかった。** 呼ぶ側の検査（STATE-9）が求めるのは、前のケースにあると分かっている行、つまり、書き換える前の行。`@db.update` は、渡した行の全体を書く（`docs/plugin-go-sqlite.md`「効果の中身」）ので、前の行を渡せば、何も変わらない。→ ケースを変える効果は、前の行と、足す事実を受け取る形にして（`startJob(job, at)`、`recordSettled(payment, charge, at)`）、中身は、人が書く。`db` のデコレータを付けた効果は、15 から 9 に減った。引き換えに、変えた行を作るだけの葉が 11 なくなった（H2。人が書く葉は、90 から 78 に減った）: 「行をどう変えるか」を書く場所が、葉から、効果の中身に移った。足す事実が込み入っているところは、事実を数える葉と、それを運ぶ model が要る（`payment.Charge`、`shipping.Placement`。F18 が、二つ増えた）。「この列に、この値を入れる」と言う `db` の語彙があれば、中身も宣言から出せる。
 - **F52 一つの `as` が言うのは、一つの分類。** 出荷は、二つの分類を持つ（`Custody` と `Gathered`）。`createShipment` は `as Custody.InHouse` と書き、「まだ待っている（`Gathered.Awaiting`）で入る」は、書けなかった。`recordHandOver`（`Custody` を進める）が `Gathered` を変えないことは、「ほかの分類については、`as` を書かない効果と同じ」という決まりから来る。
 - **F53 後のケースが、引数の値で決まる遷移は、約束できない。** `carrier.setEnabled(code, enabled)` は、`enabled` の値で、`InUse` にも `Suspended` にもする。配線は、真偽値で分けられない（F8）。→ `switchCarrier(carrier, enabled)` を、何も約束しない `as any -> else` にした。このサンプルで、抜け道を使ったのは、ここだけ。op を二つ（使う、止める）に分ければ、二つの遷移として書けるが、画面の操作（スイッチ一つ）と形が離れる。
 - **F54 行を受け取る `@db.delete` がない。** `delete` に行の遷移を書くと、効果は行を受け取る。`@db.delete` の引数は、列の条件（`docs/plugin-go-sqlite.md`「効果の中身」）。→ `staff.deleteSession(session: Session)` は、デコレータなしで、人が書く。ログアウトは、消す前に、セッションを読むことになった（`endSession`: `LoggedIn => deleteSession(session); LoggedOut => none;`）。「あれば消す」が、仕様に見えるようになったとも言える。
 - **F55 変えた後の行を返す op は、読み直す。** 効果は値を返さず、渡した行は、前の行。→ `production.start`、`shipping.gather`、`carrier.setEnabled` は、効果の後で、もう一度引いて返す（`return require(id);`）。`ordering.accept` は、読み直しのために `throws NoOrder` が増え、`fulfilment.acceptAndBegin` に伝わった（いま書き換えた行なので、起きない例外）。
 - **F56 一つの op が、場合によって二つのケースへ進めていたところは、分類が一つ増えた。** 客の同意を記録する `payment.markSecured` は、箱で送るものがあれば `Held`、なければ `Settled` にしていた（葉 `securedBy` の中）。後のケースは一つなので、効果を二つにし（`holdSecured`、`chargeSecured`）、どちらを呼ぶかを分ける分類 `Billing { Deferred; Immediate; }` を足した。葉の中にあった分かれ道が、仕様に出た。`-> else` で一つにまとめることもできたが、「決まっていない」のではなく、「二つのどちらかに、決まる」ので、そうしなかった（`recordPlacement` の `Gathered.Awaiting -> else` は、残りの品目で決まり、宣言からは決まらないので、`else`）。
-- **F57 `post` の「前」は、検査されない。** `createParcel` の `as Packing.Unpacked -> Packing.Packed` は、「梱包は一度だけ」と読めるが、呼ぶ側の検査は、`post` には掛からない（渡す行は、入る行で、「まだない」ことを示す値ではない）。一度だけであることは、今までどおり、`shipping.pack` の `match existing by Packing { Packed => throw AlreadyPacked; … }` が担う。
+- **F57 `post` の「前」は、検査されない。** `createParcel` の `as Packing.Unpacked -> Packing.Packed` は、「梱包は一度だけ」と読めるが、呼ぶ側の検査は、`post` には掛からない（渡す行は、入る行で、「まだない」ことを示す値ではない）。一度だけであることは、今までどおり、`shipping.pack` の `match (existing by Packing) { Packed => throw AlreadyPacked; … }` が担う。
 - **F58 呼ぶ側の検査（STATE-9）は、書き直しの間、error を一つも出さなかった。** 行を進める op は、もともと、`match` のアームの中で、絞り込んだ型（`Progress.Queued<Job>`）の葉を呼ぶ形だった（F10）。その葉を効果に置き換えただけで、検査を通った。確かめたのは、逆の向き: アームの外に効果の呼び出しを出すと STATE-9（このサンプルの外の小さな仕様で確かめた）。検査が守るのは「どの行に対して呼べるか」までで、効果の中身が、宣言したとおりに行を変えることは、まだ誰も確かめない（`docs/requirements.md`「段階」の、行の遷移の保証）。
 
 ## 粒度: 仕様は、どこまで書くか
@@ -693,7 +693,22 @@ export op start(id: JobId): Job throws NoJob, NotQueued {
 | 一つのトランザクション | 入口の `@db.transaction`（F19） |
 | 値の集合 | 文字列の scalar とコメント、真偽値の組（F8） |
 
+## R6 で変えたこと
+
+R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」）を、実装より先に、このサンプルに入れた。**実装は、まだ、ない**: 今の hozoc は、この書き方を読めず、`TestSamples` の `check` は、文書の版が先にあることを理由に、飛ぶ（`../README.md`「飛ばす条件」）。新しい書き方の仕様は、hozoc では、まだ、確かめていない。
+
+| 変えたもの | 変えたこと |
+|---|---|
+| すべての `.hozo` | `const` を `val` に（162 か所）。`match` の頭を、丸括弧で囲み、`}` の後ろの `;` を、省く（74 か所） |
+| `ordering.expireUnpaid` | 期限切れの注文を、一回の動きで、すべて扱う: read `oldestUnpaidBefore(…): Order?` を、並びを返す `unpaidBefore(…): Order[]` に替え、`for` で、一つずつ、`expireIfUnpaid` を呼ぶ |
+| `ordering.placeNew` | 値段を付けることと、時刻を読むことを、`disjoint` に並べる。取り置き（例外を出しうる）と、注文を足すこと（効果）は、並べられない（DISJ-1）ので、直列のまま |
+| `production.enqueue` | 行ごとに、仕事を作って、足す: 効果 `addJobs(added: Job[])` を、行を一つ受け取る `addJob(job: Job) … as Progress.Queued` に替え、葉 `plan`（並びを返す）を、`planJob`（一つを返す）に替えた。入るケースを、書けるようになった |
+| `shopApi.statusOf` | 四つの読みを、`disjoint` に並べる。名前を並べた、空の `val` |
+
+- **`payment.prepayExpiring` は、変えていない。** `docs/wiring-trial.md`「書き直し」は、これも、繰り返しに書き直したが、一つの支払いで、外の仕組みが失敗すると、残りの支払いが、その回では、扱われなくなる（同 W5）。失敗を、一件ずつ分けたいものは、時計で一件ずつ動く op のままにする（`docs/requirements.md`「書き方の指針」。`docs/decisions.md`「決めたこと」323）。
+- `ordering.expireUnpaid` は、外の仕組みを呼ばず、`@db.transaction` を持つ: 途中で失敗したら、それまでの分も、戻る。
+
 ## 確かめ方
 
-- このディレクトリで `go run ../../../cmd/hozoc check`。この文書を書いたときの結果は `0 errors, 0 warnings`。
+- このディレクトリで `go run ../../../cmd/hozoc check`。R6 の書き方にする前の結果は `0 errors, 0 warnings`。R6 の実装が入るまで、今の hozoc は、この仕様を、読めない（「R6 で変えたこと」）。
 - リポジトリで `go test ./tests/ -run TestSamples/order-app -count=1 -v`。走るのは `check` だけ（`../README.md`「仕様だけのサンプル」）。

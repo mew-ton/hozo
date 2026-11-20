@@ -20,12 +20,12 @@ namespace shopApi {
   /** 商品を一つ引く。並べていない商品は、ないものとして、値がない */
   @http.get("/products/item")
   export op product(in: ProductInput): catalog.Product? {
-    const found = catalog.find(in.sku);
-    return match found by catalog.Offer {
+    val found = catalog.find(in.sku);
+    return match (found by catalog.Offer) {
       OnSale    => found;
       Withdrawn => none;
       Absent    => none;
-    };
+    }
   }
 
   // ---- カートの値段 ----
@@ -85,7 +85,7 @@ namespace shopApi {
            ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
            payment.AlreadySecured, payment.ProviderUnavailable
   {
-    const order = ordering.place(in.checkout);
+    val order = ordering.place(in.checkout);
     return payFor(order);
   }
 
@@ -99,7 +99,7 @@ namespace shopApi {
   export op pay(in: KeyInput): Placed
     throws ordering.NoOrder, ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
   {
-    const order = ordering.byKey(in.key);
+    val order = ordering.byKey(in.key);
     return payFor(order);
   }
 
@@ -107,19 +107,19 @@ namespace shopApi {
   op payFor(order: ordering.Order): Placed
     throws ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
   {
-    return match order by ordering.Standing {
+    return match (order by ordering.Standing) {
       AwaitingPayment => openPayment(order);
       Accepted        => throw payment.AlreadySecured;
       Expired         => throw ordering.OrderExpired;
-    };
+    }
   }
 
   /** 支払いの画面を開く */
   op openPayment(order: ordering.Standing.AwaitingPayment<ordering.Order>): Placed
     throws payment.AlreadySecured, payment.ProviderUnavailable
   {
-    const returnTo = orderPage(site, order.key);
-    const session = payment.begin(order, returnTo);
+    val returnTo = orderPage(site, order.key);
+    val session = payment.begin(order, returnTo);
     return { key: order.key, payAt: session.url };
   }
 
@@ -209,19 +209,22 @@ namespace shopApi {
   /** 注文のいまを返す。その鍵の注文がなければ、値がない */
   @http.get("/orders/status")
   export op status(in: KeyQuery): OrderView? {
-    const found = ordering.peek(in.key);
-    return match found by ordering.Known {
+    val found = ordering.peek(in.key);
+    return match (found by ordering.Known) {
       Found   => statusOf(found);
       Missing => none;
-    };
+    }
   }
 
-  /** 概念ごとの事実を集めて、客に見せる形にする */
+  /** 概念ごとの事実を集めて、客に見せる形にする。四つの読みは、互いに触れない */
   op statusOf(order: ordering.Order): OrderView {
-    const charge = payment.ofOrder(order.id);
-    const progress = shipping.progressOfOrder(order.id);
-    const jobs = production.ofOrder(order.id);
-    const grants = download.granted(order.id);
+    val charge, progress, jobs, grants;
+    disjoint {
+      charge = payment.ofOrder(order.id);
+      progress = shipping.progressOfOrder(order.id);
+      jobs = production.ofOrder(order.id);
+      grants = download.granted(order.id);
+    }
     return view(order, charge, progress, jobs, grants);
   }
 
@@ -241,7 +244,7 @@ namespace shopApi {
   export op download(in: DownloadInput): type.Url
     throws ordering.NoOrder, download.NotGranted, download.GrantExpired, download.AssetsUnavailable
   {
-    const order = ordering.byKey(in.key);
+    val order = ordering.byKey(in.key);
     return download.link(order.id, in.line);
   }
 }

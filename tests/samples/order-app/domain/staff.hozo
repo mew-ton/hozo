@@ -130,11 +130,11 @@ namespace staff {
   export op login(loginName: string, password: Password): LoggedIn
     throws InvalidCredentials
   {
-    const member = memberByLoginName(loginName);
-    return match member by Account {
+    val member = memberByLoginName(loginName);
+    return match (member by Account) {
       Enrolled => issueSession(member, password);
       Unknown  => throw InvalidCredentials;
-    };
+    }
   }
 
   /** パスワードを確かめて、セッションを作る */
@@ -142,10 +142,10 @@ namespace staff {
     throws InvalidCredentials
   {
     checkPassword(member, password);
-    const now = clock.now();
-    const session = newSession(member, now);
+    val now = clock.now();
+    val session = newSession(member, now);
     createSession(session);
-    const publicMember = toPublic(member);
+    val publicMember = toPublic(member);
     return { member: publicMember, token: session.token };
   }
 
@@ -161,19 +161,19 @@ namespace staff {
 
   /** ログアウトする。トークンがなければ、何もしない */
   export op logout(token: type.Token?) {
-    match token by Credential {
+    match (token by Credential) {
       Presented => endSession(token);
       Absent    => none;
-    };
+    }
   }
 
   /** そのトークンのセッションがあれば、消す。もうなければ、何もしない */
   op endSession(token: type.Token) {
-    const session = sessionByToken(token);
-    match session by Login {
+    val session = sessionByToken(token);
+    match (session by Login) {
       LoggedIn  => deleteSession(session);
       LoggedOut => none;
-    };
+    }
   }
 
   // ---- 誰が呼んだか ----
@@ -182,34 +182,34 @@ namespace staff {
   op whoIs(token: type.Token?): Member
     throws type.Unauthorized
   {
-    return match token by Credential {
+    return match (token by Credential) {
       Presented => memberOf(token);
       Absent    => throw type.Unauthorized;
-    };
+    }
   }
 
   /** そのトークンの担当者 */
   op memberOf(token: type.Token): Member
     throws type.Unauthorized
   {
-    const session = sessionByToken(token);
-    return match session by Login {
+    val session = sessionByToken(token);
+    return match (session by Login) {
       LoggedIn  => freshMember(session);
       LoggedOut => throw type.Unauthorized;
-    };
+    }
   }
 
   /** 期限の内のセッションの担当者 */
   op freshMember(session: Session): Member
     throws type.Unauthorized
   {
-    const now = clock.now();
-    const fresh = requireFresh(session, now);
-    const member = memberById(fresh.memberId);
-    return match member by Account {
+    val now = clock.now();
+    val fresh = requireFresh(session, now);
+    val member = memberById(fresh.memberId);
+    return match (member by Account) {
       Enrolled => member;
       Unknown  => throw type.Unauthorized;
-    };
+    }
   }
 
   /** 期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized（人が書く） */
@@ -220,32 +220,32 @@ namespace staff {
   export op asMaker(token: type.Token?)
     throws type.Unauthorized, type.Forbidden
   {
-    const member = whoIs(token);
-    match member by MakerDuty {
+    val member = whoIs(token);
+    match (member by MakerDuty) {
       Maker    => none;
       NotMaker => throw type.Forbidden;
-    };
+    }
   }
 
   /** 梱包の担当として呼んでいることを確かめる */
   export op asPacker(token: type.Token?)
     throws type.Unauthorized, type.Forbidden
   {
-    const member = whoIs(token);
-    match member by PackerDuty {
+    val member = whoIs(token);
+    match (member by PackerDuty) {
       Packer    => none;
       NotPacker => throw type.Forbidden;
-    };
+    }
   }
 
   /** 管理の担当として呼んでいることを確かめる */
   export op asAdmin(token: type.Token?)
     throws type.Unauthorized, type.Forbidden
   {
-    const member = whoIs(token);
-    match member by AdminDuty {
+    val member = whoIs(token);
+    match (member by AdminDuty) {
       Admin    => none;
       NotAdmin => throw type.Forbidden;
-    };
+    }
   }
 }

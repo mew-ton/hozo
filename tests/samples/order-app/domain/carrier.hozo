@@ -112,22 +112,22 @@ namespace carrier {
   export op register(carrier: Carrier)
     throws AlreadyRegistered
   {
-    const existing = carrierByCode(carrier.code);
-    match existing by Registered {
+    val existing = carrierByCode(carrier.code);
+    match (existing by Registered) {
       Known   => throw AlreadyRegistered;
       Unknown => addCarrier(carrier);
-    };
+    }
   }
 
   /** 配送業者を使う、使わないを切り替える */
   export op setEnabled(code: CarrierCode, enabled: boolean): Carrier
     throws UnknownCarrier
   {
-    const found = carrierByCode(code);
-    match found by Registered {
+    val found = carrierByCode(code);
+    match (found by Registered) {
       Known   => switchCarrier(found, enabled);
       Unknown => throw UnknownCarrier;
-    };
+    }
     return known(code);
   }
 
@@ -135,11 +135,11 @@ namespace carrier {
   op known(code: CarrierCode): Carrier
     throws UnknownCarrier
   {
-    const found = carrierByCode(code);
-    return match found by Registered {
+    val found = carrierByCode(code);
+    return match (found by Registered) {
       Known   => found;
       Unknown => throw UnknownCarrier;
-    };
+    }
   }
 
   // ---- 使う ----
@@ -148,18 +148,18 @@ namespace carrier {
   export op quotes(parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
     throws NoCarrier, http.NetworkError, http.ServerError
   {
-    const fleet = enabledCarriers();
-    return match fleet by Fleet {
+    val fleet = enabledCarriers();
+    return match (fleet by Fleet) {
       Available   => rate(fleet, parcel, origin, destination);
       Unavailable => throw NoCarrier;
-    };
+    }
   }
 
   /** 外部の仕組みに、見積もりを頼む */
   op rate(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
     throws http.NetworkError, http.ServerError
   {
-    const request = rateRequest(fleet, parcel, origin, destination);
+    val request = rateRequest(fleet, parcel, origin, destination);
     return carriergw.rates(request);
   }
 
@@ -170,30 +170,30 @@ namespace carrier {
   export op book(choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
     throws UnknownCarrier, NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
   {
-    const found = carrierByCode(choice.carrier);
-    return match found by Registered {
+    val found = carrierByCode(choice.carrier);
+    return match (found by Registered) {
       Known   => bookWith(found, choice, parcel, origin, destination);
       Unknown => throw UnknownCarrier;
-    };
+    }
   }
 
   /** いま使っている配送業者にだけ、頼める */
   op bookWith(carrier: Carrier, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
     throws NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
   {
-    return match carrier by Use {
+    return match (carrier by Use) {
       InUse     => buy(carrier, choice, parcel, origin, destination);
       Suspended => throw NotEnabled;
-    };
+    }
   }
 
   /** 外部の仕組みから、送り状を買う */
   op buy(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
     throws carriergw.Refused, http.NetworkError, http.ServerError
   {
-    const request = labelRequest(carrier, choice, parcel, origin, destination);
-    const bought = carriergw.buyLabel(request);
-    const now = clock.now();
+    val request = labelRequest(carrier, choice, parcel, origin, destination);
+    val bought = carriergw.buyLabel(request);
+    val now = clock.now();
     return toLabel(parcel, bought, now);
   }
 

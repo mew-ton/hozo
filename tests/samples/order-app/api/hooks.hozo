@@ -16,11 +16,11 @@ namespace hooks {
   export op paymentEvent(in: PaymentInput)
     throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
   {
-    const secured = payment.record(in.event);
-    match secured by payment.Securing {
+    val secured = payment.record(in.event);
+    match (secured by payment.Securing) {
       NewlySecured => fulfilment.secured(secured);
       NoChange     => none;
-    };
+    }
   }
 
   /** 荷物の動きの通知の入力 */

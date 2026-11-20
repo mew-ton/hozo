@@ -54,8 +54,8 @@ namespace download {
 
   /** ダウンロードの行を、取れるようにする。行がなければ、何も足さない */
   export op grant(orderId: type.OrderId, lines: ordering.DigitalLine[]) {
-    const now = clock.now();
-    const entitled = entitle(orderId, lines, now, grantLifetime);
+    val now = clock.now();
+    val entitled = entitle(orderId, lines, now, grantLifetime);
     addGrants(entitled);
   }
 
@@ -71,19 +71,19 @@ namespace download {
   export op link(orderId: type.OrderId, line: type.LineId): type.Url
     throws NotGranted, GrantExpired, AssetsUnavailable
   {
-    const found = grantOf(orderId, line);
-    return match found by Entitlement {
+    val found = grantOf(orderId, line);
+    return match (found by Entitlement) {
       Granted   => linkOf(found);
       Ungranted => throw NotGranted;
-    };
+    }
   }
 
   /** 期限の内の権利だけが、URL になる */
   op linkOf(grant: Grant): type.Url
     throws GrantExpired, AssetsUnavailable
   {
-    const now = clock.now();
-    const request = stillValid(grant, now, linkLifetime);
+    val now = clock.now();
+    val request = stillValid(grant, now, linkLifetime);
     return fetchLink(request);
   }
 
