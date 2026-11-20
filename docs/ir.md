@@ -221,9 +221,9 @@ interface Decorator extends DeclBase {
                                              // external と repeatable は false で、どれも target のものを使う
 }
 
-interface CaseKind {              // 分類のケースの絞り（docs/grammar.md「decorator の宣言」の CaseKind）。絞らない所は、持たない
-  classify?: string;              // 名前で絞ったとき（`classify Actor case`）、その分類の FQN
-  subject?: "never";              // 対象で絞ったとき（`classify of never case`）
+interface CaseKind {              // 分類のケースの絞り（docs/grammar.md「decorator の宣言」の CaseKind）。持つのは、どちらか一つか、なし（`case`）
+  classify?: string;              // 名前で絞ったとき（`Actor case`）、その分類の FQN
+  subject?: "never";              // 対象で絞ったとき（`case of never`）
 }
 
 interface Param {
@@ -237,7 +237,7 @@ interface Param {
 type ParamType =
   | { kind: "type"; types: Type[] }                   // `int | float` は types が二つ。普通は一つ
   | { kind: "any"; of: "exception" | "effect" | "state" | "op" | "model" | "variant"; on?: { state: string; operation: "post" | "put" | "delete" } }
-  | { kind: "any"; of: "case"; case: CaseKind };     // `any classify … case`。分類のケースを受け取る
+  | { kind: "any"; of: "case"; case: CaseKind };     // `any case`、`any case of never`、`any Actor case`。分類のケースを受け取る
 
 interface ThrowsClause {
   exceptions: string[];           // FQN。ユニオンは展開済み。デコレータの引数名なら "$param:名前"

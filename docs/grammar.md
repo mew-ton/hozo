@@ -257,7 +257,7 @@ RestType  = AnyType | Type { "|" Type } ;              (* 渡す値一つの型�
 AnyType   = "any" AnyKind [ "on" QualifiedName "." StateOp ] ;
 AnyKind   = "exception" | "effect" | "state" | "op" | "model" | "variant" | CaseKind ;   (* variant は文脈キーワード *)
 Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | CaseKind ;   (* field は文脈キーワード *)
-CaseKind  = "classify" [ QualifiedName ] [ "of" "never" ] "case" ;   (* 分類のケース *)
+CaseKind  = "case" [ "of" "never" ] | QualifiedName "case" ;   (* 分類のケース *)
 
 DecoratorClause = ThrowsClause | CatchesClause | DecoReadsClause | DecoEffectsClause ;
 ThrowsClause    = "throws" ExcRef { "," ExcRef } { Relation } ;
@@ -276,16 +276,16 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 - `int | float`（§4.2 `valid.min`）のように、デコレータの引数の型にだけ `|` を書ける。model のフィールドや op の引数の型には書けない。`for` の対象の並びも `|`（`for scalar | field`）。節の並び（`throws`、`catches`、`reads`、`effects`）の区切りは `,` で、`|` ではない（「op」）。
 - `ThrowsClause` と `CatchesClause` の順序と回数は文法では縛らない（`catches X recovers throws Y`。§8.1）。差し引きは検査が計算する（DEC-6）。
 - `Target` の `effect` は、効果の宣言に付けるデコレータ（`@db.insert effect createOrder(order: Order) on orders.post;`）。`read` は、`read` の宣言に付けるデコレータ（`@db.find read userByEmail(email: Email): User? on users;`）。`exception` は、例外の宣言に付けるデコレータ（`@http.status(401) exception Unauthorized;`）。
-- `CaseKind` は、分類のケースを言う。分類の宣言の頭（`classify 名前 of 対象`）を、そのまま書いて、後ろに `case` を付け、絞りたい所だけを書く。`for` の後ろに書けば、ケースに付けるデコレータ（`decorator human for classify of never case;`）、`any` の後ろに書けば、ケースを受け取る引数（`decorator of(actor: any classify of never case) for op;`）。
+- `CaseKind` は、分類のケースを言う。`for` の後ろに書けば、ケースに付けるデコレータ（`decorator human for case of never;`）、`any` の後ろに書けば、ケースを受け取る引数（`decorator of(actor: any case of never) for op;`）。
 
   | 書き方 | 言うもの |
   |---|---|
-  | `classify case` | どの分類でもよい。そのケース |
-  | `classify Actor case` | 分類 `Actor` の、ケース（名前で絞る。別の名前空間の分類は、修飾して書く） |
-  | `classify of never case` | 対象のない分類（「classify」）の、ケース（対象で絞る） |
-  | `classify Actor of never case` | 両方で絞る。`Actor` が、対象のない分類でなければ、エラー（DEC-18） |
+  | `case` | どの分類でもよい。そのケース |
+  | `case of never` | 対象のない分類（「classify」）の、ケース（対象で絞る） |
+  | `Actor case` | 分類 `Actor` の、ケース（名前で絞る。別の名前空間の分類は、修飾して書く） |
 
-  `of` の後ろに書けるのは、`never` だけ。`case` のない `classify`（分類そのものを、付ける先や、引数の種類にする形）は、まだ、書けない（構文エラー）。
+  `of` の後ろは、分類の宣言の頭（`classify 名前 of 対象`）と同じく、対象で、書けるのは、`never` だけ。名前と `of never` の両方は、書けない（名前が決まれば、対象も決まる）。名前で絞る形は、`Target` か `AnyKind` の位置の名前の、すぐ後ろに `case` が続くことで、見分ける（文脈キーワード `field` / `variant` と同じ名前の分類も、`field case` と書けば、名前で絞る形）。
+- 分類そのものを、付ける先や、引数の種類にする形（`for classify`、`any classify`）は、まだ、書けない。パーサーは、`Target` か `AnyKind` の位置に `classify` が来たら、SYNTAX にする: メッセージは、分類そのものは、まだ、書けないことと、なくした書き方（`classify case`、`classify of never case`、`classify Actor case`）の、新しい書き方（上の表）を、示す。
 - `DecoReadsClause` と `DecoEffectsClause` は、そのデコレータの処理が読むものと、持つ効果を言う節（`decorator limit(counter: any state, by: any effect) for op reads counter effects by;`）。要素は op の節と同じもの（`ReadElem`、`EffectElem`）か、デコレータの引数の名前（`any state` の引数は読む状態、`any effect` の引数は効果）。何度でも書ける。意味は `docs/check.md`「デコレータが運ぶ reads と effects」。
 - `Relation` の `effects` は、直前の `prevents` / `keeps` の目的語。`DecoEffectsClause` の頭の `effects` と字句は同じだが、`prevents` / `keeps` の直後かどうかで分かれる（`throws X prevents effects effects e` は、`Relation` の後ろに `DecoEffectsClause`）。
 - `RestParam` は**残りの引数**: 適用が、ほかの引数の後ろに位置で渡した 0 個以上の値を、まとめて受け取る（`decorator effects(...targets: any effect) for op effects targets;`）。型は、渡す値一つの型を書く。引数の並びの最後に一つだけ書け、省略可能にはできない（文法で閉じる）。節の中で名前を書けば、渡した値のすべてを指す。
@@ -505,6 +505,6 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `match` の頭は、全体を、丸括弧で囲む（同 315、316） | 配線の、ブロックを持つ文の頭を、同じ見え方にする（`for (…) { … }` と `match (…) { … }`） |
 | 互いに触れないアームの並びのキーワードは、`disjoint`（同 343）。アームに、名前は、付けない（同 311）。`=>` は、「〜のとき」を言う記号で、名前を付ける所には、使わない（同 303） | 実行の手段（並列）ではなく、コードの性質を言う語にする。名前は、`val` に付いているので、アームの順を入れ替えても、名前の指す値は、変わらない |
 | 繰り返しは、TS 風の `for (val x of xs)`。数を増やしながら回す形は、持たない。集めるのは、`並びの val collect 値;`（同 308、314、318） | 図の繰り返しは、「並びの一つずつに、同じ流れを行う」だけを言う。集める文は、入れる先を、先に書く（`=` と同じ順） |
-| `val`、`disjoint`、`collect`、`case` は、予約語。`const` は、予約語から外す（同 341） | どれも、構文の骨（文の頭、節の語）。`case` を文脈キーワードにすると、`classify case` が、`case` という名前の分類を指すのか、決まらない。`const` は、どの生成規則も使わず、書かれていた位置（文の頭）は、`Ident` が、単独では文にならない位置なので、予約を外しても、なくした書き方として、見分けられる |
+| `val`、`disjoint`、`collect`、`case` は、予約語。`const` は、予約語から外す（同 341） | どれも、構文の骨（文の頭、節の語）。`case` を文脈キーワードにすると、`for case` の後ろに、もう一つ `case` が来たとき（`for case case`）、`case` という名前の分類で絞る形なのか、決まらない。`const` は、どの生成規則も使わず、書かれていた位置（文の頭）は、`Ident` が、単独では文にならない位置なので、予約を外しても、なくした書き方として、見分けられる |
 | 対象のない分類は、`of` を省かず、`of never` と書く（同 328、329） | 当たる値のない型（`never`）を、分類している、と捉える。対象の種類を、増やさない。`of` を省く形にすると、書き忘れと、区別できない |
-| デコレータの宣言で、分類のケースは、`classify 名前 of 対象 case` と書く（同 331、332）。`of` の後ろは、`never` だけ。`case` のない `classify` は、まだ、書けない（同 341） | 分類の宣言の頭と、同じ並びで、絞りたい所だけを書く。`classify` を付けておくと、後で、分類そのものを、付ける先や、引数の種類にするときに、綴りが、ぶつからない |
+| デコレータの宣言で、分類のケースは、`case`、`case of never`、`名前 case` と書く（同 331、346）。`of` の後ろは、`never` だけ。分類そのもの（`for classify`）は、まだ、書けない（同 341） | `for model` と `for field`、`any variant` と、同じ並び: 部分を言う語（`case`）と、全体を言う語（`classify`）が、別なので、後で、分類そのものを足しても、綴りが、ぶつからない。`of` の後ろは、分類の宣言の頭と同じく、対象 |

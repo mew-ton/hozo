@@ -1,0 +1,16 @@
+// DEC-7（docs/types.md「デコレータの引数」）: 分類のケースを受け取る引数。どの分類でも（any case）、対象で絞る（any case of never）、
+// 名前で絞る（any Actor case）
+namespace a {
+  model M { id: string; }
+  classify Actor of never { Customer; }
+  classify Role of never { Admin; }
+  classify Size of M { Small; Large; }
+  decorator anyCase(x: any case) for op;
+  decorator subj(x: any case of never) for op;
+  decorator named(x: any Actor case) for op;
+  decorator sized(x: any Size case?) for op;
+  @anyCase(Size.Small) @subj(Role.Admin) @named(Actor.Customer) @sized
+  op f();
+  @anyCase(Actor.Customer) @sized(Size.Large)
+  op g();
+}

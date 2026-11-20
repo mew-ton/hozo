@@ -113,8 +113,8 @@ namespace app {
     @human Customer;
     Clerk;
   }
-  decorator human for classify Actor of never case;
-  decorator seenBy(who: any classify of never case) for model;
+  decorator human for Actor case;
+  decorator seenBy(who: any case of never) for model;
   @seenBy(Actor.Clerk)
   model Receipt { id: Id; }
 }

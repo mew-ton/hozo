@@ -1299,7 +1299,7 @@ func TestReadDecl(t *testing.T) {
 		{"no result", "read r() on users;", "read r は結果の型を省略できない"},
 		{"void result", "read r(): void on users;", "read r の結果の型に void は書けない"},
 		{"never result", "read r(): never on users;", "read r の結果の型に never は書けない"},
-		{"any read", "decorator d(x: any read);", "any の種類（exception / effect / state / op / model / variant / classify … case）が必要"},
+		{"any read", "decorator d(x: any read);", "any の種類（exception / effect / state / op / model / variant / case）が必要"},
 		{"keyword as op name", "op read();", "read は予約語で、識別子には使えない"},
 	}
 	for _, tt := range tests {
@@ -2349,15 +2349,15 @@ func TestWiringBlocks(t *testing.T) {
 	}
 }
 
-// TestClassifyNeverAndCaseKind は、対象のない分類（of never）、ケースの前のデコレータ、デコレータの宣言の classify … case
-// （docs/grammar.md「classify」「decorator の宣言」）。
+// TestClassifyNeverAndCaseKind は、対象のない分類（of never）、ケースの前のデコレータ、デコレータの宣言の、分類のケース
+// （docs/grammar.md「classify」「decorator の宣言」の CaseKind）。
 func TestClassifyNeverAndCaseKind(t *testing.T) {
 	c := firstDecl[*ast.ClassifyDecl](t, "classify Actor of never { /** 客 */ @human Customer; Staff; }")
 	if !c.Never || len(c.Of) != 0 || len(c.Cases) != 2 || len(c.Cases[0].Decorators) != 1 || c.Cases[0].Doc == nil || len(c.Cases[1].Decorators) != 0 {
 		t.Fatalf("classify = %+v", c)
 	}
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any classify of never case, other: any classify Actor case?) for op | classify case | classify x.Actor of never case;")
-	if len(d.Params) != 2 || len(d.For) != 3 {
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any case of never, other: any Actor case?, free: any case) for op | case | x.Actor case | case of never | field | field case;")
+	if len(d.Params) != 3 || len(d.For) != 6 {
 		t.Fatalf("decorator = %+v", d)
 	}
 	p0 := d.Params[0].Type.Any
@@ -2365,13 +2365,50 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 		t.Errorf("Param 0 = %+v", d.Params[0].Type)
 	}
 	p1 := d.Params[1].Type.Any
-	if p1 == nil || p1.Case == nil || p1.Case.Never || p1.Case.Classify == nil || p1.Case.Classify.String() != "Actor" {
+	if p1 == nil || p1.Kind != ast.AnyCase || p1.Case == nil || p1.Case.Never || p1.Case.Classify == nil || p1.Case.Classify.String() != "Actor" || !d.Params[1].Type.Optional {
 		t.Errorf("Param 1 = %+v", d.Params[1].Type)
+	}
+	p2 := d.Params[2].Type.Any
+	if p2 == nil || p2.Kind != ast.AnyCase || p2.Case == nil || p2.Case.Never || p2.Case.Classify != nil {
+		t.Errorf("Param 2 = %+v", d.Params[2].Type)
 	}
 	if k := d.For[1]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || k.Case.Classify != nil {
 		t.Errorf("Target 1 = %+v", k)
 	}
-	if k := d.For[2]; k.Kind != ast.TargetCase || k.Case == nil || !k.Case.Never || k.Case.Classify.String() != "x.Actor" {
+	if k := d.For[2]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || k.Case.Classify == nil || k.Case.Classify.String() != "x.Actor" {
 		t.Errorf("Target 2 = %+v", k)
+	}
+	if k := d.For[3]; k.Kind != ast.TargetCase || k.Case == nil || !k.Case.Never || k.Case.Classify != nil {
+		t.Errorf("Target 3 = %+v", k)
+	}
+	// 文脈キーワードと同じ名前の分類: すぐ後ろに case が続けば、名前で絞る形
+	if k := d.For[4]; k.Kind != ast.TargetField || k.Case != nil {
+		t.Errorf("Target 4 = %+v", k)
+	}
+	if k := d.For[5]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Classify == nil || k.Case.Classify.String() != "field" {
+		t.Errorf("Target 5 = %+v", k)
+	}
+	v := firstDecl[*ast.DecoratorDecl](t, "decorator v(a: any variant, b: any variant case);")
+	if a := v.Params[0].Type.Any; a == nil || a.Kind != ast.AnyVariant {
+		t.Errorf("any variant = %+v", v.Params[0].Type)
+	}
+	if b := v.Params[1].Type.Any; b == nil || b.Kind != ast.AnyCase || b.Case.Classify == nil || b.Case.Classify.String() != "variant" {
+		t.Errorf("any variant case = %+v", v.Params[1].Type)
+	}
+
+	const removed = "分類のケースは、case、case of never、名前 case と書く"
+	tests := []struct{ name, src, want string }{
+		{"of something else", "decorator d for case of M;", "of の後ろに書けるのは never だけ"},
+		{"name and subject", "decorator d for Actor case of never;", "名前と of never の両方は、書けない"},
+		{"removed: classify case", "decorator d for classify case;", removed},
+		{"removed: classify of never case", "decorator d for classify of never case;", removed},
+		{"removed: any classify Actor case", "decorator d(x: any classify Actor case);", removed},
+		{"classify itself", "decorator d for classify;", "分類そのもの（classify）は、まだ、書けない"},
+		{"any classify itself", "decorator d(x: any classify);", "分類そのもの（classify）は、まだ、書けない"},
+		{"name without case", "decorator d for Actor;", "for の対象"},
+		{"any name without case", "decorator d(x: any Actor);", "any の種類"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
 }

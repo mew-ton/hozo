@@ -110,13 +110,14 @@ test('予約語（宣言の頭、節の頭、核の型、リテラル）', () =>
   // 対象のない分類と、ケースを対象にするデコレータ（docs/grammar.md「classify」「decorator の宣言」）
   const c = tokensOf([
     'classify Actor of never { @actor.human Customer; }',
-    'decorator human for classify Actor of never case;',
-    'decorator by(who: any classify of never case) for op;',
+    'decorator human for Actor case;',
+    'decorator by(who: any case of never) for op;',
   ].join('\n'));
   assertScope(c, 'classify Actor', 'never', 'support.type.primitive.hozo');
   assertScope(c, 'classify Actor', '@actor.human', 'entity.name.function.decorator.hozo');
   assertScope(c, 'decorator human', 'case', 'keyword.control.hozo');
   assertScope(c, 'decorator by', 'case', 'keyword.control.hozo');
+  assertScope(c, 'decorator by', 'never', 'support.type.primitive.hozo');
   assertScope(b, 'Unavailable => none;', 'none', 'constant.language.hozo');
   assertScope(b, 'return plan;', 'return', 'keyword.control.hozo');
   const t = tokensOf('@flags(true, off: false) model X { a: boolean; }');

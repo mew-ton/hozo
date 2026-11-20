@@ -1,0 +1,11 @@
+// DEC-7: 分類のケースを受け取る引数の、絞りに、渡したケースが合わない
+namespace a {
+  model M { id: string; }
+  classify Actor of never { Customer; }
+  classify Role of never { Admin; }
+  classify Size of M { Small; Large; }
+  decorator subj(x: any case of never) for op;
+  decorator named(x: any Actor case) for op;
+  @subj(Size.Small) op f();            // ERROR: DEC-7
+  @named(Role.Admin) op g();           // ERROR: DEC-7
+}

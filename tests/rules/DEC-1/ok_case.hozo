@@ -1,0 +1,14 @@
+// DEC-1（docs/check.md「デコレータ」）: 分類のケースに付けるデコレータ（docs/grammar.md「decorator の宣言」の CaseKind）。
+// どの分類でも（case）、対象で絞る（case of never）、名前で絞る（Size case）。ほかの対象と、並べられる
+namespace a {
+  model M { id: string; }
+  classify Actor of never { @any1 @bySubject Customer; }
+  classify Size of M { @any1 @byName Small; Large; }
+  decorator any1 for case;
+  decorator bySubject for case of never;
+  decorator byName for Size case;
+  decorator mixed for op | case of never | Size case;
+  classify Other of never { @mixed A; }
+  classify Sized of M { @any1 Tiny; Huge; }
+  @mixed op f();
+}

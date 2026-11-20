@@ -309,16 +309,16 @@ func targetsString(dec *ir.Decorator) string {
 			names = append(names, string(t))
 			continue
 		}
+		// 宣言の書き方（docs/grammar.md「decorator の宣言」の CaseKind）
 		k := dec.CaseTargets[cases]
 		cases++
-		name := "classify"
+		name := "case"
 		if k.Classify != "" {
-			name += " " + k.Classify
-		}
-		if k.Subject != "" {
+			name = k.Classify + " case"
+		} else if k.Subject != "" {
 			name += " of " + k.Subject
 		}
-		names = append(names, name+" case")
+		names = append(names, name)
 	}
 	return strings.Join(names, " | ")
 }
@@ -834,9 +834,8 @@ func (a *analyzer) lowerParamType(t ast.Type, sc *scope) (ir.Type, bool) {
 	return ir.Ref(r.sym.fqn), true
 }
 
-// lowerCaseKind は、デコレータの宣言の、分類のケース（`classify [名前] [of never] case`。docs/grammar.md「decorator の宣言」）。
-// 名前は、classify（どの名前空間のものでも）。分類でなければ RES-4。名前と of never の両方を書いたのに、
-// その分類が、対象のない分類でなければ DEC-18。
+// lowerCaseKind は、デコレータの宣言の、分類のケース（`case`、`case of never`、`名前 case`。docs/grammar.md「decorator の宣言」）。
+// 名前は、classify（どの名前空間のものでも）。分類でなければ RES-4。
 func (a *analyzer) lowerCaseKind(k *ast.CaseKind, sc *scope) ir.CaseKind {
 	out := ir.CaseKind{}
 	if k.Never {
@@ -850,9 +849,6 @@ func (a *analyzer) lowerCaseKind(k *ast.CaseKind, sc *scope) ir.CaseKind {
 		return out
 	}
 	out.Classify = r.sym.fqn
-	if d, isClassify := r.sym.node.(*ast.ClassifyDecl); k.Never && isClassify && !d.Never {
-		a.errorf("DEC-18", k.Classify.Span, "classify %s は、対象のない分類（of never）ではないので、classify %s of never case とは書けない", r.sym.fqn, k.Classify.String())
-	}
 	return out
 }
 

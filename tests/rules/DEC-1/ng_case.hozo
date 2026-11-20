@@ -1,0 +1,17 @@
+// DEC-1: 分類のケースに付けたデコレータの、絞りに、そのケースが合わない。ケースに付けられないデコレータを、ケースに付けた
+namespace a {
+  model M { id: string; }
+  decorator bySubject for case of never;
+  decorator byName for Size case;
+  decorator forOp for op;
+  classify Size of M { Small; Large; }
+  classify Weight of M {
+    @bySubject Light;                  // ERROR: DEC-1
+    @byName Heavy;                     // ERROR: DEC-1
+  }
+  classify Actor of never {
+    @byName Customer;                  // ERROR: DEC-1
+    @forOp Clerk;                      // ERROR: DEC-1
+  }
+  @bySubject op f();                   // ERROR: DEC-1
+}

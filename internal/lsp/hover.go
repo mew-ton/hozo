@@ -455,14 +455,13 @@ func (r *renderer) throwsClause(c ir.ThrowsClause) string {
 
 // caseKind は、デコレータの宣言の、分類のケース（docs/grammar.md「decorator の宣言」の CaseKind）。
 func (r *renderer) caseKind(k ir.CaseKind) string {
-	s := "classify"
 	if k.Classify != "" {
-		s += " " + r.rel(k.Classify)
+		return r.rel(k.Classify) + " case"
 	}
 	if k.Subject != "" {
-		s += " of " + k.Subject
+		return "case of " + k.Subject
 	}
-	return s + " case"
+	return "case"
 }
 
 // rels は節の並び（throws / catches の例外）を Hozo の構文で書く。区切りは `,`（docs/grammar.md「op」）。

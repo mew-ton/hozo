@@ -825,7 +825,7 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 | DEC-4 | error | `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている |
 | DEC-5 | warning | 計算の手順 i で `recovers` が succ(e) を `unknown` にした（F が空なら起きない） |
 | DEC-6 | warning | 一つのデコレータの宣言で、`catches` の例外と `throws` の例外に同じものがある |
-| DEC-7 | error | `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーと、分類のケース（`any classify … case` の、絞りに合わないケース）の照合 |
+| DEC-7 | error | `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーと、分類のケース（`any case of never`、`any Actor case` の、絞りに合わないケース）の照合 |
 | DEC-8 | — | 文法で閉じる |
 | DEC-9 | — | 正規化（`docs/ir.md`「デコレータの適用」） |
 | DEC-10 | — | 計算（手順 i の `throws`） |
@@ -835,9 +835,10 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 | DEC-14 | warning | `external` なデコレータが `throws` を持たない |
 | DEC-15 | error | `@external` がデコレータの宣言以外に付いている（文法で閉じる。索引として残す） |
 | DEC-16 | warning | 計算の手順 i で、`catches` の例外がそこまでの E にない |
-| DEC-18 | error | デコレータの宣言の、分類のケース（`docs/grammar.md`「decorator の宣言」の `CaseKind`）で、名前と `of never` の両方を書いたのに、その名前の分類が、対象のない分類でない（`classify Stage of never case` で、`Stage` に対象がある）。位置は、その名前 |
 
 DEC-17 は欠番。「`reads` か `effects` の節を持つデコレータが、配線の op（本体を持つ op）に付いている」という規則で、運ぶ節を持つデコレータを配線の op にも付けられるようにした（計算「デコレータが運ぶ reads と effects」）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+
+DEC-18 も欠番。「デコレータの宣言の、分類のケースで、名前と `of never` の両方を書いたのに、その名前の分類が、対象のない分類でない」という規則で、両方を書く形を、なくした（`docs/grammar.md`「decorator の宣言」の `CaseKind`）ときになくなった。
 
 ### 配線
 

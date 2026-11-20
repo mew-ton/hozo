@@ -631,7 +631,7 @@ const (
 	AnyModel
 	// AnyVariant は any variant。
 	AnyVariant
-	// AnyCase は any classify … case（分類のケース）。
+	// AnyCase は、any の後ろの、分類のケース（any case、any case of never、any Actor case）。
 	AnyCase
 )
 
@@ -651,7 +651,7 @@ func (k AnyKind) String() string {
 	case AnyVariant:
 		return "variant"
 	case AnyCase:
-		return "classify case"
+		return "case"
 	}
 	return "?"
 }
@@ -667,12 +667,12 @@ type AnyType struct {
 }
 
 // CaseKind は、デコレータの宣言で、分類のケースを言う書き方（docs/grammar.md「decorator の宣言」）:
-// "classify [名前] [of never] case"。
+// "case"、"case of never"、"名前 case"。
 type CaseKind struct {
 	Span source.Span
-	// Classify は、名前で絞ったときの、分類の名前。書いていなければ nil。
+	// Classify は、名前で絞ったとき（"Actor case"）の、分類の名前。書いていなければ nil。
 	Classify *QualifiedName
-	// Never は、対象で絞ったか（"of never"）。
+	// Never は、対象で絞ったか（"case of never"）。Classify と、同時には、立たない。
 	Never bool
 }
 
@@ -702,7 +702,7 @@ const (
 	TargetEffect
 	// TargetRead は read。
 	TargetRead
-	// TargetCase は classify … case（分類のケース）。
+	// TargetCase は、分類のケース（case、case of never、Actor case）。
 	TargetCase
 )
 
@@ -726,7 +726,7 @@ func (k TargetKind) String() string {
 	case TargetRead:
 		return "read"
 	case TargetCase:
-		return "classify case"
+		return "case"
 	}
 	return "?"
 }

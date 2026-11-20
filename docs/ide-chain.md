@@ -225,27 +225,27 @@
 - **担い手は、対象のない分類（`of never`）（「要求の文書」）の、ケースとして、宣言する。ユースケースのデコレータは、その名前を指す。**
 - **図では、担い手とユースケースを、規格（UML）どおり、線で結ぶ。** 線を引くと、ユースケースのデコレータの引数に、その担い手が入る。
 - **担い手の種類は、ケースに付けるデコレータで書く。** 担い手は、設計の上で、意味を持つから。設計の文書になるだけのもの（要求の中身）は、コメントブロックのタグで書く（「要求の文書」）。
-- **デコレータの宣言で、分類のケースは、分類の宣言の頭（`classify 名前 of 対象`）を、そのまま書いて、後ろに `case` を付けて、言う**（`decisions.md`「決めたこと」331、332）。絞りたい所だけを、書く。`of` の後ろは、宣言でも、ここでも、いつも、対象。
+- **デコレータの宣言で、分類のケースは、`case` と書き、絞りたいときだけ、絞りを足す**（`decisions.md`「決めたこと」331、346。綴りの持ち主は、`grammar.md`「decorator の宣言」）。`of` の後ろは、分類の宣言の頭（`classify 名前 of 対象`）でも、ここでも、いつも、対象。
 
   | 書き方 | 意味 |
   |---|---|
-  | `classify case` | どの分類でもよい。そのケース |
-  | `classify Actor case` | 分類 `Actor` の、ケース（名前で絞る） |
-  | `classify of never case` | 対象が `never` の分類の、ケース（対象で絞る） |
-  | `classify` | 分類そのもの |
+  | `case` | どの分類でもよい。そのケース |
+  | `case of never` | 対象が `never` の分類の、ケース（対象で絞る） |
+  | `Actor case` | 分類 `Actor` の、ケース（名前で絞る） |
+  | `classify` | 分類そのもの（まだ、書けない） |
 
-  付ける先は、`for` の後ろに、引数の種類は、`any` の後ろに、書く（案。デコレータの名前は、例）:
+  付ける先は、`for` の後ろに、引数の種類は、`any` の後ろに、書く（デコレータの名前は、例）:
 
   ```
   namespace actor {
-    decorator human for classify of never case;
+    decorator human for case of never;
   }
   namespace usecase {
-    decorator of(actor: any classify of never case) for op;
+    decorator of(actor: any case of never) for op;
   }
   ```
 
-- `classify` を付けるのは、後で、分類そのものを、付ける先や、引数の種類にするときに、困らないようにするため。名前で絞る形（`classify Actor case`）を、語彙の `.hozo` から書くことは、できない: `Actor` は、使う人が、自分の名前空間に宣言する。
+- 分類そのもの（`classify`）を、後で、付ける先や、引数の種類にしても、`case` とは、ぶつからない: `for model` と `for field` と、同じ並び。名前で絞る形（`Actor case`）を、語彙の `.hozo` から書くことは、できない: `Actor` は、使う人が、自分の名前空間に宣言する。
 - 形（利用者が示したもの。分類の書き方は、言語にある: `grammar.md`「classify」。語彙 `actor` は、まだない。名前空間と、デコレータの名前は、例）:
 
 ```

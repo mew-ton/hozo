@@ -1408,8 +1408,8 @@ func TestValAndCaseTargets(t *testing.T) {
     @human Customer;
     Clerk;
   }
-  decorator human for classify Actor of never case;
-  decorator of(who: any classify of never case) for op;
+  decorator human for Actor case;
+  decorator of(who: any case of never) for op;
   model Order { id: string; }
   model Note { id: string; }
   state orders: list<Order>;
@@ -1460,8 +1460,8 @@ func TestValAndCaseTargets(t *testing.T) {
 		{"集めた val を読む所", at("count(notes, again);", len("count(")), "notes: Note[];", 0, []string{"val notes: Note[]"}},
 		{"デコレータの引数の、分類", at("@of(Actor.Clerk)", len("@of(")), "Actor of never {", 0, []string{"classify Actor of never"}},
 		{"デコレータの引数の、ケース", at("@of(Actor.Clerk)", len("@of(Actor.")), "Clerk;", 0, []string{"Clerk"}},
-		{"デコレータの宣言の、分類の名前", at("for classify Actor of never case;", len("for classify ")), "Actor of never {", 0, []string{"classify Actor of never"}},
-		{"ケースの前のデコレータ", at("@human Customer;", 1), "decorator human", len("decorator "), []string{"decorator human for classify Actor of never case"}},
+		{"デコレータの宣言の、分類の名前", at("for Actor case;", len("for ")), "Actor of never {", 0, []string{"classify Actor of never"}},
+		{"ケースの前のデコレータ", at("@human Customer;", 1), "decorator human", len("decorator "), []string{"decorator human for Actor case"}},
 	} {
 		var hov *protocol.Hover
 		c.result(protocol.MethodHover, tt.pos, &hov)
@@ -1485,9 +1485,9 @@ func TestValAndCaseTargets(t *testing.T) {
 		what string
 		pos  protocol.TextDocumentPositionParams
 	}{
-		{"デコレータの宣言の case", at("of never case;", len("of never "))},
-		{"デコレータの宣言の never", at("for classify Actor of never case;", len("for classify Actor of "))},
-		{"引数の種類の classify", at("any classify of never case", len("any "))},
+		{"デコレータの宣言の case", at("for Actor case;", len("for Actor "))},
+		{"引数の種類の case", at("any case of never", len("any "))},
+		{"引数の種類の never", at("any case of never", len("any case of "))},
 	} {
 		var none *protocol.Location
 		c.result(protocol.MethodDefinition, tt.pos, &none)

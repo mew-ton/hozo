@@ -277,7 +277,7 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 | `any op` | `ref`（op） |
 | `any model` | `ref`（model） |
 | `any variant` | `variant` |
-| `any classify … case`（`docs/grammar.md`「decorator の宣言」の `CaseKind`） | `case`（分類のケース。`Actor.Customer`）。名前を書いた形（`any classify Actor case`）なら、その分類のケース。`of never` を書いた形なら、対象のない分類（`docs/check.md`「分類」の「対象のない分類」）のケース。合わなければ DEC-7 |
+| `any` の後ろの、分類のケース（`docs/grammar.md`「decorator の宣言」の `CaseKind`） | `case`（分類のケース。`Actor.Customer`）。名前を書いた形（`any Actor case`）なら、その分類のケース。`of never` を書いた形（`any case of never`）なら、対象のない分類（`docs/check.md`「分類」の「対象のない分類」）のケース。合わなければ DEC-7 |
 | ユニオンへの `ref`（`error: ApiError`） | `ref` で、そのユニオンの `members` に含まれる例外か効果。`refs` なら全要素が含まれる。含まれなければ DEC-7 |
 
 引数の数と名前:

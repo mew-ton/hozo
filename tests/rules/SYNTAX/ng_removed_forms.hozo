@@ -55,3 +55,11 @@ namespace removedWiring {
     match m by K { A => h(m); B => h(m); };   // ERROR: SYNTAX
   }
 }
+
+// デコレータの宣言の classify … case と、分類そのもの（docs/grammar.md「decorator の宣言」）
+namespace removedCaseKind {
+  decorator a for classify case;                     // ERROR: SYNTAX
+  decorator b for classify of never case;            // ERROR: SYNTAX
+  decorator c(x: any classify Actor case) for op;    // ERROR: SYNTAX
+  decorator d for classify;                          // ERROR: SYNTAX
+}

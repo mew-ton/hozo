@@ -1116,14 +1116,17 @@ func (p *parser) parseAnyType() *ast.AnyType {
 		a.Kind = ast.AnyOp
 	case p.at(token.Model):
 		a.Kind = ast.AnyModel
-	case p.atContextual("variant"):
-		a.Kind = ast.AnyVariant
-	case p.at(token.Classify):
+	case p.atCaseKind():
+		// 文脈キーワード variant より先に見る: すぐ後ろに case が続く名前は、名前で絞った、分類のケース
 		a.Kind, a.Case = ast.AnyCase, p.parseCaseKind()
 		a.Span = p.spanFrom(start)
 		return a
+	case p.atContextual("variant"):
+		a.Kind = ast.AnyVariant
+	case p.at(token.Classify):
+		p.failClassifyKind()
 	default:
-		p.failExpected("any の種類（exception / effect / state / op / model / variant / classify … case）")
+		p.failExpected("any の種類（exception / effect / state / op / model / variant / case）")
 	}
 	p.advance()
 	if p.got(token.On) {
@@ -1134,12 +1137,18 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	return a
 }
 
-// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" を読む。field は文脈キーワード。
+// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | CaseKind を読む。
+// field は文脈キーワード。
 func (p *parser) parseTarget() *ast.Target {
 	t := &ast.Target{Span: p.tok().Span}
 	switch {
 	case p.at(token.Op):
 		t.Kind = ast.TargetOp
+	case p.atCaseKind():
+		// 文脈キーワード field より先に見る: すぐ後ろに case が続く名前は、名前で絞った、分類のケース
+		t.Kind, t.Case = ast.TargetCase, p.parseCaseKind()
+		t.Span = t.Case.Span
+		return t
 	case p.atContextual("field"):
 		t.Kind = ast.TargetField
 	case p.at(token.State):
@@ -1155,38 +1164,50 @@ func (p *parser) parseTarget() *ast.Target {
 	case p.at(token.Read):
 		t.Kind = ast.TargetRead
 	case p.at(token.Classify):
-		t.Kind, t.Case = ast.TargetCase, p.parseCaseKind()
-		t.Span = t.Case.Span
-		return t
+		p.failClassifyKind()
 	default:
-		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect / read / classify … case）")
+		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect / read / case）")
 	}
 	p.advance()
 	return t
 }
 
-// parseCaseKind は CaseKind = "classify" [ QualifiedName ] [ "of" "never" ] "case" を読む（分類のケース）。
-// case のない classify（分類そのもの）は、まだ、書けない。of の後ろに書けるのは never だけ。
+// atCaseKind は、tok が CaseKind（分類のケース）の頭か: `case`、または、すぐ後ろに `case` が続く名前。
+func (p *parser) atCaseKind() bool {
+	return p.at(token.Case) || (p.atName() && p.peek(1).Kind == token.Case)
+}
+
+// parseCaseKind は CaseKind = "case" [ "of" "never" ] | QualifiedName "case" を読む（分類のケース）。
+// of の後ろに書けるのは never だけ。名前と of never の両方は、書けない。
 func (p *parser) parseCaseKind() *ast.CaseKind {
-	start := p.expect(token.Classify).Span.Start
+	start := p.tok().Span.Start
 	k := &ast.CaseKind{}
 	if p.atName() {
 		n := p.parseQualifiedName()
 		k.Classify = &n
+		p.expect(token.Case)
+		if p.at(token.Of) {
+			p.fail(p.tok().Span, "分類のケースに、名前と of never の両方は、書けない（名前が決まれば、対象も決まる。docs/grammar.md「decorator の宣言」）")
+		}
+		k.Span = p.spanFrom(start)
+		return k
 	}
+	p.expect(token.Case)
 	if p.got(token.Of) {
 		if !p.at(token.Never) {
-			p.fail(p.tok().Span, "デコレータの宣言の classify … case で、of の後ろに書けるのは never だけ（docs/grammar.md「decorator の宣言」）")
+			p.fail(p.tok().Span, "分類のケース（case of …）で、of の後ろに書けるのは never だけ（docs/grammar.md「decorator の宣言」）")
 		}
 		p.advance()
 		k.Never = true
 	}
-	if !p.at(token.Case) {
-		p.fail(p.tok().Span, "分類のケースは classify … case と書く（case のない classify は、まだ、書けない。docs/grammar.md「decorator の宣言」）")
-	}
-	p.advance()
 	k.Span = p.spanFrom(start)
 	return k
+}
+
+// failClassifyKind は、for か any の後ろの classify: 分類そのものは、まだ、書けない。なくした書き方（classify … case）の、
+// 新しい書き方も、示す（docs/grammar.md「decorator の宣言」）。
+func (p *parser) failClassifyKind() {
+	p.fail(p.tok().Span, "分類そのもの（classify）は、まだ、書けない。分類のケースは、case、case of never、名前 case と書く（classify … case は、なくした書き方。docs/grammar.md「decorator の宣言」）")
 }
 
 // parseThrowsClause は ThrowsClause = "throws" ExcRef { "," ExcRef } { Relation } を読む。

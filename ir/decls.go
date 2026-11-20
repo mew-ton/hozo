@@ -535,7 +535,7 @@ const (
 	TargetModel     DecoratorTarget = "model"
 	TargetEffect    DecoratorTarget = "effect"
 	TargetRead      DecoratorTarget = "read"
-	// TargetCase は、分類のケース（`classify … case`）。絞りは Decorator.CaseTargets。
+	// TargetCase は、分類のケース（`case`、`case of never`、`Actor case`）。絞りは Decorator.CaseTargets。
 	TargetCase DecoratorTarget = "case"
 )
 
@@ -606,7 +606,7 @@ const (
 	AnyOp        AnyOf = "op"
 	AnyModel     AnyOf = "model"
 	AnyVariant   AnyOf = "variant"
-	// AnyClassifyCase は、分類のケース（`any classify … case`）。絞りは AnyParam.Case。
+	// AnyClassifyCase は、分類のケース（`any case`、`any case of never`、`any Actor case`）。絞りは AnyParam.Case。
 	AnyClassifyCase AnyOf = "case"
 )
 
@@ -619,11 +619,11 @@ type AnyParam struct {
 	Case *CaseKind `json:"case,omitempty"`
 }
 
-// CaseKind は、デコレータの宣言で言う、分類のケースの絞り（docs/ir.md「decorator」の CaseKind）。絞らない所は、空。
+// CaseKind は、デコレータの宣言で言う、分類のケースの絞り（docs/ir.md「decorator」の CaseKind）。立つのは、どちらか一つか、なし。
 type CaseKind struct {
-	// Classify は、名前で絞ったとき（`classify Actor case`）の、分類の FQN。
+	// Classify は、名前で絞ったとき（`Actor case`）の、分類の FQN。
 	Classify string `json:"classify,omitempty"`
-	// Subject は、対象で絞ったとき（`classify of never case`）の "never"。
+	// Subject は、対象で絞ったとき（`case of never`）の "never"。
 	Subject string `json:"subject,omitempty"`
 }
 
