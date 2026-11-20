@@ -99,6 +99,8 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 
 `.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`sdk/ts` と `editors/vscode` は Node 22 で `npm ci && npm test`。
 
+- **実行は、同時に一つだけ。** `main` への push と、どの PR の実行も、一つの組（`concurrency` の `group: ci`）に入れる。新しい実行が始まると、動いている実行と、待っている実行は、止まる（`cancel-in-progress`）。止められた実行は、緑ではない。
+
 ## トランスパイラのテスト
 
 トランスパイラ（基底と相乗り。TS 向けのものを含む）のテストの方針。作る段階の持ち主は `docs/requirements.md`「段階」。

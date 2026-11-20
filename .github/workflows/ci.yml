@@ -3,6 +3,10 @@ on:
   push:
     branches: [main]
   pull_request:
+# 実行は、同時に一つだけ（docs/testing.md「CI」）: main への push も、どの PR も、同じ組。新しい実行が始まると、前の実行は止まる
+concurrency:
+  group: ci
+  cancel-in-progress: true
 jobs:
   go:
     runs-on: ubuntu-latest
