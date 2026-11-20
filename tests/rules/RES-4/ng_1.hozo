@@ -6,7 +6,7 @@ namespace a {
   fn f(): s;                           // ERROR: RES-4
   union U { E; }
   fn g(): U;                           // ERROR: RES-4
-  fn h() throws M;                     // ERROR: RES-4
+  fn h(): throws M;                     // ERROR: RES-4
   classify C of M { A; }
   fn i(): C;                           // ERROR: RES-4
   @M                                   // ERROR: RES-4

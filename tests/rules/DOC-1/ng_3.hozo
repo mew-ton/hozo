@@ -15,7 +15,7 @@ namespace a {
    */
   exception Plain;                       // ERROR(-2): DOC-1
   /** @param row 足す行 */
-  effect fn add(m: M) on rows.post;         // ERROR(-1): DOC-1
+  effect fn add(m: M): effects rows.post;         // ERROR(-1): DOC-1
   /** @param key 引く行 */
-  read fn byId(id: string): M? on rows;     // ERROR(-1): DOC-1
+  read fn byId(id: string): M? reads rows;     // ERROR(-1): DOC-1
 }

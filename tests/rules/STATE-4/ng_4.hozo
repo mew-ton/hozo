@@ -3,9 +3,9 @@ namespace a {
   state carts: list<string>;
   state orders: list<string>;
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
-  effect fn dupFrom() on Checkout: Shopping, Shopping -> Ordered;            // ERROR: STATE-4
-  effect fn dupTo() on Checkout: Shopping -> Ordered, Shipped, Ordered;   // ERROR: STATE-4
-  effect fn builtin() on carts: any -> Empty, Empty;                      // ERROR: STATE-4
+  effect fn dupFrom(): effects Checkout as Shopping, Shopping -> Ordered;            // ERROR: STATE-4
+  effect fn dupTo(): effects Checkout as Shopping -> Ordered, Shipped, Ordered;   // ERROR: STATE-4
+  effect fn builtin(): effects carts as any -> Empty, Empty;                      // ERROR: STATE-4
   // 前と後に同じケースがあるのは重複ではない
-  effect fn same() on Checkout: Shopping, Ordered -> Ordered, Shopping;
+  effect fn same(): effects Checkout as Shopping, Ordered -> Ordered, Shopping;
 }

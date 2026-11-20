@@ -11,6 +11,6 @@ type ItemsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: shop.items の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Item, error)
-	// AddItem は命令（効果 shop.addItem、on shop.items.post）: 品物を足す
+	// AddItem は命令（効果 shop.addItem、effects shop.items.post）: 品物を足す
 	AddItem(ctx context.Context, item Item) error
 }

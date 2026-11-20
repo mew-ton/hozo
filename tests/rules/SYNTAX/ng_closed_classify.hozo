@@ -35,9 +35,9 @@ namespace a {
   }
   // ケースの並びの区切りは ","（"|" は、なくした書き方）。"," として読み進めるので、op と効果は残る
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
-  effect fn touch() on Checkout: Shopping | Ordered -> any;                 // ERROR: SYNTAX
-  effect fn move() on Checkout: any -> Ordered | Shipped;                   // ERROR: SYNTAX
-  fn oldPipe(m: M) effects touch, move {
+  effect fn touch(): effects Checkout as Shopping | Ordered -> any;                 // ERROR: SYNTAX
+  effect fn move(): effects Checkout as any -> Ordered | Shipped;                   // ERROR: SYNTAX
+  fn oldPipe(m: M): effects touch, move {
     match (m by K) {
       A | B => use(m);                           // ERROR: SYNTAX
     };

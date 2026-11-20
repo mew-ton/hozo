@@ -58,8 +58,8 @@ namespace a {
   state plain: string;
   state maybe: single<string?>;
   state rows: User[];
-  effect fn add(u: User) on users.post;
-  effect fn set(t: string) on token.put;
+  effect fn add(u: User): effects users.post;
+  effect fn set(t: string): effects token.put;
 
   exception Unauthorized;
   exception Invalid(field: string);
@@ -107,7 +107,7 @@ namespace a {
   fn take(in: User): void;
   fn fromIn(in: User): User;
 
-  read fn userById(id: string): User? on users;
+  read fn userById(id: string): User? reads users;
   export fn find2(id: string): User? reads users, token reads users {
     return match(token by nullable){ HasItems => userById(id); Empty => none; };
   }
@@ -164,9 +164,9 @@ namespace store {
   decorator tags(first: string, ...more: string | int) for op | effect;
   decorator both = effects(addRow, Writes);
 
-  @insert(rows) effect fn addRow(r: Row) on rows.post;
-  @insert(logs) @tags("a") effect fn log(l: Row) on logs.post;
-  effect fn touch() on rows.put;
+  @insert(rows) effect fn addRow(r: Row): effects rows.post;
+  @insert(logs) @tags("a") effect fn log(l: Row): effects logs.post;
+  effect fn touch(): effects rows.put;
   union Writes { addRow; touch; }
 
   /**
@@ -210,10 +210,10 @@ namespace lib {
    *
    * @param id 引く行の識別子
    */
-  @find(rows) @where("id", "x") @where("kind", 1) read fn rowById(id: string): Row? on rows;
-  read fn allLogs(): Row[] on logs;
+  @find(rows) @where("id", "x") @where("kind", 1) read fn rowById(id: string): Row? reads rows;
+  read fn allLogs(): Row[] reads logs;
   /** @param r 触る行 */
-  effect fn touch(r: Row) on rows.put;
+  effect fn touch(r: Row): effects rows.put;
   /** @param wait 待つ時間 */
   exception Busy(wait: Duration, note: string?);
 
@@ -225,11 +225,11 @@ namespace lib {
     val   logged = allLogs();
     return pick(row, logged, rows);
   }
-  fn write(r: Row) effects rows.post { rows.post(r); }
-  fn rename(t: string) effects title.put { title.put(t); }
+  fn write(r: Row): effects rows.post { rows.post(r); }
+  fn rename(t: string): effects title.put { title.put(t); }
   fn forget() { cursor.delete(); }
   fn remember(r: Row) { cursor.post(r); lib.cursor.put(r); }
-  fn touchIt(r: Row) effects touch { touch(r); }
+  fn touchIt(r: Row): effects touch { touch(r); }
   @scan(logs) fn scanned(): Row[];
   @scan(rows, logs) fn scanned2(): Row[];
   @scan(rows) fn scannedWired(): Row[] { return rows; }
@@ -245,7 +245,7 @@ namespace lib {
   }
 }
 `
-	// 版 0.9 の行（docs/ir.md「正規化」）: ケースの `X as none`、行の遷移（`effect … on s.op as …`）。入力は row_test.go
+	// 版 0.9 の行（docs/ir.md「正規化」）: ケースの `X as none`、行の遷移（`effect fn …: effects s.op as …`）。入力は row_test.go
 	normalizeSource["row.hozo"] = rowSource
 }
 

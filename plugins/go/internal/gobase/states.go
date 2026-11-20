@@ -37,9 +37,9 @@ func readComment(r *ir.Read) string {
 	return unitMethodComment(golang.MethodName(r.Name)+" は問い合わせ（read "+r.Name+"）", r.Description)
 }
 
-// effectMethodComment は、効果のメソッドのコメント: 「<メソッド名> は命令（効果 <効果の FQN>、on <宛先>）: <説明>」。
+// effectMethodComment は、効果のメソッドのコメント: 「<メソッド名> は命令（効果 <効果の FQN>、effects <宛先>）: <説明>」。
 func effectMethodComment(x *ir.Effect) string {
-	return unitMethodComment(golang.MethodName(x.Name)+" は命令（効果 "+x.Name+"、on "+effectTarget(x)+"）", x.Description)
+	return unitMethodComment(golang.MethodName(x.Name)+" は命令（効果 "+x.Name+"、effects "+effectTarget(x)+"）", x.Description)
 }
 
 // genStates は定義のパッケージの states.go。状態の単位がなければ nil。

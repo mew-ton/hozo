@@ -21,15 +21,15 @@ namespace a {
   fn f(): void;
   model N { @forField id: string; }
   @forEffect @opOrEffect @db.insert
-  effect fn add(m: M) on s.post;
+  effect fn add(m: M): effects s.post;
   @db.update
-  effect fn change(m: M) on s.put;
+  effect fn change(m: M): effects s.put;
   @readOrEffect @db.delete @forAll
-  effect fn remove(id: string) on s.delete;
+  effect fn remove(id: string): effects s.delete;
   @forRead @readOrEffect @db.find @forAll
-  read fn byId(id: string): M? on s;
+  read fn byId(id: string): M? reads s;
   @db.list @db.where("name", "x") @db.where("id", "y") @db.latest("name")
-  read fn named(): M[] on s;
+  read fn named(): M[] reads s;
   @forAll
   exception Marked;
   @db.transaction

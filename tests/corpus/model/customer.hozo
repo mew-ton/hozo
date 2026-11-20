@@ -5,7 +5,7 @@ namespace customer {
   /** 利用者が覚えている、ほしいもの */
   state wishlist: list<shop.Line>;
   /** ほしいものを一つ選んで、覚えから消す */
-  effect fn forget() on wishlist.delete;
+  effect fn forget(): effects wishlist.delete;
 
   // docs/requirements.md「モデルが先」: op に印を付けて書く形
   /** ほしいものを一つ選ぶ */

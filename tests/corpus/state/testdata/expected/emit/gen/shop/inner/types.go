@@ -28,27 +28,27 @@ const EffectRename runtime.Effect = "shop.rename"
 const EffectRemoveToken runtime.Effect = "shop.removeToken"
 
 // EffectPlaceOrder は注文を確定する
-// on shop.Checkout: Shopping -> Ordered
+// effects shop.Checkout as Shopping -> Ordered
 const EffectPlaceOrder runtime.Effect = "shop.placeOrder"
 
 // EffectStartOver は買い物をやり直す
-// on shop.Checkout: any -> Shopping
+// effects shop.Checkout as any -> Shopping
 const EffectStartOver runtime.Effect = "shop.startOver"
 
 // EffectTouchCheckout は進み具合を記録し直す
-// on shop.Checkout: Shopping, Ordered -> any
+// effects shop.Checkout as Shopping, Ordered -> any
 const EffectTouchCheckout runtime.Effect = "shop.touchCheckout"
 
 // EffectSignIn はログインする
-// on shop.LoggedIn: any -> LoggedIn
+// effects shop.LoggedIn as any -> LoggedIn
 const EffectSignIn runtime.Effect = "shop.signIn"
 
 // EffectClearCart はカートを空にする
-// on shop.carts: HasItems -> Empty
+// effects shop.carts as HasItems -> Empty
 const EffectClearCart runtime.Effect = "shop.clearCart"
 
 // EffectSaveToken はトークンを保存する
-// on shop.token: Empty -> HasItems
+// effects shop.token as Empty -> HasItems
 const EffectSaveToken runtime.Effect = "shop.saveToken"
 
 // EmptyCart: カートが空

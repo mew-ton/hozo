@@ -826,7 +826,7 @@ func (a *analyzer) directEffect(w *wiring, r resolved, callee ast.QualifiedName)
 		return out, true
 	}
 	if st.Shape == ir.StateList && r.op != ir.OpPost {
-		a.errorf("STATE-6", opSpan, "list の状態 %s の %s は、直には呼べない（どの列かを、引数から決める規則がない。名前を付けた effect を宣言して呼ぶ: effect fn 名前(…) on %s.%s;。docs/check.md「直に呼ぶ組み込みの効果」）", st.Name, r.op, lastSegment(st.Name), r.op)
+		a.errorf("STATE-6", opSpan, "list の状態 %s の %s は、直には呼べない（どの列かを、引数から決める規則がない。名前を付けた effect を宣言して呼ぶ: effect fn 名前(…): effects %s.%s;。docs/check.md「直に呼ぶ組み込みの効果」）", st.Name, r.op, lastSegment(st.Name), r.op)
 		return out, true
 	}
 	if r.op != ir.OpDelete && st.Element != nil {

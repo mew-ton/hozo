@@ -178,42 +178,57 @@ StateDecl = "state" Ident ":" Type ";" ;
 
 ```
 FnDecl     = OpDecl | ReadDecl | EffectDecl ;       (* OpDecl は「op」。ReadDecl と EffectDecl は「exception / effect / read」 *)
-FnHead     = "fn" Ident OpParams [ ":" ReturnType ] ;
+FnHead     = "fn" Ident OpParams ;
 OpParams   = "(" [ OpParam { "," OpParam } ] ")" ;
 OpParam    = Ident ":" Type ;
 ReturnType = Type | "void" | "never" ;
 ```
 
-op、`read`、効果は、どれも関数で、同じ頭（`FnHead`）で宣言する: `fn`、名前、引数の並び、戻り値（`docs/decisions.md`「決めたこと」347、348）。違うのは、`fn` の前に書く種類の語と、後ろに書ける節。
+op、`read`、効果は、どれも関数で、同じ形で宣言する（`docs/decisions.md`「決めたこと」347、348、350、351）: 種類の語、`fn`、名前、引数の並び（`FnHead`）と、その後ろの、関数の型。違うのは、`fn` の前に書く種類の語と、関数の型に書ける節。
 
-| 種類 | 頭 | 戻り値 | 後ろに書けるもの |
+**関数の型**は、`)` の後ろの、`:` から始まる部分: 戻り値と、節（投げるもの、読むもの、変えるもの）。
+
+- `)` の後ろに、戻り値か節を書くなら、`:` で始め、戻り値、節の順に書く（`fn register(in: Input): User throws Taken reads users`）。
+- 戻り値は省けて、省けば `void`（`fn save(item: Item): throws Broken { … }`）。`: void throws Broken` と書いても、同じ（IR で同じ。§7.1）。
+- 何も書かなければ、`:` も書かない（`fn ping();`、`fn clearAll() { … }`）。`:` の後ろに、戻り値も節もない形（`fn f():;`）は、構文エラー。
+
+| 種類 | 頭 | 戻り値 | 節と、その後ろ |
 |---|---|---|---|
-| op | `fn`。別の名前空間から呼べるものは `export fn` | 省ける。型、`void`、`never` | `throws`、`reads`、`effects` の節と、`;` か本体（「op」） |
-| `read` | `read fn` | 型。省けない（TYPE-18） | `on 状態` と `;`（「exception / effect / read」） |
-| 効果 | `effect fn` | 省く。`: void` と書いてもよい（TYPE-18） | `on …` と `;`（同上） |
+| op | `fn`。別の名前空間から呼べるものは `export fn` | 省ける。型、`void`、`never` | `throws`、`reads`、`effects` を、いくつでも。その後ろに、`;` か本体（「op」） |
+| `read` | `read fn` | 型。省けない（TYPE-18） | `reads 状態` を、ちょうど一つ。その後ろに `;`（「exception / effect / read」） |
+| 効果 | `effect fn` | 省く。`void` と書いてもよい（TYPE-18） | `effects 宛先` を、ちょうど一つ。その後ろに `;`（同上） |
 
 ```
 export fn login(in: LoginInput): Session throws InvalidCredentials { … }
 fn findUser(email: Email): User?;
-read fn userByEmail(email: Email): User? on users;
-effect fn createUser(user: User) on users.post;
+fn ping();
+read fn userByEmail(email: Email): User? reads users;
+effect fn createUser(user: User): effects users.post;
 ```
 
 - 種類を書かない `fn` は、op。`op fn f()` とは書かない。
-- 種類ごとに書ける節は、文法で閉じる: `read fn` と `effect fn` に、`throws` の節や本体は書けず、種類を書かない `fn` に、`on` は書けない。
+- 種類ごとに書ける節は、文法で閉じる: `read fn` と `effect fn` に、`throws` の節や本体は書けない。`read fn` の `reads` と、`effect fn` の `effects` は、状態に直に触れることの宣言で、要素は一つだけ。
+- `reads` と `effects` は、どの種類でも、同じ関係を言う: その関数が、状態を読むこと、変えること（`docs/check.md`「状態に触れるもの」）。`read fn` と `effect fn` では、その関数が直に触れる先。op では、本体が呼ぶものの合わせたもので、葉（本体のない op）には書けない（STATE-5。「op」）。
 - 引数がなくても、`()` を書く（配線から `名前()` と呼ぶものだから）。
-- `ReturnType` を省くのと、`void` は、IR で同じ（§7.1）。効果が返せるのは `void` だけで、`read` は `void` と `never` を返せない（TYPE-18。`docs/types.md`「診断」）。
-- なくした書き方は、新しい書き方をメッセージで示して SYNTAX にする: 頭に `fn` のない宣言（`op` の直後に名前: `fn 名前(…)` と書く。`read` か `effect` の直後に名前: `read fn 名前(…)`、`effect fn 名前(…)` と書く）と、`op fn 名前(…)`（種類を書かない `fn` が op）。
+- 効果が返せるのは `void` だけで、`read` は `void` と `never` を返せない（TYPE-18。`docs/types.md`「診断」）。
+- なくした書き方は、新しい書き方をメッセージで示して SYNTAX にする:
+
+  | なくした書き方 | 新しい書き方 |
+  |---|---|
+  | 頭に `fn` のない宣言（`op f()`、`read r()`、`effect e()`） | `fn f()`、`read fn r()`、`effect fn e()` |
+  | `op fn f()` | `fn f()`（種類を書かない `fn` が op） |
+  | 節の前に `:` のない形（`fn f() throws E`、`effect fn e() effects s.post`） | `fn f(): throws E`、`effect fn e(): effects s.post` |
+  | `read fn r(): T on s;`、`effect fn e() on s.post;`（`on`） | `read fn r(): T reads s;`、`effect fn e(): effects s.post;` |
 
 ### exception / effect / read
 
 ```
 ExceptionDecl = "exception" Ident [ "(" OpParam { "," OpParam } ")" ] ";" ;
-EffectDecl    = "effect" FnHead "on" ( BuiltinEffect [ RowClause ] | Transition ) ";" ;   (* FnHead は「関数の宣言」 *)
-ReadDecl      = "read" FnHead "on" QualifiedName ";" ;
+EffectDecl    = "effect" FnHead ":" [ ReturnType ] "effects" ( BuiltinEffect [ RowClause ] | Transition ) ";" ;   (* FnHead と ReturnType は「関数の宣言」 *)
+ReadDecl      = "read" FnHead ":" [ ReturnType ] "reads" QualifiedName ";" ;
 BuiltinEffect = QualifiedName "." StateOp ;
 StateOp       = "post" | "put" | "delete" ;                 (* 文脈キーワード *)
-Transition    = QualifiedName ":" CaseSet "->" CaseSet ;
+Transition    = QualifiedName "as" CaseSet "->" CaseSet ;
 CaseSet       = "any" | Ident { "," Ident } ;
 RowClause     = "as" ( "any" | RowCase )                    (* 矢印のない形: 効果の後 *)
               | "as" RowBefore "->" ( RowCase | "else" ) ;  (* 矢印のある形: 前 -> 後 *)
@@ -221,31 +236,40 @@ RowBefore     = "any" | RowCase { "," RowCase } ;
 RowCase       = QualifiedName ;                             (* 分類の名前 "." ケースの名前: Stage.Accepted *)
 ```
 
-三つは、op が使う最小の単位で、同じ形で書く: 名前、引数の並び（`OpParams` と `OpParam` は「関数の宣言」）、宛先。どれも本体を持たず、ドキュメンテーションコメントとデコレータを付けられる（対象 `exception` / `effect` / `read`。「decorator の宣言」）。意味は `docs/check.md`「状態に触れるもの」と「op の宣言と本体」の「throw」。
+三つは、op が使う最小の単位で、同じ形で書く: 名前、引数の並び（`OpParams` と `OpParam` は「関数の宣言」）、宛先（`read` は `reads` の状態、効果は `effects` の宛先。例外には、ない）。どれも本体を持たず、ドキュメンテーションコメントとデコレータを付けられる（対象 `exception` / `effect` / `read`。「decorator の宣言」）。意味は `docs/check.md`「状態に触れるもの」と「op の宣言と本体」の「throw」。
 
 | 宣言 | 例 | 引数 | 結果 |
 |---|---|---|---|
 | `exception` | `exception InvalidCredentials;`、`exception LimitExceeded(wait: Duration);` | その例外が運ぶ値 | なし |
-| `effect` | `effect fn createOrder(order: Order) on orders.post;`、`effect fn clearCart() on carts: HasItems -> Empty;`、`effect fn startProduction(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction;` | その効果が受け取る値 | なし |
-| `read` | `read fn userByEmail(email: Email): User? on users;`、`read fn allOrders(): Order[] on orders;` | 読むときに受け取る値 | `:` の後ろの型。省略できない（「関数の宣言」） |
+| `effect` | `effect fn createOrder(order: Order): effects orders.post;`、`effect fn clearCart(): effects carts as HasItems -> Empty;`、`effect fn startProduction(order: Order): effects orders.put as Stage.Accepted -> Stage.InProduction;` | その効果が受け取る値 | なし |
+| `read` | `read fn userByEmail(email: Email): User? reads users;`、`read fn allOrders(): Order[] reads orders;` | 読むときに受け取る値 | `:` の後ろの型。省けない（「関数の宣言」） |
 
 - `effect fn` と `read fn` は、引数がなくても `()` を書く（「関数の宣言」）。`exception` は、引数がなければ括弧を書かない（`throw InvalidCredentials` と投げ、`throws` に名前で並べるもの）。`exception X();` は構文エラー（同じ意味の書き方を二つ持たない）。
-- 効果の宛先は一つだけ。基底の状態の組み込みの効果（`on carts.post`）か、分類の遷移（`on Checkout: Shopping -> Ordered`）。`Transition` の `QualifiedName` は、状態を対象にした `classify` か、組み込みの分類を持つ基底の状態（`effect fn clearCart() on carts: HasItems -> Empty;`）。`on` の後ろの `QualifiedName` の直後が `:` なら `Transition`、そうでなければ最後の要素が `StateOp`。
-- `CaseSet` のケースの並びの区切りは `,`（`effect fn touchCheckout() on Checkout: Shopping, Ordered -> any;`）。`match` のアーム（「配線」の `MatchArm`）と同じ区切り。
-- `RowClause` は**行の遷移**: 組み込みの効果が、受け取った行（状態の要素一つ）の状態をどう変えるかを言う。宛先（どこに、何の操作で書くか）とは別のことで、`BuiltinEffect` の後ろにだけ書ける（`Transition` の後ろには書けない。文法で閉じる）。形は二つ。意味、操作ごとに書ける形、分類と引数の結びつきは `docs/check.md`「行の遷移」。
+- 効果の宛先は一つだけで、`effects` の後ろに書く。基底の状態の組み込みの効果（`effects carts.post`）か、状態の遷移（`effects Checkout as Shopping -> Ordered`）。`Transition` の `QualifiedName` は、状態を対象にした `classify` か、組み込みの分類を持つ基底の状態（`effect fn clearCart(): effects carts as HasItems -> Empty;`）。
+- 宛先の `QualifiedName` の最後の要素が `StateOp`（`post` / `put` / `delete`）なら `BuiltinEffect`、そうでなければ `Transition`。最後の要素が `post` / `put` / `delete` の名前の状態や分類は、状態の遷移の宛先に書けない（`effects ns.delete as A -> B` は、状態 `ns` の `delete` と、行の遷移として読む）。
+- **`as` の後ろは、いつも、ケースの遷移。** 宛先が `状態.操作` なら、行の遷移（`RowClause`）。宛先が、状態か、状態の分類なら、状態の遷移（`Transition` の `CaseSet`）。違いは、ケースの書き方: 行の遷移は、分類の名前から書き（`Stage.Draft`）、状態の遷移は、宛先が分類を決めているので、ケースの名前だけを書く（`HasItems`）。
+- `CaseSet` のケースの並びの区切りは `,`（`effect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any;`）。`match` のアーム（「配線」の `MatchArm`）と同じ区切り。
+- `RowClause` は**行の遷移**: 組み込みの効果が、受け取った行（状態の要素一つ）の状態をどう変えるかを言う。宛先（どこに、何の操作で書くか）とは別のことで、`BuiltinEffect` の後ろにだけ書ける（`Transition` は、それ自身が `as` を持つ。文法で閉じる）。形は二つ。意味、操作ごとに書ける形、分類と引数の結びつきは `docs/check.md`「行の遷移」。
 
   | 形 | 例 | 読み方 |
   |---|---|---|
-  | `as <後>` | `effect fn accept(order: Order) on orders.post as Stage.Accepted;` | 効果の後、行は `<後>` にある |
-  | `as <前> -> <後>` | `effect fn startProduction(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction;` | `<前>` にある行が、`<後>` になる |
+  | `as <後>` | `effect fn accept(order: Order): effects orders.post as Stage.Accepted;` | 効果の後、行は `<後>` にある |
+  | `as <前> -> <後>` | `effect fn startProduction(order: Order): effects orders.put as Stage.Accepted -> Stage.InProduction;` | `<前>` にある行が、`<後>` になる |
 
 - `RowCase` は、行の分類の名前と、そのケースの名前を `.` でつないだもの（`Stage.Accepted`。別の名前空間の分類なら `ordering.Stage.Accepted`）。要素が一つだけの名前（`Accepted`）は構文エラー: どの分類のケースかを、いつも書く。
 - 矢印の前（`RowBefore`）は、`any`（どのケースからでも: `as any -> Stage.Shipped`）か、ケースの並び。区切りは `,`（`as Stage.Draft, Stage.Accepted -> Stage.Cancelled`）で、`CaseSet` と同じ。
 - 矢印の後ろは、ケース一つか、`else`（どのケースになるかは決まっていない: `as Stage.Accepted -> else`）。`else` を書けるのは矢印の後ろだけ。
 - 矢印のない形は、ケース一つか、`any`（`as any`。入る行のケースが決まっていない `post`）。ケースを二つ以上並べた `as A, B;` は構文エラー。
-- `read` の `on` の後ろは基底の状態一つで、操作（`.get` のようなもの）は書かない: 状態を読むことは一種類しかない。
-- `sessions.post` は字句では一つの `QualifiedName` になる（`post` は文脈キーワードで、字句としては `Ident`）。`EffectDecl` と `AnyType`（`on location.put`）では、構文解析で最後の要素を `StateOp` として切り出す。`effects` の要素（「op」の `EffectElem`）と、配線の呼び出し（「配線」の `Call`）では切り出さず、名前の解決が決める。
-- なくした書き方は、新しい書き方をメッセージで示して SYNTAX にする: `exception X: T;`（例外の名前の直後の `:`。運ぶ値は引数で書く: `exception X(value: T);`）、`effect fn e on s.post;`（効果の名前の直後の `on`。引数の括弧が要る: `effect fn e() on s.post;`）、`on Checkout: Shopping | Ordered -> any`（`CaseSet` と `RowBefore` のケースの後ろの `|`。区切りは `,`: `on Checkout: Shopping, Ordered -> any`）。
+- `read fn` の `reads` の後ろは基底の状態一つで、操作（`.get` のようなもの）は書かない: 状態を読むことは一種類しかない。
+- `sessions.post` は字句では一つの `QualifiedName` になる（`post` は文脈キーワードで、字句としては `Ident`）。`EffectDecl`（`effects sessions.post`）と `AnyType`（`on location.put`）では、構文解析で最後の要素を `StateOp` として切り出す。`effects` の要素（「op」の `EffectElem`）と、配線の呼び出し（「配線」の `Call`）では切り出さず、名前の解決が決める。
+- なくした書き方は、新しい書き方をメッセージで示して SYNTAX にする（関数の頭と、`:`、`on` は「関数の宣言」の表）:
+
+  | なくした書き方 | 新しい書き方 |
+  |---|---|
+  | `exception X: T;`（例外の名前の直後の `:`） | 運ぶ値は引数で書く: `exception X(value: T);` |
+  | `effect fn e: effects s.post;`（名前の直後に、引数の括弧がない） | `effect fn e(): effects s.post;` |
+  | `effects Checkout: Shopping -> Ordered`（宛先の後ろの `:`） | 状態の遷移は `as` で書く: `effects Checkout as Shopping -> Ordered` |
+  | `effects Checkout as Shopping \| Ordered -> any`（`CaseSet` と `RowBefore` のケースの後ろの `\|`） | 区切りは `,`: `effects Checkout as Shopping, Ordered -> any` |
 
 ### classify
 
@@ -307,7 +331,7 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 - `ExcRef` は例外、例外のユニオン、またはデコレータの引数の名前（`catches error recovers`。§4.2）。
 - `int | float`（§4.2 `valid.min`）のように、デコレータの引数の型にだけ `|` を書ける。model のフィールドや op の引数の型には書けない。`for` の対象の並びも `|`（`for scalar | field`）。節の並び（`throws`、`catches`、`reads`、`effects`）の区切りは `,` で、`|` ではない（「op」）。
 - `ThrowsClause` と `CatchesClause` の順序と回数は文法では縛らない（`catches X recovers throws Y`。§8.1）。差し引きは検査が計算する（DEC-6）。
-- `Target` の `effect` は、効果の宣言に付けるデコレータ（`@db.insert effect fn createOrder(order: Order) on orders.post;`）。`read` は、`read` の宣言に付けるデコレータ（`@db.find read fn userByEmail(email: Email): User? on users;`）。`exception` は、例外の宣言に付けるデコレータ（`@http.status(401) exception Unauthorized;`）。
+- `Target` の `effect` は、効果の宣言に付けるデコレータ（`@db.insert effect fn createOrder(order: Order): effects orders.post;`）。`read` は、`read` の宣言に付けるデコレータ（`@db.find read fn userByEmail(email: Email): User? reads users;`）。`exception` は、例外の宣言に付けるデコレータ（`@http.status(401) exception Unauthorized;`）。
 - `CaseKind` は、分類のケースを言う（`docs/decisions.md`「決めたこと」349）。`for` の後ろに書けば、ケースに付けるデコレータ（`decorator human for case of never;`）、`any` の後ろに書けば、ケースを受け取る引数（`decorator of(actor: any case of never) for op;`）。もとの形は、`case of …` で、`of` の後ろが、絞り。
 
   | 書き方 | 言うもの |
@@ -329,7 +353,7 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 ### op
 
 ```
-OpDecl     = [ "export" ] FnHead { OpClause } ( ";" | Block ) ;   (* FnHead は「関数の宣言」 *)
+OpDecl     = [ "export" ] FnHead [ ":" ( ReturnType { OpClause } | OpClause { OpClause } ) ] ( ";" | Block ) ;   (* FnHead と ReturnType は「関数の宣言」 *)
 OpClause   = "effects" EffectElem { "," EffectElem }
            | "reads" ReadElem { "," ReadElem }
            | ThrowsClause ;
@@ -512,17 +536,17 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `export` と `override` は、予約語の表の「修飾」の行に置く | 宣言やフィールドの頭の語の前に置いて性質を足す語で、宣言の頭でも節の頭でもない。色分けも分ける（`docs/editors.md`「TextMate の文法」） |
 | `export` を書けるのは `op` の前だけ | 別の名前空間から隠せるのは op だけ（`docs/check.md`「export」）。ほかの宣言に書ける形にしておくと、意味のない `export` が検査まで残る |
 | `throws`、`catches`、`effects`、`reads` の並びの区切りは、op の節でもデコレータの宣言の節でも `,`。`throws A \| B`、`effects a \| b` はなくした（`docs/decisions.md`「設計書から離れた決定」S25） | 三つの節（`throws`、`effects`、`reads`）は、どれも「その op を呼んだときに起きうること」の集合を言うので、同じ書き方にする。記法は「どれか」と「すべて」を書き分けない: 例外は呼び出しを終わらせるので、起きるのは高々一つ。効果と読むことは「このうちのいくつか」。「すべてを行う」と言うのは、デコレータの引数だけ（残りの引数に並べた `@effects(a, b)`）。`,` は `throws` の出どころ（Java）の書き方に近い。`\|` は、型の選択（`int \| float`）、`for` の対象の並び、一つの引数に渡す宣言の集合、ケースの並び（遷移と `match` のアーム）に残る |
-| `exception`、`effect`、`read` は、同じ形で書く: 名前、引数、（`read` は結果の型、）宛先。`exception X: T` と、引数のない `effect e on …` はなくした | 三つは、op が使う最小の単位で、op はそれを組み合わせる。配線から op と同じに使えるように（`userByEmail(email)`、`createOrder(order)`、`throw LimitExceeded(wait)`）、op と同じ引数の並びを持たせる。例外の値を一つの model に包ませない: 運ぶ値は引数として並べる |
+| `exception`、`effect`、`read` は、同じ形で書く: 名前、引数、（`read` は結果の型、）宛先。`exception X: T` と、引数の括弧のない効果の宣言（`effect fn e: effects …`）はなくした | 三つは、op が使う最小の単位で、op はそれを組み合わせる。配線から op と同じに使えるように（`userByEmail(email)`、`createOrder(order)`、`throw LimitExceeded(wait)`）、op と同じ引数の並びを持たせる。例外の値を一つの model に包ませない: 運ぶ値は引数として並べる |
 | `effect` と `read` は引数がなくても `()` を書き、`exception` は引数がなければ括弧を書かない | `effect` と `read` は呼び出すもので、呼び出しはいつも括弧を持つ（op と同じ）。例外は名前で並べ（`throws A, B`）、名前で投げる（`throw A`）もので、値を運ばない例外が普通。どちらも、同じ意味の書き方を二つ持たない |
-| `read` の結果の型は省略できない。`on` の後ろに操作は書かない | 読むことは、値を得ること。何を得るかを宣言に書かせ、配線の式の型を宣言だけから決める。操作を書かないのは、状態を読むことが一種類だから |
+| `read` の結果の型は省略できない。`reads` の後ろに操作は書かない | 読むことは、値を得ること。何を得るかを宣言に書かせ、配線の式の型を宣言だけから決める。操作を書かないのは、状態を読むことが一種類だから |
 | 名前を付けない形は、配線にある: 状態を名前で読むこと（`f(users)`）と、組み込みの効果を直に呼ぶこと（`users.post(user);`）。配線の op の `reads` と `effects` の要素も、名前でも、直にでも書ける（`reads userByEmail` と `reads users`、`effects addUser` と `effects users.post`） | 名前を付けるかどうかを、書く人が選べるようにする。説明もデコレータも要らない読み書きに、宣言を一つ足させない。分類の遷移だけは直に書けない: 前後のケースを節や呼び出しの中に書くと、並びが読めなくなる |
 | `as` の前には対象を、宣言の `of` の後ろと同じに書く。対象が一つでも省略できない | どの対象が何の型になるかを、対象が複数ある状態の分類と同じ形で読めるようにする |
 | `as` の後ろの `else` は予約語（`docs/decisions.md`「決めたこと」152） | 型の位置に来るので、予約しないと同じ名前の型と区別できない（`never` と同じ理由）。フィールド名には書ける（`FieldName`）。アームの頭の `else` も、ケースの名前（`Ident`）の位置に来るので、同じ予約語で足りる |
 | 分類のケースは、どれも名前を持つ。名前のないケース `default;` と、`condition` の宣言は、なくした（`docs/decisions.md`「決めたこと」154、155） | 残りが意味のある状態なら、名前が要る。値がない側なら、残りのケース（`as else`）がある。仕様が使わない場合は、宣言しない: 宣言したケースの外の値は、分類の誤り（`docs/check.md`「閉じた分類」）。`default` が受ける正当な残りが、なくなった。`condition` は、成り立たない側が `default` になる糖衣だったので、一緒になくなる |
 | `default` は予約語のまま。`condition` は予約語から外す | `default` が書かれていた位置（ケースの名前、アームの頭）は `Ident` の位置で、予約を外すと、なくした書き方 `default;` が「`default` という名前のケース」として通る。`condition` が書かれていた位置は宣言の頭で、`Ident` で始まる宣言はないので、予約を外しても、なくした書き方が別の意味で通ることはない（`is` / `omit` と同じ扱い。パーサーは、宣言の頭の `condition` を、メッセージのために見分ける） |
 | `match` の「ほかのすべて」は `else => …`。`MatchArm` の後ろに、最後に一つだけ（`docs/decisions.md`「決めたこと」156） | 残りを言う語は、分類のケースの `as else` と同じ語にする。「ほかの」は、先に名前で並べたアームがあって決まるので、`else` だけの `match` と、`else` の後ろのアームは、文法で閉じる |
-| ケースの並びの区切りは `,`（アームの `A, B => …`、遷移の `on C: A, B -> any`）。`\|` は、デコレータの宣言の対象（`for op \| field`）と引数の型（`string \| int`）、適用の引数の値（`ArgValue`）に残る（`docs/decisions.md`「決めたこと」157） | 残る三つの `\|` は「このどれか一つ」を言う。ケースの並びは、「これらのケースのとき」を並べるだけで、節の並び（`throws A, B`。`docs/decisions.md`「設計書から離れた決定」S25）と同じ。ケースを並べる位置は二つ（アーム、遷移）なので、同じ区切りにする |
-| 行の遷移は、宛先の後ろの `as` の節に書く（`on orders.put as Stage.Accepted -> Stage.InProduction`）。状態の分類の遷移（`on Checkout: A -> B`）の形には載せない（`docs/decisions.md`「決めたこと」163） | 効果は、二つの別のことを言う: どこに、何の操作で書くか（宛先）と、受け取った行の状態がどうなるか。状態の分類の遷移は、宛先そのものが分類で、操作を書かない。行の遷移は、操作（`post` / `put` / `delete`）を書いたうえで、行の状態を足す。語は `as`: 分類のケースの `対象 as T`（そのケースのとき、対象は T）と同じく、「行は、このケースにある」と読める |
+| ケースの並びの区切りは `,`（アームの `A, B => …`、遷移の `effects C as A, B -> any`）。`\|` は、デコレータの宣言の対象（`for op \| field`）と引数の型（`string \| int`）、適用の引数の値（`ArgValue`）に残る（`docs/decisions.md`「決めたこと」157） | 残る三つの `\|` は「このどれか一つ」を言う。ケースの並びは、「これらのケースのとき」を並べるだけで、節の並び（`throws A, B`。`docs/decisions.md`「設計書から離れた決定」S25）と同じ。ケースを並べる位置は二つ（アーム、遷移）なので、同じ区切りにする |
+| 行の遷移は、宛先の後ろの `as` の節に書く（`effects orders.put as Stage.Accepted -> Stage.InProduction`）。状態の遷移（`effects Checkout as A -> B`）とは、宛先で分かれる（`docs/decisions.md`「決めたこと」163、350） | 効果は、二つの別のことを言う: どこに、何の操作で書くか（宛先）と、受け取った行の状態がどうなるか。状態の分類の遷移は、宛先そのものが分類で、操作を書かない。行の遷移は、操作（`post` / `put` / `delete`）を書いたうえで、行の状態を足す。語は `as`: 分類のケースの `対象 as T`（そのケースのとき、対象は T）と同じく、「行は、このケースにある」と読める |
 | 行の遷移のケースは、どれも分類の名前から書く（`Stage.Accepted`）。分類を一度だけ書く形（`as Stage: Accepted -> InProduction`）にしない | 型の位置の `Stage.Accepted<Order>` と同じ綴りにする。行の型には分類がいくつもありうるので、ケースの名前だけでは、どの分類の話かが読めない |
 | 行の遷移の「どれでも」は、矢印の前では `any`、矢印の後ろでは `else` | 前の `any` は「どのケースの行でも受け取る」で、状態の分類の遷移の `any` と同じ。後ろは、受け取るものではなく、決まっていない残りなので、残りを言う語（`as else`、`else => …`）にする。後ろに `any` を書けると、「どのケースにもなる」と読める |
 | ケースの `as none` は、「値がない」を言う（`docs/decisions.md`「決めたこと」165） | 「値がない」を言う語は、配線の値の `none` で、もうある。`null` を足さない。`as else`（残り）は、残りがたまたま「値がない」ときにも書けるが、「ない」ことを名指しする語ではない |
@@ -542,3 +566,6 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | デコレータの宣言で、分類のケースは、`case of …` と書き、`of` の後ろに、`any`、型、分類の名前を書く。`case` は、`case of any` の省略（同 331、346、349）。分類そのもの（`for classify`）は、まだ、書けない（同 341） | 絞りが、いつも、`of` の後ろに来る。`for model` と `for field`、`any variant` と、同じ並び: 部分を言う語（`case`）と、全体を言う語（`classify`）が、別なので、後で、分類そのものを足しても、綴りが、ぶつからない。`any` を型にしないのは、仕様に、型のない値を、持ち込まないため |
 | 関数の宣言の頭は、`fn`。種類（`read`、`effect`）は、その前に書き、書かなければ、op（同 347）。`fn` は、予約語。`op`、`read`、`effect` は、予約語のまま | op、`read`、効果は、どれも、基底は関数。頭が一つなら、新しい種類が生まれても、文法の規則は、一つで済み、種類の語を、`fn` の前の、文脈キーワードにできる。状態に触れる末端だけに、印が付く。今ある三つの語を、文脈キーワードに変えないのは、`for op`、`any effect` の位置で、今のまま読むため |
 | 関数の戻り値は、どの種類も、`: 型` で、省けば `void`（同 348） | 効果は `void` のほかを返せず、省いた形が、ふつうになる。`read` と効果に、戻り値の、別の文法を持たない |
+| `)` の後ろに、戻り値か節を書くなら、`:` で始める。何も書かなければ、`:` も書かない（同 351） | `:` の後ろが、関数の型: 戻り値と、投げるもの、読むもの、変えるもの。`(引数): 戻り値` の形と、後ろに並ぶ節の、継ぎ目がなくなる。`:` の意味は、引数や `val` と同じ、「〜の型は」のまま。効果だけ `: void` を省く、という種類ごとの別扱いが、要らない |
+| 関数が、状態を読むこと、変えることは、どの種類も、`reads` と `effects` で書く。`read fn` と `effect fn` の `on` は、なくした（同 350） | 同じ関係を、同じ語で言う。`read fn … reads users` は、語が重なるが、修飾子は、行の頭の目印で、節が、中身。`on` は、デコレータの引数の絞り（`any effect on users.post`）に残る |
+| 状態の遷移は、宛先の後ろの `as` で書く（`effects cart as HasItems -> Empty`）。宛先の後ろの `:` は、なくした（同 350） | `as` の後ろは、いつも、ケースの遷移（行の遷移と、同じ語）。`:` は、型を言う記号だけになる。宛先が `状態.操作` か、状態（状態の分類）かは、名前の最後の要素が `post` / `put` / `delete` かで分ける: `:` で分けていたときと違い、その三つの語で終わる名前の状態や分類は、状態の遷移の宛先に書けない |

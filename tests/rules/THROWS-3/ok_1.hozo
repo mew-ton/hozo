@@ -22,7 +22,7 @@ namespace a {
   fn g(): int throws Unauthorized {
     return denied();
   }
-  fn h() throws Unauthorized {
+  fn h(): throws Unauthorized {
     unauthorized();
   }
 }

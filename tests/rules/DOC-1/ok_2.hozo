@@ -15,7 +15,7 @@ namespace a {
    * @param m 足す行
    * @see byId
    */
-  effect fn add(m: M) on rows.post;
+  effect fn add(m: M): effects rows.post;
   /**
    * 行を引く
    *
@@ -23,6 +23,6 @@ namespace a {
    * @see add
    * @see Busy
    */
-  read fn byId(id: string): M? on rows;
+  read fn byId(id: string): M? reads rows;
   fn f(m: M): M? { add(m); return byId(m.id); }
 }

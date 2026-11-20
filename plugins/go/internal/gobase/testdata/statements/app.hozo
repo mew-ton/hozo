@@ -82,7 +82,7 @@ namespace app {
     note(a);
     return fail();
   }
-  export fn stopStatement()
+  export fn stopStatement():
     throws Gone
   {
     fail();

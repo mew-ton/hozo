@@ -131,6 +131,23 @@ var caseOfRule = Rule{
 	},
 }
 
+// asRule は、as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、
+// 遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.A, C.B -> C.D、as HasItems -> Empty。-> は矢印、
+// any と else は予約語）。; か { まで続く。型の位置の規則と、effects の節の中の、どちらにも置く。
+var asRule = Rule{
+	Comment: "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.A, C.B -> C.D、as HasItems -> Empty。-> は矢印、any と else は予約語）。; か { まで続く",
+	Begin:   `\b(as)\b`,
+	End:     `(?=[;{])`,
+	BeginCaptures: Captures{
+		"1": {Name: "keyword.control.hozo"},
+	},
+	Patterns: []Rule{
+		{Include: "#arrow"},
+		{Include: "#type"},
+		{Include: "#keywords"},
+	},
+}
+
 // groupOf は予約語の Kind を KeywordGroups の添字に写す。
 func groupOf(k token.Kind) int {
 	switch {
@@ -350,7 +367,7 @@ func Build() Grammar {
 				},
 			},
 			{
-				Comment: "状態の操作: post / put / delete は on 状態. の後ろでだけ文脈キーワード",
+				Comment: "状態の操作: post / put / delete は on 状態. の後ろでだけ文脈キーワード（デコレータの引数の絞り any effect on 状態.操作。docs/grammar.md「decorator の宣言」の AnyType）",
 				Match:   `\b(on)\s+(` + qualifiedName + `)\.(post|put|delete)\b`,
 				Captures: Captures{
 					"1": {Name: "keyword.control.hozo"},
@@ -358,7 +375,7 @@ func Build() Grammar {
 				},
 			},
 			{
-				Comment: "effects の節の要素に直に書いた「状態.操作」（docs/grammar.md「op」の EffectElem）: 要素の最後の . の後ろの post / put / delete。節は ; か { か次の節の頭で終わる",
+				Comment: "effects の節の「状態.操作」（docs/grammar.md「exception / effect / read」の BuiltinEffect と、「op」の EffectElem）: 要素の最後の . の後ろの post / put / delete。節は ; か { か次の節の頭で終わる。節の中の as（行の遷移と、状態の遷移）は、as の後ろの型の位置",
 				Begin:   `\b(effects)\b`,
 				End:     `(?=[;{])|(?=\b(?:throws|catches|effects|reads|prevents|keeps|recovers|halts|ignores)\b)`,
 				BeginCaptures: Captures{
@@ -366,6 +383,7 @@ func Build() Grammar {
 				},
 				Patterns: []Rule{
 					{Include: "#comments"},
+					asRule,
 					{Name: "keyword.other.hozo", Match: `(?<=\.)(?:post|put|delete)\b(?!\s*\.)`},
 				},
 			},
@@ -415,19 +433,7 @@ func Build() Grammar {
 				},
 				Patterns: []Rule{{Include: "#type"}},
 			},
-			{
-				Comment: "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、行の遷移のケース（同「exception / effect / read」の RowClause: as C.A, C.B -> C.D。-> は矢印、any と else は予約語）。; か { まで続く",
-				Begin:   `\b(as)\b`,
-				End:     `(?=[;{])`,
-				BeginCaptures: Captures{
-					"1": {Name: "keyword.control.hozo"},
-				},
-				Patterns: []Rule{
-					{Include: "#arrow"},
-					{Include: "#type"},
-					{Include: "#keywords"},
-				},
-			},
+			asRule,
 			{
 				Comment: "match の by の後ろの分類の名前（修飾できる。docs/grammar.md「配線」の Match）。標準の分類 list / nullable は形の語として塗る",
 				Begin:   `\b(by)\b`,

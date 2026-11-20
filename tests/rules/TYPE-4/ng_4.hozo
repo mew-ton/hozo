@@ -7,8 +7,8 @@ namespace a {
   exception Plain;
   state rows: list<M>;
   state cur: nullable<M>;
-  read fn byId(id: string): M? on rows;
-  effect fn add(m: M) on rows.post;
+  read fn byId(id: string): M? reads rows;
+  effect fn add(m: M): effects rows.post;
   classify K of M { A; B; C; D; }
   fn f(m: M, n: N, count: int): M? throws Busy {
     add(n);                              // ERROR: TYPE-4

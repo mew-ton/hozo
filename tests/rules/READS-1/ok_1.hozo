@@ -4,7 +4,7 @@
 namespace a {
   state users: list<string>;
   state token: nullable<string>;
-  read fn first(): string? on users;
+  read fn first(): string? reads users;
   decorator counting(table: any state) for op reads table;
   decorator peeking for op reads first, token;
   @counting(users)
@@ -17,7 +17,7 @@ namespace a {
 }
 namespace b {
   state rows: list<string>;
-  read fn firstRow(): string? on rows;
+  read fn firstRow(): string? reads rows;
   export fn all(): string[] reads rows { return rows; }
   fn size(): int reads a.users {
     return a.count();

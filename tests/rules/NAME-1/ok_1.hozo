@@ -7,7 +7,7 @@ namespace a {
   classify Kind of User { Big; }
   state users: list<User>;
   fn find(): User;
-  effect fn added() on users.post;
-  read fn first(): User? on users;
+  effect fn added(): effects users.post;
+  read fn first(): User? reads users;
   decorator tag;
 }

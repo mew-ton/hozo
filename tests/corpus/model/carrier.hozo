@@ -7,7 +7,7 @@ namespace carrier {
   @marks.context("配送")
   state parcels: list<shop.Order>;
   /** 荷物を引き受ける */
-  effect fn accept(order: shop.Order) on parcels.post;
+  effect fn accept(order: shop.Order): effects parcels.post;
 
   /** 営業時間外 */
   exception Closed;
@@ -15,7 +15,7 @@ namespace carrier {
   // 出力しない名前空間にも、状態の持ち主の規則（STATE-2）などの検査は同じに掛かる
   /** 荷物を引き受ける */
   @marks.context("配送")
-  export fn pickup(order: shop.Order)
+  export fn pickup(order: shop.Order):
     effects accept
     throws Closed prevents effects
   {
@@ -23,5 +23,5 @@ namespace carrier {
     accept(order);
   }
   /** 営業時間の中か確かめる */
-  fn checkOpen() throws Closed;
+  fn checkOpen(): throws Closed;
 }

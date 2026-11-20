@@ -328,12 +328,17 @@ func (r *renderer) head(d ir.Decl) string {
 	case *ir.Effect:
 		return "effect fn " + name + r.params(d.Params) + r.effectTarget(d.Target) + r.rowTransition(d)
 	case *ir.Read:
+		// 「)」の後ろは、「:」で始める、関数の型: 戻り値と、reads の節（docs/grammar.md「関数の宣言」）
 		s := "read fn " + name + r.params(d.Params)
+		var parts []string
 		if d.Returns != nil {
-			s += ": " + r.typ(d.Returns)
+			parts = append(parts, r.typ(d.Returns))
 		}
 		if d.State != "" {
-			s += " on " + r.rel(d.State)
+			parts = append(parts, "reads "+r.rel(d.State))
+		}
+		if len(parts) > 0 {
+			s += ": " + strings.Join(parts, " ")
 		}
 		return s
 	case *ir.Classify:
@@ -588,19 +593,19 @@ func (r *renderer) argValue(v ir.ArgValue) string {
 	return "?"
 }
 
-// effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect fn createSession(session: Session) on sessions.post`、
-// `effect fn placeOrder() on Checkout: Shopping -> Ordered` の on から後ろ）。宛先が決まっていなければ空。
+// effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect fn createSession(session: Session): effects sessions.post`、
+// `effect fn placeOrder(): effects Checkout as Shopping -> Ordered` の「:」から後ろ）。宛先が決まっていなければ空。
 func (r *renderer) effectTarget(t ir.EffectTarget) string {
 	switch t := t.(type) {
 	case ir.BuiltinTarget:
-		return " on " + r.rel(t.State) + "." + string(t.Operation)
+		return ": effects " + r.rel(t.State) + "." + string(t.Operation)
 	case ir.TransitionTarget:
-		return " on " + r.rel(t.Of) + ": " + caseSet(t.From) + " -> " + caseSet(t.To)
+		return ": effects " + r.rel(t.Of) + " as " + caseSet(t.From) + " -> " + caseSet(t.To)
 	}
 	return ""
 }
 
-// rowTransition は行の遷移を Hozo の構文で書く（docs/lsp.md「ホバー」: `… on orders.put as Stage.Accepted -> Stage.InProduction` の
+// rowTransition は行の遷移を Hozo の構文で書く（docs/lsp.md「ホバー」: `… effects orders.put as Stage.Accepted -> Stage.InProduction` の
 // as から後ろ。頭に空白を一つ置く）。形は docs/plugin-go.md「コメント」の「行の遷移の表示」と同じで、IR から組み立てる
 // （post は `as <後>`。put は `as <前> -> <後>`。delete は、前が any なら `as <後>`）。
 // 分類の名前は、見ている名前空間から見た修飾。行の遷移を持たない効果は空。

@@ -148,14 +148,14 @@ namespace hozoc {
    *
    * @param plan 書き出す予定
    */
-  read fn outputChanges(plan: EmitPlan): EmitResult on outputs;
+  read fn outputChanges(plan: EmitPlan): EmitResult reads outputs;
 
   /**
    * 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
    *
    * @param plan 書き出す予定
    */
-  effect fn syncOutputs(plan: EmitPlan) on OutputsSync: any -> UpToDate;
+  effect fn syncOutputs(plan: EmitPlan): effects OutputsSync as any -> UpToDate;
 
   /**
    * 仕様を検査する。ファイルは書き出さない。

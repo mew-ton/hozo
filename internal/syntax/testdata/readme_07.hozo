@@ -34,7 +34,7 @@ fn cancelOrder(in: CancelInput): Order
 fn saveOrder(in: OrderInput): Order
   effects createOrder;
 
-fn sendOrderNotice(order: Order)
+fn sendOrderNotice(order: Order):
   effects notifyUser
   throws NotificationFailed prevents effects;
 

@@ -159,7 +159,7 @@ const (
 // Effect は effect 宣言（docs/ir.md「state / exception / effect」の Effect）。
 type Effect struct {
 	DeclBase
-	// Params は効果が受け取る値（`effect fn e(order: Order) on …;`）。なければ空（JSON では []）。
+	// Params は効果が受け取る値（`effect fn e(order: Order): effects …;`）。なければ空（JSON では []）。
 	Params []OpParam `json:"params"`
 	// Target は宛先。一つだけ（docs/check.md「状態の形」の「効果の宛先」）。
 	Target EffectTarget `json:"target"`
@@ -206,7 +206,7 @@ type EffectTarget interface {
 	isEffectTarget()
 }
 
-// BuiltinTarget は基底の状態の組み込みの効果（`on s.post`。docs/ir.md「state / exception / effect」の
+// BuiltinTarget は基底の状態の組み込みの効果（`effects s.post`。docs/ir.md「state / exception / effect」の
 // EffectTarget kind "builtin"）。
 type BuiltinTarget struct {
 	// State は状態の FQN。
@@ -214,7 +214,7 @@ type BuiltinTarget struct {
 	Operation Operation `json:"operation"`
 }
 
-// TransitionTarget は分類の遷移（`on X: A -> B`。docs/ir.md「state / exception / effect」の
+// TransitionTarget は分類の遷移（`effects X as A -> B`。docs/ir.md「state / exception / effect」の
 // EffectTarget kind "transition"）。
 type TransitionTarget struct {
 	// Of は状態の分類の FQN か、組み込みの分類を持つ基底の状態の FQN。

@@ -27,9 +27,9 @@ namespace a {
   decorator nothing = effects();
 
   @effect(rows) @tags("a")
-  effect fn add() on rows.post;
+  effect fn add(): effects rows.post;
   @a.effect(logs)
-  effect fn log() on logs.post;
+  effect fn log(): effects logs.post;
 
   /**
    * 全部を引く。
@@ -48,7 +48,7 @@ namespace a {
   @effects()
   fn idle2();
   @both(logs, log)
-  fn audited(entry: Row) throws Busy;
+  fn audited(entry: Row): throws Busy;
   @tags("x", 1, "y")
   @everything
   fn tagged(): Row[];

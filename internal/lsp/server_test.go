@@ -644,13 +644,13 @@ func TestStateClassification(t *testing.T) {
 	}{
 		// 効果の宛先: 組み込みの効果と、分類の遷移
 		// 引数を持つ効果（節の要素と、配線の呼び出しの名前のどちらからも）
-		{"effects addLine {", len("effects "), "```hozo\neffect fn addLine(line: Line) on carts.post\n```"},
-		{"{ addLine(line); }", len("{ "), "```hozo\neffect fn addLine(line: Line) on carts.post\n```"},
-		{"effects placeOrder throws", len("effects "), "```hozo\neffect fn placeOrder() on Checkout: Shopping -> Ordered\n```"},
-		{"effects startOver {", len("effects "), "```hozo\neffect fn startOver() on Checkout: any -> Shopping\n```"},
-		{"effects clearCart {", len("effects "), "```hozo\neffect fn clearCart() on carts: HasItems -> Empty\n```"},
-		{"touchCheckout() on", 0, "```hozo\neffect fn touchCheckout() on Checkout: Shopping, Ordered -> any\n```"},
-		{"saveToken(token); }", 0, "```hozo\neffect fn saveToken(token: Token) on token: Empty -> HasItems\n```"},
+		{"effects addLine {", len("effects "), "```hozo\neffect fn addLine(line: Line): effects carts.post\n```"},
+		{"{ addLine(line); }", len("{ "), "```hozo\neffect fn addLine(line: Line): effects carts.post\n```"},
+		{"effects placeOrder throws", len("effects "), "```hozo\neffect fn placeOrder(): effects Checkout as Shopping -> Ordered\n```"},
+		{"effects startOver {", len("effects "), "```hozo\neffect fn startOver(): effects Checkout as any -> Shopping\n```"},
+		{"effects clearCart {", len("effects "), "```hozo\neffect fn clearCart(): effects carts as HasItems -> Empty\n```"},
+		{"touchCheckout(): effects", 0, "```hozo\neffect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any\n```"},
+		{"saveToken(token); }", 0, "```hozo\neffect fn saveToken(token: Token): effects token as Empty -> HasItems\n```"},
 		// 分類の対象: 状態の分類は状態の名前の並び、値の分類は型
 		{"match (by Checkout)", len("match (by "), "```hozo\nclassify Checkout of carts, orders\n```"},
 		{"match (by LoggedIn)", len("match (by "), "```hozo\nclassify LoggedIn of token\n```"},
@@ -659,7 +659,7 @@ func TestStateClassification(t *testing.T) {
 		{"match (token by nullable", len("match ("), "```hozo\nstate token: nullable<Token>\n```"},
 		{"match (carts by list", len("match ("), "```hozo\nstate carts: list<Line>\n```"},
 		// 遷移のケース名は分類のケース
-		{"Checkout: Shopping -> Ordered", len("Checkout: "), "classify Checkout of carts, orders\n  Shopping"},
+		{"Checkout as Shopping -> Ordered", len("Checkout as "), "classify Checkout of carts, orders\n  Shopping"},
 		// 束縛のホバーは式を短く書く: 状態の分類での match
 		{"return placed;", len("return "), "match (by Checkout) { ... }"},
 	} {
@@ -667,7 +667,7 @@ func TestStateClassification(t *testing.T) {
 			t.Errorf("hover(%q) に %q がない:\n%s", tt.needle, tt.want, got)
 		}
 	}
-	if got := hover("Checkout: Shopping -> Ordered", 0, len("Checkout: ")); !strings.Contains(got, "カートに入れている途中") {
+	if got := hover("Checkout as Shopping -> Ordered", 0, len("Checkout as ")); !strings.Contains(got, "カートに入れている途中") {
 		t.Errorf("hover(遷移のケース Shopping) にケースの説明がない:\n%s", got)
 	}
 
@@ -677,11 +677,11 @@ func TestStateClassification(t *testing.T) {
 		shiftBy      int
 		target       string // 定義の位置（この文字列の先頭）
 	}{
-		{"遷移の宛先の分類", "placeOrder() on Checkout", len("placeOrder() on "), "Checkout of carts, orders"},
+		{"遷移の宛先の分類", "placeOrder(): effects Checkout", len("placeOrder(): effects "), "Checkout of carts, orders"},
 		{"遷移の後のケース", "Shopping -> Ordered;", len("Shopping -> "), "Ordered;\n  }"},
-		{"遷移の宛先の基底の状態", "clearCart() on carts", len("clearCart() on "), "carts: list<Line>"},
-		{"効果の呼び出しの名前", "{ clearCart(); }", len("{ "), "clearCart() on carts"},
-		{"効果の引数の型", "addLine(line: Line) on", len("addLine(line: "), "Line { item"},
+		{"遷移の宛先の基底の状態", "clearCart(): effects carts", len("clearCart(): effects "), "carts: list<Line>"},
+		{"効果の呼び出しの名前", "{ clearCart(); }", len("{ "), "clearCart(): effects carts"},
+		{"効果の引数の型", "addLine(line: Line): effects", len("addLine(line: "), "Line { item"},
 		{"分類の対象の状態", "Checkout of carts, orders", len("Checkout of carts, "), "orders: list<Order>"},
 		{"match の対象の状態", "match (token by nullable", len("match ("), "token: nullable<Token>"},
 		{"match by の分類", "match (by Checkout)", len("match (by "), "Checkout of carts, orders"},
@@ -709,10 +709,10 @@ func TestStateClassification(t *testing.T) {
 	}
 	for name, want := range map[string]string{
 		"token":         "nullable<Token>",
-		"addLine":       "(line: Line) on carts.post",
-		"placeOrder":    "() on Checkout: Shopping -> Ordered",
-		"touchCheckout": "() on Checkout: Shopping, Ordered -> any",
-		"clearCart":     "() on carts: HasItems -> Empty",
+		"addLine":       "(line: Line): effects carts.post",
+		"placeOrder":    "(): effects Checkout as Shopping -> Ordered",
+		"touchCheckout": "(): effects Checkout as Shopping, Ordered -> any",
+		"clearCart":     "(): effects carts as HasItems -> Empty",
 		"Checkout":      "of carts, orders",
 		"LoggedIn":      "of token",
 		"LineKind":      "of Line",
@@ -804,7 +804,7 @@ namespace store {
   state users: list<type.User>;
   state current: type.User?;
   state title: string;
-  read fn userById(id: string): type.User? on users;
+  read fn userById(id: string): type.User? reads users;
   export fn findUser(id: string): type.User? reads users { return userById(id); }
   fn unauthorized(): never throws type.Unauthorized;
   fn nameOf(user: type.User): string;
@@ -910,9 +910,9 @@ namespace store {
 		{"return title;", len("return "), []string{"```hozo\nstate title: single<string>\n```"}, nil},
 		{"reads users {", len("reads "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
 		// read の宣言と、配線からの read の呼び出し
-		{"read fn userById(", len("read fn "), []string{"```hozo\nread fn userById(id: string): type.User? on users\n```"}, nil},
-		{"return userById(id); }", len("return "), []string{"```hozo\nread fn userById(id: string): type.User? on users\n```"}, nil},
-		{"type.User? on users;", len("type.User? on "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
+		{"read fn userById(", len("read fn "), []string{"```hozo\nread fn userById(id: string): type.User? reads users\n```"}, nil},
+		{"return userById(id); }", len("return "), []string{"```hozo\nread fn userById(id: string): type.User? reads users\n```"}, nil},
+		{"type.User? reads users;", len("type.User? reads "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
 		// throw の例外
 		{"throw type.Unauthorized", len("throw type."), []string{"```hozo\nexception type.Unauthorized\n```"}, nil},
 	} {
@@ -948,9 +948,9 @@ namespace store {
 		{"ケースの X as T の T", "findUser as type.User;", len("findUser as type."), "User {\n    /** 識別子 */"},
 		{"ケースの X as T の X（状態）", "LoggedIn: current as", len("LoggedIn: "), "current: type.User?;"},
 		{"reads の状態", "reads users {", len("reads "), "users: list<type.User>;"},
-		{"read fn r(…): T on s の s", "type.User? on users;", len("type.User? on "), "users: list<type.User>;"},
-		{"read の呼び出し", "return userById(id); }", len("return "), "userById(id: string): type.User? on"},
-		{"read の結果の型", "userById(id: string): type.User? on", len("userById(id: string): type."), "User {\n    /** 識別子 */"},
+		{"read fn r(…): T reads s の s", "type.User? reads users;", len("type.User? reads "), "users: list<type.User>;"},
+		{"read の呼び出し", "return userById(id); }", len("return "), "userById(id: string): type.User? reads"},
+		{"read の結果の型", "userById(id: string): type.User? reads", len("userById(id: string): type."), "User {\n    /** 識別子 */"},
 		{"配線の値の位置の状態（match の対象）", "match(current by nullable)", len("match "), "current: type.User?;"},
 		{"配線の値の位置の状態（アームの値）", "HasItems => current;", len("HasItems => "), "current: type.User?;"},
 		{"配線の値の位置の状態（return）", "return title;", len("return "), "title: string;"},
@@ -1007,7 +1007,7 @@ namespace store {
 	c.shutdown()
 }
 
-// TestRowTransitionAndAbsentCase は、版 0.9 の構文（行の遷移 `effect … on s.op as …`、ない側のケース `対象 as none`）について、
+// TestRowTransitionAndAbsentCase は、版 0.9 の構文（行の遷移 `effect fn …: effects s.op as …`、ない側のケース `対象 as none`）について、
 // ホバーの見出し（docs/lsp.md「ホバー」）、定義へジャンプ（同「定義へジャンプ」の表）、ドキュメントのシンボル、診断（STATE-9）を確かめる。
 func TestRowTransitionAndAbsentCase(t *testing.T) {
 	root := t.TempDir()
@@ -1029,14 +1029,14 @@ namespace shop {
     /** ない */
     Absent: Order? as none;
   }
-  effect fn accept(order: Order) on orders.post as kind.Stage.Accepted;
-  effect fn open(order: Order) on orders.post as Life.Absent -> Life.Open;
-  effect fn bring(order: Order) on orders.post as any;
-  effect fn ship(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped;
-  effect fn revise(order: Order) on orders.put as kind.Stage.Accepted -> else;
-  effect fn patch(order: Order) on orders.put as any -> else;
-  effect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
-  effect fn purge(order: Order) on orders.delete as any -> Life.Absent;
+  effect fn accept(order: Order): effects orders.post as kind.Stage.Accepted;
+  effect fn open(order: Order): effects orders.post as Life.Absent -> Life.Open;
+  effect fn bring(order: Order): effects orders.post as any;
+  effect fn ship(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped;
+  effect fn revise(order: Order): effects orders.put as kind.Stage.Accepted -> else;
+  effect fn patch(order: Order): effects orders.put as any -> else;
+  effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
+  effect fn purge(order: Order): effects orders.delete as any -> Life.Absent;
   fn send(order: Order, at: Time) {
     match(order by kind.Stage){
       Accepted => ship(order, at);
@@ -1086,17 +1086,17 @@ namespace shop {
 		shiftBy int
 		want    string
 	}{
-		{"effect fn accept(", len("effect fn "), "```hozo\neffect fn accept(order: Order) on orders.post as kind.Stage.Accepted\n```"},
-		{"effect fn open(", len("effect fn "), "```hozo\neffect fn open(order: Order) on orders.post as Life.Open\n```"},
+		{"effect fn accept(", len("effect fn "), "```hozo\neffect fn accept(order: Order): effects orders.post as kind.Stage.Accepted\n```"},
+		{"effect fn open(", len("effect fn "), "```hozo\neffect fn open(order: Order): effects orders.post as Life.Open\n```"},
 		// post の as any は、as を書かないのと同じ形（IR に row がない）
-		{"effect fn bring(", len("effect fn "), "```hozo\neffect fn bring(order: Order) on orders.post\n```"},
-		{"effect fn ship(", len("effect fn "), "```hozo\neffect fn ship(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
-		{"effect fn revise(", len("effect fn "), "```hozo\neffect fn revise(order: Order) on orders.put as kind.Stage.Accepted -> else\n```"},
-		{"effect fn patch(", len("effect fn "), "```hozo\neffect fn patch(order: Order) on orders.put as any -> else\n```"},
-		{"effect fn discard(", len("effect fn "), "```hozo\neffect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent\n```"},
-		{"effect fn purge(", len("effect fn "), "```hozo\neffect fn purge(order: Order) on orders.delete as Life.Absent\n```"},
+		{"effect fn bring(", len("effect fn "), "```hozo\neffect fn bring(order: Order): effects orders.post\n```"},
+		{"effect fn ship(", len("effect fn "), "```hozo\neffect fn ship(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
+		{"effect fn revise(", len("effect fn "), "```hozo\neffect fn revise(order: Order): effects orders.put as kind.Stage.Accepted -> else\n```"},
+		{"effect fn patch(", len("effect fn "), "```hozo\neffect fn patch(order: Order): effects orders.put as any -> else\n```"},
+		{"effect fn discard(", len("effect fn "), "```hozo\neffect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent\n```"},
+		{"effect fn purge(", len("effect fn "), "```hozo\neffect fn purge(order: Order): effects orders.delete as Life.Absent\n```"},
 		// 配線の呼び出しの名前は、呼び出し先の効果の見出し
-		{"Accepted => ship(order, at);", len("Accepted => "), "```hozo\neffect fn ship(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
+		{"Accepted => ship(order, at);", len("Accepted => "), "```hozo\neffect fn ship(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
 		// 行の遷移のケース: 分類のセグメントは分類、ケースのセグメントは、そのケース
 		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind."), "```hozo\nclassify kind.Stage of Order\n```"},
 		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage."), "classify kind.Stage of Order\n  Accepted"},
@@ -1155,10 +1155,10 @@ namespace shop {
 		}
 	}
 	for name, want := range map[string]string{
-		"accept": "(order: Order) on orders.post as kind.Stage.Accepted",
-		"open":   "(order: Order) on orders.post as Life.Absent -> Life.Open",
-		"ship":   "(order: Order, at: Time) on orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped",
-		"patch":  "(order: Order) on orders.put as any -> else",
+		"accept": "(order: Order): effects orders.post as kind.Stage.Accepted",
+		"open":   "(order: Order): effects orders.post as Life.Absent -> Life.Open",
+		"ship":   "(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped",
+		"patch":  "(order: Order): effects orders.put as any -> else",
 	} {
 		if details[name] != want {
 			t.Errorf("symbol %s の detail = %q, want %q", name, details[name], want)
@@ -1188,7 +1188,7 @@ func TestCarryingDecorators(t *testing.T) {
   decorator into(table: any state) for effect;
   decorator everything = list(rows);
   @into(rows)
-  effect fn add(row: Row) on rows.post;
+  effect fn add(row: Row): effects rows.post;
   /**
    * 忙しい
    *
@@ -1201,7 +1201,7 @@ func TestCarryingDecorators(t *testing.T) {
    * @param id 引く行の識別子
    */
   @db.find @db.where("id", "x") @db.where("id", "y")
-  read fn byId(id: string): Row? on rows;
+  read fn byId(id: string): Row? reads rows;
   classify Size of Row { Big; Small; }
   fn save(row: Row): Row? throws Busy {
     add(row);
@@ -1237,7 +1237,7 @@ func TestCarryingDecorators(t *testing.T) {
     return wiredWrite();
   }
   @effects(add)
-  fn wiredShort(row: Row) effects rows.post {
+  fn wiredShort(row: Row): effects rows.post {
     rows.post(row);
   }
 }
@@ -1287,13 +1287,13 @@ func TestCarryingDecorators(t *testing.T) {
 		{"effects の節の、残りの引数の名前", at("for op effects targets", len("for op effects ")), "targets: any effect) for op", 0, []string{effectsHead, "  ...targets: any effect", "行う効果"}},
 		{"節に書いた状態の名前", at("effects targets reads rows;", len("effects targets reads ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
 		{"残りの引数の宣言", at("...targets: any effect", len("...")), "targets: any effect) for op", 0, []string{"  ...targets: any effect"}},
-		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add(row: Row) on rows.post;", 0, []string{"effect fn add(row: Row) on rows.post"}},
+		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add(row: Row): effects rows.post;", 0, []string{"effect fn add(row: Row): effects rows.post"}},
 		// 版 0.6: 引数を持つ exception / effect / read、配線からの呼び出し、引数を持つ throw
-		{"効果の呼び出し", at("    add(row);", len("    ")), "add(row: Row) on rows.post;", 0, []string{"effect fn add(row: Row) on rows.post"}},
+		{"効果の呼び出し", at("    add(row);", len("    ")), "add(row: Row): effects rows.post;", 0, []string{"effect fn add(row: Row): effects rows.post"}},
 		{"直に呼ぶ「状態.操作」の状態", at("    rows.post(row);", len("    ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
-		{"read の呼び出し", at("else    => byId(row.id);", len("else    => ")), "byId(id: string): Row?", 0, []string{"read fn byId(id: string): Row? on rows", "id で引く"}},
+		{"read の呼び出し", at("else    => byId(row.id);", len("else    => ")), "byId(id: string): Row?", 0, []string{"read fn byId(id: string): Row? reads rows", "id で引く"}},
 		{"throw E(…) の E", at("throw Busy(5m", len("throw ")), "Busy(wait: Duration", 0, []string{"exception Busy(wait: Duration, note: string?)", "忙しい"}},
-		{"read の引数", at("byId(id: string): Row?", len("byId(")), "id: string): Row? on", 0, []string{"read fn byId(id: string): Row? on rows", "  id: string", "引く行の識別子"}},
+		{"read の引数", at("byId(id: string): Row?", len("byId(")), "id: string): Row? reads", 0, []string{"read fn byId(id: string): Row? reads rows", "  id: string", "引く行の識別子"}},
 		{"例外の @param", at("@param wait", len("@param ")), "wait: Duration, note", 0, []string{"exception Busy(wait: Duration, note: string?)", "  wait: Duration", "待つ時間"}},
 		{"read に付けた、何度も付けられるデコレータ", at("@db.where(\"id\", \"y\")", len("@db.")), "", -1, []string{"@repeatable decorator db.where(column: string, value: string | int | float | boolean) for read"}},
 		{"効果の宣言に付けたデコレータ", at("@into(rows)", 1), "decorator into(", len("decorator "), []string{"decorator into(table: any state) for effect"}},
@@ -1388,8 +1388,8 @@ func TestCarryingDecorators(t *testing.T) {
 		details[s.Name] = s.Detail
 	}
 	for name, want := range map[string]string{
-		"byId": "(id: string): Row? on rows",
-		"add":  "(row: Row) on rows.post",
+		"byId": "(id: string): Row? reads rows",
+		"add":  "(row: Row): effects rows.post",
 		"Busy": "(wait: Duration, note: string?)",
 	} {
 		if details[name] != want {
@@ -1414,7 +1414,7 @@ func TestValAndCaseTargets(t *testing.T) {
   model Order { id: string; }
   model Note { id: string; }
   state orders: list<Order>;
-  read fn all(): Order[] on orders;
+  read fn all(): Order[] reads orders;
   fn note(order: Order): Note;
   fn count(notes: Note[], first: Order[]): int;
   @of(Actor.Clerk)

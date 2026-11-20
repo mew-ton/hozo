@@ -56,11 +56,11 @@
 | 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）、`classify` のケース（`C.Case<T>` の形でだけ。`C` は値の分類か op の分類で、どの名前空間のものでもよい。状態の分類と、対象のない分類なら RES-4）。核の型と形の語は予約語なので解決しない |
 | ユニオンのメンバー `X;` | `exception`、`effect`、`union`（`set`） |
 | `exception`、`effect`、`read` の引数の型、`read` の結果の型 | 上の「型」と同じ |
-| `effect fn e(…) on s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
-| `read fn r(…): T on s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
-| `effect fn e(…) on X: A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
+| `effect fn e(…): effects s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
+| `read fn r(…): T reads s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
+| `effect fn e(…): effects X as A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
 | 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら `Empty` / `HasItems` |
-| 行の遷移のケース `C.K`（`effect fn e(…) on s.op as C.K -> …`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
+| 行の遷移のケース `C.K`（`effect fn e(…): effects s.op as C.K -> …`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
 | `catches` の要素 | `throws` と同じ |

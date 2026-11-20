@@ -1,9 +1,9 @@
-// RES-5（docs/resolve.md「診断」）: effect ... on が別の名前空間の状態を指している。internal/sema/testdata/rules/RES-5.hozo から
+// RES-5（docs/resolve.md「診断」）: effect fn の宛先（effects の後ろ）が別の名前空間の状態を指している。internal/sema/testdata/rules/RES-5.hozo から
 namespace a {
   state s: list<string>;
-  effect fn ok() on s.post;
+  effect fn ok(): effects s.post;
 }
 namespace b {
-  effect fn e() on a.s.post;                // ERROR: RES-5
+  effect fn e(): effects a.s.post;                // ERROR: RES-5
   fn f();
 }

@@ -184,7 +184,7 @@ var _ runtime.Exception = LimitExceeded{}
 const EffectAddUser runtime.Effect = "app.addUser"
 
 // EffectClearUsers は effect app.clearUsers。
-// on app.users: HasItems -> Empty
+// effects app.users as HasItems -> Empty
 const EffectClearUsers runtime.Effect = "app.clearUsers"
 
 // Receipt は model app.Receipt。

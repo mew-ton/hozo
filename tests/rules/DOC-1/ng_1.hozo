@@ -7,5 +7,5 @@ namespace a {
    *
    * @throws F 投げない例外
    */
-  fn f() throws E;                     // ERROR: DOC-1
+  fn f(): throws E;                     // ERROR: DOC-1
 }

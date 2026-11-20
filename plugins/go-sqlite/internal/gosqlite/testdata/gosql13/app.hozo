@@ -13,49 +13,49 @@ namespace app {
 
   // キーでも一意でもない列
   @db.find
-  read fn rowByNote(note: string): Row? on rows;
+  read fn rowByNote(note: string): Row? reads rows;
   // 条件がない
   @db.find
-  read fn anyRow(): Row? on rows;
+  read fn anyRow(): Row? reads rows;
   // @db.where の条件だけで、キーでも一意でもない列
   @db.find
   @db.where("note", "x")
-  read fn notedRow(): Row? on rows;
+  read fn notedRow(): Row? reads rows;
   // 二つの @db.key の一つ
   @db.find
-  read fn pairByLeft(left: string): Pair? on pairs;
+  read fn pairByLeft(left: string): Pair? reads pairs;
   // 二つの @db.key の一つと、キーでない列
   @db.find
-  read fn pairByLeftAndNote(left: string, note: string): Pair? on pairs;
+  read fn pairByLeftAndNote(left: string, note: string): Pair? reads pairs;
   // キーのない model（どの列を並べても、決まらない）
   @db.find
-  read fn logByLine(line: string, at: Time): Log? on logs;
+  read fn logByLine(line: string, at: Time): Log? reads logs;
 
   // ---- 通るもの ----
 
   // 1: @db.key のすべて
   @db.find
-  read fn rowById(id: string): Row? on rows;
+  read fn rowById(id: string): Row? reads rows;
   @db.find
-  read fn pairByBoth(left: string, right: string): Pair? on pairs;
+  read fn pairByBoth(left: string, right: string): Pair? reads pairs;
   // 引数と @db.where を合わせて、@db.key のすべて
   @db.find
   @db.where("right", "r")
-  read fn pairOnRight(left: string): Pair? on pairs;
+  read fn pairOnRight(left: string): Pair? reads pairs;
   // 2: @db.unique の列
   @db.find
-  read fn rowByCode(code: string): Row? on rows;
+  read fn rowByCode(code: string): Row? reads rows;
   @db.find
   @db.where("code", "c")
-  read fn fixedRow(note: string): Row? on rows;
+  read fn fixedRow(note: string): Row? reads rows;
   // 3: @db.latest（条件がなくてもよい）
   @db.find
   @db.latest("at")
-  read fn lastLog(): Log? on logs;
+  read fn lastLog(): Log? reads logs;
   @db.find
   @db.latest("at")
-  read fn lastRowNoted(note: string): Row? on rows;
+  read fn lastRowNoted(note: string): Row? reads rows;
   // @db.list なら、どの条件でもよい
   @db.list
-  read fn rowsByNote(note: string): Row[] on rows;
+  read fn rowsByNote(note: string): Row[] reads rows;
 }

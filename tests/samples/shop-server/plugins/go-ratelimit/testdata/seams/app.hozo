@@ -16,8 +16,8 @@ namespace type {
 namespace shop {
   model Receipt { item: type.Item; count: int; }
   state items: list<type.Item>;
-  read fn itemById(id: type.ItemId): type.Item? on items;
-  effect fn addItem(item: type.Item) on items.post;
+  read fn itemById(id: type.ItemId): type.Item? reads items;
+  effect fn addItem(item: type.Item): effects items.post;
 
   // 配線: 戻り値は model（零値は構造体）。引数は、別の名前空間の型
   @rate.limited

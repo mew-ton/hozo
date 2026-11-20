@@ -31,40 +31,40 @@ namespace lib {
   // ---- books: デコレータを付けた read と効果と、付けていない read と効果 ----
 
   @db.find
-  read fn bookById(id: BookId): Book? on books;
+  read fn bookById(id: BookId): Book? reads books;
 
   /** 付けていない: 件数と位置は、この語彙で言えない */
-  read fn newestBooks(limit: int): Book[] on books;
+  read fn newestBooks(limit: int): Book[] reads books;
 
   /** 付けていない: 行でないものを引く */
-  read fn countBooks(): int on books;
+  read fn countBooks(): int reads books;
 
   @db.insert
-  effect fn createBook(book: Book) on books.post;
+  effect fn createBook(book: Book): effects books.post;
 
   /** 付けていない: 条件に合う行の、一つの列だけの書き換え */
-  effect fn retitle(id: BookId, title: string) on books.put;
+  effect fn retitle(id: BookId, title: string): effects books.put;
 
   /** 付けていない: すべての行を消す */
-  effect fn clearBooks() on books.delete;
+  effect fn clearBooks(): effects books.delete;
 
   // ---- notes: read は付け、効果は付けていない ----
 
   @db.list
-  read fn notesWith(stars: int): Note[] on notes;
+  read fn notesWith(stars: int): Note[] reads notes;
 
   /** 基底の状態の遷移を宛先にする効果には、db のデコレータを付けられない（付ければ GOSQL-11）。人が書く */
-  effect fn firstNote(note: Note) on notes: Empty -> HasItems;
+  effect fn firstNote(note: Note): effects notes as Empty -> HasItems;
 
   // ---- stamps: すべてに付けた（消すだけ） ----
 
   @db.delete
-  effect fn dropStamp(at: Time) on stamps.delete;
+  effect fn dropStamp(at: Time): effects stamps.delete;
 
   // ---- drafts: 表でない状態の read と効果は、どの型にも出ない ----
 
-  read fn draftsWith(stars: int): Note[] on drafts;
-  effect fn createDraft(note: Note) on drafts.post;
+  read fn draftsWith(stars: int): Note[] reads drafts;
+  effect fn createDraft(note: Note): effects drafts.post;
 
   // ---- 述語で決まる状態の分類の単位（LendingState）: 型は出さない ----
 
@@ -77,7 +77,7 @@ namespace lib {
   }
 
   /** 状態の分類の遷移を宛先にする効果。人が書く */
-  effect fn lend(book: Book) on Lending: Free -> Lent;
+  effect fn lend(book: Book): effects Lending as Free -> Lent;
 
   // ---- op: read と効果を呼ぶ配線 ----
 

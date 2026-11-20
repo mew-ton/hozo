@@ -55,11 +55,11 @@ namespace api {
 
   // docs/ir.md「state / exception / effect」: 効果の params（受け取る値）
   /** セッションを作る */
-  effect fn createSession(session: Session) on sessions.post;
+  effect fn createSession(session: Session): effects sessions.post;
   /** セッションを消す */
-  effect fn deleteSession(token: Token?) on sessions.delete;
+  effect fn deleteSession(token: Token?): effects sessions.delete;
   /** 最終アクセスを更新する */
-  effect fn touchUser(id: UserId) on users.put;
+  effect fn touchUser(id: UserId): effects users.put;
 
   // docs/ir.md「read」: read の宣言（params、returns、state）。docs/grammar.md「decorator の宣言」: 対象 read と @repeatable
   /**
@@ -68,12 +68,12 @@ namespace api {
    * @param id 引くユーザーの識別子
    */
   @db.find
-  read fn userById(id: UserId): User? on users;
+  read fn userById(id: UserId): User? reads users;
   /** そのユーザーの、生きているセッション */
   @db.list
   @db.where("revoked", false)
   @db.where("kind", "web")
-  read fn sessionsOf(userId: UserId): Session[] on sessions;
+  read fn sessionsOf(userId: UserId): Session[] reads sessions;
 
   // docs/check.md「計算」手順 i の throws（DEC-10）: external の例外は、境界の外（web）から見たときだけ Sig に入る
   /** ネットワーク越しに呼ぶ */
@@ -102,7 +102,7 @@ namespace api {
 
   // docs/check.md「葉の op」: 葉は状態に触れない（reads / effects の節を書けない）。throws は書ける
   fn issue(in: LoginInput): Session throws Invalid;
-  fn verify(id: UserId) throws ClientError;
+  fn verify(id: UserId): throws ClientError;
 
   // docs/check.md「配線からの呼び出し」: 効果の呼び出し。docs/check.md「計算」手順 0（配線）: 上の行の issue が Invalid を
   // 投げるとき、下の行の createSession は prevented（書いた relations は計算と照合する。REL-4）
@@ -118,7 +118,7 @@ namespace api {
 
   // docs/check.md「bind」4: 引数そのものが位置（path ["token"]）。web から見た params は空になる
   @remote
-  export fn logout(token: Token?)
+  export fn logout(token: Token?):
     effects deleteSession
   {
     deleteSession(token);
@@ -126,7 +126,7 @@ namespace api {
 
   // docs/check.md「計算」手順 0（配線）: ユニオンを展開した E。上の行の touchUser は、下の行の verify の例外のとき kept。
   // docs/ir.md「正規化」の `throws A, B にユニオン`
-  export fn touch(id: UserId)
+  export fn touch(id: UserId):
     effects touchUser
     throws ClientError keeps effects
   {
@@ -237,7 +237,7 @@ namespace api {
   // docs/ir.md「decorator」の targets の effect: 効果の宣言の decorators
   /** 名前を変える */
   @into(users)
-  effect fn renameUser(id: UserId, name: string) on users.put;
+  effect fn renameUser(id: UserId, name: string): effects users.put;
   union Cleanup { deleteSession; renameUser; }
 
   // docs/ir.md「正規化」: op に付いたデコレータの reads / effects の節は Op.carried（Op.reads / Op.effects には足さない）
@@ -253,7 +253,7 @@ namespace api {
   // docs/ir.md「正規化」: 残りの引数に渡した値は list の Arg 一つ（一つずつ ref か refs）
   // docs/check.md「計算」手順 0（葉）: F は運ばれた効果、rel は op の throws の relations
   @effects(createSession, deleteSession | renameUser)
-  export fn rotate(id: UserId, name: string)
+  export fn rotate(id: UserId, name: string):
     throws Invalid prevents effects;
   // 残りの引数に何も渡さない（items は []）。reads の節の sessions だけが運ばれる
   @effects
@@ -427,17 +427,17 @@ namespace api {
     /** いない */
     Unknown: User? as none;
   }
-  // docs/check.md「行の遷移」: 効果が、受け取った行の状態をどう変えるか。書き込む状態と操作は、今までどおり on の後ろ
+  // docs/check.md「行の遷移」: 効果が、受け取った行の状態をどう変えるか。書き込む状態と操作は、今までどおり、宛先（effects の後ろ）
   /** ユーザーを足す。Fresh で入る */
-  effect fn enrol(user: User) on users.post as Standing.Fresh;
+  effect fn enrol(user: User): effects users.post as Standing.Fresh;
   /** ユーザーを休ませる */
-  effect fn rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;
+  effect fn rest(user: User, since: Time): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;
   /** ユーザーを閉じる。どの使われ方からでも */
-  effect fn closeUser(user: User) on users.put as any -> Standing.Closed;
+  effect fn closeUser(user: User): effects users.put as any -> Standing.Closed;
   /** ユーザーを書き換える。後の使われ方は、決まっていない */
-  effect fn amend(user: User) on users.put as Standing.Idle -> else;
+  effect fn amend(user: User): effects users.put as Standing.Idle -> else;
   /** ユーザーを消す。消せるのは、登録が切れたユーザーだけ */
-  effect fn forget(user: User) on users.delete as Enrolment.Lapsed -> Enrolment.Unknown;
+  effect fn forget(user: User): effects users.delete as Enrolment.Lapsed -> Enrolment.Unknown;
   // docs/check.md「行の遷移」の「呼ぶ側の検査」: 前のケースを並べた効果は、そのケースを受けるアームの中で呼ぶ
   fn restUser(user: User, now: Time)
   {

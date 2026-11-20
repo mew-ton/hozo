@@ -1,7 +1,7 @@
 // STATE-1（docs/check.md「状態と効果」）: single の状態に post / delete。internal/sema/testdata/rules/STATE-1.hozo から
 namespace a {
   state s: single<string>;
-  effect fn put() on s.put;
-  effect fn post() on s.post;               // ERROR: STATE-1
-  effect fn del() on s.delete;              // ERROR: STATE-1
+  effect fn put(): effects s.put;
+  effect fn post(): effects s.post;               // ERROR: STATE-1
+  effect fn del(): effects s.delete;              // ERROR: STATE-1
 }

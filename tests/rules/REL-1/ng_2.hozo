@@ -3,5 +3,5 @@ namespace a {
   exception E;
   exception F;
   union Errors { E; F; }
-  fn g() throws E, Errors;            // ERROR: REL-1
+  fn g(): throws E, Errors;            // ERROR: REL-1
 }

@@ -45,7 +45,7 @@ namespace carriergw {
   state labels: list<BoughtLabel>;
 
   /** 送り状を発行する（店への請求が立つ） */
-  effect fn issueLabel() on labels.post;
+  effect fn issueLabel(): effects labels.post;
 
   /** 配送業者が、その荷物を引き受けない（大きすぎる、届け先が対象の外、サービスがない） */
   @http.status(422)

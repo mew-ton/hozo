@@ -18,7 +18,7 @@ const (
 	codeSQLColumn      = "GOSQL-3"  // どのしまい方でも列にできない型のフィールドがある
 	codeSQLCollision   = "GOSQL-4"  // 公開の名前が当たる
 	codeSQLOption      = "GOSQL-6"  // [emit.options.go-sqlite] に知らないキーがある
-	codeSQLTable       = "GOSQL-7"  // read の on の状態か、効果の宛先の状態が、N の表の状態でない
+	codeSQLTable       = "GOSQL-7"  // read の reads の状態か、効果の宛先の状態が、N の表の状態でない
 	codeSQLName        = "GOSQL-8"  // 列を名指しするものが、表の model のフィールドにない
 	codeSQLParams      = "GOSQL-9"  // 引数が、デコレータの言うものと合わない
 	codeSQLReturns     = "GOSQL-10" // read の結果の型が、デコレータの言うものと合わない

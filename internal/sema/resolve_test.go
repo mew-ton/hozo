@@ -76,7 +76,7 @@ func TestResolveStep1_2(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {
   state s: single<string>;
-  effect fn e() on s.put;
+  effect fn e(): effects s.put;
   decorator d(error: any exception, target: any effect) catches error halts target throws error;
 }`}, false)
 	noErrors(t, res, fs)
@@ -480,8 +480,8 @@ namespace a {
   model M { id: string; }
   exception Busy(wait: Duration);
   state rows: list<M>;
-  read fn byId(id: string): M? on rows;
-  effect fn add(m: M) on rows.post;
+  read fn byId(id: string): M? reads rows;
+  effect fn add(m: M): effects rows.post;
   fn keep(m: M?): M?;
   classify K of M { A; B; }
   fn f(m: M): M? throws Busy {
@@ -497,7 +497,7 @@ namespace a {
 }`}, false)
 	noErrors(t, res, fs)
 	for _, want := range []string{
-		"a.hozo:6:35 decl a.rows",  // read fn r(…): T on s の s
+		"a.hozo:6:38 decl a.rows",  // read fn r(…): T reads s の s
 		"a.hozo:6:29 decl a.M",     // read の結果の型
 		"a.hozo:7:20 decl a.M",     // effect の引数の型
 		"a.hozo:11:5 decl a.add",   // 効果の呼び出し

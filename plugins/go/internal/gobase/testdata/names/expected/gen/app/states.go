@@ -22,7 +22,7 @@ type ExtraState interface {
 	Get(ctx context.Context) (string, error)
 	// Pick は問い合わせ（read app.pick）。
 	Pick(ctx context.Context, ctx_ string, type_ string, err_ *int64) (string, error)
-	// Store は命令（効果 app.store、on app.extra.put）。
+	// Store は命令（効果 app.store、effects app.extra.put）。
 	Store(ctx context.Context, o_ string, range_ *pkgtype.Token, context_ string) error
 }
 

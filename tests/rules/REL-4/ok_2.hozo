@@ -4,29 +4,29 @@
 namespace a {
   state s: list<string>;
   state log: list<string>;
-  effect fn e() on s.post;
-  effect fn note() on log.post;
+  effect fn e(): effects s.post;
+  effect fn note(): effects log.post;
   exception E;
   decorator doing(...targets: any effect) for op effects targets;
-  fn fail() throws E;
+  fn fail(): throws E;
   // 本体は効果を持たない。運ばれた note だけ
   @doing(note)
-  fn carriedOnly() throws E prevents effects {
+  fn carriedOnly(): throws E prevents effects {
     fail();
   }
   @doing(note)
-  fn carriedKept() throws E keeps effects {
+  fn carriedKept(): throws E keeps effects {
     fail();
   }
   // 本体の e は、例外の後ろなので prevented。運ばれた note は、書いた prevents のとおり
   @doing(note)
-  fn both() throws E prevents effects {
+  fn both(): throws E prevents effects {
     fail();
     e();
   }
   // 本体も行き着く効果を運ぶ: 本体から決めた状態（prevented）と、書いた関係が同じ
   @doing(e)
-  fn same() throws E prevents effects {
+  fn same(): throws E prevents effects {
     fail();
     e();
   }

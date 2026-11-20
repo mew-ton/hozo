@@ -35,44 +35,44 @@ func (NotOpen) HozoException() string { return "app.NotOpen" }
 var _ runtime.Exception = NotOpen{}
 
 // EffectAccept は注文を受け付ける
-// on app.orders.post as app.Stage.Accepted
+// effects app.orders.post as app.Stage.Accepted
 const EffectAccept runtime.Effect = "app.accept"
 
 // EffectOpen は effect app.open。
-// on app.orders.post as app.Life.Open
+// effects app.orders.post as app.Life.Open
 const EffectOpen runtime.Effect = "app.open"
 
 // EffectBring は effect app.bring。
 const EffectBring runtime.Effect = "app.bring"
 
 // EffectStart は作り始める
-// on app.orders.put as app.Stage.Accepted -> app.Stage.InProduction
+// effects app.orders.put as app.Stage.Accepted -> app.Stage.InProduction
 const EffectStart runtime.Effect = "app.start"
 
 // EffectCancel は取り消す。
 // 取り消せるのは、作り始める前だけ
-// on app.orders.put as app.Stage.Draft, app.Stage.Accepted -> app.Stage.Cancelled
+// effects app.orders.put as app.Stage.Draft, app.Stage.Accepted -> app.Stage.Cancelled
 const EffectCancel runtime.Effect = "app.cancel"
 
 // EffectForceShip は effect app.forceShip。
-// on app.orders.put as any -> app.Stage.Shipped
+// effects app.orders.put as any -> app.Stage.Shipped
 const EffectForceShip runtime.Effect = "app.forceShip"
 
 // EffectRevise は effect app.revise。
-// on app.orders.put as app.Stage.Accepted -> else
+// effects app.orders.put as app.Stage.Accepted -> else
 const EffectRevise runtime.Effect = "app.revise"
 
 // EffectPatch は effect app.patch。
-// on app.orders.put as any -> else
+// effects app.orders.put as any -> else
 const EffectPatch runtime.Effect = "app.patch"
 
 // EffectRename は effect app.rename。
 const EffectRename runtime.Effect = "app.rename"
 
 // EffectDiscard は effect app.discard。
-// on app.orders.delete as app.Life.Open -> app.Life.Absent
+// effects app.orders.delete as app.Life.Open -> app.Life.Absent
 const EffectDiscard runtime.Effect = "app.discard"
 
 // EffectPurge は effect app.purge。
-// on app.orders.delete as app.Life.Absent
+// effects app.orders.delete as app.Life.Absent
 const EffectPurge runtime.Effect = "app.purge"

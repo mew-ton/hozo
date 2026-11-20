@@ -712,29 +712,69 @@ func (p *parser) parseException(start source.Offset, doc *ast.DocComment, decora
 	return e
 }
 
-// parseEffect は EffectDecl = "effect" FnHead "on" ( BuiltinEffect [ RowClause ] | Transition ) ";" を読む
+// parseFnType は、関数の「)」の後ろの「:」と、戻り値を読む（docs/grammar.md「関数の宣言」の FnType の頭）。
+//
+//	":" ( ReturnType { 節 } | 節 { 節 } )
+//
+// 「)」の後ろに、戻り値か節を書くなら、「:」で始める。戻り値を省けば、nil（void と同じ）。節そのものは、呼ぶ側が読む。
+// なくした書き方（「:」のない節: fn f() throws E）と、「:」の後ろに何もない形（fn f():;）は、SYNTAX。
+// head は、メッセージに出す宣言の頭（"fn f"、"read fn r"、"effect fn e"）。
+func (p *parser) parseFnType(head string) *ast.ReturnType {
+	if !p.at(token.Colon) {
+		switch p.tok().Kind {
+		case token.Throws, token.Reads, token.Effects:
+			clause := p.tok().Text
+			p.fail(p.tok().Span, fmt.Sprintf("「)」の後ろに、戻り値か節を書くなら、「:」で始める（%s(…): %s … と書く。docs/grammar.md「関数の宣言」）", head, clause))
+		}
+		return nil
+	}
+	colon := p.advance().Span
+	switch p.tok().Kind {
+	case token.Throws, token.Reads, token.Effects, token.Catches, token.On:
+		return nil
+	case token.Semicolon, token.LBrace:
+		p.fail(colon, fmt.Sprintf("「:」の後ろに、戻り値か節が要る。何も書かないなら、「:」も書かない（%s(…); か %s(…) { … } と書く。docs/grammar.md「関数の宣言」）", head, head))
+	}
+	return p.parseReturnType()
+}
+
+// failStateTouchingClause は、read fn と effect fn に書けない節を、誤りにする: throws と、種類に合わない節
+// （docs/grammar.md「関数の宣言」の表。docs/check.md「状態に触れるもの」）。
+func (p *parser) failStateTouchingClause(kind, name, want string) {
+	switch p.tok().Kind {
+	case token.Throws, token.Catches:
+		p.fail(p.tok().Span, fmt.Sprintf("%s fn %s に %s の節は書けない（read と効果は、例外を持たない。docs/check.md「状態に触れるもの」）", kind, name, p.tok().Text))
+	case token.On:
+		p.fail(p.tok().Span, fmt.Sprintf("%s fn %s(…) on … という書き方はなくなった。状態との関係は、%s で書く（%s fn %s(…): … %s … と書く。docs/grammar.md「exception / effect / read」）", kind, name, want, kind, name, want))
+	}
+}
+
+// parseEffect は EffectDecl = "effect" FnHead ":" [ ReturnType ] "effects" ( BuiltinEffect [ RowClause ] | Transition ) ";" を読む
 // （docs/grammar.md「関数の宣言」「exception / effect / read」）。引数がなくても括弧を書く。戻り値は、書いたものを、そのまま持つ
 // （void のほかは TYPE-18。意味の解析が出す）。
-// QualifiedName の直後が ":" なら Transition、そうでなければ最後の要素が StateOp の BuiltinEffect。
+// 宛先の QualifiedName の最後の要素が StateOp なら BuiltinEffect、そうでなければ Transition（状態か、状態の分類の、遷移）。
 // 行の遷移（RowClause）は BuiltinEffect の後ろにだけ書ける。
-// なくした書き方 `effect fn e on s.post;`（括弧なし）は、括弧が要ることをメッセージで示して SYNTAX にする。
+// なくした書き方（括弧のない effect fn e: …、on、宛先の後ろの「:」）は、新しい書き方をメッセージで示して SYNTAX にする。
 func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.EffectDecl {
 	p.expect(token.Effect)
 	p.expectFn("effect")
 	e := &ast.EffectDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
-	if p.at(token.On) {
-		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の名前の後ろに、引数の括弧が要る（引数がなくても effect fn %s() on … と書く。docs/grammar.md「exception / effect / read」）", e.Name.Name, e.Name.Name))
+	if !p.at(token.LParen) {
+		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の名前の後ろに、引数の括弧が要る（引数がなくても effect fn %s(): effects … と書く。docs/grammar.md「exception / effect / read」）", e.Name.Name, e.Name.Name))
 	}
 	e.Params = p.parseOpParams()
-	if p.got(token.Colon) {
-		e.Return = p.parseReturnType()
+	p.failStateTouchingClause("effect", e.Name.Name, "effects")
+	e.Return = p.parseFnType("effect fn " + e.Name.Name)
+	p.failStateTouchingClause("effect", e.Name.Name, "effects")
+	if !p.at(token.Effects) {
+		p.failExpected(fmt.Sprintf("「: effects 宛先」（effect fn %s(…): effects 状態.操作; と書く）", e.Name.Name))
 	}
-	p.expect(token.On)
+	p.advance()
 	if p.atName() && p.peek(1).Kind == token.Colon {
+		p.fail(p.peek(1).Span, "状態の遷移を、宛先の後ろの「:」で書く形はなくなった。as で書く（effects C as A -> B と書く。docs/grammar.md「exception / effect / read」）")
+	}
+	if p.atTransitionTarget() {
 		e.Transition = p.parseTransition()
-		if p.at(token.As) {
-			p.fail(p.tok().Span, "行の遷移（as …）は、組み込みの効果（on 状態.操作）の後ろにだけ書ける。分類の遷移（on C: A -> B）の後ろには書けない（docs/grammar.md「exception / effect / read」）")
-		}
 	} else {
 		ref := p.parseStateOpRef()
 		e.On = &ref
@@ -742,9 +782,28 @@ func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorator
 			e.Row = p.parseRowClause()
 		}
 	}
+	if p.at(token.Comma) {
+		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の宛先は、一つだけ（docs/grammar.md「exception / effect / read」）", e.Name.Name))
+	}
 	p.expect(token.Semicolon)
 	e.Span = p.spanFrom(start)
 	return e
+}
+
+// atTransitionTarget は、効果の宛先が、状態の遷移（Transition）の頭か: 名前の最後の要素が StateOp でなく、直後が as。
+// 最後の要素が post / put / delete の名前は、いつも「状態.操作」として読む（docs/grammar.md「exception / effect / read」）。
+func (p *parser) atTransitionTarget() bool {
+	if !p.atName() || p.peek(1).Kind != token.As {
+		return false
+	}
+	if p.at(token.QualifiedName) {
+		text := p.tok().Text
+		switch text[strings.LastIndexByte(text, '.')+1:] {
+		case "post", "put", "delete":
+			return false
+		}
+	}
+	return true
 }
 
 // parseRowClause は行の遷移を読む（docs/grammar.md「exception / effect / read」）。
@@ -817,36 +876,44 @@ func (p *parser) parseRowCase() ast.QualifiedName {
 	return p.parseQualifiedName()
 }
 
-// parseRead は ReadDecl = "read" FnHead "on" QualifiedName ";" を読む
+// parseRead は ReadDecl = "read" FnHead ":" [ ReturnType ] "reads" QualifiedName ";" を読む
 // （docs/grammar.md「関数の宣言」「exception / effect / read」）。引数がなくても括弧を書く。戻り値は、書いたものを、そのまま持つ
-// （省いた形、void、never は TYPE-18。意味の解析が出す）。on の後ろは状態の名前一つで、操作は書かない。
+// （省いた形、void、never は TYPE-18。意味の解析が出す）。reads の後ろは状態の名前一つで、操作は書かない。
 func (p *parser) parseRead(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.ReadDecl {
 	p.expect(token.Read)
 	p.expectFn("read")
 	r := &ast.ReadDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	if !p.at(token.LParen) {
-		p.fail(p.tok().Span, fmt.Sprintf("read fn %s の名前の後ろに、引数の括弧が要る（read fn %s(…): T on 状態; と書く。docs/grammar.md「exception / effect / read」）", r.Name.Name, r.Name.Name))
+		p.fail(p.tok().Span, fmt.Sprintf("read fn %s の名前の後ろに、引数の括弧が要る（read fn %s(…): T reads 状態; と書く。docs/grammar.md「exception / effect / read」）", r.Name.Name, r.Name.Name))
 	}
 	r.Params = p.parseOpParams()
-	if p.got(token.Colon) {
-		r.Return = p.parseReturnType()
-		r.Result = r.Return.Type
+	p.failStateTouchingClause("read", r.Name.Name, "reads")
+	if ret := p.parseFnType("read fn " + r.Name.Name); ret != nil {
+		r.Return = ret
+		r.Result = ret.Type
 	}
-	p.expect(token.On)
+	p.failStateTouchingClause("read", r.Name.Name, "reads")
+	if !p.at(token.Reads) {
+		p.failExpected(fmt.Sprintf("「reads 状態」（read fn %s(…): T reads 状態; と書く）", r.Name.Name))
+	}
+	p.advance()
 	if !p.atName() {
 		p.failExpected("読む状態の名前")
 	}
 	r.On = p.parseQualifiedName()
+	if p.at(token.Comma) {
+		p.fail(p.tok().Span, fmt.Sprintf("read fn %s が読む状態は、一つだけ（docs/grammar.md「exception / effect / read」）", r.Name.Name))
+	}
 	p.expect(token.Semicolon)
 	r.Span = p.spanFrom(start)
 	return r
 }
 
-// parseTransition は Transition = QualifiedName ":" CaseSet "->" CaseSet を読む。
+// parseTransition は Transition = QualifiedName "as" CaseSet "->" CaseSet を読む。
 func (p *parser) parseTransition() *ast.Transition {
 	start := p.tok().Span.Start
 	t := &ast.Transition{Of: p.parseQualifiedName()}
-	p.expect(token.Colon)
+	p.expect(token.As)
 	t.From = p.parseCaseSet()
 	p.expect(token.ThinArrow)
 	t.To = p.parseCaseSet()
@@ -864,7 +931,7 @@ func (p *parser) parseCaseSet() *ast.CaseSet {
 		if !p.atIdent() {
 			p.failExpected("遷移のケース（any かケース名）")
 		}
-		c.Cases = p.parseCaseList("遷移のケース", "on C: A, B -> any", "exception / effect / read")
+		c.Cases = p.parseCaseList("遷移のケース", "effects C as A, B -> any", "exception / effect / read")
 	}
 	c.Span = p.spanFrom(start)
 	return c
@@ -1308,17 +1375,15 @@ func (p *parser) parseNameList(clause string) []ast.QualifiedName {
 
 // parseOp は OpDecl を読む（docs/grammar.md「op」）。
 //
-//	OpDecl = [ "export" ] FnHead { OpClause } ( ";" | Block ) ;
-//	FnHead = "fn" Ident OpParams [ ":" ReturnType ] ;          （docs/grammar.md「関数の宣言」）
+//	OpDecl = [ "export" ] FnHead [ ":" ( ReturnType { OpClause } | OpClause { OpClause } ) ] ( ";" | Block ) ;
+//	FnHead = "fn" Ident OpParams ;                              （docs/grammar.md「関数の宣言」）
 //
 // export は parseDecl が読む。
 func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator) *ast.OpDecl {
 	p.expect(token.Fn)
 	o := &ast.OpDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent()}
 	o.Params = p.parseOpParams()
-	if p.got(token.Colon) {
-		o.Return = p.parseReturnType()
-	}
+	o.Return = p.parseFnType("fn " + o.Name.Name)
 	for {
 		switch p.tok().Kind {
 		case token.Effects:
@@ -1332,6 +1397,8 @@ func (p *parser) parseOp(start source.Offset, doc *ast.DocComment, decorators []
 			continue
 		case token.Catches:
 			p.fail(p.tok().Span, "catches はデコレータの宣言にだけ書ける（docs/grammar.md「op」）")
+		case token.On:
+			p.fail(p.tok().Span, fmt.Sprintf("種類を書かない fn に on は書けない。状態を読み書きするのは、read fn と effect fn（read fn %s(…): T reads 状態;、effect fn %s(…): effects 状態.操作;。docs/grammar.md「関数の宣言」）", o.Name.Name, o.Name.Name))
 		}
 		break
 	}

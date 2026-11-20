@@ -10,7 +10,7 @@ namespace a {
   @repeatable @external
   decorator viaProxy(host: string) throws Offline;
   @where("kind", "a") @where("size", 1) @where("ratio", 0.5) @where("open", true)
-  read fn some(): M[] on rows;
+  read fn some(): M[] reads rows;
   @viaNetwork("a") @viaProxy("p") @viaNetwork("b")
   fn fetch(): M[];
 }

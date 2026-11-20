@@ -1,11 +1,11 @@
 // EFF-2（docs/check.md「状態と効果」）: 配線に書いた effects に、伝播した効果が足りない
 namespace a {
   state s: list<string>;
-  effect fn e() on s.post;
-  effect fn f() on s.post;
-  fn doE() effects e { e(); }
-  fn doF() effects f { f(); }
-  fn wiring() effects e {              // ERROR: EFF-2
+  effect fn e(): effects s.post;
+  effect fn f(): effects s.post;
+  fn doE(): effects e { e(); }
+  fn doF(): effects f { f(); }
+  fn wiring(): effects e {              // ERROR: EFF-2
     doE();
     doF();
   }

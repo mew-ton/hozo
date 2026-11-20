@@ -1,7 +1,7 @@
 // DEC-7（docs/types.md「デコレータの引数」）: 性質に合う効果、ユニオンのメンバーの例外
 namespace a {
   state s: single<string>;
-  effect fn put() on s.put;
+  effect fn put(): effects s.put;
   exception E;
   exception F;
   union Errors { E; F; }

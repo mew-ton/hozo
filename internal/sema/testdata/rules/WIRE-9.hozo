@@ -6,15 +6,15 @@ namespace a {
   classify Kind of M { A; B; }
   fn fail(): never throws E;
   fn g();
-  fn f() throws E {
+  fn f(): throws E {
     fail();                            // ERROR: WIRE-9
     g();
   }
-  fn h(m: M) throws E {
+  fn h(m: M): throws E {
     match (m by Kind) { A => throw E; B => fail(); };    // ERROR: WIRE-9
     g();
   }
-  fn twice() throws E {
+  fn twice(): throws E {
     fail();                            // ERROR: WIRE-9
     fail();
   }

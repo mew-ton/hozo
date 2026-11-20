@@ -39,7 +39,7 @@ namespace c.models {
 namespace c.states {
   model Row { id: string; }
   state rows: list<Row>;
-  effect fn addRow() on rows.post;
+  effect fn addRow(): effects rows.post;
   model EffectAddRow { x: int; }
   model RowsState { x: int; }
 }
@@ -89,24 +89,24 @@ namespace c.units {
   model Row { id: string; }
   state rows: list<Row>;
   // 形で決まる問い合わせ Get と read get
-  read fn get(): int on rows;
+  read fn get(): int reads rows;
   // 同じ状態の read findRow と効果 FindRow
-  read fn findRow(id: string): Row? on rows;
-  effect fn FindRow(id: string) on rows.delete;
+  read fn findRow(id: string): Row? reads rows;
+  effect fn FindRow(id: string): effects rows.delete;
   // 形で決まる命令 Post（配線が直に呼ぶ）と効果 post
-  effect fn post(row: Row) on rows.post;
+  effect fn post(row: Row): effects rows.post;
   export fn add(row: Row)
   {
     rows.post(row);
   }
   // 直に呼ばれていない操作（rows は put を直に呼べない）は、単位のメソッドにならないので、効果 put は当たらない
-  effect fn put(row: Row) on rows.put;
+  effect fn put(row: Row): effects rows.put;
   // 状態の分類の単位: ケースの述語 Full と効果 full
   classify Load of rows {
     Full;
     Spare;
   }
-  effect fn full() on Load: Spare -> Full;
+  effect fn full(): effects Load as Spare -> Full;
 }
 
 // Seams の中のメソッドどうし（op loginRate の @x.limited と、op login の @rate.x.limited。どちらも LoginRateXLimited）と、

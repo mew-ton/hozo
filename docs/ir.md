@@ -135,7 +135,7 @@ interface Exception extends DeclBase {
 
 interface Effect extends DeclBase {
   kind: "effect";
-  params: OpParam[];              // 受け取る値（`effect fn e(order: Order) on …;`）。なければ []
+  params: OpParam[];              // 受け取る値（`effect fn e(order: Order): effects …;`）。なければ []
   target: EffectTarget;           // 宛先は一つだけ
   writes: string[];               // この効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）
   row?: RowTransition;            // 行の遷移（`as` の節。docs/check.md「行の遷移」）。書いていなければ持たない。
@@ -167,7 +167,7 @@ interface RowTransition {         // 効果が、受け取った行の状態を�
 ```ts
 interface Read extends DeclBase {
   kind: "read";
-  params: OpParam[];              // 読むときに受け取る値（`read fn r(email: Email): User? on users;`）。なければ []
+  params: OpParam[];              // 読むときに受け取る値（`read fn r(email: Email): User? reads users;`）。なければ []
   returns: Type;                  // 結果の型。null にも never にもならない
   state: string;                  // 読む基底の状態の FQN。宛先は一つだけ（docs/check.md「read の宛先」）
 }
@@ -448,11 +448,11 @@ interface Bind {
 | `val a, b: T;`（名前を並べた、空の宣言） | 名前ごとの `val` の文（書かれた順）。`span` は、それぞれの名前（と、書いた型） |
 | `disjoint` の、文の一つのアーム（`a = f(x);`） | `statements` が一つで、`block` が `false` の `Arm`。ブロックで書いた、文が一つのアーム（`{ a = f(x); }`）は、`block` が `true` |
 | ケースの `X as none`（ない側のケース） | `as` の `CaseTyping`。`by` は `none`、`type` は対象の型のまま。`Classify.absent` に、そのケースの名前。ない側のケースを `X as else` で書いた分類（`docs/check.md`「ない側のケース」の表の二行目）も、`absent` を持つ（`by` は `else` のまま） |
-| `effect fn e(o: T) on s.put as C.A, C.B -> C.D` | `row` に `{ param: "o", classify: C の FQN, from: ["A", "B"], to: "D" }`。前の `any` は `from: "any"`、後ろの `else` は `to` なし |
-| `effect fn e(o: T) on s.post as C.X`、`… as C.N -> C.X`（N は、ない側のケース） | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "X" }`。`post` の前は、IR に残さない（入る前の行は、ない） |
-| `effect fn e(o: T) on s.put as any -> else` | `row` に `{ param: "o", from: "any" }`（`classify` も `to` も持たない） |
-| `effect fn e(o: T) on s.post as any` | `row` を持たない（`as` を書かない `post` と同じ意味: 入るケースは、決まっていない。行の引数があることは、確かめてある: STATE-7） |
-| `effect fn e(o: T) on s.delete as C.N`、`… as any -> C.N` | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "N" }` |
+| `effect fn e(o: T): effects s.put as C.A, C.B -> C.D` | `row` に `{ param: "o", classify: C の FQN, from: ["A", "B"], to: "D" }`。前の `any` は `from: "any"`、後ろの `else` は `to` なし |
+| `effect fn e(o: T): effects s.post as C.X`、`… as C.N -> C.X`（N は、ない側のケース） | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "X" }`。`post` の前は、IR に残さない（入る前の行は、ない） |
+| `effect fn e(o: T): effects s.put as any -> else` | `row` に `{ param: "o", from: "any" }`（`classify` も `to` も持たない） |
+| `effect fn e(o: T): effects s.post as any` | `row` を持たない（`as` を書かない `post` と同じ意味: 入るケースは、決まっていない。行の引数があることは、確かめてある: STATE-7） |
+| `effect fn e(o: T): effects s.delete as C.N`、`… as any -> C.N` | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "N" }` |
 | アームの `A, B => …` | `cases: ["A", "B"]`（書かれた順）、`else: false` |
 | アームの `else => …` | `cases` に、ほかのアームが並べなかったケースを宣言の順で、`else: true`。受けるケースがなければ（MATCH-9）`cases: []` |
 | アームの本体の `none` | `body` の `none`（`atom` にはしない） |

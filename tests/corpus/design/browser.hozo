@@ -24,10 +24,10 @@ namespace browser {
   // ---- §6.2 effect ----
 
   /** ログイン画面へ遷移する */
-  effect fn transitionToLogin() on location.put;
+  effect fn transitionToLogin(): effects location.put;
 
   /** 権限がないことを示す画面へ遷移する */
-  effect fn transitionToForbidden() on location.put;
+  effect fn transitionToForbidden(): effects location.put;
 
   // ---- §6.4 union ----
 
@@ -64,9 +64,9 @@ namespace browser {
   // ---- §9 配線（browser 側） ----
 
   /** 手元のトークンを消す */
-  effect fn removeToken() on token.delete;   // 空にする（設計書では token.put で none を入れる）
+  effect fn removeToken(): effects token.delete;   // 空にする（設計書では token.put で none を入れる）
 
-  fn clearToken()
+  fn clearToken():
     effects removeToken
   {
     removeToken();
@@ -115,16 +115,16 @@ namespace browser {
   // ---- §10.2 match ----
 
   /** 支払い画面へ遷移する */
-  effect fn transitionToPayment() on location.put;
+  effect fn transitionToPayment(): effects location.put;
 
-  fn goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
+  fn goPayment(line: server.CartLine, warranty: server.WarrantyLine?):
     effects transitionToPayment
   {
     transitionToPayment();
   }
 
   @page.interaction(page: openProduct, when: ProductPage.Ready)
-  fn onAddToCart(item: server.Item)
+  fn onAddToCart(item: server.Item):
     throws page.Aborted, http.NetworkError, http.ServerError
   {
     val line = server.addToCart({ item });
@@ -211,7 +211,7 @@ namespace browser {
   fn orderPageVm(me: server.PublicUser, orders: server.OrderSummary[]): OrderPage;
 
   /** 注文一覧の既定の URL に置き換える */
-  effect fn transitionToOrders() on location.put;
+  effect fn transitionToOrders(): effects location.put;
 
   // このページだけ別の表示にする。fallback が吸収するので throws は書かない
   // OrdersUnavailable は OrderPage のアームの型

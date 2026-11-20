@@ -8,28 +8,28 @@ namespace a {
   classify CartFilled of carts { CartFilled; NotCartFilled; }
 
   // 通る例: 分類の遷移、基底の状態の組み込みの分類の遷移、any、ケースの和
-  effect fn placeOrder() on Checkout: Shopping -> Ordered;
-  effect fn ship() on Checkout: Ordered -> Shipped;
-  effect fn reset() on Checkout: any -> Shopping;
-  effect fn touch() on Checkout: Shopping, Ordered -> any;
-  effect fn same() on Checkout: Shopping -> Shopping;
-  effect fn clearCart() on carts: HasItems -> Empty;
-  effect fn login() on token: Empty -> HasItems;
-  effect fn anyCart() on carts: any -> Empty, HasItems;
-  effect fn fill() on CartFilled: any -> CartFilled;
+  effect fn placeOrder(): effects Checkout as Shopping -> Ordered;
+  effect fn ship(): effects Checkout as Ordered -> Shipped;
+  effect fn reset(): effects Checkout as any -> Shopping;
+  effect fn touch(): effects Checkout as Shopping, Ordered -> any;
+  effect fn same(): effects Checkout as Shopping -> Shopping;
+  effect fn clearCart(): effects carts as HasItems -> Empty;
+  effect fn login(): effects token as Empty -> HasItems;
+  effect fn anyCart(): effects carts as any -> Empty, HasItems;
+  effect fn fill(): effects CartFilled as any -> CartFilled;
 
   // 前か後のケースが、宛先の分類のケースでない
-  effect fn ng1() on Checkout: Browsing -> Ordered;          // ERROR: STATE-4
-  effect fn ng2() on Checkout: Shopping -> Paid;             // ERROR: STATE-4
-  effect fn ng3() on Checkout: Empty -> HasItems;            // ERROR: STATE-4
+  effect fn ng1(): effects Checkout as Browsing -> Ordered;          // ERROR: STATE-4
+  effect fn ng2(): effects Checkout as Shopping -> Paid;             // ERROR: STATE-4
+  effect fn ng3(): effects Checkout as Empty -> HasItems;            // ERROR: STATE-4
   // 宛先が基底の状態なら Empty / HasItems
-  effect fn ng4() on carts: Shopping -> Empty;               // ERROR: STATE-4
-  effect fn ng5() on token: HasItems -> None;                // ERROR: STATE-4
+  effect fn ng4(): effects carts as Shopping -> Empty;               // ERROR: STATE-4
+  effect fn ng5(): effects token as HasItems -> None;                // ERROR: STATE-4
   // 宛先が single の状態（組み込みの分類がない）
-  effect fn ng6() on clock: Empty -> HasItems;               // ERROR: STATE-4
-  effect fn ng7() on clock: any -> any;                      // ERROR: STATE-4
+  effect fn ng6(): effects clock as Empty -> HasItems;               // ERROR: STATE-4
+  effect fn ng7(): effects clock as any -> any;                      // ERROR: STATE-4
   // 前と後のどちらかのケースの並びに重複がある
-  effect fn ng8() on Checkout: Shopping, Shopping -> Ordered;         // ERROR: STATE-4
-  effect fn ng9() on Checkout: Shopping -> Ordered, Shipped, Ordered;     // ERROR: STATE-4
-  effect fn ng10() on carts: any -> Empty, Empty;            // ERROR: STATE-4
+  effect fn ng8(): effects Checkout as Shopping, Shopping -> Ordered;         // ERROR: STATE-4
+  effect fn ng9(): effects Checkout as Shopping -> Ordered, Shipped, Ordered;     // ERROR: STATE-4
+  effect fn ng10(): effects carts as any -> Empty, Empty;            // ERROR: STATE-4
 }

@@ -46,38 +46,38 @@ namespace inventory {
   // ---- 状態に触れるもの ----
 
   /** skus のどれかに当たる在庫の数（人が書く: 集合に入っているか） */
-  read fn levelsOf(skus: type.Sku[]): Level[] on levels;
+  read fn levelsOf(skus: type.Sku[]): Level[] reads levels;
 
   /** その商品の在庫の数 */
   @db.find
-  read fn levelOf(sku: type.Sku): Level? on levels;
+  read fn levelOf(sku: type.Sku): Level? reads levels;
 
   /** その行の取り置き */
   @db.find
-  read fn reservationOf(orderId: type.OrderId, line: type.LineId): Reservation? on reservations;
+  read fn reservationOf(orderId: type.OrderId, line: type.LineId): Reservation? reads reservations;
 
   /** その注文の取り置き */
   @db.list
-  read fn reservationsOfOrder(orderId: type.OrderId): Reservation[] on reservations;
+  read fn reservationsOfOrder(orderId: type.OrderId): Reservation[] reads reservations;
 
   /** 棚から出してよくなった取り置きのうち、まだ出していないもの（人が書く: 値があること、ないこと） */
-  read fn toPick(): Reservation[] on reservations;
+  read fn toPick(): Reservation[] reads reservations;
 
   /** 在庫の数を、まとめて書き換える */
-  effect fn saveLevels(changed: Level[]) on levels.put;
+  effect fn saveLevels(changed: Level[]): effects levels.put;
 
   /** 取り置きを、まとめて足す */
-  effect fn addReservations(added: Reservation[]) on reservations.post;
+  effect fn addReservations(added: Reservation[]): effects reservations.post;
 
   /** 棚から出した: 出した時刻を入れる（人が書く） */
-  effect fn markPicked(reservation: Reservation, at: Time) on reservations.put as Picking.OnShelf -> Picking.Picked;
+  effect fn markPicked(reservation: Reservation, at: Time): effects reservations.put as Picking.OnShelf -> Picking.Picked;
 
   /** その注文の取り置きに、棚から出してよくなった時刻を入れる。棚にあるか出したか（Picking）は、変えない: as を書かない put */
-  effect fn confirmReservations(orderId: type.OrderId, at: Time) on reservations.put;
+  effect fn confirmReservations(orderId: type.OrderId, at: Time): effects reservations.put;
 
   /** その注文の取り置きを消す。戻した取り置きは、残さない（取り置きは、なくなることが意味） */
   @db.delete
-  effect fn dropReservations(orderId: type.OrderId) on reservations.delete;
+  effect fn dropReservations(orderId: type.OrderId): effects reservations.delete;
 
   // ---- 取り置く ----
 
@@ -89,7 +89,7 @@ namespace inventory {
 
   /** 注文の在庫の行を取り置く。一つでも足りなければ、どれも取り置かない */
   @db.transaction
-  export fn reserve(orderId: type.OrderId, lines: ordering.StockedLine[])
+  export fn reserve(orderId: type.OrderId, lines: ordering.StockedLine[]):
     throws OutOfStock
   {
     val skus = skusOf(lines);
@@ -162,7 +162,7 @@ namespace inventory {
 
   /** 取り置いた行を、棚から出した。在庫の数を減らす */
   @db.transaction
-  export fn pick(orderId: type.OrderId, line: type.LineId)
+  export fn pick(orderId: type.OrderId, line: type.LineId):
     throws NotReserved, AlreadyPicked
   {
     val found = reservationOf(orderId, line);
@@ -173,7 +173,7 @@ namespace inventory {
   }
 
   /** まだ棚にある取り置きだけを、出せる */
-  fn pickReserved(reservation: Reservation)
+  fn pickReserved(reservation: Reservation):
     throws NotReserved, AlreadyPicked
   {
     match (reservation by Picking) {
@@ -183,7 +183,7 @@ namespace inventory {
   }
 
   /** 在庫の数を減らし、取り置きを、棚から出したことにする */
-  fn takeFromShelf(reservation: Picking.OnShelf<Reservation>)
+  fn takeFromShelf(reservation: Picking.OnShelf<Reservation>):
     throws NotReserved
   {
     val level = levelOf(reservation.sku);

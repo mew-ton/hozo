@@ -48,7 +48,7 @@ type effect struct {
 }
 
 // tableOf は、状態 state の表。N の表の状態でなければ GOSQL-7（位置は、デコレータを付けた宣言 at。what は、その種類と、状態の
-// 言い方: 「read store.x の on の状態」）。read の on の状態も、効果の宛先の状態も、宣言した名前空間の状態（docs/check.md「read の宛先」
+// 言い方: 「read store.x の reads の状態」）。read の reads の状態も、効果の宛先の状態も、宣言した名前空間の状態（docs/check.md「read の宛先」
 // 「効果の宛先」）なので、表の状態でないのは、@db.table が付いていない状態。@db.table は付いているが、表にならなかった状態
 // （GOSQL-1 か GOSQL-2 を返している）は、重ねて報告しない。
 func (e *emitter) tableOf(state, what, at string) *table {
@@ -131,7 +131,7 @@ func (e *emitter) collectReads() {
 		e.reads[fqn] = r
 		before := len(e.errs)
 		what := "read " + fqn
-		r.table = e.tableOf(decl.State, what+" の on の状態", fqn)
+		r.table = e.tableOf(decl.State, what+" の reads の状態", fqn)
 		if r.table == nil {
 			continue
 		}
@@ -433,7 +433,7 @@ type unit struct {
 func (u *unit) complete() bool { return len(u.missing) == 0 }
 
 // collectUnits は、出す型（e.units）を、基底の状態の単位の並び（宣言順）で作る。どの read と効果が、どの単位のメソッドか（read は
-// on の状態の単位、効果は宛先の単位）と、メソッドの並びは、基底が決める（golang.ShapeOf(view).States の Builtins、Reads、Effects）。
+// reads の状態の単位、効果は宛先の単位）と、メソッドの並びは、基底が決める（golang.ShapeOf(view).States の Builtins、Reads、Effects）。
 // 表の状態でない状態の単位と、述語で決まる状態の分類の単位の型は、出さない（人が書く）。
 func (e *emitter) collectUnits() {
 	for _, su := range e.shape.States {

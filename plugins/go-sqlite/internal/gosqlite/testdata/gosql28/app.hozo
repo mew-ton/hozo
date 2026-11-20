@@ -7,20 +7,20 @@ namespace app {
   @db.table state logs: list<Row>;
 
   @db.delete
-  effect fn clearRows() on rows.delete;
+  effect fn clearRows(): effects rows.delete;
   /** 配線が呼んでも、効果ごとに一度だけ */
   @db.delete
-  effect fn clearLogs() on logs.delete;
+  effect fn clearLogs(): effects logs.delete;
   export fn reset() {
     clearLogs();
   }
 
   // 通るもの
   @db.delete
-  effect fn deleteRow(id: string) on rows.delete;
+  effect fn deleteRow(id: string): effects rows.delete;
   /** デコレータを付けていなければ、人が書く（すべての行を消す効果は、こう書く） */
-  effect fn truncate() on rows.delete;
+  effect fn truncate(): effects rows.delete;
   /** 条件のない @db.list は、決まっている（すべての行） */
   @db.list
-  read fn allRows(): Row[] on rows;
+  read fn allRows(): Row[] reads rows;
 }

@@ -10,7 +10,7 @@ namespace shop {
   /** 売れた品物 */
   state items: list<Item>;
   /** 品物を足す */
-  effect fn addItem(item: Item) on items.post;
+  effect fn addItem(item: Item): effects items.post;
 
   // docs/plugin-go.md「出力の対象」: nightly は shop/batch.hozo で宣言した配線。単位 2 では in の外（単位の対象でない）なので、
   // 単位の対象の配線 open が呼んでいる分だけ、本体のない op（Leaves の口）として出す。単位 3（in なし）では本体を出す
@@ -27,7 +27,7 @@ namespace shop {
   }
 
   /** 品物を記録する */
-  fn save(item: Item)
+  fn save(item: Item):
     effects addItem
   {
     addItem(item);

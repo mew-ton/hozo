@@ -2,7 +2,7 @@
 // 四行目の model は構文エラー（SYNTAX）、その下の配線は THROWS-1 になる
 namespace a {
   exception E;
-  fn leaf() throws E;
+  fn leaf(): throws E;
   model Broken { x: ; }                // ERROR: SYNTAX
   fn wiring() {                        // ERROR: THROWS-1
     leaf();

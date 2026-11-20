@@ -5,7 +5,7 @@ namespace a {
   state rows: list<string>;
   state log: list<string>;
   state token: nullable<string>;
-  read fn first(): string? on rows;
+  read fn first(): string? reads rows;
   decorator counting(table: any state) for op reads table;
   decorator peeking for op reads first, token;
   fn g();
@@ -21,7 +21,7 @@ namespace a {
   }
   // 本体が状態を読まない配線: 読む状態は、運ばれたものだけ（read の名前で運ばれたものは、その宛先の状態）
   @peeking
-  fn carriedOnly() reads rows, token {
+  fn carriedOnly(): reads rows, token {
     g();
   }
   // 本体も読む状態を運んでも、同じ状態一つ

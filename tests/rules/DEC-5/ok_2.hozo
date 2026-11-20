@@ -2,7 +2,7 @@
 namespace a {
   exception E;
   decorator recoverE catches E recovers;
-  fn fail() throws E;
+  fn fail(): throws E;
   @recoverE
   fn wiring() {
     fail();

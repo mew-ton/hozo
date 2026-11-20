@@ -3,8 +3,8 @@
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  read fn byId(id: string): M? on rows;
-  effect fn add(m: M) on rows.post;
+  read fn byId(id: string): M? reads rows;
+  effect fn add(m: M): effects rows.post;
   fn f(m: M): M? {
     byId(m.id);                          // ERROR: WIRE-2
     val done = add(m);                 // ERROR: WIRE-2 // WARN: WIRE-8

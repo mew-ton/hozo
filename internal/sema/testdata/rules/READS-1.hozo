@@ -3,7 +3,7 @@
 state shared: list<string>;
 namespace a {
   state own: list<string>;
-  read fn first(): string? on own;
+  read fn first(): string? reads own;
   decorator from(table: any state) for op reads table;
   decorator fromUsers for op reads b.users;
   decorator fromRead for op reads b.firstUser;
@@ -27,7 +27,7 @@ namespace a {
 namespace b {
   state users: list<string>;
   state token: nullable<string>;
-  read fn firstUser(): string? on users;
+  read fn firstUser(): string? reads users;
   // 自分の名前空間の葉に付ければ通る
   @a.fromUsers
   fn own(): string[];

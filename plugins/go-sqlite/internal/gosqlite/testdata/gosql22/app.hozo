@@ -8,20 +8,20 @@ namespace app {
 
   @db.find
   @db.list
-  read fn rowById(id: string): Row? on rows;
+  read fn rowById(id: string): Row? reads rows;
   @db.list
   @db.find
-  read fn rowsByNote(note: string): Row[] on rows;
+  read fn rowsByNote(note: string): Row[] reads rows;
   // @db.where と @db.latest を足しても、同じ。表の状態でなくても、同じ
   @db.find
   @db.list
   @db.where("note", "x")
   @db.latest("id")
-  read fn plainRows(): Row[] on plain;
+  read fn plainRows(): Row[] reads plain;
 
   // 通るもの
   @db.find
-  read fn byId(id: string): Row? on rows;
+  read fn byId(id: string): Row? reads rows;
   @db.list
-  read fn byNote(note: string): Row[] on rows;
+  read fn byNote(note: string): Row[] reads rows;
 }

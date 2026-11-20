@@ -44,5 +44,5 @@ namespace in {
     @cli.flag("deep") deep: boolean?;
   }
   @cli.command("go")
-  export fn go(in: GoInput) throws errors.Lost, reflect.Bent, line.Cut;
+  export fn go(in: GoInput): throws errors.Lost, reflect.Bent, line.Cut;
 }

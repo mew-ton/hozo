@@ -1,7 +1,7 @@
 // DEC-3: catches には処理を書く
 namespace a {
   state s: single<string>;
-  effect fn e() on s.put;
+  effect fn e(): effects s.put;
   exception E;
   decorator r catches E recovers;
   decorator h catches E halts e;

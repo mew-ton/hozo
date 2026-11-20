@@ -3,7 +3,7 @@
 // 違い、デコレータの処理は、状態に直に触れる。位置はそのデコレータの適用
 namespace a {
   state s: list<string>;
-  effect fn e(x: string) on s.post;
+  effect fn e(x: string): effects s.post;
   decorator doing(...targets: any effect) for op effects targets;
   decorator posting for op effects s.post;
   export fn own(x: string) { e(x); }
@@ -13,7 +13,7 @@ namespace a {
 }
 namespace b {
   state u: list<string>;
-  effect fn g(x: string) on u.post;
+  effect fn g(x: string): effects u.post;
   @a.doing(g)
   fn ok(x: string) { a.own(x); }
   @a.doing(a.e)                                  // ERROR: STATE-2

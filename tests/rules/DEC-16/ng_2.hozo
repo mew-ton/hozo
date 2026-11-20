@@ -3,7 +3,7 @@ namespace a {
   exception E;
   decorator recoverE catches E recovers;
   decorator ignoreE catches E ignores;
-  fn leaf() throws E;
+  fn leaf(): throws E;
   @ignoreE                             // WARN: DEC-16
   @recoverE
   fn wiring() {

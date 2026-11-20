@@ -27,9 +27,9 @@ namespace shop {
   /** 店の名前 */
   state title: single<string>;
   /** 品物を足す */
-  effect fn addItem(item: Item) on items.post;
+  effect fn addItem(item: Item): effects items.post;
   /** 識別子が同じ品物の数 */
-  read fn countById(id: string): int on items;
+  read fn countById(id: string): int reads items;
 
   // 「中身」置き場 1（配線）: wiring.go の buyBody。継ぎ目を持つ op を同じ名前空間の配線から呼ぶと、外側を通る
   /**

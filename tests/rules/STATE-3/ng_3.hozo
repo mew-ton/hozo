@@ -4,7 +4,7 @@ namespace a {
   scalar Token extends string;
   state tokens: list<Token?>;          // ERROR: STATE-3
   bind tokens to a.*;                  // ERROR: BIND-6
-  effect fn add() on tokens.post;
+  effect fn add(): effects tokens.post;
   fn g(t: Token);
   fn all(): Token[] {
     return tokens;

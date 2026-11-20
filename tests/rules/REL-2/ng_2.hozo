@@ -1,8 +1,8 @@
 // REL-2（docs/check.md「throws」）: 配線でも Sig(O, ns(O)).effects が空なら同じ
 namespace a {
   exception E;
-  fn leaf() throws E;
-  fn wiring() throws E keeps effects { // WARN: REL-2
+  fn leaf(): throws E;
+  fn wiring(): throws E keeps effects { // WARN: REL-2
     leaf();
   }
 }

@@ -5,6 +5,6 @@
 namespace mailer {
   /** 通知を外へ送る。送れなければ NotificationFailed */
   @smtp.sendMail
-  export fn send(notice: type.Notification)
+  export fn send(notice: type.Notification):
     throws type.NotificationFailed;
 }

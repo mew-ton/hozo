@@ -3,7 +3,7 @@ namespace a {
   model M { id: string; }
   classify C of M { A; B; }
   exception E;
-  fn risky(m: M) throws E;
+  fn risky(m: M): throws E;
   fn safe(m: M);
   fn wiring(m: M) {                    // ERROR: THROWS-1
     match (m by C) {

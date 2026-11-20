@@ -3,10 +3,10 @@ namespace a {
   model M { id: string; }
   state rows: list<M>;
   exception Gone;
-  effect fn add(m: M) on rows.post;
-  effect fn put(m: M): void on rows.post;
-  read fn all(): M[] on rows;
-  read fn first(): M? on rows;
+  effect fn add(m: M): effects rows.post;
+  effect fn put(m: M): void effects rows.post;
+  read fn all(): M[] reads rows;
+  read fn first(): M? reads rows;
   fn note(m: M);
   fn quiet(m: M): void;
   fn fail(): never throws Gone;

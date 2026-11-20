@@ -51,7 +51,7 @@ const warnFile = `// internal/app のテストが足すファイル: 意図し�
 namespace server {
   /** 手が空いている */
   exception Idle;
-  fn ping() throws Idle prevents effects;
+  fn ping(): throws Idle prevents effects;
 }
 `
 
@@ -1251,7 +1251,7 @@ namespace shop {
   model Receipt { item: Item; }
   /** 品物 */
   state items: list<Item>;
-  effect fn addItem(item: Item) on items.post;
+  effect fn addItem(item: Item): effects items.post;
 
   /** 入口。nightly は batch.hozo で宣言した配線 */
   fn open(item: Item): Receipt {
@@ -1260,7 +1260,7 @@ namespace shop {
     val   r = issue(item);
     return r;
   }
-  fn save(item: Item) effects addItem { addItem(item); }
+  fn save(item: Item): effects addItem { addItem(item); }
   fn issue(item: Item): Receipt;
 }
 `

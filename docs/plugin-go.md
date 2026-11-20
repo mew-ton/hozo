@@ -246,11 +246,11 @@ type LimitExceeded struct {
 const EffectCreateUser runtime.Effect = "store.createUser"
 ```
 
-効果ごとに、この定数一つ。効果を行うメソッドは、定数とは別に、宛先の単位に出す（「状態の単位」）。宛先が分類の遷移（`Effect.target` が `transition`）の効果は、コメントの末尾に一行足す: `// on <宛先の FQN>: <前> -> <後>`（ケースの集合は `any` か `A, B`）。行の遷移を持つ効果（`Effect.row`。`docs/check.md`「行の遷移」）は、コメントの末尾に一行足す: `// on <状態の FQN>.<post / put / delete> <行の遷移の表示>`（表示の形は「コメント」の「行の遷移の表示」）。
+効果ごとに、この定数一つ。効果を行うメソッドは、定数とは別に、宛先の単位に出す（「状態の単位」）。宛先が分類の遷移（`Effect.target` が `transition`）の効果は、コメントの末尾に一行足す: `// effects <宛先の FQN> as <前> -> <後>`（ケースの集合は `any` か `A, B`）。行の遷移を持つ効果（`Effect.row`。`docs/check.md`「行の遷移」）は、コメントの末尾に一行足す: `// effects <状態の FQN>.<post / put / delete> <行の遷移の表示>`（表示の形は「コメント」の「行の遷移の表示」）。
 
 ```go
 // EffectStartProduction は作り始める
-// on shop.orders.put as shop.Stage.Accepted -> shop.Stage.InProduction
+// effects shop.orders.put as shop.Stage.Accepted -> shop.Stage.InProduction
 const EffectStartProduction runtime.Effect = "shop.startProduction"
 ```
 
@@ -345,7 +345,7 @@ type UsersState interface {
 	Get(ctx context.Context) ([]pkgtype.User, error)
 	// UserByEmail は問い合わせ（read store.userByEmail）: email が同じユーザー
 	UserByEmail(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
-	// CreateUser は命令（効果 store.createUser、on store.users.post）: ユーザーを登録する
+	// CreateUser は命令（効果 store.createUser、effects store.users.post）: ユーザーを登録する
 	CreateUser(ctx context.Context, user pkgtype.User) error
 }
 ```
@@ -877,7 +877,7 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 | `Get`（`single`） | `// Get は問い合わせ（形 single で決まる）: <状態の FQN> の値。` |
 | `Post` / `Put` / `Delete`（形で決まる命令） | `// <操作> は命令（形 <形> で決まる）: <状態の FQN> の組み込みの効果 <post / put / delete>。` |
 | `read` | `// <メソッド名> は問い合わせ（read <read の FQN>）: <説明>`。説明がなければ `// <メソッド名> は問い合わせ（read <read の FQN>）。` |
-| 効果 | `// <メソッド名> は命令（効果 <効果の FQN>、on <宛先>）: <説明>`。説明がなければ `// <メソッド名> は命令（効果 <効果の FQN>、on <宛先>）。`。宛先は、組み込みの効果なら `<状態の FQN>.<post / put / delete>`、行の遷移を持つなら（`Effect.row`）その後ろに空白一つと「行の遷移の表示」（`shop.orders.put as shop.Stage.Accepted -> shop.Stage.InProduction`）、遷移なら `<宛先の FQN>: <前> -> <後>` |
+| 効果 | `// <メソッド名> は命令（効果 <効果の FQN>、effects <宛先>）: <説明>`。説明がなければ `// <メソッド名> は命令（効果 <効果の FQN>、effects <宛先>）。`。宛先は、組み込みの効果なら `<状態の FQN>.<post / put / delete>`、行の遷移を持つなら（`Effect.row`）その後ろに空白一つと「行の遷移の表示」（`shop.orders.put as shop.Stage.Accepted -> shop.Stage.InProduction`）、遷移なら `<宛先の FQN> as <前> -> <後>`。語は、仕様の宣言の綴り（`effects 宛先`。`docs/grammar.md`「exception / effect / read」）と同じ |
 | ケースの述語 | `// <ケース名> は問い合わせ: ケース <ケース名> の述語。` |
 
 - `read` と効果の説明（`description.body`）を、単位のメソッドのコメントに写すのは、デコレータのない `read` と効果の中身を人が書くとき、何をするものかを言うのが、説明だけだから。説明が二行以上なら、二行目から先は、行ごとに `// ` を付けて続ける。「は」の後ろの空白の規則（この節の頭）は、ここでは使わない（説明の前は `: `）。

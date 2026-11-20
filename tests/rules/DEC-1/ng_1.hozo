@@ -12,7 +12,7 @@ namespace a {
   state okState: list<M>;
   decorator onlyOp;
   @onlyOp                              // ERROR: DEC-1
-  effect fn e() on s.post;
+  effect fn e(): effects s.post;
   @onlyOp                              // ERROR: DEC-1
   classify C of M { A; }
   @onlyOp                              // ERROR: DEC-1

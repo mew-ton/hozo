@@ -4,7 +4,7 @@
 // a.sub は a の単位の対象（単位は namespace とその子孫を対象にする）
 namespace a {
   exception Busy;
-  export fn save(text: string) throws Busy;
+  export fn save(text: string): throws Busy;
 }
 namespace a.sub {
   fn g();
@@ -12,9 +12,9 @@ namespace a.sub {
 /** 画面を操作する利用者 */
 namespace user {
   state memo: nullable<string>;
-  effect fn writeMemo() on memo.post;
-  fn note(text: string) effects writeMemo { writeMemo(); }
-  fn submit(text: string) throws a.Busy {
+  effect fn writeMemo(): effects memo.post;
+  fn note(text: string): effects writeMemo { writeMemo(); }
+  fn submit(text: string): throws a.Busy {
     note(text);
     a.save(text);
   }

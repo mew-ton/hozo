@@ -41,39 +41,39 @@ namespace shop {
   // docs/check.md「状態の形」効果の宛先: 基底の状態の組み込みの効果。書き込むのはその状態
   // docs/ir.md「state / exception / effect」: target は { kind: "builtin", state, operation }
   /** カートに行を足す */
-  effect fn addLine(line: Line) on carts.post;
+  effect fn addLine(line: Line): effects carts.post;
   /** 店の名前を変える */
-  effect fn rename() on title.put;
+  effect fn rename(): effects title.put;
   // 空にするのは delete（docs/decisions.md S2）
   /** 手元のトークンを消す */
-  effect fn removeToken() on token.delete;
+  effect fn removeToken(): effects token.delete;
 
   // docs/grammar.md「exception / effect / read」Transition: 状態の分類の遷移。書き込むのは分類の対象のすべての基底の状態
   // docs/ir.md「state / exception / effect」: target は { kind: "transition", of, from, to }
   /** 注文を確定する */
-  effect fn placeOrder() on Checkout: Shopping -> Ordered;
+  effect fn placeOrder(): effects Checkout as Shopping -> Ordered;
   // CaseSet: any と、ケースの和
   /** 買い物をやり直す */
-  effect fn startOver() on Checkout: any -> Shopping;
+  effect fn startOver(): effects Checkout as any -> Shopping;
   /** 進み具合を記録し直す */
-  effect fn touchCheckout() on Checkout: Shopping, Ordered -> any;
+  effect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any;
   // 二つに分かれる状態の分類の遷移
   /** ログインする */
-  effect fn signIn() on LoggedIn: any -> LoggedIn;
+  effect fn signIn(): effects LoggedIn as any -> LoggedIn;
 
   // docs/grammar.md「exception / effect / read」Transition: 基底の状態の組み込みの分類の遷移（ケースは Empty / HasItems）。
   // 書き込むのはその状態
   /** カートを空にする */
-  effect fn clearCart() on carts: HasItems -> Empty;
+  effect fn clearCart(): effects carts as HasItems -> Empty;
   /** トークンを保存する */
-  effect fn saveToken(token: Token) on token: Empty -> HasItems;
+  effect fn saveToken(token: Token): effects token as Empty -> HasItems;
 
   /** カートが空 */
   exception EmptyCart;
 
   // docs/check.md「配線からの呼び出し」: 効果を呼ぶ配線。効果の宛先が組み込みの効果でも遷移でも、呼び方は同じ。
   // 書いた effects は、本体が行う効果と照合する（EFF-2）
-  fn addToCart(line: Line) effects addLine { addLine(line); }
+  fn addToCart(line: Line): effects addLine { addLine(line); }
   // docs/check.md「葉の op」: 葉は状態に触れない（注文を作るだけ）。効果は、それを呼ぶ配線が行う
   fn newOrder(): Order throws EmptyCart;
   fn submitOrder(): Order effects placeOrder throws EmptyCart prevents effects {
@@ -81,11 +81,11 @@ namespace shop {
     placeOrder();
     return order;
   }
-  fn emptyCart() effects clearCart { clearCart(); }
-  fn restart() effects startOver { startOver(); }
-  fn storeToken(token: Token) effects saveToken { saveToken(token); }
-  fn markLoggedIn() effects signIn { signIn(); }
-  fn logout() effects removeToken { removeToken(); }
+  fn emptyCart(): effects clearCart { clearCart(); }
+  fn restart(): effects startOver { startOver(); }
+  fn storeToken(token: Token): effects saveToken { saveToken(token); }
+  fn markLoggedIn(): effects signIn { signIn(); }
+  fn logout(): effects removeToken { removeToken(); }
   fn showLogin();
   fn showCart();
   fn showEmpty();

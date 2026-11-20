@@ -23,10 +23,10 @@ namespace audit {
   @db.table state entries: list<Entry>;
 
   @db.insert
-  effect fn createEntry(entry: Entry) on entries.post;
+  effect fn createEntry(entry: Entry): effects entries.post;
 
   @db.list
-  read fn entriesOf(account: kinds.AccountId): Entry[] on entries;
+  read fn entriesOf(account: kinds.AccountId): Entry[] reads entries;
 
   /** 継ぎ目を持たない op: 呼んだ側の ctx が運ぶトランザクションに入る */
   export fn record(entry: Entry) {
@@ -56,13 +56,13 @@ namespace bank {
   @db.table state accounts: list<Account>;
 
   @db.find
-  read fn accountById(id: kinds.AccountId): Account? on accounts;
+  read fn accountById(id: kinds.AccountId): Account? reads accounts;
 
   @db.insert
-  effect fn createAccount(account: Account) on accounts.post;
+  effect fn createAccount(account: Account): effects accounts.post;
 
   @db.update
-  effect fn updateAccount(account: Account) on accounts.put;
+  effect fn updateAccount(account: Account): effects accounts.put;
 
   // ---- 継ぎ目のメソッドの二つの形 ----
 
@@ -142,7 +142,7 @@ namespace mixed {
   @db.table state rows: list<Row>;
 
   @db.insert
-  effect fn createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row): effects rows.post;
 
   /** go-sqlite の継ぎ目だけ */
   @db.transaction

@@ -124,7 +124,7 @@ func caseSet(s ir.CaseSet) string {
 
 // effectTarget は、効果の宛先の書き方（状態の単位の命令のコメント、effect の定数のコメント）: 組み込みの効果なら
 // `<状態の FQN>.<post / put / delete>`（行の遷移を持つなら、その後ろに空白一つと、行の遷移の表示）、遷移なら
-// `<宛先の FQN>: <前> -> <後>`。
+// `<宛先の FQN> as <前> -> <後>`（仕様の宣言の綴りと同じ。docs/plugin-go.md「コメント」）。
 func effectTarget(e *ir.Effect) string {
 	switch t := e.Target.(type) {
 	case ir.BuiltinTarget:
@@ -133,7 +133,7 @@ func effectTarget(e *ir.Effect) string {
 		}
 		return t.State + "." + string(t.Operation)
 	case ir.TransitionTarget:
-		return t.Of + ": " + caseSet(t.From) + " -> " + caseSet(t.To)
+		return t.Of + " as " + caseSet(t.From) + " -> " + caseSet(t.To)
 	}
 	return ""
 }

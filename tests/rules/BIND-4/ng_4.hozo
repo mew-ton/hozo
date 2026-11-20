@@ -7,8 +7,8 @@ namespace a {
   state token: single<Token>;
   state rows: list<M>;
   bind token to a.*;
-  read fn byToken(t: Token, id: string?): M? on rows;
-  effect fn add(m: M) on rows.post;
+  read fn byToken(t: Token, id: string?): M? reads rows;
+  effect fn add(m: M): effects rows.post;
   classify K of M { A; B; }
   fn viaOp(t: Token): M?;
   fn f(m: M): M? throws Busy {

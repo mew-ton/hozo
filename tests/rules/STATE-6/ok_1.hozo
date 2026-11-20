@@ -5,9 +5,9 @@ namespace a {
   state rows: list<M>;
   state cur: nullable<M>;
   state title: single<string>;
-  effect fn change(m: M) on rows.put;
-  effect fn remove(id: string) on rows.delete;
-  fn f(m: M) effects rows.post, cur.post, cur.put, cur.delete, title.put, change, remove {
+  effect fn change(m: M): effects rows.put;
+  effect fn remove(id: string): effects rows.delete;
+  fn f(m: M): effects rows.post, cur.post, cur.put, cur.delete, title.put, change, remove {
     rows.post(m);
     cur.post(m);
     cur.put({ id: "x" });

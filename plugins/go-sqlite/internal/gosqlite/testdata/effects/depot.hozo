@@ -37,45 +37,45 @@ namespace depot {
 
   /** @db.insert */
   @db.insert
-  effect fn createCrate(crate: Crate) on crates.post;
+  effect fn createCrate(crate: Crate): effects crates.post;
 
   /** @db.update: キーが一つ */
   @db.update
-  effect fn updateCrate(crate: Crate) on crates.put;
+  effect fn updateCrate(crate: Crate): effects crates.put;
 
   /** @db.delete: 列が一つ */
   @db.delete
-  effect fn deleteCrate(code: Code) on crates.delete;
+  effect fn deleteCrate(code: Code): effects crates.delete;
 
   /** @db.delete: 列が二つ（どの条件も満たす行をすべて消す） */
   @db.delete
-  effect fn deleteLabelled(label: string, weight: int) on crates.delete;
+  effect fn deleteLabelled(label: string, weight: int): effects crates.delete;
 
   /** @db.delete: 省略可能な列に、T? の引数（値がなければ、値のない行を消す） */
   @db.delete
-  effect fn deleteInZone(zone: string?) on crates.delete;
+  effect fn deleteInZone(zone: string?): effects crates.delete;
 
   @db.find
-  read fn crateByCode(code: Code): Crate? on crates;
+  read fn crateByCode(code: Code): Crate? reads crates;
 
   // ---- slots ----
 
   @db.insert
-  effect fn createSlot(slot: Slot) on slots.post;
+  effect fn createSlot(slot: Slot): effects slots.post;
 
   /** @db.update: キーが二つ */
   @db.update
-  effect fn updateSlot(slot: Slot) on slots.put;
+  effect fn updateSlot(slot: Slot): effects slots.put;
 
   /** @db.delete: 二つのキー */
   @db.delete
-  effect fn deleteSlot(aisle: string, level: int) on slots.delete;
+  effect fn deleteSlot(aisle: string, level: int): effects slots.delete;
 
   // ---- events ----
 
   /** 配線が呼んでいない効果も、状態の単位のメソッドになる */
   @db.delete
-  effect fn deleteEventsOf(crate: Code) on events.delete;
+  effect fn deleteEventsOf(crate: Code): effects events.delete;
 
   // ---- op: 効果を呼ぶ配線 ----
 

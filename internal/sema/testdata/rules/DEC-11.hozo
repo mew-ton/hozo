@@ -21,8 +21,8 @@ namespace a {
   // 残りの引数（docs/types.md「デコレータの引数」）: ほかの Param の数を超えて位置で渡した値は、書いた順に残りの引数に入る。
   // 0 個でもよい。名前では渡せない
   state s: list<string>;
-  effect fn e1() on s.post;
-  effect fn e2() on s.put;
+  effect fn e1(): effects s.post;
+  effect fn e2(): effects s.put;
   decorator all(...targets: any effect) for op effects targets;
   decorator some(first: int, second: string?, ...more: string);
   @all

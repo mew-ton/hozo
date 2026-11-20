@@ -4,8 +4,8 @@
 namespace a {
   state s: list<string>;
   state log: list<string>;
-  effect fn e() on s.post;
-  effect fn note() on log.post;
+  effect fn e(): effects s.post;
+  effect fn note(): effects log.post;
   decorator doing(...targets: any effect) for op effects targets;
   decorator posting for op effects log.post;
   fn g();
@@ -16,26 +16,26 @@ namespace a {
   }
   // 節を書いた配線: 本体の e と、運ばれた note の両方を書く（順序は問わない）
   @doing(note)
-  fn written() effects note, e {
+  fn written(): effects note, e {
     e();
   }
   // 本体が効果を持たない配線: 効果は、運ばれたものだけ。直に書いた効果を運ぶデコレータなら、直に書く
   @posting
-  fn carriedOnly() effects log.post {
+  fn carriedOnly(): effects log.post {
     g();
   }
   // 本体も行う効果を運んでも、同じ効果一つ
   @doing(e)
-  fn same() effects e {
+  fn same(): effects e {
     e();
   }
   // 残りの引数に何も渡さなければ、何も運ばれない
   @doing
-  fn nothing() effects e {
+  fn nothing(): effects e {
     e();
   }
   // 呼び出し元へ伝わる
-  export fn caller() effects e, note {
+  export fn caller(): effects e, note {
     omitted();
   }
   fn callerOmitted() {
@@ -44,7 +44,7 @@ namespace a {
 }
 namespace b {
   // 別の名前空間の配線にも伝わる
-  fn across() effects a.e, a.note {
+  fn across(): effects a.e, a.note {
     a.caller();
   }
 }

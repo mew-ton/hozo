@@ -93,11 +93,11 @@ namespace app {
   /** 利用者 */
   state users: list<User>;
   /** 利用者を足す */
-  effect fn addUser(user: User) on users.post;
-  effect fn clearUsers() on users: HasItems -> Empty;
+  effect fn addUser(user: User): effects users.post;
+  effect fn clearUsers(): effects users as HasItems -> Empty;
   // read は、型を出さない（状態の単位のメソッド。op のない名前空間でも、states.go に出る）
   /** 識別子が同じ利用者 */
-  read fn userById(id: Id): User? on users;
+  read fn userById(id: Id): User? reads users;
 
   // 型で決まる分類と decorator の宣言は、何も出さない
   classify Known of User? {

@@ -56,14 +56,14 @@ namespace catalog {
   /** 店に並べている商品 */
   @db.list
   @db.where("listed", true)
-  read fn listedProducts(): Product[] on products;
+  read fn listedProducts(): Product[] reads products;
 
   /** その識別子の商品 */
   @db.find
-  read fn productBySku(sku: type.Sku): Product? on products;
+  read fn productBySku(sku: type.Sku): Product? reads products;
 
   /** skus のどれかに当たる商品（「集合に入っている」は db の語彙で言えないので、人が書く） */
-  read fn productsBySkus(skus: type.Sku[]): Product[] on products;
+  read fn productsBySkus(skus: type.Sku[]): Product[] reads products;
 
   /** 店に並べている商品の一覧 */
   export fn listed(): Product[] {

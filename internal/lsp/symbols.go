@@ -130,25 +130,29 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			}
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolClass, d.Span, d.Name.Span, detail))
 		case *ast.EffectDecl:
-			// 宛先は組み込みの効果（on s.post）か遷移（on X: A -> B）のどちらか（docs/grammar.md「exception / effect / read」）
-			detail := b.params(d.Params)
+			// 宛先は組み込みの効果（effects s.post）か遷移（effects X as A -> B）のどちらか（docs/grammar.md「exception / effect / read」）。
+			// 「)」の後ろは、「:」で始める（同「関数の宣言」）。戻り値を書いていれば、書いたまま
+			detail := b.params(d.Params) + ":"
+			if d.Return != nil {
+				detail += " " + b.text(d.Return)
+			}
 			switch {
 			case d.On != nil:
-				detail += " on " + d.On.State.String() + "." + d.On.Op.String()
+				detail += " effects " + d.On.State.String() + "." + d.On.Op.String()
 				if d.Row != nil {
 					// 行の遷移（as …）は、書いたまま
 					detail += " " + b.text(d.Row)
 				}
 			case d.Transition != nil:
-				detail += " on " + b.text(d.Transition)
+				detail += " effects " + b.text(d.Transition)
 			}
 			out = append(out, b.sym(d.Name.Name, protocol.SymbolEvent, d.Span, d.Name.Span, detail))
 		case *ast.ReadDecl:
-			detail := b.params(d.Params)
-			if d.Result != nil {
-				detail += ": " + b.text(d.Result)
+			detail := b.params(d.Params) + ":"
+			if d.Return != nil {
+				detail += " " + b.text(d.Return)
 			}
-			out = append(out, b.sym(d.Name.Name, protocol.SymbolKey, d.Span, d.Name.Span, detail+" on "+d.On.String()))
+			out = append(out, b.sym(d.Name.Name, protocol.SymbolKey, d.Span, d.Name.Span, detail+" reads "+d.On.String()))
 		case *ast.ClassifyDecl:
 			sym := b.sym(d.Name.Name, protocol.SymbolEnum, d.Span, d.Name.Span, "of "+b.subject(d.Of))
 			for _, c := range d.Cases {

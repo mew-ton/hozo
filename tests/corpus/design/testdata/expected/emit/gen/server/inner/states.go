@@ -20,9 +20,9 @@ type SessionsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.sessions の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Session, error)
-	// CreateSession は命令（効果 server.createSession、on server.sessions.post）: ログインセッションを作成する
+	// CreateSession は命令（効果 server.createSession、effects server.sessions.post）: ログインセッションを作成する
 	CreateSession(ctx context.Context, login LoginOk) error
-	// DeleteSession は命令（効果 server.deleteSession、on server.sessions.delete）: ログインセッションを削除する
+	// DeleteSession は命令（効果 server.deleteSession、effects server.sessions.delete）: ログインセッションを削除する
 	DeleteSession(ctx context.Context, token *Token) error
 }
 
@@ -42,9 +42,9 @@ type CartsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.carts の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]CartLine, error)
-	// AddCartLine は命令（効果 server.addCartLine、on server.carts.post）: カートに一行足す
+	// AddCartLine は命令（効果 server.addCartLine、effects server.carts.post）: カートに一行足す
 	AddCartLine(ctx context.Context, line CartLine) error
-	// AttachWarrantyToLine は命令（効果 server.attachWarrantyToLine、on server.carts.put）: カートの一行に保証を付ける
+	// AttachWarrantyToLine は命令（効果 server.attachWarrantyToLine、effects server.carts.put）: カートの一行に保証を付ける
 	AttachWarrantyToLine(ctx context.Context, line WarrantyLine) error
 }
 
@@ -55,9 +55,9 @@ type OrdersState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.orders の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Order, error)
-	// Refund は命令（効果 server.refund、on server.orders.put）: 返金する（注文の状態を返金済みにする）
+	// Refund は命令（効果 server.refund、effects server.orders.put）: 返金する（注文の状態を返金済みにする）
 	Refund(ctx context.Context, orderId OrderId) error
-	// CreateOrder は命令（効果 server.createOrder、on server.orders.post）: 注文を作成する
+	// CreateOrder は命令（効果 server.createOrder、effects server.orders.post）: 注文を作成する
 	CreateOrder(ctx context.Context, order Order) error
 }
 
@@ -68,7 +68,7 @@ type NotificationsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.notifications の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Notification, error)
-	// NotifyUser は命令（効果 server.notifyUser、on server.notifications.post）: ユーザーに通知する
+	// NotifyUser は命令（効果 server.notifyUser、effects server.notifications.post）: ユーザーに通知する
 	NotifyUser(ctx context.Context, notice Notification) error
 }
 
@@ -79,6 +79,6 @@ type PasswordResetsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: server.passwordResets の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]PasswordReset, error)
-	// SendResetMail は命令（効果 server.sendResetMail、on server.passwordResets.post）: 再設定メールを送る
+	// SendResetMail は命令（効果 server.sendResetMail、effects server.passwordResets.post）: 再設定メールを送る
 	SendResetMail(ctx context.Context, reset PasswordReset) error
 }

@@ -1,5 +1,5 @@
 // docs/plugin-go-sqlite.md「read の中身」「列と引数の型」「メソッドの形とコメント」の各行。
-// 各 read の上のコメントが、その read が確かめる行。表は、宣言の on の状態で、列は、引数の名前。
+// 各 read の上のコメントが、その read が確かめる行。表は、宣言の reads の状態で、列は、引数の名前。
 // どの read も db の語彙のデコレータを持つ（どの型も、基底の単位を満たす）。
 
 /** 店の在庫 */
@@ -46,171 +46,171 @@ namespace shop {
 
   /** 条件の列が、ただ一つの @db.key */
   @db.find
-  read fn itemById(id: ItemId): Item? on items;
+  read fn itemById(id: ItemId): Item? reads items;
 
   /** 条件の列が @db.unique */
   @db.find
-  read fn itemBySku(sku: Sku): Item? on items;
+  read fn itemBySku(sku: Sku): Item? reads items;
 
   /** 引数が二つ: 条件の列が、二つの @db.key のすべて */
   @db.find
-  read fn stockAt(item: ItemId, shelf: Shelf): Stock? on stock;
+  read fn stockAt(item: ItemId, shelf: Shelf): Stock? reads stock;
 
   /** キーと、ほかの列（どれも満たす行。合う行は、一つのまま） */
   @db.find
-  read fn activeItem(id: ItemId, active: boolean): Item? on items;
+  read fn activeItem(id: ItemId, active: boolean): Item? reads items;
 
   /** キーの一つを引数で、もう一つを @db.where で */
   @db.find
   @db.where("shelf", 1)
-  read fn frontStock(item: ItemId): Stock? on stock;
+  read fn frontStock(item: ItemId): Stock? reads stock;
 
   // ---- @db.find と @db.latest: いちばん新しい一行 ----
 
   /** 条件がない */
   @db.find
   @db.latest("at")
-  read fn lastAudit(): Audit? on audits;
+  read fn lastAudit(): Audit? reads audits;
 
   /** 条件がある */
   @db.find
   @db.latest("at")
-  read fn lastAuditOf(item: ItemId): Audit? on audits;
+  read fn lastAuditOf(item: ItemId): Audit? reads audits;
 
   /** @db.where の条件だけ */
   @db.find
   @db.where("active", true)
   @db.latest("addedAt")
-  read fn newestActive(): Item? on items;
+  read fn newestActive(): Item? reads items;
 
   // ---- @db.list ----
 
   /** 条件がない: すべての行 */
   @db.list
-  read fn allItems(): Item[] on items;
+  read fn allItems(): Item[] reads items;
 
   /** @db.int の列 */
   @db.list
-  read fn itemsOnShelf(shelf: Shelf): Item[] on items;
+  read fn itemsOnShelf(shelf: Shelf): Item[] reads items;
 
   /** @db.float の列 */
   @db.list
-  read fn itemsPriced(price: Price): Item[] on items;
+  read fn itemsPriced(price: Price): Item[] reads items;
 
   /** @db.bool の列 */
   @db.list
-  read fn itemsActive(active: boolean): Item[] on items;
+  read fn itemsActive(active: boolean): Item[] reads items;
 
   /** @db.time の列 */
   @db.list
-  read fn itemsAddedAt(addedAt: Time): Item[] on items;
+  read fn itemsAddedAt(addedAt: Time): Item[] reads items;
 
   /** @db.json の列 */
   @db.list
-  read fn itemsTagged(tags: string[]): Item[] on items;
+  read fn itemsTagged(tags: string[]): Item[] reads items;
 
   /** 引数が三つ */
   @db.list
-  read fn itemsOf(kind: string, shelf: Shelf, active: boolean): Item[] on items;
+  read fn itemsOf(kind: string, shelf: Shelf, active: boolean): Item[] reads items;
 
   /** 二つの @db.key の一つ（@db.find にはできない条件でも、@db.list ならよい） */
   @db.list
-  read fn stockOf(item: ItemId): Stock[] on stock;
+  read fn stockOf(item: ItemId): Stock[] reads stock;
 
   // ---- 列と引数の型 ----
 
   /** T? の列に、T の引数（値のない行は、どの値にも合わない） */
   @db.list
-  read fn itemsNoted(note: string): Item[] on items;
+  read fn itemsNoted(note: string): Item[] reads items;
 
   /** T? の列に、T? の引数（値がなければ、値のない行） */
   @db.list
-  read fn itemsByNote(note: string?): Item[] on items;
+  read fn itemsByNote(note: string?): Item[] reads items;
 
   // ---- @db.where: 決まった値の条件。しまい方ごとのリテラル ----
 
   /** @db.text の列に、文字列 */
   @db.list
   @db.where("kind", "book")
-  read fn books(): Item[] on items;
+  read fn books(): Item[] reads items;
 
   /** @db.int の列に、整数 */
   @db.list
   @db.where("stock", 0)
-  read fn soldOut(): Item[] on items;
+  read fn soldOut(): Item[] reads items;
 
   /** @db.float の列に、小数 */
   @db.list
   @db.where("price", 9.5)
-  read fn atNineFifty(): Item[] on items;
+  read fn atNineFifty(): Item[] reads items;
 
   /** @db.float の列に、整数（Go では、小数のリテラルで書く） */
   @db.list
   @db.where("price", 10)
-  read fn atTen(): Item[] on items;
+  read fn atTen(): Item[] reads items;
 
   /** @db.bool の列に、真偽値 */
   @db.list
   @db.where("active", false)
-  read fn retired(): Item[] on items;
+  read fn retired(): Item[] reads items;
 
   /** scalar の列（元の核の型に渡せるリテラル）と、負の数 */
   @db.list
   @db.where("shelf", -1)
-  read fn unshelved(): Item[] on items;
+  read fn unshelved(): Item[] reads items;
 
   /** 省略可能な列 */
   @db.list
   @db.where("note", "fragile")
-  read fn fragile(): Item[] on items;
+  read fn fragile(): Item[] reads items;
 
   /** エスケープの要る文字列 */
   @db.list
   @db.where("kind", "\"odd\" \\ kind")
-  read fn odd(): Item[] on items;
+  read fn odd(): Item[] reads items;
 
   /** 二つの @db.where と、引数（条件は、引数の後ろに、書いた順） */
   @db.list
   @db.where("kind", "book")
   @db.where("active", true)
-  read fn activeBooksOn(shelf: Shelf): Item[] on items;
+  read fn activeBooksOn(shelf: Shelf): Item[] reads items;
 
   // ---- @db.list と @db.latest: 新しい順 ----
 
   /** @db.time の列 */
   @db.list
   @db.latest("addedAt")
-  read fn newestFirst(): Item[] on items;
+  read fn newestFirst(): Item[] reads items;
 
   /** @db.int の列 */
   @db.list
   @db.latest("stock")
-  read fn mostStocked(): Item[] on items;
+  read fn mostStocked(): Item[] reads items;
 
   /** @db.float の、省略可能な列: 値のない行は最後 */
   @db.list
   @db.latest("weight")
-  read fn heaviest(): Audit[] on audits;
+  read fn heaviest(): Audit[] reads audits;
 
   /** @db.time の、省略可能な列と、引数の条件 */
   @db.list
   @db.latest("soldAt")
-  read fn lastSoldOn(shelf: Shelf): Item[] on items;
+  read fn lastSoldOn(shelf: Shelf): Item[] reads items;
 
   /** 引数と @db.where と @db.latest */
   @db.list
   @db.where("active", true)
   @db.latest("addedAt")
-  read fn newestActiveOf(kind: string): Item[] on items;
+  read fn newestActiveOf(kind: string): Item[] reads items;
 
   // ---- 行を足す効果（テストが、表を満たすのに使う） ----
 
   @db.insert
-  effect fn createItem(item: Item) on items.post;
+  effect fn createItem(item: Item): effects items.post;
   @db.insert
-  effect fn createStock(row: Stock) on stock.post;
+  effect fn createStock(row: Stock): effects stock.post;
   @db.insert
-  effect fn createAudit(audit: Audit) on audits.post;
+  effect fn createAudit(audit: Audit): effects audits.post;
 
   // ---- op: read を呼ぶ配線 ----
 

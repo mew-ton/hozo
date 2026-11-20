@@ -13,7 +13,7 @@ type ItemsState interface {
 	Get(ctx context.Context) ([]Item, error)
 	// CountById は問い合わせ（read shop.countById）: 識別子が同じ品物の数
 	CountById(ctx context.Context, id string) (int64, error)
-	// AddItem は命令（効果 shop.addItem、on shop.items.post）: 品物を足す
+	// AddItem は命令（効果 shop.addItem、effects shop.items.post）: 品物を足す
 	AddItem(ctx context.Context, item Item) error
 }
 

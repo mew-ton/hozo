@@ -11,7 +11,7 @@ namespace fulfilment {
    * 客の同意が取れた注文を、受け付けて、渡す準備を始める。
    * 期限切れにした後で同意が届いた注文は、受け付けない: 確保した枠を手放す（在庫は、もう戻してある）。
    */
-  export fn secured(orderId: type.OrderId)
+  export fn secured(orderId: type.OrderId):
     throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
   {
     val order = ordering.byId(orderId);
@@ -24,7 +24,7 @@ namespace fulfilment {
 
   /** 受け付けて、始めて、知らせる */
   @db.transaction
-  fn acceptAndBegin(order: ordering.Standing.AwaitingPayment<ordering.Order>)
+  fn acceptAndBegin(order: ordering.Standing.AwaitingPayment<ordering.Order>):
     throws ordering.NoOrder
   {
     val accepted = ordering.accept(order);

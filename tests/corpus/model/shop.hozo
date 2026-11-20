@@ -15,14 +15,14 @@ namespace shop {
   state orders: list<Order>;
 
   /** カートに行を足す */
-  effect fn addLine(line: Line) on carts.post;
+  effect fn addLine(line: Line): effects carts.post;
   /** 注文を作る */
-  effect fn createOrder(order: Order) on orders.post;
+  effect fn createOrder(order: Order): effects orders.post;
 
   /** 在庫がない */
   exception OutOfStock;
 
-  export fn addToCart(line: Line)
+  export fn addToCart(line: Line):
     effects addLine
     throws OutOfStock prevents effects
   {
@@ -30,7 +30,7 @@ namespace shop {
     addLine(line);
   }
   /** 在庫を確かめる */
-  fn checkStock(line: Line) throws OutOfStock;
+  fn checkStock(line: Line): throws OutOfStock;
 
   // docs/check.md「計算」手順 i の throws: @marks.requirement が marks.NotApproved を E に足す（prevents effects）。
   // op 自身の throws には書かない

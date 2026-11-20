@@ -204,8 +204,8 @@ func TestUncoveredNamespace(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("app", "gen/app"))
 	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
-	write(t, filepath.Join(dir, "app.hozo"), "namespace app {\n  exception Busy;\n  export fn save(text: string) throws Busy;\n}\n")
-	write(t, filepath.Join(dir, "user.hozo"), "/** 利用者 */\nnamespace user {\n  state memo: nullable<string>;\n  fn write(text: string) throws app.Busy {\n    app.save(text);\n  }\n}\nfn globalOp();\n")
+	write(t, filepath.Join(dir, "app.hozo"), "namespace app {\n  exception Busy;\n  export fn save(text: string): throws Busy;\n}\n")
+	write(t, filepath.Join(dir, "user.hozo"), "/** 利用者 */\nnamespace user {\n  state memo: nullable<string>;\n  fn write(text: string): throws app.Busy {\n    app.save(text);\n  }\n}\nfn globalOp();\n")
 	p := Load(dir, "", nil)
 	if p.NoConfig || len(p.Diags) != 0 {
 		t.Fatalf("NoConfig=%v diags:\n%s", p.NoConfig, text(p))

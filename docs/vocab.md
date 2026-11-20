@@ -72,9 +72,9 @@ namespace db {
   /** 別の model のレコードを指す。DB の構造（外部キーなど）は db の語彙とプラグインが決める */
   decorator ref(target: any model) for field;
 
-  /** この read は、on の状態の表から、一行を引く。引数の名前が列で、どの列も引数の値と同じ行。なければ、ない */
+  /** この read は、reads の状態の表から、一行を引く。引数の名前が列で、どの列も引数の値と同じ行。なければ、ない */
   decorator find for read;
-  /** この read は、on の状態の表から、行を引く。引数の名前が列で、どの列も引数の値と同じ行のすべて。引数がなければ、すべての行 */
+  /** この read は、reads の状態の表から、行を引く。引数の名前が列で、どの列も引数の値と同じ行のすべて。引数がなければ、すべての行 */
   decorator list for read;
   /** この read が引くのは、列 column が value と同じ行だけ。何度でも書ける */
   @repeatable
@@ -82,11 +82,11 @@ namespace db {
   /** この read は、列 column の新しい順に引く */
   decorator latest(column: string) for read;
 
-  /** この効果は、on の状態の表に、引数の行を足す */
+  /** この効果は、宛先（effects）の状態の表に、引数の行を足す */
   decorator insert for effect;
-  /** この効果は、on の状態の表の、キー（@db.key）が引数の行と同じ行を、引数の行に書き換える */
+  /** この効果は、宛先（effects）の状態の表の、キー（@db.key）が引数の行と同じ行を、引数の行に書き換える */
   decorator update for effect;
-  /** この効果は、on の状態の表から、行を消す。引数の名前が列で、どの列も引数の値と同じ行 */
+  /** この効果は、宛先（effects）の状態の表から、行を消す。引数の名前が列で、どの列も引数の値と同じ行 */
   decorator delete for effect;
 
   /** この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない */
@@ -114,20 +114,20 @@ namespace db {
 ```ts
 /** email が同じユーザー */
 @db.find
-read fn userByEmail(email: type.Email): type.User? on users;
+read fn userByEmail(email: type.Email): type.User? reads users;
 
 /** そのユーザーの、支払いの済んだ請求。新しい順 */
 @db.list
 @db.where("paid", true)
 @db.latest("issuedAt")
-read fn paidInvoicesOf(userId: type.UserId): Invoice[] on invoices;
+read fn paidInvoicesOf(userId: type.UserId): Invoice[] reads invoices;
 
 /** そのトークンのセッションを消す */
 @db.delete
-effect fn deleteSession(token: type.Token) on sessions.delete;
+effect fn deleteSession(token: type.Token): effects sessions.delete;
 ```
 
-- **デコレータは、宣言がすでに言っていることを、もう一度言わない**（`docs/requirements.md`「出力を推論しない」）: 表は、宣言の `on` の状態。列は、引数の名前（表の model の、同じ名前のフィールド）。引くものの型は、`read` の結果の型。表を引数でもう一度名指しする書き方（`@db.find(users, "email")`）は、なくした。
+- **デコレータは、宣言がすでに言っていることを、もう一度言わない**（`docs/requirements.md`「出力を推論しない」）: 表は、`read` なら `reads` の状態、効果なら宛先（`effects` の後ろ）の状態。列は、引数の名前（表の model の、同じ名前のフィールド）。引くものの型は、`read` の結果の型。表を引数でもう一度名指しする書き方（`@db.find(users, "email")`）は、なくした。
 - **引数が二つ以上なら、どの列も同じ行**（かつ）。`find` と `list` と `delete` に共通。
 - **`where`** は、引数にならない、決まった値の条件（列 `column` が、リテラル `value` と同じ）。`find` か `list` を付けた `read` に、いくつでも足せる（`@repeatable`）。引数の条件と合わせて、どれも満たす行。
 - **`latest`** は、並べ方。`list` に足せば、列 `column` の新しい順（付けていない `list` は、足した順）。`find` に足せば、条件に合う行のうち、いちばん新しい一行。

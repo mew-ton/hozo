@@ -8,7 +8,7 @@
 
 | 付ける先 | このトランスパイラがすること |
 |---|---|
-| op 以外（状態、表の model のフィールド、`read`、効果） | **宣言の全体から、中身を作る。** 表は、宣言の `on` の状態。列は、引数の名前。引くものは、`read` の結果の型。列が値を持たなくてよいかは、フィールドの型の `?`。デコレータが言うのは、宣言が言っていないことだけ（表であること、しまい方、キー、引くか足すか消すか、決まった値の条件、並べ方）。書いたものが食い違っていれば「診断」の error |
+| op 以外（状態、表の model のフィールド、`read`、効果） | **宣言の全体から、中身を作る。** 表は、`read` なら `reads` の状態、効果なら宛先（`effects` の後ろ）の状態。列は、引数の名前。引くものは、`read` の結果の型。列が値を持たなくてよいかは、フィールドの型の `?`。デコレータが言うのは、宣言が言っていないことだけ（表であること、しまい方、キー、引くか足すか消すか、決まった値の条件、並べ方）。書いたものが食い違っていれば「診断」の error |
 | op（`@db.transaction`） | **op の中身は決めない。** 中身の前後に、トランザクションの始めと終わりを足すだけ（継ぎ目）。出すコードは、op の型に依らない |
 
 `db` のデコレータを付けていない `read` と効果の中身は出さず、人が書き足す（足りなければコンパイルエラーになる。「状態ごとの型」）。しまい方だけは、型から当てない: 同じ型を、いくつものしまい方でしまえる（「しまい方」）。
@@ -117,20 +117,20 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 
 ### read の中身
 
-`read` の宣言（`docs/grammar.md`「exception / effect / read」）に `@db.find` か `@db.list` を付ければ、その `read` のメソッドを出す。以下、宣言の `on` の状態を T、その表の model を M とする。
+`read` の宣言（`docs/grammar.md`「exception / effect / read」）に `@db.find` か `@db.list` を付ければ、その `read` のメソッドを出す。以下、宣言の `reads` の状態を T、その表の model を M とする。
 
 ```ts
 /** そのユーザーの、いちばん新しい注文。まだ注文がなければ、ない */
 @db.find
 @db.latest("placedAt")
-read fn latestOrderOf(userId: type.UserId): type.Order? on orders;
+read fn latestOrderOf(userId: type.UserId): type.Order? reads orders;
 ```
 
 **宣言から読むもの**（デコレータは、これをもう一度言わない）:
 
 | 宣言の部分 | 読むこと | 合わなければ |
 |---|---|---|
-| `on T` | 表。T は、N の表の状態 | GOSQL-7 |
+| `reads T` | 表。T は、N の表の状態 | GOSQL-7 |
 | 引数（`Read.params`） | **条件**。引数ごとに、その名前の列が、引数の値と同じ。引数の名前は、M のフィールドの名前で、型は、その列に合う（「列と引数の型」） | 名前のフィールドがなければ GOSQL-8、型が合わなければ GOSQL-9 |
 | 結果の型（`Read.returns`） | 引くもの。`@db.find` なら `M?`、`@db.list` なら `M[]` | GOSQL-10 |
 
@@ -171,11 +171,11 @@ read fn latestOrderOf(userId: type.UserId): type.Order? on orders;
 ```ts
 /** 注文を作る */
 @db.insert
-effect fn createOrder(order: type.Order) on orders.post;
+effect fn createOrder(order: type.Order): effects orders.post;
 
 /** ログインセッションを消す */
 @db.delete
-effect fn deleteSession(token: type.Token) on sessions.delete;
+effect fn deleteSession(token: type.Token): effects sessions.delete;
 ```
 
 | デコレータ | 効果の宛先（合わなければ GOSQL-11） | 引数（合わなければ GOSQL-9） | SQL |
@@ -184,7 +184,7 @@ effect fn deleteSession(token: type.Token) on sessions.delete;
 | `@db.update` | `T.put` | M の行一つ（同じ）。M は `@db.key` を一つ以上と、キーでない列を一つ以上持つ（GOSQL-15） | `UPDATE "<表>" SET <キーでない列> = ?… WHERE <キーの列> IS ?…`。書き換える行は、M の `@db.key` のフィールドが、引数の行と同じ行。行がなければ何もしない |
 | `@db.delete` | `T.delete` | **条件**: 引数ごとに、その名前の列が、引数の値と同じ（`read` と同じ決まり。名前のフィールドがなければ GOSQL-8、型は「列と引数の型」）。引数は一つ以上（GOSQL-28） | `DELETE FROM "<表>" WHERE <条件>`。どの条件も満たす行をすべて消す。行がなければ何もしない |
 
-- T は、N の表の状態（GOSQL-7）。**宛先は、組み込みの効果でなければならない**: 分類の遷移を宛先にする効果（`effect fn e() on Checkout: Shopping -> Ordered;`）に `db` のデコレータが付いていれば GOSQL-11（一つの遷移が、どの表に何をするかは、宣言からは決まらない）。その効果は、人が書く。
+- T は、N の表の状態（GOSQL-7）。**宛先は、組み込みの効果でなければならない**: 分類の遷移を宛先にする効果（`effect fn e(): effects Checkout as Shopping -> Ordered;`）に `db` のデコレータが付いていれば GOSQL-11（一つの遷移が、どの表に何をするかは、宣言からは決まらない）。その効果は、人が書く。
 - 効果は、三つのうち、高々一つを持つ（二つ以上なら GOSQL-12）。
 - `@db.delete` の条件の値の渡し方は、`read` と同じ（「read の中身」）。
 - **未決: 引数のない `@db.delete`**。「引数がなければ、すべての行」は、`@db.list` では決めたが、消す方では決めていない（書き忘れた引数が、表を空にする）。決まるまで GOSQL-28。
@@ -474,7 +474,7 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 | GOSQL-3 | error | 表の model に、どのしまい方でも列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model |
 | GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`Querier`、`Conn`、`<状態>Table`、`New<状態>Table`、出すなら `DbSeams`、`NewDbSeams`）が、N の定義のパッケージの名前（型など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`）も同じで、位置は後ろの宣言 |
 | GOSQL-6 | error | `[emit.options.go-sqlite]` に、知らないキーがある。位置なし |
-| GOSQL-7 | error | `db` のデコレータを付けた `read` の `on` の状態か、効果の宛先の状態が、N の表の状態でない（`@db.table` が付いていない）。位置は、その `read` か効果 |
+| GOSQL-7 | error | `db` のデコレータを付けた `read` の `reads` の状態か、効果の宛先の状態が、N の表の状態でない（`@db.table` が付いていない）。位置は、その `read` か効果 |
 | GOSQL-8 | error | 列を名指しするもの（`read` と `@db.delete` の効果の引数の名前、`@db.where` と `@db.latest` の `column`）が、表の model のフィールドにない。位置は、その `read` か効果 |
 | GOSQL-9 | error | 引数が、デコレータの言うものと合わない: 条件の引数（`read` と、`@db.delete` の効果）の型が、列に合わない（「列と引数の型」）。`@db.insert` / `@db.update` の効果の引数が、表の model の行一つでない。位置は、その `read` か効果 |
 | GOSQL-10 | error | `read` の結果の型が、デコレータの言うものと合わない: `@db.find` は `M?`、`@db.list` は `M[]`（M は表の model）。位置は `read` |
@@ -501,11 +501,11 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 | GOSQL-5 | 状態の単位のメソッドの名前が、このファイルの型のフィールド `db` と当たる（op `db`） | 起きない: メソッドの名前は先頭を大文字にしたもの（`Db`。`docs/plugin-go.md`「名前」）で、フィールド `db` とは別の名前 |
 | GOSQL-14 | op が、`db` の op のデコレータ（`@db.reads`、`@db.effects`）の言う以外のものを読み書きする | op の中身を言うデコレータを、なくした（op は、`read` と効果を呼ぶ配線） |
 | GOSQL-18、GOSQL-19 | `@db.nullable` と、フィールドの型（省略可能かどうか）の食い違い | `@db.nullable` をなくした（値がなくてよいかは、フィールドの型の `?`） |
-| GOSQL-21 | `read` のデコレータの表が、`read` の `on` の状態でない | デコレータは、表を引数に取らない（表は、`on` の状態） |
+| GOSQL-21 | `read` のデコレータの表が、`read` の読む状態でない | デコレータは、表を引数に取らない（表は、`reads` の状態） |
 | GOSQL-23 | `@db.reads` に、`read` を二つ以上並べている（決まるまでの間だけの規則） | `@db.reads` をなくした |
 
-- GOSQL-1、GOSQL-7〜GOSQL-13、GOSQL-22 は、同じ規則を、今の書き方（引数のない `@db.table`、`read` と効果の宣言の引数と `on`）に合わせて書き直した。GOSQL-12 と GOSQL-22 の、`@db.effects` / `@db.reads` に並べたものについての半分は、なくなった。
-- 一つの食い違いを、重ねて報告しない: 表にならなかった状態（GOSQL-1 か GOSQL-2 を返した）を `on` の状態か宛先にする `read` と効果に、GOSQL-7 は出さない。GOSQL-12、GOSQL-22、GOSQL-24 を返した宣言と、宛先が分類の遷移の効果（GOSQL-11）は、ほかの検査をしない（デコレータが何を言っているのかが、決まらない）。条件の列がフィールドになかった（GOSQL-8）`@db.find` に、GOSQL-13 は出さない（一行に決まるかどうかを、言えない）。一つの `read` が同じ列を三度名指ししていても、GOSQL-25 は、列ごとに一つ。
+- GOSQL-1、GOSQL-7〜GOSQL-13、GOSQL-22 は、同じ規則を、今の書き方（引数のない `@db.table`、`read` と効果の宣言の引数と宛先）に合わせて書き直した。GOSQL-12 と GOSQL-22 の、`@db.effects` / `@db.reads` に並べたものについての半分は、なくなった。
+- 一つの食い違いを、重ねて報告しない: 表にならなかった状態（GOSQL-1 か GOSQL-2 を返した）を `reads` の状態か宛先にする `read` と効果に、GOSQL-7 は出さない。GOSQL-12、GOSQL-22、GOSQL-24 を返した宣言と、宛先が分類の遷移の効果（GOSQL-11）は、ほかの検査をしない（デコレータが何を言っているのかが、決まらない）。条件の列がフィールドになかった（GOSQL-8）`@db.find` に、GOSQL-13 は出さない（一行に決まるかどうかを、言えない）。一つの `read` が同じ列を三度名指ししていても、GOSQL-25 は、列ごとに一つ。
 - どれも、書いたものの整合の検査: デコレータと宣言が食い違っていれば、黙って何かを出すことも、出さないこともせず、error にする（`docs/requirements.md`「出力を推論しない」）。`db` のデコレータを、付けられない宣言に付けたとき（`@db.find` を op に、など）は、hozoc が先に DEC-1 を返す（`docs/check.md`「デコレータ」）。
 - warning（コードは `PLUGIN`）は一つ: 表の状態が一つもない（GOSQL-29 のときは出さない）。`db` のデコレータを付けていない `read` と効果には、warning を出さない（「状態ごとの型」）。
 - Dir(U, N) の上に `go.mod` がないことは、基底が報告する（GO-1。`docs/plugin-go.md`「診断」）。このトランスパイラは、型のパッケージの import パスを求められないので、ファイルも診断も返さない。

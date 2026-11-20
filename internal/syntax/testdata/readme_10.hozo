@@ -32,13 +32,13 @@ namespace browser {
 
 namespace browser {
   /** 支払い画面へ遷移する */
-  effect fn transitionToPayment() on location.put;
+  effect fn transitionToPayment(): effects location.put;
 
-  fn goPayment(line: server.CartLine, warranty: server.WarrantyLine?)
+  fn goPayment(line: server.CartLine, warranty: server.WarrantyLine?):
     effects transitionToPayment;
 
   @page.interaction(page: openProduct, when: ProductPage.Ready)
-  fn onAddToCart(item: server.Item)
+  fn onAddToCart(item: server.Item):
     throws page.Aborted, http.NetworkError, http.ServerError
   {
     val line = server.addToCart({ item });

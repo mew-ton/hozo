@@ -23,27 +23,27 @@ const EffectRename = inner.EffectRename
 const EffectRemoveToken = inner.EffectRemoveToken
 
 // EffectPlaceOrder は注文を確定する
-// on shop.Checkout: Shopping -> Ordered
+// effects shop.Checkout as Shopping -> Ordered
 const EffectPlaceOrder = inner.EffectPlaceOrder
 
 // EffectStartOver は買い物をやり直す
-// on shop.Checkout: any -> Shopping
+// effects shop.Checkout as any -> Shopping
 const EffectStartOver = inner.EffectStartOver
 
 // EffectTouchCheckout は進み具合を記録し直す
-// on shop.Checkout: Shopping, Ordered -> any
+// effects shop.Checkout as Shopping, Ordered -> any
 const EffectTouchCheckout = inner.EffectTouchCheckout
 
 // EffectSignIn はログインする
-// on shop.LoggedIn: any -> LoggedIn
+// effects shop.LoggedIn as any -> LoggedIn
 const EffectSignIn = inner.EffectSignIn
 
 // EffectClearCart はカートを空にする
-// on shop.carts: HasItems -> Empty
+// effects shop.carts as HasItems -> Empty
 const EffectClearCart = inner.EffectClearCart
 
 // EffectSaveToken はトークンを保存する
-// on shop.token: Empty -> HasItems
+// effects shop.token as Empty -> HasItems
 const EffectSaveToken = inner.EffectSaveToken
 
 // EmptyCart: カートが空

@@ -6,9 +6,9 @@ namespace a {
   classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
   classify Urgency of Order { Rush; Normal; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
-  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
-  effect fn cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-  effect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
+  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn cancel(order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
   fn edit(order: Stage.Accepted<Order>): Order;
   // 分かっていない行
   fn unchecked(order: Order, at: Time) {

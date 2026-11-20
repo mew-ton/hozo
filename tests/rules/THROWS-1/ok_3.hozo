@@ -2,7 +2,7 @@
 namespace a {
   exception E;
   decorator declaresE throws E;
-  fn leaf() throws E;
+  fn leaf(): throws E;
   @declaresE
   fn wiring() {
     leaf();

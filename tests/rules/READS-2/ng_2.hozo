@@ -11,10 +11,10 @@ namespace a {
   fn byName(): Token? reads rows {             // ERROR: READS-2
     return token;
   }
-  fn bySubject() reads token {                 // ERROR: READS-2
+  fn bySubject(): reads token {                 // ERROR: READS-2
     match (rows by list) { Empty => g(); HasItems => none; };
   }
-  fn byClassify() reads token {                // ERROR: READS-2
+  fn byClassify(): reads token {                // ERROR: READS-2
     match (by Phase) { Idle => g(); Busy => none; };
   }
   fn byBind(): string reads rows {             // ERROR: READS-2
@@ -23,7 +23,7 @@ namespace a {
   fn across(): string[] reads rows {           // ERROR: READS-2
     return b.all();
   }
-  read fn first(): string? on rows;
+  read fn first(): string? reads rows;
   fn byRead(): string? reads token {           // ERROR: READS-2
     return first();
   }

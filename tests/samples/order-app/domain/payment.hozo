@@ -137,47 +137,47 @@ namespace payment {
 
   /** その注文の支払い */
   @db.find
-  read fn paymentOf(orderId: type.OrderId): Payment? on payments;
+  read fn paymentOf(orderId: type.OrderId): Payment? reads payments;
 
   /** その支払いの画面の支払い */
   @db.find
-  read fn paymentBySession(session: psp.SessionId): Payment? on payments;
+  read fn paymentBySession(session: psp.SessionId): Payment? reads payments;
 
   /** 枠の期限が deadline より前の、まだ請求を確定していない支払い。期限の近い順（人が書く: 比較と並べ方） */
-  read fn holdsExpiringBefore(deadline: Time): Payment[] on payments;
+  read fn holdsExpiringBefore(deadline: Time): Payment[] reads payments;
 
   /** その識別子の通知の記録 */
   @db.find
-  read fn seenEvent(id: psp.EventId): Seen? on seen;
+  read fn seenEvent(id: psp.EventId): Seen? reads seen;
 
   /** 支払いを作る。まだ同意していない支払いとして入る */
   @db.insert
-  effect fn createPayment(payment: Payment) on payments.post as Standing.Pending;
+  effect fn createPayment(payment: Payment): effects payments.post as Standing.Pending;
 
   /** 支払いの画面を差し替える。まだ同意していない支払いにだけ、できる（人が書く） */
-  effect fn replaceSessionOf(payment: Payment, session: psp.SessionId) on payments.put as Standing.Pending -> Standing.Pending;
+  effect fn replaceSessionOf(payment: Payment, session: psp.SessionId): effects payments.put as Standing.Pending -> Standing.Pending;
 
   /** 客が同意して、枠を確保した: 同意した時刻と、枠の期限を入れる（人が書く） */
-  effect fn holdSecured(payment: Payment, holdExpiresAt: Time?, at: Time) on payments.put as Standing.Pending -> Standing.Held;
+  effect fn holdSecured(payment: Payment, holdExpiresAt: Time?, at: Time): effects payments.put as Standing.Pending -> Standing.Held;
 
   /** 客が同意して、その場で請求が確定した: 同意した時刻と、確定した額（同意した額）を入れる（人が書く） */
-  effect fn chargeSecured(payment: Payment, at: Time) on payments.put as Standing.Pending -> Standing.Settled;
+  effect fn chargeSecured(payment: Payment, at: Time): effects payments.put as Standing.Pending -> Standing.Settled;
 
   /** 上限の額で、先に請求を確定した: 確定した額（同意した額）を入れる（人が書く） */
-  effect fn recordPrepaid(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Prepaid;
+  effect fn recordPrepaid(payment: Payment, at: Time): effects payments.put as Standing.Held -> Standing.Prepaid;
 
   /** 先の確定に、失敗した: 時刻と理由を、支払いに残す。枠は、確保したまま（人が書く） */
-  effect fn notePrepayFailure(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Held;
+  effect fn notePrepayFailure(payment: Payment, at: Time): effects payments.put as Standing.Held -> Standing.Held;
 
   /** 請求する額が、最後まで決まった: 決まった額と、時刻を入れる（人が書く） */
-  effect fn recordSettled(payment: Payment, charge: Charge, at: Time) on payments.put as Standing.Held, Standing.Prepaid -> Standing.Settled;
+  effect fn recordSettled(payment: Payment, charge: Charge, at: Time): effects payments.put as Standing.Held, Standing.Prepaid -> Standing.Settled;
 
   /** 枠を手放した: 手放した時刻を入れる（人が書く） */
-  effect fn recordReleased(payment: Payment, at: Time) on payments.put as Standing.Held -> Standing.Released;
+  effect fn recordReleased(payment: Payment, at: Time): effects payments.put as Standing.Held -> Standing.Released;
 
   /** 通知を、扱ったと記録する */
   @db.insert
-  effect fn remember(event: Seen) on seen.post;
+  effect fn remember(event: Seen): effects seen.post;
 
   // ---- 注文のとき: 支払いの画面を開く ----
 
@@ -341,7 +341,7 @@ namespace payment {
    */
   @prd.promise("客", "請求は、同意した額（商品の代金 + 送料の上限）を超えない")
   @prd.promise("客", "請求の確定は、注文一つに一度だけ")
-  export fn settle(orderId: type.OrderId, fee: type.Yen)
+  export fn settle(orderId: type.OrderId, fee: type.Yen):
     throws NoPayment, NotSecured, psp.HoldExpired, http.NetworkError, http.ServerError
   {
     val payment = require(orderId);
@@ -354,7 +354,7 @@ namespace payment {
   }
 
   /** 枠から、請求を確定する。枠の期限が過ぎていれば、金は動かず、記録も変わらない。相手に届かなければ、金が動いたかどうかは、分からない */
-  fn capture(payment: Standing.Held<Payment>, fee: type.Yen)
+  fn capture(payment: Standing.Held<Payment>, fee: type.Yen):
     throws psp.HoldExpired prevents effects
     throws http.NetworkError, http.ServerError
   {
@@ -366,7 +366,7 @@ namespace payment {
   }
 
   /** 先に確定した上限の額と、決まった額の差を、返す */
-  fn refundDifference(payment: Standing.Prepaid<Payment>, fee: type.Yen)
+  fn refundDifference(payment: Standing.Prepaid<Payment>, fee: type.Yen):
     throws http.NetworkError, http.ServerError
   {
     val now = clock.now();
@@ -447,7 +447,7 @@ namespace payment {
   // ---- 枠を手放す ----
 
   /** 期限切れにした注文に、後から同意が届いたとき: 枠を手放す。請求しない */
-  export fn release(orderId: type.OrderId)
+  export fn release(orderId: type.OrderId):
     throws NoPayment, http.NetworkError, http.ServerError
   {
     val payment = require(orderId);
@@ -458,7 +458,7 @@ namespace payment {
   }
 
   /** 枠を手放して、記録する */
-  fn letGo(payment: Standing.Held<Payment>)
+  fn letGo(payment: Standing.Held<Payment>):
     throws http.NetworkError, http.ServerError
   {
     val request = holdOf(payment);

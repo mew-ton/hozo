@@ -1,11 +1,11 @@
 // REL-4（docs/check.md「throws」）: 効果の前に投げる例外を keeps と書いた（計算は prevented）
 namespace a {
   state s: list<string>;
-  effect fn e() on s.post;
+  effect fn e(): effects s.post;
   exception E;
-  fn write() effects e { e(); }
-  fn fail() throws E;
-  fn wiring() throws E keeps effects {     // ERROR: REL-4
+  fn write(): effects e { e(); }
+  fn fail(): throws E;
+  fn wiring(): throws E keeps effects {     // ERROR: REL-4
     fail();
     write();
   }

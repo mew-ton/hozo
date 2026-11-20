@@ -138,7 +138,7 @@ namespace app {
 
   // 文の match: 呼び出し（純粋でない op / 純粋な op）、none のアーム（枝を書かない。if の枝がなければ条件を逆にする）、
   // 「返らない」呼び出し、throw、一つのアームが両方のケース（分けない）、絞り込んだ値を省略可能な位置へ
-  @mark export fn statementForms(user: User?, lines: Line[])
+  @mark export fn statementForms(user: User?, lines: Line[]):
     throws Denied
   {
     match (user by nullable) {

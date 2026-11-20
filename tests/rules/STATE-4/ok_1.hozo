@@ -6,17 +6,17 @@ namespace a {
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
   classify CartFilled of carts { CartFilled; NotCartFilled; }
 
-  effect fn placeOrder() on Checkout: Shopping -> Ordered;
-  effect fn ship() on Checkout: Ordered -> Shipped;
+  effect fn placeOrder(): effects Checkout as Shopping -> Ordered;
+  effect fn ship(): effects Checkout as Ordered -> Shipped;
   // any と、ケースの和。前と後が同じケースでもよい
-  effect fn reset() on Checkout: any -> Shopping;
-  effect fn touch() on Checkout: Shopping, Ordered -> any;
-  effect fn keep() on Checkout: Shopping -> Shopping;
-  effect fn move() on Checkout: Shopping, Ordered -> Ordered, Shipped;
+  effect fn reset(): effects Checkout as any -> Shopping;
+  effect fn touch(): effects Checkout as Shopping, Ordered -> any;
+  effect fn keep(): effects Checkout as Shopping -> Shopping;
+  effect fn move(): effects Checkout as Shopping, Ordered -> Ordered, Shipped;
   // condition のケースは condition の名前
-  effect fn fill() on CartFilled: any -> CartFilled;
+  effect fn fill(): effects CartFilled as any -> CartFilled;
   // 基底の状態の組み込みの分類（list / nullable）
-  effect fn clearCart() on carts: HasItems -> Empty;
-  effect fn login() on token: Empty -> HasItems;
-  effect fn anyCart() on carts: any -> Empty, HasItems;
+  effect fn clearCart(): effects carts as HasItems -> Empty;
+  effect fn login(): effects token as Empty -> HasItems;
+  effect fn anyCart(): effects carts as any -> Empty, HasItems;
 }

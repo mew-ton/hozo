@@ -223,51 +223,51 @@ namespace shipping {
 
   /** その識別子の出荷 */
   @db.find
-  read fn shipmentById(id: ShipmentId): Shipment? on shipments;
+  read fn shipmentById(id: ShipmentId): Shipment? reads shipments;
 
   /** その注文の出荷 */
   @db.find
-  read fn shipmentOfOrder(orderId: type.OrderId): Shipment? on shipments;
+  read fn shipmentOfOrder(orderId: type.OrderId): Shipment? reads shipments;
 
   /** まだ配送業者に渡していない出荷（人が書く: 値がないこと） */
-  read fn shipmentsInHouse(): Shipment[] on shipments;
+  read fn shipmentsInHouse(): Shipment[] reads shipments;
 
   /** その出荷の荷物 */
   @db.find
-  read fn parcelOf(shipmentId: ShipmentId): Parcel? on parcels;
+  read fn parcelOf(shipmentId: ShipmentId): Parcel? reads parcels;
 
   /** その出荷の送り状 */
   @db.find
-  read fn labelOf(shipmentId: ShipmentId): Label? on labels;
+  read fn labelOf(shipmentId: ShipmentId): Label? reads labels;
 
   /** その追跡番号の送り状 */
   @db.find
-  read fn labelByTracking(trackingNumber: TrackingNumber): Label? on labels;
+  read fn labelByTracking(trackingNumber: TrackingNumber): Label? reads labels;
 
   /** その箱の種類 */
   @db.find
-  read fn boxByCode(code: BoxCode): Box? on boxes;
+  read fn boxByCode(code: BoxCode): Box? reads boxes;
 
   /** 出荷を作る。店にある出荷として入る（そろったかどうか: Gathered は、一つの as では一緒に言えない。README.md「分かったこと」の F52） */
   @db.insert
-  effect fn createShipment(shipment: Shipment) on shipments.post as Custody.InHouse;
+  effect fn createShipment(shipment: Shipment): effects shipments.post as Custody.InHouse;
 
   /** 品目を一つ、そろえ場所に置いた: 置いた時刻と、量った大きさを入れる（人が書く）。それで、そろうか、まだ待つかは、残りの品目による */
-  effect fn recordPlacement(shipment: Shipment, placement: Placement) on shipments.put as Gathered.Awaiting -> else;
+  effect fn recordPlacement(shipment: Shipment, placement: Placement): effects shipments.put as Gathered.Awaiting -> else;
 
   /** 配送業者に渡した: 渡した時刻を入れる（人が書く） */
-  effect fn recordHandOver(shipment: Shipment, at: Time) on shipments.put as Custody.InHouse -> Custody.WithCarrier;
+  effect fn recordHandOver(shipment: Shipment, at: Time): effects shipments.put as Custody.InHouse -> Custody.WithCarrier;
 
   /** 届いた: 届いた時刻を入れる（人が書く） */
-  effect fn recordDelivery(shipment: Shipment, at: Time) on shipments.put as Custody.WithCarrier -> Custody.Delivered;
+  effect fn recordDelivery(shipment: Shipment, at: Time): effects shipments.put as Custody.WithCarrier -> Custody.Delivered;
 
   /** 荷物を作る。箱と送料が、ここで決まる。梱包は一度だけ: 荷物のない出荷にだけ、作る */
   @db.insert
-  effect fn createParcel(parcel: Parcel) on parcels.post as Packing.Unpacked -> Packing.Packed;
+  effect fn createParcel(parcel: Parcel): effects parcels.post as Packing.Unpacked -> Packing.Packed;
 
   /** 送り状を記録する。送り状は一つだけ: 送り状のない出荷にだけ、作る */
   @db.insert
-  effect fn createLabel(label: Label) on labels.post as Labelling.Unlabelled -> Labelling.Labelled;
+  effect fn createLabel(label: Label): effects labels.post as Labelling.Unlabelled -> Labelling.Labelled;
 
   // ---- 注文のとき: 送料の見積もりと上限 ----
 
@@ -390,7 +390,7 @@ namespace shipping {
   }
 
   /** 品目を確かめて、置く */
-  fn putDown(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?)
+  fn putDown(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?):
     throws UnknownItem
   {
     val now = clock.now();

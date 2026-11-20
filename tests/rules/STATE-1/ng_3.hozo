@@ -7,7 +7,7 @@ namespace a {
     title.delete();                      // ERROR: STATE-1
     title.put("t");
   }
-  fn g() effects title.put, title.post { // ERROR: STATE-1, EFF-2
+  fn g(): effects title.put, title.post { // ERROR: STATE-1, EFF-2
     title.put("t");
   }
 }

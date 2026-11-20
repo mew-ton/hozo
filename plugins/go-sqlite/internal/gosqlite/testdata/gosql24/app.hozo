@@ -7,24 +7,24 @@ namespace app {
 
   // @db.where だけ
   @db.where("note", "x")
-  read fn notedRows(): Row[] on rows;
+  read fn notedRows(): Row[] reads rows;
   // 二つの @db.where
   @db.where("note", "x")
   @db.where("id", "a")
-  read fn fixedRow(): Row? on rows;
+  read fn fixedRow(): Row? reads rows;
   // @db.latest だけ
   @db.latest("at")
-  read fn lastRow(): Row? on rows;
+  read fn lastRow(): Row? reads rows;
   // 両方
   @db.where("note", "x")
   @db.latest("at")
-  read fn lastNoted(): Row? on rows;
+  read fn lastNoted(): Row? reads rows;
 
   // 通るもの
   @db.list
   @db.where("note", "x")
   @db.latest("at")
-  read fn newestNoted(): Row[] on rows;
+  read fn newestNoted(): Row[] reads rows;
   /** デコレータを付けていない read は、人が書く */
-  read fn rowCount(): int on rows;
+  read fn rowCount(): int reads rows;
 }

@@ -4,7 +4,7 @@ namespace a {
   exception E;
   @external
   decorator boundary throws E;
-  fn leaf() throws E;
+  fn leaf(): throws E;
   @boundary                            // ERROR: THROWS-1
   fn wiring() {
     leaf();

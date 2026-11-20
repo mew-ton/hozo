@@ -3,7 +3,7 @@
 namespace a {
   state users: list<string>;
   state token: nullable<string>;
-  read fn byName(name: string): string? on users;
+  read fn byName(name: string): string? reads users;
   fn find(name: string): string? reads users { return byName(name); }
   fn pure(name: string): string;
   fn show(t: string?);

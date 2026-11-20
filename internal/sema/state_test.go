@@ -30,15 +30,15 @@ namespace shop {
   classify LoggedIn of token { LoggedIn; LoggedOut; }
   classify LineKind of Line { Gift; Normal; }
 
-  effect fn addLine() on carts.post;
-  effect fn tick() on clock.put;
-  effect fn logout() on token.delete;
-  effect fn placeOrder() on Checkout: Shopping -> Ordered;
-  effect fn reset() on Checkout: any -> Shopping;
-  effect fn touch() on Checkout: Ordered, Shopping -> any;
-  effect fn clearCart() on carts: HasItems -> Empty;
-  effect fn login() on token: Empty -> HasItems;
-  effect fn signIn() on LoggedIn: any -> LoggedIn;
+  effect fn addLine(): effects carts.post;
+  effect fn tick(): effects clock.put;
+  effect fn logout(): effects token.delete;
+  effect fn placeOrder(): effects Checkout as Shopping -> Ordered;
+  effect fn reset(): effects Checkout as any -> Shopping;
+  effect fn touch(): effects Checkout as Ordered, Shopping -> any;
+  effect fn clearCart(): effects carts as HasItems -> Empty;
+  effect fn login(): effects token as Empty -> HasItems;
+  effect fn signIn(): effects LoggedIn as any -> LoggedIn;
 
   fn showEmpty(): void;
   fn showCart(): void;
@@ -230,16 +230,16 @@ func TestEffectTargetRefs(t *testing.T) {
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  effect fn start() on Phase: Idle -> Busy;
-  effect fn drain() on s: HasItems -> Empty;
+  effect fn start(): effects Phase as Idle -> Busy;
+  effect fn drain(): effects s as HasItems -> Empty;
 }`}, false)
 	noErrors(t, res, fs)
-	hasRef(t, res, fs, "a.hozo:5:24 decl a.Phase")
-	hasRef(t, res, fs, "a.hozo:5:31 case a.Phase.Idle")
-	hasRef(t, res, fs, "a.hozo:5:39 case a.Phase.Busy")
-	hasRef(t, res, fs, "a.hozo:6:24 decl a.s")
+	hasRef(t, res, fs, "a.hozo:5:30 decl a.Phase")
+	hasRef(t, res, fs, "a.hozo:5:39 case a.Phase.Idle")
+	hasRef(t, res, fs, "a.hozo:5:47 case a.Phase.Busy")
+	hasRef(t, res, fs, "a.hozo:6:30 decl a.s")
 	for _, s := range refStrings(res, fs) {
-		if s == "a.hozo:6:24 case a.s.HasItems" || s == "a.hozo:6:36 case a.s.Empty" {
+		if s == "a.hozo:6:35 case a.s.HasItems" || s == "a.hozo:6:47 case a.s.Empty" {
 			t.Errorf("組み込みのケースに参照がある: %s", s)
 		}
 	}
@@ -253,10 +253,10 @@ namespace a {
   state clock: single<string>;
   state items: list<M>;
   classify Kind of M { A; B; }
-  effect fn onSingle() on clock: Empty -> HasItems; // ERROR: STATE-4
-  effect fn value() on Kind: A -> B;                // ERROR: RES-4
-  effect fn unknown() on nothing: A -> B;           // ERROR: RES-1
-  effect fn badCase() on items: Empty -> Full;      // ERROR: STATE-4
+  effect fn onSingle(): effects clock as Empty -> HasItems; // ERROR: STATE-4
+  effect fn value(): effects Kind as A -> B;                // ERROR: RES-4
+  effect fn unknown(): effects nothing as A -> B;           // ERROR: RES-1
+  effect fn badCase(): effects items as Empty -> Full;      // ERROR: STATE-4
 }`}, false)
 	for _, name := range []string{"a.onSingle", "a.value", "a.unknown"} {
 		e := res.Program.Lookup(name).(*ir.Effect)
@@ -415,8 +415,8 @@ func TestEffectOnAcceptsOnlyBuiltin(t *testing.T) {
 	res := runAnnotated(t, project{"a.hozo": `
 namespace a {
   state location: list<string>;
-  effect fn go() on location.put;
-  effect fn leave() on location: HasItems -> Empty;
+  effect fn go(): effects location.put;
+  effect fn leave(): effects location as HasItems -> Empty;
   decorator nav(target: any effect on location.put);
   @nav(go)
   fn ok(): void;

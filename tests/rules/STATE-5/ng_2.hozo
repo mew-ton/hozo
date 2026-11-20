@@ -3,13 +3,13 @@
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  effect fn add(m: M) on rows.post;
+  effect fn add(m: M): effects rows.post;
   decorator counting(table: any state) for op reads table;
   decorator doing(...targets: any effect) for op effects targets;
   @counting(rows)
   fn count(): int reads rows;                          // ERROR: STATE-5
   @doing(add)
-  fn insert(m: M) effects add;                         // ERROR: STATE-5
+  fn insert(m: M): effects add;                         // ERROR: STATE-5
   // 配線は、節を書ける
   @counting(rows) @doing(add)
   fn wired(m: M): int reads rows effects add {

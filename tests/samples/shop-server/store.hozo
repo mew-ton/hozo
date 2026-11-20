@@ -1,6 +1,6 @@
 // サンプル shop-server の仕様（README.md）。DB の状態を持つ名前空間 store。
 // 状態に触れるのは、read（読む）と効果（書く）だけ。どちらも本体を持たず、中身は、付けた db の語彙のデコレータから go-sqlite が出す
-// （docs/plugin-go-sqlite.md「read の中身」「効果の中身」）。表は、宣言の on の状態で、列は、引数の名前。
+// （docs/plugin-go-sqlite.md「read の中身」「効果の中身」）。表は、read なら reads の状態、効果なら宛先（effects の後ろ）の状態で、列は、引数の名前。
 // read と効果を呼べるのは、この名前空間の中だけ。ほかの名前空間は、ここの op（どれも、read か効果を呼ぶだけの配線）を通して読み書きする。
 // 十の op はどれも export（P33）: 九つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
 // 単位 gen/store では go-sqlite が read と効果の中身を出し、単位 gen/storemem では人が書く。
@@ -23,46 +23,46 @@ namespace store {
 
   /** email が同じユーザー */
   @db.find
-  read fn userByEmail(email: type.Email): type.User? on users;
+  read fn userByEmail(email: type.Email): type.User? reads users;
 
   /** 識別子が同じユーザー */
   @db.find
-  read fn userById(id: type.UserId): type.User? on users;
+  read fn userById(id: type.UserId): type.User? reads users;
 
   /** トークンが同じセッション */
   @db.find
-  read fn sessionByToken(token: type.Token): type.Session? on sessions;
+  read fn sessionByToken(token: type.Token): type.Session? reads sessions;
 
   /** そのユーザーの注文。足した順 */
   @db.list
-  read fn ordersOfUser(userId: type.UserId): type.Order[] on orders;
+  read fn ordersOfUser(userId: type.UserId): type.Order[] reads orders;
 
   /** そのユーザーの、いちばん新しい注文。まだ注文がなければ、ない */
   @db.find
   @db.latest("placedAt")
-  read fn latestOrderOf(userId: type.UserId): type.Order? on orders;
+  read fn latestOrderOf(userId: type.UserId): type.Order? reads orders;
 
   // ---- 書く: 効果は、表に何をするかを言う ----
 
   /** ユーザーを登録する */
   @db.insert
-  effect fn createUser(user: type.User) on users.post;
+  effect fn createUser(user: type.User): effects users.post;
 
   /** ログインセッションを作る */
   @db.insert
-  effect fn createSession(session: type.Session) on sessions.post;
+  effect fn createSession(session: type.Session): effects sessions.post;
 
   /** ログインセッションを消す */
   @db.delete
-  effect fn deleteSession(token: type.Token) on sessions.delete;
+  effect fn deleteSession(token: type.Token): effects sessions.delete;
 
   /** 注文を作る */
   @db.insert
-  effect fn createOrder(order: type.Order) on orders.post;
+  effect fn createOrder(order: type.Order): effects orders.post;
 
   /** ユーザーへの通知を記録する */
   @db.insert
-  effect fn notifyUser(notification: type.Notification) on notifications.post;
+  effect fn notifyUser(notification: type.Notification): effects notifications.post;
 
   // ---- ほかの名前空間が呼ぶ op: read か効果を呼ぶだけの配線 ----
 

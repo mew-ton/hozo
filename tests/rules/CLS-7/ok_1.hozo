@@ -15,5 +15,5 @@ namespace a {
   classify P2 of page { IsReady: page as M; Rest: page as else; }
   /** 残りのケースは、どこに書いてもよい */
   classify P3 of Page { Rest: Page as else; IsReady: Page as M; }
-  effect fn logout() on S: LoggedIn -> LoggedOut;
+  effect fn logout(): effects S as LoggedIn -> LoggedOut;
 }

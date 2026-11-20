@@ -7,7 +7,7 @@ namespace a {
   bind token to a.*;
   classify Phase of rows { Idle; Busy; }
   fn take(t: Token?): string;
-  read fn rowByName(name: string): string? on rows;
+  read fn rowByName(name: string): string? reads rows;
   fn find(name: string): string? reads rowByName { return rowByName(name); }
   fn g();
   fn omitted(name: string): string? {
@@ -19,10 +19,10 @@ namespace a {
   fn byName(): Token? reads token {
     return token;
   }
-  fn bySubject() reads rows {
+  fn bySubject(): reads rows {
     match (rows by list) { Empty => g(); HasItems => none; };
   }
-  fn byClassify() reads a.rows {
+  fn byClassify(): reads a.rows {
     match (by Phase) { Idle => g(); Busy => none; };
   }
   fn byBind(): string reads token {

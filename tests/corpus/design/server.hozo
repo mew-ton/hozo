@@ -165,7 +165,7 @@ namespace server {
   // ---- §6.2 effect ----
 
   /** ログインセッションを作成する */
-  effect fn createSession(login: LoginOk) on sessions.post;
+  effect fn createSession(login: LoginOk): effects sessions.post;
 
   // ---- §8.1 デコレータの宣言 ----
 
@@ -222,13 +222,13 @@ namespace server {
   }
 
   /** 返金する（注文の状態を返金済みにする） */
-  effect fn refund(orderId: OrderId) on orders.put;
+  effect fn refund(orderId: OrderId): effects orders.put;
 
   /** 注文を作成する */
-  effect fn createOrder(order: Order) on orders.post;
+  effect fn createOrder(order: Order): effects orders.post;
 
   /** ユーザーに通知する */
-  effect fn notifyUser(notice: Notification) on notifications.post;
+  effect fn notifyUser(notice: Notification): effects notifications.post;
 
   /** 返金の処理は受け付けたが、完了の確認が取れない */
   exception RefundPending;
@@ -266,7 +266,7 @@ namespace server {
   }
 
   /** 注文したユーザーに通知する */
-  fn sendOrderNotice(order: Order)
+  fn sendOrderNotice(order: Order):
     effects notifyUser
     throws NotificationFailed prevents effects
   {
@@ -290,7 +290,7 @@ namespace server {
 
   // 追加: §3.4 の例が参照する効果と例外
   /** 再設定メールを送る */
-  effect fn sendResetMail(reset: PasswordReset) on passwordResets.post;
+  effect fn sendResetMail(reset: PasswordReset): effects passwordResets.post;
 
   /** 同じアドレスに短時間で送りすぎた */
   @http.status(429)
@@ -308,7 +308,7 @@ namespace server {
    * @see login
    */
   @http.post("/password-reset")
-  fn requestPasswordReset(email: Email)
+  fn requestPasswordReset(email: Email):
     effects sendResetMail
     throws RateLimited prevents effects
   {
@@ -321,7 +321,7 @@ namespace server {
   // ---- §9 配線（server 側） ----
 
   /** ログインセッションを削除する */
-  effect fn deleteSession(token: Token?) on sessions.delete;
+  effect fn deleteSession(token: Token?): effects sessions.delete;
 
   model LogoutInput {
     @http.header(name: "Authorization") token: Token?;
@@ -329,7 +329,7 @@ namespace server {
 
   // トークンがない・無効な場合のログアウトは何もしない（401 にしない）
   @http.post("/logout")
-  export fn logout(in: LogoutInput)
+  export fn logout(in: LogoutInput):
     effects deleteSession
   {
     deleteSession(in.token);
@@ -377,7 +377,7 @@ namespace server {
   }
 
   /** カートに一行足す */
-  effect fn addCartLine(line: CartLine) on carts.post;
+  effect fn addCartLine(line: CartLine): effects carts.post;
 
   // 追加: addToCart の、状態に触れない部分（README.md の表の 20）
   fn newCartLine(in: AddToCartInput): CartLine;
@@ -400,7 +400,7 @@ namespace server {
   }
 
   /** カートの一行に保証を付ける */
-  effect fn attachWarrantyToLine(line: WarrantyLine) on carts.put;
+  effect fn attachWarrantyToLine(line: WarrantyLine): effects carts.put;
 
   // 追加: attachWarranty の、状態に触れない部分（README.md の表の 20）
   fn withWarranty(in: AttachWarrantyInput): WarrantyLine;

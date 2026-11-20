@@ -2,10 +2,10 @@
 namespace a {
   state s: list<string>;
   classify Phase of s { Idle; Busy; }
-  effect fn ok() on Phase: Idle -> Busy;
+  effect fn ok(): effects Phase as Idle -> Busy;
 }
 namespace b {
-  effect fn onState() on a.s: Empty -> HasItems;    // ERROR: RES-5
-  effect fn onClassify() on a.Phase: Idle -> Busy;  // ERROR: RES-5
+  effect fn onState(): effects a.s as Empty -> HasItems;    // ERROR: RES-5
+  effect fn onClassify(): effects a.Phase as Idle -> Busy;  // ERROR: RES-5
   fn f();
 }

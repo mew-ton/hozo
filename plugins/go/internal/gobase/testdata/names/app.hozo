@@ -62,8 +62,8 @@ namespace app {
 
   // 「局所の名前」read と効果の引数名も、同じ規則（状態の単位のメソッドの引数）。それを呼ぶ配線の引数名と、直に呼ぶ組み込みの
   // 効果の値
-  read fn pick(ctx: string, type: string, err: int?): string on extra;
-  effect fn store(o: string, range: type.Token?, context: string) on extra.put;
+  read fn pick(ctx: string, type: string, err: int?): string reads extra;
+  effect fn store(o: string, range: type.Token?, context: string): effects extra.put;
   export fn touch(ctx: string, type: string, value: string): string
   {
     store(ctx, none, type);

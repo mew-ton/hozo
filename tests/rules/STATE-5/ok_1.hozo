@@ -4,13 +4,13 @@ namespace a {
   model M { id: string; }
   exception Invalid(reason: string);
   state rows: list<M>;
-  effect fn add(m: M) on rows.post;
-  read fn byId(id: string): M? on rows;
+  effect fn add(m: M): effects rows.post;
+  read fn byId(id: string): M? reads rows;
   fn normalize(m: M): M throws Invalid;
   fn find(id: string): M? reads rows {
     return byId(id);
   }
-  fn insert(m: M) effects add throws Invalid {
+  fn insert(m: M): effects add throws Invalid {
     val row = normalize(m);
     add(row);
   }

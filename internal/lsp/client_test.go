@@ -271,7 +271,7 @@ const warnFile = `// internal/lsp のテストが足すファイル: 意図し�
 namespace server {
   /** 手が空いている */
   exception Idle;
-  fn ping() throws Idle prevents effects;
+  fn ping(): throws Idle prevents effects;
 }
 `
 

@@ -1,4 +1,4 @@
-// GOSQL-7（docs/plugin-go-sqlite.md「診断」）: db のデコレータを付けた read の on の状態か、効果の宛先の状態が、N の表の状態でない
+// GOSQL-7（docs/plugin-go-sqlite.md「診断」）: db のデコレータを付けた read の reads の状態か、効果の宛先の状態が、N の表の状態でない
 // （@db.table が付いていない）。位置は、その read か効果。
 
 namespace app {
@@ -9,29 +9,29 @@ namespace app {
 
   // read: @db.find、@db.list
   @db.find
-  read fn plainById(id: string): Row? on plain;
+  read fn plainById(id: string): Row? reads plain;
   @db.list
   @db.where("note", "x")
   @db.latest("note")
-  read fn plainRows(): Row[] on plain;
+  read fn plainRows(): Row[] reads plain;
 
   // 効果: @db.insert、@db.update、@db.delete（配線が呼んでいない効果も、同じに確かめる）
   @db.insert
-  effect fn createPlain(row: Row) on plain.post;
+  effect fn createPlain(row: Row): effects plain.post;
   @db.update
-  effect fn updatePlain(row: Row) on plain.put;
+  effect fn updatePlain(row: Row): effects plain.put;
   @db.delete
-  effect fn deletePlain(id: string) on plain.delete;
+  effect fn deletePlain(id: string): effects plain.delete;
   export fn addPlain(row: Row) {
     createPlain(row);
   }
 
   // 通るもの
   @db.find
-  read fn rowById(id: string): Row? on rows;
+  read fn rowById(id: string): Row? reads rows;
   @db.insert
-  effect fn createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row): effects rows.post;
   /** デコレータを付けていない read と効果は、見ない */
-  read fn plainCount(): int on plain;
-  effect fn clearPlain() on plain.delete;
+  read fn plainCount(): int reads plain;
+  effect fn clearPlain(): effects plain.delete;
 }

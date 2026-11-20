@@ -29,7 +29,7 @@ namespace a {
   classify P3 of Three { IsReady: Three as M; Rest: Three as else; }
   classify D of find { Found: find as M; }
 
-  effect fn logout() on S: LoggedIn -> LoggedOut;
+  effect fn logout(): effects S as LoggedIn -> LoggedOut;
 
   fn wire(two: Two, three: Three): void {
     val   m = find();

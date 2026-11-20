@@ -30,38 +30,38 @@ namespace backoffice {
   // ---- 効果 ----
 
   /** トークンを保存する */
-  effect fn saveToken(token: type.Token) on token: Empty -> HasItems;
+  effect fn saveToken(token: type.Token): effects token as Empty -> HasItems;
 
   /** トークンを消す */
-  effect fn removeToken() on token.delete;
+  effect fn removeToken(): effects token.delete;
 
   /** 理由を消す */
-  effect fn clearProblem() on problem.delete;
+  effect fn clearProblem(): effects problem.delete;
 
   /** ログイン名かパスワードが違う */
-  effect fn sayWrongCredentials() on problem.put;
+  effect fn sayWrongCredentials(): effects problem.put;
 
   /** その操作は、もうできない（ほかの人が先に進めた）。開き直せば、いまの状態が出る */
-  effect fn sayStale() on problem.put;
+  effect fn sayStale(): effects problem.put;
 
   /** 入れた値が、受け付けられない（箱の種類がない、重すぎる、もう登録してある） */
-  effect fn sayRejected() on problem.put;
+  effect fn sayRejected(): effects problem.put;
 
   /** 客に請求できない: 支払いの枠の期限が過ぎている。送り状は買っていない。管理の担当に渡す */
-  effect fn sayCannotCharge() on problem.put;
+  effect fn sayCannotCharge(): effects problem.put;
 
   /** 配送業者が、その荷物を引き受けない。送り状は買っていない。請求は、確定している。ほかの見積もりを選ぶ */
-  effect fn sayCarrierRefused() on problem.put;
+  effect fn sayCarrierRefused(): effects problem.put;
 
   /** 外部の仕組みに届かなかった。請求と送り状が、どこまで進んだかは、分からない。開き直して、確かめる */
-  effect fn sayUnknownOutcome() on problem.put;
+  effect fn sayUnknownOutcome(): effects problem.put;
 
   /** 画面を移す */
-  effect fn goToLogin() on location.put;
-  effect fn goToShipments() on location.put;
-  effect fn goToStation(id: shipping.ShipmentId) on location.put;
+  effect fn goToLogin(): effects location.put;
+  effect fn goToShipments(): effects location.put;
+  effect fn goToStation(id: shipping.ShipmentId): effects location.put;
   /** 同じ画面を、開き直す */
-  effect fn reload() on location.put;
+  effect fn reload(): effects location.put;
 
   // ---- デコレータ ----
 
@@ -162,7 +162,7 @@ namespace backoffice {
   @staffOnly
   @recover(production.NoJob | production.NotInProduction | shipping.NoShipment | shipping.UnknownItem, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  fn onFinishJob(job: production.Job)
+  fn onFinishJob(job: production.Job):
     throws page.Aborted
   {
     val measured = askMeasurement(job);
@@ -292,7 +292,7 @@ namespace backoffice {
   @recover(shipping.NoShipment | shipping.NotGathered | shipping.AlreadyPacked, sayStale)
   @recover(shipping.UnknownBox | shipping.OverWeight | shipping.Undeliverable, sayRejected)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  fn onPack(id: shipping.ShipmentId, option: shipping.BoxOption, weight: type.Grams)
+  fn onPack(id: shipping.ShipmentId, option: shipping.BoxOption, weight: type.Grams):
     throws page.Aborted
   {
     match (option.overCeiling by Overrun) {
@@ -370,7 +370,7 @@ namespace backoffice {
   @staffOnly
   @recover(carrier.AlreadyRegistered, sayRejected)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  fn onRegisterCarrier()
+  fn onRegisterCarrier():
     throws page.Aborted
   {
     val carrier = askCarrier();

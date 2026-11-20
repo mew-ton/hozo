@@ -23,7 +23,7 @@ namespace table {
 namespace consts {
   model Row { @db.key @db.text id: string; }
   @db.table state effectLog: list<Row>;
-  effect fn logTable() on effectLog.delete;
+  effect fn logTable(): effects effectLog.delete;
   @db.table state kind: list<Row>;
   classify Kind of string {
     Table;
@@ -52,7 +52,7 @@ namespace seamed {
   exception NewDbSeams;
   @db.table state rows: list<Row>;
   @db.insert
-  effect fn createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row): effects rows.post;
   @db.transaction
   export fn add(row: Row) {
     createRow(row);

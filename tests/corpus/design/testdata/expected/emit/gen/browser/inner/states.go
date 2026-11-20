@@ -16,7 +16,7 @@ type TokenState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 nullable で決まる）: browser.token の値。なければ nil。
 	Get(ctx context.Context) (*server.Token, error)
-	// RemoveToken は命令（効果 browser.removeToken、on browser.token.delete）: 手元のトークンを消す
+	// RemoveToken は命令（効果 browser.removeToken、effects browser.token.delete）: 手元のトークンを消す
 	RemoveToken(ctx context.Context) error
 }
 
@@ -32,12 +32,12 @@ type QueryState interface {
 type LocationState interface {
 	// Get は問い合わせ（形 single で決まる）: browser.location の値。
 	Get(ctx context.Context) (page.Route, error)
-	// TransitionToLogin は命令（効果 browser.transitionToLogin、on browser.location.put）: ログイン画面へ遷移する
+	// TransitionToLogin は命令（効果 browser.transitionToLogin、effects browser.location.put）: ログイン画面へ遷移する
 	TransitionToLogin(ctx context.Context) error
-	// TransitionToForbidden は命令（効果 browser.transitionToForbidden、on browser.location.put）: 権限がないことを示す画面へ遷移する
+	// TransitionToForbidden は命令（効果 browser.transitionToForbidden、effects browser.location.put）: 権限がないことを示す画面へ遷移する
 	TransitionToForbidden(ctx context.Context) error
-	// TransitionToPayment は命令（効果 browser.transitionToPayment、on browser.location.put）: 支払い画面へ遷移する
+	// TransitionToPayment は命令（効果 browser.transitionToPayment、effects browser.location.put）: 支払い画面へ遷移する
 	TransitionToPayment(ctx context.Context) error
-	// TransitionToOrders は命令（効果 browser.transitionToOrders、on browser.location.put）: 注文一覧の既定の URL に置き換える
+	// TransitionToOrders は命令（効果 browser.transitionToOrders、effects browser.location.put）: 注文一覧の既定の URL に置き換える
 	TransitionToOrders(ctx context.Context) error
 }

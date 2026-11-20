@@ -27,28 +27,28 @@ namespace app {
     Missing: Order? as none;
   }
 
-  read fn orderById(id: string): Order? on orders;
+  read fn orderById(id: string): Order? reads orders;
 
   /** 注文を受け付ける */
-  effect fn accept(order: Order) on orders.post as Stage.Accepted;
-  effect fn open(order: Order) on orders.post as Life.Absent -> Life.Open;
-  effect fn bring(order: Order) on orders.post as any;
+  effect fn accept(order: Order): effects orders.post as Stage.Accepted;
+  effect fn open(order: Order): effects orders.post as Life.Absent -> Life.Open;
+  effect fn bring(order: Order): effects orders.post as any;
   /** 作り始める */
-  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
   /**
    * 取り消す。
    * 取り消せるのは、作り始める前だけ
    */
-  effect fn cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-  effect fn forceShip(order: Order) on orders.put as any -> Stage.Shipped;
-  effect fn revise(order: Order, note: string) on orders.put as Stage.Accepted -> else;
-  effect fn patch(order: Order) on orders.put as any -> else;
-  effect fn rename(order: Order) on orders.put;
-  effect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
-  effect fn purge(order: Order) on orders.delete as Life.Absent;
+  effect fn cancel(order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect fn forceShip(order: Order): effects orders.put as any -> Stage.Shipped;
+  effect fn revise(order: Order, note: string): effects orders.put as Stage.Accepted -> else;
+  effect fn patch(order: Order): effects orders.put as any -> else;
+  effect fn rename(order: Order): effects orders.put;
+  effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
+  effect fn purge(order: Order): effects orders.delete as Life.Absent;
 
   /** 作り始める。受け付けた注文だけ */
-  export fn begin(id: string, at: Time)
+  export fn begin(id: string, at: Time):
     throws NoOrder, NotAccepted
   {
     val found = orderById(id);
@@ -58,7 +58,7 @@ namespace app {
     };
   }
 
-  export fn beginFound(order: Order, at: Time)
+  export fn beginFound(order: Order, at: Time):
     throws NotAccepted
   {
     match (order by Stage) {
@@ -73,7 +73,7 @@ namespace app {
   }
 
   /** 捨てる。開いている注文だけ */
-  export fn drop(id: string)
+  export fn drop(id: string):
     throws NoOrder, NotOpen
   {
     val found = orderById(id);

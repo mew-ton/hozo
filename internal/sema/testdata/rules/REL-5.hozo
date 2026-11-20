@@ -1,13 +1,13 @@
 // REL-5: 一つの ThrowsClause に prevents と keeps の両方がある（docs/check.md「throws」）
 namespace a {
   state s: list<string>;
-  effect fn e() on s.post;
+  effect fn e(): effects s.post;
   exception E;
   exception F;
   decorator doing(...targets: any effect) for op effects targets;
-  @doing(e) fn a1() throws E prevents effects keeps effects;     // ERROR: REL-5
-  @doing(e) fn a2() throws E, F keeps effects prevents effects;  // ERROR: REL-5
+  @doing(e) fn a1(): throws E prevents effects keeps effects;     // ERROR: REL-5
+  @doing(e) fn a2(): throws E, F keeps effects prevents effects;  // ERROR: REL-5
   decorator d throws E keeps effects prevents effects;           // ERROR: REL-5
-  @doing(e) fn ok() throws E prevents effects throws F keeps effects;
-  @doing(e) fn same() throws E prevents effects prevents effects;
+  @doing(e) fn ok(): throws E prevents effects throws F keeps effects;
+  @doing(e) fn same(): throws E prevents effects prevents effects;
 }

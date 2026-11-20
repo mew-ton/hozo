@@ -66,42 +66,42 @@ namespace vault {
 
   /** レシーバの t */
   @db.find
-  read fn byT(t: Key): Secret? on secrets;
+  read fn byT(t: Key): Secret? reads secrets;
 
   /** ctx、err、args */
   @db.list
-  read fn byLocals(ctx: Num, err: Ratio, args: Flag): Secret[] on secrets;
+  read fn byLocals(ctx: Num, err: Ratio, args: Flag): Secret[] reads secrets;
 
   /** Go の予約語と、事前宣言の識別子（仕様の予約語 string、any の列は、引数の名前に書けない） */
   @db.list
-  read fn byWords(type: Time): Secret[] on secrets;
+  read fn byWords(type: Time): Secret[] reads secrets;
 
   /** import するパッケージの名前 */
   @db.list
-  read fn byImports(json: Record<string, string>, time: Time?, sql: Duration, runtime: string): Secret[] on secrets;
+  read fn byImports(json: Record<string, string>, time: Time?, sql: Duration, runtime: string): Secret[] reads secrets;
 
   /** このファイルの非公開の名前と、継ぎ目のメソッドのレシーバ s */
   @db.list
-  read fn byPrivates(dbGet: string, dbScanSecret: string, s: string): Secret[] on secrets;
+  read fn byPrivates(dbGet: string, dbScanSecret: string, s: string): Secret[] reads secrets;
 
   // ---- 効果 ----
 
   /** 行の引数の名前が、行の値の変数 args と当たる */
   @db.insert
-  effect fn createSecret(args: Secret) on secrets.post;
+  effect fn createSecret(args: Secret): effects secrets.post;
 
   /** err と当たる */
   @db.update
-  effect fn updateSecret(err: Secret) on secrets.put;
+  effect fn updateSecret(err: Secret): effects secrets.put;
 
   /** @db.delete の引数（= 列の名前） */
   @db.delete
-  effect fn deleteSecret(t: Key, ctx: Num, dbGet: string) on secrets.delete;
+  effect fn deleteSecret(t: Key, ctx: Num, dbGet: string): effects secrets.delete;
 
   @db.insert
-  effect fn createA(row: row.Entry) on entriesA.post;
+  effect fn createA(row: row.Entry): effects entriesA.post;
   @db.insert
-  effect fn createB(r: r.Entry) on entriesB.post;
+  effect fn createB(r: r.Entry): effects entriesB.post;
 
   // ---- op ----
 

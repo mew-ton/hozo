@@ -8,10 +8,10 @@ namespace app {
   classify Stage of Order { Draft; Accepted; InProduction; Shipped; }
 
   @db.update
-  effect fn start(order: Order) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order): effects orders.put as Stage.Accepted -> Stage.InProduction;
   /** 配線が呼んでいない効果も、同じに確かめる。前のケースが二つでも、後のケースが、その並びになければ同じ */
   @db.update
-  effect fn ship(order: Order) on orders.put as Stage.Accepted, Stage.InProduction -> Stage.Shipped;
+  effect fn ship(order: Order): effects orders.put as Stage.Accepted, Stage.InProduction -> Stage.Shipped;
   // 配線が呼んでも、効果ごとに一度だけ
   export fn begin(order: Stage.Accepted<Order>) {
     start(order);
@@ -19,18 +19,18 @@ namespace app {
 
   // 通るもの: 前が any、後ろが else、後のケースが前の並びにある、行の遷移を書かない
   @db.update
-  effect fn forceShip(order: Order) on orders.put as any -> Stage.Shipped;
+  effect fn forceShip(order: Order): effects orders.put as any -> Stage.Shipped;
   @db.update
-  effect fn revise(order: Order) on orders.put as Stage.Accepted -> else;
+  effect fn revise(order: Order): effects orders.put as Stage.Accepted -> else;
   @db.update
-  effect fn touch(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
+  effect fn touch(order: Order): effects orders.put as Stage.Accepted -> Stage.Accepted;
   @db.update
-  effect fn hold(order: Order) on orders.put as Stage.Accepted, Stage.InProduction -> Stage.Accepted;
+  effect fn hold(order: Order): effects orders.put as Stage.Accepted, Stage.InProduction -> Stage.Accepted;
   @db.update
-  effect fn patch(order: Order) on orders.put as any -> else;
+  effect fn patch(order: Order): effects orders.put as any -> else;
   @db.update
-  effect fn rename(order: Order) on orders.put;
+  effect fn rename(order: Order): effects orders.put;
   // @db.insert は、入る行を、そのまま足す
   @db.insert
-  effect fn accept(order: Order) on orders.post as Stage.Accepted;
+  effect fn accept(order: Order): effects orders.post as Stage.Accepted;
 }

@@ -12,11 +12,11 @@ namespace web {
   bind token to api.*;
 
   /** ログイン画面へ */
-  effect fn goLogin() on location.put;
+  effect fn goLogin(): effects location.put;
   /** ホームへ */
-  effect fn goHome() on location.put;
+  effect fn goHome(): effects location.put;
   /** 手元のトークンを消す */
-  effect fn removeToken() on token.delete;
+  effect fn removeToken(): effects token.delete;
 
   /** 一時的に表示できない */
   model Unavailable {}

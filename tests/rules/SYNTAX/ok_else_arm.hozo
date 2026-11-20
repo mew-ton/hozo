@@ -6,8 +6,8 @@ namespace a {
   state orders: list<M>;
   classify K of M { A; B; C; D; E; }
   classify Checkout of carts, orders { Shopping; Ordered; Shipped; }
-  effect fn touch() on Checkout: Shopping, Ordered -> any;
-  effect fn move() on Checkout: any -> Ordered, Shipped;
+  effect fn touch(): effects Checkout as Shopping, Ordered -> any;
+  effect fn move(): effects Checkout as any -> Ordered, Shipped;
   fn use(m: M);
   fn f();
   fn check(condition: string): string;

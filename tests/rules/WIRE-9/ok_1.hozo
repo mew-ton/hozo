@@ -5,15 +5,15 @@ namespace a {
   classify Kind of M { A; B; }
   fn fail(): never throws E;
   fn g();
-  fn f() throws E {
+  fn f(): throws E {
     g();
     fail();
   }
-  fn h(m: M) throws E {
+  fn h(m: M): throws E {
     g();
     match (m by Kind) { A => throw E; B => fail(); };
   }
-  fn some(m: M) throws E {
+  fn some(m: M): throws E {
     match (m by Kind) { A => throw E; B => g(); };
     g();
   }

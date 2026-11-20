@@ -3,13 +3,13 @@ namespace a {
   state s: single<string>;
   state l: list<string>;
   state n: nullable<string>;
-  effect fn put() on s.put;
-  effect fn post() on s.post;               // ERROR: STATE-1
-  effect fn del() on s.delete;              // ERROR: STATE-1
-  effect fn lpost() on l.post;
-  effect fn lput() on l.put;
-  effect fn ldel() on l.delete;
-  effect fn npost() on n.post;
-  effect fn nput() on n.put;
-  effect fn ndel() on n.delete;
+  effect fn put(): effects s.put;
+  effect fn post(): effects s.post;               // ERROR: STATE-1
+  effect fn del(): effects s.delete;              // ERROR: STATE-1
+  effect fn lpost(): effects l.post;
+  effect fn lput(): effects l.put;
+  effect fn ldel(): effects l.delete;
+  effect fn npost(): effects n.post;
+  effect fn nput(): effects n.put;
+  effect fn ndel(): effects n.delete;
 }

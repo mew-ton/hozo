@@ -39,13 +39,13 @@ func exc(fqn string) *ir.Exception {
 	return &ir.Exception{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}}
 }
 
-// eff は基底の状態の組み込みの効果（`effect fn e() on s.op`）。書き込むのはその状態。
+// eff は基底の状態の組み込みの効果（`effect fn e(): effects s.op`）。書き込むのはその状態。
 func eff(fqn, state string, op ir.Operation) *ir.Effect {
 	return &ir.Effect{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)},
 		Target: ir.BuiltinTarget{State: state, Operation: op}, Writes: []string{state}}
 }
 
-// transition は分類の遷移の効果（`effect fn e() on X: from -> to`）。writes は書き込む基底の状態。
+// transition は分類の遷移の効果（`effect fn e(): effects X as from -> to`）。writes は書き込む基底の状態。
 func transition(fqn, of string, from, to ir.CaseSet, writes ...string) *ir.Effect {
 	return &ir.Effect{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)},
 		Target: ir.TransitionTarget{Of: of, From: from, To: to}, Writes: writes}

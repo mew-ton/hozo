@@ -2,7 +2,7 @@
 namespace a {
   exception E;
   decorator ignoreE catches E ignores;
-  fn leaf() throws E;
+  fn leaf(): throws E;
   @ignoreE
   fn f() {
     leaf();

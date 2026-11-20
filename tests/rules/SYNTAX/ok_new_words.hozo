@@ -14,7 +14,7 @@ namespace a {
   exception Gone;
   state users: list<User>;
   state omit: string;
-  read fn byId(is: string): User? on users;
+  read fn byId(is: string): User? reads users;
   export fn find(is: string): User? reads users { return byId(is); }
   fn gone(): never throws Gone;
   fn nameOf(u: User): string;

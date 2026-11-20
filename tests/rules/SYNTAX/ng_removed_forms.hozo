@@ -9,8 +9,8 @@ namespace a {
   // 引数のない例外は括弧を書かない
   exception Empty();                             // ERROR: SYNTAX
   // 効果と read は、引数がなくても括弧を書く
-  effect fn old on rows.post;                    // ERROR: SYNTAX
-  read fn noParens on rows;                      // ERROR: SYNTAX
+  effect fn old: effects rows.post;              // ERROR: SYNTAX
+  read fn noParens: M[] reads rows;              // ERROR: SYNTAX
   // any read という引数の種類はない
   decorator anyRead(target: any read);           // ERROR: SYNTAX
   exception E;
@@ -30,8 +30,8 @@ namespace a {
       B => m;
     };
   }
-  effect fn add(m: M) on rows.post;
-  read fn all(): M[] on rows;
+  effect fn add(m: M): effects rows.post;
+  read fn all(): M[] reads rows;
   fn ok(m: M): M[] {
     add(m);
     return all();
@@ -66,15 +66,48 @@ namespace removedFnHead {
   state rows: list<M>;
   op oldOp(m: M): M;                             // ERROR: SYNTAX
   export op oldExported(m: M): M;                // ERROR: SYNTAX
-  read oldRead(): M[] on rows;                   // ERROR: SYNTAX
-  effect oldEffect(m: M) on rows.post;           // ERROR: SYNTAX
+  read oldRead(): M[] reads rows;                // ERROR: SYNTAX
+  effect oldEffect(m: M): effects rows.post;     // ERROR: SYNTAX
   op fn both(m: M): M;                           // ERROR: SYNTAX
   fn leaf(m: M): M;
-  read fn all(): M[] on rows;
-  effect fn add(m: M) on rows.post;
+  read fn all(): M[] reads rows;
+  effect fn add(m: M): effects rows.post;
   fn ok(m: M): M[] {
     val x = leaf(m);
     add(x);
+    return all();
+  }
+}
+
+// 関数の末尾（docs/grammar.md「関数の宣言」「exception / effect / read」）: 節の前の「:」、on、状態の遷移の「:」
+namespace removedFnTail {
+  model M { id: string; }
+  state rows: list<M>;
+  exception E;
+  classify K of M { A; B; }
+  // 「)」の後ろに、戻り値か節を書くなら、「:」で始める
+  fn noColon(m: M) throws E;                     // ERROR: SYNTAX
+  fn noColonBody(m: M) throws E {                // ERROR: SYNTAX
+    return match (m by K) { A => throw E; B => m; };
+  }
+  // 「:」の後ろに、何もない
+  fn emptyType(m: M):;                           // ERROR: SYNTAX
+  fn emptyTypeBody(m: M): { leaf(m); }           // ERROR: SYNTAX
+  // read と効果の、状態との関係は、reads と effects で書く（on は、なくした書き方）
+  read fn oldOn(): M[] on rows;                  // ERROR: SYNTAX
+  effect fn oldOnEffect(m: M) on rows.post;      // ERROR: SYNTAX
+  effect fn noColonEffect(m: M) effects rows.post;   // ERROR: SYNTAX
+  read fn noColonRead() reads rows;              // ERROR: SYNTAX
+  // 状態の遷移は、as で書く（宛先の後ろの「:」は、なくした書き方）
+  effect fn oldTransition(): effects rows: HasItems -> Empty;   // ERROR: SYNTAX
+  fn leaf(m: M);
+  read fn all(): M[] reads rows;
+  effect fn add(m: M): effects rows.post;
+  effect fn clear(): effects rows as HasItems -> Empty;
+  fn ok(m: M): M[] throws E {
+    val x = match (m by K) { A => throw E; B => m; };
+    add(x);
+    clear();
     return all();
   }
 }

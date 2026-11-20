@@ -3,7 +3,7 @@ namespace a {
   exception E;
   exception F;
   decorator recoverE catches E recovers;
-  fn leaf() throws E, F;
+  fn leaf(): throws E, F;
   @recoverE                            // ERROR: THROWS-1
   fn wiring() {
     leaf();

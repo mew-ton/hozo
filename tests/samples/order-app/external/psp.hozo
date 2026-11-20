@@ -78,13 +78,13 @@ namespace psp {
   state holds: list<SessionRef>;
 
   /** 客から店へ、金が動く */
-  effect fn takeMoney() on ledger.post;
+  effect fn takeMoney(): effects ledger.post;
 
   /** 店から客へ、金が戻る */
-  effect fn returnMoney() on ledger.post;
+  effect fn returnMoney(): effects ledger.post;
 
   /** 枠がなくなる */
-  effect fn dropHold() on holds.delete;
+  effect fn dropHold(): effects holds.delete;
 
   /** 枠の期限が過ぎていて、請求を確定できない */
   exception HoldExpired;
@@ -100,7 +100,7 @@ namespace psp {
   /** 枠から、請求を確定する。一度だけ。額は、確保した額以下 */
   @outside.does(takeMoney, dropHold)
   @http.post("/captures")
-  export fn capture(request: AmountRequest)
+  export fn capture(request: AmountRequest):
     throws HoldExpired prevents effects;
 
   /** 確定した請求の一部を返す */

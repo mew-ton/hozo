@@ -6,8 +6,8 @@ namespace a {
   exception E;
   state rows: list<M>;
   state cur: nullable<M>;
-  effect fn add(m: M) on rows.post;
-  effect fn set(m: M) on cur.post;
+  effect fn add(m: M): effects rows.post;
+  effect fn set(m: M): effects cur.post;
   union Writes { add; set; }
   classify Stock of rows { None; Some; }
   fn f(m: M, rows: M[]) {

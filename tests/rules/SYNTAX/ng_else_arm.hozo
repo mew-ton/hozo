@@ -34,7 +34,7 @@ namespace a {
   }
   // else は、遷移のケースにも、束縛の名前にも書けない
   state carts: list<M>;
-  effect fn clear() on carts: else -> Empty;        // ERROR: SYNTAX
+  effect fn clear(): effects carts as else -> Empty;        // ERROR: SYNTAX
   fn bindElse(m: M) {
     val else = f2(m);                          // ERROR: SYNTAX
   }

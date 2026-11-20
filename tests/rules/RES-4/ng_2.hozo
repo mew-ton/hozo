@@ -6,11 +6,11 @@ namespace a {
   state s: list<M>;
   classify Kind of M { A; B; }
   // 値の分類の遷移は書けない
-  effect fn onValue() on Kind: A -> B;      // ERROR: RES-4
+  effect fn onValue(): effects Kind as A -> B;      // ERROR: RES-4
   // model は分類でも状態でもない
-  effect fn onModel() on M: A -> B;         // ERROR: RES-4
-  // 「状態.操作」の後ろに遷移は続けられない（宛先は一つだけ）
-  effect fn both() on s.post: Empty -> HasItems;   // ERROR: RES-4
+  effect fn onModel(): effects M as A -> B;         // ERROR: RES-4
+  // 例外は分類でも状態でもない
+  effect fn onException(): effects E as A -> B;     // ERROR: RES-4
   // 対象が一つの classify: 例外は型ではなく、値の分類の名前は C.Case<T> の形でだけ型になる
   classify OfException of E { A; }     // ERROR: RES-4
   classify OfClassify of Kind { A; }   // ERROR: RES-4

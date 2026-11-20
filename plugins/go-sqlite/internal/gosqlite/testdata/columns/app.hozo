@@ -95,13 +95,13 @@ namespace app {
   /** @db.table のない状態は、表にならない */
   state plain: list<Core>;
 
-  @db.insert effect fn createCore(row: Core) on cores.post;
-  @db.insert effect fn createNamed(row: Named) on nameds.post;
-  @db.insert effect fn createDoc(row: Doc) on docs.post;
-  @db.insert effect fn createSparse(row: Sparse) on sparses.post;
-  @db.insert effect fn createPair(row: Pair) on pairs.post;
-  @db.insert effect fn createSharedA(row: Shared) on sharedA.post;
-  @db.insert effect fn createLink(row: Link) on links.post;
+  @db.insert effect fn createCore(row: Core): effects cores.post;
+  @db.insert effect fn createNamed(row: Named): effects nameds.post;
+  @db.insert effect fn createDoc(row: Doc): effects docs.post;
+  @db.insert effect fn createSparse(row: Sparse): effects sparses.post;
+  @db.insert effect fn createPair(row: Pair): effects pairs.post;
+  @db.insert effect fn createSharedA(row: Shared): effects sharedA.post;
+  @db.insert effect fn createLink(row: Link): effects links.post;
 
   /** 効果を呼ぶ配線（効果は、配線が呼んでいなくても、状態の単位のメソッドになる） */
   export fn addCore(core: Core) {

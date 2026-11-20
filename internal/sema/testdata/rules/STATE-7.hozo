@@ -11,11 +11,11 @@ namespace a {
   classify Progress of Job { Queued; Done; }
   classify Hit of find { Found: find as Order; Missing: find as else; }
   classify Filled of orders { Some; None; }
-  effect fn a1(order: Order) on orders.put as Progress.Queued -> Progress.Done;   // ERROR: STATE-7
-  effect fn a2(order: Order) on orders.post as Hit.Found;                         // ERROR: STATE-7
-  effect fn a3(order: Order) on orders.post as Filled.Some;                       // ERROR: STATE-7
-  effect fn a4(order: Order) on orders.put as Stage.Draft -> Stage.Packed;        // ERROR: STATE-7
-  effect fn a5(order: Order) on orders.put as Stage.Draft -> Paid.Yes;            // ERROR: STATE-7
-  effect fn a6(order: Order) on orders.put as Stage.Draft, Paid.No -> Stage.Shipped;   // ERROR: STATE-7
-  effect fn a7(order: Order) on orders.put as Stage.Draft, Stage.Draft -> Stage.Shipped;   // ERROR: STATE-7
+  effect fn a1(order: Order): effects orders.put as Progress.Queued -> Progress.Done;   // ERROR: STATE-7
+  effect fn a2(order: Order): effects orders.post as Hit.Found;                         // ERROR: STATE-7
+  effect fn a3(order: Order): effects orders.post as Filled.Some;                       // ERROR: STATE-7
+  effect fn a4(order: Order): effects orders.put as Stage.Draft -> Stage.Packed;        // ERROR: STATE-7
+  effect fn a5(order: Order): effects orders.put as Stage.Draft -> Paid.Yes;            // ERROR: STATE-7
+  effect fn a6(order: Order): effects orders.put as Stage.Draft, Paid.No -> Stage.Shipped;   // ERROR: STATE-7
+  effect fn a7(order: Order): effects orders.put as Stage.Draft, Stage.Draft -> Stage.Shipped;   // ERROR: STATE-7
 }

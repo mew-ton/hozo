@@ -172,28 +172,28 @@ namespace ordering {
 
   /** その鍵の注文 */
   @db.find
-  read fn orderByKey(key: type.OrderKey): Order? on orders;
+  read fn orderByKey(key: type.OrderKey): Order? reads orders;
 
   /** その識別子の注文 */
   @db.find
-  read fn orderById(id: type.OrderId): Order? on orders;
+  read fn orderById(id: type.OrderId): Order? reads orders;
 
   /** その送信で、もう作った注文 */
   @db.find
-  read fn orderByRequest(requestId: type.RequestId): Order? on orders;
+  read fn orderByRequest(requestId: type.RequestId): Order? reads orders;
 
   /** deadline より前に申し込まれて、まだ支払いを待っている注文。古い順（比較と並べ方は db の語彙で言えないので、人が書く） */
-  read fn unpaidBefore(deadline: Time): Order[] on orders;
+  read fn unpaidBefore(deadline: Time): Order[] reads orders;
 
   /** 注文を作る。支払いを待つ注文として入る */
   @db.insert
-  effect fn createOrder(order: Order) on orders.post as Standing.AwaitingPayment;
+  effect fn createOrder(order: Order): effects orders.post as Standing.AwaitingPayment;
 
   /** 受け付けた: 受け付けた時刻を入れる（人が書く） */
-  effect fn acceptOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Accepted;
+  effect fn acceptOrder(order: Order, at: Time): effects orders.put as Standing.AwaitingPayment -> Standing.Accepted;
 
   /** 期限切れにした: 期限が過ぎた時刻を入れる（人が書く） */
-  effect fn expireOrder(order: Order, at: Time) on orders.put as Standing.AwaitingPayment -> Standing.Expired;
+  effect fn expireOrder(order: Order, at: Time): effects orders.put as Standing.AwaitingPayment -> Standing.Expired;
 
   // ---- 値段を付ける ----
 
@@ -290,7 +290,7 @@ namespace ordering {
     throws TermsChanged;
 
   /** 在庫の行を取り置く。箱で送る部分がなければ、何もしない */
-  fn holdStock(order: Order)
+  fn holdStock(order: Order):
     throws inventory.OutOfStock
   {
     match (order.physical by Delivery) {

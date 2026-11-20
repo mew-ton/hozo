@@ -4,7 +4,7 @@
 namespace a {
   model M { id: string; }
   state s: list<M>;
-  effect fn add() on s.post;
+  effect fn add(): effects s.post;
   decorator reading(table: any state) for op reads table;
   decorator writing(...targets: any effect) for op effects targets;
   decorator fixed for op reads s effects add;
@@ -36,7 +36,7 @@ namespace a {
 }
 namespace b {
   state t: list<a.M>;
-  effect fn put() on t.post;
+  effect fn put(): effects t.post;
   // 自分の名前空間のものを運ぶ
   @a.reading(t)
   @a.writing(put)

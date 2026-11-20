@@ -128,7 +128,7 @@ namespace api {
     @http.body items: type.Item[];
   }
   @http.post("/items/replace")
-  export fn replace(in: ReplaceInput)
+  export fn replace(in: ReplaceInput):
     throws type.NotFound;
 
   // 全体の形: ヘッダとクエリを、一つずつの model で。結果は record（値がなくても {} を返す）
@@ -217,7 +217,7 @@ namespace bare {
   export fn root(): string;
 
   @http.post("/touch")
-  export fn touch()
+  export fn touch():
     throws Unknown;
 
   // 名前付きデコレータを通して付けた @http.get も、展開した適用として経路になる

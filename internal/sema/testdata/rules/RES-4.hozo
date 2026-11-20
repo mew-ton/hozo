@@ -6,7 +6,7 @@ namespace a {
   fn f(): s;                           // ERROR: RES-4
   union U { E; }
   fn g(): U;                           // ERROR: RES-4
-  fn h() throws M;                     // ERROR: RES-4
+  fn h(): throws M;                     // ERROR: RES-4
   classify C of M { A; }
   fn i(): C;                           // ERROR: RES-4
   @M                                   // ERROR: RES-4
@@ -21,9 +21,9 @@ namespace a {
   fn o(): V.Ready;                     // ERROR: RES-4
   fn p(): M<M>;                        // ERROR: RES-4
   // 遷移の宛先にできるのは、状態を対象にした classify か、組み込みの分類を持つ state
-  effect fn q() on C: A -> A;               // ERROR: RES-4
-  effect fn r() on M: A -> B;               // ERROR: RES-4
-  effect fn t() on s.post: Empty -> HasItems;   // ERROR: RES-4
+  effect fn q(): effects C as A -> A;               // ERROR: RES-4
+  effect fn r(): effects M as A -> B;               // ERROR: RES-4
+  effect fn t(): effects n as Empty -> HasItems;    // ERROR: RES-4
   // classify の対象が一つで、型でも状態でもない（値の分類の名前は C.Case<T> の形でだけ型になる）
   classify D of E { A; }               // ERROR: RES-4
   classify F of C { A; }               // ERROR: RES-4

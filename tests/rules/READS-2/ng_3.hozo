@@ -3,7 +3,7 @@
 namespace a {
   state rows: list<string>;
   state log: list<string>;
-  read fn first(): string? on rows;
+  read fn first(): string? reads rows;
   decorator counting(table: any state) for op reads table;
   fn g();
   // 運ばれた log が足りない
@@ -13,7 +13,7 @@ namespace a {
   }
   // 本体は読まないが、運ばれた状態がある。別の状態を書いた
   @counting(log)                             // ERROR: READS-2
-  fn wrong() reads rows {
+  fn wrong(): reads rows {
     g();
   }
   @counting(log)

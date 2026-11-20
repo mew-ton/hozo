@@ -23,37 +23,37 @@ namespace shop {
   }
 
   @db.find
-  read fn orderById(id: string): Order? on orders;
+  read fn orderById(id: string): Order? reads orders;
 
   /** @db.insert: 入る行を、そのまま足す。Accepted にあることは、確かめない */
   @db.insert
-  effect fn accept(order: Order) on orders.post as Stage.Accepted;
+  effect fn accept(order: Order): effects orders.post as Stage.Accepted;
 
   /** @db.insert: 前が、ない側のケース */
   @db.insert
-  effect fn keep(order: Order) on orders.post as Life.Gone -> Life.Kept;
+  effect fn keep(order: Order): effects orders.post as Life.Gone -> Life.Kept;
 
   /** @db.update: 前が any。渡した行を、そのまま書く */
   @db.update
-  effect fn overwrite(order: Order) on orders.put as any -> Stage.InProduction;
+  effect fn overwrite(order: Order): effects orders.put as any -> Stage.InProduction;
 
   /** @db.update: ケースを変えない書き換え */
   @db.update
-  effect fn annotate(order: Order) on orders.put as Stage.Accepted -> Stage.Accepted;
+  effect fn annotate(order: Order): effects orders.put as Stage.Accepted -> Stage.Accepted;
 
   /** @db.update: 後のケースを約束しない */
   @db.update
-  effect fn revise(order: Order) on orders.put as Stage.InProduction -> else;
+  effect fn revise(order: Order): effects orders.put as Stage.InProduction -> else;
 
   /** 行の遷移を書かない @db.update は、今までどおり */
   @db.update
-  effect fn rename(order: Order) on orders.put;
+  effect fn rename(order: Order): effects orders.put;
 
   /** 作り始める: 始めた時刻を入れる（人が書く。後のケースが前の並びにないので、@db.update は付けられない） */
-  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
 
   /** 捨てる（人が書く。行を受け取る効果に、@db.delete は付けられない） */
-  effect fn discard(order: Order) on orders.delete as Life.Kept -> Life.Gone;
+  effect fn discard(order: Order): effects orders.delete as Life.Kept -> Life.Gone;
 
   /** 受け付けた注文だけを、作り始める */
   export fn begin(order: Order, at: Time) {

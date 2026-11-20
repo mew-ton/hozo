@@ -7,8 +7,8 @@ namespace a {
   state t: nullable<string>;
   classify Phase of s { Idle; Busy; }
   export fn all(): string[] reads s { return s; }
-  effect fn add(x: string) on s.post;
-  read fn first(): string? on s;
+  effect fn add(x: string): effects s.post;
+  read fn first(): string? reads s;
 }
 namespace b {
   fn f(xs: string[]);

@@ -2,9 +2,9 @@
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  effect fn add(m: M): M on rows.post;           // ERROR: TYPE-18
-  effect fn drop(m: M): never on rows.post;      // ERROR: TYPE-18
-  read fn noResult() on rows;                    // ERROR: TYPE-18
-  read fn voidResult(): void on rows;            // ERROR: TYPE-18
-  read fn neverResult(): never on rows;          // ERROR: TYPE-18
+  effect fn add(m: M): M effects rows.post;      // ERROR: TYPE-18
+  effect fn drop(m: M): never effects rows.post; // ERROR: TYPE-18
+  read fn noResult(): reads rows;                    // ERROR: TYPE-18
+  read fn voidResult(): void reads rows;            // ERROR: TYPE-18
+  read fn neverResult(): never reads rows;          // ERROR: TYPE-18
 }

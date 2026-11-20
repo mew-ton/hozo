@@ -11,9 +11,9 @@ type CartsState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 list で決まる）: shop.carts の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]Line, error)
-	// AddLine は命令（効果 shop.addLine、on shop.carts.post）: カートに行を足す
+	// AddLine は命令（効果 shop.addLine、effects shop.carts.post）: カートに行を足す
 	AddLine(ctx context.Context, line Line) error
-	// ClearCart は命令（効果 shop.clearCart、on shop.carts: HasItems -> Empty）: カートを空にする
+	// ClearCart は命令（効果 shop.clearCart、effects shop.carts as HasItems -> Empty）: カートを空にする
 	ClearCart(ctx context.Context) error
 }
 
@@ -33,9 +33,9 @@ type TokenState interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	// Get は問い合わせ（形 nullable で決まる）: shop.token の値。なければ nil。
 	Get(ctx context.Context) (*Token, error)
-	// RemoveToken は命令（効果 shop.removeToken、on shop.token.delete）: 手元のトークンを消す
+	// RemoveToken は命令（効果 shop.removeToken、effects shop.token.delete）: 手元のトークンを消す
 	RemoveToken(ctx context.Context) error
-	// SaveToken は命令（効果 shop.saveToken、on shop.token: Empty -> HasItems）: トークンを保存する
+	// SaveToken は命令（効果 shop.saveToken、effects shop.token as Empty -> HasItems）: トークンを保存する
 	SaveToken(ctx context.Context, token Token) error
 }
 
@@ -44,7 +44,7 @@ type TokenState interface {
 type TitleState interface {
 	// Get は問い合わせ（形 single で決まる）: shop.title の値。
 	Get(ctx context.Context) (string, error)
-	// Rename は命令（効果 shop.rename、on shop.title.put）: 店の名前を変える
+	// Rename は命令（効果 shop.rename、effects shop.title.put）: 店の名前を変える
 	Rename(ctx context.Context) error
 }
 
@@ -55,11 +55,11 @@ type CheckoutState interface {
 	Shopping(ctx context.Context) (bool, error)
 	// Ordered は問い合わせ: ケース Ordered の述語。
 	Ordered(ctx context.Context) (bool, error)
-	// PlaceOrder は命令（効果 shop.placeOrder、on shop.Checkout: Shopping -> Ordered）: 注文を確定する
+	// PlaceOrder は命令（効果 shop.placeOrder、effects shop.Checkout as Shopping -> Ordered）: 注文を確定する
 	PlaceOrder(ctx context.Context) error
-	// StartOver は命令（効果 shop.startOver、on shop.Checkout: any -> Shopping）: 買い物をやり直す
+	// StartOver は命令（効果 shop.startOver、effects shop.Checkout as any -> Shopping）: 買い物をやり直す
 	StartOver(ctx context.Context) error
-	// TouchCheckout は命令（効果 shop.touchCheckout、on shop.Checkout: Shopping, Ordered -> any）: 進み具合を記録し直す
+	// TouchCheckout は命令（効果 shop.touchCheckout、effects shop.Checkout as Shopping, Ordered -> any）: 進み具合を記録し直す
 	TouchCheckout(ctx context.Context) error
 }
 
@@ -70,6 +70,6 @@ type LoggedInState interface {
 	LoggedIn(ctx context.Context) (bool, error)
 	// LoggedOut は問い合わせ: ケース LoggedOut の述語。
 	LoggedOut(ctx context.Context) (bool, error)
-	// SignIn は命令（効果 shop.signIn、on shop.LoggedIn: any -> LoggedIn）: ログインする
+	// SignIn は命令（効果 shop.signIn、effects shop.LoggedIn as any -> LoggedIn）: ログインする
 	SignIn(ctx context.Context) error
 }

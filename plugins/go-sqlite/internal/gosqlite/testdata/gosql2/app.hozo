@@ -14,7 +14,7 @@ namespace app {
 
   // 表にならなかった状態を宛先にする効果は、重ねて報告しない
   @db.update
-  effect fn saveConfig(row: Row) on config.put;
+  effect fn saveConfig(row: Row): effects config.put;
   export fn setConfig(row: Row) {
     saveConfig(row);
   }

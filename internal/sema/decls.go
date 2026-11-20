@@ -383,7 +383,7 @@ type rowCase struct {
 	span     source.Span // K の位置
 }
 
-// lowerRow は行の遷移（`on s.op as …`。docs/check.md「行の遷移」）。確かめて、誤りがなければ e.Row に置く
+// lowerRow は行の遷移（`effects s.op as …`。docs/check.md「行の遷移」）。確かめて、誤りがなければ e.Row に置く
 // （post の `as any` は、確かめるだけで、置かない: as を書かないのと同じ意味）。
 // STATE-7（結びつき）: ケース `C.K` の C が、書き込む状態の行の分類（値の分類で、対象の型が、状態の要素の型 T か T?）でない。
 // K が C のケースでない。一つの as に二つ以上の分類のケースがある。前のケースの並びに同じケースが二度ある。効果の引数に、
@@ -609,7 +609,7 @@ func (a *analyzer) lowerRead(s *symbol, d *ast.ReadDecl, sc *scope) ir.Decl {
 	// TYPE-18: read は値を返す。省いた形、void、never は書けない（docs/grammar.md「関数の宣言」）
 	switch {
 	case d.Return == nil:
-		a.errorf("TYPE-18", d.Name.Span, "read fn %s は、戻り値の型を省けない（read は値を返す。read fn %s(…): T on 状態; と書く）", s.fqn, d.Name.Name)
+		a.errorf("TYPE-18", d.Name.Span, "read fn %s は、戻り値の型を省けない（read は値を返す。read fn %s(…): T reads 状態; と書く）", s.fqn, d.Name.Name)
 	case d.Return.Void, d.Return.Never:
 		word := "void"
 		if d.Return.Never {
@@ -634,7 +634,7 @@ func (a *analyzer) lowerRead(s *symbol, d *ast.ReadDecl, sc *scope) ir.Decl {
 	return rd
 }
 
-// lowerBuiltinTarget は `on s.op`。s は現在の名前空間の state（別の名前空間なら RES-5）。STATE-1。
+// lowerBuiltinTarget は `effects s.op`。s は現在の名前空間の state（別の名前空間なら RES-5）。STATE-1。
 // 書き込むのはその状態（docs/check.md「状態の形」の「効果が書き込む状態」）。
 func (a *analyzer) lowerBuiltinTarget(s *symbol, e *ir.Effect, on *ast.StateOpRef, sc *scope) {
 	r, ok := a.resolve(on.State, sc, acState)
@@ -679,7 +679,7 @@ func (a *analyzer) checkSTATE1(state *symbol, op ir.Operation, span source.Span)
 	return false
 }
 
-// lowerTransition は `on X: A -> B`（docs/resolve.md「位置ごとに受け付ける種類」）。X は現在の名前空間の、状態を
+// lowerTransition は `effects X as A -> B`（docs/resolve.md「位置ごとに受け付ける種類」）。X は現在の名前空間の、状態を
 // 対象にした classify か、組み込みの分類を持つ state（list / nullable）。別の名前空間のものなら RES-5。
 // ケースの所属は STATE-4。書き込むのは、X が分類ならその対象のすべての基底の状態、X が状態ならその状態。
 func (a *analyzer) lowerTransition(s *symbol, e *ir.Effect, t *ast.Transition, sc *scope) {

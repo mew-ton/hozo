@@ -9,7 +9,7 @@ namespace a {
   decorator hot = tag("hot");
   @db.list @db.where("kind", "a") @db.where("id", "x")
   @tag("a") @tag("b") @hot @hot
-  read fn some(): M[] on rows;
+  read fn some(): M[] reads rows;
   @tag("x") @tag("x")
   fn f(): M[] { return some(); }
   @tag("m") @tag("n")

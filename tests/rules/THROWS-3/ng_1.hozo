@@ -7,7 +7,7 @@ namespace a {
   exception WithValue(value: Detail);
   union Both { E; F; }
   state s: list<string>;
-  effect fn add(x: string) on s.post;
+  effect fn add(x: string): effects s.post;
   decorator swallow catches E recovers;
   decorator mark;
   // 1. 葉でない（位置は op の名前）

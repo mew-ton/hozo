@@ -287,7 +287,7 @@ export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 | 注文のときに、上限の額で請求を確定し、差額を、いつも返す | 納期が枠の期限を超える注文でも成り立つが、ほとんどの注文で返金が起きる。枠の期限が近いときだけ、この形にした（「枠の期限と、納期」） |
 | 送料が見積もりを超えたら、客の同意を取り直す | 梱包した箱が、同意を待つ状態になる。上限に、はじめに同意してもらう形にした |
 | 出荷の進み具合を、一つの値（`stage`）の列で持つ | 値の集合を言う型がなく（F8）、「この段階では荷物がある」を型で言えない（F9）。事実ごとの表にすると、存在の分類が、型で決まる |
-| 出荷の進み具合を、状態の分類の遷移（`on C: A -> B`）で書く | 状態の分類が言うのは、状態の全体の場合で、表の一行の場合ではない。一行の場合は、値の分類と、効果の行の遷移で書いた（F1） |
+| 出荷の進み具合を、状態の分類の遷移（`effects C as A -> B`）で書く | 状態の分類が言うのは、状態の全体の場合で、表の一行の場合ではない。一行の場合は、値の分類と、効果の行の遷移で書いた（F1） |
 | 梱包を、荷物を返す葉一つにして、中で確かめる | 葉は状態に触れないので、そろったことと、まだ梱包していないことを、配線が読んで渡すことになる。確かめる場所が、仕様から見えなくなる |
 
 ### 行の遷移で書いた進み具合
@@ -328,7 +328,7 @@ export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 ```ts
 // 前: 値の分類と、行の全体を書き換える効果と、時刻を入れる葉
 @db.update
-effect fn saveJob(job: Job) on jobs.put;
+effect fn saveJob(job: Job): effects jobs.put;
 
 export fn start(id: JobId): Job throws NoJob, NotQueued {
   val job = require(id);
@@ -346,8 +346,8 @@ fn startedAt(job: Progress.Queued<Job>, now: Time): Job;   // 人が書く
 
 ```ts
 // 後: 効果が、どのケースからどのケースへ進めるかを言う
-effect fn startJob(job: Job, at: Time) on jobs.put as Progress.Queued -> Progress.InProduction;
-effect fn finishJob(job: Job, measured: type.Measurement, at: Time) on jobs.put as Progress.InProduction -> Progress.Finished;
+effect fn startJob(job: Job, at: Time): effects jobs.put as Progress.Queued -> Progress.InProduction;
+effect fn finishJob(job: Job, measured: type.Measurement, at: Time): effects jobs.put as Progress.InProduction -> Progress.Finished;
 
 export fn start(id: JobId): Job throws NoJob, NotQueued {
   val job = require(id);
@@ -383,7 +383,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 
 ### 言語
 
-- **F1 表の一行の進み具合を、遷移で書けなかった。→ 行の遷移で、書けるようになった。** はじめは、`effect … on C: A -> B` の宛先が、状態を対象にした分類だけだった。注文、支払い、仕事、出荷は、どれも表の一行の話で、値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉で近づけていた。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からなかった。→ いまは、効果が、宛先の後ろの `as` で言う（`docs/check.md`「行の遷移」）。22 の効果が行の遷移を持ち、行の全体を書き換えていた七つの効果（`saveOrder`、`saveOrders`、`savePayment`、`saveJob`、`saveShipment`、`saveReservation`、`saveCarrier`）は、なくなった。一覧は「行の遷移で書いた進み具合」。分かったことは F50〜F57。
+- **F1 表の一行の進み具合を、遷移で書けなかった。→ 行の遷移で、書けるようになった。** はじめは、状態の遷移（`effect fn …: effects C as A -> B`）の宛先が、状態を対象にした分類だけだった。注文、支払い、仕事、出荷は、どれも表の一行の話で、値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉で近づけていた。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からなかった。→ いまは、効果が、宛先の後ろの `as` で言う（`docs/check.md`「行の遷移」）。22 の効果が行の遷移を持ち、行の全体を書き換えていた七つの効果（`saveOrder`、`saveOrders`、`savePayment`、`saveJob`、`saveShipment`、`saveReservation`、`saveCarrier`）は、なくなった。一覧は「行の遷移で書いた進み具合」。分かったことは F50〜F57。
 - **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものと、行のケースを変えるもの（F50）は、時計で一件ずつ（`payment.prepayExpiring`、`ordering.expireUnpaid`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。 → **R6 で、配線に、繰り返し（`for`）が入った**（下の「R6 で変えたこと」）: `production.enqueue` と `ordering.expireUnpaid` は、繰り返しで書き直した。外部の仕組みを一つずつ呼ぶ `payment.prepayExpiring` も、失敗を、状態に残す形にして、繰り返しにした。
 - **F3 判断一つにつき、op が一つ要る。** アームの本体は呼び出し一つで、呼び出しの引数に呼び出しを書けない。→ `shipping.pack` は `packGathered`、`packInto`、`seal` の四段。`payment` の 31 の op のうち 22 が配線。PRD に名前のない op（`packInto`、`secureFound`、`offersIfPacked`）に、名前を付けることになる。
 - **F4 例外を、配線で受けられない。受けられるのはデコレータだけで、例外の値は使えない。** → 値を運ぶ例外（`ordering.TermsChanged(terms)`、`inventory.OutOfStock(sku)`、`ordering.UnknownProduct(sku)`）の値は、画面に届かない: `storefront.sayTermsChanged` は見せている値段を捨てるだけで、`storefront.Outdated` は、どの商品かを持たない。画面を分けたい結果は、例外ではなく値で返す形に寄った（`shopApi.product` と `shopApi.status` は `T?`）。
@@ -545,7 +545,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 
 ### Q1 表の一行の進み具合を、遷移として書けるようにするか
 
-**決まった: 書ける。** 効果が、宛先（`on 状態.操作`）の後ろの `as` で、受け取った行のケースをどう変えるかを言う（行の遷移。`docs/check.md`「行の遷移」、`docs/decisions.md`「決めたこと」163〜173）。このサンプルの書き直しは「難しい問題」の「行の遷移で書いた進み具合」、分かったことは F1 と F50〜F58。事実ごとの表で持つ書き方（`parcels`、`labels`）は、そのまま使っている。
+**決まった: 書ける。** 効果が、宛先（`effects 状態.操作`）の後ろの `as` で、受け取った行のケースをどう変えるかを言う（行の遷移。`docs/check.md`「行の遷移」、`docs/decisions.md`「決めたこと」163〜173）。このサンプルの書き直しは「難しい問題」の「行の遷移で書いた進み具合」、分かったことは F1 と F50〜F58。事実ごとの表で持つ書き方（`parcels`、`labels`）は、そのまま使っている。
 
 残っている問い（どれも、決めていない）:
 

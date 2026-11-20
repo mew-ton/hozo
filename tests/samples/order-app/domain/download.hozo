@@ -43,14 +43,14 @@ namespace download {
 
   /** その注文の権利 */
   @db.list
-  read fn grantsOfOrder(orderId: type.OrderId): Grant[] on grants;
+  read fn grantsOfOrder(orderId: type.OrderId): Grant[] reads grants;
 
   /** その行の権利 */
   @db.find
-  read fn grantOf(orderId: type.OrderId, line: type.LineId): Grant? on grants;
+  read fn grantOf(orderId: type.OrderId, line: type.LineId): Grant? reads grants;
 
   /** 権利を、まとめて足す */
-  effect fn addGrants(added: Grant[]) on grants.post;
+  effect fn addGrants(added: Grant[]): effects grants.post;
 
   /** ダウンロードの行を、取れるようにする。行がなければ、何も足さない */
   export fn grant(orderId: type.OrderId, lines: ordering.DigitalLine[]) {

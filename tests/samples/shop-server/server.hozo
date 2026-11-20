@@ -70,7 +70,7 @@ namespace server {
   }
 
   /** パスワードが合わなければ InvalidCredentials（人が書く） */
-  fn checkPassword(user: type.User, password: type.Password)
+  fn checkPassword(user: type.User, password: type.Password):
     throws type.InvalidCredentials;
 
   /** トークンと期限を決める（人が書く） */
@@ -114,7 +114,7 @@ namespace server {
 
   /** ログアウトする */
   @http.post("/logout")
-  export fn logout(in: AuthInput)
+  export fn logout(in: AuthInput):
     throws type.Unauthorized
   {
     val session = authenticate(in.token);

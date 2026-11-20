@@ -143,11 +143,11 @@ test('文脈キーワードは位置でだけ色が付く', () => {
   assertScope(p, 'decorator interaction(page: any op, when: any variant);', 'variant', 'keyword.other.hozo');
   assertScope(p, 'decorator route(path: string, from: any state?', 'state', 'keyword.declaration.hozo');
   const s = linesOf(files.server);
-  assertScope(s, 'effect fn createSession(login: LoginOk) on sessions.post;', 'on', 'keyword.control.hozo');
-  assertScope(s, 'effect fn createSession(login: LoginOk) on sessions.post;', 'post', 'keyword.other.hozo');
-  assertScope(s, 'effect fn deleteSession(token: Token?) on sessions.delete;', 'delete', 'keyword.other.hozo');
+  assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'effects', 'keyword.control.hozo');
+  assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'post', 'keyword.other.hozo');
+  assertScope(s, 'effect fn deleteSession(token: Token?): effects sessions.delete;', 'delete', 'keyword.other.hozo');
   const b = linesOf(files.browser);
-  assertScope(b, 'effect fn transitionToLogin() on location.put;', 'put', 'keyword.other.hozo');
+  assertScope(b, 'effect fn transitionToLogin(): effects location.put;', 'put', 'keyword.other.hozo');
   // model Violation { field: string; } の field は識別子
   const violation = s.find((l) => l.text.includes('model Violation {'));
   assert.ok(!violation.tokens.some((t) => t.text === 'field' && t.scopes.includes('keyword.other.hozo')));
@@ -210,7 +210,7 @@ test('フィールド名の位置の予約語は予約語として塗らない',
   const d = tokensOf('fn run(): Wrap { return fetch(); }');
   assertScope(d, 'fn run', 'fn', 'keyword.declaration.hozo');
   // 関数の宣言の頭（docs/grammar.md「関数の宣言」）: fn と、その前の種類の語は、宣言の頭の予約語。名前は、fn の直後
-  const fns = tokensOf('read fn byId(id: Id): Row? on rows;\neffect fn add(row: Row) on rows.post;\nexport fn save(row: Row);');
+  const fns = tokensOf('read fn byId(id: Id): Row? reads rows;\neffect fn add(row: Row): effects rows.post;\nexport fn save(row: Row);');
   for (const [line, kind] of [['read fn byId', 'read'], ['effect fn add', 'effect']]) {
     assertScope(fns, line, kind, 'keyword.declaration.hozo');
     assertScope(fns, line, 'fn', 'keyword.declaration.hozo');
@@ -243,7 +243,7 @@ test('宣言の名前', () => {
   assertScope(s, 'scalar Email extends string;', 'Email', 'entity.name.type.hozo');
   assertScope(s, 'exception InvalidCredentials;', 'InvalidCredentials', 'entity.name.type.hozo');
   assertScope(s, 'fn login(in: LoginInput): LoginOk', 'login', 'entity.name.function.hozo');
-  assertScope(s, 'effect fn createSession(login: LoginOk) on sessions.post;', 'createSession', 'entity.name.function.hozo');
+  assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'createSession', 'entity.name.function.hozo');
   assertScope(s, 'decorator requiresAuth throws', 'requiresAuth', 'entity.name.function.hozo');
   assertScope(s, 'state users: list<User>;', 'users', 'variable.other.hozo');
   const b = linesOf(files.browser);
@@ -366,13 +366,13 @@ test('修飾（export、override）と、reads / as / throw / never', () => {
 
 test('矢印（遷移の -> と match のアームの =>）', () => {
   const st = linesOf(files.state);
-  // 遷移は `on X:` の後ろ（: の後ろの型の位置）に来る
-  assertScope(st, 'effect fn placeOrder() on Checkout: Shopping -> Ordered;', '->', 'keyword.operator.arrow.hozo');
-  assertScope(st, 'effect fn startOver() on Checkout: any -> Shopping;', '->', 'keyword.operator.arrow.hozo');
+  // 遷移は `effects X as` の後ろ（as の後ろの型の位置）に来る
+  assertScope(st, 'effect fn placeOrder(): effects Checkout as Shopping -> Ordered;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'effect fn startOver(): effects Checkout as any -> Shopping;', '->', 'keyword.operator.arrow.hozo');
   // 遷移のケースの並びの区切りは ,（docs/grammar.md「exception / effect / read」の CaseSet）
-  assertScope(st, 'effect fn touchCheckout() on Checkout: Shopping, Ordered -> any;', '->', 'keyword.operator.arrow.hozo');
-  assertScope(st, 'effect fn touchCheckout() on Checkout: Shopping, Ordered -> any;', 'any', 'keyword.control.hozo');
-  assertScope(st, 'effect fn clearCart() on carts: HasItems -> Empty;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'effect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'effect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any;', 'any', 'keyword.control.hozo');
+  assertScope(st, 'effect fn clearCart(): effects carts as HasItems -> Empty;', '->', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Empty    => showLogin();', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Shopping => submitOrder();', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Ordered  => none;', '=>', 'keyword.operator.arrow.hozo');
@@ -381,22 +381,23 @@ test('矢印（遷移の -> と match のアームの =>）', () => {
   const b = linesOf(files.browser);
   assertScope(b, 'NoWarranty => none;', '=>', 'keyword.operator.arrow.hozo');
   // 矢印の両側は今まで通り
-  assertScope(st, 'effect fn startOver() on Checkout: any -> Shopping;', 'any', 'keyword.control.hozo');
-  assertScope(st, 'effect fn placeOrder() on Checkout: Shopping -> Ordered;', 'on', 'keyword.control.hozo');
-  assertScope(st, 'effect fn placeOrder() on Checkout: Shopping -> Ordered;', 'placeOrder', 'entity.name.function.hozo');
+  assertScope(st, 'effect fn startOver(): effects Checkout as any -> Shopping;', 'any', 'keyword.control.hozo');
+  assertScope(st, 'effect fn placeOrder(): effects Checkout as Shopping -> Ordered;', 'effects', 'keyword.control.hozo');
+  assertScope(st, 'effect fn placeOrder(): effects Checkout as Shopping -> Ordered;', 'as', 'keyword.control.hozo');
+  assertScope(st, 'effect fn placeOrder(): effects Checkout as Shopping -> Ordered;', 'placeOrder', 'entity.name.function.hozo');
   assertScope(st, 'Ordered  => none;', 'none', 'constant.language.hozo');
   // 比較の記号ではない（> は型引数の閉じ、= は名前付きのデコレータ）
   const t = tokensOf('decorator once = retry(1); state s: list<X>;');
   assert.ok(!t[0].tokens.some((tk) => tk.scopes.includes('keyword.operator.arrow.hozo')));
 });
 
-test('行の遷移（effect … on 状態.操作 as …）と、ケースの as none', () => {
+test('行の遷移（effect fn …: effects 状態.操作 as …）と、ケースの as none', () => {
   // docs/grammar.md「exception / effect / read」の RowClause: as の後ろの型の位置は ; まで続き、ケース（分類の名前とケースの名前）は
   // 型の位置の名前、-> は矢印、any と else は予約語（docs/editors.md「TextMate の文法」）
-  const put = tokensOf('  effect fn cancel(order: Order) on orders.put as Stage.Draft, kind.Stage.Accepted -> Stage.Cancelled;');
+  const put = tokensOf('  effect fn cancel(order: Order): effects orders.put as Stage.Draft, kind.Stage.Accepted -> Stage.Cancelled;');
   assertScope(put, 'effect fn cancel', 'effect', 'keyword.declaration.hozo');
   assertScope(put, 'effect fn cancel', 'cancel', 'entity.name.function.hozo');
-  assertScope(put, 'effect fn cancel', 'on', 'keyword.control.hozo');
+  assertScope(put, 'effect fn cancel', 'effects', 'keyword.control.hozo');
   assertScope(put, 'effect fn cancel', 'put', 'keyword.other.hozo');
   assertScope(put, 'effect fn cancel', 'as', 'keyword.control.hozo');
   assertScope(put, 'effect fn cancel', 'Stage.Draft', 'entity.name.type.hozo');
@@ -404,18 +405,18 @@ test('行の遷移（effect … on 状態.操作 as …）と、ケースの as 
   assertScope(put, 'effect fn cancel', '->', 'keyword.operator.arrow.hozo');
   assertScope(put, 'effect fn cancel', 'Stage.Cancelled', 'entity.name.type.hozo');
   // 矢印の前の any と、後ろの else
-  const hatch = tokensOf('effect fn patch(order: Order) on orders.put as any -> else;');
+  const hatch = tokensOf('effect fn patch(order: Order): effects orders.put as any -> else;');
   assertScope(hatch, 'effect fn patch', 'as', 'keyword.control.hozo');
   assertScope(hatch, 'effect fn patch', 'any', 'keyword.control.hozo');
   assertScope(hatch, 'effect fn patch', '->', 'keyword.operator.arrow.hozo');
   assertScope(hatch, 'effect fn patch', 'else', 'keyword.control.hozo');
   // 矢印のない形
-  const post = tokensOf('effect fn accept(order: Order) on orders.post as Stage.Accepted;\neffect fn bring(order: Order) on orders.post as any;');
+  const post = tokensOf('effect fn accept(order: Order): effects orders.post as Stage.Accepted;\neffect fn bring(order: Order): effects orders.post as any;');
   assertScope(post, 'effect fn accept', 'post', 'keyword.other.hozo');
   assertScope(post, 'effect fn accept', 'Stage.Accepted', 'entity.name.type.hozo');
   assertScope(post, 'effect fn bring', 'any', 'keyword.control.hozo');
   // 行の遷移は ; で終わる: 次の宣言は、今まで通り
-  const next = tokensOf('effect fn a(o: O) on s.delete as Life.Open -> Life.Absent;\nstate rows: list<Row>;');
+  const next = tokensOf('effect fn a(o: O): effects s.delete as Life.Open -> Life.Absent;\nstate rows: list<Row>;');
   assertScope(next, 'effect fn a', 'delete', 'keyword.other.hozo');
   assertScope(next, 'effect fn a', 'Life.Absent', 'entity.name.type.hozo');
   assertScope(next, 'state rows', 'state', 'keyword.declaration.hozo');
@@ -427,10 +428,10 @@ test('行の遷移（effect … on 状態.操作 as …）と、ケースの as 
   assertScope(none, 'classify Life', 'Order', 'entity.name.type.hozo', 3);
   // 実物: コーパスの行の遷移と、ない側のケース
   const api = linesOf(files.api);
-  assertScope(api, 'effect fn rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', 'Standing.Active', 'entity.name.type.hozo');
-  assertScope(api, 'effect fn rest(user: User, since: Time) on users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', '->', 'keyword.operator.arrow.hozo');
-  assertScope(api, 'effect fn amend(user: User) on users.put as Standing.Idle -> else;', 'else', 'keyword.control.hozo');
-  assertScope(api, 'effect fn closeUser(user: User) on users.put as any -> Standing.Closed;', 'any', 'keyword.control.hozo');
+  assertScope(api, 'effect fn rest(user: User, since: Time): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', 'Standing.Active', 'entity.name.type.hozo');
+  assertScope(api, 'effect fn rest(user: User, since: Time): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(api, 'effect fn amend(user: User): effects users.put as Standing.Idle -> else;', 'else', 'keyword.control.hozo');
+  assertScope(api, 'effect fn closeUser(user: User): effects users.put as any -> Standing.Closed;', 'any', 'keyword.control.hozo');
   assertScope(api, 'Unknown: User? as none;', 'none', 'constant.language.hozo');
 });
 
@@ -453,9 +454,9 @@ test('形の語と、標準の分類のケース', () => {
     assert.ok(tk, `字句 ${word} が行にない`);
     assert.deepEqual(tk.scopes, ['source.hozo'], `${word} に scope が付いている: ${tk.scopes.join(' ')}`);
   }
-  // 遷移のケースは : の後ろなので、ほかの大文字で始まる名前と同じく型の位置の名前になる（docs/editors.md の表の「型の位置の名前」）
-  assertScope(st, 'effect fn clearCart() on carts: HasItems -> Empty;', 'HasItems', 'entity.name.type.hozo');
-  assertScope(st, 'effect fn clearCart() on carts: HasItems -> Empty;', 'Empty', 'entity.name.type.hozo');
+  // 遷移のケースは as の後ろなので、ほかの大文字で始まる名前と同じく型の位置の名前になる（docs/editors.md の表の「型の位置の名前」）
+  assertScope(st, 'effect fn clearCart(): effects carts as HasItems -> Empty;', 'HasItems', 'entity.name.type.hozo');
+  assertScope(st, 'effect fn clearCart(): effects carts as HasItems -> Empty;', 'Empty', 'entity.name.type.hozo');
 });
 
 test('リテラル', () => {
@@ -523,32 +524,61 @@ test('デコレータの対象 effect、reads / effects の節、残りの引数
   assertScope(t, 'decorator both', 'effects', 'keyword.control.hozo', 0);
   assertScope(t, 'decorator both', 'effects', 'keyword.control.hozo', 1);
   // 効果の宣言に付けたデコレータ（実物: コーパス）
-  const renameUser = 'effect fn renameUser(id: UserId, name: string) on users.put;';
+  const renameUser = 'effect fn renameUser(id: UserId, name: string): effects users.put;';
   assertScope(api, /^\s*@into\(users\)$/, '@into', 'entity.name.function.decorator.hozo');
   assertScope(api, renameUser, 'effect', 'keyword.declaration.hozo');
   assertScope(api, renameUser, 'renameUser', 'entity.name.function.hozo');
   assertScope(api, renameUser, 'UserId', 'entity.name.type.hozo');
   assertScope(api, renameUser, 'string', 'support.type.primitive.hozo');
   assertScope(api, renameUser, 'put', 'keyword.other.hozo');
-  const e = tokensOf('@db.insert effect fn createOrder(order: Order) on orders.post;');
+  const e = tokensOf('@db.insert effect fn createOrder(order: Order): effects orders.post;');
   assertScope(e, 'effect fn createOrder', '@db.insert', 'entity.name.function.decorator.hozo');
   assertScope(e, 'effect fn createOrder', 'effect', 'keyword.declaration.hozo');
   assertScope(e, 'effect fn createOrder', 'createOrder', 'entity.name.function.hozo');
-  assertScope(e, 'effect fn createOrder', 'on', 'keyword.control.hozo');
+  assertScope(e, 'effect fn createOrder', 'effects', 'keyword.control.hozo');
   assertScope(e, 'effect fn createOrder', 'post', 'keyword.other.hozo');
+});
+
+test('関数の型（「)」の後ろの「:」から: 戻り値と節）', () => {
+  // docs/grammar.md「関数の宣言」: 戻り値を省いて、節から始める形。: の後ろの型の位置は、節の頭の手前で終わる
+  const t = tokensOf([
+    'fn save(item: Item): throws Broken { note(item); }',
+    'fn register(input: Input): User throws Taken reads users effects createUser { return make(input); }',
+    'effect fn emptyCart(): effects cart as HasItems -> Empty;',
+    'read fn allCarriers(): Carrier[] reads carriers;',
+    'fn ping();',
+  ].join('\n'));
+  assertScope(t, 'fn save', 'throws', 'keyword.control.hozo');
+  assertScope(t, 'fn save', 'Broken', 'entity.name.type.hozo');
+  assertScope(t, 'fn save', 'save', 'entity.name.function.hozo');
+  assertScope(t, 'fn register', 'User', 'entity.name.type.hozo');
+  assertScope(t, 'fn register', 'Taken', 'entity.name.type.hozo');
+  for (const word of ['throws', 'reads', 'effects']) {
+    assertScope(t, 'fn register', word, 'keyword.control.hozo');
+  }
+  const reg = t.find((l) => l.text.includes('fn register'));
+  assert.ok(!reg.tokens.some((tk) => /users|createUser/.test(tk.text) && tk.scopes.includes('entity.name.type.hozo')), '節の、小文字で始まる名前が、型になっている');
+  assertScope(t, 'effect fn emptyCart', 'effects', 'keyword.control.hozo');
+  assertScope(t, 'effect fn emptyCart', 'as', 'keyword.control.hozo');
+  assertScope(t, 'effect fn emptyCart', 'HasItems', 'entity.name.type.hozo');
+  assertScope(t, 'effect fn emptyCart', '->', 'keyword.operator.arrow.hozo');
+  assertScope(t, 'effect fn emptyCart', 'Empty', 'entity.name.type.hozo');
+  assertScope(t, 'read fn allCarriers', 'Carrier', 'entity.name.type.hozo');
+  assertScope(t, 'read fn allCarriers', 'reads', 'keyword.control.hozo');
+  assertScope(t, 'fn ping', 'ping', 'entity.name.function.hozo');
 });
 
 test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み込みの効果', () => {
   const api = linesOf(files.api);
-  // read の宣言: read は宣言の頭、名前は op・effect と同じ scope。引数と結果は型の位置、on の後ろの状態には scope を付けない
-  const userById = 'read fn userById(id: UserId): User? on users;';
+  // read の宣言: read は宣言の頭、名前は op・effect と同じ scope。引数と結果は型の位置、reads の後ろの状態には scope を付けない
+  const userById = 'read fn userById(id: UserId): User? reads users;';
   assertScope(api, userById, 'read', 'keyword.declaration.hozo');
   assertScope(api, userById, 'userById', 'entity.name.function.hozo');
   assertScope(api, userById, 'UserId', 'entity.name.type.hozo');
   assertScope(api, userById, 'User', 'entity.name.type.hozo');
-  assertScope(api, userById, 'on', 'keyword.control.hozo');
+  assertScope(api, userById, 'reads', 'keyword.control.hozo');
   const readLine = api.find((l) => l.text.includes(userById));
-  assert.ok(!readLine.tokens.some((tk) => tk.text.trim() === 'users' && tk.scopes.length > 1), 'on の後ろの状態に scope が付いている');
+  assert.ok(!readLine.tokens.some((tk) => tk.text.trim() === 'users' && tk.scopes.length > 1), 'reads の後ろの状態に scope が付いている');
   // read に付けたデコレータ（何度でも書けるものを、二度）
   assertScope(api, '@db.where("revoked", false)', '@db.where', 'entity.name.function.decorator.hozo');
   assertScope(api, '@db.where("kind", "web")', '@db.where', 'entity.name.function.decorator.hozo');
@@ -569,7 +599,7 @@ test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み�
   const field = tokensOf('model Mail { read: boolean; }');
   assertScope(field, 'model Mail', 'read', 'variable.other.property.hozo');
   assertNoScope(field, 'model Mail', 'read', 'keyword.declaration.hozo');
-  const deco = tokensOf('@db.read read fn latest(): Mail? on mails;');
+  const deco = tokensOf('@db.read read fn latest(): Mail? reads mails;');
   assertScope(deco, 'read fn latest', '@db.read', 'entity.name.function.decorator.hozo');
   assertScope(deco, 'read fn latest', 'read', 'keyword.declaration.hozo');
   assertScope(deco, 'read fn latest', 'latest', 'entity.name.function.hozo');
@@ -590,7 +620,7 @@ test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み�
   const path = tokensOf('const next = save(order.post, order.put);');
   assert.ok(!path[0].tokens.some((tk) => tk.scopes.includes('keyword.other.hozo')), '値のパスの post / put が文脈キーワードになっている');
   // 配線の op の effects の節に直に書いた「状態.操作」と、名前で書いた効果（名前には scope を付けない）
-  const clause = tokensOf('fn signOut() effects sessions.delete, api.current.put, dropAll reads users { sessions.delete(); }');
+  const clause = tokensOf('fn signOut(): effects sessions.delete, api.current.put, dropAll reads users { sessions.delete(); }');
   assertScope(clause, 'fn signOut', 'effects', 'keyword.control.hozo');
   assertScope(clause, 'fn signOut', 'delete', 'keyword.other.hozo', 0);
   assertScope(clause, 'fn signOut', 'put', 'keyword.other.hozo');

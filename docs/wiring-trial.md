@@ -114,7 +114,7 @@ fn expireUnpaid() {
 
 ```
 @clock.tick(every: 10m)
-fn prepayExpiring()
+fn prepayExpiring():
   throws psp.HoldExpired, http.NetworkError, http.ServerError
 {
   const now = clock.now();
@@ -131,7 +131,7 @@ fn prepayExpiring()
 
 ```
 @clock.tick(every: 10m)
-fn prepayExpiring()
+fn prepayExpiring():
   throws psp.HoldExpired, http.NetworkError, http.ServerError
 {
   val now = clock.now();
@@ -184,7 +184,7 @@ fn prepayExpiring()
 今は、行ごとに仕事を作ることが、葉の op（`plan`）の中身に、隠れている。効果は、仕事を、まとめて受け取る。
 
 ```
-effect fn addJobs(added: Job[]) on jobs.post;
+effect fn addJobs(added: Job[]): effects jobs.post;
 
 export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   const now = clock.now();
@@ -198,7 +198,7 @@ fn plan(orderId: type.OrderId, lines: ordering.MadeLine[], now: Time): Job[];
 書き直しの一つ目。効果を、回ごとに呼ぶ。効果は、行を一つ受け取るので、入るケースを、書ける。
 
 ```
-effect fn addJob(job: Job) on jobs.post as Progress.Queued;
+effect fn addJob(job: Job): effects jobs.post as Progress.Queued;
 
 export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   val now = clock.now();

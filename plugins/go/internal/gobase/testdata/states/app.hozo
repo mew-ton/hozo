@@ -35,36 +35,36 @@ namespace app {
 
   // 「状態の単位」read: 読む状態の単位の問い合わせ（宣言順）。説明は、メソッドのコメントに写す
   /** 品目が同じ行 */
-  read fn lineFor(item: string): Line? on lines;
+  read fn lineFor(item: string): Line? reads lines;
   // 説明がなく、引数もない read。結果の型は、宣言に書かれたまま（宛先の状態の型と照らさない）
-  read fn countLines(): int on lines;
+  read fn countLines(): int reads lines;
   /**
    * 店の名前。
    * 設定の title を、そのまま返す。
    */
-  read fn shopTitle(): string on settings;
+  read fn shopTitle(): string reads settings;
   // どの配線も呼ばない read も出す。省略可能な引数と、Time の引数
-  read fn linesSince(since: Time, limit: int?): Line[] on lines;
+  read fn linesSince(since: Time, limit: int?): Line[] reads lines;
   /** 手元のトークンの写し */
-  read fn tokenCopy(): Token? on token;
+  read fn tokenCopy(): Token? reads token;
 
   // 「状態の単位」効果: 宛先の単位の命令（宣言順）。宛先の単位は、組み込みの効果と基底の状態の遷移なら、その基底の状態。
   // 述語で決まる状態の分類の遷移は、その分類の単位。型で決まる状態の分類の遷移は、ただ一つの対象の状態
   /** 行を足す */
-  effect fn addLine(line: Line) on lines.post;
-  effect fn dropToken() on token.delete;
+  effect fn addLine(line: Line): effects lines.post;
+  effect fn dropToken(): effects token.delete;
   /** カートを空にする */
-  effect fn clearLines() on lines: HasItems -> Empty;
-  effect fn refresh() on Sync: Stale -> Fresh;
+  effect fn clearLines(): effects lines as HasItems -> Empty;
+  effect fn refresh(): effects Sync as Stale -> Fresh;
   /**
    * ログインする。
    * 二行目の説明。
    */
-  effect fn signIn(token: Token) on SignedIn: any -> Yes;
+  effect fn signIn(token: Token): effects SignedIn as any -> Yes;
   // 引数が二つの効果（省略可能な引数を持つ）
-  effect fn rename(title: string, owner: Owner?) on settings.put;
+  effect fn rename(title: string, owner: Owner?): effects settings.put;
   // どの配線も呼ばない効果も出す
-  effect fn removeLine(item: string) on lines.delete;
+  effect fn removeLine(item: string): effects lines.delete;
 
   // 読む状態と効果を運ぶデコレータ（docs/check.md「デコレータが運ぶ reads と effects」）
   decorator looks(table: any state) for op reads table;

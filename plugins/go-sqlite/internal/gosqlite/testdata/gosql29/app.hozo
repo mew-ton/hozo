@@ -5,7 +5,7 @@ namespace app {
   model Row { @db.key @db.text id: string; }
   /** @db.table のない状態 */
   state rows: list<Row>;
-  effect fn createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row): effects rows.post;
 
   // 配線
   @db.transaction
@@ -27,7 +27,7 @@ namespace ok {
   model Row { @db.key @db.text id: string; }
   @db.table state rows: list<Row>;
   @db.insert
-  effect fn createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row): effects rows.post;
   @db.transaction
   export fn add(row: Row) {
     createRow(row);

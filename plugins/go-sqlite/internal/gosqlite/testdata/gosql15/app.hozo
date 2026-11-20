@@ -12,10 +12,10 @@ namespace app {
   @db.table state rows: list<Row>;
 
   @db.update
-  effect fn updateNote(row: Note) on notes.put;
+  effect fn updateNote(row: Note): effects notes.put;
   /** 配線が呼んでいない効果も、同じに確かめる */
   @db.update
-  effect fn updateMark(row: Mark) on marks.put;
+  effect fn updateMark(row: Mark): effects marks.put;
   // 配線が呼んでも、効果ごとに一度だけ
   export fn saveNote(note: Note) {
     updateNote(note);
@@ -23,10 +23,10 @@ namespace app {
 
   // 通るもの
   @db.update
-  effect fn updateRow(row: Row) on rows.put;
+  effect fn updateRow(row: Row): effects rows.put;
   // @db.insert と @db.delete は、キーを要らない
   @db.insert
-  effect fn createNote(row: Note) on notes.post;
+  effect fn createNote(row: Note): effects notes.post;
   @db.delete
-  effect fn deleteMark(book: string) on marks.delete;
+  effect fn deleteMark(book: string): effects marks.delete;
 }

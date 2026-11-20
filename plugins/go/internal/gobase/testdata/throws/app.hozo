@@ -63,7 +63,7 @@ namespace app {
 
   // 文の match の throw E(<値>, …): 戻り値のない配線は `return <例外>`。引数の型をそろえる（scalar → 元の型）、
   // 渡されていない省略可能な引数は nil、別の名前空間の例外（Duration のリテラルと、省略可能な引数に文字列のリテラル）
-  export fn guard(code: Code?, wait: boolean?)
+  export fn guard(code: Code?, wait: boolean?):
     throws Missing, limits.LimitExceeded
   {
     match (code by nullable) {

@@ -3,18 +3,18 @@
 namespace a {
   state s: list<string>;
   state log: list<string>;
-  effect fn e() on s.post;
-  effect fn note() on log.post;
+  effect fn e(): effects s.post;
+  effect fn note(): effects log.post;
   decorator doing(...targets: any effect) for op effects targets;
   decorator posting for op effects log.post;
   // 運ばれた note が足りない
   @doing(note)                               // ERROR: EFF-2
-  fn missing() effects e {
+  fn missing(): effects e {
     e();
   }
   // 直に書いた効果を運ぶデコレータ。同じ宛先の宣言 note は、別の効果
   @posting                                   // ERROR: EFF-2
-  fn wrong() effects e, note {
+  fn wrong(): effects e, note {
     e();
   }
   @doing(note)
@@ -22,7 +22,7 @@ namespace a {
     e();
   }
   // 呼び出し先の配線に運ばれた note が、呼ぶ側の節に足りない
-  fn caller() effects e {                  // ERROR: EFF-2
+  fn caller(): effects e {                  // ERROR: EFF-2
     carrying();
   }
 }

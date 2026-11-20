@@ -6,12 +6,12 @@ namespace a {
   state lines: list<Line>;
   state counter: single<int>;
   exception Declined;
-  read fn all(): Order[] on orders;
-  effect fn touch(order: Order) on orders.put;
-  effect fn removeById(id: string) on orders.delete;
-  effect fn addLine(line: Line) on lines.post;
-  effect fn bump(n: int) on counter.put;
-  fn charge(order: Order) throws Declined;
+  read fn all(): Order[] reads orders;
+  effect fn touch(order: Order): effects orders.put;
+  effect fn removeById(id: string): effects orders.delete;
+  effect fn addLine(line: Line): effects lines.post;
+  effect fn bump(n: int): effects counter.put;
+  fn charge(order: Order): throws Declined;
   fn count(x: Order[], y: Order[]): int;
   fn f(a: Order, b: Order, l: Line): int throws Declined {
     val x;

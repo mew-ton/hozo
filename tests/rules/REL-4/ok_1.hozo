@@ -1,15 +1,15 @@
 // REL-4（docs/check.md「throws」）: 書いた関係が計算と一致する
 namespace a {
   state s: list<string>;
-  effect fn e() on s.post;
+  effect fn e(): effects s.post;
   exception E;
-  fn write() effects e { e(); }
-  fn fail() throws E;
-  fn kept() throws E keeps effects {
+  fn write(): effects e { e(); }
+  fn fail(): throws E;
+  fn kept(): throws E keeps effects {
     write();
     fail();
   }
-  fn prevented() throws E prevents effects {
+  fn prevented(): throws E prevents effects {
     fail();
     write();
   }

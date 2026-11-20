@@ -22,9 +22,9 @@ type TokenState interface {
 	Delete(ctx context.Context) error
 	// TokenCopy は問い合わせ（read app.tokenCopy）: 手元のトークンの写し
 	TokenCopy(ctx context.Context) (*Token, error)
-	// DropToken は命令（効果 app.dropToken、on app.token.delete）。
+	// DropToken は命令（効果 app.dropToken、effects app.token.delete）。
 	DropToken(ctx context.Context) error
-	// SignIn は命令（効果 app.signIn、on app.SignedIn: any -> Yes）: ログインする。
+	// SignIn は命令（効果 app.signIn、effects app.SignedIn as any -> Yes）: ログインする。
 	// 二行目の説明。
 	SignIn(ctx context.Context, token Token) error
 }
@@ -44,11 +44,11 @@ type LinesState interface {
 	CountLines(ctx context.Context) (int64, error)
 	// LinesSince は問い合わせ（read app.linesSince）。
 	LinesSince(ctx context.Context, since time.Time, limit *int64) ([]Line, error)
-	// AddLine は命令（効果 app.addLine、on app.lines.post）: 行を足す
+	// AddLine は命令（効果 app.addLine、effects app.lines.post）: 行を足す
 	AddLine(ctx context.Context, line Line) error
-	// ClearLines は命令（効果 app.clearLines、on app.lines: HasItems -> Empty）: カートを空にする
+	// ClearLines は命令（効果 app.clearLines、effects app.lines as HasItems -> Empty）: カートを空にする
 	ClearLines(ctx context.Context) error
-	// RemoveLine は命令（効果 app.removeLine、on app.lines.delete）。
+	// RemoveLine は命令（効果 app.removeLine、effects app.lines.delete）。
 	RemoveLine(ctx context.Context, item string) error
 }
 
@@ -62,7 +62,7 @@ type SettingsState interface {
 	// ShopTitle は問い合わせ（read app.shopTitle）: 店の名前。
 	// 設定の title を、そのまま返す。
 	ShopTitle(ctx context.Context) (string, error)
-	// Rename は命令（効果 app.rename、on app.settings.put）。
+	// Rename は命令（効果 app.rename、effects app.settings.put）。
 	Rename(ctx context.Context, title string, owner *Owner) error
 }
 
@@ -82,6 +82,6 @@ type SyncState interface {
 	Fresh(ctx context.Context) (bool, error)
 	// Stale は問い合わせ: ケース Stale の述語。
 	Stale(ctx context.Context) (bool, error)
-	// Refresh は命令（効果 app.refresh、on app.Sync: Stale -> Fresh）。
+	// Refresh は命令（効果 app.refresh、effects app.Sync as Stale -> Fresh）。
 	Refresh(ctx context.Context) error
 }

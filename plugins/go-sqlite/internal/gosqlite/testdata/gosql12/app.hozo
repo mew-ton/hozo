@@ -8,12 +8,12 @@ namespace app {
   /** 二つ持つ効果 */
   @db.insert
   @db.update
-  effect fn both(row: Row) on rows.post;
+  effect fn both(row: Row): effects rows.post;
   /** 三つとも持つ効果（配線が呼んでいなくても、確かめる） */
   @db.insert
   @db.update
   @db.delete
-  effect fn all(id: string) on rows.delete;
+  effect fn all(id: string): effects rows.delete;
 
   // 配線が呼んでも、効果ごとに一度だけ
   export fn addBoth(row: Row) {
@@ -22,7 +22,7 @@ namespace app {
 
   // 通るもの
   @db.insert
-  effect fn createRow(row: Row) on rows.post;
+  effect fn createRow(row: Row): effects rows.post;
   /** デコレータを持たない効果 */
-  effect fn bare() on rows.delete;
+  effect fn bare(): effects rows.delete;
 }

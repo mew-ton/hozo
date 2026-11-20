@@ -20,6 +20,6 @@ namespace a {
 }
 namespace b {
   state users: list<string>;
-  read fn firstUser(): string? on users;
+  read fn firstUser(): string? reads users;
   export fn all(): string[] { return users; }
 }

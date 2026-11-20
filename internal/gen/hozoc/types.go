@@ -59,7 +59,7 @@ type LspInput = inner.LspInput
 type EmitPlan = inner.EmitPlan
 
 // EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
-// on hozoc.OutputsSync: any -> UpToDate
+// effects hozoc.OutputsSync as any -> UpToDate
 const EffectSyncOutputs = inner.EffectSyncOutputs
 
 // Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ

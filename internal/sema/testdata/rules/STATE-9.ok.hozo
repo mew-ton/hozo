@@ -10,18 +10,18 @@ namespace a {
   classify Urgency of Order { Rush; Normal; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
   classify Review of Order { Passed: Order as Stage.Accepted<Order>; Failed; }
-  read fn byId(id: string): Order? on orders;
-  effect fn accept(order: Order) on orders.post as Stage.Accepted;
-  effect fn open(order: Order) on orders.post as Life.Absent -> Life.Open;
-  effect fn start(order: Order, at: Time) on orders.put as Stage.Accepted -> Stage.InProduction;
-  effect fn cancel(order: Order) on orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-  effect fn forceShip(order: Order) on orders.put as any -> Stage.Shipped;
-  effect fn patch(order: Order) on orders.put as any -> else;
-  effect fn rename(order: Order) on orders.put;
-  effect fn discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
-  effect fn purge(order: Order) on orders.delete as Life.Absent;
+  read fn byId(id: string): Order? reads orders;
+  effect fn accept(order: Order): effects orders.post as Stage.Accepted;
+  effect fn open(order: Order): effects orders.post as Life.Absent -> Life.Open;
+  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn cancel(order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
+  effect fn forceShip(order: Order): effects orders.put as any -> Stage.Shipped;
+  effect fn patch(order: Order): effects orders.put as any -> else;
+  effect fn rename(order: Order): effects orders.put;
+  effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
+  effect fn purge(order: Order): effects orders.delete as Life.Absent;
   // アームから: 名前で並べたアーム（一つのケース、前の並びに入る二つのケース）
-  fn byArm(order: Order, at: Time) throws NotAccepted {
+  fn byArm(order: Order, at: Time): throws NotAccepted {
     match (order by Stage) {
       Accepted => start(order, at);
       else     => throw NotAccepted;

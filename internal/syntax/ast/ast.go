@@ -411,7 +411,7 @@ type EffectDecl struct {
 	Return *ReturnType
 	// On は基底の状態の組み込みの効果（"状態.操作"）。遷移なら nil。
 	On *StateOpRef
-	// Transition は分類の遷移（"X: A -> B"）。組み込みの効果なら nil。
+	// Transition は状態の遷移（"X as A -> B"。X は、状態か、状態の分類）。組み込みの効果なら nil。
 	Transition *Transition
 	// Row は行の遷移（On の後ろの "as …"。docs/grammar.md「exception / effect / read」の RowClause）。書いていなければ nil。
 	Row *RowClause
@@ -421,7 +421,7 @@ type EffectDecl struct {
 func (n *EffectDecl) NodeSpan() source.Span { return n.Span }
 func (n *EffectDecl) declNode()             {}
 
-// ReadDecl は read（docs/grammar.md「exception / effect / read」）: "read 名前 ( 引数 ) : 型 on 状態"。
+// ReadDecl は read（docs/grammar.md「exception / effect / read」）: "read fn 名前 ( 引数 ) : 型 reads 状態"。
 // 状態を読むことに名前を付ける。
 type ReadDecl struct {
 	Span       source.Span
@@ -442,7 +442,7 @@ type ReadDecl struct {
 func (n *ReadDecl) NodeSpan() source.Span { return n.Span }
 func (n *ReadDecl) declNode()             {}
 
-// Transition は分類の遷移 "QualifiedName : CaseSet -> CaseSet"（docs/grammar.md「exception / effect / read」）。
+// Transition は状態の遷移 "QualifiedName as CaseSet -> CaseSet"（docs/grammar.md「exception / effect / read」）。
 // Of は状態を対象にした classify か、組み込みの分類を持つ基底の状態。
 type Transition struct {
 	Span source.Span
