@@ -109,33 +109,33 @@ namespace a {
 
   read userById(id: string): User? on users;
   export op find2(id: string): User? reads users, token reads users {
-    return match (token by nullable) { HasItems => userById(id); Empty => none; };
+    return match(token by nullable){ HasItems => userById(id); Empty => none; };
   }
   op nameOf(u: User): string;
   op gone(): never throws Unauthorized;
   classify Found of find2 { Hit: find2 as User; Miss: find2 as else; }
   classify Session of token { In: token as string; Out: token as else; }
   op wire2(id: string): string throws Unauthorized {
-    val u = find2(id);
-    return match (u by Found) {
+    val   u = find2(id);
+    return match(u by Found){
       Hit => nameOf(u);
       else => throw Unauthorized;
     };
   }
   op wire3(): string? {
-    return match (token by nullable) { HasItems => token; Empty => none; };
+    return match(token by nullable){ HasItems => token; Empty => none; };
   }
   op wire4(): string { return a.title; }
   op wire5(): string {
-    return match (by Session) { In => token; Out => gone(); };
+    return match(by Session){ In => token; Out => gone(); };
   }
 
   @unavailable
   @cache(["users", id], 5m)
   op wire(id: string): User {
-    val u = find(id);
+    val   u = find(id);
     take({ id, email: u.email, hash: "x" });
-    val w = match (u by Kind) {
+    val   w = match(u by Kind){
       A, B => fromIn(u);
       else => none;
     };
@@ -221,8 +221,8 @@ namespace lib {
   op direct(): Row[] reads rows { return rows; }
   op pick(row: Row?, a: Row[], b: Row[]): Row[];
   op mixed(id: string): Row[] reads rowById, rows, lib.allLogs reads rows, rowById {
-    val row = rowById(id);
-    val logged = allLogs();
+    val   row = rowById(id);
+    val   logged = allLogs();
     return pick(row, logged, rows);
   }
   op write(r: Row) effects rows.post { rows.post(r); }
@@ -238,7 +238,7 @@ namespace lib {
     write(r);
     touchIt(r);
     rename("t");
-    return match (r by Load) {
+    return match(r by Load){
       Heavy => throw Busy(5m, "heavy");
       Light => named(r.id);
     };

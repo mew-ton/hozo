@@ -32,12 +32,12 @@ namespace a {
   effect logout() on S: LoggedIn -> LoggedOut;
 
   op wire(two: Two, three: Three): void {
-    val m = find();
-    match (m by F) { Found => takeM(m); NotFound => none; };
-    match (two by P2) { IsReady => takeM(two); Rest => takeN(two); };
-    match (three by P3) { IsReady => takeM(three); Rest => none; };
-    match (two by P2) { IsReady, Rest => f(); };
-    match (by S) { LoggedIn => f(); LoggedOut => none; };
+    val   m = find();
+    match(m by F){ Found => takeM(m); NotFound => none; };
+    match(two by P2){ IsReady => takeM(two); Rest => takeN(two); };
+    match(three by P3){ IsReady => takeM(three); Rest => none; };
+    match(two by P2){ IsReady, Rest => f(); };
+    match(by S){ LoggedIn => f(); LoggedOut => none; };
   }
 }
 `

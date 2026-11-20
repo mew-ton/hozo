@@ -652,12 +652,12 @@ func TestStateClassification(t *testing.T) {
 		{"touchCheckout() on", 0, "```hozo\neffect touchCheckout() on Checkout: Shopping, Ordered -> any\n```"},
 		{"saveToken(token); }", 0, "```hozo\neffect saveToken(token: Token) on token: Empty -> HasItems\n```"},
 		// 分類の対象: 状態の分類は状態の名前の並び、値の分類は型
-		{"match by Checkout", len("match by "), "```hozo\nclassify Checkout of carts, orders\n```"},
-		{"match by LoggedIn", len("match by "), "```hozo\nclassify LoggedIn of token\n```"},
-		{"match line by LineKind", len("match line by "), "```hozo\nclassify LineKind of Line\n```"},
+		{"match (by Checkout)", len("match (by "), "```hozo\nclassify Checkout of carts, orders\n```"},
+		{"match (by LoggedIn)", len("match (by "), "```hozo\nclassify LoggedIn of token\n```"},
+		{"match (line by LineKind", len("match (line by "), "```hozo\nclassify LineKind of Line\n```"},
 		// 状態の形
-		{"match token by nullable", len("match "), "```hozo\nstate token: nullable<Token>\n```"},
-		{"match carts by list", len("match "), "```hozo\nstate carts: list<Line>\n```"},
+		{"match (token by nullable", len("match ("), "```hozo\nstate token: nullable<Token>\n```"},
+		{"match (carts by list", len("match ("), "```hozo\nstate carts: list<Line>\n```"},
 		// 遷移のケース名は分類のケース
 		{"Checkout: Shopping -> Ordered", len("Checkout: "), "classify Checkout of carts, orders\n  Shopping"},
 		// 束縛のホバーは式を短く書く: 状態の分類での match
@@ -683,8 +683,8 @@ func TestStateClassification(t *testing.T) {
 		{"効果の呼び出しの名前", "{ clearCart(); }", len("{ "), "clearCart() on carts"},
 		{"効果の引数の型", "addLine(line: Line) on", len("addLine(line: "), "Line { item"},
 		{"分類の対象の状態", "Checkout of carts, orders", len("Checkout of carts, "), "orders: list<Order>"},
-		{"match の対象の状態", "match token by nullable", len("match "), "token: nullable<Token>"},
-		{"match by の分類", "match by Checkout", len("match by "), "Checkout of carts, orders"},
+		{"match の対象の状態", "match (token by nullable", len("match ("), "token: nullable<Token>"},
+		{"match by の分類", "match (by Checkout)", len("match (by "), "Checkout of carts, orders"},
 		{"match by のアームのケース", "Shopping => submitOrder()", 0, "Shopping;\n"},
 	} {
 		loc := definition(tt.needle, 0, tt.shiftBy)
@@ -737,7 +737,7 @@ func TestReservedWordFields(t *testing.T) {
   op fetch(): Wrap;
   op store(w: Wrap): Wrap;
   op run(): Wrap {
-    val res = fetch();
+    val   res = fetch();
     return store({ op: res.op, state: res.state });
   }
 }
@@ -821,7 +821,7 @@ namespace store {
     Unknown: findUser as else;
   }
   op whoAmI(): type.User? {
-    return match (current by nullable) {
+    return match(current by nullable){
       HasItems => current;
       Empty    => none;
     };
@@ -834,8 +834,8 @@ namespace server {
   export op login(id: string): string
     throws type.Unauthorized
   {
-    val user = store.findUser(id);
-    return match (user by store.Registration) {
+    val   user = store.findUser(id);
+    return match(user by store.Registration){
       Registered => store.nameOf2(user);
       else       => throw type.Unauthorized;
     };
@@ -843,8 +843,8 @@ namespace server {
   export op lookup(id: string): string
     throws type.Unauthorized
   {
-    val user = store.findUser(id);
-    return match (user by store.Account) {
+    val   user = store.findUser(id);
+    return match(user by store.Account){
       Known   => store.nameOf2(user);
       Unknown => throw type.Unauthorized;
     };
@@ -905,7 +905,7 @@ namespace store {
 		{"Unknown: findUser as else", len("Unknown: "), []string{"```hozo\nexport op findUser(id: string): type.User?\n```"}, nil},
 		// 状態の見出しだけは形の語で書く（T? と書いた状態も nullable<T>、T と書いた状態は single<T>）。アームの中で
 		// 絞り込まれていても、見出しは宣言のまま
-		{"match current by nullable", len("match "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
+		{"match(current by nullable)", len("match "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
 		{"HasItems => current;", len("HasItems => "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
 		{"return title;", len("return "), []string{"```hozo\nstate title: single<string>\n```"}, nil},
 		{"reads users {", len("reads "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
@@ -951,7 +951,7 @@ namespace store {
 		{"read r(…): T on s の s", "type.User? on users;", len("type.User? on "), "users: list<type.User>;"},
 		{"read の呼び出し", "return userById(id); }", len("return "), "userById(id: string): type.User? on"},
 		{"read の結果の型", "userById(id: string): type.User? on", len("userById(id: string): type."), "User {\n    /** 識別子 */"},
-		{"配線の値の位置の状態（match の対象）", "match current by nullable", len("match "), "current: type.User?;"},
+		{"配線の値の位置の状態（match の対象）", "match(current by nullable)", len("match "), "current: type.User?;"},
 		{"配線の値の位置の状態（アームの値）", "HasItems => current;", len("HasItems => "), "current: type.User?;"},
 		{"配線の値の位置の状態（return）", "return title;", len("return "), "title: string;"},
 		{"match x by ns.C の C", "by store.Registration", len("by store."), "Registration of findUser"},
@@ -970,7 +970,7 @@ namespace store {
 	for _, tt := range []struct {
 		needle  string
 		shiftBy int
-	}{{"by nullable {", len("by ")}, {"HasItems => current;", 0}, {"Empty    => none;", 0},
+	}{{"by nullable){", len("by ")}, {"HasItems => current;", 0}, {"Empty    => none;", 0},
 		// 残りのケースの `X as else` の else も、宣言を持たない（docs/lsp.md「定義へジャンプ」）
 		{"Unknown: findUser as else", len("Unknown: findUser as ")},
 		// アームの頭の else も、一つのケースを指さない
@@ -1038,7 +1038,7 @@ namespace shop {
   effect discard(order: Order) on orders.delete as Life.Open -> Life.Absent;
   effect purge(order: Order) on orders.delete as any -> Life.Absent;
   op send(order: Order, at: Time) {
-    match (order by kind.Stage) {
+    match(order by kind.Stage){
       Accepted => ship(order, at);
       else     => none;
     };
@@ -1206,7 +1206,7 @@ func TestCarryingDecorators(t *testing.T) {
   op save(row: Row): Row? throws Busy {
     add(row);
     rows.post(row);
-    return match (row by Size) {
+    return match(row by Size){
       Big     => throw Busy(5m, "big");
       else    => byId(row.id);
     };

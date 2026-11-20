@@ -37,18 +37,18 @@ namespace a {
   classify Session of token { LoggedIn: token as string; LoggedOut: token as else; }
 
   op wire(m: M, three: Three): void {
-    match (m by K) { A => takeA(m); else => none; };
-    match (m by K) { D, A => f(); C => f(); else => none; };
-    match (m by K) { B, C, D, E => f(); else => takeA(m); };
-    val x = find();
-    match (x by F) { NotFound => none; else => takeM(x); };
-    match (x by Arrival) { Arrived => takeM(x); };
-    match (three by Whole) { IsReady => takeM(three); else => f(); };
-    match (three by Whole) { IsReady, IsMissing => f(); else => takeO(three); };
-    match (token by nullable) { HasItems => f(); else => none; };
-    match (x by nullable) { Empty => none; else => takeM(x); };
-    match (carts by list) { HasItems => f(); else => none; };
-    match (by Session) { LoggedOut => none; else => takeString(token); };
+    match(m by K){ A => takeA(m); else => none; };
+    match(m by K){ D, A => f(); C => f(); else => none; };
+    match(m by K){ B, C, D, E => f(); else => takeA(m); };
+    val   x = find();
+    match(x by F){ NotFound => none; else => takeM(x); };
+    match(x by Arrival){ Arrived => takeM(x); };
+    match(three by Whole){ IsReady => takeM(three); else => f(); };
+    match(three by Whole){ IsReady, IsMissing => f(); else => takeO(three); };
+    match(token by nullable){ HasItems => f(); else => none; };
+    match(x by nullable){ Empty => none; else => takeM(x); };
+    match(carts by list){ HasItems => f(); else => none; };
+    match(by Session){ LoggedOut => none; else => takeString(token); };
   }
 }
 `

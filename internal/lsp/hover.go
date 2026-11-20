@@ -641,13 +641,13 @@ func (r *renderer) matchHead(m ir.Match) string {
 	switch s := m.Subject.(type) {
 	case ir.ValueSubject:
 		if m.Builtin() {
-			return "match " + r.atom(s.Atom) + " by " + m.Classify // 標準の分類。classify は "list" か "nullable"
+			return "match (" + r.atom(s.Atom) + " by " + m.Classify + ")" // 標準の分類。classify は "list" か "nullable"
 		}
-		return "match " + r.atom(s.Atom) + " by " + r.rel(m.Classify)
+		return "match (" + r.atom(s.Atom) + " by " + r.rel(m.Classify) + ")"
 	case ir.ClassifyOwnedSubject:
-		return "match by " + r.rel(m.Classify)
+		return "match (by " + r.rel(m.Classify) + ")"
 	}
-	return "match by " + r.rel(m.Classify)
+	return "match (by " + r.rel(m.Classify) + ")"
 }
 
 // expr は配線の式を短く書く（束縛のホバー）。

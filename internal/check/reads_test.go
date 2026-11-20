@@ -58,13 +58,13 @@ func TestReadsWiring(t *testing.T) {
 	take := leaf("store.take", nil, param("in", ir.Ref("store.In")), param("t", ir.Optional(ir.String())))
 	inModel := model("store.In", field("who", ir.Optional(user)), field("n", ir.Array(ir.Ref("type.Session"))))
 	byState := wire("store.w", nil, nil,
-		// match (token by nullable) { HasItems => take({ n: sessions }, token); Empty => findUser(...) }
+		// match(token by nullable){ HasItems => take({ n: sessions }, token); Empty => findUser(...) }
 		matchState("store.token", ir.StateNullable,
 			arm(ptr(call("store.take", carg("in", rec(rf("n", stateAtom("store.sessions")))), carg("t", stateAtom("store.token")))), "HasItems"),
 			arm(ptr(call("store.findUser")), "Empty"),
 		),
 	)
-	// match (by Login) { In => users; default => none }: C の対象の状態を宣言の順に、その後にアームの値
+	// match(by Login){ In => users; default => none }: C の対象の状態を宣言の順に、その後にアームの値
 	byClassify := wire("store.c", ir.Optional(ir.Array(user)), nil,
 		ir.ReturnStmt{Expr: ir.MatchExpr{Match: ir.Match{Subject: ir.ClassifyOwnedSubject{}, Classify: "store.Login", Arms: []ir.MatchArm{
 			atomArm(stateAtom("store.users"), "In"),

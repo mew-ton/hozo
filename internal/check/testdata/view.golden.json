@@ -1,5 +1,5 @@
 {
-  "version": "0.9",
+  "version": "0.10",
   "viewer": "browser",
   "config": {
     "index": 2,
@@ -68,7 +68,7 @@
     ]
   },
   "program": {
-    "version": "0.9",
+    "version": "0.10",
     "namespaces": [
       {
         "name": "http",
@@ -141,6 +141,7 @@
             "targets": [
               "op"
             ],
+            "caseTargets": [],
             "external": true,
             "repeatable": false,
             "throws": [
@@ -190,6 +191,7 @@
             "targets": [
               "op"
             ],
+            "caseTargets": [],
             "external": true,
             "repeatable": false,
             "throws": [
@@ -801,6 +803,7 @@
             "targets": [
               "op"
             ],
+            "caseTargets": [],
             "external": false,
             "repeatable": false,
             "throws": [],

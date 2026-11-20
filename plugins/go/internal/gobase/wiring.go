@@ -1089,10 +1089,15 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 			var states []string
 			statesOfAtom(ex.Atom, &states)
 			b.read(states, nil)
-			expr, typ := b.atom(ex.Atom, x.Type)
-			if x.Type != nil {
-				typ = x.Type
+			// 値の型と、val の型（型を書いた val）が、Go で違うとき（か、値がレコードリテラルのとき）だけ、型を付けて宣言する
+			if at := b.atomType(ex.Atom); x.Type != nil && (at == nil || !b.sameGo(at, x.Type)) {
+				expr, _ := b.atom(ex.Atom, x.Type)
+				name := b.bind(x.Name, x.Type)
+				b.line("var " + name + " " + b.f.goType(x.Type) + " = " + expr)
+				b.markUnused(name, x.Name, rest)
+				return
 			}
+			expr, typ := b.atom(ex.Atom, nil)
 			name := b.bind(x.Name, typ)
 			b.line(name + " := " + expr)
 			b.markUnused(name, x.Name, rest)

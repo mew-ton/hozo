@@ -49,23 +49,23 @@ namespace shop {
   op order(): Order effects placeOrder { placeOrder(); return newOrder(); }
 
   op view(line: Line): Order {
-    match (carts by list) {
+    match(carts by list){
       Empty => showEmpty();
       HasItems => showCart();
     };
-    val who = match (token by nullable) {
+    val   who = match(token by nullable){
       HasItems => me();
       Empty => none;
     };
-    val kind = match (line by LineKind) {
+    val   kind = match(line by LineKind){
       Gift => gift(line);
       Normal => normal(line);
     };
-    val placed = match (by Checkout) {
+    val   placed = match(by Checkout){
       Shopping, Ordered => order();
       else => order();
     };
-    match (by LoggedIn) {
+    match(by LoggedIn){
       LoggedIn => showCart();
       LoggedOut => none;
     };
@@ -180,8 +180,8 @@ namespace a {
   op f(): void;
   // 対象が決まらなかった分類での match には、MATCH-7 を重ねない
   op g(): void {
-    match (by Mixed) { A => f(); };
-    match (by Twice) { A => f(); };
+    match(by Mixed){ A => f(); };
+    match(by Twice){ A => f(); };
   }
 }`}, false)
 	if s := res.Program.Lookup("a.Mixed").(*ir.Classify).Subject; s != nil {
@@ -346,8 +346,8 @@ namespace a {
   classify Phase of s { Idle; Busy; }
   op f(): void;
   op g(): void {
-    match (s by list) { Empty => f(); HasItems => none; };
-    match (by Phase) { Idle => f(); Busy => none; };
+    match(s by list){ Empty => f(); HasItems => none; };
+    match(by Phase){ Idle => f(); Busy => none; };
   }
 }`}, false)
 	noErrors(t, res, fs)
@@ -376,35 +376,35 @@ namespace a {
 
   // すべてのアームが同じ型 → その型。none のアームがあれば optional
   op same(): M {
-    return match (items by list) { Empty => m(); HasItems => m(); };
+    return match(items by list){ Empty => m(); HasItems => m(); };
   }
   op optional(): void {
-    val x = match (token by nullable) { Empty => none; HasItems => m(); };
+    val   x = match(token by nullable){ Empty => none; HasItems => m(); };
     takeOptM(x);
     takeM(x);                                                          // ERROR: TYPE-4
   }
   op byClassify(): M {
-    return match (by Stock) { None => m(); Some => m(); };
+    return match(by Stock){ None => m(); Some => m(); };
   }
   // 値のある呼び出しがなければ「値がない」
   op noValue(): void {
-    match (items by list) { Empty => nothing(); HasItems => none; };
-    val y = match (by Stock) { None => nothing(); Some => none; };     // ERROR: WIRE-2 // WARN: WIRE-8
+    match(items by list){ Empty => nothing(); HasItems => none; };
+    val   y = match(by Stock){ None => nothing(); Some => none; };     // ERROR: WIRE-2 // WARN: WIRE-8
   }
   // 型がそろわない、値のある呼び出しと値のない呼び出しが混ざる
   op mixed(): void {
-    val a = match (items by list) { Empty => m(); HasItems => n(); };          // ERROR: TYPE-8 // WARN: WIRE-8
-    val b = match (by Stock) { None => m(); Some => nothing(); };              // ERROR: TYPE-8 // WARN: WIRE-8
-    val c = match (token by nullable) { Empty => m(); HasItems => m(); };      // WARN: WIRE-8
+    val   a = match(items by list){ Empty => m(); HasItems => n(); };          // ERROR: TYPE-8 // WARN: WIRE-8
+    val   b = match(by Stock){ None => m(); Some => nothing(); };              // ERROR: TYPE-8 // WARN: WIRE-8
+    val   c = match(token by nullable){ Empty => m(); HasItems => m(); };      // WARN: WIRE-8
   }
   // 対象でない引数は、アームの中でもそのままの型で照合する
   op args(v: M): void {
-    match (items by list) { Empty => takeM(v); HasItems => takeN(v); };  // ERROR: TYPE-4
-    match (by Stock) { None => takeM(v); Some => takeN(v); };            // ERROR: TYPE-4
+    match(items by list){ Empty => takeM(v); HasItems => takeN(v); };  // ERROR: TYPE-4
+    match(by Stock){ None => takeM(v); Some => takeN(v); };            // ERROR: TYPE-4
   }
   // 値がある match を束縛せずに書けない
   op unbound(): void {
-    match (items by list) { Empty => m(); HasItems => m(); };            // ERROR: WIRE-2
+    match(items by list){ Empty => m(); HasItems => m(); };            // ERROR: WIRE-2
   }
 }`}, false)
 }
@@ -439,8 +439,8 @@ namespace a {
   op get(): M;
   op f(): void;
   op g(): void {
-    val m = get();
-    match (m by Stock) { None => f(); Some => none; };   // ERROR: MATCH-7
+    val   m = get();
+    match(m by Stock){ None => f(); Some => none; };   // ERROR: MATCH-7
   }
 }`}, false)
 	// 対象は分類の宣言が持つ形で IR に載る
