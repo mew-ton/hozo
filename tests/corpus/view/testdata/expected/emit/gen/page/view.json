@@ -1,5 +1,5 @@
 {
-  "version": "0.11",
+  "version": "0.12",
   "viewer": "page",
   "config": {
     "index": 3,
@@ -70,7 +70,7 @@
     ]
   },
   "program": {
-    "version": "0.11",
+    "version": "0.12",
     "namespaces": [
       {
         "name": "",
@@ -1035,6 +1035,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.sessions",
@@ -1089,6 +1090,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.sessions",
@@ -1140,6 +1142,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.users",
@@ -4609,6 +4612,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.users",
@@ -10094,6 +10098,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.users",
@@ -10169,6 +10174,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.users",
@@ -10229,6 +10235,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.users",
@@ -10286,6 +10293,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.users",
@@ -10344,6 +10352,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "api.users",
@@ -11087,6 +11096,7 @@
               }
             },
             "params": [],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "web.location",
@@ -11119,6 +11129,7 @@
               }
             },
             "params": [],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "web.location",
@@ -11151,6 +11162,7 @@
               }
             },
             "params": [],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "web.token",
@@ -14560,6 +14572,50 @@
           },
           {
             "kind": "decorator",
+            "name": "db.conflict",
+            "description": {
+              "summary": "この効果が、表の一意の制約（@db.key、@db.unique）に当たったら、例外 error を投げる。@db.insert か @db.update の効果に足す",
+              "body": "この効果が、表の一意の制約（@db.key、@db.unique）に当たったら、例外 error を投げる。@db.insert か @db.update の効果に足す",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/db.hozo",
+              "start": {
+                "line": 40,
+                "col": 3
+              },
+              "end": {
+                "line": 40,
+                "col": 55
+              }
+            },
+            "params": [
+              {
+                "name": "error",
+                "type": {
+                  "kind": "any",
+                  "of": "exception"
+                },
+                "optional": false,
+                "rest": false
+              }
+            ],
+            "targets": [
+              "effect"
+            ],
+            "caseTargets": [],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
             "name": "db.transaction",
             "description": {
               "summary": "この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない",
@@ -14572,11 +14628,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 41,
+                "line": 43,
                 "col": 3
               },
               "end": {
-                "line": 41,
+                "line": 43,
                 "col": 32
               }
             },

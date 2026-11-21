@@ -1,0 +1,13 @@
+// DOC-1（docs/check.md「名前空間」）: 効果の @throws は、その効果の throws の例外を、指せる
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  exception E;
+  /**
+   * 足す
+   *
+   * @param m 足す行
+   * @throws E 同じ行が、もうある
+   */
+  effect fn add(m: M): throws E effects rows.post;
+}

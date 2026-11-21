@@ -1,5 +1,5 @@
 {
-  "version": "0.11",
+  "version": "0.12",
   "viewer": "browser",
   "config": {
     "index": 1,
@@ -115,7 +115,7 @@
     ]
   },
   "program": {
-    "version": "0.11",
+    "version": "0.12",
     "namespaces": [
       {
         "name": "",
@@ -317,6 +317,7 @@
               }
             },
             "params": [],
+            "throws": [],
             "target": {
               "kind": "transition",
               "of": "Login",
@@ -348,6 +349,7 @@
               }
             },
             "params": [],
+            "throws": [],
             "target": {
               "kind": "transition",
               "of": "session",
@@ -930,6 +932,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "db",
@@ -974,6 +977,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "db",
@@ -1026,6 +1030,7 @@
                 }
               }
             ],
+            "throws": [],
             "target": {
               "kind": "builtin",
               "state": "db",

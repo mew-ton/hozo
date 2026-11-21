@@ -1,0 +1,16 @@
+// SYNTAX（docs/grammar.md「関数の宣言」）: 効果の throws は、effects の前に、一つだけ。関係の節は、書けない。
+// read fn は、throws を書けない
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  exception E;
+  exception F;
+  // 関係の節（prevents effects、keeps effects）は、書けない: 投げたとき、その効果は、いつも、起きていない
+  effect fn rel(m: M): throws E prevents effects effects rows.post;   // ERROR: SYNTAX
+  // throws は、一つだけ（例外は、"," で並べる）
+  effect fn twice(m: M): throws E throws F effects rows.post;         // ERROR: SYNTAX
+  // throws は、effects の前
+  effect fn after(m: M): effects rows.post throws E;                  // ERROR: SYNTAX
+  // read は、例外を投げない
+  read fn all(): M[] throws E reads rows;                             // ERROR: SYNTAX
+}

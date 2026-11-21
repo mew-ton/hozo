@@ -35,6 +35,12 @@ type Ops interface {
 	// Reads: app.attempts
 	Retry(ctx context.Context, text *string) (string, error)
 
+	// Bump は op app.bump。
+	//
+	// Throws: app.TooMany, limits.LimitExceeded
+	// Effects: app.record
+	Bump(ctx context.Context, n int64) error
+
 	// Count は op app.count。
 	//
 	// Throws: app.TooMany

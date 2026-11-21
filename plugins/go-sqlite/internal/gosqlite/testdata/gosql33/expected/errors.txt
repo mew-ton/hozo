@@ -1,0 +1,3 @@
+GOSQL-33	app.add	効果 app.add の throws の例外 app.Taken を、このトランスパイラは投げられない（db のデコレータで中身を作る効果が投げるのは、@db.conflict が名指しした例外だけ）
+GOSQL-33	app.save	効果 app.save の throws の例外 app.Banned を、このトランスパイラは投げられない（db のデコレータで中身を作る効果が投げるのは、@db.conflict が名指しした例外だけ）
+GOSQL-33	app.remove	効果 app.remove の throws の例外 app.Banned を、このトランスパイラは投げられない（db のデコレータで中身を作る効果が投げるのは、@db.conflict が名指しした例外だけ）

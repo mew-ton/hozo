@@ -746,3 +746,13 @@ test('すべての実物の .hozo が落ちずに字句に分かれる', () => {
     }
   }
 });
+
+test('例外を投げる効果（docs/grammar.md「関数の宣言」）', () => {
+  // 効果の throws は、effects の前。例外は型の位置の名前、effects の後ろの操作は文脈キーワード
+  const t = tokensOf('effect fn createUser(user: User): throws type.EmailTaken, Full effects users.post;');
+  assertScope(t, 'effect fn', 'throws', 'keyword.control.hozo');
+  assertScope(t, 'effect fn', 'type.EmailTaken', 'entity.name.type.hozo');
+  assertScope(t, 'effect fn', 'Full', 'entity.name.type.hozo');
+  assertScope(t, 'effect fn', 'effects', 'keyword.control.hozo');
+  assertScope(t, 'effect fn', 'post', 'keyword.other.hozo');
+});

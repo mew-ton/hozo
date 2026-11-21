@@ -1,7 +1,7 @@
 package ir
 
 // Version は IR の構造の版（docs/ir.md「Program」の version）。構造が変わったら上げる。
-const Version = "0.11"
+const Version = "0.12"
 
 // Program は IR 全体（docs/ir.md「Program」）。
 //

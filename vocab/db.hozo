@@ -36,6 +36,8 @@ namespace db {
   decorator update for effect;
   /** この効果は、宛先（effects）の状態の表から、行を消す。引数の名前が列で、どの列も引数の値と同じ行 */
   decorator delete for effect;
+  /** この効果が、表の一意の制約（@db.key、@db.unique）に当たったら、例外 error を投げる。@db.insert か @db.update の効果に足す */
+  decorator conflict(error: any exception) for effect;
 
   /** この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない */
   decorator transaction for op;

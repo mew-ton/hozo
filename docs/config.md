@@ -150,7 +150,7 @@ validate = true
 | # | 使うもの | 数える参照 |
 |---|---|---|
 | 1 | N のすべての model / scalar / union / exception | フィールドの型、scalar の元の型、アームの型、例外の引数の型（例外が運ぶ値。`Exception.params`） |
-| 2 | N のすべての状態、分類、`read`、効果 | 状態の型、分類の対象の型、ケースの `as` の型、`read` と効果の引数の型、`read` の結果の型 |
+| 2 | N のすべての状態、分類、`read`、効果 | 状態の型、分類の対象の型、ケースの `as` の型、`read` と効果の引数の型、`read` の結果の型、効果の `throws` の例外（`Effect.throws`） |
 | 3 | 単位の対象の op | 引数と戻り値の型、`Op.signature.exceptions` の例外 |
 | 4 | 単位の対象の配線が呼ぶ op（別の名前空間のものを含む） | 引数と戻り値の型 |
 | 5 | 単位の対象の配線の `match` | 述語で決まる分類（`Classify.decidedBy` が `predicate`。`docs/check.md`「ケースの判定」）のうち、別の名前空間のもの |

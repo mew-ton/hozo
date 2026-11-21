@@ -19,13 +19,16 @@
 
 ## 形の書き方
 
-形の語（`docs/grammar.md`「型」）は、型の別の書き方。どの `Type` の位置でも同じ型になり、IR には一つの形だけが残る（`docs/ir.md`「正規化」）。
+型の、もとの形は、形の語（`docs/grammar.md`「型」）で書いた `nullable<T>` と `list<T>`。`T?` と `T[]` は、その省略形（`docs/decisions.md`「決めたこと」355）。どの `Type` の位置にも、どちらでも書け、同じ型になり、IR には一つの形だけが残る（`docs/ir.md`「正規化」）。
 
-| 形の語 | 同じ型 | IR |
+| もとの形 | 省略形 | IR |
 |---|---|---|
 | `nullable<T>` | `T?` | `optional(T)` |
 | `list<T>` | `T[]` | `array(T)` |
-| `single<T>` | `T` | T そのもの |
+| `single<T>` | `T`（`single<T>` は、`T` と同じ） | T そのもの |
+
+- その場で書く union（`T | null`、`T | none`）は、ない: 値がないことは、`nullable<T>` か、その省略の `T?` で言う。
+- デコレータの引数の、省ける印の `?`（`docs/grammar.md`「decorator の宣言」の `ParamType`）も、同じ省略: `who: any case of Order?` は、引数の型の全体を、`nullable` で包んだ形。
 
 - 入れ子も同じ規則で読む: `single<T?>` は `T?`、`nullable<T?>` は `T??` で、`T?` に正規化される（`optional` は入れ子にしない）。`list<T>?` と `nullable<list<T>>` は同じ `optional(array(T))`。
 - 状態の型（`state 名前: Type;` の `Type`）も同じ。状態の形（`list` / `nullable` / `single`）は、この型の最も外側から決まる（`docs/check.md`「状態の形」）。

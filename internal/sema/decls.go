@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -364,6 +365,7 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 	if d.Return != nil && !d.Return.Void {
 		a.errorf("TYPE-18", d.Return.Span, "effect fn %s は、値を返せない（効果の戻り値は、省くか、void と書く）", s.fqn)
 	}
+	a.lowerEffectThrows(s, e, d, sc)
 	switch {
 	case d.On != nil:
 		a.lowerBuiltinTarget(s, e, d.On, sc)
@@ -374,6 +376,39 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 		a.lowerTransition(s, e, d.Transition, sc)
 	}
 	return e
+}
+
+// lowerEffectThrows は、効果が投げる例外（`: throws E effects …`。docs/check.md「read と効果」）を e.Throws に置く。
+// REL-1: 同じ例外が二度ある。DOC-1: 効果の @throws の例外が、その効果の throws にない。
+func (a *analyzer) lowerEffectThrows(s *symbol, e *ir.Effect, d *ast.EffectDecl, sc *scope) {
+	e.Throws = []string{}
+	if d.Throws != nil {
+		seen := map[string]bool{}
+		for _, x := range a.lowerExceptionRefs(d.Throws.Exceptions, sc) {
+			if seen[x] {
+				a.errorf("REL-1", d.Throws.Span, "%s の throws に例外 %s が二度ある", s.fqn, x)
+				continue
+			}
+			seen[x] = true
+			e.Throws = append(e.Throws, x)
+		}
+	}
+	if e.Description == nil || d.Doc == nil {
+		return
+	}
+	for _, dt := range e.Description.Throws {
+		if slices.Contains(e.Throws, dt.Exception) {
+			continue
+		}
+		span := d.Doc.Span
+		for i := range d.Doc.Tags {
+			if tag := &d.Doc.Tags[i]; tag.Kind == ast.DocThrows && strings.HasSuffix(dt.Exception, tag.Name.String()) {
+				span = tag.Name.Span
+				break
+			}
+		}
+		a.errorf("DOC-1", span, "@throws の %s は、効果 %s の throws にない", dt.Exception, s.fqn)
+	}
 }
 
 // rowCase は、行の遷移に書いたケース一つ（`C.K`）を解決したもの。

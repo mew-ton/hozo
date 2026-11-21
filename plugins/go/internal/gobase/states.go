@@ -1,6 +1,8 @@
 package gobase
 
 import (
+	"strings"
+
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin/golang"
 )
@@ -38,8 +40,14 @@ func readComment(r *ir.Read) string {
 }
 
 // effectMethodComment は、効果のメソッドのコメント: 「<メソッド名> は命令（効果 <効果の FQN>、effects <宛先>）: <説明>」。
+// 例外を投げる効果（Effect.throws）は、effects の前に「throws <例外の FQN を「, 」で>、」を置く（docs/plugin-go.md「コメント」の
+// 「状態の単位のメソッド」）。
 func effectMethodComment(x *ir.Effect) string {
-	return unitMethodComment(golang.MethodName(x.Name)+" は命令（効果 "+x.Name+"、effects "+effectTarget(x)+"）", x.Description)
+	throws := ""
+	if len(x.Throws) > 0 {
+		throws = "throws " + strings.Join(x.Throws, ", ") + "、"
+	}
+	return unitMethodComment(golang.MethodName(x.Name)+" は命令（効果 "+x.Name+"、"+throws+"effects "+effectTarget(x)+"）", x.Description)
 }
 
 // genStates は定義のパッケージの states.go。状態の単位がなければ nil。

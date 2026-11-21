@@ -1,0 +1,20 @@
+// DISJ-1: 例外を投げる効果（docs/check.md「read と効果」）を呼ぶアームは、例外を出しうる。効果を持つ、別のアームとは、並べられない。
+// disjoint for のブロックが、例外を投げる効果を呼べば、例外を出しうるのに、効果を持つ
+namespace a {
+  model Order { id: string; }
+  model Line { id: string; }
+  state orders: list<Order>;
+  state lines: list<Line>;
+  exception Taken;
+  effect fn add(order: Order): throws Taken effects orders.post;
+  effect fn addLine(line: Line): effects lines.post;
+  fn f(a: Order, l: Line, items: Order[]): throws Taken {
+    disjoint {                         // ERROR: DISJ-1
+      add(a);
+      addLine(l);
+    }
+    disjoint for (val o of items) {    // ERROR: DISJ-1
+      add(o);
+    }
+  }
+}

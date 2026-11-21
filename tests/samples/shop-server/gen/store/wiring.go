@@ -45,6 +45,7 @@ func (o *ops) LatestOrder(ctx context.Context, userId pkgtype.UserId) (*pkgtype.
 
 // AddUser はユーザーを足す
 //
+// Throws: type.EmailTaken
 // Effects: store.createUser
 func (o *ops) AddUser(ctx context.Context, user pkgtype.User) error {
 	if err := o.users.CreateUser(ctx, user); err != nil {

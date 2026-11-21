@@ -1,0 +1,23 @@
+// GOSQL-33（docs/plugin-go-sqlite.md「効果の中身」）: @db.insert / @db.update / @db.delete を付けた効果の throws に、@db.conflict が
+// 名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。位置は効果。
+
+namespace app {
+  model User { @db.key @db.text id: string; @db.unique @db.text email: string; }
+  @db.table state users: list<User>;
+  exception Taken;
+  exception Banned;
+
+  /** @db.conflict がない */
+  @db.insert
+  effect fn add(user: User): throws Taken effects users.post;
+  /** @db.conflict が名指ししたほかに、もう一つ */
+  @db.update @db.conflict(Taken)
+  effect fn save(user: User): throws Taken, Banned effects users.put;
+  @db.delete
+  effect fn remove(id: string): throws Banned effects users.delete;
+
+  // 通るもの: デコレータのない効果（中身は、人が書く）は、何を投げてもよい
+  effect fn invite(user: User): throws Taken, Banned effects users.post;
+  @db.insert @db.conflict(Taken)
+  effect fn create(user: User): throws Taken effects users.post;
+}

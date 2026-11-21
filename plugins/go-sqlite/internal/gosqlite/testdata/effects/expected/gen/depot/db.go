@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mew-ton/hozo/runtime"
@@ -35,6 +36,10 @@ CREATE TABLE IF NOT EXISTS "events" (
   "crate" TEXT NOT NULL,
   "what" TEXT NOT NULL,
   "at" TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "tags" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "name" TEXT NOT NULL UNIQUE
 );
 `
 
@@ -202,6 +207,46 @@ func (t EventsTable) DeleteEventsOf(ctx context.Context, crate Code) error {
 	return dbExec(ctx, t.db, `DELETE FROM "events" WHERE "crate" IS ?1`, dbText(crate))
 }
 
+// TagsTable は状態 depot.tags の単位（TagsState）の、表 "tags" の上の実装。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+type TagsTable struct{ db *sql.DB }
+
+// NewTagsTable は db の表 "tags" の上の TagsTable を返す。表は CreateTables が作る。
+func NewTagsTable(db *sql.DB) TagsTable { return TagsTable{db: db} }
+
+var _ TagsState = TagsTable{}
+
+// IsEmpty は形で決まる問い合わせ: 表 "tags" に行が一つもなければ true。
+func (t TagsTable) IsEmpty(ctx context.Context) (bool, error) {
+	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "tags"`)
+}
+
+// Get は形で決まる問い合わせ: 表 "tags" の行を、足した順にすべて引く。
+func (t TagsTable) Get(ctx context.Context) ([]Tag, error) {
+	return dbList(ctx, t.db, dbScanTag,
+		`SELECT "id", "name" FROM "tags" ORDER BY rowid`)
+}
+
+// CreateTag は効果 depot.createTag（@db.insert、@db.conflict）: 表 "tags" に、引数 tag の行を足す。一意の制約に当たれば、例外 depot.TagTaken を返す。
+func (t TagsTable) CreateTag(ctx context.Context, tag Tag) error {
+	args, err := dbArgsTag(tag)
+	if err != nil {
+		return err
+	}
+	return dbConflict(dbExec(ctx, t.db,
+		`INSERT INTO "tags" ("id", "name") VALUES (?1, ?2)`, args...), TagTaken{})
+}
+
+// RenameTag は効果 depot.renameTag（@db.update、@db.conflict）: 表 "tags" の、キーが引数 tag と同じ行を書き換える。行がなければ何もしない。一意の制約に当たれば、例外 depot.TagTaken を返す。
+func (t TagsTable) RenameTag(ctx context.Context, tag Tag) error {
+	args, err := dbArgsTag(tag)
+	if err != nil {
+		return err
+	}
+	return dbConflict(dbExec(ctx, t.db,
+		`UPDATE "tags" SET "name" = ?2 WHERE "id" IS ?1`, args...), TagTaken{})
+}
+
 // dbArgsCrate は depot.Crate を、表 "crates" の列の順の値にする。
 func dbArgsCrate(row Crate) ([]any, error) {
 	return dbArgs(dbText(row.Code), dbText(row.Label), dbInt(row.Weight), dbText(row.Zone, dbNullable), dbJSON(row.Contents))
@@ -240,6 +285,20 @@ func dbScanEvent(r dbRow) (Event, error) {
 	var row Event
 	if err := r.Scan(dbText(&row.Crate), dbText(&row.What), dbTime(&row.At)); err != nil {
 		return Event{}, err
+	}
+	return row, nil
+}
+
+// dbArgsTag は depot.Tag を、表 "tags" の列の順の値にする。
+func dbArgsTag(row Tag) ([]any, error) {
+	return dbArgs(dbText(row.Id), dbText(row.Name))
+}
+
+// dbScanTag は、表 "tags" の列の順の値を depot.Tag に読む。
+func dbScanTag(r dbRow) (Tag, error) {
+	var row Tag
+	if err := r.Scan(dbText(&row.Id), dbText(&row.Name)); err != nil {
+		return Tag{}, err
 	}
 	return row, nil
 }
@@ -405,6 +464,14 @@ func dbJSON(v any, opts ...dbOption) dbCol {
 // dbExec は行を返さない文を実行する。
 func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {
 	_, err := Conn(ctx, db).ExecContext(ctx, query, args...)
+	return err
+}
+
+// dbConflict は、err が、一意の制約（キーを含む）の違反なら、conflict を返す。ほかは、err を、そのまま返す。
+func dbConflict(err, conflict error) error {
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		return conflict
+	}
 	return err
 }
 

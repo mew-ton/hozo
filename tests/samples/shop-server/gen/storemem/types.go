@@ -4,7 +4,7 @@ package store
 
 import "github.com/mew-ton/hozo/runtime"
 
-// EffectCreateUser はユーザーを登録する
+// EffectCreateUser はユーザーを登録する。同じ email（か、同じ識別子）のユーザーが、もういれば、投げる
 const EffectCreateUser runtime.Effect = "store.createUser"
 
 // EffectCreateSession はログインセッションを作る

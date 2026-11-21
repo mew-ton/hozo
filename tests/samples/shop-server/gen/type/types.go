@@ -93,3 +93,11 @@ func (NotificationFailed) Error() string         { return "type.NotificationFail
 func (NotificationFailed) HozoException() string { return "type.NotificationFailed" }
 
 var _ runtime.Exception = NotificationFailed{}
+
+// EmailTaken: その email のユーザーが、もういる（ステータスを持たない: 投げる store.addUser は、HTTP の入口から呼ばれない）
+type EmailTaken struct{}
+
+func (EmailTaken) Error() string         { return "type.EmailTaken" }
+func (EmailTaken) HozoException() string { return "type.EmailTaken" }
+
+var _ runtime.Exception = EmailTaken{}

@@ -37,6 +37,9 @@ const (
 	codeSQLDeleteAll   = "GOSQL-28" // @db.delete の効果が、引数を一つも持たない
 	codeSQLTransaction = "GOSQL-29" // op に @db.transaction が付いているのに、N に表の状態が一つもない
 	codeSQLRow         = "GOSQL-30" // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない
+	codeSQLConflictOn  = "GOSQL-31" // @db.conflict を付けた効果が、@db.insert も @db.update も持たない
+	codeSQLConflictExc = "GOSQL-32" // @db.conflict の例外が、効果の throws にないか、引数を持つ
+	codeSQLThrows      = "GOSQL-33" // db のデコレータで中身を作る効果の throws に、@db.conflict が名指ししていない例外がある
 )
 
 // 読む語彙（docs/vocab.md「`db` の語彙」）のデコレータの FQN。しまい方のデコレータは storages（tables.go）。
@@ -52,6 +55,7 @@ const (
 	decoratorInsert      = "db.insert"
 	decoratorUpdate      = "db.update"
 	decoratorDelete      = "db.delete"
+	decoratorConflict    = "db.conflict"
 	decoratorTransaction = "db.transaction"
 )
 
@@ -229,6 +233,23 @@ func refArg(a ir.Application, param string) string {
 		}
 	}
 	return ""
+}
+
+// refsArg は、適用 a の引数 param に渡した宣言の FQN の並び（any exception と any effect の引数は、ユニオンを展開した並びで
+// 渡ることがある）。渡していなければ nil。
+func refsArg(a ir.Application, param string) []string {
+	for _, arg := range a.Args {
+		if arg.Param != param {
+			continue
+		}
+		switch v := arg.Value.(type) {
+		case ir.RefValue:
+			return []string{v.Target}
+		case ir.RefsValue:
+			return v.Targets
+		}
+	}
+	return nil
 }
 
 // literalArg は、適用 a の引数 param に渡したリテラル。渡していないか、リテラルでなければ nil。

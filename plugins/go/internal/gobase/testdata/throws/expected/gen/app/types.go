@@ -65,3 +65,6 @@ func (Plain) Error() string         { return "app.Plain" }
 func (Plain) HozoException() string { return "app.Plain" }
 
 var _ runtime.Exception = Plain{}
+
+// EffectRecord は試した回数を書く。上限を超えれば、投げる（例外を投げる効果: 引数を持つ例外と、別の名前空間の例外）
+const EffectRecord runtime.Effect = "app.record"

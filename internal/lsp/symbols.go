@@ -136,6 +136,10 @@ func (b *symbolBuilder) decls(decls []ast.Decl) []protocol.DocumentSymbol {
 			if d.Return != nil {
 				detail += " " + b.text(d.Return)
 			}
+			if d.Throws != nil {
+				// 投げる例外（throws …）は、書いたまま
+				detail += " " + b.text(d.Throws)
+			}
 			switch {
 			case d.On != nil:
 				detail += " effects " + d.On.State.String() + "." + d.On.Op.String()

@@ -1500,3 +1500,79 @@ func TestValAndCaseTargets(t *testing.T) {
 		}
 	}
 }
+
+// TestEffectThrows は、例外を投げる効果（docs/grammar.md「関数の宣言」。docs/lsp.md「定義へ移動」の表と「ホバー」）: 効果の throws の
+// 例外は、その exception の名前へ飛ぶ。ホバーの見出しは、throws を effects の前に出す。アウトラインの詳細は、書いたまま。
+func TestEffectThrows(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace type {
+  exception Taken;
+}
+namespace store {
+  model Row { id: string; }
+  state rows: list<Row>;
+  exception Full;
+  effect fn add(row: Row): throws type.Taken, Full effects rows.post;
+  fn put(row: Row): throws type.Taken, Full {
+    add(row);
+  }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Errorf("診断 %s: %s", d.Code, d.Message)
+		}
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	const head = "effect fn add(row: Row): throws type.Taken, Full effects rows.post"
+	for _, tt := range []struct {
+		what   string
+		pos    protocol.TextDocumentPositionParams
+		target string
+		skip   int
+		hover  string
+	}{
+		{"効果の宣言の名前", at("add(row: Row): throws", 0), "add(row: Row): throws", 0, head},
+		{"効果の呼び出し", at("    add(row);", len("    ")), "add(row: Row): throws", 0, head},
+		{"効果の throws の、別の名前空間の例外", at("throws type.Taken, Full effects", len("throws type.")), "Taken;", 0, "exception type.Taken"},
+		{"効果の throws の、同じ名前空間の例外", at("throws type.Taken, Full effects", len("throws type.Taken, ")), "Full;", 0, "exception Full"},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, tt.pos, &hov)
+		if hov == nil || !strings.Contains(hov.Contents.Value, tt.hover) {
+			t.Errorf("hover(%s) に %q がない: %+v", tt.what, tt.hover, hov)
+		}
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, tt.pos, &loc)
+		if want := shift(positionOf(t, enc, text, tt.target, 0), tt.skip); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
+		}
+	}
+	// アウトラインの詳細: 効果の throws は、書いたまま
+	var symbols []protocol.DocumentSymbol
+	c.result(protocol.MethodDocumentSymbol, protocol.DocumentSymbolParams{TextDocument: textDoc(uri)}, &symbols)
+	found := false
+	var walk func([]protocol.DocumentSymbol)
+	walk = func(list []protocol.DocumentSymbol) {
+		for _, s := range list {
+			if s.Name == "add" {
+				found = true
+				if want := "(row: Row): throws type.Taken, Full effects rows.post"; s.Detail != want {
+					t.Errorf("アウトラインの詳細 = %q, want %q", s.Detail, want)
+				}
+			}
+			walk(s.Children)
+		}
+	}
+	walk(symbols)
+	if !found {
+		t.Error("アウトラインに、効果 add がない")
+	}
+}

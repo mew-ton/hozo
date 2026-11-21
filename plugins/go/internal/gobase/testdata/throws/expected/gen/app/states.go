@@ -9,4 +9,6 @@ import "context"
 type AttemptsState interface {
 	// Get は問い合わせ（形 single で決まる）: app.attempts の値。
 	Get(ctx context.Context) (int64, error)
+	// Record は命令（効果 app.record、throws app.TooMany, limits.LimitExceeded、effects app.attempts.put）: 試した回数を書く。上限を超えれば、投げる（例外を投げる効果: 引数を持つ例外と、別の名前空間の例外）
+	Record(ctx context.Context, n int64) error
 }

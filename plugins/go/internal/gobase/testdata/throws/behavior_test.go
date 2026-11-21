@@ -28,6 +28,14 @@ type attempts struct {
 
 func (a attempts) Get(context.Context) (int64, error) { return a.n, a.err }
 
+// Record は、効果 app.record の、人が書いた本体: 上限（3）を超えれば、仕様の例外 app.TooMany を、値で返す。
+func (a attempts) Record(_ context.Context, n int64) error {
+	if n > 3 {
+		return app.TooMany{Attempts: n}
+	}
+	return a.err
+}
+
 func newOps(a attempts) app.Ops { return app.New(leaves{}, a) }
 
 func ptr[T any](v T) *T { return &v }
@@ -150,6 +158,13 @@ func TestThrowReadsState(t *testing.T) {
 	}
 	if _, err := newOps(attempts{err: boom}).Retry(ctx, nil); err != boom {
 		t.Fatalf("Retry の err = %v, want boom", err)
+	}
+	// 例外を投げる効果を呼ぶ配線は、効果が返した例外を、そのまま返す（値の型で見分けられる）
+	if err := newOps(attempts{}).Bump(ctx, 2); err != nil {
+		t.Fatalf("Bump(2) = %v", err)
+	}
+	if err := newOps(attempts{}).Bump(ctx, 5); !errors.As(err, &tooMany) || tooMany.Attempts != 5 {
+		t.Fatalf("Bump(5) の err = %#v, want TooMany{Attempts: 5}", err)
 	}
 	// 束縛を、throw の引数に使う
 	_, err = newOps(attempts{}).Count(ctx, nil)

@@ -738,18 +738,24 @@ func (p *parser) parseFnType(head string) *ast.ReturnType {
 	return p.parseReturnType()
 }
 
-// failStateTouchingClause は、read fn と effect fn に書けない節を、誤りにする: throws と、種類に合わない節
-// （docs/grammar.md「関数の宣言」の表。docs/check.md「状態に触れるもの」）。
+// failStateTouchingClause は、read fn と effect fn に書けない節を、誤りにする: read fn の throws、catches、on
+// （docs/grammar.md「関数の宣言」の表。docs/check.md「状態に触れるもの」）。effect fn の throws は、書ける。
 func (p *parser) failStateTouchingClause(kind, name, want string) {
 	switch p.tok().Kind {
 	case token.Throws, token.Catches:
-		p.fail(p.tok().Span, fmt.Sprintf("%s fn %s に %s の節は書けない（read と効果は、例外を持たない。docs/check.md「状態に触れるもの」）", kind, name, p.tok().Text))
+		if kind == "effect" && p.at(token.Throws) {
+			return // 効果は、effects の前に、throws を一つ書ける（parseEffectThrows）
+		}
+		if kind == "effect" {
+			p.fail(p.tok().Span, fmt.Sprintf("effect fn %s に %s の節は書けない（効果に書ける節は、throws と effects。docs/grammar.md「関数の宣言」）", name, p.tok().Text))
+		}
+		p.fail(p.tok().Span, fmt.Sprintf("read fn %s に %s の節は書けない（read は、例外を投げない。docs/check.md「状態に触れるもの」）", name, p.tok().Text))
 	case token.On:
 		p.fail(p.tok().Span, fmt.Sprintf("%s fn %s(…) on … という書き方はなくなった。状態との関係は、%s で書く（%s fn %s(…): … %s … と書く。docs/grammar.md「exception / effect / read」）", kind, name, want, kind, name, want))
 	}
 }
 
-// parseEffect は EffectDecl = "effect" FnHead ":" [ ReturnType ] "effects" ( BuiltinEffect [ RowClause ] | Transition ) ";" を読む
+// parseEffect は EffectDecl = "effect" FnHead ":" [ ReturnType ] [ EffectThrows ] "effects" ( BuiltinEffect [ RowClause ] | Transition ) ";" を読む
 // （docs/grammar.md「関数の宣言」「exception / effect / read」）。引数がなくても括弧を書く。戻り値は、書いたものを、そのまま持つ
 // （void のほかは TYPE-18。意味の解析が出す）。
 // 宛先の QualifiedName の最後の要素が StateOp なら BuiltinEffect、そうでなければ Transition（状態か、状態の分類の、遷移）。
@@ -766,6 +772,9 @@ func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorator
 	p.failStateTouchingClause("effect", e.Name.Name, "effects")
 	e.Return = p.parseFnType("effect fn " + e.Name.Name)
 	p.failStateTouchingClause("effect", e.Name.Name, "effects")
+	if p.at(token.Throws) {
+		e.Throws = p.parseEffectThrows(e.Name.Name)
+	}
 	if !p.at(token.Effects) {
 		p.failExpected(fmt.Sprintf("「: effects 宛先」（effect fn %s(…): effects 状態.操作; と書く）", e.Name.Name))
 	}
@@ -785,9 +794,28 @@ func (p *parser) parseEffect(start source.Offset, doc *ast.DocComment, decorator
 	if p.at(token.Comma) {
 		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の宛先は、一つだけ（docs/grammar.md「exception / effect / read」）", e.Name.Name))
 	}
+	if p.at(token.Throws) {
+		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の throws は、effects の前に書く（effect fn %s(…): throws E effects 宛先; と書く。docs/grammar.md「関数の宣言」）", e.Name.Name, e.Name.Name))
+	}
 	p.expect(token.Semicolon)
 	e.Span = p.spanFrom(start)
 	return e
+}
+
+// parseEffectThrows は EffectThrows = "throws" ExcRef { "," ExcRef } を読む（docs/grammar.md「exception / effect / read」）。
+// 効果が投げる例外。関係の節（prevents effects、keeps effects）は書けない: 投げたとき、その効果は、いつも、起きていない
+// （docs/check.md「read と効果」）。節は、一つだけ。
+func (p *parser) parseEffectThrows(name string) *ast.ThrowsClause {
+	start := p.expect(token.Throws).Span.Start
+	c := &ast.ThrowsClause{Exceptions: p.parseNameList("throws")}
+	c.Span = p.spanFrom(start)
+	switch p.tok().Kind {
+	case token.Prevents, token.Keeps:
+		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の throws に、%s の節は書けない（効果が例外を投げたとき、その効果は、いつも、起きていない。docs/check.md「状態に触れるもの」）", name, p.tok().Text))
+	case token.Throws:
+		p.fail(p.tok().Span, fmt.Sprintf("effect fn %s の throws は、一つだけ（例外は「,」で並べる: throws A, B。docs/grammar.md「関数の宣言」）", name))
+	}
+	return c
 }
 
 // atTransitionTarget は、効果の宛先が、状態の遷移（Transition）の頭か: 名前の最後の要素が StateOp でなく、直後が as。
@@ -1193,7 +1221,8 @@ func (p *parser) parseParamType() *ast.ParamType {
 	t := &ast.ParamType{}
 	if p.at(token.Any) {
 		t.Any = p.parseAnyType()
-		t.Optional = p.got(token.Question)
+		// 分類のケースの、型で絞る形（any case of Order?）は、型が、いちばん後ろの ? を読んでいる: それも、引数を省ける印
+		t.Optional = p.got(token.Question) || (t.Any.Case != nil && t.Any.Case.Optional)
 	} else {
 		t.Types = append(t.Types, p.parseType())
 		for p.got(token.Pipe) {
@@ -1220,7 +1249,7 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	case p.at(token.Model):
 		a.Kind = ast.AnyModel
 	case p.atCaseKind():
-		a.Kind, a.Case = ast.AnyCase, p.parseCaseKind()
+		a.Kind, a.Case = ast.AnyCase, p.parseCaseKind(true)
 		a.Span = p.spanFrom(start)
 		return a
 	case p.atContextual("variant"):
@@ -1247,7 +1276,7 @@ func (p *parser) parseTarget() *ast.Target {
 	case p.at(token.Op):
 		t.Kind = ast.TargetOp
 	case p.atCaseKind():
-		t.Kind, t.Case = ast.TargetCase, p.parseCaseKind()
+		t.Kind, t.Case = ast.TargetCase, p.parseCaseKind(false)
 		t.Span = t.Case.Span
 		return t
 	case p.atContextual("field"):
@@ -1277,11 +1306,16 @@ func (p *parser) parseTarget() *ast.Target {
 func (p *parser) atCaseKind() bool { return p.at(token.Case) }
 
 // parseCaseKind は CaseKind = "case" [ "of" ( "any" | "never" | Type ) ] を読む（分類のケース）。
-// case は case of any の省略。of の後ろの型は、? と [] を含めて、型として読む（分類の名前も、型の名前として読み、
-// 名前の解決が分ける。docs/grammar.md「decorator の宣言」）。
-func (p *parser) parseCaseKind() *ast.CaseKind {
+// case は case of any の省略。of の後ろの型は、型として読む（分類の名前も、型の名前として読み、名前の解決が分ける。
+// docs/grammar.md「decorator の宣言」）。
+//
+// 型で絞る形の対象に、省略可能な型（いちばん外が ? か nullable<…>）は、書けない（docs/decisions.md「決めたこと」354）。
+// 引数の種類（param が true。any の後ろ）では、いちばん後ろの ? を、引数を省ける印として読み（CaseKind.Optional）、対象の型から外す。
+// 付ける先（for の後ろ）には、省ける印がないので、SYNTAX。
+func (p *parser) parseCaseKind(param bool) *ast.CaseKind {
 	start := p.expect(token.Case).Span.Start
 	k := &ast.CaseKind{}
+	end := p.spanFrom(start)
 	if p.got(token.Of) {
 		switch {
 		case p.got(token.Any):
@@ -1289,10 +1323,31 @@ func (p *parser) parseCaseKind() *ast.CaseKind {
 			k.Never = true
 		default:
 			k.Of = p.parseType()
+			if opt, ok := k.Of.(*ast.OptionalType); ok && param {
+				k.Of, k.Optional = opt.Elem, true
+				end = source.Span{File: end.File, Start: start, End: opt.Elem.NodeSpan().End}
+			}
+			if optionalAtTop(k.Of) {
+				p.fail(k.Of.NodeSpan(), "型で絞る形（case of 型）の対象に、省略可能な型は書けない。省略可能な型を対象にする分類のケースは、名前で絞る（case of 分類の名前）と書く（docs/grammar.md「decorator の宣言」）")
+			}
+		}
+		if !k.Optional {
+			end = p.spanFrom(start)
 		}
 	}
-	k.Span = p.spanFrom(start)
+	k.Span = end
 	return k
+}
+
+// optionalAtTop は、型 t の、いちばん外が、省略可能か（T? か nullable<T>）。
+func optionalAtTop(t ast.Type) bool {
+	switch x := t.(type) {
+	case *ast.OptionalType:
+		return true
+	case *ast.ShapeType:
+		return x.Shape == "nullable"
+	}
+	return false
 }
 
 // failClassifyKind は、for か any の後ろの classify: 分類そのものは、まだ、書けない。なくした書き方（classify … case）の、

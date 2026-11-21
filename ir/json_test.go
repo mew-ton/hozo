@@ -256,17 +256,19 @@ func TestRoundTripEffectTargets(t *testing.T) {
 	unionRoundTrip(t, EffectTarget(TransitionTarget{Of: "shop.carts", From: Cases("HasItems"), To: AnyCase()}), UnmarshalEffectTarget,
 		`{"kind":"transition","of":"shop.carts","from":["HasItems"],"to":"any"}`)
 
-	// params と writes は空でも [] で出す。target は kind で分かれる。
+	// params と throws と writes は空でも [] で出す。target は kind で分かれる。
 	b := roundTrip(t, Effect{DeclBase: DeclBase{Name: "e", Span: sp()}, Target: BuiltinTarget{State: "s", Operation: OpPut}})
-	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":[]}`; string(b) != want {
+	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[],"throws":[],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":[]}`; string(b) != want {
 		t.Errorf("effect\nwant %s\ngot  %s", want, b)
 	}
+	// throws（版 0.12）: 効果が投げうる例外の FQN の並び
 	b = roundTrip(t, Effect{
 		DeclBase: DeclBase{Name: "e", Span: sp()},
+		Throws:   []string{"s.Taken", "t.Full"},
 		Target:   TransitionTarget{Of: "C", From: Cases("A"), To: AnyCase()},
 		Writes:   []string{"s1", "s2"},
 	})
-	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[],"target":{"kind":"transition","of":"C","from":["A"],"to":"any"},"writes":["s1","s2"]}`; string(b) != want {
+	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[],"throws":["s.Taken","t.Full"],"target":{"kind":"transition","of":"C","from":["A"],"to":"any"},"writes":["s1","s2"]}`; string(b) != want {
 		t.Errorf("effect\nwant %s\ngot  %s", want, b)
 	}
 	// 行の遷移（版 0.9。docs/ir.md「state / exception / effect」の RowTransition）: 書いていなければ row のキーごと省く（上の二つ）。
@@ -279,7 +281,7 @@ func TestRoundTripEffectTargets(t *testing.T) {
 		Row:      &RowTransition{Param: "order", Classify: "s.Stage", From: Cases("Draft", "Accepted"), To: "Shipped"},
 	})
 	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[{"name":"order","type":{"kind":"ref","target":"s.Order"},` + spJSON +
-		`}],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":["s"],"row":{"param":"order","classify":"s.Stage","from":["Draft","Accepted"],"to":"Shipped"}}`; string(b) != want {
+		`}],"throws":[],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":["s"],"row":{"param":"order","classify":"s.Stage","from":["Draft","Accepted"],"to":"Shipped"}}`; string(b) != want {
 		t.Errorf("effect with row\nwant %s\ngot  %s", want, b)
 	}
 	if b := roundTrip(t, RowTransition{Param: "order", From: AnyCase()}); string(b) != `{"param":"order","from":"any"}` {
@@ -450,7 +452,8 @@ func TestCaseKindMatches(t *testing.T) {
 		{"case of any", CaseKind{}, all},
 		{"case of Size", CaseKind{Classify: "a.Size"}, []*Classify{value}},
 		{"case of Order", CaseKind{Subject: Ref("a.Order")}, []*Classify{value}},
-		{"case of Order?", CaseKind{Subject: Optional(Ref("a.Order"))}, []*Classify{optional}},
+		// 省略可能な型の絞りは、仕様には書けない（docs/decisions.md「決めたこと」354）。IR の上では、等しい型に当たる
+		{"対象が Order? の絞り", CaseKind{Subject: Optional(Ref("a.Order"))}, []*Classify{optional}},
 		{"case of never", CaseKind{Subject: Never()}, []*Classify{never}},
 	} {
 		for _, c := range all {
@@ -526,7 +529,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.11","namespaces":[],"binds":[]}`
+	want := `{"version":"0.12","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -534,7 +537,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.11","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.11","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.12","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.12","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

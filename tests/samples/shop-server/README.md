@@ -123,6 +123,24 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 - 期待する出力は、手で書いた。`go vet ./...` と `go test ./...` が、このモジュールで通る（サブテスト `go`）。
 - **`getMyPage` は、`val` を、六つ持つ**（`session`、`user`、`latest`、`orders`、`found`、`summaries`）。`disjoint` のアームから、外に値を出すには、アームの数だけ、空の `val` が要るので、数が増える。既定の上限（5）を超えて、WIRE-6 の warning になるので、`hozo.toml` の `max_bindings` を 6 にした。
 
+### 例外を投げる効果で変えたこと
+
+効果が、仕様の例外を投げられるようにした（`docs/decisions.md`「決めたこと」352）のと、`db` の語彙の `@db.conflict`（同 353）を、このサンプルで確かめる。期待する出力は、手で書いた。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `type.hozo` | 例外 `EmailTaken`。`@http.status` は、付けない（投げる `store.addUser` は、HTTP の入口から呼ばれない） | `docs/grammar.md`「exception / effect / read」 |
+| `store.hozo` | 効果 `createUser` に、`@db.conflict(type.EmailTaken)` と、`throws type.EmailTaken`。それを呼ぶ配線 `addUser` の `throws` に、同じ例外 | `docs/check.md`「read と効果」、`docs/vocab.md`「`db` の read と効果」 |
+| `gen/type/types.go` | 例外の型 `EmailTaken` | `docs/plugin-go.md`「exception」 |
+| `gen/store/states.go`、`gen/storemem/states.go` | `CreateUser` のコメントに、`throws type.EmailTaken`。メソッドの形は、同じ | `docs/plugin-go.md`「コメント」の「状態の単位のメソッド」 |
+| `gen/store/ops.go`、`gen/store/wiring.go`、`gen/storemem/ops.go`、`gen/storemem/wiring.go` | `AddUser` のコメントに、`Throws: type.EmailTaken`。本体は、同じ（効果の失敗を、そのまま返す） | `docs/plugin-go.md`「コメント」 |
+| `gen/store/types.go`、`gen/storemem/types.go` | 効果の定数のコメント（説明を変えた分） | — |
+| `gen/store/db.go` | `CreateUser` が、`dbExec` を `dbConflict(…, pkgtype.EmailTaken{})` で包む。補助 `dbConflict` と、`strings` の import | `docs/plugin-go-sqlite.md`「効果の中身」「補助」「メソッドの形とコメント」 |
+| `app/memstore/memstore.go`、`app/storetest/storetest.go` | 人が書いた `CreateUser` も、同じ鍵か、同じ email で、`type.EmailTaken` を返す。二つの実装に共通のテストが、それを確かめる（前は、「どのエラーかは決まっていない」） | 「人が書いたもの」 |
+
+- 表 `users` の一意の制約は、前から、ある（`id` の `@db.key` と、`email` の `@db.unique`）。DDL は、変えていない。
+- `@db.conflict` が当たるのは、その表の、どの一意の制約でも（キーを含む）。なので、同じ識別子の二人めも、`type.EmailTaken` になる。制約ごとに例外を分けるなら、その効果は、人が書く（`docs/plugin-go-sqlite.md`「効果の中身」）。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。

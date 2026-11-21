@@ -82,4 +82,7 @@ namespace type {
 
   /** 通知を送れなかった（ステータスを持たない） */
   exception NotificationFailed;
+
+  /** その email のユーザーが、もういる（ステータスを持たない: 投げる store.addUser は、HTTP の入口から呼ばれない） */
+  exception EmailTaken;
 }

@@ -218,6 +218,14 @@ func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {
 	return err
 }
 `},
+	{name: helperConflict, names: []string{helperConflict}, imports: []string{"strings"}, text: `// dbConflict は、err が、一意の制約（キーを含む）の違反なら、conflict を返す。ほかは、err を、そのまま返す。
+func dbConflict(err, conflict error) error {
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		return conflict
+	}
+	return err
+}
+`},
 	{name: helperIsEmpty, names: []string{helperIsEmpty}, text: `// dbIsEmpty は、行の数を返す問い合わせの結果が 0 かどうか。
 func dbIsEmpty(ctx context.Context, db *sql.DB, query string) (bool, error) {
 	var n int64

@@ -399,6 +399,7 @@ func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 	for _, e := range s.F {
 		s.succ[e] = ir.Kept
 	}
+	c.addCarriedThrows(o, s)
 }
 
 // wiringStep0 は手順 0（配線の op）。本体の行を順に見て E / F / rel / succ を計算し、その後ろに、運ばれた効果を足す
@@ -574,11 +575,53 @@ func (c *computer) addCarried(o *ir.Op, s *sigState) {
 			s.succ[e] = ir.Kept
 		}
 	}
+	c.addCarriedThrows(o, s)
+}
+
+// effectThrows は、効果 e が投げうる例外（Effect.throws）。直に書いた効果（状態.操作）と、引けない効果には、ない。
+func (c *computer) effectThrows(e ir.EffectRef) []string {
+	named, ok := e.(ir.NamedEffect)
+	if !ok {
+		return nil
+	}
+	if decl := c.ix.effect(named.Effect); decl != nil {
+		return decl.Throws
+	}
+	return nil
+}
+
+// addThrown は、効果 thrower が投げる例外 x を、E に足す（docs/check.md「Sig(O, v)」の「運ばれた効果が投げる例外」と、
+// halts の項）。この出どころでの状態は、thrower が prevented（own が true のとき。投げたとき、その効果は、起きていない）、
+// ほかの効果は unknown（デコレータの処理が、本体のどの行の前後で起きるかを、言語は決めない）。x が、ここで初めて E に
+// 入るなら、その状態。もう E にあれば、同じならその状態、違えば unknown。
+func (s *sigState) addThrown(x string, thrower ir.EffectRef, own bool) {
+	existed := s.hasE(x)
+	s.addE(x)
+	for _, e := range s.F {
+		st := ir.Unknown
+		if own && e == thrower {
+			st = ir.Prevented
+		}
+		if existed && s.relOf(x, e) != st {
+			st = ir.Unknown
+		}
+		s.setRel(x, e, st)
+	}
+}
+
+// addCarriedThrows は、運ばれた効果（Op.carried.effects）が投げる例外を、E と rel に足す（葉でも、配線でも）。
+// op が throws に書いていなくてよい（デコレータの throws と同じ）。
+func (c *computer) addCarriedThrows(o *ir.Op, s *sigState) {
+	for _, e := range o.Carried.Effects {
+		for _, x := range c.effectThrows(e) {
+			s.addThrown(x, e, true)
+		}
+	}
 }
 
 // callSig は手順 0 の表の Sc: 配線の呼び出し一つの、例外・効果・rel・succ（docs/check.md「Sig(O, v)」）。
-// op の呼び出しは Sig(callee, ns)。効果の呼び出しは、例外がなく、効果がその効果一つで、succ は kept。read の呼び出しは
-// 何も持たない。アームの本体の throw X は、例外が X だけ。呼び出し先が引けなければ nil。
+// op の呼び出しは Sig(callee, ns)。効果の呼び出しは、効果がその効果一つで、succ は kept。例外は、宣言した効果の throws
+// （直に呼んだ組み込みの効果には、ない）で、rel は、どれも prevented。read の呼び出しは何も持たない。アームの本体の throw X は、例外が X だけ。呼び出し先が引けなければ nil。
 func (c *computer) callSig(cr callRef, ns string) *sigState {
 	if cr.throw != "" {
 		sc := newSigState()
@@ -595,6 +638,11 @@ func (c *computer) callSig(cr callRef, ns string) *sigState {
 			sc := newSigState()
 			sc.addF(callee.Effect)
 			sc.succ[callee.Effect] = ir.Kept
+			// 宣言した効果が投げる例外（Effect.throws）: 投げたとき、その効果は、起きていない
+			for _, x := range c.effectThrows(callee.Effect) {
+				sc.addE(x)
+				sc.setRel(x, callee.Effect, ir.Prevented)
+			}
 			return sc
 		}
 	case ir.ReadCallee:
@@ -641,14 +689,18 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 						s.removeE(x)
 						for _, name := range subst(cl.Halts) {
 							var h ir.EffectRef = ir.NamedEffect{Effect: name} // halts の効果は、いつも宣言
-							if s.hasF(h) {
-								continue
+							added := !s.hasF(h)
+							if added {
+								s.addF(h)
+								for _, y := range s.E {
+									s.setRel(y, h, ir.Prevented)
+								}
+								s.succ[h] = ir.Prevented
 							}
-							s.addF(h)
-							for _, y := range s.E {
-								s.setRel(y, h, ir.Prevented)
+							// h が投げる例外は、E に加わる。h を、ここで足したなら、h は prevented。それ以外は、どの効果も unknown
+							for _, z := range c.effectThrows(h) {
+								s.addThrown(z, h, added)
 							}
-							s.succ[h] = ir.Prevented
 						}
 					}
 				}

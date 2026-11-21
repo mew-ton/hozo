@@ -1,0 +1,15 @@
+// DOC-1（docs/check.md「名前空間」）: 効果の @throws の例外は、その効果の throws にあること
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  exception E;
+  exception F;
+  /**
+   * 足す
+   *
+   * @throws F 書いていない例外
+   */
+  effect fn add(m: M): throws E effects rows.post;      // ERROR(-2): DOC-1
+  /** @throws E 投げない効果 */
+  effect fn put(m: M): effects rows.put;                // ERROR(-1): DOC-1
+}

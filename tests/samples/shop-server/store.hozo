@@ -4,6 +4,7 @@
 // read と効果を呼べるのは、この名前空間の中だけ。ほかの名前空間は、ここの op（どれも、read か効果を呼ぶだけの配線）を通して読み書きする。
 // 十の op はどれも export（P33）: 九つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
 // 単位 gen/store では go-sqlite が read と効果の中身を出し、単位 gen/storemem では人が書く。
+// createUser は、例外を投げる効果（docs/check.md「read と効果」）: 表の一意の制約に当たったら、type.EmailTaken（@db.conflict）。
 
 /** 保存。DB の状態の持ち主 */
 namespace store {
@@ -44,9 +45,9 @@ namespace store {
 
   // ---- 書く: 効果は、表に何をするかを言う ----
 
-  /** ユーザーを登録する */
-  @db.insert
-  effect fn createUser(user: type.User): effects users.post;
+  /** ユーザーを登録する。同じ email（か、同じ識別子）のユーザーが、もういれば、投げる */
+  @db.insert @db.conflict(type.EmailTaken)
+  effect fn createUser(user: type.User): throws type.EmailTaken effects users.post;
 
   /** ログインセッションを作る */
   @db.insert
@@ -92,7 +93,7 @@ namespace store {
   }
 
   /** ユーザーを足す */
-  export fn addUser(user: type.User) {
+  export fn addUser(user: type.User): throws type.EmailTaken {
     createUser(user);
   }
 

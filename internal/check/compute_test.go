@@ -784,3 +784,120 @@ func TestCarriedReadsOnly(t *testing.T) {
 	wantStrings(t, "R(w)", sigOf(t, p, "server.w").Reads, []string{"server.sA"})
 	wantNoCode(t, diags, "READS-2") // 配線に書いた reads は、運ばれた状態を含む計算と等しい
 }
+
+// throwing は、例外を投げる効果（Effect.throws。docs/check.md「read と効果」）。
+func throwing(fqn, state string, exceptions ...string) *ir.Effect {
+	e := eff(fqn, state, ir.OpPut)
+	e.Throws = exceptions
+	return e
+}
+
+// TestSigThrowingEffectCall は手順 0 の表の、効果の呼び出し: 宣言した効果の throws が、配線の例外に加わり、その効果との組は
+// prevented（投げたとき、その効果は、起きていない）。先に動いた効果は kept、後ろの効果は prevented。配線が throws に
+// 書いていなければ THROWS-1。直に呼んだ組み込みの効果は、例外を増やさない。
+func TestSigThrowingEffectCall(t *testing.T) {
+	t1 := throwing("server.t1", "server.sA", "server.X")
+	w := wire("server.w", nil, nil, cs(effectCall("server.e1")), cs(effectCall("server.t1")), cs(effectCall("server.e2")), cs(directCall("server.sB", ir.OpPut)))
+	w.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	p := serverWith(t1, w)
+	Compute(p)
+	sig := sigOf(t, p, "server.w")
+	wantStrings(t, "E", sig.Exceptions, []string{"server.X"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.t1", "server.e2", "server.sB.put"})
+	for e, want := range map[string]ir.EffectState{"server.e1": ir.Kept, "server.t1": ir.Prevented, "server.e2": ir.Prevented} {
+		if got := relOf(t, sig, "server.X", e); got != want {
+			t.Errorf("rel(X, %s) = %s, want %s", e, got, want)
+		}
+	}
+	if got := succOf(t, sig, "server.t1"); got != ir.Kept {
+		t.Errorf("succ(t1) = %s, want kept", got)
+	}
+
+	// 配線が throws に書いていなければ THROWS-1
+	w2 := wire("server.w2", nil, nil, cs(effectCall("server.t1")))
+	p2 := serverWith(t1, w2)
+	Compute(p2)
+	d := wantOneCode(t, Check(p2, nil), "THROWS-1")
+	if !strings.Contains(d.Message, "server.X") {
+		t.Errorf("THROWS-1 のメッセージに server.X がない: %s", d.Message)
+	}
+}
+
+// TestSigCarriedThrows は「運ばれた効果が投げる例外」: 葉でも配線でも、op が throws に書かなくても、E に加わる。
+// この出どころでの状態は、運ばれた効果そのものが prevented、ほかの効果は unknown。op も同じ例外を書いていれば、
+// 同じならその状態、違えば unknown。
+func TestSigCarriedThrows(t *testing.T) {
+	t1 := throwing("server.t1", "server.sA", "server.X")
+
+	// 葉: 書いていない例外 X が加わる
+	l := leaf("server.l", nil)
+	l.Carried = ir.Carried{Effects: ir.NamedEffects("server.e1", "server.t1")}
+	l.Throws = []ir.ThrowsClause{throws([]string{"server.Y"}, prevents())}
+	// 葉: 同じ例外 X を、prevents effects と書いている
+	l2 := leaf("server.l2", nil)
+	l2.Carried = ir.Carried{Effects: ir.NamedEffects("server.e1", "server.t1")}
+	l2.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
+	// 配線: 本体の効果 e2 と、運ばれた t1
+	w := wire("server.w", nil, nil, cs(effectCall("server.e2")))
+	w.Carried = ir.Carried{Effects: ir.NamedEffects("server.t1")}
+	p := serverWith(t1, l, l2, w)
+	Compute(p)
+
+	sig := sigOf(t, p, "server.l")
+	wantStrings(t, "E(l)", sig.Exceptions, []string{"server.Y", "server.X"})
+	wantStrings(t, "F(l)", effectNames(sig.Effects), []string{"server.e1", "server.t1"})
+	if got := relOf(t, sig, "server.X", "server.t1"); got != ir.Prevented {
+		t.Errorf("l: rel(X, t1) = %s, want prevented", got)
+	}
+	if got := relOf(t, sig, "server.X", "server.e1"); got != ir.Unknown {
+		t.Errorf("l: rel(X, e1) = %s, want unknown", got)
+	}
+	if got := relOf(t, sig, "server.Y", "server.t1"); got != ir.Prevented {
+		t.Errorf("l: rel(Y, t1) = %s, want prevented (prevents effects)", got)
+	}
+
+	sig = sigOf(t, p, "server.l2")
+	wantStrings(t, "E(l2)", sig.Exceptions, []string{"server.X"})
+	if got := relOf(t, sig, "server.X", "server.t1"); got != ir.Prevented {
+		t.Errorf("l2: rel(X, t1) = %s, want prevented (同じ)", got)
+	}
+	if got := relOf(t, sig, "server.X", "server.e1"); got != ir.Unknown {
+		t.Errorf("l2: rel(X, e1) = %s, want unknown (prevents と、運ばれた出どころの unknown が違う)", got)
+	}
+
+	sig = sigOf(t, p, "server.w")
+	wantStrings(t, "E(w)", sig.Exceptions, []string{"server.X"})
+	wantStrings(t, "F(w)", effectNames(sig.Effects), []string{"server.e2", "server.t1"})
+	if got := relOf(t, sig, "server.X", "server.t1"); got != ir.Prevented {
+		t.Errorf("w: rel(X, t1) = %s, want prevented", got)
+	}
+	if got := relOf(t, sig, "server.X", "server.e2"); got != ir.Unknown {
+		t.Errorf("w: rel(X, e2) = %s, want unknown", got)
+	}
+	// 配線は、運ばれた効果の例外を、throws に書かなくてよい（デコレータの throws と同じ）
+	wantNoCode(t, Check(p, nil), "THROWS-1")
+}
+
+// TestSigHaltsThrows は halts の項: halts に渡した効果 h が throws を持てば、その例外が E に加わる。h を、ここで F に
+// 足したなら、h は prevented、ほかの効果は unknown。
+func TestSigHaltsThrows(t *testing.T) {
+	h := decorator("server.halt")
+	h.Catches = []ir.CatchesClause{catches(ir.Halts, "server.t1", "server.X")}
+	t1 := throwing("server.t1", "server.sA", "server.Z")
+	l := leaf("server.l", nil)
+	l.Effects = ir.NamedEffects("server.e1")
+	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	w := wire("server.w", nil, nil, cs(call("server.l")))
+	w.Decorators = []ir.Application{app("server.halt")}
+	p := serverWith(h, t1, l, w)
+	Compute(p)
+	sig := sigOf(t, p, "server.w")
+	wantStrings(t, "E", sig.Exceptions, []string{"server.Z"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.t1"})
+	if got := relOf(t, sig, "server.Z", "server.t1"); got != ir.Prevented {
+		t.Errorf("rel(Z, t1) = %s, want prevented", got)
+	}
+	if got := relOf(t, sig, "server.Z", "server.e1"); got != ir.Unknown {
+		t.Errorf("rel(Z, e1) = %s, want unknown", got)
+	}
+}

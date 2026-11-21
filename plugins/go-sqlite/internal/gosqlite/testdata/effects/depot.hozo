@@ -1,5 +1,6 @@
 // docs/plugin-go-sqlite.md「効果の中身」の表の各行と、「状態ごとの型」の、形で決まる命令 Post、「メソッドの形とコメント」の効果の句。
 // 表は、効果の宛先の状態。@db.insert と @db.update の引数は、表の model の行一つ。@db.delete の引数は、条件（名前が列）。
+// @db.conflict: 一意の制約（キーと、@db.unique）に当たったら、名指しした例外を返す（@db.insert と、@db.update）。
 
 /** 倉庫 */
 namespace depot {
@@ -29,9 +30,19 @@ namespace depot {
     @db.time at: Time;
   }
 
+  /** キーと、一意の列 */
+  model Tag {
+    @db.key @db.text id: string;
+    @db.unique @db.text name: string;
+  }
+
+  /** その名前（か、その識別子）の札が、もうある */
+  exception TagTaken;
+
   @db.table state crates: list<Crate>;
   @db.table state slots: list<Slot>;
   @db.table state events: list<Event>;
+  @db.table state tags: list<Tag>;
 
   // ---- crates ----
 
@@ -77,6 +88,16 @@ namespace depot {
   @db.delete
   effect fn deleteEventsOf(crate: Code): effects events.delete;
 
+  // ---- tags: @db.conflict ----
+
+  /** @db.insert と @db.conflict: キーか、一意の列が、同じ行があれば、例外 */
+  @db.insert @db.conflict(TagTaken)
+  effect fn createTag(tag: Tag): throws TagTaken effects tags.post;
+
+  /** @db.update と @db.conflict: 書き換えた行の、一意の列が、別の行と同じになれば、例外 */
+  @db.update @db.conflict(TagTaken)
+  effect fn renameTag(tag: Tag): throws TagTaken effects tags.put;
+
   // ---- op: 効果を呼ぶ配線 ----
 
   /** 木箱を足す */
@@ -97,6 +118,16 @@ namespace depot {
   /** 棚の段を書き換える */
   export fn saveSlot(slot: Slot) {
     updateSlot(slot);
+  }
+
+  /** 札を足す */
+  export fn addTag(tag: Tag): throws TagTaken {
+    createTag(tag);
+  }
+
+  /** 札を書き換える */
+  export fn saveTag(tag: Tag): throws TagTaken {
+    renameTag(tag);
   }
 
   /** 出来事を記録する。形で決まる命令 Post: 配線が、組み込みの効果を直に呼ぶ */

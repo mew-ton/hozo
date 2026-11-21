@@ -35,6 +35,7 @@ const (
 	helperTimeLayout  = "dbTimeLayout"
 	helperTransaction = "dbTransaction"
 	helperExec        = "dbExec"
+	helperConflict    = "dbConflict"
 	helperIsEmpty     = "dbIsEmpty"
 	helperGet         = "dbGet"
 	helperList        = "dbList"
@@ -211,7 +212,7 @@ func (f *fileGen) unit(u *unit) {
 		method := golang.BuiltinMethod(op)
 		f.printf("// %s は形で決まる命令: 表 %s に、引数 %s の行を足す。\n", method, tbl, ir.DirectEffectParam)
 		f.printf("func (t %s) %s(%s) %s {\n", name, method, params, results)
-		f.rowExec(m, ir.DirectEffectParam, insertSQL(u.table))
+		f.rowExec(m, ir.DirectEffectParam, insertSQL(u.table), "")
 	}
 	for _, r := range u.reads {
 		f.read(u, r)
@@ -223,8 +224,13 @@ func (f *fileGen) unit(u *unit) {
 
 // rowExec は、行を受け取るメソッド（@db.insert、@db.update、Post）の本体: 先に、行の値を列の形にして（できなければ、文を実行
 // しない）、文を dbExec で実行する。閉じる波括弧まで書く。
-func (f *fileGen) rowExec(m *model, local, query string) {
+// conflict が、例外の値の式（@db.conflict の例外）なら、dbExec の呼び出しを、dbConflict で包む: 一意の制約に当たったら、その例外を返す。
+func (f *fileGen) rowExec(m *model, local, query, conflict string) {
 	f.printf("\targs, err := %s(%s)\n\tif err != nil {\n\t\treturn err\n\t}\n", m.argsName, local)
+	if conflict != "" {
+		f.printf("\treturn %s(%s(ctx, t.db,\n\t\t`%s`, args...), %s)\n}\n\n", f.use(helperConflict), f.use(helperExec), query, conflict)
+		return
+	}
 	f.printf("\treturn %s(ctx, t.db,\n\t\t`%s`, args...)\n}\n\n", f.use(helperExec), query)
 }
 
@@ -327,20 +333,27 @@ func (f *fileGen) effect(u *unit, x *effect) {
 	params, results := golang.EffectSignature(decl, f.im, reserved)
 	local := func(p ir.OpParam) string { return golang.LocalName(p.Name, reserved) }
 	name := golang.MethodName(decl.Name)
-	head := "// " + name + " は効果 " + decl.Name + "（@" + x.kind + "）: "
+	head := "// " + name + " は効果 " + decl.Name + "（@" + x.kind
+	// @db.conflict を付けた効果は、効果の句の後ろに、例外を返すことを言う一文を足し、文の実行を dbConflict で包む
+	open, conflict := "", ""
+	if x.conflict != "" {
+		head += "、@" + decoratorConflict
+		open = "一意の制約に当たれば、例外 " + x.conflict + " を返す。"
+		conflict = f.goType(ir.Ref(x.conflict)) + "{}"
+	}
+	head += "）: "
 	// 行の遷移を持つ効果は、効果の句の後ろに、確かめないことを言う一文を足す（SQL は変わらない）
-	open := ""
 	if row := golang.RowDisplay(decl); row != "" {
-		open = "行の遷移（" + row + "）は、確かめない。"
+		open += "行の遷移（" + row + "）は、確かめない。"
 	}
 	open += "\nfunc (t " + u.goName + ") " + name + "(" + params + ") " + results + " {\n"
 	switch x.kind {
 	case decoratorInsert:
 		f.printf("%s表 %s に、引数 %s の行を足す。%s", head, tbl, decl.Params[0].Name, open)
-		f.rowExec(x.table.model, local(decl.Params[0]), insertSQL(x.table))
+		f.rowExec(x.table.model, local(decl.Params[0]), insertSQL(x.table), conflict)
 	case decoratorUpdate:
 		f.printf("%s表 %s の、キーが引数 %s と同じ行を書き換える。行がなければ何もしない。%s", head, tbl, decl.Params[0].Name, open)
-		f.rowExec(x.table.model, local(decl.Params[0]), updateSQL(x.table))
+		f.rowExec(x.table.model, local(decl.Params[0]), updateSQL(x.table), conflict)
 	case decoratorDelete:
 		where, args, conds := f.where(x.conds, local)
 		f.printf("%s表 %s から、%s行を消す。行がなければ何もしない。%s", head, tbl, conds, open)

@@ -1,0 +1,14 @@
+// SYNTAX（docs/grammar.md「decorator の宣言」）: 型で絞る形（case of 型）の対象に、省略可能な型は、書けない。
+// 省略可能な型を対象にする分類のケースは、名前で絞る（case of 分類の名前）。引数の種類の、いちばん後ろの ? は、引数を省ける印
+namespace a {
+  model M { id: string; }
+  classify Known of M? { Yes: M? as M; No: M? as else; }
+  // 付ける先には、省ける印がない
+  decorator onOptional for case of M?;                      // ERROR: SYNTAX
+  decorator onNullable for case of nullable<M>;             // ERROR: SYNTAX
+  // 引数の種類: 形の語で書いた省略可能な型と、? を二つ
+  decorator takesNullable(x: any case of nullable<M>);      // ERROR: SYNTAX
+  decorator takesTwice(x: any case of M??);                 // ERROR: SYNTAX
+  // 残りの引数は、省略可能にできない
+  decorator rest(...xs: any case of M?) for op;             // ERROR: SYNTAX
+}

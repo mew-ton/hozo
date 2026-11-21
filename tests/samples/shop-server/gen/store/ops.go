@@ -37,6 +37,7 @@ type Ops interface {
 
 	// AddUser はユーザーを足す
 	//
+	// Throws: type.EmailTaken
 	// Effects: store.createUser
 	AddUser(ctx context.Context, user pkgtype.User) error
 

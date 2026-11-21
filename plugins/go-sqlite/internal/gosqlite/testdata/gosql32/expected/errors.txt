@@ -1,0 +1,2 @@
+GOSQL-32	app.add	効果 app.add の @db.conflict の例外 app.Taken が、その効果の throws にない（effect fn add(…): throws Taken effects … と書く）
+GOSQL-32	app.save	効果 app.save の @db.conflict の例外 app.TakenBy は、引数を持つ（このトランスパイラは、値を埋められない。この効果は、デコレータを付けずに、人が書く）

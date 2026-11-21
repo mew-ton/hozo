@@ -19,7 +19,7 @@ type UsersState interface {
 	UserByEmail(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
 	// UserById は問い合わせ（read store.userById）: 識別子が同じユーザー
 	UserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
-	// CreateUser は命令（効果 store.createUser、effects store.users.post）: ユーザーを登録する
+	// CreateUser は命令（効果 store.createUser、throws type.EmailTaken、effects store.users.post）: ユーザーを登録する。同じ email（か、同じ識別子）のユーザーが、もういれば、投げる
 	CreateUser(ctx context.Context, user pkgtype.User) error
 }
 

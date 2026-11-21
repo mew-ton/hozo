@@ -1,0 +1,5 @@
+# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-32（@db.conflict の例外が、効果の throws にないか、引数を持つ）。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-sqlite"]
+out         = "gen/app"

@@ -20,7 +20,7 @@ var goldenFixtures = []struct {
 }{
 	{name: "columns", covers: "「しまい方」の表の各行（六つのしまい方。核の型と scalar）、省略可能なフィールドの列（しまい方ごと）、「表」の制約（複数の @db.key、@db.unique、@db.ref）", behavior: true},
 	{name: "reads", covers: "「read の中身」の各行（@db.find、@db.list、@db.where、@db.latest と、その組み合わせ。二つ以上の引数）、「列と引数の型」、「メソッドの形とコメント」の read の句", behavior: true},
-	{name: "effects", covers: "「効果の中身」の表の各行（@db.insert、@db.update、一つと二つ以上の列の @db.delete）、「状態ごとの型」の、形で決まる命令 Post", behavior: true},
+	{name: "effects", covers: "「効果の中身」の表の各行（@db.insert、@db.update、一つと二つ以上の列の @db.delete）と、@db.conflict（補助 dbConflict）、「状態ごとの型」の、形で決まる命令 Post", behavior: true},
 	{name: "transaction", covers: "「トランザクション」（継ぎ目のメソッドの二つの形、確定と取り消し、入れ子、同じ db の上の二つの名前空間、var _ Seams を出すとき）", behavior: true},
 	{name: "partial", covers: "「状態ごとの型」の、デコレータを付けていない read と効果があるとき（var _ を出さない、付けていないものの句、warning を出さない。人が埋め込んで書き足し、Conn を通す）と、型を出さない単位", behavior: true},
 	{name: "rows", covers: "「効果の中身」の、行の遷移を持つ効果（SQL は変わらない。コメントの「確かめない」の一文）と、デコレータを付けられない行の遷移の効果（人が書き足す）", behavior: true},
@@ -234,6 +234,9 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gosql28", codeSQLDeleteAll},   // @db.delete の効果が、引数を一つも持たない
 	{"gosql29", codeSQLTransaction}, // op に @db.transaction が付いているのに、N に表の状態が一つもない
 	{"gosql30", codeSQLRow},         // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない
+	{"gosql31", codeSQLConflictOn},  // @db.conflict を付けた効果が、@db.insert も @db.update も持たない
+	{"gosql32", codeSQLConflictExc}, // @db.conflict の例外が、効果の throws にないか、引数を持つ
+	{"gosql33", codeSQLThrows},      // db のデコレータで中身を作る効果の throws に、@db.conflict が名指ししていない例外がある
 }
 
 // TestDiagnostics は docs/plugin-go-sqlite.md「診断」の表の各行: 診断のコード・位置・メッセージがゴールデンと同じで、

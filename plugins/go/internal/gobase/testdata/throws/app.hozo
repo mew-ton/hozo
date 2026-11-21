@@ -1,6 +1,7 @@
 // docs/plugin-go.md「exception」（引数ごとにフィールド一つの構造体）と、「match」の「アームの本体」の `throw E`、`throw E(<値>, …)` の
 // 行を、使われ方（return / const / 文）ごとに、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は一つのパッケージ）。
+// 例外を投げる効果（docs/plugin-go.md「状態の単位」「コメント」）: 単位のメソッドのコメントに throws。配線は、失敗を、そのまま返す。
 
 /** 別の名前空間の例外 */
 namespace limits {
@@ -24,6 +25,9 @@ namespace app {
 
   /** 試した回数 */
   state attempts: single<int>;
+
+  /** 試した回数を書く。上限を超えれば、投げる（例外を投げる効果: 引数を持つ例外と、別の名前空間の例外） */
+  effect fn record(n: int): throws TooMany, limits.LimitExceeded effects attempts.put;
 
   export fn show(text: string);
 
@@ -84,6 +88,13 @@ namespace app {
       HasItems => text;
       Empty    => throw TooMany(attempts);
     };
+  }
+
+  // 例外を投げる効果を呼ぶ配線: 効果の失敗（例外を含む）を、そのまま返す
+  export fn bump(n: int):
+    throws TooMany, limits.LimitExceeded
+  {
+    record(n);
   }
 
   // throw の引数だけが使う束縛は、使われている（_ = x を足さない）

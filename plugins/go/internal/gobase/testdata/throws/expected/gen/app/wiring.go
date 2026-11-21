@@ -101,6 +101,17 @@ func (o *ops) Retry(ctx context.Context, text *string) (string, error) {
 	return "", TooMany{Attempts: attempts, Last: nil}
 }
 
+// Bump は op app.bump。
+//
+// Throws: app.TooMany, limits.LimitExceeded
+// Effects: app.record
+func (o *ops) Bump(ctx context.Context, n int64) error {
+	if err := o.attempts.Record(ctx, n); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Count は op app.count。
 //
 // Throws: app.TooMany

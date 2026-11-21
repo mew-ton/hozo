@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	pkgtype "example.com/shop-server/gen/type"
@@ -96,14 +97,14 @@ func (t UsersTable) UserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.U
 		`SELECT "id", "email", "name", "hash" FROM "users" WHERE "id" IS ?1`, dbText(id))
 }
 
-// CreateUser は効果 store.createUser（@db.insert）: 表 "users" に、引数 user の行を足す。
+// CreateUser は効果 store.createUser（@db.insert、@db.conflict）: 表 "users" に、引数 user の行を足す。一意の制約に当たれば、例外 type.EmailTaken を返す。
 func (t UsersTable) CreateUser(ctx context.Context, user pkgtype.User) error {
 	args, err := dbArgsUser(user)
 	if err != nil {
 		return err
 	}
-	return dbExec(ctx, t.db,
-		`INSERT INTO "users" ("id", "email", "name", "hash") VALUES (?1, ?2, ?3, ?4)`, args...)
+	return dbConflict(dbExec(ctx, t.db,
+		`INSERT INTO "users" ("id", "email", "name", "hash") VALUES (?1, ?2, ?3, ?4)`, args...), pkgtype.EmailTaken{})
 }
 
 // SessionsTable は状態 store.sessions の単位（SessionsState）の、表 "sessions" の上の実装。
@@ -445,6 +446,14 @@ func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context
 // dbExec は行を返さない文を実行する。
 func dbExec(ctx context.Context, db *sql.DB, query string, args ...any) error {
 	_, err := Conn(ctx, db).ExecContext(ctx, query, args...)
+	return err
+}
+
+// dbConflict は、err が、一意の制約（キーを含む）の違反なら、conflict を返す。ほかは、err を、そのまま返す。
+func dbConflict(err, conflict error) error {
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		return conflict
+	}
 	return err
 }
 

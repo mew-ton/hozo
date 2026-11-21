@@ -409,6 +409,9 @@ type EffectDecl struct {
 	Params []*OpParam
 	// Return は書いた戻り値（docs/grammar.md「関数の宣言」）。省いていれば nil。効果が返せるのは void だけ（TYPE-18）。
 	Return *ReturnType
+	// Throws は、この効果が投げる例外（docs/grammar.md「exception / effect / read」の EffectThrows）。書いていなければ nil。
+	// 関係の節は書けないので、Relations は、いつも空。
+	Throws *ThrowsClause
 	// On は基底の状態の組み込みの効果（"状態.操作"）。遷移なら nil。
 	On *StateOpRef
 	// Transition は状態の遷移（"X as A -> B"。X は、状態か、状態の分類）。組み込みの効果なら nil。
@@ -677,7 +680,11 @@ type CaseKind struct {
 	// Never は、"case of never"（対象のない分類のケース）。Of と、同時には、立たない。
 	Never bool
 	// Of は、"case of <型か、分類の名前>" の、of の後ろ。"case"、"case of any"、"case of never" なら nil。
+	// いちばん外が省略可能な型（? か nullable<…>）には、ならない（docs/grammar.md「decorator の宣言」）。
 	Of Type
+	// Optional は、引数の種類（any の後ろ）で、of の後ろの型の、いちばん後ろの "?" を、引数を省ける印（ParamType の "?"）
+	// として読んだか（"any case of Order?"）。Span は、その "?" を含まない。
+	Optional bool
 }
 
 // NodeSpan は Node の実装。

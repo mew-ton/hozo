@@ -161,6 +161,9 @@ type Effect struct {
 	DeclBase
 	// Params は効果が受け取る値（`effect fn e(order: Order): effects …;`）。なければ空（JSON では []）。
 	Params []OpParam `json:"params"`
+	// Throws はこの効果が投げうる例外の FQN（`: throws E effects …`。docs/check.md「read と効果」）。ユニオンは展開済み。
+	// 書いた順で、なければ空（JSON では []）。投げたとき、その効果は、起きていない。
+	Throws []string `json:"throws"`
 	// Target は宛先。一つだけ（docs/check.md「状態の形」の「効果の宛先」）。
 	Target EffectTarget `json:"target"`
 	// Writes はこの効果が書き込む基底の状態の FQN（docs/check.md「状態の形」の「効果が書き込む状態」）。

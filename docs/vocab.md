@@ -23,7 +23,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 |---|---|---|
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
 | `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
-| `vocab/db.hozo` | `namespace db { table / text / int / float / bool / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
+| `vocab/db.hozo` | `namespace db { table / text / int / float / bool / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / conflict / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
 | `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
 | `vocab/page.hozo` | `namespace page { Aborted / Route / path / query / route / dialog / fallback / interaction }` | §4.2 |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
@@ -88,6 +88,8 @@ namespace db {
   decorator update for effect;
   /** この効果は、宛先（effects）の状態の表から、行を消す。引数の名前が列で、どの列も引数の値と同じ行 */
   decorator delete for effect;
+  /** この効果が、表の一意の制約（@db.key、@db.unique）に当たったら、例外 error を投げる。@db.insert か @db.update の効果に足す */
+  decorator conflict(error: any exception) for effect;
 
   /** この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない */
   decorator transaction for op;
@@ -133,6 +135,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 - **`latest`** は、並べ方。`list` に足せば、列 `column` の新しい順（付けていない `list` は、足した順）。`find` に足せば、条件に合う行のうち、いちばん新しい一行。
 - **`find`** は、一行に決まるものでなければならない（決まるかどうかの確かめ方は `docs/plugin-go-sqlite.md`「read の中身」）。
 - **`insert`** は宛先が `<状態>.post`、**`update`** は `<状態>.put`、**`delete`** は `<状態>.delete` の効果に付ける。`insert` と `update` の効果の引数は、表の model の行一つ。
+- **`conflict`** は、`insert` か `update` の効果に足す（`docs/decisions.md`「決めたこと」353）。その効果が、表の一意の制約（`@db.key` と `@db.unique`）に当たったら、名指しした例外を投げる（`@db.insert @db.conflict(EmailTaken) effect fn createUser(user: User): throws EmailTaken effects users.post;`）。例外は、効果ごとに一つで、その効果の `throws` にあり、引数を持たないもの。引数を持つ例外を投げる効果と、制約ごとに例外を分ける効果は、デコレータを付けずに、人が書く。
 - **`transaction`** は、op に付ける。その op が DB にすることが、一つのトランザクションで起きる。op のデコレータなので、op の中身は決めず、中身の前後に処理を足すだけ（継ぎ目。`docs/config.md`「継ぎ目」）。どこまでがトランザクションに入るかと、入れ子の扱いは、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「トランザクション」）。
 - 等しいかどうかでない比較、件数と位置、二つ以上の列での並べ方は、この語彙では言えない。その `read` か効果には `db` のデコレータを付けず、人が書く。
 

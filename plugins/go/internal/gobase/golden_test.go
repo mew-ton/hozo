@@ -30,7 +30,7 @@ var goldenFixtures = []struct {
 	{name: "matchelse", covers: "「match」の、残りのケース（対象 as else）を持つ型で決まる分類: 二つに分ける形のもう一方の枝（presence）、残りのアームを並べた case と絞り込んだ値（variant）。「分類」（何も出さない）", behavior: true},
 	{name: "matchclosed", covers: "「match」の、二つに分ける形の「分類の誤りの枝」（残りのケースを書かない presence の分類）と、else のアーム（受けるケースを名前で並べたアームと同じコード）", behavior: true},
 	{name: "rowstate", covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
-	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)", behavior: true},
+	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)、例外を投げる効果（「状態の単位」と、単位のメソッドのコメントの throws）", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
 }
 

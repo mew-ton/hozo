@@ -1,0 +1,10 @@
+// SYNTAX（docs/grammar.md「関数の宣言」）: 効果の throws。戻り値を書いても、省いても、並べても、通る
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  exception E;
+  exception F;
+  effect fn one(m: M): throws E effects rows.post;
+  effect fn two(m: M): throws E, F effects rows.put;
+  effect fn explicit(m: M): void throws E effects rows.delete;
+}

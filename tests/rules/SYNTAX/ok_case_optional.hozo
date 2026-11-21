@@ -1,0 +1,12 @@
+// SYNTAX（docs/grammar.md「decorator の宣言」）: 引数の種類の、いちばん後ろの ? は、引数を省ける印。内側の ? は、型の一部。
+// 省略可能な型を対象にする分類のケースは、名前で絞る
+namespace a {
+  model M { id: string; }
+  classify Known of M? { Yes: M? as M; No: M? as else; }
+  classify Lists of M?[] { Empty0; Some; }
+  decorator opt(x: any case of M?) for op;
+  decorator inner(x: any case of M?[], y: any case of M?[]?) for op;
+  decorator byName(x: any case of Known?) for op | case of Known;
+  @opt @inner(Lists.Some) @byName
+  fn f();
+}

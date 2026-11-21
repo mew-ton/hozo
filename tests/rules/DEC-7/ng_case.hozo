@@ -13,4 +13,9 @@ namespace a {
   @named(Role.Admin) fn g();           // ERROR: DEC-7
   @typed(Other.A) fn h();              // ERROR: DEC-7
   @typed(Actor.Customer) fn i();       // ERROR: DEC-7
+  // any case of M? は、対象が M で、省ける引数: 対象が M? の分類のケースは、当たらない（名前で絞る）
+  classify Known of M? { Yes: M? as M; No: M? as else; }
+  decorator opt(x: any case of M?) for op;
+  @opt(Known.Yes) fn j();              // ERROR: DEC-7
+  @opt(Other.A) fn k();                // ERROR: DEC-7
 }

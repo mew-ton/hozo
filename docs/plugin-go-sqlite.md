@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.11"
+protocol = "0.12"
 
 [[transpiler]]
 name     = "go-sqlite"
@@ -104,7 +104,7 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 - 基底のメソッドをすべて持つ型には、`var _ <状態>State = <状態>Table{}` を出す。
 - **デコレータを付けていない `read` か効果があるとき**、その型は、そのメソッドを持たない。型は `<状態>State` を満たさず、基底の `New` に渡す行がコンパイルできない。人は、この型を自分の型に埋め込み、足りないメソッドを書き足して、その型を `New` に渡す。`var _` は出さない。**warning も出さない**: デコレータを付けないのは、その中身を人が書くと、仕様を書いた人が選んだこと。
 - 人が書き足すメソッドは、文を、`db` を直に使わずに `Conn(ctx, db)` を通して実行する（「トランザクション」）。
-- すべて実装した型でも、埋め込んで一つのメソッドを書けば、そのメソッドだけを人のものにできる（一意の違反を見分けて、仕様の例外に写す、など）。
+- すべて実装した型でも、埋め込んで一つのメソッドを書けば、そのメソッドだけを人のものにできる（条件に合う行だけを書き換える、など）。人が書く効果が、仕様の例外を返すなら、その例外は、効果の `throws` に書いてある（`docs/check.md`「read と効果」）。
 - 表の状態でない状態の単位と、述語で決まる状態の分類の単位（`<C>State`）の型は、出さない（人が書く）。
 
 **形で決まるメソッドの中身**（`list`）。状態の宣言の形から決まるもので、デコレータは要らない（形は言語の約束。`docs/check.md`「状態の形」）:
@@ -185,10 +185,23 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 | `@db.delete` | `T.delete` | **条件**: 引数ごとに、その名前の列が、引数の値と同じ（`read` と同じ決まり。名前のフィールドがなければ GOSQL-8、型は「列と引数の型」）。引数は一つ以上（GOSQL-28） | `DELETE FROM "<表>" WHERE <条件>`。どの条件も満たす行をすべて消す。行がなければ何もしない |
 
 - T は、N の表の状態（GOSQL-7）。**宛先は、組み込みの効果でなければならない**: 分類の遷移を宛先にする効果（`effect fn e(): effects Checkout as Shopping -> Ordered;`）に `db` のデコレータが付いていれば GOSQL-11（一つの遷移が、どの表に何をするかは、宣言からは決まらない）。その効果は、人が書く。
-- 効果は、三つのうち、高々一つを持つ（二つ以上なら GOSQL-12）。
+- 効果は、`@db.insert` / `@db.update` / `@db.delete` の三つのうち、高々一つを持つ（二つ以上なら GOSQL-12）。
 - `@db.delete` の条件の値の渡し方は、`read` と同じ（「read の中身」）。
 - **未決: 引数のない `@db.delete`**。「引数がなければ、すべての行」は、`@db.list` では決めたが、消す方では決めていない（書き忘れた引数が、表を空にする）。決まるまで GOSQL-28。
-- この語彙で言えないもの（一意の違反を例外に写すこと、条件に合う行だけの書き換え）は、その効果にデコレータを付けず、人が書く。
+- **`@db.conflict(E)`** は、`@db.insert` か `@db.update` と一緒に付ける（`docs/vocab.md`「`db` の read と効果」。`docs/decisions.md`「決めたこと」353）。文が、表の一意の制約（`@db.key` の `PRIMARY KEY` と、`@db.unique` の `UNIQUE`。「表」）に当たったら、例外 E を返す。当たらなければ、SQL は、上の表のまま。
+
+  ```
+  /** ユーザーを登録する。同じ email のユーザーが、もういれば、投げる */
+  @db.insert @db.conflict(type.EmailTaken)
+  effect fn createUser(user: type.User): throws type.EmailTaken effects users.post;
+  ```
+
+  - `@db.insert` も `@db.update` も持たない効果に付いていれば GOSQL-31。
+  - E は、その効果の `throws` にあり、引数を持たない例外（どちらかが違えば GOSQL-32）。引数を持つ例外は、このトランスパイラが値を埋められないので、その効果は、人が書く。
+  - **一意の違反の見分け方**: 文を実行したエラーの文（`err.Error()`）が、`UNIQUE constraint failed` を含むこと。SQLite そのものが出す文で、`PRIMARY KEY` の違反も、この文で出る。`database/sql` のドライバの型には、依らない（生成したコードは、ドライバを import しない）。ほかの失敗は、今までどおり、そのまま返す。
+  - 返すのは、例外の値（`<型>{}`。`docs/plugin-go.md`「exception」）。もとのエラーは、包まない。
+- **`db` のデコレータで中身を作る効果の `throws` は、`@db.conflict` が名指しした例外だけ。** ほかの例外が `throws` にあれば GOSQL-33（このトランスパイラは、それを投げるコードを出せない）。
+- この語彙で言えないもの（制約ごとに別の例外に写すこと、引数を持つ例外を投げること、条件に合う行だけの書き換え）は、その効果にデコレータを付けず、人が書く。
 
 **行の遷移を持つ効果**（`Effect.row`。`docs/check.md`「行の遷移」）に `db` のデコレータを付けても、SQL は、上の表のまま変わらない。行のケースは、述語で決まる分類のもので、列とは限らない（どの列がどの値ならどのケースかは、仕様のどこにも書いていない）ので、このトランスパイラは、ケースを SQL にできない。
 
@@ -355,6 +368,7 @@ func Conn(ctx context.Context, db *sql.DB) Querier {
 | `dbText`、`dbInt`、`dbFloat`、`dbBool`、`dbTimeLayout` と `dbTime`、`dbJSON` | しまい方ごとの補助 `func(v any, opts ...dbOption) dbCol`。「しまい方」の表の、列の値への変え方と、その逆。使うしまい方の分だけ、この順で |
 | `dbTransaction` | トランザクションの始め方と終わり方（「トランザクション」）。`DbSeams` を出すときだけ。鍵は、このファイルの名前ではなく、`runtime.DBTxKey`（`Conn` も使うので、`runtime` は、いつも import する） |
 | `dbExec` | 行を返さない文を実行する |
+| `dbConflict(err, conflict error) error` | `err` が、一意の制約の違反（「効果の中身」の「一意の違反の見分け方」）なら `conflict` を、ほかは `err` を、そのまま返す。`@db.conflict` を付けた効果があるときだけ（`strings` を import するのも、そのときだけ） |
 | `dbIsEmpty` | 行の数を返す問い合わせの結果が 0 かどうか |
 | `dbGet[R]` | 問い合わせの一行を読む。行がなければ（`sql.ErrNoRows`）`nil` |
 | `dbList[R]` | 問い合わせのすべての行を読む |
@@ -416,6 +430,28 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 }
 ```
 
+`@db.conflict` を付けた効果は、`dbExec` の呼び出しを、`dbConflict(…, <例外の値>)` で包む。包む行は、`return dbConflict(dbExec(ctx, t.db,` で、文の行の末尾は `args...), <例外の値>)`:
+
+```go
+// CreateUser は効果 store.createUser（@db.insert、@db.conflict）: 表 "users" に、引数 user の行を足す。一意の制約に当たれば、例外 type.EmailTaken を返す。
+func (t UsersTable) CreateUser(ctx context.Context, user pkgtype.User) error {
+	args, err := dbArgsUser(user)
+	if err != nil {
+		return err
+	}
+	return dbConflict(dbExec(ctx, t.db,
+		`INSERT INTO "users" ("id", "email", "name", "hash") VALUES (?1, ?2, ?3, ?4)`, args...), pkgtype.EmailTaken{})
+}
+
+// dbConflict は、err が、一意の制約（キーを含む）の違反なら、conflict を返す。ほかは、err を、そのまま返す。
+func dbConflict(err, conflict error) error {
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		return conflict
+	}
+	return err
+}
+```
+
 - `@db.find` は `dbGet`、`@db.list` は `dbList`、効果は `dbExec`。行を受け取る効果（`@db.insert`、`@db.update`）と `Post` は、先に `args, err := dbArgs<Model>(<引数>)` と、その `err` の確認を置く（値を列の形にできなければ、文を実行しない）。
 - `SELECT`（`COUNT` を除く）、`INSERT`、`UPDATE` の文は、呼び出しの二行目に書く。`SELECT COUNT(*)` と `DELETE` の文は、呼び出しと同じ行に書く。
 - コメントは、宣言ごとに一行（型は二行）。途中で折り返さない。
@@ -431,7 +467,7 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 | `Get` | `// Get は形で決まる問い合わせ: 表 "<表>" の行を、足した順にすべて引く。` |
 | `Post` | `// Post は形で決まる命令: 表 "<表>" に、引数 value の行を足す。` |
 | `read` | `// <メソッド名> は read <FQN>（<@デコレータ>）: <read の句>`。`<@デコレータ>` は、付いた `db` のデコレータの名前を、`@db.find` / `@db.list`、`@db.where`（いくつあっても一度）、`@db.latest` の順に「、」でつないだもの |
-| 効果 | `// <メソッド名> は効果 <FQN>（<@デコレータ>）: <効果の句>` |
+| 効果 | `// <メソッド名> は効果 <FQN>（<@デコレータ>）: <効果の句>`。`<@デコレータ>` は、`@db.insert` / `@db.update` / `@db.delete` と、付いていれば `@db.conflict` を、この順に「、」でつないだもの |
 | 継ぎ目のメソッド | `// <メソッド名> は op <FQN> に付いた @db.transaction の継ぎ目: 中身を、一つのトランザクションの中で呼ぶ。中身が失敗すれば、取り消す。` |
 | `dbArgs<Model>` / `dbScan<Model>` | `// dbArgs<Model> は <model の FQN> を、表 "<表>" の列の順の値にする。` / `// dbScan<Model> は、表 "<表>" の列の順の値を <model の FQN> に読む。`（表は、その model を要素に持つ、最初の表の状態） |
 
@@ -454,6 +490,8 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 | `@db.insert` | `表 "<表>" に、引数 <引数名> の行を足す。` |
 | `@db.update` | `表 "<表>" の、キーが引数 <引数名> と同じ行を書き換える。行がなければ何もしない。` |
 | `@db.delete` | `表 "<表>" から、<条件>行を消す。行がなければ何もしない。` |
+
+`@db.conflict(E)` を付けた効果は、効果の句の後ろに、空白なしで一文を足す: `一意の制約に当たれば、例外 <E の FQN> を返す。`。行の遷移の一文も足すときは、こちらが先。
 
 行の遷移を持つ効果（`Effect.row`）は、効果の句の後ろに、空白なしで一文を足す: `行の遷移（<行の遷移の表示>）は、確かめない。`（表示の形は `docs/plugin-go.md`「コメント」の「行の遷移の表示」）。
 
@@ -493,6 +531,9 @@ func (t SessionsTable) DeleteSession(ctx context.Context, token pkgtype.Token) e
 | GOSQL-28 | error | `@db.delete` の効果が、引数を一つも持たない。まだ決めていない形（「効果の中身」の未決）。位置は効果 |
 | GOSQL-29 | error | N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。「出力」）。位置は op |
 | GOSQL-30 | error | `@db.update` を付けた効果の行の遷移（`Effect.row`）の、前がケースの並びで、後のケースが、その並びにない（「効果の中身」: 渡る行は前のケースにあり、そのまま書いても、後のケースにならない）。位置は効果 |
+| GOSQL-31 | error | `@db.conflict` を付けた効果が、`@db.insert` も `@db.update` も持たない（「効果の中身」）。位置は効果 |
+| GOSQL-32 | error | `@db.conflict` の例外が、使えない: その効果の `throws` にない。引数を持つ。メッセージに、どちらかを示す。位置は効果 |
+| GOSQL-33 | error | `@db.insert` / `@db.update` / `@db.delete` を付けた効果の `throws` に、`@db.conflict` が名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。メッセージに、その例外。位置は効果 |
 
 - 欠番（番号は別の意味に使い回さない。欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）:
 

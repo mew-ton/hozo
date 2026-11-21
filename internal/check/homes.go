@@ -81,7 +81,8 @@ type use struct {
 // （docs/config.md「型の置き場」の表）を、名前空間ごとに最初の一つずつ、見つけた順で返す。
 //
 //  1. N のすべての model / scalar / union / exception: フィールドの型、scalar の元の型、アームの型、例外の引数の型。
-//  2. N のすべての状態、分類、read、効果: 状態の型、分類の対象の型、ケースの as の型、read と効果の引数の型、read の結果の型。
+//  2. N のすべての状態、分類、read、効果: 状態の型、分類の対象の型、ケースの as の型、read と効果の引数の型、read の結果の型、
+//     効果の throws の例外。
 //  3. 単位の対象の op: 引数と戻り値の型、Op.signature.exceptions の例外。
 //  4. 単位の対象の配線が呼ぶ op（別の名前空間のものを含む）: 引数と戻り値の型。
 //  5. 単位の対象の配線の match: 述語で決まる分類のうち、別の名前空間のもの。
@@ -153,6 +154,9 @@ func uses(ix *index, nsName string, files []string) []use {
 			typ(x.Returns)
 		case *ir.Effect:
 			params(x.Params)
+			for _, e := range x.Throws {
+				decl(e)
+			}
 		case *ir.Classify:
 			typ(x.SubjectType())
 			for _, cs := range x.Cases {

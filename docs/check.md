@@ -69,6 +69,7 @@
 - **宣言の `reads` と `effects` は、その関数が、直に触れる先を言う。** `read fn` は、`reads` の状態を、ちょうど一つ読む。`effect fn` は、`effects` の宛先を、ちょうど一つ変える（`docs/grammar.md`「関数の宣言」）。op の節の `reads` と `effects` は、同じ関係を、本体が呼ぶものの合わせたものとして言う（「節に書く要素」）。
 - `read` と `effect` の宣言は本体を持たない。中身は、デコレータを読むトランスパイラが出すか（`@db.find` など）、人が書く。どちらになるかは、言語は決めない。
 - 宣言の引数と、`read` の結果の型は、書かれたままの約束で、検査器は宛先の状態の型と照らさない（`read fn count(): int reads orders;` も書ける）。照らすのは、デコレータを読むトランスパイラ（`docs/requirements.md`「出力を推論しない」）。
+- **効果は、仕様の例外を投げられる。`read` は、投げない**（`docs/decisions.md`「決めたこと」352）。効果の宣言の `throws`（`effect fn createUser(user: User): throws EmailTaken effects users.post;`）は、その効果が投げうる例外の並び（`Effect.throws`）。投げたとき、その効果は、起きていない: 状態は、変わっていない。同じ例外を二度書けば REL-1。いつ投げるかは、中身（トランスパイラが出すか、人が書く）が決め、言語は決めない。
 - `read` と効果を使えるのは、宣言した名前空間（状態の持ち主）の配線だけ。別の名前空間は、その名前空間の op を通す（「配線からの呼び出し」の NS-6）。`export` は op にだけ付けられる（「op の宣言と本体」の「export」）。
 - どの配線も呼んでいない `read` と効果は診断しない。
 
@@ -79,12 +80,12 @@
 | 呼ぶもの | 書ける位置 | 式の型 | その配線に足すもの |
 |---|---|---|---|
 | `read`（`userByEmail(email)`） | 値のある呼び出しを書ける位置（`val`、`=`、`collect`、`return`、アームの本体） | その `read` の結果の型（`Read.returns`） | 読む状態に、その宛先の状態（「計算」の「reads」） |
-| 効果（`createOrder(order);`） | 値のない呼び出しを書ける位置（文、アームの本体） | 「値がない」 | 効果に、その効果（「計算」の手順 0） |
+| 効果（`createOrder(order);`） | 値のない呼び出しを書ける位置（文、アームの本体） | 「値がない」 | 効果に、その効果。例外に、その効果の `throws`（「計算」の手順 0） |
 | 組み込みの効果を直に（`orders.post(order);`） | 同上 | 「値がない」 | 効果に、直に書いた効果 `<状態>.<操作>`（「節に書く要素」） |
 
 - 別の名前空間の `read` か効果（の宣言）を呼べば NS-6。別の名前空間の状態の組み込みの効果を直に呼べば RES-5（状態を名前で書けるのは、持ち主の名前空間だけ）。
 - 引数の数と型は、op の呼び出しと同じ規則で確かめる（`docs/types.md`「呼び出しの引数」、「計算」の「必須の入力」）。`bind` は、`read` と効果の引数を埋めない（「計算」の「bind」）。
-- `read` と効果は例外を持たない（宣言に `throws` を書けない）。呼び出しは、その配線の例外を増やさない。
+- 効果の呼び出しは、その配線の例外に、効果の `throws` を足す（「read と効果」）。op の呼び出しの例外と同じに、配線が `throws` に書いていなければ THROWS-1。`read` の呼び出しと、直に呼ぶ組み込みの効果は、例外を増やさない。
 - 値のある・ないの使い分けは op と同じ: `read` の呼び出しを`val` に受けずに書く、効果の呼び出しを `val` に受ける、はどちらも WIRE-2。
 
 ### 直に呼ぶ組み込みの効果
@@ -660,6 +661,7 @@ R と pure は v によらない（どの名前空間から見ても同じ）。
 - F = O が直に持つ効果（デコレータが運ぶ `Op.carried.effects`。「デコレータが運ぶ reads と effects」）。
 - rel(X, e) = X を含む `ThrowsClause` の `relations` に `prevents` があれば `prevented`、`keeps` があれば `kept`。どちらもなければ `unknown`。両方あれば REL-5。
 - succ(e) = `kept`。
+- 運ばれた効果が投げる例外を、足す（下の「運ばれた効果が投げる例外」）。
 - 呼び出しが循環している op（WIRE-7）は、本体を無視して、F = `Op.effects`（節に書いたもの）の後ろに `Op.carried.effects` を並べたもの（重複は最初の出現に寄せる）で、同じに計算する。
 
 配線の op: 本体の文を、**辿る順**に見る。辿る順は、書いた順で、中のブロックにも入る: `for` は、ブロックの文を、上から。`disjoint` は、アームを、書いた順に、アームの中の文を、上から。`disjoint` も、`for` も、直列に動いたとして計算する（`docs/decisions.md`「決めたこと」335）: `for` のブロック（`disjoint for` も）は、並びの順に、0 回以上、動き、前の回の効果は、起きている。
@@ -669,7 +671,7 @@ R と pure は v によらない（どの名前空間から見ても同じ）。
 | c | Sc.exceptions | Sc.effects | Sc.rel、Sc.succ |
 |---|---|---|---|
 | op の呼び出し | Sig(callee(c), ns(O)) のもの | 同左 | 同左 |
-| 効果の呼び出し（`createOrder(order)`、`orders.post(order)`） | 空 | その効果一つ（宣言なら `named`、直に呼んだものなら `direct`） | succ は `kept`。例外がないので rel はない |
+| 効果の呼び出し（`createOrder(order)`、`orders.post(order)`） | 宣言なら、その効果の `throws`（`Effect.throws`）。直に呼んだものなら、空 | その効果一つ（宣言なら `named`、直に呼んだものなら `direct`） | succ は `kept`。rel は、どの例外も `prevented`（投げたとき、その効果は、起きていない） |
 | `read` の呼び出し | 空 | 空 | — |
 | アームの本体の `throw X`（引数があっても同じ） | X だけ | 空 | —（出どころは、その文とその `throw`） |
 
@@ -689,7 +691,8 @@ R と pure は v によらない（どの名前空間から見ても同じ）。
 - **運ばれた効果**（`Op.carried.effects`）e を、その順に、ここまでの F、rel、succ に足す。e の**デコレータの分**は、葉の op と同じ値: 各 X ∈ E について、X を含む `ThrowsClause` の `relations` から決めた状態（`prevents` なら `prevented`、`keeps` なら `kept`、どちらもなければ `unknown`）と、成功のアームの `kept`。
   - e ∉ F（本体は e に行き着かない）なら、e を F の末尾に足し、rel(X, e) と succ(e) は、デコレータの分。
   - e ∈ F（本体も e に行き着く）なら、F の位置はそのまま。rel(X, e) と succ(e) は、本体から決めた状態とデコレータの分が同じならその状態、違えば `unknown`。
-- 配線の `Op.throws` に `relations` が書かれていれば、ここで計算した rel と比べる（REL-4）。運ばれた効果だけの組は、書かれた `relations` から決めたので、食い違わない。
+- **運ばれた効果が投げる例外**（葉でも、配線でも）: 運ばれた効果 e が、宣言した効果で、`throws` を持てば、その例外 X を、E の末尾に足す（既にあれば、位置はそのまま）。op が `throws` に書いていなくてよい（デコレータの `throws` と同じ: 手順 i）。この出どころでの状態は、e は `prevented`（投げたとき、e は、起きていない）、ほかの効果は `unknown`（デコレータの処理が、本体のどの行の前後で起きるかを、言語は決めない）。X が、ここで初めて E に入るなら、rel(X, ·) は、その状態。X が、もう E にあれば、同じならその状態、違えば `unknown`。
+- 配線の `Op.throws` に `relations` が書かれていれば、ここで計算した rel と比べる（REL-4）。運ばれた効果だけの組は、書かれた `relations` から決めたので、食い違わない。運ばれた効果が投げる例外を、op も `relations` を付けて書いていれば、その組も、同じに比べる（運ばれた効果のほかの効果は `unknown` なので、`prevents effects` とは、言えない）。
 
 **手順 i = 1..n（デコレータ dᵢ を内側から）**
 
@@ -697,7 +700,7 @@ D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節
 
 - `catches Xs mode`: 各 X ∈ Xs について、X ∉ E なら DEC-16（吸収する相手がない）。X ∈ E なら:
   - `recovers` / `ignores`: 各 e ∈ F について rel(X, e) ≠ `kept` なら succ(e) = `unknown`（§8.2「効果が不明な例外を `recovers` で吸収すると、成功のアームでもその効果は不明になる」）。X を E から除く。
-  - `halts h`: X を E から除く。h ∉ F なら h を F の末尾に足し、残りのすべての Y ∈ E について rel(Y, h) = `prevented`、succ(h) = `prevented`。h ∈ F ならそのまま。
+  - `halts h`: X を E から除く。h ∉ F なら h を F の末尾に足し、残りのすべての Y ∈ E について rel(Y, h) = `prevented`、succ(h) = `prevented`。h ∈ F ならそのまま。h が `throws` を持てば、その例外 Z を、E の末尾に足す（既にあれば、位置はそのまま）: この出どころでの状態は、h が、ここで F に足したものなら、h は `prevented`、それ以外は、どの効果も `unknown`。Z が、もう E にあれば、同じならその状態、違えば `unknown`。
 - `throws Ys relations`: D が `external` で v = ns(O) なら飛ばす（DEC-10）。そうでなければ各 Y ∈ Ys について、Y を E の末尾に足し（既にあれば位置はそのまま）、各 e ∈ F について `relations` から状態を決める（葉の rel と同じ規則。目的語の `effects` は F のすべて）。Y が既に E にあって状態が違えば `unknown`。
 
 **結果**: `Signature.exceptions` = E、`effects` = F、`relations` = rel、`successEffects` = succ、`reads` = R、`pure` = pure。`Op.signature` = Sig(O, ns(O))。`View.ops` は Sig(O, viewer)（`docs/ir.md`「その名前空間から見た IR」）。
@@ -772,7 +775,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | NS-5 | error | 別の名前空間の、`export` のない op を呼んだ（「op の宣言と本体」の「export」の表の二つ: 配線の呼び出し、デコレータの引数に渡した op）。位置は呼び出しの op の名前（デコレータの引数ならその引数の値）。`Related` にその op の宣言 |
 | NS-6 | error | 配線が、別の名前空間の `read` か効果（`effect` の宣言）を呼んだ（「状態に触れるもの」の「配線からの呼び出し」）。位置は呼び出しの名前。`Related` にその宣言。メッセージに、その名前空間の op を通すことを示す。`Signature` を要しないので `internal/sema` が出す |
 | NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `read` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。強さは、ここで warning と決めた |
-| DOC-1 | error | `@param` が引数名にない（op、デコレータ、`exception`、`effect`、`read` の引数。引数を持たない種類の宣言に書いた `@param` も）、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いた `external` なデコレータの `throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。デコレータの宣言の `@param` は `Param` の名前 |
+| DOC-1 | error | `@param` が引数名にない（op、デコレータ、`exception`、`effect`、`read` の引数。引数を持たない種類の宣言に書いた `@param` も）、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いた `external` なデコレータの `throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。効果の `@throws` の例外が、その効果の `throws`（`Effect.throws`）にない（`internal/sema`）。デコレータの宣言の `@param` は `Param` の名前 |
 | DOC-2 | error | 同じ `@param` 名、同じ `@throws` 例外が二度ある |
 | UNION-1 | error | `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複 |
 
@@ -809,7 +812,7 @@ EFF-3 は欠番。「葉の op が自分で書いた `effects` が二つ以上�
 | THROWS-1 | error | 配線の O について `Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ, ns(O))`（Sc は本体の各呼び出しの Sig(callee, ns(O))。アームの本体の `throw X` は、例外が X だけの呼び出しとして数える（計算の手順 0）。`external` なデコレータの `throws` は Sig と同じく数えない）。空でなければ、位置は O の名前、メッセージに Missing の FQN、`Related` に各例外の出どころの呼び出し、`Data.missing` に FQN の列 |
 | THROWS-2 | — | 診断なし。多めの宣言は許す |
 | THROWS-3 | error | `never` を返す op が、「op の宣言と本体」の「never を返す op」の条件 1〜6 のどれかを満たさない（`Signature` を要しないので `internal/sema` が出す）。満たさない条件ごとに一つ。位置は、1 は op の名前、2 と 3 は `throws`（なければ op の名前）、4 は最初の引数、5 と 6 はそのデコレータ |
-| REL-1 | error | `Op.throws`（またはデコレータの `throws`）の全節を通して同じ例外が二度ある（`Signature` を要しないので `internal/sema` が出す。REL-5 も同じ） |
+| REL-1 | error | `Op.throws`（またはデコレータの `throws`、効果の `throws`）の全節を通して同じ例外が二度ある（`Signature` を要しないので `internal/sema` が出す。REL-5 も同じ） |
 | REL-2 | warning | Sig(O, ns(O)).effects が空の op の `Op.throws` に `relations` がある。デコレータの `throws` の `relations` は対象外（§7.3） |
 | REL-4 | error | 計算の手順 0 の「配線の `Op.throws` に `relations` が書かれていれば」の比較。`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組を示す |
 | REL-5 | error | 一つの `ThrowsClause` に `prevents` と `keeps` の両方がある |

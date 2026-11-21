@@ -326,7 +326,7 @@ func (r *renderer) head(d ir.Decl) string {
 		}
 		return "exception " + name + r.params(d.Params)
 	case *ir.Effect:
-		return "effect fn " + name + r.params(d.Params) + r.effectTarget(d.Target) + r.rowTransition(d)
+		return "effect fn " + name + r.params(d.Params) + r.effectTarget(d) + r.rowTransition(d)
 	case *ir.Read:
 		// 「)」の後ろは、「:」で始める、関数の型: 戻り値と、reads の節（docs/grammar.md「関数の宣言」）
 		s := "read fn " + name + r.params(d.Params)
@@ -595,12 +595,17 @@ func (r *renderer) argValue(v ir.ArgValue) string {
 
 // effectTarget は効果の宛先を Hozo の構文で書く（docs/lsp.md「ホバー」: `effect fn createSession(session: Session): effects sessions.post`、
 // `effect fn placeOrder(): effects Checkout as Shopping -> Ordered` の「:」から後ろ）。宛先が決まっていなければ空。
-func (r *renderer) effectTarget(t ir.EffectTarget) string {
-	switch t := t.(type) {
+func (r *renderer) effectTarget(e *ir.Effect) string {
+	// 投げる例外（Effect.throws）は、effects の前に書く（docs/grammar.md「関数の宣言」）
+	head := ": "
+	if len(e.Throws) > 0 {
+		head += "throws " + r.rels(e.Throws) + " "
+	}
+	switch t := e.Target.(type) {
 	case ir.BuiltinTarget:
-		return ": effects " + r.rel(t.State) + "." + string(t.Operation)
+		return head + "effects " + r.rel(t.State) + "." + string(t.Operation)
 	case ir.TransitionTarget:
-		return ": effects " + r.rel(t.Of) + " as " + caseSet(t.From) + " -> " + caseSet(t.To)
+		return head + "effects " + r.rel(t.Of) + " as " + caseSet(t.From) + " -> " + caseSet(t.To)
 	}
 	return ""
 }

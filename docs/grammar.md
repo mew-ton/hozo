@@ -196,7 +196,7 @@ op、`read`、効果は、どれも関数で、同じ形で宣言する（`docs/
 |---|---|---|---|
 | op | `fn`。別の名前空間から呼べるものは `export fn` | 省ける。型、`void`、`never` | `throws`、`reads`、`effects` を、いくつでも。その後ろに、`;` か本体（「op」） |
 | `read` | `read fn` | 型。省けない（TYPE-18） | `reads 状態` を、ちょうど一つ。その後ろに `;`（「exception / effect / read」） |
-| 効果 | `effect fn` | 省く。`void` と書いてもよい（TYPE-18） | `effects 宛先` を、ちょうど一つ。その後ろに `;`（同上） |
+| 効果 | `effect fn` | 省く。`void` と書いてもよい（TYPE-18） | `throws` を、書くなら一つ。その後ろに、`effects 宛先` を、ちょうど一つ。その後ろに `;`（同上） |
 
 ```
 export fn login(in: LoginInput): Session throws InvalidCredentials { … }
@@ -204,10 +204,12 @@ fn findUser(email: Email): User?;
 fn ping();
 read fn userByEmail(email: Email): User? reads users;
 effect fn createUser(user: User): effects users.post;
+effect fn addUser(user: User): throws EmailTaken effects users.post;
 ```
 
 - 種類を書かない `fn` は、op。`op fn f()` とは書かない。
-- 種類ごとに書ける節は、文法で閉じる: `read fn` と `effect fn` に、`throws` の節や本体は書けない。`read fn` の `reads` と、`effect fn` の `effects` は、状態に直に触れることの宣言で、要素は一つだけ。
+- 種類ごとに書ける節は、文法で閉じる: `read fn` と `effect fn` に、本体は書けない。`read fn` に、`throws` の節は書けない。`read fn` の `reads` と、`effect fn` の `effects` は、状態に直に触れることの宣言で、要素は一つだけ。
+- `effect fn` の `throws` は、その効果が投げる、仕様の例外（`docs/decisions.md`「決めたこと」352。意味は `docs/check.md`「状態に触れるもの」の「read と効果」）。`effects` の前に、一つだけ書ける。要素は op の `throws` と同じ（「decorator の宣言」の `ExcRef`）で、関係の節（`prevents effects`、`keeps effects`）は書けない: 投げたとき、その効果は、いつも、起きていない。
 - `reads` と `effects` は、どの種類でも、同じ関係を言う: その関数が、状態を読むこと、変えること（`docs/check.md`「状態に触れるもの」）。`read fn` と `effect fn` では、その関数が直に触れる先。op では、本体が呼ぶものの合わせたもので、葉（本体のない op）には書けない（STATE-5。「op」）。
 - 引数がなくても、`()` を書く（配線から `名前()` と呼ぶものだから）。
 - 効果が返せるのは `void` だけで、`read` は `void` と `never` を返せない（TYPE-18。`docs/types.md`「診断」）。
@@ -224,7 +226,8 @@ effect fn createUser(user: User): effects users.post;
 
 ```
 ExceptionDecl = "exception" Ident [ "(" OpParam { "," OpParam } ")" ] ";" ;
-EffectDecl    = "effect" FnHead ":" [ ReturnType ] "effects" ( BuiltinEffect [ RowClause ] | Transition ) ";" ;   (* FnHead と ReturnType は「関数の宣言」 *)
+EffectDecl    = "effect" FnHead ":" [ ReturnType ] [ EffectThrows ] "effects" ( BuiltinEffect [ RowClause ] | Transition ) ";" ;   (* FnHead と ReturnType は「関数の宣言」 *)
+EffectThrows  = "throws" ExcRef { "," ExcRef } ;        (* ExcRef は「decorator の宣言」。関係の節（Relation）は書けない *)
 ReadDecl      = "read" FnHead ":" [ ReturnType ] "reads" QualifiedName ";" ;
 BuiltinEffect = QualifiedName "." StateOp ;
 StateOp       = "post" | "put" | "delete" ;                 (* 文脈キーワード *)
@@ -241,7 +244,7 @@ RowCase       = QualifiedName ;                             (* 分類の名前 "
 | 宣言 | 例 | 引数 | 結果 |
 |---|---|---|---|
 | `exception` | `exception InvalidCredentials;`、`exception LimitExceeded(wait: Duration);` | その例外が運ぶ値 | なし |
-| `effect` | `effect fn createOrder(order: Order): effects orders.post;`、`effect fn clearCart(): effects carts as HasItems -> Empty;`、`effect fn startProduction(order: Order): effects orders.put as Stage.Accepted -> Stage.InProduction;` | その効果が受け取る値 | なし |
+| `effect` | `effect fn createOrder(order: Order): effects orders.post;`、`effect fn clearCart(): effects carts as HasItems -> Empty;`、`effect fn startProduction(order: Order): effects orders.put as Stage.Accepted -> Stage.InProduction;`、`effect fn createUser(user: User): throws EmailTaken effects users.post;` | その効果が受け取る値 | なし |
 | `read` | `read fn userByEmail(email: Email): User? reads users;`、`read fn allOrders(): Order[] reads orders;` | 読むときに受け取る値 | `:` の後ろの型。省けない（「関数の宣言」） |
 
 - `effect fn` と `read fn` は、引数がなくても `()` を書く（「関数の宣言」）。`exception` は、引数がなければ括弧を書かない（`throw InvalidCredentials` と投げ、`throws` に名前で並べるもの）。`exception X();` は構文エラー（同じ意味の書き方を二つ持たない）。
@@ -344,7 +347,8 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 
   - `of` の後ろの名前が、型か、分類かは、名前の解決が決める（`docs/resolve.md`「位置ごとに受け付ける種類」）。op や、状態の名前は、書けない。
   - ここの `any` は、型ではなく、「どの型でも」を言う語（遷移の `as any`、`-> any` と、同じ役）。ほかの型の位置（フィールド、引数、戻り値）に、`any` は書けない。
-  - `of` の後ろの型は、`?` と `[]` を含めて、型として読む: `any case of Order?` の `?` は、対象の型 `Order?` の一部で、引数を省ける印（`ParamType` の `?`）ではない。`any case?`、`any case of any?`、`any case of never?` の `?` は、引数を省ける印。
+  - **引数の種類の、いちばん後ろの `?` は、引数を省ける印**（`ParamType` の `?`。`docs/decisions.md`「決めたこと」354）: `any case?`、`any case of any?`、`any case of never?`、`any case of Order?` は、どれも、省ける引数。`any case of Order?` の `?` は、対象の型の一部ではない（対象は `Order`）: 引数の型の全体を、`nullable` で包んだ形の、省略（`docs/types.md`「形の書き方」）。内側の `?`（`any case of Order?[]`）は、型の一部。
+  - **型で絞る形の対象に、省略可能な型は、書けない**（いちばん外が `?` か、`nullable<…>` の型。SYNTAX）: 付ける先の `for case of Order?`、`for case of nullable<Order>`、引数の種類の `any case of nullable<Order>`、`any case of Order??`。省略可能な型を対象にする分類（`classify Known of User?`）のケースは、名前で絞る（`case of Known`）。メッセージは、その書き方を示す。
 - 分類そのものを、付ける先や、引数の種類にする形（`for classify`、`any classify`）は、まだ、書けない。パーサーは、`Target` か `AnyKind` の位置に `classify` が来たら、SYNTAX にする: メッセージは、分類そのものは、まだ、書けないことと、なくした書き方（`classify case`、`classify of never case`、`classify Actor case`）の、新しい書き方（`case of any`、`case of never`、`case of Actor`）を、示す。
 - `DecoReadsClause` と `DecoEffectsClause` は、そのデコレータの処理が読むものと、持つ効果を言う節（`decorator limit(counter: any state, by: any effect) for op reads counter effects by;`）。要素は op の節と同じもの（`ReadElem`、`EffectElem`）か、デコレータの引数の名前（`any state` の引数は読む状態、`any effect` の引数は効果）。何度でも書ける。意味は `docs/check.md`「デコレータが運ぶ reads と effects」。
 - `Relation` の `effects` は、直前の `prevents` / `keeps` の目的語。`DecoEffectsClause` の頭の `effects` と字句は同じだが、`prevents` / `keeps` の直後かどうかで分かれる（`throws X prevents effects effects e` は、`Relation` の後ろに `DecoEffectsClause`）。
@@ -389,7 +393,7 @@ TypePrefix  = CoreType
 CoreType    = "string" | "boolean" | "int" | "float" | "Time" | "Duration" ;
 ```
 
-- 形の語は型の別の書き方: `list<T>` は `T[]`、`nullable<T>` は `T?`、`single<T>` は `T`。`Type` を書けるどの位置にも書け、IR では同じ型になる（`docs/types.md`「形の書き方」）。
+- 形の語で書いた `nullable<T>` と `list<T>` が、もとの形で、`T?` と `T[]` は、その省略形。`single<T>` は `T` と同じ。`Type` を書けるどの位置にも、どちらでも書け、IR では同じ型になる（`docs/types.md`「形の書き方」）。
 
 - `QualifiedName "<" Type ">"` は分類のケースで絞り込んだ型（`WarrantyKind.Yamada<server.Item>`。§10.2）にだけ使う。ほかの名前に型引数を付けたらエラー（名前の解決で判定する）。
 - その場で書く model（`ModelBody`）は `Type` ではなく、`ArmType`（ユニオンのアーム）にだけ置ける。
@@ -512,7 +516,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `to` を予約語にする | `bind x to ...` の節の頭だから。ほかの節の頭と同じ扱い |
 | 予約語をフィールド名に書ける（`FieldName`） | `{ "op": "foo" }` のようなオブジェクトを返す API を、そのままの名前で書けるようにする。フィールド名の位置は `:` の前か `.` の後ろで、予約語が来ても構文があいまいにならない |
 | `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
-| 形の語（`list<T>` / `nullable<T>` / `single<T>`）は型の別の書き方で、型を書けるどの位置にも書ける。状態の宣言は `state 名前: Type;` | 形と型を揃えた（`docs/decisions.md`「設計書から離れた決定」S21）。状態を名前で参照したときの型が、宣言に書いた型そのものになる。位置ごとに書ける綴りを分けると、同じ型なのに位置で書き方が変わる規則が要る。以前の「空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない」はなくした: `single<T>` は `T` なので、`single<T?>` は `T?`、つまり `nullable<T>` と同じ型で、「空」は型の一か所にしか現れない |
+| 形の語（`list<T>` / `nullable<T>` / `single<T>`）は、型の、もとの形で（`T?` と `T[]` は、その省略形。`docs/decisions.md`「決めたこと」355）、型を書けるどの位置にも書ける。状態の宣言は `state 名前: Type;` | 形と型を揃えた（`docs/decisions.md`「設計書から離れた決定」S21）。状態を名前で参照したときの型が、宣言に書いた型そのものになる。位置ごとに書ける綴りを分けると、同じ型なのに位置で書き方が変わる規則が要る。以前の「空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない」はなくした: `single<T>` は `T` なので、`single<T?>` は `T?`、つまり `nullable<T>` と同じ型で、「空」は型の一か所にしか現れない |
 | 状態の分類での `match` は対象を書かない（`match (by C)`） | 対象は分類の宣言が持っていて、書かせると二か所になる |
 | `prevents` / `keeps` の目的語は `effects` だけ | 効果を名前で書き分ける場面がない: 葉の op は自分では効果を持たず（STATE-5）、配線の op の、例外ごとの効果の状態は、検査器が計算する（REL-4）。デコレータが運ぶ複数の効果（`docs/check.md`「デコレータが運ぶ reads と effects」）も、名前では書き分けない: 目的語の `effects` は、その op のすべての効果 |
 | 予約語をデコレータの名前に書ける（`DecoratorName`） | 語彙のデコレータは、することの名前で呼ぶ（`@db.list`、`@db.delete`）。その語が言語の節の頭や形の語と同じでも、語彙の側の名前を曲げさせない。デコレータの名前の位置は、`decorator` の直後か `@` の後ろ（修飾していれば最後の要素）で、予約語が来ても構文があいまいにならない。フィールド名（`FieldName`）と同じ扱い |

@@ -1,0 +1,7 @@
+// REL-1（docs/check.md「throws」）: 効果の throws でも同じ
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  exception E;
+  effect fn add(m: M): throws E, E effects rows.post;   // ERROR: REL-1
+}

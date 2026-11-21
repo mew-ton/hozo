@@ -43,6 +43,8 @@ type effect struct {
 	table *table
 	// conds は、@db.delete の条件（引数を宣言の順に）。
 	conds []condition
+	// conflict は、@db.conflict が名指しした例外の FQN（一意の制約に当たったら、返す）。付けていなければ ""。
+	conflict string
 	// ok は、食い違いがない（メソッドにできる）か。
 	ok bool
 }
@@ -329,10 +331,20 @@ func (e *emitter) collectEffects() {
 			continue
 		}
 		apps := applications(decl.Decorators, decoratorInsert, decoratorUpdate, decoratorDelete)
+		fqn := decl.Name
+		conflicts := applications(decl.Decorators, decoratorConflict)
+		// GOSQL-31: @db.conflict は、@db.insert か @db.update と一緒に付ける
+		if len(conflicts) > 0 && len(applications(decl.Decorators, decoratorInsert, decoratorUpdate)) == 0 {
+			e.errorf(codeSQLConflictOn, fqn, "効果 %s の @db.conflict は、@db.insert か @db.update と一緒に付ける（一意の制約に当たりうるのは、行を足す文と、書き換える文だけ）", fqn)
+			if len(apps) == 1 {
+				// @db.delete の効果は、ほかの食い違いを重ねて報告しないように、メソッドにしないものとして、覚える
+				e.effects[fqn] = &effect{decl: decl, kind: apps[0].Decorator}
+			}
+			continue
+		}
 		if len(apps) == 0 {
 			continue
 		}
-		fqn := decl.Name
 		if len(apps) > 1 {
 			e.errorf(codeSQLEffect, fqn, "効果 %s が、効果のデコレータを二つ以上持つ（%s。@db.insert / @db.update / @db.delete のうち、高々一つ）", fqn, decoratorNames(apps))
 			continue
@@ -341,6 +353,7 @@ func (e *emitter) collectEffects() {
 		e.effects[fqn] = x
 		before := len(e.errs)
 		what := "効果 " + fqn
+		e.conflictOf(x, conflicts)
 
 		// GOSQL-11: 宛先は、組み込みの効果で、操作が、デコレータと合う
 		target, builtin := decl.Target.(ir.BuiltinTarget)
@@ -389,6 +402,55 @@ func (e *emitter) collectEffects() {
 		}
 		x.ok = len(e.errs) == before
 	}
+}
+
+// conflictOf は、効果 x の @db.conflict（conflicts は、その適用。なければ空）と、効果の throws を確かめ、x.conflict を決める
+// （docs/plugin-go-sqlite.md「効果の中身」）。GOSQL-32: 名指しした例外が、効果の throws にないか、引数を持つ。
+// GOSQL-33: 効果の throws に、@db.conflict が名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。
+func (e *emitter) conflictOf(x *effect, conflicts []ir.Application) {
+	fqn := x.decl.Name
+	if len(conflicts) > 0 {
+		for _, exc := range refsArg(conflicts[0], "error") {
+			switch decl := e.exception(exc); {
+			case !containsCase(x.decl.Throws, exc):
+				e.errorf(codeSQLConflictExc, fqn, "効果 %s の @db.conflict の例外 %s が、その効果の throws にない（effect fn %s(…): throws %s effects … と書く）", fqn, exc, short(fqn), short(exc))
+			case decl != nil && len(decl.Params) > 0:
+				e.errorf(codeSQLConflictExc, fqn, "効果 %s の @db.conflict の例外 %s は、引数を持つ（このトランスパイラは、値を埋められない。この効果は、デコレータを付けずに、人が書く）", fqn, exc)
+			default:
+				x.conflict = exc
+			}
+			break // 例外は、効果ごとに一つ（ユニオンを渡しても、最初の一つ）
+		}
+	}
+	named := refsArg(firstOr(conflicts), "error")
+	for _, exc := range x.decl.Throws {
+		if len(named) > 0 && named[0] == exc {
+			continue
+		}
+		e.errorf(codeSQLThrows, fqn, "効果 %s の throws の例外 %s を、このトランスパイラは投げられない（db のデコレータで中身を作る効果が投げるのは、@db.conflict が名指しした例外だけ）", fqn, exc)
+	}
+}
+
+// exception は、FQN が fqn の例外の宣言。なければ nil。
+func (e *emitter) exception(fqn string) *ir.Exception {
+	ns := e.p.Namespace(e.declNS[fqn])
+	if ns == nil {
+		return nil
+	}
+	for _, d := range ns.Decls {
+		if x, ok := d.(*ir.Exception); ok && x.Name == fqn {
+			return x
+		}
+	}
+	return nil
+}
+
+// firstOr は、適用の並びの最初の一つ。なければ、零値。
+func firstOr(apps []ir.Application) ir.Application {
+	if len(apps) == 0 {
+		return ir.Application{}
+	}
+	return apps[0]
 }
 
 // containsCase は、ケースの名前の列 cases に name があるか。

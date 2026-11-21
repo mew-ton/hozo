@@ -481,7 +481,40 @@ func TestEffect(t *testing.T) {
 	mustFail(t, "effect fn a() sessions.post;", "「: effects 宛先」（effect fn a(…): effects 状態.操作; と書く）が必要")
 	mustFail(t, "effect fn a(): sessions.post;", "「: effects 宛先」")
 	mustFail(t, "effect fn a(): effects sessions.post, sessions.put;", "effect fn a の宛先は、一つだけ")
-	mustFail(t, "effect fn a(): throws E effects sessions.post;", "effect fn a に throws の節は書けない（read と効果は、例外を持たない")
+	// 投げる例外（docs/grammar.md「exception / effect / read」の EffectThrows）: effects の前に、一つだけ。関係の節は書けない
+	for _, tt := range []struct {
+		src  string
+		want string
+		void bool
+	}{
+		{"effect fn a(): throws E effects sessions.post;", "E", false},
+		{"effect fn a(): throws E, store.F effects sessions.put as Stage.A -> Stage.B;", "E,store.F", false},
+		{"effect fn a(): void throws E effects Checkout as Shopping -> Ordered;", "E", true},
+	} {
+		e := firstDecl[*ast.EffectDecl](t, tt.src)
+		if e.Throws == nil || len(e.Throws.Relations) != 0 {
+			t.Fatalf("%s: Throws = %+v", tt.src, e.Throws)
+		}
+		var names []string
+		for _, x := range e.Throws.Exceptions {
+			names = append(names, x.String())
+		}
+		if got := strings.Join(names, ","); got != tt.want {
+			t.Errorf("%s: Throws = %s, want %s", tt.src, got, tt.want)
+		}
+		if (e.Return != nil && e.Return.Void) != tt.void {
+			t.Errorf("%s: Return = %+v", tt.src, e.Return)
+		}
+	}
+	if e := firstDecl[*ast.EffectDecl](t, "effect fn a(): effects sessions.post;"); e.Throws != nil {
+		t.Errorf("throws のない効果の Throws = %+v", e.Throws)
+	}
+	mustFail(t, "effect fn a(): throws E prevents effects effects sessions.post;", "effect fn a の throws に、prevents の節は書けない（効果が例外を投げたとき、その効果は、いつも、起きていない")
+	mustFail(t, "effect fn a(): throws E keeps effects effects sessions.post;", "effect fn a の throws に、keeps の節は書けない")
+	mustFail(t, "effect fn a(): throws E throws F effects sessions.post;", "effect fn a の throws は、一つだけ（例外は「,」で並べる: throws A, B")
+	mustFail(t, "effect fn a(): effects sessions.post throws E;", "effect fn a の throws は、effects の前に書く")
+	mustFail(t, "effect fn a(): catches E recovers effects sessions.post;", "effect fn a に catches の節は書けない（効果に書ける節は、throws と effects")
+	mustFail(t, "effect fn a() throws E effects sessions.post;", "「)」の後ろに、戻り値か節を書くなら、「:」で始める（effect fn a(…): throws … と書く")
 	// 「)」の後ろに、戻り値か節を書くなら、「:」で始める（docs/grammar.md「関数の宣言」）
 	mustFail(t, "effect fn a() effects sessions.post;", "「)」の後ろに、戻り値か節を書くなら、「:」で始める（effect fn a(…): effects … と書く")
 	// なくした書き方（on）は、新しい書き方をメッセージで示す
@@ -2412,8 +2445,8 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 	if !c.Never || len(c.Of) != 0 || len(c.Cases) != 2 || len(c.Cases[0].Decorators) != 1 || c.Cases[0].Doc == nil || len(c.Cases[1].Decorators) != 0 {
 		t.Fatalf("classify = %+v", c)
 	}
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any case of never, other: any case of Actor, free: any case?, all: any case of any?, opt: any case of M?) for op | case | case of x.Actor | case of never | field | case of any | case of M[];")
-	if len(d.Params) != 5 || len(d.For) != 7 {
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any case of never, other: any case of Actor, free: any case?, all: any case of any?, opt: any case of M?, inner: any case of M?[], both: any case of M?[]?) for op | case | case of x.Actor | case of never | field | case of any | case of M[];")
+	if len(d.Params) != 7 || len(d.For) != 7 {
 		t.Fatalf("decorator = %+v", d)
 	}
 	named := func(k *ast.CaseKind) string {
@@ -2437,10 +2470,17 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 			t.Errorf("Param %d = %+v", i, d.Params[i].Type)
 		}
 	}
-	// of の後ろの型は、? を含めて読む: M? が対象の型で、引数は省けない
-	p4 := d.Params[4].Type.Any
-	if p4 == nil || p4.Kind != ast.AnyCase || named(p4.Case) != "M?" || d.Params[4].Type.Optional {
-		t.Errorf("Param 4 = %+v", d.Params[4].Type)
+	// いちばん後ろの ? は、引数を省ける印（docs/decisions.md「決めたこと」354）: 対象の型は M で、引数は省ける。
+	// 内側の ? は、型の一部
+	for _, tt := range []struct {
+		i        int
+		subject  string
+		optional bool
+	}{{4, "M", true}, {5, "M?[]", false}, {6, "M?[]", true}} {
+		p := d.Params[tt.i].Type
+		if p.Any == nil || p.Any.Kind != ast.AnyCase || named(p.Any.Case) != tt.subject || p.Optional != tt.optional {
+			t.Errorf("Param %d = %+v（対象 %s、省ける %v のはず）", tt.i, p, tt.subject, tt.optional)
+		}
 	}
 	if k := d.For[1]; k.Kind != ast.TargetCase || k.Case == nil || k.Case.Never || k.Case.Of != nil {
 		t.Errorf("Target 1 = %+v", k)
@@ -2465,6 +2505,12 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 	tests := []struct{ name, src, want string }{
 		{"of without a type", "decorator d for case of;", "型"},
 		{"name before case", "decorator d for Actor case;", "for の対象"},
+		// 型で絞る形の対象に、省略可能な型は、書けない（名前で絞る形を示す）
+		{"optional subject on target", "decorator d for case of M?;", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
+		{"nullable subject on target", "decorator d for case of nullable<M>;", "省略可能な型を対象にする分類のケースは、名前で絞る（case of 分類の名前）"},
+		{"nullable subject on param", "decorator d(x: any case of nullable<M>);", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
+		{"doubly optional subject on param", "decorator d(x: any case of M??);", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
+		{"optional rest", "decorator d(...xs: any case of M?) for op;", "残りの引数 ...xs は省略可能にできない"},
 		{"removed: classify case", "decorator d for classify case;", removed},
 		{"removed: classify of never case", "decorator d for classify of never case;", removed},
 		{"removed: any classify Actor case", "decorator d(x: any classify Actor case);", removed},

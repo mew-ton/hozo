@@ -13,8 +13,9 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// ErrDuplicate は、@db.key か @db.unique のフィールドが同じ行を足そうとした。
-// 仕様はこの失敗を言わない（効果にも、それを呼ぶ op にも、throws はない）。SQLite の制約に合わせて、人が決めたもの。
+// ErrDuplicate は、@db.key か @db.unique のフィールドが同じ行を足そうとした（セッションと、注文）。
+// 仕様はこの失敗を言わない（その効果にも、それを呼ぶ op にも、throws はない）。SQLite の制約に合わせて、人が決めたもの。
+// ユーザーは、別: 効果 createUser は、仕様の例外 type.EmailTaken を投げる（store.hozo の throws）。
 var ErrDuplicate = errors.New("memstore: duplicate key")
 
 // Store は、メモリの上の四つの状態。read と効果は並行に呼ばれるので、mu で守る。
@@ -140,7 +141,8 @@ func (s Users) UserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, 
 	return nil, nil
 }
 
-// CreateUser は効果 store.createUser の本体。id（@db.key）か email（@db.unique）が同じユーザーがいれば ErrDuplicate。
+// CreateUser は効果 store.createUser の本体。id（@db.key）か email（@db.unique）が同じユーザーがいれば、例外 type.EmailTaken
+// （仕様の throws。gen/store の @db.conflict と、同じ振る舞い）。足さない。
 func (s Users) CreateUser(ctx context.Context, user pkgtype.User) error {
 	if err := s.m.lock(ctx); err != nil {
 		return err
@@ -148,7 +150,7 @@ func (s Users) CreateUser(ctx context.Context, user pkgtype.User) error {
 	defer s.m.mu.Unlock()
 	for _, u := range s.m.users {
 		if u.Id == user.Id || u.Email == user.Email {
-			return ErrDuplicate
+			return pkgtype.EmailTaken{}
 		}
 	}
 	s.m.users = append(s.m.users, user)

@@ -257,8 +257,8 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.11","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.11","direction":"emit","format":"openapi","files":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.12","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.12","direction":"emit","format":"openapi","files":[]}`, false},
 		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {

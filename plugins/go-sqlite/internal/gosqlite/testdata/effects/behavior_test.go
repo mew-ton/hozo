@@ -6,6 +6,7 @@ package behavior
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -21,6 +22,7 @@ type tables struct {
 	crates depot.CratesTable
 	slots  depot.SlotsTable
 	events depot.EventsTable
+	tags   depot.TagsTable
 	ops    depot.Ops
 }
 
@@ -38,8 +40,8 @@ func open(t *testing.T) (tables, context.Context) {
 	if err := depot.CreateTables(ctx, db); err != nil {
 		t.Fatal(err)
 	}
-	tb := tables{crates: depot.NewCratesTable(db), slots: depot.NewSlotsTable(db), events: depot.NewEventsTable(db)}
-	tb.ops = depot.New(tb.crates, tb.slots, tb.events)
+	tb := tables{crates: depot.NewCratesTable(db), slots: depot.NewSlotsTable(db), events: depot.NewEventsTable(db), tags: depot.NewTagsTable(db)}
+	tb.ops = depot.New(tb.crates, tb.slots, tb.events, tb.tags)
 	return tb, ctx
 }
 
@@ -221,6 +223,62 @@ func TestPost(t *testing.T) {
 	}
 	if got, err := tb.events.Get(ctx); err != nil || len(got) != 2 || got[0].Crate != "c2" || got[1].Crate != "c3" {
 		t.Errorf("c1 の出来事を消した後の Get = %+v, %v", got, err)
+	}
+}
+
+// TestConflict は、@db.conflict（docs/plugin-go-sqlite.md「効果の中身」）: 一意の制約（キーと、@db.unique）に当たった効果は、
+// 名指しした例外を、値で返す。当たらなければ、ふつうに書く。一意の違反でない失敗は、例外にしない。@db.conflict のない効果の
+// 一意の違反も、例外にしない。
+func TestConflict(t *testing.T) {
+	tb, ctx := open(t)
+	names := func() []string {
+		t.Helper()
+		got, err := tb.tags.Get(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := []string{}
+		for _, tag := range got {
+			out = append(out, tag.Id+"="+tag.Name)
+		}
+		return out
+	}
+	for _, tag := range []depot.Tag{{Id: "t1", Name: "fragile"}, {Id: "t2", Name: "heavy"}} {
+		if err := tb.ops.AddTag(ctx, tag); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var taken depot.TagTaken
+	// @db.insert: キー（id）が同じ行、一意の列（name）が同じ行
+	if err := tb.ops.AddTag(ctx, depot.Tag{Id: "t1", Name: "other"}); !errors.As(err, &taken) {
+		t.Errorf("キーが同じ行の AddTag = %v（期待は depot.TagTaken）", err)
+	}
+	if err := tb.ops.AddTag(ctx, depot.Tag{Id: "t3", Name: "heavy"}); !errors.As(err, &taken) {
+		t.Errorf("一意の列が同じ行の AddTag = %v（期待は depot.TagTaken）", err)
+	}
+	// @db.update: 書き換えた行の、一意の列が、別の行と同じになる。当たらない書き換えは、通る
+	if err := tb.ops.SaveTag(ctx, depot.Tag{Id: "t2", Name: "fragile"}); !errors.As(err, &taken) {
+		t.Errorf("一意の列が、別の行と同じになる SaveTag = %v（期待は depot.TagTaken）", err)
+	}
+	if err := tb.ops.SaveTag(ctx, depot.Tag{Id: "t2", Name: "bulky"}); err != nil {
+		t.Errorf("当たらない SaveTag = %v", err)
+	}
+	// 例外を返した効果は、起きていない
+	if got, want := names(), []string{"t1=fragile", "t2=bulky"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("tags = %v、期待は %v", got, want)
+	}
+	// 一意の違反でない失敗（中断された ctx）は、例外にしない
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := tb.tags.CreateTag(cancelled, depot.Tag{Id: "t9", Name: "x"}); err == nil || errors.As(err, &taken) {
+		t.Errorf("中断された ctx の CreateTag = %v（期待は、例外でない失敗）", err)
+	}
+	// @db.conflict のない効果の、一意の違反は、例外にしない（そのままのエラー）
+	if err := tb.crates.CreateCrate(ctx, depot.Crate{Code: "c1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tb.crates.CreateCrate(ctx, depot.Crate{Code: "c1"}); err == nil || errors.As(err, &taken) {
+		t.Errorf("@db.conflict のない効果の、キーが同じ行 = %v（期待は、例外でない失敗）", err)
 	}
 }
 

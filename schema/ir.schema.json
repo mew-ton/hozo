@@ -602,7 +602,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.11"
+          "const": "0.12"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1169,6 +1169,12 @@
         "target": {
           "$ref": "#/$defs/EffectTarget"
         },
+        "throws": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "writes": {
           "items": {
             "type": "string"
@@ -1182,6 +1188,7 @@
         "decorators",
         "span",
         "params",
+        "throws",
         "target",
         "writes"
       ],
@@ -1257,7 +1264,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.11"
+          "const": "0.12"
         },
         "transpiler": {
           "type": "string"
@@ -1475,7 +1482,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.11"
+          "const": "0.12"
         }
       },
       "required": [
@@ -2252,7 +2259,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.11"
+          "const": "0.12"
         }
       },
       "required": [
@@ -3133,7 +3140,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.11"
+          "const": "0.12"
         },
         "viewer": {
           "type": "string"

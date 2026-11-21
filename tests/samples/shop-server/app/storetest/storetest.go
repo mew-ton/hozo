@@ -94,12 +94,14 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		wantUser(t, "findUserById", nil)(s.FindUserById(ctx, "u9"))
 		// findUser（read userByEmail）が比べるのは、引数の名前の列（email）だけ。id の値を渡しても引けない
 		wantUser(t, "findUser", nil)(s.FindUser(ctx, "u1"))
-		// @db.key と @db.unique が同じ行は足せない。どのエラーかは決まっていない
-		if err := s.AddUser(ctx, pkgtype.User{Id: "u1", Email: "other@example.com", Name: "X", Hash: "h"}); err == nil {
-			t.Error("addUser: id（@db.key）が同じ行を足せた")
+		// @db.key と @db.unique が同じ行は足せない: 効果 createUser は、表の一意の制約に当たったら、例外 type.EmailTaken を投げる
+		// （@db.conflict。addUser の throws）。例外は、値で返る
+		var taken pkgtype.EmailTaken
+		if err := s.AddUser(ctx, pkgtype.User{Id: "u1", Email: "other@example.com", Name: "X", Hash: "h"}); !errors.As(err, &taken) {
+			t.Errorf("addUser: id（@db.key）が同じ行 = %v（期待は type.EmailTaken）", err)
 		}
-		if err := s.AddUser(ctx, pkgtype.User{Id: "u3", Email: "alice@example.com", Name: "X", Hash: "h"}); err == nil {
-			t.Error("addUser: email（@db.unique）が同じ行を足せた")
+		if err := s.AddUser(ctx, pkgtype.User{Id: "u3", Email: "alice@example.com", Name: "X", Hash: "h"}); !errors.As(err, &taken) {
+			t.Errorf("addUser: email（@db.unique）が同じ行 = %v（期待は type.EmailTaken）", err)
 		}
 		// 状態の値は、足せた二人だけ（足した順）
 		wantState(t, ctx, s.States.Users, "users", userKey, "u1", "u2")

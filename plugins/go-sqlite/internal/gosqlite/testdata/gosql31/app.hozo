@@ -1,0 +1,20 @@
+// GOSQL-31（docs/plugin-go-sqlite.md「効果の中身」）: @db.conflict を付けた効果が、@db.insert も @db.update も持たない。位置は効果。
+
+namespace app {
+  model User { @db.key @db.text id: string; @db.unique @db.text email: string; }
+  @db.table state users: list<User>;
+  exception Taken;
+
+  /** 消す文は、一意の制約に当たらない */
+  @db.delete @db.conflict(Taken)
+  effect fn remove(id: string): throws Taken effects users.delete;
+  /** db のデコレータが、ほかにない（中身は、人が書く）ときも、同じ */
+  @db.conflict(Taken)
+  effect fn add(user: User): throws Taken effects users.post;
+
+  // 通るもの
+  @db.insert @db.conflict(Taken)
+  effect fn create(user: User): throws Taken effects users.post;
+  @db.update @db.conflict(Taken)
+  effect fn save(user: User): throws Taken effects users.put;
+}
