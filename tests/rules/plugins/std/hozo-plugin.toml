@@ -3,7 +3,7 @@
 # （docs/testing.md「規則ごとのテスト」）。起動しない（[check] enabled は既定の false）
 name     = "std"
 command  = ["true"]
-protocol = "0.16"
+protocol = "0.17"
 
 [[transpiler]]
 name     = "go"

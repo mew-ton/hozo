@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {"name": "app.submit/OK", "file": "gen/app/apptest/leaves.go", "lines": [116, 123]},
+    {"name": "app.submit/Rejected", "file": "gen/app/apptest/leaves.go", "lines": [126, 134]},
+    {"name": "app.submit/AppBusy", "file": "gen/app/apptest/leaves.go", "lines": [137, 145]},
+    {"name": "app.submit/StockBusy", "file": "gen/app/apptest/leaves.go", "lines": [148, 156]},
+    {"name": "app.log/OK", "file": "gen/app/apptest/leaves.go", "lines": [162, 169]},
+    {"name": "app.send/OK", "file": "gen/app/apptest/leaves.go", "lines": [175, 187]},
+    {"name": "app.refill/OK", "file": "gen/app/apptest/leaves.go", "lines": [193, 205]},
+    {"name": "app.reopen/OK", "file": "gen/app/apptest/leaves.go", "lines": [211, 223]},
+    {"name": "app.find/OK", "file": "gen/app/apptest/leaves.go", "lines": [229, 236]},
+    {"name": "app.Stage/Draft", "file": "gen/app/apptest/classify.go", "lines": [28, 34]},
+    {"name": "app.Stage/Sent", "file": "gen/app/apptest/classify.go", "lines": [37, 43]},
+    {"name": "app.Stage/Done", "file": "gen/app/apptest/classify.go", "lines": [46, 52]},
+    {"name": "app.Life/Open", "file": "gen/app/apptest/classify.go", "lines": [71, 77]},
+    {"name": "app.Life/Closed", "file": "gen/app/apptest/classify.go", "lines": [80, 86]},
+    {"name": "app.Life/Absent", "file": "gen/app/apptest/classify.go", "lines": [89, 96]},
+    {"name": "app.Lookup/Hit", "file": "gen/app/apptest/classify.go", "lines": [117, 123]},
+    {"name": "app.Lookup/Stale", "file": "gen/app/apptest/classify.go", "lines": [126, 132]},
+    {"name": "app.Lookup/Miss", "file": "gen/app/apptest/classify.go", "lines": [135, 141]}
+  ]
+}

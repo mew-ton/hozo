@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "stock.reserve/OK", "file": "gen/stock/stocktest/leaves.go", "lines": [40, 47]},
+    {"name": "stock.reserve/Short", "file": "gen/stock/stocktest/leaves.go", "lines": [50, 58]}
+  ]
+}

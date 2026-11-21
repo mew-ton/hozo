@@ -30,6 +30,7 @@ type Manifest struct {
 	Transpilers []Transpiler // [[transpiler]]。書いた順。一つもなければ emit を持たない
 	Check       Check
 	Import      Import
+	Coverage    Coverage
 }
 
 // Transpiler は [[transpiler]] 一つ（docs/plugin-protocol.md「マニフェスト」）: プラグインが提供する、名前の付いた変換。
@@ -47,6 +48,12 @@ func (t *Transpiler) IsBase() bool { return len(t.Requires) == 0 }
 
 // Check は [check] テーブル。Enabled なら hozoc check / emit で direction "check" を呼ぶ。
 type Check struct {
+	Enabled bool
+}
+
+// Coverage は [coverage] テーブル。Enabled なら hozoc tests で direction "coverage" を呼ぶ
+// （docs/plugin-protocol.md「coverage」）。
+type Coverage struct {
 	Enabled bool
 }
 
@@ -90,6 +97,9 @@ type rawManifest struct {
 	Import struct {
 		Formats []string `toml:"formats"`
 	} `toml:"import"`
+	Coverage struct {
+		Enabled bool `toml:"enabled"`
+	} `toml:"coverage"`
 }
 
 // LoadManifest は path のマニフェストを読む。診断は MAN-4（TOML の誤り、知らないキー、command が空、値の型違い、
@@ -217,6 +227,7 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	}
 	m.Check.Enabled = raw.Check.Enabled
 	m.Import.Formats = orEmpty(raw.Import.Formats)
+	m.Coverage.Enabled = raw.Coverage.Enabled
 
 	if len(diags) > 0 {
 		return nil, diags

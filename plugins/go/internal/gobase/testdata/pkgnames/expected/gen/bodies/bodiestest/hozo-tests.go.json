@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {"name": "bodies.keep/OK", "file": "gen/bodies/bodiestest/leaves.go", "lines": [99, 106]},
+    {"name": "bodies.takeName/OK", "file": "gen/bodies/bodiestest/leaves.go", "lines": [112, 119]},
+    {"name": "bodies.takeZero/OK", "file": "gen/bodies/bodiestest/leaves.go", "lines": [125, 132]},
+    {"name": "bodies.takeKey/OK", "file": "gen/bodies/bodiestest/leaves.go", "lines": [138, 145]},
+    {"name": "bodies.load/OK", "file": "gen/bodies/bodiestest/leaves.go", "lines": [151, 158]},
+    {"name": "bodies.Size/Big", "file": "gen/bodies/bodiestest/classify.go", "lines": [26, 32]},
+    {"name": "bodies.Size/Small", "file": "gen/bodies/bodiestest/classify.go", "lines": [35, 41]}
+  ]
+}

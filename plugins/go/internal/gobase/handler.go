@@ -15,7 +15,7 @@ import (
 // TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（docs/plugin-go.md「マニフェスト」）。
 const TranspilerName = "go"
 
-// Handler は go の plugin.Handler。emit だけを実装する。
+// Handler は go の plugin.Handler。emit と coverage を実装する。
 type Handler struct {
 	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を、import パスを
 	// 求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
@@ -62,4 +62,21 @@ func (Handler) Check(*plugin.CheckRequest) (*plugin.CheckResponse, error) {
 // Import は実装しない。
 func (Handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
 	return nil, plugin.ErrUnsupported
+}
+
+// Coverage は、go test -coverprofile の形のカバレッジから、要求のファイルの、実行された行を取り出す
+// （docs/plugin-go.md「カバレッジを読む」）。
+func (h Handler) Coverage(req *plugin.CoverageRequest) (*plugin.CoverageResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("coverage: no request")
+	}
+	getenv := h.Getenv
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	root := getenv("HOZO_PROJECT_ROOT")
+	if root == "" {
+		root = "."
+	}
+	return Coverage(req, root)
 }

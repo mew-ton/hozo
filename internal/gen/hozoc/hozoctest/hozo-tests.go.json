@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {"name": "hozoc.check/OK", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [132, 139]},
+    {"name": "hozoc.check/CheckFailed", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [142, 150]},
+    {"name": "hozoc.check/ConfigInvalid", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [153, 161]},
+    {"name": "hozoc.check/LanguageMismatch", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [164, 172]},
+    {"name": "hozoc.check/Crashed", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [175, 183]},
+    {"name": "hozoc.check/MalformedOutput", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [186, 194]},
+    {"name": "hozoc.collectOutputs/OK", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [200, 207]},
+    {"name": "hozoc.collectOutputs/CheckFailed", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [210, 218]},
+    {"name": "hozoc.collectOutputs/OutputConflict", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [221, 229]},
+    {"name": "hozoc.collectOutputs/UnknownNamespace", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [232, 240]},
+    {"name": "hozoc.collectOutputs/Crashed", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [243, 251]},
+    {"name": "hozoc.collectOutputs/MalformedOutput", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [254, 262]},
+    {"name": "hozoc.matchTests/OK", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [268, 275]},
+    {"name": "hozoc.matchTests/CheckFailed", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [278, 286]},
+    {"name": "hozoc.matchTests/ConfigInvalid", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [289, 297]},
+    {"name": "hozoc.matchTests/OutputConflict", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [300, 308]},
+    {"name": "hozoc.matchTests/TestsNotRun", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [311, 319]},
+    {"name": "hozoc.matchTests/CoverageUnusable", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [322, 330]},
+    {"name": "hozoc.matchTests/Crashed", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [333, 341]},
+    {"name": "hozoc.matchTests/MalformedOutput", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [344, 352]},
+    {"name": "hozoc.lsp/OK", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [358, 365]},
+    {"name": "hozoc.runEmit/OK", "file": "internal/gen/hozoc/hozoctest/leaves.go", "lines": [371, 378]}
+  ]
+}

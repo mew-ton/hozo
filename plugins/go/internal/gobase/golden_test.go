@@ -109,7 +109,11 @@ func TestSameNamespaceOtherDir(t *testing.T) {
 		}
 		for p, content := range first {
 			moved := "elsewhere/out" + strings.TrimPrefix(p, dir)
-			if got := strings.ReplaceAll(second[moved], modulePath+"/elsewhere/out", modulePath+"/"+dir); got != content {
+			got := strings.ReplaceAll(second[moved], modulePath+"/elsewhere/out", modulePath+"/"+dir)
+			if isTestMap(p) { // 対応表は、file のパスの頭の、出力先のディレクトリが違う
+				got = strings.ReplaceAll(second[moved], `"file": "elsewhere/out/`, `"file": "`+dir+`/`)
+			}
+			if got != content {
 				t.Errorf("%s: %s が、別の out の出力 %s と違う:\n%s", name, p, moved, firstDiff(content, got))
 			}
 		}

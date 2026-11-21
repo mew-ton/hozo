@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "k.go", "file": "gen/k/ktest/design.go", "lines": [31, 44]}
+  ]
+}

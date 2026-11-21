@@ -7,6 +7,8 @@ import {
   UnsupportedDirectionError,
   type CheckRequest,
   type CheckResponse,
+  type CoverageRequest,
+  type CoverageResponse,
   type EmitRequest,
   type EmitResponse,
   type Handler,
@@ -94,6 +96,15 @@ export async function run(handler: Handler, stdin: Readable, stdout: Sink, stder
         if (!handler.import) return unsupported();
         const r = (await handler.import(head as ImportRequest)) ?? ({} as Partial<ImportResponse>);
         resp = { ir: r.ir ?? null, warnings: r.warnings ?? [] };
+        break;
+      }
+      case "coverage": {
+        if (!handler.coverage) return unsupported();
+        const r = (await handler.coverage(head as CoverageRequest)) ?? ({} as Partial<CoverageResponse>);
+        resp = {
+          recognized: r.recognized ?? false,
+          files: (r.files ?? []).map((f) => ({ path: f.path, lines: f.lines ?? [] })),
+        } satisfies CoverageResponse;
         break;
       }
       default:

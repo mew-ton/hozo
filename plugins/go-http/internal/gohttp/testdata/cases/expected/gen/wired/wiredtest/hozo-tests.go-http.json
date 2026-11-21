@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "wired.value/OK", "file": "gen/wired/wiredtest/http.go", "lines": [48, 54]}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {"name": "app.Stage/Draft", "file": "gen/app/apptest/classify.go", "lines": [32, 38]},
+    {"name": "app.Stage/Accepted", "file": "gen/app/apptest/classify.go", "lines": [41, 47]},
+    {"name": "app.Stage/InProduction", "file": "gen/app/apptest/classify.go", "lines": [50, 56]},
+    {"name": "app.Stage/Shipped", "file": "gen/app/apptest/classify.go", "lines": [59, 65]},
+    {"name": "app.Stage/Cancelled", "file": "gen/app/apptest/classify.go", "lines": [68, 74]},
+    {"name": "app.Life/Open", "file": "gen/app/apptest/classify.go", "lines": [93, 99]},
+    {"name": "app.Life/Closed", "file": "gen/app/apptest/classify.go", "lines": [102, 108]},
+    {"name": "app.Life/Absent", "file": "gen/app/apptest/classify.go", "lines": [111, 118]}
+  ]
+}

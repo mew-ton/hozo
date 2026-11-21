@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {"name": "app.findUser/OK", "file": "gen/app/apptest/leaves.go", "lines": [107, 114]},
+    {"name": "app.nameOf/OK", "file": "gen/app/apptest/leaves.go", "lines": [120, 127]},
+    {"name": "app.cardText/OK", "file": "gen/app/apptest/leaves.go", "lines": [133, 140]},
+    {"name": "app.describe/OK", "file": "gen/app/apptest/leaves.go", "lines": [146, 153]},
+    {"name": "app.shout/OK", "file": "gen/app/apptest/leaves.go", "lines": [159, 166]},
+    {"name": "app.show/OK", "file": "gen/app/apptest/leaves.go", "lines": [172, 179]}
+  ]
+}

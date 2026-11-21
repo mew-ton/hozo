@@ -1,5 +1,6 @@
 [
   "gen/admin/admintest/doc.go",
+  "gen/admin/admintest/hozo-tests.go.json",
   "gen/admin/admintest/leaves.go",
   "gen/admin/doc.go",
   "gen/admin/inner/doc.go",

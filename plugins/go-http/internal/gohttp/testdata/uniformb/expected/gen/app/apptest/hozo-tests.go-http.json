@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {"name": "app.find/OK", "file": "gen/app/apptest/http.go", "lines": [111, 117]},
+    {"name": "app.find/BadRequest", "file": "gen/app/apptest/http.go", "lines": [120, 126]},
+    {"name": "app.find/Missing", "file": "gen/app/apptest/http.go", "lines": [129, 135]},
+    {"name": "app.put/OK", "file": "gen/app/apptest/http.go", "lines": [150, 156]},
+    {"name": "app.put/BadRequest", "file": "gen/app/apptest/http.go", "lines": [159, 165]},
+    {"name": "app.put/Clash", "file": "gen/app/apptest/http.go", "lines": [168, 174]},
+    {"name": "app.all/OK", "file": "gen/app/apptest/http.go", "lines": [187, 193]},
+    {"name": "app.all/BadRequest", "file": "gen/app/apptest/http.go", "lines": [196, 202]}
+  ]
+}

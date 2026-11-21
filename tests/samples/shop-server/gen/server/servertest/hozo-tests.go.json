@@ -1,0 +1,15 @@
+{
+  "tests": [
+    {"name": "server.checkPassword/OK", "file": "gen/server/servertest/leaves.go", "lines": [160, 167]},
+    {"name": "server.checkPassword/InvalidCredentials", "file": "gen/server/servertest/leaves.go", "lines": [170, 178]},
+    {"name": "server.newSession/OK", "file": "gen/server/servertest/leaves.go", "lines": [184, 191]},
+    {"name": "server.toPublicUser/OK", "file": "gen/server/servertest/leaves.go", "lines": [197, 204]},
+    {"name": "server.requireFresh/OK", "file": "gen/server/servertest/leaves.go", "lines": [210, 217]},
+    {"name": "server.requireFresh/Unauthorized", "file": "gen/server/servertest/leaves.go", "lines": [220, 228]},
+    {"name": "server.pageOf/OK", "file": "gen/server/servertest/leaves.go", "lines": [234, 241]},
+    {"name": "server.summarize/OK", "file": "gen/server/servertest/leaves.go", "lines": [247, 254]},
+    {"name": "server.myPage/OK", "file": "gen/server/servertest/leaves.go", "lines": [260, 267]},
+    {"name": "server.newOrder/OK", "file": "gen/server/servertest/leaves.go", "lines": [273, 280]},
+    {"name": "server.composeNotice/OK", "file": "gen/server/servertest/leaves.go", "lines": [286, 293]}
+  ]
+}

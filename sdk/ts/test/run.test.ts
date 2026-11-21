@@ -22,6 +22,7 @@ import {
   run,
   sameRef,
   signature,
+  testMapName,
   type Callee,
   type EffectRef,
   type EmitRequest,
@@ -125,6 +126,33 @@ test("check: writes diagnostics and exits 0", async () => {
   });
 });
 
+// coverage（docs/plugin-protocol.md「coverage」）: 応答の files と lines は、空でも [] で出る。実装しなければ unsupported。
+test("coverage: writes recognized and files and exits 0", async () => {
+  const handler: Handler = {
+    coverage: (req) => ({
+      recognized: req.coverage.content.startsWith("TN:"),
+      files: req.files.map((path) => ({ path, lines: path.endsWith("a.ts") ? [[3, 5]] : [] })),
+    }),
+  };
+  const request = { protocol: PROTOCOL, direction: "coverage", coverage: { path: "/p/lcov.info", content: "TN:\n" }, files: ["gen/a.ts", "gen/b.ts"] };
+  const r = await exec(handler, request);
+  assert.equal(r.code, 0);
+  assert.equal(
+    r.stdout,
+    '{"recognized":true,"files":[{"path":"gen/a.ts","lines":[[3,5]]},{"path":"gen/b.ts","lines":[]}]}\n',
+  );
+  const none = await exec({ coverage: () => ({}) as never }, request);
+  assert.equal(none.code, 0);
+  assert.equal(none.stdout, '{"recognized":false,"files":[]}\n');
+  const refused = await exec(full, request);
+  assert.equal(refused.code, 2);
+  assert.equal(JSON.parse(refused.stdout).error.code, "unsupported");
+});
+
+test("testMapName: hozo-tests.<transpiler>.json", () => {
+  assert.equal(testMapName("ts-http"), "hozo-tests.ts-http.json");
+});
+
 test("import: writes ir and warnings and exits 0", async () => {
   const r = await exec(full, {
     protocol: PROTOCOL,
@@ -146,7 +174,7 @@ test("protocol mismatch: {error:{code:protocol}} on stdout and exit 2", async ()
   const out = JSON.parse(r.stdout);
   assert.equal(out.error.code, "protocol");
   assert.match(out.error.message, /0\.1/);
-  assert.match(out.error.message, /0\.16/);
+  assert.match(out.error.message, /0\.17/);
 });
 
 test("protocol missing: exit 2 with code protocol (checked before direction)", async () => {

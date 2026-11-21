@@ -6,8 +6,8 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// このファイルは、診断を運ぶ例外（cli.hozo の CheckFailed、ConfigInvalid、LanguageMismatch、OutputConflict）の作り方と読み方。
-// 四つとも、引数は一つ（error と warning のすべて。`Diagnostic[]`）で、生成した構造体は、その引数の名前のフィールドを一つ持つ
+// このファイルは、診断を運ぶ例外（cli.hozo の CheckFailed、ConfigInvalid、LanguageMismatch、OutputConflict、TestsNotRun、
+// CoverageUnusable）の作り方と読み方。六つとも、引数は一つ（error と warning のすべて。`Diagnostic[]`）で、生成した構造体は、その引数の名前のフィールドを一つ持つ
 // （docs/plugin-go.md「exception」）。
 //
 // **引数の名前（= 生成した構造体のフィールドの名前）を書くのは、carried の宣言と、carriedBy の最後の行の二か所だけ**で、
@@ -38,6 +38,16 @@ func outputConflict(diags []diag.Diagnostic, fs *source.FileSet) error {
 	return hozoc.OutputConflict(carried{toDiagnostics(diags, fs)})
 }
 
+// testsNotRun は例外 hozoc.TestsNotRun（値）。diags は、既に境界の形（位置は行と列）の、error と warning のすべて。
+func testsNotRun(diags []hozoc.Diagnostic) error {
+	return hozoc.TestsNotRun(carried{diags})
+}
+
+// coverageUnusable は例外 hozoc.CoverageUnusable（値）。
+func coverageUnusable(diags []hozoc.Diagnostic) error {
+	return hozoc.CoverageUnusable(carried{diags})
+}
+
 // carriedBy は、例外の値 v（errors.As で取り出した値か、cli.Failure の Value）が、診断を運ぶ例外なら、その診断と true。
 func carriedBy(v any) ([]hozoc.Diagnostic, bool) {
 	var c carried
@@ -49,6 +59,10 @@ func carriedBy(v any) ([]hozoc.Diagnostic, bool) {
 	case hozoc.LanguageMismatch:
 		c = carried(e)
 	case hozoc.OutputConflict:
+		c = carried(e)
+	case hozoc.TestsNotRun:
+		c = carried(e)
+	case hozoc.CoverageUnusable:
 		c = carried(e)
 	default:
 		return nil, false

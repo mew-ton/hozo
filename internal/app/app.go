@@ -4,7 +4,7 @@
 // internal/gen/hozoc（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と internal/gen/hozoc/cli（go-cli。
 // docs/plugin-go-cli.md）が持ち、ここは、生成した口を満たす [App] と、cli.Presenter の実装 [Presenter] を持つ:
 //
-//   - 葉の op（状態に触れない）check、collectOutputs、lsp、runEmit は hozoc.Leaves のメソッドで、*App がそれを満たす。
+//   - 葉の op（状態に触れない）check、collectOutputs、matchTests、lsp、runEmit は hozoc.Leaves のメソッドで、*App がそれを満たす。
 //   - 状態に触れるのは、状態の単位のメソッドだけ（docs/plugin-go.md「状態の単位」）。read outputChanges は、その状態 outputs の単位
 //     （hozoc.OutputsState）の問い合わせで、形で決まる問い合わせ（IsEmpty と Get）と一緒に、[App.Outputs] が返す値が持つ。
 //     効果 syncOutputs は、その宛先の状態の分類 OutputsSync の単位（hozoc.OutputsSyncState）の命令で、同じ単位の問い合わせ
@@ -17,7 +17,7 @@
 //
 // 境界の型は生成したもの（hozoc.CheckInput、hozoc.Diagnostic、hozoc.CheckFailed など）で、中の豊かな型
 // （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型を値で
-// 返す（診断を運ぶ四つの例外は、このパッケージの exceptions.go の関数で作る。proc の例外は internal/gen/proc の型）。cli.go は
+// 返す（診断を運ぶ六つの例外は、このパッケージの exceptions.go の関数で作る。proc の例外は internal/gen/proc の型）。cli.go は
 // それを errors.As で見分けて @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
 package app
 
@@ -74,7 +74,7 @@ type App struct {
 	planned *outputPlan
 }
 
-// *App は、人が実装する葉の op（check、collectOutputs、lsp、runEmit）の口を満たす。メソッドが一つでも足りなければ、ここで
+// *App は、人が実装する葉の op（check、collectOutputs、matchTests、lsp、runEmit）の口を満たす。メソッドが一つでも足りなければ、ここで
 // コンパイルできない。
 var _ hozoc.Leaves = (*App)(nil)
 

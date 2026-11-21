@@ -94,8 +94,15 @@ func TestPlacement(t *testing.T) {
 		"gen/strict/stricttest/http.go": "package stricttest\n",
 		"gen/bare/baretest/http.go":     "package baretest\n",
 	}
-	if len(files) != len(want) {
-		t.Errorf("ファイル = %v, want %d 個", sortedPaths(files), len(want))
+	// テストのパッケージの http.go ごとに、同じディレクトリに、テストの対応表が一つ
+	maps := []string{"gen/api/apitest/hozo-tests.go-http.json", "gen/strict/stricttest/hozo-tests.go-http.json", "gen/bare/baretest/hozo-tests.go-http.json"}
+	for _, p := range maps {
+		if files[p] == "" {
+			t.Errorf("テストの対応表 %s を出していない", p)
+		}
+	}
+	if len(files) != len(want)+len(maps) {
+		t.Errorf("ファイル = %v, want %d 個", sortedPaths(files), len(want)+len(maps))
 	}
 	for p, pkg := range want {
 		if !strings.Contains(files[p], "\n"+pkg) {
@@ -239,8 +246,12 @@ func contains(list []string, s string) bool {
 func TestUniform(t *testing.T) {
 	_, a := emitFixture(t, "uniforma")
 	_, b := emitFixture(t, "uniformb")
-	if len(a) != 2 || a["gen/app/http.go"] == "" || a["gen/app/apptest/http.go"] == "" {
+	const testMap = "gen/app/apptest/hozo-tests.go-http.json"
+	if len(a) != 3 || a["gen/app/http.go"] == "" || a["gen/app/apptest/http.go"] == "" || a[testMap] == "" {
 		t.Fatalf("uniforma のファイル = %v", sortedPaths(a))
+	}
+	if a[testMap] != b[testMap] {
+		t.Errorf("型だけが違う二つの入力の、テストの対応表が、違うテキストになった:\n%s", firstDiff(a[testMap], b[testMap]))
 	}
 	if a["gen/app/http.go"] != b["gen/app/http.go"] {
 		t.Errorf("型だけが違う二つの入力の http.go が、違うテキストになった:\n%s", firstDiff(a["gen/app/http.go"], b["gen/app/http.go"]))
@@ -425,8 +436,8 @@ func TestUnitTargets(t *testing.T) {
 	}
 	root := newRoot(t)
 	files, diags, warnings := emitViews(t, root, []*ir.View{bare})
-	if len(files) != 2 || files["gen/bare/http.go"] == "" || files["gen/bare/baretest/http.go"] == "" || len(diags) != 0 || len(warnings) != 0 {
-		t.Fatalf("files=%v 診断=%+v warnings=%+v, want 二つの http.go", sortedPaths(files), diags, warnings)
+	if len(files) != 3 || files["gen/bare/http.go"] == "" || files["gen/bare/baretest/http.go"] == "" || files["gen/bare/baretest/hozo-tests.go-http.json"] == "" || len(diags) != 0 || len(warnings) != 0 {
+		t.Fatalf("files=%v 診断=%+v warnings=%+v, want 二つの http.go と、テストの対応表", sortedPaths(files), diags, warnings)
 	}
 	outside := *bare
 	outside.Files = []string{"elsewhere.hozo"}
@@ -549,8 +560,8 @@ func TestDiagnosticPositions(t *testing.T) {
 func TestValidateHome(t *testing.T) {
 	views := loadViews(t, "gohttp11")
 	files, diags, _ := emitViews(t, newRoot(t), views)
-	if files["gen/loose/http.go"] == "" || files["gen/loose/apptest/http.go"] == "" || len(files) != 2 {
-		t.Errorf("ファイル = %v, want gen/loose の、二つの http.go だけ", sortedPaths(files))
+	if files["gen/loose/http.go"] == "" || files["gen/loose/apptest/http.go"] == "" || files["gen/loose/apptest/hozo-tests.go-http.json"] == "" || len(files) != 3 {
+		t.Errorf("ファイル = %v, want gen/loose の、二つの http.go と、テストの対応表だけ", sortedPaths(files))
 	}
 	if strings.Contains(files["gen/loose/http.go"], "Validate") {
 		t.Error("validate = false の出力が、制約の検査を持つ")
@@ -654,12 +665,12 @@ func TestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resp.Files) != 2 || len(resp.Errors) != 0 || len(resp.Warnings) != 0 {
+	if len(resp.Files) != 3 || len(resp.Errors) != 0 || len(resp.Warnings) != 0 {
 		t.Fatalf("files=%d errors=%v warnings=%v", len(resp.Files), resp.Errors, resp.Warnings)
 	}
 	want, _, _ := emitViews(t, root, []*ir.View{view})
-	// 並びは、入口のパッケージの http.go、テストのパッケージの http.go
-	for i, p := range []string{"gen/api/http.go", "gen/api/apitest/http.go"} {
+	// 並びは、入口のパッケージの http.go、テストのパッケージの http.go、その、テストの対応表
+	for i, p := range []string{"gen/api/http.go", "gen/api/apitest/http.go", "gen/api/apitest/hozo-tests.go-http.json"} {
 		if f := resp.Files[i]; f.Path != p || want[f.Path] != f.Content {
 			t.Errorf("%d 番目のファイル %s が、Emit の結果（%s）と違う", i+1, f.Path, p)
 		}

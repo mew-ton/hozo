@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {"name": "strict.order/OK", "file": "gen/strict/stricttest/http.go", "lines": [136, 142]},
+    {"name": "strict.order/BadRequest", "file": "gen/strict/stricttest/http.go", "lines": [145, 151]},
+    {"name": "strict.edit/OK", "file": "gen/strict/stricttest/http.go", "lines": [165, 170]},
+    {"name": "strict.edit/BadRequest", "file": "gen/strict/stricttest/http.go", "lines": [173, 178]},
+    {"name": "strict.bulk/OK", "file": "gen/strict/stricttest/http.go", "lines": [190, 195]},
+    {"name": "strict.bulk/BadRequest", "file": "gen/strict/stricttest/http.go", "lines": [198, 203]},
+    {"name": "strict.plain/OK", "file": "gen/strict/stricttest/http.go", "lines": [214, 220]},
+    {"name": "strict.now/OK", "file": "gen/strict/stricttest/http.go", "lines": [230, 236]}
+  ]
+}

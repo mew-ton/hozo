@@ -44,3 +44,17 @@ func (o *ops) Emit(ctx context.Context, in EmitInput) (EmitResult, error) {
 	}
 	return o.WriteOutputs(ctx, in, checked)
 }
+
+// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
+//
+// 引数:
+//   - in: コマンドの入力
+//
+// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
+func (o *ops) Tests(ctx context.Context, in TestsInput) (TestsResult, error) {
+	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath})
+	if err != nil {
+		return TestsResult{}, err
+	}
+	return o.MatchTests(ctx, in, checked)
+}

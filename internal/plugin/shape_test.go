@@ -99,6 +99,45 @@ func TestCheckResponseShape(t *testing.T) {
 	}
 }
 
+// coverage の応答の形（docs/plugin-protocol.md「応答の形」「coverage」）。
+func TestCoverageShape(t *testing.T) {
+	ok := []string{
+		`{"recognized":false,"files":[]}`,
+		`{"recognized":true,"files":[{"path":"gen/a.go","lines":[[1,1],[3,9]],"extra":1},{"path":"gen/b.go","lines":[]}],"extra":true}`,
+	}
+	for _, in := range ok {
+		if err := checkShape([]byte(in), &sdk.CoverageResponse{}); err != nil {
+			t.Errorf("%s: %v", in, err)
+		}
+	}
+	ng := map[string]string{
+		`[]`:                                                                  "応答がオブジェクトでない",
+		`{"files":[]}`:                                                        "recognized がない",
+		`{"recognized":null,"files":[]}`:                                      "recognized がない",
+		`{"recognized":"yes","files":[]}`:                                     "recognized が真偽値でない",
+		`{"recognized":true}`:                                                 "files がない",
+		`{"recognized":true,"files":{}}`:                                      "files が配列でない",
+		`{"recognized":true,"files":["a"]}`:                                   "files[0] がオブジェクトでない",
+		`{"recognized":true,"files":[{"lines":[]}]}`:                          "files[0] に path がない",
+		`{"recognized":true,"files":[{"path":"a.go"}]}`:                       "files[0] に lines がない",
+		`{"recognized":true,"files":[{"path":"a.go","lines":null}]}`:          "files[0] に lines がない",
+		`{"recognized":true,"files":[{"path":"a.go","lines":{}}]}`:            "files[0] の lines が配列でない",
+		`{"recognized":true,"files":[{"path":"a.go","lines":[1,2]}]}`:         "files[0] の lines[0] が",
+		`{"recognized":true,"files":[{"path":"a.go","lines":[[1]]}]}`:         "files[0] の lines[0] が",
+		`{"recognized":true,"files":[{"path":"a.go","lines":[[1,2,3]]}]}`:     "files[0] の lines[0] が",
+		`{"recognized":true,"files":[{"path":"a.go","lines":[[1,2],[0,1]]}]}`: "files[0] の lines[1] が",
+		`{"recognized":true,"files":[{"path":"a.go","lines":[[3,2]]}]}`:       "files[0] の lines[0] が",
+		`{"recognized":true,"files":[{"path":"a.go","lines":[[1.5,2]]}]}`:     "files[0] の lines[0] が",
+		`{"recognized":true,"files":[{"path":"a.go","lines":[["1","2"]]}]}`:   "files[0] の lines[0] が",
+	}
+	for in, want := range ng {
+		err := checkShape([]byte(in), &sdk.CoverageResponse{})
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: err = %v, want %q", in, err, want)
+		}
+	}
+}
+
 // 起動を通して: 形が違う応答は終了コード 0 でも proc.MalformedOutput で、形が合えば知らない項目があっても読める
 // （docs/plugin-protocol.md「起動」の表、「応答の形」）。echo-plugin は要求をそのまま応答に写す。
 func TestRunResponseShape(t *testing.T) {

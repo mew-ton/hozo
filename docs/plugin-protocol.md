@@ -13,7 +13,7 @@
 ```toml
 name     = "go-http"            # プラグインの名前
 command  = ["hozoc-plugin-go-http"]   # 文字列か文字列の配列
-protocol = "0.16"               # 対応する docs/ir.md の version
+protocol = "0.17"               # 対応する docs/ir.md の version
 
 vocabulary = []                 # このプラグインが提供する語彙。マニフェストからの相対パス。省略時は []
 
@@ -29,6 +29,9 @@ enabled = false                 # true なら hozoc check / emit で direction "
 
 [import]
 formats = []                    # 取り込める形式の名前。空なら import を持たない。テーブルごと省けば []
+
+[coverage]
+enabled = false                 # true なら hozoc tests で direction "coverage" を呼ぶ。テーブルごと省けば false
 ```
 
 基底のマニフェストは、`requires` を書かない（`docs/plugin-go.md`「マニフェスト」）。
@@ -49,7 +52,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 - 言語を持つのはトランスパイラで、プラグインは持たない（一つのプラグインが言語の違うトランスパイラを提供してよい）。単位の言語の決め方は `docs/config.md`「基底と相乗り」。
 - トランスパイラが受け取るオプション（`docs/config.md`「オプション」）は、マニフェストには書かない。キーと値の型を確かめるのはトランスパイラ自身で、一覧はそのプラグインの文書が持つ。
 - `protocol` が hozoc の `docs/ir.md` の `version` と違えば MAN-2（省いたときも、違うものとして MAN-2）。
-- 省いたときの値: `vocabulary` は `[]`、`[[transpiler]]` はなし、`requires` と `unsupported` と `seams` は `[]`、`[check]` は `enabled = false`（`check` を呼ばない）、`[import]` は `formats = []`（`import` を持たない）。`name` と `command` は省けない（MAN-4）。
+- 省いたときの値: `vocabulary` は `[]`、`[[transpiler]]` はなし、`requires` と `unsupported` と `seams` は `[]`、`[check]` は `enabled = false`（`check` を呼ばない）、`[import]` は `formats = []`（`import` を持たない）、`[coverage]` は `enabled = false`（`coverage` を呼ばない）。`name` と `command` は省けない（MAN-4）。
 - `vocabulary` の `.hozo` の読み込みは `docs/vocab.md`「読み込み」。
 
 ## 探索
@@ -73,6 +76,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 - `emit` は、出力（単位と、その単位が出力する名前空間の組。`docs/config.md`「in」）と、その単位のトランスパイラの組ごとに一回起動する。順序は、単位の設定の順、名前空間の IR の順、`transpilers` に書いた順。一つのプラグインの二つのトランスパイラを同じ単位に書けば、そのプラグインを二回起動する。
 - **起動は互いに独立。** どのトランスパイラも、受け取るのは同じ出力の `View` だけで、ほかのトランスパイラの応答（ファイル、warning）は受け取らない。相乗りは、基底の応答を見ずに、基底と同じファイルの置き場と名前を自分で求める（「相乗りが基底の形を知る方法」）。`transpilers` に書いた順は、起動の順と診断の並びにだけ効き、書き出すファイルを変えない。
 - `check` は、使うプラグイン（「探索」）のうち `[check] enabled` のものを、プラグインと名前空間の組ごとに一回起動する。相手の名前空間は、そのプラグインのトランスパイラを書いた単位が出力するもの。渡す `view` は、その単位のうち設定の順で最初のもの。
+- `coverage` は、`hozoc tests` が、プラグインごとに、多くて一回起動する。相手と、渡すものは「coverage」。
 - 並列には起動しない（診断の順序を決定的にするため）。
 
 終了コードと応答の読み方:
@@ -101,9 +105,9 @@ formats = []                    # 取り込める形式の名前。空なら imp
 終了コード 0 の標準出力は、JSON の値一つで、下の各 direction の応答の形をしていなければならない。hozoc は次を確かめ、違えば `proc.MalformedOutput`（「起動」）。
 
 - 応答は JSON のオブジェクト。
-- **必須の項目**がある。`null` は「ない」と同じに扱う。`emit` の応答の `files` と `warnings`、`check` の応答の `diagnostics`（どれも、空でも `[]` で出す）。要素では、`files` の要素の `path` と `content`、`warnings` の要素の `message`、`errors` と `diagnostics` の要素の `code` と `message`、`diagnostics` の要素の `severity`。
+- **必須の項目**がある。`null` は「ない」と同じに扱う。`emit` の応答の `files` と `warnings`、`check` の応答の `diagnostics`、`coverage` の応答の `recognized` と `files`（配列は、どれも、空でも `[]` で出す）。要素では、`files` の要素の `path` と `content`、`warnings` の要素の `message`、`errors` と `diagnostics` の要素の `code` と `message`、`diagnostics` の要素の `severity`、`coverage` の応答の `files` の要素の `path` と `lines`。
 - **省ける項目**は、なくても `null` でもよい。`emit` の応答の `errors`、`warnings` / `errors` / `diagnostics` の要素の `at`（省けば位置なし）。`errors` の要素の `severity` は見ない（常に error）。
-- 書かれた項目の**型**が合う: 上の配列は配列、その要素はオブジェクト、`path` / `content` / `message` / `code` / `at` は文字列。`diagnostics` の `severity` は `"error"` か `"warning"`。
+- 書かれた項目の**型**が合う: 上の配列は配列、その要素はオブジェクト、`path` / `content` / `message` / `code` / `at` は文字列。`diagnostics` の `severity` は `"error"` か `"warning"`。`coverage` の応答の `recognized` は真偽値、`lines` は、1 以上の整数二つの配列（始まりの行、終わりの行。始まり ≦ 終わり）の配列。
 - **知らない項目は無視する**。応答のどの階層でも、ここにない名前の項目があってよい（プラグインが新しい版の項目を書いていても、古い hozoc はそれを読まないだけ。版 0.3 までの `select` を書いたままの応答も、読まれないだけで通る）。項目の名前は大文字と小文字を区別する。
 
 形が合った後に、`path`（PLG-1 / PLG-2）を確かめる。`import` の応答の形は、段階 6 で `hozoc import` と一緒に決める。
@@ -112,7 +116,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 
 ```jsonc
 // 要求
-{ "protocol": "0.16", "direction": "emit",
+{ "protocol": "0.17", "direction": "emit",
   "transpiler": "go-http",                // 起動するトランスパイラの名前（マニフェストの [[transpiler]] の name）
   "view": { /* docs/ir.md の View。対象の名前空間は view.viewer、単位の設定は view.config */ } }
 
@@ -136,7 +140,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 ### check
 
 ```jsonc
-{ "protocol": "0.16", "direction": "check", "view": { /* View */ } }
+{ "protocol": "0.17", "direction": "check", "view": { /* View */ } }
 
 { "diagnostics": [ { "severity": "error", "code": "PAGE-1", "message": "...", "at": "browser.openOrders" } ] }
 ```
@@ -146,15 +150,61 @@ formats = []                    # 取り込める形式の名前。空なら imp
 - `check` の診断のメッセージには名前を付けない（`code` がプラグインの規則を示す）。`emit` の `warnings` にはトランスパイラの名前を付ける。
 - `check` はトランスパイラごとではなくプラグインごとの処理で、要求は `transpiler` を持たない。
 
+### coverage
+
+```jsonc
+// 要求
+{ "protocol": "0.17", "direction": "coverage",
+  "coverage": { "path": "/home/me/shop/cover.out", "content": "mode: set\n..." },   // hozoc tests に渡された、カバレッジのファイル
+  "files": [ "gen/server/servertest/http.go", "gen/server/servertest/leaves.go" ] } // 実行された行を知りたいファイル
+
+// 応答
+{ "recognized": true,                                                                // このプラグインが読める形のファイルだったか
+  "files": [ { "path": "gen/server/servertest/leaves.go", "lines": [ [159, 161], [163, 167] ] } ] }
+```
+
+カバレッジのファイル（テストを走らせる道具が書いた、実行された所の記録）から、「どのファイルの、どの行が、実行されたか」を取り出す direction。カバレッジの形は、言語と道具ごとに違うので、読むのは、その言語の基底のプラグイン。hozoc の本体は、応答の行を、テストの対応表（「テストの対応表」）と突き合わせるだけで、カバレッジの形を知らない（`docs/cli.md`「tests」）。
+
+- **相手**は、単位の基底（`docs/config.md`「基底と相乗り」）を提供するプラグインのうち、`[coverage] enabled` のもの。プラグインごとに一回で、起動の順は、そのプラグインを基底に持つ単位の、設定の順。基底のプラグインが `[coverage] enabled` でない単位の分は、どのプラグインにも聞かない（その単位の対応表のテストは、TESTS-3。`docs/cli.md`「tests」）。
+- `coverage.path` は、hozoc が読んだファイルの絶対パス（メッセージに使う。プラグインは、読み直さなくてよい）。`coverage.content` は、その中身。UTF-8 の文字列でないカバレッジは、渡せない。
+- 要求の `files` は、そのプラグインを基底に持つ単位の出力の、対応表が指すファイル（プロジェクトのルートからの相対パス。重複なし、辞書順）。
+- `recognized` が `false` なら、このプラグインが読める形のファイルではなかった（誤りではない。`files` は `[]`）。中身が、読める形の頭を持つのに、途中が壊れているときは、応答を書かずに、終了コード 1 で終わる（`proc.Crashed`）。
+- 応答の `files` は、要求の `files` のうち、カバレッジが測っていたファイルごとに、一つ。`lines` は、実行された所の、行の範囲（始まりの行と、終わりの行。1 始まりで、両端を含む）の列で、一度も実行されていないファイルなら `[]`。カバレッジが測っていなかったファイルは、要素を出さない（「測ったが、実行されていない」と「測っていない」を、hozoc が分けて報告する）。要求の `files` にないパスの要素は、読まれない。
+- `coverage` はトランスパイラごとではなくプラグインごとの処理で、要求は `transpiler` も `view` も持たない。
+- 応答は、同じ要求から同じバイト列（「emit」と同じ）。
+
 ### import
 
 ```jsonc
-{ "protocol": "0.16", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
+{ "protocol": "0.17", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
 
 { "ir": { /* docs/ir.md の Program */ }, "warnings": [ /* 同上 */ ] }
 ```
 
 `hozoc import` の詳細は段階 6（`docs/requirements.md`「段階」）で決める。形だけをここに置く。
+
+## テストの対応表
+
+テストを受け取る口（ケースを受け取り、テストを走らせる関数。`docs/plugin-go.md`「単体テストの口」など）を出すトランスパイラは、`emit` の応答の `files` に、**テストの対応表**を一つ足す: 自分が出した、走らせる関数の、どの行が、どのテストか。`hozoc tests` が、カバレッジの「実行された行」と突き合わせて、求めるテストが走ったかを確かめるのに使う（`docs/cli.md`「tests」、`docs/decisions.md`「決めたこと」380）。
+
+```jsonc
+// gen/server/servertest/hozo-tests.go.json
+{
+  "tests": [
+    { "name": "server.checkPassword/OK",                 // テストの名前（ラベル）
+      "file": "gen/server/servertest/leaves.go",         // そのテストの行を持つファイル。プロジェクトのルートからの相対パス
+      "lines": [160, 167] }                              // 始まりの行と、終わりの行（1 始まりで、両端を含む）
+  ]
+}
+```
+
+- **ファイルの名前**は `hozo-tests.<トランスパイラの名前>.json`。置き場は、Dir(U, N) の下なら、どこでもよい（Go のトランスパイラは、テストのパッケージのディレクトリ）。名前にトランスパイラの名前を入れるのは、同じディレクトリに、基底と相乗りが、それぞれの対応表を置けるようにするため（同じ `path` は CFG-5）。hozoc は、名前が `hozo-tests.` で始まり `.json` で終わるファイルを、対応表として読む。
+- 対応表は、ほかの `files` と同じに書き出され、出力先ごとの記録（`docs/cli.md`「emit」の `.hozoc-outputs.json`）に載る。hozoc が、置き場から読み直すことはない: `hozoc tests` は、今の仕様から集め直した応答の対応表を使い、置き場のものは、それと同じ内容かを確かめるだけ（`docs/cli.md`「tests」）。
+- **`lines` の約束**: その範囲の行のどこかが実行されるのは、そのテストが走ったときだけで、そのテストが走れば、その範囲のどこかが、必ず実行される。範囲をどう取るかは、トランスパイラが、その言語のカバレッジの数え方に合わせて決める（Go は `docs/plugin-go.md`「テストの対応表」）。
+- `name` は、その対応表の中で重ならない。テストを受け取る口の文書が「テストの名前」と呼ぶもの（`<op の FQN>/<結果>` など）。
+- `file` は、同じ応答の `files` の `path` の一つ。
+- テストを受け取る口を一つも出さない応答は、対応表を出さない。
+- hozoc は、`emit` の応答を集めるときに、対応表の形を確かめる。次のどれかなら PLG-4（`proc.MalformedOutput`。「診断」）: 名前の `<トランスパイラの名前>` が、起動したトランスパイラの名前でない。中身が、上の形の JSON でない（`tests` が配列でない、要素に `name`、`file`、`lines` のどれかがない、型が違う、`lines` が、1 以上の整数二つで、始まり ≦ 終わり、でない）。`name` が空か、重なる。`file` が、同じ応答の `files` にない。知らない項目は、読まれない（「応答の形」と同じ）。
 
 ## 相乗りが基底の形を知る方法
 
@@ -197,6 +247,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 | MAN-5 | error | プラグインがその `direction` か、要求の `transpiler` を実装していない（マニフェストに書いてあるのに。起動したプラグインが `code: "unsupported"` で断った） |
 | PLG-1 | — | 応答の `files` の `path` が、その起動の Dir(U, N) の下にない（「emit」） |
 | PLG-2 | — | 応答の中で同じ `path` が二度 |
+| PLG-4 | — | 応答の `files` の、テストの対応表の、名前か中身が、約束の形でない（「テストの対応表」） |
 | PLUGIN | warning | トランスパイラの `warnings` |
 
 - MAN-1 は欠番。マニフェストの `[emit]` の `entry` も `decorate` も空であることを報告していた規則で、`[emit]` を `[[transpiler]]` に替えたときになくなった。

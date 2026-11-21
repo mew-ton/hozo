@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "shop.issue/OK", "file": "gen/api/shoptest/leaves.go", "lines": [51, 58]},
+    {"name": "shop.nightly/OK", "file": "gen/api/shoptest/leaves.go", "lines": [64, 71]}
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "o.make/OK", "file": "gen/o/otest/leaves.go", "lines": [36, 43]}
+  ]
+}

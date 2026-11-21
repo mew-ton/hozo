@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	sdk "github.com/mew-ton/hozo/plugin"
 )
@@ -13,7 +14,8 @@ import (
 // 形が違えば proc.MalformedOutput（同「起動」の表）。確かめるのは次のことだけ:
 //
 //   - 応答は JSON のオブジェクト一つ。
-//   - 必須の項目がある（null は「ない」と同じ）: emit の files と warnings、check の diagnostics、
+//   - 必須の項目がある（null は「ない」と同じ）: emit の files と warnings、check の diagnostics、coverage の recognized と
+//     files（要素の path と lines）、
 //     要素では files の path と content、warnings の message、errors / diagnostics の code と message、
 //     check の diagnostics の severity。
 //   - 書かれた項目の型が合う（配列、オブジェクト、文字列）。check の severity は "error" か "warning"。
@@ -23,7 +25,7 @@ import (
 // path が Dir(U, N) の下か（PLG-1）、重複（PLG-2）は、形が合った後に呼ぶ側が確かめる。
 
 // checkShape は終了コード 0 の標準出力 data が、resp の型の応答の形をしているかを確かめる。
-// resp が *sdk.EmitResponse なら emit、*sdk.CheckResponse なら check の応答。ほかの型は確かめない
+// resp が *sdk.EmitResponse なら emit、*sdk.CheckResponse なら check、*sdk.CoverageResponse なら coverage の応答。ほかの型は確かめない
 // （import の応答の形は docs/plugin-protocol.md「import」が段階 6 で決める）。
 func checkShape(data []byte, resp any) error {
 	switch resp.(type) {
@@ -31,8 +33,58 @@ func checkShape(data []byte, resp any) error {
 		return emitShape(data)
 	case *sdk.CheckResponse:
 		return checkResponseShape(data)
+	case *sdk.CoverageResponse:
+		return coverageShape(data)
 	}
 	return nil
+}
+
+// coverageShape は coverage の応答（docs/plugin-protocol.md「coverage」）の形。
+func coverageShape(data []byte) error {
+	top, err := shapeObject(data, "")
+	if err != nil {
+		return err
+	}
+	// recognized: 必須。真偽値
+	raw, ok := present(top, "recognized")
+	if !ok {
+		return errors.New("recognized がない")
+	}
+	var recognized bool
+	if json.Unmarshal(raw, &recognized) != nil {
+		return errors.New("recognized が真偽値でない")
+	}
+	// files: 必須。要素は { path, lines }。lines は、1 以上の整数二つ（始まり ≦ 終わり）の配列の配列
+	return eachElement(top, "files", true, func(el map[string]json.RawMessage, where string) error {
+		if err := requireString(el, "path", where); err != nil {
+			return err
+		}
+		raw, ok := present(el, "lines")
+		if !ok {
+			return fmt.Errorf("%s に lines がない（空でも [] で出す）", where)
+		}
+		var ranges []json.RawMessage
+		if json.Unmarshal(raw, &ranges) != nil {
+			return fmt.Errorf("%s の lines が配列でない", where)
+		}
+		for i, r := range ranges {
+			if !isLineRange(r) {
+				return fmt.Errorf("%s の lines[%d] が、1 以上の整数二つ（始まり ≦ 終わり）の配列でない", where, i)
+			}
+		}
+		return nil
+	})
+}
+
+// isLineRange は raw が、1 以上の整数二つ（始まり ≦ 終わり）の JSON の配列か。文字列に書いた数（"1"）は、整数ではない。
+func isLineRange(raw json.RawMessage) bool {
+	var pair []json.RawMessage
+	if isNull(raw) || json.Unmarshal(raw, &pair) != nil || len(pair) != 2 {
+		return false
+	}
+	start, err1 := strconv.ParseInt(string(bytes.TrimSpace(pair[0])), 10, 32)
+	end, err2 := strconv.ParseInt(string(bytes.TrimSpace(pair[1])), 10, 32)
+	return err1 == nil && err2 == nil && start >= 1 && start <= end
 }
 
 // emitShape は emit の応答（docs/plugin-protocol.md「emit」）の形。

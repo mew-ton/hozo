@@ -66,3 +66,8 @@ func (Handler) Check(*plugin.CheckRequest) (*plugin.CheckResponse, error) {
 func (Handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
 	return nil, plugin.ErrUnsupported
 }
+
+// Coverage は実装しない（カバレッジを読むのは、基底）。
+func (Handler) Coverage(*plugin.CoverageRequest) (*plugin.CoverageResponse, error) {
+	return nil, plugin.ErrUnsupported
+}

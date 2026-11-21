@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "shop.admin.ban/OK", "file": "gen/admin/admintest/leaves.go", "lines": [38, 45]}
+  ]
+}

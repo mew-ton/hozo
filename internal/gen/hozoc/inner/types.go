@@ -94,6 +94,26 @@ func (OutputConflict) HozoException() string { return "hozoc.OutputConflict" }
 
 var _ runtime.Exception = OutputConflict{}
 
+// TestsNotRun: 求めるテストのうち、走ったと確かめられないものがある（docs/cli.md「tests」の TESTS-1）
+type TestsNotRun struct {
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
+
+func (TestsNotRun) Error() string         { return "hozoc.TestsNotRun" }
+func (TestsNotRun) HozoException() string { return "hozoc.TestsNotRun" }
+
+var _ runtime.Exception = TestsNotRun{}
+
+// CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「tests」の TESTS-2、TESTS-3）
+type CoverageUnusable struct {
+	Diagnostics []Diagnostic `json:"diagnostics"`
+}
+
+func (CoverageUnusable) Error() string         { return "hozoc.CoverageUnusable" }
+func (CoverageUnusable) HozoException() string { return "hozoc.CoverageUnusable" }
+
+var _ runtime.Exception = CoverageUnusable{}
+
 // UnknownNamespace: emit の引数の名前空間も、その子孫も、どの単位の対象でもない
 type UnknownNamespace struct{}
 
@@ -116,6 +136,13 @@ type EmitResult struct {
 	Removed []Path `json:"removed"`
 }
 
+// TestsResult は突き合わせの結果
+type TestsResult struct {
+	Warnings []Diagnostic `json:"warnings"`
+	// 走ったと確かめた、求めるテスト（`<トランスパイラの名前>: <テストの名前>`。対応表の順）
+	Ran []string `json:"ran"`
+}
+
 // CheckInput は check の入力
 type CheckInput struct {
 	// 設定ファイルの場所
@@ -136,6 +163,18 @@ type EmitInput struct {
 	Namespaces []string `json:"namespaces"`
 	// 書き出さずに、書き出す予定のファイルだけを表示する
 	DryRun *bool `json:"dryRun,omitempty"`
+	// プラグインを探すディレクトリ（OS のパス区切りで複数）
+	PluginPath *string `json:"pluginPath,omitempty"`
+}
+
+// TestsInput は tests の入力
+type TestsInput struct {
+	// 設定ファイルの場所
+	Config *Path `json:"config,omitempty"`
+	// 表示の形式
+	Format *OutputFormat `json:"format,omitempty"`
+	// テストを走らせたときに取った、カバレッジのファイル
+	Coverage Path `json:"coverage"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
 }

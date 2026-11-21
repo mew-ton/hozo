@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"name": "design.Req.R1", "file": "gen/reqonly/reqonlytest/design.go", "lines": [24, 24]},
+    {"name": "design.Req.R2", "file": "gen/reqonly/reqonlytest/design.go", "lines": [27, 27]},
+    {"name": "design.Req.r3", "file": "gen/reqonly/reqonlytest/design.go", "lines": [30, 30]}
+  ]
+}

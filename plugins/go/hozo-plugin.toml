@@ -1,7 +1,10 @@
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.16"
+protocol = "0.17"
 
 [[transpiler]]
 name     = "go"
 language = "go"
+
+[coverage]
+enabled = true

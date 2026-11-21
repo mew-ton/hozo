@@ -20,6 +20,7 @@ import (
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
+	sdk "github.com/mew-ton/hozo/plugin"
 )
 
 // このファイルは、サンプル（tests/samples/<名前>/。持ち主は tests/samples/README.md）を確かめる。サンプルは
@@ -65,6 +66,8 @@ type sampleProject struct {
 	files map[string][]string
 	// owner は、期待する出力のファイル → それを出すトランスパイラの名前（files の逆）。
 	owner map[string]string
+	// tests は sample.json の tests（サブテスト tests の missing の入力）。期待する出力に、テストの対応表があるサンプルだけが持つ。
+	tests *sampleTests
 
 	// cfg は、今の hozoc（internal/config）が読んだ、サンプルの本物の hozo.toml。
 	cfg *config.Config
@@ -83,6 +86,14 @@ type sampleProject struct {
 	// サブテスト（check と transpilers/*）は、言語の検査にも落とさず、飛ばす: 仕様そのものが、今の hozoc の読めない書き方で
 	// 書かれていてよい。
 	ahead string
+}
+
+// sampleTests は sample.json の tests（tests/samples/README.md「sample.json」）。
+type sampleTests struct {
+	// Skip は、除いて走らせる Go のテストのパターン（go test -skip に渡す）。
+	Skip string `json:"skip"`
+	// Missing は、そのとき、走っていないと名指しされるはずのテスト（<トランスパイラの名前>: <テストの名前>）。
+	Missing []string `json:"missing"`
 }
 
 // irDoc は、IR の版の持ち主の文書（tests/ からの相対パス）。
@@ -146,6 +157,7 @@ func loadSample(t *testing.T, name string) *sampleProject {
 		Transpilers map[string]struct {
 			Files []string `json:"files"`
 		} `json:"transpilers"`
+		Tests *sampleTests `json:"tests"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields() // ほかのキー（これまでの pending、select）は書けない
@@ -170,6 +182,14 @@ func loadSample(t *testing.T, name string) *sampleProject {
 			}
 			s.owner[f] = name
 		}
+	}
+	// tests は、期待する出力に、テストの対応表があるサンプルだけが、書く
+	s.tests = m.Tests
+	switch maps := s.testMaps(); {
+	case len(maps) > 0 && (s.tests == nil || s.tests.Skip == "" || len(s.tests.Missing) == 0):
+		t.Errorf("%s: 期待する出力にテストの対応表（%s）があるので、tests（skip と missing）が要る", sampleManifestFile, strings.Join(maps, "、"))
+	case len(maps) == 0 && s.tests != nil:
+		t.Errorf("%s: 期待する出力にテストの対応表がないので、tests は書けない", sampleManifestFile)
 	}
 	if t.Failed() {
 		t.FailNow()
@@ -614,6 +634,9 @@ func TestSamples(t *testing.T) {
 			t.Run("files", s.testFiles)
 			t.Run("go", s.testGo)
 			t.Run("transpilers", s.testTranspilers)
+			if len(s.testMaps()) > 0 {
+				t.Run("tests", s.testTests)
+			}
 		})
 	}
 }
@@ -755,6 +778,134 @@ func (s *sampleProject) testGo(t *testing.T) {
 		}
 		t.Logf("go %s:\n%s", strings.Join(args, " "), out)
 	}
+}
+
+// testMaps は、期待する出力のうち、テストの対応表（docs/plugin-protocol.md「テストの対応表」）のパス（辞書順）。
+func (s *sampleProject) testMaps() []string {
+	var out []string
+	for p := range s.owner {
+		if _, ok := sdk.TestMapTranspiler(p); ok {
+			out = append(out, p)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// testTests は、求めるテストが走ったかを、カバレッジと突き合わせられること（docs/cli.md「tests」、tests/samples/README.md
+// 「テスト」）。サンプルのモジュールで、カバレッジを取りながらテストを走らせ、サンプルのディレクトリ（期待する出力が、置き場に
+// ある）で hozoc tests を走らせる。hozoc は、何も書き出さない。
+//
+//   - all: すべてのテストを走らせたカバレッジで、終了コード 0。ran が、期待する出力の対応表のテストのすべて。
+//   - missing: sample.json の tests.skip の Go のテストを除いて走らせたカバレッジ（口を渡す一行を、書かなかったのと同じ）で、
+//     終了コード 4。走っていないと名指しされるテストが、ちょうど tests.missing。
+func (s *sampleProject) testTests(t *testing.T) {
+	const what = "hozoc tests を、このサンプルに掛けられない"
+	s.skipIfAhead(t, what)
+	s.skipIfBlocked(t, what)
+	if len(s.absent) > 0 {
+		t.Skipf("飛ばす（求めるテストは、すべてのトランスパイラの対応表がそろってから比べる）。足りないもの:\n  - %s\nそろえば、何も変えずに走る",
+			strings.Join(s.absentReasons(), "\n  - "))
+	}
+	plugins, err := filepath.Abs(repoPluginsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 求めるテスト: 期待する出力の対応表（手で書いたもの）の、<トランスパイラの名前>: <テストの名前>
+	var want []string
+	for _, p := range s.testMaps() {
+		data, err := os.ReadFile(filepath.Join(s.dir, filepath.FromSlash(p)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m sdk.TestMap
+		if err := json.Unmarshal(data, &m); err != nil {
+			t.Fatalf("%s/%s が JSON でない: %v", s.dir, p, err)
+		}
+		transpiler, _ := sdk.TestMapTranspiler(p)
+		for _, e := range m.Tests {
+			want = append(want, transpiler+": "+e.Name)
+		}
+	}
+	sort.Strings(want)
+	// cover は、サンプルのモジュールで、カバレッジを取りながらテストを走らせ、カバレッジのファイルを返す。skip が空でなければ、
+	// そのパターンの Go のテストを除く。-coverpkg が要る理由は docs/plugin-go.md「カバレッジを読む」。
+	cover := func(t *testing.T, skip string) string {
+		t.Helper()
+		file := filepath.Join(t.TempDir(), "cover.out")
+		args := []string{"test", "-count=1", "-coverprofile=" + file, "-coverpkg=./..."}
+		if skip != "" {
+			args = append(args, "-skip", skip)
+		}
+		cmd := exec.Command("go", append(args, "./...")...)
+		cmd.Dir = s.dir
+		cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOFLAGS=-mod=readonly", "GOWORK=off")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s で go %s が通らない: %v\n%s", s.dir, strings.Join(args, " "), err, out)
+		}
+		return file
+	}
+	t.Run("all", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		code := hozocMainEnv(s.dir, pluginPathEnv(plugins), []string{"tests", "--coverage", cover(t, ""), "--format=json"}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("hozoc tests が終了コード %d で終わった（want 0: 求めるテストが、すべて走っている）:\n%s%s", code, stdout.String(), stderr.String())
+		}
+		var result struct {
+			Ran []string `json:"ran"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+			t.Fatalf("hozoc tests の出力が JSON でない: %v\n%s", err, stdout.String())
+		}
+		sort.Strings(result.Ran)
+		if strings.Join(result.Ran, "\n") != strings.Join(want, "\n") {
+			t.Errorf("走ったと言ったテストが、期待する出力の対応表のテストと違う:\n got:\n  %s\nwant:\n  %s", strings.Join(result.Ran, "\n  "), strings.Join(want, "\n  "))
+		}
+		t.Logf("%d tests ran", len(result.Ran))
+	})
+	t.Run("missing", func(t *testing.T) {
+		var stdout, stderr bytes.Buffer
+		code := hozocMainEnv(s.dir, pluginPathEnv(plugins), []string{"tests", "--coverage", cover(t, s.tests.Skip), "--format=json"}, &stdout, &stderr)
+		if code != 4 {
+			t.Fatalf("hozoc tests が終了コード %d で終わった（want 4: TestsNotRun）:\n%s%s", code, stdout.String(), stderr.String())
+		}
+		var failure struct {
+			Error string `json:"error"`
+			Value struct {
+				Diagnostics []struct {
+					Severity string `json:"severity"`
+					Code     string `json:"code"`
+					Message  string `json:"message"`
+				} `json:"diagnostics"`
+			} `json:"value"`
+		}
+		if err := json.Unmarshal(stderr.Bytes(), &failure); err != nil || failure.Error != "hozoc.TestsNotRun" {
+			t.Fatalf("hozoc tests の例外が hozoc.TestsNotRun でない: %v\n%s", err, stderr.String())
+		}
+		var named []string
+		for _, d := range failure.Value.Diagnostics {
+			if d.Severity != "error" {
+				continue
+			}
+			label, _, ok := strings.Cut(strings.TrimPrefix(d.Message, "求めるテスト "), " が、")
+			if d.Code != "TESTS-1" || !strings.HasPrefix(d.Message, "求めるテスト ") || !ok {
+				t.Errorf("TESTS-1 でない error: %s: %s", d.Code, d.Message)
+				continue
+			}
+			named = append(named, label)
+		}
+		sort.Strings(named)
+		missing := append([]string{}, s.tests.Missing...)
+		sort.Strings(missing)
+		if strings.Join(named, "\n") != strings.Join(missing, "\n") {
+			t.Errorf("走っていないと名指しされたテストが、%s の tests.missing と違う:\n got:\n  %s\nwant:\n  %s", sampleManifestFile, strings.Join(named, "\n  "), strings.Join(missing, "\n  "))
+		}
+		for _, m := range missing {
+			if !containsString(want, m) {
+				t.Errorf("%s の tests.missing の %q が、期待する出力の対応表にない", sampleManifestFile, m)
+			}
+		}
+	})
 }
 
 // testTranspilers は、トランスパイラのブラックボックスのテスト（docs/testing.md「トランスパイラのテスト」）:

@@ -153,12 +153,14 @@ var overrides = map[string]any{
 	"Op.returns": nullable(ref("Type")),
 	"Op.body":    nullable(ref("Wiring")),
 	// docs/plugin-protocol.md「要求と応答」: protocol は docs/ir.md の version と同じ値。
-	"EmitRequest.protocol":    map[string]any{"const": ir.Version},
-	"EmitRequest.direction":   map[string]any{"const": "emit"},
-	"CheckRequest.protocol":   map[string]any{"const": ir.Version},
-	"CheckRequest.direction":  map[string]any{"const": "check"},
-	"ImportRequest.protocol":  map[string]any{"const": ir.Version},
-	"ImportRequest.direction": map[string]any{"const": "import"},
+	"EmitRequest.protocol":      map[string]any{"const": ir.Version},
+	"EmitRequest.direction":     map[string]any{"const": "emit"},
+	"CheckRequest.protocol":     map[string]any{"const": ir.Version},
+	"CheckRequest.direction":    map[string]any{"const": "check"},
+	"ImportRequest.protocol":    map[string]any{"const": ir.Version},
+	"ImportRequest.direction":   map[string]any{"const": "import"},
+	"CoverageRequest.protocol":  map[string]any{"const": ir.Version},
+	"CoverageRequest.direction": map[string]any{"const": "coverage"},
 	// docs/plugin-protocol.md「check」: severity は "error" か "warning"。emit の errors では省く。
 	"Diagnostic.severity": map[string]any{"type": "string", "enum": []string{"error", "warning"}},
 	// check の診断は severity を必ず持つ。
@@ -254,6 +256,11 @@ var descriptions = map[string]string{
 	"CheckResponse":        "\"check\" の応答（docs/plugin-protocol.md「check」）。",
 	"ImportRequest":        "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",
 	"ImportResponse":       "\"import\" の応答（docs/plugin-protocol.md「import」）。",
+	"CoverageRequest":      "direction \"coverage\" の要求（docs/plugin-protocol.md「coverage」）。coverage はカバレッジのファイル、files は実行された行を知りたいファイル。",
+	"CoverageResponse":     "\"coverage\" の応答（docs/plugin-protocol.md「coverage」）。recognized が false なら、読める形のファイルではなかった。",
+	"CoveredFile":          "カバレッジが測っていたファイル一つの、実行された所の行の範囲（docs/plugin-protocol.md「coverage」）。lines の要素は、始まりの行と終わりの行。",
+	"TestMap":              "テストの対応表（docs/plugin-protocol.md「テストの対応表」）。emit の応答の files に足すファイル hozo-tests.<トランスパイラの名前>.json の中身。",
+	"TestEntry":            "対応表のテスト一つ（docs/plugin-protocol.md「テストの対応表」）。lines は、始まりの行と終わりの行。",
 	"File":                 "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス（emit の応答では、その起動の view.config.dir の下。そうでなければ PLG-1）、content は UTF-8 の文字列。",
 	"Warning":              "warning の診断（docs/plugin-protocol.md「emit」）。at は FQN か \"file:line:col\"。",
 	"Diagnostic":           "emit の errors の要素（docs/plugin-protocol.md「emit」）。severity は省ける（常に error）。",
@@ -267,6 +274,8 @@ var roots = []reflect.Type{
 	typeOf[plugin.EmitRequest](), typeOf[plugin.EmitResponse](),
 	typeOf[plugin.CheckRequest](), typeOf[plugin.CheckResponse](),
 	typeOf[plugin.ImportRequest](), typeOf[plugin.ImportResponse](),
+	typeOf[plugin.CoverageRequest](), typeOf[plugin.CoverageResponse](),
+	typeOf[plugin.TestMap](),
 }
 
 // ---- 生成 ----
@@ -391,6 +400,15 @@ func (g *gen) schemaOf(t reflect.Type, fieldKey string) (any, error) {
 			return nil, err
 		}
 		return arrayOf(items), nil
+	case reflect.Array:
+		// 長さの決まった配列（行の範囲の [始まり, 終わり]）: 要素の数を、長さに固定する
+		items, err := g.schemaOf(t.Elem(), "")
+		if err != nil {
+			return nil, err
+		}
+		a := arrayOf(items)
+		a["minItems"], a["maxItems"] = t.Len(), t.Len()
+		return a, nil
 	case reflect.Map:
 		if t.Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("map with non-string key: %s", t)

@@ -1,0 +1,23 @@
+{
+  "tests": [
+    {"name": "app.takeString/OK", "file": "gen/app/apptest/leaves.go", "lines": [262, 269]},
+    {"name": "app.takeInt/OK", "file": "gen/app/apptest/leaves.go", "lines": [275, 282]},
+    {"name": "app.takeFloat/OK", "file": "gen/app/apptest/leaves.go", "lines": [288, 295]},
+    {"name": "app.takeBool/OK", "file": "gen/app/apptest/leaves.go", "lines": [301, 308]},
+    {"name": "app.takeDuration/OK", "file": "gen/app/apptest/leaves.go", "lines": [314, 321]},
+    {"name": "app.takeAccount/OK", "file": "gen/app/apptest/leaves.go", "lines": [327, 334]},
+    {"name": "app.takeProfile/OK", "file": "gen/app/apptest/leaves.go", "lines": [340, 347]},
+    {"name": "app.takeAddress/OK", "file": "gen/app/apptest/leaves.go", "lines": [353, 360]},
+    {"name": "app.takeOptions/OK", "file": "gen/app/apptest/leaves.go", "lines": [366, 373]},
+    {"name": "app.takeOptionalString/OK", "file": "gen/app/apptest/leaves.go", "lines": [379, 386]},
+    {"name": "app.takeOptionalInt/OK", "file": "gen/app/apptest/leaves.go", "lines": [392, 399]},
+    {"name": "app.takeOptionalProfile/OK", "file": "gen/app/apptest/leaves.go", "lines": [405, 412]},
+    {"name": "app.takeOptionalTags/OK", "file": "gen/app/apptest/leaves.go", "lines": [418, 425]},
+    {"name": "app.takeStrings/OK", "file": "gen/app/apptest/leaves.go", "lines": [431, 438]},
+    {"name": "app.takeOptionalStrings/OK", "file": "gen/app/apptest/leaves.go", "lines": [444, 451]},
+    {"name": "app.takeTable/OK", "file": "gen/app/apptest/leaves.go", "lines": [457, 464]},
+    {"name": "app.takeOptionalTable/OK", "file": "gen/app/apptest/leaves.go", "lines": [470, 477]},
+    {"name": "app.Size/Big", "file": "gen/app/apptest/classify.go", "lines": [26, 32]},
+    {"name": "app.Size/Small", "file": "gen/app/apptest/classify.go", "lines": [35, 41]}
+  ]
+}

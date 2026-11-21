@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "split.pick/OK", "file": "gen/split/splittest/leaves.go", "lines": [53, 60]},
+    {"name": "split.keep/OK", "file": "gen/split/splittest/leaves.go", "lines": [66, 73]}
+  ]
+}

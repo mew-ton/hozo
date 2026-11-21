@@ -20,13 +20,14 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Handler はプラグインが実装する三つの方向（direction）。
+// Handler はプラグインが実装する四つの方向（direction）。
 // 実装しない方向と、Emit で知らないトランスパイラ（EmitRequest.Transpiler）は ErrUnsupported を返す。Main はそれを
 // docs/plugin-protocol.md「起動」の code "unsupported"（終了コード 2）にする。
 type Handler interface {
 	Emit(req *EmitRequest) (*EmitResponse, error)
 	Check(req *CheckRequest) (*CheckResponse, error)
 	Import(req *ImportRequest) (*ImportResponse, error)
+	Coverage(req *CoverageRequest) (*CoverageResponse, error)
 }
 
 // ErrUnsupported は、Handler がその direction か、要求のトランスパイラを実装していないときに返す誤り。
@@ -162,6 +163,30 @@ type ImportResponse struct {
 	Warnings []Warning   `json:"warnings"`
 }
 
+// CoverageRequest は direction "coverage" の要求（docs/plugin-protocol.md「coverage」）。
+// Coverage は hozoc tests に渡されたカバレッジのファイル（Path は絶対パス）。Files は、実行された行を知りたいファイル
+// （プロジェクトのルートからの相対パス）。
+type CoverageRequest struct {
+	Protocol  string   `json:"protocol"`
+	Direction string   `json:"direction"`
+	Coverage  File     `json:"coverage"`
+	Files     []string `json:"files"`
+}
+
+// CoverageResponse は "coverage" の応答。Recognized が false なら、このプラグインが読める形のファイルではなかった。
+// Files は、要求の Files のうち、カバレッジが測っていたファイルごとに一つ。
+type CoverageResponse struct {
+	Recognized bool          `json:"recognized"`
+	Files      []CoveredFile `json:"files"`
+}
+
+// CoveredFile は、測られていたファイル一つの、実行された所の行の範囲（始まりの行、終わりの行。1 始まりで両端を含む）。
+// 一度も実行されていなければ Lines は空。
+type CoveredFile struct {
+	Path  string   `json:"path"`
+	Lines [][2]int `json:"lines"`
+}
+
 // File は書き出す（または取り込む）ファイル。Path はプロジェクトのルートからの相対パス（docs/plugin-protocol.md「emit」）。
 // emit の応答では、その起動の出力先（EmitRequest.View.Config.Dir。Dir(U, N)）の下でなければならず、そうでないパス
 // （`..`、絶対パス、別のディレクトリ）は PLG-1。Content は UTF-8 の文字列（バイナリは出せない）。
@@ -277,6 +302,27 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 		}
 		if r.Warnings == nil {
 			r.Warnings = []Warning{}
+		}
+		resp = r
+	case "coverage":
+		var req CoverageRequest
+		if err := json.Unmarshal(raw, &req); err != nil {
+			return fail(errOut, fmt.Errorf("decode coverage request: %w", err))
+		}
+		r, err := h.Coverage(&req)
+		if err != nil {
+			return handlerError(out, errOut, head.Direction, err)
+		}
+		if r == nil {
+			r = &CoverageResponse{}
+		}
+		if r.Files == nil {
+			r.Files = []CoveredFile{}
+		}
+		for i := range r.Files {
+			if r.Files[i].Lines == nil {
+				r.Files[i].Lines = [][2]int{}
+			}
 		}
 		resp = r
 	default:

@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {"name": "shop.newOrder/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [119, 126]},
+    {"name": "shop.newOrder/EmptyCart", "file": "gen/shop/shoptest/leaves.go", "lines": [129, 137]},
+    {"name": "shop.showLogin/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [143, 150]},
+    {"name": "shop.showCart/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [156, 163]},
+    {"name": "shop.showEmpty/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [169, 176]},
+    {"name": "shop.showOrders/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [182, 189]},
+    {"name": "shop.packSingle/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [195, 202]},
+    {"name": "shop.packBulk/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [208, 215]},
+    {"name": "shop.LineKind/Single", "file": "gen/shop/shoptest/classify.go", "lines": [26, 32]},
+    {"name": "shop.LineKind/Bulk", "file": "gen/shop/shoptest/classify.go", "lines": [35, 41]}
+  ]
+}

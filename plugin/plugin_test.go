@@ -18,6 +18,7 @@ type fake struct {
 	emit   func(*EmitRequest) (*EmitResponse, error)
 	check  func(*CheckRequest) (*CheckResponse, error)
 	imp    func(*ImportRequest) (*ImportResponse, error)
+	cov    func(*CoverageRequest) (*CoverageResponse, error)
 	called string
 }
 
@@ -313,6 +314,7 @@ func TestRequestHead(t *testing.T) {
 				emit:  func(*EmitRequest) (*EmitResponse, error) { return &EmitResponse{}, nil },
 				check: func(*CheckRequest) (*CheckResponse, error) { return &CheckResponse{}, nil },
 				imp:   func(*ImportRequest) (*ImportResponse, error) { return &ImportResponse{}, nil },
+				cov:   func(*CoverageRequest) (*CoverageResponse, error) { return &CoverageResponse{}, nil },
 			}
 			code, out, errOut := run(t, h, c.Request)
 			if code != c.Exit {
@@ -337,8 +339,86 @@ func TestRequestHead(t *testing.T) {
 	}
 }
 
+func (f *fake) Coverage(r *CoverageRequest) (*CoverageResponse, error) {
+	f.called = "coverage"
+	if f.cov == nil {
+		return nil, ErrUnsupported
+	}
+	return f.cov(r)
+}
+
+// coverage（docs/plugin-protocol.md「coverage」）: 要求の coverage と files が届き、応答の files と lines は、空でも [] で出る。
+func TestCoverage(t *testing.T) {
+	h := &fake{cov: func(r *CoverageRequest) (*CoverageResponse, error) {
+		if r.Coverage.Path != "/p/cover.out" || r.Coverage.Content != "mode: set\n" || len(r.Files) != 2 || r.Files[0] != "gen/a.go" {
+			t.Errorf("request = %+v", r)
+		}
+		return &CoverageResponse{Recognized: true, Files: []CoveredFile{{Path: "gen/a.go", Lines: [][2]int{{3, 5}}}, {Path: "gen/b.go"}}}, nil
+	}}
+	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"coverage","coverage":{"path":"/p/cover.out","content":"mode: set\n"},"files":["gen/a.go","gen/b.go"]}`, ir.Version))
+	if code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	want := `{"recognized":true,"files":[{"path":"gen/a.go","lines":[[3,5]]},{"path":"gen/b.go","lines":[]}]}` + "\n"
+	if out != want {
+		t.Errorf("response:\n got %s\nwant %s", out, want)
+	}
+
+	// 読める形でないファイル: recognized が false で、files は []
+	h = &fake{cov: func(*CoverageRequest) (*CoverageResponse, error) { return &CoverageResponse{}, nil }}
+	code, out, _ = run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"coverage","coverage":{"path":"x","content":"?"},"files":[]}`, ir.Version))
+	if want := `{"recognized":false,"files":[]}` + "\n"; code != 0 || out != want {
+		t.Errorf("code = %d, response = %s, want %s", code, out, want)
+	}
+}
+
+// テストの対応表のファイル（docs/plugin-protocol.md「テストの対応表」、docs/plugin-go.md「テストの対応表」の並びと字下げ）。
+func TestTestMapFile(t *testing.T) {
+	f := TestMapFile("gen/server/servertest", "go-http", []TestEntry{
+		{Name: "server.login/OK", File: "gen/server/servertest/http.go", Lines: [2]int{216, 222}},
+		{Name: `server.search/OK/GET /search?q=<a>&"b"`, File: "gen/server/servertest/http.go", Lines: [2]int{230, 230}},
+	})
+	if f.Path != "gen/server/servertest/hozo-tests.go-http.json" {
+		t.Errorf("path = %q", f.Path)
+	}
+	want := `{
+  "tests": [
+    {"name": "server.login/OK", "file": "gen/server/servertest/http.go", "lines": [216, 222]},
+    {"name": "server.search/OK/GET /search?q=<a>&\"b\"", "file": "gen/server/servertest/http.go", "lines": [230, 230]}
+  ]
+}
+`
+	if f.Content != want {
+		t.Errorf("content:\n got %s\nwant %s", f.Content, want)
+	}
+	var m TestMap
+	decode(t, f.Content, &m)
+	if len(m.Tests) != 2 || m.Tests[1].Name != `server.search/OK/GET /search?q=<a>&"b"` || m.Tests[0].Lines != [2]int{216, 222} {
+		t.Errorf("round trip = %+v", m)
+	}
+
+	for _, c := range []struct {
+		path, name string
+		ok         bool
+	}{
+		{"gen/x/xtest/hozo-tests.go.json", "go", true},
+		{"hozo-tests.go-http.json", "go-http", true},
+		{"gen/hozo-tests..json", "", true},
+		{"gen/hozo-tests.json", "", false},
+		{"gen/tests.go.json", "", false},
+		{"gen/hozo-tests.go.json/leaves.go", "", false},
+	} {
+		if name, ok := TestMapTranspiler(c.path); name != c.name || ok != c.ok {
+			t.Errorf("TestMapTranspiler(%q) = %q, %v; want %q, %v", c.path, name, ok, c.name, c.ok)
+		}
+	}
+	if TestMapName("go") != "hozo-tests.go.json" {
+		t.Errorf("TestMapName = %q", TestMapName("go"))
+	}
+}
+
 func TestUnsupportedDirection(t *testing.T) {
-	for _, dir := range []string{"emit", "check", "import"} {
+	for _, dir := range []string{"emit", "check", "import", "coverage"} {
 		t.Run(dir, func(t *testing.T) {
 			h := &fake{} // すべて ErrUnsupported
 			code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":%q}`, ir.Version, dir))

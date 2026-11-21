@@ -8,8 +8,10 @@ import (
 	"go/format"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -215,10 +217,116 @@ func firstDiff(want, got string) string {
 	return "  （違いなし）"
 }
 
-// checkFormatted は、生成した Go が go/format を通した形であること（docs/plugin-go.md「ファイル」）を確かめる。
+// isTestMap は、パス p が、基底のテストの対応表（docs/plugin-go.md「テストの対応表」）か。
+func isTestMap(p string) bool { return path.Base(p) == plugin.TestMapName(TranspilerName) }
+
+// goFiles は、files のうち、Go のファイル（テストの対応表を除いたもの）。
+func goFiles(files map[string]string) map[string]string {
+	out := map[string]string{}
+	for p, content := range files {
+		if !isTestMap(p) {
+			out[p] = content
+		}
+	}
+	return out
+}
+
+// scanTestRuns は、Go のソース src（置き場は file）の、いちばん内側の `t.Run(<名前>, func(t *testing.T) {` … `})` を、
+// 字下げだけを頼りに探す（go/parser を使う golang.TestMap とは、別の読み方）: 名前は、外の段から / でつなぎ、行は、
+// 開く行の次の行から、閉じる行の前の行まで（docs/plugin-go.md「テストの対応表」）。
+func scanTestRuns(t *testing.T, file, src string) []plugin.TestEntry {
+	t.Helper()
+	type run struct {
+		indent, start int
+		name          string
+		parent        bool
+	}
+	var stack []run
+	var out []plugin.TestEntry
+	for i, l := range strings.Split(src, "\n") {
+		body := strings.TrimLeft(l, "\t")
+		indent := len(l) - len(body)
+		if strings.HasPrefix(body, "t.Run(") {
+			rest := strings.TrimPrefix(body, "t.Run(")
+			if !strings.HasSuffix(rest, ", func(t *testing.T) {") {
+				t.Fatalf("%s の %d 行目の t.Run が、その場の関数で、行の終わりに { を持つ形でない: %s", file, i+1, l)
+			}
+			name, err := strconv.Unquote(strings.TrimSuffix(rest, ", func(t *testing.T) {"))
+			if err != nil {
+				t.Fatalf("%s の %d 行目の t.Run の名前を読めない: %s", file, i+1, l)
+			}
+			if len(stack) > 0 {
+				stack[len(stack)-1].parent = true
+			}
+			stack = append(stack, run{indent: indent, start: i + 1, name: name})
+			continue
+		}
+		if len(stack) > 0 && body == "})" && indent == stack[len(stack)-1].indent {
+			r := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if r.parent {
+				continue
+			}
+			names := make([]string, 0, len(stack)+1)
+			for _, s := range stack {
+				names = append(names, s.name)
+			}
+			out = append(out, plugin.TestEntry{Name: strings.Join(append(names, r.name), "/"), File: file, Lines: [2]int{r.start + 1, i}})
+		}
+	}
+	if len(stack) > 0 {
+		t.Fatalf("%s の t.Run が、閉じていない", file)
+	}
+	return out
+}
+
+// checkTestMaps は、出力のテストの対応表（docs/plugin-go.md「テストの対応表」）を、出力の Go のテキストに当てて確かめる:
+// t.Run を持つ Go のファイルがあるディレクトリにだけ、一つあり、中身は、そのディレクトリの Go のファイル（パスの順は、
+// doc.go、leaves.go、classify.go: 基底が出す順）の、いちばん内側の t.Run を、行の順に、テスト一つを一行で並べたもの。
+func checkTestMaps(t *testing.T, files map[string]string) {
+	t.Helper()
+	want := map[string][]plugin.TestEntry{} // ディレクトリ → テスト
+	for _, name := range []string{fileDoc, fileLeaves, fileClassify} {
+		for _, p := range sortedPaths(files) {
+			if isTestMap(p) || path.Base(p) != name || !strings.Contains(files[p], "t.Run(") {
+				continue
+			}
+			want[path.Dir(p)] = append(want[path.Dir(p)], scanTestRuns(t, p, files[p])...)
+		}
+	}
+	for p, content := range files {
+		if !isTestMap(p) && strings.Contains(content, "t.Run(") && path.Base(p) != fileDoc && path.Base(p) != fileLeaves && path.Base(p) != fileClassify {
+			t.Errorf("%s が t.Run を持つが、テストのパッケージのファイルでない", p)
+		}
+	}
+	for _, p := range sortedPaths(files) {
+		if !isTestMap(p) {
+			continue
+		}
+		tests := want[path.Dir(p)]
+		delete(want, path.Dir(p))
+		if len(tests) == 0 {
+			t.Errorf("%s: t.Run のないディレクトリに、対応表を出した", p)
+			continue
+		}
+		if expected := plugin.TestMapFile(path.Dir(p), TranspilerName, tests).Content; files[p] != expected {
+			t.Errorf("%s が、出力の Go のテキストの t.Run と合わない:\n%s", p, firstDiff(expected, files[p]))
+		}
+	}
+	for dir := range want {
+		t.Errorf("%s: t.Run を持つのに、対応表を出していない", dir)
+	}
+}
+
+// checkFormatted は、生成した Go が go/format を通した形であること（docs/plugin-go.md「ファイル」）を確かめる。Go でない
+// ファイルは、テストの対応表だけ（中身は checkTestMaps）。
 func checkFormatted(t *testing.T, files map[string]string) {
 	t.Helper()
+	checkTestMaps(t, files)
 	for _, p := range sortedPaths(files) {
+		if isTestMap(p) {
+			continue
+		}
 		if !strings.HasSuffix(p, ".go") {
 			t.Errorf("Go でないファイル %s を出力した", p)
 			continue

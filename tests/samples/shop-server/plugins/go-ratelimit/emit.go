@@ -74,6 +74,11 @@ func (Handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
 	return nil, plugin.ErrUnsupported
 }
 
+// Coverage は実装しない（カバレッジを読むのは、基底）。
+func (Handler) Coverage(*plugin.CoverageRequest) (*plugin.CoverageResponse, error) {
+	return nil, plugin.ErrUnsupported
+}
+
 // Emit は、要求の View の出力 (U, N) の ratelimit.go を作る。root はプロジェクトのルート（go.mod を探す起点）。
 // 対象（自分が宣言した継ぎ目）が一つもなければ、ファイルを出さない。診断があれば、ファイルは返さない。誤り（error）を返すのは、
 // 利用者の仕様の誤りではないとき（View が欠けている、生成したコードを整形できない、型の置き場がない）。

@@ -217,7 +217,8 @@ func (f *file) runRequirements(classes []class) string {
 	for _, c := range classes {
 		for i := range c.cases {
 			k := &c.cases[i]
-			fmt.Fprintf(&b, "t.Run(%s, c.%s)\n", strconv.Quote(k.label), k.method)
+			// その場の関数で包む: RunRequirements の中に、要求ごとの行を持つ（テストの対応表が、その行を指す）
+			fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\nc.%s(t)\n})\n", strconv.Quote(k.label), f.use("testing"), k.method)
 		}
 	}
 	b.WriteString("}\n\n")

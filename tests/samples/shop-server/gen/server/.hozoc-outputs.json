@@ -9,6 +9,8 @@
   "gen/server/ops.go",
   "gen/server/ratelimit.go",
   "gen/server/servertest/doc.go",
+  "gen/server/servertest/hozo-tests.go-http.json",
+  "gen/server/servertest/hozo-tests.go.json",
   "gen/server/servertest/http.go",
   "gen/server/servertest/leaves.go",
   "gen/server/types.go"

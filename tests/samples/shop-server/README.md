@@ -226,6 +226,37 @@ R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の�
 - 操作の op は、状態を持たない: ログインのトークンは、`signIn` の戻り値で受け取り、`order` と `viewOrders` の引数で渡す。
 - テストのパッケージ `flowstest` を import するのは、テストを支えるパッケージ `app/flowtest`（`testing` を import する）だけ。
 
+### 走ったかの確かめで足したこと
+
+求めるテストが、走ったかを、カバレッジで突き合わせる決定（`docs/decisions.md`「決めたこと」380）で、足したもの。仕様（`.hozo`、`hozo.toml`）と、人が書いたコード（`app/`）は、変えていない。
+
+| 足した、変えたもの | 中身 | 文書 |
+|---|---|---|
+| `gen/server/servertest/hozo-tests.go.json` | 基底 `go` の、テストの対応表: `RunLeaves` の、11 のテスト（`server.checkPassword/OK` など）と、`leaves.go` の行 | `docs/plugin-go.md`「テストの対応表」 |
+| `gen/server/servertest/hozo-tests.go-http.json` | `go-http` の、テストの対応表: `RunHTTP` の、21 のテスト（`server.login/OK` など）と、テストのパッケージの `http.go` の行 | `docs/plugin-go-http.md`「インテグレーションテストの口」の「置き場と名前」 |
+| `gen/flows/flowstest/hozo-tests.go-design.json` | `go-design` の、テストの対応表: `RunFlows` の `flows.signInAndOrder` と、`RunRequirements` の `design.Requirement.PRD_001`、`PRD_002` と、`design.go` の行 | `docs/plugin-go-design.md`「出力」 |
+| `gen/flows/flowstest/design.go` | `RunRequirements` が、要求の入れ物を、その場の関数で包んで呼ぶ形にした（`t.Run("design.Requirement.PRD_001", func(t *testing.T) { c.PRD_001(t) })`。行は、三つに分かれる）。`RunRequirements` の中に、要求ごとの行を持つため | `docs/plugin-go-design.md`「要求の、テストの入れ物の口」の「口の形」 |
+| `gen/server/.hozoc-outputs.json`、`gen/flows/.hozoc-outputs.json`、`sample.json` | 三つの対応表を、出力先ごとの記録と、トランスパイラの `files` に足した。`sample.json` に、`tests`（`skip` と `missing`）を足した | `../README.md`「sample.json」 |
+
+- **対応表は、手で書いた**（ほかの期待する出力と同じ）: 置いてある `leaves.go`、`http.go`、`design.go` の字面から、いちばん内側の `t.Run` の、`{` の次の行と、`})` の前の行を、数えた。`hozoc emit` の出力と、バイト単位で同じことは、`transpilers/<名前>` が確かめる。
+- **走ったと分かること**は、サブテスト `tests` が確かめる（`../README.md`「テスト」）。手で確かめるなら、このディレクトリで:
+
+```bash
+GOTOOLCHAIN=local go test -coverprofile=/tmp/cover.out -coverpkg=./... ./...
+```
+
+```bash
+(cd ../../.. && go build -o /tmp/hozoc ./cmd/hozoc)
+```
+
+```bash
+HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.out
+```
+
+- **口を渡す一行を、書かなかったとき**: `app/onmem/compose_test.go` と `app/onsqlite/compose_test.go` の `TestFlows`（`flowstest.RunFlows` を呼ぶ一行）を除いて走らせる（`go test -skip '^TestFlows$'`）と、`hozoc tests` は、`go-design: flows.signInAndOrder` が走っていない、と名指しして、終了コード 4 で終わる。`sample.json` の `tests` が、この組。
+- `-coverpkg=./...` を付けなければ、テストのパッケージ（`gen/server/servertest`、`gen/flows/flowstest`）の行は、カバレッジに、0 回として載るだけで、35 のテストが、すべて、走っていない、と出る（`docs/plugin-go.md`「カバレッジを読む」）。
+- `store`、`storemem`、`type`、`rate`、`http`、`client` の出力は、テストを受け取る口を持たないので、対応表もない。
+
 ### 配線の op の `throws` を消したこと
 
 配線の op は、`throws` の節を書かなくてよい（`docs/decisions.md`「決めたこと」379。決まりの持ち主は `docs/check.md`「状態に触れるもの」の「節に書く要素」）。このサンプルの、配線の op から、`throws` の節を、すべて消した。`gen/` と `app/` は、一つも変えていない: op の例外（`Signature.exceptions`）は、どの op も、消す前と同じで、hozoc の出力は、期待する出力と、バイト単位で同じ。
@@ -399,13 +430,13 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/server/inner/validate.go` | `go-valid`（型にメソッドを足すので、定義のパッケージ） |
 | `gen/server/doc.go` `types.go` `ops.go` | `go`（入口のパッケージ: 内側の再公開と、`export` の op だけの `Ops`） |
 | `gen/server/http.go` | `go-http`（入口のパッケージ） |
-| `gen/server/servertest/http.go` | `go-http`（テストのパッケージ: 八つの入口の、インテグレーションテストの口。`docs/plugin-go-http.md`「インテグレーションテストの口」） |
+| `gen/server/servertest/http.go` `hozo-tests.go-http.json` | `go-http`（テストのパッケージ: 八つの入口の、インテグレーションテストの口と、その、テストの対応表。`docs/plugin-go-http.md`「インテグレーションテストの口」） |
 | `gen/server/ratelimit.go` | `go-ratelimit`（入口のパッケージ） |
-| `gen/server/servertest/doc.go` `leaves.go` | `go`（テストのパッケージ: `server` の葉の op の、単体テストの口。`docs/plugin-go.md`「単体テストの口」。`type`、`rate`、`store` は、葉の op も、述語で決まる値の分類も持たないので、テストのパッケージを持たない） |
+| `gen/server/servertest/doc.go` `leaves.go` `hozo-tests.go.json` | `go`（テストのパッケージ: `server` の葉の op の、単体テストの口と、その、テストの対応表。`docs/plugin-go.md`「単体テストの口」。`type`、`rate`、`store` は、葉の op も、述語で決まる値の分類も持たないので、テストのパッケージを持たない） |
 | `gen/http/doc.go` `types.go` | `go` |
 | `gen/client/doc.go` `ops.go` `wiring.go` | `go`（`client` は、内部の op を持たないので、出力を分けない。型も持たないので、`types.go` はない） |
 | `gen/flows/doc.go` `types.go` `ops.go` `wiring.go` | `go` |
-| `gen/flows/flowstest/design.go` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口。`docs/plugin-go-design.md`。`flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、このパッケージにファイルを出さず、`doc.go` はない） |
+| `gen/flows/flowstest/design.go` `hozo-tests.go-design.json` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口と、その、テストの対応表。`docs/plugin-go-design.md`。`flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、このパッケージにファイルを出さず、`doc.go` はない） |
 | `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
 | `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 九つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/memstore/memstore.go` | 人が書く: `store` の四つの状態の単位（その状態の `read` と効果）の、メモリの上の実装（`gen/storemem` の `New` に渡す型） |
@@ -514,13 +545,13 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 
 ## `go-design` が従う規則
 
-持ち主は `docs/plugin-go-design.md`。出すファイルは、単位 8 の、テストのパッケージの `gen/flows/flowstest/design.go` 一つ（「R6 のプラグインの部分で足したこと」）。
+持ち主は `docs/plugin-go-design.md`。出すファイルは、単位 8 の、テストのパッケージの `gen/flows/flowstest/design.go` と、その、テストの対応表 `hozo-tests.go-design.json`（「R6 のプラグインの部分で足したこと」「走ったかの確かめで足したこと」）。
 
 - **フローは一つ**（同「E2E テストの口」）: `flows.signInAndOrder`。`SignInAndOrderFlowCase` のフィールドは、フローの三つの引数（`Email`、`Password`、`Lines`）と、`Given`、`Then`。フローは、値（`flows.Ordered`）を返すので、`Then` は `func(t *testing.T, got flows.Ordered)`。
 - **フローの op の決まり**（同「フローの op の決まり」）は、どれも満たしている: `export` が付き、配線で、呼ぶ先の三つ（`client.signIn`、`client.order`、`client.viewOrders`）は、どれも `@usecase.of` の付いた op で、`flows` には、`@usecase.of` の付いた op がない。
 - **要求は二つ**（同「要求の、テストの入れ物の口」）: オプション `requirements` に並べた分類 `design.Requirement` のケース `PRD_001`、`PRD_002`。分類 `design.Actor` は、並べていないので、要求ではない。
 - **指している設計**（同「指している設計」）は、`server` の三つの op から: `PRD_001` は `server.authenticate`、`server.placeOrder`。`PRD_002` は `server.getOrders`、`server.placeOrder`（宣言順）。どちらも指されているので、warning は、出ない。
-- `flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、テストのパッケージにファイルを出さない。`flowstest` のファイルは、`design.go` だけ。
+- `flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、テストのパッケージにファイルを出さない。`flowstest` のファイルは、`design.go` と、`go-design` の対応表だけ。
 - この仕様が使っていない規則: 値を返さないフロー、引数のないフロー、`Given`・`Then` と当たる引数の名前、二つ以上の要求の分類、どこからも指されていない要求、op のほかの宣言からの `@prd.ref`、要求だけの単位、基底が、テストのパッケージを作る出力、診断（GODESIGN-*）。`plugins/go-design` の単体テストが確かめる（`docs/testing.md`「単体テスト」）。
 
 ## 人が書いたもの

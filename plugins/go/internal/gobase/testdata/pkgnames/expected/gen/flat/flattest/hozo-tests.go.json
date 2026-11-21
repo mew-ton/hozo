@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "flat.pick/OK", "file": "gen/flat/flattest/leaves.go", "lines": [55, 62]},
+    {"name": "flat.keep/OK", "file": "gen/flat/flattest/leaves.go", "lines": [68, 75]}
+  ]
+}

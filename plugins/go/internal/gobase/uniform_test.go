@@ -56,7 +56,7 @@ func uniform(ft *ast.FuncType) bool {
 func TestEveryFunctionTakesCtxAndReturnsError(t *testing.T) {
 	for _, fx := range goldenFixtures {
 		_, files := emitFixture(t, fx.name)
-		for path, content := range files {
+		for path, content := range goFiles(files) {
 			f, err := parser.ParseFile(token.NewFileSet(), path, content, 0)
 			if err != nil {
 				t.Fatalf("%s/%s: %v", fx.name, path, err)
@@ -155,7 +155,7 @@ func TestPureOpsHaveTheSameShape(t *testing.T) {
 func TestNoGeneratedPanic(t *testing.T) {
 	for _, fx := range goldenFixtures {
 		_, files := emitFixture(t, fx.name)
-		for path, content := range files {
+		for path, content := range goFiles(files) {
 			f, err := parser.ParseFile(token.NewFileSet(), path, content, 0)
 			if err != nil {
 				t.Fatalf("%s/%s: %v", fx.name, path, err)

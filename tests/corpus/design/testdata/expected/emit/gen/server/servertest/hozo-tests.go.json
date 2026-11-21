@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {"name": "server.authenticate/OK", "file": "gen/server/servertest/leaves.go", "lines": [178, 185]},
+    {"name": "server.authenticate/InvalidCredentials", "file": "gen/server/servertest/leaves.go", "lines": [188, 196]},
+    {"name": "server.authenticate/NotVerified", "file": "gen/server/servertest/leaves.go", "lines": [199, 207]},
+    {"name": "server.authenticate/Suspended", "file": "gen/server/servertest/leaves.go", "lines": [210, 218]},
+    {"name": "server.authenticate/AlreadyLoggedIn", "file": "gen/server/servertest/leaves.go", "lines": [221, 229]},
+    {"name": "server.confirmRefund/OK", "file": "gen/server/servertest/leaves.go", "lines": [235, 242]},
+    {"name": "server.confirmRefund/RefundPending", "file": "gen/server/servertest/leaves.go", "lines": [245, 253]},
+    {"name": "server.newOrder/OK", "file": "gen/server/servertest/leaves.go", "lines": [259, 266]},
+    {"name": "server.composeNotice/OK", "file": "gen/server/servertest/leaves.go", "lines": [272, 279]},
+    {"name": "server.composeNotice/NotificationFailed", "file": "gen/server/servertest/leaves.go", "lines": [282, 290]},
+    {"name": "server.newPasswordReset/OK", "file": "gen/server/servertest/leaves.go", "lines": [296, 303]},
+    {"name": "server.newPasswordReset/RateLimited", "file": "gen/server/servertest/leaves.go", "lines": [306, 314]},
+    {"name": "server.getMe/OK", "file": "gen/server/servertest/leaves.go", "lines": [320, 327]},
+    {"name": "server.getOrders/OK", "file": "gen/server/servertest/leaves.go", "lines": [333, 340]},
+    {"name": "server.getItem/OK", "file": "gen/server/servertest/leaves.go", "lines": [346, 353]},
+    {"name": "server.newCartLine/OK", "file": "gen/server/servertest/leaves.go", "lines": [359, 366]},
+    {"name": "server.withWarranty/OK", "file": "gen/server/servertest/leaves.go", "lines": [372, 379]}
+  ]
+}

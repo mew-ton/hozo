@@ -602,7 +602,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.16"
+          "const": "0.17"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -792,6 +792,79 @@
       "required": [
         "kind",
         "name"
+      ],
+      "type": "object"
+    },
+    "CoverageRequest": {
+      "additionalProperties": false,
+      "description": "direction \"coverage\" の要求（docs/plugin-protocol.md「coverage」）。coverage はカバレッジのファイル、files は実行された行を知りたいファイル。",
+      "properties": {
+        "coverage": {
+          "$ref": "#/$defs/File"
+        },
+        "direction": {
+          "const": "coverage"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "protocol": {
+          "const": "0.17"
+        }
+      },
+      "required": [
+        "protocol",
+        "direction",
+        "coverage",
+        "files"
+      ],
+      "type": "object"
+    },
+    "CoverageResponse": {
+      "additionalProperties": false,
+      "description": "\"coverage\" の応答（docs/plugin-protocol.md「coverage」）。recognized が false なら、読める形のファイルではなかった。",
+      "properties": {
+        "files": {
+          "items": {
+            "$ref": "#/$defs/CoveredFile"
+          },
+          "type": "array"
+        },
+        "recognized": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "recognized",
+        "files"
+      ],
+      "type": "object"
+    },
+    "CoveredFile": {
+      "additionalProperties": false,
+      "description": "カバレッジが測っていたファイル一つの、実行された所の行の範囲（docs/plugin-protocol.md「coverage」）。lines の要素は、始まりの行と終わりの行。",
+      "properties": {
+        "lines": {
+          "items": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "lines"
       ],
       "type": "object"
     },
@@ -1266,7 +1339,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.16"
+          "const": "0.17"
         },
         "transpiler": {
           "type": "string"
@@ -1484,7 +1557,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.16"
+          "const": "0.17"
         }
       },
       "required": [
@@ -2289,7 +2362,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.16"
+          "const": "0.17"
         }
       },
       "required": [
@@ -2807,6 +2880,48 @@
       ],
       "type": "object"
     },
+    "TestEntry": {
+      "additionalProperties": false,
+      "description": "対応表のテスト一つ（docs/plugin-protocol.md「テストの対応表」）。lines は、始まりの行と終わりの行。",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "file",
+        "lines"
+      ],
+      "type": "object"
+    },
+    "TestMap": {
+      "additionalProperties": false,
+      "description": "テストの対応表（docs/plugin-protocol.md「テストの対応表」）。emit の応答の files に足すファイル hozo-tests.\u003cトランスパイラの名前\u003e.json の中身。",
+      "properties": {
+        "tests": {
+          "items": {
+            "$ref": "#/$defs/TestEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "tests"
+      ],
+      "type": "object"
+    },
     "ThrowBody": {
       "additionalProperties": false,
       "description": "アームの本体の throw（docs/ir.md「配線」）。exception は FQN。",
@@ -3142,7 +3257,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.16"
+          "const": "0.17"
         },
         "viewer": {
           "type": "string"

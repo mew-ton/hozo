@@ -1,0 +1,13 @@
+{
+  "tests": [
+    {"name": "flows.checkout", "file": "gen/flows/flowstest/design.go", "lines": [78, 91]},
+    {"name": "flows.ping", "file": "gen/flows/flowstest/design.go", "lines": [94, 107]},
+    {"name": "flows.rename", "file": "gen/flows/flowstest/design.go", "lines": [110, 123]},
+    {"name": "flows.branch", "file": "gen/flows/flowstest/design.go", "lines": [126, 139]},
+    {"name": "flows.lookup", "file": "gen/flows/flowstest/design.go", "lines": [142, 155]},
+    {"name": "design.Req.R1", "file": "gen/flows/flowstest/design.go", "lines": [182, 182]},
+    {"name": "design.Req.R2", "file": "gen/flows/flowstest/design.go", "lines": [185, 185]},
+    {"name": "design.Req.r3", "file": "gen/flows/flowstest/design.go", "lines": [188, 188]},
+    {"name": "design.Extra.X1", "file": "gen/flows/flowstest/design.go", "lines": [191, 191]}
+  ]
+}

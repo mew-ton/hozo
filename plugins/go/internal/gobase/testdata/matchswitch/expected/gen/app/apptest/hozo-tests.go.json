@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {"name": "app.findItem/OK", "file": "gen/app/apptest/leaves.go", "lines": [149, 156]},
+    {"name": "app.load/OK", "file": "gen/app/apptest/leaves.go", "lines": [162, 169]},
+    {"name": "app.titleOf/OK", "file": "gen/app/apptest/leaves.go", "lines": [175, 182]},
+    {"name": "app.codeText/OK", "file": "gen/app/apptest/leaves.go", "lines": [188, 195]},
+    {"name": "app.receiptText/OK", "file": "gen/app/apptest/leaves.go", "lines": [201, 208]},
+    {"name": "app.send/OK", "file": "gen/app/apptest/leaves.go", "lines": [214, 221]},
+    {"name": "app.priceOf/OK", "file": "gen/app/apptest/leaves.go", "lines": [227, 234]},
+    {"name": "app.bigOnly/OK", "file": "gen/app/apptest/leaves.go", "lines": [240, 247]},
+    {"name": "app.show/OK", "file": "gen/app/apptest/leaves.go", "lines": [253, 260]},
+    {"name": "app.Size/Big", "file": "gen/app/apptest/classify.go", "lines": [28, 34]},
+    {"name": "app.Size/Small", "file": "gen/app/apptest/classify.go", "lines": [37, 43]},
+    {"name": "app.Size/Tiny", "file": "gen/app/apptest/classify.go", "lines": [46, 52]},
+    {"name": "app.Address/Valid", "file": "gen/app/apptest/classify.go", "lines": [71, 77]},
+    {"name": "app.Address/Invalid", "file": "gen/app/apptest/classify.go", "lines": [80, 86]},
+    {"name": "app.Contact/Mail", "file": "gen/app/apptest/classify.go", "lines": [107, 113]},
+    {"name": "app.Contact/Text", "file": "gen/app/apptest/classify.go", "lines": [116, 122]},
+    {"name": "app.Contact/Silent", "file": "gen/app/apptest/classify.go", "lines": [125, 131]},
+    {"name": "app.Stock/InStock", "file": "gen/app/apptest/classify.go", "lines": [152, 158]},
+    {"name": "app.Stock/SoldOut", "file": "gen/app/apptest/classify.go", "lines": [161, 167]},
+    {"name": "app.Stock/Unknown", "file": "gen/app/apptest/classify.go", "lines": [170, 176]}
+  ]
+}

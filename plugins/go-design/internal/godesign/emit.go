@@ -104,7 +104,13 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Output{Files: []plugin.File{{Path: path.Join(layout.TestDir, FileName), Content: content}}, Warnings: warnings}, nil
+	file := plugin.File{Path: path.Join(layout.TestDir, FileName), Content: content}
+	// テストの対応表（docs/plugin-go-design.md「出力」）: 出したテキストから作る
+	tests, err := golang.TestMap(file.Path, file.Content)
+	if err != nil {
+		return nil, fmt.Errorf("テストの対応表を作れない（生成器の不具合）: %w", err)
+	}
+	return &Output{Files: []plugin.File{file, plugin.TestMapFile(layout.TestDir, TranspilerName, tests)}, Warnings: warnings}, nil
 }
 
 // generator は一つの出力 (U, N) の design.go を作る状態。

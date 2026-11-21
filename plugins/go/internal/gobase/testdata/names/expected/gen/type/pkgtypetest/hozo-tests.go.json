@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "type.issue/OK", "file": "gen/type/pkgtypetest/leaves.go", "lines": [36, 43]}
+  ]
+}

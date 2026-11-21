@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "mixed.run", "file": "gen/mixed/mixedtest/design.go", "lines": [32, 45]},
+    {"name": "design.Extra.X1", "file": "gen/mixed/mixedtest/design.go", "lines": [63, 63]}
+  ]
+}

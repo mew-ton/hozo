@@ -319,6 +319,22 @@ func (e *emitter) build() []plugin.File {
 	add(test, e.genTestDoc())
 	add(test, e.genTestLeaves())
 	add(test, e.genTestClassify())
+	// テストの対応表（docs/plugin-go.md「テストの対応表」）: 出したテキストから作る
+	var tests []plugin.TestEntry
+	for _, f := range files {
+		if path.Dir(f.Path) != test {
+			continue
+		}
+		entries, err := golang.TestMap(f.Path, f.Content)
+		if err != nil {
+			e.errorf(codeInternal, "", "テストの対応表を作れない（生成器の不具合）: %v", err)
+			continue
+		}
+		tests = append(tests, entries...)
+	}
+	if len(tests) > 0 {
+		files = append(files, plugin.TestMapFile(test, TranspilerName, tests))
+	}
 	return files
 }
 

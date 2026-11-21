@@ -58,6 +58,34 @@ type CollectOutputsCase struct {
 	Then func(t *testing.T, got hozoc.EmitPlan, err error)
 }
 
+// MatchTestsCases は、葉 hozoc.matchTests の、結果ごとのケース。結果の数だけ、メソッドがある。
+type MatchTestsCases interface {
+	// OK は、正常に終わるケース。
+	OK() MatchTestsCase
+	// CheckFailed は、例外 hozoc.CheckFailed を投げるケース。
+	CheckFailed() MatchTestsCase
+	// ConfigInvalid は、例外 hozoc.ConfigInvalid を投げるケース。
+	ConfigInvalid() MatchTestsCase
+	// OutputConflict は、例外 hozoc.OutputConflict を投げるケース。
+	OutputConflict() MatchTestsCase
+	// TestsNotRun は、例外 hozoc.TestsNotRun を投げるケース。
+	TestsNotRun() MatchTestsCase
+	// CoverageUnusable は、例外 hozoc.CoverageUnusable を投げるケース。
+	CoverageUnusable() MatchTestsCase
+	// Crashed は、例外 proc.Crashed を投げるケース。
+	Crashed() MatchTestsCase
+	// MalformedOutput は、例外 proc.MalformedOutput を投げるケース。
+	MalformedOutput() MatchTestsCase
+}
+
+// MatchTestsCase は、葉 hozoc.matchTests の、ケース一つ: 渡す引数と、足りない確かめ。
+type MatchTestsCase struct {
+	In      hozoc.TestsInput
+	Checked hozoc.CheckResult
+	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、葉が返した値、err は、葉が返した失敗（正常のケースでは nil）。
+	Then func(t *testing.T, got hozoc.TestsResult, err error)
+}
+
 // LspCases は、葉 hozoc.lsp の、結果ごとのケース。結果の数だけ、メソッドがある。
 type LspCases interface {
 	// OK は、正常に終わるケース。
@@ -90,6 +118,7 @@ type RunEmitCase struct {
 type LeafCases interface {
 	Check() CheckCases
 	CollectOutputs() CollectOutputsCases
+	MatchTests() MatchTestsCases
 	Lsp() LspCases
 	RunEmit() RunEmitCases
 }
@@ -224,6 +253,96 @@ func RunLeaves(t *testing.T, leaves hozoc.Leaves, c LeafCases) {
 		t.Run("MalformedOutput", func(t *testing.T) {
 			k := cases.MalformedOutput()
 			got, err := leaves.CollectOutputs(context.Background(), k.In, k.Checked)
+			var want proc.MalformedOutput
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception proc.MalformedOutput, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+	})
+	t.Run("hozoc.matchTests", func(t *testing.T) {
+		cases := c.MatchTests()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("CheckFailed", func(t *testing.T) {
+			k := cases.CheckFailed()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
+			var want hozoc.CheckFailed
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozoc.CheckFailed, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("ConfigInvalid", func(t *testing.T) {
+			k := cases.ConfigInvalid()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
+			var want hozoc.ConfigInvalid
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozoc.ConfigInvalid, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("OutputConflict", func(t *testing.T) {
+			k := cases.OutputConflict()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
+			var want hozoc.OutputConflict
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozoc.OutputConflict, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("TestsNotRun", func(t *testing.T) {
+			k := cases.TestsNotRun()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
+			var want hozoc.TestsNotRun
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozoc.TestsNotRun, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("CoverageUnusable", func(t *testing.T) {
+			k := cases.CoverageUnusable()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
+			var want hozoc.CoverageUnusable
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozoc.CoverageUnusable, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("Crashed", func(t *testing.T) {
+			k := cases.Crashed()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
+			var want proc.Crashed
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception proc.Crashed, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("MalformedOutput", func(t *testing.T) {
+			k := cases.MalformedOutput()
+			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
 			var want proc.MalformedOutput
 			if !errors.As(err, &want) {
 				t.Fatalf("want exception proc.MalformedOutput, got %v", err)

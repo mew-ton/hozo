@@ -14,6 +14,7 @@ import (
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
+	"github.com/mew-ton/hozo/internal/testmap"
 	"github.com/mew-ton/hozo/ir"
 	sdk "github.com/mew-ton/hozo/plugin"
 )
@@ -110,6 +111,18 @@ type outputPlan struct {
 	outputs []output
 	// warnings は check の warning に、トランスパイラの warning を足したもの（並べ替え済み）。
 	warnings []diag.Diagnostic
+	// tests は求めるテスト: 集めたファイルのうち、テストの対応表（docs/plugin-protocol.md「テストの対応表」）のテスト
+	// （出力の順、トランスパイラの順、対応表の中の順）。
+	tests []plannedTest
+}
+
+// plannedTest は、求めるテスト一つと、その出どころ。
+type plannedTest struct {
+	testmap.Test
+	// mapPath は、そのテストを持つ対応表のパス（ルートからの相対パス）。
+	mapPath string
+	// unit は、その対応表を出した単位（Project.Units の添字）。カバレッジを読む相手（単位の基底のプラグイン）を決める。
+	unit int
 }
 
 // record は出力先 dir の .hozoc-outputs.json の中身（今回書くパスの一覧。辞書順の JSON の配列）。
@@ -233,6 +246,30 @@ func (a *App) collect(ctx context.Context, p *project.Project, namespaces []stri
 				}
 				seen[rel] = true
 				outputs = append(outputs, output{path: rel, content: []byte(f.Content), source: "トランスパイラ " + t.Name, where: where(k), dir: dir})
+			}
+			// テストの対応表（docs/plugin-protocol.md「テストの対応表」）: 形を確かめて、求めるテストに足す。違えば PLG-4
+			for _, f := range resp.Files {
+				rel, _ := pluginPath(f.Path, dir)
+				if !testmap.IsMap(rel) {
+					continue
+				}
+				// file は、応答の files の path の一つ: 書かれたままのパスでも、畳んだパスでもよい
+				paths := map[string]bool{}
+				for _, g := range resp.Files {
+					paths[g.Path] = true
+				}
+				for r := range seen {
+					paths[r] = true
+				}
+				m, err := testmap.Parse(sdk.File{Path: rel, Content: f.Content}, t.Name, paths)
+				if err != nil {
+					return nil, asProc(&hostplugin.MalformedOutputError{Plugin: t.Plugin.Name,
+						Reason: fmt.Sprintf("PLG-4: files の、テストの対応表 %q が、約束の形でない: %v", f.Path, err)})
+				}
+				for _, e := range m.Tests {
+					e.File, _ = pluginPath(e.File, dir)
+					pl.tests = append(pl.tests, plannedTest{Test: testmap.Test{Transpiler: t.Name, TestEntry: e}, mapPath: rel, unit: k.unit})
+				}
 			}
 		}
 	}

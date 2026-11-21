@@ -39,4 +39,9 @@ func (handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
 	return nil, plugin.ErrUnsupported
 }
 
+// Coverage は実装しない（カバレッジを読むのは、基底）。
+func (handler) Coverage(*plugin.CoverageRequest) (*plugin.CoverageResponse, error) {
+	return nil, plugin.ErrUnsupported
+}
+
 func main() { os.Exit(plugin.Main(handler{})) }

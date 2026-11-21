@@ -45,6 +45,23 @@ type Ops interface {
 	// Effects: hozoc.syncOutputs
 	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
 
+	// MatchTests は検査を通った仕様から、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
+	//
+	// 引数:
+	//   - in: コマンドの入力
+	//   - checked: 検査の結果
+	//
+	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, proc.Crashed, proc.MalformedOutput
+	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
+
+	// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
+	//
+	// 引数:
+	//   - in: コマンドの入力
+	//
+	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
+	Tests(ctx context.Context, in TestsInput) (TestsResult, error)
+
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
 	// 引数:
@@ -80,6 +97,15 @@ type Leaves interface {
 	//
 	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
 	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
+
+	// MatchTests は検査を通った仕様から、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
+	//
+	// 引数:
+	//   - in: コマンドの入力
+	//   - checked: 検査の結果
+	//
+	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, proc.Crashed, proc.MalformedOutput
+	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
@@ -118,6 +144,10 @@ func (o *ops) Check(ctx context.Context, in CheckInput) (CheckResult, error) {
 
 func (o *ops) CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error) {
 	return o.leaves.CollectOutputs(ctx, in, checked)
+}
+
+func (o *ops) MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error) {
+	return o.leaves.MatchTests(ctx, in, checked)
 }
 
 func (o *ops) Lsp(ctx context.Context, in LspInput) error {

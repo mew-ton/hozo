@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {"name": "shop.add/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [134, 141]},
+    {"name": "shop.count/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [147, 154]},
+    {"name": "shop.summary/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [160, 167]},
+    {"name": "shop.notify/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [173, 180]},
+    {"name": "shop.lookup/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [186, 193]},
+    {"name": "shop.audit/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [199, 206]},
+    {"name": "shop.post/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [212, 219]},
+    {"name": "shop.plain/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [225, 232]}
+  ]
+}

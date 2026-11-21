@@ -90,6 +90,8 @@ hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = "server"）に out 
 | 1 | `CheckFailed` | error の診断が一つ以上で、設定とマニフェストの error（下の 2）がない。トランスパイラの `errors`（GO-*、GOVALID-*、GOSQL-*、GOHTTP-*、CLI-* など。それぞれのプラグインの文書の「診断」）を含む |
 | 2 | `ConfigInvalid` / `LanguageMismatch` | 設定とマニフェストの error の診断が一つ以上: CFG-*（CFG-5 を除く。`docs/config.md`「診断」）と MAN-*（`docs/plugin-protocol.md`「診断」）。それがすべて CFG-16 なら `LanguageMismatch`、そうでなければ `ConfigInvalid`（`docs/cli.md`「check」の 5） |
 | 3 | `OutputConflict` | CFG-5 |
+| 4 | `TestsNotRun` | 求めるテストのうち、走ったと確かめられないものがある（TESTS-1。`docs/cli.md`「tests」） |
+| 5 | `CoverageUnusable` | カバレッジを、求めるテストと突き合わせられない（TESTS-2、TESTS-3。同） |
 | 64 | `UnknownNamespace`、使い方の誤り | 引数・フラグの解釈の失敗と、`cli.hozo` で 64 を付けた例外 |
 | 70 | `proc.Crashed` / `proc.MalformedOutput`、宣言にない例外 | プラグインの異常終了（`proc.Crashed`）、プラグインの応答の誤り（`proc.MalformedOutput`: JSON でない、形が違う、PLG-1、PLG-2。診断にはならず、例外のメッセージで示す。`docs/plugin-protocol.md`「起動」「応答の形」「診断」）、`cli.exitCode` のない例外 |
 

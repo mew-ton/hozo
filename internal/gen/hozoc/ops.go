@@ -28,6 +28,14 @@ type Ops interface {
 	// Effects: hozoc.syncOutputs
 	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
 
+	// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
+	//
+	// 引数:
+	//   - in: コマンドの入力
+	//
+	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
+	Tests(ctx context.Context, in TestsInput) (TestsResult, error)
+
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
 	// 引数:

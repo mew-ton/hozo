@@ -80,6 +80,22 @@ namespace hozoc {
   @cli.exitCode(3)
   exception OutputConflict(diagnostics: Diagnostic[]);
 
+  /**
+   * 求めるテストのうち、走ったと確かめられないものがある（docs/cli.md「tests」の TESTS-1）
+   *
+   * @param diagnostics error と warning のすべて
+   */
+  @cli.exitCode(4)
+  exception TestsNotRun(diagnostics: Diagnostic[]);
+
+  /**
+   * カバレッジを、求めるテストと突き合わせられない（docs/cli.md「tests」の TESTS-2、TESTS-3）
+   *
+   * @param diagnostics error と warning のすべて
+   */
+  @cli.exitCode(5)
+  exception CoverageUnusable(diagnostics: Diagnostic[]);
+
   /** emit の引数の名前空間も、その子孫も、どの単位の対象でもない */
   @cli.exitCode(64)
   exception UnknownNamespace;
@@ -94,6 +110,13 @@ namespace hozoc {
     written: Path[];
     /** 消したファイル */
     removed: Path[];
+  }
+
+  /** 突き合わせの結果 */
+  model TestsResult {
+    warnings: Diagnostic[];
+    /** 走ったと確かめた、求めるテスト（`<トランスパイラの名前>: <テストの名前>`。対応表の順） */
+    ran: string[];
   }
 
   /** check の入力 */
@@ -116,6 +139,18 @@ namespace hozoc {
     @cli.arg(1) namespaces: string[];
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
+    /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
+    @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+  }
+
+  /** tests の入力 */
+  model TestsInput {
+    /** 設定ファイルの場所 */
+    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
+    /** 表示の形式 */
+    @cli.flag("format") format: OutputFormat?;
+    /** テストを走らせたときに取った、カバレッジのファイル */
+    @cli.required @cli.flag("coverage") coverage: Path;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
   }
@@ -218,6 +253,34 @@ namespace hozoc {
   {
     val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
     return writeOutputs(in, checked);
+  }
+
+  /**
+   * 検査を通った仕様から、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
+   *
+   * @param in コマンドの入力
+   * @param checked 検査の結果
+   * @throws CheckFailed トランスパイラが errors を返した
+   * @throws ConfigInvalid hozo.toml がない（docs/config.md の CFG-7）
+   * @throws OutputConflict 同じファイルに二つの出どころが書こうとした
+   * @throws TestsNotRun 求めるテストのうち、走ったと確かめられないものがある
+   * @throws CoverageUnusable 置き場の出力が今の仕様からのものと違う、または、カバレッジを読めない
+   * @throws proc.Crashed プラグインが異常終了した
+   */
+  fn matchTests(in: TestsInput, checked: CheckResult): TestsResult
+    throws CheckFailed, ConfigInvalid, OutputConflict, TestsNotRun, CoverageUnusable
+    throws proc.Crashed, proc.MalformedOutput;
+
+  /**
+   * 仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
+   *
+   * @param in コマンドの入力
+   * @see check
+   */
+  @cli.command("tests")
+  export fn tests(in: TestsInput): TestsResult {
+    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
+    return matchTests(in, checked);
   }
 
   /**

@@ -133,9 +133,16 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 	if err != nil {
 		return nil, err
 	}
+	testFile := plugin.File{Path: path.Join(layout.TestDir, TestFileName), Content: test}
+	// テストの対応表（docs/plugin-go-http.md「インテグレーションテストの口」の「置き場と名前」）: 出したテキストから作る
+	tests, err := golang.TestMap(testFile.Path, testFile.Content)
+	if err != nil {
+		return nil, fmt.Errorf("テストの対応表を作れない（生成器の不具合）: %w", err)
+	}
 	return &Output{Files: []plugin.File{
 		{Path: path.Join(layout.Dir, FileName), Content: content},
-		{Path: path.Join(layout.TestDir, TestFileName), Content: test},
+		testFile,
+		plugin.TestMapFile(layout.TestDir, TranspilerName, tests),
 	}}, nil
 }
 

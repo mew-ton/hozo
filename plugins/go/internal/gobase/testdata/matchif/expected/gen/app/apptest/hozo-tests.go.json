@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {"name": "app.findUser/OK", "file": "gen/app/apptest/leaves.go", "lines": [163, 170]},
+    {"name": "app.lookup/OK", "file": "gen/app/apptest/leaves.go", "lines": [176, 183]},
+    {"name": "app.nameOf/OK", "file": "gen/app/apptest/leaves.go", "lines": [189, 196]},
+    {"name": "app.loadName/OK", "file": "gen/app/apptest/leaves.go", "lines": [202, 209]},
+    {"name": "app.show/OK", "file": "gen/app/apptest/leaves.go", "lines": [215, 222]},
+    {"name": "app.record/OK", "file": "gen/app/apptest/leaves.go", "lines": [228, 235]},
+    {"name": "app.countOf/OK", "file": "gen/app/apptest/leaves.go", "lines": [241, 248]},
+    {"name": "app.countTags/OK", "file": "gen/app/apptest/leaves.go", "lines": [254, 261]},
+    {"name": "app.useToken/OK", "file": "gen/app/apptest/leaves.go", "lines": [267, 274]},
+    {"name": "app.takeOptionalUser/OK", "file": "gen/app/apptest/leaves.go", "lines": [280, 287]}
+  ]
+}

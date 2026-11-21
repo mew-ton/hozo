@@ -13,10 +13,11 @@ import (
 // Presenter は結果と例外の表示（docs/cli.md「手で書くもの」の Presenter、docs/plugin-go-cli.md「実行と表示」）。
 // go-cli が生成した cli.Presenter の実装で、cli.Main が結果を標準出力に、例外を標準エラーに出すときに呼ぶ。
 //
-// 形式は input（hozoc.CheckInput / hozoc.EmitInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
+// 形式は input（hozoc.CheckInput / hozoc.EmitInput / hozoc.TestsInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
 //
 //   - text: CheckResult は診断（warning）の一覧と件数。EmitResult は warning があればその一覧と件数、続けて
-//     `written: <path>` と `removed: <path>` を一行ずつ。診断を運ぶ例外はその一覧と件数。それ以外の例外は
+//     `written: <path>` と `removed: <path>` を一行ずつ。TestsResult は warning があればその一覧と件数、続けて
+//     `ran: <トランスパイラの名前>: <テストの名前>` を一行ずつと、最後に件数（`3 tests ran`）。診断を運ぶ例外はその一覧と件数。それ以外の例外は
 //     `hozoc: <メッセージ>`（Failure.Err のメッセージ。なければ例外の FQN）。
 //   - json: CheckResult は {"warnings": [...]}、EmitResult は {"warnings": [...], "written": [...], "removed": [...]}。
 //     例外は {"error": "<FQN>", "value": {...}} で、診断を運ぶ例外の value は docs/diagnostics.md「表示」の json
@@ -63,6 +64,29 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 			}
 		}
 		return nil
+	case hozoc.TestsResult:
+		ran := r.Ran
+		if ran == nil {
+			ran = []string{}
+		}
+		if isJSON(input) {
+			return writeJSON(w, struct {
+				Warnings []diag.Rendered `json:"warnings"`
+				Ran      []string        `json:"ran"`
+			}{rendered(r.Warnings), ran})
+		}
+		if len(r.Warnings) > 0 {
+			if err := diag.WriteRenderedText(w, rendered(r.Warnings)); err != nil {
+				return err
+			}
+		}
+		for _, name := range ran {
+			if _, err := fmt.Fprintf(w, "ran: %s\n", name); err != nil {
+				return err
+			}
+		}
+		_, err := fmt.Fprintf(w, "%d tests ran\n", len(ran))
+		return err
 	}
 	return cli.JSONPresenter{}.Present(w, command, input, result)
 }
@@ -91,12 +115,14 @@ func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Fail
 	return err
 }
 
-// isJSON は入力の format が json か（cli.hozo の CheckInput / EmitInput の format。lsp にはない）。
+// isJSON は入力の format が json か（cli.hozo の CheckInput / EmitInput / TestsInput の format。lsp にはない）。
 func isJSON(input any) bool {
 	switch in := input.(type) {
 	case hozoc.CheckInput:
 		return in.Format != nil && *in.Format == "json"
 	case hozoc.EmitInput:
+		return in.Format != nil && *in.Format == "json"
+	case hozoc.TestsInput:
 		return in.Format != nil && *in.Format == "json"
 	}
 	return false

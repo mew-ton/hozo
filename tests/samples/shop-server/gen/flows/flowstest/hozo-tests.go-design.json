@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"name": "flows.signInAndOrder", "file": "gen/flows/flowstest/design.go", "lines": [35, 48]},
+    {"name": "design.Requirement.PRD_001", "file": "gen/flows/flowstest/design.go", "lines": [66, 66]},
+    {"name": "design.Requirement.PRD_002", "file": "gen/flows/flowstest/design.go", "lines": [69, 69]}
+  ]
+}

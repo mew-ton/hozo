@@ -1,0 +1,25 @@
+{
+  "tests": [
+    {"name": "server.login/OK", "file": "gen/server/servertest/http.go", "lines": [216, 222]},
+    {"name": "server.login/BadRequest", "file": "gen/server/servertest/http.go", "lines": [225, 231]},
+    {"name": "server.login/InvalidCredentials", "file": "gen/server/servertest/http.go", "lines": [234, 240]},
+    {"name": "server.login/LimitExceeded", "file": "gen/server/servertest/http.go", "lines": [243, 249]},
+    {"name": "server.logout/OK", "file": "gen/server/servertest/http.go", "lines": [260, 265]},
+    {"name": "server.logout/Unauthorized", "file": "gen/server/servertest/http.go", "lines": [268, 273]},
+    {"name": "server.getMe/OK", "file": "gen/server/servertest/http.go", "lines": [284, 290]},
+    {"name": "server.getMe/Unauthorized", "file": "gen/server/servertest/http.go", "lines": [293, 299]},
+    {"name": "server.getOrders/OK", "file": "gen/server/servertest/http.go", "lines": [311, 317]},
+    {"name": "server.getOrders/Unauthorized", "file": "gen/server/servertest/http.go", "lines": [320, 326]},
+    {"name": "server.getLatestOrder/OK", "file": "gen/server/servertest/http.go", "lines": [337, 343]},
+    {"name": "server.getLatestOrder/Unauthorized", "file": "gen/server/servertest/http.go", "lines": [346, 352]},
+    {"name": "server.getMyPage/OK", "file": "gen/server/servertest/http.go", "lines": [363, 369]},
+    {"name": "server.getMyPage/Unauthorized", "file": "gen/server/servertest/http.go", "lines": [372, 378]},
+    {"name": "server.placeOrder/OK", "file": "gen/server/servertest/http.go", "lines": [390, 396]},
+    {"name": "server.placeOrder/BadRequest", "file": "gen/server/servertest/http.go", "lines": [399, 405]},
+    {"name": "server.placeOrder/Unauthorized", "file": "gen/server/servertest/http.go", "lines": [408, 414]},
+    {"name": "server.placeOrder/NotificationFailed", "file": "gen/server/servertest/http.go", "lines": [417, 423]},
+    {"name": "server.resendNotices/OK", "file": "gen/server/servertest/http.go", "lines": [434, 440]},
+    {"name": "server.resendNotices/Unauthorized", "file": "gen/server/servertest/http.go", "lines": [443, 449]},
+    {"name": "server.resendNotices/NotificationFailed", "file": "gen/server/servertest/http.go", "lines": [452, 458]}
+  ]
+}

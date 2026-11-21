@@ -1,0 +1,13 @@
+{
+  "tests": [
+    {"name": "app.submit/OK", "file": "gen/app/apptest/http.go", "lines": [120, 126]},
+    {"name": "app.submit/BadRequest", "file": "gen/app/apptest/http.go", "lines": [129, 135]},
+    {"name": "app.submit/AppOK", "file": "gen/app/apptest/http.go", "lines": [138, 144]},
+    {"name": "app.submit/AppBadRequest", "file": "gen/app/apptest/http.go", "lines": [147, 153]},
+    {"name": "app.submit/AppBusy", "file": "gen/app/apptest/http.go", "lines": [156, 162]},
+    {"name": "app.submit/OtherBusy", "file": "gen/app/apptest/http.go", "lines": [165, 171]},
+    {"name": "app.fail/Busy", "file": "gen/app/apptest/http.go", "lines": [181, 186]},
+    {"name": "app.byRequest/OK", "file": "gen/app/apptest/http.go", "lines": [197, 203]},
+    {"name": "app.byThen/OK", "file": "gen/app/apptest/http.go", "lines": [214, 219]}
+  ]
+}

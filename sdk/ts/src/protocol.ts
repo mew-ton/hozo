@@ -5,9 +5,9 @@
 import type { Program, View } from "./ir.js";
 
 /** プロトコルの版。docs/ir.md の version（view.version）と同じ値。 */
-export const PROTOCOL = "0.16" as const;
+export const PROTOCOL = "0.17" as const;
 
-export type Direction = "emit" | "check" | "import";
+export type Direction = "emit" | "check" | "import" | "coverage";
 
 /**
  * 書き出す（または取り込む）ファイル。path はプロジェクトのルートからの相対パス。emit の応答では、その起動の出力先
@@ -91,8 +91,54 @@ export interface ImportResponse {
   warnings: Warning[];
 }
 
-export type Request = EmitRequest | CheckRequest | ImportRequest;
-export type Response = EmitResponse | CheckResponse | ImportResponse;
+/** 行の範囲: 始まりの行と、終わりの行（1 始まりで、両端を含む）。 */
+export type LineRange = [number, number];
+
+/** coverage の要求（docs/plugin-protocol.md「coverage」）。 */
+export interface CoverageRequest {
+  protocol: typeof PROTOCOL;
+  direction: "coverage";
+  /** hozoc tests に渡された、カバレッジのファイル（path は絶対パス）。 */
+  coverage: File;
+  /** 実行された行を知りたいファイル（プロジェクトのルートからの相対パス）。 */
+  files: string[];
+}
+
+/** coverage の応答。recognized が false なら、このプラグインが読める形のファイルではなかった。 */
+export interface CoverageResponse {
+  recognized: boolean;
+  /** 要求の files のうち、カバレッジが測っていたファイルごとに一つ。 */
+  files: CoveredFile[];
+}
+
+/** 測られていたファイル一つの、実行された所の行の範囲。一度も実行されていなければ lines は空。 */
+export interface CoveredFile {
+  path: string;
+  lines: LineRange[];
+}
+
+/**
+ * テストの対応表（docs/plugin-protocol.md「テストの対応表」）: テストを受け取る口を出すトランスパイラが、emit の応答の files に
+ * 足すファイル hozo-tests.<トランスパイラの名前>.json の中身。
+ */
+export interface TestMap {
+  tests: TestEntry[];
+}
+
+/** 対応表のテスト一つ。file は、そのテストの行を持つファイル（プロジェクトのルートからの相対パス）。 */
+export interface TestEntry {
+  name: string;
+  file: string;
+  lines: LineRange;
+}
+
+/** トランスパイラ transpiler の対応表のファイルの名前（Go の plugin.TestMapName）。 */
+export function testMapName(transpiler: string): string {
+  return `hozo-tests.${transpiler}.json`;
+}
+
+export type Request = EmitRequest | CheckRequest | ImportRequest | CoverageRequest;
+export type Response = EmitResponse | CheckResponse | ImportResponse | CoverageResponse;
 
 /** 終了コード 2 のときの標準出力（docs/plugin-protocol.md「起動」）。 */
 export interface PluginError {
@@ -105,7 +151,7 @@ export interface PluginError {
 type MaybePromise<T> = T | Promise<T>;
 
 /**
- * プラグインが実装する三つの方向。実装しない方向はメソッドを持たないか、
+ * プラグインが実装する四つの方向。実装しない方向はメソッドを持たないか、
  * UnsupportedDirectionError を投げる。emit で知らないトランスパイラ（req.transpiler）のときも同じものを投げる。
  * どれも code "unsupported"（終了コード 2）になる。
  */
@@ -113,6 +159,7 @@ export interface Handler {
   emit?(req: EmitRequest): MaybePromise<EmitResponse>;
   check?(req: CheckRequest): MaybePromise<CheckResponse>;
   import?(req: ImportRequest): MaybePromise<ImportResponse>;
+  coverage?(req: CoverageRequest): MaybePromise<CoverageResponse>;
 }
 
 /** Handler がその direction か、要求のトランスパイラを実装していないことを表す（Go の plugin.ErrUnsupported）。 */

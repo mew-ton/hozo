@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "ops.run/OK", "file": "gen/ops/opstest/leaves.go", "lines": [37, 44]}
+  ]
+}

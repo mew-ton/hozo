@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"name": "stock.Level/Plenty", "file": "gen/stock/stocktest/classify.go", "lines": [28, 34]},
+    {"name": "stock.Level/Few", "file": "gen/stock/stocktest/classify.go", "lines": [37, 43]},
+    {"name": "stock.Level/Out", "file": "gen/stock/stocktest/classify.go", "lines": [46, 52]}
+  ]
+}

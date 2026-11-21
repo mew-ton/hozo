@@ -3,6 +3,7 @@
   "internal/gen/hozoc/cli/cli.go",
   "internal/gen/hozoc/doc.go",
   "internal/gen/hozoc/hozoctest/doc.go",
+  "internal/gen/hozoc/hozoctest/hozo-tests.go.json",
   "internal/gen/hozoc/hozoctest/leaves.go",
   "internal/gen/hozoc/inner/classify.go",
   "internal/gen/hozoc/inner/doc.go",

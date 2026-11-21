@@ -25,6 +25,7 @@ internal/check/        検査
 internal/config/       hozo.toml
 internal/vocab/        埋め込んだ標準の語彙
 internal/plugin/       プラグインの探索と起動
+internal/testmap/      テストの対応表の形の確かめと、実行された行との突き合わせ
 internal/project/      一度の解析のすべて
 internal/app/          hozoc の葉の op と状態の単位の実装と表示
 internal/lsp/          言語サーバー（jsonrpc/ は JSON-RPC、protocol/ は LSP の型のうち使うもの）
@@ -56,12 +57,13 @@ Go のパッケージごとの、このモジュールの中で import してい
 | パッケージ | import する |
 |---|---|
 | `cmd/hozoc` | `internal/app`、`internal/gen/hozoc/cli` |
-| `internal/app` | `internal/config`、`internal/diag`、`internal/gen/hozoc`、`internal/gen/hozoc/cli`、`internal/gen/proc`、`internal/lsp`、`internal/plugin`、`internal/project`、`internal/source`、`ir`、`plugin` |
+| `internal/app` | `internal/config`、`internal/diag`、`internal/gen/hozoc`、`internal/gen/hozoc/cli`、`internal/gen/proc`、`internal/lsp`、`internal/plugin`、`internal/project`、`internal/source`、`internal/testmap`、`ir`、`plugin` |
 | `internal/lsp` | `internal/diag`、`internal/lsp/jsonrpc`、`internal/lsp/protocol`、`internal/project`、`internal/sema`、`internal/source`、`internal/syntax`、`internal/syntax/ast`、`internal/vocab`、`ir` |
 | `internal/lsp/jsonrpc` | — |
 | `internal/lsp/protocol` | — |
 | `internal/project` | `internal/check`、`internal/config`、`internal/diag`、`internal/plugin`、`internal/sema`、`internal/source`、`internal/syntax`、`internal/syntax/ast`、`internal/vocab`、`ir`、`plugin` |
 | `internal/plugin` | `internal/config`、`internal/diag`、`ir`、`plugin` |
+| `internal/testmap` | `plugin` |
 | `internal/check` | `internal/config`、`internal/diag`、`internal/source`、`ir` |
 | `internal/sema` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`ir` |
 | `internal/syntax` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`internal/syntax/token` |
@@ -81,7 +83,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/tools/selfgen` | — |
 | `ir` | — |
 | `plugin` | `ir` |
-| `plugin/golang` | `ir` |
+| `plugin/golang` | `ir`、`plugin` |
 | `plugin/govalid` | `ir`、`runtime` |
 | `runtime` | — |
 | `vocab` | — |
@@ -148,6 +150,7 @@ type Handler interface {
     Emit(req *EmitRequest) (*EmitResponse, error)
     Check(req *CheckRequest) (*CheckResponse, error)
     Import(req *ImportRequest) (*ImportResponse, error)
+    Coverage(req *CoverageRequest) (*CoverageResponse, error)
 }
 type EmitRequest struct { Protocol string; Direction string; Transpiler string; View *ir.View }   // Transpiler は起動されたトランスパイラの名前
 type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic }
@@ -157,6 +160,16 @@ func Options(req *EmitRequest, into any) ([]string, error)         // req.View.C
                                                                    // 知らないキーと error を診断にするのは呼ぶ側（docs/config.md「オプション」）
 const Version = "0.0.0-dev"                                         // このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）
 // CheckRequest / CheckResponse / ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
+type CoverageRequest struct { Protocol string; Direction string; Coverage File; Files []string }   // docs/plugin-protocol.md「coverage」
+type CoverageResponse struct { Recognized bool; Files []CoveredFile }
+type CoveredFile struct { Path string; Lines [][2]int }             // 実行された所の、行の範囲（始まり、終わり）
+
+// テストの対応表（docs/plugin-protocol.md「テストの対応表」）
+type TestMap struct { Tests []TestEntry }
+type TestEntry struct { Name string; File string; Lines [2]int }
+func TestMapName(transpiler string) string                          // "hozo-tests.<transpiler>.json"
+func TestMapTranspiler(path string) (string, bool)                  // path の名前が、対応表のもの（hozo-tests.<名前>.json）なら、その <名前>
+func TestMapFile(dir, transpiler string, tests []TestEntry) File     // dir の下の、対応表のファイル。テスト一つを一行に書く（docs/plugin-go.md「テストの対応表」の並びと字下げ）
 
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。終了コードを返す
 // （docs/plugin-protocol.md「要求と応答」「起動」。文字列でない protocol も「合わない」で code "protocol"。TS の run も同じ）。
@@ -286,6 +299,9 @@ type TestName struct {
     What string                                   // その名前を生んだものの、診断のメッセージ用の言い方（`op server.newSession のケースの口 NewSessionCases`）
 }
 func PublicTestNames(view *ir.View) []TestName    // 出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて。口が一つもない出力では、空
+func TestMap(path, src string) ([]plugin.TestEntry, error)   // 整形した後の Go のソース src（置き場は path）の、走らせる関数の中のテスト（docs/plugin-go.md「テストの対応表」）。行の順。約束の形でない t.Run があれば error
+func ReadCoverProfile(content string) (profile *CoverProfile, recognized bool, err error)   // go test -coverprofile の形を読む（同「カバレッジを読む」）。頭の行が違えば recognized が false
+func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <import パス>/<ファイル名> の、実行された行の範囲。一行もなければ measured が false
 ```
 
 - `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは入口のパッケージなので、import には効かない。
@@ -467,14 +483,14 @@ func Under(a, dir string) bool                              // 相対パス a �
 ホスト側。`docs/plugin-protocol.md`。
 
 ```go
-type Manifest struct{ ...; Transpilers []Transpiler }
+type Manifest struct{ ...; Transpilers []Transpiler; Coverage Coverage }   // Coverage.Enabled は [coverage] enabled
 type Transpiler struct { Name, Language string; Requires, Unsupported, Seams []string }  // [[transpiler]] 一つ。Requires が空なら基底。Seams は継ぎ目を要るデコレータの FQN
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-2 / MAN-4
 type Plugin struct { Name, Dir string; Manifest *Manifest; Mismatch []diag.Diagnostic } // 入っているプラグイン一つ。Dir は絶対パス。Mismatch は MAN-2（使うときにだけ報告する）
 type SearchEnv struct { PluginPath, Home string }                                       // 探索が見るプロジェクトの外の場所（HOZO_PLUGIN_PATH の値、ホーム）。呼ぶ側が渡す。零値なら plugin_dirs だけ
 func Discover(cfg *config.Config, env SearchEnv) ([]*Plugin, []diag.Diagnostic)         // 入っているプラグインのすべて（docs/plugin-protocol.md「探索」の順）。MAN-3 / MAN-4。プロセスの環境は読まない
 type Runner struct { Root string; Stderr io.Writer; Env []string }
-func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）。resp が *sdk.EmitResponse か *sdk.CheckResponse なら応答の形も確かめる（同「応答の形」）
+func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）。resp が *sdk.EmitResponse か *sdk.CheckResponse か *sdk.CoverageResponse なら応答の形も確かめる（同「応答の形」）
 var ErrCrashed, ErrMalformedOutput error                                                // errors.Is で判定。*PluginError は exit 2 の code を持ち、MAN-2 / MAN-5 の診断にする
 ```
 
@@ -512,6 +528,18 @@ func (p *Project) PluginWarning(transpiler string, w sdk.Warning) diag.Diagnosti
 ```
 
 `hozoc` の `check` / `emit`（`internal/app`）と言語サーバー（`internal/lsp`）は `LoadWith` を呼ぶ。`Project` は `Root`、`Sources`、`RunErr`（プラグインの `check` が `proc.Crashed` / `proc.MalformedOutput` で終わったときの誤り）も持つ。`Covered` 以下の五つは、`internal/app` が `emit` の手順（`docs/cli.md`「emit」）で使うためのもの。
+
+### `internal/testmap`
+
+テストの対応表と、カバレッジの「実行された行」の突き合わせ（`docs/cli.md`「tests」の 2 と 5）。言語も、カバレッジの形も、知らない。診断は作らない（`internal/app` が、結果から作る）。
+
+```go
+func IsMap(path string) bool                                          // 名前が hozo-tests.<…>.json か
+func Parse(file sdk.File, transpiler string, files map[string]bool) (*sdk.TestMap, error)   // 形を確かめて読む。違えば error（PLG-4 の文面）。files は、同じ応答の files の path
+type Test struct { Transpiler string; sdk.TestEntry }                  // 求めるテスト一つ
+type Status int                                                       // Ran / NotRun（測ったが、行が実行されていない）/ Unmeasured（カバレッジが、そのファイルを測っていない）
+func Match(tests []Test, covered []sdk.CoveredFile) []Status          // tests と同じ長さ、同じ順
+```
 
 ### `internal/app`
 

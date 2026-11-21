@@ -223,8 +223,11 @@ func TestIncompleteDoNotCompile(t *testing.T) {
 // TestContents は、design.go の中身（「出力」「口の形」「指している設計」）のうち、行として確かめるもの。
 func TestContents(t *testing.T) {
 	_, files := emitFixture(t, "flows")
-	// 出すファイルは、go-design を並べた単位ごとに、テストのパッケージの design.go 一つ（act の単位は、並べていない）
-	if got := strings.Join(sortedPaths(files), " "); got != "gen/flows/flowstest/design.go gen/k/ktest/design.go gen/mixed/mixedtest/design.go gen/reqonly/reqonlytest/design.go" {
+	// 出すファイルは、go-design を並べた単位ごとに、テストのパッケージの design.go と、その、テストの対応表（act の単位は、
+	// 並べていない）
+	if got := strings.Join(sortedPaths(files), " "); got != "gen/flows/flowstest/design.go gen/flows/flowstest/hozo-tests.go-design.json "+
+		"gen/k/ktest/design.go gen/k/ktest/hozo-tests.go-design.json gen/mixed/mixedtest/design.go gen/mixed/mixedtest/hozo-tests.go-design.json "+
+		"gen/reqonly/reqonlytest/design.go gen/reqonly/reqonlytest/hozo-tests.go-design.json" {
 		t.Errorf("出したファイル = %s", got)
 	}
 	flows := files["gen/flows/flowstest/design.go"]
@@ -244,7 +247,8 @@ func TestContents(t *testing.T) {
 		"足りない確かめ。\ntype PingFlowCase struct {\n",
 		// 要求: 分類の順、その中は、ケースの宣言順。メソッドの名前は、先頭を大文字に。テストの名前は、もとのケースの名前
 		"// Requirements は、要求ごとの、テストの入れ物。要求（design.Req、design.Extra のケース）ごとに、メソッド一つ（宣言順）。中身は、人か AI が書く。\n",
-		"\tt.Run(\"design.Req.r3\", c.R3)\n", "func RunRequirements(t *testing.T, c Requirements) {\n",
+		// 走らせる側は、入れ物を、その場の関数で包んで呼ぶ（「要求の、テストの入れ物の口」の「口の形」）
+		"\tt.Run(\"design.Req.r3\", func(t *testing.T) {\n\t\tc.R3(t)\n\t})\n", "func RunRequirements(t *testing.T, c Requirements) {\n",
 		// 指している設計: 名前空間の FQN の辞書順、その中は宣言順。同じ宣言は、一度だけ。op のほかの宣言（model、状態、read、効果）も
 		"\t// 指している設計: act.buy、act.count、flows.checkout\n", "\t// 指している設計: data.Row、data.rows、data.first、data.add\n",
 		"\t// 指している設計: なし\n", "\t// 指している設計: data.first、flows.checkout\n",
@@ -519,12 +523,15 @@ func TestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	// どこからも指されていない要求の warning は、ファイルと一緒に返す
-	if len(resp.Files) != 1 || len(resp.Errors) != 0 || len(resp.Warnings) != 1 {
+	if len(resp.Files) != 2 || len(resp.Errors) != 0 || len(resp.Warnings) != 1 {
 		t.Fatalf("files=%d errors=%v warnings=%v", len(resp.Files), resp.Errors, resp.Warnings)
 	}
 	want, _, _ := emitViews(t, root, []*ir.View{view})
-	if f := resp.Files[0]; f.Path != "gen/flows/flowstest/design.go" || want[f.Path] != f.Content {
-		t.Errorf("ファイル %s が、Emit の結果と違う", f.Path)
+	// 並びは、design.go、その、テストの対応表
+	for i, p := range []string{"gen/flows/flowstest/design.go", "gen/flows/flowstest/hozo-tests.go-design.json"} {
+		if f := resp.Files[i]; f.Path != p || want[f.Path] != f.Content {
+			t.Errorf("%d 番目のファイル %s が、Emit の結果（%s）と違う", i+1, f.Path, p)
+		}
 	}
 	// 診断は errors で返し、ファイルも warning も返さない
 	resp, err = h.Emit(request(loadViews(t, "godesign5")[1], TranspilerName))

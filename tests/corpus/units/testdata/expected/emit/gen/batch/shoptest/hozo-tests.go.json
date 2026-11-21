@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"name": "shop.issue/OK", "file": "gen/batch/shoptest/leaves.go", "lines": [64, 71]},
+    {"name": "shop.sweep/OK", "file": "gen/batch/shoptest/leaves.go", "lines": [77, 84]},
+    {"name": "shop.report/OK", "file": "gen/batch/shoptest/leaves.go", "lines": [90, 97]}
+  ]
+}

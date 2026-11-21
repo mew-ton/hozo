@@ -62,6 +62,10 @@ type Requirements interface {
 
 // RunRequirements は、要求ごとに、入れ物を一つ走らせる。テストの名前は、要求の名前（<分類の FQN>.<ケース>）。
 func RunRequirements(t *testing.T, c Requirements) {
-	t.Run("design.Requirement.PRD_001", c.PRD_001)
-	t.Run("design.Requirement.PRD_002", c.PRD_002)
+	t.Run("design.Requirement.PRD_001", func(t *testing.T) {
+		c.PRD_001(t)
+	})
+	t.Run("design.Requirement.PRD_002", func(t *testing.T) {
+		c.PRD_002(t)
+	})
 }

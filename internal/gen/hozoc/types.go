@@ -40,6 +40,12 @@ type LanguageMismatch = inner.LanguageMismatch
 // OutputConflict: 複数の出どころが同じファイルに書こうとした
 type OutputConflict = inner.OutputConflict
 
+// TestsNotRun: 求めるテストのうち、走ったと確かめられないものがある（docs/cli.md「tests」の TESTS-1）
+type TestsNotRun = inner.TestsNotRun
+
+// CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「tests」の TESTS-2、TESTS-3）
+type CoverageUnusable = inner.CoverageUnusable
+
 // UnknownNamespace: emit の引数の名前空間も、その子孫も、どの単位の対象でもない
 type UnknownNamespace = inner.UnknownNamespace
 
@@ -49,11 +55,17 @@ type CheckResult = inner.CheckResult
 // EmitResult は書き出しの結果
 type EmitResult = inner.EmitResult
 
+// TestsResult は突き合わせの結果
+type TestsResult = inner.TestsResult
+
 // CheckInput は check の入力
 type CheckInput = inner.CheckInput
 
 // EmitInput は emit の入力
 type EmitInput = inner.EmitInput
+
+// TestsInput は tests の入力
+type TestsInput = inner.TestsInput
 
 // LspInput は lsp の入力
 type LspInput = inner.LspInput

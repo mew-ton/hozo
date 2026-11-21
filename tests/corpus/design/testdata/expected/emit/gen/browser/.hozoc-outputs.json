@@ -1,6 +1,7 @@
 [
   "gen/browser/browsertest/classify.go",
   "gen/browser/browsertest/doc.go",
+  "gen/browser/browsertest/hozo-tests.go.json",
   "gen/browser/browsertest/leaves.go",
   "gen/browser/classify.go",
   "gen/browser/doc.go",

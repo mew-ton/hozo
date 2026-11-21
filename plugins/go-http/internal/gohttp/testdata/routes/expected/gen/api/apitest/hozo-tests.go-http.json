@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {"name": "api.health/OK", "file": "gen/api/apitest/http.go", "lines": [245, 251]},
+    {"name": "api.create/OK", "file": "gen/api/apitest/http.go", "lines": [277, 283]},
+    {"name": "api.create/BadRequest", "file": "gen/api/apitest/http.go", "lines": [286, 292]},
+    {"name": "api.create/Conflict", "file": "gen/api/apitest/http.go", "lines": [295, 301]},
+    {"name": "api.create/Rejected", "file": "gen/api/apitest/http.go", "lines": [304, 310]},
+    {"name": "api.search/OK", "file": "gen/api/apitest/http.go", "lines": [336, 342]},
+    {"name": "api.search/BadRequest", "file": "gen/api/apitest/http.go", "lines": [345, 351]},
+    {"name": "api.search/Broken", "file": "gen/api/apitest/http.go", "lines": [354, 360]},
+    {"name": "api.search/Leaky", "file": "gen/api/apitest/http.go", "lines": [363, 369]},
+    {"name": "api.first/OK", "file": "gen/api/apitest/http.go", "lines": [381, 387]},
+    {"name": "api.first/BadRequest", "file": "gen/api/apitest/http.go", "lines": [390, 396]},
+    {"name": "api.first/NotFound", "file": "gen/api/apitest/http.go", "lines": [399, 405]},
+    {"name": "api.first/Limited", "file": "gen/api/apitest/http.go", "lines": [408, 414]},
+    {"name": "api.first/Gone", "file": "gen/api/apitest/http.go", "lines": [417, 423]},
+    {"name": "api.replace/OK", "file": "gen/api/apitest/http.go", "lines": [434, 439]},
+    {"name": "api.replace/BadRequest", "file": "gen/api/apitest/http.go", "lines": [442, 447]},
+    {"name": "api.replace/NotFound", "file": "gen/api/apitest/http.go", "lines": [450, 455]},
+    {"name": "api.listAll/OK", "file": "gen/api/apitest/http.go", "lines": [467, 473]},
+    {"name": "api.put/OK", "file": "gen/api/apitest/http.go", "lines": [485, 491]},
+    {"name": "api.put/BadRequest", "file": "gen/api/apitest/http.go", "lines": [494, 500]},
+    {"name": "api.reset/OK", "file": "gen/api/apitest/http.go", "lines": [510, 515]},
+    {"name": "api.ping/OK/GET /ping", "file": "gen/api/apitest/http.go", "lines": [526, 532]},
+    {"name": "api.ping/OK/POST /ping", "file": "gen/api/apitest/http.go", "lines": [535, 541]},
+    {"name": "api.count/OK", "file": "gen/api/apitest/http.go", "lines": [552, 558]}
+  ]
+}

@@ -25,6 +25,8 @@ interface SchemaNode {
   enum?: string[];
   type?: string;
   items?: SchemaNode;
+  minItems?: number;
+  maxItems?: number;
   properties?: Record<string, SchemaNode>;
   required?: string[];
 }
@@ -41,6 +43,11 @@ const mapping: Record<string, string> = {
   CheckResponse: "CheckResponse",
   ImportRequest: "ImportRequest",
   ImportResponse: "ImportResponse",
+  CoverageRequest: "CoverageRequest",
+  CoverageResponse: "CoverageResponse",
+  CoveredFile: "CoveredFile",
+  TestMap: "TestMap",
+  TestEntry: "TestEntry",
   File: "File",
   Warning: "Warning",
   Diagnostic: "EmitError",
@@ -79,6 +86,14 @@ function members(nodes: ts.NodeArray<ts.TypeElement>): string {
 
 function typeOf(node: ts.TypeNode): string {
   if (node.kind === ts.SyntaxKind.StringKeyword) return "string";
+  if (node.kind === ts.SyntaxKind.BooleanKeyword) return "boolean";
+  if (node.kind === ts.SyntaxKind.NumberKeyword) return "number";
+  // 長さの決まった配列（[number, number]）: 要素の型と、長さ
+  if (ts.isTupleTypeNode(node)) {
+    const elements = node.elements.map((e) => typeOf(e as ts.TypeNode));
+    assert.ok(elements.length > 0 && elements.every((e) => e === elements[0]), `要素の型がそろっていないタプル: ${node.getText()}`);
+    return `${elements[0]}[${elements.length}]`;
+  }
   if (ts.isLiteralTypeNode(node) && ts.isStringLiteral(node.literal)) return JSON.stringify(node.literal.text);
   if (ts.isArrayTypeNode(node)) return `${typeOf(node.elementType)}[]`;
   if (ts.isUnionTypeNode(node)) return node.types.map(typeOf).sort().join(" | ");
@@ -107,6 +122,11 @@ function schemaType(node: SchemaNode): string {
   if (node.const !== undefined) return JSON.stringify(node.const);
   if (node.enum !== undefined) return node.enum.map((v) => JSON.stringify(v)).sort().join(" | ");
   if (node.type === "string") return "string";
+  if (node.type === "boolean") return "boolean";
+  if (node.type === "integer") return "number";
+  if (node.type === "array" && node.items && node.minItems !== undefined && node.minItems === node.maxItems) {
+    return `${schemaType(node.items)}[${node.minItems}]`;
+  }
   if (node.type === "array" && node.items) return `${schemaType(node.items)}[]`;
   if (node.type === "object" && node.properties) return schemaObject(node, "");
   assert.fail(`正規形にできないスキーマ: ${JSON.stringify(node)}`);

@@ -25,6 +25,7 @@
         "gen/server/inner/wiring.go",
         "gen/server/servertest/doc.go",
         "gen/server/servertest/leaves.go",
+        "gen/server/servertest/hozo-tests.go.json",
         "gen/http/doc.go",
         "gen/http/types.go",
         "gen/client/doc.go",
@@ -43,13 +44,17 @@
       "files": ["gen/store/db.go"]
     },
     "go-http": {
-      "files": ["gen/server/http.go", "gen/server/servertest/http.go"]
+      "files": ["gen/server/http.go", "gen/server/servertest/http.go", "gen/server/servertest/hozo-tests.go-http.json"]
     },
     "go-ratelimit": {
       "files": ["gen/server/ratelimit.go"]
     },
     "go-design": {
-      "files": ["gen/flows/flowstest/design.go"]
+      "files": ["gen/flows/flowstest/design.go", "gen/flows/flowstest/hozo-tests.go-design.json"]
     }
+  },
+  "tests": {
+    "skip": "^TestFlows$",
+    "missing": ["go-design: flows.signInAndOrder"]
   }
 }

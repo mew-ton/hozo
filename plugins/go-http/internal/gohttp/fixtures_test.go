@@ -8,8 +8,10 @@ import (
 	"go/format"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -232,10 +234,103 @@ func firstDiff(want, got string) string {
 	return "  （違いなし）"
 }
 
+// isTestMap は、パス p が、このトランスパイラのテストの対応表（docs/plugin-go-http.md「インテグレーションテストの口」の「置き場と名前」）か。
+func isTestMap(p string) bool { return path.Base(p) == plugin.TestMapName(TranspilerName) }
+
+// scanTestRuns は、Go のソース src（置き場は file）の、いちばん内側の `t.Run(<名前>, func(t *testing.T) {` … `})` を、
+// 字下げだけを頼りに探す（go/parser を使う golang.TestMap とは、別の読み方）: 名前は、外の段から / でつなぎ、行は、
+// 開く行の次の行から、閉じる行の前の行まで（docs/plugin-go.md「テストの対応表」）。
+func scanTestRuns(t *testing.T, file, src string) []plugin.TestEntry {
+	t.Helper()
+	type run struct {
+		indent, start int
+		name          string
+		parent        bool
+	}
+	var stack []run
+	var out []plugin.TestEntry
+	for i, l := range strings.Split(src, "\n") {
+		body := strings.TrimLeft(l, "\t")
+		indent := len(l) - len(body)
+		if strings.HasPrefix(body, "t.Run(") {
+			rest := strings.TrimPrefix(body, "t.Run(")
+			if !strings.HasSuffix(rest, ", func(t *testing.T) {") {
+				t.Fatalf("%s の %d 行目の t.Run が、その場の関数で、行の終わりに { を持つ形でない: %s", file, i+1, l)
+			}
+			name, err := strconv.Unquote(strings.TrimSuffix(rest, ", func(t *testing.T) {"))
+			if err != nil {
+				t.Fatalf("%s の %d 行目の t.Run の名前を読めない: %s", file, i+1, l)
+			}
+			if len(stack) > 0 {
+				stack[len(stack)-1].parent = true
+			}
+			stack = append(stack, run{indent: indent, start: i + 1, name: name})
+			continue
+		}
+		if len(stack) > 0 && body == "})" && indent == stack[len(stack)-1].indent {
+			r := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if r.parent {
+				continue
+			}
+			names := make([]string, 0, len(stack)+1)
+			for _, s := range stack {
+				names = append(names, s.name)
+			}
+			out = append(out, plugin.TestEntry{Name: strings.Join(append(names, r.name), "/"), File: file, Lines: [2]int{r.start + 1, i}})
+		}
+	}
+	if len(stack) > 0 {
+		t.Fatalf("%s の t.Run が、閉じていない", file)
+	}
+	return out
+}
+
+// checkTestMaps は、出力のテストの対応表を、出力の Go のテキストに当てて確かめる: テストのパッケージのファイル（http.go）が
+// あるディレクトリにだけ、一つあり、中身は、そのファイルの、いちばん内側の t.Run を、行の順に、テスト一つを一行で並べたもの
+// （docs/plugin-go.md「テストの対応表」）。
+func checkTestMaps(t *testing.T, files map[string]string) {
+	t.Helper()
+	want := map[string]string{} // 対応表のパス → 中身
+	for p, content := range files {
+		if isTestMap(p) || !strings.Contains(content, "t.Run(") {
+			continue
+		}
+		tests := scanTestRuns(t, p, content)
+		if len(tests) == 0 {
+			t.Errorf("%s が t.Run を持つが、テストが一つもない", p)
+			continue
+		}
+		f := plugin.TestMapFile(path.Dir(p), TranspilerName, tests)
+		want[f.Path] = f.Content
+	}
+	for _, p := range sortedPaths(files) {
+		if !isTestMap(p) {
+			continue
+		}
+		expected, ok := want[p]
+		delete(want, p)
+		if !ok {
+			t.Errorf("%s: t.Run のないディレクトリに、対応表を出した", p)
+			continue
+		}
+		if files[p] != expected {
+			t.Errorf("%s が、出力の Go のテキストの t.Run と合わない:\n%s", p, firstDiff(expected, files[p]))
+		}
+	}
+	for p := range want {
+		t.Errorf("%s を出していない（同じディレクトリのファイルが、t.Run を持つ）", p)
+	}
+}
+
 // checkFormatted は、生成した Go が go/format を通した形で、一行目がヘッダであること（docs/plugin-go-http.md「出力」）を確かめる。
 func checkFormatted(t *testing.T, files map[string]string) {
 	t.Helper()
+	checkTestMaps(t, files)
 	for _, p := range sortedPaths(files) {
+		if isTestMap(p) {
+			continue
+		}
 		if filepath.Base(p) != FileName {
 			t.Errorf("%s でないファイル %s を出力した", FileName, p)
 			continue

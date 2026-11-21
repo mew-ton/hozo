@@ -1,0 +1,8 @@
+{
+  "tests": [
+    {"name": "app.findUser/OK", "file": "gen/app/apptest/leaves.go", "lines": [79, 86]},
+    {"name": "app.nameOf/OK", "file": "gen/app/apptest/leaves.go", "lines": [92, 99]},
+    {"name": "app.useToken/OK", "file": "gen/app/apptest/leaves.go", "lines": [105, 112]},
+    {"name": "app.show/OK", "file": "gen/app/apptest/leaves.go", "lines": [118, 125]}
+  ]
+}

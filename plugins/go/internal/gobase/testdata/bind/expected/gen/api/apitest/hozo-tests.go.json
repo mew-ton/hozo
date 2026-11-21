@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {"name": "api.logout/OK", "file": "gen/api/apitest/leaves.go", "lines": [107, 114]},
+    {"name": "api.get/OK", "file": "gen/api/apitest/leaves.go", "lines": [120, 127]},
+    {"name": "api.nested/OK", "file": "gen/api/apitest/leaves.go", "lines": [133, 140]},
+    {"name": "api.ping/OK", "file": "gen/api/apitest/leaves.go", "lines": [146, 153]},
+    {"name": "api.enter/OK", "file": "gen/api/apitest/leaves.go", "lines": [159, 166]},
+    {"name": "api.plain/OK", "file": "gen/api/apitest/leaves.go", "lines": [172, 179]}
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "tests": [
+    {"name": "app.push/OK", "file": "gen/app/apptest/leaves.go", "lines": [176, 183]},
+    {"name": "app.summary/OK", "file": "gen/app/apptest/leaves.go", "lines": [189, 196]},
+    {"name": "app.checkout/OK", "file": "gen/app/apptest/leaves.go", "lines": [202, 209]},
+    {"name": "app.peek/OK", "file": "gen/app/apptest/leaves.go", "lines": [215, 222]},
+    {"name": "app.audit/OK", "file": "gen/app/apptest/leaves.go", "lines": [228, 235]},
+    {"name": "app.show/OK", "file": "gen/app/apptest/leaves.go", "lines": [241, 248]},
+    {"name": "app.showCount/OK", "file": "gen/app/apptest/leaves.go", "lines": [254, 261]},
+    {"name": "app.showOwner/OK", "file": "gen/app/apptest/leaves.go", "lines": [267, 274]},
+    {"name": "app.showToken/OK", "file": "gen/app/apptest/leaves.go", "lines": [280, 287]},
+    {"name": "app.showBoth/OK", "file": "gen/app/apptest/leaves.go", "lines": [293, 300]},
+    {"name": "app.showLines/OK", "file": "gen/app/apptest/leaves.go", "lines": [306, 313]}
+  ]
+}

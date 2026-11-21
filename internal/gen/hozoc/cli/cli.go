@@ -100,6 +100,8 @@ func Main(ctx context.Context, ops hozoc.Ops, p Presenter, args []string, env fu
 		return runCheck(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	case "emit":
 		return runEmit(ctx, ops, p, prog, args[1:], env, stdout, stderr)
+	case "tests":
+		return runTests(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	case "lsp":
 		return runLsp(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	}
@@ -108,7 +110,7 @@ func Main(ctx context.Context, ops hozoc.Ops, p Presenter, args []string, env fu
 
 // cliUsage は全体の使い方。
 func cliUsage(prog string) string {
-	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  check   仕様を検査する。ファイルは書き出さない\n  emit    仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
+	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  check   仕様を検査する。ファイルは書き出さない\n  emit    仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n  tests   仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
 }
 
 // runCheck はサブコマンド check（op hozoc.check）。
@@ -215,6 +217,63 @@ func usageEmit() cliHelp {
 		{"format", "表示の形式"},
 		{"namespaces", "生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す"},
 		{"dryRun", "書き出さずに、書き出す予定のファイルだけを表示する"},
+		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
+	}}
+}
+
+// runTests はサブコマンド tests（op hozoc.tests）。
+func runTests(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
+	var in hozoc.TestsInput
+	line := cliLine{args: args, getenv: env}
+	line.flag("config", &in.Config)
+	line.env("HOZO_CONFIG", &in.Config)
+	line.flag("format", &in.Format)
+	line.required(&in.Coverage)
+	line.flag("coverage", &in.Coverage)
+	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
+	if code, done := line.read(prog, usageTests(), stdout, stderr); done {
+		return code
+	}
+	if !cliValidate(stderr, prog, in) {
+		return 64
+	}
+	result, err := ops.Tests(ctx, in)
+	if err != nil {
+		return failTests(p, prog, in, err, stderr)
+	}
+	if err := p.Present(stdout, "tests", in, result); err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
+		return 70
+	}
+	return 0
+}
+
+// failTests は tests の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
+func failTests(p Presenter, prog string, input any, err error, stderr io.Writer) int {
+	f, code := Failure{Err: err}, 70
+	switch {
+	case cliThrown[hozoc.CheckFailed](err, 1, &f, &code):
+	case cliThrown[hozoc.ConfigInvalid](err, 2, &f, &code):
+	case cliThrown[hozoc.LanguageMismatch](err, 2, &f, &code):
+	case cliThrown[proc.Crashed](err, 70, &f, &code):
+	case cliThrown[proc.MalformedOutput](err, 70, &f, &code):
+	case cliThrown[hozoc.OutputConflict](err, 3, &f, &code):
+	case cliThrown[hozoc.TestsNotRun](err, 4, &f, &code):
+	case cliThrown[hozoc.CoverageUnusable](err, 5, &f, &code):
+	}
+	if err := p.PresentError(stderr, "tests", input, f); err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
+		return 70
+	}
+	return code
+}
+
+// usageTests は tests の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageTests() cliHelp {
+	return cliHelp{command: "tests", summary: "仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない", fields: [][2]string{
+		{"config", "設定ファイルの場所"},
+		{"format", "表示の形式"},
+		{"coverage", "テストを走らせたときに取った、カバレッジのファイル"},
 		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
 	}}
 }
@@ -383,6 +442,9 @@ func (l *cliLine) env(name string, dst any) { l.field(dst).env = name }
 
 // arg は @cli.arg の行: position 番目（1 から数える）の位置引数を dst に読む。
 func (l *cliLine) arg(position int, dst any) { l.field(dst).position = position }
+
+// required は @cli.required の行: dst に値が与えられなければ、誤り。
+func (l *cliLine) required(dst any) { l.field(dst).required = true }
 
 // read は、並べた行に従って、引数の並びを解釈し、読む先に値を入れる。終わりなら、終了コードと true を返す: --help か -h が
 // あれば、使い方を stdout に出して 0。使い方の誤りは、文言と使い方を stderr に出して 64。読めたら、false。
