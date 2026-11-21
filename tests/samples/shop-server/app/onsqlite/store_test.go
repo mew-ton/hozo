@@ -31,7 +31,7 @@ func newStore(t *testing.T) storetest.Store {
 	}
 }
 
-// TestStore は、go-sqlite が出した read と効果の上の、store の op の振る舞い。onmem の TestStore と同じ storetest.Run を走らせる。
+// TestStore は、go-sqlite が出した read と効果の上の、store の op の振る舞い。storetest.Run を走らせる。
 func TestStore(t *testing.T) {
 	t.Parallel()
 	storetest.Run(t, newStore)
@@ -206,7 +206,7 @@ func TestColumns(t *testing.T) {
 }
 
 // TestRef は、@db.ref の REFERENCES: 接続で外部キーを有効にしていれば、いないユーザーの行は足せない。
-// これは SQLite の制約で、仕様（store.hozo）が言っていることではない。メモリの上の実装（memstore）は確かめない。
+// これは SQLite の制約で、仕様（store.hozo）が言っていることではない（なので、storetest は確かめない）。
 func TestRef(t *testing.T) {
 	t.Parallel()
 	s, ctx := newStore(t), context.Background()
@@ -222,7 +222,7 @@ func TestRef(t *testing.T) {
 
 // TestPlaceOrderIsOneTransaction は、@db.transaction を付けた op（placeOrder: 二つの効果を呼ぶ配線）が、SQLite の上で
 // 一つのトランザクションであること: 二つ目の効果（通知の行）が失敗すれば、一つ目の効果（注文の行）も残らない。
-// 一つ目の効果が失敗する場合（同じ id の注文）は、二つの実装が共に走らせる storetest の placeOrder が確かめる。
+// 一つ目の効果が失敗する場合（同じ id の注文）は、storetest の placeOrder が確かめる。
 // ここでは、二つ目だけを失敗させる: 外部キーを有効にした接続で、通知の userId（@db.ref）を、いないユーザーにする。
 func TestPlaceOrderIsOneTransaction(t *testing.T) {
 	t.Parallel()
@@ -338,5 +338,54 @@ func TestNestedTransactionJoins(t *testing.T) {
 	}
 	if got, err := notifications.Get(ctx); err != nil || len(got) != 1 {
 		t.Errorf("外側が成功した後の notifications = %+v, %v（期待は一つ）", got, err)
+	}
+}
+
+// memNotifications は、状態 notifications の単位を、人が、メモリの上に、まるごと書いたもの（go-sqlite の型を、使わない）。
+type memNotifications struct{ rows *[]pkgtype.Notification }
+
+func (m memNotifications) IsEmpty(context.Context) (bool, error) { return len(*m.rows) == 0, nil }
+
+func (m memNotifications) Get(context.Context) ([]pkgtype.Notification, error) {
+	return append([]pkgtype.Notification(nil), *m.rows...), nil
+}
+
+func (m memNotifications) NotifyUser(_ context.Context, notification pkgtype.Notification) error {
+	*m.rows = append(*m.rows, notification)
+	return nil
+}
+
+var _ store.NotificationsState = memNotifications{}
+
+// TestStatesFromTwoImplementations は、一つの store の状態の単位を、状態ごとに別の実装から取れること:
+// users、sessions、orders は SQLite（go-sqlite の型）、notifications はメモリ（人が書いた memNotifications）。store.New は、
+// 状態ごとのインターフェースを満たす値を受け取るだけで、どの実装かを知らない。
+// @db.transaction の継ぎ目（store.DbSeams）が取り消せるのは、同じ db の上の go-sqlite の型がしたことだけ: placeOrder が
+// 呼ぶ二つ目の効果（notifyUser）は、ここではメモリの上なので、トランザクションには入らない。
+func TestStatesFromTwoImplementations(t *testing.T) {
+	t.Parallel()
+	db, ctx := openDB(t), context.Background()
+	if err := store.CreateTables(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	var rows []pkgtype.Notification
+	orders, notifications := store.NewOrdersTable(db), memNotifications{&rows}
+	s := store.New(store.NewUsersTable(db), store.NewSessionsTable(db), orders, notifications, store.NewDbSeams(db))
+	if err := s.AddUser(ctx, pkgtype.User{Id: "u1", Email: "alice@example.com", Name: "Alice", Hash: "h"}); err != nil {
+		t.Fatal(err)
+	}
+	order := pkgtype.Order{Id: "o1", UserId: "u1", PlacedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}
+	if err := s.PlaceOrder(ctx, order, pkgtype.Notification{UserId: "u1", Message: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	// 注文は SQLite の表に、通知はメモリにある
+	if got, err := orders.Get(ctx); err != nil || len(got) != 1 {
+		t.Errorf("SQLite の orders = %+v, %v（期待は一つ）", got, err)
+	}
+	if len(rows) != 1 || rows[0].Message != "x" {
+		t.Errorf("メモリの notifications = %+v（期待は一つ）", rows)
+	}
+	if empty, err := store.NewNotificationsTable(db).IsEmpty(ctx); err != nil || !empty {
+		t.Errorf("SQLite の notifications の IsEmpty = %v, %v（期待は true）", empty, err)
 	}
 }

@@ -1,6 +1,6 @@
 // Package handlertest は、サンプル shop-server のハンドラ（go-http の出力 server.NewHandler）の振る舞いのテスト。
-// 人が書いたもので、二つの組み立て（onsqlite: store は SQLite、onmem: store はメモリ）が同じものを走らせる:
-// 保存先が違っても、HTTP から見た振る舞いは同じ。
+// 人が書いたもので、組み立て（onsqlite: store は SQLite）が走らせる。試す相手は、組み立てる関数で受け取るので、
+// ここは、保存先を知らない。
 //
 // 応答の本文は文字列のまま比べる。ここに書いた JSON が、このサーバーを呼ぶクライアント（TS のトランスパイラなど）が
 // 合わせる形になる（../../README.md「go-http が従う規則」）。
@@ -98,7 +98,7 @@ func (f *Fixture) FailDelivery(fail bool) { f.failDelivery = fail }
 // Advance は、葉の op と Limiter が見る時計を d だけ進める。
 func (f *Fixture) Advance(d time.Duration) { f.elapsed += d }
 
-// Store は、Run が状態を用意し、確かめるのに使う store の op。gen/store と gen/storemem の Ops のどちらも満たす。
+// Store は、Run が状態を用意し、確かめるのに使う store の op。gen/store の Ops が満たす。
 type Store interface {
 	AddUser(ctx context.Context, user pkgtype.User) error
 	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
@@ -363,7 +363,7 @@ func Run(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 		s := start(t)
 		token := s.login(t)
 		// 中断された要求の ctx は、ハンドラ → 配線 → store の op まで届く: store の op は ctx のエラーを返し
-		// （SQLite は database/sql が、メモリは memstore が ctx を見る）、状態は変わらない。応答は 500
+		// （SQLite は database/sql が ctx を見る）、状態は変わらない。応答は 500
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		s.do(t, ctx, http.MethodPost, "/orders", token, `{"lines":[{"item":"apple","quantity":2}]}`).want(t, 500, `{"error":"internal"}`)

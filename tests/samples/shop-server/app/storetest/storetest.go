@@ -1,9 +1,9 @@
-// Package storetest は、名前空間 store の op の振る舞いのテスト。人が書いたもので、二つの実装（gen/store: read と効果の中身は
-// go-sqlite が出したもの、gen/storemem: 人がメモリの上に書いたもの）が同じものを走らせる。
+// Package storetest は、名前空間 store の op の振る舞いのテスト。人が書いたもので、走らせるのは、gen/store（read と効果の中身は
+// go-sqlite が出したもの）の上の組み立て（../onsqlite）。
 //
 // ここで確かめるのは、仕様（store.hozo の read と効果と、その説明と、db の語彙のデコレータ）と、go-sqlite の規則
-// （../../README.md「go-sqlite が従う規則」）から、二つの実装に共に言えることだけ。仕様が言わないこと（@db.ref の先がないときなど）と、
-// 一方だけに言えること（@db.transaction。onsqlite と onmem のテスト）は確かめない。
+// （../../README.md「go-sqlite が従う規則」）から、保存先によらずに言えることだけ。仕様が言わないこと（@db.ref の先がないときなど）と、
+// SQLite にだけ言えること（@db.transaction。onsqlite のテスト）は確かめない。
 // 効果の結果は、状態の単位の、形で決まる問い合わせ（IsEmpty、Get）で確かめる: read のない状態（notifications）でも読める。
 package storetest
 
@@ -18,8 +18,8 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Ops は名前空間 store のすべての op（九つとも export を付けてある）。gen/store と gen/storemem の Ops のどちらも満たす
-// （二つは別のパッケージの別のインターフェースだが、型は同じ gen/type のものなので、メソッドの型が一致する）。
+// Ops は名前空間 store の op のうち、ここで試す九つ（recordNotice のほか。どれも export を付けてある）。gen/store の Ops が満たす
+// （別のパッケージの別のインターフェースだが、型は同じ gen/type のものなので、メソッドの型が一致する）。
 type Ops interface {
 	FindUser(ctx context.Context, email pkgtype.Email) (*pkgtype.User, error)
 	FindUserById(ctx context.Context, id pkgtype.UserId) (*pkgtype.User, error)
@@ -33,7 +33,7 @@ type Ops interface {
 }
 
 // List は、list の状態の単位が形から持つ問い合わせ（<状態>State の IsEmpty と Get）。
-// 状態の単位の実装（go-sqlite の store.UsersTable、人が書いた memstore.Users など）は、どれもそのまま満たす。
+// 状態の単位の実装（go-sqlite の store.UsersTable など）は、どれもそのまま満たす。
 type List[T any] interface {
 	IsEmpty(ctx context.Context) (bool, error)
 	Get(ctx context.Context) ([]T, error)
@@ -210,8 +210,8 @@ func Run(t *testing.T, newStore func(t *testing.T) Store) {
 		wantState(t, ctx, s.States.Orders, "orders", orderKey, "o1", "o2")
 		wantState(t, ctx, s.States.Notifications, "notifications", notificationKey, "u1: こんにちは", "u1: こんにちは")
 		// 一つ目の効果（createOrder）が失敗すれば、二つ目（notifyUser）は呼ばれない: id（@db.key）が同じ注文は足せず、
-		// そのときは通知も足されない。どのエラーかは決まっていない。二つ目だけが失敗するときにどうなるかは、実装ごとに違う
-		// （SQLite は、@db.transaction の継ぎ目が取り消す。メモリは、取り消さない。onsqlite と onmem のテスト）
+		// そのときは通知も足されない。どのエラーかは決まっていない。二つ目だけが失敗するときにどうなるかは、継ぎ目で決まる
+		// （SQLite は、@db.transaction の継ぎ目が取り消す。onsqlite の TestPlaceOrderIsOneTransaction、TestTransactionIsTheSeam）
 		if err := s.PlaceOrder(ctx, pkgtype.Order{Id: "o1", UserId: "u2", PlacedAt: at}, pkgtype.Notification{UserId: "u2", Message: "残らない"}); err == nil {
 			t.Error("placeOrder: id（@db.key）が同じ注文を足せた")
 		}

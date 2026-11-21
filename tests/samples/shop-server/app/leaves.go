@@ -1,8 +1,8 @@
 // Package app は、サンプル shop-server で人が書く部分のうち、保存先によらないもの（../README.md「人が書いたもの」）:
 // server の葉の op の本体（leaves.go）、mailer.send の実装（mailer.go）、@rate.limited の数え方（limiter.go）。
 //
-// このパッケージは保存先に触れない。import するのは gen/server と gen/type だけで、gen/store も gen/storemem も
-// import しない（leaves_test.go が確かめる）。保存先との組み立ては onsqlite と onmem にある。
+// このパッケージは保存先に触れない。import するのは gen/server と gen/type だけで、gen/store は
+// import しない（leaves_test.go が確かめる）。保存先との組み立ては onsqlite にある。
 package app
 
 import (

@@ -43,14 +43,14 @@ func newServer(t *testing.T, f *handlertest.Fixture) handlertest.Server {
 }
 
 // TestHandler は、go-http のハンドラ → 配線 → go-sqlite が出した read と効果、の全体の振る舞い。
-// onmem の TestHandler と同じ handlertest.Run を走らせる。
+// handlertest.Run を走らせる。
 func TestHandler(t *testing.T) {
 	t.Parallel()
 	handlertest.Run(t, newServer)
 }
 
 // TestHTTPCases は、八つの入口の、結果ごとのインテグレーションテスト（docs/plugin-go-http.md「インテグレーションテストの口」）。
-// go-http が出した servertest.RunHTTP に、handlertest.HTTPCases を渡す。onmem の TestHTTPCases と同じものを走らせる。
+// go-http が出した servertest.RunHTTP に、handlertest.HTTPCases を渡す。
 func TestHTTPCases(t *testing.T) {
 	t.Parallel()
 	handlertest.RunCases(t, newServer)
@@ -76,7 +76,7 @@ func newSystem(t *testing.T, f *handlertest.Fixture) flowtest.System {
 }
 
 // TestFlows は、フローの E2E テスト（docs/plugin-go-design.md「E2E テストの口」）: フロー → 操作の op → 機能入口 → 配線 → go-sqlite が
-// 出した read と効果。go-design が出した flowstest.RunFlows に、flowtest.FlowCases を渡す。onmem の TestFlows と同じものを走らせる。
+// 出した read と効果。go-design が出した flowstest.RunFlows に、flowtest.FlowCases を渡す。
 func TestFlows(t *testing.T) {
 	t.Parallel()
 	flowtest.RunFlows(t, newSystem)

@@ -16,7 +16,7 @@ import (
 )
 
 // TestNoStorageImport は、このパッケージ（server の葉の op と mailer.send の実装）が保存先を知らないこと:
-// テストでないファイルは、gen/store も gen/storemem も、保存先との組み立ても import しない。
+// テストでないファイルは、gen/store も、保存先との組み立ても import しない。
 func TestNoStorageImport(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {

@@ -1,6 +1,6 @@
 # サンプル shop-server（tests/samples/README.md）: docs/decisions.md の P1〜P39 の後の形。
 # 名前空間は、仕様の七つ（type、store、server、mailer、design、client、flows）と、サンプルの中のプラグインの語彙 rate と、標準の語彙 http。
-# 単位は八つ。mailer と design には単位を置かない（コードを出さない）。
+# 単位は七つ。mailer と design には単位を置かない（コードを出さない）。
 # 単位の transpilers には、依存しているものもすべて書く（P18）。期待する出力は、それぞれの out のディレクトリ（README.md）。
 
 [hozo]
@@ -26,13 +26,7 @@ namespace   = "store"
 transpilers = ["go", "go-sqlite"]
 out         = "gen/store"
 
-# 4: 同じ store を、DB なしで。read と効果の中身は、人がメモリの上に書く。@db.transaction を読む者がいないので、継ぎ目はない
-[[emit]]
-namespace   = "store"
-transpilers = ["go"]
-out         = "gen/storemem"
-
-# 5: HTTP の入口と業務の流れ。go-ratelimit が @rate.limited の継ぎ目を宣言しているので、login は二層になる
+# 4: HTTP の入口と業務の流れ。go-ratelimit が @rate.limited の継ぎ目を宣言しているので、login は二層になる
 [[emit]]
 namespace   = "server"
 transpilers = ["go", "go-valid", "go-http", "go-ratelimit"]
@@ -41,19 +35,19 @@ out         = "gen/server"
 [emit.options.go-http]
 validate = true                 # 要求を受けたときに制約を確かめる（P15、P16）
 
-# 6: 標準の語彙 http の型（例外 http.ServerError、http.NetworkError）。client と flows が、throws に書くので、同じ基底の単位が要る（P7）
+# 5: 標準の語彙 http の型（例外 http.ServerError、http.NetworkError）。client と flows が、throws に書くので、同じ基底の単位が要る（P7）
 [[emit]]
 namespace   = "http"
 transpilers = ["go"]
 out         = "gen/http"
 
-# 7: 画面の側の、操作の op（ユースケース）。機能入口の op（server の、外に出した op）を呼ぶ
+# 6: 画面の側の、操作の op（ユースケース）。機能入口の op（server の、外に出した op）を呼ぶ
 [[emit]]
 namespace   = "client"
 transpilers = ["go"]
 out         = "gen/client"
 
-# 8: 業務フロー。テスト用の単位: go-design が、フローごとの E2E テストの口と、要求ごとの、テストの入れ物の口を出す
+# 7: 業務フロー。テスト用の単位: go-design が、フローごとの E2E テストの口と、要求ごとの、テストの入れ物の口を出す
 [[emit]]
 namespace   = "flows"
 transpilers = ["go", "go-design"]

@@ -3,7 +3,7 @@
 // （docs/plugin-go-sqlite.md「read の中身」「効果の中身」）。表は、read なら reads の状態、効果なら宛先（effects の後ろ）の状態で、列は、引数の名前。
 // read と効果を呼べるのは、この名前空間の中だけ。ほかの名前空間は、ここの op（どれも、read か効果を呼ぶだけの配線）を通して読み書きする。
 // 十の op はどれも export（P33）: 九つは server が呼び、addUser は人が書くコード（起動とテスト）が呼ぶ。
-// 単位 gen/store では go-sqlite が read と効果の中身を出し、単位 gen/storemem では人が書く。
+// read と効果の中身は、単位 gen/store で、go-sqlite が出す。
 // createUser は、例外を投げる効果（docs/check.md「read と効果」）: 表の一意の制約に当たったら、type.EmailTaken（@db.conflict）。
 
 /** 保存。DB の状態の持ち主 */

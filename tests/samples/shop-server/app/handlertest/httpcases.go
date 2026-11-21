@@ -37,8 +37,7 @@ func RunCases(t *testing.T, newServer func(t *testing.T, f *Fixture) Server) {
 	servertest.RunHTTP(t, s.Handler, HTTPCases{caseServer{s, store}})
 }
 
-// CaseStore は、ケースが、状態を用意し、確かめるのに使う store の op（Store に、三つ足したもの）。gen/store と gen/storemem の Ops の
-// どちらも満たす。
+// CaseStore は、ケースが、状態を用意し、確かめるのに使う store の op（Store に、三つ足したもの）。gen/store の Ops が満たす。
 type CaseStore interface {
 	Store
 	AddSession(ctx context.Context, session pkgtype.Session) error

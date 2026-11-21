@@ -6,7 +6,7 @@
 // ことの確かめ、Then の順）は、go-design が作る。ここに書くのは、フローの引数と、今の状態の用意（Given）と、後の状態と返り値の
 // 確かめ（Then）と、要求ごとの入れ物の中身だけ。フローか、要求を、一つ足せば、足りないメソッドで、ここの型はコンパイルできなくなる。
 //
-// 二つの組み立て（../onmem、../onsqlite）が、同じものを走らせる。操作の op（client）は、機能入口（server の入口の Ops）を、Go の上で
+// 組み立て（../onsqlite）が、走らせる。操作の op（client）は、機能入口（server の入口の Ops）を、Go の上で
 // 直に呼ぶ: HTTP の層は、通らない（その層は、インテグレーションテストが通す: ../handlertest/httpcases.go）。
 package flowtest
 
@@ -23,7 +23,7 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Store は、テストが、状態を用意し、確かめるのに使う store の op。gen/store と gen/storemem の Ops のどちらも満たす。
+// Store は、テストが、状態を用意し、確かめるのに使う store の op。gen/store の Ops が満たす。
 type Store interface {
 	AddUser(ctx context.Context, user pkgtype.User) error
 	ListOrders(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error)
@@ -39,7 +39,7 @@ type System struct {
 	Store Store
 }
 
-// NewSystem は、新しい System を作る関数: 組み立てごとに（../onmem、../onsqlite）、一つ書く。f は、葉と、配送と、数え方の材料。
+// NewSystem は、新しい System を作る関数: 組み立て（../onsqlite）が、書く。f は、葉と、配送と、数え方の材料。
 type NewSystem func(t *testing.T, f *handlertest.Fixture) System
 
 // lines は、テストが注文する行。
