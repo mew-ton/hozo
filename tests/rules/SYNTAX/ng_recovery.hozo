@@ -1,10 +1,11 @@
 // 構文エラーのあるファイルでも、作れた部分には検査を行う（docs/check.md「この文書が決めること」）。
-// 四行目の model は構文エラー（SYNTAX）、その下の配線は THROWS-1 になる
+// model は構文エラー（SYNTAX）、その下の配線は THROWS-1 になる（throws の節を書いているのに、E を書いていない）
 namespace a {
   exception E;
+  exception F;
   fn leaf(): throws E;
   model Broken { x: ; }                // ERROR: SYNTAX
-  fn wiring() {                        // ERROR: THROWS-1
+  fn wiring(): throws F {              // ERROR: THROWS-1
     leaf();
   }
 }

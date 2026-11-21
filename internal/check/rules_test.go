@@ -24,6 +24,7 @@ func TestThrows1(t *testing.T) {
 
 	t.Run("ng", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
+		w.Throws = []ir.ThrowsClause{throws([]string{"server.W"})}
 		p := serverWith(a, b, w)
 		d := wantOneCode(t, Checker{Locate: locatorFor()}.Check(p, cfgFor("server")), "THROWS-1")
 		wantStrings(t, "missing", d.Data["missing"].([]string), []string{"server.X", "server.Y", "server.Z"})
@@ -31,6 +32,24 @@ func TestThrows1(t *testing.T) {
 			t.Errorf("related = %d, want 4", len(d.Related))
 		}
 		if !strings.Contains(d.Message, "server.w") || !strings.Contains(d.Message, "server.X") {
+			t.Errorf("message = %q", d.Message)
+		}
+	})
+	t.Run("節を書かない配線には出さない (docs/check.md「節に書く要素」)", func(t *testing.T) {
+		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
+		outer := wire("server.outer", nil, nil, cs(call("server.w")))
+		p := serverWith(a, b, w, outer)
+		wantNoCode(t, Check(p, cfgFor("server")), "THROWS-1")
+		wantStrings(t, "w.E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Y", "server.Z"})
+		wantStrings(t, "outer.E", sigOf(t, p, "server.outer").Exceptions, []string{"server.X", "server.Y", "server.Z"})
+	})
+	t.Run("節を書かない配線の例外も、節を書いた呼び出し元は覆う", func(t *testing.T) {
+		w := wire("server.w", nil, nil, cs(call("server.a")))
+		outer := wire("server.outer", nil, nil, cs(call("server.w")))
+		outer.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+		d := wantOneCode(t, Check(serverWith(a, w, outer), cfgFor("server")), "THROWS-1")
+		wantStrings(t, "missing", d.Data["missing"].([]string), []string{"server.Y"})
+		if !strings.Contains(d.Message, "server.outer") {
 			t.Errorf("message = %q", d.Message)
 		}
 	})

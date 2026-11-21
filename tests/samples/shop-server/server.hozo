@@ -48,9 +48,7 @@ namespace server {
   /** ログインする */
   @http.post("/login")
   @rate.limited
-  export fn login(in: LoginInput): LoginOk
-    throws type.InvalidCredentials
-  {
+  export fn login(in: LoginInput): LoginOk {
     val user = store.findUser(in.body.email);
     return match (user by store.Registration) {
       Registered   => issueSession(user, in.body.password);
@@ -59,9 +57,7 @@ namespace server {
   }
 
   /** パスワードを確かめて、セッションを作る */
-  fn issueSession(user: type.User, password: type.Password): LoginOk
-    throws type.InvalidCredentials
-  {
+  fn issueSession(user: type.User, password: type.Password): LoginOk {
     checkPassword(user, password);
     val session = newSession(user);
     store.addSession(session);
@@ -89,9 +85,7 @@ namespace server {
 
   /** 呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
   @prd.ref(design.Requirement.PRD_001)
-  fn authenticate(token: type.Token?): type.Session
-    throws type.Unauthorized
-  {
+  fn authenticate(token: type.Token?): type.Session {
     return match (token by Credential) {
       Presented => sessionOf(token);
       Absent    => throw type.Unauthorized;
@@ -99,9 +93,7 @@ namespace server {
   }
 
   /** そのトークンのセッション。ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
-  fn sessionOf(token: type.Token): type.Session
-    throws type.Unauthorized
-  {
+  fn sessionOf(token: type.Token): type.Session {
     val session = store.findSession(token);
     return match (session by store.Login) {
       LoggedIn  => requireFresh(session);
@@ -115,18 +107,14 @@ namespace server {
 
   /** ログアウトする */
   @http.post("/logout")
-  export fn logout(in: AuthInput):
-    throws type.Unauthorized
-  {
+  export fn logout(in: AuthInput) {
     val session = authenticate(in.token);
     store.removeSession(session.token);
   }
 
   /** 自分の情報を返す */
   @http.get("/me")
-  export fn getMe(in: AuthInput): type.PublicUser
-    throws type.Unauthorized
-  {
+  export fn getMe(in: AuthInput): type.PublicUser {
     val session = authenticate(in.token);
     val user = store.findUserById(session.userId);
     return match (user by store.Account) {
@@ -140,9 +128,7 @@ namespace server {
   /** 自分の注文の一覧を返す */
   @http.get("/orders")
   @prd.ref(design.Requirement.PRD_002)
-  export fn getOrders(in: GetOrdersInput): type.Order[]
-    throws type.Unauthorized
-  {
+  export fn getOrders(in: GetOrdersInput): type.Order[] {
     val session = authenticate(in.token);
     val orders = store.listOrders(session.userId);
     return pageOf(orders, in.page);
@@ -153,18 +139,14 @@ namespace server {
 
   /** 自分のいちばん新しい注文を返す。まだ注文がなければ、値がない */
   @http.get("/orders/latest")
-  export fn getLatestOrder(in: AuthInput): type.Order?
-    throws type.Unauthorized
-  {
+  export fn getLatestOrder(in: AuthInput): type.Order? {
     val session = authenticate(in.token);
     return store.latestOrder(session.userId);
   }
 
   /** 自分のページ: 自分の情報と、いちばん新しい注文と、注文ごとの要約を、まとめて返す */
   @http.get("/me/page")
-  export fn getMyPage(in: AuthInput): MyPage
-    throws type.Unauthorized
-  {
+  export fn getMyPage(in: AuthInput): MyPage {
     val session = authenticate(in.token);
     val user, latest, orders;
     disjoint {
@@ -194,9 +176,7 @@ namespace server {
   /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")
   @prd.ref(design.Requirement.PRD_001, design.Requirement.PRD_002)
-  export fn placeOrder(in: PlaceOrderInput): type.Order
-    throws type.Unauthorized, type.NotificationFailed
-  {
+  export fn placeOrder(in: PlaceOrderInput): type.Order {
     val session = authenticate(in.token);
     val order = newOrder(session, in.lines);
     val notice = composeNotice(order);
@@ -213,9 +193,7 @@ namespace server {
 
   /** 自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る */
   @http.post("/orders/notices")
-  export fn resendNotices(in: AuthInput): type.Notification[]
-    throws type.Unauthorized, type.NotificationFailed
-  {
+  export fn resendNotices(in: AuthInput): type.Notification[] {
     val session = authenticate(in.token);
     val orders = store.listOrders(session.userId);
     val sent: type.Notification[];

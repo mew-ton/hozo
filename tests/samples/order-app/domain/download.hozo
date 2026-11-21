@@ -68,9 +68,7 @@ namespace download {
   }
 
   /** その行のファイルを取る URL を作る。URL は、短い間だけ使える */
-  export fn link(orderId: type.OrderId, line: type.LineId): type.Url
-    throws NotGranted, GrantExpired, AssetsUnavailable
-  {
+  export fn link(orderId: type.OrderId, line: type.LineId): type.Url {
     val found = grantOf(orderId, line);
     return match (found by Entitlement) {
       Granted   => linkOf(found);
@@ -79,9 +77,7 @@ namespace download {
   }
 
   /** 期限の内の権利だけが、URL になる */
-  fn linkOf(grant: Grant): type.Url
-    throws GrantExpired, AssetsUnavailable
-  {
+  fn linkOf(grant: Grant): type.Url {
     val now = clock.now();
     val request = stillValid(grant, now, linkLifetime);
     return fetchLink(request);

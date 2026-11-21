@@ -11,9 +11,7 @@ namespace fulfilment {
    * 客の同意が取れた注文を、受け付けて、渡す準備を始める。
    * 期限切れにした後で同意が届いた注文は、受け付けない: 確保した枠を手放す（在庫は、もう戻してある）。
    */
-  export fn secured(orderId: type.OrderId):
-    throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
-  {
+  export fn secured(orderId: type.OrderId) {
     val order = ordering.byId(orderId);
     match (order by ordering.Standing) {
       AwaitingPayment => acceptAndBegin(order);
@@ -24,9 +22,7 @@ namespace fulfilment {
 
   /** 受け付けて、始めて、知らせる */
   @db.transaction
-  fn acceptAndBegin(order: ordering.Order on ordering.Standing.AwaitingPayment):
-    throws ordering.NoOrder
-  {
+  fn acceptAndBegin(order: ordering.Order on ordering.Standing.AwaitingPayment) {
     val accepted = ordering.accept(order);
     begin(accepted);
     notice.accepted(accepted);
@@ -54,18 +50,14 @@ namespace fulfilment {
 
   /** 在庫の行を、棚から出して、そろえ場所に置いた */
   @db.transaction
-  export fn picked(orderId: type.OrderId, line: type.LineId): shipping.Shipment
-    throws inventory.NotReserved, inventory.AlreadyPicked, shipping.NoShipment, shipping.UnknownItem
-  {
+  export fn picked(orderId: type.OrderId, line: type.LineId): shipping.Shipment {
     inventory.pick(orderId, line);
     return shipping.gather(orderId, line, none);
   }
 
   /** 受注製作の行を、作り終えて、量って、そろえ場所に置いた。出来上がりの大きさが、ここで出荷に届く */
   @db.transaction
-  export fn made(id: production.JobId, measured: type.Measurement): shipping.Shipment
-    throws production.NoJob, production.NotInProduction, shipping.NoShipment, shipping.UnknownItem
-  {
+  export fn made(id: production.JobId, measured: type.Measurement): shipping.Shipment {
     val job = production.finish(id, measured);
     return shipping.gather(job.orderId, job.line, measured);
   }
@@ -84,9 +76,7 @@ namespace fulfilment {
   }
 
   /** 梱包の台に見せるものを集める */
-  export fn station(id: shipping.ShipmentId): Station
-    throws shipping.NoShipment, carrier.NoCarrier, http.NetworkError, http.ServerError
-  {
+  export fn station(id: shipping.ShipmentId): Station {
     val progress = shipping.progress(id);
     val options = optionsFor(progress);
     val offers = offersFor(progress);
@@ -111,9 +101,7 @@ namespace fulfilment {
   }
 
   /** まだ送り状を買っていない出荷には、見積もりを出す */
-  fn offersFor(progress: shipping.Progress): carrier.Quote[]?
-    throws carrier.NoCarrier, http.NetworkError, http.ServerError
-  {
+  fn offersFor(progress: shipping.Progress): carrier.Quote[]? {
     return match (progress.label by shipping.Labelling) {
       Labelled   => none;
       Unlabelled => offersIfPacked(progress);
@@ -121,9 +109,7 @@ namespace fulfilment {
   }
 
   /** 見積もりを取れるのは、荷物（箱と重さ）が決まった後だけ */
-  fn offersIfPacked(progress: shipping.Progress): carrier.Quote[]?
-    throws carrier.NoCarrier, http.NetworkError, http.ServerError
-  {
+  fn offersIfPacked(progress: shipping.Progress): carrier.Quote[]? {
     return match (progress.parcel by shipping.Packing) {
       Packed   => offers(progress.parcel, progress.shipment.destination);
       Unpacked => none;
@@ -131,9 +117,7 @@ namespace fulfilment {
   }
 
   /** 荷物の見積もりを、いま使っている配送業者から取る */
-  fn offers(parcel: shipping.Parcel, destination: type.Address): carrier.Quote[]
-    throws carrier.NoCarrier, http.NetworkError, http.ServerError
-  {
+  fn offers(parcel: shipping.Parcel, destination: type.Address): carrier.Quote[] {
     val origin = shipping.shipFrom();
     return carrier.quotes(parcel, origin, destination);
   }
@@ -146,12 +130,7 @@ namespace fulfilment {
    * 請求できない荷物（枠の期限切れ）には、送り状を買わない。途中で失敗したら、もう一度呼べる: 請求の確定は、二度は起きない。
    */
   @prd.promise("店", "請求を確定できない荷物には、送り状を買わない")
-  export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
-    throws shipping.NoShipment, shipping.NotPacked, shipping.AlreadyLabelled,
-           payment.NoPayment, payment.NotSecured, psp.HoldExpired,
-           carrier.UnknownCarrier, carrier.NotEnabled, carriergw.Refused,
-           http.NetworkError, http.ServerError
-  {
+  export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label {
     val sealed = shipping.sealed(id);
     payment.settle(sealed.shipment.orderId, sealed.parcel.fee);
     val origin = shipping.shipFrom();
@@ -163,9 +142,7 @@ namespace fulfilment {
   // ---- 渡す、届く ----
 
   /** 配送業者に渡した。客に、決まった送料と、確定した請求と、追跡番号を知らせる */
-  export fn handedOver(id: shipping.ShipmentId): shipping.Shipment
-    throws shipping.NoShipment, shipping.NotPacked, shipping.NotLabelled, shipping.AlreadyHandedOver, ordering.NoOrder
-  {
+  export fn handedOver(id: shipping.ShipmentId): shipping.Shipment {
     val dispatched = shipping.handOver(id);
     val order = ordering.byId(dispatched.shipment.orderId);
     val charge = payment.ofOrder(order.id);

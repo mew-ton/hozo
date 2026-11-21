@@ -162,9 +162,7 @@ namespace backoffice {
   @staffOnly
   @recover(production.NoJob | production.NotInProduction | shipping.NoShipment | shipping.UnknownItem, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  fn onFinishJob(job: production.Job):
-    throws page.Aborted
-  {
+  fn onFinishJob(job: production.Job) {
     val measured = askMeasurement(job);
     val shipment = staffApi.finishJob({ id: job.id, measured });
     placedIn(shipment);
@@ -292,9 +290,7 @@ namespace backoffice {
   @recover(shipping.NoShipment | shipping.NotGathered | shipping.AlreadyPacked, sayStale)
   @recover(shipping.UnknownBox | shipping.OverWeight | shipping.Undeliverable, sayRejected)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  fn onPack(id: shipping.ShipmentId, option: shipping.BoxOption, weight: type.Grams):
-    throws page.Aborted
-  {
+  fn onPack(id: shipping.ShipmentId, option: shipping.BoxOption, weight: type.Grams) {
     match (option.overCeiling by Overrun) {
       OverCeiling   => confirmAbsorb(option.overCeiling);
       WithinCeiling => none;
@@ -370,9 +366,7 @@ namespace backoffice {
   @staffOnly
   @recover(carrier.AlreadyRegistered, sayRejected)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
-  fn onRegisterCarrier():
-    throws page.Aborted
-  {
+  fn onRegisterCarrier() {
     val carrier = askCarrier();
     staffApi.registerCarrier({ carrier });
     reload();

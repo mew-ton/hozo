@@ -1,0 +1,15 @@
+// THROWS-1（docs/check.md「節に書く要素」）: throws を書いていない配線の op の例外も、計算した結果として、呼ぶ側に伝わる。
+// それを呼ぶ op が、節を書くなら、その例外も書く
+namespace a {
+  exception E;
+  exception F;
+  fn leaf(): throws E;
+  fn other(): throws F;
+  fn inner() {
+    leaf();
+  }
+  fn outer(): throws F {               // ERROR: THROWS-1
+    other();
+    inner();
+  }
+}

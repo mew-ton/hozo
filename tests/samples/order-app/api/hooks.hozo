@@ -13,9 +13,7 @@ namespace hooks {
   @webhook.signed("psp")
   @http.post("/hooks/payment")
   @db.transaction
-  export fn paymentEvent(in: PaymentInput):
-    throws ordering.NoOrder, payment.NoPayment, http.NetworkError, http.ServerError
-  {
+  export fn paymentEvent(in: PaymentInput) {
     val secured = payment.record(in.event);
     match (secured by payment.Securing) {
       NewlySecured => fulfilment.secured(secured);

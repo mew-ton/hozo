@@ -97,7 +97,7 @@ Markdown の `MarkupContent`。順に:
    - 配線の値の位置の状態の名前は、ほかの宣言への参照と同じく、その状態の見出し。アームの中で絞り込まれていても、見出しは宣言のまま。
    - 継承した model のフィールドは、受け継いだものも `fields` にあるので、同じ形で出る。
 2. `description.body`。
-3. op なら `throws:` と `effects:` の一覧（`Signature`）。例外ごとの効果の状態（`relations`）が `unknown` でないものを添える。効果は、宣言なら見ている名前空間から見た名前、直に書いた効果なら `状態.操作`。続けて、`Signature.reads` が空でなければ `reads:` の一覧（基底の状態）、`Signature.pure` が真なら `純粋` の一行。
+3. op なら `throws:` と `effects:` の一覧（`Signature`）。例外ごとの効果の状態（`relations`）が `unknown` でないものを添える。効果は、宣言なら見ている名前空間から見た名前、直に書いた効果なら `状態.操作`。続けて、`Signature.reads` が空でなければ `reads:` の一覧（基底の状態）、`Signature.pure` が真なら `純粋` の一行。どれも、計算した結果（`docs/check.md`「計算」）で、配線の op が、`throws`、`reads`、`effects` の節を書いていなくても、出る: 節を書かなくてよい op（同「状態に触れるもの」の「節に書く要素」）の関数の型を、見る所。
 4. デコレータの適用なら、適用先ではなくデコレータの宣言の 1〜2 と、固定した引数。
 
 ## ドキュメントのシンボル
@@ -122,5 +122,5 @@ Markdown の `MarkupContent`。順に:
 
 - **補完**: 名前の位置で、`docs/resolve.md`「位置ごとに受け付ける種類」に合う名前。別の名前空間のものは修飾した形。
 - **参照の検索**: 宣言から、それを参照しているトークンすべて。
-- **コードアクション**: 診断の `Data` から作る。THROWS-1 → `throws` に `missing` を足す。READS-2 → `reads` を計算した集合に直す。MATCH-2 → 足りないアームを足す。RES-1 で候補があれば置き換える。NS-5 → 同じプロジェクトの op なら `export` を足す。
+- **コードアクション**: 診断の `Data` から作る。THROWS-1 → 書いてある `throws` の節に `missing` を足す（THROWS-1 が出るのは、節を書いた配線の op だけ。`docs/check.md`「診断」の「throws」）。READS-2 → `reads` を計算した集合に直す。MATCH-2 → 足りないアームを足す。RES-1 で候補があれば置き換える。NS-5 → 同じプロジェクトの op なら `export` を足す。
 - **semantic tokens**: 型の位置の名前と値の位置の名前を区別して色を付ける（TextMate では命名規則に頼るしかない部分）。

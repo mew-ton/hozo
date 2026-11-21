@@ -226,6 +226,22 @@ R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の�
 - 操作の op は、状態を持たない: ログインのトークンは、`signIn` の戻り値で受け取り、`order` と `viewOrders` の引数で渡す。
 - テストのパッケージ `flowstest` を import するのは、テストを支えるパッケージ `app/flowtest`（`testing` を import する）だけ。
 
+### 配線の op の `throws` を消したこと
+
+配線の op は、`throws` の節を書かなくてよい（`docs/decisions.md`「決めたこと」379。決まりの持ち主は `docs/check.md`「状態に触れるもの」の「節に書く要素」）。このサンプルの、配線の op から、`throws` の節を、すべて消した。`gen/` と `app/` は、一つも変えていない: op の例外（`Signature.exceptions`）は、どの op も、消す前と同じで、hozoc の出力は、期待する出力と、バイト単位で同じ。
+
+| 変えたもの | `throws` の節を消した op |
+|---|---|
+| `server.hozo` | 11: `login`、`issueSession`、`authenticate`、`sessionOf`、`logout`、`getMe`、`getOrders`、`getLatestOrder`、`getMyPage`、`placeOrder`、`resendNotices` |
+| `client.hozo` | 3: `signIn`、`order`、`viewOrders` |
+| `flows.hozo` | 1: `signInAndOrder` |
+| `store.hozo` | 1: `addUser` |
+
+- **`throws` を書いているのは、定義する所だけ**: 葉の op 三つ（`server.checkPassword`、`server.requireFresh`、`mailer.send`）と、効果 `store.createUser`。語彙 `rate` のデコレータ `limited` の `throws` は、サンプルの中のプラグインの語彙が持つ（「サンプルの中のプラグイン `go-ratelimit`」）。
+- **この README の、消す前の記録は、書き直していない。** 配線の op の `throws` を言う所（「R4 で、まだないもの」の表の `server.placeOrder`、「例外を投げる効果で変えたこと」の表の `addUser`、「下書きから変えたこと」の 18）は、書いたときの仕様の記録。
+- **単位 6（`http`）は、今も要る。** 「R6 のプラグインの部分で足したこと」は、理由を「操作の op と、フローは、それを `throws` に書くので」と言うが、型の置き場が要るのは、op の例外（`Op.signature.exceptions`）が使う型（`docs/config.md`「型の置き場」の表の 3）で、節を書くかどうかには、よらない。
+- 消した行の分、`server.hozo` の 60 行目から後ろの行番号は、前に詰まった。この README が引く `server.hozo:<行>` は、前から、ずれていて、直していない（`docs/open.md`「サンプルと、hozoc 自身の仕様」の、行番号の点）。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。

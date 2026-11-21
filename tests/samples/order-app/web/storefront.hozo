@@ -159,9 +159,7 @@ namespace storefront {
 
   /** カートに入れる。受注製作の商品は、作り方の希望を聞いてから入れる */
   @page.interaction(page: openProduct, when: ProductPage.Ready)
-  fn onAddToCart(product: catalog.Product, quantity: type.Quantity):
-    throws page.Aborted
-  {
+  fn onAddToCart(product: catalog.Product, quantity: type.Quantity) {
     val line = match (product.fulfilment by catalog.Kind) {
       Made              => askRequest(product, quantity);
       Digital, Stocked  => lineOf(product, quantity);
@@ -204,9 +202,7 @@ namespace storefront {
 
   /** カートの中身に、いまの値段を付けてもらう。ページの op に fallback を二つは付けられないので、二つ目は、この op が持つ */
   @outdatedOnFailure
-  fn filledCart(): CartPage
-    throws http.NetworkError, http.ServerError
-  {
+  fn filledCart(): CartPage {
     val sorted = shopApi.itemise({ lines: cart });
     return filledCartVm(sorted, problem);
   }
@@ -275,9 +271,7 @@ namespace storefront {
 
   /** 値段を見せているか、まだか */
   @outdatedOnFailure
-  fn checkout(): CheckoutPage
-    throws http.NetworkError, http.ServerError
-  {
+  fn checkout(): CheckoutPage {
     return match (offer by nullable) {
       Some => quotedVm(offer, problem);
       None => entering();
@@ -285,9 +279,7 @@ namespace storefront {
   }
 
   /** 入力を待つ */
-  fn entering(): CheckoutPage
-    throws ordering.UnknownProduct, ordering.NotForSale, http.NetworkError, http.ServerError
-  {
+  fn entering(): CheckoutPage {
     val sorted = shopApi.itemise({ lines: cart });
     return enteringVm(sorted, problem);
   }
@@ -338,11 +330,7 @@ namespace storefront {
   }
 
   /** 注文して、カートを空にして、支払いの画面へ出る */
-  fn placeOrder(agreed: Offer):
-    throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired, ordering.TermsChanged,
-           ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
-           payment.AlreadySecured, payment.ProviderUnavailable, http.NetworkError, http.ServerError
-  {
+  fn placeOrder(agreed: Offer) {
     val placed = shopApi.checkout({ checkout: {
       requestId: agreed.requestId,
       email: agreed.email,

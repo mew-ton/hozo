@@ -10,9 +10,7 @@ namespace flows {
 
   /** ログインして、注文し、自分の注文の一覧を見る */
   @business.flow
-  export fn signInAndOrder(email: type.Email, password: type.Password, lines: type.OrderLine[]): Ordered
-    throws type.InvalidCredentials, rate.LimitExceeded, type.Unauthorized, type.NotificationFailed, http.ServerError, http.NetworkError
-  {
+  export fn signInAndOrder(email: type.Email, password: type.Password, lines: type.OrderLine[]): Ordered {
     val token = client.signIn(email, password);
     val placed = client.order(token, lines);
     val listed = client.viewOrders(token);

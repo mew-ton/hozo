@@ -1,11 +1,14 @@
 // THROWS-1（docs/check.md「配線からの呼び出し」）: 効果の呼び出しは、その効果の throws を、配線の例外に足す。
-// 配線が throws に書いていなければ（デコレータも吸収していなければ）THROWS-1
+// 節を書いた配線の op が、それを書いていなければ（デコレータも吸収していなければ）THROWS-1
 namespace a {
   model M { id: string; }
   state rows: list<M>;
   exception Taken;
+  exception Other;
+  fn other(): throws Other;
   effect fn add(m: M): throws Taken effects rows.post;
-  fn f(m: M) {                         // ERROR: THROWS-1
+  fn f(m: M): throws Other {           // ERROR: THROWS-1
+    other();
     add(m);
   }
 }

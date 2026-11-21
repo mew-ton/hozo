@@ -198,18 +198,14 @@ namespace ordering {
   // ---- 値段を付ける ----
 
   /** カートを、商品の種類ごとに分けて、商品の代金を出す。送料は、まだ出さない（届け先が要る） */
-  export fn itemise(lines: CartLine[]): Sorted
-    throws UnknownProduct, NotForSale
-  {
+  export fn itemise(lines: CartLine[]): Sorted {
     val skus = skusOf(lines);
     val products = catalog.lookup(skus);
     return sort(lines, products);
   }
 
   /** カートに値段を付ける。箱で送るものがあれば、届け先から、送料の見積もりと上限を出す */
-  export fn price(lines: CartLine[], destination: type.Address?): Priced
-    throws UnknownProduct, NotForSale, DestinationRequired, shipping.Undeliverable, shipping.TooLarge
-  {
+  export fn price(lines: CartLine[], destination: type.Address?): Priced {
     val sorted = itemise(lines);
     return match (sorted by Mix) {
       NeedsBox    => priceToShip(sorted, destination);
@@ -225,9 +221,7 @@ namespace ordering {
     throws UnknownProduct, NotForSale;
 
   /** 箱で送るものがあるカートは、届け先が要る */
-  fn priceToShip(sorted: Sorted on Mix.NeedsBox, destination: type.Address?): Priced
-    throws DestinationRequired, shipping.Undeliverable, shipping.TooLarge
-  {
+  fn priceToShip(sorted: Sorted on Mix.NeedsBox, destination: type.Address?): Priced {
     return match (destination by Destination) {
       Given   => withShipping(sorted, destination);
       Omitted => throw DestinationRequired;
@@ -235,9 +229,7 @@ namespace ordering {
   }
 
   /** 送料の見積もりと上限を、shipping に出してもらう */
-  fn withShipping(sorted: Sorted on Mix.NeedsBox, destination: type.Address): Priced
-    throws shipping.Undeliverable, shipping.TooLarge
-  {
+  fn withShipping(sorted: Sorted on Mix.NeedsBox, destination: type.Address): Priced {
     val terms = shipping.estimate(sorted.made, sorted.stocked, destination);
     return toShip(sorted, destination, terms);
   }
@@ -254,10 +246,7 @@ namespace ordering {
   @prd.promise("客", "同じ申し込みを二度送っても、注文は一つ")
   @prd.promise("客", "注文できたなら、在庫の品目は取り置いてある")
   @db.transaction
-  export fn place(checkout: Checkout): Order
-    throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
-           shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
-  {
+  export fn place(checkout: Checkout): Order {
     val sent = orderByRequest(checkout.requestId);
     return match (sent by Known) {
       Found   => sent;
@@ -266,10 +255,7 @@ namespace ordering {
   }
 
   /** 新しい注文を作る。値段を付けることと、時刻を読むことは、互いに触れない。効果は、取り置きの後に、注文を足す */
-  fn placeNew(checkout: Checkout): Order
-    throws UnknownProduct, NotForSale, DestinationRequired, TermsChanged,
-           shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock
-  {
+  fn placeNew(checkout: Checkout): Order {
     val priced, now;
     disjoint {
       priced = price(checkout.lines, checkout.destination);
@@ -290,9 +276,7 @@ namespace ordering {
     throws TermsChanged;
 
   /** 在庫の行を取り置く。箱で送る部分がなければ、何もしない */
-  fn holdStock(order: Order):
-    throws inventory.OutOfStock
-  {
+  fn holdStock(order: Order) {
     match (order.physical by Delivery) {
       ToShip        => inventory.reserve(order.id, order.physical.stocked);
       NothingToShip => none;
@@ -302,9 +286,7 @@ namespace ordering {
   // ---- 引く ----
 
   /** 鍵から注文を引く */
-  export fn byKey(key: type.OrderKey): Order
-    throws NoOrder
-  {
+  export fn byKey(key: type.OrderKey): Order {
     val found = orderByKey(key);
     return match (found by Known) {
       Found   => found;
@@ -318,9 +300,7 @@ namespace ordering {
   }
 
   /** 識別子から注文を引く */
-  export fn byId(id: type.OrderId): Order
-    throws NoOrder
-  {
+  export fn byId(id: type.OrderId): Order {
     val found = orderById(id);
     return match (found by Known) {
       Found   => found;
@@ -331,9 +311,7 @@ namespace ordering {
   // ---- 受け付けと、期限切れ ----
 
   /** 注文を受け付ける（支払いの枠を確保できた）。受け付けた後の注文を返す */
-  export fn accept(order: Order on Standing.AwaitingPayment): Order
-    throws NoOrder
-  {
+  export fn accept(order: Order on Standing.AwaitingPayment): Order {
     val now = clock.now();
     acceptOrder(order, now);
     return byId(order.id);

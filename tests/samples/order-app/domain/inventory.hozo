@@ -89,9 +89,7 @@ namespace inventory {
 
   /** 注文の在庫の行を取り置く。一つでも足りなければ、どれも取り置かない */
   @db.transaction
-  export fn reserve(orderId: type.OrderId, lines: ordering.StockedLine[]):
-    throws OutOfStock
-  {
+  export fn reserve(orderId: type.OrderId, lines: ordering.StockedLine[]) {
     val skus = skusOf(lines);
     val current = levelsOf(skus);
     val allocation = allocate(orderId, lines, current);
@@ -162,9 +160,7 @@ namespace inventory {
 
   /** 取り置いた行を、棚から出した。在庫の数を減らす */
   @db.transaction
-  export fn pick(orderId: type.OrderId, line: type.LineId):
-    throws NotReserved, AlreadyPicked
-  {
+  export fn pick(orderId: type.OrderId, line: type.LineId) {
     val found = reservationOf(orderId, line);
     match (found by Held) {
       Reserved   => pickReserved(found);
@@ -173,9 +169,7 @@ namespace inventory {
   }
 
   /** まだ棚にある取り置きだけを、出せる */
-  fn pickReserved(reservation: Reservation):
-    throws NotReserved, AlreadyPicked
-  {
+  fn pickReserved(reservation: Reservation) {
     match (reservation by Picking) {
       OnShelf => takeFromShelf(reservation);
       Picked  => throw AlreadyPicked;
@@ -183,9 +177,7 @@ namespace inventory {
   }
 
   /** 在庫の数を減らし、取り置きを、棚から出したことにする */
-  fn takeFromShelf(reservation: Reservation on Picking.OnShelf):
-    throws NotReserved
-  {
+  fn takeFromShelf(reservation: Reservation on Picking.OnShelf) {
     val level = levelOf(reservation.sku);
     val now = clock.now();
     match (level by Stocked) {

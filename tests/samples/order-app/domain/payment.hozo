@@ -182,9 +182,7 @@ namespace payment {
   // ---- 注文のとき: 支払いの画面を開く ----
 
   /** 注文の支払いの画面を開く。まだ同意していない注文なら、何度でも開き直せる */
-  export fn begin(order: ordering.Order, returnTo: type.Url): psp.Session
-    throws AlreadySecured, ProviderUnavailable
-  {
+  export fn begin(order: ordering.Order, returnTo: type.Url): psp.Session {
     val existing = paymentOf(order.id);
     return match (existing by Known) {
       Found   => reopen(order, existing, returnTo);
@@ -193,9 +191,7 @@ namespace payment {
   }
 
   /** はじめて開く */
-  fn openFirst(order: ordering.Order, returnTo: type.Url): psp.Session
-    throws ProviderUnavailable
-  {
+  fn openFirst(order: ordering.Order, returnTo: type.Url): psp.Session {
     val session = openSession(order, returnTo);
     val payment = pending(order, session);
     createPayment(payment);
@@ -203,9 +199,7 @@ namespace payment {
   }
 
   /** 開き直せるのは、まだ同意していない支払いだけ */
-  fn reopen(order: ordering.Order, payment: Payment, returnTo: type.Url): psp.Session
-    throws AlreadySecured, ProviderUnavailable
-  {
+  fn reopen(order: ordering.Order, payment: Payment, returnTo: type.Url): psp.Session {
     return match (payment by Standing) {
       Pending => replaceSession(order, payment, returnTo);
       else    => throw AlreadySecured;
@@ -213,18 +207,14 @@ namespace payment {
   }
 
   /** 新しい支払いの画面に差し替える */
-  fn replaceSession(order: ordering.Order, payment: Payment on Standing.Pending, returnTo: type.Url): psp.Session
-    throws ProviderUnavailable
-  {
+  fn replaceSession(order: ordering.Order, payment: Payment on Standing.Pending, returnTo: type.Url): psp.Session {
     val session = openSession(order, returnTo);
     replaceSessionOf(payment, session.id);
     return session;
   }
 
   /** 箱で送るものがあれば、上限の額の枠を確保する画面。ダウンロードだけなら、その場で請求する画面 */
-  fn openSession(order: ordering.Order, returnTo: type.Url): psp.Session
-    throws ProviderUnavailable
-  {
+  fn openSession(order: ordering.Order, returnTo: type.Url): psp.Session {
     return match (order.physical by ordering.Delivery) {
       ToShip        => openHold(order, order.physical, returnTo);
       NothingToShip => openCharge(order, returnTo);
@@ -325,9 +315,7 @@ namespace payment {
   }
 
   /** 注文の支払い。なければ NoPayment */
-  fn require(orderId: type.OrderId): Payment
-    throws NoPayment
-  {
+  fn require(orderId: type.OrderId): Payment {
     val found = paymentOf(orderId);
     return match (found by Known) {
       Found   => found;
@@ -344,9 +332,7 @@ namespace payment {
    */
   @prd.promise("客", "請求は、同意した額（商品の代金 + 送料の上限）を超えない")
   @prd.promise("客", "請求の確定は、注文一つに一度だけ")
-  export fn settle(orderId: type.OrderId, fee: type.Yen):
-    throws NoPayment, NotSecured, psp.HoldExpired, http.NetworkError, http.ServerError
-  {
+  export fn settle(orderId: type.OrderId, fee: type.Yen) {
     val payment = require(orderId);
     match (payment by Standing) {
       Held               => capture(payment, fee);
@@ -369,9 +355,7 @@ namespace payment {
   }
 
   /** 先に確定した上限の額と、決まった額の差を、返す */
-  fn refundDifference(payment: Payment on Standing.Prepaid, fee: type.Yen):
-    throws http.NetworkError, http.ServerError
-  {
+  fn refundDifference(payment: Payment on Standing.Prepaid, fee: type.Yen) {
     val now = clock.now();
     val charge = charged(payment, fee);
     val request = refundOf(payment, charge);
@@ -450,9 +434,7 @@ namespace payment {
   // ---- 枠を手放す ----
 
   /** 期限切れにした注文に、後から同意が届いたとき: 枠を手放す。請求しない */
-  export fn release(orderId: type.OrderId):
-    throws NoPayment, http.NetworkError, http.ServerError
-  {
+  export fn release(orderId: type.OrderId) {
     val payment = require(orderId);
     match (payment by Standing) {
       Held => letGo(payment);
@@ -461,9 +443,7 @@ namespace payment {
   }
 
   /** 枠を手放して、記録する */
-  fn letGo(payment: Payment on Standing.Held):
-    throws http.NetworkError, http.ServerError
-  {
+  fn letGo(payment: Payment on Standing.Held) {
     val request = holdOf(payment);
     psp.release(request);
     val now = clock.now();

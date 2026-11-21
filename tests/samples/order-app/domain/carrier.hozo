@@ -109,9 +109,7 @@ namespace carrier {
   }
 
   /** 配送業者を登録する */
-  export fn register(carrier: Carrier):
-    throws AlreadyRegistered
-  {
+  export fn register(carrier: Carrier) {
     val existing = carrierByCode(carrier.code);
     match (existing by Registered) {
       Known   => throw AlreadyRegistered;
@@ -120,9 +118,7 @@ namespace carrier {
   }
 
   /** 配送業者を使う、使わないを切り替える */
-  export fn setEnabled(code: CarrierCode, enabled: boolean): Carrier
-    throws UnknownCarrier
-  {
+  export fn setEnabled(code: CarrierCode, enabled: boolean): Carrier {
     val found = carrierByCode(code);
     match (found by Registered) {
       Known   => switchCarrier(found, enabled);
@@ -132,9 +128,7 @@ namespace carrier {
   }
 
   /** 登録してある配送業者を引く */
-  fn known(code: CarrierCode): Carrier
-    throws UnknownCarrier
-  {
+  fn known(code: CarrierCode): Carrier {
     val found = carrierByCode(code);
     return match (found by Registered) {
       Known   => found;
@@ -145,9 +139,7 @@ namespace carrier {
   // ---- 使う ----
 
   /** いま使っている配送業者の、この荷物の見積もり */
-  export fn quotes(parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
-    throws NoCarrier, http.NetworkError, http.ServerError
-  {
+  export fn quotes(parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[] {
     val fleet = enabledCarriers();
     return match (fleet by Fleet) {
       Available   => rate(fleet, parcel, origin, destination);
@@ -156,9 +148,7 @@ namespace carrier {
   }
 
   /** 外部の仕組みに、見積もりを頼む */
-  fn rate(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[]
-    throws http.NetworkError, http.ServerError
-  {
+  fn rate(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): Quote[] {
     val request = rateRequest(fleet, parcel, origin, destination);
     return carriergw.rates(request);
   }
@@ -167,9 +157,7 @@ namespace carrier {
   fn rateRequest(fleet: Carrier[], parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.RateRequest;
 
   /** 選んだ配送業者とサービスで、送り状を買う。店の金が動く */
-  export fn book(choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
-    throws UnknownCarrier, NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
-  {
+  export fn book(choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label {
     val found = carrierByCode(choice.carrier);
     return match (found by Registered) {
       Known   => bookWith(found, choice, parcel, origin, destination);
@@ -178,9 +166,7 @@ namespace carrier {
   }
 
   /** いま使っている配送業者にだけ、頼める */
-  fn bookWith(carrier: Carrier, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
-    throws NotEnabled, carriergw.Refused, http.NetworkError, http.ServerError
-  {
+  fn bookWith(carrier: Carrier, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label {
     return match (carrier by Use) {
       InUse     => buy(carrier, choice, parcel, origin, destination);
       Suspended => throw NotEnabled;
@@ -188,9 +174,7 @@ namespace carrier {
   }
 
   /** 外部の仕組みから、送り状を買う */
-  fn buy(carrier: Carrier on Use.InUse, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label
-    throws carriergw.Refused, http.NetworkError, http.ServerError
-  {
+  fn buy(carrier: Carrier on Use.InUse, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): shipping.Label {
     val request = labelRequest(carrier, choice, parcel, origin, destination);
     val bought = carriergw.buyLabel(request);
     val now = clock.now();

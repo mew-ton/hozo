@@ -37,9 +37,7 @@ namespace shopApi {
 
   /** カートを種類ごとに分けて、商品の代金を出す。送料は出さない */
   @http.post("/cart/items")
-  export fn itemise(in: CartInput): ordering.Sorted
-    throws ordering.UnknownProduct, ordering.NotForSale
-  {
+  export fn itemise(in: CartInput): ordering.Sorted {
     return ordering.itemise(in.lines);
   }
 
@@ -54,10 +52,7 @@ namespace shopApi {
    * 請求する送料は、梱包の後に決まり、上限を超えない。
    */
   @http.post("/quote")
-  export fn quote(in: QuoteInput): ordering.Priced
-    throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired,
-           shipping.Undeliverable, shipping.TooLarge
-  {
+  export fn quote(in: QuoteInput): ordering.Priced {
     return ordering.price(in.lines, in.destination);
   }
 
@@ -80,11 +75,7 @@ namespace shopApi {
 
   /** 注文して、支払いの画面を開く。同じ送信が二度届いても、注文は一つ */
   @http.post("/orders")
-  export fn checkout(in: CheckoutInput): Placed
-    throws ordering.UnknownProduct, ordering.NotForSale, ordering.DestinationRequired, ordering.TermsChanged,
-           ordering.OrderExpired, shipping.Undeliverable, shipping.TooLarge, inventory.OutOfStock,
-           payment.AlreadySecured, payment.ProviderUnavailable
-  {
+  export fn checkout(in: CheckoutInput): Placed {
     val order = ordering.place(in.checkout);
     return payFor(order);
   }
@@ -96,17 +87,13 @@ namespace shopApi {
 
   /** 支払いの画面を、開き直す（客が、支払いの画面を閉じてしまったとき） */
   @http.post("/orders/pay")
-  export fn pay(in: KeyInput): Placed
-    throws ordering.NoOrder, ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
-  {
+  export fn pay(in: KeyInput): Placed {
     val order = ordering.byKey(in.key);
     return payFor(order);
   }
 
   /** 支払いを待っている注文にだけ、支払いの画面を開く */
-  fn payFor(order: ordering.Order): Placed
-    throws ordering.OrderExpired, payment.AlreadySecured, payment.ProviderUnavailable
-  {
+  fn payFor(order: ordering.Order): Placed {
     return match (order by ordering.Standing) {
       AwaitingPayment => openPayment(order);
       Accepted        => throw payment.AlreadySecured;
@@ -115,9 +102,7 @@ namespace shopApi {
   }
 
   /** 支払いの画面を開く */
-  fn openPayment(order: ordering.Order on ordering.Standing.AwaitingPayment): Placed
-    throws payment.AlreadySecured, payment.ProviderUnavailable
-  {
+  fn openPayment(order: ordering.Order on ordering.Standing.AwaitingPayment): Placed {
     val returnTo = orderPage(site, order.key);
     val session = payment.begin(order, returnTo);
     return { key: order.key, payAt: session.url };
@@ -241,9 +226,7 @@ namespace shopApi {
 
   /** ダウンロードの行のファイルを取る URL。短い間だけ使える */
   @http.get("/orders/download")
-  export fn download(in: DownloadInput): type.Url
-    throws ordering.NoOrder, download.NotGranted, download.GrantExpired, download.AssetsUnavailable
-  {
+  export fn download(in: DownloadInput): type.Url {
     val order = ordering.byKey(in.key);
     return download.link(order.id, in.line);
   }

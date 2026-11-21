@@ -93,15 +93,19 @@ func TestExampleLogout(t *testing.T) {
 		t.Errorf("bound = %+v", bound)
 	}
 
-	// ignoreFailure を外すと requestLogout に THROWS-1 が出て、例外は logout にも伝わる
+	// ignoreFailure を外すと、例外は requestLogout と logout に伝わる。どちらも throws の節を書いていないので、THROWS-1 は出ない
 	p2 := logoutProgram()
 	p2.Lookup("browser.requestLogout").(*ir.Op).Decorators = nil
-	t1 := withCode(Check(p2, cfgFor("server", "browser")), "THROWS-1")
-	if len(t1) != 2 {
-		t.Fatalf("THROWS-1 count = %d, want 2 (requestLogout and logout)\n%s", len(t1), messages(t1))
-	}
-	wantStrings(t, "missing", t1[0].Data["missing"].([]string), []string{"http.ServerError", "http.NetworkError"})
+	wantNoCode(t, Check(p2, cfgFor("server", "browser")), "THROWS-1")
+	wantStrings(t, "requestLogout.E", sigOf(t, p2, "browser.requestLogout").Exceptions, []string{"http.ServerError", "http.NetworkError"})
 	wantStrings(t, "logout.E", sigOf(t, p2, "browser.logout").Exceptions, []string{"http.ServerError", "http.NetworkError"})
+
+	// 節を書いた配線は、伝わった例外を覆うこと: 片方だけを書いた logout に THROWS-1
+	p3 := logoutProgram()
+	p3.Lookup("browser.requestLogout").(*ir.Op).Decorators = nil
+	p3.Lookup("browser.logout").(*ir.Op).Throws = []ir.ThrowsClause{throws([]string{"http.NetworkError"})}
+	t1 := wantOneCode(t, Check(p3, cfgFor("server", "browser")), "THROWS-1")
+	wantStrings(t, "missing", t1.Data["missing"].([]string), []string{"http.ServerError"})
 }
 
 // TestExamplePlaceOrder は §7.3 の placeOrder。設計書の原文は葉の op に

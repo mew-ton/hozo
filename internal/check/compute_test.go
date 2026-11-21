@@ -448,11 +448,18 @@ func TestSigExternal(t *testing.T) {
 	wantStrings(t, "Sig(getMe, server).E", sigOf(t, p, "server.getMe").Exceptions, nil)
 	wantStrings(t, "Sig(inside, server).E", sigOf(t, p, "server.inside").Exceptions, nil)
 	wantStrings(t, "Sig(fetchMe, browser).E", sigOf(t, p, "browser.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError"})
-	d := wantOneCode(t, diags, "THROWS-1")
+	// throws の節を書いていない配線には、THROWS-1 を出さない（docs/check.md「状態に触れるもの」の「節に書く要素」）
+	wantNoCode(t, diags, "THROWS-1")
+	// 節を書いた配線は、計算した例外を、節が覆うこと
+	written := wire("browser.fetchMe", ir.String(), nil, ret(call("server.getMe")))
+	written.Throws = []ir.ThrowsClause{throws([]string{"browser.Offline"})}
+	pw := program(nil, httpVocab(), namespace("server", getMe, inside), namespace("browser", exc("browser.Offline"), written))
+	d := wantOneCode(t, Check(pw, cfgFor("server", "browser")), "THROWS-1")
 	if d.Message == "" || d.Data["missing"] == nil {
 		t.Errorf("THROWS-1 without message or data: %+v", d)
 	}
 	wantStrings(t, "Data.missing", d.Data["missing"].([]string), []string{"http.ServerError", "http.NetworkError"})
+	wantStrings(t, "Sig(fetchMe 節あり, browser).E", sigOf(t, pw, "browser.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError", "browser.Offline"})
 	views := viewsOf(p, cfgFor("server", "browser"))
 	wantStrings(t, "View(browser).ops[server.getMe].E", views["browser"].Ops["server.getMe"].Exceptions, []string{"http.ServerError", "http.NetworkError"})
 	wantStrings(t, "View(server).ops[server.getMe].E", views["server"].Ops["server.getMe"].Exceptions, nil)
@@ -529,6 +536,7 @@ func TestSigCycle(t *testing.T) {
 	c := wire("server.c", nil, nil, cs(call("server.a")))
 	self := wire("server.self", nil, nil, cs(call("server.self")))
 	d := wire("server.d", nil, nil, cs(call("server.a")))
+	d.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
 	p := serverWith(a, b, c, self, d)
 	diags := Checker{Locate: locatorFor()}.Check(p, cfgFor("server"))
 	w7 := withCode(diags, "WIRE-7")
@@ -545,10 +553,10 @@ func TestSigCycle(t *testing.T) {
 	wantStrings(t, "a.E (as leaf)", sa.Exceptions, []string{"server.X"})
 	wantStrings(t, "a.F (as leaf)", effectNames(sa.Effects), []string{"server.e1"})
 	wantStrings(t, "b.E", sigOf(t, p, "server.b").Exceptions, nil)
-	wantStrings(t, "d.E", sigOf(t, p, "server.d").Exceptions, []string{"server.X"})
+	wantStrings(t, "d.E", sigOf(t, p, "server.d").Exceptions, []string{"server.X", "server.Y"})
 	wantNoCode(t, diags, "EFF-2") // 循環上の配線の effects は自分の宣言と一致する
 	if n := len(withCode(diags, "THROWS-1")); n != 1 {
-		t.Errorf("THROWS-1 count = %d, want 1 (d calls a)", n)
+		t.Errorf("THROWS-1 count = %d, want 1 (throws の節を書いた d が、a の X を覆わない)", n)
 	}
 }
 
@@ -793,8 +801,9 @@ func throwing(fqn, state string, exceptions ...string) *ir.Effect {
 }
 
 // TestSigThrowingEffectCall は手順 0 の表の、効果の呼び出し: 宣言した効果の throws が、配線の例外に加わり、その効果との組は
-// prevented（投げたとき、その効果は、起きていない）。先に動いた効果は kept、後ろの効果は prevented。配線が throws に
-// 書いていなければ THROWS-1。直に呼んだ組み込みの効果は、例外を増やさない。
+// prevented（投げたとき、その効果は、起きていない）。先に動いた効果は kept、後ろの効果は prevented。配線が throws の節を
+// 書いていなければ、例外は計算されるだけで、THROWS-1 は出ない。節を書いて覆わなければ THROWS-1。直に呼んだ組み込みの効果は、
+// 例外を増やさない。
 func TestSigThrowingEffectCall(t *testing.T) {
 	t1 := throwing("server.t1", "server.sA", "server.X")
 	w := wire("server.w", nil, nil, cs(effectCall("server.e1")), cs(effectCall("server.t1")), cs(effectCall("server.e2")), cs(directCall("server.sB", ir.OpPut)))
@@ -813,11 +822,16 @@ func TestSigThrowingEffectCall(t *testing.T) {
 		t.Errorf("succ(t1) = %s, want kept", got)
 	}
 
-	// 配線が throws に書いていなければ THROWS-1
+	// 配線が throws の節を書いていなければ、例外は計算されるだけ
 	w2 := wire("server.w2", nil, nil, cs(effectCall("server.t1")))
 	p2 := serverWith(t1, w2)
-	Compute(p2)
-	d := wantOneCode(t, Check(p2, nil), "THROWS-1")
+	wantNoCode(t, Check(p2, nil), "THROWS-1")
+	wantStrings(t, "w2.E", sigOf(t, p2, "server.w2").Exceptions, []string{"server.X"})
+
+	// 節を書いて、効果の例外を覆わなければ THROWS-1
+	w3 := wire("server.w3", nil, nil, cs(effectCall("server.t1")))
+	w3.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
+	d := wantOneCode(t, Check(serverWith(t1, w3), nil), "THROWS-1")
 	if !strings.Contains(d.Message, "server.X") {
 		t.Errorf("THROWS-1 のメッセージに server.X がない: %s", d.Message)
 	}

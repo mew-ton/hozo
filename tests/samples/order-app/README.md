@@ -430,7 +430,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 ### 検査器
 
 - **F33 検査器が error にしたのは、言語の限りを確かめた実験だけ。** F1、F8、F9、F12、F16、F22、F26、F30 の書き方は、このサンプルの外で確かめた。サンプルの約 4,300 行は、まだ書いていない名前空間を引いたとき（RES-1）のほかは、書いたまま通った。順番の誤り（請求の確定より先に、送り状を買う）は、通る。
-- **F34 書く量をいちばん増やしたのは THROWS-1。** `staffApi.buyLabel` の `throws` は 13、`storefront.placeOrder` は 12。同じ並びを、`fulfilment.dispatch`、`staffApi.buyLabel`、`backoffice.onBuyLabel` の `@recover` で、三度書く。例外のユニオンでまとめることは、していない（G8）。
+- **F34 書く量をいちばん増やしたのは THROWS-1。** `staffApi.buyLabel` の `throws` は 13、`storefront.placeOrder` は 12。同じ並びを、`fulfilment.dispatch`、`staffApi.buyLabel`、`backoffice.onBuyLabel` の `@recover` で、三度書く。例外のユニオンでまとめることは、していない（G8）。 → 配線の op は、`throws` を書かなくてよくなり（`docs/decisions.md`「決めたこと」379）、`staffApi.buyLabel`、`storefront.placeOrder`、`fulfilment.dispatch` の節は、消した（「配線の op の `throws` を消したこと」）。同じ並びを書くのは、`backoffice.onBuyLabel` の `@recover` の一度だけ。
 - **F35 DEC-16 は、画面で役に立った。** `@recover` の相手を、その op が投げない例外にすると warning。
 - **F36 op が値を返すかどうかが、呼ぶ側の都合で決まった。** 確かめるためだけに呼ぶ op は、値を返せない（WIRE-2 と WIRE-8）。→ `staff.asPacker`、`inventory.pick`、`payment.settle` を、値を返さない op に直した。
 - **F37 `hozoc check` は、親のディレクトリの `hozo.toml` を拾う。** サンプルに `hozo.toml` を置く前は、リポジトリ直下の設定で検査され、「0 errors」と出た（`docs/config.md`「置き場と探し方」のとおりの振る舞い）。
@@ -714,6 +714,20 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 - **`Record<K, V>` をなくした**（`docs/decisions.md`「決めたこと」360）のに合わせて、二つの画面（`storefront`、`backoffice`）の、URL のクエリの状態を、`state query: single<page.Query>;` にした。`page.Query` は、標準の語彙 `page` が宣言する、インデックスの model（`docs/vocab.md`）。
 - **標準の分類 `nullable` のケースの名前を、`None` / `Some` に替えた**（`docs/decisions.md`「決めたこと」362）のに合わせて、二つの画面（`storefront`、`backoffice`）の、形が `nullable` の状態の遷移（`effects token as None -> Some`、`effects offer as None -> Some`）と、`match (… by nullable)` のアームを、書き直した。形が `list` の所（`Empty` / `HasItems`）は、変えていない。
 - **絞り込んだ型を `T on C.K` と書き、行の遷移の、前のケースを、行の引数の型で言う**（`docs/decisions.md`「決めたこと」368〜370）のに合わせて、絞り込んだ型（`C.K<T>`）と、行の遷移を持つ 24 の効果を、書き直した（`effect fn startJob(job: Job, …): effects jobs.put as Progress.Queued -> Progress.InProduction;` を、`effect fn startJob(job: Job on Progress.Queued, …): effects jobs.put as Progress.InProduction;` に）。`post` の効果の「前」（`as Packing.Unpacked -> Packing.Packed`）と、`as any` は、なくなった（F57、F53）。配線で変えたのは、`payment.markSecured` の一か所（F59）。
+
+## 配線の op の `throws` を消したこと
+
+配線の op は、`throws` の節を書かなくてよい（`docs/decisions.md`「決めたこと」379。決まりの持ち主は `docs/check.md`「状態に触れるもの」の「節に書く要素」）。このサンプルの、配線の op の `throws` の節を、99 の op から消した。op の例外（`Signature.exceptions`）は、どの op も、消す前と同じ。
+
+| 置き場 | 節を消した op の数 |
+|---|---|
+| `api/` | 22（`hooks.hozo` 1、`shop-api.hozo` 7、`staff-api.hozo` 14） |
+| `domain/` | 69（`carrier.hozo` 8、`download.hozo` 2、`fulfilment.hozo` 10、`inventory.hozo` 4、`ordering.hozo` 10、`payment.hozo` 10、`production.hozo` 3、`shipping.hozo` 14、`staff.hozo` 8） |
+| `web/` | 8（`backoffice.hozo` 3、`storefront.hozo` 5） |
+
+- **節を残した配線の op は、`payment.capture` の一つ。** 例外と効果の関係（`throws psp.HoldExpired prevents effects`）を、書いて言っている op で、関係を付けない節（`throws http.NetworkError, http.ServerError`）も、一緒に残した: 節を書いた配線の op は、計算した例外を、節が覆わなければ THROWS-1 になる。
+- **ほかに `throws` を書いているのは、定義する所だけ**: 葉の op（12）と、デコレータの宣言（`outside.failsAs`、`webhook.signed`）。
+- 「分かったこと」の F34（書く量をいちばん増やしたのは THROWS-1）は、消す前の記録。
 
 ## 確かめ方
 

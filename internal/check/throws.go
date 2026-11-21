@@ -5,10 +5,14 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// checkThrows1 は THROWS-1（docs/check.md「throws」）。配線の O について
+// checkThrows1 は THROWS-1（docs/check.md「throws」）。throws の節を書いた（Op.throws が空でない）配線の O について
 // Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ, ns(O))（external の throws は Sig と同じく数えない）。
 // 空でなければ、位置は O、メッセージに Missing の FQN、Related に各例外の出どころの呼び出し、Data.missing に FQN の列。
+// 節を書いていない配線の op には、出さない: 配線の op は、throws を書かなくてよい（同「状態に触れるもの」の「節に書く要素」）。
 func checkThrows1(c *computer, o *ir.Op, info *bodyInfo) {
+	if len(o.Throws) == 0 {
+		return
+	}
 	decl := declared(o)
 	catches, throws, _ := c.decoratorSets(o)
 	var missing []string

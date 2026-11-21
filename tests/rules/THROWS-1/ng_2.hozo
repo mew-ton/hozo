@@ -1,11 +1,12 @@
-// THROWS-1（docs/check.md「throws」）: デコレータが吸収するのは E だけで、F が漏れている
+// THROWS-1（docs/check.md「throws」）: デコレータが吸収するのは E だけで、節を書いた配線の op から、F が漏れている
 namespace a {
   exception E;
   exception F;
+  exception G;
   decorator recoverE catches E recovers;
-  fn leaf(): throws E, F;
+  fn leaf(): throws E, F, G;
   @recoverE                            // ERROR: THROWS-1
-  fn wiring() {
+  fn wiring(): throws G {
     leaf();
   }
 }

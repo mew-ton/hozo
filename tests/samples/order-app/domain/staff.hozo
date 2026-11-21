@@ -127,9 +127,7 @@ namespace staff {
   }
 
   /** ログインする */
-  export fn login(loginName: string, password: Password): LoggedIn
-    throws InvalidCredentials
-  {
+  export fn login(loginName: string, password: Password): LoggedIn {
     val member = memberByLoginName(loginName);
     return match (member by Account) {
       Enrolled => issueSession(member, password);
@@ -138,9 +136,7 @@ namespace staff {
   }
 
   /** パスワードを確かめて、セッションを作る */
-  fn issueSession(member: Member, password: Password): LoggedIn
-    throws InvalidCredentials
-  {
+  fn issueSession(member: Member, password: Password): LoggedIn {
     checkPassword(member, password);
     val now = clock.now();
     val session = newSession(member, now);
@@ -179,9 +175,7 @@ namespace staff {
   // ---- 誰が呼んだか ----
 
   /** 呼んだ担当者。トークンがない、ログインしていない、期限が過ぎている、のどれでも Unauthorized */
-  fn whoIs(token: type.Token?): Member
-    throws type.Unauthorized
-  {
+  fn whoIs(token: type.Token?): Member {
     return match (token by Credential) {
       Presented => memberOf(token);
       Absent    => throw type.Unauthorized;
@@ -189,9 +183,7 @@ namespace staff {
   }
 
   /** そのトークンの担当者 */
-  fn memberOf(token: type.Token): Member
-    throws type.Unauthorized
-  {
+  fn memberOf(token: type.Token): Member {
     val session = sessionByToken(token);
     return match (session by Login) {
       LoggedIn  => freshMember(session);
@@ -200,9 +192,7 @@ namespace staff {
   }
 
   /** 期限の内のセッションの担当者 */
-  fn freshMember(session: Session): Member
-    throws type.Unauthorized
-  {
+  fn freshMember(session: Session): Member {
     val now = clock.now();
     val fresh = requireFresh(session, now);
     val member = memberById(fresh.memberId);
@@ -217,9 +207,7 @@ namespace staff {
     throws type.Unauthorized;
 
   /** 製作の担当として呼んでいることを確かめる */
-  export fn asMaker(token: type.Token?):
-    throws type.Unauthorized, type.Forbidden
-  {
+  export fn asMaker(token: type.Token?) {
     val member = whoIs(token);
     match (member by MakerDuty) {
       Maker    => none;
@@ -228,9 +216,7 @@ namespace staff {
   }
 
   /** 梱包の担当として呼んでいることを確かめる */
-  export fn asPacker(token: type.Token?):
-    throws type.Unauthorized, type.Forbidden
-  {
+  export fn asPacker(token: type.Token?) {
     val member = whoIs(token);
     match (member by PackerDuty) {
       Packer    => none;
@@ -239,9 +225,7 @@ namespace staff {
   }
 
   /** 管理の担当として呼んでいることを確かめる */
-  export fn asAdmin(token: type.Token?):
-    throws type.Unauthorized, type.Forbidden
-  {
+  export fn asAdmin(token: type.Token?) {
     val member = whoIs(token);
     match (member by AdminDuty) {
       Admin    => none;

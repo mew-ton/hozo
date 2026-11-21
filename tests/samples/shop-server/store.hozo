@@ -93,7 +93,7 @@ namespace store {
   }
 
   /** ユーザーを足す */
-  export fn addUser(user: type.User): throws type.EmailTaken {
+  export fn addUser(user: type.User) {
     createUser(user);
   }
 
