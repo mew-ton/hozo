@@ -2,7 +2,7 @@
 
 小さな店のサーバー（ログイン、自分の情報、注文）を、サンプルを書きながら決めたこと（`docs/decisions.md`「サンプルを書きながら決めたこと（P の番号との対応）」の P1〜P39）を**当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書から離れた決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124、132〜143 と S25〜S28: 節の区切りは `,` 一つ。状態に触れるのは、引数を持つ `read` と効果だけで、その中身は `db` の語彙のデコレータが宣言から作る。op は、それを呼ぶ配線か、状態に触れない葉。op のデコレータは、包むだけ）も、このサンプルと設計文書を先に書き、その後に実装を入れた**（書いたときになかったものと、今の状態は、同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。
+P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書から離れた決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124、132〜143 と S25〜S28: 節の区切りは `,` 一つ。状態に触れるのは、引数を持つ `read` と効果だけで、その中身は `db` の語彙のデコレータが宣言から作る。op は、それを呼ぶ配線か、状態に触れない葉。op のデコレータは、包むだけ）も、このサンプルと設計文書を先に書き、その後に実装を入れた**（書いたときになかったものと、今の状態は、同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。 その後に足した、六つ目のトランスパイラ `go-design`（設計文書がある。テストを受け取る口だけを出す）は、「R6 のプラグインの部分で足したこと」。
 
 **生成するコードの規則の持ち主は、トランスパイラごとの設計文書**（「各トランスパイラの規則」）。この文書が持つのは、ファイルの出どころ、この仕様に固有の事実、サンプルの中のプラグイン `go-ratelimit` の規則、書いて分かったこと。期待する出力（`gen/`）は、設計文書の形のとおりに書いてある（文書と違うところは、残していない）。
 
@@ -198,6 +198,34 @@ R6 の、プラグインの部分の、段 3（`docs/requirements.md`「R6 の�
 - `store` の `export` の op（`addUser` など）は、`@http.*` を持たないので、この口を持たない（`docs/open.md`「語彙とプラグイン」）。
 - テストのパッケージ `servertest` を import するのは、テストのファイルと、テストを支えるパッケージ `app/handlertest`（`testing` を import する）だけ。
 
+### R6 のプラグインの部分で足したこと
+
+R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の、プラグインの部分」）: テストのプラグイン `go-design`（`docs/plugin-go-design.md`）が、フローの E2E テストの口と、要求ごとの、テストの入れ物の口を出す。仕様に、担い手と、要求と、操作の op の名前空間と、フローの名前空間を足した。期待する出力は、手で書き、hozoc の出力と、バイト単位で同じ。
+
+| 足したもの | 中身 | 文書 |
+|---|---|---|
+| `design.hozo` | 名前空間 `design`（単位を置かない）: 担い手の分類 `Actor`（`@actor.human Customer`）と、要求の分類 `Requirement`（`PRD_001`、`PRD_002`）。どちらも、対象のない分類 | `docs/vocab.md`「設計の図の語彙」、`docs/check.md`「分類」の「対象のない分類」 |
+| `client.hozo` | 名前空間 `client`: 操作の op（ユースケース）三つ（`signIn`、`order`、`viewOrders`。どれも `@usecase.of(design.Actor.Customer)` と `export`）。どれも、機能入口の op（`server.login`、`server.placeOrder`、`server.getOrders`）を、一つ呼ぶ配線 | `docs/ide-chain.md`「ユースケース図」 |
+| `flows.hozo` | 名前空間 `flows`: フロー `signInAndOrder`（`@business.flow` と `export`）と、その結果の model `Ordered`。三つの操作の op を、順に呼ぶ配線 | `docs/ide-chain.md`「業務フロー図」 |
+| `server.hozo` | `@prd.ref` を、三つの op に付けた: `authenticate`（`PRD_001`）、`getOrders`（`PRD_002`）、`placeOrder`（`PRD_001` と `PRD_002`）。op の宣言と配線は、変えていない | `docs/vocab.md`「設計の図の語彙」 |
+| `hozo.toml` | 単位を三つ足した（6: `http`、7: `client`、8: `flows`）。単位 8 に、`[emit.options.go-design]` の `requirements = ["design.Requirement"]` | `docs/plugin-go-design.md`「オプション」 |
+| `gen/http/doc.go`、`types.go` | 標準の語彙 `http` の型（例外三つと、model `Violation`） | `docs/plugin-go.md`「型」 |
+| `gen/client/doc.go`、`ops.go`、`wiring.go` | 操作の op の `Ops`、`server` の口 `ServerOps`、`New`、三つの配線の本体 | `docs/plugin-go.md`「実装を受け取る口」「配線の本体」 |
+| `gen/flows/doc.go`、`types.go`、`ops.go`、`wiring.go` | model `Ordered`、フローの `Ops`、`client` の口 `ClientOps`、`New`、フローの配線の本体 | 同上 |
+| `gen/flows/flowstest/design.go` | `go-design` の出力: `SignInAndOrderFlowCase`、`FlowCases`、`RunFlows`、`Requirements`（`PRD_001`、`PRD_002`）、`RunRequirements` | `docs/plugin-go-design.md`「E2E テストの口」「要求の、テストの入れ物の口」 |
+| `sample.json`、`gen/http/.hozoc-outputs.json`、`gen/client/.hozoc-outputs.json`、`gen/flows/.hozoc-outputs.json` | 上のファイルを、`go` と `go-design` のファイルと、出力先ごとの記録に足した | `../README.md`「sample.json」 |
+| `app/flowtest/flowtest.go` | 足した: 二つの口を満たす型 `FlowCases`、`Requirements` と、`RunFlows`、`RunRequirements`、`RunIncomplete`（「人が書いたもの」） | — |
+| `app/onmem/compose.go`、`app/onsqlite/compose.go` | 足した: `NewFlows`（同じ `store` と `server` の上に、`client` と `flows` を重ねる） | — |
+| `app/onmem/compose_test.go`、`app/onsqlite/compose_test.go` | 足した: `TestFlows`、`TestRequirements`、`TestIncompleteFlowCasesAreRejected` | — |
+
+- **今までの `gen/` のファイル（`gen/type`、`gen/rate`、`gen/store`、`gen/storemem`、`gen/server`）は、変わらない。** `@prd.ref` は、基底にも、ほかの相乗りにも、印（何も出ない）。
+- **単位 6（`http`）が要るのは、型の置き場のため**（`docs/config.md`「型の置き場」）: 機能入口は `@http.post` / `@http.get` の op で、別の名前空間から呼ぶと、通信の失敗（`http.ServerError`、`http.NetworkError`）が、起こりうる例外に加わる（`docs/check.md`「計算」の、`external` なデコレータの `throws`）。操作の op と、フローは、それを `throws` に書くので、その例外の型の置き場が要る。単位がなければ CFG-22。
+- **四つの口**（`docs/requirements.md`「R6 の、プラグインの部分」の条件）: 単体テスト（`gen/server/servertest/leaves.go`。基底）、インテグレーションテスト（`gen/server/servertest/http.go`。`go-http`）、E2E テストと、要求のテスト（`gen/flows/flowstest/design.go`。`go-design`）。`client` は、葉も、入口のデコレータも、フローも持たないので、口を持たない: 操作の op の中身は、基底が作る配線で、つながっていることは、フローの E2E テストが、通して確かめる。
+- **フローは、`flows` の単位だけの対象**（テスト用の単位。`docs/ide-chain.md`「業務フロー図」）。サーバーの main（`app/cmd/`）は、`gen/client` も `gen/flows` も import しない。
+- **人のテストは、操作の op と、機能入口を、Go の上で、直につなぐ**（`client.New(server.New(…))`）: `server.Ops` は、`client.ServerOps` を、そのまま満たす。HTTP の層は、通らないので、二つの通信の例外は、`throws` に出るが、起きない。HTTP の層は、インテグレーションテストが通す（`docs/open.md`「語彙とプラグイン」に、通信の層を通す E2E の点を置いた）。
+- 操作の op は、状態を持たない: ログインのトークンは、`signIn` の戻り値で受け取り、`order` と `viewOrders` の引数で渡す。
+- テストのパッケージ `flowstest` を import するのは、テストを支えるパッケージ `app/flowtest`（`testing` を import する）だけ。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。
@@ -210,8 +238,11 @@ R6 の、プラグインの部分の、段 3（`docs/requirements.md`「R6 の�
 | `mailer.hozo` | `mailer` | 通知を外へ届ける仕組み。`@smtp.sendMail` を付けた op `send`（`export`） |
 | `smtp.hozo` | `smtp` | メールを SMTP で送る仕組みの語彙。デコレータ `sendMail`。読むトランスパイラがないので、印（何も出ない。P37） |
 | `plugins/go-ratelimit/rate.hozo` | `rate` | サンプルの中のプラグイン `go-ratelimit` が提供する語彙: 例外 `LimitExceeded` と、デコレータ `limited`（「サンプルの中のプラグイン」） |
+| `design.hozo` | `design` | 設計の図が持つ名前: 担い手の分類 `Actor` と、要求の分類 `Requirement`（どちらも、対象のない分類）。単位を置かない（「R6 のプラグインの部分で足したこと」） |
+| `client.hozo` | `client` | 操作の op（ユースケース）三つ。機能入口の op を呼ぶ配線（同） |
+| `flows.hozo` | `flows` | フロー一つと、その結果の model。操作の op を、順に呼ぶ配線（同） |
 
-`hozo.toml` は、`[hozo]` の `plugin_dirs = ["plugins"]`（サンプルの中のプラグインの置き場）と、五つの単位。`mailer` と `smtp` には単位を置かないので、コードは出ない。
+`hozo.toml` は、`[hozo]` の `plugin_dirs = ["plugins"]`（サンプルの中のプラグインの置き場）と、八つの単位。`mailer`、`smtp`、`design` には単位を置かないので、コードは出ない。
 
 | # | 単位の `out` | `namespace` | `transpilers` | 中身を埋める者 |
 |---|---|---|---|---|
@@ -220,9 +251,12 @@ R6 の、プラグインの部分の、段 3（`docs/requirements.md`「R6 の�
 | 3 | `gen/store` | `store` | `go`、`go-sqlite` | `go-sqlite`: 四つの状態の単位の実装（五つの `read`、五つの効果、状態の形で決まる問い合わせのすべて）と、`@db.transaction` の継ぎ目の実装。op の中身（配線）は、基底 |
 | 4 | `gen/storemem` | `store` | `go` | 人: `app/memstore`（四つの状態の単位の実装。メモリの上）。op の中身（配線）は、基底 |
 | 5 | `gen/server` | `server` | `go`、`go-valid`、`go-http`、`go-ratelimit` | 人: `app/leaves.go`（葉の op 九つ）、`app/mailer.go`（`mailer.send`）、`app/limiter.go`（`@rate.limited` の数え方）。`go-ratelimit`: 継ぎ目の中身 |
+| 6 | `gen/http` | `http` | `go` | —（標準の語彙 `http` の型だけ） |
+| 7 | `gen/client` | `client` | `go` | —（三つの op は、どれも配線。中身は、基底） |
+| 8 | `gen/flows` | `flows` | `go`、`go-design` | 人: `app/flowtest`（フローのケースと、要求ごとの入れ物の中身）。フローの配線は、基底。口と、走らせる関数は、`go-design` |
 
-- 五つの単位は、どれも基底 `go` を一つ持ち、相乗りの依存（`go-http` は `go` と `go-valid`、`go-ratelimit` は `go`）をすべて並べている（`docs/config.md`「基底と相乗り」）。
-- 使う型の名前空間は、どれも `go` の単位を持つ（同「型の置き場」）: `type` は単位 1、`rate` は単位 2。**`rate` は語彙の名前空間**で、その例外 `rate.LimitExceeded` を `server` の出力が使う（`login` の `Op.signature.exceptions` にある。同「型の置き場」の表の 3）ので、単位が要る。単位 2 がなければ CFG-22。
+- 八つの単位は、どれも基底 `go` を一つ持ち、相乗りの依存（`go-http` は `go` と `go-valid`、`go-ratelimit` と `go-design` は `go`）をすべて並べている（`docs/config.md`「基底と相乗り」）。
+- 使う型の名前空間は、どれも `go` の単位を持つ（同「型の置き場」）: `type` は単位 1、`rate` は単位 2、`http` は単位 6、`server`、`client`、`flows` は、自分の単位。**`rate` は語彙の名前空間**で、その例外 `rate.LimitExceeded` を `server` の出力が使う（`login` の `Op.signature.exceptions` にある。同「型の置き場」の表の 3）ので、単位が要る。単位 2 がなければ CFG-22。
 - `gen/server` の単位だけ、`[emit.options.go-http]` で `validate = true` を渡す（P16）。
 - **単位の継ぎ目**（`docs/config.md`「継ぎ目」）: 単位 3 は `db.transaction` → `go-sqlite`、単位 5 は `rate.limited` → `go-ratelimit`（それぞれのマニフェストの `seams`）。ほかの単位の継ぎ目は空。**単位 4 は、同じ `store` を出すが、`go-sqlite` を並べていないので、`@db.transaction` は印で、継ぎ目にならない**。
 
@@ -335,7 +369,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 
 | ファイル | 出どころ |
 |---|---|
-| `type.hozo`、`store.hozo`、`server.hozo`、`mailer.hozo`、`smtp.hozo`、`hozo.toml` | 人が書く（入力） |
+| `type.hozo`、`store.hozo`、`server.hozo`、`mailer.hozo`、`smtp.hozo`、`design.hozo`、`client.hozo`、`flows.hozo`、`hozo.toml` | 人が書く（入力） |
 | `plugins/go-ratelimit/hozo-plugin.toml`、`rate.hozo` | 人が書く（サンプルの中のプラグインのマニフェストと語彙。入力） |
 | `sample.json` | 人が書く（各トランスパイラが出すファイル。`../README.md`「sample.json」） |
 | `go.mod`、`go.sum` | 人が書く（「モジュール」） |
@@ -352,12 +386,16 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/server/servertest/http.go` | `go-http`（テストのパッケージ: 八つの入口の、インテグレーションテストの口。`docs/plugin-go-http.md`「インテグレーションテストの口」） |
 | `gen/server/ratelimit.go` | `go-ratelimit`（入口のパッケージ） |
 | `gen/server/servertest/doc.go` `leaves.go` | `go`（テストのパッケージ: `server` の葉の op の、単体テストの口。`docs/plugin-go.md`「単体テストの口」。`type`、`rate`、`store` は、葉の op も、述語で決まる値の分類も持たないので、テストのパッケージを持たない） |
+| `gen/http/doc.go` `types.go` | `go` |
+| `gen/client/doc.go` `ops.go` `wiring.go` | `go`（`client` は、内部の op を持たないので、出力を分けない。型も持たないので、`types.go` はない） |
+| `gen/flows/doc.go` `types.go` `ops.go` `wiring.go` | `go` |
+| `gen/flows/flowstest/design.go` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口。`docs/plugin-go-design.md`。`flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、このパッケージにファイルを出さず、`doc.go` はない） |
 | `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
 | `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 九つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/memstore/memstore.go` | 人が書く: `store` の四つの状態の単位（その状態の `read` と効果）の、メモリの上の実装（`gen/storemem` の `New` に渡す型） |
-| `app/onsqlite/compose.go`、`app/onmem/compose.go` | 人が書く: 二つの組み立て（`server` を `gen/store` の上に、`gen/storemem` の上に） |
+| `app/onsqlite/compose.go`、`app/onmem/compose.go` | 人が書く: 二つの組み立て（`server` を `gen/store` の上に、`gen/storemem` の上に）。`NewFlows` は、その上に、`client` と `flows` を重ねる |
 | `app/cmd/shop-sqlite/main.go`、`app/cmd/shop-mem/main.go` | 人が書く: それぞれの組み立てで待ち受ける main |
-| `app/handlertest/`、`app/storetest/` | 人が書く: 二つの組み立てが共に走らせるテスト（HTTP から見た振る舞い、`store` の op と状態の問い合わせの振る舞いのうち、二つの実装に共に言えること） |
+| `app/handlertest/`、`app/storetest/`、`app/flowtest/` | 人が書く: 二つの組み立てが共に走らせるテスト（HTTP から見た振る舞い、`store` の op と状態の問い合わせの振る舞いのうち、二つの実装に共に言えること、フローの E2E テストと、要求のテスト） |
 | `app/*_test.go`、`app/*/*_test.go` | 人が書く: テスト（「人が書いたもの」） |
 
 ## モジュール
@@ -374,7 +412,7 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 
 ## 各トランスパイラの規則
 
-規則の持ち主は設計文書。下の四つの節は、文書への入口と、この仕様が規則のどこを使っているかだけを書く（「分かったこと」は、この節の名前で規則を引いている）。`go-ratelimit` の規則は、上の「サンプルの中のプラグイン」。
+規則の持ち主は設計文書。下の五つの節は、文書への入口と、この仕様が規則のどこを使っているかだけを書く（「分かったこと」は、この節の名前で規則を引いている）。`go-ratelimit` の規則は、上の「サンプルの中のプラグイン」。
 
 ## 基底 `go` が従う規則
 
@@ -458,6 +496,17 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 
 v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制約の検査（P15、P16）、op を呼ぶ前の失敗の本文（v1 は `{"error":"http.BadRequest","message":"…"}`。「分かったこと」N44）。P33 で足したのは、`export` のない op についての規則一つ。決定 103〜110 で変えたのは、上の、同じ形のハンドラと、実行時に決まる成功の応答と、要求のどこから読むかの六つのデコレータ。決定 114〜116 で変えたのは、項目がないときの扱い（`@http.required`、`@http.default`）と、入力を `var` で置くこと。
 
+## `go-design` が従う規則
+
+持ち主は `docs/plugin-go-design.md`。出すファイルは、単位 8 の、テストのパッケージの `gen/flows/flowstest/design.go` 一つ（「R6 のプラグインの部分で足したこと」）。
+
+- **フローは一つ**（同「E2E テストの口」）: `flows.signInAndOrder`。`SignInAndOrderFlowCase` のフィールドは、フローの三つの引数（`Email`、`Password`、`Lines`）と、`Given`、`Then`。フローは、値（`flows.Ordered`）を返すので、`Then` は `func(t *testing.T, got flows.Ordered)`。
+- **フローの op の決まり**（同「フローの op の決まり」）は、どれも満たしている: `export` が付き、配線で、呼ぶ先の三つ（`client.signIn`、`client.order`、`client.viewOrders`）は、どれも `@usecase.of` の付いた op で、`flows` には、`@usecase.of` の付いた op がない。
+- **要求は二つ**（同「要求の、テストの入れ物の口」）: オプション `requirements` に並べた分類 `design.Requirement` のケース `PRD_001`、`PRD_002`。分類 `design.Actor` は、並べていないので、要求ではない。
+- **指している設計**（同「指している設計」）は、`server` の三つの op から: `PRD_001` は `server.authenticate`、`server.placeOrder`。`PRD_002` は `server.getOrders`、`server.placeOrder`（宣言順）。どちらも指されているので、warning は、出ない。
+- `flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、テストのパッケージにファイルを出さない。`flowstest` のファイルは、`design.go` だけ。
+- この仕様が使っていない規則: 値を返さないフロー、引数のないフロー、`Given`・`Then` と当たる引数の名前、二つ以上の要求の分類、どこからも指されていない要求、op のほかの宣言からの `@prd.ref`、要求だけの単位、基底が、テストのパッケージを作る出力、診断（GODESIGN-*）。`plugins/go-design` の単体テストが確かめる（`docs/testing.md`「単体テスト」）。
+
 ## 人が書いたもの
 
 - **`app/leaves.go`**: `server` の葉の op 九つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:38`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも、最初の引数に `ctx` を取り、最後の戻り値に `error` を返す**（`docs/plugin-go.md`「op の形」）: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go` の `Leaves`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:69-74`）。トークンと識別子を作る関数（`app.Leaves` の `NewToken`、`NewOrderID`）は `error` も返し、`NewSession` と `NewOrder` が、それをそのまま返す: 二つの main（`app/cmd/shop-sqlite`、`app/cmd/shop-mem`）は、乱数を読めないときに、panic にせず、その `error` を返す（ハンドラが 500 にする）。
@@ -469,6 +518,7 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
   - **メモリの上の `store.placeOrder` は、一つのトランザクションではない。** 単位 4（`gen/storemem`）には、`@db.transaction` を読むトランスパイラがいない。読む者のないデコレータは、何も出ない（`docs/config.md`「継ぎ目」）ので、生成された配線（`gen/storemem/wiring.go` の `PlaceOrder`）は、二つの効果を順に呼ぶだけ。一つ目（`CreateOrder`）が失敗すれば、二つ目は呼ばれず、何も残らない。**二つ目（`NotifyUser`）が失敗すれば、一つ目の注文は残る**（`app/onmem/compose_test.go` の `TestPlaceOrderIsNotOneTransaction`）。`memstore` の `NotifyUser` が失敗するのは、二つの効果の間で `ctx` が中断されたときだけなので、起きにくいが、起きる。この単位で「どちらも足すか、どちらも足さない」を守るには、`@db.transaction` の継ぎ目を宣言して、メモリの上の取り消しを出すトランスパイラを、単位に並べるしかない（人の書く型は、op を包めない: 継ぎ目の口は、宣言したトランスパイラがいる単位にだけ出る）。仕様の `placeOrder` の説明（「どちらも足すか、どちらも足さない」）は、この単位では、守られていない。
 - **二つの組み立て**: `app/onsqlite/compose.go`（表を作る `store.CreateTables(ctx, db)` と、`go-sqlite` の四つの表の型と `store.NewDbSeams(db)` を渡す `store.New`）と `app/onmem/compose.go`（`memstore` の四つの型を渡す `store.New`。継ぎ目の引数は、ない）。どちらも、`store.New(…)` の戻り値を `server.New(leaves, mailer, s, server.NewRateSeams(limiter))` の三つ目に渡し、その戻り値を `server.NewHandler` に渡す。**二つが使う `gen/server` と `app` の葉は同じ一つのもの**で、違うのは `store` の import と、状態の単位の実装と、`store` の継ぎ目の有無だけ。組み立ては何度呼んでもよい（パッケージの変数がない）。
 - **`app/handlertest/httpcases.go`**: 八つの入口の、結果ごとのインテグレーションテスト。型 `HTTPCases` が、`go-http` の出した口 `servertest.HTTPCases` を満たし、`RunCases` が、サーバー一つと一緒に、`servertest.RunHTTP(t, handler, cases)` に渡す。二つの組み立ての `TestHTTPCases` が、同じものを走らせる。書いてあるのは、入力の値と、今の状態の用意（`Given`）と、後の状態の確かめ（`Then`）だけ: 要求の組み立て、送ること、結果の見分け（ステータスと、本文の形）は、生成したコードが持つ。テストの名前は、`TestHTTPCases/<op の FQN>/<結果>`（`TestHTTPCases/server.login/LimitExceeded`）。`RunHTTP` は、サーバー一つを、すべてのケースで使うので、状態を使うケースは、自分のユーザーとセッションを、`store` の op で足して使う（`newUser`。`handlertest.CaseStore`）。op を呼ぶ前の失敗（`BadRequest`）は、二つの書き方を、一つずつ: `login` は、制約に合わない入力の値（`Request` は要らない）、`placeOrder` は、`Request` で、`@http.required` の項目 `lines` のない本文に置き換える。`@rate.limited` が運ぶ `rate.LimitExceeded` のケースは、`Given` が、`/login` を `LoginLimit` 回呼んでおく。`@http.status` を持たない `type.NotificationFailed` のケースは、`Given` が、配送を失敗させ、走らせる側は、500 と `internal` までを確かめ、`Then` が、注文と通知の記録が残っていることを確かめる。**ケースを欠いた型は、口を満たさない**（`RunIncomplete`。二つの組み立ての `TestIncompleteHTTPCasesAreRejected`: 口が求めるメソッドを、リフレクションで確かめる。コンパイルできないことそのものは、リポジトリの `plugins/go-http` の単体テストが確かめる: `docs/testing.md`「単体テスト」）。
+- **`app/flowtest`**（`flowtest.go`）: フローの E2E テストと、要求のテスト。型 `FlowCases` が、`go-design` の出した口 `flowstest.FlowCases` を満たし、`RunFlows` が、`flowstest.RunFlows(t, s.Flows, FlowCases{s})` に渡す。書いてあるのは、フローの引数と、今の状態の用意（`Given`: alice を足す）と、後の状態と返り値の確かめ（`Then`: できた注文が、返ってきた一覧と、`store` の両方に、一つある）だけ: フローの配線は、基底が作り、`Given`、フロー、正常に終わったことの確かめ、`Then` の順は、生成したコードが持つ。テストの名前は、`TestFlows/flows.signInAndOrder`。型 `Requirements` が、口 `flowstest.Requirements` を満たし、要求ごとの入れ物（`PRD_001`、`PRD_002`）に、サブテストを二つずつ持つ（`TestRequirements/design.Requirement.PRD_001/…`）。どの設計を通すかは、入れ物が選ぶ: ここでは、どちらも、操作の op（`client`）を通す。二つの組み立て（`app/onmem/compose_test.go`、`app/onsqlite/compose_test.go` の `TestFlows`、`TestRequirements`）が、同じものを走らせる。**口を一つ欠いた型が、コンパイルできないこと**は、段 2・段 3 と同じ分け方: `RunIncomplete`（二つの組み立ての `TestIncompleteFlowCasesAreRejected`）が、口のメソッド（`FlowCases` は、フローごとに一つ。`Requirements` は、要求ごとに一つ）と、欠いた型が、口を満たさないことを、リフレクションで確かめ、コンパイルできないことそのものは、リポジトリの `plugins/go-design` の `TestIncompleteDoNotCompile` が、生成したコードをコンパイルして確かめる。
 - **`app/handlertest`**（`handlertest.go`）: HTTP から見た振る舞い。二つの組み立て（`app/onsqlite/compose_test.go`、`app/onmem/compose_test.go` の `TestHandler`）が同じものを走らせる。サブテストは、それぞれ新しいサーバーを作り、並列に走る（`t.Parallel()`）。応答の本文を文字列のまま比べるので、そこに書いた JSON が、クライアントが合わせる形になる。確かめること: パスワード違いとユーザーなしは 401 `type.InvalidCredentials`、制約に合わない入力は 400 `http.BadRequest` と違反の一覧、ログインでトークン、`GET /me`（トークンあり・なし・知らないトークン）、`POST /orders`（本文は `{"lines":[…]}`）で注文と通知が一つずつ（通知は、状態 `store.notifications` の `Get` で数える。`Server.count`）、`mailer.send` を失敗させると 500 で**注文も、通知の記録も残る**（二つは、配送の前に、一つの op で一緒に記録してある）、`GET /orders?page=…`（`page` がなければ、`@http.default(1)` の 1 ページ目）、読めない `page` は 400、ログアウトの後の `GET /me` は 401、中断された要求は 500 で状態が変わらない、**期限の切れたセッションは、どの入口でも 401 `type.Unauthorized`**（時計を進めて確かめる。サブテスト `expired`）。
   - **`login/LimitExceeded`**（`app/handlertest/handlertest.go:166-196`）: **`/login` を、制限（`LoginLimit` 回。パスワード違いの失敗も一回と数える）を超えて呼ぶと、429 `{"error":"rate.LimitExceeded"}`**。op の中身は呼ばれない（トークンが作られない）。制約に合わない入力は、制限を超えていても 400 が先（`go-http` の検査は op を呼ぶ前で、op を呼ばないので、数えない）。時間の幅が過ぎれば、また呼べる。`@rate.limited` の付いていない op（`GET /me`）は、何度呼んでも制限されない。
   - **`getLatestOrder`**: **省略可能な戻り値で、値がなければ 204 で本文なし**（`null` を返さない）。注文を足した後は、同じ経路が 200 と、その注文の JSON（二つの注文は、時計を止めてあるので `placedAt` が同じ。返るのは、後から足した方）。空の配列（`GET /orders`）は値なので 200 と `[]`、戻り値のない `POST /logout` は 204（サブテスト `getOrders`、`logout`）。

@@ -1,0 +1,21 @@
+// サンプル shop-server の仕様（README.md）。業務フローの名前空間 flows。
+// フローの op は、操作の op（client.hozo の、@usecase.of を付けた op）を、順に呼ぶ配線で、E2E テストの起点
+// （docs/ide-chain.md「業務フロー図」「テストの規約」の「E2E テスト」）。アプリのコードには、ならない: この名前空間を対象にするのは、
+// テスト用の単位（hozo.toml の 8）だけ。
+
+/** 業務フロー。操作の op（ユースケース）を、順に行う */
+namespace flows {
+  /** フローの結果: できた注文と、その後の、自分の注文の一覧 */
+  model Ordered { placed: type.Order; listed: type.Order[]; }
+
+  /** ログインして、注文し、自分の注文の一覧を見る */
+  @business.flow
+  export fn signInAndOrder(email: type.Email, password: type.Password, lines: type.OrderLine[]): Ordered
+    throws type.InvalidCredentials, rate.LimitExceeded, type.Unauthorized, type.NotificationFailed, http.ServerError, http.NetworkError
+  {
+    val token = client.signIn(email, password);
+    val placed = client.order(token, lines);
+    val listed = client.viewOrders(token);
+    return { placed: placed, listed: listed };
+  }
+}

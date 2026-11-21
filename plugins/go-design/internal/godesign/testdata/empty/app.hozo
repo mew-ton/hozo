@@ -1,0 +1,13 @@
+// フローも、要求もない: @usecase.of の op だけでは、何も出さない。
+namespace design {
+  classify Actor of never { @actor.human User; }
+}
+
+namespace app {
+  @usecase.of(design.Actor.User)
+  export fn touch();
+}
+
+namespace other {
+  export fn plain();
+}

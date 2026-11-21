@@ -1,0 +1,77 @@
+// GODESIGN-3: 位置は、フローの op。呼んだ先ごとに、一つ（同じ先を二度呼んでも、一つ）。
+namespace design {
+  classify Actor of never { @actor.human User; }
+}
+
+namespace act {
+  @usecase.of(design.Actor.User)
+  export fn touch();
+
+  @usecase.of(design.Actor.User)
+  export fn find(name: string): string?;
+
+  // @usecase.of のない op
+  export fn plain();
+  export fn text(name: string): string;
+}
+
+namespace flows {
+  state notes: list<string>;
+
+  read fn firstNote(): string? reads notes;
+  effect fn addNote(note: string): effects notes.post;
+
+  // 同じ名前空間の、@usecase.of のない op（葉）
+  fn helper();
+
+  // 別の名前空間の、@usecase.of のない op。二度呼んでも、診断は、一つ
+  @business.flow
+  export fn callsPlain() {
+    act.touch();
+    act.plain();
+    act.plain();
+  }
+
+  // 同じ名前空間の、@usecase.of のない op
+  @business.flow
+  export fn callsHelper() {
+    helper();
+  }
+
+  // 別のフロー
+  @business.flow
+  export fn callsFlow() {
+    callsHelper();
+  }
+
+  // read と、効果と、直に呼ぶ組み込みの効果
+  @business.flow
+  export fn callsState(note: string): string? {
+    addNote(note);
+    notes.post(note);
+    return firstNote();
+  }
+
+  // match のアームの本体と、for、disjoint の中
+  @business.flow
+  export fn nested(name: string, items: string[]): string {
+    val found = act.find(name);
+    for (val item of items) {
+      helper();
+    }
+    disjoint {
+      act.touch();
+      act.plain();
+    }
+    return match (found by nullable) {
+      Some => act.text(found);
+      None => act.text(name);
+    }
+  }
+
+  // 操作の op だけを呼ぶフローは、当たらない
+  @business.flow
+  export fn fine() {
+    act.touch();
+  }
+}

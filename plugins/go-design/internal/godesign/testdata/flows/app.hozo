@@ -1,0 +1,150 @@
+// plugins/go-design の単体テストの入力: docs/plugin-go-design.md「E2E テストの口」「要求の、テストの入れ物の口」の各行。
+
+/** 設計の図が持つ名前 */
+namespace design {
+  classify Actor of never {
+    @actor.human User;
+    @actor.bot Timer;
+  }
+
+  /** 要求 */
+  classify Req of never {
+    /** 買ったものは、控えに残る */
+    R1;
+    // 説明のない要求
+    R2;
+    /** どこからも指されていない要求（warning） */
+    r3;
+  }
+
+  /** もう一つの、要求の分類 */
+  classify Extra of never {
+    /**
+     * 二行以上の説明を持つ要求。
+     * 二行目。
+     *
+     * 空行の後の行。
+     */
+    X1;
+  }
+}
+
+/** 状態と、read と、効果: op のほかの宣言からの @prd.ref */
+namespace data {
+  @prd.ref(design.Req.R2)
+  model Row { name: string; }
+
+  @prd.ref(design.Req.R2)
+  state rows: list<Row>;
+
+  @prd.ref(design.Req.R2, design.Extra.X1)
+  read fn first(): Row? reads rows;
+
+  @prd.ref(design.Req.R2)
+  effect fn add(row: Row): effects rows.post;
+}
+
+/** 操作の op（ユースケース） */
+namespace act {
+  /** 控え */
+  model Receipt { item: string; count: int; }
+
+  /** 買う */
+  @usecase.of(design.Actor.User)
+  @prd.ref(design.Req.R1)
+  export fn buy(item: string, count: int): Receipt;
+
+  @usecase.of(design.Actor.User, design.Actor.Timer)
+  export fn touch();
+
+  @usecase.of(design.Actor.User)
+  export fn echo(a: string, b: string): string;
+
+  @usecase.of()
+  export fn find(name: string): string?;
+
+  // 同じ要求を、一つの @prd.ref に二度書いても、指している設計には、一度だけ
+  @usecase.of(design.Actor.Timer)
+  @prd.ref(design.Req.R1, design.Req.R1)
+  export fn count(items: string[]): int;
+
+  @usecase.of(design.Actor.User)
+  export fn note(text: string);
+}
+
+/** フロー */
+namespace flows {
+  /** 買って、控えを受け取る */
+  @business.flow
+  @prd.ref(design.Req.R1, design.Extra.X1)
+  export fn checkout(item: string, count: int): act.Receipt {
+    act.touch();
+    return act.buy(item, count);
+  }
+
+  // 値を返さない、引数のない、説明のないフロー
+  @business.flow
+  export fn ping() {
+    act.touch();
+  }
+
+  /**
+   * 二行以上の説明を持つフロー。
+   * 引数の名前が、Given、Then と当たる。
+   */
+  @business.flow
+  export fn rename(given: string, then: string): string {
+    return act.echo(given, then);
+  }
+
+  /** match、for、disjoint の中から、操作の op を呼ぶ */
+  @business.flow
+  export fn branch(name: string, items: string[]): string {
+    val found = act.find(name);
+    for (val item of items) {
+      act.note(item);
+    }
+    disjoint {
+      act.touch();
+      act.note(name);
+    }
+    return match (found by nullable) {
+      Some => act.echo(found, name);
+      None => act.echo(name, name);
+    }
+  }
+
+  // 省略可能な値を返すフロー
+  @business.flow
+  export fn lookup(name: string?): string? {
+    return act.find("x");
+  }
+}
+
+/** 葉を持つ名前空間のフロー */
+namespace mixed {
+  // @usecase.of のない葉: 基底が、テストのパッケージ（doc.go、leaves.go）を作る
+  fn helper(x: int): int;
+
+  /** 葉と同じ名前空間のフロー */
+  @business.flow
+  export fn run(items: string[]): int {
+    return act.count(items);
+  }
+}
+
+/** 要求だけの単位 */
+namespace reqonly {
+  model Note { text: string; }
+}
+
+/** パッケージの名前が、本体の局所の名前と当たる名前空間 */
+namespace k {
+  model Out { text: string; }
+
+  @business.flow
+  export fn go(text: string): Out {
+    val s = act.echo(text, text);
+    return { text: s };
+  }
+}

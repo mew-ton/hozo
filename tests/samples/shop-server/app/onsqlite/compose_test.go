@@ -7,6 +7,7 @@ import (
 
 	_ "modernc.org/sqlite" // database/sql のドライバ "sqlite"。生成された gen/store は import しない
 
+	"example.com/shop-server/app/flowtest"
 	"example.com/shop-server/app/handlertest"
 	"example.com/shop-server/gen/store"
 )
@@ -64,3 +65,28 @@ func TestTwoServers(t *testing.T) {
 	t.Parallel()
 	handlertest.RunTwo(t, newServer)
 }
+
+// newSystem は、新しいデータベースの上に、server、client、flows を重ねたもの。
+func newSystem(t *testing.T, f *handlertest.Fixture) flowtest.System {
+	flowOps, clientOps, s, err := NewFlows(context.Background(), openDB(t), f.Leaves(), f.Mailer(), f.Limiter())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return flowtest.System{Flows: flowOps, Client: clientOps, Store: s}
+}
+
+// TestFlows は、フローの E2E テスト（docs/plugin-go-design.md「E2E テストの口」）: フロー → 操作の op → 機能入口 → 配線 → go-sqlite が
+// 出した read と効果。go-design が出した flowstest.RunFlows に、flowtest.FlowCases を渡す。onmem の TestFlows と同じものを走らせる。
+func TestFlows(t *testing.T) {
+	t.Parallel()
+	flowtest.RunFlows(t, newSystem)
+}
+
+// TestRequirements は、要求のテスト（同「要求の、テストの入れ物の口」）: 要求ごとの入れ物を、flowstest.RunRequirements が走らせる。
+func TestRequirements(t *testing.T) {
+	t.Parallel()
+	flowtest.RunRequirements(t, newSystem)
+}
+
+// TestIncompleteFlowCasesAreRejected は、ケースか、入れ物を欠いた型が、口 flowstest.FlowCases、flowstest.Requirements を満たさないこと。
+func TestIncompleteFlowCasesAreRejected(t *testing.T) { flowtest.RunIncomplete(t) }

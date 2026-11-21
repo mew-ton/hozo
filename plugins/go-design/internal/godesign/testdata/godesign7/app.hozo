@@ -1,0 +1,41 @@
+// GODESIGN-7: 位置は、最初のフローの op。フローがなければ、最初の要求の分類。
+namespace design {
+  classify Actor of never { @actor.human User; }
+  classify Req of never { R1; }
+}
+
+namespace act {
+  @usecase.of(design.Actor.User)
+  @prd.ref(design.Req.R1)
+  export fn touch();
+}
+
+namespace n {
+  @business.flow
+  export fn first() { act.touch(); }
+  @business.flow
+  export fn second() { act.touch(); }
+}
+
+namespace n.ntest {
+  model Thing { x: int; }
+}
+
+namespace r {
+  model Thing { x: int; }
+}
+
+namespace r.rtest {
+  model Thing { x: int; }
+}
+
+namespace m {
+  // 葉の op がある: 基底が GO-4 を返す
+  fn helper(): int;
+  @business.flow
+  export fn run() { act.touch(); }
+}
+
+namespace m.mtest {
+  model Thing { x: int; }
+}

@@ -1,0 +1,5 @@
+[
+  "gen/client/doc.go",
+  "gen/client/ops.go",
+  "gen/client/wiring.go"
+]

@@ -37,6 +37,7 @@ plugins/go-valid/      go-valid プラグイン（main。中身は internal/gova
 plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）
 plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）
 plugins/go-cli/        go-cli プラグイン（main。中身は internal/gocli/）と、その語彙 cli.hozo
+plugins/go-design/     go-design プラグイン（main。中身は internal/godesign/）
 sdk/ts/                TS 向けプラグイン SDK
 schema/                IR の JSON スキーマ（go generate の置き場のパッケージ schema）
 editors/vscode/        VS Code 拡張（syntaxes/ は TextMate の文法と、go generate の置き場のパッケージ syntaxes）
@@ -94,6 +95,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugins/go-http/internal/gohttp` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid` |
 | `plugins/go-cli` | `plugin`、`plugins/go-cli/internal/gocli` |
 | `plugins/go-cli/internal/gocli` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid` |
+| `plugins/go-design` | `plugin`、`plugins/go-design/internal/godesign` |
+| `plugins/go-design/internal/godesign` | `ir`、`plugin`、`plugin/golang` |
 | `tests/corpus/view/plugins/view-dump` | `plugin` |
 | `schema` | — |
 | `editors/vscode/syntaxes` | — |
@@ -529,6 +532,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `plugins/go-sqlite` | `docs/plugin-go-sqlite.md` | `internal/gosqlite`: `db.go`。GOSQL-* |
 | `plugins/go-http` | `docs/plugin-go-http.md` | `internal/gohttp`: 入口のパッケージの `http.go` と、テストのパッケージの `http.go`。GOHTTP-* |
 | `plugins/go-cli` | `docs/plugin-go-cli.md` | `internal/gocli`: `cli/cli.go`。CLI-* |
+| `plugins/go-design` | `docs/plugin-go-design.md` | `internal/godesign`: テストのパッケージの `design.go`。GODESIGN-* |
 
 ## 生成するもの
 

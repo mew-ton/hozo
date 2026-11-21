@@ -1,0 +1,15 @@
+# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: フローも、要求もない単位（docs/plugin-go-design.md「対象」）。
+# ファイルを出さず、warning を一つ返す。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-design"]
+out         = "gen/app"
+
+# requirements を、空の配列で書いても、同じ
+[[emit]]
+namespace   = "other"
+transpilers = ["go", "go-design"]
+out         = "gen/other"
+
+[emit.options.go-design]
+requirements = []

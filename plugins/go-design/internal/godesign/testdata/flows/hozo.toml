@@ -1,0 +1,41 @@
+# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: テストのパッケージの design.go の、ゴールデンと、振る舞い。
+# 名前空間 design（担い手と、要求の分類）と data（状態と、read と、効果）には、単位を置かない。
+
+# 操作の op（どれも、人が書く葉）。基底は、テストのパッケージを作る（葉がある）が、go-design は並べない
+[[emit]]
+namespace   = "act"
+transpilers = ["go"]
+out         = "gen/act"
+
+# フローと、二つの要求の分類。基底は、テストのパッケージを作らない（葉も、判定の口を出す分類もない）
+[[emit]]
+namespace   = "flows"
+transpilers = ["go", "go-design"]
+out         = "gen/flows"
+
+[emit.options.go-design]
+requirements = ["design.Req", "design.Extra"]
+
+# 葉を持つ名前空間のフロー: 基底が、テストのパッケージを作る出力に、design.go を足す。要求の分類は、一つ
+[[emit]]
+namespace   = "mixed"
+transpilers = ["go", "go-design"]
+out         = "gen/mixed"
+
+[emit.options.go-design]
+requirements = ["design.Extra"]
+
+# 要求だけの単位（フローがない）: Requirements と RunRequirements だけを出す。N の入口のパッケージは、import しない
+[[emit]]
+namespace   = "reqonly"
+transpilers = ["go", "go-design"]
+out         = "gen/reqonly"
+
+[emit.options.go-design]
+requirements = ["design.Req"]
+
+# フローだけの単位（requirements を書かない）: 名前空間のパッケージの名前 k が、本体の局所の名前と当たるので、k2 で import する
+[[emit]]
+namespace   = "k"
+transpilers = ["go", "go-design"]
+out         = "gen/k"

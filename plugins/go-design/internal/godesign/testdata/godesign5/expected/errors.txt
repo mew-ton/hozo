@@ -1,0 +1,8 @@
+GODESIGN-5		2 番目の [[emit]] の [emit.options.go-design] に、知らないキー label がある（あるのは requirements）
+GODESIGN-5		2 番目の [[emit]] の [emit.options.go-design] に、知らないキー strict がある（あるのは requirements）
+GODESIGN-5		3 番目の [[emit]] の [emit.options.go-design] の requirements の値 "design.Req" が、文字列の配列でない
+GODESIGN-5		4 番目の [[emit]] の [emit.options.go-design] の requirements の値 [1,2] が、文字列の配列でない
+GODESIGN-5		5 番目の [[emit]] の [emit.options.go-design] の requirements の design.Missing という宣言がない（書くのは、要求の分類の FQN）
+GODESIGN-5		5 番目の [[emit]] の [emit.options.go-design] の requirements の design.Note は、分類でない（書くのは、要求の分類の FQN）
+GODESIGN-5		5 番目の [[emit]] の [emit.options.go-design] の requirements の分類 design.Size は、対象を持つ（要求の分類は、対象のない分類: classify … of never）
+GODESIGN-5		5 番目の [[emit]] の [emit.options.go-design] の requirements に、design.Req が二度ある

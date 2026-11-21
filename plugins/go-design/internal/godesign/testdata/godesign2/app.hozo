@@ -1,0 +1,28 @@
+// GODESIGN-2: 位置は、その op。
+namespace design {
+  classify Actor of never { @actor.human User; }
+}
+
+namespace act {
+  @usecase.of(design.Actor.User)
+  export fn touch();
+}
+
+namespace flows {
+  exception Stop;
+
+  // 本体を持たない（葉）
+  @business.flow
+  export fn leaf(): int;
+
+  // never を返す
+  @business.flow
+  export fn fail(): never
+    throws Stop;
+
+  // 配線で、値を返さないフローは、当たらない
+  @business.flow
+  export fn fine() {
+    act.touch();
+  }
+}

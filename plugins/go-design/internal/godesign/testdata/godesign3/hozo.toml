@@ -1,0 +1,10 @@
+# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: GODESIGN-3（フローの op の配線が、操作の op でないものを呼ぶ）。
+[[emit]]
+namespace   = "act"
+transpilers = ["go"]
+out         = "gen/act"
+
+[[emit]]
+namespace   = "flows"
+transpilers = ["go", "go-design"]
+out         = "gen/flows"

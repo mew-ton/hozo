@@ -1,0 +1,34 @@
+// サンプル shop-server の仕様（README.md）。操作の op（ユースケース）の名前空間 client。
+// 操作の op は、担い手の、一つの操作で、機能入口の op（server.hozo の、export を付けた op）を呼ぶ
+// （docs/ide-chain.md「ユースケース図」の、層の表）。画面の側は、操作を受けたら、この関数を呼ぶだけになる。
+// 機能入口は、HTTP の入口なので、呼ぶ側には、通信の失敗（http.ServerError、http.NetworkError）も、起こりうる例外として伝わる。
+// 状態は、持たない: ログインのトークンは、引数で受け取り、戻り値で返す（覚えておくのは、呼ぶ側）。
+// 三つの op は、どれも export で、中身は、基底が作る配線。人が書く op は、ない。
+
+/** 画面の側。客の、一つずつの操作（ユースケース） */
+namespace client {
+  /** 客が、ログインする */
+  @usecase.of(design.Actor.Customer)
+  export fn signIn(email: type.Email, password: type.Password): type.Token
+    throws type.InvalidCredentials, rate.LimitExceeded, http.ServerError, http.NetworkError
+  {
+    val ok = server.login({ body: { email: email, password: password } });
+    return ok.token;
+  }
+
+  /** 客が、注文する */
+  @usecase.of(design.Actor.Customer)
+  export fn order(token: type.Token, lines: type.OrderLine[]): type.Order
+    throws type.Unauthorized, type.NotificationFailed, http.ServerError, http.NetworkError
+  {
+    return server.placeOrder({ token: token, lines: lines });
+  }
+
+  /** 客が、自分の注文の一覧を見る */
+  @usecase.of(design.Actor.Customer)
+  export fn viewOrders(token: type.Token): type.Order[]
+    throws type.Unauthorized, http.ServerError, http.NetworkError
+  {
+    return server.getOrders({ token: token, page: 1 });
+  }
+}

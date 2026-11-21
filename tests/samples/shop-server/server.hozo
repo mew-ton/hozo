@@ -88,6 +88,7 @@ namespace server {
   }
 
   /** 呼んだ人のセッション。トークンがなければ、ログインしていなければ、またはセッションの期限が過ぎていれば Unauthorized */
+  @prd.ref(design.Requirement.PRD_001)
   fn authenticate(token: type.Token?): type.Session
     throws type.Unauthorized
   {
@@ -138,6 +139,7 @@ namespace server {
 
   /** 自分の注文の一覧を返す */
   @http.get("/orders")
+  @prd.ref(design.Requirement.PRD_002)
   export fn getOrders(in: GetOrdersInput): type.Order[]
     throws type.Unauthorized
   {
@@ -191,6 +193,7 @@ namespace server {
 
   /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
   @http.post("/orders")
+  @prd.ref(design.Requirement.PRD_001, design.Requirement.PRD_002)
   export fn placeOrder(in: PlaceOrderInput): type.Order
     throws type.Unauthorized, type.NotificationFailed
   {

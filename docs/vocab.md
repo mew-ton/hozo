@@ -294,7 +294,7 @@ namespace flows {
 
 - **`actor.human` / `actor.bot` / `actor.ai`** は、担い手のケースに付ける。分けるのは、何が、処理を呼び出すことを決めるか（`docs/ide-chain.md`「ユースケース図」）。
 - **`usecase.of`** は、op に付ける。担い手は、一つのユースケースに、いくつでも書ける。
-- **`business.flow`** は、op に付ける。その op の配線が呼べるのは、操作の op（`@usecase.of` を付けた op）だけ、という決まり（同「業務フロー図」）は、検査器は見ない。見るのは、この語彙を読むプラグイン（`docs/requirements.md`「R6 の、プラグインの部分」の段 4）。
+- **`business.flow`** は、op に付ける。その op の配線が呼べるのは、操作の op（`@usecase.of` を付けた op）だけ、という決まり（同「業務フロー図」）は、検査器は見ない。見るのは、この語彙を読むプラグイン（`go-design` の GODESIGN-3。`docs/plugin-go-design.md`「フローの op の決まり」）。
 - **`prd.ref`** は、op、model、状態、効果、`read` に付ける。辿るための印で、テストの中身は、ここから作らない（`docs/decisions.md`「決めたこと」377）。
 - 使う人が、同じ名前の名前空間（`actor`、`usecase`、`business`、`prd`）に、宣言を足してもよい（「読み込み」）。同じ名前の宣言（`actor.human` など）を足せば RES-6。
 
@@ -315,4 +315,5 @@ namespace flows {
 | `http`（サーバー） | `go-http`（`docs/plugin-go-http.md`） |
 | `db` | `go-sqlite`（`docs/plugin-go-sqlite.md`） |
 | `http`（クライアント）/ `localStorage` / `page` | 段階 5 のプラグイン |
-| `actor` / `usecase` / `business` / `prd` | まだ、ない。読むトランスパイラがなく、印のまま。`business.flow` と `prd.ref` は、テストのプラグインが読む見込み（`docs/requirements.md`「R6 の、プラグインの部分」の段 4） |
+| `usecase` / `business` / `prd` | `go-design`（`docs/plugin-go-design.md`）: `business.flow` の op に、E2E テストの口。`usecase.of` は、フローが呼べる op の印。`prd.ref` は、要求を指している設計の一覧（要求ごとの、テストの入れ物の口のコメントと、どこからも指されていない要求の warning）。`go-design` を並べない単位では、印のまま |
+| `actor` | まだ、ない。読むトランスパイラがなく、印のまま |

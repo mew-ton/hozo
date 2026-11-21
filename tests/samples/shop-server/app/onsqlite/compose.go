@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"net/http"
 
+	"example.com/shop-server/gen/client"
+	"example.com/shop-server/gen/flows"
 	"example.com/shop-server/gen/server"
 	"example.com/shop-server/gen/store"
 )
@@ -26,4 +28,17 @@ func New(ctx context.Context, db *sql.DB, leaves server.Leaves, mailer server.Ma
 	// store.Ops は、server が呼ぶ store の op（server.StoreOps）をそのまま満たす。
 	// 継ぎ目（server.Seams）の実装は、go-ratelimit が出した型。この単位で継ぎ目を宣言したトランスパイラは一つなので、そのまま渡せる
 	return server.NewHandler(server.New(leaves, mailer, s, server.NewRateSeams(limiter))), s, nil
+}
+
+// NewFlows は、New と同じ store と server の上に、操作の op（client）と、フロー（flows）を重ねて返す（フローの E2E テストと、要求の
+// テストが使う。../flowtest）。client は、server の入口の Ops を、Go の上で、直に呼ぶ: server.Ops は、client が呼ぶ server の op
+// （client.ServerOps）を、client.Ops は、flows が呼ぶ client の op（flows.ClientOps）を、そのまま満たす。HTTP の層は、通らない。
+func NewFlows(ctx context.Context, db *sql.DB, leaves server.Leaves, mailer server.MailerOps, limiter server.RateLimiter) (flows.Ops, client.Ops, store.Ops, error) {
+	if err := store.CreateTables(ctx, db); err != nil {
+		return nil, nil, nil, err
+	}
+	s := store.New(store.NewUsersTable(db), store.NewSessionsTable(db), store.NewOrdersTable(db), store.NewNotificationsTable(db),
+		store.NewDbSeams(db))
+	c := client.New(server.New(leaves, mailer, s, server.NewRateSeams(limiter)))
+	return flows.New(c), c, s, nil
 }

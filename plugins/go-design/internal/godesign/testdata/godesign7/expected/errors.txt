@@ -1,0 +1,2 @@
+GODESIGN-7	n.first	名前空間 n は、E2E テストの口と、要求の入れ物の口を、テストのパッケージ gen/n/ntest に置くが、同じ単位（2 番目の [[emit]]）が出力する子の名前空間 n.ntest の出力先と重なる
+GODESIGN-7	design.Req	名前空間 r は、E2E テストの口と、要求の入れ物の口を、テストのパッケージ gen/r/rtest に置くが、同じ単位（3 番目の [[emit]]）が出力する子の名前空間 r.rtest の出力先と重なる

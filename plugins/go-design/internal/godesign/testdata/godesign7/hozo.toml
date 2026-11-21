@@ -1,0 +1,27 @@
+# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: GODESIGN-7（テストのパッケージのディレクトリが、同じ単位が出力する
+# 子の名前空間 N.<N のパッケージ名>test の出力先と重なる）。
+[[emit]]
+namespace   = "act"
+transpilers = ["go"]
+out         = "gen/act"
+
+# 単位は n とその子孫（n.ntest）を出力する: Dir(U, n) は gen/n、Dir(U, n.ntest) は gen/n/ntest
+[[emit]]
+namespace   = "n"
+transpilers = ["go", "go-design"]
+out         = "gen/n"
+
+# フローがなく、要求だけの単位: 位置は、最初の要求の分類
+[[emit]]
+namespace   = "r"
+transpilers = ["go", "go-design"]
+out         = "gen/r"
+
+[emit.options.go-design]
+requirements = ["design.Req"]
+
+# 基底も、テストのパッケージを作る出力（葉の op がある）: 基底が、同じことを GO-4 で返すので、go-design は、返さない
+[[emit]]
+namespace   = "m"
+transpilers = ["go", "go-design"]
+out         = "gen/m"

@@ -129,6 +129,7 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | `go-http` | `http.go` | 入口 | `http` | `docs/plugin-go-http.md` |
 | `go-http` | `http.go` | テスト | `http` | `docs/plugin-go-http.md`「インテグレーションテストの口」 |
 | `go-cli` | `cli/cli.go`（パッケージ `cli`） | 自分のパッケージ | — | `docs/plugin-go-cli.md` |
+| `go-design` | `design.go` | テスト | `design` | `docs/plugin-go-design.md`「出力」 |
 
 - 相乗りは、置き場と名前を `plugin/golang`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。この文書の規則を自分で書き写さない（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
 - 表にないトランスパイラ（プロジェクトの中のプラグインのものなど）も、同じ決まりに従う: 表のファイル名、前置き、公開の名前を避け、自分のものを自分の文書に書く。

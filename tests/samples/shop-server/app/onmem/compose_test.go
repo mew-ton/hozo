@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"example.com/shop-server/app/flowtest"
 	"example.com/shop-server/app/handlertest"
 	"example.com/shop-server/app/memstore"
 	"example.com/shop-server/app/storetest"
@@ -91,3 +92,25 @@ func TestPlaceOrderIsNotOneTransaction(t *testing.T) {
 		t.Errorf("二つ目の効果が失敗した後の notifications の IsEmpty = %v, %v（期待は true）", empty, err)
 	}
 }
+
+// newSystem は、新しい memstore.Store の上に、server、client、flows を重ねたもの。
+func newSystem(t *testing.T, f *handlertest.Fixture) flowtest.System {
+	flowOps, clientOps, s := NewFlows(memstore.New(), f.Leaves(), f.Mailer(), f.Limiter())
+	return flowtest.System{Flows: flowOps, Client: clientOps, Store: s}
+}
+
+// TestFlows は、フローの E2E テスト（docs/plugin-go-design.md「E2E テストの口」）: フロー → 操作の op → 機能入口 → 配線 → 人がメモリの
+// 上に書いた read と効果。go-design が出した flowstest.RunFlows に、flowtest.FlowCases を渡す。onsqlite の TestFlows と同じものを走らせる。
+func TestFlows(t *testing.T) {
+	t.Parallel()
+	flowtest.RunFlows(t, newSystem)
+}
+
+// TestRequirements は、要求のテスト（同「要求の、テストの入れ物の口」）: 要求ごとの入れ物を、flowstest.RunRequirements が走らせる。
+func TestRequirements(t *testing.T) {
+	t.Parallel()
+	flowtest.RunRequirements(t, newSystem)
+}
+
+// TestIncompleteFlowCasesAreRejected は、ケースか、入れ物を欠いた型が、口 flowstest.FlowCases、flowstest.Requirements を満たさないこと。
+func TestIncompleteFlowCasesAreRejected(t *testing.T) { flowtest.RunIncomplete(t) }

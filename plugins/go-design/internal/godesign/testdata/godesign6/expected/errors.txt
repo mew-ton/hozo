@@ -1,0 +1,10 @@
+GODESIGN-6	leafy.flow	go-design の、フローのケースのまとめ FlowCases が、基底 go の、op leafy.flow のケースの口 FlowCases と当たる（どちらも、テストのパッケージの名前 FlowCases。直すのは仕様の名前）
+GODESIGN-6	leafy.x	go-design の、フロー leafy.x のケース XFlowCase が、基底 go の、op leafy.xFlow のケース XFlowCase と当たる（どちらも、テストのパッケージの名前 XFlowCase。直すのは仕様の名前）
+GODESIGN-6	typed.Flows	go-design の、フローを走らせる RunFlows が、基底 go の、分類 typed.Flows の例を走らせる RunFlows と当たる（どちらも、テストのパッケージの名前 RunFlows。直すのは仕様の名前）
+GODESIGN-6	typed.Requirements	go-design の、要求の入れ物を走らせる RunRequirements が、基底 go の、分類 typed.Requirements の例を走らせる RunRequirements と当たる（どちらも、テストのパッケージの名前 RunRequirements。直すのは仕様の名前）
+GODESIGN-6	fields.clash	フロー fields.clash のケース ClashFlowCase の、引数 given_ のフィールド Given_ が、引数 given と当たる（直すのは仕様の名前）
+GODESIGN-6	fields.caps	フロー fields.caps のケース CapsFlowCase の、引数 Id のフィールド Id が、引数 id と当たる（直すのは仕様の名前）
+GODESIGN-6	hidden._secret	フローの op hidden._secret の名前が、_ で始まる（Go の公開の名前にならず、口を、別のパッケージから満たせない）
+GODESIGN-6	design.Hidden	要求 design.Hidden._R のケースの名前が、_ で始まる（Go の公開の名前にならず、口を、別のパッケージから満たせない）
+GODESIGN-6	design.Other	要求 design.Other.R1 の入れ物 R1 が、要求 design.Req.R1 の入れ物と当たる（どちらも、Requirements のメソッド R1。直すのは仕様の名前）
+GODESIGN-6	design.Other	要求 design.Other.dup の入れ物 Dup が、要求 design.Req.Dup の入れ物と当たる（どちらも、Requirements のメソッド Dup。直すのは仕様の名前）

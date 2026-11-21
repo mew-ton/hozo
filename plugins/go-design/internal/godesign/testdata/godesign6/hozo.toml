@@ -1,0 +1,46 @@
+# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: GODESIGN-6（テストのパッケージに足す名前が、基底の公開の名前か、
+# 自分のほかの名前と当たる、または Go の公開の名前にならない）。
+[[emit]]
+namespace   = "act"
+transpilers = ["go"]
+out         = "gen/act"
+
+[[emit]]
+namespace   = "leafy"
+transpilers = ["go", "go-design"]
+out         = "gen/leafy"
+
+[[emit]]
+namespace   = "typed"
+transpilers = ["go", "go-design"]
+out         = "gen/typed"
+
+[emit.options.go-design]
+requirements = ["design.Req"]
+
+[[emit]]
+namespace   = "fields"
+transpilers = ["go", "go-design"]
+out         = "gen/fields"
+
+[[emit]]
+namespace   = "hidden"
+transpilers = ["go", "go-design"]
+out         = "gen/hidden"
+
+[emit.options.go-design]
+requirements = ["design.Hidden"]
+
+[[emit]]
+namespace   = "twice"
+transpilers = ["go", "go-design"]
+out         = "gen/twice"
+
+[emit.options.go-design]
+requirements = ["design.Req", "design.Other"]
+
+# フローも、要求もなければ、口を出さないので、当たらない（warning）
+[[emit]]
+namespace   = "quiet"
+transpilers = ["go", "go-design"]
+out         = "gen/quiet"

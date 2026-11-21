@@ -1,0 +1,2 @@
+GODESIGN-2	flows.leaf	フローの op flows.leaf が、本体を持たない（フローは、操作の op を、順に呼ぶ配線）
+GODESIGN-2	flows.fail	フローの op flows.fail が、never を返す（正常に終わる道がないので、E2E テストのケースを、書けない）

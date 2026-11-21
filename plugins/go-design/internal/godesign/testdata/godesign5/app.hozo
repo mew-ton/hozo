@@ -1,0 +1,34 @@
+// GODESIGN-5: 位置なし。
+namespace design {
+  classify Actor of never { @actor.human User; }
+  classify Req of never { R1; }
+  model Note { text: string; }
+  // 対象を持つ分類
+  classify Size of int { Small; Large; }
+}
+
+namespace act {
+  @usecase.of(design.Actor.User)
+  @prd.ref(design.Req.R1)
+  export fn touch();
+}
+
+namespace unknown {
+  @business.flow
+  export fn run() { act.touch(); }
+}
+
+namespace onestr {
+  @business.flow
+  export fn run() { act.touch(); }
+}
+
+namespace numbers {
+  @business.flow
+  export fn run() { act.touch(); }
+}
+
+namespace entries {
+  @business.flow
+  export fn run() { act.touch(); }
+}

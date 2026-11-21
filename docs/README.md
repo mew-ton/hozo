@@ -28,6 +28,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`plugin-go-sqlite.md`](plugin-go-sqlite.md) | `db` の状態を SQLite の表と読み書きにする相乗り `go-sqlite` | `plugins/go-sqlite` |
 | [`plugin-go-http.md`](plugin-go-http.md) | `http` の op を `net/http` のハンドラにする相乗り `go-http` と、HTTP の通信の上の形 | `plugins/go-http` |
 | [`plugin-go-cli.md`](plugin-go-cli.md) | `cli` の語彙を Go の CLI にする相乗り `go-cli` | `plugins/go-cli` |
+| [`plugin-go-design.md`](plugin-go-design.md) | 設計の図の語彙（`business.flow`、`usecase.of`、`prd.ref`）から、フローの E2E テストの口と、要求ごとの、テストの入れ物の口を出す相乗り `go-design` | `plugins/go-design` |
 | [`diagnostics.md`](diagnostics.md) | 診断の形、表示、終了コード | `internal/diag` |
 | [`cli.md`](cli.md) | `hozoc` の振る舞いと `cli.hozo` | `cli.hozo`、`internal/app`、`cmd/hozoc` |
 | [`lsp.md`](lsp.md) | 言語サーバー | `internal/lsp` |
@@ -71,6 +72,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | テストのパッケージ、単体テストの口（人か AI が中身を書く関数の、結果ごとのケースを受け取る口）、効果の入口の確かめ | `plugin-go.md`「単体テストの口」「効果の入口の確かめ」。言語によらない決まりは `ide-chain.md`「テストの規約」「ステートマシン図」 |
 | 通信の形（HTTP の要求と応答の JSON） | `plugin-go-http.md`「通信の形」 |
 | インテグレーションテストの口（入口のデコレータを持つ op の、結果ごとのケースを受け取る口。HTTP の入口のもの） | `plugin-go-http.md`「インテグレーションテストの口」。言語によらない決まりは `ide-chain.md`「テストの規約」の「インテグレーションテスト」 |
+| E2E テストの口（フローの op の、ケースを受け取る口）、要求の、テストの入れ物の口、要求の分類、指している設計 | `plugin-go-design.md`「E2E テストの口」「要求の、テストの入れ物の口」。言語によらない決まりは `ide-chain.md`「テストの規約」の「E2E テスト」「要求のテスト」 |
 | emit の対象（一度の `hozoc emit` が書き出す出力） | `cli.md`「emit」 |
 | 基底の状態、状態の分類、値の分類 | `check.md`「状態の形」 |
 | op の分類、標準の分類、型で決まる分類、述語で決まる分類 | `check.md`「分類」 |

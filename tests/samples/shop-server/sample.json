@@ -24,7 +24,16 @@
         "gen/server/inner/ops.go",
         "gen/server/inner/wiring.go",
         "gen/server/servertest/doc.go",
-        "gen/server/servertest/leaves.go"
+        "gen/server/servertest/leaves.go",
+        "gen/http/doc.go",
+        "gen/http/types.go",
+        "gen/client/doc.go",
+        "gen/client/ops.go",
+        "gen/client/wiring.go",
+        "gen/flows/doc.go",
+        "gen/flows/types.go",
+        "gen/flows/ops.go",
+        "gen/flows/wiring.go"
       ]
     },
     "go-valid": {
@@ -38,6 +47,9 @@
     },
     "go-ratelimit": {
       "files": ["gen/server/ratelimit.go"]
+    },
+    "go-design": {
+      "files": ["gen/flows/flowstest/design.go"]
     }
   }
 }

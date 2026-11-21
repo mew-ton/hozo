@@ -1,0 +1,43 @@
+# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: GODESIGN-5（[emit.options.go-design] の誤り）。
+[[emit]]
+namespace   = "act"
+transpilers = ["go"]
+out         = "gen/act"
+
+# 知らないキー（二つ）。requirements は、正しい
+[[emit]]
+namespace   = "unknown"
+transpilers = ["go", "go-design"]
+out         = "gen/unknown"
+
+[emit.options.go-design]
+requirements = ["design.Req"]
+strict       = true
+label        = "x"
+
+# requirements が、文字列の配列でない
+[[emit]]
+namespace   = "onestr"
+transpilers = ["go", "go-design"]
+out         = "gen/onestr"
+
+[emit.options.go-design]
+requirements = "design.Req"
+
+# requirements の項目が、文字列でない
+[[emit]]
+namespace   = "numbers"
+transpilers = ["go", "go-design"]
+out         = "gen/numbers"
+
+[emit.options.go-design]
+requirements = [1, 2]
+
+# 宣言がない。分類でない。対象を持つ分類。同じ FQN を、二度
+[[emit]]
+namespace   = "entries"
+transpilers = ["go", "go-design"]
+out         = "gen/entries"
+
+[emit.options.go-design]
+requirements = ["design.Missing", "design.Note", "design.Size", "design.Req", "design.Req"]
