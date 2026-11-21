@@ -72,7 +72,7 @@ namespace backoffice {
    * @param then  代わりに行う効果
    */
   @repeatable
-  decorator recover(error: any exception, then: any effect)
+  decorator fn recover(error: any exception, then: any effect):
     catches error halts then;
 
   /** 一時的に表示できない */
@@ -123,7 +123,7 @@ namespace backoffice {
   }
 
   /** 結果を見ない呼び出し */
-  decorator ignoreFailure
+  decorator fn ignoreFailure():
     catches http.NetworkError, http.ServerError ignores;
 
   // ---- 製作 ----

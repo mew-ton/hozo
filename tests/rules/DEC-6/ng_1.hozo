@@ -1,6 +1,6 @@
 // DEC-6（docs/check.md「デコレータ」）: 一つの宣言で catches の例外と throws の例外に同じものがある（warning）
 namespace a {
   exception E;
-  decorator d catches E recovers throws E; // WARN: DEC-6
+  decorator fn d(): catches E recovers throws E; // WARN: DEC-6
   fn f();
 }

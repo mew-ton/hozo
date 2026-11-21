@@ -1,6 +1,6 @@
 // DEC-11: 引数の数と名前（docs/types.md「デコレータの引数」）
 namespace a {
-  decorator d(code: int, name: string?);
+  decorator fn d(code: int, name: string?);
   @d                                   // ERROR: DEC-11
   fn missing(): void;
   @d(1, "x", true)                     // ERROR: DEC-11
@@ -23,8 +23,8 @@ namespace a {
   state s: list<string>;
   effect fn e1(): effects s.post;
   effect fn e2(): effects s.put;
-  decorator all(...targets: any effect) for op effects targets;
-  decorator some(first: int, second: string?, ...more: string);
+  decorator fn all(...targets: any effect): effects targets;
+  decorator fn some(first: int, second: string?, ...more: string);
   @all
   fn rest0(): void;
   @all()

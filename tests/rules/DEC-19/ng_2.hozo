@@ -1,0 +1,8 @@
+// DEC-19: デコレータの本体の外の proceed()（その名前の op が、見えていないとき）
+namespace a {
+  fn leaf();
+  fn wiring() {
+    leaf();
+    proceed();                             // ERROR: DEC-19
+  }
+}

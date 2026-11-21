@@ -5,10 +5,10 @@ namespace a {
   model M { id: string; }
   state s: list<M>;
   effect fn add(): effects s.post;
-  decorator reading(table: any state) for op reads table;
-  decorator writing(...targets: any effect) for op effects targets;
-  decorator fixed for op reads s effects add;
-  decorator plain for op;
+  decorator fn reading(table: any state): reads table;
+  decorator fn writing(...targets: any effect): effects targets;
+  decorator fn fixed(): reads s effects add;
+  decorator fn plain();
 
   @reading(s) fn leafRead(): M[];
   @writing(add) export fn leafWrite(m: M);

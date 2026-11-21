@@ -702,7 +702,7 @@ func typesString(ts []ir.Type) string {
 
 // lowerDecoratorDecl は decorator の宣言。名前付き（別名）なら Alias だけを持つ。
 func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope) ir.Decl {
-	dec := &ir.Decorator{External: d.External, Repeatable: d.Repeatable}
+	dec := &ir.Decorator{External: d.External, Repeatable: d.Repeatable, Fn: d.Fn}
 	if d.Alias != nil {
 		dec.DeclBase = a.base(s, d.Doc, d.Span, docContext{})
 		a.addSite(d.Decorators, siteDecorator, sc, &dec.DeclBase.Decorators)
@@ -722,6 +722,9 @@ func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope
 	dec.DeclBase = a.base(s, d.Doc, d.Span, docContext{params: setOf(params.params), hasParams: true})
 	a.addSite(d.Decorators, siteDecorator, sc, &dec.DeclBase.Decorators)
 	dec.Targets = lowerTargets(d.For)
+	if d.Fn {
+		dec.Targets = []ir.DecoratorTarget{ir.TargetOp}
+	}
 	for _, t := range d.For {
 		if t != nil && t.Case != nil {
 			dec.CaseTargets = append(dec.CaseTargets, a.lowerCaseKind(t.Case, sc))
@@ -741,7 +744,14 @@ func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope
 		}
 	}
 	a.checkREL1(s.fqn, dec.Throws, d.Span)
-	a.checkDEC2(s, dec, d)
+	if d.Body != nil {
+		for _, c := range d.Clauses {
+			if cc, ok := c.(*ast.CatchesClause); ok {
+				a.errorf("DEC-22", cc.Span, "本体のあるデコレータ %s に、catches の節は書けない（例外を受ける処理は、本体に書けない。例外を受けるデコレータは、本体を持たない形で宣言する）", s.fqn)
+			}
+		}
+		a.wirings = append(a.wirings, &wiringJob{sym: s, deco: dec, decoDecl: d})
+	}
 	return dec
 }
 
@@ -915,20 +925,6 @@ func (a *analyzer) lowerCatches(c *ast.CatchesClause, sc *scope) ir.CatchesClaus
 		}
 	}
 	return cc
-}
-
-// checkDEC2 は DEC-2（docs/check.md「デコレータ」）: targets に op を含まない宣言が throws、catches、reads、effects の
-// どれかの節を持つ。
-func (a *analyzer) checkDEC2(s *symbol, dec *ir.Decorator, d *ast.DecoratorDecl) {
-	if len(d.Clauses) == 0 {
-		return
-	}
-	for _, t := range dec.Targets {
-		if t == ir.TargetOp {
-			return
-		}
-	}
-	a.errorf("DEC-2", d.Clauses[0].NodeSpan(), "デコレータ %s は op に付けないので throws / catches / reads / effects を宣言できない（for: %s）", s.fqn, targetsString(dec))
 }
 
 // lowerAlias は名前付きデコレータ `decorator X = Y(args);`。DEC-12: Y が別名、または args が Y の Param に合わない。

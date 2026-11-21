@@ -6,7 +6,7 @@ namespace a {
   decorator bySubject for case of never;
   decorator byType for case of M;
   decorator byName for case of Size;
-  decorator forOp for op;
+  decorator fn forOp();
   classify Size of M { Small; Large; }
   classify Weight of M {
     @bySubject Light;                  // ERROR: DEC-1

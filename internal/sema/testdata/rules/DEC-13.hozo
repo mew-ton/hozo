@@ -1,6 +1,6 @@
 // DEC-13: 同じデコレータが同じ宣言に二度（docs/check.md「デコレータ」）
 namespace a {
-  decorator d(code: int);
+  decorator fn d(code: int);
   decorator alias = d(1);
   @d(1)
   @d(2)                                // ERROR: DEC-13

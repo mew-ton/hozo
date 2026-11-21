@@ -1,7 +1,7 @@
 // DEC-8（docs/check.md「デコレータ」。文法で閉じる）: 名前付きのデコレータは別名としてだけ定義でき、for も節も持たない
 namespace a {
   exception E;
-  decorator d(code: int);
+  decorator fn d(code: int);
   decorator alias = d(1) throws E;     // ERROR: SYNTAX
   fn f();
 }

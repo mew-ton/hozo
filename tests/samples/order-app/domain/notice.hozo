@@ -4,7 +4,7 @@
 /** 知らせ。客に、何が起きたかを伝える */
 namespace notice {
   /** 送れなかったことを、呼び出し元に伝えない（値を返さない op にだけ付く） */
-  decorator bestEffort
+  decorator fn bestEffort():
     catches mailer.Undelivered ignores;
 
   /** 注文を受け付けた。見るための鍵、ダウンロード、送料の見積もりと上限と「梱包の後に決まる」こと、納期を伝える */

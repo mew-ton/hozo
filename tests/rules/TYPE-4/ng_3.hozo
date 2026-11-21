@@ -8,9 +8,9 @@ namespace a {
   effect fn set(): effects cur.post;
   effect fn drop(): effects rows.delete;
   union Posts { add; add2; }
-  decorator posts(...es: any effect on rows.post) for op effects es;
-  decorator tags(first: string, ...more: string | int);
-  decorator states(...ts: any state) for op reads ts;
+  decorator fn posts(...es: any effect on rows.post): effects es;
+  decorator fn tags(first: string, ...more: string | int);
+  decorator fn states(...ts: any state): reads ts;
   @posts(add, add2, Posts)
   fn ok(x: string, y: string);
   @tags("a", "b", 1)

@@ -1,6 +1,6 @@
-// DEC-2（docs/check.md「デコレータ」）: targets に op を含まない宣言が throws を持つ。internal/sema/testdata/rules/DEC-2.hozo から
+// DEC-2（docs/check.md「デコレータ」。文法で閉じる）: targets に op を含まない宣言が throws を持つ。internal/sema/testdata/rules/DEC-2.hozo から
 namespace a {
   exception E;
-  decorator d for field throws E;                  // ERROR: DEC-2
+  decorator d for field throws E;                  // ERROR: SYNTAX
   fn f();
 }

@@ -1130,7 +1130,11 @@ func (p *parser) parseClassifySubject() []ast.Type {
 // reads / effects の節は op の節と同じ形で、同じ構文木（ReadsClause / EffectsClause）にする。
 func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator, marks coreMarks) *ast.DecoratorDecl {
 	p.expect(token.Decorator)
-	d := &ast.DecoratorDecl{Doc: doc, Decorators: decorators, Name: p.parseDecoratorName()}
+	d := &ast.DecoratorDecl{Doc: doc, Decorators: decorators}
+	if p.at(token.Fn) {
+		d.Fn, d.FnSpan = true, p.advance().Span
+	}
+	d.Name = p.parseDecoratorName()
 	if marks.external != nil {
 		d.External = true
 		d.ExternalSpan = *marks.external
@@ -1140,6 +1144,10 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		d.RepeatableSpan = *marks.repeatable
 	}
 	if p.at(token.Assign) {
+		if d.Fn {
+			p.errorAt(d.FnSpan, "名前付きのデコレータに fn は書かない（decorator 名前 = 元(…); と書く。docs/grammar.md「decorator の宣言」）")
+			d.Fn, d.FnSpan = false, source.Span{}
+		}
 		if marks.external != nil {
 			p.errorAt(*marks.external, "名前付きのデコレータに @external は付けられない（docs/grammar.md「decorator の宣言」）")
 		}
@@ -1155,24 +1163,103 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		d.Span = p.spanFrom(start)
 		return d
 	}
+	name := d.Name.Name
+	if d.Fn {
+		if !p.at(token.LParen) {
+			p.fail(p.tok().Span, fmt.Sprintf("decorator fn の引数の「(」が要る。引数がなくても書く（decorator fn %s() と書く。docs/grammar.md「decorator の宣言」）", name))
+		}
+		d.Params = p.parseParams()
+		p.parseDecoratorFnTail(d)
+		d.Span = p.spanFrom(start)
+		return d
+	}
 	if p.at(token.LParen) {
 		d.Params = p.parseParams()
 	}
-	if p.got(token.For) {
-		// 付ける先の並び: Target { "," Target }。"|" は、なくした書き方（docs/grammar.md「decorator の宣言」）:
-		// 区切りが "," であることをメッセージで示して SYNTAX にし、"," として読み進める
-		d.For = append(d.For, p.parseTarget())
-		for {
-			if p.at(token.Pipe) {
-				p.errorAt(p.tok().Span, "for の対象の並びの区切りは「,」で、「|」ではない（for model, state, op と書く。docs/grammar.md「decorator の宣言」）")
-				p.advance()
-			} else if !p.got(token.Comma) {
-				break
-			}
-			d.For = append(d.For, p.parseTarget())
-		}
+	if !p.at(token.For) {
+		// なくした書き方: for を省いた形（前は、op の意味）。decorator fn として読み進める
+		p.errorAt(d.Name.Span, fmt.Sprintf("付ける先を書かない decorator %s … という書き方はなくなった。関数に付けるデコレータは decorator fn %s(…) と書き、そのほかは for で付ける先を書く（docs/grammar.md「decorator の宣言」）", name, name))
+		d.Fn = true
+		p.parseOldDecoratorClauses(d)
+		p.expect(token.Semicolon)
+		d.Span = p.spanFrom(start)
+		return d
 	}
-clauses:
+	forSpan := p.advance().Span
+	// 付ける先の並び: Target { "," Target }。"|" は、なくした書き方（docs/grammar.md「decorator の宣言」）:
+	// 区切りが "," であることをメッセージで示して SYNTAX にし、"," として読み進める
+	d.For = append(d.For, p.parseTarget())
+	for {
+		if p.at(token.Pipe) {
+			p.errorAt(p.tok().Span, "for の対象の並びの区切りは「,」で、「|」ではない（for model, state, op と書く。docs/grammar.md「decorator の宣言」）")
+			p.advance()
+		} else if !p.got(token.Comma) {
+			break
+		}
+		d.For = append(d.For, p.parseTarget())
+	}
+	if len(d.For) == 1 && d.For[0] != nil && d.For[0].Kind == ast.TargetOp {
+		// なくした書き方: op だけに付ける for の形。decorator fn として読み進める
+		p.errorAt(p.spanFrom(forSpan.Start), fmt.Sprintf("decorator %s for op … という書き方はなくなった。関数に付けるデコレータは decorator fn %s(…) と書く（節は「:」の後ろ。docs/grammar.md「decorator の宣言」）", name, name))
+		d.Fn, d.For = true, nil
+		p.parseOldDecoratorClauses(d)
+		p.expect(token.Semicolon)
+		d.Span = p.spanFrom(start)
+		return d
+	}
+	switch p.tok().Kind {
+	case token.Throws, token.Catches, token.Reads, token.Effects, token.Colon, token.LBrace:
+		p.fail(p.tok().Span, fmt.Sprintf("for で付ける先を書いたデコレータは、節も本体も持てない。節と本体を書けるのは、関数に付けるデコレータ（decorator fn %s(…): 節 { … }）だけ（docs/grammar.md「decorator の宣言」）", name))
+	}
+	p.expect(token.Semicolon)
+	d.Span = p.spanFrom(start)
+	return d
+}
+
+// parseDecoratorFnTail は decorator fn の「)」の後ろを読む（docs/grammar.md「decorator の宣言」）。
+//
+//	[ ":" DecoratorClause { DecoratorClause } ] ( ";" | Block )
+//
+// 節を書くなら「:」で始め、節がなければ「:」も書かない（関数の宣言の FnType と、同じ決まり）。戻り値は、書かない。
+func (p *parser) parseDecoratorFnTail(d *ast.DecoratorDecl) {
+	name := d.Name.Name
+	atClause := func() bool {
+		switch p.tok().Kind {
+		case token.Throws, token.Catches, token.Reads, token.Effects:
+			return true
+		}
+		return false
+	}
+	switch {
+	case p.at(token.Colon):
+		colon := p.advance().Span
+		if !atClause() {
+			switch p.tok().Kind {
+			case token.Semicolon, token.LBrace:
+				p.fail(colon, fmt.Sprintf("「:」の後ろに、節が要る。何も書かないなら、「:」も書かない（decorator fn %s(…); か decorator fn %s(…) { … } と書く。docs/grammar.md「decorator の宣言」）", name, name))
+			}
+			p.fail(p.tok().Span, "decorator fn に、戻り値は書かない。「:」の後ろは、節（throws / catches / reads / effects）だけ（包んだ op の結果が、そのまま返る。docs/grammar.md「decorator の宣言」）")
+		}
+	case atClause():
+		p.fail(p.tok().Span, fmt.Sprintf("「)」の後ろに、節を書くなら、「:」で始める（decorator fn %s(…): %s … と書く。docs/grammar.md「decorator の宣言」）", name, p.tok().Text))
+	case p.at(token.For):
+		p.fail(p.tok().Span, "decorator fn に for は書かない。fn が、付ける先（op）を言う（docs/grammar.md「decorator の宣言」）")
+	}
+	p.parseOldDecoratorClauses(d)
+	switch p.tok().Kind {
+	case token.Semicolon:
+		p.advance()
+	case token.LBrace:
+		d.Body = p.parseBlock()
+	case token.For:
+		p.fail(p.tok().Span, "decorator fn に for は書かない。fn が、付ける先（op）を言う（docs/grammar.md「decorator の宣言」）")
+	default:
+		p.failExpected("「;」かデコレータの本体の「{」")
+	}
+}
+
+// parseOldDecoratorClauses は DecoratorClause の並びを読む（頭の「:」は、呼ぶ側が読む）。
+func (p *parser) parseOldDecoratorClauses(d *ast.DecoratorDecl) {
 	for {
 		switch p.tok().Kind {
 		case token.Throws:
@@ -1184,12 +1271,9 @@ clauses:
 		case token.Effects:
 			d.Clauses = append(d.Clauses, p.parseEffectsClause())
 		default:
-			break clauses
+			return
 		}
 	}
-	p.expect(token.Semicolon)
-	d.Span = p.spanFrom(start)
-	return d
 }
 
 // parseParams は Params を読む。

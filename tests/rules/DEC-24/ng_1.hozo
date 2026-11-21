@@ -1,0 +1,25 @@
+// DEC-24（docs/check.md「デコレータ」）: 本体のあるデコレータを、別の名前空間の op に付けていて、本体が、
+// その名前空間の配線からは呼べないもの（export のない op、read、効果）に触れている
+namespace a {
+  state log: list<string>;
+  read fn entries(): string[] reads log;
+  effect fn add(text: string): effects log.post;
+  export fn show(lines: string[]);
+  fn hidden();
+  decorator fn usesHidden() {
+    hidden();
+    proceed();
+  }
+  decorator fn usesState() {
+    val all = entries();
+    show(all);
+    proceed();
+    add("done");
+  }
+}
+namespace b {
+  @a.usesHidden                            // ERROR: DEC-24
+  fn f();
+  @a.usesState                             // ERROR: DEC-24
+  fn g();
+}

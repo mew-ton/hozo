@@ -1,6 +1,6 @@
 // DEC-11（docs/types.md「デコレータの引数」）: 必須の Param が渡されていない。internal/sema/testdata/rules/DEC-11.hozo から
 namespace a {
-  decorator d(code: int, name: string?);
+  decorator fn d(code: int, name: string?);
   @d                                   // ERROR: DEC-11
   fn missing(): void;
 }

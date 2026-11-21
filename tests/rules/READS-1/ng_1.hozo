@@ -4,10 +4,10 @@ state shared: list<string>;
 namespace a {
   state own: list<string>;
   read fn first(): string? reads own;
-  decorator from(table: any state) for op reads table;
-  decorator fromUsers for op reads b.users;
-  decorator fromRead for op reads b.firstUser;
-  decorator fromOwnRead for op reads first;
+  decorator fn from(table: any state): reads table;
+  decorator fn fromUsers(): reads b.users;
+  decorator fn fromRead(): reads b.firstUser;
+  decorator fn fromOwnRead(): reads first;
   @from(own)
   fn j(): string[];
   @fromOwnRead

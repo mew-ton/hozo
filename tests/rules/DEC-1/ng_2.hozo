@@ -36,7 +36,7 @@ namespace a {
   @onlyEffect                          // ERROR: DEC-1
   classify D of M { A; }
   @onlyEffect                          // ERROR: DEC-1
-  decorator another;
+  decorator fn another();
   @onlyEffect
   effect fn ok(m: M): effects s.post;
   @onlyException

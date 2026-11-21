@@ -137,6 +137,20 @@ func (composeNoticeCases) OK() servertest.ComposeNoticeCase {
 }
 func (leafCases) ComposeNotice() servertest.ComposeNoticeCases { return composeNoticeCases{} }
 
+type recordAuditCases struct{}
+
+func (recordAuditCases) OK() servertest.RecordAuditCase {
+	return servertest.RecordAuditCase{Then: func(t *testing.T, _ error) {
+		if audited != 1 {
+			t.Errorf("記録の先が呼ばれた回数 = %d（期待は、一度）", audited)
+		}
+	}}
+}
+func (leafCases) RecordAudit() servertest.RecordAuditCases { return recordAuditCases{} }
+
+// audited は、TestLeafCases の Leaves の、記録の先（Audit）が呼ばれた回数。
+var audited int
+
 // TestLeafCases は、葉ごと、結果ごとのケースを、すべて走らせる。テストの名前は、<op の FQN>/<結果>
 // （TestLeafCases/server.checkPassword/InvalidCredentials など）。
 func TestLeafCases(t *testing.T) {
@@ -146,6 +160,7 @@ func TestLeafCases(t *testing.T) {
 		NewOrderID: func() (pkgtype.OrderId, error) { return "order-1", nil },
 		SessionTTL: time.Hour,
 		PageSize:   2,
+		Audit:      func() { audited++ },
 	}
 	servertest.RunLeaves(t, leaves, leafCases{})
 }
@@ -162,6 +177,7 @@ type (
 		Summarize() servertest.SummarizeCases
 		MyPage() servertest.MyPageCases
 		NewOrder() servertest.NewOrderCases
+		RecordAudit() servertest.RecordAuditCases
 	}
 	missingResult struct{}
 )

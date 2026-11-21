@@ -50,7 +50,7 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 | 核の型と形 | `string` `boolean` `int` `float` `datetime` `date` `time` `duration` `void` `never` `list` `nullable` `single` |
 | リテラル | `true` `false` |
 
-`fn` は、関数の宣言の頭。`read` と `effect` は、その前に書く、関数の種類の語（「関数の宣言」）。`op` は、種類の名前で、宣言の頭には書かない: 書くのは、デコレータの宣言の `for op` と `any op`（「decorator の宣言」）。
+`fn` は、関数の宣言の頭。`read` と `effect` は、その前に書く、関数の種類の語（「関数の宣言」）。`op` は、種類の名前で、宣言の頭には書かない: 書くのは、デコレータの宣言の、付ける先の並び（`for model, state, op`）と `any op`（「decorator の宣言」）。関数に付けるデコレータの宣言の頭は、`decorator fn`（同）。
 
 `for` と `of` は、節の頭（デコレータの宣言の `for`、`classify` の `of`）のほかに、配線の繰り返し（「配線」の `For`）の頭にも書く、同じ字句。`case` は、デコレータの宣言で、分類のケースを言う語（「decorator の宣言」の `CaseKind`）。
 
@@ -308,7 +308,8 @@ ClassifySubject = "never" | Type { "," Type } ;
 ### decorator の宣言
 
 ```
-DecoratorDecl = { CoreMark } "decorator" DecoratorName [ Params ] [ "for" Target { "," Target } ] { DecoratorClause } ";"
+DecoratorDecl = { CoreMark } "decorator" "fn" DecoratorName Params [ ":" DecoratorClause { DecoratorClause } ] ( ";" | Block )
+              | { CoreMark } "decorator" DecoratorName [ Params ] "for" Target { "," Target } ";"
               | "decorator" DecoratorName "=" DecoratorRef Args ";" ;
 CoreMark      = "@external" | "@repeatable" ;          (* 核の印。それぞれ一度まで *)
 
@@ -331,17 +332,32 @@ DecoReadsClause   = "reads" ReadElem { "," ReadElem } ;       (* ReadElem と Ef
 DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 ```
 
+宣言の形は、三つ（`docs/decisions.md`「決めたこと」392〜394）。
+
+| 形 | 書き方 | 付ける先 | 節 | 本体 |
+|---|---|---|---|---|
+| 関数に付けるデコレータ | `decorator fn limited(): throws LimitExceeded prevents effects;` | op（種類を書かない `fn`）だけ | 書ける | 書ける |
+| そのほかのデコレータ | `decorator table for state;`、`decorator context(name: string) for model, state, op;` | `for` の後ろに並べた種類 | 書けない | 書けない |
+| 名前付きのデコレータ | `decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);` | 汎用の側の宣言に従う | 書けない | 書けない |
+
+- **関数に付けるデコレータは、`decorator fn` と書く。** `fn` が、付ける先（op）を言うので、`for` は書かない。後ろの形は、関数の宣言（「関数の宣言」の `FnType`）と、同じ決まり: `()` は、引数がなくても書く。`)` の後ろに節を書くなら、`:` で始める。節がなければ、`:` も書かない（`decorator fn post(path: string);`、`decorator fn audited() { … }`）。戻り値は、書かない（包んだ op の結果が、そのまま返る）。`:` のない節（`decorator fn f() throws E;`）と、`:` の後ろに節のない形は、SYNTAX。
+- **`decorator` の直後の `fn` は、いつも、この頭**: `fn` という名前のデコレータは、宣言できない（`DecoratorName` に書ける予約語の、ただ一つの例外）。
+- **本体のないものは、プラグインが解釈する**（同 393）。op の中身を包む（継ぎ目。`docs/config.md`「継ぎ目」）か、語彙として読むだけかは、そのプラグインが決める。宣言では、言い分けない。
+- **本体のあるものは、包み方が、仕様にある。** 本体は、配線のブロック（「配線」の `Block`）で、包んだ op の中身が動く所に、`proceed();` を書く（下の「デコレータの本体」）。
+- **op だけに付けるデコレータを、`for` の形で書くことは、なくした**: `decorator x for op …;` と、`for` を省いた `decorator x …;`（前は、op の意味）。パーサーは、新しい書き方（`decorator fn x(…)`）をメッセージで示して SYNTAX にし、`decorator fn` として読み進める。op と、ほかの種類の、両方に付けるデコレータ（`for model, state, op`）と、`read fn`・`effect fn` に付けるデコレータ（`for read`、`for effect`）は、`for` の形のまま。
+- **`for` の形は、節も、本体も、持てない**（文法で閉じる。前は、検査の DEC-2）。`for` の対象の後ろに、節の頭（`throws`、`catches`、`reads`、`effects`）か、`{` が来たら、SYNTAX: メッセージは、節と本体を書けるのは `decorator fn` だけであることを示す。
+
 - `@external` と `@repeatable` は核の印（`CoreMark`）で、デコレータの宣言にだけ付く。`decorator` の直前に置き、引数を取らず、別名の形には付けられない。二つを並べてよく、順は問わない。同じ印を二度書く、ほかの位置に書く、は構文エラー。
   - `@external`: そのデコレータの `throws` の例外は、境界の外から見たときだけ加わる（§8.2「境界の外から見たときの型の変化」。DEC-10）。
   - `@repeatable`: そのデコレータを、一つの宣言に何度でも付けられる（`@repeatable decorator where(column: string, value: string | int | float | boolean) for read;`）。印のないデコレータは、一つの宣言に一度だけ（DEC-13。`docs/check.md`「デコレータ」）。何度も付けた適用は、書いた順に IR に並ぶ（`docs/ir.md`「デコレータの適用」）。
-- 二つ目の形が名前付きのデコレータ（§8.1 `decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);`）。`for` も節も持たない（汎用の側の宣言に従う）。
+- 三つ目の形が名前付きのデコレータ（§8.1 `decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);`）。`for` も節も持たない（汎用の側の宣言に従う）。
 - `ExcRef` は例外、例外のユニオン、またはデコレータの引数の名前（`catches error recovers`。§4.2）。
 - `|` は、union を、その場で書く記号で、「A か B」を言う（`docs/decisions.md`「決めたこと」358、368）。宣言の中で書けるのは、デコレータの引数の型（`value: int | float`。§4.2 `valid.min`）と、絞り込んだ型の `on` の後ろのケース（「型」の `OnType`）。model のフィールドや、関数の引数の、型そのものには、書けない。適用の側の `|` は「デコレータの適用」の `ArgValue`。
 - `for` の後ろは、型ではなく、付ける先の種類の一覧で、区切りは `,`（`for scalar, field`）。節の並び（`throws`、`catches`、`reads`、`effects`。「op」）と、同じ決まり。パーサーは、`for` の対象の後ろに `|` が来たら、区切りは `,` であることをメッセージで示して SYNTAX にし、`,` として読み進める（なくした書き方。「決めたこと」）。
 - `any` は、「どれでも」を言う語（`docs/decisions.md`「決めたこと」357）。`for` の後ろに書くのは、種類（`for effect`）。`:` の後ろに書くのは、型。`any <種類>` は、種類から、型を作る: その種類の宣言なら、どれでも（`error: any exception`）。なので、付ける先には `any` を書かず、引数の種類には、書く。
 - `ThrowsClause` と `CatchesClause` の順序と回数は文法では縛らない（`catches X recovers throws Y`。§8.1）。差し引きは検査が計算する（DEC-6）。
 - `Target` の `effect` は、効果の宣言に付けるデコレータ（`@db.insert effect fn createOrder(order: Order): effects orders.post;`）。`read` は、`read` の宣言に付けるデコレータ（`@db.find read fn userByEmail(email: Email): User? reads users;`）。`exception` は、例外の宣言に付けるデコレータ（`@http.status(401) exception Unauthorized;`）。
-- `CaseKind` は、分類のケースを言う（`docs/decisions.md`「決めたこと」349）。`for` の後ろに書けば、ケースに付けるデコレータ（`decorator human for case of never;`）、`any` の後ろに書けば、ケースを受け取る引数（`decorator of(actor: any case of never) for op;`）。もとの形は、`case of …` で、`of` の後ろが、絞り。
+- `CaseKind` は、分類のケースを言う（`docs/decisions.md`「決めたこと」349）。`for` の後ろに書けば、ケースに付けるデコレータ（`decorator human for case of never;`）、`any` の後ろに書けば、ケースを受け取る引数（`decorator fn of(actor: any case of never);`）。もとの形は、`case of …` で、`of` の後ろが、絞り。
 
   | 書き方 | 言うもの |
   |---|---|
@@ -356,9 +372,36 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
   - **引数の種類の、いちばん後ろの `?` は、引数を省ける印**（`ParamType` の `?`。`docs/decisions.md`「決めたこと」354）: `any case?`、`any case of any?`、`any case of never?`、`any case of Order?` は、どれも、省ける引数。`any case of Order?` の `?` は、対象の型の一部ではない（対象は `Order`）: 引数の型の全体を、`nullable` で包んだ形の、省略（`docs/types.md`「形の書き方」）。内側の `?`（`any case of Order?[]`）は、型の一部。
   - **型で絞る形の対象に、省略可能な型は、書けない**（いちばん外が `?` か、`nullable<…>` の型。SYNTAX）: 付ける先の `for case of Order?`、`for case of nullable<Order>`、引数の種類の `any case of nullable<Order>`、`any case of Order??`。省略可能な型を対象にする分類（`classify Known of User?`）のケースは、名前で絞る（`case of Known`）。メッセージは、その書き方を示す。
 - 分類そのものを、付ける先や、引数の種類にする形（`for classify`、`any classify`）は、まだ、書けない。パーサーは、`Target` か `AnyKind` の位置に `classify` が来たら、SYNTAX にする: メッセージは、分類そのものは、まだ、書けないことと、なくした書き方（`classify case`、`classify of never case`、`classify Actor case`）の、新しい書き方（`case of any`、`case of never`、`case of Actor`）を、示す。
-- `DecoReadsClause` と `DecoEffectsClause` は、そのデコレータの処理が読むものと、持つ効果を言う節（`decorator limit(counter: any state, by: any effect) for op reads counter effects by;`）。要素は op の節と同じもの（`ReadElem`、`EffectElem`）か、デコレータの引数の名前（`any state` の引数は読む状態、`any effect` の引数は効果）。何度でも書ける。意味は `docs/check.md`「デコレータが運ぶ reads と effects」。
+- `DecoReadsClause` と `DecoEffectsClause` は、そのデコレータの処理が読むものと、持つ効果を言う節（`decorator fn limit(counter: any state, by: any effect): reads counter effects by;`）。要素は op の節と同じもの（`ReadElem`、`EffectElem`）か、デコレータの引数の名前（`any state` の引数は読む状態、`any effect` の引数は効果）。何度でも書ける。意味は `docs/check.md`「デコレータが運ぶ reads と effects」。
 - `Relation` の `effects` は、直前の `prevents` / `keeps` の目的語。`DecoEffectsClause` の頭の `effects` と字句は同じだが、`prevents` / `keeps` の直後かどうかで分かれる（`throws X prevents effects effects e` は、`Relation` の後ろに `DecoEffectsClause`）。
-- `RestParam` は**残りの引数**: 適用が、ほかの引数の後ろに位置で渡した 0 個以上の値を、まとめて受け取る（`decorator effects(...targets: any effect) for op effects targets;`）。型は、渡す値一つの型を書く。引数の並びの最後に一つだけ書け、省略可能にはできない（文法で閉じる）。節の中で名前を書けば、渡した値のすべてを指す。
+- `RestParam` は**残りの引数**: 適用が、ほかの引数の後ろに位置で渡した 0 個以上の値を、まとめて受け取る（`decorator fn effects(...targets: any effect): effects targets;`）。型は、渡す値一つの型を書く。引数の並びの最後に一つだけ書け、省略可能にはできない（文法で閉じる）。節の中で名前を書けば、渡した値のすべてを指す。
+
+#### デコレータの本体
+
+`docs/decisions.md`「決めたこと」392。`decorator fn` の本体は、配線のブロックに、`proceed()` を足したもの。
+
+```
+decorator fn limited(): throws LimitExceeded {
+  val allowance = currentAllowance();
+  match (allowance by Allowance) {
+    Allowed => proceed();
+    Denied  => throw LimitExceeded;
+  }
+}
+
+decorator fn audited() {
+  proceed();
+  recordAudit();
+}
+```
+
+- **`proceed()` は、包んだ op の中身を呼ぶ。** 二つ以上のデコレータを重ねた op では、外側の `proceed()` は、内側のデコレータごと、先へ進める。
+- **`proceed` は、文脈キーワード**: 予約語ではなく、デコレータの本体の中の、修飾のない呼び出し `proceed(…)` だけが、この意味になる。本体の外では、ふつうの名前。
+- **書ける位置は、二つだけ**: 文（`proceed();`）と、`match` のアームの本体（`Allowed => proceed();`）。引数は、書かない。値は、ない: `val` に入れる、`return` する、呼び出しの引数にする、は、書けない（`docs/check.md`「デコレータ」の DEC-19）。`for` と `disjoint` の中にも、書けない（同）。
+- **本体に、`return` は、書けない**（同 DEC-21）。op の結果は、そのまま、呼び元に返る。
+- **どの道も、`proceed()` を、ちょうど一度呼ぶか、例外を投げる**（同 DEC-20）。
+- **本体の中の名前は、デコレータを宣言した名前空間で、解決する**（`docs/resolve.md`「スコープ」）。引数のうち、値の型のもの（`max: int`）は、本体の中で、値として読める。`any <種類>` の引数は、本体では、まだ、使えない（同 DEC-23）。
+- 本体の意味（付けた所で、広げたものとして計算する）の持ち主は、`docs/check.md`「デコレータの本体」。
 
 ### op
 

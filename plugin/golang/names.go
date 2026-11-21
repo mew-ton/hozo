@@ -186,6 +186,11 @@ func SeamMethod(opName, decorator string) string {
 	return b.String()
 }
 
+// WrapMethod は、本体のあるデコレータを付けた op の、そのデコレータの外側のメソッドの名前（docs/plugin-go.md
+// 「本体のあるデコレータ」）: 継ぎ目のメソッドの名前（SeamMethod）の、先頭を小文字にしたもの（`login` と `audit.logged` →
+// `loginAuditLogged`）。非公開で、どのインターフェースにも現れない。
+func WrapMethod(opName, decorator string) string { return lowerFirst(SeamMethod(opName, decorator)) }
+
 // BodyName は、継ぎ目を持ち、基底が中身を出す op（配線と、never を返す op）の、中身のメソッドの名前
 // （docs/plugin-go.md「名前」「継ぎ目」の「中身」）: op 名の先頭を小文字にして Body を付ける（`login` → `loginBody`）。
 // op は FQN を渡してもよい。

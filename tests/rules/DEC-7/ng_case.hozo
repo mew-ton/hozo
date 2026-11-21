@@ -6,16 +6,16 @@ namespace a {
   classify Role of never { Admin; }
   classify Size of M { Small; Large; }
   classify Other of N { A; B; }
-  decorator subj(x: any case of never) for op;
-  decorator typed(x: any case of M) for op;
-  decorator named(x: any case of Actor) for op;
+  decorator fn subj(x: any case of never);
+  decorator fn typed(x: any case of M);
+  decorator fn named(x: any case of Actor);
   @subj(Size.Small) fn f();            // ERROR: DEC-7
   @named(Role.Admin) fn g();           // ERROR: DEC-7
   @typed(Other.A) fn h();              // ERROR: DEC-7
   @typed(Actor.Customer) fn i();       // ERROR: DEC-7
   // any case of M? は、対象が M で、省ける引数: 対象が M? の分類のケースは、当たらない（名前で絞る）
   classify Known of M? { Yes: M? as M; No: M? as else; }
-  decorator opt(x: any case of M?) for op;
+  decorator fn opt(x: any case of M?);
   @opt(Known.Yes) fn j();              // ERROR: DEC-7
   @opt(Other.A) fn k();                // ERROR: DEC-7
 }

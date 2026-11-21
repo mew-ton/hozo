@@ -10,5 +10,5 @@ namespace prd {
    * @param what 約束の文
    */
   @repeatable
-  decorator promise(whom: string, what: string) for op;
+  decorator fn promise(whom: string, what: string);
 }

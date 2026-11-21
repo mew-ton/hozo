@@ -4,7 +4,7 @@ namespace a {
   effect fn e(): effects s.post;
   exception E;
   exception F;
-  decorator doing(...targets: any effect) for op effects targets;
+  decorator fn doing(...targets: any effect): effects targets;
   @doing(e) fn ok(): throws E keeps effects;
   @doing(e) fn split(): throws E prevents effects throws F keeps effects;
 }

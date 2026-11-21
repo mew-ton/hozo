@@ -1,0 +1,16 @@
+// DEC-20: どの道も、proceed() を、ちょうど一度呼ぶか、例外を投げる
+namespace a {
+  exception Denied;
+  model Ticket { ok: boolean; }
+  fn ticket(): Ticket;
+  classify Gate of Ticket { Open; Closed; }
+  decorator fn guarded() {
+    val t = ticket();
+    match (t by Gate) {
+      Open   => proceed();
+      Closed => throw Denied;
+    }
+  }
+  @guarded
+  fn f();
+}

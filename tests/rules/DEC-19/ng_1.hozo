@@ -1,0 +1,17 @@
+// DEC-19（docs/check.md「デコレータ」）: proceed() を、書けない所に書いた: 引数を書いた。for か disjoint の中
+namespace a {
+  fn notify(id: string);
+  fn ids(): string[];
+  decorator fn withArgs() {
+    proceed("x");                          // ERROR: DEC-19
+  }
+  decorator fn inLoop() {
+    val all = ids();
+    for (val id of all) {
+      notify(id);
+      proceed();                           // ERROR: DEC-19
+    }
+    proceed();
+  }
+  fn f();
+}

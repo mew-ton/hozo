@@ -12,7 +12,7 @@
 |---|---|
 | `none` の型 | `none` の型。どの `optional` にも入る |
 | レコードリテラルの型 | フィールド名と値の型の組の列。model に照合して初めて型が決まる |
-| 「値がない」 | 値を返さない（`void` の）op の呼び出しと、効果の呼び出し（`createOrder(order)`、`orders.post(order)`）の型 |
+| 「値がない」 | 値を返さない（`void` の）op の呼び出しと、効果の呼び出し（`createOrder(order)`、`orders.post(order)`）の型。デコレータの本体の `proceed()` も、「値がない」: 包んだ op が値を返しても、本体からは、受け取れない（`docs/grammar.md`「デコレータの本体」） |
 | 「返らない」 | 決して値を返さない式の型: `never` を返す op の呼び出し、アームの本体の `throw`、すべてのアームが返らない `match`（「式の型」） |
 
 ### never

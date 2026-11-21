@@ -10,9 +10,9 @@ namespace http {
   exception BadRequest(message: string, violations: Violation[]);
 
   @external
-  decorator get(path: string) throws ServerError, NetworkError;
+  decorator fn get(path: string): throws ServerError, NetworkError;
   @external
-  decorator post(path: string) throws ServerError, NetworkError;
+  decorator fn post(path: string): throws ServerError, NetworkError;
 
   decorator status(code: int) for exception;
 
@@ -35,5 +35,5 @@ namespace http {
   /** このフィールドの項目が要求になければ、value にする */
   decorator default(value: string | int | float | boolean | duration) for field;
 
-  decorator retry(times: int);
+  decorator fn retry(times: int);
 }

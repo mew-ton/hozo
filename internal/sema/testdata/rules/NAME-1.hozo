@@ -9,7 +9,7 @@ namespace a {
   fn Find(): user;                     // WARN: NAME-1
   effect fn Added(): effects Users.post;        // WARN: NAME-1
   read fn First(): user? reads Users;        // WARN: NAME-1
-  decorator Tag;                       // WARN: NAME-1
+  decorator fn Tag();                       // WARN: NAME-1
   model _Hidden { id: string; }        // WARN: NAME-1
   model Ok { id: string; }
   fn ok(): Ok;

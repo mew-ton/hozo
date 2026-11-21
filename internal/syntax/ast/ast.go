@@ -553,7 +553,8 @@ type CaseTyping struct {
 func (n *CaseTyping) NodeSpan() source.Span { return n.Span }
 
 // DecoratorDecl はデコレータの宣言（docs/grammar.md「decorator の宣言」）。
-// Alias が nil でなければ二つ目の形（名前付きのデコレータ）で、Params / For / Clauses は空。
+// Fn が真なら、関数に付けるデコレータ（decorator fn）で、For は空。節と本体を持てるのは、この形だけ。
+// Alias が nil でなければ三つ目の形（名前付きのデコレータ）で、Params / For / Clauses は空。
 type DecoratorDecl struct {
 	Span       source.Span
 	Doc        *DocComment
@@ -567,14 +568,19 @@ type DecoratorDecl struct {
 	// RepeatableSpan は @repeatable の範囲。Repeatable でなければゼロ値。
 	RepeatableSpan source.Span
 	// Name は DecoratorName（docs/grammar.md「識別子」）。予約語のこともある（decorator list(…)）。
-	Name   Ident
+	Name Ident
+	// Fn は decorator fn（付ける先は op）。FnSpan は、その fn の範囲（なくした書き方から読み直したときは、ゼロ値）。
+	Fn     bool
+	FnSpan source.Span
 	Params []*Param
-	// For は付けられる対象。省略なら空（意味は op。設計書 §8.2）。
+	// For は付けられる対象。decorator fn と、名前付きのデコレータでは、空。
 	For []*Target
 	// Clauses は節。*ThrowsClause、*CatchesClause と、デコレータが op に運ぶ *ReadsClause、*EffectsClause
 	// （docs/grammar.md「decorator の宣言」の DecoReadsClause / DecoEffectsClause）。書かれた順。
 	Clauses []Clause
-	Alias   *DecoratorAlias
+	// Body は、decorator fn の本体（docs/grammar.md「デコレータの本体」）。なければ nil。
+	Body  *Block
+	Alias *DecoratorAlias
 }
 
 // NodeSpan は Node の実装。

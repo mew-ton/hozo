@@ -54,8 +54,23 @@ type OpShape struct {
 	Place Place
 	// Seams は、この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない。
 	Seams []string
-	// Body は、継ぎ目を持ち、基底が中身を出す op（Wiring と Never）の、中身のメソッドの名前（`loginBody`）。それ以外は ""。
+	// Layers は、この op の中身を包むデコレータ（書かれた順。先頭が最も外側）: 継ぎ目のデコレータ（Seams と同じもの）と、
+	// 本体のあるデコレータ（docs/plugin-go.md「本体のあるデコレータ」）。空なら、op は一層。
+	Layers []Layer
+	// Body は、包むデコレータを持ち、基底が中身を出す op（Wiring と Never）の、中身のメソッドの名前（`loginBody`）。それ以外は ""。
 	Body string
+}
+
+// Layer は、op の中身を包むデコレータ一つ（docs/plugin-go.md「継ぎ目」「本体のあるデコレータ」）。
+type Layer struct {
+	// Decorator はデコレータの FQN（名前付きのデコレータは、汎用の側）。
+	Decorator string
+	// Bodied は、本体のあるデコレータか。真なら、基底が、本体から外側を作る（Method は、そのメソッドの名前: `loginAuditLogged`）。
+	// 偽なら継ぎ目で、Method は、インターフェース Seams のメソッドの名前（`LoginRateLimited`）。
+	Bodied bool
+	Method string
+	// Args は、その適用の引数（本体のあるデコレータの、値の引数を、本体に当てはめるため）。
+	Args []ir.Arg
 }
 
 // StateUnit は状態の単位一つ（docs/plugin-go.md「状態の単位」）: インターフェース `<状態>State`。その状態に触れるもののすべて。
@@ -171,6 +186,48 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 			}
 		})
 	}
+	// 単位の対象の op に付いた、本体のあるデコレータの本体も、その op の配線として数える（docs/check.md「デコレータの本体」）
+	for _, d := range ns.Decls {
+		o, ok := d.(*ir.Op)
+		if !ok || !inUnit(o) {
+			continue
+		}
+		for _, app := range o.Decorators {
+			dec, ok := p.Lookup(app.Decorator).(*ir.Decorator)
+			if !ok || dec.Body == nil {
+				continue
+			}
+			eachCall(dec.Body, func(c *ir.Call) {
+				switch callee := c.Callee.(type) {
+				case ir.OpCallee:
+					name := callee.Op
+					called[name] = true
+					if m, known := declNS[name]; known && m != viewer {
+						if depOps[m] == nil {
+							depOps[m] = map[string]bool{}
+						}
+						depOps[m][name] = true
+					}
+				case ir.EffectCallee:
+					if direct, ok := callee.Effect.(ir.DirectEffect); ok {
+						if builtins[direct.State] == nil {
+							builtins[direct.State] = map[ir.Operation]bool{}
+						}
+						builtins[direct.State][direct.Operation] = true
+					}
+				}
+			})
+			eachMatch(dec.Body, func(m *ir.Match) {
+				c, ok := p.Lookup(m.Classify).(*ir.Classify)
+				if !ok || c.DecidedBy != ir.DecidedByPredicate {
+					return
+				}
+				if _, isState := c.SubjectStates(); !isState {
+					classifies[c.Name] = true
+				}
+			})
+		}
+	}
 
 	// 状態の単位: 基底の状態と、述語で決まる状態の分類（宣言順）
 	units := map[string]int{} // FQN → s.States の添字
@@ -234,13 +291,22 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		os := OpShape{FQN: o.Name, Method: MethodName(o.Name), Exported: o.Exported, Place: place(o, target)}
 		if target {
 			for _, app := range o.Decorators {
+				// 本体のあるデコレータは、基底が、本体から外側を作る。継ぎ目には、しない（単位のトランスパイラが、
+				// 継ぎ目を宣言していても。基底が GO-7 で報告する）
+				if dec, ok := p.Lookup(app.Decorator).(*ir.Decorator); ok && dec.Body != nil {
+					if !hasLayer(os.Layers, app.Decorator) {
+						os.Layers = append(os.Layers, Layer{Decorator: app.Decorator, Bodied: true, Method: WrapMethod(o.Name, app.Decorator), Args: app.Args})
+					}
+					continue
+				}
 				if _, has := seams[app.Decorator]; has && !contains(os.Seams, app.Decorator) {
 					os.Seams = append(os.Seams, app.Decorator)
+					os.Layers = append(os.Layers, Layer{Decorator: app.Decorator, Method: SeamMethod(o.Name, app.Decorator), Args: app.Args})
 					s.Seams = append(s.Seams, Seam{Op: o.Name, Decorator: app.Decorator, Transpiler: seams[app.Decorator],
 						Method: SeamMethod(o.Name, app.Decorator)})
 				}
 			}
-			if len(os.Seams) > 0 && (os.Place == Wiring || os.Place == Never) {
+			if len(os.Layers) > 0 && (os.Place == Wiring || os.Place == Never) {
 				os.Body = BodyName(o.Name)
 			}
 		}
@@ -506,6 +572,15 @@ func eachMatch(w *ir.Wiring, fn func(m *ir.Match)) {
 			}
 		}
 	})
+}
+
+func hasLayer(layers []Layer, decorator string) bool {
+	for _, l := range layers {
+		if l.Decorator == decorator {
+			return true
+		}
+	}
+	return false
 }
 
 func contains(list []string, s string) bool {

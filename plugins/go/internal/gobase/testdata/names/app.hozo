@@ -3,13 +3,13 @@
 
 // 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
 // （docs/check.md「デコレータが運ぶ reads と effects」）
-decorator reading(...tables: any state) for op reads tables;
-decorator doing(...targets: any effect) for op effects targets;
+decorator fn reading(...tables: any state): reads tables;
+decorator fn doing(...targets: any effect): effects targets;
 
 namespace type {
   scalar Token extends string;
   /** 印。付いた op は純粋でなくなる */
-  decorator mark;
+  decorator fn mark();
   @mark export fn issue(): Token;
 }
 

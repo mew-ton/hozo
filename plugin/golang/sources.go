@@ -136,6 +136,22 @@ type sourceFrame struct {
 	op      *ir.Op
 	call    *ir.Call // 呼んだ側の呼び出し（入口なら nil）
 	parent  *sourceFrame
+	// deco は、op に付いた、本体のあるデコレータの本体を辿っているときの、そのデコレータ（docs/plugin-go.md「本体のあるデコレータ」）。
+	// そのとき、body は、その本体の文で、proceed は、proceed() の先（内側の層）を辿る関数。op の配線を辿っているときは nil。
+	deco    *ir.Decorator
+	body    []ir.Statement
+	proceed func(c sourceCond)
+}
+
+// statements は、fr が辿っている文（op の配線の本体か、デコレータの本体）。
+func (fr *sourceFrame) statements() []ir.Statement {
+	if fr.deco != nil {
+		return fr.body
+	}
+	if fr.op.Body == nil {
+		return nil
+	}
+	return fr.op.Body.Statements
 }
 
 type sourceWalker struct {
@@ -230,24 +246,45 @@ func (w *sourceWalker) op(caller *sourceFrame, kit *TestKit, prefix []string, fq
 		return
 	}
 	fr := &sourceFrame{kit: kit, prefix: prefix, noFakes: noFakes, op: o, call: call, parent: caller}
-	// 継ぎ目: 中身の前に、デコレータが投げる
-	bySeam := map[string]bool{}
-	for _, d := range shape.Seams {
-		dec, _ := w.p.Lookup(d).(*ir.Decorator)
-		seams, ok := w.param(kit, KitSeams, "")
-		if dec == nil || !ok {
-			continue
+	w.layer(fr, shape, 0, c, map[string]bool{})
+}
+
+// layer は、op の層 i（0 が、いちばん外。len(shape.Layers) が、op の中身）から内側の、出どころを足す
+// （docs/plugin-go.md「継ぎ目」「本体のあるデコレータ」）。継ぎ目は、中身の前に、デコレータが投げる（にせものの継ぎ目が、投げる）。
+// 本体のあるデコレータは、本物を通すので、本体を、配線として辿り、proceed() の所で、内側の層へ進む。
+func (w *sourceWalker) layer(fr *sourceFrame, shape *OpShape, i int, c sourceCond, bySeam map[string]bool) {
+	o, kit, fqn := fr.op, fr.kit, fr.op.Name
+	if i < len(shape.Layers) {
+		l := shape.Layers[i]
+		dec, _ := w.p.Lookup(l.Decorator).(*ir.Decorator)
+		if dec == nil {
+			w.layer(fr, shape, i+1, c, bySeam)
+			return
 		}
-		for _, clause := range dec.Throws {
-			for _, x := range clause.Exceptions {
-				if strings.HasPrefix(x, "$param:") {
-					continue
+		if l.Bodied {
+			if dec.Body == nil {
+				return
+			}
+			in := *fr
+			in.deco, in.body = dec, dec.Body.Statements
+			in.proceed = func(pc sourceCond) { w.layer(fr, shape, i+1, pc, bySeam) }
+			w.stmts(&in, in.body, c)
+			return
+		}
+		if seams, ok := w.param(kit, KitSeams, ""); ok {
+			for _, clause := range dec.Throws {
+				for _, x := range clause.Exceptions {
+					if strings.HasPrefix(x, "$param:") {
+						continue
+					}
+					bySeam[x] = true
+					w.add(fr, ThrowSource{Exception: x, Kind: SourceSeam, Label: fqn + "@" + l.Decorator, Ident: SeamMethod(o.Name, l.Decorator)}, c,
+						[]FakeStep{{Path: w.path(fr, seams.Field, SeamMethod(o.Name, l.Decorator)), Verb: StepThrows, Exception: x}})
 				}
-				bySeam[x] = true
-				w.add(fr, ThrowSource{Exception: x, Kind: SourceSeam, Label: fqn + "@" + d, Ident: SeamMethod(o.Name, d)}, c,
-					[]FakeStep{{Path: w.path(fr, seams.Field, SeamMethod(o.Name, d)), Verb: StepThrows, Exception: x}})
 			}
 		}
+		w.layer(fr, shape, i+1, c, bySeam)
+		return
 	}
 	switch shape.Place {
 	case Leaf:
@@ -255,7 +292,7 @@ func (w *sourceWalker) op(caller *sourceFrame, kit *TestKit, prefix []string, fq
 		if !ok {
 			return
 		}
-		for _, x := range o.Signature.Exceptions {
+		for _, x := range leafExceptions(o, shape) {
 			if bySeam[x] {
 				continue
 			}
@@ -276,6 +313,27 @@ func (w *sourceWalker) op(caller *sourceFrame, kit *TestKit, prefix []string, fq
 		w.stmts(fr, o.Body.Statements, c)
 		delete(w.stack, fqn)
 	}
+}
+
+// leafExceptions は、葉の op o が、自分で投げうる例外: 計算した例外（Op.signature.exceptions）のすべて。本体のあるデコレータを
+// 持つ葉では、計算した例外に、デコレータの本体の分が混ざるので、節に書いた例外（葉の op は、節が、定義）。
+func leafExceptions(o *ir.Op, shape *OpShape) []string {
+	bodied := false
+	for _, l := range shape.Layers {
+		bodied = bodied || l.Bodied
+	}
+	if !bodied {
+		return o.Signature.Exceptions
+	}
+	var written []string
+	for _, clause := range o.Throws {
+		for _, x := range clause.Exceptions {
+			if !contains(written, x) {
+				written = append(written, x)
+			}
+		}
+	}
+	return written
 }
 
 func (w *sourceWalker) stmts(fr *sourceFrame, list []ir.Statement, c sourceCond) {
@@ -302,6 +360,11 @@ func (w *sourceWalker) stmts(fr *sourceFrame, list []ir.Statement, c sourceCond)
 
 func (w *sourceWalker) call(fr *sourceFrame, call *ir.Call, c sourceCond) {
 	switch callee := call.Callee.(type) {
+	case ir.ProceedCallee:
+		// デコレータの本体の proceed(): 内側の層へ
+		if fr.proceed != nil {
+			fr.proceed(c)
+		}
 	case ir.OpCallee:
 		w.op(fr, fr.kit, fr.prefix, callee.Op, call, c)
 	case ir.EffectCallee:
@@ -347,8 +410,13 @@ func (w *sourceWalker) match(fr *sourceFrame, m *ir.Match, c sourceCond) {
 			for _, k := range arm.Cases {
 				ident += Capitalize(k)
 			}
-			w.add(fr, ThrowSource{Exception: body.Exception, Kind: SourceArm, Label: fr.op.Name + "." + strings.Join(arm.Cases, "+"),
-				Ident: MethodName(fr.op.Name) + ident}, c.with(steps, why), nil)
+			label, id := fr.op.Name, MethodName(fr.op.Name)
+			if fr.deco != nil {
+				// デコレータの本体のアーム: <op の FQN>@<デコレータの FQN>.<ケース>
+				label, id = fr.op.Name+"@"+fr.deco.Name, SeamMethod(fr.op.Name, fr.deco.Name)
+			}
+			w.add(fr, ThrowSource{Exception: body.Exception, Kind: SourceArm, Label: label + "." + strings.Join(arm.Cases, "+"),
+				Ident: id + ident}, c.with(steps, why), nil)
 		case ir.CallExpr:
 			cc := c
 			if nonThrow > 1 {
@@ -442,8 +510,15 @@ func (w *sourceWalker) none(fr *sourceFrame, atom ir.Atom, depth int) ([]FakeSte
 			return nil, "値の一部（" + strings.Join(a.Path, ".") + "）で決まる"
 		}
 		name := a.Path[0]
+		if fr.deco != nil {
+			for _, p := range fr.deco.Params {
+				if p.Name == name {
+					return nil, "デコレータの引数（" + name + "）で決まる"
+				}
+			}
+		}
 		for _, p := range fr.op.Params {
-			if p.Name != name {
+			if p.Name != name || fr.deco != nil {
 				continue
 			}
 			if fr.parent == nil || fr.call == nil {
@@ -459,7 +534,7 @@ func (w *sourceWalker) none(fr *sourceFrame, atom ir.Atom, depth int) ([]FakeSte
 		// 束縛を探す: 値と一緒に宣言した val が、一つだけ
 		var bound ir.Expr
 		n := 0
-		ir.WalkStatements(fr.op.Body.Statements, func(st ir.Statement) {
+		ir.WalkStatements(fr.statements(), func(st ir.Statement) {
 			switch s := st.(type) {
 			case ir.ValStmt:
 				if s.Name == name {

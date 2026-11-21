@@ -360,9 +360,9 @@ func (c Call) CalledOp() string {
 }
 
 // Callee は呼び出し先（docs/ir.md「配線」の Callee）。具体型は値型の [OpCallee]（kind "op"）、[ReadCallee]（kind "read"）、
-// [EffectCallee]（kind "effect"）で、== で比べられる。
+// [EffectCallee]（kind "effect"）、[ProceedCallee]（kind "proceed"）で、== で比べられる。
 type Callee interface {
-	// Kind は JSON の判別子（"op"、"read"、"effect"）。
+	// Kind は JSON の判別子（"op"、"read"、"effect"、"proceed"）。
 	Kind() string
 	// String は表示のための文字列: op と read は宣言の FQN、効果は [EffectRef] の String。
 	String() string
@@ -387,11 +387,33 @@ type EffectCallee struct {
 	Effect EffectRef `json:"effect"`
 }
 
+// ProceedCallee は、デコレータの本体の `proceed()`: 包んだ op の中身（内側のデコレータを含む）の呼び出し
+// （docs/grammar.md「デコレータの本体」）。現れるのは [Decorator] の Body の中だけで、引数は、ない。
+type ProceedCallee struct{}
+
 var (
 	_ Callee = OpCallee{}
 	_ Callee = ReadCallee{}
 	_ Callee = EffectCallee{}
+	_ Callee = ProceedCallee{}
 )
+
+// Kind は "proceed"。
+func (ProceedCallee) Kind() string { return "proceed" }
+
+// String は "proceed"。
+func (ProceedCallee) String() string { return "proceed" }
+
+func (ProceedCallee) isCallee() {}
+
+// MarshalJSON は kind だけを書く。
+func (ProceedCallee) MarshalJSON() ([]byte, error) { return []byte(`{"kind":"proceed"}`), nil }
+
+// IsProceed は、呼び出しが `proceed()` か。
+func (c Call) IsProceed() bool {
+	_, ok := c.Callee.(ProceedCallee)
+	return ok
+}
 
 // Kind は "op"。
 func (OpCallee) Kind() string { return "op" }
@@ -442,9 +464,10 @@ func (c EffectCallee) MarshalJSON() ([]byte, error) {
 func (c *EffectCallee) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, c) }
 
 var calleeTable = map[string]func([]byte) (Callee, error){
-	"op":     asValue[Callee, OpCallee],
-	"read":   asValue[Callee, ReadCallee],
-	"effect": asValue[Callee, EffectCallee],
+	"op":      asValue[Callee, OpCallee],
+	"read":    asValue[Callee, ReadCallee],
+	"effect":  asValue[Callee, EffectCallee],
+	"proceed": asValue[Callee, ProceedCallee],
 }
 
 // UnmarshalCallee は kind で分けて Callee を読む（docs/ir.md「JSON」）。

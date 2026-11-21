@@ -3,8 +3,8 @@
 namespace a {
   model M { id: string; }
   exception Unauthorized;
-  decorator mark;
-  decorator writing(...targets: any effect) for op effects targets;
+  decorator fn mark();
+  decorator fn writing(...targets: any effect): effects targets;
   classify Kind of M { A; B; }
   fn unauthorized(): never throws Unauthorized;
   @mark

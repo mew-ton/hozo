@@ -320,7 +320,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int, t
 		transpilers = []string{name}
 	}
 	script := "cat >/dev/null; printf '%s' '" + stdout + "'; exit " + string(rune('0'+exit))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.17\"\n" + extra
+	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.18\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
@@ -339,7 +339,7 @@ func TestPluginCheck(t *testing.T) {
 	write(t, filepath.Join(dir, "hozo.toml"), config("chk"))
 	resp := `{"diagnostics":[{"severity":"warning","code":"CHK-1","at":"server.placeOrder","message":"by fqn"},{"severity":"error","code":"CHK-2","at":"server.hozo:3:5","message":"by pos"},{"severity":"error","code":"CHK-3","at":"nowhere","message":"unknown"}]}`
 	fakePlugin(t, dir, "chk", "go", "vocabulary = [\"v.hozo\"]\n\n[check]\nenabled = true\n", resp, 0)
-	write(t, filepath.Join(dir, "plugins", "chk", "v.hozo"), "/** 語彙 */\nnamespace chk {\n  decorator mark for op;\n}\n")
+	write(t, filepath.Join(dir, "plugins", "chk", "v.hozo"), "/** 語彙 */\nnamespace chk {\n  decorator fn mark();\n}\n")
 	// hozoc 自身の warning（NAME-1）を一つ足し、プラグインの診断と一緒に出ることを確かめる
 	write(t, filepath.Join(dir, "extra.hozo"), "namespace server {\n  model lowerName { id: string; }\n}\n")
 	hasFile := func(p *Project, path string) bool {
@@ -408,7 +408,7 @@ func TestPluginCheck(t *testing.T) {
 // （name と language のほかの行: requires、seams など）を、トランスパイラの名前 → 行で。
 func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
 	t.Helper()
-	m := "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.17\"\n"
+	m := "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.18\"\n"
 	for _, tr := range transpilers {
 		lang := "go"
 		if strings.HasPrefix(tr[0], "ts") {
@@ -643,7 +643,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	envDir, home := t.TempDir(), t.TempDir()
 	// env-t と home-t は、基底 t に相乗りする（一つの単位は、基底をちょうど一つ持つ）
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.17\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
+		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.18\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -692,7 +692,7 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.17\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.18\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
@@ -774,8 +774,8 @@ func userFiles(files []string) string {
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.17\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator legacy;\n  @legacy fn f();\n}\n")
+		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.18\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator fn legacy();\n  @legacy fn f();\n}\n")
 	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy fn g();\n}\n")
 	count := func(units string) int {
 		t.Helper()

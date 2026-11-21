@@ -10,7 +10,7 @@ namespace a {
   @repeatable @repeatable                        // ERROR: SYNTAX
   decorator twice for read;
   @external @repeatable @external                // ERROR: SYNTAX
-  decorator twiceExternal;
+  decorator fn twiceExternal();
   decorator plain(column: string) for read;
   @repeatable                                    // ERROR: SYNTAX
   decorator alias = plain("id");

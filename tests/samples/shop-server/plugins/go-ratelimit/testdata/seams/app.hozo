@@ -4,7 +4,7 @@
 /** テストの語彙 */
 namespace t {
   /** 継ぎ目を要る（go-trace） */
-  decorator traced;
+  decorator fn traced();
 }
 
 namespace type {

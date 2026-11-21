@@ -181,16 +181,19 @@
           }
         },
         {
-          "comment": "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator list(…)。docs/grammar.md「識別子」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
-          "match": "\\b(decorator)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*))?",
+          "comment": "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator fn list(…)。docs/grammar.md「識別子」）。decorator の直後の fn は、関数に付けるデコレータの頭（同「decorator の宣言」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
+          "match": "\\b(decorator)\\s+(?:(fn)\\s+)?([A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*))?",
           "captures": {
             "1": {
               "name": "keyword.declaration.hozo"
             },
             "2": {
-              "name": "entity.name.function.hozo"
+              "name": "keyword.declaration.hozo"
             },
             "3": {
+              "name": "entity.name.function.hozo"
+            },
+            "4": {
               "name": "entity.name.function.decorator.hozo"
             }
           }

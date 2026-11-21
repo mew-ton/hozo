@@ -1,5 +1,5 @@
 {
-  "version": "0.17",
+  "version": "0.18",
   "viewer": "browser",
   "config": {
     "index": 2,
@@ -68,7 +68,7 @@
     ]
   },
   "program": {
-    "version": "0.17",
+    "version": "0.18",
     "namespaces": [
       {
         "name": "http",
@@ -138,6 +138,7 @@
                 "rest": false
               }
             ],
+            "fn": false,
             "targets": [
               "op"
             ],
@@ -188,6 +189,7 @@
                 "rest": false
               }
             ],
+            "fn": false,
             "targets": [
               "op"
             ],
@@ -802,6 +804,7 @@
               }
             },
             "params": [],
+            "fn": false,
             "targets": [
               "op"
             ],

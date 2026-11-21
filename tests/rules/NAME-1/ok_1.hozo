@@ -9,5 +9,5 @@ namespace a {
   fn find(): User;
   effect fn added(): effects users.post;
   read fn first(): User? reads users;
-  decorator tag;
+  decorator fn tag();
 }

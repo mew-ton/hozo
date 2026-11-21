@@ -3,8 +3,8 @@
 
 // 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
 // （docs/check.md「デコレータが運ぶ reads と effects」）
-decorator reading(...tables: any state) for op reads tables;
-decorator doing(...targets: any effect) for op effects targets;
+decorator fn reading(...tables: any state): reads tables;
+decorator fn doing(...targets: any effect): effects targets;
 
 /** 状態に触れる read と効果と、それを呼ぶ配線 */
 namespace app {
@@ -67,10 +67,10 @@ namespace app {
   effect fn removeLine(item: string): effects lines.delete;
 
   // 読む状態と効果を運ぶデコレータ（docs/check.md「デコレータが運ぶ reads と effects」）
-  decorator looks(table: any state) for op reads table;
-  decorator does(...targets: any effect) for op effects targets;
+  decorator fn looks(table: any state): reads table;
+  decorator fn does(...targets: any effect): effects targets;
   /** 運ぶ節のないデコレータ。付いた op は純粋でなくなるだけ */
-  decorator mark for op;
+  decorator fn mark();
 
   // 「op の置き場」の 3: 葉は、いつも Leaves。デコレータが reads / effects を運んでいても（一つの状態でも、二つの状態でも）、
   // 置き場は変わらない

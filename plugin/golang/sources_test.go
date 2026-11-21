@@ -169,3 +169,39 @@ func TestThrowSourcesNeverCaughtAndShared(t *testing.T) {
 		"app.Bad app.leaf made Leaves.Leaf.Throws(app.Bad)",
 		"app.Caught app.leaf made Leaves.Leaf.Throws(app.Caught)")
 }
+
+// TestThrowSourcesDecoratorBody は、本体のあるデコレータ（docs/plugin-go.md「本体のあるデコレータ」）: 本物を通すので、本体を、
+// 配線として辿る。本体の throw のアームは、出どころ（<op の FQN>@<デコレータの FQN>.<ケース>）。proceed() の所で、内側（op の中身）へ
+// 進む。proceed() の後ろの呼び出しが投げる例外も、出どころ。
+func TestThrowSourcesDecoratorBody(t *testing.T) {
+	// decorator fn guarded() { match (by Gate) { Open => proceed(); Shut => throw Closed; } }（Gate は、状態の分類の述語）
+	guarded := &ir.Decorator{DeclBase: base("a.guarded", "a.hozo"), Fn: true, Targets: []ir.DecoratorTarget{ir.TargetOp},
+		Body: &ir.Wiring{Statements: []ir.Statement{
+			matchOn("", "a.Gate",
+				ir.MatchArm{Cases: []string{"Open"}, Body: ir.CallExpr{Call: ir.Call{Callee: ir.ProceedCallee{}}}},
+				armThrow("a.Closed", "Shut")),
+		}}}
+	// decorator fn noted() { proceed(); note(); }（note は、Failed を投げうる葉）
+	noted := &ir.Decorator{DeclBase: base("a.noted", "a.hozo"), Fn: true, Targets: []ir.DecoratorTarget{ir.TargetOp},
+		Body: &ir.Wiring{Statements: []ir.Statement{
+			ir.CallStmt{Call: ir.Call{Callee: ir.ProceedCallee{}}},
+			call("a.note"),
+		}}}
+	v := viewOf("a", namespace("a",
+		exception("a.Closed"), exception("a.Failed"), exception("a.Broken"),
+		state("a.door", ir.String()),
+		classify("a.Gate", ir.StatesSubject{States: []string{"a.door"}}, ir.DecidedByPredicate, "Open", "Shut"),
+		guarded, noted,
+		with(op("a.note", nil), internal(), throwing("a.Failed")),
+		with(op("a.work", nil), internal(), throwing("a.Broken")),
+		with(op("a.entry", nil), decorated("a.guarded", "a.noted"), wired(call("a.work")), throwing("a.Closed", "a.Broken", "a.Failed")),
+	))
+	wantSources(t, sourcesOf(t, v, "a.entry"),
+		// 本体の throw のアーム: 状態の分類の述語のにせものが、Shut だけを真にする
+		"a.Closed a.entry@a.guarded.Shut made Gate.Open.Returns(false) Gate.Shut.Returns(true)",
+		// proceed() の先（op の中身）の葉
+		"a.Broken a.work made Leaves.Work.Throws(a.Broken)",
+		// proceed() の後ろで、デコレータの本体が呼ぶ葉
+		"a.Failed a.note made Leaves.Note.Throws(a.Failed)",
+	)
+}

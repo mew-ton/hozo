@@ -11,7 +11,7 @@
 ```toml
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.17"
+protocol = "0.18"
 
 vocabulary = ["cli.hozo"]
 
@@ -34,7 +34,7 @@ requires = ["go", "go-valid"]
 
 ```ts
 namespace cli {
-  decorator command(name: string);
+  decorator fn command(name: string);
   /** 位置引数として受け取る。position は、1 から数える位置 */
   decorator arg(position: int) for field;
   /** フラグとして受け取る。name（`--` を除く）を省けば、フィールドの名前 */

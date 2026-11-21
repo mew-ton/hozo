@@ -603,8 +603,8 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | REL-1 | `throws` の中で各例外は一度だけ現れる | §7.3 |
 | REL-2 | 効果を持たない op の `throws` に `prevents` / `keeps` があれば警告 | §7.3 |
 | REL-4 | 配線の op の例外ごとの効果の状態は検査器が計算する。書かれた `prevents` / `keeps`（目的語は `effects` だけ）が計算と食い違えばエラー | §7.3、§9。S9: `docs/check.md`「計算」「throws」 |
-| DEC-1 | 付けられる対象は `for` で決まる。省略は `op`。宣言にない対象に付けたらエラー | §8.2。対象 `effect` と `read`: `docs/grammar.md`「decorator の宣言」（理由は同「決めたこと」） |
-| DEC-2 | `throws` / `catches`（と、`reads` / `effects`）の節を宣言できるのは `op` に付けるデコレータだけ | §8.2。`reads` / `effects` の節は `docs/decisions.md` の 98: `docs/check.md`「デコレータ」 |
+| DEC-1 | 付けられる対象は、関数に付けるデコレータ（`decorator fn`）なら `op`、そのほかは `for` で決まる。宣言にない対象に付けたらエラー | §8.2。対象 `effect` と `read`: `docs/grammar.md`「decorator の宣言」（理由は同「決めたこと」） |
+| DEC-2 | `throws` / `catches`（と、`reads` / `effects`）の節を宣言できるのは、関数に付けるデコレータ（`decorator fn`）だけ（文法で閉じる） | §8.2。`reads` / `effects` の節は `docs/decisions.md` の 98。`decorator fn`: 同 394、`docs/grammar.md`「decorator の宣言」 |
 | DEC-3 | `catches X` の後に `recovers` / `halts e` / `ignores` を必ず書く | §8.2 |
 | DEC-4 | `ignores` は値を返さない op にだけ付けられる | §8.2 |
 | DEC-5 | 効果が不明な例外を `recovers` で吸収するデコレータを、効果を持つ op に付けたら警告 | §8.2 |
@@ -613,6 +613,12 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | DEC-8 | 名前付きのデコレータは、汎用のデコレータに引数を固定した別名としてだけ定義できる | §8.1、§8.2 |
 | DEC-9 | 適用順は op に近いものから。IR では入れ子にせず、順序付きの列に正規化する | §8.2、`docs/ir.md`「デコレータの適用」（`docs/decisions.md` の 16） |
 | DEC-10 | `@external` の例外は境界の外から見たときだけ加わる | §8.2 |
+| DEC-19 | `proceed()` は、デコレータの本体の、文か、`match` のアームの本体にだけ書け、引数を取らない | `docs/decisions.md` の 392: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」 |
+| DEC-20 | デコレータの本体は、どの道も、`proceed()` を、ちょうど一度呼ぶか、例外を投げる | 同 |
+| DEC-21 | デコレータの本体に、`return` は書けない | 同 |
+| DEC-22 | 本体のあるデコレータは、`catches` の節を持てない | 同。`docs/check.md`「デコレータの本体」 |
+| DEC-23 | デコレータの本体で読める引数は、型を一つ書いた、値の引数だけ | 同 |
+| DEC-24 | 本体のあるデコレータの本体が呼べるのは、付けた op の名前空間の配線が、呼べるものだけ | 同 |
 | WIRE-1 | 書けるのは、`val` の宣言、値を入れる文、集める文、`return`、`match`、値を返さない呼び出し（op か効果）、`disjoint`、`for` だけ | §9。効果の呼び出し: `docs/check.md`「配線からの呼び出し」。`val`、`disjoint`、`for`: `docs/grammar.md`「配線」 |
 | WIRE-2 | 値を返す呼び出しを `val` に受けずに書く、値を返さない（か、決して返らない）呼び出しを `val` に受ける、はどちらもエラー | §9。S19: `docs/types.md`「式の型」 |
 | WIRE-3 | 値を返さない配線の op は `return` を書かない | §9 |

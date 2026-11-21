@@ -221,7 +221,7 @@ func ruleID(dirName string) string {
 
 // grammarClosed は「文法で閉じる」規則。例は構文エラー（SYNTAX）で確かめる（docs/testing.md「規則ごとのテスト」）。
 var grammarClosed = map[string]bool{
-	"SYN-1": true, "SYN-2": true, "DEC-3": true, "DEC-8": true, "DEC-15": true,
+	"SYN-1": true, "SYN-2": true, "DEC-2": true, "DEC-3": true, "DEC-8": true, "DEC-15": true,
 	"WIRE-1": true, "WIRE-5": true, "MATCH-1": true, "MATCH-3": true,
 }
 

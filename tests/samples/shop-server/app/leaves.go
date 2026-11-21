@@ -15,10 +15,10 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// Leaves は、server の葉の op 九つの本体（メソッド）と、それが外から受け取るもの（フィールド）。
+// Leaves は、server の葉の op 十の本体（メソッド）と、それが外から受け取るもの（フィールド）。
 // *Leaves を server.New の引数 leaves にそのまま渡す。テストが差し替えられるように、時計と識別子の作り方を持つ。
 //
-// メソッドは、九つとも、最初の引数に ctx を取り、最後の戻り値に error を返す（生成された server.Leaves のメソッドの形。
+// メソッドは、十とも、最初の引数に ctx を取り、最後の戻り値に error を返す（生成された server.Leaves のメソッドの形。
 // docs/plugin-go.md「op の形」: 基底は、どの op にそれが要るかを判定しない）。ここの本体は、どれも待たないので ctx を見ない。
 // error を返すのは、仕様の例外（checkPassword、requireFresh）と、トークンと識別子を作れなかったとき（newSession、newOrder）。
 type Leaves struct {
@@ -32,6 +32,8 @@ type Leaves struct {
 	SessionTTL time.Duration
 	// PageSize は注文一覧の 1 ページの件数。
 	PageSize int
+	// Audit は、呼ばれたことの記録の先（server.recordAudit）。nil なら、何もしない。
+	Audit func()
 }
 
 // *Leaves は server の葉の op をすべて持つ。メソッドが一つでも足りなければ、ここでコンパイルできない。
@@ -109,6 +111,15 @@ func (l *Leaves) NewOrder(_ context.Context, session pkgtype.Session, lines []pk
 // ComposeNotice は server.composeNotice の本体。
 func (l *Leaves) ComposeNotice(_ context.Context, order pkgtype.Order) (pkgtype.Notification, error) {
 	return pkgtype.Notification{UserId: order.UserId, Message: "注文 " + string(order.Id) + " を受け付けました"}, nil
+}
+
+// RecordAudit は server.recordAudit の本体: 記録の先（Audit）を、一度呼ぶ。デコレータ @server.audited の本体が、
+// 包んだ op の中身が正常に終わった後に、呼ぶ（生成された logoutServerAudited）。
+func (l *Leaves) RecordAudit(_ context.Context) error {
+	if l.Audit != nil {
+		l.Audit()
+	}
+	return nil
 }
 
 // HashPassword はパスワードのハッシュ。サンプルなので SHA-256 一回（本物は bcrypt などにする）。

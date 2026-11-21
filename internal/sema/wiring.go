@@ -15,6 +15,9 @@ type wiringJob struct {
 	sym  *symbol
 	decl *ast.OpDecl
 	op   *ir.Op
+	// deco と decoDecl は、デコレータの本体を下ろす仕事のとき（docs/grammar.md「デコレータの本体」）。そのとき decl と op は nil。
+	deco     *ir.Decorator
+	decoDecl *ast.DecoratorDecl
 }
 
 // binding は配線のスコープの名前: op の引数、val、for の変数。
@@ -43,6 +46,8 @@ type binding struct {
 	loops int
 	// irSpan は、IR の val の文の span（後から、型を入れるための鍵）。
 	irSpan ir.Span
+	// unusable は、デコレータの本体で、まだ使えない引数（any <種類>、型が二つ以上、残りの引数）なら、その引数の型の言い方（DEC-23）。
+	unusable string
 }
 
 type collectedType struct {
@@ -120,6 +125,10 @@ type disjointFrame struct {
 
 // lowerWiring は配線の本体（docs/ir.md「配線」）。WIRE-2 / WIRE-3 / WIRE-4 / WIRE-8〜WIRE-14 と式の型。
 func (a *analyzer) lowerWiring(j *wiringJob) {
+	if j.deco != nil {
+		a.lowerDecoratorBody(j)
+		return
+	}
 	ws := &wiringScope{op: j.sym.fqn, params: map[string]*binding{}}
 	ws.unassignedRead = func(b *binding, at source.Span) {
 		a.errorf("WIRE-10", at, "val %s は、まだ、代入が済んでいないので、読めない", b.name).Related = []diag.Related{related(b.span, "宣言")}
@@ -143,6 +152,123 @@ func (a *analyzer) lowerWiring(j *wiringJob) {
 	a.checkWIRE8(ws)
 	a.fillVals(w, body.Statements)
 	j.op.Body = body
+}
+
+// lowerDecoratorBody は、デコレータの本体（docs/grammar.md「デコレータの本体」、docs/check.md「デコレータの本体」）。
+// 配線と同じに下ろす。違うのは: 名前は、デコレータを宣言した名前空間で解決する。値の型の引数は、値として読める
+// （any <種類> と、型が二つ以上の引数と、残りの引数は、まだ読めない。DEC-23）。return は書けない（DEC-21）。
+// proceed() は、文か、match のアームの本体にだけ書ける（DEC-19）。どの道も、proceed() をちょうど一度呼ぶか、例外を投げる（DEC-20）。
+func (a *analyzer) lowerDecoratorBody(j *wiringJob) {
+	ws := &wiringScope{op: j.sym.fqn, params: map[string]*binding{}}
+	ws.unassignedRead = func(b *binding, at source.Span) {
+		a.errorf("WIRE-10", at, "val %s は、まだ、代入が済んでいないので、読めない", b.name).Related = []diag.Related{related(b.span, "宣言")}
+	}
+	for i, p := range j.deco.Params {
+		var span source.Span
+		for _, ap := range j.decoDecl.Params {
+			if ap != nil && ap.Name.Name == p.Name {
+				span = ap.Name.Span
+			}
+		}
+		b := &binding{name: p.Name, typ: unknownType(), span: span, isParam: true, used: true, target: Target{Kind: TargetDecoratorParam, Decl: j.sym.fqn, Name: p.Name, Span: span}}
+		switch pt := p.Type.(type) {
+		case ir.TypeParam:
+			switch {
+			case p.Rest:
+				b.unusable = "残りの引数"
+			case len(pt.Types) != 1:
+				b.unusable = "型を二つ以上書いた引数"
+			default:
+				t := pt.Types[0]
+				if p.Optional {
+					if _, already := t.(ir.OptionalType); !already {
+						t = ir.OptionalType{Of: t}
+					}
+				}
+				b.typ = valueType(t)
+			}
+		default:
+			b.unusable = "any <種類> の引数"
+		}
+		_ = i
+		ws.params[p.Name] = b
+	}
+	w := &wiring{job: j, scope: ws, sc: &scope{ns: j.sym.ns, wiring: ws}, vsc: &scope{ns: j.sym.ns, wiring: ws, values: true}, vals: map[ir.Span]*binding{}}
+	body := &ir.Wiring{}
+	body.Statements = a.lowerBlock(w, j.decoDecl.Body.Stmts)
+	a.checkWIRE8(ws)
+	a.fillVals(w, body.Statements)
+	j.deco.Body = body
+	a.checkDEC20(j, body.Statements)
+}
+
+// proceedCount は、文の並びを通る道ごとの、proceed() の回数の集まり（0、1、2 以上は 2）。例外を投げて終わる道
+// （throw のアーム、すべてのアームが返らない match）は、数えない。done は、その並びが、必ず、返らずに終わるか。
+func proceedCounts(stmts []ir.Statement) (counts map[int]bool, done bool) {
+	counts = map[int]bool{0: true}
+	add := func(next map[int]bool) {
+		out := map[int]bool{}
+		for a := range counts {
+			for b := range next {
+				n := a + b
+				if n > 2 {
+					n = 2
+				}
+				out[n] = true
+			}
+		}
+		counts = out
+	}
+	for _, st := range stmts {
+		expr, ok := ir.StatementExpr(st)
+		if !ok {
+			continue
+		}
+		switch e := expr.(type) {
+		case ir.CallExpr:
+			if e.Call.IsProceed() {
+				add(map[int]bool{1: true})
+			}
+		case ir.MatchExpr:
+			next := map[int]bool{}
+			for _, arm := range e.Match.Arms {
+				switch body := arm.Body.(type) {
+				case ir.ThrowBody:
+					// 投げて終わる道
+				case ir.CallExpr:
+					if body.Call.IsProceed() {
+						next[1] = true
+					} else {
+						next[0] = true
+					}
+				default:
+					next[0] = true
+				}
+			}
+			if len(next) == 0 {
+				return counts, true
+			}
+			add(next)
+		}
+	}
+	return counts, false
+}
+
+// checkDEC20 は DEC-20（docs/check.md「デコレータ」）: デコレータの本体に、proceed() を、ちょうど一度呼ばずに終わる道がある。
+// never を返す op の呼び出しで終わる道は、ここでは見分けない（投げて終わる道として数えるのは、throw のアームだけ）。
+func (a *analyzer) checkDEC20(j *wiringJob, stmts []ir.Statement) {
+	counts, done := proceedCounts(stmts)
+	if done {
+		return
+	}
+	switch {
+	case counts[0] && len(counts) == 1:
+		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体は、proceed() を呼ばない。どの道も、proceed() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn)
+	case counts[0]:
+		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体に、proceed() を呼ばずに終わる道がある。どの道も、proceed() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn)
+	case counts[2]:
+		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体に、proceed() を二度以上呼ぶ道がある。どの道も、proceed() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn)
+	}
 }
 
 // lowerBlock は、ブロック一つの文の並び。名前の枠を一つ足し、抜けるときに WIRE-12 を見る。
@@ -606,6 +732,10 @@ func (a *analyzer) lowerFor(w *wiring, s *ast.ForStmt) (ir.Statement, bool) {
 // lowerReturn は `return 式;`。WIRE-3（void の op に return、最後以外の行の return）、WIRE-2（値がない）、TYPE-3（returns に渡せない）。
 // 「返らない」式は、どの型の return にも書ける（docs/types.md「式の型」）。
 func (a *analyzer) lowerReturn(w *wiring, s *ast.ReturnStmt, last bool) (ir.Statement, bool) {
+	if w.job.deco != nil {
+		a.errorf("DEC-21", s.Span, "デコレータの本体に return は書けない。包んだ op の結果が、そのまま、呼び元に返る")
+		return nil, false
+	}
 	op := w.job.op
 	if op.Returns == nil {
 		a.errorf("WIRE-3", s.Span, "op %s は値を返さないので return を書けない", op.Name)
@@ -670,6 +800,23 @@ type callTarget struct {
 // （docs/check.md「bind」が、op の呼び出しにだけ埋める）。
 func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, ir.Call, bool) {
 	call := ir.Call{Span: a.irSpan(c.Span)}
+	if len(c.Callee.Segments) == 1 && c.Callee.Segments[0].Name == "proceed" {
+		if w.job.deco != nil {
+			// デコレータの本体の proceed(): 包んだ op の中身（docs/grammar.md「デコレータの本体」）
+			call.Callee = ir.ProceedCallee{}
+			if len(c.Args) > 0 {
+				a.errorf("DEC-19", c.Args[0].NodeSpan(), "proceed() に、引数は書かない。包んだ op は、呼ばれたときの引数のまま、動く")
+			}
+			if w.depth > 0 {
+				a.errorf("DEC-19", c.Span, "proceed() は、for と disjoint の中には書けない。書けるのは、本体のいちばん外の文と、その match のアームの本体")
+			}
+			return noValue(), call, true
+		}
+		if _, rerr := a.resolveName(c.Callee, &scope{ns: w.sc.ns}, acCallPos); rerr != nil {
+			a.errorf("DEC-19", c.Span, "proceed() は、デコレータの本体（decorator fn 名前(…) { … }）の中でだけ書ける")
+			return unknownType(), call, false
+		}
+	}
 	args := a.evalArgs(w, c.Args)
 	r, ok := a.resolve(c.Callee, w.sc, acCallPos)
 	if !ok {

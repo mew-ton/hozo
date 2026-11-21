@@ -51,17 +51,6 @@ export type DecidedBy = "type" | "predicate";
  * 分類の対象（docs/ir.md「classify」の subject）。kind で分ける。
  */
 export type ClassifySubject = TypeSubject | OpSubject | StatesSubject;
-export type CatchMode = "recovers" | "halts" | "ignores";
-export type EffectRef = NamedEffect | DirectEffect;
-/**
- * デコレータの引数の型（docs/ir.md「decorator」の ParamType）。
- */
-export type ParamType = TypeParam | AnyParam;
-export type AnyOf = "exception" | "effect" | "state" | "op" | "model" | "variant";
-export type ReadRef = NamedRead | DirectRead;
-export type DecoratorTarget =
-  "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read";
-export type RelationKind = "prevents" | "keeps";
 /**
  * 配線の文（docs/ir.md「配線」）。kind で分ける。
  */
@@ -75,7 +64,8 @@ export type Expr = CallExpr | MatchExpr | AtomExpr;
  * 式の葉（docs/ir.md「配線」）。kind で分ける。
  */
 export type Atom = NameAtom | StateAtom | LiteralAtom | NoneAtom | RecordAtom;
-export type Callee = OpCallee | ReadCallee | EffectCallee;
+export type Callee = OpCallee | ReadCallee | EffectCallee | ProceedCallee;
+export type EffectRef = NamedEffect | DirectEffect;
 /**
  * match のアームの本体（docs/ir.md「配線」）。call、atom、none、throw のどれか。
  */
@@ -84,6 +74,16 @@ export type ArmBody = CallExpr | AtomExpr | NoneBody | ThrowBody;
  * match の対象（docs/ir.md「配線」の Match の subject）。kind で分ける。
  */
 export type MatchSubject = ValueSubject | ClassifyOwnedSubject;
+export type CatchMode = "recovers" | "halts" | "ignores";
+/**
+ * デコレータの引数の型（docs/ir.md「decorator」の ParamType）。
+ */
+export type ParamType = TypeParam | AnyParam;
+export type AnyOf = "exception" | "effect" | "state" | "op" | "model" | "variant";
+export type ReadRef = NamedRead | DirectRead;
+export type DecoratorTarget =
+  "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read";
+export type RelationKind = "prevents" | "keeps";
 export type EffectState = "prevented" | "kept" | "unknown";
 
 /**
@@ -92,7 +92,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.17";
+  version: "0.18";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -486,12 +486,14 @@ export interface StatesSubject {
  */
 export interface Decorator {
   alias?: DecoratorAlias;
+  body?: Wiring;
   caseTargets: CaseKind[];
   catches: CatchesClause[];
   decorators: Application[];
   description?: Doc;
   effects: EffectRef[];
   external: boolean;
+  fn: boolean;
   kind: "decorator";
   name: string;
   params: Param[];
@@ -507,99 +509,6 @@ export interface Decorator {
 export interface DecoratorAlias {
   args: Arg[];
   target: string;
-}
-export interface CaseKind {
-  classify?: string;
-  subject?: Type;
-}
-/**
- * catches の一節（docs/ir.md「decorator」）。
- */
-export interface CatchesClause {
-  exceptions: string[];
-  halts?: string;
-  mode: CatchMode;
-}
-export interface NamedEffect {
-  effect: string;
-  kind: "named";
-}
-export interface DirectEffect {
-  kind: "direct";
-  operation: Operation;
-  state: string;
-}
-/**
- * デコレータの引数（docs/ir.md「decorator」の Param）。
- */
-export interface Param {
-  name: string;
-  optional: boolean;
-  rest: boolean;
-  type: ParamType;
-}
-/**
- * 型で受ける引数（docs/ir.md「decorator」の ParamType kind "type"）。
- */
-export interface TypeParam {
-  kind: "type";
-  types: Type[];
-}
-/**
- * `any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind "any"）。
- */
-export interface AnyParam {
-  case?: CaseKind;
-  kind: "any";
-  of: AnyOf;
-  on?: EffectOn;
-}
-/**
- * `any effect on <state>.<operation>` の制約（docs/ir.md「decorator」）。
- */
-export interface EffectOn {
-  operation: Operation;
-  state: string;
-}
-export interface NamedRead {
-  kind: "named";
-  read: string;
-}
-export interface DirectRead {
-  kind: "direct";
-  state: string;
-}
-/**
- * throws の一節（docs/ir.md「decorator」）。exceptions はデコレータの引数名なら "$param:名前"。
- */
-export interface ThrowsClause {
-  exceptions: string[];
-  relations: Relation[];
-}
-/**
- * 例外が効果に及ぼす関係（docs/ir.md「decorator」）。目的語は常にその op のすべての効果（`effects`）。
- */
-export interface Relation {
-  kind: RelationKind;
-}
-/**
- * op 宣言（docs/ir.md「op」）。returns の null は void、never は決して返さない op。body の null は葉。
- */
-export interface Op {
-  body: Wiring | null;
-  carried: Carried;
-  decorators: Application[];
-  description?: Doc;
-  effects: EffectRef[];
-  exported: boolean;
-  kind: "op";
-  name: string;
-  params: OpParam[];
-  reads: ReadRef[];
-  returns: Type | null;
-  signature: Signature;
-  span: Span;
-  throws: ThrowsClause[];
 }
 /**
  * op の本体（docs/ir.md「配線」）。
@@ -685,6 +594,18 @@ export interface ReadCallee {
 export interface EffectCallee {
   effect: EffectRef;
   kind: "effect";
+}
+export interface NamedEffect {
+  effect: string;
+  kind: "named";
+}
+export interface DirectEffect {
+  kind: "direct";
+  operation: Operation;
+  state: string;
+}
+export interface ProceedCallee {
+  kind: "proceed";
 }
 export interface MatchExpr {
   kind: "match";
@@ -794,6 +715,90 @@ export interface ForStmt {
   var: string;
   varType: Type;
 }
+export interface CaseKind {
+  classify?: string;
+  subject?: Type;
+}
+/**
+ * catches の一節（docs/ir.md「decorator」）。
+ */
+export interface CatchesClause {
+  exceptions: string[];
+  halts?: string;
+  mode: CatchMode;
+}
+/**
+ * デコレータの引数（docs/ir.md「decorator」の Param）。
+ */
+export interface Param {
+  name: string;
+  optional: boolean;
+  rest: boolean;
+  type: ParamType;
+}
+/**
+ * 型で受ける引数（docs/ir.md「decorator」の ParamType kind "type"）。
+ */
+export interface TypeParam {
+  kind: "type";
+  types: Type[];
+}
+/**
+ * `any exception` のように宣言の参照で受ける引数（docs/ir.md「decorator」の ParamType kind "any"）。
+ */
+export interface AnyParam {
+  case?: CaseKind;
+  kind: "any";
+  of: AnyOf;
+  on?: EffectOn;
+}
+/**
+ * `any effect on <state>.<operation>` の制約（docs/ir.md「decorator」）。
+ */
+export interface EffectOn {
+  operation: Operation;
+  state: string;
+}
+export interface NamedRead {
+  kind: "named";
+  read: string;
+}
+export interface DirectRead {
+  kind: "direct";
+  state: string;
+}
+/**
+ * throws の一節（docs/ir.md「decorator」）。exceptions はデコレータの引数名なら "$param:名前"。
+ */
+export interface ThrowsClause {
+  exceptions: string[];
+  relations: Relation[];
+}
+/**
+ * 例外が効果に及ぼす関係（docs/ir.md「decorator」）。目的語は常にその op のすべての効果（`effects`）。
+ */
+export interface Relation {
+  kind: RelationKind;
+}
+/**
+ * op 宣言（docs/ir.md「op」）。returns の null は void、never は決して返さない op。body の null は葉。
+ */
+export interface Op {
+  body: Wiring | null;
+  carried: Carried;
+  decorators: Application[];
+  description?: Doc;
+  effects: EffectRef[];
+  exported: boolean;
+  kind: "op";
+  name: string;
+  params: OpParam[];
+  reads: ReadRef[];
+  returns: Type | null;
+  signature: Signature;
+  span: Span;
+  throws: ThrowsClause[];
+}
 export interface Carried {
   effects: EffectRef[];
   reads: ReadRef[];
@@ -837,7 +842,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.17";
+  version: "0.18";
   viewer: string;
 }
 /**

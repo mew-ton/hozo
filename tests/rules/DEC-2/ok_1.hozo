@@ -1,14 +1,14 @@
-// DEC-2（docs/check.md「デコレータ」）: op を含む targets なら throws / catches / reads / effects を持てる。
-// 節を持たなければ、op を含まない targets でよい（対象 effect を含む）
+// DEC-2（docs/check.md「デコレータ」。文法で閉じる）: 節（throws / catches / reads / effects）を持てるのは、
+// 関数に付けるデコレータ（decorator fn）だけ。for で付ける先を書いたデコレータは、節を持たない（op を含む並びでも）
 namespace a {
   exception E;
   state s: list<string>;
   effect fn e(): effects s.post;
-  decorator ok for op, field throws E;
-  decorator ok2 throws E;
-  decorator ok3(table: any state) for op reads table;
-  decorator ok4(...targets: any effect) effects targets;
-  decorator ok5 for effect, op reads s effects e;
+  decorator ok for op, field;
+  decorator fn ok2(): throws E;
+  decorator fn ok3(table: any state): reads table;
+  decorator fn ok4(...targets: any effect): effects targets;
+  decorator ok5 for effect, op;
   decorator ok6 for effect;
   fn f();
 }

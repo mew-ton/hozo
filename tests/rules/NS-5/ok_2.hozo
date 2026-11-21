@@ -5,7 +5,7 @@ namespace a {
   scalar Token extends string;
   state token: nullable<Token>;
   bind token to b.*;
-  decorator fallback(target: any op);
+  decorator fn fallback(target: any op);
   decorator toOpen = fallback(b.open);
   fn local();
   // 対象にすることは呼び出しではない

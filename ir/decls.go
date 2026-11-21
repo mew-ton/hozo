@@ -577,7 +577,10 @@ const (
 type Decorator struct {
 	DeclBase
 	Params []Param `json:"params"`
-	// Targets は対象。表面で省略されていれば ["op"]（正規化の側が埋める）。
+	// Fn は、関数に付けるデコレータ（`decorator fn`。docs/grammar.md「decorator の宣言」）か。真なら Targets は ["op"]。
+	// 節（Throws / Catches / Reads / Effects）と Body を持てるのは、Fn が真の宣言だけ。
+	Fn bool `json:"fn"`
+	// Targets は対象。`decorator fn` なら ["op"]（正規化の側が埋める）。
 	Targets []DecoratorTarget `json:"targets"`
 	// CaseTargets は、Targets の "case" ごとの絞り（書かれた順）。なければ空（JSON では []）。
 	CaseTargets []CaseKind `json:"caseTargets"`
@@ -593,6 +596,10 @@ type Decorator struct {
 	Reads []ReadRef `json:"reads"`
 	// Effects は `effects` の節の要素（同じ。ユニオンは展開済み）。any effect の引数は [NamedEffect] の Effect に "$param:名前"。
 	Effects []EffectRef `json:"effects"`
+	// Body は、デコレータの本体（docs/grammar.md「デコレータの本体」）。本体のない宣言は nil。
+	// 文は op の配線と同じ形で、包んだ op の中身を呼ぶ所は、Callee が [ProceedCallee] の呼び出し。
+	// 値の型の引数（Param）は、[NameAtom] の Path の頭の名前で読む。
+	Body *Wiring `json:"body,omitempty"`
 	// Alias は名前付きデコレータの記録。
 	Alias *DecoratorAlias `json:"alias,omitempty"`
 }

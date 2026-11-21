@@ -1,0 +1,9 @@
+// DEC-21（docs/check.md「デコレータ」）: デコレータの本体に return は書けない
+namespace a {
+  fn label(): string;
+  decorator fn d() {
+    proceed();
+    return label();                        // ERROR: DEC-21
+  }
+  fn f(): string;
+}

@@ -24,7 +24,7 @@ namespace app {
   }
   exception Bad;
   /** 印。付いた op は純粋でなくなる */
-  decorator mark;
+  decorator fn mark();
 
   /** 今の画面 */
   state stage: single<Page>;

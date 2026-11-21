@@ -6,7 +6,7 @@ namespace a {
 }
 namespace b {
   exception X;
-  decorator haltOnX catches X halts a.e;
+  decorator fn haltOnX(): catches X halts a.e;
   fn leaf(): throws X;
   @haltOnX                             // ERROR: STATE-2
   fn g() {

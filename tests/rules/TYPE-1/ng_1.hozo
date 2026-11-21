@@ -12,7 +12,7 @@ namespace a {
   fn h(): void {
     send({ email: "a@b" });            // ERROR: TYPE-4
   }
-  decorator d(e: Email);
+  decorator fn d(e: Email);
   @d("x")                              // ERROR: TYPE-1
   fn j(): void;
   fn k(s: string): void {

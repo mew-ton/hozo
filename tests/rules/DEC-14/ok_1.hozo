@@ -2,6 +2,6 @@
 namespace a {
   exception E;
   @external
-  decorator boundary throws E;
+  decorator fn boundary(): throws E;
   fn f();
 }

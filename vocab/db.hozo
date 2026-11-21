@@ -44,5 +44,5 @@ namespace db {
   decorator conflict(error: any exception) for effect;
 
   /** この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない */
-  decorator transaction for op;
+  decorator fn transaction();
 }

@@ -1,0 +1,87 @@
+// docs/plugin-go.md「本体のあるデコレータ」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+
+/** テストの語彙 */
+namespace t {
+  /** 継ぎ目を要る（go-trace）。本体のあるデコレータと、重ねる */
+  decorator fn traced();
+}
+
+/** 本体のあるデコレータを宣言する名前空間 */
+namespace gate {
+  /** 閉まっている */
+  exception Closed;
+  model Ticket { ok: boolean; }
+  /** 通してよいか（述語で決まる分類） */
+  classify Gate of Ticket { Open; Shut; }
+  /** 今の切符（人が書く） */
+  export fn ticket(): Ticket;
+  /** 記録する（人が書く） */
+  export fn note(label: string, times: int, memo: string?);
+  /** 内部の op（別の名前空間に付けるデコレータの本体からは、呼べない） */
+  fn local();
+
+  // 前で確かめる。proceed() は、最後の文の match のアーム: return <内側の呼び出し>。別の名前空間の op にも付けられる
+  // （本体が呼ぶのは、export の op だけ）。分類 Gate の述語は、付けた先の New が受け取る
+  /** 閉まっていれば、op の中身を呼ばずに Closed */
+  decorator fn guarded() {
+    val now = ticket();
+    match (now by Gate) {
+      Open => proceed();
+      Shut => throw Closed;
+    }
+  }
+
+  // 後で記録する。proceed() の後ろに文が続く: 値を返す op では、結果を result に受けて、最後に返す。値の引数は、
+  // 適用に書いたリテラルを、その場に書く。渡されていない省略可能な引数は nil
+  /** op の中身が、正常に終わった後に、記録する */
+  decorator fn noted(label: string, times: int, memo: string?) {
+    proceed();
+    note(label, times, memo);
+  }
+
+  // 宣言した名前空間の op に付けるなら、内部の op も呼べる
+  /** 前に、内部の op を呼ぶ */
+  decorator fn prepared() {
+    local();
+    proceed();
+  }
+
+  // 宣言した名前空間の、葉の op に付ける: 中身は Leaves のメソッド（名前は op 名のまま）
+  /** 中を見る（人が書く） */
+  @prepared
+  export fn peek(): Ticket;
+}
+
+/** gate のデコレータを、別の名前空間から付ける */
+namespace shop {
+  model Item { id: string; }
+
+  // 配線の op、値を返す、proceed() が最後: 中身は findBody
+  /** 品物を探す */
+  @gate.guarded
+  export fn find(id: string): Item {
+    return lookup(id);
+  }
+  /** 品物を引く（人が書く） */
+  fn lookup(id: string): Item;
+
+  // 葉の op、値を返す、proceed() の後ろに文: 中身は o.leaves.Save。値の引数のリテラル（省略可能な memo は、渡さない）
+  /** 品物をしまう（人が書く） */
+  @gate.noted("save", 2)
+  export fn save(item: Item): Item;
+
+  // 値を返さない op に、継ぎ目と、本体のあるデコレータ二つを重ねる。書かれた順に、外から内へ:
+  // 継ぎ目 t.traced → gate.guarded → gate.noted → 中身
+  /** 店を開ける（人が書く） */
+  @t.traced @gate.guarded @gate.noted("open", 1, "朝")
+  export fn open();
+
+  // 本体のあるデコレータの内側に、継ぎ目: proceed() が、継ぎ目を呼ぶ
+  /** 店を閉める */
+  @gate.guarded @t.traced
+  export fn close() {
+    sweep();
+  }
+  /** 掃除する（人が書く） */
+  fn sweep();
+}

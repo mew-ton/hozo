@@ -1,5 +1,5 @@
 {
-  "version": "0.17",
+  "version": "0.18",
   "namespaces": [
     {
       "name": "",
@@ -240,6 +240,7 @@
             }
           },
           "params": [],
+          "fn": false,
           "targets": [
             "field"
           ],
@@ -1432,7 +1433,7 @@
             },
             "end": {
               "line": 56,
-              "col": 51
+              "col": 55
             }
           },
           "params": [
@@ -1451,6 +1452,7 @@
               "rest": false
             }
           ],
+          "fn": true,
           "targets": [
             "op"
           ],
@@ -1481,7 +1483,7 @@
             },
             "end": {
               "line": 57,
-              "col": 98
+              "col": 88
             }
           },
           "params": [
@@ -1504,9 +1506,9 @@
               "rest": false
             }
           ],
+          "fn": true,
           "targets": [
-            "op",
-            "field"
+            "op"
           ],
           "caseTargets": [],
           "external": false,
@@ -1539,6 +1541,7 @@
             }
           },
           "params": [],
+          "fn": false,
           "targets": [],
           "caseTargets": [],
           "external": false,
@@ -1583,7 +1586,7 @@
             },
             "end": {
               "line": 59,
-              "col": 52
+              "col": 55
             }
           },
           "params": [
@@ -1619,6 +1622,7 @@
               "rest": false
             }
           ],
+          "fn": true,
           "targets": [
             "op"
           ],
@@ -1665,6 +1669,7 @@
               "rest": false
             }
           ],
+          "fn": false,
           "targets": [
             "model"
           ],
@@ -4487,6 +4492,7 @@
               "rest": false
             }
           ],
+          "fn": false,
           "targets": [
             "state"
           ],
@@ -4514,6 +4520,7 @@
             }
           },
           "params": [],
+          "fn": false,
           "targets": [
             "field"
           ],
@@ -4537,7 +4544,7 @@
             },
             "end": {
               "line": 9,
-              "col": 71
+              "col": 68
             }
           },
           "params": [
@@ -4565,6 +4572,7 @@
               "rest": false
             }
           ],
+          "fn": true,
           "targets": [
             "op"
           ],
@@ -4593,7 +4601,7 @@
             },
             "end": {
               "line": 10,
-              "col": 72
+              "col": 69
             }
           },
           "params": [
@@ -4621,6 +4629,7 @@
               "rest": false
             }
           ],
+          "fn": true,
           "targets": [
             "op"
           ],
@@ -4663,6 +4672,7 @@
               "rest": false
             }
           ],
+          "fn": false,
           "targets": [
             "effect"
           ],
@@ -4686,7 +4696,7 @@
             },
             "end": {
               "line": 12,
-              "col": 68
+              "col": 65
             }
           },
           "params": [
@@ -4700,6 +4710,7 @@
               "rest": true
             }
           ],
+          "fn": true,
           "targets": [
             "op"
           ],
@@ -4728,7 +4739,7 @@
             },
             "end": {
               "line": 13,
-              "col": 96
+              "col": 93
             }
           },
           "params": [
@@ -4742,6 +4753,7 @@
               "rest": false
             }
           ],
+          "fn": true,
           "targets": [
             "op"
           ],
@@ -4828,6 +4840,7 @@
               "rest": true
             }
           ],
+          "fn": false,
           "targets": [
             "op",
             "effect"
@@ -4856,6 +4869,7 @@
             }
           },
           "params": [],
+          "fn": false,
           "targets": [],
           "caseTargets": [],
           "external": false,
@@ -6096,6 +6110,7 @@
               "rest": false
             }
           ],
+          "fn": false,
           "targets": [
             "read"
           ],
@@ -6156,6 +6171,7 @@
               "rest": false
             }
           ],
+          "fn": false,
           "targets": [
             "read"
           ],
@@ -6202,6 +6218,7 @@
               "rest": false
             }
           ],
+          "fn": true,
           "targets": [
             "op"
           ],

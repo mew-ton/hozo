@@ -5,8 +5,8 @@ namespace a {
   state users: list<string>;
   state token: nullable<string>;
   read fn first(): string? reads users;
-  decorator counting(table: any state) for op reads table;
-  decorator peeking for op reads first, token;
+  decorator fn counting(table: any state): reads table;
+  decorator fn peeking(): reads first, token;
   @counting(users)
   export fn count(): int;
   @peeking

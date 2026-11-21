@@ -6,9 +6,9 @@ namespace a {
   @repeatable
   decorator where(column: string, value: string | int | float | boolean) for read;
   @external @repeatable
-  decorator viaNetwork(host: string) throws Offline;
+  decorator fn viaNetwork(host: string): throws Offline;
   @repeatable @external
-  decorator viaProxy(host: string) throws Offline;
+  decorator fn viaProxy(host: string): throws Offline;
   @where("kind", "a") @where("size", 1) @where("ratio", 0.5) @where("open", true)
   read fn some(): M[] reads rows;
   @viaNetwork("a") @viaProxy("p") @viaNetwork("b")

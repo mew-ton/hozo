@@ -15,7 +15,7 @@ namespace a {
   fn i(e: Email): void {
     send(e);
   }
-  decorator d(e: Email);
+  decorator fn d(e: Email);
   @d("x")                              // ERROR: TYPE-1
   fn j(): void;
   fn k(s: string): void {

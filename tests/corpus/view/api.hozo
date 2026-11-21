@@ -80,8 +80,8 @@ namespace api {
   // docs/check.md「計算」手順 i の throws（DEC-10）: external の例外は、境界の外（web）から見たときだけ Sig に入る
   /** ネットワーク越しに呼ぶ */
   @external
-  decorator remote throws Timeout;
-  decorator requiresAuth throws Unauthorized prevents effects;
+  decorator fn remote(): throws Timeout;
+  decorator fn requiresAuth(): throws Unauthorized prevents effects;
 
   // docs/check.md「bind」4: web.token の位置は model の中の Token?（path ["in", "token"]）。id は呼び出し側が渡す
   model GetUserInput { token: Token?; id: UserId; }
@@ -228,9 +228,9 @@ namespace api {
   // docs/ir.md「decorator」: reads / effects の節（引数名は `$param:名前`。効果のユニオンは展開）、残りの引数（Param.rest）、
   // 対象 effect。docs/grammar.md「識別子」: 予約語のデコレータ名（宣言、適用、別名の先、@see）
   /** 表から、列が引数の値と同じ一行を引く */
-  decorator find(table: any state, column: string?) for op reads table;
+  decorator fn find(table: any state, column: string?): reads table;
   /** 並べた効果を、書いた順に行う */
-  decorator effects(...targets: any effect) for op effects targets reads sessions;
+  decorator fn effects(...targets: any effect): effects targets reads sessions;
   /** この効果が書く表 */
   decorator into(table: any state) for effect;
   // docs/ir.md「正規化」: 名前付きデコレータの固定した引数も、残りの引数は list の Arg 一つ

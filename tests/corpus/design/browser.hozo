@@ -53,12 +53,12 @@ namespace browser {
   exception OfflineCacheMiss;
 
   // 条件付きの回復: 回復できなかった場合は別の名前の例外にする
-  decorator fallbackToCache
+  decorator fn fallbackToCache():
     catches http.NetworkError recovers
     throws OfflineCacheMiss;
 
   // 結果を見ない呼び出し（ログアウトの依頼など）
-  decorator ignoreFailure
+  decorator fn ignoreFailure():
     catches http.NetworkError, http.ServerError ignores;
 
   // ---- §9 配線（browser 側） ----

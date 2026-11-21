@@ -10,7 +10,7 @@ namespace a {
   exception Busy(wait: duration);
   @valid.min(1)
   scalar PosInt extends int;
-  decorator onlyOp;
+  decorator fn onlyOp();
   decorator forField for field;
   decorator forEffect for effect;
   decorator opOrEffect for op, effect;

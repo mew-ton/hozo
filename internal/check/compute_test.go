@@ -902,3 +902,62 @@ func TestSigHaltsThrows(t *testing.T) {
 		t.Errorf("rel(Z, e1) = %s, want unknown", got)
 	}
 }
+
+// TestSigDecoratorBody は、本体のあるデコレータ（docs/check.md「デコレータの本体」）: 付けた op は、その配線が、自分で、
+// proceed() の前後の呼び出しを書いたのと、同じに計算する。proceed() より前の throw は、op の効果を「起きていない」にし、
+// proceed() より後の呼び出しが投げる例外には、op の効果が「起きている」。
+func TestSigDecoratorBody(t *testing.T) {
+	proceed := ir.Call{Callee: ir.ProceedCallee{}}
+	// guard: 前で確かめる。match (…) { Open => proceed(); Closed => throw X; }
+	guard := decorator("server.guard")
+	guard.Fn = true
+	guard.Body = &ir.Wiring{Statements: []ir.Statement{
+		matchStmt("server.Gate", arm(&proceed, "Open"), throwArm("server.X", "Closed")),
+	}}
+	// audit: 後で記録する。proceed(); record();（record は、効果 e2 を持ち、Y を投げうる葉）
+	audit := decorator("server.audit")
+	audit.Fn = true
+	audit.Body = &ir.Wiring{Statements: []ir.Statement{cs(proceed), cs(call("server.record"))}}
+	record := leaf("server.record", nil)
+	record.Effects = ir.NamedEffects("server.e2")
+	record.Throws = []ir.ThrowsClause{throws([]string{"server.Y"}, prevents())}
+	work := leaf("server.work", nil)
+	work.Effects = ir.NamedEffects("server.e1")
+	work.Throws = []ir.ThrowsClause{throws([]string{"server.Z"}, prevents())}
+	o := wire("server.op", nil, nil, cs(call("server.work")))
+	o.Decorators = []ir.Application{app("server.guard"), app("server.audit")}
+	p := serverWith(guard, audit, record, work, o)
+	Compute(p)
+	sig := sigOf(t, p, "server.op")
+	wantStrings(t, "E", sig.Exceptions, []string{"server.Z", "server.Y", "server.X"})
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1", "server.e2"})
+	for _, tt := range []struct {
+		x    string
+		e    string
+		want ir.EffectState
+	}{
+		{"server.X", "server.e1", ir.Prevented}, // guard が、proceed() より前に投げる: op の効果は、起きていない
+		{"server.X", "server.e2", ir.Prevented},
+		{"server.Z", "server.e1", ir.Prevented}, // work が投げる: work の効果は、起きていない
+		{"server.Z", "server.e2", ir.Prevented}, // audit の record は、proceed() の後: まだ、起きていない
+		{"server.Y", "server.e1", ir.Kept},      // record が投げる: proceed() は、済んでいる
+		{"server.Y", "server.e2", ir.Prevented},
+	} {
+		if got := relOf(t, sig, tt.x, tt.e); got != tt.want {
+			t.Errorf("rel(%s, %s) = %s, want %s", tt.x, tt.e, got, tt.want)
+		}
+	}
+	// 本体のないデコレータと同じ op に付けても、本体のある側だけが、広がる
+	plain := decorator("server.plain")
+	plain.Fn = true
+	plain.Throws = []ir.ThrowsClause{throws([]string{"server.W"}, prevents())}
+	o2 := wire("server.op2", nil, nil, cs(call("server.work")))
+	o2.Decorators = []ir.Application{app("server.plain"), app("server.audit")}
+	p = serverWith(plain, audit, record, work, o2)
+	Compute(p)
+	sig = sigOf(t, p, "server.op2")
+	wantStrings(t, "E", sig.Exceptions, []string{"server.Z", "server.Y", "server.W"})
+	if got := relOf(t, sig, "server.W", "server.e1"); got != ir.Prevented {
+		t.Errorf("rel(W, e1) = %s, want prevented（外側の、本体のないデコレータの節）", got)
+	}
+}

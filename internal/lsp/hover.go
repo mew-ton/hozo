@@ -386,6 +386,18 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 	if d.Repeatable {
 		b.WriteString("@repeatable ")
 	}
+	if d.Fn {
+		// 関数に付けるデコレータ: decorator fn 名前(引数): 節（docs/grammar.md「decorator の宣言」）。本体は、出さない
+		var ps []string
+		for _, p := range d.Params {
+			ps = append(ps, r.param(p))
+		}
+		b.WriteString("decorator fn " + name + "(" + strings.Join(ps, ", ") + ")")
+		if clauses := r.decoratorClauses(d); clauses != "" {
+			b.WriteString(":" + clauses)
+		}
+		return b.String()
+	}
 	b.WriteString("decorator " + name)
 	if len(d.Params) > 0 {
 		var ps []string
@@ -394,7 +406,7 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 		}
 		b.WriteString("(" + strings.Join(ps, ", ") + ")")
 	}
-	if !(len(d.Targets) == 1 && d.Targets[0] == ir.TargetOp) && len(d.Targets) > 0 {
+	if len(d.Targets) > 0 {
 		var ts []string
 		cases := 0
 		for _, t := range d.Targets {
@@ -408,6 +420,12 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 		}
 		b.WriteString(" for " + strings.Join(ts, ", "))
 	}
+	return b.String()
+}
+
+// decoratorClauses は、decorator fn の節（頭に空白を付けて、書かれた種類の順: throws、catches、reads、effects）。なければ空。
+func (r *renderer) decoratorClauses(d *ir.Decorator) string {
+	var b strings.Builder
 	for _, c := range d.Throws {
 		b.WriteString(" " + r.throwsClause(c))
 	}

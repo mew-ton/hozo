@@ -4,11 +4,11 @@
 /** テストの語彙 */
 namespace t {
   /** stock の入口の印 */
-  decorator stock;
+  decorator fn stock();
   /** shop の API の入口の印 */
-  decorator api;
+  decorator fn api();
   /** shop のバッチの入口の印 */
-  decorator batch;
+  decorator fn batch();
   /** 管理の入口の印 */
-  decorator admin;
+  decorator fn admin();
 }

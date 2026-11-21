@@ -1,6 +1,6 @@
 // DEC-11（docs/types.md「デコレータの引数」）: 位置と名前で渡す。省略可能な引数は省ける
 namespace a {
-  decorator d(code: int, name: string?);
+  decorator fn d(code: int, name: string?);
   @d(1)
   fn ok1(): void;
   @d(name: "x", code: 1)

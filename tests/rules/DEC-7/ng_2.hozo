@@ -4,7 +4,7 @@ namespace a {
   exception F;
   exception G;
   union Errors { E; F; }
-  decorator onError(error: Errors);
+  decorator fn onError(error: Errors);
   @onError(G)                          // ERROR: DEC-7
   fn ng2(): void;
   @onError(E | G)                      // ERROR: DEC-7

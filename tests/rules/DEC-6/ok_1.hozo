@@ -2,6 +2,6 @@
 namespace a {
   exception E;
   exception F;
-  decorator d catches E recovers throws F;
+  decorator fn d(): catches E recovers throws F;
   fn f();
 }

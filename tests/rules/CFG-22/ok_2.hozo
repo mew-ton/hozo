@@ -15,7 +15,7 @@ namespace a {
 }
 namespace b {
   exception E;
-  decorator mark(e: any exception);
+  decorator fn mark(e: any exception);
   export fn g();
   classify Present of string? {
     Some: string? as string;

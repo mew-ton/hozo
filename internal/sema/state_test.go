@@ -458,7 +458,7 @@ namespace a {
   state location: list<string>;
   effect fn go(): effects location.put;
   effect fn leave(): effects location as HasItems -> Empty;
-  decorator nav(target: any effect on location.put);
+  decorator fn nav(target: any effect on location.put);
   @nav(go)
   fn ok(): void;
   @nav(leave)                          // ERROR: DEC-7

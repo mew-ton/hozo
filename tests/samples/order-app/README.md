@@ -424,7 +424,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
   - 待つ、定期的に見直す、がない。→ 同意の通知を待つ間は、客が `onRefresh` を押す。
   - 操作の op が投げた例外が、画面でどうなるかを言う語彙がない。→ `recover(error, then)` を、画面の名前空間ごとに作った。
   - 操作の結果を画面に出すには、それを受け取る葉が要る（`backoffice.seen`、`placedIn`、`sealed`）: 値を返す呼び出しは束縛しなければならず（WIRE-2）、使わない束縛は WIRE-8。
-- **F31 認証を、入口ごとに一行書いた**（`staffApi` の 13 の op の一行目が、`staff.asMaker`、`asPacker`、`asAdmin` のどれか）。デコレータにすれば一語で書ける（`decorator packerOnly for op throws type.Unauthorized, type.Forbidden prevents effects;`）。そうしなかったのは、確かめるために `staff` のセッションを読むことが、仕様から消えるから: 別の名前空間の状態を読むことは、デコレータの `reads` に書けない（READS-1。`docs/check.md`「デコレータが運ぶ reads と effects」）。配線なら、`staff.sessions` が、入口の op の読む状態に現れる。
+- **F31 認証を、入口ごとに一行書いた**（`staffApi` の 13 の op の一行目が、`staff.asMaker`、`asPacker`、`asAdmin` のどれか）。デコレータにすれば一語で書ける（`decorator fn packerOnly(): throws type.Unauthorized, type.Forbidden prevents effects;`）。そうしなかったのは、確かめるために `staff` のセッションを読むことが、仕様から消えるから: 別の名前空間の状態を読むことは、デコレータの `reads` に書けない（READS-1。`docs/check.md`「デコレータが運ぶ reads と effects」）。配線なら、`staff.sessions` が、入口の op の読む状態に現れる。
 - **F32 一つの述語を、二つの担い手が要る。** `shipping.Gathered` をブラウザでも使うと、述語の実装が、二つの言語に要る。分類の結果を、値として運ぶ型はない。→ サーバーが、結果を、値の形で運ぶ（`fulfilment.Station.options` があるか）。
 
 ### 検査器
@@ -588,7 +588,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **(a) 今のまま。** 画面で使う値は、例外ではなく、op の結果で返す。
 - **(b) `halts` の効果に、例外の引数を渡せる。**
   ```ts
-  decorator recover(error: any exception, then: any effect) catches error halts then(error);
+  decorator fn recover(error: any exception, then: any effect): catches error halts then(error);
   // @recover(ordering.TermsChanged, showNewTerms)  →  showNewTerms(terms)
   ```
 - **(c) 配線で、例外を値にできる。**
@@ -657,7 +657,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **(a) 今のまま。** 境界で、名前をそろえない。
 - **(b) 言い換えの節を足す。** 効果の状態は、元の例外のものを引き継ぐ。
   ```ts
-  decorator failsAs(error: any exception) for op catches http.NetworkError, http.ServerError rethrows error;
+  decorator fn failsAs(error: any exception): catches http.NetworkError, http.ServerError rethrows error;
   ```
 
 勧め: **(b)**。入口の応答（`@http.status`）を、相手ごとに決められる。

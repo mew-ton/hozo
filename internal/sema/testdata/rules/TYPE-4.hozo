@@ -27,11 +27,11 @@ namespace a {
   fn j(): void {
     takeInt(none);                     // ERROR: TYPE-4
   }
-  decorator d(n: int | float);
+  decorator fn d(n: int | float);
   @d(1.5)
   @http.retry("x")                     // ERROR: TYPE-4
   fn k(): void;
-  decorator l(xs: string[]);
+  decorator fn l(xs: string[]);
   @l(["a", 1])                         // ERROR: TYPE-4
   fn m(): void;
   @l("a")                              // ERROR: TYPE-4

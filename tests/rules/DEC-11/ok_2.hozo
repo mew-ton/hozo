@@ -6,8 +6,8 @@ namespace a {
   effect fn e1(): effects s.post;
   effect fn e2(): effects t.put;
   union Both { e1; e2; }
-  decorator all(...targets: any effect) for op effects targets;
-  decorator some(first: int, second: string?, ...more: string | int);
+  decorator fn all(...targets: any effect): effects targets;
+  decorator fn some(first: int, second: string?, ...more: string | int);
   @all
   fn rest0();
   @all()

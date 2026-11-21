@@ -4,8 +4,8 @@
 namespace a {
   state s: list<string>;
   effect fn e(x: string): effects s.post;
-  decorator doing(...targets: any effect) for op effects targets;
-  decorator posting for op effects s.post;
+  decorator fn doing(...targets: any effect): effects targets;
+  decorator fn posting(): effects s.post;
   export fn own(x: string) { e(x); }
   // 自分の名前空間の配線に付ければ通る
   @doing(e) @posting

@@ -206,6 +206,17 @@ func (ix *index) decorator(fqn string) (*ir.Decorator, []ir.Arg) {
 	return nil, nil
 }
 
+// bodiedDecorators は、o に付いたデコレータのうち、本体のあるもの（Op.decorators の順。名前付きのデコレータは、汎用の側）。
+func (ix *index) bodiedDecorators(o *ir.Op) []*ir.Decorator {
+	var out []*ir.Decorator
+	for _, app := range o.Decorators {
+		if d, _ := ix.decorator(app.Decorator); d != nil && d.Body != nil {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 func (ix *index) model(fqn string) *ir.Model {
 	m, _ := ix.decls[fqn].(*ir.Model)
 	return m

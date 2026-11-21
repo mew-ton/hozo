@@ -32,14 +32,14 @@ namespace web {
   exception Offline;
 
   // docs/ir.md「decorator」: any の引数を節で使う。exceptions / halts は "$param:名前"
-  decorator redirectOn(error: any exception, target: any effect) catches error halts target;
+  decorator fn redirectOn(error: any exception, target: any effect): catches error halts target;
   // docs/ir.md「正規化」: 名前付きデコレータ。適用は decorator "web.redirectOn"、via "web.redirectToLogin"
   decorator redirectToLogin = redirectOn(api.Unauthorized, goLogin);
   // docs/check.md「計算」手順 i の catches: recovers（§8.2。効果が不明なら成功のアームでも不明）と ignores
-  decorator offlineFallback catches api.Timeout recovers throws Offline;
-  decorator ignoreTimeout catches api.Timeout ignores;
+  decorator fn offlineFallback(): catches api.Timeout recovers throws Offline;
+  decorator fn ignoreTimeout(): catches api.Timeout ignores;
   // docs/ir.md「デコレータの適用」: op の引数を値に取る引数は "$param:名前"（docs/resolve.md「手続き」1.3）
-  decorator traced(key: string, within: duration);
+  decorator fn traced(key: string, within: duration);
 
   // docs/ir.md「classify」: 述語で決まる値の分類。二つに分かれる分類も、両側に名前を付ける（docs/check.md「閉じた分類」）
   /** ユーザーの種類 */

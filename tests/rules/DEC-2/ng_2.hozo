@@ -1,6 +1,6 @@
-// DEC-2（docs/check.md「デコレータ」）: targets に op を含まない宣言が catches を持つ
+// DEC-2（docs/check.md「デコレータ」。文法で閉じる）: targets に op を含まない宣言が catches を持つ
 namespace a {
   exception E;
-  decorator c for state, scalar catches E ignores; // ERROR: DEC-2
+  decorator c for state, scalar catches E ignores; // ERROR: SYNTAX
   fn f();
 }

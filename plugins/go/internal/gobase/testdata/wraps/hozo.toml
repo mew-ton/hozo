@@ -1,0 +1,15 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「本体のあるデコレータ」の各行。
+[hozo]
+plugin_dirs = ["plugins"]
+
+# 1: gate。本体のあるデコレータを宣言する名前空間。自分の op にも付ける
+[[emit]]
+namespace   = "gate"
+transpilers = ["go"]
+out         = "gen/gate"
+
+# 2: shop。gate のデコレータを、別の名前空間から付ける。単位の継ぎ目は t.traced（go-trace）
+[[emit]]
+namespace   = "shop"
+transpilers = ["go", "go-trace"]
+out         = "gen/shop"

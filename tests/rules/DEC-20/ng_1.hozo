@@ -1,0 +1,23 @@
+// DEC-20（docs/check.md「デコレータ」）: デコレータの本体に、proceed() を、ちょうど一度呼ばずに終わる道がある
+namespace a {
+  exception Denied;
+  model Ticket { ok: boolean; }
+  fn ticket(): Ticket;
+  classify Gate of Ticket { Open; Closed; }
+  fn record();
+  decorator fn never() {                   // ERROR: DEC-20
+    record();
+  }
+  decorator fn twice() {                   // ERROR: DEC-20
+    proceed();
+    proceed();
+  }
+  decorator fn sometimes() {               // ERROR: DEC-20
+    val t = ticket();
+    match (t by Gate) {
+      Open   => proceed();
+      Closed => record();
+    }
+  }
+  fn f();
+}

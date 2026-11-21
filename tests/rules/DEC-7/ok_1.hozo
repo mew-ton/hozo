@@ -5,8 +5,8 @@ namespace a {
   exception E;
   exception F;
   union Errors { E; F; }
-  decorator onPut(e: any effect on s.put);
-  decorator onError(error: Errors);
+  decorator fn onPut(e: any effect on s.put);
+  decorator fn onError(error: Errors);
   @onPut(put)
   fn ok1(): void;
   @onError(E)

@@ -6,5 +6,5 @@ namespace a {
   fn f(): throws E, F throws E;        // ERROR: REL-1
   fn g(): throws E, Errors;            // ERROR: REL-1
   fn ok(): throws E throws F;
-  decorator d throws E throws E;       // ERROR: REL-1
+  decorator fn d(): throws E throws E;       // ERROR: REL-1
 }

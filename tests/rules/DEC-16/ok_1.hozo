@@ -1,7 +1,7 @@
 // DEC-16（docs/check.md「デコレータ」）: 本体が投げる例外を吸収する
 namespace a {
   exception E;
-  decorator recoverE catches E recovers;
+  decorator fn recoverE(): catches E recovers;
   fn leaf(): throws E;
   @recoverE
   fn wiring() {

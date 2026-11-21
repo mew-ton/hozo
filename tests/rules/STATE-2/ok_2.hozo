@@ -3,7 +3,7 @@ namespace a {
   state s: single<string>;
   effect fn e(): effects s.put;
   exception X;
-  decorator haltOnX catches X halts e;
+  decorator fn haltOnX(): catches X halts e;
   fn leaf(): throws X;
   @haltOnX
   fn g() {

@@ -9,7 +9,7 @@ namespace api {
   model NestedInput { auth: Auth; id: string; }
   model Guest { token: Token?; id: string; }
   /** 印。付いた op は純粋でなくなる */
-  decorator remote;
+  decorator fn remote();
 
   @remote export fn logout(token: Token?);
   @remote export fn get(in: GetInput): string;

@@ -3,5 +3,5 @@
 /** SMTP でメールを送る仕組みの語彙 */
 namespace smtp {
   /** この op は、SMTP のサーバーにメールを送る。付いた op は純粋でなくなる */
-  decorator sendMail for op;
+  decorator fn sendMail();
 }

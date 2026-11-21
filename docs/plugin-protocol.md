@@ -13,7 +13,7 @@
 ```toml
 name     = "go-http"            # プラグインの名前
 command  = ["hozoc-plugin-go-http"]   # 文字列か文字列の配列
-protocol = "0.17"               # 対応する docs/ir.md の version
+protocol = "0.18"               # 対応する docs/ir.md の version
 
 vocabulary = []                 # このプラグインが提供する語彙。マニフェストからの相対パス。省略時は []
 
@@ -116,7 +116,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ```jsonc
 // 要求
-{ "protocol": "0.17", "direction": "emit",
+{ "protocol": "0.18", "direction": "emit",
   "transpiler": "go-http",                // 起動するトランスパイラの名前（マニフェストの [[transpiler]] の name）
   "view": { /* docs/ir.md の View。対象の名前空間は view.viewer、単位の設定は view.config */ } }
 
@@ -140,7 +140,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 ### check
 
 ```jsonc
-{ "protocol": "0.17", "direction": "check", "view": { /* View */ } }
+{ "protocol": "0.18", "direction": "check", "view": { /* View */ } }
 
 { "diagnostics": [ { "severity": "error", "code": "PAGE-1", "message": "...", "at": "browser.openOrders" } ] }
 ```
@@ -154,7 +154,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ```jsonc
 // 要求
-{ "protocol": "0.17", "direction": "coverage",
+{ "protocol": "0.18", "direction": "coverage",
   "coverage": { "path": "/home/me/shop/cover.out", "content": "mode: set\n..." },   // hozoc tests に渡された、カバレッジのファイル
   "files": [ "gen/server/servertest/http.go", "gen/server/servertest/leaves.go" ] } // 実行された行を知りたいファイル
 
@@ -176,7 +176,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 ### import
 
 ```jsonc
-{ "protocol": "0.17", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
+{ "protocol": "0.18", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
 
 { "ir": { /* docs/ir.md の Program */ }, "warnings": [ /* 同上 */ ] }
 ```

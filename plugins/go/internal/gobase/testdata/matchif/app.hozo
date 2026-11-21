@@ -11,7 +11,7 @@ namespace app {
   exception Missing;
   exception Denied;
   /** 印。付いた op は純粋でなくなる */
-  decorator mark;
+  decorator fn mark();
 
   /** 手元のトークン */
   state token: nullable<Token>;

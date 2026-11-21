@@ -6,7 +6,7 @@ namespace a {
   effect fn put(): effects t.put;
   effect fn drain(): effects t as HasItems -> Empty;
   effect fn start(): effects Phase as Idle -> Busy;
-  decorator onPut(e: any effect on t.put);
+  decorator fn onPut(e: any effect on t.put);
   @onPut(put)
   fn ok1(): void;
   @onPut(drain)                        // ERROR: DEC-7

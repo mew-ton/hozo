@@ -11,5 +11,5 @@ namespace a {
     e1();
     check();
   }
-  decorator d throws X prevents effects;
+  decorator fn d(): throws X prevents effects;
 }

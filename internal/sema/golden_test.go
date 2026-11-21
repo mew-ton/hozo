@@ -78,10 +78,10 @@ namespace a {
   classify Kind of User { A; /** B の説明 */ B; /** それ以外 */ C; }
 
   @external
-  decorator get(path: string) throws Unauthorized;
-  decorator fallback(error: any exception, view: any model) for op, field catches error recovers;
+  decorator fn get(path: string): throws Unauthorized;
+  decorator fn fallback(error: any exception, view: any model): catches error recovers;
   decorator unavailable = fallback(AllErrors, User);
-  decorator cache(key: string[], stale: duration?);
+  decorator fn cache(key: string[], stale: duration?);
   decorator tagged(tags: string | int) for model;
 
   /**
@@ -156,11 +156,11 @@ namespace store {
 
   decorator table(element: any model) for state;
   decorator text for field;
-  decorator find(table: any state, column: string) for op reads table;
-  decorator list(table: any state, column: string?) for op reads table;
+  decorator fn find(table: any state, column: string): reads table;
+  decorator fn list(table: any state, column: string?): reads table;
   decorator insert(table: any state) for effect;
-  decorator effects(...targets: any effect) for op effects targets;
-  decorator audited(extra: any state?) for op reads logs, extra reads rows effects Writes, log;
+  decorator fn effects(...targets: any effect): effects targets;
+  decorator fn audited(extra: any state?): reads logs, extra reads rows effects Writes, log;
   decorator tags(first: string, ...more: string | int) for op, effect;
   decorator both = effects(addRow, Writes);
 
@@ -201,7 +201,7 @@ namespace lib {
 
   decorator find(table: any state) for read;
   @repeatable decorator where(column: string, value: string | int) for read;
-  decorator scan(table: any state, via: any state?) for op
+  decorator fn scan(table: any state, via: any state?):
     reads via, table, rowById reads logs
     effects logs.post, touch;
 

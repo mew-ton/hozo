@@ -11,5 +11,5 @@ namespace webhook {
    *
    * @param sender 呼ぶ仕組みの名前（秘密は、動かす環境が持つ）
    */
-  decorator signed(sender: string) for op throws BadSignature prevents effects;
+  decorator fn signed(sender: string): throws BadSignature prevents effects;
 }

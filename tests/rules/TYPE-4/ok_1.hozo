@@ -19,7 +19,7 @@ namespace a {
     val e = email();
     takeString(e);
   }
-  decorator l(xs: string[]);
+  decorator fn l(xs: string[]);
   @l(["a", "b"])
   fn m(): void;
 }

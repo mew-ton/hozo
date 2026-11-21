@@ -33,7 +33,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/business.hozo` | `namespace business { flow }` | 同 366 |
 | `vocab/prd.hozo` | `namespace prd { ref }` | 同 377、378 |
 
-- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator get(path: string) throws ServerError, NetworkError;`。`docs/decisions.md`「設計書から離れた決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
+- 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator fn get(path: string): throws ServerError, NetworkError;`。`docs/decisions.md`「設計書から離れた決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
 - `actor`、`usecase`、`business`、`prd` は、設計書にはない。設計の図（ユースケース図、業務フロー図、要求の文書）から決めたもので、中身は「設計の図の語彙」。
 - `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイルとプラグインの起動）なので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
 - `@http.get` / `@http.post` の `@external` はそのまま写す。
@@ -48,7 +48,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 - `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の語彙」。
 - `http` は、要求のどこから読むかを言うフィールドのデコレータを、出典から変える。中身は「`http` の語彙」。
-- `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator stdio throws Crashed, MalformedOutput;`。節の区切りは `docs/grammar.md`「decorator の宣言」）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
+- `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator fn stdio(): throws Crashed, MalformedOutput;`。節の区切りは `docs/grammar.md`「decorator の宣言」）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
 
 ### `db` の語彙
 
@@ -101,7 +101,7 @@ namespace db {
   decorator conflict(error: any exception) for effect;
 
   /** この op が DB にすることは、すべて、一つのトランザクションで起きる。op が失敗すれば、どれも残らない */
-  decorator transaction for op;
+  decorator fn transaction();
 }
 ```
 
@@ -234,7 +234,7 @@ namespace usecase {
    *
    * @param actors 行う担い手。対象のない分類のケース
    */
-  decorator of(...actors: any case of never) for op;
+  decorator fn of(...actors: any case of never);
 }
 ```
 
@@ -244,7 +244,7 @@ namespace usecase {
 /** 業務フローの語彙（業務フロー図） */
 namespace business {
   /** この op は、業務フロー。操作の op（ユースケース）を、順に行う */
-  decorator flow for op;
+  decorator fn flow();
 }
 ```
 

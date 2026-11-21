@@ -1,7 +1,7 @@
 // NS-5（docs/check.md「export」）: デコレータの引数（any op）に渡した op も「呼ぶ」に当たる。呼ぶ側は、デコレータを
 // 付けた宣言の名前空間（名前付きのデコレータの固定した引数なら、その別名の宣言の名前空間）。位置はその引数の値
 namespace a {
-  decorator fallback(target: any op);
+  decorator fn fallback(target: any op);
   // 別名の宣言は a にあるので、a の内部の op を固定できる。b の内部の op は固定できない
   decorator toLocal = fallback(local);
   decorator toHidden = fallback(b.hidden);       // ERROR: NS-5

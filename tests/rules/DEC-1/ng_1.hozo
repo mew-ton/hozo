@@ -10,13 +10,13 @@ namespace a {
   model N { @http.get("/x") id: string; }   // ERROR: DEC-1
   @db.table
   state okState: list<M>;
-  decorator onlyOp;
+  decorator fn onlyOp();
   @onlyOp                              // ERROR: DEC-1
   effect fn e(): effects s.post;
   @onlyOp                              // ERROR: DEC-1
   classify C of M { A; }
   @onlyOp                              // ERROR: DEC-1
-  decorator other;
+  decorator fn other();
   @onlyOp
   fn ok(): void;
 }

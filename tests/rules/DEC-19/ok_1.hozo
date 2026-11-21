@@ -1,0 +1,28 @@
+// DEC-19: proceed() は、デコレータの本体の、文と、match のアームの本体に書ける。本体の外では、ふつうの名前
+namespace a {
+  exception Denied;
+  model Ticket { ok: boolean; }
+  fn ticket(): Ticket;
+  classify Gate of Ticket { Open; Closed; }
+  fn record();
+  decorator fn audited() {
+    proceed();
+    record();
+  }
+  decorator fn guarded() {
+    val t = ticket();
+    match (t by Gate) {
+      Open   => proceed();
+      Closed => throw Denied;
+    }
+  }
+  @audited @guarded
+  fn f();
+}
+namespace b {
+  // デコレータの本体の外では、proceed は、ふつうの op の名前
+  fn proceed();
+  fn g() {
+    proceed();
+  }
+}

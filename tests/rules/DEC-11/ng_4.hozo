@@ -3,8 +3,8 @@
 namespace a {
   state s: list<string>;
   effect fn e1(): effects s.post;
-  decorator all(...targets: any effect) for op effects targets;
-  decorator some(first: int, second: string?, ...more: string);
+  decorator fn all(...targets: any effect): effects targets;
+  decorator fn some(first: int, second: string?, ...more: string);
   @all(targets: e1)                    // ERROR: DEC-11
   fn restNamed(x: string);
   @some                                // ERROR: DEC-11

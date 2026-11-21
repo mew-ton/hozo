@@ -4,7 +4,7 @@ namespace a {
   state s: list<string>;
   effect fn e(x: string): effects s.post;
   effect fn f(id: string): effects s.delete;
-  decorator doing(...targets: any effect) for op effects targets;
+  decorator fn doing(...targets: any effect): effects targets;
   @doing(f, e)
   export fn replace(id: string, x: string);
 }

@@ -11,13 +11,13 @@ namespace a {
   decorator table(element: any model) for state;
   decorator text for field;
   decorator int for field;
-  decorator list(table: any state, column: string?) for op reads table;
-  decorator effects(...targets: any effect) for op effects targets;
+  decorator fn list(table: any state, column: string?): reads table;
+  decorator fn effects(...targets: any effect): effects targets;
   decorator effect(table: any state) for effect;
-  decorator op for op;
-  decorator for for op;
+  decorator fn op();
+  decorator fn for();
   // 節は何度でも、どの順でも書ける。prevents / keeps の目的語の effects の後ろに、effects の節
-  decorator both(extra: any state?, ...more: any effect)
+  decorator fn both(extra: any state?, ...more: any effect):
     reads logs, extra
     throws Busy prevents effects effects more, add
     reads rows;

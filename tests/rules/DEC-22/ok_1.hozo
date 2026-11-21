@@ -1,0 +1,14 @@
+// DEC-22: 例外を受けるデコレータは、本体を持たない形で宣言する。本体のあるデコレータは、throws は書ける（計算に足す）
+namespace a {
+  exception E;
+  exception X;
+  decorator fn catching(): catches E recovers;
+  decorator fn throwing(): throws X {
+    proceed();
+  }
+  fn leaf(): throws E;
+  @catching @throwing
+  fn f() {
+    leaf();
+  }
+}

@@ -22,6 +22,7 @@ const (
 	codeInnerDir    = "GO-4"        // 内側のフォルダが、子の名前空間 N.inner の出力先と重なる
 	codeOption      = "GO-5"        // [emit.options.go] に知らないキーがある
 	codeVariant     = "GO-6"        // variant の絞り込みの as の型と等しい型のアームが、union に二つ以上ある
+	codeSeamOnBody  = "GO-7"        // 単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言している
 	codeInternal    = "GO-INTERNAL" // 生成器の不具合
 )
 
@@ -199,6 +200,17 @@ func (e *emitter) prepare() {
 	}
 	e.reserved = baseReserved()
 	e.imports = map[string]*golang.Imports{}
+	// GO-7: 単位の継ぎ目にあるデコレータが、本体を持つ（docs/plugin-go.md「本体のあるデコレータ」）。デコレータの FQN の辞書順
+	var seamed []string
+	for fqn := range e.view.Config.Seams {
+		seamed = append(seamed, fqn)
+	}
+	sort.Strings(seamed)
+	for _, fqn := range seamed {
+		if d, ok := e.lookup(fqn).(*ir.Decorator); ok && d.Body != nil {
+			e.errorf(codeSeamOnBody, fqn, "デコレータ %s は、本体を持つ（包み方が、仕様にある）のに、トランスパイラ %s が、継ぎ目を宣言している。本体をなくすか、継ぎ目の宣言をやめる", fqn, e.view.Config.Seams[fqn])
+		}
+	}
 }
 
 // baseReserved は、生成したコードがメソッドの中で使う名前（docs/plugin-go.md「名前」の「局所の名前」）。

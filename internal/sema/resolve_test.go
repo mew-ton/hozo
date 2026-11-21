@@ -77,7 +77,7 @@ func TestResolveStep1_2(t *testing.T) {
 namespace a {
   state s: single<string>;
   effect fn e(): effects s.put;
-  decorator d(error: any exception, target: any effect) catches error halts target throws error;
+  decorator fn d(error: any exception, target: any effect): catches error halts target throws error;
 }`}, false)
 	noErrors(t, res, fs)
 	d := res.Program.Lookup("a.d").(*ir.Decorator)
@@ -90,8 +90,8 @@ namespace a {
 	if got := d.Throws[0].Exceptions[0]; got != "$param:error" {
 		t.Errorf("throws = %q", got)
 	}
-	hasRef(t, res, fs, "a.hozo:5:65 decoratorParam a.d.error")
-	hasRef(t, res, fs, "a.hozo:5:77 decoratorParam a.d.target")
+	hasRef(t, res, fs, "a.hozo:5:69 decoratorParam a.d.error")
+	hasRef(t, res, fs, "a.hozo:5:81 decoratorParam a.d.target")
 }
 
 // TestResolveStep1_3 は 1.3: op に付いたデコレータの引数の値で、Param.type が type なら op の引数名が $param: になり、
@@ -100,8 +100,8 @@ func TestResolveStep1_3(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {
   state query: single<string>;
-  decorator cache(key: string[]);
-  decorator route(path: string, from: any state?);
+  decorator fn cache(key: string[]);
+  decorator fn route(path: string, from: any state?);
   @cache(["orders", query])
   @route("/orders", from: query)
   fn f(query: string): void;
@@ -246,7 +246,7 @@ namespace a {
   classify C of Q { A; }
   union U { Ready: Q; }
   state s: list<Q>;
-  decorator when(v: any variant);
+  decorator fn when(v: any variant);
   fn takeInt(n: int): void;
   fn takeOpt(n: int?): void;
   fn f(q: Q): void {
@@ -256,7 +256,7 @@ namespace a {
   fn g(q: Q on C.A): void;
   @when(U.Ready)
   fn h(): void;
-  decorator d(e: any effect);
+  decorator fn d(e: any effect);
   @d(s.post)
   fn bad(): void;
 }`}, false)

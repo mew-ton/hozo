@@ -8,5 +8,5 @@ namespace rate {
   exception LimitExceeded;
 
   /** この op を呼べる頻度を制限する。制限を超えた呼び出しは、op の中身を呼ばずに LimitExceeded */
-  decorator limited for op throws LimitExceeded prevents effects;
+  decorator fn limited(): throws LimitExceeded prevents effects;
 }

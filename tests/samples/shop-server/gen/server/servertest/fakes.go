@@ -36,6 +36,7 @@ type LeavesFake struct {
 		Lines   []pkgtype.OrderLine
 	}, pkgtype.Order]
 	ComposeNotice runtime.Fake[struct{ Order pkgtype.Order }, pkgtype.Notification]
+	RecordAudit   runtime.FakeVoid[struct{}]
 }
 
 // leavesFake は、LeavesFake を、server.Leaves にする。
@@ -93,6 +94,10 @@ func (o leavesFake) NewOrder(ctx context.Context, session pkgtype.Session, lines
 
 func (o leavesFake) ComposeNotice(ctx context.Context, order pkgtype.Order) (pkgtype.Notification, error) {
 	return o.f.ComposeNotice.Call(struct{ Order pkgtype.Order }{order}, func() (pkgtype.Notification, error) { return o.impl.ComposeNotice(ctx, order) })
+}
+
+func (o leavesFake) RecordAudit(ctx context.Context) error {
+	return o.f.RecordAudit.Call(struct{}{}, func() error { return o.impl.RecordAudit(ctx) })
 }
 
 // MailerOpsFake は、名前空間 mailer の op（server.MailerOps）のにせもの。メソッドごとに、フィールド一つ。

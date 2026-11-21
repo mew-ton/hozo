@@ -5,5 +5,5 @@ namespace usecase {
    *
    * @param actors 行う担い手。対象のない分類のケース
    */
-  decorator of(...actors: any case of never) for op;
+  decorator fn of(...actors: any case of never);
 }

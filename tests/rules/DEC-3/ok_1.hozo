@@ -3,8 +3,8 @@ namespace a {
   state s: single<string>;
   effect fn e(): effects s.put;
   exception E;
-  decorator r catches E recovers;
-  decorator h catches E halts e;
-  decorator i catches E ignores;
+  decorator fn r(): catches E recovers;
+  decorator fn h(): catches E halts e;
+  decorator fn i(): catches E ignores;
   fn f();
 }

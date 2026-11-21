@@ -4,7 +4,7 @@
 
 /** 継ぎ目を宣言する、もう一つの相乗り go-trace のデコレータ */
 namespace t {
-  decorator traced for op;
+  decorator fn traced();
 }
 
 /** bank と audit が使う型 */

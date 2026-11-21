@@ -6,7 +6,7 @@ namespace a {
   union V { Ready: M; }
   fn n(): V throws E;
   fn f(s: S): M;
-  decorator d;
+  decorator fn d();
   @d
   fn j(): void;
 }

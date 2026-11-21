@@ -1,6 +1,6 @@
 // DEC-12（docs/check.md「デコレータ」）: 別名の args が target の Param に合わない（DEC-11 と同じ手続き。型違いは TYPE-4）
 namespace a {
-  decorator d(code: int);
+  decorator fn d(code: int);
   decorator a3 = d();                  // ERROR: DEC-12
   decorator a4 = d("x");               // ERROR: TYPE-4
   decorator a5 = d(1, 2);              // ERROR: DEC-12

@@ -6,9 +6,9 @@ namespace a {
   effect fn e(x: string): effects s.post;
   effect fn f(x: string): effects t.post;
   union Both { e; f; }
-  decorator doing(...targets: any effect) for op effects targets;
-  decorator doingE for op effects e;
-  decorator posting for op effects s.post;
+  decorator fn doing(...targets: any effect): effects targets;
+  decorator fn doingE(): effects e;
+  decorator fn posting(): effects s.post;
   @doing(e, f) fn ownCarried(x: string, y: string);
   @doingE @posting export fn own();
 }

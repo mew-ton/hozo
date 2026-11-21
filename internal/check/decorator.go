@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/ir"
 )
 
@@ -17,8 +18,64 @@ func checkDecorators(ix *index, c *computer, r *reporter) {
 			checkDec14(dec, r)
 		}
 	}
-	for _, o := range ix.ops {
+	for i, o := range ix.ops {
 		checkDec4(ix, o, r)
+		checkDec24(ix, o, ix.opsNS[i], r)
+	}
+}
+
+// checkDec24 は DEC-24（docs/check.md「デコレータ」）: 本体のあるデコレータを、宣言した名前空間のほかの op に付けていて、
+// 本体が、その op の名前空間の配線からは呼べないものに触れている: export のない op、read、効果、状態。
+// 本体は、付けた所で広げたものとして扱う（同「デコレータの本体」）ので、呼べるのは、付けた op の配線が呼べるものだけ。
+// 位置は、適用。本体の、当たった呼び出しを Related に示す。
+func checkDec24(ix *index, o *ir.Op, ns string, r *reporter) {
+	for ai := range o.Decorators {
+		app := &o.Decorators[ai]
+		d, _ := ix.decorator(app.Decorator)
+		if d == nil || d.Body == nil || ix.namespaceOf(d.Name) == ns {
+			continue
+		}
+		var rel []related
+		var whats []string
+		hit := func(what string, span ir.Span) {
+			whats = appendUnique(whats, what)
+			rel = append(rel, related{span: span, msg: what})
+		}
+		for _, row := range rowsOf(d.Body) {
+			for _, cr := range row.calls {
+				switch callee := cr.call.Callee.(type) {
+				case ir.OpCallee:
+					if op := ix.op(callee.Op); op != nil && !op.Exported && ix.namespaceOf(op.Name) != ns {
+						hit("export のない op "+op.Name, cr.call.Span)
+					}
+				case ir.ReadCallee:
+					if ix.namespaceOf(callee.Read) != ns {
+						hit("read "+callee.Read, cr.call.Span)
+					}
+				case ir.EffectCallee:
+					if callee.Effect != nil {
+						hit("効果 "+callee.Effect.String(), cr.call.Span)
+					}
+				}
+			}
+		}
+		ir.WalkStatements(d.Body.Statements, func(st ir.Statement) {
+			expr, ok := ir.StatementExpr(st)
+			if !ok {
+				return
+			}
+			if m, ok := expr.(ir.MatchExpr); ok {
+				if state, ok := m.Match.SubjectState(); ok {
+					hit("状態 "+state, m.Match.Span)
+				} else if _, owned := m.Match.Subject.(ir.ClassifyOwnedSubject); owned {
+					hit("状態の分類 "+m.Match.Classify, m.Match.Span)
+				}
+			}
+		})
+		if len(whats) == 0 {
+			continue
+		}
+		r.report(diag.Error, "DEC-24", app.Span, sprintf("デコレータ %s の本体は、名前空間 %s の配線からは呼べないものに触れているので、op %s には付けられない: %s。別の名前空間の op に付けるデコレータの本体が呼べるのは、export の op だけ", d.Name, ns, o.Name, joinNames(whats)), rel, nil)
 	}
 }
 

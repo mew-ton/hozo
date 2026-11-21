@@ -11,24 +11,24 @@ import (
 // docs/vocab.md「同梱する語彙」の表。
 var expected = map[string][]string{
 	"hozo:vocab/valid.hozo": {"namespace valid {", "decorator min(", "decorator max(", "decorator length(min: int?, max: int?)", "decorator pattern(", "decorator format("},
-	"hozo:vocab/http.hozo": {"namespace http {", "exception ServerError;", "exception NetworkError;", "model Violation {", "exception BadRequest(message: string, violations: Violation[]);", "@external\n  decorator get(", "@external\n  decorator post(", "decorator status(",
+	"hozo:vocab/http.hozo": {"namespace http {", "exception ServerError;", "exception NetworkError;", "model Violation {", "exception BadRequest(message: string, violations: Violation[]);", "@external\n  decorator fn get(", "@external\n  decorator fn post(", "decorator status(",
 		"decorator header(name: string?) for field;", "decorator query(name: string?) for field;", "decorator body(name: string?) for field;",
-		"decorator headerObj for field;", "decorator queryObj for field;", "decorator bodyObj for field;", "decorator required for field;", "decorator default(value:", "decorator retry("},
+		"decorator headerObj for field;", "decorator queryObj for field;", "decorator bodyObj for field;", "decorator required for field;", "decorator default(value:", "decorator fn retry("},
 	"hozo:vocab/db.hozo": {"namespace db {", "decorator table for state;",
 		"decorator text for field;", "decorator int for field;", "decorator float for field;", "decorator bool for field;", "decorator datetime for field;", "decorator date for field;", "decorator time for field;", "decorator json for field;",
 		"decorator key for field;", "decorator unique for field;", "decorator ref(target: any model) for field;",
 		"decorator find for read;", "decorator list for read;",
 		"@repeatable\n  decorator where(column: string, value: string | int | float | boolean) for read;", "decorator latest(column: string) for read;",
 		"decorator insert for effect;", "decorator update for effect;", "decorator delete for effect;",
-		"decorator transaction for op;"},
+		"decorator fn transaction();"},
 	"hozo:vocab/localstorage.hozo": {"decorator localStorage for state;"},
-	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator route(path: string, from: any state?, onInvalid: any effect?);", "decorator dialog(", "decorator fallback(", "decorator interaction("},
+	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator fn route(path: string, from: any state?, onInvalid: any effect?);", "decorator fn dialog(", "decorator fn fallback(", "decorator fn interaction("},
 	"hozo:vocab/fs.hozo":           {"namespace fs {", "decorator files(glob: string) for state;"},
-	"hozo:vocab/proc.hozo":         {"namespace proc {", "exception Crashed;", "exception MalformedOutput;", "decorator stdio throws Crashed, MalformedOutput;"},
+	"hozo:vocab/proc.hozo":         {"namespace proc {", "exception Crashed;", "exception MalformedOutput;", "decorator fn stdio(): throws Crashed, MalformedOutput;"},
 	// 設計の図の語彙（docs/vocab.md「設計の図の語彙」）
 	"hozo:vocab/actor.hozo":    {"namespace actor {", "decorator human for case of never;", "decorator bot for case of never;", "decorator ai for case of never;"},
-	"hozo:vocab/usecase.hozo":  {"namespace usecase {", "decorator of(...actors: any case of never) for op;"},
-	"hozo:vocab/business.hozo": {"namespace business {", "decorator flow for op;"},
+	"hozo:vocab/usecase.hozo":  {"namespace usecase {", "decorator fn of(...actors: any case of never);"},
+	"hozo:vocab/business.hozo": {"namespace business {", "decorator fn flow();"},
 	"hozo:vocab/prd.hozo":      {"namespace prd {", "decorator ref(...requirements: any case of never) for op, model, state, effect, read;"},
 }
 
@@ -65,7 +65,7 @@ func TestFiles(t *testing.T) {
 		if strings.Contains(s, "cache") {
 			t.Errorf("%s: contains cache", f.Path)
 		}
-		if strings.Contains(s, "stdio(") || regexp.MustCompile(`@external\s+decorator stdio`).MatchString(s) {
+		if regexp.MustCompile(`stdio\([^)]`).MatchString(s) || regexp.MustCompile(`@external\s+decorator (fn )?stdio`).MatchString(s) {
 			t.Errorf("%s: stdio must have no parameter and no @external", f.Path)
 		}
 	}

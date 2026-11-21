@@ -9,15 +9,15 @@ namespace http {
   exception NetworkError;
 
   @external
-  decorator get(path: string) throws ServerError, NetworkError;
+  decorator fn get(path: string): throws ServerError, NetworkError;
   @external
-  decorator post(path: string) throws ServerError, NetworkError;
+  decorator fn post(path: string): throws ServerError, NetworkError;
 
   decorator status(code: int) for exception;
   decorator header(name: string) for field;
   decorator body for field;
   decorator query for field;
-  decorator retry(times: int);
+  decorator fn retry(times: int);
 }
 
 /** この状態を DB が持つ */
@@ -42,15 +42,15 @@ namespace page {
 
   decorator path for state;
   decorator query for state;
-  decorator route(path: string, from: any state?, onInvalid: any effect?);
+  decorator fn route(path: string, from: any state?, onInvalid: any effect?);
   /**
    * ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: "YamadaWarrantyModal"）。
    * どの実装を指すかは展開器が解決する（表層は責務外）。
    */
-  decorator dialog(component: string) throws Aborted;
+  decorator fn dialog(component: string): throws Aborted;
   /** error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2） */
-  decorator fallback(error: any exception, view: any model) catches error recovers;
-  decorator interaction(page: any op, when: any variant);
+  decorator fn fallback(error: any exception, view: any model): catches error recovers;
+  decorator fn interaction(page: any op, when: any variant);
 }
 
 namespace valid {

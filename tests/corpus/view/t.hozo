@@ -4,5 +4,5 @@
 /** テストの語彙 */
 namespace t {
   /** view-dump プラグインの起点（emit の応答の select の roots に選ぶ op の印） */
-  decorator entry;
+  decorator fn entry();
 }

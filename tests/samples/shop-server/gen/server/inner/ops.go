@@ -110,6 +110,9 @@ type Ops interface {
 	// Reads: store.sessions, store.orders
 	// Effects: store.notifyUser
 	ResendNotices(ctx context.Context, in AuthInput) ([]pkgtype.Notification, error)
+
+	// RecordAudit は呼ばれたことを、記録する（人が書く。記録の先は、実装が決める）
+	RecordAudit(ctx context.Context) error
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
@@ -145,6 +148,9 @@ type Leaves interface {
 
 	// ComposeNotice は通知の文面を作る（人が書く）
 	ComposeNotice(ctx context.Context, order pkgtype.Order) (pkgtype.Notification, error)
+
+	// RecordAudit は呼ばれたことを、記録する（人が書く。記録の先は、実装が決める）
+	RecordAudit(ctx context.Context) error
 }
 
 // MailerOps は名前空間 mailer の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 mailer に渡す。
@@ -247,6 +253,11 @@ func (o *ops) RequireFresh(ctx context.Context, session pkgtype.Session) (pkgtyp
 	return o.leaves.RequireFresh(ctx, session)
 }
 
+// Logout は、デコレータ（@server.audited）を通して、中身（o.logoutBody）を呼ぶ。
+func (o *ops) Logout(ctx context.Context, in AuthInput) error {
+	return o.logoutServerAudited(ctx, in)
+}
+
 func (o *ops) PageOf(ctx context.Context, orders []pkgtype.Order, page int64) ([]pkgtype.Order, error) {
 	return o.leaves.PageOf(ctx, orders, page)
 }
@@ -265,4 +276,8 @@ func (o *ops) NewOrder(ctx context.Context, session pkgtype.Session, lines []pkg
 
 func (o *ops) ComposeNotice(ctx context.Context, order pkgtype.Order) (pkgtype.Notification, error) {
 	return o.leaves.ComposeNotice(ctx, order)
+}
+
+func (o *ops) RecordAudit(ctx context.Context) error {
+	return o.leaves.RecordAudit(ctx)
 }

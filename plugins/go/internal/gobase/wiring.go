@@ -19,24 +19,154 @@ const ptrHelper = "func ptr[T any](v T) *T { return &v }\n"
 
 // genWiring は定義のパッケージの wiring.go。単位の対象の配線がなければ nil。
 func (e *emitter) genWiring() *fileGen {
-	var wirings []golang.OpShape
+	any := false
 	for _, os := range e.shape.Ops {
-		if os.Place == golang.Wiring {
-			wirings = append(wirings, os)
-		}
+		any = any || os.Place == golang.Wiring || hasBodied(os)
 	}
-	if len(wirings) == 0 {
+	if !any {
 		return nil
 	}
 	f := e.newFile(fileWiring, true)
-	for _, os := range wirings {
-		b := newBody(e, f, os)
-		b.gen()
+	for _, os := range e.shape.Ops {
+		if os.Place == golang.Wiring {
+			b := newBody(e, f, os)
+			b.gen()
+		}
+		// 本体のあるデコレータの外側（docs/plugin-go.md「本体のあるデコレータ」）: 適用ごとに、メソッド一つ。書かれた順
+		for i, l := range os.Layers {
+			if l.Bodied {
+				e.genWrap(f, os, i)
+			}
+		}
 	}
 	if f.usesPtr {
 		f.print(ptrHelper)
 	}
 	return f
+}
+
+// through は、op の中身を包むものの呼び名: 層が、継ぎ目だけなら「継ぎ目」、本体のあるデコレータを含めば「デコレータ」。
+func through(os golang.OpShape) string {
+	if hasBodied(os) {
+		return "デコレータ"
+	}
+	return "継ぎ目"
+}
+
+// hasBodied は、op が、本体のあるデコレータの層を持つか。
+func hasBodied(os golang.OpShape) bool {
+	for _, l := range os.Layers {
+		if l.Bodied {
+			return true
+		}
+	}
+	return false
+}
+
+// wrapResult は、本体のあるデコレータの外側で、proceed() の結果を受ける val の名前（docs/plugin-go.md「本体のあるデコレータ」）。
+const wrapResult = "result"
+
+// wrapStatements は、デコレータの本体の文を、値を返す op の配線として書ける形に、直す: proceed()（か、proceed() のアームを
+// 持つ match）が、最後の文なら、その return にする。後ろに文が続くなら、結果を val に受けて、最後に、その val を return する。
+// 値を返さない op では、何も変えない。
+func wrapStatements(stmts []ir.Statement, o *ir.Op) []ir.Statement {
+	if o.Returns == nil || ir.IsNever(o.Returns) {
+		return stmts
+	}
+	name := wrapResult
+	ir.WalkStatements(stmts, func(s ir.Statement) {
+		if v, ok := s.(ir.ValStmt); ok && v.Name == name {
+			name += "_"
+		}
+	})
+	proceeds := func(m ir.Match) bool {
+		for _, a := range m.Arms {
+			if c, ok := a.Body.(ir.CallExpr); ok && c.Call.IsProceed() {
+				return true
+			}
+		}
+		return false
+	}
+	out := make([]ir.Statement, 0, len(stmts)+1)
+	held := false
+	for i, st := range stmts {
+		last := i == len(stmts)-1
+		var expr ir.Expr
+		var span ir.Span
+		switch x := st.(type) {
+		case ir.CallStmt:
+			if x.Call.IsProceed() {
+				expr, span = ir.CallExpr{Call: x.Call}, x.Span
+			}
+		case ir.MatchStmt:
+			if proceeds(x.Match) {
+				expr, span = ir.MatchExpr{Match: x.Match}, x.Span
+			}
+		}
+		switch {
+		case expr == nil:
+			out = append(out, st)
+		case last:
+			out = append(out, ir.ReturnStmt{Expr: expr, Span: span})
+		default:
+			out = append(out, ir.ValStmt{Name: name, Type: o.Returns, Expr: expr, Span: span})
+			held = true
+		}
+	}
+	if held {
+		out = append(out, ir.ReturnStmt{Expr: ir.AtomExpr{Atom: ir.NameAtom{Path: []string{name}}}})
+	}
+	return out
+}
+
+// genWrap は、op os に付いた、本体のあるデコレータ（os.Layers[i]）の外側のメソッド（docs/plugin-go.md「本体のあるデコレータ」）。
+// 本体を、op の配線として書く。proceed() は、内側の層を、op の引数のまま呼ぶ。
+func (e *emitter) genWrap(f *fileGen, os golang.OpShape, i int) {
+	o := e.op(os.FQN)
+	l := os.Layers[i]
+	dec, ok := e.lookup(l.Decorator).(*ir.Decorator)
+	if o == nil || !ok || dec.Body == nil {
+		e.errorf(codeInternal, os.FQN, "op %s に付いたデコレータ %s の本体が Program にない（生成器の不具合）", os.FQN, l.Decorator)
+		return
+	}
+	syn := *o
+	syn.Body = &ir.Wiring{Statements: wrapStatements(dec.Body.Statements, o)}
+	b := newBodyOf(e, f, os, &syn)
+	b.proceed = e.layerCall(f, os, o, i+1)
+	// デコレータの、値の引数: 適用に書いたリテラルを、その場に書く
+	for _, p := range dec.Params {
+		tp, isType := p.Type.(ir.TypeParam)
+		if !isType || len(tp.Types) != 1 || p.Rest {
+			continue
+		}
+		typ := tp.Types[0]
+		if p.Optional {
+			typ = ir.OptionalType{Of: typ}
+		}
+		expr := "nil"
+		for _, a := range l.Args {
+			if a.Param != p.Name {
+				continue
+			}
+			if lv, isLit := a.Value.(ir.LiteralValue); isLit {
+				expr = f.literal(lv.Literal, typ)
+			} else {
+				e.errorf(codeInternal, os.FQN, "op %s に付いた @%s の引数 %s が、リテラルでない（本体のあるデコレータの、値の引数に渡せるのは、リテラルだけ）", os.FQN, l.Decorator, p.Name)
+			}
+		}
+		b.scopes[0].vars[p.Name] = local{expr: expr, typ: typ}
+	}
+	b.block(syn.Body.Statements)
+	if !b.terminated && b.ret == nil {
+		b.line("return nil")
+	}
+	inner := e.implExpr(os)
+	if i+1 < len(os.Layers) {
+		inner = "@" + os.Layers[i+1].Decorator
+	}
+	f.print(comment(l.Method + " は op " + o.Name + " に付いた @" + l.Decorator + " の外側（デコレータの本体）。proceed() が、内側（" + inner + "）を呼ぶ。"))
+	params, results := golang.Signature(o, f.im, e.reserved)
+	f.printf("func (o *ops) %s {\n%s}\n\n", method(l.Method, params, results), b.buf.String())
 }
 
 // local は、配線の中の名前（引数、束縛）一つ: Go の式と、その値の型。
@@ -90,10 +220,16 @@ type bodyGen struct {
 	ret ir.Type // 配線の戻り値の型（void なら nil）
 	// terminated は、直前に書いた文が、関数を抜ける文（return）か。
 	terminated bool
+	// proceed は、本体のあるデコレータの外側を書いているときの、proceed() の式（内側の層の呼び出し）。配線の本体では空。
+	proceed string
 }
 
 func newBody(e *emitter, f *fileGen, os golang.OpShape) *bodyGen {
-	o := e.op(os.FQN)
+	return newBodyOf(e, f, os, e.op(os.FQN))
+}
+
+// newBodyOf は、op o の形（引数と戻り値）のメソッドの中身を、o.Body の文から書く bodyGen。
+func newBodyOf(e *emitter, f *fileGen, os golang.OpShape, o *ir.Op) *bodyGen {
 	b := &bodyGen{e: e, f: f, op: o, os: os, buf: &strings.Builder{}, depth: 1, taken: map[string]bool{}}
 	if o.Returns != nil && !ir.IsNever(o.Returns) {
 		b.ret = o.Returns
@@ -228,7 +364,7 @@ func (b *bodyGen) gen() {
 	if b.os.Body != "" {
 		// 継ぎ目を持つ配線は、中身の名前のメソッド。op のコメントは、Ops のメソッドにだけ書く
 		name = b.os.Body
-		b.f.print(comment(name + " は op " + o.Name + " の中身（配線の本体）。外側の " + b.os.Method + " が、継ぎ目を通して呼ぶ。"))
+		b.f.print(comment(name + " は op " + o.Name + " の中身（配線の本体）。外側の " + b.os.Method + " が、" + through(b.os) + "を通して呼ぶ。"))
 	} else {
 		b.f.print(opComment(o))
 	}
@@ -819,6 +955,13 @@ func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
 		return "o." + u.Param + ".", true
 	}
 	switch callee := c.Callee.(type) {
+	case ir.ProceedCallee:
+		// デコレータの本体の proceed(): 内側の層。形は、op のまま（式は call が作る）
+		t := target{never: ir.IsNever(b.op.Returns)}
+		if b.op.Returns != nil && !t.never {
+			t.ret = b.op.Returns
+		}
+		return t, true
 	case ir.OpCallee:
 		o := e.op(callee.Op)
 		if o == nil {
@@ -878,6 +1021,9 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 	t, ok := b.targetOf(c)
 	if !ok {
 		return callInfo{expr: "nil"}
+	}
+	if c.IsProceed() {
+		return callInfo{expr: b.proceed, ret: t.ret, never: t.never}
 	}
 	var bounds []boundValue
 	if t.isOp { // bind は、read と効果の引数を埋めない

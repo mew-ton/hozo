@@ -1,6 +1,6 @@
 // CFG-23（docs/config.md「継ぎ目」）: 継ぎ目の中身を出す者は、単位ごとに一人。別の単位でなら、同じデコレータを別のトランスパイラが
 // 宣言していてよい（ok_1.toml、plugins/seams）。宣言したデコレータが付いているか、宣言されているかは確かめない
 namespace a {
-  decorator dec;
+  decorator fn dec();
   @dec fn f();
 }

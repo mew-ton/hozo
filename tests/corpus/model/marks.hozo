@@ -11,7 +11,7 @@ namespace marks {
 
   // docs/ir.md「decorator」: targets は ["op"]
   /** 人が担い手であること（人の手で行う） */
-  decorator manual for op;
+  decorator fn manual();
 
   /** 要求の承認がまだ下りていない */
   exception NotApproved;
@@ -19,5 +19,5 @@ namespace marks {
   // docs/check.md「計算」手順 i の throws: 印でも、throws を宣言していれば付けた op の Signature に効く
   // （external ではないので、op の名前空間から見ても投げる）
   /** 要求（PRD）の項目に対応する op。承認されるまで始めない */
-  decorator requirement(id: string) throws NotApproved prevents effects;
+  decorator fn requirement(id: string): throws NotApproved prevents effects;
 }

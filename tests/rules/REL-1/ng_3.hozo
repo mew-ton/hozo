@@ -1,6 +1,6 @@
 // REL-1（docs/check.md「throws」）: デコレータの throws でも同じ
 namespace a {
   exception E;
-  decorator d throws E throws E;       // ERROR: REL-1
+  decorator fn d(): throws E throws E;       // ERROR: REL-1
   fn f();
 }

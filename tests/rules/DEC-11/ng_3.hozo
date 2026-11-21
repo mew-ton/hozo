@@ -1,6 +1,6 @@
 // DEC-11（docs/types.md「デコレータの引数」）: 同じ引数に二度渡す。別名に引数を渡す
 namespace a {
-  decorator d(code: int, name: string?);
+  decorator fn d(code: int, name: string?);
   @d(1, code: 2)                       // ERROR: DEC-11
   fn twice(): void;
   decorator alias = d(1);

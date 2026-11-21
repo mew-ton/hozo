@@ -8,8 +8,8 @@ namespace a {
   union Both { E; F; }
   state s: list<string>;
   effect fn add(x: string): effects s.post;
-  decorator swallow catches E recovers;
-  decorator mark;
+  decorator fn swallow(): catches E recovers;
+  decorator fn mark();
   // 1. 葉でない（位置は op の名前）
   fn body(): never throws E {          // ERROR: THROWS-3
     return leaf();
@@ -31,8 +31,8 @@ namespace a {
   @swallow                             // ERROR: THROWS-3
   fn caught(): never throws E;
   // 5. デコレータが運ぶ reads / effects を持てない（位置はそのデコレータ）
-  decorator reading(table: any state) for op reads table;
-  decorator writing(...targets: any effect) for op effects targets;
+  decorator fn reading(table: any state): reads table;
+  decorator fn writing(...targets: any effect): effects targets;
   @mark
   @reading(s)                          // ERROR: THROWS-3
   fn carriesRead(): never throws E;

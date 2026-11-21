@@ -317,12 +317,13 @@ func Build() Grammar {
 				},
 			},
 			{
-				Comment: "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator list(…)。docs/grammar.md「識別子」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
-				Match:   `\b(decorator)\s+(` + ident + `)(?:\s*=\s*(` + qualifiedName + `))?`,
+				Comment: "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator fn list(…)。docs/grammar.md「識別子」）。decorator の直後の fn は、関数に付けるデコレータの頭（同「decorator の宣言」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
+				Match:   `\b(decorator)\s+(?:(fn)\s+)?(` + ident + `)(?:\s*=\s*(` + qualifiedName + `))?`,
 				Captures: Captures{
 					"1": {Name: "keyword.declaration.hozo"},
-					"2": {Name: "entity.name.function.hozo"},
-					"3": {Name: "entity.name.function.decorator.hozo"},
+					"2": {Name: "keyword.declaration.hozo"},
+					"3": {Name: "entity.name.function.hozo"},
+					"4": {Name: "entity.name.function.decorator.hozo"},
 				},
 			},
 			{

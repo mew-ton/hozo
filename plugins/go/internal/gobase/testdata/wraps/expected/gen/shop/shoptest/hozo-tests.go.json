@@ -1,0 +1,8 @@
+{
+  "tests": [
+    {"name": "shop.lookup/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [77, 84]},
+    {"name": "shop.save/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [90, 97]},
+    {"name": "shop.open/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [103, 110]},
+    {"name": "shop.sweep/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [116, 123]}
+  ]
+}

@@ -1,7 +1,7 @@
 // CFG-6（docs/config.md「診断」）: 単位のトランスパイラの unsupported にあるデコレータが、単位の対象の宣言に付いている（warning。付いた位置）
 namespace a {
-  decorator legacy;
-  decorator wrap;
+  decorator fn legacy();
+  decorator fn wrap();
   @legacy                              // WARN: CFG-6
   fn f();
   @wrap

@@ -3,8 +3,8 @@
 // 名前空間の op を呼んで行き着く状態（READS-1/ok_1.hozo の viaStore）とは違う。位置はそのデコレータの適用
 namespace a {
   state own: list<string>;
-  decorator from(table: any state) for op reads table;
-  decorator fromRead for op reads b.firstUser;
+  decorator fn from(table: any state): reads table;
+  decorator fn fromRead(): reads b.firstUser;
   @from(own)
   fn ok(): string[] {
     return b.all();

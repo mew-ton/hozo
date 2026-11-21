@@ -107,6 +107,7 @@ namespace server {
 
   /** ログアウトする */
   @http.post("/logout")
+  @audited
   export fn logout(in: AuthInput) {
     val session = authenticate(in.token);
     store.removeSession(session.token);
@@ -205,4 +206,15 @@ namespace server {
     }
     return sent;
   }
+
+  // ---- 本体のあるデコレータ（docs/grammar.md「デコレータの本体」） ----
+
+  /** op の中身が、正常に終わった後に、その op が呼ばれたことを、記録する。中身が例外を投げたら、記録しない */
+  decorator fn audited() {
+    proceed();
+    recordAudit();
+  }
+
+  /** 呼ばれたことを、記録する（人が書く。記録の先は、実装が決める） */
+  fn recordAudit();
 }

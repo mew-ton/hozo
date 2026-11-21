@@ -126,6 +126,10 @@ func (logoutCases) OK() servertest.LogoutHTTPCase {
 			if calls := f.Store.Sessions.DeleteSession.Calls; len(calls) != 1 || calls[0].Token != leafSession.Token {
 				t.Errorf("deleteSession の呼び出し = %+v（期待は、トークン %s で、一度）", calls, leafSession.Token)
 			}
+			// @server.audited の本体（本物を通す）が、中身の後に、葉 recordAudit を、一度呼ぶ
+			if n := len(f.Leaves.RecordAudit.Calls); n != 1 {
+				t.Errorf("recordAudit の呼び出し = %d 回（期待は、一度）", n)
+			}
 		},
 	}
 }

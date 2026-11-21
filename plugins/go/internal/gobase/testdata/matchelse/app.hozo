@@ -21,7 +21,7 @@ namespace app {
   }
   exception Unknown;
   /** 印。付いた op は純粋でなくなる */
-  decorator mark;
+  decorator fn mark();
 
   /** ログインしている人 */
   state session: nullable<User>;

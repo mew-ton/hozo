@@ -12,7 +12,7 @@ namespace a {
   effect fn old: effects rows.post;              // ERROR: SYNTAX
   read fn noParens: M[] reads rows;              // ERROR: SYNTAX
   // any read という引数の種類はない
-  decorator anyRead(target: any read);           // ERROR: SYNTAX
+  decorator fn anyRead(target: any read);           // ERROR: SYNTAX
   exception E;
   exception F;
   classify K of M { A; B; }
@@ -56,7 +56,7 @@ namespace removedWiring {
 namespace removedCaseKind {
   decorator a for classify case;                     // ERROR: SYNTAX
   decorator b for classify of never case;            // ERROR: SYNTAX
-  decorator c(x: any classify Actor case) for op;    // ERROR: SYNTAX
+  decorator fn c(x: any classify Actor case);    // ERROR: SYNTAX
   decorator d for classify;                          // ERROR: SYNTAX
 }
 

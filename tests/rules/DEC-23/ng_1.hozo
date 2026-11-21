@@ -1,0 +1,19 @@
+// DEC-23（docs/check.md「デコレータ」）: デコレータの本体が、値として読めない引数を使った
+namespace a {
+  state log: list<string>;
+  fn note(text: string);
+  fn count(n: int);
+  decorator fn byState(target: any state) {
+    note(target);                          // ERROR: DEC-23
+    proceed();
+  }
+  decorator fn byUnion(value: string | int) {
+    note(value);                           // ERROR: DEC-23
+    proceed();
+  }
+  decorator fn byRest(...labels: string) {
+    note(labels);                          // ERROR: DEC-23
+    proceed();
+  }
+  fn f();
+}

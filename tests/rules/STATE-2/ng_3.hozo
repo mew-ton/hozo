@@ -6,7 +6,7 @@ namespace a {
 }
 namespace b {
   exception X;
-  decorator haltWith(h: any effect) catches X halts h;
+  decorator fn haltWith(h: any effect): catches X halts h;
   fn leaf(): throws X;
   @haltWith(a.e)                       // ERROR: STATE-2
   fn g() {

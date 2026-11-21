@@ -1,8 +1,8 @@
 // DEC-16（docs/check.md「デコレータ」）: 内側のデコレータが先に吸収していれば、外側のデコレータには相手がない
 namespace a {
   exception E;
-  decorator recoverE catches E recovers;
-  decorator ignoreE catches E ignores;
+  decorator fn recoverE(): catches E recovers;
+  decorator fn ignoreE(): catches E ignores;
   fn leaf(): throws E;
   @ignoreE                             // WARN: DEC-16
   @recoverE

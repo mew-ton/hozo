@@ -6,15 +6,15 @@ namespace a {
   classify Actor of never { Customer; }
   classify Role of never { Admin; }
   classify Size of M { Small; Large; }
-  decorator anyCase(x: any case) for op;
-  decorator anyCase2(x: any case of any?) for op;
-  decorator subj(x: any case of never) for op;
-  decorator typed(x: any case of M) for op;
-  decorator named(x: any case of Actor) for op;
-  decorator sized(x: any case of Size) for op;
-  decorator opt(x: any case of M?) for op;
+  decorator fn anyCase(x: any case);
+  decorator fn anyCase2(x: any case of any?);
+  decorator fn subj(x: any case of never);
+  decorator fn typed(x: any case of M);
+  decorator fn named(x: any case of Actor);
+  decorator fn sized(x: any case of Size);
+  decorator fn opt(x: any case of M?);
   classify Known of M? { Yes: M? as M; No: M? as else; }
-  decorator known(x: any case of Known) for op;
+  decorator fn known(x: any case of Known);
   @anyCase(Size.Small) @subj(Role.Admin) @named(Actor.Customer) @typed(Size.Large) @anyCase2
   fn f();
   @anyCase(Actor.Customer) @anyCase2(Role.Admin) @sized(Size.Large)

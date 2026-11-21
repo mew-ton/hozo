@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.17"
+protocol = "0.18"
 
 [[transpiler]]
 name     = "go"
@@ -878,6 +878,60 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 - 変わらない: op のメソッドの形（「op の形」。`ctx`、引数、戻り値、`error`）、`Ops`、`Leaves`、状態の単位（`read` と効果のメソッドを含む）、`<Ns>Ops`、コメントの `Throws:` など（どれも仕様だけで決まる）。継ぎ目を宣言するトランスパイラを単位に足しても、`Ops` を使うコードと、口を実装するコードは、そのまま通る。
 - 変わる: `Seams` と `New` の最後の引数、継ぎ目を持つ op の `ops.go` と `wiring.go` の中（外側と、中身の名前）。`New` を呼ぶ行は、引数が一つ増える。
 
+## 本体のあるデコレータ
+
+`docs/decisions.md`「決めたこと」392〜395。本体のあるデコレータ（`docs/grammar.md`「デコレータの本体」）を付けた op は、継ぎ目を持つ op（「継ぎ目」）と同じに、**二層**で出す。違いは、外側を、基底が、デコレータの本体から作ること: 人も、プラグインも、実装しない。`Seams` には、載らない。
+
+仕様:
+
+```
+decorator fn audited() {
+  proceed();
+  recordAudit();
+}
+
+@audited
+export fn getMe(in: AuthInput): type.PublicUser { … }
+```
+
+出力:
+
+```go
+// ops.go
+
+// GetMe は、デコレータ（@server.audited）を通して、中身（o.getMeBody）を呼ぶ。
+func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, error) {
+	return o.getMeServerAudited(ctx, in)
+}
+```
+
+```go
+// wiring.go
+
+// getMeServerAudited は op server.getMe に付いた @server.audited の外側（デコレータの本体）。proceed() が、内側（o.getMeBody）を呼ぶ。
+func (o *ops) getMeServerAudited(ctx context.Context, in AuthInput) (pkgtype.PublicUser, error) {
+	result, err := o.getMeBody(ctx, in)
+	if err != nil {
+		return pkgtype.PublicUser{}, err
+	}
+	if err := o.RecordAudit(ctx); err != nil {
+		return pkgtype.PublicUser{}, err
+	}
+	return result, nil
+}
+```
+
+- **外側のメソッド**は、適用ごとに一つ。名前は、継ぎ目のメソッドの名前（「Seams」）の、先頭を小文字にしたもの（op `getMe` と `server.audited` → `getMeServerAudited`）。非公開で、形（引数と戻り値）は、op の形のまま。置き場は `wiring.go`: 配線の op なら、その op の中身のメソッドの、すぐ後ろ。そのほかの op（葉、`never` を返す op）なら、op の宣言順の、その位置。当たる名前は「名前」の GO-2。
+- **本体は、「配線の本体」の規則で書く。** 本体の中の名前は、op の配線が書いたのと、同じ式になる: 同じ名前空間の op は `o.<Op>(…)`、別の名前空間の op は `o.<名前空間の引数名>.<Op>(…)`（「別の名前空間の op」の口に、その op が並ぶ）、`read` と効果は、状態の単位のメソッド。
+- **`proceed()` は、内側を、op の引数のまま呼ぶ式**になる: 内側が、op の中身なら `o.<op>Body(ctx, …)`（葉なら `o.leaves.<Op>(ctx, …)`）、本体のある別のデコレータなら、その外側のメソッド、継ぎ目なら `o.seams.<継ぎ目>(ctx, …, <その内側>)`。
+- **op が値を返すとき**、`proceed()` の結果を、そのまま返す: `proceed()` が、本体の最後の文（か、最後の文の `match` のアーム）なら `return <内側の呼び出し>`。後ろに文が続くなら、結果を `result` に受けて、最後に `return result, nil`。値を返さない op では、`proceed()` は、ふつうの、値のない呼び出しと同じ。
+- **デコレータの、値の引数**は、適用に書いたリテラルを、「値」の規則で、その場に書く。渡されていない省略可能な引数は `nil`。
+- **中身の名前**（`<op>Body`）は、継ぎ目を持つ op と同じに、基底が中身を出す op（配線と、`never` を返す op）が、包むデコレータを一つでも持てば、付く（「継ぎ目」の「中身」）。
+- **コメントの言い方**: 包むものに、本体のあるデコレータが一つでもあれば、外側と中身のコメントは、「継ぎ目」の代わりに「デコレータ」と言う（`Logout は、デコレータ（@server.audited）を通して、中身（o.logoutBody）を呼ぶ。`、`logoutBody は op server.logout の中身（配線の本体）。外側の Logout が、デコレータを通して呼ぶ。`）。
+- **継ぎ目と重ねたとき**は、書かれた順に、外から内へ、入れ子にする（「外側」）。op の公開のメソッドは、いちばん外の層を呼ぶ: 継ぎ目なら `o.seams.<継ぎ目>(ctx, …, <内側>)`、本体のあるデコレータなら、その外側のメソッド。
+- **単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言していれば GO-7。** 包み方が、仕様にあるのに、プラグインも包もうとしている。基底は、本体から外側を作り、継ぎ目の口は、出さない。
+- **テストのにせもの**（「テストのにせもの」）と、インテグレーションテスト（`docs/ide-chain.md`「インテグレーションテストの作り直し」の「継ぎ目に置くもの」）では、本体のあるデコレータは、本物を通す: 外側は、op の一部で、にせものにする口が、ない。
+
 ## 単体テストの口
 
 人か AI が中身を書く関数に、基底は、結果ごとの単体テストを受け取る口と、それを走らせる関数を出す（`docs/decisions.md`「決めたこと」373〜375）。対象は、葉の op（`Leaves` のメソッド）と、述語で決まる値の分類・op の分類の判定（`<C>Cases` の述語）。Hozo が担保することと、その確かめ方（ケースの漏れは、コンパイルエラー。走ったかは、「テストの対応表」と、カバレッジの突き合わせ。通ったかは、テストの実行の結果）の持ち主は、`docs/ide-chain.md`「テストの規約」の「担保すること」。中身が作られるもの（配線の op）と、型で決まる分類には、出さない。
@@ -1327,6 +1381,7 @@ func (f *FakeVoid[A]) Call(args A, impl func() error) error
 | GO-4 | error | 基底が作るディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる: 内側のフォルダ `inner` と `N.inner`（「内側のフォルダと入口」。位置は、名前空間の最初の内部の op）、テストのパッケージ `<パッケージ名>test` と `N.<パッケージ名>test`（「単体テストの口」。位置は、口を持つ最初の宣言） |
 | GO-5 | error | `[emit.options.go]` に、知らないキーがある（「マニフェスト」）。位置なし |
 | GO-6 | error | `variant` の絞り込みの `as` の型と等しい型のアームが、union に二つ以上ある（「match」）。位置は分類 |
+| GO-7 | error | 単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言している（「本体のあるデコレータ」）。位置は、デコレータの宣言。メッセージに、宣言したトランスパイラの名前 |
 | GO-INTERNAL | error | 生成器の不具合（利用者の仕様の誤りではない）: 生成したコードを `go/format` で整形できない、検査を通った IR には来ないはずの形、`View` が欠けている、型の置き場がない（CFG-22 が通したはずのもの） |
 
 - warning は返さない。`catches` を持つデコレータが配線の op に付いているときの warning は、やめた（基底はデコレータの節を見ない。「デコレータ」）。

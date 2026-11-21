@@ -134,8 +134,8 @@ func TestDeclReject(t *testing.T) {
 		{"not a decl", "foo;", "宣言が必要"},
 		{"stray close brace", "model A {} }", "対応する「{」のない「}」"},
 		{"external on model", "@external model A {}", "@external はデコレータの宣言の直前にだけ書ける"},
-		{"external with args", "@external() decorator x;", "@external は引数を取らない"},
-		{"external before other decorator", "@external @db decorator x;", "@external はデコレータの宣言の直前にだけ書ける"},
+		{"external with args", "@external() decorator fn x();", "@external は引数を取らない"},
+		{"external before other decorator", "@external @db decorator fn x();", "@external はデコレータの宣言の直前にだけ書ける"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -872,7 +872,7 @@ func TestRemovedClassifyForms(t *testing.T) {
 // --- decorator の宣言 ---
 
 func TestDecoratorDecl(t *testing.T) {
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator retry(times: int);")
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator fn retry(times: int);")
 	if d.Name.Name != "retry" || len(d.Params) != 1 || d.Params[0].Name.Name != "times" || len(d.Params[0].Type.Types) != 1 || len(d.For) != 0 || len(d.Clauses) != 0 || d.External || d.Alias != nil {
 		t.Errorf("Decorator = %+v", d)
 	}
@@ -890,7 +890,7 @@ func TestDecoratorDecl(t *testing.T) {
 			t.Errorf("For[%d] = %s, want %s", i, d.For[i].Kind, w)
 		}
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "@external decorator get(path: string) throws ServerError, NetworkError;")
+	d = firstDecl[*ast.DecoratorDecl](t, "@external decorator fn get(path: string): throws ServerError, NetworkError;")
 	if !d.External || d.ExternalSpan.Start != 0 || d.ExternalSpan.End != 9 || len(d.Clauses) != 1 {
 		t.Fatalf("Decorator = %+v", d)
 	}
@@ -911,22 +911,22 @@ func TestCoreMarks(t *testing.T) {
 		t.Fatalf("Decorator = %+v", d)
 	}
 	// 二つを並べてよく、順は問わない
-	for _, src := range []string{"@external @repeatable decorator x throws E;", "@repeatable @external decorator x throws E;"} {
+	for _, src := range []string{"@external @repeatable decorator fn x(): throws E;", "@repeatable @external decorator fn x(): throws E;"} {
 		d = firstDecl[*ast.DecoratorDecl](t, src)
 		if !d.Repeatable || !d.External || len(d.Decorators) != 0 {
 			t.Errorf("%s: Decorator = %+v", src, d)
 		}
 	}
 	// 印のない宣言
-	if d = firstDecl[*ast.DecoratorDecl](t, "decorator x;"); d.Repeatable || d.External {
+	if d = firstDecl[*ast.DecoratorDecl](t, "decorator fn x();"); d.Repeatable || d.External {
 		t.Errorf("Decorator = %+v", d)
 	}
 	tests := []struct{ name, src, want string }{
 		{"on model", "@repeatable model A {}", "@repeatable はデコレータの宣言の直前にだけ書ける"},
-		{"with args", "@repeatable() decorator x;", "@repeatable は引数を取らない"},
-		{"before other decorator", "@repeatable @db decorator x;", "@repeatable はデコレータの宣言の直前にだけ書ける"},
-		{"twice", "@repeatable @repeatable decorator x;", "@repeatable を二度書いている"},
-		{"external twice", "@external @repeatable @external decorator x;", "@external を二度書いている"},
+		{"with args", "@repeatable() decorator fn x();", "@repeatable は引数を取らない"},
+		{"before other decorator", "@repeatable @db decorator fn x();", "@repeatable はデコレータの宣言の直前にだけ書ける"},
+		{"twice", "@repeatable @repeatable decorator fn x();", "@repeatable を二度書いている"},
+		{"external twice", "@external @repeatable @external decorator fn x();", "@external を二度書いている"},
 		{"on alias", "@repeatable decorator a = b();", "名前付きのデコレータに @repeatable は付けられない"},
 		{"on field", "model A { @repeatable x: int; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
 		{"on reserved field", "model A { @repeatable decorator: string; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
@@ -938,7 +938,7 @@ func TestCoreMarks(t *testing.T) {
 }
 
 func TestDecoratorDeclClauses(t *testing.T) {
-	d := firstDecl[*ast.DecoratorDecl](t, `decorator fallbackToCache
+	d := firstDecl[*ast.DecoratorDecl](t, `decorator fn fallbackToCache():
     catches http.NetworkError recovers
     throws OfflineCacheMiss prevents effects
     catches A, B ignores
@@ -977,11 +977,11 @@ func TestDecoratorDeclClauses(t *testing.T) {
 // （宣言の名前、適用の @ の後ろ、別名の = の後ろ、@see の後ろ）には予約語を書け、指す位置では最後の要素だけが予約語でよい。
 func TestDecoratorName(t *testing.T) {
 	for _, kw := range []string{"list", "effects", "int", "float", "delete", "op", "for", "decorator", "reads", "datetime"} {
-		d := firstDecl[*ast.DecoratorDecl](t, "decorator "+kw+"(table: any state) for op;")
-		if d.Name.Name != kw || len(d.Params) != 1 || len(d.For) != 1 {
-			t.Errorf("decorator %s = %+v", kw, d)
+		d := firstDecl[*ast.DecoratorDecl](t, "decorator fn "+kw+"(table: any state);")
+		if d.Name.Name != kw || len(d.Params) != 1 || !d.Fn || len(d.For) != 0 {
+			t.Errorf("decorator fn %s = %+v", kw, d)
 		}
-		if got := d.Name.Span; got.Start != source.Offset(len("decorator ")) || got.End != source.Offset(len("decorator "+kw)) {
+		if got := d.Name.Span; got.Start != source.Offset(len("decorator fn ")) || got.End != source.Offset(len("decorator fn "+kw)) {
 			t.Errorf("decorator %s の名前の Span = %+v", kw, got)
 		}
 	}
@@ -1034,7 +1034,7 @@ func TestDecoratorName(t *testing.T) {
 		t.Errorf("Tags = %+v", mm.Doc.Tags)
 	}
 	// @external は予約語のデコレータ名の宣言にも付く
-	x := firstDecl[*ast.DecoratorDecl](t, "@external decorator delete throws X;")
+	x := firstDecl[*ast.DecoratorDecl](t, "@external decorator fn delete(): throws X;")
 	if !x.External || x.Name.Name != "delete" {
 		t.Errorf("Decorator = %+v", x)
 	}
@@ -1043,7 +1043,7 @@ func TestDecoratorName(t *testing.T) {
 // TestDecoratorDeclCarryingClauses は DecoReadsClause / DecoEffectsClause と対象 effect、残りの引数
 // （docs/grammar.md「decorator の宣言」）。
 func TestDecoratorDeclCarryingClauses(t *testing.T) {
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator find(table: any state, column: string) for op reads table;")
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator fn find(table: any state, column: string): reads table;")
 	if len(d.Clauses) != 1 {
 		t.Fatalf("Clauses = %d", len(d.Clauses))
 	}
@@ -1054,14 +1054,14 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 	if got := r.Span; got.End-got.Start != source.Offset(len("reads table")) {
 		t.Errorf("reads の Span = %+v", got)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator effects(...targets: any effect) for op effects targets;")
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn effects(...targets: any effect): effects targets;")
 	if d.Name.Name != "effects" || len(d.Params) != 1 || !d.Params[0].Rest || d.Params[0].Name.Name != "targets" {
 		t.Fatalf("Decorator = %+v", d)
 	}
 	if p := d.Params[0]; p.Type.Any == nil || p.Type.Any.Kind != ast.AnyEffect || p.Type.Optional {
 		t.Errorf("Rest の型 = %+v", p.Type)
 	}
-	if got := d.Params[0].RestSpan; got.Start != source.Offset(len("decorator effects(")) || got.End-got.Start != 3 {
+	if got := d.Params[0].RestSpan; got.Start != source.Offset(len("decorator fn effects(")) || got.End-got.Start != 3 {
 		t.Errorf("RestSpan = %+v", got)
 	}
 	if got := d.Params[0].Span; got.Start != d.Params[0].RestSpan.Start {
@@ -1072,7 +1072,7 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 		t.Errorf("effects = %+v", e)
 	}
 	// 節は何度でも、どの順でも書ける。要素と区切りは op の節と同じ（区切りは ","。effects には直に書いた「状態.操作」も）
-	d = firstDecl[*ast.DecoratorDecl](t, `decorator both(a: any state, b: any state, ...es: any effect)
+	d = firstDecl[*ast.DecoratorDecl](t, `decorator fn both(a: any state, b: any state, ...es: any effect):
     reads a, b, store.users
     throws X prevents effects effects es, store.e, store.users.post
     catches Y recovers
@@ -1102,11 +1102,11 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 		t.Errorf("Clause 5 = %+v", e)
 	}
 	// 残りの引数は、ほかの引数の後ろに一つ、または単独で。型は any か、型（| も書ける）
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator tags(first: string, second: int?, ...rest: int | float);")
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn tags(first: string, second: int?, ...rest: int | float);")
 	if len(d.Params) != 3 || d.Params[0].Rest || d.Params[1].Rest || !d.Params[2].Rest || len(d.Params[2].Type.Types) != 2 {
 		t.Errorf("Params = %+v", d.Params)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator on(...ss: any effect on carts.post);")
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn on(...ss: any effect on carts.post);")
 	if p := d.Params[0]; !p.Rest || p.Type.Any == nil || p.Type.Any.On == nil || p.Type.Any.On.Op != ast.Post {
 		t.Errorf("Param = %+v", p)
 	}
@@ -1144,7 +1144,7 @@ func TestRelationObject(t *testing.T) {
 		{"named effect on op", "fn f(): effects a throws X keeps a;", "目的語は「effects」だけ"},
 		{"named effects on op", "fn f(): effects a throws X keeps a prevents b;", "keeps の目的語は「effects」だけ"},
 		{"qualified effect", "fn f(): throws X prevents server.a;", "prevents の目的語は「effects」だけ"},
-		{"named effect on decorator", "decorator d throws X prevents a | b;", "prevents の目的語は「effects」だけ"},
+		{"named effect on decorator", "decorator fn d(): throws X prevents a | b;", "prevents の目的語は「effects」だけ"},
 		{"missing object", "fn f(): throws X prevents;", "「effects」が必要だが「;」がある"},
 	}
 	for _, tt := range tests {
@@ -1164,7 +1164,7 @@ func TestDecoratorDeclAlias(t *testing.T) {
 }
 
 func TestDecoratorDeclParamTypes(t *testing.T) {
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator route(path: string, from: any state?, onInvalid: any effect on location.put, when: any variant, e: any exception, o: any op, m: any model);")
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator fn route(path: string, from: any state?, onInvalid: any effect on location.put, when: any variant, e: any exception, o: any op, m: any model);")
 	if len(d.Params) != 7 {
 		t.Fatalf("Params = %d", len(d.Params))
 	}
@@ -1187,32 +1187,32 @@ func TestDecoratorDeclParamTypes(t *testing.T) {
 func TestDecoratorDeclReject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
 		{"external on alias", "@external decorator a = b();", "名前付きのデコレータに @external は付けられない"},
-		{"catches without outcome", "decorator a catches X;", "catches の後の振る舞い"},
-		{"halts without effect", "decorator a catches X halts;", "名前が必要"},
-		{"bad any kind", "decorator a(x: any thing);", "any の種類"},
+		{"catches without outcome", "decorator fn a(): catches X;", "catches の後の振る舞い"},
+		{"halts without effect", "decorator fn a(): catches X halts;", "名前が必要"},
+		{"bad any kind", "decorator fn a(x: any thing);", "any の種類"},
 		{"bad target", "decorator a for thing;", "for の対象"},
 		{"namespace target", "decorator a for namespace;", "for の対象"},
-		{"param without type", "decorator a(x);", "「:」が必要"},
+		{"param without type", "decorator fn a(x);", "「:」が必要"},
 		{"alias without args", "decorator a = b;", "「(」が必要"},
-		{"optional non-any type with pipe", "decorator a(x: int |);", "型が必要"},
-		{"missing semicolon", "decorator a", "「;」が必要"},
-		{"reads without name", "decorator a reads;", "名前が必要"},
-		{"reads separated by pipe", "decorator a reads x | y;", "reads の並びの区切りは「,」で、「|」ではない"},
-		{"effects separated by pipe", "decorator a effects x | y;", "effects の並びの区切りは「,」で、「|」ではない"},
-		{"throws separated by pipe", "decorator a throws X | Y;", "throws の並びの区切りは「,」で、「|」ではない"},
-		{"catches separated by pipe", "decorator a catches X | Y recovers;", "catches の並びの区切りは「,」で、「|」ではない"},
-		{"effects trailing comma", "decorator a effects x,;", "名前が必要"},
-		{"effects without name", "decorator a effects;", "名前が必要"},
+		{"optional non-any type with pipe", "decorator fn a(x: int |);", "型が必要"},
+		{"missing semicolon", "decorator a for state", "「;」が必要"},
+		{"reads without name", "decorator fn a(): reads;", "名前が必要"},
+		{"reads separated by pipe", "decorator fn a(): reads x | y;", "reads の並びの区切りは「,」で、「|」ではない"},
+		{"effects separated by pipe", "decorator fn a(): effects x | y;", "effects の並びの区切りは「,」で、「|」ではない"},
+		{"throws separated by pipe", "decorator fn a(): throws X | Y;", "throws の並びの区切りは「,」で、「|」ではない"},
+		{"catches separated by pipe", "decorator fn a(): catches X | Y recovers;", "catches の並びの区切りは「,」で、「|」ではない"},
+		{"effects trailing comma", "decorator fn a(): effects x,;", "名前が必要"},
+		{"effects without name", "decorator fn a(): effects;", "名前が必要"},
 		{"qualified name", "decorator a.b;", "修飾しない識別子"},
 		{"no name", "decorator ;", "デコレータの名前が必要"},
-		{"rest not last", "decorator a(...xs: any effect, y: string);", "残りの引数 ...xs は引数の並びの最後に一つだけ書ける"},
-		{"two rests", "decorator a(...xs: any effect, ...ys: any state);", "残りの引数 ...xs は引数の並びの最後に一つだけ書ける"},
-		{"optional rest any", "decorator a(...xs: any effect?);", "残りの引数 ...xs は省略可能にできない"},
-		{"optional rest type", "decorator a(...xs: string?);", "残りの引数 ...xs は省略可能にできない"},
-		{"array rest type", "decorator a(...xs: string[]);", "渡す値一つの型を書く"},
-		{"rest without name", "decorator a(...: string);", "「識別子」が必要"},
-		{"rest with keyword name", "decorator a(...to: string);", "to は予約語で、識別子には使えない"},
-		{"two dots", "decorator a(..xs: string);", "「識別子」が必要だが「.」がある"},
+		{"rest not last", "decorator fn a(...xs: any effect, y: string);", "残りの引数 ...xs は引数の並びの最後に一つだけ書ける"},
+		{"two rests", "decorator fn a(...xs: any effect, ...ys: any state);", "残りの引数 ...xs は引数の並びの最後に一つだけ書ける"},
+		{"optional rest any", "decorator fn a(...xs: any effect?);", "残りの引数 ...xs は省略可能にできない"},
+		{"optional rest type", "decorator fn a(...xs: string?);", "残りの引数 ...xs は省略可能にできない"},
+		{"array rest type", "decorator fn a(...xs: string[]);", "渡す値一つの型を書く"},
+		{"rest without name", "decorator fn a(...: string);", "「識別子」が必要"},
+		{"rest with keyword name", "decorator fn a(...to: string);", "to は予約語で、識別子には使えない"},
+		{"two dots", "decorator fn a(..xs: string);", "「識別子」が必要だが「.」がある"},
 		{"rest in op params", "fn f(...xs: string);", "「識別子」が必要だが「...」がある"},
 		{"alias target keyword in the middle", "decorator a = b.op.c();", "op は予約語で、名前には使えない"},
 	}
@@ -1368,7 +1368,7 @@ func TestReadDecl(t *testing.T) {
 	if len(m.Body.Fields) != 1 || m.Body.Fields[0].Name.Name != "read" {
 		t.Errorf("Model = %+v", m)
 	}
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator read(target: any state, ...rest: any state) for read, op reads target;")
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator read(target: any state, ...rest: any state) for read, op;")
 	if d.Name.Name != "read" || d.Params[0].Type.Any.Kind != ast.AnyState || !d.Params[1].Rest {
 		t.Fatalf("Decorator = %+v", d)
 	}
@@ -1388,7 +1388,7 @@ func TestReadDecl(t *testing.T) {
 		{"qualified name", "read fn a.r(): T reads users;", "修飾しない識別子"},
 		{"no parens", "read fn r: T reads users;", "read fn r の名前の後ろに、引数の括弧が要る"},
 		{"old head", "read r(): T reads users;", "read r(…) という書き方はなくなった。関数の宣言の頭は fn で、種類は、その前に書く（read fn r(…) と書く"},
-		{"any read", "decorator d(x: any read);", "any の種類（exception / effect / state / op / model / variant / case）が必要"},
+		{"any read", "decorator fn d(x: any read);", "any の種類（exception / effect / state / op / model / variant / case）が必要"},
 		{"keyword as op name", "fn read();", "read は予約語で、識別子には使えない"},
 	}
 	for _, tt := range tests {
@@ -2059,7 +2059,7 @@ func TestReservedWordReject(t *testing.T) {
 		{"declaration name", "model op {}", "op は予約語で、識別子には使えない"},
 		{"op name", "fn state();", "state は予約語で、識別子には使えない"},
 		{"op parameter", "fn f(op: string);", "op は予約語で、識別子には使えない"},
-		{"decorator parameter", "decorator d(to: string);", "to は予約語で、識別子には使えない"},
+		{"decorator parameter", "decorator fn d(to: string);", "to は予約語で、識別子には使えない"},
 		{"named argument", "@d(to: 1) fn f();", "to は予約語で、識別子には使えない"},
 		{"const name", "fn f() { val match = g(); }", "match は予約語で、識別子には使えない"},
 		{"union arm", "union U { model: string; }", "ユニオンのメンバー"},
@@ -2566,16 +2566,16 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 		// 型で絞る形の対象に、省略可能な型は、書けない（名前で絞る形を示す）
 		{"optional subject on target", "decorator d for case of M?;", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
 		{"nullable subject on target", "decorator d for case of nullable<M>;", "省略可能な型を対象にする分類のケースは、名前で絞る（case of 分類の名前）"},
-		{"nullable subject on param", "decorator d(x: any case of nullable<M>);", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
-		{"doubly optional subject on param", "decorator d(x: any case of M??);", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
-		{"optional rest", "decorator d(...xs: any case of M?) for op;", "残りの引数 ...xs は省略可能にできない"},
+		{"nullable subject on param", "decorator fn d(x: any case of nullable<M>);", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
+		{"doubly optional subject on param", "decorator fn d(x: any case of M??);", "型で絞る形（case of 型）の対象に、省略可能な型は書けない"},
+		{"optional rest", "decorator fn d(...xs: any case of M?);", "残りの引数 ...xs は省略可能にできない"},
 		{"removed: classify case", "decorator d for classify case;", removed},
 		{"removed: classify of never case", "decorator d for classify of never case;", removed},
-		{"removed: any classify Actor case", "decorator d(x: any classify Actor case);", removed},
+		{"removed: any classify Actor case", "decorator fn d(x: any classify Actor case);", removed},
 		{"classify itself", "decorator d for classify;", "分類そのもの（classify）は、まだ、書けない"},
-		{"any classify itself", "decorator d(x: any classify);", "分類そのもの（classify）は、まだ、書けない"},
+		{"any classify itself", "decorator fn d(x: any classify);", "分類そのもの（classify）は、まだ、書けない"},
 		{"name without case", "decorator d for Actor;", "for の対象"},
-		{"any name without case", "decorator d(x: any Actor);", "any の種類"},
+		{"any name without case", "decorator fn d(x: any Actor);", "any の種類"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -2585,9 +2585,9 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 // TestDecoratorTargets は、付ける先の並び（docs/grammar.md「decorator の宣言」）: 区切りは ","。なくした区切り "|" は、
 // "," として読み進める（対象は、どちらも読める）。核の型の語（datetime、date、time、duration）は、型の位置で読める。
 func TestDecoratorTargets(t *testing.T) {
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator context(name: string) for model, state, op reads counter;")
-	if len(d.For) != 3 || d.For[0].Kind != ast.TargetModel || d.For[1].Kind != ast.TargetState || d.For[2].Kind != ast.TargetOp || len(d.Clauses) != 1 {
-		t.Errorf("For = %+v, Clauses = %d", d.For, len(d.Clauses))
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator context(name: string) for model, state, op;")
+	if len(d.For) != 3 || d.For[0].Kind != ast.TargetModel || d.For[1].Kind != ast.TargetState || d.For[2].Kind != ast.TargetOp || d.Fn {
+		t.Errorf("For = %+v, Fn = %v", d.For, d.Fn)
 	}
 	file, diags := parseSrc(t, "decorator d for model | state;")
 	if len(diags) != 1 || len(file.Decls) != 1 || len(file.Decls[0].(*ast.DecoratorDecl).For) != 2 {
@@ -2603,4 +2603,68 @@ func TestDecoratorTargets(t *testing.T) {
 	mustFail(t, "fn date();", "date は予約語で、識別子には使えない")
 	mustFail(t, "fn f(time: string);", "time は予約語で、識別子には使えない")
 	firstDecl[*ast.ModelDecl](t, "model M { time: time; date: date; datetime: datetime; duration: duration; }")
+}
+
+// TestDecoratorFn は、関数に付けるデコレータ（docs/grammar.md「decorator の宣言」「デコレータの本体」）: decorator fn の頭、
+// 「)」の後ろの形（節は「:」の後ろ。節がなければ「:」も書かない）、本体、なくした書き方からの読み進め。
+func TestDecoratorFn(t *testing.T) {
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator fn post(path: string);")
+	if !d.Fn || d.Name.Name != "post" || len(d.Params) != 1 || len(d.For) != 0 || len(d.Clauses) != 0 || d.Body != nil {
+		t.Errorf("decorator fn post = %+v", d)
+	}
+	if got := d.FnSpan; got.Start != source.Offset(len("decorator ")) || got.End-got.Start != 2 {
+		t.Errorf("FnSpan = %+v", got)
+	}
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn limited(): throws LimitExceeded prevents effects;")
+	if !d.Fn || len(d.Params) != 0 || len(d.Clauses) != 1 || d.Body != nil {
+		t.Errorf("decorator fn limited = %+v", d)
+	}
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn limited(): throws LimitExceeded { val a = allowance(); match (a by Allowance) { Allowed => proceed(); Denied => throw LimitExceeded; } }")
+	if !d.Fn || len(d.Clauses) != 1 || d.Body == nil || len(d.Body.Stmts) != 2 {
+		t.Fatalf("本体のある decorator fn = %+v", d)
+	}
+	arm := d.Body.Stmts[1].(*ast.MatchStmt).Match.Arms[0]
+	if call, ok := arm.Body.(*ast.Call); !ok || call.Callee.String() != "proceed" || len(call.Args) != 0 {
+		t.Errorf("アームの本体 = %+v", arm.Body)
+	}
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn audited() { proceed(); record(); }")
+	if d.Body == nil || len(d.Body.Stmts) != 2 || len(d.Clauses) != 0 {
+		t.Errorf("節のない、本体のある decorator fn = %+v", d)
+	}
+	d = firstDecl[*ast.DecoratorDecl](t, "@external @repeatable decorator fn get(path: string): throws ServerError;")
+	if !d.Fn || !d.External || !d.Repeatable {
+		t.Errorf("核の印の付いた decorator fn = %+v", d)
+	}
+
+	// なくした書き方は、新しい書き方を示して SYNTAX にし、decorator fn として読み進める
+	for _, tt := range []struct{ src, want string }{
+		{"decorator limited for op throws X prevents effects;", "decorator limited for op … という書き方はなくなった。関数に付けるデコレータは decorator fn limited(…) と書く"},
+		{"decorator limited throws X;", "付ける先を書かない decorator limited … という書き方はなくなった"},
+		{"decorator traced;", "付ける先を書かない decorator traced … という書き方はなくなった"},
+	} {
+		file, diags := parseSrc(t, tt.src)
+		if len(diags) != 1 || !strings.Contains(diags[0].Message, tt.want) {
+			t.Errorf("%s: 診断 = %+v, want %q", tt.src, diags, tt.want)
+			continue
+		}
+		if len(file.Decls) != 1 || !file.Decls[0].(*ast.DecoratorDecl).Fn {
+			t.Errorf("%s: 読み進めた宣言が decorator fn でない", tt.src)
+		}
+	}
+
+	rejects := []struct{ name, src, want string }{
+		{"no parens", "decorator fn a;", "decorator fn の引数の「(」が要る。引数がなくても書く（decorator fn a() と書く"},
+		{"clause without colon", "decorator fn a() throws X;", "「)」の後ろに、節を書くなら、「:」で始める（decorator fn a(…): throws … と書く"},
+		{"colon without clause", "decorator fn a():;", "「:」の後ろに、節が要る。何も書かないなら、「:」も書かない"},
+		{"colon before body", "decorator fn a(): { proceed(); }", "「:」の後ろに、節が要る。何も書かないなら、「:」も書かない"},
+		{"return type", "decorator fn a(): string;", "decorator fn に、戻り値は書かない"},
+		{"for after fn", "decorator fn a() for op;", "decorator fn に for は書かない"},
+		{"fn alias", "decorator fn a = b();", "名前付きのデコレータに fn は書かない"},
+		{"clause on for form", "decorator a for model, op throws X;", "for で付ける先を書いたデコレータは、節も本体も持てない"},
+		{"body on for form", "decorator a for state { proceed(); }", "for で付ける先を書いたデコレータは、節も本体も持てない"},
+		{"no end", "decorator fn a()", "「;」かデコレータの本体の「{」が必要"},
+	}
+	for _, tt := range rejects {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
 }

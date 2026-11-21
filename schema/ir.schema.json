@@ -411,6 +411,9 @@
         },
         {
           "$ref": "#/$defs/EffectCallee"
+        },
+        {
+          "$ref": "#/$defs/ProceedCallee"
         }
       ]
     },
@@ -602,7 +605,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.17"
+          "const": "0.18"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -812,7 +815,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.17"
+          "const": "0.18"
         }
       },
       "required": [
@@ -918,6 +921,9 @@
         "alias": {
           "$ref": "#/$defs/DecoratorAlias"
         },
+        "body": {
+          "$ref": "#/$defs/Wiring"
+        },
         "caseTargets": {
           "items": {
             "$ref": "#/$defs/CaseKind"
@@ -946,6 +952,9 @@
           "type": "array"
         },
         "external": {
+          "type": "boolean"
+        },
+        "fn": {
           "type": "boolean"
         },
         "kind": {
@@ -991,6 +1000,7 @@
         "decorators",
         "span",
         "params",
+        "fn",
         "targets",
         "caseTargets",
         "external",
@@ -1339,7 +1349,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.17"
+          "const": "0.18"
         },
         "transpiler": {
           "type": "string"
@@ -1557,7 +1567,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.17"
+          "const": "0.18"
         }
       },
       "required": [
@@ -2345,6 +2355,18 @@
       ],
       "type": "object"
     },
+    "ProceedCallee": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "proceed"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
     "Program": {
       "additionalProperties": false,
       "description": "IR 全体（docs/ir.md「Program」）。namespaces の先頭はグローバル（name \"\"）。",
@@ -2362,7 +2384,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.17"
+          "const": "0.18"
         }
       },
       "required": [
@@ -3257,7 +3279,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.17"
+          "const": "0.18"
         },
         "viewer": {
           "type": "string"

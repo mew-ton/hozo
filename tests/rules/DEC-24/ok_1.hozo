@@ -1,0 +1,25 @@
+// DEC-24: 宣言した名前空間の op に付けるなら、その名前空間の op、read、効果を呼べる。別の名前空間の op に付けるなら、
+// 本体が呼べるのは、export の op だけ
+namespace a {
+  state log: list<string>;
+  effect fn add(text: string): effects log.post;
+  fn hidden();
+  export fn record() {
+    add("done");
+  }
+  decorator fn local() {
+    hidden();
+    proceed();
+    add("done");
+  }
+  decorator fn shared() {
+    proceed();
+    record();
+  }
+  @local
+  fn f();
+}
+namespace b {
+  @a.shared
+  fn g();
+}

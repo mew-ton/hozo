@@ -219,7 +219,7 @@ function walkClassifySubject(s: ClassifySubject): void {
   }
 }
 
-// 呼び出し先は op、read、効果のどれか（docs/ir.md「配線」の Callee。版 0.6）
+// 呼び出し先は op、read、効果、proceed のどれか（docs/ir.md「配線」の Callee。版 0.6。proceed は 0.18）
 function walkCall(c: Call): void {
   const callee = c.callee;
   seen.add(`callee:${callee.kind}`);
@@ -234,6 +234,10 @@ function walkCall(c: Call): void {
       walkEffectRef(callee.effect);
       // 直に呼ぶ組み込みの効果の、値を取る操作の引数名は value
       if (callee.effect.kind === "direct") for (const a of c.args) assert.equal(a.param, "value");
+      break;
+    case "proceed":
+      // デコレータの本体の proceed()（docs/ir.md「配線」の Callee。版 0.18）: 引数は、ない
+      assert.equal(c.args.length, 0);
       break;
     default:
       unreachable(callee);
@@ -519,7 +523,7 @@ function walkDecl(d: Decl, program: Program): void {
 }
 
 function walkProgram(p: Program): void {
-  assert.equal(p.version, "0.17");
+  assert.equal(p.version, "0.18");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
     // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
@@ -539,7 +543,7 @@ test("program.golden.json reads as Program and round-trips", () => {
 test("view.golden.json reads as View and round-trips", () => {
   const text = golden("view.golden.json");
   const view: View = JSON.parse(text);
-  assert.equal(view.version, "0.17");
+  assert.equal(view.version, "0.18");
   assert.equal(typeof view.viewer, "string");
   // files は単位の in に合ったファイル。namespaces の値は、その名前空間を出力する単位ごとの設定（設定の順）
   assert.ok(view.files.every((f) => typeof f === "string"));

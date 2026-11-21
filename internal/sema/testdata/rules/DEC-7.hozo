@@ -8,8 +8,8 @@ namespace a {
   exception F;
   exception G;
   union Errors { E; F; }
-  decorator onPut(e: any effect on s.put);
-  decorator onError(error: Errors);
+  decorator fn onPut(e: any effect on s.put);
+  decorator fn onError(error: Errors);
   @onPut(put)
   fn ok1(): void;
   @onPut(post)                         // ERROR: DEC-7
@@ -29,7 +29,7 @@ namespace a {
   effect fn drain(): effects t as HasItems -> Empty;
   classify Phase of t { Idle; Busy; }
   effect fn start(): effects Phase as Idle -> Busy;
-  decorator onListPut(e: any effect on t.put);
+  decorator fn onListPut(e: any effect on t.put);
   @onListPut(tput)
   fn ok4(): void;
   @onListPut(drain)                    // ERROR: DEC-7

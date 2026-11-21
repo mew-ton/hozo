@@ -1,7 +1,7 @@
 // DEC-16（docs/check.md「デコレータ」）: catches の例外が、そこまでの E にない（吸収する相手がない。warning）
 namespace a {
   exception E;
-  decorator recoverE catches E recovers;
+  decorator fn recoverE(): catches E recovers;
   fn leaf();
   @recoverE                            // WARN: DEC-16
   fn wiring() {

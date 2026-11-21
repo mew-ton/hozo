@@ -5,7 +5,7 @@
 namespace ops {
   model Job { id: int; }
   /** 印。付いた op は純粋でなくなる */
-  decorator mark;
+  decorator fn mark();
   @mark export fn run(job: Job): Job;
 }
 
@@ -54,7 +54,7 @@ namespace split {
 namespace o {
   model Thing { x: int; }
   /** 印。付いた op は純粋でなくなる */
-  decorator mark;
+  decorator fn mark();
   @mark export fn make(): Thing;
 }
 namespace ctx { model Info { y: int; } }

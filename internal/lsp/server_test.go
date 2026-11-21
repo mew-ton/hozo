@@ -302,7 +302,7 @@ func TestSession(t *testing.T) {
 	if hov == nil {
 		t.Fatal("hover(@unavailableOnFailure) = nil")
 	}
-	for _, want := range []string{"decorator unavailableOnFailure = page.fallback(error: http.NetworkError | http.ServerError, view: Unavailable)", "decorator page.fallback(error: any exception, view: any model) catches error recovers", "固定した引数:", "- `error: http.NetworkError | http.ServerError`", "- `view: Unavailable`"} {
+	for _, want := range []string{"decorator unavailableOnFailure = page.fallback(error: http.NetworkError | http.ServerError, view: Unavailable)", "decorator fn page.fallback(error: any exception, view: any model): catches error recovers", "固定した引数:", "- `error: http.NetworkError | http.ServerError`", "- `view: Unavailable`"} {
 		if !strings.Contains(hov.Contents.Value, want) {
 			t.Errorf("hover(@unavailableOnFailure) に %q がない:\n%s", want, hov.Contents.Value)
 		}
@@ -1182,13 +1182,13 @@ func TestCarryingDecorators(t *testing.T) {
   @db.table
   state rows: list<Row>;
   /** 表から引く */
-  decorator list(table: any state, column: string?) for op reads table;
+  decorator fn list(table: any state, column: string?): reads table;
   /**
    * 並べた効果を行う。
    *
    * @param targets 行う効果
    */
-  decorator effects(...targets: any effect) for op effects targets reads rows;
+  decorator fn effects(...targets: any effect): effects targets reads rows;
   decorator into(table: any state) for effect;
   decorator everything = list(rows);
   @into(rows)
@@ -1267,8 +1267,8 @@ func TestCarryingDecorators(t *testing.T) {
 		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
 	}
 	const (
-		listHead    = "decorator list(table: any state, column: string?) reads table"
-		effectsHead = "decorator effects(...targets: any effect) reads rows effects targets"
+		listHead    = "decorator fn list(table: any state, column: string?): reads table"
+		effectsHead = "decorator fn effects(...targets: any effect): reads rows effects targets"
 	)
 	for _, tt := range []struct {
 		what   string
@@ -1277,14 +1277,14 @@ func TestCarryingDecorators(t *testing.T) {
 		skip   int
 		hover  []string
 	}{
-		{"予約語のデコレータ名の宣言", at("decorator list(", len("decorator ")), "decorator list(", len("decorator "), []string{listHead, "表から引く"}},
-		{"予約語のデコレータ名の適用", at("@list(rows)\n  fn all", 1), "decorator list(", len("decorator "), []string{listHead, "表から引く"}},
-		{"修飾しない予約語の適用（@effects）", at("@effects(add)", 1), "decorator effects(", len("decorator "), []string{effectsHead, "並べた効果を行う。"}},
-		{"修飾した予約語の適用（@store.effects）", at("@store.effects\n", len("@store.")), "decorator effects(", len("decorator "), []string{effectsHead}},
-		{"reads の節の引数名", at("for op reads table;", len("for op reads ")), "table: any state, column", 0, []string{listHead, "  table: any state"}},
-		{"effects の節の、残りの引数の名前", at("for op effects targets", len("for op effects ")), "targets: any effect) for op", 0, []string{effectsHead, "  ...targets: any effect", "行う効果"}},
+		{"予約語のデコレータ名の宣言", at("decorator fn list(", len("decorator fn ")), "decorator fn list(", len("decorator fn "), []string{listHead, "表から引く"}},
+		{"予約語のデコレータ名の適用", at("@list(rows)\n  fn all", 1), "decorator fn list(", len("decorator fn "), []string{listHead, "表から引く"}},
+		{"修飾しない予約語の適用（@effects）", at("@effects(add)", 1), "decorator fn effects(", len("decorator fn "), []string{effectsHead, "並べた効果を行う。"}},
+		{"修飾した予約語の適用（@store.effects）", at("@store.effects\n", len("@store.")), "decorator fn effects(", len("decorator fn "), []string{effectsHead}},
+		{"reads の節の引数名", at("): reads table;", len("): reads ")), "table: any state, column", 0, []string{listHead, "  table: any state"}},
+		{"effects の節の、残りの引数の名前", at("): effects targets", len("): effects ")), "targets: any effect): ", 0, []string{effectsHead, "  ...targets: any effect", "行う効果"}},
 		{"節に書いた状態の名前", at("effects targets reads rows;", len("effects targets reads ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
-		{"残りの引数の宣言", at("...targets: any effect", len("...")), "targets: any effect) for op", 0, []string{"  ...targets: any effect"}},
+		{"残りの引数の宣言", at("...targets: any effect", len("...")), "targets: any effect): ", 0, []string{"  ...targets: any effect"}},
 		{"残りの引数に渡した効果", at("@effects(add)", len("@effects(")), "add(row: Row): effects rows.post;", 0, []string{"effect fn add(row: Row): effects rows.post"}},
 		// 版 0.6: 引数を持つ exception / effect / read、配線からの呼び出し、引数を持つ throw
 		{"効果の呼び出し", at("    add(row);", len("    ")), "add(row: Row): effects rows.post;", 0, []string{"effect fn add(row: Row): effects rows.post"}},
@@ -1295,10 +1295,10 @@ func TestCarryingDecorators(t *testing.T) {
 		{"例外の @param", at("@param wait", len("@param ")), "wait: duration, note", 0, []string{"exception Busy(wait: duration, note: string?)", "  wait: duration", "待つ時間"}},
 		{"read に付けた、何度も付けられるデコレータ", at("@db.where(\"id\", \"y\")", len("@db.")), "", -1, []string{"@repeatable decorator db.where(column: string, value: string | int | float | boolean) for read"}},
 		{"効果の宣言に付けたデコレータ", at("@into(rows)", 1), "decorator into(", len("decorator "), []string{"decorator into(table: any state) for effect"}},
-		{"別名の先の予約語", at("= list(rows);", len("= ")), "decorator list(", len("decorator "), []string{listHead}},
-		{"@see の予約語のデコレータ名", at("@see list", len("@see ")), "decorator list(", len("decorator "), []string{listHead}},
-		{"@see の修飾した予約語のデコレータ名", at("@see store.effects", len("@see store.")), "decorator effects(", len("decorator "), []string{effectsHead}},
-		{"@param の残りの引数", at("@param targets", len("@param ")), "targets: any effect) for op", 0, []string{"  ...targets: any effect"}},
+		{"別名の先の予約語", at("= list(rows);", len("= ")), "decorator fn list(", len("decorator fn "), []string{listHead}},
+		{"@see の予約語のデコレータ名", at("@see list", len("@see ")), "decorator fn list(", len("decorator fn "), []string{listHead}},
+		{"@see の修飾した予約語のデコレータ名", at("@see store.effects", len("@see store.")), "decorator fn effects(", len("decorator fn "), []string{effectsHead}},
+		{"@param の残りの引数", at("@param targets", len("@param ")), "targets: any effect): ", 0, []string{"  ...targets: any effect"}},
 	} {
 		var hov *protocol.Hover
 		c.result(protocol.MethodHover, tt.pos, &hov)
@@ -1408,7 +1408,7 @@ func TestValAndCaseTargets(t *testing.T) {
   }
   decorator human for case of Actor;
   decorator both(until: date?, from: time) for model, case of never;
-  decorator of(who: any case of never) for op;
+  decorator fn of(who: any case of never);
   decorator seenBy(what: any case of Order?, any1: any case?) for model, case;
   model Order { id: string; }
   model Note { id: string; }

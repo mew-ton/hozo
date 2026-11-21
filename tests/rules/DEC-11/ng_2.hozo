@@ -1,6 +1,6 @@
 // DEC-11（docs/types.md「デコレータの引数」）: 位置で渡した引数が Param の数を超える、宣言にない引数名
 namespace a {
-  decorator d(code: int, name: string?);
+  decorator fn d(code: int, name: string?);
   @d(1, "x", true)                     // ERROR: DEC-11
   fn tooMany(): void;
   @d(code: 1, nope: "x")               // ERROR: DEC-11

@@ -8,7 +8,7 @@ namespace outside {
    *
    * @param targets 外部の仕組みが持つ状態への効果
    */
-  decorator does(...targets: any effect) for op effects targets;
+  decorator fn does(...targets: any effect): effects targets;
 
   /**
    * この op が呼ぶ外部の仕組みに届かなかった、または相手が壊れていたとき（http.NetworkError、http.ServerError）を、error に言い換える。
@@ -16,7 +16,7 @@ namespace outside {
    *
    * @param error 言い換えた先の例外
    */
-  decorator failsAs(error: any exception) for op
+  decorator fn failsAs(error: any exception):
     catches http.NetworkError, http.ServerError recovers
     throws error;
 }

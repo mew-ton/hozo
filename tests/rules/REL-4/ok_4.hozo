@@ -12,9 +12,9 @@ namespace a {
   fn failE(): throws E;
   fn failF(): throws F;
   fn failG(): throws G;
-  decorator absorb catches G ignores;
+  decorator fn absorb(): catches G ignores;
   @external
-  decorator boundary throws H;
+  decorator fn boundary(): throws H;
   fn only(): throws E prevents effects {
     failE();
     failF();

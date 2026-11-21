@@ -51,8 +51,8 @@ func TestOpsHoldExportedOpsOnly(t *testing.T) {
 	}
 	everything := []string{
 		"Authenticate", "CheckPassword", "ComposeNotice", "GetLatestOrder", "GetMe", "GetMyPage", "GetOrders", "IssueSession",
-		"Login", "Logout", "MyPage", "NewOrder", "NewSession", "PageOf", "PlaceOrder", "RequireFresh", "ResendNotices", "SessionOf",
-		"Summarize", "ToPublicUser",
+		"Login", "Logout", "MyPage", "NewOrder", "NewSession", "PageOf", "PlaceOrder", "RecordAudit", "RequireFresh", "ResendNotices",
+		"SessionOf", "Summarize", "ToPublicUser",
 	}
 	if got := methodNames(reflect.TypeFor[inner.Ops]()); !slices.Equal(got, everything) {
 		t.Errorf("inner.Ops のメソッド = %v（期待は %v）", got, everything)

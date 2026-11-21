@@ -31,6 +31,23 @@ func newSigState() *sigState {
 	return &sigState{rel: map[string]map[ir.EffectRef]ir.EffectState{}, succ: map[ir.EffectRef]ir.EffectState{}}
 }
 
+// clone は s の写し（デコレータの本体の proceed() の Sc にする。docs/check.md「デコレータの本体」）。
+func (s *sigState) clone() *sigState {
+	out := newSigState()
+	out.E = append([]string(nil), s.E...)
+	out.F = append([]ir.EffectRef(nil), s.F...)
+	for x, m := range s.rel {
+		out.rel[x] = map[ir.EffectRef]ir.EffectState{}
+		for e, st := range m {
+			out.rel[x][e] = st
+		}
+	}
+	for e, st := range s.succ {
+		out.succ[e] = st
+	}
+	return out
+}
+
 func (s *sigState) hasE(x string) bool       { return contains(s.E, x) }
 func (s *sigState) hasF(e ir.EffectRef) bool { return contains(s.F, e) }
 
@@ -254,6 +271,8 @@ type computer struct {
 	// reads と pure は op ごとの R と pure（docs/check.md「reads」「純粋」）。見る側によらない。
 	reads map[string][]string
 	pure  map[string]bool
+	// proceed は、今、計算しているデコレータの本体の proceed() の Sc（包んだ op の、そこまでの Sig）。本体の外では nil。
+	proceed *sigState
 }
 
 func newComputer(ix *index, r *reporter) *computer {
@@ -295,13 +314,20 @@ func (c *computer) detectCycles() {
 	edges := func(fqn string) []string {
 		var out []string
 		o := ix.op(fqn)
-		if o == nil || o.Body == nil {
+		if o == nil {
 			return nil
 		}
-		for _, r := range rowsOf(o.Body) {
-			for _, cr := range r.calls {
-				if name := cr.call.CalledOp(); ix.op(name) != nil {
-					out = appendUnique(out, name)
+		bodies := []*ir.Wiring{o.Body}
+		// 本体のあるデコレータの呼び出しは、付けた op の呼び出しとして数える（docs/check.md「デコレータの本体」）
+		for _, d := range ix.bodiedDecorators(o) {
+			bodies = append(bodies, d.Body)
+		}
+		for _, body := range bodies {
+			for _, r := range rowsOf(body) {
+				for _, cr := range r.calls {
+					if name := cr.call.CalledOp(); ix.op(name) != nil {
+						out = appendUnique(out, name)
+					}
 				}
 			}
 		}
@@ -405,7 +431,20 @@ func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 // wiringStep0 は手順 0（配線の op）。本体の行を順に見て E / F / rel / succ を計算し、その後ろに、運ばれた効果を足す
 // （addCarried）。
 func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
-	info := &bodyInfo{rows: rowsOf(o.Body), sources: map[string][]exSource{}}
+	info := c.blockStep(o.Body, ns, s, declared(o), o.Throws)
+	c.addWritten(o, s)
+	c.addCarried(o, s)
+	c.bodies[o.Name] = info
+	if emit {
+		checkRel4(o, s, c.r)
+	}
+}
+
+// blockStep は、文の並び一つ（op の配線の本体か、デコレータの本体）の、手順 0 の計算: 行を順に見て、E / F / rel / succ を
+// s に入れる。written は、節に書いた例外（Declared）、throws は、その節（出どころのない例外の rel を決める）。
+// デコレータの本体では、proceed() の Sc が、c.proceed（包んだ op の、そこまでの Sig）。
+func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []string, throws []ir.ThrowsClause) *bodyInfo {
+	info := &bodyInfo{rows: rowsOf(body), sources: map[string][]exSource{}}
 	info.sigs = make([][]*sigState, len(info.rows))
 	for i, r := range info.rows {
 		for _, cr := range r.calls {
@@ -436,7 +475,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 			}
 		}
 	}
-	for _, x := range declared(o) {
+	for _, x := range written {
 		s.addE(x)
 	}
 	// 文 j が、e を持つ呼び出しを持つか
@@ -479,7 +518,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 		srcs := info.sources[x]
 		for _, e := range s.F {
 			if len(srcs) == 0 {
-				s.setRel(x, e, relationState(o.Throws, x, identity))
+				s.setRel(x, e, relationState(throws, x, identity))
 				continue
 			}
 			var state ir.EffectState
@@ -546,12 +585,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 			s.succ[e] = ir.Unknown
 		}
 	}
-	c.addWritten(o, s)
-	c.addCarried(o, s)
-	c.bodies[o.Name] = info
-	if emit {
-		checkRel4(o, s, c.r)
-	}
+	return info
 }
 
 // addWritten は手順 0（配線の op）の「節に書いた効果」（docs/check.md「Sig(O, v)」）: Op.effects の効果 e のうち、本体が
@@ -664,6 +698,9 @@ func (c *computer) callSig(cr callRef, ns string) *sigState {
 		}
 	case ir.ReadCallee:
 		return newSigState()
+	case ir.ProceedCallee:
+		// デコレータの本体の proceed(): 包んだ op の、そこまでの Sig（docs/check.md「デコレータの本体」）
+		return c.proceed
 	}
 	return nil
 }
@@ -680,6 +717,22 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 			args = app.Args
 		}
 		subst := substituter(args)
+		if d.Body != nil {
+			// 本体のあるデコレータ: 付けた所で、広げたものとして計算する（docs/check.md「デコレータの本体」）。
+			// 本体を、配線として手順 0 と同じに計算し、proceed() の Sc を、ここまでの Sig にする。
+			inner, outer := s.clone(), c.proceed
+			*s = *newSigState()
+			c.proceed = inner
+			var written []string
+			for _, cl := range d.Throws {
+				for _, raw := range cl.Exceptions {
+					written = append(written, subst(raw)...)
+				}
+			}
+			c.blockStep(d.Body, ns, s, written, d.Throws)
+			c.proceed = outer
+			continue
+		}
 		for _, cl := range d.Catches {
 			for _, raw := range cl.Exceptions {
 				for _, x := range subst(raw) {
@@ -889,6 +942,9 @@ func (c *computer) readsOf(o *ir.Op) []string {
 		return out
 	}
 	add(c.stmtReads(o.Body.Statements)...)
+	for _, d := range c.ix.bodiedDecorators(o) {
+		add(c.stmtReads(d.Body.Statements)...) // 本体のあるデコレータが読む状態（docs/check.md「デコレータの本体」）
+	}
 	add(c.ix.readStates(o.Reads)...) // 節に書いた状態は、計算した分に足す（docs/check.md「reads」）
 	add(c.ix.readStates(o.Carried.Reads)...)
 	c.reads[o.Name] = out

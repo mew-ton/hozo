@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {"name": "gate.ticket/OK", "file": "gen/gate/gatetest/leaves.go", "lines": [78, 85]},
+    {"name": "gate.note/OK", "file": "gen/gate/gatetest/leaves.go", "lines": [91, 98]},
+    {"name": "gate.local/OK", "file": "gen/gate/gatetest/leaves.go", "lines": [104, 111]},
+    {"name": "gate.peek/OK", "file": "gen/gate/gatetest/leaves.go", "lines": [117, 124]},
+    {"name": "gate.Gate/Open", "file": "gen/gate/gatetest/classify.go", "lines": [26, 32]},
+    {"name": "gate.Gate/Shut", "file": "gen/gate/gatetest/classify.go", "lines": [35, 41]}
+  ]
+}

@@ -21,5 +21,5 @@ namespace a {
   /** @param x フィールドには引数がない */ // ERROR: DOC-1
   model N { x: string; }
   /** @param code ある */
-  decorator d(code: int);
+  decorator fn d(code: int);
 }

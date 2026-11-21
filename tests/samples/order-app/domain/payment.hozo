@@ -385,7 +385,7 @@ namespace payment {
    * @param then  代わりに行う効果
    */
   @repeatable
-  decorator noteFailure(error: any exception, then: any effect)
+  decorator fn noteFailure(error: any exception, then: any effect):
     catches error halts then;
 
   /**

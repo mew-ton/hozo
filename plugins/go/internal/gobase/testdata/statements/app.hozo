@@ -11,7 +11,7 @@ namespace app {
   exception Broken;
   exception Gone;
   /** 印。読むトランスパイラはない。付いた op は純粋でなくなる（メソッドの形は変わらない） */
-  decorator mark;
+  decorator fn mark();
 
   // 葉: デコレータを持つ（仕様の上で、純粋でない）
   @mark export fn load(id: Id): Item;

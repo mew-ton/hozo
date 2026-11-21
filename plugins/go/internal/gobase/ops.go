@@ -232,10 +232,10 @@ func (e *emitter) genOps() *fileGen {
 	// ops のメソッドのうち、配線の本体でないもの（op の宣言順）
 	for _, os := range s.Ops {
 		o := e.op(os.FQN)
-		if len(os.Seams) > 0 {
+		if len(os.Layers) > 0 {
 			e.genOuter(f, os, o)
 			if os.Place == golang.Never {
-				f.print(comment(os.Body + " は op " + o.Name + " の中身（" + neverException(o) + " を投げる）。外側の " + os.Method + " が、継ぎ目を通して呼ぶ。"))
+				f.print(comment(os.Body + " は op " + o.Name + " の中身（" + neverException(o) + " を投げる）。外側の " + os.Method + " が、" + through(os) + "を通して呼ぶ。"))
 				params, results := golang.Signature(o, f.im, e.reserved)
 				f.printf("func (o *ops) %s {\n\treturn %s\n}\n\n", method(os.Body, params, results), e.neverValue(f, o))
 			}
@@ -287,29 +287,44 @@ func (e *emitter) neverValue(f *fileGen, o *ir.Op) string {
 	return f.goType(ir.Ref(x)) + "{}"
 }
 
-// genOuter は、継ぎ目を持つ op の外側: ops の公開のメソッド（docs/plugin-go.md「外側」）。継ぎ目が二つ以上なら入れ子にする:
-// Op.decorators の最後（op に最も近い）のものが最も内側で、中身を直に受け取る。
+// genOuter は、包むデコレータ（継ぎ目か、本体のあるデコレータ）を持つ op の外側: ops の公開のメソッド（docs/plugin-go.md
+// 「外側」「本体のあるデコレータ」）。層が二つ以上なら入れ子にする: Op.decorators の最後（op に最も近い）のものが最も内側で、
+// 中身を直に受け取る。
 func (e *emitter) genOuter(f *fileGen, os golang.OpShape, o *ir.Op) {
 	var decorators []string
-	for _, d := range os.Seams {
-		decorators = append(decorators, "@"+d)
+	for _, l := range os.Layers {
+		decorators = append(decorators, "@"+l.Decorator)
 	}
 	impl := e.implExpr(os)
-	f.print(comment(os.Method + " は、継ぎ目（" + joinJa(decorators) + "）を通して、中身（" + impl + "）を呼ぶ。"))
+	f.print(comment(os.Method + " は、" + through(os) + "（" + joinJa(decorators) + "）を通して、中身（" + impl + "）を呼ぶ。"))
 	params, results := golang.Signature(o, f.im, e.reserved)
-	args := e.args(o) + ", "
-	fn := "func(" + params + ") " + results
-	// 内側から外へ組み立てる
-	inner := impl
-	for i := len(os.Seams) - 1; i >= 0; i-- {
-		call := "o." + e.fields.seams + "." + golang.SeamMethod(o.Name, os.Seams[i]) + "(" + args + inner + ")"
-		if i == 0 {
-			inner = call
-			break
-		}
-		inner = fn + " {\nreturn " + call + "\n}"
+	f.printf("func (o *ops) %s {\n\treturn %s\n}\n\n", method(os.Method, params, results), e.layerCall(f, os, o, 0))
+}
+
+// layerCall は、op の層 i（0 が、いちばん外。len(os.Layers) が、op の中身）を、op の引数のまま呼ぶ式。
+func (e *emitter) layerCall(f *fileGen, os golang.OpShape, o *ir.Op, i int) string {
+	args := e.args(o)
+	if i >= len(os.Layers) {
+		return e.implExpr(os) + "(" + args + ")"
 	}
-	f.printf("func (o *ops) %s {\n\treturn %s\n}\n\n", method(os.Method, params, results), inner)
+	l := os.Layers[i]
+	if l.Bodied {
+		return "o." + l.Method + "(" + args + ")"
+	}
+	return "o." + e.fields.seams + "." + l.Method + "(" + args + ", " + e.layerFunc(f, os, o, i+1) + ")"
+}
+
+// layerFunc は、op の層 i を、関数の値として指す式（継ぎ目に、中身として渡す）。
+func (e *emitter) layerFunc(f *fileGen, os golang.OpShape, o *ir.Op, i int) string {
+	if i >= len(os.Layers) {
+		return e.implExpr(os)
+	}
+	l := os.Layers[i]
+	if l.Bodied {
+		return "o." + l.Method
+	}
+	params, results := golang.Signature(o, f.im, e.reserved)
+	return "func(" + params + ") " + results + " {\nreturn " + e.layerCall(f, os, o, i) + "\n}"
 }
 
 // exportedOps は、N の op のうち export を付けたもの（入口の Ops に並ぶもの）。宣言順。

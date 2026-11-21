@@ -1,0 +1,12 @@
+// DEC-23: 型を一つ書いた、値の引数は、本体の中で、値として読める
+namespace a {
+  fn note(text: string);
+  fn count(n: int);
+  decorator fn labeled(label: string, times: int) {
+    note(label);
+    count(times);
+    proceed();
+  }
+  @labeled("f", 3)
+  fn f();
+}

@@ -3,14 +3,14 @@
 /** 時計の語彙 */
 namespace clock {
   /** この op は、動いている計算機の時計を読む。付いた op は純粋でなくなる */
-  decorator system for op;
+  decorator fn system();
 
   /**
    * この op を、誰にも呼ばれずに、every の間隔で動かす。
    *
    * @param every 動かす間隔
    */
-  decorator tick(every: duration) for op;
+  decorator fn tick(every: duration);
 
   /** 今の時刻 */
   @system

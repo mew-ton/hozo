@@ -74,6 +74,19 @@ func (e *emitter) checkNames() {
 	for _, o := range s.Ops {
 		ops.add(o.Method, "op "+o.FQN, o.FQN)
 	}
+	// 構造体 ops の、非公開のメソッドどうし: 中身の名前（<op>Body）と、本体のあるデコレータの外側（docs/plugin-go.md
+	// 「本体のあるデコレータ」）
+	private := e.names("構造体 ops の、非公開のメソッド")
+	for _, o := range s.Ops {
+		if o.Body != "" {
+			private.add(o.Body, "op "+o.FQN+" の中身", o.FQN)
+		}
+		for _, l := range o.Layers {
+			if l.Bodied {
+				private.add(l.Method, fmt.Sprintf("op %s の @%s の外側", o.FQN, l.Decorator), o.FQN)
+			}
+		}
+	}
 	// 状態の単位: 形で決まるメソッド（IsEmpty / Get と、出す Post / Put / Delete）、ケースの述語と、その単位の read と効果の名前を
 	// 先頭大文字にしたもの
 	for _, u := range s.States {

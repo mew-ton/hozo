@@ -4,16 +4,16 @@
 namespace a {
   state rows: list<string>;
   effect fn add(): effects rows.post;
-  decorator ok(...targets: any effect) for op effects targets;
-  decorator notLast(...xs: any effect, y: string);                 // ERROR: SYNTAX
-  decorator twoRests(...xs: any effect, ...ys: any state);         // ERROR: SYNTAX
-  decorator optionalRest(...xs: any effect?);                      // ERROR: SYNTAX
-  decorator optionalRest2(...xs: string?);                         // ERROR: SYNTAX
-  decorator arrayRest(...xs: string[]);                            // ERROR: SYNTAX
-  decorator keywordParam(...to: string);                           // ERROR: SYNTAX
-  decorator readsPipe(a: any state, b: any state) reads a | b;     // ERROR: SYNTAX
-  decorator effectsPipe(a: any effect, b: any effect) effects a | b;   // ERROR: SYNTAX
-  decorator noElement reads;                                       // ERROR: SYNTAX
+  decorator fn ok(...targets: any effect): effects targets;
+  decorator fn notLast(...xs: any effect, y: string);                 // ERROR: SYNTAX
+  decorator fn twoRests(...xs: any effect, ...ys: any state);         // ERROR: SYNTAX
+  decorator fn optionalRest(...xs: any effect?);                      // ERROR: SYNTAX
+  decorator fn optionalRest2(...xs: string?);                         // ERROR: SYNTAX
+  decorator fn arrayRest(...xs: string[]);                            // ERROR: SYNTAX
+  decorator fn keywordParam(...to: string);                           // ERROR: SYNTAX
+  decorator fn readsPipe(a: any state, b: any state): reads a | b;     // ERROR: SYNTAX
+  decorator fn effectsPipe(a: any effect, b: any effect): effects a | b;   // ERROR: SYNTAX
+  decorator fn noElement(): reads;                                       // ERROR: SYNTAX
   decorator a.qualified;                                           // ERROR: SYNTAX
   decorator badTarget for namespace;                               // ERROR: SYNTAX
   fn rest(...xs: string);                                          // ERROR: SYNTAX

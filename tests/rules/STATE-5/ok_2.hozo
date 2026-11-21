@@ -10,7 +10,7 @@ namespace a {
   effect fn log(m: M): effects logs.post;
   read fn byId(id: string): M? reads rows;
   read fn lastSeen(): M? reads seen;
-  decorator audited for op reads seen effects logs.post;
+  decorator fn audited(): reads seen effects logs.post;
   fn pick(a: M?, b: M?): M?;
   fn partial(m: M): M? reads byId effects add {
     add(m);

@@ -137,6 +137,18 @@ type ComposeNoticeCase struct {
 	Then func(t *testing.T, got pkgtype.Notification, err error)
 }
 
+// RecordAuditCases は、葉 server.recordAudit の、結果ごとのケース。結果の数だけ、メソッドがある。
+type RecordAuditCases interface {
+	// OK は、正常に終わるケース。
+	OK() RecordAuditCase
+}
+
+// RecordAuditCase は、葉 server.recordAudit の、ケース一つ: 渡す引数と、足りない確かめ。
+type RecordAuditCase struct {
+	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。err は、葉が返した失敗（正常のケースでは nil）。
+	Then func(t *testing.T, err error)
+}
+
 // LeafCases は、人が実装する葉の op の、単体テストのケース。葉ごとに、メソッド一つ（Leaves と同じ並び）。
 // メソッドが一つでも足りない値は、RunLeaves に渡すところでコンパイルできない。
 type LeafCases interface {
@@ -149,6 +161,7 @@ type LeafCases interface {
 	MyPage() MyPageCases
 	NewOrder() NewOrderCases
 	ComposeNotice() ComposeNoticeCases
+	RecordAudit() RecordAuditCases
 }
 
 // RunLeaves は、葉ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。
@@ -290,6 +303,19 @@ func RunLeaves(t *testing.T, leaves server.Leaves, c LeafCases) {
 			}
 			if k.Then != nil {
 				k.Then(t, got, err)
+			}
+		})
+	})
+	t.Run("server.recordAudit", func(t *testing.T) {
+		cases := c.RecordAudit()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			err := leaves.RecordAudit(context.Background())
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, err)
 			}
 		})
 	})

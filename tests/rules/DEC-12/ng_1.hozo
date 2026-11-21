@@ -1,6 +1,6 @@
 // DEC-12（docs/check.md「デコレータ」）: 別名の target が別名。internal/sema/testdata/rules/DEC-12.hozo から
 namespace a {
-  decorator d(code: int);
+  decorator fn d(code: int);
   decorator a1 = d(1);
   decorator a2 = a1();                 // ERROR: DEC-12
   @a1

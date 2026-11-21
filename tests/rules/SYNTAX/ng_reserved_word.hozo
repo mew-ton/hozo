@@ -7,7 +7,7 @@ namespace a {
   fn state(): Wrap;                                    // ERROR: SYNTAX
   fn byParam(op: string): Wrap;                        // ERROR: SYNTAX
   fn byType(w: a.model): Wrap;                         // ERROR: SYNTAX
-  decorator mark(to: string);                          // ERROR: SYNTAX
+  decorator fn mark(to: string);                          // ERROR: SYNTAX
   fn fetch(): Wrap;
   fn store(w: Wrap): Wrap;
   fn run(): Wrap {

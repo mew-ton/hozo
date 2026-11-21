@@ -8,6 +8,6 @@ namespace a {
   exception X;
   fn f(): effects e1 throws X keeps e1 prevents e2 { e1(); }       // ERROR: SYNTAX
   fn g(): effects e1 throws X prevents e1 { e1(); }                // ERROR: SYNTAX
-  decorator d throws X keeps e1 | e2;                    // ERROR: SYNTAX
+  decorator fn d(): throws X keeps e1 | e2;                    // ERROR: SYNTAX
   fn ok(): effects e1 throws X keeps effects { e1(); }
 }

@@ -285,7 +285,8 @@ func sampleProgram() *Program {
 							{Name: "on", Type: AnyParam{Of: AnyException}, Optional: true},
 							{Name: "after", Type: AnyParam{Of: AnyEffect, On: &EffectOn{State: "db", Operation: OpPost}}, Optional: true},
 						},
-						Targets: []DecoratorTarget{TargetOp, TargetField},
+						Fn:      true,
+						Targets: []DecoratorTarget{TargetOp},
 						Throws: []ThrowsClause{
 							{Exceptions: []string{"server.Unavailable"}, Relations: []Relation{{Kind: Prevents}}},
 							{Exceptions: []string{"$param:on"}, Relations: []Relation{{Kind: Keeps}}},
@@ -325,9 +326,14 @@ func sampleProgram() *Program {
 							{Name: "table", Type: AnyParam{Of: AnyState}, Optional: true},
 							{Name: "targets", Type: AnyParam{Of: AnyEffect}, Rest: true},
 						},
+						Fn:      true,
 						Targets: []DecoratorTarget{TargetOp},
 						Reads:   StateReads("$param:table", "session"),
 						Effects: NamedEffects("$param:targets"),
+						// 本体（docs/ir.md「decorator」の body）: 包んだ op の中身を、そのまま呼ぶ
+						Body: &Wiring{Statements: []Statement{
+							CallStmt{Call: Call{Callee: ProceedCallee{}, Span: span(f, 44, 141, 44, 150)}, Span: span(f, 44, 141, 44, 151)},
+						}},
 					},
 					&Op{
 						DeclBase: DeclBase{

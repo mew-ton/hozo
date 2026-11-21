@@ -15,7 +15,7 @@ namespace a {
     add(row);
   }
   // デコレータが運ぶ分は、葉の節ではない
-  decorator counting(table: any state) for op reads table;
+  decorator fn counting(table: any state): reads table;
   @counting(rows)
   fn count(): int;
 }

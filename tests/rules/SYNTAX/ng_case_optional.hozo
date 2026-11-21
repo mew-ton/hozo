@@ -7,8 +7,8 @@ namespace a {
   decorator onOptional for case of M?;                      // ERROR: SYNTAX
   decorator onNullable for case of nullable<M>;             // ERROR: SYNTAX
   // 引数の種類: 形の語で書いた省略可能な型と、? を二つ
-  decorator takesNullable(x: any case of nullable<M>);      // ERROR: SYNTAX
-  decorator takesTwice(x: any case of M??);                 // ERROR: SYNTAX
+  decorator fn takesNullable(x: any case of nullable<M>);      // ERROR: SYNTAX
+  decorator fn takesTwice(x: any case of M??);                 // ERROR: SYNTAX
   // 残りの引数は、省略可能にできない
-  decorator rest(...xs: any case of M?) for op;             // ERROR: SYNTAX
+  decorator fn rest(...xs: any case of M?);             // ERROR: SYNTAX
 }

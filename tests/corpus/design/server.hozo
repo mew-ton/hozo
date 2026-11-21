@@ -171,8 +171,8 @@ namespace server {
 
   // 4xx は設計判断なので op ごとのデコレータで宣言する
   // op の本体より前に投げるので、すべての効果を打ち消す（§7.3）
-  decorator requiresAuth throws Unauthorized prevents effects;
-  decorator validated throws ClientError prevents effects;
+  decorator fn requiresAuth(): throws Unauthorized prevents effects;
+  decorator fn validated(): throws ClientError prevents effects;
 
   // ---- §7.1 op の宣言 ----
 

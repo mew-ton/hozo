@@ -112,13 +112,16 @@ test('予約語（宣言の頭、節の頭、核の型、リテラル）', () =>
     'classify Actor of never { @actor.human Customer; }',
     'decorator human for case of Actor;',
     'decorator seen(what: any case of any) for model, case of Order;',
-    'decorator by(who: any case of never) for op;',
+    'decorator fn by(who: any case of never);',
   ].join('\n'));
   assertScope(c, 'classify Actor', 'never', 'support.type.primitive.hozo');
   assertScope(c, 'classify Actor', '@actor.human', 'entity.name.function.decorator.hozo');
   assertScope(c, 'decorator human', 'case', 'keyword.control.hozo');
-  assertScope(c, 'decorator by', 'case', 'keyword.control.hozo');
-  assertScope(c, 'decorator by', 'never', 'support.type.primitive.hozo');
+  assertScope(c, 'decorator fn by', 'case', 'keyword.control.hozo');
+  assertScope(c, 'decorator fn by', 'never', 'support.type.primitive.hozo');
+  // 関数に付けるデコレータの頭（docs/grammar.md「decorator の宣言」）: decorator の直後の fn は、宣言の頭の語
+  assertScope(c, 'decorator fn by', 'fn', 'keyword.declaration.hozo');
+  assertScope(c, 'decorator fn by', 'by', 'entity.name.function.hozo');
   // of の後ろ（docs/grammar.md「decorator の宣言」の CaseKind）: any は節の語、型と分類の名前は、型の位置の名前
   assertScope(c, 'decorator human', 'of', 'keyword.control.hozo');
   assertScope(c, 'decorator human', 'Actor', 'entity.name.type.hozo');
@@ -139,9 +142,9 @@ test('文脈キーワードは位置でだけ色が付く', () => {
   assertScope(v, 'decorator min(value: int | float) for scalar, field;', 'field', 'keyword.other.hozo');
   assertScope(v, 'decorator min(value: int | float) for scalar, field;', 'scalar', 'keyword.declaration.hozo');
   const p = linesOf(files.page);
-  assertScope(p, 'decorator interaction(page: any op, when: any variant);', 'any', 'keyword.control.hozo');
-  assertScope(p, 'decorator interaction(page: any op, when: any variant);', 'variant', 'keyword.other.hozo');
-  assertScope(p, 'decorator route(path: string, from: any state?', 'state', 'keyword.declaration.hozo');
+  assertScope(p, 'decorator fn interaction(page: any op, when: any variant);', 'any', 'keyword.control.hozo');
+  assertScope(p, 'decorator fn interaction(page: any op, when: any variant);', 'variant', 'keyword.other.hozo');
+  assertScope(p, 'decorator fn route(path: string, from: any state?', 'state', 'keyword.declaration.hozo');
   const s = linesOf(files.server);
   assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'effects', 'keyword.control.hozo');
   assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'post', 'keyword.other.hozo');
@@ -244,7 +247,7 @@ test('宣言の名前', () => {
   assertScope(s, 'exception InvalidCredentials;', 'InvalidCredentials', 'entity.name.type.hozo');
   assertScope(s, 'fn login(in: LoginInput): LoginOk', 'login', 'entity.name.function.hozo');
   assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'createSession', 'entity.name.function.hozo');
-  assertScope(s, 'decorator requiresAuth throws', 'requiresAuth', 'entity.name.function.hozo');
+  assertScope(s, 'decorator fn requiresAuth(): throws', 'requiresAuth', 'entity.name.function.hozo');
   assertScope(s, 'state users: list<User>;', 'users', 'variable.other.hozo');
   const b = linesOf(files.browser);
   assertScope(b, 'union ApiError {', 'ApiError', 'entity.name.type.hozo');
@@ -511,21 +514,19 @@ test('デコレータの対象 effect、reads / effects の節、残りの引数
   assertScope(api, into, 'state', 'keyword.declaration.hozo');
   assertScope(api, into, 'effect', 'keyword.declaration.hozo');
   // デコレータの宣言の reads の節: reads は節の頭。後ろの引数名には scope を付けない
-  const find = 'decorator find(table: any state, column: string?) for op reads table;';
+  const find = 'decorator fn find(table: any state, column: string?): reads table;';
   assertScope(api, find, 'reads', 'keyword.control.hozo');
-  assertScope(api, find, 'op', 'keyword.declaration.hozo');
-  assertScope(api, find, 'for', 'keyword.control.hozo');
+  assertScope(api, find, 'fn', 'keyword.declaration.hozo');
   assertScope(api, find, 'string', 'support.type.primitive.hozo');
   const findLine = api.find((l) => l.text.includes(find));
   assert.ok(!findLine.tokens.some((tk) => tk.text.trim() === 'table' && tk.scopes.length > 1), 'reads の後ろの引数名に scope が付いている');
   assert.ok(!findLine.tokens.some((tk) => tk.scopes.includes('entity.name.function.hozo') && tk.text !== 'find'), 'デコレータの名前のほかが、宣言の名前になっている');
   // 残りの引数（...）と、effects の節
-  const effects = 'decorator effects(...targets: any effect) for op effects targets reads sessions;';
+  const effects = 'decorator fn effects(...targets: any effect): effects targets reads sessions;';
   assertScope(api, effects, '...', 'keyword.operator.rest.hozo');
   assertScope(api, effects, 'any', 'keyword.control.hozo');
   assertScope(api, effects, 'effect', 'keyword.declaration.hozo');
-  assertScope(api, effects, 'for', 'keyword.control.hozo');
-  assertScope(api, effects, 'op', 'keyword.declaration.hozo');
+  assertScope(api, effects, 'fn', 'keyword.declaration.hozo');
   // 一つ目の effects は宣言の名前（予約語として塗らない）、二つ目は節の頭。その後ろに reads の節が続く
   assertScope(api, effects, 'effects', 'entity.name.function.hozo', 0);
   assertNoScope(api, effects, 'effects', 'keyword.control.hozo');
@@ -534,15 +535,15 @@ test('デコレータの対象 effect、reads / effects の節、残りの引数
   const effectsLine = api.find((l) => l.text.includes(effects));
   assert.ok(!effectsLine.tokens.some((tk) => tk.text.trim() === 'targets' && tk.scopes.length > 1), '引数名 targets に scope が付いている');
   // for を書かない宣言の節、ほかの引数の後ろの残りの引数、節が続く形
-  const t = tokensOf('decorator both(extra: any state?, ...more: any effect) reads logs, extra throws Busy, Late prevents effects effects more, add;');
-  assertScope(t, 'decorator both', '...', 'keyword.operator.rest.hozo');
-  assertScope(t, 'decorator both', 'reads', 'keyword.control.hozo');
-  assertScope(t, 'decorator both', 'throws', 'keyword.control.hozo');
-  assertScope(t, 'decorator both', 'Busy', 'entity.name.type.hozo');
-  assertScope(t, 'decorator both', 'Late', 'entity.name.type.hozo');
-  assertScope(t, 'decorator both', 'prevents', 'keyword.control.hozo');
-  assertScope(t, 'decorator both', 'effects', 'keyword.control.hozo', 0);
-  assertScope(t, 'decorator both', 'effects', 'keyword.control.hozo', 1);
+  const t = tokensOf('decorator fn both(extra: any state?, ...more: any effect): reads logs, extra throws Busy, Late prevents effects effects more, add;');
+  assertScope(t, 'decorator fn both', '...', 'keyword.operator.rest.hozo');
+  assertScope(t, 'decorator fn both', 'reads', 'keyword.control.hozo');
+  assertScope(t, 'decorator fn both', 'throws', 'keyword.control.hozo');
+  assertScope(t, 'decorator fn both', 'Busy', 'entity.name.type.hozo');
+  assertScope(t, 'decorator fn both', 'Late', 'entity.name.type.hozo');
+  assertScope(t, 'decorator fn both', 'prevents', 'keyword.control.hozo');
+  assertScope(t, 'decorator fn both', 'effects', 'keyword.control.hozo', 0);
+  assertScope(t, 'decorator fn both', 'effects', 'keyword.control.hozo', 1);
   // 効果の宣言に付けたデコレータ（実物: コーパス）
   const renameUser = 'effect fn renameUser(id: UserId, name: string): effects users.put;';
   assertScope(api, /^\s*@into\(users\)$/, '@into', 'entity.name.function.decorator.hozo');

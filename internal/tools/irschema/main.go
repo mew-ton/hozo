@@ -93,7 +93,7 @@ var unions = []struct {
 	{typeOf[ir.EffectTarget](), []reflect.Type{typeOf[ir.BuiltinTarget](), typeOf[ir.TransitionTarget]()}},
 	{typeOf[ir.ReadRef](), []reflect.Type{typeOf[ir.NamedRead](), typeOf[ir.DirectRead]()}},
 	{typeOf[ir.EffectRef](), []reflect.Type{typeOf[ir.NamedEffect](), typeOf[ir.DirectEffect]()}},
-	{typeOf[ir.Callee](), []reflect.Type{typeOf[ir.OpCallee](), typeOf[ir.ReadCallee](), typeOf[ir.EffectCallee]()}},
+	{typeOf[ir.Callee](), []reflect.Type{typeOf[ir.OpCallee](), typeOf[ir.ReadCallee](), typeOf[ir.EffectCallee](), typeOf[ir.ProceedCallee]()}},
 	{typeOf[ir.ClassifySubject](), []reflect.Type{typeOf[ir.TypeSubject](), typeOf[ir.OpSubject](), typeOf[ir.StatesSubject]()}},
 	{typeOf[ir.ParamType](), []reflect.Type{typeOf[ir.TypeParam](), typeOf[ir.AnyParam]()}},
 	{typeOf[ir.Statement](), []reflect.Type{

@@ -1,6 +1,6 @@
 // DEC-8: 汎用のデコレータに引数を固定した別名
 namespace a {
-  decorator d(code: int);
+  decorator fn d(code: int);
   decorator alias = d(1);
   @alias
   fn f();

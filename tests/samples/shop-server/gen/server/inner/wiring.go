@@ -77,17 +77,24 @@ func (o *ops) SessionOf(ctx context.Context, token pkgtype.Token) (pkgtype.Sessi
 	return pkgtype.Session{}, pkgtype.Unauthorized{}
 }
 
-// Logout はログアウトする
-//
-// Throws: type.Unauthorized
-// Reads: store.sessions
-// Effects: store.deleteSession
-func (o *ops) Logout(ctx context.Context, in AuthInput) error {
+// logoutBody は op server.logout の中身（配線の本体）。外側の Logout が、デコレータを通して呼ぶ。
+func (o *ops) logoutBody(ctx context.Context, in AuthInput) error {
 	session, err := o.Authenticate(ctx, in.Token)
 	if err != nil {
 		return err
 	}
 	if err := o.store.RemoveSession(ctx, session.Token); err != nil {
+		return err
+	}
+	return nil
+}
+
+// logoutServerAudited は op server.logout に付いた @server.audited の外側（デコレータの本体）。proceed() が、内側（o.logoutBody）を呼ぶ。
+func (o *ops) logoutServerAudited(ctx context.Context, in AuthInput) error {
+	if err := o.logoutBody(ctx, in); err != nil {
+		return err
+	}
+	if err := o.RecordAudit(ctx); err != nil {
 		return err
 	}
 	return nil

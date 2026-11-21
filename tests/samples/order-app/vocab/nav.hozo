@@ -3,8 +3,8 @@
 /** ブラウザの、アプリの外への動きの語彙 */
 namespace nav {
   /** この op は、ブラウザを、アプリの外の URL へ移す。戻ってくるまで、アプリは動かない */
-  decorator leave for op;
+  decorator fn leave();
 
   /** この op は、ブラウザにファイルを保存させる */
-  decorator save for op;
+  decorator fn save();
 }

@@ -1,5 +1,5 @@
 {
-  "version": "0.17",
+  "version": "0.18",
   "viewer": "browser",
   "config": {
     "index": 1,
@@ -115,7 +115,7 @@
     ]
   },
   "program": {
-    "version": "0.17",
+    "version": "0.18",
     "namespaces": [
       {
         "name": "",
@@ -1646,9 +1646,9 @@
                 "rest": false
               }
             ],
+            "fn": true,
             "targets": [
-              "op",
-              "field"
+              "op"
             ],
             "caseTargets": [],
             "external": false,
@@ -1715,6 +1715,7 @@
               }
             },
             "params": [],
+            "fn": false,
             "targets": [],
             "caseTargets": [],
             "external": false,
@@ -1775,6 +1776,7 @@
                 "rest": false
               }
             ],
+            "fn": false,
             "targets": [
               "effect"
             ],
@@ -1817,6 +1819,7 @@
                 "rest": false
               }
             ],
+            "fn": false,
             "targets": [
               "read"
             ],
@@ -1863,6 +1866,7 @@
                 "rest": true
               }
             ],
+            "fn": true,
             "targets": [
               "op"
             ],
@@ -1886,7 +1890,43 @@
                 "kind": "named",
                 "effect": "$param:targets"
               }
-            ]
+            ],
+            "body": {
+              "statements": [
+                {
+                  "kind": "call",
+                  "call": {
+                    "callee": {
+                      "kind": "proceed"
+                    },
+                    "args": [],
+                    "bound": [],
+                    "span": {
+                      "file": "server.hozo",
+                      "start": {
+                        "line": 44,
+                        "col": 141
+                      },
+                      "end": {
+                        "line": 44,
+                        "col": 150
+                      }
+                    }
+                  },
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 44,
+                      "col": 141
+                    },
+                    "end": {
+                      "line": 44,
+                      "col": 151
+                    }
+                  }
+                }
+              ]
+            }
           },
           {
             "kind": "op",

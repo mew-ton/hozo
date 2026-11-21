@@ -20,7 +20,7 @@ namespace cli {
    *
    * @param name サブコマンドの名前
    */
-  decorator command(name: string);
+  decorator fn command(name: string);
 
   /** 位置引数として受け取る */
   decorator arg for field;
@@ -71,7 +71,7 @@ namespace proc {
    * @param command 起動するコマンド
    */
   @external
-  decorator stdio(command: string) throws Crashed, MalformedOutput;
+  decorator fn stdio(command: string): throws Crashed, MalformedOutput;
 }
 
 /** hozo の仕様を検査し、各言語のコードに展開する CLI */
