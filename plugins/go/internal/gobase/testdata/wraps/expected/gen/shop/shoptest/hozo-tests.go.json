@@ -1,8 +1,17 @@
 {
   "tests": [
-    {"name": "shop.lookup/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [77, 84]},
-    {"name": "shop.save/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [90, 97]},
-    {"name": "shop.open/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [103, 110]},
-    {"name": "shop.sweep/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [116, 123]}
+    {"name": "shop.lookup/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [90, 97]},
+    {"name": "shop.save/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [103, 110]},
+    {"name": "shop.open/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [116, 123]},
+    {"name": "shop.sweep/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [129, 136]},
+    {"name": "shop.ring/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [142, 149]},
+    {"name": "shop.open@trace.traced/OK", "file": "gen/shop/shoptest/seams.go", "lines": [45, 56]},
+    {"name": "shop.open@trace.traced/Busy", "file": "gen/shop/shoptest/seams.go", "lines": [59, 71]},
+    {"name": "shop.open@trace.traced/Late", "file": "gen/shop/shoptest/seams.go", "lines": [74, 86]},
+    {"name": "shop.open@trace.traced/Odd", "file": "gen/shop/shoptest/seams.go", "lines": [89, 99]},
+    {"name": "shop.close@trace.traced/OK", "file": "gen/shop/shoptest/seams.go", "lines": [105, 116]},
+    {"name": "shop.close@trace.traced/Busy", "file": "gen/shop/shoptest/seams.go", "lines": [119, 131]},
+    {"name": "shop.close@trace.traced/Late", "file": "gen/shop/shoptest/seams.go", "lines": [134, 146]},
+    {"name": "shop.close@trace.traced/Odd", "file": "gen/shop/shoptest/seams.go", "lines": [149, 159]}
   ]
 }

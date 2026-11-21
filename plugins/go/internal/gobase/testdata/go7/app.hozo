@@ -1,0 +1,13 @@
+// GO-7（docs/plugin-go.md「本体のあるデコレータ」）: 包み方が、仕様にあるデコレータに、プラグインも、継ぎ目を宣言している
+namespace a {
+  fn count();
+  /** 本体のあるデコレータ: 継ぎ目を宣言されている（GO-7） */
+  decorator fn counted() {
+    proceed();
+    count();
+  }
+  /** 本体のないデコレータ: 継ぎ目を宣言されていてよい */
+  decorator fn plain();
+  @counted @plain
+  export fn work();
+}

@@ -6,3 +6,6 @@ import "example.com/app/gen/shop/inner"
 
 // Item は model shop.Item。
 type Item = inner.Item
+
+// Denied: 断られた
+type Denied = inner.Denied

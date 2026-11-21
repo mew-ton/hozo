@@ -32,7 +32,7 @@ var goldenFixtures = []struct {
 	{name: "rowstate", covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示。行の引数を絞り込んだ効果は「効果の入口の確かめ」）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
 	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)、例外を投げる効果（「状態の単位」と、単位のメソッドのコメントの throws）", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
-	{name: "wraps", covers: "「本体のあるデコレータ」の各行（外側のメソッド、proceed() の式、値を返す op の result、値の引数、別の名前空間の op と分類の述語、継ぎ目との入れ子）", behavior: true},
+	{name: "wraps", covers: "「本体のあるデコレータ」の各行（外側のメソッド、proceed() の式、値を返す op の result、値の引数、別の名前空間の op と分類の述語、継ぎ目との入れ子、proceed() のアームを持つ match の後ろの文、never を返す op）", behavior: true},
 	{name: "unittest", covers: "「単体テストの口」（葉の op の結果ごとのケース、当たる結果の名前、Then_、絞り込んだ戻り値の確かめ、分類の判定の例、口を持たないもの）と、「効果の入口の確かめ」（包む型、New が包むこと、別の名前空間の分類の述語）", behavior: true},
 }
 
@@ -129,9 +129,10 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"go4", codeInnerDir},    // 内側のフォルダ inner が、子の名前空間 N.inner の出力先と重なる
 	{"go5", codeOption},      // [emit.options.go] に、知らないキーがある
 	{"go6", codeVariant},     // variant の絞り込みの型と等しい型のアームが、union に二つ以上ある
+	{"go7", codeSeamOnBody},  // 単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言している
 }
 
-// TestDiagnostics は docs/plugin-go.md「診断」の GO-2〜GO-6: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は docs/plugin-go.md「診断」の GO-2〜GO-7: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルを返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {

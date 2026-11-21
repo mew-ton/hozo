@@ -925,6 +925,8 @@ func (o *ops) getMeServerAudited(ctx context.Context, in AuthInput) (pkgtype.Pub
 - **本体は、「配線の本体」の規則で書く。** 本体の中の名前は、op の配線が書いたのと、同じ式になる: 同じ名前空間の op は `o.<Op>(…)`、別の名前空間の op は `o.<名前空間の引数名>.<Op>(…)`（「別の名前空間の op」の口に、その op が並ぶ）、`read` と効果は、状態の単位のメソッド。
 - **`proceed()` は、内側を、op の引数のまま呼ぶ式**になる: 内側が、op の中身なら `o.<op>Body(ctx, …)`（葉なら `o.leaves.<Op>(ctx, …)`）、本体のある別のデコレータなら、その外側のメソッド、継ぎ目なら `o.seams.<継ぎ目>(ctx, …, <その内側>)`。
 - **op が値を返すとき**、`proceed()` の結果を、そのまま返す: `proceed()` が、本体の最後の文（か、最後の文の `match` のアーム）なら `return <内側の呼び出し>`。後ろに文が続くなら、結果を `result` に受けて、最後に `return result, nil`。値を返さない op では、`proceed()` は、ふつうの、値のない呼び出しと同じ。
+- **`proceed()` のアームを持つ `match` の後ろに、文が続くとき**も、同じ: 値を返す op では、`var result <型>` を置き、`proceed()` のアームが `result` に入れ（内側が失敗すれば、その場で、失敗を返す）、`throw` のアームは、その場で、失敗を返し、最後に `return result, nil`。
+- **`never` を返す op** では、`proceed()` は、「返らない」呼び出しと同じ（「文」）: `return <内側の呼び出し>`（op の形は、`error` だけを返す）。後ろに文を持つデコレータは、付けられない（`docs/check.md`「デコレータ」の DEC-25）。
 - **デコレータの、値の引数**は、適用に書いたリテラルを、「値」の規則で、その場に書く。渡されていない省略可能な引数は `nil`。
 - **中身の名前**（`<op>Body`）は、継ぎ目を持つ op と同じに、基底が中身を出す op（配線と、`never` を返す op）が、包むデコレータを一つでも持てば、付く（「継ぎ目」の「中身」）。
 - **コメントの言い方**: 包むものに、本体のあるデコレータが一つでもあれば、外側と中身のコメントは、「継ぎ目」の代わりに「デコレータ」と言う（`Logout は、デコレータ（@server.audited）を通して、中身（o.logoutBody）を呼ぶ。`、`logoutBody は op server.logout の中身（配線の本体）。外側の Logout が、デコレータを通して呼ぶ。`）。
@@ -946,7 +948,7 @@ func TestLeaves(t *testing.T) { servertest.RunLeaves(t, app.Leaves{}, leafCases{
 
 - 口は、**テストのパッケージ**に置く: ディレクトリは `<Dir(U, N)>/<N のパッケージ名>test/`、パッケージ名は `<N のパッケージ名>test`（`gen/server/servertest`、パッケージ `servertest`）。`testing` を import するので、アプリのコード（入口と、定義のパッケージ）とは、分ける。人のテスト（`out` の外に置く）が、import する。
 - テストのパッケージは、N の**入口のパッケージ**を import する（N の型、`Leaves`、`<C>Cases`、`Classify<C>` は、どれも、入口にある）。内側のパッケージは、import しない。
-- ファイルは、`doc.go`、`leaves.go`（葉の op が、一つでもあるとき）、`classify.go`（述語で決まる値の分類か op の分類が、N に、一つでもあるとき）、`fakes.go`（「テストのにせもの」の「出すとき」）。三つとも、なければ、パッケージを作らない。`doc.go` のコメントは、`// Package <名前> は、名前空間 <N> の、テストのためのもの: 単体テストの口と、にせもの（docs/plugin-go.md「単体テストの口」「テストのにせもの」）。`
+- ファイルは、`doc.go`、`leaves.go`（葉の op が、一つでもあるとき）、`classify.go`（述語で決まる値の分類か op の分類が、N に、一つでもあるとき）、`seams.go`（「デコレータのテストの口」の対象が、一つでもあるとき）、`fakes.go`（「テストのにせもの」の「出すとき」）。四つとも、なければ、パッケージを作らない。`doc.go` のコメントは、`// Package <名前> は、名前空間 <N> の、テストのためのもの: 単体テストの口と、にせもの（docs/plugin-go.md「単体テストの口」「テストのにせもの」）。`
 - import の名前の決まり（「パッケージと import パス」の「import の名前」）は、同じ。違うのは二つ。（1）N の入口のパッケージは、名前が、import パスの最後の要素と同じでも、**いつも、名前を書いて** import する（`server "example.com/shop-server/gen/server"`）: 出力先のディレクトリの名前で、ファイルの中身が変わらないようにする（「決定性」の、同じ名前空間の二つの単位）。（2）import の名前に使わないのは、テストのパッケージの関数の本体が、決まった名前で使う識別子: `t`、`c`、`x`、`k`、`cases`、`leaves`、`got`、`err`、`want`、`kind`、`none`（と、どのファイルでも使わない `ops`、`ptr`）。`fakes.go` では、`f`、`o`、`ctx`、`k`（「テストのにせもの」）。
 - テストのパッケージの、公開の名前どうしが当たれば、GO-2（op `leaf` の `LeafCases` と、まとめの `LeafCases` など）。同じ単位が、子の名前空間 `N.<N のパッケージ名>test` を出力するなら、GO-4。基底の公開の名前の一覧は、`golang.PublicTestNames`（`docs/packages.md`「`plugin/golang`（公開）」）。相乗りが、このパッケージに足すファイルの決まりは、「相乗りのファイル」。
 - 失敗の文面（`t.Fatalf`）は、`runtime` の誤りと同じに、英語で書く。
@@ -1097,10 +1099,95 @@ func RunWarrantyKind(t *testing.T, cases shop.WarrantyKindCases, x WarrantyKindE
 - テストの名前は、`<分類の FQN>/<ケース>`。
 - 述語で決まる**状態の分類**（述語は、状態の単位のメソッド）には、出さない: 状態を用意する道が、要る（`docs/open.md`「Hozo の側の改善する点」）。
 
+### デコレータのテストの口
+
+`docs/decisions.md`「決めたこと」382、395。規則の持ち主は `docs/ide-chain.md`「テストの規約」の「デコレータのテスト」。この節が決めるのは、Go での形。期待する出力の実物は、サンプルの `gen/server/servertest/seams.go`。
+
+**対象**は、単位の継ぎ目（`docs/config.md`「継ぎ目」）にあるデコレータのうち、単位の対象の op に、一つでも付いているもの（`Seams` にメソッドを持つもの。「継ぎ目」）。本体のあるデコレータ（「本体のあるデコレータ」）と、語彙として読むだけのデコレータには、出さない。対象が一つもなければ、ファイルを出さない。
+
+```go
+// seams.go
+
+// RateLimitedCases は、デコレータ rate.limited の、結果ごとのケース。結果の数だけ、メソッドがある。
+type RateLimitedCases interface {
+	// OK は、op の中身を、ちょうど一度呼んで、その結果を、そのまま返すケース。
+	OK() RateLimitedCase
+	// LimitExceeded は、例外 rate.LimitExceeded を投げるケース（prevents effects: op の中身を、呼ばない）。
+	LimitExceeded() RateLimitedCase
+}
+
+// RateLimitedCase は、デコレータ rate.limited の、ケース一つ: その結果になる状態の、継ぎ目の実装。
+type RateLimitedCase struct {
+	// Seams は、継ぎ目の実装を返す。走らせる側が、付けた op ごとに、一度呼ぶ。
+	Seams func() server.Seams
+}
+
+// SeamCases は、継ぎ目を持つデコレータの、テストのケース。デコレータごとに、メソッド一つ。
+// メソッドが一つでも足りない値は、RunSeams に渡すところでコンパイルできない。
+type SeamCases interface {
+	RateLimited() RateLimitedCases
+}
+
+// RunSeams は、継ぎ目ごと（付けた op と、デコレータの組）、結果ごとに、テストを一つ走らせる。テストの名前は、
+// <op の FQN>@<デコレータの FQN>/<結果>。ケースごとに、継ぎ目を、にせものの中身（呼ばれた回数を数え、零値を返す）と一緒に呼び、
+// 結果が、そのケースのものであることを確かめる。
+func RunSeams(t *testing.T, c SeamCases) {
+	t.Run("server.login@rate.limited", func(t *testing.T) {
+		cases := c.RateLimited()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			calls := 0
+			_, err := k.Seams().LoginRateLimited(context.Background(), server.LoginInput{}, func(ctx context.Context, in server.LoginInput) (server.LoginOk, error) {
+				calls++
+				return server.LoginOk{}, nil
+			})
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if calls != 1 {
+				t.Fatalf("want the body called once, got %d", calls)
+			}
+		})
+		t.Run("LimitExceeded", func(t *testing.T) {
+			k := cases.LimitExceeded()
+			calls := 0
+			_, err := k.Seams().LoginRateLimited(context.Background(), server.LoginInput{}, func(ctx context.Context, in server.LoginInput) (server.LoginOk, error) {
+				calls++
+				return server.LoginOk{}, nil
+			})
+			var want rate.LimitExceeded
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception rate.LimitExceeded, got %v", err)
+			}
+			if calls != 0 {
+				t.Fatalf("want the body not called (prevents effects), got %d", calls)
+			}
+		})
+	})
+}
+```
+
+- **`<D>Cases` と `<D>Case`** は、デコレータの宣言ごとに、一組。`<D>` は、デコレータの FQN のセグメントを、それぞれ先頭大文字にして連結したもの（`rate.limited` → `RateLimited`）。並びは、`Seams` のメソッドの並びで、そのデコレータが、最初に出てくる順。
+- **結果**は、正常（`OK`）と、デコレータの宣言の `throws` の例外ごと（書かれた順。同じ例外は、一度だけ）。名前の決まりは、葉の op の結果と同じ（「葉の op」: 例外の宣言の名前。当たれば、名前空間のセグメントを前に付ける）。`throws` に、デコレータの引数の名前で書いた例外（`throws error`）と、`catches` の節は、結果にしない（`docs/open.md`「Hozo の側の改善する点」）。
+- **`<D>Case` のフィールドは、`Seams` 一つ**: その結果になる状態の、継ぎ目の実装を返す関数。型は、N の `Seams`（単位の継ぎ目の、すべてのメソッドを持つ）。
+- **`SeamCases`** は、対象のデコレータごとに、メソッド一つ（名前は `<D>`）。**`RunSeams`** の引数は、`t` と `c SeamCases` だけ。
+- **走らせる単位は、`Seams` のメソッドごと**（付けた op と、デコレータの組）。テストの名前は、`<op の FQN>@<デコレータの FQN>/<結果>`（インテグレーションテストの、出どころの書き方と、同じ。`docs/plugin-go-http.md`「インテグレーションテストの口」）。対応表（「テストの対応表」）に、この名前で載る。
+- **継ぎ目に渡すもの**: `context.Background()`、op の引数ごとの零値（「値」）、にせものの中身。にせものの中身は、呼ばれた回数（`calls`）を数え、零値と `nil` を返す関数リテラルで、形は、`Seams` のメソッドの `body` の型。
+- **確かめること**は、結果と、その `throws` の節の関係で決まる。
+
+| 結果 | 確かめること |
+|---|---|
+| `OK` | 失敗が返らない。`calls` が 1 |
+| 例外（その節の関係が `prevents effects` だけ） | 返った失敗が、その例外。`calls` が 0 |
+| 例外（その節の関係が `keeps effects` だけ） | 返った失敗が、その例外。`calls` が 1 |
+| 例外（関係がない。両方ある） | 返った失敗が、その例外。`calls` は、見ない（`_ = calls` を置く: Go は、読まれない変数を、許さない） |
+
+- 当たる名前は、GO-2（「テストのパッケージ」）: `SeamCases`、`RunSeams`、`<D>Cases`、`<D>Case` は、`golang.PublicTestNames` に並ぶ。
+
 ### 口を持たないもの
 
 - 配線の op（中身は、基底が作る。375）。`never` を返す op。
-- 状態の単位の、人が書くメソッド（デコレータのない `read` と効果、形で決まるメソッド）と、継ぎ目の実装。対象に入れるかは、決めていない（`docs/open.md`「Hozo の側の改善する点」）。
+- 状態の単位の、人が書くメソッド（デコレータのない `read` と効果、形で決まるメソッド）。対象に入れるかは、決めていない（`docs/open.md`「Hozo の側の改善する点」）。継ぎ目の実装は、「デコレータのテストの口」。
 - 呼ぶ先の op を、にせものに差し替えて、配線の op 一つだけを試す、単体テストの口（375 の、目標）。にせものそのものは、ある（「テストのにせもの」）。
 
 ### テストの対応表

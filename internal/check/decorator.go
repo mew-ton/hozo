@@ -21,6 +21,50 @@ func checkDecorators(ix *index, c *computer, r *reporter) {
 	for i, o := range ix.ops {
 		checkDec4(ix, o, r)
 		checkDec24(ix, o, ix.opsNS[i], r)
+		checkDec25(ix, o, r)
+	}
+}
+
+// checkDec25 は DEC-25（docs/check.md「デコレータ」）: 本体のあるデコレータを、never を返す op に付けていて、本体の proceed()
+// （か、proceed() のアームを持つ match）の後ろに、文がある。包んだ op は、いつも、例外を投げるので、後ろの文は、評価されない
+// （WIRE-9 と、同じ理由）。位置は、適用。後ろの、最初の文を Related に示す。
+func checkDec25(ix *index, o *ir.Op, r *reporter) {
+	if !ir.IsNever(o.Returns) {
+		return
+	}
+	for ai := range o.Decorators {
+		app := &o.Decorators[ai]
+		d, _ := ix.decorator(app.Decorator)
+		if d == nil || d.Body == nil {
+			continue
+		}
+		stmts := d.Body.Statements
+		for i, st := range stmts {
+			expr, span, ok := stmtExpr(st)
+			if !ok {
+				continue
+			}
+			proceeds := false
+			switch e := expr.(type) {
+			case ir.CallExpr:
+				proceeds = e.Call.IsProceed()
+			case ir.MatchExpr:
+				for _, arm := range e.Match.Arms {
+					if c, isCall := arm.Body.(ir.CallExpr); isCall && c.Call.IsProceed() {
+						proceeds = true
+					}
+				}
+			}
+			if !proceeds {
+				continue
+			}
+			if i < len(stmts)-1 {
+				_, next, _ := stmtExpr(stmts[i+1])
+				r.report(diag.Error, "DEC-25", app.Span, sprintf("デコレータ %s の本体は、proceed() の後ろに、文を持つので、never を返す op %s には付けられない（op は、いつも、例外を投げるので、後ろの文が、評価されない）", d.Name, o.Name),
+					[]related{{span: span, msg: "proceed()"}, {span: next, msg: "評価されない文"}}, nil)
+			}
+			break
+		}
 	}
 }
 

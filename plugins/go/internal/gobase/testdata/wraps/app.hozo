@@ -1,9 +1,17 @@
 // docs/plugin-go.md「本体のあるデコレータ」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 
 /** テストの語彙 */
-namespace t {
-  /** 継ぎ目を要る（go-trace）。本体のあるデコレータと、重ねる */
-  decorator fn traced();
+namespace trace {
+  /** 混んでいる */
+  exception Busy;
+  /** 遅れた */
+  exception Late;
+  /** 変だ */
+  exception Odd;
+  // 継ぎ目を要る（go-trace）。本体のあるデコレータと、重ねる。デコレータのテストの口（docs/plugin-go.md「デコレータのテストの口」）の、
+  // 結果ごとの確かめ: prevents effects（中身を呼ばない）、keeps effects（中身を呼んでいる）、関係なし（例外だけ）
+  /** 中身の前後に、印を残す */
+  decorator fn traced(): throws Busy prevents effects throws Late keeps effects throws Odd;
 }
 
 /** 本体のあるデコレータを宣言する名前空間 */
@@ -39,6 +47,18 @@ namespace gate {
     note(label, times, memo);
   }
 
+  // 前で確かめ、後で記録する。proceed() のアームを持つ match の後ろに、文が続く: 値を返す op では、var result を置き、
+  // proceed() のアームが、result に入れる。throw のアームは、その場で、失敗を返す
+  /** 閉まっていれば、op の中身を呼ばずに Closed。op の中身が、正常に終わった後に、記録する */
+  decorator fn checked(label: string) {
+    val now = ticket();
+    match (now by Gate) {
+      Open => proceed();
+      Shut => throw Closed;
+    }
+    note(label, 1);
+  }
+
   // 宣言した名前空間の op に付けるなら、内部の op も呼べる
   /** 前に、内部の op を呼ぶ */
   decorator fn prepared() {
@@ -71,17 +91,37 @@ namespace shop {
   export fn save(item: Item): Item;
 
   // 値を返さない op に、継ぎ目と、本体のあるデコレータ二つを重ねる。書かれた順に、外から内へ:
-  // 継ぎ目 t.traced → gate.guarded → gate.noted → 中身
+  // 継ぎ目 trace.traced → gate.guarded → gate.noted → 中身
   /** 店を開ける（人が書く） */
-  @t.traced @gate.guarded @gate.noted("open", 1, "朝")
+  @trace.traced @gate.guarded @gate.noted("open", 1, "朝")
   export fn open();
 
   // 本体のあるデコレータの内側に、継ぎ目: proceed() が、継ぎ目を呼ぶ
   /** 店を閉める */
-  @gate.guarded @t.traced
+  @gate.guarded @trace.traced
   export fn close() {
     sweep();
   }
   /** 掃除する（人が書く） */
   fn sweep();
+
+  // proceed() のアームを持つ match の後ろに、文: 値を返す op（配線）
+  /** 値段を引く */
+  @gate.checked("price")
+  export fn price(id: string): Item {
+    return lookup(id);
+  }
+
+  // proceed() のアームを持つ match の後ろに、文: 値を返さない op（葉）
+  /** 呼び鈴を鳴らす（人が書く） */
+  @gate.checked("ring")
+  export fn ring();
+
+  /** 断られた */
+  exception Denied;
+
+  // never を返す op に、前で確かめるだけのデコレータ: proceed() は、「返らない」呼び出しと同じ。中身は refuseBody
+  /** いつも、断る */
+  @gate.guarded
+  export fn refuse(): never throws Denied;
 }

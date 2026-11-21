@@ -11,6 +11,7 @@ import (
 
 	"example.com/shop-server/app/storetest"
 	"example.com/shop-server/gen/store"
+	genstoretest "example.com/shop-server/gen/store/storetest"
 	pkgtype "example.com/shop-server/gen/type"
 	"github.com/mew-ton/hozo/runtime"
 )
@@ -388,4 +389,23 @@ func TestStatesFromTwoImplementations(t *testing.T) {
 	if empty, err := store.NewNotificationsTable(db).IsEmpty(ctx); err != nil || !empty {
 		t.Errorf("SQLite の notifications の IsEmpty = %v, %v（期待は true）", empty, err)
 	}
+}
+
+// dbSeamCases は、デコレータ @db.transaction の継ぎ目の実装（go-sqlite が出した store.DbSeams）の、結果ごとのケース
+// （docs/ide-chain.md「テストの規約」の「デコレータのテスト」。Go の口は docs/plugin-go.md「デコレータのテストの口」）。
+// 結果は、正常だけ（宣言が、throws を持たない）。書いてあるのは、継ぎ目の実装だけ: 継ぎ目を呼ぶ所と、op の中身が、ちょうど
+// 一度、呼ばれたことの確かめは、生成したコード（RunSeams）が持つ。
+type dbSeamCases struct{ db *sql.DB }
+
+func (c dbSeamCases) DbTransaction() genstoretest.DbTransactionCases { return dbTransactionCases(c) }
+
+type dbTransactionCases struct{ db *sql.DB }
+
+func (c dbTransactionCases) OK() genstoretest.DbTransactionCase {
+	return genstoretest.DbTransactionCase{Seams: func() store.Seams { return store.NewDbSeams(c.db) }}
+}
+
+// TestSeamCases は、継ぎ目ごと、結果ごとのケースを、すべて走らせる（TestSeamCases/store.placeOrder@db.transaction/OK）。
+func TestSeamCases(t *testing.T) {
+	genstoretest.RunSeams(t, dbSeamCases{openDB(t)})
 }

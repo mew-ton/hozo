@@ -59,6 +59,18 @@ type SweepCase struct {
 	Then func(t *testing.T, err error)
 }
 
+// RingCases は、葉 shop.ring の、結果ごとのケース。結果の数だけ、メソッドがある。
+type RingCases interface {
+	// OK は、正常に終わるケース。
+	OK() RingCase
+}
+
+// RingCase は、葉 shop.ring の、ケース一つ: 渡す引数と、足りない確かめ。
+type RingCase struct {
+	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。err は、葉が返した失敗（正常のケースでは nil）。
+	Then func(t *testing.T, err error)
+}
+
 // LeafCases は、人が実装する葉の op の、単体テストのケース。葉ごとに、メソッド一つ（Leaves と同じ並び）。
 // メソッドが一つでも足りない値は、RunLeaves に渡すところでコンパイルできない。
 type LeafCases interface {
@@ -66,6 +78,7 @@ type LeafCases interface {
 	Save() SaveCases
 	Open() OpenCases
 	Sweep() SweepCases
+	Ring() RingCases
 }
 
 // RunLeaves は、葉ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。
@@ -115,6 +128,19 @@ func RunLeaves(t *testing.T, leaves shop.Leaves, c LeafCases) {
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
 			err := leaves.Sweep(context.Background())
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, err)
+			}
+		})
+	})
+	t.Run("shop.ring", func(t *testing.T) {
+		cases := c.Ring()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			err := leaves.Ring(context.Background())
 			if err != nil {
 				t.Fatalf("want no error, got %v", err)
 			}

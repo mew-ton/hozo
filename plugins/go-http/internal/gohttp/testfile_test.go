@@ -317,8 +317,8 @@ func TestHTTPMadeCases(t *testing.T) {
 	content := files["gen/flow/flowtest/http.go"]
 	for _, want := range []string{
 		// 人が書いたもの（分類の述語）を、位置引数で受け取り、組み立てに渡す
-		"func RunHTTP(t *testing.T, size flow.SizeCases, c HTTPCases) {\n",
-		"return call.send(t, flow.NewHandler(NewOps(f, size)), k.Request), f\n",
+		"func RunHTTP(t *testing.T, leaves flow.Leaves, hours flow.HoursCases, size flow.SizeCases, c HTTPCases) {\n",
+		"return call.send(t, flow.NewHandler(NewOps(f, leaves, hours, size)), k.Request), f\n",
 		// 判定のにせものが、Big だと言う
 		"\t\t\tt.Run(\"flow.add.Big\", func(t *testing.T) {\n" +
 			"\t\t\t\tk := cases.OK()\n" +
@@ -335,6 +335,22 @@ func TestHTTPMadeCases(t *testing.T) {
 			"\t\t\t\t})\n" +
 			"\t\t\t\thttpWantThrown[flow.Taken](t, res, 409)\n" +
 			"\t\t\t})\n",
+		// 本体のあるデコレータ @flow.opened（本物を通す）の、本体が呼ぶ葉が、投げる: 葉のにせものが、投げる
+		"\t\t\tt.Run(\"flow.checkDoor\", func(t *testing.T) {\n" +
+			"\t\t\t\tk := cases.OK()\n" +
+			"\t\t\t\tres, _ := send(t, k, func(f *Fakes) {\n" +
+			"\t\t\t\t\tf.Leaves.CheckDoor.Throws(flow.Jammed{})\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t\thttpWantThrown[flow.Jammed](t, res, 502)\n" +
+			"\t\t\t})\n",
+		// デコレータの本体の、throw のアーム: 判定のにせものが、Late だと言う。出どころの名前は、<op>@<デコレータ>.<ケース>
+		"\t\t\tt.Run(\"flow.shelve@flow.opened.Late\", func(t *testing.T) {\n" +
+			"\t\t\t\tk := cases.OK()\n" +
+			"\t\t\t\tres, _ := send(t, k, func(f *Fakes) {\n" +
+			"\t\t\t\t\tf.Hours.Is(flow.HoursLate)\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t\thttpWantThrown[flow.Shut](t, res, 503)\n" +
+			"\t\t\t})\n",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("gen/flow/flowtest/http.go に、次がない:\n%s\n----\n%s", want, content)
@@ -348,8 +364,14 @@ func TestHTTPMadeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("作られたケースを含むテストが落ちた: %v\n%s", err, out)
 	}
+	if got := strings.Join(caseMethods(t, content, "ShelveHTTPCases"), " "); got != "OK BadRequest" {
+		t.Errorf("ShelveHTTPCases のメソッド = %s, want OK BadRequest（デコレータの本体の例外のケースも、口にない）", got)
+	}
 	for _, name := range []string{"TestFlowHTTPCases/flow.add/OK", "TestFlowHTTPCases/flow.add/BadRequest",
-		"TestFlowHTTPCases/flow.add/TooBig/flow.add.Big", "TestFlowHTTPCases/flow.add/Taken/flow.addItem"} {
+		"TestFlowHTTPCases/flow.add/TooBig/flow.add.Big", "TestFlowHTTPCases/flow.add/Taken/flow.addItem",
+		"TestFlowHTTPCases/flow.shelve/OK", "TestFlowHTTPCases/flow.shelve/BadRequest",
+		"TestFlowHTTPCases/flow.shelve/Jammed/flow.checkDoor", "TestFlowHTTPCases/flow.shelve/Shut/flow.shelve@flow.opened.Late",
+		"TestFlowHTTPCases/flow.shelve/Taken/flow.addItem"} {
 		if !strings.Contains(out, "--- PASS: "+name+" ") {
 			t.Errorf("テスト %s が、通っていない:\n%s", name, out)
 		}

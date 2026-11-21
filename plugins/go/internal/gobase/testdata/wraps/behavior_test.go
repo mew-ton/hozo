@@ -12,10 +12,18 @@ import (
 
 	"example.com/app/gen/gate"
 	"example.com/app/gen/shop"
+	"example.com/app/gen/shop/shoptest"
+	"example.com/app/gen/trace"
 )
 
-// log は、呼ばれた順。
-type log struct{ lines []string }
+// log は、呼ばれた順。fail は、失敗させる葉の名前（"" なら、どれも、失敗しない）。
+type log struct {
+	lines []string
+	fail  string
+}
+
+// errBroken は、葉が返す、仕様の例外でない失敗。
+var errBroken = errors.New("broken")
 
 func (l *log) note(s string) { l.lines = append(l.lines, s) }
 
@@ -32,7 +40,17 @@ type shopLeaves struct{ l *log }
 
 func (x shopLeaves) Lookup(_ context.Context, id string) (shop.Item, error) {
 	x.l.note("leaf Lookup " + id)
+	if x.l.fail == "Lookup" {
+		return shop.Item{}, errBroken
+	}
 	return shop.Item{Id: id}, nil
+}
+func (x shopLeaves) Ring(context.Context) error {
+	x.l.note("leaf Ring")
+	if x.l.fail == "Ring" {
+		return errBroken
+	}
+	return nil
 }
 func (x shopLeaves) Save(_ context.Context, item shop.Item) (shop.Item, error) {
 	x.l.note("leaf Save " + item.Id)
@@ -66,16 +84,16 @@ type gateCases struct{}
 func (gateCases) Open(_ context.Context, v gate.Ticket) (bool, error) { return v.Ok, nil }
 func (gateCases) Shut(_ context.Context, v gate.Ticket) (bool, error) { return !v.Ok, nil }
 
-// seams は、継ぎ目 t.traced: 中身の前と後に、印を残す。
+// seams は、継ぎ目 trace.traced: 中身の前と後に、印を残す。
 type seams struct{ l *log }
 
-func (x seams) OpenTTraced(ctx context.Context, body func(ctx context.Context) error) error {
+func (x seams) OpenTraceTraced(ctx context.Context, body func(ctx context.Context) error) error {
 	x.l.note("seam Open before")
 	err := body(ctx)
 	x.l.note("seam Open after")
 	return err
 }
-func (x seams) CloseTTraced(ctx context.Context, body func(ctx context.Context) error) error {
+func (x seams) CloseTraceTraced(ctx context.Context, body func(ctx context.Context) error) error {
 	x.l.note("seam Close before")
 	err := body(ctx)
 	x.l.note("seam Close after")
@@ -118,7 +136,7 @@ func TestNoteAfter(t *testing.T) {
 // TestLayers は、継ぎ目と、本体のあるデコレータを重ねた op: 書かれた順に、外から内へ。
 func TestLayers(t *testing.T) {
 	ctx, l := context.Background(), &log{}
-	// open: 継ぎ目 t.traced → gate.guarded → gate.noted → 葉
+	// open: 継ぎ目 trace.traced → gate.guarded → gate.noted → 葉
 	if err := newShop(l, true).Open(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +148,7 @@ func TestLayers(t *testing.T) {
 	}
 	l.expect(t, "seam Open before", "gate Ticket", "seam Open after")
 
-	// close: gate.guarded → 継ぎ目 t.traced → 配線の中身
+	// close: gate.guarded → 継ぎ目 trace.traced → 配線の中身
 	if err := newShop(l, true).Close(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -160,4 +178,108 @@ func TestSameNamespace(t *testing.T) {
 		t.Fatalf("Peek = %+v, %v", got, err)
 	}
 	l.expect(t, "leaf Local", "leaf Peek")
+}
+
+// outcome は、継ぎ目 trace.traced の、結果一つを起こす実装: fail が nil なら、中身を呼んで、その結果を返す。nil でなければ、
+// before なら、中身を呼ばずに、fail を返し、そうでなければ、中身を呼んでから、fail を返す。
+type outcome struct {
+	fail   error
+	before bool
+}
+
+func (x outcome) run(ctx context.Context, body func(ctx context.Context) error) error {
+	if x.fail != nil && x.before {
+		return x.fail
+	}
+	if err := body(ctx); err != nil {
+		return err
+	}
+	return x.fail
+}
+func (x outcome) OpenTraceTraced(ctx context.Context, body func(ctx context.Context) error) error {
+	return x.run(ctx, body)
+}
+func (x outcome) CloseTraceTraced(ctx context.Context, body func(ctx context.Context) error) error {
+	return x.run(ctx, body)
+}
+
+// traceCases は、デコレータ trace.traced の、結果ごとのケース（docs/plugin-go.md「デコレータのテストの口」）。
+type traceCases struct{}
+
+func seamsOf(x outcome) shoptest.TraceTracedCase {
+	return shoptest.TraceTracedCase{Seams: func() shop.Seams { return x }}
+}
+func (traceCases) OK() shoptest.TraceTracedCase { return seamsOf(outcome{}) }
+func (traceCases) Busy() shoptest.TraceTracedCase {
+	return seamsOf(outcome{fail: trace.Busy{}, before: true})
+}
+func (traceCases) Late() shoptest.TraceTracedCase { return seamsOf(outcome{fail: trace.Late{}}) }
+func (traceCases) Odd() shoptest.TraceTracedCase {
+	return seamsOf(outcome{fail: trace.Odd{}, before: true})
+}
+
+type seamCases struct{}
+
+func (seamCases) TraceTraced() shoptest.TraceTracedCases { return traceCases{} }
+
+// TestSeamCases は、生成した RunSeams が、付けた op ごと（open、close）、結果ごとに、継ぎ目を呼び、関係ごとの確かめ
+// （prevents effects: 中身を呼ばない。keeps effects: 中身を呼んでいる。関係なし: 例外だけ）を通すこと。
+func TestSeamCases(t *testing.T) {
+	shoptest.RunSeams(t, seamCases{})
+}
+
+// TestMatchThenStatement は、proceed() のアームを持つ match の後ろに、文が続くデコレータ（gate.checked）: proceed() のアームに
+// 入ったとき、op の結果が、そのまま返り、後ろの文が、動く。throw のアームに入ったとき、中身も、後ろの文も、動かない。中身が
+// 失敗したとき、後ろの文が、動かない。値を返す op（price）と、値を返さない op（ring）の、両方。
+func TestMatchThenStatement(t *testing.T) {
+	ctx, l := context.Background(), &log{}
+	var closed gate.Closed
+
+	// 値を返す op
+	got, err := newShop(l, true).Price(ctx, "a")
+	if err != nil || got != (shop.Item{Id: "a"}) {
+		t.Fatalf("Price = %+v, %v（期待は、中身が返した値のまま）", got, err)
+	}
+	l.expect(t, "gate Ticket", "leaf Lookup a", "gate Note price 1 nil")
+	if _, err := newShop(l, false).Price(ctx, "a"); !errors.As(err, &closed) {
+		t.Fatalf("閉まっているときの Price の失敗 = %v（期待は gate.Closed）", err)
+	}
+	l.expect(t, "gate Ticket")
+	l.fail = "Lookup"
+	if _, err := newShop(l, true).Price(ctx, "a"); !errors.Is(err, errBroken) {
+		t.Fatalf("中身が失敗したときの Price の失敗 = %v（期待は、中身の失敗のまま）", err)
+	}
+	l.expect(t, "gate Ticket", "leaf Lookup a")
+	l.fail = ""
+
+	// 値を返さない op
+	if err := newShop(l, true).Ring(ctx); err != nil {
+		t.Fatal(err)
+	}
+	l.expect(t, "gate Ticket", "leaf Ring", "gate Note ring 1 nil")
+	if err := newShop(l, false).Ring(ctx); !errors.As(err, &closed) {
+		t.Fatalf("閉まっているときの Ring の失敗 = %v（期待は gate.Closed）", err)
+	}
+	l.expect(t, "gate Ticket")
+	l.fail = "Ring"
+	if err := newShop(l, true).Ring(ctx); !errors.Is(err, errBroken) {
+		t.Fatalf("中身が失敗したときの Ring の失敗 = %v（期待は、中身の失敗のまま）", err)
+	}
+	l.expect(t, "gate Ticket", "leaf Ring")
+}
+
+// TestNeverOp は、never を返す op に付けた、前で確かめるだけのデコレータ: 開いていれば、中身（いつも、shop.Denied を投げる）へ進み、
+// 閉まっていれば、中身へ進まずに gate.Closed。
+func TestNeverOp(t *testing.T) {
+	ctx, l := context.Background(), &log{}
+	var denied shop.Denied
+	if err := newShop(l, true).Refuse(ctx); !errors.As(err, &denied) {
+		t.Fatalf("開いているときの Refuse の失敗 = %v（期待は shop.Denied）", err)
+	}
+	l.expect(t, "gate Ticket")
+	var closed gate.Closed
+	if err := newShop(l, false).Refuse(ctx); !errors.As(err, &closed) {
+		t.Fatalf("閉まっているときの Refuse の失敗 = %v（期待は gate.Closed）", err)
+	}
+	l.expect(t, "gate Ticket")
 }

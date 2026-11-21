@@ -5,6 +5,8 @@
   "gen/store/states.go",
   "gen/store/storetest/doc.go",
   "gen/store/storetest/fakes.go",
+  "gen/store/storetest/hozo-tests.go.json",
+  "gen/store/storetest/seams.go",
   "gen/store/types.go",
   "gen/store/wiring.go"
 ]

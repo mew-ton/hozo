@@ -197,6 +197,9 @@ func CaseConst(classify, caseName string) string
 func StateUnitName(stateOrClassify string) string // <状態>State
 func DepName(namespace string) (typeName, param string)   // 別の名前空間の口: StoreOps と store
 func SeamMethod(opName, decorator string) string  // 継ぎ目のメソッド: login と rate.limited から LoginRateLimited（同「名前」「継ぎ目」）
+func WrapMethod(opName, decorator string) string  // 本体のあるデコレータの外側のメソッド: logout と server.audited から logoutServerAudited（同「本体のあるデコレータ」）
+func SeamCasesName(decorator string) string       // デコレータのテストの口の名前 <D>: rate.limited から RateLimited（同「デコレータのテストの口」）
+func SeamDecorators(s *Shape) []string            // デコレータのテストの口の対象: s.Seams にメソッドを持つデコレータ（最初に出てくる順）
 func BodyName(opName string) string               // 基底が出す中身のメソッド: loginBody
 func Capitalize(s string) string                  // 先頭の一文字を大文字に
 func IsKeyword(name string) bool                  // Go の予約語か
@@ -253,7 +256,14 @@ type OpShape struct {
     Exported   bool
     Place      Place                              // Wiring / Never / Leaf（同「op の置き場」の 1〜3）
     Seams      []string                           // この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない
-    Body       string                             // 継ぎ目を持ち、基底が中身を出す op（Wiring / Never）の、中身のメソッドの名前。それ以外は ""
+    Layers     []Layer                            // この op の中身を包むデコレータ（書かれた順）: 継ぎ目（Seams と同じもの）と、本体のあるデコレータ
+    Body       string                             // 包むデコレータを持ち、基底が中身を出す op（Wiring / Never）の、中身のメソッドの名前。それ以外は ""
+}
+type Layer struct {                               // op の中身を包むデコレータ一つ（同「継ぎ目」「本体のあるデコレータ」）
+    Decorator string                              // デコレータの FQN
+    Bodied    bool                                // 本体のあるデコレータか。真なら Method は外側のメソッド（WrapMethod）、偽なら継ぎ目のメソッド（SeamMethod）
+    Method    string
+    Args      []ir.Arg                            // その適用の引数
 }
 type StateUnit struct {                           // 状態の単位一つ（同「状態の単位」）。メソッドの並びは、形で決まる問い合わせ、Builtins、Reads、Effects
     FQN, TypeName, Param string

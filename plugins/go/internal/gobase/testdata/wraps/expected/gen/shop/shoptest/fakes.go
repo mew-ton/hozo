@@ -18,6 +18,7 @@ type LeavesFake struct {
 	Save   runtime.Fake[struct{ Item shop.Item }, shop.Item]
 	Open   runtime.FakeVoid[struct{}]
 	Sweep  runtime.FakeVoid[struct{}]
+	Ring   runtime.FakeVoid[struct{}]
 }
 
 // leavesFake は、LeavesFake を、shop.Leaves にする。
@@ -42,6 +43,10 @@ func (o leavesFake) Open(ctx context.Context) error {
 
 func (o leavesFake) Sweep(ctx context.Context) error {
 	return o.f.Sweep.Call(struct{}{}, func() error { return o.impl.Sweep(ctx) })
+}
+
+func (o leavesFake) Ring(ctx context.Context) error {
+	return o.f.Ring.Call(struct{}{}, func() error { return o.impl.Ring(ctx) })
 }
 
 // GateCasesFake は、分類 gate.Gate の述語（gate.GateCases）のにせもの。言われていなければ、本物の述語を呼ぶ。
@@ -78,8 +83,8 @@ func (o gateCasesFake) Shut(ctx context.Context, v gate.Ticket) (bool, error) {
 // SeamsFake は、継ぎ目（shop.Seams）のにせもの。継ぎ目ごとに、フィールド一つ。
 // 言われていない継ぎ目は、op の中身を、そのまま呼ぶ。
 type SeamsFake struct {
-	OpenTTraced  runtime.FakeVoid[struct{}]
-	CloseTTraced runtime.FakeVoid[struct{}]
+	OpenTraceTraced  runtime.FakeVoid[struct{}]
+	CloseTraceTraced runtime.FakeVoid[struct{}]
 }
 
 // seamsFake は、SeamsFake を、shop.Seams にする。
@@ -87,12 +92,12 @@ type seamsFake struct{ f *SeamsFake }
 
 var _ shop.Seams = seamsFake{}
 
-func (o seamsFake) OpenTTraced(ctx context.Context, body func(ctx context.Context) error) error {
-	return o.f.OpenTTraced.Call(struct{}{}, func() error { return body(ctx) })
+func (o seamsFake) OpenTraceTraced(ctx context.Context, body func(ctx context.Context) error) error {
+	return o.f.OpenTraceTraced.Call(struct{}{}, func() error { return body(ctx) })
 }
 
-func (o seamsFake) CloseTTraced(ctx context.Context, body func(ctx context.Context) error) error {
-	return o.f.CloseTTraced.Call(struct{}{}, func() error { return body(ctx) })
+func (o seamsFake) CloseTraceTraced(ctx context.Context, body func(ctx context.Context) error) error {
+	return o.f.CloseTraceTraced.Call(struct{}{}, func() error { return body(ctx) })
 }
 
 // Fakes は、名前空間 shop の、テストの中の組み立て（NewOps）に使う、にせもの。フィールドは、New の引数の順。零値のまま、使える。

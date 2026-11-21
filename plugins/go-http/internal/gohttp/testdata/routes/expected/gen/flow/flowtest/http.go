@@ -35,16 +35,37 @@ type AddHTTPCase struct {
 	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
+// ShelveHTTPCases は、入口 flow.shelve（POST /flow/shelf）の、人か AI が書くケース。メソッドごとに、一つ。
+type ShelveHTTPCases interface {
+	// OK は、正常に終わるケース: 成功の応答。
+	OK() ShelveHTTPCase
+	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
+	BadRequest() ShelveHTTPCase
+}
+
+// ShelveHTTPCase は、入口 flow.shelve の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
+type ShelveHTTPCase struct {
+	// In は、入力。走らせる側が、要求に組み立てる。
+	In flow.AddInput
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
+	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
+	Request func(r *http.Request)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
+}
+
 // HTTPCases は、@http.get / @http.post の付いた op の、インテグレーションテストのケース。入口ごとに、メソッド一つ（宣言順）。
 // メソッドが一つでも足りない値は、RunHTTP に渡すところでコンパイルできない。
 type HTTPCases interface {
 	Add() AddHTTPCases
+	Shelve() ShelveHTTPCases
 }
 
 // RunHTTP は、入口ごと、結果ごとに、テストを走らせる。テストの名前は、<op の FQN>/<結果>。例外は、出どころごとに、<op の FQN>/<例外>/<出どころ>。
 // ケースごとに、新しいにせものの上に、流れを組み立て（NewOps）、入力を要求に組み立てて送り、応答が、そのケースのものであること
 // （ステータスと、本文の形）を確かめてから、Then を呼ぶ。口にない、例外のケースは、正常のケースの用意の後に、にせものに、例外を起こさせる。
-func RunHTTP(t *testing.T, size flow.SizeCases, c HTTPCases) {
+func RunHTTP(t *testing.T, leaves flow.Leaves, hours flow.HoursCases, size flow.SizeCases, c HTTPCases) {
 	t.Run("flow.add", func(t *testing.T) {
 		cases := c.Add()
 		send := func(t *testing.T, k AddHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
@@ -57,7 +78,7 @@ func RunHTTP(t *testing.T, size flow.SizeCases, c HTTPCases) {
 			}
 			call := httpCall{method: "POST", path: "/flow/items"}
 			call.bodyObj(k.In.Item)
-			return call.send(t, flow.NewHandler(NewOps(f, size)), k.Request), f
+			return call.send(t, flow.NewHandler(NewOps(f, leaves, hours, size)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
@@ -91,6 +112,64 @@ func RunHTTP(t *testing.T, size flow.SizeCases, c HTTPCases) {
 					f.Size.Is(flow.SizeBig)
 				})
 				httpWantThrown[flow.TooBig](t, res, 422)
+			})
+		})
+	})
+	t.Run("flow.shelve", func(t *testing.T) {
+		cases := c.Shelve()
+		send := func(t *testing.T, k ShelveHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
+			call := httpCall{method: "POST", path: "/flow/shelf"}
+			call.bodyObj(k.In.Item)
+			return call.send(t, flow.NewHandler(NewOps(f, leaves, hours, size)), k.Request), f
+		}
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			res, f := send(t, k, nil)
+			httpWantResult(t, res, nil)
+			if k.Then != nil {
+				k.Then(t, res, f)
+			}
+		})
+		t.Run("BadRequest", func(t *testing.T) {
+			k := cases.BadRequest()
+			res, f := send(t, k, nil)
+			httpWantBadRequest(t, res)
+			if k.Then != nil {
+				k.Then(t, res, f)
+			}
+		})
+		t.Run("Jammed", func(t *testing.T) {
+			t.Run("flow.checkDoor", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.CheckDoor.Throws(flow.Jammed{})
+				})
+				httpWantThrown[flow.Jammed](t, res, 502)
+			})
+		})
+		t.Run("Taken", func(t *testing.T) {
+			t.Run("flow.addItem", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Items.AddItem.Throws(flow.Taken{})
+				})
+				httpWantThrown[flow.Taken](t, res, 409)
+			})
+		})
+		t.Run("Shut", func(t *testing.T) {
+			t.Run("flow.shelve@flow.opened.Late", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Hours.Is(flow.HoursLate)
+				})
+				httpWantThrown[flow.Shut](t, res, 503)
 			})
 		})
 	})

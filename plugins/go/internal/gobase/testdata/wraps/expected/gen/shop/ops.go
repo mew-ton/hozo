@@ -21,13 +21,28 @@ type Ops interface {
 
 	// Open は店を開ける（人が書く）
 	//
-	// Throws: gate.Closed
+	// Throws: gate.Closed, trace.Busy, trace.Late, trace.Odd
 	Open(ctx context.Context) error
 
 	// Close は店を閉める
 	//
-	// Throws: gate.Closed
+	// Throws: trace.Busy, trace.Late, trace.Odd, gate.Closed
 	Close(ctx context.Context) error
+
+	// Price は値段を引く
+	//
+	// Throws: gate.Closed
+	Price(ctx context.Context, id string) (Item, error)
+
+	// Ring は呼び鈴を鳴らす（人が書く）
+	//
+	// Throws: gate.Closed
+	Ring(ctx context.Context) error
+
+	// Refuse はいつも、断る
+	//
+	// Throws: shop.Denied, gate.Closed
+	Refuse(ctx context.Context) error
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。

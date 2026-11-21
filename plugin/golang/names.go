@@ -186,6 +186,10 @@ func SeamMethod(opName, decorator string) string {
 	return b.String()
 }
 
+// SeamCasesName は、デコレータのテストの口（docs/plugin-go.md「デコレータのテストの口」）の、デコレータ decorator の名前 <D>:
+// デコレータの FQN のセグメントを、それぞれ先頭大文字にして連結したもの（`rate.limited` → `RateLimited`）。
+func SeamCasesName(decorator string) string { return SeamMethod("", decorator) }
+
 // WrapMethod は、本体のあるデコレータを付けた op の、そのデコレータの外側のメソッドの名前（docs/plugin-go.md
 // 「本体のあるデコレータ」）: 継ぎ目のメソッドの名前（SeamMethod）の、先頭を小文字にしたもの（`login` と `audit.logged` →
 // `loginAuditLogged`）。非公開で、どのインターフェースにも現れない。

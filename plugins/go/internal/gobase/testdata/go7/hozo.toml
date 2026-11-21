@@ -1,0 +1,9 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-7（単位のトランスパイラが、本体のあるデコレータに、
+# 継ぎ目を宣言している）。
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-wrap"]
+out         = "gen/a"

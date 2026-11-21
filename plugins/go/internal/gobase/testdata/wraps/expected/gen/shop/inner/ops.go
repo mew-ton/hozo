@@ -23,16 +23,31 @@ type Ops interface {
 
 	// Open は店を開ける（人が書く）
 	//
-	// Throws: gate.Closed
+	// Throws: gate.Closed, trace.Busy, trace.Late, trace.Odd
 	Open(ctx context.Context) error
 
 	// Close は店を閉める
 	//
-	// Throws: gate.Closed
+	// Throws: trace.Busy, trace.Late, trace.Odd, gate.Closed
 	Close(ctx context.Context) error
 
 	// Sweep は掃除する（人が書く）
 	Sweep(ctx context.Context) error
+
+	// Price は値段を引く
+	//
+	// Throws: gate.Closed
+	Price(ctx context.Context, id string) (Item, error)
+
+	// Ring は呼び鈴を鳴らす（人が書く）
+	//
+	// Throws: gate.Closed
+	Ring(ctx context.Context) error
+
+	// Refuse はいつも、断る
+	//
+	// Throws: shop.Denied, gate.Closed
+	Refuse(ctx context.Context) error
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
@@ -46,11 +61,16 @@ type Leaves interface {
 
 	// Open は店を開ける（人が書く）
 	//
-	// Throws: gate.Closed
+	// Throws: gate.Closed, trace.Busy, trace.Late, trace.Odd
 	Open(ctx context.Context) error
 
 	// Sweep は掃除する（人が書く）
 	Sweep(ctx context.Context) error
+
+	// Ring は呼び鈴を鳴らす（人が書く）
+	//
+	// Throws: gate.Closed
+	Ring(ctx context.Context) error
 }
 
 // GateOps は名前空間 gate の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 gate_ に渡す。
@@ -66,11 +86,11 @@ type GateOps interface {
 // Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 seams に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Seams interface {
-	// OpenTTraced は op shop.open に付いた @t.traced の継ぎ目（go-trace）。body が op の中身で、その前後に置くものを、実装が決める。
-	OpenTTraced(ctx context.Context, body func(ctx context.Context) error) error
+	// OpenTraceTraced は op shop.open に付いた @trace.traced の継ぎ目（go-trace）。body が op の中身で、その前後に置くものを、実装が決める。
+	OpenTraceTraced(ctx context.Context, body func(ctx context.Context) error) error
 
-	// CloseTTraced は op shop.close に付いた @t.traced の継ぎ目（go-trace）。body が op の中身で、その前後に置くものを、実装が決める。
-	CloseTTraced(ctx context.Context, body func(ctx context.Context) error) error
+	// CloseTraceTraced は op shop.close に付いた @trace.traced の継ぎ目（go-trace）。body が op の中身で、その前後に置くものを、実装が決める。
+	CloseTraceTraced(ctx context.Context, body func(ctx context.Context) error) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves、分類の述語（FQN の辞書順）、別の名前空間（名前の辞書順）、seams。
@@ -101,16 +121,36 @@ func (o *ops) Save(ctx context.Context, item Item) (Item, error) {
 	return o.saveGateNoted(ctx, item)
 }
 
-// Open は、デコレータ（@t.traced、@gate.guarded、@gate.noted）を通して、中身（o.leaves.Open）を呼ぶ。
+// Open は、デコレータ（@trace.traced、@gate.guarded、@gate.noted）を通して、中身（o.leaves.Open）を呼ぶ。
 func (o *ops) Open(ctx context.Context) error {
-	return o.seams.OpenTTraced(ctx, o.openGateGuarded)
+	return o.seams.OpenTraceTraced(ctx, o.openGateGuarded)
 }
 
-// Close は、デコレータ（@gate.guarded、@t.traced）を通して、中身（o.closeBody）を呼ぶ。
+// Close は、デコレータ（@gate.guarded、@trace.traced）を通して、中身（o.closeBody）を呼ぶ。
 func (o *ops) Close(ctx context.Context) error {
 	return o.closeGateGuarded(ctx)
 }
 
 func (o *ops) Sweep(ctx context.Context) error {
 	return o.leaves.Sweep(ctx)
+}
+
+// Price は、デコレータ（@gate.checked）を通して、中身（o.priceBody）を呼ぶ。
+func (o *ops) Price(ctx context.Context, id string) (Item, error) {
+	return o.priceGateChecked(ctx, id)
+}
+
+// Ring は、デコレータ（@gate.checked）を通して、中身（o.leaves.Ring）を呼ぶ。
+func (o *ops) Ring(ctx context.Context) error {
+	return o.ringGateChecked(ctx)
+}
+
+// Refuse は、デコレータ（@gate.guarded）を通して、中身（o.refuseBody）を呼ぶ。
+func (o *ops) Refuse(ctx context.Context) error {
+	return o.refuseGateGuarded(ctx)
+}
+
+// refuseBody は op shop.refuse の中身（shop.Denied を投げる）。外側の Refuse が、デコレータを通して呼ぶ。
+func (o *ops) refuseBody(ctx context.Context) error {
+	return Denied{}
 }

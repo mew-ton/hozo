@@ -87,7 +87,7 @@ func (o *ops) closeBody(ctx context.Context) error {
 	return nil
 }
 
-// closeGateGuarded は op shop.close に付いた @gate.guarded の外側（デコレータの本体）。proceed() が、内側（@t.traced）を呼ぶ。
+// closeGateGuarded は op shop.close に付いた @gate.guarded の外側（デコレータの本体）。proceed() が、内側（@trace.traced）を呼ぶ。
 func (o *ops) closeGateGuarded(ctx context.Context) error {
 	now, err := o.gate_.Ticket(ctx)
 	if err != nil {
@@ -100,13 +100,91 @@ func (o *ops) closeGateGuarded(ctx context.Context) error {
 	}
 	switch k0 {
 	case gate.GateOpen:
-		if err := o.seams.CloseTTraced(ctx, o.closeBody); err != nil {
+		if err := o.seams.CloseTraceTraced(ctx, o.closeBody); err != nil {
 			return err
 		}
 	case gate.GateShut:
 		return gate.Closed{}
 	}
 	return nil
+}
+
+// priceBody は op shop.price の中身（配線の本体）。外側の Price が、デコレータを通して呼ぶ。
+func (o *ops) priceBody(ctx context.Context, id string) (Item, error) {
+	return o.Lookup(ctx, id)
+}
+
+// priceGateChecked は op shop.price に付いた @gate.checked の外側（デコレータの本体）。proceed() が、内側（o.priceBody）を呼ぶ。
+func (o *ops) priceGateChecked(ctx context.Context, id string) (Item, error) {
+	now, err := o.gate_.Ticket(ctx)
+	if err != nil {
+		return Item{}, err
+	}
+	// match (now by gate.Gate)
+	var result Item
+	k0, err := gate.ClassifyGate(ctx, o.gate, now)
+	if err != nil {
+		return Item{}, err
+	}
+	switch k0 {
+	case gate.GateOpen:
+		v0, err := o.priceBody(ctx, id)
+		if err != nil {
+			return Item{}, err
+		}
+		result = v0
+	case gate.GateShut:
+		return Item{}, gate.Closed{}
+	}
+	if err := o.gate_.Note(ctx, "price", 1, nil); err != nil {
+		return Item{}, err
+	}
+	return result, nil
+}
+
+// ringGateChecked は op shop.ring に付いた @gate.checked の外側（デコレータの本体）。proceed() が、内側（o.leaves.Ring）を呼ぶ。
+func (o *ops) ringGateChecked(ctx context.Context) error {
+	now, err := o.gate_.Ticket(ctx)
+	if err != nil {
+		return err
+	}
+	// match (now by gate.Gate)
+	k0, err := gate.ClassifyGate(ctx, o.gate, now)
+	if err != nil {
+		return err
+	}
+	switch k0 {
+	case gate.GateOpen:
+		if err := o.leaves.Ring(ctx); err != nil {
+			return err
+		}
+	case gate.GateShut:
+		return gate.Closed{}
+	}
+	if err := o.gate_.Note(ctx, "ring", 1, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// refuseGateGuarded は op shop.refuse に付いた @gate.guarded の外側（デコレータの本体）。proceed() が、内側（o.refuseBody）を呼ぶ。
+func (o *ops) refuseGateGuarded(ctx context.Context) error {
+	now, err := o.gate_.Ticket(ctx)
+	if err != nil {
+		return err
+	}
+	// match (now by gate.Gate)
+	k0, err := gate.ClassifyGate(ctx, o.gate, now)
+	if err != nil {
+		return err
+	}
+	switch k0 {
+	case gate.GateOpen:
+		return o.refuseBody(ctx)
+	case gate.GateShut:
+		return gate.Closed{}
+	}
+	return &runtime.ClassificationError{Classify: "gate.Gate"}
 }
 
 func ptr[T any](v T) *T { return &v }

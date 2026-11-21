@@ -1,0 +1,26 @@
+// DEC-24: 本体の match の対象が、状態（状態の分類での match、状態を名前で書いた match）。別の名前空間の op に付けると、
+// その名前空間の配線からは、状態に触れられない
+namespace a {
+  exception Shut;
+  state door: nullable<string>;
+  /** 戸の状態（述語で決まる、状態の分類） */
+  classify Door of door { Opened; Closed; }
+  decorator fn byClassify() {
+    match (by Door) {
+      Opened => proceed();
+      Closed => throw Shut;
+    }
+  }
+  decorator fn byState() {
+    match (door by nullable) {
+      Some => proceed();
+      None => throw Shut;
+    }
+  }
+}
+namespace b {
+  @a.byClassify                            // ERROR: DEC-24
+  fn f();
+  @a.byState                               // ERROR: DEC-24
+  fn g();
+}

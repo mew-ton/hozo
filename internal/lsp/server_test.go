@@ -1640,3 +1640,102 @@ func TestIndexModel(t *testing.T) {
 		}
 	}
 }
+
+// TestDecoratorBody は、デコレータの本体（docs/grammar.md「デコレータの本体」）の中の、ホバーと、定義へジャンプ
+// （docs/lsp.md「ホバー」「定義へジャンプ」）: 本体が呼ぶ op、match の分類とケース、throw の例外、val、値の引数は、op の配線の
+// 中と同じに働く。値の引数の定義は、そのデコレータの宣言の引数。proceed は、名前ではないので、ホバーも、定義も、ない。
+func TestDecoratorBody(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace gate {
+  /** 閉まっている */
+  exception Closed;
+  model Ticket { ok: boolean; }
+  /** 通してよいか */
+  classify Gate of Ticket { Open; Shut; }
+  /** 今の切符 */
+  fn ticket(): Ticket;
+  /** 記録する */
+  fn note(label: string);
+  /**
+   * 閉まっていれば、op の中身を呼ばずに Closed
+   *
+   * @param label 記録に残す名前
+   */
+  decorator fn guarded(label: string) {
+    val now = ticket();
+    note(label);
+    match (now by Gate) {
+      Open => proceed();
+      Shut => throw Closed;
+    }
+  }
+  @guarded("x")
+  fn work();
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Fatalf("診断 %s: %s（want なし）", d.Code, d.Message)
+		}
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	const head = "decorator fn guarded(label: string)"
+	for _, tt := range []struct {
+		what   string
+		pos    protocol.TextDocumentPositionParams
+		target string
+		skip   int
+		hover  []string
+	}{
+		{"本体が呼ぶ op", at("val now = ticket();", len("val now = ")), "ticket(): Ticket;", 0, []string{"fn ticket(): Ticket", "今の切符"}},
+		{"本体の、文の呼び出し", at("note(label);", 0), "note(label: string);", 0, []string{"fn note(label: string)", "記録する"}},
+		{"値の引数", at("note(label);", len("note(")), "label: string) {", 0, []string{head, "  label: string", "記録に残す名前"}},
+		{"match の対象の val", at("match (now by Gate)", len("match (")), "now = ticket();", 0, nil},
+		{"match の分類", at("match (now by Gate)", len("match (now by ")), "Gate of Ticket", 0, []string{"classify Gate of Ticket", "通してよいか"}},
+		{"アームのケース", at("Open => proceed();", 0), "Open; Shut;", 0, nil},
+		{"throw の例外", at("throw Closed;", len("throw ")), "Closed;", 0, []string{"exception Closed", "閉まっている"}},
+		{"適用", at("@guarded(\"x\")", 1), "guarded(label: string) {", 0, []string{head, "閉まっていれば、op の中身を呼ばずに Closed"}},
+	} {
+		if tt.hover != nil {
+			var hov *protocol.Hover
+			c.result(protocol.MethodHover, tt.pos, &hov)
+			if hov == nil {
+				t.Errorf("hover(%s) = nil", tt.what)
+			} else {
+				for _, want := range tt.hover {
+					if !strings.Contains(hov.Contents.Value, want) {
+						t.Errorf("hover(%s) に %q がない:\n%s", tt.what, want, hov.Contents.Value)
+					}
+				}
+			}
+		}
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, tt.pos, &loc)
+		if want := shift(positionOf(t, enc, text, tt.target, 0), tt.skip); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
+		}
+	}
+	// proceed は、名前ではない: ホバーも、定義も、ない
+	var hov *protocol.Hover
+	c.result(protocol.MethodHover, at("Open => proceed();", len("Open => ")), &hov)
+	if hov != nil {
+		t.Errorf("hover(proceed) = %+v, want nil", hov)
+	}
+	var none *protocol.Location
+	c.result(protocol.MethodDefinition, at("Open => proceed();", len("Open => ")), &none)
+	if none != nil {
+		t.Errorf("definition(proceed) = %+v, want nil", none)
+	}
+	// 本体は、ホバーの見出しに出ない
+	c.result(protocol.MethodHover, at("@guarded(\"x\")", 1), &hov)
+	if hov != nil && strings.Contains(hov.Contents.Value, "proceed") {
+		t.Errorf("hover(@guarded) に、本体が出ている:\n%s", hov.Contents.Value)
+	}
+}

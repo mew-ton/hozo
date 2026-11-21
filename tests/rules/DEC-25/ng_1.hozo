@@ -1,0 +1,26 @@
+// DEC-25（docs/check.md「デコレータ」）: proceed() の後ろに文を持つデコレータを、never を返す op に付けた。
+// op は、いつも、例外を投げるので、後ろの文が、評価されない
+namespace a {
+  exception Denied;
+  exception Shut;
+  model Ticket { ok: boolean; }
+  classify Gate of Ticket { Open; Closed; }
+  fn ticket(): Ticket;
+  fn record();
+  decorator fn after() {
+    proceed();
+    record();
+  }
+  decorator fn guardedAfter() {
+    val now = ticket();
+    match (now by Gate) {
+      Open   => proceed();
+      Closed => throw Shut;
+    }
+    record();
+  }
+  @after                                   // ERROR: DEC-25
+  fn denied(): never throws Denied;
+  @guardedAfter                            // ERROR: DEC-25
+  fn refused(): never throws Denied;
+}

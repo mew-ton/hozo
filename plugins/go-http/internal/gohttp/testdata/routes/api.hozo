@@ -259,4 +259,35 @@ namespace flow {
       Big   => throw TooBig;
     }
   }
+
+  // 本体のあるデコレータ（docs/plugin-go.md「本体のあるデコレータ」）を付けた入口: 本体は、本物を通すので、本体の中の、例外の出どころ
+  // （throw のアームと、本体が呼ぶ葉）も、Hozo が、ケースを作る。proceed() のアームの先（op の中身）の出どころも、同じ
+  @http.status(503)
+  exception Shut;
+  @http.status(502)
+  exception Jammed;
+
+  /** 受け付ける時間か（人が、述語を書く） */
+  classify Hours of Item { Open; Late; }
+
+  /** 今の番（人が書く） */
+  fn duty(): Item;
+  /** 戸を確かめる。壊れていれば Jammed（人が書く） */
+  fn checkDoor(): throws Jammed;
+
+  /** 戸を確かめ、受け付ける時間でなければ、op の中身を呼ばずに Shut */
+  decorator fn opened() {
+    checkDoor();
+    val now = duty();
+    match (now by Hours) {
+      Open => proceed();
+      Late => throw Shut;
+    }
+  }
+
+  @http.post("/flow/shelf")
+  @opened
+  export fn shelve(in: AddInput) {
+    addItem(in.item);
+  }
 }

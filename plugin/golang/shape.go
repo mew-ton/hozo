@@ -574,6 +574,18 @@ func eachMatch(w *ir.Wiring, fn func(m *ir.Match)) {
 	})
 }
 
+// SeamDecorators は、デコレータのテストの口の対象（docs/plugin-go.md「デコレータのテストの口」）: s.Seams にメソッドを持つ
+// デコレータの FQN。並びは、s.Seams の中で、最初に出てくる順。
+func SeamDecorators(s *Shape) []string {
+	var out []string
+	for _, sm := range s.Seams {
+		if !contains(out, sm.Decorator) {
+			out = append(out, sm.Decorator)
+		}
+	}
+	return out
+}
+
 func hasLayer(layers []Layer, decorator string) bool {
 	for _, l := range layers {
 		if l.Decorator == decorator {

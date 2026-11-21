@@ -11,6 +11,8 @@
     {"name": "server.myPage/OK", "file": "gen/server/servertest/leaves.go", "lines": [273, 280]},
     {"name": "server.newOrder/OK", "file": "gen/server/servertest/leaves.go", "lines": [286, 293]},
     {"name": "server.composeNotice/OK", "file": "gen/server/servertest/leaves.go", "lines": [299, 306]},
-    {"name": "server.recordAudit/OK", "file": "gen/server/servertest/leaves.go", "lines": [312, 319]}
+    {"name": "server.recordAudit/OK", "file": "gen/server/servertest/leaves.go", "lines": [312, 319]},
+    {"name": "server.login@rate.limited/OK", "file": "gen/server/servertest/seams.go", "lines": [41, 52]},
+    {"name": "server.login@rate.limited/LimitExceeded", "file": "gen/server/servertest/seams.go", "lines": [55, 67]}
   ]
 }

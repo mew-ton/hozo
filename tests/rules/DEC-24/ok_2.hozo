@@ -1,0 +1,23 @@
+// DEC-24: 宣言した名前空間の op に付けるなら、本体の match の対象に、その名前空間の状態を書ける
+namespace a {
+  exception Shut;
+  state door: nullable<string>;
+  /** 戸の状態（述語で決まる、状態の分類） */
+  classify Door of door { Opened; Closed; }
+  decorator fn byClassify() {
+    match (by Door) {
+      Opened => proceed();
+      Closed => throw Shut;
+    }
+  }
+  decorator fn byState() {
+    match (door by nullable) {
+      Some => proceed();
+      None => throw Shut;
+    }
+  }
+  @byClassify
+  fn f();
+  @byState
+  fn g();
+}

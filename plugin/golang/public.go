@@ -200,5 +200,16 @@ func PublicTestNames(view *ir.View) []TestName {
 			TestName{Name: name + "Examples", Decl: c.Name, What: "分類 " + c.Name + " の例の口 " + name + "Examples"},
 			TestName{Name: "Run" + name, Decl: c.Name, What: "分類 " + c.Name + " の例を走らせる Run" + name})
 	}
+	if decorators := SeamDecorators(ShapeOf(view)); len(decorators) > 0 {
+		out = append(out,
+			TestName{Name: "SeamCases", What: "デコレータのケースのまとめ SeamCases"},
+			TestName{Name: "RunSeams", What: "デコレータのケースを走らせる RunSeams"})
+		for _, fqn := range decorators {
+			name := SeamCasesName(fqn)
+			out = append(out,
+				TestName{Name: name + "Cases", Decl: fqn, What: "デコレータ " + fqn + " のケースの口 " + name + "Cases"},
+				TestName{Name: name + "Case", Decl: fqn, What: "デコレータ " + fqn + " のケース " + name + "Case"})
+		}
+	}
 	return append(out, TestFakeNames(view)...)
 }

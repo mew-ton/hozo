@@ -8,4 +8,4 @@ protocol = "0.18"
 name     = "go-trace"
 language = "go"
 requires = ["go"]
-seams    = ["t.traced"]
+seams    = ["trace.traced"]

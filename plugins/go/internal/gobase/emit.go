@@ -339,6 +339,7 @@ func (e *emitter) build() []plugin.File {
 	add(test, e.genTestDoc())
 	add(test, e.genTestLeaves())
 	add(test, e.genTestClassify())
+	add(test, e.genTestSeams())
 	add(test, e.genTestFakes())
 	// テストの対応表（docs/plugin-go.md「テストの対応表」）: 出したテキストから作る
 	var tests []plugin.TestEntry

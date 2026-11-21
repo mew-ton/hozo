@@ -1,8 +1,13 @@
 {
   "tests": [
-    {"name": "flow.add/OK", "file": "gen/flow/flowtest/http.go", "lines": [63, 68]},
-    {"name": "flow.add/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [71, 76]},
-    {"name": "flow.add/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [80, 84]},
-    {"name": "flow.add/TooBig/flow.add.Big", "file": "gen/flow/flowtest/http.go", "lines": [89, 93]}
+    {"name": "flow.add/OK", "file": "gen/flow/flowtest/http.go", "lines": [84, 89]},
+    {"name": "flow.add/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [92, 97]},
+    {"name": "flow.add/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [101, 105]},
+    {"name": "flow.add/TooBig/flow.add.Big", "file": "gen/flow/flowtest/http.go", "lines": [110, 114]},
+    {"name": "flow.shelve/OK", "file": "gen/flow/flowtest/http.go", "lines": [133, 138]},
+    {"name": "flow.shelve/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [141, 146]},
+    {"name": "flow.shelve/Jammed/flow.checkDoor", "file": "gen/flow/flowtest/http.go", "lines": [150, 154]},
+    {"name": "flow.shelve/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [159, 163]},
+    {"name": "flow.shelve/Shut/flow.shelve@flow.opened.Late", "file": "gen/flow/flowtest/http.go", "lines": [168, 172]}
   ]
 }

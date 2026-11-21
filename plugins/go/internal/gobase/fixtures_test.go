@@ -282,11 +282,11 @@ func scanTestRuns(t *testing.T, file, src string) []plugin.TestEntry {
 
 // checkTestMaps は、出力のテストの対応表（docs/plugin-go.md「テストの対応表」）を、出力の Go のテキストに当てて確かめる:
 // t.Run を持つ Go のファイルがあるディレクトリにだけ、一つあり、中身は、そのディレクトリの Go のファイル（パスの順は、
-// doc.go、leaves.go、classify.go: 基底が出す順）の、いちばん内側の t.Run を、行の順に、テスト一つを一行で並べたもの。
+// doc.go、leaves.go、classify.go、seams.go: 基底が出す順）の、いちばん内側の t.Run を、行の順に、テスト一つを一行で並べたもの。
 func checkTestMaps(t *testing.T, files map[string]string) {
 	t.Helper()
 	want := map[string][]plugin.TestEntry{} // ディレクトリ → テスト
-	for _, name := range []string{fileDoc, fileLeaves, fileClassify} {
+	for _, name := range []string{fileDoc, fileLeaves, fileClassify, fileSeams} {
 		for _, p := range sortedPaths(files) {
 			if isTestMap(p) || path.Base(p) != name || !strings.Contains(files[p], "t.Run(") {
 				continue
@@ -295,7 +295,7 @@ func checkTestMaps(t *testing.T, files map[string]string) {
 		}
 	}
 	for p, content := range files {
-		if !isTestMap(p) && strings.Contains(content, "t.Run(") && path.Base(p) != fileDoc && path.Base(p) != fileLeaves && path.Base(p) != fileClassify {
+		if !isTestMap(p) && strings.Contains(content, "t.Run(") && path.Base(p) != fileDoc && path.Base(p) != fileLeaves && path.Base(p) != fileClassify && path.Base(p) != fileSeams {
 			t.Errorf("%s が t.Run を持つが、テストのパッケージのファイルでない", p)
 		}
 	}

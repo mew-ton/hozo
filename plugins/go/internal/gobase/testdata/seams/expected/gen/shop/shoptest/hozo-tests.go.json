@@ -7,6 +7,17 @@
     {"name": "shop.lookup/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [186, 193]},
     {"name": "shop.audit/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [199, 206]},
     {"name": "shop.post/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [212, 219]},
-    {"name": "shop.plain/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [225, 232]}
+    {"name": "shop.plain/OK", "file": "gen/shop/shoptest/leaves.go", "lines": [225, 232]},
+    {"name": "shop.buy@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [50, 61]},
+    {"name": "shop.restock@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [67, 78]},
+    {"name": "shop.closed@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [84, 95]},
+    {"name": "shop.add@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [101, 112]},
+    {"name": "shop.count@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [118, 129]},
+    {"name": "shop.summary@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [135, 146]},
+    {"name": "shop.notify@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [152, 163]},
+    {"name": "shop.find@t.traced/OK", "file": "gen/shop/shoptest/seams.go", "lines": [169, 180]},
+    {"name": "shop.find@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [186, 197]},
+    {"name": "shop.audit@t.traced/OK", "file": "gen/shop/shoptest/seams.go", "lines": [203, 214]},
+    {"name": "shop.post@t.limited/OK", "file": "gen/shop/shoptest/seams.go", "lines": [220, 231]}
   ]
 }

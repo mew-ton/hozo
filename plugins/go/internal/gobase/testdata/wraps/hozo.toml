@@ -8,7 +8,13 @@ namespace   = "gate"
 transpilers = ["go"]
 out         = "gen/gate"
 
-# 2: shop。gate のデコレータを、別の名前空間から付ける。単位の継ぎ目は t.traced（go-trace）
+# 2: trace。継ぎ目のデコレータが投げる例外の型（デコレータのテストの口が、参照する）
+[[emit]]
+namespace   = "trace"
+transpilers = ["go"]
+out         = "gen/trace"
+
+# 3: shop。gate のデコレータを、別の名前空間から付ける。単位の継ぎ目は trace.traced（go-trace）
 [[emit]]
 namespace   = "shop"
 transpilers = ["go", "go-trace"]

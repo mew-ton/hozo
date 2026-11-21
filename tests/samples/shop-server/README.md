@@ -338,6 +338,24 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 - **ほかの `gen/` のファイルは、変わらない。**
 - **この節より上の、インテグレーションテストの口の記述**（「インテグレーションテストの口で変えたこと」「走ったかの確かめで足したこと」の、`RunHTTP(t, handler, …)`、21 のテスト、`app/handlertest/httpcases.go`）は、書いたときの形で、今の形ではない。
 
+### 本体のあるデコレータと、デコレータのテストで足したこと
+
+`docs/decisions.md`「決めたこと」392〜395。仕様の書き方（`decorator fn`）の持ち主は `docs/grammar.md`「decorator の宣言」「デコレータの本体」、出力の形の持ち主は `docs/plugin-go.md`「本体のあるデコレータ」「デコレータのテストの口」。
+
+| ファイル | 変えたこと | 持ち主 |
+|---|---|---|
+| `server.hozo`、`plugins/go-ratelimit/rate.hozo` | op に付けるデコレータの宣言を、`decorator fn` に（`decorator fn limited(): throws LimitExceeded prevents effects;`）。足した: 本体のあるデコレータ `server.audited`（`proceed(); recordAudit();`）と、それが呼ぶ葉 `server.recordAudit`。`logout` に `@audited` を付けた | `docs/grammar.md`「decorator の宣言」「デコレータの本体」 |
+| `gen/server/inner/ops.go`、`wiring.go` | `Logout` が二層になった: 外側 `Logout` が `o.logoutServerAudited` を呼び、それ（デコレータの本体から作った外側）が、中身 `o.logoutBody` と、葉 `o.RecordAudit` を、順に呼ぶ。`Leaves` と、内側の `Ops` に、`RecordAudit` | `docs/plugin-go.md`「本体のあるデコレータ」 |
+| `gen/server/servertest/leaves.go`、`fakes.go` | 葉 `recordAudit` の口（`RecordAuditCases`、`RecordAuditCase`）と、にせもの（`LeavesFake.RecordAudit`） | 同「単体テストの口」「テストのにせもの」 |
+| `gen/server/servertest/seams.go`、`gen/store/storetest/seams.go` | 足した: デコレータのテストの口。`server` は `rate.limited`（結果は `OK` と `LimitExceeded`）、`store` は `db.transaction`（結果は `OK` だけ: 宣言が `throws` を持たない） | 同「デコレータのテストの口」 |
+| `gen/server/servertest/hozo-tests.go.json`、`gen/store/storetest/hozo-tests.go.json` | テストの対応表に、`server.recordAudit/OK`、`server.login@rate.limited/OK`、`server.login@rate.limited/LimitExceeded`、`store.placeOrder@db.transaction/OK`。`store` の対応表は、新しいファイル | 同「テストの対応表」 |
+| `app/leaves.go`、`app/leafcases_test.go` | 葉 `RecordAudit`（記録の先 `Audit` を、一度呼ぶ）と、そのケース。葉は、十になった | — |
+| `app/seamcases_test.go`、`app/onsqlite/store_test.go` | 足した: デコレータのテストのケース。`@rate.limited` は、数え方 `Limiter` の、まだ呼べる状態と、もう呼べない状態。`@db.transaction` は、`go-sqlite` の `store.NewDbSeams(db)` | `docs/ide-chain.md`「テストの規約」の「デコレータのテスト」 |
+| `app/httpcases_test.go` | `logout` の正常のケースが、葉 `recordAudit` が、一度、呼ばれたことも確かめる（本体のあるデコレータは、インテグレーションテストで、本物を通す） | 同「インテグレーションテストの作り直し」の「継ぎ目に置くもの」 |
+
+- **`@rate.limited` は、本体のないまま**: プラグイン `go-ratelimit` が、継ぎ目として包む例。`@server.audited` は、本体のある例で、プラグインは、要らない。
+- **インテグレーションテストの、Hozo が作るケースは、変わらない**: `audited` の本体は、例外を投げない（葉 `recordAudit` は、`throws` を持たない）。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。
@@ -361,7 +379,7 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 | 1 | `gen/type` | `type` | `go`、`go-valid` | —（型だけ） |
 | 2 | `gen/rate` | `rate` | `go` | —（語彙 `rate` の例外の型だけ） |
 | 3 | `gen/store` | `store` | `go`、`go-sqlite` | `go-sqlite`: 四つの状態の単位の実装（五つの `read`、五つの効果、状態の形で決まる問い合わせのすべて）と、`@db.transaction` の継ぎ目の実装。op の中身（配線）は、基底 |
-| 4 | `gen/server` | `server` | `go`、`go-valid`、`go-http`、`go-ratelimit` | 人: `app/leaves.go`（葉の op 九つ）、`app/mailer.go`（`mailer.send`）、`app/limiter.go`（`@rate.limited` の数え方）。`go-ratelimit`: 継ぎ目の中身 |
+| 4 | `gen/server` | `server` | `go`、`go-valid`、`go-http`、`go-ratelimit` | 人: `app/leaves.go`（葉の op 十）、`app/mailer.go`（`mailer.send`）、`app/limiter.go`（`@rate.limited` の数え方）。`go-ratelimit`: 継ぎ目の中身 |
 | 5 | `gen/http` | `http` | `go` | —（標準の語彙 `http` の型だけ） |
 | 6 | `gen/client` | `client` | `go` | —（三つの op は、どれも配線。中身は、基底） |
 | 7 | `gen/flows` | `flows` | `go`、`go-design` | 人: `app/flowtest`（フローのケースと、要求ごとの入れ物の中身）。フローの配線は、基底。口と、走らせる関数は、`go-design` |
@@ -426,7 +444,7 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 | ファイル | 中身 | 今 |
 |---|---|---|
 | `plugins/go-ratelimit/hozo-plugin.toml` | マニフェスト: 語彙 `rate.hozo` と、トランスパイラ `go-ratelimit`（`language = "go"`、`requires = ["go"]`、`seams = ["rate.limited"]`） | ある |
-| `plugins/go-ratelimit/rate.hozo` | 語彙 `rate`: 例外 `LimitExceeded`（`@http.status(429)`）と、デコレータ `limited for op throws LimitExceeded prevents effects` | ある |
+| `plugins/go-ratelimit/rate.hozo` | 語彙 `rate`: 例外 `LimitExceeded`（`@http.status(429)`）と、デコレータ `decorator fn limited(): throws LimitExceeded prevents effects` | ある |
 | `plugins/go-ratelimit/main.go`、`emit.go` | トランスパイラの実装（下の「実装」） | ある |
 | `plugins/go-ratelimit/emit_test.go`、`testdata/` | 実装の単体テストと、その入力・ゴールデン（下の「実装」） | ある |
 | `gen/server/ratelimit.go` | 期待する出力 | ある |
@@ -505,7 +523,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/flows/flowstest/doc.go` `fakes.go` | `go`（テストのパッケージ: `Fakes` と `NewOps`。`client` の出力を、本物で通す） |
 | `gen/flows/flowstest/design.go` `hozo-tests.go-design.json` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口と、その、テストの対応表。`docs/plugin-go-design.md`。基底が、同じパッケージに出すのは、`doc.go` と `fakes.go`） |
 | `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
-| `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 九つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
+| `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 十の本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/onsqlite/compose.go` | 人が書く: 組み立て（`server` を `gen/store` の上に）。`NewFlows` は、その上に、`client` と `flows` を重ねる |
 | `app/cmd/shop-sqlite/main.go` | 人が書く: その組み立てで待ち受ける main |
 | `app/handlertest/`、`app/storetest/`、`app/flowtest/` | 人が書く: 組み立て（`app/onsqlite`）が走らせるテスト（HTTP から見た振る舞い、`store` の op と状態の問い合わせの振る舞いのうち、保存先によらずに言えること、フローの E2E テストと、要求のテスト）。試す相手は、組み立てる関数で受け取る |
@@ -621,8 +639,8 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 
 ## 人が書いたもの
 
-- **`app/leaves.go`**: `server` の葉の op 九つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:38`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも、最初の引数に `ctx` を取り、最後の戻り値に `error` を返す**（`docs/plugin-go.md`「op の形」）: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go` の `Leaves`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:69-74`）。トークンと識別子を作る関数（`app.Leaves` の `NewToken`、`NewOrderID`）は `error` も返し、`NewSession` と `NewOrder` が、それをそのまま返す: main（`app/cmd/shop-sqlite`）は、乱数を読めないときに、panic にせず、その `error` を返す（ハンドラが 500 にする）。
-- **`app/leafcases_test.go`**: 九つの葉の、結果ごとの単体テスト。型 `leafCases` が、基底の出した口 `servertest.LeafCases` を満たし、`TestLeafCases` が、`servertest.RunLeaves(t, leaves, leafCases{})` に渡す。書いてあるのは、引数の値と、返り値の確かめ（`Then`）だけ: 葉を呼ぶ所と、結果の見分け（正常か、どの例外か）は、生成したコードが持つ。テストの名前は、`TestLeafCases/<op の FQN>/<結果>`（`TestLeafCases/server.checkPassword/InvalidCredentials`）。結果が二つあるのは、`checkPassword`（`type.InvalidCredentials`）と `requireFresh`（`type.Unauthorized`）で、ほかの七つは、正常のケースだけ。**ケースを欠いた型は、口を満たさない**（`TestIncompleteCasesAreRejected`: 欠いた型を渡す行は、コンパイルできないので、口が求めるメソッドを、リフレクションで確かめる。コンパイルできないことそのものは、リポジトリの `plugins/go` の単体テストが確かめる: `docs/testing.md`「単体テスト」）。
+- **`app/leaves.go`**: `server` の葉の op 十の本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:38`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも、最初の引数に `ctx` を取り、最後の戻り値に `error` を返す**（`docs/plugin-go.md`「op の形」）: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go` の `Leaves`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:69-74`）。トークンと識別子を作る関数（`app.Leaves` の `NewToken`、`NewOrderID`）は `error` も返し、`NewSession` と `NewOrder` が、それをそのまま返す: main（`app/cmd/shop-sqlite`）は、乱数を読めないときに、panic にせず、その `error` を返す（ハンドラが 500 にする）。
+- **`app/leafcases_test.go`**: 十の葉の、結果ごとの単体テスト。型 `leafCases` が、基底の出した口 `servertest.LeafCases` を満たし、`TestLeafCases` が、`servertest.RunLeaves(t, leaves, leafCases{})` に渡す。書いてあるのは、引数の値と、返り値の確かめ（`Then`）だけ: 葉を呼ぶ所と、結果の見分け（正常か、どの例外か）は、生成したコードが持つ。テストの名前は、`TestLeafCases/<op の FQN>/<結果>`（`TestLeafCases/server.checkPassword/InvalidCredentials`）。結果が二つあるのは、`checkPassword`（`type.InvalidCredentials`）と `requireFresh`（`type.Unauthorized`）で、ほかの七つは、正常のケースだけ。**ケースを欠いた型は、口を満たさない**（`TestIncompleteCasesAreRejected`: 欠いた型を渡す行は、コンパイルできないので、口が求めるメソッドを、リフレクションで確かめる。コンパイルできないことそのものは、リポジトリの `plugins/go` の単体テストが確かめる: `docs/testing.md`「単体テスト」）。
 - **`app/fakes_test.go`**: 基底が出した、にせものの上のテスト。`TestFakesPlaceOrder`: 端が返す値（セッション）を言うと、`server.placeOrder` の流れが、配線と葉の本物で通り、効果（`createOrder`、`notifyUser`）と `mailer.send` が、言ったとおりの値で、一度ずつ呼ばれる。`TestFakesThrow`: にせもので、例外を起こす四つの道（流れの端が投げる、葉が投げる、端が「ない」を返す、継ぎ目が投げる）。`TestFakesFlow`: `flowstest.NewOps` が、`flows`、`client`、`server`、`store` の配線を重ね、フローが、DB なしで通る。葉は、人が書いた本物（`app.Leaves`）を渡す。
 - **`app/mailer.go`**: `mailer.send` の実装。`*app.Mailer` が `server.MailerOps` を満たし、`server.New` の引数 `mailer` に、そのまま渡す。受け取った `ctx` は、届ける関数（`Deliver`）に渡す。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。`@smtp.sendMail` は、読むトランスパイラがなく、`mailer` には単位もないので、基底は何も出さない: デコレータの意味（SMTP で送る）を実装するのは、`server.MailerOps` を満たす型を書く人。
 - **`app/limiter.go`**: `@rate.limited` の数え方。`*app.Limiter` が、`go-ratelimit` の出力の `server.RateLimiter` を満たす（`app/limiter.go:34`）。op ごとに、`Window` の間に `Max` 回まで。時計（`Now`）は、テストが差し替える。`server.NewRateSeams(limiter)` に渡し、その戻り値を `server.New` の最後の引数 `seams` に渡す。数え方のテストは `app/limiter_test.go`。

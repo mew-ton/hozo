@@ -15,6 +15,7 @@ import (
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 //
 //	POST /flow/items  flow.add
+//	POST /flow/shelf  flow.shelve
 func NewHandler(ops Ops) http.Handler {
 	mux := http.NewServeMux()
 
@@ -27,6 +28,21 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		if err := ops.Add(r.Context(), in); err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, nil)
+	})
+
+	// flow.shelve
+	mux.HandleFunc("POST /flow/shelf", func(w http.ResponseWriter, r *http.Request) {
+		var in AddInput
+		req := httpRequest{r: r}
+		req.bodyObj(&in.Item)
+		if !req.ok(w) {
+			return
+		}
+		if err := ops.Shelve(r.Context(), in); err != nil {
 			httpWriteError(w, err)
 			return
 		}
@@ -126,6 +142,8 @@ func httpWriteError(w http.ResponseWriter, err error) {
 	switch {
 	case httpThrown[Taken](w, err, 409):
 	case httpThrown[TooBig](w, err, 422):
+	case httpThrown[Jammed](w, err, 502):
+	case httpThrown[Shut](w, err, 503):
 	default:
 		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
 	}

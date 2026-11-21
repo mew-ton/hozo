@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "store.placeOrder@db.transaction/OK", "file": "gen/store/storetest/seams.go", "lines": [38, 49]}
+  ]
+}

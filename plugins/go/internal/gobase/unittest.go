@@ -44,9 +44,10 @@ func (e *emitter) testClassifies() []*ir.Classify {
 	return out
 }
 
-// hasTests は、テストのパッケージを作るか: 葉の op か、判定の口を出す分類が、一つでもあるか、fakes.go を出す。
+// hasTests は、テストのパッケージを作るか: 葉の op か、判定の口を出す分類か、デコレータのテストの口の対象が、一つでもあるか、
+// fakes.go を出す。
 func (e *emitter) hasTests() bool {
-	return len(e.shape.Leaves) > 0 || len(e.testClassifies()) > 0 || e.hasFakes()
+	return len(e.shape.Leaves) > 0 || len(e.testClassifies()) > 0 || len(e.shape.Seams) > 0 || e.hasFakes()
 }
 
 // leafResult は、葉の結果一つ（docs/plugin-go.md「単体テストの口」の「葉の op」）: 正常か、例外一つ。name は、<Op>Cases の
