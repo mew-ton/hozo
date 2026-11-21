@@ -1,8 +1,9 @@
 // 入力 routes の、インテグレーションテストの口（テストのパッケージの http.go）を動かす（plugins/go-http の TestHTTPCases が、behavior_test.go と
 // 同じモジュールのルートに置いて走らせる）。確かめること（docs/plugin-go-http.md「インテグレーションテストの口」）:
 //
-//   - 「口の形」: すべての入口の、すべての結果のケースを満たす型を RunHTTP に渡せば、通る。テストの名前は <op の FQN>/<結果>。
-//     経路を二つ持つ op は、その下に、経路ごとの段。Given、Request、Then は、nil なら呼ばれない。
+//   - 「口の形」: すべての入口の、人が書くケース（正常と、op を呼ぶ前の失敗）を満たす型を RunHTTP に渡せば、通る。テストの名前は
+//     <op の FQN>/<結果>。例外のケースは、Hozo が作る（葉のにせものが、投げる）: <op の FQN>/<例外の名前>/<出どころ>。
+//     経路を二つ持つ op は、その下に、経路ごとの段。Given、Request、Then は、nil なら呼ばれない。葉は、本物（apiLeaves）を渡す。
 //   - 「必要なケース」: 正常（値を返す op、返さない op、省略可能な結果の 204、零値の結果、空の、インデックスの model）、op を呼ぶ前の失敗、
 //     @http.status を持つ例外（引数を持たないもの、持つもの、どの引数にも値がないもの）、持たない例外（500 と internal）。
 //   - 「要求の組み立て」: 六つのデコレータの一行ずつ。組み立てた要求を、ハンドラが、もとの入力と同じ値に読む（「入力の読み方」の裏返し）。
@@ -21,7 +22,6 @@ import (
 
 	"example.com/app/gen/api"
 	"example.com/app/gen/api/apitest"
-	"example.com/app/gen/bare"
 	"example.com/app/gen/bare/baretest"
 	"example.com/app/gen/strict"
 	"example.com/app/gen/strict/stricttest"
@@ -33,12 +33,9 @@ type apiCases struct{ l *apiLeaves }
 
 var _ apitest.HTTPCases = apiCases{}
 
-// returns は、葉が返す失敗を err にし、呼ばれた記録を消す Given。
-func (c apiCases) returns(err error) func(context.Context) error {
-	return func(context.Context) error {
-		c.l.err, c.l.calls = err, nil
-		return nil
-	}
+// returns は、葉（本物）が返す失敗を err にし、呼ばれた記録を消す Given。にせものには、何も言わない。
+func (c apiCases) returns(err error) func(*apitest.Fakes) {
+	return func(*apitest.Fakes) { c.l.err, c.l.calls = err, nil }
 }
 
 // notCalled は、op が呼ばれていないことを確かめる。
@@ -62,7 +59,7 @@ type healthCases struct{ apiCases }
 
 func (c apiCases) Health() apitest.HealthHTTPCases { return healthCases{c} }
 func (c healthCases) OK() apitest.HealthHTTPCase {
-	return apitest.HealthHTTPCase{Given: c.returns(nil), Then: func(t *testing.T, got string, res *httptest.ResponseRecorder) {
+	return apitest.HealthHTTPCase{Given: c.returns(nil), Then: func(t *testing.T, got string, res *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		if got != "ok" || res.Code != 200 {
 			t.Errorf("health = %q（%d）", got, res.Code)
 		}
@@ -79,7 +76,7 @@ var createIn = api.CreateInput{Tenant: "acme", Token: "t", RequestId: ptr("r1"),
 
 func (c apiCases) Create() apitest.CreateHTTPCases { return createCases{c} }
 func (c createCases) OK() apitest.CreateHTTPCase {
-	return apitest.CreateHTTPCase{In: createIn, Given: c.returns(nil), Then: func(t *testing.T, got pkgtype.Item, _ *httptest.ResponseRecorder) {
+	return apitest.CreateHTTPCase{In: createIn, Given: c.returns(nil), Then: func(t *testing.T, got pkgtype.Item, _ *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		// 組み立てた要求を、ハンドラが、もとの入力と同じ値に読んでいる
 		if !reflect.DeepEqual(c.l.create, createIn) {
 			t.Errorf("op に届いた入力 = %+v, want %+v", c.l.create, createIn)
@@ -94,28 +91,12 @@ func (c createCases) OK() apitest.CreateHTTPCase {
 func (c createCases) BadRequest() apitest.CreateHTTPCase {
 	return apitest.CreateHTTPCase{In: createIn, Given: c.returns(nil),
 		Request: func(r *http.Request) { r.Header.Del("X-Tenant") },
-		Then: func(t *testing.T, _ pkgtype.Item, res *httptest.ResponseRecorder) {
+		Then: func(t *testing.T, _ pkgtype.Item, res *httptest.ResponseRecorder, _ *apitest.Fakes) {
 			c.notCalled(t)
 			if !strings.Contains(res.Body.String(), "header X-Tenant: missing") {
 				t.Errorf("本文 = %s", res.Body)
 			}
 		}}
-}
-func (c createCases) Conflict() apitest.CreateHTTPCase {
-	return apitest.CreateHTTPCase{In: createIn, Given: c.returns(pkgtype.Conflict{Existing: "pen", Count: 2}),
-		Then: func(t *testing.T, got pkgtype.Item, res *httptest.ResponseRecorder) {
-			if !reflect.DeepEqual(got, pkgtype.Item{}) {
-				t.Errorf("例外のケースの got = %+v（零値のはず）", got)
-			}
-			if want := `{"error":"type.Conflict","value":{"existing":"pen","count":2}}`; res.Body.String() != want {
-				t.Errorf("本文 = %s, want %s", res.Body, want)
-			}
-		}}
-}
-
-// Then が nil のケース
-func (c createCases) Rejected() apitest.CreateHTTPCase {
-	return apitest.CreateHTTPCase{In: createIn, Given: c.returns(pkgtype.Rejected{Value: pen})}
 }
 
 // ---- api.search: クエリの各型 ----
@@ -127,7 +108,7 @@ var searchIn = api.SearchInput{Q: "pen & ink", Name: ptr(pkgtype.Name("n")), Own
 
 func (c apiCases) Search() apitest.SearchHTTPCases { return searchCases{c} }
 func (c searchCases) OK() apitest.SearchHTTPCase {
-	return apitest.SearchHTTPCase{In: searchIn, Given: c.returns(nil), Then: func(t *testing.T, got []pkgtype.Item, res *httptest.ResponseRecorder) {
+	return apitest.SearchHTTPCase{In: searchIn, Given: c.returns(nil), Then: func(t *testing.T, got []pkgtype.Item, res *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		// 値がない項目（tag、size、scale）は、送られず、nil のまま届く
 		if !reflect.DeepEqual(c.l.search, searchIn) {
 			t.Errorf("op に届いた入力 = %+v, want %+v", c.l.search, searchIn)
@@ -145,15 +126,7 @@ func (c searchCases) BadRequest() apitest.SearchHTTPCase {
 			q.Del("q")
 			r.URL.RawQuery = q.Encode()
 		},
-		Then: func(t *testing.T, _ []pkgtype.Item, _ *httptest.ResponseRecorder) { c.notCalled(t) }}
-}
-
-// @http.status を持たない例外は、どれも、500 と internal
-func (c searchCases) Broken() apitest.SearchHTTPCase {
-	return apitest.SearchHTTPCase{In: searchIn, Given: c.returns(pkgtype.Broken{})}
-}
-func (c searchCases) Leaky() apitest.SearchHTTPCase {
-	return apitest.SearchHTTPCase{In: searchIn, Given: c.returns(pkgtype.Leaky{Secret: "secret detail"})}
+		Then: func(t *testing.T, _ []pkgtype.Item, _ *httptest.ResponseRecorder, _ *apitest.Fakes) { c.notCalled(t) }}
 }
 
 // ---- api.first: 別の名前空間の入力の model。省略可能な結果 ----
@@ -165,11 +138,11 @@ var firstIn = pkgtype.Lookup{Id: "1", Trace: ptr("x")}
 func (c apiCases) First() apitest.FirstHTTPCases { return firstCases{c} }
 func (c firstCases) OK() apitest.FirstHTTPCase {
 	return apitest.FirstHTTPCase{In: firstIn,
-		Given: func(ctx context.Context) error {
+		Given: func(f *apitest.Fakes) {
 			c.l.first = &pen
-			return c.returns(nil)(ctx)
+			c.returns(nil)(f)
 		},
-		Then: func(t *testing.T, got *pkgtype.Item, _ *httptest.ResponseRecorder) {
+		Then: func(t *testing.T, got *pkgtype.Item, _ *httptest.ResponseRecorder, _ *apitest.Fakes) {
 			c.l.first = nil
 			if got == nil || !reflect.DeepEqual(*got, pen) || !reflect.DeepEqual(c.l.lookup, firstIn) {
 				t.Errorf("first = %+v（入力 %+v）", got, c.l.lookup)
@@ -178,17 +151,6 @@ func (c firstCases) OK() apitest.FirstHTTPCase {
 }
 func (c firstCases) BadRequest() apitest.FirstHTTPCase {
 	return apitest.FirstHTTPCase{In: firstIn, Given: c.returns(nil), Request: func(r *http.Request) { r.URL.RawQuery = "" }}
-}
-func (c firstCases) NotFound() apitest.FirstHTTPCase {
-	return apitest.FirstHTTPCase{In: firstIn, Given: c.returns(pkgtype.NotFound{})}
-}
-func (c firstCases) Limited() apitest.FirstHTTPCase {
-	return apitest.FirstHTTPCase{In: firstIn, Given: c.returns(pkgtype.Limited{RetryAfter: pkgtype.Wait(30 * time.Second), Hint: ptr("slow down")})}
-}
-
-// 引数を持つ例外は、どの引数にも値がなくても、value を持つ（空のオブジェクト）
-func (c firstCases) Gone() apitest.FirstHTTPCase {
-	return apitest.FirstHTTPCase{In: firstIn, Given: c.returns(pkgtype.Gone{})}
 }
 
 // ---- api.replace: 本文の項目が一つ。戻り値がない ----
@@ -199,7 +161,7 @@ var replaceIn = api.ReplaceInput{Items: []pkgtype.Item{pen}}
 
 func (c apiCases) Replace() apitest.ReplaceHTTPCases { return replaceCases{c} }
 func (c replaceCases) OK() apitest.ReplaceHTTPCase {
-	return apitest.ReplaceHTTPCase{In: replaceIn, Given: c.returns(nil), Then: func(t *testing.T, res *httptest.ResponseRecorder) {
+	return apitest.ReplaceHTTPCase{In: replaceIn, Given: c.returns(nil), Then: func(t *testing.T, res *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		if !reflect.DeepEqual(c.l.replace, replaceIn) || res.Code != 204 {
 			t.Errorf("op に届いた入力 = %+v（%d）", c.l.replace, res.Code)
 		}
@@ -207,10 +169,7 @@ func (c replaceCases) OK() apitest.ReplaceHTTPCase {
 }
 func (c replaceCases) BadRequest() apitest.ReplaceHTTPCase {
 	return apitest.ReplaceHTTPCase{In: replaceIn, Given: c.returns(nil), Request: body(`[`),
-		Then: func(t *testing.T, _ *httptest.ResponseRecorder) { c.notCalled(t) }}
-}
-func (c replaceCases) NotFound() apitest.ReplaceHTTPCase {
-	return apitest.ReplaceHTTPCase{In: replaceIn, Given: c.returns(pkgtype.NotFound{})}
+		Then: func(t *testing.T, _ *httptest.ResponseRecorder, _ *apitest.Fakes) { c.notCalled(t) }}
 }
 
 // ---- api.listAll: ヘッダとクエリの全体の形。結果は、インデックスの model ----
@@ -222,7 +181,7 @@ var listIn = api.ListInput{Meta: pkgtype.Meta{Tenant: "acme", Trace: ptr(pkgtype
 
 func (c apiCases) ListAll() apitest.ListAllHTTPCases { return listAllCases{c} }
 func (c listAllCases) OK() apitest.ListAllHTTPCase {
-	return apitest.ListAllHTTPCase{In: listIn, Given: c.returns(nil), Then: func(t *testing.T, got api.Counts, res *httptest.ResponseRecorder) {
+	return apitest.ListAllHTTPCase{In: listIn, Given: c.returns(nil), Then: func(t *testing.T, got api.Counts, res *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		if !reflect.DeepEqual(c.l.list, listIn) {
 			t.Errorf("op に届いた入力 = %+v, want %+v", c.l.list, listIn)
 		}
@@ -241,7 +200,7 @@ var putIn = api.PutInput{Item: pen, Tenant: ptr("acme")}
 
 func (c apiCases) Put() apitest.PutHTTPCases { return putCases{c} }
 func (c putCases) OK() apitest.PutHTTPCase {
-	return apitest.PutHTTPCase{In: putIn, Given: c.returns(nil), Then: func(t *testing.T, got *pkgtype.Token, res *httptest.ResponseRecorder) {
+	return apitest.PutHTTPCase{In: putIn, Given: c.returns(nil), Then: func(t *testing.T, got *pkgtype.Token, res *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		if got != nil || res.Code != 204 || !reflect.DeepEqual(c.l.put, putIn) {
 			t.Errorf("put = %v（%d。入力 %+v）", got, res.Code, c.l.put)
 		}
@@ -266,7 +225,7 @@ func (c apiCases) Ping() apitest.PingHTTPCases { return pingCases{c} }
 
 // 経路を二つ持つ op: ケースは、経路ごとに、取り直される
 func (c pingCases) OK() apitest.PingHTTPCase {
-	return apitest.PingHTTPCase{Given: c.returns(nil), Then: func(t *testing.T, got bool, _ *httptest.ResponseRecorder) {
+	return apitest.PingHTTPCase{Given: c.returns(nil), Then: func(t *testing.T, got bool, _ *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		if !got || len(c.l.calls) != 1 {
 			t.Errorf("ping = %v（呼ばれた op %v）", got, c.l.calls)
 		}
@@ -279,7 +238,7 @@ func (c apiCases) Count() apitest.CountHTTPCases { return countCases{c} }
 
 // 零値の結果も、値（200）
 func (c countCases) OK() apitest.CountHTTPCase {
-	return apitest.CountHTTPCase{Given: c.returns(nil), Then: func(t *testing.T, got int64, res *httptest.ResponseRecorder) {
+	return apitest.CountHTTPCase{Given: c.returns(nil), Then: func(t *testing.T, got int64, res *httptest.ResponseRecorder, _ *apitest.Fakes) {
 		if got != 0 || res.Code != 200 {
 			t.Errorf("count = %d（%d）", got, res.Code)
 		}
@@ -287,8 +246,8 @@ func (c countCases) OK() apitest.CountHTTPCase {
 }
 
 func TestHTTPCases(t *testing.T) {
-	leaves, h := newAPI()
-	apitest.RunHTTP(t, h, apiCases{leaves})
+	leaves, _ := newAPI()
+	apitest.RunHTTP(t, leaves, apiCases{leaves})
 }
 
 // ---- strict: validate = true。op を呼ぶ前の失敗のケースを、制約に合わない入力の値で書く（Request は要らない） ----
@@ -302,7 +261,7 @@ type orderCases struct{ strictCases }
 func (c strictCases) Order() stricttest.OrderHTTPCases { return orderCases{c} }
 func (c orderCases) OK() stricttest.OrderHTTPCase {
 	return stricttest.OrderHTTPCase{In: strict.OrderInput{Token: ptr(pkgtype.Token("t")), Lines: []pkgtype.Item{pen, pen}},
-		Then: func(t *testing.T, got int64, _ *httptest.ResponseRecorder) {
+		Then: func(t *testing.T, got int64, _ *httptest.ResponseRecorder, _ *stricttest.Fakes) {
 			if got != 2 {
 				t.Errorf("order = %d, want 2", got)
 			}
@@ -310,7 +269,7 @@ func (c orderCases) OK() stricttest.OrderHTTPCase {
 }
 func (c orderCases) BadRequest() stricttest.OrderHTTPCase {
 	return stricttest.OrderHTTPCase{In: strict.OrderInput{Lines: []pkgtype.Item{{Name: "", Quantity: 0}}},
-		Then: func(t *testing.T, _ int64, res *httptest.ResponseRecorder) {
+		Then: func(t *testing.T, _ int64, res *httptest.ResponseRecorder, _ *stricttest.Fakes) {
 			if want := invalid("body.lines[0].name", "length", "body.lines[0].quantity", "min"); res.Body.String() != want {
 				t.Errorf("本文 = %s, want %s", res.Body, want)
 			}
@@ -350,7 +309,7 @@ func (c nowCases) OK() stricttest.NowHTTPCase      { return stricttest.NowHTTPCa
 
 func TestStrictHTTPCases(t *testing.T) {
 	leaves := &strictLeaves{}
-	stricttest.RunHTTP(t, strict.NewHandler(strict.New(leaves)), strictCases{leaves})
+	stricttest.RunHTTP(t, leaves, strictCases{leaves})
 }
 
 // ---- bare: 入力も、@http.status を持つ例外もない。/ で終わるパスと、名前付きデコレータを通した経路 ----
@@ -372,7 +331,7 @@ type rootCases struct{ bareCases }
 // / で終わるパス
 func (c bareCases) Root() baretest.RootHTTPCases { return rootCases{c} }
 func (c rootCases) OK() baretest.RootHTTPCase {
-	return baretest.RootHTTPCase{Then: func(t *testing.T, got string, _ *httptest.ResponseRecorder) {
+	return baretest.RootHTTPCase{Then: func(t *testing.T, got string, _ *httptest.ResponseRecorder, _ *baretest.Fakes) {
 		if got != "root" {
 			t.Errorf("root = %q", got)
 		}
@@ -383,10 +342,7 @@ type touchCases struct{ bareCases }
 
 func (c bareCases) Touch() baretest.TouchHTTPCases { return touchCases{c} }
 func (c touchCases) OK() baretest.TouchHTTPCase {
-	return baretest.TouchHTTPCase{Given: func(context.Context) error { c.l.err = nil; return nil }}
-}
-func (c touchCases) Unknown() baretest.TouchHTTPCase {
-	return baretest.TouchHTTPCase{Given: func(context.Context) error { c.l.err = bare.Unknown{}; return nil }}
+	return baretest.TouchHTTPCase{Given: func(*baretest.Fakes) { c.l.err = nil }}
 }
 
 type viaAliasCases struct{ bareCases }
@@ -396,5 +352,5 @@ func (c viaAliasCases) OK() baretest.ViaAliasHTTPCase    { return baretest.ViaAl
 
 func TestBareHTTPCases(t *testing.T) {
 	leaves := &touchLeaves{}
-	baretest.RunHTTP(t, bare.NewHandler(bare.New(leaves)), bareCases{leaves})
+	baretest.RunHTTP(t, leaves, bareCases{leaves})
 }

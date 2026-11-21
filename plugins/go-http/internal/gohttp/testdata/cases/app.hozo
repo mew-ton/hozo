@@ -46,3 +46,11 @@ namespace wired {
     return other.value();
   }
 }
+
+namespace plain {
+  // New が、引数を取らない出力（葉も、状態も、別の名前空間もない）: にせものにするものがないので、口は、Fakes を使わない形
+  @http.get("/one")
+  export fn one(): int {
+    return 1;
+  }
+}

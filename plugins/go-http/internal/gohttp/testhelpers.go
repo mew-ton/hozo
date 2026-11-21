@@ -76,8 +76,8 @@ func (c *httpCall) bodyObj(v any) {
 
 `}
 	// 要求を組み立て、given、edit の順に呼んでから、handler に送る
-	testHelperSend = helper{imports: []string{"bytes", "context", "encoding/json", "net/http", "net/http/httptest", "testing"}, text: `// send は、要求を組み立てて handler に送り、応答を返す。送る前に、given（今の状態の用意）と、edit（要求の手直し）を、この順に呼ぶ（nil なら、呼ばない）。
-func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx context.Context) error, edit func(r *http.Request)) *httptest.ResponseRecorder {
+	testHelperSend = helper{imports: []string{"bytes", "encoding/json", "net/http", "net/http/httptest", "testing"}, text: `// send は、要求を組み立てて handler に送り、応答を返す。送る前に、edit（要求の手直し）を呼ぶ（nil なら、呼ばない）。
+func (c *httpCall) send(t *testing.T, handler http.Handler, edit func(r *http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	target := c.path
 	if len(c.values) > 0 {
@@ -114,11 +114,6 @@ func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx conte
 	}
 	if c.hasBody {
 		r.Header.Set("Content-Type", "application/json")
-	}
-	if given != nil {
-		if err := given(context.Background()); err != nil {
-			t.Fatalf("given: %v", err)
-		}
 	}
 	if edit != nil {
 		edit(r)

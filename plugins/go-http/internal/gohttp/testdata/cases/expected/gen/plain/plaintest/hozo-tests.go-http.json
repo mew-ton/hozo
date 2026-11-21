@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "plain.one/OK", "file": "gen/plain/plaintest/http.go", "lines": [48, 54]}
+  ]
+}

@@ -230,3 +230,33 @@ namespace bare {
   @pong
   export fn viaAlias(): string;
 }
+
+namespace flow {
+  // Hozo が作る、例外のケース（docs/plugin-go-http.md「インテグレーションテストの口」の「必要なケース」）が、走って、通ることを見る入口:
+  // 述語で決まる分類の match の、throw のアーム（判定のにせものが、そのケースだと言う）と、effect fn が投げる例外（端のにせものが、投げる）
+  model Item { id: string; }
+
+  @http.status(409)
+  exception Taken;
+  @http.status(422)
+  exception TooBig;
+
+  state items: Item[];
+
+  /** 品物を足す。同じ識別子の品物が、もうあれば、投げる */
+  effect fn addItem(item: Item): throws Taken effects items.post;
+
+  /** 大きさ（人が、述語を書く） */
+  classify Size of Item { Big; Small; }
+
+  model AddInput { @http.bodyObj item: Item; }
+
+  @http.post("/flow/items")
+  export fn add(in: AddInput) {
+    val item = in.item;
+    match (item by Size) {
+      Small => addItem(item);
+      Big   => throw TooBig;
+    }
+  }
+}

@@ -2,4 +2,4 @@ GOHTTP-20	app.foo	go-http の、op app.foo のケースの口 FooHTTPCases が�
 GOHTTP-20	app.foo	go-http の、op app.foo のケース FooHTTPCase が、基底 go の、op app.fooHTTP のケース FooHTTPCase と当たる（どちらも、テストのパッケージの名前 FooHTTPCase。直すのは仕様の名前）
 GOHTTP-20	typed.HTTP	go-http の、入口のケースを走らせる RunHTTP が、基底 go の、分類 typed.HTTP の例を走らせる RunHTTP と当たる（どちらも、テストのパッケージの名前 RunHTTP。直すのは仕様の名前）
 GOHTTP-20	leafy.HTTP	go-http の、入口のケースのまとめ HTTPCases が、基底 go の、op leafy.HTTP のケースの口 HTTPCases と当たる（どちらも、テストのパッケージの名前 HTTPCases。直すのは仕様の名前）
-GOHTTP-20	multi.both	op multi.both のケースの口 BothHTTPCases の、例外 aB.X の結果の名前 ABX が、例外 a.b.X の結果の名前と当たる（直すのは仕様の名前）
+GOHTTP-20	multi.both	op multi.both の、例外 aB.X の名前 ABX が、例外 a.b.X の名前と当たる（名前空間を前に付けても、同じ名前。直すのは仕様の名前）

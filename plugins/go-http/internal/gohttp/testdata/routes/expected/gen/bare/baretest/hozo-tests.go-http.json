@@ -1,8 +1,8 @@
 {
   "tests": [
-    {"name": "bare.root/OK", "file": "gen/bare/baretest/http.go", "lines": [84, 90]},
-    {"name": "bare.touch/OK", "file": "gen/bare/baretest/http.go", "lines": [100, 105]},
-    {"name": "bare.touch/Unknown", "file": "gen/bare/baretest/http.go", "lines": [108, 113]},
-    {"name": "bare.viaAlias/OK", "file": "gen/bare/baretest/http.go", "lines": [123, 129]}
+    {"name": "bare.root/OK", "file": "gen/bare/baretest/http.go", "lines": [91, 97]},
+    {"name": "bare.touch/OK", "file": "gen/bare/baretest/http.go", "lines": [114, 119]},
+    {"name": "bare.touch/Unknown/bare.touch", "file": "gen/bare/baretest/http.go", "lines": [123, 127]},
+    {"name": "bare.viaAlias/OK", "file": "gen/bare/baretest/http.go", "lines": [145, 151]}
   ]
 }

@@ -1,0 +1,8 @@
+{
+  "tests": [
+    {"name": "flow.add/OK", "file": "gen/flow/flowtest/http.go", "lines": [63, 68]},
+    {"name": "flow.add/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [71, 76]},
+    {"name": "flow.add/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [80, 84]},
+    {"name": "flow.add/TooBig/flow.add.Big", "file": "gen/flow/flowtest/http.go", "lines": [89, 93]}
+  ]
+}

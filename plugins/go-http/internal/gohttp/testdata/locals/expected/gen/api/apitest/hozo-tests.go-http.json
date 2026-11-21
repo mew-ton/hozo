@@ -1,16 +1,16 @@
 {
   "tests": [
-    {"name": "api.viaIn/OK", "file": "gen/api/apitest/http.go", "lines": [206, 212]},
-    {"name": "api.viaIn/BadRequest", "file": "gen/api/apitest/http.go", "lines": [215, 221]},
-    {"name": "api.viaIn/NotFound", "file": "gen/api/apitest/http.go", "lines": [224, 230]},
-    {"name": "api.viaIn/Conflict", "file": "gen/api/apitest/http.go", "lines": [233, 239]},
-    {"name": "api.viaOut/OK", "file": "gen/api/apitest/http.go", "lines": [250, 256]},
-    {"name": "api.viaR/OK", "file": "gen/api/apitest/http.go", "lines": [267, 273]},
-    {"name": "api.viaReq/OK", "file": "gen/api/apitest/http.go", "lines": [284, 289]},
-    {"name": "api.viaMux/OK", "file": "gen/api/apitest/http.go", "lines": [300, 306]},
-    {"name": "api.viaOps/OK", "file": "gen/api/apitest/http.go", "lines": [317, 323]},
-    {"name": "api.viaStrconv/OK", "file": "gen/api/apitest/http.go", "lines": [334, 340]},
-    {"name": "api.viaReflect/OK", "file": "gen/api/apitest/http.go", "lines": [351, 357]},
-    {"name": "api.viaReflect/BadRequest", "file": "gen/api/apitest/http.go", "lines": [360, 366]}
+    {"name": "api.viaIn/OK", "file": "gen/api/apitest/http.go", "lines": [210, 216]},
+    {"name": "api.viaIn/BadRequest", "file": "gen/api/apitest/http.go", "lines": [219, 225]},
+    {"name": "api.viaIn/NotFound/api.viaIn", "file": "gen/api/apitest/http.go", "lines": [229, 233]},
+    {"name": "api.viaIn/Conflict/api.viaIn", "file": "gen/api/apitest/http.go", "lines": [238, 242]},
+    {"name": "api.viaOut/OK", "file": "gen/api/apitest/http.go", "lines": [261, 267]},
+    {"name": "api.viaR/OK", "file": "gen/api/apitest/http.go", "lines": [285, 291]},
+    {"name": "api.viaReq/OK", "file": "gen/api/apitest/http.go", "lines": [309, 314]},
+    {"name": "api.viaMux/OK", "file": "gen/api/apitest/http.go", "lines": [332, 338]},
+    {"name": "api.viaOps/OK", "file": "gen/api/apitest/http.go", "lines": [356, 362]},
+    {"name": "api.viaStrconv/OK", "file": "gen/api/apitest/http.go", "lines": [380, 386]},
+    {"name": "api.viaReflect/OK", "file": "gen/api/apitest/http.go", "lines": [404, 410]},
+    {"name": "api.viaReflect/BadRequest", "file": "gen/api/apitest/http.go", "lines": [413, 419]}
   ]
 }

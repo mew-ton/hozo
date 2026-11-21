@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mew-ton/hozo/ir"
 )
 
 // このファイルは docs/plugin-go-http.md「インテグレーションテストの口」のテスト: テストのパッケージの http.go の中身（必要なケース、
@@ -28,9 +30,10 @@ func caseMethods(t *testing.T, content, name string) []string {
 	return names
 }
 
-// TestHTTPCaseResults は「必要なケース」: 入口ごとの結果は、正常、op を呼ぶ前の失敗（入力が、本文のデコレータか、@http.required の
-// 付いたフィールドを持つ op だけ）、op が投げうる例外ごと（Op.signature.exceptions の順）。結果の名前は、その op の中で当たれば、
-// 名前空間を前に付ける。まとめの HTTPCases は、入口ごとに、メソッド一つ（宣言順。経路を二つ持つ op も、一つ）。
+// TestHTTPCaseResults は「必要なケース」: 口のメソッド（人か AI が書くケース）は、正常、op を呼ぶ前の失敗（入力が、本文の
+// デコレータか、@http.required の付いたフィールドを持つ op だけ）、Hozo が作れない、例外の出どころ。Hozo が作れる出どころ（葉の op が
+// 投げる例外は、その葉のにせものが投げる）は、口になく、テストの対応表に、<op>/<例外の名前>/<出どころ> で載る。例外の名前は、
+// その op の中で当たれば、名前空間を前に付ける。まとめの HTTPCases は、入口ごとに、メソッド一つ（宣言順。経路を二つ持つ op も、一つ）。
 func TestHTTPCaseResults(t *testing.T) {
 	_, routes := emitFixture(t, "routes")
 	_, cases := emitFixture(t, "cases")
@@ -42,12 +45,12 @@ func TestHTTPCaseResults(t *testing.T) {
 		// 入力がない: 正常だけ
 		{routes["gen/api/apitest/http.go"], "HealthHTTPCases", "OK"},
 		// 本文の項目と、@http.required。@http.status を持つ例外
-		{routes["gen/api/apitest/http.go"], "CreateHTTPCases", "OK BadRequest Conflict Rejected"},
-		// @http.required のクエリ。@http.status を持たない例外も、結果
-		{routes["gen/api/apitest/http.go"], "SearchHTTPCases", "OK BadRequest Broken Leaky"},
-		{routes["gen/api/apitest/http.go"], "FirstHTTPCases", "OK BadRequest NotFound Limited Gone"},
+		{routes["gen/api/apitest/http.go"], "CreateHTTPCases", "OK BadRequest"},
+		// @http.required のクエリ
+		{routes["gen/api/apitest/http.go"], "SearchHTTPCases", "OK BadRequest"},
+		{routes["gen/api/apitest/http.go"], "FirstHTTPCases", "OK BadRequest"},
 		// 値を返さない op。本文の項目だけ（@http.required はない）でも、読めない本文を送れる
-		{routes["gen/api/apitest/http.go"], "ReplaceHTTPCases", "OK BadRequest NotFound"},
+		{routes["gen/api/apitest/http.go"], "ReplaceHTTPCases", "OK BadRequest"},
 		// ヘッダとクエリの全体の形だけ: op を呼ぶ前の失敗は、数えない（全体の形の中の項目は、@http.required を持てない）
 		{routes["gen/api/apitest/http.go"], "ListAllHTTPCases", "OK"},
 		// 本文の全体の形
@@ -56,14 +59,32 @@ func TestHTTPCaseResults(t *testing.T) {
 		// validate = true でも、@http.required のないクエリだけの入力は、数えない（型と制約は、見ない）
 		{routes["gen/strict/stricttest/http.go"], "PlainHTTPCases", "OK"},
 		{routes["gen/strict/stricttest/http.go"], "EditHTTPCases", "OK BadRequest"},
-		{routes["gen/bare/baretest/http.go"], "TouchHTTPCases", "OK Unknown"},
-		// 決まった名前 OK、BadRequest と当たる例外と、二つの名前空間の、同じ名前の例外は、名前空間を前に付ける
-		{cases["gen/app/apptest/http.go"], "SubmitHTTPCases", "OK BadRequest AppOK AppBadRequest AppBusy OtherBusy"},
-		// never を返す op には、正常のケースがない。当たらない例外は、宣言の名前のまま
-		{cases["gen/app/apptest/http.go"], "FailHTTPCases", "Busy"},
+		{routes["gen/bare/baretest/http.go"], "TouchHTTPCases", "OK"},
+		{cases["gen/app/apptest/http.go"], "SubmitHTTPCases", "OK BadRequest"},
+		// never を返す op には、正常のケースがない: 例外のケースは、Hozo が作れず、口に出る（<例外の名前><出どころの名前>）
+		{cases["gen/app/apptest/http.go"], "FailHTTPCases", "BusyFail"},
 	} {
 		if got := strings.Join(caseMethods(t, tt.content, tt.name), " "); got != tt.want {
 			t.Errorf("%s のメソッド = %s, want %s", tt.name, got, tt.want)
+		}
+	}
+	// Hozo が作るケースは、テストの対応表に載る。@http.status を持たない例外も。決まった名前 OK、BadRequest と当たる例外と、
+	// 二つの名前空間の、同じ名前の例外は、名前空間を前に付ける
+	for file, names := range map[string][]string{
+		"gen/api/apitest/hozo-tests.go-http.json": {`"api.create/Conflict/api.create"`, `"api.create/Rejected/api.create"`, `"api.search/Leaky/api.search"`,
+			`"api.first/Gone/api.first"`, `"api.replace/NotFound/api.replace"`},
+		"gen/bare/baretest/hozo-tests.go-http.json": {`"bare.touch/Unknown/bare.touch"`},
+	} {
+		for _, name := range names {
+			if !strings.Contains(routes[file], name) {
+				t.Errorf("%s に、テスト %s がない", file, name)
+			}
+		}
+	}
+	for _, name := range []string{`"app.submit/AppOK/app.submit"`, `"app.submit/AppBadRequest/app.submit"`, `"app.submit/AppBusy/app.submit"`,
+		`"app.submit/OtherBusy/app.submit"`, `"app.fail/Busy/app.fail"`} {
+		if !strings.Contains(cases["gen/app/apptest/hozo-tests.go-http.json"], name) {
+			t.Errorf("cases の対応表に、テスト %s がない", name)
 		}
 	}
 	// 入力のフィールドの名前: op の引数の名前。Given、Request、Then と当たれば、末尾に _
@@ -90,16 +111,19 @@ func TestHTTPCaseLines(t *testing.T) {
 		"\tIn api.CreateInput\n", "\tIn pkgtype.Lookup\n",
 		// 経路と、送る行
 		`call := httpCall{method: "POST", path: "/items"}`, `call := httpCall{method: "POST", path: "/reset/"}`,
-		"return call.send(t, handler, k.Given, k.Request)\n",
+		"return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f\n",
 		// 経路を二つ持つ op: 結果の下に、経路ごとの段
-		"send := func(t *testing.T, method, path string, k PingHTTPCase) *httptest.ResponseRecorder {\n",
-		"t.Run(\"GET /ping\", func(t *testing.T) {\n", `res := send(t, "POST", "/ping", k)`,
+		"send := func(t *testing.T, method, path string, k PingHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {\n",
+		"t.Run(\"GET /ping\", func(t *testing.T) {\n", `res, f := send(t, "POST", "/ping", k, nil)`,
 		// 結果ごとの確かめ: 値を返す op と、返さない op。例外は、型引数と、ステータスだけ
 		"var got *pkgtype.Item\n", "httpWantResult(t, res, &got)\n", "httpWantResult(t, res, nil)\n", "httpWantBadRequest(t, res)\n",
 		"httpWantThrown[pkgtype.Conflict](t, res, 409)\n", "httpWantThrown[pkgtype.Gone](t, res, 410)\n", "httpWantInternal(t, res)\n",
-		"k.Then(t, got, res)\n", "k.Then(t, res)\n",
+		"k.Then(t, got, res, f)\n", "k.Then(t, res, f)\n",
+		// Hozo が作るケース: 正常のケースの用意の後に、にせものに言う
+		"res, _ := send(t, k, func(f *Fakes) {\n", "f.Leaves.Create.Throws(pkgtype.Conflict{})\n",
 		// Then の形
-		"\tThen func(t *testing.T, got api.Counts, res *httptest.ResponseRecorder)\n", "\tThen func(t *testing.T, res *httptest.ResponseRecorder)\n",
+		"\tThen func(t *testing.T, got api.Counts, res *httptest.ResponseRecorder, f *Fakes)\n", "\tThen func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)\n",
+		"\tGiven func(f *Fakes)\n", "func RunHTTP(t *testing.T, leaves api.Leaves, c HTTPCases) {\n",
 	} {
 		if !strings.Contains(api, line) {
 			t.Errorf("gen/api/apitest/http.go に、%q がない", line)
@@ -198,13 +222,41 @@ func TestHTTPCaseHelpers(t *testing.T) {
 	}
 }
 
-// TestHTTPCasesWithoutBaseTests は「置き場と名前」: 基底が、テストのパッケージを作らない出力（葉の op も、判定の口を出す分類もない）でも、
-// テストのパッケージに http.go を出す。経路の op が一つもなければ、どちらの http.go も出さない（TestNoRoutes）。
+// TestHTTPCasesWithoutBaseTests は「置き場と名前」: 基底が、単体テストの口を出さない出力（葉の op も、判定の口を出す分類もない）でも、
+// テストのパッケージに http.go を出す。RunHTTP は、本物を通す、別の名前空間の出力の葉（otherLeaves）を、受け取る。
+// 経路の op が一つもなければ、どちらの http.go も出さない（TestNoRoutes）。
 func TestHTTPCasesWithoutBaseTests(t *testing.T) {
 	_, files := emitFixture(t, "cases")
 	content := files["gen/wired/wiredtest/http.go"]
-	if !strings.Contains(content, "\npackage wiredtest\n") || !strings.Contains(content, "func RunHTTP(t *testing.T, handler http.Handler, c HTTPCases) {") {
+	if !strings.Contains(content, "\npackage wiredtest\n") || !strings.Contains(content, "func RunHTTP(t *testing.T, otherLeaves other.Leaves, c HTTPCases) {") ||
+		!strings.Contains(content, "wired.NewHandler(NewOps(f, otherLeaves))") {
 		t.Errorf("gen/wired/wiredtest/http.go =\n%s", content)
+	}
+}
+
+// TestHTTPCasesWithoutFakes は「口の形」の「Fakes を使わない形」: N の出力の New が、引数を取らなければ（にせものにするものがない）、
+// <Op>HTTPCase に Given がなく、Then は、にせものを取らず、RunHTTP は、t と c だけを取る。ハンドラは、New() の上。
+func TestHTTPCasesWithoutFakes(t *testing.T) {
+	_, files := emitFixture(t, "cases")
+	content := files["gen/plain/plaintest/http.go"]
+	for _, line := range []string{
+		"func RunHTTP(t *testing.T, c HTTPCases) {\n",
+		"send := func(t *testing.T, k OneHTTPCase) *httptest.ResponseRecorder {\n",
+		"return call.send(t, plain.NewHandler(plain.New()), k.Request)\n",
+		"\tThen func(t *testing.T, got int64, res *httptest.ResponseRecorder)\n",
+		"res := send(t, k)\n", "k.Then(t, got, res)\n",
+	} {
+		if !strings.Contains(content, line) {
+			t.Errorf("gen/plain/plaintest/http.go に、%q がない:\n%s", line, content)
+		}
+	}
+	for _, banned := range []string{"Fakes", "Given", "NewOps"} {
+		if strings.Contains(content, banned) {
+			t.Errorf("gen/plain/plaintest/http.go に、%s がある", banned)
+		}
+	}
+	if _, has := files["gen/plain/plaintest/fakes.go"]; has {
+		t.Error("New が引数を取らない出力に、fakes.go がある")
 	}
 }
 
@@ -235,21 +287,106 @@ func TestHTTPCases(t *testing.T) {
 		t.Fatalf("口を満たす型のテストが落ちた: %v\n%s", err, out)
 	}
 	for _, name := range []string{
-		"TestHTTPCases/api.health/OK", "TestHTTPCases/api.create/OK", "TestHTTPCases/api.create/BadRequest", "TestHTTPCases/api.create/Conflict",
-		"TestHTTPCases/api.create/Rejected", "TestHTTPCases/api.search/OK", "TestHTTPCases/api.search/BadRequest", "TestHTTPCases/api.search/Broken",
-		"TestHTTPCases/api.search/Leaky", "TestHTTPCases/api.first/OK", "TestHTTPCases/api.first/BadRequest", "TestHTTPCases/api.first/NotFound",
-		"TestHTTPCases/api.first/Limited", "TestHTTPCases/api.first/Gone", "TestHTTPCases/api.replace/OK", "TestHTTPCases/api.replace/BadRequest",
-		"TestHTTPCases/api.replace/NotFound", "TestHTTPCases/api.listAll/OK", "TestHTTPCases/api.put/OK", "TestHTTPCases/api.put/BadRequest",
+		"TestHTTPCases/api.health/OK", "TestHTTPCases/api.create/OK", "TestHTTPCases/api.create/BadRequest",
+		// 例外のテストは、Hozo が作る: <op>/<例外の名前>/<出どころ>（出どころは、その葉）
+		"TestHTTPCases/api.create/Conflict/api.create", "TestHTTPCases/api.create/Rejected/api.create",
+		"TestHTTPCases/api.search/OK", "TestHTTPCases/api.search/BadRequest", "TestHTTPCases/api.search/Broken/api.search",
+		"TestHTTPCases/api.search/Leaky/api.search", "TestHTTPCases/api.first/OK", "TestHTTPCases/api.first/BadRequest",
+		"TestHTTPCases/api.first/NotFound/api.first", "TestHTTPCases/api.first/Limited/api.first", "TestHTTPCases/api.first/Gone/api.first",
+		"TestHTTPCases/api.replace/OK", "TestHTTPCases/api.replace/BadRequest", "TestHTTPCases/api.replace/NotFound/api.replace",
+		"TestHTTPCases/api.listAll/OK", "TestHTTPCases/api.put/OK", "TestHTTPCases/api.put/BadRequest",
 		"TestHTTPCases/api.reset/OK", "TestHTTPCases/api.count/OK",
 		// 経路を二つ持つ op（go test は、名前の空白を _ にする）
 		"TestHTTPCases/api.ping/OK/GET_/ping", "TestHTTPCases/api.ping/OK/POST_/ping",
 		"TestStrictHTTPCases/strict.order/OK", "TestStrictHTTPCases/strict.order/BadRequest", "TestStrictHTTPCases/strict.edit/BadRequest",
 		"TestStrictHTTPCases/strict.bulk/BadRequest", "TestStrictHTTPCases/strict.plain/OK", "TestStrictHTTPCases/strict.now/OK",
-		"TestBareHTTPCases/bare.root/OK", "TestBareHTTPCases/bare.touch/OK", "TestBareHTTPCases/bare.touch/Unknown", "TestBareHTTPCases/bare.viaAlias/OK",
+		"TestBareHTTPCases/bare.root/OK", "TestBareHTTPCases/bare.touch/OK", "TestBareHTTPCases/bare.touch/Unknown/bare.touch", "TestBareHTTPCases/bare.viaAlias/OK",
 	} {
 		if !strings.Contains(out, "--- PASS: "+name+" ") {
 			t.Errorf("テスト %s が、通っていない:\n%s", name, out)
 		}
+	}
+}
+
+// TestHTTPMadeCases は「必要なケース」の、Hozo が作るケース: 述語で決まる分類の match の、throw のアーム（判定のにせものが、そのケースだと
+// 言う）と、effect fn が投げる例外（状態の単位のにせものが、投げる）のケースが、口になく、正常のケースから作られ、一時のモジュールで、
+// 走って、通る（testdata/routes/flowcases_test.go）。作られるケースの中身は、ここに、手で書いたもの。
+func TestHTTPMadeCases(t *testing.T) {
+	t.Parallel()
+	_, files := emitFixture(t, "routes")
+	content := files["gen/flow/flowtest/http.go"]
+	for _, want := range []string{
+		// 人が書いたもの（分類の述語）を、位置引数で受け取り、組み立てに渡す
+		"func RunHTTP(t *testing.T, size flow.SizeCases, c HTTPCases) {\n",
+		"return call.send(t, flow.NewHandler(NewOps(f, size)), k.Request), f\n",
+		// 判定のにせものが、Big だと言う
+		"\t\t\tt.Run(\"flow.add.Big\", func(t *testing.T) {\n" +
+			"\t\t\t\tk := cases.OK()\n" +
+			"\t\t\t\tres, _ := send(t, k, func(f *Fakes) {\n" +
+			"\t\t\t\t\tf.Size.Is(flow.SizeBig)\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t\thttpWantThrown[flow.TooBig](t, res, 422)\n" +
+			"\t\t\t})\n",
+		// 状態の単位のにせものが、投げる（Small のアームは、throw でない、ただ一つのアーム: 正常のケースが、通る）
+		"\t\t\tt.Run(\"flow.addItem\", func(t *testing.T) {\n" +
+			"\t\t\t\tk := cases.OK()\n" +
+			"\t\t\t\tres, _ := send(t, k, func(f *Fakes) {\n" +
+			"\t\t\t\t\tf.Items.AddItem.Throws(flow.Taken{})\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t\thttpWantThrown[flow.Taken](t, res, 409)\n" +
+			"\t\t\t})\n",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("gen/flow/flowtest/http.go に、次がない:\n%s\n----\n%s", want, content)
+		}
+	}
+	if got := strings.Join(caseMethods(t, content, "AddHTTPCases"), " "); got != "OK BadRequest" {
+		t.Errorf("AddHTTPCases のメソッド = %s, want OK BadRequest（例外のケースは、口にない）", got)
+	}
+	root := writeRoutes(t, "flowcases_test.go")
+	out, err := runGo(t, root, "test", "-count=1", "-v", "-run", "^TestFlowHTTPCases$", ".")
+	if err != nil {
+		t.Fatalf("作られたケースを含むテストが落ちた: %v\n%s", err, out)
+	}
+	for _, name := range []string{"TestFlowHTTPCases/flow.add/OK", "TestFlowHTTPCases/flow.add/BadRequest",
+		"TestFlowHTTPCases/flow.add/TooBig/flow.add.Big", "TestFlowHTTPCases/flow.add/Taken/flow.addItem"} {
+		if !strings.Contains(out, "--- PASS: "+name+" ") {
+			t.Errorf("テスト %s が、通っていない:\n%s", name, out)
+		}
+	}
+}
+
+// TestBlockedComposition は「置き場と名前」: N の出力の、テストの中の組み立てを、作れない（呼ぶ先の名前空間を、同じ基底の単位が、二つ
+// 出力する）とき、ハンドラは出すが、テストのパッケージの http.go と、対応表は、出さず、warning を一つ返す。
+func TestBlockedComposition(t *testing.T) {
+	root := newRoot(t)
+	var app *ir.View
+	for _, v := range loadViews(t, "blocked") {
+		if v.Viewer == "app" {
+			app = v
+		}
+	}
+	if app == nil {
+		t.Fatal("入力 blocked に、app の View がない")
+	}
+	files, diags, warnings := emitViews(t, root, []*ir.View{app})
+	if len(diags) != 0 || len(warnings) != 1 {
+		t.Fatalf("診断=%+v warnings=%+v, want warning が一つだけ", diags, warnings)
+	}
+	if paths := strings.Join(sortedPaths(files), " "); paths != "gen/app/http.go" {
+		t.Errorf("files = %s, want gen/app/http.go だけ（口と、対応表は、出さない）", paths)
+	}
+	const want = "名前空間 app の、テストの中の組み立てを作れないので、インテグレーションテストの口（apptest/http.go）を出さない: 名前空間 other を出力する、基底 go の単位が、二つ以上ある"
+	if warnings[0].At != "app" || warnings[0].Message != want {
+		t.Errorf("warning = %+v, want At が app、文面が %q", warnings[0], want)
+	}
+	// 応答でも、warning（コードは、hozoc が PLUGIN を付ける: docs/plugin-go-http.md「診断」）で、errors は、ない
+	resp, err := Handler{Getenv: func(string) string { return root }}.Emit(request(app, TranspilerName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Files) != 1 || len(resp.Warnings) != 1 || len(resp.Errors) != 0 {
+		t.Errorf("応答 = %+v, want ファイル一つと、warning 一つ", resp)
 	}
 }
 
@@ -265,12 +402,15 @@ func TestHTTPMismatch(t *testing.T) {
 	for name, message := range map[string]string{
 		"api.health/OK":        "want status 200, got 404",
 		"api.first/BadRequest": "want status 400, got 204",
-		"api.first/NotFound":   "want status 404, got 410",
-		"api.first/Limited":    "want status 429, got 204",
-		"api.first/Gone":       "want status 410, got 500",
 		"api.replace/OK":       "want status 204, got 404",
-		"api.search/Broken":    "want status 500, got 200",
-		"api.search/Leaky":     "given: context canceled",
+		// 正常のケースの要求が、断られる（400）: 正常のテストと、そのケースから Hozo が作る、例外のテストが、どれも、落ちる
+		"api.first/OK":                 "want status 200, got 400",
+		"api.first/NotFound/api.first": "want status 404, got 400",
+		"api.first/Limited/api.first":  "want status 429, got 400",
+		"api.first/Gone/api.first":     "want status 410, got 400",
+		"api.search/OK":                "want status 200, got 400",
+		"api.search/Broken/api.search": "want status 500, got 400",
+		"api.search/Leaky/api.search":  "want status 500, got 400",
 	} {
 		if !strings.Contains(out, "--- FAIL: TestHTTPMismatch/"+name+" ") {
 			t.Errorf("テスト %s が、落ちていない:\n%s", name, out)
@@ -282,13 +422,23 @@ func TestHTTPMismatch(t *testing.T) {
 	if strings.Contains(out, "Then was called") {
 		t.Errorf("結果の見分けに落ちたケースの Then が、呼ばれた:\n%s", out)
 	}
-	for _, name := range []string{"api.create/OK", "api.first/OK", "api.search/OK", "api.replace/NotFound", "api.ping/OK/GET_/ping"} {
+	for _, name := range []string{"api.create/OK", "api.create/Conflict/api.create", "api.search/BadRequest", "api.replace/NotFound/api.replace", "api.ping/OK/GET_/ping"} {
 		if !strings.Contains(out, "--- PASS: TestHTTPMismatch/"+name+" ") {
 			t.Errorf("差し替えていないテスト %s が、通っていない:\n%s", name, out)
 		}
 	}
-	if n := strings.Count(out, "\n        --- FAIL: "); n != 8 {
-		t.Errorf("落ちた、結果のテストが %d 個（8 のはず）:\n%s", n, out)
+	// 落ちるのは、差し替えた十のテストだけ（いちばん内側の段で数える: 正常と、op を呼ぶ前の失敗は、結果の段。例外は、出どころの段）
+	failed := 0
+	for _, line := range strings.Split(out, "\n") {
+		if name, ok := strings.CutPrefix(strings.TrimSpace(line), "--- FAIL: TestHTTPMismatch/"); ok {
+			name, _, _ = strings.Cut(name, " ")
+			if n := strings.Count(name, "/"); n == 2 || n == 1 && (strings.HasSuffix(name, "/OK") || strings.HasSuffix(name, "/BadRequest")) {
+				failed++
+			}
+		}
+	}
+	if failed != 10 {
+		t.Errorf("落ちた、いちばん内側のテストが %d 個（10 のはず）:\n%s", failed, out)
 	}
 }
 
@@ -343,8 +493,10 @@ func Run(t *testing.T) {
 }
 
 // TestIncompleteHTTPCasesDoNotCompile は、インテグレーションテストのケースの漏れが、コンパイルエラーになること（「口の形」「必要なケース」。
-// CLAUDE.md「実装の漏れは、コンパイルエラーにする」）: 入口を一つ欠いた HTTPCases、結果（正常、op を呼ぶ前の失敗、例外）を一つ欠いた
-// <Op>HTTPCases は、走らせる関数に渡すところで、コンパイルできない。
+// CLAUDE.md「実装の漏れは、コンパイルエラーにする」）: 入口を一つ欠いた HTTPCases、人か AI が書くケース（正常、op を呼ぶ前の失敗）を一つ欠いた
+// <Op>HTTPCases は、走らせる関数に渡すところで、コンパイルできない。Hozo が作る、例外のケース（葉が投げる bare.Unknown、type.NotFound など）は、
+// 口にないので、書かなくても、コンパイルできる。作れない出どころのケースが、口に出ることは、サンプル shop-server の
+// TestIncompleteHTTPCasesAreRejected が、確かめる。
 func TestIncompleteHTTPCasesDoNotCompile(t *testing.T) {
 	t.Parallel()
 	root := writeRoutes(t)
@@ -359,10 +511,8 @@ func TestIncompleteHTTPCasesDoNotCompile(t *testing.T) {
 		{"bareCases.Touch", "入口 touch のケース"},
 		{"bareCases.ViaAlias", "入口 viaAlias のケース"},
 		{"touchCases.OK", "入口 touch の、正常のケース"},
-		{"touchCases.Unknown", "入口 touch の、例外 bare.Unknown のケース"},
+		{"firstCases.OK", "入口 first の、正常のケース"},
 		{"firstCases.BadRequest", "入口 first の、op を呼ぶ前の失敗のケース"},
-		{"firstCases.NotFound", "入口 first の、例外 type.NotFound のケース"},
-		{"firstCases.Gone", "入口 first の、例外 type.Gone のケース"},
 	} {
 		method := tt.omit[strings.IndexByte(tt.omit, '.')+1:]
 		writeFile(t, impl, httpCasesImpl(tt.omit))

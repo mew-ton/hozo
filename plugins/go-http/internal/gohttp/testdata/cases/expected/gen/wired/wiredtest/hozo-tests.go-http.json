@@ -1,5 +1,5 @@
 {
   "tests": [
-    {"name": "wired.value/OK", "file": "gen/wired/wiredtest/http.go", "lines": [48, 54]}
+    {"name": "wired.value/OK", "file": "gen/wired/wiredtest/http.go", "lines": [58, 64]}
   ]
 }

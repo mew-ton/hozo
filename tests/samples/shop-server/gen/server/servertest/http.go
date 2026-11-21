@@ -4,7 +4,6 @@ package servertest
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -19,174 +18,168 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// LoginHTTPCases は、入口 server.login（POST /login）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// LoginHTTPCases は、入口 server.login（POST /login）の、人か AI が書くケース。メソッドごとに、一つ。
 type LoginHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() LoginHTTPCase
 	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
 	BadRequest() LoginHTTPCase
-	// InvalidCredentials は、例外 type.InvalidCredentials を投げるケース: 401。
-	InvalidCredentials() LoginHTTPCase
-	// LimitExceeded は、例外 rate.LimitExceeded を投げるケース: 429。
-	LimitExceeded() LoginHTTPCase
 }
 
-// LoginHTTPCase は、入口 server.login の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// LoginHTTPCase は、入口 server.login の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type LoginHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.LoginInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got server.LoginOk, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got server.LoginOk, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// LogoutHTTPCases は、入口 server.logout（POST /logout）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// LogoutHTTPCases は、入口 server.logout（POST /logout）の、人か AI が書くケース。メソッドごとに、一つ。
 type LogoutHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() LogoutHTTPCase
-	// Unauthorized は、例外 type.Unauthorized を投げるケース: 401。
-	Unauthorized() LogoutHTTPCase
+	// UnauthorizedAuthenticateAbsent は、例外 type.Unauthorized を、server.authenticate.Absent が投げるケース: 401。
+	UnauthorizedAuthenticateAbsent() LogoutHTTPCase
 }
 
-// LogoutHTTPCase は、入口 server.logout の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// LogoutHTTPCase は、入口 server.logout の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type LogoutHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.AuthInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答。
-	Then func(t *testing.T, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// GetMeHTTPCases は、入口 server.getMe（GET /me）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// GetMeHTTPCases は、入口 server.getMe（GET /me）の、人か AI が書くケース。メソッドごとに、一つ。
 type GetMeHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() GetMeHTTPCase
-	// Unauthorized は、例外 type.Unauthorized を投げるケース: 401。
-	Unauthorized() GetMeHTTPCase
+	// UnauthorizedAuthenticateAbsent は、例外 type.Unauthorized を、server.authenticate.Absent が投げるケース: 401。
+	UnauthorizedAuthenticateAbsent() GetMeHTTPCase
 }
 
-// GetMeHTTPCase は、入口 server.getMe の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// GetMeHTTPCase は、入口 server.getMe の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type GetMeHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.AuthInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got pkgtype.PublicUser, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got pkgtype.PublicUser, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// GetOrdersHTTPCases は、入口 server.getOrders（GET /orders）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// GetOrdersHTTPCases は、入口 server.getOrders（GET /orders）の、人か AI が書くケース。メソッドごとに、一つ。
 type GetOrdersHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() GetOrdersHTTPCase
-	// Unauthorized は、例外 type.Unauthorized を投げるケース: 401。
-	Unauthorized() GetOrdersHTTPCase
+	// UnauthorizedAuthenticateAbsent は、例外 type.Unauthorized を、server.authenticate.Absent が投げるケース: 401。
+	UnauthorizedAuthenticateAbsent() GetOrdersHTTPCase
 }
 
-// GetOrdersHTTPCase は、入口 server.getOrders の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// GetOrdersHTTPCase は、入口 server.getOrders の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type GetOrdersHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.GetOrdersInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got []pkgtype.Order, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got []pkgtype.Order, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// GetLatestOrderHTTPCases は、入口 server.getLatestOrder（GET /orders/latest）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// GetLatestOrderHTTPCases は、入口 server.getLatestOrder（GET /orders/latest）の、人か AI が書くケース。メソッドごとに、一つ。
 type GetLatestOrderHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() GetLatestOrderHTTPCase
-	// Unauthorized は、例外 type.Unauthorized を投げるケース: 401。
-	Unauthorized() GetLatestOrderHTTPCase
+	// UnauthorizedAuthenticateAbsent は、例外 type.Unauthorized を、server.authenticate.Absent が投げるケース: 401。
+	UnauthorizedAuthenticateAbsent() GetLatestOrderHTTPCase
 }
 
-// GetLatestOrderHTTPCase は、入口 server.getLatestOrder の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// GetLatestOrderHTTPCase は、入口 server.getLatestOrder の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type GetLatestOrderHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.AuthInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got *pkgtype.Order, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got *pkgtype.Order, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// GetMyPageHTTPCases は、入口 server.getMyPage（GET /me/page）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// GetMyPageHTTPCases は、入口 server.getMyPage（GET /me/page）の、人か AI が書くケース。メソッドごとに、一つ。
 type GetMyPageHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() GetMyPageHTTPCase
-	// Unauthorized は、例外 type.Unauthorized を投げるケース: 401。
-	Unauthorized() GetMyPageHTTPCase
+	// UnauthorizedAuthenticateAbsent は、例外 type.Unauthorized を、server.authenticate.Absent が投げるケース: 401。
+	UnauthorizedAuthenticateAbsent() GetMyPageHTTPCase
 }
 
-// GetMyPageHTTPCase は、入口 server.getMyPage の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// GetMyPageHTTPCase は、入口 server.getMyPage の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type GetMyPageHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.AuthInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got server.MyPage, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got server.MyPage, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// PlaceOrderHTTPCases は、入口 server.placeOrder（POST /orders）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// PlaceOrderHTTPCases は、入口 server.placeOrder（POST /orders）の、人か AI が書くケース。メソッドごとに、一つ。
 type PlaceOrderHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() PlaceOrderHTTPCase
 	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
 	BadRequest() PlaceOrderHTTPCase
-	// Unauthorized は、例外 type.Unauthorized を投げるケース: 401。
-	Unauthorized() PlaceOrderHTTPCase
-	// NotificationFailed は、例外 type.NotificationFailed を投げるケース: 500（@http.status を持たない例外は、中身を出さない）。
-	NotificationFailed() PlaceOrderHTTPCase
+	// UnauthorizedAuthenticateAbsent は、例外 type.Unauthorized を、server.authenticate.Absent が投げるケース: 401。
+	UnauthorizedAuthenticateAbsent() PlaceOrderHTTPCase
 }
 
-// PlaceOrderHTTPCase は、入口 server.placeOrder の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// PlaceOrderHTTPCase は、入口 server.placeOrder の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type PlaceOrderHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.PlaceOrderInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got pkgtype.Order, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got pkgtype.Order, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// ResendNoticesHTTPCases は、入口 server.resendNotices（POST /orders/notices）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// ResendNoticesHTTPCases は、入口 server.resendNotices（POST /orders/notices）の、人か AI が書くケース。メソッドごとに、一つ。
 type ResendNoticesHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() ResendNoticesHTTPCase
-	// Unauthorized は、例外 type.Unauthorized を投げるケース: 401。
-	Unauthorized() ResendNoticesHTTPCase
-	// NotificationFailed は、例外 type.NotificationFailed を投げるケース: 500（@http.status を持たない例外は、中身を出さない）。
-	NotificationFailed() ResendNoticesHTTPCase
+	// UnauthorizedAuthenticateAbsent は、例外 type.Unauthorized を、server.authenticate.Absent が投げるケース: 401。
+	UnauthorizedAuthenticateAbsent() ResendNoticesHTTPCase
+	// NotificationFailedSend は、例外 type.NotificationFailed を、mailer.send が投げるケース: 500（@http.status を持たない例外は、中身を出さない）。
+	NotificationFailedSend() ResendNoticesHTTPCase
 }
 
-// ResendNoticesHTTPCase は、入口 server.resendNotices の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// ResendNoticesHTTPCase は、入口 server.resendNotices の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type ResendNoticesHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In server.AuthInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got []pkgtype.Notification, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got []pkgtype.Notification, res *httptest.ResponseRecorder, f *Fakes)
 }
 
 // HTTPCases は、@http.get / @http.post の付いた op の、インテグレーションテストのケース。入口ごとに、メソッド一つ（宣言順）。
@@ -202,260 +195,452 @@ type HTTPCases interface {
 	ResendNotices() ResendNoticesHTTPCases
 }
 
-// RunHTTP は、入口ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。
-// ケースごとに、入力を要求に組み立てて handler に送り、応答が、そのケースのものであること（ステータスと、本文の形）を確かめてから、Then を呼ぶ。
-func RunHTTP(t *testing.T, handler http.Handler, c HTTPCases) {
+// RunHTTP は、入口ごと、結果ごとに、テストを走らせる。テストの名前は、<op の FQN>/<結果>。例外は、出どころごとに、<op の FQN>/<例外>/<出どころ>。
+// ケースごとに、新しいにせものの上に、流れを組み立て（NewOps）、入力を要求に組み立てて送り、応答が、そのケースのものであること
+// （ステータスと、本文の形）を確かめてから、Then を呼ぶ。口にない、例外のケースは、正常のケースの用意の後に、にせものに、例外を起こさせる。
+func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 	t.Run("server.login", func(t *testing.T) {
 		cases := c.Login()
-		send := func(t *testing.T, k LoginHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k LoginHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/login"}
 			call.bodyObj(k.In.Body)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got server.LoginOk
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got server.LoginOk
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("InvalidCredentials", func(t *testing.T) {
-			k := cases.InvalidCredentials()
-			res := send(t, k)
-			var got server.LoginOk
-			httpWantThrown[pkgtype.InvalidCredentials](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.checkPassword", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.CheckPassword.Throws(pkgtype.InvalidCredentials{})
+				})
+				httpWantThrown[pkgtype.InvalidCredentials](t, res, 401)
+			})
+			t.Run("server.login.Unregistered", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Users.UserByEmail.Returns(nil)
+				})
+				httpWantThrown[pkgtype.InvalidCredentials](t, res, 401)
+			})
 		})
 		t.Run("LimitExceeded", func(t *testing.T) {
-			k := cases.LimitExceeded()
-			res := send(t, k)
-			var got server.LoginOk
-			httpWantThrown[rate.LimitExceeded](t, res, 429)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.login@rate.limited", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Seams.LoginRateLimited.Throws(rate.LimitExceeded{})
+				})
+				httpWantThrown[rate.LimitExceeded](t, res, 429)
+			})
 		})
 	})
 	t.Run("server.logout", func(t *testing.T) {
 		cases := c.Logout()
-		send := func(t *testing.T, k LogoutHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k LogoutHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/logout"}
 			call.header("Authorization", k.In.Token)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantResult(t, res, nil)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 		t.Run("Unauthorized", func(t *testing.T) {
-			k := cases.Unauthorized()
-			res := send(t, k)
-			httpWantThrown[pkgtype.Unauthorized](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, res)
-			}
+			t.Run("server.requireFresh", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.RequireFresh.Throws(pkgtype.Unauthorized{})
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.sessionOf.LoggedOut", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Sessions.SessionByToken.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.authenticate.Absent", func(t *testing.T) {
+				k := cases.UnauthorizedAuthenticateAbsent()
+				res, f := send(t, k, nil)
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+				if k.Then != nil {
+					k.Then(t, res, f)
+				}
+			})
 		})
 	})
 	t.Run("server.getMe", func(t *testing.T) {
 		cases := c.GetMe()
-		send := func(t *testing.T, k GetMeHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k GetMeHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/me"}
 			call.header("Authorization", k.In.Token)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got pkgtype.PublicUser
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Unauthorized", func(t *testing.T) {
-			k := cases.Unauthorized()
-			res := send(t, k)
-			var got pkgtype.PublicUser
-			httpWantThrown[pkgtype.Unauthorized](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.requireFresh", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.RequireFresh.Throws(pkgtype.Unauthorized{})
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.sessionOf.LoggedOut", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Sessions.SessionByToken.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.authenticate.Absent", func(t *testing.T) {
+				k := cases.UnauthorizedAuthenticateAbsent()
+				res, f := send(t, k, nil)
+				var got pkgtype.PublicUser
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+				if k.Then != nil {
+					k.Then(t, got, res, f)
+				}
+			})
+			t.Run("server.getMe.Missing", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Users.UserById.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
 		})
 	})
 	t.Run("server.getOrders", func(t *testing.T) {
 		cases := c.GetOrders()
-		send := func(t *testing.T, k GetOrdersHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k GetOrdersHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/orders"}
 			call.header("Authorization", k.In.Token)
 			call.query("page", k.In.Page)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got []pkgtype.Order
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Unauthorized", func(t *testing.T) {
-			k := cases.Unauthorized()
-			res := send(t, k)
-			var got []pkgtype.Order
-			httpWantThrown[pkgtype.Unauthorized](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.requireFresh", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.RequireFresh.Throws(pkgtype.Unauthorized{})
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.sessionOf.LoggedOut", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Sessions.SessionByToken.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.authenticate.Absent", func(t *testing.T) {
+				k := cases.UnauthorizedAuthenticateAbsent()
+				res, f := send(t, k, nil)
+				var got []pkgtype.Order
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+				if k.Then != nil {
+					k.Then(t, got, res, f)
+				}
+			})
 		})
 	})
 	t.Run("server.getLatestOrder", func(t *testing.T) {
 		cases := c.GetLatestOrder()
-		send := func(t *testing.T, k GetLatestOrderHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k GetLatestOrderHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/orders/latest"}
 			call.header("Authorization", k.In.Token)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got *pkgtype.Order
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Unauthorized", func(t *testing.T) {
-			k := cases.Unauthorized()
-			res := send(t, k)
-			var got *pkgtype.Order
-			httpWantThrown[pkgtype.Unauthorized](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.requireFresh", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.RequireFresh.Throws(pkgtype.Unauthorized{})
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.sessionOf.LoggedOut", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Sessions.SessionByToken.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.authenticate.Absent", func(t *testing.T) {
+				k := cases.UnauthorizedAuthenticateAbsent()
+				res, f := send(t, k, nil)
+				var got *pkgtype.Order
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+				if k.Then != nil {
+					k.Then(t, got, res, f)
+				}
+			})
 		})
 	})
 	t.Run("server.getMyPage", func(t *testing.T) {
 		cases := c.GetMyPage()
-		send := func(t *testing.T, k GetMyPageHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k GetMyPageHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/me/page"}
 			call.header("Authorization", k.In.Token)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got server.MyPage
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Unauthorized", func(t *testing.T) {
-			k := cases.Unauthorized()
-			res := send(t, k)
-			var got server.MyPage
-			httpWantThrown[pkgtype.Unauthorized](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.requireFresh", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.RequireFresh.Throws(pkgtype.Unauthorized{})
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.sessionOf.LoggedOut", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Sessions.SessionByToken.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.authenticate.Absent", func(t *testing.T) {
+				k := cases.UnauthorizedAuthenticateAbsent()
+				res, f := send(t, k, nil)
+				var got server.MyPage
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+				if k.Then != nil {
+					k.Then(t, got, res, f)
+				}
+			})
+			t.Run("server.getMyPage.Missing", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Users.UserById.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
 		})
 	})
 	t.Run("server.placeOrder", func(t *testing.T) {
 		cases := c.PlaceOrder()
-		send := func(t *testing.T, k PlaceOrderHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k PlaceOrderHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/orders"}
 			call.header("Authorization", k.In.Token)
 			call.body("lines", k.In.Lines)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got pkgtype.Order
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got pkgtype.Order
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Unauthorized", func(t *testing.T) {
-			k := cases.Unauthorized()
-			res := send(t, k)
-			var got pkgtype.Order
-			httpWantThrown[pkgtype.Unauthorized](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.requireFresh", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.RequireFresh.Throws(pkgtype.Unauthorized{})
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.sessionOf.LoggedOut", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Sessions.SessionByToken.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.authenticate.Absent", func(t *testing.T) {
+				k := cases.UnauthorizedAuthenticateAbsent()
+				res, f := send(t, k, nil)
+				var got pkgtype.Order
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+				if k.Then != nil {
+					k.Then(t, got, res, f)
+				}
+			})
 		})
 		t.Run("NotificationFailed", func(t *testing.T) {
-			k := cases.NotificationFailed()
-			res := send(t, k)
-			var got pkgtype.Order
-			httpWantInternal(t, res)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("mailer.send", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Mailer.Send.Throws(pkgtype.NotificationFailed{})
+				})
+				httpWantInternal(t, res)
+			})
 		})
 	})
 	t.Run("server.resendNotices", func(t *testing.T) {
 		cases := c.ResendNotices()
-		send := func(t *testing.T, k ResendNoticesHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k ResendNoticesHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/orders/notices"}
 			call.header("Authorization", k.In.Token)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, server.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got []pkgtype.Notification
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Unauthorized", func(t *testing.T) {
-			k := cases.Unauthorized()
-			res := send(t, k)
-			var got []pkgtype.Notification
-			httpWantThrown[pkgtype.Unauthorized](t, res, 401)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("server.requireFresh", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.RequireFresh.Throws(pkgtype.Unauthorized{})
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.sessionOf.LoggedOut", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Store.Sessions.SessionByToken.Returns(nil)
+				})
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+			})
+			t.Run("server.authenticate.Absent", func(t *testing.T) {
+				k := cases.UnauthorizedAuthenticateAbsent()
+				res, f := send(t, k, nil)
+				var got []pkgtype.Notification
+				httpWantThrown[pkgtype.Unauthorized](t, res, 401)
+				if k.Then != nil {
+					k.Then(t, got, res, f)
+				}
+			})
 		})
 		t.Run("NotificationFailed", func(t *testing.T) {
-			k := cases.NotificationFailed()
-			res := send(t, k)
-			var got []pkgtype.Notification
-			httpWantInternal(t, res)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("mailer.send", func(t *testing.T) {
+				k := cases.NotificationFailedSend()
+				res, f := send(t, k, nil)
+				var got []pkgtype.Notification
+				httpWantInternal(t, res)
+				if k.Then != nil {
+					k.Then(t, got, res, f)
+				}
+			})
 		})
 	})
 }
@@ -511,8 +696,8 @@ func (c *httpCall) bodyObj(v any) {
 	c.whole = v
 }
 
-// send は、要求を組み立てて handler に送り、応答を返す。送る前に、given（今の状態の用意）と、edit（要求の手直し）を、この順に呼ぶ（nil なら、呼ばない）。
-func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx context.Context) error, edit func(r *http.Request)) *httptest.ResponseRecorder {
+// send は、要求を組み立てて handler に送り、応答を返す。送る前に、edit（要求の手直し）を呼ぶ（nil なら、呼ばない）。
+func (c *httpCall) send(t *testing.T, handler http.Handler, edit func(r *http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	target := c.path
 	if len(c.values) > 0 {
@@ -549,11 +734,6 @@ func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx conte
 	}
 	if c.hasBody {
 		r.Header.Set("Content-Type", "application/json")
-	}
-	if given != nil {
-		if err := given(context.Background()); err != nil {
-			t.Fatalf("given: %v", err)
-		}
 	}
 	if edit != nil {
 		edit(r)

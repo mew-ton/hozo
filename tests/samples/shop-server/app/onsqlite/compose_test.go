@@ -49,16 +49,6 @@ func TestHandler(t *testing.T) {
 	handlertest.Run(t, newServer)
 }
 
-// TestHTTPCases は、八つの入口の、結果ごとのインテグレーションテスト（docs/plugin-go-http.md「インテグレーションテストの口」）。
-// go-http が出した servertest.RunHTTP に、handlertest.HTTPCases を渡す。
-func TestHTTPCases(t *testing.T) {
-	t.Parallel()
-	handlertest.RunCases(t, newServer)
-}
-
-// TestIncompleteHTTPCasesAreRejected は、ケースを欠いた型が、口 servertest.HTTPCases を満たさないこと。
-func TestIncompleteHTTPCasesAreRejected(t *testing.T) { handlertest.RunIncomplete(t) }
-
 // TestTwoServers は、同じ出力（gen/store と gen/server）の上の二つのサーバーが、一つのプロセスで同時に動き、
 // 互いに混ざらないこと: SQLite のデータベースが二つ、store.New と server.New が二度。
 func TestTwoServers(t *testing.T) {

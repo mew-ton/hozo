@@ -318,6 +318,20 @@ type KitParam struct {
     Fake  string                                  // にせものの型の名前（KitUnit なら ""）
     Unit  *TestKit                                // KitUnit のとき、本物を通す出力
 }
+func ThrowSources(p *ir.Program, kit *TestKit, entry string) []ThrowSource   // kit の出力の op entry が投げうる例外の、出どころ（docs/ide-chain.md「テストの規約」の「インテグレーションテストの作り直し」）。例外の順、その中は、辿った順
+type ThrowSource struct {
+    Exception string                              // 例外の FQN
+    Kind  SourceKind                              // SourceLeaf、SourceEffect、SourceExternal、SourceSeam、SourceArm、SourceNever、SourceUnknown（出どころが、見つからない）
+    Label, Ident string                           // テストの名前の <出どころ> と、口のメソッドの名前の、出どころの部分
+    Made  bool                                    // Hozo が、ケースを作れるか
+    Steps []FakeStep                              // 作れるとき、正常のケースの用意の後に、にせものに言うこと（順に）
+    Why   string                                  // 作れないとき、その理由
+}
+type FakeStep struct {
+    Path []string                                 // 入口の出力の Fakes から、にせもの（のフィールド）までの、フィールドの名前
+    Verb StepVerb                                 // StepThrows、StepReturnsNone、StepReturnsBool、StepIs
+    Exception string; Bool bool; Classify, Case string   // 種類ごとの中身
+}
 type KitReal struct {
     Name string                                   // NewOps の引数の名前（import の名前は、書く側が避ける）
     Kind KitKind                                  // KitLeaves か KitClassify

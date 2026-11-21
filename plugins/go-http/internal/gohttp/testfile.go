@@ -28,32 +28,62 @@ const (
 )
 
 // testBodyNames は、テストのパッケージの http.go の関数の本体が、決まった名前で使う識別子（同「置き場と名前」）。import の名前に使わない。
-var testBodyNames = []string{"t", "c", "k", "cases", "send", "call", "res", "got", "handler", "method", "path"}
+var testBodyNames = []string{"t", "c", "k", "f", "cases", "send", "force", "call", "res", "got", "method", "path"}
 
-// resultKind は、入口の結果の種類（同「必要なケース」の表の行）。
-type resultKind int
-
-const (
-	resultOK         resultKind = iota // 正常
-	resultBadRequest                   // op を呼ぶ前の失敗（400 と http.BadRequest）
-	resultStatus                       // @http.status を持つ例外
-	resultInternal                     // @http.status を持たない例外（500 と internal）
-)
-
-// result は、入口の結果一つ。name は、<Op>HTTPCases のメソッドの名前で、テストの名前の <結果> でもある。
-// exception は、例外の FQN（例外でなければ ""）。code は、@http.status のステータス（resultStatus のときだけ）。
-type result struct {
-	name      string
-	kind      resultKind
-	exception string
-	code      int64
+// group は、入口が投げうる例外一つと、その出どころ（同「必要なケース」）。name は、例外の名前で、テストの名前の <例外の名前>。
+// status は、@http.status を持つか（持てば、code が、そのステータス）。
+type group struct {
+	name, exception string
+	status          bool
+	code            int64
+	sources         []source
 }
 
-// entry は、入口一つ: 経路の op と、その経路（書かれた順）と、結果。
+// source は、例外の出どころ一つ。made は、Hozo が、ケースを作るか。作らないなら、method が、口のメソッドの名前。
+type source struct {
+	golang.ThrowSource
+	made   bool
+	method string
+}
+
+// entry は、入口一つ: 経路の op と、その経路（書かれた順）と、テスト（正常、op を呼ぶ前の失敗、例外の出どころごと）。
 type entry struct {
-	op      *ir.Op
-	routes  []*route
-	results []result
+	op     *ir.Op
+	routes []*route
+	hasOK  bool // 正常のケースがある（never を返す op には、ない）
+	hasBad bool // op を呼ぶ前の失敗のケースがある
+	groups []group
+}
+
+// humanCase は、人か AI が書くケース一つ（<Op>HTTPCases のメソッド）: 名前と、コメントの文。
+type humanCase struct{ name, comment string }
+
+// human は、入口 e の、人か AI が書くケース（口のメソッドの順）: 正常、op を呼ぶ前の失敗、Hozo が作らない出どころ。
+func (e *entry) human() []humanCase {
+	var out []humanCase
+	if e.hasOK {
+		out = append(out, humanCase{"OK", "OK は、正常に終わるケース: 成功の応答。"})
+	}
+	if e.hasBad {
+		out = append(out, humanCase{"BadRequest", "BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。"})
+	}
+	for _, g := range e.groups {
+		what := "500（@http.status を持たない例外は、中身を出さない）"
+		if g.status {
+			what = strconv.FormatInt(g.code, 10)
+		}
+		for _, s := range g.sources {
+			if s.made {
+				continue
+			}
+			if s.Kind == golang.SourceUnknown {
+				out = append(out, humanCase{s.method, s.method + " は、例外 " + g.exception + " を投げるケース: " + what + "。"})
+				continue
+			}
+			out = append(out, humanCase{s.method, s.method + " は、例外 " + g.exception + " を、" + s.Label + " が投げるケース: " + what + "。"})
+		}
+	}
+	return out
 }
 
 // method は、op のメソッドの名前。口の名前 <Op>HTTPCases と <Op>HTTPCase の <Op>。
@@ -78,32 +108,30 @@ func (g *generator) entries(routes []route) []entry {
 		out = append(out, entry{op: r.op, routes: []*route{r}})
 	}
 	for i := range out {
-		out[i].results = g.results(&out[i])
+		g.tests(&out[i])
 	}
 	return out
 }
 
-// results は、入口 e の結果（docs/plugin-go-http.md「インテグレーションテストの口」の「必要なケース」）。この順:
-// 正常（never を返す op には、ない）。op を呼ぶ前の失敗（入力が、本文のデコレータのフィールドか、@http.required の付いたフィールドを、
-// 一つでも持つ op だけ。型は見ない）。op が投げうる例外ごと（Op.signature.exceptions の順。デコレータが運ぶ例外を含む）。
+// tests は、入口 e のテストを決める（docs/plugin-go-http.md「インテグレーションテストの口」の「必要なケース」）: 正常（never を返す op には、
+// ない）。op を呼ぶ前の失敗（入力が、本文のデコレータのフィールドか、@http.required の付いたフィールドを、一つでも持つ op だけ。
+// 型は見ない）。op が投げうる例外（Op.signature.exceptions の順。デコレータが運ぶ例外を含む）の、出どころごと（golang.ThrowSources）。
 // 例外の名前は、宣言の名前。その op の中で名前が当たるもの（別の名前空間の、同じ名前の例外。例外 OK、BadRequest）は、名前空間の
 // セグメントを先頭大文字にして前に付ける（基底の、葉の op の口と同じ決まり）。
-func (g *generator) results(e *entry) []result {
-	var out []result
+func (g *generator) tests(e *entry) {
 	count := map[string]int{}
-	add := func(r result) {
-		count[r.name]++
-		out = append(out, r)
-	}
 	if !ir.IsNever(e.op.Returns) {
-		add(result{name: "OK", kind: resultOK})
+		e.hasOK = true
+		count["OK"]++
 	}
 	for _, in := range e.inputs() {
 		if in.place == inBody || in.required {
-			add(result{name: "BadRequest", kind: resultBadRequest})
+			e.hasBad = true
+			count["BadRequest"]++
 			break
 		}
 	}
+	sources := golang.ThrowSources(g.p, g.kit, e.op.Name)
 	seen := map[string]bool{}
 	for _, fqn := range e.op.Signature.Exceptions {
 		x, ok := g.p.Lookup(fqn).(*ir.Exception)
@@ -111,23 +139,31 @@ func (g *generator) results(e *entry) []result {
 			continue
 		}
 		seen[fqn] = true
-		r := result{name: golang.TypeName(fqn, g.declNS[fqn]), kind: resultInternal, exception: fqn}
-		if code, has := statusOf(x); has {
-			r.kind, r.code = resultStatus, code
+		gr := group{name: golang.TypeName(fqn, g.declNS[fqn]), exception: fqn}
+		gr.code, gr.status = statusOf(x)
+		for _, s := range sources {
+			if s.Exception == fqn {
+				// Hozo が作るのは、作れる出どころで、正常のケースがあり、にせものに言うことがあるなら、Fakes があるとき
+				made := s.Made && e.hasOK && (len(s.Steps) == 0 || g.kit.HasFakes())
+				gr.sources = append(gr.sources, source{ThrowSource: s, made: made})
+			}
 		}
-		add(r)
+		count[gr.name]++
+		e.groups = append(e.groups, gr)
 	}
-	for i := range out {
-		if out[i].exception == "" || count[out[i].name] == 1 {
-			continue
+	for i := range e.groups {
+		gr := &e.groups[i]
+		if count[gr.name] > 1 {
+			var prefix string
+			for _, seg := range strings.Split(g.declNS[gr.exception], ".") {
+				prefix += golang.Capitalize(seg)
+			}
+			gr.name = prefix + gr.name
 		}
-		var prefix string
-		for _, seg := range strings.Split(g.declNS[out[i].exception], ".") {
-			prefix += golang.Capitalize(seg)
+		for j := range gr.sources {
+			gr.sources[j].method = gr.name + gr.sources[j].Ident
 		}
-		out[i].name = prefix + out[i].name
 	}
-	return out
 }
 
 // statusOf は、例外 x の @http.status のステータス。持たなければ false。
@@ -187,21 +223,24 @@ func (g *generator) checkTestNames(entries []entry) {
 		m := e.method()
 		add(m+casesName, TranspilerName+" の、op "+e.op.Name+" のケースの口 "+m+casesName, e.op.Name)
 		add(m+"HTTPCase", TranspilerName+" の、op "+e.op.Name+" のケース "+m+"HTTPCase", e.op.Name)
-		methods := map[string]string{}
-		for _, r := range e.results {
-			what := "正常の結果"
-			switch r.kind {
-			case resultBadRequest:
-				what = "op を呼ぶ前の失敗の結果"
-			case resultStatus, resultInternal:
-				what = "例外 " + r.exception + " の結果"
-			}
-			if prev, dup := methods[r.name]; dup {
-				g.errorf(codeHTTPTestName, e.op.Name, "op %s のケースの口 %s%s の、%sの名前 %s が、%sの名前と当たる（直すのは仕様の名前）",
-					e.op.Name, m, casesName, what, r.name, prev)
+		// 例外の名前（テストの名前の段）どうし
+		groups := map[string]string{}
+		for _, gr := range e.groups {
+			if prev, dup := groups[gr.name]; dup {
+				g.errorf(codeHTTPTestName, e.op.Name, "op %s の、例外 %s の名前 %s が、例外 %s の名前と当たる（名前空間を前に付けても、同じ名前。直すのは仕様の名前）",
+					e.op.Name, gr.exception, gr.name, prev)
 				continue
 			}
-			methods[r.name] = what
+			groups[gr.name] = gr.exception
+		}
+		methods := map[string]bool{}
+		for _, h := range e.human() {
+			if methods[h.name] {
+				g.errorf(codeHTTPTestName, e.op.Name, "op %s のケースの口 %s%s の、メソッドの名前 %s が、二つのケースで当たる（直すのは仕様の名前）",
+					e.op.Name, m, casesName, h.name)
+				continue
+			}
+			methods[h.name] = true
 		}
 	}
 }
@@ -282,48 +321,47 @@ func (f *testFile) draw(entries []entry) string {
 	return b.String()
 }
 
-// cases は、入口一つの口（docs/plugin-go-http.md「インテグレーションテストの口」の「口の形」）: 結果ごとのメソッドを持つ <Op>HTTPCases と、
-// ケース一つの <Op>HTTPCase。
+// cases は、入口一つの口（docs/plugin-go-http.md「インテグレーションテストの口」の「口の形」）: 人か AI が書くケースごとのメソッドを持つ
+// <Op>HTTPCases と、ケース一つの <Op>HTTPCase。
 func (f *testFile) cases(e *entry) string {
 	m := e.method()
+	fakes := f.g.kit.HasFakes()
 	var paths []string
 	for _, r := range e.routes {
 		paths = append(paths, r.method+" "+r.path)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "// %s%s は、入口 %s（%s）の、結果ごとのケース。結果の数だけ、メソッドがある。\ntype %s%s interface {\n",
+	fmt.Fprintf(&b, "// %s%s は、入口 %s（%s）の、人か AI が書くケース。メソッドごとに、一つ。\ntype %s%s interface {\n",
 		m, casesName, e.op.Name, strings.Join(paths, "、"), m, casesName)
-	for _, r := range e.results {
-		switch r.kind {
-		case resultOK:
-			fmt.Fprintf(&b, "// %s は、正常に終わるケース: 成功の応答。\n", r.name)
-		case resultBadRequest:
-			fmt.Fprintf(&b, "// %s は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。\n", r.name)
-		case resultStatus:
-			fmt.Fprintf(&b, "// %s は、例外 %s を投げるケース: %d。\n", r.name, r.exception, r.code)
-		case resultInternal:
-			fmt.Fprintf(&b, "// %s は、例外 %s を投げるケース: 500（@http.status を持たない例外は、中身を出さない）。\n", r.name, r.exception)
-		}
-		fmt.Fprintf(&b, "%s() %sHTTPCase\n", r.name, m)
+	for _, h := range e.human() {
+		fmt.Fprintf(&b, "// %s\n%s() %sHTTPCase\n", h.comment, h.name, m)
 	}
 	b.WriteString("}\n\n")
 
 	testing, httptest := f.use("testing"), f.use("net/http/httptest")
+	what := "入力と、流れの端が返す値と、足りない確かめ"
+	if !fakes {
+		what = "入力と、足りない確かめ"
+	}
 	if model := e.model(); model != nil {
 		ns := f.g.declNS[model.Name]
-		fmt.Fprintf(&b, "// %sHTTPCase は、入口 %s の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。\ntype %sHTTPCase struct {\n", m, e.op.Name, m)
+		fmt.Fprintf(&b, "// %sHTTPCase は、入口 %s の、ケース一つ: %s。\ntype %sHTTPCase struct {\n", m, e.op.Name, what, m)
 		fmt.Fprintf(&b, "// %s は、入力。走らせる側が、要求に組み立てる。\n%s %s%s\n", inputField(e), inputField(e), f.im.Qualifier(ns), golang.TypeName(model.Name, ns))
 	} else {
-		fmt.Fprintf(&b, "// %sHTTPCase は、入口 %s の、ケース一つ: 今の状態の用意と、足りない確かめ。\ntype %sHTTPCase struct {\n", m, e.op.Name, m)
+		fmt.Fprintf(&b, "// %sHTTPCase は、入口 %s の、ケース一つ: %s。\ntype %sHTTPCase struct {\n", m, e.op.Name, strings.TrimPrefix(what, "入力と、"), m)
 	}
-	fmt.Fprintf(&b, "// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。\nGiven func(ctx %s.Context) error\n", f.use("context"))
+	tail, tailDoc := "", ""
+	if fakes {
+		b.WriteString("// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。\nGiven func(f *Fakes)\n")
+		tail, tailDoc = ", f *Fakes", "、f は、にせもの（覚えた呼び出しを、確かめる）"
+	}
 	fmt.Fprintf(&b, "// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。\nRequest func(r *%s.Request)\n", f.use("net/http"))
 	if e.hasValue() {
-		fmt.Fprintf(&b, "// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。\n"+
-			"Then func(t *%s.T, got %s, res *%s.ResponseRecorder)\n", testing, golang.GoType(e.op.Returns, f.im), httptest)
+		fmt.Fprintf(&b, "// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答%s。\n"+
+			"Then func(t *%s.T, got %s, res *%s.ResponseRecorder%s)\n", tailDoc, testing, golang.GoType(e.op.Returns, f.im), httptest, tail)
 	} else {
-		fmt.Fprintf(&b, "// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答。\n"+
-			"Then func(t *%s.T, res *%s.ResponseRecorder)\n", testing, httptest)
+		fmt.Fprintf(&b, "// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答%s。\n"+
+			"Then func(t *%s.T, res *%s.ResponseRecorder%s)\n", tailDoc, testing, httptest, tail)
 	}
 	b.WriteString("}\n\n")
 	return b.String()
@@ -342,27 +380,71 @@ func (f *testFile) all(entries []entry) string {
 	return b.String()
 }
 
-// run は、走らせる関数 RunHTTP（同「口の形」）: 入口ごと、結果ごとに、t.Run を重ねる。経路を二つ以上持つ op は、結果の下に、
-// 経路ごとの段を足す。
+// reals は、RunHTTP が受け取る、人が書いたもの（NewOps が取るもの）の、引数（`<名前> <型>`）と、名前。名前は、このファイルの
+// import の名前と、本体が決まった名前で使う識別子を避ける。
+func (f *testFile) reals() (params, names []string) {
+	taken := map[string]bool{}
+	for _, n := range testBodyNames {
+		taken[n] = true
+	}
+	for _, n := range f.im.Names() {
+		taken[n] = true
+	}
+	for _, r := range f.g.kit.Reals {
+		name := r.Name
+		for taken[name] {
+			name += "_"
+		}
+		taken[name] = true
+		typ := f.im.Qualifier(r.Namespace) + "Leaves"
+		if r.Kind == golang.KitClassify {
+			ns := f.g.declNS[r.Classify]
+			typ = f.im.Qualifier(ns) + golang.TypeName(r.Classify, ns) + "Cases"
+		}
+		params = append(params, name+" "+typ)
+		names = append(names, name)
+	}
+	return params, names
+}
+
+// run は、走らせる関数 RunHTTP（同「口の形」）: 入口ごと、結果ごとに、t.Run を重ねる。例外は、その下に、出どころごと。経路を二つ以上
+// 持つ op は、テスト一つの下に、経路ごとの段を足す。
 func (f *testFile) run(entries []entry) string {
-	testing, http, httptest := f.use("testing"), f.use("net/http"), f.use("net/http/httptest")
+	testing, httptest := f.use("testing"), f.use("net/http/httptest")
+	entryPkg := f.im.Qualifier(f.g.view.Viewer)
+	fakes := f.g.kit.HasFakes()
+	params, names := f.reals()
+	handler := entryPkg + "NewHandler(" + entryPkg + "New())"
+	if fakes {
+		handler = entryPkg + "NewHandler(NewOps(" + strings.Join(append([]string{"f"}, names...), ", ") + "))"
+	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "// %s は、入口ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。\n"+
-		"// ケースごとに、入力を要求に組み立てて handler に送り、応答が、そのケースのものであること（ステータスと、本文の形）を確かめてから、Then を呼ぶ。\n"+
-		"func %s(t *%s.T, handler %s.Handler, c %s) {\n", runName, runName, testing, http, casesName)
+	fmt.Fprintf(&b, "// %s は、入口ごと、結果ごとに、テストを走らせる。テストの名前は、<op の FQN>/<結果>。例外は、出どころごとに、<op の FQN>/<例外>/<出どころ>。\n", runName)
+	if fakes {
+		b.WriteString("// ケースごとに、新しいにせものの上に、流れを組み立て（NewOps）、入力を要求に組み立てて送り、応答が、そのケースのものであること\n" +
+			"// （ステータスと、本文の形）を確かめてから、Then を呼ぶ。口にない、例外のケースは、正常のケースの用意の後に、にせものに、例外を起こさせる。\n")
+	} else {
+		b.WriteString("// ケースごとに、新しく、流れを組み立て、入力を要求に組み立てて送り、応答が、そのケースのものであること\n" +
+			"// （ステータスと、本文の形）を確かめてから、Then を呼ぶ。\n")
+	}
+	fmt.Fprintf(&b, "func %s(%s) {\n", runName, strings.Join(append(append([]string{"t *" + testing + ".T"}, params...), "c "+casesName), ", "))
 	for i := range entries {
 		e := &entries[i]
 		m := e.method()
 		single := len(e.routes) == 1
 		fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\ncases := c.%s()\n", strconv.Quote(e.op.Name), testing, m)
-		// 要求の組み立て（同「要求の組み立て」）: フィールドごとに、デコレータと、その引数（か、フィールドの名前）だけで決まる一行
-		if single {
-			fmt.Fprintf(&b, "send := func(t *%s.T, k %sHTTPCase) *%s.ResponseRecorder {\ncall := httpCall{method: %s, path: %s}\n",
-				testing, m, httptest, strconv.Quote(e.routes[0].method), strconv.Quote(e.routes[0].path))
-		} else {
-			fmt.Fprintf(&b, "send := func(t *%s.T, method, path string, k %sHTTPCase) *%s.ResponseRecorder {\ncall := httpCall{method: method, path: path}\n",
-				testing, m, httptest)
+		// 組み立てと、要求の組み立て（同「要求の組み立て」）: フィールドごとに、デコレータと、その引数（か、フィールドの名前）だけで決まる一行
+		args, call := "k "+m+"HTTPCase", "httpCall{method: "+strconv.Quote(e.routes[0].method)+", path: "+strconv.Quote(e.routes[0].path)+"}"
+		if !single {
+			args, call = "method, path string, "+args, "httpCall{method: method, path: path}"
 		}
+		if fakes {
+			fmt.Fprintf(&b, "send := func(t *%s.T, %s, force func(f *Fakes)) (*%s.ResponseRecorder, *Fakes) {\n"+
+				"f := new(Fakes)\nif k.Given != nil {\nk.Given(f)\n}\nif force != nil {\nforce(f)\n}\n", testing, args, httptest)
+		} else {
+			fmt.Fprintf(&b, "send := func(t *%s.T, %s) *%s.ResponseRecorder {\n", testing, args, httptest)
+		}
+		fmt.Fprintf(&b, "call := %s\n", call)
 		for _, x := range e.inputs() {
 			value := "k." + inputField(e) + "." + golang.FieldName(x.field.Name)
 			name := strings.TrimPrefix(x.decorator, "http.")
@@ -372,16 +454,52 @@ func (f *testFile) run(entries []entry) string {
 				fmt.Fprintf(&b, "call.%s(%s, %s)\n", name, strconv.Quote(x.name), value)
 			}
 		}
-		b.WriteString("return call.send(t, handler, k.Given, k.Request)\n}\n")
-		for _, r := range e.results {
-			fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\n", strconv.Quote(r.name), testing)
+		if fakes {
+			fmt.Fprintf(&b, "return call.send(t, %s, k.Request), f\n}\n", handler)
+		} else {
+			fmt.Fprintf(&b, "return call.send(t, %s, k.Request)\n}\n", handler)
+		}
+		// test は、テスト一つ（か、経路ごとの段）を書く。body は、送る式の前半（"send(t, " か "send(t, <メソッド>, <パス>, "）から、中身を作る
+		test := func(name string, body func(sendHead string) string) {
+			fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\n", strconv.Quote(name), testing)
 			if single {
-				b.WriteString(f.body(e, &r, "send(t, k)"))
+				b.WriteString(body("send(t, "))
 			} else {
 				for _, route := range e.routes {
 					fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\n%s})\n", strconv.Quote(route.method+" "+route.path), testing,
-						f.body(e, &r, "send(t, "+strconv.Quote(route.method)+", "+strconv.Quote(route.path)+", k)"))
+						body("send(t, "+strconv.Quote(route.method)+", "+strconv.Quote(route.path)+", "))
 				}
+			}
+			b.WriteString("})\n")
+		}
+		if e.hasOK {
+			test("OK", func(head string) string { return f.written(e, "OK", f.wantOK(e), head) })
+		}
+		if e.hasBad {
+			test("BadRequest", func(head string) string { return f.written(e, "BadRequest", "httpWantBadRequest(t, res)\n", head) })
+		}
+		for gi := range e.groups {
+			gr := &e.groups[gi]
+			want := "httpWantInternal(t, res)\n"
+			if gr.status {
+				ns := f.g.declNS[gr.exception]
+				want = fmt.Sprintf("httpWantThrown[%s%s](t, res, %d)\n", f.im.Qualifier(ns), golang.TypeName(gr.exception, ns), gr.code)
+			}
+			one := func(s *source) func(head string) string {
+				return func(head string) string {
+					if s.made {
+						return f.made(s, want, head)
+					}
+					return f.written(e, s.method, want, head)
+				}
+			}
+			if len(gr.sources) == 1 && gr.sources[0].Kind == golang.SourceUnknown {
+				test(gr.name, one(&gr.sources[0]))
+				continue
+			}
+			fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\n", strconv.Quote(gr.name), testing)
+			for si := range gr.sources {
+				test(gr.sources[si].Label, one(&gr.sources[si]))
 			}
 			b.WriteString("})\n")
 		}
@@ -391,28 +509,68 @@ func (f *testFile) run(entries []entry) string {
 	return b.String()
 }
 
-// body は、テスト一つの中: ケースを取り、送り（send は、送る式）、応答が、結果 r のものであることを確かめ、Then を呼ぶ。
-// 行の形は、結果の種類と、op が値を返すかだけで決まる。
-func (f *testFile) body(e *entry, r *result, send string) string {
+// wantOK は、正常のケースの確かめの行。
+func (f *testFile) wantOK(e *entry) string {
+	if e.hasValue() {
+		return "httpWantResult(t, res, &got)\n"
+	}
+	return "httpWantResult(t, res, nil)\n"
+}
+
+// written は、人か AI が書いたケース method のテストの中: ケースを取り、送り、応答が、そのケースのものであること（want の行）を確かめ、
+// Then を呼ぶ。head は、送る式の前半。
+func (f *testFile) written(e *entry, method, want, head string) string {
+	fakes := f.g.kit.HasFakes()
 	var b strings.Builder
-	fmt.Fprintf(&b, "k := cases.%s()\nres := %s\n", r.name, send)
-	then, dst := "k.Then(t, res)", "nil"
+	fmt.Fprintf(&b, "k := cases.%s()\n", method)
+	then := "k.Then(t, res"
+	if fakes {
+		fmt.Fprintf(&b, "res, f := %sk, nil)\n", head)
+	} else {
+		fmt.Fprintf(&b, "res := %sk)\n", head)
+	}
 	if e.hasValue() {
 		fmt.Fprintf(&b, "var got %s\n", golang.GoType(e.op.Returns, f.im))
-		then, dst = "k.Then(t, got, res)", "&got"
+		then = "k.Then(t, got, res"
 	}
-	switch r.kind {
-	case resultOK:
-		fmt.Fprintf(&b, "httpWantResult(t, res, %s)\n", dst)
-	case resultBadRequest:
-		b.WriteString("httpWantBadRequest(t, res)\n")
-	case resultStatus:
-		ns := f.g.declNS[r.exception]
-		fmt.Fprintf(&b, "httpWantThrown[%s%s](t, res, %d)\n", f.im.Qualifier(ns), golang.TypeName(r.exception, ns), r.code)
-	case resultInternal:
-		b.WriteString("httpWantInternal(t, res)\n")
+	if fakes {
+		then += ", f"
 	}
-	fmt.Fprintf(&b, "if k.Then != nil {\n%s\n}\n", then)
+	b.WriteString(want)
+	fmt.Fprintf(&b, "if k.Then != nil {\n%s)\n}\n", then)
+	return b.String()
+}
+
+// made は、Hozo が作るケースのテストの中: 正常のケースを取り、その用意の後に、にせものに言い（出どころの Steps を、一行ずつ）、
+// 応答が、その例外のものであること（want の行）を確かめる。Then は、呼ばない。
+func (f *testFile) made(s *source, want, head string) string {
+	var b strings.Builder
+	b.WriteString("k := cases.OK()\n")
+	switch {
+	case !f.g.kit.HasFakes():
+		fmt.Fprintf(&b, "res := %sk)\n", head)
+	case len(s.Steps) == 0:
+		fmt.Fprintf(&b, "res, _ := %sk, nil)\n", head)
+	default:
+		fmt.Fprintf(&b, "res, _ := %sk, func(f *Fakes) {\n", head)
+		for _, st := range s.Steps {
+			at := "f." + strings.Join(st.Path, ".")
+			switch st.Verb {
+			case golang.StepThrows:
+				ns := f.g.declNS[st.Exception]
+				fmt.Fprintf(&b, "%s.Throws(%s%s{})\n", at, f.im.Qualifier(ns), golang.TypeName(st.Exception, ns))
+			case golang.StepReturnsNone:
+				fmt.Fprintf(&b, "%s.Returns(nil)\n", at)
+			case golang.StepReturnsBool:
+				fmt.Fprintf(&b, "%s.Returns(%t)\n", at, st.Bool)
+			case golang.StepIs:
+				ns := f.g.declNS[st.Classify]
+				fmt.Fprintf(&b, "%s.Is(%s%s)\n", at, f.im.Qualifier(ns), golang.CaseConst(golang.TypeName(st.Classify, ns), st.Case))
+			}
+		}
+		b.WriteString("})\n")
+	}
+	b.WriteString(want)
 	return b.String()
 }
 
@@ -438,13 +596,11 @@ func (f *testFile) helpers(entries []entry) string {
 				bodyObj = true
 			}
 		}
-		for _, r := range entries[i].results {
-			switch r.kind {
-			case resultBadRequest:
-				badRequest = true
-			case resultStatus:
+		badRequest = badRequest || entries[i].hasBad
+		for _, gr := range entries[i].groups {
+			if gr.status {
 				thrown = true
-			case resultInternal:
+			} else {
 				internal = true
 			}
 		}

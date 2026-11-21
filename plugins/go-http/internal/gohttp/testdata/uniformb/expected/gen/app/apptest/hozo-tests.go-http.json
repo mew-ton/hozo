@@ -1,12 +1,12 @@
 {
   "tests": [
-    {"name": "app.find/OK", "file": "gen/app/apptest/http.go", "lines": [111, 117]},
-    {"name": "app.find/BadRequest", "file": "gen/app/apptest/http.go", "lines": [120, 126]},
-    {"name": "app.find/Missing", "file": "gen/app/apptest/http.go", "lines": [129, 135]},
-    {"name": "app.put/OK", "file": "gen/app/apptest/http.go", "lines": [150, 156]},
-    {"name": "app.put/BadRequest", "file": "gen/app/apptest/http.go", "lines": [159, 165]},
-    {"name": "app.put/Clash", "file": "gen/app/apptest/http.go", "lines": [168, 174]},
-    {"name": "app.all/OK", "file": "gen/app/apptest/http.go", "lines": [187, 193]},
-    {"name": "app.all/BadRequest", "file": "gen/app/apptest/http.go", "lines": [196, 202]}
+    {"name": "app.find/OK", "file": "gen/app/apptest/http.go", "lines": [114, 120]},
+    {"name": "app.find/BadRequest", "file": "gen/app/apptest/http.go", "lines": [123, 129]},
+    {"name": "app.find/Missing/app.find", "file": "gen/app/apptest/http.go", "lines": [133, 137]},
+    {"name": "app.put/OK", "file": "gen/app/apptest/http.go", "lines": [160, 166]},
+    {"name": "app.put/BadRequest", "file": "gen/app/apptest/http.go", "lines": [169, 175]},
+    {"name": "app.put/Clash/app.put", "file": "gen/app/apptest/http.go", "lines": [179, 183]},
+    {"name": "app.all/OK", "file": "gen/app/apptest/http.go", "lines": [204, 210]},
+    {"name": "app.all/BadRequest", "file": "gen/app/apptest/http.go", "lines": [213, 219]}
   ]
 }

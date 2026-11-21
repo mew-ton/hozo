@@ -4,7 +4,6 @@ package stricttest
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +16,7 @@ import (
 	strict "example.com/app/gen/strict"
 )
 
-// OrderHTTPCases は、入口 strict.order（POST /orders）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// OrderHTTPCases は、入口 strict.order（POST /orders）の、人か AI が書くケース。メソッドごとに、一つ。
 type OrderHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() OrderHTTPCase
@@ -25,19 +24,19 @@ type OrderHTTPCases interface {
 	BadRequest() OrderHTTPCase
 }
 
-// OrderHTTPCase は、入口 strict.order の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// OrderHTTPCase は、入口 strict.order の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type OrderHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In strict.OrderInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got int64, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got int64, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// EditHTTPCases は、入口 strict.edit（POST /edit）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// EditHTTPCases は、入口 strict.edit（POST /edit）の、人か AI が書くケース。メソッドごとに、一つ。
 type EditHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() EditHTTPCase
@@ -45,19 +44,19 @@ type EditHTTPCases interface {
 	BadRequest() EditHTTPCase
 }
 
-// EditHTTPCase は、入口 strict.edit の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// EditHTTPCase は、入口 strict.edit の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type EditHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In strict.EditInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答。
-	Then func(t *testing.T, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// BulkHTTPCases は、入口 strict.bulk（POST /bulk）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// BulkHTTPCases は、入口 strict.bulk（POST /bulk）の、人か AI が書くケース。メソッドごとに、一つ。
 type BulkHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() BulkHTTPCase
@@ -65,50 +64,50 @@ type BulkHTTPCases interface {
 	BadRequest() BulkHTTPCase
 }
 
-// BulkHTTPCase は、入口 strict.bulk の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// BulkHTTPCase は、入口 strict.bulk の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type BulkHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In strict.BulkInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答。
-	Then func(t *testing.T, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// PlainHTTPCases は、入口 strict.plain（GET /plain）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// PlainHTTPCases は、入口 strict.plain（GET /plain）の、人か AI が書くケース。メソッドごとに、一つ。
 type PlainHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() PlainHTTPCase
 }
 
-// PlainHTTPCase は、入口 strict.plain の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// PlainHTTPCase は、入口 strict.plain の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type PlainHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In strict.PlainInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got string, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got string, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// NowHTTPCases は、入口 strict.now（GET /now）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// NowHTTPCases は、入口 strict.now（GET /now）の、人か AI が書くケース。メソッドごとに、一つ。
 type NowHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() NowHTTPCase
 }
 
-// NowHTTPCase は、入口 strict.now の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// NowHTTPCase は、入口 strict.now の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type NowHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got string, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got string, res *httptest.ResponseRecorder, f *Fakes)
 }
 
 // HTTPCases は、@http.get / @http.post の付いた op の、インテグレーションテストのケース。入口ごとに、メソッド一つ（宣言順）。
@@ -121,118 +120,154 @@ type HTTPCases interface {
 	Now() NowHTTPCases
 }
 
-// RunHTTP は、入口ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。
-// ケースごとに、入力を要求に組み立てて handler に送り、応答が、そのケースのものであること（ステータスと、本文の形）を確かめてから、Then を呼ぶ。
-func RunHTTP(t *testing.T, handler http.Handler, c HTTPCases) {
+// RunHTTP は、入口ごと、結果ごとに、テストを走らせる。テストの名前は、<op の FQN>/<結果>。例外は、出どころごとに、<op の FQN>/<例外>/<出どころ>。
+// ケースごとに、新しいにせものの上に、流れを組み立て（NewOps）、入力を要求に組み立てて送り、応答が、そのケースのものであること
+// （ステータスと、本文の形）を確かめてから、Then を呼ぶ。口にない、例外のケースは、正常のケースの用意の後に、にせものに、例外を起こさせる。
+func RunHTTP(t *testing.T, leaves strict.Leaves, c HTTPCases) {
 	t.Run("strict.order", func(t *testing.T) {
 		cases := c.Order()
-		send := func(t *testing.T, k OrderHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k OrderHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/orders"}
 			call.header("Authorization", k.In.Token)
 			call.body("lines", k.In.Lines)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, strict.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got int64
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got int64
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
 	t.Run("strict.edit", func(t *testing.T) {
 		cases := c.Edit()
-		send := func(t *testing.T, k EditHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k EditHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/edit"}
 			call.query("page", k.In.Page)
 			call.header("X-Name", k.In.Name)
 			call.body("item", k.In.Item)
 			call.body("more", k.In.Extra)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, strict.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantResult(t, res, nil)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 	})
 	t.Run("strict.bulk", func(t *testing.T) {
 		cases := c.Bulk()
-		send := func(t *testing.T, k BulkHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k BulkHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/bulk"}
 			call.bodyObj(k.In.Payload)
 			call.queryObj(k.In.Paging)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, strict.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantResult(t, res, nil)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 	})
 	t.Run("strict.plain", func(t *testing.T) {
 		cases := c.Plain()
-		send := func(t *testing.T, k PlainHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k PlainHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/plain"}
 			call.query("id", k.In.Id)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, strict.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got string
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
 	t.Run("strict.now", func(t *testing.T) {
 		cases := c.Now()
-		send := func(t *testing.T, k NowHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k NowHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/now"}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, strict.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got string
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
@@ -292,8 +327,8 @@ func (c *httpCall) bodyObj(v any) {
 	c.whole = v
 }
 
-// send は、要求を組み立てて handler に送り、応答を返す。送る前に、given（今の状態の用意）と、edit（要求の手直し）を、この順に呼ぶ（nil なら、呼ばない）。
-func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx context.Context) error, edit func(r *http.Request)) *httptest.ResponseRecorder {
+// send は、要求を組み立てて handler に送り、応答を返す。送る前に、edit（要求の手直し）を呼ぶ（nil なら、呼ばない）。
+func (c *httpCall) send(t *testing.T, handler http.Handler, edit func(r *http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	target := c.path
 	if len(c.values) > 0 {
@@ -330,11 +365,6 @@ func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx conte
 	}
 	if c.hasBody {
 		r.Header.Set("Content-Type", "application/json")
-	}
-	if given != nil {
-		if err := given(context.Background()); err != nil {
-			t.Fatalf("given: %v", err)
-		}
 	}
 	if edit != nil {
 		edit(r)

@@ -90,12 +90,15 @@ func TestPlacement(t *testing.T) {
 		"gen/api/http.go":               "package api\n",
 		"gen/strict/http.go":            "package strict\n",
 		"gen/bare/http.go":              "package bare\n",
+		"gen/flow/http.go":              "package flow\n",
+		"gen/flow/flowtest/http.go":     "package flowtest\n",
 		"gen/api/apitest/http.go":       "package apitest\n",
 		"gen/strict/stricttest/http.go": "package stricttest\n",
 		"gen/bare/baretest/http.go":     "package baretest\n",
 	}
 	// テストのパッケージの http.go ごとに、同じディレクトリに、テストの対応表が一つ
-	maps := []string{"gen/api/apitest/hozo-tests.go-http.json", "gen/strict/stricttest/hozo-tests.go-http.json", "gen/bare/baretest/hozo-tests.go-http.json"}
+	maps := []string{"gen/api/apitest/hozo-tests.go-http.json", "gen/strict/stricttest/hozo-tests.go-http.json", "gen/bare/baretest/hozo-tests.go-http.json",
+		"gen/flow/flowtest/hozo-tests.go-http.json"}
 	for _, p := range maps {
 		if files[p] == "" {
 			t.Errorf("テストの対応表 %s を出していない", p)

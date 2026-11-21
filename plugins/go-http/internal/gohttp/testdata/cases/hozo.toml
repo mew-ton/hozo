@@ -19,3 +19,9 @@ out         = "gen/app"
 namespace   = "wired"
 transpilers = ["go", "go-valid", "go-http"]
 out         = "gen/wired"
+
+# にせものにするものがない出力: 口は、Fakes を使わない形（docs/plugin-go-http.md「インテグレーションテストの口」の「口の形」）
+[[emit]]
+namespace   = "plain"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/plain"

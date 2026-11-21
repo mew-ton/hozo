@@ -31,3 +31,9 @@ out         = "gen/bare"
 
 [emit.options.go-http]
 validate = true
+
+# 5: 配線の入口（状態の単位と、分類の述語を持つ）: Hozo が作る、例外のケースを、走らせる（flowcases_test.go）
+[[emit]]
+namespace   = "flow"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/flow"

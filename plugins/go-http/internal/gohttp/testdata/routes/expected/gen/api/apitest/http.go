@@ -4,7 +4,6 @@ package apitest
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -19,137 +18,121 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// HealthHTTPCases は、入口 api.health（GET /health）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// HealthHTTPCases は、入口 api.health（GET /health）の、人か AI が書くケース。メソッドごとに、一つ。
 type HealthHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() HealthHTTPCase
 }
 
-// HealthHTTPCase は、入口 api.health の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// HealthHTTPCase は、入口 api.health の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type HealthHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got string, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got string, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// CreateHTTPCases は、入口 api.create（POST /items）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// CreateHTTPCases は、入口 api.create（POST /items）の、人か AI が書くケース。メソッドごとに、一つ。
 type CreateHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() CreateHTTPCase
 	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
 	BadRequest() CreateHTTPCase
-	// Conflict は、例外 type.Conflict を投げるケース: 409。
-	Conflict() CreateHTTPCase
-	// Rejected は、例外 type.Rejected を投げるケース: 422。
-	Rejected() CreateHTTPCase
 }
 
-// CreateHTTPCase は、入口 api.create の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// CreateHTTPCase は、入口 api.create の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type CreateHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In api.CreateInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got pkgtype.Item, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got pkgtype.Item, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// SearchHTTPCases は、入口 api.search（GET /items）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// SearchHTTPCases は、入口 api.search（GET /items）の、人か AI が書くケース。メソッドごとに、一つ。
 type SearchHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() SearchHTTPCase
 	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
 	BadRequest() SearchHTTPCase
-	// Broken は、例外 type.Broken を投げるケース: 500（@http.status を持たない例外は、中身を出さない）。
-	Broken() SearchHTTPCase
-	// Leaky は、例外 type.Leaky を投げるケース: 500（@http.status を持たない例外は、中身を出さない）。
-	Leaky() SearchHTTPCase
 }
 
-// SearchHTTPCase は、入口 api.search の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// SearchHTTPCase は、入口 api.search の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type SearchHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In api.SearchInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got []pkgtype.Item, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got []pkgtype.Item, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// FirstHTTPCases は、入口 api.first（GET /items/first）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// FirstHTTPCases は、入口 api.first（GET /items/first）の、人か AI が書くケース。メソッドごとに、一つ。
 type FirstHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() FirstHTTPCase
 	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
 	BadRequest() FirstHTTPCase
-	// NotFound は、例外 type.NotFound を投げるケース: 404。
-	NotFound() FirstHTTPCase
-	// Limited は、例外 type.Limited を投げるケース: 429。
-	Limited() FirstHTTPCase
-	// Gone は、例外 type.Gone を投げるケース: 410。
-	Gone() FirstHTTPCase
 }
 
-// FirstHTTPCase は、入口 api.first の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// FirstHTTPCase は、入口 api.first の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type FirstHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In pkgtype.Lookup
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got *pkgtype.Item, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got *pkgtype.Item, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// ReplaceHTTPCases は、入口 api.replace（POST /items/replace）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// ReplaceHTTPCases は、入口 api.replace（POST /items/replace）の、人か AI が書くケース。メソッドごとに、一つ。
 type ReplaceHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() ReplaceHTTPCase
 	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
 	BadRequest() ReplaceHTTPCase
-	// NotFound は、例外 type.NotFound を投げるケース: 404。
-	NotFound() ReplaceHTTPCase
 }
 
-// ReplaceHTTPCase は、入口 api.replace の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// ReplaceHTTPCase は、入口 api.replace の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type ReplaceHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In api.ReplaceInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答。
-	Then func(t *testing.T, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// ListAllHTTPCases は、入口 api.listAll（GET /list）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// ListAllHTTPCases は、入口 api.listAll（GET /list）の、人か AI が書くケース。メソッドごとに、一つ。
 type ListAllHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() ListAllHTTPCase
 }
 
-// ListAllHTTPCase は、入口 api.listAll の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// ListAllHTTPCase は、入口 api.listAll の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type ListAllHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In api.ListInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got api.Counts, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got api.Counts, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// PutHTTPCases は、入口 api.put（POST /put）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// PutHTTPCases は、入口 api.put（POST /put）の、人か AI が書くケース。メソッドごとに、一つ。
 type PutHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() PutHTTPCase
@@ -157,64 +140,64 @@ type PutHTTPCases interface {
 	BadRequest() PutHTTPCase
 }
 
-// PutHTTPCase は、入口 api.put の、ケース一つ: 入力と、今の状態の用意と、足りない確かめ。
+// PutHTTPCase は、入口 api.put の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
 type PutHTTPCase struct {
 	// In は、入力。走らせる側が、要求に組み立てる。
 	In api.PutInput
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got *pkgtype.Token, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got *pkgtype.Token, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// ResetHTTPCases は、入口 api.reset（POST /reset/）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// ResetHTTPCases は、入口 api.reset（POST /reset/）の、人か AI が書くケース。メソッドごとに、一つ。
 type ResetHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() ResetHTTPCase
 }
 
-// ResetHTTPCase は、入口 api.reset の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// ResetHTTPCase は、入口 api.reset の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type ResetHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答。
-	Then func(t *testing.T, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// PingHTTPCases は、入口 api.ping（GET /ping、POST /ping）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// PingHTTPCases は、入口 api.ping（GET /ping、POST /ping）の、人か AI が書くケース。メソッドごとに、一つ。
 type PingHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() PingHTTPCase
 }
 
-// PingHTTPCase は、入口 api.ping の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// PingHTTPCase は、入口 api.ping の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type PingHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got bool, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got bool, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// CountHTTPCases は、入口 api.count（GET /count）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// CountHTTPCases は、入口 api.count（GET /count）の、人か AI が書くケース。メソッドごとに、一つ。
 type CountHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() CountHTTPCase
 }
 
-// CountHTTPCase は、入口 api.count の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// CountHTTPCase は、入口 api.count の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type CountHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got int64, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got int64, res *httptest.ResponseRecorder, f *Fakes)
 }
 
 // HTTPCases は、@http.get / @http.post の付いた op の、インテグレーションテストのケース。入口ごとに、メソッド一つ（宣言順）。
@@ -232,28 +215,43 @@ type HTTPCases interface {
 	Count() CountHTTPCases
 }
 
-// RunHTTP は、入口ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。
-// ケースごとに、入力を要求に組み立てて handler に送り、応答が、そのケースのものであること（ステータスと、本文の形）を確かめてから、Then を呼ぶ。
-func RunHTTP(t *testing.T, handler http.Handler, c HTTPCases) {
+// RunHTTP は、入口ごと、結果ごとに、テストを走らせる。テストの名前は、<op の FQN>/<結果>。例外は、出どころごとに、<op の FQN>/<例外>/<出どころ>。
+// ケースごとに、新しいにせものの上に、流れを組み立て（NewOps）、入力を要求に組み立てて送り、応答が、そのケースのものであること
+// （ステータスと、本文の形）を確かめてから、Then を呼ぶ。口にない、例外のケースは、正常のケースの用意の後に、にせものに、例外を起こさせる。
+func RunHTTP(t *testing.T, leaves api.Leaves, c HTTPCases) {
 	t.Run("api.health", func(t *testing.T) {
 		cases := c.Health()
-		send := func(t *testing.T, k HealthHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k HealthHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/health"}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got string
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
 	t.Run("api.create", func(t *testing.T) {
 		cases := c.Create()
-		send := func(t *testing.T, k CreateHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k CreateHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/items"}
 			call.header("X-Tenant", k.In.Tenant)
 			call.header("Authorization", k.In.Token)
@@ -271,48 +269,55 @@ func RunHTTP(t *testing.T, handler http.Handler, c HTTPCases) {
 			call.body("timeout", k.In.Timeout)
 			call.body("wait", k.In.Wait)
 			call.body("owner", k.In.Owner)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got pkgtype.Item
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got pkgtype.Item
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Conflict", func(t *testing.T) {
-			k := cases.Conflict()
-			res := send(t, k)
-			var got pkgtype.Item
-			httpWantThrown[pkgtype.Conflict](t, res, 409)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("api.create", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.Create.Throws(pkgtype.Conflict{})
+				})
+				httpWantThrown[pkgtype.Conflict](t, res, 409)
+			})
 		})
 		t.Run("Rejected", func(t *testing.T) {
-			k := cases.Rejected()
-			res := send(t, k)
-			var got pkgtype.Item
-			httpWantThrown[pkgtype.Rejected](t, res, 422)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("api.create", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.Create.Throws(pkgtype.Rejected{})
+				})
+				httpWantThrown[pkgtype.Rejected](t, res, 422)
+			})
 		})
 	})
 	t.Run("api.search", func(t *testing.T) {
 		cases := c.Search()
-		send := func(t *testing.T, k SearchHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k SearchHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/items"}
 			call.query("q", k.In.Q)
 			call.query("n", k.In.Name)
@@ -330,231 +335,281 @@ func RunHTTP(t *testing.T, handler http.Handler, c HTTPCases) {
 			call.query("deep", k.In.Deep)
 			call.query("flag", k.In.Flag)
 			call.query("factor", k.In.Factor)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got []pkgtype.Item
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got []pkgtype.Item
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("Broken", func(t *testing.T) {
-			k := cases.Broken()
-			res := send(t, k)
-			var got []pkgtype.Item
-			httpWantInternal(t, res)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("api.search", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.Search.Throws(pkgtype.Broken{})
+				})
+				httpWantInternal(t, res)
+			})
 		})
 		t.Run("Leaky", func(t *testing.T) {
-			k := cases.Leaky()
-			res := send(t, k)
-			var got []pkgtype.Item
-			httpWantInternal(t, res)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("api.search", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.Search.Throws(pkgtype.Leaky{})
+				})
+				httpWantInternal(t, res)
+			})
 		})
 	})
 	t.Run("api.first", func(t *testing.T) {
 		cases := c.First()
-		send := func(t *testing.T, k FirstHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k FirstHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/items/first"}
 			call.query("id", k.In.Id)
 			call.header("X-Trace", k.In.Trace)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got *pkgtype.Item
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got *pkgtype.Item
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("NotFound", func(t *testing.T) {
-			k := cases.NotFound()
-			res := send(t, k)
-			var got *pkgtype.Item
-			httpWantThrown[pkgtype.NotFound](t, res, 404)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("api.first", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.First.Throws(pkgtype.NotFound{})
+				})
+				httpWantThrown[pkgtype.NotFound](t, res, 404)
+			})
 		})
 		t.Run("Limited", func(t *testing.T) {
-			k := cases.Limited()
-			res := send(t, k)
-			var got *pkgtype.Item
-			httpWantThrown[pkgtype.Limited](t, res, 429)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("api.first", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.First.Throws(pkgtype.Limited{})
+				})
+				httpWantThrown[pkgtype.Limited](t, res, 429)
+			})
 		})
 		t.Run("Gone", func(t *testing.T) {
-			k := cases.Gone()
-			res := send(t, k)
-			var got *pkgtype.Item
-			httpWantThrown[pkgtype.Gone](t, res, 410)
-			if k.Then != nil {
-				k.Then(t, got, res)
-			}
+			t.Run("api.first", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.First.Throws(pkgtype.Gone{})
+				})
+				httpWantThrown[pkgtype.Gone](t, res, 410)
+			})
 		})
 	})
 	t.Run("api.replace", func(t *testing.T) {
 		cases := c.Replace()
-		send := func(t *testing.T, k ReplaceHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k ReplaceHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/items/replace"}
 			call.body("items", k.In.Items)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantResult(t, res, nil)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 		t.Run("NotFound", func(t *testing.T) {
-			k := cases.NotFound()
-			res := send(t, k)
-			httpWantThrown[pkgtype.NotFound](t, res, 404)
-			if k.Then != nil {
-				k.Then(t, res)
-			}
+			t.Run("api.replace", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.Replace.Throws(pkgtype.NotFound{})
+				})
+				httpWantThrown[pkgtype.NotFound](t, res, 404)
+			})
 		})
 	})
 	t.Run("api.listAll", func(t *testing.T) {
 		cases := c.ListAll()
-		send := func(t *testing.T, k ListAllHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k ListAllHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/list"}
 			call.headerObj(k.In.Meta)
 			call.queryObj(k.In.Paging)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got api.Counts
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
 	t.Run("api.put", func(t *testing.T) {
 		cases := c.Put()
-		send := func(t *testing.T, k PutHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k PutHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/put"}
 			call.bodyObj(k.In.Item)
 			call.header("X-Tenant", k.In.Tenant)
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got *pkgtype.Token
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 		t.Run("BadRequest", func(t *testing.T) {
 			k := cases.BadRequest()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got *pkgtype.Token
 			httpWantBadRequest(t, res)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
 	t.Run("api.reset", func(t *testing.T) {
 		cases := c.Reset()
-		send := func(t *testing.T, k ResetHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k ResetHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/reset/"}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantResult(t, res, nil)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 	})
 	t.Run("api.ping", func(t *testing.T) {
 		cases := c.Ping()
-		send := func(t *testing.T, method, path string, k PingHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, method, path string, k PingHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: method, path: path}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			t.Run("GET /ping", func(t *testing.T) {
 				k := cases.OK()
-				res := send(t, "GET", "/ping", k)
+				res, f := send(t, "GET", "/ping", k, nil)
 				var got bool
 				httpWantResult(t, res, &got)
 				if k.Then != nil {
-					k.Then(t, got, res)
+					k.Then(t, got, res, f)
 				}
 			})
 			t.Run("POST /ping", func(t *testing.T) {
 				k := cases.OK()
-				res := send(t, "POST", "/ping", k)
+				res, f := send(t, "POST", "/ping", k, nil)
 				var got bool
 				httpWantResult(t, res, &got)
 				if k.Then != nil {
-					k.Then(t, got, res)
+					k.Then(t, got, res, f)
 				}
 			})
 		})
 	})
 	t.Run("api.count", func(t *testing.T) {
 		cases := c.Count()
-		send := func(t *testing.T, k CountHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k CountHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/count"}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, api.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got int64
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
@@ -617,8 +672,8 @@ func (c *httpCall) bodyObj(v any) {
 	c.whole = v
 }
 
-// send は、要求を組み立てて handler に送り、応答を返す。送る前に、given（今の状態の用意）と、edit（要求の手直し）を、この順に呼ぶ（nil なら、呼ばない）。
-func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx context.Context) error, edit func(r *http.Request)) *httptest.ResponseRecorder {
+// send は、要求を組み立てて handler に送り、応答を返す。送る前に、edit（要求の手直し）を呼ぶ（nil なら、呼ばない）。
+func (c *httpCall) send(t *testing.T, handler http.Handler, edit func(r *http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	target := c.path
 	if len(c.values) > 0 {
@@ -655,11 +710,6 @@ func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx conte
 	}
 	if c.hasBody {
 		r.Header.Set("Content-Type", "application/json")
-	}
-	if given != nil {
-		if err := given(context.Background()); err != nil {
-			t.Fatalf("given: %v", err)
-		}
 	}
 	if edit != nil {
 		edit(r)

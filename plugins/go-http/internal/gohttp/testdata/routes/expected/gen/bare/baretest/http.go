@@ -4,63 +4,62 @@ package baretest
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"testing"
+
+	bare "example.com/app/gen/bare"
 )
 
-// RootHTTPCases は、入口 bare.root（GET /）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// RootHTTPCases は、入口 bare.root（GET /）の、人か AI が書くケース。メソッドごとに、一つ。
 type RootHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() RootHTTPCase
 }
 
-// RootHTTPCase は、入口 bare.root の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// RootHTTPCase は、入口 bare.root の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type RootHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got string, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got string, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// TouchHTTPCases は、入口 bare.touch（POST /touch）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// TouchHTTPCases は、入口 bare.touch（POST /touch）の、人か AI が書くケース。メソッドごとに、一つ。
 type TouchHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() TouchHTTPCase
-	// Unknown は、例外 bare.Unknown を投げるケース: 500（@http.status を持たない例外は、中身を出さない）。
-	Unknown() TouchHTTPCase
 }
 
-// TouchHTTPCase は、入口 bare.touch の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// TouchHTTPCase は、入口 bare.touch の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type TouchHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答。
-	Then func(t *testing.T, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
-// ViaAliasHTTPCases は、入口 bare.viaAlias（GET /pong）の、結果ごとのケース。結果の数だけ、メソッドがある。
+// ViaAliasHTTPCases は、入口 bare.viaAlias（GET /pong）の、人か AI が書くケース。メソッドごとに、一つ。
 type ViaAliasHTTPCases interface {
 	// OK は、正常に終わるケース: 成功の応答。
 	OK() ViaAliasHTTPCase
 }
 
-// ViaAliasHTTPCase は、入口 bare.viaAlias の、ケース一つ: 今の状態の用意と、足りない確かめ。
+// ViaAliasHTTPCase は、入口 bare.viaAlias の、ケース一つ: 流れの端が返す値と、足りない確かめ。
 type ViaAliasHTTPCase struct {
-	// Given は、要求を送る前に、今の状態を用意する（nil なら、呼ばない）。
-	Given func(ctx context.Context) error
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
 	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
 	Request func(r *http.Request)
-	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答。
-	Then func(t *testing.T, got string, res *httptest.ResponseRecorder)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、成功の応答から読んだ値（正常のケースのほかでは、零値）、res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, got string, res *httptest.ResponseRecorder, f *Fakes)
 }
 
 // HTTPCases は、@http.get / @http.post の付いた op の、インテグレーションテストのケース。入口ごとに、メソッド一つ（宣言順）。
@@ -71,61 +70,84 @@ type HTTPCases interface {
 	ViaAlias() ViaAliasHTTPCases
 }
 
-// RunHTTP は、入口ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。
-// ケースごとに、入力を要求に組み立てて handler に送り、応答が、そのケースのものであること（ステータスと、本文の形）を確かめてから、Then を呼ぶ。
-func RunHTTP(t *testing.T, handler http.Handler, c HTTPCases) {
+// RunHTTP は、入口ごと、結果ごとに、テストを走らせる。テストの名前は、<op の FQN>/<結果>。例外は、出どころごとに、<op の FQN>/<例外>/<出どころ>。
+// ケースごとに、新しいにせものの上に、流れを組み立て（NewOps）、入力を要求に組み立てて送り、応答が、そのケースのものであること
+// （ステータスと、本文の形）を確かめてから、Then を呼ぶ。口にない、例外のケースは、正常のケースの用意の後に、にせものに、例外を起こさせる。
+func RunHTTP(t *testing.T, leaves bare.Leaves, c HTTPCases) {
 	t.Run("bare.root", func(t *testing.T) {
 		cases := c.Root()
-		send := func(t *testing.T, k RootHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k RootHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/"}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, bare.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got string
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
 	t.Run("bare.touch", func(t *testing.T) {
 		cases := c.Touch()
-		send := func(t *testing.T, k TouchHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k TouchHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "POST", path: "/touch"}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, bare.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			httpWantResult(t, res, nil)
 			if k.Then != nil {
-				k.Then(t, res)
+				k.Then(t, res, f)
 			}
 		})
 		t.Run("Unknown", func(t *testing.T) {
-			k := cases.Unknown()
-			res := send(t, k)
-			httpWantInternal(t, res)
-			if k.Then != nil {
-				k.Then(t, res)
-			}
+			t.Run("bare.touch", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.Touch.Throws(bare.Unknown{})
+				})
+				httpWantInternal(t, res)
+			})
 		})
 	})
 	t.Run("bare.viaAlias", func(t *testing.T) {
 		cases := c.ViaAlias()
-		send := func(t *testing.T, k ViaAliasHTTPCase) *httptest.ResponseRecorder {
+		send := func(t *testing.T, k ViaAliasHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
 			call := httpCall{method: "GET", path: "/pong"}
-			return call.send(t, handler, k.Given, k.Request)
+			return call.send(t, bare.NewHandler(NewOps(f, leaves)), k.Request), f
 		}
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			res := send(t, k)
+			res, f := send(t, k, nil)
 			var got string
 			httpWantResult(t, res, &got)
 			if k.Then != nil {
-				k.Then(t, got, res)
+				k.Then(t, got, res, f)
 			}
 		})
 	})
@@ -147,8 +169,8 @@ type httpItem struct {
 	value any
 }
 
-// send は、要求を組み立てて handler に送り、応答を返す。送る前に、given（今の状態の用意）と、edit（要求の手直し）を、この順に呼ぶ（nil なら、呼ばない）。
-func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx context.Context) error, edit func(r *http.Request)) *httptest.ResponseRecorder {
+// send は、要求を組み立てて handler に送り、応答を返す。送る前に、edit（要求の手直し）を呼ぶ（nil なら、呼ばない）。
+func (c *httpCall) send(t *testing.T, handler http.Handler, edit func(r *http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	target := c.path
 	if len(c.values) > 0 {
@@ -185,11 +207,6 @@ func (c *httpCall) send(t *testing.T, handler http.Handler, given func(ctx conte
 	}
 	if c.hasBody {
 		r.Header.Set("Content-Type", "application/json")
-	}
-	if given != nil {
-		if err := given(context.Background()); err != nil {
-			t.Fatalf("given: %v", err)
-		}
 	}
 	if edit != nil {
 		edit(r)

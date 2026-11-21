@@ -107,6 +107,15 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		return nil, fmt.Errorf("名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
 	}
 	g.layout = layout // go.mod がなければ nil
+	root_ := root
+	if layout == nil {
+		root_ = "" // go.mod がない: 置き場は、求めない
+	}
+	kit, err := golang.TestKitOf(view, root_)
+	if err != nil {
+		return nil, fmt.Errorf("名前空間 %s の、テストの中の組み立てに使う出力の import パスを求められない: %w", view.Viewer, err)
+	}
+	g.kit = kit
 
 	routes := g.check()
 	entries := g.entries(routes)
@@ -128,6 +137,12 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 	content, err := g.render(routes)
 	if err != nil {
 		return nil, err
+	}
+	if g.kit.Blocked != "" {
+		// テストの中の組み立てを、作れない: 口を出さない（docs/plugin-go-http.md「インテグレーションテストの口」の「置き場と名前」）
+		return &Output{Files: []plugin.File{{Path: path.Join(layout.Dir, FileName), Content: content}},
+			Warnings: []plugin.Warning{{At: view.Viewer,
+				Message: fmt.Sprintf("名前空間 %s の、テストの中の組み立てを作れないので、インテグレーションテストの口（%s/%s）を出さない: %s", view.Viewer, layout.TestName, TestFileName, g.kit.Blocked)}}}, nil
 	}
 	test, err := g.renderTest(entries)
 	if err != nil {
@@ -154,6 +169,8 @@ type generator struct {
 	ns     *ir.Namespace // N
 	opts   options
 	layout *golang.Layout
+	// kit は、N の出力の、テストのにせものと、テストの中の組み立て（docs/plugin-go.md「テストのにせもの」）。
+	kit *golang.TestKit
 
 	declNS map[string]string // 宣言の FQN → 宣言した名前空間
 	files  map[string]bool   // 単位の対象のファイル（View.files）
