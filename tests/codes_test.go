@@ -357,7 +357,7 @@ func TestDiagnosticCodesAreDocumented(t *testing.T) {
 		seen[u.code] = true
 	}
 	// 拾えていることの確かめ: 作り方の違う代表が入っている
-	for _, want := range []string{"SYNTAX", "IO", "PLUGIN", "GO-INTERNAL", "LSP-1", "CFG-7", "CFG-5", "MAN-5", "PLG-1", "PLG-2", "CFG-19", "CFG-22", "THROWS-1", "RES-1", "WIRE-8", "GO-3", "GO-6", "CLI-1"} {
+	for _, want := range []string{"SYNTAX", "IO", "PLUGIN", "GO-INTERNAL", "LSP-1", "CFG-7", "CFG-5", "MAN-5", "PLG-1", "PLG-2", "CFG-19", "CFG-22", "REL-4", "RES-1", "WIRE-8", "GO-3", "GO-6", "CLI-1"} {
 		if !seen[want] {
 			t.Errorf("コードから %s を拾えていない（集め方が合っていない）", want)
 		}

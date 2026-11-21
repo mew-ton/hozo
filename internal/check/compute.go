@@ -235,7 +235,7 @@ type exSource struct {
 	sig *sigState // Sc
 }
 
-// bodyInfo は手順 0 で集めた配線の情報。THROWS-1 と REL-4 が使う。
+// bodyInfo は手順 0 で集めた配線の情報（行と、その Sc、本体から出る例外と、その出どころ）。
 type bodyInfo struct {
 	rows    []row
 	sigs    [][]*sigState         // rows と同じ並びの Sc
@@ -546,11 +546,28 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 			s.succ[e] = ir.Unknown
 		}
 	}
+	c.addWritten(o, s)
 	c.addCarried(o, s)
 	c.bodies[o.Name] = info
 	if emit {
 		checkRel4(o, s, c.r)
-		checkThrows1(c, o, info)
+	}
+}
+
+// addWritten は手順 0（配線の op）の「節に書いた効果」（docs/check.md「Sig(O, v)」）: Op.effects の効果 e のうち、本体が
+// 行き着いていないものを、F の末尾に足す。rel と succ は、葉の op と同じ値（rel は Op.throws の relations から、succ は kept）:
+// 本体は e を行わないので、行の順からは決まらない。本体が、もう行き着いている e は、何も変えない（節に書くのは、その関数が、
+// 自分で足す分。同「状態に触れるもの」の「節に書く要素」）。
+func (c *computer) addWritten(o *ir.Op, s *sigState) {
+	for _, e := range o.Effects {
+		if s.hasF(e) {
+			continue
+		}
+		s.addF(e)
+		for _, x := range s.E {
+			s.setRel(x, e, relationState(o.Throws, x, identity))
+		}
+		s.succ[e] = ir.Kept
 	}
 }
 
@@ -774,7 +791,7 @@ func refTargets(v ir.ArgValue) []string {
 }
 
 // decoratorSets は O に付いたデコレータの ∪Catches(dᵢ)、∪Throws(dᵢ, ns(O))（external の throws を除く）、
-// external の throws（docs/check.md「throws」の THROWS-1 と「名前空間」の DOC-1 が使う）。`$param:` は置き換え済み。
+// external の throws（docs/check.md「名前空間」の DOC-1 が使う）。`$param:` は置き換え済み。
 func (c *computer) decoratorSets(o *ir.Op) (catches, throws, externalThrows []string) {
 	for _, app := range o.Decorators {
 		d, args := c.ix.decorator(app.Decorator)
@@ -852,7 +869,7 @@ func (c *computer) returningArms(r row) int {
 // 要素ごとの状態。read の宣言は、その宛先の状態として数える。STATE-5 に当たった葉は、節に書いた Op.reads を前に並べる）。
 // 呼び出しが循環している op も、葉として同じ（Op.reads の要素の状態の後ろに、運ばれた状態）。
 // 配線の op は、本体を行の順に見て集め（名前で書いた状態、bind で埋まる位置の状態、呼んだ read の宛先の状態、
-// 呼んだ op の R）、その後ろに、運ばれた状態を並べる。
+// 呼んだ op の R）、その後ろに、節に書いた状態（Op.reads）、運ばれた状態を並べる。
 func (c *computer) readsOf(o *ir.Op) []string {
 	if r, ok := c.reads[o.Name]; ok {
 		return r
@@ -872,6 +889,7 @@ func (c *computer) readsOf(o *ir.Op) []string {
 		return out
 	}
 	add(c.stmtReads(o.Body.Statements)...)
+	add(c.ix.readStates(o.Reads)...) // 節に書いた状態は、計算した分に足す（docs/check.md「reads」）
 	add(c.ix.readStates(o.Carried.Reads)...)
 	c.reads[o.Name] = out
 	return out

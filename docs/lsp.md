@@ -122,5 +122,5 @@ Markdown の `MarkupContent`。順に:
 
 - **補完**: 名前の位置で、`docs/resolve.md`「位置ごとに受け付ける種類」に合う名前。別の名前空間のものは修飾した形。
 - **参照の検索**: 宣言から、それを参照しているトークンすべて。
-- **コードアクション**: 診断の `Data` から作る。THROWS-1 → 書いてある `throws` の節に `missing` を足す（THROWS-1 が出るのは、節を書いた配線の op だけ。`docs/check.md`「診断」の「throws」）。READS-2 → `reads` を計算した集合に直す。MATCH-2 → 足りないアームを足す。RES-1 で候補があれば置き換える。NS-5 → 同じプロジェクトの op なら `export` を足す。
+- **コードアクション**: 診断の `Data` から作る。MATCH-2 → 足りないアームを足す。RES-1 で候補があれば置き換える。NS-5 → 同じプロジェクトの op なら `export` を足す。 配線の op の節（`throws`、`reads`、`effects`）を直すコードアクションは、ない: 節と、計算した分を、照合する診断が、なくなった（`docs/decisions.md`「決めたこと」381。THROWS-1、READS-2 は欠番）。
 - **semantic tokens**: 型の位置の名前と値の位置の名前を区別して色を付ける（TextMate では命名規則に頼るしかない部分）。

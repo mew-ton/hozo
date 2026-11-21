@@ -220,11 +220,12 @@ func TestUncoveredNamespace(t *testing.T) {
 	if vs := views[0]["app"].Ops["user.write"]; vs == nil || strings.Join(vs.Exceptions, ",") != "app.Busy" {
 		t.Fatalf("View(app).ops[user.write] = %+v", vs)
 	}
-	// 単位の対象でない名前空間にも検査は同じに掛かる: throws の節が、呼び先の例外を覆わなければ THROWS-1
-	write(t, filepath.Join(dir, "user.hozo"), "namespace user {\n  exception Full;\n  fn write(text: string): throws Full {\n    app.save(text);\n  }\n}\n")
+	// 単位の対象でない名前空間にも検査は同じに掛かる: 効果の後に投げる例外を prevents effects と書けば REL-4
+	write(t, filepath.Join(dir, "user.hozo"), "namespace user {\n  state memo: list<string>;\n  effect fn keep(text: string): effects memo.post;\n"+
+		"  fn write(text: string): throws app.Busy prevents effects {\n    keep(text);\n    app.save(text);\n  }\n}\n")
 	p = Load(dir, "", nil)
-	if got := strings.Join(codes(p.Diags), ","); got != "THROWS-1" {
-		t.Fatalf("codes = %v, want [THROWS-1]\n%s", got, text(p))
+	if got := strings.Join(codes(p.Diags), ","); got != "REL-4" {
+		t.Fatalf("codes = %v, want [REL-4]\n%s", got, text(p))
 	}
 }
 

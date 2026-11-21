@@ -1,0 +1,33 @@
+// STATE-5（docs/check.md「葉の op」「節に書く要素」）: 節を書けないのは、葉の op。配線の op の reads / effects の節は、その関数が、
+// 自分で足す分で、本体と照合しない: 本体が読む状態、行き着く効果、デコレータが運ぶものを、書いていなくてよく（partial）、
+// 本体にないものを書いていてもよい（extra。計算した分に、足される）。それを呼ぶ op（caller）も、同じ
+namespace a {
+  model M { id: string; }
+  state rows: list<M>;
+  state logs: list<M>;
+  state seen: nullable<M>;
+  effect fn add(m: M): effects rows.post;
+  effect fn log(m: M): effects logs.post;
+  read fn byId(id: string): M? reads rows;
+  read fn lastSeen(): M? reads seen;
+  decorator audited for op reads seen effects logs.post;
+  fn pick(a: M?, b: M?): M?;
+  fn partial(m: M): M? reads byId effects add {
+    add(m);
+    log(m);
+    val found = byId(m.id);
+    val last = lastSeen();
+    return pick(found, last);
+  }
+  fn extra(m: M): reads seen effects log, logs.post {
+    add(m);
+  }
+  @audited
+  fn carried(m: M): reads rows effects add {
+    add(m);
+  }
+  fn caller(m: M): effects add {
+    carried(m);
+    extra(m);
+  }
+}

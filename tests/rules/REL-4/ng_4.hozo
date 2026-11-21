@@ -1,0 +1,15 @@
+// REL-4（docs/check.md「節に書く要素」の、上書き）: 呼ぶ先が prevents effects と言った例外を、呼び元が、向きを変えて
+// keeps effects と書いた。呼ぶ先の効果 e は、例外のとき、起きていない（呼ぶ先の言ったとおりに計算される）
+namespace a {
+  state s: list<string>;
+  effect fn e(): effects s.post;
+  exception E;
+  fn fail(): throws E;
+  fn lower(): throws E prevents effects {
+    fail();
+    e();
+  }
+  fn upper(): throws E keeps effects {  // ERROR: REL-4
+    lower();
+  }
+}

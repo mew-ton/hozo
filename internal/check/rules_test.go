@@ -10,8 +10,10 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// TestThrows1 は THROWS-1: Missing = 呼び出し先の例外 − Declared − Catches − Throws。Related に出どころ、Data.missing に FQN。
-func TestThrows1(t *testing.T) {
+// TestWrittenThrows は、配線の op に書いた throws の節（docs/check.md「状態に触れるもの」の「節に書く要素」、「throws」の THROWS-2）:
+// 節に書いた例外は、計算した例外（呼び出し先の例外から、デコレータが吸収したものを除き、足したものを加えたもの）に、足される。
+// 計算した例外を、節に書いていなくても、節に、本体から出ない例外を書いていても、診断は出ない。
+func TestWrittenThrows(t *testing.T) {
 	a := leaf("server.a", nil)
 	a.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y"})}
 	b := leaf("server.b", nil)
@@ -22,58 +24,52 @@ func TestThrows1(t *testing.T) {
 	throwZ.External = true
 	throwZ.Throws = []ir.ThrowsClause{throws([]string{"server.Z"})}
 
-	t.Run("ng", func(t *testing.T) {
+	t.Run("節に書いていない例外も、E に入る。書いた例外は、足される", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.W"})}
 		p := serverWith(a, b, w)
-		d := wantOneCode(t, Checker{Locate: locatorFor()}.Check(p, cfgFor("server")), "THROWS-1")
-		wantStrings(t, "missing", d.Data["missing"].([]string), []string{"server.X", "server.Y", "server.Z"})
-		if len(d.Related) != 4 { // X from a and b, Y from a, Z from b
-			t.Errorf("related = %d, want 4", len(d.Related))
-		}
-		if !strings.Contains(d.Message, "server.w") || !strings.Contains(d.Message, "server.X") {
-			t.Errorf("message = %q", d.Message)
-		}
+		wantCodes(t, Checker{Locate: locatorFor()}.Check(p, cfgFor("server")))
+		wantStrings(t, "w.E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Y", "server.Z", "server.W"})
 	})
-	t.Run("節を書かない配線には出さない (docs/check.md「節に書く要素」)", func(t *testing.T) {
+	t.Run("節を書かない配線", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
 		outer := wire("server.outer", nil, nil, cs(call("server.w")))
 		p := serverWith(a, b, w, outer)
-		wantNoCode(t, Check(p, cfgFor("server")), "THROWS-1")
+		wantCodes(t, Check(p, cfgFor("server")))
 		wantStrings(t, "w.E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Y", "server.Z"})
 		wantStrings(t, "outer.E", sigOf(t, p, "server.outer").Exceptions, []string{"server.X", "server.Y", "server.Z"})
 	})
-	t.Run("節を書かない配線の例外も、節を書いた呼び出し元は覆う", func(t *testing.T) {
+	t.Run("節を書かない配線の例外を、節を書いた呼び出し元が、書いていなくてよい", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")))
 		outer := wire("server.outer", nil, nil, cs(call("server.w")))
 		outer.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
-		d := wantOneCode(t, Check(serverWith(a, w, outer), cfgFor("server")), "THROWS-1")
-		wantStrings(t, "missing", d.Data["missing"].([]string), []string{"server.Y"})
-		if !strings.Contains(d.Message, "server.outer") {
-			t.Errorf("message = %q", d.Message)
-		}
+		p := serverWith(a, w, outer)
+		wantCodes(t, Check(p, cfgFor("server")))
+		wantStrings(t, "outer.E", sigOf(t, p, "server.outer").Exceptions, []string{"server.X", "server.Y"})
 	})
-	t.Run("ok", func(t *testing.T) {
+	t.Run("デコレータが吸収した例外は、E から除かれる", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Z"})}
 		w.Decorators = []ir.Application{app("server.throwZ"), app("server.catchY")}
 		p := serverWith(a, b, catchY, throwZ, w)
-		diags := Check(p, cfgFor("server"))
-		wantNoCode(t, diags, "THROWS-1")
+		wantCodes(t, Check(p, cfgFor("server")))
 		wantStrings(t, "E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Z"})
 	})
-	t.Run("external throws do not cover the body (docs/check.md「throws」)", func(t *testing.T) {
-		// external なデコレータの throws は Sig(O, ns(O)) に入らない（DEC-10）ので、THROWS-1 の差し引きにも数えない。
+	t.Run("external throws are not added inside (docs/check.md「throws」)", func(t *testing.T) {
+		// external なデコレータの throws は Sig(O, ns(O)) に入らない（DEC-10）。本体から出る Z は、節に書いていなくても、E に入る
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 		w.Decorators = []ir.Application{app("server.throwZ"), app("server.catchY")}
 		p := serverWith(a, b, catchY, throwZ, w)
-		wantOneCode(t, Check(p, cfgFor("server")), "THROWS-1")
+		wantCodes(t, Check(p, cfgFor("server")))
+		wantStrings(t, "E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Z"})
 	})
 	t.Run("over-declared is allowed (THROWS-2)", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y", "server.W"})}
-		wantNoCode(t, Check(serverWith(a, w), cfgFor("server")), "THROWS-1")
+		p := serverWith(a, w)
+		wantCodes(t, Check(p, cfgFor("server")))
+		wantStrings(t, "E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Y", "server.W"})
 	})
 }
 
@@ -125,28 +121,54 @@ func TestRel4(t *testing.T) {
 	wantNoCode(t, Check(mk(throws([]string{"server.X"}), "server.a", "server.b"), cfgFor("server")), "REL-4")
 }
 
-// TestEff2 は EFF-2: 配線の effects が伝播した効果と集合として等しくない。Data.missing / Data.extra。
-func TestEff2(t *testing.T) {
+// TestWrittenEffects は、配線の op に書いた effects の節（docs/check.md「Sig(O, v)」の手順 0 の「節に書いた効果」）: 本体が行き着く
+// 効果を、書いていなくてよく、本体が行き着かない効果を書けば、F の末尾に足される。足した効果の rel は、葉と同じに、
+// throws の relations から決まり、succ は kept。本体が、もう行き着いている効果を書いても、何も変わらない。
+func TestWrittenEffects(t *testing.T) {
 	a := leaf("server.a", nil)
 	a.Effects = ir.NamedEffects("server.e1", "server.e2")
+	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
 	w := wire("server.w", nil, nil, cs(call("server.a")))
 	w.Effects = ir.NamedEffects("server.e2", "server.e3")
-	d := wantOneCode(t, Check(serverWith(a, w), cfgFor("server")), "EFF-2")
-	wantStrings(t, "missing", d.Data["missing"].([]string), []string{"server.e1"})
-	wantStrings(t, "extra", d.Data["extra"].([]string), []string{"server.e3"})
-	w.Effects = ir.NamedEffects("server.e2", "server.e1") // 順序は問わない
-	wantNoCode(t, Check(serverWith(a, w), cfgFor("server")), "EFF-2")
-	w.Effects = nil // 省略は検査しない
-	wantNoCode(t, Check(serverWith(a, w), cfgFor("server")), "EFF-2")
-	// halts の効果も伝播した効果に含まれる
+	p := serverWith(a, w)
+	wantCodes(t, Check(p, cfgFor("server")))
+	sig := sigOf(t, p, "server.w")
+	wantStrings(t, "F（本体の e1、e2 の後ろに、書いた e3）", effectNames(sig.Effects), []string{"server.e1", "server.e2", "server.e3"})
+	// 本体が行き着く e2 は、書いても、本体から決めた状態のまま。足した e3 は、関係を書いていないので unknown
+	for e, want := range map[string]ir.EffectState{"server.e1": ir.Prevented, "server.e2": ir.Prevented, "server.e3": ir.Unknown} {
+		if got := relOf(t, sig, "server.X", e); got != want {
+			t.Errorf("rel(X, %s) = %s, want %s", e, got, want)
+		}
+	}
+	if got := succOf(t, sig, "server.e3"); got != ir.Kept {
+		t.Errorf("succ(e3) = %s, want kept", got)
+	}
+	// 関係を付けて書けば、足した効果の rel は、書いたとおり（REL-4 にも当たらない: 本体の e1、e2 も prevented）
+	w.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
+	p = serverWith(a, w)
+	wantCodes(t, Check(p, cfgFor("server")))
+	if got := relOf(t, sigOf(t, p, "server.w"), "server.X", "server.e3"); got != ir.Prevented {
+		t.Errorf("rel(X, e3) = %s, want prevented（書いた prevents）", got)
+	}
+	// 呼び出し元へも、伝わる
+	outer := wire("server.outer", nil, nil, cs(call("server.w")))
+	p = serverWith(a, w, outer)
+	wantCodes(t, Check(p, cfgFor("server")))
+	wantStrings(t, "outer.F", effectNames(sigOf(t, p, "server.outer").Effects), []string{"server.e1", "server.e2", "server.e3"})
+	// 節を書かなければ、本体の分だけ
+	w.Effects, w.Throws = nil, nil
+	p = serverWith(a, w)
+	wantCodes(t, Check(p, cfgFor("server")))
+	wantStrings(t, "F（節なし）", effectNames(sigOf(t, p, "server.w").Effects), []string{"server.e1", "server.e2"})
+	// halts の効果は、デコレータが足す: 節に書いていなくてよい
 	h := decorator("server.halt")
 	h.Catches = []ir.CatchesClause{catches(ir.Halts, "server.h", "server.X")}
-	a.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	w2 := wire("server.w2", nil, nil, cs(call("server.a")))
 	w2.Decorators = []ir.Application{app("server.halt")}
 	w2.Effects = ir.NamedEffects("server.e1", "server.e2")
-	d2 := wantOneCode(t, Check(serverWith(a, h, w2), cfgFor("server")), "EFF-2")
-	wantStrings(t, "missing (halts)", d2.Data["missing"].([]string), []string{"server.h"})
+	p = serverWith(a, h, w2)
+	wantCodes(t, Check(p, cfgFor("server")))
+	wantStrings(t, "F（halts）", effectNames(sigOf(t, p, "server.w2").Effects), []string{"server.e1", "server.e2", "server.h"})
 }
 
 // TestState2 は STATE-2 のうち、このパッケージが出す分: デコレータの halts の効果が、付けた op の名前空間と違う。
@@ -177,7 +199,6 @@ func TestState2(t *testing.T) {
 	if !strings.Contains(s2[0].Message, "browser.m") {
 		t.Errorf("STATE-2 message: %q", s2[0].Message)
 	}
-	wantNoCode(t, diags, "EFF-2")
 }
 
 // TestDec6And14 は DEC-6（catches と throws に同じ例外）と DEC-14（external なのに throws がない）。別名の宣言は対象外。

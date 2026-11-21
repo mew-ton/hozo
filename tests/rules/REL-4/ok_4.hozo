@@ -1,0 +1,40 @@
+// REL-4（docs/check.md「節に書く要素」）: 節に書くのは、その関数が、自分で足す分。配線の op は、関係を言う例外だけを、節に
+// 書ける: 伝わってくるほかの例外（F、G）を、書いていなくてよい（足りない、のエラーは、ない）。伝わってくる例外を、関係なしで
+// 書いても（echo）、本体にない例外を書いても（extra）、通る。デコレータが吸収する例外、external なデコレータの例外も、
+// 書いていなくてよい
+namespace a {
+  state s: list<string>;
+  effect fn e(): effects s.post;
+  exception E;
+  exception F;
+  exception G;
+  exception H;
+  fn failE(): throws E;
+  fn failF(): throws F;
+  fn failG(): throws G;
+  decorator absorb catches G ignores;
+  @external
+  decorator boundary throws H;
+  fn only(): throws E prevents effects {
+    failE();
+    failF();
+    e();
+  }
+  fn echo(): throws F {
+    failE();
+    failF();
+  }
+  fn extra(): throws H {
+    failE();
+  }
+  @absorb
+  fn absorbed(): throws F {
+    failF();
+    failG();
+  }
+  @boundary
+  fn edge(): throws F {
+    failF();
+    failE();
+  }
+}

@@ -34,7 +34,7 @@ func (s Severity) MarshalText() ([]byte, error) {
 // Diagnostic は一件の診断（docs/diagnostics.md「構造」）。
 type Diagnostic struct {
 	Severity Severity
-	// Code は規則の ID（"THROWS-1"、"RES-1"、"SYNTAX"、"PLUGIN"）。
+	// Code は規則の ID（"REL-4"、"RES-1"、"SYNTAX"、"PLUGIN"）。
 	Code string
 	// Message は一文。何が、どこで、どう違うか。名前は FQN で。
 	Message string

@@ -178,7 +178,7 @@ func TestModelCorpus(t *testing.T) {
 			},
 			Succ: []string{"shop.createOrder = kept", "carrier.accept = kept"},
 		})
-		// 単位の対象でない customer の配線が、対象の shop の op を呼ぶ。検査（THROWS-1 など）は同じに掛かり、Signature も計算される
+		// 単位の対象でない customer の配線が、対象の shop の op を呼ぶ。検査は同じに掛かり、Signature も計算される
 		expect(t, "buy の Signature", sigOf(opOf(t, prog, "customer.buy").Signature), sig{
 			E: []string{"shop.OutOfStock", "marks.NotApproved", "carrier.Closed"},
 			F: []string{"customer.forget", "shop.addLine", "shop.createOrder", "carrier.accept"},

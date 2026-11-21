@@ -12,7 +12,7 @@
 // 診断の位置は IR の Span（ファイルのパスと行・列）から作る。診断の Span はバイトのオフセットなので、
 // Checker.Locate（FileSetLocator）で直す。Locate がなければ Span は nil で、File に IR のファイルのパスを置く。
 //
-// 規則ごとに一つの関数で、ファイルは節ごと: throws.go（THROWS-1、REL-*）、effects.go（STATE-2 の halts の効果の分、EFF-2、READS-2）、
+// 規則ごとに一つの関数で、ファイルは節ごと: throws.go（REL-*）、effects.go（STATE-2 の halts の効果の分）、
 // decorator.go（DEC-*）、wiring.go（WIRE-6、WIRE-7）、bind.go（BIND-*）、namespace.go（DOC-1）、cfg.go（CFG-*）。
-// 計算の途中でしか分からない規則（THROWS-1、REL-4、DEC-5、DEC-16、WIRE-7）は compute.go から呼ばれる。
+// 計算の途中でしか分からない規則（REL-4、DEC-5、DEC-16、WIRE-7）は compute.go から呼ばれる。
 package check

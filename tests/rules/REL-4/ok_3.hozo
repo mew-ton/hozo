@@ -1,0 +1,26 @@
+// REL-4（docs/check.md「節に書く要素」の、上書き）: 呼び元が、同じ向き（prevents effects）で書いて、範囲を広げる。広げた分
+// （e2）も、例外の後ろにあるので、本当に、起きていない。節を書かない呼び元（plain）にも、呼ぶ先の関係は、そのまま伝わる
+namespace a {
+  state s: list<string>;
+  state t: list<string>;
+  effect fn e1(): effects s.post;
+  effect fn e2(): effects t.post;
+  exception E;
+  fn fail(): throws E;
+  fn lower(): throws E prevents effects {
+    fail();
+    e1();
+  }
+  fn upper(): throws E prevents effects {
+    lower();
+    e2();
+  }
+  fn plain() {
+    lower();
+    e2();
+  }
+  // plain を通しても、同じ: upper と同じ関係を、その上で、言い直せる
+  fn top(): throws E prevents effects {
+    plain();
+  }
+}

@@ -40,7 +40,7 @@ import (
 // 行 0 の期待にする。
 //
 // 規則のディレクトリに skip.txt があれば、その内容を理由にして飛ばす（実装か文書の誤りを見つけた例を、直るまで
-// 残しておくため。中身は理由と TODO(bug)）。ディレクトリの名前は <ID> か <ID>.<補足>（THROWS-1.external）で、
+// 残しておくため。中身は理由と TODO(bug)）。ディレクトリの名前は <ID> か <ID>.<補足>（DOC-1.external）で、
 // 補足は同じ規則の例を分けて skip できるようにするためのもの。
 
 const rulesDir = "rules"
@@ -347,7 +347,7 @@ func TestRules(t *testing.T) {
 // ruleDocs は規則の ID を持つ設計文書（docs/testing.md「規則ごとのテスト」の対象）。
 var ruleDocs = []string{"check.md", "resolve.md", "types.md", "config.md"}
 
-// idRowRE は「診断」の表の行の先頭の列（`| THROWS-1 | error | ... |`）。
+// idRowRE は「診断」の表の行の先頭の列（`| REL-4 | error | ... |`）。
 var idRowRE = regexp.MustCompile(`^\|\s*([A-Z]+-\d+)\s*\|`)
 
 // notTestable は .hozo と hozo.toml だけでは起こせない、または診断を持たない規則と、その理由。
@@ -356,9 +356,9 @@ var idRowRE = regexp.MustCompile(`^\|\s*([A-Z]+-\d+)\s*\|`)
 var notTestable = map[string]string{
 	"NS-2":     "正規化で行う。診断なし（docs/check.md「名前空間」）",
 	"EFF-1":    "計算（Sig の F）で行う。診断なし（docs/check.md「状態と効果」）",
-	"THROWS-2": "診断なし。多めの宣言は許す（docs/check.md「throws」）",
+	"THROWS-2": "計算（Sig の E）で行う。診断なし（docs/check.md「throws」）。節に書いていない例外も、多めに書いた例外も、通ることは、REL-4 の ok の例（ok_4）で確かめる",
 	"DEC-9":    "正規化（docs/ir.md「デコレータの適用」）。診断なし",
-	"DEC-10":   "計算（手順 i の throws）。診断なし。DEC-10 の意味は THROWS-1 / DOC-1 の external の例で確かめる",
+	"DEC-10":   "計算（手順 i の throws）。診断なし。DEC-10 の意味は DOC-1 の external の例で確かめる",
 	"BIND-3":   "計算（Call.bound）。診断なし。BIND-4 の ok の例で確かめる",
 	"CFG-13":   "対象の手続き。診断なし（docs/config.md「単位の対象」）。CFG-10 の ok の例（子孫は対象、対象でない名前空間は診断なし）と CFG-17 の例、internal/config の TestCovering で確かめる",
 	"TYPE-2":   "DEC-1 で検出される。ID は索引として残す（docs/types.md「診断」）",

@@ -1,48 +1,16 @@
 package check
 
 import (
-	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/ir"
 )
 
-// checkThrows1 は THROWS-1（docs/check.md「throws」）。throws の節を書いた（Op.throws が空でない）配線の O について
-// Missing = (∪ Sc.exceptions) − Declared(O) − ∪Catches(dᵢ) − ∪Throws(dᵢ, ns(O))（external の throws は Sig と同じく数えない）。
-// 空でなければ、位置は O、メッセージに Missing の FQN、Related に各例外の出どころの呼び出し、Data.missing に FQN の列。
-// 節を書いていない配線の op には、出さない: 配線の op は、throws を書かなくてよい（同「状態に触れるもの」の「節に書く要素」）。
-func checkThrows1(c *computer, o *ir.Op, info *bodyInfo) {
-	if len(o.Throws) == 0 {
-		return
-	}
-	decl := declared(o)
-	catches, throws, _ := c.decoratorSets(o)
-	var missing []string
-	for _, x := range info.thrown {
-		if contains(decl, x) || contains(catches, x) || contains(throws, x) {
-			continue
-		}
-		missing = append(missing, x)
-	}
-	if len(missing) == 0 {
-		return
-	}
-	var rel []related
-	for _, x := range missing {
-		for _, src := range info.sources[x] {
-			if src.ref.throw != "" {
-				rel = append(rel, related{span: src.ref.call.Span, msg: sprintf("出どころ: アームの throw（%s）", x)})
-				continue
-			}
-			rel = append(rel, related{span: src.ref.call.Span, msg: sprintf("出どころ: %s の呼び出し（%s）", src.ref.call.Callee, x)})
-		}
-	}
-	c.r.report(diag.Error, "THROWS-1", o.Span,
-		sprintf("%s は %s を投げうるが throws に書かれていない", o.Name, joinNames(missing)),
-		rel, map[string]any{"missing": missing})
-}
-
 // checkRel4 は REL-4（docs/check.md「throws」）。計算の手順 0 で、配線の Op.throws に relations が書かれていれば
 // 計算した rel と比べ、prevents なのに prevented でない、keeps なのに kept でない組を示す。
-// 目的語は常に `effects`（その op のすべての効果。s.F）。
+// 目的語は常に `effects`（その op のすべての効果。s.F）。関係を付けた throws は、その op の高さでの、例外の宣言の上書きで
+// （同「状態に触れるもの」の「節に書く要素」）、呼ぶ先の言った向きを変えたとき、広げた範囲に、例外の前に起きる効果が
+// あるときに、ここに当たる。
+//
+// 配線の op の throws の節と、計算した例外の、過不足は、確かめない（THROWS-1 は欠番）: 節に書くのは、その関数が足す分。
 func checkRel4(o *ir.Op, s *sigState, r *reporter) {
 	for _, cl := range o.Throws {
 		for _, x := range cl.Exceptions {

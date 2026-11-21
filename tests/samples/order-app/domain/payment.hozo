@@ -345,7 +345,6 @@ namespace payment {
   /** 枠から、請求を確定する。枠の期限が過ぎていれば、金は動かず、記録も変わらない。相手に届かなければ、金が動いたかどうかは、分からない */
   fn capture(payment: Payment on Standing.Held, fee: type.Yen):
     throws psp.HoldExpired prevents effects
-    throws http.NetworkError, http.ServerError
   {
     val now = clock.now();
     val charge = charged(payment, fee);

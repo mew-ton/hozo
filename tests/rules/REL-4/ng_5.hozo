@@ -1,0 +1,18 @@
+// REL-4（docs/check.md「節に書く要素」の、上書き）: 呼び元が、同じ向き（prevents effects）で書けば、言う範囲は、呼び元の
+// 効果のすべて（呼ぶ先の e1 と、呼び元が足した e2）に広がる。e2 が、例外の前に起きているので、prevents effects とは言えない
+namespace a {
+  state s: list<string>;
+  state t: list<string>;
+  effect fn e1(): effects s.post;
+  effect fn e2(): effects t.post;
+  exception E;
+  fn fail(): throws E;
+  fn lower(): throws E prevents effects {
+    fail();
+    e1();
+  }
+  fn upper(): throws E prevents effects {  // ERROR: REL-4
+    e2();
+    lower();
+  }
+}

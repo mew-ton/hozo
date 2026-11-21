@@ -65,8 +65,9 @@ func TestReadsNamed(t *testing.T) {
 	}
 }
 
-// TestReads2Named は READS-2: 配線に書いた reads は、要素の状態の集合で比べる。read の名前で書いても、状態で書いても同じ。
-func TestReads2Named(t *testing.T) {
+// TestWrittenReadsNamed は、配線に書いた reads の要素の数え方: read の名前で書いても、状態で書いても、その状態として、本体が
+// 読む状態に足される。本体が読む状態を落とした節（short）も、同じ R になる。
+func TestWrittenReadsNamed(t *testing.T) {
 	body := func(name string) *ir.Op {
 		return wire(name, nil, nil, cst("a", call("store.findByEmail", carg("email", nameAtom("e")))), cs(call("store.audit")))
 	}
@@ -76,14 +77,12 @@ func TestReads2Named(t *testing.T) {
 	mixed := body("store.mixed")
 	mixed.Reads = []ir.ReadRef{ir.DirectRead{State: "store.logs"}, ir.NamedRead{Read: "store.byEmail"}}
 	short := body("store.short")
-	short.Reads = ir.NamedReads("store.byEmail") // logs が足りない
+	short.Reads = ir.NamedReads("store.byEmail") // logs を書いていない
 	p := refsProgram(byName, byState, mixed, short)
-	diags := withCode(Check(p, cfgFor("store")), "READS-2")
-	if len(diags) != 1 {
-		t.Fatalf("READS-2 = %d 件, want 1（store.short だけ）: %s", len(diags), messages(diags))
+	wantNoErrors(t, Check(p, cfgFor("store")))
+	for _, name := range []string{"store.byName", "store.byState", "store.mixed", "store.short"} {
+		wantStrings(t, "R("+name+")", sigOf(t, p, name).Reads, []string{"store.users", "store.logs"})
 	}
-	missing, _ := diags[0].Data["missing"].([]string)
-	wantStrings(t, "Data.missing", missing, []string{"store.logs"})
 }
 
 // TestEffectsDirect は、直に書いた効果（状態の組み込みの効果そのもの）が F に入り、同じ宛先の宣言とは別の効果として
@@ -120,20 +119,17 @@ func TestEffectsDirect(t *testing.T) {
 	}
 }
 
-// TestEff2Direct は EFF-2: 配線に書いた effects は、効果の同一性で比べる。直に書いた効果は、同じ宛先の宣言の代わりにならない。
-func TestEff2Direct(t *testing.T) {
+// TestWrittenEffectsDirect は、配線に書いた effects の要素の数え方: 効果は、書き方ごとに別のもの。直に書いた効果は、同じ宛先の
+// 宣言の代わりにならないので、本体が行き着く宣言の効果の後ろに、別の効果として、足される（viaNamed）。本体が行き着く効果と
+// 同じなら、何も変わらない（viaDirect）。
+func TestWrittenEffectsDirect(t *testing.T) {
 	post := ir.DirectEffect{State: "store.users", Operation: ir.OpPost}
 	named := wire("store.viaNamed", nil, nil, cs(call("store.addUser", carg("u", nameAtom("u")))))
 	named.Effects = []ir.EffectRef{post} // 呼び出し先の効果は、宣言 createUser
 	direct := wire("store.viaDirect", nil, nil, cs(call("store.putUser", carg("u", nameAtom("u")))))
-	direct.Effects = []ir.EffectRef{post} // 合っている
+	direct.Effects = []ir.EffectRef{post} // 本体が行き着く効果と、同じ
 	p := refsProgram(named, direct)
-	diags := withCode(Check(p, cfgFor("store")), "EFF-2")
-	if len(diags) != 1 {
-		t.Fatalf("EFF-2 = %d 件, want 1（store.viaNamed だけ）: %s", len(diags), messages(diags))
-	}
-	missing, _ := diags[0].Data["missing"].([]string)
-	extra, _ := diags[0].Data["extra"].([]string)
-	wantStrings(t, "Data.missing（宣言は FQN）", missing, []string{"store.createUser"})
-	wantStrings(t, "Data.extra（直に書いた効果は <状態の FQN>.<操作>）", extra, []string{"store.users.post"})
+	wantNoErrors(t, Check(p, cfgFor("store")))
+	wantStrings(t, "F(viaNamed)", effectNames(sigOf(t, p, "store.viaNamed").Effects), []string{"store.createUser", "store.users.post"})
+	wantStrings(t, "F(viaDirect)", effectNames(sigOf(t, p, "store.viaDirect").Effects), []string{"store.users.post"})
 }

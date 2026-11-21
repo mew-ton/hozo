@@ -167,7 +167,7 @@ func TestViewsUncoveredNamespace(t *testing.T) {
 		namespace("user", open, press),
 	)
 	cfg := cfgFor("server")
-	wantCodes(t, Check(p, cfg)) // 単位の対象でない名前空間に診断はなく、THROWS-1 も出ない
+	wantCodes(t, Check(p, cfg)) // 単位の対象でない名前空間に、診断はない
 
 	// 単位の対象でない名前空間の op の Signature も計算されている
 	wantStrings(t, "Sig(user.open).E", sigOf(t, p, "user.open").Exceptions, []string{"http.ServerError", "http.NetworkError"})

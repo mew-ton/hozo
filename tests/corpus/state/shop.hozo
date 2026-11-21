@@ -72,7 +72,7 @@ namespace shop {
   exception EmptyCart;
 
   // docs/check.md「配線からの呼び出し」: 効果を呼ぶ配線。効果の宛先が組み込みの効果でも遷移でも、呼び方は同じ。
-  // 書いた effects は、本体が行う効果と照合する（EFF-2）
+  // 書いた effects は、本体が行う効果に足される（照合は、しない）
   fn addToCart(line: Line): effects addLine { addLine(line); }
   // docs/check.md「葉の op」: 葉は状態に触れない（注文を作るだけ）。効果は、それを呼ぶ配線が行う
   fn newOrder(): Order throws EmptyCart;

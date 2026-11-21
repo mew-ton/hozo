@@ -114,7 +114,7 @@ func TestSigWiringRows(t *testing.T) {
 			t.Errorf("succ(%s) = %s, want kept", e, got)
 		}
 	}
-	wantNoCode(t, Check(p, cfgFor("server")), "THROWS-1")
+	wantNoErrors(t, Check(p, cfgFor("server")))
 }
 
 // TestSigMultipleSources は同じ例外が複数の出どころから出るとき、状態が同じならその状態、違えば unknown。
@@ -254,7 +254,7 @@ func TestSigStateMatch(t *testing.T) {
 			if got := relOf(t, sig, "server.X", "server.drain"); got != ir.Prevented {
 				t.Errorf("rel(X, drain) = %s, want prevented (下の行)", got)
 			}
-			// 規則の検査も通る（EFF-2 / THROWS-1 / STATE-2 は宛先の形によらない）
+			// 規則の検査も通る（STATE-2 は宛先の形によらない）
 			for _, dg := range Check(p, cfgFor("server")) {
 				if dg.Severity == diag.Error {
 					t.Errorf("想定しない error: %s %s", dg.Code, dg.Message)
@@ -319,7 +319,7 @@ func TestSigCatchesRecovers(t *testing.T) {
 	if d.Severity.String() != "warning" {
 		t.Errorf("DEC-5 severity = %s", d.Severity)
 	}
-	wantNoCode(t, diags, "THROWS-1")
+	wantNoErrors(t, diags)
 
 	// すべて kept なら DEC-5 は出ない
 	l.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps()), throws([]string{"server.Y"})}
@@ -448,17 +448,13 @@ func TestSigExternal(t *testing.T) {
 	wantStrings(t, "Sig(getMe, server).E", sigOf(t, p, "server.getMe").Exceptions, nil)
 	wantStrings(t, "Sig(inside, server).E", sigOf(t, p, "server.inside").Exceptions, nil)
 	wantStrings(t, "Sig(fetchMe, browser).E", sigOf(t, p, "browser.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError"})
-	// throws の節を書いていない配線には、THROWS-1 を出さない（docs/check.md「状態に触れるもの」の「節に書く要素」）
-	wantNoCode(t, diags, "THROWS-1")
-	// 節を書いた配線は、計算した例外を、節が覆うこと
+	// throws の節を書いていない配線に、節についての診断は、出ない（docs/check.md「状態に触れるもの」の「節に書く要素」）
+	wantCodes(t, diags)
+	// 節を書いた配線も、同じ: 節に書くのは、その関数が足す分で、伝わってくる例外を、書いていなくてよい。書いた例外は、足される
 	written := wire("browser.fetchMe", ir.String(), nil, ret(call("server.getMe")))
 	written.Throws = []ir.ThrowsClause{throws([]string{"browser.Offline"})}
 	pw := program(nil, httpVocab(), namespace("server", getMe, inside), namespace("browser", exc("browser.Offline"), written))
-	d := wantOneCode(t, Check(pw, cfgFor("server", "browser")), "THROWS-1")
-	if d.Message == "" || d.Data["missing"] == nil {
-		t.Errorf("THROWS-1 without message or data: %+v", d)
-	}
-	wantStrings(t, "Data.missing", d.Data["missing"].([]string), []string{"http.ServerError", "http.NetworkError"})
+	wantCodes(t, Check(pw, cfgFor("server", "browser")))
 	wantStrings(t, "Sig(fetchMe 節あり, browser).E", sigOf(t, pw, "browser.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError", "browser.Offline"})
 	views := viewsOf(p, cfgFor("server", "browser"))
 	wantStrings(t, "View(browser).ops[server.getMe].E", views["browser"].Ops["server.getMe"].Exceptions, []string{"http.ServerError", "http.NetworkError"})
@@ -554,10 +550,8 @@ func TestSigCycle(t *testing.T) {
 	wantStrings(t, "a.F (as leaf)", effectNames(sa.Effects), []string{"server.e1"})
 	wantStrings(t, "b.E", sigOf(t, p, "server.b").Exceptions, nil)
 	wantStrings(t, "d.E", sigOf(t, p, "server.d").Exceptions, []string{"server.X", "server.Y"})
-	wantNoCode(t, diags, "EFF-2") // 循環上の配線の effects は自分の宣言と一致する
-	if n := len(withCode(diags, "THROWS-1")); n != 1 {
-		t.Errorf("THROWS-1 count = %d, want 1 (throws の節を書いた d が、a の X を覆わない)", n)
-	}
+	// 節についての診断は、ない: throws の節を書いた d は、a の X を書いていないが、X は、計算した例外として、d の E に入る
+	wantCodes(t, diags, "WIRE-7", "WIRE-7")
 }
 
 // TestComputeIdempotent は Compute を二度呼んでも同じ結果になること（Check は Compute を含む）。
@@ -653,7 +647,8 @@ func TestSigCarried(t *testing.T) {
 // TestSigCarriedWiring は docs/check.md「デコレータが運ぶ reads と effects」と、手順 0（配線の op）の「運ばれた効果」:
 // 配線の op の F と R は、本体が行き着くものの後ろに、運ばれたもの（重複は最初の出現）。運ばれた効果のデコレータの分は、
 // 葉と同じ（rel は op の throws の relations から、succ は kept）で、本体も行き着く効果は、本体から決めた状態と違えば unknown。
-// 呼び出し元へ伝わり、書いた節は、運ばれたものを含む Sig と照合する（READS-2 / EFF-2）。
+// 呼び出し元へ伝わる。書いた節は、運ばれたものを、含んでいても（written）、落としていても（dropped）、同じ Sig になる
+// （節に書くのは、その関数が足す分。照合は、しない）。
 func TestSigCarriedWiring(t *testing.T) {
 	doing := decorator("server.doing")
 	doing.Reads = ir.StateReads("$param:table")
@@ -679,7 +674,7 @@ func TestSigCarriedWiring(t *testing.T) {
 	// keeps: 本体から決めた e1（prevented）と違うので unknown になり、REL-4
 	kept := body("server.kept")
 	kept.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, keeps())}
-	// 節を書く: 運ばれたものを含めば通り、落とせば READS-2 / EFF-2
+	// 節を書く: 運ばれたものを、含んでいても、落としていても、通る
 	written := body("server.written")
 	written.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	written.Reads = ir.StateReads("server.sA", "server.sB")
@@ -688,7 +683,7 @@ func TestSigCarriedWiring(t *testing.T) {
 	dropped.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	dropped.Reads = ir.StateReads("server.sA")
 	dropped.Effects = ir.NamedEffects("server.e1")
-	// 呼び出し元: 運ばれたものも伝わる。節が落とせば READS-2 / EFF-2
+	// 呼び出し元: 運ばれたものも伝わる。節が落としていても、通る
 	caller := wire("server.caller", nil, nil, cs(call("server.prevented")))
 	caller.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	callerDropped := wire("server.callerDropped", nil, nil, cs(call("server.prevented")))
@@ -740,15 +735,8 @@ func TestSigCarriedWiring(t *testing.T) {
 		return out
 	}
 	wantStrings(t, "REL-4（keeps と書いたが、本体も行き着く e1 は unknown）", byOp("REL-4"), []string{"server.kept"})
-	wantStrings(t, "READS-2（運ばれた sB を落とした節）", byOp("READS-2"), []string{"server.dropped", "server.callerDropped"})
-	wantStrings(t, "EFF-2（運ばれた e2 を落とした節）", byOp("EFF-2"), []string{"server.dropped", "server.callerDropped"})
-	for _, d := range append(withCode(diags, "READS-2"), withCode(diags, "EFF-2")...) {
-		missing, _ := d.Data["missing"].([]string)
-		if len(missing) != 1 || (missing[0] != "server.sB" && missing[0] != "server.e2") {
-			t.Errorf("%s の Data.missing = %v, want 運ばれたもの一つ", d.Code, d.Data["missing"])
-		}
-	}
-	wantNoCode(t, diags, "THROWS-1")
+	// 節についての診断は、REL-4 だけ: 運ばれたものを落とした節（dropped、callerDropped）は、通る
+	wantCodes(t, diags, "REL-4")
 }
 
 // TestSigCarriedSucc は手順 0（配線の op）の「運ばれた効果」の succ: 本体も行き着く効果は、本体から決めた状態（一部のアームに
@@ -790,7 +778,7 @@ func TestCarriedReadsOnly(t *testing.T) {
 	wantStrings(t, "R(find)", sigOf(t, p, "server.find").Reads, []string{"server.sA"})
 	wantStrings(t, "F(find)", effectNames(sigOf(t, p, "server.find").Effects), nil)
 	wantStrings(t, "R(w)", sigOf(t, p, "server.w").Reads, []string{"server.sA"})
-	wantNoCode(t, diags, "READS-2") // 配線に書いた reads は、運ばれた状態を含む計算と等しい
+	wantNoErrors(t, diags) // 配線に書いた reads は、計算した分に足されるだけ
 }
 
 // throwing は、例外を投げる効果（Effect.throws。docs/check.md「read と効果」）。
@@ -802,8 +790,8 @@ func throwing(fqn, state string, exceptions ...string) *ir.Effect {
 
 // TestSigThrowingEffectCall は手順 0 の表の、効果の呼び出し: 宣言した効果の throws が、配線の例外に加わり、その効果との組は
 // prevented（投げたとき、その効果は、起きていない）。先に動いた効果は kept、後ろの効果は prevented。配線が throws の節を
-// 書いていなければ、例外は計算されるだけで、THROWS-1 は出ない。節を書いて覆わなければ THROWS-1。直に呼んだ組み込みの効果は、
-// 例外を増やさない。
+// 書いていても、いなくても、効果の例外は、計算した例外に入る（節に書いた例外は、それに足される）。直に呼んだ組み込みの
+// 効果は、例外を増やさない。
 func TestSigThrowingEffectCall(t *testing.T) {
 	t1 := throwing("server.t1", "server.sA", "server.X")
 	w := wire("server.w", nil, nil, cs(effectCall("server.e1")), cs(effectCall("server.t1")), cs(effectCall("server.e2")), cs(directCall("server.sB", ir.OpPut)))
@@ -825,16 +813,15 @@ func TestSigThrowingEffectCall(t *testing.T) {
 	// 配線が throws の節を書いていなければ、例外は計算されるだけ
 	w2 := wire("server.w2", nil, nil, cs(effectCall("server.t1")))
 	p2 := serverWith(t1, w2)
-	wantNoCode(t, Check(p2, nil), "THROWS-1")
+	wantCodes(t, Check(p2, nil))
 	wantStrings(t, "w2.E", sigOf(t, p2, "server.w2").Exceptions, []string{"server.X"})
 
-	// 節を書いて、効果の例外を覆わなければ THROWS-1
+	// 節に、効果の例外を書いていなくても、通る。書いた例外 Y は、計算した例外 X に、足される
 	w3 := wire("server.w3", nil, nil, cs(effectCall("server.t1")))
 	w3.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
-	d := wantOneCode(t, Check(serverWith(t1, w3), nil), "THROWS-1")
-	if !strings.Contains(d.Message, "server.X") {
-		t.Errorf("THROWS-1 のメッセージに server.X がない: %s", d.Message)
-	}
+	p3 := serverWith(t1, w3)
+	wantCodes(t, Check(p3, nil))
+	wantStrings(t, "w3.E", sigOf(t, p3, "server.w3").Exceptions, []string{"server.X", "server.Y"})
 }
 
 // TestSigCarriedThrows は「運ばれた効果が投げる例外」: 葉でも配線でも、op が throws に書かなくても、E に加わる。
@@ -889,7 +876,7 @@ func TestSigCarriedThrows(t *testing.T) {
 		t.Errorf("w: rel(X, e2) = %s, want unknown", got)
 	}
 	// 配線は、運ばれた効果の例外を、throws に書かなくてよい（デコレータの throws と同じ）
-	wantNoCode(t, Check(p, nil), "THROWS-1")
+	wantNoErrors(t, Check(p, nil))
 }
 
 // TestSigHaltsThrows は halts の項: halts に渡した効果 h が throws を持てば、その例外が E に加わる。h を、ここで F に

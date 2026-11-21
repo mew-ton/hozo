@@ -725,9 +725,9 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 | `domain/` | 69（`carrier.hozo` 8、`download.hozo` 2、`fulfilment.hozo` 10、`inventory.hozo` 4、`ordering.hozo` 10、`payment.hozo` 10、`production.hozo` 3、`shipping.hozo` 14、`staff.hozo` 8） |
 | `web/` | 8（`backoffice.hozo` 3、`storefront.hozo` 5） |
 
-- **節を残した配線の op は、`payment.capture` の一つ。** 例外と効果の関係（`throws psp.HoldExpired prevents effects`）を、書いて言っている op で、関係を付けない節（`throws http.NetworkError, http.ServerError`）も、一緒に残した: 節を書いた配線の op は、計算した例外を、節が覆わなければ THROWS-1 になる。
+- **節を残した配線の op は、`payment.capture` の一つ。** 例外と効果の関係（`throws psp.HoldExpired prevents effects`）を、書いて言っている op で、残した節は、その一つだけ。はじめは、関係を付けない節（`throws http.NetworkError, http.ServerError`）も、一緒に残していた（節を書いた配線の op は、計算した例外を、節が覆わなければ、エラーだった）。節を、その関数が足すものにした決定（`docs/decisions.md`「決めたこと」381）で、その節を消した: 二つの例外は、`psp.capture` の呼び出しから伝わってくるもので、書かなくても、`capture` の例外に入る（`docs/check.md`「状態に触れるもの」の「節に書く要素」）。
 - **ほかに `throws` を書いているのは、定義する所だけ**: 葉の op（12）と、デコレータの宣言（`outside.failsAs`、`webhook.signed`）。
-- 「分かったこと」の F34（書く量をいちばん増やしたのは THROWS-1）は、消す前の記録。
+- 「分かったこと」の F34（書く量をいちばん増やしたのは THROWS-1）は、消す前の記録。THROWS-1 は、その後、欠番になった（同 381）。
 
 ## 確かめ方
 

@@ -160,7 +160,7 @@ namespace api {
 
   // docs/ir.md「正規化」: `export fn f()` は exported。`reads a, b`、複数の reads は ReadRef の列一つ（直に書いた状態は direct、
   // read の名前は named。重複は最初の出現に寄せる）
-  // docs/check.md「reads」: 配線の R は、呼んだ read の宛先の状態（行の順）。書いた reads は、状態の集合で照合する（READS-2）
+  // docs/check.md「reads」: 配線の R は、呼んだ read の宛先の状態（行の順）。書いた reads は、計算した読む状態に足される（照合は、しない）
   fn whenLive(user: User?, live: Session[]): User?;
   /** 識別子からユーザーを引く */
   export fn findUser(id: UserId): User? reads users, sessionsOf reads users {
@@ -282,7 +282,7 @@ namespace api {
     rotate(id, name);
     return findByName(name);
   }
-  // 節を書いた配線は、運ばれたものも書く（READS-2、EFF-2）。運ばれた効果の rel は、葉と同じに、書いた prevents から決まる（REL-4 は
+  // 節を書いた配線は、運ばれたものを、書いても、書かなくてもよい（ここでは、書いている）。運ばれた効果の rel は、葉と同じに、書いた prevents から決まる（REL-4 は
   // 食い違わない）
   @find(motd)
   @effects(touchUser, renameUser)

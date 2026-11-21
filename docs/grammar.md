@@ -375,7 +375,7 @@ ReadElem   = QualifiedName ;      (* read の名前か、直に書く状態の�
 - `never` は、決して値を返さない op（`fn unauthorized(): never throws Unauthorized;`）。宣言の規則は `docs/check.md`「never を返す op」。
 - `export` は、別の名前空間から呼べる op の印（`export fn login(in: LoginInput): LoginOk`）。`DocComment` とデコレータの後ろ、`fn` の直前に書く。付けられるのは、種類を書かない `fn`（op）だけで、ほかの宣言の前に書いたら構文エラー。意味は `docs/check.md`「export」。
 - `throws`、`effects`、`reads` の三つは、その op を呼んだときに起きうることの並びで、区切りはどれも `,`（`throws Unauthorized, NotFound`、`effects createOrder, notifyUser`、`reads users, sessions`）。どの節も何度でも書け、同じ要素の重複は一つと数える。
-- 配線の op の `throws`、`effects`、`reads` は、書かなくてよい: 本体が投げる例外、行う効果、読む状態は、本体の呼び出しと、デコレータから決まる。書いた場合は、それと照合する（THROWS-1、EFF-2、READS-2。決まりの持ち主は `docs/check.md`「状態に触れるもの」の「節に書く要素」）。葉の op は、`throws` を書く（そこが、定義）。
+- 配線の op の `throws`、`effects`、`reads` は、書かなくてよい: 本体が投げる例外、行う効果、読む状態は、本体の呼び出しと、デコレータから決まる。節に書いたものは、それに、足される（照合は、しない。決まりの持ち主は `docs/check.md`「状態に触れるもの」の「節に書く要素」）。葉の op は、`throws` を書く（そこが、定義）。
 - `effects` の要素（`EffectElem`）は、`effect` の宣言の名前（効果のユニオンの名前でもよい）か、基底の状態の組み込みの効果を直に書いた `状態.操作`（`effects users.post`）。分類の遷移は、直には書けない（名前の付いた `effect` の宣言にだけ書ける）。
 - `reads` の要素（`ReadElem`）は、`read` の宣言の名前か、直に書いた状態の名前（`reads users`）。
 - 要素が名前か、直に書いたものかは、名前の解決が決める（`docs/resolve.md`「位置ごとに受け付ける種類」）。節の要素と、配線の本体が行ったものとの対応は `docs/check.md`「節に書く要素」、`reads` の意味は同「reads」。

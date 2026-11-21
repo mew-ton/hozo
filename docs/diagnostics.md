@@ -11,7 +11,7 @@ type Severity int // Error, Warning
 
 type Diagnostic struct {
     Severity Severity
-    Code     string          // 規則の ID（"THROWS-1"、"RES-1"）か、規則の ID でないコード（"SYNTAX"、"PLUGIN"）
+    Code     string          // 規則の ID（"REL-4"、"RES-1"）か、規則の ID でないコード（"SYNTAX"、"PLUGIN"）
     Message  string          // 一文。何が、どこで、どう違うか。名前は FQN で
     Span     *source.Span    // 位置（バイトのオフセット。docs/packages.md「internal/source」）。位置がなければ nil
     File     string          // Span が nil のときのファイル（hozo.toml など）。空なら全体
@@ -26,7 +26,7 @@ type Related struct {
 ```
 
 - `Code` は `docs/requirements.md`「検査の規則の一覧」と、各設計文書の「診断」の表のもの。トランスパイラが `emit` の応答の `errors` で返したコード（`docs/plugin-protocol.md`「emit」）は、そのまま `Code` になる。規則の ID でないコードは下の「規則の ID でないコード」。コードが出しうる `Code` がどれかの表にあり、表の重さがコードと合っていることは `tests/codes_test.go` が確かめる。
-- `Message` は、`docs/` の文書の言葉で書く。例: THROWS-1 → `openOrders は http.NetworkError を投げうるが throws に書かれていない（出どころ: fetchMe の呼び出し）`。
+- `Message` は、`docs/` の文書の言葉で書く。例: BIND-4 → `openOrders の呼び出しで必須の入力 token が明示でも bind でも埋まっていない`。
 - `Message` は、設計書（`docs/README.md`「設計書という呼び名」）と、その節番号（「§n」）を引かない。設計書は仕様の持ち主ではなく、利用者が読んで確かめる先にならない。文書を引くなら、`docs/` の文書と見出しを引く（`docs/check.md`「残りのケース」）。
 - `Data` の中身は `docs/check.md`「Data」。
 
@@ -48,8 +48,8 @@ type Related struct {
 ### text（既定）
 
 ```
-examples/orders.hozo:42:3: error[THROWS-1]: openOrders は http.NetworkError を投げうるが throws に書かれていない
-  examples/orders.hozo:44:16: note: 出どころ: fetchMe の呼び出し
+examples/orders.hozo:42:5: error[DISJ-3]: disjoint で、二つのアームが、同じ状態 store.orders に、効果を持つ: …（同じ行に書くと、順で、結果が変わる。直列に書く）
+  examples/orders.hozo:44:5: note: store.orders に書く
 hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = "server"）に out がない
 2 errors, 1 warning
 ```
@@ -64,10 +64,10 @@ hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = "server"）に out 
 ```json
 {
   "diagnostics": [
-    { "severity": "error", "code": "THROWS-1", "message": "...",
+    { "severity": "error", "code": "MATCH-2", "message": "...",
       "file": "examples/orders.hozo", "start": { "line": 42, "col": 3 }, "end": { "line": 42, "col": 13 },
       "related": [ { "file": "...", "start": { "line": 44, "col": 16 }, "end": { "line": 44, "col": 23 }, "message": "..." } ],
-      "data": { "missing": ["http.NetworkError"] } }
+      "data": { "missing": ["Registered"], "extra": [] } }
   ],
   "errors": 2,
   "warnings": 1

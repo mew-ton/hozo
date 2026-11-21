@@ -592,7 +592,7 @@ func TestViewFromEntry(t *testing.T) {
 			})
 		expect(t, "api.renewAudited の R（本体、運ばれたもの）", audited.Signature.Reads, []string{"api.sessions", "api.users", "api.motd"})
 		expect(t, "運ばれたものを持つ配線は純粋でない", audited.Signature.Pure, false)
-		// 節を書いた配線: 書いた節は、運ばれたものを含む Sig と等しい（READS-2 / EFF-2 は出ない: check.txt）。運ばれた効果の rel は、書いた prevents
+		// 節を書いた配線: 書いた節は、運ばれたものを含む Sig と等しい（節についての診断は、ない: check.txt）。運ばれた効果の rel は、書いた prevents
 		declared := opOf(t, prog, "api.renewDeclared")
 		expect(t, "api.renewDeclared の Op.carried", declared.Carried, carried)
 		expect(t, "api.renewDeclared（書いた prevents が、運ばれた効果にも掛かる）", sigOf(declared.Signature), sig{

@@ -1,11 +1,13 @@
 // 構文エラーのあるファイルでも、作れた部分には検査を行う（docs/check.md「この文書が決めること」）。
-// model は構文エラー（SYNTAX）、その下の配線は THROWS-1 になる（throws の節を書いているのに、E を書いていない）
+// model は構文エラー（SYNTAX）、その下の配線は REL-4 になる（効果の後に投げる例外を、prevents effects と書いている）
 namespace a {
   exception E;
-  exception F;
+  state s: list<string>;
+  effect fn e(): effects s.post;
   fn leaf(): throws E;
   model Broken { x: ; }                // ERROR: SYNTAX
-  fn wiring(): throws F {              // ERROR: THROWS-1
+  fn wiring(): throws E prevents effects {  // ERROR: REL-4
+    e();
     leaf();
   }
 }

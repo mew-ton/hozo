@@ -1,5 +1,5 @@
 // STATE-5（docs/check.md「葉の op」）: 葉は、人が中身を書く op で、状態に触れない。throws は書ける。状態を読み書きするのは、
-// read と効果を呼ぶ配線。配線の op は、reads / effects の節を書ける（本体と照合する）
+// read と効果を呼ぶ配線。配線の op は、reads / effects の節を書ける（本体と照合しない: ok_2）
 namespace a {
   model M { id: string; }
   exception Invalid(reason: string);

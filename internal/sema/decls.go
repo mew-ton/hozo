@@ -1514,7 +1514,7 @@ func (a *analyzer) checkSTATE5(s *symbol, d *ast.OpDecl, span source.Span, claus
 
 // lowerOpEffects は op の effects の一節（docs/ir.md「op」の effects）。要素は、名前で書いた効果（effect か、効果の union。
 // 展開する）か、直に書いた「状態.操作」（docs/check.md「節に書く要素」）。どの名前空間のものでも書ける（配線の効果は、
-// 呼び出し先から名前空間をまたいで伝わる）。本体から決まる効果との照合（EFF-2）は internal/check が行う。
+// 呼び出し先から名前空間をまたいで伝わる）。節に書いた効果を、本体から決まる効果に足すのは internal/check（計算）。
 func (a *analyzer) lowerOpEffects(c *ast.EffectsClause, sc *scope) []ir.EffectRef {
 	var out []ir.EffectRef
 	for _, n := range c.Effects {
@@ -1554,8 +1554,8 @@ func (a *analyzer) effectOwner(e ir.EffectRef) *namespace {
 }
 
 // lowerReads は reads の一節（docs/ir.md「op」の reads）。要素は、名前で書いた read か、直に書いた state（基底の状態）。
-// どちらも、どの名前空間のものでも解決する（どちらでもなければ RES-4）。本体から決まる読む状態との照合（READS-2）は
-// internal/check が行う。
+// どちらも、どの名前空間のものでも解決する（どちらでもなければ RES-4）。節に書いた状態を、本体から決まる
+// 読む状態に足すのは internal/check（計算）。
 func (a *analyzer) lowerReads(c *ast.ReadsClause, sc *scope) []ir.ReadRef {
 	var out []ir.ReadRef
 	for _, n := range c.Reads {

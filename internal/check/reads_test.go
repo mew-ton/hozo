@@ -91,35 +91,27 @@ func TestReadsWiring(t *testing.T) {
 
 func ptr(c ir.Call) *ir.Call { return &c }
 
-// TestReads2 は READS-2: 配線の op の Op.reads が空でなく、集合として R と等しくない。書かなければ出ない。
-// 配線の reads には別の名前空間の状態も書ける。
-func TestReads2(t *testing.T) {
+// TestWrittenReads は、配線の op に書いた reads の節（docs/check.md「reads」、「状態に触れるもの」の「節に書く要素」）: 節に書いた
+// 状態は、本体が読む状態に、足される。本体が読む状態を、書いていなくても（wrong）、本体が読まない状態を書いていても（extra）、
+// 診断は出ない。配線の reads には別の名前空間の状態も書ける。
+func TestWrittenReads(t *testing.T) {
 	body := func() []ir.Statement {
 		return []ir.Statement{cst("u", call("store.findUser", carg("email", nameAtom("e"))))}
 	}
 	omitted := wire("server.omitted", nil, nil, body()...)
 	equal := reads(wire("server.equal", nil, nil, body()...), "store.users")
 	wrong := reads(wire("server.wrong", nil, nil, body()...), "store.sessions")
-	extra := reads(wire("server.extra", nil, nil, body()...), "store.users", "store.sessions")
-	// 葉の op は READS-2 の対象外（Op.reads がそのまま R）
-	diags := Checker{Locate: locatorFor()}.Check(storeProgram(omitted, equal, wrong, extra), cfgFor("server"))
-	var got []string
-	for _, d := range diags {
-		if d.Code != "READS-2" {
-			continue
-		}
-		got = append(got, d.Message)
-		switch {
-		case len(got) == 1:
-			wantStrings(t, "missing", d.Data["missing"].([]string), []string{"store.users"})
-			wantStrings(t, "extra", d.Data["extra"].([]string), []string{"store.sessions"})
-		case len(got) == 2:
-			wantStrings(t, "missing", d.Data["missing"].([]string), []string{})
-			wantStrings(t, "extra", d.Data["extra"].([]string), []string{"store.sessions"})
-		}
-	}
-	if len(got) != 2 {
-		t.Fatalf("READS-2 = %d, want 2（wrong と extra）: %v", len(got), got)
+	extra := reads(wire("server.extra", nil, nil, body()...), "store.sessions", "store.users")
+	caller := wire("server.caller", nil, nil, cs(call("server.wrong")))
+	p := storeProgram(omitted, equal, wrong, extra, caller)
+	wantNoErrors(t, (Checker{Locate: locatorFor()}).Check(p, cfgFor("server")))
+	wantStrings(t, "R(omitted)", sigOf(t, p, "server.omitted").Reads, []string{"store.users"})
+	wantStrings(t, "R(equal)", sigOf(t, p, "server.equal").Reads, []string{"store.users"})
+	wantStrings(t, "R(wrong: 本体が読む users の後ろに、書いた sessions)", sigOf(t, p, "server.wrong").Reads, []string{"store.users", "store.sessions"})
+	wantStrings(t, "R(extra: 本体の分が先。書いた順は、後ろの並びにだけ効く)", sigOf(t, p, "server.extra").Reads, []string{"store.users", "store.sessions"})
+	wantStrings(t, "R(caller: 書いて足した状態も、呼び出し元へ伝わる)", sigOf(t, p, "server.caller").Reads, []string{"store.users", "store.sessions"})
+	if sigOf(t, p, "server.wrong").Pure {
+		t.Errorf("状態を読む op は、純粋でない")
 	}
 }
 
@@ -188,7 +180,7 @@ func TestPure(t *testing.T) {
 }
 
 // TestThrowArm は手順 0 の「アームの本体の throw X は、例外が X だけで効果を持たない呼び出しとして数える」と、
-// THROWS-1、succ の「返らないアームは数えない」。
+// succ の「返らないアームは数えない」。
 func TestThrowArm(t *testing.T) {
 	issue := leaf("server.issue", ir.String())
 	issue.Effects = ir.NamedEffects("server.e1")
@@ -203,7 +195,7 @@ func TestThrowArm(t *testing.T) {
 		w := wire("server.w", ir.String(), nil, match(arm(ptr(call("server.issue")), "A"), throwArm("server.X"), arm(ptr(call("server.unauthorized")), "B")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y", "server.Z"})}
 		p := serverWith(issue, never, w)
-		wantNoCode(t, Check(p, cfgFor("server")), "THROWS-1")
+		wantNoErrors(t, Check(p, cfgFor("server")))
 		sig := sigOf(t, p, "server.w")
 		wantStrings(t, "E", sig.Exceptions, []string{"server.Y", "server.X", "server.Z"})
 		wantStrings(t, "F", effectNames(sig.Effects), []string{"server.e1"})
@@ -228,14 +220,12 @@ func TestThrowArm(t *testing.T) {
 			t.Errorf("succ(e1) = %s, want unknown", got)
 		}
 	})
-	t.Run("THROWS-1: throw の例外も throws に書く", func(t *testing.T) {
+	t.Run("throw の例外は、節に書いていなくても、E に入る", func(t *testing.T) {
 		w := wire("server.w", ir.String(), nil, match(arm(ptr(call("server.issue")), "A"), throwArm("server.X")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
-		d := wantOneCode(t, Checker{Locate: locatorFor()}.Check(serverWith(issue, w), cfgFor("server")), "THROWS-1")
-		wantStrings(t, "missing", d.Data["missing"].([]string), []string{"server.X"})
-		if len(d.Related) != 1 {
-			t.Errorf("related = %d, want 1（その throw）", len(d.Related))
-		}
+		p := serverWith(issue, w)
+		wantNoErrors(t, (Checker{Locate: locatorFor()}).Check(p, cfgFor("server")))
+		wantStrings(t, "E（issue の Y、throw の X。節に書いた Y は、もう入っている）", sigOf(t, p, "server.w").Exceptions, []string{"server.Y", "server.X"})
 	})
 	t.Run("デコレータが吸収する", func(t *testing.T) {
 		catchX := decorator("server.catchX")
@@ -245,7 +235,7 @@ func TestThrowArm(t *testing.T) {
 		w.Decorators = []ir.Application{app("server.catchX")}
 		p := serverWith(issue, catchX, w)
 		diags := Check(p, cfgFor("server"))
-		wantNoCode(t, diags, "THROWS-1")
+		wantNoErrors(t, diags)
 		wantNoCode(t, diags, "DEC-16")
 		wantStrings(t, "E", sigOf(t, p, "server.w").Exceptions, []string{"server.Y"})
 	})

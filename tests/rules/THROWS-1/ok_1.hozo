@@ -1,8 +1,0 @@
-// THROWS-1（docs/check.md「throws」）: 呼び出し先の例外を throws に書いている
-namespace a {
-  exception E;
-  fn leaf(): throws E;
-  fn wiring(): throws E {
-    leaf();
-  }
-}

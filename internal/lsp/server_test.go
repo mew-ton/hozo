@@ -1173,7 +1173,8 @@ namespace shop {
 // TestCarryingDecorators は、版 0.5 の構文（予約語のデコレータ名、reads / effects の節、残りの引数、対象 effect）について、
 // 定義へジャンプ（docs/lsp.md「定義へジャンプ」の表）、ホバーの見出し（同「ホバー」）、ドキュメントのシンボル、診断を確かめる。
 // 運ぶ節を持つデコレータは、配線の op にも付けられる（docs/check.md「デコレータが運ぶ reads と effects」）: 付けただけでは診断は出ず、
-// 運ばれたものは、その配線と、それを呼ぶ配線のホバーに出る。書いた節が運ばれたものを落としていれば EFF-2。
+// 運ばれたものは、その配線と、それを呼ぶ配線のホバーに出る。書いた節が、運ばれたものを落としていても、診断は出ない
+// （節に書くのは、その関数が足す分。docs/check.md「状態に触れるもの」の「節に書く要素」）。
 func TestCarryingDecorators(t *testing.T) {
 	root := t.TempDir()
 	text := `namespace store {
@@ -1250,23 +1251,17 @@ func TestCarryingDecorators(t *testing.T) {
 	c := startServer(t, Options{})
 	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
 	uri, enc := fileURI(path), encUTF16
-	// 診断: 運ぶ節を持つデコレータを配線に付けた wired と wiredWrite には、何も出ない。出るのは、書いた effects が、運ばれた add を
-	// 落としている wiredShort の EFF-2 だけ（位置は op。デコレータの適用から始まる）
+	// 診断: 運ぶ節を持つデコレータを配線に付けた wired と wiredWrite には、何も出ない。書いた effects が、運ばれた add を
+	// 落としている wiredShort にも、出ない（節と、計算した分は、照合しない）
 	var codes []string
 	for _, d := range byURI[uri] {
 		if d.Code == codeNoConfig {
 			continue
 		}
 		codes = append(codes, d.Code)
-		if want := positionOf(t, enc, text, "@effects(add)\n  fn wiredShort", 0); d.Code == "EFF-2" && d.Range.Start != want {
-			t.Errorf("EFF-2 の位置 = %+v, want %+v", d.Range.Start, want)
-		}
-		if d.Code == "EFF-2" && !strings.Contains(d.Message, "足りない: store.add") {
-			t.Errorf("EFF-2 のメッセージ = %q, want 運ばれた store.add が足りないこと", d.Message)
-		}
 	}
-	if strings.Join(codes, ",") != "EFF-2" {
-		t.Fatalf("診断 = %v, want [EFF-2]", codes)
+	if len(codes) != 0 {
+		t.Fatalf("診断 = %v, want なし", codes)
 	}
 	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
 		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}

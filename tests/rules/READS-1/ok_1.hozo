@@ -1,6 +1,6 @@
 // READS-1（docs/check.md「reads」「デコレータが運ぶ reads と effects」）: デコレータが、自分の名前空間の状態を reads として運ぶ
 // 葉の op。別の名前空間の配線には、R として伝わる。配線の op の reads の節には、別の名前空間の状態（と read）も書ける
-// （呼び出し先から伝わったもの。READS-2）
+// （呼び出し先から伝わったもの。節に書いた状態は、計算した分に足される）
 namespace a {
   state users: list<string>;
   state token: nullable<string>;

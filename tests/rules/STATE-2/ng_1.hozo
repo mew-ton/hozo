@@ -25,7 +25,7 @@ namespace b {
   fn carriedFixed();
   @a.posting                                     // ERROR: STATE-2
   fn carriedDirect();
-  // 配線の op の節には、別の名前空間の効果を書ける（呼び出し先から伝わった効果。EFF-2 が照合する）
+  // 配線の op の節には、別の名前空間の効果を書ける（呼び出し先から伝わった効果。節に書いた効果は、計算した分に足される）
   fn wire(): effects a.e, a.s.post {
     a.own();
   }

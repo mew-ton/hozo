@@ -300,6 +300,16 @@ func sigOf(t *testing.T, p *ir.Program, fqn string) ir.Signature {
 	return o.Signature
 }
 
+// wantNoErrors は、diags に error が一つもないことを確かめる（warning は、あってよい）。
+func wantNoErrors(t *testing.T, diags []diag.Diagnostic) {
+	t.Helper()
+	for _, d := range diags {
+		if d.Severity == diag.Error {
+			t.Errorf("想定しない error: %s %s", d.Code, d.Message)
+		}
+	}
+}
+
 // effectOf は、テストが効果を書く二つの形を EffectRef にする: 文字列は宣言の FQN（名前で書いた効果）、EffectRef はそのまま。
 func effectOf(e any) ir.EffectRef {
 	if s, ok := e.(string); ok {
