@@ -602,7 +602,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.13"
+          "const": "0.14"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1266,7 +1266,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.13"
+          "const": "0.14"
         },
         "transpiler": {
           "type": "string"
@@ -1484,7 +1484,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.13"
+          "const": "0.14"
         }
       },
       "required": [
@@ -1738,6 +1738,9 @@
           },
           "type": "array"
         },
+        "index": {
+          "$ref": "#/$defs/ModelIndex"
+        },
         "kind": {
           "const": "model"
         },
@@ -1784,6 +1787,31 @@
         "base",
         "removed",
         "overridden"
+      ],
+      "type": "object"
+    },
+    "ModelIndex": {
+      "additionalProperties": false,
+      "description": "インデックスの model のインデックス（docs/ir.md「model / scalar / union」の index）。キーの名前、キーの型、値の型。",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/Type"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "value": {
+          "$ref": "#/$defs/Type"
+        }
+      },
+      "required": [
+        "name",
+        "key",
+        "value",
+        "span"
       ],
       "type": "object"
     },
@@ -2261,7 +2289,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.13"
+          "const": "0.14"
         }
       },
       "required": [
@@ -2377,27 +2405,6 @@
       },
       "required": [
         "name",
-        "value"
-      ],
-      "type": "object"
-    },
-    "RecordType": {
-      "additionalProperties": false,
-      "description": "Record\u003cK, V\u003e（docs/ir.md「型」の record）。",
-      "properties": {
-        "key": {
-          "$ref": "#/$defs/Type"
-        },
-        "kind": {
-          "const": "record"
-        },
-        "value": {
-          "$ref": "#/$defs/Type"
-        }
-      },
-      "required": [
-        "kind",
-        "key",
         "value"
       ],
       "type": "object"
@@ -2896,9 +2903,6 @@
           "$ref": "#/$defs/ArrayType"
         },
         {
-          "$ref": "#/$defs/RecordType"
-        },
-        {
           "$ref": "#/$defs/CaseType"
         },
         {
@@ -3142,7 +3146,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.13"
+          "const": "0.14"
         },
         "viewer": {
           "type": "string"

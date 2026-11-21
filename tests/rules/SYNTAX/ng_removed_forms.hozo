@@ -103,6 +103,10 @@ namespace removedFnTail {
   decorator targets for model, state;
   // 状態の遷移は、as で書く（宛先の後ろの「:」は、なくした書き方）
   effect fn oldTransition(): effects rows: HasItems -> Empty;   // ERROR: SYNTAX
+  // キーが決まっていない構造は、インデックスの model で書く（Record<K, V> は、なくした書き方）
+  model OldRecord { attrs: Record<string, M>; }  // ERROR: SYNTAX
+  model ByName { [name: string]: M; }
+  model NewIndex { attrs: ByName; }
   fn leaf(m: M);
   read fn all(): M[] reads rows;
   effect fn add(m: M): effects rows.post;

@@ -19,6 +19,9 @@ type OutputFile = inner.OutputFile
 // Position は位置（1 始まりの行と列）
 type Position = inner.Position
 
+// DiagnosticData は指摘の、機械が読む補足（docs/check.md「Data」）。項目の名前から、値の並びを引く
+type DiagnosticData = inner.DiagnosticData
+
 // Diagnostic は検査やプラグインが報告する一件の指摘（docs/diagnostics.md）
 type Diagnostic = inner.Diagnostic
 

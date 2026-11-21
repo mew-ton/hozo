@@ -37,6 +37,7 @@ namespace vault {
   scalar Flag extends boolean;
 
   model Tag { name: string; }
+  model Labels { [name: string]: string; }
 
   /** フィールドの名前が、Go の予約語、事前宣言の識別子、import するパッケージの名前、このファイルが使う名前と同じ */
   model Secret {
@@ -46,7 +47,7 @@ namespace vault {
     @db.bool args: Flag;
     @db.datetime type: datetime;
     @db.json string: Tag[];
-    @db.json json: Record<string, string>;
+    @db.json json: Labels;
     @db.json any: Tag?;
     @db.datetime time: datetime?;
     @db.int sql: duration;
@@ -78,7 +79,7 @@ namespace vault {
 
   /** import するパッケージの名前 */
   @db.list
-  read fn byImports(json: Record<string, string>, sql: duration, runtime: string): Secret[] reads secrets;
+  read fn byImports(json: Labels, sql: duration, runtime: string): Secret[] reads secrets;
 
   /** このファイルの非公開の名前と、継ぎ目のメソッドのレシーバ s */
   @db.list

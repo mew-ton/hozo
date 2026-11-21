@@ -4,12 +4,14 @@ namespace app {
   union Shape { Dot: Card; Label: string; }
   model Drawing { title: string; shape: Shape; }
   model Album { drawings: Drawing[]; }
+  model ShapesByName { [name: string]: Shape[]; }
+  model CardsByName { [name: string]: Card[]; }
 
   // 本文の項目: union そのもの、union を中に持つ model
   model ShapeIn { @http.body shape: Shape; }
   @http.post("/shape")
   export fn putShape(in: ShapeIn);
-  model AlbumIn { @http.query id: string?; @http.body album: Album?; @http.body("names") byName: Record<string, Shape[]>; }
+  model AlbumIn { @http.query id: string?; @http.body album: Album?; @http.body("names") byName: ShapesByName; }
   @http.post("/album")
   export fn putAlbum(in: AlbumIn);
 
@@ -39,7 +41,7 @@ namespace app {
   // ステータスを持たない例外の引数は、通信に現れないので、当たらない。union を持たない型も、当たらない
   exception Quiet(value: Drawing);
   @http.status(404)
-  exception Missing(card: Card, cards: Record<string, Card[]>?);
+  exception Missing(card: Card, cards: CardsByName?);
   @http.get("/quiet")
   export fn quiet(): Card
     throws Quiet, Missing;

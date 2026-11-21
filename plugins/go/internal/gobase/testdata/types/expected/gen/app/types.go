@@ -36,6 +36,12 @@ type Day runtime.Date
 // Clock は scalar app.Clock。
 type Clock runtime.TimeOfDay
 
+// Counts は名前ごとの数。インデックスの model は、名前付きのマップの型
+type Counts map[string]int64
+
+// UsersById はキーが scalar で、値が省略可能な model の、インデックスの model
+type UsersById map[Id]*User
+
 // User は利用者。
 //
 // 二つ目の段。
@@ -45,7 +51,7 @@ type User struct {
 	Name     string             `json:"name"`
 	Nick     *string            `json:"nick,omitempty"`
 	Tags     []string           `json:"tags"`
-	Attrs    map[string]int64   `json:"attrs"`
+	Attrs    Counts             `json:"attrs"`
 	Born     time.Time          `json:"born"`
 	Wait     *time.Duration     `json:"wait,omitempty"`
 	Birthday runtime.Date       `json:"birthday"`
@@ -76,7 +82,7 @@ type Public struct {
 	Id       AdminId            `json:"id"`
 	Name     string             `json:"name"`
 	Tags     []string           `json:"tags"`
-	Attrs    map[string]int64   `json:"attrs"`
+	Attrs    Counts             `json:"attrs"`
 	Born     time.Time          `json:"born"`
 	Wait     *time.Duration     `json:"wait,omitempty"`
 	Birthday runtime.Date       `json:"birthday"`
@@ -98,7 +104,7 @@ type Renamed struct {
 	Id       Id                 `json:"id"`
 	Name     string             `json:"name"`
 	Nick     *string            `json:"nick,omitempty"`
-	Attrs    map[string]int64   `json:"attrs"`
+	Attrs    Counts             `json:"attrs"`
 	Born     time.Time          `json:"born"`
 	Wait     *time.Duration     `json:"wait,omitempty"`
 	Birthday runtime.Date       `json:"birthday"`

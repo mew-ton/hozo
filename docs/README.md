@@ -18,7 +18,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`grammar.md`](grammar.md) | 字句と構文（EBNF） | `internal/syntax` |
 | [`ir.md`](ir.md) | IR の構造、正規化、JSON、その名前空間から見た IR | `ir`、`internal/sema` |
 | [`resolve.md`](resolve.md) | 名前の解決 | `internal/sema` |
-| [`types.md`](types.md) | 型の互換、形の書き方、継承した model、絞り込み、式の型 | `internal/sema` |
+| [`types.md`](types.md) | 型の互換、形の書き方、継承した model、インデックスの model、絞り込み、式の型 | `internal/sema` |
 | [`check.md`](check.md) | 状態の形、分類、`export` などの op の規則、例外・効果・読む状態・純粋さ・`bind` の計算と、規則ごとの検査 | `internal/check` |
 | [`config.md`](config.md) | `hozo.toml`: 単位、基底と相乗り、オプション、継ぎ目、型の置き場 | `internal/config`、`internal/project`、`internal/check` |
 | [`vocab.md`](vocab.md) | 標準の語彙 | `vocab/`、`internal/vocab` |
@@ -89,6 +89,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | 項目の形、全体の形（要求のどこから読むか） | `plugin-go-http.md`「対象」（語彙は `vocab.md`「`http` の語彙」） |
 | 形の語、状態の型 | `types.md`「形の書き方」 |
 | 継承した model、元の model、継承している | `types.md`「継承した model」 |
+| インデックスの model（本体にインデックス `[名前: K]: V;` を書いた model。キーが決まっていない構造） | `types.md`「インデックスの model」 |
 | 絞り込み、型で決まる絞り込み、述語の要る絞り込み | `types.md`「絞り込み」 |
 | 「値がない」「返らない」（式の型） | `types.md`「型の種類」 |
 | 状態の単位（生成した Go の中の、状態ごとのインターフェース。設定の単位とは別） | `plugin-go.md`「状態の単位」 |

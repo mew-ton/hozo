@@ -1,0 +1,9 @@
+// RES-3（docs/types.md「インデックスの model」）: インデックスの model は、フィールドを持たない。キーの名前も、フィールドではない
+namespace a {
+  model Labels { [name: string]: string; }
+  model Holder { labels: Labels; }
+  fn takeString(s: string);
+  fn f(h: Holder) {
+    takeString(h.labels.name);         // ERROR: RES-3
+  }
+}

@@ -181,7 +181,7 @@ func (f *file) model(m *ir.Model) string {
 }
 
 // value は、値一つの検査（docs/plugin-go-valid.md「model」の 1 と 2、包まれた型の表）: expr はその値の Go の式、path は違反の
-// Path、t は型、cons は、その値に付いた制約（フィールドそのものの値だけが持つ）。depth は、配列と record の入れ子の深さ
+// Path、t は型、cons は、その値に付いた制約（フィールドそのものの値だけが持つ）。depth は、配列とインデックスの model の入れ子の深さ
 // （i0、x0、k0 の番号）。violations は、違反を集める変数の名前。確かめるものがなければ ""。
 func (f *file) value(expr string, path pathExpr, t ir.Type, cons []constraint, depth int, violations string) string {
 	switch x := t.(type) {
@@ -189,7 +189,7 @@ func (f *file) value(expr string, path pathExpr, t ir.Type, cons []constraint, d
 		return f.value(expr, path, x.Of, cons, depth, violations)
 	case ir.OptionalType:
 		if golang.IsNillable(x.Of, f.g.p) {
-			// Go でポインタにならない（array、record の nil が「なし」）: そのまま回す
+			// Go でポインタにならない（array、インデックスの model の nil が「なし」）: そのまま回す
 			return f.value(expr, path, x.Of, cons, depth, violations)
 		}
 		inner := f.value("*"+expr, path, x.Of, cons, depth, violations)
@@ -198,21 +198,24 @@ func (f *file) value(expr string, path pathExpr, t ir.Type, cons []constraint, d
 		}
 		return fmt.Sprintf("if %s != nil {\n%s}\n", expr, inner)
 	case ir.ArrayType:
-		if _, ok := f.g.validatedRef(through(x.Of)); !ok {
+		if _, ok := f.g.validatedRef(f.g.through(x.Of)); !ok {
 			return ""
 		}
 		i, elem := "i"+strconv.Itoa(depth), "x"+strconv.Itoa(depth)
 		index := part{text: f.im.Add("strconv", "strconv") + ".Itoa(" + i + ")"}
 		inner := f.value(elem, path.index(index), x.Of, nil, depth+1, violations)
 		return fmt.Sprintf("for %s, %s := range %s {\n%s}\n", i, elem, expr, inner)
-	case ir.RecordType:
-		if _, ok := f.g.validatedRef(through(x.Value)); !ok {
-			return ""
+	case ir.RefType:
+		// インデックスの model: キーの辞書順に、値を回す（docs/plugin-go-valid.md「model」の表）
+		if idx := f.g.p.IndexOf(x); idx != nil {
+			if _, ok := f.g.validatedRef(f.g.through(idx.Value)); !ok {
+				return ""
+			}
+			f.usesKeys = true
+			k, elem := "k"+strconv.Itoa(depth), "x"+strconv.Itoa(depth)
+			inner := f.value(elem, path.index(part{text: "string(" + k + ")"}), idx.Value, nil, depth+1, violations)
+			return fmt.Sprintf("for _, %s := range %s(%s) {\n%s := %s[%s]\n%s}\n", k, helperKeys, expr, elem, expr, k, inner)
 		}
-		f.usesKeys = true
-		k, elem := "k"+strconv.Itoa(depth), "x"+strconv.Itoa(depth)
-		inner := f.value(elem, path.index(part{text: "string(" + k + ")"}), x.Value, nil, depth+1, violations)
-		return fmt.Sprintf("for _, %s := range %s(%s) {\n%s := %s[%s]\n%s}\n", k, helperKeys, expr, elem, expr, k, inner)
 	}
 	var b strings.Builder
 	if _, ok := f.g.validatedRef(t); ok {
@@ -238,7 +241,7 @@ type part struct {
 // pathExpr は、違反の Path の Go の式（部分を + でつないだもの）。
 type pathExpr []part
 
-// index は、p の後ろに `[<式>]` を足した式（配列の添字、record のキー）。
+// index は、p の後ろに `[<式>]` を足した式（配列の添字、インデックスの model のキー）。
 func (p pathExpr) index(expr part) pathExpr {
 	out := append(pathExpr{}, p...)
 	return append(out, part{text: "[", literal: true}, expr, part{text: "]", literal: true})
@@ -294,7 +297,7 @@ func %[1]s(dst []%[2]s.Violation, path string, err error) []%[2]s.Violation {
 `, helperAppend, rt, errs)
 }
 
-// keysHelper は、補助の関数 validKeys: record のキーを辞書順に並べる（docs/plugin-go-valid.md「model」の record の行）。
+// keysHelper は、補助の関数 validKeys: インデックスの model のキーを辞書順に並べる（docs/plugin-go-valid.md「model」の表）。
 func (f *file) keysHelper() string {
 	return fmt.Sprintf(`// %[1]s は m のキーを、辞書順に並べて返す。
 func %[1]s[K ~string, V any](m map[K]V) []K {

@@ -95,7 +95,7 @@ type armType struct {
 }
 
 // armTypes は union u のアームの Go の型（docs/plugin-go.md「union」）: アームの型が、u を宣言した名前空間の model への ref なら、
-// その構造体。それ以外（別の名前空間の model、scalar、核の型、optional、array、record、union）は、包む型 `<Union><アーム名>`。
+// その構造体。それ以外（別の名前空間の model、scalar、核の型、optional、array、union）は、包む型 `<Union><アーム名>`。
 func (e *emitter) armTypes(u *ir.Union) []armType {
 	ns := e.declNS[u.Name]
 	var out []armType
@@ -159,9 +159,14 @@ func (e *emitter) genTypes() *fileGen {
 }
 
 // genModel は model 一つ: 構造体だけ（docs/plugin-go.md「model」: 値を作る関数は出さない。フィールドの既定値は、言語にない）。
+// インデックスの model は、名前付きのマップの型。
 func (e *emitter) genModel(f *fileGen, m *ir.Model) {
 	name := e.typeName(m.Name)
 	f.print(e.modelComment(m))
+	if m.Index != nil {
+		f.printf("type %s map[%s]%s\n\n", name, f.goType(m.Index.Key), f.goType(m.Index.Value))
+		return
+	}
 	if len(m.Fields) == 0 {
 		f.printf("type %s struct{}\n\n", name)
 	} else {

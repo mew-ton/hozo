@@ -1,0 +1,8 @@
+// TYPE-5（docs/types.md「当てはまる」「インデックスの model」）: インデックスの model は、フィールドを持たない。フィールドを書いたレコードリテラルは、当てはまらない
+namespace a {
+  model Labels { [name: string]: string; }
+  fn take(v: Labels);
+  fn f() {
+    take({ color: "red" });            // ERROR: TYPE-5
+  }
+}

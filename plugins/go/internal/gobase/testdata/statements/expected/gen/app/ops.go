@@ -130,7 +130,7 @@ type Ops interface {
 	AsItems(ctx context.Context) ([]Item, error)
 
 	// AsTable は op app.asTable。
-	AsTable(ctx context.Context) (map[string]int64, error)
+	AsTable(ctx context.Context) (Counts, error)
 
 	// AsOptional は op app.asOptional。
 	AsOptional(ctx context.Context) (*Item, error)
@@ -166,7 +166,7 @@ type Ops interface {
 	ZeroItems(ctx context.Context) ([]Item, error)
 
 	// ZeroTable は op app.zeroTable。
-	ZeroTable(ctx context.Context) (map[string]int64, error)
+	ZeroTable(ctx context.Context) (Counts, error)
 
 	// ZeroOptional は op app.zeroOptional。
 	ZeroOptional(ctx context.Context) (*Item, error)
@@ -238,7 +238,7 @@ type Leaves interface {
 	AsItems(ctx context.Context) ([]Item, error)
 
 	// AsTable は op app.asTable。
-	AsTable(ctx context.Context) (map[string]int64, error)
+	AsTable(ctx context.Context) (Counts, error)
 
 	// AsOptional は op app.asOptional。
 	AsOptional(ctx context.Context) (*Item, error)
@@ -342,7 +342,7 @@ func (o *ops) AsItems(ctx context.Context) ([]Item, error) {
 	return o.leaves.AsItems(ctx)
 }
 
-func (o *ops) AsTable(ctx context.Context) (map[string]int64, error) {
+func (o *ops) AsTable(ctx context.Context) (Counts, error) {
 	return o.leaves.AsTable(ctx)
 }
 

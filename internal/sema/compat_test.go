@@ -26,6 +26,8 @@ namespace a {
   union Page { Ready: User; Missing: Other; }
   classify C of User { A; B; }
   classify D of User { A; }
+  model ByName { [name: string]: User; }
+  model ByName2 { [name: string]: User; }
 }`}, false)
 	a := analyze(fs, files)
 	if n := len(a.diags); n > 0 {
@@ -118,16 +120,22 @@ func TestCompatRule6Array(t *testing.T) {
 	}
 }
 
-func TestCompatRule7Record(t *testing.T) {
+// TestCompatIndexModel は、インデックスの model（docs/types.md「インデックスの model」）: ほかの model と同じに、名前で比べる。
+// キーと値の型が同じでも、別の model には渡せない（規則 7 は欠番）。
+func TestCompatIndexModel(t *testing.T) {
 	a := compatAnalyzer(t)
-	if !a.assignType(ir.Record(ir.String(), email), ir.Record(ir.String(), ir.String())) {
-		t.Error("キーが等しく値が渡せれば Record も渡せる")
+	byName, byName2 := ir.Ref("a.ByName"), ir.Ref("a.ByName2")
+	if m := a.models["a.ByName"]; m == nil || m.Index == nil || m.Index.Name != "name" || !ir.TypeEqual(m.Index.Key, ir.String()) || !ir.TypeEqual(m.Index.Value, user) || len(m.Fields) != 0 {
+		t.Fatalf("a.ByName のインデックス = %+v", m)
 	}
-	if a.assignType(ir.Record(ir.String(), user), ir.Record(ir.String(), publicUser)) {
-		t.Error("値が別の model なら渡せない")
+	if !a.assignType(byName, byName) {
+		t.Error("同じインデックスの model は渡せる")
 	}
-	if a.assignType(ir.Record(email, user), ir.Record(ir.String(), user)) {
-		t.Error("キーが違えば渡せない（Email と string は別）")
+	if !a.assignType(byName, ir.Optional(byName)) {
+		t.Error("インデックスの model は、その optional に渡せる")
+	}
+	if a.assignType(byName, byName2) {
+		t.Error("キーと値の型が同じでも、別のインデックスの model には渡せない")
 	}
 }
 
@@ -193,8 +201,6 @@ func TestChangeable(t *testing.T) {
 		{"4 optional の中", ir.Optional(user), ir.Optional(admin), true, false},
 		{"4 optional の中を広げる", ir.Optional(user), ir.Optional(page), true, true},
 		{"5 array の中", ir.Array(ir.String()), ir.Array(email), true, false},
-		{"6 record の値", ir.Record(ir.String(), user), ir.Record(ir.String(), page), true, true},
-		{"6 record のキーは変えられない", ir.Record(ir.String(), user), ir.Record(email, user), false, false},
 		{"必須を省略可能にできない", user, ir.Optional(user), false, false},
 		{"省略可能を必須にできない", ir.Optional(user), user, false, false},
 		{"関係のない型", user, other, false, false},

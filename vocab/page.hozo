@@ -5,6 +5,9 @@ namespace page {
   /** ルートの位置（path と params） */
   scalar Route extends string;
 
+  /** URL のクエリ。名前から、値の並びを引く */
+  model Query { [name: string]: string[]; }
+
   decorator path for state;
   decorator query for state;
   decorator route(path: string, from: any state?, onInvalid: any effect?);

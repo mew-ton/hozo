@@ -7,6 +7,7 @@ namespace app {
   model Address { city: string; zip: string?; tags: string[]; }
   model Profile { name: string; address: Address?; nick: string?; age: int?; active: boolean?; }
   model Account { id: string; profile: Profile?; email: Email; }
+  model Labels { [name: string]: string; }
   model Options { limit: int?; label: string?; ratio: float?; wait: duration?; note: string?; }
   /** 大きさ（述語で決まる分類。ケースで絞り込んだ型 Size.Big<Address> を作るため） */
   classify Size of Address {
@@ -30,7 +31,8 @@ namespace app {
   export fn takeOptionalTags(v: string[]?);
   export fn takeStrings(v: string[]);
   export fn takeOptionalStrings(v: string?[]);
-  export fn takeTable(v: Record<string, string>);
+  export fn takeTable(v: Labels);
+  export fn takeOptionalTable(v: Labels?);
 
   // 「値」name（パスなし）、name のパス、none
   export fn names(account: Account)
@@ -81,12 +83,20 @@ namespace app {
     takeOptionalString(email);
   }
 
-  // 「型をそろえる」array / record の要素をそろえる（その文の前のループ。nil は nil のまま）
-  export fn elements(emails: Email[], names: string[], byName: Record<string, Email>)
+  // 「型をそろえる」array の要素をそろえる（その文の前のループ。nil は nil のまま）
+  export fn elements(emails: Email[], names: string[])
   {
     takeStrings(emails);
     takeOptionalStrings(names);
+  }
+
+  // 「値」インデックスの model: そのまま渡す。省略可能な位置にも、そのまま（nil が「なし」）。空のレコードリテラルは、空のマップ
+  export fn tables(byName: Labels)
+  {
     takeTable(byName);
+    takeOptionalTable(byName);
+    takeTable({});
+    takeOptionalTable({});
   }
 
   // 「型をそろえる」case(…) → of（Go では同じ型）

@@ -215,7 +215,7 @@ func single(m *model, cols map[*column]bool) bool {
 
 // literalFits は、@db.where のリテラル lit を、列 c の型に渡せるか（docs/plugin-go-sqlite.md「read の中身」）: 列のフィールドの型
 // （scalar は元の核の型。省略可能は外して見る）に、docs/types.md「互換」の 10 で渡せる（整数のリテラルは float にも）。
-// datetime、date、time、duration、array、record、model の列には、渡せるリテラルがない。
+// datetime、date、time、duration、array、model（インデックスの model を含む）の列には、渡せるリテラルがない。
 func (e *emitter) literalFits(lit ir.Literal, c *column) bool {
 	inner := c.typ
 	if o, ok := inner.(ir.OptionalType); ok {

@@ -8,7 +8,7 @@ import "github.com/mew-ton/hozo/gen/browser/inner"
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type TokenState = inner.TokenState
 
-// QueryState は状態 browser.query（single<Record<string, string[]>>）の単位。実装は New の引数 query に渡す。
+// QueryState は状態 browser.query（single<page.Query>）の単位。実装は New の引数 query に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type QueryState = inner.QueryState
 

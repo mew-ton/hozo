@@ -5,6 +5,7 @@ namespace app {
   scalar Count extends int;
   scalar Stamp extends datetime;
   model Tag { name: string; }
+  model CountsByName { [name: string]: Count; }
 
   model Row {
     @db.key @db.text id: string;
@@ -43,7 +44,7 @@ namespace app {
     @db.datetime stamp: Stamp;
     @db.json tag: Tag;
     @db.json tags: Name[];
-    @db.json byName: Record<string, Count>;
+    @db.json byName: CountsByName;
     @db.float ratio: float?;
   }
 

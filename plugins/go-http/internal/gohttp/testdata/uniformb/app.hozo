@@ -10,6 +10,8 @@ namespace app {
   scalar Name extends string;
 
   model Paging { page: Page?; q: Name?; }
+  model ItemLists { [name: string]: Item[]; }
+  model ItemsByName { [name: string]: Item; }
   model Meta { tenant: Token?; }
   model Item { @valid.length(min: 1) name: Name; tags: string[]; at: datetime?; }
 
@@ -35,7 +37,7 @@ namespace app {
   model PutInput {
     @http.header @http.default("en") lang: Name;
     @http.body item: Item?;
-    @http.body("memo") note: Record<string, Item[]>;
+    @http.body("memo") note: ItemLists;
     @http.body @http.required count: float;
     @http.body @http.default(1) copies: Page;
   }
@@ -49,5 +51,5 @@ namespace app {
     @http.bodyObj item: Item;
   }
   @http.post("/all")
-  export fn all(in: AllInput): Record<string, Item>;
+  export fn all(in: AllInput): ItemsByName;
 }

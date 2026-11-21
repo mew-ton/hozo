@@ -14,3 +14,6 @@ var _ runtime.Exception = Aborted{}
 
 // Route はルートの位置（path と params）
 type Route string
+
+// Query は URL のクエリ。名前から、値の並びを引く
+type Query map[string][]string

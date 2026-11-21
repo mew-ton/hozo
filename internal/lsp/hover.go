@@ -311,6 +311,10 @@ func (r *renderer) head(d ir.Decl) string {
 		if d.Extends != nil {
 			s += " extends " + r.rel(d.Extends.Base)
 		}
+		if d.Index != nil {
+			// インデックスの model は、インデックスまで出す（docs/lsp.md「ホバー」）
+			s += " { [" + d.Index.Name + ": " + r.typ(d.Index.Key) + "]: " + r.typ(d.Index.Value) + " }"
+		}
 		return s
 	case *ir.Scalar:
 		return "scalar " + name + " extends " + r.typ(d.Base)
@@ -523,8 +527,6 @@ func (r *renderer) typ(t ir.Type) string {
 		return r.typ(t.Of) + "?"
 	case ir.ArrayType:
 		return r.typ(t.Of) + "[]"
-	case ir.RecordType:
-		return "Record<" + r.typ(t.Key) + ", " + r.typ(t.Value) + ">"
 	case ir.CaseType:
 		cases := strings.Join(t.Cases, ", ")
 		if len(t.Cases) != 1 {

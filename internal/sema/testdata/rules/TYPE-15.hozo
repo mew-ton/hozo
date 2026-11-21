@@ -6,13 +6,15 @@ namespace a {
   model Profile { nick: string; }
   model Wide extends Profile { }
   union Status { Active: Profile; Pending: Other; }
+  model ByName { [name: string]: Profile; }
+  model ByEmail { [email: Email]: Profile; }
   model User {
     id: string;
     email: Email;
     profile: Profile;
     nick: string?;
     tags: string[];
-    attrs: Record<string, Profile>;
+    attrs: ByName;
     status: Status;
     wide: Wide;
   }
@@ -23,7 +25,8 @@ namespace a {
     override profile: Profile?;                    // ERROR: TYPE-15
     override nick: string;                         // ERROR: TYPE-15
     override tags: string;                         // ERROR: TYPE-15
-    override attrs: Record<Email, Profile>;        // ERROR: TYPE-15
+    // インデックスの model は、別のインデックスの model に変えられない（名前で比べる）
+    override attrs: ByEmail;                       // ERROR: TYPE-15
     // union から元の型には戻せない。継承した型から元の型にも戻せない
     override status: Profile;                      // ERROR: TYPE-15
     override wide: Profile;                        // ERROR: TYPE-15

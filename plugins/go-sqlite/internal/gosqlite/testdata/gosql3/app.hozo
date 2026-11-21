@@ -1,9 +1,11 @@
 // GOSQL-3（docs/plugin-go-sqlite.md「しまい方」）: 表の model に、どのしまい方でも列にできない型のフィールドがある
-// （union と、union を中に持つ array / record / model）。位置は model。フィールドごとに一つ。同じ model の表の状態が二つあっても、一度だけ。
+// （union と、union を中に持つ array / model。model は、インデックスの model を含む）。位置は model。フィールドごとに一つ。同じ model の表の状態が二つあっても、一度だけ。
 
 namespace app {
   model Circle { r: float; }
   union Shape { Circle: Circle; Other: string; }
+  /** union を値に持つ、インデックスの model */
+  model ShapesByName { [name: string]: Shape; }
   /** union を中に持つ model */
   model Frame { shape: Shape; }
   /** union を、model を二つ辿った先に持つ model */
@@ -16,7 +18,7 @@ namespace app {
     @db.json shape: Shape;
     @db.json maybe: Shape?;
     @db.json shapes: Shape[];
-    @db.json byName: Record<string, Shape>;
+    @db.json byName: ShapesByName;
     @db.json frame: Frame;
     @db.json albums: Album[]?;
     // しまい方が @db.json でなくても、同じ（合わないしまい方 GOSQL-17 とは、重ねて報告しない）

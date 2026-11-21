@@ -1,0 +1,6 @@
+// TYPE-10（docs/types.md「診断」「インデックスの model」）: インデックスの model は、extends の元に、できない
+namespace a {
+  model Attrs { [name: string]: string; }
+  model More extends Attrs { extra: string; }   // ERROR: TYPE-10
+  fn f(a: Attrs): More;
+}

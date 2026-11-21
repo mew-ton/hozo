@@ -310,6 +310,13 @@ func (m Maps) Validate() error {
 			violations = validAppend(violations, "opt["+string(k0)+"]", (*x0).Validate())
 		}
 	}
+	for _, k0 := range validKeys(m.Nested) {
+		x0 := m.Nested[k0]
+		for _, k1 := range validKeys(x0) {
+			x1 := x0[k1]
+			violations = validAppend(violations, "nested["+string(k0)+"]["+string(k1)+"]", x1.Validate())
+		}
+	}
 	if len(violations) == 0 {
 		return nil
 	}

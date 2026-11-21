@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.13";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.14";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -68,7 +68,6 @@ type Type =
   | { kind: "ref"; target: string }                    // model / scalar / union の FQN
   | { kind: "optional"; of: Type }
   | { kind: "array"; of: Type }
-  | { kind: "record"; key: Type; value: Type }
   | { kind: "case"; classify: string; cases: string[]; of: Type }    // 絞り込まれた型。cases は昇順ではなく match のアームに書かれた順
   | { kind: "never" };                                               // 当たる値がない。Op.returns（決して値を返さない）と、
                                                                      // 対象のない分類の Classify.subject.type にだけ現れる
@@ -84,7 +83,14 @@ type Type =
 ```ts
 interface Model extends DeclBase {
   kind: "model";
-  fields: Field[];                // 継承した model なら、受け継いだ分も入れた展開済みの並び（docs/types.md「継承した model」の「フィールド」）
+  fields: Field[];                // 継承した model なら、受け継いだ分も入れた展開済みの並び（docs/types.md「継承した model」の「フィールド」）。
+                                  // インデックスの model なら []
+  index?: {                       // インデックスの model（`model Attrs { [name: string]: string[]; }`。docs/types.md「インデックスの model」）
+    name: string;                 // キーの名前（説明のための名前）
+    key: Type;                    // キーの型（string か、元が string の scalar）
+    value: Type;                  // 値の型
+    span: Span;                   // インデックスの位置（`[` から `;` まで）
+  };
   extends?: {                     // 継承した model（`model D extends B { ... }`）の記録
     base: string;                 // 元の model の FQN（直接の元）
     removed: string[];            // `override f: never;` でなくしたフィールドの名前（書かれた順）
@@ -487,7 +493,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.13";
+  version: "0.14";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -545,10 +551,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.13"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.14"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.14 | 型の種類 `record` をなくし、`Model.index`（インデックスの model: キーの名前、キーの型、値の型）を足した。`Record<K, V>` は、インデックスの model を宣言して、その名前（`ref`）で書く（`docs/grammar.md`「model」、`docs/types.md`「インデックスの model」） |
 | 0.13 | 核の型の名前（`Type` の `core` の `name`）: `Time` を `datetime` に、`Duration` を `duration` に替え、`date` と `time` を足した（`docs/grammar.md`「型」）。デコレータの宣言の、付ける先の並びの区切りが `,` になったこと（`docs/grammar.md`「decorator の宣言」）は、綴りだけで、`Decorator.targets` の形は、変わらない |
 | 0.12 | `Effect.throws`（効果が投げうる例外。`docs/check.md`「read と効果」）。効果の呼び出しと、運ばれた効果が、`Signature.exceptions` に例外を足しうる。`View` とやり取りの形は 0.11 と同じ |
 | 0.11 | `CaseKind.subject` が、文字列の `"never"` から、`Type` になった（対象の型で絞る `case of <型>`。`docs/grammar.md`「decorator の宣言」）。`of never` は、kind が `never` の型。`View` とやり取りの形は 0.10 と同じ |

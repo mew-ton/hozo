@@ -188,7 +188,7 @@ func PackageName(namespace string) string
 
 // 型（同「型」）
 func GoType(t ir.Type, imports *Imports) string   // 型の文字列。必要な import を imports に足す
-func IsNillable(t ir.Type, p *ir.Program) bool    // Go の零値 nil が「なし」を表せる型か（array、record、union）。optional(T) を *T にしない型
+func IsNillable(t ir.Type, p *ir.Program) bool    // Go の零値 nil が「なし」を表せる型か（array、インデックスの model、union）。optional(T) を *T にしない型
 func Zero(t ir.Type, imports *Imports) string     // 零値の式（同「呼び出し」）
 func TypeDisplay(t ir.Type) string                // コメントの中の型（同「コメント」の「型の表示」）
 func RowDisplay(e *ir.Effect) string              // コメントの中の行の遷移（同「コメント」の「行の遷移の表示」）。行の遷移を持たない効果は ""

@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.13"
+protocol = "0.14"
 
 [[transpiler]]
 name     = "go"
@@ -163,10 +163,9 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | `string` / `boolean` / `int` / `float` | `string` / `bool` / `int64` / `float64` |
 | `datetime` / `duration` | `time.Time` / `time.Duration` |
 | `date` / `time` | `runtime.Date` / `runtime.TimeOfDay`（Go に、日付だけ、時刻だけの型がないので、「runtime パッケージ」が持つ） |
-| `optional(T)` | T が `array`、`record`、union（`arms`）への `ref` ならそのまま（`nil` が「なし」）。それ以外は `*T` |
+| `optional(T)` | T が `array`、インデックスの model への `ref`、union（`arms`）への `ref` ならそのまま（`nil` が「なし」）。それ以外は `*T` |
 | `array(T)` | `[]T` |
-| `record(K, V)` | `map[K]V` |
-| model への `ref` | 構造体の型 |
+| model への `ref` | 構造体の型。インデックスの model なら、名前付きのマップの型（「model」） |
 | scalar への `ref` | 名前付きの型 |
 | union（`arms`）への `ref` | インターフェースの型 |
 | `case(C, cases, of)` | `of` の型（絞り込みは Go の型にしない） |
@@ -189,6 +188,7 @@ type User struct {
 - フィールドは `Model.fields` の順。フィールドの説明は、フィールドの前の行のコメント。
 - **継承した model**（`Model.extends`）は、元の model とは別の、普通の構造体。フィールドは展開済みの `fields`（なくしたフィールドは、もうない）。元の model から写す関数は出さない。コメントに継承の一行を足す（「コメント」）。
 - union のアームの合成 model には、union のマーカーメソッドを足す（「union」）。
+- **インデックスの model**（`Model.index`。`docs/types.md`「インデックスの model」）は、構造体ではなく、名前付きのマップの型: `type Attrs map[string][]string`（キーと値の Go の型は、この表のとおり）。コメントは、ほかの model と同じ。値のないマップ（`nil`）は、空の構造と同じに扱う。
 - model から出すのは、構造体だけ。値を作る関数（初めの値を入れる関数）は出さない: フィールドの既定値は、言語にない（`docs/decisions.md`「設計書から離れた決定」S24）。使う側は、零値（`var in <Model>`、`<Model>{}`）から始め、決まった値を入れるのは、それを言うデコレータを読む相乗り（`docs/plugin-go-http.md`「入力の読み方」、`docs/plugin-go-cli.md`「引数の解釈」）。
 
 ### scalar
@@ -213,7 +213,7 @@ func (OrderPageEmpty) isOrderPage() {}
 - `variant: "set"` の union は Go の型にしない（例外と効果の集合は `throws` と `effects` に展開済み）。
 - マーカーメソッドは、アームの順に、インターフェースの直後に並べる。
 - アームの型が、**N の model への `ref`**（その場で書いた合成 model を含む）なら、その構造体にマーカーを生やす。
-- それ以外のアームの型（別の名前空間の model、scalar、核の型、`optional`、`array`、`record`、union）は、マーカーをその型に生やせないので、定義のパッケージに包む型 `type <Union><アーム名> struct{ Value <型> }` を作り、それにマーカーを生やす。包む型は、マーカーメソッドの並びの後ろに、アームの順で置く。
+- それ以外のアームの型（別の名前空間の model、scalar、核の型、`optional`、`array`、union）は、マーカーをその型に生やせないので、定義のパッケージに包む型 `type <Union><アーム名> struct{ Value <型> }` を作り、それにマーカーを生やす。包む型は、マーカーメソッドの並びの後ろに、アームの順で置く。
 
 ### exception
 
@@ -478,7 +478,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 - `read` と効果を呼べるのは、宣言した名前空間の配線だけ（NS-6。`docs/check.md`「配線からの呼び出し」）なので、呼ぶ先は、いつも N の状態の単位。単位は「状態の単位」の表のとおり。
 - 状態を名前で読むこと（名前を付けない `read`）は、呼び出しではなく、値（「状態の参照」）。
 - **失敗の扱い**: 呼び出しは、どれも `error` を返す（「op の形」）。その結果を`val` か文で受ける呼び出しは、すぐ後に `if err != nil { return <零値>, err }` を置く（`<零値>` は、この配線の戻り値の型の零値。戻り値がなければ `return err`）。配線も、いつも `error` を返すので、返す先は、いつもある。受け取った `error` は、包まず、そのまま返す。
-- **零値**: ポインタ・インターフェース・スライス・マップは `nil`、構造体は `<型>{}`、`time.Time`、`runtime.Date`、`runtime.TimeOfDay` は `<型>{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
+- **零値**: ポインタ・インターフェース・スライス・マップ（インデックスの model を含む）は `nil`、構造体は `<型>{}`、`time.Time`、`runtime.Date`、`runtime.TimeOfDay` は `<型>{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
 
 ### 値
 
@@ -491,7 +491,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 | `state` | その文の前で読んだ値（「状態の参照」）と、パス |
 | `literal` | 文字列は Go の文字列リテラル（`strconv.Quote`）、整数は 10 進、小数は `strconv.FormatFloat(v, 'g', -1, 64)`（`.` も `e` も含まなければ `.0` を足す）、真偽値は `true` / `false`、`duration` は `time.Duration(<ナノ秒>)` |
 | `none` | `nil` |
-| `record` | 当てはめる model の構造体リテラル `<型>{<フィールド>: <値>, …}`。並びは model のフィールドの順。書かれていないフィールド（省略可能なフィールドだけ。`docs/types.md`「当てはまる」）は書かず、零値のまま。当てはめる型が省略可能なら `&<型>{…}` |
+| `record` | 当てはめる model の構造体リテラル `<型>{<フィールド>: <値>, …}`。並びは model のフィールドの順。書かれていないフィールド（省略可能なフィールドだけ。`docs/types.md`「当てはまる」）は書かず、零値のまま。当てはめる型が省略可能なら `&<型>{…}`。インデックスの model に当てはまるのは、空のリテラルだけで、`<型>{}`（空のマップ。省略可能でも、`&` を付けない） |
 
 - **絞り込まれた対象**（`match` のアームの中の、対象と同じ `Atom`。`docs/types.md`「アームの中の対象の型」）は、「match」の「絞り込んだ値」の式に置き換えてから、上の表を当てる。
 - **型をそろえる**: 値の型が、当てはめる型と Go で違うとき（`docs/types.md`「互換」の規則で渡せる組）は、次のように包む。
@@ -499,9 +499,9 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 | 値の型 → 当てはめる型 | Go |
 |---|---|
 | T → `optional(T)` で、Go の型が `*T` | `ptr(<式>)`。リテラルは `ptr(<T の Go の型>(<リテラル>))` |
-| T → `optional(T)` で、Go の型がそのまま（`array`、`record`、union） | そのまま |
+| T → `optional(T)` で、Go の型がそのまま（`array`、インデックスの model、union） | そのまま |
 | scalar → その元の型（規則 11） | `<元の型>(<式>)` |
-| `array` / `record` で、要素の型をそろえる必要があるもの | 同じ長さのスライス（同じキーのマップ）を作り、要素ごとにそろえて写すループを、その文の前に置く。値が `nil` なら `nil` のまま |
+| `array` で、要素の型をそろえる必要があるもの | 同じ長さのスライスを作り、要素ごとにそろえて写すループを、その文の前に置く。値が `nil` なら `nil` のまま |
 | `case(…)` → `of`、`case` どうし | そのまま（Go では同じ型） |
 
 - `ptr` は `func ptr[T any](v T) *T { return &v }`。`wiring.go` が使っていれば、その末尾に一つだけ出す（「ファイル」）。
@@ -624,7 +624,7 @@ if err != nil {
 
 | 絞り込みの種類（`CaseTyping.by`、標準の分類は `presence`） | 式 |
 |---|---|
-| `presence` | `*<対象>`（対象の Go の型がポインタのとき。`array`、`record`、union はそのまま） |
+| `presence` | `*<対象>`（対象の Go の型がポインタのとき。`array`、インデックスの model、union はそのまま） |
 | `variant` | `<対象>.(<アームの Go の型>)`。アームを包む型なら `<対象>.(<包む型>).Value` |
 | `predicate` | 対象の型から絞り込んだ型へ: 省略可能を外すなら `*<対象>`、Go の型が違えば `<絞り込んだ型>(<…>)`（`string` を `Email` に: `Email(<対象>)`） |
 | `else`（残りのケース） | 残りのアームがちょうど一つで、対象がそのアームの型になるとき（`docs/types.md`「残りのケースでの対象の型」）だけ、`variant` と同じ式。それ以外は、対象の型が変わらないので、何も置き換えない |
@@ -895,7 +895,7 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 | `delete` | `from` が `any` | `as <後>` |
 | `delete` | `from` がケースの列 | `as <前> -> <後>` |
 
-**型の表示**（コメントの中の型）: 核の型は名前、`ref` は FQN、`optional(T)` は `T?`、`array(T)` は `T[]`、`record(K, V)` は `Record<K, V>`、`case` はその `of`。
+**型の表示**（コメントの中の型）: 核の型は名前、`ref` は FQN、`optional(T)` は `T?`、`array(T)` は `T[]`、`case` はその `of`。
 
 ## runtime パッケージ
 

@@ -95,7 +95,7 @@ var statementsLeaves = map[string]string{
 	"AsFloat":    "func (leaves) AsFloat(context.Context) (float64, error) { return 0, nil }",
 	"AsBool":     "func (leaves) AsBool(context.Context) (bool, error) { return false, nil }",
 	"AsItems":    "func (leaves) AsItems(context.Context) ([]app.Item, error) { return nil, nil }",
-	"AsTable":    "func (leaves) AsTable(context.Context) (map[string]int64, error) { return nil, nil }",
+	"AsTable":    "func (leaves) AsTable(context.Context) (app.Counts, error) { return nil, nil }",
 	"AsOptional": "func (leaves) AsOptional(context.Context) (*app.Item, error) { return nil, nil }",
 	"AsShape":    "func (leaves) AsShape(context.Context) (app.Shape, error) { return nil, nil }",
 }

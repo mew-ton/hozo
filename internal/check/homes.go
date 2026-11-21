@@ -87,7 +87,7 @@ type use struct {
 //  4. 単位の対象の配線が呼ぶ op（別の名前空間のものを含む）: 引数と戻り値の型。
 //  5. 単位の対象の配線の match: 述語で決まる分類のうち、別の名前空間のもの。
 //
-// 数えるのは、型（ref）、例外、5 の分類が指す宣言の名前空間が N でないもの。型の中の型（array、optional、record、case の of）は
+// 数えるのは、型（ref）、例外、5 の分類が指す宣言の名前空間が N でないもの。型の中の型（array、optional、case の of）は
 // 辿るが、参照先の宣言の中までは辿らない。デコレータの適用とその引数、別の名前空間の効果と read の宣言そのもの、別の名前空間の op そのもの、
 // 型で決まる分類は数えない。
 func uses(ix *index, nsName string, files []string) []use {
@@ -117,9 +117,6 @@ func uses(ix *index, nsName string, files []string) []use {
 			typ(x.Of)
 		case ir.ArrayType:
 			typ(x.Of)
-		case ir.RecordType:
-			typ(x.Key)
-			typ(x.Value)
 		case ir.CaseType:
 			typ(x.Of)
 		}
@@ -138,6 +135,10 @@ func uses(ix *index, nsName string, files []string) []use {
 		case *ir.Model: // 1
 			for _, f := range x.Fields {
 				typ(f.Type)
+			}
+			if x.Index != nil {
+				typ(x.Index.Key)
+				typ(x.Index.Value)
 			}
 		case *ir.Scalar:
 			typ(x.Base)

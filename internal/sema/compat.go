@@ -115,10 +115,7 @@ func (a *analyzer) assignType(s, t ir.Type) bool {
 		// 6. 要素が渡せる
 		tv, ok := t.(ir.ArrayType)
 		return ok && a.assignType(sv.Of, tv.Of)
-	case ir.RecordType:
-		// 7. キーが等しく、値が渡せる
-		tv, ok := t.(ir.RecordType)
-		return ok && ir.TypeEqual(sv.Key, tv.Key) && a.assignType(sv.Value, tv.Value)
+		// 7 は欠番（Record<K, V> どうしの規則だった。インデックスの model は、名前で比べる: 規則 1）
 	case ir.RefType:
 		// 11. scalar の値は元の型の位置に渡せる。model の値は、別の model の位置には渡せない
 		// （フィールドが同じでも、一方がもう一方を継承していても。docs/types.md「互換」の「渡せないもの」）

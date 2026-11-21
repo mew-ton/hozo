@@ -491,7 +491,7 @@ func TestDiagnostics(t *testing.T) {
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
 		"gohttp1": {"app.hidden", "app.also"},
-		"gohttp2": {"app.two", "app.core", "app.byId", "app.optional", "app.many", "app.either"},
+		"gohttp2": {"app.two", "app.core", "app.byId", "app.optional", "app.many", "app.either", "app.byIndex"},
 		"gohttp3": {"app.In"},
 		// 全体の形で受け取る model のフィールドの型は、その model の位置
 		"gohttp4":  {"app.HeaderIn", "app.QueryIn", "app.Meta", "app.Paging"},

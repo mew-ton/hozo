@@ -6,13 +6,15 @@ namespace app {
 
   union Contact { Mail: Email; Other: string; }
   union Nested { Inner: Contact; None: string; }
-  union Cards { Many: Card[]; One: Record<string, Card?>; }
+  model CardsByName { [name: string]: Card?; }
+  model NestedByName { [name: string]: Nested; }
+  union Cards { Many: Card[]; One: CardsByName; }
   union Free { A: string; B: int; }
 
   model Holder { contact: Contact; }
   model Lists {
     contacts: Contact[];
-    byName: Record<string, Nested>?;
+    byName: NestedByName?;
     cards: Cards?;
   }
   // アームに Validate を持つ型のない union は、当たらない

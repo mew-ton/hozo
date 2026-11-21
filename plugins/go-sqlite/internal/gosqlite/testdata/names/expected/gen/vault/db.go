@@ -122,7 +122,7 @@ func (t SecretsTable) ByWords(ctx context.Context, type_ time.Time) ([]Secret, e
 }
 
 // ByImports は read vault.byImports（@db.list）: 表 "secrets" から、"json" が引数 json と同じで、"sql" が引数 sql と同じで、"runtime" が引数 runtime と同じ行を、足した順にすべて引く。
-func (t SecretsTable) ByImports(ctx context.Context, json_ map[string]string, sql_ time.Duration, runtime_ string) ([]Secret, error) {
+func (t SecretsTable) ByImports(ctx context.Context, json_ Labels, sql_ time.Duration, runtime_ string) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
 		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "json" IS ?1 AND "sql" IS ?2 AND "runtime" IS ?3 ORDER BY rowid`, dbJSON(json_), dbInt(sql_), dbText(runtime_))
 }

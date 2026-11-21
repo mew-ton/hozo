@@ -5,6 +5,7 @@ namespace app {
   scalar Id extends string;
   model Row { @db.key @db.text id: Id; }
   union Shape { Circle: Row; Other: string; }
+  model RowsByName { [name: string]: Row; }
 
   // 核の型
   @db.table state names: list<string>;
@@ -12,8 +13,8 @@ namespace app {
   @db.table state ids: list<Id>;
   // array
   @db.table state groups: list<Row[]>;
-  // record
-  @db.table state byName: list<Record<string, Row>>;
+  // インデックスの model（フィールドを持たない）
+  @db.table state byName: list<RowsByName>;
   // union
   @db.table state shapes: list<Shape>;
   // model なら通る

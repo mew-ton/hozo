@@ -6,6 +6,7 @@ namespace app {
   scalar Id extends string;
   scalar Count extends int;
   model Item { id: Id; count: int; }
+  model Counts { [name: string]: int; }
   union Shape { Thing: Item; Key: Id; }
   exception Broken;
   exception Gone;
@@ -201,7 +202,7 @@ namespace app {
   export fn asFloat(): float;
   export fn asBool(): boolean;
   export fn asItems(): Item[];
-  export fn asTable(): Record<string, int>;
+  export fn asTable(): Counts;
   export fn asOptional(): Item?;
   export fn asShape(): Shape;
   @mark export fn zeroTime(): datetime { touch(); return asTime(); }
@@ -213,7 +214,7 @@ namespace app {
   @mark export fn zeroFloat(): float { touch(); return asFloat(); }
   @mark export fn zeroBool(): boolean { touch(); return asBool(); }
   @mark export fn zeroItems(): Item[] { touch(); return asItems(); }
-  @mark export fn zeroTable(): Record<string, int> { touch(); return asTable(); }
+  @mark export fn zeroTable(): Counts { touch(); return asTable(); }
   @mark export fn zeroOptional(): Item? { touch(); return asOptional(); }
   @mark export fn zeroShape(): Shape { touch(); return asShape(); }
   @mark export fn zeroItem(id: Id): Item { touch(); return make(id); }

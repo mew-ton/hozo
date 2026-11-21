@@ -4,7 +4,8 @@ namespace a {
   state maybe: nullable<M>;
   state one: single<M>;
   state many: list<M>;
-  // 要素の中の optional（Record の値、配列の要素）は、要素の型そのものの optional ではない
-  state attrs: single<Record<string, string?>>;
+  // 要素の中の optional（インデックスの値、配列の要素）は、要素の型そのものの optional ではない
+  model Attrs { [name: string]: string?; }
+  state attrs: single<Attrs>;
   state slots: list<M?[]>;
 }

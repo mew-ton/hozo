@@ -58,6 +58,11 @@ func (a *analyzer) finalizeModels() {
 			continue
 		}
 		j.base = byName[r.sym.fqn]
+		// インデックスの model は、元の model になれない（docs/types.md「インデックスの model」）
+		if j.base != nil && j.base.model.Index != nil {
+			a.errorf("TYPE-10", j.extends.Span, "model %s の extends の元 %s は、インデックスの model で、継承できない", j.model.Name, j.base.model.Name)
+			j.base = nil
+		}
 	}
 	// 循環（TYPE-10）: extends を辿って自分に戻る model は、元の model を持たないものとして続ける
 	for _, j := range a.bodies {
@@ -282,10 +287,7 @@ func (a *analyzer) changeableStrict(o, n ir.Type) (widened, ok bool) {
 		if nv, isArr := n.(ir.ArrayType); isArr {
 			return a.changeableStrict(ov.Of, nv.Of)
 		}
-	case ir.RecordType: // 6
-		if nv, isRec := n.(ir.RecordType); isRec && ir.TypeEqual(ov.Key, nv.Key) {
-			return a.changeableStrict(ov.Value, nv.Value)
-		}
+		// 6 は欠番（Record<K, V> の値の型を変える規則だった）
 	}
 	return false, false
 }

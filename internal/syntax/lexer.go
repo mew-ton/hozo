@@ -310,7 +310,7 @@ func parseDuration(text string) (int64, error) {
 	return n * unit, nil
 }
 
-// lexSymbol は記号を読む（docs/grammar.md「記号」）。">>" は一つの記号にしない（Record<string, string[]>> のため）。
+// lexSymbol は記号を読む（docs/grammar.md「記号」）。">>" は一つの記号にしない（list<list<string>> のため）。
 func (l *lexer) lexSymbol() {
 	start := l.pos
 	c := l.src[l.pos]

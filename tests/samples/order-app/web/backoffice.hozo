@@ -20,7 +20,7 @@ namespace backoffice {
   state location: single<page.Route>;
 
   @page.query
-  state query: single<Record<string, string[]>>;
+  state query: single<page.Query>;
 
   /** 操作が通らなかった理由（値の集合は、下の効果の名前が決める） */
   model Problem {

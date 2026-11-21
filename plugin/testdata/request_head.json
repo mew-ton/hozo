@@ -1,24 +1,24 @@
 {
   "comment": "Go の SDK（plugin.Run）と TS の SDK（sdk/ts の run）が、同じ要求に同じ終了コードと同じ error の code を返すことを確かめる表（docs/plugin-protocol.md「要求と応答」「起動」）。どちらのテストもこのファイルを読む。request は標準入力に渡す文字列そのまま。Handler は三つの direction をすべて実装していて、空の応答を返す。code は終了コード 2 のときの error の code（それ以外は \"\"）。",
   "cases": [
-    { "name": "protocol が合い direction を実装している", "request": "{\"protocol\":\"0.13\",\"direction\":\"check\",\"view\":null}", "exit": 0, "code": "" },
+    { "name": "protocol が合い direction を実装している", "request": "{\"protocol\":\"0.14\",\"direction\":\"check\",\"view\":null}", "exit": 0, "code": "" },
 
     { "name": "protocol が違う文字列", "request": "{\"protocol\":\"9.9\",\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
     { "name": "protocol がない", "request": "{\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
     { "name": "protocol が null", "request": "{\"protocol\":null,\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
-    { "name": "protocol が数", "request": "{\"protocol\":0.13,\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
+    { "name": "protocol が数", "request": "{\"protocol\":0.14,\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
     { "name": "protocol が真偽値", "request": "{\"protocol\":true,\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
-    { "name": "protocol が配列", "request": "{\"protocol\":[\"0.13\"],\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
-    { "name": "protocol がオブジェクト", "request": "{\"protocol\":{\"version\":\"0.13\"},\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
+    { "name": "protocol が配列", "request": "{\"protocol\":[\"0.14\"],\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
+    { "name": "protocol がオブジェクト", "request": "{\"protocol\":{\"version\":\"0.14\"},\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
     { "name": "protocol が空の文字列", "request": "{\"protocol\":\"\",\"direction\":\"check\"}", "exit": 2, "code": "protocol" },
     { "name": "protocol を direction より先に確かめる", "request": "{\"protocol\":1,\"direction\":2}", "exit": 2, "code": "protocol" },
     { "name": "protocol が違えば、ほかの項目の形が違っていても protocol", "request": "{\"protocol\":\"9.9\",\"direction\":\"emit\",\"transpiler\":7,\"view\":\"x\"}", "exit": 2, "code": "protocol" },
 
-    { "name": "direction を知らない", "request": "{\"protocol\":\"0.13\",\"direction\":\"dance\"}", "exit": 2, "code": "unsupported" },
-    { "name": "direction がない", "request": "{\"protocol\":\"0.13\"}", "exit": 2, "code": "unsupported" },
-    { "name": "direction が null", "request": "{\"protocol\":\"0.13\",\"direction\":null}", "exit": 2, "code": "unsupported" },
-    { "name": "direction が数", "request": "{\"protocol\":\"0.13\",\"direction\":3}", "exit": 2, "code": "unsupported" },
-    { "name": "direction が配列", "request": "{\"protocol\":\"0.13\",\"direction\":[\"check\"]}", "exit": 2, "code": "unsupported" },
+    { "name": "direction を知らない", "request": "{\"protocol\":\"0.14\",\"direction\":\"dance\"}", "exit": 2, "code": "unsupported" },
+    { "name": "direction がない", "request": "{\"protocol\":\"0.14\"}", "exit": 2, "code": "unsupported" },
+    { "name": "direction が null", "request": "{\"protocol\":\"0.14\",\"direction\":null}", "exit": 2, "code": "unsupported" },
+    { "name": "direction が数", "request": "{\"protocol\":\"0.14\",\"direction\":3}", "exit": 2, "code": "unsupported" },
+    { "name": "direction が配列", "request": "{\"protocol\":\"0.14\",\"direction\":[\"check\"]}", "exit": 2, "code": "unsupported" },
 
     { "name": "JSON でない", "request": "{", "exit": 1, "code": "" },
     { "name": "空", "request": "", "exit": 1, "code": "" },

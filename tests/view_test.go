@@ -184,10 +184,13 @@ func TestViewFromEntry(t *testing.T) {
 	t.Run("ir.md 型", func(t *testing.T) {
 		expect(t, "api.User のフィールド", renderFields(declOf(t, prog, "api.User").(*ir.Model)), []string{
 			"id: api.UserId", "name: string", "secret: string", "hash: string",
-			"nick: string?",                   // 正規化: T?? は T?
-			"tags: string[]",                  // array
-			"attrs: Record<string, string[]>", // record
+			"nick: string?",    // 正規化: T?? は T?
+			"tags: string[]",   // array
+			"attrs: api.Attrs", // インデックスの model への ref
 		})
+		attrs := declOf(t, prog, "api.Attrs").(*ir.Model)
+		expect(t, "インデックスの model（Model.index。fields は空）",
+			attrs.Index != nil && attrs.Index.Name == "name" && typeStr(attrs.Index.Key) == "string" && typeStr(attrs.Index.Value) == "string[]" && len(attrs.Fields) == 0, true)
 		expect(t, "scalar の base が別の scalar への ref", typeStr(declOf(t, prog, "api.AdminToken").(*ir.Scalar).Base), "api.Token")
 		expect(t, "絞り込まれた型 case", typeStr(opOf(t, prog, "web.adminPageVm").Params[0].Type), "web.UserKind.Admin<api.PublicUser>")
 		expect(t, "void は returns が null", opOf(t, prog, "web.signOut").Returns == nil, true)
@@ -199,7 +202,7 @@ func TestViewFromEntry(t *testing.T) {
 
 	t.Run("ir.md 正規化/model extends", func(t *testing.T) {
 		m := declOf(t, prog, "api.PublicUser").(*ir.Model)
-		expect(t, "fields は、なくしたものを除いて元の並びのまま写す", renderFields(m), []string{"id: api.UserId", "name: string", "nick: string?", "tags: string[]", "attrs: Record<string, string[]>"})
+		expect(t, "fields は、なくしたものを除いて元の並びのまま写す", renderFields(m), []string{"id: api.UserId", "name: string", "nick: string?", "tags: string[]", "attrs: api.Attrs"})
 		expect(t, "extends", m.Extends, &ir.ModelExtends{Base: "api.User", Removed: []string{"secret", "hash"}})
 		expect(t, "写したフィールドはデコレータも保つ", renderApplications(m.Fields[0].Decorators), []string{"@db.key"})
 		user := declOf(t, prog, "api.User").(*ir.Model)
@@ -207,7 +210,7 @@ func TestViewFromEntry(t *testing.T) {
 		// override で型を変える・デコレータを足す・なくす、フィールドを足す
 		a := declOf(t, prog, "api.Admin").(*ir.Model)
 		expect(t, "Admin の fields（override は元の位置のまま、足したフィールドは末尾）", renderFields(a), []string{
-			"id: api.AdminId", "name: string", "secret: string", "nick: string?", "tags: string[]", "attrs: Record<string, string[]>", "level: int",
+			"id: api.AdminId", "name: string", "secret: string", "nick: string?", "tags: string[]", "attrs: api.Attrs", "level: int",
 		})
 		expect(t, "Admin の extends（書かれた順）", a.Extends, &ir.ModelExtends{Base: "api.User", Removed: []string{"hash"}, Overridden: []string{"id", "name", "secret"}})
 		expect(t, "override に付けたデコレータは、受け継いだものの後ろ", [][]string{renderApplications(a.Fields[0].Decorators), renderApplications(a.Fields[1].Decorators)}, [][]string{{"@db.key"}, {"@db.unique"}})

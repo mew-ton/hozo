@@ -30,6 +30,9 @@ type Account struct {
 	Email   Email    `json:"email"`
 }
 
+// Labels は model app.Labels。
+type Labels map[string]string
+
 // Options は model app.Options。
 type Options struct {
 	Limit *int64         `json:"limit,omitempty"`

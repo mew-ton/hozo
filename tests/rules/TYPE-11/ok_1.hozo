@@ -1,9 +1,7 @@
-// TYPE-11（docs/types.md「診断」）: K は string か、元が string の scalar
+// TYPE-11（docs/types.md「診断」「インデックスの model」）: インデックスのキーの型は string か、元が string の scalar
 namespace a {
   scalar Key extends string;
-  model M {
-    ok1: Record<string, int>;
-    ok2: Record<Key, int>;
-  }
-  fn f(): M;
+  model Ok1 { [name: string]: int; }
+  model Ok2 { [key: Key]: int?; }
+  fn f(a: Ok1): Ok2;
 }

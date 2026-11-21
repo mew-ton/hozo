@@ -31,7 +31,7 @@ namespace browser {
   state token: single<Token?>;
 
   @page.query
-  state query: single<Record<string, string[]>>;
+  state query: single<page.Query>;
 
   @page.path
   state location: single<Route>;

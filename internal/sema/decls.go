@@ -89,9 +89,29 @@ func (a *analyzer) lowerModel(s *symbol, d *ast.ModelDecl, sc *scope) ir.Decl {
 	a.addSite(d.Decorators, siteModel, sc, &m.DeclBase.Decorators)
 	if d.Body != nil {
 		m.Fields = a.lowerFields(d.Body.Fields, s.fqn, sc)
+		m.Index = a.lowerIndex(d.Body.Index, sc)
 	}
 	a.addModelJob(&modelJob{sym: s, model: m, body: d.Body, extends: d.Extends, sc: sc})
 	return m
+}
+
+// lowerIndex は、インデックスの model のインデックス（docs/types.md「インデックスの model」）。なければ nil。
+// TYPE-11: キーの型は string か、元が string の scalar。型が解決できなければ、その型は nil のまま残す。
+func (a *analyzer) lowerIndex(idx *ast.Index, sc *scope) *ir.ModelIndex {
+	if idx == nil {
+		return nil
+	}
+	out := &ir.ModelIndex{Name: idx.Name.Name, Span: a.irSpan(idx.Span)}
+	if key, ok := a.lowerType(idx.Key, sc); ok {
+		out.Key = key
+		if !a.isStringLike(key) {
+			a.errorf("TYPE-11", idx.Key.NodeSpan(), "インデックスのキーの型 %s は string でも、元が string の scalar でもない", typeName(key))
+		}
+	}
+	if value, ok := a.lowerType(idx.Value, sc); ok {
+		out.Value = value
+	}
+	return out
 }
 
 // lowerFields はフィールドの列。owner は持ち主の model の FQN。

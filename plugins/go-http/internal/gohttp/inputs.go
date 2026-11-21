@@ -113,7 +113,7 @@ func (g *generator) inputs(m *ir.Model) []input {
 			// GOHTTP-12
 			whole := g.wholeModel(f.Type)
 			if whole == nil {
-				g.errorf(codeHTTPWholeType, m.Name, "入力の model %s の @%s のフィールド %s の型 %s が、model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model と配列は、model ではない）",
+				g.errorf(codeHTTPWholeType, m.Name, "入力の model %s の @%s のフィールド %s の型 %s が、フィールドを持つ model でない（全体の形は、型が model のフィールドにだけ付けられる。省略可能な model、配列、インデックスの model には、付けられない）",
 					m.Name, in.decorator, f.Name, golang.TypeDisplay(f.Type))
 				continue
 			}
@@ -143,6 +143,10 @@ func (g *generator) wholeModel(t ir.Type) *ir.Model {
 		return nil
 	}
 	m, _ := g.p.Lookup(r.Target).(*ir.Model)
+	if m != nil && m.Index != nil {
+		// インデックスの model は、フィールドを持たないので、全体の形にできない（docs/plugin-go-http.md「対象」）
+		return nil
+	}
 	return m
 }
 

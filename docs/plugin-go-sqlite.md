@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.13"
+protocol = "0.14"
 
 [[transpiler]]
 name     = "go-sqlite"
@@ -84,11 +84,11 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 | `@db.datetime` | `TEXT` | RFC 3339、UTC、小数部はいつも 9 桁の文字列（文字列の順が、瞬間の順になる） | `datetime` |
 | `@db.date` | `TEXT` | `2026-11-21` の形の文字列（文字列の順が、日付の順になる） | `date` |
 | `@db.time` | `TEXT` | `09:30:00.000000000` の形の文字列。小数部はいつも 9 桁（文字列の順が、時刻の順になる） | `time` |
-| `@db.json` | `TEXT` | `encoding/json` の JSON の文字列 | `array`、`record`、model |
+| `@db.json` | `TEXT` | `encoding/json` の JSON の文字列 | `array`、model（インデックスの model を含む） |
 
 - しまい方の名前は、語彙が決めた、保存先の製品に依らない種類。SQLite の列の型に写すのは、このトランスパイラ（ほかの保存先のトランスパイラは、同じ種類を、自分の列の型に写す）。
 - **一つのしまい方の中で、型によって変え方が分かれることはない。** `duration` を `@db.int` に入れたのは、Go の値が `int` と同じ 64 ビットの整数で、同じ補助が同じに読み書きできるから。同じしまい方の二つの型が、別の変え方を要るようになったら、型で分けずに、しまい方を足す。
-- union（`arms`）と、union を中に持つ `array` / `record` / model は、どのしまい方でも列にできない（GOSQL-3。JSON での union の形を、まだ決めていない）。
+- union（`arms`）と、union を中に持つ `array` / model は、どのしまい方でも列にできない（GOSQL-3。JSON での union の形を、まだ決めていない）。
 - `@db.json` の中の値の形（model のフィールド、配列の要素）は、`encoding/json` が、Go の型から決める。その中の model のフィールドに、しまい方のデコレータは要らない（付いていても読まない）。
 - 表の model でない model のフィールドに付いた、しまい方のデコレータと、`@db.key`、`@db.unique`、`@db.ref` は、読まない（何も出さず、確かめない）。
 
@@ -394,7 +394,7 @@ func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 - `dbExec`、`dbIsEmpty`、`dbGet`、`dbList` は、`*sql.DB` を受け取り、文を `Conn(ctx, db)` で実行する（「トランザクション」）。表のメソッドの本体は、トランザクションの有無で変わらない。
 - **行に足すのは、宣言が言ったことだけ**: フィールドごとの補助は、しまい方のデコレータが選び、省略可能なフィールド（`T?`）は、最後の引数に `dbNullable` を足す（`dbText(row.Nickname, dbNullable)`、`dbText(&row.Nickname, dbNullable)`）。scalar か核の型かでは、書き分けない。
 - **値がないこと（`NULL`）は、`dbCol` が、実行時に、渡された Go の値と `dbNullable` を見て決める**（`reflect`）。
-  - 書くとき: 値のないポインタは `NULL`（省略可能なフィールドの、値のない値。列と比べる、値のない引数）。`dbNullable` の列では、値のないスライスとマップ（`T[]?`、`Record<K, V>?` の `nil`）も `NULL` で、`@db.json` でも、JSON の `null` という文字列にはしない。`dbNullable` のない列の、値のないスライスとマップは、しまい方のまま書く（`@db.json` なら、`encoding/json` が出す文字列 `null`）。
+  - 書くとき: 値のないポインタは `NULL`（省略可能なフィールドの、値のない値。列と比べる、値のない引数）。`dbNullable` の列では、値のないスライスとマップ（`T[]?` と、省略可能な、インデックスの model の `nil`）も `NULL` で、`@db.json` でも、JSON の `null` という文字列にはしない。`dbNullable` のない列の、値のないスライスとマップは、しまい方のまま書く（`@db.json` なら、`encoding/json` が出す文字列 `null`）。
   - 読むとき: `NULL` を読めるのは、`dbNullable` の列だけで、読む先は、値がない（`nil`）。ほかの列に `NULL` があれば、エラー（その列は `NOT NULL` なので、`Schema` で作った表では起きない）。値があれば、読む先がポインタなら、置く先を作って読む。
 - しまい方の補助に、合わない型の値が渡ることは、GOSQL-17 と GOSQL-26 が先に断るので、ない（そのときの振る舞いは、決めない）。型の食い違いをコンパイルエラーにする形（型引数）にしないのは、省略可能な値と、そうでない値を、一つの関数で、型を書かずに受け取れないため（`docs/plugin-go-http.md`「補助」の末尾と同じ理由）。
 - 補助の中身は、サンプルの `gen/store/db.go` の通り（`dbInt`、`dbFloat`、`dbBool` は、サンプルが使わないので、`go-sqlite` の単体テストのゴールデンが固定する。`docs/testing.md`「単体テスト」）。
@@ -509,7 +509,7 @@ func dbConflict(err, conflict error) error {
 
 | ID | 重さ | 意味 |
 |---|---|---|
-| GOSQL-1 | error | `@db.table` の付いた状態の要素の型が、model でない（「表」）。位置は状態 |
+| GOSQL-1 | error | `@db.table` の付いた状態の要素の型が、model でないか、インデックスの model（フィールドを持たない。「表」）。位置は状態 |
 | GOSQL-2 | error | `@db.table` の付いた状態の形が `list` でない（`nullable`、`single`）。位置は状態 |
 | GOSQL-3 | error | 表の model に、どのしまい方でも列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model |
 | GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`Querier`、`Conn`、`<状態>Table`、`New<状態>Table`、出すなら `DbSeams`、`NewDbSeams`）が、N の定義のパッケージの名前（型など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`）も同じで、位置は後ろの宣言 |

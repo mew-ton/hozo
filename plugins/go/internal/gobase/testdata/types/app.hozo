@@ -15,6 +15,11 @@ namespace app {
   scalar Clock extends time;
 
   // 「model」核の型、省略可能（omitempty）、array、record、別の名前空間の型、説明が複数の行
+  /** 名前ごとの数。インデックスの model は、名前付きのマップの型 */
+  model Counts { [name: string]: int; }
+  /** キーが scalar で、値が省略可能な model の、インデックスの model */
+  model UsersById { [id: Id]: User?; }
+
   /**
    * 利用者。
    *
@@ -26,7 +31,7 @@ namespace app {
     name: string;
     nick: string?;
     tags: string[];
-    attrs: Record<string, int>;
+    attrs: Counts;
     born: datetime;
     wait: duration?;
     birthday: date;

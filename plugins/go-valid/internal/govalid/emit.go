@@ -150,23 +150,9 @@ func (g *generator) validatedRef(t ir.Type) (string, bool) {
 	return r.Target, true
 }
 
-// through は、フィールドの型を、optional、array、record の値を通して見た型（docs/plugin-go-valid.md「Validate を持つ型」の 4）。
-func through(t ir.Type) ir.Type {
-	for {
-		switch x := t.(type) {
-		case ir.OptionalType:
-			t = x.Of
-		case ir.ArrayType:
-			t = x.Of
-		case ir.RecordType:
-			t = x.Value
-		case ir.CaseType:
-			t = x.Of
-		default:
-			return t
-		}
-	}
-}
+// through は、フィールドの型を、optional、array と、インデックスの model の値を通して見た型
+// （docs/plugin-go-valid.md「Validate を持つ型」の 4）。
+func (g *generator) through(t ir.Type) ir.Type { return govalid.Through(g.p, t) }
 
 // unwrap は、フィールドの型から、optional を外した型（制約が付く値の型）。
 func unwrap(t ir.Type) ir.Type {
@@ -269,7 +255,7 @@ func (g *generator) checkModel(m *ir.Model) {
 		for _, problem := range g.fieldProblems(f, subject, m.Name) {
 			g.errorf(codeValidConstraint, m.Name, "%s", problem)
 		}
-		if t, isRef := through(f.Type).(ir.RefType); isRef {
+		if t, isRef := g.through(f.Type).(ir.RefType); isRef {
 			if u, ok := g.p.Lookup(t.Target).(*ir.Union); ok && u.Variant == ir.UnionArms {
 				if arm, found := g.validatedArm(u, map[string]bool{}); found {
 					g.errorf(codeValidUnion, m.Name, "%s の型が union %s で、そのアームに %s を持つ型 %s がある（union の値の制約を確かめる形は、まだない）",
@@ -301,12 +287,12 @@ func (g *generator) fieldConstraints(f *ir.Field, subject string) (cons []constr
 		if !g.vocab[app.Decorator] || !govalid.Standard(app.Decorator) {
 			continue
 		}
-		switch value.(type) {
-		case ir.ArrayType:
+		if _, isArray := value.(ir.ArrayType); isArray {
 			problems = append(problems, fmt.Sprintf("@%s が、配列そのもの（%s）に付いている（制約を付けられるのは、要素の型）", app.Decorator, subject))
 			continue
-		case ir.RecordType:
-			problems = append(problems, fmt.Sprintf("@%s が、record そのもの（%s）に付いている（制約を付けられるのは、値の型）", app.Decorator, subject))
+		}
+		if g.p.IndexOf(value) != nil {
+			problems = append(problems, fmt.Sprintf("@%s が、インデックスの model そのもの（%s）に付いている（制約を付けられるのは、値の型）", app.Decorator, subject))
 			continue
 		}
 		c, problem := parse(app, core, ok, subject)
@@ -332,7 +318,7 @@ func (g *generator) fieldProblems(f *ir.Field, subject, at string) []string {
 	return problems
 }
 
-// validatedArm は、union u のアームの型（optional、array、record の値を通して見たもの。アームが union なら、その中も）に、
+// validatedArm は、union u のアームの型（optional、array、インデックスの model の値を通して見たもの。アームが union なら、その中も）に、
 // Validate を持つ型があれば、その FQN（アームの順で最初のもの）。
 func (g *generator) validatedArm(u *ir.Union, visited map[string]bool) (string, bool) {
 	if visited[u.Name] {
@@ -340,7 +326,7 @@ func (g *generator) validatedArm(u *ir.Union, visited map[string]bool) (string, 
 	}
 	visited[u.Name] = true
 	for _, a := range u.Arms {
-		r, ok := through(a.Type).(ir.RefType)
+		r, ok := g.through(a.Type).(ir.RefType)
 		if !ok {
 			continue
 		}

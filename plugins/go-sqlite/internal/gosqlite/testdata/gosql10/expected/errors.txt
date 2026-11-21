@@ -7,4 +7,4 @@ GOSQL-10	app.oneRow	read app.oneRow の結果の型 app.Row? が、@db.list の�
 GOSQL-10	app.maybeRows	read app.maybeRows の結果の型 app.Row[]? が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
 GOSQL-10	app.otherRows	read app.otherRows の結果の型 app.Other[] が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
 GOSQL-10	app.rowCount	read app.rowCount の結果の型 int が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
-GOSQL-10	app.rowsByNote	read app.rowsByNote の結果の型 Record<string, app.Row> が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない
+GOSQL-10	app.rowsByNote	read app.rowsByNote の結果の型 app.RowsByNote が、@db.list の言うもの（app.Row[]。表 app.rows の model の行）でない

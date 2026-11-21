@@ -10,11 +10,27 @@ type Model struct {
 	DeclBase
 	// Fields はフィールドの列。継承した model なら、受け継いだ分も入れた展開済みの並び
 	// （docs/types.md「継承した model」の「フィールド」）。
+	// インデックスの model なら空。
 	Fields []Field `json:"fields"`
+	// Index は、インデックスの model のインデックス（`model Attrs { [name: string]: string[]; }`。
+	// docs/types.md「インデックスの model」）。ふつうの model なら nil。
+	Index *ModelIndex `json:"index,omitempty"`
 	// Extends は継承した model（`model D extends B { ... }`）の記録。
 	Extends *ModelExtends `json:"extends,omitempty"`
 	// SynthesizedFrom はその場で書いた model の出どころ（持ち主の FQN。"server.OrderPage.Ready"）。
 	SynthesizedFrom string `json:"synthesizedFrom,omitempty"`
+}
+
+// ModelIndex は、インデックスの model のインデックス（docs/ir.md「model / scalar / union」の index）。
+type ModelIndex struct {
+	// Name は、キーの名前（説明のための名前）。
+	Name string `json:"name"`
+	// Key は、キーの型（string か、元が string の scalar）。
+	Key Type `json:"key"`
+	// Value は、値の型。
+	Value Type `json:"value"`
+	// Span は、インデックスの位置（`[` から `;` まで）。
+	Span Span `json:"span"`
 }
 
 // ModelExtends は `model D extends B { ... }` の記録（docs/ir.md「model / scalar / union」の extends）。
@@ -997,6 +1013,15 @@ func (x ModelExtends) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (x *ModelExtends) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く。
+func (x ModelIndex) MarshalJSON() ([]byte, error) {
+	type alias ModelIndex
+	return marshalStruct(alias(x))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (x *ModelIndex) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, x) }
 
 // MarshalJSON は docs/ir.md「JSON」の形で書く。
 func (x Field) MarshalJSON() ([]byte, error) { type alias Field; return marshalStruct(alias(x)) }

@@ -116,7 +116,7 @@ func TestTargets(t *testing.T) {
 	}
 	validated := 0
 	for _, p := range rejected.Params {
-		if r, isRef := through(p.Type).(ir.RefType); isRef && govalid.HasValidate(view.Program, r.Target) {
+		if r, isRef := govalid.Through(view.Program, p.Type).(ir.RefType); isRef && govalid.HasValidate(view.Program, r.Target) {
 			validated++
 		}
 	}

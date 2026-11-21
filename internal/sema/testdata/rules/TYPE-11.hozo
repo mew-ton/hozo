@@ -1,11 +1,9 @@
-// TYPE-11: Record<K, V> の K が string でも、元が string の scalar でもない（docs/types.md「診断」）
+// TYPE-11: model のインデックスのキーの型が string でも、元が string の scalar でもない（docs/types.md「診断」）
 namespace a {
   scalar Key extends string;
   scalar Num extends int;
-  model M {
-    ok1: Record<string, int>;
-    ok2: Record<Key, int>;
-    ng1: Record<int, int>;             // ERROR: TYPE-11
-    ng2: Record<Num, int>;             // ERROR: TYPE-11
-  }
+  model Ok1 { [name: string]: int; }
+  model Ok2 { [key: Key]: int; }
+  model Ng1 { [n: int]: int; }             // ERROR: TYPE-11
+  model Ng2 { [n: Num]: int; }             // ERROR: TYPE-11
 }

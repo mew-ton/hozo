@@ -25,7 +25,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
 | `vocab/db.hozo` | `namespace db { table / text / int / float / bool / datetime / date / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / conflict / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
 | `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
-| `vocab/page.hozo` | `namespace page { Aborted / Route / path / query / route / dialog / fallback / interaction }` | §4.2 |
+| `vocab/page.hozo` | `namespace page { Aborted / Route / Query / path / query / route / dialog / fallback / interaction }` | §4.2 |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
 | `vocab/proc.hozo` | `namespace proc { Crashed / MalformedOutput / stdio }` | `examples/hozoc.hozo` |
 

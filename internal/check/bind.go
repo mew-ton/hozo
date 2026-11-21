@@ -69,7 +69,8 @@ func (t *bindTable) compute(bi int, o *ir.Op) []position {
 }
 
 // collect は型 typ の位置 path から、τ または optional(τ) の位置を集める。model（と model の optional）は
-// フィールドを再帰的に辿り、array と record の中は辿らない。辿っている途中で同じ model に戻ったら止める。
+// フィールドを再帰的に辿り、array の中は辿らない。インデックスの model は、フィールドを持たないので、その先は辿らない。
+// 辿っている途中で同じ model に戻ったら止める。
 func (t *bindTable) collect(path []string, typ ir.Type, span ir.Span, tau ir.Type, visiting map[string]bool, out *[]position) {
 	if typ == nil {
 		return

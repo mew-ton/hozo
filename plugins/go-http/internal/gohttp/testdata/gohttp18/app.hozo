@@ -3,6 +3,7 @@ namespace app {
   scalar Token extends string;
   scalar Page extends int;
   model Item { name: string; }
+  model Attrs { [name: string]: string; }
 
   model In {
     // 核の型と、リテラルの型が合わない
@@ -14,10 +15,10 @@ namespace app {
     // scalar は、元の核の型で見る
     @http.query @http.default("x") limit: Page;
     @http.query @http.default(30s) owner: Token;
-    // 本文の項目: リテラルで書けない型（model、配列、record、datetime）
+    // 本文の項目: リテラルで書けない型（model、配列、インデックスの model、datetime）
     @http.body @http.default("x") item: Item;
     @http.body @http.default(1) tags: int[];
-    @http.body @http.default("x") attrs: Record<string, string>;
+    @http.body @http.default("x") attrs: Attrs;
     @http.body @http.default("2024-01-02T03:04:05Z") at: datetime;
     @http.body @http.default(5) wait: duration;
     // 渡せるリテラルは、当たらない: 同じ核の型、整数のリテラルを float に、scalar の元の核の型、期間

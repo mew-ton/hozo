@@ -118,13 +118,18 @@ func sampleProgram() *Program {
 								}},
 								Span: span(f, 11, 3, 11, 30),
 							},
-							{Name: "attrs", Type: Record(String(), String()), Span: span(f, 12, 3, 12, 30)},
+							{Name: "attrs", Type: Ref("server.Attrs"), Span: span(f, 12, 3, 12, 30)},
 						},
 					},
 					&Model{
 						DeclBase: DeclBase{Name: "server.PublicUser", Span: span(f, 14, 1, 14, 40)},
 						Fields:   []Field{{Name: "id", Type: Int(), Span: span(f, 14, 3, 14, 20)}, {Name: "nick", Type: String(), Span: span(f, 14, 22, 14, 35)}},
 						Extends:  &ModelExtends{Base: "server.User", Removed: []string{"email", "token", "tags", "limit", "attrs"}, Overridden: []string{"id"}},
+					},
+					// インデックスの model（docs/ir.md「model / scalar / union」の index）
+					&Model{
+						DeclBase: DeclBase{Name: "server.Attrs", Span: span(f, 15, 1, 15, 40)},
+						Index:    &ModelIndex{Name: "name", Key: String(), Value: String(), Span: span(f, 15, 15, 15, 38)},
 					},
 					&Union{
 						DeclBase: DeclBase{Name: "server.OrderPage", Span: span(f, 16, 1, 19, 2)},

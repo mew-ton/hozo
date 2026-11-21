@@ -99,16 +99,26 @@ namespace app {
     plains: Plain[][];
   }
 
-  // 「model」record: キーの辞書順。値の Validate。scalar のキー、配列の値、record の配列
+  // 「model」インデックスの model: キーの辞書順。値の Validate。scalar のキー、配列の値、インデックスの model の配列、
+  // 値が、別のインデックスの model（入れ子）
+  model ItemsByName { [name: string]: Item; }
+  model PercentBySku { [sku: Sku]: Percent; }
+  model ItemGroups { [name: string]: Item[]; }
+  model RatiosByName { [name: string]: Ratio; }
+  model LinksByName { [name: string]: Link?; }
+  model Labels { [name: string]: string; }
+  model CountsBySku { [sku: Sku]: int; }
+  model ItemsByGroup { [group: string]: ItemsByName; }
   model Maps {
-    byName: Record<string, Item>;
-    bySku: Record<Sku, Percent>;
-    groups: Record<string, Item[]>;
-    pages: Record<string, Ratio>[];
-    opt: Record<string, Link?>?;
-    labels: Record<string, string>;
+    byName: ItemsByName;
+    bySku: PercentBySku;
+    groups: ItemGroups;
+    pages: RatiosByName[];
+    opt: LinksByName?;
+    labels: Labels;
     // キーが Validate を持っていても、キーは確かめない
-    counts: Record<Sku, int>;
+    counts: CountsBySku;
+    nested: ItemsByGroup;
   }
 
   // 核の型と、別の名前空間の型のフィールド（零値は、どの制約にも合わない）

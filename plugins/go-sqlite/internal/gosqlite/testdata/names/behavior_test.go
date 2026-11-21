@@ -119,7 +119,7 @@ func TestSecrets(t *testing.T) {
 	// 内部の op を呼ぶ配線
 	got, err := w.ops.Find(ctx, "k2")
 	if err != nil || got == nil || got.Ctx != 8 || got.Time == nil || !got.Time.Equal(at) || got.Any == nil || got.Any.Name != "any" ||
-		got.Sql != time.Minute || !reflect.DeepEqual(got.Json, map[string]string{"k": "v"}) || got.Value != "v" {
+		got.Sql != time.Minute || !reflect.DeepEqual(got.Json, vault.Labels{"k": "v"}) || got.Value != "v" {
 		t.Errorf("Find(k2) = %+v, %v", got, err)
 	}
 	if got, err := w.secrets.ByLocals(ctx, 7, 0.5, true); err != nil || !reflect.DeepEqual(keys(got), []vault.Key{"k1"}) {

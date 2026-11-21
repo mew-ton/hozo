@@ -39,9 +39,6 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 			typ(x.Of)
 		case ir.ArrayType:
 			typ(x.Of)
-		case ir.RecordType:
-			typ(x.Key)
-			typ(x.Value)
 		case ir.CaseType:
 			typ(x.Of)
 		}
@@ -60,6 +57,10 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 			}
 			for _, f := range x.Fields {
 				typ(f.Type)
+			}
+			if x.Index != nil {
+				typ(x.Index.Key)
+				typ(x.Index.Value)
 			}
 		case *ir.Scalar:
 			typ(x.Base)

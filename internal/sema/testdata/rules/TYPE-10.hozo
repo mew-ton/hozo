@@ -19,6 +19,9 @@ namespace a {
   model S extends T { override id: never; }              // ERROR: TYPE-10
   model T extends S { override id: never; }              // ERROR: TYPE-10
   model Self extends Self { }                            // ERROR: TYPE-10
+  // インデックスの model は、元の model になれない（docs/types.md「インデックスの model」）
+  model Attrs { [name: string]: string; }
+  model More extends Attrs { extra: string; }            // ERROR: TYPE-10
   // 循環に入った model は、元の model を持たないものとして続ける
   model Tail extends S { extra: string; }
 }

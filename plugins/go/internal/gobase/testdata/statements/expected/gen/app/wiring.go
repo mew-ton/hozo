@@ -355,7 +355,7 @@ func (o *ops) ZeroItems(ctx context.Context) ([]Item, error) {
 }
 
 // ZeroTable は op app.zeroTable。
-func (o *ops) ZeroTable(ctx context.Context) (map[string]int64, error) {
+func (o *ops) ZeroTable(ctx context.Context) (Counts, error) {
 	if err := o.Touch(ctx); err != nil {
 		return nil, err
 	}

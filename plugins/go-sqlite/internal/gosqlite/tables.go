@@ -30,7 +30,7 @@ var storages = []*storage{
 	{decorator: "db.datetime", helper: "dbDatetime", sqlType: "TEXT", fits: "datetime", classes: []string{"datetime"}},
 	{decorator: "db.date", helper: "dbDate", sqlType: "TEXT", fits: "date", classes: []string{"date"}},
 	{decorator: "db.time", helper: "dbTime", sqlType: "TEXT", fits: "time", classes: []string{"time"}},
-	{decorator: "db.json", helper: "dbJSON", sqlType: "TEXT", fits: "array、record、model", classes: []string{"array", "record", "model"}},
+	{decorator: "db.json", helper: "dbJSON", sqlType: "TEXT", fits: "array、model（インデックスの model を含む）", classes: []string{"array", "model"}},
 }
 
 // column は列一つ: 表の model のフィールド一つ。
@@ -113,6 +113,10 @@ func (e *emitter) collectTables() (marked int) {
 		}
 		if decl == nil {
 			e.errorf(codeSQLElement, st.Name, "@db.table の状態 %s の要素の型 %s が、model でない（表の列は、要素の model のフィールドから作る）",
+				st.Name, golang.TypeDisplay(st.Element))
+			valid = false
+		} else if decl.Index != nil {
+			e.errorf(codeSQLElement, st.Name, "@db.table の状態 %s の要素の型 %s が、インデックスの model（表の列は、要素の model のフィールドから作る。インデックスの model は、フィールドを持たない）",
 				st.Name, golang.TypeDisplay(st.Element))
 			valid = false
 		}
@@ -205,7 +209,7 @@ func fits(s *storage, class string) bool {
 	return false
 }
 
-// typeClass は、型 t（省略可能を外したもの）の種類: 核の型の名前（scalar は、元の核の型まで辿る）、"array"、"record"、"model"。
+// typeClass は、型 t（省略可能を外したもの）の種類: 核の型の名前（scalar は、元の核の型まで辿る）、"array"、"model"（インデックスの model を含む）。
 // どれでもなければ ""。しまい方が型に合うか（GOSQL-17）を確かめるのにだけ使う。
 func (e *emitter) typeClass(t ir.Type) string {
 	for depth := 0; depth < 64; depth++ {
@@ -217,8 +221,6 @@ func (e *emitter) typeClass(t ir.Type) string {
 			return string(x.Name)
 		case ir.ArrayType:
 			return "array"
-		case ir.RecordType:
-			return "record"
 		case ir.RefType:
 			switch d := e.p.Lookup(x.Target).(type) {
 			case *ir.Scalar:
@@ -233,15 +235,13 @@ func (e *emitter) typeClass(t ir.Type) string {
 	return ""
 }
 
-// hasUnion は、型 t が union（arms）か、union を中に持つ array / record / model か。seen は、辿った model（自分を指す model で止まる）。
+// hasUnion は、型 t が union（arms）か、union を中に持つ array / model（インデックスの model を含む）か。seen は、辿った model（自分を指す model で止まる）。
 func (e *emitter) hasUnion(t ir.Type, seen map[string]bool) bool {
 	switch x := t.(type) {
 	case ir.OptionalType:
 		return e.hasUnion(x.Of, seen)
 	case ir.ArrayType:
 		return e.hasUnion(x.Of, seen)
-	case ir.RecordType:
-		return e.hasUnion(x.Key, seen) || e.hasUnion(x.Value, seen)
 	case ir.CaseType:
 		return e.hasUnion(x.Of, seen)
 	case ir.RefType:
@@ -257,6 +257,9 @@ func (e *emitter) hasUnion(t ir.Type, seen map[string]bool) bool {
 				if e.hasUnion(f.Type, seen) {
 					return true
 				}
+			}
+			if d.Index != nil {
+				return e.hasUnion(d.Index.Key, seen) || e.hasUnion(d.Index.Value, seen)
 			}
 		}
 	}

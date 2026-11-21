@@ -3,6 +3,7 @@ namespace app {
   scalar Count extends int;
   scalar When extends datetime;
   model Inner { x: int; }
+  model Attrs { [name: string]: string; }
 
   model HeaderIn {
     // @http.header は、string と、その省略可能だけ
@@ -24,7 +25,7 @@ namespace app {
     @http.query("w") wait: duration?;
     @http.query list: string[];
     @http.query later: int[]?;
-    @http.query attrs: Record<string, string>?;
+    @http.query attrs: Attrs?;
     @http.query inner: Inner?;
     @http.query ok: Count?;
   }

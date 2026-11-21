@@ -7,11 +7,12 @@ namespace type {
 }
 
 namespace app {
+  model AddressesById { [id: string]: type.Address?; }
   // type の置き場の単位（1 番目）が go-valid を並べていない
   model User {
     email: type.Email;
     homes: type.Address[];
-    byId: Record<string, type.Address?>?;
+    byId: AddressesById?;
     // Validate を持たない型は、当たらない
     id: type.Id;
   }

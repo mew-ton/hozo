@@ -17,10 +17,12 @@ namespace api {
     hash: string;
     // docs/ir.md「正規化」: `T??` は `T?`（optional は入れ子にしない）
     nick: string??;
-    // docs/ir.md「型」: array / record
+    // docs/ir.md「型」: array
     tags: string[];
-    attrs: Record<string, string[]>;
+    attrs: Attrs;
   }
+  // docs/ir.md「model / scalar / union」: インデックスの model（Model.index。fields は空）
+  model Attrs { [name: string]: string[]; }
   // docs/ir.md「正規化」: `model D extends B { override a: never; ... }` は fields を展開し extends に記録
   model PublicUser extends User {
     override secret: never;

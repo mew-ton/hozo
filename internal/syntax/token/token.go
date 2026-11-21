@@ -89,7 +89,6 @@ const (
 	DurationType
 	Void
 	Never
-	Record
 	List
 	Nullable
 	Single
@@ -181,7 +180,6 @@ var Keywords = map[string]Kind{
 	"duration": DurationType,
 	"void":     Void,
 	"never":    Never,
-	"Record":   Record,
 	"list":     List,
 	"nullable": Nullable,
 	"single":   Single,

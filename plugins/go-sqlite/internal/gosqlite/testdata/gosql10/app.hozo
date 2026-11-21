@@ -6,6 +6,7 @@ namespace app {
   /** 形は同じでも、別の model */
   model Other { @db.key @db.text id: string; @db.text note: string; @db.datetime at: datetime; }
   @db.table state rows: list<Row>;
+  model RowsByNote { [note: string]: Row; }
 
   // ---- @db.find は M? ----
 
@@ -32,7 +33,7 @@ namespace app {
   @db.list
   read fn rowCount(): int reads rows;
   @db.list
-  read fn rowsByNote(): Record<string, Row> reads rows;
+  read fn rowsByNote(): RowsByNote reads rows;
 
   // ---- 通るもの ----
 

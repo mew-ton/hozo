@@ -47,7 +47,7 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 | 修飾 | `export` `override` |
 | 節の頭 | `extends` `of` `on` `to` `by` `for` `as` `effects` `reads` `throws` `prevents` `keeps` `catches` `recovers` `halts` `ignores` `any` `case` |
 | 文の頭と値 | `val` `return` `match` `disjoint` `collect` `default` `else` `none` `throw` |
-| 核の型と形 | `string` `boolean` `int` `float` `datetime` `date` `time` `duration` `void` `never` `Record` `list` `nullable` `single` |
+| 核の型と形 | `string` `boolean` `int` `float` `datetime` `date` `time` `duration` `void` `never` `list` `nullable` `single` |
 | リテラル | `true` `false` |
 
 `fn` は、関数の宣言の頭。`read` と `effect` は、その前に書く、関数の種類の語（「関数の宣言」）。`op` は、種類の名前で、宣言の頭には書かない: 書くのは、デコレータの宣言の `for op` と `any op`（「decorator の宣言」）。
@@ -129,8 +129,9 @@ ArgTerm   = Literal | QualifiedName ;
 
 ```
 ModelDecl   = "model" Ident [ "extends" QualifiedName ] ModelBody ;
-ModelBody   = "{" { Member } "}" ;
+ModelBody   = "{" ( { Member } | Index ) "}" ;
 Member      = Field | Override ;
+Index       = "[" Ident ":" Type "]" ":" Type ";" ;
 Field       = [ DocComment ] { Decorator } FieldName ":" Type ";" ;
 Override    = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "never" ) ] ";" ;
 ```
@@ -148,6 +149,9 @@ Override    = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "
 
 - メンバーの頭（`DocComment` とデコレータの後ろ）の `override` は、直後が `:` ならフィールドの名前（`override: string;`。`FieldName` は予約語も書ける）、そうでなければ `Override` の頭。`override override: never;` は、`override` という名前のフィールドをなくす。
 - `Override` は文法ではどの `ModelBody` にも書けるが、`extends` のない model と、その場で書く model（「union」）には元の model がないので、検査でエラーになる（TYPE-10。`docs/types.md`「診断」）。
+- `Index` を書いた model は、**インデックスの model**: キーが決まっていない構造で、キーから、値を引く（`model Attrs { [name: string]: string[]; }`。`docs/decisions.md`「決めたこと」360）。`[` の後ろの名前は、キーが何かを言う、説明のための名前。型の規則は `docs/types.md`「インデックスの model」。
+- 本体に書けるのは、`Member` の並びか、`Index` 一つの、どちらか。`Index` と `Member` を混ぜる、`Index` を二つ書く、`Index` にデコレータか `DocComment` を付ける、`extends` を持つ model に `Index` を書く、その場で書く model（「union」の `ArmType`）に `Index` を書く、は、どれも SYNTAX。
+- `Record<K, V>` は書けない（なくした書き方。「決めたこと」）。パーサーは、型の位置に、`Record` という名前と、その直後の `<` が来たら、インデックスの model を宣言して、その名前を書くことをメッセージで示して SYNTAX にする。`Record` は、予約語ではなく、ふつうの名前として宣言できる。
 - `model A is B omit f;` は書けない（なくした書き方。「決めたこと」）。パーサーは、`model` の名前の直後に `is` という識別子が来たら、`extends` と `override f: never;` で書くことをメッセージで示して SYNTAX にする。
 
 ### scalar
@@ -389,7 +393,6 @@ BindDecl = "bind" Ident "to" QualifiedName "." ( "*" | "**" ) ";" ;
 ```
 Type        = TypePrefix { "[" "]" | "?" } ;
 TypePrefix  = CoreType
-            | "Record" "<" Type "," Type ">"
             | ( "list" | "nullable" | "single" ) "<" Type ">"
             | QualifiedName [ "<" Type ">" ] ;
 CoreType    = "string" | "boolean" | "int" | "float" | "datetime" | "date" | "time" | "duration" ;
@@ -406,7 +409,8 @@ CoreType    = "string" | "boolean" | "int" | "float" | "datetime" | "date" | "ti
 
   その言語の型、通信の上の形、保存の形に写すのは、基底とプラグイン（Go は `docs/plugin-go.md`「型」、`docs/plugin-go-http.md`、`docs/plugin-go-sqlite.md`「しまい方」）。
 - `Time` と `Duration` は、核の型の名前ではなくなった。ふつうの名前として読み、宣言がなければ、RES-1 が、今の語を示す（`docs/resolve.md`「手続き」の 1.7）。
-- 形の語で書いた `nullable<T>` と `list<T>` が、もとの形で、`T?` と `T[]` は、その省略形。`single<T>` は `T` と同じ。`Type` を書けるどの位置にも、どちらでも書け、IR では同じ型になる（`docs/types.md`「形の書き方」）。
+- 形の語で書いた `single<T>`、`nullable<T>`、`list<T>` が、もとの形で、`T`、`T?`、`T[]` は、その省略形（`docs/decisions.md`「決めたこと」355、361）。`Type` を書けるどの位置にも、どちらでも書け、IR では同じ型になる（`docs/types.md`「形の書き方」）。
+- 型の中に、その場で書ける、構造を持つ型は、形の語だけ。キーが決まっていない構造は、インデックスの model を宣言して、その名前を書く（「model」）。
 
 - `QualifiedName "<" Type ">"` は分類のケースで絞り込んだ型（`WarrantyKind.Yamada<server.Item>`。§10.2）にだけ使う。ほかの名前に型引数を付けたらエラー（名前の解決で判定する）。
 - その場で書く model（`ModelBody`）は `Type` ではなく、`ArmType`（ユニオンのアーム）にだけ置ける。
@@ -529,7 +533,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `to` を予約語にする | `bind x to ...` の節の頭だから。ほかの節の頭と同じ扱い |
 | 予約語をフィールド名に書ける（`FieldName`） | `{ "op": "foo" }` のようなオブジェクトを返す API を、そのままの名前で書けるようにする。フィールド名の位置は `:` の前か `.` の後ろで、予約語が来ても構文があいまいにならない |
 | `field` `variant` `post` `put` `delete` は文脈キーワード | 節の操作対象（名詞）で、識別子が来る位置と同じ。§6.1 の `model Violation { field: string; }` が通る |
-| 形の語（`list<T>` / `nullable<T>` / `single<T>`）は、型の、もとの形で（`T?` と `T[]` は、その省略形。`docs/decisions.md`「決めたこと」355）、型を書けるどの位置にも書ける。状態の宣言は `state 名前: Type;` | 形と型を揃えた（`docs/decisions.md`「設計書から離れた決定」S21）。状態を名前で参照したときの型が、宣言に書いた型そのものになる。位置ごとに書ける綴りを分けると、同じ型なのに位置で書き方が変わる規則が要る。以前の「空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない」はなくした: `single<T>` は `T` なので、`single<T?>` は `T?`、つまり `nullable<T>` と同じ型で、「空」は型の一か所にしか現れない |
+| 形の語（`single<T>` / `nullable<T>` / `list<T>`）は、型の、もとの形で（`T`、`T?`、`T[]` は、その省略形。`docs/decisions.md`「決めたこと」355、361）、型を書けるどの位置にも書ける。状態の宣言は `state 名前: Type;` | 形と型を揃えた（`docs/decisions.md`「設計書から離れた決定」S21）。状態を名前で参照したときの型が、宣言に書いた型そのものになる。位置ごとに書ける綴りを分けると、同じ型なのに位置で書き方が変わる規則が要る。以前の「空になりうる状態は `nullable<T>` とだけ書き、`single<T?>` は書けない」はなくした: `single<T>` は `T` なので、`single<T?>` は `T?`、つまり `nullable<T>` と同じ型で、「空」は型の一か所にしか現れない |
 | 状態の分類での `match` は対象を書かない（`match (by C)`） | 対象は分類の宣言が持っていて、書かせると二か所になる |
 | `prevents` / `keeps` の目的語は `effects` だけ | 効果を名前で書き分ける場面がない: 葉の op は自分では効果を持たず（STATE-5）、配線の op の、例外ごとの効果の状態は、検査器が計算する（REL-4）。デコレータが運ぶ複数の効果（`docs/check.md`「デコレータが運ぶ reads と effects」）も、名前では書き分けない: 目的語の `effects` は、その op のすべての効果 |
 | 予約語をデコレータの名前に書ける（`DecoratorName`） | 語彙のデコレータは、することの名前で呼ぶ（`@db.list`、`@db.delete`）。その語が言語の節の頭や形の語と同じでも、語彙の側の名前を曲げさせない。デコレータの名前の位置は、`decorator` の直後か `@` の後ろ（修飾していれば最後の要素）で、予約語が来ても構文があいまいにならない。フィールド名（`FieldName`）と同じ扱い |
@@ -540,7 +544,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | `@external` と `@repeatable` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
 | 同じデコレータを一つの宣言に重ねられるのは、宣言が `@repeatable` を持つときだけ | 条件を一つずつ足す語彙（`@db.where(…)` を二つ）のように、重ねることに意味があるデコレータと、重ねれば書き間違いであるデコレータ（`@http.status` を二つ）を、宣言の側で分ける。既定は今までどおり一度だけ（DEC-13） |
 | その場で書く model はユニオンのアームにだけ置ける | 合成する名前（`docs/ir.md`「正規化」）が、そこにしか決まらない。例外の値に置けた形（`exception X: { … }`）は、例外が引数を持つ形になってなくなった |
-| 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない | 同じ意味の書き方を二つ持たない。型の `?` は `Record<string, int?>` や `Item?[]` のように、名前のない型の位置でも要るので、名前の側を落とす。設計書の例の `x?: T` は、`x: T?` と書く |
+| 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない | 同じ意味の書き方を二つ持たない。型の `?` は `Item?[]` や、インデックスの値の型（`[name: string]: int?;`）のように、名前のない型の位置でも要るので、名前の側を落とす。設計書の例の `x?: T` は、`x: T?` と書く |
 | 識別子は ASCII | §3.3 の命名規則が ASCII の大文字小文字で書かれている |
 | `duration` のリテラルの単位は `ms` `s` `m` `h` `d` | 例にあるのは `m` と `s`。秒未満と日は使う場面が見えるので足す。週以上は月と年が一定でないので持たない |
 | `datetime`、`date`、`time` のリテラルはない | 例にない。日時を仕様に直接書く場面がない |
@@ -589,3 +593,4 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 日時の核の型は、`datetime`、`date`、`time`、`duration`。核の型は、どれも小文字。`Time` と `Duration` は、なくした（同 359） | 言語が持つ型は小文字、宣言された型は大文字で始まる、と一つの決まりで言える。日時は、設計する人が、そのまま考える概念なので、素の型にする。表現（文字列か、数か）は、仕様が言うことではなく、基底とプラグインが、決まった表で写す |
 | デコレータの宣言の、付ける先の並びの区切りは `,`（`for model, state, op`）。`for model \| op` は、なくした（同 358） | `for` の後ろは、型ではなく、修飾する先の一覧。節の並びと同じ `,` にすると、`\|` は、「その場で書く union」の一つの意味になる |
 | 引数の種類には `any` を書き（`error: any exception`）、付ける先には書かない（`for effect`）（同 357） | `any <種類>` は、種類から、型を作る。`for` の後ろは種類、`:` の後ろは型。引数の種類から `any` を取ると、種類の語が、そのまま型として扱われる |
+| キーが決まっていない構造は、model の本体のインデックスで書く（`model Attrs { [name: string]: string[]; }`）。`Record<K, V>` と、予約語 `Record` は、なくした（同 360） | 構造を持つ型は、どれも、名前を付けて宣言する（union と同じ）。「何を、何で引くのか」に、名前と、説明と、キーの名前が付く。大文字で始まる、言語の語が、なくなる |

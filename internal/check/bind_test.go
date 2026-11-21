@@ -16,6 +16,8 @@ func bindFixture(serverOps []ir.Decl, browserOps []ir.Decl, binds ...ir.Bind) *i
 		model("server.LoginInput", field("token", ir.Optional(ir.Ref("server.Token"))), field("body", ir.Ref("server.Body"))),
 		model("server.StrictInput", field("token", ir.Ref("server.Token"))),
 		model("server.Node", field("next", ir.Optional(ir.Ref("server.Node"))), field("token", ir.Optional(ir.Ref("server.Token")))),
+		// インデックスの model: 値の型が τ でも、その先は辿らない
+		&ir.Model{DeclBase: ir.DeclBase{Name: "server.Tokens"}, Fields: []ir.Field{}, Index: &ir.ModelIndex{Name: "name", Key: ir.String(), Value: ir.Ref("server.Token")}},
 	}
 	browser := []ir.Decl{
 		state("browser.token", ir.StateNullable, ir.Ref("server.Token")),
@@ -49,14 +51,14 @@ func wantPaths(t *testing.T, what string, got [][]string, want ...string) {
 	wantStrings(t, what, gs, want)
 }
 
-// TestBindPositions は Pos(b, O): 0 / 1 / 2 の位置、model の再帰、array と record は辿らない、同じ model に戻ったら止める、
+// TestBindPositions は Pos(b, O): 0 / 1 / 2 の位置、model の再帰、array とインデックスの model は辿らない、同じ model に戻ったら止める、
 // `*` は直下だけ、`**` は子孫も。
 func TestBindPositions(t *testing.T) {
 	ops := []ir.Decl{
 		leaf("server.none", nil, param("n", ir.Int())),
 		leaf("server.login", nil, param("in", ir.Ref("server.LoginInput"))),
 		leaf("server.two", nil, param("a", ir.Ref("server.Token")), param("b", ir.Optional(ir.Ref("server.Token")))),
-		leaf("server.list", nil, param("l", ir.Array(ir.Ref("server.Token"))), param("r", ir.Record(ir.String(), ir.Ref("server.Token")))),
+		leaf("server.list", nil, param("l", ir.Array(ir.Ref("server.Token"))), param("r", ir.Ref("server.Tokens"))),
 		leaf("server.node", nil, param("n", ir.Ref("server.Node"))),
 		leaf("server.opt", nil, param("in", ir.Optional(ir.Ref("server.LoginInput")))),
 	}
@@ -64,7 +66,7 @@ func TestBindPositions(t *testing.T) {
 	wantPaths(t, "none", positionsOf(t, p, 0, "server.none"))
 	wantPaths(t, "login", positionsOf(t, p, 0, "server.login"), "in.token")
 	wantPaths(t, "two", positionsOf(t, p, 0, "server.two"), "a", "b")
-	wantPaths(t, "list/record", positionsOf(t, p, 0, "server.list"))
+	wantPaths(t, "list/index model", positionsOf(t, p, 0, "server.list"))
 	wantPaths(t, "node (cycle cut)", positionsOf(t, p, 0, "server.node"), "n.token")
 	wantPaths(t, "optional model", positionsOf(t, p, 0, "server.opt"), "in.token")
 	wantPaths(t, "server.* does not reach server.admin", positionsOf(t, p, 0, "server.admin.x"))

@@ -8,7 +8,7 @@
 //   - 「op を呼ぶ前の失敗」: 読めない要求は 400 `http.BadRequest` と決まった文言で、op を呼ばない。読めない要求が先で、次に制約の検査。
 //   - 「制約の検査」: validate = true のときだけ。違反の path は、通信の上の場所。validate = false なら、確かめずに op を呼ぶ。
 //     Validate を持たない入力は、同じ補助を通って、そのまま op に届く。
-//   - 「成功の応答」: 返す値があれば 200 と JSON（値のない配列は []、値のない record は {}、零値も値）、なければ 204 で本文なし
+//   - 「成功の応答」: 返す値があれば 200 と JSON（値のない配列は []、値のない、インデックスの model は {}、零値も値）、なければ 204 で本文なし
 //     （戻り値のない op、省略可能な戻り値で値がないとき）。一つの op が、呼び出しによって 200 も 204 も返す。
 //   - 「失敗の応答」: @http.status を持つ例外は、そのステータスと FQN。引数を持つ例外は、引数の名前をキーにしたオブジェクトを value に
 //     （引数が一つでも包む。省略可能な引数で値がなければ、キーを省く）。引数のない例外に、value はない。それ以外（ステータスを
@@ -49,7 +49,7 @@ type apiLeaves struct {
 	put     api.PutInput
 	items   []pkgtype.Item
 	first   *pkgtype.Item
-	counts  map[string]int64
+	counts  api.Counts
 	token   *pkgtype.Token
 	err     error
 }
@@ -82,7 +82,7 @@ func (l *apiLeaves) Replace(ctx context.Context, in api.ReplaceInput) error {
 	l.replace = in
 	return l.err
 }
-func (l *apiLeaves) ListAll(ctx context.Context, in api.ListInput) (map[string]int64, error) {
+func (l *apiLeaves) ListAll(ctx context.Context, in api.ListInput) (api.Counts, error) {
 	l.called(ctx, "listAll")
 	l.list = in
 	return l.counts, l.err
@@ -396,7 +396,7 @@ func TestWholeForms(t *testing.T) {
 	if leaves.list.Meta.Tenant != "" || leaves.list.Meta.Trace != nil {
 		t.Errorf("空のヘッダ: 入力 = %+v, want ないもの", leaves.list.Meta)
 	}
-	// 空の record（nil でない）も、{}
+	// 空の、インデックスの model（nil でないマップ）も、{}
 	leaves.counts = map[string]int64{}
 	expectJSON(t, call(t, h, "GET", "/list", ""), 200, `{}`)
 

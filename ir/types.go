@@ -7,11 +7,11 @@ import (
 )
 
 // Type は型（docs/ir.md「型」）。具体型は値型の [CoreType]、[RefType]、[OptionalType]、
-// [ArrayType]、[RecordType]、[CaseType]、[NeverType]。void は型ではなく Op.Returns が nil であること。
+// [ArrayType]、[CaseType]、[NeverType]。void は型ではなく Op.Returns が nil であること。
 // never は値の型ではなく、Op.Returns にだけ現れる。
 // 等しさは [TypeEqual]（docs/types.md「等しい」）、表示は String（Hozo の構文）。
 type Type interface {
-	// Kind は JSON の判別子（"core"、"ref"、"optional"、"array"、"record"、"case"、"never"）。
+	// Kind は JSON の判別子（"core"、"ref"、"optional"、"array"、"case"、"never"）。
 	Kind() string
 	// String は Hozo の構文で型を書く（docs/grammar.md「型」）。
 	String() string
@@ -55,12 +55,6 @@ type ArrayType struct {
 	Of Type `json:"of"`
 }
 
-// RecordType は Record<K, V>（docs/ir.md「型」の kind "record"）。
-type RecordType struct {
-	Key   Type `json:"key"`
-	Value Type `json:"value"`
-}
-
 // CaseType は分類のケースで絞り込まれた型 C.Case<T>（docs/ir.md「型」の kind "case"）。
 type CaseType struct {
 	// Classify は classify の FQN。
@@ -80,7 +74,6 @@ var (
 	_ Type = RefType{}
 	_ Type = OptionalType{}
 	_ Type = ArrayType{}
-	_ Type = RecordType{}
 	_ Type = CaseType{}
 )
 
@@ -96,9 +89,6 @@ func (OptionalType) Kind() string { return "optional" }
 // Kind は "array"。
 func (ArrayType) Kind() string { return "array" }
 
-// Kind は "record"。
-func (RecordType) Kind() string { return "record" }
-
 // Kind は "case"。
 func (CaseType) Kind() string { return "case" }
 
@@ -110,7 +100,6 @@ func (CoreType) isType()     {}
 func (RefType) isType()      {}
 func (OptionalType) isType() {}
 func (ArrayType) isType()    {}
-func (RecordType) isType()   {}
 func (CaseType) isType()     {}
 
 // String は "never"。
@@ -130,11 +119,6 @@ func (t OptionalType) String() string { return typeString(t.Of) + "?" }
 
 // String は "T[]"。
 func (t ArrayType) String() string { return typeString(t.Of) + "[]" }
-
-// String は "Record<K, V>"。
-func (t RecordType) String() string {
-	return "Record<" + typeString(t.Key) + ", " + typeString(t.Value) + ">"
-}
 
 // String は "C.Case<T>"。ケースが複数なら "C.(A, B)<T>"（表面の構文にはない形。ケースの並びの区切りは、アームと同じ ","）。
 func (t CaseType) String() string {
@@ -182,12 +166,6 @@ func (t ArrayType) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON は kind を付けて書く。
-func (t RecordType) MarshalJSON() ([]byte, error) {
-	type alias RecordType
-	return marshalKind("record", alias(t))
-}
-
-// MarshalJSON は kind を付けて書く。
 func (t CaseType) MarshalJSON() ([]byte, error) {
 	type alias CaseType
 	return marshalKind("case", alias(t))
@@ -200,9 +178,6 @@ func (t *OptionalType) UnmarshalJSON(data []byte) error { return unmarshalStruct
 func (t *ArrayType) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, t) }
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
-func (t *RecordType) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, t) }
-
-// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (t *CaseType) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, t) }
 
 var typeTable = map[string]func([]byte) (Type, error){
@@ -210,7 +185,6 @@ var typeTable = map[string]func([]byte) (Type, error){
 	"ref":      asValue[Type, RefType],
 	"optional": asValue[Type, OptionalType],
 	"array":    asValue[Type, ArrayType],
-	"record":   asValue[Type, RecordType],
 	"case":     asValue[Type, CaseType],
 	"never":    asValue[Type, NeverType],
 }
@@ -258,9 +232,6 @@ func Optional(of Type) Type {
 // Array は T[] を作る（docs/ir.md「型」の kind "array"）。
 func Array(of Type) Type { return ArrayType{Of: of} }
 
-// Record は Record<K, V> を作る（docs/ir.md「型」の kind "record"）。
-func Record(key, value Type) Type { return RecordType{Key: key, Value: value} }
-
 // Never は never を作る（docs/ir.md「型」の kind "never"）。Op.Returns にだけ置く。
 func Never() Type { return NeverType{} }
 
@@ -294,9 +265,6 @@ func TypeEqual(a, b Type) bool {
 	case ArrayType:
 		y, ok := b.(ArrayType)
 		return ok && TypeEqual(x.Of, y.Of)
-	case RecordType:
-		y, ok := b.(RecordType)
-		return ok && TypeEqual(x.Key, y.Key) && TypeEqual(x.Value, y.Value)
 	case CaseType:
 		y, ok := b.(CaseType)
 		return ok && x.Classify == y.Classify && sameSet(x.Cases, y.Cases) && TypeEqual(x.Of, y.Of)

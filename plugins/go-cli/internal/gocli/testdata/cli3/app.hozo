@@ -1,6 +1,7 @@
 // CLI-3: 位置は model。
 namespace app {
   model Point { x: int; }
+  model Labels { [name: string]: string; }
   scalar Path extends string;
   scalar Count extends int;
   scalar Count2 extends Count;
@@ -8,7 +9,7 @@ namespace app {
 
   model In {
     @cli.flag("model") model_: Point;
-    @cli.flag("record") record: Record<string, string>;
+    @cli.flag("index") index: Labels;
     @cli.flag("time") time: datetime;
     @cli.arg(1) duration: duration;
     @cli.flag("when") when: When?;

@@ -38,10 +38,13 @@ namespace app {
     @db.text label: kinds.Label;
   }
 
-  /** @db.json の列（array、record、model）。自分を指す model も JSON */
+  /** 名前ごとの数 */
+  model Counts { [name: string]: int; }
+
+  /** @db.json の列（array、インデックスの model、model）。自分を指す model も JSON */
   model Doc {
     @db.json tags: string[];
-    @db.json attrs: Record<string, int>;
+    @db.json attrs: Counts;
     @db.json tag: kinds.Tag;
     @db.json nested: kinds.Tag[];
     @db.json tree: Tree;
@@ -63,7 +66,7 @@ namespace app {
     @db.bool flag: kinds.Flag?;
     @db.datetime stamp: kinds.Stamp?;
     @db.json tags: string[]?;
-    @db.json attrs: Record<string, int>?;
+    @db.json attrs: Counts?;
     @db.json tag: kinds.Tag?;
   }
 

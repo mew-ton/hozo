@@ -68,7 +68,6 @@ func TestRoundTripTypes(t *testing.T) {
 	unionRoundTrip(t, Ref("server.User"), UnmarshalType, `{"kind":"ref","target":"server.User"}`)
 	unionRoundTrip(t, Optional(Int()), UnmarshalType, `{"kind":"optional","of":{"kind":"core","name":"int"}}`)
 	unionRoundTrip(t, Array(Optional(Int())), UnmarshalType, `{"kind":"array","of":{"kind":"optional","of":{"kind":"core","name":"int"}}}`)
-	unionRoundTrip(t, Record(String(), Ref("X")), UnmarshalType, `{"kind":"record","key":{"kind":"core","name":"string"},"value":{"kind":"ref","target":"X"}}`)
 	unionRoundTrip(t, Case("s.C", []string{"B", "A"}, Ref("s.T")), UnmarshalType,
 		`{"kind":"case","classify":"s.C","cases":["B","A"],"of":{"kind":"ref","target":"s.T"}}`)
 	// cases は空でも [] で出す。
@@ -422,7 +421,6 @@ func TestStateShapes(t *testing.T) {
 		{Ref("U"), StateSingle, Ref("U")},
 		{Optional(Array(Ref("U"))), StateNullable, Array(Ref("U"))},
 		{Array(Optional(Ref("U"))), StateList, Optional(Ref("U"))},
-		{Record(String(), Int()), StateSingle, Record(String(), Int())},
 	}
 	for _, tt := range shapes {
 		shape, elem := ShapeOf(tt.t)
@@ -529,7 +527,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.13","namespaces":[],"binds":[]}`
+	want := `{"version":"0.14","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -537,7 +535,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.13","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.13","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.14","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.14","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -729,7 +727,7 @@ func TestUnmarshalNullAndMissing(t *testing.T) {
 
 func TestKinds(t *testing.T) {
 	cases := map[string]interface{ Kind() string }{
-		"core": CoreType{}, "ref": RefType{}, "optional": OptionalType{}, "array": ArrayType{}, "record": RecordType{}, "case": CaseType{}, "never": NeverType{},
+		"core": CoreType{}, "ref": RefType{}, "optional": OptionalType{}, "array": ArrayType{}, "case": CaseType{}, "never": NeverType{},
 		"throw": ThrowBody{},
 		"type":  TypeParam{}, "any": AnyParam{},
 		"val": ValStmt{}, "assign": AssignStmt{}, "collect": CollectStmt{}, "disjoint": DisjointStmt{}, "for": ForStmt{}, "return": ReturnStmt{},

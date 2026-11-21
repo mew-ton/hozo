@@ -171,6 +171,7 @@ func TestArray(t *testing.T) {
 		"children[1].leaf.weight: min", "children[1].leaf.parent.leaf.weight: min")
 }
 
+// TestRecord は、インデックスの model を型に持つフィールド（docs/plugin-go-valid.md「model」の表）。
 func TestRecord(t *testing.T) {
 	expect(t, app.Maps{})
 	item := validItem()
@@ -178,11 +179,13 @@ func TestRecord(t *testing.T) {
 		ByName: map[string]app.Item{"z": {}, "a": item, "m": {Sku: "AB-1", Color: "#00ff00", Image: "https://example.com/", Code: "abc", Seller: "s@example.com", From: pkgtype.Address{City: "x"}}},
 		BySku:  map[app.Sku]app.Percent{"ZZ-1": 0, "AA-1": 101, "MM-1": 50},
 		Groups: map[string][]app.Item{"g": {item, {Sku: "AB-1", Name: "n", Color: "#00ff00", Image: "https://example.com/", Code: "abc", Seller: "x", From: pkgtype.Address{City: "x"}}}},
-		Pages:  []map[string]app.Ratio{{"b": 11, "a": 0}, nil},
+		Pages:  []app.RatiosByName{{"b": 11, "a": 0}, nil},
 		Opt:    map[string]*app.Link{"none": nil, "bad": ptr(app.Link("x")), "ok": ptr(app.Link("https://example.com/"))},
 		Labels: map[string]string{"": ""},
 		// キーは確かめない（Sku の形でないキーがあっても、違反にならない）
 		Counts: map[app.Sku]int64{"not a sku": 1},
+		// 値が、別のインデックスの model（入れ子）: 外のキー、内のキーの順に、辞書順
+		Nested: app.ItemsByGroup{"g2": {"b": {}}, "g1": {"ok": item, "a": {Sku: "AB-1", Color: "#00ff00", Image: "https://example.com/", Code: "abc", Seller: "s@example.com", From: pkgtype.Address{City: "x"}}}},
 	}
 	want := []string{
 		// キーの辞書順
@@ -192,6 +195,8 @@ func TestRecord(t *testing.T) {
 		"groups[g][1].seller: format",
 		"pages[0][a]: min", "pages[0][b]: max",
 		"opt[bad]: format",
+		"nested[g1][a].name: length",
+		"nested[g2][b].sku: pattern", "nested[g2][b].name: length", "nested[g2][b].color: pattern", "nested[g2][b].image: format", "nested[g2][b].code: length", "nested[g2][b].seller: format", "nested[g2][b].from.city: length",
 	}
 	// マップの走査の順によらず、いつも同じ順
 	for i := 0; i < 20; i++ {

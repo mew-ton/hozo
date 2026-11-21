@@ -16,7 +16,7 @@ import (
 // 診断のコード（docs/plugin-go-http.md「診断」）。
 const (
 	codeHTTPExport     = "GOHTTP-1"  // @http.get / @http.post の付いた op に export がない
-	codeHTTPParams     = "GOHTTP-2"  // 経路の op の引数が、0 個でも model 一つでもない
+	codeHTTPParams     = "GOHTTP-2"  // 経路の op の引数が、0 個でも、フィールドを持つ model 一つでもない
 	codeHTTPPlace      = "GOHTTP-3"  // 入力の model のフィールドが、場所の六つのデコレータのどれも持たない、または二つ以上持つ
 	codeHTTPFieldType  = "GOHTTP-4"  // ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない
 	codeHTTPJSON       = "GOHTTP-5"  // 本文、結果、@http.status を持つ例外の引数の型に、JSON にできない型がある
@@ -26,11 +26,11 @@ const (
 	codeHTTPOption     = "GOHTTP-9"  // [emit.options.go-http] に、知らないキーか、型の違う値がある
 	codeHTTPName       = "GOHTTP-10" // NewHandler が、N の定義のパッケージの名前と当たる
 	codeHTTPValidate   = "GOHTTP-11" // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
-	codeHTTPWholeType  = "GOHTTP-12" // 全体の形を付けたフィールドの型が、model でない
+	codeHTTPWholeType  = "GOHTTP-12" // 全体の形を付けたフィールドの型が、フィールドを持つ model でない
 	codeHTTPWholeMix   = "GOHTTP-13" // 一つの場所に、全体の形が二つ以上ある、または、全体の形と項目の形の両方がある
 	codeHTTPNoItem     = "GOHTTP-14" // @http.required か @http.default の付いたフィールドが、項目の形を持たない
 	codeHTTPOptional   = "GOHTTP-15" // @http.required か @http.default の付いたフィールドの型が、省略可能
-	codeHTTPResult     = "GOHTTP-16" // 経路の op の結果の型が、省略可能な配列か、省略可能な record
+	codeHTTPResult     = "GOHTTP-16" // 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model
 	codeHTTPBoth       = "GOHTTP-17" // 一つのフィールドに、@http.required と @http.default の両方がある
 	codeHTTPDefault    = "GOHTTP-18" // @http.default のリテラルが、フィールドの型に渡せない
 	codeHTTPConstraint = "GOHTTP-19" // @http.default の値が、フィールドの制約（@valid.*）に合わない
@@ -227,8 +227,11 @@ func (g *generator) check() []route {
 			if r, isRef := op.Params[0].Type.(ir.RefType); isRef {
 				model, _ = g.p.Lookup(r.Target).(*ir.Model)
 			}
+			if model != nil && model.Index != nil {
+				model = nil // インデックスの model は、フィールドを持たないので、入力の model にできない
+			}
 			if model == nil {
-				g.errorf(codeHTTPParams, op.Name, "経路の op %s の引数 %s の型 %s が model でない（引数は、0 個か、入力の model 一つ）",
+				g.errorf(codeHTTPParams, op.Name, "経路の op %s の引数 %s の型 %s が、フィールドを持つ model でない（引数は、0 個か、入力の model 一つ。インデックスの model は、入力の model にできない）",
 					op.Name, op.Params[0].Name, golang.TypeDisplay(op.Params[0].Type))
 			}
 		default:
@@ -309,7 +312,7 @@ func (g *generator) checkValidateHome(op *ir.Op, m *ir.Model) {
 	}
 }
 
-// checkResult は GOHTTP-16: 経路の op の結果の型が、省略可能な配列か、省略可能な record。Go では、どちらも nil が「値がない」を
+// checkResult は GOHTTP-16: 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model。Go では、どちらも nil が「値がない」を
 // 表すので、補助 httpWriteResult は、実行時に、値がない（204）ことと、空である（200）ことを見分けられない。
 func (g *generator) checkResult(op *ir.Op) {
 	t := op.Returns
@@ -325,11 +328,11 @@ func (g *generator) checkResult(op *ir.Op) {
 		of = c.Of
 	}
 	var what string
-	switch of.(type) {
-	case ir.ArrayType:
+	switch {
+	case isArray(of):
 		what = "省略可能な配列"
-	case ir.RecordType:
-		what = "省略可能な record"
+	case g.p.IndexOf(of) != nil:
+		what = "省略可能な、インデックスの model"
 	default:
 		return
 	}
@@ -414,7 +417,7 @@ func (g *generator) checkJSON(op *ir.Op, t ir.Type, what string) {
 }
 
 // unionIn は、型 t の中の union（arms）の FQN（docs/plugin-go-http.md「対象」の「JSON にできる型」: 核の型、scalar、model、
-// optional、array、record と、それらの組み合わせのほかは、JSON にできない）。なければ false。
+// optional、array と、それらの組み合わせのほかは、JSON にできない。model は、インデックスの model を含む）。なければ false。
 func (g *generator) unionIn(t ir.Type, visited map[string]bool) (string, bool) {
 	switch x := t.(type) {
 	case ir.OptionalType:
@@ -423,11 +426,6 @@ func (g *generator) unionIn(t ir.Type, visited map[string]bool) (string, bool) {
 		return g.unionIn(x.Of, visited)
 	case ir.CaseType:
 		return g.unionIn(x.Of, visited)
-	case ir.RecordType:
-		if u, bad := g.unionIn(x.Key, visited); bad {
-			return u, true
-		}
-		return g.unionIn(x.Value, visited)
 	case ir.RefType:
 		if visited[x.Target] {
 			return "", false
@@ -441,6 +439,12 @@ func (g *generator) unionIn(t ir.Type, visited map[string]bool) (string, bool) {
 				if u, bad := g.unionIn(f.Type, visited); bad {
 					return u, true
 				}
+			}
+			if d.Index != nil {
+				if u, bad := g.unionIn(d.Index.Key, visited); bad {
+					return u, true
+				}
+				return g.unionIn(d.Index.Value, visited)
 			}
 		}
 	}
@@ -475,4 +479,10 @@ func (g *generator) checkName() {
 		}
 		g.errorf(codeHTTPName, n.Decl, "%s %s が、%s が入口のパッケージに足す関数 %s と当たる（直すのは仕様の名前）", what, n.Name, TranspilerName, handlerName)
 	}
+}
+
+// isArray は、型 t が array か。
+func isArray(t ir.Type) bool {
+	_, ok := t.(ir.ArrayType)
+	return ok
 }

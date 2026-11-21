@@ -20,11 +20,11 @@ type TokenState interface {
 	RemoveToken(ctx context.Context) error
 }
 
-// QueryState は状態 browser.query（single<Record<string, string[]>>）の単位。実装は New の引数 query に渡す。
+// QueryState は状態 browser.query（single<page.Query>）の単位。実装は New の引数 query に渡す。
 // メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type QueryState interface {
 	// Get は問い合わせ（形 single で決まる）: browser.query の値。
-	Get(ctx context.Context) (map[string][]string, error)
+	Get(ctx context.Context) (page.Query, error)
 }
 
 // LocationState は状態 browser.location（single<page.Route>）の単位。実装は New の引数 location に渡す。

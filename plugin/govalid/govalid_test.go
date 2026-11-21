@@ -25,6 +25,11 @@ func model(fqn string, fields ...ir.Field) *ir.Model {
 	return &ir.Model{DeclBase: decl(fqn), Fields: fields}
 }
 
+// index は、インデックスの model（docs/types.md「インデックスの model」）。
+func index(fqn string, key, value ir.Type) *ir.Model {
+	return &ir.Model{DeclBase: decl(fqn), Index: &ir.ModelIndex{Name: "name", Key: key, Value: value}}
+}
+
 func field(name string, t ir.Type, decorators ...string) ir.Field {
 	f := ir.Field{Name: name, Type: t}
 	for _, d := range decorators {
@@ -59,14 +64,21 @@ func TestHasValidate(t *testing.T) {
 			// 3: @valid.* が付いたフィールドを持つ model
 			model("app.Named", field("name", ir.String(), "valid.length")),
 			model("app.Marked", field("id", ir.String(), "db.key")),
-			// 4: Validate を持つ型をフィールドの型に持つ model。optional、array、record の値を通して見る
+			// 4: Validate を持つ型をフィールドの型に持つ model。optional、array、インデックスの model の値を通して見る
 			model("app.Direct", field("email", ir.Ref("type.Email"))),
 			model("app.Opt", field("email", ir.Optional(ir.Ref("type.Email")))),
 			model("app.List", field("emails", ir.Array(ir.Ref("type.Email")))),
-			model("app.Map", field("emails", ir.Record(ir.String(), ir.Ref("type.Email")))),
-			model("app.Deep", field("x", ir.Optional(ir.Array(ir.Record(ir.String(), ir.Array(ir.Optional(ir.Ref("app.Named")))))))),
-			// record のキーは見ない（値だけ）
-			model("app.Keyed", field("byEmail", ir.Record(ir.Ref("type.Email"), ir.String()))),
+			model("app.Map", field("emails", ir.Ref("app.Emails"))),
+			model("app.Deep", field("x", ir.Optional(ir.Array(ir.Ref("app.NamedLists"))))),
+			// インデックスのキーは見ない（値だけ）
+			model("app.Keyed", field("byEmail", ir.Ref("app.ByEmail"))),
+			// インデックスの model そのものは、Validate を持たない（値を回すのは、それをフィールドの型に持つ model）
+			index("app.Emails", ir.String(), ir.Ref("type.Email")),
+			index("app.NamedLists", ir.String(), ir.Array(ir.Optional(ir.Ref("app.Named")))),
+			index("app.ByEmail", ir.Ref("type.Email"), ir.String()),
+			// インデックスの model だけを辿って、自分に戻る（値を持たない循環）: 止まる
+			index("app.Tree", ir.String(), ir.Ref("app.Tree")),
+			model("app.Forest", field("root", ir.Ref("app.Tree"))),
 			model("app.NoCheck", field("id", ir.Ref("type.PlainId")), field("at", ir.Datetime()), field("m", ir.Ref("app.Marked"))),
 			// 当たるものがなくなるまで繰り返す: 順に辿る model と、互いを参照する model
 			model("app.Outer", field("mid", ir.Ref("app.Mid"))),
@@ -96,6 +108,7 @@ func TestHasValidate(t *testing.T) {
 		"app.Named": true, "app.Marked": false,
 		"app.Direct": true, "app.Opt": true, "app.List": true, "app.Map": true, "app.Deep": true,
 		"app.Keyed": false, "app.NoCheck": false,
+		"app.Emails": false, "app.NamedLists": false, "app.ByEmail": false, "app.Tree": false, "app.Forest": false,
 		"app.Outer": true, "app.Mid": true, "app.Ping": true, "app.Pong": true, "app.Loop": false,
 		"app.Contact": false, "app.Holder": false, "app.Bad": false,
 		"app.Page.Ready": true, "app.Bad2": false, "app.Bad3": false,

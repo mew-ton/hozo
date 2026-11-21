@@ -16,6 +16,9 @@ type Item struct {
 	Count int64 `json:"count"`
 }
 
+// Counts は model app.Counts。
+type Counts map[string]int64
+
 // Shape は union app.Shape。
 type Shape interface{ isShape() }
 

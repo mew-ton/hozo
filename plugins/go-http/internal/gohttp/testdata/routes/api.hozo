@@ -63,6 +63,11 @@ namespace type {
 
 /** 入力の読み方のすべて（validate は既定の false） */
 namespace api {
+  /** 品物のラベル。名前から、値を引く */
+  model Labels { [name: string]: type.Name; }
+  /** 名前ごとの数 */
+  model Counts { [name: string]: int; }
+
   // 引数がなく、戻り値がある
   @http.get("/health")
   export fn health(): string;
@@ -79,7 +84,7 @@ namespace api {
     @http.query @http.required dryRun: boolean;
     @http.body("memo") note: string?;
     @http.body @http.default(1) copies: int;
-    @http.required @http.body labels: Record<string, type.Name>;
+    @http.required @http.body labels: Labels;
     @http.body @http.default(2) weight: float;
     @http.body @http.default(1.5) scale: type.Ratio;
     @http.body @http.default(true) active: boolean;
@@ -131,13 +136,13 @@ namespace api {
   export fn replace(in: ReplaceInput):
     throws type.NotFound;
 
-  // 全体の形: ヘッダとクエリを、一つずつの model で。結果は record（値がなくても {} を返す）
+  // 全体の形: ヘッダとクエリを、一つずつの model で。結果は、インデックスの model（値がなくても {} を返す）
   model ListInput {
     @http.headerObj meta: type.Meta;
     @http.queryObj paging: type.Paging;
   }
   @http.get("/list")
-  export fn listAll(in: ListInput): Record<string, int>;
+  export fn listAll(in: ListInput): Counts;
 
   // 全体の形: 本文が、その model の JSON。ほかの場所の項目の形とは、一緒に書ける。結果は、省略可能な scalar
   model PutInput {

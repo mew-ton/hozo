@@ -153,6 +153,14 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 | `gen/store/db.go` | 表 `orders` の二つの列（`TEXT`。`NOT NULL` なし）。`SELECT` と `INSERT` の列の並び。`dbArgsOrder` と `dbScanOrder` の `dbDate(…, dbNullable)` と `dbTime(…, dbNullable)`。補助の名前 `dbTime` を `dbDatetime` に（`dbDatetimeLayout`）。補助 `dbDate` と、新しい `dbTime` | `docs/plugin-go-sqlite.md`「しまい方」「補助」 |
 | `app/onsqlite/store_test.go` | 二つの列が、値がなければ `NULL`、あれば、決まった形の文字列で、読み戻すと、同じ値になること | 「人が書いたもの」 |
 
+### インデックスの model で変えたこと
+
+`Record<K, V>` をなくして、キーが決まっていない構造を、model のインデックスで書くことにした（`docs/decisions.md`「決めたこと」360）。このサンプルの仕様は、`Record` を使っていないので、変わらない。変わったのは、期待する出力の、コメントの一行だけで、手で直した。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `gen/server/http.go` | 補助 `httpWriteResult` のコメントの一行（「値のない record」を、「値のない、インデックスの model（nil のマップ）」に） | `docs/plugin-go-http.md`「補助」 |
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。

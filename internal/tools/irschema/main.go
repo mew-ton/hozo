@@ -84,7 +84,7 @@ var unions = []struct {
 }{
 	{typeOf[ir.Type](), []reflect.Type{
 		typeOf[ir.CoreType](), typeOf[ir.RefType](), typeOf[ir.OptionalType](),
-		typeOf[ir.ArrayType](), typeOf[ir.RecordType](), typeOf[ir.CaseType](), typeOf[ir.NeverType](),
+		typeOf[ir.ArrayType](), typeOf[ir.CaseType](), typeOf[ir.NeverType](),
 	}},
 	{typeOf[ir.Decl](), []reflect.Type{
 		typeOf[ir.Model](), typeOf[ir.Scalar](), typeOf[ir.Union](), typeOf[ir.State](),
@@ -181,9 +181,9 @@ var descriptions = map[string]string{
 	"RefType":              "model / scalar / union への参照（docs/ir.md「型」の ref）。",
 	"OptionalType":         "T?（docs/ir.md「型」の optional）。入れ子にはしない。",
 	"ArrayType":            "T[]（docs/ir.md「型」の array）。",
-	"RecordType":           "Record<K, V>（docs/ir.md「型」の record）。",
 	"CaseType":             "分類のケースで絞り込まれた型（docs/ir.md「型」の case）。cases は match のアームに書かれた順。",
 	"Model":                "model 宣言（docs/ir.md「model / scalar / union」）。",
+	"ModelIndex":           "インデックスの model のインデックス（docs/ir.md「model / scalar / union」の index）。キーの名前、キーの型、値の型。",
 	"ModelExtends":         "継承した model（`model D extends B { ... }`）の記録（docs/ir.md「model / scalar / union」の extends）。fields は展開済み。",
 	"Field":                "model のフィールド（docs/ir.md「model / scalar / union」の Field）。",
 	"Scalar":               "scalar 宣言（docs/ir.md「model / scalar / union」）。",

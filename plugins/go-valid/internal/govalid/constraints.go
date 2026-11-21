@@ -53,7 +53,7 @@ type constraint struct {
 }
 
 // parse は、適用 app（valid の標準の制約）を読む。core は付いた先の元の型で、coreOK が false なら、付いた先は核の型を元に
-// 持たない（model、union、array、record など）。subject は、メッセージに書く、付いた先（「scalar type.Email」）。
+// 持たない（model、union、array など）。subject は、メッセージに書く、付いた先（「scalar type.Email」）。
 // 「制約」の表に合わなければ、problem にその理由を返す（GOVALID-1 のメッセージ）。
 func parse(app *ir.Application, core ir.CoreName, coreOK bool, subject string) (c constraint, problem string) {
 	c = constraint{decorator: app.Decorator, name: short(app.Decorator), core: core}

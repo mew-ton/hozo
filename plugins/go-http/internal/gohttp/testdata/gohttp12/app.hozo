@@ -3,12 +3,13 @@ namespace app {
   scalar Name extends string;
   model Item { name: string; }
   union Shape { Dot: Item; Label: string; }
+  model ItemsByName { [name: string]: Item; }
 
   model In {
-    // 省略可能な model、配列、record、核の型、scalar、union は、model ではない
+    // 省略可能な model、配列、インデックスの model、核の型、scalar、union には、付けられない
     @http.headerObj meta: Item?;
     @http.queryObj paging: Item[];
-    @http.bodyObj attrs: Record<string, Item>;
+    @http.bodyObj attrs: ItemsByName;
   }
   @http.post("/in")
   export fn take(in: In);

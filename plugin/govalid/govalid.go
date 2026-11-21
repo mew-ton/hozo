@@ -41,7 +41,8 @@ func constraint(decorator string) bool {
 //  1. `@valid.*` が付いた scalar。
 //  2. 元の型（Scalar.base）が、Validate を持つ scalar である scalar。
 //  3. `@valid.*` が付いたフィールドを持つ model。
-//  4. Validate を持つ型を、フィールドの型に持つ model。フィールドの型は、optional、array、record の値を通して見る。
+//  4. Validate を持つ型を、フィールドの型に持つ model。フィールドの型は、optional、array と、インデックスの model の値を通して見る。
+//     インデックスの model そのものは、Validate を持たない。
 //
 // 継承した model は、展開済みのフィールド（受け継いだデコレータを含む）で判定する。union と exception は持たない（例外の引数の型が
 // Validate を持つ型でも、例外の構造体には出さない）。
@@ -107,7 +108,7 @@ func validated(p *ir.Program) map[string]bool {
 					continue
 				}
 				for _, f := range x.Fields {
-					if r, ok := through(f.Type).(ir.RefType); ok && has[r.Target] {
+					if r, ok := Through(p, f.Type).(ir.RefType); ok && has[r.Target] {
 						has[name], changed = true, true
 						break
 					}
@@ -128,18 +129,26 @@ func constrained(decorators []ir.Application) bool {
 	return false
 }
 
-// through は、フィールドの型を、optional、array、record の値を通して見た型（`T?`、`T[]`、`Record<K, T>` の T）。
-func through(t ir.Type) ir.Type {
+// Through は、フィールドの型を、optional、array と、インデックスの model の値を通して見た型（`T?`、`T[]`、
+// `model Items { [name: string]: T; }` の Items から T。docs/plugin-go-valid.md「Validate を持つ型」の 4）。
+// インデックスの model だけを辿って、同じ model に戻ったら（値を持たない循環）、その ref を返す。
+func Through(p *ir.Program, t ir.Type) ir.Type {
+	seen := map[string]bool{}
 	for {
 		switch x := t.(type) {
 		case ir.OptionalType:
 			t = x.Of
 		case ir.ArrayType:
 			t = x.Of
-		case ir.RecordType:
-			t = x.Value
 		case ir.CaseType:
 			t = x.Of
+		case ir.RefType:
+			idx := p.IndexOf(x)
+			if idx == nil || idx.Value == nil || seen[x.Target] {
+				return t
+			}
+			seen[x.Target] = true
+			t = idx.Value
 		default:
 			return t
 		}

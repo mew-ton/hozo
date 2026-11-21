@@ -25,7 +25,7 @@ namespace storefront {
   state location: single<page.Route>;
 
   @page.query
-  state query: single<Record<string, string[]>>;
+  state query: single<page.Query>;
 
   /** 客に見せて、同意を求めている値段 */
   model Offer {

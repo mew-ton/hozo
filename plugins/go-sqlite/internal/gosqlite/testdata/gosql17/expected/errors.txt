@@ -9,9 +9,9 @@ GOSQL-17	app.Row	model app.Row のフィールド floatOnInt のしまい方 @db
 GOSQL-17	app.Row	model app.Row のフィールド boolOnInt のしまい方 @db.bool が、型 int に合わない（@db.bool に合う型は boolean）
 GOSQL-17	app.Row	model app.Row のフィールド timeOnString のしまい方 @db.datetime が、型 string に合わない（@db.datetime に合う型は datetime）
 GOSQL-17	app.Row	model app.Row のフィールド timeOnDuration のしまい方 @db.datetime が、型 duration に合わない（@db.datetime に合う型は datetime）
-GOSQL-17	app.Row	model app.Row のフィールド jsonOnString のしまい方 @db.json が、型 string に合わない（@db.json に合う型は array、record、model）
-GOSQL-17	app.Row	model app.Row のフィールド jsonOnInt のしまい方 @db.json が、型 int に合わない（@db.json に合う型は array、record、model）
-GOSQL-17	app.Row	model app.Row のフィールド jsonOnScalar のしまい方 @db.json が、型 app.Name に合わない（@db.json に合う型は array、record、model）
+GOSQL-17	app.Row	model app.Row のフィールド jsonOnString のしまい方 @db.json が、型 string に合わない（@db.json に合う型は array、model（インデックスの model を含む））
+GOSQL-17	app.Row	model app.Row のフィールド jsonOnInt のしまい方 @db.json が、型 int に合わない（@db.json に合う型は array、model（インデックスの model を含む））
+GOSQL-17	app.Row	model app.Row のフィールド jsonOnScalar のしまい方 @db.json が、型 app.Name に合わない（@db.json に合う型は array、model（インデックスの model を含む））
 GOSQL-17	app.Row	model app.Row のフィールド intOnName のしまい方 @db.int が、型 app.Name に合わない（@db.int に合う型は int、duration）
 GOSQL-17	app.Row	model app.Row のフィールド textOnCount のしまい方 @db.text が、型 app.Count に合わない（@db.text に合う型は string）
 GOSQL-17	app.Row	model app.Row のフィールド intOnStamp のしまい方 @db.int が、型 app.Stamp に合わない（@db.int に合う型は int、duration）

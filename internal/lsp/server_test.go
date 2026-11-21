@@ -1578,3 +1578,67 @@ namespace store {
 		t.Error("アウトラインに、効果 add がない")
 	}
 }
+
+// TestIndexModel は、インデックスの model（docs/grammar.md「model」、docs/lsp.md「ホバー」「ドキュメントのシンボル」）: 見出しは
+// インデックスまで出す。使う所の型の名前は、宣言へ飛ぶ。なくした Record<K, V> は SYNTAX。
+func TestIndexModel(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace a {
+  scalar Sku extends string;
+  /** 在庫。品番から、数を引く */
+  model Stock { [sku: Sku]: int?; }
+  model Shelf { stock: Stock; old: Record<string, int>; }
+  fn take(s: Stock);
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	var codes []string
+	for _, d := range byURI[uri] {
+		if d.Code == codeNoConfig {
+			continue
+		}
+		codes = append(codes, d.Code)
+		if d.Code == "SYNTAX" && !strings.Contains(d.Message, "インデックスの model を宣言して") {
+			t.Errorf("SYNTAX のメッセージ = %q, want 新しい書き方を示す", d.Message)
+		}
+	}
+	if strings.Join(codes, ",") != "SYNTAX" {
+		t.Fatalf("診断 = %v, want [SYNTAX]（Record<K, V>）", codes)
+	}
+	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
+		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
+	}
+	for _, tt := range []struct {
+		what   string
+		pos    protocol.TextDocumentPositionParams
+		target string
+		skip   int
+		hover  []string
+	}{
+		{"インデックスの model の宣言", at("model Stock", len("model ")), "Stock { [sku", 0, []string{"model Stock { [sku: Sku]: int? }", "在庫。品番から、数を引く"}},
+		{"フィールドの型に書いた名前", at("stock: Stock;", len("stock: ")), "Stock { [sku", 0, []string{"model Stock { [sku: Sku]: int? }"}},
+		{"引数の型に書いた名前", at("fn take(s: Stock)", len("fn take(s: ")), "Stock { [sku", 0, []string{"model Stock { [sku: Sku]: int? }"}},
+		{"インデックスのキーの型", at("[sku: Sku]", len("[sku: ")), "Sku extends string;", 0, []string{"scalar Sku extends string"}},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, tt.pos, &hov)
+		if hov == nil {
+			t.Errorf("hover(%s) = nil", tt.what)
+		} else {
+			for _, want := range tt.hover {
+				if !strings.Contains(hov.Contents.Value, want) {
+					t.Errorf("hover(%s) に %q がない:\n%s", tt.what, want, hov.Contents.Value)
+				}
+			}
+		}
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, tt.pos, &loc)
+		if want := shift(positionOf(t, enc, text, tt.target, 0), tt.skip); loc == nil || loc.URI != uri || loc.Range.Start != want {
+			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
+		}
+	}
+}

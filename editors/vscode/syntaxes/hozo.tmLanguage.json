@@ -59,17 +59,17 @@
       "patterns": [
         {
           "name": "variable.other.property.hozo",
-          "match": "\\b(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|datetime|date|time|duration|void|never|Record|list|nullable|single|none|true|false|default)\\b(?=\\s*:)"
+          "match": "\\b(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single|none|true|false|default)\\b(?=\\s*:)"
         },
         {
           "name": "variable.other.property.hozo",
-          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|datetime|date|time|duration|void|never|Record|list|nullable|single|none|true|false|default)\\b"
+          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single|none|true|false|default)\\b"
         }
       ]
     },
     "override-name": {
       "comment": "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
-      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|datetime|date|time|duration|void|never|Record|list|nullable|single|none|true|false|default))\\b",
+      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single|none|true|false|default))\\b",
       "captures": {
         "1": {
           "name": "storage.modifier.hozo"
@@ -511,7 +511,7 @@
     },
     "keywords.type": {
       "name": "support.type.primitive.hozo",
-      "match": "\\b(?:string|boolean|int|float|datetime|date|time|duration|void|never|Record|list|nullable|single)\\b"
+      "match": "\\b(?:string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single)\\b"
     },
     "keywords.constant": {
       "name": "constant.language.hozo",

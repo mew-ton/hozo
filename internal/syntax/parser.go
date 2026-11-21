@@ -529,22 +529,52 @@ func (p *parser) parseModel(start source.Offset, doc *ast.DocComment, decorators
 		}
 		p.failExpected("「{」か「extends」")
 	}
-	m.Body = p.parseModelBody()
+	m.Body = p.parseModelBody(indexDeclared)
+	if idx := m.Body.Index; idx != nil && m.Extends != nil {
+		p.errorAt(idx.Span, "extends を持つ model に、インデックスは書けない（インデックスの model は、継承できない。docs/grammar.md「model」）")
+	}
 	m.Span = p.spanFrom(start)
 	return m
 }
 
-// parseModelBody は ModelBody = "{" { Member } "}" を読む。誤ったメンバーは読み飛ばし、読めたものを残す。
-func (p *parser) parseModelBody() *ast.ModelBody {
+// indexPlace は、ModelBody の置き場が、インデックスを書ける所か。
+type indexPlace int
+
+const (
+	// indexDeclared は、名前を付けて宣言する model の本体（インデックスを書ける）。
+	indexDeclared indexPlace = iota
+	// indexInline は、その場で書く model（ArmType）の本体（インデックスを書けない）。
+	indexInline
+)
+
+// parseModelBody は ModelBody = "{" ( { Member } | Index ) "}" を読む。誤ったメンバーは読み飛ばし、読めたものを残す。
+//
+// 本体に書けるのは、Member の並びか、Index 一つの、どちらか（docs/grammar.md「model」）: Index と Member を混ぜる、
+// Index を二つ書く、その場で書く model に Index を書く、は誤り。誤りのあった Index も、最初の一つは残す。
+func (p *parser) parseModelBody(place indexPlace) *ast.ModelBody {
 	start := p.expect(token.LBrace).Span.Start
 	body := &ast.ModelBody{Fields: []*ast.Field{}}
+	mixed := false
 	p.parseMembers(func() {
-		f, o := p.parseMember()
+		f, o, idx := p.parseMember()
 		if f != nil {
 			body.Fields = append(body.Fields, f)
 		}
 		if o != nil {
 			body.Overrides = append(body.Overrides, o)
+		}
+		switch {
+		case idx == nil:
+		case place == indexInline:
+			p.errorAt(idx.Span, "その場で書く model に、インデックスは書けない。インデックスの model は、名前を付けて宣言する（docs/grammar.md「model」）")
+		case body.Index != nil:
+			p.errorAt(idx.Span, "インデックスは、一つの model に一つだけ（docs/grammar.md「model」）")
+		default:
+			body.Index = idx
+		}
+		if !mixed && body.Index != nil && len(body.Fields)+len(body.Overrides) > 0 {
+			mixed = true
+			p.errorAt(body.Index.Span, "インデックスと、フィールドは、一つの model に混ぜられない。本体は、フィールドの並びか、インデックス一つ（docs/grammar.md「model」）")
 		}
 	})
 	p.expect(token.RBrace)
@@ -563,16 +593,19 @@ func (p *parser) parseMembers(parseOne func()) {
 	}
 }
 
-// parseMember は Member = Field | Override を読む。どちらか一方を返す。
+// parseMember は Member = Field | Override か、Index を読む。どれか一つを返す。
 //
 //	Field    = [ DocComment ] { Decorator } FieldName ":" Type ";" ;
 //	Override = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "never" ) ] ";" ;
+//	Index    = "[" Ident ":" Type "]" ":" Type ";" ;
+//
+// Index には、デコレータも DocComment も付けられない（model の宣言に付ける）。
 //
 // フィールドの名前は FieldName なので予約語も書ける（`op: string;`。docs/grammar.md「識別子」）。
 // メンバーの頭の override は、直後が ":" ならフィールドの名前、そうでなければ Override の頭。
 // フィールドの既定値（`page: int = 1`）はなくした書き方で、型の直後の "=" は、今の書き方を示して誤りにする
 // （docs/grammar.md「model」「決めたこと」）。
-func (p *parser) parseMember() (*ast.Field, *ast.Override) {
+func (p *parser) parseMember() (*ast.Field, *ast.Override, *ast.Index) {
 	doc := p.parseLeadingDoc()
 	start := p.tok().Span.Start
 	decorators, marks := p.parseDecorators()
@@ -585,6 +618,21 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override) {
 	}
 	if doc != nil && p.at(token.RBrace) {
 		p.fail(doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
+	}
+	if p.at(token.LBracket) {
+		if doc != nil || len(decorators) > 0 {
+			p.errorAt(p.tok().Span, "インデックスには、デコレータも、説明も、付けられない。model の宣言に付ける（docs/grammar.md「model」）")
+		}
+		p.advance()
+		idx := &ast.Index{Name: p.parseIdent()}
+		p.expect(token.Colon)
+		idx.Key = p.parseType()
+		p.expect(token.RBracket)
+		p.expect(token.Colon)
+		idx.Value = p.parseType()
+		p.expect(token.Semicolon)
+		idx.Span = p.spanFrom(start)
+		return nil, nil, idx
 	}
 	if p.at(token.Override) && p.peek(1).Kind != token.Colon {
 		p.advance()
@@ -601,7 +649,7 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override) {
 		}
 		p.expect(token.Semicolon)
 		o.Span = p.spanFrom(start)
-		return nil, o
+		return nil, o, nil
 	}
 	f := &ast.Field{Doc: doc, Decorators: decorators, Name: p.parseFieldName()}
 	p.expect(token.Colon)
@@ -611,7 +659,7 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override) {
 	}
 	p.expect(token.Semicolon)
 	f.Span = p.spanFrom(start)
-	return f, nil
+	return f, nil, nil
 }
 
 // failFieldDefault は、フィールドの型の直後の "="（なくした書き方の既定値）を、今の書き方を示して誤りにする。
@@ -671,7 +719,7 @@ func (p *parser) parseUnionMember() *ast.UnionMember {
 func (p *parser) parseArmType() *ast.ArmType {
 	a := &ast.ArmType{}
 	if p.at(token.LBrace) {
-		a.Body = p.parseModelBody()
+		a.Body = p.parseModelBody(indexInline)
 		a.Span = a.Body.Span
 	} else {
 		a.Type = p.parseType()
@@ -1537,16 +1585,11 @@ func (p *parser) parseType() ast.Type {
 	case token.StringType, token.BooleanType, token.IntType, token.FloatType, token.DatetimeType, token.DateType, token.TimeType, token.DurationType:
 		tok := p.advance()
 		t = &ast.CoreType{Span: tok.Span, Name: tok.Text}
-	case token.Record:
-		p.advance()
-		p.expect(token.Less)
-		r := &ast.RecordType{Key: p.parseType()}
-		p.expect(token.Comma)
-		r.Value = p.parseType()
-		p.expect(token.Greater)
-		r.Span = p.spanFrom(start)
-		t = r
 	case token.Ident, token.QualifiedName:
+		if p.tok().Kind == token.Ident && p.tok().Text == "Record" && p.peek(1).Kind == token.Less {
+			// なくした書き方（docs/grammar.md「model」「決めたこと」）
+			p.fail(p.tok().Span, "Record<K, V> という書き方はなくなった。キーが決まっていない構造は、インデックスの model を宣言して、その名前を書く（model 名前 { [キーの名前: K]: V; }。docs/grammar.md「model」）")
+		}
 		n := &ast.NamedType{Name: p.parseQualifiedName()}
 		if p.got(token.Less) {
 			n.Arg = p.parseType()

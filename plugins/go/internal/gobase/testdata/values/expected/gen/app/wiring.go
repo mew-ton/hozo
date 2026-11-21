@@ -102,7 +102,7 @@ func (o *ops) ToBase(ctx context.Context, email Email) error {
 }
 
 // Elements は op app.elements。
-func (o *ops) Elements(ctx context.Context, emails []Email, names []string, byName map[string]Email) error {
+func (o *ops) Elements(ctx context.Context, emails []Email, names []string) error {
 	var v0 []string
 	if emails != nil {
 		v0 = make([]string, len(emails))
@@ -123,14 +123,21 @@ func (o *ops) Elements(ctx context.Context, emails []Email, names []string, byNa
 	if err := o.TakeOptionalStrings(ctx, v1); err != nil {
 		return err
 	}
-	var v2 map[string]string
-	if byName != nil {
-		v2 = make(map[string]string, len(byName))
-		for key, e := range byName {
-			v2[key] = string(e)
-		}
+	return nil
+}
+
+// Tables は op app.tables。
+func (o *ops) Tables(ctx context.Context, byName Labels) error {
+	if err := o.TakeTable(ctx, byName); err != nil {
+		return err
 	}
-	if err := o.TakeTable(ctx, v2); err != nil {
+	if err := o.TakeOptionalTable(ctx, byName); err != nil {
+		return err
+	}
+	if err := o.TakeTable(ctx, Labels{}); err != nil {
+		return err
+	}
+	if err := o.TakeOptionalTable(ctx, Labels{}); err != nil {
 		return err
 	}
 	return nil

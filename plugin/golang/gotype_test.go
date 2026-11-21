@@ -14,6 +14,8 @@ func typesView() *ir.View {
 			scalar("server.When", ir.Datetime()), scalar("server.Alias", ir.Ref("server.Email")), scalar("server.Flag", ir.Boolean()),
 			union("server.Page", ir.UnionArm{Name: "Ready", Type: ir.Ref("server.Page.Ready")}),
 			model("server.Page.Ready"),
+			// インデックスの model: Go では、名前付きのマップの型（nil が「なし」）
+			&ir.Model{DeclBase: ir.DeclBase{Name: "server.Counts"}, Fields: []ir.Field{}, Index: &ir.ModelIndex{Name: "name", Key: ir.String(), Value: ir.Int()}},
 		),
 		namespace("type", model("type.Session"), scalar("type.Token", ir.String()), union("type.Shape")),
 	)
@@ -37,17 +39,16 @@ func TestGoType(t *testing.T) {
 		{ir.String(), "string"}, {ir.Boolean(), "bool"}, {ir.Int(), "int64"}, {ir.Float(), "float64"},
 		{ir.Datetime(), "time.Time"}, {ir.Duration(), "time.Duration"},
 		{ir.Date(), "runtime.Date"}, {ir.Time(), "runtime.TimeOfDay"}, {ir.Optional(ir.Date()), "*runtime.Date"},
-		// optional(T): array、record、union（arms）への ref はそのまま。それ以外は *T
+		// optional(T): array、インデックスの model への ref、union（arms）への ref はそのまま。それ以外は *T
 		{ir.Optional(ir.String()), "*string"},
 		{ir.Optional(ir.Ref("server.User")), "*User"},
 		{ir.Optional(ir.Ref("server.Email")), "*Email"},
 		{ir.Optional(ir.Array(ir.String())), "[]string"},
-		{ir.Optional(ir.Record(ir.String(), ir.Int())), "map[string]int64"},
+		{ir.Optional(ir.Ref("server.Counts")), "Counts"}, {ir.Ref("server.Counts"), "Counts"},
 		{ir.Optional(ir.Ref("server.Page")), "Page"},
 		{ir.Optional(ir.Ref("type.Shape")), "pkgtype.Shape"},
 		{ir.Array(ir.Ref("server.User")), "[]User"},
 		{ir.Array(ir.Optional(ir.Int())), "[]*int64"},
-		{ir.Record(ir.Ref("server.Email"), ir.Array(ir.Datetime())), "map[Email][]time.Time"},
 		// ref: model は構造体、scalar は名前付きの型、union はインターフェース。合成 model は連結した名前
 		{ir.Ref("server.User"), "User"}, {ir.Ref("server.Email"), "Email"}, {ir.Ref("server.Page"), "Page"},
 		{ir.Ref("server.Page.Ready"), "PageReady"},
@@ -90,7 +91,7 @@ func TestIsNillable(t *testing.T) {
 		t    ir.Type
 		want bool
 	}{
-		{ir.Array(ir.String()), true}, {ir.Record(ir.String(), ir.String()), true}, {ir.Ref("server.Page"), true},
+		{ir.Array(ir.String()), true}, {ir.Ref("server.Counts"), true}, {ir.Ref("server.Page"), true},
 		{ir.Case("c", nil, ir.Array(ir.String())), true},
 		{ir.String(), false}, {ir.Ref("server.User"), false}, {ir.Ref("server.Email"), false}, {ir.Datetime(), false},
 	} {
@@ -114,7 +115,7 @@ func TestZero(t *testing.T) {
 		want string
 	}{
 		{ir.Optional(ir.Ref("server.User")), "nil"}, {ir.Ref("server.Page"), "nil"}, {ir.Array(ir.Int()), "nil"},
-		{ir.Record(ir.String(), ir.Int()), "nil"}, {ir.Optional(ir.Ref("server.Page")), "nil"},
+		{ir.Ref("server.Counts"), "nil"}, {ir.Optional(ir.Ref("server.Page")), "nil"},
 		{ir.Ref("server.User"), "User{}"}, {ir.Ref("type.Session"), "pkgtype.Session{}"}, {ir.Ref("server.Page.Ready"), "PageReady{}"},
 		{ir.Datetime(), "time.Time{}"}, {ir.Ref("server.When"), "When{}"},
 		{ir.Date(), "runtime.Date{}"}, {ir.Time(), "runtime.TimeOfDay{}"},
@@ -165,7 +166,6 @@ func TestTypeDisplay(t *testing.T) {
 	}{
 		{ir.String(), "string"}, {ir.Datetime(), "datetime"}, {ir.Ref("type.User"), "type.User"},
 		{ir.Optional(ir.Ref("type.User")), "type.User?"}, {ir.Array(ir.Ref("type.Order")), "type.Order[]"},
-		{ir.Record(ir.String(), ir.Array(ir.Int())), "Record<string, int[]>"},
 		{ir.Case("store.Login", []string{"LoggedIn"}, ir.Ref("type.Session")), "type.Session"},
 	} {
 		if got := TypeDisplay(tt.t); got != tt.want {

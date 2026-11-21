@@ -281,7 +281,7 @@ func (e *emitter) isPointer(t ir.Type) bool {
 	return ok && !golang.IsNillable(o.Of, e.p)
 }
 
-// nilable は、型 t の Go の型が nil を持てるか（optional、array、record、union）。
+// nilable は、型 t の Go の型が nil を持てるか（optional、array、インデックスの model、union）。
 func (e *emitter) nilable(t ir.Type) bool {
 	if _, ok := strip(t).(ir.OptionalType); ok {
 		return true
@@ -308,8 +308,6 @@ func (e *emitter) goKey(t ir.Type) string {
 		return "*" + e.goKey(x.Of)
 	case ir.ArrayType:
 		return "[]" + e.goKey(x.Of)
-	case ir.RecordType:
-		return "map[" + e.goKey(x.Key) + "]" + e.goKey(x.Value)
 	case ir.CaseType:
 		return e.goKey(x.Of)
 	}
@@ -351,10 +349,6 @@ func (e *emitter) assignable(s, t ir.Type) bool {
 	case ir.ArrayType: // 規則 6
 		if sa, ok := s.(ir.ArrayType); ok {
 			return e.assignable(sa.Of, tt.Of)
-		}
-	case ir.RecordType: // 規則 7
-		if sr, ok := s.(ir.RecordType); ok {
-			return ir.TypeEqual(sr.Key, tt.Key) && e.assignable(sr.Value, tt.Value)
 		}
 	}
 	if r, ok := s.(ir.RefType); ok { // 規則 11
@@ -584,7 +578,7 @@ func (b *bodyGen) atom(a ir.Atom, target ir.Type) (string, ir.Type) {
 }
 
 // convert は、型 from の式 expr を、型 to の位置に渡す式にする（docs/plugin-go.md「値」の「型をそろえる」）。
-// Go の型が同じなら、そのまま。array / record の要素をそろえる必要があれば、文の前にループを置く。
+// Go の型が同じなら、そのまま。array の要素をそろえる必要があれば、文の前にループを置く。
 func (b *bodyGen) convert(expr string, from, to ir.Type) string {
 	if from == nil || to == nil || b.sameGo(from, to) {
 		return expr
@@ -606,14 +600,7 @@ func (b *bodyGen) convert(expr string, from, to ir.Type) string {
 			src := b.simple(expr)
 			return b.convertEach(src, to, "len("+src+")", func(dst, src, idx, el string) {
 				b.line(dst + "[" + idx + "] = " + b.convert(el, fa.Of, tt.Of))
-			}, false)
-		}
-	case ir.RecordType:
-		if fr, ok := from.(ir.RecordType); ok {
-			src := b.simple(expr)
-			return b.convertEach(src, to, "len("+src+")", func(dst, src, idx, el string) {
-				b.line(dst + "[" + idx + "] = " + b.convert(el, fr.Value, tt.Value))
-			}, true)
+			})
 		}
 	case ir.CoreType:
 		if fc, ok := from.(ir.CoreType); ok && fc.Name == ir.CoreInt && tt.Name == ir.CoreFloat {
@@ -639,18 +626,14 @@ func (b *bodyGen) simple(expr string) string {
 }
 
 // convertEach は、同じ長さのスライス（同じキーのマップ）を作り、要素ごとにそろえて写すループを置く。値が nil なら nil のまま。
-func (b *bodyGen) convertEach(src string, to ir.Type, length string, assign func(dst, src, idx, el string), isMap bool) string {
+func (b *bodyGen) convertEach(src string, to ir.Type, length string, assign func(dst, src, idx, el string)) string {
 	dst := b.temp()
 	goTo := b.f.goType(to)
 	b.line("var " + dst + " " + goTo)
 	b.line("if " + src + " != nil {")
 	b.depth++
 	b.line(dst + " = make(" + goTo + ", " + length + ")")
-	idxBase := "i"
-	if isMap {
-		idxBase = "key"
-	}
-	idx, el := b.fresh(idxBase), b.fresh("e")
+	idx, el := b.fresh("i"), b.fresh("e")
 	b.line("for " + idx + ", " + el + " := range " + src + " {")
 	b.depth++
 	assign(dst, src, idx, el)
@@ -738,7 +721,8 @@ func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, boun
 		}
 	}
 	lit := b.f.goType(inner) + "{" + strings.Join(fields, ", ") + "}"
-	if optional {
+	if optional && m.Index == nil {
+		// インデックスの model は、省略可能でも、マップのまま（nil が「なし」）: & を付けない
 		return "&" + lit
 	}
 	return lit

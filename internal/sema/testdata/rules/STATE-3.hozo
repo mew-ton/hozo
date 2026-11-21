@@ -4,8 +4,9 @@ namespace a {
   state ok1: nullable<M>;
   state ok2: single<M>;
   state ok3: list<M>;
-  // 要素の中の optional（配列の要素、Record の値）は要素の型そのものではない
-  state ok4: single<Record<string, string?>>;
+  // 要素の中の optional（配列の要素、インデックスの値）は要素の型そのものではない
+  model Attrs { [name: string]: string?; }
+  state ok4: single<Attrs>;
   state ok5: list<M?[]>;
   // single<T?> と nullable<T?> は T?（nullable<T>）と同じ型（docs/types.md「形の書き方」）
   state ok6: single<M?>;

@@ -9,7 +9,7 @@ GOVALID-1	app.Any	@valid.length に、min も max もない（scalar app.Any）
 GOVALID-1	app.Look	@valid.pattern の正規表現 "(?<!a)b" を、RE2 で解釈できない（scalar app.Look）: error parsing regexp: invalid named capture: `(?<!a)b`
 GOVALID-1	app.Phone	@valid.format の名前 "phone" を知らない（scalar app.Phone。知っているのは email / uri / uuid / date-time）
 GOVALID-1	app.Form	@valid.min が、配列そのもの（model app.Form のフィールド tags）に付いている（制約を付けられるのは、要素の型）
-GOVALID-1	app.Form	@valid.length が、record そのもの（model app.Form のフィールド attrs）に付いている（制約を付けられるのは、値の型）
+GOVALID-1	app.Form	@valid.length が、インデックスの model そのもの（model app.Form のフィールド attrs）に付いている（制約を付けられるのは、値の型）
 GOVALID-1	app.Form	@valid.min が、配列そのもの（model app.Form のフィールド later）に付いている（制約を付けられるのは、要素の型）
 GOVALID-1	app.Form	@valid.min は、元の型が int か float の位置にだけ付けられるが、model app.Form のフィールド name は元の型が string
 GOVALID-1	app.Form	@valid.length は、元の型が string の位置にだけ付けられるが、model app.Form のフィールド inner は核の型を元に持たない

@@ -17,10 +17,9 @@ const RuntimePath = "github.com/mew-ton/hozo/runtime"
 //	string / boolean / int / float   → string / bool / int64 / float64
 //	datetime / duration              → time.Time / time.Duration（"time" を import）
 //	date / time                      → runtime.Date / runtime.TimeOfDay（RuntimePath を import）
-//	optional(T)                      → T が array、record、union（arms）への ref ならそのまま（nil が「なし」）。それ以外は *T
+//	optional(T)                      → T が array、インデックスの model への ref、union（arms）への ref ならそのまま（nil が「なし」）。それ以外は *T
 //	array(T)                         → []T
-//	record(K, V)                     → map[K]V
-//	ref                              → 型の名前（model は構造体、scalar は名前付きの型、union はインターフェース）
+//	ref                              → 型の名前（model は構造体、インデックスの model は名前付きのマップ、scalar は名前付きの型、union はインターフェース）
 //	case(C, cases, of)               → of の型（絞り込みは Go の型にしない）
 //
 // ref の修飾は imports が決める: 見る側の名前空間 N の型は修飾なし（定義のパッケージでも、入口のパッケージでも。入口は別名を持つ）、
@@ -61,41 +60,44 @@ func GoType(t ir.Type, imports *Imports) string {
 		return "*" + inner
 	case ir.ArrayType:
 		return "[]" + GoType(x.Of, imports)
-	case ir.RecordType:
-		return "map[" + GoType(x.Key, imports) + "]" + GoType(x.Value, imports)
 	case ir.CaseType:
 		return GoType(x.Of, imports)
 	}
 	panic(fmt.Sprintf("golang: unknown ir.Type %T", t))
 }
 
-// IsNillable は、その型の Go の零値 nil が「なし」を表せるか（docs/plugin-go.md「型」の optional の行）: array、record、
-// union（arms）への ref。case は of を見る。optional(T) が *T にならず T のままになるのは、T がこれに当たるとき。
-// p は ref が union かどうかを引くための Program（nil なら、ref はどれも当たらないとする）。
+// IsNillable は、その型の Go の零値 nil が「なし」を表せるか（docs/plugin-go.md「型」の optional の行）: array、
+// インデックスの model への ref、union（arms）への ref。case は of を見る。optional(T) が *T にならず T のままになるのは、
+// T がこれに当たるとき。p は ref が何の宣言かを引くための Program（nil なら、ref はどれも当たらないとする）。
 func IsNillable(t ir.Type, p *ir.Program) bool {
 	switch x := t.(type) {
-	case ir.ArrayType, ir.RecordType:
+	case ir.ArrayType:
 		return true
 	case ir.RefType:
 		if p == nil {
 			return false
 		}
-		u, ok := p.Lookup(x.Target).(*ir.Union)
-		return ok && u.Variant == ir.UnionArms
+		switch d := p.Lookup(x.Target).(type) {
+		case *ir.Union:
+			return d.Variant == ir.UnionArms
+		case *ir.Model:
+			return d.Index != nil
+		}
+		return false
 	case ir.CaseType:
 		return IsNillable(x.Of, p)
 	}
 	return false
 }
 
-// Zero は型の零値の Go の式（docs/plugin-go.md「呼び出し」の「零値」）: ポインタ・インターフェース・スライス・マップは nil、
+// Zero は型の零値の Go の式（docs/plugin-go.md「呼び出し」の「零値」）: ポインタ・インターフェース・スライス・マップ（インデックスの model）は nil、
 // 構造体は `<型>{}`、time.Time、runtime.Date、runtime.TimeOfDay は `<型>{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
 // 必要な import を imports に足す。nil の型（void）と never は ""。
 func Zero(t ir.Type, imports *Imports) string {
 	switch x := t.(type) {
 	case nil, ir.NeverType:
 		return ""
-	case ir.OptionalType, ir.ArrayType, ir.RecordType:
+	case ir.OptionalType, ir.ArrayType:
 		return "nil"
 	case ir.CaseType:
 		return Zero(x.Of, imports)
@@ -105,6 +107,10 @@ func Zero(t ir.Type, imports *Imports) string {
 		switch d := imports.program().Lookup(x.Target).(type) {
 		case *ir.Union:
 			return "nil"
+		case *ir.Model:
+			if d.Index != nil {
+				return "nil"
+			}
 		case *ir.Scalar:
 			// 元の型を核の型まで辿る（scalar の元は、核の型か、別の scalar）
 			base := d.Base
@@ -176,7 +182,7 @@ func RowDisplay(e *ir.Effect) string {
 }
 
 // TypeDisplay は、コメントの中の型の書き方（docs/plugin-go.md「コメント」の「型の表示」）: 核の型は名前、ref は FQN、
-// optional(T) は `T?`、array(T) は `T[]`、record(K, V) は `Record<K, V>`、case はその of。
+// optional(T) は `T?`、array(T) は `T[]`、case はその of。
 func TypeDisplay(t ir.Type) string {
 	switch x := t.(type) {
 	case nil:
@@ -189,8 +195,6 @@ func TypeDisplay(t ir.Type) string {
 		return TypeDisplay(x.Of) + "?"
 	case ir.ArrayType:
 		return TypeDisplay(x.Of) + "[]"
-	case ir.RecordType:
-		return "Record<" + TypeDisplay(x.Key) + ", " + TypeDisplay(x.Value) + ">"
 	case ir.CaseType:
 		return TypeDisplay(x.Of)
 	case ir.NeverType:

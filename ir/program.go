@@ -1,7 +1,7 @@
 package ir
 
 // Version は IR の構造の版（docs/ir.md「Program」の version）。構造が変わったら上げる。
-const Version = "0.13"
+const Version = "0.14"
 
 // Program は IR 全体（docs/ir.md「Program」）。
 //
@@ -175,4 +175,17 @@ var declTable = map[string]func([]byte) (Decl, error){
 // UnmarshalDecl は kind で分けて Decl を読む（docs/ir.md「JSON」）。
 func UnmarshalDecl(data []byte) (Decl, error) {
 	return decodeUnion("decl", data, declTable)
+}
+
+// IndexOf は、型 t が、インデックスの model（docs/types.md「インデックスの model」）への ref なら、そのインデックス。
+// そうでなければ nil（optional、array、case の中は見ない: 見るのは、その型そのもの）。
+func (p *Program) IndexOf(t Type) *ModelIndex {
+	r, ok := t.(RefType)
+	if !ok {
+		return nil
+	}
+	if m, isModel := p.Lookup(r.Target).(*Model); isModel {
+		return m.Index
+	}
+	return nil
 }

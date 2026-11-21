@@ -145,8 +145,6 @@ func (a *analyzer) lowerType(t ast.Type, sc *scope) (ir.Type, bool) {
 		return nil, false
 	case *ast.CoreType:
 		return ir.CoreType{Name: ir.CoreName(t.Name)}, true
-	case *ast.RecordType:
-		return a.lowerRecordType(t, sc)
 	case *ast.ArrayType:
 		elem, ok := a.lowerType(t.Elem, sc)
 		if !ok {
@@ -176,19 +174,6 @@ func (a *analyzer) lowerType(t ast.Type, sc *scope) (ir.Type, bool) {
 		return a.lowerNamedType(t, sc)
 	}
 	return nil, false
-}
-
-// lowerRecordType は Record<K, V>。TYPE-11: K は string か、元が string の scalar。
-func (a *analyzer) lowerRecordType(t *ast.RecordType, sc *scope) (ir.Type, bool) {
-	key, kok := a.lowerType(t.Key, sc)
-	value, vok := a.lowerType(t.Value, sc)
-	if !kok || !vok {
-		return nil, false
-	}
-	if !a.isStringLike(key) {
-		a.errorf("TYPE-11", t.Key.NodeSpan(), "Record のキーの型 %s は string でも、元が string の scalar でもない", typeName(key))
-	}
-	return ir.Record(key, value), true
 }
 
 // isStringLike は string か、継承を辿った元が string の scalar か（TYPE-11）。

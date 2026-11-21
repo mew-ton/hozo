@@ -65,8 +65,6 @@ func typeString(t ast.Type) string {
 	switch x := t.(type) {
 	case *ast.CoreType:
 		return x.Name
-	case *ast.RecordType:
-		return "Record<" + typeString(x.Key) + ", " + typeString(x.Value) + ">"
 	case *ast.ShapeType:
 		return x.Shape + "<" + typeString(x.Elem) + ">"
 	case *ast.NamedType:
@@ -356,6 +354,44 @@ func TestModelReject(t *testing.T) {
 	}
 }
 
+// TestModelIndex は、インデックスの model（docs/grammar.md「model」の Index）: `[<キーの名前>: <キーの型>]: <値の型>;`。
+func TestModelIndex(t *testing.T) {
+	m := firstDecl[*ast.ModelDecl](t, "model Attrs { [name: string]: string[]; }")
+	idx := m.Body.Index
+	if idx == nil || idx.Name.Name != "name" || typeString(idx.Key) != "string" || typeString(idx.Value) != "string[]" || len(m.Body.Fields) != 0 {
+		t.Fatalf("Index = %+v, Fields = %+v", idx, m.Body.Fields)
+	}
+	src := "model Attrs { [name: string]: string[]; }"
+	if idx.Span.Start != source.Offset(strings.Index(src, "[")) || idx.Span.End != source.Offset(strings.Index(src, ";")+1) {
+		t.Errorf("Index の位置 = %+v", idx.Span)
+	}
+	// キーの型は scalar でも、値の型は、どの型でもよい（検査は、意味の解析: TYPE-11）
+	m = firstDecl[*ast.ModelDecl](t, "/** 在庫 */ @mark model Stock { [sku: type.Sku]: nullable<Count>; }")
+	if idx := m.Body.Index; idx == nil || idx.Name.Name != "sku" || typeString(idx.Key) != "type.Sku" || typeString(idx.Value) != "nullable<Count>" || m.Doc == nil || len(m.Decorators) != 1 {
+		t.Errorf("Index = %+v", m.Body.Index)
+	}
+	// ふつうの model は、Index を持たない
+	if m := firstDecl[*ast.ModelDecl](t, "model A { x: string; }"); m.Body.Index != nil {
+		t.Errorf("Index = %+v, want nil", m.Body.Index)
+	}
+	rejects := []struct{ name, src, want string }{
+		{"index after field", "model A { x: int; [k: string]: int; }", "インデックスと、フィールドは、一つの model に混ぜられない"},
+		{"field after index", "model A { [k: string]: int; x: int; }", "インデックスと、フィールドは、一つの model に混ぜられない"},
+		{"two indexes", "model A { [k: string]: int; [j: string]: int; }", "インデックスは、一つの model に一つだけ"},
+		{"decorator on index", "model A { @mark [k: string]: int; }", "インデックスには、デコレータも、説明も、付けられない"},
+		{"doc on index", "model A { /** x */ [k: string]: int; }", "インデックスには、デコレータも、説明も、付けられない"},
+		{"index with extends", "model A extends B { [k: string]: int; }", "extends を持つ model に、インデックスは書けない"},
+		{"index in inline model", "union U { A: { [k: string]: int; }; }", "その場で書く model に、インデックスは書けない"},
+		{"missing key name", "model A { [string]: int; }", "string は予約語で、識別子には使えない"},
+		{"missing key type", "model A { [k]: int; }", "「:」が必要だが「]」がある"},
+		{"missing value type", "model A { [k: string]; }", "「:」が必要だが「;」がある"},
+		{"missing semicolon", "model A { [k: string]: int }", "「;」が必要だが「}」がある"},
+	}
+	for _, tt := range rejects {
+		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
+}
+
 // --- scalar ---
 
 func TestScalar(t *testing.T) {
@@ -408,7 +444,7 @@ func TestState(t *testing.T) {
 	}
 	// 形の語は型の別の書き方で、状態の型は Type（docs/grammar.md「state」）。形は検査が型から決める。
 	tests := []struct{ src, want string }{
-		{"state query: single<Record<string, string[]>>;", "single<Record<string, string[]>>"},
+		{"state query: single<Query>;", "single<Query>"},
 		{"state token: nullable<server.Token>;", "nullable<server.Token>"},
 		{"state token: single<Token?>;", "single<Token?>"},
 		{"state token: Token?;", "Token?"},
@@ -1467,15 +1503,13 @@ func TestType(t *testing.T) {
 		{"User[]?", "User[]?"},
 		{"User?[]", "User?[]"},
 		{"User[][]", "User[][]"},
-		{"Record<string, string[]>", "Record<string, string[]>"},
-		{"Record<string, Record<string, int>>", "Record<string, Record<string, int>>"},
+		{"Record", "Record"}, // Record は、予約語ではなく、ふつうの名前
 		{"WarrantyKind.Yamada<server.Item>", "WarrantyKind.Yamada<server.Item>"},
 		{"A<B<C>>?", "A<B<C>>?"},
 		{"list<A>", "list<A>"},
 		{"nullable<A>", "nullable<A>"},
 		{"single<A>", "single<A>"},
 		{"list<nullable<a.B>>?", "list<nullable<a.B>>?"},
-		{"Record<string, list<int>>", "Record<string, list<int>>"},
 		{"single<A?>[]", "single<A?>[]"},
 	}
 	for _, tt := range tests {
@@ -1494,8 +1528,10 @@ func TestType(t *testing.T) {
 		{"list", "「<」が必要"},
 		{"list<A, B>", "「>」が必要"},
 		{"{ a: int; }", "その場で書く model はユニオンのアームと例外の値にだけ置ける"},
-		{"Record<string>", "「,」が必要"},
-		{"Record<string, int", "「>」が必要"},
+		// Record<K, V> は、なくした書き方（docs/grammar.md「model」「決めたこと」）
+		{"Record<string, int>", "Record<K, V> という書き方はなくなった"},
+		{"Record<string, int>", "model 名前 { [キーの名前: K]: V; }"},
+		{"list<Record<string, int>>", "インデックスの model を宣言して、その名前を書く"},
 		{"User[", "「]」が必要"},
 		{"string<int>", "「;」が必要だが「<」がある"},
 		{"5", "型が必要"},

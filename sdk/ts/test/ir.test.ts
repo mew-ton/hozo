@@ -53,10 +53,6 @@ function walkType(t: Type): void {
     case "array":
       walkType(t.of);
       return;
-    case "record":
-      walkType(t.key);
-      walkType(t.value);
-      return;
     case "case":
       assert.ok(Array.isArray(t.cases));
       walkType(t.of);
@@ -369,6 +365,14 @@ function walkDecl(d: Decl, program: Program): void {
         walkType(f.type);
         assert.ok(!("default" in f), "Field.default は 0.5 でなくなった");
       }
+      if (d.index) {
+        // インデックスの model（docs/ir.md「model / scalar / union」の index）: フィールドは空
+        seen.add("model:index");
+        assert.equal(typeof d.index.name, "string");
+        assert.equal(d.fields.length, 0);
+        walkType(d.index.key);
+        walkType(d.index.value);
+      }
       if (d.extends) {
         seen.add("model:extends");
         assert.equal(typeof d.extends.base, "string");
@@ -513,7 +517,7 @@ function walkDecl(d: Decl, program: Program): void {
 }
 
 function walkProgram(p: Program): void {
-  assert.equal(p.version, "0.13");
+  assert.equal(p.version, "0.14");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
     // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
@@ -533,7 +537,7 @@ test("program.golden.json reads as Program and round-trips", () => {
 test("view.golden.json reads as View and round-trips", () => {
   const text = golden("view.golden.json");
   const view: View = JSON.parse(text);
-  assert.equal(view.version, "0.13");
+  assert.equal(view.version, "0.14");
   assert.equal(typeof view.viewer, "string");
   // files は単位の in に合ったファイル。namespaces の値は、その名前空間を出力する単位ごとの設定（設定の順）
   assert.ok(view.files.every((f) => typeof f === "string"));
@@ -550,7 +554,7 @@ test("view.golden.json reads as View and round-trips", () => {
 
 test("goldens cover every kind of every union", () => {
   const want = [
-    ...["core", "ref", "optional", "array", "record", "case", "never"].map((k) => `type:${k}`),
+    ...["core", "ref", "optional", "array", "case", "never"].map((k) => `type:${k}`),
     ...["model", "scalar", "union", "state", "exception", "effect", "read", "classify", "decorator", "op"].map((k) => `decl:${k}`),
     ...["string", "int", "float", "boolean", "duration"].map((k) => `literal:${k}`),
     ...["literal", "ref", "refs", "variant", "list"].map((k) => `argValue:${k}`),
@@ -570,6 +574,7 @@ test("goldens cover every kind of every union", () => {
     ...["value", "classify"].map((k) => `matchSubject:${k}`),
     "standardClassify:nullable",
     "model:extends",
+    "model:index",
     "op:exported",
     // 版 0.5 で足した形（docs/ir.md「版」）
     "target:effect",

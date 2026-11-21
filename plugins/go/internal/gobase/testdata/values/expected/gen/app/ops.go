@@ -55,7 +55,10 @@ type Ops interface {
 	TakeOptionalStrings(ctx context.Context, v []*string) error
 
 	// TakeTable は op app.takeTable。
-	TakeTable(ctx context.Context, v map[string]string) error
+	TakeTable(ctx context.Context, v Labels) error
+
+	// TakeOptionalTable は op app.takeOptionalTable。
+	TakeOptionalTable(ctx context.Context, v Labels) error
 
 	// Names は op app.names。
 	Names(ctx context.Context, account Account) error
@@ -73,7 +76,10 @@ type Ops interface {
 	ToBase(ctx context.Context, email Email) error
 
 	// Elements は op app.elements。
-	Elements(ctx context.Context, emails []Email, names []string, byName map[string]Email) error
+	Elements(ctx context.Context, emails []Email, names []string) error
+
+	// Tables は op app.tables。
+	Tables(ctx context.Context, byName Labels) error
 
 	// FromCase は op app.fromCase。
 	FromCase(ctx context.Context, big Address) error
@@ -131,7 +137,10 @@ type Leaves interface {
 	TakeOptionalStrings(ctx context.Context, v []*string) error
 
 	// TakeTable は op app.takeTable。
-	TakeTable(ctx context.Context, v map[string]string) error
+	TakeTable(ctx context.Context, v Labels) error
+
+	// TakeOptionalTable は op app.takeOptionalTable。
+	TakeOptionalTable(ctx context.Context, v Labels) error
 }
 
 // New はこの名前空間の Ops を組み立てる。引数の並びは、leaves。
@@ -205,6 +214,10 @@ func (o *ops) TakeOptionalStrings(ctx context.Context, v []*string) error {
 	return o.leaves.TakeOptionalStrings(ctx, v)
 }
 
-func (o *ops) TakeTable(ctx context.Context, v map[string]string) error {
+func (o *ops) TakeTable(ctx context.Context, v Labels) error {
 	return o.leaves.TakeTable(ctx, v)
+}
+
+func (o *ops) TakeOptionalTable(ctx context.Context, v Labels) error {
+	return o.leaves.TakeOptionalTable(ctx, v)
 }

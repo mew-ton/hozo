@@ -748,7 +748,7 @@ pure(O) が真なのは、次のすべてを満たすとき。
 1. ns(O) が T.namespace と等しくない（`deep` なら T.namespace を接頭辞に持たない）→ Pos は空。位置を持つのは op だけで、`read`、効果、`throw` の引数は `bind` で埋まらない（その呼び出しの `Call.bound` は、いつも空）。ns(O) が A と違い、O に `export` がない（A から呼べない。「op の宣言と本体」の「export」）→ Pos は空。
 2. s の `shape` が `list` → BIND-6。
 3. τ = s の `element`。
-4. O の各引数から、型が τ または `optional(τ)` の位置を集める。型が model（または model の `optional`）ならフィールドを再帰的に辿る。`array` と `record` の中は辿らない。辿っている途中で同じ model に戻ったら、そこで止める。位置はパス（`["in", "token"]`）。
+4. O の各引数から、型が τ または `optional(τ)` の位置を集める。型が model（または model の `optional`）ならフィールドを再帰的に辿る。`array` の中は辿らない。インデックスの model（`docs/types.md`「インデックスの model」）は、フィールドを持たないので、その先は辿らない。辿っている途中で同じ model に戻ったら、そこで止める。位置はパス（`["in", "token"]`）。
 5. 位置が 2 以上 → BIND-1。1 で、s の `shape` が `nullable` で、位置の型が `optional` でない → BIND-2。
 6. 二つの `Bind` が同じ op の同じ位置に当たる → BIND-5。
 

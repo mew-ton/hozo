@@ -248,7 +248,20 @@ type ModelBody struct {
 	Span      source.Span
 	Fields    []*Field
 	Overrides []*Override
+	// Index は、インデックスの model のインデックス（`[name: string]: T;`）。ふつうの model なら nil。
+	Index *Index
 }
+
+// Index は model のインデックス（docs/grammar.md「model」の Index）: `[<キーの名前>: <キーの型>]: <値の型>;`。
+type Index struct {
+	Span  source.Span
+	Name  Ident
+	Key   Type
+	Value Type
+}
+
+// NodeSpan は Node の実装。
+func (n *Index) NodeSpan() source.Span { return n.Span }
 
 // NodeSpan は Node の実装。
 func (n *ModelBody) NodeSpan() source.Span { return n.Span }
@@ -902,7 +915,7 @@ type ReturnType struct {
 // NodeSpan は Node の実装。
 func (n *ReturnType) NodeSpan() source.Span { return n.Span }
 
-// Type は型（docs/grammar.md「型」）。*CoreType、*RecordType、*ShapeType、*NamedType、*ArrayType、*OptionalType が実装する。
+// Type は型（docs/grammar.md「型」）。*CoreType、*ShapeType、*NamedType、*ArrayType、*OptionalType が実装する。
 type Type interface {
 	Node
 	typeNode()
@@ -917,17 +930,6 @@ type CoreType struct {
 // NodeSpan は Node の実装。
 func (n *CoreType) NodeSpan() source.Span { return n.Span }
 func (n *CoreType) typeNode()             {}
-
-// RecordType は Record<K, V>。
-type RecordType struct {
-	Span  source.Span
-	Key   Type
-	Value Type
-}
-
-// NodeSpan は Node の実装。
-func (n *RecordType) NodeSpan() source.Span { return n.Span }
-func (n *RecordType) typeNode()             {}
 
 // ShapeType は形の語で書いた型（list<T> / nullable<T> / single<T>。docs/grammar.md「型」）。
 // T[] / T? / T の別の書き方で、IR では同じ型になる。

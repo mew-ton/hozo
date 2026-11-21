@@ -270,7 +270,9 @@ func TestCfg22(t *testing.T) {
 	}{
 		// 1: N のすべての model / scalar / union / exception
 		{"フィールドの型", []ir.Decl{model("server.M", field("f", ref))}, true},
-		{"型の中の型（array、optional、record）は辿る", []ir.Decl{model("server.M", field("f", ir.Record(ir.String(), ir.Array(ir.Optional(ref)))))}, true},
+		{"型の中の型（array、optional）は辿る", []ir.Decl{model("server.M", field("f", ir.Array(ir.Optional(ref))))}, true},
+		{"インデックスの値の型", []ir.Decl{&ir.Model{DeclBase: ir.DeclBase{Name: "server.I", Span: sp("server.I")}, Index: &ir.ModelIndex{Name: "name", Key: ir.String(), Value: ir.Array(ref)}}}, true},
+		{"インデックスのキーの型", []ir.Decl{&ir.Model{DeclBase: ir.DeclBase{Name: "server.K", Span: sp("server.K")}, Index: &ir.ModelIndex{Name: "name", Key: ir.Ref("types.T"), Value: ir.String()}}}, true},
 		{"scalar の元の型", []ir.Decl{scalar("server.S", ir.Ref("types.T"))}, true},
 		{"union のアームの型", []ir.Decl{&ir.Union{DeclBase: ir.DeclBase{Name: "server.U", Span: sp("server.U")}, Variant: ir.UnionArms,
 			Arms: []ir.UnionArm{{Name: "A", Type: ref}}}}, true},

@@ -19,13 +19,13 @@
 
 ## 形の書き方
 
-型の、もとの形は、形の語（`docs/grammar.md`「型」）で書いた `nullable<T>` と `list<T>`。`T?` と `T[]` は、その省略形（`docs/decisions.md`「決めたこと」355）。どの `Type` の位置にも、どちらでも書け、同じ型になり、IR には一つの形だけが残る（`docs/ir.md`「正規化」）。
+型の、もとの形は、形の語（`docs/grammar.md`「型」）で書いた `single<T>`、`nullable<T>`、`list<T>`。`T`、`T?`、`T[]` は、その省略形（`docs/decisions.md`「決めたこと」355、361）。どの `Type` の位置にも、どちらでも書け、同じ型になり、IR には一つの形だけが残る（`docs/ir.md`「正規化」）。
 
 | もとの形 | 省略形 | IR |
 |---|---|---|
+| `single<T>` | `T` | T そのもの |
 | `nullable<T>` | `T?` | `optional(T)` |
 | `list<T>` | `T[]` | `array(T)` |
-| `single<T>` | `T`（`single<T>` は、`T` と同じ） | T そのもの |
 
 - その場で書く union（`T | null`、`T | none`）は、ない: 値がないことは、`nullable<T>` か、その省略の `T?` で言う。
 - デコレータの引数の、省ける印の `?`（`docs/grammar.md`「decorator の宣言」の `ParamType`）も、同じ省略: `who: any case of Order?` は、引数の型の全体を、`nullable` で包んだ形。
@@ -48,7 +48,7 @@ S の値を T の位置に渡せるのは、次のどれかを満たすとき。
 4. S が `case(C, cases, of)` で、T が `of`（絞り込みを捨てる）。
 5. S が `case(C, s, of)`、T が `case(C, t, of)` で、s ⊆ t（§10.2「まとめたアームではケースの和の型」。狭い方は広い方に渡せる）。
 6. S が `array(S')`、T が `array(T')` で、S' が T' に渡せる。
-7. S が `record(K1, V1)`、T が `record(K2, V2)` で、K1 = K2 かつ V1 が V2 に渡せる。
+7. （欠番。`Record<K, V>` どうしの規則だった。なくした: キーが決まっていない構造は、インデックスの model で、ほかの model と同じに、名前で比べる。「インデックスの model」）
 8. （欠番。model から model への射影の規則だった。なくした。下の「渡せないもの」）
 9. S がレコードリテラルで、T が model への `ref`（または model の `optional`）で、リテラルが T に**当てはまる**（下）。
 10. S がリテラルの型で、T が対応する核の型（`string`→`string`、`int`→`int` または `float`、`float`→`float`、`boolean`→`boolean`、`duration`→`duration`）。`datetime`、`date`、`time` には、リテラルがない（`docs/grammar.md`「決めたこと」）。
@@ -110,20 +110,31 @@ D のフィールド（`Model.fields`）は、次の順に作る。IR には作�
 
 ### 変えられる型
 
-元の型 O を N に変えられるのは、次のどれか。4〜6 は再帰的に適用する。
+元の型 O を N に変えられるのは、次のどれか。4 と 5 は再帰的に適用する。
 
 1. N が O と等しい（型は変わらない。デコレータを足すために型も書いた場合）。
 2. **広げる**: N が union（`arms`）への `ref` で、そのアームのどれかの型が O と等しい。
 3. **差し替える**: N が O を継承している（上の定義。N と O が model への `ref`、または N が `scalar` への `ref` で O が `scalar` への `ref` か核の型）。
-4. O が `optional(O')`、N が `optional(N')` で、O' を N' に 2〜6 で変えられる。
-5. O が `array(O')`、N が `array(N')` で、O' を N' に 2〜6 で変えられる。
-6. O が `record(K, V)`、N が `record(K, V')` で、V を V' に 2〜6 で変えられる。
+4. O が `optional(O')`、N が `optional(N')` で、O' を N' に 2〜5 で変えられる。
+5. O が `array(O')`、N が `array(N')` で、O' を N' に 2〜5 で変えられる。
+6. （欠番。`Record<K, V>` の値の型を変える規則だった。なくした: 「インデックスの model」）
 
 これ以外の変更（必須を省略可能にする、省略可能を必須にする、関係のない型にする、union から元の型に戻す、など）は TYPE-15。
 
 ### 循環
 
 `extends` を辿って自分に戻れば TYPE-10（位置は `extends` の後ろの名前）。循環に入った model は、元の model を持たないものとして残りの検査を続け、その本体の `Override` は重ねて報告しない。
+
+## インデックスの model
+
+本体にインデックスを書いた model（`model Attrs { [name: string]: string[]; }`。`docs/grammar.md`「model」）は、キーが決まっていない構造: キーから、値を引く。`Record<K, V>` の置き換え（`docs/decisions.md`「決めたこと」360）。
+
+- **キーの型**は、`string` か、元が `string` の `scalar`。違えば TYPE-11。**値の型**は、どの型でもよい（`[sku: Sku]: int?;`）。入れ子にするときは、値の型に、別のインデックスの model の名前を書く。
+- **フィールドを持たない。** `x.f` のパス（「式の型」）は、インデックスの model の値の先には、書けない（RES-3: そのフィールドは、ない）。`for` の並びにも、`match (x by list)` の対象にも、ならない（並びではない: TYPE-17、MATCH-7）。配線に、キーで値を引く書き方は、ない: 引くのは、葉の op の中身。
+- **ほかの model と同じに、名前で比べる。** 別の model の位置には、キーと値の型が同じでも、渡せない（「互換」の「渡せないもの」）。
+- **レコードリテラルは、空（`{}`）だけが、当てはまる**（空の構造）。フィールドを書いたリテラルは、T にないフィールドなので、TYPE-5（「当てはまる」）。
+- **継承できない。** インデックスの model を、`extends` の元にすれば、TYPE-10。`extends` を持つ model の本体に、インデックスは書けない（SYNTAX。`docs/grammar.md`「model」）。
+- デコレータは、model の宣言に付ける（`for model`）。インデックスそのものには、付けられない。
 
 ## 絞り込み
 
@@ -306,8 +317,8 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 | TYPE-7 | error | レコードリテラルの当てはめる先が決まらない |
 | TYPE-8 | error | `match` のアームの型がそろわない（「match の型」の 4〜6） |
 | TYPE-9 | error | `scalar X extends B` の `B` が核の型でも `scalar` でもない。または `scalar` の継承が循環している |
-| TYPE-10 | error | `override f` の `f` が元の model のフィールドにない（元の model を持たない model に書いた `override` を含む）。または model の `extends` が循環している（「継承した model」。`model P is U omit f` をなくす前は、`omit` の名前が元にないことと `is` の循環だった。同じ規則の、今の書き方での形） |
-| TYPE-11 | error | `Record<K, V>` の `K` が `string` でも、元が `string` の `scalar` でもない |
+| TYPE-10 | error | `override f` の `f` が元の model のフィールドにない（元の model を持たない model に書いた `override` を含む）。または model の `extends` が循環している（「継承した model」）。または、`extends` の元が、インデックスの model（「インデックスの model」）。（`model P is U omit f` をなくす前は、`omit` の名前が元にないことと `is` の循環だった。同じ規則の、今の書き方での形） |
+| TYPE-11 | error | model のインデックス（`[名前: K]: V;`）のキーの型 `K` が、`string` でも、元が `string` の `scalar` でもない（「インデックスの model」）。位置は、キーの型 |
 | TYPE-12 | error | `C.Case<T>` の `T` が `C` の対象の型（値の分類は `subject` の型、op の分類はその op の `returns`）に渡せない |
 | TYPE-14 | error | 継承した model の本体に、元の model のフィールドと同じ名前のフィールドを `override` なしで書いた（「本体に書けるもの」） |
 | TYPE-15 | error | `override f: T` の T が、元の型から変えられる型でない（「変えられる型」）。元の型と、変えられる形をメッセージに示す |

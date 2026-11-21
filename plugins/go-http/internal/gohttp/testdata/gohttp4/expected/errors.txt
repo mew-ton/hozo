@@ -9,7 +9,7 @@ GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィール
 GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド wait の型 duration? は、クエリから読めない（string / int / float / boolean か、その省略可能）
 GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド list の型 string[] は、クエリから読めない（string / int / float / boolean か、その省略可能）
 GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド later の型 int[]? は、クエリから読めない（string / int / float / boolean か、その省略可能）
-GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド attrs の型 Record<string, string>? は、クエリから読めない（string / int / float / boolean か、その省略可能）
+GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド attrs の型 app.Attrs? は、クエリから読めない（string / int / float / boolean か、その省略可能）
 GOHTTP-4	app.QueryIn	入力の model app.QueryIn の @http.query のフィールド inner の型 app.Inner? は、クエリから読めない（string / int / float / boolean か、その省略可能）
 GOHTTP-4	app.Meta	@http.headerObj で受け取る model app.Meta のフィールド retries の型 int は、ヘッダから読めない（string か、その省略可能）
 GOHTTP-4	app.Paging	@http.queryObj で受け取る model app.Paging のフィールド tags の型 string[] は、クエリから読めない（string / int / float / boolean か、その省略可能）

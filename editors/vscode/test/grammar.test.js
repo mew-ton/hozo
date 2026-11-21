@@ -277,8 +277,15 @@ test('型の位置の名前', () => {
   assertScope(st, 'match (token by nullable) {', 'nullable', 'support.type.primitive.hozo');
   assertScope(st, 'match (carts by list) {', 'list', 'support.type.primitive.hozo');
   assertScope(st, 'match (carts by list) {', 'by', 'keyword.control.hozo');
-  assertScope(b, 'state query: single<Record<string, string[]>>;', 'Record', 'support.type.primitive.hozo');
-  assertScope(b, 'state query: single<Record<string, string[]>>;', 'string', 'support.type.primitive.hozo', 1);
+  assertScope(b, 'state query: single<page.Query>;', 'single', 'support.type.primitive.hozo');
+  assertScope(b, 'state query: single<page.Query>;', 'page.Query', 'entity.name.type.hozo');
+  // インデックスの model（docs/grammar.md「model」）: キーと値の型は、型の位置。Record は、予約語ではなくなった（ふつうの名前）
+  const ix = tokensOf('model Attrs { [name: string]: Item[]; }\nmodel Holder { attrs: Record; }');
+  assertScope(ix, 'model Attrs', 'model', 'keyword.declaration.hozo');
+  assertScope(ix, 'model Attrs', 'Attrs', 'entity.name.type.hozo');
+  assertScope(ix, 'model Attrs', 'string', 'support.type.primitive.hozo');
+  assertScope(ix, 'model Attrs', 'Item', 'entity.name.type.hozo');
+  assertScope(ix, 'model Holder', 'Record', 'entity.name.type.hozo');
   assertScope(b, 'fn chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>', 'WarrantyKind.Yamada', 'entity.name.type.hozo');
   // 複数行にまたがる返り値の型と throws
   assertScope(b, /^\s*: server\.WarrantyLine$/, 'server.WarrantyLine', 'entity.name.type.hozo');

@@ -32,11 +32,12 @@ namespace app {
   scalar Phone extends string;
 
   model Inner { x: int; }
+  model Attrs { [name: string]: string; }
 
   model Form {
-    // 配列か record そのものに制約が付いている（省略可能でも同じ）
+    // 配列か、インデックスの model そのものに制約が付いている（省略可能でも同じ）
     @valid.min(1) tags: string[];
-    @valid.length(max: 3) attrs: Record<string, string>;
+    @valid.length(max: 3) attrs: Attrs;
     @valid.min(1) later: int[]?;
     // フィールドの型（scalar なら元の型）に合わない
     @valid.min(1) name: string;

@@ -22,8 +22,7 @@ export type Literal = StringLiteral | IntLiteral | FloatLiteral | BooleanLiteral
 /**
  * 型（docs/ir.md「型」）。void は型ではなく Op.returns が null であること。never は Op.returns にだけ現れる。
  */
-export type Type =
-  CoreType | RefType | OptionalType | ArrayType | RecordType | CaseType | NeverType;
+export type Type = CoreType | RefType | OptionalType | ArrayType | CaseType | NeverType;
 export type CoreName =
   "string" | "boolean" | "int" | "float" | "datetime" | "date" | "time" | "duration";
 export type UnionVariant = "arms" | "set";
@@ -93,7 +92,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.13";
+  version: "0.14";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -142,6 +141,7 @@ export interface Model {
   description?: Doc;
   extends?: ModelExtends;
   fields: Field[];
+  index?: ModelIndex;
   kind: "model";
   name: string;
   span: Span;
@@ -280,14 +280,6 @@ export interface ArrayType {
   of: Type;
 }
 /**
- * Record<K, V>（docs/ir.md「型」の record）。
- */
-export interface RecordType {
-  key: Type;
-  kind: "record";
-  value: Type;
-}
-/**
  * 分類のケースで絞り込まれた型（docs/ir.md「型」の case）。cases は match のアームに書かれた順。
  */
 export interface CaseType {
@@ -301,6 +293,15 @@ export interface CaseType {
  */
 export interface NeverType {
   kind: "never";
+}
+/**
+ * インデックスの model のインデックス（docs/ir.md「model / scalar / union」の index）。キーの名前、キーの型、値の型。
+ */
+export interface ModelIndex {
+  key: Type;
+  name: string;
+  span: Span;
+  value: Type;
 }
 /**
  * scalar 宣言（docs/ir.md「model / scalar / union」）。
@@ -837,7 +838,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.13";
+  version: "0.14";
   viewer: string;
 }
 /**

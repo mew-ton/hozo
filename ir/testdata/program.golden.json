@@ -1,5 +1,5 @@
 {
-  "version": "0.13",
+  "version": "0.14",
   "namespaces": [
     {
       "name": "",
@@ -488,15 +488,8 @@
             {
               "name": "attrs",
               "type": {
-                "kind": "record",
-                "key": {
-                  "kind": "core",
-                  "name": "string"
-                },
-                "value": {
-                  "kind": "core",
-                  "name": "string"
-                }
+                "kind": "ref",
+                "target": "server.Attrs"
               },
               "decorators": [],
               "span": {
@@ -580,6 +573,45 @@
             "overridden": [
               "id"
             ]
+          }
+        },
+        {
+          "kind": "model",
+          "name": "server.Attrs",
+          "decorators": [],
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 15,
+              "col": 1
+            },
+            "end": {
+              "line": 15,
+              "col": 40
+            }
+          },
+          "fields": [],
+          "index": {
+            "name": "name",
+            "key": {
+              "kind": "core",
+              "name": "string"
+            },
+            "value": {
+              "kind": "core",
+              "name": "string"
+            },
+            "span": {
+              "file": "server.hozo",
+              "start": {
+                "line": 15,
+                "col": 15
+              },
+              "end": {
+                "line": 15,
+                "col": 38
+              }
+            }
           }
         },
         {
