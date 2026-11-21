@@ -7,6 +7,7 @@
   "gen/batch/inner/wiring.go",
   "gen/batch/ops.go",
   "gen/batch/shoptest/doc.go",
+  "gen/batch/shoptest/fakes.go",
   "gen/batch/shoptest/hozo-tests.go.json",
   "gen/batch/shoptest/leaves.go",
   "gen/batch/states.go",

@@ -1,4 +1,6 @@
 [
+  "gen/client/clienttest/doc.go",
+  "gen/client/clienttest/fakes.go",
   "gen/client/doc.go",
   "gen/client/ops.go",
   "gen/client/wiring.go"

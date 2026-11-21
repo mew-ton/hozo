@@ -25,3 +25,10 @@ requirements = ["design.Req"]
 namespace   = "m"
 transpilers = ["go", "go-design"]
 out         = "gen/m"
+
+# act を、もう一つの単位にも出す: n の、テストの中の組み立ては、作れない（通す出力を、選ばない。docs/plugin-go.md「テストのにせもの」の
+# 「別の名前空間」）ので、基底は、n に、テストのパッケージを作らない
+[[emit]]
+namespace   = "act"
+transpilers = ["go"]
+out         = "gen/act2"

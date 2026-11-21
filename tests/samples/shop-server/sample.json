@@ -11,6 +11,8 @@
         "gen/store/ops.go",
         "gen/store/states.go",
         "gen/store/wiring.go",
+        "gen/store/storetest/doc.go",
+        "gen/store/storetest/fakes.go",
         "gen/server/doc.go",
         "gen/server/types.go",
         "gen/server/ops.go",
@@ -20,16 +22,21 @@
         "gen/server/inner/wiring.go",
         "gen/server/servertest/doc.go",
         "gen/server/servertest/leaves.go",
+        "gen/server/servertest/fakes.go",
         "gen/server/servertest/hozo-tests.go.json",
         "gen/http/doc.go",
         "gen/http/types.go",
         "gen/client/doc.go",
         "gen/client/ops.go",
         "gen/client/wiring.go",
+        "gen/client/clienttest/doc.go",
+        "gen/client/clienttest/fakes.go",
         "gen/flows/doc.go",
         "gen/flows/types.go",
         "gen/flows/ops.go",
-        "gen/flows/wiring.go"
+        "gen/flows/wiring.go",
+        "gen/flows/flowstest/doc.go",
+        "gen/flows/flowstest/fakes.go"
       ]
     },
     "go-valid": {

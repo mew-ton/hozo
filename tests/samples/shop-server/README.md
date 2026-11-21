@@ -290,8 +290,26 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 - **この節より上（「まだないもの」の下の、どの節も）と、「分かったこと」は、書き直していない。** そこは、書いたときの番号と形で言っている: `gen/storemem`、`app/memstore`、`app/onmem`、`app/cmd/shop-mem`、`app/both_test.go`、単位 4 から 8 の番号、「二つの組み立て」「二つの実装」は、今の形ではない。今の形を言うのは、「入力」から「人が書いたもの」まで。
 - **消したテスト（対象が、なくなった）**: `app/onmem/compose_test.go` の九つ。そのうち八つ（`TestHandler`、`TestHTTPCases`、`TestIncompleteHTTPCasesAreRejected`、`TestTwoServers`、`TestStore`、`TestFlows`、`TestRequirements`、`TestIncompleteFlowCasesAreRejected`）は、同じものを、`app/onsqlite` の同じ名前のテストが、走らせている。`TestPlaceOrderIsNotOneTransaction` は、メモリ版だけの事実。`app/both_test.go` の `TestTwoStoresInOneProcess` と `TestStoreOutputsShareBaseFiles` は、二つの出力があることの事実。
 - **移したテスト**: `TestStatesFromTwoImplementations`（一つの `store` の状態の単位を、状態ごとに、別の実装から取れる）は、`app/both_test.go` から `app/onsqlite/store_test.go` に移した。メモリの側は、`memstore` の代わりに、テストの中に書いた `memNotifications`（状態 `notifications` の単位の、三つのメソッド）。
-- **`store` の配線まで通す、DB なしのテストは、今は、ない。** `app/handlertest`、`app/storetest`、`app/flowtest` は、メモリの上の SQLite で走る（`app/onsqlite/compose_test.go` の `openDB`）。メモリ版の役目（DB なしで、`server` をテストする）は、インテグレーションテストの作り直しで、Hozo が作る、流れの端のにせものが受け持つ（`docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」。まだ、作っていない）。`server` だけのテスト（`app/server_test.go`、`app/inner_test.go`）は、前から、`store` のどの出力も使わず、`server.StoreOps` を満たす型を、テストが書く。
+- **`store` の配線まで通す、DB なしのテストは、今は、ない。** `app/handlertest`、`app/storetest`、`app/flowtest` は、メモリの上の SQLite で走る（`app/onsqlite/compose_test.go` の `openDB`）。メモリ版の役目（DB なしで、`server` をテストする）は、インテグレーションテストの作り直しで、Hozo が作る、流れの端のにせものが受け持つ（`docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」。にせものと、その上のテストは、次の節「テストのにせもので足したこと」で、入った）。`server` だけのテスト（`app/server_test.go`、`app/inner_test.go`）は、前から、`store` のどの出力も使わず、`server.StoreOps` を満たす型を、テストが書く。
 - **同じ名前空間を、複数の単位に書けること**（`docs/config.md`「単位の対象」）は、変わらない。このサンプルが、その例を持たなくなっただけ（出力の形は、`tests/corpus/units` などが確かめる）。
+
+### テストのにせもので足したこと
+
+`docs/decisions.md`「決めたこと」384、385、390、391。基底 `go` が、出力ごとに、実装を受け取る口のにせものと、にせものの上に、その名前空間の `Ops` を組み立てる `NewOps` を出す（`docs/plugin-go.md`「テストのにせもの」）。
+
+| ファイル | 中身 |
+|---|---|
+| `gen/store/storetest/doc.go`、`fakes.go` | 足した: 四つの状態の単位のにせもの（`UsersStateFake` など）、継ぎ目のにせもの（`SeamsFake`: `placeOrder` の `@db.transaction`）、`Fakes`、`NewOps` |
+| `gen/server/servertest/fakes.go` | 足した: 葉のにせもの（`LeavesFake`。本物を包む）、`mailer` の op のにせもの（`MailerOpsFake`。`mailer` には、単位がない）、継ぎ目のにせもの（`SeamsFake`: `login` の `@rate.limited`）、`Fakes`（`Store` は `storetest.Fakes`）、`NewOps` |
+| `gen/client/clienttest/doc.go`、`fakes.go` | 足した: `Fakes`（`Server` は `servertest.Fakes`）と `NewOps`。`client` 自身は、にせものにするものを持たない（`New` の引数は、`server` の op だけ） |
+| `gen/flows/flowstest/doc.go`、`fakes.go` | 足した: `Fakes`（`Client` は `clienttest.Fakes`）と `NewOps` |
+| `gen/server/servertest/doc.go` | パッケージのコメント（単体テストの口と、にせもの、の両方を言う） |
+| `sample.json`、四つの `.hozoc-outputs.json` | 足したファイルの分 |
+| `app/fakes_test.go` | 足した: にせものの上のテスト（「人が書いたもの」） |
+
+- **`store` の配線まで通す、DB なしのテストが、戻った。** `servertest.NewOps(f, leaves)` が、`server` と `store` の配線（本物）を、流れの端（`store` の `read` と効果、`mailer.send`）と、二つの継ぎ目の、にせものの上に、組み立てる。
+- **ほかの `gen/` のファイルは、変わらない。** `type`、`rate`、`http` は、op を持たないので、にせものも、ない。
+- **テストの対応表は、変わらない。** にせものは、テストではない。
 
 ## 入力
 
@@ -444,17 +462,21 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/rate/doc.go` `types.go` | `go` |
 | `gen/store/doc.go` `types.go` `ops.go` `states.go` `wiring.go` | `go` |
 | `gen/store/db.go` | `go-sqlite` |
+| `gen/store/storetest/doc.go` `fakes.go` | `go`（テストのパッケージ: `store` の、状態の単位と継ぎ目の、にせものと、`NewOps`。`docs/plugin-go.md`「テストのにせもの」） |
+| `gen/server/servertest/fakes.go` | `go`（`server` の、葉と、`mailer` の op と、継ぎ目の、にせものと、`NewOps`） |
 | `gen/server/inner/doc.go` `types.go` `ops.go` `wiring.go` | `go`（内側のパッケージ: すべての定義。`server` は内部の op を持つので、出力を二つに分ける） |
 | `gen/server/inner/validate.go` | `go-valid`（型にメソッドを足すので、定義のパッケージ） |
 | `gen/server/doc.go` `types.go` `ops.go` | `go`（入口のパッケージ: 内側の再公開と、`export` の op だけの `Ops`） |
 | `gen/server/http.go` | `go-http`（入口のパッケージ） |
 | `gen/server/servertest/http.go` `hozo-tests.go-http.json` | `go-http`（テストのパッケージ: 八つの入口の、インテグレーションテストの口と、その、テストの対応表。`docs/plugin-go-http.md`「インテグレーションテストの口」） |
 | `gen/server/ratelimit.go` | `go-ratelimit`（入口のパッケージ） |
-| `gen/server/servertest/doc.go` `leaves.go` `hozo-tests.go.json` | `go`（テストのパッケージ: `server` の葉の op の、単体テストの口と、その、テストの対応表。`docs/plugin-go.md`「単体テストの口」。`type`、`rate`、`store` は、葉の op も、述語で決まる値の分類も持たないので、テストのパッケージを持たない） |
+| `gen/server/servertest/doc.go` `leaves.go` `hozo-tests.go.json` | `go`（テストのパッケージ: `server` の葉の op の、単体テストの口と、その、テストの対応表。`docs/plugin-go.md`「単体テストの口」。`type`、`rate`、`http` は、葉の op も、述語で決まる値の分類も、にせものにするものも持たないので、テストのパッケージを持たない） |
 | `gen/http/doc.go` `types.go` | `go` |
 | `gen/client/doc.go` `ops.go` `wiring.go` | `go`（`client` は、内部の op を持たないので、出力を分けない。型も持たないので、`types.go` はない） |
+| `gen/client/clienttest/doc.go` `fakes.go` | `go`（テストのパッケージ: `Fakes` と `NewOps`。`server` の出力を、本物で通す） |
 | `gen/flows/doc.go` `types.go` `ops.go` `wiring.go` | `go` |
-| `gen/flows/flowstest/design.go` `hozo-tests.go-design.json` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口と、その、テストの対応表。`docs/plugin-go-design.md`。`flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、このパッケージにファイルを出さず、`doc.go` はない） |
+| `gen/flows/flowstest/doc.go` `fakes.go` | `go`（テストのパッケージ: `Fakes` と `NewOps`。`client` の出力を、本物で通す） |
+| `gen/flows/flowstest/design.go` `hozo-tests.go-design.json` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口と、その、テストの対応表。`docs/plugin-go-design.md`。基底が、同じパッケージに出すのは、`doc.go` と `fakes.go`） |
 | `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
 | `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 九つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/onsqlite/compose.go` | 人が書く: 組み立て（`server` を `gen/store` の上に）。`NewFlows` は、その上に、`client` と `flows` を重ねる |
@@ -567,13 +589,14 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 - **フローの op の決まり**（同「フローの op の決まり」）は、どれも満たしている: `export` が付き、配線で、呼ぶ先の三つ（`client.signIn`、`client.order`、`client.viewOrders`）は、どれも `@usecase.of` の付いた op で、`flows` には、`@usecase.of` の付いた op がない。
 - **要求は二つ**（同「要求の、テストの入れ物の口」）: オプション `requirements` に並べた分類 `design.Requirement` のケース `PRD_001`、`PRD_002`。分類 `design.Actor` は、並べていないので、要求ではない。
 - **指している設計**（同「指している設計」）は、`server` の三つの op から: `PRD_001` は `server.authenticate`、`server.placeOrder`。`PRD_002` は `server.getOrders`、`server.placeOrder`（宣言順）。どちらも指されているので、warning は、出ない。
-- `flows` は、葉の op も、述語で決まる値の分類も持たないので、基底は、テストのパッケージにファイルを出さない。`flowstest` のファイルは、`design.go` と、`go-design` の対応表だけ。
+- `flows` は、葉の op も、述語で決まる値の分類も持たないので、基底が、テストのパッケージに出すのは、`doc.go` と `fakes.go`（「テストのにせもので足したこと」）だけ。`flowstest` の、テストの口は、`design.go` で、対応表は、`go-design` のものだけ。
 - この仕様が使っていない規則: 値を返さないフロー、引数のないフロー、`Given`・`Then` と当たる引数の名前、二つ以上の要求の分類、どこからも指されていない要求、op のほかの宣言からの `@prd.ref`、要求だけの単位、基底が、テストのパッケージを作る出力、診断（GODESIGN-*）。`plugins/go-design` の単体テストが確かめる（`docs/testing.md`「単体テスト」）。
 
 ## 人が書いたもの
 
 - **`app/leaves.go`**: `server` の葉の op 九つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:38`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも、最初の引数に `ctx` を取り、最後の戻り値に `error` を返す**（`docs/plugin-go.md`「op の形」）: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go` の `Leaves`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:69-74`）。トークンと識別子を作る関数（`app.Leaves` の `NewToken`、`NewOrderID`）は `error` も返し、`NewSession` と `NewOrder` が、それをそのまま返す: main（`app/cmd/shop-sqlite`）は、乱数を読めないときに、panic にせず、その `error` を返す（ハンドラが 500 にする）。
 - **`app/leafcases_test.go`**: 九つの葉の、結果ごとの単体テスト。型 `leafCases` が、基底の出した口 `servertest.LeafCases` を満たし、`TestLeafCases` が、`servertest.RunLeaves(t, leaves, leafCases{})` に渡す。書いてあるのは、引数の値と、返り値の確かめ（`Then`）だけ: 葉を呼ぶ所と、結果の見分け（正常か、どの例外か）は、生成したコードが持つ。テストの名前は、`TestLeafCases/<op の FQN>/<結果>`（`TestLeafCases/server.checkPassword/InvalidCredentials`）。結果が二つあるのは、`checkPassword`（`type.InvalidCredentials`）と `requireFresh`（`type.Unauthorized`）で、ほかの七つは、正常のケースだけ。**ケースを欠いた型は、口を満たさない**（`TestIncompleteCasesAreRejected`: 欠いた型を渡す行は、コンパイルできないので、口が求めるメソッドを、リフレクションで確かめる。コンパイルできないことそのものは、リポジトリの `plugins/go` の単体テストが確かめる: `docs/testing.md`「単体テスト」）。
+- **`app/fakes_test.go`**: 基底が出した、にせものの上のテスト。`TestFakesPlaceOrder`: 端が返す値（セッション）を言うと、`server.placeOrder` の流れが、配線と葉の本物で通り、効果（`createOrder`、`notifyUser`）と `mailer.send` が、言ったとおりの値で、一度ずつ呼ばれる。`TestFakesThrow`: にせもので、例外を起こす四つの道（流れの端が投げる、葉が投げる、端が「ない」を返す、継ぎ目が投げる）。`TestFakesFlow`: `flowstest.NewOps` が、`flows`、`client`、`server`、`store` の配線を重ね、フローが、DB なしで通る。葉は、人が書いた本物（`app.Leaves`）を渡す。
 - **`app/mailer.go`**: `mailer.send` の実装。`*app.Mailer` が `server.MailerOps` を満たし、`server.New` の引数 `mailer` に、そのまま渡す。受け取った `ctx` は、届ける関数（`Deliver`）に渡す。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。`@smtp.sendMail` は、読むトランスパイラがなく、`mailer` には単位もないので、基底は何も出さない: デコレータの意味（SMTP で送る）を実装するのは、`server.MailerOps` を満たす型を書く人。
 - **`app/limiter.go`**: `@rate.limited` の数え方。`*app.Limiter` が、`go-ratelimit` の出力の `server.RateLimiter` を満たす（`app/limiter.go:34`）。op ごとに、`Window` の間に `Max` 回まで。時計（`Now`）は、テストが差し替える。`server.NewRateSeams(limiter)` に渡し、その戻り値を `server.New` の最後の引数 `seams` に渡す。数え方のテストは `app/limiter_test.go`。
 - `app` パッケージは保存先を知らない: import するのは `gen/server` と `gen/type` だけ（`app/leaves_test.go` の `TestNoStorageImport`）。

@@ -11,8 +11,3 @@ out         = "gen/n"
 namespace   = "m"
 transpilers = ["go", "go-valid", "go-http"]
 out         = "gen/m"
-
-[[emit]]
-namespace   = "other"
-transpilers = ["go"]
-out         = "gen/other"

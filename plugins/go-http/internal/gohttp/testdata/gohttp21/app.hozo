@@ -1,17 +1,13 @@
 // GOHTTP-21: 位置は、最初の経路の op。
-namespace other {
-  export fn value(): int;
-}
-
 namespace n {
-  // 葉の op も、分類もない: 基底は、テストのパッケージを作らないので、重なりを返すのは、go-http
+  // 葉の op も、分類も、にせものにするもの（New の引数）もない: 基底は、テストのパッケージを作らないので、重なりを返すのは、go-http
   @http.get("/first")
   export fn first(): int {
-    return other.value();
+    return 1;
   }
   @http.get("/second")
   export fn second(): int {
-    return other.value();
+    return 2;
   }
 }
 

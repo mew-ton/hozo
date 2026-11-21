@@ -75,7 +75,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/vocab` | `vocab` |
 | `internal/gen/hozoc` | `internal/gen/hozoc/inner` |
 | `internal/gen/hozoc/inner` | `runtime` |
-| `internal/gen/hozoc/hozoctest` | `internal/gen/hozoc`、`internal/gen/proc` |
+| `internal/gen/hozoc/hozoctest` | `internal/gen/hozoc`、`internal/gen/proc`、`runtime` |
 | `internal/gen/hozoc/cli` | `internal/gen/hozoc`、`internal/gen/proc`、`runtime` |
 | `internal/gen/proc` | `runtime` |
 | `internal/tools/irschema` | `ir`、`plugin` |
@@ -298,7 +298,31 @@ type TestName struct {
     Decl string                                   // その名前を生んだ宣言の FQN（葉の op か、分類）。診断の位置に使う。まとめの LeafCases と RunLeaves なら ""
     What string                                   // その名前を生んだものの、診断のメッセージ用の言い方（`op server.newSession のケースの口 NewSessionCases`）
 }
-func PublicTestNames(view *ir.View) []TestName    // 出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて。口が一つもない出力では、空
+func PublicTestNames(view *ir.View) []TestName    // 出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて。口も、にせものも、ない出力では、空
+func TestFakeNames(view *ir.View) []TestName      // そのうち、fakes.go の名前: にせものの型（New の引数の順）、Fakes、NewOps。fakes.go を持たない出力では、空
+func TestKitOf(view *ir.View, root string) (*TestKit, error)   // 出力 (U, N) の、テストのにせものと、テストの中の組み立ての形（docs/plugin-go.md「テストのにせもの」）。root が "" なら、Layout は nil
+type TestKit struct {
+    Namespace, Dir string                         // 出力する名前空間と、Dir(U, N)
+    Shape  *Shape                                 // その出力の、op と口（別の単位の出力なら、その単位の in を省いたものとして求めた形）
+    Layout *Layout                                // その出力の置き場
+    Blocked string                                // テストの中の組み立てを、作れない理由（作れるなら ""）。作れない出力は、fakes.go を持たない
+    Params []KitParam                             // New の引数ごとの、NewOps が渡すもの（New の引数の順）
+    Reals  []KitReal                              // NewOps が、f の後ろに取る、人が書いたもの
+}
+func (k *TestKit) HasFakes() bool                 // fakes.go を持つか
+func (k *TestKit) Fakes() []KitParam              // にせものの型を持つ Param（本物を通す出力を除く）
+type KitParam struct {
+    Kind  KitKind                                 // KitLeaves、KitState、KitClassify、KitExternal、KitUnit（本物を通す、別の名前空間の出力）、KitSeams
+    Param, Field string                           // New の引数の名前と、Fakes のフィールドの名前（フィールドがなければ ""）
+    FQN   string                                  // 状態、分類、別の名前空間の FQN
+    Fake  string                                  // にせものの型の名前（KitUnit なら ""）
+    Unit  *TestKit                                // KitUnit のとき、本物を通す出力
+}
+type KitReal struct {
+    Name string                                   // NewOps の引数の名前（import の名前は、書く側が避ける）
+    Kind KitKind                                  // KitLeaves か KitClassify
+    Namespace, Classify string                    // その口を持つ出力の名前空間と、分類の FQN（葉なら ""）
+}
 func TestMap(path, src string) ([]plugin.TestEntry, error)   // 整形した後の Go のソース src（置き場は path）の、走らせる関数の中のテスト（docs/plugin-go.md「テストの対応表」）。行の順。約束の形でない t.Run があれば error
 func ReadCoverProfile(content string) (profile *CoverProfile, recognized bool, err error)   // go test -coverprofile の形を読む（同「カバレッジを読む」）。頭の行が違えば recognized が false
 func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <import パス>/<ファイル名> の、実行された行の範囲。一行もなければ measured が false
@@ -314,7 +338,8 @@ func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
 - `PublicNames` は、`docs/plugin-go.md`「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
-- `PublicTestNames` は、テストのパッケージの、基底の公開の名前（`docs/plugin-go.md`「単体テストの口」: `LeafCases`、`RunLeaves`、葉ごとの `<Op>Cases` と `<Op>Case`、分類ごとの `<C>Examples` と `Run<C>`）の、ただ一つの写し。基底は、この一覧の中で名前が当たれば GO-2 を返す。テストのパッケージにファイルを足す相乗り（`go-http` の GOHTTP-20）は、自分の名前が、この一覧の名前と当たるかを確かめる。空かどうかは、基底が、テストのパッケージを作るかどうか。
+- `PublicTestNames` は、テストのパッケージの、基底の公開の名前（`docs/plugin-go.md`「単体テストの口」: `LeafCases`、`RunLeaves`、葉ごとの `<Op>Cases` と `<Op>Case`、分類ごとの `<C>Examples` と `Run<C>`。同「テストのにせもの」: にせものの型、`Fakes`、`NewOps`）の、ただ一つの写し。基底は、この一覧の中で名前が当たれば GO-2 を返す。テストのパッケージにファイルを足す相乗り（`go-http` の GOHTTP-20）は、自分の名前が、この一覧の名前と当たるかを確かめる。空かどうかは、基底が、テストのパッケージを作るかどうか。
+- `TestKitOf` は、テストのにせものと、テストの中の組み立て（`docs/plugin-go.md`「テストのにせもの」）の、ただ一つの写し。基底は、ここから `fakes.go` を作り、組み立てを使う相乗り（`go-http` の `RunHTTP`）は、同じ値から、`Fakes` のフィールドの名前と、`NewOps` の引数を求める。別の単位の出力の形は、`HomeOf` と同じに、その単位の `in` を省いたものとして求める。
 
 ### `plugin/govalid`（公開）
 

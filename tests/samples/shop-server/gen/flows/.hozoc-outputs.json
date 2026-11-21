@@ -1,6 +1,8 @@
 [
   "gen/flows/doc.go",
   "gen/flows/flowstest/design.go",
+  "gen/flows/flowstest/doc.go",
+  "gen/flows/flowstest/fakes.go",
   "gen/flows/flowstest/hozo-tests.go-design.json",
   "gen/flows/ops.go",
   "gen/flows/types.go",

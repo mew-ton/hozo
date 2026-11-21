@@ -115,16 +115,16 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 
 分けた出力の入口のファイルは、内側の同じ名前のファイルの再公開: `doc.go`（N のパッケージのコメント）、`types.go`、`ops.go`（入口の `Ops`、`Leaves` と `<Ns>Ops` と `Seams` の別名、`New`）、`states.go`、`classify.go`。`wiring.go` はない。内側のファイルに再公開するものがなければ、入口のファイルも作らない。
 
-テストのパッケージ（「単体テストの口」）のファイルは、`doc.go`（パッケージのコメント）、`leaves.go`（葉の op の口）、`classify.go`（分類の判定の口）、`hozo-tests.go.json`（テストの対応表。Go のファイルではないので、先頭の行も、整形もない。「テストの対応表」）。中身がなければ作らず、`leaves.go` も `classify.go` もなければ、パッケージそのものを作らない。
+テストのパッケージ（「単体テストの口」の「テストのパッケージ」）のファイルは、`doc.go`（パッケージのコメント）、`leaves.go`（葉の op の口）、`classify.go`（分類の判定の口）、`fakes.go`（にせものと、テストの中の組み立て。「テストのにせもの」）、`hozo-tests.go.json`（テストの対応表。Go のファイルではないので、先頭の行も、整形もない。「テストの対応表」）。中身がなければ作らず、`leaves.go` も `classify.go` も `fakes.go` もなければ、パッケージそのものを作らない。
 
 ### 相乗りのファイル
 
 `go` に相乗りするトランスパイラの決まり。どれも、プラグインどうしで当たらないようにするためのもの。
 
 - ファイルは、**入口のパッケージ**（`<Dir(U, N)>/`）に、プラグインごとに決めた名前のファイル一つで置く。型にメソッドを足すもの（`go-valid` の `Validate`）だけは、Go がメソッドを型の定義のパッケージにしか書かせないので、**定義のパッケージ**に置く。自分のパッケージを持つもの（`go-cli`）は、`<Dir(U, N)>/` の下の、プラグインごとに決めたディレクトリに置く。
-- 基底のファイル名（`doc.go`、`types.go`、`ops.go`、`states.go`、`classify.go`、`wiring.go`）と、ディレクトリ名 `inner` は使わない。テストのパッケージ（「単体テストの口」の「テストのパッケージ」）の中では、基底のファイル名 `doc.go`、`leaves.go`、`classify.go`、`hozo-tests.go.json` を使わない。
+- 基底のファイル名（`doc.go`、`types.go`、`ops.go`、`states.go`、`classify.go`、`wiring.go`）と、ディレクトリ名 `inner` は使わない。テストのパッケージ（「単体テストの口」の「テストのパッケージ」）の中では、基底のファイル名 `doc.go`、`leaves.go`、`classify.go`、`fakes.go`、`hozo-tests.go.json` を使わない。
 - パッケージに足す非公開の名前には、プラグインごとの前置きを付ける。公開の名前は、プラグインの文書に並べる。
-- **テストのコード**（`testing` を import するコード。自分の層を通すテストを受け取る口と、それを走らせる関数）は、入口にも、定義のパッケージにも置かず、N の**テストのパッケージ**（「単体テストの口」の「テストのパッケージ」）に、プラグインごとに決めた名前のファイル一つで置く。ファイルの決まり（N の入口のパッケージを、いつも名前を書いて import する。import の名前に使わない識別子を、`Imports.Reserve` に渡す。失敗の文面は英語）は、基底のファイルと同じで、非公開の名前の前置きも、同じものを使う。基底が、そのパッケージを作らない出力でも、置いてよい（`doc.go` は、基底が口を出すときにだけ、ある）。テストのパッケージの、基底の公開の名前の一覧は、`golang.PublicTestNames`（`docs/packages.md`「`plugin/golang`（公開）」）で求め、当たれば、自分の診断で報告する。
+- **テストのコード**（`testing` を import するコード。自分の層を通すテストを受け取る口と、それを走らせる関数）は、入口にも、定義のパッケージにも置かず、N の**テストのパッケージ**（「単体テストの口」の「テストのパッケージ」）に、プラグインごとに決めた名前のファイル一つで置く。ファイルの決まり（N の入口のパッケージを、いつも名前を書いて import する。import の名前に使わない識別子を、`Imports.Reserve` に渡す。失敗の文面は英語）は、基底のファイルと同じで、非公開の名前の前置きも、同じものを使う。基底が、そのパッケージを作らない出力でも、置いてよい（`doc.go` は、基底が、口か、にせものを出すときにだけ、ある）。テストのパッケージの、基底の公開の名前の一覧は、`golang.PublicTestNames`（`docs/packages.md`「`plugin/golang`（公開）」）で求め、当たれば、自分の診断で報告する。
 
 | トランスパイラ | ファイル | 置くパッケージ | 非公開の名前の前置き | 文書 |
 |---|---|---|---|---|
@@ -892,8 +892,8 @@ func TestLeaves(t *testing.T) { servertest.RunLeaves(t, app.Leaves{}, leafCases{
 
 - 口は、**テストのパッケージ**に置く: ディレクトリは `<Dir(U, N)>/<N のパッケージ名>test/`、パッケージ名は `<N のパッケージ名>test`（`gen/server/servertest`、パッケージ `servertest`）。`testing` を import するので、アプリのコード（入口と、定義のパッケージ）とは、分ける。人のテスト（`out` の外に置く）が、import する。
 - テストのパッケージは、N の**入口のパッケージ**を import する（N の型、`Leaves`、`<C>Cases`、`Classify<C>` は、どれも、入口にある）。内側のパッケージは、import しない。
-- ファイルは、`doc.go`、`leaves.go`（葉の op が、一つでもあるとき）、`classify.go`（述語で決まる値の分類か op の分類が、N に、一つでもあるとき）。どちらもなければ、パッケージを作らない。`doc.go` のコメントは、`// Package <名前> は、名前空間 <N> の、単体テストの口: 結果ごとのケースを受け取り、走らせる（docs/plugin-go.md「単体テストの口」）。`
-- import の名前の決まり（「パッケージと import パス」の「import の名前」）は、同じ。違うのは二つ。（1）N の入口のパッケージは、名前が、import パスの最後の要素と同じでも、**いつも、名前を書いて** import する（`server "example.com/shop-server/gen/server"`）: 出力先のディレクトリの名前で、ファイルの中身が変わらないようにする（「決定性」の、同じ名前空間の二つの単位）。（2）import の名前に使わないのは、テストのパッケージの関数の本体が、決まった名前で使う識別子: `t`、`c`、`x`、`k`、`cases`、`leaves`、`got`、`err`、`want`、`kind`、`none`（と、どのファイルでも使わない `ops`、`ptr`）。
+- ファイルは、`doc.go`、`leaves.go`（葉の op が、一つでもあるとき）、`classify.go`（述語で決まる値の分類か op の分類が、N に、一つでもあるとき）、`fakes.go`（「テストのにせもの」の「出すとき」）。三つとも、なければ、パッケージを作らない。`doc.go` のコメントは、`// Package <名前> は、名前空間 <N> の、テストのためのもの: 単体テストの口と、にせもの（docs/plugin-go.md「単体テストの口」「テストのにせもの」）。`
+- import の名前の決まり（「パッケージと import パス」の「import の名前」）は、同じ。違うのは二つ。（1）N の入口のパッケージは、名前が、import パスの最後の要素と同じでも、**いつも、名前を書いて** import する（`server "example.com/shop-server/gen/server"`）: 出力先のディレクトリの名前で、ファイルの中身が変わらないようにする（「決定性」の、同じ名前空間の二つの単位）。（2）import の名前に使わないのは、テストのパッケージの関数の本体が、決まった名前で使う識別子: `t`、`c`、`x`、`k`、`cases`、`leaves`、`got`、`err`、`want`、`kind`、`none`（と、どのファイルでも使わない `ops`、`ptr`）。`fakes.go` では、`f`、`o`、`ctx`、`k`（「テストのにせもの」）。
 - テストのパッケージの、公開の名前どうしが当たれば、GO-2（op `leaf` の `LeafCases` と、まとめの `LeafCases` など）。同じ単位が、子の名前空間 `N.<N のパッケージ名>test` を出力するなら、GO-4。基底の公開の名前の一覧は、`golang.PublicTestNames`（`docs/packages.md`「`plugin/golang`（公開）」）。相乗りが、このパッケージに足すファイルの決まりは、「相乗りのファイル」。
 - 失敗の文面（`t.Fatalf`）は、`runtime` の誤りと同じに、英語で書く。
 
@@ -1047,7 +1047,7 @@ func RunWarrantyKind(t *testing.T, cases shop.WarrantyKindCases, x WarrantyKindE
 
 - 配線の op（中身は、基底が作る。375）。`never` を返す op。
 - 状態の単位の、人が書くメソッド（デコレータのない `read` と効果、形で決まるメソッド）と、継ぎ目の実装。対象に入れるかは、決めていない（`docs/open.md`「Hozo の側の改善する点」）。
-- 呼ぶ先の op を、にせものに差し替える道具（375 の、目標）。
+- 呼ぶ先の op を、にせものに差し替えて、配線の op 一つだけを試す、単体テストの口（375 の、目標）。にせものそのものは、ある（「テストのにせもの」）。
 
 ### テストの対応表
 
@@ -1087,6 +1087,121 @@ hozoc tests --coverage cover.out
 - 要求の `files` のファイルごとに、`<そのディレクトリの import パス>/<ファイル名>`（import パスは「パッケージと import パス」）を名前に持つ行を探す。一行もなければ、そのファイルは、測られていない（応答の `files` に出さない）。`go.mod` が見つからないファイルも、同じ。
 - 応答の `lines` は、回数が 1 以上の行の、`[<始まりの行>, <終わりの行>]`。重複を除き、始まりの行、終わりの行の順に並べる。同じ区切りが、二度出てくる（パッケージごとのテストの実行を、一つのファイルにまとめたもの）ときは、どれかの回数が 1 以上なら、実行済み。
 - 列は、使わない（対応表の `lines` が、行だけで分けられるように取ってある: 「テストの対応表」）。
+
+## テストのにせもの
+
+基底は、出力ごとに、実装を受け取る口（「実装を受け取る口」）のにせものと、にせものの上に、その名前空間の `Ops` を組み立てる関数を出す（`docs/decisions.md`「決めたこと」384、385、390、391）。使うのは、流れを通すテスト（入口のデコレータのプラグインが出す、インテグレーションテスト: `docs/plugin-go-http.md`「インテグレーションテストの口」）と、人が書くテスト。何を、にせものにし、何を、本物で通すかの決まりの持ち主は、`docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」。この節が決めるのは、Go での形。期待する出力の実物は、サンプルの `gen/store/storetest/fakes.go` と `gen/server/servertest/fakes.go`。
+
+```go
+f := new(servertest.Fakes)                           // 零値のまま、使える
+f.Store.Sessions.SessionByToken.Returns(&session)    // 端（read fn）が返す値を言う
+f.Mailer.Send.Throws(pkgtype.NotificationFailed{})   // 外の仕組みの op が、例外を投げる
+ops := servertest.NewOps(f, leaves)                  // 配線と、葉（leaves）は、本物
+_, err := ops.PlaceOrder(ctx, in)
+n := len(f.Store.Orders.CreateOrder.Calls)           // どの効果が、何の値で、呼ばれたか
+```
+
+### 出すとき
+
+- ファイルは、テストのパッケージ（「単体テストの口」の「テストのパッケージ」）の `fakes.go`。テストの対応表（「テストの対応表」）には、載らない（テストではない）。import の名前に使わない識別子は、`f`、`o`、`ctx`、`k`（本体が、決まった名前で使う）。口を満たす型のメソッドの、引数の局所の名前は、`o`、`ctx` と、このファイルの import の名前を避ける（「名前」の「局所の名前」）。
+- **出すのは、`New` が、引数を一つでも取り、テストの中の組み立てを、作れる出力**。`New` が引数を取らない出力には、にせものにするものがない（使う側は、`New()` を、そのまま呼ぶ）。op が一つもない出力（`New` がない: 「ファイル」）にも、出さない。
+- **組み立てを作れない出力**（下の「別の名前空間」の表の、最後の行に当たる別の名前空間を、一つでも持つ出力）には、`fakes.go` を出さない。診断も、出さない: 設定は、正しい。その出力の組み立てを要るプラグインが、自分の診断で、報告する（`golang.TestKitOf` の `Blocked`。`docs/packages.md`「`plugin/golang`（公開）」）。
+
+### にせものの型
+
+`New` の引数（「New」の表）ごとに、にせものを、一つ持つ。並びは、`New` の引数の順。
+
+| `New` の引数 | にせものの型 | 言われていないとき |
+|---|---|---|
+| `leaves` | `LeavesFake`。フィールドは、葉ごとに一つ（`Leaves` の並び） | 本物の葉（`NewOps` に渡したもの）を呼ぶ |
+| 状態の単位 | `<状態>StateFake`。フィールドは、単位のメソッドごとに一つ（「状態の単位」の並び: 形で決まる問い合わせ、形で決まる命令、`read`、効果。状態の分類は、述語、効果） | 零値を返す。失敗は、ない |
+| 分類の述語 | `<C>CasesFake`。メソッド `Is(k <C>)` | 本物の述語（`NewOps` に渡したもの）を呼ぶ |
+| 別の名前空間 | 下の「別の名前空間」 | — |
+| `seams` | `SeamsFake`。フィールドは、継ぎ目ごとに一つ（`Seams` の並び） | op の中身（`body`）を、そのまま呼ぶ |
+
+```go
+// SessionsStateFake は、状態 store.sessions の単位（store.SessionsState）のにせもの。メソッドごとに、フィールド一つ。
+// 言われていないメソッドは、零値を返す。
+type SessionsStateFake struct {
+	IsEmpty        runtime.Fake[struct{}, bool]
+	Get            runtime.Fake[struct{}, []pkgtype.Session]
+	SessionByToken runtime.Fake[struct{ Token pkgtype.Token }, *pkgtype.Session]
+	CreateSession  runtime.FakeVoid[struct{ Session pkgtype.Session }]
+	DeleteSession  runtime.FakeVoid[struct{ Token pkgtype.Token }]
+}
+
+// sessionsStateFake は、SessionsStateFake を、store.SessionsState にする。
+type sessionsStateFake struct{ f *SessionsStateFake }
+
+var _ store.SessionsState = sessionsStateFake{}
+
+func (o sessionsStateFake) SessionByToken(ctx context.Context, token pkgtype.Token) (*pkgtype.Session, error) {
+	return o.f.SessionByToken.Call(struct{ Token pkgtype.Token }{token}, nil)
+}
+```
+
+- **フィールドの型**は、メソッドが値を返すなら `runtime.Fake[A, R]`、返さないなら `runtime.FakeVoid[A]`（「runtime パッケージ」）。`R` は、メソッドの戻り値の型（`error` の前のもの）。フィールドの名前は、メソッドの名前。コメントは、書かない（何のメソッドかは、口のインターフェースのコメントが言う）。
+- **`A` は、呼ばれた引数を覚える、名前のない構造体**: フィールドは、メソッドの引数（`ctx` と、継ぎ目の `body` を除く。宣言の順）。名前は、フィールド名と同じ決まり（「名前」）、型は、引数の Go の型。引数がなければ `struct{}`。形で決まる命令の引数は、`Value`。
+- **口を満たすのは、非公開の型**（にせものの型の名前の、先頭を小文字にしたもの: `sessionsStateFake`）。フィールドは、にせもの `f` と、本物を包むもの（`leaves` と、分類の述語）は、本物 `impl`。メソッドは、口のメソッドのすべてで、どれも、`o.f.<メソッド>.Call(<覚える引数>, <本物>)` を返す。`<本物>` は、葉は、本物の葉を呼ぶ関数、継ぎ目は、`body` を呼ぶ関数、状態の単位と、別の名前空間は `nil`。型のすぐ後ろに、口を満たすことの確かめ（`var _ <口> = <型>{}`）を置く。レシーバは `o`。
+- **にせものの型と、口を満たす型を、分ける**のは、Go では、フィールドとメソッドが、同じ名前を持てないため。口を満たす型は、公開しない: にせものを、口に渡すのは、`NewOps` だけ。
+- **`<C>CasesFake`** は、フィールドを公開せず、メソッド `Is` だけを持つ。`Is(k)` の後は、値によらず、ケース `k` の述語が真、ほかの述語が偽を返す（本物の述語は、呼ばない）。ない側のケース（述語を持たない。「分類」）は、`Is` では、入らせられない（値がないことで、決まる）。
+
+```go
+// StandingCasesFake は、分類 pay.Standing の述語（pay.StandingCases）のにせもの。言われていなければ、本物の述語を呼ぶ。
+type StandingCasesFake struct {
+	set  bool
+	kind pay.Standing
+}
+
+// Is は、これからの判定が、値によらず、ケース k になるようにする。
+func (f *StandingCasesFake) Is(k pay.Standing) { f.set, f.kind = true, k }
+```
+
+- コメント: にせものの型は、`// <型> は、<もの>（<口>）のにせもの。<フィールドの言い方>。` と、二行目に、言われていないときの振る舞い。`<もの>` は、`人が実装する葉の op`、`状態 <FQN> の単位`、`名前空間 <M> の op`、`継ぎ目`。口を満たす型は、`// <型> は、<にせものの型> を、<口> にする。`
+
+### 別の名前空間
+
+別の名前空間 M の口（`<M>Ops`。「別の名前空間の op」）に、何を渡すかは、M を出力する、同じ基底の単位の数で決まる（`View.namespaces`。`docs/decisions.md`「決めたこと」383、387）。
+
+| M を出力する単位 | 渡すもの | `Fakes` のフィールド |
+|---|---|---|
+| この出力と同じ単位が、M も出力する。か、同じ基底の単位が、ちょうど一つ | その出力の配線（本物）: その出力のテストのパッケージの `NewOps(&f.<M>, …)`。その出力が `fakes.go` を持たない（`New` が、引数を取らない）なら、その出力の `New()` | その出力の `Fakes`（`fakes.go` を持たなければ、ない） |
+| 同じ基底の単位が、ない（外の仕組み。単位を置かない名前空間） | にせもの `<M>OpsFake`。フィールドは、`<M>Ops` のメソッドごとに一つ。言われていないメソッドは、零値を返す | `<M>OpsFake` |
+| 同じ基底の単位が、二つ以上ある（同じ単位のものは、ない）。その出力の組み立てを、作れない。名前空間どうしが、輪になって呼び合う | — | 組み立てを作れない（「出すとき」） |
+
+- **本物を通す出力は、選ばない。** 同じ名前空間を、二つの単位に出したとき、どちらも、テストの対象で（387）、二つを、どう組み合わせて通すかは、決めていない（`docs/open.md`「Hozo の側の改善する点」）。型の置き場（`docs/config.md`「型の置き場」）が、設定の順で最初の単位を選ぶのとは、違う。
+- **別の単位の `in` は、見えない**（`View` にあるのは、この単位の `in` に合ったファイルだけ）。別の単位の出力の形（葉を持つか、など）は、`in` を省いた単位として、求める（`golang.HomeOf` と、同じ）。`in` で絞った単位の出力を、別の単位から通すと、`NewOps` の引数が合わず、コンパイルできないことがある。
+- テストのパッケージは、通す出力の、入口のパッケージと、テストのパッケージを import する（テストのコードに限った、単位をまたぐ import。テストでない出力は、今までどおり、別の名前空間の op を import しない）。
+
+### Fakes と NewOps
+
+```go
+// Fakes は、名前空間 server の、テストの中の組み立て（NewOps）に使う、にせもの。フィールドは、New の引数の順。零値のまま、使える。
+type Fakes struct {
+	// Leaves は、葉のにせもの。言われていない葉は、本物を呼ぶ。
+	Leaves LeavesFake
+	// Mailer は、名前空間 mailer（単位がない）の op のにせもの。
+	Mailer MailerOpsFake
+	// Store は、名前空間 store の出力（gen/store）の、にせもの。その配線は、本物を通す。
+	Store storetest.Fakes
+	// Seams は、継ぎ目のにせもの。言われていない継ぎ目は、op の中身を、そのまま呼ぶ。
+	Seams SeamsFake
+}
+
+// NewOps は、にせもの f の上に、名前空間 server の Ops を組み立てる: 配線は、本物。流れの端と、継ぎ目は、にせもの。
+// 人が書いたもの（leaves）は、引数で受け取り、にせものが包む。
+func NewOps(f *Fakes, leaves server.Leaves) server.Ops {
+	return server.New(leavesFake{&f.Leaves, leaves}, mailerOpsFake{&f.Mailer}, storetest.NewOps(&f.Store), seamsFake{&f.Seams})
+}
+```
+
+- **`Fakes`** のフィールドは、`New` の引数ごとに一つ（引数を取らない出力を通す、別の名前空間には、ない）。名前は、`New` の引数の名前を、フィールド名にしたもの（先頭を大文字に）。コメントは、種類ごとに決まった一行: 葉は、例のとおり。状態の単位は `// <名前> は、状態 <FQN> の単位のにせもの。`、分類の述語は `// <名前> は、分類 <FQN> の述語のにせもの。言われていなければ、本物の述語を呼ぶ。`、別の名前空間と、継ぎ目は、例のとおり（出力の場所は、その出力の `Dir`）。
+- **`NewOps` の引数**は、`f *Fakes` の後ろに、人が書いたもの: この出力の `leaves`（`<入口>.Leaves`）、分類の述語（`New` と同じ名前、同じ順。型は `<C>Cases`）、その後ろに、本物を通す別の名前空間の出力の `NewOps` が取る、人が書いたものを、別の名前空間の順に（名前は、`<別の名前空間の引数の名前><その引数の名前の先頭を大文字にしたもの>`: `storeLeaves`）。先に並んだ名前、`f`、このファイルの import の名前と当たれば、当たらなくなるまで、末尾に `_`。人が書いたものを、名前のある構造体ではなく、位置引数で受け取るのは、渡し忘れを、コンパイルエラーにするため（`CLAUDE.md`「実装の漏れは、コンパイルエラーにする」）。
+- **`NewOps` の本体**は、入口の `New` を、一度、呼ぶ。引数は、`New` の引数の順に、口を満たす型の値（`<型>{&f.<フィールド>[, <本物>]}`）か、本物を通す出力の `NewOps(…)` / `New()`。効果の入口の確かめ（「効果の入口の確かめ」）は、`New` が包むので、にせものの単位にも、掛かる。
+- **`NewOps` のコメント**は、例の二行。二行目の括弧の中は、人が書いたものの引数の名前を、「、」でつないだもの。人が書いたものを取らなければ、一行目だけ。
+- **戻り値は、入口の `Ops`**（`export` の op だけ）。内部の op を、にせものの上で呼ぶ道は、出さない。
+- `NewOps` は、何度呼んでもよく、`f` を書き換えない。同じ `f` に、二度、組み立てれば、二つの `Ops` が、同じにせものを使う。
+- テストのパッケージの、公開の名前（`Fakes`、`NewOps`、にせものの型）が、ほかの公開の名前と当たれば、GO-2（「単体テストの口」の「テストのパッケージ」）。
 
 ## コメント
 
@@ -1162,6 +1277,24 @@ type Exception interface { error; HozoException() string }
 type ClassificationError struct { Classify string; Hits []string }   // 分類の誤り（判定関数と、型で決まる分類の match が返す）。Error() を持つ
 type CaseError struct { Effect, Param, Classify string; Want []string; Got string }   // 効果の入口の確かめの失敗（「効果の入口の確かめ」）。Error() を持つ
 ```
+
+テストのにせもの（「テストのにせもの」）が使うのは、次の二つ。`testing` は、import しない。
+
+```go
+type Fake[A, R any] struct { Calls []A; … }    // 値を返すメソッド一つのにせもの
+func (f *Fake[A, R]) Returns(v R)               // これからの呼び出しが、v を返す（本物は、呼ばない）
+func (f *Fake[A, R]) Throws(err error)          // これからの呼び出しが、R の零値と、err を返す（本物は、呼ばない）
+func (f *Fake[A, R]) Call(args A, impl func() (R, error)) (R, error)
+
+type FakeVoid[A any] struct { Calls []A; … }   // 値を返さないメソッド一つのにせもの
+func (f *FakeVoid[A]) Returns()                 // これからの呼び出しが、何もせずに、正常に終わる（本物は、呼ばない）
+func (f *FakeVoid[A]) Throws(err error)         // これからの呼び出しが、err を返す（本物は、呼ばない）
+func (f *FakeVoid[A]) Call(args A, impl func() error) error
+```
+
+- `Call` は、生成したコードが呼ぶ: `args` を `Calls` に足し（呼ばれた順）、`Returns` か `Throws` が言われていれば、そのとおりに返す。言われていなくて、`impl` が `nil` でなければ、`impl` を呼んで、その結果を返す。`nil` なら、零値を返す（失敗は、ない）。
+- `Returns` と `Throws` は、後に言った方が、効く。どちらも、すべての呼び出しに、同じ結果を返す（呼び出しごとに、違う値を返す道は、ない）。
+- 零値のまま、使える。同時に呼ばれることは、守らない（テストの中で、一つの流れが呼ぶためのもの）。
 
 - 核の型 `date` と `time` の値の型も、ここに置く（「型」）。どちらも、時刻帯を持たず、`==` で比べられ、`encoding/json` では、文字列になる（`MarshalText` / `UnmarshalText`）。
 

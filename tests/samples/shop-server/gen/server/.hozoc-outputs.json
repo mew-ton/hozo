@@ -9,6 +9,7 @@
   "gen/server/ops.go",
   "gen/server/ratelimit.go",
   "gen/server/servertest/doc.go",
+  "gen/server/servertest/fakes.go",
   "gen/server/servertest/hozo-tests.go-http.json",
   "gen/server/servertest/hozo-tests.go.json",
   "gen/server/servertest/http.go",

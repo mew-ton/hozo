@@ -20,13 +20,14 @@ const fileLeaves = "leaves.go"
 // 「テストのパッケージ」）。import の名前に使わない。
 var testBodyNames = []string{"t", "c", "x", "k", "cases", "leaves", "got", "err", "want", "kind", "none"}
 
-// newTestFile は、テストのパッケージのファイル name を作り始める。
-func (e *emitter) newTestFile(name string) *fileGen {
+// newTestFile は、テストのパッケージのファイル name を作り始める。reserved は、そのファイルの本体が、決まった名前で使う識別子
+// （import の名前に使わない）。
+func (e *emitter) newTestFile(name string, reserved []string) *fileGen {
 	f := &fileGen{e: e, name: name, inTest: true, pkg: e.layout.TestName, key: "test/" + name}
 	f.im = e.imports[f.key]
 	if f.im == nil {
 		f.im = golang.NewTestImports(e.view, e.layout, e.root)
-		f.im.Reserve(testBodyNames...)
+		f.im.Reserve(reserved...)
 		e.imports[f.key] = f.im
 	}
 	return f
@@ -43,9 +44,9 @@ func (e *emitter) testClassifies() []*ir.Classify {
 	return out
 }
 
-// hasTests は、テストのパッケージを作るか: 葉の op か、判定の口を出す分類が、一つでもある。
+// hasTests は、テストのパッケージを作るか: 葉の op か、判定の口を出す分類が、一つでもあるか、fakes.go を出す。
 func (e *emitter) hasTests() bool {
-	return len(e.shape.Leaves) > 0 || len(e.testClassifies()) > 0
+	return len(e.shape.Leaves) > 0 || len(e.testClassifies()) > 0 || e.hasFakes()
 }
 
 // leafResult は、葉の結果一つ（docs/plugin-go.md「単体テストの口」の「葉の op」）: 正常か、例外一つ。name は、<Op>Cases の
@@ -115,9 +116,9 @@ func (e *emitter) genTestDoc() *fileGen {
 	if !e.hasTests() {
 		return nil
 	}
-	f := e.newTestFile(fileDoc)
+	f := e.newTestFile(fileDoc, testBodyNames)
 	f.doc = comment("Package " + e.layout.TestName + " は、名前空間 " + e.view.Viewer +
-		" の、単体テストの口: 結果ごとのケースを受け取り、走らせる（docs/plugin-go.md「単体テストの口」）。")
+		" の、テストのためのもの: 単体テストの口と、にせもの（docs/plugin-go.md「単体テストの口」「テストのにせもの」）。")
 	return f
 }
 
@@ -128,7 +129,7 @@ func (e *emitter) genTestLeaves() *fileGen {
 	if len(s.Leaves) == 0 {
 		return nil
 	}
-	f := e.newTestFile(fileLeaves)
+	f := e.newTestFile(fileLeaves, testBodyNames)
 	testing := f.im.Add("testing", "testing")
 	entry := f.im.Qualifier(e.view.Viewer)
 	for _, fqn := range s.Leaves {
@@ -246,7 +247,7 @@ func (e *emitter) genTestClassify() *fileGen {
 	if len(cs) == 0 {
 		return nil
 	}
-	f := e.newTestFile(fileClassify)
+	f := e.newTestFile(fileClassify, testBodyNames)
 	testing := f.im.Add("testing", "testing")
 	entry := f.im.Qualifier(e.view.Viewer)
 	ctx := f.im.Add("context", "context") + ".Background()"

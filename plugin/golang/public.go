@@ -159,10 +159,11 @@ type TestName struct {
 	What string
 }
 
-// PublicTestNames は、view の出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて（docs/plugin-go.md「単体テストの口」）。
-// 並びは、まとめの `LeafCases` と `RunLeaves`（葉が一つでもあれば）、葉ごとの `<Op>Cases` と `<Op>Case`（Leaves の並び）、
-// 判定の口を出す分類（N が宣言した、述語で決まる値の分類と op の分類。宣言順）ごとの `<C>Examples` と `Run<C>`。
-// 口が一つもない出力（基底が、テストのパッケージを作らない出力）では、空。当たる名前も、そのまま二つ返す（当たっているかを
+// PublicTestNames は、view の出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて（docs/plugin-go.md「単体テストの口」
+// 「テストのにせもの」）。並びは、まとめの `LeafCases` と `RunLeaves`（葉が一つでもあれば）、葉ごとの `<Op>Cases` と `<Op>Case`
+// （Leaves の並び）、判定の口を出す分類（N が宣言した、述語で決まる値の分類と op の分類。宣言順）ごとの `<C>Examples` と `Run<C>`、
+// fakes.go の名前（TestFakeNames: にせものの型、`Fakes`、`NewOps`）。
+// 口も、にせものも、ない出力（基底が、テストのパッケージを作らない出力）では、空。当たる名前も、そのまま二つ返す（当たっているかを
 // 見るのは呼ぶ側: 基底は GO-2、このパッケージにファイルを足す相乗りは、自分の診断。同「相乗りのファイル」）。
 func PublicTestNames(view *ir.View) []TestName {
 	p := view.Program
@@ -199,5 +200,5 @@ func PublicTestNames(view *ir.View) []TestName {
 			TestName{Name: name + "Examples", Decl: c.Name, What: "分類 " + c.Name + " の例の口 " + name + "Examples"},
 			TestName{Name: "Run" + name, Decl: c.Name, What: "分類 " + c.Name + " の例を走らせる Run" + name})
 	}
-	return out
+	return append(out, TestFakeNames(view)...)
 }

@@ -96,8 +96,9 @@ func TestPublicNames(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「単体テストの口」の「テストのパッケージ」: 基底が、テストのパッケージに出す公開の名前。並びは、まとめの
-// LeafCases と RunLeaves、葉ごとの <Op>Cases と <Op>Case、判定の口を出す分類ごとの <C>Examples と Run<C>。
+// docs/plugin-go.md「単体テストの口」の「テストのパッケージ」と「テストのにせもの」: 基底が、テストのパッケージに出す公開の名前。
+// 並びは、まとめの LeafCases と RunLeaves、葉ごとの <Op>Cases と <Op>Case、判定の口を出す分類ごとの <C>Examples と Run<C>、
+// fakes.go の名前（にせものの型を New の引数の順に、Fakes、NewOps）。
 func TestPublicTestNames(t *testing.T) {
 	kind := classify("shop.Kind", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "Big", "Small")
 	sync := classify("shop.Sync", ir.StatesSubject{States: []string{"shop.items"}}, ir.DecidedByPredicate, "UpToDate", "OutOfDate")
@@ -118,6 +119,11 @@ func TestPublicTestNames(t *testing.T) {
 		{"KindExamples", "shop.Kind", "分類 shop.Kind の例の口 KindExamples"},
 		{"RunKind", "shop.Kind", "分類 shop.Kind の例を走らせる RunKind"},
 		// 状態の分類（Sync）と、型で決まる分類（Present）と、配線の op（wire）は、口を持たない
+		{"LeavesFake", "", "葉のにせもの LeavesFake"},
+		{"SyncStateFake", "shop.Sync", "状態の単位 shop.Sync のにせもの SyncStateFake"},
+		{"ItemsStateFake", "shop.items", "状態の単位 shop.items のにせもの ItemsStateFake"},
+		{"Fakes", "", "にせもののまとめ Fakes"},
+		{"NewOps", "", "テストの中の組み立て NewOps"},
 	}
 	got := PublicTestNames(v)
 	if len(got) != len(want) {
@@ -128,9 +134,15 @@ func TestPublicTestNames(t *testing.T) {
 			t.Errorf("%d: %+v, want %+v", i, got[i], w)
 		}
 	}
-	// 口が一つもない出力（基底が、テストのパッケージを作らない出力）では、空
-	if got := PublicTestNames(viewOf("shop", namespace("shop", with(op("shop.wire", nil), wired(call("other.run")))),
-		namespace("other", op("other.run", nil)))); len(got) != 0 {
+	// 単位のない別の名前空間を呼ぶだけの出力は、その口のにせものと、Fakes、NewOps を持つ
+	external := PublicTestNames(viewOf("shop", namespace("shop", with(op("shop.wire", nil), wired(call("other.run")))),
+		namespace("other", op("other.run", nil))))
+	if len(external) != 3 || external[0] != (TestName{"OtherOpsFake", "", "別の名前空間 other の口のにせもの OtherOpsFake"}) ||
+		external[1].Name != "Fakes" || external[2].Name != "NewOps" {
+		t.Errorf("別の名前空間を呼ぶだけの出力に %+v", external)
+	}
+	// 口も、にせものも、ない出力（New が、引数を取らない。基底が、テストのパッケージを作らない出力）では、空
+	if got := PublicTestNames(viewOf("shop", namespace("shop", model("shop.Item")))); len(got) != 0 {
 		t.Errorf("口のない出力に %+v", got)
 	}
 }

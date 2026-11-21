@@ -67,6 +67,12 @@ func Emit(req *plugin.EmitRequest, root string, stderr io.Writer) ([]plugin.File
 		return nil, e.errs
 	}
 	e.layout = layout
+	kit, err := golang.TestKitOf(view, root)
+	if err != nil {
+		e.errorf(codeInternal, "", "名前空間 %s の、テストの中の組み立てに使う出力の import パスを求められない: %v", view.Viewer, err)
+		return nil, e.errs
+	}
+	e.kit = kit
 	e.prepare()
 	e.checkInnerDir()
 	e.checkTestDir()
@@ -91,8 +97,10 @@ type emitter struct {
 	stderr io.Writer
 	layout *golang.Layout
 	shape  *golang.Shape
-	p      *ir.Program
-	ns     *ir.Namespace // N
+	// kit は、テストのにせものと、テストの中の組み立ての形（docs/plugin-go.md「テストのにせもの」）。
+	kit *golang.TestKit
+	p   *ir.Program
+	ns  *ir.Namespace // N
 
 	declNS map[string]string           // 宣言の FQN → 宣言した名前空間
 	ops    map[string]golang.OpShape   // N の op（Shape.Ops）を FQN で引く
@@ -319,6 +327,7 @@ func (e *emitter) build() []plugin.File {
 	add(test, e.genTestDoc())
 	add(test, e.genTestLeaves())
 	add(test, e.genTestClassify())
+	add(test, e.genTestFakes())
 	// テストの対応表（docs/plugin-go.md「テストの対応表」）: 出したテキストから作る
 	var tests []plugin.TestEntry
 	for _, f := range files {
