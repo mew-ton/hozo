@@ -2,7 +2,7 @@
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
-  fn onA(m: C.A<M>): void;
+  fn onA(m: M on C.A): void;
   fn g(m: M): void {
     match (m by C) {
       A, B => onA(m);                  // ERROR: MATCH-4

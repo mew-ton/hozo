@@ -205,17 +205,15 @@ type Effect struct {
 	Row *RowTransition `json:"row,omitempty"`
 }
 
-// RowTransition は行の遷移（docs/ir.md「state / exception / effect」の RowTransition）: 効果が、受け取った行の状態を
-// どう変えるか。書き込む状態と操作は、[Effect] の Target にある。
+// RowTransition は行の遷移（docs/ir.md「state / exception / effect」の RowTransition）: 効果の後、受け取った行が、
+// どのケースにあるか。書き込む状態と操作は、[Effect] の Target にある。
 type RowTransition struct {
-	// Param は行の引数の名前（Effect.Params のうち、型が状態の要素の型と等しい、ただ一つのもの）。
+	// Param は行の引数の名前（Effect.Params のうち、型が、状態の要素の型か、それを絞り込んだ型の、ただ一つのもの）。
+	// 効果の前のケースは、この引数の型が言う（[CaseType] なら、その Cases。そうでなければ、どのケースでも）。
 	Param string `json:"param"`
-	// Classify は行の分類の FQN（値の分類）。分類を名指ししない形（`as any -> else`）では空（JSON ではキーごと省く）。
+	// Classify は行の分類の FQN（値の分類）。`as else` では空（JSON ではキーごと省く）。
 	Classify string `json:"classify,omitempty"`
-	// From は効果の前のケース。any は、どのケースの行でも。ケースの列なら、呼ぶ側が、そのどれかにあると分かっている行を
-	// 渡す（STATE-9）。post では、いつも any。
-	From CaseSet `json:"from"`
-	// To は効果の後のケースの名前。空なら、決まっていない（put の `-> else`。JSON ではキーごと省く）。post では、いつも持つ。
+	// To は効果の後のケースの名前。空なら、決まっていない（put の `as else`。JSON ではキーごと省く）。post では、いつも持つ。
 	To string `json:"to,omitempty"`
 }
 

@@ -148,37 +148,35 @@ func coreZero(c ir.CoreType, goType string) string {
 }
 
 // RowDisplay は、コメントの中の行の遷移の書き方（docs/plugin-go.md「コメント」の「行の遷移の表示」）: 仕様の書き方で、
-// IR（Effect.row）から組み立てる。ケースは `<分類の FQN>.<ケース名>`、前のケースの並びの区切りは `, `。
-// post は `as <後>`、put は `as <前> -> <後>`（後が決まっていなければ else）、delete は、前が any なら `as <後>`、
-// そうでなければ `as <前> -> <後>`。行の遷移を持たない効果（と、宛先が組み込みの効果でない効果）は ""。
+// IR（Effect.row）から組み立てる。後のケースがあれば `as <分類の FQN>.<ケース名>`、なければ `as else`。
+// 行の遷移を持たない効果（と、宛先が組み込みの効果でない効果）は ""。
 func RowDisplay(e *ir.Effect) string {
-	target, ok := e.Target.(ir.BuiltinTarget)
-	if !ok || e.Row == nil {
+	if _, ok := e.Target.(ir.BuiltinTarget); !ok || e.Row == nil {
 		return ""
 	}
-	row := e.Row
-	name := func(c string) string { return row.Classify + "." + c }
-	after := "else"
-	if row.To != "" {
-		after = name(row.To)
+	if e.Row.To == "" {
+		return "as else"
 	}
-	before := "any"
-	if !row.From.Any {
-		names := make([]string, len(row.From.Cases))
-		for i, c := range row.From.Cases {
-			names[i] = name(c)
+	return "as " + e.Row.Classify + "." + e.Row.To
+}
+
+// NarrowedParamsDisplay は、コメントの中の、絞り込んだ引数の書き方（docs/plugin-go.md「コメント」の「絞り込んだ引数の表示」）:
+// 効果の引数のうち、型が case のものを、宣言の順に、「、」でつなぐ。一つは `<引数名> on <分類の FQN>.<ケース名>`
+// （いくつかのケースは " | " でつなぐ）。なければ ""。行の引数なら、これが、効果の前のケース。
+func NarrowedParamsDisplay(e *ir.Effect) string {
+	var parts []string
+	for _, p := range e.Params {
+		c, ok := p.Type.(ir.CaseType)
+		if !ok {
+			continue
 		}
-		before = strings.Join(names, ", ")
-	}
-	switch target.Operation {
-	case ir.OpPost:
-		return "as " + after
-	case ir.OpDelete:
-		if row.From.Any {
-			return "as " + after
+		cases := make([]string, len(c.Cases))
+		for i, name := range c.Cases {
+			cases[i] = c.Classify + "." + name
 		}
+		parts = append(parts, p.Name+" on "+strings.Join(cases, " | "))
 	}
-	return "as " + before + " -> " + after
+	return strings.Join(parts, "、")
 }
 
 // TypeDisplay は、コメントの中の型の書き方（docs/plugin-go.md「コメント」の「型の表示」）: 核の型は名前、ref は FQN、

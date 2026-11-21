@@ -1008,7 +1008,7 @@ namespace store {
 }
 
 // TestRowTransitionAndAbsentCase は、版 0.9 の構文（行の遷移 `effect fn …: effects s.op as …`、ない側のケース `対象 as none`）について、
-// ホバーの見出し（docs/lsp.md「ホバー」）、定義へジャンプ（同「定義へジャンプ」の表）、ドキュメントのシンボル、診断（STATE-9）を確かめる。
+// ホバーの見出し（docs/lsp.md「ホバー」）、定義へジャンプ（同「定義へジャンプ」の表）、ドキュメントのシンボル、診断（呼ぶ側の TYPE-4）を確かめる。
 func TestRowTransitionAndAbsentCase(t *testing.T) {
 	root := t.TempDir()
 	text := `namespace kind {
@@ -1030,13 +1030,13 @@ namespace shop {
     Absent: Order? as none;
   }
   effect fn accept(order: Order): effects orders.post as kind.Stage.Accepted;
-  effect fn open(order: Order): effects orders.post as Life.Absent -> Life.Open;
-  effect fn bring(order: Order): effects orders.post as any;
-  effect fn ship(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped;
-  effect fn revise(order: Order): effects orders.put as kind.Stage.Accepted -> else;
-  effect fn patch(order: Order): effects orders.put as any -> else;
-  effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
-  effect fn purge(order: Order): effects orders.delete as any -> Life.Absent;
+  effect fn open(order: Order): effects orders.post as Life.Open;
+  effect fn bring(order: Order): effects orders.post;
+  effect fn ship(order: Order on kind.Stage.Draft | kind.Stage.Accepted, at: datetime): effects orders.put as kind.Stage.Shipped;
+  effect fn revise(order: Order on kind.Stage.Accepted): effects orders.put as else;
+  effect fn patch(order: Order): effects orders.put as else;
+  effect fn discard(order: Order on Life.Open): effects orders.delete as Life.Absent;
+  effect fn purge(order: Order): effects orders.delete as Life.Absent;
   fn send(order: Order, at: datetime) {
     match(order by kind.Stage){
       Accepted => ship(order, at);
@@ -1053,19 +1053,19 @@ namespace shop {
 	c := startServer(t, Options{})
 	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
 	uri, enc := fileURI(path), encUTF16
-	// 診断は、分かっていない行で呼んだ STATE-9 が一つ（位置は、渡した値）
-	var state9 []protocol.Diagnostic
+	// 診断は、絞り込んでいない行を、絞り込んだ行の引数に渡した TYPE-4 が一つ（位置は、渡した値。docs/check.md「行の遷移」の「呼ぶ側」）
+	var mismatch []protocol.Diagnostic
 	for _, d := range byURI[uri] {
 		switch d.Code {
 		case codeNoConfig:
-		case "STATE-9":
-			state9 = append(state9, d)
+		case "TYPE-4":
+			mismatch = append(mismatch, d)
 		default:
 			t.Fatalf("診断が出た: %+v", d)
 		}
 	}
-	if want := shift(positionOf(t, enc, text, "ship(order, at);\n  }\n}", 0), len("ship(")); len(state9) != 1 || state9[0].Range.Start != want {
-		t.Errorf("STATE-9 = %+v, want 一つ（位置 %+v）", state9, want)
+	if want := shift(positionOf(t, enc, text, "ship(order, at);\n  }\n}", 0), len("ship(")); len(mismatch) != 1 || mismatch[0].Range.Start != want {
+		t.Errorf("TYPE-4 = %+v, want 一つ（位置 %+v）", mismatch, want)
 	}
 	at := func(needle string, shiftBy int) protocol.TextDocumentPositionParams {
 		return protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, needle, 0), shiftBy)}
@@ -1079,8 +1079,7 @@ namespace shop {
 		}
 		return h.Contents.Value
 	}
-	// ホバーの見出し: 行の遷移は、IR から、仕様の書き方で組み立てる（同じ意味の二つの書き方は、一つの形）。分類の名前は、
-	// 見ている名前空間から見た修飾
+	// ホバーの見出し: 行の遷移と、絞り込んだ型は、IR から、仕様の書き方で組み立てる。分類の名前は、見ている名前空間から見た修飾
 	for _, tt := range []struct {
 		needle  string
 		shiftBy int
@@ -1088,19 +1087,22 @@ namespace shop {
 	}{
 		{"effect fn accept(", len("effect fn "), "```hozo\neffect fn accept(order: Order): effects orders.post as kind.Stage.Accepted\n```"},
 		{"effect fn open(", len("effect fn "), "```hozo\neffect fn open(order: Order): effects orders.post as Life.Open\n```"},
-		// post の as any は、as を書かないのと同じ形（IR に row がない）
 		{"effect fn bring(", len("effect fn "), "```hozo\neffect fn bring(order: Order): effects orders.post\n```"},
-		{"effect fn ship(", len("effect fn "), "```hozo\neffect fn ship(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
-		{"effect fn revise(", len("effect fn "), "```hozo\neffect fn revise(order: Order): effects orders.put as kind.Stage.Accepted -> else\n```"},
-		{"effect fn patch(", len("effect fn "), "```hozo\neffect fn patch(order: Order): effects orders.put as any -> else\n```"},
-		{"effect fn discard(", len("effect fn "), "```hozo\neffect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent\n```"},
+		{"effect fn ship(", len("effect fn "), "```hozo\neffect fn ship(order: Order on kind.Stage.Draft | kind.Stage.Accepted, at: datetime): effects orders.put as kind.Stage.Shipped\n```"},
+		{"effect fn revise(", len("effect fn "), "```hozo\neffect fn revise(order: Order on kind.Stage.Accepted): effects orders.put as else\n```"},
+		{"effect fn patch(", len("effect fn "), "```hozo\neffect fn patch(order: Order): effects orders.put as else\n```"},
+		{"effect fn discard(", len("effect fn "), "```hozo\neffect fn discard(order: Order on Life.Open): effects orders.delete as Life.Absent\n```"},
 		{"effect fn purge(", len("effect fn "), "```hozo\neffect fn purge(order: Order): effects orders.delete as Life.Absent\n```"},
 		// 配線の呼び出しの名前は、呼び出し先の効果の見出し
-		{"Accepted => ship(order, at);", len("Accepted => "), "```hozo\neffect fn ship(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
+		{"Accepted => ship(order, at);", len("Accepted => "), "```hozo\neffect fn ship(order: Order on kind.Stage.Draft | kind.Stage.Accepted, at: datetime): effects orders.put as kind.Stage.Shipped\n```"},
 		// 行の遷移のケース: 分類のセグメントは分類、ケースのセグメントは、そのケース
 		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind."), "```hozo\nclassify kind.Stage of Order\n```"},
 		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage."), "classify kind.Stage of Order\n  Accepted"},
-		{"as Life.Open -> Life.Absent;", len("as Life.Open -> Life."), "classify Life of Order?\n  Absent: Order? as none"},
+		{"order: Order on Life.Open): effects orders.delete as Life.Absent;", len("order: Order on Life.Open): effects orders.delete as Life."), "classify Life of Order?\n  Absent: Order? as none"},
+		// 絞り込んだ型のケース（T on C.K）も同じ: 分類のセグメントは分類、ケースのセグメントは、そのケース
+		{"order: Order on Life.Open)", len("order: Order on "), "```hozo\nclassify Life of Order?\n```"},
+		{"order: Order on Life.Open)", len("order: Order on Life."), "classify Life of Order?\n  Open: Order? as Order"},
+		{"order: Order on kind.Stage.Draft | kind.Stage.Accepted,", len("order: Order on kind.Stage.Draft | kind.Stage."), "classify kind.Stage of Order\n  Accepted"},
 		// ない側のケース（as none）: 見出しは、書いたとおり `対象 as none`
 		{"Absent: Order? as none;", 0, "classify Life of Order?\n  Absent: Order? as none"},
 	} {
@@ -1119,11 +1121,13 @@ namespace shop {
 		target       string
 	}{
 		{"行の遷移のケースの分類（別の名前空間）", "orders.post as kind.Stage.Accepted;", len("orders.post as kind."), "Stage of shop.Order"},
-		{"行の遷移のケース（矢印のない形）", "orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage."), "Accepted;\n    Shipped;"},
-		{"行の遷移の前のケース（二つ目）", "kind.Stage.Draft, kind.Stage.Accepted -> ", len("kind.Stage.Draft, kind.Stage."), "Accepted;\n    Shipped;"},
-		{"行の遷移の後のケース", "-> kind.Stage.Shipped;", len("-> kind.Stage."), "Shipped;\n  }"},
-		{"行の遷移のケースの分類（同じ名前空間）", "as Life.Open -> Life.Absent;", len("as "), "Life of Order?"},
-		{"行の遷移の、ない側のケース", "as Life.Open -> Life.Absent;", len("as Life.Open -> Life."), "Absent: Order? as none;"},
+		{"行の遷移のケース", "orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage."), "Accepted;\n    Shipped;"},
+		{"絞り込んだ型のケースの分類（別の名前空間）", "order: Order on kind.Stage.Draft | kind.Stage.Accepted,", len("order: Order on kind."), "Stage of shop.Order"},
+		{"絞り込んだ型のケース（二つ目）", "order: Order on kind.Stage.Draft | kind.Stage.Accepted,", len("order: Order on kind.Stage.Draft | kind.Stage."), "Accepted;\n    Shipped;"},
+		{"行の遷移の後のケース", "orders.put as kind.Stage.Shipped;", len("orders.put as kind.Stage."), "Shipped;\n  }"},
+		{"絞り込んだ型のケースの分類（同じ名前空間）", "order: Order on Life.Open)", len("order: Order on "), "Life of Order?"},
+		{"絞り込んだ型のケース", "order: Order on Life.Open)", len("order: Order on Life."), "Open: Order? as Order;"},
+		{"行の遷移の、ない側のケース", "orders.delete as Life.Absent;", len("orders.delete as Life."), "Absent: Order? as none;"},
 		{"ケースの X as none の X", "Absent: Order? as none;", len("Absent: "), "Order { id: string; }"},
 	} {
 		var loc *protocol.Location
@@ -1132,12 +1136,11 @@ namespace shop {
 			t.Errorf("definition(%s) = %+v, want %q の位置 %+v", tt.what, loc, tt.target, want)
 		}
 	}
-	// 行の遷移の any と else、ケースの as none の none は、宣言を持たないので null
+	// 行の遷移の else、ケースの as none の none は、宣言を持たないので null
 	for _, tt := range []struct {
 		needle  string
 		shiftBy int
-	}{{"orders.post as any;", len("orders.post as ")}, {"as any -> else;", len("as ")}, {"as any -> else;", len("as any -> ")},
-		{"Absent: Order? as none;", len("Absent: Order? as ")}} {
+	}{{"orders.put as else;", len("orders.put as ")}, {"Absent: Order? as none;", len("Absent: Order? as ")}} {
 		var loc *protocol.Location
 		c.result(protocol.MethodDefinition, at(tt.needle, tt.shiftBy), &loc)
 		if loc != nil {
@@ -1156,9 +1159,9 @@ namespace shop {
 	}
 	for name, want := range map[string]string{
 		"accept": "(order: Order): effects orders.post as kind.Stage.Accepted",
-		"open":   "(order: Order): effects orders.post as Life.Absent -> Life.Open",
-		"ship":   "(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped",
-		"patch":  "(order: Order): effects orders.put as any -> else",
+		"open":   "(order: Order): effects orders.post as Life.Open",
+		"ship":   "(order: Order on kind.Stage.Draft | kind.Stage.Accepted, at: datetime): effects orders.put as kind.Stage.Shipped",
+		"patch":  "(order: Order): effects orders.put as else",
 	} {
 		if details[name] != want {
 			t.Errorf("symbol %s の detail = %q, want %q", name, details[name], want)

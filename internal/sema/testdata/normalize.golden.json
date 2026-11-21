@@ -1,5 +1,5 @@
 {
-  "version": "0.15",
+  "version": "0.16",
   "namespaces": [
     {
       "name": "",
@@ -3171,8 +3171,15 @@
                         "narrowed": [
                           {
                             "type": {
-                              "kind": "ref",
-                              "target": "a.User"
+                              "kind": "case",
+                              "classify": "a.Found",
+                              "cases": [
+                                "Hit"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "a.User"
+                              }
                             }
                           }
                         ],
@@ -3209,7 +3216,24 @@
                             }
                           }
                         },
-                        "narrowed": [],
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "a.Found",
+                              "cases": [
+                                "Miss"
+                              ],
+                              "of": {
+                                "kind": "optional",
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "a.User"
+                                }
+                              }
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "a.hozo",
                           "start": {
@@ -9514,13 +9538,12 @@
           "row": {
             "param": "order",
             "classify": "row.Stage",
-            "from": "any",
             "to": "Draft"
           }
         },
         {
           "kind": "effect",
-          "name": "row.enterFromAbsent",
+          "name": "row.enterOpen",
           "decorators": [],
           "span": {
             "file": "row.hozo",
@@ -9530,7 +9553,7 @@
             },
             "end": {
               "line": 19,
-              "col": 92
+              "col": 71
             }
           },
           "params": [
@@ -9544,11 +9567,11 @@
                 "file": "row.hozo",
                 "start": {
                   "line": 19,
-                  "col": 29
+                  "col": 23
                 },
                 "end": {
                   "line": 19,
-                  "col": 41
+                  "col": 35
                 }
               }
             }
@@ -9565,54 +9588,8 @@
           "row": {
             "param": "order",
             "classify": "row.Life",
-            "from": "any",
             "to": "Open"
           }
-        },
-        {
-          "kind": "effect",
-          "name": "row.enterAny",
-          "decorators": [],
-          "span": {
-            "file": "row.hozo",
-            "start": {
-              "line": 20,
-              "col": 3
-            },
-            "end": {
-              "line": 20,
-              "col": 64
-            }
-          },
-          "params": [
-            {
-              "name": "order",
-              "type": {
-                "kind": "ref",
-                "target": "row.Order"
-              },
-              "span": {
-                "file": "row.hozo",
-                "start": {
-                  "line": 20,
-                  "col": 22
-                },
-                "end": {
-                  "line": 20,
-                  "col": 34
-                }
-              }
-            }
-          ],
-          "throws": [],
-          "target": {
-            "kind": "builtin",
-            "state": "row.orders",
-            "operation": "post"
-          },
-          "writes": [
-            "row.orders"
-          ]
         },
         {
           "kind": "effect",
@@ -9621,11 +9598,11 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 21,
+              "line": 20,
               "col": 3
             },
             "end": {
-              "line": 21,
+              "line": 20,
               "col": 54
             }
           },
@@ -9639,11 +9616,11 @@
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 21,
+                  "line": 20,
                   "col": 19
                 },
                 "end": {
-                  "line": 21,
+                  "line": 20,
                   "col": 31
                 }
               }
@@ -9666,12 +9643,12 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 22,
+              "line": 21,
               "col": 3
             },
             "end": {
-              "line": 22,
-              "col": 117
+              "line": 21,
+              "col": 118
             }
           },
           "params": [
@@ -9684,11 +9661,11 @@
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 22,
+                  "line": 21,
                   "col": 21
                 },
                 "end": {
-                  "line": 22,
+                  "line": 21,
                   "col": 33
                 }
               }
@@ -9696,18 +9673,26 @@
             {
               "name": "order",
               "type": {
-                "kind": "ref",
-                "target": "row.Order"
+                "kind": "case",
+                "classify": "row.Stage",
+                "cases": [
+                  "Draft",
+                  "Accepted"
+                ],
+                "of": {
+                  "kind": "ref",
+                  "target": "row.Order"
+                }
               },
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 22,
+                  "line": 21,
                   "col": 35
                 },
                 "end": {
-                  "line": 22,
-                  "col": 47
+                  "line": 21,
+                  "col": 79
                 }
               }
             }
@@ -9724,10 +9709,6 @@
           "row": {
             "param": "order",
             "classify": "row.Stage",
-            "from": [
-              "Draft",
-              "Accepted"
-            ],
             "to": "Shipped"
           }
         },
@@ -9738,12 +9719,12 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 23,
+              "line": 22,
               "col": 3
             },
             "end": {
-              "line": 23,
-              "col": 81
+              "line": 22,
+              "col": 74
             }
           },
           "params": [
@@ -9756,11 +9737,11 @@
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 23,
+                  "line": 22,
                   "col": 19
                 },
                 "end": {
-                  "line": 23,
+                  "line": 22,
                   "col": 31
                 }
               }
@@ -9778,7 +9759,6 @@
           "row": {
             "param": "order",
             "classify": "row.Stage",
-            "from": "any",
             "to": "Shipped"
           }
         },
@@ -9789,11 +9769,11 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 24,
+              "line": 23,
               "col": 3
             },
             "end": {
-              "line": 24,
+              "line": 23,
               "col": 80
             }
           },
@@ -9801,18 +9781,25 @@
             {
               "name": "order",
               "type": {
-                "kind": "ref",
-                "target": "row.Order"
+                "kind": "case",
+                "classify": "row.Stage",
+                "cases": [
+                  "Accepted"
+                ],
+                "of": {
+                  "kind": "ref",
+                  "target": "row.Order"
+                }
               },
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 24,
+                  "line": 23,
                   "col": 20
                 },
                 "end": {
-                  "line": 24,
-                  "col": 32
+                  "line": 23,
+                  "col": 50
                 }
               }
             }
@@ -9827,11 +9814,7 @@
             "row.orders"
           ],
           "row": {
-            "param": "order",
-            "classify": "row.Stage",
-            "from": [
-              "Accepted"
-            ]
+            "param": "order"
           }
         },
         {
@@ -9841,12 +9824,12 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 25,
+              "line": 24,
               "col": 3
             },
             "end": {
-              "line": 25,
-              "col": 68
+              "line": 24,
+              "col": 61
             }
           },
           "params": [
@@ -9859,11 +9842,11 @@
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 25,
+                  "line": 24,
                   "col": 19
                 },
                 "end": {
-                  "line": 25,
+                  "line": 24,
                   "col": 31
                 }
               }
@@ -9879,8 +9862,7 @@
             "row.orders"
           ],
           "row": {
-            "param": "order",
-            "from": "any"
+            "param": "order"
           }
         },
         {
@@ -9890,11 +9872,11 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 26,
+              "line": 25,
               "col": 3
             },
             "end": {
-              "line": 26,
+              "line": 25,
               "col": 54
             }
           },
@@ -9908,11 +9890,11 @@
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 26,
+                  "line": 25,
                   "col": 20
                 },
                 "end": {
-                  "line": 26,
+                  "line": 25,
                   "col": 32
                 }
               }
@@ -9935,11 +9917,11 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 27,
+              "line": 26,
               "col": 3
             },
             "end": {
-              "line": 27,
+              "line": 26,
               "col": 86
             }
           },
@@ -9947,18 +9929,25 @@
             {
               "name": "order",
               "type": {
-                "kind": "ref",
-                "target": "row.Order"
+                "kind": "case",
+                "classify": "row.Life",
+                "cases": [
+                  "Open"
+                ],
+                "of": {
+                  "kind": "ref",
+                  "target": "row.Order"
+                }
               },
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 27,
+                  "line": 26,
                   "col": 21
                 },
                 "end": {
-                  "line": 27,
-                  "col": 33
+                  "line": 26,
+                  "col": 46
                 }
               }
             }
@@ -9975,9 +9964,6 @@
           "row": {
             "param": "order",
             "classify": "row.Life",
-            "from": [
-              "Open"
-            ],
             "to": "Absent"
           }
         },
@@ -9988,11 +9974,11 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 28,
+              "line": 27,
               "col": 3
             },
             "end": {
-              "line": 28,
+              "line": 27,
               "col": 71
             }
           },
@@ -10006,11 +9992,11 @@
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 28,
+                  "line": 27,
                   "col": 19
                 },
                 "end": {
-                  "line": 28,
+                  "line": 27,
                   "col": 31
                 }
               }
@@ -10028,41 +10014,47 @@
           "row": {
             "param": "order",
             "classify": "row.Life",
-            "from": "any",
             "to": "Absent"
           }
         },
         {
           "kind": "effect",
-          "name": "row.purgeAny",
+          "name": "row.keep",
           "decorators": [],
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 29,
+              "line": 28,
               "col": 3
             },
             "end": {
-              "line": 29,
-              "col": 81
+              "line": 28,
+              "col": 67
             }
           },
           "params": [
             {
               "name": "order",
               "type": {
-                "kind": "ref",
-                "target": "row.Order"
+                "kind": "case",
+                "classify": "row.Stage",
+                "cases": [
+                  "Draft"
+                ],
+                "of": {
+                  "kind": "ref",
+                  "target": "row.Order"
+                }
               },
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 29,
-                  "col": 22
+                  "line": 28,
+                  "col": 18
                 },
                 "end": {
-                  "line": 29,
-                  "col": 34
+                  "line": 28,
+                  "col": 45
                 }
               }
             }
@@ -10071,17 +10063,11 @@
           "target": {
             "kind": "builtin",
             "state": "row.orders",
-            "operation": "delete"
+            "operation": "put"
           },
           "writes": [
             "row.orders"
-          ],
-          "row": {
-            "param": "order",
-            "classify": "row.Life",
-            "from": "any",
-            "to": "Absent"
-          }
+          ]
         },
         {
           "kind": "op",
@@ -10090,11 +10076,11 @@
           "span": {
             "file": "row.hozo",
             "start": {
-              "line": 31,
+              "line": 30,
               "col": 3
             },
             "end": {
-              "line": 33,
+              "line": 32,
               "col": 4
             }
           },
@@ -10112,11 +10098,11 @@
               "span": {
                 "file": "row.hozo",
                 "start": {
-                  "line": 31,
+                  "line": 30,
                   "col": 11
                 },
                 "end": {
-                  "line": 31,
+                  "line": 30,
                   "col": 24
                 }
               }
@@ -10145,11 +10131,11 @@
                       "span": {
                         "file": "row.hozo",
                         "start": {
-                          "line": 32,
+                          "line": 31,
                           "col": 11
                         },
                         "end": {
-                          "line": 32,
+                          "line": 31,
                           "col": 16
                         }
                       }
@@ -10183,11 +10169,11 @@
                                 "span": {
                                   "file": "row.hozo",
                                   "start": {
-                                    "line": 32,
+                                    "line": 31,
                                     "col": 43
                                   },
                                   "end": {
-                                    "line": 32,
+                                    "line": 31,
                                     "col": 48
                                   }
                                 }
@@ -10198,11 +10184,11 @@
                           "span": {
                             "file": "row.hozo",
                             "start": {
-                              "line": 32,
+                              "line": 31,
                               "col": 35
                             },
                             "end": {
-                              "line": 32,
+                              "line": 31,
                               "col": 49
                             }
                           }
@@ -10211,19 +10197,26 @@
                       "narrowed": [
                         {
                           "type": {
-                            "kind": "ref",
-                            "target": "row.Order"
+                            "kind": "case",
+                            "classify": "row.Life",
+                            "cases": [
+                              "Open"
+                            ],
+                            "of": {
+                              "kind": "ref",
+                              "target": "row.Order"
+                            }
                           }
                         }
                       ],
                       "span": {
                         "file": "row.hozo",
                         "start": {
-                          "line": 32,
+                          "line": 31,
                           "col": 27
                         },
                         "end": {
-                          "line": 32,
+                          "line": 31,
                           "col": 50
                         }
                       }
@@ -10245,11 +10238,11 @@
                           "span": {
                             "file": "row.hozo",
                             "start": {
-                              "line": 32,
+                              "line": 31,
                               "col": 61
                             },
                             "end": {
-                              "line": 32,
+                              "line": 31,
                               "col": 64
                             }
                           }
@@ -10258,19 +10251,26 @@
                       "narrowed": [
                         {
                           "type": {
-                            "kind": "ref",
-                            "target": "row.Order"
+                            "kind": "case",
+                            "classify": "row.Life",
+                            "cases": [
+                              "Closed"
+                            ],
+                            "of": {
+                              "kind": "ref",
+                              "target": "row.Order"
+                            }
                           }
                         }
                       ],
                       "span": {
                         "file": "row.hozo",
                         "start": {
-                          "line": 32,
+                          "line": 31,
                           "col": 51
                         },
                         "end": {
-                          "line": 32,
+                          "line": 31,
                           "col": 65
                         }
                       }
@@ -10283,15 +10283,32 @@
                       "body": {
                         "kind": "none"
                       },
-                      "narrowed": [],
+                      "narrowed": [
+                        {
+                          "type": {
+                            "kind": "case",
+                            "classify": "row.Life",
+                            "cases": [
+                              "Absent"
+                            ],
+                            "of": {
+                              "kind": "optional",
+                              "of": {
+                                "kind": "ref",
+                                "target": "row.Order"
+                              }
+                            }
+                          }
+                        }
+                      ],
                       "span": {
                         "file": "row.hozo",
                         "start": {
-                          "line": 32,
+                          "line": 31,
                           "col": 66
                         },
                         "end": {
-                          "line": 32,
+                          "line": 31,
                           "col": 81
                         }
                       }
@@ -10300,11 +10317,11 @@
                   "span": {
                     "file": "row.hozo",
                     "start": {
-                      "line": 32,
+                      "line": 31,
                       "col": 5
                     },
                     "end": {
-                      "line": 32,
+                      "line": 31,
                       "col": 83
                     }
                   }
@@ -10312,11 +10329,11 @@
                 "span": {
                   "file": "row.hozo",
                   "start": {
-                    "line": 32,
+                    "line": 31,
                     "col": 5
                   },
                   "end": {
-                    "line": 32,
+                    "line": 31,
                     "col": 84
                   }
                 }

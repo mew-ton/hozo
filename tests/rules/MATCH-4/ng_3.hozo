@@ -25,8 +25,8 @@ namespace a {
       None => takeM(m);            // ERROR: MATCH-4
     };
   }
-  // 型を書いたケースと C.Case<T> は、どちらか一方で書く: 絞り込んだ型は T そのもので、C.K<…> の位置には渡せない
-  fn onHit(m: Found.Hit<M?>): void;
+  // 型を書いたケースと T on C.Case は、どちらか一方で書く: 絞り込んだ型は T そのもので、… on C.K の位置には渡せない
+  fn onHit(m: M? on Found.Hit): void;
   fn g(in: In): void {
     match (in.m by Found) {
       Hit     => onHit(in.m);          // ERROR: MATCH-4

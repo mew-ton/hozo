@@ -132,10 +132,10 @@ var caseOfRule = Rule{
 }
 
 // asRule は、as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、
-// 遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.A, C.B -> C.D、as HasItems -> Empty。-> は矢印、
+// 遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.D、as else、as HasItems -> Empty。-> は、状態の遷移の矢印、
 // any と else は予約語）。; か { まで続く。型の位置の規則と、effects の節の中の、どちらにも置く。
 var asRule = Rule{
-	Comment: "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.A, C.B -> C.D、as HasItems -> Empty。-> は矢印、any と else は予約語）。; か { まで続く",
+	Comment: "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.D、as else、as HasItems -> Empty。-> は、状態の遷移の矢印、any と else は予約語）。; か { まで続く",
 	Begin:   `\b(as)\b`,
 	End:     `(?=[;{])`,
 	BeginCaptures: Captures{
@@ -284,7 +284,7 @@ func Build() Grammar {
 
 		// ---- 記号 ----
 		{Key: "arrow", Rule: Rule{
-			Comment: "-> は遷移と行の遷移（docs/grammar.md「exception / effect / read」の Transition と RowClause）、=> は match のアーム（同「配線」の MatchArm）",
+			Comment: "-> は状態の遷移（docs/grammar.md「exception / effect / read」の Transition）、=> は match のアーム（同「配線」の MatchArm）",
 			Name:    "keyword.operator.arrow.hozo",
 			Match:   `->|=>`,
 		}},
@@ -396,11 +396,12 @@ func Build() Grammar {
 
 		// ---- 型の位置 ----
 		{Key: "type", Rule: Rule{
-			Comment: "型の位置に現れるもの。核の型、< > の中、大文字で始まる名前",
+			Comment: "型の位置に現れるもの。核の型、< > の中、大文字で始まる名前、絞り込んだ型の on（docs/grammar.md「型」の OnType: T on C.K | C.K2。on の後ろのケースは、大文字で始まる名前の規則が拾い、| には scope を付けない）",
 			Patterns: []Rule{
 				{Include: "#comments"},
 				{Include: "#keywords.type"},
 				{Include: "#generic"},
+				{Name: "keyword.control.hozo", Match: `\bon\b`},
 				{Name: "entity.name.type.hozo", Match: `\b` + typeName + `\b`},
 			},
 		}},

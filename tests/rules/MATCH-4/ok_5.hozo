@@ -9,12 +9,12 @@ namespace a {
   classify Whole of Three { IsReady: Three as M; IsMissing: Three as N; IsBroken: Three as O; }
   fn find(): M?;
   classify Hit of find { Found: find as M; Missing: find as else; }
-  fn onA(m: K.A<M>): void;
+  fn onA(m: M on K.A): void;
   fn takeM(m: M): void;
   fn takeO(o: O): void;
   fn takeThree(t: Three): void;
   fn f(m: M, three: Three): void {
-    // else は A だけを受ける: m は K.A<M>
+    // else は A だけを受ける: m は M on K.A
     match (m by K) {
       B, C, D, E => none;
       else       => onA(m);

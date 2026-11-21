@@ -31,14 +31,14 @@ export type UnionVariant = "arms" | "set";
  */
 export type StateShape = "list" | "nullable" | "single";
 /**
- * 遷移の前か後のケースの集合。"any" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。
- */
-export type CaseSet = "any" | string[];
-/**
  * 効果の宛先（docs/ir.md「state / exception / effect」の EffectTarget）。kind で分ける。
  */
 export type EffectTarget = BuiltinTarget | TransitionTarget;
 export type Operation = "post" | "put" | "delete";
+/**
+ * 遷移の前か後のケースの集合。"any" か、ケース名の列（書かれた順。docs/ir.md「state / exception / effect」の CaseSet）。
+ */
+export type CaseSet = "any" | string[];
 /**
  * 絞り込みの種類（docs/ir.md「classify」の CaseTyping の by、docs/types.md「型で決まる絞り込み」）。else は残りのケース `対象 as else`、none はない側のケース `対象 as none`。
  */
@@ -92,7 +92,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.15";
+  version: "0.16";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -396,7 +396,6 @@ export interface Effect {
  */
 export interface RowTransition {
   classify?: string;
-  from: CaseSet;
   param: string;
   to?: string;
 }
@@ -838,7 +837,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.15";
+  version: "0.16";
   viewer: string;
 }
 /**

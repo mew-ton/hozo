@@ -24,7 +24,7 @@ namespace fulfilment {
 
   /** 受け付けて、始めて、知らせる */
   @db.transaction
-  fn acceptAndBegin(order: ordering.Standing.AwaitingPayment<ordering.Order>):
+  fn acceptAndBegin(order: ordering.Order on ordering.Standing.AwaitingPayment):
     throws ordering.NoOrder
   {
     val accepted = ordering.accept(order);

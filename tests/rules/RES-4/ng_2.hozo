@@ -11,7 +11,7 @@ namespace a {
   effect fn onModel(): effects M as A -> B;         // ERROR: RES-4
   // 例外は分類でも状態でもない
   effect fn onException(): effects E as A -> B;     // ERROR: RES-4
-  // 対象が一つの classify: 例外は型ではなく、値の分類の名前は C.Case<T> の形でだけ型になる
+  // 対象が一つの classify: 例外は型ではなく、値の分類の名前は T on C.Case の形でだけ型になる
   classify OfException of E { A; }     // ERROR: RES-4
   classify OfClassify of Kind { A; }   // ERROR: RES-4
 }

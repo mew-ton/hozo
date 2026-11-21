@@ -598,13 +598,13 @@ func TestNormalizeExpectations(t *testing.T) {
 	if !reflect.DeepEqual(stmts[3].(ir.ReturnStmt).Expr.(ir.AtomExpr).Atom.(ir.NameAtom).Path, []string{"u"}) {
 		t.Errorf("return u のパス")
 	}
-	// 型を書かないケースの絞り込みは case(C, Ks, X)。受けるケースが一つの else のアームは、そのケースのアームと同じ
+	// 値の分類と op の分類のアームの絞り込みは case(C, Ks, B)。受けるケースが一つの else のアームは、そのケースのアームと同じ
 	eq("narrowed（型を書かないケース）", m.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.Case("a.Kind", []string{"A", "B"}, ir.Ref("a.User"))}})
 	eq("narrowed（else、ケース一つ）", m.Arms[1].Narrowed, []ir.Narrowing{{Type: ir.Case("a.Kind", []string{"C"}, ir.Ref("a.User"))}})
 
 	// アームの本体の throw、as で絞り込んだ型
 	m2 := p.Lookup("a.wire2").(*ir.Op).Body.Statements[1].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match
-	eq("as のケースのアームでは、対象は書いた型", m2.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.Ref("a.User")}})
+	eq("as のケースのアームでは、対象は、書いた型を、そのケースに絞り込んだ型", m2.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.Case(m2.Classify, m2.Arms[0].Cases, ir.Ref("a.User"))}})
 	eq("throw", m2.Arms[1].Body, ir.ThrowBody{Exception: "a.Unauthorized", Span: m2.Arms[1].Body.(ir.ThrowBody).Span})
 	// 状態の名前は Atom の state。標準の分類の対象も value。アームの本体の値は atom、none は none
 	m3 := p.Lookup("a.wire3").(*ir.Op).Body.Statements[0].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match

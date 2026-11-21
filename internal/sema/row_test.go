@@ -9,7 +9,7 @@ import (
 
 // このファイルは、行の遷移（`effect fn …: effects s.op as …`）と、ない側のケース（`対象 as none`）の IR
 // （docs/ir.md「state / exception / effect」の RowTransition、「classify」の absent、「正規化」。docs/check.md「行の遷移」
-// 「ない側のケース」）。診断（STATE-7、STATE-8、STATE-9、CLS-7、CLS-8）は testdata/rules が確かめる。
+// 「ない側のケース」）。診断（STATE-7、STATE-8、CLS-7、CLS-8。呼ぶ側は TYPE-4、MATCH-4）は testdata/rules が確かめる。
 
 const rowSource = `
 namespace row {
@@ -29,17 +29,16 @@ namespace row {
   classify Present of Order? { Here: Order? as Order; }
 
   effect fn enter(order: Order): effects orders.post as Stage.Draft;
-  effect fn enterFromAbsent(order: Order): effects orders.post as Life.Absent -> Life.Open;
-  effect fn enterAny(order: Order): effects orders.post as any;
+  effect fn enterOpen(order: Order): effects orders.post as Life.Open;
   effect fn plain(order: Order): effects orders.post;
-  effect fn advance(at: datetime, order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
-  effect fn force(order: Order): effects orders.put as any -> row.Stage.Shipped;
-  effect fn revise(order: Order): effects orders.put as Stage.Accepted -> else;
-  effect fn patch(order: Order): effects orders.put as any -> else;
+  effect fn advance(at: datetime, order: Order on Stage.Draft | Stage.Accepted): effects orders.put as Stage.Shipped;
+  effect fn force(order: Order): effects orders.put as row.Stage.Shipped;
+  effect fn revise(order: Order on Stage.Accepted): effects orders.put as else;
+  effect fn patch(order: Order): effects orders.put as else;
   effect fn rename(order: Order): effects orders.put;
-  effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
+  effect fn discard(order: Order on Life.Open): effects orders.delete as Life.Absent;
   effect fn purge(order: Order): effects orders.delete as Life.Absent;
-  effect fn purgeAny(order: Order): effects orders.delete as any -> Life.Absent;
+  effect fn keep(order: Order on Stage.Draft): effects orders.put;
 
   fn wire(found: Order?) {
     match(found by Life){ Open => discard(found); Closed => f(); Absent => none; };
@@ -57,32 +56,41 @@ func analyzeRow(t *testing.T) (*ir.Program, *Result) {
 	return res.Program, res
 }
 
-// TestRowTransition は、行の遷移の IR: 行の引数、分類、前のケース、後のケース。同じ意味の二つの書き方は、一つの形になる
-// （post の `as N -> X` と `as X`、delete の `as any -> N` と `as N`）。
+// TestRowTransition は、行の遷移の IR: 行の引数、分類、後のケース。前のケースは、行の引数の型（case）にある。
 func TestRowTransition(t *testing.T) {
 	p, _ := analyzeRow(t)
-	anyFrom := ir.AnyCase()
+	order := ir.Ref("row.Order")
 	tests := []struct {
 		effect string
 		want   *ir.RowTransition
+		// param は、引数 order の型（前のケース）
+		param ir.Type
 	}{
-		{"row.enter", &ir.RowTransition{Param: "order", Classify: "row.Stage", From: anyFrom, To: "Draft"}},
-		{"row.enterFromAbsent", &ir.RowTransition{Param: "order", Classify: "row.Life", From: anyFrom, To: "Open"}},
-		{"row.enterAny", nil}, // post の as any は、as を書かないのと同じ形
-		{"row.plain", nil},
-		{"row.advance", &ir.RowTransition{Param: "order", Classify: "row.Stage", From: ir.Cases("Draft", "Accepted"), To: "Shipped"}},
-		{"row.force", &ir.RowTransition{Param: "order", Classify: "row.Stage", From: anyFrom, To: "Shipped"}},
-		{"row.revise", &ir.RowTransition{Param: "order", Classify: "row.Stage", From: ir.Cases("Accepted")}},
-		{"row.patch", &ir.RowTransition{Param: "order", From: anyFrom}},
-		{"row.rename", nil},
-		{"row.discard", &ir.RowTransition{Param: "order", Classify: "row.Life", From: ir.Cases("Open"), To: "Absent"}},
-		{"row.purge", &ir.RowTransition{Param: "order", Classify: "row.Life", From: anyFrom, To: "Absent"}},
-		{"row.purgeAny", &ir.RowTransition{Param: "order", Classify: "row.Life", From: anyFrom, To: "Absent"}},
+		{"row.enter", &ir.RowTransition{Param: "order", Classify: "row.Stage", To: "Draft"}, order},
+		{"row.enterOpen", &ir.RowTransition{Param: "order", Classify: "row.Life", To: "Open"}, order},
+		{"row.plain", nil, order},
+		{"row.advance", &ir.RowTransition{Param: "order", Classify: "row.Stage", To: "Shipped"}, ir.Case("row.Stage", []string{"Draft", "Accepted"}, order)},
+		{"row.force", &ir.RowTransition{Param: "order", Classify: "row.Stage", To: "Shipped"}, order},
+		{"row.revise", &ir.RowTransition{Param: "order"}, ir.Case("row.Stage", []string{"Accepted"}, order)},
+		{"row.patch", &ir.RowTransition{Param: "order"}, order},
+		{"row.rename", nil, order},
+		{"row.discard", &ir.RowTransition{Param: "order", Classify: "row.Life", To: "Absent"}, ir.Case("row.Life", []string{"Open"}, order)},
+		{"row.purge", &ir.RowTransition{Param: "order", Classify: "row.Life", To: "Absent"}, order},
+		{"row.keep", nil, ir.Case("row.Stage", []string{"Draft"}, order)}, // as を書かない: ケースは変わらない。前は、型が言う
 	}
 	for _, tt := range tests {
 		e := p.Lookup(tt.effect).(*ir.Effect)
 		if !reflect.DeepEqual(e.Row, tt.want) {
 			t.Errorf("%s の row = %+v、期待は %+v", tt.effect, e.Row, tt.want)
+		}
+		var got ir.Type
+		for _, prm := range e.Params {
+			if prm.Name == "order" {
+				got = prm.Type
+			}
+		}
+		if !ir.TypeEqual(got, tt.param) {
+			t.Errorf("%s の引数 order の型 = %s、期待は %s", tt.effect, got, tt.param)
 		}
 		// 宛先と、書き込む状態は、行の遷移があっても変わらない
 		if target, ok := e.Target.(ir.BuiltinTarget); !ok || target.State != "row.orders" || !reflect.DeepEqual(e.Writes, []string{"row.orders"}) {
@@ -133,17 +141,17 @@ func TestAbsentCase(t *testing.T) {
 	if cs := p.Lookup("row.Life").(*ir.Classify).Case("Absent"); cs.Description == nil || cs.Description.Summary != "ない" {
 		t.Errorf("row.Life.Absent の説明 = %+v", cs.Description)
 	}
-	// アームの中の対象の型: 型を書いたケースは T、ない側のケースは外のまま
+	// アームの中の対象の型: 型を書いたケースは、その型 T を、そのケースに絞り込んだ型。ない側のケースは、もとの型が外のまま
 	arms := p.Lookup("row.wire").(*ir.Op).Body.Statements[0].(ir.MatchStmt).Match.Arms
-	if n := arms[0].Narrowed; len(n) != 1 || !ir.TypeEqual(n[0].Type, ir.Ref("row.Order")) {
+	if n := arms[0].Narrowed; len(n) != 1 || !ir.TypeEqual(n[0].Type, ir.Case("row.Life", []string{"Open"}, ir.Ref("row.Order"))) {
 		t.Errorf("Life.Open のアーム: narrowed = %+v", n)
 	}
-	if n := arms[2].Narrowed; len(n) != 0 {
+	if n := arms[2].Narrowed; len(n) != 1 || !ir.TypeEqual(n[0].Type, ir.Case("row.Life", []string{"Absent"}, ir.Optional(ir.Ref("row.Order")))) {
 		t.Errorf("Life.Absent のアーム: narrowed = %+v", n)
 	}
 }
 
-// TestRowCaseRefs は、行の遷移のケース `C.K` の参照: C は classify、K はそのケース（docs/lsp.md「定義へジャンプ」）。
+// TestRowCaseRefs は、行の遷移のケースと、絞り込んだ型のケース `C.K` の参照: C は classify、K はそのケース（docs/lsp.md「定義へジャンプ」）。
 func TestRowCaseRefs(t *testing.T) {
 	_, res := analyzeRow(t)
 	want := map[string]int{"row.Stage": 0, "row.Life": 0}
@@ -158,12 +166,12 @@ func TestRowCaseRefs(t *testing.T) {
 			cases[r.Target.Decl+"."+r.Target.Name]++
 		}
 	}
-	// Stage は、enter、advance（三つ）、force、revise の六か所。Life は、enterFromAbsent（二つ）、discard（二つ）、purge、purgeAny と、
-	// match の by の七か所
-	if want["row.Stage"] != 6 || want["row.Life"] != 7 {
+	// Stage は、enter、advance（型に二つ、as に一つ）、force、revise（型）、keep（型）の七か所。Life は、enterOpen、
+	// discard（型と as）、purge と、match の by の五か所
+	if want["row.Stage"] != 7 || want["row.Life"] != 5 {
 		t.Errorf("分類への参照 = %v", want)
 	}
-	for name, n := range map[string]int{"row.Stage.Draft": 2, "row.Stage.Accepted": 2, "row.Stage.Shipped": 2, "row.Life.Open": 3, "row.Life.Absent": 5} {
+	for name, n := range map[string]int{"row.Stage.Draft": 3, "row.Stage.Accepted": 2, "row.Stage.Shipped": 2, "row.Life.Open": 3, "row.Life.Absent": 3} {
 		if cases[name] != n {
 			t.Errorf("ケース %s への参照 = %d、期待は %d", name, cases[name], n)
 		}

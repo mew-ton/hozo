@@ -148,7 +148,7 @@
       "match": "(?\u003c![A-Za-z0-9_.])(?:-?[0-9]+\\.[0-9]+|[0-9]+(?:ms|s|m|h|d)|-?[0-9]+)\\b"
     },
     "arrow": {
-      "comment": "-\u003e は遷移と行の遷移（docs/grammar.md「exception / effect / read」の Transition と RowClause）、=\u003e は match のアーム（同「配線」の MatchArm）",
+      "comment": "-\u003e は状態の遷移（docs/grammar.md「exception / effect / read」の Transition）、=\u003e は match のアーム（同「配線」の MatchArm）",
       "name": "keyword.operator.arrow.hozo",
       "match": "-\u003e|=\u003e"
     },
@@ -319,7 +319,7 @@
               "include": "#comments"
             },
             {
-              "comment": "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.A, C.B -\u003e C.D、as HasItems -\u003e Empty。-\u003e は矢印、any と else は予約語）。; か { まで続く",
+              "comment": "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.D、as else、as HasItems -\u003e Empty。-\u003e は、状態の遷移の矢印、any と else は予約語）。; か { まで続く",
               "begin": "\\b(as)\\b",
               "end": "(?=[;{])",
               "beginCaptures": {
@@ -353,7 +353,7 @@
       ]
     },
     "type": {
-      "comment": "型の位置に現れるもの。核の型、\u003c \u003e の中、大文字で始まる名前",
+      "comment": "型の位置に現れるもの。核の型、\u003c \u003e の中、大文字で始まる名前、絞り込んだ型の on（docs/grammar.md「型」の OnType: T on C.K | C.K2。on の後ろのケースは、大文字で始まる名前の規則が拾い、| には scope を付けない）",
       "patterns": [
         {
           "include": "#comments"
@@ -363,6 +363,10 @@
         },
         {
           "include": "#generic"
+        },
+        {
+          "name": "keyword.control.hozo",
+          "match": "\\bon\\b"
         },
         {
           "name": "entity.name.type.hozo",
@@ -425,7 +429,7 @@
           ]
         },
         {
-          "comment": "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.A, C.B -\u003e C.D、as HasItems -\u003e Empty。-\u003e は矢印、any と else は予約語）。; か { まで続く",
+          "comment": "as の後ろの型の位置。ケースの as の後ろの型（docs/grammar.md「classify」の CaseTyping。, で次の CaseTyping が続く）と、遷移のケース（同「exception / effect / read」の RowClause と Transition: as C.D、as else、as HasItems -\u003e Empty。-\u003e は、状態の遷移の矢印、any と else は予約語）。; か { まで続く",
           "begin": "\\b(as)\\b",
           "end": "(?=[;{])",
           "beginCaptures": {

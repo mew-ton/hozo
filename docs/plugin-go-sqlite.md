@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.15"
+protocol = "0.16"
 
 [[transpiler]]
 name     = "go-sqlite"
@@ -182,7 +182,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 
 | デコレータ | 効果の宛先（合わなければ GOSQL-11） | 引数（合わなければ GOSQL-9） | SQL |
 |---|---|---|---|
-| `@db.insert` | `T.post` | M の行一つ（引数は一つで、型は M そのもの） | `INSERT INTO "<表>" (<すべての列>) VALUES (?1, …)` |
+| `@db.insert` | `T.post` | M の行一つ（引数は一つで、型は M そのものか、M を分類のケースで絞り込んだ型 `M on C.K`: 行の引数。`docs/check.md`「行の遷移」の「行と、行の分類」） | `INSERT INTO "<表>" (<すべての列>) VALUES (?1, …)` |
 | `@db.update` | `T.put` | M の行一つ（同じ）。M は `@db.key` を一つ以上と、キーでない列を一つ以上持つ（GOSQL-15） | `UPDATE "<表>" SET <キーでない列> = ?… WHERE <キーの列> IS ?…`。書き換える行は、M の `@db.key` のフィールドが、引数の行と同じ行。行がなければ何もしない |
 | `@db.delete` | `T.delete` | **条件**: 引数ごとに、その名前の列が、引数の値と同じ（`read` と同じ決まり。名前のフィールドがなければ GOSQL-8、型は「列と引数の型」）。引数は一つ以上（GOSQL-28） | `DELETE FROM "<表>" WHERE <条件>`。どの条件も満たす行をすべて消す。行がなければ何もしない |
 
@@ -213,7 +213,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 | `@db.update`（`put`） | 引数の行のすべての列を、キーが同じ行に書く | 保存してある行が、前のケースにあること（`WHERE` に足すものがない）。書いた後の行が、後のケースにあること |
 | `@db.delete`（`delete`） | 付けられない（下） | — |
 
-- **`@db.update` は、後のケースが、前のケースの並びにないとき、付けられない**（GOSQL-30）: `as Stage.Accepted -> Stage.InProduction` の効果に渡る行は、`Accepted` にあると分かっている行（STATE-9）。`@db.update` は、その行を、そのまま書く。書いた後の行も `Accepted` のままで、宣言した `InProduction` にならない。行を `InProduction` にする書き方（どの列を、何に変えるか）は、宣言から決まらないので、その効果は、人が書く（遷移を宛先にする効果と同じ扱い: GOSQL-11）。付けられるのは、前が `any` の形（`as any -> Stage.Shipped`: 渡した行を、そのまま書く。その行が `Shipped` にあることは、行を作る側が担う）、後ろが `else` の形、後のケースが前の並びにある形（`as Stage.Accepted -> Stage.Accepted`: ケースを変えない書き換え）。
+- **`@db.update` は、後のケースが、行の引数の型の言う、前のケースの並びにないとき、付けられない**（GOSQL-30）: `effect fn start(order: Order on Stage.Accepted): effects orders.put as Stage.InProduction;` に渡る行は、`Accepted` にあると分かっている行（`docs/check.md`「行の遷移」の「呼ぶ側」）。`@db.update` は、その行を、そのまま書く。書いた後の行も `Accepted` のままで、宣言した `InProduction` にならない。行を `InProduction` にする書き方（どの列を、何に変えるか）は、宣言から決まらないので、その効果は、人が書く（遷移を宛先にする効果と同じ扱い: GOSQL-11）。付けられるのは、行の引数を、その分類で絞り込んでいない形（`effect fn forceShip(order: Order): effects orders.put as Stage.Shipped;`: 渡した行が、もう `Shipped` でありうる）、後のケースが、前のケースの並びにある形、`as else` の形。
 - **`@db.delete` は、行の遷移を持つ効果に、付けられない**: 行の遷移を持つ効果は、行を引数に取る（STATE-7）。`@db.delete` の引数は、列の条件で、行の引数の名前の列は、ない（GOSQL-8）。その効果は、人が書く。**未決: 行を受け取る `@db.delete`**（キーが、引数の行と同じ行を消す）。決まるまで、今の規則のまま。
 - 生成するメソッドのコメントは、行の遷移を確かめないことを言う（「メソッドの形とコメント」の「効果の句」）。
 
@@ -495,7 +495,7 @@ func dbConflict(err, conflict error) error {
 
 `@db.conflict(E)` を付けた効果は、効果の句の後ろに、空白なしで一文を足す: `一意の制約に当たれば、例外 <E の FQN> を返す。`。行の遷移の一文も足すときは、こちらが先。
 
-行の遷移を持つ効果（`Effect.row`）は、効果の句の後ろに、空白なしで一文を足す: `行の遷移（<行の遷移の表示>）は、確かめない。`（表示の形は `docs/plugin-go.md`「コメント」の「行の遷移の表示」）。
+行の遷移を持つ効果（`Effect.row`）は、効果の句の後ろに、空白なしで一文を足す: `行の遷移（<行の遷移の表示>）は、確かめない。`（表示の形は `docs/plugin-go.md`「コメント」の「行の遷移の表示」）。絞り込んだ引数があれば、その表示を、前に、`、` でつなぐ: `行の遷移（<絞り込んだ引数の表示>、<行の遷移の表示>）は、確かめない。`（同「絞り込んだ引数の表示」。行の引数なら、効果の前のケース）。GOSQL-30 のメッセージも、同じ並びで言う。
 
 ```go
 // AcceptOrder は効果 shop.acceptOrder（@db.insert）: 表 "orders" に、引数 order の行を足す。行の遷移（as shop.Stage.Accepted）は、確かめない。
@@ -532,7 +532,7 @@ func dbConflict(err, conflict error) error {
 | GOSQL-27 | error | `@db.latest` の列のしまい方が、`@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float` のどれでもない。位置は `read` |
 | GOSQL-28 | error | `@db.delete` の効果が、引数を一つも持たない。まだ決めていない形（「効果の中身」の未決）。位置は効果 |
 | GOSQL-29 | error | N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。「出力」）。位置は op |
-| GOSQL-30 | error | `@db.update` を付けた効果の行の遷移（`Effect.row`）の、前がケースの並びで、後のケースが、その並びにない（「効果の中身」: 渡る行は前のケースにあり、そのまま書いても、後のケースにならない）。位置は効果 |
+| GOSQL-30 | error | `@db.update` を付けた効果の行の遷移（`Effect.row`）の、行の引数の型が、同じ分類で絞り込んだ型（`case`）で、後のケース（`to`）が、その `cases` にない（「効果の中身」: 渡る行は前のケースにあり、そのまま書いても、後のケースにならない）。位置は効果 |
 | GOSQL-31 | error | `@db.conflict` を付けた効果が、`@db.insert` も `@db.update` も持たない（「効果の中身」）。位置は効果 |
 | GOSQL-32 | error | `@db.conflict` の例外が、使えない: その効果の `throws` にない。引数を持つ。メッセージに、どちらかを示す。位置は効果 |
 | GOSQL-33 | error | `@db.insert` / `@db.update` / `@db.delete` を付けた効果の `throws` に、`@db.conflict` が名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。メッセージに、その例外。位置は効果 |

@@ -1,0 +1,45 @@
+// MATCH-4（docs/check.md「行の遷移」の「呼ぶ側」、docs/types.md「アームの中の対象の型」）: アームの中の対象を、行の引数を
+// 絞り込んだ効果に渡したが、アームが受けるケースが、引数の型のケースに収まらない
+namespace a {
+  model Order { id: string; }
+  state orders: list<Order>;
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+  classify Urgency of Order { Rush; Normal; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  effect fn start(order: Order on Stage.Accepted, at: datetime): effects orders.put as Stage.InProduction;
+  effect fn cancel(order: Order on Stage.Draft | Stage.Accepted): effects orders.put as Stage.Cancelled;
+  effect fn discard(order: Order on Life.Open): effects orders.delete as Life.Absent;
+  // 別のケースのアーム、引数の型にないケースを含むアーム
+  fn wrongArm(order: Order, at: datetime) {
+    match (order by Stage) {
+      Draft => start(order, at);       // ERROR: MATCH-4
+      else  => none;
+    };
+    match (order by Stage) {
+      Accepted, Shipped => cancel(order);   // ERROR: MATCH-4
+      else => none;
+    };
+    match (order by Stage) {
+      Cancelled => none;
+      else => cancel(order);           // ERROR: MATCH-4
+    };
+  }
+  // 別の分類のアーム。型を書いたケースのアーム
+  fn wrongClassify(order: Order, mixed: Order?, at: datetime) {
+    match (order by Urgency) {
+      Rush   => start(order, at);      // ERROR: MATCH-4
+      Normal => none;
+    };
+    match (mixed by Life) {
+      Closed => discard(mixed);        // ERROR: MATCH-4
+      else   => none;
+    };
+  }
+  // 型から分かっていても、別の分類のアームの中では、前の絞り込みは、残らない
+  fn inOtherArm(order: Order on Stage.Accepted, at: datetime) {
+    match (order by Urgency) {
+      Rush   => start(order, at);      // ERROR: MATCH-4
+      Normal => none;
+    };
+  }
+}

@@ -6,5 +6,5 @@ namespace a {
     return g(q, q.page);
   }
   classify C of Q { A; }
-  fn j(q: C.A<Q>): int;
+  fn j(q: Q on C.A): int;
 }

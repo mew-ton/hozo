@@ -253,7 +253,7 @@ namespace a {
     takeInt(q.page);
     takeOpt(q.inner.page);
   }
-  fn g(q: C.A<Q>): void;
+  fn g(q: Q on C.A): void;
   @when(U.Ready)
   fn h(): void;
   decorator d(e: any effect);
@@ -267,7 +267,8 @@ namespace a {
 	}
 	hasRef(t, res, fs, "a.hozo:11:15 field a.Q.page")
 	hasRef(t, res, fs, "a.hozo:12:21 field a.Q.page")
-	hasRef(t, res, fs, "a.hozo:14:13 case a.C.A")
+	hasRef(t, res, fs, "a.hozo:14:16 decl a.C")
+	hasRef(t, res, fs, "a.hozo:14:18 case a.C.A")
 	hasRef(t, res, fs, "a.hozo:15:11 arm a.U.Ready")
 	v := res.Program.Lookup("a.h").(*ir.Op).Decorators[0].Args[0].Value.(ir.VariantValue)
 	if v.Union != "a.U" || v.Arm != "Ready" {
@@ -275,7 +276,7 @@ namespace a {
 	}
 	g := res.Program.Lookup("a.g").(*ir.Op)
 	if !ir.TypeEqual(g.Params[0].Type, ir.Case("a.C", []string{"A"}, ir.Ref("a.Q"))) {
-		t.Errorf("C.A<Q> = %v", g.Params[0].Type)
+		t.Errorf("Q on C.A = %v", g.Params[0].Type)
 	}
 }
 

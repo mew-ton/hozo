@@ -654,11 +654,6 @@ type armContext struct {
 	// subject は対象の Atom の同一性（narrowKey）。対象が名前でなければ空。
 	subject string
 	cases   string
-	// classify は match の分類の FQN（標準の分類なら空）。known は、このアームが受けるケース。outer は、対象の、アームの外での型。
-	// 行の遷移の、呼ぶ側の検査（STATE-9。docs/types.md「ケースが分かっている値」）が使う。
-	classify string
-	known    []string
-	outer    exprType
 }
 
 // callTarget は呼び出し先の、引数の並びと呼び名（docs/types.md「呼び出しの引数」の表の一行）。
@@ -721,64 +716,11 @@ func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, 
 		a.checkNS6(r.sym, w.sc.ns, c.Callee.Span)
 		call.Callee = ir.EffectCallee{Effect: ir.NamedEffect{Effect: e.Name}}
 		target, result = callTarget{what: "効果 " + e.Name, params: e.Params}, noValue()
-		a.checkSTATE9(e, args, arm)
 	default:
 		return unknownType(), call, false
 	}
 	call.Args = a.bindArgs(target, args, arm)
 	return result, call, true
-}
-
-// checkSTATE9 は STATE-9（docs/check.md「行の遷移」の「呼ぶ側の検査」）: 矢印の前にケースを並べた行の遷移を持つ効果 e を、
-// そのケースにあると分かっていない行で呼んだ。行の引数に渡した値が、効果の分類について、ケースが分かっている値
-// （docs/types.md「ケースが分かっている値」）で、分かっているケースのすべてが、前のケースの並びに入っていなければならない。
-// 前が any の形と、post の効果（IR の from は、いつも any）は、どの行でも受け取る。行の引数に値を渡していない呼び出しは、
-// BIND-4 に任せる。
-func (a *analyzer) checkSTATE9(e *ir.Effect, args []evaluatedArg, arm *armContext) {
-	row := e.Row
-	if row == nil || row.From.Any || row.Classify == "" {
-		return
-	}
-	var arg *evaluatedArg
-	for i, p := range e.Params {
-		if p.Name == row.Param && i < len(args) {
-			arg = &args[i]
-		}
-	}
-	if arg == nil {
-		return
-	}
-	// ケースが分かっているか: 1. アームから。2. 型から（アームの中での型と、宣言したままの型）
-	var known [][]string
-	inArm := arm != nil && arm.subject != "" && arg.key == arm.subject
-	if inArm && arm.classify == row.Classify {
-		known = append(known, arm.known)
-	}
-	types := []exprType{arg.typ}
-	if inArm {
-		types = append(types, arm.outer)
-	}
-	for _, t := range types {
-		if t.kind != etValue {
-			continue
-		}
-		if ct, ok := t.typ.(ir.CaseType); ok && ct.Classify == row.Classify {
-			known = append(known, ct.Cases)
-		}
-	}
-	for _, ks := range known {
-		if len(ks) > 0 && subset(ks, row.From.Cases) {
-			return
-		}
-	}
-	from := strings.Join(row.From.Cases, ", ")
-	if len(known) == 0 {
-		a.errorf("STATE-9", arg.span, "効果 %s は、%s の %s にある行でしか呼べないが、%s が、そのケースにあると分かっていない。match %s by %s のアームの中で呼ぶか、型が %s.<ケース><…> の値を渡す（docs/check.md「行の遷移」の「呼ぶ側の検査」）",
-			e.Name, row.Classify, from, arg.text, arg.text, row.Classify, row.Classify)
-		return
-	}
-	a.errorf("STATE-9", arg.span, "効果 %s は、%s の %s にある行でしか呼べないが、%s について分かっているのは %s（docs/check.md「行の遷移」の「呼ぶ側の検査」）",
-		e.Name, row.Classify, from, arg.text, strings.Join(known[0], ", "))
 }
 
 // bindArgs は位置で渡した値を、呼び出し先の引数名に対応付け、型を照合する（docs/types.md「呼び出しの引数」）。
@@ -1252,10 +1194,7 @@ func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, valu
 	out.Cases = cases
 	var ctx *armContext
 	if value != nil {
-		ctx = &armContext{subject: value.key, cases: label, known: cases, outer: value.typ}
-		if class != nil && class.classify != nil {
-			ctx.classify = class.classify.Name
-		}
+		ctx = &armContext{subject: value.key, cases: label}
 	}
 	narrow, narrowed := a.narrowArm(arm.Else, cases, class, value)
 	out.Narrowed = narrowed
@@ -1308,23 +1247,22 @@ func (a *analyzer) narrowArm(isElse bool, cases []string, class *matchClass, val
 	if class == nil {
 		return nil, nil
 	}
-	if isElse && len(cases) != 1 {
-		// 1. else のアームで、受けるケースが二つ以上なら、外のまま。ちょうど一つなら、そのケースを名前で書いたアームと同じ
-		// （受けるケースがないのは MATCH-9）
-		return nil, nil
+	if len(cases) == 0 {
+		return nil, nil // 受けるケースがない else のアーム（MATCH-9）
 	}
 	if value != nil {
 		if value.typ.kind != etValue || value.key == "" {
 			return nil, nil // 対象が名前でない Atom なら、絞り込みは何にも掛からない
 		}
 		x := value.typ.typ
-		n := a.narrowValue(x, cases, class)
+		n := a.narrowValue(x, isElse, cases, class)
 		if n == nil || ir.TypeEqual(n, x) {
 			return nil, nil
 		}
 		return map[string]exprType{value.key: valueType(n)}, []ir.Narrowing{{Type: n}}
 	}
-	if class.classify == nil {
+	if class.classify == nil || (isElse && len(cases) != 1) {
+		// 状態の分類の else のアームで、受けるケースが二つ以上なら、外のまま。ちょうど一つなら、そのケースを名前で書いたアームと同じ
 		return nil, nil
 	}
 	states, isStates := class.classify.SubjectStates()
@@ -1342,7 +1280,7 @@ func (a *analyzer) narrowArm(isElse bool, cases []string, class *matchClass, val
 		if !ok || st.Type == nil {
 			continue
 		}
-		// 3. すべてのケースがその状態の as を持ち、書いた型がすべて等しい。5. そうでなければ外のまま
+		// 2. すべてのケースがその状態の as を持ち、書いた型がすべて等しい。そうでなければ外のまま
 		n := a.writtenType(class.classify, cases, state)
 		if n == nil || a.assignType(st.Type, n) {
 			continue
@@ -1356,10 +1294,11 @@ func (a *analyzer) narrowArm(isElse bool, cases []string, class *matchClass, val
 	return narrow, narrowed
 }
 
-// narrowValue は値を対象にした match の、アームの中での対象の型（外での型は x）。規則 2〜4。
-func (a *analyzer) narrowValue(x ir.Type, cases []string, class *matchClass) ir.Type {
+// narrowValue は値を対象にした match の、アームの中での対象の型（外での型は x）。docs/types.md「アームの中の対象の型」の
+// 規則 1（標準の分類）と 3（値の分類、op の分類: case(C, Ks, B)）。
+func (a *analyzer) narrowValue(x ir.Type, isElse bool, cases []string, class *matchClass) ir.Type {
 	if class.classify == nil {
-		// 2. 標準の分類: by nullable の Some だけのアームで、optional(T) は T。それ以外は外のまま
+		// 1. 標準の分類: by nullable の Some だけのアームで、optional(T) は T。それ以外は外のまま
 		if class.name == ir.ClassifyNullable && len(cases) == 1 && cases[0] == ir.CaseSome {
 			if o, ok := uncase(x).(ir.OptionalType); ok {
 				return o.Of
@@ -1370,15 +1309,20 @@ func (a *analyzer) narrowValue(x ir.Type, cases []string, class *matchClass) ir.
 	if _, isStates := class.classify.SubjectStates(); isStates {
 		return x
 	}
-	// 3. すべてのケースが as を持ち、書いた型がすべて等しい → その型。ただし x がその型に渡せるなら x のまま
-	if n := a.writtenType(class.classify, cases, ""); n != nil {
-		if a.assignType(x, n) {
-			return x
+	// 3. もとの型 B: else のアームで、受けるケースが二つ以上なら、絞り込みを捨てた x（3.1）。すべてのケースが as を持ち、
+	// 書いた型がすべて等しければ、その型（ただし、x がその型に渡せるなら x。3.2）。それ以外は x（3.3）
+	base := uncase(x)
+	if !isElse || len(cases) == 1 {
+		if n := a.writtenType(class.classify, cases, ""); n != nil && !a.assignType(base, n) {
+			if _, narrowed := n.(ir.CaseType); narrowed {
+				// 書いた型が、もう、絞り込んだ型（`Passed: Order as Order on Stage.Accepted;`）なら、その型のまま:
+				// 二つの分類の絞り込みを、同時に持つ型は、ない
+				return n
+			}
+			base = n
 		}
-		return n
 	}
-	// 4. 型を書かないケースの絞り込み: case(C, Ks, X)
-	return ir.Case(class.classify.Name, cases, uncase(x))
+	return ir.Case(class.classify.Name, cases, base)
 }
 
 // writtenType は、cases のすべてのケースが対象（状態の分類なら state、それ以外は ""）の as を持ち、書いた型が
@@ -1472,6 +1416,22 @@ func (a *analyzer) matchType(arms []armResult, m *ast.Match, ret *returnContext)
 			if all {
 				t = cand.typ.typ
 				break
+			}
+		}
+		if t == nil {
+			// 絞り込みを捨てた型で、同じことをする（T on C.A と T on C.B のアームは T にそろう）
+			for _, cand := range typed {
+				all := true
+				for _, other := range typed {
+					if !a.assignType(other.typ.typ, uncase(cand.typ.typ)) {
+						all = false
+						break
+					}
+				}
+				if all {
+					t = uncase(cand.typ.typ)
+					break
+				}
 			}
 		}
 		if t == nil {

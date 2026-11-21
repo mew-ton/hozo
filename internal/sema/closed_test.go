@@ -23,7 +23,7 @@ namespace a {
   fn find(): M?;
   fn takeM(m: M): void;
   fn takeO(o: O): void;
-  fn takeA(m: K.A<M>): void;
+  fn takeA(m: M on K.A): void;
   fn takeString(s: string): void;
   fn f(): void;
 
@@ -111,19 +111,20 @@ func TestElseArm(t *testing.T) {
 		stmt int
 		want []arm
 	}{
-		// else のアームの cases は、ほかのアームが並べなかったケース（分類の宣言の順）。二つ以上なら、対象は絞り込まれない
-		{"1 : 4", 0, []arm{{[]string{"A"}, false, []string{":a.K.A<a.M>"}}, {[]string{"B", "C", "D", "E"}, true, nil}}},
+		// else のアームの cases は、ほかのアームが並べなかったケース（分類の宣言の順）。対象は、受けるケースに絞り込んだ型
+		// （docs/types.md「アームの中の対象の型」の 3。二つ以上を受ける else は、もとの型を変えない: 3.1）
+		{"1 : 4", 0, []arm{{[]string{"A"}, false, []string{":a.M on a.K.A"}}, {[]string{"B", "C", "D", "E"}, true, []string{":a.M on a.K.B | a.K.C | a.K.D | a.K.E"}}}},
 		// 名前で並べたアームの cases は書かれた順。else は、並べなかった B と E
-		{"名前のアームが二つ", 1, []arm{{[]string{"D", "A"}, false, []string{":a.K.(D, A)<a.M>"}}, {[]string{"C"}, false, []string{":a.K.C<a.M>"}}, {[]string{"B", "E"}, true, nil}}},
-		// 受けるケースがちょうど一つの else のアームは、そのケースを名前で書いたアームと同じ（型を書かないケースは case(C, [K], X)）
-		{"else が一つのケース", 2, []arm{{[]string{"B", "C", "D", "E"}, false, []string{":a.K.(B, C, D, E)<a.M>"}}, {[]string{"A"}, true, []string{":a.K.A<a.M>"}}}},
-		// 型を書いたケース一つを受ける else のアーム: 書いた型
-		{"else が as のケース", 4, []arm{{[]string{"NotFound"}, false, nil}, {[]string{"Found"}, true, []string{":a.M"}}}},
+		{"名前のアームが二つ", 1, []arm{{[]string{"D", "A"}, false, []string{":a.M on a.K.D | a.K.A"}}, {[]string{"C"}, false, []string{":a.M on a.K.C"}}, {[]string{"B", "E"}, true, []string{":a.M on a.K.B | a.K.E"}}}},
+		// 受けるケースがちょうど一つの else のアームは、そのケースを名前で書いたアームと同じ
+		{"else が一つのケース", 2, []arm{{[]string{"B", "C", "D", "E"}, false, []string{":a.M on a.K.B | a.K.C | a.K.D | a.K.E"}}, {[]string{"A"}, true, []string{":a.M on a.K.A"}}}},
+		// 型を書いたケース一つを受ける else のアーム: もとの型は、書いた型。残りのケース（presence）のアームは、もとの型が外のまま
+		{"else が as のケース", 4, []arm{{[]string{"NotFound"}, false, []string{":a.M? on a.F.NotFound"}}, {[]string{"Found"}, true, []string{":a.M on a.F.Found"}}}},
 		// ケースが一つの分類: アームは一つ
-		{"ケースが一つの分類", 5, []arm{{[]string{"Arrived"}, false, []string{":a.M"}}}},
-		// variant: 二つのケースを受ける else のアームは外のまま、一つなら、そのアームの型
-		{"variant、else が二つ", 6, []arm{{[]string{"IsReady"}, false, []string{":a.M"}}, {[]string{"IsMissing", "IsBroken"}, true, nil}}},
-		{"variant、else が一つ", 7, []arm{{[]string{"IsReady", "IsMissing"}, false, []string{":a.Whole.(IsReady, IsMissing)<a.Three>"}}, {[]string{"IsBroken"}, true, []string{":a.O"}}}},
+		{"ケースが一つの分類", 5, []arm{{[]string{"Arrived"}, false, []string{":a.M on a.Arrival.Arrived"}}}},
+		// variant: 二つのケースを受ける else のアームは、もとの型が外のまま（3.1）、一つなら、そのアームの型（3.2）
+		{"variant、else が二つ", 6, []arm{{[]string{"IsReady"}, false, []string{":a.M on a.Whole.IsReady"}}, {[]string{"IsMissing", "IsBroken"}, true, []string{":a.Three on a.Whole.IsMissing | a.Whole.IsBroken"}}}},
+		{"variant、else が一つ", 7, []arm{{[]string{"IsReady", "IsMissing"}, false, []string{":a.Three on a.Whole.IsReady | a.Whole.IsMissing"}}, {[]string{"IsBroken"}, true, []string{":a.O on a.Whole.IsBroken"}}}},
 		// 標準の分類: ケースは、ない側、ある側の順（nullable は None、Some。list は Empty、HasItems）。Some だけを受ける
 		// by nullable の else のアームは T
 		{"by nullable、else が None", 8, []arm{{[]string{"Some"}, false, []string{":string"}}, {[]string{"None"}, true, nil}}},

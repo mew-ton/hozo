@@ -190,10 +190,10 @@ namespace ordering {
   effect fn createOrder(order: Order): effects orders.post as Standing.AwaitingPayment;
 
   /** 受け付けた: 受け付けた時刻を入れる（人が書く） */
-  effect fn acceptOrder(order: Order, at: datetime): effects orders.put as Standing.AwaitingPayment -> Standing.Accepted;
+  effect fn acceptOrder(order: Order on Standing.AwaitingPayment, at: datetime): effects orders.put as Standing.Accepted;
 
   /** 期限切れにした: 期限が過ぎた時刻を入れる（人が書く） */
-  effect fn expireOrder(order: Order, at: datetime): effects orders.put as Standing.AwaitingPayment -> Standing.Expired;
+  effect fn expireOrder(order: Order on Standing.AwaitingPayment, at: datetime): effects orders.put as Standing.Expired;
 
   // ---- 値段を付ける ----
 
@@ -225,7 +225,7 @@ namespace ordering {
     throws UnknownProduct, NotForSale;
 
   /** 箱で送るものがあるカートは、届け先が要る */
-  fn priceToShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address?): Priced
+  fn priceToShip(sorted: Sorted on Mix.NeedsBox, destination: type.Address?): Priced
     throws DestinationRequired, shipping.Undeliverable, shipping.TooLarge
   {
     return match (destination by Destination) {
@@ -235,7 +235,7 @@ namespace ordering {
   }
 
   /** 送料の見積もりと上限を、shipping に出してもらう */
-  fn withShipping(sorted: Mix.NeedsBox<Sorted>, destination: type.Address): Priced
+  fn withShipping(sorted: Sorted on Mix.NeedsBox, destination: type.Address): Priced
     throws shipping.Undeliverable, shipping.TooLarge
   {
     val terms = shipping.estimate(sorted.made, sorted.stocked, destination);
@@ -243,10 +243,10 @@ namespace ordering {
   }
 
   /** 箱で送る部分を組み立てる（人が書く） */
-  fn toShip(sorted: Mix.NeedsBox<Sorted>, destination: type.Address, terms: shipping.FeeQuote): Priced;
+  fn toShip(sorted: Sorted on Mix.NeedsBox, destination: type.Address, terms: shipping.FeeQuote): Priced;
 
   /** ダウンロードだけの中身にする（人が書く） */
-  fn withoutShipping(sorted: Mix.DigitalOnly<Sorted>): Priced;
+  fn withoutShipping(sorted: Sorted on Mix.DigitalOnly): Priced;
 
   // ---- 注文する ----
 
@@ -331,7 +331,7 @@ namespace ordering {
   // ---- 受け付けと、期限切れ ----
 
   /** 注文を受け付ける（支払いの枠を確保できた）。受け付けた後の注文を返す */
-  export fn accept(order: Standing.AwaitingPayment<Order>): Order
+  export fn accept(order: Order on Standing.AwaitingPayment): Order
     throws NoOrder
   {
     val now = clock.now();
@@ -367,7 +367,7 @@ namespace ordering {
   }
 
   /** 期限切れにして、取り置きを戻す */
-  fn expire(order: Standing.AwaitingPayment<Order>, now: datetime) {
+  fn expire(order: Order on Standing.AwaitingPayment, now: datetime) {
     expireOrder(order, now);
     inventory.release(order.id);
   }

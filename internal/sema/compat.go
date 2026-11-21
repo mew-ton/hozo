@@ -90,7 +90,7 @@ func (a *analyzer) assignRecord(r *recordVal, t ir.Type) assignFailure {
 	return assignOK
 }
 
-// assignType は型 S の値を型 T の位置に渡せるか（docs/types.md「互換」の規則 1、2、4〜7、11。規則 8 は欠番）。
+// assignType は型 S の値を型 T の位置に渡せるか（docs/types.md「互換」の規則 1、2、4〜7、11、12。規則 8 は欠番）。
 func (a *analyzer) assignType(s, t ir.Type) bool {
 	if s == nil || t == nil {
 		return false
@@ -111,6 +111,10 @@ func (a *analyzer) assignType(s, t ir.Type) bool {
 		}
 		// 4. 絞り込みを捨てる
 		return a.assignType(sv.Of, t)
+	case ir.OptionalType:
+		// 12. 中の型が渡せる
+		tv, ok := t.(ir.OptionalType)
+		return ok && a.assignType(sv.Of, tv.Of)
 	case ir.ArrayType:
 		// 6. 要素が渡せる
 		tv, ok := t.(ir.ArrayType)

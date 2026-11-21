@@ -4,5 +4,5 @@ namespace a {
   model N { name: string; }
   fn find(): M?;
   classify Found of find { Hit; Other; }
-  fn ng(n: Found.Hit<N>): void;        // ERROR: TYPE-12
+  fn ng(n: N on Found.Hit): void;        // ERROR: TYPE-12
 }

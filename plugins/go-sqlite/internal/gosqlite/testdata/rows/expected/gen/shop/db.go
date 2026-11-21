@@ -90,7 +90,7 @@ func (t OrdersTable) Keep(ctx context.Context, order Order) error {
 		`INSERT INTO "orders" ("id", "note", "startedAt") VALUES (?1, ?2, ?3)`, args...)
 }
 
-// Overwrite は効果 shop.overwrite（@db.update）: 表 "orders" の、キーが引数 order と同じ行を書き換える。行がなければ何もしない。行の遷移（as any -> shop.Stage.InProduction）は、確かめない。
+// Overwrite は効果 shop.overwrite（@db.update）: 表 "orders" の、キーが引数 order と同じ行を書き換える。行がなければ何もしない。行の遷移（as shop.Stage.InProduction）は、確かめない。
 func (t OrdersTable) Overwrite(ctx context.Context, order Order) error {
 	args, err := dbArgsOrder(order)
 	if err != nil {
@@ -100,7 +100,7 @@ func (t OrdersTable) Overwrite(ctx context.Context, order Order) error {
 		`UPDATE "orders" SET "note" = ?2, "startedAt" = ?3 WHERE "id" IS ?1`, args...)
 }
 
-// Annotate は効果 shop.annotate（@db.update）: 表 "orders" の、キーが引数 order と同じ行を書き換える。行がなければ何もしない。行の遷移（as shop.Stage.Accepted -> shop.Stage.Accepted）は、確かめない。
+// Annotate は効果 shop.annotate（@db.update）: 表 "orders" の、キーが引数 order と同じ行を書き換える。行がなければ何もしない。行の遷移（order on shop.Stage.Accepted、as shop.Stage.Accepted）は、確かめない。
 func (t OrdersTable) Annotate(ctx context.Context, order Order) error {
 	args, err := dbArgsOrder(order)
 	if err != nil {
@@ -110,7 +110,7 @@ func (t OrdersTable) Annotate(ctx context.Context, order Order) error {
 		`UPDATE "orders" SET "note" = ?2, "startedAt" = ?3 WHERE "id" IS ?1`, args...)
 }
 
-// Revise は効果 shop.revise（@db.update）: 表 "orders" の、キーが引数 order と同じ行を書き換える。行がなければ何もしない。行の遷移（as shop.Stage.InProduction -> else）は、確かめない。
+// Revise は効果 shop.revise（@db.update）: 表 "orders" の、キーが引数 order と同じ行を書き換える。行がなければ何もしない。行の遷移（order on shop.Stage.InProduction、as else）は、確かめない。
 func (t OrdersTable) Revise(ctx context.Context, order Order) error {
 	args, err := dbArgsOrder(order)
 	if err != nil {

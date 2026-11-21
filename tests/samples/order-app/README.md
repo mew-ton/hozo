@@ -191,7 +191,7 @@ psp, carriergw ─▶ hooks ┘     │                 ├─▶ payment  ─�
 
 ### モデル: 事実が、足されていく
 
-出荷の進み具合は、**足された事実**で持つ。前の事実がなければ、次の事実を作る op に渡せる値が、手に入らない。事実を足す効果は、行の遷移（`docs/check.md`「行の遷移」）で、どのケースの行に足せるかを言う: 品目を置けるのは、まだ待っている出荷（`recordPlacement`: `Gathered.Awaiting -> else`）、渡せるのは、店にある出荷（`recordHandOver`: `Custody.InHouse -> Custody.WithCarrier`）、荷物を作れるのは、荷物のない出荷（`createParcel`: `Packing.Unpacked -> Packing.Packed`）。「行の遷移で書いた進み具合」に、一覧がある。
+出荷の進み具合は、**足された事実**で持つ。前の事実がなければ、次の事実を作る op に渡せる値が、手に入らない。事実を足す効果は、行の遷移（`docs/check.md`「行の遷移」）で、どのケースの行に足せるかを言う: 品目を置けるのは、まだ待っている出荷（`recordPlacement`: 行の引数は `Shipment on Gathered.Awaiting`、後は `as else`）、渡せるのは、店にある出荷（`recordHandOver`: `Shipment on Custody.InHouse` を、`as Custody.WithCarrier`）、荷物は、`Packed` で入る（`createParcel`: `post as Packing.Packed`。`post` の前は、いつも「行がない」ので、書かない。荷物がまだないことは、`shipping.pack` の `match` が確かめる: F57）。「行の遷移で書いた進み具合」に、一覧がある。
 
 ```
 shipments（何を待っているか）──[すべてそろった: Gathered.Complete]──▶ parcels（箱、重さ、送料）
@@ -208,7 +208,7 @@ classify Gathered of Shipment {
 }
 
 // そろっていない出荷は、引数に渡せない
-export fn boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
+export fn boxOptions(shipment: Shipment on Gathered.Complete): BoxOption[] {
   return fitting(shipment, boxes, tariffs);
 }
 
@@ -230,7 +230,7 @@ fn packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
   throws NotGathered, UnknownBox, OverWeight, Undeliverable
 {
   return match (shipment by Gathered) {
-    Complete => packInto(shipment, box, weight);   // ここでだけ Gathered.Complete<Shipment> になる
+    Complete => packInto(shipment, box, weight);   // ここでだけ Shipment on Gathered.Complete になる
     Awaiting => throw NotGathered;
   };
 }
@@ -292,32 +292,34 @@ export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 ### 行の遷移で書いた進み具合
 
-行の型の分類と、その分類のケースを進める効果。効果は、どれも、前の行と、足す事実を受け取る（`effect fn startJob(job: Job, at: datetime) …`）。「前」にケースを並べた効果は、そのケースを受ける `match` のアームの中か、型が `C.K<T>` の値でしか呼べない（STATE-9）。
+行の型の分類と、その分類のケースを進める効果。効果は、どれも、前の行と、足す事実を受け取る（`effect fn startJob(job: Job on Progress.Queued, at: datetime): effects jobs.put as Progress.InProduction;`）。前のケースは、行の引数の型（`T on C.K`）が言い、後のケースは、`as` が言う（`docs/check.md`「行の遷移」）。行の引数を絞り込んだ効果は、そのケースを受ける `match` のアームの中か、型が `T on C.K` の値でしか呼べない（TYPE-4、MATCH-4）。
 
-| 行 | 分類 | 効果 | 行の遷移 |
-|---|---|---|---|
-| 注文（`ordering.orders`） | `Standing` | `createOrder` | `post as Standing.AwaitingPayment` |
-| | | `acceptOrder` | `put as Standing.AwaitingPayment -> Standing.Accepted` |
-| | | `expireOrder` | `put as Standing.AwaitingPayment -> Standing.Expired` |
-| 支払い（`payment.payments`） | `Standing` | `createPayment` | `post as Standing.Pending` |
-| | | `replaceSessionOf` | `put as Standing.Pending -> Standing.Pending`（ケースを変えない。できるのは、まだ同意していない支払いだけ） |
-| | | `holdSecured` | `put as Standing.Pending -> Standing.Held` |
-| | | `chargeSecured` | `put as Standing.Pending -> Standing.Settled` |
-| | | `recordPrepaid` | `put as Standing.Held -> Standing.Prepaid` |
-| | | `recordSettled` | `put as Standing.Held, Standing.Prepaid -> Standing.Settled` |
-| | | `recordReleased` | `put as Standing.Held -> Standing.Released` |
-| 製作の仕事（`production.jobs`） | `Progress` | `startJob` | `put as Progress.Queued -> Progress.InProduction` |
-| | | `finishJob` | `put as Progress.InProduction -> Progress.Finished` |
-| 出荷（`shipping.shipments`） | `Custody` | `createShipment` | `post as Custody.InHouse` |
-| | | `recordHandOver` | `put as Custody.InHouse -> Custody.WithCarrier` |
-| | | `recordDelivery` | `put as Custody.WithCarrier -> Custody.Delivered` |
-| | `Gathered` | `recordPlacement` | `put as Gathered.Awaiting -> else`（そろうか、まだ待つかは、残りの品目による） |
-| 荷物（`shipping.parcels`） | `Packing`（`Parcel?`） | `createParcel` | `post as Packing.Unpacked -> Packing.Packed` |
-| 送り状（`shipping.labels`） | `Labelling`（`Label?`） | `createLabel` | `post as Labelling.Unlabelled -> Labelling.Labelled` |
-| 取り置き（`inventory.reservations`） | `Picking` | `markPicked` | `put as Picking.OnShelf -> Picking.Picked` |
-| セッション（`staff.sessions`） | `Login`（`Session?`） | `createSession` | `post as Login.LoggedOut -> Login.LoggedIn` |
-| | | `deleteSession` | `delete as Login.LoggedIn -> Login.LoggedOut` |
-| 配送業者（`carrier.carriers`） | `Use` | `switchCarrier` | `put as any -> else`（後のケースが、引数の値で決まる。F53） |
+| 行 | 分類 | 効果 | 前（行の引数の型） | 後（`as`） |
+|---|---|---|---|---|
+| 注文（`ordering.orders`） | `Standing` | `createOrder` | —（`post`: 行は、まだない） | `post as Standing.AwaitingPayment` |
+|  |  | `acceptOrder` | `on Standing.AwaitingPayment` | `put as Standing.Accepted` |
+|  |  | `expireOrder` | `on Standing.AwaitingPayment` | `put as Standing.Expired` |
+| 支払い（`payment.payments`） | `Standing` | `createPayment` | —（`post`: 行は、まだない） | `post as Standing.Pending` |
+|  |  | `replaceSessionOf` | `on Standing.Pending` | `put as Standing.Pending`（ケースを変えない。できるのは、まだ同意していない支払いだけ） |
+|  |  | `holdSecured` | `on Standing.Pending` | `put as Standing.Held` |
+|  |  | `chargeSecured` | `on Standing.Pending` | `put as Standing.Settled` |
+|  |  | `recordPrepaid` | `on Standing.Held` | `put as Standing.Prepaid` |
+|  |  | `notePrepayFailure` | `on Standing.Held` | `put as Standing.Held`（ケースを変えない。失敗を残せるのは、枠を確保した支払いだけ） |
+|  |  | `recordSettled` | `on Standing.Held \| Standing.Prepaid` | `put as Standing.Settled` |
+|  |  | `recordReleased` | `on Standing.Held` | `put as Standing.Released` |
+| 製作の仕事（`production.jobs`） | `Progress` | `addJob` | —（`post`: 行は、まだない） | `post as Progress.Queued` |
+|  |  | `startJob` | `on Progress.Queued` | `put as Progress.InProduction` |
+|  |  | `finishJob` | `on Progress.InProduction` | `put as Progress.Finished` |
+| 出荷（`shipping.shipments`） | `Custody` | `createShipment` | —（`post`: 行は、まだない） | `post as Custody.InHouse` |
+|  |  | `recordHandOver` | `on Custody.InHouse` | `put as Custody.WithCarrier` |
+|  |  | `recordDelivery` | `on Custody.WithCarrier` | `put as Custody.Delivered` |
+|  | `Gathered` | `recordPlacement` | `on Gathered.Awaiting` | `put as else`（そろうか、まだ待つかは、残りの品目による） |
+| 荷物（`shipping.parcels`） | `Packing`（`Parcel?`） | `createParcel` | —（`post`: 行は、まだない） | `post as Packing.Packed` |
+| 送り状（`shipping.labels`） | `Labelling`（`Label?`） | `createLabel` | —（`post`: 行は、まだない） | `post as Labelling.Labelled` |
+| 取り置き（`inventory.reservations`） | `Picking` | `markPicked` | `on Picking.OnShelf` | `put as Picking.Picked` |
+| セッション（`staff.sessions`） | `Login`（`Session?`） | `createSession` | —（`post`: 行は、まだない） | `post as Login.LoggedIn` |
+|  |  | `deleteSession` | `on Login.LoggedIn` | `delete as Login.LoggedOut` |
+| 配送業者（`carrier.carriers`） | `Use` | `switchCarrier` | 絞り込まない（どのケースの行でも） | `put as else`（後のケースが、引数の値で決まる。F53） |
 
 `as` を書かない `put`（`inventory.confirmReservations`、`inventory.saveLevels`）は、行のケースを変えない: 取り置きを「棚から出してよい」にしても、`Picking` は `OnShelf` のまま。
 
@@ -341,13 +343,13 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
   return started;
 }
 
-fn startedAt(job: Progress.Queued<Job>, now: datetime): Job;   // 人が書く
+fn startedAt(job: Job on Progress.Queued, now: datetime): Job;   // 人が書く
 ```
 
 ```ts
 // 後: 効果が、どのケースからどのケースへ進めるかを言う
-effect fn startJob(job: Job, at: datetime): effects jobs.put as Progress.Queued -> Progress.InProduction;
-effect fn finishJob(job: Job, measured: type.Measurement, at: datetime): effects jobs.put as Progress.InProduction -> Progress.Finished;
+effect fn startJob(job: Job on Progress.Queued, at: datetime): effects jobs.put as Progress.InProduction;
+effect fn finishJob(job: Job on Progress.InProduction, measured: type.Measurement, at: datetime): effects jobs.put as Progress.Finished;
 
 export fn start(id: JobId): Job throws NoJob, NotQueued {
   val job = require(id);
@@ -367,9 +369,9 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 | 言えなかったこと | 代わりにしたこと | 項目 |
 |---|---|---|
 | 請求は上限を超えない、請求する送料 = min(送料, 上限) | 葉のコメントと、印 `@prd.promise` | F11 |
-| 行のケースを、宣言した向きのほかには変えないこと | 効果の中身は、人が書く。宣言と、呼ぶ側の検査（STATE-9）まで | F1、F51 |
+| 行のケースを、宣言した向きのほかには変えないこと | 効果の中身は、人が書く。宣言と、呼ぶ側の検査（引数の型: TYPE-4、MATCH-4）まで | F1、F51 |
 | いくつかの行のケースを、一度に変える | 時計で、一行ずつ | F50 |
-| 後のケースが、引数の値で決まる遷移 | 何も約束しない `as any -> else` | F53 |
+| 後のケースが、引数の値で決まる遷移 | 何も約束しない `as else`（行の引数は、絞り込まない） | F53 |
 | 一つの行の、二つの分類を一度に言う | 片方だけを書く | F52 |
 | 荷物は、そろった出荷からしか作れない | 荷物を返す葉 `weighed` の引数の型。効果 `createParcel` は、どの荷物でも受け取る | F10 |
 | 混ざった注文の行を、種類ごとに分ける | 葉 `ordering.sort`。分けた結果の形（`Sorted`）だけが仕様 | F2 |
@@ -383,7 +385,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 
 ### 言語
 
-- **F1 表の一行の進み具合を、遷移で書けなかった。→ 行の遷移で、書けるようになった。** はじめは、状態の遷移（`effect fn …: effects C as A -> B`）の宛先が、状態を対象にした分類だけだった。注文、支払い、仕事、出荷は、どれも表の一行の話で、値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉で近づけていた。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からなかった。→ いまは、効果が、宛先の後ろの `as` で言う（`docs/check.md`「行の遷移」）。22 の効果が行の遷移を持ち、行の全体を書き換えていた七つの効果（`saveOrder`、`saveOrders`、`savePayment`、`saveJob`、`saveShipment`、`saveReservation`、`saveCarrier`）は、なくなった。一覧は「行の遷移で書いた進み具合」。分かったことは F50〜F57。
+- **F1 表の一行の進み具合を、遷移で書けなかった。→ 行の遷移で、書けるようになった。** はじめは、状態の遷移（`effect fn …: effects C as A -> B`）の宛先が、状態を対象にした分類だけだった。注文、支払い、仕事、出荷は、どれも表の一行の話で、値の分類（`ordering.Standing`、`payment.Standing`、`production.Progress`、`shipping.Custody`）と、行の全体を書き換える効果（`saveOrder` など）と、時刻を入れる葉で近づけていた。どの op が、どのケースからどのケースへ進めるかは、`match` のアームを読まないと分からなかった。→ いまは、効果が、宛先の後ろの `as` で言う（`docs/check.md`「行の遷移」）。24 の効果が行の遷移を持ち、行の全体を書き換えていた七つの効果（`saveOrder`、`saveOrders`、`savePayment`、`saveJob`、`saveShipment`、`saveReservation`、`saveCarrier`）は、なくなった。一覧は「行の遷移で書いた進み具合」。分かったことは F50〜F57。
 - **F2 配線は、一覧の要素ごとに、何もできない。** → 三つの形に逃げた。一覧を受け取る効果と op（`inventory.addReservations`、`production.addJobs`、`download.addGrants`）。一覧を作る葉（`ordering.sort`、`production.plan`）。外部の仕組みを一つずつ呼ぶものと、行のケースを変えるもの（F50）は、時計で一件ずつ（`payment.prepayExpiring`、`ordering.expireUnpaid`）。**混ざった注文を種類に分けること自体が、葉になった**: `catalog.Kind` は型で決まる分類だが、一覧の要素には当てられない。 → **R6 で、配線に、繰り返し（`for`）が入った**（下の「R6 で変えたこと」）: `production.enqueue` と `ordering.expireUnpaid` は、繰り返しで書き直した。外部の仕組みを一つずつ呼ぶ `payment.prepayExpiring` も、失敗を、状態に残す形にして、繰り返しにした。
 - **F3 判断一つにつき、op が一つ要る。** アームの本体は呼び出し一つで、呼び出しの引数に呼び出しを書けない。→ `shipping.pack` は `packGathered`、`packInto`、`seal` の四段。`payment` の 31 の op のうち 22 が配線。PRD に名前のない op（`packInto`、`secureFound`、`offersIfPacked`）に、名前を付けることになる。
 - **F4 例外を、配線で受けられない。受けられるのはデコレータだけで、例外の値は使えない。** → 値を運ぶ例外（`ordering.TermsChanged(terms)`、`inventory.OutOfStock(sku)`、`ordering.UnknownProduct(sku)`）の値は、画面に届かない: `storefront.sayTermsChanged` は見せている値段を捨てるだけで、`storefront.Outdated` は、どの商品かを持たない。画面を分けたい結果は、例外ではなく値で返す形に寄った（`shopApi.product` と `shopApi.status` は `T?`）。
@@ -392,7 +394,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F7 分類の述語は、対象の値しか見られない。** 時刻で変わる場合分け（期限が過ぎたか）は、分類にできない。→ 「受け取った値を、そのまま返すか、投げる葉」（`staff.requireFresh`、`download.stillValid`）。`ordering.Standing.Expired` は、時計で動く `ordering.expireUnpaid` が `expiredAt` を入れた後でだけ、当たる。
 - **F8 値の集合を言う型（列挙）がない。** リテラルを scalar の引数に渡せない（TYPE-1）ので、`authorize(token, "packer")` は書けない。→ 仕事は、三つの真偽値と、仕事ごとの分類三つ（`staff.MakerDuty`、`PackerDuty`、`AdminDuty`）と、三つの op（`staff.asMaker`、`asPacker`、`asAdmin`）。商品の種類は、union と、型で決まる分類で書けた（`catalog.Fulfilment`、`catalog.Kind`）。`psp.Event.kind`、`shipping.SizeClass`、`shipping.Zone`、`Problem.reason` は文字列で、値の集合はコメント。
 - **F9 「この段階では、この値がある」を、一つの model では言えない。** `model Packed extends Shipment { override parcel: Parcel; }` は TYPE-15。model を別の model に絞るケースは CLS-6。→ 事実を別の表にして（`parcels`、`labels`）、存在の分類（`Packing`、`Labelling`）で絞り、そろった組を model にした（`Sealed`、`Dispatched`）。
-- **F10 `C.Case<T>` の引数は、別の名前空間からも効いた。作り方は縛れない。** `shipping.boxOptions(shipment: Gathered.Complete<Shipment>)` を `fulfilment.optionsIfGathered` が呼ぶ。そろっていない出荷を渡すと MATCH-4（`Awaiting` のアームから `boxOptions(shipment)` を呼んで確かめた）。ただし、効果 `createParcel(parcel: Parcel)` は、どの `Parcel` でも受け取る。「荷物は、そろった出荷からしか作れない」は、`Parcel` を返す葉が `weighed` だけであることに依り、検査されない。
+- **F10 `T on C.Case` の引数は、別の名前空間からも効いた。作り方は縛れない。** `shipping.boxOptions(shipment: Shipment on Gathered.Complete)` を `fulfilment.optionsIfGathered` が呼ぶ。そろっていない出荷を渡すと MATCH-4（`Awaiting` のアームから `boxOptions(shipment)` を呼んで確かめた）。ただし、効果 `createParcel(parcel: Parcel)` は、どの `Parcel` でも受け取る。「荷物は、そろった出荷からしか作れない」は、`Parcel` を返す葉が `weighed` だけであることに依り、検査されない。
 - **F11 不変条件を書けない。** 「請求は上限を超えない」「請求する送料 = min(送料, 上限)」「`limit` = `itemsTotal` + `shippingCeiling`」「見積もり ≤ 上限」は、葉（`payment.charged`、`shipping.foresee`）のコメント。→ 印 `@prd.promise` を、約束を守る op に付けた。約束と op が結ばれるだけで、中身は確かめない。この仕様でいちばん大事な客への約束が、検査の外にある。
 - **F12 分類の対象に `read` を書けない**（RES-4）。op の分類にするには、`read` をそのまま呼ぶ op が要る（`shop-server/README.md` の N119）。→ 型の分類にした（`classify Known of Order?`）。「引いたものがあるか」の分類が、名前空間ごとに並ぶ（`Known` が四つ、`Held`、`Stocked`、`Registered`、`Account`、`Entitlement`、`Login`）。どれも同じ意味（同 N4）。「ない」側の名前も、分類ごとに付けた（F44）。
 - **F13 空でない一覧の型がない。** `carrier.Fleet`（使っている配送業者があるか）は、述語で決まる分類になり、「空でない」（`Available`）と「空」（`Unavailable`）を、人が二つとも書く（F45）。`by list` なら書かずに済むが、場合に業務の名前が付かない。
@@ -456,14 +458,15 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F48 仕事の分類は、一つの `Role` にしなかった。** 担当者は、三つの仕事を、いくつでも持てる（`Member.maker`、`packer`、`admin` は、別々の真偽値）。`classify Role of Member { Maker; Packer; Admin; }` は、製作と梱包の両方をする担当者で、二つの述語が真になり、分類の誤りになる（ケースは排他）。仕事ごとに、「してよい / してはいけない」の分類を一つずつ持った。「してはいけない」側の名前（`NotMaker`）は、業務の言葉になかった。
 - **F49 `match` の `else` のアームが合ったのは、`payment.Standing` だけ。** 五つのケースから一つを取り出して、残りの四つを同じに扱う `match` が四つあり（`reopen`、`secureFound`、`prepayHeld`、`release`）、`else` にした（`docs/requirements.md`「書き方の指針」の「1 : 4」）。`payment.settle` は「1 : 1 : 1 : 2」なので、どのアームも名前で並べた。三つのケースの「1 : 2」（`production.start` と `finish`、`shipping.release` と `markDelivered`、`storefront.onAddToCart`）も、名前で並べた: 並べる名前が二つなら、`else` にしても短くならず、ケースを足したときに MATCH-2 が尋ねる方がよい。
 - **F50 行のケースを変える効果は、行を一つずつ受け取る。** 行の遷移を書く効果は、行の引数（型が、状態の要素の型の引数）を、ちょうど一つ持つ（STATE-7）。行の並びを受け取る効果（`saveOrders(changed: Order[])`）には `as` を書けず、`as` を書かない `put` は「行のケースを変えない」という意味になる。→ 期限切れは、時計で一件ずつにした（`ordering.expireUnpaid` は、いちばん古い一つを `expireOrder` に渡す。間隔を 5 分から 1 分にした）。`inventory.release` は、注文一つの取り置きを戻す形になり、葉 `idsOf` と、集合で引く `read` が要らなくなった。まとめて足す `post`（`production.addJobs`、`inventory.addReservations`、`download.addGrants`）は、入るケースを書けないまま（どれも、はじめのケースで作ることは、葉のコメント）。 → **R6 で、効果を、繰り返しの中で、一つずつ呼べるようになった**: `ordering.expireUnpaid` は、期限切れの注文を、一回の動きで、すべて扱う。
-- **F51 `@db.update` は、行のケースを変える効果の、どれにも合わなかった。** 呼ぶ側の検査（STATE-9）が求めるのは、前のケースにあると分かっている行、つまり、書き換える前の行。`@db.update` は、渡した行の全体を書く（`docs/plugin-go-sqlite.md`「効果の中身」）ので、前の行を渡せば、何も変わらない。→ ケースを変える効果は、前の行と、足す事実を受け取る形にして（`startJob(job, at)`、`recordSettled(payment, charge, at)`）、中身は、人が書く。`db` のデコレータを付けた効果は、15 から 9 に減った。引き換えに、変えた行を作るだけの葉が 11 なくなった（H2。人が書く葉は、90 から 78 に減った）: 「行をどう変えるか」を書く場所が、葉から、効果の中身に移った。足す事実が込み入っているところは、事実を数える葉と、それを運ぶ model が要る（`payment.Charge`、`shipping.Placement`。F18 が、二つ増えた）。「この列に、この値を入れる」と言う `db` の語彙があれば、中身も宣言から出せる。
+- **F51 `@db.update` は、行のケースを変える効果の、どれにも合わなかった。** 呼ぶ側の検査（行の引数の型。TYPE-4、MATCH-4）が求めるのは、前のケースにあると分かっている行、つまり、書き換える前の行。`@db.update` は、渡した行の全体を書く（`docs/plugin-go-sqlite.md`「効果の中身」）ので、前の行を渡せば、何も変わらない。→ ケースを変える効果は、前の行と、足す事実を受け取る形にして（`startJob(job, at)`、`recordSettled(payment, charge, at)`）、中身は、人が書く。`db` のデコレータを付けた効果は、15 から 9 に減った。引き換えに、変えた行を作るだけの葉が 11 なくなった（H2。人が書く葉は、90 から 78 に減った）: 「行をどう変えるか」を書く場所が、葉から、効果の中身に移った。足す事実が込み入っているところは、事実を数える葉と、それを運ぶ model が要る（`payment.Charge`、`shipping.Placement`。F18 が、二つ増えた）。「この列に、この値を入れる」と言う `db` の語彙があれば、中身も宣言から出せる。
 - **F52 一つの `as` が言うのは、一つの分類。** 出荷は、二つの分類を持つ（`Custody` と `Gathered`）。`createShipment` は `as Custody.InHouse` と書き、「まだ待っている（`Gathered.Awaiting`）で入る」は、書けなかった。`recordHandOver`（`Custody` を進める）が `Gathered` を変えないことは、「ほかの分類については、`as` を書かない効果と同じ」という決まりから来る。
-- **F53 後のケースが、引数の値で決まる遷移は、約束できない。** `carrier.setEnabled(code, enabled)` は、`enabled` の値で、`InUse` にも `Suspended` にもする。配線は、真偽値で分けられない（F8）。→ `switchCarrier(carrier, enabled)` を、何も約束しない `as any -> else` にした。このサンプルで、抜け道を使ったのは、ここだけ。op を二つ（使う、止める）に分ければ、二つの遷移として書けるが、画面の操作（スイッチ一つ）と形が離れる。
+- **F53 後のケースが、引数の値で決まる遷移は、約束できない。** `carrier.setEnabled(code, enabled)` は、`enabled` の値で、`InUse` にも `Suspended` にもする。配線は、真偽値で分けられない（F8）。→ `switchCarrier(carrier, enabled)` を、何も約束しない形（行の引数を絞り込まず、後は `as else`）にした。このサンプルで、抜け道を使ったのは、ここだけ。op を二つ（使う、止める）に分ければ、二つの遷移として書けるが、画面の操作（スイッチ一つ）と形が離れる。
 - **F54 行を受け取る `@db.delete` がない。** `delete` に行の遷移を書くと、効果は行を受け取る。`@db.delete` の引数は、列の条件（`docs/plugin-go-sqlite.md`「効果の中身」）。→ `staff.deleteSession(session: Session)` は、デコレータなしで、人が書く。ログアウトは、消す前に、セッションを読むことになった（`endSession`: `LoggedIn => deleteSession(session); LoggedOut => none;`）。「あれば消す」が、仕様に見えるようになったとも言える。
 - **F55 変えた後の行を返す op は、読み直す。** 効果は値を返さず、渡した行は、前の行。→ `production.start`、`shipping.gather`、`carrier.setEnabled` は、効果の後で、もう一度引いて返す（`return require(id);`）。`ordering.accept` は、読み直しのために `throws NoOrder` が増え、`fulfilment.acceptAndBegin` に伝わった（いま書き換えた行なので、起きない例外）。
-- **F56 一つの op が、場合によって二つのケースへ進めていたところは、分類が一つ増えた。** 客の同意を記録する `payment.markSecured` は、箱で送るものがあれば `Held`、なければ `Settled` にしていた（葉 `securedBy` の中）。後のケースは一つなので、効果を二つにし（`holdSecured`、`chargeSecured`）、どちらを呼ぶかを分ける分類 `Billing { Deferred; Immediate; }` を足した。葉の中にあった分かれ道が、仕様に出た。`-> else` で一つにまとめることもできたが、「決まっていない」のではなく、「二つのどちらかに、決まる」ので、そうしなかった（`recordPlacement` の `Gathered.Awaiting -> else` は、残りの品目で決まり、宣言からは決まらないので、`else`）。
-- **F57 `post` の「前」は、検査されない。** `createParcel` の `as Packing.Unpacked -> Packing.Packed` は、「梱包は一度だけ」と読めるが、呼ぶ側の検査は、`post` には掛からない（渡す行は、入る行で、「まだない」ことを示す値ではない）。一度だけであることは、今までどおり、`shipping.pack` の `match (existing by Packing) { Packed => throw AlreadyPacked; … }` が担う。
-- **F58 呼ぶ側の検査（STATE-9）は、書き直しの間、error を一つも出さなかった。** 行を進める op は、もともと、`match` のアームの中で、絞り込んだ型（`Progress.Queued<Job>`）の葉を呼ぶ形だった（F10）。その葉を効果に置き換えただけで、検査を通った。確かめたのは、逆の向き: アームの外に効果の呼び出しを出すと STATE-9（このサンプルの外の小さな仕様で確かめた）。検査が守るのは「どの行に対して呼べるか」までで、効果の中身が、宣言したとおりに行を変えることは、まだ誰も確かめない（`docs/requirements.md`「段階」の、行の遷移の保証）。
+- **F56 一つの op が、場合によって二つのケースへ進めていたところは、分類が一つ増えた。** 客の同意を記録する `payment.markSecured` は、箱で送るものがあれば `Held`、なければ `Settled` にしていた（葉 `securedBy` の中）。後のケースは一つなので、効果を二つにし（`holdSecured`、`chargeSecured`）、どちらを呼ぶかを分ける分類 `Billing { Deferred; Immediate; }` を足した。葉の中にあった分かれ道が、仕様に出た。`as else` で一つにまとめることもできたが、「決まっていない」のではなく、「二つのどちらかに、決まる」ので、そうしなかった（`recordPlacement` の `as else` は、残りの品目で決まり、宣言からは決まらないので、`else`）。
+- **F57 `post` の「前」は、書かない。** `createParcel` は、`post as Packing.Packed`。`post` の前は、いつも「行がない」で、操作が言っている（`docs/check.md`「行の遷移」の「操作ごとに書ける形」）。渡す行は、入る行で、「まだない」ことを示す値ではないので、「梱包は一度だけ」は、効果の宣言からは、守られない。一度だけであることは、今までどおり、`shipping.pack` の `match (existing by Packing) { Packed => throw AlreadyPacked; … }` が担う。
+- **F58 呼ぶ側の検査（行の引数の型: TYPE-4、MATCH-4）は、行の遷移への書き直しの間、error を一つも出さなかった。** 行を進める op は、もともと、`match` のアームの中で、絞り込んだ型（`Job on Progress.Queued`）の葉を呼ぶ形だった（F10）。その葉を効果に置き換えただけで、検査を通った。確かめたのは、逆の向き: アームの外に効果の呼び出しを出すと、絞り込んでいない行を渡すことになり、TYPE-4（このサンプルの外の小さな仕様で確かめた）。検査が守るのは「どの行に対して呼べるか」までで、効果の中身が、宣言したとおりに行を変えることは、まだ誰も確かめない（`docs/requirements.md`「段階」の、行の遷移の保証）。
+- **F59 一つの値は、二つの分類の絞り込みを、同時には持てない。** `payment.markSecured(payment: Payment on Standing.Pending, …)` は、請求のしかた（`Billing`）で分けて、`Standing.Pending` の行を受け取る効果（`holdSecured`、`chargeSecured`）を呼ぶ。`match (payment by Billing)` のアームの中で、`payment` は `Payment on Billing.Deferred` になり、`Standing.Pending` の絞り込みを持たなくなる（`docs/types.md`「アームの中の対象の型」）ので、そのままでは、効果に渡せない（MATCH-4）。→ 分ける対象を、別の名前に受けた（`val billed = payment; match (billed by Billing) { Deferred => holdSecured(payment, …); … }`）。絞り込みが掛かるのは、対象と同じ名前だけなので、`payment` は、アームの中でも、もとの型のまま。回り道で、読む人には、理由が要る（`docs/open.md`「言語」）。
 
 ## 粒度: 仕様は、どこまで書くか
 
@@ -502,7 +505,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **G8 例外のユニオン**（F34 の並びに、名前を付ける）。
 - **G9 `effects` と `reads` の節**。一つも書いていない。`prevents effects` は、一か所だけ（`payment.capture`）。
 - **G10 通知の種類の値**（`psp.Event.kind`）と、荷物の動きの、届いた以外の通知。
-- **G11 受け付けた後のキャンセル。** 枠を手放す op（`payment.release`）は、期限切れの注文のためにだけある。作るものに入れるなら、取り消した注文は、消さずに、`ordering.Standing` のケース（`Cancelled`）と、そこへ進める効果（`as Standing.Accepted -> Standing.Cancelled`）を足す（期限切れの `Expired` と同じ形。`docs/requirements.md`「書き方の指針」）。
+- **G11 受け付けた後のキャンセル。** 枠を手放す op（`payment.release`）は、期限切れの注文のためにだけある。作るものに入れるなら、取り消した注文は、消さずに、`ordering.Standing` のケース（`Cancelled`）と、そこへ進める効果（行の引数が `Order on Standing.Accepted` で、`as Standing.Cancelled`）を足す（期限切れの `Expired` と同じ形。`docs/requirements.md`「書き方の指針」）。
 
 ### 実装に見えたが、書いたもの
 
@@ -710,6 +713,7 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 - `ordering.expireUnpaid` は、外の仕組みを呼ばず、`@db.transaction` を持つ: 途中で失敗したら、それまでの分も、戻る。
 - **`Record<K, V>` をなくした**（`docs/decisions.md`「決めたこと」360）のに合わせて、二つの画面（`storefront`、`backoffice`）の、URL のクエリの状態を、`state query: single<page.Query>;` にした。`page.Query` は、標準の語彙 `page` が宣言する、インデックスの model（`docs/vocab.md`）。
 - **標準の分類 `nullable` のケースの名前を、`None` / `Some` に替えた**（`docs/decisions.md`「決めたこと」362）のに合わせて、二つの画面（`storefront`、`backoffice`）の、形が `nullable` の状態の遷移（`effects token as None -> Some`、`effects offer as None -> Some`）と、`match (… by nullable)` のアームを、書き直した。形が `list` の所（`Empty` / `HasItems`）は、変えていない。
+- **絞り込んだ型を `T on C.K` と書き、行の遷移の、前のケースを、行の引数の型で言う**（`docs/decisions.md`「決めたこと」368〜370）のに合わせて、絞り込んだ型（`C.K<T>`）と、行の遷移を持つ 24 の効果を、書き直した（`effect fn startJob(job: Job, …): effects jobs.put as Progress.Queued -> Progress.InProduction;` を、`effect fn startJob(job: Job on Progress.Queued, …): effects jobs.put as Progress.InProduction;` に）。`post` の効果の「前」（`as Packing.Unpacked -> Packing.Packed`）と、`as any` は、なくなった（F57、F53）。配線で変えたのは、`payment.markSecured` の一か所（F59）。
 
 ## 確かめ方
 

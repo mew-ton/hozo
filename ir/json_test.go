@@ -271,22 +271,19 @@ func TestRoundTripEffectTargets(t *testing.T) {
 		t.Errorf("effect\nwant %s\ngot  %s", want, b)
 	}
 	// 行の遷移（版 0.9。docs/ir.md「state / exception / effect」の RowTransition）: 書いていなければ row のキーごと省く（上の二つ）。
-	// 分類を名指ししない形は classify を、後のケースが決まっていない形は to を、キーごと省く。from は CaseSet（"any" か列）
+	// 後のケースが決まっていない形（`as else`）は、classify と to を、キーごと省く。前のケースは、行の引数の型が言う（版 0.16）
 	b = roundTrip(t, Effect{
 		DeclBase: DeclBase{Name: "e", Span: sp()},
 		Params:   []OpParam{{Name: "order", Type: Ref("s.Order"), Span: sp()}},
 		Target:   BuiltinTarget{State: "s", Operation: OpPut},
 		Writes:   []string{"s"},
-		Row:      &RowTransition{Param: "order", Classify: "s.Stage", From: Cases("Draft", "Accepted"), To: "Shipped"},
+		Row:      &RowTransition{Param: "order", Classify: "s.Stage", To: "Shipped"},
 	})
 	if want := `{"kind":"effect","name":"e","decorators":[],` + spJSON + `,"params":[{"name":"order","type":{"kind":"ref","target":"s.Order"},` + spJSON +
-		`}],"throws":[],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":["s"],"row":{"param":"order","classify":"s.Stage","from":["Draft","Accepted"],"to":"Shipped"}}`; string(b) != want {
+		`}],"throws":[],"target":{"kind":"builtin","state":"s","operation":"put"},"writes":["s"],"row":{"param":"order","classify":"s.Stage","to":"Shipped"}}`; string(b) != want {
 		t.Errorf("effect with row\nwant %s\ngot  %s", want, b)
 	}
-	if b := roundTrip(t, RowTransition{Param: "order", From: AnyCase()}); string(b) != `{"param":"order","from":"any"}` {
-		t.Errorf("row without classify and to: %s", b)
-	}
-	if b := roundTrip(t, RowTransition{Param: "order", Classify: "s.Stage", From: Cases("Accepted")}); string(b) != `{"param":"order","classify":"s.Stage","from":["Accepted"]}` {
+	if b := roundTrip(t, RowTransition{Param: "order"}); string(b) != `{"param":"order"}` {
 		t.Errorf("row to else: %s", b)
 	}
 
@@ -533,7 +530,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.15","namespaces":[],"binds":[]}`
+	want := `{"version":"0.16","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -541,7 +538,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.15","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.15","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.16","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.16","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

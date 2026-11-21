@@ -44,7 +44,7 @@ namespace shop {
   fn showEmpty(): void;
   fn showCart(): void;
   fn me(): Token;
-  fn gift(line: LineKind.Gift<Line>): Line;
+  fn gift(line: Line on LineKind.Gift): Line;
   fn normal(line: Line): Line;
   fn newOrder(): Order;
   fn order(): Order effects placeOrder { placeOrder(); return newOrder(); }

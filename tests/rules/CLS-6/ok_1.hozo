@@ -14,7 +14,7 @@ namespace a {
   classify V1 of M? { Has: M? as M; }
   classify V2 of string { Valid: string as Email; }
   classify V3 of M { Same: M as M; }
-  classify V4 of M { Narrow: M as Kind.A<M>; }
+  classify V4 of M { Narrow: M as M on Kind.A; }
   classify O1 of find { Hit: find as M; }
   classify O2 of page { Ready: page as M; Missing: page as N; }
   classify O3 of maybePage { Ready: maybePage as M; }

@@ -37,6 +37,10 @@ type parser struct {
 	// openRecords は読みかけのレコードリテラルの "{" の数。誤りからの回復（skip）が、文の途中の "}" を
 	// ブロックの終わりと取り違えないために数える。
 	openRecords int
+	// noOnType は、型の後ろの on を、絞り込んだ型（OnType）として読まないか: 関数の戻り値の後ろの、
+	// なくした書き方の on（`read fn r(): T on 状態;`、`fn f(): T on 状態;`）を、呼んだ側が、メッセージにするため。on の後ろが
+	// 「分類.ケース」の形なら、このときも、絞り込んだ型として読む。
+	noOnType bool
 }
 
 // bailout は誤りからの回復のために投げる印。宣言・メンバー・文の単位で受ける。
@@ -783,6 +787,8 @@ func (p *parser) parseFnType(head string) *ast.ReturnType {
 	case token.Semicolon, token.LBrace:
 		p.fail(colon, fmt.Sprintf("「:」の後ろに、戻り値か節が要る。何も書かないなら、「:」も書かない（%s(…); か %s(…) { … } と書く。docs/grammar.md「関数の宣言」）", head, head))
 	}
+	p.noOnType = true
+	defer func() { p.noOnType = false }()
 	return p.parseReturnType()
 }
 
@@ -884,52 +890,19 @@ func (p *parser) atTransitionTarget() bool {
 
 // parseRowClause は行の遷移を読む（docs/grammar.md「exception / effect / read」）。
 //
-//	RowClause = "as" ( "any" | RowCase )
-//	          | "as" RowBefore "->" ( RowCase | "else" ) ;
-//	RowBefore = "any" | RowCase { "," RowCase } ;
+//	RowClause = "as" ( RowCase | "else" ) ;
 //	RowCase   = QualifiedName ;      (* 分類の名前 "." ケースの名前 *)
 //
-// 矢印のない形のケースは一つだけ。else を書けるのは矢印の後ろだけで、矢印の後ろに any は書けない。
+// 書くのは、効果の後のケースだけ。効果の前のケースは、行の引数の型（parseType の OnType）が言う。矢印の形（as <前> -> <後>）と、
+// any は、なくした書き方で、新しい書き方をメッセージで示す。
 func (p *parser) parseRowClause() *ast.RowClause {
+	const removed = "行の遷移の、前のケースは、行の引数の型で言い（order: Order on C.A | C.B）、as には、後のケースだけを書く（effects s.put as C.D。docs/grammar.md「exception / effect / read」）"
 	start := p.tok().Span.Start
 	r := &ast.RowClause{AsSpan: p.expect(token.As).Span}
-	if p.at(token.Else) {
-		p.fail(p.tok().Span, "行の遷移の else を書けるのは、矢印の後ろだけ（as <前> -> else。docs/grammar.md「exception / effect / read」）")
-	}
-	before := &ast.RowBefore{}
-	beforeStart := p.tok().Span.Start
-	if p.got(token.Any) {
-		before.Any = true
-	} else {
-		before.Cases = []ast.QualifiedName{p.parseRowCase()}
-		for {
-			if p.at(token.Pipe) {
-				p.errorAt(p.tok().Span, "行の遷移のケースの並びの区切りは「,」で、「|」ではない（as C.A, C.B -> C.D と書く。docs/grammar.md「exception / effect / read」）")
-				p.advance()
-			} else if !p.got(token.Comma) {
-				break
-			}
-			before.Cases = append(before.Cases, p.parseRowCase())
-		}
-	}
-	before.Span = p.spanFrom(beforeStart)
-	if !p.got(token.ThinArrow) {
-		// 矢印のない形: 書いたものが、効果の後
-		if len(before.Cases) > 1 {
-			p.fail(before.Cases[1].Span, "矢印のない行の遷移（as <後>）に書けるケースは、一つだけ。前のケースを並べるなら、矢印を書く（as C.A, C.B -> C.D。docs/grammar.md「exception / effect / read」）")
-		}
-		r.After = ast.RowAfter{Span: before.Span, Any: before.Any}
-		if !before.Any {
-			r.After.Case = &before.Cases[0]
-		}
-		r.Span = p.spanFrom(start)
-		return r
-	}
-	r.Arrow, r.Before = true, before
 	afterStart := p.tok().Span.Start
 	switch {
 	case p.at(token.Any):
-		p.fail(p.tok().Span, "行の遷移の矢印の後ろに any は書けない。後のケースが決まっていないなら else と書く（as <前> -> else。docs/grammar.md「exception / effect / read」）")
+		p.fail(p.tok().Span, "行の遷移に any は書けない。前がどのケースでもよければ、行の引数を絞り込まない。後のケースを言わないなら、as を書かない（put で、後のケースを約束しないなら as else）。"+removed)
 	case p.got(token.Else):
 		r.After.Else = true
 	default:
@@ -937,6 +910,12 @@ func (p *parser) parseRowClause() *ast.RowClause {
 		r.After.Case = &c
 	}
 	r.After.Span = p.spanFrom(afterStart)
+	switch p.tok().Kind {
+	case token.ThinArrow:
+		p.fail(p.tok().Span, "行の遷移の矢印（as <前> -> <後>）はなくなった。"+removed)
+	case token.Comma, token.Pipe:
+		p.fail(p.tok().Span, "行の遷移の as に書けるケースは、一つだけ（効果の後のケース）。"+removed)
+	}
 	r.Span = p.spanFrom(start)
 	return r
 }
@@ -947,7 +926,7 @@ func (p *parser) parseRowCase() ast.QualifiedName {
 		p.fail(p.tok().Span, fmt.Sprintf("行の遷移のケースは、分類の名前から書く（<分類>.%s。docs/grammar.md「exception / effect / read」）", p.tok().Text))
 	}
 	if !p.at(token.QualifiedName) {
-		p.failExpected("行の遷移のケース（any か、<分類>.<ケース>）")
+		p.failExpected("行の遷移のケース（<分類>.<ケース> か、else）")
 	}
 	return p.parseQualifiedName()
 }
@@ -1591,9 +1570,9 @@ func (p *parser) parseType() ast.Type {
 			p.fail(p.tok().Span, "Record<K, V> という書き方はなくなった。キーが決まっていない構造は、インデックスの model を宣言して、その名前を書く（model 名前 { [キーの名前: K]: V; }。docs/grammar.md「model」）")
 		}
 		n := &ast.NamedType{Name: p.parseQualifiedName()}
-		if p.got(token.Less) {
-			n.Arg = p.parseType()
-			p.expect(token.Greater)
+		if p.at(token.Less) {
+			// なくした書き方（docs/grammar.md「型」「決めたこと」）
+			p.fail(p.tok().Span, fmt.Sprintf("%s<T> という書き方はなくなった。分類のケースで絞り込んだ型は、T on %s と書く（<> は、list<T>、nullable<T>、single<T> だけのもの。docs/grammar.md「型」）", n.Name.String(), n.Name.String()))
 		}
 		n.Span = p.spanFrom(start)
 		t = n
@@ -1622,10 +1601,54 @@ func (p *parser) parseType() ast.Type {
 		case token.Question:
 			p.advance()
 			t = &ast.OptionalType{Span: p.spanFrom(start), Elem: t}
+		case token.On:
+			if p.noOnType && p.peek(1).Kind != token.QualifiedName {
+				return t // なくした書き方 `read fn r(): T on 状態;`、`fn f(): T on 状態;` の on。呼んだ側が、メッセージを出す
+			}
+			return p.parseOnType(start, t)
 		default:
 			return t
 		}
 	}
+}
+
+// parseOnType は OnType = "on" CaseRef { "|" CaseRef } を読む（docs/grammar.md「型」）: 分類のケースで絞り込んだ型 T on C.K。
+// of は、on の前までに読んだ型で、start は、その頭。on の後ろには、[] も ? も続けない。
+func (p *parser) parseOnType(start source.Offset, of ast.Type) ast.Type {
+	t := &ast.OnType{Of: of, OnSpan: p.expect(token.On).Span}
+	for {
+		if p.atIdent() {
+			p.fail(p.tok().Span, fmt.Sprintf("絞り込んだ型のケースは、分類の名前から書く（T on <分類>.%s。docs/grammar.md「型」）", p.tok().Text))
+		}
+		if !p.at(token.QualifiedName) {
+			p.failExpected("絞り込んだ型のケース（T on <分類>.<ケース>）")
+		}
+		t.Cases = append(t.Cases, p.parseQualifiedName())
+		if p.at(token.Comma) && p.peek(1).Kind == token.QualifiedName && p.peek(2).Kind != token.Colon && onTypeListEnd(p.peek(2).Kind) {
+			p.fail(p.tok().Span, "絞り込んだ型の、いくつかのケースの区切りは「|」で、「,」ではない（T on C.A | C.B と書く。docs/grammar.md「型」）")
+		}
+		if !p.got(token.Pipe) {
+			break
+		}
+	}
+	switch p.tok().Kind {
+	case token.LBracket, token.Question:
+		p.fail(p.tok().Span, "on の後ろに [] と ? は続けられない。絞り込んだ型の並びは list<T on C.K>、省略可能は nullable<T on C.K> と書く（docs/grammar.md「型」）")
+	case token.On:
+		p.fail(p.tok().Span, "on は、一つの型に、一度だけ書ける（二つの分類の絞り込みを、同時に持つ型は、ない。docs/types.md「アームの中の対象の型」）")
+	}
+	t.Span = p.spanFrom(start)
+	return t
+}
+
+// onTypeListEnd は、絞り込んだ型のケースを「,」で並べた、と読める形の、終わりの字句か（「,」の後ろの名前の、次の字句）。
+// 引数の並びの「,」（次が「名前 :」）とは、名前の後ろの「:」で見分ける。
+func onTypeListEnd(k token.Kind) bool {
+	switch k {
+	case token.RParen, token.Comma, token.Pipe, token.Semicolon, token.Greater:
+		return true
+	}
+	return false
 }
 
 // --- 配線（docs/grammar.md「配線」） ---

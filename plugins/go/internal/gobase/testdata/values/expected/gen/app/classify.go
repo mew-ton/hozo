@@ -8,7 +8,7 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// Size は大きさ（述語で決まる分類。ケースで絞り込んだ型 Size.Big<Address> を作るため）
+// Size は大きさ（述語で決まる分類。ケースで絞り込んだ型 Address on Size.Big を作るため）
 type Size int
 
 const (

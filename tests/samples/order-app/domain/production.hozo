@@ -72,10 +72,10 @@ namespace production {
   effect fn addJob(job: Job): effects jobs.post as Progress.Queued;
 
   /** 作り始めた: 始めた時刻を入れる（人が書く） */
-  effect fn startJob(job: Job, at: datetime): effects jobs.put as Progress.Queued -> Progress.InProduction;
+  effect fn startJob(job: Job on Progress.Queued, at: datetime): effects jobs.put as Progress.InProduction;
 
   /** 作り終えて、量った: 終えた時刻と、量った大きさを入れる（人が書く） */
-  effect fn finishJob(job: Job, measured: type.Measurement, at: datetime): effects jobs.put as Progress.InProduction -> Progress.Finished;
+  effect fn finishJob(job: Job on Progress.InProduction, measured: type.Measurement, at: datetime): effects jobs.put as Progress.Finished;
 
   // ---- 受け付けたとき ----
 

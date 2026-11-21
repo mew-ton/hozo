@@ -90,7 +90,7 @@ namespace shop {
   fn showCart();
   fn showEmpty();
   fn showOrders();
-  fn packSingle(line: LineKind.Single<Line>): Line;
+  fn packSingle(line: Line on LineKind.Single): Line;
   fn packBulk(line: Line): Line;
 
   // docs/check.md「計算」手順 0（配線）: F は呼び出しの effects を行の順に連結したもの（saveToken、signIn）

@@ -2,7 +2,7 @@
 # 読むのは View.config.seams だけで、このプラグインは起動しない。hozoc emit で試せるように、何も返さない sh の代役にしてある。
 name     = "tracer"
 command  = ["sh", "-c", "cat >/dev/null; echo '{\"files\":[],\"warnings\":[]}'"]
-protocol = "0.15"
+protocol = "0.16"
 
 [[transpiler]]
 name     = "go-trace"

@@ -141,20 +141,39 @@ func TestRowDisplay(t *testing.T) {
 		e    *ir.Effect
 		want string
 	}{
-		{effect(ir.OpPost, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.AnyCase(), To: "Accepted"}), "as shop.Stage.Accepted"},
-		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.Cases("Accepted"), To: "InProduction"}), "as shop.Stage.Accepted -> shop.Stage.InProduction"},
-		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.Cases("Draft", "Accepted"), To: "Cancelled"}), "as shop.Stage.Draft, shop.Stage.Accepted -> shop.Stage.Cancelled"},
-		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.AnyCase(), To: "Shipped"}), "as any -> shop.Stage.Shipped"},
-		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", From: ir.Cases("Accepted")}), "as shop.Stage.Accepted -> else"},
-		{effect(ir.OpPut, &ir.RowTransition{Param: "order", From: ir.AnyCase()}), "as any -> else"},
-		{effect(ir.OpDelete, &ir.RowTransition{Param: "order", Classify: "shop.Life", From: ir.AnyCase(), To: "Absent"}), "as shop.Life.Absent"},
-		{effect(ir.OpDelete, &ir.RowTransition{Param: "order", Classify: "shop.Life", From: ir.Cases("Draft"), To: "Absent"}), "as shop.Life.Draft -> shop.Life.Absent"},
+		{effect(ir.OpPost, &ir.RowTransition{Param: "order", Classify: "shop.Stage", To: "Accepted"}), "as shop.Stage.Accepted"},
+		{effect(ir.OpPut, &ir.RowTransition{Param: "order", Classify: "shop.Stage", To: "InProduction"}), "as shop.Stage.InProduction"},
+		{effect(ir.OpPut, &ir.RowTransition{Param: "order"}), "as else"},
+		{effect(ir.OpDelete, &ir.RowTransition{Param: "order", Classify: "shop.Life", To: "Absent"}), "as shop.Life.Absent"},
 		// 行の遷移を持たない効果と、宛先が組み込みの効果でない効果は ""
 		{effect(ir.OpPut, nil), ""},
-		{&ir.Effect{Target: ir.TransitionTarget{Of: "shop.Checkout"}, Row: &ir.RowTransition{Param: "order", From: ir.AnyCase()}}, ""},
+		{&ir.Effect{Target: ir.TransitionTarget{Of: "shop.Checkout"}, Row: &ir.RowTransition{Param: "order"}}, ""},
 	} {
 		if got := RowDisplay(tt.e); got != tt.want {
 			t.Errorf("RowDisplay(%+v) = %q, want %q", tt.e.Row, got, tt.want)
+		}
+	}
+}
+
+// TestNarrowedParamsDisplay は、コメントの中の、絞り込んだ引数の書き方（docs/plugin-go.md「コメント」の「絞り込んだ引数の表示」）。
+func TestNarrowedParamsDisplay(t *testing.T) {
+	order := ir.Ref("shop.Order")
+	param := func(name string, t ir.Type) ir.OpParam { return ir.OpParam{Name: name, Type: t} }
+	for _, tt := range []struct {
+		params []ir.OpParam
+		want   string
+	}{
+		{nil, ""},
+		{[]ir.OpParam{param("order", order)}, ""},
+		{[]ir.OpParam{param("order", ir.Case("shop.Stage", []string{"Accepted"}, order))}, "order on shop.Stage.Accepted"},
+		{[]ir.OpParam{param("at", ir.Datetime()), param("order", ir.Case("shop.Stage", []string{"Draft", "Accepted"}, order))}, "order on shop.Stage.Draft | shop.Stage.Accepted"},
+		{[]ir.OpParam{
+			param("order", ir.Case("shop.Stage", []string{"Accepted"}, order)),
+			param("payment", ir.Case("pay.Standing", []string{"Held"}, ir.Ref("pay.Payment"))),
+		}, "order on shop.Stage.Accepted、payment on pay.Standing.Held"},
+	} {
+		if got := NarrowedParamsDisplay(&ir.Effect{Params: tt.params}); got != tt.want {
+			t.Errorf("NarrowedParamsDisplay(%+v) = %q, want %q", tt.params, got, tt.want)
 		}
 	}
 }

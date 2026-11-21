@@ -5,26 +5,27 @@ namespace a {
   classify Stage of Order { Draft; Accepted; Shipped; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
   classify Known of Order? { Found: Order? as Order; Missing: Order? as else; }
-  // post: as X、as any、ない側のケースからの矢印
+  // post: as を書かない、as X
   effect fn p1(order: Order): effects orders.post;
-  effect fn p2(order: Order): effects orders.post as any;
-  effect fn p3(order: Order): effects orders.post as Stage.Draft;
-  effect fn p4(order: Order): effects orders.post as Life.Open;
-  effect fn p5(order: Order): effects orders.post as Life.Absent -> Life.Open;
-  effect fn p6(order: Order): effects orders.post as Known.Missing -> Known.Found;
-  // put: 矢印のある形
+  effect fn p2(order: Order): effects orders.post as Stage.Draft;
+  effect fn p3(order: Order): effects orders.post as Life.Open;
+  effect fn p4(order: Order): effects orders.post as Known.Found;
+  // put: as を書かない、as X、as else。前のケースは、行の引数の型
   effect fn u1(order: Order): effects orders.put;
-  effect fn u2(order: Order): effects orders.put as Stage.Draft -> Stage.Accepted;
-  effect fn u3(order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
-  effect fn u4(order: Order): effects orders.put as any -> Stage.Shipped;
-  effect fn u5(order: Order): effects orders.put as Stage.Accepted -> else;
-  effect fn u6(order: Order): effects orders.put as any -> else;
-  effect fn u7(order: Order): effects orders.put as Stage.Accepted -> Stage.Accepted;
-  effect fn u8(order: Order): effects orders.put as Life.Open -> Life.Closed;
-  // delete: 後は、ない側のケース
+  effect fn u2(order: Order on Stage.Draft): effects orders.put as Stage.Accepted;
+  effect fn u3(order: Order on Stage.Draft | Stage.Accepted): effects orders.put as Stage.Shipped;
+  effect fn u4(order: Order): effects orders.put as Stage.Shipped;
+  effect fn u5(order: Order on Stage.Accepted): effects orders.put as else;
+  effect fn u6(order: Order): effects orders.put as else;
+  effect fn u7(order: Order on Stage.Accepted): effects orders.put as Stage.Accepted;
+  effect fn u8(order: Order on Life.Open): effects orders.put as Life.Closed;
+  effect fn u9(order: Order on Stage.Draft): effects orders.put;
+  // 行の引数を絞り込む分類は、as の分類と、違ってもよい（as の分類については、前は、どのケースでも）
+  effect fn u10(order: Order on Life.Open): effects orders.put as Stage.Shipped;
+  // delete: as を書かない、as <ない側のケース>
   effect fn d1(order: Order): effects orders.delete;
   effect fn d2(order: Order): effects orders.delete as Life.Absent;
-  effect fn d3(order: Order): effects orders.delete as Life.Open -> Life.Absent;
-  effect fn d4(order: Order): effects orders.delete as any -> Life.Absent;
-  effect fn d5(order: Order): effects orders.delete as Known.Found -> Known.Missing;
+  effect fn d3(order: Order on Life.Open): effects orders.delete as Life.Absent;
+  effect fn d4(order: Order on Known.Found): effects orders.delete as Known.Missing;
+  effect fn d5(order: Order on Stage.Draft): effects orders.delete;
 }

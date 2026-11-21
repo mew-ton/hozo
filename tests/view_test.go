@@ -192,7 +192,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "インデックスの model（Model.index。fields は空）",
 			attrs.Index != nil && attrs.Index.Name == "name" && typeStr(attrs.Index.Key) == "string" && typeStr(attrs.Index.Value) == "string[]" && len(attrs.Fields) == 0, true)
 		expect(t, "scalar の base が別の scalar への ref", typeStr(declOf(t, prog, "api.AdminToken").(*ir.Scalar).Base), "api.Token")
-		expect(t, "絞り込まれた型 case", typeStr(opOf(t, prog, "web.adminPageVm").Params[0].Type), "web.UserKind.Admin<api.PublicUser>")
+		expect(t, "絞り込まれた型 case", typeStr(opOf(t, prog, "web.adminPageVm").Params[0].Type), "api.PublicUser on web.UserKind.Admin")
 		expect(t, "void は returns が null", opOf(t, prog, "web.signOut").Returns == nil, true)
 		expect(t, "戻り値の型", typeStr(opOf(t, prog, "web.openUser").Returns), "web.UserPage")
 		expect(t, "state の shape", declOf(t, prog, "api.users").(*ir.State).Shape, ir.StateList)
@@ -284,14 +284,15 @@ func TestViewFromEntry(t *testing.T) {
 			}
 			return out
 		}
-		expect(t, "as のケースのアームでは、対象は書いた型", narrowed(arms("api.currentName")[0].Narrowed), []string{"api.User"})
-		expect(t, "値がない側の残りのケースを受ける else のアームは外のまま", narrowed(arms("api.currentName")[1].Narrowed), []string{})
+		// 値の分類と op の分類のアームは、いつも case(C, Ks, B)（docs/types.md「アームの中の対象の型」の 3）
+		expect(t, "as のケースのアームでは、対象は、書いた型を、そのケースに絞り込んだ型", narrowed(arms("api.currentName")[0].Narrowed), []string{"api.User on api.Lookup.Found"})
+		expect(t, "値がない側の残りのケースを受ける else のアームは、もとの型が外のまま", narrowed(arms("api.currentName")[1].Narrowed), []string{"api.User? on api.Lookup.Missing"})
 		expect(t, "by nullable の Some だけのアームで T", narrowed(arms("api.tokenOrNone")[0].Narrowed), []string{"api.Token"})
 		expect(t, "None のアームは外のまま", narrowed(arms("api.tokenOrNone")[1].Narrowed), []string{})
 		expect(t, "状態の分類での match の narrowed は state を持つ", narrowed(arms("api.guard")[0].Narrowed), []string{"api.current: api.Token"})
-		// 型を書かないケースの絞り込みは case(C, Ks, X)
+		// 型を書かないケースも同じ形
 		open := opOf(t, prog, "web.openUser").Body.Statements[1].(ir.ValStmt).Expr.(ir.MatchExpr).Match
-		expect(t, "型を書かないケースの narrowed", narrowed(open.Arms[0].Narrowed), []string{"web.UserKind.Admin<api.PublicUser>"})
+		expect(t, "型を書かないケースの narrowed", narrowed(open.Arms[0].Narrowed), []string{"api.PublicUser on web.UserKind.Admin"})
 	})
 
 	t.Run("ir.md classify/残りのケース", func(t *testing.T) {
@@ -327,8 +328,8 @@ func TestViewFromEntry(t *testing.T) {
 			}
 			return out
 		}
-		expect(t, "presence の残りのケースのアームは外のまま", types(arms("api.memberName")[1].Narrowed), []string{})
-		expect(t, "variant の残りのケースのアーム（残りのアームが一つ）は、そのアームの型", types(arms("api.shownName")[1].Narrowed), []string{"api.User"})
+		expect(t, "presence の残りのケースのアームは、もとの型が外のまま", types(arms("api.memberName")[1].Narrowed), []string{"api.User? on api.Membership.Stranger"})
+		expect(t, "variant の残りのケースのアーム（残りのアームが一つ）は、もとの型が、そのアームの型", types(arms("api.shownName")[1].Narrowed), []string{"api.User on api.Detail.Full"})
 	})
 
 	t.Run("ir.md state / exception / effect と read/引数", func(t *testing.T) {
@@ -452,8 +453,8 @@ func TestViewFromEntry(t *testing.T) {
 		s := armsOf("api.standingName")
 		expect(t, "standingName のアーム", []any{s[0].Cases, s[0].Else, s[1].Cases, s[1].Else},
 			[]any{[]string{"Closed"}, false, []string{"Fresh", "Active", "Idle", "Dormant"}, true})
-		// 受けるケースが二つ以上の else のアームは、絞り込まれない（docs/types.md「アームの中の対象の型」の 1）
-		expect(t, "standingName の else のアームの narrowed", narrowed(s[1]), []string{})
+		// 受けるケースが二つ以上の else のアームは、受けるケースに絞り込んだ型で、もとの型は変えない（docs/types.md「アームの中の対象の型」の 3.1）
+		expect(t, "standingName の else のアームの narrowed", narrowed(s[1]), []string{"api.User on api.Standing.Fresh | api.Standing.Active | api.Standing.Idle | api.Standing.Dormant"})
 		expect(t, "standingName の本体", renderBody(opOf(t, prog, "api.standingName").Body), []string{
 			"return match (user by api.Standing) { Closed => throw api.NotFound; else(Fresh, Active, Idle, Dormant) => api.nameOf(user: user) }",
 		})
@@ -463,10 +464,10 @@ func TestViewFromEntry(t *testing.T) {
 			[]any{[]string{"Idle", "Fresh"}, false, []string{"Active"}, []string{"Dormant", "Closed"}, true})
 		// 受けるケースがちょうど一つの else のアームは、そのケースを名前で書いたアームと同じに絞り込まれる
 		r := armsOf("api.arrivedName")
-		expect(t, "arrivedName の else のアーム", []any{r[1].Cases, r[1].Else, narrowed(r[1])}, []any{[]string{"Member"}, true, []string{"api.User"}})
+		expect(t, "arrivedName の else のアーム", []any{r[1].Cases, r[1].Else, narrowed(r[1])}, []any{[]string{"Member"}, true, []string{"api.User on api.Membership.Member"}})
 		// ケースが一つの分類での match
 		o := armsOf("api.onlyArrived")
-		expect(t, "onlyArrived のアーム", []any{len(o), o[0].Cases, o[0].Else, narrowed(o[0])}, []any{1, []string{"Arrived"}, false, []string{"api.User"}})
+		expect(t, "onlyArrived のアーム", []any{len(o), o[0].Cases, o[0].Else, narrowed(o[0])}, []any{1, []string{"Arrived"}, false, []string{"api.User on api.Arrival.Arrived"}})
 	})
 
 	t.Run("ir.md decorator/$param と external", func(t *testing.T) {
@@ -845,11 +846,14 @@ func TestViewFromEntry(t *testing.T) {
 				t.Errorf("classify の JSON に %s のキーがある", key)
 			}
 		}
-		// 版 0.9: 行の遷移（Effect.row）。書いていない効果は、row のキーを持たない。-> else は to を、分類を名指ししない形は classify を持たない
-		expect(t, "行の遷移の JSON（post）", jsonDecl(t, api, "api.enrol")["row"], map[string]any{"param": "user", "classify": "api.Standing", "from": "any", "to": "Fresh"})
-		expect(t, "行の遷移の JSON（put、前のケースの並び）", jsonDecl(t, api, "api.rest")["row"], map[string]any{"param": "user", "classify": "api.Standing", "from": []any{"Fresh", "Active"}, "to": "Idle"})
-		expect(t, "行の遷移の JSON（-> else）", jsonDecl(t, api, "api.amend")["row"], map[string]any{"param": "user", "classify": "api.Standing", "from": []any{"Idle"}})
-		expect(t, "行の遷移の JSON（delete）", jsonDecl(t, api, "api.forget")["row"], map[string]any{"param": "user", "classify": "api.Enrolment", "from": []any{"Lapsed"}, "to": "Unknown"})
+		// 版 0.9、0.16: 行の遷移（Effect.row）。書いていない効果は、row のキーを持たない。`as else` は classify と to を持たない。
+		// 前のケースは、行の引数の型（kind が case）が言い、row には、ない
+		expect(t, "行の遷移の JSON（post）", jsonDecl(t, api, "api.enrol")["row"], map[string]any{"param": "user", "classify": "api.Standing", "to": "Fresh"})
+		expect(t, "行の遷移の JSON（put）", jsonDecl(t, api, "api.rest")["row"], map[string]any{"param": "user", "classify": "api.Standing", "to": "Idle"})
+		expect(t, "行の引数の型の JSON（put、前のケースの並び）", jsonDecl(t, api, "api.rest")["params"].([]any)[0].(map[string]any)["type"],
+			map[string]any{"kind": "case", "classify": "api.Standing", "cases": []any{"Fresh", "Active"}, "of": map[string]any{"kind": "ref", "target": "api.User"}})
+		expect(t, "行の遷移の JSON（as else）", jsonDecl(t, api, "api.amend")["row"], map[string]any{"param": "user"})
+		expect(t, "行の遷移の JSON（delete）", jsonDecl(t, api, "api.forget")["row"], map[string]any{"param": "user", "classify": "api.Enrolment", "to": "Unknown"})
 		if _, ok := jsonDecl(t, api, "api.createSession")["row"]; ok {
 			t.Error("行の遷移を書いていない効果に row のキーを出さない")
 		}

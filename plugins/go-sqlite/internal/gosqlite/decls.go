@@ -379,8 +379,8 @@ func (e *emitter) collectEffects() {
 			}
 			x.conds = e.paramConditions(x.table, decl.Params, what, fqn)
 		default:
-			// 引数は、表の model の行一つ
-			if len(decl.Params) != 1 || !ir.TypeEqual(decl.Params[0].Type, ir.Ref(m.decl.Name)) {
+			// 引数は、表の model の行一つ（型は、model そのものか、それを分類のケースで絞り込んだ型）
+			if len(decl.Params) != 1 || !ir.TypeEqual(uncase(decl.Params[0].Type), ir.Ref(m.decl.Name)) {
 				e.errorf(codeSQLParams, fqn, "効果 %s の引数（%s）が、@%s の受け取るもの（表 %s の model %s の行一つ）でない", fqn, paramsDisplay(decl.Params), x.kind, x.table.state.Name, m.decl.Name)
 			}
 		}
@@ -394,14 +394,38 @@ func (e *emitter) collectEffects() {
 				e.errorf(codeSQLUpdate, fqn, "効果 %s の @db.update の表 %s の model %s が、キーでない列を一つも持たない（書き換えるものがない）", fqn, x.table.state.Name, m.decl.Name)
 			}
 		}
-		// GOSQL-30: @db.update は、渡った行を、そのまま書く。渡る行は、前のケースにある（STATE-9）ので、後のケースが
+		// GOSQL-30: @db.update は、渡った行を、そのまま書く。渡る行は、行の引数の型が言う、前のケースにあるので、後のケースが
 		// 前のケースの並びになければ、書いた後の行は、宣言した後のケースにならない
-		if row := decl.Row; x.kind == decoratorUpdate && row != nil && !row.From.Any && row.To != "" && !containsCase(row.From.Cases, row.To) {
-			e.errorf(codeSQLRow, fqn, "効果 %s の @db.update が、行の遷移（%s）と合わない: 渡る行は、前のケースにあり、@db.update は、その行を、そのまま書くので、書いた後の行は %s.%s にならない（行をそのケースにする書き方は、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）",
-				fqn, golang.RowDisplay(decl), row.Classify, row.To)
+		if row := decl.Row; x.kind == decoratorUpdate && row != nil && row.To != "" {
+			if from, ok := rowParamCases(decl); ok && !containsCase(from, row.To) {
+				e.errorf(codeSQLRow, fqn, "効果 %s の @db.update が、行の遷移（%s、%s）と合わない: 渡る行は、前のケースにあり、@db.update は、その行を、そのまま書くので、書いた後の行は %s.%s にならない（行をそのケースにする書き方は、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）",
+					fqn, golang.NarrowedParamsDisplay(decl), golang.RowDisplay(decl), row.Classify, row.To)
+			}
 		}
 		x.ok = len(e.errs) == before
 	}
+}
+
+// uncase は、絞り込んだ型（case）なら、もとの型。それ以外は、そのまま。
+func uncase(t ir.Type) ir.Type {
+	if c, ok := t.(ir.CaseType); ok {
+		return c.Of
+	}
+	return t
+}
+
+// rowParamCases は、効果の、行の引数の型が、行の遷移の分類で絞り込んだ型（case）なら、そのケースの並び（効果の前のケース）。
+// 絞り込んでいなければ（どのケースの行でも受け取る）ok は false。
+func rowParamCases(decl *ir.Effect) ([]string, bool) {
+	for _, p := range decl.Params {
+		if p.Name != decl.Row.Param {
+			continue
+		}
+		if c, ok := p.Type.(ir.CaseType); ok && c.Classify == decl.Row.Classify {
+			return c.Cases, true
+		}
+	}
+	return nil, false
 }
 
 // conflictOf は、効果 x の @db.conflict（conflicts は、その適用。なければ空）と、効果の throws を確かめ、x.conflict を決める

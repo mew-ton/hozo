@@ -162,9 +162,7 @@ func (a *analyzer) lowerScalar(s *symbol, d *ast.ScalarDecl, sc *scope) ir.Decl 
 		sl.Base = ir.CoreType{Name: ir.CoreName(t.Name)}
 	case *ast.NamedType:
 		if r, ok := a.resolve(t.Name, sc, acScalar); ok {
-			if t.Arg != nil {
-				a.errorf("TYPE-9", t.Span, "scalar %s の extends の先に型引数は書けない", s.fqn)
-			} else if a.lower(r.sym) == nil && r.sym.state == lowering {
+			if a.lower(r.sym) == nil && r.sym.state == lowering {
 				a.errorf("TYPE-9", t.Span, "scalar %s の継承が循環している（%s）", s.fqn, r.sym.fqn)
 			} else {
 				sl.Base = ir.Ref(r.sym.fqn)
@@ -389,8 +387,9 @@ func (a *analyzer) lowerEffect(s *symbol, d *ast.EffectDecl, sc *scope) ir.Decl 
 	switch {
 	case d.On != nil:
 		a.lowerBuiltinTarget(s, e, d.On, sc)
+		rowParamOK := a.checkRowParam(s, e, d)
 		if d.Row != nil {
-			a.lowerRow(s, e, d.Row, sc)
+			a.lowerRow(s, e, d.Row, sc, rowParamOK)
 		}
 	case d.Transition != nil:
 		a.lowerTransition(s, e, d.Transition, sc)
@@ -438,25 +437,14 @@ type rowCase struct {
 	span     source.Span // K の位置
 }
 
-// lowerRow は行の遷移（`effects s.op as …`。docs/check.md「行の遷移」）。確かめて、誤りがなければ e.Row に置く
-// （post の `as any` は、確かめるだけで、置かない: as を書かないのと同じ意味）。
+// lowerRow は行の遷移（`effects s.op as …`。docs/check.md「行の遷移」）。確かめて、誤りがなければ e.Row に置く。
 // STATE-7（結びつき）: ケース `C.K` の C が、書き込む状態の行の分類（値の分類で、対象の型が、状態の要素の型 T か T?）でない。
-// K が C のケースでない。一つの as に二つ以上の分類のケースがある。前のケースの並びに同じケースが二度ある。効果の引数に、
-// 型が T のものが、ちょうど一つでない。STATE-8（形）: 形が、操作に合わない（同「操作ごとに書ける形」）。
-// 宛先が決まらなかった効果（RES-5、STATE-1 で報告済み）には、名前の解決だけを行う。
-func (a *analyzer) lowerRow(s *symbol, e *ir.Effect, r *ast.RowClause, sc *scope) {
-	var element ir.Type
-	var op ir.Operation
-	if target, ok := e.Target.(ir.BuiltinTarget); ok {
-		op = target.Operation
-		if sym := a.syms[target.State]; sym != nil {
-			if st, ok := a.lower(sym).(*ir.State); ok {
-				element = st.Element
-			}
-		}
-	}
+// K が C のケースでない。効果の引数に、型が T か、T を絞り込んだ型のものが、ちょうど一つでない。STATE-8（形）: 形が、操作に
+// 合わない（同「操作ごとに書ける形」）。宛先が決まらなかった効果（RES-5、STATE-1 で報告済み）には、名前の解決だけを行う。
+// rowParamOK は、行の引数の型の規則（checkRowParam）を満たしたか。満たさなければ、STATE-8 は報告済みなので、形の検査を重ねない。
+func (a *analyzer) lowerRow(s *symbol, e *ir.Effect, r *ast.RowClause, sc *scope, rowParamOK bool) {
+	element, op := a.rowTarget(e)
 	ok := true
-	var classify *ir.Classify
 	// 解決: 分類は、最後の要素（ケースの名前）を除いた名前
 	resolveCase := func(qn *ast.QualifiedName) *rowCase {
 		n := len(qn.Segments)
@@ -500,31 +488,7 @@ func (a *analyzer) lowerRow(s *symbol, e *ir.Effect, r *ast.RowClause, sc *scope
 			return nil
 		}
 		a.addRef(last.Span, Target{Kind: TargetCase, Decl: c.Name, Name: last.Name, Span: span})
-		if classify == nil {
-			classify = c
-		} else if classify.Name != c.Name {
-			a.errorf("STATE-7", qn.Span, "effect %s の行の遷移に、二つの分類（%s と %s）のケースがある。一つの as が言うのは、一つの分類のこと（docs/check.md「行の遷移」の「書き方と意味」）", s.fqn, classify.Name, c.Name)
-			ok = false
-			return nil
-		}
 		return &rowCase{classify: c, name: last.Name, span: last.Span}
-	}
-	var before []*rowCase
-	if r.Before != nil {
-		seen := map[string]bool{}
-		for i := range r.Before.Cases {
-			rc := resolveCase(&r.Before.Cases[i])
-			if rc == nil {
-				continue
-			}
-			if seen[rc.name] {
-				a.errorf("STATE-7", rc.span, "effect %s の行の遷移の、前のケースに %s が二度ある", s.fqn, rc.name)
-				ok = false
-				continue
-			}
-			seen[rc.name] = true
-			before = append(before, rc)
-		}
 	}
 	var after *rowCase
 	if r.After.Case != nil {
@@ -533,47 +497,31 @@ func (a *analyzer) lowerRow(s *symbol, e *ir.Effect, r *ast.RowClause, sc *scope
 	if element == nil || !ok {
 		return
 	}
-	// 行の引数: 型が、状態の要素の型と等しい引数が、ちょうど一つ
-	var rows []string
+	// 行の引数: 型が、状態の要素の型か、それを絞り込んだ型の引数が、ちょうど一つ
+	var rows []ir.OpParam
+	var names []string
 	for _, p := range e.Params {
-		if p.Type != nil && ir.TypeEqual(p.Type, element) {
-			rows = append(rows, p.Name)
+		if p.Type != nil && ir.TypeEqual(uncase(p.Type), element) {
+			rows = append(rows, p)
+			names = append(names, p.Name)
 		}
 	}
 	if len(rows) != 1 {
 		found := "一つもない"
 		if len(rows) > 1 {
-			found = "二つ以上ある（" + strings.Join(rows, "、") + "）"
+			found = "二つ以上ある（" + strings.Join(names, "、") + "）"
 		}
-		a.errorf("STATE-7", r.AsSpan, "effect %s の行の遷移: 型が %s（書き込む状態の要素の型）の引数が、%s。行の遷移を書く効果は、行を受け取る引数を、ちょうど一つ持つ（行の引数を持たない効果は as を書けない。docs/check.md「行の遷移」の「結びつき」）",
+		a.errorf("STATE-7", r.AsSpan, "effect %s の行の遷移: 型が %s（書き込む状態の要素の型）か、それを絞り込んだ型の引数が、%s。行の遷移を書く効果は、行を受け取る引数を、ちょうど一つ持つ（行の引数を持たない効果は as を書けない。docs/check.md「行の遷移」の「結びつき」）",
 			s.fqn, typeName(element), found)
 		return
 	}
-	absent := ""
-	if classify != nil {
-		absent = classify.Absent
-	}
-	if !a.checkSTATE8(s, op, r, before, after, absent) {
+	if !rowParamOK || !a.checkSTATE8(s, op, r, after) {
 		return
 	}
-	if op == ir.OpPost && after == nil {
-		// post の `as any` は、as を書かないのと同じ意味で、IR では同じ形（row を持たない。docs/ir.md「正規化」）
-		return
-	}
-	row := &ir.RowTransition{Param: rows[0], From: ir.AnyCase()}
-	if classify != nil {
-		row.Classify = classify.Name
-	}
+	row := &ir.RowTransition{Param: rows[0].Name}
 	if after != nil {
+		row.Classify = after.classify.Name
 		row.To = after.name
-	}
-	// post の前は、IR に残さない（入る前の行は、ない。docs/ir.md「正規化」）
-	if op != ir.OpPost && r.Before != nil && !r.Before.Any {
-		names := make([]string, len(before))
-		for i, rc := range before {
-			names[i] = rc.name
-		}
-		row.From = ir.Cases(names...)
 	}
 	e.Row = row
 }
@@ -587,68 +535,91 @@ func caseNames(c *ir.Classify) []string {
 	return out
 }
 
+// rowTarget は、組み込みの効果 e が書き込む状態の要素の型と、操作。宛先が決まらなかった効果では、要素の型は nil。
+func (a *analyzer) rowTarget(e *ir.Effect) (element ir.Type, op ir.Operation) {
+	if target, ok := e.Target.(ir.BuiltinTarget); ok {
+		op = target.Operation
+		if sym := a.syms[target.State]; sym != nil {
+			if st, ok := a.lower(sym).(*ir.State); ok {
+				element = st.Element
+			}
+		}
+	}
+	return element, op
+}
+
+// checkRowParam は STATE-8 のうち、行の引数の型の規則（docs/check.md「行の遷移」の「操作ごとに書ける形」）: put と delete の
+// 行の引数（型が、状態の要素の型か、それを絞り込んだ型の、ただ一つの引数）を、ない側のケースに絞り込んだ型は、書けない
+// （書き換える行、消す行は、ある）。as を書いていない効果にも掛かる。位置は、その引数の型。満たしていれば true。
+func (a *analyzer) checkRowParam(s *symbol, e *ir.Effect, d *ast.EffectDecl) bool {
+	element, op := a.rowTarget(e)
+	if element == nil || op == ir.OpPost {
+		return true
+	}
+	var rows []ir.OpParam
+	for _, p := range e.Params {
+		if p.Type != nil && ir.TypeEqual(uncase(p.Type), element) {
+			rows = append(rows, p)
+		}
+	}
+	if len(rows) != 1 {
+		return true
+	}
+	ct, narrowed := rows[0].Type.(ir.CaseType)
+	if !narrowed {
+		return true
+	}
+	sym := a.syms[ct.Classify]
+	if sym == nil {
+		return true
+	}
+	c, isClassify := a.lower(sym).(*ir.Classify)
+	if !isClassify || c.Absent == "" || !contains(ct.Cases, c.Absent) {
+		return true
+	}
+	span := d.Span
+	for _, p := range d.Params {
+		if p.Name.Name == rows[0].Name {
+			span = p.Type.NodeSpan()
+		}
+	}
+	a.errorf("STATE-8", span, "effect %s の行の引数 %s の型 %s は、ない側のケース %s を含む（%s は、ある行を受け取る。docs/check.md「行の遷移」の「操作ごとに書ける形」）",
+		s.fqn, rows[0].Name, typeName(rows[0].Type), c.Absent, op)
+	return false
+}
+
 // checkSTATE8 は STATE-8（docs/check.md「行の遷移」の「操作ごとに書ける形」）: 行の遷移の形が、操作に合わない。
-// absent は、分類のない側のケースの名前（なければ空）。一つの効果に、一つだけ報告する。合っていれば true。
-func (a *analyzer) checkSTATE8(s *symbol, op ir.Operation, r *ast.RowClause, before []*rowCase, after *rowCase, absent string) bool {
+// after は後のケース（as else なら nil）。一つの効果に、一つだけ報告する（行の引数の型の規則は checkRowParam）。合っていれば true。
+func (a *analyzer) checkSTATE8(s *symbol, op ir.Operation, r *ast.RowClause, after *rowCase) bool {
 	fail := func(span source.Span, format string, args ...any) bool {
 		a.errorf("STATE-8", span, "effect %s の行の遷移: %s（docs/check.md「行の遷移」の「操作ごとに書ける形」）", s.fqn, fmt.Sprintf(format, args...))
 		return false
 	}
-	isAbsent := func(rc *rowCase) bool { return rc != nil && absent != "" && rc.name == absent }
+	isAbsent := func(rc *rowCase) bool { return rc != nil && rc.classify.Absent != "" && rc.name == rc.classify.Absent }
 	switch op {
 	case ir.OpPost:
-		const forms = "post に書けるのは、as <ケース>（そのケースで入る）、as any、as <ない側のケース> -> <ケース>"
-		if !r.Arrow {
-			if isAbsent(after) {
-				return fail(after.span, "%s は、ない側のケースで、post の後のケースには書けない（入った行は、ある）。%s", after.name, forms)
-			}
-			return true
-		}
-		if r.Before.Any {
-			return fail(r.Before.Span, "post の矢印の前に any は書けない（入る前の行は、ない）。%s", forms)
-		}
-		for _, rc := range before {
-			if !isAbsent(rc) {
-				return fail(rc.span, "post の矢印の前に書けるのは、ない側のケース一つだけで、%s は、そうではない（入る前の行は、ない）。%s", rc.name, forms)
-			}
-		}
+		const forms = "post に書けるのは、as <ケース>（そのケースで入る）。入るケースが決まっていないなら、as を書かない"
 		if r.After.Else {
-			return fail(r.After.Span, "post の矢印の後ろに else は書けない（入るケースが決まっていないなら、as を書かない）。%s", forms)
+			return fail(r.After.Span, "post の as に else は書けない。%s", forms)
 		}
 		if isAbsent(after) {
 			return fail(after.span, "%s は、ない側のケースで、post の後のケースには書けない（入った行は、ある）。%s", after.name, forms)
 		}
 	case ir.OpPut:
-		const forms = "put に書けるのは、as <前> -> <後>（前は any か、ケースの並び。後は、ケース一つか else）"
-		if !r.Arrow {
-			return fail(r.AsSpan, "put は、矢印で書く（どのケースからでもよければ as any -> <後>）。%s", forms)
-		}
-		for _, rc := range before {
-			if isAbsent(rc) {
-				return fail(rc.span, "%s は、ない側のケースで、put の前のケースには書けない（put は、ある行を書き換える）。%s", rc.name, forms)
-			}
-		}
+		const forms = "put に書けるのは、as <ケース>（後のケース）か as else（後のケースは決まっていない）。前のケースは、行の引数の型で言う"
 		if isAbsent(after) {
 			return fail(after.span, "%s は、ない側のケースで、put の後のケースには書けない（行をなくすのは delete）。%s", after.name, forms)
 		}
 	case ir.OpDelete:
-		const forms = "delete に書けるのは、as <ない側のケース>、as <前> -> <ない側のケース>（前は any か、ない側でないケースの並び）。ない側のケースは、T? を対象にした分類に <名前>: T? as none; と書く"
-		if !r.Arrow && r.After.Any {
-			return fail(r.After.Span, "delete の後は、ない側のケース（消した後の行は、ない）。%s", forms)
-		}
+		const forms = "delete に書けるのは、as <ない側のケース>。消せる行を絞るなら、行の引数の型で言う。ない側のケースは、T? を対象にした分類に <名前>: T? as none; と書く"
 		if r.After.Else {
-			return fail(r.After.Span, "delete の矢印の後ろに else は書けない（消した後の行は、ない）。%s", forms)
+			return fail(r.After.Span, "delete の as に else は書けない（消した後の行は、ない）。%s", forms)
 		}
 		if after != nil && !isAbsent(after) {
-			if absent == "" {
+			if after.classify.Absent == "" {
 				return fail(after.span, "classify %s は、ない側のケースを持たないので、delete の効果の as には書けない（「行がない」を言うケースがない）。%s", after.classify.Name, forms)
 			}
-			return fail(after.span, "delete の後のケースは、ない側のケース %s で、%s ではない（消した後の行は、ない）。%s", absent, after.name, forms)
-		}
-		for _, rc := range before {
-			if isAbsent(rc) {
-				return fail(rc.span, "%s は、ない側のケースで、delete の前のケースには書けない（消すのは、ある行）。%s", rc.name, forms)
-			}
+			return fail(after.span, "delete の後のケースは、ない側のケース %s で、%s ではない（消した後の行は、ない）。%s", after.classify.Absent, after.name, forms)
 		}
 	}
 	return true
@@ -1145,7 +1116,7 @@ func (a *analyzer) caseTypingSubject(s *symbol, c *ir.Classify, ct *ast.CaseTypi
 	}
 	var named *symbol
 	nt, isName := ct.Subject.(*ast.NamedType)
-	if isName && nt.Arg == nil {
+	if isName {
 		r, found := a.peek(nt.Name, sc)
 		if !found {
 			a.resolve(nt.Name, sc, acState|acOp|acTypePos) // 名前が見つからないことを言う
@@ -1405,7 +1376,7 @@ func (a *analyzer) lowerClassifySubject(s *symbol, of []ast.Type, sc *scope) ir.
 // lowerOpSubject は op の分類の対象（docs/check.md「分類」の「対象」）。どの名前空間の op でもよく、export は要らない
 // （対象にすることは呼び出しではない）。CLS-4: 値を返さない op（returns が null か never）。
 // 対象の型（その op の returns）は op の宣言の構文から読む: op の引数や戻り値の型が、この分類のケースで絞り込んだ型
-// （C.Case<T>）を使っていても、互いを下ろし合わないようにするため。
+// （T on C.Case）を使っていても、互いを下ろし合わないようにするため。
 func (a *analyzer) lowerOpSubject(s *symbol, nt *ast.NamedType, sc *scope) ir.ClassifySubject {
 	r, ok := a.resolve(nt.Name, sc, acOp)
 	if !ok {
@@ -1446,7 +1417,7 @@ func (a *analyzer) quietType(t ast.Type, sc *scope) (ir.Type, bool) {
 // 形の語や ? / [] を持つ型は、型として読む。
 func (a *analyzer) subjectKindOf(t ast.Type, sc *scope) (subjectKind, *symbol) {
 	nt, ok := t.(*ast.NamedType)
-	if !ok || nt.Arg != nil {
+	if !ok {
 		return subjectType, nil
 	}
 	r, ok := a.peek(nt.Name, sc)

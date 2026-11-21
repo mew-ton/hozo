@@ -4,10 +4,10 @@ namespace a {
   fn find(): M?;
   classify Found of find { Hit; Other; }
   classify Kind of M { A; B; }
-  fn ok1(m: Found.Hit<M?>): void;
-  fn ok2(m: Found.Hit<M>): void;
+  fn ok1(m: M? on Found.Hit): void;
+  fn ok2(m: M on Found.Hit): void;
 }
 namespace b {
-  fn ok3(m: a.Kind.A<a.M>): void;
-  fn ok4(m: a.Found.Hit<a.M>): void;
+  fn ok3(m: a.M on a.Kind.A): void;
+  fn ok4(m: a.M on a.Found.Hit): void;
 }

@@ -2,8 +2,8 @@
 namespace a {
   model M { id: string; }
   classify C of M { A; B; }
-  fn onA(m: C.A<M>): void;
-  fn onB(m: C.B<M>): void;
+  fn onA(m: M on C.A): void;
+  fn onB(m: M on C.B): void;
   fn wide2(m: M): void;
   fn f(m: M): void {
     match (m by C) {

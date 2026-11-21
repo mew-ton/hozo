@@ -19,12 +19,12 @@ namespace a {
   union V { Ready: M; }
   fn n(): V;
   fn o(): V.Ready;                     // ERROR: RES-4
-  fn p(): M<M>;                        // ERROR: RES-4
+  fn p(): M on V.Ready;                // ERROR: RES-4
   // 遷移の宛先にできるのは、状態を対象にした classify か、組み込みの分類を持つ state
   effect fn q(): effects C as A -> A;               // ERROR: RES-4
   effect fn r(): effects M as A -> B;               // ERROR: RES-4
   effect fn t(): effects n as None -> Some;    // ERROR: RES-4
-  // classify の対象が一つで、型でも状態でもない（値の分類の名前は C.Case<T> の形でだけ型になる）
+  // classify の対象が一つで、型でも状態でもない（値の分類の名前は T on C.Case の形でだけ型になる）
   classify D of E { A; }               // ERROR: RES-4
   classify F of C { A; }               // ERROR: RES-4
 }

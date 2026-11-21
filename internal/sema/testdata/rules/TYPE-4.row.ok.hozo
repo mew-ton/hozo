@@ -1,0 +1,80 @@
+// TYPE-4（docs/check.md「行の遷移」の「呼ぶ側」、docs/types.md「アームの中の対象の型」「ケースが分かっている値」）: 行の引数を
+// 絞り込んだ効果は、そのケースにあると分かっている値で呼ぶ。分かるのは、型が T on C.Ks の値: match のアームの中の対象
+// （名前で並べたアームも、else のアームも、型を書いたケースのアームも）と、その型を書いた引数、val。絞り込まない引数の効果と、
+// as を書かない効果、post は、どの行でも受け取る
+namespace a {
+  model Order { id: string; note: string; }
+  model Box { order: Order; }
+  state orders: list<Order>;
+  exception NotAccepted;
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  classify Review of Order { Passed: Order as Order on Stage.Accepted; Failed; }
+  read fn byId(id: string): Order? reads orders;
+  effect fn accept(order: Order): effects orders.post as Stage.Accepted;
+  effect fn open(order: Order): effects orders.post as Life.Open;
+  effect fn start(order: Order on Stage.Accepted, at: datetime): effects orders.put as Stage.InProduction;
+  effect fn cancel(order: Order on Stage.Draft | Stage.Accepted): effects orders.put as Stage.Cancelled;
+  effect fn forceShip(order: Order): effects orders.put as Stage.Shipped;
+  effect fn patch(order: Order): effects orders.put as else;
+  effect fn rename(order: Order): effects orders.put;
+  effect fn discard(order: Order on Life.Open): effects orders.delete as Life.Absent;
+  effect fn purge(order: Order): effects orders.delete as Life.Absent;
+  // 名前で並べたアーム（一つのケース、引数の型に収まる二つのケース）
+  fn byArm(order: Order, at: datetime): throws NotAccepted {
+    match (order by Stage) {
+      Accepted => start(order, at);
+      else     => throw NotAccepted;
+    };
+    match (order by Stage) {
+      Draft, Accepted => cancel(order);
+      InProduction, Shipped, Cancelled => none;
+    };
+  }
+  // else のアームが受けるケースが、引数の型に収まる
+  fn byElseArm(order: Order) {
+    match (order by Stage) {
+      InProduction, Shipped, Cancelled => none;
+      else => cancel(order);
+    };
+  }
+  // 対象がパスでも、同じ Atom なら分かる。型を書いたケースのアームでも分かる
+  fn byPath(box: Box, found: Order?) {
+    match (box.order by Stage) {
+      Draft => cancel(box.order);
+      else  => none;
+    };
+    match (found by Life) {
+      Open   => discard(found);
+      Closed => none;
+      Absent => none;
+    };
+  }
+  // 引数の型、val の型、別の分類のケースが as に書いた型
+  fn byType(order: Order on Stage.Accepted, at: datetime) {
+    start(order, at);
+    cancel(order);
+  }
+  fn pick(order: Order): Order on Stage.Draft;
+  fn byBinding(order: Order, reviewed: Order) {
+    val draft = pick(order);
+    cancel(draft);
+    match (reviewed by Review) {
+      Passed => cancel(reviewed);
+      Failed => none;
+    };
+  }
+  // 絞り込んだ値は、絞り込まない引数にも渡せる
+  fn widen(order: Order on Stage.Accepted) {
+    forceShip(order);
+  }
+  // どの行でも受け取る効果
+  fn free(order: Order) {
+    accept(order);
+    open(order);
+    forceShip(order);
+    patch(order);
+    rename(order);
+    purge(order);
+  }
+}

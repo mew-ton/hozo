@@ -53,14 +53,15 @@
 | `classify C of ...` の対象 | `never` なら、対象のない分類（予約語で、解決しない。`docs/check.md`「分類」の「対象のない分類」）。一つで型を指せば値の分類（下の「型」と同じ）。一つで `op` を指せば op の分類（どの名前空間の op でも。`export` は要らない。値を返さない op は CLS-4）。すべてが現在の名前空間の `state`（基底の状態）なら状態の分類。型や op と状態の混在、状態でないものを含む並びなどは CLS-3（`docs/check.md`「classify / match」）。対象が一つで、型でも op でも状態でもなければ RES-4。対象が形の語か `?` / `[]` を持つ型（`nullable<User>`、`User?`）なら、型として読む |
 | ケースの `X as T` の `X` | その分類の対象と同じもの: 値の分類なら型（`subject` の型と等しいこと）、op の分類ならその `op`、状態の分類なら対象の `state` のどれか。解決は対象と同じ規則で行い、対象でなければ CLS-5（`docs/check.md`「classify / match」） |
 | ケースの `X as T` の `T` | 下の「型」と同じ。絞り込める型かどうかは CLS-6。残りのケースの `X as else` の `else` と、ない側のケースの `X as none` の `none` は予約語で、解決しない（`X` は上の行と同じ） |
-| 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）、`classify` のケース（`C.Case<T>` の形でだけ。`C` は値の分類か op の分類で、どの名前空間のものでもよい。状態の分類と、対象のない分類なら RES-4）。核の型と形の語は予約語なので解決しない |
+| 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）、核の型と形の語は予約語なので解決しない。`classify` と、そのケースは、型にならない（RES-4）: 絞り込んだ型は、`T on C.K` と書く（下の行） |
+| 絞り込んだ型のケース `C.K`（`T on C.K`。`docs/grammar.md`「型」の `OnType`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`C` は値の分類か op の分類で、状態の分類と、対象のない分類なら RES-4。`K` が `C` のケースでなければ RES-3。並べたケースが一つの分類のものか、同じケースが二度ないか、`T` が対象の型に渡せるかは TYPE-12（`docs/types.md`「型の種類」の「絞り込んだ型」） |
 | ユニオンのメンバー `X;` | `exception`、`effect`、`union`（`set`） |
 | `exception`、`effect`、`read` の引数の型、`read` の結果の型 | 上の「型」と同じ |
 | `effect fn e(…): effects s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
 | `read fn r(…): T reads s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
 | `effect fn e(…): effects X as A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
 | 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら、その形の、組み込みの分類のケース（`docs/check.md`「状態の形」の表） |
-| 行の遷移のケース `C.K`（`effect fn e(…): effects s.op as C.K -> …`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
+| 行の遷移のケース `C.K`（`effect fn e(…): effects s.op as C.K`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
 | `catches` の要素 | `throws` と同じ |

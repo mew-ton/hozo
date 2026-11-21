@@ -821,7 +821,7 @@ func (a *analyzer) lowerParam(p *ast.Param, sc *scope) ir.Param {
 // docs/types.md「デコレータの引数」）も受け付ける。
 func (a *analyzer) lowerParamType(t ast.Type, sc *scope) (ir.Type, bool) {
 	nt, ok := t.(*ast.NamedType)
-	if !ok || nt.Arg != nil {
+	if !ok {
 		return a.lowerType(t, sc)
 	}
 	r, ok := a.resolve(nt.Name, sc, acTypePos|acUnionSet)
@@ -829,7 +829,7 @@ func (a *analyzer) lowerParamType(t ast.Type, sc *scope) (ir.Type, bool) {
 		return nil, false
 	}
 	if r.kind == rCase {
-		a.errorf("RES-4", nt.Name.Span, "classify のケース %s を型にするには型引数が要る（%s<T>）", nt.Name.String(), nt.Name.String())
+		a.errorf("RES-4", nt.Name.Span, "classify のケース %s は、そのままでは型にならない。絞り込んだ型は、T on %s と書く", nt.Name.String(), nt.Name.String())
 		return nil, false
 	}
 	return ir.Ref(r.sym.fqn), true
@@ -844,8 +844,8 @@ func (a *analyzer) lowerCaseKind(k *ast.CaseKind, sc *scope) ir.CaseKind {
 	case k.Never:
 		out.Subject = ir.Never()
 	case k.Of != nil:
-		if n, ok := k.Of.(*ast.NamedType); ok && n.Arg == nil {
-			// 型引数のない名前: 分類の名前か、型の名前かを、名前の解決で分ける
+		if n, ok := k.Of.(*ast.NamedType); ok {
+			// 名前: 分類の名前か、型の名前かを、名前の解決で分ける
 			r, ok := a.resolve(n.Name, sc, acClassify|acModel|acScalar|acUnionArms)
 			if !ok || r.sym == nil {
 				return out

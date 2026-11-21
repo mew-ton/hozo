@@ -55,10 +55,13 @@ func TestTypeString(t *testing.T) {
 		{Array(String()), "string[]"},
 		{Optional(Array(String())), "string[]?"},
 		{Array(Optional(String())), "string?[]"},
-		{Case("server.WarrantyKind", []string{"Yamada"}, Ref("server.Item")), "server.WarrantyKind.Yamada<server.Item>"},
-		{Case("C", []string{"A", "B"}, Int()), "C.(A, B)<int>"},
-		{Case("C", nil, Int()), "C.()<int>"},
-		{Optional(Case("C", []string{"A"}, Ref("T"))), "C.A<T>?"},
+		// 絞り込んだ型は、仕様の綴り（docs/grammar.md「型」の OnType）。on の後ろに ? と [] は続けられないので、
+		// 包む形は nullable<…>、list<…>
+		{Case("server.WarrantyKind", []string{"Yamada"}, Ref("server.Item")), "server.Item on server.WarrantyKind.Yamada"},
+		{Case("C", []string{"A", "B"}, Int()), "int on C.A | C.B"},
+		{Case("C", []string{"A"}, Optional(Ref("T"))), "T? on C.A"},
+		{Optional(Case("C", []string{"A"}, Ref("T"))), "nullable<T on C.A>"},
+		{Array(Case("C", []string{"A"}, Ref("T"))), "list<T on C.A>"},
 		{OptionalType{}, "void?"},
 	}
 	for _, c := range cases {

@@ -1,7 +1,7 @@
-// TYPE-12（docs/types.md「診断」）: C.Case<T> の T が C の subject に渡せない。internal/sema/testdata/rules/TYPE-12.hozo から
+// TYPE-12（docs/types.md「診断」）: T on C.Case の T が C の subject に渡せない。internal/sema/testdata/rules/TYPE-12.hozo から
 namespace a {
   model M { id: string; }
   model N { name: string; }
   classify C of M { A; }
-  fn ng(n: C.A<N>): void;              // ERROR: TYPE-12
+  fn ng(n: N on C.A): void;              // ERROR: TYPE-12
 }

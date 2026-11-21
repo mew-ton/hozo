@@ -19,5 +19,5 @@ namespace a {
   union V { Ready: M; }
   fn n(): V;
   fn o(): V.Ready;                     // ERROR: RES-4
-  fn p(): M<M>;                        // ERROR: RES-4
+  fn p(): M on V.Ready;                // ERROR: RES-4
 }

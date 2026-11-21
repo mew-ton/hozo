@@ -602,7 +602,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.15"
+          "const": "0.16"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -1266,7 +1266,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.15"
+          "const": "0.16"
         },
         "transpiler": {
           "type": "string"
@@ -1484,7 +1484,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.15"
+          "const": "0.16"
         }
       },
       "required": [
@@ -2289,7 +2289,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.15"
+          "const": "0.16"
         }
       },
       "required": [
@@ -2508,9 +2508,6 @@
         "classify": {
           "type": "string"
         },
-        "from": {
-          "$ref": "#/$defs/CaseSet"
-        },
         "param": {
           "type": "string"
         },
@@ -2519,8 +2516,7 @@
         }
       },
       "required": [
-        "param",
-        "from"
+        "param"
       ],
       "type": "object"
     },
@@ -3146,7 +3142,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.15"
+          "const": "0.16"
         },
         "viewer": {
           "type": "string"

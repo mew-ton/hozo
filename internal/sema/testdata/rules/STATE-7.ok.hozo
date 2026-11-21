@@ -1,19 +1,22 @@
 // STATE-7（docs/check.md「行の遷移」の「結びつき」）: as のケースの分類は、書き込む状態の要素の型 T（か T?）を対象にした
-// 値の分類。効果の引数のうち、型が T のものが、ちょうど一つ（行の引数）。別の名前空間の分類でもよい
+// 値の分類。効果の引数のうち、型が T か、T を絞り込んだ型のものが、ちょうど一つ（行の引数）。別の名前空間の分類でもよい。
+// 行の引数を絞り込む分類と、as の分類は、同じでなくてもよい
 namespace a {
   model Order { id: string; }
   state orders: list<Order>;
   state draft: nullable<Order>;
   state current: single<Order>;
   classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+  classify Paid of Order { Yes; No; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
   effect fn accept(order: Order): effects orders.post as Stage.Accepted;
-  effect fn start(order: Order, at: datetime): effects orders.put as Stage.Accepted -> Stage.InProduction;
-  effect fn cancel(reason: string, order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-  effect fn patch(order: Order): effects orders.put as any -> else;
-  effect fn close(order: Order): effects orders.put as Life.Open -> Life.Closed;
+  effect fn start(order: Order on Stage.Accepted, at: datetime): effects orders.put as Stage.InProduction;
+  effect fn cancel(reason: string, order: Order on Stage.Draft | Stage.Accepted): effects orders.put as Stage.Cancelled;
+  effect fn ship(order: Order on Paid.Yes): effects orders.put as Stage.Shipped;
+  effect fn patch(order: Order): effects orders.put as else;
+  effect fn close(order: Order on Life.Open): effects orders.put as Life.Closed;
   effect fn keep(order: Order): effects draft.post as b.Kind.Fresh;
-  effect fn touch(order: Order): effects current.put as any -> a.Stage.Shipped;
+  effect fn touch(order: Order): effects current.put as a.Stage.Shipped;
   // as を書かない効果は、行の引数を持たなくてよい
   effect fn saveAll(changed: Order[]): effects orders.put;
   effect fn remove(id: string): effects orders.delete;

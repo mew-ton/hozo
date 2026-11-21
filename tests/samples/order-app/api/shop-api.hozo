@@ -115,7 +115,7 @@ namespace shopApi {
   }
 
   /** 支払いの画面を開く */
-  fn openPayment(order: ordering.Standing.AwaitingPayment<ordering.Order>): Placed
+  fn openPayment(order: ordering.Order on ordering.Standing.AwaitingPayment): Placed
     throws payment.AlreadySecured, payment.ProviderUnavailable
   {
     val returnTo = orderPage(site, order.key);

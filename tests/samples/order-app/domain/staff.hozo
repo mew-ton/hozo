@@ -63,13 +63,13 @@ namespace staff {
 
   /** セッションを作る。ログインしていなかったトークンが、ログインしたことになる */
   @db.insert
-  effect fn createSession(session: Session): effects sessions.post as Login.LoggedOut -> Login.LoggedIn;
+  effect fn createSession(session: Session): effects sessions.post as Login.LoggedIn;
 
   /**
    * セッションを消す（人が書く）。消せるのは、あるセッションだけ。セッションは、なくなることが意味: ログアウトした後に、残す記録はない。
    * db の語彙の @db.delete は、列の条件を引数に取り、行を受け取れないので、付けていない（README.md「分かったこと」の F54）。
    */
-  effect fn deleteSession(session: Session): effects sessions.delete as Login.LoggedIn -> Login.LoggedOut;
+  effect fn deleteSession(session: Session on Login.LoggedIn): effects sessions.delete as Login.LoggedOut;
 
   // ---- 分類 ----
 

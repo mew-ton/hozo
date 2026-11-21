@@ -344,6 +344,9 @@ func (f *fileGen) effect(u *unit, x *effect) {
 	head += "）: "
 	// 行の遷移を持つ効果は、効果の句の後ろに、確かめないことを言う一文を足す（SQL は変わらない）
 	if row := golang.RowDisplay(decl); row != "" {
+		if narrowed := golang.NarrowedParamsDisplay(decl); narrowed != "" {
+			row = narrowed + "、" + row
+		}
 		open += "行の遷移（" + row + "）は、確かめない。"
 	}
 	open += "\nfunc (t " + u.goName + ") " + name + "(" + params + ") " + results + " {\n"

@@ -1,0 +1,36 @@
+// TYPE-4（docs/check.md「行の遷移」の「呼ぶ側」、docs/types.md「互換」）: 行の引数を絞り込んだ効果を、そのケースにあると
+// 分かっていない値で呼んだ。T の値は、T on C.Ks の引数に渡せない。分かっているケースが、引数の型のケースに収まらない値も、渡せない
+namespace a {
+  model Order { id: string; }
+  model Box { order: Order; other: Order; }
+  state orders: list<Order>;
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
+  classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
+  effect fn start(order: Order on Stage.Accepted, at: datetime): effects orders.put as Stage.InProduction;
+  effect fn cancel(order: Order on Stage.Draft | Stage.Accepted): effects orders.put as Stage.Cancelled;
+  effect fn discard(order: Order on Life.Open): effects orders.delete as Life.Absent;
+  fn edit(order: Order on Stage.Accepted): Order;
+  // 分かっていない行
+  fn unchecked(order: Order, at: datetime) {
+    start(order, at);                  // ERROR: TYPE-4
+    cancel(order);                     // ERROR: TYPE-4
+    discard(order);                    // ERROR: TYPE-4
+  }
+  // アームの中の、別の値。対象より長いパス。対象から作った別の値
+  fn wrongValue(order: Order, other: Order, box: Box, known: Order on Stage.Accepted, at: datetime) {
+    match (order by Stage) {
+      Accepted => start(other, at);    // ERROR: TYPE-4
+      else     => none;
+    };
+    match (box.order by Stage) {
+      Accepted => start(box.other, at);   // ERROR: TYPE-4
+      else     => none;
+    };
+    val edited = edit(known);
+    start(edited, at);                 // ERROR: TYPE-4
+  }
+  // 型から分かっているケースが、引数の型のケースに収まらない
+  fn wrongType(order: Order on Stage.Shipped) {
+    cancel(order);                     // ERROR: TYPE-4
+  }
+}

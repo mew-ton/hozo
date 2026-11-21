@@ -46,31 +46,31 @@ const EffectOpen runtime.Effect = "app.open"
 const EffectBring runtime.Effect = "app.bring"
 
 // EffectStart は作り始める
-// effects app.orders.put as app.Stage.Accepted -> app.Stage.InProduction
+// order on app.Stage.Accepted、effects app.orders.put as app.Stage.InProduction
 const EffectStart runtime.Effect = "app.start"
 
 // EffectCancel は取り消す。
 // 取り消せるのは、作り始める前だけ
-// effects app.orders.put as app.Stage.Draft, app.Stage.Accepted -> app.Stage.Cancelled
+// order on app.Stage.Draft | app.Stage.Accepted、effects app.orders.put as app.Stage.Cancelled
 const EffectCancel runtime.Effect = "app.cancel"
 
 // EffectForceShip は effect app.forceShip。
-// effects app.orders.put as any -> app.Stage.Shipped
+// effects app.orders.put as app.Stage.Shipped
 const EffectForceShip runtime.Effect = "app.forceShip"
 
 // EffectRevise は effect app.revise。
-// effects app.orders.put as app.Stage.Accepted -> else
+// order on app.Stage.Accepted、effects app.orders.put as else
 const EffectRevise runtime.Effect = "app.revise"
 
 // EffectPatch は effect app.patch。
-// effects app.orders.put as any -> else
+// effects app.orders.put as else
 const EffectPatch runtime.Effect = "app.patch"
 
 // EffectRename は effect app.rename。
 const EffectRename runtime.Effect = "app.rename"
 
 // EffectDiscard は effect app.discard。
-// effects app.orders.delete as app.Life.Open -> app.Life.Absent
+// order on app.Life.Open、effects app.orders.delete as app.Life.Absent
 const EffectDiscard runtime.Effect = "app.discard"
 
 // EffectPurge は effect app.purge。

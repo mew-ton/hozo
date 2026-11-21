@@ -1,13 +1,13 @@
-// STATE-7（docs/check.md「行の遷移」の「結びつき」）: 効果の引数に、型が状態の要素の型のものが、ちょうど一つでない。
-// 行の並び（T[]）、絞り込んだ型（C.K<T>）、識別子の引数は、行の引数に数えない。分類を名指ししない as でも要る
+// STATE-7（docs/check.md「行の遷移」の「結びつき」）: 効果の引数に、型が、状態の要素の型か、それを絞り込んだ型のものが、
+// ちょうど一つでない。行の並び（T[]）、省略可能（T?）、識別子の引数は、行の引数に数えない。as else でも要る
 namespace a {
   model Order { id: string; }
   state orders: list<Order>;
   classify Stage of Order { Draft; Accepted; Shipped; }
-  effect fn b1(id: string): effects orders.put as Stage.Draft -> Stage.Accepted;                 // ERROR: STATE-7
-  effect fn b2(before: Order, after: Order): effects orders.put as Stage.Draft -> Stage.Accepted;   // ERROR: STATE-7
-  effect fn b3(changed: Order[]): effects orders.put as Stage.Draft -> Stage.Accepted;           // ERROR: STATE-7
-  effect fn b4(order: Stage.Draft<Order>): effects orders.put as Stage.Draft -> Stage.Accepted;  // ERROR: STATE-7
-  effect fn b5(): effects orders.put as any -> else;                                             // ERROR: STATE-7
-  effect fn b6(order: Order?): effects orders.post as Stage.Draft;                               // ERROR: STATE-7
+  effect fn b1(id: string): effects orders.put as Stage.Accepted;                                    // ERROR: STATE-7
+  effect fn b2(before: Order, after: Order): effects orders.put as Stage.Accepted;                   // ERROR: STATE-7
+  effect fn b3(changed: Order[]): effects orders.put as Stage.Accepted;                              // ERROR: STATE-7
+  effect fn b4(before: Order on Stage.Draft, after: Order): effects orders.put as Stage.Accepted;    // ERROR: STATE-7
+  effect fn b5(): effects orders.put as else;                                                        // ERROR: STATE-7
+  effect fn b6(order: Order?): effects orders.post as Stage.Draft;                                   // ERROR: STATE-7
 }

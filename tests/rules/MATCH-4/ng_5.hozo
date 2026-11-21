@@ -1,5 +1,5 @@
-// MATCH-4（docs/types.md「アームの中の対象の型」の 1）: else のアームが二つ以上のケースを受けるなら、対象は絞り込まれない
-// （外の型のまま）。受けるケースのすべてが同じ型の as を持っていても、型を書かないケースの和にも、ならない
+// MATCH-4（docs/types.md「アームの中の対象の型」の 3.1）: else のアームが二つ以上のケースを受けるなら、対象は、受けるケースの
+// 並びに絞り込んだ型で、もとの型は、外のまま。受けるケースのすべてが同じ型の as を持っていても、もとの型は、その型にならない
 namespace a {
   model M { id: string; }
   model N { id: string; }
@@ -9,21 +9,21 @@ namespace a {
   classify Whole of Three { IsReady: Three as M; IsMissing: Three as N; IsBroken: Three as O; }
   fn find(): M?;
   classify Stale of find { Fresh: find as M; Old: find as M; Gone; }
-  fn onBToE(m: K.B<M>): void;
+  fn onBToE(m: M on K.B): void;
   fn takeM(m: M): void;
   fn takeN(n: N): void;
   fn f(m: M, three: Three): void {
-    // else は B、C、D、E を受ける: m は M のまま（case(K, [B, C, D, E], M) ではない）
+    // else は B、C、D、E を受ける: m は M on K.B | K.C | K.D | K.E で、M on K.B には、渡せない（広い方を、狭い方に）
     match (m by K) {
       A    => none;
       else => onBToE(m);               // ERROR: MATCH-4
     };
-    // else は IsMissing と IsBroken を受ける: three は Three のまま
+    // else は IsMissing と IsBroken を受ける: three の、もとの型は Three のまま
     match (three by Whole) {
       IsReady => takeM(three);
       else    => takeN(three);         // ERROR: MATCH-4
     };
-    // else は Fresh と Old を受ける。どちらも M の as を持つが、x は M? のまま（名前で並べれば M）
+    // else は Fresh と Old を受ける。どちらも M の as を持つが、x の、もとの型は M? のまま（名前で並べれば M）
     val x = find();
     match (x by Stale) {
       Gone => none;

@@ -4,16 +4,13 @@ namespace a {
   state orders: list<Order>;
   classify Stage of Order { Draft; Accepted; Shipped; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
-  // post: 前が、ない側のケースでない矢印。後ろが、ない側のケースか else
-  effect fn p1(order: Order): effects orders.post as any -> Stage.Draft;           // ERROR: STATE-8
-  effect fn p2(order: Order): effects orders.post as Stage.Draft -> Stage.Accepted;   // ERROR: STATE-8
-  effect fn p3(order: Order): effects orders.post as Life.Open -> Life.Closed;     // ERROR: STATE-8
-  effect fn p4(order: Order): effects orders.post as Life.Absent;                  // ERROR: STATE-8
-  effect fn p5(order: Order): effects orders.post as Life.Absent -> else;          // ERROR: STATE-8
-  effect fn p6(order: Order): effects orders.post as Life.Absent, Life.Open -> Life.Closed;   // ERROR: STATE-8
-  // put: 矢印のない形。前か後ろに、ない側のケース
-  effect fn u1(order: Order): effects orders.put as Stage.Shipped;                 // ERROR: STATE-8
-  effect fn u2(order: Order): effects orders.put as any;                           // ERROR: STATE-8
-  effect fn u3(order: Order): effects orders.put as Life.Absent -> Life.Open;      // ERROR: STATE-8
-  effect fn u4(order: Order): effects orders.put as Life.Open -> Life.Absent;      // ERROR: STATE-8
+  // post: 後が、ない側のケースか else
+  effect fn p1(order: Order): effects orders.post as Life.Absent;                  // ERROR: STATE-8
+  effect fn p2(order: Order): effects orders.post as else;                         // ERROR: STATE-8
+  // put: 後が、ない側のケース。行の引数を、ない側のケースに絞り込んだ型
+  effect fn u1(order: Order on Life.Open): effects orders.put as Life.Absent;      // ERROR: STATE-8
+  effect fn u2(order: Order on Life.Absent): effects orders.put as Life.Open;      // ERROR: STATE-8
+  effect fn u3(order: Order on Life.Open | Life.Absent): effects orders.put as else;   // ERROR: STATE-8
+  // as を書かない効果でも、行の引数を、ない側のケースに絞り込んだ型は、書けない
+  effect fn u4(order: Order on Life.Absent): effects orders.put;                   // ERROR: STATE-8
 }

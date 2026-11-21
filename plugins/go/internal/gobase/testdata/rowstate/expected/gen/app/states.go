@@ -22,20 +22,20 @@ type OrdersState interface {
 	Open(ctx context.Context, order Order) error
 	// Bring は命令（効果 app.bring、effects app.orders.post）。
 	Bring(ctx context.Context, order Order) error
-	// Start は命令（効果 app.start、effects app.orders.put as app.Stage.Accepted -> app.Stage.InProduction）: 作り始める
+	// Start は命令（効果 app.start、order on app.Stage.Accepted、effects app.orders.put as app.Stage.InProduction）: 作り始める
 	Start(ctx context.Context, order Order, at time.Time) error
-	// Cancel は命令（効果 app.cancel、effects app.orders.put as app.Stage.Draft, app.Stage.Accepted -> app.Stage.Cancelled）: 取り消す。
+	// Cancel は命令（効果 app.cancel、order on app.Stage.Draft | app.Stage.Accepted、effects app.orders.put as app.Stage.Cancelled）: 取り消す。
 	// 取り消せるのは、作り始める前だけ
 	Cancel(ctx context.Context, order Order) error
-	// ForceShip は命令（効果 app.forceShip、effects app.orders.put as any -> app.Stage.Shipped）。
+	// ForceShip は命令（効果 app.forceShip、effects app.orders.put as app.Stage.Shipped）。
 	ForceShip(ctx context.Context, order Order) error
-	// Revise は命令（効果 app.revise、effects app.orders.put as app.Stage.Accepted -> else）。
+	// Revise は命令（効果 app.revise、order on app.Stage.Accepted、effects app.orders.put as else）。
 	Revise(ctx context.Context, order Order, note string) error
-	// Patch は命令（効果 app.patch、effects app.orders.put as any -> else）。
+	// Patch は命令（効果 app.patch、effects app.orders.put as else）。
 	Patch(ctx context.Context, order Order) error
 	// Rename は命令（効果 app.rename、effects app.orders.put）。
 	Rename(ctx context.Context, order Order) error
-	// Discard は命令（効果 app.discard、effects app.orders.delete as app.Life.Open -> app.Life.Absent）。
+	// Discard は命令（効果 app.discard、order on app.Life.Open、effects app.orders.delete as app.Life.Absent）。
 	Discard(ctx context.Context, order Order) error
 	// Purge は命令（効果 app.purge、effects app.orders.delete as app.Life.Absent）。
 	Purge(ctx context.Context, order Order) error

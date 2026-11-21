@@ -55,7 +55,7 @@ type ArrayType struct {
 	Of Type `json:"of"`
 }
 
-// CaseType は分類のケースで絞り込まれた型 C.Case<T>（docs/ir.md「型」の kind "case"）。
+// CaseType は分類のケースで絞り込んだ型 T on C.K | C.K2（docs/ir.md「型」の kind "case"）。
 type CaseType struct {
 	// Classify は classify の FQN。
 	Classify string `json:"classify"`
@@ -114,24 +114,29 @@ func (t CoreType) String() string { return string(t.Name) }
 // String は参照先の FQN。
 func (t RefType) String() string { return t.Target }
 
-// String は "T?"。
-func (t OptionalType) String() string { return typeString(t.Of) + "?" }
-
-// String は "T[]"。
-func (t ArrayType) String() string { return typeString(t.Of) + "[]" }
-
-// String は "C.Case<T>"。ケースが複数なら "C.(A, B)<T>"（表面の構文にはない形。ケースの並びの区切りは、アームと同じ ","）。
-func (t CaseType) String() string {
-	cases := ""
-	switch len(t.Cases) {
-	case 0:
-		cases = "()"
-	case 1:
-		cases = t.Cases[0]
-	default:
-		cases = "(" + strings.Join(t.Cases, ", ") + ")"
+// String は "T?"。中が絞り込んだ型なら "nullable<T on C.K>"（on の後ろに "?" は続けられない。docs/grammar.md「型」）。
+func (t OptionalType) String() string {
+	if _, narrowed := t.Of.(CaseType); narrowed {
+		return "nullable<" + typeString(t.Of) + ">"
 	}
-	return t.Classify + "." + cases + "<" + typeString(t.Of) + ">"
+	return typeString(t.Of) + "?"
+}
+
+// String は "T[]"。中が絞り込んだ型なら "list<T on C.K>"（on の後ろに "[]" は続けられない。docs/grammar.md「型」）。
+func (t ArrayType) String() string {
+	if _, narrowed := t.Of.(CaseType); narrowed {
+		return "list<" + typeString(t.Of) + ">"
+	}
+	return typeString(t.Of) + "[]"
+}
+
+// String は "T on C.K"。ケースが複数なら "T on C.A | C.B"（docs/grammar.md「型」の OnType と同じ綴り）。
+func (t CaseType) String() string {
+	cases := make([]string, len(t.Cases))
+	for i, c := range t.Cases {
+		cases[i] = t.Classify + "." + c
+	}
+	return typeString(t.Of) + " on " + strings.Join(cases, " | ")
 }
 
 func typeString(t Type) string {
@@ -241,7 +246,7 @@ func IsNever(t Type) bool {
 	return ok
 }
 
-// Case は C.Case<T> を作る（docs/ir.md「型」の kind "case"）。cases は書かれた順のまま。
+// Case は絞り込んだ型 T on C.Ks を作る（docs/ir.md「型」の kind "case"）。cases は書かれた順のまま。
 func Case(classify string, cases []string, of Type) Type {
 	return CaseType{Classify: classify, Cases: cases, Of: of}
 }

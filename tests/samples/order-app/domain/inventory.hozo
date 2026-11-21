@@ -70,7 +70,7 @@ namespace inventory {
   effect fn addReservations(added: Reservation[]): effects reservations.post;
 
   /** 棚から出した: 出した時刻を入れる（人が書く） */
-  effect fn markPicked(reservation: Reservation, at: datetime): effects reservations.put as Picking.OnShelf -> Picking.Picked;
+  effect fn markPicked(reservation: Reservation on Picking.OnShelf, at: datetime): effects reservations.put as Picking.Picked;
 
   /** その注文の取り置きに、棚から出してよくなった時刻を入れる。棚にあるか出したか（Picking）は、変えない: as を書かない put */
   effect fn confirmReservations(orderId: type.OrderId, at: datetime): effects reservations.put;
@@ -183,7 +183,7 @@ namespace inventory {
   }
 
   /** 在庫の数を減らし、取り置きを、棚から出したことにする */
-  fn takeFromShelf(reservation: Picking.OnShelf<Reservation>):
+  fn takeFromShelf(reservation: Reservation on Picking.OnShelf):
     throws NotReserved
   {
     val level = levelOf(reservation.sku);

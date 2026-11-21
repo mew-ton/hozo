@@ -8,7 +8,7 @@ namespace a {
   classify Stock of items { None; Some; }
   classify Kind of M { A; B; }
   // 状態の分類のケースで絞り込んだ型は書けない
-  fn ng1(m: Stock.Some<M>): void;      // ERROR: RES-4
+  fn ng1(m: M on Stock.Some): void;      // ERROR: RES-4
   // reads の要素は read か状態だけ（状態の分類も書けない）
   fn pick(): M?;
   fn ng2(): M? reads Stock {           // ERROR: RES-4

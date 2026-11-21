@@ -1,0 +1,8 @@
+// TYPE-12（docs/types.md「型の種類」の「絞り込んだ型」）: 並べたケースが、一つの分類のものでない。同じケースが、二度ある
+namespace a {
+  model Order { id: string; }
+  classify Stage of Order { Draft; Accepted; Shipped; }
+  classify Paid of Order { Yes; No; }
+  fn f1(order: Order on Stage.Draft | Paid.No);          // ERROR: TYPE-12
+  fn f2(order: Order on Stage.Draft | Stage.Draft);      // ERROR: TYPE-12
+}

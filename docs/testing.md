@@ -11,10 +11,10 @@
 - 落ちる例は、診断が出る行の末尾に `// ERROR: <ID>` か `// WARN: <ID>` のコメントを書く。同じ行に複数なら `// ERROR: A, B`。
 - テストはディレクトリごとに `hozo.toml`（なければ `tests/rules/hozo.toml` を使う）で `Project` を作り、診断の集合を「ファイル、行、重さ、ID」の組で比べる。期待にない診断、出なかった期待はどちらも失敗。
 - `hozo.toml` の単位はトランスパイラを要る（`docs/config.md`「単位」）ので、起動しないプラグインの fixture を置く: 既定のもの `tests/rules/plugins/std`（基底 `go` / `go-b` / `ts` と、`go` に相乗りする `go-x`、`go` と `go-x` に相乗りする `go-y`）と、規則のディレクトリの `plugins/`（その規則のためのもの）。どちらも各例のプロジェクトの `plugins/` に写す。既定の `tests/rules/hozo.toml` は、名前空間 `a` をトランスパイラ `go` で出力する単位一つ。規則のテストは `check` だけで、プラグインを起動しない。
-- 欠番にした規則（CFG-8、CFG-11、TYPE-13、EFF-3、MATCH-8、DEC-17、DEC-18）のディレクトリは消す。足した規則（CFG-19〜CFG-23、NS-6、STATE-5〜STATE-9、MATCH-9、CLS-8）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
+- 欠番にした規則（CFG-8、CFG-11、TYPE-13、EFF-3、MATCH-8、DEC-17、DEC-18、STATE-9）のディレクトリは消す。足した規則（CFG-19〜CFG-23、NS-6、STATE-5〜STATE-8、MATCH-9、CLS-8）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
 - メッセージの文言は比べない（変えやすくするため）。文言はゴールデン（下）で確かめる。
 - 文法で閉じている規則（`—` のもの）は、構文エラーになる例を `ng_*.hozo` に置き、`// ERROR: SYNTAX` で確かめる。
-- なくした書き方（`docs/grammar.md` の、新しい書き方をメッセージで示して SYNTAX にするもの: `throws A | B`、`exception X: T`、引数の括弧のない `effect fn e: effects s.post`、`exception X()`、`throw X()`、`model A is B`、フィールドの既定値、分類の `default;`、`condition`、`default =>` のアーム、ケースの並びの `|`、配線の `const`、丸括弧のない `match` の頭、デコレータの宣言の `classify … case`、頭に `fn` のない関数の宣言、`op fn`、節の前に `:` のない関数の型（`fn f() throws E`）、`:` の後ろに何もない関数の型、`read fn` と `effect fn` の `on`、状態の遷移の、宛先の後ろの `:`、デコレータの宣言の、付ける先の並びの `|`、`Record<K, V>`）は、`tests/rules/SYNTAX/` に `ng_*.hozo` を一つずつ置く。メッセージの文言は、`internal/syntax` の単体テストが確かめる。
+- なくした書き方（`docs/grammar.md` の、新しい書き方をメッセージで示して SYNTAX にするもの: `throws A | B`、`exception X: T`、引数の括弧のない `effect fn e: effects s.post`、`exception X()`、`throw X()`、`model A is B`、フィールドの既定値、分類の `default;`、`condition`、`default =>` のアーム、ケースの並びの `|`、配線の `const`、丸括弧のない `match` の頭、デコレータの宣言の `classify … case`、頭に `fn` のない関数の宣言、`op fn`、節の前に `:` のない関数の型（`fn f() throws E`）、`:` の後ろに何もない関数の型、`read fn` と `effect fn` の `on`、状態の遷移の、宛先の後ろの `:`、デコレータの宣言の、付ける先の並びの `|`、`Record<K, V>`、絞り込んだ型の `C.K<T>`、行の遷移の矢印（`as 前 -> 後`）と `any` とケースの並び）は、`tests/rules/SYNTAX/` に `ng_*.hozo` を一つずつ置く。メッセージの文言は、`internal/syntax` の単体テストが確かめる。
 
 ## コーパス
 

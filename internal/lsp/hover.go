@@ -524,15 +524,23 @@ func (r *renderer) typ(t ir.Type) string {
 	case ir.RefType:
 		return r.rel(t.Target)
 	case ir.OptionalType:
+		// on の後ろに ? と [] は続けられないので、絞り込んだ型を包む形は、nullable<…>、list<…>
+		if _, narrowed := t.Of.(ir.CaseType); narrowed {
+			return "nullable<" + r.typ(t.Of) + ">"
+		}
 		return r.typ(t.Of) + "?"
 	case ir.ArrayType:
+		if _, narrowed := t.Of.(ir.CaseType); narrowed {
+			return "list<" + r.typ(t.Of) + ">"
+		}
 		return r.typ(t.Of) + "[]"
 	case ir.CaseType:
-		cases := strings.Join(t.Cases, ", ")
-		if len(t.Cases) != 1 {
-			cases = "(" + cases + ")"
+		// 絞り込んだ型は、仕様の綴りで（docs/grammar.md「型」の OnType）: T on C.K | C.K2
+		cases := make([]string, len(t.Cases))
+		for i, c := range t.Cases {
+			cases[i] = r.rel(t.Classify) + "." + c
 		}
-		return r.rel(t.Classify) + "." + cases + "<" + r.typ(t.Of) + ">"
+		return r.typ(t.Of) + " on " + strings.Join(cases, " | ")
 	case ir.NeverType:
 		return "never"
 	}
@@ -612,38 +620,17 @@ func (r *renderer) effectTarget(e *ir.Effect) string {
 	return ""
 }
 
-// rowTransition は行の遷移を Hozo の構文で書く（docs/lsp.md「ホバー」: `… effects orders.put as Stage.Accepted -> Stage.InProduction` の
-// as から後ろ。頭に空白を一つ置く）。形は docs/plugin-go.md「コメント」の「行の遷移の表示」と同じで、IR から組み立てる
-// （post は `as <後>`。put は `as <前> -> <後>`。delete は、前が any なら `as <後>`）。
+// rowTransition は行の遷移を Hozo の構文で書く（docs/lsp.md「ホバー」: `… effects orders.put as Stage.InProduction` の
+// as から後ろ。頭に空白を一つ置く）。後のケースがあれば `as <分類>.<ケース>`、なければ `as else`。前のケースは、引数の型に出る。
 // 分類の名前は、見ている名前空間から見た修飾。行の遷移を持たない効果は空。
 func (r *renderer) rowTransition(e *ir.Effect) string {
-	target, ok := e.Target.(ir.BuiltinTarget)
-	if !ok || e.Row == nil {
+	if _, ok := e.Target.(ir.BuiltinTarget); !ok || e.Row == nil {
 		return ""
 	}
-	row := e.Row
-	name := func(c string) string { return r.rel(row.Classify) + "." + c }
-	after := "else"
-	if row.To != "" {
-		after = name(row.To)
+	if e.Row.To == "" {
+		return " as else"
 	}
-	before := "any"
-	if !row.From.Any {
-		names := make([]string, len(row.From.Cases))
-		for i, c := range row.From.Cases {
-			names[i] = name(c)
-		}
-		before = strings.Join(names, ", ")
-	}
-	switch target.Operation {
-	case ir.OpPost:
-		return " as " + after
-	case ir.OpDelete:
-		if row.From.Any {
-			return " as " + after
-		}
-	}
-	return " as " + before + " -> " + after
+	return " as " + r.rel(e.Row.Classify) + "." + e.Row.To
 }
 
 func caseSet(c ir.CaseSet) string {

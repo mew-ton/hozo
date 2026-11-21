@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.15";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.16";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -68,7 +68,8 @@ type Type =
   | { kind: "ref"; target: string }                    // model / scalar / union の FQN
   | { kind: "optional"; of: Type }
   | { kind: "array"; of: Type }
-  | { kind: "case"; classify: string; cases: string[]; of: Type }    // 絞り込まれた型。cases は昇順ではなく match のアームに書かれた順
+  | { kind: "case"; classify: string; cases: string[]; of: Type }    // 絞り込んだ型 `of on classify.cases`（docs/types.md「型の種類」の「絞り込んだ型」）。
+                                                                    // cases は昇順ではなく、書かれた順（アームの中の対象なら、アームが受ける順）
   | { kind: "never" };                                               // 値が一つもない型。Op.returns（決して値を返さない）、対象のない分類の
                                                                      // Classify.subject.type、CaseKind.subject（`case of never`）にだけ現れる
 ```
@@ -156,18 +157,16 @@ type EffectTarget =
                                                                                // 組み込みの分類を持つ基底の状態の FQN
 type CaseSet = "any" | string[];  // ケース名の列（書かれた順）
 
-interface RowTransition {         // 効果が、受け取った行の状態をどう変えるか。書き込む状態と操作は、Effect.target にある
-  param: string;                  // 行の引数の名前（Effect.params のうち、型が状態の要素の型と等しい、ただ一つのもの）
-  classify?: string;              // 行の分類の FQN（値の分類。対象の型は、状態の要素の型 T か T?）。
-                                  // 分類を名指ししない形（`as any -> else`）では持たない
-  from: CaseSet;                  // 効果の前のケース。"any" は、どのケースの行でも。
-                                  // ケースの列なら、呼ぶ側が、そのどれかにあると分かっている行を渡す（STATE-9）。post では、いつも "any"
-  to?: string;                    // 効果の後のケースの名前。持たなければ、決まっていない（put の `-> else`）。post では、いつも持つ。
+interface RowTransition {         // 効果の後、受け取った行が、どのケースにあるか。書き込む状態と操作は、Effect.target にある
+  param: string;                  // 行の引数の名前（Effect.params のうち、型が、状態の要素の型か、それを絞り込んだ型の、ただ一つのもの）。
+                                  // 効果の前のケースは、この引数の型が言う（kind "case" なら、その cases。そうでなければ、どのケースでも）
+  classify?: string;              // 行の分類の FQN（値の分類。対象の型は、状態の要素の型 T か T?）。`as else` では持たない
+  to?: string;                    // 効果の後のケースの名前。持たなければ、決まっていない（put の `as else`）。post では、いつも持つ。
                                   // delete では、いつも、分類のない側のケース（Classify.absent）
 }
 ```
 
-- `RowTransition` は、行の遷移を、生成したテストで確かめる段階（`docs/requirements.md`「段階」）が要るものを持つ: 状態と操作（`Effect.target`）、分類、前のケース、後のケース、行の引数。
+- `RowTransition` は、行の遷移を、生成したテストで確かめる段階（`docs/requirements.md`「段階」）が要るものを持つ: 状態と操作（`Effect.target`）、行の引数（その型が、前のケース）、分類、後のケース。
 - `row` を持たない効果の意味は、操作から決まる（`docs/check.md`「行の遷移」の「操作ごとに書ける形」の「`as` を書かない」の列）。
 
 ### read
@@ -456,11 +455,10 @@ interface Bind {
 | `val a, b: T;`（名前を並べた、空の宣言） | 名前ごとの `val` の文（書かれた順）。`span` は、それぞれの名前（と、書いた型） |
 | `disjoint` の、文の一つのアーム（`a = f(x);`） | `statements` が一つで、`block` が `false` の `Arm`。ブロックで書いた、文が一つのアーム（`{ a = f(x); }`）は、`block` が `true` |
 | ケースの `X as none`（ない側のケース） | `as` の `CaseTyping`。`by` は `none`、`type` は対象の型のまま。`Classify.absent` に、そのケースの名前。ない側のケースを `X as else` で書いた分類（`docs/check.md`「ない側のケース」の表の二行目）も、`absent` を持つ（`by` は `else` のまま） |
-| `effect fn e(o: T): effects s.put as C.A, C.B -> C.D` | `row` に `{ param: "o", classify: C の FQN, from: ["A", "B"], to: "D" }`。前の `any` は `from: "any"`、後ろの `else` は `to` なし |
-| `effect fn e(o: T): effects s.post as C.X`、`… as C.N -> C.X`（N は、ない側のケース） | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "X" }`。`post` の前は、IR に残さない（入る前の行は、ない） |
-| `effect fn e(o: T): effects s.put as any -> else` | `row` に `{ param: "o", from: "any" }`（`classify` も `to` も持たない） |
-| `effect fn e(o: T): effects s.post as any` | `row` を持たない（`as` を書かない `post` と同じ意味: 入るケースは、決まっていない。行の引数があることは、確かめてある: STATE-7） |
-| `effect fn e(o: T): effects s.delete as C.N`、`… as any -> C.N` | どちらも `row` に `{ param: "o", classify: C の FQN, from: "any", to: "N" }` |
+| `effect fn e(o: T on C.A \| C.B): effects s.put as C.D` | `row` に `{ param: "o", classify: C の FQN, to: "D" }`。前のケースは、`params` の `o` の型（`case(C, ["A", "B"], T)`）にある |
+| `effect fn e(o: T): effects s.post as C.X` | `row` に `{ param: "o", classify: C の FQN, to: "X" }` |
+| `effect fn e(o: T): effects s.put as else` | `row` に `{ param: "o" }`（`classify` も `to` も持たない） |
+| `effect fn e(o: T): effects s.delete as C.N` | `row` に `{ param: "o", classify: C の FQN, to: "N" }` |
 | アームの `A, B => …` | `cases: ["A", "B"]`（書かれた順）、`else: false` |
 | アームの `else => …` | `cases` に、ほかのアームが並べなかったケースを宣言の順で、`else: true`。受けるケースがなければ（MATCH-9）`cases: []` |
 | アームの本体の `none` | `body` の `none`（`atom` にはしない） |
@@ -493,7 +491,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.15";
+  version: "0.16";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -551,10 +549,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.15"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.16"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.16 | `RowTransition.from` をなくした: 効果の前のケースは、行の引数の型（`case`）が言う（`docs/check.md`「行の遷移」、`docs/decisions.md`「決めたこと」369）。値の分類と op の分類の `match` のアームの `narrowed` の型は、いつも `case`（型を書いたケースのアームと、`else` のアームでも。`docs/types.md`「アームの中の対象の型」、同 370）。`View` とやり取りの形は 0.15 と同じ |
 | 0.15 | 標準の分類 `nullable` のケースの名前が、`Empty` / `HasItems` から、`None` / `Some` になった（`docs/check.md`「分類」の「標準の分類」、`docs/decisions.md`「決めたこと」362）。変わるのは、`Match.classify` が `"nullable"` の `MatchArm.cases` と、形が `nullable` の状態を宛先にする `TransitionTarget` の `from` / `to` に載る、名前の値。構造は、0.14 と同じ。値だけの変更で版を上げるのは、基底が、この名前でアームを選ぶため: 前の版の名前を待つプラグインは、アームを見つけられない |
 | 0.14 | 型の種類 `record` をなくし、`Model.index`（インデックスの model: キーの名前、キーの型、値の型）を足した。`Record<K, V>` は、インデックスの model を宣言して、その名前（`ref`）で書く（`docs/grammar.md`「model」、`docs/types.md`「インデックスの model」） |
 | 0.13 | 核の型の名前（`Type` の `core` の `name`）: `Time` を `datetime` に、`Duration` を `duration` に替え、`date` と `time` を足した（`docs/grammar.md`「型」）。デコレータの宣言の、付ける先の並びの区切りが `,` になったこと（`docs/grammar.md`「decorator の宣言」）は、綴りだけで、`Decorator.targets` の形は、変わらない |

@@ -107,7 +107,7 @@ func TestElseCaseTyping(t *testing.T) {
 	}
 }
 
-// TestElseArmNarrowing は、残りのケースのアームの中の対象の型（docs/types.md「アームの中の対象の型」の 3）。
+// TestElseArmNarrowing は、残りのケースのアームの中の対象の型（docs/types.md「アームの中の対象の型」の 2 と 3）。
 func TestElseArmNarrowing(t *testing.T) {
 	p := analyzeElse(t)
 	stmts := p.Lookup("a.wire").(*ir.Op).Body.Statements
@@ -132,15 +132,16 @@ func TestElseArmNarrowing(t *testing.T) {
 			t.Errorf("%s: narrowed = %v、期待は %s", name, got, want)
 		}
 	}
+	// 値の分類と op の分類のアームは、いつも case(C, Ks, B)。もとの型 B は:
 	// presence: 型を書いたケースは T、残りのケースは外のまま
-	one("F.Found", arms(1)[0], ir.Ref("a.M"))
-	one("F.NotFound", arms(1)[1], nil)
+	one("F.Found", arms(1)[0], ir.Case("a.F", []string{"Found"}, ir.Ref("a.M")))
+	one("F.NotFound", arms(1)[1], ir.Case("a.F", []string{"NotFound"}, ir.Optional(ir.Ref("a.M"))))
 	// variant で残りのアームが一つ: そのアームの型
-	one("P2.IsReady", arms(2)[0], ir.Ref("a.M"))
-	one("P2.Rest", arms(2)[1], ir.Ref("a.N"))
+	one("P2.IsReady", arms(2)[0], ir.Case("a.P2", []string{"IsReady"}, ir.Ref("a.M")))
+	one("P2.Rest", arms(2)[1], ir.Case("a.P2", []string{"Rest"}, ir.Ref("a.N")))
 	// variant で残りのアームが二つ以上: 外のまま
-	one("P3.Rest", arms(3)[1], nil)
-	// 型を書いたケースと残りのケースを並べたアーム: 型が等しくないので、型を書かないケースと同じ絞り込み（規則 4）
+	one("P3.Rest", arms(3)[1], ir.Case("a.P3", []string{"Rest"}, ir.Ref("a.Three")))
+	// 型を書いたケースと残りのケースを並べたアーム: 型が等しくないので、もとの型は外のまま（3.3）
 	one("P2.IsReady, Rest", arms(4)[0], ir.Case("a.P2", []string{"IsReady", "Rest"}, ir.Ref("a.Two")))
 	// 状態の分類: 残りのケースは外のまま
 	one("S.LoggedOut", arms(5)[1], nil)

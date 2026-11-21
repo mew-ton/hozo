@@ -192,6 +192,7 @@ func IsNillable(t ir.Type, p *ir.Program) bool    // Go の零値 nil が「な�
 func Zero(t ir.Type, imports *Imports) string     // 零値の式（同「呼び出し」）
 func TypeDisplay(t ir.Type) string                // コメントの中の型（同「コメント」の「型の表示」）
 func RowDisplay(e *ir.Effect) string              // コメントの中の行の遷移（同「コメント」の「行の遷移の表示」）。行の遷移を持たない効果は ""
+func NarrowedParamsDisplay(e *ir.Effect) string   // コメントの中の、絞り込んだ引数（同「コメント」の「絞り込んだ引数の表示」）。なければ ""
 
 // 置き場（同「配置」）
 func ImportPath(root, dir string) (string, error) // go.mod を探す。見つからなければ ErrNoGoMod（GO-1）

@@ -596,7 +596,8 @@ func editDistance(a, b string) int {
 // --- 位置ごとの accept（docs/resolve.md「位置ごとに受け付ける種類」） ---
 
 const (
-	// acTypePos は型の位置。classify は C.Case<T> の形でだけ（lowerType が確かめる）。
+	// acTypePos は型の位置。classify のケースを書けるのは、絞り込んだ型 `T on C.K` の on の後ろだけ（型そのものの位置に
+	// 書いたケースは、lowerNamedType が RES-4 にする）。
 	acTypePos = acModel | acScalar | acUnionArms | acCase
 	// acThrowsPos は throws / catches の要素。デコレータの宣言の中では any exception の引数も（lowerExceptions が確かめる）。
 	acThrowsPos = acException | acUnionSet | acDecoParam

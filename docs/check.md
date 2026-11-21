@@ -41,7 +41,7 @@
 
 **効果が書き込む状態**（`Effect.writes`）は、組み込みの効果ならその基底の状態、遷移なら、宛先が状態の分類ならその対象のすべての基底の状態、宛先が基底の状態ならその状態。
 
-宛先が言うのは、どこに、何の操作で書くか。組み込みの効果は、それとは別に、受け取った行の状態がどうなるかを言える（`effects orders.put as Stage.Accepted -> Stage.InProduction`）。規則は「行の遷移」。
+宛先が言うのは、どこに、何の操作で書くか。組み込みの効果は、それとは別に、受け取った行の状態がどうなるかを言える（`effects orders.put as Stage.InProduction`）。規則は「行の遷移」。
 
 ### read の宛先
 
@@ -147,7 +147,7 @@
 - op の分類は、その op が返した値の分類（`classify Registration of findUser { ... }`）。対象の型をその op の `returns` とした値の分類として扱う。違いは、何を分類しているかが宣言の名前で読めることと、`as` の前の書き方だけ。
 - `match (x by C)` の `x` は、型が対象の型に渡せる値ならよい（MATCH-6）。その op の呼び出しの結果である必要はない。値の出どころは追わない（「検査器が遷移を使う範囲」と同じく、検査器は配線の行をまたいで値を追わない）。
 - 対象にできる op は、値を返す op（`returns` が `null` でも `never` でもない）。そうでなければ CLS-4。どの名前空間の op でもよく、`export` の有無によらない（対象にすることは呼び出しではない。「op の宣言と本体」の「export」）。
-- `C.Case<T>`（絞り込まれた型）を書けるのは、値の分類と op の分類。
+- 絞り込んだ型（`T on C.K`）を書けるのは、値の分類と op の分類。
 
 ### 対象のない分類
 
@@ -161,7 +161,7 @@
 
   | 書いた所 | 診断 |
   |---|---|
-  | 型（`C.Case<T>`） | RES-4（`docs/resolve.md`「位置ごとに受け付ける種類」） |
+  | 型（`T on C.K`） | RES-4（`docs/resolve.md`「位置ごとに受け付ける種類」） |
   | `match (x by C)`、`match (by C)` | MATCH-7 |
   | 効果の遷移の宛先（`effect fn …: effects C as A -> B`） | RES-4 |
   | 行の遷移のケース（`as C.K`） | STATE-7（対象の型が、状態の要素の型でない。「行の遷移」の「結びつき」） |
@@ -170,7 +170,7 @@
 
 ### 置き場
 
-分類は、どの名前空間にも宣言でき、値の分類と op の分類は、どの名前空間からも使える。別の名前空間のものは修飾して書く（`match (user by store.Registration) { ... }`、`store.Registration.Registered<type.User>`）。複数の担い手が共有する型の分類を、型と同じ名前空間にも、使う側の名前空間にも置ける。
+分類は、どの名前空間にも宣言でき、値の分類と op の分類は、どの名前空間からも使える。別の名前空間のものは修飾して書く（`match (user by store.Registration) { ... }`、`type.User on store.Registration.Registered`）。複数の担い手が共有する型の分類を、型と同じ名前空間にも、使う側の名前空間にも置ける。
 
 状態の分類を `match (by C)` で読めるのは、その分類を宣言した名前空間の配線だけ。読むのは状態で、状態を読めるのは持ち主の名前空間だけだから（別の名前空間の状態の分類なら RES-5。`docs/resolve.md`「診断」）。
 
@@ -309,54 +309,56 @@ classify Life of Order? {
 
 ## 行の遷移
 
-値の分類は、値一つの状態を言う。表（`list` の状態）なら、一行の状態（注文、支払い、仕事、出荷の、いまの段階）。**行の遷移**は、効果が、受け取った行の状態をどう変えるかを、その分類のケースで言うもの。構文は `docs/grammar.md`「exception / effect / read」の `RowClause`。`docs/decisions.md`「決めたこと」163〜173、「設計書から離れた決定」S30。
+値の分類は、値一つの状態を言う。表（`list` の状態）なら、一行の状態（注文、支払い、仕事、出荷の、いまの段階）。**行の遷移**は、効果が、受け取った行の状態をどう変えるかを、その分類のケースで言うもの。前のケースは、行の引数の型（`docs/grammar.md`「型」の `OnType`）で言い、後のケースは、宛先の後ろの `as`（同「exception / effect / read」の `RowClause`）で言う。`docs/decisions.md`「決めたこと」163〜173、369、「設計書から離れた決定」S30。
 
 ```ts
 classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
 
-effect fn accept(order: Order):          effects orders.post as Stage.Accepted;                          // Accepted で入る
-effect fn startProduction(order: Order): effects orders.put  as Stage.Accepted -> Stage.InProduction;    // Accepted の行が InProduction になる
-effect fn cancel(order: Order):          effects orders.put  as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
-effect fn forceShip(order: Order):       effects orders.put  as any -> Stage.Shipped;                    // どのケースからでも
-effect fn revise(order: Order):          effects orders.put  as Stage.Accepted -> else;                  // 後のケースは決まっていない
-effect fn patch(order: Order):           effects orders.put  as any -> else;                             // 何も約束しない（抜け道）
-effect fn rename(order: Order):          effects orders.put;                                             // as がない: ケースは変わらない
-effect fn import(order: Order):          effects orders.post;                                            // as any と同じ: 入るケースは決まっていない
+effect fn accept(order: Order):                                   effects orders.post as Stage.Accepted;       // Accepted で入る
+effect fn startProduction(order: Order on Stage.Accepted):        effects orders.put  as Stage.InProduction;   // Accepted の行が InProduction になる
+effect fn cancel(order: Order on Stage.Draft | Stage.Accepted):   effects orders.put  as Stage.Cancelled;
+effect fn forceShip(order: Order):                                effects orders.put  as Stage.Shipped;        // どのケースからでも
+effect fn revise(order: Order on Stage.Accepted):                 effects orders.put  as else;                 // 後のケースは決まっていない
+effect fn patch(order: Order):                                    effects orders.put  as else;                 // 何も約束しない（抜け道）
+effect fn rename(order: Order):                                   effects orders.put;                          // as がない: ケースは変わらない
+effect fn import(order: Order):                                   effects orders.post;                         // 入るケースは決まっていない
 ```
 
 ### 行と、行の分類
 
 - **行**は、効果が書き込む基底の状態（`Effect.writes` の一つ）の要素一つ。型は、その状態の要素の型 T（`State.element`）。`list<T>` なら列の一つ、`nullable<T>` と `single<T>` なら、その値。
 - **行の分類**は、対象の型が T か `T?` の、値の分類。`T?` を対象にした分類は、「行がない」ことも、ケースとして言える（「行がないこと」）。
-- 状態の分類の遷移（`effects Checkout as Shopping -> Ordered`。「状態の形」の「効果の宛先」）は、別のもの: 状態の全体の場合を言い、宛先そのものが、状態か、状態の分類。行の遷移は、宛先（`effects 状態.操作`）の後ろに足す。どちらも `as` で書き、宛先で分かれる（`docs/grammar.md`「exception / effect / read」）。
+- 状態の分類の遷移（`effects Checkout as Shopping -> Ordered`。「状態の形」の「効果の宛先」）は、別のもの: 状態の全体の場合を言い、宛先そのものが、状態か、状態の分類。引数を持たないので、前も後も、`as` に矢印で書く。行の遷移は、宛先（`effects 状態.操作`）の後ろに、後のケースだけを足す。どちらも `as` で書き、宛先で分かれる（`docs/grammar.md`「exception / effect / read」）。
 
 ### 書き方と意味
 
 | 書き方 | 意味 |
 |---|---|
-| `as X`（矢印なし） | 効果の後、行は X にある |
-| `as Xs -> Y` | Xs（一つ以上のケース）のどれかにある行が、Y になる |
-| 矢印の前の `any` | どのケースの行でも |
-| 矢印の後ろの `else` | 後のケースは、決まっていない |
+| 行の引数の型 `T on C.Ks` | 効果の前、行は、Ks（一つ以上のケース）のどれかにある。呼ぶ側は、そうと分かっている行しか、渡せない（「呼ぶ側」） |
+| 行の引数の型 `T`（絞り込まない） | どのケースの行でも、受け取る |
+| `as X` | 効果の後、行は X にある |
+| `as else` | 後のケースは、決まっていない |
 | `as` を書かない | 操作ごとに決まる（下の表） |
 
-- **一つの `as` が言うのは、一つの分類のこと。** 並べたケースは、どれも同じ分類のもの（違えば STATE-7）。行の、ほかの分類については、`as` を書かない効果と同じ意味になる（`put` なら、変わらない）。二つの分類のケースを一度に変える効果は、`as any -> else` と書くしかない。
-- `as any -> else` と、`post` の `as any` は、分類を名指ししない。行の分類のすべてについて、何も約束しない（`post` の `as any` は、`as` を書かないのと同じ意味で、IR でも同じ形。`docs/ir.md`「正規化」）。
-- **`put` は、`as` を書かなければ、行のケースを変えない。** だから、行のケースが変わる道は、宣言した行の遷移だけで、ほかにない。変わるかどうかを約束しない効果は、`-> else` と書いて、そう言う。
+- **前は、引数の性質。後は、効果の約束。** 前のケースを、効果の節には、書かない。
+- **一つの `as` が言うのは、一つの分類のこと。** 行の、ほかの分類については、`as` を書かない効果と同じ意味になる（`put` なら、変わらない）。二つの分類のケースを一度に変える効果は、`as else` と書くしかない。
+- `as else` は、分類を名指ししない。行の分類のすべてについて、後のケースを、何も約束しない。
+- **`put` は、`as` を書かなければ、行のケースを変えない。** だから、行のケースが変わる道は、宣言した行の遷移だけで、ほかにない。変わるかどうかを約束しない効果は、`as else` と書いて、そう言う。
+- 行の引数を絞り込む分類と、`as` の分類は、同じでなくてもよい（`effect fn ship(order: Order on Paid.Yes): effects orders.put as Stage.Shipped;`: 支払いの済んだ行だけを受け取り、段階を `Shipped` にする）。
 - 直に呼ぶ組み込みの効果（「状態に触れるもの」の「直に呼ぶ組み込みの効果」）は、`as` を書かない宣言と同じ意味。
 
 ### 操作ごとに書ける形
 
-操作は、宛先の `post` / `put` / `delete`。N は、分類のない側のケース（「分類」の「ない側のケース」。対象の型が `T?` の分類にだけ、ありうる）。X、Y は、それ以外のケース。合わない形は STATE-8。
+操作は、宛先の `post` / `put` / `delete`。N は、分類のない側のケース（「分類」の「ない側のケース」。対象の型が `T?` の分類にだけ、ありうる）。X は、それ以外のケース。合わない形は STATE-8。
 
 | 操作 | `as` を書かない | 書ける形 | 書けない形 |
 |---|---|---|---|
-| `post` | 入る行のケースは、決まっていない | `as X`（X で入る）、`as any`（書かないのと同じ）、`as N -> X`（「ない」から X になる。`as X` と同じ意味） | 前が N でない矢印（`as any -> X`、`as Y -> X`）: 入る前の行は、ない。後ろが N か `else` |
-| `put` | 行のケースは、変わらない | `as Xs -> Y`、`as any -> Y`、`as Xs -> else`、`as any -> else` | 矢印のない形: `put` は、前を書く（どのケースからでもよければ `any`）。前か後ろに N: `put` は、ある行を書き換える |
-| `delete` | どのケースの行でも消す | `as N`（行は、なくなる。どのケースからでも）、`as Xs -> N`（Xs の行だけを消せる）、`as any -> N`（`as N` と同じ意味） | 後ろが N でない形: 消した後の行は、ない。ない側のケースを持たない分類（対象の型が T の分類は、どれも）のケースを書いた `as`: その分類には、「ない」を言うケースがない |
+| `post` | 入る行のケースは、決まっていない | `as X`（X で入る） | `as N`: 入った行は、ある。`as else`: 入るケースが決まっていないなら、`as` を書かない |
+| `put` | 行のケースは、変わらない | `as X`、`as else` | `as N`: 行をなくすのは `delete` |
+| `delete` | どのケースの行でも消す。消した後の行は、ない | `as N`（行は、なくなる） | `as X`: 消した後の行は、ない。`as else`。ない側のケースを持たない分類（対象の型が T の分類は、どれも）のケースを書いた `as`: その分類には、「ない」を言うケースがない |
 
-- `post` の `as N -> X` と `as X`、`delete` の `as any -> N` と `as N` は、同じ意味の二つの書き方。IR では一つの形になる（`docs/ir.md`「正規化」）。
-- 前のケースの並びに、同じケースが二度あれば STATE-7。
+- `post` の前は、いつも、「行がない」。操作が言っているので、どこにも書かない。`post` の行の引数は、入る行。
+- `put` と `delete` の行の引数を、ない側のケース N に絞り込んだ型（`Order on Life.Absent`）は、書けない（STATE-8）: 書き換える行、消す行は、ある。
 
 ### 結びつき
 
@@ -364,8 +366,8 @@ effect fn import(order: Order):          effects orders.post;                   
 
 1. `as` に書いたケース `C.K` の C は、値の分類で、対象の型が、書き込む状態の要素の型 T か、`T?` と等しい（`docs/types.md`「等しい」）。op の分類と状態の分類は、行の分類にならない。別の名前空間の分類でもよい（修飾して書く）。
 2. K は、C のケース。
-3. **行の引数**: 効果の引数（`Effect.params`）のうち、型が T と等しいものが、ちょうど一つ。それが、状態を変える行。一つもないか、二つ以上あれば STATE-7。`as any -> else` のように、分類を名指ししない `as` でも要る。型が `T[]`（行の並び）や `C.K<T>`（絞り込んだ型）の引数は、行の引数に数えない。
-4. 行の引数が運ぶ値: `put` と `delete` では、効果の前の行（どのケースにあるかを、呼ぶ側が示す。「呼ぶ側の検査」）。`post` では、入る行。
+3. **行の引数**: 効果の引数（`Effect.params`）のうち、型が、T と等しいか、T を絞り込んだ型（`T on C.Ks`）のものが、ちょうど一つ。それが、状態を変える行。一つもないか、二つ以上あれば STATE-7。`as else` でも要る。型が `T[]`（行の並び）の引数は、行の引数に数えない。行の引数を絞り込む分類は、`as` の分類と、違ってもよい（`effect fn pack(order: Order on Stage.Accepted): effects orders.put as Packing.Packed;`）: そのとき、`as` の分類については、前は、どのケースでも。
+4. 行の引数が運ぶ値: `put` と `delete` では、効果の前の行（どのケースにあるかを、引数の型が言う）。`post` では、入る行。
 
 行の引数を持たない効果（行の並びをまとめて書く `effect fn saveAll(changed: Order[]): effects orders.put;`、識別子で消す `effect fn remove(id: OrderId): effects orders.delete;`）は、`as` を書けない。意味は「書き方と意味」の「`as` を書かない」のとおりなので、行のケースを変える `put` は、行を一つずつ受け取る効果として宣言する。
 
@@ -382,44 +384,44 @@ classify Life of Order? {
   Absent: Order? as none;
 }
 
-effect fn createDraft(order: Order):  effects orders.post   as Life.Absent -> Life.Draft;    // as Life.Draft でも同じ
-effect fn place(order: Order):        effects orders.put    as Life.Draft -> Life.Placed;
-effect fn discardDraft(order: Order): effects orders.delete as Life.Draft -> Life.Absent;    // 消せるのは、下書きだけ
+effect fn createDraft(order: Order):                effects orders.post   as Life.Draft;
+effect fn place(order: Order on Life.Draft):        effects orders.put    as Life.Placed;
+effect fn discardDraft(order: Order on Life.Draft): effects orders.delete as Life.Absent;    // 消せるのは、下書きだけ
 ```
 
 消すものと、消さずにケースで言うものの分け方の勧めは `docs/requirements.md`「書き方の指針」。
 
-### 呼ぶ側の検査
+### 呼ぶ側
 
-矢印の前にケースを並べた行の遷移（`put` の `as Xs -> …`、`delete` の `as Xs -> N`）を持つ効果は、Xs のどれかにあると分かっている行でしか、呼べない。分かっていない行を渡せば STATE-9。
+行の引数を絞り込んだ効果は、そのケースにあると分かっている行でしか、呼べない。確かめるのは、型の検査（`docs/types.md`「呼び出しの引数」「互換」）で、行の遷移のための、別の検査は、ない: `T` の値は、`T on C.Ks` の引数に渡せない（TYPE-4。`match` のアームの中の対象なら MATCH-4）。
 
-- 確かめるのは、配線の呼び出し（`docs/grammar.md`「配線」の `Call`）が、行の引数に渡した値。その値は、効果の分類 C について、ケースが分かっている `Atom` で、分かっているケースのすべてが Xs に入っていなければならない。「ケースが分かっている」の定義は `docs/types.md`「ケースが分かっている値」: `match 値 by C` のアームの中の、その値（アームが受けるケース）と、型が `C.K<T>` の値。
-- 前が `any` の形、`as` を書かない効果、`post` の効果（`as N -> X` を含む）は、どの行でも受け取る: 確かめない。`post` の前の N は、行がないことで、渡す行（入る行）が示せることではない。
+- ケースが分かっている値は、型が `T on C.Ks` の値。`match (x by C)` のアームの中の x は、その型を持つ（`docs/types.md`「アームの中の対象の型」）。引数や `val` に、その型を書いてもよい。
+- op の引数も、同じ型で、同じことを言える（`fn restart(order: Order on Stage.Accepted)`）。効果だけの決まりではない。
 
 ```ts
 export fn start(id: OrderId): throws NoOrder, NotAccepted {
   val order = byId(id);
   match (order by Stage) {
-    Accepted => startProduction(order);     // order は、ここで Accepted と分かっている
+    Accepted => startProduction(order);     // order は、ここで Order on Stage.Accepted
     else     => throw NotAccepted;
   };
 }
 
-fn restart(order: Stage.Accepted<Order>) {
-  startProduction(order);                   // 型から Accepted と分かっている
+fn restart(order: Order on Stage.Accepted) {
+  startProduction(order);                   // 引数の型が、そのまま渡せる
 }
 
 fn bad(order: Order) {
-  startProduction(order);                   // STATE-9: order が Accepted にあると分かっていない
+  startProduction(order);                   // TYPE-4: Order は、Order on Stage.Accepted に渡せない
 }
 ```
 
 ### 検査器が確かめないこと
 
-- 効果の中身が、宣言した行の遷移のとおりに書くこと。中身は、デコレータを読むトランスパイラが出すか、人が書く（「状態に触れるもの」の「read と効果」）。宣言した向きのほかに行のケースが変わらないことと、`as` のない `put` が行のケースを変えないことを、生成したテストで確かめることは、まだ作っていない段階（`docs/requirements.md`「段階」）。IR は、そのために、状態、操作、分類、前のケース、後のケース、行の引数を持つ（`docs/ir.md`「state / exception / effect」の `RowTransition`）。
+- 効果の中身が、宣言した行の遷移のとおりに書くこと。中身は、デコレータを読むトランスパイラが出すか、人が書く（「状態に触れるもの」の「read と効果」）。宣言した向きのほかに行のケースが変わらないことと、`as` のない `put` が行のケースを変えないことを、生成したテストで確かめることは、まだ作っていない段階（`docs/requirements.md`「段階」）。IR は、そのために、状態、操作、行の引数（その型が、前のケース）、分類、後のケースを持つ（`docs/ir.md`「state / exception / effect」の `RowTransition`）。
+- 動いているときに、渡ってきた行が、引数の型の言うケースにあること。入口で確かめて、違えば、仕様の例外でない失敗にする、と決めてある（`docs/decisions.md`「決めたこと」371）が、基底は、まだ、そのコードを出さない（`docs/open.md`「次の段」）。
 - 渡した行が、保存してある行と同じものであること。検査器は、配線の行をまたいで値を追わない（「状態の形」の「検査器が遷移を使う範囲」）: ケースが分かっているのは、渡した値について。
-- デコレータが運ぶ効果と、`halts` の効果（「計算」の「デコレータが運ぶ reads と effects」）。デコレータの処理は、仕様の上では行を受け取らないので、呼ぶ側の検査（STATE-9）は掛からない。
-- `post` の `as N -> X` の、「入る前に、その行がない」こと。
+- デコレータが運ぶ効果と、`halts` の効果（「計算」の「デコレータが運ぶ reads と effects」）。デコレータの処理は、仕様の上では行を受け取らないので、引数の型の検査は掛からない。
 
 ## op の宣言と本体
 
@@ -591,7 +593,7 @@ DISJ-3 は、s に書く呼び出し（a と b の中の、Sc.effects に、s �
 |---|---|
 | 効果（宣言）の呼び出し | 引数のうち、型が T と等しいものが、ちょうど一つあれば、それ（「行の遷移」の「結びつき」の、行の引数と、同じ決まり。`as` を書かない効果にも、当てる） |
 | 直に呼ぶ組み込みの効果（`s.post(v)`、`s.put(v)`） | 値の引数。型が T と等しいとき |
-| op の呼び出し | 引数のうち、型が、T と等しいか、T を絞り込んだ型（`C.K<T>`）のものが、ちょうど一つあれば、それ。op の配線は、辿らない |
+| op の呼び出し | 引数のうち、型が、T と等しいか、T を絞り込んだ型（`T on C.K`）のものが、ちょうど一つあれば、それ。op の配線は、辿らない |
 
 - 通るのは、s に書く呼び出しが、どれも、行を受け取り、a の呼び出しが渡した値と、b の呼び出しが渡した値が、どれも、同じでないとき。
 - 行を受け取らない呼び出し（識別子で消す効果、行の並びをまとめて書く効果、分類の遷移の効果、別の状態の行だけを受け取る op）が、一つでもあれば、通らない。比べる値がなく、ぶつかるかどうかが、分からない。
@@ -780,7 +782,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | DOC-2 | error | 同じ `@param` 名、同じ `@throws` 例外が二度ある |
 | UNION-1 | error | `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複 |
 
-NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使える」（型の位置の `C.Case<T>` の C と、`match` の C が、現在の名前空間の `classify` でなければエラー）という規則で、分類の置き場を自由にした（`docs/decisions.md`「設計書から離れた決定」S18）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使える」（型の位置の、絞り込んだ型の C と、`match` の C が、現在の名前空間の `classify` でなければエラー）という規則で、分類の置き場を自由にした（`docs/decisions.md`「設計書から離れた決定」S18）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 
 ### 設定
 
@@ -800,9 +802,10 @@ NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使え�
 | READS-2 | error | 配線の O で `Op.reads` が空でなく、その要素の状態の集合が Sig(O, ns(O)).reads と等しくない（計算「reads」。O に運ばれた状態を含む）。足りないもの・余分なものを `Data.missing` / `Data.extra` に。位置は O の名前 |
 | STATE-5 | error | 葉の op（本体を持たない op）が `reads` か `effects` の節を書いた（「状態に触れるもの」の「葉の op」。`Signature` を要しないので `internal/sema` が出す）。節ごとに一つ。位置はその節。メッセージに、`read` か効果を宣言して配線で呼ぶことを示す |
 | STATE-6 | error | 配線が、`list` の状態の `put` か `delete` を直に呼んだ（「状態に触れるもの」の「直に呼ぶ組み込みの効果」: どの列かを引数から決める規則がない）。位置は操作の語。メッセージに、名前を付けた `effect` を宣言して呼ぶことを示す。`internal/sema` が出す |
-| STATE-7 | error | 行の遷移（`as` の節）が、書き込む状態と効果の引数に結びつかない（「行の遷移」の「結びつき」）: ケース `C.K` の C が、値の分類でない（op の分類、状態の分類）か、対象の型が、状態の要素の型 T でも `T?` でもない。K が C のケースでない。一つの `as` に、二つ以上の分類のケースがある。前のケースの並びに、同じケースが二度ある。効果の引数に、型が T のものが、ちょうど一つでない（メッセージに、行の引数を持たない効果は `as` を書けないことを示す）。位置は、当たったケースの名前（引数の数なら `as`）。`internal/sema` が出す |
-| STATE-8 | error | 行の遷移の形が、操作に合わない（「行の遷移」の「操作ごとに書ける形」の表の「書けない形」）。位置は、合わないところ（矢印のない形なら `as`、ケースなら、そのケースの名前、`else` なら `else`）。メッセージに、その操作で書ける形を示す。`internal/sema` が出す |
-| STATE-9 | error | 配線が、矢印の前にケースを並べた行の遷移を持つ効果を、そのケースにあると分かっていない行で呼んだ（「行の遷移」の「呼ぶ側の検査」）: 行の引数に渡した値が、効果の分類について、ケースが分かっている値（`docs/types.md`「ケースが分かっている値」）でない。または、分かっているケースに、前のケースの並びにないものがある。位置は、渡した値。メッセージに、前のケースの並びと、分かっているケース（あれば）を示す。`Signature` を要しないので `internal/sema` が出す |
+| STATE-7 | error | 行の遷移（`as` の節）が、書き込む状態と効果の引数に結びつかない（「行の遷移」の「結びつき」）: ケース `C.K` の C が、値の分類でない（op の分類、状態の分類）か、対象の型が、状態の要素の型 T でも `T?` でもない。K が C のケースでない。効果の引数に、型が T か、T を絞り込んだ型のものが、ちょうど一つでない（メッセージに、行の引数を持たない効果は `as` を書けないことを示す）。位置は、当たったケースの名前（引数の数なら `as`）。`internal/sema` が出す |
+| STATE-8 | error | 行の遷移の形が、操作に合わない（「行の遷移」の「操作ごとに書ける形」の表の「書けない形」）。`put` と `delete` の行の引数を、ない側のケースに絞り込んだ型も、これ。位置は、合わないところ（ケースなら、そのケースの名前、`else` なら `else`、引数の型なら、その型）。メッセージに、その操作で書ける形を示す。`internal/sema` が出す |
+
+STATE-9 は欠番。「配線が、矢印の前にケースを並べた行の遷移を持つ効果を、そのケースにあると分かっていない行で呼んだ」という規則で、前のケースを、行の引数の型で言うようにした（`docs/decisions.md`「決めたこと」369）ときに、型の検査（TYPE-4、MATCH-4）にまとまった。
 
 EFF-3 は欠番。「葉の op が自分で書いた `effects` が二つ以上」という規則で、葉の op が `reads` / `effects` の節を書けなくなった（STATE-5）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 

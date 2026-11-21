@@ -175,21 +175,22 @@ func sampleProgram() *Program {
 						Target: BuiltinTarget{State: "db", Operation: OpPost},
 						Writes: []string{"db"},
 					},
-					// 行の遷移を持つ効果（docs/ir.md「state / exception / effect」の RowTransition）: 前のケースの並び、後のケース
+					// 行の遷移を持つ効果（docs/ir.md「state / exception / effect」の RowTransition）: 前のケースは、行の引数の型（case）、
+					// 後のケースは row
 					&Effect{
 						DeclBase: DeclBase{Name: "server.promote", Span: span(f, 25, 1, 25, 90)},
-						Params:   []OpParam{{Name: "user", Type: Ref("server.User"), Span: span(f, 25, 16, 25, 26)}},
+						Params:   []OpParam{{Name: "user", Type: Case("server.IsAdmin", []string{"NotAdmin"}, Ref("server.User")), Span: span(f, 25, 16, 25, 46)}},
 						Target:   BuiltinTarget{State: "db", Operation: OpPut},
 						Writes:   []string{"db"},
-						Row:      &RowTransition{Param: "user", Classify: "server.IsAdmin", From: Cases("NotAdmin"), To: "IsAdmin"},
+						Row:      &RowTransition{Param: "user", Classify: "server.IsAdmin", To: "IsAdmin"},
 					},
-					// 分類を名指ししない行の遷移（`as any -> else`）は、classify も to も持たない
+					// 後のケースを決めない行の遷移（`as else`）は、classify も to も持たない
 					&Effect{
 						DeclBase: DeclBase{Name: "server.patch", Span: span(f, 26, 1, 26, 60)},
 						Params:   []OpParam{{Name: "user", Type: Ref("server.User"), Span: span(f, 26, 14, 26, 24)}},
 						Target:   BuiltinTarget{State: "db", Operation: OpPut},
 						Writes:   []string{"db"},
-						Row:      &RowTransition{Param: "user", From: AnyCase()},
+						Row:      &RowTransition{Param: "user"},
 					},
 					// read の宣言（docs/ir.md「read」）
 					&Read{

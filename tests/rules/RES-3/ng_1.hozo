@@ -11,5 +11,5 @@ namespace a {
   scalar S extends string;
   fn i(): S.foo;                       // ERROR: RES-3
   classify C of Q { A; }
-  fn j(q: C.B<Q>): int;                // ERROR: RES-3
+  fn j(q: Q on C.B): int;                // ERROR: RES-3
 }

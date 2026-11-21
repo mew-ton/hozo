@@ -13,7 +13,7 @@
 ```toml
 name     = "go-http"            # プラグインの名前
 command  = ["hozoc-plugin-go-http"]   # 文字列か文字列の配列
-protocol = "0.15"               # 対応する docs/ir.md の version
+protocol = "0.16"               # 対応する docs/ir.md の version
 
 vocabulary = []                 # このプラグインが提供する語彙。マニフェストからの相対パス。省略時は []
 
@@ -112,7 +112,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 
 ```jsonc
 // 要求
-{ "protocol": "0.15", "direction": "emit",
+{ "protocol": "0.16", "direction": "emit",
   "transpiler": "go-http",                // 起動するトランスパイラの名前（マニフェストの [[transpiler]] の name）
   "view": { /* docs/ir.md の View。対象の名前空間は view.viewer、単位の設定は view.config */ } }
 
@@ -136,7 +136,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 ### check
 
 ```jsonc
-{ "protocol": "0.15", "direction": "check", "view": { /* View */ } }
+{ "protocol": "0.16", "direction": "check", "view": { /* View */ } }
 
 { "diagnostics": [ { "severity": "error", "code": "PAGE-1", "message": "...", "at": "browser.openOrders" } ] }
 ```
@@ -149,7 +149,7 @@ formats = []                    # 取り込める形式の名前。空なら imp
 ### import
 
 ```jsonc
-{ "protocol": "0.15", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
+{ "protocol": "0.16", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
 
 { "ir": { /* docs/ir.md の Program */ }, "warnings": [ /* 同上 */ ] }
 ```

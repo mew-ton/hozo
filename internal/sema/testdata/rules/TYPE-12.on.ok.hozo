@@ -1,0 +1,13 @@
+// TYPE-12（docs/types.md「型の種類」の「絞り込んだ型」）: いくつかのケースを | で並べた、絞り込んだ型。引数、戻り値、val、
+// フィールド、並びの要素（list<T on C.K>）に書ける
+namespace a {
+  model Order { id: string; }
+  model Batch { first: Order on Stage.Draft; rest: list<Order on Stage.Draft | Stage.Accepted>; }
+  classify Stage of Order { Draft; Accepted; Shipped; }
+  fn open(order: Order on Stage.Draft | Stage.Accepted): Order on Stage.Draft | Stage.Accepted;
+  fn use(order: Order on Stage.Draft | Stage.Accepted | Stage.Shipped);
+  fn f(order: Order on Stage.Draft) {
+    val kept: Order on Stage.Draft | Stage.Accepted = open(order);
+    use(kept);
+  }
+}

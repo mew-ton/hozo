@@ -1,5 +1,5 @@
 {
-  "version": "0.15",
+  "version": "0.16",
   "viewer": "api",
   "config": {
     "index": 1,
@@ -70,7 +70,7 @@
     ]
   },
   "program": {
-    "version": "0.15",
+    "version": "0.16",
     "namespaces": [
       {
         "name": "",
@@ -3825,8 +3825,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "ref",
-                                "target": "api.User"
+                                "kind": "case",
+                                "classify": "api.Lookup",
+                                "cases": [
+                                  "Found"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
                               }
                             }
                           ],
@@ -3863,7 +3870,24 @@
                               }
                             }
                           },
-                          "narrowed": [],
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "api.Lookup",
+                                "cases": [
+                                  "Missing"
+                                ],
+                                "of": {
+                                  "kind": "optional",
+                                  "of": {
+                                    "kind": "ref",
+                                    "target": "api.User"
+                                  }
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "api.hozo",
                             "start": {
@@ -6973,8 +6997,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "ref",
-                                "target": "api.User"
+                                "kind": "case",
+                                "classify": "api.Lookup",
+                                "cases": [
+                                  "Found"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
                               }
                             }
                           ],
@@ -7011,7 +7042,24 @@
                               }
                             }
                           },
-                          "narrowed": [],
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "api.Lookup",
+                                "cases": [
+                                  "Missing"
+                                ],
+                                "of": {
+                                  "kind": "optional",
+                                  "of": {
+                                    "kind": "ref",
+                                    "target": "api.User"
+                                  }
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "api.hozo",
                             "start": {
@@ -7154,8 +7202,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "ref",
-                                "target": "api.User"
+                                "kind": "case",
+                                "classify": "api.Lookup",
+                                "cases": [
+                                  "Found"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
                               }
                             }
                           ],
@@ -7192,7 +7247,24 @@
                               }
                             }
                           },
-                          "narrowed": [],
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "api.Lookup",
+                                "cases": [
+                                  "Missing"
+                                ],
+                                "of": {
+                                  "kind": "optional",
+                                  "of": {
+                                    "kind": "ref",
+                                    "target": "api.User"
+                                  }
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "api.hozo",
                             "start": {
@@ -8359,8 +8431,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "ref",
-                                "target": "api.User"
+                                "kind": "case",
+                                "classify": "api.Membership",
+                                "cases": [
+                                  "Member"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
                               }
                             }
                           ],
@@ -8397,7 +8476,24 @@
                               }
                             }
                           },
-                          "narrowed": [],
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "api.Membership",
+                                "cases": [
+                                  "Stranger"
+                                ],
+                                "of": {
+                                  "kind": "optional",
+                                  "of": {
+                                    "kind": "ref",
+                                    "target": "api.User"
+                                  }
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "api.hozo",
                             "start": {
@@ -8556,8 +8652,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "core",
-                                "name": "string"
+                                "kind": "case",
+                                "classify": "api.Detail",
+                                "cases": [
+                                  "Short"
+                                ],
+                                "of": {
+                                  "kind": "core",
+                                  "name": "string"
+                                }
                               }
                             }
                           ],
@@ -8624,8 +8727,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "ref",
-                                "target": "api.User"
+                                "kind": "case",
+                                "classify": "api.Detail",
+                                "cases": [
+                                  "Full"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
                               }
                             }
                           ],
@@ -9038,7 +9148,24 @@
                               }
                             }
                           },
-                          "narrowed": [],
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "api.Standing",
+                                "cases": [
+                                  "Fresh",
+                                  "Active",
+                                  "Idle",
+                                  "Dormant"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "api.hozo",
                             "start": {
@@ -9323,7 +9450,22 @@
                               }
                             }
                           },
-                          "narrowed": [],
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "api.Standing",
+                                "cases": [
+                                  "Dormant",
+                                  "Closed"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "api.hozo",
                             "start": {
@@ -9543,7 +9685,24 @@
                               }
                             }
                           },
-                          "narrowed": [],
+                          "narrowed": [
+                            {
+                              "type": {
+                                "kind": "case",
+                                "classify": "api.Membership",
+                                "cases": [
+                                  "Stranger"
+                                ],
+                                "of": {
+                                  "kind": "optional",
+                                  "of": {
+                                    "kind": "ref",
+                                    "target": "api.User"
+                                  }
+                                }
+                              }
+                            }
+                          ],
                           "span": {
                             "file": "api.hozo",
                             "start": {
@@ -9607,8 +9766,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "ref",
-                                "target": "api.User"
+                                "kind": "case",
+                                "classify": "api.Membership",
+                                "cases": [
+                                  "Member"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
                               }
                             }
                           ],
@@ -9859,8 +10025,15 @@
                           "narrowed": [
                             {
                               "type": {
-                                "kind": "ref",
-                                "target": "api.User"
+                                "kind": "case",
+                                "classify": "api.Arrival",
+                                "cases": [
+                                  "Arrived"
+                                ],
+                                "of": {
+                                  "kind": "ref",
+                                  "target": "api.User"
+                                }
                               }
                             }
                           ],
@@ -10122,7 +10295,6 @@
             "row": {
               "param": "user",
               "classify": "api.Standing",
-              "from": "any",
               "to": "Fresh"
             }
           },
@@ -10145,15 +10317,23 @@
               },
               "end": {
                 "line": 436,
-                "col": 118
+                "col": 119
               }
             },
             "params": [
               {
                 "name": "user",
                 "type": {
-                  "kind": "ref",
-                  "target": "api.User"
+                  "kind": "case",
+                  "classify": "api.Standing",
+                  "cases": [
+                    "Fresh",
+                    "Active"
+                  ],
+                  "of": {
+                    "kind": "ref",
+                    "target": "api.User"
+                  }
                 },
                 "span": {
                   "file": "api.hozo",
@@ -10163,7 +10343,7 @@
                   },
                   "end": {
                     "line": 436,
-                    "col": 28
+                    "col": 64
                   }
                 }
               },
@@ -10177,11 +10357,11 @@
                   "file": "api.hozo",
                   "start": {
                     "line": 436,
-                    "col": 30
+                    "col": 66
                   },
                   "end": {
                     "line": 436,
-                    "col": 45
+                    "col": 81
                   }
                 }
               }
@@ -10198,10 +10378,6 @@
             "row": {
               "param": "user",
               "classify": "api.Standing",
-              "from": [
-                "Fresh",
-                "Active"
-              ],
               "to": "Idle"
             }
           },
@@ -10224,7 +10400,7 @@
               },
               "end": {
                 "line": 438,
-                "col": 80
+                "col": 73
               }
             },
             "params": [
@@ -10259,7 +10435,6 @@
             "row": {
               "param": "user",
               "classify": "api.Standing",
-              "from": "any",
               "to": "Closed"
             }
           },
@@ -10289,8 +10464,15 @@
               {
                 "name": "user",
                 "type": {
-                  "kind": "ref",
-                  "target": "api.User"
+                  "kind": "case",
+                  "classify": "api.Standing",
+                  "cases": [
+                    "Idle"
+                  ],
+                  "of": {
+                    "kind": "ref",
+                    "target": "api.User"
+                  }
                 },
                 "span": {
                   "file": "api.hozo",
@@ -10300,7 +10482,7 @@
                   },
                   "end": {
                     "line": 440,
-                    "col": 29
+                    "col": 46
                   }
                 }
               }
@@ -10315,11 +10497,7 @@
               "api.users"
             ],
             "row": {
-              "param": "user",
-              "classify": "api.Standing",
-              "from": [
-                "Idle"
-              ]
+              "param": "user"
             }
           },
           {
@@ -10348,8 +10526,15 @@
               {
                 "name": "user",
                 "type": {
-                  "kind": "ref",
-                  "target": "api.User"
+                  "kind": "case",
+                  "classify": "api.Enrolment",
+                  "cases": [
+                    "Lapsed"
+                  ],
+                  "of": {
+                    "kind": "ref",
+                    "target": "api.User"
+                  }
                 },
                 "span": {
                   "file": "api.hozo",
@@ -10359,7 +10544,7 @@
                   },
                   "end": {
                     "line": 442,
-                    "col": 30
+                    "col": 50
                   }
                 }
               }
@@ -10376,9 +10561,6 @@
             "row": {
               "param": "user",
               "classify": "api.Enrolment",
-              "from": [
-                "Lapsed"
-              ],
               "to": "Unknown"
             }
           },
@@ -10581,7 +10763,23 @@
                         "body": {
                           "kind": "none"
                         },
-                        "narrowed": [],
+                        "narrowed": [
+                          {
+                            "type": {
+                              "kind": "case",
+                              "classify": "api.Standing",
+                              "cases": [
+                                "Idle",
+                                "Dormant",
+                                "Closed"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "api.User"
+                              }
+                            }
+                          }
+                        ],
                         "span": {
                           "file": "api.hozo",
                           "start": {
@@ -10834,8 +11032,15 @@
                         "narrowed": [
                           {
                             "type": {
-                              "kind": "ref",
-                              "target": "api.User"
+                              "kind": "case",
+                              "classify": "api.Enrolment",
+                              "cases": [
+                                "Lapsed"
+                              ],
+                              "of": {
+                                "kind": "ref",
+                                "target": "api.User"
+                              }
                             }
                           }
                         ],
@@ -12002,7 +12207,7 @@
               },
               "end": {
                 "line": 63,
-                "col": 66
+                "col": 68
               }
             },
             "exported": false,
@@ -12028,7 +12233,7 @@
                   },
                   "end": {
                     "line": 63,
-                    "col": 54
+                    "col": 56
                   }
                 }
               }
@@ -18059,7 +18264,7 @@
             },
             "end": {
               "line": 63,
-              "col": 54
+              "col": 56
             }
           }
         }

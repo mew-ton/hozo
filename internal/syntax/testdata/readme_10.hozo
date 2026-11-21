@@ -50,7 +50,7 @@ namespace browser {
     goPayment(line, warranty);
   }
 
-  fn chooseYamadaWarranty(item: WarrantyKind.Yamada<server.Item>, line: server.CartLine)
+  fn chooseYamadaWarranty(item: server.Item on WarrantyKind.Yamada, line: server.CartLine)
     : server.WarrantyLine
     throws page.Aborted, http.NetworkError, http.ServerError
   {
@@ -59,7 +59,7 @@ namespace browser {
   }
 
   @page.dialog("YamadaWarrantyModal")
-  fn askYamadaWarranty(item: WarrantyKind.Yamada<server.Item>): server.PlanId;
+  fn askYamadaWarranty(item: server.Item on WarrantyKind.Yamada): server.PlanId;
 
   fn chooseWarrantyPlan(item: server.Item): server.PlanId?
     throws page.Aborted

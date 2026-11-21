@@ -94,7 +94,7 @@ namespace app {
   export fn receiptText(receipt: Receipt): string;
   export fn send(addr: Email): string;
   export fn priceOf(item: Item): int;
-  export fn bigOnly(item: Size.Big<Item>): string;
+  export fn bigOnly(item: Item on Size.Big): string;
   export fn show(text: string);
   export fn fail(): never throws Bad;
 
@@ -184,7 +184,7 @@ namespace app {
   }
 
   // 述語で決まる値の分類の return match: 判定関数と失敗の扱い、switch k<n>。default: の節がないので、後ろに return を置く。
-  // ケースで絞り込んだ型（Size.Big<Item>）は、Go では同じ型
+  // ケースで絞り込んだ型（Item on Size.Big）は、Go では同じ型
   @mark export fn sizeLabel(item: Item): string
   {
     return match (item by Size) {

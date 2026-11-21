@@ -77,11 +77,15 @@ func (e *emitter) exceptionComment(x *ir.Exception) string {
 }
 
 // effectComment は「<定数名> は<説明>」。宛先が分類の遷移なら、末尾に `effects <宛先の FQN> as <前> -> <後>` の一行を足す。
-// 行の遷移を持つ効果（Effect.row）なら、末尾に `effects <状態の FQN>.<操作> <行の遷移の表示>` の一行を足す。
+// 行の遷移を持つ効果（Effect.row）なら、末尾に `[<絞り込んだ引数の表示>、]effects <状態の FQN>.<操作> <行の遷移の表示>` の一行を足す。
 func (e *emitter) effectComment(x *ir.Effect) string {
 	text := describe(golang.EffectConst(x.Name), x.Description, "effect "+x.Name+"。")
 	if _, ok := x.Target.(ir.TransitionTarget); ok || x.Row != nil {
-		text += "\neffects " + effectTarget(x)
+		narrowed := ""
+		if n := golang.NarrowedParamsDisplay(x); n != "" && x.Row != nil {
+			narrowed = n + "、"
+		}
+		text += "\n" + narrowed + "effects " + effectTarget(x)
 	}
 	return comment(text)
 }

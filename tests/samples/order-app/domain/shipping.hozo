@@ -253,21 +253,21 @@ namespace shipping {
   effect fn createShipment(shipment: Shipment): effects shipments.post as Custody.InHouse;
 
   /** 品目を一つ、そろえ場所に置いた: 置いた時刻と、量った大きさを入れる（人が書く）。それで、そろうか、まだ待つかは、残りの品目による */
-  effect fn recordPlacement(shipment: Shipment, placement: Placement): effects shipments.put as Gathered.Awaiting -> else;
+  effect fn recordPlacement(shipment: Shipment on Gathered.Awaiting, placement: Placement): effects shipments.put as else;
 
   /** 配送業者に渡した: 渡した時刻を入れる（人が書く） */
-  effect fn recordHandOver(shipment: Shipment, at: datetime): effects shipments.put as Custody.InHouse -> Custody.WithCarrier;
+  effect fn recordHandOver(shipment: Shipment on Custody.InHouse, at: datetime): effects shipments.put as Custody.WithCarrier;
 
   /** 届いた: 届いた時刻を入れる（人が書く） */
-  effect fn recordDelivery(shipment: Shipment, at: datetime): effects shipments.put as Custody.WithCarrier -> Custody.Delivered;
+  effect fn recordDelivery(shipment: Shipment on Custody.WithCarrier, at: datetime): effects shipments.put as Custody.Delivered;
 
   /** 荷物を作る。箱と送料が、ここで決まる。梱包は一度だけ: 荷物のない出荷にだけ、作る */
   @db.insert
-  effect fn createParcel(parcel: Parcel): effects parcels.post as Packing.Unpacked -> Packing.Packed;
+  effect fn createParcel(parcel: Parcel): effects parcels.post as Packing.Packed;
 
   /** 送り状を記録する。送り状は一つだけ: 送り状のない出荷にだけ、作る */
   @db.insert
-  effect fn createLabel(label: Label): effects labels.post as Labelling.Unlabelled -> Labelling.Labelled;
+  effect fn createLabel(label: Label): effects labels.post as Labelling.Labelled;
 
   // ---- 注文のとき: 送料の見積もりと上限 ----
 
@@ -390,7 +390,7 @@ namespace shipping {
   }
 
   /** 品目を確かめて、置く */
-  fn putDown(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?):
+  fn putDown(shipment: Shipment on Gathered.Awaiting, line: type.LineId, measured: type.Measurement?):
     throws UnknownItem
   {
     val now = clock.now();
@@ -399,7 +399,7 @@ namespace shipping {
   }
 
   /** その行が、出荷の、まだ置いていない品目であることを確かめて、置いた事実にする（人が書く）。品目になければ UnknownItem */
-  fn place(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?, now: datetime): Placement
+  fn place(shipment: Shipment on Gathered.Awaiting, line: type.LineId, measured: type.Measurement?, now: datetime): Placement
     throws UnknownItem;
 
   // ---- 梱包する: 箱と重さを決める。送料が、ここで決まる ----
@@ -417,12 +417,12 @@ namespace shipping {
    * そろった出荷が入る箱の種類と、それぞれの送料。小さい順。梱包する人は、ここから選ぶ。
    * そろっていない出荷は、引数に渡せない（箱は、そろうまで決められない）。
    */
-  export fn boxOptions(shipment: Gathered.Complete<Shipment>): BoxOption[] {
+  export fn boxOptions(shipment: Shipment on Gathered.Complete): BoxOption[] {
     return fitting(shipment, boxes, tariffs);
   }
 
   /** 品目の大きさから、入る箱の種類を選び、料金表で送料を付ける（人が書く） */
-  fn fitting(shipment: Gathered.Complete<Shipment>, boxes: Box[], tariffs: Tariff[]): BoxOption[];
+  fn fitting(shipment: Shipment on Gathered.Complete, boxes: Box[], tariffs: Tariff[]): BoxOption[];
 
   /**
    * 梱包した: 箱の種類と、量った重さを記録する。送料は、箱の大きさの区分と届け先の地帯から、料金表で決まる。
@@ -453,7 +453,7 @@ namespace shipping {
   }
 
   /** 箱の種類を引く */
-  fn packInto(shipment: Gathered.Complete<Shipment>, code: BoxCode, weight: type.Grams): Parcel
+  fn packInto(shipment: Shipment on Gathered.Complete, code: BoxCode, weight: type.Grams): Parcel
     throws UnknownBox, OverWeight, Undeliverable
   {
     val box = boxByCode(code);
@@ -464,7 +464,7 @@ namespace shipping {
   }
 
   /** 荷物を作る */
-  fn seal(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams): Parcel
+  fn seal(shipment: Shipment on Gathered.Complete, box: Box, weight: type.Grams): Parcel
     throws OverWeight, Undeliverable
   {
     val now = clock.now();
@@ -474,7 +474,7 @@ namespace shipping {
   }
 
   /** 箱の大きさの区分と届け先の地帯から、料金表で送料を決めて、荷物にする（人が書く）。重さが箱の上限を超えていれば OverWeight */
-  fn weighed(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams, tariffs: Tariff[], now: datetime): Parcel
+  fn weighed(shipment: Shipment on Gathered.Complete, box: Box, weight: type.Grams, tariffs: Tariff[], now: datetime): Parcel
     throws OverWeight, Undeliverable;
 
   // ---- 送り状を買う前に: 梱包が済んでいて、まだ送り状がないこと ----

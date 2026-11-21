@@ -2,7 +2,7 @@
 # 別のデコレータを書いた seam-other。どれも基底 go に相乗りする
 name     = "seams"
 command  = ["true"]
-protocol = "0.15"
+protocol = "0.16"
 
 [[transpiler]]
 name     = "seam-a"

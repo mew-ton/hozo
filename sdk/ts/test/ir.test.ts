@@ -410,16 +410,18 @@ function walkDecl(d: Decl, program: Program): void {
       d.params.forEach((p) => walkType(p.type));
       assert.ok(d.writes.length > 0);
       for (const st of d.writes) assert.equal(typeof st, "string");
-      // 行の遷移（版 0.9）: 行の引数、分類（名指ししない形では持たない）、前のケース（"any" か列）、後のケース（決まっていなければ持たない）
+      // 行の遷移（版 0.9、0.16）: 行の引数、分類と後のケース（`as else` では、どちらも持たない）。前のケースは、
+      // 行の引数の型が言う（kind が case なら、その cases。そうでなければ、どのケースでも）。row には、ない
       if (d.row) {
         seen.add("effect:row");
         assert.equal(d.target.kind, "builtin");
-        assert.ok(d.params.some((p) => p.name === d.row!.param));
-        if (d.row.from === "any") seen.add("row:fromAny");
-        else {
-          seen.add("row:fromCases");
-          for (const c of d.row.from) assert.equal(typeof c, "string");
-        }
+        assert.ok(!("from" in d.row), "RowTransition.from は 0.16 でなくなった");
+        const rowParam = d.params.find((p) => p.name === d.row!.param);
+        assert.ok(rowParam);
+        if (rowParam.type.kind === "case") {
+          seen.add("row:paramNarrowed");
+          for (const c of rowParam.type.cases) assert.equal(typeof c, "string");
+        } else seen.add("row:paramPlain");
         if (d.row.classify === undefined) seen.add("row:noClassify");
         if (d.row.to === undefined) seen.add("row:noTo");
         else assert.equal(typeof d.row.to, "string");
@@ -517,7 +519,7 @@ function walkDecl(d: Decl, program: Program): void {
 }
 
 function walkProgram(p: Program): void {
-  assert.equal(p.version, "0.15");
+  assert.equal(p.version, "0.16");
   assert.equal(p.namespaces[0]?.name, "");
   for (const ns of p.namespaces) {
     // Namespace は decorators を持たない（デコレータは名前空間に付けられない。docs/ir.md「Program」）
@@ -537,7 +539,7 @@ test("program.golden.json reads as Program and round-trips", () => {
 test("view.golden.json reads as View and round-trips", () => {
   const text = golden("view.golden.json");
   const view: View = JSON.parse(text);
-  assert.equal(view.version, "0.15");
+  assert.equal(view.version, "0.16");
   assert.equal(typeof view.viewer, "string");
   // files は単位の in に合ったファイル。namespaces の値は、その名前空間を出力する単位ごとの設定（設定の順）
   assert.ok(view.files.every((f) => typeof f === "string"));
@@ -599,8 +601,8 @@ test("goldens cover every kind of every union", () => {
     "arm:else",
     // 版 0.9 で足した形（同上）: 行の遷移、ない側のケース
     "effect:row",
-    "row:fromCases",
-    "row:fromAny",
+    "row:paramNarrowed",
+    "row:paramPlain",
     "row:noClassify",
     "row:noTo",
     "classify:absent",

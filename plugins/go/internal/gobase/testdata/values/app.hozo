@@ -9,7 +9,7 @@ namespace app {
   model Account { id: string; profile: Profile?; email: Email; }
   model Labels { [name: string]: string; }
   model Options { limit: int?; label: string?; ratio: float?; wait: duration?; note: string?; }
-  /** 大きさ（述語で決まる分類。ケースで絞り込んだ型 Size.Big<Address> を作るため） */
+  /** 大きさ（述語で決まる分類。ケースで絞り込んだ型 Address on Size.Big を作るため） */
   classify Size of Address {
     Big;
     Small;
@@ -100,7 +100,7 @@ namespace app {
   }
 
   // 「型をそろえる」case(…) → of（Go では同じ型）
-  export fn fromCase(big: Size.Big<Address>)
+  export fn fromCase(big: Address on Size.Big)
   {
     takeAddress(big);
   }

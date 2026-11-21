@@ -1,5 +1,5 @@
 {
-  "version": "0.15",
+  "version": "0.16",
   "namespaces": [
     {
       "name": "",
@@ -877,8 +877,15 @@
             {
               "name": "user",
               "type": {
-                "kind": "ref",
-                "target": "server.User"
+                "kind": "case",
+                "classify": "server.IsAdmin",
+                "cases": [
+                  "NotAdmin"
+                ],
+                "of": {
+                  "kind": "ref",
+                  "target": "server.User"
+                }
               },
               "span": {
                 "file": "server.hozo",
@@ -888,7 +895,7 @@
                 },
                 "end": {
                   "line": 25,
-                  "col": 26
+                  "col": 46
                 }
               }
             }
@@ -905,9 +912,6 @@
           "row": {
             "param": "user",
             "classify": "server.IsAdmin",
-            "from": [
-              "NotAdmin"
-            ],
             "to": "IsAdmin"
           }
         },
@@ -956,8 +960,7 @@
             "db"
           ],
           "row": {
-            "param": "user",
-            "from": "any"
+            "param": "user"
           }
         },
         {

@@ -172,6 +172,8 @@ func (a *analyzer) lowerType(t ast.Type, sc *scope) (ir.Type, bool) {
 		return elem, true
 	case *ast.NamedType:
 		return a.lowerNamedType(t, sc)
+	case *ast.OnType:
+		return a.lowerOnType(t, sc)
 	}
 	return nil, false
 }
@@ -183,43 +185,62 @@ func (a *analyzer) isStringLike(t ir.Type) bool {
 	return ok && c.Name == ir.CoreString
 }
 
-// lowerNamedType は名前の型。`C.Case<T>` は絞り込まれた型（TYPE-12）、ほかは ref。
+// lowerNamedType は名前の型（ref）。classify のケースは、そのままでは型にならない（絞り込んだ型は T on C.K: lowerOnType）。
 func (a *analyzer) lowerNamedType(t *ast.NamedType, sc *scope) (ir.Type, bool) {
 	r, ok := a.resolve(t.Name, sc, acTypePos)
 	if !ok {
 		return nil, false
 	}
-	if t.Arg != nil {
-		return a.lowerCaseType(t, r, sc)
-	}
 	if r.kind == rCase {
-		a.errorf("RES-4", t.Name.Span, "classify のケース %s を型にするには型引数が要る（%s<T>）", t.Name.String(), t.Name.String())
+		a.errorf("RES-4", t.Name.Span, "classify のケース %s は、そのままでは型にならない。絞り込んだ型は、T on %s と書く", t.Name.String(), t.Name.String())
 		return nil, false
 	}
 	return ir.Ref(r.sym.fqn), true
 }
 
-// lowerCaseType は C.Case<T>。型引数を付けられるのは classify のケースだけ（docs/grammar.md「型」）。
-// C は値の分類か op の分類で、どの名前空間のものでもよい（docs/resolve.md「位置ごとに受け付ける種類」の「型」）。
-// 状態の分類なら RES-4。対象の型との照合（TYPE-12）は、すべての宣言が下りてから行う（checkPendingCaseTypes）。
-func (a *analyzer) lowerCaseType(t *ast.NamedType, r resolved, sc *scope) (ir.Type, bool) {
-	if r.kind != rCase {
-		a.errorf("RES-4", t.Name.Span, "型引数を付けられるのは classify のケースだけで、%s ではない", describe(r))
+// lowerOnType は絞り込んだ型 T on C.K | C.K2（docs/types.md「型の種類」の「絞り込んだ型」）。C は値の分類か op の分類で、
+// どの名前空間のものでもよい（docs/resolve.md「位置ごとに受け付ける種類」）。対象のない分類なら RES-4。TYPE-12: 並べたケースが
+// 一つの分類のものでない、同じケースが二度ある。状態の分類（RES-4）と、対象の型との照合（TYPE-12）は、すべての宣言が
+// 下りてから行う（checkPendingCaseTypes）。
+func (a *analyzer) lowerOnType(t *ast.OnType, sc *scope) (ir.Type, bool) {
+	of, ok := a.lowerType(t.Of, sc)
+	var classify *symbol
+	var cases []string
+	for i := range t.Cases {
+		qn := t.Cases[i]
+		r, found := a.resolve(qn, sc, acCase)
+		if !found {
+			ok = false
+			continue
+		}
+		if d, isClassify := r.sym.node.(*ast.ClassifyDecl); isClassify && d.Never {
+			a.errorf("RES-4", qn.Span, "classify %s は、対象のない分類（of never）なので、型には書けない（当たる値がない）", r.sym.fqn)
+			ok = false
+			continue
+		}
+		switch {
+		case classify == nil:
+			classify = r.sym
+		case classify != r.sym:
+			a.errorf("TYPE-12", qn.Span, "絞り込んだ型に、二つの分類（%s と %s）のケースがある。一つの on が言うのは、一つの分類のこと", classify.fqn, r.sym.fqn)
+			ok = false
+			continue
+		}
+		if contains(cases, r.name) {
+			a.errorf("TYPE-12", qn.Span, "絞り込んだ型に、ケース %s が二度ある", r.name)
+			ok = false
+			continue
+		}
+		cases = append(cases, r.name)
+	}
+	if !ok || classify == nil {
 		return nil, false
 	}
-	if d, isClassify := r.sym.node.(*ast.ClassifyDecl); isClassify && d.Never {
-		a.errorf("RES-4", t.Name.Span, "classify %s は、対象のない分類（of never）なので、型には書けない（当たる値がない）", r.sym.fqn)
-		return nil, false
-	}
-	of, ok := a.lowerType(t.Arg, sc)
-	if !ok {
-		return nil, false
-	}
-	a.pendingCaseTypes = append(a.pendingCaseTypes, pendingCaseType{classify: r.sym, of: of, nameSpan: t.Name.Span, argSpan: t.Arg.NodeSpan()})
-	return ir.Case(r.sym.fqn, []string{r.name}, of), true
+	a.pendingCaseTypes = append(a.pendingCaseTypes, pendingCaseType{classify: classify, of: of, nameSpan: t.Cases[0].Span, argSpan: t.Of.NodeSpan()})
+	return ir.Case(classify.fqn, cases, of), true
 }
 
-// pendingCaseType は、宣言が下りてから確かめる C.Case<T>。
+// pendingCaseType は、宣言が下りてから確かめる、絞り込んだ型 T on C.Ks。
 type pendingCaseType struct {
 	classify *symbol
 	of       ir.Type
@@ -227,7 +248,7 @@ type pendingCaseType struct {
 	argSpan  source.Span
 }
 
-// checkPendingCaseTypes は、型の位置の C.Case<T> を確かめる。分類の対象は op でありうる（op の分類）ので、
+// checkPendingCaseTypes は、型の位置の、絞り込んだ型を確かめる。分類の対象は op でありうる（op の分類）ので、
 // 分類と op が互いを参照していても確かめられるように、すべての宣言が下りてから行う。
 func (a *analyzer) checkPendingCaseTypes() {
 	for _, p := range a.pendingCaseTypes {
@@ -236,7 +257,7 @@ func (a *analyzer) checkPendingCaseTypes() {
 	a.pendingCaseTypes = nil
 }
 
-// checkCaseType は RES-4（C が状態の分類）と TYPE-12（docs/types.md「診断」: C.Case<T> の T が C の対象の型に渡せない）。
+// checkCaseType は RES-4（C が状態の分類）と TYPE-12（docs/types.md「診断」: T on C.Ks の T が C の対象の型に渡せない）。
 func (a *analyzer) checkCaseType(p pendingCaseType) {
 	c, ok := a.lower(p.classify).(*ir.Classify)
 	if !ok || c.Subject == nil {

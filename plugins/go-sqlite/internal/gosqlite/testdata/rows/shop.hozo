@@ -31,29 +31,29 @@ namespace shop {
 
   /** @db.insert: 前が、ない側のケース */
   @db.insert
-  effect fn keep(order: Order): effects orders.post as Life.Gone -> Life.Kept;
+  effect fn keep(order: Order): effects orders.post as Life.Kept;
 
   /** @db.update: 前が any。渡した行を、そのまま書く */
   @db.update
-  effect fn overwrite(order: Order): effects orders.put as any -> Stage.InProduction;
+  effect fn overwrite(order: Order): effects orders.put as Stage.InProduction;
 
   /** @db.update: ケースを変えない書き換え */
   @db.update
-  effect fn annotate(order: Order): effects orders.put as Stage.Accepted -> Stage.Accepted;
+  effect fn annotate(order: Order on Stage.Accepted): effects orders.put as Stage.Accepted;
 
   /** @db.update: 後のケースを約束しない */
   @db.update
-  effect fn revise(order: Order): effects orders.put as Stage.InProduction -> else;
+  effect fn revise(order: Order on Stage.InProduction): effects orders.put as else;
 
   /** 行の遷移を書かない @db.update は、今までどおり */
   @db.update
   effect fn rename(order: Order): effects orders.put;
 
   /** 作り始める: 始めた時刻を入れる（人が書く。後のケースが前の並びにないので、@db.update は付けられない） */
-  effect fn start(order: Order, at: datetime): effects orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order on Stage.Accepted, at: datetime): effects orders.put as Stage.InProduction;
 
   /** 捨てる（人が書く。行を受け取る効果に、@db.delete は付けられない） */
-  effect fn discard(order: Order): effects orders.delete as Life.Kept -> Life.Gone;
+  effect fn discard(order: Order on Life.Kept): effects orders.delete as Life.Gone;
 
   /** 受け付けた注文だけを、作り始める */
   export fn begin(order: Order, at: datetime) {

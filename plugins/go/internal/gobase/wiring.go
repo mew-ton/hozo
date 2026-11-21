@@ -1467,7 +1467,9 @@ func (b *bodyGen) narrow(p *matchPlan, a *ir.MatchArm) string {
 			text = short(n.State)
 			if !read {
 				// アームの本体が、この状態を使っていない
-				texts = append(texts, text+" は "+golang.TypeDisplay(n.Type))
+				if golang.TypeDisplay(n.Type) != golang.TypeDisplay(from) {
+					texts = append(texts, text+" は "+golang.TypeDisplay(n.Type))
+				}
 				continue
 			}
 		} else {
@@ -1478,14 +1480,18 @@ func (b *bodyGen) narrow(p *matchPlan, a *ir.MatchArm) string {
 			subject, from = p.subject, p.subjectType
 			text = subjectText(p.m.SubjectAtom())
 		}
-		texts = append(texts, text+" は "+golang.TypeDisplay(n.Type))
+		// ケースで絞っただけで、もとの型が同じアームは、Go の型が変わらないので、コメントに書かない
+		if golang.TypeDisplay(n.Type) != golang.TypeDisplay(from) {
+			texts = append(texts, text+" は "+golang.TypeDisplay(n.Type))
+		}
 		ov.value, ov.base = subject, subject
 		if !b.sameGo(from, n.Type) {
 			switch by := p.narrowBy(a, n.State); {
 			// 残りのケースで対象の型が変わるのは、残りのアームがちょうど一つの variant だけで、式は variant と同じ
 			case by == ir.NarrowByVariant, by == ir.NarrowByElse:
 				if u := b.e.unionOf(from); u != nil {
-					if arm, ok := b.e.variantArm(u, n.Type, p.m.Classify); ok {
+					// アームを探すのは、絞り込みを捨てた、もとの型で（アームの中の対象の型は case(C, Ks, <アームの型>)）
+					if arm, ok := b.e.variantArm(u, strip(n.Type), p.m.Classify); ok {
 						ov.value = subject + ".(" + b.e.armGoType(b.f, u, arm) + ")"
 						if arm.wrapped {
 							ov.value += ".Value"
@@ -1597,6 +1603,18 @@ func (b *bodyGen) matchType(p *matchPlan) ir.Type {
 		if ok {
 			t = cand
 			break
+		}
+	}
+	if t == nil { // そういう型がなければ、絞り込みを捨てた型で、同じことをする（docs/types.md「match の型」の 5.1）
+		for _, cand := range typed {
+			ok := true
+			for _, other := range typed {
+				ok = ok && b.e.assignable(strip(other), strip(cand))
+			}
+			if ok {
+				t = strip(cand)
+				break
+			}
 		}
 	}
 	if t == nil && len(typed) > 0 {

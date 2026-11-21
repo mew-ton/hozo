@@ -118,3 +118,28 @@ namespace removedFnTail {
     return all();
   }
 }
+
+// 絞り込んだ型と、行の遷移（docs/grammar.md「型」「exception / effect / read」）: C.K<T>、行の遷移の矢印、any、ケースの並び
+namespace removedNarrowing {
+  model Order { id: string; }
+  state orders: list<Order>;
+  classify Stage of Order { Draft; Accepted; Shipped; }
+  // 絞り込んだ型は、T on C.K（C.K<T> は、なくした書き方）
+  fn oldNarrowed(order: Stage.Accepted<Order>);                                          // ERROR: SYNTAX
+  // 行の遷移の、前のケースは、行の引数の型で言う（矢印と、any と、ケースの並びは、なくした書き方）
+  effect fn oldArrow(order: Order): effects orders.put as Stage.Accepted -> Stage.Shipped;   // ERROR: SYNTAX
+  effect fn oldAnyArrow(order: Order): effects orders.put as any -> Stage.Shipped;       // ERROR: SYNTAX
+  effect fn oldArrowElse(order: Order): effects orders.put as Stage.Accepted -> else;    // ERROR: SYNTAX
+  effect fn oldAny(order: Order): effects orders.post as any;                            // ERROR: SYNTAX
+  effect fn oldList(order: Order): effects orders.put as Stage.Draft, Stage.Accepted;    // ERROR: SYNTAX
+  fn takeAccepted(order: Order on Stage.Accepted);
+  effect fn ship(order: Order on Stage.Draft | Stage.Accepted): effects orders.put as Stage.Shipped;
+  effect fn patch(order: Order): effects orders.put as else;
+  fn ok(order: Order) {
+    match (order by Stage) {
+      Accepted => takeAccepted(order);
+      Draft    => ship(order);
+      Shipped  => patch(order);
+    };
+  }
+}

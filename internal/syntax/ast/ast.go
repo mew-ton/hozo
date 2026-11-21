@@ -480,17 +480,13 @@ type CaseSet struct {
 // NodeSpan は Node の実装。
 func (n *CaseSet) NodeSpan() source.Span { return n.Span }
 
-// RowClause は行の遷移 "as <後>" か "as <前> -> <後>"（docs/grammar.md「exception / effect / read」の RowClause）。
-// 意味は docs/check.md「行の遷移」。
+// RowClause は行の遷移 "as <後>"（docs/grammar.md「exception / effect / read」の RowClause）: 効果の後の、行のケース。
+// 効果の前のケースは、行の引数の型（OnType）が言う。意味は docs/check.md「行の遷移」。
 type RowClause struct {
 	// Span は as から、後の終わりまで（";" は含まない）。
 	Span source.Span
 	// AsSpan は as の語。
 	AsSpan source.Span
-	// Arrow は矢印のある形（"as <前> -> <後>"）か。
-	Arrow bool
-	// Before は矢印の前（RowBefore）。矢印のない形では nil。
-	Before *RowBefore
 	// After は効果の後。
 	After RowAfter
 }
@@ -498,23 +494,11 @@ type RowClause struct {
 // NodeSpan は Node の実装。
 func (n *RowClause) NodeSpan() source.Span { return n.Span }
 
-// RowBefore は行の遷移の矢印の前: "any" か、ケース（分類の名前とケースの名前）の並び。Any なら Cases は空。
-type RowBefore struct {
-	Span  source.Span
-	Any   bool
-	Cases []QualifiedName
-}
-
-// NodeSpan は Node の実装。
-func (n *RowBefore) NodeSpan() source.Span { return n.Span }
-
-// RowAfter は行の遷移の後: ケース一つ（Case）、矢印の後ろの "else"（Else）、矢印のない形の "any"（Any）のどれか一つ。
-// 解析できなかったときは、どれでもない。
+// RowAfter は行の遷移の後: ケース一つ（Case）か、"else"（Else）。解析できなかったときは、どちらでもない。
 type RowAfter struct {
 	Span source.Span
-	Any  bool
 	Else bool
-	// Case は "分類の名前.ケースの名前"。Any か Else なら nil。
+	// Case は "分類の名前.ケースの名前"。Else なら nil。
 	Case *QualifiedName
 }
 
@@ -946,11 +930,10 @@ type ShapeType struct {
 func (n *ShapeType) NodeSpan() source.Span { return n.Span }
 func (n *ShapeType) typeNode()             {}
 
-// NamedType は宣言の名前。Arg は分類のケースで絞り込んだ型の型引数（WarrantyKind.Yamada<server.Item>）。なければ nil。
+// NamedType は宣言の名前。
 type NamedType struct {
 	Span source.Span
 	Name QualifiedName
-	Arg  Type
 }
 
 // NodeSpan は Node の実装。
@@ -976,6 +959,21 @@ type OptionalType struct {
 // NodeSpan は Node の実装。
 func (n *OptionalType) NodeSpan() source.Span { return n.Span }
 func (n *OptionalType) typeNode()             {}
+
+// OnType は分類のケースで絞り込んだ型 "T on C.K | C.K2"（docs/grammar.md「型」の OnType）。
+type OnType struct {
+	Span source.Span
+	// Of は、もとの型（on の前）。
+	Of Type
+	// OnSpan は on の語。
+	OnSpan source.Span
+	// Cases は "分類の名前.ケースの名前" の並び（書かれた順。一つ以上）。
+	Cases []QualifiedName
+}
+
+// NodeSpan は Node の実装。
+func (n *OnType) NodeSpan() source.Span { return n.Span }
+func (n *OnType) typeNode()             {}
 
 // Block は配線の本体（docs/grammar.md「配線」）。
 type Block struct {

@@ -47,7 +47,11 @@ func effectMethodComment(x *ir.Effect) string {
 	if len(x.Throws) > 0 {
 		throws = "throws " + strings.Join(x.Throws, ", ") + "、"
 	}
-	return unitMethodComment(golang.MethodName(x.Name)+" は命令（効果 "+x.Name+"、"+throws+"effects "+effectTarget(x)+"）", x.Description)
+	narrowed := ""
+	if n := golang.NarrowedParamsDisplay(x); n != "" {
+		narrowed = n + "、"
+	}
+	return unitMethodComment(golang.MethodName(x.Name)+" は命令（効果 "+x.Name+"、"+narrowed+throws+"effects "+effectTarget(x)+"）", x.Description)
 }
 
 // genStates は定義のパッケージの states.go。状態の単位がなければ nil。
