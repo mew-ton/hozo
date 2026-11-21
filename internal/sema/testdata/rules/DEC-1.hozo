@@ -21,7 +21,7 @@ namespace a {
   fn ok(): void;
   // 対象 effect: 効果の宣言に付けられ、宣言にない対象（op、state）には付けられない
   decorator onlyEffect for effect;
-  decorator opOrEffect for op | effect;
+  decorator opOrEffect for op, effect;
   @onlyEffect @opOrEffect @db.insert
   effect fn okEffect(): effects s.post;
   @db.update @db.delete

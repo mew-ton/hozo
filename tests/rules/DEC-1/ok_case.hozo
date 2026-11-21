@@ -12,7 +12,7 @@ namespace a {
   decorator bySubject for case of never;
   decorator byType for case of M;
   decorator byName for case of Size;
-  decorator mixed for op | case of never | case of Size;
+  decorator mixed for op, case of never, case of Size;
   classify Other of never { @mixed A; }
   classify Sized of M { @any1 @byType Tiny; Huge; }
   @mixed fn f();

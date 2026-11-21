@@ -24,7 +24,7 @@ namespace ordering {
   model MadeLine extends Line {
     /** 客が書いた、作り方の希望 */
     request: string?;
-    leadTime: Duration;
+    leadTime: duration;
     largest: type.Measurement;
   }
 
@@ -53,11 +53,11 @@ namespace ordering {
     physical: PhysicalPart?;
     /** 商品の代金の合計。送料を含まない */
     itemsTotal: type.Yen;
-    placedAt: Time;
+    placedAt: datetime;
     /** 支払いの枠を確保できて、注文を受け付けた時刻 */
-    acceptedAt: Time?;
+    acceptedAt: datetime?;
     /** 支払いがないまま、期限が過ぎた時刻 */
-    expiredAt: Time?;
+    expiredAt: datetime?;
   }
 
   @db.table
@@ -183,17 +183,17 @@ namespace ordering {
   read fn orderByRequest(requestId: type.RequestId): Order? reads orders;
 
   /** deadline より前に申し込まれて、まだ支払いを待っている注文。古い順（比較と並べ方は db の語彙で言えないので、人が書く） */
-  read fn unpaidBefore(deadline: Time): Order[] reads orders;
+  read fn unpaidBefore(deadline: datetime): Order[] reads orders;
 
   /** 注文を作る。支払いを待つ注文として入る */
   @db.insert
   effect fn createOrder(order: Order): effects orders.post as Standing.AwaitingPayment;
 
   /** 受け付けた: 受け付けた時刻を入れる（人が書く） */
-  effect fn acceptOrder(order: Order, at: Time): effects orders.put as Standing.AwaitingPayment -> Standing.Accepted;
+  effect fn acceptOrder(order: Order, at: datetime): effects orders.put as Standing.AwaitingPayment -> Standing.Accepted;
 
   /** 期限切れにした: 期限が過ぎた時刻を入れる（人が書く） */
-  effect fn expireOrder(order: Order, at: Time): effects orders.put as Standing.AwaitingPayment -> Standing.Expired;
+  effect fn expireOrder(order: Order, at: datetime): effects orders.put as Standing.AwaitingPayment -> Standing.Expired;
 
   // ---- 値段を付ける ----
 
@@ -286,7 +286,7 @@ namespace ordering {
    * 箱で送る部分があるのに、客が同意した上限（agreedCeiling）がいまの上限と違えば、いまの約束を運ぶ TermsChanged。
    */
   @prd.promise("客", "客が見て同意した送料の上限と、注文に記録する上限は、同じ額")
-  fn draft(checkout: Checkout, priced: Priced, now: Time): Order
+  fn draft(checkout: Checkout, priced: Priced, now: datetime): Order
     throws TermsChanged;
 
   /** 在庫の行を取り置く。箱で送る部分がなければ、何もしない */
@@ -340,7 +340,7 @@ namespace ordering {
   }
 
   /** 支払いを待つ長さ。これを過ぎた注文は、期限切れにする */
-  state paymentWindow: single<Duration>;
+  state paymentWindow: single<duration>;
 
   /**
    * 支払いがないまま期限が過ぎた注文を、古い順に、一つずつ、期限切れにして、取り置きを戻す。誰にも呼ばれずに動く。
@@ -359,7 +359,7 @@ namespace ordering {
   }
 
   /** 期限切れにできるのは、支払いを待っている注文だけ */
-  fn expireIfUnpaid(order: Order, now: Time) {
+  fn expireIfUnpaid(order: Order, now: datetime) {
     match (order by Standing) {
       AwaitingPayment   => expire(order, now);
       Accepted, Expired => none;
@@ -367,11 +367,11 @@ namespace ordering {
   }
 
   /** 期限切れにして、取り置きを戻す */
-  fn expire(order: Standing.AwaitingPayment<Order>, now: Time) {
+  fn expire(order: Standing.AwaitingPayment<Order>, now: datetime) {
     expireOrder(order, now);
     inventory.release(order.id);
   }
 
   /** now から window だけ前の時刻（人が書く） */
-  fn before(now: Time, window: Duration): Time;
+  fn before(now: datetime, window: duration): datetime;
 }

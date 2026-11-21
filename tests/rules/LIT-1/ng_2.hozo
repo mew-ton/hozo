@@ -1,6 +1,6 @@
-// LIT-1（docs/types.md「診断」）: Duration がナノ秒で 64 ビット符号付きの範囲を超える
+// LIT-1（docs/types.md「診断」）: duration がナノ秒で 64 ビット符号付きの範囲を超える
 namespace a {
-  decorator wait(d: Duration);
+  decorator wait(d: duration);
   fn g();
   @wait(9223372037s)                   // ERROR: LIT-1
   fn f();

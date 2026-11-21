@@ -7,7 +7,7 @@ namespace app {
   model Address { city: string; zip: string?; tags: string[]; }
   model Profile { name: string; address: Address?; nick: string?; age: int?; active: boolean?; }
   model Account { id: string; profile: Profile?; email: Email; }
-  model Options { limit: int?; label: string?; ratio: float?; wait: Duration?; note: string?; }
+  model Options { limit: int?; label: string?; ratio: float?; wait: duration?; note: string?; }
   /** 大きさ（述語で決まる分類。ケースで絞り込んだ型 Size.Big<Address> を作るため） */
   classify Size of Address {
     Big;
@@ -19,7 +19,7 @@ namespace app {
   export fn takeInt(v: int);
   export fn takeFloat(v: float);
   export fn takeBool(v: boolean);
-  export fn takeDuration(v: Duration);
+  export fn takeDuration(v: duration);
   export fn takeAccount(v: Account);
   export fn takeProfile(v: Profile);
   export fn takeAddress(v: Address);
@@ -40,7 +40,7 @@ namespace app {
     takeOptionalString(none);
   }
 
-  // 「値」literal: 文字列（エスケープ）、整数、小数（. も e も含まなければ .0 を足す）、真偽値、Duration
+  // 「値」literal: 文字列（エスケープ）、整数、小数（. も e も含まなければ .0 を足す）、真偽値、duration
   export fn literals()
   {
     takeString("a\"b\n");

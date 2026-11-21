@@ -4,7 +4,7 @@ namespace a {
   effect fn e(): effects s.post;
   decorator r(table: any state) for effect reads table;            // ERROR: DEC-2
   decorator w(...targets: any effect) for state effects targets;   // ERROR: DEC-2
-  decorator r2 for field | effect reads s;                         // ERROR: DEC-2
+  decorator r2 for field, effect reads s;                         // ERROR: DEC-2
   decorator w2 for model effects e;                                // ERROR: DEC-2
   fn f();
 }

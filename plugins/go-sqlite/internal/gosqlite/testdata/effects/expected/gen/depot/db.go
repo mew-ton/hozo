@@ -277,13 +277,13 @@ func dbScanSlot(r dbRow) (Slot, error) {
 
 // dbArgsEvent は depot.Event を、表 "events" の列の順の値にする。
 func dbArgsEvent(row Event) ([]any, error) {
-	return dbArgs(dbText(row.Crate), dbText(row.What), dbTime(row.At))
+	return dbArgs(dbText(row.Crate), dbText(row.What), dbDatetime(row.At))
 }
 
 // dbScanEvent は、表 "events" の列の順の値を depot.Event に読む。
 func dbScanEvent(r dbRow) (Event, error) {
 	var row Event
-	if err := r.Scan(dbText(&row.Crate), dbText(&row.What), dbTime(&row.At)); err != nil {
+	if err := r.Scan(dbText(&row.Crate), dbText(&row.What), dbDatetime(&row.At)); err != nil {
 		return Event{}, err
 	}
 	return row, nil
@@ -425,14 +425,14 @@ func dbBool(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {

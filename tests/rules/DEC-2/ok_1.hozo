@@ -4,11 +4,11 @@ namespace a {
   exception E;
   state s: list<string>;
   effect fn e(): effects s.post;
-  decorator ok for op | field throws E;
+  decorator ok for op, field throws E;
   decorator ok2 throws E;
   decorator ok3(table: any state) for op reads table;
   decorator ok4(...targets: any effect) effects targets;
-  decorator ok5 for effect | op reads s effects e;
+  decorator ok5 for effect, op reads s effects e;
   decorator ok6 for effect;
   fn f();
 }

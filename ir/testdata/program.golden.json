@@ -1,5 +1,5 @@
 {
-  "version": "0.12",
+  "version": "0.13",
   "namespaces": [
     {
       "name": "",
@@ -77,12 +77,12 @@
           },
           "type": {
             "kind": "core",
-            "name": "Time"
+            "name": "datetime"
           },
           "shape": "single",
           "element": {
             "kind": "core",
-            "name": "Time"
+            "name": "datetime"
           }
         },
         {
@@ -740,7 +740,7 @@
                 "kind": "optional",
                 "of": {
                   "kind": "core",
-                  "name": "Duration"
+                  "name": "duration"
                 }
               },
               "span": {

@@ -3,7 +3,7 @@
 namespace a {
   model M { id: string; }
   state rows: list<M>;
-  decorator once(column: string) for read | effect | exception;
+  decorator once(column: string) for read, effect, exception;
   decorator alias = once("id");
   @once("a")
   @once("b")                           // ERROR: DEC-13

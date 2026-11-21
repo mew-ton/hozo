@@ -1,8 +1,8 @@
 // GOVALID-5: 位置は、付いた scalar か model。
 namespace valid {
   /** 末尾の 1 桁が、チェックディジットと一致する */
-  decorator checkDigit for scalar | field;
-  decorator even(strict: boolean) for scalar | field;
+  decorator checkDigit for scalar, field;
+  decorator even(strict: boolean) for scalar, field;
 }
 
 namespace app {

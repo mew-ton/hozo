@@ -1,8 +1,8 @@
 GOVALID-1	app.Name	@valid.min は、元の型が int か float の位置にだけ付けられるが、scalar app.Name は元の型が string
-GOVALID-1	app.Wait	@valid.max は、元の型が int か float の位置にだけ付けられるが、scalar app.Wait は元の型が Duration
+GOVALID-1	app.Wait	@valid.max は、元の型が int か float の位置にだけ付けられるが、scalar app.Wait は元の型が duration
 GOVALID-1	app.Count	@valid.length は、元の型が string の位置にだけ付けられるが、scalar app.Count は元の型が int
 GOVALID-1	app.Flag	@valid.pattern は、元の型が string の位置にだけ付けられるが、scalar app.Flag は元の型が boolean
-GOVALID-1	app.At	@valid.format は、元の型が string の位置にだけ付けられるが、scalar app.At は元の型が Time
+GOVALID-1	app.At	@valid.format は、元の型が string の位置にだけ付けられるが、scalar app.At は元の型が datetime
 GOVALID-1	app.Alias	@valid.max は、元の型が int か float の位置にだけ付けられるが、scalar app.Alias は元の型が string
 GOVALID-1	app.Half	@valid.min の value 0.5 は整数でないので、元の型が int の scalar app.Half には付けられない
 GOVALID-1	app.Any	@valid.length に、min も max もない（scalar app.Any）

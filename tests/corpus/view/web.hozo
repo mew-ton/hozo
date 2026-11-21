@@ -39,7 +39,7 @@ namespace web {
   decorator offlineFallback catches api.Timeout recovers throws Offline;
   decorator ignoreTimeout catches api.Timeout ignores;
   // docs/ir.md「デコレータの適用」: op の引数を値に取る引数は "$param:名前"（docs/resolve.md「手続き」1.3）
-  decorator traced(key: string, within: Duration);
+  decorator traced(key: string, within: duration);
 
   // docs/ir.md「classify」: 述語で決まる値の分類。二つに分かれる分類も、両側に名前を付ける（docs/check.md「閉じた分類」）
   /** ユーザーの種類 */
@@ -51,11 +51,11 @@ namespace web {
   /** メールアドレスを確認済み */
   classify Verified of api.PublicUser { Verified; Unverified; }
 
-  // docs/ir.md「正規化」: デコレータの引数のリテラル（int、Duration のナノ秒、boolean）
-  decorator limits(page: int, timeout: Duration, strict: boolean) for model;
+  // docs/ir.md「正規化」: デコレータの引数のリテラル（int、duration のナノ秒、boolean）
+  decorator limits(page: int, timeout: duration, strict: boolean) for model;
   /** 問い合わせ */
   @limits(1, 30s, false)
-  model Query { id: api.UserId; page: int?; timeout: Duration?; strict: boolean?; }
+  model Query { id: api.UserId; page: int?; timeout: duration?; strict: boolean?; }
 
   // 葉の op
   fn userPageVm(user: api.PublicUser): UserPage;

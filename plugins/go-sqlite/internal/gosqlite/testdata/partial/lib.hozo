@@ -18,7 +18,7 @@ namespace lib {
   }
 
   model Stamp {
-    @db.time at: Time;
+    @db.datetime at: datetime;
   }
 
   @db.table state books: list<Book>;
@@ -59,7 +59,7 @@ namespace lib {
   // ---- stamps: すべてに付けた（消すだけ） ----
 
   @db.delete
-  effect fn dropStamp(at: Time): effects stamps.delete;
+  effect fn dropStamp(at: datetime): effects stamps.delete;
 
   // ---- drafts: 表でない状態の read と効果は、どの型にも出ない ----
 

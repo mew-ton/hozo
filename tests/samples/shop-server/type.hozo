@@ -1,7 +1,7 @@
 // サンプル shop-server の仕様（README.md）。共有の型の名前空間 type。
 // 保存（store.hozo）、サーバー（server.hozo）、配送（mailer.hozo）が同じ型を使う。
 // 書き方は docs/decisions.md の P1〜P39 と、「決めたこと」のその後の決定を当てはめた形。まだ実装のない書き方を含む（README.md「まだないもの」）。
-// 表の model（store.hozo の @db.table の状態の要素: User、Session、Order、Notification）のフィールドは、しまい方のデコレータ（@db.text、@db.time、@db.json）をちょうど一つ持つ（docs/plugin-go-sqlite.md「しまい方」）。どのフィールドも省略可能でないので、どの列も NOT NULL（同「表」）。
+// 表の model（store.hozo の @db.table の状態の要素: User、Session、Order、Notification）のフィールドは、しまい方のデコレータ（@db.text、@db.datetime、@db.json）をちょうど一つ持つ（docs/plugin-go-sqlite.md「しまい方」）。どのフィールドも省略可能でないので、どの列も NOT NULL（同「表」）。
 
 /** 共有の型。どの担い手にも属さない */
 namespace type {
@@ -47,7 +47,7 @@ namespace type {
   model Session {
     @db.key       @db.text token: Token;
     @db.ref(User) @db.text userId: UserId;
-    @db.time expiresAt: Time;
+    @db.datetime expiresAt: datetime;
   }
 
   /** 注文の一行 */
@@ -61,7 +61,11 @@ namespace type {
     @db.key       @db.text id: OrderId;
     @db.ref(User) @db.text userId: UserId;
     @db.json lines: OrderLine[];
-    @db.time placedAt: Time;
+    @db.datetime placedAt: datetime;
+    /** 届ける日（決まっていれば） */
+    @db.date deliverOn: date?;
+    /** 届ける時刻の、いちばん早いもの（決まっていれば） */
+    @db.time deliverFrom: time?;
   }
 
   /** ユーザーへの通知 */

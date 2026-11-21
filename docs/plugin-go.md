@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.12"
+protocol = "0.13"
 
 [[transpiler]]
 name     = "go"
@@ -161,7 +161,8 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | IR | Go |
 |---|---|
 | `string` / `boolean` / `int` / `float` | `string` / `bool` / `int64` / `float64` |
-| `Time` / `Duration` | `time.Time` / `time.Duration` |
+| `datetime` / `duration` | `time.Time` / `time.Duration` |
+| `date` / `time` | `runtime.Date` / `runtime.TimeOfDay`（Go に、日付だけ、時刻だけの型がないので、「runtime パッケージ」が持つ） |
 | `optional(T)` | T が `array`、`record`、union（`arms`）への `ref` ならそのまま（`nil` が「なし」）。それ以外は `*T` |
 | `array(T)` | `[]T` |
 | `record(K, V)` | `map[K]V` |
@@ -226,7 +227,7 @@ func (InvalidCredentials) HozoException() string { return "type.InvalidCredentia
 var _ runtime.Exception = InvalidCredentials{}
 ```
 
-- 引数を持つ例外（`exception LimitExceeded(retryAfter: Duration);`。`docs/grammar.md`「exception / effect / read」）は、**引数ごとにフィールド一つ**の構造体。並びは `Exception.params` の順で、名前とタグは model のフィールドと同じ（「名前」）。引数のない例外は `struct{}`。値を一つの `Value` に包む形は、なくした。
+- 引数を持つ例外（`exception LimitExceeded(retryAfter: duration);`。`docs/grammar.md`「exception / effect / read」）は、**引数ごとにフィールド一つ**の構造体。並びは `Exception.params` の順で、名前とタグは model のフィールドと同じ（「名前」）。引数のない例外は `struct{}`。値を一つの `Value` に包む形は、なくした。
 
 ```go
 // LimitExceeded: 呼び出しの頻度の制限を超えた
@@ -477,7 +478,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 - `read` と効果を呼べるのは、宣言した名前空間の配線だけ（NS-6。`docs/check.md`「配線からの呼び出し」）なので、呼ぶ先は、いつも N の状態の単位。単位は「状態の単位」の表のとおり。
 - 状態を名前で読むこと（名前を付けない `read`）は、呼び出しではなく、値（「状態の参照」）。
 - **失敗の扱い**: 呼び出しは、どれも `error` を返す（「op の形」）。その結果を`val` か文で受ける呼び出しは、すぐ後に `if err != nil { return <零値>, err }` を置く（`<零値>` は、この配線の戻り値の型の零値。戻り値がなければ `return err`）。配線も、いつも `error` を返すので、返す先は、いつもある。受け取った `error` は、包まず、そのまま返す。
-- **零値**: ポインタ・インターフェース・スライス・マップは `nil`、構造体は `<型>{}`、`time.Time` は `time.Time{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
+- **零値**: ポインタ・インターフェース・スライス・マップは `nil`、構造体は `<型>{}`、`time.Time`、`runtime.Date`、`runtime.TimeOfDay` は `<型>{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
 
 ### 値
 
@@ -488,7 +489,7 @@ func (o *ops) Authenticate(ctx context.Context, token *pkgtype.Token) (pkgtype.S
 | `name`（`val`・`for` の変数・引数。パスなし） | その局所の名前 |
 | `name` のパス（`in.body.email`） | フィールドを先頭大文字にしてつなぐ（`in.Body.Email`）。途中に省略可能な model があるときは「省略可能を通るパス」 |
 | `state` | その文の前で読んだ値（「状態の参照」）と、パス |
-| `literal` | 文字列は Go の文字列リテラル（`strconv.Quote`）、整数は 10 進、小数は `strconv.FormatFloat(v, 'g', -1, 64)`（`.` も `e` も含まなければ `.0` を足す）、真偽値は `true` / `false`、`Duration` は `time.Duration(<ナノ秒>)` |
+| `literal` | 文字列は Go の文字列リテラル（`strconv.Quote`）、整数は 10 進、小数は `strconv.FormatFloat(v, 'g', -1, 64)`（`.` も `e` も含まなければ `.0` を足す）、真偽値は `true` / `false`、`duration` は `time.Duration(<ナノ秒>)` |
 | `none` | `nil` |
 | `record` | 当てはめる model の構造体リテラル `<型>{<フィールド>: <値>, …}`。並びは model のフィールドの順。書かれていないフィールド（省略可能なフィールドだけ。`docs/types.md`「当てはまる」）は書かず、零値のまま。当てはめる型が省略可能なら `&<型>{…}` |
 
@@ -898,7 +899,7 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 
 ## runtime パッケージ
 
-生成したコードが import する `github.com/mew-ton/hozo/runtime`。基底の出力が使うのは次の三つ。
+生成したコードが import する `github.com/mew-ton/hozo/runtime`。基底の出力が使うのは、次の三つと、核の型 `date`・`time` の値の型（下の表）。
 
 ```go
 type Effect string
@@ -906,7 +907,14 @@ type Exception interface { error; HozoException() string }
 type ClassificationError struct { Classify string; Hits []string }   // 分類の誤り（判定関数と、型で決まる分類の match が返す）。Error() を持つ
 ```
 
-- `Effect` と `Exception` は `types.go`、`ClassificationError` は `classify.go` と `wiring.go` が使う。`ops.go` と `states.go` は `runtime` を import しない。
+- 核の型 `date` と `time` の値の型も、ここに置く（「型」）。どちらも、時刻帯を持たず、`==` で比べられ、`encoding/json` では、文字列になる（`MarshalText` / `UnmarshalText`）。
+
+  | 型 | 核の型 | 零値 | 文字列の形 | 作る・読む | 取り出す |
+  |---|---|---|---|---|---|
+  | `Date` | `date` | `0001-01-01` | `2006-01-02` | `NewDate(年, 月, 日)`、`DateOf(time.Time)`、`ParseDate(文字列)` | `Year` / `Month` / `Day`、`In(時刻帯)`（その日の 0 時）、`Compare`、`String` |
+  | `TimeOfDay` | `time` | `00:00:00` | `15:04:05`。秒より細かい部分は、末尾の 0 を除いた小数部（読むときは、0〜9 桁） | `NewTimeOfDay(時, 分, 秒, ナノ秒)`、`TimeOfDayOf(time.Time)`、`ParseTimeOfDay(文字列)` | `Hour` / `Minute` / `Second` / `Nanosecond`、`SinceMidnight`、`Compare`、`String`、`Fixed`（小数部を、いつも 9 桁で書く） |
+
+- `Effect` と `Exception` は `types.go`、`ClassificationError` は `classify.go` と `wiring.go` が使う。`ops.go` と `states.go` が `runtime` を import するのは、関数の引数か戻り値に、`date` か `time` があるときだけ。
 - `MissingError` はなくした（「実装を受け取る口」）。
 - `runtime` には、標準の相乗りが使う型も置く: `Violation`、`ValidationError`、`CheckFormat` は `go-valid` のもの（持ち主は `docs/plugin-go-valid.md`「runtime」）。`DBTxKey`（`ctx` が運ぶ DB のトランザクションの鍵。`struct { DB *sql.DB }`）は `go-sqlite` のもの（持ち主は `docs/plugin-go-sqlite.md`「トランザクション」）。Go の出力が import するライブラリを一つにするため。`DBTxKey` は、それに加えて、同じ DB を使う二つの名前空間の出力が、同じ鍵を使うため（出力のパッケージごとの型では、共有できない）。
 - API を変えるときは、生成したコードのヘッダに書く版（「ファイル」）と合わせて互換を保つ。

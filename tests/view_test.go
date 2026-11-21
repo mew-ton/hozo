@@ -479,7 +479,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "offlineFallback の catches", renderCatches(f.Catches), []string{"catches api.Timeout recovers"})
 		expect(t, "offlineFallback の throws", renderThrows(f.Throws), []string{"throws web.Offline"})
 		expect(t, "ignoreTimeout の catches", renderCatches(declOf(t, prog, "web.ignoreTimeout").(*ir.Decorator).Catches), []string{"catches api.Timeout ignores"})
-		expect(t, "traced の params（型で受ける）", renderParams(declOf(t, prog, "web.traced").(*ir.Decorator).Params), []string{"key: string", "within: Duration"})
+		expect(t, "traced の params（型で受ける）", renderParams(declOf(t, prog, "web.traced").(*ir.Decorator).Params), []string{"key: string", "within: duration"})
 	})
 
 	t.Run("ir.md 正規化/名前付きデコレータ", func(t *testing.T) {
@@ -508,11 +508,11 @@ func TestViewFromEntry(t *testing.T) {
 
 	t.Run("ir.md 正規化/リテラル", func(t *testing.T) {
 		// フィールドの既定値は書けない（docs/grammar.md「model」）ので、リテラルはデコレータの引数で確かめる
-		expect(t, "Query に付けたデコレータの引数（int、Duration はナノ秒、boolean）", renderApplications(declOf(t, prog, "web.Query").Common().Decorators), []string{
+		expect(t, "Query に付けたデコレータの引数（int、duration はナノ秒、boolean）", renderApplications(declOf(t, prog, "web.Query").Common().Decorators), []string{
 			"@web.limits(page: 1, timeout: 30000000000ns, strict: false)",
 		})
 		expect(t, "Query の fields（既定値を持たない）", renderFields(declOf(t, prog, "web.Query").(*ir.Model)), []string{
-			"id: api.UserId", "page: int?", "timeout: Duration?", "strict: boolean?",
+			"id: api.UserId", "page: int?", "timeout: duration?", "strict: boolean?",
 		})
 	})
 

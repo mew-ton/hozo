@@ -8,7 +8,7 @@ namespace a {
    * @param wait 待つ時間
    * @param note 補足
    */
-  exception Busy(wait: Duration, note: string?);
+  exception Busy(wait: duration, note: string?);
   /**
    * 行を足す
    *

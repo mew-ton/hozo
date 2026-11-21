@@ -4,8 +4,8 @@ namespace a {
   model M { id: string; }
   state rows: list<M>;
   @repeatable
-  decorator tag(name: string) for read | op;
-  decorator once(name: string) for read | op;
+  decorator tag(name: string) for read, op;
+  decorator once(name: string) for read, op;
   decorator hot = tag("hot");
   decorator cold = once("cold");
   @tag("a") @tag("b") @hot @hot

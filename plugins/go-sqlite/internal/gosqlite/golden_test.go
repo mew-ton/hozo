@@ -230,7 +230,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gosql24", codeSQLNeither},     // @db.where か @db.latest の付いた read が、@db.find も @db.list も持たない
 	{"gosql25", codeSQLTwice},       // 一つの read の条件が、同じ列を二度名指ししている
 	{"gosql26", codeSQLLiteral},     // @db.where のリテラルが、列の型に渡せない
-	{"gosql27", codeSQLLatest},      // @db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない
+	{"gosql27", codeSQLLatest},      // @db.latest の列のしまい方が、@db.datetime / @db.int / @db.float のどれでもない
 	{"gosql28", codeSQLDeleteAll},   // @db.delete の効果が、引数を一つも持たない
 	{"gosql29", codeSQLTransaction}, // op に @db.transaction が付いているのに、N に表の状態が一つもない
 	{"gosql30", codeSQLRow},         // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない

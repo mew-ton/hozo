@@ -41,7 +41,7 @@ namespace a {
     name: string;
     /** 段階 */
     level: int;
-    since: Time;
+    since: datetime;
   }
   model Admin extends Member {
     override id: Email;
@@ -63,7 +63,7 @@ namespace a {
 
   exception Unauthorized;
   exception Invalid(field: string);
-  exception Wrapped(user: User, at: Time?);
+  exception Wrapped(user: User, at: datetime?);
   union Errors { Unauthorized; Invalid; }
   union AllErrors { Errors; Wrapped; }
   union Effects { add; set; }
@@ -79,9 +79,9 @@ namespace a {
 
   @external
   decorator get(path: string) throws Unauthorized;
-  decorator fallback(error: any exception, view: any model) for op | field catches error recovers;
+  decorator fallback(error: any exception, view: any model) for op, field catches error recovers;
   decorator unavailable = fallback(AllErrors, User);
-  decorator cache(key: string[], stale: Duration?);
+  decorator cache(key: string[], stale: duration?);
   decorator tagged(tags: string | int) for model;
 
   /**
@@ -161,7 +161,7 @@ namespace store {
   decorator insert(table: any state) for effect;
   decorator effects(...targets: any effect) for op effects targets;
   decorator audited(extra: any state?) for op reads logs, extra reads rows effects Writes, log;
-  decorator tags(first: string, ...more: string | int) for op | effect;
+  decorator tags(first: string, ...more: string | int) for op, effect;
   decorator both = effects(addRow, Writes);
 
   @insert(rows) effect fn addRow(r: Row): effects rows.post;
@@ -215,7 +215,7 @@ namespace lib {
   /** @param r 触る行 */
   effect fn touch(r: Row): effects rows.put;
   /** @param wait 待つ時間 */
-  exception Busy(wait: Duration, note: string?);
+  exception Busy(wait: duration, note: string?);
 
   fn named(id: string): Row? reads rowById { return rowById(id); }
   fn direct(): Row[] reads rows { return rows; }
@@ -503,7 +503,7 @@ func TestNormalizeExpectations(t *testing.T) {
 	// 例外の引数、ユニオンのアームのその場の model（持ち主の直後）
 	eq("Invalid の引数", p.Lookup("a.Invalid").(*ir.Exception).Params[0].Type, ir.String())
 	eq("Wrapped の引数", []ir.Type{p.Lookup("a.Wrapped").(*ir.Exception).Params[0].Type, p.Lookup("a.Wrapped").(*ir.Exception).Params[1].Type},
-		[]ir.Type{ir.Ref("a.User"), ir.Optional(ir.Time())})
+		[]ir.Type{ir.Ref("a.User"), ir.Optional(ir.Datetime())})
 	page := p.Lookup("a.Page").(*ir.Union)
 	eq("Page のアーム", []ir.Type{page.Arms[0].Type, page.Arms[1].Type}, []ir.Type{ir.Ref("a.Page.Ready"), ir.Ref("a.User")})
 	eq("Ready の説明", page.Arms[0].Description.Summary, "準備できた")
@@ -572,7 +572,7 @@ func TestNormalizeExpectations(t *testing.T) {
 	eq("effects のユニオン", p.Lookup("a.both").(*ir.Op).Effects, ir.NamedEffects("a.add", "a.set"))
 	eq("Signature は零値", find.Signature, ir.Signature{})
 
-	// 適用: 名前付きの展開、位置→名前、$param:、Duration
+	// 適用: 名前付きの展開、位置→名前、$param:、duration
 	wire := p.Lookup("a.wire").(*ir.Op)
 	eq("名前付きデコレータの展開", wire.Decorators[0], ir.Application{
 		Decorator: "a.fallback", Via: "a.unavailable", Args: alias.Alias.Args, Span: wire.Decorators[0].Span,

@@ -33,7 +33,7 @@ namespace http {
   /** このフィールドの項目が要求になければ、誤り（op は呼ばれない） */
   decorator required for field;
   /** このフィールドの項目が要求になければ、value にする */
-  decorator default(value: string | int | float | boolean | Duration) for field;
+  decorator default(value: string | int | float | boolean | duration) for field;
 
   decorator retry(times: int);
 }

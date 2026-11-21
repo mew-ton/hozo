@@ -2,14 +2,14 @@
 // レコードリテラルは引数の型の model に当てはめる。アームの中の対象は絞り込まれた型で渡す
 namespace a {
   model M { id: string; note: string?; }
-  exception Busy(wait: Duration, note: string?);
+  exception Busy(wait: duration, note: string?);
   exception NotFound(id: string);
   state rows: list<M>;
   state cur: nullable<M>;
   read fn byId(id: string): M? reads rows;
   read fn all(): M[] reads rows;
   effect fn add(m: M): effects rows.post;
-  effect fn touch(m: M, at: Time?): effects rows.put;
+  effect fn touch(m: M, at: datetime?): effects rows.put;
   classify K of M { A; B; }
   fn f(m: M, id: string): M[] throws Busy, NotFound {
     add(m);

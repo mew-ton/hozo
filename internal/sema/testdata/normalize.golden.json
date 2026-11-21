@@ -1,5 +1,5 @@
 {
-  "version": "0.12",
+  "version": "0.13",
   "namespaces": [
     {
       "name": "",
@@ -365,7 +365,7 @@
               "name": "since",
               "type": {
                 "kind": "core",
-                "name": "Time"
+                "name": "datetime"
               },
               "decorators": [],
               "span": {
@@ -376,7 +376,7 @@
                 },
                 "end": {
                   "line": 19,
-                  "col": 17
+                  "col": 21
                 }
               }
             }
@@ -479,7 +479,7 @@
               "name": "since",
               "type": {
                 "kind": "core",
-                "name": "Time"
+                "name": "datetime"
               },
               "decorators": [],
               "span": {
@@ -490,7 +490,7 @@
                 },
                 "end": {
                   "line": 19,
-                  "col": 17
+                  "col": 21
                 }
               }
             },
@@ -970,7 +970,7 @@
             },
             "end": {
               "line": 41,
-              "col": 44
+              "col": 48
             }
           },
           "params": [
@@ -998,7 +998,7 @@
                 "kind": "optional",
                 "of": {
                   "kind": "core",
-                  "name": "Time"
+                  "name": "datetime"
                 }
               },
               "span": {
@@ -1009,7 +1009,7 @@
                 },
                 "end": {
                   "line": 41,
-                  "col": 42
+                  "col": 46
                 }
               }
             }
@@ -1481,7 +1481,7 @@
             },
             "end": {
               "line": 57,
-              "col": 99
+              "col": 98
             }
           },
           "params": [
@@ -1611,7 +1611,7 @@
                 "types": [
                   {
                     "kind": "core",
-                    "name": "Duration"
+                    "name": "duration"
                   }
                 ]
               },
@@ -4767,7 +4767,7 @@
             },
             "end": {
               "line": 14,
-              "col": 72
+              "col": 71
             }
           },
           "params": [
@@ -6482,7 +6482,7 @@
               "name": "wait",
               "type": {
                 "kind": "core",
-                "name": "Duration"
+                "name": "duration"
               },
               "span": {
                 "file": "d.hozo",
@@ -9671,7 +9671,7 @@
             },
             "end": {
               "line": 22,
-              "col": 113
+              "col": 117
             }
           },
           "params": [
@@ -9679,7 +9679,7 @@
               "name": "at",
               "type": {
                 "kind": "core",
-                "name": "Time"
+                "name": "datetime"
               },
               "span": {
                 "file": "row.hozo",
@@ -9689,7 +9689,7 @@
                 },
                 "end": {
                   "line": 22,
-                  "col": 29
+                  "col": 33
                 }
               }
             },
@@ -9703,11 +9703,11 @@
                 "file": "row.hozo",
                 "start": {
                   "line": 22,
-                  "col": 31
+                  "col": 35
                 },
                 "end": {
                   "line": 22,
-                  "col": 43
+                  "col": 47
                 }
               }
             }

@@ -3,27 +3,27 @@
 namespace app {
   scalar Name extends string;
   scalar Count extends int;
-  scalar Stamp extends Time;
+  scalar Stamp extends datetime;
   model Tag { name: string; }
 
   model Row {
     @db.key @db.text id: string;
     // @db.text は string
     @db.text textOnInt: int;
-    @db.text textOnTime: Time;
+    @db.text textOnTime: datetime;
     @db.text textOnArray: string[];
-    // @db.int は int と Duration
+    // @db.int は int と duration
     @db.int intOnString: string;
     @db.int intOnFloat: float;
     @db.int intOnBool: boolean;
-    @db.int intOnTime: Time;
+    @db.int intOnTime: datetime;
     // @db.float は float
     @db.float floatOnInt: int;
     // @db.bool は boolean
     @db.bool boolOnInt: int;
-    // @db.time は Time
-    @db.time timeOnString: string;
-    @db.time timeOnDuration: Duration;
+    // @db.datetime は datetime
+    @db.datetime timeOnString: string;
+    @db.datetime timeOnDuration: duration;
     // @db.json は array、record、model
     @db.json jsonOnString: string;
     @db.json jsonOnInt: int;
@@ -39,8 +39,8 @@ namespace app {
     // 通るもの
     @db.text name: Name;
     @db.int count: Count;
-    @db.int span: Duration;
-    @db.time stamp: Stamp;
+    @db.int span: duration;
+    @db.datetime stamp: Stamp;
     @db.json tag: Tag;
     @db.json tags: Name[];
     @db.json byName: Record<string, Count>;

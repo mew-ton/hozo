@@ -4,13 +4,13 @@ namespace app {
   scalar Path extends string;
   scalar Count extends int;
   scalar Count2 extends Count;
-  scalar When extends Time;
+  scalar When extends datetime;
 
   model In {
     @cli.flag("model") model_: Point;
     @cli.flag("record") record: Record<string, string>;
-    @cli.flag("time") time: Time;
-    @cli.arg(1) duration: Duration;
+    @cli.flag("time") time: datetime;
+    @cli.arg(1) duration: duration;
     @cli.flag("when") when: When?;
     @cli.flag("flags") flags: string[];
     @cli.env("ENVS") envs: string[];

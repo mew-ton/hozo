@@ -28,7 +28,7 @@ namespace carrier {
     /** 店が配送業者に払う額 */
     cost: type.Yen;
     /** 届く見込み */
-    arrivesBy: Time?;
+    arrivesBy: datetime?;
   }
 
   /** 梱包する人が選んだ、配送業者とサービス */
@@ -201,5 +201,5 @@ namespace carrier {
   fn labelRequest(carrier: Use.InUse<Carrier>, choice: Choice, parcel: shipping.Parcel, origin: type.Address, destination: type.Address): carriergw.LabelRequest;
 
   /** 買った送り状を、出荷の送り状の形に写す（人が書く） */
-  fn toLabel(parcel: shipping.Parcel, bought: carriergw.BoughtLabel, now: Time): shipping.Label;
+  fn toLabel(parcel: shipping.Parcel, bought: carriergw.BoughtLabel, now: datetime): shipping.Label;
 }

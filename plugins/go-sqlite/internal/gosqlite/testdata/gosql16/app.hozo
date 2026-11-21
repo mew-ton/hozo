@@ -1,5 +1,5 @@
 // GOSQL-16（docs/plugin-go-sqlite.md「しまい方」）: 表の model のフィールドが、しまい方のデコレータ（@db.text / @db.int /
-// @db.float / @db.bool / @db.time / @db.json）を一つも持たないか、二つ以上持つ。位置は model。フィールドごとに一つ。
+// @db.float / @db.bool / @db.datetime / @db.json）を一つも持たないか、二つ以上持つ。位置は model。フィールドごとに一つ。
 
 namespace app {
   /** 表の model でない model のフィールドは、見ない */

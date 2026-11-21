@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.12"
+protocol = "0.13"
 
 [[transpiler]]
 name     = "go-sqlite"
@@ -27,7 +27,7 @@ requires = ["go"]
 seams    = ["db.transaction"]
 ```
 
-- 読む語彙は、状態の `@db.table`、フィールドの、しまい方（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.time` / `@db.json`）と `@db.key` / `@db.unique` / `@db.ref`、`read` の `@db.find` / `@db.list` / `@db.where` / `@db.latest`、効果の `@db.insert` / `@db.update` / `@db.delete`、op の `@db.transaction`。語彙は提供しない。
+- 読む語彙は、状態の `@db.table`、フィールドの、しまい方（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）と `@db.key` / `@db.unique` / `@db.ref`、`read` の `@db.find` / `@db.list` / `@db.where` / `@db.latest`、効果の `@db.insert` / `@db.update` / `@db.delete`、op の `@db.transaction`。語彙は提供しない。
 - **`@db.transaction` は継ぎ目**（`seams`。`docs/config.md`「継ぎ目」）: このトランスパイラを並べた単位では、基底が、`@db.transaction` の付いた op を二層で出し、継ぎ目の口（`Seams` のメソッド）を出す。中身は、このトランスパイラが出す（「トランザクション」）。並べていない単位では、`@db.transaction` は印で、何も起きない（同「継ぎ目」の「読む者がなければ、何も出ない」）。
 - オプションはない。`[emit.options.go-sqlite]` にキーがあれば GOSQL-6。
 - 制約（`@valid.*`）は確かめない（`go-valid` に依存しない）。足す前に確かめるかどうかは、境界を持つ相乗りの仕事（`docs/plugin-go-valid.md`「この文書が決めること」）。
@@ -78,14 +78,16 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 | しまい方 | SQLite の列の型 | 列の値 | 合うフィールドの型（scalar は元の核の型で見る。どれも、その省略可能を含む） |
 |---|---|---|---|
 | `@db.text` | `TEXT` | 文字列そのまま | `string` |
-| `@db.int` | `INTEGER` | 整数 | `int`、`Duration`（ナノ秒） |
+| `@db.int` | `INTEGER` | 整数 | `int`、`duration`（ナノ秒） |
 | `@db.float` | `REAL` | 小数 | `float` |
 | `@db.bool` | `INTEGER` | 0 か 1 | `boolean` |
-| `@db.time` | `TEXT` | RFC 3339、UTC、小数部はいつも 9 桁の文字列（文字列の順が時刻の順になる） | `Time` |
+| `@db.datetime` | `TEXT` | RFC 3339、UTC、小数部はいつも 9 桁の文字列（文字列の順が、瞬間の順になる） | `datetime` |
+| `@db.date` | `TEXT` | `2026-11-21` の形の文字列（文字列の順が、日付の順になる） | `date` |
+| `@db.time` | `TEXT` | `09:30:00.000000000` の形の文字列。小数部はいつも 9 桁（文字列の順が、時刻の順になる） | `time` |
 | `@db.json` | `TEXT` | `encoding/json` の JSON の文字列 | `array`、`record`、model |
 
 - しまい方の名前は、語彙が決めた、保存先の製品に依らない種類。SQLite の列の型に写すのは、このトランスパイラ（ほかの保存先のトランスパイラは、同じ種類を、自分の列の型に写す）。
-- **一つのしまい方の中で、型によって変え方が分かれることはない。** `Duration` を `@db.int` に入れたのは、Go の値が `int` と同じ 64 ビットの整数で、同じ補助が同じに読み書きできるから。同じしまい方の二つの型が、別の変え方を要るようになったら、型で分けずに、しまい方を足す。
+- **一つのしまい方の中で、型によって変え方が分かれることはない。** `duration` を `@db.int` に入れたのは、Go の値が `int` と同じ 64 ビットの整数で、同じ補助が同じに読み書きできるから。同じしまい方の二つの型が、別の変え方を要るようになったら、型で分けずに、しまい方を足す。
 - union（`arms`）と、union を中に持つ `array` / `record` / model は、どのしまい方でも列にできない（GOSQL-3。JSON での union の形を、まだ決めていない）。
 - `@db.json` の中の値の形（model のフィールド、配列の要素）は、`encoding/json` が、Go の型から決める。その中の model のフィールドに、しまい方のデコレータは要らない（付いていても読まない）。
 - 表の model でない model のフィールドに付いた、しまい方のデコレータと、`@db.key`、`@db.unique`、`@db.ref` は、読まない（何も出さず、確かめない）。
@@ -141,15 +143,15 @@ read fn latestOrderOf(userId: type.UserId): type.Order? reads orders;
 | `@db.find` | 条件に合う一行を引く。なければ `nil` | `@db.list` と一緒には付けられない（GOSQL-22）。一行に決まらなければ GOSQL-13（下） |
 | `@db.list` | 条件に合う行を、すべて引く。条件が一つもなければ、すべての行 | 同上 |
 | `@db.where("c", v)`（何度でも） | 条件を足す: 列 c が、リテラル v と同じ | `@db.find` か `@db.list` の付いた `read` にだけ（GOSQL-24）。c は M のフィールドの名前（GOSQL-8）。v は、列 c の型に渡せる（GOSQL-26。下） |
-| `@db.latest("c")` | 並べ方: 列 c の新しい順 | `@db.find` か `@db.list` の付いた `read` にだけ（GOSQL-24）。c は M のフィールドの名前（GOSQL-8）で、しまい方が `@db.time` / `@db.int` / `@db.float`（GOSQL-27） |
+| `@db.latest("c")` | 並べ方: 列 c の新しい順 | `@db.find` か `@db.list` の付いた `read` にだけ（GOSQL-24）。c は M のフィールドの名前（GOSQL-8）で、しまい方が `@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float`（GOSQL-27） |
 
 - **条件**は、引数（宣言の順）の後ろに、`@db.where`（書いた順）を並べたもの。**どれも満たす行**が合う（`AND`）。一つの列を、二つの条件に書けない（引数と `@db.where`、二つの `@db.where`）。書いていれば GOSQL-25。
 - **`@db.find` は、一行に決まる**ものでなければならない。次のどれかを満たさなければ GOSQL-13:
   1. 条件の列が、M の `@db.key` のフィールドを**すべて**含む（M が `@db.key` を一つ以上持つとき）。
   2. 条件の列が、`@db.unique` のフィールドを一つ以上含む。
   3. `@db.latest` が付いている（条件に合う行のうち、いちばん新しい一行に決まる。条件がなくてもよい）。
-- **`@db.latest("c")` の「新しい順」**は、列 c の値の大きい順（時刻なら、後の時刻が先）。c の値が同じ行は、後から足した行が先。c が値を持たない行（省略可能な列）は、最後。`@db.list` に足せば、その順のすべての行。`@db.find` に足せば、その順の最初の一行（上の 1 か 2 も満たしていれば、合う行は一つなので、結果は変わらない）。`@db.latest` のない `@db.list` は、足した順。
-- **`@db.where` のリテラル**は、列のフィールドの型（scalar は元の核の型。省略可能は外して見る）に渡せなければならない（`docs/types.md`「互換」の 10: 整数のリテラルは `float` にも渡せる）。しまい方が `@db.time` と `@db.json` の列には、渡せるリテラルがない。
+- **`@db.latest("c")` の「新しい順」**は、列 c の値の大きい順（瞬間、日付、時刻なら、後のものが先）。c の値が同じ行は、後から足した行が先。c が値を持たない行（省略可能な列）は、最後。`@db.list` に足せば、その順のすべての行。`@db.find` に足せば、その順の最初の一行（上の 1 か 2 も満たしていれば、合う行は一つなので、結果は変わらない）。`@db.latest` のない `@db.list` は、足した順。
+- **`@db.where` のリテラル**は、列のフィールドの型（scalar は元の核の型。省略可能は外して見る）に渡せなければならない（`docs/types.md`「互換」の 10: 整数のリテラルは `float` にも渡せる）。しまい方が `@db.datetime`、`@db.date`、`@db.time`、`@db.json` の列には、渡せるリテラルがない。
 - **SQL** は、この形。`<条件>` は、条件ごとの `"<列>" IS ?<n>` を ` AND ` でつないだもの（n は 1 からの通し番号）で、条件がなければ `WHERE` ごと書かない。
 
 | デコレータ | SQL |
@@ -364,8 +366,8 @@ func Conn(ctx context.Context, db *sql.DB) Querier {
 | `dbOption`、`dbNullable` | 列の読み書きに、フィールドの宣言が足すこと（`type dbOption int`）と、省略可能なフィールドの印（`const dbNullable dbOption = 1`）。`dbCol` と一緒に、いつも出す |
 | `dbCol` | 列一つ: しまい方と、Go の値（書くときはフィールドの値か、列と比べる引数かリテラル。読むときはフィールドへのポインタ）と、渡された `dbOption`。`database/sql` が、書くときに `Value`（`driver.Valuer`）を、読むときに `Scan`（`sql.Scanner`）を呼ぶ |
 | `dbArgs(cols ...dbCol) ([]any, error)` | 列の並びを、文に渡す値の並びにする |
-| `dbString` | 列の値を、文字列として読む（`@db.text`、`@db.time`、`@db.json` の補助が使う） |
-| `dbText`、`dbInt`、`dbFloat`、`dbBool`、`dbTimeLayout` と `dbTime`、`dbJSON` | しまい方ごとの補助 `func(v any, opts ...dbOption) dbCol`。「しまい方」の表の、列の値への変え方と、その逆。使うしまい方の分だけ、この順で |
+| `dbString` | 列の値を、文字列として読む（`@db.text`、`@db.datetime`、`@db.date`、`@db.time`、`@db.json` の補助が使う） |
+| `dbText`、`dbInt`、`dbFloat`、`dbBool`、`dbDatetimeLayout` と `dbDatetime`、`dbDate`、`dbTime`、`dbJSON` | しまい方ごとの補助 `func(v any, opts ...dbOption) dbCol`。「しまい方」の表の、列の値への変え方と、その逆。使うしまい方の分だけ、この順で |
 | `dbTransaction` | トランザクションの始め方と終わり方（「トランザクション」）。`DbSeams` を出すときだけ。鍵は、このファイルの名前ではなく、`runtime.DBTxKey`（`Conn` も使うので、`runtime` は、いつも import する） |
 | `dbExec` | 行を返さない文を実行する |
 | `dbConflict(err, conflict error) error` | `err` が、一意の制約の違反（「効果の中身」の「一意の違反の見分け方」）なら `conflict` を、ほかは `err` を、そのまま返す。`@db.conflict` を付けた効果があるときだけ（`strings` を import するのも、そのときだけ） |
@@ -376,13 +378,13 @@ func Conn(ctx context.Context, db *sql.DB) Querier {
 ```go
 // dbArgsOrder は type.Order を、表 "orders" の列の順の値にする。
 func dbArgsOrder(row pkgtype.Order) ([]any, error) {
-	return dbArgs(dbText(row.Id), dbText(row.UserId), dbJSON(row.Lines), dbTime(row.PlacedAt))
+	return dbArgs(dbText(row.Id), dbText(row.UserId), dbJSON(row.Lines), dbDatetime(row.PlacedAt))
 }
 
 // dbScanOrder は、表 "orders" の列の順の値を type.Order に読む。
 func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 	var row pkgtype.Order
-	if err := r.Scan(dbText(&row.Id), dbText(&row.UserId), dbJSON(&row.Lines), dbTime(&row.PlacedAt)); err != nil {
+	if err := r.Scan(dbText(&row.Id), dbText(&row.UserId), dbJSON(&row.Lines), dbDatetime(&row.PlacedAt)); err != nil {
 		return pkgtype.Order{}, err
 	}
 	return row, nil
@@ -520,14 +522,14 @@ func dbConflict(err, conflict error) error {
 | GOSQL-12 | error | 一つの効果が、`@db.insert` / `@db.update` / `@db.delete` のうち二つ以上を持つ。位置は効果 |
 | GOSQL-13 | error | `@db.find` の `read` が、一行に決まらない: 条件の列が、表の model の `@db.key` のすべても、`@db.unique` の列も含まず、`@db.latest` もない（「read の中身」）。位置は `read` |
 | GOSQL-15 | error | `@db.update` の表の model が、`@db.key` を一つも持たないか、キーでない列を一つも持たない。位置は効果 |
-| GOSQL-16 | error | 表の model のフィールドが、しまい方のデコレータ（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.time` / `@db.json`）を一つも持たないか、二つ以上持つ（「しまい方」）。位置は model |
+| GOSQL-16 | error | 表の model のフィールドが、しまい方のデコレータ（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）を一つも持たないか、二つ以上持つ（「しまい方」）。位置は model |
 | GOSQL-17 | error | しまい方が、フィールドの型に合わない（「しまい方」の表）。メッセージに、フィールド、しまい方、型を示す。位置は model |
 | GOSQL-20 | error | 表の model のフィールドの `@db.ref(M2)` の指す先が、一つに決まらない: 要素の型が M2 の表の状態が、N にないか、二つ以上ある。または、M2 の `@db.key` が一つでない（「表」）。位置は model |
 | GOSQL-22 | error | 一つの `read` が、`@db.find` と `@db.list` の両方を持つ。位置は `read` |
 | GOSQL-24 | error | `@db.where` か `@db.latest` の付いた `read` が、`@db.find` も `@db.list` も持たない。位置は `read` |
 | GOSQL-25 | error | 一つの `read` の条件が、同じ列を二度名指ししている（引数と `@db.where`、二つの `@db.where`）。位置は `read` |
-| GOSQL-26 | error | `@db.where` のリテラルが、列の型に渡せない（しまい方が `@db.time` か `@db.json` の列を含む。「read の中身」）。メッセージに、列、リテラル、型を示す。位置は `read` |
-| GOSQL-27 | error | `@db.latest` の列のしまい方が、`@db.time` / `@db.int` / `@db.float` のどれでもない。位置は `read` |
+| GOSQL-26 | error | `@db.where` のリテラルが、列の型に渡せない（しまい方が `@db.datetime`、`@db.date`、`@db.time`、`@db.json` の列を含む。「read の中身」）。メッセージに、列、リテラル、型を示す。位置は `read` |
+| GOSQL-27 | error | `@db.latest` の列のしまい方が、`@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float` のどれでもない。位置は `read` |
 | GOSQL-28 | error | `@db.delete` の効果が、引数を一つも持たない。まだ決めていない形（「効果の中身」の未決）。位置は効果 |
 | GOSQL-29 | error | N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。「出力」）。位置は op |
 | GOSQL-30 | error | `@db.update` を付けた効果の行の遷移（`Effect.row`）の、前がケースの並びで、後のケースが、その並びにない（「効果の中身」: 渡る行は前のケースにあり、そのまま書いても、後のケースにならない）。位置は効果 |

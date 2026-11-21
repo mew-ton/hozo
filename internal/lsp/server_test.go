@@ -1032,18 +1032,18 @@ namespace shop {
   effect fn accept(order: Order): effects orders.post as kind.Stage.Accepted;
   effect fn open(order: Order): effects orders.post as Life.Absent -> Life.Open;
   effect fn bring(order: Order): effects orders.post as any;
-  effect fn ship(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped;
+  effect fn ship(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped;
   effect fn revise(order: Order): effects orders.put as kind.Stage.Accepted -> else;
   effect fn patch(order: Order): effects orders.put as any -> else;
   effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
   effect fn purge(order: Order): effects orders.delete as any -> Life.Absent;
-  fn send(order: Order, at: Time) {
+  fn send(order: Order, at: datetime) {
     match(order by kind.Stage){
       Accepted => ship(order, at);
       else     => none;
     };
   }
-  fn wrong(order: Order, at: Time) {
+  fn wrong(order: Order, at: datetime) {
     ship(order, at);
   }
 }
@@ -1090,13 +1090,13 @@ namespace shop {
 		{"effect fn open(", len("effect fn "), "```hozo\neffect fn open(order: Order): effects orders.post as Life.Open\n```"},
 		// post の as any は、as を書かないのと同じ形（IR に row がない）
 		{"effect fn bring(", len("effect fn "), "```hozo\neffect fn bring(order: Order): effects orders.post\n```"},
-		{"effect fn ship(", len("effect fn "), "```hozo\neffect fn ship(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
+		{"effect fn ship(", len("effect fn "), "```hozo\neffect fn ship(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
 		{"effect fn revise(", len("effect fn "), "```hozo\neffect fn revise(order: Order): effects orders.put as kind.Stage.Accepted -> else\n```"},
 		{"effect fn patch(", len("effect fn "), "```hozo\neffect fn patch(order: Order): effects orders.put as any -> else\n```"},
 		{"effect fn discard(", len("effect fn "), "```hozo\neffect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent\n```"},
 		{"effect fn purge(", len("effect fn "), "```hozo\neffect fn purge(order: Order): effects orders.delete as Life.Absent\n```"},
 		// 配線の呼び出しの名前は、呼び出し先の効果の見出し
-		{"Accepted => ship(order, at);", len("Accepted => "), "```hozo\neffect fn ship(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
+		{"Accepted => ship(order, at);", len("Accepted => "), "```hozo\neffect fn ship(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped\n```"},
 		// 行の遷移のケース: 分類のセグメントは分類、ケースのセグメントは、そのケース
 		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind."), "```hozo\nclassify kind.Stage of Order\n```"},
 		{"orders.post as kind.Stage.Accepted;", len("orders.post as kind.Stage."), "classify kind.Stage of Order\n  Accepted"},
@@ -1157,7 +1157,7 @@ namespace shop {
 	for name, want := range map[string]string{
 		"accept": "(order: Order): effects orders.post as kind.Stage.Accepted",
 		"open":   "(order: Order): effects orders.post as Life.Absent -> Life.Open",
-		"ship":   "(order: Order, at: Time): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped",
+		"ship":   "(order: Order, at: datetime): effects orders.put as kind.Stage.Draft, kind.Stage.Accepted -> kind.Stage.Shipped",
 		"patch":  "(order: Order): effects orders.put as any -> else",
 	} {
 		if details[name] != want {
@@ -1194,7 +1194,7 @@ func TestCarryingDecorators(t *testing.T) {
    *
    * @param wait 待つ時間
    */
-  exception Busy(wait: Duration, note: string?);
+  exception Busy(wait: duration, note: string?);
   /**
    * id で引く
    *
@@ -1292,9 +1292,9 @@ func TestCarryingDecorators(t *testing.T) {
 		{"効果の呼び出し", at("    add(row);", len("    ")), "add(row: Row): effects rows.post;", 0, []string{"effect fn add(row: Row): effects rows.post"}},
 		{"直に呼ぶ「状態.操作」の状態", at("    rows.post(row);", len("    ")), "rows: list<Row>;", 0, []string{"state rows: list<Row>"}},
 		{"read の呼び出し", at("else    => byId(row.id);", len("else    => ")), "byId(id: string): Row?", 0, []string{"read fn byId(id: string): Row? reads rows", "id で引く"}},
-		{"throw E(…) の E", at("throw Busy(5m", len("throw ")), "Busy(wait: Duration", 0, []string{"exception Busy(wait: Duration, note: string?)", "忙しい"}},
+		{"throw E(…) の E", at("throw Busy(5m", len("throw ")), "Busy(wait: duration", 0, []string{"exception Busy(wait: duration, note: string?)", "忙しい"}},
 		{"read の引数", at("byId(id: string): Row?", len("byId(")), "id: string): Row? reads", 0, []string{"read fn byId(id: string): Row? reads rows", "  id: string", "引く行の識別子"}},
-		{"例外の @param", at("@param wait", len("@param ")), "wait: Duration, note", 0, []string{"exception Busy(wait: Duration, note: string?)", "  wait: Duration", "待つ時間"}},
+		{"例外の @param", at("@param wait", len("@param ")), "wait: duration, note", 0, []string{"exception Busy(wait: duration, note: string?)", "  wait: duration", "待つ時間"}},
 		{"read に付けた、何度も付けられるデコレータ", at("@db.where(\"id\", \"y\")", len("@db.")), "", -1, []string{"@repeatable decorator db.where(column: string, value: string | int | float | boolean) for read"}},
 		{"効果の宣言に付けたデコレータ", at("@into(rows)", 1), "decorator into(", len("decorator "), []string{"decorator into(table: any state) for effect"}},
 		{"別名の先の予約語", at("= list(rows);", len("= ")), "decorator list(", len("decorator "), []string{listHead}},
@@ -1390,7 +1390,7 @@ func TestCarryingDecorators(t *testing.T) {
 	for name, want := range map[string]string{
 		"byId": "(id: string): Row? reads rows",
 		"add":  "(row: Row): effects rows.post",
-		"Busy": "(wait: Duration, note: string?)",
+		"Busy": "(wait: duration, note: string?)",
 	} {
 		if details[name] != want {
 			t.Errorf("symbol %s の detail = %q, want %q", name, details[name], want)
@@ -1409,8 +1409,9 @@ func TestValAndCaseTargets(t *testing.T) {
     Clerk;
   }
   decorator human for case of Actor;
+  decorator both(until: date?, from: time) for model, case of never;
   decorator of(who: any case of never) for op;
-  decorator seenBy(what: any case of Order?, any1: any case?) for model | case;
+  decorator seenBy(what: any case of Order?, any1: any case?) for model, case;
   model Order { id: string; }
   model Note { id: string; }
   state orders: list<Order>;
@@ -1464,7 +1465,8 @@ func TestValAndCaseTargets(t *testing.T) {
 		{"デコレータの宣言の、of の後ろの、分類の名前", at("for case of Actor;", len("for case of ")), "Actor of never {", 0, []string{"classify Actor of never"}},
 		{"デコレータの宣言の、of の後ろの、型の名前", at("any case of Order?", len("any case of ")), "Order { id: string; }", 0, []string{"model Order"}},
 		{"ケースの前のデコレータ", at("@human Customer;", 1), "decorator human", len("decorator "), []string{"decorator human for case of Actor"}},
-		{"分類のケースの絞りの見出し（もとの形）", at("decorator seenBy(", len("decorator ")), "seenBy(what", 0, []string{"decorator seenBy(what: any case of Order?, any1: any case of any?) for model | case of any"}},
+		{"付ける先の並び（区切りは ,）と、日付と時刻の核の型", at("decorator both(", len("decorator ")), "decorator both(", len("decorator "), []string{"decorator both(until: date?, from: time) for model, case of never"}},
+		{"分類のケースの絞りの見出し（もとの形）", at("decorator seenBy(", len("decorator ")), "seenBy(what", 0, []string{"decorator seenBy(what: any case of Order?, any1: any case of any?) for model, case of any"}},
 	} {
 		var hov *protocol.Hover
 		c.result(protocol.MethodHover, tt.pos, &hov)

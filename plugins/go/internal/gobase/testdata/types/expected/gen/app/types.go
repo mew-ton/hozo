@@ -30,23 +30,33 @@ type Stamp time.Time
 // Wait は scalar app.Wait。
 type Wait time.Duration
 
+// Day は scalar app.Day。
+type Day runtime.Date
+
+// Clock は scalar app.Clock。
+type Clock runtime.TimeOfDay
+
 // User は利用者。
 //
 // 二つ目の段。
 type User struct {
 	// 識別子
-	Id     Id                `json:"id"`
-	Name   string            `json:"name"`
-	Nick   *string           `json:"nick,omitempty"`
-	Tags   []string          `json:"tags"`
-	Attrs  map[string]int64  `json:"attrs"`
-	Born   time.Time         `json:"born"`
-	Wait   *time.Duration    `json:"wait,omitempty"`
-	Score  float64           `json:"score"`
-	Active bool              `json:"active"`
-	Twice  *string           `json:"twice,omitempty"`
-	Home   pkgtype.Address   `json:"home"`
-	Homes  []pkgtype.Address `json:"homes,omitempty"`
+	Id       Id                 `json:"id"`
+	Name     string             `json:"name"`
+	Nick     *string            `json:"nick,omitempty"`
+	Tags     []string           `json:"tags"`
+	Attrs    map[string]int64   `json:"attrs"`
+	Born     time.Time          `json:"born"`
+	Wait     *time.Duration     `json:"wait,omitempty"`
+	Birthday runtime.Date       `json:"birthday"`
+	Wakes    *runtime.TimeOfDay `json:"wakes,omitempty"`
+	Holidays []Day              `json:"holidays"`
+	Alarm    Clock              `json:"alarm"`
+	Score    float64            `json:"score"`
+	Active   bool               `json:"active"`
+	Twice    *string            `json:"twice,omitempty"`
+	Home     pkgtype.Address    `json:"home"`
+	Homes    []pkgtype.Address  `json:"homes,omitempty"`
 }
 
 // Options は model app.Options。
@@ -63,34 +73,42 @@ type Options struct {
 // Public は model app.Public。
 // app.User を継承し（extends）、nick をなくした、id を変えた、extra を足したもの。app.User とは別の型で、暗黙には渡せない。
 type Public struct {
-	Id     AdminId           `json:"id"`
-	Name   string            `json:"name"`
-	Tags   []string          `json:"tags"`
-	Attrs  map[string]int64  `json:"attrs"`
-	Born   time.Time         `json:"born"`
-	Wait   *time.Duration    `json:"wait,omitempty"`
-	Score  float64           `json:"score"`
-	Active bool              `json:"active"`
-	Twice  *string           `json:"twice,omitempty"`
-	Home   pkgtype.Address   `json:"home"`
-	Homes  []pkgtype.Address `json:"homes,omitempty"`
-	Extra  int64             `json:"extra"`
+	Id       AdminId            `json:"id"`
+	Name     string             `json:"name"`
+	Tags     []string           `json:"tags"`
+	Attrs    map[string]int64   `json:"attrs"`
+	Born     time.Time          `json:"born"`
+	Wait     *time.Duration     `json:"wait,omitempty"`
+	Birthday runtime.Date       `json:"birthday"`
+	Wakes    *runtime.TimeOfDay `json:"wakes,omitempty"`
+	Holidays []Day              `json:"holidays"`
+	Alarm    Clock              `json:"alarm"`
+	Score    float64            `json:"score"`
+	Active   bool               `json:"active"`
+	Twice    *string            `json:"twice,omitempty"`
+	Home     pkgtype.Address    `json:"home"`
+	Homes    []pkgtype.Address  `json:"homes,omitempty"`
+	Extra    int64              `json:"extra"`
 }
 
 // Renamed は model app.Renamed。
 // app.User を継承し（extends）、twice、tags をなくしたもの。app.User とは別の型で、暗黙には渡せない。
 type Renamed struct {
 	// 識別子
-	Id     Id                `json:"id"`
-	Name   string            `json:"name"`
-	Nick   *string           `json:"nick,omitempty"`
-	Attrs  map[string]int64  `json:"attrs"`
-	Born   time.Time         `json:"born"`
-	Wait   *time.Duration    `json:"wait,omitempty"`
-	Score  float64           `json:"score"`
-	Active bool              `json:"active"`
-	Home   pkgtype.Address   `json:"home"`
-	Homes  []pkgtype.Address `json:"homes,omitempty"`
+	Id       Id                 `json:"id"`
+	Name     string             `json:"name"`
+	Nick     *string            `json:"nick,omitempty"`
+	Attrs    map[string]int64   `json:"attrs"`
+	Born     time.Time          `json:"born"`
+	Wait     *time.Duration     `json:"wait,omitempty"`
+	Birthday runtime.Date       `json:"birthday"`
+	Wakes    *runtime.TimeOfDay `json:"wakes,omitempty"`
+	Holidays []Day              `json:"holidays"`
+	Alarm    Clock              `json:"alarm"`
+	Score    float64            `json:"score"`
+	Active   bool               `json:"active"`
+	Home     pkgtype.Address    `json:"home"`
+	Homes    []pkgtype.Address  `json:"homes,omitempty"`
 }
 
 // Problem は model app.Problem。

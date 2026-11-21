@@ -11,7 +11,7 @@ namespace app {
 
   model Paging { page: Page?; q: Name?; }
   model Meta { tenant: Token?; }
-  model Item { @valid.length(min: 1) name: Name; tags: string[]; at: Time?; }
+  model Item { @valid.length(min: 1) name: Name; tags: string[]; at: datetime?; }
 
   @http.status(404)
   exception Missing(value: Item);

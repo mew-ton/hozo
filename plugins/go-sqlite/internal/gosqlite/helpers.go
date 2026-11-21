@@ -153,20 +153,56 @@ func dbBool(v any, opts ...dbOption) dbCol {
 	}}
 }
 `},
-	{name: "dbTime", names: []string{helperTimeLayout, "dbTime"}, imports: []string{"time"}, text: `// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+	{name: "dbDatetime", names: []string{helperTimeLayout, "dbDatetime"}, imports: []string{"time"}, text: `// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {
 			return err
 		}
 		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(t).Convert(dst.Type()))
+		return nil
+	}}
+}
+`},
+	{name: "dbDate", names: []string{"dbDate"}, imports: []string{runtimePath}, text: `// dbDate は @db.date の列: 日付を、2006-01-02 の形の文字列で（文字列の順が日付の順になる）。
+func dbDate(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
+		return v.Convert(reflect.TypeFor[runtime.Date]()).Interface().(runtime.Date).String(), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		d, err := runtime.ParseDate(s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(d).Convert(dst.Type()))
+		return nil
+	}}
+}
+`},
+	{name: "dbTime", names: []string{"dbTime"}, imports: []string{runtimePath}, text: `// dbTime は @db.time の列: 一日の中の時刻を、15:04:05.000000000 の形の文字列で（小数部はいつも 9 桁。文字列の順が時刻の順になる）。
+func dbTime(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
+		return v.Convert(reflect.TypeFor[runtime.TimeOfDay]()).Interface().(runtime.TimeOfDay).Fixed(), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		t, err := runtime.ParseTimeOfDay(s)
 		if err != nil {
 			return err
 		}
@@ -268,10 +304,10 @@ func dbList[R any](ctx context.Context, db *sql.DB, scan func(dbRow) (R, error),
 }
 
 // helpers は補助（docs/plugin-go-sqlite.md「補助」の表の順）。使ったものだけを出す。dbOption、dbNullable、dbCol は、いつも出す。
-// dbString は、それを使うしまい方の補助（dbText、dbTime、dbJSON）を出すときに出す。
+// dbString は、それを使うしまい方の補助（dbText、dbDatetime、dbDate、dbTime、dbJSON）を出すときに出す。
 func (f *fileGen) helpers() {
 	f.used[helperCol] = true
-	if f.used["dbText"] || f.used["dbTime"] || f.used["dbJSON"] {
+	if f.used["dbText"] || f.used["dbDatetime"] || f.used["dbDate"] || f.used["dbTime"] || f.used["dbJSON"] {
 		f.used[helperString] = true
 	}
 	first := true

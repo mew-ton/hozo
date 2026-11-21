@@ -28,7 +28,7 @@ namespace psp {
   model Session {
     id: SessionId;
     url: type.Url;
-    expiresAt: Time;
+    expiresAt: datetime;
   }
 
   /** 額を伴う依頼（請求の確定、返金） */
@@ -49,7 +49,7 @@ namespace psp {
     /** 何が起きたか（"secured" など。値の集合は、相手が決める） */
     kind: string;
     /** 枠の期限。枠の確保でない通知には、ない */
-    holdExpiresAt: Time?;
+    holdExpiresAt: datetime?;
   }
 
   /**

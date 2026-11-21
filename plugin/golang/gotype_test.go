@@ -11,7 +11,7 @@ func typesView() *ir.View {
 	v := viewOf("server",
 		namespace("server",
 			model("server.User"), scalar("server.Email", ir.String()), scalar("server.Count", ir.Int()),
-			scalar("server.When", ir.Time()), scalar("server.Alias", ir.Ref("server.Email")), scalar("server.Flag", ir.Boolean()),
+			scalar("server.When", ir.Datetime()), scalar("server.Alias", ir.Ref("server.Email")), scalar("server.Flag", ir.Boolean()),
 			union("server.Page", ir.UnionArm{Name: "Ready", Type: ir.Ref("server.Page.Ready")}),
 			model("server.Page.Ready"),
 		),
@@ -35,7 +35,8 @@ func TestGoType(t *testing.T) {
 		want string
 	}{
 		{ir.String(), "string"}, {ir.Boolean(), "bool"}, {ir.Int(), "int64"}, {ir.Float(), "float64"},
-		{ir.Time(), "time.Time"}, {ir.Duration(), "time.Duration"},
+		{ir.Datetime(), "time.Time"}, {ir.Duration(), "time.Duration"},
+		{ir.Date(), "runtime.Date"}, {ir.Time(), "runtime.TimeOfDay"}, {ir.Optional(ir.Date()), "*runtime.Date"},
 		// optional(T): array、record、union（arms）への ref はそのまま。それ以外は *T
 		{ir.Optional(ir.String()), "*string"},
 		{ir.Optional(ir.Ref("server.User")), "*User"},
@@ -46,7 +47,7 @@ func TestGoType(t *testing.T) {
 		{ir.Optional(ir.Ref("type.Shape")), "pkgtype.Shape"},
 		{ir.Array(ir.Ref("server.User")), "[]User"},
 		{ir.Array(ir.Optional(ir.Int())), "[]*int64"},
-		{ir.Record(ir.Ref("server.Email"), ir.Array(ir.Time())), "map[Email][]time.Time"},
+		{ir.Record(ir.Ref("server.Email"), ir.Array(ir.Datetime())), "map[Email][]time.Time"},
 		// ref: model は構造体、scalar は名前付きの型、union はインターフェース。合成 model は連結した名前
 		{ir.Ref("server.User"), "User"}, {ir.Ref("server.Email"), "Email"}, {ir.Ref("server.Page"), "Page"},
 		{ir.Ref("server.Page.Ready"), "PageReady"},
@@ -73,7 +74,7 @@ func TestGoType(t *testing.T) {
 		t.Errorf("Err = %v", err)
 	}
 	// 使った import だけが入る
-	want := "import (\n\t\"time\"\n\n\tpkgtype \"example.com/app/gen/type\"\n)\n"
+	want := "import (\n\t\"time\"\n\n\tpkgtype \"example.com/app/gen/type\"\n\t\"github.com/mew-ton/hozo/runtime\"\n)\n"
 	if got := im.Render(); got != want {
 		t.Errorf("Render = %q, want %q", got, want)
 	}
@@ -91,7 +92,7 @@ func TestIsNillable(t *testing.T) {
 	}{
 		{ir.Array(ir.String()), true}, {ir.Record(ir.String(), ir.String()), true}, {ir.Ref("server.Page"), true},
 		{ir.Case("c", nil, ir.Array(ir.String())), true},
-		{ir.String(), false}, {ir.Ref("server.User"), false}, {ir.Ref("server.Email"), false}, {ir.Time(), false},
+		{ir.String(), false}, {ir.Ref("server.User"), false}, {ir.Ref("server.Email"), false}, {ir.Datetime(), false},
 	} {
 		if got := IsNillable(tt.t, p); got != tt.want {
 			t.Errorf("IsNillable(%s) = %v, want %v", tt.t, got, tt.want)
@@ -115,7 +116,8 @@ func TestZero(t *testing.T) {
 		{ir.Optional(ir.Ref("server.User")), "nil"}, {ir.Ref("server.Page"), "nil"}, {ir.Array(ir.Int()), "nil"},
 		{ir.Record(ir.String(), ir.Int()), "nil"}, {ir.Optional(ir.Ref("server.Page")), "nil"},
 		{ir.Ref("server.User"), "User{}"}, {ir.Ref("type.Session"), "pkgtype.Session{}"}, {ir.Ref("server.Page.Ready"), "PageReady{}"},
-		{ir.Time(), "time.Time{}"}, {ir.Ref("server.When"), "When{}"},
+		{ir.Datetime(), "time.Time{}"}, {ir.Ref("server.When"), "When{}"},
+		{ir.Date(), "runtime.Date{}"}, {ir.Time(), "runtime.TimeOfDay{}"},
 		{ir.String(), `""`}, {ir.Ref("server.Email"), `""`}, {ir.Ref("server.Alias"), `""`}, {ir.Ref("type.Token"), `""`},
 		{ir.Int(), "0"}, {ir.Float(), "0"}, {ir.Duration(), "0"}, {ir.Ref("server.Count"), "0"},
 		{ir.Boolean(), "false"}, {ir.Ref("server.Flag"), "false"},
@@ -161,7 +163,7 @@ func TestTypeDisplay(t *testing.T) {
 		t    ir.Type
 		want string
 	}{
-		{ir.String(), "string"}, {ir.Time(), "Time"}, {ir.Ref("type.User"), "type.User"},
+		{ir.String(), "string"}, {ir.Datetime(), "datetime"}, {ir.Ref("type.User"), "type.User"},
 		{ir.Optional(ir.Ref("type.User")), "type.User?"}, {ir.Array(ir.Ref("type.Order")), "type.Order[]"},
 		{ir.Record(ir.String(), ir.Array(ir.Int())), "Record<string, int[]>"},
 		{ir.Case("store.Login", []string{"LoggedIn"}, ir.Ref("type.Session")), "type.Session"},

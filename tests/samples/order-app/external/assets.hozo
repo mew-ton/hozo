@@ -6,7 +6,7 @@ namespace assets {
   model LinkRequest {
     asset: type.AssetId;
     /** URL が使える長さ */
-    lifetime: Duration;
+    lifetime: duration;
   }
 
   /** そのファイルを、期限の間だけ取れる URL を作る */

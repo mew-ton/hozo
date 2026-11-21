@@ -1,5 +1,5 @@
 {
-  "version": "0.12",
+  "version": "0.13",
   "viewer": "page",
   "config": {
     "index": 3,
@@ -70,7 +70,7 @@
     ]
   },
   "program": {
-    "version": "0.12",
+    "version": "0.13",
     "namespaces": [
       {
         "name": "",
@@ -10133,7 +10133,7 @@
               },
               "end": {
                 "line": 434,
-                "col": 114
+                "col": 118
               }
             },
             "params": [
@@ -10159,7 +10159,7 @@
                 "name": "since",
                 "type": {
                   "kind": "core",
-                  "name": "Time"
+                  "name": "datetime"
                 },
                 "span": {
                   "file": "api.hozo",
@@ -10169,7 +10169,7 @@
                   },
                   "end": {
                     "line": 434,
-                    "col": 41
+                    "col": 45
                   }
                 }
               }
@@ -10409,7 +10409,7 @@
                 "name": "now",
                 "type": {
                   "kind": "core",
-                  "name": "Time"
+                  "name": "datetime"
                 },
                 "span": {
                   "file": "api.hozo",
@@ -10419,7 +10419,7 @@
                   },
                   "end": {
                     "line": 442,
-                    "col": 36
+                    "col": 40
                   }
                 }
               }
@@ -11538,7 +11538,7 @@
                   "types": [
                     {
                       "kind": "core",
-                      "name": "Duration"
+                      "name": "duration"
                     }
                   ]
                 },
@@ -11731,7 +11731,7 @@
                   "types": [
                     {
                       "kind": "core",
-                      "name": "Duration"
+                      "name": "duration"
                     }
                   ]
                 },
@@ -11881,7 +11881,7 @@
                   "kind": "optional",
                   "of": {
                     "kind": "core",
-                    "name": "Duration"
+                    "name": "duration"
                   }
                 },
                 "decorators": [],
@@ -14112,10 +14112,10 @@
           },
           {
             "kind": "decorator",
-            "name": "db.time",
+            "name": "db.datetime",
             "description": {
-              "summary": "このフィールドを、時刻の列にしまう",
-              "body": "このフィールドを、時刻の列にしまう",
+              "summary": "このフィールドを、瞬間（datetime）の列にしまう",
+              "body": "このフィールドを、瞬間（datetime）の列にしまう",
               "params": [],
               "throws": [],
               "see": []
@@ -14129,6 +14129,74 @@
               },
               "end": {
                 "line": 14,
+                "col": 32
+              }
+            },
+            "params": [],
+            "targets": [
+              "field"
+            ],
+            "caseTargets": [],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "db.date",
+            "description": {
+              "summary": "このフィールドを、日付（date）の列にしまう",
+              "body": "このフィールドを、日付（date）の列にしまう",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/db.hozo",
+              "start": {
+                "line": 16,
+                "col": 3
+              },
+              "end": {
+                "line": 16,
+                "col": 28
+              }
+            },
+            "params": [],
+            "targets": [
+              "field"
+            ],
+            "caseTargets": [],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "db.time",
+            "description": {
+              "summary": "このフィールドを、一日の中の時刻（time）の列にしまう",
+              "body": "このフィールドを、一日の中の時刻（time）の列にしまう",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/db.hozo",
+              "start": {
+                "line": 18,
+                "col": 3
+              },
+              "end": {
+                "line": 18,
                 "col": 28
               }
             },
@@ -14158,11 +14226,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 16,
+                "line": 20,
                 "col": 3
               },
               "end": {
-                "line": 16,
+                "line": 20,
                 "col": 28
               }
             },
@@ -14185,11 +14253,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 18,
+                "line": 22,
                 "col": 3
               },
               "end": {
-                "line": 18,
+                "line": 22,
                 "col": 27
               }
             },
@@ -14212,11 +14280,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 19,
+                "line": 23,
                 "col": 3
               },
               "end": {
-                "line": 19,
+                "line": 23,
                 "col": 30
               }
             },
@@ -14246,11 +14314,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 21,
+                "line": 25,
                 "col": 3
               },
               "end": {
-                "line": 21,
+                "line": 25,
                 "col": 46
               }
             },
@@ -14290,11 +14358,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 24,
+                "line": 28,
                 "col": 3
               },
               "end": {
-                "line": 24,
+                "line": 28,
                 "col": 27
               }
             },
@@ -14324,11 +14392,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 26,
+                "line": 30,
                 "col": 3
               },
               "end": {
-                "line": 26,
+                "line": 30,
                 "col": 27
               }
             },
@@ -14358,11 +14426,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 28,
+                "line": 32,
                 "col": 3
               },
               "end": {
-                "line": 29,
+                "line": 33,
                 "col": 83
               }
             },
@@ -14433,11 +14501,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 31,
+                "line": 35,
                 "col": 3
               },
               "end": {
-                "line": 31,
+                "line": 35,
                 "col": 45
               }
             },
@@ -14482,11 +14550,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 34,
+                "line": 38,
                 "col": 3
               },
               "end": {
-                "line": 34,
+                "line": 38,
                 "col": 31
               }
             },
@@ -14516,11 +14584,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 36,
+                "line": 40,
                 "col": 3
               },
               "end": {
-                "line": 36,
+                "line": 40,
                 "col": 31
               }
             },
@@ -14550,11 +14618,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 38,
+                "line": 42,
                 "col": 3
               },
               "end": {
-                "line": 38,
+                "line": 42,
                 "col": 31
               }
             },
@@ -14584,11 +14652,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 40,
+                "line": 44,
                 "col": 3
               },
               "end": {
-                "line": 40,
+                "line": 44,
                 "col": 55
               }
             },
@@ -14628,11 +14696,11 @@
             "span": {
               "file": "hozo:vocab/db.hozo",
               "start": {
-                "line": 43,
+                "line": 47,
                 "col": 3
               },
               "end": {
-                "line": 43,
+                "line": 47,
                 "col": 32
               }
             },
@@ -15365,7 +15433,7 @@
                     },
                     {
                       "kind": "core",
-                      "name": "Duration"
+                      "name": "duration"
                     }
                   ]
                 },
@@ -15877,7 +15945,7 @@
               },
               "end": {
                 "line": 2,
-                "col": 56
+                "col": 55
               }
             },
             "params": [
@@ -15924,7 +15992,7 @@
               },
               "end": {
                 "line": 3,
-                "col": 56
+                "col": 55
               }
             },
             "params": [
@@ -15971,7 +16039,7 @@
               },
               "end": {
                 "line": 4,
-                "col": 61
+                "col": 60
               }
             },
             "params": [
@@ -16028,7 +16096,7 @@
               },
               "end": {
                 "line": 5,
-                "col": 55
+                "col": 54
               }
             },
             "params": [
@@ -16071,7 +16139,7 @@
               },
               "end": {
                 "line": 6,
-                "col": 53
+                "col": 52
               }
             },
             "params": [
@@ -17242,7 +17310,7 @@
           "name": "now",
           "type": {
             "kind": "core",
-            "name": "Time"
+            "name": "datetime"
           },
           "span": {
             "file": "api.hozo",
@@ -17252,7 +17320,7 @@
             },
             "end": {
               "line": 442,
-              "col": 36
+              "col": 40
             }
           }
         }

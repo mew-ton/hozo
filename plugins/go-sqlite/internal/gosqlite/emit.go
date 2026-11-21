@@ -33,7 +33,7 @@ const (
 	codeSQLNeither     = "GOSQL-24" // @db.where か @db.latest の付いた read が、@db.find も @db.list も持たない
 	codeSQLTwice       = "GOSQL-25" // 一つの read の条件が、同じ列を二度名指ししている
 	codeSQLLiteral     = "GOSQL-26" // @db.where のリテラルが、列の型に渡せない
-	codeSQLLatest      = "GOSQL-27" // @db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない
+	codeSQLLatest      = "GOSQL-27" // @db.latest の列のしまい方が、@db.datetime / @db.date / @db.time / @db.int / @db.float のどれでもない
 	codeSQLDeleteAll   = "GOSQL-28" // @db.delete の効果が、引数を一つも持たない
 	codeSQLTransaction = "GOSQL-29" // op に @db.transaction が付いているのに、N に表の状態が一つもない
 	codeSQLRow         = "GOSQL-30" // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない

@@ -6,18 +6,18 @@ namespace a {
   classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
   classify Urgency of Order { Rush; Normal; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
-  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order, at: datetime): effects orders.put as Stage.Accepted -> Stage.InProduction;
   effect fn cancel(order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
   effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
   fn edit(order: Stage.Accepted<Order>): Order;
   // 分かっていない行
-  fn unchecked(order: Order, at: Time) {
+  fn unchecked(order: Order, at: datetime) {
     start(order, at);                  // ERROR: STATE-9
     cancel(order);                     // ERROR: STATE-9
     discard(order);                    // ERROR: STATE-9
   }
   // 別のケースのアーム、前の並びにないケースを含むアーム
-  fn wrongArm(order: Order, at: Time) {
+  fn wrongArm(order: Order, at: datetime) {
     match (order by Stage) {
       Draft => start(order, at);       // ERROR: STATE-9
       else  => none;
@@ -32,7 +32,7 @@ namespace a {
     };
   }
   // 別の分類のアーム、別の値、対象より長いパス、対象から作った別の値
-  fn wrongValue(order: Order, other: Order, box: Box, known: Stage.Accepted<Order>, at: Time) {
+  fn wrongValue(order: Order, other: Order, box: Box, known: Stage.Accepted<Order>, at: datetime) {
     match (order by Urgency) {
       Rush   => start(order, at);      // ERROR: STATE-9
       Normal => none;

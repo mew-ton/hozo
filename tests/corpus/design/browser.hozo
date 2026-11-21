@@ -196,7 +196,7 @@ namespace browser {
   model OrderRow {
     id: server.OrderId;
     status: server.OrderStatus;
-    placedAt: Time;
+    placedAt: datetime;
   }
 
   union OrderPage {

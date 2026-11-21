@@ -32,7 +32,7 @@ namespace row {
   effect fn enterFromAbsent(order: Order): effects orders.post as Life.Absent -> Life.Open;
   effect fn enterAny(order: Order): effects orders.post as any;
   effect fn plain(order: Order): effects orders.post;
-  effect fn advance(at: Time, order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
+  effect fn advance(at: datetime, order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Shipped;
   effect fn force(order: Order): effects orders.put as any -> row.Stage.Shipped;
   effect fn revise(order: Order): effects orders.put as Stage.Accepted -> else;
   effect fn patch(order: Order): effects orders.put as any -> else;

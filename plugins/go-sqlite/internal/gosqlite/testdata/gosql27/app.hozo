@@ -1,4 +1,4 @@
-// GOSQL-27（docs/plugin-go-sqlite.md「read の中身」）: @db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない。
+// GOSQL-27（docs/plugin-go-sqlite.md「read の中身」）: @db.latest の列のしまい方が、@db.datetime / @db.int / @db.float のどれでもない。
 // 位置は read。
 
 namespace app {
@@ -7,9 +7,9 @@ namespace app {
     @db.bool flag: boolean;
     @db.json tags: string[];
     @db.text note: string?;
-    @db.time at: Time;
+    @db.datetime at: datetime;
     @db.int rank: int;
-    @db.int span: Duration;
+    @db.int span: duration;
     @db.float score: float?;
   }
   @db.table state rows: list<Row>;
@@ -30,7 +30,7 @@ namespace app {
   @db.latest("tags")
   read fn byTags(): Row[] reads rows;
 
-  // 通るもの: @db.time、@db.int（Duration も）、@db.float（省略可能でも）
+  // 通るもの: @db.datetime、@db.int（duration も）、@db.float（省略可能でも）
   @db.list
   @db.latest("at")
   read fn newest(): Row[] reads rows;

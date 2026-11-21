@@ -55,7 +55,7 @@ namespace shop {
   @rate.limited
   export fn open(): boolean;
   @rate.limited
-  export fn since(): Time;
+  export fn since(): datetime;
   @rate.limited
   export fn firstId(): type.ItemId;
 

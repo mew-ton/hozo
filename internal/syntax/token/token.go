@@ -83,6 +83,8 @@ const (
 	BooleanType
 	IntType
 	FloatType
+	DatetimeType
+	DateType
 	TimeType
 	DurationType
 	Void
@@ -173,8 +175,10 @@ var Keywords = map[string]Kind{
 	"boolean":  BooleanType,
 	"int":      IntType,
 	"float":    FloatType,
-	"Time":     TimeType,
-	"Duration": DurationType,
+	"datetime": DatetimeType,
+	"date":     DateType,
+	"time":     TimeType,
+	"duration": DurationType,
 	"void":     Void,
 	"never":    Never,
 	"Record":   Record,

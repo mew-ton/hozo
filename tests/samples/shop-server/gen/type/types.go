@@ -62,6 +62,10 @@ type Order struct {
 	UserId   UserId      `json:"userId"`
 	Lines    []OrderLine `json:"lines"`
 	PlacedAt time.Time   `json:"placedAt"`
+	// 届ける日（決まっていれば）
+	DeliverOn *runtime.Date `json:"deliverOn,omitempty"`
+	// 届ける時刻の、いちばん早いもの（決まっていれば）
+	DeliverFrom *runtime.TimeOfDay `json:"deliverFrom,omitempty"`
 }
 
 // Notification はユーザーへの通知

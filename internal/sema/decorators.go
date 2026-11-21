@@ -325,7 +325,7 @@ func targetsString(dec *ir.Decorator) string {
 		cases++
 		names = append(names, caseKindString(k))
 	}
-	return strings.Join(names, " | ")
+	return strings.Join(names, ", ")
 }
 
 // --- 引数（docs/types.md「デコレータの引数」） ---

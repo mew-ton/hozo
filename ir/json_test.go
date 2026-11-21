@@ -63,8 +63,8 @@ func TestRoundTripTypes(t *testing.T) {
 	unionRoundTrip(t, Boolean(), UnmarshalType, `{"kind":"core","name":"boolean"}`)
 	unionRoundTrip(t, Int(), UnmarshalType, `{"kind":"core","name":"int"}`)
 	unionRoundTrip(t, Float(), UnmarshalType, `{"kind":"core","name":"float"}`)
-	unionRoundTrip(t, Time(), UnmarshalType, `{"kind":"core","name":"Time"}`)
-	unionRoundTrip(t, Duration(), UnmarshalType, `{"kind":"core","name":"Duration"}`)
+	unionRoundTrip(t, Datetime(), UnmarshalType, `{"kind":"core","name":"datetime"}`)
+	unionRoundTrip(t, Duration(), UnmarshalType, `{"kind":"core","name":"duration"}`)
 	unionRoundTrip(t, Ref("server.User"), UnmarshalType, `{"kind":"ref","target":"server.User"}`)
 	unionRoundTrip(t, Optional(Int()), UnmarshalType, `{"kind":"optional","of":{"kind":"core","name":"int"}}`)
 	unionRoundTrip(t, Array(Optional(Int())), UnmarshalType, `{"kind":"array","of":{"kind":"optional","of":{"kind":"core","name":"int"}}}`)
@@ -529,7 +529,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.12","namespaces":[],"binds":[]}`
+	want := `{"version":"0.13","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -537,7 +537,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.12","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.12","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.13","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.13","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

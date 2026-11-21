@@ -7,7 +7,7 @@ namespace marks {
   // docs/grammar.md「ファイルと宣言」: デコレータは名前空間には付けられないので、文脈の印は宣言（model / state / op）に付ける
   // docs/grammar.md「decorator の宣言」Target、docs/ir.md「decorator」: targets は ["model", "state", "op"]（書いた順）
   /** 分かれた文脈（境界づけられたコンテキスト）に属する宣言 */
-  decorator context(name: string) for model | state | op;
+  decorator context(name: string) for model, state, op;
 
   // docs/ir.md「decorator」: targets は ["op"]
   /** 人が担い手であること（人の手で行う） */

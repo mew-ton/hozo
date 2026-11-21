@@ -9,8 +9,10 @@ namespace app {
   scalar Count extends int;
   scalar Ratio extends float;
   scalar Flag extends boolean;
-  scalar Stamp extends Time;
-  scalar Wait extends Duration;
+  scalar Stamp extends datetime;
+  scalar Wait extends duration;
+  scalar Day extends date;
+  scalar Clock extends time;
 
   // 「model」核の型、省略可能（omitempty）、array、record、別の名前空間の型、説明が複数の行
   /**
@@ -25,8 +27,12 @@ namespace app {
     nick: string?;
     tags: string[];
     attrs: Record<string, int>;
-    born: Time;
-    wait: Duration?;
+    born: datetime;
+    wait: duration?;
+    birthday: date;
+    wakes: time?;
+    holidays: Day[];
+    alarm: Clock;
     score: float;
     active: boolean;
     twice: string??;
@@ -39,7 +45,7 @@ namespace app {
     limit: int;
     label: string;
     ratio: float;
-    wait: Duration;
+    wait: duration;
     on: boolean;
     id: Id;
     note: string?;
@@ -76,7 +82,7 @@ namespace app {
   }
 
   // 「exception」引数のない例外（struct{}）と、引数を持つ例外（引数ごとにフィールド一つ。並びは引数の順、名前とタグは model の
-  // フィールドと同じ）: 核の型と省略可能（omitempty）、宣言した model、Duration と別の名前空間の型と array
+  // フィールドと同じ）: 核の型と省略可能（omitempty）、宣言した model、duration と別の名前空間の型と array
   exception Plain;
   /** 入力が不正 */
   exception Invalid(reason: string, at: int?);
@@ -85,7 +91,7 @@ namespace app {
    * 呼び出しの頻度の制限を超えた。
    * 二行目の説明。
    */
-  exception LimitExceeded(retryAfter: Duration, home: type.Address, userIds: Id[]);
+  exception LimitExceeded(retryAfter: duration, home: type.Address, userIds: Id[]);
   // variant が set の union は、Go の型にしない
   union Errors { Plain; Invalid; }
 
@@ -104,7 +110,7 @@ namespace app {
     Yes: User? as User;
     No: User? as else;
   }
-  decorator mark for model | op;
+  decorator mark for model, op;
 
   // 「分類」対象のない分類と、そのケースに付けたデコレータ、ケースを引数に取るデコレータは、何も出さない
   /** 担い手 */

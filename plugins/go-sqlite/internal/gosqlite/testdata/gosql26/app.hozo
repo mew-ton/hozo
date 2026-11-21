@@ -1,5 +1,5 @@
 // GOSQL-26（docs/plugin-go-sqlite.md「read の中身」）: @db.where のリテラルが、列の型（scalar は元の核の型。省略可能は外して見る）に
-// 渡せない。しまい方が @db.time と @db.json の列には、渡せるリテラルがない。位置は read。
+// 渡せない。しまい方が @db.datetime と @db.json の列には、渡せるリテラルがない。位置は read。
 
 namespace app {
   scalar Name extends string;
@@ -9,10 +9,10 @@ namespace app {
     @db.key @db.text id: string;
     @db.text name: Name;
     @db.int count: Count;
-    @db.int span: Duration;
+    @db.int span: duration;
     @db.float ratio: float;
     @db.bool flag: boolean;
-    @db.time at: Time;
+    @db.datetime at: datetime;
     @db.json tags: string[];
     @db.json tag: Tag;
     @db.text note: string?;
@@ -45,11 +45,11 @@ namespace app {
   @db.list
   @db.where("flag", "true")
   read fn textToBool(): Row[] reads rows;
-  // Duration の列（@db.int）に、整数
+  // duration の列（@db.int）に、整数
   @db.list
   @db.where("span", 60)
   read fn intToDuration(): Row[] reads rows;
-  // @db.time の列には、渡せるリテラルがない
+  // @db.datetime の列には、渡せるリテラルがない
   @db.list
   @db.where("at", "2026-01-02T03:04:05Z")
   read fn textToTime(): Row[] reads rows;

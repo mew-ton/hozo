@@ -248,14 +248,22 @@ func (a *analyzer) resolveHead(qn ast.QualifiedName, sc *scope, acc accept, refs
 			return resolved{kind: rDecl, sym: s}, rest, nil
 		}
 	}
-	// 1.7 RES-1
+	// 1.7 RES-1。なくした核の型の名前（Time、Duration）は、新しい語を示す（docs/resolve.md「手続き」の 1.7）
+	msg := fmt.Sprintf("%s が見つからない", head.Name)
+	if now, ok := removedCoreTypes[head.Name]; ok {
+		msg += fmt.Sprintf("（核の型 %s は、%s に名前が変わった。docs/grammar.md「型」）", head.Name, now)
+	}
 	return resolved{}, nil, &resolveError{
 		code:       "RES-1",
 		span:       head.Span,
-		msg:        fmt.Sprintf("%s が見つからない", head.Name),
+		msg:        msg,
 		candidates: a.candidates(head.Name, sc, acc, nil),
 	}
 }
+
+// removedCoreTypes は、なくした核の型の名前と、今の語（docs/decisions.md「決めたこと」359）。今は、ふつうの名前なので、
+// 同じ名前の宣言があれば、それに解決する。なければ、RES-1 のメッセージに、今の語を足す。
+var removedCoreTypes = map[string]string{"Time": "datetime", "Duration": "duration"}
 
 // resolveSegment は手続き 2（残りのセグメントを辿る）の表の一行。
 func (a *analyzer) resolveSegment(prev resolved, seg ast.Ident, sc *scope, acc accept, refs *[]Ref) (resolved, *resolveError) {

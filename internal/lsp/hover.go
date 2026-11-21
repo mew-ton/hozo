@@ -402,7 +402,7 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 			}
 			ts = append(ts, string(t))
 		}
-		b.WriteString(" for " + strings.Join(ts, " | "))
+		b.WriteString(" for " + strings.Join(ts, ", "))
 	}
 	for _, c := range d.Throws {
 		b.WriteString(" " + r.throwsClause(c))

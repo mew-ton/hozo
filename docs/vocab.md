@@ -23,7 +23,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 |---|---|---|
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
 | `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
-| `vocab/db.hozo` | `namespace db { table / text / int / float / bool / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / conflict / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
+| `vocab/db.hozo` | `namespace db { table / text / int / float / bool / datetime / date / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / conflict / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
 | `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
 | `vocab/page.hozo` | `namespace page { Aborted / Route / path / query / route / dialog / fallback / interaction }` | §4.2 |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
@@ -62,7 +62,11 @@ namespace db {
   decorator float for field;
   /** このフィールドを、真偽値の列にしまう */
   decorator bool for field;
-  /** このフィールドを、時刻の列にしまう */
+  /** このフィールドを、瞬間（datetime）の列にしまう */
+  decorator datetime for field;
+  /** このフィールドを、日付（date）の列にしまう */
+  decorator date for field;
+  /** このフィールドを、一日の中の時刻（time）の列にしまう */
   decorator time for field;
   /** このフィールドを、JSON にして一つの列にしまう */
   decorator json for field;
@@ -105,7 +109,7 @@ namespace db {
 表の model のフィールドに書くデコレータ（`docs/decisions.md`「決めたこと」105、134）。何を出すかと、整合の検査の持ち主は `docs/plugin-go-sqlite.md`「表」「しまい方」。
 
 - **表**は、状態に `@db.table` を付けて言う（`@db.table state orders: list<type.Order>;`）。引数はない: 表の行の model（**表の model**）は、状態の要素の型（`docs/ir.md`「state / exception / effect」の `State.element`）。出典のグローバルのデコレータ `db`（`@db state …`）は、名前空間 `db` の中の `table` にした。
-- **しまい方**（`text` / `int` / `float` / `bool` / `time` / `json`）は、フィールドを列にどうしまうかの種類で、保存先の製品に依らない名前。表の model のフィールドは、どれか一つを、ちょうど一つ持つ。**しまい方は、フィールドの型からは当てない**: `string` のフィールドでも `@db.text` を書く（同じ型を、文字列でも JSON でもしまえる。どれにするかは、書いた人が決める）。型は、種類に合うかの検査にだけ使う。同じ種類の中で、型によって変え方が分かれるようになったら、種類を足す。
+- **しまい方**（`text` / `int` / `float` / `bool` / `datetime` / `date` / `time` / `json`）は、フィールドを列にどうしまうかの種類で、保存先の製品に依らない名前。表の model のフィールドは、どれか一つを、ちょうど一つ持つ。**しまい方は、フィールドの型からは当てない**: `string` のフィールドでも `@db.text` を書く（同じ型を、文字列でも JSON でもしまえる。どれにするかは、書いた人が決める）。型は、種類に合うかの検査にだけ使う。同じ種類の中で、型によって変え方が分かれるようになったら、種類を足す。
 - **値がなくてよい列**かどうかは、フィールドの型の `?` が言う（`@db.text nickname: string?` の列は、値がなくてよい。`?` のないフィールドの列は、いつも値を持つ）。型に書いてあることで、当てるのではないので、別のデコレータは要らない。
 - **`@db.key`** は、行を一つに決める列（の組）。**`@db.unique`** は、その列だけで行が一つに決まる列。**`@db.ref(M)`** は、M の表の行を指す列で、指す先（M の表と、その列）が一つに決まらなければ、語彙を読むトランスパイラの error。
 
@@ -161,7 +165,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
   /** このフィールドの項目が要求になければ、誤り（op は呼ばれない） */
   decorator required for field;
   /** このフィールドの項目が要求になければ、value にする */
-  decorator default(value: string | int | float | boolean | Duration) for field;
+  decorator default(value: string | int | float | boolean | duration) for field;
 ```
 
 | 場所 | 項目一つ | 場所の全体を、一つの model で |

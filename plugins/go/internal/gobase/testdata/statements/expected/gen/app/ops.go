@@ -5,6 +5,8 @@ package app
 import (
 	"context"
 	"time"
+
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
@@ -106,6 +108,12 @@ type Ops interface {
 	// AsDuration は op app.asDuration。
 	AsDuration(ctx context.Context) (time.Duration, error)
 
+	// AsDate は op app.asDate。
+	AsDate(ctx context.Context) (runtime.Date, error)
+
+	// AsClock は op app.asClock。
+	AsClock(ctx context.Context) (runtime.TimeOfDay, error)
+
 	// AsId は op app.asId。
 	AsId(ctx context.Context) (Id, error)
 
@@ -135,6 +143,12 @@ type Ops interface {
 
 	// ZeroDuration は op app.zeroDuration。
 	ZeroDuration(ctx context.Context) (time.Duration, error)
+
+	// ZeroDate は op app.zeroDate。
+	ZeroDate(ctx context.Context) (runtime.Date, error)
+
+	// ZeroClock は op app.zeroClock。
+	ZeroClock(ctx context.Context) (runtime.TimeOfDay, error)
 
 	// ZeroId は op app.zeroId。
 	ZeroId(ctx context.Context) (Id, error)
@@ -201,6 +215,12 @@ type Leaves interface {
 
 	// AsDuration は op app.asDuration。
 	AsDuration(ctx context.Context) (time.Duration, error)
+
+	// AsDate は op app.asDate。
+	AsDate(ctx context.Context) (runtime.Date, error)
+
+	// AsClock は op app.asClock。
+	AsClock(ctx context.Context) (runtime.TimeOfDay, error)
 
 	// AsId は op app.asId。
 	AsId(ctx context.Context) (Id, error)
@@ -292,6 +312,14 @@ func (o *ops) AsTime(ctx context.Context) (time.Time, error) {
 
 func (o *ops) AsDuration(ctx context.Context) (time.Duration, error) {
 	return o.leaves.AsDuration(ctx)
+}
+
+func (o *ops) AsDate(ctx context.Context) (runtime.Date, error) {
+	return o.leaves.AsDate(ctx)
+}
+
+func (o *ops) AsClock(ctx context.Context) (runtime.TimeOfDay, error) {
+	return o.leaves.AsClock(ctx)
 }
 
 func (o *ops) AsId(ctx context.Context) (Id, error) {

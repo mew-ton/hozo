@@ -51,7 +51,7 @@ S の値を T の位置に渡せるのは、次のどれかを満たすとき。
 7. S が `record(K1, V1)`、T が `record(K2, V2)` で、K1 = K2 かつ V1 が V2 に渡せる。
 8. （欠番。model から model への射影の規則だった。なくした。下の「渡せないもの」）
 9. S がレコードリテラルで、T が model への `ref`（または model の `optional`）で、リテラルが T に**当てはまる**（下）。
-10. S がリテラルの型で、T が対応する核の型（`string`→`string`、`int`→`int` または `float`、`float`→`float`、`boolean`→`boolean`、`duration`→`Duration`）。
+10. S がリテラルの型で、T が対応する核の型（`string`→`string`、`int`→`int` または `float`、`float`→`float`、`boolean`→`boolean`、`duration`→`duration`）。`datetime`、`date`、`time` には、リテラルがない（`docs/grammar.md`「決めたこと」）。
 11. S が `scalar` への `ref` で、S の `base` が T に渡せる（`Email` を `string` に。値の型は元の型の部分集合）。
 
 規則の番号は使い回さない（ほかの文書とコードが番号で引くため）。
@@ -240,7 +240,7 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 4. 値のある本体と「値がない」が混ざれば TYPE-8。
 5. そろえる型 T を決める。上から順に、最初に当たるもの。
    1. 型の決まった本体（値のある呼び出し、名前の `Atom`）があれば、それらの型のうち、ほかのすべてが渡せる型（「互換」。等しい型は一つと数え、複数あればアームの順で最初のもの）。そういう型がなければ TYPE-8。
-   2. リテラルの本体があり、リテラルの種類がすべて同じなら、対応する核の型（`string` / `int` / `float` / `boolean` / `Duration`）。種類が混ざれば TYPE-8（`int` と `float` も別の種類）。
+   2. リテラルの本体があり、リテラルの種類がすべて同じなら、対応する核の型（`string` / `int` / `float` / `boolean` / `duration`）。種類が混ざれば TYPE-8（`int` と `float` も別の種類）。
    3. レコードリテラルと `none` しかなく、`match` が `return` の式なら、op の `returns` から `optional` を外した型。型を書いた `val` に入れる式（「val の型」の 1）なら、その当てはめる先の型から `optional` を外した型。どちらでもなければ TYPE-7。
 6. リテラルとレコードリテラルの本体は、T に渡せること（規則 9・10。レコードリテラルは T に当てはめる）。渡せなければ、そのアームの位置に TYPE-8（T が `scalar` でリテラルを渡したなら TYPE-1）。
 7. `match` の型は、`none` の本体があれば `optional(T)`（T が既に `optional` なら T）、なければ T。
@@ -270,10 +270,13 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 
 `Application.args` の値が `Param.type` に合うかの規則。`docs/resolve.md` で種類が決まった後に適用する。
 
+- `any <種類>` は、その種類の宣言なら、どれでも、を受ける型（`any` は「どれでも」。`docs/grammar.md`「decorator の宣言」）。
+- 一つの引数に `A | B` と渡した値（`refs`）は、その場で書いた union で、「A か B」（`docs/grammar.md`「デコレータの適用」）。名前を付けた union を渡したときと、同じに数える: どちらも、要素の並びに開く。
+
 | `ParamType` | 受け付ける `ArgValue` |
 |---|---|
 | `type` の `Type` | `literal` で、リテラルの型が渡せるもの（`scalar` の位置には渡せない。TYPE-1）。`list` は `array` の位置に。`ref` で op の引数（`$param:`。`docs/resolve.md`「手続き」1.3）なら、その引数の型が渡せること |
-| `any exception` | `ref`（例外）、`refs`（例外の集合）、`ref`（`set` のユニオンで要素が例外。展開して `refs` にする） |
+| `any exception` | `ref`（例外）、`refs`（その場で書いた、例外の union）、`ref`（`set` のユニオンで要素が例外。展開して `refs` にする） |
 | `any effect` | `ref`（効果）、`refs`、ユニオン（同上） |
 | `any effect on s.op` | 上のうち、すべての効果の宛先（`Effect.target`）が組み込みの効果で、その `state` が `s`、`operation` が `op` のもの。遷移の効果や、違う状態・操作なら DEC-7 |
 | `any state` | `ref`（状態） |
@@ -311,6 +314,6 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 | TYPE-16 | error | `override` の形が合わない: 何も変えない（型を書かないか元と等しい型で、デコレータを足していない。説明だけを変えるのも含む）、`never` にデコレータか説明を付けた、同じフィールドへの `override` が二度ある（「本体に書けるもの」） |
 | TYPE-17 | error | 配線の、値の入れ物と、繰り返しの型が合わない（「val の型」と、「式の型」の `for` の変数）: 型を書いた `val` に入れる式の型が、渡せない。集める先の `val` の型が `list` でない。集める式の型が、要素の型に渡せない。型を書かない `val` に集める式の型が、そろわない。`for` の頭の並びの型が `list<T>` でない |
 | TYPE-18 | error | 関数の戻り値が、種類に合わない（`docs/grammar.md`「関数の宣言」）: 効果（`effect fn`）の戻り値が、`void` でも、省いた形でもない。`read fn` の戻り値を、省いた、または、`void` か `never`。位置は、書いた戻り値の型（省いた `read fn` は、名前）。`Signature` を要しないので `internal/sema` が出す |
-| LIT-1 | error | 整数リテラルが 64 ビット符号付きの範囲を超える。`Duration` がナノ秒で同じ範囲を超える |
+| LIT-1 | error | 整数リテラルが 64 ビット符号付きの範囲を超える。`duration` のリテラルがナノ秒で同じ範囲を超える |
 
 TYPE-13 は欠番。「既定値のリテラルがフィールドの型（`scalar` なら元の型）に渡せない」という規則で、フィールドの既定値を言語からなくした（`docs/grammar.md`「決めたこと」）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。

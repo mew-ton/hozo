@@ -111,7 +111,7 @@ test('予約語（宣言の頭、節の頭、核の型、リテラル）', () =>
   const c = tokensOf([
     'classify Actor of never { @actor.human Customer; }',
     'decorator human for case of Actor;',
-    'decorator seen(what: any case of any) for model | case of Order;',
+    'decorator seen(what: any case of any) for model, case of Order;',
     'decorator by(who: any case of never) for op;',
   ].join('\n'));
   assertScope(c, 'classify Actor', 'never', 'support.type.primitive.hozo');
@@ -136,8 +136,8 @@ test('文脈キーワードは位置でだけ色が付く', () => {
   assertScope(h, 'decorator header(name: string?) for field;', 'for', 'keyword.control.hozo');
   assertScope(h, 'decorator header(name: string?) for field;', 'field', 'keyword.other.hozo');
   const v = linesOf(files.valid);
-  assertScope(v, 'decorator min(value: int | float) for scalar | field;', 'field', 'keyword.other.hozo');
-  assertScope(v, 'decorator min(value: int | float) for scalar | field;', 'scalar', 'keyword.declaration.hozo');
+  assertScope(v, 'decorator min(value: int | float) for scalar, field;', 'field', 'keyword.other.hozo');
+  assertScope(v, 'decorator min(value: int | float) for scalar, field;', 'scalar', 'keyword.declaration.hozo');
   const p = linesOf(files.page);
   assertScope(p, 'decorator interaction(page: any op, when: any variant);', 'any', 'keyword.control.hozo');
   assertScope(p, 'decorator interaction(page: any op, when: any variant);', 'variant', 'keyword.other.hozo');
@@ -428,8 +428,8 @@ test('行の遷移（effect fn …: effects 状態.操作 as …）と、ケー�
   assertScope(none, 'classify Life', 'Order', 'entity.name.type.hozo', 3);
   // 実物: コーパスの行の遷移と、ない側のケース
   const api = linesOf(files.api);
-  assertScope(api, 'effect fn rest(user: User, since: Time): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', 'Standing.Active', 'entity.name.type.hozo');
-  assertScope(api, 'effect fn rest(user: User, since: Time): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', '->', 'keyword.operator.arrow.hozo');
+  assertScope(api, 'effect fn rest(user: User, since: datetime): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', 'Standing.Active', 'entity.name.type.hozo');
+  assertScope(api, 'effect fn rest(user: User, since: datetime): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;', '->', 'keyword.operator.arrow.hozo');
   assertScope(api, 'effect fn amend(user: User): effects users.put as Standing.Idle -> else;', 'else', 'keyword.control.hozo');
   assertScope(api, 'effect fn closeUser(user: User): effects users.put as any -> Standing.Closed;', 'any', 'keyword.control.hozo');
   assertScope(api, 'Unknown: User? as none;', 'none', 'constant.language.hozo');
@@ -464,7 +464,7 @@ test('リテラル', () => {
   assertScope(s, '@http.header(name: "Authorization") token: Token?;', 'Authorization', 'string.quoted.double.hozo');
   assertScope(s, '@http.status(401)', '401', 'constant.numeric.hozo');
   assertScope(s, '@http.default(1) @http.query page: int;', '1', 'constant.numeric.hozo');
-  const t = tokensOf('@limits(5m, 30s, 100ms, -3.5, "a\\n\\u{1F600}\\"") model X { a: Duration; }');
+  const t = tokensOf('@limits(5m, 30s, 100ms, -3.5, "a\\n\\u{1F600}\\"") model X { a: duration; }');
   assertScope(t, 'model X', '5m', 'constant.numeric.hozo');
   assertScope(t, 'model X', '30s', 'constant.numeric.hozo');
   assertScope(t, 'model X', '100ms', 'constant.numeric.hozo');
@@ -589,7 +589,7 @@ test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み�
   assertNoScope(d, '@repeatable', '@repeatable', 'entity.name.function.decorator.hozo');
   assertScope(d, 'decorator find for read;', 'read', 'keyword.declaration.hozo');
   assertScope(d, 'decorator find for read;', 'find', 'entity.name.function.hozo');
-  const marks = tokensOf('@repeatable @external decorator tag(name: string) for read | effect | exception;');
+  const marks = tokensOf('@repeatable @external decorator tag(name: string) for read, effect, exception;');
   assertScope(marks, 'decorator tag', '@repeatable', 'storage.modifier.hozo');
   assertScope(marks, 'decorator tag', '@external', 'storage.modifier.hozo');
   assertScope(marks, 'decorator tag', 'read', 'keyword.declaration.hozo');
@@ -604,10 +604,15 @@ test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み�
   assertScope(deco, 'read fn latest', 'read', 'keyword.declaration.hozo');
   assertScope(deco, 'read fn latest', 'latest', 'entity.name.function.hozo');
   // 引数を持つ例外と、引数を渡す throw
-  const ex = tokensOf('exception LimitExceeded(wait: Duration, reason: string);');
+  const ex = tokensOf('exception LimitExceeded(wait: duration, reason: string);');
   assertScope(ex, 'exception LimitExceeded', 'exception', 'keyword.declaration.hozo');
   assertScope(ex, 'exception LimitExceeded', 'LimitExceeded', 'entity.name.type.hozo');
-  assertScope(ex, 'exception LimitExceeded', 'Duration', 'support.type.primitive.hozo');
+  assertScope(ex, 'exception LimitExceeded', 'duration', 'support.type.primitive.hozo');
+  // 日時の核の型（docs/grammar.md「型」）: datetime、date、time、duration は、どれも、核の型
+  const dt = tokensOf('model Slot { at: datetime; on: date; from: time?; span: duration[]; }');
+  for (const word of ['datetime', 'date', 'time', 'duration']) {
+    assertScope(dt, 'model Slot', word, 'support.type.primitive.hozo');
+  }
   assertScope(ex, 'exception LimitExceeded', 'string', 'support.type.primitive.hozo');
   const weak = 'Weak   => throw Invalid("weak password");';
   assertScope(api, weak, 'throw', 'keyword.control.hozo');

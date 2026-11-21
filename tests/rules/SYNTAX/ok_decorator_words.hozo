@@ -21,7 +21,7 @@ namespace a {
     reads logs, extra
     throws Busy prevents effects effects more, add
     reads rows;
-  decorator tags(first: string, ...more: string | int) for op | effect;
+  decorator tags(first: string, ...more: string | int) for op, effect;
   // 別名の先
   decorator everything = list(rows);
   decorator nothing = effects();

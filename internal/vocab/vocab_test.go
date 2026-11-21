@@ -15,7 +15,7 @@ var expected = map[string][]string{
 		"decorator header(name: string?) for field;", "decorator query(name: string?) for field;", "decorator body(name: string?) for field;",
 		"decorator headerObj for field;", "decorator queryObj for field;", "decorator bodyObj for field;", "decorator required for field;", "decorator default(value:", "decorator retry("},
 	"hozo:vocab/db.hozo": {"namespace db {", "decorator table for state;",
-		"decorator text for field;", "decorator int for field;", "decorator float for field;", "decorator bool for field;", "decorator time for field;", "decorator json for field;",
+		"decorator text for field;", "decorator int for field;", "decorator float for field;", "decorator bool for field;", "decorator datetime for field;", "decorator date for field;", "decorator time for field;", "decorator json for field;",
 		"decorator key for field;", "decorator unique for field;", "decorator ref(target: any model) for field;",
 		"decorator find for read;", "decorator list for read;",
 		"@repeatable\n  decorator where(column: string, value: string | int | float | boolean) for read;", "decorator latest(column: string) for read;",

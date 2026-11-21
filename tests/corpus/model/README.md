@@ -6,7 +6,7 @@
 |---|---|
 | `hozo.toml` | 単位が三つ: 出力したい `namespace = "shop"` と、`shop` が使う型（例外 `carrier.Closed`、`marks.NotApproved`）の置き場の `"carrier"`、`"marks"`（`docs/config.md`「型の置き場」。なければ CFG-22）。どれも `transpilers = ["none"]`。`customer` はどの単位の対象でもない |
 | `plugins/none/` | テスト用のプラグインのマニフェスト。トランスパイラ `none`（`requires` を持たない、テストのための基底。sh で動く）は、ファイルを返さない |
-| `marks.hozo` | `namespace marks`。どのプラグインも読まない印のデコレータ: `context`（`for model \| state \| op`）、`manual`（`for op`）、`requirement`（op。`throws NotApproved prevents effects` を宣言する） |
+| `marks.hozo` | `namespace marks`。どのプラグインも読まない印のデコレータ: `context`（`for model, state, op`）、`manual`（`for op`）、`requirement`（op。`throws NotApproved prevents effects` を宣言する） |
 | `shop.hozo` | `namespace shop`。出力する名前空間。`@marks.context("販売")` の付いた model と状態、効果を呼ぶ配線（`addToCart`、`@marks.requirement` の付いた `placeOrder`）と、その葉（`checkStock`、`newOrder`）、`carrier` の op を呼ぶ配線 |
 | `carrier.hozo` | `namespace carrier`。外部のシステム。状態・効果・例外と、効果を呼ぶ配線（`pickup`）、その葉（`checkOpen`）を持つ。単位は、`shop` が使う例外の置き場としてだけ持つ。状態と op に `@marks.context("配送")` |
 | `customer.hozo` | `namespace customer` のブロックが二つ。人の操作。`@marks.manual` の付いた op（効果を呼ぶ配線 `pick`、葉の `choose` と `leave`）と、`shop` の op を呼ぶ配線を持つが、出力しない |
@@ -23,7 +23,7 @@
 | 文書の見出し | 構文（ファイル） | 確かめること |
 |---|---|---|
 | `docs/grammar.md`「ファイルと宣言」（デコレータは名前空間に付けられない）、`docs/ir.md`「デコレータの適用」 | `@marks.context("販売") model Order { }`、`@marks.context("販売") state orders: ...;`（`shop.hozo`）、`@marks.context("配送") state parcels: ...;`、`@marks.context("配送") fn pickup(...)`（`carrier.hozo`）、`customer.hozo` の二つの `namespace customer` のブロック | 印は名前空間ではなく宣言（model / state / op）に付ける。`DeclBase.decorators` は `Application` の列（引数は `param` に対応付け済み、位置は適用そのもの）。同じ名前の `namespace` のブロックは一つの `Namespace` にまとまり、`Namespace` は `decorators` を持たない。`namespace` の前に書けば構文エラー（`tests/rules/SYN-1` の `ng_1` / `ng_4`） |
-| `docs/grammar.md`「decorator の宣言」の `Target`、`docs/ir.md`「decorator」の `targets` | `decorator context(name: string) for model \| state \| op;`、`decorator manual for op;`、`decorator requirement(id: string) throws ...;`（`marks.hozo`） | `targets` は `["model", "state", "op"]`（書いた順）、`["op"]`、省略なら `["op"]`。`for` にない対象に付ければ DEC-1（`tests/rules/DEC-1`） |
+| `docs/grammar.md`「decorator の宣言」の `Target`、`docs/ir.md`「decorator」の `targets` | `decorator context(name: string) for model, state, op;`、`decorator manual for op;`、`decorator requirement(id: string) throws ...;`（`marks.hozo`） | `targets` は `["model", "state", "op"]`（書いた順）、`["op"]`、省略なら `["op"]`。`for` にない対象に付ければ DEC-1（`tests/rules/DEC-1`） |
 | `docs/config.md`「単位の対象」「型の置き場」 | `hozo.toml` の単位は `shop` と、型の置き場の `carrier`、`marks`。`customer` は `state` と `op` を持つが、どの単位の対象でもない | どの単位の対象でもない名前空間に診断は出ない。`Views()` は `shop`、`carrier`、`marks` で、`View.namespaces` にも `customer` は入らない。`View.program` は全体そのまま、`View.ops` は出力しない名前空間の op も `Sig(O, shop)` で持つ |
 | `docs/requirements.md`「モデルが先」の「決まったこと」（人の操作の書き方） | 担い手ごとの名前空間 `namespace customer` と、op に印を付ける形 `@marks.manual fn pick()`、`@marks.manual fn leave()`（`customer.hozo`） | どちらの形でも書ける（言語は決めない）。名前空間そのものには印を付けられないので、担い手が人であることは名前空間の説明と、op ごとの印で表す |
 | `docs/check.md`「計算」手順 i の `throws`（印のデコレータ） | `@marks.requirement("PRD-12") fn placeOrder(): Order effects createOrder { … }`（`shop.hozo`） | どのプラグインも読まない印でも、`throws` を宣言していれば付けた op の `Signature` に効く: `exceptions` に `marks.NotApproved`、`relations` は `prevented`。op 自身の `throws` は `[]` のまま。`throws` を持たない印（`@marks.manual`）は `Signature` を変えない |

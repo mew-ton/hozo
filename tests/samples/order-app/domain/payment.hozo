@@ -18,9 +18,9 @@ namespace payment {
     /** 客が同意する額: 商品の代金 + 送料の上限。請求は、これを超えない */
     limit: type.Yen;
     /** 客が同意して、枠を確保した時刻 */
-    securedAt: Time?;
+    securedAt: datetime?;
     /** 枠の期限 */
-    holdExpiresAt: Time?;
+    holdExpiresAt: datetime?;
     /** 請求を確定した額 */
     captured: type.Yen?;
     /** 決まった送料のうち、客に請求する額（上限で切った後） */
@@ -30,11 +30,11 @@ namespace payment {
     /** 返した額（上限の額で先に確定したときの差額） */
     refunded: type.Yen?;
     /** 送料が決まって、請求する額が最後まで決まった時刻 */
-    settledAt: Time?;
+    settledAt: datetime?;
     /** 枠を手放した時刻 */
-    releasedAt: Time?;
+    releasedAt: datetime?;
     /** 上限の額での、先の確定に、最後に失敗した時刻。失敗していなければ、ない */
-    prepayFailedAt: Time?;
+    prepayFailedAt: datetime?;
     /** その失敗の理由（デコレータの中身が、受けた例外から書く） */
     prepayFailure: string?;
   }
@@ -54,7 +54,7 @@ namespace payment {
   /** 相手から届いた通知。同じ通知を二度扱わないための記録 */
   model Seen {
     @db.key id: psp.EventId;
-    at: Time;
+    at: datetime;
   }
 
   @db.table
@@ -64,7 +64,7 @@ namespace payment {
   state seen: list<Seen>;
 
   /** 枠の期限の、どれだけ前に、先に請求を確定するか */
-  state holdMargin: single<Duration>;
+  state holdMargin: single<duration>;
 
   // ---- 分類 ----
 
@@ -144,7 +144,7 @@ namespace payment {
   read fn paymentBySession(session: psp.SessionId): Payment? reads payments;
 
   /** 枠の期限が deadline より前の、まだ請求を確定していない支払い。期限の近い順（人が書く: 比較と並べ方） */
-  read fn holdsExpiringBefore(deadline: Time): Payment[] reads payments;
+  read fn holdsExpiringBefore(deadline: datetime): Payment[] reads payments;
 
   /** その識別子の通知の記録 */
   @db.find
@@ -158,22 +158,22 @@ namespace payment {
   effect fn replaceSessionOf(payment: Payment, session: psp.SessionId): effects payments.put as Standing.Pending -> Standing.Pending;
 
   /** 客が同意して、枠を確保した: 同意した時刻と、枠の期限を入れる（人が書く） */
-  effect fn holdSecured(payment: Payment, holdExpiresAt: Time?, at: Time): effects payments.put as Standing.Pending -> Standing.Held;
+  effect fn holdSecured(payment: Payment, holdExpiresAt: datetime?, at: datetime): effects payments.put as Standing.Pending -> Standing.Held;
 
   /** 客が同意して、その場で請求が確定した: 同意した時刻と、確定した額（同意した額）を入れる（人が書く） */
-  effect fn chargeSecured(payment: Payment, at: Time): effects payments.put as Standing.Pending -> Standing.Settled;
+  effect fn chargeSecured(payment: Payment, at: datetime): effects payments.put as Standing.Pending -> Standing.Settled;
 
   /** 上限の額で、先に請求を確定した: 確定した額（同意した額）を入れる（人が書く） */
-  effect fn recordPrepaid(payment: Payment, at: Time): effects payments.put as Standing.Held -> Standing.Prepaid;
+  effect fn recordPrepaid(payment: Payment, at: datetime): effects payments.put as Standing.Held -> Standing.Prepaid;
 
   /** 先の確定に、失敗した: 時刻と理由を、支払いに残す。枠は、確保したまま（人が書く） */
-  effect fn notePrepayFailure(payment: Payment, at: Time): effects payments.put as Standing.Held -> Standing.Held;
+  effect fn notePrepayFailure(payment: Payment, at: datetime): effects payments.put as Standing.Held -> Standing.Held;
 
   /** 請求する額が、最後まで決まった: 決まった額と、時刻を入れる（人が書く） */
-  effect fn recordSettled(payment: Payment, charge: Charge, at: Time): effects payments.put as Standing.Held, Standing.Prepaid -> Standing.Settled;
+  effect fn recordSettled(payment: Payment, charge: Charge, at: datetime): effects payments.put as Standing.Held, Standing.Prepaid -> Standing.Settled;
 
   /** 枠を手放した: 手放した時刻を入れる（人が書く） */
-  effect fn recordReleased(payment: Payment, at: Time): effects payments.put as Standing.Held -> Standing.Released;
+  effect fn recordReleased(payment: Payment, at: datetime): effects payments.put as Standing.Held -> Standing.Released;
 
   /** 通知を、扱ったと記録する */
   @db.insert
@@ -286,7 +286,7 @@ namespace payment {
   }
 
   /** 客の同意の通知。知らない支払いの画面のものは、何もしない */
-  fn secure(event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
+  fn secure(event: psp.Meaning.Secured<psp.Event>, now: datetime): type.OrderId? {
     val payment = paymentBySession(event.session);
     return match (payment by Known) {
       Found   => secureFound(payment, event, now);
@@ -295,7 +295,7 @@ namespace payment {
   }
 
   /** まだ同意していなかった支払いだけが、新しく確保される */
-  fn secureFound(payment: Payment, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId? {
+  fn secureFound(payment: Payment, event: psp.Meaning.Secured<psp.Event>, now: datetime): type.OrderId? {
     return match (payment by Standing) {
       Pending => markSecured(payment, event, now);
       else    => none;
@@ -306,7 +306,7 @@ namespace payment {
    * 同意を記録する。箱で送るものがある支払いは、枠を確保した（Held）。
    * 送料がない支払い（ダウンロードだけ）は、その場で請求が確定している（Settled）。
    */
-  fn markSecured(payment: Standing.Pending<Payment>, event: psp.Meaning.Secured<psp.Event>, now: Time): type.OrderId {
+  fn markSecured(payment: Standing.Pending<Payment>, event: psp.Meaning.Secured<psp.Event>, now: datetime): type.OrderId {
     match (payment by Billing) {
       Deferred  => holdSecured(payment, event.holdExpiresAt, now);
       Immediate => chargeSecured(payment, now);
@@ -418,10 +418,10 @@ namespace payment {
   }
 
   /** now から margin だけ先の時刻（人が書く） */
-  fn ahead(now: Time, margin: Duration): Time;
+  fn ahead(now: datetime, margin: duration): datetime;
 
   /** 枠を確保してある支払いだけを、先に確定する */
-  fn prepayHeld(payment: Payment, now: Time) {
+  fn prepayHeld(payment: Payment, now: datetime) {
     match (payment by Standing) {
       Held => prepay(payment, now);
       else => none;
@@ -435,7 +435,7 @@ namespace payment {
   @noteFailure(psp.HoldExpired, notePrepayFailure)
   @noteFailure(http.NetworkError, notePrepayFailure)
   @noteFailure(http.ServerError, notePrepayFailure)
-  fn prepay(payment: Standing.Held<Payment>, now: Time) {
+  fn prepay(payment: Standing.Held<Payment>, now: datetime) {
     val request = limitCaptureOf(payment);
     psp.capture(request);
     recordPrepaid(payment, now);

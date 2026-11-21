@@ -43,8 +43,8 @@ namespace app {
    * 設定の title を、そのまま返す。
    */
   read fn shopTitle(): string reads settings;
-  // どの配線も呼ばない read も出す。省略可能な引数と、Time の引数
-  read fn linesSince(since: Time, limit: int?): Line[] reads lines;
+  // どの配線も呼ばない read も出す。省略可能な引数と、datetime の引数
+  read fn linesSince(since: datetime, limit: int?): Line[] reads lines;
   /** 手元のトークンの写し */
   read fn tokenCopy(): Token? reads token;
 

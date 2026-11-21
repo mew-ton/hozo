@@ -5,7 +5,7 @@
 
 // パッケージの名前が、dbArgs<Model> / dbScan<Model> の中の局所の名前（row、r）と同じ名前空間。同じ名前の model を持つ
 namespace row {
-  model Entry { @db.key @db.text id: string; @db.time at: Time; }
+  model Entry { @db.key @db.text id: string; @db.datetime at: datetime; }
 }
 
 namespace r {
@@ -44,12 +44,12 @@ namespace vault {
     @db.int ctx: Num;
     @db.float err: Ratio;
     @db.bool args: Flag;
-    @db.time type: Time;
+    @db.datetime type: datetime;
     @db.json string: Tag[];
     @db.json json: Record<string, string>;
     @db.json any: Tag?;
-    @db.time time: Time?;
-    @db.int sql: Duration;
+    @db.datetime time: datetime?;
+    @db.int sql: duration;
     @db.text runtime: string;
     @db.text dbGet: string;
     @db.text dbScanSecret: string;
@@ -72,13 +72,13 @@ namespace vault {
   @db.list
   read fn byLocals(ctx: Num, err: Ratio, args: Flag): Secret[] reads secrets;
 
-  /** Go の予約語と、事前宣言の識別子（仕様の予約語 string、any の列は、引数の名前に書けない） */
+  /** Go の予約語と、事前宣言の識別子（仕様の予約語 string、any、time の列は、引数の名前に書けない） */
   @db.list
-  read fn byWords(type: Time): Secret[] reads secrets;
+  read fn byWords(type: datetime): Secret[] reads secrets;
 
   /** import するパッケージの名前 */
   @db.list
-  read fn byImports(json: Record<string, string>, time: Time?, sql: Duration, runtime: string): Secret[] reads secrets;
+  read fn byImports(json: Record<string, string>, sql: duration, runtime: string): Secret[] reads secrets;
 
   /** このファイルの非公開の名前と、継ぎ目のメソッドのレシーバ s */
   @db.list

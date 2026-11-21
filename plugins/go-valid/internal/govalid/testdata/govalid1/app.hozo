@@ -4,13 +4,13 @@ namespace app {
   @valid.min(1)
   scalar Name extends string;
   @valid.max(1)
-  scalar Wait extends Duration;
+  scalar Wait extends duration;
   @valid.length(min: 1)
   scalar Count extends int;
   @valid.pattern("x")
   scalar Flag extends boolean;
   @valid.format("email")
-  scalar At extends Time;
+  scalar At extends datetime;
   scalar Nick extends Name;
   @valid.max(3)
   scalar Alias extends Nick;

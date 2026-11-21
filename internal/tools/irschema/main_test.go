@@ -212,7 +212,7 @@ func TestNegative(t *testing.T) {
 		{"effect ref direct bad operation", "EffectRef", `{"kind":"direct","state":"a.rows","operation":"get"}`, false},
 		{"decl read", "Decl", `{"kind":"read","name":"a.byId","decorators":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}},"params":[],"returns":{"kind":"core","name":"int"},"state":"a.rows"}`, true},
 		{"decl read without returns", "Decl", `{"kind":"read","name":"a.byId","decorators":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}},"params":[],"state":"a.rows"}`, false},
-		{"decl exception with params", "Decl", `{"kind":"exception","name":"a.E","decorators":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}},"params":[{"name":"wait","type":{"kind":"core","name":"Duration"},"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}]}`, true},
+		{"decl exception with params", "Decl", `{"kind":"exception","name":"a.E","decorators":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}},"params":[{"name":"wait","type":{"kind":"core","name":"duration"},"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}]}`, true},
 		{"decl exception with value (old shape)", "Decl", `{"kind":"exception","name":"a.E","decorators":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}},"params":[],"value":{"kind":"ref","target":"a.M"}}`, false},
 		{"decl exception without params", "Decl", `{"kind":"exception","name":"a.E","decorators":[],"span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		{"param type any read", "ParamType", `{"kind":"any","of":"read"}`, false},
@@ -257,8 +257,8 @@ func TestNegative(t *testing.T) {
 		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
 		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
 		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.12","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.12","direction":"emit","format":"openapi","files":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.13","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.13","direction":"emit","format":"openapi","files":[]}`, false},
 		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
 	}
 	for _, c := range cases {
@@ -474,7 +474,7 @@ func TestSchemaMatchesGo(t *testing.T) {
 // 定数をスキーマの型に代入して確かめる（定数が増えたら表に足す）。
 func TestEnumsMatchGo(t *testing.T) {
 	want := map[reflect.Type][]string{
-		typeOf[ir.CoreName]():        {string(ir.CoreString), string(ir.CoreBoolean), string(ir.CoreInt), string(ir.CoreFloat), string(ir.CoreTime), string(ir.CoreDuration)},
+		typeOf[ir.CoreName]():        {string(ir.CoreString), string(ir.CoreBoolean), string(ir.CoreInt), string(ir.CoreFloat), string(ir.CoreDatetime), string(ir.CoreDate), string(ir.CoreTime), string(ir.CoreDuration)},
 		typeOf[ir.UnionVariant]():    {string(ir.UnionArms), string(ir.UnionSet)},
 		typeOf[ir.StateShape]():      {string(ir.StateList), string(ir.StateNullable), string(ir.StateSingle)},
 		typeOf[ir.Operation]():       {string(ir.OpPost), string(ir.OpPut), string(ir.OpDelete)},

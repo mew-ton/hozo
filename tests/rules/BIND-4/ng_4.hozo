@@ -3,7 +3,7 @@
 namespace a {
   scalar Token extends string;
   model M { id: string; note: string; }
-  exception Busy(wait: Duration, note: string?);
+  exception Busy(wait: duration, note: string?);
   state token: single<Token>;
   state rows: list<M>;
   bind token to a.*;

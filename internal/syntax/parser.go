@@ -1132,8 +1132,16 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		d.Params = p.parseParams()
 	}
 	if p.got(token.For) {
+		// 付ける先の並び: Target { "," Target }。"|" は、なくした書き方（docs/grammar.md「decorator の宣言」）:
+		// 区切りが "," であることをメッセージで示して SYNTAX にし、"," として読み進める
 		d.For = append(d.For, p.parseTarget())
-		for p.got(token.Pipe) {
+		for {
+			if p.at(token.Pipe) {
+				p.errorAt(p.tok().Span, "for の対象の並びの区切りは「,」で、「|」ではない（for model, state, op と書く。docs/grammar.md「decorator の宣言」）")
+				p.advance()
+			} else if !p.got(token.Comma) {
+				break
+			}
 			d.For = append(d.For, p.parseTarget())
 		}
 	}
@@ -1526,7 +1534,7 @@ func (p *parser) parseType() ast.Type {
 	start := p.tok().Span.Start
 	var t ast.Type
 	switch p.tok().Kind {
-	case token.StringType, token.BooleanType, token.IntType, token.FloatType, token.TimeType, token.DurationType:
+	case token.StringType, token.BooleanType, token.IntType, token.FloatType, token.DatetimeType, token.DateType, token.TimeType, token.DurationType:
 		tok := p.advance()
 		t = &ast.CoreType{Span: tok.Span, Name: tok.Text}
 	case token.Record:

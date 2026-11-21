@@ -17,9 +17,9 @@ namespace production {
     /** 客が書いた、作り方の希望 */
     request: string?;
     /** 納期。受け付けた時刻 + 商品の納期 */
-    dueAt: Time;
-    startedAt: Time?;
-    finishedAt: Time?;
+    dueAt: datetime;
+    startedAt: datetime?;
+    finishedAt: datetime?;
     /** 出来上がりを量った大きさと重さ（行の全部の分） */
     measured: type.Measurement?;
   }
@@ -72,10 +72,10 @@ namespace production {
   effect fn addJob(job: Job): effects jobs.post as Progress.Queued;
 
   /** 作り始めた: 始めた時刻を入れる（人が書く） */
-  effect fn startJob(job: Job, at: Time): effects jobs.put as Progress.Queued -> Progress.InProduction;
+  effect fn startJob(job: Job, at: datetime): effects jobs.put as Progress.Queued -> Progress.InProduction;
 
   /** 作り終えて、量った: 終えた時刻と、量った大きさを入れる（人が書く） */
-  effect fn finishJob(job: Job, measured: type.Measurement, at: Time): effects jobs.put as Progress.InProduction -> Progress.Finished;
+  effect fn finishJob(job: Job, measured: type.Measurement, at: datetime): effects jobs.put as Progress.InProduction -> Progress.Finished;
 
   // ---- 受け付けたとき ----
 
@@ -89,7 +89,7 @@ namespace production {
   }
 
   /** 行から仕事を作り、納期を決める（人が書く） */
-  fn planJob(orderId: type.OrderId, line: ordering.MadeLine, now: Time): Job;
+  fn planJob(orderId: type.OrderId, line: ordering.MadeLine, now: datetime): Job;
 
   // ---- 引く ----
 

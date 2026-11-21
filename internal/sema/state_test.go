@@ -20,7 +20,7 @@ namespace shop {
   state carts: list<Line>;
   state orders: list<Order>;
   state token: nullable<Token>;
-  state clock: single<Time>;
+  state clock: single<datetime>;
 
   classify Checkout of carts, orders {
     Shopping;

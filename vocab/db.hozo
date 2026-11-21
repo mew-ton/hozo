@@ -10,7 +10,11 @@ namespace db {
   decorator float for field;
   /** このフィールドを、真偽値の列にしまう */
   decorator bool for field;
-  /** このフィールドを、時刻の列にしまう */
+  /** このフィールドを、瞬間（datetime）の列にしまう */
+  decorator datetime for field;
+  /** このフィールドを、日付（date）の列にしまう */
+  decorator date for field;
+  /** このフィールドを、一日の中の時刻（time）の列にしまう */
   decorator time for field;
   /** このフィールドを、JSON にして一つの列にしまう */
   decorator json for field;

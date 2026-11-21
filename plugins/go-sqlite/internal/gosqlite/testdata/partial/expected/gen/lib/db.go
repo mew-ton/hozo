@@ -133,7 +133,7 @@ func (t StampsTable) Get(ctx context.Context) ([]Stamp, error) {
 
 // DropStamp は効果 lib.dropStamp（@db.delete）: 表 "stamps" から、"at" が引数 at と同じ行を消す。行がなければ何もしない。
 func (t StampsTable) DropStamp(ctx context.Context, at time.Time) error {
-	return dbExec(ctx, t.db, `DELETE FROM "stamps" WHERE "at" IS ?1`, dbTime(at))
+	return dbExec(ctx, t.db, `DELETE FROM "stamps" WHERE "at" IS ?1`, dbDatetime(at))
 }
 
 // DbSeams は、@db.transaction の継ぎ目（Seams のメソッドのうち、このデコレータの分）の、db の上の実装。New の引数 seams に渡す。
@@ -187,7 +187,7 @@ func dbScanNote(r dbRow) (Note, error) {
 // dbScanStamp は、表 "stamps" の列の順の値を lib.Stamp に読む。
 func dbScanStamp(r dbRow) (Stamp, error) {
 	var row Stamp
-	if err := r.Scan(dbTime(&row.At)); err != nil {
+	if err := r.Scan(dbDatetime(&row.At)); err != nil {
 		return Stamp{}, err
 	}
 	return row, nil
@@ -298,14 +298,14 @@ func dbInt(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {

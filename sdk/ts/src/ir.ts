@@ -24,7 +24,8 @@ export type Literal = StringLiteral | IntLiteral | FloatLiteral | BooleanLiteral
  */
 export type Type =
   CoreType | RefType | OptionalType | ArrayType | RecordType | CaseType | NeverType;
-export type CoreName = "string" | "boolean" | "int" | "float" | "Time" | "Duration";
+export type CoreName =
+  "string" | "boolean" | "int" | "float" | "datetime" | "date" | "time" | "duration";
 export type UnionVariant = "arms" | "set";
 /**
  * 状態の形（docs/ir.md「state / exception / effect」の shape）。列数の範囲: list は 0 以上、nullable は 0 か 1、single はちょうど 1。状態の型の最も外側から決まる（docs/check.md「状態の形」）。
@@ -92,7 +93,7 @@ export type EffectState = "prevented" | "kept" | "unknown";
 export interface Program {
   binds: Bind[];
   namespaces: Namespace[];
-  version: "0.12";
+  version: "0.13";
 }
 /**
  * bind 宣言（docs/ir.md「bind」）。
@@ -836,7 +837,7 @@ export interface View {
     [k: string]: ViewedSignature;
   };
   program: Program;
-  version: "0.12";
+  version: "0.13";
   viewer: string;
 }
 /**

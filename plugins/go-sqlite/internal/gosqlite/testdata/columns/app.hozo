@@ -1,4 +1,4 @@
-// docs/plugin-go-sqlite.md「表」「しまい方」: 六つのしまい方（表の各行。核の型と scalar）、省略可能なフィールドの列（しまい方ごと。
+// docs/plugin-go-sqlite.md「表」「しまい方」: 八つのしまい方（表の各行。核の型と scalar）、省略可能なフィールドの列（しまい方ごと。
 // NOT NULL が付かない）、制約。どの表にも、行を足す効果を置く（dbArgs<Model> が出る）。読むのは、形で決まる問い合わせ Get。
 
 namespace kinds {
@@ -6,8 +6,8 @@ namespace kinds {
   scalar Count extends int;
   scalar Ratio extends float;
   scalar Flag extends boolean;
-  scalar Span extends Duration;
-  scalar Stamp extends Time;
+  scalar Span extends duration;
+  scalar Stamp extends datetime;
   /** scalar の元が scalar（元の核の型は string） */
   scalar Label extends Name;
 
@@ -21,10 +21,10 @@ namespace app {
   model Core {
     @db.key @db.text s: string;
     @db.int i: int;
-    @db.int d: Duration;
+    @db.int d: duration;
     @db.float f: float;
     @db.bool b: boolean;
-    @db.time t: Time;
+    @db.datetime t: datetime;
   }
 
   /** scalar の列（しまい方に合うかは、元の核の型で見る） */
@@ -34,7 +34,7 @@ namespace app {
     @db.int span: kinds.Span;
     @db.float ratio: kinds.Ratio;
     @db.bool flag: kinds.Flag;
-    @db.time stamp: kinds.Stamp;
+    @db.datetime stamp: kinds.Stamp;
     @db.text label: kinds.Label;
   }
 
@@ -52,19 +52,28 @@ namespace app {
   model Sparse {
     @db.text s: string?;
     @db.int i: int?;
-    @db.int d: Duration?;
+    @db.int d: duration?;
     @db.float f: float?;
     @db.bool b: boolean?;
-    @db.time t: Time?;
+    @db.datetime t: datetime?;
     @db.text name: kinds.Name?;
     @db.int count: kinds.Count?;
     @db.int span: kinds.Span?;
     @db.float ratio: kinds.Ratio?;
     @db.bool flag: kinds.Flag?;
-    @db.time stamp: kinds.Stamp?;
+    @db.datetime stamp: kinds.Stamp?;
     @db.json tags: string[]?;
     @db.json attrs: Record<string, int>?;
     @db.json tag: kinds.Tag?;
+  }
+
+  /** 日付（@db.date）と、一日の中の時刻（@db.time）の列。省略可能なものも */
+  model Clock {
+    @db.key @db.text id: string;
+    @db.date day: date;
+    @db.time at: time;
+    @db.date maybeDay: date?;
+    @db.time maybeAt: time?;
   }
 
   /** 複数の @db.key（表の末尾の PRIMARY KEY）と @db.unique */
@@ -88,6 +97,7 @@ namespace app {
   @db.table state nameds: list<Named>;
   @db.table state docs: list<Doc>;
   @db.table state sparses: list<Sparse>;
+  @db.table state clocks: list<Clock>;
   @db.table state pairs: list<Pair>;
   @db.table state sharedA: list<Shared>;
   @db.table state sharedB: list<Shared>;
@@ -97,6 +107,9 @@ namespace app {
 
   @db.insert effect fn createCore(row: Core): effects cores.post;
   @db.insert effect fn createNamed(row: Named): effects nameds.post;
+  @db.insert effect fn createClock(row: Clock): effects clocks.post;
+  /** 日付の新しい順 */
+  @db.list @db.latest("day") read fn clocksByDay(): Clock[] reads clocks;
   @db.insert effect fn createDoc(row: Doc): effects docs.post;
   @db.insert effect fn createSparse(row: Sparse): effects sparses.post;
   @db.insert effect fn createPair(row: Pair): effects pairs.post;

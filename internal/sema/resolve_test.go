@@ -203,6 +203,41 @@ namespace b {
 	}
 }
 
+// TestResolveRemovedCoreTypes は 1.7 の、なくした核の型の名前（docs/resolve.md「手続き」）: 宣言がなければ、RES-1 のメッセージに、
+// 今の語を足す。同じ名前の宣言があれば、それに解決する（もう、予約語ではない）。
+func TestResolveRemovedCoreTypes(t *testing.T) {
+	res, _ := analyzeProject(t, project{"a.hozo": `
+namespace a {
+  model M { at: Time; span: Duration; }
+}`}, false)
+	want := map[string]string{"Time": "datetime", "Duration": "duration"}
+	for _, d := range res.Diags {
+		if d.Code != "RES-1" {
+			t.Errorf("予期しない診断 %s: %s", d.Code, d.Message)
+			continue
+		}
+		for old, now := range want {
+			if strings.Contains(d.Message, old+" が見つからない") {
+				if !strings.Contains(d.Message, now+" に名前が変わった") {
+					t.Errorf("%s のメッセージに、今の語 %s がない: %s", old, now, d.Message)
+				}
+				delete(want, old)
+			}
+		}
+	}
+	if len(want) != 0 {
+		t.Errorf("RES-1 が出なかった名前: %v", want)
+	}
+	res, _ = analyzeProject(t, project{"a.hozo": `
+namespace a {
+  model Time { hour: int; }
+  model M { at: Time; }
+}`}, false)
+	if len(res.Diags) != 0 {
+		t.Errorf("宣言した Time を指して、診断が出た: %v", res.Diags)
+	}
+}
+
 // TestResolveStep2 は 2: 直前のものの種類で次のセグメントが決まる（値→フィールド、classify→ケース、union→アーム、state→操作）。
 func TestResolveStep2(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
@@ -478,7 +513,7 @@ func TestCallResolution(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {
   model M { id: string; }
-  exception Busy(wait: Duration);
+  exception Busy(wait: duration);
   state rows: list<M>;
   read fn byId(id: string): M? reads rows;
   effect fn add(m: M): effects rows.post;

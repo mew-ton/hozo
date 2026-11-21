@@ -88,6 +88,8 @@ var statementsLeaves = map[string]string{
 	"Parse":      "func (leaves) Parse(context.Context, string) (app.Id, error) { return \"\", nil }",
 	"AsTime":     "func (leaves) AsTime(context.Context) (time.Time, error) { return time.Time{}, nil }",
 	"AsDuration": "func (leaves) AsDuration(context.Context) (time.Duration, error) { return 0, nil }",
+	"AsDate":     "func (leaves) AsDate(context.Context) (runtime.Date, error) { return runtime.Date{}, nil }",
+	"AsClock":    "func (leaves) AsClock(context.Context) (runtime.TimeOfDay, error) { return runtime.TimeOfDay{}, nil }",
 	"AsId":       "func (leaves) AsId(context.Context) (app.Id, error) { return \"\", nil }",
 	"AsCount":    "func (leaves) AsCount(context.Context) (app.Count, error) { return 0, nil }",
 	"AsFloat":    "func (leaves) AsFloat(context.Context) (float64, error) { return 0, nil }",
@@ -106,7 +108,7 @@ func leavesImpl(replace map[string]string) string {
 	}
 	sort.Strings(names)
 	var b strings.Builder
-	b.WriteString("package impl\n\nimport (\n\t\"context\"\n\t\"time\"\n\n\t\"" + modulePath + "/gen/app\"\n)\n\n")
+	b.WriteString("package impl\n\nimport (\n\t\"context\"\n\t\"time\"\n\n\t\"" + modulePath + "/gen/app\"\n\t\"github.com/mew-ton/hozo/runtime\"\n)\n\n")
 	b.WriteString("type leaves struct{}\n\nvar _ context.Context\nvar _ time.Time\n\n// 葉は、New の位置引数で渡す。ここでは、渡すところを、代入で確かめる\nvar _ app.Leaves = leaves{}\n\n")
 	for _, name := range names {
 		src := statementsLeaves[name]

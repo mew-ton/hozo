@@ -11,7 +11,7 @@ namespace catalog {
   /** 注文を受けてから作る。出来上がりの大きさと重さは、作り終えるまで決まらない。決まっているのは、納期と、いちばん大きく出来た場合 */
   model MadeGoods {
     /** 注文から出来上がりまでの、長くてもの日数。支払いの与信の期限より短い（README.md「難しい問題」） */
-    leadTime: Duration;
+    leadTime: duration;
     /** いちばん大きく出来た場合の、一個の大きさと重さ。送料の上限を出すのに使う */
     largest: type.Measurement;
   }

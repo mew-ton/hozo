@@ -59,7 +59,7 @@ namespace shipping {
     /** 大きさと重さ（行の全部の分）。在庫の品目は、はじめから分かっている。受注製作の品目は、出来上がるまで、ない */
     measured: type.Measurement?;
     /** そろえ場所に置いた時刻。まだなら、ない */
-    gatheredAt: Time?;
+    gatheredAt: datetime?;
   }
 
   /** 出荷。注文の、箱で送る部分一つに、一つ */
@@ -71,9 +71,9 @@ namespace shipping {
     terms: FeeQuote;
     items: Item[];
     /** 配送業者に渡した時刻 */
-    handedOverAt: Time?;
+    handedOverAt: datetime?;
     /** 届いた時刻 */
-    deliveredAt: Time?;
+    deliveredAt: datetime?;
   }
 
   /** 荷物。梱包して、箱と重さが決まったもの。ここで、送料が決まる */
@@ -86,7 +86,7 @@ namespace shipping {
     weight: type.Grams;
     /** 箱の大きさの区分と、届け先の地帯から決まった送料（店の料金表のとおり。上限で切る前） */
     fee: type.Yen;
-    packedAt: Time;
+    packedAt: datetime;
   }
 
   /** 送り状。配送業者に頼んで、追跡番号が決まったもの */
@@ -99,7 +99,7 @@ namespace shipping {
     cost: type.Yen;
     /** 印刷する送り状 */
     document: type.Url;
-    boughtAt: Time;
+    boughtAt: datetime;
   }
 
   // ---- 状態 ----
@@ -256,10 +256,10 @@ namespace shipping {
   effect fn recordPlacement(shipment: Shipment, placement: Placement): effects shipments.put as Gathered.Awaiting -> else;
 
   /** 配送業者に渡した: 渡した時刻を入れる（人が書く） */
-  effect fn recordHandOver(shipment: Shipment, at: Time): effects shipments.put as Custody.InHouse -> Custody.WithCarrier;
+  effect fn recordHandOver(shipment: Shipment, at: datetime): effects shipments.put as Custody.InHouse -> Custody.WithCarrier;
 
   /** 届いた: 届いた時刻を入れる（人が書く） */
-  effect fn recordDelivery(shipment: Shipment, at: Time): effects shipments.put as Custody.WithCarrier -> Custody.Delivered;
+  effect fn recordDelivery(shipment: Shipment, at: datetime): effects shipments.put as Custody.WithCarrier -> Custody.Delivered;
 
   /** 荷物を作る。箱と送料が、ここで決まる。梱包は一度だけ: 荷物のない出荷にだけ、作る */
   @db.insert
@@ -361,7 +361,7 @@ namespace shipping {
     line: type.LineId;
     /** 受注製作の品目の、出来上がりを量った大きさと重さ。在庫の品目は、もう分かっているので、ない */
     measured: type.Measurement?;
-    at: Time;
+    at: datetime;
   }
 
   /**
@@ -399,7 +399,7 @@ namespace shipping {
   }
 
   /** その行が、出荷の、まだ置いていない品目であることを確かめて、置いた事実にする（人が書く）。品目になければ UnknownItem */
-  fn place(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?, now: Time): Placement
+  fn place(shipment: Gathered.Awaiting<Shipment>, line: type.LineId, measured: type.Measurement?, now: datetime): Placement
     throws UnknownItem;
 
   // ---- 梱包する: 箱と重さを決める。送料が、ここで決まる ----
@@ -474,7 +474,7 @@ namespace shipping {
   }
 
   /** 箱の大きさの区分と届け先の地帯から、料金表で送料を決めて、荷物にする（人が書く）。重さが箱の上限を超えていれば OverWeight */
-  fn weighed(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams, tariffs: Tariff[], now: Time): Parcel
+  fn weighed(shipment: Gathered.Complete<Shipment>, box: Box, weight: type.Grams, tariffs: Tariff[], now: datetime): Parcel
     throws OverWeight, Undeliverable;
 
   // ---- 送り状を買う前に: 梱包が済んでいて、まだ送り状がないこと ----
@@ -550,7 +550,7 @@ namespace shipping {
   }
 
   /** 配送業者が、届けたと知らせてきた。知らない追跡番号と、もう届いている出荷は、何もしない */
-  export fn delivered(trackingNumber: TrackingNumber, at: Time) {
+  export fn delivered(trackingNumber: TrackingNumber, at: datetime) {
     val bought = labelByTracking(trackingNumber);
     match (bought by Labelling) {
       Labelled   => arrive(bought.shipmentId, at);
@@ -559,7 +559,7 @@ namespace shipping {
   }
 
   /** 出荷に、届いた時刻を入れる */
-  fn arrive(id: ShipmentId, at: Time) {
+  fn arrive(id: ShipmentId, at: datetime) {
     val found = shipmentById(id);
     match (found by Known) {
       Found   => markDelivered(found, at);
@@ -568,7 +568,7 @@ namespace shipping {
   }
 
   /** 配送業者に渡してある出荷だけが、届く */
-  fn markDelivered(shipment: Shipment, at: Time) {
+  fn markDelivered(shipment: Shipment, at: datetime) {
     match (shipment by Custody) {
       WithCarrier        => recordDelivery(shipment, at);
       InHouse, Delivered => none;

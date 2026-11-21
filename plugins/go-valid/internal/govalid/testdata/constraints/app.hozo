@@ -145,7 +145,7 @@ namespace app {
   }
 
   // 制約のない model は Validate を持たない
-  model Free { id: Plain; at: Time; free: Free?; }
+  model Free { id: Plain; at: datetime; free: Free?; }
 
   // union と exception は Validate を持たない。アームに Validate を持つ型のない union は、フィールドに持てる
   union Shape {

@@ -5,7 +5,7 @@ namespace a {
   @db.table
   state rows: list<M>;
   @repeatable
-  decorator tag(name: string) for read | op | field | model;
+  decorator tag(name: string) for read, op, field, model;
   decorator hot = tag("hot");
   @db.list @db.where("kind", "a") @db.where("id", "x")
   @tag("a") @tag("b") @hot @hot

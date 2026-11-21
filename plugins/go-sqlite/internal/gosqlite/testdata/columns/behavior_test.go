@@ -1,4 +1,4 @@
-// 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go-sqlite`）: 六つのしまい方（列の型と、値の変え方）、
+// 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go-sqlite`）: 八つのしまい方（列の型と、値の変え方）、
 // 省略可能なフィールドの列（NULL の読み書きと、NOT NULL の有無）、制約（docs/plugin-go-sqlite.md「表」「しまい方」「補助」）を、
 // 本物の SQLite の上で確かめる。plugins/go-sqlite の TestBehavior が、基底の出力と go-sqlite の出力を置いたモジュールのルートに
 // 置いて走らせる。
@@ -15,6 +15,7 @@ import (
 
 	"example.com/app/gen/app"
 	"example.com/app/gen/kinds"
+	"github.com/mew-ton/hozo/runtime"
 
 	_ "modernc.org/sqlite"
 )
@@ -54,7 +55,7 @@ func (plain) Get(context.Context) ([]app.Core, error) { return nil, nil }
 // TestUnits は、どの型も基底の状態の単位を満たし、基底の New にそのまま渡せること（満たさなければ、ここでコンパイルできない）。
 func TestUnits(t *testing.T) {
 	db, ctx := openDB(t)
-	ops := app.New(app.NewCoresTable(db), app.NewNamedsTable(db), app.NewDocsTable(db), app.NewSparsesTable(db),
+	ops := app.New(app.NewCoresTable(db), app.NewNamedsTable(db), app.NewDocsTable(db), app.NewSparsesTable(db), app.NewClocksTable(db),
 		app.NewPairsTable(db), app.NewSharedATable(db), app.NewSharedBTable(db), app.NewLinksTable(db), plain{})
 	// 配線の op は、効果のメソッドを呼ぶ
 	if err := ops.AddCore(ctx, app.Core{S: "via op"}); err != nil {
@@ -371,5 +372,39 @@ func TestLink(t *testing.T) {
 	got, err := links.Get(ctx)
 	if err != nil || len(got) != 3 || got[0].Parent != nil || got[1].Parent == nil || *got[1].Parent != "l1" || got[2].Parent != nil {
 		t.Errorf("Get = %+v, %v", got, err)
+	}
+}
+
+// TestDateAndTime は、@db.date と @db.time の列（docs/plugin-go-sqlite.md「しまい方」）: どちらも TEXT で、日付は 2006-01-02、
+// 時刻は、小数部がいつも 9 桁の 15:04:05.000000000。文字列の順が、値の順になる。省略可能な列は、値がなければ NULL。
+func TestDateAndTime(t *testing.T) {
+	db, ctx := openDB(t)
+	clocks := app.NewClocksTable(db)
+	a := app.Clock{Id: "a", Day: runtime.NewDate(2026, 11, 21), At: runtime.NewTimeOfDay(9, 30, 0, 500_000_000)}
+	b := app.Clock{
+		Id: "b", Day: runtime.NewDate(2026, 11, 22), At: runtime.NewTimeOfDay(9, 30, 0, 0),
+		MaybeDay: ptr(runtime.NewDate(2027, 1, 1)), MaybeAt: ptr(runtime.NewTimeOfDay(23, 59, 59, 0)),
+	}
+	for _, row := range []app.Clock{a, b} {
+		if err := clocks.CreateClock(ctx, row); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var types, day, at string
+	var nulls int64
+	err := db.QueryRow(`SELECT typeof("day") || ' ' || typeof("at"), "day", "at", ("maybeDay" IS NULL) + ("maybeAt" IS NULL) FROM "clocks" WHERE "id" = 'a'`).
+		Scan(&types, &day, &at, &nulls)
+	if err != nil || types != "text text" || day != "2026-11-21" || at != "09:30:00.500000000" || nulls != 2 {
+		t.Errorf("列が %s、day = %s、at = %s、NULL の列が %d, %v", types, day, at, nulls, err)
+	}
+	// 読み戻すと、同じ値。@db.latest("day") は、日付の新しい順
+	got, err := clocks.ClocksByDay(ctx)
+	if err != nil || !reflect.DeepEqual(got, []app.Clock{b, a}) {
+		t.Errorf("ClocksByDay = %+v, %v（期待は b、a）", got, err)
+	}
+	// 文字列の順が、時刻の順になる（09:30:00.000000000 は、09:30:00.500000000 より前）
+	var first string
+	if err := db.QueryRow(`SELECT "id" FROM "clocks" ORDER BY "at" LIMIT 1`).Scan(&first); err != nil || first != "b" {
+		t.Errorf("時刻の列の順で最初の行が %q, %v（期待は b）", first, err)
 	}
 }

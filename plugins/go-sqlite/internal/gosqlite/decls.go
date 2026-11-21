@@ -169,8 +169,8 @@ func (e *emitter) collectReads() {
 			name := stringArg(latests[0], "column")
 			if c := e.columnOf(r.table, name, what+" の @db.latest の列 "+strconv.Quote(name), fqn); c != nil {
 				r.latest = c
-				if s := c.store; s != nil && s.decorator != "db.time" && s.decorator != "db.int" && s.decorator != "db.float" {
-					e.errorf(codeSQLLatest, fqn, "read %s の @db.latest の列 %q のしまい方が @%s（新しい順に並べられるのは @db.time / @db.int / @db.float の列）", fqn, name, s.decorator)
+				if s := c.store; s != nil && s.decorator != "db.datetime" && s.decorator != "db.date" && s.decorator != "db.time" && s.decorator != "db.int" && s.decorator != "db.float" {
+					e.errorf(codeSQLLatest, fqn, "read %s の @db.latest の列 %q のしまい方が @%s（新しい順に並べられるのは @db.datetime / @db.date / @db.time / @db.int / @db.float の列）", fqn, name, s.decorator)
 				}
 			}
 		}
@@ -215,7 +215,7 @@ func single(m *model, cols map[*column]bool) bool {
 
 // literalFits は、@db.where のリテラル lit を、列 c の型に渡せるか（docs/plugin-go-sqlite.md「read の中身」）: 列のフィールドの型
 // （scalar は元の核の型。省略可能は外して見る）に、docs/types.md「互換」の 10 で渡せる（整数のリテラルは float にも）。
-// Time、Duration、array、record、model の列には、渡せるリテラルがない。
+// datetime、date、time、duration、array、record、model の列には、渡せるリテラルがない。
 func (e *emitter) literalFits(lit ir.Literal, c *column) bool {
 	inner := c.typ
 	if o, ok := inner.(ir.OptionalType); ok {

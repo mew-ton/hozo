@@ -8,5 +8,5 @@ GOHTTP-18	app.In	model app.In のフィールド owner の @http.default のリ�
 GOHTTP-18	app.In	model app.In のフィールド item の @http.default のリテラル "x"（string）は、型 app.Item に渡せない
 GOHTTP-18	app.In	model app.In のフィールド tags の @http.default のリテラル 1（int）は、型 int[] に渡せない
 GOHTTP-18	app.In	model app.In のフィールド attrs の @http.default のリテラル "x"（string）は、型 Record<string, string> に渡せない
-GOHTTP-18	app.In	model app.In のフィールド at の @http.default のリテラル "2024-01-02T03:04:05Z"（string）は、型 Time に渡せない
-GOHTTP-18	app.In	model app.In のフィールド wait の @http.default のリテラル 5（int）は、型 Duration に渡せない
+GOHTTP-18	app.In	model app.In のフィールド at の @http.default のリテラル "2024-01-02T03:04:05Z"（string）は、型 datetime に渡せない
+GOHTTP-18	app.In	model app.In のフィールド wait の @http.default のリテラル 5（int）は、型 duration に渡せない

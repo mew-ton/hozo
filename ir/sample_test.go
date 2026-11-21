@@ -30,9 +30,9 @@ func sampleProgram() *Program {
 					},
 					&State{
 						DeclBase: DeclBase{Name: "clock", Span: span("global.hozo", 3, 1, 3, 30)},
-						Type:     Time(),
+						Type:     Datetime(),
 						Shape:    StateSingle,
-						Element:  Time(),
+						Element:  Datetime(),
 					},
 					&Classify{
 						DeclBase: DeclBase{Name: "Login", Span: span("global.hozo", 4, 1, 7, 2)},

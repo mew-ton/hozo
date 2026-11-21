@@ -11,7 +11,7 @@
 ```toml
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.12"
+protocol = "0.13"
 
 vocabulary = ["cli.hozo"]
 
@@ -88,7 +88,7 @@ type JSONPresenter struct{}
 - **`@cli.command` の付いた op は `export` が付いていなければならない。** `Main` は、名前空間の外から、入口の `Ops`（`export` の op だけ）を通して op を呼ぶ。付いていなければ CLI-6（`go-http` の GOHTTP-1 と同じ理由。`docs/plugin-go-http.md`「対象」）。
 - 引数は 0 個か、model 一つ。それ以外は CLI-1。
 - 引数の model の各フィールドは、`@cli.arg(position)`、`@cli.flag`、`@cli.env` のどれかを持つ。`@cli.env` は `@cli.arg` か `@cli.flag` と一緒に付けられる（与えられなかったときの代わり）。`@cli.arg` と `@cli.flag` の両方、またはどれもなければ CLI-2。
-- フィールドの型は `string`、`boolean`、`int`、`float`、元がこれらの `scalar`、またはそれらの `optional`、`@cli.arg` に限り `string`（と `string` の scalar）の `array`（`optional` は付けない。0 個を表せるため）。それ以外（model、`Record`、`Time`、`optional` の `array`）は CLI-3。
+- フィールドの型は `string`、`boolean`、`int`、`float`、元がこれらの `scalar`、またはそれらの `optional`、`@cli.arg` に限り `string`（と `string` の scalar）の `array`（`optional` は付けない。0 個を表せるため）。それ以外（model、`Record`、`datetime`、`optional` の `array`）は CLI-3。
 - `@cli.required` と `@cli.default` は、省略可能なフィールド（`T?`）に付けられない。付いていれば CLI-11（型は「なくてよい」と言っている: なければ誤りにするなら、また、なければ値を入れるなら、省略可能にしない）。一つのフィールドに、両方は付けられない（CLI-12）。`@cli.default` のリテラルは、フィールドの型（scalar は元の核の型）に渡せなければならない（`docs/types.md`「互換」の 10。渡せなければ CLI-13。`array` のフィールドに渡せるリテラルはない）。値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）を一つも持たないフィールドは、この二つが付いていても CLI-2。
 - `@cli.arg` の位置は、1 から、重なりも抜けもなく続く（一つなら 1、三つなら 1、2、3）。1 より小さい位置、同じ位置が二つ、抜けた位置があれば CLI-10。
 - `@cli.arg` の `array` のフィールド（残りの引数をすべて受け取る）は、いちばん後ろの位置の一つだけ。違えば CLI-4。

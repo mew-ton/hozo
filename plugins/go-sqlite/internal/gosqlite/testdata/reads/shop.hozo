@@ -17,11 +17,11 @@ namespace shop {
     @db.float price: Price;
     @db.int stock: int;
     @db.bool active: boolean;
-    @db.time addedAt: Time;
+    @db.datetime addedAt: datetime;
     @db.json tags: string[];
     /** 値がなくてよい列 */
     @db.text note: string?;
-    @db.time soldAt: Time?;
+    @db.datetime soldAt: datetime?;
   }
 
   /** キーが二つ */
@@ -34,7 +34,7 @@ namespace shop {
   /** キーも、一意の列もない */
   model Audit {
     @db.text item: ItemId;
-    @db.time at: Time;
+    @db.datetime at: datetime;
     @db.float weight: float?;
   }
 
@@ -101,9 +101,9 @@ namespace shop {
   @db.list
   read fn itemsActive(active: boolean): Item[] reads items;
 
-  /** @db.time の列 */
+  /** @db.datetime の列 */
   @db.list
-  read fn itemsAddedAt(addedAt: Time): Item[] reads items;
+  read fn itemsAddedAt(addedAt: datetime): Item[] reads items;
 
   /** @db.json の列 */
   @db.list
@@ -177,7 +177,7 @@ namespace shop {
 
   // ---- @db.list と @db.latest: 新しい順 ----
 
-  /** @db.time の列 */
+  /** @db.datetime の列 */
   @db.list
   @db.latest("addedAt")
   read fn newestFirst(): Item[] reads items;
@@ -192,7 +192,7 @@ namespace shop {
   @db.latest("weight")
   read fn heaviest(): Audit[] reads audits;
 
-  /** @db.time の、省略可能な列と、引数の条件 */
+  /** @db.datetime の、省略可能な列と、引数の条件 */
   @db.list
   @db.latest("soldAt")
   read fn lastSoldOn(shelf: Shelf): Item[] reads items;

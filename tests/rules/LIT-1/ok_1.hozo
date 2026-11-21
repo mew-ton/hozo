@@ -1,8 +1,8 @@
-// LIT-1（docs/types.md「診断」）: 64 ビット符号付きの範囲の端と、ナノ秒で収まる Duration
+// LIT-1（docs/types.md「診断」）: 64 ビット符号付きの範囲の端と、ナノ秒で収まる duration
 namespace a {
   model M { id: string; }
   decorator between(min: int, max: int);
-  decorator wait(d: Duration);
+  decorator wait(d: duration);
   @between(-9223372036854775808, 9223372036854775807)
   @wait(9223372036s)
   fn f(): M;

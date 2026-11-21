@@ -10,9 +10,9 @@ namespace clock {
    *
    * @param every 動かす間隔
    */
-  decorator tick(every: Duration) for op;
+  decorator tick(every: duration) for op;
 
   /** 今の時刻 */
   @system
-  export fn now(): Time;
+  export fn now(): datetime;
 }

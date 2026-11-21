@@ -5,6 +5,8 @@ package app
 import (
 	"context"
 	"time"
+
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // Consts は op app.consts。
@@ -294,6 +296,22 @@ func (o *ops) ZeroDuration(ctx context.Context) (time.Duration, error) {
 		return 0, err
 	}
 	return o.AsDuration(ctx)
+}
+
+// ZeroDate は op app.zeroDate。
+func (o *ops) ZeroDate(ctx context.Context) (runtime.Date, error) {
+	if err := o.Touch(ctx); err != nil {
+		return runtime.Date{}, err
+	}
+	return o.AsDate(ctx)
+}
+
+// ZeroClock は op app.zeroClock。
+func (o *ops) ZeroClock(ctx context.Context) (runtime.TimeOfDay, error) {
+	if err := o.Touch(ctx); err != nil {
+		return runtime.TimeOfDay{}, err
+	}
+	return o.AsClock(ctx)
 }
 
 // ZeroId は op app.zeroId。

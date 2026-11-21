@@ -5,7 +5,7 @@
 // §6.5: valid が持たない制約は、ユーザーが valid の名前空間にデコレータとして足す（§3.2）
 namespace valid {
   /** 末尾の 1 桁が、前の 4 桁から計算したチェックディジットと一致する */
-  decorator checkDigit for scalar | field;
+  decorator checkDigit for scalar, field;
 }
 
 namespace server {
@@ -61,7 +61,7 @@ namespace server {
   model Session {
     @db.key token: Token;
     userId: UserId;
-    expiresAt: Time;
+    expiresAt: datetime;
   }
 
   model PublicUser extends User {
@@ -104,14 +104,14 @@ namespace server {
     @db.ref(User) userId: UserId;
     status: OrderStatus;
     lines: CartLine[];
-    placedAt: Time;
+    placedAt: datetime;
   }
 
   /** 注文一覧の一行 */
   model OrderSummary {
     id: OrderId;
     status: OrderStatus;
-    placedAt: Time;
+    placedAt: datetime;
   }
 
   /** ユーザーへの通知 */
@@ -123,7 +123,7 @@ namespace server {
   /** パスワードの再設定の依頼 */
   model PasswordReset {
     email: Email;
-    expiresAt: Time;
+    expiresAt: datetime;
   }
 
   @db.table

@@ -67,7 +67,7 @@ func TestHasValidate(t *testing.T) {
 			model("app.Deep", field("x", ir.Optional(ir.Array(ir.Record(ir.String(), ir.Array(ir.Optional(ir.Ref("app.Named")))))))),
 			// record のキーは見ない（値だけ）
 			model("app.Keyed", field("byEmail", ir.Record(ir.Ref("type.Email"), ir.String()))),
-			model("app.NoCheck", field("id", ir.Ref("type.PlainId")), field("at", ir.Time()), field("m", ir.Ref("app.Marked"))),
+			model("app.NoCheck", field("id", ir.Ref("type.PlainId")), field("at", ir.Datetime()), field("m", ir.Ref("app.Marked"))),
 			// 当たるものがなくなるまで繰り返す: 順に辿る model と、互いを参照する model
 			model("app.Outer", field("mid", ir.Ref("app.Mid"))),
 			model("app.Mid", field("inner", ir.Array(ir.Ref("app.Named")))),

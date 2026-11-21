@@ -14,12 +14,12 @@ namespace app {
     // scalar は、元の核の型で見る
     @http.query @http.default("x") limit: Page;
     @http.query @http.default(30s) owner: Token;
-    // 本文の項目: リテラルで書けない型（model、配列、record、Time）
+    // 本文の項目: リテラルで書けない型（model、配列、record、datetime）
     @http.body @http.default("x") item: Item;
     @http.body @http.default(1) tags: int[];
     @http.body @http.default("x") attrs: Record<string, string>;
-    @http.body @http.default("2024-01-02T03:04:05Z") at: Time;
-    @http.body @http.default(5) wait: Duration;
+    @http.body @http.default("2024-01-02T03:04:05Z") at: datetime;
+    @http.body @http.default(5) wait: duration;
     // 渡せるリテラルは、当たらない: 同じ核の型、整数のリテラルを float に、scalar の元の核の型、期間
     @http.query @http.default(1) ok: int;
     @http.query @http.default(2) ratio: float;
@@ -27,7 +27,7 @@ namespace app {
     @http.query @http.default("me") who: Token;
     @http.query @http.default(3) per: Page;
     @http.query @http.default(false) deep: boolean;
-    @http.body @http.default(5s) pause: Duration;
+    @http.body @http.default(5s) pause: duration;
   }
   @http.post("/in")
   export fn take(in: In);

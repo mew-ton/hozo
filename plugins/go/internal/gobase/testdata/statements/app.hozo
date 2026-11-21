@@ -192,8 +192,10 @@ namespace app {
   }
 
   // 「呼び出し」零値: 失敗の扱いの return の、戻り値の型ごとの零値
-  export fn asTime(): Time;
-  export fn asDuration(): Duration;
+  export fn asTime(): datetime;
+  export fn asDuration(): duration;
+  export fn asDate(): date;
+  export fn asClock(): time;
   export fn asId(): Id;
   export fn asCount(): Count;
   export fn asFloat(): float;
@@ -202,8 +204,10 @@ namespace app {
   export fn asTable(): Record<string, int>;
   export fn asOptional(): Item?;
   export fn asShape(): Shape;
-  @mark export fn zeroTime(): Time { touch(); return asTime(); }
-  @mark export fn zeroDuration(): Duration { touch(); return asDuration(); }
+  @mark export fn zeroTime(): datetime { touch(); return asTime(); }
+  @mark export fn zeroDuration(): duration { touch(); return asDuration(); }
+  @mark export fn zeroDate(): date { touch(); return asDate(); }
+  @mark export fn zeroClock(): time { touch(); return asClock(); }
   @mark export fn zeroId(): Id { touch(); return asId(); }
   @mark export fn zeroCount(): Count { touch(); return asCount(); }
   @mark export fn zeroFloat(): float { touch(); return asFloat(); }

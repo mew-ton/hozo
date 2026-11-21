@@ -74,7 +74,7 @@ model User {
 
 namespace valid {
   /** 末尾の 1 桁が、前の 4 桁から計算したチェックディジットと一致する */
-  decorator checkDigit for scalar | field;
+  decorator checkDigit for scalar, field;
 }
 
 namespace server {

@@ -137,7 +137,7 @@ func (t ItemsTable) ItemsActive(ctx context.Context, active bool) ([]Item, error
 // ItemsAddedAt は read shop.itemsAddedAt（@db.list）: 表 "items" から、"addedAt" が引数 addedAt と同じ行を、足した順にすべて引く。
 func (t ItemsTable) ItemsAddedAt(ctx context.Context, addedAt time.Time) ([]Item, error) {
 	return dbList(ctx, t.db, dbScanItem,
-		`SELECT "id", "sku", "shelf", "kind", "price", "stock", "active", "addedAt", "tags", "note", "soldAt" FROM "items" WHERE "addedAt" IS ?1 ORDER BY rowid`, dbTime(addedAt))
+		`SELECT "id", "sku", "shelf", "kind", "price", "stock", "active", "addedAt", "tags", "note", "soldAt" FROM "items" WHERE "addedAt" IS ?1 ORDER BY rowid`, dbDatetime(addedAt))
 }
 
 // ItemsTagged は read shop.itemsTagged（@db.list）: 表 "items" から、"tags" が引数 tags と同じ行を、足した順にすべて引く。
@@ -350,13 +350,13 @@ func (t AuditsTable) CreateAudit(ctx context.Context, audit Audit) error {
 
 // dbArgsItem は shop.Item を、表 "items" の列の順の値にする。
 func dbArgsItem(row Item) ([]any, error) {
-	return dbArgs(dbText(row.Id), dbText(row.Sku), dbInt(row.Shelf), dbText(row.Kind), dbFloat(row.Price), dbInt(row.Stock), dbBool(row.Active), dbTime(row.AddedAt), dbJSON(row.Tags), dbText(row.Note, dbNullable), dbTime(row.SoldAt, dbNullable))
+	return dbArgs(dbText(row.Id), dbText(row.Sku), dbInt(row.Shelf), dbText(row.Kind), dbFloat(row.Price), dbInt(row.Stock), dbBool(row.Active), dbDatetime(row.AddedAt), dbJSON(row.Tags), dbText(row.Note, dbNullable), dbDatetime(row.SoldAt, dbNullable))
 }
 
 // dbScanItem は、表 "items" の列の順の値を shop.Item に読む。
 func dbScanItem(r dbRow) (Item, error) {
 	var row Item
-	if err := r.Scan(dbText(&row.Id), dbText(&row.Sku), dbInt(&row.Shelf), dbText(&row.Kind), dbFloat(&row.Price), dbInt(&row.Stock), dbBool(&row.Active), dbTime(&row.AddedAt), dbJSON(&row.Tags), dbText(&row.Note, dbNullable), dbTime(&row.SoldAt, dbNullable)); err != nil {
+	if err := r.Scan(dbText(&row.Id), dbText(&row.Sku), dbInt(&row.Shelf), dbText(&row.Kind), dbFloat(&row.Price), dbInt(&row.Stock), dbBool(&row.Active), dbDatetime(&row.AddedAt), dbJSON(&row.Tags), dbText(&row.Note, dbNullable), dbDatetime(&row.SoldAt, dbNullable)); err != nil {
 		return Item{}, err
 	}
 	return row, nil
@@ -378,13 +378,13 @@ func dbScanStock(r dbRow) (Stock, error) {
 
 // dbArgsAudit は shop.Audit を、表 "audits" の列の順の値にする。
 func dbArgsAudit(row Audit) ([]any, error) {
-	return dbArgs(dbText(row.Item), dbTime(row.At), dbFloat(row.Weight, dbNullable))
+	return dbArgs(dbText(row.Item), dbDatetime(row.At), dbFloat(row.Weight, dbNullable))
 }
 
 // dbScanAudit は、表 "audits" の列の順の値を shop.Audit に読む。
 func dbScanAudit(r dbRow) (Audit, error) {
 	var row Audit
-	if err := r.Scan(dbText(&row.Item), dbTime(&row.At), dbFloat(&row.Weight, dbNullable)); err != nil {
+	if err := r.Scan(dbText(&row.Item), dbDatetime(&row.At), dbFloat(&row.Weight, dbNullable)); err != nil {
 		return Audit{}, err
 	}
 	return row, nil
@@ -526,14 +526,14 @@ func dbBool(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {

@@ -8,7 +8,7 @@ namespace a {
   classify Stage of Order { Draft; Accepted; InProduction; Shipped; Cancelled; }
   classify Life of Order? { Open: Order? as Order; Closed: Order? as Order; Absent: Order? as none; }
   effect fn accept(order: Order): effects orders.post as Stage.Accepted;
-  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order, at: datetime): effects orders.put as Stage.Accepted -> Stage.InProduction;
   effect fn cancel(reason: string, order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
   effect fn patch(order: Order): effects orders.put as any -> else;
   effect fn close(order: Order): effects orders.put as Life.Open -> Life.Closed;

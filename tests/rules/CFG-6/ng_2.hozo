@@ -1,6 +1,6 @@
 // CFG-6（docs/config.md「診断」）: フィールドに付いたデコレータも対象
 namespace a {
-  decorator legacy for field | op;
+  decorator legacy for field, op;
   model M {
     @legacy                            // WARN: CFG-6
     id: string;

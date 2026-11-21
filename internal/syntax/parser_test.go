@@ -437,8 +437,8 @@ func TestException(t *testing.T) {
 		t.Errorf("Exception = %+v", e)
 	}
 	// 引数は例外が運ぶ値（docs/grammar.md「exception / effect / read」）
-	e = firstDecl[*ast.ExceptionDecl](t, "/** 待つ */ exception LimitExceeded(wait: Duration, items: Violation[]);")
-	if len(e.Params) != 2 || e.Params[0].Name.Name != "wait" || typeString(e.Params[0].Type) != "Duration" ||
+	e = firstDecl[*ast.ExceptionDecl](t, "/** 待つ */ exception LimitExceeded(wait: duration, items: Violation[]);")
+	if len(e.Params) != 2 || e.Params[0].Name.Name != "wait" || typeString(e.Params[0].Type) != "duration" ||
 		e.Params[1].Name.Name != "items" || typeString(e.Params[1].Type) != "Violation[]" || e.Doc == nil {
 		t.Errorf("Exception = %+v", e)
 	}
@@ -521,8 +521,8 @@ func TestEffect(t *testing.T) {
 	mustFail(t, "effect fn a() on sessions.post;", "effect fn a(…) on … という書き方はなくなった。状態との関係は、effects で書く（effect fn a(…): … effects … と書く")
 	mustFail(t, "effect fn a(): void on sessions.post;", "effect fn a(…) on … という書き方はなくなった")
 	// 引数（効果が受け取る値）。括弧は引数がなくても書く
-	e := firstDecl[*ast.EffectDecl](t, "effect fn createOrder(order: Order, at: Time): effects orders.post;")
-	if len(e.Params) != 2 || e.Params[0].Name.Name != "order" || typeString(e.Params[1].Type) != "Time" {
+	e := firstDecl[*ast.EffectDecl](t, "effect fn createOrder(order: Order, at: datetime): effects orders.post;")
+	if len(e.Params) != 2 || e.Params[0].Name.Name != "order" || typeString(e.Params[1].Type) != "datetime" {
 		t.Errorf("Params = %+v", e.Params)
 	}
 	// なくした書き方（括弧なし）は、今の書き方をメッセージで示す
@@ -816,6 +816,7 @@ func TestRemovedClassifyForms(t *testing.T) {
 		{"else arm only", "fn a() { match (x by K) { else => f(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
 		{"else arm first", "fn a() { match (x by K) { else => f(); A => g(); }; }", "else のアームは、ケースを名前で並べたアームの後ろに書く"},
 		{"else in a case list", "fn a() { match (x by K) { A, else => f(); }; }", "else は予約語で、識別子には使えない"},
+		{"pipe in decorator targets", "decorator d for model | state;", "for の対象の並びの区切りは「,」で、「|」ではない（for model, state, op と書く"},
 	} {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
@@ -861,7 +862,7 @@ func TestDecoratorDecl(t *testing.T) {
 	if len(d.Params) != 0 || len(d.For) != 1 || d.For[0].Kind != ast.TargetField {
 		t.Errorf("Decorator = %+v", d)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator min(value: int | float) for scalar | field | op | state | exception | model;")
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator min(value: int | float) for scalar, field, op, state, exception, model;")
 	if len(d.Params[0].Type.Types) != 2 || len(d.For) != 6 {
 		t.Errorf("Decorator = %+v", d)
 	}
@@ -957,7 +958,7 @@ func TestDecoratorDeclClauses(t *testing.T) {
 // TestDecoratorName は DecoratorName / DecoratorRef（docs/grammar.md「識別子」）: デコレータの名前を書く位置
 // （宣言の名前、適用の @ の後ろ、別名の = の後ろ、@see の後ろ）には予約語を書け、指す位置では最後の要素だけが予約語でよい。
 func TestDecoratorName(t *testing.T) {
-	for _, kw := range []string{"list", "effects", "int", "float", "delete", "op", "for", "decorator", "reads", "Time"} {
+	for _, kw := range []string{"list", "effects", "int", "float", "delete", "op", "for", "decorator", "reads", "datetime"} {
 		d := firstDecl[*ast.DecoratorDecl](t, "decorator "+kw+"(table: any state) for op;")
 		if d.Name.Name != kw || len(d.Params) != 1 || len(d.For) != 1 {
 			t.Errorf("decorator %s = %+v", kw, d)
@@ -1096,7 +1097,7 @@ func TestDecoratorDeclCarryingClauses(t *testing.T) {
 	if len(d.For) != 1 || d.For[0].Kind != ast.TargetEffect || d.For[0].Kind.String() != "effect" {
 		t.Errorf("For = %+v", d.For)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator mark for op | effect | field;")
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator mark for op, effect, field;")
 	if len(d.For) != 3 || d.For[1].Kind != ast.TargetEffect {
 		t.Errorf("For = %+v", d.For)
 	}
@@ -1349,7 +1350,7 @@ func TestReadDecl(t *testing.T) {
 	if len(m.Body.Fields) != 1 || m.Body.Fields[0].Name.Name != "read" {
 		t.Errorf("Model = %+v", m)
 	}
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator read(target: any state, ...rest: any state) for read | op reads target;")
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator read(target: any state, ...rest: any state) for read, op reads target;")
 	if d.Name.Name != "read" || d.Params[0].Type.Any.Kind != ast.AnyState || !d.Params[1].Rest {
 		t.Fatalf("Decorator = %+v", d)
 	}
@@ -1457,8 +1458,8 @@ func TestType(t *testing.T) {
 		{"boolean", "boolean"},
 		{"int", "int"},
 		{"float", "float"},
-		{"Time", "Time"},
-		{"Duration", "Duration"},
+		{"datetime", "datetime"},
+		{"duration", "duration"},
 		{"User", "User"},
 		{"server.User", "server.User"},
 		{"User[]", "User[]"},
@@ -2445,7 +2446,7 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 	if !c.Never || len(c.Of) != 0 || len(c.Cases) != 2 || len(c.Cases[0].Decorators) != 1 || c.Cases[0].Doc == nil || len(c.Cases[1].Decorators) != 0 {
 		t.Fatalf("classify = %+v", c)
 	}
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any case of never, other: any case of Actor, free: any case?, all: any case of any?, opt: any case of M?, inner: any case of M?[], both: any case of M?[]?) for op | case | case of x.Actor | case of never | field | case of any | case of M[];")
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator of(actor: any case of never, other: any case of Actor, free: any case?, all: any case of any?, opt: any case of M?, inner: any case of M?[], both: any case of M?[]?) for op, case, case of x.Actor, case of never, field, case of any, case of M[];")
 	if len(d.Params) != 7 || len(d.For) != 7 {
 		t.Fatalf("decorator = %+v", d)
 	}
@@ -2522,4 +2523,27 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
 	}
+}
+
+// TestDecoratorTargets は、付ける先の並び（docs/grammar.md「decorator の宣言」）: 区切りは ","。なくした区切り "|" は、
+// "," として読み進める（対象は、どちらも読める）。核の型の語（datetime、date、time、duration）は、型の位置で読める。
+func TestDecoratorTargets(t *testing.T) {
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator context(name: string) for model, state, op reads counter;")
+	if len(d.For) != 3 || d.For[0].Kind != ast.TargetModel || d.For[1].Kind != ast.TargetState || d.For[2].Kind != ast.TargetOp || len(d.Clauses) != 1 {
+		t.Errorf("For = %+v, Clauses = %d", d.For, len(d.Clauses))
+	}
+	file, diags := parseSrc(t, "decorator d for model | state;")
+	if len(diags) != 1 || len(file.Decls) != 1 || len(file.Decls[0].(*ast.DecoratorDecl).For) != 2 {
+		t.Errorf("なくした区切りの後: 診断 %d 件、宣言 %d 件", len(diags), len(file.Decls))
+	}
+	m := firstDecl[*ast.ModelDecl](t, "model Slot { at: datetime; on: date; from: time?; span: duration[]; }")
+	for i, want := range []string{"datetime", "date", "time?", "duration[]"} {
+		if got := typeString(m.Body.Fields[i].Type); got != want {
+			t.Errorf("フィールド %d の型 = %q, want %q", i, got, want)
+		}
+	}
+	// 核の型の語は、予約語: 関数、引数、val の名前には、使えない。フィールドの名前には、書ける
+	mustFail(t, "fn date();", "date は予約語で、識別子には使えない")
+	mustFail(t, "fn f(time: string);", "time は予約語で、識別子には使えない")
+	firstDecl[*ast.ModelDecl](t, "model M { time: time; date: date; datetime: datetime; duration: duration; }")
 }

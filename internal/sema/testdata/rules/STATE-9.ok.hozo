@@ -13,7 +13,7 @@ namespace a {
   read fn byId(id: string): Order? reads orders;
   effect fn accept(order: Order): effects orders.post as Stage.Accepted;
   effect fn open(order: Order): effects orders.post as Life.Absent -> Life.Open;
-  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order, at: datetime): effects orders.put as Stage.Accepted -> Stage.InProduction;
   effect fn cancel(order: Order): effects orders.put as Stage.Draft, Stage.Accepted -> Stage.Cancelled;
   effect fn forceShip(order: Order): effects orders.put as any -> Stage.Shipped;
   effect fn patch(order: Order): effects orders.put as any -> else;
@@ -21,7 +21,7 @@ namespace a {
   effect fn discard(order: Order): effects orders.delete as Life.Open -> Life.Absent;
   effect fn purge(order: Order): effects orders.delete as Life.Absent;
   // アームから: 名前で並べたアーム（一つのケース、前の並びに入る二つのケース）
-  fn byArm(order: Order, at: Time): throws NotAccepted {
+  fn byArm(order: Order, at: datetime): throws NotAccepted {
     match (order by Stage) {
       Accepted => start(order, at);
       else     => throw NotAccepted;
@@ -51,7 +51,7 @@ namespace a {
     };
   }
   // 型から: 引数の型、束縛の型、別の分類のケースが as に書いた型
-  fn byType(order: Stage.Accepted<Order>, at: Time) {
+  fn byType(order: Stage.Accepted<Order>, at: datetime) {
     start(order, at);
     cancel(order);
   }
@@ -65,7 +65,7 @@ namespace a {
     };
   }
   // 型から分かっていれば、別の分類のアームの中でも分かる
-  fn inOtherArm(order: Stage.Accepted<Order>, at: Time) {
+  fn inOtherArm(order: Stage.Accepted<Order>, at: datetime) {
     match (order by Urgency) {
       Rush   => start(order, at);
       Normal => none;

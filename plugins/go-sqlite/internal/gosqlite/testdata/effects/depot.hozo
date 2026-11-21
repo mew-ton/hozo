@@ -27,7 +27,7 @@ namespace depot {
   model Event {
     @db.text crate: Code;
     @db.text what: string;
-    @db.time at: Time;
+    @db.datetime at: datetime;
   }
 
   /** キーと、一意の列 */

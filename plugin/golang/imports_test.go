@@ -71,7 +71,7 @@ func TestImportsCollision(t *testing.T) {
 	for _, fqn := range []string{"x.inner.I", "time.Slot", "b.store.B", "a.store.A"} {
 		GoType(ir.Ref(fqn), im)
 	}
-	GoType(ir.Time(), im) // 標準ライブラリの time を、名前空間 time の後で足す
+	GoType(ir.Datetime(), im) // 標準ライブラリの time を、名前空間 time の後で足す
 	im.Add(l.DefPath, l.DefName)
 	if err := im.Err(); err != nil {
 		t.Fatal(err)
@@ -86,8 +86,8 @@ func TestImportsCollision(t *testing.T) {
 			t.Errorf("GoType(%s) = %q, want %q", fqn, got, want)
 		}
 	}
-	if got := GoType(ir.Time(), c); got != "time.Time" {
-		t.Errorf("GoType(Time) = %q", got)
+	if got := GoType(ir.Datetime(), c); got != "time.Time" {
+		t.Errorf("GoType(datetime) = %q", got)
 	}
 	got := c.Render()
 	for _, line := range []string{
@@ -105,7 +105,7 @@ func TestImportsCollision(t *testing.T) {
 	// 同じ import の集まりなら、Canonical は足した順によらず同じ
 	im2 := NewImports(v, l, root, false)
 	im2.Add(l.DefPath, l.DefName)
-	GoType(ir.Time(), im2)
+	GoType(ir.Datetime(), im2)
 	for _, fqn := range []string{"a.store.A", "b.store.B", "time.Slot", "x.inner.I"} {
 		GoType(ir.Ref(fqn), im2)
 	}

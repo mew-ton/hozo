@@ -7,16 +7,16 @@ namespace a {
   @http.status(404)
   exception NotFound;
   @http.status(429)
-  exception Busy(wait: Duration);
+  exception Busy(wait: duration);
   @valid.min(1)
   scalar PosInt extends int;
   decorator onlyOp;
   decorator forField for field;
   decorator forEffect for effect;
-  decorator opOrEffect for op | effect;
+  decorator opOrEffect for op, effect;
   decorator forRead for read;
-  decorator readOrEffect for read | effect;
-  decorator forAll for exception | effect | read;
+  decorator readOrEffect for read, effect;
+  decorator forAll for exception, effect, read;
   @onlyOp @opOrEffect
   fn f(): void;
   model N { @forField id: string; }

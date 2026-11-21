@@ -57,6 +57,13 @@ CREATE TABLE IF NOT EXISTS "sparses" (
   "attrs" TEXT,
   "tag" TEXT
 );
+CREATE TABLE IF NOT EXISTS "clocks" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "day" TEXT NOT NULL,
+  "at" TEXT NOT NULL,
+  "maybeDay" TEXT,
+  "maybeAt" TEXT
+);
 CREATE TABLE IF NOT EXISTS "pairs" (
   "left" TEXT NOT NULL,
   "right" INTEGER NOT NULL,
@@ -219,6 +226,42 @@ func (t SparsesTable) CreateSparse(ctx context.Context, row Sparse) error {
 		`INSERT INTO "sparses" ("s", "i", "d", "f", "b", "t", "name", "count", "span", "ratio", "flag", "stamp", "tags", "attrs", "tag") VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`, args...)
 }
 
+// ClocksTable は状態 app.clocks の単位（ClocksState）の、表 "clocks" の上の実装。
+// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
+type ClocksTable struct{ db *sql.DB }
+
+// NewClocksTable は db の表 "clocks" の上の ClocksTable を返す。表は CreateTables が作る。
+func NewClocksTable(db *sql.DB) ClocksTable { return ClocksTable{db: db} }
+
+var _ ClocksState = ClocksTable{}
+
+// IsEmpty は形で決まる問い合わせ: 表 "clocks" に行が一つもなければ true。
+func (t ClocksTable) IsEmpty(ctx context.Context) (bool, error) {
+	return dbIsEmpty(ctx, t.db, `SELECT COUNT(*) FROM "clocks"`)
+}
+
+// Get は形で決まる問い合わせ: 表 "clocks" の行を、足した順にすべて引く。
+func (t ClocksTable) Get(ctx context.Context) ([]Clock, error) {
+	return dbList(ctx, t.db, dbScanClock,
+		`SELECT "id", "day", "at", "maybeDay", "maybeAt" FROM "clocks" ORDER BY rowid`)
+}
+
+// ClocksByDay は read app.clocksByDay（@db.list、@db.latest）: 表 "clocks" の行を、"day" の新しい順にすべて引く。
+func (t ClocksTable) ClocksByDay(ctx context.Context) ([]Clock, error) {
+	return dbList(ctx, t.db, dbScanClock,
+		`SELECT "id", "day", "at", "maybeDay", "maybeAt" FROM "clocks" ORDER BY "day" DESC, rowid DESC`)
+}
+
+// CreateClock は効果 app.createClock（@db.insert）: 表 "clocks" に、引数 row の行を足す。
+func (t ClocksTable) CreateClock(ctx context.Context, row Clock) error {
+	args, err := dbArgsClock(row)
+	if err != nil {
+		return err
+	}
+	return dbExec(ctx, t.db,
+		`INSERT INTO "clocks" ("id", "day", "at", "maybeDay", "maybeAt") VALUES (?1, ?2, ?3, ?4, ?5)`, args...)
+}
+
 // PairsTable は状態 app.pairs の単位（PairsState）の、表 "pairs" の上の実装。
 // メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（この単位では、すべて）。
 type PairsTable struct{ db *sql.DB }
@@ -331,13 +374,13 @@ func (t LinksTable) CreateLink(ctx context.Context, row Link) error {
 
 // dbArgsCore は app.Core を、表 "cores" の列の順の値にする。
 func dbArgsCore(row Core) ([]any, error) {
-	return dbArgs(dbText(row.S), dbInt(row.I), dbInt(row.D), dbFloat(row.F), dbBool(row.B), dbTime(row.T))
+	return dbArgs(dbText(row.S), dbInt(row.I), dbInt(row.D), dbFloat(row.F), dbBool(row.B), dbDatetime(row.T))
 }
 
 // dbScanCore は、表 "cores" の列の順の値を app.Core に読む。
 func dbScanCore(r dbRow) (Core, error) {
 	var row Core
-	if err := r.Scan(dbText(&row.S), dbInt(&row.I), dbInt(&row.D), dbFloat(&row.F), dbBool(&row.B), dbTime(&row.T)); err != nil {
+	if err := r.Scan(dbText(&row.S), dbInt(&row.I), dbInt(&row.D), dbFloat(&row.F), dbBool(&row.B), dbDatetime(&row.T)); err != nil {
 		return Core{}, err
 	}
 	return row, nil
@@ -345,13 +388,13 @@ func dbScanCore(r dbRow) (Core, error) {
 
 // dbArgsNamed は app.Named を、表 "nameds" の列の順の値にする。
 func dbArgsNamed(row Named) ([]any, error) {
-	return dbArgs(dbText(row.Name), dbInt(row.Count), dbInt(row.Span), dbFloat(row.Ratio), dbBool(row.Flag), dbTime(row.Stamp), dbText(row.Label))
+	return dbArgs(dbText(row.Name), dbInt(row.Count), dbInt(row.Span), dbFloat(row.Ratio), dbBool(row.Flag), dbDatetime(row.Stamp), dbText(row.Label))
 }
 
 // dbScanNamed は、表 "nameds" の列の順の値を app.Named に読む。
 func dbScanNamed(r dbRow) (Named, error) {
 	var row Named
-	if err := r.Scan(dbText(&row.Name), dbInt(&row.Count), dbInt(&row.Span), dbFloat(&row.Ratio), dbBool(&row.Flag), dbTime(&row.Stamp), dbText(&row.Label)); err != nil {
+	if err := r.Scan(dbText(&row.Name), dbInt(&row.Count), dbInt(&row.Span), dbFloat(&row.Ratio), dbBool(&row.Flag), dbDatetime(&row.Stamp), dbText(&row.Label)); err != nil {
 		return Named{}, err
 	}
 	return row, nil
@@ -373,14 +416,28 @@ func dbScanDoc(r dbRow) (Doc, error) {
 
 // dbArgsSparse は app.Sparse を、表 "sparses" の列の順の値にする。
 func dbArgsSparse(row Sparse) ([]any, error) {
-	return dbArgs(dbText(row.S, dbNullable), dbInt(row.I, dbNullable), dbInt(row.D, dbNullable), dbFloat(row.F, dbNullable), dbBool(row.B, dbNullable), dbTime(row.T, dbNullable), dbText(row.Name, dbNullable), dbInt(row.Count, dbNullable), dbInt(row.Span, dbNullable), dbFloat(row.Ratio, dbNullable), dbBool(row.Flag, dbNullable), dbTime(row.Stamp, dbNullable), dbJSON(row.Tags, dbNullable), dbJSON(row.Attrs, dbNullable), dbJSON(row.Tag, dbNullable))
+	return dbArgs(dbText(row.S, dbNullable), dbInt(row.I, dbNullable), dbInt(row.D, dbNullable), dbFloat(row.F, dbNullable), dbBool(row.B, dbNullable), dbDatetime(row.T, dbNullable), dbText(row.Name, dbNullable), dbInt(row.Count, dbNullable), dbInt(row.Span, dbNullable), dbFloat(row.Ratio, dbNullable), dbBool(row.Flag, dbNullable), dbDatetime(row.Stamp, dbNullable), dbJSON(row.Tags, dbNullable), dbJSON(row.Attrs, dbNullable), dbJSON(row.Tag, dbNullable))
 }
 
 // dbScanSparse は、表 "sparses" の列の順の値を app.Sparse に読む。
 func dbScanSparse(r dbRow) (Sparse, error) {
 	var row Sparse
-	if err := r.Scan(dbText(&row.S, dbNullable), dbInt(&row.I, dbNullable), dbInt(&row.D, dbNullable), dbFloat(&row.F, dbNullable), dbBool(&row.B, dbNullable), dbTime(&row.T, dbNullable), dbText(&row.Name, dbNullable), dbInt(&row.Count, dbNullable), dbInt(&row.Span, dbNullable), dbFloat(&row.Ratio, dbNullable), dbBool(&row.Flag, dbNullable), dbTime(&row.Stamp, dbNullable), dbJSON(&row.Tags, dbNullable), dbJSON(&row.Attrs, dbNullable), dbJSON(&row.Tag, dbNullable)); err != nil {
+	if err := r.Scan(dbText(&row.S, dbNullable), dbInt(&row.I, dbNullable), dbInt(&row.D, dbNullable), dbFloat(&row.F, dbNullable), dbBool(&row.B, dbNullable), dbDatetime(&row.T, dbNullable), dbText(&row.Name, dbNullable), dbInt(&row.Count, dbNullable), dbInt(&row.Span, dbNullable), dbFloat(&row.Ratio, dbNullable), dbBool(&row.Flag, dbNullable), dbDatetime(&row.Stamp, dbNullable), dbJSON(&row.Tags, dbNullable), dbJSON(&row.Attrs, dbNullable), dbJSON(&row.Tag, dbNullable)); err != nil {
 		return Sparse{}, err
+	}
+	return row, nil
+}
+
+// dbArgsClock は app.Clock を、表 "clocks" の列の順の値にする。
+func dbArgsClock(row Clock) ([]any, error) {
+	return dbArgs(dbText(row.Id), dbDate(row.Day), dbTime(row.At), dbDate(row.MaybeDay, dbNullable), dbTime(row.MaybeAt, dbNullable))
+}
+
+// dbScanClock は、表 "clocks" の列の順の値を app.Clock に読む。
+func dbScanClock(r dbRow) (Clock, error) {
+	var row Clock
+	if err := r.Scan(dbText(&row.Id), dbDate(&row.Day), dbTime(&row.At), dbDate(&row.MaybeDay, dbNullable), dbTime(&row.MaybeAt, dbNullable)); err != nil {
+		return Clock{}, err
 	}
 	return row, nil
 }
@@ -563,20 +620,56 @@ func dbBool(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {
 			return err
 		}
 		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(t).Convert(dst.Type()))
+		return nil
+	}}
+}
+
+// dbDate は @db.date の列: 日付を、2006-01-02 の形の文字列で（文字列の順が日付の順になる）。
+func dbDate(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
+		return v.Convert(reflect.TypeFor[runtime.Date]()).Interface().(runtime.Date).String(), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		d, err := runtime.ParseDate(s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(d).Convert(dst.Type()))
+		return nil
+	}}
+}
+
+// dbTime は @db.time の列: 一日の中の時刻を、15:04:05.000000000 の形の文字列で（小数部はいつも 9 桁。文字列の順が時刻の順になる）。
+func dbTime(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
+		return v.Convert(reflect.TypeFor[runtime.TimeOfDay]()).Interface().(runtime.TimeOfDay).Fixed(), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		t, err := runtime.ParseTimeOfDay(s)
 		if err != nil {
 			return err
 		}

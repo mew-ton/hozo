@@ -3,7 +3,7 @@
 namespace a {
   model M { id: string; }
   model N { id: string; }
-  exception Busy(wait: Duration, note: string?);
+  exception Busy(wait: duration, note: string?);
   exception Plain;
   state rows: list<M>;
   state cur: nullable<M>;

@@ -2,9 +2,9 @@
 // @db.list は M[]（M は表の model）。位置は read。
 
 namespace app {
-  model Row { @db.key @db.text id: string; @db.text note: string; @db.time at: Time; }
+  model Row { @db.key @db.text id: string; @db.text note: string; @db.datetime at: datetime; }
   /** 形は同じでも、別の model */
-  model Other { @db.key @db.text id: string; @db.text note: string; @db.time at: Time; }
+  model Other { @db.key @db.text id: string; @db.text note: string; @db.datetime at: datetime; }
   @db.table state rows: list<Row>;
 
   // ---- @db.find は M? ----

@@ -34,7 +34,7 @@ namespace app {
   effect fn open(order: Order): effects orders.post as Life.Absent -> Life.Open;
   effect fn bring(order: Order): effects orders.post as any;
   /** 作り始める */
-  effect fn start(order: Order, at: Time): effects orders.put as Stage.Accepted -> Stage.InProduction;
+  effect fn start(order: Order, at: datetime): effects orders.put as Stage.Accepted -> Stage.InProduction;
   /**
    * 取り消す。
    * 取り消せるのは、作り始める前だけ
@@ -48,7 +48,7 @@ namespace app {
   effect fn purge(order: Order): effects orders.delete as Life.Absent;
 
   /** 作り始める。受け付けた注文だけ */
-  export fn begin(id: string, at: Time):
+  export fn begin(id: string, at: datetime):
     throws NoOrder, NotAccepted
   {
     val found = orderById(id);
@@ -58,7 +58,7 @@ namespace app {
     };
   }
 
-  export fn beginFound(order: Order, at: Time):
+  export fn beginFound(order: Order, at: datetime):
     throws NotAccepted
   {
     match (order by Stage) {

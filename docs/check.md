@@ -236,7 +236,7 @@ classify Registration of findUser {     // findUser(email: Email): User?
 | `presence` | 値がない（ない側のケースを `as none` で書いていれば、そういう値はない） |
 | `variant` | 値が、どのケースも `as` に書かなかった型のアーム。書いた型が union のすべてのアームの型を覆っていれば、そういう値はない |
 
-値がない側を使わない分類は、型を書いたケースだけを宣言する（`classify Arrival of Time? { Arrived: Time? as Time; }`）。値がないことは、分類の誤りになる。
+値がない側を使わない分類は、型を書いたケースだけを宣言する（`classify Arrival of datetime? { Arrived: datetime? as datetime; }`）。値がないことは、分類の誤りになる。
 
 標準の分類も型で決まる分類。
 

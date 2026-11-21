@@ -6,7 +6,7 @@
 /** 別の名前空間の例外 */
 namespace limits {
   /** 呼び出しの頻度の制限を超えた */
-  exception LimitExceeded(retryAfter: Duration, scope: string?);
+  exception LimitExceeded(retryAfter: duration, scope: string?);
 }
 
 /** 引数を持つ例外を投げる配線 */
@@ -66,7 +66,7 @@ namespace app {
   }
 
   // 文の match の throw E(<値>, …): 戻り値のない配線は `return <例外>`。引数の型をそろえる（scalar → 元の型）、
-  // 渡されていない省略可能な引数は nil、別の名前空間の例外（Duration のリテラルと、省略可能な引数に文字列のリテラル）
+  // 渡されていない省略可能な引数は nil、別の名前空間の例外（duration のリテラルと、省略可能な引数に文字列のリテラル）
   export fn guard(code: Code?, wait: boolean?):
     throws Missing, limits.LimitExceeded
   {

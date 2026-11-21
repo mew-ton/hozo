@@ -6,7 +6,7 @@ namespace a {
   classify Lists of M?[] { Empty0; Some; }
   decorator opt(x: any case of M?) for op;
   decorator inner(x: any case of M?[], y: any case of M?[]?) for op;
-  decorator byName(x: any case of Known?) for op | case of Known;
+  decorator byName(x: any case of Known?) for op, case of Known;
   @opt @inner(Lists.Some) @byName
   fn f();
 }

@@ -12,7 +12,7 @@ namespace server {
   model Session {
     @db.key token: Token;
     userId: UserId;
-    expiresAt: Time;
+    expiresAt: datetime;
   }
 
   model PublicUser extends User {

@@ -57,8 +57,8 @@ func TestLexTokens(t *testing.T) {
 	}{
 		{"empty", "", []token.Kind{token.EOF}},
 		{"keywords", "namespace model op throws", []token.Kind{token.Namespace, token.Model, token.Op, token.Throws, token.EOF}},
-		{"core types and state shapes", "string boolean int float Time Duration void Record list nullable single",
-			[]token.Kind{token.StringType, token.BooleanType, token.IntType, token.FloatType, token.TimeType, token.DurationType, token.Void, token.Record, token.List, token.Nullable, token.Single, token.EOF}},
+		{"core types and state shapes", "string boolean int float datetime date time duration void Record list nullable single",
+			[]token.Kind{token.StringType, token.BooleanType, token.IntType, token.FloatType, token.DatetimeType, token.DateType, token.TimeType, token.DurationType, token.Void, token.Record, token.List, token.Nullable, token.Single, token.EOF}},
 		{"bool literals", "true false", []token.Kind{token.True, token.False, token.EOF}},
 		{"ident", "foo _bar baz9", []token.Kind{token.Ident, token.Ident, token.Ident, token.EOF}},
 		{"contextual words are idents", "field variant post put delete", []token.Kind{token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.EOF}},
@@ -123,7 +123,7 @@ func TestLexTextAndSpan(t *testing.T) {
 	}
 	dur := toks[2]
 	if dur.Span.Start != 19 || dur.Span.End != 21 {
-		t.Errorf("Duration Span = %+v", dur.Span)
+		t.Errorf("duration Span = %+v", dur.Span)
 	}
 	eof := toks[3]
 	if eof.Span.Start != 21 || eof.Span.End != 21 {

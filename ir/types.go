@@ -27,8 +27,10 @@ const (
 	CoreBoolean  CoreName = "boolean"
 	CoreInt      CoreName = "int"
 	CoreFloat    CoreName = "float"
-	CoreTime     CoreName = "Time"
-	CoreDuration CoreName = "Duration"
+	CoreDatetime CoreName = "datetime"
+	CoreDate     CoreName = "date"
+	CoreTime     CoreName = "time"
+	CoreDuration CoreName = "duration"
 )
 
 // CoreType は核の型（docs/ir.md「型」の kind "core"）。
@@ -230,10 +232,16 @@ func Int() Type { return CoreType{Name: CoreInt} }
 // Float は核の型 float を作る（docs/ir.md「型」の kind "core"）。
 func Float() Type { return CoreType{Name: CoreFloat} }
 
-// Time は核の型 Time を作る（docs/ir.md「型」の kind "core"）。
+// Datetime は核の型 datetime（ある瞬間）を作る（docs/ir.md「型」の kind "core"）。
+func Datetime() Type { return CoreType{Name: CoreDatetime} }
+
+// Date は核の型 date（日付）を作る（docs/ir.md「型」の kind "core"）。
+func Date() Type { return CoreType{Name: CoreDate} }
+
+// Time は核の型 time（一日の中の時刻）を作る（docs/ir.md「型」の kind "core"）。
 func Time() Type { return CoreType{Name: CoreTime} }
 
-// Duration は核の型 Duration を作る（docs/ir.md「型」の kind "core"）。
+// Duration は核の型 duration を作る（docs/ir.md「型」の kind "core"）。
 func Duration() Type { return CoreType{Name: CoreDuration} }
 
 // Ref は宣言の FQN への参照を作る（docs/ir.md「型」の kind "ref"）。

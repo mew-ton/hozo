@@ -132,13 +132,13 @@ func (t OrdersTable) Rename(ctx context.Context, order Order) error {
 
 // dbArgsOrder は shop.Order を、表 "orders" の列の順の値にする。
 func dbArgsOrder(row Order) ([]any, error) {
-	return dbArgs(dbText(row.Id), dbText(row.Note), dbTime(row.StartedAt, dbNullable))
+	return dbArgs(dbText(row.Id), dbText(row.Note), dbDatetime(row.StartedAt, dbNullable))
 }
 
 // dbScanOrder は、表 "orders" の列の順の値を shop.Order に読む。
 func dbScanOrder(r dbRow) (Order, error) {
 	var row Order
-	if err := r.Scan(dbText(&row.Id), dbText(&row.Note), dbTime(&row.StartedAt, dbNullable)); err != nil {
+	if err := r.Scan(dbText(&row.Id), dbText(&row.Note), dbDatetime(&row.StartedAt, dbNullable)); err != nil {
 		return Order{}, err
 	}
 	return row, nil
@@ -235,14 +235,14 @@ func dbText(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {

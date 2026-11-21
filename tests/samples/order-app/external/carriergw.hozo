@@ -38,7 +38,7 @@ namespace carriergw {
   model TrackingEvent {
     trackingNumber: shipping.TrackingNumber;
     /** 届いた時刻。届く前の通知には、ない */
-    deliveredAt: Time?;
+    deliveredAt: datetime?;
   }
 
   /** 相手が持つ、買った送り状 */

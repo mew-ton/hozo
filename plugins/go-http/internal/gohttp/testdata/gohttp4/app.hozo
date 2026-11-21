@@ -1,7 +1,7 @@
 // GOHTTP-4: 位置は、そのフィールドを持つ model。
 namespace app {
   scalar Count extends int;
-  scalar When extends Time;
+  scalar When extends datetime;
   model Inner { x: int; }
 
   model HeaderIn {
@@ -9,7 +9,7 @@ namespace app {
     @http.header("X-Count") count: int;
     @http.header("X-Scalar") scalarCount: Count?;
     @http.header flag: boolean?;
-    @http.header("X-At") at: Time;
+    @http.header("X-At") at: datetime;
     @http.header("X-List") list: string[];
     @http.header("X-Inner") inner: Inner?;
     @http.header("X-Ok") ok: string?;
@@ -19,9 +19,9 @@ namespace app {
 
   model QueryIn {
     // @http.query は、string / int / float / boolean と、その省略可能だけ
-    @http.query at: Time?;
+    @http.query at: datetime?;
     @http.query when: When;
-    @http.query("w") wait: Duration?;
+    @http.query("w") wait: duration?;
     @http.query list: string[];
     @http.query later: int[]?;
     @http.query attrs: Record<string, string>?;

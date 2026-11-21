@@ -9,10 +9,14 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
+// RuntimePath は、生成したコードが import する runtime パッケージ（docs/plugin-go.md「runtime パッケージ」）。
+const RuntimePath = "github.com/mew-ton/hozo/runtime"
+
 // GoType は IR の型を Go の型の文字列にする（docs/plugin-go.md「型」の表）。必要な import を imports に足す。
 //
 //	string / boolean / int / float   → string / bool / int64 / float64
-//	Time / Duration                  → time.Time / time.Duration（"time" を import）
+//	datetime / duration              → time.Time / time.Duration（"time" を import）
+//	date / time                      → runtime.Date / runtime.TimeOfDay（RuntimePath を import）
 //	optional(T)                      → T が array、record、union（arms）への ref ならそのまま（nil が「なし」）。それ以外は *T
 //	array(T)                         → []T
 //	record(K, V)                     → map[K]V
@@ -37,8 +41,12 @@ func GoType(t ir.Type, imports *Imports) string {
 			return "int64"
 		case ir.CoreFloat:
 			return "float64"
-		case ir.CoreTime:
+		case ir.CoreDatetime:
 			return qualify(imports, "time", "time") + ".Time"
+		case ir.CoreDate:
+			return qualify(imports, RuntimePath, "runtime") + ".Date"
+		case ir.CoreTime:
+			return qualify(imports, RuntimePath, "runtime") + ".TimeOfDay"
 		case ir.CoreDuration:
 			return qualify(imports, "time", "time") + ".Duration"
 		}
@@ -81,7 +89,7 @@ func IsNillable(t ir.Type, p *ir.Program) bool {
 }
 
 // Zero は型の零値の Go の式（docs/plugin-go.md「呼び出し」の「零値」）: ポインタ・インターフェース・スライス・マップは nil、
-// 構造体は `<型>{}`、time.Time は `time.Time{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
+// 構造体は `<型>{}`、time.Time、runtime.Date、runtime.TimeOfDay は `<型>{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
 // 必要な import を imports に足す。nil の型（void）と never は ""。
 func Zero(t ir.Type, imports *Imports) string {
 	switch x := t.(type) {
@@ -120,14 +128,14 @@ func Zero(t ir.Type, imports *Imports) string {
 	return "nil"
 }
 
-// coreZero は核の型 c の零値。goType は、その値の Go の型（time.Time か、Time が元の scalar の名前）。
+// coreZero は核の型 c の零値。goType は、その値の Go の型（time.Time、runtime.Date、runtime.TimeOfDay か、それが元の scalar の名前）。
 func coreZero(c ir.CoreType, goType string) string {
 	switch c.Name {
 	case ir.CoreString:
 		return `""`
 	case ir.CoreBoolean:
 		return "false"
-	case ir.CoreTime:
+	case ir.CoreDatetime, ir.CoreDate, ir.CoreTime:
 		return goType + "{}"
 	}
 	return "0"

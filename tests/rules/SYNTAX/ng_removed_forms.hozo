@@ -98,6 +98,9 @@ namespace removedFnTail {
   effect fn oldOnEffect(m: M) on rows.post;      // ERROR: SYNTAX
   effect fn noColonEffect(m: M) effects rows.post;   // ERROR: SYNTAX
   read fn noColonRead() reads rows;              // ERROR: SYNTAX
+  // デコレータの宣言の、付ける先の並びの区切りは「,」（「|」は、なくした書き方）
+  decorator oldTargets for model | state;        // ERROR: SYNTAX
+  decorator targets for model, state;
   // 状態の遷移は、as で書く（宛先の後ろの「:」は、なくした書き方）
   effect fn oldTransition(): effects rows: HasItems -> Empty;   // ERROR: SYNTAX
   fn leaf(m: M);

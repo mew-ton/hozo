@@ -345,9 +345,9 @@ func Build() Grammar {
 		// ---- 文脈キーワード ----
 		{Key: "contextual", Rule: Rule{Patterns: []Rule{
 			{
-				Comment: "for の対象: field は for の後ろ（| で続く位置を含む）でだけ文脈キーワード。対象の並びは、節の頭（throws / catches / reads / effects）か記号で終わる",
+				Comment: "for の対象: field は for の後ろ（, で続く位置を含む）でだけ文脈キーワード。対象の並びは、節の頭（throws / catches / reads / effects）か、, のほかの記号で終わる",
 				Begin:   `\b(for)\b`,
-				End:     `(?=[^\s|A-Za-z0-9_])|(?=\b(?:throws|catches|reads|effects)\b)`,
+				End:     `(?=[^\s,A-Za-z0-9_])|(?=\b(?:throws|catches|reads|effects)\b)`,
 				BeginCaptures: Captures{
 					"1": {Name: "keyword.control.hozo"},
 				},

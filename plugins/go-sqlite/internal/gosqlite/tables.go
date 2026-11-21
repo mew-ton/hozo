@@ -24,10 +24,12 @@ type storage struct {
 // storages は、しまい方のすべて（「しまい方」の表の順。補助を出す順でもある）。classes は、合うフィールドの型の種類（typeClass）。
 var storages = []*storage{
 	{decorator: "db.text", helper: "dbText", sqlType: "TEXT", fits: "string", classes: []string{"string"}},
-	{decorator: "db.int", helper: "dbInt", sqlType: "INTEGER", fits: "int、Duration", classes: []string{"int", "Duration"}},
+	{decorator: "db.int", helper: "dbInt", sqlType: "INTEGER", fits: "int、duration", classes: []string{"int", "duration"}},
 	{decorator: "db.float", helper: "dbFloat", sqlType: "REAL", fits: "float", classes: []string{"float"}},
 	{decorator: "db.bool", helper: "dbBool", sqlType: "INTEGER", fits: "boolean", classes: []string{"boolean"}},
-	{decorator: "db.time", helper: "dbTime", sqlType: "TEXT", fits: "Time", classes: []string{"Time"}},
+	{decorator: "db.datetime", helper: "dbDatetime", sqlType: "TEXT", fits: "datetime", classes: []string{"datetime"}},
+	{decorator: "db.date", helper: "dbDate", sqlType: "TEXT", fits: "date", classes: []string{"date"}},
+	{decorator: "db.time", helper: "dbTime", sqlType: "TEXT", fits: "time", classes: []string{"time"}},
 	{decorator: "db.json", helper: "dbJSON", sqlType: "TEXT", fits: "array、record、model", classes: []string{"array", "record", "model"}},
 }
 

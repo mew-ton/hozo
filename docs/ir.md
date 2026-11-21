@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.12";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.13";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -64,7 +64,7 @@ interface Doc {
 
 ```ts
 type Type =
-  | { kind: "core"; name: "string" | "boolean" | "int" | "float" | "Time" | "Duration" }
+  | { kind: "core"; name: "string" | "boolean" | "int" | "float" | "datetime" | "date" | "time" | "duration" }
   | { kind: "ref"; target: string }                    // model / scalar / union の FQN
   | { kind: "optional"; of: Type }
   | { kind: "array"; of: Type }
@@ -487,7 +487,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.12";
+  version: "0.13";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -545,10 +545,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.12"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.13"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.13 | 核の型の名前（`Type` の `core` の `name`）: `Time` を `datetime` に、`Duration` を `duration` に替え、`date` と `time` を足した（`docs/grammar.md`「型」）。デコレータの宣言の、付ける先の並びの区切りが `,` になったこと（`docs/grammar.md`「decorator の宣言」）は、綴りだけで、`Decorator.targets` の形は、変わらない |
 | 0.12 | `Effect.throws`（効果が投げうる例外。`docs/check.md`「read と効果」）。効果の呼び出しと、運ばれた効果が、`Signature.exceptions` に例外を足しうる。`View` とやり取りの形は 0.11 と同じ |
 | 0.11 | `CaseKind.subject` が、文字列の `"never"` から、`Type` になった（対象の型で絞る `case of <型>`。`docs/grammar.md`「decorator の宣言」）。`of never` は、kind が `never` の型。`View` とやり取りの形は 0.10 と同じ |
 | 0.10 | 配線の文（`Statement`）: `const` をやめて `val`（`type`、`collected`。`expr` は省ける）。`assign`、`collect`、`disjoint`（`Arm`）、`for`。`Classify.cases[].decorators`。`Classify.decidedBy` に `none`（対象のない分類。`subject` の `type` が `never`）。`Decorator.targets` に `case` と、`Decorator.caseTargets`（`CaseKind`）。`ParamType` の `any` の `of` に `case` と、`case`（`CaseKind`）。`ArgValue` に `case`。`View` とやり取りの形は 0.9 と同じ |

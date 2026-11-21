@@ -13,7 +13,7 @@
 ```toml
 name     = "go-http"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-http"]
-protocol = "0.12"
+protocol = "0.13"
 
 [[transpiler]]
 name     = "go-http"
@@ -133,7 +133,7 @@ func NewHandler(ops Ops) http.Handler {
 | `@http.required` | `httpRequired` | `req.body("lines", &in.Lines, httpRequired)` |
 | `@http.default(<リテラル>)` | `httpDefault(<リテラル>)` | `req.query("page", &in.Page, httpDefault(1))` |
 
-`<リテラル>` の Go での書き方は、基底と同じ（`docs/plugin-go.md`「値」の表の `literal` の行。`Duration` は `time.Duration(<ナノ秒>)`）。フィールドの型への変換は書かない: 補助が、実行時に、読む先の型に変える。
+`<リテラル>` の Go での書き方は、基底と同じ（`docs/plugin-go.md`「値」の表の `literal` の行。`duration` は `time.Duration(<ナノ秒>)`）。フィールドの型への変換は書かない: 補助が、実行時に、読む先の型に変える。
 
 読み方は、補助 `httpRequest` が、実行時に、読む先の Go の型を見て決める（`reflect`）:
 
@@ -230,8 +230,10 @@ func httpWriteError(w http.ResponseWriter, err error) {
 | `int` | 数（整数）。64 ビットの範囲。2^53 を超える値は、数を倍精度で持つ言語では正確に読めない |
 | `float` | 数 |
 | `boolean` | `true` / `false` |
-| `Time` | RFC 3339 の文字列（小数部は 0〜9 桁、時刻帯は `Z` か `±hh:mm`） |
-| `Duration` | 数（整数のナノ秒） |
+| `datetime` | RFC 3339 の文字列（小数部は 0〜9 桁、時刻帯は `Z` か `±hh:mm`） |
+| `date` | `2026-11-21` の形の文字列 |
+| `time` | `09:30:00` の形の文字列。秒より細かい部分は、小数部（書くときは、末尾の 0 を除く。読むときは、0〜9 桁） |
+| `duration` | 数（整数のナノ秒） |
 | scalar | 元の型の JSON |
 | model | オブジェクト。キーはフィールド名（仕様に書いたまま）。並びはフィールドの順 |
 | `optional(T)` のフィールド | 値がなければ、キーを省く。読む側は、キーがないことと `null` を、どちらも「ない」と読む |
@@ -260,7 +262,7 @@ func httpWriteError(w http.ResponseWriter, err error) {
 { "error": "<例外の FQN>", "value": { "<引数の名前>": <その値の JSON>, … } }
 ```
 
-- `value` は、**例外の引数の名前をキーにしたオブジェクト**（`exception LimitExceeded(retryAfter: Duration);` なら `{"error":"rate.LimitExceeded","value":{"retryAfter":30000000000}}`）。キーの並びは、宣言の引数の順。値の形は「値の JSON」で、省略可能な引数で値がなければ、キーを省く。引数が一つでも、オブジェクトで包む。
+- `value` は、**例外の引数の名前をキーにしたオブジェクト**（`exception LimitExceeded(retryAfter: duration);` なら `{"error":"rate.LimitExceeded","value":{"retryAfter":30000000000}}`）。キーの並びは、宣言の引数の順。値の形は「値の JSON」で、省略可能な引数で値がなければ、キーを省く。引数が一つでも、オブジェクトで包む。
 - `value` は、引数のない例外にはない。
 
 | 場合 | ステータス | 本文 |

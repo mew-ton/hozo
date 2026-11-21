@@ -602,7 +602,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.12"
+          "const": "0.13"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -771,8 +771,10 @@
         "boolean",
         "int",
         "float",
-        "Time",
-        "Duration"
+        "datetime",
+        "date",
+        "time",
+        "duration"
       ],
       "type": "string"
     },
@@ -1264,7 +1266,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.12"
+          "const": "0.13"
         },
         "transpiler": {
           "type": "string"
@@ -1482,7 +1484,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.12"
+          "const": "0.13"
         }
       },
       "required": [
@@ -2259,7 +2261,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.12"
+          "const": "0.13"
         }
       },
       "required": [
@@ -3140,7 +3142,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.12"
+          "const": "0.13"
         },
         "viewer": {
           "type": "string"

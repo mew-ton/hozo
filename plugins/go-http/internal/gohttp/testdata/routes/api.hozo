@@ -9,14 +9,14 @@ namespace type {
   scalar Flag extends boolean;
   @valid.length(min: 1)
   scalar Name extends string;
-  scalar Wait extends Duration;
+  scalar Wait extends duration;
 
   /** 品物 */
   model Item {
     @valid.length(min: 1) name: string;
     @valid.min(1) quantity: int;
     tags: string[];
-    at: Time?;
+    at: datetime?;
   }
 
   /** 見つからない（引数のない例外） */
@@ -30,10 +30,10 @@ namespace type {
   exception Rejected(value: Item);
   /** 多すぎる（省略可能な引数を持つ。scalar の引数は、元の型の JSON） */
   @http.status(429)
-  exception Limited(retryAfter: Wait, hint: string?, until: Time?);
+  exception Limited(retryAfter: Wait, hint: string?, until: datetime?);
   /** もうない（引数が、どれも省略可能） */
   @http.status(410)
-  exception Gone(since: Time?);
+  exception Gone(since: datetime?);
   /** ステータスを持たない例外 */
   exception Broken;
   /** ステータスを持たない例外は、引数を持っていても、通信に現れない */
@@ -83,7 +83,7 @@ namespace api {
     @http.body @http.default(2) weight: float;
     @http.body @http.default(1.5) scale: type.Ratio;
     @http.body @http.default(true) active: boolean;
-    @http.body @http.default(30s) timeout: Duration;
+    @http.body @http.default(30s) timeout: duration;
     @http.body @http.default(5m) wait: type.Wait;
     @http.body @http.default("anon") owner: type.Token;
   }

@@ -123,7 +123,7 @@ var unions = []struct {
 // enums は名前付き文字列型の取りうる値（docs/ir.md「構造」の文字列リテラルのユニオン）。
 // ir パッケージの定数と同じ並び。ここにない名前付き文字列型が現れたら生成は失敗する。
 var enums = map[reflect.Type][]string{
-	typeOf[ir.CoreName]():        {"string", "boolean", "int", "float", "Time", "Duration"},
+	typeOf[ir.CoreName]():        {"string", "boolean", "int", "float", "datetime", "date", "time", "duration"},
 	typeOf[ir.UnionVariant]():    {"arms", "set"},
 	typeOf[ir.StateShape]():      {"list", "nullable", "single"},
 	typeOf[ir.Operation]():       {"post", "put", "delete"},

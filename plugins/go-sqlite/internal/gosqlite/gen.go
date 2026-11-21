@@ -32,7 +32,7 @@ const (
 	helperCol         = "dbCol"
 	helperArgs        = "dbArgs"
 	helperString      = "dbString"
-	helperTimeLayout  = "dbTimeLayout"
+	helperTimeLayout  = "dbDatetimeLayout"
 	helperTransaction = "dbTransaction"
 	helperExec        = "dbExec"
 	helperConflict    = "dbConflict"

@@ -431,7 +431,7 @@ namespace api {
   /** ユーザーを足す。Fresh で入る */
   effect fn enrol(user: User): effects users.post as Standing.Fresh;
   /** ユーザーを休ませる */
-  effect fn rest(user: User, since: Time): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;
+  effect fn rest(user: User, since: datetime): effects users.put as Standing.Fresh, Standing.Active -> Standing.Idle;
   /** ユーザーを閉じる。どの使われ方からでも */
   effect fn closeUser(user: User): effects users.put as any -> Standing.Closed;
   /** ユーザーを書き換える。後の使われ方は、決まっていない */
@@ -439,7 +439,7 @@ namespace api {
   /** ユーザーを消す。消せるのは、登録が切れたユーザーだけ */
   effect fn forget(user: User): effects users.delete as Enrolment.Lapsed -> Enrolment.Unknown;
   // docs/check.md「行の遷移」の「呼ぶ側の検査」: 前のケースを並べた効果は、そのケースを受けるアームの中で呼ぶ
-  fn restUser(user: User, now: Time)
+  fn restUser(user: User, now: datetime)
   {
     match (user by Standing) {
       Fresh, Active => rest(user, now);

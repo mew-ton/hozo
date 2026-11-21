@@ -292,7 +292,7 @@ export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.La
 
 ### 行の遷移で書いた進み具合
 
-行の型の分類と、その分類のケースを進める効果。効果は、どれも、前の行と、足す事実を受け取る（`effect fn startJob(job: Job, at: Time) …`）。「前」にケースを並べた効果は、そのケースを受ける `match` のアームの中か、型が `C.K<T>` の値でしか呼べない（STATE-9）。
+行の型の分類と、その分類のケースを進める効果。効果は、どれも、前の行と、足す事実を受け取る（`effect fn startJob(job: Job, at: datetime) …`）。「前」にケースを並べた効果は、そのケースを受ける `match` のアームの中か、型が `C.K<T>` の値でしか呼べない（STATE-9）。
 
 | 行 | 分類 | 効果 | 行の遷移 |
 |---|---|---|---|
@@ -341,13 +341,13 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
   return started;
 }
 
-fn startedAt(job: Progress.Queued<Job>, now: Time): Job;   // 人が書く
+fn startedAt(job: Progress.Queued<Job>, now: datetime): Job;   // 人が書く
 ```
 
 ```ts
 // 後: 効果が、どのケースからどのケースへ進めるかを言う
-effect fn startJob(job: Job, at: Time): effects jobs.put as Progress.Queued -> Progress.InProduction;
-effect fn finishJob(job: Job, measured: type.Measurement, at: Time): effects jobs.put as Progress.InProduction -> Progress.Finished;
+effect fn startJob(job: Job, at: datetime): effects jobs.put as Progress.Queued -> Progress.InProduction;
+effect fn finishJob(job: Job, measured: type.Measurement, at: datetime): effects jobs.put as Progress.InProduction -> Progress.Finished;
 
 export fn start(id: JobId): Job throws NoJob, NotQueued {
   val job = require(id);
@@ -411,7 +411,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F23 `http` の語彙に足りなかったもの。** パスの中の引数（`/orders/:key`）→ クエリにした。POST と GET のほかのメソッド → POST にした。外へ呼ぶときの、相手の場所、鍵、やり直しても二度起きないための識別子のヘッダ、待つ長さ → 書いていない。`@http.retry` は、金が動く呼び出しに、その識別子なしでは付けられないので、使っていない。
 - **F24 外へ呼ぶ HTTP は、相手の名前空間の op に `@http.post` を付けて書けた。こちらの入口と、相手の口が、同じ書き方になる。** `@external` が、呼ぶ側に `http.NetworkError` と `http.ServerError` を足す（`external/psp.hozo`、`external/carriergw.hozo`）。違いは、`hozo.toml` に単位があるかだけ。このサンプルには単位がないので、どれがこちらのサーバーかは、ディレクトリの名前と、この文書にしかない。
 - **F25 二度届く通知は、配線で書けた。届く順は、書けない。** `payment.seen` と分類 `Redelivery`、`payment.Securing`。「もう扱った」と記録する行と、扱う行が、一つのトランザクションに入ることは、F19 のとおり、仕様の外。
-- **F26 時刻。** `clock.now()` と `@clock.tick` を作った。「期限の N 日前」は、時刻を作る葉（`ordering.before`、`payment.ahead`）と、比較を人が書く `read`（`oldestUnpaidBefore`、`nextExpiringHold`）。`Duration` の上限は、`valid` で言えない（`@valid.max(45d)` は TYPE-4）。
+- **F26 時刻。** `clock.now()` と `@clock.tick` を作った。「期限の N 日前」は、時刻を作る葉（`ordering.before`、`payment.ahead`）と、比較を人が書く `read`（`oldestUnpaidBefore`、`nextExpiringHold`）。`duration` の上限は、`valid` で言えない（`@valid.max(45d)` は TYPE-4）。
 - **F27 `db` の語彙で言えなかった読み書き。** サーバーの 34 の `read` のうち 7、30 の効果のうち 21 に、デコレータを付けられなかった: 集合に入っているか（`productsBySkus`、`levelsOf`）、比較（`oldestUnpaidBefore`）、値がないこと（`toPick`、`shipmentsInHouse`、`openJobs`）、まとめて書く（`saveLevels`、`addJobs`）、キーでない列で書き換える（`confirmReservations`）。効果の 21 のうち 16 は、行のケースを変える効果で、`@db.update` と `@db.delete` の形に合わない（F51、F54）。列のしまい方（`@db.text` など）は、一つも書いていない（G1）。
 - **F28 「後で、必ず」がない。** 通知の入口は、受け付けて、分けて、メールを送るまでを、その場で行う（`hooks.paymentEvent`）。失敗したら、相手がもう一度送ることに頼る。
 - **F29 金額。** `type.Yen` は整数の scalar。足し算も比較も配線にないので、合計と差額は、どれも葉（`payment.limitOf`、`payment.charged`、`payment.refundOf`）。
@@ -451,7 +451,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
   - `hooks.trackingEvent` は、運んでいる途中、不在、返送の通知のたびに失敗する。配送業者は、荷物一つにつき、そういう通知をいくつも送る。
   - 分類の誤りは、仕様が扱わない、ありえないことが起きた誤りで、`throws` に書かず、受けることもできない。**当たらない値に対して何かをしたい（ここでは、受け取ったとだけ答える）なら、それは分類できるということなので、ケースとして宣言して、枝に書く**（`docs/requirements.md`「書き方の指針」）。二つの通知は、どちらも、これに当たった:
     - `psp.Meaning`: `Echo;` を足した（こちらが頼んだことの結果の知らせ: 請求の確定、返金、枠の解放）。述語で決まる（`kind` は文字列）。`payment.recordNew` は、`Echo => none;` で、通知を「扱った」と記録して、何もしない。
-    - `fulfilment.Arrival`: `Underway: Time? as else;` を足した（届いた時刻のない通知: 運んでいる途中、不在、返送）。型で決まる。`fulfilment.tracked` は、`Underway => none;`。
+    - `fulfilment.Arrival`: `Underway: datetime? as else;` を足した（届いた時刻のない通知: 運んでいる途中、不在、返送）。型で決まる。`fulfilment.tracked` は、`Underway => none;`。
   - 宣言しないままにしたものは、ない: この二つの入口のほかに、「来るはずのない値」を受けている分類は、このサンプルにない（ほかの分類の、ケースの外の値は、述語の実装の誤りで、仕様が何かをする場合ではない）。Q11 は、これで閉じた。
 - **F48 仕事の分類は、一つの `Role` にしなかった。** 担当者は、三つの仕事を、いくつでも持てる（`Member.maker`、`packer`、`admin` は、別々の真偽値）。`classify Role of Member { Maker; Packer; Admin; }` は、製作と梱包の両方をする担当者で、二つの述語が真になり、分類の誤りになる（ケースは排他）。仕事ごとに、「してよい / してはいけない」の分類を一つずつ持った。「してはいけない」側の名前（`NotMaker`）は、業務の言葉になかった。
 - **F49 `match` の `else` のアームが合ったのは、`payment.Standing` だけ。** 五つのケースから一つを取り出して、残りの四つを同じに扱う `match` が四つあり（`reopen`、`secureFound`、`prepayHeld`、`release`）、`else` にした（`docs/requirements.md`「書き方の指針」の「1 : 4」）。`payment.settle` は「1 : 1 : 1 : 2」なので、どのアームも名前で並べた。三つのケースの「1 : 2」（`production.start` と `finish`、`shipping.release` と `markDelivered`、`storefront.onAddToCart`）も、名前で並べた: 並べる名前が二つなら、`else` にしても短くならず、ケースを足したときに MATCH-2 が尋ねる方がよい。
@@ -666,7 +666,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **(a) 印のまま。** 約束と op を結ぶだけ。
 - **(b) 葉の op に、結果の条件を書ける。** アサーションの材料にする。
   ```ts
-  fn charged(payment: Payment, fee: type.Yen, now: Time): Payment
+  fn charged(payment: Payment, fee: type.Yen, now: datetime): Payment
     ensures result.captured <= payment.limit;
   ```
 

@@ -2,11 +2,11 @@
 // 表の model の @db.key のすべても、@db.unique の列も含まず、@db.latest もない。位置は read。
 
 namespace app {
-  model Row { @db.key @db.text id: string; @db.unique @db.text code: string; @db.text note: string; @db.time at: Time; }
+  model Row { @db.key @db.text id: string; @db.unique @db.text code: string; @db.text note: string; @db.datetime at: datetime; }
   /** キーが二つ */
   model Pair { @db.key @db.text left: string; @db.key @db.text right: string; @db.text note: string; }
   /** キーも、一意の列もない */
-  model Log { @db.text line: string; @db.time at: Time; }
+  model Log { @db.text line: string; @db.datetime at: datetime; }
   @db.table state rows: list<Row>;
   @db.table state pairs: list<Pair>;
   @db.table state logs: list<Log>;
@@ -29,7 +29,7 @@ namespace app {
   read fn pairByLeftAndNote(left: string, note: string): Pair? reads pairs;
   // キーのない model（どの列を並べても、決まらない）
   @db.find
-  read fn logByLine(line: string, at: Time): Log? reads logs;
+  read fn logByLine(line: string, at: datetime): Log? reads logs;
 
   // ---- 通るもの ----
 

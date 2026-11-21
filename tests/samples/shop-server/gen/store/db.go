@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS "orders" (
   "id" TEXT NOT NULL PRIMARY KEY,
   "userId" TEXT NOT NULL REFERENCES "users" ("id"),
   "lines" TEXT NOT NULL,
-  "placedAt" TEXT NOT NULL
+  "placedAt" TEXT NOT NULL,
+  "deliverOn" TEXT,
+  "deliverFrom" TEXT
 );
 CREATE TABLE IF NOT EXISTS "notifications" (
   "userId" TEXT NOT NULL REFERENCES "users" ("id"),
@@ -165,19 +167,19 @@ func (t OrdersTable) IsEmpty(ctx context.Context) (bool, error) {
 // Get は形で決まる問い合わせ: 表 "orders" の行を、足した順にすべて引く。
 func (t OrdersTable) Get(ctx context.Context) ([]pkgtype.Order, error) {
 	return dbList(ctx, t.db, dbScanOrder,
-		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" ORDER BY rowid`)
+		`SELECT "id", "userId", "lines", "placedAt", "deliverOn", "deliverFrom" FROM "orders" ORDER BY rowid`)
 }
 
 // OrdersOfUser は read store.ordersOfUser（@db.list）: 表 "orders" から、"userId" が引数 userId と同じ行を、足した順にすべて引く。
 func (t OrdersTable) OrdersOfUser(ctx context.Context, userId pkgtype.UserId) ([]pkgtype.Order, error) {
 	return dbList(ctx, t.db, dbScanOrder,
-		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" WHERE "userId" IS ?1 ORDER BY rowid`, dbText(userId))
+		`SELECT "id", "userId", "lines", "placedAt", "deliverOn", "deliverFrom" FROM "orders" WHERE "userId" IS ?1 ORDER BY rowid`, dbText(userId))
 }
 
 // LatestOrderOf は read store.latestOrderOf（@db.find、@db.latest）: 表 "orders" から、"userId" が引数 userId と同じ行のうち、"placedAt" がいちばん新しい行を引く。なければ nil。
 func (t OrdersTable) LatestOrderOf(ctx context.Context, userId pkgtype.UserId) (*pkgtype.Order, error) {
 	return dbGet(ctx, t.db, dbScanOrder,
-		`SELECT "id", "userId", "lines", "placedAt" FROM "orders" WHERE "userId" IS ?1 ORDER BY "placedAt" DESC, rowid DESC LIMIT 1`, dbText(userId))
+		`SELECT "id", "userId", "lines", "placedAt", "deliverOn", "deliverFrom" FROM "orders" WHERE "userId" IS ?1 ORDER BY "placedAt" DESC, rowid DESC LIMIT 1`, dbText(userId))
 }
 
 // CreateOrder は効果 store.createOrder（@db.insert）: 表 "orders" に、引数 order の行を足す。
@@ -187,7 +189,7 @@ func (t OrdersTable) CreateOrder(ctx context.Context, order pkgtype.Order) error
 		return err
 	}
 	return dbExec(ctx, t.db,
-		`INSERT INTO "orders" ("id", "userId", "lines", "placedAt") VALUES (?1, ?2, ?3, ?4)`, args...)
+		`INSERT INTO "orders" ("id", "userId", "lines", "placedAt", "deliverOn", "deliverFrom") VALUES (?1, ?2, ?3, ?4, ?5, ?6)`, args...)
 }
 
 // NotificationsTable は状態 store.notifications の単位（NotificationsState）の、表 "notifications" の上の実装。
@@ -253,13 +255,13 @@ func dbScanUser(r dbRow) (pkgtype.User, error) {
 
 // dbArgsSession は type.Session を、表 "sessions" の列の順の値にする。
 func dbArgsSession(row pkgtype.Session) ([]any, error) {
-	return dbArgs(dbText(row.Token), dbText(row.UserId), dbTime(row.ExpiresAt))
+	return dbArgs(dbText(row.Token), dbText(row.UserId), dbDatetime(row.ExpiresAt))
 }
 
 // dbScanSession は、表 "sessions" の列の順の値を type.Session に読む。
 func dbScanSession(r dbRow) (pkgtype.Session, error) {
 	var row pkgtype.Session
-	if err := r.Scan(dbText(&row.Token), dbText(&row.UserId), dbTime(&row.ExpiresAt)); err != nil {
+	if err := r.Scan(dbText(&row.Token), dbText(&row.UserId), dbDatetime(&row.ExpiresAt)); err != nil {
 		return pkgtype.Session{}, err
 	}
 	return row, nil
@@ -267,13 +269,13 @@ func dbScanSession(r dbRow) (pkgtype.Session, error) {
 
 // dbArgsOrder は type.Order を、表 "orders" の列の順の値にする。
 func dbArgsOrder(row pkgtype.Order) ([]any, error) {
-	return dbArgs(dbText(row.Id), dbText(row.UserId), dbJSON(row.Lines), dbTime(row.PlacedAt))
+	return dbArgs(dbText(row.Id), dbText(row.UserId), dbJSON(row.Lines), dbDatetime(row.PlacedAt), dbDate(row.DeliverOn, dbNullable), dbTime(row.DeliverFrom, dbNullable))
 }
 
 // dbScanOrder は、表 "orders" の列の順の値を type.Order に読む。
 func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 	var row pkgtype.Order
-	if err := r.Scan(dbText(&row.Id), dbText(&row.UserId), dbJSON(&row.Lines), dbTime(&row.PlacedAt)); err != nil {
+	if err := r.Scan(dbText(&row.Id), dbText(&row.UserId), dbJSON(&row.Lines), dbDatetime(&row.PlacedAt), dbDate(&row.DeliverOn, dbNullable), dbTime(&row.DeliverFrom, dbNullable)); err != nil {
 		return pkgtype.Order{}, err
 	}
 	return row, nil
@@ -384,20 +386,56 @@ func dbText(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {
 			return err
 		}
 		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(t).Convert(dst.Type()))
+		return nil
+	}}
+}
+
+// dbDate は @db.date の列: 日付を、2006-01-02 の形の文字列で（文字列の順が日付の順になる）。
+func dbDate(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
+		return v.Convert(reflect.TypeFor[runtime.Date]()).Interface().(runtime.Date).String(), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		d, err := runtime.ParseDate(s)
+		if err != nil {
+			return err
+		}
+		dst.Set(reflect.ValueOf(d).Convert(dst.Type()))
+		return nil
+	}}
+}
+
+// dbTime は @db.time の列: 一日の中の時刻を、15:04:05.000000000 の形の文字列で（小数部はいつも 9 桁。文字列の順が時刻の順になる）。
+func dbTime(v any, opts ...dbOption) dbCol {
+	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
+		return v.Convert(reflect.TypeFor[runtime.TimeOfDay]()).Interface().(runtime.TimeOfDay).Fixed(), nil
+	}, func(src any, dst reflect.Value) error {
+		s, err := dbString(src)
+		if err != nil {
+			return err
+		}
+		t, err := runtime.ParseTimeOfDay(s)
 		if err != nil {
 			return err
 		}

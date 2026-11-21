@@ -178,11 +178,11 @@ namespace fulfilment {
    * 通知は、荷物一つにつき、いくつも届く（運んでいる途中、不在、返送など）。店がすることがあるのは、届いたという通知だけで、
    * ほかの通知は、受け取ったとだけ答える: 答えなければ、相手が送り直し続ける。だから、その場合にも名前を付けて、何もしない枝を書く。
    */
-  classify Arrival of Time? {
+  classify Arrival of datetime? {
     /** 届いた */
-    Arrived: Time? as Time;
+    Arrived: datetime? as datetime;
     /** まだ届いていない（運んでいる途中、不在、返送など）。店は、何もしない */
-    Underway: Time? as else;
+    Underway: datetime? as else;
   }
 
   /** 配送業者から、荷物の動きの通知が届いた。届いたという通知なら、出荷に記録する。ほかの動きの通知は、受け取るだけ */

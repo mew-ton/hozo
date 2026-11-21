@@ -118,13 +118,13 @@ func (t SecretsTable) ByLocals(ctx context.Context, ctx_ Num, err_ Ratio, args_ 
 // ByWords は read vault.byWords（@db.list）: 表 "secrets" から、"type" が引数 type と同じ行を、足した順にすべて引く。
 func (t SecretsTable) ByWords(ctx context.Context, type_ time.Time) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "type" IS ?1 ORDER BY rowid`, dbTime(type_))
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "type" IS ?1 ORDER BY rowid`, dbDatetime(type_))
 }
 
-// ByImports は read vault.byImports（@db.list）: 表 "secrets" から、"json" が引数 json と同じで、"time" が引数 time と同じで、"sql" が引数 sql と同じで、"runtime" が引数 runtime と同じ行を、足した順にすべて引く。
-func (t SecretsTable) ByImports(ctx context.Context, json_ map[string]string, time_ *time.Time, sql_ time.Duration, runtime_ string) ([]Secret, error) {
+// ByImports は read vault.byImports（@db.list）: 表 "secrets" から、"json" が引数 json と同じで、"sql" が引数 sql と同じで、"runtime" が引数 runtime と同じ行を、足した順にすべて引く。
+func (t SecretsTable) ByImports(ctx context.Context, json_ map[string]string, sql_ time.Duration, runtime_ string) ([]Secret, error) {
 	return dbList(ctx, t.db, dbScanSecret,
-		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "json" IS ?1 AND "time" IS ?2 AND "sql" IS ?3 AND "runtime" IS ?4 ORDER BY rowid`, dbJSON(json_), dbTime(time_, dbNullable), dbInt(sql_), dbText(runtime_))
+		`SELECT "t", "ctx", "err", "args", "type", "string", "json", "any", "time", "sql", "runtime", "dbGet", "dbScanSecret", "s", "value" FROM "secrets" WHERE "json" IS ?1 AND "sql" IS ?2 AND "runtime" IS ?3 ORDER BY rowid`, dbJSON(json_), dbInt(sql_), dbText(runtime_))
 }
 
 // ByPrivates は read vault.byPrivates（@db.list）: 表 "secrets" から、"dbGet" が引数 dbGet と同じで、"dbScanSecret" が引数 dbScanSecret と同じで、"s" が引数 s と同じ行を、足した順にすべて引く。
@@ -273,13 +273,13 @@ func (s_ DbSeams) ReportDbTransaction(ctx_ context.Context, fault err.Fault, bod
 
 // dbArgsSecret は vault.Secret を、表 "secrets" の列の順の値にする。
 func dbArgsSecret(row_ Secret) ([]any, error) {
-	return dbArgs(dbText(row_.T), dbInt(row_.Ctx), dbFloat(row_.Err), dbBool(row_.Args), dbTime(row_.Type), dbJSON(row_.String), dbJSON(row_.Json), dbJSON(row_.Any, dbNullable), dbTime(row_.Time, dbNullable), dbInt(row_.Sql), dbText(row_.Runtime), dbText(row_.DbGet), dbText(row_.DbScanSecret), dbText(row_.S), dbText(row_.Value))
+	return dbArgs(dbText(row_.T), dbInt(row_.Ctx), dbFloat(row_.Err), dbBool(row_.Args), dbDatetime(row_.Type), dbJSON(row_.String), dbJSON(row_.Json), dbJSON(row_.Any, dbNullable), dbDatetime(row_.Time, dbNullable), dbInt(row_.Sql), dbText(row_.Runtime), dbText(row_.DbGet), dbText(row_.DbScanSecret), dbText(row_.S), dbText(row_.Value))
 }
 
 // dbScanSecret は、表 "secrets" の列の順の値を vault.Secret に読む。
 func dbScanSecret(r_ dbRow) (Secret, error) {
 	var row_ Secret
-	if err_ := r_.Scan(dbText(&row_.T), dbInt(&row_.Ctx), dbFloat(&row_.Err), dbBool(&row_.Args), dbTime(&row_.Type), dbJSON(&row_.String), dbJSON(&row_.Json), dbJSON(&row_.Any, dbNullable), dbTime(&row_.Time, dbNullable), dbInt(&row_.Sql), dbText(&row_.Runtime), dbText(&row_.DbGet), dbText(&row_.DbScanSecret), dbText(&row_.S), dbText(&row_.Value)); err_ != nil {
+	if err_ := r_.Scan(dbText(&row_.T), dbInt(&row_.Ctx), dbFloat(&row_.Err), dbBool(&row_.Args), dbDatetime(&row_.Type), dbJSON(&row_.String), dbJSON(&row_.Json), dbJSON(&row_.Any, dbNullable), dbDatetime(&row_.Time, dbNullable), dbInt(&row_.Sql), dbText(&row_.Runtime), dbText(&row_.DbGet), dbText(&row_.DbScanSecret), dbText(&row_.S), dbText(&row_.Value)); err_ != nil {
 		return Secret{}, err_
 	}
 	return row_, nil
@@ -287,13 +287,13 @@ func dbScanSecret(r_ dbRow) (Secret, error) {
 
 // dbArgsEntry は row.Entry を、表 "entriesA" の列の順の値にする。
 func dbArgsEntry(row_ row.Entry) ([]any, error) {
-	return dbArgs(dbText(row_.Id), dbTime(row_.At))
+	return dbArgs(dbText(row_.Id), dbDatetime(row_.At))
 }
 
 // dbScanEntry は、表 "entriesA" の列の順の値を row.Entry に読む。
 func dbScanEntry(r_ dbRow) (row.Entry, error) {
 	var row_ row.Entry
-	if err_ := r_.Scan(dbText(&row_.Id), dbTime(&row_.At)); err_ != nil {
+	if err_ := r_.Scan(dbText(&row_.Id), dbDatetime(&row_.At)); err_ != nil {
 		return row.Entry{}, err_
 	}
 	return row_, nil
@@ -449,14 +449,14 @@ func dbBool(v any, opts ...dbOption) dbCol {
 	}}
 }
 
-// dbTimeLayout は @db.time の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
-const dbTimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
+// dbDatetimeLayout は @db.datetime の列の形: RFC 3339、UTC、小数部はいつも 9 桁（文字列の順が時刻の順になる）。
+const dbDatetimeLayout = "2006-01-02T15:04:05.000000000Z07:00"
 
-// dbTime は @db.time の列: 時刻を、dbTimeLayout の文字列で。
-func dbTime(v any, opts ...dbOption) dbCol {
+// dbDatetime は @db.datetime の列: 瞬間を、dbDatetimeLayout の文字列で。
+func dbDatetime(v any, opts ...dbOption) dbCol {
 	return dbCol{v, opts, func(v reflect.Value) (driver.Value, error) {
 		t := v.Convert(reflect.TypeFor[time.Time]()).Interface().(time.Time)
-		return t.UTC().Format(dbTimeLayout), nil
+		return t.UTC().Format(dbDatetimeLayout), nil
 	}, func(src any, dst reflect.Value) error {
 		s, err := dbString(src)
 		if err != nil {

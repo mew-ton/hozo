@@ -20,9 +20,9 @@ namespace inventory {
     name: string;
     quantity: type.Quantity;
     /** 注文を受け付けて、棚から出してよくなった時刻。支払いを待っている間は、ない */
-    confirmedAt: Time?;
+    confirmedAt: datetime?;
     /** 棚から出した時刻。まだ出していなければ、ない */
-    pickedAt: Time?;
+    pickedAt: datetime?;
   }
 
   @db.table
@@ -70,10 +70,10 @@ namespace inventory {
   effect fn addReservations(added: Reservation[]): effects reservations.post;
 
   /** 棚から出した: 出した時刻を入れる（人が書く） */
-  effect fn markPicked(reservation: Reservation, at: Time): effects reservations.put as Picking.OnShelf -> Picking.Picked;
+  effect fn markPicked(reservation: Reservation, at: datetime): effects reservations.put as Picking.OnShelf -> Picking.Picked;
 
   /** その注文の取り置きに、棚から出してよくなった時刻を入れる。棚にあるか出したか（Picking）は、変えない: as を書かない put */
-  effect fn confirmReservations(orderId: type.OrderId, at: Time): effects reservations.put;
+  effect fn confirmReservations(orderId: type.OrderId, at: datetime): effects reservations.put;
 
   /** その注文の取り置きを消す。戻した取り置きは、残さない（取り置きは、なくなることが意味） */
   @db.delete

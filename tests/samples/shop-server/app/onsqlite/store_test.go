@@ -12,6 +12,7 @@ import (
 	"example.com/shop-server/app/storetest"
 	"example.com/shop-server/gen/store"
 	pkgtype "example.com/shop-server/gen/type"
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // newStore は、新しいメモリの上の SQLite に表を作り、その上の store を返す（server は組み立てない。gen/store だけで動く）。
@@ -162,7 +163,7 @@ func TestHumanCompletesPluginType(t *testing.T) {
 	}
 }
 
-// TestColumns は、go-sqlite が決めた列の形: Time は RFC 3339・UTC・小数部 9 桁の TEXT、配列は JSON の TEXT。
+// TestColumns は、go-sqlite が決めた列の形: datetime は RFC 3339・UTC・小数部 9 桁の TEXT、配列は JSON の TEXT。
 func TestColumns(t *testing.T) {
 	t.Parallel()
 	db, ctx := openDB(t), context.Background()
@@ -183,6 +184,24 @@ func TestColumns(t *testing.T) {
 	}
 	if lines != `[{"item":"apple","quantity":2}]` || at != "2026-01-02T03:04:05.120000000Z" {
 		t.Errorf("列の値が lines = %s、placedAt = %s", lines, at)
+	}
+	// 日付（@db.date）と、一日の中の時刻（@db.time）の列: 値がなければ NULL、あれば、決まった形の文字列。読み戻すと、同じ値
+	var nulls int64
+	if err := db.QueryRow(`SELECT ("deliverOn" IS NULL) + ("deliverFrom" IS NULL) FROM "orders" WHERE "id" = 'o1'`).Scan(&nulls); err != nil || nulls != 2 {
+		t.Errorf("値のない deliverOn と deliverFrom のうち、NULL の列が %d, %v（期待は 2）", nulls, err)
+	}
+	on, from := runtime.NewDate(2026, 1, 5), runtime.NewTimeOfDay(9, 30, 0, 0)
+	timed := pkgtype.Order{Id: "o2", UserId: "u1", PlacedAt: placedAt.UTC(), DeliverOn: &on, DeliverFrom: &from}
+	if err := store.NewOrdersTable(db).CreateOrder(ctx, timed); err != nil {
+		t.Fatal(err)
+	}
+	var day, clock string
+	if err := db.QueryRow(`SELECT "deliverOn", "deliverFrom" FROM "orders" WHERE "id" = 'o2'`).Scan(&day, &clock); err != nil || day != "2026-01-05" || clock != "09:30:00.000000000" {
+		t.Errorf("列の値が deliverOn = %s、deliverFrom = %s, %v", day, clock, err)
+	}
+	got, err := store.NewOrdersTable(db).Get(ctx)
+	if err != nil || len(got) != 2 || got[1].DeliverOn == nil || *got[1].DeliverOn != on || got[1].DeliverFrom == nil || *got[1].DeliverFrom != from {
+		t.Errorf("読み戻した注文が %+v, %v", got, err)
 	}
 }
 

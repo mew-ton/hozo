@@ -192,7 +192,7 @@ export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   addJobs(planned);
 }
 
-fn plan(orderId: type.OrderId, lines: ordering.MadeLine[], now: Time): Job[];
+fn plan(orderId: type.OrderId, lines: ordering.MadeLine[], now: datetime): Job[];
 ```
 
 書き直しの一つ目。効果を、回ごとに呼ぶ。効果は、行を一つ受け取るので、入るケースを、書ける。
@@ -208,7 +208,7 @@ export fn enqueue(orderId: type.OrderId, lines: ordering.MadeLine[]) {
   }
 }
 
-fn planJob(orderId: type.OrderId, line: ordering.MadeLine, now: Time): Job;
+fn planJob(orderId: type.OrderId, line: ordering.MadeLine, now: datetime): Job;
 ```
 
 書き直しの二つ目。効果は、まとめて受け取るまま。仕事を、`collect` で集める。

@@ -34,7 +34,7 @@ namespace staff {
   model Session {
     @db.key token: type.Token;
     @db.ref(Member) memberId: MemberId;
-    expiresAt: Time;
+    expiresAt: datetime;
   }
 
   @db.table
@@ -154,7 +154,7 @@ namespace staff {
     throws InvalidCredentials;
 
   /** トークンと期限を決める（人が書く） */
-  fn newSession(member: Member, now: Time): Session;
+  fn newSession(member: Member, now: datetime): Session;
 
   /** 外に見せる形に写す（人が書く） */
   fn toPublic(member: Member): PublicMember;
@@ -213,7 +213,7 @@ namespace staff {
   }
 
   /** 期限が過ぎていないセッションを、そのまま返す。過ぎていれば Unauthorized（人が書く） */
-  fn requireFresh(session: Session, now: Time): Session
+  fn requireFresh(session: Session, now: datetime): Session
     throws type.Unauthorized;
 
   /** 製作の担当として呼んでいることを確かめる */
