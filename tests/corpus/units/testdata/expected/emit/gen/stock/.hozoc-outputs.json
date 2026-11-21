@@ -1,5 +1,7 @@
 [
   "gen/stock/doc.go",
   "gen/stock/ops.go",
+  "gen/stock/stocktest/doc.go",
+  "gen/stock/stocktest/leaves.go",
   "gen/stock/types.go"
 ]

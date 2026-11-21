@@ -70,3 +70,18 @@ func (e *ClassificationError) Error() string {
 	}
 	return fmt.Sprintf("classification %s: %d cases matched (%s)", e.Classify, len(e.Hits), strings.Join(e.Hits, ", "))
 }
+
+// CaseError は、効果の入口の確かめの失敗（docs/plugin-go.md「効果の入口の確かめ」）: 絞り込んだ引数が、言ったとおりのケースに
+// ない。仕様の例外ではない（Exception を満たさない）。効果は、起きていない。
+// Effect は効果の FQN、Param は引数の名前、Classify は分類の FQN、Want は、引数の型が言うケース（型に書かれた順）、
+// Got は、判定関数が返したケース。
+type CaseError struct {
+	Effect, Param, Classify string
+	Want                    []string
+	Got                     string
+}
+
+// Error は "effect <Effect>: argument <Param> is in case <Got> of <Classify>, want <Want を ", " で>"。
+func (e *CaseError) Error() string {
+	return fmt.Sprintf("effect %s: argument %s is in case %s of %s, want %s", e.Effect, e.Param, e.Got, e.Classify, strings.Join(e.Want, ", "))
+}

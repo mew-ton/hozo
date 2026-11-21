@@ -5,6 +5,8 @@ package app
 import (
 	"context"
 	"time"
+
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // OrdersState は状態 app.orders（list<app.Order>）の単位。実装は New の引数 orders に渡す。
@@ -39,4 +41,52 @@ type OrdersState interface {
 	Discard(ctx context.Context, order Order) error
 	// Purge は命令（効果 app.purge、effects app.orders.delete as app.Life.Absent）。
 	Purge(ctx context.Context, order Order) error
+}
+
+// checkedOrdersState は、状態 app.orders の単位を包む: 絞り込んだ引数を持つ効果の入口で、引数が、言ったとおりのケースにあるかを確かめる。
+// New が、引数 orders を、これで包む。ほかのメソッドは、包んだ単位を、そのまま呼ぶ。
+type checkedOrdersState struct {
+	OrdersState
+	life  LifeCases
+	stage StageCases
+}
+
+// Start は、効果 app.start の入口の確かめ: order が、app.Stage の Accepted にあること。違えば、*runtime.CaseError を返し、効果は、起きない。
+func (o checkedOrdersState) Start(ctx context.Context, order Order, at time.Time) error {
+	if kind, err := ClassifyStage(ctx, o.stage, order); err != nil {
+		return err
+	} else if kind != StageAccepted {
+		return &runtime.CaseError{Effect: "app.start", Param: "order", Classify: "app.Stage", Want: []string{"Accepted"}, Got: [...]string{"Draft", "Accepted", "InProduction", "Shipped", "Cancelled"}[kind]}
+	}
+	return o.OrdersState.Start(ctx, order, at)
+}
+
+// Cancel は、効果 app.cancel の入口の確かめ: order が、app.Stage の Draft か Accepted にあること。違えば、*runtime.CaseError を返し、効果は、起きない。
+func (o checkedOrdersState) Cancel(ctx context.Context, order Order) error {
+	if kind, err := ClassifyStage(ctx, o.stage, order); err != nil {
+		return err
+	} else if kind != StageDraft && kind != StageAccepted {
+		return &runtime.CaseError{Effect: "app.cancel", Param: "order", Classify: "app.Stage", Want: []string{"Draft", "Accepted"}, Got: [...]string{"Draft", "Accepted", "InProduction", "Shipped", "Cancelled"}[kind]}
+	}
+	return o.OrdersState.Cancel(ctx, order)
+}
+
+// Revise は、効果 app.revise の入口の確かめ: order が、app.Stage の Accepted にあること。違えば、*runtime.CaseError を返し、効果は、起きない。
+func (o checkedOrdersState) Revise(ctx context.Context, order Order, note string) error {
+	if kind, err := ClassifyStage(ctx, o.stage, order); err != nil {
+		return err
+	} else if kind != StageAccepted {
+		return &runtime.CaseError{Effect: "app.revise", Param: "order", Classify: "app.Stage", Want: []string{"Accepted"}, Got: [...]string{"Draft", "Accepted", "InProduction", "Shipped", "Cancelled"}[kind]}
+	}
+	return o.OrdersState.Revise(ctx, order, note)
+}
+
+// Discard は、効果 app.discard の入口の確かめ: order が、app.Life の Open にあること。違えば、*runtime.CaseError を返し、効果は、起きない。
+func (o checkedOrdersState) Discard(ctx context.Context, order Order) error {
+	if kind, err := ClassifyLife(ctx, o.life, &order); err != nil {
+		return err
+	} else if kind != LifeOpen {
+		return &runtime.CaseError{Effect: "app.discard", Param: "order", Classify: "app.Life", Want: []string{"Open"}, Got: [...]string{"Open", "Closed", "Absent"}[kind]}
+	}
+	return o.OrdersState.Discard(ctx, order)
 }

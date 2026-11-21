@@ -22,7 +22,9 @@
         "gen/server/inner/doc.go",
         "gen/server/inner/types.go",
         "gen/server/inner/ops.go",
-        "gen/server/inner/wiring.go"
+        "gen/server/inner/wiring.go",
+        "gen/server/servertest/doc.go",
+        "gen/server/servertest/leaves.go"
       ]
     },
     "go-valid": {

@@ -11,6 +11,9 @@ import (
 // 相乗りは、このディレクトリ名を使わない（同「相乗りのファイル」）。
 const innerDir = "inner"
 
+// testSuffix は、テストのパッケージの名前の後ろに付ける語（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）。
+const testSuffix = "test"
+
 // Layout は一つの出力 (U, N) の置き場（docs/plugin-go.md「配置」）。
 //
 // 入口のパッケージは `<Dir(U, N)>/` で、人が書くコード、別の名前空間の出力、相乗りのファイルが使う。定義のパッケージは、
@@ -27,6 +30,10 @@ type Layout struct {
 	// DefDir、DefPath、DefName は、定義のパッケージのディレクトリ、import パス、名前。HasInner なら `<Dir>/inner`、
 	// `<EntryPath>/inner`、"inner"。そうでなければ入口と同じ。
 	DefDir, DefPath, DefName string
+	// TestDir、TestPath、TestName は、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の
+	// ディレクトリ、import パス、名前: `<Dir>/<EntryName>test`、`<EntryPath>/<EntryName>test`、`<EntryName>test`。
+	// 口が一つもない出力では、基底は、このパッケージを作らない。
+	TestDir, TestPath, TestName string
 }
 
 // LayoutOf は、この View の出力 (U, N) の置き場（docs/plugin-go.md「パッケージと import パス」「内側のフォルダと入口」）。
@@ -89,6 +96,8 @@ func layout(namespace, dir, root string, hasInner bool) (*Layout, error) {
 	}
 	l := &Layout{Namespace: namespace, Dir: dir, EntryPath: entry, EntryName: PackageName(namespace), HasInner: hasInner}
 	l.DefDir, l.DefPath, l.DefName = l.Dir, l.EntryPath, l.EntryName
+	l.TestName = l.EntryName + testSuffix
+	l.TestDir, l.TestPath = path.Join(dir, l.TestName), entry+"/"+l.TestName
 	if hasInner {
 		l.DefDir, l.DefPath, l.DefName = path.Join(dir, innerDir), entry+"/"+innerDir, innerDir
 	}

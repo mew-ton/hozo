@@ -1,4 +1,6 @@
 [
+  "gen/admin/admintest/doc.go",
+  "gen/admin/admintest/leaves.go",
   "gen/admin/doc.go",
   "gen/admin/inner/doc.go",
   "gen/admin/inner/ops.go",

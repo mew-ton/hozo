@@ -215,7 +215,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 
 - **`@db.update` は、後のケースが、行の引数の型の言う、前のケースの並びにないとき、付けられない**（GOSQL-30）: `effect fn start(order: Order on Stage.Accepted): effects orders.put as Stage.InProduction;` に渡る行は、`Accepted` にあると分かっている行（`docs/check.md`「行の遷移」の「呼ぶ側」）。`@db.update` は、その行を、そのまま書く。書いた後の行も `Accepted` のままで、宣言した `InProduction` にならない。行を `InProduction` にする書き方（どの列を、何に変えるか）は、宣言から決まらないので、その効果は、人が書く（遷移を宛先にする効果と同じ扱い: GOSQL-11）。付けられるのは、行の引数を、その分類で絞り込んでいない形（`effect fn forceShip(order: Order): effects orders.put as Stage.Shipped;`: 渡した行が、もう `Shipped` でありうる）、後のケースが、前のケースの並びにある形、`as else` の形。
 - **`@db.delete` は、行の遷移を持つ効果に、付けられない**: 行の遷移を持つ効果は、行を引数に取る（STATE-7）。`@db.delete` の引数は、列の条件で、行の引数の名前の列は、ない（GOSQL-8）。その効果は、人が書く。**未決: 行を受け取る `@db.delete`**（キーが、引数の行と同じ行を消す）。決まるまで、今の規則のまま。
-- 生成するメソッドのコメントは、行の遷移を確かめないことを言う（「メソッドの形とコメント」の「効果の句」）。
+- 生成するメソッドのコメントは、行の遷移を確かめないことを言う（「メソッドの形とコメント」の「効果の句」）。確かめないのは、このメソッド。絞り込んだ引数（効果の前のケース）は、基底が、`New` で包んだ単位の入口で確かめる（`docs/plugin-go.md`「効果の入口の確かめ」）ので、コメントの「（<絞り込んだ引数の表示>、…）は、確かめない。」は、前のケースについては、このメソッドの中のことだけを言う。文を直すかは、決めていない（`docs/open.md`「語彙とプラグイン」）。
 
 ### 列と引数の型
 

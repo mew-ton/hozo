@@ -5,6 +5,8 @@ GO-2	c.kinds.SizeBig	定義のパッケージ（gen/c/kinds）の名前 SizeBig 
 GO-2	c.kinds.SizeCases	定義のパッケージ（gen/c/kinds）の名前 SizeCases が当たる: classify c.kinds.Size の述語のインターフェース と model c.kinds.SizeCases（直すのは仕様の名前）
 GO-2	c.kinds.ClassifySize	定義のパッケージ（gen/c/kinds）の名前 ClassifySize が当たる: classify c.kinds.Size の判定関数 と model c.kinds.ClassifySize（直すのは仕様の名前）
 GO-2	c.methods.Foo	インターフェース Ops の名前 Foo が当たる: op c.methods.foo と op c.methods.Foo（直すのは仕様の名前）
+GO-2	c.methods.Foo	テストのパッケージ（gen/c/methods/methodstest）の名前 FooCases が当たる: op c.methods.foo のケースの口 FooCases と op c.methods.Foo のケースの口 FooCases（直すのは仕様の名前）
+GO-2	c.methods.Foo	テストのパッケージ（gen/c/methods/methodstest）の名前 FooCase が当たる: op c.methods.foo のケース FooCase と op c.methods.Foo のケース FooCase（直すのは仕様の名前）
 GO-2	c.ops.Ops	定義のパッケージ（gen/c/ops）の名前 Ops が当たる: model c.ops.Ops と インターフェース Ops（直すのは仕様の名前）
 GO-2	c.ops.Leaves	定義のパッケージ（gen/c/ops）の名前 Leaves が当たる: model c.ops.Leaves と インターフェース Leaves（直すのは仕様の名前）
 GO-2	c.ops.CDepOps	定義のパッケージ（gen/c/ops）の名前 CDepOps が当たる: model c.ops.CDepOps と 別の名前空間 c.dep の口（直すのは仕様の名前）

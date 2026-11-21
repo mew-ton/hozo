@@ -13,7 +13,14 @@ import (
 
 // このファイルは、docs/plugin-go.md「op の形」が一通りであること: 基底が出す、仕様の宣言を写した関数（op のメソッド、状態の単位の
 // メソッド、分類の述語と判定関数、継ぎ目のメソッドと body）は、どれも、最初の引数に ctx context.Context を取り、最後の戻り値に
-// error を返す。純粋かどうか（Op.signature.pure）でも、throws の有無でも、形は変わらない。
+// error を返す。純粋かどうか（Op.signature.pure）でも、throws の有無でも、形は変わらない。テストのパッケージ（同「単体テストの口」）の
+// 関数は、仕様の宣言を写したものではなく、testing がその形を決めているので、確かめない。
+
+// inTestPackage は、出力のファイル path（package 節の名前が pkg）が、テストのパッケージのものか: ディレクトリの名前が、パッケージ名と
+// 同じで、test で終わる（同「単体テストの口」の「テストのパッケージ」）。入力の名前空間に、test で終わる名前のものはない。
+func inTestPackage(path, pkg string) bool {
+	return strings.HasSuffix(pkg, "test") && filepath.Base(filepath.Dir(path)) == pkg
+}
 
 // specFunc は、仕様の宣言を写した関数でないもの（同「op の形」: Go がその形を決めているもの）を除く: New、補助 ptr、union の
 // マーカーメソッド（is<Union>）、例外の Error と HozoException。
@@ -53,6 +60,9 @@ func TestEveryFunctionTakesCtxAndReturnsError(t *testing.T) {
 			f, err := parser.ParseFile(token.NewFileSet(), path, content, 0)
 			if err != nil {
 				t.Fatalf("%s/%s: %v", fx.name, path, err)
+			}
+			if inTestPackage(path, f.Name.Name) {
+				continue
 			}
 			checked := 0
 			ast.Inspect(f, func(n ast.Node) bool {

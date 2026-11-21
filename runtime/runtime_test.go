@@ -133,3 +133,15 @@ func TestDBTxKey(t *testing.T) {
 		t.Errorf("db のない鍵で引いた値 = %v（期待は nil）", got)
 	}
 }
+
+func TestCaseErrorMessage(t *testing.T) {
+	err := &CaseError{Effect: "pay.capture", Param: "payment", Classify: "pay.Standing", Want: []string{"Held", "Prepaid"}, Got: "Settled"}
+	if got, want := err.Error(), "effect pay.capture: argument payment is in case Settled of pay.Standing, want Held, Prepaid"; got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+	// 仕様の例外ではない
+	var e error = err
+	if _, ok := e.(Exception); ok {
+		t.Error("CaseError が Exception を満たしている")
+	}
+}

@@ -29,9 +29,10 @@ var goldenFixtures = []struct {
 	{name: "matchswitch", covers: "「match」の switch の形（variant、述語で決まる分類）と、その「分類の誤りの枝」（型の switch の default:）、else のアーム、「絞り込んだ値」、「分類」", behavior: true},
 	{name: "matchelse", covers: "「match」の、残りのケース（対象 as else）を持つ型で決まる分類: 二つに分ける形のもう一方の枝（presence）、残りのアームを並べた case と絞り込んだ値（variant）。「分類」（何も出さない）", behavior: true},
 	{name: "matchclosed", covers: "「match」の、二つに分ける形の「分類の誤りの枝」（残りのケースを書かない presence の分類）と、else のアーム（受けるケースを名前で並べたアームと同じコード）", behavior: true},
-	{name: "rowstate", covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
+	{name: "rowstate", covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示。行の引数を絞り込んだ効果は「効果の入口の確かめ」）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
 	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)、例外を投げる効果（「状態の単位」と、単位のメソッドのコメントの throws）", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
+	{name: "unittest", covers: "「単体テストの口」（葉の op の結果ごとのケース、当たる結果の名前、Then_、絞り込んだ戻り値の確かめ、分類の判定の例、口を持たないもの）と、「効果の入口の確かめ」（包む型、New が包むこと、別の名前空間の分類の述語）", behavior: true},
 }
 
 // TestGolden は、入力ごとに、出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形で

@@ -429,3 +429,67 @@ func TestSeamSignature(t *testing.T) {
 		t.Errorf("SeamBodyParam = %q", got)
 	}
 }
+
+// docs/plugin-go.md「効果の入口の確かめ」: 確かめる引数は、効果の引数のうち、型が、そのまま、述語で決まる値の分類か op の分類で
+// 絞り込んだ型のもの。型で決まる分類、状態の分類、optional や array の中の絞り込みは、確かめない。
+func TestCheckedParams(t *testing.T) {
+	order := ir.Ref("app.Order")
+	on := func(of ir.Type, classify string, cases ...string) ir.Type {
+		return ir.CaseType{Classify: classify, Cases: cases, Of: of}
+	}
+	e := effect("app.move", ir.BuiltinTarget{State: "app.orders", Operation: ir.OpPut},
+		param("order", on(order, "app.Stage", "Sent", "Done")),
+		param("plain", order),
+		param("byType", on(order, "app.Known", "Found")),
+		param("item", on(ir.Ref("stock.Item"), "stock.Level", "Out")),
+		param("found", on(ir.Optional(order), "app.Lookup", "Hit")),
+		param("inList", ir.Array(on(order, "app.Stage", "Sent"))),
+		param("inOptional", ir.Optional(on(order, "app.Stage", "Sent"))),
+		param("byState", on(order, "app.Backlog", "Calm")))
+	v := viewOf("app",
+		namespace("app",
+			model("app.Order"), state("app.orders", ir.Array(order)), e,
+			effect("app.keep", ir.BuiltinTarget{State: "app.orders", Operation: ir.OpPost}, param("order", order)),
+			classify("app.Stage", ir.TypeSubject{Type: order}, ir.DecidedByPredicate, "Draft", "Sent", "Done"),
+			classify("app.Known", ir.TypeSubject{Type: ir.Optional(order)}, ir.DecidedByType, "Found", "Missing"),
+			classify("app.Lookup", ir.OpSubject{Op: "app.find", Type: ir.Optional(order)}, ir.DecidedByPredicate, "Hit", "Miss"),
+			classify("app.Backlog", ir.StatesSubject{States: []string{"app.orders"}}, ir.DecidedByPredicate, "Calm", "Rush"),
+			op("app.find", ir.Optional(order)),
+		),
+		namespace("stock", model("stock.Item"),
+			classify("stock.Level", ir.TypeSubject{Type: ir.Ref("stock.Item")}, ir.DecidedByPredicate, "Plenty", "Out")),
+	)
+	want := []CheckedParam{
+		{Param: "order", Classify: "app.Stage", Cases: []string{"Sent", "Done"}},
+		{Param: "item", Classify: "stock.Level", Cases: []string{"Out"}},
+		{Param: "found", Classify: "app.Lookup", Cases: []string{"Hit"}},
+	}
+	if got := CheckedParams(v.Program, e); !reflect.DeepEqual(got, want) {
+		t.Errorf("CheckedParams = %+v\nwant %+v", got, want)
+	}
+	if got := CheckedParams(v.Program, v.Program.Lookup("app.keep").(*ir.Effect)); len(got) != 0 {
+		t.Errorf("絞り込んだ引数のない効果: %+v", got)
+	}
+	if c, ks, ok := PredicateNarrowing(v.Program, on(order, "app.Stage", "Draft")); !ok || c != "app.Stage" || !reflect.DeepEqual(ks, []string{"Draft"}) {
+		t.Errorf("PredicateNarrowing = %q, %v, %v", c, ks, ok)
+	}
+	for name, typ := range map[string]ir.Type{"絞り込んでいない型": order, "型で決まる分類": on(order, "app.Known", "Found"),
+		"状態の分類": on(order, "app.Backlog", "Calm"), "並びの中": ir.Array(on(order, "app.Stage", "Sent")), "型がない": nil} {
+		if _, _, ok := PredicateNarrowing(v.Program, typ); ok {
+			t.Errorf("%s: PredicateNarrowing が ok", name)
+		}
+	}
+	if got := CheckedUnitName("app.orders"); got != "checkedOrdersState" {
+		t.Errorf("CheckedUnitName = %q", got)
+	}
+	// 入口の確かめが使う分類の述語は、どの配線も match に使わなくても、New が受け取る（別の名前空間のものを含む。FQN の辞書順）
+	s := ShapeOf(v)
+	if got := strings.Join(s.Classify, ","); got != "app.Lookup,app.Stage,stock.Level" {
+		t.Errorf("Classify = %s", got)
+	}
+	wantNew := []Param{{"leaves", "Leaves"}, {"orders", "OrdersState"}, {"backlog", "BacklogState"},
+		{"lookup", "LookupCases"}, {"stage", "StageCases"}, {"level", "LevelCases"}}
+	if !reflect.DeepEqual(s.New, wantNew) {
+		t.Errorf("New = %+v\nwant %+v", s.New, wantNew)
+	}
+}

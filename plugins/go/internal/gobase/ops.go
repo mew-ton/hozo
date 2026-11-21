@@ -19,6 +19,8 @@ const (
 	commentMissing = "メソッドが一つでも足りない値は、渡すところでコンパイルできない。"
 	commentSeams   = "Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 %s に渡す。\n" + commentMissing
 	commentOps     = "ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。"
+	// 入口の確かめを持つ単位が、一つでもあるとき（docs/plugin-go.md「New」）
+	commentOpsChecked = "ops は New が返す非公開の構造体。フィールドは New の引数（入口の確かめを持つ状態の単位は、New が包んだもの）。メソッドは、この名前空間の op のすべて。"
 )
 
 func (e *emitter) leavesComment() string {
@@ -190,12 +192,33 @@ func (e *emitter) genOps() *fileGen {
 	// New と、構造体 ops
 	params, _ := e.newParams(f)
 	f.print(e.newComment())
+	// 入口の確かめを持つ単位は、包んで入れる（docs/plugin-go.md「効果の入口の確かめ」）
+	wrapped := map[string]string{} // New の引数の名前 → 包んだ式
+	for _, u := range s.States {
+		cs := e.checkedClassifies(u)
+		if len(cs) == 0 {
+			continue
+		}
+		parts := []string{u.Param}
+		for _, fqn := range cs {
+			parts = append(parts, e.fields.classify[fqn])
+		}
+		wrapped[u.Param] = golang.CheckedUnitName(u.FQN) + "{" + strings.Join(parts, ", ") + "}"
+	}
 	var inits []string
 	for _, p := range s.New {
+		if w, ok := wrapped[p.Name]; ok {
+			inits = append(inits, p.Name+": "+w)
+			continue
+		}
 		inits = append(inits, p.Name+": "+p.Name)
 	}
 	f.printf("func New(%s) Ops {\n\treturn &ops{%s}\n}\n\n", strings.Join(params, ", "), strings.Join(inits, ", "))
-	f.print(comment(commentOps))
+	if len(wrapped) > 0 {
+		f.print(comment(commentOpsChecked))
+	} else {
+		f.print(comment(commentOps))
+	}
 	if len(s.New) == 0 {
 		f.print("type ops struct{}\n\n")
 	} else {

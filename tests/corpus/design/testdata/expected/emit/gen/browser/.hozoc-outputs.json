@@ -1,4 +1,7 @@
 [
+  "gen/browser/browsertest/classify.go",
+  "gen/browser/browsertest/doc.go",
+  "gen/browser/browsertest/leaves.go",
   "gen/browser/classify.go",
   "gen/browser/doc.go",
   "gen/browser/inner/classify.go",

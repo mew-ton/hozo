@@ -161,6 +161,19 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 |---|---|---|
 | `gen/server/http.go` | 補助 `httpWriteResult` のコメントの一行（「値のない record」を、「値のない、インデックスの model（nil のマップ）」に） | `docs/plugin-go-http.md`「補助」 |
 
+### 単体テストの口で変えたこと
+
+R6 の、プラグインの部分の、段 2（`docs/requirements.md`「R6 の、プラグインの部分」）: 基底 `go` が、単体テストの口と、効果の入口の確かめを出す。期待する出力（`gen/server/servertest/`）は、手で書き、hozoc の出力と、バイト単位で同じ。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `gen/server/servertest/doc.go`、`leaves.go` | 足した: `server` の九つの葉の、`<Op>Cases` と `<Op>Case`、まとめの `LeafCases`、走らせる `RunLeaves` | `docs/plugin-go.md`「単体テストの口」 |
+| `sample.json`、`gen/server/.hozoc-outputs.json` | 上の二つのファイルを、`go` のファイルと、`gen/server` の記録に足した | `../README.md`「sample.json」 |
+| `app/leafcases_test.go` | 足した: 口を満たす型と、`TestLeafCases`、`TestIncompleteCasesAreRejected`（「人が書いたもの」） | — |
+
+- **ほかの `gen/` のファイルは、変わらない。** この仕様には、述語で決まる値の分類も、絞り込んだ引数を持つ効果もないので、判定の口（`classify.go`）も、効果の入口の確かめ（`checked<状態>State`）も、出ない。その二つは、`plugins/go` の単体テストの入力 `unittest` と `rowstate` が確かめる（`docs/testing.md`「単体テスト」）。
+- `app` のテストでないファイルが import するものは、変わらない（`TestNoStorageImport`）。テストのパッケージ `servertest` を import するのは、テストのファイルだけ。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。
@@ -313,8 +326,9 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/server/doc.go` `types.go` `ops.go` | `go`（入口のパッケージ: 内側の再公開と、`export` の op だけの `Ops`） |
 | `gen/server/http.go` | `go-http`（入口のパッケージ） |
 | `gen/server/ratelimit.go` | `go-ratelimit`（入口のパッケージ） |
+| `gen/server/servertest/doc.go` `leaves.go` | `go`（テストのパッケージ: `server` の葉の op の、単体テストの口。`docs/plugin-go.md`「単体テストの口」。`type`、`rate`、`store` は、葉の op も、述語で決まる値の分類も持たないので、テストのパッケージを持たない） |
 | `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
-| `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 七つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
+| `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 九つの本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/memstore/memstore.go` | 人が書く: `store` の四つの状態の単位（その状態の `read` と効果）の、メモリの上の実装（`gen/storemem` の `New` に渡す型） |
 | `app/onsqlite/compose.go`、`app/onmem/compose.go` | 人が書く: 二つの組み立て（`server` を `gen/store` の上に、`gen/storemem` の上に） |
 | `app/cmd/shop-sqlite/main.go`、`app/cmd/shop-mem/main.go` | 人が書く: それぞれの組み立てで待ち受ける main |
@@ -421,7 +435,8 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 
 ## 人が書いたもの
 
-- **`app/leaves.go`**: `server` の葉の op 七つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:38`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも、最初の引数に `ctx` を取り、最後の戻り値に `error` を返す**（`docs/plugin-go.md`「op の形」）: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go` の `Leaves`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:69-74`）。トークンと識別子を作る関数（`app.Leaves` の `NewToken`、`NewOrderID`）は `error` も返し、`NewSession` と `NewOrder` が、それをそのまま返す: 二つの main（`app/cmd/shop-sqlite`、`app/cmd/shop-mem`）は、乱数を読めないときに、panic にせず、その `error` を返す（ハンドラが 500 にする）。
+- **`app/leaves.go`**: `server` の葉の op 九つの本体。型 `app.Leaves` のメソッドで、`*app.Leaves` が生成された `server.Leaves` を満たす（`app/leaves.go:38`。メソッドが足りなければ、ここでコンパイルできない）。`server.New` の引数 `leaves` に、そのまま渡す。時計、トークンと注文の識別子の作り方、セッションの有効期間、1 ページの件数は `app.Leaves` のフィールドで、テストが差し替える。**どのメソッドも、最初の引数に `ctx` を取り、最後の戻り値に `error` を返す**（`docs/plugin-go.md`「op の形」）: `server.Leaves` のメソッドの形（`gen/server/inner/ops.go` の `Leaves`）がそう決めていて、違う形のメソッドでは満たせない（コンパイルのときの事実。`app/server_test.go` の先頭の `var` が、メソッド式の代入で確かめる）。七つとも内部の op（`export` がない）で、入口の `server.Ops` にはない。葉の本体のテスト（`app/leaves_test.go` の `TestLeaves`）は、`server.Leaves` として持った `*app.Leaves` のメソッドを直に呼ぶ。`RequireFresh` は、今が期限より前ならセッションをそのまま返し、期限ちょうどから先は `type.Unauthorized`（`app/leaves.go:69-74`）。トークンと識別子を作る関数（`app.Leaves` の `NewToken`、`NewOrderID`）は `error` も返し、`NewSession` と `NewOrder` が、それをそのまま返す: 二つの main（`app/cmd/shop-sqlite`、`app/cmd/shop-mem`）は、乱数を読めないときに、panic にせず、その `error` を返す（ハンドラが 500 にする）。
+- **`app/leafcases_test.go`**: 九つの葉の、結果ごとの単体テスト。型 `leafCases` が、基底の出した口 `servertest.LeafCases` を満たし、`TestLeafCases` が、`servertest.RunLeaves(t, leaves, leafCases{})` に渡す。書いてあるのは、引数の値と、返り値の確かめ（`Then`）だけ: 葉を呼ぶ所と、結果の見分け（正常か、どの例外か）は、生成したコードが持つ。テストの名前は、`TestLeafCases/<op の FQN>/<結果>`（`TestLeafCases/server.checkPassword/InvalidCredentials`）。結果が二つあるのは、`checkPassword`（`type.InvalidCredentials`）と `requireFresh`（`type.Unauthorized`）で、ほかの七つは、正常のケースだけ。**ケースを欠いた型は、口を満たさない**（`TestIncompleteCasesAreRejected`: 欠いた型を渡す行は、コンパイルできないので、口が求めるメソッドを、リフレクションで確かめる。コンパイルできないことそのものは、リポジトリの `plugins/go` の単体テストが確かめる: `docs/testing.md`「単体テスト」）。
 - **`app/mailer.go`**: `mailer.send` の実装。`*app.Mailer` が `server.MailerOps` を満たし、`server.New` の引数 `mailer` に、そのまま渡す。受け取った `ctx` は、届ける関数（`Deliver`）に渡す。届けられなければ `type.NotificationFailed`。届け方（`Deliver`）はテストが差し替える。`@smtp.sendMail` は、読むトランスパイラがなく、`mailer` には単位もないので、基底は何も出さない: デコレータの意味（SMTP で送る）を実装するのは、`server.MailerOps` を満たす型を書く人。
 - **`app/limiter.go`**: `@rate.limited` の数え方。`*app.Limiter` が、`go-ratelimit` の出力の `server.RateLimiter` を満たす（`app/limiter.go:34`）。op ごとに、`Window` の間に `Max` 回まで。時計（`Now`）は、テストが差し替える。`server.NewRateSeams(limiter)` に渡し、その戻り値を `server.New` の最後の引数 `seams` に渡す。数え方のテストは `app/limiter_test.go`。
 - `app` パッケージは保存先を知らない: import するのは `gen/server` と `gen/type` だけ（`app/leaves_test.go` の `TestNoStorageImport`）。

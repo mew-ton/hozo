@@ -30,8 +30,8 @@ type Shape struct {
 	Leaves []string
 	// States は状態の単位: 基底の状態と、述語で決まる状態の分類。宣言順。N の read と効果は、どれも、このどれか一つのメソッド。
 	States []StateUnit
-	// Classify は、New が述語を受け取る、値の分類と op の分類の FQN: 単位の対象の配線が match に使う、述語で決まるもの
-	// （別の名前空間のものを含む）。FQN の辞書順。
+	// Classify は、New が述語を受け取る、値の分類と op の分類の FQN: 単位の対象の配線が match に使う、述語で決まるものと、
+	// N の効果の入口の確かめ（CheckedParams）が使うもの（どちらも、別の名前空間のものを含む）。FQN の辞書順。
 	Classify []string
 	// Deps は別の名前空間の口: 単位の対象の配線が呼ぶ別の名前空間ごとに一つ。FQN の辞書順。
 	Deps []Dep
@@ -212,6 +212,15 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		}
 	}
 
+	// N の効果の入口の確かめが使う分類も、New が述語を受け取る
+	for _, d := range ns.Decls {
+		if x, ok := d.(*ir.Effect); ok {
+			for _, c := range CheckedParams(p, x) {
+				classifies[c.Classify] = true
+			}
+		}
+	}
+
 	// N の op と、その置き場
 	for _, d := range ns.Decls {
 		o, ok := d.(*ir.Op)
@@ -300,6 +309,53 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		param("seams", "Seams")
 	}
 	return s
+}
+
+// CheckedParam は、効果の入口の確かめ一つ（docs/plugin-go.md「効果の入口の確かめ」）: 引数 Param の値が、分類 Classify の
+// ケース Cases（引数の型に書かれた順）の、どれかにあること。
+type CheckedParam struct {
+	// Param は引数の名前。Classify は分類の FQN。Cases は、引数の型が言うケース。
+	Param, Classify string
+	Cases           []string
+}
+
+// CheckedParams は、効果 e の入口で確かめる引数（宣言の順）: 型が、そのまま、述語で決まる値の分類か op の分類で絞り込んだ型
+// （`T on C.K`）のもの。型で決まる分類の絞り込みと、optional や array の中の絞り込みは、数えない。なければ nil。
+func CheckedParams(p *ir.Program, e *ir.Effect) []CheckedParam {
+	if p == nil || e == nil {
+		return nil
+	}
+	var out []CheckedParam
+	for _, param := range e.Params {
+		if classify, cases, ok := PredicateNarrowing(p, param.Type); ok {
+			out = append(out, CheckedParam{Param: param.Name, Classify: classify, Cases: cases})
+		}
+	}
+	return out
+}
+
+// PredicateNarrowing は、型 t が、そのまま、述語で決まる値の分類か op の分類で絞り込んだ型（`T on C.K`）なら、その分類の FQN と、
+// 型が言うケース。そうでなければ ok は false。基底が、判定関数 Classify<C> を呼んで確かめる所（効果の入口の確かめと、
+// 葉の op の戻り値の確かめ: docs/plugin-go.md「効果の入口の確かめ」「単体テストの口」）が使う。
+func PredicateNarrowing(p *ir.Program, t ir.Type) (classify string, cases []string, ok bool) {
+	c, isCase := t.(ir.CaseType)
+	if !isCase || p == nil {
+		return "", nil, false
+	}
+	cl, isClassify := p.Lookup(c.Classify).(*ir.Classify)
+	if !isClassify || cl.DecidedBy != ir.DecidedByPredicate {
+		return "", nil, false
+	}
+	if _, isState := cl.SubjectStates(); isState {
+		return "", nil, false
+	}
+	return cl.Name, c.Cases, true
+}
+
+// CheckedUnitName は、入口の確かめを持つ状態の単位を包む、非公開の型の名前（docs/plugin-go.md「効果の入口の確かめ」）:
+// `checked<状態>State`。
+func CheckedUnitName(stateOrClassify string) string {
+	return "checked" + StateUnitName(stateOrClassify)
 }
 
 // builtinOrder は、形で決まる命令の並び（docs/plugin-go.md「状態の単位」: Post、Put、Delete の順）。

@@ -86,8 +86,10 @@ type use struct {
 //  3. 単位の対象の op: 引数と戻り値の型、Op.signature.exceptions の例外。
 //  4. 単位の対象の配線が呼ぶ op（別の名前空間のものを含む）: 引数と戻り値の型。
 //  5. 単位の対象の配線の match: 述語で決まる分類のうち、別の名前空間のもの。
+//  6. N の効果の引数のうち、型が、そのまま、絞り込んだ型のもの: その分類が、述語で決まり、別の名前空間のものなら、その分類。
+//  7. 単位の対象の、本体のない op の戻り値のうち、型が、そのまま、絞り込んだ型のもの: 6 と同じ分類。
 //
-// 数えるのは、型（ref）、例外、5 の分類が指す宣言の名前空間が N でないもの。型の中の型（array、optional、case の of）は
+// 数えるのは、型（ref）、例外、5〜7 の分類が指す宣言の名前空間が N でないもの。型の中の型（array、optional、case の of）は
 // 辿るが、参照先の宣言の中までは辿らない。デコレータの適用とその引数、別の名前空間の効果と read の宣言そのもの、別の名前空間の op そのもの、
 // 型で決まる分類は数えない。
 func uses(ix *index, nsName string, files []string) []use {
@@ -130,6 +132,16 @@ func uses(ix *index, nsName string, files []string) []use {
 		params(o.Params)
 		typ(o.Returns)
 	}
+	// 6 と 7: 型が、そのまま、述語で決まる分類で絞り込んだ型なら、その分類（基底が、判定関数を呼ぶ）
+	narrowing := func(t ir.Type) {
+		if c, ok := t.(ir.CaseType); ok {
+			if cl, ok := ix.decls[c.Classify].(*ir.Classify); ok && cl.DecidedBy == ir.DecidedByPredicate {
+				if _, isState := cl.SubjectStates(); !isState {
+					decl(cl.Name)
+				}
+			}
+		}
+	}
 	for _, d := range ns.Decls {
 		switch x := d.(type) {
 		case *ir.Model: // 1
@@ -158,6 +170,9 @@ func uses(ix *index, nsName string, files []string) []use {
 			for _, e := range x.Throws {
 				decl(e)
 			}
+			for _, p := range x.Params { // 6
+				narrowing(p.Type)
+			}
 		case *ir.Classify:
 			typ(x.SubjectType())
 			for _, cs := range x.Cases {
@@ -174,6 +189,7 @@ func uses(ix *index, nsName string, files []string) []use {
 				decl(e)
 			}
 			if x.Body == nil {
+				narrowing(x.Returns) // 6
 				continue
 			}
 			eachCall(x.Body, func(c *ir.Call) { // 4

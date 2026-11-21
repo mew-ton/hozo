@@ -1,6 +1,7 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 行の遷移を持つ効果は、宛先の状態の単位の
-// メソッドのままで、配線は、仕様の呼び出しを、そのまま写す（基底は、行のケースを確かめるコードを足さない。docs/plugin-go.md
-// 「状態の単位」）。ない側のケースを持つ、述語で決まる分類は、述語を持たないケースを、判定関数が、値がないことで決める（同「分類」）。
+// メソッドのままで、配線は、仕様の呼び出しを、そのまま写す（基底は、効果の後で、行が、言ったケースにあるかを確かめるコードを
+// 足さない。docs/plugin-go.md「状態の単位」）。効果の前の、行のケース（絞り込んだ引数）は、効果の入口で確かめる（同「効果の入口の
+// 確かめ」）。ない側のケースを持つ、述語で決まる分類は、述語を持たないケースを、判定関数が、値がないことで決める（同「分類」）。
 // plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 
@@ -191,5 +192,24 @@ func TestDeleteWithAbsentCase(t *testing.T) {
 		if got, err := o.LifeName(ctx, tt.found); err != nil || got != tt.want {
 			t.Errorf("LifeName(%v) = %q, %v, want %q", tt.found, got, err, tt.want)
 		}
+	}
+}
+
+// 行の引数を絞り込んだ効果は、入口で、行が、言ったケースにあるかを確かめる: 型から Accepted と分かっているはずの注文が、
+// Accepted になければ、*runtime.CaseError が返り、単位のメソッドは、呼ばれない
+func TestRowCaseIsCheckedAtEntry(t *testing.T) {
+	ctx := context.Background()
+	s, _, o := setup()
+	err := o.Amend(ctx, app.Order{Id: "d", Note: "draft"}, "hurry")
+	var ce *runtime.CaseError
+	if !errors.As(err, &ce) {
+		t.Fatalf("Amend(draft) = %v, want *runtime.CaseError", err)
+	}
+	want := runtime.CaseError{Effect: "app.revise", Param: "order", Classify: "app.Stage", Want: []string{"Accepted"}, Got: "Draft"}
+	if !reflect.DeepEqual(*ce, want) {
+		t.Errorf("CaseError = %+v, want %+v", *ce, want)
+	}
+	if len(s.calls) != 0 {
+		t.Errorf("確かめが通らないのに、効果を呼んだ: %v", s.calls)
 	}
 }

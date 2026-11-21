@@ -69,7 +69,9 @@ func Emit(req *plugin.EmitRequest, root string, stderr io.Writer) ([]plugin.File
 	e.layout = layout
 	e.prepare()
 	e.checkInnerDir()
+	e.checkTestDir()
 	e.checkNames()
+	e.checkTestNames()
 	e.checkImportCycle()
 	if len(e.errs) > 0 {
 		return nil, e.errs
@@ -312,6 +314,11 @@ func (e *emitter) build() []plugin.File {
 		add(entry, e.genEntryStates())
 		add(entry, e.genEntryClassify())
 	}
+	// テストのパッケージ（docs/plugin-go.md「単体テストの口」）
+	test := e.layout.TestDir
+	add(test, e.genTestDoc())
+	add(test, e.genTestLeaves())
+	add(test, e.genTestClassify())
 	return files
 }
 
@@ -319,12 +326,14 @@ func (e *emitter) build() []plugin.File {
 type fileGen struct {
 	e     *emitter
 	name  string
-	key   string // "def/<name>" か "entry/<name>"
+	key   string // "def/<name>" か "entry/<name>" か "test/<name>"
 	inDef bool
-	pkg   string
-	doc   string // パッケージのコメント（doc.go だけ）
-	im    *golang.Imports
-	body  strings.Builder
+	// inTest は、テストのパッケージのファイルか（docs/plugin-go.md「単体テストの口」）。
+	inTest bool
+	pkg    string
+	doc    string // パッケージのコメント（doc.go だけ）
+	im     *golang.Imports
+	body   strings.Builder
 	// usesPtr は、このファイルが補助 ptr を使ったか（wiring.go だけが使う。docs/plugin-go.md「値」）。
 	usesPtr bool
 }
@@ -399,6 +408,9 @@ func (f *fileGen) render() (string, bool) {
 }
 
 func (f *fileGen) dir() string {
+	if f.inTest {
+		return f.e.layout.TestDir
+	}
 	if f.inDef {
 		return f.e.layout.DefDir
 	}

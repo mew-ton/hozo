@@ -1,0 +1,94 @@
+// docs/plugin-go.md「単体テストの口」（葉の op、分類の判定、口を持たないもの）と「効果の入口の確かめ」を、一か所ずつ使う。
+// 各宣言の上のコメントが、その宣言が確かめる行。op はどれも export（出力は一つのパッケージ）。
+
+/** 別の名前空間: app と同じ名前の例外と、app が絞り込みに使う、述語で決まる分類 */
+namespace stock {
+  model Item { name: string; count: int; }
+  /** 棚が混んでいる */
+  exception Busy;
+  /** 在庫の多さ（述語で決まる値の分類） */
+  classify Level of Item { Plenty; Few; Out; }
+}
+
+/** 単体テストの口と、効果の入口の確かめ */
+namespace app {
+  model Order { id: string; note: string; }
+  exception Busy;
+  exception Rejected(reason: string);
+  exception Gone;
+
+  state orders: list<Order>;
+  state shelf: list<stock.Item>;
+
+  /** 述語で決まる値の分類: 判定の口を持つ */
+  classify Stage of Order { Draft; Sent; Done; }
+  /** 述語で決まる値の分類で、ない側のケースを持つ: 例を求めるのは、Open と Closed だけ */
+  classify Life of Order? {
+    Open: Order? as Order;
+    Closed: Order? as Order;
+    Absent: Order? as none;
+  }
+  /** 述語で決まる op の分類: 判定の口を持つ（例の型は、op の戻り値の型） */
+  classify Lookup of find {
+    Hit: find as Order;
+    Stale: find as Order;
+    Miss;
+  }
+  /** 型で決まる分類: 判定の口を持たない */
+  classify Known of Order? {
+    Found: Order? as Order;
+    Missing: Order? as none;
+  }
+  /** 述語で決まる状態の分類: 判定の口を持たない */
+  classify Backlog of orders { Calm; Rush; }
+
+  // 葉: 結果は、正常と、例外三つ。その op の中で名前が当たる例外（app.Busy と stock.Busy）は、名前空間を前に付ける。
+  // 引数 then のフィールドは Then_
+  export fn submit(order: Order, then: string): Order
+    throws Rejected, Busy, stock.Busy;
+  // 葉: 戻り値がない（Then は、err だけを受ける）
+  export fn log(text: string);
+  // 葉: 戻り値の型が、述語で決まる分類で絞り込んだ型。正常のケースで、判定関数も呼ぶ（RunLeaves が、述語を受け取る）
+  export fn send(order: Order on Stage.Draft): Order on Stage.Sent;
+  // 葉: 戻り値の型が、別の名前空間の分類の、二つのケースで絞り込んだ型
+  export fn refill(item: stock.Item): stock.Item on stock.Level.Plenty | stock.Level.Few;
+  // 葉: 戻り値の型が、ない側のケースを持つ分類で絞り込んだ型（判定関数には、&got を渡す）
+  export fn reopen(order: Order): Order on Life.Open;
+  // 葉: op の分類の対象
+  export fn find(id: string): Order?;
+  // never を返す op は、口を持たない
+  export fn fail(): never throws Gone;
+
+  // 効果: 絞り込んだ引数を、入口で確かめる（ケースが二つ）
+  effect fn close(order: Order on Stage.Sent | Stage.Done): effects orders.put;
+  // 効果: ない側のケースを持つ分類で絞り込んだ引数（判定関数には、&order を渡す）
+  effect fn discard(order: Order on Life.Open): effects orders.delete;
+  // 効果: 絞り込んだ引数が二つ。一つは、別の名前空間の分類（どの配線も match に使わない分類の述語も、New が受け取る）
+  effect fn restock(item: stock.Item on stock.Level.Out, editor: Order on Stage.Draft, count: int): effects shelf.put;
+  // 効果: 絞り込んだ引数を持たない（確かめない。包む型に、メソッドを持たない）
+  effect fn keep(order: Order): effects orders.post;
+  // 効果: 絞り込みが、並びの中（確かめない）
+  effect fn closeAll(sent: list<Order on Stage.Sent>): effects orders.put;
+
+  // 配線: 口を持たない。絞り込んだ引数を、そのまま効果に渡す（確かめるのは、効果の入口）
+  export fn finish(order: Order on Stage.Sent | Stage.Done) {
+    close(order);
+  }
+  export fn drop(order: Order on Life.Open) {
+    discard(order);
+  }
+  export fn fill(item: stock.Item on stock.Level.Out, editor: Order on Stage.Draft, count: int) {
+    restock(item, editor, count);
+  }
+  export fn store(order: Order) {
+    keep(order);
+  }
+  export fn finishAll(sent: list<Order on Stage.Sent>) {
+    closeAll(sent);
+  }
+  // 配線: 葉が絞り込んだ型で返した値を、効果に渡す。葉が、言ったケースにない値を返せば、効果の入口で止まる
+  export fn sendAndFinish(order: Order on Stage.Draft) {
+    val sent = send(order);
+    close(sent);
+  }
+}

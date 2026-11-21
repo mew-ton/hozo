@@ -6,6 +6,8 @@
   "gen/batch/inner/types.go",
   "gen/batch/inner/wiring.go",
   "gen/batch/ops.go",
+  "gen/batch/shoptest/doc.go",
+  "gen/batch/shoptest/leaves.go",
   "gen/batch/states.go",
   "gen/batch/types.go"
 ]

@@ -249,7 +249,16 @@ func TestCfg22(t *testing.T) {
 	ref := ir.Ref(T)
 	types := func() ir.Namespace {
 		return namespace("types", model(T), exc("types.E"), &ir.Classify{DeclBase: ir.DeclBase{Name: "types.K", Span: sp("types.K")},
-			Subject: ir.TypeSubject{Type: ir.String()}, DecidedBy: ir.DecidedByPredicate, Cases: []ir.ClassifyCase{{Name: "A"}}})
+			Subject: ir.TypeSubject{Type: ir.String()}, DecidedBy: ir.DecidedByPredicate, Cases: []ir.ClassifyCase{{Name: "A"}}},
+			&ir.Classify{DeclBase: ir.DeclBase{Name: "types.ByType", Span: sp("types.ByType")},
+				Subject: ir.TypeSubject{Type: ir.Optional(ir.String())}, DecidedBy: ir.DecidedByType, Cases: []ir.ClassifyCase{{Name: "A"}}})
+	}
+	// on は、絞り込んだ型 string on <分類>.A
+	on := func(classify string) ir.Type {
+		return ir.CaseType{Classify: classify, Cases: []string{"A"}, Of: ir.String()}
+	}
+	effectOf := func(t ir.Type) ir.Decl {
+		return &ir.Effect{DeclBase: ir.DeclBase{Name: "server.e", Span: sp("server.e")}, Params: []ir.OpParam{param("row", t)}}
 	}
 	classifyOf := func(fqn string, subject ir.ClassifySubject, as ...ir.CaseTyping) *ir.Classify {
 		return &ir.Classify{DeclBase: ir.DeclBase{Name: fqn, Span: sp(fqn)}, Subject: subject,
@@ -296,6 +305,15 @@ func TestCfg22(t *testing.T) {
 		{"述語で決まる、別の名前空間の分類", []ir.Decl{wire("server.w", nil, []ir.OpParam{param("v", ir.String())},
 			ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: nameAtom("v")}, Classify: "types.K",
 				Arms: []ir.MatchArm{{Cases: []string{"A"}, Body: ir.NoneBody{}}}}})}, true},
+		// 6: N の効果の引数の、絞り込みの分類
+		{"効果の引数を絞り込む、述語で決まる、別の名前空間の分類", []ir.Decl{effectOf(on("types.K"))}, true},
+		{"効果の引数を絞り込む、型で決まる分類は数えない", []ir.Decl{effectOf(on("types.ByType"))}, false},
+		{"効果の引数の、並びの中の絞り込みは数えない", []ir.Decl{effectOf(ir.Array(on("types.K")))}, false},
+		// 7: 単位の対象の、本体のない op の戻り値の、絞り込みの分類
+		{"本体のない op の戻り値を絞り込む、述語で決まる、別の名前空間の分類", []ir.Decl{leaf("server.o", on("types.K"))}, true},
+		{"本体のない op の引数の絞り込みは数えない", []ir.Decl{leaf("server.o", nil, param("p", on("types.K")))}, false},
+		{"配線の戻り値の絞り込みは数えない", []ir.Decl{wire("server.w", on("types.K"), []ir.OpParam{param("v", on("types.K"))}, retAtom(nameAtom("v")))}, false},
+		{"単位の対象でない、本体のない op の戻り値の絞り込みは数えない", []ir.Decl{leaf("server.keep", nil), outOfUnit(leaf("server.o", on("types.K")))}, false},
 		// 数えないもの
 		{"デコレータの適用とその引数", []ir.Decl{func() ir.Decl {
 			o := leaf("server.o", nil)

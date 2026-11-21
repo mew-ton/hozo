@@ -8,6 +8,9 @@
   "gen/shop/inner/types.go",
   "gen/shop/inner/wiring.go",
   "gen/shop/ops.go",
+  "gen/shop/shoptest/classify.go",
+  "gen/shop/shoptest/doc.go",
+  "gen/shop/shoptest/leaves.go",
   "gen/shop/states.go",
   "gen/shop/types.go"
 ]

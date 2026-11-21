@@ -41,10 +41,10 @@ type Ops interface {
 // New はこの名前空間の Ops を組み立てる。引数の並びは、状態の単位（宣言順）、分類の述語（FQN の辞書順）。
 // 引数が nil かどうかは確かめない。
 func New(orders OrdersState, life LifeCases, stage StageCases) Ops {
-	return &ops{orders: orders, life: life, stage: stage}
+	return &ops{orders: checkedOrdersState{orders, life, stage}, life: life, stage: stage}
 }
 
-// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
+// ops は New が返す非公開の構造体。フィールドは New の引数（入口の確かめを持つ状態の単位は、New が包んだもの）。メソッドは、この名前空間の op のすべて。
 type ops struct {
 	orders OrdersState
 	life   LifeCases

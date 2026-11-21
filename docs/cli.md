@@ -346,7 +346,7 @@ out         = "internal/gen/proc"
 
 ## 手で書くもの
 
-`cli.hozo` から生成するのは、`internal/gen/hozoc`（基底 `go` の出力。`hozoc` は内部の op を持つので、入口のパッケージと、内側の `internal/gen/hozoc/inner` に分かれる。`docs/plugin-go.md`「内側のフォルダと入口」）、`internal/gen/hozoc/inner/validate.go`（`go-valid`）、`internal/gen/hozoc/cli`（`go-cli`）、`internal/gen/proc`（基底 `go` の、`proc` の例外の型）。変えるときは `cli.hozo` を変えて `make generate`（`docs/packages.md`「自己生成の手順」）。生成物はコミットし、`tests/generated_test.go` と CI が遅れていないことを確かめる（`docs/testing.md`「生成物の一致」）。
+`cli.hozo` から生成するのは、`internal/gen/hozoc`（基底 `go` の出力。`hozoc` は内部の op を持つので、入口のパッケージと、内側の `internal/gen/hozoc/inner` に分かれる。`docs/plugin-go.md`「内側のフォルダと入口」）、`internal/gen/hozoc/hozoctest`（基底 `go` の、テストのパッケージ: 四つの葉の op の、単体テストの口。`docs/plugin-go.md`「単体テストの口」。この口を満たすテストは、まだ書いていない: `docs/open.md`「サンプルと、hozoc 自身の仕様」）、`internal/gen/hozoc/inner/validate.go`（`go-valid`）、`internal/gen/hozoc/cli`（`go-cli`）、`internal/gen/proc`（基底 `go` の、`proc` の例外の型）。変えるときは `cli.hozo` を変えて `make generate`（`docs/packages.md`「自己生成の手順」）。生成物はコミットし、`tests/generated_test.go` と CI が遅れていないことを確かめる（`docs/testing.md`「生成物の一致」）。
 
 基底が `hozoc` に出す、実装を受け取る口（`docs/plugin-go.md`「op の置き場」「New」）と、それを満たすもの:
 

@@ -57,7 +57,7 @@ language = "go"
 - **別の名前空間 M の型**（と、述語で決まる分類）は、M の型の置き場（`docs/config.md`「型の置き場」: U 自身が M を出力するならその出力、そうでなければ基底が `go` で M を出力する最初の単位の出力）の**入口のパッケージ**（下）を import する。複製はしない。置き場があることは hozoc が確かめている（CFG-22）。
 - 同じ名前空間 N を出力する別の単位のパッケージは import しない。
 - **import の名前**: 名前空間のパッケージは、パッケージ名で import する。パッケージ名が import パスの最後の要素と違えば、名前を書く（`pkgtype "example.com/shop-server/gen/type"`）。一つのファイルの中で名前が当たるとき（標準ライブラリか `runtime` の import、内側のパッケージ `inner`、先に決めた別の名前空間のパッケージ）は、名前空間の FQN の辞書順に名前を決めていき、当たった方に `2`、`3`、… を付ける（`store2`）。標準ライブラリ、`runtime`、`inner` の名前は変えない。**基底が決まった名前で使う識別子**も、import の名前に使わない: パッケージ名がそれと同じ名前空間は、初めから `2`、`3`、… を付けて import する（名前空間 `ops` は `ops2`、名前空間 `ctx` は `ctx2`）。二種類ある。（1）基底が定義のパッケージに宣言する非公開の名前のうち、パッケージ名になりうるもの: `New` が返す構造体 `ops` と、補助 `ptr`。Go では、パッケージの宣言と、そのパッケージのどのファイルの import の名前も、同じ名前ならコンパイルできないので、**どのファイルでも**（入口のパッケージのファイルと、相乗りのファイルでも）使わない。（2）基底が、関数の本体の中で決まった名前で使う識別子のうち、その本体が名前空間のパッケージの型を書きうるもの: メソッドのレシーバ `o` と、`ctx`、`err`。その名前の局所の変数が、同じ名前のパッケージを隠す（`return ctx.Info{}, err` が書けない）ので、**基底のファイルでは**使わない。相乗りのファイルは、（2）に従わず、自分の局所の名前の方を変える（それぞれの文書）。import のブロックは、標準ライブラリ、空行、それ以外の順で、それぞれパスの辞書順。一つなら一行で書く。
-- **出力から出力への import は一方向でなければならない。** 出力（単位と名前空間の組）が、import を辿って自分に戻るなら GO-3 で、何も書き出さない（Go は import の循環をコンパイルできない）。import する相手は、`docs/config.md`「型の置き場」の表が数える宣言の置き場で、どの出力についても `View` だけから求まる。直すのは仕様の側: 互いに使う型を、一方か、第三の名前空間に寄せる。
+- **出力から出力への import は一方向でなければならない。** 出力（単位と名前空間の組）が、import を辿って自分に戻るなら GO-3 で、何も書き出さない（Go は import の循環をコンパイルできない）。import する相手は、`docs/config.md`「型の置き場」の表の 1〜6 が数える宣言の置き場で、どの出力についても `View` だけから求まる（7 は、テストのパッケージだけが import する。テストのパッケージは、どの出力からも import されないので、輪に入らない: 「単体テストの口」）。直すのは仕様の側: 互いに使う型を、一方か、第三の名前空間に寄せる。
 
 ### 内側のフォルダと入口
 
@@ -77,7 +77,7 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 - 内側のフォルダの名前が `internal` でないのは、Go のコンパイラが、`internal` という名前のディレクトリの下のパッケージを、その親の下からしか import させないため。単位の `out` の下は hozoc のもの（記録 `.hozoc-outputs.json` の通りに消す）で、人のテストは置けない。テストは `out` の外にあるので、`internal` では import できない。
 - 分けるかどうかを内部の op の有無で決めるのは、内側のフォルダが、内部の op をテストするためだけにあるから。型だけの名前空間や、すべての op が `export` の名前空間に、別名だけの入口を重ねない。`export` を付け外しして内部の op の有無が変わると、定義のパッケージが動くが、入口のパッケージの名前（型、口、`Ops`、`New`）は変わらないので、入口を使うコードはそのまま通る。
 - 内側のパッケージの型は、入口の別名と同じ型（`type User = inner.User`）。エラーメッセージや `%T` には `inner.User` と出る。
-- 同じ単位が、N の子の名前空間 `N.inner` を出力するなら GO-4（Dir(U, N.inner) が内側のフォルダと重なる）。
+- 同じ単位が、N の子の名前空間 `N.inner` を出力するなら GO-4（Dir(U, N.inner) が内側のフォルダと重なる）。テストのパッケージのディレクトリ（「単体テストの口」）と重なる子の名前空間も、同じ GO-4。
 - 内部の op を、パッケージの外から呼べなくすること（非公開のメソッドにする、型アサーションでも取り出せなくする）は、目的にしない。内側のフォルダを import すれば呼べる。守るのは検査。
 
 入口の再公開のしかた（分けた出力だけ）:
@@ -105,18 +105,20 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | `doc.go` | パッケージのコメント（「コメント」） |
 | `types.go` | model、scalar、union、exception、effect を、宣言の順に一つずつ（「型」） |
 | `ops.go` | `Ops`、`Leaves`、`<Ns>Ops`（名前空間の FQN の辞書順）、`Seams`、`New`、構造体 `ops`、`ops` のメソッドのうち配線の本体でないもの（op の宣言順。継ぎ目を持つ op の外側のメソッドと、`never` を返す op の中身のメソッドを含む。「継ぎ目」）。N の op が一つもなければ作らない |
-| `states.go` | 状態の単位（基底の状態と、述語で決まる状態の分類を、宣言順に） |
+| `states.go` | 状態の単位（基底の状態と、述語で決まる状態の分類を、宣言順に）。入口の確かめを持つ単位は、インターフェースのすぐ後ろに、包む型 `checked<状態>State` と、そのメソッド（「効果の入口の確かめ」） |
 | `classify.go` | 述語で決まる分類の、列挙の型と定数、述語のインターフェース、判定関数（宣言順） |
 | `wiring.go` | 配線の op の本体（宣言順。継ぎ目を持つ配線は、中身の名前のメソッド）。値をポインタにする補助 `ptr` を使っていれば、末尾に一つ |
 
 分けた出力の入口のファイルは、内側の同じ名前のファイルの再公開: `doc.go`（N のパッケージのコメント）、`types.go`、`ops.go`（入口の `Ops`、`Leaves` と `<Ns>Ops` と `Seams` の別名、`New`）、`states.go`、`classify.go`。`wiring.go` はない。内側のファイルに再公開するものがなければ、入口のファイルも作らない。
+
+テストのパッケージ（「単体テストの口」）のファイルは、`doc.go`（パッケージのコメント）、`leaves.go`（葉の op の口）、`classify.go`（分類の判定の口）。中身がなければ作らず、`leaves.go` も `classify.go` もなければ、パッケージそのものを作らない。
 
 ### 相乗りのファイル
 
 `go` に相乗りするトランスパイラの決まり。どれも、プラグインどうしで当たらないようにするためのもの。
 
 - ファイルは、**入口のパッケージ**（`<Dir(U, N)>/`）に、プラグインごとに決めた名前のファイル一つで置く。型にメソッドを足すもの（`go-valid` の `Validate`）だけは、Go がメソッドを型の定義のパッケージにしか書かせないので、**定義のパッケージ**に置く。自分のパッケージを持つもの（`go-cli`）は、`<Dir(U, N)>/` の下の、プラグインごとに決めたディレクトリに置く。
-- 基底のファイル名（`doc.go`、`types.go`、`ops.go`、`states.go`、`classify.go`、`wiring.go`）と、ディレクトリ名 `inner` は使わない。
+- 基底のファイル名（`doc.go`、`types.go`、`ops.go`、`states.go`、`classify.go`、`wiring.go`）と、ディレクトリ名 `inner` は使わない。テストのパッケージ（「単体テストの口」の「テストのパッケージ」）の中では、基底のファイル名 `doc.go`、`leaves.go`、`classify.go` を使わない。
 - パッケージに足す非公開の名前には、プラグインごとの前置きを付ける。公開の名前は、プラグインの文書に並べる。
 
 | トランスパイラ | ファイル | 置くパッケージ | 非公開の名前の前置き | 文書 |
@@ -268,7 +270,7 @@ op のメソッドの形は、その op の宣言だけで決まり、どのイ�
 | `error` | 最後の戻り値に、**いつも** `error` を返す。値があれば `(T, error)`、なければ `error` だけ |
 
 - **基底は、どの関数に `ctx` と `error` が要るかを判定しない**（原則の持ち主は `docs/requirements.md`「op の中身に立ち入らない」）。基底が出す関数のうち、仕様の宣言を写したものは、どれも同じ形: 最初の引数が `ctx context.Context`、最後の戻り値が `error`。op（配線でも葉でも）のほかに、`read` と効果のメソッド（「状態の単位」）、分類の述語と判定関数（「分類」）、継ぎ目のメソッドとその `body`（「Seams」）。
-- 仕様の宣言を写したものでない関数は、Go がその形を決めているので、この形にしない: `New`（「New」）、補助 `ptr`（「値」）、union のマーカーメソッド（「union」）、例外の `Error()` と `HozoException()`（「exception」）。
+- 仕様の宣言を写したものでない関数は、Go がその形を決めているので、この形にしない: `New`（「New」）、補助 `ptr`（「値」）、union のマーカーメソッド（「union」）、例外の `Error()` と `HozoException()`（「exception」）、テストのパッケージの関数とインターフェース（`testing` が形を決める。「単体テストの口」）。
 - `ctx` は、中断と期限を伝えるための、標準の `context.Context`（Go の作法）。自前のコンテキスト型は作らず、基底は、値を載せて引数の代わりにすることには使わない。生成したコードは、受け取った `ctx` を、呼ぶ先にそのまま渡す（継ぎ目の実装が、`body` に渡す `ctx` に、呼び出しの間だけのものを載せることはある: `docs/plugin-go-sqlite.md`「トランザクション」）。
 - 純粋さ（`docs/check.md`「純粋」）は、言語が仕様から割り出す事実として IR に残る。基底は、それを読まない: 関数の形にも、コメントにも使わない。
 - `throws` を持たない op の実装も、`error` を返せる。仕様の例外でない `error`（中断、入出力の失敗）は、配線がそのまま呼び出し元へ返す（「呼び出し」の「失敗の扱い」）。
@@ -375,10 +377,48 @@ type UsersState interface {
 - **形で決まる命令を、呼ばれているものだけにする**のは、実装する者に、誰も呼ばない操作を書かせないため（別の名前空間の口 `<M>Ops` と同じ決め方）。問い合わせと違って、テストが効果の結果を見るのには要らない。配線の本体を書き換えて、直に呼ぶ操作が増えれば、単位のメソッドが増え、実装は、渡すところでコンパイルできなくなる。
 - **`read` と効果を、呼ばれていなくても出す**のは、宣言が、その状態にできることの約束だから（`docs/check.md`「read と効果」）。`read` の引数と結果の型、効果の引数は、宣言に書かれたままで、基底は、宛先の状態の型と照らさない（照らすのは、デコレータを読む相乗り）。
 - **例外を投げる効果**（`Effect.throws`。`docs/check.md`「read と効果」）も、宛先の単位のメソッドで、形は、ほかの効果と同じ。実装は、例外を、`error` として、値で返す（「exception」）。配線は、ほかの呼び出しの失敗と同じに、そのまま返す（「呼び出し」）。基底が `throws` から出すのは、単位のメソッドのコメントだけ（「コメント」の「状態の単位のメソッド」）。
-- **行の遷移を持つ効果**（`Effect.row`）も、宛先の単位のメソッドで、形は、ほかの効果と同じ（引数は `Effect.params` の並びのまま。行の引数も、ただの引数）。基底が行の遷移から出すのは、コメントだけ: 効果の定数の一行（「effect」）と、単位のメソッドのコメントの宛先（「コメント」の「状態の単位のメソッド」）。**出さないもの**: 呼ばれたときに行のケースを確かめるコード、メソッドの中や前後で分類の判定関数を呼ぶコード、遷移の表、テスト。渡す行が、前のケースにあると分かっていることは、型の検査が、仕様の配線について確かめてある（`docs/check.md`「行の遷移」の「呼ぶ側」）。入口で、引数のケースを確かめるコードは、出すと決めてあるが、まだ出さない（`docs/decisions.md`「決めたこと」371、372）。生成した配線は、仕様の呼び出しを、そのまま写す。メソッドの中身が、宣言のとおりに行を変えることは、実装する者（相乗りか、人）が担う。
+- **行の遷移を持つ効果**（`Effect.row`）も、宛先の単位のメソッドで、形は、ほかの効果と同じ（引数は `Effect.params` の並びのまま。行の引数も、ただの引数）。基底が行の遷移から出すのは、コメントだけ: 効果の定数の一行（「effect」）と、単位のメソッドのコメントの宛先（「コメント」の「状態の単位のメソッド」）。**出さないもの**: 効果の後で、行が、言ったケースにあるかを確かめるコード、遷移の表。メソッドの中身が、宣言のとおりに行を変えることは、実装する者（相乗りか、人）が担う。
+- **絞り込んだ引数を持つ効果**は、入口で、引数のケースを確かめる（「効果の入口の確かめ」）。単位のインターフェースの形は、変わらない。
 - **述語で決まる状態の分類** C も、同じ形の単位 `<C>State` を持つ。メソッドは、ケースごとの述語（宣言順。どのケースも持つ: 「分類」。`<ケース名>(ctx context.Context) (bool, error)`）、命令（その分類の遷移を宛先にする効果。宣言順）。型で決まる状態の分類は、単位を持たない。
 - 二つの基底の状態にまたがるものは、ない: `read` の宛先は基底の状態一つ（`docs/check.md`「read の宛先」）、効果の宛先は一つの状態の一つの変化（同「効果の宛先」）。二つの状態を一緒に変える処理は、二つの効果を呼ぶ配線で書く。
 - 単位のメソッドの実装は、その `read` か効果のデコレータを読む相乗りが出すか（`docs/plugin-go-sqlite.md`「状態ごとの型」）、人が書く。デコレータのない `read` と効果、形で決まる命令のうち、相乗りが出さなかったものは、人が、相乗りの型を埋め込んで書き足す。
+
+### 効果の入口の確かめ
+
+絞り込んだ引数を持つ効果は、入口で、引数が、言ったとおりのケースにあるかを確かめる（`docs/decisions.md`「決めたこと」371、372）。葉の op が、絞り込んだ型で返した値や、読んでから時間が経った行を、状態を書く手前で、最後に確かめる所。
+
+```ts
+classify Standing of Payment { Pending; Held; Settled; }
+effect fn capture(payment: Payment on Standing.Held, fee: Yen): effects payments.put as Standing.Settled;
+```
+
+```go
+// checkedPaymentsState は、状態 pay.payments の単位を包む: 絞り込んだ引数を持つ効果の入口で、引数が、言ったとおりのケースにあるかを確かめる。
+// New が、引数 payments を、これで包む。ほかのメソッドは、包んだ単位を、そのまま呼ぶ。
+type checkedPaymentsState struct {
+	PaymentsState
+	standing StandingCases
+}
+
+// Capture は、効果 pay.capture の入口の確かめ: payment が、pay.Standing の Held にあること。違えば、*runtime.CaseError を返し、効果は、起きない。
+func (o checkedPaymentsState) Capture(ctx context.Context, payment Payment, fee Yen) error {
+	if kind, err := ClassifyStanding(ctx, o.standing, payment); err != nil {
+		return err
+	} else if kind != StandingHeld {
+		return &runtime.CaseError{Effect: "pay.capture", Param: "payment", Classify: "pay.Standing", Want: []string{"Held"}, Got: [...]string{"Pending", "Held", "Settled"}[kind]}
+	}
+	return o.PaymentsState.Capture(ctx, payment, fee)
+}
+```
+
+- **確かめる引数**は、N の効果の引数のうち、型が、述語で決まる値の分類か op の分類で絞り込んだ型（`T on C.K`。`Param.type` が、そのまま `case`）のもの。行の引数でなくてもよい。型で決まる分類で絞り込んだ引数は、確かめない（値の型から決まる）。`optional` や `array` の中の絞り込み（`list<Order on Stage.Draft>`）も、確かめない。op と `read` の引数も、確かめない（372）。
+- **包む型** `checked<状態>State` は、確かめる引数を持つ効果が、一つでもある状態の単位ごとに一つ。`states.go` の、その単位のインターフェースのすぐ後ろに出す。非公開の型で、入口には、再公開しない。フィールドは、埋め込んだ単位（`<状態>State`）と、使う分類ごとの述語（名前は、`New` の、その分類の引数と同じ）。メソッドは、確かめる引数を持つ効果だけ（宣言順）。ほかのメソッドは、埋め込んだ単位のものが、そのまま呼ばれる。
+- **コメント**: 包む型は、例の二行（`<状態の FQN>` と、`New` の引数の名前が入る）。メソッドは、`// <メソッド> は、効果 <効果の FQN> の入口の確かめ: <句>。違えば、*runtime.CaseError を返し、効果は、起きない。` で、句は、確かめる引数ごとの `<引数> が、<分類の FQN> の <ケース> にあること` を、宣言の順に「、」でつないだもの。ケースが二つ以上なら「か」でつなぐ（`Sent か Done`）。
+- **メソッドの中身**: レシーバは `o`。確かめる引数を、宣言の順に、一つずつ: 判定関数 `Classify<C>` を呼ぶ。判定関数が `error` を返したら（述語の `error` か、分類の誤り）、そのまま返す。返ったケースが、引数の型が言うケース（`Ks`）のどれでもなければ、`*runtime.CaseError`（「runtime パッケージ」）を返す。すべて通れば、埋め込んだ単位の、同じ名前のメソッドを、同じ引数で呼んで返す。
+- 判定関数に渡す値は、引数そのもの。分類の対象の型が `optional(T)` で、引数の Go の型が `T` なら、`&<引数>`。
+- **包むのは `New`**（「New」）: 状態の単位の引数を、`checked<状態>State{<引数>, <述語>…}` で包んで、構造体 `ops` に入れる。配線は、いつも、包んだ単位を呼ぶので、単位の実装が、相乗りのものでも、人が書いたものでも、確かめは掛かる。`New` に渡す前の単位を、人のコードが直に呼べば、確かめは掛からない。
+- 述語は、`New` が、引数で受け取る（「New」の 3。配線が `match` に使っていない分類でも、確かめに使うなら、受け取る）。
+- 確かめの失敗は、仕様の例外ではない（`throws` に出ない。`docs/check.md`「行の遷移」）。配線は、ほかの呼び出しの失敗と同じに、そのまま返す。
 
 ### 別の名前空間の op
 
@@ -423,7 +463,7 @@ type ops struct {
 |---|---|---|---|
 | 1 | 人が実装する葉（`Leaves` があるとき） | `leaves` | `Leaves` |
 | 2 | 状態の単位。基底の状態と、述語で決まる状態の分類を、宣言順に | 状態（分類）の名前 | `<状態>State` |
-| 3 | 単位の対象の配線が `match` に使う、述語で決まる値の分類と op の分類（別の名前空間のものを含む）。分類の FQN の辞書順 | 分類の名前 | `<C>Cases`（別の名前空間のものは修飾する） |
+| 3 | 単位の対象の配線が `match` に使う、述語で決まる値の分類と op の分類と、N の効果の入口の確かめ（「効果の入口の確かめ」）が使う分類（どちらも、別の名前空間のものを含む）。分類の FQN の辞書順 | 分類の名前 | `<C>Cases`（別の名前空間のものは修飾する） |
 | 4 | 単位の対象の配線が呼ぶ別の名前空間。FQN の辞書順 | 名前空間の FQN のセグメントをつないだもの（`store`、`shopAdmin`） | `<M>Ops` |
 | 5 | 継ぎ目（`Seams` があるとき。「継ぎ目」） | `seams` | `Seams` |
 
@@ -432,6 +472,8 @@ type ops struct {
 - 継ぎ目を最後に置くのは、継ぎ目を宣言するトランスパイラを単位に足し引きしても、ほかの引数の位置が動かないようにするため。
 - 引数の型が同じ二つの状態（同じ形、同じ要素の型で、どちらにも `read` も効果もない）は、入れ替えて渡してもコンパイルが通る。位置引数と引き換えに受け入れた弱さ。
 - `New` のコメントの一行目は `// New はこの名前空間の Ops を組み立てる。引数の並びは、<句>。` で、句は、ある引数の種類を、この順に「、」でつないだもの: `leaves`、`状態の単位（宣言順）`、`分類の述語（FQN の辞書順）`、`別の名前空間（名前の辞書順）`、`seams`。二行目は `// 引数が nil かどうかは確かめない。`。引数が一つもなければ、`// New はこの名前空間の Ops を組み立てる。` の一行だけ。
+
+- **入口の確かめを持つ単位**（「効果の入口の確かめ」）は、`New` が包む: 構造体のリテラルの、その単位の所が、`<引数>: checked<状態>State{<引数>, <述語の引数>…}` になる（述語は、包む型のフィールドの順 = 分類の FQN の辞書順）。構造体 `ops` のフィールドの型は、`<状態>State` のまま。包む単位が一つでもあれば、構造体 `ops` のコメントは、`// ops は New が返す非公開の構造体。フィールドは New の引数（入口の確かめを持つ状態の単位は、New が包んだもの）。メソッドは、この名前空間の op のすべて。`
 
 **構造体 `ops`** は、N の op のすべてをメソッドに持つ（公開の名前）。配線のメソッドは `wiring.go`、それ以外は `ops.go` に、宣言順で置く。配線でないメソッドは、実装を呼ぶだけ。継ぎ目を持つ op は、公開の名前のメソッドが外側になり、下の表の中身は、その内側に入る（「継ぎ目」）。
 
@@ -693,7 +735,7 @@ type LifeCases interface {
 }
 ```
 - **判定の誤りは、配線が返す。** 判定関数が返した `error`（述語の `error` か、`*runtime.ClassificationError`）は、ほかの呼び出しの失敗と同じに、配線がそのまま返す（「呼び出し」の「失敗の扱い」）。どの配線も `error` を返す（「op の形」）ので、返す先は、いつもある。基底は、`panic` を呼ぶコードを出さない。どの述語も真でないのは、値が、宣言したケースの外にあるということ（`docs/check.md`「閉じた分類」）。二つ以上が真なのは、述語の実装の誤り（排他であることは、述語を書く人が担保する）。どちらも、仕様の例外（`throws`）ではない `error` として、呼び出し元に届く。
-- 述語の実装は、その分類を `match` に使う名前空間の `New` が、引数で受け取る（「New」の 3）。分類を宣言した名前空間の `New` が受け取るのは、その名前空間の配線が使うときだけ。
+- 述語の実装は、その分類を `match` に使う名前空間と、効果の入口の確かめ（「効果の入口の確かめ」）に使う名前空間の `New` が、引数で受け取る（「New」の 3）。分類を宣言した名前空間の `New` が受け取るのは、その名前空間が、どちらかに使うときだけ。
 - **述語で決まる状態の分類** C は、`classify.go` に列挙の型と定数と、判定関数 `func Classify<C>(ctx context.Context, s <C>State) (<C>, error)` を出す。述語は状態の単位 `<C>State` のメソッド（「状態の単位」）。判定関数は、値の分類と同じ規則で、すべての述語を呼び、真の数を確かめる。配線が `match by C` に使っていなくても出す（テストが、効果の結果の判定に使う）。
 
 ## デコレータ
@@ -828,6 +870,177 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 - 変わらない: op のメソッドの形（「op の形」。`ctx`、引数、戻り値、`error`）、`Ops`、`Leaves`、状態の単位（`read` と効果のメソッドを含む）、`<Ns>Ops`、コメントの `Throws:` など（どれも仕様だけで決まる）。継ぎ目を宣言するトランスパイラを単位に足しても、`Ops` を使うコードと、口を実装するコードは、そのまま通る。
 - 変わる: `Seams` と `New` の最後の引数、継ぎ目を持つ op の `ops.go` と `wiring.go` の中（外側と、中身の名前）。`New` を呼ぶ行は、引数が一つ増える。
 
+## 単体テストの口
+
+人か AI が中身を書く関数に、基底は、結果ごとの単体テストを受け取る口と、それを走らせる関数を出す（`docs/decisions.md`「決めたこと」373〜375）。対象は、葉の op（`Leaves` のメソッド）と、述語で決まる値の分類・op の分類の判定（`<C>Cases` の述語）。Hozo が担保するのは、必要なケースが用意されていて、通っていること。中身が作られるもの（配線の op）と、型で決まる分類には、出さない。
+
+人が書くのは、口を満たす型と、それを走らせる関数に渡す、一行のテスト:
+
+```go
+func TestLeaves(t *testing.T) { servertest.RunLeaves(t, app.Leaves{}, leafCases{}) }
+```
+
+### テストのパッケージ
+
+- 口は、**テストのパッケージ**に置く: ディレクトリは `<Dir(U, N)>/<N のパッケージ名>test/`、パッケージ名は `<N のパッケージ名>test`（`gen/server/servertest`、パッケージ `servertest`）。`testing` を import するので、アプリのコード（入口と、定義のパッケージ）とは、分ける。人のテスト（`out` の外に置く）が、import する。
+- テストのパッケージは、N の**入口のパッケージ**を import する（N の型、`Leaves`、`<C>Cases`、`Classify<C>` は、どれも、入口にある）。内側のパッケージは、import しない。
+- ファイルは、`doc.go`、`leaves.go`（葉の op が、一つでもあるとき）、`classify.go`（述語で決まる値の分類か op の分類が、N に、一つでもあるとき）。どちらもなければ、パッケージを作らない。`doc.go` のコメントは、`// Package <名前> は、名前空間 <N> の、単体テストの口: 結果ごとのケースを受け取り、走らせる（docs/plugin-go.md「単体テストの口」）。`
+- import の名前の決まり（「パッケージと import パス」の「import の名前」）は、同じ。違うのは二つ。（1）N の入口のパッケージは、名前が、import パスの最後の要素と同じでも、**いつも、名前を書いて** import する（`server "example.com/shop-server/gen/server"`）: 出力先のディレクトリの名前で、ファイルの中身が変わらないようにする（「決定性」の、同じ名前空間の二つの単位）。（2）import の名前に使わないのは、テストのパッケージの関数の本体が、決まった名前で使う識別子: `t`、`c`、`x`、`k`、`cases`、`leaves`、`got`、`err`、`want`、`kind`、`none`（と、どのファイルでも使わない `ops`、`ptr`）。
+- テストのパッケージの、公開の名前どうしが当たれば、GO-2（op `leaf` の `LeafCases` と、まとめの `LeafCases` など）。同じ単位が、子の名前空間 `N.<N のパッケージ名>test` を出力するなら、GO-4。
+- 失敗の文面（`t.Fatalf`）は、`runtime` の誤りと同じに、英語で書く。
+
+### 葉の op
+
+葉（`Shape.Leaves`。「Leaves」）ごとに、結果ごとのケースを受け取るインターフェース `<Op>Cases` と、ケース一つの構造体 `<Op>Case` を出す。その後ろに、葉をまとめる `LeafCases` と、走らせる `RunLeaves` を出す。
+
+```ts
+/** パスワードが合わなければ InvalidCredentials（人が書く） */
+fn checkPassword(user: type.User, password: type.Password): throws type.InvalidCredentials;
+/** トークンと期限を決める（人が書く） */
+fn newSession(user: type.User): type.Session;
+```
+
+```go
+// CheckPasswordCases は、葉 server.checkPassword の、結果ごとのケース。結果の数だけ、メソッドがある。
+type CheckPasswordCases interface {
+	// OK は、正常に終わるケース。
+	OK() CheckPasswordCase
+	// InvalidCredentials は、例外 type.InvalidCredentials を投げるケース。
+	InvalidCredentials() CheckPasswordCase
+}
+
+// CheckPasswordCase は、葉 server.checkPassword の、ケース一つ: 渡す引数と、足りない確かめ。
+type CheckPasswordCase struct {
+	User     pkgtype.User
+	Password pkgtype.Password
+	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。err は、葉が返した失敗（正常のケースでは nil）。
+	Then func(t *testing.T, err error)
+}
+
+// NewSessionCases は、葉 server.newSession の、結果ごとのケース。結果の数だけ、メソッドがある。
+type NewSessionCases interface {
+	// OK は、正常に終わるケース。
+	OK() NewSessionCase
+}
+
+// NewSessionCase は、葉 server.newSession の、ケース一つ: 渡す引数と、足りない確かめ。
+type NewSessionCase struct {
+	User pkgtype.User
+	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、葉が返した値、err は、葉が返した失敗（正常のケースでは nil）。
+	Then func(t *testing.T, got pkgtype.Session, err error)
+}
+
+// LeafCases は、人が実装する葉の op の、単体テストのケース。葉ごとに、メソッド一つ（Leaves と同じ並び）。
+// メソッドが一つでも足りない値は、RunLeaves に渡すところでコンパイルできない。
+type LeafCases interface {
+	CheckPassword() CheckPasswordCases
+	NewSession() NewSessionCases
+}
+
+// RunLeaves は、葉ごと、結果ごとに、テストを一つ走らせる。テストの名前は、<op の FQN>/<結果>。
+// ケースごとに、leaves の葉を呼び、結果が、そのケースのものであることを確かめてから、Then を呼ぶ。
+func RunLeaves(t *testing.T, leaves server.Leaves, c LeafCases) {
+	t.Run("server.checkPassword", func(t *testing.T) {
+		cases := c.CheckPassword()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			err := leaves.CheckPassword(context.Background(), k.User, k.Password)
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, err)
+			}
+		})
+		t.Run("InvalidCredentials", func(t *testing.T) {
+			k := cases.InvalidCredentials()
+			err := leaves.CheckPassword(context.Background(), k.User, k.Password)
+			var want pkgtype.InvalidCredentials
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception type.InvalidCredentials, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, err)
+			}
+		})
+	})
+	t.Run("server.newSession", func(t *testing.T) {
+		cases := c.NewSession()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			got, err := leaves.NewSession(context.Background(), k.User)
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+	})
+}
+```
+
+- **必要なケース**は、葉の結果ごとに、一つ: 正常（`OK`）と、その op が `throws` に書いた例外ごと（`Op.throws` の、書かれた順。同じ例外は、一度だけ）。デコレータが運ぶ例外（`Op.carried`）は、数えない（投げるのは、デコレータの処理で、葉の中身ではない）。例外を一つ足せば、`<Op>Cases` のメソッドが一つ増え、口を満たしていた型は、`RunLeaves` に渡すところでコンパイルできなくなる。
+- **結果の名前**: 正常は `OK`。例外は、宣言の名前（`type.InvalidCredentials` → `InvalidCredentials`）。その op の中で、名前が当たるとき（別の名前空間の、同じ名前の例外。例外 `OK`）は、当たったものを、名前空間のセグメントを先頭大文字にして前に付けた名前にする（`rate.Busy` → `RateBusy`）。メソッドの名前と、テストの名前の `<結果>` は、同じ。
+- **テストの名前**（ラベル）は、`<op の FQN>/<結果>`（`server.checkPassword/InvalidCredentials`）。`t.Run` を、op と結果の、二段に重ねる。
+- **`<Op>Case` のフィールド**は、op の引数（`Op.params` の順）。名前は、フィールド名と同じ決まり（先頭を大文字に。「名前」）。`Then` と当たる引数（`then`）は、`Then_`。型は、引数の Go の型。その後ろに `Then`。
+- **`Then`** は、戻り値を持つ op なら `func(t *testing.T, got <戻り値の型>, err error)`、持たない op なら `func(t *testing.T, err error)`。走らせる側が、結果の見分けを済ませた後に、呼ぶ。例外のケースでは、`err` から、例外が運ぶ値を確かめられる（`errors.As`）。`got` は、例外のケースでは、葉が返した値のまま（ふつうは、零値）。
+- **走らせる側が確かめること**: 正常のケースは、失敗がないこと（`err == nil`）。例外のケースは、返ってきた失敗が、その例外であること（`errors.As`。「exception」）。戻り値の型が、述語で決まる値の分類か op の分類で絞り込んだ型（`T on C.K`。`Op.returns` が、そのまま `case`）なら、正常のケースで、判定関数 `Classify<C>` を呼び、返ったケースが、型が言うケースのどれかであることも、確かめる。
+- **`RunLeaves` の引数**は、`t`、`leaves`（`<入口>.Leaves`）、戻り値の確かめに使う分類の述語（`<C>Cases`。分類の FQN の辞書順。名前は、分類の名前の先頭を小文字にしたもの。Go の予約語か事前宣言の識別子、本体が決まった名前で使う識別子、このファイルの import の名前、先に並んだ述語の名前と当たれば、当たらなくなるまで末尾に `_`）、`c`（`LeafCases`）。述語を使う葉がなければ、`t`、`leaves`、`c` の三つ。
+- 葉は、`leaves` のメソッドを、直に呼ぶ（`Ops` を通さない: 継ぎ目も、ほかの op も、通らない）。`ctx` は `context.Background()`。葉は、状態に触れない（`docs/check.md`「葉の op」）ので、状態の用意は、要らない。
+- 単位の対象でない配線（「op の置き場」の 3 の、もう一方）も、`Leaves` のメソッドなので、同じに、口を持つ。
+
+### 分類の判定
+
+N が宣言した、述語で決まる値の分類と op の分類 C ごとに、ケースごとの例を受け取るインターフェース `<C>Examples` と、走らせる `Run<C>` を出す（宣言順）。
+
+```go
+// WarrantyKindExamples は、分類 shop.WarrantyKind の判定の、ケースごとの例: そのケースに当たる値。
+// メソッドが一つでも足りない値は、RunWarrantyKind に渡すところでコンパイルできない。
+type WarrantyKindExamples interface {
+	// Standard は、ケース Standard に当たる値。
+	Standard() shop.Item
+	// Yamada は、ケース Yamada に当たる値。
+	Yamada() shop.Item
+}
+
+// RunWarrantyKind は、ケースごとに、テストを一つ走らせる。テストの名前は、<分類の FQN>/<ケース>。
+// ケースごとに、例の値を、判定関数 ClassifyWarrantyKind に渡し、そのケースになることを確かめる。
+func RunWarrantyKind(t *testing.T, cases shop.WarrantyKindCases, x WarrantyKindExamples) {
+	t.Run("shop.WarrantyKind", func(t *testing.T) {
+		t.Run("Standard", func(t *testing.T) {
+			kind, err := shop.ClassifyWarrantyKind(context.Background(), cases, x.Standard())
+			if err != nil {
+				t.Fatalf("want case Standard, got error %v", err)
+			}
+			if kind != shop.WarrantyKindStandard {
+				t.Fatalf("want case Standard, got %s", [...]string{"Standard", "Yamada"}[kind])
+			}
+		})
+		t.Run("Yamada", func(t *testing.T) {
+			kind, err := shop.ClassifyWarrantyKind(context.Background(), cases, x.Yamada())
+			if err != nil {
+				t.Fatalf("want case Yamada, got error %v", err)
+			}
+			if kind != shop.WarrantyKindYamada {
+				t.Fatalf("want case Yamada, got %s", [...]string{"Standard", "Yamada"}[kind])
+			}
+		})
+	})
+}
+```
+
+- **必要なケース**は、分類のケースごとに、一つ（宣言順）。人が書くのは、そのケースに当たる値の例（型は、分類の対象の型: 「分類」）。確かめ（判定関数が、そのケースを返すこと）は、基底が作る。判定関数は、すべての述語を呼ぶので、一つの例が、ほかのケースの述語が偽を返すことも、確かめる。
+- **ない側のケース**（`Classify.absent`）は、例を求めない: `<C>Examples` に、メソッドがない。走らせる側が、値がない（零値の `nil`）ことを渡して、そのケースになることを確かめる（作れる分は、テストごと作る。373）。
+- テストの名前は、`<分類の FQN>/<ケース>`。
+- 述語で決まる**状態の分類**（述語は、状態の単位のメソッド）には、出さない: 状態を用意する道が、要る（`docs/open.md`「Hozo の側の改善する点」）。
+
+### 口を持たないもの
+
+- 配線の op（中身は、基底が作る。375）。`never` を返す op。
+- 状態の単位の、人が書くメソッド（デコレータのない `read` と効果、形で決まるメソッド）と、継ぎ目の実装。対象に入れるかは、決めていない（`docs/open.md`「Hozo の側の改善する点」）。
+- 呼ぶ先の op を、にせものに差し替える道具（375 の、目標）。
+
 ## コメント
 
 説明（`description.body`）は、行ごとに `// ` を付けて写す（空の行は `//`）。説明がなければ、下の「説明がないとき」を使う。`<名前> は<説明>` の形で、説明が ASCII の文字で始まるときは、「は」の後ろに空白を一つ置く（`// FindUser は email からユーザーを引く`）。
@@ -894,12 +1107,13 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 
 ## runtime パッケージ
 
-生成したコードが import する `github.com/mew-ton/hozo/runtime`。基底の出力が使うのは、次の三つと、核の型 `date`・`time` の値の型（下の表）。
+生成したコードが import する `github.com/mew-ton/hozo/runtime`。基底の出力が使うのは、次の四つと、核の型 `date`・`time` の値の型（下の表）。
 
 ```go
 type Effect string
 type Exception interface { error; HozoException() string }
 type ClassificationError struct { Classify string; Hits []string }   // 分類の誤り（判定関数と、型で決まる分類の match が返す）。Error() を持つ
+type CaseError struct { Effect, Param, Classify string; Want []string; Got string }   // 効果の入口の確かめの失敗（「効果の入口の確かめ」）。Error() を持つ
 ```
 
 - 核の型 `date` と `time` の値の型も、ここに置く（「型」）。どちらも、時刻帯を持たず、`==` で比べられ、`encoding/json` では、文字列になる（`MarshalText` / `UnmarshalText`）。
@@ -909,7 +1123,7 @@ type ClassificationError struct { Classify string; Hits []string }   // 分類�
   | `Date` | `date` | `0001-01-01` | `2006-01-02` | `NewDate(年, 月, 日)`、`DateOf(time.Time)`、`ParseDate(文字列)` | `Year` / `Month` / `Day`、`In(時刻帯)`（その日の 0 時）、`Compare`、`String` |
   | `TimeOfDay` | `time` | `00:00:00` | `15:04:05`。秒より細かい部分は、末尾の 0 を除いた小数部（読むときは、0〜9 桁） | `NewTimeOfDay(時, 分, 秒, ナノ秒)`、`TimeOfDayOf(time.Time)`、`ParseTimeOfDay(文字列)` | `Hour` / `Minute` / `Second` / `Nanosecond`、`SinceMidnight`、`Compare`、`String`、`Fixed`（小数部を、いつも 9 桁で書く） |
 
-- `Effect` と `Exception` は `types.go`、`ClassificationError` は `classify.go` と `wiring.go` が使う。`ops.go` と `states.go` が `runtime` を import するのは、関数の引数か戻り値に、`date` か `time` があるときだけ。
+- `Effect` と `Exception` は `types.go`、`ClassificationError` は `classify.go` と `wiring.go` が使う。`CaseError` は、`states.go` の、入口の確かめが使う: `Effect` は効果の FQN、`Param` は引数の名前、`Classify` は分類の FQN、`Want` は、引数の型が言うケース（型に書かれた順）、`Got` は、判定関数が返したケース。仕様の例外ではない（`Exception` を満たさない）。`ops.go` と `states.go` が `runtime` を import するのは、関数の引数か戻り値に、`date` か `time` があるときと、`states.go` が、入口の確かめを持つとき。
 - `MissingError` はなくした（「実装を受け取る口」）。
 - `runtime` には、標準の相乗りが使う型も置く: `Violation`、`ValidationError`、`CheckFormat` は `go-valid` のもの（持ち主は `docs/plugin-go-valid.md`「runtime」）。`DBTxKey`（`ctx` が運ぶ DB のトランザクションの鍵。`struct { DB *sql.DB }`）は `go-sqlite` のもの（持ち主は `docs/plugin-go-sqlite.md`「トランザクション」）。Go の出力が import するライブラリを一つにするため。`DBTxKey` は、それに加えて、同じ DB を使う二つの名前空間の出力が、同じ鍵を使うため（出力のパッケージごとの型では、共有できない）。
 - API を変えるときは、生成したコードのヘッダに書く版（「ファイル」）と合わせて互換を保つ。
@@ -930,7 +1144,7 @@ type ClassificationError struct { Classify string; Hits []string }   // 分類�
 | GO-1 | error | Dir(U, N) の上に `go.mod` がない（「パッケージと import パス」）。位置なし |
 | GO-2 | error | 生成する名前が当たる（「名前」）。当たった二つの宣言をメッセージに示す。位置は後ろの宣言 |
 | GO-3 | error | 出力どうしの import が循環する（「パッケージと import パス」）。輪に入る出力を、単位（何番目の `[[emit]]` か）と名前空間でメッセージに示す。位置なし。輪に入る出力ごとに出る |
-| GO-4 | error | 内側のフォルダ `inner` が、同じ単位が出力する子の名前空間 `N.inner` の出力先と重なる（「内側のフォルダと入口」）。位置は名前空間の最初の内部の op |
+| GO-4 | error | 基底が作るディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる: 内側のフォルダ `inner` と `N.inner`（「内側のフォルダと入口」。位置は、名前空間の最初の内部の op）、テストのパッケージ `<パッケージ名>test` と `N.<パッケージ名>test`（「単体テストの口」。位置は、口を持つ最初の宣言） |
 | GO-5 | error | `[emit.options.go]` に、知らないキーがある（「マニフェスト」）。位置なし |
 | GO-6 | error | `variant` の絞り込みの `as` の型と等しい型のアームが、union に二つ以上ある（「match」）。位置は分類 |
 | GO-INTERNAL | error | 生成器の不具合（利用者の仕様の誤りではない）: 生成したコードを `go/format` で整形できない、検査を通った IR には来ないはずの形、`View` が欠けている、型の置き場がない（CFG-22 が通したはずのもの） |
@@ -969,3 +1183,4 @@ type ClassificationError struct { Classify string; Hits []string }   // 分類�
 | 状態に触れる葉の op を、読む状態と効果で、状態の単位か、複数の状態にまたがる口 `SharedState` に置く | 状態に触れるのは `read` と効果で、どちらも状態の単位のメソッド。葉の op は `Leaves` だけ。`SharedState` はない | 139（100 を置き換えた） |
 | 値を運ぶ例外は `struct{ Value <型> }` | 引数ごとにフィールド一つ | 139 |
 | 述語で決まる分類は、どのケースも述語を持つ。効果のコメントの宛先は、`<状態>.<操作>` か、状態の分類の遷移 | ない側のケース（`Classify.absent`）は、述語を持たず、判定関数が、値がないことで決める。行の遷移を持つ効果は、コメントに、行の遷移の表示を持つ。効果のメソッドの形は変わらない | 169 |
+| 行の引数のケースは、どこでも確かめない。テストを受け取る口は、ない | 絞り込んだ引数を持つ効果は、`New` が包んだ単位が、入口で、引数のケースを確かめる（「効果の入口の確かめ」）。人か AI が中身を書く関数（葉の op、分類の判定）に、結果ごとの単体テストを受け取る口を、テストのパッケージに出す（「単体テストの口」） | 371〜375 |

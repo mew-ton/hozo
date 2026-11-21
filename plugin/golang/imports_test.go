@@ -219,3 +219,35 @@ func TestImportsQualifier(t *testing.T) {
 		t.Errorf("置き場がない: %q, %v", got, im.Err())
 	}
 }
+
+// docs/plugin-go.md「単体テストの口」の「テストのパッケージ」: テストのパッケージのファイルは、N の宣言も、入口のパッケージの名前で
+// 修飾する。入口の import は、名前がパスの最後の要素と同じでも、名前を書く（Canonical で足し直しても）。別の名前空間の import は、
+// ほかのファイルと同じ。
+func TestTestImports(t *testing.T) {
+	root := projectRoot(t)
+	v := typesView()
+	l, _ := LayoutOf(v, root)
+	im := NewTestImports(v, l, root)
+	if got := GoType(ir.Ref("server.User"), im); got != "server.User" {
+		t.Errorf("N の型 = %q, want server.User", got)
+	}
+	if got := im.Qualifier("server"); got != "server." {
+		t.Errorf("Qualifier(viewer) = %q, want server.", got)
+	}
+	if got := GoType(ir.Ref("type.Session"), im); got != "pkgtype.Session" || im.Err() != nil {
+		t.Errorf("別の名前空間の型 = %q, %v", got, im.Err())
+	}
+	want := "import (\n\tserver \"example.com/app/gen/server\"\n\tpkgtype \"example.com/app/gen/type\"\n)\n"
+	if got := im.Render(); got != want {
+		t.Errorf("Render =\n%s\nwant\n%s", got, want)
+	}
+	if got := im.Canonical().Render(); got != want {
+		t.Errorf("Canonical().Render =\n%s\nwant\n%s", got, want)
+	}
+	// 本体が決まった名前で使う識別子と同じ名前のパッケージは、2 を付ける（入口のパッケージでも）
+	im = NewTestImports(v, l, root)
+	im.Reserve("server")
+	if got := im.Qualifier("server"); got != "server2." {
+		t.Errorf("Reserve の後の Qualifier(viewer) = %q, want server2.", got)
+	}
+}

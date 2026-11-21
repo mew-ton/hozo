@@ -23,12 +23,15 @@ type Imports struct {
 	layout *Layout
 	root   string
 	inDef  bool
+	// outside は、書くファイルが、出力の外のパッケージ（テストのパッケージ）のものか。そのとき、N の宣言も、入口のパッケージで修飾する。
+	outside bool
 
 	paths    map[string]string // import パス → 使う名前
 	names    map[string]string // 使う名前 → import パス（import に使わせない名前は ""）
 	reserved []string          // Reserve で足した、import に使わせない名前
 	pkgNames map[string]string // import パス → パッケージの名前（Add に渡されたもの）
 	nsOf     map[string]string // 名前空間のパッケージの import パス → 名前空間の FQN
+	named    map[string]bool   // いつも名前を書いて import するパス（テストのパッケージから見た、N の入口のパッケージ）
 	declNS   map[string]string // 宣言の FQN → 宣言した名前空間（view.Program から。最初に引いたときに作る）
 	homes    map[string]*Layout
 	err      error
@@ -48,11 +51,20 @@ func NewImports(view *ir.View, layout *Layout, root string, inDef bool) *Imports
 	return &Imports{view: view, layout: layout, root: root, inDef: inDef}
 }
 
+// NewTestImports は、view の出力の、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の、一つの
+// ファイルの import を作る。テストのパッケージは、N の入口のパッケージを import するので、N の型も、入口のパッケージの名前で
+// 修飾する（Qualifier(N) が、入口を import して `<名前>.` を返す）。その import は、名前がパスの最後の要素と同じでも、名前を書く
+// （出力先のディレクトリの名前で、ファイルの中身が変わらないように: 同「決定性」）。
+func NewTestImports(view *ir.View, layout *Layout, root string) *Imports {
+	return &Imports{view: view, layout: layout, root: root, outside: true}
+}
+
 func (im *Imports) init() {
 	if im.paths != nil {
 		return
 	}
 	im.paths, im.names, im.pkgNames, im.nsOf = map[string]string{}, map[string]string{}, map[string]string{}, map[string]string{}
+	im.named = map[string]bool{}
 	// 基底が定義のパッケージに宣言する非公開の名前は、import の名前に使わせない（当たれば、名前空間のパッケージに 2、3、… が付く）
 	for _, name := range basePrivateNames {
 		im.names[name] = ""
@@ -137,14 +149,14 @@ func (im *Imports) Names() []string {
 }
 
 // Render は import のブロックを返す: 標準ライブラリ（パスの先頭の要素に `.` がない）、空行、それ以外の順で、それぞれパスの
-// 辞書順。名前がパスの最後の要素と違えば、名前を書く。一つなら `import "time"` の一行、なければ ""。末尾に改行を一つ付ける。
+// 辞書順。名前がパスの最後の要素と違えば、名前を書く（テストのパッケージから見た、N の入口のパッケージは、いつも書く）。一つなら `import "time"` の一行、なければ ""。末尾に改行を一つ付ける。
 func (im *Imports) Render() string {
 	ps := im.Paths()
 	if len(ps) == 0 {
 		return ""
 	}
 	line := func(p string) string {
-		if name := im.paths[p]; name != path.Base(p) {
+		if name := im.paths[p]; name != path.Base(p) || im.named[p] {
 			return name + " " + strconv.Quote(p)
 		}
 		return strconv.Quote(p)
@@ -180,7 +192,7 @@ func (im *Imports) Render() string {
 // その後に、名前空間のパッケージを、名前空間の FQN の辞書順に。名前が当たれば、後の方に 2、3、… が付く。
 // ファイルを一度作って import の集まりを知り、返った Imports で作り直せば、名前は、足した順（型を書いた順）によらない。
 func (im *Imports) Canonical() *Imports {
-	out := &Imports{view: im.view, layout: im.layout, root: im.root, inDef: im.inDef, declNS: im.declNS, homes: im.homes,
+	out := &Imports{view: im.view, layout: im.layout, root: im.root, inDef: im.inDef, outside: im.outside, declNS: im.declNS, homes: im.homes,
 		reserved: append([]string(nil), im.reserved...)}
 	out.init()
 	var plain, spaces []string
@@ -198,16 +210,29 @@ func (im *Imports) Canonical() *Imports {
 	for _, p := range spaces {
 		out.Add(p, im.pkgNames[p])
 		out.nsOf[p] = im.nsOf[p]
+		out.named[p] = im.named[p]
 	}
 	return out
 }
 
 // Qualifier は、名前空間 namespace の宣言（型、例外、述語で決まる分類の名前）を、このファイルから書くときの前置き:
-// 見る側の名前空間 N なら ""（修飾なし）、別の名前空間なら、その型の置き場の入口のパッケージを import して `<名前>.`。
+// 見る側の名前空間 N なら ""（修飾なし。テストのパッケージのファイルでは、N の入口のパッケージを import して `<名前>.`）、
+// 別の名前空間なら、その型の置き場の入口のパッケージを import して `<名前>.`。
 // 置き場がなければ "" を返し、Err がそれを報告する。
 func (im *Imports) Qualifier(namespace string) string {
-	if im == nil || im.view == nil || namespace == im.view.Viewer {
+	if im == nil || im.view == nil {
 		return ""
+	}
+	if namespace == im.view.Viewer {
+		if !im.outside || im.layout == nil {
+			return ""
+		}
+		// テストのパッケージから見た N: 入口のパッケージ
+		im.init()
+		name := im.Add(im.layout.EntryPath, im.layout.EntryName)
+		im.nsOf[im.layout.EntryPath] = namespace
+		im.named[im.layout.EntryPath] = true
+		return name + "."
 	}
 	home := im.home(namespace)
 	if home == nil {

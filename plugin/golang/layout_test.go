@@ -38,6 +38,7 @@ func TestImportPath(t *testing.T) {
 
 // docs/plugin-go.md「内側のフォルダと入口」: N の op に内部の op が一つでもある出力は、内側（<Dir>/inner、パッケージ inner）と
 // 入口に分ける。一つもない出力（op を持たない、型だけの名前空間を含む）は分けない。
+// テストのパッケージ（同「単体テストの口」の「テストのパッケージ」）は、分けても分けなくても、<Dir>/<入口のパッケージ名>test。
 func TestLayoutOf(t *testing.T) {
 	root := projectRoot(t)
 	// 型だけの名前空間。パッケージ名は名前空間から決まり、予約語なら pkg を前に付ける
@@ -47,7 +48,8 @@ func TestLayoutOf(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Layout{Namespace: "type", Dir: "gen/type", EntryPath: "example.com/app/gen/type", EntryName: "pkgtype",
-		DefDir: "gen/type", DefPath: "example.com/app/gen/type", DefName: "pkgtype"}
+		DefDir: "gen/type", DefPath: "example.com/app/gen/type", DefName: "pkgtype",
+		TestDir: "gen/type/pkgtypetest", TestPath: "example.com/app/gen/type/pkgtypetest", TestName: "pkgtypetest"}
 	if *l != want {
 		t.Errorf("型だけの名前空間: %+v, want %+v", *l, want)
 	}
@@ -60,7 +62,8 @@ func TestLayoutOf(t *testing.T) {
 	v = viewOf("server", namespace("server", op("server.login", nil), with(op("server.check", nil), internal())))
 	l, _ = LayoutOf(v, root)
 	want = Layout{Namespace: "server", Dir: "gen/server", EntryPath: "example.com/app/gen/server", EntryName: "server", HasInner: true,
-		DefDir: "gen/server/inner", DefPath: "example.com/app/gen/server/inner", DefName: "inner"}
+		DefDir: "gen/server/inner", DefPath: "example.com/app/gen/server/inner", DefName: "inner",
+		TestDir: "gen/server/servertest", TestPath: "example.com/app/gen/server/servertest", TestName: "servertest"}
 	if *l != want {
 		t.Errorf("内部の op を持つ: %+v, want %+v", *l, want)
 	}

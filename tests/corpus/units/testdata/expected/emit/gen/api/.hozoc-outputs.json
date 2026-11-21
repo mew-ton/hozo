@@ -6,6 +6,8 @@
   "gen/api/inner/types.go",
   "gen/api/inner/wiring.go",
   "gen/api/ops.go",
+  "gen/api/shoptest/doc.go",
+  "gen/api/shoptest/leaves.go",
   "gen/api/states.go",
   "gen/api/types.go"
 ]

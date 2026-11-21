@@ -6,6 +6,8 @@
   "gen/server/inner/types.go",
   "gen/server/inner/wiring.go",
   "gen/server/ops.go",
+  "gen/server/servertest/doc.go",
+  "gen/server/servertest/leaves.go",
   "gen/server/states.go",
   "gen/server/types.go"
 ]
