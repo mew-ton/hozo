@@ -14,7 +14,7 @@ namespace a {
   effect fn touch(): effects Checkout as Shopping, Ordered -> any;
   effect fn same(): effects Checkout as Shopping -> Shopping;
   effect fn clearCart(): effects carts as HasItems -> Empty;
-  effect fn login(): effects token as Empty -> HasItems;
+  effect fn login(): effects token as None -> Some;
   effect fn anyCart(): effects carts as any -> Empty, HasItems;
   effect fn fill(): effects CartFilled as any -> CartFilled;
 
@@ -22,9 +22,9 @@ namespace a {
   effect fn ng1(): effects Checkout as Browsing -> Ordered;          // ERROR: STATE-4
   effect fn ng2(): effects Checkout as Shopping -> Paid;             // ERROR: STATE-4
   effect fn ng3(): effects Checkout as Empty -> HasItems;            // ERROR: STATE-4
-  // 宛先が基底の状態なら Empty / HasItems
+  // 宛先が基底の状態なら、その形のケース（list は Empty / HasItems、nullable は None / Some）
   effect fn ng4(): effects carts as Shopping -> Empty;               // ERROR: STATE-4
-  effect fn ng5(): effects token as HasItems -> None;                // ERROR: STATE-4
+  effect fn ng5(): effects token as Some -> Empty;                   // ERROR: STATE-4
   // 宛先が single の状態（組み込みの分類がない）
   effect fn ng6(): effects clock as Empty -> HasItems;               // ERROR: STATE-4
   effect fn ng7(): effects clock as any -> any;                      // ERROR: STATE-4

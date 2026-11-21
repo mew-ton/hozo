@@ -1,10 +1,10 @@
-// MATCH-2（docs/check.md「標準の分類」）: 標準の分類（by list / by nullable）のケースは Empty / HasItems。
+// MATCH-2（docs/check.md「標準の分類」）: 標準の分類（by list / by nullable）のケースは、list が Empty / HasItems、nullable が None / Some。
 // 値を対象にしても同じ
 namespace a {
   model In { token: string?; lines: string[]; }
   fn f();
   fn ok(in: In) {
-    match (in.token by nullable) { Empty => f(); HasItems => none; };
+    match (in.token by nullable) { None => f(); Some => none; };
     match (in.lines by list) { HasItems => f(); Empty => none; };
     match (in.lines by list) { Empty, HasItems => f(); };
     match (in.lines by list) { Empty => f(); else => none; };

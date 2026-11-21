@@ -709,6 +709,7 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 - **`payment.prepayExpiring` は、失敗を、状態に残す形にしてから、繰り返しにした**（`docs/decisions.md`「決めたこと」345）。そのまま繰り返しにすると、一つの支払いで、外の仕組みが失敗したとき、残りの支払いが、その回では、扱われない（`docs/wiring-trial.md` の W5）。`prepay` に、想定した失敗を受けて、支払いに残すデコレータ（`payment.noteFailure`: `catches … halts …`）を付けた。繰り返しの中身は、例外を出さなくなり、一つが失敗しても、残りは、続く。残した失敗は、次に時計が動いたときに、もう一度、試される。想定していない失敗は、ここまで届き、繰り返しを、止める。
 - `ordering.expireUnpaid` は、外の仕組みを呼ばず、`@db.transaction` を持つ: 途中で失敗したら、それまでの分も、戻る。
 - **`Record<K, V>` をなくした**（`docs/decisions.md`「決めたこと」360）のに合わせて、二つの画面（`storefront`、`backoffice`）の、URL のクエリの状態を、`state query: single<page.Query>;` にした。`page.Query` は、標準の語彙 `page` が宣言する、インデックスの model（`docs/vocab.md`）。
+- **標準の分類 `nullable` のケースの名前を、`None` / `Some` に替えた**（`docs/decisions.md`「決めたこと」362）のに合わせて、二つの画面（`storefront`、`backoffice`）の、形が `nullable` の状態の遷移（`effects token as None -> Some`、`effects offer as None -> Some`）と、`match (… by nullable)` のアームを、書き直した。形が `list` の所（`Empty` / `HasItems`）は、変えていない。
 
 ## 確かめ方
 

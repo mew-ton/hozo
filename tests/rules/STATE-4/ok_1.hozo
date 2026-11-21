@@ -1,4 +1,4 @@
-// STATE-4（docs/check.md「状態と効果」）: 遷移の前と後のケースは宛先の分類のケース。宛先が基底の状態なら Empty / HasItems
+// STATE-4（docs/check.md「状態と効果」）: 遷移の前と後のケースは宛先の分類のケース。宛先が基底の状態なら、その形のケース（list は Empty / HasItems、nullable は None / Some）
 namespace a {
   state carts: list<string>;
   state orders: list<string>;
@@ -17,6 +17,6 @@ namespace a {
   effect fn fill(): effects CartFilled as any -> CartFilled;
   // 基底の状態の組み込みの分類（list / nullable）
   effect fn clearCart(): effects carts as HasItems -> Empty;
-  effect fn login(): effects token as Empty -> HasItems;
+  effect fn login(): effects token as None -> Some;
   effect fn anyCart(): effects carts as any -> Empty, HasItems;
 }

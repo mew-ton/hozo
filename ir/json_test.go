@@ -207,8 +207,8 @@ func TestRoundTripMatchSubjects(t *testing.T) {
 	}
 	unionRoundTrip(t, MatchSubject(ClassifyOwnedSubject{}), UnmarshalMatchSubject, `{"kind":"classify"}`)
 
-	arm := MatchArm{Cases: []string{CaseEmpty, CaseHasItems}, Body: NoneBody{}, Span: sp()}
-	armJSON := `{"cases":["Empty","HasItems"],"else":false,"body":{"kind":"none"},"narrowed":[],` + spJSON + `}`
+	arm := MatchArm{Cases: []string{CaseNone, CaseSome}, Body: NoneBody{}, Span: sp()}
+	armJSON := `{"cases":["None","Some"],"else":false,"body":{"kind":"none"},"narrowed":[],` + spJSON + `}`
 	// 標準の分類なら classify は "list" か "nullable"。
 	b := roundTrip(t, Match{Subject: ValueSubject{Atom: StateAtom{State: "browser.token", Span: sp()}}, Classify: "nullable", Arms: []MatchArm{arm}, Span: sp()})
 	if want := `{"subject":{"kind":"value","atom":` + stateAtomJSON + `},"classify":"nullable","arms":[` + armJSON + `],` + spJSON + `}`; string(b) != want {
@@ -403,8 +403,14 @@ func TestStateShapes(t *testing.T) {
 			t.Errorf("%s.HasBuiltinClassify() = %v, want %v", shape, !want, want)
 		}
 	}
-	if !reflect.DeepEqual(BuiltinCases(), []string{"Empty", "HasItems"}) {
-		t.Errorf("BuiltinCases = %v", BuiltinCases())
+	// 標準の分類のケース名は、形ごとに違う（docs/check.md「標準の分類」）。single は、組み込みの分類を持たない
+	for shape, want := range map[StateShape][]string{StateList: {"Empty", "HasItems"}, StateNullable: {"None", "Some"}, StateSingle: nil} {
+		if got := shape.BuiltinCases(); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s.BuiltinCases() = %v, want %v", shape, got, want)
+		}
+		if got := StandardCases(string(shape)); !reflect.DeepEqual(got, want) {
+			t.Errorf("StandardCases(%q) = %v, want %v", shape, got, want)
+		}
 	}
 	b := roundTrip(t, State{DeclBase: DeclBase{Name: "token", Span: sp()}, Type: Optional(Ref("Token")), Shape: StateNullable, Element: Ref("Token")})
 	if want := `{"kind":"state","name":"token","decorators":[],` + spJSON + `,"type":{"kind":"optional","of":{"kind":"ref","target":"Token"}},"shape":"nullable","element":{"kind":"ref","target":"Token"}}`; string(b) != want {
@@ -527,7 +533,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.14","namespaces":[],"binds":[]}`
+	want := `{"version":"0.15","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -535,7 +541,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.14","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.14","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.15","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.15","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

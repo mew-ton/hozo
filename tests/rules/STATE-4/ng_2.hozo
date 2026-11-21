@@ -1,10 +1,11 @@
-// STATE-4（docs/check.md「状態と効果」）: 宛先が基底の状態なら、ケースは Empty / HasItems
+// STATE-4（docs/check.md「状態と効果」）: 宛先が基底の状態なら、ケースは、その形のもの（list は Empty / HasItems、nullable は None / Some）
 namespace a {
   state carts: list<string>;
   state token: nullable<string>;
   classify Session of token { Anonymous; LoggedIn; }
   effect fn clear(): effects carts as Full -> Empty;             // ERROR: STATE-4
-  effect fn login(): effects token as Empty -> Some;             // ERROR: STATE-4
+  // nullable に、list のケースの名前を書いた
+  effect fn login(): effects token as Empty -> HasItems;         // ERROR: STATE-4
   // 状態の分類のケースは、基底の状態の遷移には書けない
   effect fn signIn(): effects token as Anonymous -> LoggedIn;    // ERROR: STATE-4
 }

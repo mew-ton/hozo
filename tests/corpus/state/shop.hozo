@@ -61,12 +61,12 @@ namespace shop {
   /** ログインする */
   effect fn signIn(): effects LoggedIn as any -> LoggedIn;
 
-  // docs/grammar.md「exception / effect / read」Transition: 基底の状態の組み込みの分類の遷移（ケースは Empty / HasItems）。
+  // docs/grammar.md「exception / effect / read」Transition: 基底の状態の組み込みの分類の遷移（ケースは、list が Empty / HasItems、nullable が None / Some）。
   // 書き込むのはその状態
   /** カートを空にする */
   effect fn clearCart(): effects carts as HasItems -> Empty;
   /** トークンを保存する */
-  effect fn saveToken(token: Token): effects token as Empty -> HasItems;
+  effect fn saveToken(token: Token): effects token as None -> Some;
 
   /** カートが空 */
   exception EmptyCart;
@@ -105,8 +105,8 @@ namespace shop {
   fn openTop()
   {
     match (token by nullable) {
-      Empty    => showLogin();
-      HasItems => showCart();
+      None => showLogin();
+      Some => showCart();
     };
   }
 

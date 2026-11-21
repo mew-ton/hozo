@@ -116,10 +116,10 @@ func (o *ops) Direct(ctx context.Context, line Line, t Token) error {
 func (o *ops) FindOrNone(ctx context.Context, item *string) (*Line, error) {
 	// match (item by nullable)
 	if item != nil {
-		// HasItems: item は string
+		// Some: item は string
 		return o.lines.LineFor(ctx, *item)
 	}
-	// Empty
+	// None
 	return nil, nil
 }
 
@@ -130,14 +130,14 @@ func (o *ops) CountOrZero(ctx context.Context, item *string) (int64, error) {
 	// match (item by nullable)
 	var n int64
 	if item != nil {
-		// HasItems: item は string
+		// Some: item は string
 		v0, err := o.lines.CountLines(ctx)
 		if err != nil {
 			return 0, err
 		}
 		n = v0
 	} else {
-		// Empty
+		// None
 		n = 0
 	}
 	return n, nil
@@ -154,12 +154,12 @@ func (o *ops) Toggle(ctx context.Context, t Token) error {
 	}
 	// match (token by nullable)
 	if token != nil {
-		// HasItems: token は app.Token
+		// Some: token は app.Token
 		if err := o.token.DropToken(ctx); err != nil {
 			return err
 		}
 	} else {
-		// Empty
+		// None
 		if err := o.token.Post(ctx, t); err != nil {
 			return err
 		}
@@ -288,12 +288,12 @@ func (o *ops) Branches(ctx context.Context) error {
 	}
 	// match (token by nullable)
 	if token != nil {
-		// HasItems: token は app.Token
+		// Some: token は app.Token
 		if err := o.token.DropToken(ctx); err != nil {
 			return err
 		}
 	} else {
-		// Empty
+		// None
 		if err := o.ShowToken(ctx, token); err != nil {
 			return err
 		}

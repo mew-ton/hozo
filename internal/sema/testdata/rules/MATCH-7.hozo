@@ -18,8 +18,8 @@ namespace a {
   fn ok(m: M, in: In): void {
     match (m by Kind) { A => g(m); B => none; };
     match (carts by list) { Empty => f(); HasItems => none; };
-    match (token by nullable) { Empty => f(); HasItems => none; };
-    match (in.token by nullable) { Empty => f(); HasItems => none; };
+    match (token by nullable) { None => f(); Some => none; };
+    match (in.token by nullable) { None => f(); Some => none; };
     match (in.lines by list) { Empty => f(); HasItems => none; };
     match (by Checkout) { Shopping => f(); Ordered => none; };
   }
@@ -34,18 +34,18 @@ namespace a {
   }
   // by list の対象の型が array でない、by nullable の対象の型が optional でない
   fn ng3(): void {
-    match (carts by nullable) { Empty => f(); HasItems => none; };     // ERROR: MATCH-7
+    match (carts by nullable) { None => f(); Some => none; };     // ERROR: MATCH-7
     match (token by list) { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
     match (clock by list) { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
-    match (clock by nullable) { Empty => f(); HasItems => none; };     // ERROR: MATCH-7
+    match (clock by nullable) { None => f(); Some => none; };     // ERROR: MATCH-7
   }
   // 型が合わない値、リテラル、none。値でない宣言は RES-4
   fn ng4(m: M, in: In): void {
     match (m by list) { Empty => f(); HasItems => none; };             // ERROR: MATCH-7
     match (in.token by list) { Empty => f(); HasItems => none; };      // ERROR: MATCH-7
-    match (in.lines by nullable) { Empty => f(); HasItems => none; };  // ERROR: MATCH-7
+    match (in.lines by nullable) { None => f(); Some => none; };  // ERROR: MATCH-7
     match (Checkout by list) { Empty => f(); HasItems => none; };      // ERROR: RES-4
-    match (1 by nullable) { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
+    match (1 by nullable) { None => f(); Some => none; };         // ERROR: MATCH-7
     match (none by list) { Empty => f(); HasItems => none; };          // ERROR: MATCH-7
   }
   // 別の名前空間の状態は、名前では読めない（RES-5）
@@ -55,7 +55,7 @@ namespace a {
   // 対象がない
   fn ng6(): void {
     match (by list) { Empty => f(); HasItems => none; };               // ERROR: MATCH-7
-    match (by nullable) { Empty => f(); HasItems => none; };           // ERROR: MATCH-7
+    match (by nullable) { None => f(); Some => none; };           // ERROR: MATCH-7
   }
   // 引数や束縛が同じ名前なら、そちらを指す（docs/resolve.md「手続き」1.1）。その値の型で照合する
   fn ng7(carts: M): void {

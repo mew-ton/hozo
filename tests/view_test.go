@@ -268,7 +268,7 @@ func TestViewFromEntry(t *testing.T) {
 			"return match (user by api.Lookup) { Found => api.nameOf(user: user); else(Missing) => throw api.NotFound }",
 		})
 		expect(t, "tokenOrNone の本体（状態の名前は Atom の state、アームの値と none）", renderBody(opOf(t, prog, "api.tokenOrNone").Body), []string{
-			"return match (state api.current by nullable) { HasItems => state api.current; Empty => none }",
+			"return match (state api.current by nullable) { Some => state api.current; None => none }",
 		})
 		expect(t, "greeting の本体（修飾して書いた状態の名前も同じ）", renderBody(opOf(t, prog, "api.greeting").Body), []string{"return state api.motd"})
 		expect(t, "guard の本体（状態の分類での match、never を返す op の呼び出し）", renderBody(opOf(t, prog, "api.guard").Body), []string{
@@ -286,8 +286,8 @@ func TestViewFromEntry(t *testing.T) {
 		}
 		expect(t, "as のケースのアームでは、対象は書いた型", narrowed(arms("api.currentName")[0].Narrowed), []string{"api.User"})
 		expect(t, "値がない側の残りのケースを受ける else のアームは外のまま", narrowed(arms("api.currentName")[1].Narrowed), []string{})
-		expect(t, "by nullable の HasItems だけのアームで T", narrowed(arms("api.tokenOrNone")[0].Narrowed), []string{"api.Token"})
-		expect(t, "Empty のアームは外のまま", narrowed(arms("api.tokenOrNone")[1].Narrowed), []string{})
+		expect(t, "by nullable の Some だけのアームで T", narrowed(arms("api.tokenOrNone")[0].Narrowed), []string{"api.Token"})
+		expect(t, "None のアームは外のまま", narrowed(arms("api.tokenOrNone")[1].Narrowed), []string{})
 		expect(t, "状態の分類での match の narrowed は state を持つ", narrowed(arms("api.guard")[0].Narrowed), []string{"api.current: api.Token"})
 		// 型を書かないケースの絞り込みは case(C, Ks, X)
 		open := opOf(t, prog, "web.openUser").Body.Statements[1].(ir.ValStmt).Expr.(ir.MatchExpr).Match
@@ -946,9 +946,9 @@ func TestStateCorpusIR(t *testing.T) {
 			{"shop.startOver", ir.TransitionTarget{Of: "shop.Checkout", From: ir.AnyCase(), To: ir.Cases("Shopping")}, both},
 			{"shop.touchCheckout", ir.TransitionTarget{Of: "shop.Checkout", From: ir.Cases("Shopping", "Ordered"), To: ir.AnyCase()}, both},
 			{"shop.signIn", ir.TransitionTarget{Of: "shop.LoggedIn", From: ir.AnyCase(), To: ir.Cases("LoggedIn")}, []string{"shop.token"}},
-			// 宛先が基底の状態（組み込みの分類。ケースは Empty / HasItems）: 書き込むのはその状態
+			// 宛先が基底の状態（組み込みの分類。ケースは、list が Empty / HasItems、nullable が None / Some）: 書き込むのはその状態
 			{"shop.clearCart", ir.TransitionTarget{Of: "shop.carts", From: ir.Cases("HasItems"), To: ir.Cases("Empty")}, []string{"shop.carts"}},
-			{"shop.saveToken", ir.TransitionTarget{Of: "shop.token", From: ir.Cases("Empty"), To: ir.Cases("HasItems")}, []string{"shop.token"}},
+			{"shop.saveToken", ir.TransitionTarget{Of: "shop.token", From: ir.Cases("None"), To: ir.Cases("Some")}, []string{"shop.token"}},
 		} {
 			expect(t, tt.name+" の target", effect(tt.name).Target, ir.EffectTarget(tt.target))
 			expect(t, tt.name+" の writes", effect(tt.name).Writes, tt.writes)

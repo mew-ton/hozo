@@ -21,8 +21,8 @@ namespace a {
     cur.delete();
     val found = byId(m.id);
     match (found by nullable) {
-      HasItems => add(found);
-      Empty    => throw NotFound(id);
+      Some => add(found);
+      None => throw NotFound(id);
     };
     return match (m by K) {
       A => throw Busy(5m, "busy");

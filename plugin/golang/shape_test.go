@@ -107,7 +107,7 @@ func TestShapeStateUnits(t *testing.T) {
 		// 直に呼ぶ組み込みの効果: 呼んだ順によらず post、put、delete の順。同じ操作を二度呼んでも一つ
 		with(op("shop.wire", nil), wired(callDirect("shop.token", ir.OpDelete), callDirect("shop.token", ir.OpPost),
 			callDirect("shop.token", ir.OpDelete), callDirect("shop.title", ir.OpPut), callRead("shop.itemByName"), callEffect("shop.addItem"),
-			matchBy("nullable", armDirect("shop.token", ir.OpPut, ir.CaseHasItems)))),
+			matchBy("nullable", armDirect("shop.token", ir.OpPut, ir.CaseSome)))),
 		// 単位の対象でない配線が直に呼ぶものは、数えない
 		with(op("shop.outside", nil), inFile("batch.hozo"), wired(callDirect("shop.items", ir.OpPost))),
 	))

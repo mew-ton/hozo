@@ -109,7 +109,7 @@ namespace a {
 
   read fn userById(id: string): User? reads users;
   export fn find2(id: string): User? reads users, token reads users {
-    return match(token by nullable){ HasItems => userById(id); Empty => none; };
+    return match(token by nullable){ Some => userById(id); None => none; };
   }
   fn nameOf(u: User): string;
   fn gone(): never throws Unauthorized;
@@ -123,7 +123,7 @@ namespace a {
     };
   }
   fn wire3(): string? {
-    return match(token by nullable){ HasItems => token; Empty => none; };
+    return match(token by nullable){ Some => token; None => none; };
   }
   fn wire4(): string { return a.title; }
   fn wire5(): string {
@@ -610,11 +610,11 @@ func TestNormalizeExpectations(t *testing.T) {
 	m3 := p.Lookup("a.wire3").(*ir.Op).Body.Statements[0].(ir.ReturnStmt).Expr.(ir.MatchExpr).Match
 	subject := m3.Subject.(ir.ValueSubject).Atom.(ir.StateAtom)
 	eq("match token by nullable の対象", []any{subject.State, subject.Path, m3.Classify}, []any{"a.token", []string(nil), "nullable"})
-	eq("HasItems だけのアームで T", m3.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.String()}})
+	eq("Some だけのアームで T", m3.Arms[0].Narrowed, []ir.Narrowing{{Type: ir.String()}})
 	body := m3.Arms[0].Body.(ir.AtomExpr).Atom.(ir.StateAtom)
 	eq("アームの本体の値", []any{body.State, len(body.Path)}, []any{"a.token", 0})
 	eq("アームの本体の none", m3.Arms[1].Body, ir.NoneBody{})
-	eq("Empty のアームは外のまま", m3.Arms[1].Narrowed, []ir.Narrowing(nil))
+	eq("None のアームは外のまま", m3.Arms[1].Narrowed, []ir.Narrowing(nil))
 	// 修飾して書いた状態も同じ
 	ret := p.Lookup("a.wire4").(*ir.Op).Body.Statements[0].(ir.ReturnStmt).Expr.(ir.AtomExpr).Atom.(ir.StateAtom)
 	eq("a.title", []any{ret.State, len(ret.Path)}, []any{"a.title", 0})

@@ -1,5 +1,5 @@
 {
-  "version": "0.14",
+  "version": "0.15",
   "namespaces": [
     {
       "name": "",
@@ -2541,7 +2541,7 @@
                     "arms": [
                       {
                         "cases": [
-                          "HasItems"
+                          "Some"
                         ],
                         "else": false,
                         "body": {
@@ -2563,11 +2563,11 @@
                                     "file": "a.hozo",
                                     "start": {
                                       "line": 87,
-                                      "col": 59
+                                      "col": 55
                                     },
                                     "end": {
                                       "line": 87,
-                                      "col": 61
+                                      "col": 57
                                     }
                                   }
                                 }
@@ -2578,11 +2578,11 @@
                               "file": "a.hozo",
                               "start": {
                                 "line": 87,
-                                "col": 50
+                                "col": 46
                               },
                               "end": {
                                 "line": 87,
-                                "col": 62
+                                "col": 58
                               }
                             }
                           }
@@ -2603,13 +2603,13 @@
                           },
                           "end": {
                             "line": 87,
-                            "col": 63
+                            "col": 59
                           }
                         }
                       },
                       {
                         "cases": [
-                          "Empty"
+                          "None"
                         ],
                         "else": false,
                         "body": {
@@ -2620,11 +2620,11 @@
                           "file": "a.hozo",
                           "start": {
                             "line": 87,
-                            "col": 64
+                            "col": 60
                           },
                           "end": {
                             "line": 87,
-                            "col": 78
+                            "col": 73
                           }
                         }
                       }
@@ -2637,7 +2637,7 @@
                       },
                       "end": {
                         "line": 87,
-                        "col": 80
+                        "col": 75
                       }
                     }
                   }
@@ -2650,7 +2650,7 @@
                   },
                   "end": {
                     "line": 87,
-                    "col": 81
+                    "col": 76
                   }
                 }
               }
@@ -3320,7 +3320,7 @@
                     "arms": [
                       {
                         "cases": [
-                          "HasItems"
+                          "Some"
                         ],
                         "else": false,
                         "body": {
@@ -3333,11 +3333,11 @@
                               "file": "a.hozo",
                               "start": {
                                 "line": 101,
-                                "col": 50
+                                "col": 46
                               },
                               "end": {
                                 "line": 101,
-                                "col": 55
+                                "col": 51
                               }
                             }
                           }
@@ -3358,13 +3358,13 @@
                           },
                           "end": {
                             "line": 101,
-                            "col": 56
+                            "col": 52
                           }
                         }
                       },
                       {
                         "cases": [
-                          "Empty"
+                          "None"
                         ],
                         "else": false,
                         "body": {
@@ -3375,11 +3375,11 @@
                           "file": "a.hozo",
                           "start": {
                             "line": 101,
-                            "col": 57
+                            "col": 53
                           },
                           "end": {
                             "line": 101,
-                            "col": 71
+                            "col": 66
                           }
                         }
                       }
@@ -3392,7 +3392,7 @@
                       },
                       "end": {
                         "line": 101,
-                        "col": 73
+                        "col": 68
                       }
                     }
                   }
@@ -3405,7 +3405,7 @@
                   },
                   "end": {
                     "line": 101,
-                    "col": 74
+                    "col": 69
                   }
                 }
               }

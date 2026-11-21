@@ -1,4 +1,4 @@
-// MATCH-4（docs/types.md「アームの中の対象の型」）: as のケース、by nullable の HasItems、状態の分類の as で、アームの中の対象は
+// MATCH-4（docs/types.md「アームの中の対象の型」）: as のケース、by nullable の Some、状態の分類の as で、アームの中の対象は
 // 書いた型になる。絞り込みは、対象と同じ Atom と、それを先頭に持つより長いパス、レコードリテラルの中の値に掛かる
 namespace a {
   model Profile { nick: string; }
@@ -34,15 +34,15 @@ namespace a {
       else    => none;
     };
     match (in.m by nullable) {
-      HasItems => takeString(in.m.id);
-      Empty    => none;
+      Some => takeString(in.m.id);
+      None => none;
     };
   }
   // 状態を対象にした絞り込み: アームの中のその状態の名前は、match が読んだ値を指す
   fn g(): void {
     match (current by nullable) {
-      HasItems => takeM(current);
-      Empty    => none;
+      Some => takeM(current);
+      None => none;
     };
     match (by Session) {
       In      => takeString(current.id);

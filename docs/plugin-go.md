@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.14"
+protocol = "0.15"
 
 [[transpiler]]
 name     = "go"
@@ -604,7 +604,7 @@ if err != nil {
 
 | 分類 | 条件 |
 |---|---|
-| 標準の分類 `nullable`、型で決まる分類のうち絞り込みが `presence` のもの | `if <対象> != nil`。この枝が、値のある場合（`HasItems`、型を書いたケース）。もう一方が `Empty` / ない側のケース（`Classify.absent`: `対象 as else` か `対象 as none`。`docs/check.md`「ない側のケース」）。ない側のケースを持たない分類では、もう一方は、分類の誤りの枝（下） |
+| 標準の分類 `nullable`、型で決まる分類のうち絞り込みが `presence` のもの | `if <対象> != nil`。この枝が、値のある場合（`Some`、型を書いたケース）。もう一方が `None` / ない側のケース（`Classify.absent`: `対象 as else` か `対象 as none`。`docs/check.md`「ない側のケース」）。ない側のケースを持たない分類では、もう一方は、分類の誤りの枝（下） |
 | 標準の分類 `list` | `if len(<対象>) != 0`。この枝が `HasItems`、もう一方が `Empty` |
 | 型で決まる分類のうち絞り込みが `variant` のもの | `switch <対象>.(type)`。型を書いたケースごとに `case <アームの Go の型>:`（アームを包む型なら、その包む型）。残りのケースは、残りのアーム（`docs/check.md`「残りのケース」）の Go の型を、union の宣言の順に並べた `case <型>, <型>:`（同じ Go の型は一度だけ）。最後の節は、いつも `default:` で、分類の誤りの枝（下） |
 | 述語で決まる値の分類・op の分類（ない側のケースを持つものを含む。「分類」） | `k<n>, err := <パッケージ>.Classify<C>(ctx, o.<分類の引数名>, <対象>)` と失敗の扱いの後、`switch k<n>`。ケースごとに `case <C><ケース名>:` |

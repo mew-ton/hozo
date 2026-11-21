@@ -89,7 +89,7 @@ namespace app {
     };
   }
 
-  // 標準の分類の else のアーム（nullable の HasItems を受けて絞り込まれる。list の Empty を受ける）
+  // 標準の分類の else のアーム（nullable の Some を受けて絞り込まれる。list の Empty を受ける）
   @mark export fn standard(user: User?, lines: Line[]): string
   {
     match (lines by list) {
@@ -97,7 +97,7 @@ namespace app {
       else     => show("none");
     };
     return match (user by nullable) {
-      Empty => "nobody";
+      None => "nobody";
       else  => nameOf(user);
     };
   }

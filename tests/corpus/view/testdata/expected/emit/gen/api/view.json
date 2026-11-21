@@ -1,5 +1,5 @@
 {
-  "version": "0.14",
+  "version": "0.15",
   "viewer": "api",
   "config": {
     "index": 1,
@@ -70,7 +70,7 @@
     ]
   },
   "program": {
-    "version": "0.14",
+    "version": "0.15",
     "namespaces": [
       {
         "name": "",
@@ -3979,7 +3979,7 @@
                       "arms": [
                         {
                           "cases": [
-                            "HasItems"
+                            "Some"
                           ],
                           "else": false,
                           "body": {
@@ -3992,11 +3992,11 @@
                                 "file": "api.hozo",
                                 "start": {
                                   "line": 205,
-                                  "col": 19
+                                  "col": 15
                                 },
                                 "end": {
                                   "line": 205,
-                                  "col": 26
+                                  "col": 22
                                 }
                               }
                             }
@@ -4017,13 +4017,13 @@
                             },
                             "end": {
                               "line": 205,
-                              "col": 27
+                              "col": 23
                             }
                           }
                         },
                         {
                           "cases": [
-                            "Empty"
+                            "None"
                           ],
                           "else": false,
                           "body": {
@@ -4038,7 +4038,7 @@
                             },
                             "end": {
                               "line": 206,
-                              "col": 24
+                              "col": 20
                             }
                           }
                         }

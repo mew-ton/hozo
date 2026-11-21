@@ -7,13 +7,13 @@ namespace a {
   fn find(): M?;
   fn all(): M[];
   fn ok(in: In) {
-    match (in.token by nullable) { Empty => f(); HasItems => none; };
+    match (in.token by nullable) { None => f(); Some => none; };
     match (in.lines by list) { Empty => f(); HasItems => none; };
     val m = find();
-    match (m by nullable) { Empty => f(); HasItems => none; };
+    match (m by nullable) { None => f(); Some => none; };
     val ms = all();
     match (ms by list) { Empty, HasItems => f(); };
     // 状態は、名前で書けば値になる。T? と書いた状態も nullable
-    match (maybe by nullable) { Empty => f(); HasItems => none; };
+    match (maybe by nullable) { None => f(); Some => none; };
   }
 }

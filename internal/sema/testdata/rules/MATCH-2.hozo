@@ -40,13 +40,13 @@ namespace a {
     match (m by C) { A => use(m); else => none; };
   }
 
-  // 標準の分類のケースは Empty / HasItems
+  // 標準の分類のケースは、list が Empty / HasItems、nullable が None / Some
   state carts: list<M>;
   state token: nullable<string>;
   fn f(): void;
   fn builtinOk(): void {
     match (carts by list) { Empty => f(); HasItems => none; };
-    match (token by nullable) { HasItems => f(); Empty => none; };
+    match (token by nullable) { Some => f(); None => none; };
     match (carts by list) { Empty, HasItems => f(); };
     match (carts by list) { Empty => f(); else => none; };
   }
@@ -55,7 +55,7 @@ namespace a {
       Empty => f();
     };
     match (token by nullable) {          // ERROR: MATCH-2
-      HasItems => f();
+      Some => f();
     };
   }
   fn builtinUnknown(): void {
@@ -65,8 +65,8 @@ namespace a {
       Full => none;
     };
     match (token by nullable) {          // ERROR: MATCH-2
-      None => f();
-      Some => none;
+      Empty => f();
+      HasItems => none;
     };
   }
   fn builtinDup(): void {

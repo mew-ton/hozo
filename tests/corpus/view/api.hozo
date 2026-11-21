@@ -202,8 +202,8 @@ namespace api {
   fn tokenOrNone(): Token?
   {
     return match (current by nullable) {
-      HasItems => current;
-      Empty    => none;
+      Some => current;
+      None => none;
     };
   }
 

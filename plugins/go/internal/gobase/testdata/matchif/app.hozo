@@ -59,8 +59,8 @@ namespace app {
   export fn nickOf(user: User?): string?
   {
     return match (user by nullable) {
-      HasItems => user.nick;
-      Empty    => none;
+      Some => user.nick;
+      None => none;
     };
   }
 
@@ -79,8 +79,8 @@ namespace app {
   @mark export fn widened(in: Input): string?
   {
     return match (in.user by nullable) {
-      HasItems => loadName(in.user);
-      Empty    => none;
+      Some => loadName(in.user);
+      None => none;
     };
   }
 
@@ -88,8 +88,8 @@ namespace app {
   export fn tagCount(tags: string[]?): int
   {
     return match (tags by nullable) {
-      HasItems => countTags(tags);
-      Empty    => 0;
+      Some => countTags(tags);
+      None => 0;
     };
   }
 
@@ -97,8 +97,8 @@ namespace app {
   export fn tokenText(): string
   {
     return match (token by nullable) {
-      HasItems => useToken(token);
-      Empty    => "none";
+      Some => useToken(token);
+      None => "none";
     };
   }
   export fn signedInText(): string
@@ -116,20 +116,20 @@ namespace app {
   {
     val user = lookup(id);
     val name = match (user by nullable) {
-      HasItems => loadName(user);
-      Empty    => "nobody";
+      Some => loadName(user);
+      None => "nobody";
     };
     val count = match (lines by list) {
       HasItems => countOf(lines);
       Empty    => 0;
     };
     val maybe = match (user by nullable) {
-      HasItems => nameOf(user);
-      Empty    => none;
+      Some => nameOf(user);
+      None => none;
     };
     val strict = match (user by nullable) {
-      HasItems => user.name;
-      Empty    => throw Missing;
+      Some => user.name;
+      None => throw Missing;
     };
     show(name);
     takeOptionalUser(user);
@@ -142,23 +142,23 @@ namespace app {
     throws Denied
   {
     match (user by nullable) {
-      HasItems => record(user.name);
-      Empty    => show("none");
+      Some => record(user.name);
+      None => show("none");
     };
     match (lines by list) {
       HasItems => show("some");
       Empty    => none;
     };
     match (user by nullable) {
-      HasItems => none;
-      Empty    => deny();
+      Some => none;
+      None => deny();
     };
     match (lines by list) {
       Empty, HasItems => show("any");
     };
     match (user by nullable) {
-      HasItems => takeOptionalUser(user);
-      Empty    => throw Denied;
+      Some => takeOptionalUser(user);
+      None => throw Denied;
     };
   }
 }

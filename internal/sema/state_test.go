@@ -3,6 +3,7 @@ package sema
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/ir"
@@ -37,7 +38,7 @@ namespace shop {
   effect fn reset(): effects Checkout as any -> Shopping;
   effect fn touch(): effects Checkout as Ordered, Shopping -> any;
   effect fn clearCart(): effects carts as HasItems -> Empty;
-  effect fn login(): effects token as Empty -> HasItems;
+  effect fn login(): effects token as None -> Some;
   effect fn signIn(): effects LoggedIn as any -> LoggedIn;
 
   fn showEmpty(): void;
@@ -54,8 +55,8 @@ namespace shop {
       HasItems => showCart();
     };
     val   who = match(token by nullable){
-      HasItems => me();
-      Empty => none;
+      Some => me();
+      None => none;
     };
     val   kind = match(line by LineKind){
       Gift => gift(line);
@@ -211,7 +212,7 @@ func TestEffectTargets(t *testing.T) {
 		{"shop.signIn", ir.TransitionTarget{Of: "shop.LoggedIn", From: ir.AnyCase(), To: ir.Cases("LoggedIn")}, []string{"shop.token"}},
 		// 遷移で宛先が基底の状態: その状態
 		{"shop.clearCart", ir.TransitionTarget{Of: "shop.carts", From: ir.Cases("HasItems"), To: ir.Cases("Empty")}, []string{"shop.carts"}},
-		{"shop.login", ir.TransitionTarget{Of: "shop.token", From: ir.Cases("Empty"), To: ir.Cases("HasItems")}, []string{"shop.token"}},
+		{"shop.login", ir.TransitionTarget{Of: "shop.token", From: ir.Cases("None"), To: ir.Cases("Some")}, []string{"shop.token"}},
 	}
 	for _, tt := range tests {
 		e := p.Lookup(tt.name).(*ir.Effect)
@@ -241,6 +242,46 @@ namespace a {
 	for _, s := range refStrings(res, fs) {
 		if s == "a.hozo:6:35 case a.s.HasItems" || s == "a.hozo:6:47 case a.s.Empty" {
 			t.Errorf("組み込みのケースに参照がある: %s", s)
+		}
+	}
+}
+
+// TestStandardCaseNames は、標準の分類のケースの名前が、形ごとに違うこと（docs/check.md「分類」の「標準の分類」）: list は
+// Empty / HasItems、nullable は None / Some。形に合わない名前を書けば、アームは MATCH-2、状態の遷移は STATE-4 で、
+// メッセージが、その形のケースを並べる。
+func TestStandardCaseNames(t *testing.T) {
+	res := runAnnotated(t, project{"a.hozo": `
+namespace a {
+  state items: list<string>;
+  state token: nullable<string>;
+  fn f();
+  effect fn fill(): effects items as Empty -> HasItems;
+  effect fn save(): effects token as None -> Some;
+  effect fn oldNames(): effects token as Empty -> HasItems;   // ERROR: STATE-4
+  effect fn otherShape(): effects items as None -> Some;      // ERROR: STATE-4
+  fn ok() {
+    match (items by list) { Empty => f(); HasItems => none; }
+    match (token by nullable) { None => f(); Some => none; }
+  }
+  fn ng() {
+    match (token by nullable) { Empty => f(); HasItems => none; }   // ERROR: MATCH-2
+    match (items by list) { None => f(); Some => none; }            // ERROR: MATCH-2
+  }
+}`}, false)
+	for _, want := range []struct{ code, part string }{
+		{"STATE-4", "（nullable）の組み込みの分類のケースではない（None / Some）"},
+		{"STATE-4", "（list）の組み込みの分類のケースではない（Empty / HasItems）"},
+		{"MATCH-2", "標準の分類 nullable のケース（None / Some）"},
+		{"MATCH-2", "標準の分類 list のケース（Empty / HasItems）"},
+	} {
+		found := false
+		for _, d := range res.Diags {
+			if d.Code == want.code && strings.Contains(d.Message, want.part) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s のメッセージに %q を含むものがない", want.code, want.part)
 		}
 	}
 }
@@ -294,7 +335,7 @@ func TestMatchSubjects(t *testing.T) {
 	}
 	// アームは書かれた順
 	jsonEq(t, "by nullable のアーム", []any{byNullable.Arms[0].Cases, byNullable.Arms[1].Cases, byNullable.Arms[1].Body},
-		[]any{[]string{"HasItems"}, []string{"Empty"}, ir.NoneBody{}})
+		[]any{[]string{"Some"}, []string{"None"}, ir.NoneBody{}})
 
 	byValue := stmts[2].(ir.ValStmt).Expr.(ir.MatchExpr).Match
 	value, ok := byValue.Subject.(ir.ValueSubject)
@@ -379,7 +420,7 @@ namespace a {
     return match(items by list){ Empty => m(); HasItems => m(); };
   }
   fn optional(): void {
-    val   x = match(token by nullable){ Empty => none; HasItems => m(); };
+    val   x = match(token by nullable){ None => none; Some => m(); };
     takeOptM(x);
     takeM(x);                                                          // ERROR: TYPE-4
   }
@@ -395,7 +436,7 @@ namespace a {
   fn mixed(): void {
     val   a = match(items by list){ Empty => m(); HasItems => n(); };          // ERROR: TYPE-8 // WARN: WIRE-8
     val   b = match(by Stock){ None => m(); Some => nothing(); };              // ERROR: TYPE-8 // WARN: WIRE-8
-    val   c = match(token by nullable){ Empty => m(); HasItems => m(); };      // WARN: WIRE-8
+    val   c = match(token by nullable){ None => m(); Some => m(); };      // WARN: WIRE-8
   }
   // 対象でない引数は、アームの中でもそのままの型で照合する
   fn args(v: M): void {

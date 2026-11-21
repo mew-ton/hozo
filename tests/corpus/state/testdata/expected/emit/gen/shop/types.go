@@ -43,7 +43,7 @@ const EffectSignIn = inner.EffectSignIn
 const EffectClearCart = inner.EffectClearCart
 
 // EffectSaveToken はトークンを保存する
-// effects shop.token as Empty -> HasItems
+// effects shop.token as None -> Some
 const EffectSaveToken = inner.EffectSaveToken
 
 // EmptyCart: カートが空

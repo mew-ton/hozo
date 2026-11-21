@@ -40,10 +40,10 @@ namespace a {
       Missing => none;
       else    => takeM(x);
     };
-    // 標準の分類でも同じ: else は HasItems だけを受け、x は M
+    // 標準の分類でも同じ: else は Some だけを受け、x は M
     match (x by nullable) {
-      Empty => none;
-      else  => takeM(x);
+      None => none;
+      else => takeM(x);
     };
   }
 }

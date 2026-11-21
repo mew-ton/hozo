@@ -48,7 +48,7 @@ const EffectSignIn runtime.Effect = "shop.signIn"
 const EffectClearCart runtime.Effect = "shop.clearCart"
 
 // EffectSaveToken はトークンを保存する
-// effects shop.token as Empty -> HasItems
+// effects shop.token as None -> Some
 const EffectSaveToken runtime.Effect = "shop.saveToken"
 
 // EmptyCart: カートが空

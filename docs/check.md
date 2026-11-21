@@ -17,7 +17,7 @@
 | 状態の型 | 形（`State.shape`） | 要素（`State.element`） | 列数 | 組み込みの分類 | 組み込みの効果 |
 |---|---|---|---|---|---|
 | `array(T)`（`list<T>`、`T[]`） | `list` | T | 0 以上 | `Empty` / `HasItems` | `post` / `put` / `delete` |
-| `optional(T)`（`nullable<T>`、`T?`） | `nullable` | T | 0 か 1 | `Empty` / `HasItems` | `post` / `put` / `delete` |
+| `optional(T)`（`nullable<T>`、`T?`） | `nullable` | T | 0 か 1 | `None` / `Some` | `post` / `put` / `delete` |
 | それ以外（`single<T>`、`T`） | `single` | その型 | ちょうど 1 | なし（常に一列） | `put` |
 
 - 形を決めるのは最も外側だけ: `T[]?` は `nullable`（要素は `T[]`）、`T?[]` は `list`。`list` の要素は `optional` にできない（STATE-3）。
@@ -29,7 +29,7 @@
 | 形 | `post` | `put` | `delete` |
 |---|---|---|---|
 | `list` | どの場合でも → `HasItems` | `HasItems` → `HasItems` | `HasItems` → `Empty` か `HasItems` |
-| `nullable` | `Empty` → `HasItems` | `HasItems` → `HasItems` | `HasItems` → `Empty` |
+| `nullable` | `None` → `Some` | `Some` → `Some` | `Some` → `None` |
 
 ### 状態の分類
 
@@ -191,12 +191,13 @@
 
 | 名前 | 対象の型 | ケース | 判定 | アームでの絞り込み |
 |---|---|---|---|---|
-| `nullable` | `nullable<T>`（`T?`） | `Empty` / `HasItems` | 値がなければ `Empty`、あれば `HasItems` | `HasItems` だけのアームで T |
+| `nullable` | `nullable<T>`（`T?`） | `None` / `Some` | 値がなければ `None`、あれば `Some` | `Some` だけのアームで T |
 | `list` | `list<T>`（`T[]`） | `Empty` / `HasItems` | 要素が一つもなければ `Empty`、あれば `HasItems` | なし |
 
 - 対象は値。状態に限らない（`match (in.token by nullable) { ... }`、`match (order.lines by list) { ... }`）。状態は、名前で書けば値になる（`match (token by nullable) { ... }`）。
 - 基底の状態の「組み込みの分類」（「状態の形」）は、この分類をその状態に当てたもの。遷移の宛先（`effect fn clearCart(): effects carts as HasItems -> Empty;`）になるのは、基底の状態に当てたものだけ（「効果の宛先」）。
 - 自分で宣言する分類も、`nullable<T>` や `list<T>` を対象にできる（`classify Presence of nullable<User> { ... }`）。
+- ケースの名前は、形ごとに違う（`docs/decisions.md`「決めたこと」362）。`nullable` に、`list` のケースの名前（`Empty` / `HasItems`）を書けば、アームなら MATCH-2、状態の遷移なら STATE-4 で、メッセージが、その形のケース（`None` / `Some`）を並べる。
 
 ### ケースの型
 
@@ -303,7 +304,7 @@ classify Life of Order? {
 - `else` のアームが受けるのは、宣言したケースだけ。どのケースにも当たらない値（「閉じた分類」）は、`else` のアームにも渡らない。
 - `else` のアームがなければ、すべてのケースを名前で並べる（足りなければ MATCH-2）。`else` のアームがあれば、足りないケースはない。
 - `else` のアームが受けるケースが一つもなければ（ほかのアームが、すべてのケースを並べている）MATCH-9。
-- 標準の分類の `match` にも、同じに書ける（ケースは `Empty` / `HasItems`）。
+- 標準の分類の `match` にも、同じに書ける（ケースは「標準の分類」の表）。
 - `else` のアームの中の対象の型は `docs/types.md`「アームの中の対象の型」。`else` を使う場面の勧めは `docs/requirements.md`「書き方の指針」。
 
 ## 行の遷移
@@ -791,7 +792,7 @@ NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使え�
 |---|---|---|
 | STATE-1 | error | 組み込みの効果の `operation` が、その状態の形にない（「状態の形」の表。`single` に `post` / `delete`）。`effect` の宣言の宛先にも、`effects` に直に書いた `状態.操作`（「状態に触れるもの」の「節に書く要素」）にも、配線で直に呼んだ `状態.操作(…)`（同「直に呼ぶ組み込みの効果」）にも掛かる。位置は操作の語 |
 | STATE-3 | error | 状態の要素の型（`State.element`）が `optional`。形が型から決まるようになった（「状態の形」）ので、当たるのは `list` の状態だけ（`list<T?>`、`T?[]`）: 列は値を持つ。`single<T?>` と `nullable<T?>` は `T?`（`nullable<T>`）と同じ型なので当たらない（`docs/types.md`「形の書き方」）。当たった状態は、`list<T>` として残りの検査を続ける |
-| STATE-4 | error | 遷移の前か後のケースが、宛先の分類のケースでない（宛先が基底の状態なら `Empty` / `HasItems`）。宛先が `single` の状態（組み込みの分類がない）。前と後のどちらかのケースの並びに重複がある |
+| STATE-4 | error | 遷移の前か後のケースが、宛先の分類のケースでない（宛先が基底の状態なら、その形の、組み込みの分類のケース: 「状態の形」の表）。宛先が `single` の状態（組み込みの分類がない）。前と後のどちらかのケースの並びに重複がある |
 | STATE-2 | error | op O（葉でも配線でも）にデコレータが運ぶ効果 e（`Op.carried.effects`）について、e の名前空間（直に書いた効果なら、その状態の名前空間）が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」を、葉が節を書けなくなり、デコレータが配線にも運ぶ形に当てたもの）。位置はそのデコレータの適用 |
 | EFF-1 | — | 計算（Sig の F）で行う。診断なし |
 | EFF-2 | error | 配線の O で `Op.effects` が空でなく、集合として Sig(O, ns(O)).effects と等しくない（効果の数え方は「状態に触れるもの」の「節に書く要素」: 直に書いた効果と、同じ宛先の宣言は別。Sig は、O に運ばれた効果を含む: 計算「デコレータが運ぶ reads と effects」）。足りないもの・余分なものを `Data.missing` / `Data.extra` に（宣言は FQN、直に書いた効果は `<状態の FQN>.<操作>`） |
@@ -887,7 +888,7 @@ DEC-18 も欠番。「デコレータの宣言の、分類のケースで、名�
 | CLS-8 | error | `as none` を、書けない分類に書いた（「分類」の「ない側のケース」）: 値の分類でも op の分類でもない。対象の型が `T?` でない。`as none` のケースを除いたケースが、一つもないか、`T? as T` を持たないものがある。位置は `none` |
 | CLS-9 | error | 対象のない分類（`of never`）のケースに、`as` を書いた（「分類」の「対象のない分類」）。位置は、その `as` |
 | MATCH-1 | — | 文法で閉じる |
-| MATCH-2 | error | アームが、分類のケース（標準の分類なら `Empty` / `HasItems`）を、ちょうど一度ずつ受けていない（「分類」の「アームが受けるケース」）: 名前で並べたケースが、その分類のケースでない、または二度並んでいる（`Data.extra`）。`else` のアームがなく、どのアームも並べていないケースがある（`Data.missing`）。位置は `by` の後ろの分類の名前 |
+| MATCH-2 | error | アームが、分類のケース（標準の分類なら、「分類」の「標準の分類」の表のケース）を、ちょうど一度ずつ受けていない（「分類」の「アームが受けるケース」）: 名前で並べたケースが、その分類のケースでない、または二度並んでいる（`Data.extra`）。`else` のアームがなく、どのアームも並べていないケースがある（`Data.missing`）。位置は `by` の後ろの分類の名前 |
 | MATCH-3 | — | 文法で閉じる（アームの本体は、呼び出し一つ、値一つ、`throw` 一つのどれか。`docs/grammar.md`「配線」の `ArmBody`） |
 | MATCH-4 | error | 値を対象にした `match` で、アームの本体の呼び出しに、対象と同じ `Atom` をそのまま渡している引数が、アームの中の対象の型（`docs/types.md`「アームの中の対象の型」。型を書かないケースなら `case(C, アームのケース, X)` で、「互換」の規則 4・5）では渡せない。対象を渡していない引数は TYPE-4 |
 | MATCH-5 | error | 「値がない」型の `match` を `val` に受けている（`=`、`collect` も）（WIRE-2 と同じ条件。索引として残す） |

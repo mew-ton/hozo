@@ -380,7 +380,7 @@ test('矢印（遷移の -> と match のアームの =>）', () => {
   assertScope(st, 'effect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any;', '->', 'keyword.operator.arrow.hozo');
   assertScope(st, 'effect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any;', 'any', 'keyword.control.hozo');
   assertScope(st, 'effect fn clearCart(): effects carts as HasItems -> Empty;', '->', 'keyword.operator.arrow.hozo');
-  assertScope(st, 'Empty    => showLogin();', '=>', 'keyword.operator.arrow.hozo');
+  assertScope(st, 'None => showLogin();', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Shopping => submitOrder();', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'Ordered  => none;', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'else     => showLogin();', '=>', 'keyword.operator.arrow.hozo');
@@ -453,8 +453,8 @@ test('形の語と、標準の分類のケース', () => {
   assertScope(st, 'classify Checkout of carts, orders {', 'of', 'keyword.control.hozo');
   const of = st.find((l) => l.text.includes('classify Checkout of carts, orders {'));
   assert.ok(!of.tokens.some((tk) => /carts|orders/.test(tk.text) && tk.scopes.includes('entity.name.type.hozo')));
-  // Empty / HasItems は予約語ではない（docs/grammar.md「予約語」）。match のアームでは色を付けない
-  for (const [line, word] of [['Empty    => showLogin();', 'Empty'], ['HasItems => showCart();', 'HasItems']]) {
+  // 標準の分類のケース（None / Some、Empty / HasItems）は予約語ではない（docs/grammar.md「予約語」）。match のアームでは色を付けない
+  for (const [line, word] of [['None => showLogin();', 'None'], ['Some => showCart();', 'Some'], ['Empty    => showEmpty();', 'Empty']]) {
     const l = st.find((x) => x.text.includes(line));
     assert.ok(l, `行が見つからない: ${line}`);
     const tk = l.tokens.find((x) => x.text.includes(word));

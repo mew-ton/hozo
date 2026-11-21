@@ -1793,7 +1793,11 @@ func (b *bodyGen) matchInto(m *ir.Match, v string, typ ir.Type) {
 // matchIf は、二つに分ける形（`if`）。アームを書いた順によらず、値のある場合を if の枝にする。
 func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	m := p.m
+	// 標準の分類のケース名は、形ごとに違う（list は HasItems / Empty、nullable は Some / None）
 	valueCase, otherCase := ir.CaseHasItems, ir.CaseEmpty
+	if m.Classify == ir.ClassifyNullable {
+		valueCase, otherCase = ir.CaseSome, ir.CaseNone
+	}
 	if p.classify != nil {
 		// presence の分類は、型を書いたケースが一つだけ。もう一方は、残りのケース（対象 as else）。残りのケースがなければ、
 		// もう一方は、どのケースでもない（分類の誤りの枝）

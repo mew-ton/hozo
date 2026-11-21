@@ -111,9 +111,12 @@ const (
 )
 
 // 標準の分類のケース名（docs/check.md「標準の分類」）。基底の状態の組み込みの分類は、これを状態に当てたもの。
+// 名前は、形ごとに違う: list は Empty / HasItems、nullable は None / Some。
 const (
 	CaseEmpty    = "Empty"
 	CaseHasItems = "HasItems"
+	CaseNone     = "None"
+	CaseSome     = "Some"
 )
 
 // 標準の分類の名前（docs/check.md「標準の分類」）。Match.Classify に、FQN の代わりに置く。
@@ -125,8 +128,17 @@ const (
 // IsStandardClassify は name が標準の分類の名前（"list" か "nullable"）か。
 func IsStandardClassify(name string) bool { return name == ClassifyList || name == ClassifyNullable }
 
-// BuiltinCases は標準の分類のケース名の列（Empty、HasItems の順）。毎回新しい列を返す。
-func BuiltinCases() []string { return []string{CaseEmpty, CaseHasItems} }
+// StandardCases は、標準の分類 name（"list" か "nullable"）のケース名の列: 値や要素がない側、ある側の順
+// （list は Empty、HasItems。nullable は None、Some）。標準の分類の名前でなければ nil。毎回新しい列を返す。
+func StandardCases(name string) []string {
+	switch name {
+	case ClassifyList:
+		return []string{CaseEmpty, CaseHasItems}
+	case ClassifyNullable:
+		return []string{CaseNone, CaseSome}
+	}
+	return nil
+}
 
 // ShapeOf は状態の型から形と要素を決める（docs/check.md「状態の形」の表）: 最も外側が array なら list、
 // optional なら nullable、それ以外は single。list と nullable の要素は of、single は型そのもの。
@@ -140,9 +152,13 @@ func ShapeOf(t Type) (StateShape, Type) {
 	return StateSingle, t
 }
 
-// HasBuiltinClassify は、この形の状態が組み込みの分類 Empty / HasItems を持つか（list と nullable）。
+// HasBuiltinClassify は、この形の状態が組み込みの分類を持つか（list と nullable）。
 // single は常に一列なので持たない（docs/check.md「状態の形」）。
 func (s StateShape) HasBuiltinClassify() bool { return s == StateList || s == StateNullable }
+
+// BuiltinCases は、この形の状態の、組み込みの分類のケース名の列（[StandardCases] と同じ順）。組み込みの分類を
+// 持たない形（single）なら nil。
+func (s StateShape) BuiltinCases() []string { return StandardCases(string(s)) }
 
 // State は state 宣言（docs/ir.md「state / exception / effect」の State）。
 type State struct {

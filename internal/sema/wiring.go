@@ -982,7 +982,7 @@ type matchClass struct {
 	name string
 	// classify は classify の宣言。標準の分類なら nil。
 	classify *ir.Classify
-	// cases は分類のケースのすべて（宣言順。標準の分類は Empty、HasItems）。
+	// cases は分類のケースのすべて（宣言順。標準の分類は ir.StandardCases の順）。
 	cases []string
 }
 
@@ -1002,9 +1002,9 @@ func classOf(c *ir.Classify) *matchClass {
 	return mc
 }
 
-// standardClass は標準の分類（list / nullable）。ケースは Empty / HasItems。
+// standardClass は標準の分類（list / nullable）。ケースは、形ごとに違う（ir.StandardCases）。
 func standardClass(name string) *matchClass {
-	return &matchClass{name: name, cases: ir.BuiltinCases()}
+	return &matchClass{name: name, cases: ir.StandardCases(name)}
 }
 
 // evalMatch は match。形は三つ（docs/grammar.md「配線」の表。合わなければ MATCH-7）: 値を対象にした、値の分類か
@@ -1158,7 +1158,7 @@ func (a *analyzer) checkMATCH6(subject exprType, c *ir.Classify, m *ast.Match) {
 // checkArmCases は、match のアームが受けるケースを確かめる（docs/check.md「アームが受けるケース」）。戻り値は、else のアームが
 // 受けるケース: 分類のケースのうち、どのアームも名前で並べなかったもの（宣言順）。else のアームがなければ nil。
 //
-// MATCH-2: 名前で並べたケースが分類のケース（標準の分類なら Empty / HasItems）でない、または二度並んでいる（Data.extra）。
+// MATCH-2: 名前で並べたケースが分類のケース（標準の分類なら ir.StandardCases）でない、または二度並んでいる（Data.extra）。
 // else のアームがなく、どのアームも並べていないケースがある（Data.missing）。
 // MATCH-9: else のアームが受けるケースが一つもない。
 func (a *analyzer) checkArmCases(c *matchClass, m *ast.Match) []string {
@@ -1359,8 +1359,8 @@ func (a *analyzer) narrowArm(isElse bool, cases []string, class *matchClass, val
 // narrowValue は値を対象にした match の、アームの中での対象の型（外での型は x）。規則 2〜4。
 func (a *analyzer) narrowValue(x ir.Type, cases []string, class *matchClass) ir.Type {
 	if class.classify == nil {
-		// 2. 標準の分類: by nullable の HasItems だけのアームで、optional(T) は T。それ以外は外のまま
-		if class.name == ir.ClassifyNullable && len(cases) == 1 && cases[0] == ir.CaseHasItems {
+		// 2. 標準の分類: by nullable の Some だけのアームで、optional(T) は T。それ以外は外のまま
+		if class.name == ir.ClassifyNullable && len(cases) == 1 && cases[0] == ir.CaseSome {
 			if o, ok := uncase(x).(ir.OptionalType); ok {
 				return o.Of
 			}

@@ -3,7 +3,7 @@
 # 実装は、このディレクトリの main パッケージ（main.go、emit.go）。期待する出力は ../../gen/server/ratelimit.go。
 name     = "go-ratelimit"
 command  = ["go", "run", "example.com/shop-server/plugins/go-ratelimit"]
-protocol = "0.14"
+protocol = "0.15"
 
 vocabulary = ["rate.hozo"]      # 語彙 rate: 例外 LimitExceeded と、デコレータ limited
 

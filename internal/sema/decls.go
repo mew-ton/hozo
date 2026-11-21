@@ -759,7 +759,7 @@ func (a *analyzer) lowerTransition(s *symbol, e *ir.Effect, t *ast.Transition, s
 			a.errorf("STATE-4", t.Of.Span, "状態 %s は %s で組み込みの分類がないので、遷移の宛先にできない（常に一列。docs/check.md「状態の形」）", decl.Name, decl.Shape)
 			return
 		}
-		cases, writes = ir.BuiltinCases(), []string{decl.Name}
+		cases, writes = decl.Shape.BuiltinCases(), []string{decl.Name}
 		what = fmt.Sprintf("状態 %s（%s）の組み込みの分類", decl.Name, decl.Shape)
 	case *ir.Classify:
 		states, isStates := decl.SubjectStates()
@@ -785,7 +785,7 @@ func (a *analyzer) lowerTransition(s *symbol, e *ir.Effect, t *ast.Transition, s
 }
 
 // lowerCaseSet は遷移の前か後のケースの集合。STATE-4（docs/check.md「状態と効果」）: ケースが宛先の分類のケースでない
-// （宛先が基底の状態なら Empty / HasItems）、並びに重複がある。IR には書かれた順に、書かれたまま載せる。
+// （宛先が基底の状態なら、その形の、組み込みの分類のケース）、並びに重複がある。IR には書かれた順に、書かれたまま載せる。
 func (a *analyzer) lowerCaseSet(of *symbol, cs *ast.CaseSet, known []string, what, side string) ir.CaseSet {
 	if cs == nil {
 		return ir.CaseSet{}

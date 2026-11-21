@@ -7,7 +7,7 @@ namespace a {
   fn f(): void;
   fn ok(): void {
     match (items by list) { Empty => f(); HasItems => none; };
-    match (token by nullable) { Empty => f(); HasItems => none; };
+    match (token by nullable) { None => f(); Some => none; };
     match (by Stock) { None => f(); Some => none; };
   }
 }

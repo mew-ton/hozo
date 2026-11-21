@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.14";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.15";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -69,12 +69,12 @@ type Type =
   | { kind: "optional"; of: Type }
   | { kind: "array"; of: Type }
   | { kind: "case"; classify: string; cases: string[]; of: Type }    // 絞り込まれた型。cases は昇順ではなく match のアームに書かれた順
-  | { kind: "never" };                                               // 当たる値がない。Op.returns（決して値を返さない）と、
-                                                                     // 対象のない分類の Classify.subject.type にだけ現れる
+  | { kind: "never" };                                               // 値が一つもない型。Op.returns（決して値を返さない）、対象のない分類の
+                                                                     // Classify.subject.type、CaseKind.subject（`case of never`）にだけ現れる
 ```
 
 - `void` は型ではなく、`Op.returns` が `null` であること。
-- `never` は値の型ではない。`Op.returns` と、対象のない分類の対象（`classify C of never`。`docs/check.md`「分類」の「対象のない分類」）のほかの位置（フィールド、引数、`as` など）には現れない。`override f: never;` の `never` は型ではなく、IR では `Model.extends.removed` になる。
+- `never` は、値が一つもない型（意味と、書ける所は `docs/types.md`「型の種類」の「never」）。IR で現れるのは、`Op.returns`、対象のない分類の対象（`Classify.subject.type`）、デコレータの宣言の `CaseKind.subject` だけ。ほかの位置（フィールド、引数、`as` など）には現れない。`override f: never;` は、型として載らず、`Model.extends.removed` になる。
 - 形の語（`list<T>` / `nullable<T>` / `single<T>`）は IR にない。`array(T)` / `optional(T)` / T になる（「正規化」）。
 - その場で書いた model（`{ ... }`）は IR にはない（「正規化」）。
 
@@ -371,7 +371,7 @@ interface Match {
 
 interface MatchArm {
   cases: string[];                // このアームが受けるケース（docs/check.md「アームが受けるケース」）。名前で並べたアームなら、書かれた順。
-                                  // else のアームなら、ほかのアームが並べなかったケースを、分類の宣言の順に（標準の分類は Empty、HasItems の順）
+                                  // else のアームなら、ほかのアームが並べなかったケースを、分類の宣言の順に（標準の分類は、list が Empty、HasItems、nullable が None、Some の順）
   else: boolean;                  // `else => …` と書いたアームか。プラグインは、cases だけを読めば足りる
   body: { kind: "call"; call: Call }
       | { kind: "atom"; atom: Atom }                // 値（docs/grammar.md「配線」の ArmBody の Atom）。none はここに入れず、下の none にする
@@ -493,7 +493,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.14";
+  version: "0.15";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -551,10 +551,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。今の版は `"0.14"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.15"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.15 | 標準の分類 `nullable` のケースの名前が、`Empty` / `HasItems` から、`None` / `Some` になった（`docs/check.md`「分類」の「標準の分類」、`docs/decisions.md`「決めたこと」362）。変わるのは、`Match.classify` が `"nullable"` の `MatchArm.cases` と、形が `nullable` の状態を宛先にする `TransitionTarget` の `from` / `to` に載る、名前の値。構造は、0.14 と同じ。値だけの変更で版を上げるのは、基底が、この名前でアームを選ぶため: 前の版の名前を待つプラグインは、アームを見つけられない |
 | 0.14 | 型の種類 `record` をなくし、`Model.index`（インデックスの model: キーの名前、キーの型、値の型）を足した。`Record<K, V>` は、インデックスの model を宣言して、その名前（`ref`）で書く（`docs/grammar.md`「model」、`docs/types.md`「インデックスの model」） |
 | 0.13 | 核の型の名前（`Type` の `core` の `name`）: `Time` を `datetime` に、`Duration` を `duration` に替え、`date` と `time` を足した（`docs/grammar.md`「型」）。デコレータの宣言の、付ける先の並びの区切りが `,` になったこと（`docs/grammar.md`「decorator の宣言」）は、綴りだけで、`Decorator.targets` の形は、変わらない |
 | 0.12 | `Effect.throws`（効果が投げうる例外。`docs/check.md`「read と効果」）。効果の呼び出しと、運ばれた効果が、`Signature.exceptions` に例外を足しうる。`View` とやり取りの形は 0.11 と同じ |

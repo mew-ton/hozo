@@ -16,7 +16,7 @@ namespace b {
   fn ng() {
     f(a.s);                                                    // ERROR: RES-5
     f(shared);                                                 // ERROR: RES-5
-    match (a.t by nullable) { Empty => g(); HasItems => none; }; // ERROR: RES-5
+    match (a.t by nullable) { None => g(); Some => none; }; // ERROR: RES-5
     match (by a.Phase) { Idle => g(); Busy => none; };           // ERROR: RES-5
     match (by Shared) { None => g(); Some => none; };            // ERROR: RES-5
     a.s.post("x");                                             // ERROR: RES-5

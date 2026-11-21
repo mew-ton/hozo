@@ -59,7 +59,7 @@
 | `effect fn e(…): effects s.op` の `s` | 現在の名前空間の `state`。別の名前空間の状態なら `RES-5` |
 | `read fn r(…): T reads s` の `s` | 現在の名前空間の `state`（基底の状態）。別の名前空間の状態なら `RES-5`。状態でなければ（状態の分類を含む）RES-4（`docs/check.md`「read の宛先」） |
 | `effect fn e(…): effects X as A -> B` の `X` | 現在の名前空間の、状態を対象にした `classify`、または組み込みの分類を持つ `state`（`list` / `nullable`）。別の名前空間のものなら `RES-5`。値を対象にした `classify` なら RES-4 |
-| 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら `Empty` / `HasItems` |
+| 遷移のケース名 `A`、`B` | `X` が `classify` ならそのケース。`X` が状態なら、その形の、組み込みの分類のケース（`docs/check.md`「状態の形」の表） |
 | 行の遷移のケース `C.K`（`effect fn e(…): effects s.op as C.K -> …`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`K` は、その分類のケース。`C` が行の分類か（値の分類で、対象の型が状態の要素の型か）と、`K` がケースかは STATE-7（`docs/check.md`「行の遷移」の「結びつき」） |
 | `any effect on s.op` の `s` | どの名前空間の `state` でも |
 | `throws` の要素 | `exception`、`union`（`set` で要素が例外）、デコレータの宣言の中なら `any exception` の引数 |
@@ -73,7 +73,7 @@
 | `match (x by C)` の `C` | `classify`（値の分類、op の分類、状態の分類。対象のない分類なら MATCH-7）。どの名前空間のものでもよく、別の名前空間のものは修飾して書く。対象の有無と分類の種類の照合は MATCH-7 |
 | `match (by C)` の `C` | 同上。状態の分類が別の名前空間のものなら `RES-5` |
 | `match (x by list)` / `(x by nullable)` の `list` / `nullable` | 解決しない（標準の分類の名前。予約語） |
-| `match` のアームのケース名 | その分類のケース。標準の分類なら `Empty` / `HasItems` |
+| `match` のアームのケース名 | その分類のケース。標準の分類なら、`docs/check.md`「分類」の「標準の分類」の表のケース |
 | 配線の呼び出しの名前（`Call` の `QualifiedName`） | `op`、`read`、`effect`、現在の名前空間の `state`（基底の状態）から辿った `post` / `put` / `delete`（下の「呼び出しの読み分け」）。別の名前空間の、`export` のない op なら NS-5、別の名前空間の `read` か `effect` なら NS-6（`docs/check.md`「名前空間」）、別の名前空間の状態の操作なら RES-5。効果の `union`、操作を付けない `state`、`classify` は RES-4 |
 | 配線の値の位置の `Path`（呼び出しの引数、レコードリテラルの値、`val`・`=`・`collect`・`return` の値、`match` の対象、アームの本体の値、`for` の頭の並び） | `val`、`for` の変数、引数、現在の名前空間の `state`（基底の状態。修飾して書いても同じ）と、そのフィールドのパス。`val`、`for` の変数、引数は `Atom.name`、状態は `Atom.state` になる（`docs/ir.md`「配線」）。別の名前空間（かグローバル）の `state` に解決できたら `RES-5`。それ以外の宣言なら RES-4 |
 | 値を入れる文の左（`x = 式`）、集める文の左（`xs collect 式`） | そこで見えている `val`（「スコープ」の「配線」）。見えている名前でなければ `RES-1`。引数や、`for` の変数を指していれば、WIRE-11（値を入れる文）か WIRE-14（集める文）（`docs/check.md`「値の入れ物」「繰り返し」） |

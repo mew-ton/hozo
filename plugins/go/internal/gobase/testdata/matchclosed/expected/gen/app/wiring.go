@@ -112,9 +112,9 @@ func (o *ops) Standard(ctx context.Context, user *User, lines []Line) (string, e
 	}
 	// match (user by nullable)
 	if user != nil {
-		// HasItems: user は app.User
+		// Some: user は app.User
 		return o.NameOf(ctx, *user)
 	}
-	// Empty
+	// None
 	return "nobody", nil
 }

@@ -149,23 +149,23 @@ namespace app {
   export fn findOrNone(item: string?): Line?
   {
     return match (item by nullable) {
-      HasItems => lineFor(item);
-      Empty    => none;
+      Some => lineFor(item);
+      None => none;
     };
   }
   export fn countOrZero(item: string?): int
   {
     val n = match (item by nullable) {
-      HasItems => countLines();
-      Empty    => 0;
+      Some => countLines();
+      None => 0;
     };
     return n;
   }
   export fn toggle(t: Token)
   {
     match (token by nullable) {
-      HasItems => dropToken();
-      Empty    => token.post(t);
+      Some => dropToken();
+      None => token.post(t);
     };
   }
 
@@ -209,8 +209,8 @@ namespace app {
       Empty    => show(settings.title);
     };
     match (token by nullable) {
-      HasItems => dropToken();
-      Empty    => showToken(token);
+      Some => dropToken();
+      None => showToken(token);
     };
   }
 

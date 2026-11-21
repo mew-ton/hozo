@@ -162,8 +162,8 @@ namespace app {
       {
         val found = find(other);
         b = match (found by nullable) {
-          Empty    => make(other);
-          HasItems => found;
+          None => make(other);
+          Some => found;
         };
       }
     }
@@ -174,8 +174,8 @@ namespace app {
     disjoint for (val each of ids) {
       val found = find(each);
       items collect match (found by nullable) {
-        Empty    => make(each);
-        HasItems => found;
+        None => make(each);
+        Some => found;
       };
     }
     return items;

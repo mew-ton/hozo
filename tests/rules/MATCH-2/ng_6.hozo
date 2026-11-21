@@ -1,4 +1,4 @@
-// MATCH-2（docs/check.md「classify / match」）: 標準の分類のケース Empty / HasItems が足りない・知らない名前・重複
+// MATCH-2（docs/check.md「classify / match」）: 標準の分類のケース（list は Empty / HasItems、nullable は None / Some）が足りない・知らない名前・重複
 namespace a {
   state carts: list<string>;
   state token: nullable<string>;
@@ -7,9 +7,10 @@ namespace a {
     match (carts by list) {              // ERROR: MATCH-2
       Empty => f();
     };
+    // nullable に、list のケースの名前を書いた（知らない名前。メッセージが None / Some を並べる）
     match (token by nullable) {          // ERROR: MATCH-2
-      None => f();
-      Some => none;
+      Empty => f();
+      HasItems => none;
     };
     match (carts by list) {              // ERROR: MATCH-2
       Empty => f();

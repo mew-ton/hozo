@@ -19,10 +19,10 @@ namespace a {
       Hit     => takeM(m);             // ERROR: MATCH-4
       Miss    => takeOpt(m);
     };
-    // by nullable の Empty のアームは外のまま
+    // by nullable の None のアームは外のまま
     match (m by nullable) {
-      HasItems => takeM(m);
-      Empty    => takeM(m);            // ERROR: MATCH-4
+      Some => takeM(m);
+      None => takeM(m);            // ERROR: MATCH-4
     };
   }
   // 型を書いたケースと C.Case<T> は、どちらか一方で書く: 絞り込んだ型は T そのもので、C.K<…> の位置には渡せない

@@ -214,10 +214,10 @@ func (o *ops) Apart(ctx context.Context, id Id, other Id, ids []Id) ([]Item, err
 			}
 			// match (found by nullable)
 			if found != nil {
-				// HasItems: found は app.Item
+				// Some: found は app.Item
 				b = *found
 			} else {
-				// Empty
+				// None
 				v0, err := o.Make(ctx, other)
 				if err != nil {
 					return nil, err
@@ -245,10 +245,10 @@ func (o *ops) Apart(ctx context.Context, id Id, other Id, ids []Id) ([]Item, err
 		// match (found by nullable)
 		var v1 Item
 		if found != nil {
-			// HasItems: found は app.Item
+			// Some: found は app.Item
 			v1 = *found
 		} else {
-			// Empty
+			// None
 			v2, err := o.Make(ctx, each)
 			if err != nil {
 				return nil, err

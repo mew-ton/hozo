@@ -1721,7 +1721,7 @@ func TestMatchArmBody(t *testing.T) {
 		t.Errorf("Throw Span.End = %d", ta.Span.End)
 	}
 	// 値を対象にした標準の分類（対象は Atom のどれでも）。
-	o = firstDecl[*ast.OpDecl](t, "fn b(in: In) { match (in.token by nullable) { Empty => f(); HasItems => g(in.token); }; }")
+	o = firstDecl[*ast.OpDecl](t, "fn b(in: In) { match (in.token by nullable) { None => f(); Some => g(in.token); }; }")
 	if mt := o.Body.Stmts[0].(*ast.MatchStmt).Match; mt.Subject.(*ast.NameAtom).Name.String() != "in.token" || !mt.Builtin {
 		t.Errorf("match = %+v", mt)
 	}
@@ -1735,8 +1735,8 @@ func TestMatchOnState(t *testing.T) {
     HasItems => showCart();
   };
   val me = match (token by nullable) {
-    Empty => none;
-    HasItems => server.getMe();
+    None => none;
+    Some => server.getMe();
   };
   match (by Checkout) {
     Shopping => f();
@@ -1791,7 +1791,7 @@ func TestStateConstructSpans(t *testing.T) {
   effect fn placeOrder(): effects Checkout as Shopping, Ordered -> any;
   effect fn clearCart(): effects shop.carts as any -> Empty;
   fn view(): Order? {
-    match (token by nullable) { Empty => f(); HasItems => none; };
+    match (token by nullable) { None => f(); Some => none; };
     val placed = match (by Checkout) { Shopping => submit(); Ordered => none; };
     return match (carts by list) { Empty, HasItems => g(); };
   }
@@ -1856,7 +1856,7 @@ func TestBlockReject(t *testing.T) {
 		{"match by core type", "fn a() { match (s by string) { A => f(); }; }", "string は予約語"},
 		{"match without by", "fn a() { match (x) { A => f(); }; }", "「by」が必要"},
 		{"match two subjects", "fn a() { match (x, y by K) { A => f(); }; }", "「by」が必要"},
-		{"match by nullable with type argument", "fn a() { match (s by nullable<T>) { Empty => f(); }; }", "「)」が必要"},
+		{"match by nullable with type argument", "fn a() { match (s by nullable<T>) { None => f(); }; }", "「)」が必要"},
 		{"match by without classifier", "fn a() { match (by) { A => f(); }; }", "名前が必要"},
 	}
 	for _, tt := range tests {

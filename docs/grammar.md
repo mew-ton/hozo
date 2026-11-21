@@ -145,7 +145,7 @@ Override    = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "
   |---|---|
   | `@db.key override id;` | 型を変えず、デコレータを足す |
   | `override status: StatusOrPending;` | 型を変える（変えられる形は `docs/types.md`「継承した model」） |
-  | `override hash: never;` | そのフィールドをなくす。`never` はここでは型ではなく、なくす印 |
+  | `override hash: never;` | そのフィールドをなくす: 入る値が一つもない型（`never`）にするので、フィールドがない（`docs/types.md`「型の種類」の「never」） |
 
 - メンバーの頭（`DocComment` とデコレータの後ろ）の `override` は、直後が `:` ならフィールドの名前（`override: string;`。`FieldName` は予約語も書ける）、そうでなければ `Override` の頭。`override override: never;` は、`override` という名前のフィールドをなくす。
 - `Override` は文法ではどの `ModelBody` にも書けるが、`extends` のない model と、その場で書く model（「union」）には元の model がないので、検査でエラーになる（TYPE-10。`docs/types.md`「診断」）。
@@ -414,7 +414,9 @@ CoreType    = "string" | "boolean" | "int" | "float" | "datetime" | "date" | "ti
 
 - `QualifiedName "<" Type ">"` は分類のケースで絞り込んだ型（`WarrantyKind.Yamada<server.Item>`。§10.2）にだけ使う。ほかの名前に型引数を付けたらエラー（名前の解決で判定する）。
 - その場で書く model（`ModelBody`）は `Type` ではなく、`ArmType`（ユニオンのアーム）にだけ置ける。
-- `void` と `never` は `ReturnType` にだけ書ける（`never` は、ほかに、`Override` のなくす印（「model」）と、`classify` の対象（「classify」）として書く）。`match` の `by` の後ろの `list` / `nullable` は型ではなく、標準の分類の名前（「配線」）。
+- `void` は `ReturnType` にだけ書ける。
+- `never` は、値が一つもない型。書ける所は、四つ: `ReturnType`、`Override` の型（「model」）、`classify` の対象（「classify」）、`CaseKind` の `of` の後ろ（「decorator の宣言」）。どれも、同じ意味から読む（`docs/types.md`「型の種類」の「never」）。
+- `match` の `by` の後ろの `list` / `nullable` は型ではなく、標準の分類の名前（「配線」）。
 
 ## 配線
 
@@ -478,7 +480,7 @@ For      = "for" "(" "val" Ident "of" Atom ")" Block ;
 | 形 | 対象 | 分類 |
 |---|---|---|
 | `match (item by WarrantyKind) { ... }`、`match (user by store.Registration) { ... }` | 値 | 値の分類か op の分類 |
-| `match (carts by list) { ... }`、`match (in.token by nullable) { ... }` | 値。型が `list<T>`（`by list`）か `nullable<T>`（`by nullable`） | 標準の分類（ケースは `Empty` / `HasItems`。`docs/check.md`「分類」） |
+| `match (carts by list) { ... }`、`match (in.token by nullable) { ... }` | 値。型が `list<T>`（`by list`）か `nullable<T>`（`by nullable`） | 標準の分類（ケースは、`by list` が `Empty` / `HasItems`、`by nullable` が `None` / `Some`。`docs/check.md`「分類」の「標準の分類」） |
 | `match (by Checkout) { ... }` | 書かない（分類の宣言が対象を持つ） | 状態の分類 |
 
 - `Atom` の `Path` は、`val` の名前・`for` の変数・op の引数・今の名前空間の状態と、そのフィールド（`query.page`）のどれか。状態は名前で値として書ける（`f(token)`、`match (token by nullable) { ... }`）。同じ名前の `val`、`for` の変数、引数があれば、そちらを指す。何を指すかは名前の解決が決める（`docs/resolve.md`「手続き」）。
@@ -503,7 +505,7 @@ For      = "for" "(" "val" Ident "of" Atom ")" Block ;
   | 本体 | 例 | 意味 |
   |---|---|---|
   | `Call` | `Registered => issueSession(user, in.body.password);` | 呼び出し一つ |
-  | `Atom` | `LoggedIn => session;`、`Empty => none;`、`Standard => 1;` | 値そのもの。`none` もここに入る |
+  | `Atom` | `LoggedIn => session;`、`None => none;`、`Standard => 1;` | 値そのもの。`none` もここに入る |
   | `Throw` | `Absent => throw type.Unauthorized;`、`Exceeded => throw rate.LimitExceeded(wait);` | その例外を投げる。引数は、例外の宣言の引数に、位置で渡す値。引数のない例外には括弧を書かない（`throw X()` は構文エラー）。書ける例外と引数の規則は `docs/check.md`「throw」 |
 
 - `Path` の直後が `(` なら `Call`、そうでなければ `Atom`。
@@ -589,7 +591,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 関数の戻り値は、どの種類も、`: 型` で、省けば `void`（同 348） | 効果は `void` のほかを返せず、省いた形が、ふつうになる。`read` と効果に、戻り値の、別の文法を持たない |
 | `)` の後ろに、戻り値か節を書くなら、`:` で始める。何も書かなければ、`:` も書かない（同 351） | `:` の後ろが、関数の型: 戻り値と、投げるもの、読むもの、変えるもの。`(引数): 戻り値` の形と、後ろに並ぶ節の、継ぎ目がなくなる。`:` の意味は、引数や `val` と同じ、「〜の型は」のまま。効果だけ `: void` を省く、という種類ごとの別扱いが、要らない |
 | 関数が、状態を読むこと、変えることは、どの種類も、`reads` と `effects` で書く。`read fn` と `effect fn` の `on` は、なくした（同 350） | 同じ関係を、同じ語で言う。`read fn … reads users` は、語が重なるが、修飾子は、行の頭の目印で、節が、中身。`on` は、デコレータの引数の絞り（`any effect on users.post`）に残る |
-| 状態の遷移は、宛先の後ろの `as` で書く（`effects cart as HasItems -> Empty`）。宛先の後ろの `:` は、なくした（同 350） | `as` の後ろは、いつも、ケースの遷移（行の遷移と、同じ語）。`:` は、型を言う記号だけになる。宛先が `状態.操作` か、状態（状態の分類）かは、名前の最後の要素が `post` / `put` / `delete` かで分ける: `:` で分けていたときと違い、その三つの語で終わる名前の状態や分類は、状態の遷移の宛先に書けない |
+| 状態の遷移は、宛先の後ろの `as` で書く（`effects carts as HasItems -> Empty`）。宛先の後ろの `:` は、なくした（同 350） | `as` の後ろは、いつも、ケースの遷移（行の遷移と、同じ語）。`:` は、型を言う記号だけになる。宛先が `状態.操作` か、状態（状態の分類）かは、名前の最後の要素が `post` / `put` / `delete` かで分ける: `:` で分けていたときと違い、その三つの語で終わる名前の状態や分類は、状態の遷移の宛先に書けない |
 | 日時の核の型は、`datetime`、`date`、`time`、`duration`。核の型は、どれも小文字。`Time` と `Duration` は、なくした（同 359） | 言語が持つ型は小文字、宣言された型は大文字で始まる、と一つの決まりで言える。日時は、設計する人が、そのまま考える概念なので、素の型にする。表現（文字列か、数か）は、仕様が言うことではなく、基底とプラグインが、決まった表で写す |
 | デコレータの宣言の、付ける先の並びの区切りは `,`（`for model, state, op`）。`for model \| op` は、なくした（同 358） | `for` の後ろは、型ではなく、修飾する先の一覧。節の並びと同じ `,` にすると、`\|` は、「その場で書く union」の一つの意味になる |
 | 引数の種類には `any` を書き（`error: any exception`）、付ける先には書かない（`for effect`）（同 357） | `any <種類>` は、種類から、型を作る。`for` の後ろは種類、`:` の後ろは型。引数の種類から `any` を取ると、種類の語が、そのまま型として扱われる |

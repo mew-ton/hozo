@@ -57,7 +57,7 @@ func sampleProgram() *Program {
 					},
 					&Effect{
 						DeclBase: DeclBase{Name: "logout", Span: span("global.hozo", 9, 1, 9, 50)},
-						Target:   TransitionTarget{Of: "session", From: AnyCase(), To: Cases(CaseEmpty)},
+						Target:   TransitionTarget{Of: "session", From: AnyCase(), To: Cases(CaseNone)},
 						Writes:   []string{"session"},
 					},
 				},
@@ -496,9 +496,9 @@ func sampleProgram() *Program {
 									Subject:  ValueSubject{Atom: StateAtom{State: "session", Span: span(f, 62, 9, 62, 16)}},
 									Classify: ClassifyNullable,
 									Arms: []MatchArm{
-										{Cases: []string{CaseEmpty}, Body: NoneBody{}, Span: span(f, 63, 5, 63, 19)},
+										{Cases: []string{CaseNone}, Body: NoneBody{}, Span: span(f, 63, 5, 63, 19)},
 										{
-											Cases:    []string{CaseHasItems},
+											Cases:    []string{CaseSome},
 											Body:     CallExpr{Call: Call{Callee: OpCallee{Op: "server.notify"}, Span: span(f, 64, 17, 64, 32)}},
 											Narrowed: []Narrowing{{Type: Ref("server.Token")}},
 											Span:     span(f, 64, 5, 64, 33),

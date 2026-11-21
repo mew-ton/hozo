@@ -58,10 +58,10 @@ func TestReadsWiring(t *testing.T) {
 	take := leaf("store.take", nil, param("in", ir.Ref("store.In")), param("t", ir.Optional(ir.String())))
 	inModel := model("store.In", field("who", ir.Optional(user)), field("n", ir.Array(ir.Ref("type.Session"))))
 	byState := wire("store.w", nil, nil,
-		// match(token by nullable){ HasItems => take({ n: sessions }, token); Empty => findUser(...) }
+		// match(token by nullable){ Some => take({ n: sessions }, token); None => findUser(...) }
 		matchState("store.token", ir.StateNullable,
-			arm(ptr(call("store.take", carg("in", rec(rf("n", stateAtom("store.sessions")))), carg("t", stateAtom("store.token")))), "HasItems"),
-			arm(ptr(call("store.findUser")), "Empty"),
+			arm(ptr(call("store.take", carg("in", rec(rf("n", stateAtom("store.sessions")))), carg("t", stateAtom("store.token")))), "Some"),
+			arm(ptr(call("store.findUser")), "None"),
 		),
 	)
 	// match(by Login){ In => users; default => none }: C の対象の状態を宣言の順に、その後にアームの値

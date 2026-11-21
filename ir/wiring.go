@@ -705,7 +705,7 @@ func (m Match) SubjectState() (state string, ok bool) {
 // MatchArm は match のアーム（docs/ir.md「配線」の MatchArm）。
 type MatchArm struct {
 	// Cases はこのアームが受けるケース（docs/check.md「アームが受けるケース」）。名前で並べたアームなら、書かれた順。
-	// else のアームなら、ほかのアームが並べなかったケースを、分類の宣言の順に（標準の分類は Empty、HasItems の順）。
+	// else のアームなら、ほかのアームが並べなかったケースを、分類の宣言の順に（標準の分類は [StandardCases] の順）。
 	// JSON では、なくても []。
 	Cases []string `json:"cases"`
 	// Else は `else => …` と書いたアームか。プラグインは、Cases だけを読めば足りる。

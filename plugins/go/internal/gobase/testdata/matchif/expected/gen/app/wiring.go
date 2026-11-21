@@ -25,10 +25,10 @@ func (o *ops) NameById(ctx context.Context, id string) (string, error) {
 func (o *ops) NickOf(ctx context.Context, user *User) (*string, error) {
 	// match (user by nullable)
 	if user != nil {
-		// HasItems: user は app.User
+		// Some: user は app.User
 		return user.Nick, nil
 	}
-	// Empty
+	// None
 	return nil, nil
 }
 
@@ -49,14 +49,14 @@ func (o *ops) PureName(ctx context.Context, user *User) (string, error) {
 func (o *ops) Widened(ctx context.Context, in Input) (*string, error) {
 	// match (in.user by nullable)
 	if in.User != nil {
-		// HasItems: in.user は app.User
+		// Some: in.user は app.User
 		v0, err := o.LoadName(ctx, *in.User)
 		if err != nil {
 			return nil, err
 		}
 		return ptr(v0), nil
 	}
-	// Empty
+	// None
 	return nil, nil
 }
 
@@ -64,10 +64,10 @@ func (o *ops) Widened(ctx context.Context, in Input) (*string, error) {
 func (o *ops) TagCount(ctx context.Context, tags []string) (int64, error) {
 	// match (tags by nullable)
 	if tags != nil {
-		// HasItems: tags は string[]
+		// Some: tags は string[]
 		return o.CountTags(ctx, tags)
 	}
-	// Empty
+	// None
 	return 0, nil
 }
 
@@ -81,10 +81,10 @@ func (o *ops) TokenText(ctx context.Context) (string, error) {
 	}
 	// match (token by nullable)
 	if token != nil {
-		// HasItems: token は app.Token
+		// Some: token は app.Token
 		return o.UseToken(ctx, *token)
 	}
-	// Empty
+	// None
 	return "none", nil
 }
 
@@ -116,14 +116,14 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 	// match (user by nullable)
 	var name string
 	if user != nil {
-		// HasItems: user は app.User
+		// Some: user は app.User
 		v0, err := o.LoadName(ctx, *user)
 		if err != nil {
 			return "", err
 		}
 		name = v0
 	} else {
-		// Empty
+		// None
 		name = "nobody"
 	}
 	// match (lines by list)
@@ -143,7 +143,7 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 	// match (user by nullable)
 	var maybe *string
 	if user != nil {
-		// HasItems: user は app.User
+		// Some: user は app.User
 		v2, err := o.NameOf(ctx, *user)
 		if err != nil {
 			return "", err
@@ -154,10 +154,10 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 	// match (user by nullable)
 	var strict string
 	if user != nil {
-		// HasItems: user は app.User
+		// Some: user は app.User
 		strict = user.Name
 	} else {
-		// Empty
+		// None
 		return "", Missing{}
 	}
 	if err := o.Show(ctx, name); err != nil {
@@ -175,12 +175,12 @@ func (o *ops) ConstForms(ctx context.Context, id string, lines []Line) (string, 
 func (o *ops) StatementForms(ctx context.Context, user *User, lines []Line) error {
 	// match (user by nullable)
 	if user != nil {
-		// HasItems: user は app.User
+		// Some: user は app.User
 		if err := o.Record(ctx, user.Name); err != nil {
 			return err
 		}
 	} else {
-		// Empty
+		// None
 		if err := o.Show(ctx, "none"); err != nil {
 			return err
 		}
@@ -194,7 +194,7 @@ func (o *ops) StatementForms(ctx context.Context, user *User, lines []Line) erro
 	}
 	// match (user by nullable)
 	if user == nil {
-		// Empty
+		// None
 		return o.Deny(ctx)
 	}
 	// match (lines by list)
@@ -203,12 +203,12 @@ func (o *ops) StatementForms(ctx context.Context, user *User, lines []Line) erro
 	}
 	// match (user by nullable)
 	if user != nil {
-		// HasItems: user は app.User
+		// Some: user は app.User
 		if err := o.TakeOptionalUser(ctx, ptr(*user)); err != nil {
 			return err
 		}
 	} else {
-		// Empty
+		// None
 		return Denied{}
 	}
 	return nil

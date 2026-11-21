@@ -35,7 +35,7 @@ type TokenState interface {
 	Get(ctx context.Context) (*Token, error)
 	// RemoveToken は命令（効果 shop.removeToken、effects shop.token.delete）: 手元のトークンを消す
 	RemoveToken(ctx context.Context) error
-	// SaveToken は命令（効果 shop.saveToken、effects shop.token as Empty -> HasItems）: トークンを保存する
+	// SaveToken は命令（効果 shop.saveToken、effects shop.token as None -> Some）: トークンを保存する
 	SaveToken(ctx context.Context, token Token) error
 }
 

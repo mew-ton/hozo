@@ -7,9 +7,9 @@ namespace a {
   fn f();
   fn ng(in: In) {
     match (in.token by list) { Empty => f(); HasItems => none; };      // ERROR: MATCH-7
-    match (in.lines by nullable) { Empty => f(); HasItems => none; };  // ERROR: MATCH-7
-    match (in.name by nullable) { Empty => f(); HasItems => none; };   // ERROR: MATCH-7
+    match (in.lines by nullable) { None => f(); Some => none; };  // ERROR: MATCH-7
+    match (in.name by nullable) { None => f(); Some => none; };   // ERROR: MATCH-7
     match (token by list) { Empty => f(); HasItems => none; };         // ERROR: MATCH-7
-    match (title by nullable) { Empty => f(); HasItems => none; };     // ERROR: MATCH-7
+    match (title by nullable) { None => f(); Some => none; };     // ERROR: MATCH-7
   }
 }

@@ -15,10 +15,10 @@ import (
 func (o *ops) Need(ctx context.Context, id *string, known *bool) (string, error) {
 	// match (known by nullable)
 	if known != nil {
-		// HasItems: known は boolean
+		// Some: known は boolean
 		return o.NeedId(ctx, id)
 	}
-	// Empty
+	// None
 	return "", Plain{}
 }
 
@@ -28,10 +28,10 @@ func (o *ops) Need(ctx context.Context, id *string, known *bool) (string, error)
 func (o *ops) NeedId(ctx context.Context, id *string) (string, error) {
 	// match (id by nullable)
 	if id != nil {
-		// HasItems: id は string
+		// Some: id は string
 		return *id, nil
 	}
-	// Empty
+	// None
 	return "", Missing{Id: "unknown"}
 }
 
@@ -42,10 +42,10 @@ func (o *ops) Check(ctx context.Context, in Input, tags []string, text *string) 
 	// match (text by nullable)
 	var first string
 	if text != nil {
-		// HasItems: text は string
+		// Some: text は string
 		first = *text
 	} else {
-		// Empty
+		// None
 		return "", Invalid{Code: in.Code, Detail: Detail{Field: "text"}, Tags: tags, At: ptr(int64(7))}
 	}
 	// match (tags by list)
@@ -70,15 +70,15 @@ func (o *ops) Check(ctx context.Context, in Input, tags []string, text *string) 
 func (o *ops) Guard(ctx context.Context, code *Code, wait *bool) error {
 	// match (code by nullable)
 	if code != nil {
-		// HasItems: code は app.Code
+		// Some: code は app.Code
 		return Missing{Id: string(*code)}
 	}
 	// match (wait by nullable)
 	if wait != nil {
-		// HasItems: wait は boolean
+		// Some: wait は boolean
 		return limits.LimitExceeded{RetryAfter: time.Duration(300000000000), Scope: ptr(string("guard"))}
 	} else {
-		// Empty
+		// None
 		return limits.LimitExceeded{RetryAfter: time.Duration(1000000000), Scope: nil}
 	}
 }
@@ -90,10 +90,10 @@ func (o *ops) Guard(ctx context.Context, code *Code, wait *bool) error {
 func (o *ops) Retry(ctx context.Context, text *string) (string, error) {
 	// match (text by nullable)
 	if text != nil {
-		// HasItems: text は string
+		// Some: text は string
 		return *text, nil
 	}
-	// Empty
+	// None
 	attempts, err := o.attempts.Get(ctx)
 	if err != nil {
 		return "", err
@@ -119,10 +119,10 @@ func (o *ops) Count(ctx context.Context, text *string) (string, error) {
 	n := int64(3)
 	// match (text by nullable)
 	if text != nil {
-		// HasItems: text は string
+		// Some: text は string
 		return *text, nil
 	}
-	// Empty
+	// None
 	return "", TooMany{Attempts: n, Last: nil}
 }
 

@@ -102,12 +102,12 @@ func (o *ops) OpenTop(ctx context.Context) error {
 	}
 	// match (token by nullable)
 	if token != nil {
-		// HasItems: token は shop.Token
+		// Some: token は shop.Token
 		if err := o.ShowCart(ctx); err != nil {
 			return err
 		}
 	} else {
-		// Empty
+		// None
 		if err := o.ShowLogin(ctx); err != nil {
 			return err
 		}

@@ -650,7 +650,7 @@ func TestStateClassification(t *testing.T) {
 		{"effects startOver {", len("effects "), "```hozo\neffect fn startOver(): effects Checkout as any -> Shopping\n```"},
 		{"effects clearCart {", len("effects "), "```hozo\neffect fn clearCart(): effects carts as HasItems -> Empty\n```"},
 		{"touchCheckout(): effects", 0, "```hozo\neffect fn touchCheckout(): effects Checkout as Shopping, Ordered -> any\n```"},
-		{"saveToken(token); }", 0, "```hozo\neffect fn saveToken(token: Token): effects token as Empty -> HasItems\n```"},
+		{"saveToken(token); }", 0, "```hozo\neffect fn saveToken(token: Token): effects token as None -> Some\n```"},
 		// 分類の対象: 状態の分類は状態の名前の並び、値の分類は型
 		{"match (by Checkout)", len("match (by "), "```hozo\nclassify Checkout of carts, orders\n```"},
 		{"match (by LoggedIn)", len("match (by "), "```hozo\nclassify LoggedIn of token\n```"},
@@ -822,8 +822,8 @@ namespace store {
   }
   fn whoAmI(): type.User? {
     return match(current by nullable){
-      HasItems => current;
-      Empty    => none;
+      Some => current;
+      None => none;
     };
   }
   fn heading(): string {
@@ -906,7 +906,7 @@ namespace store {
 		// 状態の見出しだけは形の語で書く（T? と書いた状態も nullable<T>、T と書いた状態は single<T>）。アームの中で
 		// 絞り込まれていても、見出しは宣言のまま
 		{"match(current by nullable)", len("match "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
-		{"HasItems => current;", len("HasItems => "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
+		{"Some => current;", len("Some => "), []string{"```hozo\nstate current: nullable<type.User>\n```"}, nil},
 		{"return title;", len("return "), []string{"```hozo\nstate title: single<string>\n```"}, nil},
 		{"reads users {", len("reads "), []string{"```hozo\nstate users: list<type.User>\n```"}, nil},
 		// read の宣言と、配線からの read の呼び出し
@@ -952,7 +952,7 @@ namespace store {
 		{"read の呼び出し", "return userById(id); }", len("return "), "userById(id: string): type.User? reads"},
 		{"read の結果の型", "userById(id: string): type.User? reads", len("userById(id: string): type."), "User {\n    /** 識別子 */"},
 		{"配線の値の位置の状態（match の対象）", "match(current by nullable)", len("match "), "current: type.User?;"},
-		{"配線の値の位置の状態（アームの値）", "HasItems => current;", len("HasItems => "), "current: type.User?;"},
+		{"配線の値の位置の状態（アームの値）", "Some => current;", len("Some => "), "current: type.User?;"},
 		{"配線の値の位置の状態（return）", "return title;", len("return "), "title: string;"},
 		{"match x by ns.C の C", "by store.Registration", len("by store."), "Registration of findUser"},
 		{"アームのケース名", "Registered => store.nameOf2", 0, "Registered: findUser as"},
@@ -966,11 +966,11 @@ namespace store {
 			t.Errorf("definition(%s) = %+v, want %q の位置 %+v", tt.what, loc, tt.target, want)
 		}
 	}
-	// 標準の分類の名前（by の後ろの nullable）とケース（Empty / HasItems）は宣言を持たないので null
+	// 標準の分類の名前（by の後ろの nullable）とケース（None / Some）は宣言を持たないので null
 	for _, tt := range []struct {
 		needle  string
 		shiftBy int
-	}{{"by nullable){", len("by ")}, {"HasItems => current;", 0}, {"Empty    => none;", 0},
+	}{{"by nullable){", len("by ")}, {"Some => current;", 0}, {"None => none;", 0},
 		// 残りのケースの `X as else` の else も、宣言を持たない（docs/lsp.md「定義へジャンプ」）
 		{"Unknown: findUser as else", len("Unknown: findUser as ")},
 		// アームの頭の else も、一つのケースを指さない

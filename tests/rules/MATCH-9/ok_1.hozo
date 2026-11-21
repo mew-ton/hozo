@@ -21,7 +21,7 @@ namespace a {
     match (x by Hit) { Missing => none; else => use(x); };
     match (x by Arrival) { Arrived => use(x); };
     match (carts by list) { HasItems => f(); else => none; };
-    match (token by nullable) { Empty => f(); else => none; };
+    match (token by nullable) { None => f(); else => none; };
     match (by Session) { LoggedIn => f(); else => none; };
   }
 }

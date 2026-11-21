@@ -56,7 +56,7 @@ namespace storefront {
   effect fn emptyCart(): effects cart as HasItems -> Empty;
 
   /** 見せる値段を置く */
-  effect fn showOffer(offer: Offer): effects offer as Empty -> HasItems;
+  effect fn showOffer(offer: Offer): effects offer as None -> Some;
 
   /** 見せている値段を捨てる。同意は、取り直しになる */
   effect fn forgetOffer(): effects offer.delete;
@@ -279,8 +279,8 @@ namespace storefront {
     throws http.NetworkError, http.ServerError
   {
     return match (offer by nullable) {
-      HasItems => quotedVm(offer, problem);
-      Empty    => entering();
+      Some => quotedVm(offer, problem);
+      None => entering();
     }
   }
 
@@ -332,8 +332,8 @@ namespace storefront {
   @recover(ordering.OrderExpired | payment.AlreadySecured | payment.ProviderUnavailable | http.NetworkError | http.ServerError, sayTryLater)
   fn onPlaceOrder() {
     match (offer by nullable) {
-      HasItems => placeOrder(offer);
-      Empty    => none;
+      Some => placeOrder(offer);
+      None => none;
     }
   }
 

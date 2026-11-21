@@ -80,7 +80,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | デコレータの引数の、分類のケース（`@usecase.of(Actor.Customer)`） | `Actor` のセグメントは `classify` の名前、`Customer` のセグメントは、その `classify` のケース |
 | デコレータの宣言の、分類のケース（`case of Actor`、`case of Order`）の、`of` の後ろの名前 | `classify` の名前か、型の宣言。`case`、`of`、`any`、`never` の語は、宣言を持たないので `null` |
 | 引数名 | 引数 |
-| `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）の `Empty` / `HasItems` と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null`。アームの頭の `else` も、一つのケースを指さないので `null` |
+| `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）のケース（`Empty` / `HasItems`、`None` / `Some`）と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null`。アームの頭の `else` も、一つのケースを指さないので `null` |
 | デコレータの引数名（`name:`） | デコレータの宣言の `Param` |
 | ドキュメンテーションコメントの `@param` / `@throws` / `@see` の名前 | 同上（`internal/sema` の `Refs` にはないので、言語サーバーが構文木から解決する） |
 | 語彙の宣言 | `hozo:` の URI の位置 |

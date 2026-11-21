@@ -45,8 +45,8 @@ namespace a {
     match(x by Arrival){ Arrived => takeM(x); };
     match(three by Whole){ IsReady => takeM(three); else => f(); };
     match(three by Whole){ IsReady, IsMissing => f(); else => takeO(three); };
-    match(token by nullable){ HasItems => f(); else => none; };
-    match(x by nullable){ Empty => none; else => takeM(x); };
+    match(token by nullable){ Some => f(); else => none; };
+    match(x by nullable){ None => none; else => takeM(x); };
     match(carts by list){ HasItems => f(); else => none; };
     match(by Session){ LoggedOut => none; else => takeString(token); };
   }
@@ -124,9 +124,10 @@ func TestElseArm(t *testing.T) {
 		// variant: 二つのケースを受ける else のアームは外のまま、一つなら、そのアームの型
 		{"variant、else が二つ", 6, []arm{{[]string{"IsReady"}, false, []string{":a.M"}}, {[]string{"IsMissing", "IsBroken"}, true, nil}}},
 		{"variant、else が一つ", 7, []arm{{[]string{"IsReady", "IsMissing"}, false, []string{":a.Whole.(IsReady, IsMissing)<a.Three>"}}, {[]string{"IsBroken"}, true, []string{":a.O"}}}},
-		// 標準の分類: ケースは Empty、HasItems の順。HasItems だけを受ける by nullable の else のアームは T
-		{"by nullable、else が Empty", 8, []arm{{[]string{"HasItems"}, false, []string{":string"}}, {[]string{"Empty"}, true, nil}}},
-		{"by nullable、else が HasItems", 9, []arm{{[]string{"Empty"}, false, nil}, {[]string{"HasItems"}, true, []string{":a.M"}}}},
+		// 標準の分類: ケースは、ない側、ある側の順（nullable は None、Some。list は Empty、HasItems）。Some だけを受ける
+		// by nullable の else のアームは T
+		{"by nullable、else が None", 8, []arm{{[]string{"Some"}, false, []string{":string"}}, {[]string{"None"}, true, nil}}},
+		{"by nullable、else が Some", 9, []arm{{[]string{"None"}, false, nil}, {[]string{"Some"}, true, []string{":a.M"}}}},
 		{"by list", 10, []arm{{[]string{"HasItems"}, false, nil}, {[]string{"Empty"}, true, nil}}},
 		// 状態の分類: narrowed は state を持つ
 		{"状態の分類", 11, []arm{{[]string{"LoggedOut"}, false, nil}, {[]string{"LoggedIn"}, true, []string{"a.token:string"}}}},

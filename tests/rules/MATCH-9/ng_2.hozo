@@ -27,8 +27,8 @@ namespace a {
       else => none;                    // ERROR: MATCH-9
     };
     match (token by nullable) {
-      Empty => f();
-      HasItems => none;
+      None => f();
+      Some => none;
       else => none;                    // ERROR: MATCH-9
     };
     match (by Session) {

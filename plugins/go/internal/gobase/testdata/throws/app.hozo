@@ -36,16 +36,16 @@ namespace app {
     throws Missing, Plain
   {
     return match (known by nullable) {
-      HasItems => needId(id);
-      Empty    => throw Plain;
+      Some => needId(id);
+      None => throw Plain;
     };
   }
   export fn needId(id: string?): string
     throws Missing
   {
     return match (id by nullable) {
-      HasItems => id;
-      Empty    => throw Missing("unknown");
+      Some => id;
+      None => throw Missing("unknown");
     };
   }
 
@@ -55,8 +55,8 @@ namespace app {
     throws Invalid
   {
     val first = match (text by nullable) {
-      HasItems => text;
-      Empty    => throw Invalid(in.code, { field: "text" }, tags, 7);
+      Some => text;
+      None => throw Invalid(in.code, { field: "text" }, tags, 7);
     };
     val second = match (tags by list) {
       HasItems => first;
@@ -71,12 +71,12 @@ namespace app {
     throws Missing, limits.LimitExceeded
   {
     match (code by nullable) {
-      HasItems => throw Missing(code);
-      Empty    => none;
+      Some => throw Missing(code);
+      None => none;
     };
     match (wait by nullable) {
-      HasItems => throw limits.LimitExceeded(5m, "guard");
-      Empty    => throw limits.LimitExceeded(1s);
+      Some => throw limits.LimitExceeded(5m, "guard");
+      None => throw limits.LimitExceeded(1s);
     };
   }
 
@@ -85,8 +85,8 @@ namespace app {
     throws TooMany
   {
     return match (text by nullable) {
-      HasItems => text;
-      Empty    => throw TooMany(attempts);
+      Some => text;
+      None => throw TooMany(attempts);
     };
   }
 
@@ -103,8 +103,8 @@ namespace app {
   {
     val n = 3;
     return match (text by nullable) {
-      HasItems => text;
-      Empty    => throw TooMany(n);
+      Some => text;
+      None => throw TooMany(n);
     };
   }
 }

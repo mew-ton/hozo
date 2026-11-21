@@ -1,5 +1,5 @@
 {
-  "version": "0.14",
+  "version": "0.15",
   "namespaces": [
     {
       "name": "",
@@ -239,7 +239,7 @@
             "of": "session",
             "from": "any",
             "to": [
-              "Empty"
+              "None"
             ]
           },
           "writes": [
@@ -2856,7 +2856,7 @@
                   "arms": [
                     {
                       "cases": [
-                        "Empty"
+                        "None"
                       ],
                       "else": false,
                       "body": {
@@ -2877,7 +2877,7 @@
                     },
                     {
                       "cases": [
-                        "HasItems"
+                        "Some"
                       ],
                       "else": false,
                       "body": {

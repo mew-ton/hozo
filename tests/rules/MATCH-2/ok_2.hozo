@@ -1,4 +1,4 @@
-// MATCH-2（docs/check.md「classify / match」）: 標準の分類のケースは Empty / HasItems。
+// MATCH-2（docs/check.md「classify / match」）: 標準の分類のケースは、list が Empty / HasItems、nullable が None / Some。
 // 状態の分類は値の分類と同じ（すべてのケースを名前で並べるか、最後の else のアームが残りを受ける）
 namespace a {
   state carts: list<string>;
@@ -9,7 +9,7 @@ namespace a {
   fn f();
   fn ok() {
     match (carts by list) { Empty => f(); HasItems => none; };
-    match (token by nullable) { HasItems => f(); Empty => none; };
+    match (token by nullable) { Some => f(); None => none; };
     match (carts by list) { Empty, HasItems => f(); };
     match (carts by list) { HasItems => f(); else => none; };
     match (by Checkout) { Shopping => f(); Ordered => none; };
