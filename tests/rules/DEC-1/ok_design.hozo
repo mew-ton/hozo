@@ -1,0 +1,46 @@
+// DEC-1: 標準の語彙のうち、設計の図の語彙（docs/vocab.md「設計の図の語彙」）を、付けられる先に付ける
+namespace design {
+  classify Actor of never {
+    /** 店で買う人 */
+    @actor.human Customer;
+    /** 決済代行 */
+    @actor.bot PaymentProvider;
+    /** 注文を代わりに行う、AI のエージェント */
+    @actor.ai Agent;
+  }
+  classify Requirement of never {
+    /** 同じ申し込みを、二度送っても、注文は一つ */
+    PRD_001;
+    /** 在庫がなければ、注文できない */
+    PRD_002;
+  }
+}
+namespace a {
+  @prd.ref(design.Requirement.PRD_001)
+  model Order { id: string; }
+  @prd.ref(design.Requirement.PRD_001)
+  state orders: list<Order>;
+  @prd.ref(design.Requirement.PRD_002)
+  read fn orderById(id: string): Order? reads orders;
+  @prd.ref(design.Requirement.PRD_001)
+  effect fn createOrder(order: Order): effects orders.post;
+  @prd.ref(design.Requirement.PRD_001, design.Requirement.PRD_002)
+  export fn confirm(order: Order) { createOrder(order); }
+  export fn find(id: string): Order? { return orderById(id); }
+}
+namespace web {
+  /** 客が、注文を確定する */
+  @usecase.of(design.Actor.Customer)
+  export fn order(order: a.Order) { a.confirm(order); }
+  /** 客か、エージェントが、注文を見る */
+  @usecase.of(design.Actor.Customer, design.Actor.Agent)
+  export fn look(id: string): a.Order? { return a.find(id); }
+}
+namespace flows {
+  /** 注文してから、見るまで */
+  @business.flow
+  fn orderAndLook(order: a.Order, id: string): a.Order? {
+    web.order(order);
+    return web.look(id);
+  }
+}

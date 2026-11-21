@@ -1,0 +1,9 @@
+/** ユースケースの語彙（ユースケース図） */
+namespace usecase {
+  /**
+   * この op は、ユースケース（担い手の、一つの操作）。actors が、行う。
+   *
+   * @param actors 行う担い手。対象のない分類のケース
+   */
+  decorator of(...actors: any case of never) for op;
+}

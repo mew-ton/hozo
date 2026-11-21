@@ -1,0 +1,21 @@
+// DEC-1: 設計の図の語彙（docs/vocab.md「設計の図の語彙」）を、付けられない先に付けた
+namespace a {
+  model Order { id: string; }
+  state orders: list<Order>;
+  classify Size of Order {
+    @actor.human Small;                // ERROR: DEC-1
+    Large;
+  }
+  classify Actor of never { Customer; }
+  classify Requirement of never { PRD_001; }
+  @usecase.of(Actor.Customer)          // ERROR: DEC-1
+  model Cart { id: string; }
+  @business.flow                       // ERROR: DEC-1
+  state carts: list<Cart>;
+  @usecase.of(Actor.Customer)          // ERROR: DEC-1
+  read fn all(): Order[] reads orders;
+  @prd.ref(Requirement.PRD_001)        // ERROR: DEC-1
+  exception Missing;
+  @actor.bot                           // ERROR: DEC-1
+  fn f();
+}

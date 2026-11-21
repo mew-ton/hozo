@@ -17,12 +17,16 @@
     "api.hozo",
     "t.hozo",
     "web.hozo",
+    "hozo:vocab/actor.hozo",
+    "hozo:vocab/business.hozo",
     "hozo:vocab/db.hozo",
     "hozo:vocab/fs.hozo",
     "hozo:vocab/http.hozo",
     "hozo:vocab/localstorage.hozo",
     "hozo:vocab/page.hozo",
+    "hozo:vocab/prd.hozo",
     "hozo:vocab/proc.hozo",
+    "hozo:vocab/usecase.hozo",
     "hozo:vocab/valid.hozo"
   ],
   "namespaces": {
@@ -14155,6 +14159,184 @@
         ]
       },
       {
+        "name": "actor",
+        "description": {
+          "summary": "担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける",
+          "body": "担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける",
+          "params": [],
+          "throws": [],
+          "see": []
+        },
+        "decls": [
+          {
+            "kind": "decorator",
+            "name": "actor.human",
+            "description": {
+              "summary": "人が、呼び出す",
+              "body": "人が、呼び出す",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/actor.hozo",
+              "start": {
+                "line": 4,
+                "col": 3
+              },
+              "end": {
+                "line": 4,
+                "col": 37
+              }
+            },
+            "params": [],
+            "targets": [
+              "case"
+            ],
+            "caseTargets": [
+              {
+                "subject": {
+                  "kind": "never"
+                }
+              }
+            ],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "actor.bot",
+            "description": {
+              "summary": "機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理）",
+              "body": "機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理）",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/actor.hozo",
+              "start": {
+                "line": 7,
+                "col": 3
+              },
+              "end": {
+                "line": 7,
+                "col": 35
+              }
+            },
+            "params": [],
+            "targets": [
+              "case"
+            ],
+            "caseTargets": [
+              {
+                "subject": {
+                  "kind": "never"
+                }
+              }
+            ],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "actor.ai",
+            "description": {
+              "summary": "生成 AI の判断で、呼び出す",
+              "body": "生成 AI の判断で、呼び出す",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/actor.hozo",
+              "start": {
+                "line": 10,
+                "col": 3
+              },
+              "end": {
+                "line": 10,
+                "col": 34
+              }
+            },
+            "params": [],
+            "targets": [
+              "case"
+            ],
+            "caseTargets": [
+              {
+                "subject": {
+                  "kind": "never"
+                }
+              }
+            ],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          }
+        ]
+      },
+      {
+        "name": "business",
+        "description": {
+          "summary": "業務フローの語彙（業務フロー図）",
+          "body": "業務フローの語彙（業務フロー図）",
+          "params": [],
+          "throws": [],
+          "see": []
+        },
+        "decls": [
+          {
+            "kind": "decorator",
+            "name": "business.flow",
+            "description": {
+              "summary": "この op は、業務フロー。操作の op（ユースケース）を、順に行う",
+              "body": "この op は、業務フロー。操作の op（ユースケース）を、順に行う",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/business.hozo",
+              "start": {
+                "line": 4,
+                "col": 3
+              },
+              "end": {
+                "line": 4,
+                "col": 25
+              }
+            },
+            "params": [],
+            "targets": [
+              "op"
+            ],
+            "caseTargets": [],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          }
+        ]
+      },
+      {
         "name": "db",
         "decls": [
           {
@@ -16095,6 +16277,76 @@
         ]
       },
       {
+        "name": "prd",
+        "description": {
+          "summary": "要求を指す語彙（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース",
+          "body": "要求を指す語彙（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース",
+          "params": [],
+          "throws": [],
+          "see": []
+        },
+        "decls": [
+          {
+            "kind": "decorator",
+            "name": "prd.ref",
+            "description": {
+              "summary": "この宣言は、この要求のためのもの。",
+              "body": "この宣言は、この要求のためのもの。",
+              "params": [
+                {
+                  "name": "requirements",
+                  "text": "指す要求。対象のない分類のケース"
+                }
+              ],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/prd.hozo",
+              "start": {
+                "line": 8,
+                "col": 3
+              },
+              "end": {
+                "line": 8,
+                "col": 88
+              }
+            },
+            "params": [
+              {
+                "name": "requirements",
+                "type": {
+                  "kind": "any",
+                  "of": "case",
+                  "case": {
+                    "subject": {
+                      "kind": "never"
+                    }
+                  }
+                },
+                "optional": false,
+                "rest": true
+              }
+            ],
+            "targets": [
+              "op",
+              "model",
+              "state",
+              "effect",
+              "read"
+            ],
+            "caseTargets": [],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          }
+        ]
+      },
+      {
         "name": "proc",
         "description": {
           "summary": "外部プロセスの語彙（プラグインの呼び出し）",
@@ -16190,6 +16442,72 @@
                 "relations": []
               }
             ],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          }
+        ]
+      },
+      {
+        "name": "usecase",
+        "description": {
+          "summary": "ユースケースの語彙（ユースケース図）",
+          "body": "ユースケースの語彙（ユースケース図）",
+          "params": [],
+          "throws": [],
+          "see": []
+        },
+        "decls": [
+          {
+            "kind": "decorator",
+            "name": "usecase.of",
+            "description": {
+              "summary": "この op は、ユースケース（担い手の、一つの操作）。actors が、行う。",
+              "body": "この op は、ユースケース（担い手の、一つの操作）。actors が、行う。",
+              "params": [
+                {
+                  "name": "actors",
+                  "text": "行う担い手。対象のない分類のケース"
+                }
+              ],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/usecase.hozo",
+              "start": {
+                "line": 8,
+                "col": 3
+              },
+              "end": {
+                "line": 8,
+                "col": 53
+              }
+            },
+            "params": [
+              {
+                "name": "actors",
+                "type": {
+                  "kind": "any",
+                  "of": "case",
+                  "case": {
+                    "subject": {
+                      "kind": "never"
+                    }
+                  }
+                },
+                "optional": false,
+                "rest": true
+              }
+            ],
+            "targets": [
+              "op"
+            ],
+            "caseTargets": [],
+            "external": false,
+            "repeatable": false,
+            "throws": [],
             "catches": [],
             "reads": [],
             "effects": []

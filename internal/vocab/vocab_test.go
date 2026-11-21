@@ -25,6 +25,11 @@ var expected = map[string][]string{
 	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator route(path: string, from: any state?, onInvalid: any effect?);", "decorator dialog(", "decorator fallback(", "decorator interaction("},
 	"hozo:vocab/fs.hozo":           {"namespace fs {", "decorator files(glob: string) for state;"},
 	"hozo:vocab/proc.hozo":         {"namespace proc {", "exception Crashed;", "exception MalformedOutput;", "decorator stdio throws Crashed, MalformedOutput;"},
+	// 設計の図の語彙（docs/vocab.md「設計の図の語彙」）
+	"hozo:vocab/actor.hozo":    {"namespace actor {", "decorator human for case of never;", "decorator bot for case of never;", "decorator ai for case of never;"},
+	"hozo:vocab/usecase.hozo":  {"namespace usecase {", "decorator of(...actors: any case of never) for op;"},
+	"hozo:vocab/business.hozo": {"namespace business {", "decorator flow for op;"},
+	"hozo:vocab/prd.hozo":      {"namespace prd {", "decorator ref(...requirements: any case of never) for op, model, state, effect, read;"},
 }
 
 func TestFiles(t *testing.T) {

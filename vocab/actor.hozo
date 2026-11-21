@@ -1,0 +1,11 @@
+/** 担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける */
+namespace actor {
+  /** 人が、呼び出す */
+  decorator human for case of never;
+
+  /** 機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理） */
+  decorator bot for case of never;
+
+  /** 生成 AI の判断で、呼び出す */
+  decorator ai for case of never;
+}

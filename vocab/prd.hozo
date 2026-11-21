@@ -1,0 +1,9 @@
+/** 要求を指す語彙（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース */
+namespace prd {
+  /**
+   * この宣言は、この要求のためのもの。
+   *
+   * @param requirements 指す要求。対象のない分類のケース
+   */
+  decorator ref(...requirements: any case of never) for op, model, state, effect, read;
+}

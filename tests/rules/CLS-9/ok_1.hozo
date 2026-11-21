@@ -1,10 +1,5 @@
-// CLS-9（docs/check.md「分類」の「対象のない分類」）: 対象のない分類のケースは、名前だけ。デコレータと、引数で、指せる
-namespace actor {
-  decorator human for case of never;
-}
-namespace usecase {
-  decorator of(actor: any case of never) for op;
-}
+// CLS-9（docs/check.md「分類」の「対象のない分類」）: 対象のない分類のケースは、名前だけ。デコレータと、引数で、指せる。
+// 使うデコレータは、標準の語彙（docs/vocab.md「設計の図の語彙」）
 namespace a {
   classify Actor of never {
     /** 客 */
