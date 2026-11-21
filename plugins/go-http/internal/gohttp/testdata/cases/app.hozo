@@ -1,0 +1,48 @@
+// docs/plugin-go-http.md「インテグレーションテストの口」の、入力 routes が使わない場合。
+
+namespace other {
+  /** 別の名前空間の、同じ名前の例外（ステータスを持たない） */
+  exception Busy;
+
+  export fn value(): int;
+}
+
+/** 結果の名前と、入力のフィールドの名前 */
+namespace app {
+  /** 決まった結果の名前 OK と当たる例外 */
+  @http.status(418)
+  exception OK;
+  /** 決まった結果の名前 BadRequest と当たる例外（引数を持つ） */
+  @http.status(400)
+  exception BadRequest(reason: string);
+  /** 別の名前空間の例外と、名前が当たる例外 */
+  @http.status(503)
+  exception Busy;
+
+  model In { @http.body note: string?; }
+
+  // 結果の名前: その op の中で当たる例外は、名前空間を前に付ける（AppOK、AppBadRequest、AppBusy、OtherBusy）。
+  // 引数 given のフィールドは Given_
+  @http.post("/submit")
+  export fn submit(given: In): int
+    throws OK, BadRequest, Busy, other.Busy;
+
+  // never を返す op: 正常のケースは、ない。当たらない例外は、宣言の名前のまま
+  @http.get("/fail")
+  export fn fail(): never throws Busy;
+
+  // 引数 request のフィールドは Request_、引数 then のフィールドは Then_
+  model Q { @http.query q: string?; }
+  @http.get("/request")
+  export fn byRequest(request: Q): string;
+  @http.get("/then")
+  export fn byThen(then: Q);
+}
+
+/** 葉の op も、分類もない名前空間: go-http の http.go が、テストのパッケージの、ただ一つのファイル */
+namespace wired {
+  @http.get("/value")
+  export fn value(): int {
+    return other.value();
+  }
+}

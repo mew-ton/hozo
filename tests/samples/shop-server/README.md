@@ -172,7 +172,31 @@ R6 の、プラグインの部分の、段 2（`docs/requirements.md`「R6 の�
 | `app/leafcases_test.go` | 足した: 口を満たす型と、`TestLeafCases`、`TestIncompleteCasesAreRejected`（「人が書いたもの」） | — |
 
 - **ほかの `gen/` のファイルは、変わらない。** この仕様には、述語で決まる値の分類も、絞り込んだ引数を持つ効果もないので、判定の口（`classify.go`）も、効果の入口の確かめ（`checked<状態>State`）も、出ない。その二つは、`plugins/go` の単体テストの入力 `unittest` と `rowstate` が確かめる（`docs/testing.md`「単体テスト」）。
-- `app` のテストでないファイルが import するものは、変わらない（`TestNoStorageImport`）。テストのパッケージ `servertest` を import するのは、テストのファイルだけ。
+- `app` のテストでないファイルが import するものは、変わらない（`TestNoStorageImport`）。テストのパッケージ `servertest` を import するのは、テストのファイルだけ（段 3 で、`app/handlertest` が加わった: 「インテグレーションテストの口で変えたこと」）。
+
+### インテグレーションテストの口で変えたこと
+
+R6 の、プラグインの部分の、段 3（`docs/requirements.md`「R6 の、プラグインの部分」）: `go-http` が、`@http.*` の入口に、結果ごとのインテグレーションテストの口を出す。期待する出力（`gen/server/servertest/http.go`）は、手で書き、hozoc の出力と、バイト単位で同じ。
+
+| 変えたもの | 変えたこと | 文書 |
+|---|---|---|
+| `gen/server/servertest/http.go` | 足した: 八つの入口の、`<Op>HTTPCases` と `<Op>HTTPCase`、まとめの `HTTPCases`、走らせる `RunHTTP`、補助 | `docs/plugin-go-http.md`「インテグレーションテストの口」 |
+| `sample.json`、`gen/server/.hozoc-outputs.json` | 上のファイルを、`go-http` のファイルと、`gen/server` の記録に足した | `../README.md`「sample.json」 |
+| `app/handlertest/httpcases.go` | 足した: 口を満たす型 `HTTPCases` と、`RunCases`、`RunIncomplete`（「人が書いたもの」） | — |
+| `app/onmem/compose_test.go`、`app/onsqlite/compose_test.go` | 足した: `TestHTTPCases`、`TestIncompleteHTTPCasesAreRejected` | — |
+
+- **ほかの `gen/` のファイルは、変わらない。** 入口のパッケージの `gen/server/http.go` も、同じ。
+- 入口ごとの結果（`docs/plugin-go-http.md`「インテグレーションテストの口」の「必要なケース」）:
+
+| 入口 | 結果 |
+|---|---|
+| `login` | `OK`、`BadRequest`（本文の全体 `@http.bodyObj`）、`InvalidCredentials`（401）、`LimitExceeded`（429。`@rate.limited` が運ぶ例外） |
+| `logout`、`getMe`、`getOrders`、`getLatestOrder`、`getMyPage` | `OK`、`Unauthorized`（401）。入力は、ヘッダと、`@http.required` のないクエリだけなので、`BadRequest` は、ない |
+| `placeOrder` | `OK`、`BadRequest`（`@http.required` の、本文の項目 `lines`）、`Unauthorized`（401）、`NotificationFailed`（`@http.status` を持たないので、500 と `internal`） |
+| `resendNotices` | `OK`、`Unauthorized`（401）、`NotificationFailed`（500 と `internal`） |
+
+- `store` の `export` の op（`addUser` など）は、`@http.*` を持たないので、この口を持たない（`docs/open.md`「語彙とプラグイン」）。
+- テストのパッケージ `servertest` を import するのは、テストのファイルと、テストを支えるパッケージ `app/handlertest`（`testing` を import する）だけ。
 
 ## 入力
 
@@ -325,6 +349,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/server/inner/validate.go` | `go-valid`（型にメソッドを足すので、定義のパッケージ） |
 | `gen/server/doc.go` `types.go` `ops.go` | `go`（入口のパッケージ: 内側の再公開と、`export` の op だけの `Ops`） |
 | `gen/server/http.go` | `go-http`（入口のパッケージ） |
+| `gen/server/servertest/http.go` | `go-http`（テストのパッケージ: 八つの入口の、インテグレーションテストの口。`docs/plugin-go-http.md`「インテグレーションテストの口」） |
 | `gen/server/ratelimit.go` | `go-ratelimit`（入口のパッケージ） |
 | `gen/server/servertest/doc.go` `leaves.go` | `go`（テストのパッケージ: `server` の葉の op の、単体テストの口。`docs/plugin-go.md`「単体テストの口」。`type`、`rate`、`store` は、葉の op も、述語で決まる値の分類も持たないので、テストのパッケージを持たない） |
 | `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
@@ -421,7 +446,7 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-mem      # 同じサーバーを、メ�
 
 ## `go-http` が従う規則
 
-持ち主は `docs/plugin-go-http.md`。出すファイルは `http.go` 一つ（入口のパッケージ）。**通信の上の形（要求と応答の JSON）の持ち主も、その文書の「通信の形」**で、`app/handlertest` が文字列のまま比べている JSON は、その実物。
+持ち主は `docs/plugin-go-http.md`。出すファイルは、入口のパッケージの `http.go`（この見出し）と、テストのパッケージの `http.go`（インテグレーションテストの口。「インテグレーションテストの口で変えたこと」）。**通信の上の形（要求と応答の JSON）の持ち主も、その文書の「通信の形」**で、`app/handlertest` が文字列のまま比べている JSON は、その実物。
 
 - この仕様では、`@http.*` の付いた op と、`server` の `export` を付けた op が、同じ六つ。`NewHandler` が受け取る `Ops` は、ハンドラが呼ぶ op ちょうど。
 - **六つのハンドラは、同じ形**（同「出力」）: `var in <Model>`、`req := httpRequest{r: r}`、フィールドごとの一行、`req.ok`、`httpValidate`、op の呼び出し、`httpWriteResult`（`gen/server/http.go:31-144`）。フィールドの読み方は四通りで、どれもデコレータとその引数だけで決まる: `req.bodyObj(&in.Body)`（`@http.bodyObj`）、`req.header("Authorization", &in.Token)`（`@http.header("Authorization")`）、`req.query("page", &in.Page, httpDefault(1))`（名前を省いた `@http.query` と、`@http.default(1)`）、`req.body("lines", &in.Lines, httpRequired)`（名前を省いた `@http.body` と、`@http.required`）。
@@ -443,7 +468,8 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 - **`app/memstore/memstore.go`**: `store` の四つの状態の単位の、メモリの上の実装。`memstore.New()` が空の `Store` を返し、`Users()`、`Sessions()`、`Orders()`、`Notifications()` が、その上の状態ごとの型を返す。四つの型は、`gen/storemem` の `UsersState` などを満たす（メソッドが足りなければ、`memstore.go` の先頭の `var` でコンパイルできない）。メソッドは合わせて十八（形で決まる問い合わせ `IsEmpty`、`Get` が八つ、`read` が五つ、効果が五つ）で、どれも、はじめに `ctx.Err()` を見る。**何をするかを言うのは、`read` と効果の説明のコメントだけ**（`gen/storemem/states.go` のメソッドのコメントに写っている）: `db` の語彙のデコレータは、この単位では誰も読まないので、人が、同じ意味になるように書く（`LatestOrderOf` は、`placedAt` がいちばん新しく、同じ時刻なら後から足した注文）。`Store` はいくつ作ってもよく、互いに混ざらない。テストのためだけの読む口は持たない。
   - **メモリの上の `store.placeOrder` は、一つのトランザクションではない。** 単位 4（`gen/storemem`）には、`@db.transaction` を読むトランスパイラがいない。読む者のないデコレータは、何も出ない（`docs/config.md`「継ぎ目」）ので、生成された配線（`gen/storemem/wiring.go` の `PlaceOrder`）は、二つの効果を順に呼ぶだけ。一つ目（`CreateOrder`）が失敗すれば、二つ目は呼ばれず、何も残らない。**二つ目（`NotifyUser`）が失敗すれば、一つ目の注文は残る**（`app/onmem/compose_test.go` の `TestPlaceOrderIsNotOneTransaction`）。`memstore` の `NotifyUser` が失敗するのは、二つの効果の間で `ctx` が中断されたときだけなので、起きにくいが、起きる。この単位で「どちらも足すか、どちらも足さない」を守るには、`@db.transaction` の継ぎ目を宣言して、メモリの上の取り消しを出すトランスパイラを、単位に並べるしかない（人の書く型は、op を包めない: 継ぎ目の口は、宣言したトランスパイラがいる単位にだけ出る）。仕様の `placeOrder` の説明（「どちらも足すか、どちらも足さない」）は、この単位では、守られていない。
 - **二つの組み立て**: `app/onsqlite/compose.go`（表を作る `store.CreateTables(ctx, db)` と、`go-sqlite` の四つの表の型と `store.NewDbSeams(db)` を渡す `store.New`）と `app/onmem/compose.go`（`memstore` の四つの型を渡す `store.New`。継ぎ目の引数は、ない）。どちらも、`store.New(…)` の戻り値を `server.New(leaves, mailer, s, server.NewRateSeams(limiter))` の三つ目に渡し、その戻り値を `server.NewHandler` に渡す。**二つが使う `gen/server` と `app` の葉は同じ一つのもの**で、違うのは `store` の import と、状態の単位の実装と、`store` の継ぎ目の有無だけ。組み立ては何度呼んでもよい（パッケージの変数がない）。
-- **`app/handlertest`**: HTTP から見た振る舞い。二つの組み立て（`app/onsqlite/compose_test.go`、`app/onmem/compose_test.go` の `TestHandler`）が同じものを走らせる。サブテストは、それぞれ新しいサーバーを作り、並列に走る（`t.Parallel()`）。応答の本文を文字列のまま比べるので、そこに書いた JSON が、クライアントが合わせる形になる。確かめること: パスワード違いとユーザーなしは 401 `type.InvalidCredentials`、制約に合わない入力は 400 `http.BadRequest` と違反の一覧、ログインでトークン、`GET /me`（トークンあり・なし・知らないトークン）、`POST /orders`（本文は `{"lines":[…]}`）で注文と通知が一つずつ（通知は、状態 `store.notifications` の `Get` で数える。`Server.count`）、`mailer.send` を失敗させると 500 で**注文も、通知の記録も残る**（二つは、配送の前に、一つの op で一緒に記録してある）、`GET /orders?page=…`（`page` がなければ、`@http.default(1)` の 1 ページ目）、読めない `page` は 400、ログアウトの後の `GET /me` は 401、中断された要求は 500 で状態が変わらない、**期限の切れたセッションは、どの入口でも 401 `type.Unauthorized`**（時計を進めて確かめる。サブテスト `expired`）。
+- **`app/handlertest/httpcases.go`**: 八つの入口の、結果ごとのインテグレーションテスト。型 `HTTPCases` が、`go-http` の出した口 `servertest.HTTPCases` を満たし、`RunCases` が、サーバー一つと一緒に、`servertest.RunHTTP(t, handler, cases)` に渡す。二つの組み立ての `TestHTTPCases` が、同じものを走らせる。書いてあるのは、入力の値と、今の状態の用意（`Given`）と、後の状態の確かめ（`Then`）だけ: 要求の組み立て、送ること、結果の見分け（ステータスと、本文の形）は、生成したコードが持つ。テストの名前は、`TestHTTPCases/<op の FQN>/<結果>`（`TestHTTPCases/server.login/LimitExceeded`）。`RunHTTP` は、サーバー一つを、すべてのケースで使うので、状態を使うケースは、自分のユーザーとセッションを、`store` の op で足して使う（`newUser`。`handlertest.CaseStore`）。op を呼ぶ前の失敗（`BadRequest`）は、二つの書き方を、一つずつ: `login` は、制約に合わない入力の値（`Request` は要らない）、`placeOrder` は、`Request` で、`@http.required` の項目 `lines` のない本文に置き換える。`@rate.limited` が運ぶ `rate.LimitExceeded` のケースは、`Given` が、`/login` を `LoginLimit` 回呼んでおく。`@http.status` を持たない `type.NotificationFailed` のケースは、`Given` が、配送を失敗させ、走らせる側は、500 と `internal` までを確かめ、`Then` が、注文と通知の記録が残っていることを確かめる。**ケースを欠いた型は、口を満たさない**（`RunIncomplete`。二つの組み立ての `TestIncompleteHTTPCasesAreRejected`: 口が求めるメソッドを、リフレクションで確かめる。コンパイルできないことそのものは、リポジトリの `plugins/go-http` の単体テストが確かめる: `docs/testing.md`「単体テスト」）。
+- **`app/handlertest`**（`handlertest.go`）: HTTP から見た振る舞い。二つの組み立て（`app/onsqlite/compose_test.go`、`app/onmem/compose_test.go` の `TestHandler`）が同じものを走らせる。サブテストは、それぞれ新しいサーバーを作り、並列に走る（`t.Parallel()`）。応答の本文を文字列のまま比べるので、そこに書いた JSON が、クライアントが合わせる形になる。確かめること: パスワード違いとユーザーなしは 401 `type.InvalidCredentials`、制約に合わない入力は 400 `http.BadRequest` と違反の一覧、ログインでトークン、`GET /me`（トークンあり・なし・知らないトークン）、`POST /orders`（本文は `{"lines":[…]}`）で注文と通知が一つずつ（通知は、状態 `store.notifications` の `Get` で数える。`Server.count`）、`mailer.send` を失敗させると 500 で**注文も、通知の記録も残る**（二つは、配送の前に、一つの op で一緒に記録してある）、`GET /orders?page=…`（`page` がなければ、`@http.default(1)` の 1 ページ目）、読めない `page` は 400、ログアウトの後の `GET /me` は 401、中断された要求は 500 で状態が変わらない、**期限の切れたセッションは、どの入口でも 401 `type.Unauthorized`**（時計を進めて確かめる。サブテスト `expired`）。
   - **`login/LimitExceeded`**（`app/handlertest/handlertest.go:166-196`）: **`/login` を、制限（`LoginLimit` 回。パスワード違いの失敗も一回と数える）を超えて呼ぶと、429 `{"error":"rate.LimitExceeded"}`**。op の中身は呼ばれない（トークンが作られない）。制約に合わない入力は、制限を超えていても 400 が先（`go-http` の検査は op を呼ぶ前で、op を呼ばないので、数えない）。時間の幅が過ぎれば、また呼べる。`@rate.limited` の付いていない op（`GET /me`）は、何度呼んでも制限されない。
   - **`getLatestOrder`**: **省略可能な戻り値で、値がなければ 204 で本文なし**（`null` を返さない）。注文を足した後は、同じ経路が 200 と、その注文の JSON（二つの注文は、時計を止めてあるので `placedAt` が同じ。返るのは、後から足した方）。空の配列（`GET /orders`）は値なので 200 と `[]`、戻り値のない `POST /logout` は 204（サブテスト `getOrders`、`logout`）。
   - **`names`**: 入力のフィールドを、要求のどの名前から読むか。ヘッダは、書いた名前（`@http.header("Authorization") token`: `Authorization` で読み、フィールドの名前 `token` のヘッダは読まない）。クエリは、名前を省いたので、フィールドの名前（`@http.query page`: `page` で読み、`p` は読まない）。本文の項目も同じ（`@http.body lines`: 本文のオブジェクトのキー `lines`。ほかのキー `items` は読まないので、`lines` はないことになり、`@http.required` で 400）。本文の全体（`@http.bodyObj body`）は、本文そのものが `server.Credentials` で、フィールドの名前 `body` では包まない。

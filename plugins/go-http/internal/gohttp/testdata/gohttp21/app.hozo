@@ -1,0 +1,30 @@
+// GOHTTP-21: 位置は、最初の経路の op。
+namespace other {
+  export fn value(): int;
+}
+
+namespace n {
+  // 葉の op も、分類もない: 基底は、テストのパッケージを作らないので、重なりを返すのは、go-http
+  @http.get("/first")
+  export fn first(): int {
+    return other.value();
+  }
+  @http.get("/second")
+  export fn second(): int {
+    return other.value();
+  }
+}
+
+namespace n.ntest {
+  model Thing { x: int; }
+}
+
+namespace m {
+  // 葉の op がある: 基底が GO-4 を返す
+  @http.get("/m")
+  export fn get(): int;
+}
+
+namespace m.mtest {
+  model Thing { x: int; }
+}

@@ -1,0 +1,37 @@
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-20（テストのパッケージに足す公開の名前が、基底の公開の名前か、
+# 自分のほかの名前と当たる。<Op>HTTPCases のメソッドの名前どうしが当たるときも）。
+[[emit]]
+namespace   = "a.b"
+transpilers = ["go"]
+out         = "gen/a/b"
+
+[[emit]]
+namespace   = "aB"
+transpilers = ["go"]
+out         = "gen/ab"
+
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/app"
+
+[[emit]]
+namespace   = "typed"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/typed"
+
+[[emit]]
+namespace   = "leafy"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/leafy"
+
+[[emit]]
+namespace   = "multi"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/multi"
+
+# 経路の op がなければ、口を出さないので、当たらない
+[[emit]]
+namespace   = "quiet"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/quiet"

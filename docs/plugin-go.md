@@ -120,12 +120,14 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 - ファイルは、**入口のパッケージ**（`<Dir(U, N)>/`）に、プラグインごとに決めた名前のファイル一つで置く。型にメソッドを足すもの（`go-valid` の `Validate`）だけは、Go がメソッドを型の定義のパッケージにしか書かせないので、**定義のパッケージ**に置く。自分のパッケージを持つもの（`go-cli`）は、`<Dir(U, N)>/` の下の、プラグインごとに決めたディレクトリに置く。
 - 基底のファイル名（`doc.go`、`types.go`、`ops.go`、`states.go`、`classify.go`、`wiring.go`）と、ディレクトリ名 `inner` は使わない。テストのパッケージ（「単体テストの口」の「テストのパッケージ」）の中では、基底のファイル名 `doc.go`、`leaves.go`、`classify.go` を使わない。
 - パッケージに足す非公開の名前には、プラグインごとの前置きを付ける。公開の名前は、プラグインの文書に並べる。
+- **テストのコード**（`testing` を import するコード。自分の層を通すテストを受け取る口と、それを走らせる関数）は、入口にも、定義のパッケージにも置かず、N の**テストのパッケージ**（「単体テストの口」の「テストのパッケージ」）に、プラグインごとに決めた名前のファイル一つで置く。ファイルの決まり（N の入口のパッケージを、いつも名前を書いて import する。import の名前に使わない識別子を、`Imports.Reserve` に渡す。失敗の文面は英語）は、基底のファイルと同じで、非公開の名前の前置きも、同じものを使う。基底が、そのパッケージを作らない出力でも、置いてよい（`doc.go` は、基底が口を出すときにだけ、ある）。テストのパッケージの、基底の公開の名前の一覧は、`golang.PublicTestNames`（`docs/packages.md`「`plugin/golang`（公開）」）で求め、当たれば、自分の診断で報告する。
 
 | トランスパイラ | ファイル | 置くパッケージ | 非公開の名前の前置き | 文書 |
 |---|---|---|---|---|
 | `go-valid` | `validate.go` | 定義 | `valid` | `docs/plugin-go-valid.md` |
 | `go-sqlite` | `db.go` | 入口 | `db` | `docs/plugin-go-sqlite.md` |
 | `go-http` | `http.go` | 入口 | `http` | `docs/plugin-go-http.md` |
+| `go-http` | `http.go` | テスト | `http` | `docs/plugin-go-http.md`「インテグレーションテストの口」 |
 | `go-cli` | `cli/cli.go`（パッケージ `cli`） | 自分のパッケージ | — | `docs/plugin-go-cli.md` |
 
 - 相乗りは、置き場と名前を `plugin/golang`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。この文書の規則を自分で書き写さない（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
@@ -886,7 +888,7 @@ func TestLeaves(t *testing.T) { servertest.RunLeaves(t, app.Leaves{}, leafCases{
 - テストのパッケージは、N の**入口のパッケージ**を import する（N の型、`Leaves`、`<C>Cases`、`Classify<C>` は、どれも、入口にある）。内側のパッケージは、import しない。
 - ファイルは、`doc.go`、`leaves.go`（葉の op が、一つでもあるとき）、`classify.go`（述語で決まる値の分類か op の分類が、N に、一つでもあるとき）。どちらもなければ、パッケージを作らない。`doc.go` のコメントは、`// Package <名前> は、名前空間 <N> の、単体テストの口: 結果ごとのケースを受け取り、走らせる（docs/plugin-go.md「単体テストの口」）。`
 - import の名前の決まり（「パッケージと import パス」の「import の名前」）は、同じ。違うのは二つ。（1）N の入口のパッケージは、名前が、import パスの最後の要素と同じでも、**いつも、名前を書いて** import する（`server "example.com/shop-server/gen/server"`）: 出力先のディレクトリの名前で、ファイルの中身が変わらないようにする（「決定性」の、同じ名前空間の二つの単位）。（2）import の名前に使わないのは、テストのパッケージの関数の本体が、決まった名前で使う識別子: `t`、`c`、`x`、`k`、`cases`、`leaves`、`got`、`err`、`want`、`kind`、`none`（と、どのファイルでも使わない `ops`、`ptr`）。
-- テストのパッケージの、公開の名前どうしが当たれば、GO-2（op `leaf` の `LeafCases` と、まとめの `LeafCases` など）。同じ単位が、子の名前空間 `N.<N のパッケージ名>test` を出力するなら、GO-4。
+- テストのパッケージの、公開の名前どうしが当たれば、GO-2（op `leaf` の `LeafCases` と、まとめの `LeafCases` など）。同じ単位が、子の名前空間 `N.<N のパッケージ名>test` を出力するなら、GO-4。基底の公開の名前の一覧は、`golang.PublicTestNames`（`docs/packages.md`「`plugin/golang`（公開）」）。相乗りが、このパッケージに足すファイルの決まりは、「相乗りのファイル」。
 - 失敗の文面（`t.Fatalf`）は、`runtime` の誤りと同じに、英語で書く。
 
 ### 葉の op

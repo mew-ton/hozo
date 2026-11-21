@@ -1,0 +1,43 @@
+// GOHTTP-20: 位置は、当たった自分の名前を生んだ経路の op。決まった名前（HTTPCases、RunHTTP）が当たったなら、相手の名前を生んだ宣言。
+namespace a.b {
+  exception X;
+}
+
+namespace aB {
+  exception X;
+}
+
+namespace app {
+  // 葉 fooHTTP の、基底の口 FooHTTPCases と FooHTTPCase が、経路の op foo の口と当たる
+  fn fooHTTP(): int;
+  @http.get("/foo")
+  export fn foo(): int;
+}
+
+namespace typed {
+  // 分類 HTTP の例を走らせる、基底の RunHTTP が、走らせる関数 RunHTTP と当たる
+  classify HTTP of string { Plain; Secure; }
+  @http.get("/kind")
+  export fn kind(): string;
+}
+
+namespace leafy {
+  // 葉 HTTP の、基底の口 HTTPCases が、まとめの HTTPCases と当たる
+  fn HTTP(): int;
+  @http.get("/leaf")
+  export fn leaf(): int;
+}
+
+namespace multi {
+  // 結果の名前: a.b.X と aB.X は、名前空間を前に付けても、どちらも ABX
+  @http.get("/both")
+  export fn both(): int
+    throws a.b.X, aB.X;
+}
+
+namespace quiet {
+  // 経路の op がなければ、口を出さないので、当たらない
+  classify HTTP of string { Plain; Secure; }
+  fn fooHTTP(): int;
+  export fn foo(): string;
+}

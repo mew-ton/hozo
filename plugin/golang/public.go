@@ -148,3 +148,56 @@ func PublicNames(view *ir.View) []PublicName {
 	}
 	return out
 }
+
+// TestName は、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の、基底の公開の名前一つ。
+type TestName struct {
+	// Name は Go の名前。
+	Name string
+	// Decl は、その名前を生んだ宣言の FQN（葉の op か、分類）。診断の位置に使う。まとめの LeafCases と RunLeaves なら ""。
+	Decl string
+	// What は、その名前を生んだものの、診断のメッセージ用の言い方（`op server.newSession のケースの口 NewSessionCases`）。
+	What string
+}
+
+// PublicTestNames は、view の出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて（docs/plugin-go.md「単体テストの口」）。
+// 並びは、まとめの `LeafCases` と `RunLeaves`（葉が一つでもあれば）、葉ごとの `<Op>Cases` と `<Op>Case`（Leaves の並び）、
+// 判定の口を出す分類（N が宣言した、述語で決まる値の分類と op の分類。宣言順）ごとの `<C>Examples` と `Run<C>`。
+// 口が一つもない出力（基底が、テストのパッケージを作らない出力）では、空。当たる名前も、そのまま二つ返す（当たっているかを
+// 見るのは呼ぶ側: 基底は GO-2、このパッケージにファイルを足す相乗りは、自分の診断。同「相乗りのファイル」）。
+func PublicTestNames(view *ir.View) []TestName {
+	p := view.Program
+	if p == nil {
+		return nil
+	}
+	ns := p.Namespace(view.Viewer)
+	if ns == nil {
+		return nil
+	}
+	var out []TestName
+	leaves := ShapeOf(view).Leaves
+	if len(leaves) > 0 {
+		out = append(out,
+			TestName{Name: "LeafCases", What: "葉のケースのまとめ LeafCases"},
+			TestName{Name: "RunLeaves", What: "葉のケースを走らせる RunLeaves"})
+	}
+	for _, fqn := range leaves {
+		m := MethodName(fqn)
+		out = append(out,
+			TestName{Name: m + "Cases", Decl: fqn, What: "op " + fqn + " のケースの口 " + m + "Cases"},
+			TestName{Name: m + "Case", Decl: fqn, What: "op " + fqn + " のケース " + m + "Case"})
+	}
+	for _, d := range ns.Decls {
+		c, ok := d.(*ir.Classify)
+		if !ok || c.DecidedBy != ir.DecidedByPredicate {
+			continue
+		}
+		if _, isState := c.SubjectStates(); isState {
+			continue
+		}
+		name := TypeName(c.Name, view.Viewer)
+		out = append(out,
+			TestName{Name: name + "Examples", Decl: c.Name, What: "分類 " + c.Name + " の例の口 " + name + "Examples"},
+			TestName{Name: "Run" + name, Decl: c.Name, What: "分類 " + c.Name + " の例を走らせる Run" + name})
+	}
+	return out
+}

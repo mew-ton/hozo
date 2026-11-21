@@ -58,7 +58,7 @@
 
 ラベルと、見込み（同 245、367、375）:
 
-- **ラベルは、テストの名前。** 書かなければならないテストと、テストコードを、名前で結ぶ。E2E テストのラベルは、フローの名前（下の「E2E テスト」）。要求のテストのラベルは、要求の名前（下の「要求のテスト」）。単体テストのラベルは、`<op の FQN>/<結果>` と、`<分類の FQN>/<ケース>`（Go の形は `plugin-go.md`「単体テストの口」）。インテグレーションテストの、名前の細かい形は、決めていない。
+- **ラベルは、テストの名前。** 書かなければならないテストと、テストコードを、名前で結ぶ。E2E テストのラベルは、フローの名前（下の「E2E テスト」）。要求のテストのラベルは、要求の名前（下の「要求のテスト」）。単体テストのラベルは、`<op の FQN>/<結果>` と、`<分類の FQN>/<ケース>`（Go の形は `plugin-go.md`「単体テストの口」）。インテグレーションテストのラベルも、`<op の FQN>/<結果>`（HTTP の入口の形は `plugin-go-http.md`「インテグレーションテストの口」）。
 - **ラベルから、対応するコードへ、飛べる。**
 - **テストカバレッジで、確かめられる。**
 - **テストコードは、実装がある前提で、書ける。** op から、コードの枠が作れるので、テストコードは、中身がなくても、枠に対して書ける。
@@ -88,22 +88,7 @@
 - **人か AI が書くのは、入力の値、今の状態の用意（`Given`）、後の状態の確かめ（`Then`）。** 呼び方、結果の見分け、通信の形は、書かない。
 - **入口のデコレータを持つプラグインが、その層のテストを足す**: HTTP なら `go-http`、CLI なら `go-cli`。
 
-入口 `@http.post("/orders") export fn placeOrder(in: PlaceOrderInput): type.Order throws type.Unauthorized, type.OutOfStock { … }` から、`go-http` が出す口:
-
-```go
-// PlaceOrderCases は、入口 server.placeOrder の、結果ごとのテスト。結果の数だけ、ケースが要る。
-type PlaceOrderCases interface {
-	OK() PlaceOrderCase             // 正常
-	Unauthorized() PlaceOrderCase   // 例外ごとに、一つ
-	OutOfStock() PlaceOrderCase
-}
-
-type PlaceOrderCase struct {
-	In    server.PlaceOrderInput                             // 入力
-	Given func(ctx context.Context) error                    // 今の状態を、用意する
-	Then  func(t *testing.T, got pkgtype.Order, err error)   // 足りない確かめ（後の状態など）
-}
-```
+`go-http` が出す口の形（口の置き場、`<Op>HTTPCases` と `<Op>HTTPCase`、まとめの `HTTPCases`、走らせる `RunHTTP`、必要なケースの数え方、要求の組み立て）の持ち主は、`plugin-go-http.md`「インテグレーションテストの口」。
 
 ### E2E テスト
 

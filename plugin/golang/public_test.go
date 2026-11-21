@@ -95,3 +95,42 @@ func TestPublicNames(t *testing.T) {
 		}
 	}
 }
+
+// docs/plugin-go.md「単体テストの口」の「テストのパッケージ」: 基底が、テストのパッケージに出す公開の名前。並びは、まとめの
+// LeafCases と RunLeaves、葉ごとの <Op>Cases と <Op>Case、判定の口を出す分類ごとの <C>Examples と Run<C>。
+func TestPublicTestNames(t *testing.T) {
+	kind := classify("shop.Kind", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "Big", "Small")
+	sync := classify("shop.Sync", ir.StatesSubject{States: []string{"shop.items"}}, ir.DecidedByPredicate, "UpToDate", "OutOfDate")
+	v := viewOf("shop",
+		namespace("shop",
+			kind, sync,
+			classify("shop.Present", ir.TypeSubject{Type: ir.Optional(ir.String())}, ir.DecidedByType, "Some"),
+			state("shop.items", ir.Array(ir.String())),
+			op("shop.leaf", nil),
+			with(op("shop.wire", nil), wired(call("shop.leaf"))),
+		),
+	)
+	want := []TestName{
+		{"LeafCases", "", "葉のケースのまとめ LeafCases"},
+		{"RunLeaves", "", "葉のケースを走らせる RunLeaves"},
+		{"LeafCases", "shop.leaf", "op shop.leaf のケースの口 LeafCases"}, // 当たる名前も、そのまま二つ返す
+		{"LeafCase", "shop.leaf", "op shop.leaf のケース LeafCase"},
+		{"KindExamples", "shop.Kind", "分類 shop.Kind の例の口 KindExamples"},
+		{"RunKind", "shop.Kind", "分類 shop.Kind の例を走らせる RunKind"},
+		// 状態の分類（Sync）と、型で決まる分類（Present）と、配線の op（wire）は、口を持たない
+	}
+	got := PublicTestNames(v)
+	if len(got) != len(want) {
+		t.Fatalf("PublicTestNames = %+v, want %+v", got, want)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("%d: %+v, want %+v", i, got[i], w)
+		}
+	}
+	// 口が一つもない出力（基底が、テストのパッケージを作らない出力）では、空
+	if got := PublicTestNames(viewOf("shop", namespace("shop", with(op("shop.wire", nil), wired(call("other.run")))),
+		namespace("other", op("other.run", nil)))); len(got) != 0 {
+		t.Errorf("口のない出力に %+v", got)
+	}
+}

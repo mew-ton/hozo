@@ -24,6 +24,7 @@ var goldenFixtures = []struct {
 	{name: "locals", covers: "名前空間のパッケージの名前が、NewHandler とハンドラの中の局所の名前や、標準ライブラリのパッケージの名前と当たるとき（「出力」。docs/plugin-go.md「パッケージと import パス」の import の名前）"},
 	{name: "uniforma", covers: "型に依らない形の確かめ（docs/testing.md「単体テスト」）の一つ目: 核の型、省略可能でないフィールド、引数のない例外、戻り値のある op"},
 	{name: "uniformb", covers: "同、二つ目: scalar、省略可能なフィールド、引数を持つ例外（一つと、二つ以上。省略可能な引数）、省略可能な戻り値の op。uniforma と同じテキストになる（TestUniform）"},
+	{name: "cases", covers: "「インテグレーションテストの口」のうち、routes が使わない場合: 結果の名前が当たるとき、never を返す op、Given・Request・Then と当たる引数の名前、基底が、テストのパッケージを作らない出力"},
 }
 
 // TestGolden は、入力ごとに、出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形で
@@ -80,14 +81,18 @@ func TestBehavior(t *testing.T) {
 	}
 }
 
-// TestPlacement は「出力」の置き場と、公開の名前: http.go は、N の入口のパッケージに一つ（内部の op を持つ名前空間でも、
-// 内側のパッケージではない）。公開の名前は NewHandler 一つで、非公開の名前は http で始まる。
+// TestPlacement は「出力」と「インテグレーションテストの口」の置き場と、公開の名前: http.go は、N の入口のパッケージに一つ（内部の op を
+// 持つ名前空間でも、内側のパッケージではない）と、N のテストのパッケージに一つ。入口のパッケージの公開の名前は NewHandler 一つ。
+// テストのパッケージの公開の名前は、<Op>HTTPCases、<Op>HTTPCase、HTTPCases、RunHTTP。非公開の名前は、どちらも http で始まる。
 func TestPlacement(t *testing.T) {
 	_, files := emitFixture(t, "routes")
 	want := map[string]string{
-		"gen/api/http.go":    "package api\n",
-		"gen/strict/http.go": "package strict\n",
-		"gen/bare/http.go":   "package bare\n",
+		"gen/api/http.go":               "package api\n",
+		"gen/strict/http.go":            "package strict\n",
+		"gen/bare/http.go":              "package bare\n",
+		"gen/api/apitest/http.go":       "package apitest\n",
+		"gen/strict/stricttest/http.go": "package stricttest\n",
+		"gen/bare/baretest/http.go":     "package baretest\n",
 	}
 	if len(files) != len(want) {
 		t.Errorf("ファイル = %v, want %d 個", sortedPaths(files), len(want))
@@ -96,6 +101,7 @@ func TestPlacement(t *testing.T) {
 		if !strings.Contains(files[p], "\n"+pkg) {
 			t.Errorf("%s が %q を持たない", p, strings.TrimSpace(pkg))
 		}
+		inTest := strings.HasSuffix(pkg, "test\n")
 		for _, line := range strings.Split(files[p], "\n") {
 			var name string
 			switch {
@@ -113,8 +119,12 @@ func TestPlacement(t *testing.T) {
 				continue
 			}
 			name = name[:strings.IndexAny(name, "([ ")]
-			if name != handlerName && !strings.HasPrefix(name, "http") {
-				t.Errorf("%s: パッケージに足す名前 %s が、NewHandler でも、http で始まる名前でもない", p, name)
+			public := name == handlerName
+			if inTest {
+				public = name == casesName || name == runName || strings.HasSuffix(name, "HTTPCases") || strings.HasSuffix(name, "HTTPCase")
+			}
+			if !public && !strings.HasPrefix(name, "http") {
+				t.Errorf("%s: パッケージに足す名前 %s が、決まった公開の名前でも、http で始まる名前でもない", p, name)
 			}
 		}
 	}
@@ -229,7 +239,7 @@ func contains(list []string, s string) bool {
 func TestUniform(t *testing.T) {
 	_, a := emitFixture(t, "uniforma")
 	_, b := emitFixture(t, "uniformb")
-	if len(a) != 1 || a["gen/app/http.go"] == "" {
+	if len(a) != 2 || a["gen/app/http.go"] == "" || a["gen/app/apptest/http.go"] == "" {
 		t.Fatalf("uniforma のファイル = %v", sortedPaths(a))
 	}
 	if a["gen/app/http.go"] != b["gen/app/http.go"] {
@@ -415,8 +425,8 @@ func TestUnitTargets(t *testing.T) {
 	}
 	root := newRoot(t)
 	files, diags, warnings := emitViews(t, root, []*ir.View{bare})
-	if len(files) != 1 || len(diags) != 0 || len(warnings) != 0 {
-		t.Fatalf("files=%v 診断=%+v warnings=%+v, want ファイルが一つ", sortedPaths(files), diags, warnings)
+	if len(files) != 2 || files["gen/bare/http.go"] == "" || files["gen/bare/baretest/http.go"] == "" || len(diags) != 0 || len(warnings) != 0 {
+		t.Fatalf("files=%v 診断=%+v warnings=%+v, want 二つの http.go", sortedPaths(files), diags, warnings)
 	}
 	outside := *bare
 	outside.Files = []string{"elsewhere.hozo"}
@@ -448,25 +458,27 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gohttp17", codeHTTPBoth},       // 一つのフィールドに、@http.required と @http.default の両方がある
 	{"gohttp18", codeHTTPDefault},    // @http.default のリテラルが、フィールドの型に渡せない
 	{"gohttp19", codeHTTPConstraint}, // @http.default の値が、フィールドの制約（@valid.*）に合わない
+	{"gohttp20", codeHTTPTestName},   // テストのパッケージに足す公開の名前が、基底の公開の名前か、自分のほかの名前と当たる
+	{"gohttp21", codeHTTPTestDir},    // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（GOHTTP-1〜GOHTTP-19。欠番はない）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、「診断」の表の ID（GOHTTP-1〜GOHTTP-21。欠番はない）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
 		seen[fx.code] = true
 	}
-	for n := 1; n <= 19; n++ {
+	for n := 1; n <= 21; n++ {
 		if code := "GOHTTP-" + strconv.Itoa(n); !seen[code] {
 			t.Errorf("%s の入力がない", code)
 		}
 	}
-	if len(seen) != 19 {
-		t.Errorf("診断の入力のコードが %d 種類（19 のはず）", len(seen))
+	if len(seen) != 21 {
+		t.Errorf("診断の入力のコードが %d 種類（21 のはず）", len(seen))
 	}
 }
 
-// TestDiagnostics は docs/plugin-go-http.md「診断」の GOHTTP-1〜GOHTTP-19: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は docs/plugin-go-http.md「診断」の GOHTTP-1〜GOHTTP-21: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルも warning も返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -511,6 +523,10 @@ func TestDiagnosticPositions(t *testing.T) {
 		"gohttp17": {"app.In"},
 		"gohttp18": {"app.In"},
 		"gohttp19": {"app.In"},
+		// 当たった自分の名前を生んだ経路の op。決まった名前（RunHTTP、HTTPCases）が当たったなら、相手の名前を生んだ宣言（分類、葉の op）
+		"gohttp20": {"app.foo", "typed.HTTP", "leafy.HTTP", "multi.both"},
+		// 最初の経路の op
+		"gohttp21": {"n.first"},
 	} {
 		_, diags, _ := emitViews(t, newRoot(t), loadViews(t, name))
 		got := map[string]bool{}
@@ -533,8 +549,8 @@ func TestDiagnosticPositions(t *testing.T) {
 func TestValidateHome(t *testing.T) {
 	views := loadViews(t, "gohttp11")
 	files, diags, _ := emitViews(t, newRoot(t), views)
-	if _, ok := files["gen/loose/http.go"]; !ok || len(files) != 1 {
-		t.Errorf("ファイル = %v, want gen/loose/http.go だけ", sortedPaths(files))
+	if files["gen/loose/http.go"] == "" || files["gen/loose/apptest/http.go"] == "" || len(files) != 2 {
+		t.Errorf("ファイル = %v, want gen/loose の、二つの http.go だけ", sortedPaths(files))
 	}
 	if strings.Contains(files["gen/loose/http.go"], "Validate") {
 		t.Error("validate = false の出力が、制約の検査を持つ")
@@ -638,12 +654,15 @@ func TestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resp.Files) != 1 || len(resp.Errors) != 0 || len(resp.Warnings) != 0 {
+	if len(resp.Files) != 2 || len(resp.Errors) != 0 || len(resp.Warnings) != 0 {
 		t.Fatalf("files=%d errors=%v warnings=%v", len(resp.Files), resp.Errors, resp.Warnings)
 	}
 	want, _, _ := emitViews(t, root, []*ir.View{view})
-	if f := resp.Files[0]; f.Path != "gen/api/http.go" || want[f.Path] != f.Content {
-		t.Errorf("%s が Emit の結果と違う", f.Path)
+	// 並びは、入口のパッケージの http.go、テストのパッケージの http.go
+	for i, p := range []string{"gen/api/http.go", "gen/api/apitest/http.go"} {
+		if f := resp.Files[i]; f.Path != p || want[f.Path] != f.Content {
+			t.Errorf("%d 番目のファイル %s が、Emit の結果（%s）と違う", i+1, f.Path, p)
+		}
 	}
 	// 診断は errors で返し、ファイルは返さない
 	resp, err = h.Emit(request(loadViews(t, "gohttp9")[0], TranspilerName))

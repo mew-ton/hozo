@@ -34,7 +34,7 @@
       "files": ["gen/store/db.go"]
     },
     "go-http": {
-      "files": ["gen/server/http.go"]
+      "files": ["gen/server/http.go", "gen/server/servertest/http.go"]
     },
     "go-ratelimit": {
       "files": ["gen/server/ratelimit.go"]

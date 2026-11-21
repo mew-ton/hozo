@@ -283,31 +283,22 @@ func (e *emitter) genTestClassify() *fileGen {
 	return f
 }
 
-// checkTestNames は GO-2 のうち、テストのパッケージの分: 公開の名前どうしと、<Op>Cases のメソッドどうし、<Op>Case のフィールドどうし。
+// checkTestNames は GO-2 のうち、テストのパッケージの分: 公開の名前どうしと、<Op>Case のフィールドどうし。公開の名前の一覧は、
+// このパッケージにファイルを足す相乗りと共有する golang.PublicTestNames。
 func (e *emitter) checkTestNames() {
 	if !e.hasTests() {
 		return
 	}
 	pkg := e.names("テストのパッケージ（" + e.layout.TestDir + "）")
-	if len(e.shape.Leaves) > 0 {
-		pkg.add("LeafCases", "葉のケースのまとめ LeafCases", "")
-		pkg.add("RunLeaves", "葉のケースを走らせる RunLeaves", "")
+	for _, n := range golang.PublicTestNames(e.view) {
+		pkg.add(n.Name, n.What, n.Decl)
 	}
 	for _, fqn := range e.shape.Leaves {
-		o := e.op(fqn)
-		m := golang.MethodName(fqn)
-		pkg.add(m+"Cases", "op "+fqn+" のケースの口 "+m+"Cases", fqn)
-		pkg.add(m+"Case", "op "+fqn+" のケース "+m+"Case", fqn)
 		fields := e.names("op " + fqn + " のケースの構造体")
 		fields.add("Then", "足りない確かめ Then", "")
-		for _, p := range o.Params {
+		for _, p := range e.op(fqn).Params {
 			fields.add(caseField(p.Name), "引数 "+p.Name, fqn)
 		}
-	}
-	for _, c := range e.testClassifies() {
-		name := e.typeName(c.Name)
-		pkg.add(name+"Examples", "分類 "+c.Name+" の例の口 "+name+"Examples", c.Name)
-		pkg.add("Run"+name, "分類 "+c.Name+" の例を走らせる Run"+name, c.Name)
 	}
 }
 

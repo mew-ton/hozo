@@ -275,6 +275,14 @@ type PublicName struct {
     What   string                                 // その名前を生んだものの、診断のメッセージ用の言い方（`model store.Schema`、`インターフェース Ops`）
 }
 func PublicNames(view *ir.View) []PublicName      // 出力 (U, N) の定義のパッケージの公開の名前のすべて。当たる名前も、そのまま二つ返す
+
+// テストのパッケージの、基底の公開の名前（同「単体テストの口」の「テストのパッケージ」）
+type TestName struct {
+    Name string                                   // Go の名前
+    Decl string                                   // その名前を生んだ宣言の FQN（葉の op か、分類）。診断の位置に使う。まとめの LeafCases と RunLeaves なら ""
+    What string                                   // その名前を生んだものの、診断のメッセージ用の言い方（`op server.newSession のケースの口 NewSessionCases`）
+}
+func PublicTestNames(view *ir.View) []TestName    // 出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて。口が一つもない出力では、空
 ```
 
 - `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは入口のパッケージなので、import には効かない。
@@ -287,6 +295,7 @@ func PublicNames(view *ir.View) []PublicName      // 出力 (U, N) の定義の�
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
 - `PublicNames` は、`docs/plugin-go.md`「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
+- `PublicTestNames` は、テストのパッケージの、基底の公開の名前（`docs/plugin-go.md`「単体テストの口」: `LeafCases`、`RunLeaves`、葉ごとの `<Op>Cases` と `<Op>Case`、分類ごとの `<C>Examples` と `Run<C>`）の、ただ一つの写し。基底は、この一覧の中で名前が当たれば GO-2 を返す。テストのパッケージにファイルを足す相乗り（`go-http` の GOHTTP-20）は、自分の名前が、この一覧の名前と当たるかを確かめる。空かどうかは、基底が、テストのパッケージを作るかどうか。
 
 ### `plugin/govalid`（公開）
 
@@ -518,7 +527,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `plugins/go` | `docs/plugin-go.md` | `internal/gobase`: 形は `plugin/golang` で求め、ファイルのテキストを作る。GO-* |
 | `plugins/go-valid` | `docs/plugin-go-valid.md` | `internal/govalid`: `validate.go`。GOVALID-* |
 | `plugins/go-sqlite` | `docs/plugin-go-sqlite.md` | `internal/gosqlite`: `db.go`。GOSQL-* |
-| `plugins/go-http` | `docs/plugin-go-http.md` | `internal/gohttp`: `http.go`。GOHTTP-* |
+| `plugins/go-http` | `docs/plugin-go-http.md` | `internal/gohttp`: 入口のパッケージの `http.go` と、テストのパッケージの `http.go`。GOHTTP-* |
 | `plugins/go-cli` | `docs/plugin-go-cli.md` | `internal/gocli`: `cli/cli.go`。CLI-* |
 
 ## 生成するもの

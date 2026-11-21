@@ -15,16 +15,21 @@ type helper struct {
 	imports []string
 }
 
-// 補助が使うパッケージ（import パス → package 節の名前）。
+// 補助が使うパッケージ（import パス → package 節の名前）。入口の http.go と、テストのパッケージの http.go（testhelpers.go）の、両方の分。
 var helperPackages = map[string]string{
-	"encoding/json": "json",
-	"errors":        "errors",
-	"io":            "io",
-	"net/http":      "http",
-	"reflect":       "reflect",
-	"strconv":       "strconv",
-	"strings":       "strings",
-	runtimePath:     "runtime",
+	"bytes":             "bytes",
+	"context":           "context",
+	"encoding/json":     "json",
+	"errors":            "errors",
+	"io":                "io",
+	"net/http":          "http",
+	"net/http/httptest": "httptest",
+	"net/url":           "url",
+	"reflect":           "reflect",
+	"strconv":           "strconv",
+	"strings":           "strings",
+	"testing":           "testing",
+	runtimePath:         "runtime",
 }
 
 var (

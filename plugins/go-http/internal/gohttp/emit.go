@@ -34,9 +34,12 @@ const (
 	codeHTTPBoth       = "GOHTTP-17" // 一つのフィールドに、@http.required と @http.default の両方がある
 	codeHTTPDefault    = "GOHTTP-18" // @http.default のリテラルが、フィールドの型に渡せない
 	codeHTTPConstraint = "GOHTTP-19" // @http.default の値が、フィールドの制約（@valid.*）に合わない
+	codeHTTPTestName   = "GOHTTP-20" // テストのパッケージに足す公開の名前が、基底の公開の名前か、自分のほかの名前と当たる
+	codeHTTPTestDir    = "GOHTTP-21" // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 )
 
-// FileName は、このトランスパイラが出すただ一つのファイルの名前（docs/plugin-go.md「相乗りのファイル」）。入口のパッケージに置く。
+// FileName は、このトランスパイラが、入口のパッケージに出すファイルの名前（docs/plugin-go.md「相乗りのファイル」）。
+// テストのパッケージに出すファイルの名前は TestFileName（testfile.go）。
 const FileName = "http.go"
 
 // handlerName は、このトランスパイラが入口のパッケージに足す、ただ一つの公開の名前。
@@ -70,7 +73,8 @@ type Output struct {
 	Errors   []plugin.Diagnostic
 }
 
-// Emit は、要求の View の出力 (U, N) の http.go を作る（docs/plugin-go-http.md「出力」）。root はプロジェクトのルート
+// Emit は、要求の View の出力 (U, N) の、入口のパッケージの http.go（docs/plugin-go-http.md「出力」）と、テストのパッケージの http.go
+// （同「インテグレーションテストの口」）を作る。root はプロジェクトのルート
 // （go.mod を探す起点）。診断があれば、ファイルは返さない。経路の op が一つもなければ、ファイルを出さず warning を一つ返す。
 // 戻り値の error は、利用者の仕様の誤りでないもの（View が欠けている、生成したコードを整形できない）。
 func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
@@ -97,7 +101,20 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] に、知らないキー %s がある（あるのは validate）", view.Config.Index, TranspilerName, key)
 	}
 
+	// 置き場。go.mod がなければ、基底が GO-1 を返すので、ここでは何も返さない（診断は、そのときも返す）
+	layout, err := golang.LayoutOf(view, root)
+	if err != nil && !errors.Is(err, golang.ErrNoGoMod) {
+		return nil, fmt.Errorf("名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
+	}
+	g.layout = layout // go.mod がなければ nil
+
 	routes := g.check()
+	entries := g.entries(routes)
+	if len(routes) > 0 {
+		// GOHTTP-20、GOHTTP-21
+		g.checkTestNames(entries)
+		g.checkTestDir(entries)
+	}
 	if len(g.errs) > 0 {
 		return &Output{Errors: g.errs}, nil
 	}
@@ -105,23 +122,24 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		return &Output{Warnings: []plugin.Warning{{At: view.Viewer,
 			Message: fmt.Sprintf("名前空間 %s の単位の対象に @%s か @%s の付いた op がないので、%s を出さない", view.Viewer, httpGet, httpPost, FileName)}}}, nil
 	}
-	// 置き場。go.mod がなければ、基底が GO-1 を返すので、ここでは何も返さない
-	layout, err := golang.LayoutOf(view, root)
-	if err != nil {
-		if errors.Is(err, golang.ErrNoGoMod) {
-			return &Output{}, nil
-		}
-		return nil, fmt.Errorf("名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
+	if g.layout == nil {
+		return &Output{}, nil
 	}
-	g.layout = layout
 	content, err := g.render(routes)
 	if err != nil {
 		return nil, err
 	}
-	return &Output{Files: []plugin.File{{Path: path.Join(layout.Dir, FileName), Content: content}}}, nil
+	test, err := g.renderTest(entries)
+	if err != nil {
+		return nil, err
+	}
+	return &Output{Files: []plugin.File{
+		{Path: path.Join(layout.Dir, FileName), Content: content},
+		{Path: path.Join(layout.TestDir, TestFileName), Content: test},
+	}}, nil
 }
 
-// generator は一つの出力 (U, N) の http.go を作る状態。
+// generator は一つの出力 (U, N) の、二つの http.go を作る状態。
 type generator struct {
 	view   *ir.View
 	root   string
@@ -196,7 +214,7 @@ type status struct {
 }
 
 // check は、N の単位の対象の op を宣言順に見て、診断（GOHTTP-1〜GOHTTP-8、GOHTTP-10〜GOHTTP-19）を集め、経路を返す
-// （docs/plugin-go-http.md「対象」）。
+// （docs/plugin-go-http.md「対象」）。テストのパッケージの診断（GOHTTP-20、GOHTTP-21）は、testfile.go。
 func (g *generator) check() []route {
 	var routes []route
 	taken := map[string]string{} // "<メソッド> <パス>" → 先に使った op
