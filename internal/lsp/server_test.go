@@ -2,12 +2,9 @@ package lsp
 
 import (
 	"fmt"
-	"github.com/mew-ton/hozo/ir"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -487,37 +484,6 @@ func TestFiniteTypeDiagnostic(t *testing.T) {
 	diags := byURI[uri]
 	if len(diags) != 1 || diags[0].Code != "TYPE-19" || diags[0].Range.Start.Line != 1 {
 		t.Fatalf("a.hozo の診断 = %+v（期待は、2 行目の TYPE-19 が一つ）", diags)
-	}
-	c.shutdown()
-}
-
-// TestNoPluginCheckDiagnostics は、言語サーバーが、プラグインの check を起動しないこと（docs/lsp.md「診断」: 起動は、打鍵ごとの
-// 解析には、遅い）。[check] enabled のプラグインが、診断を返す設定でも、その診断は出ず、プラグインは、呼ばれない。
-// hozoc 自身の診断は、今までどおり出る。
-func TestNoPluginCheckDiagnostics(t *testing.T) {
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
-	root := t.TempDir()
-	script := filepath.Join(root, "plugins", "chk", "run.sh")
-	writeFile(t, script, "cat >/dev/null\necho called >> called\nprintf '{\"diagnostics\":[{\"severity\":\"error\",\"code\":\"CHK-1\",\"at\":\"a.f\",\"message\":\"from plugin\"}]}'\n")
-	writeFile(t, filepath.Join(root, "plugins", "chk", "hozo-plugin.toml"),
-		"name = \"chk\"\ncommand = [\"sh\", "+strconv.Quote(script)+"]\nprotocol = \""+ir.Version+"\"\n\n[check]\nenabled = true\n\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n")
-	writeFile(t, filepath.Join(root, "hozo.toml"), "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[[emit]]\nnamespace = \"a\"\ntranspilers = [\"chk\"]\nout = \"gen/a\"\n")
-	writeFile(t, filepath.Join(root, "a.hozo"), "namespace a {\n  fn f();\n  model lower { id: string; }\n}\n")
-	uri := fileURI(filepath.Join(root, "a.hozo"))
-	c := startServer(t, Options{})
-	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
-	for u, ds := range byURI {
-		if hasCode(ds, "CHK-1") {
-			t.Errorf("%s: プラグインの check の診断が出ている: %+v", u, ds)
-		}
-	}
-	if !hasCode(byURI[uri], "NAME-1") {
-		t.Errorf("hozoc 自身の診断（NAME-1）が出ていない: %+v", byURI[uri])
-	}
-	if _, err := os.Stat(filepath.Join(root, "called")); err == nil {
-		t.Error("言語サーバーが、プラグインを起動した")
 	}
 	c.shutdown()
 }

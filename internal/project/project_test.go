@@ -1,6 +1,8 @@
 package project
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -457,6 +459,67 @@ printf '{"diagnostics":[]}'
 	if got := calls(); got != "" || p.Errors() == 0 || p.RunErr != nil {
 		t.Errorf("仕様に error があるのに、check を呼んだ: %q（errors = %d, RunErr = %v）", got, p.Errors(), p.RunErr)
 	}
+}
+
+// TestPluginCheckContext は、Options.Context で、プラグインの check を、やめさせられること（言語サーバーの、裏の check。
+// docs/lsp.md「プラグインの診断」）: やめるのは、プラグインの起動と起動の間。やめたら、RunErr が、その誤りで、そこまでの
+// プラグインは、起動している。はじめから、やめてあれば、一つも、起動しない。Context が nil なら、やめさせない。
+func TestPluginCheckContext(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh がない")
+	}
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
+	script := filepath.Join(dir, "plugins", "chk", "run.sh")
+	// 呼ばれるたびに、ルートの calls に一行書く
+	write(t, script, "cat >/dev/null\necho x >> calls\nprintf '{\"diagnostics\":[]}'\n")
+	write(t, filepath.Join(dir, "plugins", "chk", "hozo-plugin.toml"),
+		"name = \"chk\"\ncommand = [\"sh\", "+strconv.Quote(script)+"]\nprotocol = \"0.18\"\n\n[check]\nenabled = true\n\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n")
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", "chk")+unit("b", "gen/b", "chk"))
+	calls := func() int {
+		data, _ := os.ReadFile(filepath.Join(dir, "calls"))
+		_ = os.Remove(filepath.Join(dir, "calls"))
+		return strings.Count(string(data), "x")
+	}
+
+	// はじめから、やめてある: 一つも、起動しない
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	p := LoadWith(Options{Root: dir, Context: ctx})
+	if n := calls(); n != 0 || !errors.Is(p.RunErr, context.Canceled) {
+		t.Errorf("やめてあるのに: 起動 %d 回、RunErr = %v（期待は、0 回と context.Canceled）", n, p.RunErr)
+	}
+	if p.Errors() != 0 {
+		t.Errorf("やめたことが、診断になっている:\n%s", text(p))
+	}
+
+	// 一つ目の起動の後で、やめる: 二つ目は、起動しない
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	p = LoadWith(Options{Root: dir, Context: &cancelAfterFirst{Context: ctx, cancel: cancel, calls: filepath.Join(dir, "calls")}})
+	if n := calls(); n != 1 || !errors.Is(p.RunErr, context.Canceled) {
+		t.Errorf("一つ目の後で、やめたのに: 起動 %d 回、RunErr = %v（期待は、1 回と context.Canceled）", n, p.RunErr)
+	}
+
+	// Context が nil: 二つとも、起動する
+	p = LoadWith(Options{Root: dir})
+	if n := calls(); n != 2 || p.RunErr != nil {
+		t.Errorf("Context なし: 起動 %d 回、RunErr = %v（期待は、2 回と nil）", n, p.RunErr)
+	}
+}
+
+// cancelAfterFirst は、プラグインが一度起動した後（calls ができた後）に、Err を聞かれたら、やめる Context。
+type cancelAfterFirst struct {
+	context.Context
+	cancel func()
+	calls  string
+}
+
+func (c *cancelAfterFirst) Err() error {
+	if _, err := os.Stat(c.calls); err == nil {
+		c.cancel()
+	}
+	return c.Context.Err()
 }
 
 // manifest は、起動しないプラグイン name のマニフェストを plugins/<name> に置く。transpilers は [[transpiler]] の中身

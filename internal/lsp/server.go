@@ -1,12 +1,14 @@
 package lsp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/mew-ton/hozo/internal/lsp/jsonrpc"
@@ -39,9 +41,13 @@ type Options struct {
 // テストが短くするために変数。
 var debounceDelay = 150 * time.Millisecond
 
+// exitWait は、終わるときに、走っている、プラグインの check が止まるのを待つ上限（docs/lsp.md「プラグインの診断」の 5 秒）。
+// テストが短くするために変数。
+var exitWait = 5 * time.Second
+
 // Serve は in から要求を読み、out に応答と通知を書く言語サーバーを、クライアントが exit を送るか in が
 // 閉じるまで動かす（docs/lsp.md）。要求は一つの goroutine が順に処理し、didChange の待ち合わせの
-// タイマーも同じ goroutine が見る。戻り値は常に nil（docs/lsp.md「ライフサイクル」: 終了コードは常に 0）で、
+// タイマーと、裏で走らせた、プラグインの check の答え（plugincheck.go）も、同じ goroutine が見る。戻り値は常に nil（docs/lsp.md「ライフサイクル」: 終了コードは常に 0）で、
 // 読み書きの誤りはログに残して終わる。
 func Serve(in io.Reader, out io.Writer, opts Options) error {
 	s := newServer(in, out, opts)
@@ -89,6 +95,9 @@ type server struct {
 	// timer は didChange の待ち合わせ。pending が true なら動いている。
 	timer   *time.Timer
 	pending bool
+
+	// checks は、裏で走らせる、プラグインの check（plugincheck.go。docs/lsp.md「プラグインの診断」）。
+	checks pluginChecks
 }
 
 func newServer(in io.Reader, out io.Writer, opts Options) *server {
@@ -96,17 +105,32 @@ func newServer(in io.Reader, out io.Writer, opts Options) *server {
 	if logW == nil {
 		logW = io.Discard
 	}
+	// ログの書き出し先は、裏の check が起動したプラグインの標準エラーも受けるので、書き込みを、一つずつにする
+	logW = &lockedWriter{w: logW}
 	return &server{
 		reader:    jsonrpc.NewReader(in),
 		writer:    jsonrpc.NewWriter(out),
 		log:       log.New(logW, "", log.Ltime|log.Lmicroseconds),
 		logW:      logW,
+		checks:    pluginChecks{results: make(chan checkResult, 1), quit: make(chan struct{})},
 		opts:      opts,
 		enc:       encUTF16,
 		overlay:   map[string][]byte{},
 		docs:      map[string]string{},
 		published: map[string]string{},
 	}
+}
+
+// lockedWriter は、書き込みを、一つずつにする。
+type lockedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (l *lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
 }
 
 type incoming struct {
@@ -119,6 +143,7 @@ func (s *server) run() {
 	msgs := make(chan incoming)
 	done := make(chan struct{})
 	defer close(done)
+	defer s.stopPluginChecks()
 	go func() {
 		for {
 			m, err := s.reader.ReadMessage()
@@ -155,6 +180,8 @@ func (s *server) run() {
 		case <-s.timerC():
 			s.pending = false
 			s.reanalyze()
+		case r := <-s.checks.results:
+			s.pluginCheckDone(r)
 		}
 	}
 }
@@ -240,6 +267,10 @@ func (s *server) handleRequest(m *jsonrpc.Message) {
 	case protocol.MethodShutdown:
 		s.shutdown = true
 		s.stopTimer()
+		if s.checks.running {
+			s.checks.cancel() // 止まるのを待つのは、終わるとき（stopPluginChecks）
+		}
+		s.checks.queued = nil
 		s.reply(m.ID, nil)
 	case protocol.MethodDefinition:
 		var params protocol.TextDocumentPositionParams
@@ -318,6 +349,7 @@ func (s *server) handleNotification(m *jsonrpc.Message) (exit bool) {
 		}
 	case protocol.MethodDidChangeWatchedFiles:
 		s.reanalyze()
+		s.requestPluginChecks(false)
 	}
 	if err != nil {
 		s.log.Printf("%s: bad params: %v", m.Method, err)
@@ -410,6 +442,7 @@ func (s *server) didOpen(p protocol.DidOpenTextDocumentParams) {
 	s.overlay[key] = []byte(p.TextDocument.Text)
 	s.docs[p.TextDocument.URI] = key
 	s.reanalyze()
+	s.requestPluginChecks(false)
 }
 
 func (s *server) didChange(p protocol.DidChangeTextDocumentParams) {
@@ -450,6 +483,7 @@ func (s *server) didSave(p protocol.DidSaveTextDocumentParams) {
 		}
 	}
 	s.reanalyze()
+	s.requestPluginChecks(true)
 }
 
 // overlayKey は文書の URI を overlay のキー（絶対パス）にする。語彙の文書（読み取り専用）は持たない。
@@ -508,17 +542,8 @@ func (s *server) reanalyze() {
 		overlay[k] = v
 	}
 	start := time.Now()
-	s.proj = project.LoadWith(project.Options{
-		Root:       s.root,
-		ConfigPath: s.opts.ConfigPath,
-		Overlay:    overlay,
-		Stderr:     s.logW, // 標準エラーには書かない（docs/lsp.md「通信」）
-		Env:        s.opts.Env,
-		PluginPath: s.opts.PluginPath,
-		Home:       s.opts.Home,
-		// プラグインの check は、起動しない（docs/lsp.md「診断」）: 起動は、打鍵ごとの解析には、遅い
-		NoPluginChecks: true,
-	})
+	// 解析は、プラグインの check を、起動しない（docs/lsp.md「プラグインの診断」）: 起動は、打鍵ごとの解析には、遅い
+	s.proj = project.LoadWith(s.loadOptions(overlay, nil))
 	s.fileIDs = make(map[string]source.FileID, s.proj.Files.Len())
 	for i := 0; i < s.proj.Files.Len(); i++ {
 		s.fileIDs[s.proj.Files.Path(source.FileID(i))] = source.FileID(i)
@@ -528,11 +553,25 @@ func (s *server) reanalyze() {
 	s.pendingTags = map[source.FileID][]pendingTag{}
 	s.docRefIdx = map[source.FileID][]declEntry{}
 	s.declNS = namespaceIndex(s.proj.Sema)
-	if s.proj.RunErr != nil {
-		s.log.Printf("plugin check: %v", s.proj.RunErr)
-	}
 	s.log.Printf("analyzed %d files, %d diagnostics in %s", s.proj.Files.Len(), len(s.proj.Diags), time.Since(start))
+	s.contentChanged(fingerprint(s.proj))
 	s.publishAll()
+}
+
+// loadOptions は、project.LoadWith の設定。ctx が nil なら、解析（プラグインの check を、起動しない）。nil でなければ、裏の check
+// （プラグインの check を起動し、ctx で、やめさせられる）。
+func (s *server) loadOptions(overlay map[string][]byte, ctx context.Context) project.Options {
+	return project.Options{
+		Root:           s.root,
+		ConfigPath:     s.opts.ConfigPath,
+		Overlay:        overlay,
+		Stderr:         s.logW, // 標準エラーには書かない（docs/lsp.md「通信」）
+		Env:            s.opts.Env,
+		PluginPath:     s.opts.PluginPath,
+		Home:           s.opts.Home,
+		NoPluginChecks: ctx == nil,
+		Context:        ctx,
+	}
 }
 
 // publishAll は docs/lsp.md「プロジェクト」の発行: 診断のあるファイルについて publishDiagnostics を送る。前回送って今回は
@@ -588,9 +627,12 @@ func (s *server) fileOf(uri string) (source.FileID, bool) {
 }
 
 // location はバイトの範囲を Location にする。
-func (s *server) location(sp source.Span) protocol.Location {
-	fs := s.proj.Files
-	return protocol.Location{URI: pathToURI(s.proj.Root, fs.Path(sp.File)), Range: s.enc.toRange(fs, sp)}
+func (s *server) location(sp source.Span) protocol.Location { return s.locationIn(s.proj, sp) }
+
+// locationIn は、解析 p の中の、バイトの範囲を Location にする。
+func (s *server) locationIn(p *project.Project, sp source.Span) protocol.Location {
+	fs := p.Files
+	return protocol.Location{URI: pathToURI(p.Root, fs.Path(sp.File)), Range: s.enc.toRange(fs, sp)}
 }
 
 // vocabulary は要求 hozo/vocabulary（docs/lsp.md「プロジェクト」）: `hozo:` の URI の内容を返す。
@@ -611,11 +653,13 @@ func (s *server) vocabulary(p protocol.VocabularyParams) (protocol.VocabularyRes
 }
 
 // configURI は位置のない診断を付ける hozo.toml の URI（docs/lsp.md「診断」）。
-func (s *server) configURI() string {
-	if s.proj.Config != nil && s.proj.Config.Path != "" {
-		return fileURI(s.proj.Config.Path)
+func (s *server) configURI() string { return configURIOf(s.proj) }
+
+func configURIOf(p *project.Project) string {
+	if p.Config != nil && p.Config.Path != "" {
+		return fileURI(p.Config.Path)
 	}
-	return fileURI(filepath.Join(s.proj.Root, "hozo.toml"))
+	return fileURI(filepath.Join(p.Root, "hozo.toml"))
 }
 
 // String はログ用。

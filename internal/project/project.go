@@ -1,6 +1,7 @@
 package project
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +46,7 @@ type Project struct {
 	Units []Unit
 	// RunErr はプラグインの check が proc.Crashed / proc.MalformedOutput（internal/plugin の ErrCrashed /
 	// ErrMalformedOutput）で終わったときのその誤り。最初の一つで止め、以降のプラグインは呼ばない。なければ nil。
+	// Options.Context で、やめさせたときは、Context の誤り。
 	RunErr error
 }
 
@@ -95,6 +97,10 @@ type Options struct {
 	// NoPluginChecks は、プラグインの check（docs/cli.md「check」の 4）を、起動しない。仕様を読むだけの呼び出し（出力を集める前の
 	// 読み直し。プラグインの誤りは、emit の応答の errors で返る）と、言語サーバー（docs/lsp.md「診断」）が、真にする。
 	NoPluginChecks bool
+	// Context は、プラグインの check を、やめさせる口（言語サーバーの、裏の check。docs/lsp.md「プラグインの診断」）。nil なら、
+	// やめさせない。見るのは、プラグインの起動と起動の間（起動したプラグインは、止めない）。やめたら、そこで止めて、
+	// RunErr が、Context の誤り（診断には、しない）。
+	Context context.Context
 }
 
 // Load は root から hozo.toml を探して（configPath があればそれを読んで）プロジェクトを解析する
@@ -583,6 +589,11 @@ func (p *Project) runPluginChecks(opts Options) ([]diag.Diagnostic, error) {
 				view := views[i][ns]
 				if view == nil {
 					continue
+				}
+				if opts.Context != nil {
+					if err := opts.Context.Err(); err != nil {
+						return diags, err
+					}
 				}
 				called[pl] = true
 				req := sdk.CheckRequest{Protocol: hostplugin.Protocol, Direction: "check", View: view}

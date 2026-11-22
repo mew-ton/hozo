@@ -571,7 +571,8 @@ type Options struct {
     Overlay map[string][]byte        // ディスクの代わりに使う内容（言語サーバーの開いている文書）
     Stderr io.Writer; Env []string   // プラグインの標準エラーの流し先と、プラグインに渡す環境変数の元
     PluginPath, Home string          // プラグインの探索が見るプロジェクトの外の場所（internal/plugin.SearchEnv）。空なら探さない
-    NoPluginChecks bool              // プラグインの check（docs/cli.md「check」の 4）を、起動しない。仕様を読み直すだけの呼び出しと、言語サーバー（docs/lsp.md「診断」）
+    NoPluginChecks bool              // プラグインの check（docs/cli.md「check」の 4）を、起動しない。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
+    Context context.Context          // プラグインの check を、やめさせる口（言語サーバーの、裏の check）。nil なら、やめさせない。プラグインの起動と起動の間で見て、やめたら、Project.RunErr が、その誤り
 }
 func LoadWith(opts Options) *Project                                            // 解析の本体。NoConfig なら CFG-* の診断を除く
 func Load(root string, configPath string, overlay map[string][]byte) *Project   // LoadWith の短い形。プラグインは plugin_dirs だけから探す

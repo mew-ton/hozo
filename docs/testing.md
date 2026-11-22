@@ -46,7 +46,7 @@ hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコー�
 
 ## 言語サーバーと check の一致
 
-各コーパス（`tests/corpus/` の下のすべて。足せば自動で入る）について、`internal/project.LoadWith` を一度呼び（プラグインの探索には、コーパスの `emit` と同じく、リポジトリの `plugins/` を渡す）、`hozoc check` の診断（プラグインの check の分を除く: 言語サーバーは、プラグインの check を起動しない。`docs/lsp.md`「診断」）と `internal/lsp` が `publishDiagnostics` で送る診断（LSP の形から戻したもの）が同じ集合であることを確かめる（`internal/lsp` の `TestCheckAgreement`。位置のエンコーディングは utf-16 と utf-8 の両方）。`LSP-1` だけは言語サーバーにしか出ないので除く。診断のないコーパスでは「どちらも空」を確かめることになるので、設計書のコーパスに warning を一つ足したものでも確かめる。
+各コーパス（`tests/corpus/` の下のすべて。足せば自動で入る）について、`internal/project.LoadWith` を一度呼び（プラグインの探索には、コーパスの `emit` と同じく、リポジトリの `plugins/` を渡す）、`hozoc check` の診断（プラグインの check の分を除く: 言語サーバーは、解析では、プラグインの check を起動せず、後から足す。`docs/lsp.md`「プラグインの診断」。足した後の診断が、プラグインの check の分を含めて、`hozoc check` と同じであることは、同じパッケージの `TestPluginDiagnosticsOnOpen` が、にせもののプラグインで確かめる）と `internal/lsp` が `publishDiagnostics` で送る診断（LSP の形から戻したもの）が同じ集合であることを確かめる（`internal/lsp` の `TestCheckAgreement`。位置のエンコーディングは utf-16 と utf-8 の両方）。`LSP-1` だけは言語サーバーにしか出ないので除く。診断のないコーパスでは「どちらも空」を確かめることになるので、設計書のコーパスに warning を一つ足したものでも確かめる。
 
 ## 生成物の一致
 
@@ -99,7 +99,7 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 - `internal/app` の `tests` の手順（`docs/cli.md`「tests」）: sh で動く小さなプラグインで、すべて走った、走っていないテストの名指し（TESTS-1。測っていないファイルの文面を含む）、置き場の出力がない・違う（TESTS-2）、カバレッジのファイルを開けない・基底のプラグインが `[coverage] enabled` でない・`recognized: false`（TESTS-3）、対応表が一つもない、対応表の形の誤り（PLG-4。`emit` でも）、text と json の表示、終了コード。
 - `internal/tools/selfgen`: コンパイルできない生成物を置き場に置かないこと（`docs/packages.md`「自己生成の手順」）。
 - `plugins/go-cli`: CLI-* の各条件と、引数の解釈の各規則（`docs/plugin-go-cli.md`「引数の解釈」）。
-- `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。
+- `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。プラグインの診断（`docs/lsp.md`「プラグインの診断」。`plugincheck_test.go`。プラグインは、`sh` で動く、にせもので、待たせる・進ませるを、テストが決める）: 開いたときと、保存したときに、裏で走り、終わったら、足されて出ること。解析（`initialized`、`didChange`）では、起動しないこと。走っている間も、ホバーと解析が、待たされないこと。古い答えが、出ないこと。中身が変われば消え、戻れば、起動し直さずに、また出ること。error があれば、起動しないこと。ファイルの監視の知らせで、走ること（同じ中身なら、走らないこと）。異常終了で、LSP-2 が出て、動き続けること。終わるときに、走っている check を、待つこと。ほかのテストのサーバーは、リポジトリの `plugins/` の代役（マニフェストと語彙は同じで、起動するのは、診断を返さない `sh`）を見る。
 
 ## CI
 

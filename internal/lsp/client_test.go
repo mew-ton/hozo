@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -51,8 +53,9 @@ func startServer(t *testing.T, opts Options) *testClient {
 		opts.Log = c.logBuf
 	}
 	if opts.PluginPath == "" {
-		// コーパスの出力単位が指す基盤のトランスパイラ（go）は、リポジトリの plugins/ にある
-		opts.PluginPath = repoPlugins(t)
+		// コーパスの出力単位が指す基盤のトランスパイラ（go）は、リポジトリの plugins/ にある。サーバーは、文書を開いたときと、
+		// 保存したときに、プラグインの check を、裏で起動する（docs/lsp.md「プラグインの診断」）ので、起動するのは、代役にする
+		opts.PluginPath = standInPlugins(t)
 	}
 	go func() {
 		_ = Serve(inR, outW, opts)
@@ -254,6 +257,49 @@ func repoPlugins(t *testing.T) string {
 	dir, err := filepath.Abs(filepath.Join("..", "..", "plugins"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	return dir
+}
+
+// standInPlugins は、リポジトリの plugins/ の代役: マニフェストと語彙は、同じで、起動するのは、診断を返さない sh のスクリプト
+// （本物は、開発中のマニフェストの go run で、go.mod のない一時のプロジェクトでは、異常終了する）。sh がなければ、本物の場所。
+func standInPlugins(t *testing.T) string {
+	t.Helper()
+	repo := repoPlugins(t)
+	if _, err := exec.LookPath("sh"); err != nil {
+		return repo
+	}
+	dir := t.TempDir()
+	script := filepath.Join(dir, "ok.sh")
+	writeFile(t, script, "cat >/dev/null\nprintf '{\"diagnostics\":[]}'\n")
+	entries, err := os.ReadDir(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		files, err := os.ReadDir(filepath.Join(repo, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range files {
+			if f.IsDir() || strings.HasSuffix(f.Name(), ".go") {
+				continue
+			}
+			content := readFile(t, filepath.Join(repo, e.Name(), f.Name()))
+			if f.Name() == "hozo-plugin.toml" {
+				lines := strings.Split(content, "\n")
+				for i, l := range lines {
+					if strings.HasPrefix(l, "command") {
+						lines[i] = "command = [\"sh\", " + strconv.Quote(script) + "]"
+					}
+				}
+				content = strings.Join(lines, "\n")
+			}
+			writeFile(t, filepath.Join(dir, e.Name(), f.Name()), content)
+		}
 	}
 	return dir
 }
