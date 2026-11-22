@@ -1577,16 +1577,21 @@ type CaseError struct { Effect, Param, Classify string; Want []string; Got strin
 type Fake[A, R any] struct { Calls []A; … }    // 値を返すメソッド一つのにせもの
 func (f *Fake[A, R]) Returns(v R)               // これからの呼び出しが、v を返す（本物は、呼ばない）
 func (f *Fake[A, R]) Throws(err error)          // これからの呼び出しが、R の零値と、err を返す（本物は、呼ばない）
+func (f *Fake[A, R]) ReturnsAt(n int, v R)      // n 回目の呼び出しだけが、v を返す
+func (f *Fake[A, R]) ThrowsAt(n int, err error) // n 回目の呼び出しだけが、R の零値と、err を返す
 func (f *Fake[A, R]) Call(args A, impl func() (R, error)) (R, error)
 
 type FakeVoid[A any] struct { Calls []A; … }   // 値を返さないメソッド一つのにせもの
 func (f *FakeVoid[A]) Returns()                 // これからの呼び出しが、何もせずに、正常に終わる（本物は、呼ばない）
 func (f *FakeVoid[A]) Throws(err error)         // これからの呼び出しが、err を返す（本物は、呼ばない）
+func (f *FakeVoid[A]) ReturnsAt(n int)          // n 回目の呼び出しだけが、何もせずに、正常に終わる
+func (f *FakeVoid[A]) ThrowsAt(n int, err error) // n 回目の呼び出しだけが、err を返す
 func (f *FakeVoid[A]) Call(args A, impl func() error) error
 ```
 
 - `Call` は、生成したコードが呼ぶ: `args` を `Calls` に足し（呼ばれた順）、`Returns` か `Throws` が言われていれば、そのとおりに返す。言われていなくて、`impl` が `nil` でなければ、`impl` を呼んで、その結果を返す。`nil` なら、零値を返す（失敗は、ない）。
-- `Returns` と `Throws` は、後に言った方が、効く。どちらも、すべての呼び出しに、同じ結果を返す（呼び出しごとに、違う値を返す道は、ない）。
+- `Returns` と `Throws` は、後に言った方が、効く。どちらも、すべての呼び出しに、同じ結果を返す。
+- **呼び出しごとに、違う結果を返させるには、`ReturnsAt` と `ThrowsAt`**（`Fake` には、`ReturnsAt(n int, v R)` と `ThrowsAt(n int, err error)`。`docs/decisions.md`「決めたこと」424）。`n` は、何回目の呼び出しか（1 から数える）。その回だけ、言われた結果を返し、本物は、呼ばない。ほかの回は、`Returns` か `Throws`、どちらも言われていなければ、本物か、零値（今までどおり）。同じ回に、二度言えば、後に言った方が、効く。同じ流れの端を、二度呼ぶ流れ（`try` の外と中。繰り返しの中）で、「一度目は成功、二度目は失敗」を、言うためのもの。
 - 零値のまま、使える。同時に呼ばれることは、守らない（テストの中で、一つの流れが呼ぶためのもの）。
 
 - 核の型 `date` と `time` の値の型も、ここに置く（「型」）。どちらも、時刻帯を持たず、`==` で比べられ、`encoding/json` では、文字列になる（`MarshalText` / `UnmarshalText`）。
